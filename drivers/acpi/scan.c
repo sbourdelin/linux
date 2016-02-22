@@ -1969,14 +1969,36 @@ static struct acpi_probe_entry *ape;
 static int acpi_probe_count;
 static DEFINE_SPINLOCK(acpi_probe_lock);
 
-static int __init acpi_match_madt(struct acpi_subtable_header *header,
-				  const unsigned long end)
+static int __init acpi_match_and_setup(struct acpi_subtable_header *header,
+				       const unsigned long end)
 {
-	if (!ape->subtable_valid || ape->subtable_valid(header, ape))
-		if (!ape->probe_subtbl(header, end))
+	const struct acpi_probe_subtype_data *data = ape->data;
+
+	if (data->valid(header, data->data))
+		if (!data->setup(header, end))
 			acpi_probe_count++;
 
 	return 0;
+}
+
+int __init acpi_probe_subtype_setup(struct acpi_table_header *table,
+				    const void *data)
+{
+	const struct acpi_probe_subtype_data *data_subtype = data;
+
+	return acpi_parse_entries(ape->id, data_subtype->size,
+				  acpi_match_and_setup, table,
+				  data_subtype->subtype, 0);
+}
+
+static int __init acpi_probe_table_handler(struct acpi_table_header *table)
+{
+	int err = ape->setup(table, ape->data);
+
+	if (ape->setup != acpi_probe_subtype_setup && err >= 0)
+		acpi_probe_count++;
+
+	return err;
 }
 
 int __init __acpi_probe_device_table(struct acpi_probe_entry *ap_head, int nr)
@@ -1988,16 +2010,10 @@ int __init __acpi_probe_device_table(struct acpi_probe_entry *ap_head, int nr)
 
 	spin_lock(&acpi_probe_lock);
 	for (ape = ap_head; nr; ape++, nr--) {
-		if (ACPI_COMPARE_NAME(ACPI_SIG_MADT, ape->id)) {
-			acpi_probe_count = 0;
-			acpi_table_parse_madt(ape->type, acpi_match_madt, 0);
-			count += acpi_probe_count;
-		} else {
-			int res;
-			res = acpi_table_parse(ape->id, ape->probe_table);
-			if (!res)
-				count++;
-		}
+		acpi_probe_count = 0;
+		if (acpi_table_parse(ape->id, acpi_probe_table_handler) < 0)
+			continue;
+		count += acpi_probe_count;
 	}
 	spin_unlock(&acpi_probe_lock);
 

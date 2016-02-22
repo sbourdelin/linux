@@ -826,7 +826,8 @@ static int __init map_generic_timer_interrupt(u32 interrupt, u32 flags)
 }
 
 /* Initialize per-processor generic timer */
-static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+static int __init arch_timer_acpi_init(struct acpi_table_header *table,
+				       const void *data)
 {
 	struct acpi_table_gtdt *gtdt;
 

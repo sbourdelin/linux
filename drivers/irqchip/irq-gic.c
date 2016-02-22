@@ -1287,12 +1287,12 @@ static bool __init acpi_gic_redist_is_present(void)
 }
 
 static bool __init gic_validate_dist(struct acpi_subtable_header *header,
-				     struct acpi_probe_entry *ape)
+				     kernel_ulong_t driver_data)
 {
 	struct acpi_madt_generic_distributor *dist;
 	dist = (struct acpi_madt_generic_distributor *)header;
 
-	return (dist->version == ape->driver_data &&
+	return (dist->version == driver_data &&
 		(dist->version != ACPI_MADT_GIC_VERSION_NONE ||
 		 !acpi_gic_redist_is_present()));
 }

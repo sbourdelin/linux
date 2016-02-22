@@ -879,46 +879,75 @@ int acpi_dev_prop_read(struct acpi_device *adev, const char *propname,
 struct fwnode_handle *acpi_get_next_subnode(struct device *dev,
 					    struct fwnode_handle *subnode);
 
-struct acpi_probe_entry;
 typedef bool (*acpi_probe_entry_validate_subtbl)(struct acpi_subtable_header *,
-						 struct acpi_probe_entry *);
+						 kernel_ulong_t);
+
+typedef int (*acpi_probe_entry_setup)(struct acpi_table_header *, const void *);
 
 #define ACPI_TABLE_ID_LEN	5
 
-/**
- * struct acpi_probe_entry - boot-time probing entry
- * @id:			ACPI table name
- * @type:		Optional subtable type to match
- *			(if @id contains subtables)
- * @subtable_valid:	Optional callback to check the validity of
- *			the subtable
- * @probe_table:	Callback to the driver being probed when table
- *			match is successful
- * @probe_subtbl:	Callback to the driver being probed when table and
- *			subtable match (and optional callback is successful)
- * @driver_data:	Sideband data provided back to the driver
- */
 struct acpi_probe_entry {
 	__u8 id[ACPI_TABLE_ID_LEN];
-	__u8 type;
-	acpi_probe_entry_validate_subtbl subtable_valid;
-	union {
-		acpi_tbl_table_handler probe_table;
-		acpi_tbl_entry_handler probe_subtbl;
-	};
-	kernel_ulong_t driver_data;
+	acpi_probe_entry_setup setup;
+	const void *data;
 };
 
-#define ACPI_DECLARE_PROBE_ENTRY(table, name, table_id, subtable, valid, data, fn)	\
+/**
+ * ACPI_DECLARE_PROBE_ENTRY() - declare boot-time probing entry
+ * @table:		Name of subsystem to match
+ * @name:               Identifier to compose name of table data
+ * @table_id:		ACPI table name
+ * @setup_fn:		Callback to the driver being probed when table
+ *			matches (of type acpi_probe_entry_setup)
+ * @data_ptr:		Sideband data provided back to the driver
+ */
+#define ACPI_DECLARE_PROBE_ENTRY(table, name, table_id, setup_fn, data_ptr) \
 	static const struct acpi_probe_entry __acpi_probe_##name	\
 		__used __section(__##table##_acpi_probe_table)		\
 		 = {							\
 			.id = table_id,					\
-			.type = subtable,				\
-			.subtable_valid = valid,			\
-			.probe_table = (acpi_tbl_table_handler)fn,	\
-			.driver_data = data, 				\
+			.setup = setup_fn,				\
+			.data = data_ptr,				\
 		   }
+
+struct acpi_probe_subtype_data {
+	u8 subtype;
+	unsigned long size;
+	acpi_probe_entry_validate_subtbl valid;
+	acpi_tbl_entry_handler setup;
+	kernel_ulong_t data;
+};
+
+int acpi_probe_subtype_setup(struct acpi_table_header *table, const void *data);
+
+/**
+ * ACPI_DECLARE_PROBE_SUBTYPE_ENTRY() - declare boot-time probing entry that
+ *				      matches subtables
+ * @table:		Name of subsystem to match
+ * @name:               Identifier to compose name of table data
+ * @table_id:		ACPI table name
+ * @table_size:		Size of the table (without subtables) of type table_id
+ * @subtable:		Subtable type to match
+ * @valid_fn:		Callback to check the validity of the subtable
+ *			(of type acpi_probe_entry_validate_subtbl)
+ * @data_int:		Sideband data provided back to the driver
+ *			(of type kernel_ulong_t)
+ * @setup_fn:		Callback to the driver being probed when table and
+ *			subtable match and valid_fn callback is successful
+ *			(of type acpi_tbl_entry_handler)
+ */
+#define ACPI_DECLARE_PROBE_SUBTYPE_ENTRY(table, name, table_id, table_size, \
+				subtable, valid_fn, data_int, setup_fn)     \
+	static const struct acpi_probe_subtype_data			    \
+	__acpi_probe_subtype_##name __used = {				    \
+			.subtype = subtable,				    \
+			.size = table_size,				    \
+			.valid = valid_fn,				    \
+			.setup = setup_fn,				    \
+			.data = data_int,				    \
+		   };							    \
+	ACPI_DECLARE_PROBE_ENTRY(table, name, table_id,			    \
+		acpi_probe_subtype_setup, &__acpi_probe_subtype_##name)
 
 #define ACPI_PROBE_TABLE(name)		__##name##_acpi_probe_table
 #define ACPI_PROBE_TABLE_END(name)	__##name##_acpi_probe_table_end
@@ -992,14 +1021,23 @@ static inline struct fwnode_handle *acpi_get_next_subnode(struct device *dev,
 	return NULL;
 }
 
-#define ACPI_DECLARE_PROBE_ENTRY(table, name, table_id, subtable, validate, data, fn) \
+#define ACPI_DECLARE_PROBE_ENTRY(table, name, table_id, match, data)	\
 	static const void * __acpi_table_##name[]			\
 		__attribute__((unused))					\
-		 = { (void *) table_id,					\
-		     (void *) subtable,					\
-		     (void *) valid,					\
-		     (void *) fn,					\
-		     (void *) data }
+		 = { (void *)table_id,					\
+		     (void *)match,					\
+		     (void *)data }
+
+#define ACPI_DECLARE_PROBE_SUBTYPE_ENTRY(table, name, table_id, table_size, \
+				subtable, valid_fn, data_int, setup_fn)	    \
+	static const void *__acpi_table_##name[]			\
+		__attribute__((unused))					\
+		 = { (void *)table_id,					\
+		     (void *)table_size,				\
+		     (void *)subtable,					\
+		     (void *)valid_fn,					\
+		     (void *)data_int,					\
+		     (void *)setup_fn }
 
 #define acpi_probe_device_table(t)	({ int __r = 0; __r;})
 #endif
