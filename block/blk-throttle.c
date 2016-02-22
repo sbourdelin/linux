@@ -281,6 +281,8 @@ static inline uint64_t queue_bandwidth(struct throtl_data *td)
 	/* can't estimate bandwidth, can't do proporation control */
 	if (bw == 0)
 		bw = -1;
+	else
+		bw += bw >> 3;
 	return bw;
 }
 
@@ -292,6 +294,8 @@ static inline uint64_t queue_iops(struct throtl_data *td)
 	/* can't estimate iops, can't do proporation control */
 	if (iops == 0)
 		iops = -1;
+	else
+		iops += iops >> 3;
 	return iops;
 }
 
