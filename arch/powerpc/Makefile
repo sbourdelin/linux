@@ -355,6 +355,13 @@ TOUT	:= .tmp_gas_check
 # - Require gcc 4.0 or above on 64-bit
 # - gcc-4.2.0 has issues compiling modules on 64-bit
 checkbin:
+	@if test "$(call try-run,echo 'int _start(void) { return 0; }' > \"$$TMP\"; \
+	$(CC) $(KBUILD_CPPFLAGS) $(KBUILD_CFLAGS) -x c -nostdlib \"$$TMP\" \
+	-o /dev/null,ok,broken)" = "broken" ; then \
+		echo "*** Sorry, your toolchain seems to be broken or incorrect. ***" ; \
+		echo "Make sure it supports your kernel configuration ($(UTS_MACHINE))." ; \
+		false; \
+	fi
 	@if test "$(cc-name)" != "clang" \
 	    && test "$(cc-version)" = "0304" ; then \
 		if ! /bin/echo mftb 5 | $(AS) -v -mppc -many -o $(TOUT) >/dev/null 2>&1 ; then \
