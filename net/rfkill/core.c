@@ -89,6 +89,7 @@ struct rfkill_data {
 	struct mutex		mtx;
 	wait_queue_head_t	read_wait;
 	bool			input_handler;
+	bool			is_apm_owner;
 };
 
 
@@ -123,7 +124,7 @@ static struct {
 } rfkill_global_states[NUM_RFKILL_TYPES];
 
 static bool rfkill_epo_lock_active;
-
+static bool rfkill_apm_owned;
 
 #ifdef CONFIG_RFKILL_LEDS
 static struct led_trigger rfkill_apm_led_trigger;
@@ -350,7 +351,8 @@ static void rfkill_update_global_state(enum rfkill_type type, bool blocked)
 
 	for (i = 0; i < NUM_RFKILL_TYPES; i++)
 		rfkill_global_states[i].cur = blocked;
-	rfkill_apm_led_trigger_event(blocked);
+	if (!rfkill_apm_owned)
+		rfkill_apm_led_trigger_event(blocked);
 }
 
 #ifdef CONFIG_RFKILL_INPUT
@@ -1172,9 +1174,23 @@ static ssize_t rfkill_fop_read(struct file *file, char __user *buf,
 	return ret;
 }
 
+static int rfkill_airplane_mode_release(struct rfkill_data *data)
+{
+	bool state = rfkill_global_states[RFKILL_TYPE_ALL].cur;
+
+	if (rfkill_apm_owned && data->is_apm_owner) {
+		rfkill_apm_owned = false;
+		data->is_apm_owner = false;
+		rfkill_apm_led_trigger_event(state);
+		return 0;
+	}
+	return -EACCES;
+}
+
 static ssize_t rfkill_fop_write(struct file *file, const char __user *buf,
 				size_t count, loff_t *pos)
 {
+	struct rfkill_data *data = file->private_data;
 	struct rfkill *rfkill;
 	struct rfkill_event ev;
 	int ret = 0;
@@ -1210,6 +1226,20 @@ static ssize_t rfkill_fop_write(struct file *file, const char __user *buf,
 			if (rfkill->idx == ev.idx && rfkill->type == ev.type)
 				rfkill_set_block(rfkill, ev.soft);
 		break;
+	case RFKILL_OP_AIRPLANE_MODE_INDICATOR_ACQUIRE:
+		if (rfkill_apm_owned && !data->is_apm_owner) {
+			ret = -EACCES;
+		} else {
+			rfkill_apm_owned = true;
+			data->is_apm_owner = true;
+		}
+		break;
+	case RFKILL_OP_AIRPLANE_MODE_INDICATOR_CHANGE:
+		if (rfkill_apm_owned && data->is_apm_owner)
+			rfkill_apm_led_trigger_event(ev.soft);
+		else
+			ret = -EACCES;
+		break;
 	default:
 		ret = -EINVAL;
 		break;
@@ -1226,6 +1256,7 @@ static int rfkill_fop_release(struct inode *inode, struct file *file)
 	struct rfkill_int_event *ev, *tmp;
 
 	mutex_lock(&rfkill_global_mutex);
+	rfkill_airplane_mode_release(data);
 	list_del(&data->list);
 	mutex_unlock(&rfkill_global_mutex);
 
