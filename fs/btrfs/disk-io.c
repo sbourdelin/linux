@@ -4383,7 +4383,7 @@ void btrfs_cleanup_one_transaction(struct btrfs_transaction *cur_trans,
 	btrfs_destroy_pinned_extent(root,
 				    root->fs_info->pinned_extents);
 
-	cur_trans->state =TRANS_STATE_COMPLETED;
+	cur_trans->state = TRANS_STATE_COMPLETED;
 	wake_up(&cur_trans->commit_wait);
 
 	/*
