@@ -449,6 +449,7 @@ static inline void local_r4k___flush_cache_all(void * args)
 
 	default:
 		r4k_blast_dcache();
+		mb(); /* cache instructions may be reordered */
 		r4k_blast_icache();
 		break;
 	}
@@ -493,8 +494,10 @@ static inline void local_r4k_flush_cache_range(void * args)
 		return;
 
 	r4k_blast_dcache();
-	if (exec)
+	if (exec) {
+		mb(); /* cache instructions may be reordered */
 		r4k_blast_icache();
+	}
 }
 
 static void r4k_flush_cache_range(struct vm_area_struct *vma,
@@ -599,8 +602,13 @@ static inline void local_r4k_flush_cache_page(void *args)
 	if (cpu_has_dc_aliases || (exec && !cpu_has_ic_fills_f_dc)) {
 		vaddr ? r4k_blast_dcache_page(addr) :
 			r4k_blast_dcache_user_page(addr);
-		if (exec && !cpu_icache_snoops_remote_store)
+		if (exec)
+			mb(); /* cache instructions may be reordered */
+
+		if (exec && !cpu_icache_snoops_remote_store) {
 			r4k_blast_scache_page(addr);
+			mb(); /* cache instructions may be reordered */
+		}
 	}
 	if (exec) {
 		if (vaddr && cpu_has_vtag_icache && mm == current->active_mm) {
@@ -660,6 +668,7 @@ static inline void local_r4k_flush_icache_range(unsigned long start, unsigned lo
 			R4600_HIT_CACHEOP_WAR_IMPL;
 			protected_blast_dcache_range(start, end);
 		}
+		mb(); /* cache instructions may be reordered */
 	}
 
 	if (end - start > icache_size)
@@ -798,6 +807,8 @@ static void local_r4k_flush_cache_sigtramp(void * arg)
 		protected_writeback_dcache_line(addr & ~(dc_lsize - 1));
 	if (!cpu_icache_snoops_remote_store && scache_size)
 		protected_writeback_scache_line(addr & ~(sc_lsize - 1));
+	if ((dc_lsize || scache_size) && ic_lsize)
+		mb(); /* cache instructions may be reordered */
 	if (ic_lsize)
 		protected_flush_icache_line(addr & ~(ic_lsize - 1));
 	if (MIPS4K_ICACHE_REFILL_WAR) {
