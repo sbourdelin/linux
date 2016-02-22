@@ -601,29 +601,21 @@ static struct nvmem_cell *nvmem_cell_get_from_list(const char *cell_id)
 
 #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
 /**
- * of_nvmem_cell_get() - Get a nvmem cell from given device node and cell id
+ * of_nvmem_cell_from_device_node() - Get a nvmem cell from device node representation
  *
- * @dev node: Device tree node that uses the nvmem cell
- * @id: nvmem cell name from nvmem-cell-names property.
+ * @np node: Device tree node representing NVMEM cell
  *
  * Return: Will be an ERR_PTR() on error or a valid pointer
  * to a struct nvmem_cell.  The nvmem_cell will be freed by the
  * nvmem_cell_put().
  */
-struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
-					    const char *name)
+struct nvmem_cell *of_nvmem_cell_from_device_node(struct device_node *cell_np)
 {
-	struct device_node *cell_np, *nvmem_np;
+	struct device_node *nvmem_np;
 	struct nvmem_cell *cell;
 	struct nvmem_device *nvmem;
 	const __be32 *addr;
-	int rval, len, index;
-
-	index = of_property_match_string(np, "nvmem-cell-names", name);
-
-	cell_np = of_parse_phandle(np, "nvmem-cells", index);
-	if (!cell_np)
-		return ERR_PTR(-EINVAL);
+	int rval, len;
 
 	nvmem_np = of_get_next_parent(cell_np);
 	if (!nvmem_np)
@@ -681,6 +673,32 @@ err_mem:
 	__nvmem_device_put(nvmem);
 
 	return ERR_PTR(rval);
+}
+EXPORT_SYMBOL_GPL(of_nvmem_cell_from_device_node);
+
+/**
+ * of_nvmem_cell_get() - Get a nvmem cell from given device node referencing it and cell id
+ *
+ * @dev node: Device tree node that uses the nvmem cell
+ * @id: nvmem cell name from nvmem-cell-names property.
+ *
+ * Return: Will be an ERR_PTR() on error or a valid pointer
+ * to a struct nvmem_cell.  The nvmem_cell will be freed by the
+ * nvmem_cell_put().
+ */
+struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+					    const char *name)
+{
+	struct device_node *cell_np;
+	int index;
+
+	index = of_property_match_string(np, "nvmem-cell-names", name);
+
+	cell_np = of_parse_phandle(np, "nvmem-cells", index);
+	if (!cell_np)
+		return ERR_PTR(-EINVAL);
+
+	return of_nvmem_cell_from_device_node(cell_np);
 }
 EXPORT_SYMBOL_GPL(of_nvmem_cell_get);
 #endif
