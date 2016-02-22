@@ -1884,11 +1884,11 @@ static int transaction_kthread(void *arg)
 				cannot_commit = true;
 			goto sleep;
 		}
-		if (transid == trans->transid) {
+		if (transid == trans->transid)
 			btrfs_commit_transaction(trans, root);
-		} else {
+		else
 			btrfs_end_transaction(trans, root);
-		}
+
 sleep:
 		wake_up_process(root->fs_info->cleaner_kthread);
 		mutex_unlock(&root->fs_info->transaction_kthread_mutex);
@@ -1954,11 +1954,11 @@ static void find_oldest_super_backup(struct btrfs_fs_info *info,
 
 	newest_index = find_newest_super_backup(info, newest_gen);
 	/* if there was garbage in there, just move along */
-	if (newest_index == -1) {
+	if (newest_index == -1)
 		info->backup_root_index = 0;
-	} else {
+	else
 		info->backup_root_index = (newest_index + 1) % BTRFS_NUM_BACKUP_ROOTS;
-	}
+
 }
 
 /*
