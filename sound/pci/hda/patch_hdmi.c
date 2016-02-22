@@ -102,7 +102,6 @@ struct hdmi_spec_per_pin {
 #endif
 };
 
-struct cea_channel_speaker_allocation;
 /* operations used by generic code that can be overridden by patches */
 struct hdmi_ops {
 	int (*pin_get_eld)(struct hda_codec *codec, hda_nid_t pin_nid,
@@ -255,15 +254,6 @@ static int eld_speaker_allocation_bits[] = {
 	[8] = FLH | FRH,
 	[9] = TC,
 	[10] = FCH,
-};
-
-struct cea_channel_speaker_allocation {
-	int ca_index;
-	int speakers[8];
-
-	/* derived values, just for convenience */
-	int channels;
-	int spk_mask;
 };
 
 /*
