@@ -20,24 +20,6 @@
 
 struct dl_bandwidth def_dl_bandwidth;
 
-static inline struct task_struct *dl_task_of(struct sched_dl_entity *dl_se)
-{
-	return container_of(dl_se, struct task_struct, dl);
-}
-
-static inline struct rq *rq_of_dl_rq(struct dl_rq *dl_rq)
-{
-	return container_of(dl_rq, struct rq, dl);
-}
-
-static inline struct dl_rq *dl_rq_of_se(struct sched_dl_entity *dl_se)
-{
-	struct task_struct *p = dl_task_of(dl_se);
-	struct rq *rq = task_rq(p);
-
-	return &rq->dl;
-}
-
 static inline int on_dl_rq(struct sched_dl_entity *dl_se)
 {
 	return !RB_EMPTY_NODE(&dl_se->rb_node);
