@@ -2235,6 +2235,11 @@ i915_gem_object_put_pages(struct drm_i915_gem_object *obj)
 	ops->put_pages(obj);
 	obj->pages = NULL;
 
+	if (obj->vmapping) {
+		vunmap(obj->vmapping);
+		obj->vmapping = NULL;
+	}
+
 	i915_gem_object_invalidate(obj);
 
 	return 0;
@@ -2445,6 +2450,40 @@ void *i915_gem_object_vmap_range(struct drm_i915_gem_object *obj,
 	drm_free_large(pages);
 
 	return addr;
+}
+
+/**
+ * i915_gem_object_pin_vmap - pin a GEM object and map it into kernel space
+ * @obj: the GEM object to be mapped
+ *
+ * Conbines the functions of get_pages(), pin_pages() and vmap_range() on
+ * the whole object.  The caller should release the mappoing by calling
+ * i915_gem_object_unpin_vmap() when the object is no longer required.
+ * function.
+ *
+ * Returns an ERR_PTR on failure.
+ */
+void *i915_gem_object_pin_vmap(struct drm_i915_gem_object *obj)
+{
+	int ret;
+
+	ret = i915_gem_object_get_pages(obj);
+	if (ret)
+		return ERR_PTR(ret);
+
+	i915_gem_object_pin_pages(obj);
+
+	if (obj->vmapping == NULL) {
+		obj->vmapping = i915_gem_object_vmap_range(obj, 0,
+					obj->base.size >> PAGE_SHIFT);
+
+		if (obj->vmapping == NULL) {
+			i915_gem_object_unpin_pages(obj);
+			return ERR_PTR(-ENOMEM);
+		}
+	}
+
+	return obj->vmapping;
 }
 
 void i915_vma_move_to_active(struct i915_vma *vma,

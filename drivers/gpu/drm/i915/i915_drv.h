@@ -2168,10 +2168,7 @@ struct drm_i915_gem_object {
 		struct scatterlist *sg;
 		int last;
 	} get_page;
-
-	/* prime dma-buf support */
-	void *dma_buf_vmapping;
-	int vmapping_count;
+	void *vmapping;
 
 	/** Breadcrumb of last rendering to the buffer.
 	 * There can only be one writer, but we allow for multiple readers.
@@ -2977,6 +2974,12 @@ static inline void i915_gem_object_unpin_pages(struct drm_i915_gem_object *obj)
 {
 	BUG_ON(obj->pages_pin_count == 0);
 	obj->pages_pin_count--;
+}
+
+void *__must_check i915_gem_object_pin_vmap(struct drm_i915_gem_object *obj);
+static inline void i915_gem_object_unpin_vmap(struct drm_i915_gem_object *obj)
+{
+	i915_gem_object_unpin_pages(obj);
 }
 
 void *__must_check i915_gem_object_vmap_range(struct drm_i915_gem_object *obj,

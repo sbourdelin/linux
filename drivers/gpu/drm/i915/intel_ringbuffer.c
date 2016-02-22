@@ -2056,7 +2056,7 @@ static int init_phys_status_page(struct intel_engine_cs *ring)
 void intel_unpin_ringbuffer_obj(struct intel_ringbuffer *ringbuf)
 {
 	if (HAS_LLC(ringbuf->obj->base.dev) && !ringbuf->obj->stolen)
-		vunmap(ringbuf->virtual_start);
+		i915_gem_object_unpin_vmap(ringbuf->obj);
 	else
 		iounmap(ringbuf->virtual_start);
 	ringbuf->virtual_start = NULL;
@@ -2077,16 +2077,14 @@ int intel_pin_and_map_ringbuffer_obj(struct drm_device *dev,
 			return ret;
 
 		ret = i915_gem_object_set_to_cpu_domain(obj, true);
-		if (ret) {
-			i915_gem_object_ggtt_unpin(obj);
-			return ret;
-		}
+		if (ret)
+			goto unpin;
 
-		ringbuf->virtual_start = i915_gem_object_vmap_range(obj, 0,
-						ringbuf->size >> PAGE_SHIFT);
-		if (ringbuf->virtual_start == NULL) {
-			i915_gem_object_ggtt_unpin(obj);
-			return -ENOMEM;
+		ringbuf->virtual_start = i915_gem_object_pin_vmap(obj);
+		if (IS_ERR(ringbuf->virtual_start)) {
+			ret = PTR_ERR(ringbuf->virtual_start);
+			ringbuf->virtual_start = NULL;
+			goto unpin;
 		}
 	} else {
 		ret = i915_gem_obj_ggtt_pin(obj, PAGE_SIZE, PIN_MAPPABLE);
@@ -2094,10 +2092,8 @@ int intel_pin_and_map_ringbuffer_obj(struct drm_device *dev,
 			return ret;
 
 		ret = i915_gem_object_set_to_gtt_domain(obj, true);
-		if (ret) {
-			i915_gem_object_ggtt_unpin(obj);
-			return ret;
-		}
+		if (ret)
+			goto unpin;
 
 		/* Access through the GTT requires the device to be awake. */
 		assert_rpm_wakelock_held(dev_priv);
@@ -2105,14 +2101,18 @@ int intel_pin_and_map_ringbuffer_obj(struct drm_device *dev,
 		ringbuf->virtual_start = ioremap_wc(dev_priv->gtt.mappable_base +
 						    i915_gem_obj_ggtt_offset(obj), ringbuf->size);
 		if (ringbuf->virtual_start == NULL) {
-			i915_gem_object_ggtt_unpin(obj);
-			return -EINVAL;
+			ret = -ENOMEM;
+			goto unpin;
 		}
 	}
 
 	ringbuf->vma = i915_gem_obj_to_ggtt(obj);
 
 	return 0;
+
+unpin:
+	i915_gem_object_ggtt_unpin(obj);
+	return ret;
 }
 
 static void intel_destroy_ringbuffer_obj(struct intel_ringbuffer *ringbuf)
