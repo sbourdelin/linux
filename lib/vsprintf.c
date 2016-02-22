@@ -2639,6 +2639,45 @@ int vsscanf(const char *buf, const char *fmt, va_list args)
 			num++;
 		}
 		continue;
+		case '[':
+		{
+			char *s = (char *)va_arg(args, char *);
+			char *set;
+			size_t (*op)(const char *str, const char *set);
+			size_t len = 0;
+			bool negate = (*(fmt) == '^');
+
+			if (field_width == -1)
+				field_width = SHRT_MAX;
+
+			op = negate ? &strcspn : &strspn;
+			if (negate)
+				fmt++;
+
+			len = strcspn(fmt, "]");
+			/* invalid format; stop here */
+			if (!len)
+				return num;
+
+			set = kstrndup(fmt, len, GFP_KERNEL);
+			if (!set)
+				return num;
+
+			/* advance fmt past ']' */
+			fmt += len + 1;
+
+			len = (*op)(str, set);
+			/* no matches */
+			if (!len)
+				return num;
+
+			while (*str && len-- && field_width--)
+				*s++ = *str++;
+			*s = '\0';
+			kfree(set);
+			num++;
+		}
+		continue;
 		case 'o':
 			base = 8;
 			break;
