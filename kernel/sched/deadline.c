@@ -17,6 +17,7 @@
 #include "sched.h"
 
 #include <linux/slab.h>
+#include <trace/events/sched.h>
 
 struct dl_bandwidth def_dl_bandwidth;
 
@@ -344,6 +345,7 @@ static inline void setup_new_dl_entity(struct sched_dl_entity *dl_se,
 	dl_se->deadline = rq_clock(rq) + pi_se->dl_deadline;
 	dl_se->runtime = pi_se->dl_runtime;
 	dl_se->dl_new = 0;
+	trace_sched_deadline_replenish(dl_se);
 }
 
 /*
@@ -406,6 +408,8 @@ static void replenish_dl_entity(struct sched_dl_entity *dl_se,
 		dl_se->deadline = rq_clock(rq) + pi_se->dl_deadline;
 		dl_se->runtime = pi_se->dl_runtime;
 	}
+
+	trace_sched_deadline_replenish(dl_se);
 
 	if (dl_se->dl_yielded)
 		dl_se->dl_yielded = 0;
@@ -495,6 +499,7 @@ static void update_dl_entity(struct sched_dl_entity *dl_se,
 	    dl_entity_overflow(dl_se, pi_se, rq_clock(rq))) {
 		dl_se->deadline = rq_clock(rq) + pi_se->dl_deadline;
 		dl_se->runtime = pi_se->dl_runtime;
+		trace_sched_deadline_replenish(dl_se);
 	}
 }
 
@@ -734,6 +739,7 @@ static void update_curr_dl(struct rq *rq)
 	dl_se->runtime -= dl_se->dl_yielded ? 0 : delta_exec;
 	if (dl_runtime_exceeded(dl_se)) {
 		dl_se->dl_throttled = 1;
+		trace_sched_deadline_throttle(dl_se);
 		__dequeue_task_dl(rq, curr, 0);
 		if (unlikely(dl_se->dl_boosted || !start_dl_timer(curr)))
 			enqueue_task_dl(rq, curr, ENQUEUE_REPLENISH);
@@ -910,6 +916,7 @@ enqueue_dl_entity(struct sched_dl_entity *dl_se,
 static void dequeue_dl_entity(struct sched_dl_entity *dl_se)
 {
 	__dequeue_dl_entity(dl_se);
+	trace_sched_deadline_block(dl_se);
 }
 
 static void enqueue_task_dl(struct rq *rq, struct task_struct *p, int flags)
@@ -978,6 +985,7 @@ static void yield_task_dl(struct rq *rq)
 {
 	struct task_struct *p = rq->curr;
 
+	update_rq_clock(rq);
 	/*
 	 * We make the task go to sleep until its current deadline by
 	 * forcing its runtime to zero. This way, update_curr_dl() stops
@@ -986,9 +994,15 @@ static void yield_task_dl(struct rq *rq)
 	 */
 	if (p->dl.runtime > 0) {
 		rq->curr->dl.dl_yielded = 1;
+		if (trace_sched_deadline_yield_enabled()) {
+			u64 delta_exec = rq_clock_task(rq) - p->se.exec_start;
+			/* Subtract the last run till now */
+			if (likely((s64)delta_exec > 0))
+				p->dl.runtime -= delta_exec;
+			trace_sched_deadline_yield(&p->dl);
+		}
 		p->dl.runtime = 0;
 	}
-	update_rq_clock(rq);
 	update_curr_dl(rq);
 	/*
 	 * Tell update_rq_clock() that we've just updated,
