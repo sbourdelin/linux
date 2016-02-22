@@ -411,6 +411,16 @@ static inline void blkg_put(struct blkcg_gq *blkg)
 	css_for_each_descendant_post((pos_css), &(p_blkg)->blkcg->css)	\
 		if (((d_blkg) = __blkg_lookup(css_to_blkcg(pos_css),	\
 					      (p_blkg)->q, false)))
+/**
+ * blkg_for_each_child - walk all children of a blkg
+ * @d_blkg: loop cursor pointing to the current child
+ * @pos_css: used for iteration
+ * @p_blkg: target blkg to walk children of
+ */
+#define blkg_for_each_child(d_blkg, pos_css, p_blkg)			\
+	css_for_each_child((pos_css), &(p_blkg)->blkcg->css)		\
+		if (((d_blkg) = __blkg_lookup(css_to_blkcg(pos_css),	\
+					      (p_blkg)->q, false)))
 
 /**
  * blk_get_rl - get request_list to use

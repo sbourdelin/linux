@@ -18,7 +18,11 @@
 #define DFT_WEIGHT (100)
 #define SHARE_SHIFT (14)
 #define MAX_SHARE (1 << SHARE_SHIFT)
-/* must be less than the interval we update bandwidth */
+/*
+ * must be less than the interval we update bandwidth
+ * must be multiple of throtl_slice, otherwise we don't calculate cgroup
+ * bandwidth correctly
+ */
 #define CGCHECK_TIME (msecs_to_jiffies(100))
 
 /* Max dispatch from a group in 1 round */
@@ -89,8 +93,6 @@ struct throtl_service_queue {
 	unsigned int		new_weight; /* weight changed to */
 	unsigned int		children_weight; /* children weight */
 	unsigned int		share; /* disk bandwidth share of the queue */
-
-	unsigned long active_timestamp;
 };
 
 enum tg_state_flags {
@@ -111,6 +113,15 @@ struct throtl_io_cost {
 	uint64_t bytes_disp[2];
 	/* Number of bio's dispatched in current slice */
 	unsigned int io_disp[2];
+
+	uint64_t bytes_disp_active;
+	unsigned int io_disp_active;
+	uint64_t act_bps;
+	unsigned int act_iops;
+	bool check_weight;
+
+	uint64_t target_bps;
+	unsigned int target_iops;
 };
 
 /* per cgroup per device data */
@@ -1005,6 +1016,9 @@ static inline void io_cost_charge_bio(struct throtl_grp *tg, struct bio *bio)
 	/* Charge the bio to the group */
 	tg->io_cost.bytes_disp[index] += bio->bi_iter.bi_size;
 	tg->io_cost.io_disp[index]++;
+
+	tg->io_cost.bytes_disp_active += bio->bi_iter.bi_size;
+	tg->io_cost.io_disp_active++;
 }
 
 static void throtl_charge_bio(struct throtl_grp *tg, struct bio *bio)
@@ -1161,14 +1175,12 @@ static void tg_update_share(struct throtl_data *td, struct throtl_grp *tg)
 	}
 }
 
-static void tg_update_active_time(struct throtl_grp *tg)
+static void tg_init_acting_weight(struct throtl_grp *tg)
 {
 	struct throtl_service_queue *sq = &tg->service_queue;
-	unsigned long now = jiffies;
 
 	tg = NULL;
 	while (sq->parent_sq) {
-		sq->active_timestamp = now;
 		if (!sq->acting_weight) {
 			sq->acting_weight = sq->weight;
 			sq->parent_sq->children_weight += sq->acting_weight;
@@ -1183,6 +1195,173 @@ static void tg_update_active_time(struct throtl_grp *tg)
 		tg_update_share(tg->td, tg);
 }
 
+static void precheck_tg_activity(struct throtl_grp *tg, unsigned long elapsed_time,
+	bool *has_overrun)
+{
+	struct throtl_service_queue *sq = &tg->service_queue;
+	struct throtl_service_queue *psq = sq->parent_sq;
+
+	if (!psq)
+		return;
+
+	/* don't check if the queue has no IO for a long time */
+	if (elapsed_time > 4 * CGCHECK_TIME)
+		return;
+
+	if (tg->td->mode == MODE_WEIGHT_BANDWIDTH) {
+		if (tg->io_cost.bps[0] == -1)
+			return;
+
+		tg->io_cost.act_bps = tg->io_cost.bytes_disp_active * HZ;
+		do_div(tg->io_cost.act_bps, elapsed_time);
+
+		/* the cgroup dispatches significantly more IO */
+		if (tg->io_cost.act_bps > tg->io_cost.bps[0] +
+				(tg->io_cost.bps[0] >> 2)) {
+			*has_overrun = true;
+			throtl_log(sq, "excessive bps. Actual %lld, expected %lld",
+				(unsigned long long)tg->io_cost.act_bps,
+				(unsigned long long)tg->io_cost.bps[0]);
+		}
+		return;
+	}
+
+	if (tg->io_cost.iops[0] == -1)
+		return;
+
+	tg->io_cost.act_iops = tg->io_cost.io_disp_active * HZ / elapsed_time;
+	/* the cgroup dispatches significantly more IO */
+	if (tg->io_cost.act_iops > tg->io_cost.iops[0] +
+	    (tg->io_cost.iops[0] >> 2)) {
+		*has_overrun = true;
+		throtl_log(sq, "excessive iops. Actual %u, expected %u",
+			tg->io_cost.act_iops, tg->io_cost.iops[0]);
+	}
+}
+
+static bool detect_one_inactive_cg(struct throtl_grp *tg, unsigned long elapsed_time)
+{
+	struct throtl_service_queue *sq = &tg->service_queue;
+	struct throtl_service_queue *psq = tg->service_queue.parent_sq;
+	struct throtl_grp *ptg = sq_to_tg(psq);
+	struct throtl_grp *child;
+	struct blkcg_gq *blkg;
+	struct cgroup_subsys_state *pos_css;
+	uint64_t adjusted_bps = 0;
+	unsigned int adjusted_iops = 0;
+	unsigned int adjusted_weight = 0;
+	unsigned int none_scaled_weight = 0;
+	unsigned int new_children_weight;
+	uint64_t parent_bps;
+	unsigned int parent_iops;
+	uint64_t tmp_bps = 0;
+	unsigned int tmp_iops;
+	bool bandwidth_mode = tg->td->mode == MODE_WEIGHT_BANDWIDTH;
+
+	tg->io_cost.check_weight = false;
+
+	if (!psq)
+		return false;
+
+	/* don't check if the queue has no IO for a long time */
+	if (elapsed_time > 4 * CGCHECK_TIME ||
+	    sq->acting_weight == psq->children_weight)
+		return false;
+
+	blkg_for_each_child(blkg, pos_css, tg_to_blkg(ptg)) {
+		child = blkg_to_tg(blkg);
+		sq = &child->service_queue;
+		child->io_cost.check_weight = false;
+		child->io_cost.target_bps = 0;
+		child->io_cost.target_iops = 0;
+		if (sq->acting_weight == sq->weight)
+			none_scaled_weight += sq->acting_weight;
+
+		if (bandwidth_mode) {
+			if (child->io_cost.bps[0] == -1)
+				continue;
+			if (child->io_cost.act_bps +
+			    (child->io_cost.act_bps >> 3) >= child->io_cost.bps[0])
+				continue;
+
+			tmp_bps = child->io_cost.bps[0] - child->io_cost.act_bps -
+				(child->io_cost.act_bps >> 3);
+			/* this cg's target bps will drop tmp_bps/2 */
+			adjusted_bps = tmp_bps >> 2;
+			child->io_cost.target_bps = child->io_cost.bps[0] -
+				adjusted_bps;
+		} else {
+			if (child->io_cost.iops[0] == -1)
+				continue;
+			if (child->io_cost.act_iops +
+			    (child->io_cost.act_iops >> 3) >= child->io_cost.iops[0])
+				continue;
+
+			tmp_iops = child->io_cost.iops[0] - child->io_cost.act_iops -
+				(child->io_cost.act_iops >> 3);
+			/* this cg's target iops will drop tmp_iops/2 */
+			adjusted_iops = tmp_iops >> 2;
+			child->io_cost.target_iops = child->io_cost.iops[0] -
+				adjusted_iops;
+		}
+
+		adjusted_weight += sq->acting_weight;
+		if (sq->acting_weight == sq->weight)
+			none_scaled_weight -= sq->acting_weight;
+	}
+
+	/* don't shrink if none or all cgroups will be shrinked */
+	if ((adjusted_bps == 0 && adjusted_iops == 0) || none_scaled_weight == 0)
+		return false;
+
+	if (bandwidth_mode) {
+		uint64_t base;
+
+		parent_bps = (psq->share * queue_bandwidth(tg->td)) >>
+			SHARE_SHIFT;
+
+		tmp_bps = adjusted_bps * psq->children_weight;
+		base = adjusted_weight * parent_bps;
+		do_div(base, psq->children_weight);
+		base = parent_bps + adjusted_bps - base;
+		tmp_bps = div64_u64(tmp_bps, base);
+
+		new_children_weight = psq->children_weight - tmp_bps;
+	} else {
+		parent_iops = (psq->share * queue_iops(tg->td)) >>
+			SHARE_SHIFT;
+		tmp_iops = adjusted_iops * psq->children_weight /
+			(parent_iops + adjusted_iops -
+			 adjusted_weight * parent_iops / psq->children_weight);
+
+		new_children_weight = psq->children_weight - tmp_iops;
+	}
+
+	blkg_for_each_child(blkg, pos_css, tg_to_blkg(ptg)) {
+		unsigned int new_weight;
+
+		child = blkg_to_tg(blkg);
+		sq = &child->service_queue;
+		if (!child->io_cost.target_bps && !child->io_cost.target_iops)
+			continue;
+
+		if (bandwidth_mode) {
+			tmp_bps = child->io_cost.target_bps * new_children_weight;
+			tmp_bps = div64_u64(tmp_bps, parent_bps);
+			new_weight = tmp_bps;
+			child->io_cost.target_bps = 0;
+		} else {
+			new_weight = child->io_cost.target_iops *
+				new_children_weight / parent_iops;
+			child->io_cost.target_iops = 0;
+		}
+		psq->children_weight -= sq->acting_weight - new_weight;
+		sq->acting_weight = new_weight;
+	}
+
+	return true;
+}
+
 static void detect_inactive_cg(struct throtl_grp *tg)
 {
 	struct throtl_data *td = tg->td;
@@ -1191,11 +1370,15 @@ static void detect_inactive_cg(struct throtl_grp *tg)
 	struct cgroup_subsys_state *pos_css;
 	struct blkcg_gq *blkg;
 	bool update_share = false;
+	bool ret;
+	unsigned long elapsed_time;
+	bool has_overrun = false;
 
-	tg_update_active_time(tg);
+	tg_init_acting_weight(tg);
 
 	if (time_before(now, td->last_check_timestamp + CGCHECK_TIME))
 		return;
+	elapsed_time = now - td->last_check_timestamp;
 	td->last_check_timestamp = now;
 
 	blkg_for_each_descendant_post(blkg, pos_css, td->queue->root_blkg) {
@@ -1205,18 +1388,36 @@ static void detect_inactive_cg(struct throtl_grp *tg)
 		if (cgroup_subsys_on_dfl(io_cgrp_subsys) &&
 		    !tg_to_blkg(tg)->parent)
 			continue;
+		tg->io_cost.check_weight = true;
+		precheck_tg_activity(tg, elapsed_time, &has_overrun);
+	}
 
-		if (sq->parent_sq &&
-		    time_before(sq->active_timestamp + CGCHECK_TIME, now) &&
-		    !(sq->nr_queued[READ] || sq->nr_queued[WRITE])) {
-			if (sq->acting_weight && sq->parent_sq) {
-				sq->parent_sq->children_weight -= sq->acting_weight;
-				sq->acting_weight = 0;
-				update_share = true;
-				throtl_log(sq, "inactive weight=%u parent_weight=%u",
-					sq->weight, sq->parent_sq->children_weight);
-			}
+	blkg_for_each_descendant_pre(blkg, pos_css, td->queue->root_blkg) {
+		tg = blkg_to_tg(blkg);
+		sq = &tg->service_queue;
+		/* '/' cgroup of cgroup2 */
+		if (cgroup_subsys_on_dfl(io_cgrp_subsys) &&
+		    !tg_to_blkg(tg)->parent)
+			continue;
+
+		/*
+		 * If there are other cgroups dispatch more IO than their
+		 * limits, this cgroup might not be able to get a chance to
+		 * dispatch IO, don't shrink this cgroup's share
+		 */
+		if (has_overrun || !tg->io_cost.check_weight) {
+			tg->io_cost.bytes_disp_active = 0;
+			tg->io_cost.io_disp_active = 0;
+			continue;
 		}
+
+		ret = detect_one_inactive_cg(tg, elapsed_time);
+		update_share |= ret;
+		if (ret)
+			throtl_log(sq, "idle weight=%u parent_weight=%u",
+				sq->acting_weight, sq->parent_sq->children_weight);
+		tg->io_cost.bytes_disp_active = 0;
+		tg->io_cost.io_disp_active = 0;
 	}
 
 	if (update_share)
