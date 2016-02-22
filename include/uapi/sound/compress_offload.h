@@ -30,7 +30,7 @@
 #include <sound/compress_params.h>
 
 
-#define SNDRV_COMPRESS_VERSION SNDRV_PROTOCOL_VERSION(0, 1, 2)
+#define SNDRV_COMPRESS_VERSION SNDRV_PROTOCOL_VERSION(0, 1, 3)
 /**
  * struct snd_compressed_buffer - compressed buffer
  * @fragment_size: size of buffer fragment in bytes
@@ -150,6 +150,8 @@ struct snd_compr_metadata {
  * SNDRV_COMPRESS_SET_PARAMS: Set codec and stream parameters
  * Note: only codec params can be changed runtime and stream params cant be
  * SNDRV_COMPRESS_GET_PARAMS: Query codec params
+ * SNDRV_COMPRESS_SET_DSP_PRIV: Set private DSP metadata
+ * SNDRV_COMPRESS_GET_DSP_PRIV: Get private DSP metadata
  * SNDRV_COMPRESS_TSTAMP: get the current timestamp value
  * SNDRV_COMPRESS_AVAIL: get the current buffer avail value.
  * This also queries the tstamp properties
@@ -171,6 +173,8 @@ struct snd_compr_metadata {
 						 struct snd_compr_metadata)
 #define SNDRV_COMPRESS_GET_METADATA	_IOWR('C', 0x15,\
 						 struct snd_compr_metadata)
+#define SNDRV_COMPRESS_SET_DSP_PRIV	_IOW('C', 0x16, struct snd_compr_metadata)
+#define SNDRV_COMPRESS_GET_DSP_PRIV	_IOWR('C', 0x17, struct snd_compr_metadata)
 #define SNDRV_COMPRESS_TSTAMP		_IOR('C', 0x20, struct snd_compr_tstamp)
 #define SNDRV_COMPRESS_AVAIL		_IOR('C', 0x21, struct snd_compr_avail)
 #define SNDRV_COMPRESS_PAUSE		_IO('C', 0x30)
