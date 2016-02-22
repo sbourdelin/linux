@@ -1,8 +1,5 @@
 /*
- * drivers/misc/goldfish_audio.c
- *
- * Copyright (C) 2007 Google, Inc.
- * Copyright (C) 2012 Intel, Inc.
+ * Copyright (C) 2016 PrasannaKumar Muralidharan <prasannatsmkumar@gmail.com>
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -12,64 +9,30 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/module.h>
-#include <linux/miscdevice.h>
-#include <linux/fs.h>
+#include <linux/printk.h>
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <sound/core.h>
+#include <sound/pcm.h>
+#include <sound/pcm_params.h>
 #include <linux/platform_device.h>
 #include <linux/types.h>
-#include <linux/pci.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/sched.h>
 #include <linux/dma-mapping.h>
 #include <linux/uaccess.h>
+#include <linux/kthread.h>
 #include <linux/goldfish.h>
 
-MODULE_AUTHOR("Google, Inc.");
-MODULE_DESCRIPTION("Android QEMU Audio Driver");
-MODULE_LICENSE("GPL");
-MODULE_VERSION("1.0");
-
-struct goldfish_audio {
-	char __iomem *reg_base;
-	int irq;
-	/* lock protects access to buffer_status and to device registers */
-	spinlock_t lock;
-	wait_queue_head_t wait;
-
-	char *buffer_virt;		/* combined buffer virtual address */
-	unsigned long buffer_phys;      /* combined buffer physical address */
-
-	char *write_buffer1;		/* write buffer 1 virtual address */
-	char *write_buffer2;		/* write buffer 2 virtual address */
-	char *read_buffer;		/* read buffer virtual address */
-	int buffer_status;
-	int read_supported;         /* true if we have audio input support */
-};
-
-/*
- *  We will allocate two read buffers and two write buffers.
- *  Having two read buffers facilitate stereo -> mono conversion.
- *  Having two write buffers facilitate interleaved IO.
- */
-#define READ_BUFFER_SIZE        16384
-#define WRITE_BUFFER_SIZE       16384
-#define COMBINED_BUFFER_SIZE    ((2 * READ_BUFFER_SIZE) + \
-					(2 * WRITE_BUFFER_SIZE))
-
-#define AUDIO_READ(data, addr)		(readl(data->reg_base + addr))
-#define AUDIO_WRITE(data, addr, x)	(writel(x, data->reg_base + addr))
-#define AUDIO_WRITE64(data, addr, addr2, x)	\
-	(gf_write_dma_addr((x), data->reg_base + addr, data->reg_base + addr2))
-
-/*
- *  temporary variable used between goldfish_audio_probe() and
- *  goldfish_audio_open()
- */
-static struct goldfish_audio *audio_data;
+#define READ_BUFFER_SIZE	16384
+#define WRITE_BUFFER_SIZE	16384
+#define COMBINED_BUFFER_SIZE	(2 * ((READ_BUFFER_SIZE) + (WRITE_BUFFER_SIZE)))
 
 enum {
 	/* audio status register */
@@ -109,172 +72,237 @@ enum {
 					  AUDIO_INT_READ_BUFFER_FULL,
 };
 
-static atomic_t open_count = ATOMIC_INIT(0);
+#define AUDIO_READ(data, addr)		(readl(data->reg_base + addr))
+#define AUDIO_WRITE(data, addr, x)	(writel(x, data->reg_base + addr))
+#define AUDIO_WRITE64(data, addr, addr2, x)	\
+	(gf_write_dma_addr((x), data->reg_base + addr, data->reg_base + addr2))
 
-static ssize_t goldfish_audio_read(struct file *fp, char __user *buf,
-				   size_t count, loff_t *pos)
+struct goldfish_audio {
+	char __iomem *reg_base;
+	int irq;
+
+	/* lock protects access to buffer_status and to device registers */
+	spinlock_t lock;
+	wait_queue_head_t wait;
+	struct task_struct *playback_task;
+
+	int buffer_status;
+	int read_supported;		/* true if audio input is supported */
+
+	struct snd_card *card;
+	int stream_data;
+};
+
+static struct snd_pcm_hardware goldfish_pcm_hw = {
+	.info = (SNDRV_PCM_INFO_NONINTERLEAVED | SNDRV_PCM_INFO_BLOCK_TRANSFER),
+	/* Signed 16bit host endian format. TODO: Change accordingly */
+#ifdef __LITTLE_ENDIAN
+	.formats = SNDRV_PCM_FMTBIT_S16_LE,
+#else
+	.formats = SNDRV_PCM_FMTBIT_S16_BE,
+#endif
+	.rates = SNDRV_PCM_RATE_44100,
+	.rate_min = 44100,
+	.rate_max = 44100,
+	.channels_min = 1,
+	.channels_max = 1,
+	.buffer_bytes_max = 2 * 16384,
+	.period_bytes_min = 1,
+	.period_bytes_max = 16384,
+	.periods_min = 1,
+	.periods_max = 2,
+};
+
+static int playback_thread(void *data)
 {
-	struct goldfish_audio *data = fp->private_data;
-	int length;
-	int result = 0;
-
-	if (!data->read_supported)
-		return -ENODEV;
-
-	while (count > 0) {
-		length = (count > READ_BUFFER_SIZE ? READ_BUFFER_SIZE : count);
-		AUDIO_WRITE(data, AUDIO_START_READ, length);
-
-		wait_event_interruptible(data->wait, data->buffer_status &
-					 AUDIO_INT_READ_BUFFER_FULL);
-
-		length = AUDIO_READ(data, AUDIO_READ_BUFFER_AVAILABLE);
-
-		/* copy data to user space */
-		if (copy_to_user(buf, data->read_buffer, length))
-			return -EFAULT;
-
-		result += length;
-		buf += length;
-		count -= length;
-	}
-	return result;
-}
-
-static ssize_t goldfish_audio_write(struct file *fp, const char __user *buf,
-				    size_t count, loff_t *pos)
-{
-	struct goldfish_audio *data = fp->private_data;
+	struct goldfish_audio *const audio_data = data;
 	unsigned long irq_flags;
-	ssize_t result = 0;
-	char *kbuf;
+	int status;
 
-	while (count > 0) {
-		ssize_t copy = count;
+	while (!kthread_should_stop()) {
+		/* bool period_elapsed = false; */
+		wait_event_interruptible(audio_data->wait,
+					 audio_data->stream_data &&
+					 (audio_data->buffer_status &
+					 (AUDIO_INT_WRITE_BUFFER_1_EMPTY |
+					 AUDIO_INT_WRITE_BUFFER_2_EMPTY)));
 
-		if (copy > WRITE_BUFFER_SIZE)
-			copy = WRITE_BUFFER_SIZE;
-		wait_event_interruptible(data->wait, data->buffer_status &
-					(AUDIO_INT_WRITE_BUFFER_1_EMPTY |
-					AUDIO_INT_WRITE_BUFFER_2_EMPTY));
-
-		if ((data->buffer_status & AUDIO_INT_WRITE_BUFFER_1_EMPTY) != 0)
-			kbuf = data->write_buffer1;
-		else
-			kbuf = data->write_buffer2;
-
-		/* copy from user space to the appropriate buffer */
-		if (copy_from_user(kbuf, buf, copy)) {
-			result = -EFAULT;
-			break;
-		}
-
-		spin_lock_irqsave(&data->lock, irq_flags);
+		spin_lock_irqsave(&audio_data->lock, irq_flags);
+		status = audio_data->buffer_status;
 		/*
 		 *  clear the buffer empty flag, and signal the emulator
 		 *  to start writing the buffer
 		 */
-		if (kbuf == data->write_buffer1) {
-			data->buffer_status &= ~AUDIO_INT_WRITE_BUFFER_1_EMPTY;
-			AUDIO_WRITE(data, AUDIO_WRITE_BUFFER_1, copy);
-		} else {
-			data->buffer_status &= ~AUDIO_INT_WRITE_BUFFER_2_EMPTY;
-			AUDIO_WRITE(data, AUDIO_WRITE_BUFFER_2, copy);
+		if (status & AUDIO_INT_WRITE_BUFFER_1_EMPTY) {
+			audio_data->buffer_status &=
+				~AUDIO_INT_WRITE_BUFFER_1_EMPTY;
+			AUDIO_WRITE(audio_data, AUDIO_WRITE_BUFFER_1, 16384);
+		} else if (status & AUDIO_INT_WRITE_BUFFER_2_EMPTY) {
+			audio_data->buffer_status &=
+				~AUDIO_INT_WRITE_BUFFER_2_EMPTY;
+			AUDIO_WRITE(audio_data, AUDIO_WRITE_BUFFER_2, 16384);
 		}
-		spin_unlock_irqrestore(&data->lock, irq_flags);
-
-		buf += copy;
-		result += copy;
-		count -= copy;
+		spin_unlock_irqrestore(&audio_data->lock, irq_flags);
 	}
-	return result;
-}
-
-static int goldfish_audio_open(struct inode *ip, struct file *fp)
-{
-	if (!audio_data)
-		return -ENODEV;
-
-	if (atomic_inc_return(&open_count) == 1) {
-		fp->private_data = audio_data;
-		audio_data->buffer_status = (AUDIO_INT_WRITE_BUFFER_1_EMPTY |
-					     AUDIO_INT_WRITE_BUFFER_2_EMPTY);
-		AUDIO_WRITE(audio_data, AUDIO_INT_ENABLE, AUDIO_INT_MASK);
-		return 0;
-	}
-
-	atomic_dec(&open_count);
-	return -EBUSY;
-}
-
-static int goldfish_audio_release(struct inode *ip, struct file *fp)
-{
-	atomic_dec(&open_count);
-	/* FIXME: surely this is wrong for the multi-opened case */
-	AUDIO_WRITE(audio_data, AUDIO_INT_ENABLE, 0);
-	return 0;
-}
-
-static long goldfish_audio_ioctl(struct file *fp, unsigned int cmd,
-				 unsigned long arg)
-{
-	/* temporary workaround, until we switch to the ALSA API */
-	if (cmd == 315)
-		return -1;
 
 	return 0;
 }
 
-static irqreturn_t goldfish_audio_interrupt(int irq, void *dev_id)
+static int goldfish_pcm_open(struct snd_pcm_substream *substream)
+{
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct goldfish_audio *audio_data = substream->private_data;
+	unsigned long irq_flags;
+
+	unsigned long buf_addr = runtime->dma_addr;
+
+	runtime->hw = goldfish_pcm_hw;
+
+	spin_lock_irqsave(&audio_data->lock, irq_flags);
+	AUDIO_WRITE64(audio_data, AUDIO_SET_WRITE_BUFFER_1,
+		      AUDIO_SET_WRITE_BUFFER_1_HIGH, buf_addr);
+	buf_addr += WRITE_BUFFER_SIZE;
+
+	AUDIO_WRITE64(audio_data, AUDIO_SET_WRITE_BUFFER_2,
+		      AUDIO_SET_WRITE_BUFFER_2_HIGH, buf_addr);
+
+#if 0
+	buf_addr += WRITE_BUFFER_SIZE;
+
+	audio_data->read_supported = AUDIO_READ(audio_data,
+			AUDIO_READ_SUPPORTED);
+	if (audio_data->read_supported)
+		AUDIO_WRITE64(audio_data, AUDIO_SET_READ_BUFFER,
+			      AUDIO_SET_READ_BUFFER_HIGH, buf_addr);
+#endif
+	audio_data->playback_task = kthread_run(playback_thread, audio_data,
+						     "goldfish_audio_playback");
+	spin_unlock_irqrestore(&audio_data->lock, irq_flags);
+	return 0;
+}
+
+static int goldfish_pcm_hw_params(struct snd_pcm_substream *substream,
+				  struct snd_pcm_hw_params *hw_params)
+{
+	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
+						params_buffer_bytes(hw_params));
+}
+
+static int goldfish_pcm_prepare(struct snd_pcm_substream *substream)
+{
+	/* Nothing to do here */
+	return 0;
+}
+
+static int goldfish_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
+{
+	struct goldfish_audio *audio_data = substream->private_data;
+	unsigned long irq_flags;
+
+	switch (cmd) {
+	case SNDRV_PCM_TRIGGER_START:
+		spin_lock_irqsave(&audio_data->lock, irq_flags);
+		audio_data->stream_data = true;
+		wake_up_interruptible(&audio_data->wait);
+		spin_unlock_irqrestore(&audio_data->lock, irq_flags);
+		break;
+	case SNDRV_PCM_TRIGGER_STOP:
+		spin_lock_irqsave(&audio_data->lock, irq_flags);
+		audio_data->stream_data = false;
+		spin_unlock_irqrestore(&audio_data->lock, irq_flags);
+		break;
+	default:
+		pr_info("goldfish_pcm_trigger(), invalid\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static snd_pcm_uframes_t goldfish_pcm_pointer(struct snd_pcm_substream *s)
+{
+	struct goldfish_audio *audio_data = s->private_data;
+	unsigned long irq_flags;
+	snd_pcm_uframes_t pos = 0;
+
+	spin_lock_irqsave(&audio_data->lock, irq_flags);
+	/* TODO: Return correct pointer */
+	if (audio_data->buffer_status & AUDIO_INT_WRITE_BUFFER_1_EMPTY)
+		pos = 0;
+	else if (audio_data->buffer_status & AUDIO_INT_WRITE_BUFFER_2_EMPTY)
+		pos = 1;
+
+	spin_unlock_irqrestore(&audio_data->lock, irq_flags);
+	return pos;
+}
+
+static int goldfish_pcm_close(struct snd_pcm_substream *substream)
+{
+	struct goldfish_audio *audio_data = substream->private_data;
+	unsigned long irq_flags;
+
+	spin_lock_irqsave(&audio_data->lock, irq_flags);
+	if (audio_data->playback_task) {
+		kthread_stop(audio_data->playback_task);
+		audio_data->playback_task = NULL;
+	}
+
+	spin_unlock_irqrestore(&audio_data->lock, irq_flags);
+	return 0;
+}
+
+static struct snd_pcm_ops goldfish_pcm_ops = {
+	.open       = goldfish_pcm_open,
+	.close      = goldfish_pcm_close,
+	.ioctl      = snd_pcm_lib_ioctl,
+	.hw_params  = goldfish_pcm_hw_params,
+	.hw_free    = snd_pcm_lib_free_vmalloc_buffer,
+	.prepare    = goldfish_pcm_prepare,
+	.trigger    = goldfish_pcm_trigger,
+	.pointer    = goldfish_pcm_pointer,
+	.page       = snd_pcm_lib_get_vmalloc_page,
+	.mmap       = snd_pcm_lib_mmap_vmalloc,
+};
+
+static irqreturn_t goldfish_audio_interrupt(int irq, void *data)
 {
 	unsigned long irq_flags;
-	struct goldfish_audio	*data = dev_id;
+	struct goldfish_audio *audio_data = data;
 	u32 status;
 
-	spin_lock_irqsave(&data->lock, irq_flags);
+	spin_lock_irqsave(&audio_data->lock, irq_flags);
 
 	/* read buffer status flags */
-	status = AUDIO_READ(data, AUDIO_INT_STATUS);
+	status = AUDIO_READ(audio_data, AUDIO_INT_STATUS);
 	status &= AUDIO_INT_MASK;
 	/*
 	 *  if buffers are newly empty, wake up blocked
 	 *  goldfish_audio_write() call
 	 */
 	if (status) {
-		data->buffer_status = status;
-		wake_up(&data->wait);
+		audio_data->buffer_status = status;
+		wake_up(&audio_data->wait);
 	}
 
-	spin_unlock_irqrestore(&data->lock, irq_flags);
+	spin_unlock_irqrestore(&audio_data->lock, irq_flags);
 	return status ? IRQ_HANDLED : IRQ_NONE;
 }
-
-/* file operations for /dev/eac */
-static const struct file_operations goldfish_audio_fops = {
-	.owner = THIS_MODULE,
-	.read = goldfish_audio_read,
-	.write = goldfish_audio_write,
-	.open = goldfish_audio_open,
-	.release = goldfish_audio_release,
-	.unlocked_ioctl = goldfish_audio_ioctl,
-};
-
-static struct miscdevice goldfish_audio_device = {
-	.minor = MISC_DYNAMIC_MINOR,
-	.name = "eac",
-	.fops = &goldfish_audio_fops,
-};
 
 static int goldfish_audio_probe(struct platform_device *pdev)
 {
 	int ret;
 	struct resource *r;
 	struct goldfish_audio *data;
-	dma_addr_t buf_addr;
+	struct snd_card *card;
+	struct snd_pcm *pcm;
 
-	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-	if (!data)
-		return -ENOMEM;
+	ret = snd_card_new(NULL, -1, "eac", THIS_MODULE,
+			   sizeof(*data), &card);
+	if (ret < 0)
+		return ret;
+
+	data = card->private_data;
+	data->card = card;
 	spin_lock_init(&data->lock);
 	init_waitqueue_head(&data->wait);
 	platform_set_drvdata(pdev, data);
@@ -282,65 +310,64 @@ static int goldfish_audio_probe(struct platform_device *pdev)
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!r) {
 		dev_err(&pdev->dev, "platform_get_resource failed\n");
-		return -ENODEV;
+		ret = -ENODEV;
+		goto fail;
 	}
 	data->reg_base = devm_ioremap(&pdev->dev, r->start, PAGE_SIZE);
-	if (!data->reg_base)
-		return -ENOMEM;
+	if (!data->reg_base) {
+		ret = -ENOMEM;
+		goto fail;
+	}
 
 	data->irq = platform_get_irq(pdev, 0);
 	if (data->irq < 0) {
 		dev_err(&pdev->dev, "platform_get_irq failed\n");
-		return -ENODEV;
+		ret = -ENODEV;
+		goto fail;
 	}
-	data->buffer_virt = dmam_alloc_coherent(&pdev->dev,
-				COMBINED_BUFFER_SIZE, &buf_addr, GFP_KERNEL);
-	if (!data->buffer_virt) {
-		dev_err(&pdev->dev, "allocate buffer failed\n");
-		return -ENOMEM;
-	}
-	data->buffer_phys = buf_addr;
-	data->write_buffer1 = data->buffer_virt;
-	data->write_buffer2 = data->buffer_virt + WRITE_BUFFER_SIZE;
-	data->read_buffer = data->buffer_virt + 2 * WRITE_BUFFER_SIZE;
 
 	ret = devm_request_irq(&pdev->dev, data->irq, goldfish_audio_interrupt,
 			       IRQF_SHARED, pdev->name, data);
 	if (ret) {
 		dev_err(&pdev->dev, "request_irq failed\n");
-		return ret;
+		goto fail;
 	}
 
-	ret = misc_register(&goldfish_audio_device);
-	if (ret) {
-		dev_err(&pdev->dev,
-			"misc_register returned %d in goldfish_audio_init\n",
-								ret);
-		return ret;
-	}
+	snprintf(card->driver, sizeof(card->driver), "%s", "goldfish_audio");
+	snprintf(card->shortname, sizeof(card->shortname), "EAC Goldfish:%d",
+		 card->number);
+	snprintf(card->longname, sizeof(card->longname), "%s", card->shortname);
 
-	AUDIO_WRITE64(data, AUDIO_SET_WRITE_BUFFER_1,
-		      AUDIO_SET_WRITE_BUFFER_1_HIGH, buf_addr);
-	buf_addr += WRITE_BUFFER_SIZE;
+	ret = snd_pcm_new(card, "eac", 0, 1, 0, &pcm);
+	if (ret < 0)
+		goto fail;
 
-	AUDIO_WRITE64(data, AUDIO_SET_WRITE_BUFFER_2,
-		      AUDIO_SET_WRITE_BUFFER_2_HIGH, buf_addr);
+	pcm->private_data = data;
+	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &goldfish_pcm_ops);
+	ret = snd_card_register(card);
+	if (ret < 0)
+		goto fail;
 
-	buf_addr += WRITE_BUFFER_SIZE;
-
-	data->read_supported = AUDIO_READ(data, AUDIO_READ_SUPPORTED);
-	if (data->read_supported)
-		AUDIO_WRITE64(data, AUDIO_SET_READ_BUFFER,
-			      AUDIO_SET_READ_BUFFER_HIGH, buf_addr);
-
-	audio_data = data;
 	return 0;
+
+fail:
+	snd_card_free(card);
+	return ret;
 }
 
 static int goldfish_audio_remove(struct platform_device *pdev)
 {
-	misc_deregister(&goldfish_audio_device);
-	audio_data = NULL;
+	struct goldfish_audio *audio_data = platform_get_drvdata(pdev);
+	unsigned long irq_flags;
+
+	spin_lock_irqsave(&audio_data->lock, irq_flags);
+	if (audio_data->playback_task) {
+		kthread_stop(audio_data->playback_task);
+		audio_data->playback_task = NULL;
+	}
+	snd_card_free(audio_data->card);
+
+	spin_unlock_irqrestore(&audio_data->lock, irq_flags);
 	return 0;
 }
 
@@ -353,3 +380,7 @@ static struct platform_driver goldfish_audio_driver = {
 };
 
 module_platform_driver(goldfish_audio_driver);
+
+MODULE_AUTHOR("PrasannaKumar Muralidharan <prasannatsmkumar@gmail.com>");
+MODULE_DESCRIPTION("Android QEMU Audio Driver");
+MODULE_LICENSE("GPL");

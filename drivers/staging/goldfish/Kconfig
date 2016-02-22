@@ -1,6 +1,7 @@
 config GOLDFISH_AUDIO
 	tristate "Goldfish AVD Audio Device"
 	depends on GOLDFISH
+	depends on SND_PCM
 	---help---
 	  Emulated audio channel for the Goldfish Android Virtual Device
 
