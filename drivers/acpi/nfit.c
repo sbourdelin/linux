@@ -781,6 +781,26 @@ static ssize_t flags_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(flags);
 
+static ssize_t id_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct acpi_nfit_control_region *dcr = to_nfit_dcr(dev);
+
+	if (dcr->valid_fields & ACPI_NFIT_CONTROL_MFG_INFO_VALID)
+		return sprintf(buf, "%02x%02x-%02x-%02x%02x-%02x%02x%02x%02x\n",
+			dcr->vendor_id[0], dcr->vendor_id[1],
+			dcr->manufacturing_location,
+			dcr->manufacturing_date[0], dcr->manufacturing_date[1],
+			dcr->serial_number[0], dcr->serial_number[1],
+			dcr->serial_number[2], dcr->serial_number[3]);
+	else
+		return sprintf(buf, "%02x%02x-%02x%02x%02x%02x\n",
+			dcr->vendor_id[0], dcr->vendor_id[1],
+			dcr->serial_number[0], dcr->serial_number[1],
+			dcr->serial_number[2], dcr->serial_number[3]);
+}
+static DEVICE_ATTR_RO(id);
+
 static struct attribute *acpi_nfit_dimm_attributes[] = {
 	&dev_attr_handle.attr,
 	&dev_attr_phys_id.attr,
@@ -790,6 +810,7 @@ static struct attribute *acpi_nfit_dimm_attributes[] = {
 	&dev_attr_serial.attr,
 	&dev_attr_rev_id.attr,
 	&dev_attr_flags.attr,
+	&dev_attr_id.attr,
 	NULL,
 };
 
