@@ -1153,6 +1153,7 @@ static void tg_update_share(struct throtl_data *td, struct throtl_grp *tg)
 			sq->parent_sq->share * sq->acting_weight /
 				sq->parent_sq->children_weight,
 			1);
+		throtl_log(sq, "new share=%u", sq->share);
 	}
 }
 
@@ -1168,6 +1169,8 @@ static void tg_update_active_time(struct throtl_grp *tg)
 			sq->acting_weight = sq->weight;
 			sq->parent_sq->children_weight += sq->acting_weight;
 			tg = sq_to_tg(sq);
+			throtl_log(sq, "active weight=%u parent_weight=%u",
+				sq->acting_weight, sq->parent_sq->children_weight);
 		}
 		sq = sq->parent_sq;
 	}
@@ -1206,6 +1209,8 @@ static void detect_inactive_cg(struct throtl_grp *tg)
 				sq->parent_sq->children_weight -= sq->acting_weight;
 				sq->acting_weight = 0;
 				update_share = true;
+				throtl_log(sq, "inactive weight=%u parent_weight=%u",
+					sq->weight, sq->parent_sq->children_weight);
 			}
 		}
 	}
@@ -1621,6 +1626,10 @@ static void __tg_set_weight(struct throtl_grp *tg, unsigned int weight)
 			psq->children_weight -= old_weight - weight;
 		tg->service_queue.acting_weight = weight;
 	}
+	throtl_log(&tg->service_queue, "weight=%d parent_weight=%d",
+		tg->service_queue.acting_weight,
+		tg->service_queue.parent_sq ?
+			tg->service_queue.parent_sq->children_weight : 0);
 
 	tg_update_share(tg->td, tg);
 }
