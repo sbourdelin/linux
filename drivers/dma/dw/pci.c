@@ -49,8 +49,9 @@ static int dw_pci_probe(struct pci_dev *pdev, const struct pci_device_id *pid)
 	chip->dev = &pdev->dev;
 	chip->regs = pcim_iomap_table(pdev)[0];
 	chip->irq = pdev->irq;
+	chip->pdata = pdata;
 
-	ret = dw_dma_probe(chip, pdata);
+	ret = dw_dma_probe(chip);
 	if (ret)
 		return ret;
 
