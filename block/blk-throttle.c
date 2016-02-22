@@ -1912,12 +1912,54 @@ out_finish:
 	return ret ?: nbytes;
 }
 
+static int tg_print_cg2_weight(struct seq_file *sf, void *v)
+{
+	struct blkcg *blkcg = css_to_blkcg(seq_css(sf));
+	struct throtl_group_data *tgd = blkcg_to_tgd(blkcg);
+
+	seq_printf(sf, "default %u\n", tgd->weight);
+	return tg_print_weight_device(sf, v);
+}
+
+static ssize_t tg_set_cg2_weight(struct kernfs_open_file *of,
+	char *buf, size_t nbytes, loff_t off)
+{
+	char *endp;
+	int ret;
+	u64 v;
+
+	buf = strim(buf);
+
+	/* "WEIGHT" or "default WEIGHT" sets the default weight */
+	v = simple_strtoull(buf, &endp, 0);
+	if (*endp == '\0' || sscanf(buf, "default %llu", &v) == 1) {
+		ret = tg_set_weight(of_css(of), of_cft(of), v);
+		return ret ?: nbytes;
+	}
+
+	/* "MAJ:MIN WEIGHT" */
+	return tg_set_weight_device(of, buf, nbytes, off);
+}
+
 static struct cftype throtl_files[] = {
 	{
 		.name = "max",
 		.flags = CFTYPE_NOT_ON_ROOT,
 		.seq_show = tg_print_max,
 		.write = tg_set_max,
+	},
+	{
+		.name = "throttle.weight",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.private = offsetof(struct throtl_grp, service_queue.weight),
+		.seq_show = tg_print_cg2_weight,
+		.write = tg_set_cg2_weight,
+	},
+	{
+		.name = "throttle.mode_device",
+		.flags = CFTYPE_ONLY_ON_ROOT,
+		.seq_show = throtl_print_mode_device,
+		.write = tg_set_mode_device,
 	},
 	{ }	/* terminate */
 };
