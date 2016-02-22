@@ -177,8 +177,10 @@ static int get_mailbox(struct ivtv *itv, struct ivtv_mailbox_data *mbdata, int f
 
 		/* Sleep before a retry, if not atomic */
 		if (!(flags & API_NO_WAIT_MB)) {
-			if (time_after(jiffies,
-				       then + msecs_to_jiffies(10*retries)))
+			unsigned int timeout;
+
+			timeout = msecs_to_jiffies(10 * retries);
+			if (time_after(jiffies, then + timeout))
 			       break;
 			ivtv_msleep_timeout(10, 0);
 		}
