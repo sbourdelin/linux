@@ -1895,9 +1895,14 @@ static void gsm0_receive(struct gsm_mux *gsm, unsigned char c)
 		}
 		break;
 	case GSM_ADDRESS:	/* Address EA */
-		gsm->fcs = gsm_fcs_add(gsm->fcs, c);
+		/* Ignore (not first) GSM0_SOF as it decodes into
+		 * reserved DLCI 62 (5.6 of the 27.010 mux spec).
+		 */
+		if (c == GSM0_SOF)
+			break;
 		if (gsm_read_ea(&gsm->address, c))
 			gsm->state = GSM_CONTROL;
+		gsm->fcs = gsm_fcs_add(gsm->fcs, c);
 		break;
 	case GSM_CONTROL:	/* Control Byte */
 		gsm->fcs = gsm_fcs_add(gsm->fcs, c);
@@ -1944,13 +1949,10 @@ static void gsm0_receive(struct gsm_mux *gsm, unsigned char c)
 	case GSM_FCS:		/* FCS follows the packet */
 		gsm->received_fcs = c;
 		gsm_queue(gsm);
-		gsm->state = GSM_SSOF;
-		break;
-	case GSM_SSOF:
-		if (c == GSM0_SOF) {
-			gsm->state = GSM_SEARCH;
-			break;
-		}
+		/* Frames can be separated with a single GSM0_SOF.
+		 * Deal with consecutive GSM0_SOFs in GSM_ADDRESS.
+		 */
+		gsm->state = GSM_SEARCH;
 		break;
 	}
 }
