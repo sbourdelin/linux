@@ -22,6 +22,7 @@ struct hdac_device;
 struct hdac_driver;
 struct hdac_widget_tree;
 struct hda_device_id;
+struct hdmi_chmap_ops;
 
 /*
  * exported bus type
