@@ -112,6 +112,7 @@ struct throtl_io_cost {
 	unsigned int io_disp[2];
 };
 
+/* per cgroup per device data */
 struct throtl_grp {
 	/* must be the first member */
 	struct blkg_policy_data pd;
@@ -153,6 +154,14 @@ struct throtl_grp {
 	/* When did we start a new slice */
 	unsigned long slice_start[2];
 	unsigned long slice_end[2];
+};
+
+/* per-cgroup data */
+struct throtl_group_data {
+	/* must be the first member */
+	struct blkcg_policy_data cpd;
+
+	unsigned int weight;
 };
 
 enum run_mode {
@@ -244,6 +253,16 @@ static struct throtl_data *sq_to_td(struct throtl_service_queue *sq)
 		return tg->td;
 	else
 		return container_of(sq, struct throtl_data, service_queue);
+}
+
+static inline struct throtl_group_data *cpd_to_tgd(struct blkcg_policy_data *cpd)
+{
+	return cpd ? container_of(cpd, struct throtl_group_data, cpd) : NULL;
+}
+
+static inline struct throtl_group_data *blkcg_to_tgd(struct blkcg *blkcg)
+{
+	return cpd_to_tgd(blkcg_to_cpd(blkcg, &blkcg_policy_throtl));
 }
 
 static inline int tg_data_index(struct throtl_grp *tg, bool rw)
@@ -385,6 +404,28 @@ static struct bio *throtl_pop_queued(struct list_head *queued,
 	return bio;
 }
 
+static struct blkcg_policy_data *throtl_cpd_alloc(gfp_t gfp)
+{
+	struct throtl_group_data *tgd;
+
+	tgd = kzalloc(sizeof(*tgd), gfp);
+	if (!tgd)
+		return NULL;
+	return &tgd->cpd;
+}
+
+static void throtl_cpd_init(struct blkcg_policy_data *cpd)
+{
+	struct throtl_group_data *tgd = cpd_to_tgd(cpd);
+
+	tgd->weight = DFT_WEIGHT;
+}
+
+static void throtl_cpd_free(struct blkcg_policy_data *cpd)
+{
+	kfree(cpd_to_tgd(cpd));
+}
+
 /* init a service_queue, assumes the caller zeroed it */
 static void throtl_service_queue_init(struct throtl_service_queue *sq)
 {
@@ -449,7 +490,7 @@ static void throtl_pd_init(struct blkg_policy_data *pd)
 	sq->parent_sq = &td->service_queue;
 	if (cgroup_subsys_on_dfl(io_cgrp_subsys) && blkg->parent)
 		sq->parent_sq = &blkg_to_tg(blkg->parent)->service_queue;
-	sq->weight = DFT_WEIGHT;
+	sq->weight = blkcg_to_tgd(blkg->blkcg)->weight;
 	sq->acting_weight = 0;
 	tg->td = td;
 }
@@ -1676,6 +1717,10 @@ static void throtl_shutdown_wq(struct request_queue *q)
 static struct blkcg_policy blkcg_policy_throtl = {
 	.dfl_cftypes		= throtl_files,
 	.legacy_cftypes		= throtl_legacy_files,
+
+	.cpd_alloc_fn		= throtl_cpd_alloc,
+	.cpd_init_fn		= throtl_cpd_init,
+	.cpd_free_fn		= throtl_cpd_free,
 
 	.pd_alloc_fn		= throtl_pd_alloc,
 	.pd_init_fn		= throtl_pd_init,
