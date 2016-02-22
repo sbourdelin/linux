@@ -2422,6 +2422,7 @@ void *i915_gem_object_vmap_range(struct drm_i915_gem_object *obj,
 				 unsigned int npages)
 {
 	struct sg_page_iter sg_iter;
+	struct page *mypages[32];
 	struct page **pages;
 	void *addr;
 	int i;
@@ -2431,10 +2432,16 @@ void *i915_gem_object_vmap_range(struct drm_i915_gem_object *obj,
 		return NULL;
 	}
 
-	pages = drm_malloc_ab(npages, sizeof(*pages));
-	if (pages == NULL) {
-		DRM_DEBUG_DRIVER("Failed to get space for pages\n");
-		return NULL;
+	if (npages <= ARRAY_SIZE(mypages))
+		pages = mypages;
+	else {
+		pages = kmalloc(npages*sizeof(*pages), GFP_TEMPORARY | __GFP_NOWARN);
+		if (pages == NULL)
+			pages = drm_malloc_ab(npages, sizeof(*pages));
+		if (pages == NULL) {
+			DRM_DEBUG_DRIVER("Failed to get space for pages\n");
+			return NULL;
+		}
 	}
 
 	i = 0;
@@ -2447,7 +2454,8 @@ void *i915_gem_object_vmap_range(struct drm_i915_gem_object *obj,
 	addr = vmap(pages, npages, 0, PAGE_KERNEL);
 	if (addr == NULL)
 		DRM_DEBUG_DRIVER("Failed to vmap pages\n");
-	drm_free_large(pages);
+	if (pages != mypages)
+		drm_free_large(pages);
 
 	return addr;
 }
