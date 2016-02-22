@@ -207,6 +207,11 @@ static struct throtl_data *sq_to_td(struct throtl_service_queue *sq)
 		return container_of(sq, struct throtl_data, service_queue);
 }
 
+static inline int tg_data_index(struct throtl_grp *tg, bool rw)
+{
+	return rw;
+}
+
 /**
  * throtl_log - log debug message via blktrace
  * @sq: the service_queue being reported
@@ -338,7 +343,7 @@ static inline void io_cost_init(struct throtl_grp *tg)
 static struct blkg_policy_data *throtl_pd_alloc(gfp_t gfp, int node)
 {
 	struct throtl_grp *tg;
-	int rw;
+	int i;
 
 	tg = kzalloc_node(sizeof(*tg), gfp, node);
 	if (!tg)
@@ -346,9 +351,9 @@ static struct blkg_policy_data *throtl_pd_alloc(gfp_t gfp, int node)
 
 	throtl_service_queue_init(&tg->service_queue);
 
-	for (rw = READ; rw <= WRITE; rw++) {
-		throtl_qnode_init(&tg->qnode_on_self[rw], tg);
-		throtl_qnode_init(&tg->qnode_on_parent[rw], tg);
+	for (i = READ; i <= WRITE; i++) {
+		throtl_qnode_init(&tg->qnode_on_self[i], tg);
+		throtl_qnode_init(&tg->qnode_on_parent[i], tg);
 	}
 
 	RB_CLEAR_NODE(&tg->rb_node);
@@ -384,9 +389,9 @@ static void throtl_pd_init(struct blkg_policy_data *pd)
 	tg->td = td;
 }
 
-static inline bool io_cost_has_limit(struct throtl_grp *tg, int rw)
+static inline bool io_cost_has_limit(struct throtl_grp *tg, int index)
 {
-	return tg->io_cost.bps[rw] != -1 || tg->io_cost.iops[rw] != -1;
+	return tg->io_cost.bps[index] != -1 || tg->io_cost.iops[index] != -1;
 }
 
 /*
@@ -397,11 +402,11 @@ static inline bool io_cost_has_limit(struct throtl_grp *tg, int rw)
 static void tg_update_has_rules(struct throtl_grp *tg)
 {
 	struct throtl_grp *parent_tg = sq_to_tg(tg->service_queue.parent_sq);
-	int rw;
+	int i;
 
-	for (rw = READ; rw <= WRITE; rw++)
-		tg->has_rules[rw] = (parent_tg && parent_tg->has_rules[rw]) ||
-				    io_cost_has_limit(tg, rw);
+	for (i = READ; i <= WRITE; i++)
+		tg->has_rules[i] = (parent_tg && parent_tg->has_rules[i]) ||
+				    io_cost_has_limit(tg, i);
 }
 
 static void throtl_pd_online(struct blkg_policy_data *pd)
@@ -565,13 +570,15 @@ static bool throtl_schedule_next_dispatch(struct throtl_service_queue *sq,
 static inline void io_cost_start_new_slice(struct throtl_grp *tg,
 		bool rw)
 {
-	tg->io_cost.bytes_disp[rw] = 0;
-	tg->io_cost.io_disp[rw] = 0;
+	int index = tg_data_index(tg, rw);
+	tg->io_cost.bytes_disp[index] = 0;
+	tg->io_cost.io_disp[index] = 0;
 }
 
 static inline void throtl_start_new_slice_with_credit(struct throtl_grp *tg,
 		bool rw, unsigned long start)
 {
+	int index = tg_data_index(tg, rw);
 	io_cost_start_new_slice(tg, rw);
 
 	/*
@@ -580,47 +587,52 @@ static inline void throtl_start_new_slice_with_credit(struct throtl_grp *tg,
 	 * that bandwidth. Do try to make use of that bandwidth while giving
 	 * credit.
 	 */
-	if (time_after_eq(start, tg->slice_start[rw]))
-		tg->slice_start[rw] = start;
+	if (time_after_eq(start, tg->slice_start[index]))
+		tg->slice_start[index] = start;
 
-	tg->slice_end[rw] = jiffies + throtl_slice;
+	tg->slice_end[index] = jiffies + throtl_slice;
 	throtl_log(&tg->service_queue,
 		   "[%c] new slice with credit start=%lu end=%lu jiffies=%lu",
-		   rw == READ ? 'R' : 'W', tg->slice_start[rw],
-		   tg->slice_end[rw], jiffies);
+		   rw == READ ? 'R' : 'W', tg->slice_start[index],
+		   tg->slice_end[index], jiffies);
 }
 
 static inline void throtl_start_new_slice(struct throtl_grp *tg, bool rw)
 {
+	int index = tg_data_index(tg, rw);
+
 	io_cost_start_new_slice(tg, rw);
-	tg->slice_start[rw] = jiffies;
-	tg->slice_end[rw] = jiffies + throtl_slice;
+	tg->slice_start[index] = jiffies;
+	tg->slice_end[index] = jiffies + throtl_slice;
 	throtl_log(&tg->service_queue,
 		   "[%c] new slice start=%lu end=%lu jiffies=%lu",
-		   rw == READ ? 'R' : 'W', tg->slice_start[rw],
-		   tg->slice_end[rw], jiffies);
+		   rw == READ ? 'R' : 'W', tg->slice_start[index],
+		   tg->slice_end[index], jiffies);
 }
 
 static inline void throtl_set_slice_end(struct throtl_grp *tg, bool rw,
 					unsigned long jiffy_end)
 {
-	tg->slice_end[rw] = roundup(jiffy_end, throtl_slice);
+	int index = tg_data_index(tg, rw);
+	tg->slice_end[index] = roundup(jiffy_end, throtl_slice);
 }
 
 static inline void throtl_extend_slice(struct throtl_grp *tg, bool rw,
 				       unsigned long jiffy_end)
 {
-	tg->slice_end[rw] = roundup(jiffy_end, throtl_slice);
+	int index = tg_data_index(tg, rw);
+	tg->slice_end[index] = roundup(jiffy_end, throtl_slice);
 	throtl_log(&tg->service_queue,
 		   "[%c] extend slice start=%lu end=%lu jiffies=%lu",
-		   rw == READ ? 'R' : 'W', tg->slice_start[rw],
-		   tg->slice_end[rw], jiffies);
+		   rw == READ ? 'R' : 'W', tg->slice_start[index],
+		   tg->slice_end[index], jiffies);
 }
 
 /* Determine if previously allocated or extended slice is complete or not */
 static bool throtl_slice_used(struct throtl_grp *tg, bool rw)
 {
-	if (time_in_range(jiffies, tg->slice_start[rw], tg->slice_end[rw]))
+	int index = tg_data_index(tg, rw);
+	if (time_in_range(jiffies, tg->slice_start[index], tg->slice_end[index]))
 		return false;
 
 	return 1;
@@ -631,25 +643,26 @@ static inline bool io_cost_trim_slice(struct throtl_grp *tg, bool rw,
 {
 	unsigned long io_trim;
 	u64 bytes_trim, tmp;
+	int index = tg_data_index(tg, rw);
 
-	tmp = tg->io_cost.bps[rw] * throtl_slice * nr_slices;
+	tmp = tg->io_cost.bps[index] * throtl_slice * nr_slices;
 	do_div(tmp, HZ);
 	bytes_trim = tmp;
 
-	io_trim = (tg->io_cost.iops[rw] * throtl_slice * nr_slices) / HZ;
+	io_trim = (tg->io_cost.iops[index] * throtl_slice * nr_slices) / HZ;
 
 	if (!bytes_trim && !io_trim)
 		return false;
 
-	if (tg->io_cost.bytes_disp[rw] >= bytes_trim)
-		tg->io_cost.bytes_disp[rw] -= bytes_trim;
+	if (tg->io_cost.bytes_disp[index] >= bytes_trim)
+		tg->io_cost.bytes_disp[index] -= bytes_trim;
 	else
-		tg->io_cost.bytes_disp[rw] = 0;
+		tg->io_cost.bytes_disp[index] = 0;
 
-	if (tg->io_cost.io_disp[rw] >= io_trim)
-		tg->io_cost.io_disp[rw] -= io_trim;
+	if (tg->io_cost.io_disp[index] >= io_trim)
+		tg->io_cost.io_disp[index] -= io_trim;
 	else
-		tg->io_cost.io_disp[rw] = 0;
+		tg->io_cost.io_disp[index] = 0;
 
 	return true;
 }
@@ -658,8 +671,9 @@ static inline bool io_cost_trim_slice(struct throtl_grp *tg, bool rw,
 static inline void throtl_trim_slice(struct throtl_grp *tg, bool rw)
 {
 	unsigned long nr_slices, time_elapsed;
+	int index = tg_data_index(tg, rw);
 
-	BUG_ON(time_before(tg->slice_end[rw], tg->slice_start[rw]));
+	BUG_ON(time_before(tg->slice_end[index], tg->slice_start[index]));
 
 	/*
 	 * If bps are unlimited (-1), then time slice don't get
@@ -679,7 +693,7 @@ static inline void throtl_trim_slice(struct throtl_grp *tg, bool rw)
 
 	throtl_set_slice_end(tg, rw, jiffies + throtl_slice);
 
-	time_elapsed = jiffies - tg->slice_start[rw];
+	time_elapsed = jiffies - tg->slice_start[index];
 
 	nr_slices = time_elapsed / throtl_slice;
 
@@ -688,23 +702,24 @@ static inline void throtl_trim_slice(struct throtl_grp *tg, bool rw)
 
 	if (!io_cost_trim_slice(tg, rw, nr_slices))
 		return;
-	tg->slice_start[rw] += nr_slices * throtl_slice;
+	tg->slice_start[index] += nr_slices * throtl_slice;
 
 	throtl_log(&tg->service_queue,
 		   "[%c] trim slice nr=%lu start=%lu end=%lu jiffies=%lu",
 		   rw == READ ? 'R' : 'W', nr_slices,
-		   tg->slice_start[rw], tg->slice_end[rw], jiffies);
+		   tg->slice_start[index], tg->slice_end[index], jiffies);
 }
 
 static bool io_cost_with_in_iops_limit(struct throtl_grp *tg, struct bio *bio,
 				  unsigned long *wait)
 {
 	bool rw = bio_data_dir(bio);
+	int index = tg_data_index(tg, rw);
 	unsigned int io_allowed;
 	unsigned long jiffy_elapsed, jiffy_wait, jiffy_elapsed_rnd;
 	u64 tmp;
 
-	jiffy_elapsed = jiffy_elapsed_rnd = jiffies - tg->slice_start[rw];
+	jiffy_elapsed = jiffy_elapsed_rnd = jiffies - tg->slice_start[index];
 
 	/* Slice has just started. Consider one slice interval */
 	if (!jiffy_elapsed)
@@ -719,7 +734,7 @@ static bool io_cost_with_in_iops_limit(struct throtl_grp *tg, struct bio *bio,
 	 * have been trimmed.
 	 */
 
-	tmp = (u64)tg->io_cost.iops[rw] * jiffy_elapsed_rnd;
+	tmp = (u64)tg->io_cost.iops[index] * jiffy_elapsed_rnd;
 	do_div(tmp, HZ);
 
 	if (tmp > UINT_MAX)
@@ -727,15 +742,15 @@ static bool io_cost_with_in_iops_limit(struct throtl_grp *tg, struct bio *bio,
 	else
 		io_allowed = tmp;
 
-	if (tg->io_cost.io_disp[rw] + 1 <= io_allowed) {
+	if (tg->io_cost.io_disp[index] + 1 <= io_allowed) {
 		if (wait)
 			*wait = 0;
 		return true;
 	}
 
 	/* Calc approx time to dispatch */
-	jiffy_wait = ((tg->io_cost.io_disp[rw] + 1) * HZ) /
-		tg->io_cost.iops[rw] + 1;
+	jiffy_wait = ((tg->io_cost.io_disp[index] + 1) * HZ) /
+		tg->io_cost.iops[index] + 1;
 
 	if (jiffy_wait > jiffy_elapsed)
 		jiffy_wait = jiffy_wait - jiffy_elapsed;
@@ -751,10 +766,11 @@ static bool io_cost_with_in_bps_limit(struct throtl_grp *tg, struct bio *bio,
 				 unsigned long *wait)
 {
 	bool rw = bio_data_dir(bio);
+	int index = tg_data_index(tg, rw);
 	u64 bytes_allowed, extra_bytes, tmp;
 	unsigned long jiffy_elapsed, jiffy_wait, jiffy_elapsed_rnd;
 
-	jiffy_elapsed = jiffy_elapsed_rnd = jiffies - tg->slice_start[rw];
+	jiffy_elapsed = jiffy_elapsed_rnd = jiffies - tg->slice_start[index];
 
 	/* Slice has just started. Consider one slice interval */
 	if (!jiffy_elapsed)
@@ -762,11 +778,11 @@ static bool io_cost_with_in_bps_limit(struct throtl_grp *tg, struct bio *bio,
 
 	jiffy_elapsed_rnd = roundup(jiffy_elapsed_rnd, throtl_slice);
 
-	tmp = tg->io_cost.bps[rw] * jiffy_elapsed_rnd;
+	tmp = tg->io_cost.bps[index] * jiffy_elapsed_rnd;
 	do_div(tmp, HZ);
 	bytes_allowed = tmp;
 
-	if (tg->io_cost.bytes_disp[rw] + bio->bi_iter.bi_size <=
+	if (tg->io_cost.bytes_disp[index] + bio->bi_iter.bi_size <=
 	    bytes_allowed) {
 		if (wait)
 			*wait = 0;
@@ -774,9 +790,9 @@ static bool io_cost_with_in_bps_limit(struct throtl_grp *tg, struct bio *bio,
 	}
 
 	/* Calc approx time to dispatch */
-	extra_bytes = tg->io_cost.bytes_disp[rw] +
+	extra_bytes = tg->io_cost.bytes_disp[index] +
 		bio->bi_iter.bi_size - bytes_allowed;
-	jiffy_wait = div64_u64(extra_bytes * HZ, tg->io_cost.bps[rw]);
+	jiffy_wait = div64_u64(extra_bytes * HZ, tg->io_cost.bps[index]);
 
 	if (!jiffy_wait)
 		jiffy_wait = 1;
@@ -813,6 +829,7 @@ static bool tg_may_dispatch(struct throtl_grp *tg, struct bio *bio,
 			    unsigned long *wait)
 {
 	bool rw = bio_data_dir(bio);
+	int index = tg_data_index(tg, rw);
 	unsigned long max_wait = 0;
 
 	/*
@@ -821,11 +838,11 @@ static bool tg_may_dispatch(struct throtl_grp *tg, struct bio *bio,
 	 * this function with a different bio if there are other bios
 	 * queued.
 	 */
-	BUG_ON(tg->service_queue.nr_queued[rw] &&
-	       bio != throtl_peek_queued(&tg->service_queue.queued[rw]));
+	BUG_ON(tg->service_queue.nr_queued[index] &&
+	       bio != throtl_peek_queued(&tg->service_queue.queued[index]));
 
 	/* If tg->bps = -1, then BW is unlimited */
-	if (!io_cost_has_limit(tg, rw)) {
+	if (!io_cost_has_limit(tg, index)) {
 		if (wait)
 			*wait = 0;
 		return true;
@@ -839,7 +856,7 @@ static bool tg_may_dispatch(struct throtl_grp *tg, struct bio *bio,
 	if (throtl_slice_used(tg, rw))
 		throtl_start_new_slice(tg, rw);
 	else {
-		if (time_before(tg->slice_end[rw], jiffies + throtl_slice))
+		if (time_before(tg->slice_end[index], jiffies + throtl_slice))
 			throtl_extend_slice(tg, rw, jiffies + throtl_slice);
 	}
 
@@ -852,7 +869,7 @@ static bool tg_may_dispatch(struct throtl_grp *tg, struct bio *bio,
 	if (wait)
 		*wait = max_wait;
 
-	if (time_before(tg->slice_end[rw], jiffies + max_wait))
+	if (time_before(tg->slice_end[index], jiffies + max_wait))
 		throtl_extend_slice(tg, rw, jiffies + max_wait);
 
 	return false;
@@ -861,10 +878,11 @@ static bool tg_may_dispatch(struct throtl_grp *tg, struct bio *bio,
 static inline void io_cost_charge_bio(struct throtl_grp *tg, struct bio *bio)
 {
 	bool rw = bio_data_dir(bio);
+	int index = tg_data_index(tg, rw);
 
 	/* Charge the bio to the group */
-	tg->io_cost.bytes_disp[rw] += bio->bi_iter.bi_size;
-	tg->io_cost.io_disp[rw]++;
+	tg->io_cost.bytes_disp[index] += bio->bi_iter.bi_size;
+	tg->io_cost.io_disp[index]++;
 }
 
 static void throtl_charge_bio(struct throtl_grp *tg, struct bio *bio)
@@ -894,9 +912,10 @@ static void throtl_add_bio_tg(struct bio *bio, struct throtl_qnode *qn,
 {
 	struct throtl_service_queue *sq = &tg->service_queue;
 	bool rw = bio_data_dir(bio);
+	int index = tg_data_index(tg, rw);
 
 	if (!qn)
-		qn = &tg->qnode_on_self[rw];
+		qn = &tg->qnode_on_self[index];
 
 	/*
 	 * If @tg doesn't currently have any bios queued in the same
@@ -904,12 +923,12 @@ static void throtl_add_bio_tg(struct bio *bio, struct throtl_qnode *qn,
 	 * dispatched.  Mark that @tg was empty.  This is automatically
 	 * cleaered on the next tg_update_disptime().
 	 */
-	if (!sq->nr_queued[rw])
+	if (!sq->nr_queued[index])
 		tg->flags |= THROTL_TG_WAS_EMPTY;
 
-	throtl_qnode_add_bio(bio, qn, &sq->queued[rw]);
+	throtl_qnode_add_bio(bio, qn, &sq->queued[index]);
 
-	sq->nr_queued[rw]++;
+	sq->nr_queued[index]++;
 	throtl_enqueue_tg(tg);
 }
 
@@ -940,9 +959,10 @@ static void tg_update_disptime(struct throtl_grp *tg)
 static void start_parent_slice_with_credit(struct throtl_grp *child_tg,
 					struct throtl_grp *parent_tg, bool rw)
 {
+	int index = tg_data_index(child_tg, rw);
 	if (throtl_slice_used(parent_tg, rw)) {
 		throtl_start_new_slice_with_credit(parent_tg, rw,
-				child_tg->slice_start[rw]);
+				child_tg->slice_start[index]);
 	}
 
 }
@@ -954,6 +974,7 @@ static void tg_dispatch_one_bio(struct throtl_grp *tg, bool rw)
 	struct throtl_grp *parent_tg = sq_to_tg(parent_sq);
 	struct throtl_grp *tg_to_put = NULL;
 	struct bio *bio;
+	int index = tg_data_index(tg, rw);
 
 	/*
 	 * @bio is being transferred from @tg to @parent_sq.  Popping a bio
@@ -961,8 +982,8 @@ static void tg_dispatch_one_bio(struct throtl_grp *tg, bool rw)
 	 * getting released prematurely.  Remember the tg to put and put it
 	 * after @bio is transferred to @parent_sq.
 	 */
-	bio = throtl_pop_queued(&sq->queued[rw], &tg_to_put);
-	sq->nr_queued[rw]--;
+	bio = throtl_pop_queued(&sq->queued[index], &tg_to_put);
+	sq->nr_queued[index]--;
 
 	throtl_charge_bio(tg, bio);
 
@@ -974,13 +995,13 @@ static void tg_dispatch_one_bio(struct throtl_grp *tg, bool rw)
 	 * responsible for issuing these bios.
 	 */
 	if (parent_tg) {
-		throtl_add_bio_tg(bio, &tg->qnode_on_parent[rw], parent_tg);
+		throtl_add_bio_tg(bio, &tg->qnode_on_parent[index], parent_tg);
 		start_parent_slice_with_credit(tg, parent_tg, rw);
 	} else {
-		throtl_qnode_add_bio(bio, &tg->qnode_on_parent[rw],
-				     &parent_sq->queued[rw]);
-		BUG_ON(tg->td->nr_queued[rw] <= 0);
-		tg->td->nr_queued[rw]--;
+		throtl_qnode_add_bio(bio, &tg->qnode_on_parent[index],
+				     &parent_sq->queued[index]);
+		BUG_ON(tg->td->nr_queued[index] <= 0);
+		tg->td->nr_queued[index]--;
 	}
 
 	throtl_trim_slice(tg, rw);
@@ -1139,13 +1160,13 @@ static void blk_throtl_dispatch_work_fn(struct work_struct *work)
 	struct bio_list bio_list_on_stack;
 	struct bio *bio;
 	struct blk_plug plug;
-	int rw;
+	int i;
 
 	bio_list_init(&bio_list_on_stack);
 
 	spin_lock_irq(q->queue_lock);
-	for (rw = READ; rw <= WRITE; rw++)
-		while ((bio = throtl_pop_queued(&td_sq->queued[rw], NULL)))
+	for (i = READ; i <= WRITE; i++)
+		while ((bio = throtl_pop_queued(&td_sq->queued[i], NULL)))
 			bio_list_add(&bio_list_on_stack, bio);
 	spin_unlock_irq(q->queue_lock);
 
@@ -1453,12 +1474,13 @@ bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 	struct throtl_grp *tg = blkg_to_tg(blkg ?: q->root_blkg);
 	struct throtl_service_queue *sq;
 	bool rw = bio_data_dir(bio);
+	int index = tg_data_index(tg, rw);
 	bool throttled = false;
 
 	WARN_ON_ONCE(!rcu_read_lock_held());
 
 	/* see throtl_charge_bio() */
-	if ((bio->bi_rw & REQ_THROTTLED) || !tg->has_rules[rw])
+	if ((bio->bi_rw & REQ_THROTTLED) || !tg->has_rules[index])
 		goto out;
 
 	spin_lock_irq(q->queue_lock);
@@ -1470,7 +1492,7 @@ bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 
 	while (true) {
 		/* throtl is FIFO - if bios are already queued, should queue */
-		if (sq->nr_queued[rw])
+		if (sq->nr_queued[index])
 			break;
 
 		/* if above limits, break to queue */
@@ -1498,7 +1520,7 @@ bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 		 * Climb up the ladder.  If we''re already at the top, it
 		 * can be executed directly.
 		 */
-		qn = &tg->qnode_on_parent[rw];
+		qn = &tg->qnode_on_parent[index];
 		sq = sq->parent_sq;
 		tg = sq_to_tg(sq);
 		if (!tg)
@@ -1508,13 +1530,13 @@ bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 	/* out-of-limit, queue to @tg */
 	throtl_log(sq, "[%c] bio. bdisp=%llu sz=%u bps=%llu iodisp=%u iops=%u queued=%d/%d",
 		   rw == READ ? 'R' : 'W',
-		   tg->io_cost.bytes_disp[rw], bio->bi_iter.bi_size,
-		   tg->io_cost.bps[rw], tg->io_cost.io_disp[rw],
-		   tg->io_cost.iops[rw],
+		   tg->io_cost.bytes_disp[index], bio->bi_iter.bi_size,
+		   tg->io_cost.bps[index], tg->io_cost.io_disp[index],
+		   tg->io_cost.iops[index],
 		   sq->nr_queued[READ], sq->nr_queued[WRITE]);
 
 	bio_associate_current(bio);
-	tg->td->nr_queued[rw]++;
+	tg->td->nr_queued[index]++;
 	throtl_add_bio_tg(bio, qn, tg);
 	throttled = true;
 
@@ -1577,7 +1599,7 @@ void blk_throtl_drain(struct request_queue *q)
 	struct blkcg_gq *blkg;
 	struct cgroup_subsys_state *pos_css;
 	struct bio *bio;
-	int rw;
+	int i;
 
 	queue_lockdep_assert_held(q);
 	rcu_read_lock();
@@ -1598,8 +1620,8 @@ void blk_throtl_drain(struct request_queue *q)
 	spin_unlock_irq(q->queue_lock);
 
 	/* all bios now should be in td->service_queue, issue them */
-	for (rw = READ; rw <= WRITE; rw++)
-		while ((bio = throtl_pop_queued(&td->service_queue.queued[rw],
+	for (i = READ; i <= WRITE; i++)
+		while ((bio = throtl_pop_queued(&td->service_queue.queued[i],
 						NULL)))
 			generic_make_request(bio);
 
