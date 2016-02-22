@@ -3630,13 +3630,13 @@ int lock_is_held(struct lockdep_map *lock)
 	if (unlikely(current->lockdep_recursion))
 		return 1; /* avoid false negative lockdep_assert_held() */
 
-	raw_local_irq_save(flags);
+	local_irq_save(flags);
 	check_flags(flags);
 
 	current->lockdep_recursion = 1;
 	ret = __lock_is_held(lock);
 	current->lockdep_recursion = 0;
-	raw_local_irq_restore(flags);
+	local_irq_restore(flags);
 
 	return ret;
 }
