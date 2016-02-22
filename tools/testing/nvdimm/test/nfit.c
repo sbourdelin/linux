@@ -160,6 +160,14 @@ static struct nfit_test *to_nfit_test(struct device *dev)
 	return container_of(pdev, struct nfit_test, pdev);
 }
 
+static void nfit_set_spd_id(u8 *dist, u64 value, size_t size)
+{
+	int shift;
+
+	for (shift = size - 1; shift >= 0; shift--, dist++)
+		*dist = (u8)((value >> (8 * shift)) & 0xff);
+}
+
 static int nfit_test_cmd_get_config_size(struct nd_cmd_get_config_size *nd_cmd,
 		unsigned int buf_len)
 {
@@ -815,10 +823,11 @@ static void nfit_test0_setup(struct nfit_test *t)
 	dcr->header.type = ACPI_NFIT_TYPE_CONTROL_REGION;
 	dcr->header.length = sizeof(struct acpi_nfit_control_region);
 	dcr->region_index = 0+1;
-	dcr->vendor_id = 0xabcd;
-	dcr->device_id = 0;
-	dcr->revision_id = 1;
-	dcr->serial_number = ~handle[0];
+	nfit_set_spd_id(dcr->vendor_id, 0xabcd, sizeof(dcr->vendor_id));
+	nfit_set_spd_id(dcr->device_id, 0, sizeof(dcr->device_id));
+	nfit_set_spd_id(dcr->revision_id, 1, sizeof(dcr->revision_id));
+	nfit_set_spd_id(dcr->serial_number, ~handle[0],
+				sizeof(dcr->serial_number));
 	dcr->windows = 1;
 	dcr->window_size = DCR_SIZE;
 	dcr->command_offset = 0;
@@ -831,10 +840,11 @@ static void nfit_test0_setup(struct nfit_test *t)
 	dcr->header.type = ACPI_NFIT_TYPE_CONTROL_REGION;
 	dcr->header.length = sizeof(struct acpi_nfit_control_region);
 	dcr->region_index = 1+1;
-	dcr->vendor_id = 0xabcd;
-	dcr->device_id = 0;
-	dcr->revision_id = 1;
-	dcr->serial_number = ~handle[1];
+	nfit_set_spd_id(dcr->vendor_id, 0xabcd, sizeof(dcr->vendor_id));
+	nfit_set_spd_id(dcr->device_id, 0, sizeof(dcr->device_id));
+	nfit_set_spd_id(dcr->revision_id, 1, sizeof(dcr->revision_id));
+	nfit_set_spd_id(dcr->serial_number, ~handle[1],
+				sizeof(dcr->serial_number));
 	dcr->windows = 1;
 	dcr->window_size = DCR_SIZE;
 	dcr->command_offset = 0;
@@ -847,10 +857,11 @@ static void nfit_test0_setup(struct nfit_test *t)
 	dcr->header.type = ACPI_NFIT_TYPE_CONTROL_REGION;
 	dcr->header.length = sizeof(struct acpi_nfit_control_region);
 	dcr->region_index = 2+1;
-	dcr->vendor_id = 0xabcd;
-	dcr->device_id = 0;
-	dcr->revision_id = 1;
-	dcr->serial_number = ~handle[2];
+	nfit_set_spd_id(dcr->vendor_id, 0xabcd, sizeof(dcr->vendor_id));
+	nfit_set_spd_id(dcr->device_id, 0, sizeof(dcr->device_id));
+	nfit_set_spd_id(dcr->revision_id, 1, sizeof(dcr->revision_id));
+	nfit_set_spd_id(dcr->serial_number, ~handle[2],
+				sizeof(dcr->serial_number));
 	dcr->windows = 1;
 	dcr->window_size = DCR_SIZE;
 	dcr->command_offset = 0;
@@ -863,10 +874,11 @@ static void nfit_test0_setup(struct nfit_test *t)
 	dcr->header.type = ACPI_NFIT_TYPE_CONTROL_REGION;
 	dcr->header.length = sizeof(struct acpi_nfit_control_region);
 	dcr->region_index = 3+1;
-	dcr->vendor_id = 0xabcd;
-	dcr->device_id = 0;
-	dcr->revision_id = 1;
-	dcr->serial_number = ~handle[3];
+	nfit_set_spd_id(dcr->vendor_id, 0xabcd, sizeof(dcr->vendor_id));
+	nfit_set_spd_id(dcr->device_id, 0, sizeof(dcr->device_id));
+	nfit_set_spd_id(dcr->revision_id, 1, sizeof(dcr->revision_id));
+	nfit_set_spd_id(dcr->serial_number, ~handle[3],
+				sizeof(dcr->serial_number));
 	dcr->windows = 1;
 	dcr->window_size = DCR_SIZE;
 	dcr->command_offset = 0;
@@ -959,10 +971,11 @@ static void nfit_test0_setup(struct nfit_test *t)
 		dcr->header.type = ACPI_NFIT_TYPE_CONTROL_REGION;
 		dcr->header.length = sizeof(struct acpi_nfit_control_region);
 		dcr->region_index = 4+1;
-		dcr->vendor_id = 0xabcd;
-		dcr->device_id = 0;
-		dcr->revision_id = 1;
-		dcr->serial_number = ~handle[4];
+		nfit_set_spd_id(dcr->vendor_id, 0xabcd, sizeof(dcr->vendor_id));
+		nfit_set_spd_id(dcr->device_id, 0, sizeof(dcr->device_id));
+		nfit_set_spd_id(dcr->revision_id, 1, sizeof(dcr->revision_id));
+		nfit_set_spd_id(dcr->serial_number, ~handle[4],
+					sizeof(dcr->serial_number));
 		dcr->windows = 1;
 		dcr->window_size = DCR_SIZE;
 		dcr->command_offset = 0;
@@ -1128,11 +1141,12 @@ static void nfit_test1_setup(struct nfit_test *t)
 	dcr->header.type = ACPI_NFIT_TYPE_CONTROL_REGION;
 	dcr->header.length = sizeof(struct acpi_nfit_control_region);
 	dcr->region_index = 0+1;
-	dcr->vendor_id = 0xabcd;
-	dcr->device_id = 0;
-	dcr->revision_id = 1;
-	dcr->serial_number = ~0;
-	dcr->code = 0x201;
+	nfit_set_spd_id(dcr->vendor_id, 0xabcd, sizeof(dcr->vendor_id));
+	nfit_set_spd_id(dcr->device_id, 0, sizeof(dcr->device_id));
+	nfit_set_spd_id(dcr->revision_id, 1, sizeof(dcr->revision_id));
+	nfit_set_spd_id(dcr->serial_number, ~0,
+				sizeof(dcr->serial_number));
+	nfit_set_spd_id(dcr->code, 0x201, sizeof(dcr->code));
 	dcr->windows = 0;
 	dcr->window_size = 0;
 	dcr->command_offset = 0;
