@@ -1798,7 +1798,7 @@ static void gsm_queue(struct gsm_mux *gsm)
 
 	gsm_print_packet("<--", address, cr, gsm->control, gsm->buf, gsm->len);
 
-	cr ^= 1 - gsm->initiator;	/* Flip so 1 always means command */
+	cr ^= gsm->initiator;		/* Flip so 1 always means command */
 	dlci = gsm->dlci[address];
 
 	switch (gsm->control) {
@@ -1829,7 +1829,7 @@ static void gsm_queue(struct gsm_mux *gsm)
 		break;
 	case UA:
 	case UA|PF:
-		if (cr == 0 || dlci == NULL)
+		if (cr || dlci == NULL)
 			break;
 		switch (dlci->state) {
 		case DLCI_CLOSING:
