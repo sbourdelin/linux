@@ -1852,10 +1852,11 @@ static void gsm_queue(struct gsm_mux *gsm)
 	case UI|PF:
 	case UIH:
 	case UIH|PF:
-#if 0
-		if (cr)
-			goto invalid;
-#endif
+		/* Don't reject frames based on cr value as UI/UIH
+		 * frame can be received as a command from other
+		 * station or as a response to a command we issued
+		 * earlier.
+		 */
 		if (dlci == NULL || dlci->state != DLCI_OPEN) {
 			gsm_response(gsm, address, DM|PF);
 			return;
