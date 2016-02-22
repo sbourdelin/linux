@@ -145,7 +145,7 @@ no_update:
 
 	/* write data page to try to make data consistent */
 	set_page_writeback(page);
-	fio.blk_addr = dn->data_blkaddr;
+	fio.old_blkaddr = dn->data_blkaddr;
 	write_data_page(dn, &fio);
 	set_data_blkaddr(dn);
 	f2fs_update_extent_cache(dn);
