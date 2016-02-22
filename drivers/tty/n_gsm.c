@@ -2874,12 +2874,11 @@ static int gsmtty_modem_update(struct gsm_dlci *dlci, u8 brk)
 	if (brk)
 		len++;
 
-	modembits[0] = len << 1 | EA;		/* Data bytes */
-	modembits[1] = dlci->addr << 2 | 3;	/* DLCI, EA, 1 */
-	modembits[2] = gsm_encode_modem(dlci) << 1 | EA;
+	modembits[0] = dlci->addr << 2 | 3;	/* DLCI, EA, 1 */
+	modembits[1] = gsm_encode_modem(dlci) << 1 | EA;
 	if (brk)
-		modembits[3] = brk << 4 | 2 | EA;	/* Valid, EA */
-	ctrl = gsm_control_send(dlci->gsm, CMD_MSC, modembits, len + 1);
+		modembits[2] = brk << 4 | 2 | EA;	/* Valid, EA */
+	ctrl = gsm_control_send(dlci->gsm, CMD_MSC, modembits, len);
 	if (ctrl == NULL)
 		return -ENOMEM;
 	return gsm_control_wait(dlci->gsm, ctrl);
