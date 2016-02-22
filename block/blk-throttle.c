@@ -2229,6 +2229,7 @@ bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 
 	sq = &tg->service_queue;
 
+again:
 	tg_check_new_weight(tg);
 	detect_inactive_cg(tg);
 	while (true) {
@@ -2238,8 +2239,18 @@ bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 		tg_update_perf(tg);
 
 		/* if above limits, break to queue */
-		if (!tg_may_dispatch(tg, bio, NULL))
+		if (!tg_may_dispatch(tg, bio, NULL)) {
+			/*
+			 * If the cg hits limit but its share is shrinked, the
+			 * shrink isn't optimal
+			 */
+			if (sq->acting_weight < sq->weight) {
+				/* pretend we are changing weight */
+				sq->new_weight = sq->weight;
+				goto again;
+			}
 			break;
+		}
 
 		/* within limits, let's charge and dispatch directly */
 		throtl_charge_bio(tg, bio);
