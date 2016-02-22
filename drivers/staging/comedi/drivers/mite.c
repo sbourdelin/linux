@@ -51,7 +51,7 @@
 
 #include "mite.h"
 
-#define TOP_OF_PAGE(x) ((x)|(~(PAGE_MASK)))
+#define TOP_OF_PAGE(x) ((x) | (~(PAGE_MASK)))
 
 struct mite_struct *mite_alloc(struct pci_dev *pcidev)
 {
@@ -216,7 +216,7 @@ EXPORT_SYMBOL_GPL(mite_free_ring);
 struct mite_channel *mite_request_channel_in_range(struct mite_struct *mite,
 						   struct
 						   mite_dma_descriptor_ring
-						   *ring, unsigned min_channel,
+						   * ring, unsigned min_channel,
 						   unsigned max_channel)
 {
 	int i;
