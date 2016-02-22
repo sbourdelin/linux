@@ -963,6 +963,9 @@ irqreturn_t azx_interrupt(int irq, void *dev_id)
 		azx_writeb(chip, RIRBSTS, RIRB_INT_MASK);
 	}
 
+	if (chip->post_irq)
+		chip->post_irq(chip);
+
 	spin_unlock(&bus->reg_lock);
 
 	return IRQ_HANDLED;

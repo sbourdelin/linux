@@ -1663,6 +1663,43 @@ static int azx_create(struct snd_card *card, struct pci_dev *pci,
 	return 0;
 }
 
+/* HSW, BDW, SKL and BXT need do post_irq() */
+#define INTEL_IRQ_POST(chip) \
+	(((chip)->pci->vendor == PCI_VENDOR_ID_INTEL) && \
+	 (((chip)->pci->device == 0x0a0c) || \
+	 ((chip)->pci->device == 0x0c0c) || \
+	 ((chip)->pci->device == 0x0d0c) || \
+	 ((chip)->pci->device == 0x160c) || \
+	 ((chip)->pci->device == 0xa170) || \
+	 ((chip)->pci->device == 0x9d70) || \
+	 ((chip)->pci->device == 0x5a98)))
+
+
+/* on some intel platforms, if there occurs an interrupt
+ * when irq is being handled, interrupt signal will not be raised
+ * after the irq handler returns. And the interrupt status may never
+ * be cleared.
+ * So let's clear all the interrupt status before return from irq handler.
+ * This can help to reduce the contest between the irq handler and the signal.
+ */
+static void intel_post_irq(struct azx *chip)
+{
+	struct hdac_bus *bus = azx_bus(chip);
+	struct hdac_stream *azx_dev;
+
+	list_for_each_entry(azx_dev, &bus->stream_list, list)
+		snd_hdac_stream_writeb(azx_dev, SD_STS, SD_INT_MASK);
+
+	/* clear STATESTS */
+	snd_hdac_chip_writew(bus, STATESTS, STATESTS_INT_MASK);
+
+	/* clear rirb status */
+	snd_hdac_chip_writeb(bus, RIRBSTS, RIRB_INT_MASK);
+
+	/* clear int status */
+	snd_hdac_chip_writel(bus, INTSTS, AZX_INT_CTRL_EN | AZX_INT_ALL_STREAM);
+}
+
 static int azx_first_init(struct azx *chip)
 {
 	int dev = chip->dev_index;
@@ -1716,6 +1753,9 @@ static int azx_first_init(struct azx *chip)
 	/* AMD devices support 40 or 48bit DMA, take the safe one */
 	if (chip->pci->vendor == PCI_VENDOR_ID_AMD)
 		dma_bits = 40;
+
+	if (INTEL_IRQ_POST(chip))
+		chip->post_irq = intel_post_irq;
 
 	/* disable SB600 64bit support for safety */
 	if (chip->pci->vendor == PCI_VENDOR_ID_ATI) {

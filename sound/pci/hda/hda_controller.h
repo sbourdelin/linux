@@ -146,6 +146,9 @@ struct azx {
 	const struct firmware *fw;
 #endif
 
+	/* callback at the end of interrupt handler  */
+	void (*post_irq)(struct azx *);
+
 	/* flags */
 	int bdl_pos_adj;
 	int poll_count;
