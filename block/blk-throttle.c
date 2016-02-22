@@ -18,6 +18,8 @@
 #define DFT_WEIGHT (100)
 #define SHARE_SHIFT (14)
 #define MAX_SHARE (1 << SHARE_SHIFT)
+/* must be less than the interval we update bandwidth */
+#define CGCHECK_TIME (msecs_to_jiffies(100))
 
 /* Max dispatch from a group in 1 round */
 static int throtl_grp_quantum = 8;
@@ -83,8 +85,11 @@ struct throtl_service_queue {
 	struct timer_list	pending_timer;	/* fires on first_pending_disptime */
 
 	unsigned int		weight; /* this queue's weight against siblings */
+	unsigned int		acting_weight; /* actual weight of the queue */
 	unsigned int		children_weight; /* children weight */
 	unsigned int		share; /* disk bandwidth share of the queue */
+
+	unsigned long active_timestamp;
 };
 
 enum tg_state_flags {
@@ -184,6 +189,7 @@ struct throtl_data
 	/* Work for dispatching throttled bios */
 	struct work_struct dispatch_work;
 	enum run_mode mode;
+	unsigned long last_check_timestamp;
 };
 
 static bool td_weight_based(struct throtl_data *td)
@@ -444,7 +450,7 @@ static void throtl_pd_init(struct blkg_policy_data *pd)
 	if (cgroup_subsys_on_dfl(io_cgrp_subsys) && blkg->parent)
 		sq->parent_sq = &blkg_to_tg(blkg->parent)->service_queue;
 	sq->weight = DFT_WEIGHT;
-	sq->parent_sq->children_weight += sq->weight;
+	sq->acting_weight = 0;
 	tg->td = td;
 }
 
@@ -483,8 +489,10 @@ static void throtl_pd_free(struct blkg_policy_data *pd)
 	struct throtl_grp *tg = pd_to_tg(pd);
 	struct throtl_service_queue *sq = &tg->service_queue;
 
-	if (sq->parent_sq)
-		sq->parent_sq->children_weight -= sq->weight;
+	if (sq->acting_weight && sq->parent_sq) {
+		sq->parent_sq->children_weight -= sq->acting_weight;
+		sq->acting_weight = 0;
+	}
 
 	del_timer_sync(&tg->service_queue.pending_timer);
 	kfree(tg);
@@ -1096,14 +1104,72 @@ static void tg_update_share(struct throtl_data *td, struct throtl_grp *tg)
 		child = blkg_to_tg(blkg);
 		sq = &child->service_queue;
 
-		if (!sq->parent_sq)
+		if (!sq->parent_sq || !sq->acting_weight)
 			continue;
 
 		sq->share = max_t(unsigned int,
-			sq->parent_sq->share * sq->weight /
+			sq->parent_sq->share * sq->acting_weight /
 				sq->parent_sq->children_weight,
 			1);
 	}
+}
+
+static void tg_update_active_time(struct throtl_grp *tg)
+{
+	struct throtl_service_queue *sq = &tg->service_queue;
+	unsigned long now = jiffies;
+
+	tg = NULL;
+	while (sq->parent_sq) {
+		sq->active_timestamp = now;
+		if (!sq->acting_weight) {
+			sq->acting_weight = sq->weight;
+			sq->parent_sq->children_weight += sq->acting_weight;
+			tg = sq_to_tg(sq);
+		}
+		sq = sq->parent_sq;
+	}
+
+	if (tg)
+		tg_update_share(tg->td, tg);
+}
+
+static void detect_inactive_cg(struct throtl_grp *tg)
+{
+	struct throtl_data *td = tg->td;
+	struct throtl_service_queue *sq = &tg->service_queue;
+	unsigned long now = jiffies;
+	struct cgroup_subsys_state *pos_css;
+	struct blkcg_gq *blkg;
+	bool update_share = false;
+
+	tg_update_active_time(tg);
+
+	if (time_before(now, td->last_check_timestamp + CGCHECK_TIME))
+		return;
+	td->last_check_timestamp = now;
+
+	blkg_for_each_descendant_post(blkg, pos_css, td->queue->root_blkg) {
+		tg = blkg_to_tg(blkg);
+		sq = &tg->service_queue;
+		/* '/' cgroup of cgroup2 */
+		if (cgroup_subsys_on_dfl(io_cgrp_subsys) &&
+		    !tg_to_blkg(tg)->parent)
+			continue;
+
+		if (sq->parent_sq &&
+		    time_before(sq->active_timestamp + CGCHECK_TIME, now) &&
+		    !(sq->nr_queued[READ] || sq->nr_queued[WRITE])) {
+			if (sq->acting_weight && sq->parent_sq) {
+				sq->parent_sq->children_weight -= sq->acting_weight;
+				sq->acting_weight = 0;
+				update_share = true;
+			}
+		}
+	}
+
+	if (update_share)
+		tg_update_share(td, NULL);
 }
 
 static void tg_dispatch_one_bio(struct throtl_grp *tg, bool rw)
@@ -1186,6 +1252,7 @@ static int throtl_dispatch_tg(struct throtl_grp *tg)
 			break;
 	}
 	if (nr_reads + nr_writes) {
+		detect_inactive_cg(tg);
 		tg_update_perf(tg);
 	}
 
@@ -1639,6 +1706,7 @@ bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 
 	sq = &tg->service_queue;
 
+	detect_inactive_cg(tg);
 	while (true) {
 		/* throtl is FIFO - if bios are already queued, should queue */
 		if (sq->nr_queued[index])
@@ -1791,6 +1859,7 @@ int blk_throtl_init(struct request_queue *q)
 	throtl_service_queue_init(&td->service_queue);
 	td->service_queue.share = MAX_SHARE;
 	td->mode = MODE_NONE;
+	td->service_queue.acting_weight = DFT_WEIGHT;
 
 	q->td = td;
 	td->queue = q;
