@@ -86,6 +86,7 @@ struct throtl_service_queue {
 
 	unsigned int		weight; /* this queue's weight against siblings */
 	unsigned int		acting_weight; /* actual weight of the queue */
+	unsigned int		new_weight; /* weight changed to */
 	unsigned int		children_weight; /* children weight */
 	unsigned int		share; /* disk bandwidth share of the queue */
 
@@ -1529,11 +1530,16 @@ static ssize_t tg_set_conf(struct kernfs_open_file *of,
 		v = -1;
 
 	tg = blkg_to_tg(ctx.blkg);
+	if (td_weight_based(tg->td)) {
+		ret = -EBUSY;
+		goto out_finish;
+	}
 
 	if (is_u64)
 		*(u64 *)((void *)tg + of_cft(of)->private) = v;
 	else
 		*(unsigned int *)((void *)tg + of_cft(of)->private) = v;
+	tg->td->mode = MODE_THROTTLE;
 
 	tg_conf_updated(tg);
 	ret = 0;
@@ -1554,7 +1560,216 @@ static ssize_t tg_set_conf_uint(struct kernfs_open_file *of,
 	return tg_set_conf(of, buf, nbytes, off, false);
 }
 
+static int tg_print_weight(struct seq_file *sf, void *v)
+{
+	struct blkcg *blkcg = css_to_blkcg(seq_css(sf));
+	struct throtl_group_data *tgd = blkcg_to_tgd(blkcg);
+	unsigned int weight = 0;
+
+	if (tgd)
+		weight = tgd->weight;
+	seq_printf(sf, "%u\n", weight);
+	return 0;
+}
+
+static int tg_set_weight(struct cgroup_subsys_state *css,
+	struct cftype *cft, u64 val)
+{
+	struct blkcg *blkcg = css_to_blkcg(css);
+	struct throtl_group_data *tgd;
+	struct blkcg_gq *blkg;
+
+	if (val < MIN_WEIGHT)
+		val = MIN_WEIGHT;
+	if (val > MAX_WEIGHT)
+		val = MAX_WEIGHT;
+
+	spin_lock_irq(&blkcg->lock);
+	tgd = blkcg_to_tgd(blkcg);
+	if (!tgd) {
+		spin_unlock_irq(&blkcg->lock);
+		return -EINVAL;
+	}
+	tgd->weight = val;
+
+	hlist_for_each_entry(blkg, &blkcg->blkg_list, blkcg_node) {
+		struct throtl_grp *tg = blkg_to_tg(blkg);
+
+		if (!tg)
+			continue;
+		/* can't hold queue->lock here, weight changing is deferred */
+		if (td_weight_based(tg->td))
+			tg->service_queue.new_weight = val;
+	}
+	spin_unlock_irq(&blkcg->lock);
+	return 0;
+}
+
+static void __tg_set_weight(struct throtl_grp *tg, unsigned int weight)
+{
+	unsigned int old_weight;
+
+	old_weight = tg->service_queue.acting_weight;
+
+	tg->service_queue.weight = weight;
+	tg->service_queue.new_weight = 0;
+	if (old_weight && tg->service_queue.parent_sq) {
+		struct throtl_service_queue *psq = tg->service_queue.parent_sq;
+		if (weight > old_weight)
+			psq->children_weight += weight - old_weight;
+		else if (weight < old_weight)
+			psq->children_weight -= old_weight - weight;
+		tg->service_queue.acting_weight = weight;
+	}
+
+	tg_update_share(tg->td, tg);
+}
+
+static ssize_t tg_set_weight_device(struct kernfs_open_file *of,
+			   char *buf, size_t nbytes, loff_t off)
+{
+	struct blkcg *blkcg = css_to_blkcg(of_css(of));
+	struct blkg_conf_ctx ctx;
+	struct throtl_grp *tg;
+	unsigned int weight;
+	int ret;
+
+	ret = blkg_conf_prep(blkcg, &blkcg_policy_throtl, buf, &ctx);
+	if (ret)
+		return ret;
+
+	ret = -EINVAL;
+	if (sscanf(ctx.body, "%u", &weight) != 1)
+		goto out_finish;
+	if (weight < MIN_WEIGHT)
+		weight = MIN_WEIGHT;
+	if (weight > MAX_WEIGHT)
+		weight = MAX_WEIGHT;
+
+	tg = blkg_to_tg(ctx.blkg);
+	if (!td_weight_based(tg->td)) {
+		ret = -EBUSY;
+		goto out_finish;
+	}
+
+	__tg_set_weight(tg, weight);
+
+	tg_conf_updated(tg);
+	ret = 0;
+out_finish:
+	blkg_conf_finish(&ctx);
+	return ret ?: nbytes;
+}
+
+static u64 tg_prfill_mode_device(struct seq_file *sf,
+	struct blkg_policy_data *pd, int off)
+{
+	struct throtl_grp *tg = pd_to_tg(pd);
+	const char *dname = blkg_dev_name(pd->blkg);
+
+	if (!dname)
+		return 0;
+	if (tg->td->mode == MODE_NONE)
+		return 0;
+	seq_printf(sf, "%s %s\n", dname, run_mode_name[tg->td->mode]);
+	return 0;
+}
+
+static int throtl_print_mode_device(struct seq_file *sf, void *v)
+{
+	int i;
+	seq_printf(sf, "available ");
+	for (i = 0; i < MAX_MODE; i++)
+		seq_printf(sf, "%s ", run_mode_name[i]);
+	seq_printf(sf, "\n");
+	seq_printf(sf, "default %s\n", run_mode_name[MODE_NONE]);
+	blkcg_print_blkgs(sf, css_to_blkcg(seq_css(sf)),
+		tg_prfill_mode_device,  &blkcg_policy_throtl, 0, false);
+	return 0;
+}
+
+static u64 tg_prfill_weight_uint(struct seq_file *sf,
+	struct blkg_policy_data *pd, int off)
+{
+	struct throtl_grp *tg = pd_to_tg(pd);
+	struct throtl_group_data *tgd = blkcg_to_tgd(pd_to_blkg(pd)->blkcg);
+	unsigned int v = *(unsigned int *)((void *)tg + off);
+
+	if (v == tgd->weight)
+		return 0;
+	return __blkg_prfill_u64(sf, pd, v);
+}
+
+static int tg_print_weight_device(struct seq_file *sf, void *v)
+{
+	blkcg_print_blkgs(sf, css_to_blkcg(seq_css(sf)), tg_prfill_weight_uint,
+			  &blkcg_policy_throtl, seq_cft(sf)->private, false);
+	return 0;
+}
+
+static ssize_t tg_set_mode_device(struct kernfs_open_file *of,
+				  char *buf, size_t nbytes, loff_t off)
+{
+	struct blkcg *blkcg = css_to_blkcg(of_css(of));
+	struct blkg_conf_ctx ctx;
+	struct throtl_grp *tg;
+	int ret;
+	char mode_name[20] = "";
+	int mode;
+
+	ret = blkg_conf_prep(blkcg, &blkcg_policy_throtl, buf, &ctx);
+	if (ret)
+		return ret;
+
+	ret = -EINVAL;
+	if (sscanf(ctx.body, "%s", mode_name) != 1)
+		goto out_finish;
+
+	for (mode = 0; mode < MAX_MODE; mode++)
+		if (!strcmp(mode_name, run_mode_name[mode]))
+			break;
+	if (mode == MAX_MODE)
+		goto out_finish;
+
+	tg = blkg_to_tg(ctx.blkg);
+	if (tg->td->mode == mode) {
+		ret = 0;
+		goto out_finish;
+	}
+	/* Don't allow switching between throttle and weight based currently */
+	if (tg->td->mode != MODE_NONE) {
+		ret = -EBUSY;
+		goto out_finish;
+	}
+
+	tg->td->mode = mode;
+
+	ret = 0;
+out_finish:
+	blkg_conf_finish(&ctx);
+	return ret ?: nbytes;
+}
+
 static struct cftype throtl_legacy_files[] = {
+	{
+		.name = "throttle.mode_device",
+		.flags = CFTYPE_ONLY_ON_ROOT,
+		.seq_show = throtl_print_mode_device,
+		.write = tg_set_mode_device,
+	},
+	{
+		.name = "throttle.weight",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.seq_show = tg_print_weight,
+		.write_u64 = tg_set_weight,
+	},
+	{
+		.name = "throttle.weight_device",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.private = offsetof(struct throtl_grp, service_queue.weight),
+		.seq_show = tg_print_weight_device,
+		.write = tg_set_weight_device,
+	},
 	{
 		.name = "throttle.read_bps_device",
 		.private = offsetof(struct throtl_grp, io_cost.bps[READ]),
@@ -1728,6 +1943,13 @@ static struct blkcg_policy blkcg_policy_throtl = {
 	.pd_free_fn		= throtl_pd_free,
 };
 
+static void tg_check_new_weight(struct throtl_grp *tg)
+{
+	if (!td_weight_based(tg->td) || !tg->service_queue.new_weight)
+		return;
+	__tg_set_weight(tg, tg->service_queue.new_weight);
+}
+
 bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 		    struct bio *bio)
 {
@@ -1751,6 +1973,7 @@ bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 
 	sq = &tg->service_queue;
 
+	tg_check_new_weight(tg);
 	detect_inactive_cg(tg);
 	while (true) {
 		/* throtl is FIFO - if bios are already queued, should queue */
