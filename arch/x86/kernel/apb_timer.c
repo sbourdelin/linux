@@ -196,8 +196,8 @@ void apbt_setup_secondary_clock(void)
 		dw_apb_clockevent_resume(adev->timer);
 	}
 
-	printk(KERN_INFO "Registering CPU %d clockevent device %s, cpu %08x\n",
-	       cpu, adev->name, adev->cpu);
+	pr_info("Registering CPU %d clockevent device %s, cpu %08x\n",
+		cpu, adev->name, adev->cpu);
 
 	apbt_setup_irq(adev);
 	dw_apb_clockevent_register(adev->timer);
@@ -327,7 +327,7 @@ void __init apbt_time_init(void)
 #ifdef CONFIG_SMP
 	/* kernel cmdline disable apb timer, so we will use lapic timers */
 	if (intel_mid_timer_options == INTEL_MID_TIMER_LAPIC_APBT) {
-		printk(KERN_INFO "apbt: disabled per cpu timer\n");
+		pr_info("apbt: disabled per cpu timer\n");
 		return;
 	}
 	pr_debug("%s: %d CPUs online\n", __func__, num_online_cpus());
@@ -400,13 +400,12 @@ unsigned long apbt_quick_calibrate(void)
 
 	shift = 5;
 	if (unlikely(loop >> shift == 0)) {
-		printk(KERN_INFO
-		       "APBT TSC calibration failed, not enough resolution\n");
+		pr_info("APBT TSC calibration failed, not enough resolution\n");
 		return 0;
 	}
 	scale = (int)div_u64((t2 - t1), loop >> shift);
 	khz = (scale * (apbt_freq / 1000)) >> shift;
-	printk(KERN_INFO "TSC freq calculated by APB timer is %lu khz\n", khz);
+	pr_info("TSC freq calculated by APB timer is %lu khz\n", khz);
 	return khz;
 failed:
 	return 0;

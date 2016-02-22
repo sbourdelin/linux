@@ -1050,7 +1050,7 @@ void __init xen_arch_setup(void)
 
 #ifdef CONFIG_ACPI
 	if (!(xen_start_info->flags & SIF_INITDOMAIN)) {
-		printk(KERN_INFO "ACPI in unprivileged domain disabled\n");
+		pr_info("ACPI in unprivileged domain disabled\n");
 		disable_acpi();
 	}
 #endif

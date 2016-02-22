@@ -112,8 +112,8 @@ static int __init geos_init(void)
 	if (!product || strcmp(product, "Geos"))
 		return 0;
 
-	printk(KERN_INFO "%s: system is recognized as \"%s %s\"\n",
-	       KBUILD_MODNAME, vendor, product);
+	pr_info("%s: system is recognized as \"%s %s\"\n",
+		KBUILD_MODNAME, vendor, product);
 
 	register_geos();
 

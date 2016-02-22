@@ -376,8 +376,8 @@ static int __init __setup_host_supports_tls(void)
 {
 	check_host_supports_tls(&host_supports_tls, &host_gdt_entry_tls_min);
 	if (host_supports_tls) {
-		printk(KERN_INFO "Host TLS support detected\n");
-		printk(KERN_INFO "Detected host type: ");
+		pr_info("Host TLS support detected\n");
+		pr_info("Detected host type: ");
 		switch (host_gdt_entry_tls_min) {
 		case GDT_ENTRY_TLS_MIN_I386:
 			printk(KERN_CONT "i386");

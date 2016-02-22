@@ -46,7 +46,7 @@ void pcibios_scan_specific_bus(int busn)
 		if (!raw_pci_read(0, busn, devfn, PCI_VENDOR_ID, 2, &l) &&
 		    l != 0x0000 && l != 0xffff) {
 			DBG("Found device at %02x:%02x [%04x]\n", busn, devfn, l);
-			printk(KERN_INFO "PCI: Discovered peer bus %02x\n", busn);
+			pr_info("PCI: Discovered peer bus %02x\n", busn);
 			pcibios_scan_root(busn);
 			return;
 		}

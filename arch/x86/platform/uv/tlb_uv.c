@@ -1539,7 +1539,7 @@ static int parse_tunables_write(struct bau_control *bcp, char *instr,
 			break;
 	}
 	if (cnt != e) {
-		printk(KERN_INFO "bau tunable error: should be %d values\n", e);
+		pr_info("bau tunable error: should be %d values\n", e);
 		return -EINVAL;
 	}
 

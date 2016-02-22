@@ -135,7 +135,7 @@ static int xen_register_gsi(u32 gsi, int gsi_override, int triggering, int polar
 
 	rc = HYPERVISOR_physdev_op(PHYSDEVOP_setup_gsi, &setup_gsi);
 	if (rc == -EEXIST)
-		printk(KERN_INFO "Already setup the GSI :%d\n", gsi);
+		pr_info("Already setup the GSI :%d\n", gsi);
 	else if (rc) {
 		printk(KERN_ERR "Failed to setup GSI :%d, err_code:%d\n",
 				gsi, rc);
@@ -408,7 +408,7 @@ int __init pci_xen_init(void)
 	if (!xen_pv_domain() || xen_initial_domain())
 		return -ENODEV;
 
-	printk(KERN_INFO "PCI: setting up Xen PCI frontend stub\n");
+	pr_info("PCI: setting up Xen PCI frontend stub\n");
 
 	pcibios_set_cache_line_size();
 

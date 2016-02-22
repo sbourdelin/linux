@@ -163,16 +163,14 @@ void xen_unplug_emulated_devices(void)
 	 * been compiled for this kernel (modules or built-in are both OK). */
 	if (!xen_emul_unplug) {
 		if (xen_must_unplug_nics()) {
-			printk(KERN_INFO "Netfront and the Xen platform PCI driver have "
-					"been compiled for this kernel: unplug emulated NICs.\n");
+			pr_info("Netfront and the Xen platform PCI driver have been compiled for this kernel: unplug emulated NICs.\n");
 			xen_emul_unplug |= XEN_UNPLUG_ALL_NICS;
 		}
 		if (xen_must_unplug_disks()) {
-			printk(KERN_INFO "Blkfront and the Xen platform PCI driver have "
-					"been compiled for this kernel: unplug emulated disks.\n"
-					"You might have to change the root device\n"
-					"from /dev/hd[a-d] to /dev/xvd[a-d]\n"
-					"in your root= kernel command line option\n");
+			pr_info("Blkfront and the Xen platform PCI driver have been compiled for this kernel: unplug emulated disks.\n"
+				"You might have to change the root device\n"
+				"from /dev/hd[a-d] to /dev/xvd[a-d]\n"
+				"in your root= kernel command line option\n");
 			xen_emul_unplug |= XEN_UNPLUG_ALL_IDE_DISKS;
 		}
 	}

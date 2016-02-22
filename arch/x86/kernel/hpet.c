@@ -139,31 +139,28 @@ EXPORT_SYMBOL_GPL(is_hpet_enabled);
 static void _hpet_print_config(const char *function, int line)
 {
 	u32 i, timers, l, h;
-	printk(KERN_INFO "hpet: %s(%d):\n", function, line);
+	pr_info("hpet: %s(%d):\n", function, line);
 	l = hpet_readl(HPET_ID);
 	h = hpet_readl(HPET_PERIOD);
 	timers = ((l & HPET_ID_NUMBER) >> HPET_ID_NUMBER_SHIFT) + 1;
-	printk(KERN_INFO "hpet: ID: 0x%x, PERIOD: 0x%x\n", l, h);
+	pr_info("hpet: ID: 0x%x, PERIOD: 0x%x\n", l, h);
 	l = hpet_readl(HPET_CFG);
 	h = hpet_readl(HPET_STATUS);
-	printk(KERN_INFO "hpet: CFG: 0x%x, STATUS: 0x%x\n", l, h);
+	pr_info("hpet: CFG: 0x%x, STATUS: 0x%x\n", l, h);
 	l = hpet_readl(HPET_COUNTER);
 	h = hpet_readl(HPET_COUNTER+4);
-	printk(KERN_INFO "hpet: COUNTER_l: 0x%x, COUNTER_h: 0x%x\n", l, h);
+	pr_info("hpet: COUNTER_l: 0x%x, COUNTER_h: 0x%x\n", l, h);
 
 	for (i = 0; i < timers; i++) {
 		l = hpet_readl(HPET_Tn_CFG(i));
 		h = hpet_readl(HPET_Tn_CFG(i)+4);
-		printk(KERN_INFO "hpet: T%d: CFG_l: 0x%x, CFG_h: 0x%x\n",
-		       i, l, h);
+		pr_info("hpet: T%d: CFG_l: 0x%x, CFG_h: 0x%x\n", i, l, h);
 		l = hpet_readl(HPET_Tn_CMP(i));
 		h = hpet_readl(HPET_Tn_CMP(i)+4);
-		printk(KERN_INFO "hpet: T%d: CMP_l: 0x%x, CMP_h: 0x%x\n",
-		       i, l, h);
+		pr_info("hpet: T%d: CMP_l: 0x%x, CMP_h: 0x%x\n", i, l, h);
 		l = hpet_readl(HPET_Tn_ROUTE(i));
 		h = hpet_readl(HPET_Tn_ROUTE(i)+4);
-		printk(KERN_INFO "hpet: T%d ROUTE_l: 0x%x, ROUTE_h: 0x%x\n",
-		       i, l, h);
+		pr_info("hpet: T%d ROUTE_l: 0x%x, ROUTE_h: 0x%x\n", i, l, h);
 	}
 }
 
@@ -526,8 +523,8 @@ static irqreturn_t hpet_interrupt_handler(int irq, void *data)
 	struct clock_event_device *hevt = &dev->evt;
 
 	if (!hevt->event_handler) {
-		printk(KERN_INFO "Spurious HPET timer interrupt on HPET timer %d\n",
-				dev->num);
+		pr_info("Spurious HPET timer interrupt on HPET timer %d\n",
+			dev->num);
 		return IRQ_HANDLED;
 	}
 
@@ -646,7 +643,7 @@ static void hpet_msi_capability_lookup(unsigned int start_timer)
 			break;
 	}
 
-	printk(KERN_INFO "HPET: %d timers in total, %d timers will be used for per-cpu timer\n",
+	pr_info("HPET: %d timers in total, %d timers will be used for per-cpu timer\n",
 		num_timers, num_timers_used);
 }
 

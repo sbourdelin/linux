@@ -57,6 +57,9 @@ EXPORT_SYMBOL(acpi_disabled);
 
 #define PREFIX			"ACPI: "
 
+#undef pr_fmt
+#define pr_fmt(fmt) "ACPI: " fmt
+
 int acpi_noirq;				/* skip ACPI IRQ initialization */
 int acpi_pci_disabled;		/* skip ACPI PCI scan and IRQ initialization */
 EXPORT_SYMBOL(acpi_pci_disabled);
@@ -170,7 +173,7 @@ static int acpi_register_lapic(int id, u8 enabled)
 	unsigned int ver = 0;
 
 	if (id >= MAX_LOCAL_APIC) {
-		printk(KERN_INFO PREFIX "skipped apicid that is too big\n");
+		pr_info("skipped apicid that is too big\n");
 		return -EINVAL;
 	}
 
@@ -717,7 +720,7 @@ int acpi_map_cpu(acpi_handle handle, phys_cpuid_t physid, int *pcpu)
 
 	cpu = acpi_register_lapic(physid, ACPI_MADT_ENABLED);
 	if (cpu < 0) {
-		pr_info(PREFIX "Unable to map lapic to logical cpu number\n");
+		pr_info("Unable to map lapic to logical cpu number\n");
 		return cpu;
 	}
 
@@ -872,8 +875,7 @@ static int __init acpi_parse_hpet(struct acpi_table_header *table)
 		hpet_address >>= 32;
 	}
 #endif
-	printk(KERN_INFO PREFIX "HPET id: %#x base: %#lx\n",
-	       hpet_tbl->id, hpet_address);
+	pr_info("HPET id: %#x base: %#lx\n", hpet_tbl->id, hpet_address);
 
 	/*
 	 * Allocate and initialize the HPET firmware resource for adding into
@@ -935,8 +937,7 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
 		pmtmr_ioport = acpi_gbl_FADT.pm_timer_block;
 	}
 	if (pmtmr_ioport)
-		printk(KERN_INFO PREFIX "PM-Timer IO Port: %#x\n",
-		       pmtmr_ioport);
+		pr_info("PM-Timer IO Port: %#x\n", pmtmr_ioport);
 #endif
 	return 0;
 }
@@ -1132,8 +1133,7 @@ static int __init acpi_parse_madt_ioapic_entries(void)
 	 * if "noapic" boot option, don't look for IO-APICs
 	 */
 	if (skip_ioapic_setup) {
-		printk(KERN_INFO PREFIX "Skipping IOAPIC probe "
-		       "due to 'noapic' option.\n");
+		pr_info("Skipping IOAPIC probe due to 'noapic' option.\n");
 		return -ENODEV;
 	}
 
@@ -1263,11 +1263,9 @@ static void __init acpi_process_madt(void)
 	 * processors, where MPS only supports physical.
 	 */
 	if (acpi_lapic && acpi_ioapic)
-		printk(KERN_INFO "Using ACPI (MADT) for SMP configuration "
-		       "information\n");
+		pr_info("Using ACPI (MADT) for SMP configuration information\n");
 	else if (acpi_lapic)
-		printk(KERN_INFO "Using ACPI for processor (LAPIC) "
-		       "configuration information\n");
+		pr_info("Using ACPI for processor (LAPIC) configuration information\n");
 #endif
 	return;
 }

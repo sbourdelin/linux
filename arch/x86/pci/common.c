@@ -83,7 +83,7 @@ DEFINE_RAW_SPINLOCK(pci_config_lock);
 static int __init can_skip_ioresource_align(const struct dmi_system_id *d)
 {
 	pci_probe |= PCI_CAN_SKIP_ISA_ALIGN;
-	printk(KERN_INFO "PCI: %s detected, can skip ISA alignment\n", d->ident);
+	pr_info("PCI: %s detected, can skip ISA alignment\n", d->ident);
 	return 0;
 }
 
@@ -189,7 +189,7 @@ static int __init set_bf_sort(const struct dmi_system_id *d)
 {
 	if (pci_bf_sort == pci_bf_sort_default) {
 		pci_bf_sort = pci_dmi_bf;
-		printk(KERN_INFO "PCI: %s detected, enabling pci=bfsort.\n", d->ident);
+		pr_info("PCI: %s detected, enabling pci=bfsort.\n", d->ident);
 	}
 	return 0;
 }
@@ -203,7 +203,7 @@ static void __init read_dmi_type_b1(const struct dmi_header *dm,
 		return;
 	switch (((*(u32 *)d) >> 9) & 0x03) {
 	case 0x00:
-		printk(KERN_INFO "dmi type 0xB1 record - unknown flag\n");
+		pr_info("dmi type 0xB1 record - unknown flag\n");
 		break;
 	case 0x01: /* set pci=bfsort */
 		smbios_type_b1_flag = 1;
@@ -234,16 +234,16 @@ static int __init find_sort_method(const struct dmi_system_id *d)
 static int __init assign_all_busses(const struct dmi_system_id *d)
 {
 	pci_probe |= PCI_ASSIGN_ALL_BUSSES;
-	printk(KERN_INFO "%s detected: enabling PCI bus# renumbering"
-			" (pci=assign-busses)\n", d->ident);
+	pr_info("%s detected: enabling PCI bus# renumbering (pci=assign-busses)\n",
+		d->ident);
 	return 0;
 }
 #endif
 
 static int __init set_scan_all(const struct dmi_system_id *d)
 {
-	printk(KERN_INFO "PCI: %s detected, enabling pci=pcie_scan_all\n",
-	       d->ident);
+	pr_info("PCI: %s detected, enabling pci=pcie_scan_all\n",
+		d->ident);
 	pci_add_flags(PCI_SCAN_ALL_PCIE_DEVS);
 	return 0;
 }

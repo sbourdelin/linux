@@ -115,7 +115,7 @@ static int test_NX(void)
 
 	test_data = 0xC3;
 
-	printk(KERN_INFO "Testing NX protection\n");
+	pr_info("Testing NX protection\n");
 
 	/* Test 1: check if the stack is not executable */
 	if (test_address(&stackcode)) {

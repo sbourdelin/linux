@@ -273,9 +273,10 @@ static void __init xen_banner(void)
 	pr_info("Booting paravirtualized kernel %son %s\n",
 		xen_feature(XENFEAT_auto_translated_physmap) ?
 			"with PVH extensions " : "", pv_info.name);
-	printk(KERN_INFO "Xen version: %d.%d%s%s\n",
-	       version >> 16, version & 0xffff, extra.extraversion,
-	       xen_feature(XENFEAT_mmu_pt_update_preserve_ad) ? " (preserve-AD)" : "");
+	pr_info("Xen version: %d.%d%s%s\n",
+		version >> 16, version & 0xffff, extra.extraversion,
+		xen_feature(XENFEAT_mmu_pt_update_preserve_ad) ?
+			" (preserve-AD)" : "");
 }
 /* Check if running on Xen version (major, minor) or later */
 bool
@@ -1769,7 +1770,7 @@ static void __init init_hvm_pv_info(void)
 
 	major = eax >> 16;
 	minor = eax & 0xffff;
-	printk(KERN_INFO "Xen version %d.%d.\n", major, minor);
+	pr_info("Xen version %d.%d.\n", major, minor);
 
 	cpuid(base + 2, &pages, &msr, &ecx, &edx);
 

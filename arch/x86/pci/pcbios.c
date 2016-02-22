@@ -44,7 +44,7 @@ static inline void set_bios_x(void)
 	pcibios_enabled = 1;
 	set_memory_x(PAGE_OFFSET + BIOS_BEGIN, (BIOS_END - BIOS_BEGIN) >> PAGE_SHIFT);
 	if (__supported_pte_mask & _PAGE_NX)
-		printk(KERN_INFO "PCI : PCI BIOS area is rw and x. Use pci=nobios if you want it NX.\n");
+		pr_info("PCI : PCI BIOS area is rw and x. Use pci=nobios if you want it NX.\n");
 }
 
 /*
@@ -161,7 +161,7 @@ static int __init check_pcibios(void)
 				status, signature);
 			return 0;
 		}
-		printk(KERN_INFO "PCI: PCI BIOS revision %x.%02x entry at 0x%lx, last bus=%d\n",
+		pr_info("PCI: PCI BIOS revision %x.%02x entry at 0x%lx, last bus=%d\n",
 			major_ver, minor_ver, pcibios_entry, pcibios_last_bus);
 #ifdef CONFIG_PCI_DIRECT
 		if (!(hw_mech & PCIBIOS_HW_TYPE1))
@@ -388,7 +388,7 @@ struct irq_routing_table * pcibios_get_irq_routing_table(void)
 			rt->size = opt.size + sizeof(struct irq_routing_table);
 			rt->exclusive_irqs = map;
 			memcpy(rt->slots, (void *) page, opt.size);
-			printk(KERN_INFO "PCI: Using BIOS Interrupt Routing Table\n");
+			pr_info("PCI: Using BIOS Interrupt Routing Table\n");
 		}
 	}
 	free_page(page);

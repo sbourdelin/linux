@@ -94,7 +94,7 @@ asmlinkage __visible int xo1_do_sleep(u8 sleep_state)
 
 static void xo1_power_off(void)
 {
-	printk(KERN_INFO "OLPC XO-1 power off sequence...\n");
+	pr_info("OLPC XO-1 power off sequence...\n");
 
 	/* Enable all of these controls with 0 delay */
 	outl(0x40000000, pms_base + CS5536_PM_SCLK);
@@ -148,7 +148,7 @@ static int xo1_pm_probe(struct platform_device *pdev)
 	if (pms_base && acpi_base) {
 		suspend_set_ops(&xo1_suspend_ops);
 		pm_power_off = xo1_power_off;
-		printk(KERN_INFO "OLPC XO-1 support registered\n");
+		pr_info("OLPC XO-1 support registered\n");
 	}
 
 	return 0;

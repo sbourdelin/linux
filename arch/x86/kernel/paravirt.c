@@ -67,8 +67,7 @@ u64 _paravirt_ident_64(u64 x)
 
 void __init default_banner(void)
 {
-	printk(KERN_INFO "Booting paravirtualized kernel on %s\n",
-	       pv_info.name);
+	pr_info("Booting paravirtualized kernel on %s\n", pv_info.name);
 }
 
 /* Undefined instruction for dealing with missing ops pointers. */

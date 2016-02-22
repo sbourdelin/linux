@@ -72,14 +72,14 @@ static int iris_probe(struct platform_device *pdev)
 	}
 	old_pm_power_off = pm_power_off;
 	pm_power_off = &iris_power_off;
-	printk(KERN_INFO "Iris power_off handler installed.\n");
+	pr_info("Iris power_off handler installed.\n");
 	return 0;
 }
 
 static int iris_remove(struct platform_device *pdev)
 {
 	pm_power_off = old_pm_power_off;
-	printk(KERN_INFO "Iris power_off handler uninstalled.\n");
+	pr_info("Iris power_off handler uninstalled.\n");
 	return 0;
 }
 

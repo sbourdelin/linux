@@ -90,8 +90,7 @@ static int print_split(struct split_state *s)
 		}
 	}
 	if (print) {
-		printk(KERN_INFO
-			" 4k %lu large %lu gb %lu x %lu[%lx-%lx] miss %lu\n",
+		pr_info(" 4k %lu large %lu gb %lu x %lu[%lx-%lx] miss %lu\n",
 			s->spg, s->lpg, s->gpg, s->exec,
 			s->min_exec != ~0UL ? s->min_exec : 0,
 			s->max_exec, missed);
@@ -122,7 +121,7 @@ static int pageattr_test(void)
 	unsigned long test_addr;
 
 	if (print)
-		printk(KERN_INFO "CPA self-test:\n");
+		pr_info("CPA self-test:\n");
 
 	bm = vzalloc((max_pfn_mapped + 7) / 8);
 	if (!bm) {
@@ -227,7 +226,7 @@ static int pageattr_test(void)
 		return -EINVAL;
 	} else {
 		if (print)
-			printk(KERN_INFO "ok.\n");
+			pr_info("ok.\n");
 	}
 
 	return 0;

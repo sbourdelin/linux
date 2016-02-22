@@ -370,9 +370,9 @@ static __init int uv_rtc_setup_clock(void)
 
 	rc = clocksource_register_hz(&clocksource_uv, sn_rtc_cycles_per_second);
 	if (rc)
-		printk(KERN_INFO "UV RTC clocksource failed rc %d\n", rc);
+		pr_info("UV RTC clocksource failed rc %d\n", rc);
 	else
-		printk(KERN_INFO "UV RTC clocksource registered freq %lu MHz\n",
+		pr_info("UV RTC clocksource registered freq %lu MHz\n",
 			sn_rtc_cycles_per_second/(unsigned long)1E6);
 
 	if (rc || !uv_rtc_evt_enable || x86_platform_ipi_callback)
@@ -401,13 +401,13 @@ static __init int uv_rtc_setup_clock(void)
 		goto error;
 	}
 
-	printk(KERN_INFO "UV RTC clockevents registered\n");
+	pr_info("UV RTC clockevents registered\n");
 
 	return 0;
 
 error:
 	clocksource_unregister(&clocksource_uv);
-	printk(KERN_INFO "UV RTC clockevents failed rc %d\n", rc);
+	pr_info("UV RTC clockevents failed rc %d\n", rc);
 
 	return rc;
 }

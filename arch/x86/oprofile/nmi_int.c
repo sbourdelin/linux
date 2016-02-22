@@ -601,8 +601,8 @@ static int __init p4_init(char **cpu_type)
 	}
 #endif
 
-	printk(KERN_INFO "oprofile: P4 HyperThreading detected with > 2 threads\n");
-	printk(KERN_INFO "oprofile: Reverting to timer mode.\n");
+	pr_info("oprofile: P4 HyperThreading detected with > 2 threads\n");
+	pr_info("oprofile: Reverting to timer mode.\n");
 	return 0;
 }
 
@@ -618,10 +618,10 @@ static int set_cpu_type(const char *str, struct kernel_param *kp)
 {
 	if (!strcmp(str, "timer")) {
 		force_cpu_type = timer;
-		printk(KERN_INFO "oprofile: forcing NMI timer mode\n");
+		pr_info("oprofile: forcing NMI timer mode\n");
 	} else if (!strcmp(str, "arch_perfmon")) {
 		force_cpu_type = arch_perfmon;
-		printk(KERN_INFO "oprofile: forcing architectural perfmon\n");
+		pr_info("oprofile: forcing architectural perfmon\n");
 	} else {
 		force_cpu_type = 0;
 	}
@@ -792,7 +792,7 @@ int __init op_nmi_init(struct oprofile_operations *ops)
 
 	init_suspend_resume();
 
-	printk(KERN_INFO "oprofile: using NMI interrupt.\n");
+	pr_info("oprofile: using NMI interrupt.\n");
 	return 0;
 }
 

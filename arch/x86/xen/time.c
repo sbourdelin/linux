@@ -362,7 +362,7 @@ void xen_setup_timer(int cpu)
 	if (evt->irq >= 0)
 		xen_teardown_timer(cpu);
 
-	printk(KERN_INFO "installing Xen timer for CPU %d\n", cpu);
+	pr_info("installing Xen timer for CPU %d\n", cpu);
 
 	snprintf(xevt->name, sizeof(xevt->name), "timer%d", cpu);
 
@@ -471,8 +471,7 @@ void __init xen_hvm_init_time_ops(void)
 	if (!xen_have_vector_callback)
 		return;
 	if (!xen_feature(XENFEAT_hvm_safe_pvclock)) {
-		printk(KERN_INFO "Xen doesn't support pvclock on HVM,"
-				"disable pv timer\n");
+		pr_info("Xen doesn't support pvclock on HVM, disable pv timer\n");
 		return;
 	}
 

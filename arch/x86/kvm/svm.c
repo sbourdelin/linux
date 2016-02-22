@@ -621,7 +621,7 @@ static int has_svm(void)
 	const char *msg;
 
 	if (!cpu_has_svm(&msg)) {
-		printk(KERN_INFO "has_svm: %s\n", msg);
+		pr_info("has_svm: %s\n", msg);
 		return 0;
 	}
 
@@ -899,7 +899,7 @@ static __init int svm_hardware_setup(void)
 	}
 
 	if (nested) {
-		printk(KERN_INFO "kvm: Nested Virtualization enabled\n");
+		pr_info("kvm: Nested Virtualization enabled\n");
 		kvm_enable_efer_bits(EFER_SVME | EFER_LMSLE);
 	}
 
@@ -913,12 +913,12 @@ static __init int svm_hardware_setup(void)
 		npt_enabled = false;
 
 	if (npt_enabled && !npt) {
-		printk(KERN_INFO "kvm: Nested Paging disabled\n");
+		pr_info("kvm: Nested Paging disabled\n");
 		npt_enabled = false;
 	}
 
 	if (npt_enabled) {
-		printk(KERN_INFO "kvm: Nested Paging enabled\n");
+		pr_info("kvm: Nested Paging enabled\n");
 		kvm_enable_tdp();
 	} else
 		kvm_disable_tdp();

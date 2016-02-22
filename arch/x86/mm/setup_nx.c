@@ -45,11 +45,9 @@ void __init x86_report_nx(void)
 	} else {
 #if defined(CONFIG_X86_64) || defined(CONFIG_X86_PAE)
 		if (disable_nx) {
-			printk(KERN_INFO "NX (Execute Disable) protection: "
-			       "disabled by kernel command line option\n");
+			pr_info("NX (Execute Disable) protection: disabled by kernel command line option\n");
 		} else {
-			printk(KERN_INFO "NX (Execute Disable) protection: "
-			       "active\n");
+			pr_info("NX (Execute Disable) protection: active\n");
 		}
 #else
 		/* 32bit non-PAE kernel, NX cannot be used */

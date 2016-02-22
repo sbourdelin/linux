@@ -770,8 +770,7 @@ bool kvm_irq_delivery_to_apic_fast(struct kvm *kvm, struct kvm_lapic *src,
 			 */
 			if (!dst[idx] && !kvm->arch.disabled_lapic_found) {
 				kvm->arch.disabled_lapic_found = true;
-				printk(KERN_INFO
-					"Disabled LAPIC found during irq injection\n");
+				pr_info("Disabled LAPIC found during irq injection\n");
 				goto out;
 			}
 
@@ -867,8 +866,7 @@ bool kvm_intr_is_single_vcpu_fast(struct kvm *kvm, struct kvm_lapic_irq *irq,
 			dst = map->logical_map[cid][idx];
 			if (!dst && !kvm->arch.disabled_lapic_found) {
 				kvm->arch.disabled_lapic_found = true;
-				printk(KERN_INFO
-					"Disabled LAPIC found during irq injection\n");
+				pr_info("Disabled LAPIC found during irq injection\n");
 				goto out;
 			}
 

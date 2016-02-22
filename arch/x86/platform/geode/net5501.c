@@ -120,8 +120,8 @@ static bool __init net5501_present(void)
 		unsigned char *model = rombase + boards[i].offset;
 
 		if (!memcmp(model, boards[i].sig, boards[i].len)) {
-			printk(KERN_INFO "%s: system is recognized as \"%s\"\n",
-			       KBUILD_MODNAME, model);
+			pr_info("%s: system is recognized as \"%s\"\n",
+				KBUILD_MODNAME, model);
 
 			found = true;
 			break;

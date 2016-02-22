@@ -62,8 +62,7 @@ void early_dump_pci_device(u8 bus, u8 slot, u8 func)
 	int j;
 	u32 val;
 
-	printk(KERN_INFO "pci 0000:%02x:%02x.%d config space:",
-	       bus, slot, func);
+	pr_info("pci 0000:%02x:%02x.%d config space:", bus, slot, func);
 
 	for (i = 0; i < 256; i += 4) {
 		if (!(i & 0x0f))

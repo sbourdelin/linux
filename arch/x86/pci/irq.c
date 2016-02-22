@@ -823,7 +823,7 @@ static void __init pirq_find_router(struct irq_router *r)
 
 #ifdef CONFIG_PCI_BIOS
 	if (!rt->signature) {
-		printk(KERN_INFO "PCI: Using BIOS for IRQ routing\n");
+		pr_info("PCI: Using BIOS for IRQ routing\n");
 		r->set = pirq_bios_set;
 		r->name = "BIOS";
 		return;
@@ -1072,7 +1072,7 @@ static int __init fix_broken_hp_bios_irq9(const struct dmi_system_id *d)
 {
 	if (!broken_hp_bios_irq9) {
 		broken_hp_bios_irq9 = 1;
-		printk(KERN_INFO "%s detected - fixing broken IRQ routing\n",
+		pr_info("%s detected - fixing broken IRQ routing\n",
 			d->ident);
 	}
 	return 0;
@@ -1086,7 +1086,7 @@ static int __init fix_acer_tm360_irqrouting(const struct dmi_system_id *d)
 {
 	if (!acer_tm360_irqrouting) {
 		acer_tm360_irqrouting = 1;
-		printk(KERN_INFO "%s detected - fixing broken IRQ routing\n",
+		pr_info("%s detected - fixing broken IRQ routing\n",
 			d->ident);
 	}
 	return 0;
@@ -1156,7 +1156,7 @@ void __init pcibios_irq_init(void)
 		 * also do it here in case there are still broken drivers that
 		 * don't use pci_enable_device().
 		 */
-		printk(KERN_INFO "PCI: Routing PCI interrupts for all devices because \"pci=routeirq\" specified\n");
+		pr_info("PCI: Routing PCI interrupts for all devices because \"pci=routeirq\" specified\n");
 		for_each_pci_dev(dev)
 			pirq_enable_irq(dev);
 	}

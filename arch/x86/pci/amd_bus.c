@@ -194,7 +194,7 @@ static int __init early_root_info_init(void)
 	address = MSR_K8_TOP_MEM1;
 	rdmsrl(address, val);
 	end = (val & 0xffffff800000ULL);
-	printk(KERN_INFO "TOM: %016llx aka %lldM\n", end, end>>20);
+	pr_info("TOM: %016llx aka %lldM\n", end, end>>20);
 	if (end < (1ULL<<32))
 		subtract_range(range, RANGE_NUM, 0, end);
 
@@ -290,7 +290,7 @@ static int __init early_root_info_init(void)
 		address = MSR_K8_TOP_MEM2;
 		rdmsrl(address, val);
 		end = (val & 0xffffff800000ULL);
-		printk(KERN_INFO "TOM2: %016llx aka %lldM\n", end, end>>20);
+		pr_info("TOM2: %016llx aka %lldM\n", end, end>>20);
 		subtract_range(range, RANGE_NUM, 1ULL<<32, end);
 	}
 

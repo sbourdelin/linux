@@ -680,9 +680,9 @@ void __init initmem_init(void)
 
 void __init setup_bootmem_allocator(void)
 {
-	printk(KERN_INFO "  mapped low ram: 0 - %08lx\n",
+	pr_info("  mapped low ram: 0 - %08lx\n",
 		 max_pfn_mapped<<PAGE_SHIFT);
-	printk(KERN_INFO "  low ram: 0 - %08lx\n", max_low_pfn<<PAGE_SHIFT);
+	pr_info("  low ram: 0 - %08lx\n", max_low_pfn<<PAGE_SHIFT);
 }
 
 /*
@@ -717,8 +717,7 @@ void __init paging_init(void)
  */
 static void __init test_wp_bit(void)
 {
-	printk(KERN_INFO
-  "Checking if this processor honours the WP bit even in supervisor mode...");
+	pr_info("Checking if this processor honours the WP bit even in supervisor mode...");
 
 	/* Any page-aligned address will do, the test is non-destructive */
 	__set_fixmap(FIX_WP_TEST, __pa(&swapper_pg_dir), PAGE_KERNEL_RO);
@@ -757,7 +756,7 @@ void __init mem_init(void)
 	after_bootmem = 1;
 
 	mem_init_print_info(NULL);
-	printk(KERN_INFO "virtual kernel memory layout:\n"
+	pr_info("virtual kernel memory layout:\n"
 		"    fixmap  : 0x%08lx - 0x%08lx   (%4ld kB)\n"
 #ifdef CONFIG_HIGHMEM
 		"    pkmap   : 0x%08lx - 0x%08lx   (%4ld kB)\n"
@@ -915,7 +914,7 @@ static void mark_nxdata_nx(void)
 	unsigned long size = (((unsigned long)__init_end + HPAGE_SIZE) & HPAGE_MASK) - start;
 
 	if (__supported_pte_mask & _PAGE_NX)
-		printk(KERN_INFO "NX-protecting the kernel data: %luk\n", size >> 10);
+		pr_info("NX-protecting the kernel data: %luk\n", size >> 10);
 	set_pages_nx(virt_to_page(start), size >> PAGE_SHIFT);
 }
 
@@ -925,32 +924,32 @@ void mark_rodata_ro(void)
 	unsigned long size = PFN_ALIGN(_etext) - start;
 
 	set_pages_ro(virt_to_page(start), size >> PAGE_SHIFT);
-	printk(KERN_INFO "Write protecting the kernel text: %luk\n",
+	pr_info("Write protecting the kernel text: %luk\n",
 		size >> 10);
 
 	kernel_set_to_readonly = 1;
 
 #ifdef CONFIG_CPA_DEBUG
-	printk(KERN_INFO "Testing CPA: Reverting %lx-%lx\n",
+	pr_info("Testing CPA: Reverting %lx-%lx\n",
 		start, start+size);
 	set_pages_rw(virt_to_page(start), size>>PAGE_SHIFT);
 
-	printk(KERN_INFO "Testing CPA: write protecting again\n");
+	pr_info("Testing CPA: write protecting again\n");
 	set_pages_ro(virt_to_page(start), size>>PAGE_SHIFT);
 #endif
 
 	start += size;
 	size = (unsigned long)__end_rodata - start;
 	set_pages_ro(virt_to_page(start), size >> PAGE_SHIFT);
-	printk(KERN_INFO "Write protecting the kernel read-only data: %luk\n",
+	pr_info("Write protecting the kernel read-only data: %luk\n",
 		size >> 10);
 	rodata_test();
 
 #ifdef CONFIG_CPA_DEBUG
-	printk(KERN_INFO "Testing CPA: undo %lx-%lx\n", start, start + size);
+	pr_info("Testing CPA: undo %lx-%lx\n", start, start + size);
 	set_pages_rw(virt_to_page(start), size >> PAGE_SHIFT);
 
-	printk(KERN_INFO "Testing CPA: write protecting again\n");
+	pr_info("Testing CPA: write protecting again\n");
 	set_pages_ro(virt_to_page(start), size >> PAGE_SHIFT);
 #endif
 	mark_nxdata_nx();

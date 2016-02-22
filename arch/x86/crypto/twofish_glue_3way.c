@@ -471,10 +471,7 @@ MODULE_PARM_DESC(force, "Force module load, ignore CPU blacklist");
 static int __init init(void)
 {
 	if (!force && is_blacklisted_cpu()) {
-		printk(KERN_INFO
-			"twofish-x86_64-3way: performance on this CPU "
-			"would be suboptimal: disabling "
-			"twofish-x86_64-3way.\n");
+		pr_info("twofish-x86_64-3way: performance on this CPU would be suboptimal: disabling twofish-x86_64-3way.\n");
 		return -ENODEV;
 	}
 

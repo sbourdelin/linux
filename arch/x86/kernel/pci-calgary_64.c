@@ -998,11 +998,10 @@ static void __init calgary_enable_translation(struct pci_dev *dev)
 	val32 = be32_to_cpu(readl(target));
 	val32 |= PHB_TCE_ENABLE | PHB_DAC_DISABLE | PHB_MCSR_ENABLE;
 
-	printk(KERN_INFO "Calgary: enabling translation on %s PHB %#x\n",
-	       (dev->device == PCI_DEVICE_ID_IBM_CALGARY) ?
-	       "Calgary" : "CalIOC2", busnum);
-	printk(KERN_INFO "Calgary: errant DMAs will now be prevented on this "
-	       "bus.\n");
+	pr_info("Calgary: enabling translation on %s PHB %#x\n",
+		(dev->device == PCI_DEVICE_ID_IBM_CALGARY) ?
+			"Calgary" : "CalIOC2", busnum);
+	pr_info("Calgary: errant DMAs will now be prevented on this bus.\n");
 
 	writel(cpu_to_be32(val32), target);
 	readl(target); /* flush */
@@ -1030,7 +1029,7 @@ static void __init calgary_disable_translation(struct pci_dev *dev)
 	val32 = be32_to_cpu(readl(target));
 	val32 &= ~(PHB_TCE_ENABLE | PHB_DAC_DISABLE | PHB_MCSR_ENABLE);
 
-	printk(KERN_INFO "Calgary: disabling translation on PHB %#x!\n", busnum);
+	pr_info("Calgary: disabling translation on PHB %#x!\n", busnum);
 	writel(cpu_to_be32(val32), target);
 	readl(target); /* flush */
 
@@ -1359,7 +1358,7 @@ static int __init calgary_iommu_init(void)
 	int ret;
 
 	/* ok, we're trying to use Calgary - let's roll */
-	printk(KERN_INFO "PCI-DMA: Using Calgary IOMMU\n");
+	pr_info("PCI-DMA: Using Calgary IOMMU\n");
 
 	ret = calgary_init();
 	if (ret) {
@@ -1464,9 +1463,9 @@ int __init detect_calgary(void)
 	if (calgary_found) {
 		iommu_detected = 1;
 		calgary_detected = 1;
-		printk(KERN_INFO "PCI-DMA: Calgary IOMMU detected.\n");
-		printk(KERN_INFO "PCI-DMA: Calgary TCE table spec is %d\n",
-		       specified_table_size);
+		pr_info("PCI-DMA: Calgary IOMMU detected.\n");
+		pr_info("PCI-DMA: Calgary TCE table spec is %d\n",
+			specified_table_size);
 
 		x86_init.iommu.iommu_init = calgary_iommu_init;
 	}
@@ -1524,8 +1523,8 @@ static int __init calgary_parse_options(char *p)
 
 			bridge = val;
 			if (bridge < MAX_PHB_BUS_NUM) {
-				printk(KERN_INFO "Calgary: disabling "
-				       "translation for PHB %#x\n", bridge);
+				pr_info("Calgary: disabling translation for PHB %#x\n",
+					bridge);
 				bus_info[bridge].translation_disabled = 1;
 			}
 		}

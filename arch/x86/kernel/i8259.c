@@ -313,7 +313,7 @@ static int probe_8259A(void)
 	outb(probe_val, PIC_MASTER_IMR);
 	new_val = inb(PIC_MASTER_IMR);
 	if (new_val != probe_val) {
-		printk(KERN_INFO "Using NULL legacy PIC\n");
+		pr_info("Using NULL legacy PIC\n");
 		legacy_pic = &null_legacy_pic;
 	}
 

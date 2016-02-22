@@ -106,7 +106,7 @@ void __init olpc_ofw_detect(void)
 
 	/* determine where OFW starts in memory */
 	start = round_down((unsigned long)olpc_ofw_cif, OFW_BOUND);
-	printk(KERN_INFO "OFW detected in memory, cif @ 0x%lx (reserving top %ldMB)\n",
+	pr_info("OFW detected in memory, cif @ 0x%lx (reserving top %ldMB)\n",
 			(unsigned long)olpc_ofw_cif, (-start) >> 20);
 	reserve_top_address(-start);
 }

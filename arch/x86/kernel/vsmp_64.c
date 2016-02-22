@@ -97,8 +97,8 @@ static void __init set_vsmp_pv_ops(void)
 	address = early_ioremap(cfg, 8);
 	cap = readl(address);
 	ctl = readl(address + 4);
-	printk(KERN_INFO "vSMP CTL: capabilities:0x%08x  control:0x%08x\n",
-	       cap, ctl);
+	pr_info("vSMP CTL: capabilities:0x%08x  control:0x%08x\n",
+		cap, ctl);
 
 	/* If possible, let the vSMP foundation route the interrupt optimally */
 #ifdef CONFIG_SMP

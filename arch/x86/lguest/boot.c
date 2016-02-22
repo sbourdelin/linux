@@ -1304,7 +1304,7 @@ static void probe_pci_console(void)
 	}
 
 	console_cfg_offset = device_offset;
-	printk(KERN_INFO "lguest: Console via virtio-pci emerg_wr\n");
+	pr_info("lguest: Console via virtio-pci emerg_wr\n");
 }
 
 /*

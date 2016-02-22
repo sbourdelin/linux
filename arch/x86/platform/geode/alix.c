@@ -154,9 +154,8 @@ static bool __init alix_present(unsigned long bios_phys,
 
 		tail = p + alix_sig_len;
 		if ((tail[0] == '2' || tail[0] == '3' || tail[0] == '6')) {
-			printk(KERN_INFO
-			       "%s: system is recognized as \"%s\"\n",
-			       KBUILD_MODNAME, name);
+			pr_info("%s: system is recognized as \"%s\"\n",
+				KBUILD_MODNAME, name);
 			return true;
 		}
 	}
@@ -176,8 +175,8 @@ static bool __init alix_present_dmi(void)
 	if (!product || (strcmp(product, "ALIX.2D") && strcmp(product, "ALIX.6")))
 		return false;
 
-	printk(KERN_INFO "%s: system is recognized as \"%s %s\"\n",
-	       KBUILD_MODNAME, vendor, product);
+	pr_info("%s: system is recognized as \"%s %s\"\n",
+		KBUILD_MODNAME, vendor, product);
 
 	return true;
 }

@@ -458,10 +458,7 @@ MODULE_PARM_DESC(force, "Force module load, ignore CPU blacklist");
 static int __init init(void)
 {
 	if (!force && is_blacklisted_cpu()) {
-		printk(KERN_INFO
-			"blowfish-x86_64: performance on this CPU "
-			"would be suboptimal: disabling "
-			"blowfish-x86_64.\n");
+		pr_info("blowfish-x86_64: performance on this CPU would be suboptimal: disabling blowfish-x86_64.\n");
 		return -ENODEV;
 	}
 

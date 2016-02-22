@@ -1306,8 +1306,8 @@ void setup_local_APIC(void)
 			}
 		}
 		if (acked > 256) {
-			printk(KERN_ERR "LAPIC pending interrupts after %d EOI\n",
-			       acked);
+			pr_err("LAPIC pending interrupts after %d EOI\n",
+				acked);
 			break;
 		}
 		if (queued) {
@@ -1454,7 +1454,7 @@ static void __x2apic_disable(void)
 	/* Disable xapic and x2apic first and then reenable xapic mode */
 	wrmsrl(MSR_IA32_APICBASE, msr & ~(X2APIC_ENABLE | XAPIC_ENABLE));
 	wrmsrl(MSR_IA32_APICBASE, msr & ~X2APIC_ENABLE);
-	printk_once(KERN_INFO "x2apic disabled\n");
+	pr_info_once("x2apic disabled\n");
 }
 
 static void __x2apic_enable(void)
@@ -1465,7 +1465,7 @@ static void __x2apic_enable(void)
 	if (msr & X2APIC_ENABLE)
 		return;
 	wrmsrl(MSR_IA32_APICBASE, msr | X2APIC_ENABLE);
-	printk_once(KERN_INFO "x2apic enabled\n");
+	pr_info_once("x2apic enabled\n");
 }
 
 static int __init setup_nox2apic(char *str)
@@ -1474,8 +1474,8 @@ static int __init setup_nox2apic(char *str)
 		int apicid = native_apic_msr_read(APIC_ID);
 
 		if (apicid >= 255) {
-			pr_warning("Apicid: %08x, cannot enforce nox2apic\n",
-				   apicid);
+			pr_warn("Apicid: %08x, cannot enforce nox2apic\n",
+				apicid);
 			return 0;
 		}
 		pr_warning("x2apic already enabled.\n");

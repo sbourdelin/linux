@@ -48,8 +48,7 @@ void memory_present(int nid, unsigned long start, unsigned long end)
 {
 	unsigned long pfn;
 
-	printk(KERN_INFO "Node: %d, start_pfn: %lx, end_pfn: %lx\n",
-			nid, start, end);
+	pr_info("Node: %d, start_pfn: %lx, end_pfn: %lx\n", nid, start, end);
 	printk(KERN_DEBUG "  Setting physnode_map array to node %d for pfns:\n", nid);
 	printk(KERN_DEBUG "  ");
 	start = round_down(start, PAGES_PER_SECTION);

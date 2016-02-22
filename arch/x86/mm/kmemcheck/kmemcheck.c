@@ -55,19 +55,18 @@ int __init kmemcheck_init(void)
 	 * runs before SMP is set up.
 	 */
 	if (setup_max_cpus > 1) {
-		printk(KERN_INFO
-			"kmemcheck: Limiting number of CPUs to 1.\n");
+		pr_info("kmemcheck: Limiting number of CPUs to 1.\n");
 		setup_max_cpus = 1;
 	}
 #endif
 
 	if (!kmemcheck_selftest()) {
-		printk(KERN_INFO "kmemcheck: self-tests failed; disabling\n");
+		pr_info("kmemcheck: self-tests failed; disabling\n");
 		kmemcheck_enabled = 0;
 		return -EINVAL;
 	}
 
-	printk(KERN_INFO "kmemcheck: Initialized\n");
+	pr_info("kmemcheck: Initialized\n");
 	return 0;
 }
 

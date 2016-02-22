@@ -10771,9 +10771,8 @@ static int vmx_update_pi_irte(struct kvm *kvm, unsigned int host_irq,
 			 */
 			ret = irq_set_vcpu_affinity(host_irq, NULL);
 			if (ret < 0) {
-				printk(KERN_INFO
-				   "failed to back to remapped mode, irq: %u\n",
-				   host_irq);
+				pr_info("failed to back to remapped mode, irq: %u\n",
+					host_irq);
 				goto out;
 			}
 
@@ -10796,8 +10795,7 @@ static int vmx_update_pi_irte(struct kvm *kvm, unsigned int host_irq,
 		}
 
 		if (ret < 0) {
-			printk(KERN_INFO "%s: failed to update PI IRTE\n",
-					__func__);
+			pr_info("%s: failed to update PI IRTE\n", __func__);
 			goto out;
 		}
 	}

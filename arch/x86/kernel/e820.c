@@ -165,10 +165,10 @@ void __init e820_print_map(char *who)
 	int i;
 
 	for (i = 0; i < e820.nr_map; i++) {
-		printk(KERN_INFO "%s: [mem %#018Lx-%#018Lx] ", who,
-		       (unsigned long long) e820.map[i].addr,
-		       (unsigned long long)
-		       (e820.map[i].addr + e820.map[i].size - 1));
+		pr_info("%s: [mem %#018Lx-%#018Lx] ", who,
+			(unsigned long long) e820.map[i].addr,
+			(unsigned long long)
+			(e820.map[i].addr + e820.map[i].size - 1));
 		e820_print_type(e820.map[i].type);
 		printk(KERN_CONT "\n");
 	}
@@ -568,7 +568,7 @@ void __init update_e820(void)
 {
 	if (sanitize_e820_map(e820.map, ARRAY_SIZE(e820.map), &e820.nr_map))
 		return;
-	printk(KERN_INFO "e820: modified physical RAM map:\n");
+	pr_info("e820: modified physical RAM map:\n");
 	e820_print_map("modified");
 }
 static void __init update_e820_saved(void)
@@ -644,9 +644,8 @@ __init void e820_setup_gap(void)
 	 */
 	pci_mem_start = gapstart;
 
-	printk(KERN_INFO
-	       "e820: [mem %#010lx-%#010lx] available for PCI devices\n",
-	       gapstart, gapstart + gapsize - 1);
+	pr_info("e820: [mem %#010lx-%#010lx] available for PCI devices\n",
+		gapstart, gapstart + gapsize - 1);
 }
 
 /**
@@ -667,7 +666,7 @@ void __init parse_e820_ext(u64 phys_addr, u32 data_len)
 	__append_e820_map(extmap, entries);
 	sanitize_e820_map(e820.map, ARRAY_SIZE(e820.map), &e820.nr_map);
 	early_memunmap(sdata, data_len);
-	printk(KERN_INFO "e820: extended physical RAM map:\n");
+	pr_info("e820: extended physical RAM map:\n");
 	e820_print_map("extended");
 }
 
@@ -734,7 +733,7 @@ u64 __init early_reserve_e820(u64 size, u64 align)
 	addr = __memblock_alloc_base(size, align, MEMBLOCK_ALLOC_ACCESSIBLE);
 	if (addr) {
 		e820_update_range_saved(addr, size, E820_RAM, E820_RESERVED);
-		printk(KERN_INFO "e820: update e820_saved for early_reserve_e820\n");
+		pr_info("e820: update e820_saved for early_reserve_e820\n");
 		update_e820_saved();
 	}
 
@@ -788,8 +787,8 @@ static unsigned long __init e820_end_pfn(unsigned long limit_pfn)
 	if (last_pfn > max_arch_pfn)
 		last_pfn = max_arch_pfn;
 
-	printk(KERN_INFO "e820: last_pfn = %#lx max_arch_pfn = %#lx\n",
-			 last_pfn, max_arch_pfn);
+	pr_info("e820: last_pfn = %#lx max_arch_pfn = %#lx\n",
+		last_pfn, max_arch_pfn);
 	return last_pfn;
 }
 unsigned long __init e820_end_of_ram_pfn(void)
@@ -907,7 +906,7 @@ void __init finish_e820_parsing(void)
 					&e820.nr_map) < 0)
 			early_panic("Invalid user supplied memory map");
 
-		printk(KERN_INFO "e820: user-defined physical RAM map:\n");
+		pr_info("e820: user-defined physical RAM map:\n");
 		e820_print_map("user");
 	}
 }
@@ -1125,7 +1124,7 @@ void __init setup_memory_map(void)
 
 	who = x86_init.resources.memory_setup();
 	memcpy(&e820_saved, &e820, sizeof(struct e820map));
-	printk(KERN_INFO "e820: BIOS-provided physical RAM map:\n");
+	pr_info("e820: BIOS-provided physical RAM map:\n");
 	e820_print_map(who);
 }
 

@@ -177,8 +177,7 @@ static struct pci_dev *cached_dev;
 
 static void hpet_print_force_info(void)
 {
-	printk(KERN_INFO "HPET not enabled in BIOS. "
-	       "You might try hpet=force boot option\n");
+	pr_info("HPET not enabled in BIOS. You might try hpet=force boot option\n");
 }
 
 static void old_ich_force_hpet_resume(void)

@@ -210,11 +210,11 @@ static void __init alloc_node_data(int nid)
 	nd = __va(nd_pa);
 
 	/* report and initialize */
-	printk(KERN_INFO "NODE_DATA(%d) allocated [mem %#010Lx-%#010Lx]\n", nid,
+	pr_info("NODE_DATA(%d) allocated [mem %#010Lx-%#010Lx]\n", nid,
 	       nd_pa, nd_pa + nd_size - 1);
 	tnid = early_pfn_to_nid(nd_pa >> PAGE_SHIFT);
 	if (tnid != nid)
-		printk(KERN_INFO "    NODE_DATA(%d) on node %d\n", nid, tnid);
+		pr_info("    NODE_DATA(%d) on node %d\n", nid, tnid);
 
 	node_data[nid] = nd;
 	memset(NODE_DATA(nid), 0, sizeof(pg_data_t));
@@ -297,7 +297,7 @@ int __init numa_cleanup_meminfo(struct numa_meminfo *mi)
 			}
 			if (k < mi->nr_blks)
 				continue;
-			printk(KERN_INFO "NUMA: Node %d [mem %#010Lx-%#010Lx] + [mem %#010Lx-%#010Lx] -> [mem %#010Lx-%#010Lx]\n",
+			pr_info("NUMA: Node %d [mem %#010Lx-%#010Lx] + [mem %#010Lx-%#010Lx] -> [mem %#010Lx-%#010Lx]\n",
 			       bi->nid, bi->start, bi->end - 1, bj->start,
 			       bj->end - 1, start, end - 1);
 			bi->start = start;
@@ -691,10 +691,10 @@ static int __init numa_init(int (*init_func)(void))
  */
 static int __init dummy_numa_init(void)
 {
-	printk(KERN_INFO "%s\n",
-	       numa_off ? "NUMA turned off" : "No NUMA configuration found");
-	printk(KERN_INFO "Faking a node at [mem %#018Lx-%#018Lx]\n",
-	       0LLU, PFN_PHYS(max_pfn) - 1);
+	pr_info("%s\n", numa_off ?
+			"NUMA turned off" : "No NUMA configuration found");
+	pr_info("Faking a node at [mem %#018Lx-%#018Lx]\n",
+		0LLU, PFN_PHYS(max_pfn) - 1);
 
 	node_set(0, numa_nodes_parsed);
 	numa_add_memblk(0, 0, PFN_PHYS(max_pfn));

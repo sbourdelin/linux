@@ -1126,8 +1126,8 @@ void mark_rodata_ro(void)
 	unsigned long rodata_end = PFN_ALIGN(&__end_rodata);
 	unsigned long all_end;
 
-	printk(KERN_INFO "Write protecting the kernel read-only data: %luk\n",
-	       (end - start) >> 10);
+	pr_info("Write protecting the kernel read-only data: %luk\n",
+		(end - start) >> 10);
 	set_memory_ro(start, (end - start) >> PAGE_SHIFT);
 
 	kernel_set_to_readonly = 1;
@@ -1150,10 +1150,10 @@ void mark_rodata_ro(void)
 	rodata_test();
 
 #ifdef CONFIG_CPA_DEBUG
-	printk(KERN_INFO "Testing CPA: undo %lx-%lx\n", start, end);
+	pr_info("Testing CPA: undo %lx-%lx\n", start, end);
 	set_memory_rw(start, (end-start) >> PAGE_SHIFT);
 
-	printk(KERN_INFO "Testing CPA: again\n");
+	pr_info("Testing CPA: again\n");
 	set_memory_ro(start, (end-start) >> PAGE_SHIFT);
 #endif
 

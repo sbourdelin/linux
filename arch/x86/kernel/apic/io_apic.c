@@ -1347,7 +1347,7 @@ void __init print_IO_APICs(void)
 	 * We are a bit conservative about what we expect.  We have to
 	 * know about every hardware change ASAP.
 	 */
-	printk(KERN_INFO "testing the IO APIC.......................\n");
+	pr_info("testing the IO APIC.......................\n");
 
 	for_each_ioapic(ioapic_idx)
 		print_IO_APIC(ioapic_idx);
@@ -1373,7 +1373,7 @@ void __init print_IO_APICs(void)
 		pr_cont("\n");
 	}
 
-	printk(KERN_INFO ".................................... done.\n");
+	pr_info(".................................... done.\n");
 }
 
 /* Where if anywhere is the i8259 connect in external int mode */
@@ -1413,7 +1413,7 @@ void __init enable_IO_APIC(void)
 	i8259_apic = find_isa_irq_apic(0, mp_ExtINT);
 	/* Trust the MP table if nothing is setup in the hardware */
 	if ((ioapic_i8259.pin == -1) && (i8259_pin >= 0)) {
-		printk(KERN_WARNING "ExtINT not setup in hardware but reported by MP table\n");
+		pr_warn("ExtINT not setup in hardware but reported by MP table\n");
 		ioapic_i8259.pin  = i8259_pin;
 		ioapic_i8259.apic = i8259_apic;
 	}
@@ -1421,7 +1421,7 @@ void __init enable_IO_APIC(void)
 	if (((ioapic_i8259.apic != i8259_apic) || (ioapic_i8259.pin != i8259_pin)) &&
 		(i8259_pin >= 0) && (ioapic_i8259.pin >= 0))
 	{
-		printk(KERN_WARNING "ExtINT in hardware and MP table differ\n");
+		pr_warn("ExtINT in hardware and MP table differ\n");
 	}
 
 	/*
@@ -1508,9 +1508,9 @@ void __init setup_ioapic_ids_from_mpc_nocheck(void)
 		old_id = mpc_ioapic_id(ioapic_idx);
 
 		if (mpc_ioapic_id(ioapic_idx) >= get_physical_broadcast()) {
-			printk(KERN_ERR "BIOS bug, IO-APIC#%d ID is %d in the MPC table!...\n",
+			pr_err("BIOS bug, IO-APIC#%d ID is %d in the MPC table!...\n",
 				ioapic_idx, mpc_ioapic_id(ioapic_idx));
-			printk(KERN_ERR "... fixing up to %d. (tell your hw vendor)\n",
+			pr_err("... fixing up to %d. (tell your hw vendor)\n",
 				reg_00.bits.ID);
 			ioapics[ioapic_idx].mp_config.apicid = reg_00.bits.ID;
 		}
@@ -1522,14 +1522,14 @@ void __init setup_ioapic_ids_from_mpc_nocheck(void)
 		 */
 		if (apic->check_apicid_used(&phys_id_present_map,
 					    mpc_ioapic_id(ioapic_idx))) {
-			printk(KERN_ERR "BIOS bug, IO-APIC#%d ID %d is already used!...\n",
+			pr_err("BIOS bug, IO-APIC#%d ID %d is already used!...\n",
 				ioapic_idx, mpc_ioapic_id(ioapic_idx));
 			for (i = 0; i < get_physical_broadcast(); i++)
 				if (!physid_isset(i, phys_id_present_map))
 					break;
 			if (i >= get_physical_broadcast())
 				panic("Max APIC ID exceeded!\n");
-			printk(KERN_ERR "... fixing up to %d. (tell your hw vendor)\n",
+			pr_err("... fixing up to %d. (tell your hw vendor)\n",
 				i);
 			physid_set(i, phys_id_present_map);
 			ioapics[ioapic_idx].mp_config.apicid = i;
@@ -2369,8 +2369,8 @@ static int io_apic_get_unique_id(int ioapic, int apic_id)
 	raw_spin_unlock_irqrestore(&ioapic_lock, flags);
 
 	if (apic_id >= get_physical_broadcast()) {
-		printk(KERN_WARNING "IOAPIC[%d]: Invalid apic_id %d, trying "
-			"%d\n", ioapic, apic_id, reg_00.bits.ID);
+		pr_warn("IOAPIC[%d]: Invalid apic_id %d, trying %d\n",
+			ioapic, apic_id, reg_00.bits.ID);
 		apic_id = reg_00.bits.ID;
 	}
 
@@ -2388,8 +2388,8 @@ static int io_apic_get_unique_id(int ioapic, int apic_id)
 		if (i == get_physical_broadcast())
 			panic("Max apic_id exceeded!\n");
 
-		printk(KERN_WARNING "IOAPIC[%d]: apic_id %d already used, "
-			"trying %d\n", ioapic, apic_id, i);
+		pr_warn("IOAPIC[%d]: apic_id %d already used, trying %d\n",
+			ioapic, apic_id, i);
 
 		apic_id = i;
 	}
@@ -2609,10 +2609,7 @@ void __init io_apic_init_mappings(void)
 			ioapic_phys = mpc_ioapic_addr(i);
 #ifdef CONFIG_X86_32
 			if (!ioapic_phys) {
-				printk(KERN_ERR
-				       "WARNING: bogus zero IO-APIC "
-				       "address found in MPTABLE, "
-				       "disabling IO/APIC support!\n");
+				pr_err("WARNING: bogus zero IO-APIC address found in MPTABLE, disabling IO/APIC support!\n");
 				smp_found_config = 0;
 				skip_ioapic_setup = 1;
 				goto fake_ioapic_page;
@@ -2644,8 +2641,7 @@ void __init ioapic_insert_resources(void)
 
 	if (!r) {
 		if (nr_ioapics > 0)
-			printk(KERN_ERR
-				"IO APIC resources couldn't be allocated.\n");
+			pr_err("IO APIC resources couldn't be allocated.\n");
 		return;
 	}
 
@@ -2669,7 +2665,7 @@ int mp_find_ioapic(u32 gsi)
 			return i;
 	}
 
-	printk(KERN_ERR "ERROR: Unable to locate IOAPIC for GSI %d\n", gsi);
+	pr_err("ERROR: Unable to locate IOAPIC for GSI %d\n", gsi);
 	return -1;
 }
 

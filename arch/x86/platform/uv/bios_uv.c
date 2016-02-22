@@ -207,7 +207,7 @@ void uv_bios_init(void)
 	memcpy(&uv_systab, tab, sizeof(struct uv_systab));
 	iounmap(tab);
 
-	printk(KERN_INFO "EFI UV System Table Revision %d\n",
+	pr_info("EFI UV System Table Revision %d\n",
 					uv_systab.revision);
 }
 #else	/* !CONFIG_EFI */

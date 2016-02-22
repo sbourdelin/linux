@@ -140,7 +140,7 @@ static void cpuid_fix_nx_cap(struct kvm_vcpu *vcpu)
 	}
 	if (entry && (entry->edx & F(NX)) && !is_efer_nx()) {
 		entry->edx &= ~F(NX);
-		printk(KERN_INFO "kvm: guest NX capability removed\n");
+		pr_info("kvm: guest NX capability removed\n");
 	}
 }
 

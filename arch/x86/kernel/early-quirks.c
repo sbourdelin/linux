@@ -33,13 +33,10 @@ static void __init fix_hypertransport_config(int num, int slot, int func)
 	 */
 	htcfg = read_pci_config(num, slot, func, 0x68);
 	if (htcfg & (1 << 18)) {
-		printk(KERN_INFO "Detected use of extended apic ids "
-				 "on hypertransport bus\n");
+		pr_info("Detected use of extended apic ids on hypertransport bus\n");
 		if ((htcfg & (1 << 17)) == 0) {
-			printk(KERN_INFO "Enabling hypertransport extended "
-					 "apic interrupt broadcast\n");
-			printk(KERN_INFO "Note this is a bios bug, "
-					 "please contact your hw vendor\n");
+			pr_info("Enabling hypertransport extended apic interrupt broadcast\n");
+			pr_info("Note this is a bios bug, please contact your hw vendor\n");
 			htcfg |= (1 << 17);
 			write_pci_config(num, slot, func, 0x68, htcfg);
 		}
@@ -53,9 +50,7 @@ static void __init via_bugs(int  num, int slot, int func)
 #ifdef CONFIG_GART_IOMMU
 	if ((max_pfn > MAX_DMA32_PFN ||  force_iommu) &&
 	    !gart_iommu_aperture_allowed) {
-		printk(KERN_INFO
-		       "Looks like a VIA chipset. Disabling IOMMU."
-		       " Override with iommu=allowed\n");
+		pr_info("Looks like a VIA chipset. Disabling IOMMU. Override with iommu=allowed\n");
 		gart_iommu_aperture_disabled = 1;
 	}
 #endif
@@ -87,11 +82,8 @@ static void __init nvidia_bugs(int num, int slot, int func)
 
 	if (acpi_table_parse(ACPI_SIG_HPET, nvidia_hpet_check)) {
 		acpi_skip_timer_override = 1;
-		printk(KERN_INFO "Nvidia board "
-		       "detected. Ignoring ACPI "
-		       "timer override.\n");
-		printk(KERN_INFO "If you got timer trouble "
-			"try acpi_use_timer_override\n");
+		pr_info("Nvidia board detected. Ignoring ACPI timer override.\n");
+		pr_info("If you got timer trouble try acpi_use_timer_override\n");
 	}
 #endif
 #endif
@@ -137,10 +129,9 @@ static void __init ati_bugs(int num, int slot, int func)
 	}
 
 	if (acpi_skip_timer_override) {
-		printk(KERN_INFO "SB4X0 revision 0x%x\n", d);
-		printk(KERN_INFO "Ignoring ACPI timer override.\n");
-		printk(KERN_INFO "If you got timer trouble "
-		       "try acpi_use_timer_override\n");
+		pr_info("SB4X0 revision 0x%x\n", d);
+		pr_info("Ignoring ACPI timer override.\n");
+		pr_info("If you got timer trouble try acpi_use_timer_override\n");
 	}
 }
 
@@ -179,10 +170,9 @@ static void __init ati_bugs_contd(int num, int slot, int func)
 		acpi_skip_timer_override = 1;
 
 	if (acpi_skip_timer_override) {
-		printk(KERN_INFO "SB600 revision 0x%x\n", rev);
-		printk(KERN_INFO "Ignoring ACPI timer override.\n");
-		printk(KERN_INFO "If you got timer trouble "
-		       "try acpi_use_timer_override\n");
+		pr_info("SB600 revision 0x%x\n", rev);
+		pr_info("Ignoring ACPI timer override.\n");
+		pr_info("If you got timer trouble try acpi_use_timer_override\n");
 	}
 }
 #else
@@ -569,8 +559,8 @@ static void __init intel_graphics_stolen(int num, int slot, int func)
 			size = stolen_funcs->size(num, slot, func);
 			start = stolen_funcs->base(num, slot, func, size);
 			if (size && start) {
-				printk(KERN_INFO "Reserving Intel graphics stolen memory at 0x%x-0x%x\n",
-				       start, start + (u32)size - 1);
+				pr_info("Reserving Intel graphics stolen memory at 0x%x-0x%x\n",
+					start, start + (u32)size - 1);
 				/* Mark this space as reserved */
 				e820_add_region(start, size, E820_RESERVED);
 				sanitize_e820_map(e820.map,

@@ -450,7 +450,7 @@ static void init_ibs(void)
 	if (!ibs_caps)
 		return;
 
-	printk(KERN_INFO "oprofile: AMD IBS detected (0x%08x)\n", ibs_caps);
+	pr_info("oprofile: AMD IBS detected (0x%08x)\n", ibs_caps);
 }
 
 static int (*create_arch_files)(struct dentry *root);

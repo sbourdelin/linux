@@ -338,13 +338,12 @@ static void __init relocate_initrd(void)
 	memblock_reserve(relocated_ramdisk, area_size);
 	initrd_start = relocated_ramdisk + PAGE_OFFSET;
 	initrd_end   = initrd_start + ramdisk_size;
-	printk(KERN_INFO "Allocated new RAMDISK: [mem %#010llx-%#010llx]\n",
-	       relocated_ramdisk, relocated_ramdisk + ramdisk_size - 1);
+	pr_info("Allocated new RAMDISK: [mem %#010llx-%#010llx]\n",
+		relocated_ramdisk, relocated_ramdisk + ramdisk_size - 1);
 
 	copy_from_early_mem((void *)initrd_start, ramdisk_image, ramdisk_size);
 
-	printk(KERN_INFO "Move RAMDISK from [mem %#010llx-%#010llx] to"
-		" [mem %#010llx-%#010llx]\n",
+	pr_info("Move RAMDISK from [mem %#010llx-%#010llx] to [mem %#010llx-%#010llx]\n",
 		ramdisk_image, ramdisk_image + ramdisk_size - 1,
 		relocated_ramdisk, relocated_ramdisk + ramdisk_size - 1);
 }
@@ -382,7 +381,7 @@ static void __init reserve_initrd(void)
 		       "disabling initrd (%lld needed, %lld available)\n",
 		       ramdisk_size, mapped_size>>1);
 
-	printk(KERN_INFO "RAMDISK: [mem %#010llx-%#010llx]\n", ramdisk_image,
+	pr_info("RAMDISK: [mem %#010llx-%#010llx]\n", ramdisk_image,
 			ramdisk_end - 1);
 
 	if (pfn_range_is_mapped(PFN_DOWN(ramdisk_image),
@@ -457,7 +456,7 @@ static void __init e820_reserve_setup_data(void)
 
 	sanitize_e820_map(e820.map, ARRAY_SIZE(e820.map), &e820.nr_map);
 	memcpy(&e820_saved, &e820, sizeof(struct e820map));
-	printk(KERN_INFO "extended physical RAM map:\n");
+	pr_info("extended physical RAM map:\n");
 	e820_print_map("reserve setup_data");
 }
 
@@ -881,7 +880,7 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	__flush_tlb_all();
 #else
-	printk(KERN_INFO "Command line: %s\n", boot_command_line);
+	pr_info("Command line: %s\n", boot_command_line);
 #endif
 
 	/*
@@ -1030,7 +1029,7 @@ void __init setup_arch(char **cmdline_p)
 		e820_update_range(0x70000000ULL, 0x40000ULL, E820_RAM,
 				  E820_RESERVED);
 		sanitize_e820_map(e820.map, ARRAY_SIZE(e820.map), &e820.nr_map);
-		printk(KERN_INFO "fixed physical RAM map:\n");
+		pr_info("fixed physical RAM map:\n");
 		e820_print_map("bad_ppro");
 	}
 #else

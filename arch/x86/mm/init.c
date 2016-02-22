@@ -174,7 +174,7 @@ static void __init probe_page_size_mask(void)
 
 	/* Enable 1 GB linear kernel mappings if available: */
 	if (direct_gbpages && cpu_has_gbpages) {
-		printk(KERN_INFO "Using GB pages for direct mapping\n");
+		pr_info("Using GB pages for direct mapping\n");
 		page_size_mask |= 1 << PG_LEVEL_1G;
 	} else {
 		direct_gbpages = 0;

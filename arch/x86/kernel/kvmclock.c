@@ -114,8 +114,8 @@ static inline void kvm_sched_clock_init(bool stable)
 	pv_time_ops.sched_clock = kvm_sched_clock_read;
 	set_sched_clock_stable();
 
-	printk(KERN_INFO "kvm-clock: using sched offset of %llu cycles\n",
-			kvm_sched_clock_offset);
+	pr_info("kvm-clock: using sched offset of %llu cycles\n",
+		kvm_sched_clock_offset);
 
 	BUILD_BUG_ON(sizeof(kvm_sched_clock_offset) >
 	         sizeof(((struct pvclock_vcpu_time_info *)NULL)->system_time));
@@ -195,8 +195,8 @@ int kvm_register_clock(char *txt)
 	low = (int)slow_virt_to_phys(src) | 1;
 	high = ((u64)slow_virt_to_phys(src) >> 32);
 	ret = native_write_msr_safe(msr_kvm_system_time, low, high);
-	printk(KERN_INFO "kvm-clock: cpu %d, msr %x:%x, %s\n",
-	       cpu, high, low, txt);
+	pr_info("kvm-clock: cpu %d, msr %x:%x, %s\n",
+		cpu, high, low, txt);
 
 	return ret;
 }
@@ -263,7 +263,7 @@ void __init kvmclock_init(void)
 	} else if (!(kvmclock && kvm_para_has_feature(KVM_FEATURE_CLOCKSOURCE)))
 		return;
 
-	printk(KERN_INFO "kvm-clock: Using msrs %x and %x",
+	pr_info("kvm-clock: Using msrs %x and %x",
 		msr_kvm_system_time, msr_kvm_wall_clock);
 
 	mem = memblock_alloc(size, PAGE_SIZE);
