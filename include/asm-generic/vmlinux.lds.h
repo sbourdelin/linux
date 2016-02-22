@@ -526,6 +526,7 @@
 	IRQCHIP_OF_MATCH_TABLE()					\
 	ACPI_PROBE_TABLE(irqchip)					\
 	ACPI_PROBE_TABLE(clksrc)					\
+	ACPI_PROBE_TABLE(dbg2)						\
 	EARLYCON_TABLE()						\
 	EARLYCON_OF_TABLES()
 
