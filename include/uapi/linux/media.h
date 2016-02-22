@@ -302,7 +302,7 @@ struct media_v2_entity {
 	__u32 id;
 	char name[64];		/* FIXME: move to a property? (RFC says so) */
 	__u32 function;		/* Main function of the entity */
-	__u16 reserved[12];
+	__u32 reserved[8];
 };
 
 /* Should match the specific fields at media_intf_devnode */
@@ -327,7 +327,7 @@ struct media_v2_pad {
 	__u32 id;
 	__u32 entity_id;
 	__u32 flags;
-	__u16 reserved[9];
+	__u32 reserved[9];
 };
 
 struct media_v2_link {
@@ -335,7 +335,7 @@ struct media_v2_link {
 	__u32 source_id;
 	__u32 sink_id;
 	__u32 flags;
-	__u32 reserved[5];
+	__u32 reserved[8];
 };
 
 struct media_v2_topology {
