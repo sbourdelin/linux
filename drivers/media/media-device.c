@@ -38,6 +38,11 @@
  * Userspace API
  */
 
+static inline void __user *media_get_uptr(__u64 arg)
+{
+	return (void __user *)(uintptr_t)arg;
+}
+
 static int media_device_open(struct file *filp)
 {
 	return 0;
