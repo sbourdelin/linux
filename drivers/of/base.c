@@ -2143,7 +2143,7 @@ struct device_node *of_graph_get_port_by_id(struct device_node *parent, u32 id)
 	if (node)
 		parent = node;
 
-	for_each_child_of_node(parent, port) {
+	for_each_available_child_of_node(parent, port) {
 		u32 port_id = 0;
 
 		if (of_node_cmp(port->name, "port") != 0)
@@ -2209,7 +2209,7 @@ struct device_node *of_graph_get_next_endpoint(const struct device_node *parent,
 		 * getting the next child. If the previous endpoint is NULL this
 		 * will return the first child.
 		 */
-		endpoint = of_get_next_child(port, prev);
+		endpoint = of_get_next_available_child(port, prev);
 		if (endpoint) {
 			of_node_put(port);
 			return endpoint;
@@ -2219,7 +2219,7 @@ struct device_node *of_graph_get_next_endpoint(const struct device_node *parent,
 		prev = NULL;
 
 		do {
-			port = of_get_next_child(parent, port);
+			port = of_get_next_available_child(parent, port);
 			if (!port)
 				return NULL;
 		} while (of_node_cmp(port->name, "port"));
