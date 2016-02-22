@@ -622,7 +622,7 @@ static void gsm_send(struct gsm_mux *gsm, int addr, int cr, int control)
 
 static inline void gsm_response(struct gsm_mux *gsm, int addr, int control)
 {
-	gsm_send(gsm, addr, 0, control);
+	gsm_send(gsm, addr, gsm->initiator ? 0 : 1, control);
 }
 
 /**
@@ -636,7 +636,7 @@ static inline void gsm_response(struct gsm_mux *gsm, int addr, int control)
 
 static inline void gsm_command(struct gsm_mux *gsm, int addr, int control)
 {
-	gsm_send(gsm, addr, 1, control);
+	gsm_send(gsm, addr, gsm->initiator ? 1 : 0, control);
 }
 
 /* Data transmission */
