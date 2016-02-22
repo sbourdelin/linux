@@ -238,6 +238,11 @@ static int tegra_max98090_probe(struct platform_device *pdev)
 	if (machine->gpio_hp_det == -EPROBE_DEFER)
 		return -EPROBE_DEFER;
 
+	if (of_property_read_bool(np, "nvidia,hd-no-invert"))
+		tegra_max98090_hp_jack_gpio.invert = 0;
+	else
+		tegra_max98090_hp_jack_gpio.invert = 1;
+
 	machine->gpio_mic_det =
 			of_get_named_gpio(np, "nvidia,mic-det-gpios", 0);
 	if (machine->gpio_mic_det == -EPROBE_DEFER)
