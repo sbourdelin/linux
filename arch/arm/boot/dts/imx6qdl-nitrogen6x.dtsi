@@ -85,9 +85,21 @@
 			enable-active-high;
 		};
 
-		reg_can_xcvr: regulator@3 {
+		reg_usb_h1_vbus: regulator@3 {
 			compatible = "regulator-fixed";
 			reg = <3>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_usbh1>;
+			regulator-name = "usb_h1_vbus";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+			gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
+			enable-active-high;
+		};
+
+		reg_can_xcvr: regulator@4 {
+			compatible = "regulator-fixed";
+			reg = <4>;
 			regulator-name = "CAN XCVR";
 			regulator-min-microvolt = <3300000>;
 			regulator-max-microvolt = <3300000>;
@@ -96,9 +108,9 @@
 			gpio = <&gpio1 2 GPIO_ACTIVE_LOW>;
 		};
 
-		reg_wlan_vmmc: regulator@4 {
+		reg_wlan_vmmc: regulator@5 {
 			compatible = "regulator-fixed";
-			reg = <4>;
+			reg = <5>;
 			pinctrl-names = "default";
 			pinctrl-0 = <&pinctrl_wlan_vmmc>;
 			regulator-name = "reg_wlan_vmmc";
@@ -515,6 +527,12 @@
 			>;
 		};
 
+		pinctrl_usbh1: usbh1grp {
+			fsl,pins = <
+				MX6QDL_PAD_GPIO_17__GPIO7_IO12          0x0b0b0
+			>;
+		};
+
 		pinctrl_usbotg: usbotggrp {
 			fsl,pins = <
 				MX6QDL_PAD_GPIO_1__USB_OTG_ID	0x17059
@@ -632,6 +650,7 @@
 };
 
 &usbh1 {
+	vbus-supply = <&reg_usb_h1_vbus>;
 	status = "okay";
 };
 
