@@ -1,5 +1,6 @@
 config FS_ENCRYPTION
 	bool "FS Encryption (Per-file encryption)"
+	depends on BLOCK
 	select CRYPTO_AES
 	select CRYPTO_CBC
 	select CRYPTO_ECB
