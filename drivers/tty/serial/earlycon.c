@@ -21,6 +21,7 @@
 #include <linux/serial_core.h>
 #include <linux/sizes.h>
 #include <linux/mod_devicetable.h>
+#include <linux/acpi.h>
 
 #ifdef CONFIG_FIX_EARLYCON_MEM
 #include <asm/fixmap.h>
@@ -186,6 +187,8 @@ int __init setup_earlycon(char *buf)
 	return -ENOENT;
 }
 
+static bool setup_dbg2_earlycon;
+
 /* early_param wrapper for setup_earlycon() */
 static int __init param_setup_earlycon(char *buf)
 {
@@ -197,6 +200,11 @@ static int __init param_setup_earlycon(char *buf)
 	 */
 	if (!buf || !buf[0])
 		return early_init_dt_scan_chosen_serial();
+
+	if (!strcmp(buf, "acpi_dbg2")) {
+		setup_dbg2_earlycon = true;
+		return 0;
+	}
 
 	err = setup_earlycon(buf);
 	if (err == -ENOENT || err == -EALREADY)
@@ -224,6 +232,54 @@ int __init of_setup_earlycon(unsigned long addr,
 	if (!early_console_dev.con->write)
 		return -ENODEV;
 
+
+	register_console(early_console_dev.con);
+	return 0;
+}
+
+int __init acpi_setup_earlycon(struct acpi_dbg2_device *device, void *d)
+{
+	int err;
+	struct uart_port *port = &early_console_dev.port;
+	int (*setup)(struct earlycon_device *, const char *) = d;
+	struct acpi_generic_address *reg;
+
+	if (!setup_dbg2_earlycon)
+		return -ENODEV;
+
+	if (device->register_count < 1)
+		return -ENODEV;
+
+	if (device->base_address_offset >= device->length)
+		return -EINVAL;
+
+	reg = (void *)device + device->base_address_offset;
+
+	if (reg->space_id != ACPI_ADR_SPACE_SYSTEM_MEMORY &&
+	    reg->space_id != ACPI_ADR_SPACE_SYSTEM_IO)
+		return -EINVAL;
+
+	spin_lock_init(&port->lock);
+	port->uartclk = BASE_BAUD * 16;
+
+	if (reg->space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY) {
+		if (device->port_type == ACPI_DBG2_ARM_SBSA_32BIT)
+			port->iotype = UPIO_MEM32;
+		else
+			port->iotype = UPIO_MEM;
+		port->mapbase = reg->address;
+		port->membase = earlycon_map(reg->address, SZ_4K);
+	} else {
+		port->iotype = UPIO_PORT;
+		port->iobase = reg->address;
+	}
+
+	early_console_dev.con->data = &early_console_dev;
+	err = setup(&early_console_dev, NULL);
+	if (err < 0)
+		return err;
+	if (!early_console_dev.con->write)
+		return -ENODEV;
 
 	register_console(early_console_dev.con);
 	return 0;

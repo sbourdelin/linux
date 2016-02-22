@@ -1064,6 +1064,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			A valid base address must be provided, and the serial
 			port must already be setup and configured.
 
+		acpi_dbg2
+			Use serial port specified by the DBG2 ACPI table.
+
 	earlyprintk=	[X86,SH,BLACKFIN,ARM,M68k]
 			earlyprintk=vga
 			earlyprintk=efi
