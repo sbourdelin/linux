@@ -83,6 +83,19 @@ enum tg_state_flags {
 
 #define rb_entry_tg(node)	rb_entry((node), struct throtl_grp, rb_node)
 
+struct throtl_io_cost {
+	/* bytes per second rate limits */
+	uint64_t bps[2];
+
+	/* IOPS limits */
+	unsigned int iops[2];
+
+	/* Number of bytes disptached in current slice */
+	uint64_t bytes_disp[2];
+	/* Number of bio's dispatched in current slice */
+	unsigned int io_disp[2];
+};
+
 struct throtl_grp {
 	/* must be the first member */
 	struct blkg_policy_data pd;
@@ -119,16 +132,7 @@ struct throtl_grp {
 	/* are there any throtl rules between this group and td? */
 	bool has_rules[2];
 
-	/* bytes per second rate limits */
-	uint64_t bps[2];
-
-	/* IOPS limits */
-	unsigned int iops[2];
-
-	/* Number of bytes disptached in current slice */
-	uint64_t bytes_disp[2];
-	/* Number of bio's dispatched in current slice */
-	unsigned int io_disp[2];
+	struct throtl_io_cost io_cost;
 
 	/* When did we start a new slice */
 	unsigned long slice_start[2];
@@ -323,6 +327,14 @@ static void throtl_service_queue_init(struct throtl_service_queue *sq)
 		    (unsigned long)sq);
 }
 
+static inline void io_cost_init(struct throtl_grp *tg)
+{
+	tg->io_cost.bps[READ] = -1;
+	tg->io_cost.bps[WRITE] = -1;
+	tg->io_cost.iops[READ] = -1;
+	tg->io_cost.iops[WRITE] = -1;
+}
+
 static struct blkg_policy_data *throtl_pd_alloc(gfp_t gfp, int node)
 {
 	struct throtl_grp *tg;
@@ -340,10 +352,8 @@ static struct blkg_policy_data *throtl_pd_alloc(gfp_t gfp, int node)
 	}
 
 	RB_CLEAR_NODE(&tg->rb_node);
-	tg->bps[READ] = -1;
-	tg->bps[WRITE] = -1;
-	tg->iops[READ] = -1;
-	tg->iops[WRITE] = -1;
+
+	io_cost_init(tg);
 
 	return &tg->pd;
 }
@@ -374,6 +384,11 @@ static void throtl_pd_init(struct blkg_policy_data *pd)
 	tg->td = td;
 }
 
+static inline bool io_cost_has_limit(struct throtl_grp *tg, int rw)
+{
+	return tg->io_cost.bps[rw] != -1 || tg->io_cost.iops[rw] != -1;
+}
+
 /*
  * Set has_rules[] if @tg or any of its parents have limits configured.
  * This doesn't require walking up to the top of the hierarchy as the
@@ -386,7 +401,7 @@ static void tg_update_has_rules(struct throtl_grp *tg)
 
 	for (rw = READ; rw <= WRITE; rw++)
 		tg->has_rules[rw] = (parent_tg && parent_tg->has_rules[rw]) ||
-				    (tg->bps[rw] != -1 || tg->iops[rw] != -1);
+				    io_cost_has_limit(tg, rw);
 }
 
 static void throtl_pd_online(struct blkg_policy_data *pd)
@@ -547,11 +562,17 @@ static bool throtl_schedule_next_dispatch(struct throtl_service_queue *sq,
 	return false;
 }
 
+static inline void io_cost_start_new_slice(struct throtl_grp *tg,
+		bool rw)
+{
+	tg->io_cost.bytes_disp[rw] = 0;
+	tg->io_cost.io_disp[rw] = 0;
+}
+
 static inline void throtl_start_new_slice_with_credit(struct throtl_grp *tg,
 		bool rw, unsigned long start)
 {
-	tg->bytes_disp[rw] = 0;
-	tg->io_disp[rw] = 0;
+	io_cost_start_new_slice(tg, rw);
 
 	/*
 	 * Previous slice has expired. We must have trimmed it after last
@@ -571,8 +592,7 @@ static inline void throtl_start_new_slice_with_credit(struct throtl_grp *tg,
 
 static inline void throtl_start_new_slice(struct throtl_grp *tg, bool rw)
 {
-	tg->bytes_disp[rw] = 0;
-	tg->io_disp[rw] = 0;
+	io_cost_start_new_slice(tg, rw);
 	tg->slice_start[rw] = jiffies;
 	tg->slice_end[rw] = jiffies + throtl_slice;
 	throtl_log(&tg->service_queue,
@@ -606,11 +626,38 @@ static bool throtl_slice_used(struct throtl_grp *tg, bool rw)
 	return 1;
 }
 
+static inline bool io_cost_trim_slice(struct throtl_grp *tg, bool rw,
+	unsigned long nr_slices)
+{
+	unsigned long io_trim;
+	u64 bytes_trim, tmp;
+
+	tmp = tg->io_cost.bps[rw] * throtl_slice * nr_slices;
+	do_div(tmp, HZ);
+	bytes_trim = tmp;
+
+	io_trim = (tg->io_cost.iops[rw] * throtl_slice * nr_slices) / HZ;
+
+	if (!bytes_trim && !io_trim)
+		return false;
+
+	if (tg->io_cost.bytes_disp[rw] >= bytes_trim)
+		tg->io_cost.bytes_disp[rw] -= bytes_trim;
+	else
+		tg->io_cost.bytes_disp[rw] = 0;
+
+	if (tg->io_cost.io_disp[rw] >= io_trim)
+		tg->io_cost.io_disp[rw] -= io_trim;
+	else
+		tg->io_cost.io_disp[rw] = 0;
+
+	return true;
+}
+
 /* Trim the used slices and adjust slice start accordingly */
 static inline void throtl_trim_slice(struct throtl_grp *tg, bool rw)
 {
-	unsigned long nr_slices, time_elapsed, io_trim;
-	u64 bytes_trim, tmp;
+	unsigned long nr_slices, time_elapsed;
 
 	BUG_ON(time_before(tg->slice_end[rw], tg->slice_start[rw]));
 
@@ -638,34 +685,18 @@ static inline void throtl_trim_slice(struct throtl_grp *tg, bool rw)
 
 	if (!nr_slices)
 		return;
-	tmp = tg->bps[rw] * throtl_slice * nr_slices;
-	do_div(tmp, HZ);
-	bytes_trim = tmp;
 
-	io_trim = (tg->iops[rw] * throtl_slice * nr_slices)/HZ;
-
-	if (!bytes_trim && !io_trim)
+	if (!io_cost_trim_slice(tg, rw, nr_slices))
 		return;
-
-	if (tg->bytes_disp[rw] >= bytes_trim)
-		tg->bytes_disp[rw] -= bytes_trim;
-	else
-		tg->bytes_disp[rw] = 0;
-
-	if (tg->io_disp[rw] >= io_trim)
-		tg->io_disp[rw] -= io_trim;
-	else
-		tg->io_disp[rw] = 0;
-
 	tg->slice_start[rw] += nr_slices * throtl_slice;
 
 	throtl_log(&tg->service_queue,
-		   "[%c] trim slice nr=%lu bytes=%llu io=%lu start=%lu end=%lu jiffies=%lu",
-		   rw == READ ? 'R' : 'W', nr_slices, bytes_trim, io_trim,
+		   "[%c] trim slice nr=%lu start=%lu end=%lu jiffies=%lu",
+		   rw == READ ? 'R' : 'W', nr_slices,
 		   tg->slice_start[rw], tg->slice_end[rw], jiffies);
 }
 
-static bool tg_with_in_iops_limit(struct throtl_grp *tg, struct bio *bio,
+static bool io_cost_with_in_iops_limit(struct throtl_grp *tg, struct bio *bio,
 				  unsigned long *wait)
 {
 	bool rw = bio_data_dir(bio);
@@ -688,7 +719,7 @@ static bool tg_with_in_iops_limit(struct throtl_grp *tg, struct bio *bio,
 	 * have been trimmed.
 	 */
 
-	tmp = (u64)tg->iops[rw] * jiffy_elapsed_rnd;
+	tmp = (u64)tg->io_cost.iops[rw] * jiffy_elapsed_rnd;
 	do_div(tmp, HZ);
 
 	if (tmp > UINT_MAX)
@@ -696,14 +727,15 @@ static bool tg_with_in_iops_limit(struct throtl_grp *tg, struct bio *bio,
 	else
 		io_allowed = tmp;
 
-	if (tg->io_disp[rw] + 1 <= io_allowed) {
+	if (tg->io_cost.io_disp[rw] + 1 <= io_allowed) {
 		if (wait)
 			*wait = 0;
 		return true;
 	}
 
 	/* Calc approx time to dispatch */
-	jiffy_wait = ((tg->io_disp[rw] + 1) * HZ)/tg->iops[rw] + 1;
+	jiffy_wait = ((tg->io_cost.io_disp[rw] + 1) * HZ) /
+		tg->io_cost.iops[rw] + 1;
 
 	if (jiffy_wait > jiffy_elapsed)
 		jiffy_wait = jiffy_wait - jiffy_elapsed;
@@ -712,10 +744,10 @@ static bool tg_with_in_iops_limit(struct throtl_grp *tg, struct bio *bio,
 
 	if (wait)
 		*wait = jiffy_wait;
-	return 0;
+	return false;
 }
 
-static bool tg_with_in_bps_limit(struct throtl_grp *tg, struct bio *bio,
+static bool io_cost_with_in_bps_limit(struct throtl_grp *tg, struct bio *bio,
 				 unsigned long *wait)
 {
 	bool rw = bio_data_dir(bio);
@@ -730,19 +762,21 @@ static bool tg_with_in_bps_limit(struct throtl_grp *tg, struct bio *bio,
 
 	jiffy_elapsed_rnd = roundup(jiffy_elapsed_rnd, throtl_slice);
 
-	tmp = tg->bps[rw] * jiffy_elapsed_rnd;
+	tmp = tg->io_cost.bps[rw] * jiffy_elapsed_rnd;
 	do_div(tmp, HZ);
 	bytes_allowed = tmp;
 
-	if (tg->bytes_disp[rw] + bio->bi_iter.bi_size <= bytes_allowed) {
+	if (tg->io_cost.bytes_disp[rw] + bio->bi_iter.bi_size <=
+	    bytes_allowed) {
 		if (wait)
 			*wait = 0;
 		return true;
 	}
 
 	/* Calc approx time to dispatch */
-	extra_bytes = tg->bytes_disp[rw] + bio->bi_iter.bi_size - bytes_allowed;
-	jiffy_wait = div64_u64(extra_bytes * HZ, tg->bps[rw]);
+	extra_bytes = tg->io_cost.bytes_disp[rw] +
+		bio->bi_iter.bi_size - bytes_allowed;
+	jiffy_wait = div64_u64(extra_bytes * HZ, tg->io_cost.bps[rw]);
 
 	if (!jiffy_wait)
 		jiffy_wait = 1;
@@ -754,7 +788,21 @@ static bool tg_with_in_bps_limit(struct throtl_grp *tg, struct bio *bio,
 	jiffy_wait = jiffy_wait + (jiffy_elapsed_rnd - jiffy_elapsed);
 	if (wait)
 		*wait = jiffy_wait;
-	return 0;
+	return false;
+}
+
+static bool io_cost_with_in_limit(struct throtl_grp *tg, struct bio *bio,
+		unsigned long *wait)
+{
+	unsigned long bps_wait = 0, iops_wait = 0;
+
+	if (io_cost_with_in_bps_limit(tg, bio, &bps_wait) &&
+	    io_cost_with_in_iops_limit(tg, bio, &iops_wait)) {
+		*wait = 0;
+		return true;
+	}
+	*wait = max(bps_wait, iops_wait);
+	return false;
 }
 
 /*
@@ -765,7 +813,7 @@ static bool tg_may_dispatch(struct throtl_grp *tg, struct bio *bio,
 			    unsigned long *wait)
 {
 	bool rw = bio_data_dir(bio);
-	unsigned long bps_wait = 0, iops_wait = 0, max_wait = 0;
+	unsigned long max_wait = 0;
 
 	/*
  	 * Currently whole state machine of group depends on first bio
@@ -777,7 +825,7 @@ static bool tg_may_dispatch(struct throtl_grp *tg, struct bio *bio,
 	       bio != throtl_peek_queued(&tg->service_queue.queued[rw]));
 
 	/* If tg->bps = -1, then BW is unlimited */
-	if (tg->bps[rw] == -1 && tg->iops[rw] == -1) {
+	if (!io_cost_has_limit(tg, rw)) {
 		if (wait)
 			*wait = 0;
 		return true;
@@ -795,14 +843,11 @@ static bool tg_may_dispatch(struct throtl_grp *tg, struct bio *bio,
 			throtl_extend_slice(tg, rw, jiffies + throtl_slice);
 	}
 
-	if (tg_with_in_bps_limit(tg, bio, &bps_wait) &&
-	    tg_with_in_iops_limit(tg, bio, &iops_wait)) {
+	if (io_cost_with_in_limit(tg, bio, &max_wait)) {
 		if (wait)
 			*wait = 0;
-		return 1;
+		return true;
 	}
-
-	max_wait = max(bps_wait, iops_wait);
 
 	if (wait)
 		*wait = max_wait;
@@ -810,17 +855,21 @@ static bool tg_may_dispatch(struct throtl_grp *tg, struct bio *bio,
 	if (time_before(tg->slice_end[rw], jiffies + max_wait))
 		throtl_extend_slice(tg, rw, jiffies + max_wait);
 
-	return 0;
+	return false;
 }
 
-static void throtl_charge_bio(struct throtl_grp *tg, struct bio *bio)
+static inline void io_cost_charge_bio(struct throtl_grp *tg, struct bio *bio)
 {
 	bool rw = bio_data_dir(bio);
 
 	/* Charge the bio to the group */
-	tg->bytes_disp[rw] += bio->bi_iter.bi_size;
-	tg->io_disp[rw]++;
+	tg->io_cost.bytes_disp[rw] += bio->bi_iter.bi_size;
+	tg->io_cost.io_disp[rw]++;
+}
 
+static void throtl_charge_bio(struct throtl_grp *tg, struct bio *bio)
+{
+	io_cost_charge_bio(tg, bio);
 	/*
 	 * REQ_THROTTLED is used to prevent the same bio to be throttled
 	 * more than once as a throttled bio will go through blk-throtl the
@@ -1152,8 +1201,8 @@ static void tg_conf_updated(struct throtl_grp *tg)
 
 	throtl_log(&tg->service_queue,
 		   "limit change rbps=%llu wbps=%llu riops=%u wiops=%u",
-		   tg->bps[READ], tg->bps[WRITE],
-		   tg->iops[READ], tg->iops[WRITE]);
+		   tg->io_cost.bps[READ], tg->io_cost.bps[WRITE],
+		   tg->io_cost.iops[READ], tg->io_cost.iops[WRITE]);
 
 	/*
 	 * Update has_rules[] flags for the updated tg's subtree.  A tg is
@@ -1230,25 +1279,25 @@ static ssize_t tg_set_conf_uint(struct kernfs_open_file *of,
 static struct cftype throtl_legacy_files[] = {
 	{
 		.name = "throttle.read_bps_device",
-		.private = offsetof(struct throtl_grp, bps[READ]),
+		.private = offsetof(struct throtl_grp, io_cost.bps[READ]),
 		.seq_show = tg_print_conf_u64,
 		.write = tg_set_conf_u64,
 	},
 	{
 		.name = "throttle.write_bps_device",
-		.private = offsetof(struct throtl_grp, bps[WRITE]),
+		.private = offsetof(struct throtl_grp, io_cost.bps[WRITE]),
 		.seq_show = tg_print_conf_u64,
 		.write = tg_set_conf_u64,
 	},
 	{
 		.name = "throttle.read_iops_device",
-		.private = offsetof(struct throtl_grp, iops[READ]),
+		.private = offsetof(struct throtl_grp, io_cost.iops[READ]),
 		.seq_show = tg_print_conf_uint,
 		.write = tg_set_conf_uint,
 	},
 	{
 		.name = "throttle.write_iops_device",
-		.private = offsetof(struct throtl_grp, iops[WRITE]),
+		.private = offsetof(struct throtl_grp, io_cost.iops[WRITE]),
 		.seq_show = tg_print_conf_uint,
 		.write = tg_set_conf_uint,
 	},
@@ -1274,18 +1323,22 @@ static u64 tg_prfill_max(struct seq_file *sf, struct blkg_policy_data *pd,
 
 	if (!dname)
 		return 0;
-	if (tg->bps[READ] == -1 && tg->bps[WRITE] == -1 &&
-	    tg->iops[READ] == -1 && tg->iops[WRITE] == -1)
+	if (tg->io_cost.bps[READ] == -1 && tg->io_cost.bps[WRITE] == -1 &&
+	    tg->io_cost.iops[READ] == -1 && tg->io_cost.iops[WRITE] == -1)
 		return 0;
 
-	if (tg->bps[READ] != -1)
-		snprintf(bufs[0], sizeof(bufs[0]), "%llu", tg->bps[READ]);
-	if (tg->bps[WRITE] != -1)
-		snprintf(bufs[1], sizeof(bufs[1]), "%llu", tg->bps[WRITE]);
-	if (tg->iops[READ] != -1)
-		snprintf(bufs[2], sizeof(bufs[2]), "%u", tg->iops[READ]);
-	if (tg->iops[WRITE] != -1)
-		snprintf(bufs[3], sizeof(bufs[3]), "%u", tg->iops[WRITE]);
+	if (tg->io_cost.bps[READ] != -1)
+		snprintf(bufs[0], sizeof(bufs[0]), "%llu",
+			tg->io_cost.bps[READ]);
+	if (tg->io_cost.bps[WRITE] != -1)
+		snprintf(bufs[1], sizeof(bufs[1]), "%llu",
+			tg->io_cost.bps[WRITE]);
+	if (tg->io_cost.iops[READ] != -1)
+		snprintf(bufs[2], sizeof(bufs[2]), "%u",
+			tg->io_cost.iops[READ]);
+	if (tg->io_cost.iops[WRITE] != -1)
+		snprintf(bufs[3], sizeof(bufs[3]), "%u",
+			tg->io_cost.iops[WRITE]);
 
 	seq_printf(sf, "%s rbps=%s wbps=%s riops=%s wiops=%s\n",
 		   dname, bufs[0], bufs[1], bufs[2], bufs[3]);
@@ -1314,10 +1367,10 @@ static ssize_t tg_set_max(struct kernfs_open_file *of,
 
 	tg = blkg_to_tg(ctx.blkg);
 
-	v[0] = tg->bps[READ];
-	v[1] = tg->bps[WRITE];
-	v[2] = tg->iops[READ];
-	v[3] = tg->iops[WRITE];
+	v[0] = tg->io_cost.bps[READ];
+	v[1] = tg->io_cost.bps[WRITE];
+	v[2] = tg->io_cost.iops[READ];
+	v[3] = tg->io_cost.iops[WRITE];
 
 	while (true) {
 		char tok[27];	/* wiops=18446744073709551616 */
@@ -1354,10 +1407,10 @@ static ssize_t tg_set_max(struct kernfs_open_file *of,
 			goto out_finish;
 	}
 
-	tg->bps[READ] = v[0];
-	tg->bps[WRITE] = v[1];
-	tg->iops[READ] = v[2];
-	tg->iops[WRITE] = v[3];
+	tg->io_cost.bps[READ] = v[0];
+	tg->io_cost.bps[WRITE] = v[1];
+	tg->io_cost.iops[READ] = v[2];
+	tg->io_cost.iops[WRITE] = v[3];
 
 	tg_conf_updated(tg);
 	ret = 0;
@@ -1455,8 +1508,9 @@ bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 	/* out-of-limit, queue to @tg */
 	throtl_log(sq, "[%c] bio. bdisp=%llu sz=%u bps=%llu iodisp=%u iops=%u queued=%d/%d",
 		   rw == READ ? 'R' : 'W',
-		   tg->bytes_disp[rw], bio->bi_iter.bi_size, tg->bps[rw],
-		   tg->io_disp[rw], tg->iops[rw],
+		   tg->io_cost.bytes_disp[rw], bio->bi_iter.bi_size,
+		   tg->io_cost.bps[rw], tg->io_cost.io_disp[rw],
+		   tg->io_cost.iops[rw],
 		   sq->nr_queued[READ], sq->nr_queued[WRITE]);
 
 	bio_associate_current(bio);
