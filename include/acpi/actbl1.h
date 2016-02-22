@@ -1040,15 +1040,18 @@ struct acpi_nfit_smbios {
 struct acpi_nfit_control_region {
 	struct acpi_nfit_header header;
 	u16 region_index;
-	u16 vendor_id;
-	u16 device_id;
-	u16 revision_id;
-	u16 subsystem_vendor_id;
-	u16 subsystem_device_id;
-	u16 subsystem_revision_id;
-	u8 reserved[6];		/* Reserved, must be zero */
-	u32 serial_number;
-	u16 code;
+	u8 vendor_id[2];
+	u8 device_id[2];
+	u8 revision_id[2];
+	u8 subsystem_vendor_id[2];
+	u8 subsystem_device_id[2];
+	u8 subsystem_revision_id[2];
+	u8 valid_fields;
+	u8 manufacturing_location;
+	u8 manufacturing_date[2];
+	u8 reserved[2];		/* Reserved, must be zero */
+	u8 serial_number[4];
+	u8 code[2];
 	u16 windows;
 	u64 window_size;
 	u64 command_offset;
@@ -1058,6 +1061,9 @@ struct acpi_nfit_control_region {
 	u16 flags;
 	u8 reserved1[6];	/* Reserved, must be zero */
 };
+
+/* Valid Fields */
+#define ACPI_NFIT_CONTROL_MFG_INFO_VALID (1)	/* Manufacturing fields are valid */
 
 /* Flags */
 

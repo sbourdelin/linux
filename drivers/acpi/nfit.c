@@ -722,7 +722,8 @@ static ssize_t vendor_show(struct device *dev,
 {
 	struct acpi_nfit_control_region *dcr = to_nfit_dcr(dev);
 
-	return sprintf(buf, "%#x\n", dcr->vendor_id);
+	return sprintf(buf, "0x%02x%02x\n",
+				dcr->vendor_id[0], dcr->vendor_id[1]);
 }
 static DEVICE_ATTR_RO(vendor);
 
@@ -731,7 +732,8 @@ static ssize_t rev_id_show(struct device *dev,
 {
 	struct acpi_nfit_control_region *dcr = to_nfit_dcr(dev);
 
-	return sprintf(buf, "%#x\n", dcr->revision_id);
+	return sprintf(buf, "0x%02x%02x\n",
+				dcr->revision_id[0], dcr->revision_id[1]);
 }
 static DEVICE_ATTR_RO(rev_id);
 
@@ -740,7 +742,8 @@ static ssize_t device_show(struct device *dev,
 {
 	struct acpi_nfit_control_region *dcr = to_nfit_dcr(dev);
 
-	return sprintf(buf, "%#x\n", dcr->device_id);
+	return sprintf(buf, "0x%02x%02x\n",
+				dcr->device_id[0], dcr->device_id[1]);
 }
 static DEVICE_ATTR_RO(device);
 
@@ -749,7 +752,7 @@ static ssize_t format_show(struct device *dev,
 {
 	struct acpi_nfit_control_region *dcr = to_nfit_dcr(dev);
 
-	return sprintf(buf, "%#x\n", dcr->code);
+	return sprintf(buf, "0x%02x%02x\n", dcr->code[0], dcr->code[1]);
 }
 static DEVICE_ATTR_RO(format);
 
@@ -758,7 +761,9 @@ static ssize_t serial_show(struct device *dev,
 {
 	struct acpi_nfit_control_region *dcr = to_nfit_dcr(dev);
 
-	return sprintf(buf, "%#x\n", dcr->serial_number);
+	return sprintf(buf, "0x%02x%02x%02x%02x\n",
+			dcr->serial_number[0], dcr->serial_number[1],
+			dcr->serial_number[2], dcr->serial_number[3]);
 }
 static DEVICE_ATTR_RO(serial);
 
@@ -956,7 +961,7 @@ static const struct attribute_group *acpi_nfit_region_attribute_groups[] = {
 struct nfit_set_info {
 	struct nfit_set_info_map {
 		u64 region_offset;
-		u32 serial_number;
+		u8 serial_number[4];
 		u32 pad;
 	} mapping[0];
 };
@@ -1025,7 +1030,8 @@ static int acpi_nfit_init_interleave_set(struct acpi_nfit_desc *acpi_desc,
 		}
 
 		map->region_offset = memdev->region_offset;
-		map->serial_number = nfit_mem->dcr->serial_number;
+		memcpy(map->serial_number, nfit_mem->dcr->serial_number,
+				sizeof(map->serial_number));
 	}
 
 	sort(&info->mapping[0], nr, sizeof(struct nfit_set_info_map),
