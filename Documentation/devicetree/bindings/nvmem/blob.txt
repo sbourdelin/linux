@@ -1,0 +1,35 @@
+= Deviece Tree Embedded Blob As NVMEM Device =
+
+This binding is designed to provide a way for a developer to reference
+data, built-in into device tree blob file, as NVMEM provider and acccess
+certain portions of that data as NVMEM cells using NVMEM consumer API.
+
+Required properties:
+- compatible: should be "nvmem-blob"
+- data: specifies data contained in nvmem device
+
+= Data cells =
+Are child nodes of nvmem-composite, bindings of which as described in
+bindings/nvmem/nvmem.txt
+
+Example:
+
+	a-blob {
+		compatible = "nvmem-blob";
+		data = [aa bb cc dd ee];
+
+		cell1: cell@0 {
+			reg = <0 5>;
+		};
+	};
+
+= Data consumers =
+Are device nodes which consume nvmem data cells.
+
+Example:
+
+	a-node {
+		...
+		nvmem-cells = <&cell1>;
+		nvmem-cell-names = "some-data";
+	};
