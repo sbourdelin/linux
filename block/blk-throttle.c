@@ -122,7 +122,15 @@ struct throtl_io_cost {
 
 	uint64_t target_bps;
 	unsigned int target_iops;
+
+	uint64_t last_bps;
+	unsigned int last_iops;
+	unsigned int last_weight;
+	unsigned long last_shrink_time;
+	unsigned long last_wrong_shrink_time;
 };
+#define SHRINK_STABLE_TIME (2 * CGCHECK_TIME)
+#define WRONG_SHRINK_STABLE_TIME (16 * CGCHECK_TIME)
 
 /* per cgroup per device data */
 struct throtl_grp {
@@ -1239,6 +1247,76 @@ static void precheck_tg_activity(struct throtl_grp *tg, unsigned long elapsed_ti
 	}
 }
 
+static bool detect_wrong_shrink(struct throtl_grp *tg, unsigned long elapsed_time)
+{
+	struct throtl_service_queue *sq = &tg->service_queue;
+	struct throtl_service_queue *psq = tg->service_queue.parent_sq;
+	struct throtl_grp *ptg = sq_to_tg(psq);
+	struct blkcg_gq *blkg;
+	struct cgroup_subsys_state *pos_css;
+	uint64_t actual_bps;
+	unsigned int actual_iops;
+	bool ret = false;
+	unsigned long now = jiffies;
+	unsigned int new_weight;
+	bool bandwidth_mode = tg->td->mode == MODE_WEIGHT_BANDWIDTH;
+
+	blkg_for_each_child(blkg, pos_css, tg_to_blkg(ptg)) {
+		struct throtl_grp *child;
+
+		child = blkg_to_tg(blkg);
+		sq = &child->service_queue;
+
+		actual_bps = child->io_cost.act_bps;
+		actual_iops = child->io_cost.act_iops;
+		if (child->io_cost.last_shrink_time) {
+			if (time_before_eq(now, child->io_cost.last_shrink_time +
+			     SHRINK_STABLE_TIME) &&
+			   ((bandwidth_mode && actual_bps < child->io_cost.last_bps &&
+			     child->io_cost.last_bps - actual_bps >
+			      (child->io_cost.last_bps >> 5)) ||
+			    (!bandwidth_mode && actual_iops < child->io_cost.last_iops &&
+			      child->io_cost.last_iops - actual_iops >
+			       (child->io_cost.last_iops >> 5)))) {
+
+				ret = true;
+				/* the cgroup will get 1/4 more share */
+				if (4 * psq->children_weight > 5 * sq->acting_weight) {
+					new_weight = sq->acting_weight *
+					  psq->children_weight / (4 * psq->children_weight -
+					  5 * sq->acting_weight) + sq->acting_weight;
+					if (new_weight > sq->weight)
+						new_weight = sq->weight;
+				} else
+					new_weight = sq->weight;
+
+				psq->children_weight += new_weight -
+					sq->acting_weight;
+				sq->acting_weight = new_weight;
+
+				child->io_cost.last_shrink_time = 0;
+				child->io_cost.last_wrong_shrink_time = now;
+			} else if (time_after(now,
+				   child->io_cost.last_shrink_time + SHRINK_STABLE_TIME))
+				child->io_cost.last_shrink_time = 0;
+		}
+		if (child->io_cost.last_wrong_shrink_time &&
+		    time_after(now, child->io_cost.last_wrong_shrink_time +
+		     WRONG_SHRINK_STABLE_TIME))
+			child->io_cost.last_wrong_shrink_time = 0;
+	}
+	if (!ret)
+		return ret;
+
+	blkg_for_each_child(blkg, pos_css, tg_to_blkg(ptg)) {
+		struct throtl_grp *child;
+
+		child = blkg_to_tg(blkg);
+		child->io_cost.check_weight = false;
+	}
+	return true;
+}
+
 static bool detect_one_inactive_cg(struct throtl_grp *tg, unsigned long elapsed_time)
 {
 	struct throtl_service_queue *sq = &tg->service_queue;
@@ -1268,6 +1346,9 @@ static bool detect_one_inactive_cg(struct throtl_grp *tg, unsigned long elapsed_
 	    sq->acting_weight == psq->children_weight)
 		return false;
 
+	if (detect_wrong_shrink(tg, elapsed_time))
+		return true;
+
 	blkg_for_each_child(blkg, pos_css, tg_to_blkg(ptg)) {
 		child = blkg_to_tg(blkg);
 		sq = &child->service_queue;
@@ -1277,9 +1358,18 @@ static bool detect_one_inactive_cg(struct throtl_grp *tg, unsigned long elapsed_
 		if (sq->acting_weight == sq->weight)
 			none_scaled_weight += sq->acting_weight;
 
+		/* wait it stable */
+		if ((child->io_cost.last_shrink_time && time_before_eq(jiffies,
+		     child->io_cost.last_shrink_time + SHRINK_STABLE_TIME)) ||
+		    (child->io_cost.last_wrong_shrink_time && time_before_eq(jiffies,
+		      child->io_cost.last_wrong_shrink_time +
+		      WRONG_SHRINK_STABLE_TIME)))
+			continue;
+
 		if (bandwidth_mode) {
 			if (child->io_cost.bps[0] == -1)
 				continue;
+
 			if (child->io_cost.act_bps +
 			    (child->io_cost.act_bps >> 3) >= child->io_cost.bps[0])
 				continue;
@@ -1290,6 +1380,8 @@ static bool detect_one_inactive_cg(struct throtl_grp *tg, unsigned long elapsed_
 			adjusted_bps = tmp_bps >> 2;
 			child->io_cost.target_bps = child->io_cost.bps[0] -
 				adjusted_bps;
+
+			child->io_cost.last_bps = child->io_cost.act_bps;
 		} else {
 			if (child->io_cost.iops[0] == -1)
 				continue;
@@ -1305,6 +1397,7 @@ static bool detect_one_inactive_cg(struct throtl_grp *tg, unsigned long elapsed_
 				adjusted_iops;
 		}
 
+		child->io_cost.last_weight = sq->acting_weight;
 		adjusted_weight += sq->acting_weight;
 		if (sq->acting_weight == sq->weight)
 			none_scaled_weight -= sq->acting_weight;
@@ -1357,6 +1450,8 @@ static bool detect_one_inactive_cg(struct throtl_grp *tg, unsigned long elapsed_
 		}
 		psq->children_weight -= sq->acting_weight - new_weight;
 		sq->acting_weight = new_weight;
+
+		child->io_cost.last_shrink_time = jiffies;
 	}
 
 	return true;
