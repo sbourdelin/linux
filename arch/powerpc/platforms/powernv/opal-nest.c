@@ -32,6 +32,8 @@
 
 extern struct perchip_nest_info nest_perchip_info[NEST_MAX_CHIPS];
 extern struct nest_pmu *per_nest_pmu_arr[NEST_MAX_PMUS];
+extern int init_nest_pmu(struct nest_ima_events *nest_events,
+				int idx, struct nest_pmu *pmu_ptr);
 
 static int nest_event_info(char *name, struct nest_ima_events *nest_events)
 {
@@ -208,6 +210,12 @@ static int nest_pmu_create(struct device_node *parent, int pmu_index)
 		 * event scale and unit files also.
 		 */
 		idx += ret;
+	}
+
+	ret = init_nest_pmu(nest_events, idx, pmu_ptr);
+	if (ret) {
+		pr_err("Nest PMU %s Register failed\n", pmu_ptr->pmu.name);
+		return ret;
 	}
 
 	return 0;
