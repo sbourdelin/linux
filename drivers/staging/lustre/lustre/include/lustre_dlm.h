@@ -848,9 +848,6 @@ struct ldlm_resource {
 	struct list_head		lr_waiting;
 	/** @} */
 
-	/* XXX No longer needed? Remove ASAP */
-	ldlm_mode_t		lr_most_restr;
-
 	/** Type of locks this resource can hold. Only one type per resource. */
 	enum ldlm_type		lr_type; /* LDLM_{PLAIN,EXTENT,FLOCK,IBITS} */
 
