@@ -1,0 +1,23 @@
+512kB battery backed up SRAM on ICP DAS LP-8841 industrial computers
+
+LP-8441, LP-8141, and LP-8041 differ from LP-8841 only in expansion
+slot count.
+
+Required properties:
+- compatible : should be "icpdas,lp8841-sram"
+
+- reg: physical base addresses and region lengths of
+       * IO memory range
+       * SRAM page selector
+
+SRAM chip is connected via FPGA and is not accessible without a driver,
+unlike flash memory which is wired to CPU MMU. Driver is essentially
+an address translation routine.
+
+Example:
+
+	sram@a000 {
+		compatible = "icpdas,lp8841-sram";
+		reg = <0xa000 0x1000
+		       0x901e 0x1>;
+	};
