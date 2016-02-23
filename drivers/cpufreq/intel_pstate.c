@@ -975,17 +975,15 @@ static inline int32_t get_target_pstate_use_performance(struct cpudata *cpu)
 
 	/*
 	 * Since our utilization update callback will not run unless we are
-	 * in C0, check if the actual elapsed time is significantly greater (3x)
-	 * than our sample interval.  If it is, then we were idle for a long
-	 * enough period of time to adjust our busyness.
+	 * in C0, check if the actual elapsed time is significantly greater (12x)
+	 * than our sample interval.  If it is, then assume we were idle for a long
+	 * enough period of time to adjust our busyness. While the assumption
+	 * is not always true, it seems to be good enough.
 	 */
 	duration_ns = cpu->sample.time - cpu->last_sample_time;
-	if ((s64)duration_ns > pid_params.sample_rate_ns * 3
-	    && cpu->last_sample_time > 0) {
-		sample_ratio = div_fp(int_tofp(pid_params.sample_rate_ns),
-				      int_tofp(duration_ns));
-		core_busy = mul_fp(core_busy, sample_ratio);
-	}
+	if ((s64)duration_ns > pid_params.sample_rate_ns * 12
+	    && cpu->last_sample_time > 0)
+		core_busy = 0;
 
 	cpu->sample.busy_scaled = core_busy;
 	return cpu->pstate.current_pstate - pid_calc(&cpu->pid, core_busy);
