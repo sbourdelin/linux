@@ -517,6 +517,9 @@ struct intel_crtc_state {
 			struct skl_pipe_wm skl;
 		} optimal;
 	} wm;
+
+	/* Gamma mode programmed on the pipe */
+	uint32_t gamma_mode;
 };
 
 struct vlv_wm_state {
