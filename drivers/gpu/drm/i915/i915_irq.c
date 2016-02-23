@@ -2908,7 +2908,7 @@ semaphore_waits_for(struct intel_engine_cs *ring, u32 *seqno)
 		head &= ring->buffer->size - 1;
 
 		/* This here seems to blow up */
-		cmd = ioread32(ring->buffer->virtual_start + head);
+		cmd = I915_IOREAD32(ring->buffer->virtual_start + head);
 		if (cmd == ipehr)
 			break;
 
@@ -2918,11 +2918,11 @@ semaphore_waits_for(struct intel_engine_cs *ring, u32 *seqno)
 	if (!i)
 		return NULL;
 
-	*seqno = ioread32(ring->buffer->virtual_start + head + 4) + 1;
+	*seqno = I915_IOREAD32(ring->buffer->virtual_start + head + 4) + 1;
 	if (INTEL_INFO(ring->dev)->gen >= 8) {
-		offset = ioread32(ring->buffer->virtual_start + head + 12);
+		offset = I915_IOREAD32(ring->buffer->virtual_start + head + 12);
 		offset <<= 32;
-		offset = ioread32(ring->buffer->virtual_start + head + 8);
+		offset = I915_IOREAD32(ring->buffer->virtual_start + head + 8);
 	}
 	return semaphore_wait_to_signaller_ring(ring, ipehr, offset);
 }

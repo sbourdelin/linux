@@ -804,13 +804,14 @@ intel_logical_ring_advance_and_submit(struct drm_i915_gem_request *request)
 
 static void __wrap_ring_buffer(struct intel_ringbuffer *ringbuf)
 {
+	struct drm_i915_private *dev_priv = to_i915(ringbuf->obj->base.dev);
 	uint32_t __iomem *virt;
 	int rem = ringbuf->size - ringbuf->tail;
 
 	virt = ringbuf->virtual_start + ringbuf->tail;
 	rem /= 4;
 	while (rem--)
-		iowrite32(MI_NOOP, virt++);
+		I915_IOWRITE32(MI_NOOP, virt++);
 
 	ringbuf->tail = 0;
 	intel_ring_update_space(ringbuf);

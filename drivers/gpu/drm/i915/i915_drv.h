@@ -3509,6 +3509,123 @@ int intel_freq_opcode(struct drm_i915_private *dev_priv, int val);
 #define I915_READ_NOTRACE(reg)		dev_priv->uncore.funcs.mmio_readl(dev_priv, (reg), false)
 #define I915_WRITE_NOTRACE(reg, val)	dev_priv->uncore.funcs.mmio_writel(dev_priv, (reg), (val), false)
 
+static inline void
+assert_rpm_device_not_suspended(struct drm_i915_private *dev_priv)
+{
+	WARN_ONCE(dev_priv->pm.suspended,
+		  "Device suspended during HW access\n");
+}
+
+static inline void
+assert_rpm_wakelock_held(struct drm_i915_private *dev_priv)
+{
+	assert_rpm_device_not_suspended(dev_priv);
+	/* FIXME: Needs to be converted back to WARN_ONCE, but currently causes
+	 * too much noise. */
+	if (!atomic_read(&dev_priv->pm.wakeref_count))
+		DRM_DEBUG_DRIVER("RPM wakelock ref not held during HW access");
+}
+
+static inline int
+assert_rpm_atomic_begin(struct drm_i915_private *dev_priv)
+{
+	int seq = atomic_read(&dev_priv->pm.atomic_seq);
+
+	assert_rpm_wakelock_held(dev_priv);
+
+	return seq;
+}
+
+static inline void
+assert_rpm_atomic_end(struct drm_i915_private *dev_priv, int begin_seq)
+{
+	WARN_ONCE(atomic_read(&dev_priv->pm.atomic_seq) != begin_seq,
+		  "HW access outside of RPM atomic section\n");
+}
+
+/**
+ * disable_rpm_wakeref_asserts - disable the RPM assert checks
+ * @dev_priv: i915 device instance
+ *
+ * This function disable asserts that check if we hold an RPM wakelock
+ * reference, while keeping the device-not-suspended checks still enabled.
+ * It's meant to be used only in special circumstances where our rule about
+ * the wakelock refcount wrt. the device power state doesn't hold. According
+ * to this rule at any point where we access the HW or want to keep the HW in
+ * an active state we must hold an RPM wakelock reference acquired via one of
+ * the intel_runtime_pm_get() helpers. Currently there are a few special spots
+ * where this rule doesn't hold: the IRQ and suspend/resume handlers, the
+ * forcewake release timer, and the GPU RPS and hangcheck works. All other
+ * users should avoid using this function.
+ *
+ * Any calls to this function must have a symmetric call to
+ * enable_rpm_wakeref_asserts().
+ */
+static inline void
+disable_rpm_wakeref_asserts(struct drm_i915_private *dev_priv)
+{
+	atomic_inc(&dev_priv->pm.wakeref_count);
+}
+
+/**
+ * enable_rpm_wakeref_asserts - re-enable the RPM assert checks
+ * @dev_priv: i915 device instance
+ *
+ * This function re-enables the RPM assert checks after disabling them with
+ * disable_rpm_wakeref_asserts. It's meant to be used only in special
+ * circumstances otherwise its use should be avoided.
+ *
+ * Any calls to this function must have a symmetric call to
+ * disable_rpm_wakeref_asserts().
+ */
+static inline void
+enable_rpm_wakeref_asserts(struct drm_i915_private *dev_priv)
+{
+	atomic_dec(&dev_priv->pm.wakeref_count);
+}
+
+
+#define I915_IOWRITE32(val, addr) ({			\
+	assert_rpm_wakelock_held(dev_priv);		\
+	iowrite32(val, addr); })
+
+#define I915_IOREAD32(addr) ({				\
+	assert_rpm_wakelock_held(dev_priv);		\
+	ioread32(addr); })
+
+static inline void intel_ring_emit(struct intel_engine_cs *ring,
+				   u32 data)
+{
+	struct drm_i915_private *dev_priv = to_i915(ring->dev);
+	struct intel_ringbuffer *ringbuf = ring->buffer;
+
+	I915_IOWRITE32(data, ringbuf->virtual_start + ringbuf->tail);
+	ringbuf->tail += 4;
+}
+static inline void intel_ring_emit_reg(struct intel_engine_cs *ring,
+				       i915_reg_t reg)
+{
+	intel_ring_emit(ring, i915_mmio_reg_offset(reg));
+}
+/**
+ * intel_logical_ring_emit() - write a DWORD to the ringbuffer.
+ * @ringbuf: Ringbuffer to write to.
+ * @data: DWORD to write.
+ */
+static inline void intel_logical_ring_emit(struct intel_ringbuffer *ringbuf,
+					   u32 data)
+{
+	struct drm_i915_private *dev_priv = to_i915(ringbuf->ring->dev);
+
+	I915_IOWRITE32(data, ringbuf->virtual_start + ringbuf->tail);
+	ringbuf->tail += 4;
+}
+static inline void intel_logical_ring_emit_reg(struct intel_ringbuffer *ringbuf,
+					       i915_reg_t reg)
+{
+	intel_logical_ring_emit(ringbuf, i915_mmio_reg_offset(reg));
+}
+
 /* Be very careful with read/write 64-bit values. On 32-bit machines, they
  * will be implemented using 2 32-bit writes in an arbitrary order with
  * an arbitrary delay between them. This can cause the hardware to

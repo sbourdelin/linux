@@ -332,7 +332,7 @@ relocate_entry_gtt(struct drm_i915_gem_object *obj,
 	offset += reloc->offset;
 	reloc_page = io_mapping_map_atomic_wc(dev_priv->gtt.mappable,
 					      offset & PAGE_MASK);
-	iowrite32(lower_32_bits(delta), reloc_page + offset_in_page(offset));
+	I915_IOWRITE32(lower_32_bits(delta), reloc_page + offset_in_page(offset));
 
 	if (INTEL_INFO(dev)->gen >= 8) {
 		offset += sizeof(uint32_t);
@@ -344,7 +344,7 @@ relocate_entry_gtt(struct drm_i915_gem_object *obj,
 							 offset);
 		}
 
-		iowrite32(upper_32_bits(delta),
+		I915_IOWRITE32(upper_32_bits(delta),
 			  reloc_page + offset_in_page(offset));
 	}
 

@@ -1343,7 +1343,8 @@ bool intel_bios_is_valid_vbt(const void *buf, size_t size)
 	return vbt;
 }
 
-static const struct vbt_header *find_vbt(void __iomem *bios, size_t size)
+static const struct vbt_header *find_vbt(struct drm_i915_private *dev_priv,
+					 void __iomem *bios, size_t size)
 {
 	size_t i;
 
@@ -1351,7 +1352,7 @@ static const struct vbt_header *find_vbt(void __iomem *bios, size_t size)
 	for (i = 0; i + 4 < size; i++) {
 		void *vbt;
 
-		if (ioread32(bios + i) != *((const u32 *) "$VBT"))
+		if (I915_IOREAD32(bios + i) != *((const u32 *) "$VBT"))
 			continue;
 
 		/*
@@ -1397,7 +1398,7 @@ intel_bios_init(struct drm_i915_private *dev_priv)
 		if (!bios)
 			return -1;
 
-		vbt = find_vbt(bios, size);
+		vbt = find_vbt(dev_priv, bios, size);
 		if (!vbt) {
 			pci_unmap_rom(pdev, bios);
 			return -1;
