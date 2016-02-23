@@ -263,6 +263,22 @@ static enum oom_constraint constrained_alloc(struct oom_control *oc,
 }
 #endif
 
+bool task_can_read_lock_mm(struct task_struct *tsk)
+{
+	struct mm_struct *mm;
+	bool ret = false;
+
+	task_lock(tsk);
+	mm = tsk->mm;
+	if (mm && down_read_trylock(&mm->mmap_sem)) {
+		up_read(&mm->mmap_sem);
+		ret = true;
+	}
+	task_unlock(tsk);
+	return ret;
+}
+
+
 enum oom_scan_t oom_scan_process_thread(struct oom_control *oc,
 			struct task_struct *task, unsigned long totalpages)
 {
@@ -273,7 +289,8 @@ enum oom_scan_t oom_scan_process_thread(struct oom_control *oc,
 	 * This task already has access to memory reserves and is being killed.
 	 * Don't allow any other task to have access to the reserves.
 	 */
-	if (test_tsk_thread_flag(task, TIF_MEMDIE)) {
+	if (test_tsk_thread_flag(task, TIF_MEMDIE) &&
+	    task_can_read_lock_mm(task)) {
 		if (!is_sysrq_oom(oc))
 			return OOM_SCAN_ABORT;
 	}
@@ -287,7 +304,8 @@ enum oom_scan_t oom_scan_process_thread(struct oom_control *oc,
 	if (oom_task_origin(task))
 		return OOM_SCAN_SELECT;
 
-	if (task_will_free_mem(task) && !is_sysrq_oom(oc))
+	if (task_will_free_mem(task) && !is_sysrq_oom(oc) &&
+	    task_can_read_lock_mm(task))
 		return OOM_SCAN_ABORT;
 
 	return OOM_SCAN_OK;
@@ -522,14 +540,16 @@ void oom_kill_process(struct oom_control *oc, struct task_struct *p,
 	 * If the task is already exiting, don't alarm the sysadmin or kill
 	 * its children or threads, just set TIF_MEMDIE so it can die quickly
 	 */
-	task_lock(p);
-	if (p->mm && task_will_free_mem(p)) {
-		mark_oom_victim(p);
+	if (task_can_read_lock_mm(p)) {
+		task_lock(p);
+		if (p->mm && task_will_free_mem(p)) {
+			mark_oom_victim(p);
+			task_unlock(p);
+			put_task_struct(p);
+			return;
+		}
 		task_unlock(p);
-		put_task_struct(p);
-		return;
 	}
-	task_unlock(p);
 
 	if (__ratelimit(&oom_rs))
 		dump_header(oc, p, memcg);
@@ -696,7 +716,8 @@ bool out_of_memory(struct oom_control *oc)
 	 * TIF_MEMDIE flag at exit_mm(), otherwise an OOM livelock may occur.
 	 */
 	if (current->mm &&
-	    (fatal_signal_pending(current) || task_will_free_mem(current))) {
+	    (fatal_signal_pending(current) || task_will_free_mem(current)) &&
+	    task_can_read_lock_mm(current)) {
 		mark_oom_victim(current);
 		return true;
 	}

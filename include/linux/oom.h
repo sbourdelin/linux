@@ -86,6 +86,7 @@ extern void check_panic_on_oom(struct oom_control *oc,
 			       enum oom_constraint constraint,
 			       struct mem_cgroup *memcg);
 
+extern bool task_can_read_lock_mm(struct task_struct *tsk);
 extern enum oom_scan_t oom_scan_process_thread(struct oom_control *oc,
 		struct task_struct *task, unsigned long totalpages);
 
