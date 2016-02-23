@@ -12,14 +12,9 @@
 
 #include <linux/types.h>
 #include <linux/irqflags.h>
+#include <linux/bug.h>
 
 #ifndef xchg
-
-/*
- * This function doesn't exist, so you'll get a linker error if
- * something tries to do an invalidly-sized xchg().
- */
-extern void __xchg_called_with_bad_pointer(void);
 
 static inline
 unsigned long __xchg(unsigned long x, volatile void *ptr, int size)
@@ -74,7 +69,7 @@ unsigned long __xchg(unsigned long x, volatile void *ptr, int size)
 #endif /* CONFIG_64BIT */
 
 	default:
-		__xchg_called_with_bad_pointer();
+		BUILD_BUG();
 		return x;
 	}
 }

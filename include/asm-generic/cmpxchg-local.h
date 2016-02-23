@@ -3,9 +3,7 @@
 
 #include <linux/types.h>
 #include <linux/irqflags.h>
-
-extern unsigned long wrong_size_cmpxchg(volatile void *ptr)
-	__noreturn;
+#include <linux/bug.h>
 
 /*
  * Generic version of __cmpxchg_local (disables interrupts). Takes an unsigned
@@ -20,7 +18,7 @@ static inline unsigned long __cmpxchg_local_generic(volatile void *ptr,
 	 * Sanity checking, compile-time.
 	 */
 	if (size == 8 && sizeof(unsigned long) != 8)
-		wrong_size_cmpxchg(ptr);
+		BUILD_BUG();
 
 	raw_local_irq_save(flags);
 	switch (size) {
@@ -41,7 +39,7 @@ static inline unsigned long __cmpxchg_local_generic(volatile void *ptr,
 			*(u64 *)ptr = (u64)new;
 		break;
 	default:
-		wrong_size_cmpxchg(ptr);
+		BUILD_BUG();
 	}
 	raw_local_irq_restore(flags);
 	return prev;
