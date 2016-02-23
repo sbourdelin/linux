@@ -510,7 +510,9 @@ static void __init osk_mistral_init(void)
 	 */
 	omap_cfg_reg(N15_1610_MPUIO2);
 	if (gpio_request(OMAP_MPUIO(2), "wakeup") == 0) {
+#ifdef	CONFIG_PM
 		int ret = 0;
+#endif
 		int irq = gpio_to_irq(OMAP_MPUIO(2));
 
 		gpio_direction_input(OMAP_MPUIO(2));
