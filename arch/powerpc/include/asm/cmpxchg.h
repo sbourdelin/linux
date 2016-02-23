@@ -5,6 +5,7 @@
 #include <linux/compiler.h>
 #include <asm/synch.h>
 #include <asm/asm-compat.h>
+#include <linux/bug.h>
 
 /*
  * Atomic exchange
@@ -92,12 +93,6 @@ __xchg_u64_local(volatile void *p, unsigned long val)
 }
 #endif
 
-/*
- * This function doesn't exist, so you'll get a linker error
- * if something tries to do an invalid xchg().
- */
-extern void __xchg_called_with_bad_pointer(void);
-
 static __always_inline unsigned long
 __xchg(volatile void *ptr, unsigned long x, unsigned int size)
 {
@@ -109,7 +104,7 @@ __xchg(volatile void *ptr, unsigned long x, unsigned int size)
 		return __xchg_u64(ptr, x);
 #endif
 	}
-	__xchg_called_with_bad_pointer();
+	BUILD_BUG();
 	return x;
 }
 
@@ -124,7 +119,7 @@ __xchg_local(volatile void *ptr, unsigned long x, unsigned int size)
 		return __xchg_u64_local(ptr, x);
 #endif
 	}
-	__xchg_called_with_bad_pointer();
+	BUILD_BUG();
 	return x;
 }
 #define xchg(ptr,x)							     \
@@ -235,10 +230,6 @@ __cmpxchg_u64_local(volatile unsigned long *p, unsigned long old,
 }
 #endif
 
-/* This function doesn't exist, so you'll get a linker error
-   if something tries to do an invalid cmpxchg().  */
-extern void __cmpxchg_called_with_bad_pointer(void);
-
 static __always_inline unsigned long
 __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new,
 	  unsigned int size)
@@ -251,7 +242,7 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new,
 		return __cmpxchg_u64(ptr, old, new);
 #endif
 	}
-	__cmpxchg_called_with_bad_pointer();
+	BUILD_BUG();
 	return old;
 }
 
@@ -267,7 +258,7 @@ __cmpxchg_local(volatile void *ptr, unsigned long old, unsigned long new,
 		return __cmpxchg_u64_local(ptr, old, new);
 #endif
 	}
-	__cmpxchg_called_with_bad_pointer();
+	BUILD_BUG();
 	return old;
 }
 
