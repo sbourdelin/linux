@@ -993,6 +993,7 @@ static int host1x_drm_probe(struct host1x_device *dev)
 
 	dev_set_drvdata(&dev->dev, drm);
 	of_dma_configure(drm->dev, NULL);
+	dma_set_mask(drm->dev, DMA_BIT_MASK(34));
 
 	err = drm_dev_register(drm, 0);
 	if (err < 0)
