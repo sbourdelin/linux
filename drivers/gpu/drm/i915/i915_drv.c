@@ -733,6 +733,14 @@ static int i915_drm_resume(struct drm_device *dev)
 	intel_opregion_setup(dev);
 
 	intel_init_pch_refclk(dev);
+
+	/*
+	 * We need to make sure that we resume MST before doing anything
+	 * display related, otherwise we risk trying to bring up a display on
+	 * MST before the hub is actually ready
+	 */
+	intel_dp_mst_resume(dev);
+
 	drm_mode_config_reset(dev);
 
 	/*
@@ -764,8 +772,6 @@ static int i915_drm_resume(struct drm_device *dev)
 	drm_modeset_lock_all(dev);
 	intel_display_resume(dev);
 	drm_modeset_unlock_all(dev);
-
-	intel_dp_mst_resume(dev);
 
 	/*
 	 * ... but also need to make sure that hotplug processing
