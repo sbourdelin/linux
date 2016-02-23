@@ -883,6 +883,14 @@ config ARCH_STM32
 	help
 	  Support for STMicroelectronics STM32 processors.
 
+config ARCH_MPS2
+	bool "ARM MPS2 paltform"
+	depends on ARM_SINGLE_ARMV7M
+	select ARM_AMBA
+	select CLKSRC_MPS2
+	help
+	  Support for ARM MPS2 Cortex-M platform.
+
 # Definitions to make life easier
 config ARCH_ACORN
 	bool
