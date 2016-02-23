@@ -906,6 +906,16 @@ config GPIO_WM8994
 	  Say yes here to access the GPIO signals of WM8994 audio hub
 	  CODECs from Wolfson Microelectronics.
 
+config GPIO_F81504
+        tristate "Fintek F81504/508/512 PCIE-to-UART/GPIO support"
+        depends on MFD_FINTEK_F81504_CORE
+        select MFD_CORE
+        help
+          Say yes here to support the GPIO functionality of Fintek
+          F81504/508/512 PCIE-to-UART/GPIO.
+
+          If unsure, say N.
+
 endmenu
 
 menu "PCI GPIO expanders"
