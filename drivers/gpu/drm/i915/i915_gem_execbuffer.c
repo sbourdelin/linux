@@ -1394,6 +1394,13 @@ eb_select_ring(struct drm_i915_private *dev_priv,
 		return -EINVAL;
 	}
 
+	if ((user_ring_id == I915_EXEC_BSD) && !HAS_BSD2(dev_priv) &&
+			((args->flags & I915_EXEC_BSD_MASK) != 0)) {
+		DRM_DEBUG("execbuf with bsd ring but with invalid "
+			  "bsd dispatch flags: %d\n", (int)(args->flags));
+		return -EINVAL;
+	}
+
 	if (user_ring_id == I915_EXEC_BSD && HAS_BSD2(dev_priv)) {
 		unsigned int bsd_idx = args->flags & I915_EXEC_BSD_MASK;
 
