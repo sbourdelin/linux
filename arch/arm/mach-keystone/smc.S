@@ -10,6 +10,7 @@
  */
 
 #include <linux/linkage.h>
+#include <asm/assembler.h>
 
 /**
  * u32 keystone_cpu_smc(u32 command, u32 cpu, u32 addr)
@@ -26,3 +27,10 @@ ENTRY(keystone_cpu_smc)
 	smc	#0
 	ldmfd   sp!, {r4-r11, pc}
 ENDPROC(keystone_cpu_smc)
+
+#ifdef CONFIG_SMP
+ENTRY(keystone_secondary_startup)
+ARM_BE8(setend	be)			@ go BE8 if entered LE
+	b	secondary_startup
+ENDPROC(keystone_secondary_startup)
+#endif

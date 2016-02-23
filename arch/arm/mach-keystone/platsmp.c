@@ -26,7 +26,7 @@
 static int keystone_smp_boot_secondary(unsigned int cpu,
 						struct task_struct *idle)
 {
-	unsigned long start = virt_to_idmap(&secondary_startup);
+	unsigned long start = virt_to_idmap(&keystone_secondary_startup);
 	int error;
 
 	pr_debug("keystone-smp: booting cpu %d, vector %08lx\n",
