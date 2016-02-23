@@ -93,6 +93,8 @@ enum ctype {
 	CT_OVERWRITE_ALLOCATION,
 	CT_WRITE_AFTER_FREE,
 	CT_READ_AFTER_FREE,
+	CT_WRITE_BUDDY_AFTER_FREE,
+	CT_READ_BUDDY_AFTER_FREE,
 	CT_SOFTLOCKUP,
 	CT_HARDLOCKUP,
 	CT_SPINLOCKUP,
@@ -131,6 +133,8 @@ static char* cp_type[] = {
 	"OVERWRITE_ALLOCATION",
 	"WRITE_AFTER_FREE",
 	"READ_AFTER_FREE",
+	"WRITE_BUDDY_AFTER_FREE",
+	"READ_BUDDY_AFTER_FREE",
 	"SOFTLOCKUP",
 	"HARDLOCKUP",
 	"SPINLOCKUP",
@@ -448,6 +452,42 @@ static void lkdtm_do_action(enum ctype which)
 		pr_info("Attempting to read from freed memory\n");
 		pr_info("Successfully read value: %x\n", *tmp);
 
+		kfree(val);
+		break;
+	}
+	case CT_WRITE_BUDDY_AFTER_FREE: {
+		unsigned long p = __get_free_page(GFP_KERNEL);
+		if (!p)
+			break;
+		pr_info("Writing to the buddy page before free\n");
+		memset((void *)p, 0x3, PAGE_SIZE);
+		free_page(p);
+		schedule();
+		pr_info("Writing to the buddy page after free\n");
+		memset((void *)p, 0x78, PAGE_SIZE);
+		pr_info("Wrote to free page successfully\n");
+		break;
+	}
+	case CT_READ_BUDDY_AFTER_FREE: {
+		unsigned long p = __get_free_page(GFP_KERNEL);
+		int *tmp, *val = kmalloc(1024, GFP_KERNEL);
+		int **base;
+
+		if (!p)
+			break;
+
+		if (!val)
+			break;
+
+		base = (int **)p;
+
+		*val = 0x12345678;
+		pr_info("Value in memory before free: %x\n", *val);
+		base[0] = val;
+		free_page(p);
+		tmp = base[0];
+		pr_info("Attempting to read from freed memory\n");
+		pr_info("Successfully read value: %x\n", *tmp);
 		kfree(val);
 		break;
 	}
