@@ -189,9 +189,7 @@ static ssize_t kernfs_file_direct_read(struct kernfs_open_file *of,
 	const struct kernfs_ops *ops;
 	char *buf;
 
-	buf = of->prealloc_buf;
-	if (!buf)
-		buf = kmalloc(len, GFP_KERNEL);
+	buf = kmalloc(len, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 
@@ -214,22 +212,18 @@ static ssize_t kernfs_file_direct_read(struct kernfs_open_file *of,
 	else
 		len = -EINVAL;
 
-	if (len < 0)
-		goto out_unlock;
-
-	if (copy_to_user(user_buf, buf, len)) {
-		len = -EFAULT;
-		goto out_unlock;
-	}
-
-	*ppos += len;
-
- out_unlock:
 	kernfs_put_active(of->kn);
 	mutex_unlock(&of->mutex);
+
+	if (len > 0) {
+		if (copy_to_user(user_buf, buf, len) == 0)
+			*ppos += len;
+		else
+			len = -EFAULT;
+	}
+
  out_free:
-	if (buf != of->prealloc_buf)
-		kfree(buf);
+	kfree(buf);
 	return len;
 }
 
@@ -283,11 +277,11 @@ static ssize_t kernfs_fop_write(struct file *file, const char __user *user_buf,
 		len = min_t(size_t, count, PAGE_SIZE);
 	}
 
-	buf = of->prealloc_buf;
-	if (!buf)
-		buf = kmalloc(len + 1, GFP_KERNEL);
-	if (!buf)
-		return -ENOMEM;
+	buf = memdup_user(user_buf, len + 1);
+	if (IS_ERR(buf))
+		return PTR_ERR(buf);
+
+	buf[len] = '\0';	/* guarantee string termination */
 
 	/*
 	 * @of->mutex nests outside active ref and is used both to ensure that
@@ -301,12 +295,6 @@ static ssize_t kernfs_fop_write(struct file *file, const char __user *user_buf,
 		goto out_free;
 	}
 
-	if (copy_from_user(buf, user_buf, len)) {
-		len = -EFAULT;
-		goto out_unlock;
-	}
-	buf[len] = '\0';	/* guarantee string termination */
-
 	ops = kernfs_ops(of->kn);
 	if (ops->write)
 		len = ops->write(of, buf, len, *ppos);
@@ -316,12 +304,10 @@ static ssize_t kernfs_fop_write(struct file *file, const char __user *user_buf,
 	if (len > 0)
 		*ppos += len;
 
-out_unlock:
 	kernfs_put_active(of->kn);
 	mutex_unlock(&of->mutex);
 out_free:
-	if (buf != of->prealloc_buf)
-		kfree(buf);
+	kfree(buf);
 	return len;
 }
 
