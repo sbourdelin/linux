@@ -651,6 +651,15 @@ static void opal_i2c_create_devs(void)
 		of_platform_device_create(np, NULL, NULL);
 }
 
+static void opal_nest_create_dev(void)
+{
+	struct device_node *np;
+
+	np = of_find_compatible_node(NULL, NULL, "ibm,opal-in-memory-counters");
+	if (np)
+		of_platform_device_create(np, NULL, NULL);
+}
+
 static int kopald(void *unused)
 {
 	__be64 events;
@@ -716,6 +725,9 @@ static int __init opal_init(void)
 
 	/* Setup a heatbeat thread if requested by OPAL */
 	opal_init_heartbeat();
+
+	/* Create nest platform devices */
+	opal_nest_create_dev();
 
 	/* Create leds platform devices */
 	leds = of_find_node_by_path("/ibm,opal/leds");
