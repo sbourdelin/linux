@@ -9,6 +9,7 @@
 
 #include <linux/host1x.h>
 #include <linux/iommu.h>
+#include <linux/of_device.h>
 
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
@@ -991,6 +992,7 @@ static int host1x_drm_probe(struct host1x_device *dev)
 		return -ENOMEM;
 
 	dev_set_drvdata(&dev->dev, drm);
+	of_dma_configure(drm->dev, NULL);
 
 	err = drm_dev_register(drm, 0);
 	if (err < 0)
