@@ -15,6 +15,7 @@ Required properties:
 - atmel,nand-cmd-offset : offset for the command latch.
 - #address-cells, #size-cells : Must be present if the device has sub-nodes
   representing partitions.
+- clocks: phandle to the peripheral clock
 
 - gpios : specifies the gpio pins to control the NAND device. detect is an
   optional gpio and may be set to 0 if not present.
@@ -43,7 +44,6 @@ Required properties:
 - reg : should specify the address and size used for NFC command registers,
         NFC registers and NFC SRAM. NFC SRAM address and size can be absent
         if don't want to use it.
-- clocks: phandle to the peripheral clock
 Optional properties:
 - atmel,write-by-sram: boolean to enable NFC write by SRAM.
 
@@ -100,13 +100,13 @@ nand0: nand@40000000 {
 	compatible = "atmel,at91rm9200-nand";
 	#address-cells = <1>;
 	#size-cells = <1>;
+	clocks = <&hsmc_clk>
 	ranges;
         ...
         nfc@70000000 {
 		compatible = "atmel,sama5d3-nfc";
 		#address-cells = <1>;
 		#size-cells = <1>;
-		clocks = <&hsmc_clk>
 		reg = <
 			0x70000000 0x10000000	/* NFC Command Registers */
 			0xffffc000 0x00000070	/* NFC HSMC regs */
