@@ -92,7 +92,7 @@ enum iommu_cap {
 };
 
 /*
- * Following constraints are specifc to FSL_PAMUV1:
+ * Following constraints are specific to FSL_PAMUV1:
  *  -aperture must be power of 2, and naturally aligned
  *  -number of windows must be power of 2, and address space size
  *   of each window is determined by aperture size / # of windows

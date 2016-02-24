@@ -350,7 +350,7 @@ struct mmc_fixup {
 	unsigned int manfid;
 	unsigned short oemid;
 
-	/* SDIO-specfic fields. You can use SDIO_ANY_ID here of course */
+	/* SDIO-specific fields. You can use SDIO_ANY_ID here of course */
 	u16 cis_vendor, cis_device;
 
 	void (*vendor_fixup)(struct mmc_card *card, int data);

@@ -819,7 +819,7 @@ struct regmap_irq {
  * @wake_base:   Base address for wake enables.  If zero unsupported.
  * @type_base:   Base address for irq type.  If zero unsupported.
  * @irq_reg_stride:  Stride to use for chips where registers are not contiguous.
- * @init_ack_masked: Ack all masked interrupts once during initalization.
+ * @init_ack_masked: Ack all masked interrupts once during initialization.
  * @mask_invert: Inverted mask register: cleared bits are masked out.
  * @use_ack:     Use @ack register even if it is zero.
  * @ack_invert:  Inverted ack register: cleared bits for ack.

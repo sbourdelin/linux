@@ -53,11 +53,11 @@
  *
  *	This function is called when the user requests an ioctl which
  *	is not handled by the tty layer or the low-level tty driver.
- *	It is intended for ioctls which affect line discpline
+ *	It is intended for ioctls which affect line discipline
  *	operation.  Note that the search order for ioctls is (1) tty
- *	layer, (2) tty low-level driver, (3) line discpline.  So a
+ *	layer, (2) tty low-level driver, (3) line discipline.  So a
  *	low-level driver can "grab" an ioctl request before the line
- *	discpline has a chance to see it.
+ *	discipline has a chance to see it.
  *
  * long	(*compat_ioctl)(struct tty_struct * tty, struct file * file,
  *		        unsigned int cmd, unsigned long arg);
@@ -66,7 +66,7 @@
  *
  * void	(*set_termios)(struct tty_struct *tty, struct ktermios * old);
  *
- *	This function notifies the line discpline that a change has
+ *	This function notifies the line discipline that a change has
  *	been made to the termios structure.
  *
  * int	(*poll)(struct tty_struct * tty, struct file * file,
@@ -80,7 +80,7 @@
  *		       char *fp, int count);
  *
  *	This function is called by the low-level tty driver to send
- *	characters received by the hardware to the line discpline for
+ *	characters received by the hardware to the line discipline for
  *	processing.  <cp> is a pointer to the buffer of input
  *	character received by the device.  <fp> is a pointer to a
  *	pointer of flag bytes which indicate whether a character was
@@ -90,8 +90,8 @@
  * void	(*write_wakeup)(struct tty_struct *);
  *
  *	This function is called by the low-level tty driver to signal
- *	that line discpline should try to send more characters to the
- *	low-level driver for transmission.  If the line discpline does
+ *	that line discipline should try to send more characters to the
+ *	low-level driver for transmission.  If the line discipline does
  *	not have any more data to send, it can just return. If the line
  *	discipline does have some data to send, please arise a tasklet
  *	or workqueue to do the real data transfer. Do not send data in
@@ -118,7 +118,7 @@
  *			char *fp, int count);
  *
  *	This function is called by the low-level tty driver to send
- *	characters received by the hardware to the line discpline for
+ *	characters received by the hardware to the line discipline for
  *	processing.  <cp> is a pointer to the buffer of input
  *	character received by the device.  <fp> is a pointer to a
  *	pointer of flag bytes which indicate whether a character was

@@ -22,7 +22,7 @@ struct s3c_ide_platdata {
 };
 
 /*
- * s3c_ide_set_platdata() - Setup the platform specifc data for IDE driver.
+ * s3c_ide_set_platdata() - Setup the platform specific data for IDE driver.
  * @pdata: Platform data for IDE driver.
  */
 extern void s3c_ide_set_platdata(struct s3c_ide_platdata *pdata);

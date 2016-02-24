@@ -69,9 +69,9 @@
 /* the amount of time the INVOKED process waits for a reaction from  */
 /* the network.                                                      */
 /* If a response (either error or result) is received during this    */
-/* intervall, a reporting callback is initiated and the process will */
+/* interval, a reporting callback is initiated and the process will  */
 /* be deleted, the hl identifier will be freed.                      */
-/* If no response is received during the specified intervall, a error*/
+/* If no response is received during the specified interval, a error */
 /* callback is initiated with timeout set to -1 and a datalen set    */
 /* to 0.                                                             */
 /* If timeout is set to a value <= 0 during INVOCATION the process is*/

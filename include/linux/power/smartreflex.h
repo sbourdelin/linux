@@ -189,7 +189,7 @@ struct omap_sr {
 })
 
 /**
- * struct omap_sr_pmic_data - Strucutre to be populated by pmic code to pass
+ * struct omap_sr_pmic_data - Structure to be populated by pmic code to pass
  *				pmic specific info to smartreflex driver
  *
  * @sr_pmic_init:	API to initialize smartreflex on the PMIC side.

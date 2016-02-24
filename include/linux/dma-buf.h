@@ -45,7 +45,7 @@ struct dma_buf_attachment;
  *	    of requesting device.
  * @detach: [optional] detach a given device from this buffer.
  * @map_dma_buf: returns list of scatter pages allocated, increases usecount
- *		 of the buffer. Requires atleast one attach to be called
+ *		 of the buffer. Requires at least one attach to be called
  *		 before. Returned sg list should already be mapped into
  *		 _device_ address space. This call may sleep. May also return
  *		 -EINTR. Should return -EINVAL if attach hasn't been called yet.

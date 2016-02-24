@@ -133,7 +133,7 @@ struct hw_perf_event {
 			/*
 			 * Crufty hack to avoid the chicken and egg
 			 * problem hw_breakpoint has with context
-			 * creation and event initalization.
+			 * creation and event initialization.
 			 */
 			struct arch_hw_breakpoint	info;
 			struct list_head		bp_list;

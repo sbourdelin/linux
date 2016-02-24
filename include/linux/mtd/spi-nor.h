@@ -200,7 +200,7 @@ static inline struct device_node *spi_nor_get_flash_node(struct spi_nor *nor)
  * @name:	the chip type name
  * @mode:	the read mode supported by the driver
  *
- * The drivers can use this fuction to scan the SPI NOR.
+ * The drivers can use this function to scan the SPI NOR.
  * In the scanning, it will try to get all the necessary information to
  * fill the mtd_info{} and the spi_nor{}.
  *

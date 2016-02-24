@@ -92,7 +92,7 @@ struct ipack_region {
  *
  * Warning: Direct access to mapped memory is possible but the endianness
  * is not the same with PCI carrier or VME carrier. The endianness is managed
- * by the carrier board throught bus->ops.
+ * by the carrier board through bus->ops.
  */
 struct ipack_device {
 	unsigned int slot;
@@ -216,7 +216,7 @@ void ipack_driver_unregister(struct ipack_driver *edrv);
  * is done by the carrier driver.  The carrier should populate the fields
  * bus and slot as well as the region array of @dev prior to calling this
  * function.  The rest of the fields will be allocated and populated
- * during initalization.
+ * during initialization.
  *
  * Return zero on success or error code on failure.
  *

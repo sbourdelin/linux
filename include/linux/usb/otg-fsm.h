@@ -78,7 +78,7 @@ struct otg_fsm {
 	int b_se0_srp;
 	int b_ssend_srp;
 	int b_sess_vld;
-	/* Auxilary inputs */
+	/* Auxiliary inputs */
 	int a_sess_vld;
 	int b_bus_resume;
 	int b_bus_suspend;
@@ -102,7 +102,7 @@ struct otg_fsm {
 	int a_bus_req_inf;
 	int a_clr_err_inf;
 	int b_bus_req_inf;
-	/* Auxilary informative variables */
+	/* Auxiliary informative variables */
 	int a_suspend_req_inf;
 
 	/* Timeout indicator for timers */

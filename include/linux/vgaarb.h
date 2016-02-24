@@ -93,7 +93,7 @@ static inline void vga_set_legacy_decoding(struct pci_dev *pdev,
  *     VGA forwarding on parent P2P bridges if any).
  *     This function will block if some conflicting card is already locking
  *     one of the required resources (or any resource on a different bus
- *     segment, since P2P bridges don't differenciate VGA memory and IO
+ *     segment, since P2P bridges don't differentiate VGA memory and IO
  *     afaik). You can indicate whether this blocking should be interruptible
  *     by a signal (for userland interface) or not.
  *     Must not be called at interrupt time or in atomic context.

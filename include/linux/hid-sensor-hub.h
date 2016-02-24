@@ -145,7 +145,7 @@ int sensor_hub_register_callback(struct hid_sensor_hub_device *hsdev,
 * @hsdev:	Hub device instance.
 * @usage_id:	Usage id of the client (E.g. 0x200076 for Gyro).
 *
-* If there is a callback registred, this call will remove that
+* If there is a callback registered, this call will remove that
 * callbacks, so that it will stop data and event notifications.
 */
 int sensor_hub_remove_callback(struct hid_sensor_hub_device *hsdev,

@@ -595,7 +595,7 @@ enum ifc_nand_fir_opcodes {
  */
 /* Source ID for error transaction */
 #define IFC_NOR_ERATTR0_ERSRCID		0xFF000000
-/* AXI ID for error transation */
+/* AXI ID for error transaction */
 #define IFC_NOR_ERATTR0_ERAID		0x000FF000
 /* Chip select corresponds to NOR error */
 #define IFC_NOR_ERATTR0_ERCS_CS0	0x00000000

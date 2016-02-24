@@ -12,7 +12,7 @@
  * @ocr_mask: available voltages on the 4 pins from the block, this
  * is ignored if a regulator is used, see the MMC_VDD_* masks in
  * mmc/host.h
- * @ios_handler: a callback function to act on specfic ios changes,
+ * @ios_handler: a callback function to act on specific ios changes,
  * used for example to control a levelshifter
  * mask into a value to be binary (or set some other custom bits
  * in MMCIPWR) or:ed and written into the MMCIPWR register of the
