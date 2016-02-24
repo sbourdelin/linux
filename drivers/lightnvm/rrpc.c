@@ -332,7 +332,7 @@ try:
 
 		/* Perform read to do GC */
 		bio->bi_iter.bi_sector = rrpc_get_sector(rev->addr);
-		bio->bi_rw = READ;
+		bio->bi_op = REQ_OP_READ;
 		bio->bi_private = &wait;
 		bio->bi_end_io = rrpc_end_sync_bio;
 
@@ -354,7 +354,7 @@ try:
 		reinit_completion(&wait);
 
 		bio->bi_iter.bi_sector = rrpc_get_sector(rev->addr);
-		bio->bi_rw = WRITE;
+		bio->bi_op = REQ_OP_WRITE;
 		bio->bi_private = &wait;
 		bio->bi_end_io = rrpc_end_sync_bio;
 
