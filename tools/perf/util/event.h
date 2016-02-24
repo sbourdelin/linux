@@ -600,7 +600,8 @@ struct addr_location;
 int perf_event__preprocess_sample(const union perf_event *event,
 				  struct machine *machine,
 				  struct addr_location *al,
-				  struct perf_sample *sample);
+				  struct perf_sample *sample,
+				  struct perf_evsel *evsel);
 
 void addr_location__put(struct addr_location *al);
 
