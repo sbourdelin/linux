@@ -281,6 +281,38 @@ int ftrace_make_nop(struct module *mod,
 
 #ifdef CONFIG_MODULES
 #ifdef CONFIG_PPC64
+/* Examine the existing instructions for __ftrace_make_call.
+ * They should effectively be a NOP, and follow formal constraints,
+ * depending on the ABI. Return false if they don't.
+ */
+#ifndef CC_USING_MPROFILE_KERNEL
+static int
+expected_nop_sequence(void *ip, unsigned int op0, unsigned int op1)
+{
+	/*
+	 * We expect to see:
+	 *
+	 * b +8
+	 * ld r2,XX(r1)
+	 *
+	 * The load offset is different depending on the ABI. For simplicity
+	 * just mask it out when doing the compare.
+	 */
+	if ((op0 != 0x48000008) || ((op1 & 0xffff0000) != 0xe8410000))
+		return 0;
+	return 1;
+}
+#else
+static int
+expected_nop_sequence(void *ip, unsigned int op0, unsigned int op1)
+{
+	/* look for patched "NOP" on ppc64 with -mprofile-kernel */
+	if (op0 != PPC_INST_NOP)
+		return 0;
+	return 1;
+}
+#endif
+
 static int
 __ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
 {
@@ -291,17 +323,9 @@ __ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
 	if (probe_kernel_read(op, ip, sizeof(op)))
 		return -EFAULT;
 
-	/*
-	 * We expect to see:
-	 *
-	 * b +8
-	 * ld r2,XX(r1)
-	 *
-	 * The load offset is different depending on the ABI. For simplicity
-	 * just mask it out when doing the compare.
-	 */
-	if ((op[0] != 0x48000008) || ((op[1] & 0xffff0000) != 0xe8410000)) {
-		pr_err("Unexpected call sequence: %x %x\n", op[0], op[1]);
+	if (!expected_nop_sequence(ip, op[0], op[1])) {
+		pr_err("Unexpected call sequence at %p: %x %x\n",
+		ip, op[0], op[1]);
 		return -EINVAL;
 	}
 

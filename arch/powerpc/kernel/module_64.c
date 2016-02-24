@@ -41,7 +41,6 @@
    --RR.  */
 
 #if defined(_CALL_ELF) && _CALL_ELF == 2
-#define R2_STACK_OFFSET 24
 
 /* An address is simply the address of the function. */
 typedef unsigned long func_desc_t;
@@ -73,7 +72,6 @@ static unsigned int local_entry_offset(const Elf64_Sym *sym)
 	return PPC64_LOCAL_ENTRY_OFFSET(sym->st_other);
 }
 #else
-#define R2_STACK_OFFSET 40
 
 /* An address is address of the OPD entry, which contains address of fn. */
 typedef struct ppc64_opd_entry func_desc_t;
@@ -450,17 +448,44 @@ static unsigned long stub_for_addr(const Elf64_Shdr *sechdrs,
 	return (unsigned long)&stubs[i];
 }
 
+#ifdef CC_USING_MPROFILE_KERNEL
+static int is_early_mcount_callsite(u32 *instruction)
+{
+	/* -mprofile-kernel sequence starting with
+	 * mflr r0 and maybe std r0, LRSAVE(r1).
+	 */
+	if ((instruction[-3] == PPC_INST_MFLR &&
+	     instruction[-2] == PPC_INST_STD_LR) ||
+	    instruction[-2] == PPC_INST_MFLR) {
+		/* Nothing to be done here, it's an _mcount
+		 * call location and r2 will have to be
+		 * restored in the _mcount function.
+		 */
+		return 1;
+	}
+	return 0;
+}
+#else
+/* without -mprofile-kernel, mcount calls are never early */
+static int is_early_mcount_callsite(u32 *instruction)
+{
+	return 0;
+}
+#endif
+
 /* We expect a noop next: if it is, replace it with instruction to
    restore r2. */
 static int restore_r2(u32 *instruction, struct module *me)
 {
 	if (*instruction != PPC_INST_NOP) {
+		if (is_early_mcount_callsite(instruction))
+			return 1;
 		pr_err("%s: Expect noop after relocate, got %08x\n",
 		       me->name, *instruction);
 		return 0;
 	}
 	/* ld r2,R2_STACK_OFFSET(r1) */
-	*instruction = 0xe8410000 | R2_STACK_OFFSET;
+	*instruction = PPC_INST_LD_TOC;
 	return 1;
 }
 
