@@ -123,6 +123,7 @@ config DELL_WMI
 	depends on ACPI_WMI
 	depends on INPUT
 	depends on ACPI_VIDEO || ACPI_VIDEO = n
+	depends on DELL_SMBIOS
 	select INPUT_SPARSEKMAP
 	select DMI
 	---help---
