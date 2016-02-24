@@ -354,8 +354,10 @@ static void XGINew_DDR2_DefaultRegister(
 {
 	unsigned long P3d4 = Port, P3c4 = Port - 0x10;
 
-	/* keep following setting sequence, each setting in
-	 * the same reg insert idle */
+	/*
+	 * keep following setting sequence, each setting in
+	 * the same reg insert idle
+	 */
 	xgifb_reg_set(P3d4, 0x82, 0x77);
 	xgifb_reg_set(P3d4, 0x86, 0x00);
 	xgifb_reg_get(P3d4, 0x86); /* Insert read command for delay */
