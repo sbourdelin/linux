@@ -28,6 +28,11 @@
 
 
 #ifdef CONFIG_DYNAMIC_FTRACE
+#if defined(CONFIG_DYNAMIC_FTRACE_WITH_REGS) && defined(CONFIG_PPC64) && \
+  !defined(CC_USING_MPROFILE_KERNEL)
+#error "DYNAMIC_FTRACE_WITH_REGS requires working -mprofile-kernel"
+#endif
+
 static unsigned int
 ftrace_call_replace(unsigned long ip, unsigned long addr, int link)
 {
