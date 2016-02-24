@@ -1171,65 +1171,98 @@ _GLOBAL(ftrace_graph_stub)
 	mtlr	r0
 	addi	r1, r1, 112
 #else
+/*
+ *
+ * ftrace_caller() is the function that replaces _mcount() when ftrace is
+ * active.
+ *
+ * We arrive here after a function A calls function B, and we are the trace
+ * function for B. When we enter r1 points to A's stack frame, B has not yet
+ * had a chance to allocate one yet.
+ *
+ * Additionally r2 may point either to the TOC for A, or B, depending on
+ * whether B did a TOC setup sequence before calling us.
+ *
+ * On entry the LR points back to the _mcount() call site, and r0 holds the
+ * saved LR as it was on entry to B, ie. the original return address at the
+ * call site in A.
+ *
+ * Our job is to save the register state into a struct pt_regs (on the stack)
+ * and then arrange for the ftrace function to be called.
+ */
 _GLOBAL(ftrace_caller)
+	/* Save the original return address in A's stack frame */
 	std	r0,LRSAVE(r1)
-#if defined(_CALL_ELF) && _CALL_ELF == 2
-	mflr	r0
-	bl	2f
-2:	mflr	r12
-	mtlr	r0
-	mr      r0,r2   /* save callee's TOC */
-	addis	r2,r12,(.TOC.-ftrace_caller-12)@ha
-	addi    r2,r2,(.TOC.-ftrace_caller-12)@l
-#else
-	mr	r0,r2
-#endif
-	ld	r12,LRSAVE(r1)	/* get caller's address */
 
+	/* Create our stack frame + pt_regs */
 	stdu	r1,-SWITCH_FRAME_SIZE(r1)
 
-	std     r12, _LINK(r1)
+	/* Save all gprs to pt_regs */
 	SAVE_8GPRS(0,r1)
-	std	r0, 24(r1)	/* save TOC */
 	SAVE_8GPRS(8,r1)
 	SAVE_8GPRS(16,r1)
 	SAVE_8GPRS(24,r1)
+
+	/* Load special regs for save below */
+	mfmsr   r8
+	mfctr   r9
+	mfxer   r10
+	mfcr	r11
+
+	/* Get the _mcount() call site out of LR */
+	mflr	r7
+	/* Save it as pt_regs->nip & pt_regs->link */
+	std     r7, _NIP(r1)
+	std     r7, _LINK(r1)
+
+	/* Save callee's TOC in the ABI compliant location */
+	std	r2, 24(r1)
+	ld	r2,PACATOC(r13)	/* get kernel TOC in r2 */
 
 	addis	r3,r2,function_trace_op@toc@ha
 	addi	r3,r3,function_trace_op@toc@l
 	ld	r5,0(r3)
 
-	mflr    r3
-	std     r3, _NIP(r1)
-	std	r3, 16(r1)
-	subi    r3, r3, MCOUNT_INSN_SIZE
-	mfmsr   r4
-	std     r4, _MSR(r1)
-	mfctr   r4
-	std     r4, _CTR(r1)
-	mfxer   r4
-	std     r4, _XER(r1)
-	mr	r4, r12
+	/* Calculate ip from nip-4 into r3 for call below */
+	subi    r3, r7, MCOUNT_INSN_SIZE
+
+	/* Put the original return address in r4 as parent_ip */
+	mr	r4, r0
+
+	/* Save special regs */
+	std     r8, _MSR(r1)
+	std     r9, _CTR(r1)
+	std     r10, _XER(r1)
+	std     r11, _CCR(r1)
+
+	/* Load &pt_regs in r6 for call below */
 	addi    r6, r1 ,STACK_FRAME_OVERHEAD
 
+	/* ftrace_call(r3, r4, r5, r6) */
 .globl ftrace_call
 ftrace_call:
 	bl	ftrace_stub
 	nop
 
+	/* Load ctr with the possibly modified NIP */
 	ld	r3, _NIP(r1)
-	mtlr	r3
+	mtctr	r3
 
+	/* Restore gprs */
 	REST_8GPRS(0,r1)
 	REST_8GPRS(8,r1)
 	REST_8GPRS(16,r1)
 	REST_8GPRS(24,r1)
 
+	/* Restore callee's TOC */
+	ld	r2, 24(r1)
+
+	/* Pop our stack frame */
 	addi r1, r1, SWITCH_FRAME_SIZE
 
-	ld	r12, LRSAVE(r1)  /* get caller's address */
-	mtlr	r12
-	mr	r2,r0		/* restore callee's TOC */
+	/* Restore original LR for return to B */
+	ld	r0, LRSAVE(r1)
+	mtlr	r0
 
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 	stdu	r1, -112(r1)
@@ -1239,9 +1272,6 @@ ftrace_graph_call:
 _GLOBAL(ftrace_graph_stub)
 	addi	r1, r1, 112
 #endif
-
-	mflr	r0		/* move this LR to CTR */
-	mtctr	r0
 
 	ld	r0,LRSAVE(r1)	/* restore callee's lr at _mcount site */
 	mtlr	r0
