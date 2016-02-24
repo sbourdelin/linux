@@ -671,10 +671,56 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 }
 
 #ifdef CONFIG_DYNAMIC_FTRACE
+
+#define PACATOC offsetof(struct paca_struct, kernel_toc)
+
+static unsigned long create_ftrace_stub(const Elf64_Shdr *sechdrs, struct module *me)
+{
+	struct ppc64_stub_entry *entry;
+	unsigned int i, num_stubs;
+	static u32 stub_insns[] = {
+		0xe98d0000 | PACATOC, 	/* ld      r12,PACATOC(r13)	*/
+		0x3d8c0000,		/* addis   r12,r12,<high>	*/
+		0x398c0000, 		/* addi    r12,r12,<low>	*/
+		0x7d8903a6, 		/* mtctr   r12			*/
+		0x4e800420, 		/* bctr				*/
+	};
+	long reladdr;
+
+	num_stubs = sechdrs[me->arch.stubs_section].sh_size / sizeof(*entry);
+
+	/* Find the next available stub entry */
+	entry = (void *)sechdrs[me->arch.stubs_section].sh_addr;
+	for (i = 0; i < num_stubs && stub_func_addr(entry->funcdata); i++, entry++);
+
+	if (i >= num_stubs) {
+		pr_err("%s: Unable to find a free slot for ftrace stub.\n", me->name);
+		return 0;
+	}
+
+	memcpy(entry->jump, stub_insns, sizeof(stub_insns));
+
+	/* Stub uses address relative to kernel_toc */
+	reladdr = (unsigned long)ftrace_caller - get_paca()->kernel_toc;
+	if (reladdr > 0x7FFFFFFF || reladdr < -(0x80000000L)) {
+		pr_err("%s: Address of ftrace_caller out of range of kernel_toc.\n", me->name);
+		return 0;
+	}
+
+	entry->jump[1] |= PPC_HA(reladdr);
+	entry->jump[2] |= PPC_LO(reladdr);
+
+	/* Eventhough we don't use funcdata in the stub, it's needed elsewhere. */
+	entry->funcdata = func_desc((unsigned long)ftrace_caller);
+	entry->magic = STUB_MAGIC;
+
+	return (unsigned long)entry;
+}
+
 int module_finalize_ftrace(struct module *mod, const Elf_Shdr *sechdrs)
 {
 	mod->arch.toc = my_r2(sechdrs, mod);
-	mod->arch.tramp = stub_for_addr(sechdrs, (unsigned long)ftrace_caller, mod);
+	mod->arch.tramp = create_ftrace_stub(sechdrs, mod);
 
 	if (!mod->arch.tramp)
 		return -ENOENT;
