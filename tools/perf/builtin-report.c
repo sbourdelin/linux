@@ -930,6 +930,11 @@ repeat:
 	else
 		use_browser = 0;
 
+	if (!field_order &&
+	    is_perf_data_reorded_on_ppc(session->evlist) &&
+	    perf_guest_only())
+		field_order = "overhead,comm,dso,sym";
+
 	if (setup_sorting(session->evlist) < 0) {
 		if (sort_order)
 			parse_options_usage(report_usage, options, "s", 1);
