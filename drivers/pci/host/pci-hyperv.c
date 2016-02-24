@@ -1265,11 +1265,6 @@ static struct hv_pci_dev *new_pcichild_device(struct hv_pcibus_device *hbus,
 	if (!hpdev)
 		return NULL;
 
-	dev_info(&hbus->hdev->device,
-		 "New child device (%p) [%04x:%04x] at %04x:00:00.%02x\n",
-		 hpdev, desc->v_id, desc->d_id, pci_domain_nr(hbus->pci_bus),
-		 desc->win_slot.bits.func);
-
 	hpdev->hbus = hbus;
 
 	memset(&pkt, 0, sizeof(pkt));
@@ -1558,9 +1553,15 @@ static void hv_eject_device_work(struct work_struct *work)
 		return;
 	}
 
+	/*
+	 * Ejection can come before or after the PCI bus has been set up, so
+	 * attempt to find it and tear down the bus state, if it exists.  This
+	 * must be done without constructs like pci_domain_nr(hbus->pci_bus)
+	 * because hbus->pci_bus may not exist yet.
+	 */
 	wslot = wslot_to_devfn(hpdev->desc.win_slot.slot);
-	pdev = pci_get_domain_bus_and_slot(pci_domain_nr(hpdev->hbus->pci_bus),
-					   0, wslot);
+	pdev = pci_get_domain_bus_and_slot(hpdev->hbus->sysdata.domain, 0,
+					   wslot);
 	if (pdev) {
 		pci_stop_and_remove_bus_device(pdev);
 		pci_dev_put(pdev);
