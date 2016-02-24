@@ -2605,17 +2605,13 @@ static void init_rq_based_worker_thread(struct mapped_device *md)
  */
 static int dm_init_request_based_queue(struct mapped_device *md)
 {
-	struct request_queue *q = NULL;
-
 	/* Fully initialize the queue */
-	q = blk_init_allocated_queue(md->queue, dm_request_fn, NULL);
-	if (!q)
+	if (!blk_init_allocated_queue(md->queue, dm_request_fn, NULL))
 		return -EINVAL;
 
 	/* disable dm_request_fn's merge heuristic by default */
 	md->seq_rq_merge_deadline_usecs = 0;
 
-	md->queue = q;
 	dm_init_old_md_queue(md);
 	blk_queue_softirq_done(md->queue, dm_softirq_done);
 	blk_queue_prep_rq(md->queue, dm_prep_fn);
@@ -2740,7 +2736,6 @@ static int dm_init_request_based_blk_mq_queue(struct mapped_device *md)
 		err = PTR_ERR(q);
 		goto out_tag_set;
 	}
-	md->queue = q;
 	dm_init_md_queue(md);
 
 	/* backfill 'mq' sysfs registration normally done in blk_register_queue */
