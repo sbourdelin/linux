@@ -620,9 +620,15 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 #define   IOSF_PORT_FLISDSI			0x1b
 #define   IOSF_PORT_GPIO_SC			0x48
 #define   IOSF_PORT_GPIO_SUS			0xa8
+#define   IOSF_MAX_GPIO_NUM_NC			26
+#define   IOSF_MAX_GPIO_NUM_SC			128
+#define   IOSF_MAX_GPIO_NUM			172
 #define   IOSF_PORT_CCU				0xa9
 #define VLV_IOSF_DATA				_MMIO(VLV_DISPLAY_BASE + 0x2104)
 #define VLV_IOSF_ADDR				_MMIO(VLV_DISPLAY_BASE + 0x2108)
+
+#define VLV_GPIO_CFG				0x2000CC00
+#define VLV_GPIO_INPUT_DIS			0x04
 
 /* See configdb bunit SB addr map */
 #define BUNIT_REG_BISOC				0x11
