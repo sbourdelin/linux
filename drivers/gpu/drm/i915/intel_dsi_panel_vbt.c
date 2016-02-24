@@ -58,6 +58,28 @@ static inline struct vbt_panel *to_vbt_panel(struct drm_panel *panel)
 
 #define NS_KHZ_RATIO 1000000
 
+#define CHV_IOSF_PORT_GPIO_N                 0x13
+#define CHV_IOSF_PORT_GPIO_SE                0x48
+#define CHV_IOSF_PORT_GPIO_SW                0xB2
+#define CHV_IOSF_PORT_GPIO_E                 0xA8
+#define CHV_MAX_GPIO_NUM_N                   72
+#define CHV_MAX_GPIO_NUM_SE                  99
+#define CHV_MAX_GPIO_NUM_SW                  197
+#define CHV_MIN_GPIO_NUM_SE                  73
+#define CHV_MIN_GPIO_NUM_SW                  100
+#define CHV_MIN_GPIO_NUM_E                   198
+
+#define CHV_PAD_FMLY_BASE                    0x4400
+#define CHV_PAD_FMLY_SIZE                    0x400
+#define CHV_PAD_CFG_0_1_REG_SIZE             0x8
+#define CHV_PAD_CFG_REG_SIZE                 0x4
+#define CHV_VBT_MAX_PINS_PER_FMLY            15
+
+#define CHV_GPIO_CFG_UNLOCK                    0x00000000
+#define CHV_GPIO_CFG_HIZ                       0x00008100
+#define CHV_GPIO_CFG_TX_STATE_SHIFT            1
+
+
 #define VLV_HV_DDI0_HPD_GPIONC_0_PCONF0             0x4130
 #define VLV_HV_DDI0_HPD_GPIONC_0_PAD                0x4138
 #define VLV_HV_DDI0_DDC_SDA_GPIONC_1_PCONF0         0x4120
@@ -685,34 +707,13 @@ static const u8 *mipi_exec_delay(struct intel_dsi *intel_dsi, const u8 *data)
 	return data;
 }
 
-static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
+void vlv_program_gpio(struct intel_dsi *intel_dsi, u8 gpio, u8 action)
 {
-	u8 gpio, action;
+	struct drm_device *dev = intel_dsi->base.base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
 	u16 function, pad;
 	u32 val;
 	u8 port;
-	struct drm_device *dev = intel_dsi->base.base.dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-
-	DRM_DEBUG_DRIVER("MIPI: executing gpio element\n");
-
-	if (dev_priv->vbt.dsi.seq_version >= 3)
-		data++;
-
-	gpio = *data++;
-
-	/* pull up/down */
-	action = *data++ & 1;
-
-	if (gpio >= ARRAY_SIZE(gtable)) {
-		DRM_DEBUG_KMS("unknown gpio %u\n", gpio);
-		goto out;
-	}
-
-	if (!IS_VALLEYVIEW(dev_priv)) {
-		DRM_DEBUG_KMS("GPIO element not supported on this platform\n");
-		goto out;
-	}
 
 	if (dev_priv->vbt.dsi.seq_version >= 3) {
 		if (gpio <= IOSF_MAX_GPIO_NUM_NC) {
@@ -728,7 +729,7 @@ static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
 			port = IOSF_PORT_GPIO_SUS;
 		} else {
 			DRM_ERROR("GPIO number is not present in the table\n");
-			goto out;
+			return;
 		}
 	} else {
 		port = IOSF_PORT_GPIO_NC;
@@ -750,6 +751,78 @@ static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
 	/* pull up/down */
 	vlv_iosf_sb_write(dev_priv, port, pad, val);
 	mutex_unlock(&dev_priv->sb_lock);
+}
+
+void chv_program_gpio(struct intel_dsi *intel_dsi, u8 gpio, u8 action)
+{
+	struct drm_device *dev = intel_dsi->base.base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	u16 function, pad;
+	u16 family_num;
+	u8 block;
+
+	if (dev_priv->vbt.dsi.seq_version >= 3) {
+		if (gpio <= CHV_MAX_GPIO_NUM_N) {
+			block = CHV_IOSF_PORT_GPIO_N;
+			DRM_DEBUG_DRIVER("GPIO is in the north Block\n");
+		} else if (gpio <= CHV_MAX_GPIO_NUM_SE) {
+			block = CHV_IOSF_PORT_GPIO_SE;
+			gpio = gpio - CHV_MIN_GPIO_NUM_SE;
+			DRM_DEBUG_DRIVER("GPIO is in the south east Block\n");
+		} else if (gpio <= CHV_MAX_GPIO_NUM_SW) {
+			block = CHV_IOSF_PORT_GPIO_SW;
+			gpio = gpio - CHV_MIN_GPIO_NUM_SW;
+			DRM_DEBUG_DRIVER("GPIO is in the south west Block\n");
+		} else {
+			block = CHV_IOSF_PORT_GPIO_E;
+			gpio = gpio - CHV_MIN_GPIO_NUM_E;
+			DRM_DEBUG_DRIVER("GPIO is in the east Block\n");
+		}
+	} else
+		block = IOSF_PORT_GPIO_NC;
+
+	family_num =  gpio / CHV_VBT_MAX_PINS_PER_FMLY;
+	gpio = gpio - (family_num * CHV_VBT_MAX_PINS_PER_FMLY);
+	pad = CHV_PAD_FMLY_BASE + (family_num * CHV_PAD_FMLY_SIZE) +
+		(((u16)gpio) * CHV_PAD_CFG_0_1_REG_SIZE);
+	function = pad + CHV_PAD_CFG_REG_SIZE;
+
+	mutex_lock(&dev_priv->sb_lock);
+	vlv_iosf_sb_write(dev_priv, block, function,
+			CHV_GPIO_CFG_UNLOCK);
+	vlv_iosf_sb_write(dev_priv, block, pad, CHV_GPIO_CFG_HIZ |
+			(action << CHV_GPIO_CFG_TX_STATE_SHIFT));
+	mutex_unlock(&dev_priv->sb_lock);
+
+}
+
+static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
+{
+	u8 gpio, action;
+	struct drm_device *dev = intel_dsi->base.base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	DRM_DEBUG_DRIVER("MIPI: executing gpio element\n");
+
+	if (dev_priv->vbt.dsi.seq_version >= 3)
+		data++;
+
+	gpio = *data++;
+
+	/* pull up/down */
+	action = *data++ & 1;
+
+	if (gpio >= ARRAY_SIZE(gtable)) {
+		DRM_DEBUG_KMS("unknown gpio %u\n", gpio);
+		goto out;
+	}
+
+	if (IS_VALLEYVIEW(dev))
+		vlv_program_gpio(intel_dsi, gpio, action);
+	else if (IS_CHERRYVIEW(dev))
+		chv_program_gpio(intel_dsi, gpio, action);
+	else
+		DRM_ERROR("GPIO programming missing for this platform.\n");
 
 out:
 	return data;
