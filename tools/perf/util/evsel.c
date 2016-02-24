@@ -1622,6 +1622,82 @@ static inline bool overflow(const void *endp, u16 max_size, const void *offset,
 #define OVERFLOW_CHECK_u64(offset) \
 	OVERFLOW_CHECK(offset, sizeof(u64), sizeof(u64))
 
+#define KVMPPC_EXIT "kvm_hv:kvm_guest_exit"
+#define HV_DECREMENTER 2432
+#define HV_BIT 3
+#define PR_BIT 49
+#define PPC_MAX 63
+
+bool is_kvmppc_exit_event(struct perf_evsel *evsel)
+{
+	static unsigned int kvmppc_exit;
+
+	if (evsel->attr.type != PERF_TYPE_TRACEPOINT)
+		return false;
+
+	if (unlikely(kvmppc_exit == 0)) {
+		if (strcmp(KVMPPC_EXIT, evsel->name))
+			return false;
+		kvmppc_exit = evsel->attr.config;
+	} else if (kvmppc_exit != evsel->attr.config) {
+		return false;
+	}
+
+	return true;
+}
+
+bool is_hv_dec_trap(struct perf_evsel *evsel, struct perf_sample *sample)
+{
+	int trap = perf_evsel__intval(evsel, sample, "trap");
+	return trap == HV_DECREMENTER;
+}
+
+bool is_perf_data_reorded_on_ppc(struct perf_evlist *evlist)
+{
+	if (evlist && evlist->env && evlist->env->arch)
+		return !strcmp(evlist->env->arch, "ppc64") ||
+			!strcmp(evlist->env->arch, "ppc64le");
+	return false;
+}
+
+u8 arch__get_cpumode(const union perf_event *event,
+		     struct perf_evsel *evsel,
+		     struct perf_sample *sample)
+{
+	unsigned long hv, pr, msr;
+	u8 cpumode = event->header.misc & PERF_RECORD_MISC_CPUMODE_MASK;
+
+	if (!(is_perf_data_reorded_on_ppc(evsel->evlist) &&
+	      perf_guest_only() &&
+	      is_kvmppc_exit_event(evsel)))
+		goto ret;
+
+	if (sample->raw_data && is_hv_dec_trap(evsel, sample)) {
+		msr = perf_evsel__intval(evsel, sample, "msr");
+		hv = msr & ((unsigned long)1 << (PPC_MAX - HV_BIT));
+		pr = msr & ((unsigned long)1 << (PPC_MAX - PR_BIT));
+
+		if (!hv && pr)
+			cpumode = PERF_RECORD_MISC_GUEST_USER;
+		else
+			cpumode = PERF_RECORD_MISC_GUEST_KERNEL;
+	}
+
+ret:
+	return cpumode;
+}
+
+u64 arch__get_ip(struct perf_evsel *evsel, struct perf_sample *sample)
+{
+	if (is_perf_data_reorded_on_ppc(evsel->evlist) &&
+	    perf_guest_only() &&
+	    is_kvmppc_exit_event(evsel) &&
+	    is_hv_dec_trap(evsel, sample))
+		return perf_evsel__intval(evsel, sample, "pc");
+
+	return sample->ip;
+}
+
 int perf_evsel__parse_sample(struct perf_evsel *evsel, union perf_event *event,
 			     struct perf_sample *data)
 {
@@ -1795,6 +1871,7 @@ int perf_evsel__parse_sample(struct perf_evsel *evsel, union perf_event *event,
 		OVERFLOW_CHECK(array, data->raw_size, max_size);
 		data->raw_data = (void *)array;
 		array = (void *)array + data->raw_size;
+		data->ip = arch__get_ip(evsel, data);
 	}
 
 	if (type & PERF_SAMPLE_BRANCH_STACK) {
