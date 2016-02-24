@@ -840,8 +840,7 @@ void intel_pmu_pebs_disable(struct perf_event *event)
 	if (large_pebs && !pebs_is_enabled(cpuc))
 		perf_sched_cb_dec(event->ctx->pmu);
 
-	if (cpuc->enabled)
-		wrmsrl(MSR_IA32_PEBS_ENABLE, cpuc->pebs_enabled);
+	wrmsrl(MSR_IA32_PEBS_ENABLE, cpuc->pebs_enabled);
 
 	hwc->config |= ARCH_PERFMON_EVENTSEL_INT;
 }
