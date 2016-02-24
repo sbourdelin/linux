@@ -294,11 +294,16 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 			return -ENOEXEC;
 		}
 	}
-#ifdef CONFIG_DYNAMIC_FTRACE
-	module->arch.tramp =
-		do_plt_call(module->core_layout.base,
-			    (unsigned long)ftrace_caller,
-			    sechdrs, module);
-#endif
+
 	return 0;
 }
+
+#ifdef CONFIG_DYNAMIC_FTRACE
+int module_finalize_ftrace(struct module *module, const Elf_Shdr *sechdrs)
+{
+	module->arch.tramp = do_plt_call(module->core_layout.base,
+					 (unsigned long)ftrace_caller,
+					 sechdrs, module);
+	return 0;
+}
+#endif
