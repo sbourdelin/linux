@@ -449,27 +449,25 @@ static unsigned long stub_for_addr(const Elf64_Shdr *sechdrs,
 }
 
 #ifdef CC_USING_MPROFILE_KERNEL
-static int is_early_mcount_callsite(u32 *instruction)
+static bool is_early_mcount_callsite(u32 *instruction)
 {
-	/* -mprofile-kernel sequence starting with
-	 * mflr r0 and maybe std r0, LRSAVE(r1).
+	/*
+	 * Check if this is one of the -mprofile-kernel sequences.
 	 */
-	if ((instruction[-3] == PPC_INST_MFLR &&
-	     instruction[-2] == PPC_INST_STD_LR) ||
-	    instruction[-2] == PPC_INST_MFLR) {
-		/* Nothing to be done here, it's an _mcount
-		 * call location and r2 will have to be
-		 * restored in the _mcount function.
-		 */
-		return 1;
-	}
-	return 0;
+	if (instruction[-1] == PPC_INST_STD_LR &&
+	    instruction[-2] == PPC_INST_MFLR)
+		return true;
+
+	if (instruction[-1] == PPC_INST_MFLR)
+		return true;
+
+	return false;
 }
 #else
 /* without -mprofile-kernel, mcount calls are never early */
-static int is_early_mcount_callsite(u32 *instruction)
+static bool is_early_mcount_callsite(u32 *instruction)
 {
-	return 0;
+	return false;
 }
 #endif
 
@@ -478,7 +476,7 @@ static int is_early_mcount_callsite(u32 *instruction)
 static int restore_r2(u32 *instruction, struct module *me)
 {
 	if (*instruction != PPC_INST_NOP) {
-		if (is_early_mcount_callsite(instruction))
+		if (is_early_mcount_callsite(instruction - 1))
 			return 1;
 		pr_err("%s: Expect noop after relocate, got %08x\n",
 		       me->name, *instruction);
