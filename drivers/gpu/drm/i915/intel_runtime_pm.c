@@ -2030,6 +2030,9 @@ static uint32_t get_allowed_dc_mask(const struct drm_i915_private *dev_priv,
 	if (!HAS_CSR(dev_priv))
 		return mask;
 
+	if (!i915.disable_power_well)
+		return mask;
+
 	mask |= DC_STATE_EN_UPTO_DC5;
 	if (IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv)) {
 		mask |= DC_STATE_EN_UPTO_DC6;
