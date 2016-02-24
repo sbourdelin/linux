@@ -659,10 +659,12 @@ static struct iommu_group *get_pci_function_alias_group(struct pci_dev *pdev,
 	return NULL;
 }
 
-static bool dma_alias_is_enabled(struct pci_dev *dev, u8 devfn)
+static bool pci_devs_are_dma_aliases(struct pci_dev *pdev1, struct pci_dev *pdev2)
 {
-	return dev->dma_alias_mask &&
-	       test_bit(devfn, dev->dma_alias_mask);
+	return (pdev1->dma_alias_mask &&
+		test_bit(pdev2->devfn, pdev1->dma_alias_mask)) ||
+	       (pdev2->dma_alias_mask &&
+		test_bit(pdev1->devfn, pdev2->dma_alias_mask));
 }
 
 /*
@@ -692,8 +694,7 @@ static struct iommu_group *get_pci_alias_group(struct pci_dev *pdev,
 			continue;
 
 		/* We alias them or they alias us */
-		if (dma_alias_is_enabled(pdev, tmp->devfn) ||
-		    dma_alias_is_enabled(tmp, pdev->devfn)) {
+		if (pci_devs_are_dma_aliases(pdev, tmp)) {
 			group = get_pci_alias_group(tmp, devfns);
 			if (group) {
 				pci_dev_put(tmp);
