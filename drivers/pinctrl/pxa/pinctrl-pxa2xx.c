@@ -416,7 +416,7 @@ int pxa2xx_pinctrl_init(struct platform_device *pdev,
 	if (ret)
 		return ret;
 
-	pctl->pctl_dev = pinctrl_register(&pctl->desc, &pdev->dev, pctl);
+	pctl->pctl_dev = devm_pinctrl_register(&pdev->dev, &pctl->desc, pctl);
 	if (IS_ERR(pctl->pctl_dev)) {
 		dev_err(&pdev->dev, "couldn't register pinctrl driver\n");
 		return PTR_ERR(pctl->pctl_dev);
@@ -427,11 +427,3 @@ int pxa2xx_pinctrl_init(struct platform_device *pdev,
 	return 0;
 }
 EXPORT_SYMBOL(pxa2xx_pinctrl_init);
-
-int pxa2xx_pinctrl_exit(struct platform_device *pdev)
-{
-	struct pxa_pinctrl *pctl = platform_get_drvdata(pdev);
-
-	pinctrl_unregister(pctl->pctl_dev);
-	return 0;
-}
