@@ -538,12 +538,8 @@ static void gen9_set_dc_state(struct drm_i915_private *dev_priv, uint32_t state)
 	else
 		mask |= DC_STATE_EN_UPTO_DC6;
 
-	WARN_ON_ONCE(state & ~mask);
-
-	if (i915.enable_dc == 0)
-		state = DC_STATE_DISABLE;
-	else if (i915.enable_dc == 1 && state > DC_STATE_EN_UPTO_DC5)
-		state = DC_STATE_EN_UPTO_DC5;
+	if (WARN_ON_ONCE(state & ~dev_priv->csr.allowed_dc_mask))
+		state &= dev_priv->csr.allowed_dc_mask;
 
 	val = I915_READ(DC_STATE_EN);
 	DRM_DEBUG_KMS("Setting DC state from %02x to %02x\n",
@@ -659,8 +655,7 @@ static void gen9_disable_dc5_dc6(struct drm_i915_private *dev_priv)
 {
 	assert_can_disable_dc5(dev_priv);
 
-	if ((IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv)) &&
-	    i915.enable_dc != 0 && i915.enable_dc != 1)
+	if (dev_priv->csr.allowed_dc_mask & DC_STATE_EN_UPTO_DC6)
 		assert_can_disable_dc6(dev_priv);
 
 	gen9_set_dc_state(dev_priv, DC_STATE_DISABLE);
@@ -839,26 +834,19 @@ static void gen9_dc_off_power_well_enable(struct drm_i915_private *dev_priv,
 static void gen9_dc_off_power_well_disable(struct drm_i915_private *dev_priv,
 					   struct i915_power_well *power_well)
 {
-	if ((IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv)) &&
-	    i915.enable_dc != 0 && i915.enable_dc != 1)
+	if (dev_priv->csr.allowed_dc_mask & DC_STATE_EN_UPTO_DC6)
 		skl_enable_dc6(dev_priv);
-	else
+	else if (dev_priv->csr.allowed_dc_mask & DC_STATE_EN_UPTO_DC5)
 		gen9_enable_dc5(dev_priv);
 }
 
 static void gen9_dc_off_power_well_sync_hw(struct drm_i915_private *dev_priv,
 					   struct i915_power_well *power_well)
 {
-	if (power_well->count > 0) {
-		gen9_set_dc_state(dev_priv, DC_STATE_DISABLE);
-	} else {
-		if ((IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv)) &&
-		    i915.enable_dc != 0 &&
-		    i915.enable_dc != 1)
-			gen9_set_dc_state(dev_priv, DC_STATE_EN_UPTO_DC6);
-		else
-			gen9_set_dc_state(dev_priv, DC_STATE_EN_UPTO_DC5);
-	}
+	if (power_well->count > 0)
+		gen9_dc_off_power_well_enable(dev_priv, power_well);
+	else
+		gen9_dc_off_power_well_disable(dev_priv, power_well);
 }
 
 static void i9xx_always_on_power_well_noop(struct drm_i915_private *dev_priv,
@@ -2023,6 +2011,48 @@ sanitize_disable_power_well_option(const struct drm_i915_private *dev_priv,
 	return 1;
 }
 
+static uint32_t get_allowed_dc_mask(const struct drm_i915_private *dev_priv,
+				    int enable_dc)
+{
+	uint32_t mask = 0;
+
+	/*
+	 * DC9 has a separate HW flow from the rest of the DC states, not
+	 * depending on the DMC firmware. It's needed by system
+	 * suspend/resume, so allow it unconditionally.
+	 */
+	if (IS_BROXTON(dev_priv))
+		mask |= DC_STATE_EN_DC9;
+
+	if (!enable_dc)
+		return mask;
+
+	if (!HAS_CSR(dev_priv))
+		return mask;
+
+	mask |= DC_STATE_EN_UPTO_DC5;
+	if (IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv)) {
+		mask |= DC_STATE_EN_UPTO_DC6;
+	} else if (!IS_BROXTON(dev_priv)) {
+		MISSING_CASE(INTEL_DEVID(dev_priv));
+		mask = 0;
+	}
+
+	switch (enable_dc) {
+	case 1:
+		mask &= ~DC_STATE_EN_UPTO_DC6;
+		break;
+	case 2:
+	case -1:
+		break;
+	default:
+		DRM_ERROR("Unexpected value for enable_dc (%d)\n", enable_dc);
+		break;
+	}
+
+	return mask;
+}
+
 #define set_power_wells(power_domains, __power_wells) ({		\
 	(power_domains)->power_wells = (__power_wells);			\
 	(power_domains)->power_well_count = ARRAY_SIZE(__power_wells);	\
@@ -2041,6 +2071,8 @@ int intel_power_domains_init(struct drm_i915_private *dev_priv)
 
 	i915.disable_power_well = sanitize_disable_power_well_option(dev_priv,
 						     i915.disable_power_well);
+	dev_priv->csr.allowed_dc_mask = get_allowed_dc_mask(dev_priv,
+							    i915.enable_dc);
 
 	BUILD_BUG_ON(POWER_DOMAIN_NUM > 31);
 
