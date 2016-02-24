@@ -4577,8 +4577,15 @@ int pci_set_vga_state(struct pci_dev *dev, bool decode,
  */
 void pci_add_dma_alias(struct pci_dev *dev, u8 devfn)
 {
-	dev->dma_alias_devfn = PCI_DEVFN(PCI_SLOT(dev->devfn), 0);
-	dev->dev_flags |= PCI_DEV_FLAGS_DMA_ALIAS_DEVFN;
+	if (!dev->dma_alias_mask)
+		dev->dma_alias_mask = kcalloc(BITS_TO_LONGS(U8_MAX),
+					      sizeof(long), GFP_KERNEL);
+	if (!dev->dma_alias_mask) {
+		dev_warn(&dev->dev, "Unable to allocate DMA alias mask\n");
+		return;
+	}
+
+	set_bit(devfn, dev->dma_alias_mask);
 	dev_info(&dev->dev, "Enabling fixed DMA alias to %02x.%d\n",
 		 PCI_SLOT(devfn), PCI_FUNC(devfn));
 }
