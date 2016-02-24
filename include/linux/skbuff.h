@@ -2784,6 +2784,23 @@ static inline int skb_linearize_cow(struct sk_buff *skb)
 }
 
 /**
+ *	skb_postpush_rcsum - update checksum for received skb after push
+ *	@skb: buffer to update
+ *	@start: start of data before push
+ *	@len: length of data pushed
+ *
+ *	After doing a push on a received packet, you need to call this to
+ *	update the CHECKSUM_COMPLETE checksum.
+ */
+
+static inline void skb_postpush_rcsum(struct sk_buff *skb,
+				      const void *start, unsigned int len)
+{
+	if (skb->ip_summed == CHECKSUM_COMPLETE)
+		skb->csum = csum_add(skb->csum, csum_partial(start, len, 0));
+}
+
+/**
  *	skb_postpull_rcsum - update checksum for received skb after pull
  *	@skb: buffer to update
  *	@start: start of data before pull
