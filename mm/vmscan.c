@@ -2586,20 +2586,17 @@ static bool shrink_zones(struct zonelist *zonelist, struct scan_control *sc)
 				continue;	/* Let kswapd poll it */
 
 			/*
-			 * If we already have plenty of memory free for
-			 * compaction in this zone, don't free any more.
-			 * Even though compaction is invoked for any
-			 * non-zero order, only frequent costly order
-			 * reclamation is disruptive enough to become a
-			 * noticeable problem, like transparent huge
-			 * page allocations.
+			 * For higher order allocations, free enough memory
+			 * to be able to do compaction for the largest possible
+			 * allocation. On smaller systems, this may be enough
+			 * that smaller allocations can skip compaction, if
+			 * enough adjacent pages get freed.
 			 */
-			if (IS_ENABLED(CONFIG_COMPACTION) &&
-			    sc->order > PAGE_ALLOC_COSTLY_ORDER &&
+			if (IS_ENABLED(CONFIG_COMPACTION) && sc->order &&
 			    zonelist_zone_idx(z) <= requested_highidx &&
-			    compaction_ready(zone, sc->order)) {
+			    compaction_ready(zone, MAX_ORDER)) {
 				sc->compaction_ready = true;
-				continue;
+				return true;
 			}
 
 			/*
