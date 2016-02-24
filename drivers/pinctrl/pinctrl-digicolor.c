@@ -326,17 +326,15 @@ static int dc_pinctrl_probe(struct platform_device *pdev)
 
 	pmap->dev = &pdev->dev;
 
-	pmap->pctl = pinctrl_register(pctl_desc, &pdev->dev, pmap);
+	pmap->pctl = devm_pinctrl_register(&pdev->dev, pctl_desc, pmap);
 	if (IS_ERR(pmap->pctl)) {
 		dev_err(&pdev->dev, "pinctrl driver registration failed\n");
 		return PTR_ERR(pmap->pctl);
 	}
 
 	ret = dc_gpiochip_add(pmap, pdev->dev.of_node);
-	if (ret < 0) {
-		pinctrl_unregister(pmap->pctl);
+	if (ret < 0)
 		return ret;
-	}
 
 	return 0;
 }
@@ -345,7 +343,6 @@ static int dc_pinctrl_remove(struct platform_device *pdev)
 {
 	struct dc_pinmap *pmap = platform_get_drvdata(pdev);
 
-	pinctrl_unregister(pmap->pctl);
 	gpiochip_remove(&pmap->chip);
 
 	return 0;
