@@ -41,25 +41,7 @@ EXPORT_SYMBOL(acpi_disabled);
 int acpi_pci_disabled = 1;	/* skip ACPI PCI scan and IRQ initialization */
 EXPORT_SYMBOL(acpi_pci_disabled);
 
-static bool param_acpi_off __initdata;
 static bool param_acpi_force __initdata;
-
-static int __init parse_acpi(char *arg)
-{
-	if (!arg)
-		return -EINVAL;
-
-	/* "acpi=off" disables both ACPI table parsing and interpreter */
-	if (strcmp(arg, "off") == 0)
-		param_acpi_off = true;
-	else if (strcmp(arg, "force") == 0) /* force ACPI to be enabled */
-		param_acpi_force = true;
-	else
-		return -EINVAL;	/* Core will print when we return error */
-
-	return 0;
-}
-early_param("acpi", parse_acpi);
 
 static int __init dt_scan_depth1_nodes(unsigned long node,
 				       const char *uname, int depth,
@@ -73,6 +55,35 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
 		return 1;
 	return 0;
 }
+
+static int __init parse_acpi(char *arg)
+{
+	if (!arg)
+		return -EINVAL;
+
+	/*
+	 * Enable ACPI instead of device tree unless
+	 * - ACPI has been disabled explicitly (acpi=off), or
+	 * - the device tree is not empty (it has more than just a /chosen node)
+	 *   and ACPI has not been force enabled (acpi=force)
+	 */
+	if (strcmp(arg, "off") == 0)
+		return 0;
+	else if (strcmp(arg, "force") == 0)
+		param_acpi_force = true;
+	else if (of_scan_flat_dt(dt_scan_depth1_nodes, NULL))
+		return 0;
+
+	/*
+	 * ACPI is disabled at this point. Enable it in order to parse
+	 * the ACPI tables and carry out sanity checks
+	 */
+	enable_acpi();
+
+	return 0;
+}
+
+early_param("acpi", parse_acpi);
 
 /*
  * __acpi_map_table() will be called before page_init(), so early_ioremap()
@@ -181,21 +192,8 @@ out:
  */
 void __init acpi_boot_table_init(void)
 {
-	/*
-	 * Enable ACPI instead of device tree unless
-	 * - ACPI has been disabled explicitly (acpi=off), or
-	 * - the device tree is not empty (it has more than just a /chosen node)
-	 *   and ACPI has not been force enabled (acpi=force)
-	 */
-	if (param_acpi_off ||
-	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+	if (acpi_disabled)
 		return;
-
-	/*
-	 * ACPI is disabled at this point. Enable it in order to parse
-	 * the ACPI tables and carry out sanity checks
-	 */
-	enable_acpi();
 
 	/*
 	 * If ACPI tables are initialized and FADT sanity checks passed,
