@@ -139,6 +139,19 @@ static u32 ppc64_stub_insns[] = {
 	0x4e800420			/* bctr */
 };
 
+#ifdef CC_USING_MPROFILE_KERNEL
+/* In case of _mcount calls or dynamic ftracing, Do not save the
+ * current callee's TOC (in R2) again into the original caller's stack
+ * frame during this trampoline hop. The stack frame already holds
+ * that of the original caller.  _mcount and ftrace_caller will take
+ * care of this TOC value themselves.
+ */
+#define SQUASH_TOC_SAVE_INSN(trampoline_addr) \
+	(((struct ppc64_stub_entry *)(trampoline_addr))->jump[2] = PPC_INST_NOP)
+#else
+#define SQUASH_TOC_SAVE_INSN(trampoline_addr)
+#endif
+
 #ifdef CONFIG_DYNAMIC_FTRACE
 int module_trampoline_target(struct module *mod, unsigned long addr,
 			     unsigned long *target)
@@ -608,6 +621,9 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 					return -ENOENT;
 				if (!restore_r2((u32 *)location + 1, me))
 					return -ENOEXEC;
+				/* Squash the TOC saver for profiler calls */
+				if (!strcmp("_mcount", strtab+sym->st_name))
+					SQUASH_TOC_SAVE_INSN(value);
 			} else
 				value += local_entry_offset(sym);
 
