@@ -174,28 +174,19 @@ __ftrace_make_nop(struct module *mod,
 		return -EFAULT;
 	}
 
-	if (op != PPC_INST_LD_TOC)
-	{
-		unsigned int op0, op1;
+	if (op != PPC_INST_LD_TOC) {
+		unsigned int inst;
 
-		if (probe_kernel_read(&op0, (void *)(ip-8), MCOUNT_INSN_SIZE)) {
-			pr_err("Fetching op0 failed.\n");
+		if (probe_kernel_read(&inst, (void *)(ip - 4), 4)) {
+			pr_err("Fetching instruction at %lx failed.\n", ip - 4);
 			return -EFAULT;
 		}
 
-		if (probe_kernel_read(&op1, (void *)(ip-4), MCOUNT_INSN_SIZE)) {
-			pr_err("Fetching op1 failed.\n");
-			return -EFAULT;
-		}
-
-		/* mflr r0 ; [ std r0,LRSAVE(r1) ]? */
-		if ( (op0 != PPC_INST_MFLR ||
-		      op1 != PPC_INST_STD_LR)
-		     && op1 != PPC_INST_MFLR )
-		{
+		/* We expect either a mlfr r0, or a std r0, LRSAVE(r1) */
+		if (inst != PPC_INST_MFLR && inst != PPC_INST_STD_LR) {
 			pr_err("Unexpected instructions around bl _mcount\n"
 			       "when enabling dynamic ftrace!\t"
-			       "(%08x,%08x,bl,%08x)\n", op0, op1, op);
+			       "(%08x,bl,%08x)\n", inst, op);
 			return -EINVAL;
 		}
 
