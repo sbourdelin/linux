@@ -1052,16 +1052,17 @@ static DECLARE_WAIT_QUEUE_HEAD(muxed_resource_wait);
 
 /**
  * __request_region - create a new busy resource region
- * @parent: parent resource descriptor
+ * @root: root resource descriptor
  * @start: resource start address
  * @n: resource region size
  * @name: reserving caller's ID string
  * @flags: IO resource flags
  */
-struct resource * __request_region(struct resource *parent,
+struct resource * __request_region(struct resource *root,
 				   resource_size_t start, resource_size_t n,
 				   const char *name, int flags)
 {
+	struct resource *parent = root;
 	DECLARE_WAITQUEUE(wait, current);
 	struct resource *res = alloc_resource(GFP_KERNEL);
 
@@ -1089,6 +1090,7 @@ struct resource * __request_region(struct resource *parent,
 			}
 		}
 		if (conflict->flags & flags & IORESOURCE_MUXED) {
+			parent = root;
 			add_wait_queue(&muxed_resource_wait, &wait);
 			write_unlock(&resource_lock);
 			set_current_state(TASK_UNINTERRUPTIBLE);
