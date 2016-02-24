@@ -567,6 +567,8 @@ void thermal_zone_device_update(struct thermal_zone_device *tz)
 
 	for (count = 0; count < tz->trips; count++)
 		handle_thermal_trip(tz, count);
+
+	sysfs_notify(&tz->device.kobj, NULL, "temp");
 }
 EXPORT_SYMBOL_GPL(thermal_zone_device_update);
 
@@ -1638,6 +1640,7 @@ void thermal_cdev_update(struct thermal_cooling_device *cdev)
 	cdev->updated = true;
 	trace_cdev_update(cdev, target);
 	dev_dbg(&cdev->device, "set to state %lu\n", target);
+	sysfs_notify(&cdev->device.kobj, NULL, "cur_state");
 }
 EXPORT_SYMBOL(thermal_cdev_update);
 
