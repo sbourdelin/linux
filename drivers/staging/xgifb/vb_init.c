@@ -698,13 +698,13 @@ static void XGINew_CheckChannel(struct xgi_hw_device_info *HwDeviceExtension,
 		xgifb_reg_set(pVBInfo->P3c4, 0x14, 0x51); /* 32Mx16 bit*/
 		break;
 	case XG42:
-		/*
-		 XG42 SR14 D[3] Reserve
-		 D[2] = 1, Dual Channel
-		 = 0, Single Channel
-
-		 It's Different from Other XG40 Series.
-		 */
+	       /*
+		* XG42 SR14 D[3] Reserve
+		* D[2] = 1, Dual Channel
+		* = 0, Single Channel
+		*
+		* It's Different from Other XG40 Series.
+		*/
 		if (XGINew_CheckFrequence(pVBInfo) == 1) { /* DDRII, DDR2x */
 			pVBInfo->ram_bus = 32; /* 32 bits */
 			pVBInfo->ram_channel = 2; /* 2 Channel */
