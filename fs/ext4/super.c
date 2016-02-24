@@ -353,13 +353,14 @@ static void save_error_info(struct super_block *sb, const char *func,
  * This is a kludge to prevent these oops until we can put in a proper
  * hook in del_gendisk() to inform the VFS and file system layers.
  */
-static int block_device_ejected(struct super_block *sb)
+int block_device_ejected(struct super_block *sb)
 {
 	struct inode *bd_inode = sb->s_bdev->bd_inode;
 	struct backing_dev_info *bdi = inode_to_bdi(bd_inode);
 
 	return bdi->dev == NULL;
 }
+EXPORT_SYMBOL(block_device_ejected);
 
 static void ext4_journal_commit_callback(journal_t *journal, transaction_t *txn)
 {

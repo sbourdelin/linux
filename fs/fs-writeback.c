@@ -1985,6 +1985,9 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 	struct super_block *sb = inode->i_sb;
 	int dirtytime;
 
+	if (block_device_ejected(sb))
+		return;
+
 	trace_writeback_mark_inode_dirty(inode, flags);
 
 	/*
