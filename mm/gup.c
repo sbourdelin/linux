@@ -1087,8 +1087,7 @@ struct page *get_dump_page(unsigned long addr)
  *
  * get_user_pages_fast attempts to pin user pages by walking the page
  * tables directly and avoids taking locks. Thus the walker needs to be
- * protected from page table pages being freed from under it, and should
- * block any THP splits.
+ * protected from page table pages being freed from under it.
  *
  * One way to achieve this is to have the walker disable interrupts, and
  * rely on IPIs from the TLB flushing code blocking before the page table
@@ -1097,9 +1096,8 @@ struct page *get_dump_page(unsigned long addr)
  *
  * Another way to achieve this is to batch up page table containing pages
  * belonging to more than one mm_user, then rcu_sched a callback to free those
- * pages. Disabling interrupts will allow the fast_gup walker to both block
- * the rcu_sched callback, and an IPI that we broadcast for splitting THPs
- * (which is a relatively rare event). The code below adopts this strategy.
+ * pages. Disabling interrupts will allow the fast_gup walker to block
+ * the rcu_sched callback. The code below adopts this strategy.
  *
  * Before activating this code, please be aware that the following assumptions
  * are currently made:
@@ -1391,9 +1389,6 @@ int __get_user_pages_fast(unsigned long start, int nr_pages, int write,
 	 * With interrupts disabled, we block page table pages from being
 	 * freed from under us. See mmu_gather_tlb in asm-generic/tlb.h
 	 * for more details.
-	 *
-	 * We do not adopt an rcu_read_lock(.) here as we also want to
-	 * block IPIs that come from THPs splitting.
 	 */
 
 	local_irq_save(flags);
