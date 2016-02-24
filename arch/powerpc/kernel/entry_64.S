@@ -1237,6 +1237,11 @@ _GLOBAL(ftrace_graph_caller)
 	std	r5, 64(r1)
 	std	r4, 56(r1)
 	std	r3, 48(r1)
+
+	/* Save callee's TOC in the ABI compliant location */
+	std	r2, 24(r1)
+	ld	r2, PACATOC(r13)	/* get kernel TOC in r2 */
+
 	mfctr	r4		/* ftrace_caller has moved local addr here */
 	std	r4, 40(r1)
 	mflr	r3		/* ftrace_caller has restored LR from stack */
@@ -1261,6 +1266,9 @@ _GLOBAL(ftrace_graph_caller)
 	ld	r5, 64(r1)
 	ld	r4, 56(r1)
 	ld	r3, 48(r1)
+
+	/* Restore callee's TOC */
+	ld	r2, 24(r1)
 
 	addi	r1, r1, 112
 	mflr	r0
