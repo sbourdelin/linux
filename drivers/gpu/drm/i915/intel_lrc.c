@@ -225,6 +225,17 @@ enum {
 #define GEN8_CTX_ID_SHIFT 32
 #define CTX_RCS_INDIRECT_CTX_OFFSET_DEFAULT  0x17
 
+/*
+ * Reserve space for some NOOPs at the end of each request, to be used by
+ * a workaround for not being allowed to do lite restore with HEAD==TAIL
+ * (WaIdleLiteRestore).
+ *
+ * The number of NOOPs is the same constant on all current platforms that
+ * require this, but in theory could be a platform- or engine- specific
+ * value based on the request.
+ */
+#define WA_TAIL_DWORDS(request)	(2)
+
 static int intel_lr_context_pin(struct intel_context *ctx,
 				struct intel_engine_cs *engine);
 static void lrc_setup_hardware_status_page(struct intel_engine_cs *ring,
@@ -457,21 +468,31 @@ static void execlists_context_unqueue(struct intel_engine_cs *ring)
 
 	if (IS_GEN8(ring->dev) || IS_GEN9(ring->dev)) {
 		/*
-		 * WaIdleLiteRestore: make sure we never cause a lite
-		 * restore with HEAD==TAIL
+		 * WaIdleLiteRestore: lite restore must not have HEAD==TAIL.
+		 *
+		 * If a request has previously been submitted (as req1) and
+		 * is now being /re/submitted (as req0), it may actually have 
+		 * completed (with HEAD==TAIL), but we don't know that yet.
+		 *
+		 * Unfortunately the hardware requires that we not submit
+		 * a context that is already idle with HEAD==TAIL; but we
+		 * cannot safely check this because there would always be
+		 * an opportunity for a race, where the context /becomes/
+		 * idle after we check and before resubmission.
+		 *
+		 * So instead we increment the request TAIL here to ensure
+		 * that it is different from the last value seen by the
+		 * hardware, in effect always adding extra work to be done
+		 * even if the context has already completed. That work
+		 * consists of NOOPs added by intel_logical_ring_submit()
+		 * after the end of each request. Advancing TAIL turns
+		 * those NOOPs into part of the current request; if not so
+		 * consumed, they remain in the ringbuffer as a harmless
+		 * prefix to the next request.
 		 */
 		if (req0->elsp_submitted) {
-			/*
-			 * Apply the wa NOOPS to prevent ring:HEAD == req:TAIL
-			 * as we resubmit the request. See gen8_emit_request()
-			 * for where we prepare the padding after the end of the
-			 * request.
-			 */
-			struct intel_ringbuffer *ringbuf;
-
-			ringbuf = req0->ctx->engine[ring->id].ringbuf;
 			req0->tail += 8;
-			req0->tail &= ringbuf->size - 1;
+			req0->tail &= req0->ringbuf->size - 1;
 		}
 	}
 
@@ -752,33 +773,47 @@ static int logical_ring_wait_for_space(struct drm_i915_gem_request *req,
 }
 
 /*
- * intel_logical_ring_advance_and_submit() - advance the tail and submit the workload
- * @request: Request to advance the logical ringbuffer of.
+ * intel_logical_ring_submit() - submit the workload (to GuC or execlist queue)
+ * @request: Request to submit
  *
- * The tail is updated in our logical ringbuffer struct, not in the actual context. What
- * really happens during submission is that the context and current tail will be placed
- * on a queue waiting for the ELSP to be ready to accept a new context submission. At that
- * point, the tail *inside* the context is updated and the ELSP written to.
+ * The tail is updated in our logical ringbuffer struct, not in the actual
+ * context. What really happens during submission is that the context and
+ * current tail will be placed on a queue waiting for the ELSP to be ready 
+ * to accept a new context submission. At that point, the tail *inside* the
+ * context is updated and the ELSP written to by the submitting agent i.e.
+ * either the driver (in execlist mode), or the GuC (in GuC-submission mode).
  */
 static int
-intel_logical_ring_advance_and_submit(struct drm_i915_gem_request *request)
+intel_logical_ring_submit(struct drm_i915_gem_request *request)
 {
 	struct intel_ringbuffer *ringbuf = request->ringbuf;
 	struct drm_i915_private *dev_priv = request->i915;
 	struct intel_engine_cs *engine = request->ring;
+	int padding = WA_TAIL_DWORDS(request);
 
-	intel_logical_ring_advance(ringbuf);
 	request->tail = ringbuf->tail;
 
 	/*
-	 * Here we add two extra NOOPs as padding to avoid
-	 * lite restore of a context with HEAD==TAIL.
-	 *
-	 * Caller must reserve WA_TAIL_DWORDS for us!
+	 * Fill in a few NOOPs after the end of the request proper,
+	 * as a buffer between requests to be used by a workaround
+	 * for not being allowed to do lite restore with HEAD==TAIL.
+	 * (WaIdleLiteRestore). These words may be consumed by the
+	 * submission mechanism if a context is *re*submitted while
+	 * (potentially) still active; otherwise, they will be left
+	 * as a harmless preamble to the next request.
 	 */
-	intel_logical_ring_emit(ringbuf, MI_NOOP);
-	intel_logical_ring_emit(ringbuf, MI_NOOP);
-	intel_logical_ring_advance(ringbuf);
+	if (padding > 0) {
+		/* Safe because we reserved the space earlier */
+		int ret = intel_logical_ring_begin(request, padding);
+		if (WARN_ON(ret != 0))
+			return ret;
+
+		do
+			intel_logical_ring_emit(ringbuf, MI_NOOP);
+		while (--padding);
+
+		intel_logical_ring_advance(ringbuf);
+	}
 
 	if (intel_ring_stopped(engine))
 		return 0;
@@ -907,7 +942,8 @@ int intel_logical_ring_reserve_space(struct drm_i915_gem_request *request)
 	 * adding any commands to it then there might not actually be
 	 * sufficient room for the submission commands.
 	 */
-	intel_ring_reserved_space_reserve(request->ringbuf, MIN_SPACE_FOR_ADD_REQUEST);
+	intel_ring_reserved_space_reserve(request->ringbuf,
+		MIN_SPACE_FOR_ADD_REQUEST + WA_TAIL_DWORDS(request));
 
 	return intel_logical_ring_begin(request, 0);
 }
@@ -1875,13 +1911,6 @@ static void bxt_a_set_seqno(struct intel_engine_cs *ring, u32 seqno)
 	intel_flush_status_page(ring, I915_GEM_HWS_INDEX);
 }
 
-/*
- * Reserve space for 2 NOOPs at the end of each request to be
- * used as a workaround for not being allowed to do lite
- * restore with HEAD==TAIL (WaIdleLiteRestore).
- */
-#define WA_TAIL_DWORDS 2
-
 static inline u32 hws_seqno_address(struct intel_engine_cs *engine)
 {
 	return engine->status_page.gfx_addr + I915_GEM_HWS_INDEX_ADDR;
@@ -1892,7 +1921,7 @@ static int gen8_emit_request(struct drm_i915_gem_request *request)
 	struct intel_ringbuffer *ringbuf = request->ringbuf;
 	int ret;
 
-	ret = intel_logical_ring_begin(request, 6 + WA_TAIL_DWORDS);
+	ret = intel_logical_ring_begin(request, 6);
 	if (ret)
 		return ret;
 
@@ -1908,7 +1937,9 @@ static int gen8_emit_request(struct drm_i915_gem_request *request)
 	intel_logical_ring_emit(ringbuf, i915_gem_request_get_seqno(request));
 	intel_logical_ring_emit(ringbuf, MI_USER_INTERRUPT);
 	intel_logical_ring_emit(ringbuf, MI_NOOP);
-	return intel_logical_ring_advance_and_submit(request);
+	intel_logical_ring_advance(ringbuf);
+
+	return intel_logical_ring_submit(request);
 }
 
 static int gen8_emit_request_render(struct drm_i915_gem_request *request)
@@ -1916,7 +1947,7 @@ static int gen8_emit_request_render(struct drm_i915_gem_request *request)
 	struct intel_ringbuffer *ringbuf = request->ringbuf;
 	int ret;
 
-	ret = intel_logical_ring_begin(request, 6 + WA_TAIL_DWORDS);
+	ret = intel_logical_ring_begin(request, 6);
 	if (ret)
 		return ret;
 
@@ -1933,7 +1964,9 @@ static int gen8_emit_request_render(struct drm_i915_gem_request *request)
 	intel_logical_ring_emit(ringbuf, 0);
 	intel_logical_ring_emit(ringbuf, i915_gem_request_get_seqno(request));
 	intel_logical_ring_emit(ringbuf, MI_USER_INTERRUPT);
-	return intel_logical_ring_advance_and_submit(request);
+	intel_logical_ring_advance(ringbuf);
+
+	return intel_logical_ring_submit(request);
 }
 
 static int intel_lr_context_render_state_init(struct drm_i915_gem_request *req)
