@@ -127,6 +127,8 @@ static const char *hw_flag_names[NUM_IEEE80211_HW_FLAGS + 1] = {
 	FLAG(BEACON_TX_STATUS),
 	FLAG(NEEDS_UNIQUE_STA_ADDR),
 	FLAG(SUPPORTS_REORDERING_BUFFER),
+	FLAG(TX_AMSDU),
+	FLAG(TX_FRAG_LIST),
 
 	/* keep last for the build bug below */
 	(void *)0x1
