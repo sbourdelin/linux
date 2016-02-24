@@ -79,6 +79,7 @@ struct of_reconfig_data {
 	struct device_node	*dn;
 	struct property		*prop;
 	struct property		*old_prop;
+	struct device_node	*overlay; /* only for pre-apply notify */
 };
 
 /* initialize a node */
@@ -350,6 +351,12 @@ extern int of_update_property(struct device_node *np, struct property *newprop);
 #define OF_RECONFIG_ADD_PROPERTY	0x0003
 #define OF_RECONFIG_REMOVE_PROPERTY	0x0004
 #define OF_RECONFIG_UPDATE_PROPERTY	0x0005
+#define OF_RECONFIG_PRE_ATTACH_NODE	0x0006
+#define OF_RECONFIG_PRE_DETACH_NODE	0x0007
+#define OF_RECONFIG_PRE_ADD_PROPERTY	0x0008
+#define OF_RECONFIG_PRE_REMOVE_PROPERTY	0x0009
+#define OF_RECONFIG_PRE_UPDATE_PROPERTY	0x000a
+
 
 extern int of_attach_node(struct device_node *);
 extern int of_detach_node(struct device_node *);

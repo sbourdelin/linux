@@ -53,13 +53,30 @@ struct of_overlay {
 	struct of_changeset cset;
 };
 
+static int of_overlay_notify(unsigned long action, struct device_node *np,
+			     struct property *prop, struct property *old_prop,
+			     struct device_node *overlay)
+{
+	struct of_reconfig_data rd;
+
+	memset(&rd, 0, sizeof(rd));
+	rd.dn = np;
+	rd.prop = prop;
+	rd.old_prop = old_prop;
+	rd.overlay = overlay;
+	return of_reconfig_notify(action, &rd);
+}
+
 static int of_overlay_apply_one(struct of_overlay *ov,
-		struct device_node *target, const struct device_node *overlay);
+		struct device_node *target, struct device_node *overlay);
 
 static int of_overlay_apply_single_property(struct of_overlay *ov,
-		struct device_node *target, struct property *prop)
+		struct device_node *target, struct property *prop,
+		struct device_node *overlay)
 {
 	struct property *propn, *tprop;
+	unsigned long action;
+	int ret;
 
 	/* NOTE: Multiple changes of single properties not supported */
 	tprop = of_find_property(target, prop->name, NULL);
@@ -74,6 +91,15 @@ static int of_overlay_apply_single_property(struct of_overlay *ov,
 	if (propn == NULL)
 		return -ENOMEM;
 
+	if (!tprop)
+		action = OF_RECONFIG_PRE_ADD_PROPERTY;
+	else
+		action = OF_RECONFIG_PRE_UPDATE_PROPERTY;
+
+	ret = of_overlay_notify(action, target, propn, tprop, overlay);
+	if (ret)
+		return ret;
+
 	/* not found? add */
 	if (tprop == NULL)
 		return of_changeset_add_property(&ov->cset, target, propn);
@@ -83,7 +109,8 @@ static int of_overlay_apply_single_property(struct of_overlay *ov,
 }
 
 static int of_overlay_apply_single_device_node(struct of_overlay *ov,
-		struct device_node *target, struct device_node *child)
+		struct device_node *target, struct device_node *child,
+		struct device_node *overlay)
 {
 	const char *cname;
 	struct device_node *tchild;
@@ -108,6 +135,11 @@ static int of_overlay_apply_single_device_node(struct of_overlay *ov,
 		/* point to parent */
 		tchild->parent = target;
 
+		ret = of_overlay_notify(OF_RECONFIG_PRE_ATTACH_NODE, tchild,
+					NULL, NULL, overlay);
+		if (ret)
+			return ret;
+
 		ret = of_changeset_attach_node(&ov->cset, tchild);
 		if (ret)
 			return ret;
@@ -128,14 +160,15 @@ static int of_overlay_apply_single_device_node(struct of_overlay *ov,
  * by using the changeset.
  */
 static int of_overlay_apply_one(struct of_overlay *ov,
-		struct device_node *target, const struct device_node *overlay)
+		struct device_node *target, struct device_node *overlay)
 {
 	struct device_node *child;
 	struct property *prop;
 	int ret;
 
 	for_each_property_of_node(overlay, prop) {
-		ret = of_overlay_apply_single_property(ov, target, prop);
+		ret = of_overlay_apply_single_property(ov, target, prop,
+						       overlay);
 		if (ret) {
 			pr_err("%s: Failed to apply prop @%s/%s\n",
 				__func__, target->full_name, prop->name);
@@ -144,7 +177,8 @@ static int of_overlay_apply_one(struct of_overlay *ov,
 	}
 
 	for_each_child_of_node(overlay, child) {
-		ret = of_overlay_apply_single_device_node(ov, target, child);
+		ret = of_overlay_apply_single_device_node(ov, target, child,
+							  overlay);
 		if (ret != 0) {
 			pr_err("%s: Failed to apply single node @%s/%s\n",
 					__func__, target->full_name,

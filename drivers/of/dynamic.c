@@ -84,6 +84,12 @@ const char *action_names[] = {
 	[OF_RECONFIG_ADD_PROPERTY] = "ADD_PROPERTY",
 	[OF_RECONFIG_REMOVE_PROPERTY] = "REMOVE_PROPERTY",
 	[OF_RECONFIG_UPDATE_PROPERTY] = "UPDATE_PROPERTY",
+
+	[OF_RECONFIG_PRE_ATTACH_NODE] = "PRE_ATTACH_NODE",
+	[OF_RECONFIG_PRE_DETACH_NODE] = "PRE_DETACH_NODE",
+	[OF_RECONFIG_PRE_ADD_PROPERTY] = "PRE_ADD_PROPERTY",
+	[OF_RECONFIG_PRE_REMOVE_PROPERTY] = "PRE_REMOVE_PROPERTY",
+	[OF_RECONFIG_PRE_UPDATE_PROPERTY] = "PRE_UPDATE_PROPERTY",
 };
 #endif
 
@@ -96,12 +102,17 @@ int of_reconfig_notify(unsigned long action, struct of_reconfig_data *p)
 	switch (action) {
 	case OF_RECONFIG_ATTACH_NODE:
 	case OF_RECONFIG_DETACH_NODE:
+	case OF_RECONFIG_PRE_ATTACH_NODE:
+	case OF_RECONFIG_PRE_DETACH_NODE:
 		pr_debug("of/notify %-15s %s\n", action_names[action],
 			pr->dn->full_name);
 		break;
 	case OF_RECONFIG_ADD_PROPERTY:
 	case OF_RECONFIG_REMOVE_PROPERTY:
 	case OF_RECONFIG_UPDATE_PROPERTY:
+	case OF_RECONFIG_PRE_ADD_PROPERTY:
+	case OF_RECONFIG_PRE_REMOVE_PROPERTY:
+	case OF_RECONFIG_PRE_UPDATE_PROPERTY:
 		pr_debug("of/notify %-15s %s:%s\n", action_names[action],
 			pr->dn->full_name, pr->prop->name);
 		break;
@@ -140,6 +151,13 @@ int of_reconfig_get_state_change(unsigned long action, struct of_reconfig_data *
 		prop = pr->prop;
 		old_prop = pr->old_prop;
 		break;
+	/* no state change during pre-apply notifications */
+	case OF_RECONFIG_PRE_ATTACH_NODE:
+	case OF_RECONFIG_PRE_DETACH_NODE:
+	case OF_RECONFIG_PRE_ADD_PROPERTY:
+	case OF_RECONFIG_PRE_REMOVE_PROPERTY:
+	case OF_RECONFIG_PRE_UPDATE_PROPERTY:
+		return OF_RECONFIG_NO_CHANGE;
 	default:
 		return OF_RECONFIG_NO_CHANGE;
 	}
@@ -501,10 +519,31 @@ static void __of_changeset_entry_invert(struct of_changeset_entry *ce,
 	}
 }
 
-static void __of_changeset_entry_notify(struct of_changeset_entry *ce, bool revert)
+static unsigned long __of_changeset_entry_pre_action(unsigned long action)
+{
+	switch (action) {
+	case OF_RECONFIG_ATTACH_NODE:
+		return OF_RECONFIG_PRE_ATTACH_NODE;
+	case OF_RECONFIG_DETACH_NODE:
+		return OF_RECONFIG_PRE_DETACH_NODE;
+	case OF_RECONFIG_ADD_PROPERTY:
+		return OF_RECONFIG_PRE_ADD_PROPERTY;
+	case OF_RECONFIG_REMOVE_PROPERTY:
+		return OF_RECONFIG_PRE_REMOVE_PROPERTY;
+	case OF_RECONFIG_UPDATE_PROPERTY:
+		return OF_RECONFIG_PRE_UPDATE_PROPERTY;
+	}
+
+	/* this should not happen */
+	return action;
+}
+
+static int __of_changeset_entry_notify(struct of_changeset_entry *ce,
+				       bool revert, bool pre)
 {
 	struct of_reconfig_data rd;
 	struct of_changeset_entry ce_inverted;
+	unsigned long action;
 	int ret;
 
 	if (revert) {
@@ -512,26 +551,38 @@ static void __of_changeset_entry_notify(struct of_changeset_entry *ce, bool reve
 		ce = &ce_inverted;
 	}
 
-	switch (ce->action) {
+	action = ce->action;
+	if (pre)
+		action = __of_changeset_entry_pre_action(action);
+
+	switch (action) {
 	case OF_RECONFIG_ATTACH_NODE:
 	case OF_RECONFIG_DETACH_NODE:
+	case OF_RECONFIG_PRE_DETACH_NODE:
+	case OF_RECONFIG_PRE_ATTACH_NODE:
 		memset(&rd, 0, sizeof(rd));
 		rd.dn = ce->np;
-		ret = of_reconfig_notify(ce->action, &rd);
+		ret = of_reconfig_notify(action, &rd);
 		break;
 	case OF_RECONFIG_ADD_PROPERTY:
 	case OF_RECONFIG_REMOVE_PROPERTY:
 	case OF_RECONFIG_UPDATE_PROPERTY:
-		ret = of_property_notify(ce->action, ce->np, ce->prop, ce->old_prop);
+	case OF_RECONFIG_PRE_REMOVE_PROPERTY:
+	case OF_RECONFIG_PRE_ADD_PROPERTY:
+	case OF_RECONFIG_PRE_UPDATE_PROPERTY:
+		ret = of_property_notify(action, ce->np, ce->prop,
+					 ce->old_prop);
 		break;
 	default:
 		pr_err("%s: invalid devicetree changeset action: %i\n", __func__,
-			(int)ce->action);
-		return;
+			(int)action);
+		return -EINVAL;
 	}
 
 	if (ret)
 		pr_err("%s: notifier error @%s\n", __func__, ce->np->full_name);
+
+	return ret;
 }
 
 static int __of_changeset_entry_apply(struct of_changeset_entry *ce)
@@ -686,7 +737,7 @@ int __of_changeset_apply(struct of_changeset *ocs)
 	/* drop the global lock while emitting notifiers */
 	mutex_unlock(&of_mutex);
 	list_for_each_entry(ce, &ocs->entries, node)
-		__of_changeset_entry_notify(ce, 0);
+		__of_changeset_entry_notify(ce, 0, 0);
 	mutex_lock(&of_mutex);
 	pr_debug("of_changeset: notifiers sent.\n");
 
@@ -707,7 +758,15 @@ int __of_changeset_apply(struct of_changeset *ocs)
  */
 int of_changeset_apply(struct of_changeset *ocs)
 {
+	struct of_changeset_entry *ce;
 	int ret;
+
+	pr_debug("of_changeset: pre-apply notifiers.\n");
+	list_for_each_entry(ce, &ocs->entries, node) {
+		ret = __of_changeset_entry_notify(ce, 0, 1);
+		if (ret)
+			return ret;
+	}
 
 	mutex_lock(&of_mutex);
 	ret = __of_changeset_apply(ocs);
@@ -721,6 +780,10 @@ int __of_changeset_revert(struct of_changeset *ocs)
 {
 	struct of_changeset_entry *ce;
 	int ret;
+
+	pr_debug("of_changeset: emitting pre-revert notifiers.\n");
+	list_for_each_entry_reverse(ce, &ocs->entries, node)
+		__of_changeset_entry_notify(ce, 1, 1);
 
 	pr_debug("of_changeset: reverting...\n");
 	list_for_each_entry_reverse(ce, &ocs->entries, node) {
@@ -737,7 +800,7 @@ int __of_changeset_revert(struct of_changeset *ocs)
 	/* drop the global lock while emitting notifiers */
 	mutex_unlock(&of_mutex);
 	list_for_each_entry_reverse(ce, &ocs->entries, node)
-		__of_changeset_entry_notify(ce, 1);
+		__of_changeset_entry_notify(ce, 1, 0);
 	mutex_lock(&of_mutex);
 	pr_debug("of_changeset: notifiers sent.\n");
 

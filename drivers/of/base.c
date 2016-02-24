@@ -1719,6 +1719,12 @@ int of_add_property(struct device_node *np, struct property *prop)
 
 	mutex_lock(&of_mutex);
 
+	rc = of_property_notify(OF_RECONFIG_PRE_ADD_PROPERTY, np, prop, NULL);
+	if (rc) {
+		mutex_unlock(&of_mutex);
+		return rc;
+	}
+
 	raw_spin_lock_irqsave(&devtree_lock, flags);
 	rc = __of_add_property(np, prop);
 	raw_spin_unlock_irqrestore(&devtree_lock, flags);
@@ -1777,6 +1783,13 @@ int of_remove_property(struct device_node *np, struct property *prop)
 	int rc;
 
 	mutex_lock(&of_mutex);
+
+	rc = of_property_notify(OF_RECONFIG_PRE_REMOVE_PROPERTY, np, prop,
+				NULL);
+	if (rc) {
+		mutex_unlock(&of_mutex);
+		return rc;
+	}
 
 	raw_spin_lock_irqsave(&devtree_lock, flags);
 	rc = __of_remove_property(np, prop);
@@ -1853,6 +1866,13 @@ int of_update_property(struct device_node *np, struct property *newprop)
 		return -EINVAL;
 
 	mutex_lock(&of_mutex);
+
+	rc = of_property_notify(OF_RECONFIG_PRE_UPDATE_PROPERTY, np, newprop,
+				oldprop);
+	if (rc) {
+		mutex_unlock(&of_mutex);
+		return rc;
+	}
 
 	raw_spin_lock_irqsave(&devtree_lock, flags);
 	rc = __of_update_property(np, newprop, &oldprop);
