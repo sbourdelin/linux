@@ -25,6 +25,7 @@
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/list.h>
+#include <linux/serial_core.h>
 
 #include <asm/io.h>
 #include <asm/xen/hypervisor.h>
@@ -597,20 +598,10 @@ static int xen_cons_init(void)
 }
 console_initcall(xen_cons_init);
 
-#ifdef CONFIG_EARLY_PRINTK
-static void xenboot_write_console(struct console *console, const char *string,
-				  unsigned len)
+static void domU_write_early_console(const char *string, unsigned len)
 {
 	unsigned int linelen, off = 0;
 	const char *pos;
-
-	if (!xen_pv_domain())
-		return;
-
-	dom0_write_console(0, string, len);
-
-	if (xen_initial_domain())
-		return;
 
 	domU_write_console(0, "(early) ", 8);
 	while (off < len && NULL != (pos = strchr(string+off, '\n'))) {
@@ -623,6 +614,21 @@ static void xenboot_write_console(struct console *console, const char *string,
 	}
 	if (off < len)
 		domU_write_console(0, string+off, len-off);
+}
+
+#ifdef CONFIG_EARLY_PRINTK
+static void xenboot_write_console(struct console *console, const char *string,
+				  unsigned len)
+{
+	if (!xen_pv_domain())
+		return;
+
+	dom0_write_console(0, string, len);
+
+	if (xen_initial_domain())
+		return;
+
+	domU_write_early_console(string, len);
 }
 
 struct console xenboot_console = {
@@ -664,3 +670,23 @@ void xen_raw_printk(const char *fmt, ...)
 
 	xen_raw_console_write(buf);
 }
+
+static void xenboot_earlycon_write(struct console *console,
+				  const char *string,
+				  unsigned len)
+{
+	dom0_write_console(0, string, len);
+
+	if (xen_initial_domain())
+		return;
+
+	domU_write_early_console(string, len);
+}
+
+static int __init xenboot_earlycon_setup(struct earlycon_device *device,
+					    const char *opt)
+{
+	device->con->write = xenboot_earlycon_write;
+	return 0;
+}
+EARLYCON_DECLARE(xenboot, xenboot_earlycon_setup);
