@@ -17,10 +17,14 @@
 
 #include <linux/err.h>
 
+struct device;
 struct device_node;
+struct syscon;
 
 #ifdef CONFIG_MFD_SYSCON
 extern struct regmap *syscon_node_to_regmap(struct device_node *np);
+extern struct syscon *syscon_register(struct device *dev,
+				      struct device_node *np);
 extern struct regmap *syscon_regmap_lookup_by_compatible(const char *s);
 extern struct regmap *syscon_regmap_lookup_by_pdevname(const char *s);
 extern struct regmap *syscon_regmap_lookup_by_phandle(
@@ -28,6 +32,12 @@ extern struct regmap *syscon_regmap_lookup_by_phandle(
 					const char *property);
 #else
 static inline struct regmap *syscon_node_to_regmap(struct device_node *np)
+{
+	return ERR_PTR(-ENOTSUPP);
+}
+
+static struct syscon *syscon_register(struct device *dev,
+				      struct device_node *np)
 {
 	return ERR_PTR(-ENOTSUPP);
 }

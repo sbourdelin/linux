@@ -42,7 +42,7 @@ static const struct regmap_config syscon_regmap_config = {
 	.reg_stride = 4,
 };
 
-static struct syscon *of_syscon_register(struct device_node *np)
+struct syscon *syscon_register(struct device *dev, struct device_node *np)
 {
 	struct syscon *syscon;
 	struct regmap *regmap;
@@ -89,7 +89,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
 	syscon_config.val_bits = reg_io_width * 8;
 	syscon_config.max_register = resource_size(&res) - reg_io_width;
 
-	regmap = regmap_init_mmio(NULL, base, &syscon_config);
+	regmap = regmap_init_mmio(dev, base, &syscon_config);
 	if (IS_ERR(regmap)) {
 		pr_err("regmap init failed\n");
 		ret = PTR_ERR(regmap);
@@ -110,6 +110,12 @@ err_regmap:
 err_map:
 	kfree(syscon);
 	return ERR_PTR(ret);
+}
+EXPORT_SYMBOL_GPL(syscon_register);
+
+static struct syscon *of_syscon_register(struct device_node *np)
+{
+	return syscon_register(NULL, np);
 }
 
 struct regmap *syscon_node_to_regmap(struct device_node *np)
