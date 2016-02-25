@@ -1160,7 +1160,7 @@ ERRORHANDLER:
 				memcpy(strConnectInfo.bssid, pstrHostIFconnectAttr->bssid, 6);
 
 			if (pstrHostIFconnectAttr->ies) {
-				strConnectInfo.ReqIEsLen = pstrHostIFconnectAttr->ies_len;
+				strConnectInfo.req_ies_len = pstrHostIFconnectAttr->ies_len;
 				strConnectInfo.req_ies = kmalloc(pstrHostIFconnectAttr->ies_len, GFP_KERNEL);
 				memcpy(strConnectInfo.req_ies,
 				       pstrHostIFconnectAttr->ies,
@@ -1267,7 +1267,7 @@ static s32 Handle_ConnectTimeout(struct wilc_vif *vif)
 		}
 
 		if (hif_drv->usr_conn_req.ies) {
-			strConnectInfo.ReqIEsLen = hif_drv->usr_conn_req.ies_len;
+			strConnectInfo.req_ies_len = hif_drv->usr_conn_req.ies_len;
 			strConnectInfo.req_ies = kmalloc(hif_drv->usr_conn_req.ies_len, GFP_KERNEL);
 			memcpy(strConnectInfo.req_ies,
 			       hif_drv->usr_conn_req.ies,
@@ -1504,7 +1504,7 @@ static s32 Handle_RcvdGnrlAsyncInfo(struct wilc_vif *vif,
 			}
 
 			if (hif_drv->usr_conn_req.ies) {
-				strConnectInfo.ReqIEsLen = hif_drv->usr_conn_req.ies_len;
+				strConnectInfo.req_ies_len = hif_drv->usr_conn_req.ies_len;
 				strConnectInfo.req_ies = kmalloc(hif_drv->usr_conn_req.ies_len, GFP_KERNEL);
 				memcpy(strConnectInfo.req_ies,
 				       hif_drv->usr_conn_req.ies,
