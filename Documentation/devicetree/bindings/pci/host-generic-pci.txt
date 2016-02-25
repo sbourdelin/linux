@@ -70,6 +70,8 @@ Practice: Interrupt Mapping' and requires the following properties:
 
 - interrupt-map-mask : <see aforementioned specification>
 
+- interrupt-skip-mask: Explicitly declare which pci devices only use msi/msix
+but leave the value of Interrupt Pin non-zero.
 
 Example:
 
