@@ -38,6 +38,20 @@
 	__INIT
 ENTRY(startup_xen)
 	cld
+
+#ifdef CONFIG_X86_32
+#define WSIZE_SHIFT	2
+#else
+#define WSIZE_SHIFT	3
+#endif
+	/* Clear .bss */
+	xor %eax,%eax
+	mov $__bss_start, %__ASM_REG(di)
+	mov $__bss_stop, %__ASM_REG(cx)
+	sub %__ASM_REG(di), %__ASM_REG(cx)
+	shr $WSIZE_SHIFT, %__ASM_REG(cx)
+	rep __ASM_SIZE(stos)
+
 #ifdef CONFIG_X86_32
 	mov %esi,xen_start_info
 	mov $init_thread_union+THREAD_SIZE,%esp
