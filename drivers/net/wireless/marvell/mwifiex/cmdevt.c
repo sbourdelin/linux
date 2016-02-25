@@ -26,6 +26,10 @@
 #include "11n.h"
 #include "11ac.h"
 
+static void
+mwifiex_insert_cmd_to_free_q(struct mwifiex_adapter *adapter,
+			     struct cmd_ctrl_node *cmd_node);
+
 /*
  * This function initializes a command node.
  *
@@ -619,7 +623,7 @@ int mwifiex_send_cmd(struct mwifiex_private *priv, u16 cmd_no,
  * The function also calls the completion callback if required, before
  * cleaning the command node and re-inserting it into the free queue.
  */
-void
+static void
 mwifiex_insert_cmd_to_free_q(struct mwifiex_adapter *adapter,
 			     struct cmd_ctrl_node *cmd_node)
 {
