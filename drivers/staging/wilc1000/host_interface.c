@@ -1161,8 +1161,8 @@ ERRORHANDLER:
 
 			if (pstrHostIFconnectAttr->ies) {
 				strConnectInfo.ReqIEsLen = pstrHostIFconnectAttr->ies_len;
-				strConnectInfo.pu8ReqIEs = kmalloc(pstrHostIFconnectAttr->ies_len, GFP_KERNEL);
-				memcpy(strConnectInfo.pu8ReqIEs,
+				strConnectInfo.req_ies = kmalloc(pstrHostIFconnectAttr->ies_len, GFP_KERNEL);
+				memcpy(strConnectInfo.req_ies,
 				       pstrHostIFconnectAttr->ies,
 				       pstrHostIFconnectAttr->ies_len);
 			}
@@ -1173,8 +1173,8 @@ ERRORHANDLER:
 							       NULL,
 							       pstrHostIFconnectAttr->arg);
 			hif_drv->hif_state = HOST_IF_IDLE;
-			kfree(strConnectInfo.pu8ReqIEs);
-			strConnectInfo.pu8ReqIEs = NULL;
+			kfree(strConnectInfo.req_ies);
+			strConnectInfo.req_ies = NULL;
 
 		} else {
 			netdev_err(vif->ndev, "Connect callback is NULL\n");
@@ -1268,8 +1268,8 @@ static s32 Handle_ConnectTimeout(struct wilc_vif *vif)
 
 		if (hif_drv->usr_conn_req.ies) {
 			strConnectInfo.ReqIEsLen = hif_drv->usr_conn_req.ies_len;
-			strConnectInfo.pu8ReqIEs = kmalloc(hif_drv->usr_conn_req.ies_len, GFP_KERNEL);
-			memcpy(strConnectInfo.pu8ReqIEs,
+			strConnectInfo.req_ies = kmalloc(hif_drv->usr_conn_req.ies_len, GFP_KERNEL);
+			memcpy(strConnectInfo.req_ies,
 			       hif_drv->usr_conn_req.ies,
 			       hif_drv->usr_conn_req.ies_len);
 		}
@@ -1280,8 +1280,8 @@ static s32 Handle_ConnectTimeout(struct wilc_vif *vif)
 						  NULL,
 						  hif_drv->usr_conn_req.arg);
 
-		kfree(strConnectInfo.pu8ReqIEs);
-		strConnectInfo.pu8ReqIEs = NULL;
+		kfree(strConnectInfo.req_ies);
+		strConnectInfo.req_ies = NULL;
 	} else {
 		netdev_err(vif->ndev, "Connect callback is NULL\n");
 	}
@@ -1505,8 +1505,8 @@ static s32 Handle_RcvdGnrlAsyncInfo(struct wilc_vif *vif,
 
 			if (hif_drv->usr_conn_req.ies) {
 				strConnectInfo.ReqIEsLen = hif_drv->usr_conn_req.ies_len;
-				strConnectInfo.pu8ReqIEs = kmalloc(hif_drv->usr_conn_req.ies_len, GFP_KERNEL);
-				memcpy(strConnectInfo.pu8ReqIEs,
+				strConnectInfo.req_ies = kmalloc(hif_drv->usr_conn_req.ies_len, GFP_KERNEL);
+				memcpy(strConnectInfo.req_ies,
 				       hif_drv->usr_conn_req.ies,
 				       hif_drv->usr_conn_req.ies_len);
 			}
@@ -1535,8 +1535,8 @@ static s32 Handle_RcvdGnrlAsyncInfo(struct wilc_vif *vif,
 			kfree(strConnectInfo.pu8RespIEs);
 			strConnectInfo.pu8RespIEs = NULL;
 
-			kfree(strConnectInfo.pu8ReqIEs);
-			strConnectInfo.pu8ReqIEs = NULL;
+			kfree(strConnectInfo.req_ies);
+			strConnectInfo.req_ies = NULL;
 			hif_drv->usr_conn_req.ssid_len = 0;
 			kfree(hif_drv->usr_conn_req.ssid);
 			hif_drv->usr_conn_req.ssid = NULL;
