@@ -748,6 +748,8 @@ static int twl4030_usb_probe(struct platform_device *pdev)
 static int twl4030_usb_remove(struct platform_device *pdev)
 {
 	struct twl4030_usb *twl = platform_get_drvdata(pdev);
+	struct twl4030_usb_data *pdata = dev_get_platdata(&pdev->dev);
+	struct phy *phy;
 	int val;
 
 	pm_runtime_get_sync(twl->dev);
@@ -770,6 +772,14 @@ static int twl4030_usb_remove(struct platform_device *pdev)
 
 	/* disable complete OTG block */
 	twl4030_usb_clear_bits(twl, POWER_CTRL, POWER_CTRL_OTG_ENAB);
+
+	if (pdata) {
+		phy = phy_get(twl->dev, "usb");
+		if (!IS_ERR(phy)) {
+			phy_remove_lookup(phy, "usb", "musb-hdrc.0");
+			phy_put(phy);
+		}
+	}
 
 	if (cable_present(twl->linkstat))
 		pm_runtime_put_noidle(twl->dev);
