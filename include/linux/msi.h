@@ -17,7 +17,15 @@ struct msi_desc;
 struct pci_dev;
 struct platform_msi_priv_data;
 void __get_cached_msi_msg(struct msi_desc *entry, struct msi_msg *msg);
+
+#ifdef CONFIG_PCI_MSI
 void get_cached_msi_msg(unsigned int irq, struct msi_msg *msg);
+#else
+static inline void get_cached_msi_msg(unsigned int irq,
+				      struct msi_msg *msg)
+{
+}
+#endif
 
 typedef void (*irq_write_msi_msg_t)(struct msi_desc *desc,
 				    struct msi_msg *msg);
@@ -116,7 +124,14 @@ struct msi_desc *alloc_msi_entry(struct device *dev);
 void free_msi_entry(struct msi_desc *entry);
 void __pci_read_msi_msg(struct msi_desc *entry, struct msi_msg *msg);
 void __pci_write_msi_msg(struct msi_desc *entry, struct msi_msg *msg);
+
+#ifdef CONFIG_PCI_MSI
 void pci_write_msi_msg(unsigned int irq, struct msi_msg *msg);
+#else
+static inline void pci_write_msi_msg(unsigned int irq, struct msi_msg *msg)
+{
+}
+#endif
 
 u32 __pci_msix_desc_mask_irq(struct msi_desc *desc, u32 flag);
 u32 __pci_msi_desc_mask_irq(struct msi_desc *desc, u32 mask, u32 flag);
