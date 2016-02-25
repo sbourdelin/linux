@@ -52,13 +52,9 @@ ENTRY(startup_xen)
 	shr $WSIZE_SHIFT, %__ASM_REG(cx)
 	rep __ASM_SIZE(stos)
 
-#ifdef CONFIG_X86_32
-	mov %esi,xen_start_info
-	mov $init_thread_union+THREAD_SIZE,%esp
-#else
-	mov %rsi,xen_start_info
-	mov $init_thread_union+THREAD_SIZE,%rsp
-#endif
+	mov %__ASM_REG(si), xen_start_info
+	mov $init_thread_union+THREAD_SIZE, %__ASM_REG(sp)
+
 	jmp xen_start_kernel
 
 	__FINIT
