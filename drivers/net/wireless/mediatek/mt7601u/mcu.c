@@ -359,13 +359,13 @@ mt7601u_upload_firmware(struct mt7601u_dev *dev, const struct mt76_fw *fw)
 	struct mt7601u_dma_buf dma_buf;
 	void *ivb;
 	u32 ilm_len, dlm_len;
-	int i, ret;
+	int i, ret = -ENOMEM;
 
 	ivb = kmemdup(fw->ivb, sizeof(fw->ivb), GFP_KERNEL);
-	if (!ivb || mt7601u_usb_alloc_buf(dev, MCU_FW_URB_SIZE, &dma_buf)) {
-		ret = -ENOMEM;
+	if (!ivb)
+		goto error_ivb;
+	if (mt7601u_usb_alloc_buf(dev, MCU_FW_URB_SIZE, &dma_buf))
 		goto error;
-	}
 
 	ilm_len = le32_to_cpu(fw->hdr.ilm_len) - sizeof(fw->ivb);
 	dev_dbg(dev->dev, "loading FW - ILM %u + IVB %zu\n",
@@ -396,8 +396,9 @@ mt7601u_upload_firmware(struct mt7601u_dev *dev, const struct mt76_fw *fw)
 
 	dev_dbg(dev->dev, "Firmware running!\n");
 error:
-	kfree(ivb);
 	mt7601u_usb_free_buf(dev, &dma_buf);
+error_ivb:
+	kfree(ivb);
 
 	return ret;
 }
