@@ -745,6 +745,12 @@ static void intel_fbc_update_state_cache(struct intel_crtc *crtc)
 	cache->fb.stride = fb->pitches[0];
 	cache->fb.fence_reg = obj->fence_reg;
 	cache->fb.tiling_mode = obj->tiling_mode;
+	cache->fb.mmap_bits = obj->mmap_bits;
+}
+
+static bool need_mmap_disable_workaround(struct intel_fbc *fbc)
+{
+	return fbc->state_cache.fb.mmap_bits & (MMAP_BITS_CPU | MMAP_BITS_WC);
 }
 
 static bool intel_fbc_can_activate(struct intel_crtc *crtc)
@@ -813,6 +819,11 @@ static bool intel_fbc_can_activate(struct intel_crtc *crtc)
 	if (intel_fbc_calculate_cfb_size(dev_priv, &fbc->state_cache) >
 	    fbc->compressed_fb.size * fbc->threshold) {
 		fbc->no_fbc_reason = "CFB requirements changed";
+		return false;
+	}
+
+	if (need_mmap_disable_workaround(fbc)) {
+		fbc->no_fbc_reason = "FB is CPU or WC mmapped";
 		return false;
 	}
 
@@ -1009,6 +1020,27 @@ void intel_fbc_flush(struct drm_i915_private *dev_priv,
 			intel_fbc_recompress(dev_priv);
 		else
 			__intel_fbc_post_update(fbc->crtc);
+	}
+
+	mutex_unlock(&fbc->lock);
+}
+
+void intel_fbc_mmap_notify(struct drm_i915_private *dev_priv,
+			   unsigned int frontbuffer_bits,
+			   unsigned int mmap_bits)
+{
+	struct intel_fbc *fbc = &dev_priv->fbc;
+
+	if (!fbc_supported(dev_priv))
+		return;
+
+	mutex_lock(&fbc->lock);
+
+	if (fbc->enabled &&
+	    (intel_fbc_get_frontbuffer_bit(fbc) & frontbuffer_bits)) {
+		fbc->state_cache.fb.mmap_bits = mmap_bits;
+		if (need_mmap_disable_workaround(fbc))
+			intel_fbc_deactivate(dev_priv);
 	}
 
 	mutex_unlock(&fbc->lock);

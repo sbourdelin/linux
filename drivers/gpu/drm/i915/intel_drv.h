@@ -1041,6 +1041,7 @@ void intel_frontbuffer_flip_complete(struct drm_device *dev,
 				     unsigned frontbuffer_bits);
 void intel_frontbuffer_flip(struct drm_device *dev,
 			    unsigned frontbuffer_bits);
+void intel_frontbuffer_obj_mmap(struct drm_i915_gem_object *obj);
 unsigned int intel_fb_align_height(struct drm_device *dev,
 				   unsigned int height,
 				   uint32_t pixel_format,
@@ -1342,6 +1343,9 @@ void intel_fbc_invalidate(struct drm_i915_private *dev_priv,
 			  enum fb_op_origin origin);
 void intel_fbc_flush(struct drm_i915_private *dev_priv,
 		     unsigned int frontbuffer_bits, enum fb_op_origin origin);
+void intel_fbc_mmap_notify(struct drm_i915_private *dev_priv,
+			   unsigned int frontbuffer_bits,
+			   unsigned int mmap_bits);
 void intel_fbc_cleanup_cfb(struct drm_i915_private *dev_priv);
 
 /* intel_hdmi.c */
