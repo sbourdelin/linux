@@ -1157,7 +1157,7 @@ ERRORHANDLER:
 
 		if (pstrHostIFconnectAttr->result) {
 			if (pstrHostIFconnectAttr->bssid)
-				memcpy(strConnectInfo.au8bssid, pstrHostIFconnectAttr->bssid, 6);
+				memcpy(strConnectInfo.bssid, pstrHostIFconnectAttr->bssid, 6);
 
 			if (pstrHostIFconnectAttr->ies) {
 				strConnectInfo.ReqIEsLen = pstrHostIFconnectAttr->ies_len;
@@ -1262,7 +1262,7 @@ static s32 Handle_ConnectTimeout(struct wilc_vif *vif)
 
 	if (hif_drv->usr_conn_req.conn_result) {
 		if (hif_drv->usr_conn_req.bssid) {
-			memcpy(strConnectInfo.au8bssid,
+			memcpy(strConnectInfo.bssid,
 			       hif_drv->usr_conn_req.bssid, 6);
 		}
 
@@ -1494,7 +1494,7 @@ static s32 Handle_RcvdGnrlAsyncInfo(struct wilc_vif *vif,
 			}
 
 			if (hif_drv->usr_conn_req.bssid) {
-				memcpy(strConnectInfo.au8bssid, hif_drv->usr_conn_req.bssid, 6);
+				memcpy(strConnectInfo.bssid, hif_drv->usr_conn_req.bssid, 6);
 
 				if ((u8MacStatus == MAC_CONNECTED) &&
 				    (strConnectInfo.u16ConnectStatus == SUCCESSFUL_STATUSCODE))	{
