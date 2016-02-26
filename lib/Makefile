@@ -167,6 +167,13 @@ obj-$(CONFIG_SG_SPLIT) += sg_split.o
 obj-$(CONFIG_STMP_DEVICE) += stmp_device.o
 obj-$(CONFIG_IRQ_POLL) += irq_poll.o
 
+ifeq ($(CONFIG_KASAN),y)
+ifeq ($(CONFIG_SLAB),y)
+	obj-y	+= stackdepot.o
+	KASAN_SANITIZE_slub.o := n
+endif
+endif
+
 libfdt_files = fdt.o fdt_ro.o fdt_wip.o fdt_rw.o fdt_sw.o fdt_strerror.o \
 	       fdt_empty_tree.o
 $(foreach file, $(libfdt_files), \
