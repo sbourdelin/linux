@@ -502,11 +502,12 @@ struct net *get_net_ns_by_pid(pid_t pid)
 	tsk = find_task_by_vpid(pid);
 	if (tsk) {
 		struct nsproxy *nsproxy;
-		task_lock(tsk);
-		nsproxy = tsk->nsproxy;
+
+	        set_reader_nsproxy(tsk);
+		nsproxy = task_nsproxy(tsk);
 		if (nsproxy)
 			net = get_net(nsproxy->net_ns);
-		task_unlock(tsk);
+	        clear_reader_nsproxy(tsk);
 	}
 	rcu_read_unlock();
 	return net;
@@ -964,11 +965,11 @@ static struct ns_common *netns_get(struct task_struct *task)
 	struct net *net = NULL;
 	struct nsproxy *nsproxy;
 
-	task_lock(task);
-	nsproxy = task->nsproxy;
+	set_reader_nsproxy(task);
+	nsproxy = task_nsproxy(task);
 	if (nsproxy)
 		net = get_net(nsproxy->net_ns);
-	task_unlock(task);
+	clear_reader_nsproxy(task);
 
 	return net ? &net->ns : NULL;
 }

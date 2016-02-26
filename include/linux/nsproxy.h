@@ -39,28 +39,59 @@ extern struct nsproxy init_nsproxy;
 /*
  * the namespaces access rules are:
  *
- *  1. only current task is allowed to change tsk->nsproxy pointer or
- *     any pointer on the nsproxy itself.  Current must hold the task_lock
- *     when changing tsk->nsproxy.
+ *  1. only current task is allowed to change current->nsproxy pointer or
+ *     any pointer on the nsproxy itself.
  *
- *  2. when accessing (i.e. reading) current task's namespaces - no
- *     precautions should be taken - just dereference the pointers
+ *  2. the access to other task namespaces (reader) are very rare and short
+ *     lived, enough to refcount whatever resource we are dealing with. This
+ *     remote reader access is performed like this:
  *
- *  3. the access to other task namespaces is performed like this
- *     task_lock(task);
- *     nsproxy = task->nsproxy;
+ *     set_reader_nsproxy(task);
+ *     nsproxy = task_nsproxy(task);
  *     if (nsproxy != NULL) {
  *             / *
  *               * work with the namespaces here
- *               * e.g. get the reference on one of them
+ *               * i.e. get the reference on one of them
  *               * /
  *     } / *
  *         * NULL task->nsproxy means that this task is
  *         * almost dead (zombie)
  *         * /
- *     task_unlock(task);
+ *     clear_reader_nsproxy(task);
  *
+ *  3. above guarantees 1 & 2 enable writer pointer fastpath optimizations
+ *     and proxy on the task's alloc_lock as a slowpath. Otherwise the common
+ *     case will be that nobody is peeking into our ns and, synchronized via
+ *     [Rmw], we can skip any locks altogether when setting a new namespace,
+ *     i.e. switch_task_namespaces().
  */
+
+#define NSPROXY_READER	1UL
+
+static inline void set_reader_nsproxy(struct task_struct *tsk)
+{
+	/*
+	 * In case there is contention on the alloc_lock, toggle
+	 * readers before we try to acquire it. Any incoming writer
+	 * must sync-up at this point.
+	 */
+	(void)xchg(&tsk->nsproxy, (struct nsproxy *)
+		   ((unsigned long)tsk->nsproxy | NSPROXY_READER));
+	task_lock(tsk);
+}
+
+static inline void clear_reader_nsproxy(struct task_struct *tsk)
+{
+	task_unlock(tsk);
+	(void)xchg(&tsk->nsproxy, (struct nsproxy *)
+		   ((unsigned long)tsk->nsproxy & ~NSPROXY_READER));
+}
+
+static inline struct nsproxy *task_nsproxy(struct task_struct *tsk)
+{
+	return (struct nsproxy *)
+		((unsigned long)READ_ONCE(tsk->nsproxy) & ~NSPROXY_READER);
+}
 
 int copy_namespaces(unsigned long flags, struct task_struct *tsk);
 void exit_task_namespaces(struct task_struct *tsk);

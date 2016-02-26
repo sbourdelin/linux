@@ -244,8 +244,8 @@ static int mounts_open_common(struct inode *inode, struct file *file,
 	if (!task)
 		goto err;
 
-	task_lock(task);
-	nsp = task->nsproxy;
+	set_reader_nsproxy(task);
+	nsp = task_nsproxy(task);
 	if (!nsp || !nsp->mnt_ns) {
 		task_unlock(task);
 		put_task_struct(task);
@@ -260,7 +260,7 @@ static int mounts_open_common(struct inode *inode, struct file *file,
 		goto err_put_ns;
 	}
 	get_fs_root(task->fs, &root);
-	task_unlock(task);
+	clear_reader_nsproxy(task);
 	put_task_struct(task);
 
 	ret = seq_open_private(file, &mounts_op, sizeof(struct proc_mounts));

@@ -138,11 +138,11 @@ static struct ns_common *ipcns_get(struct task_struct *task)
 	struct ipc_namespace *ns = NULL;
 	struct nsproxy *nsproxy;
 
-	task_lock(task);
-	nsproxy = task->nsproxy;
+	set_reader_nsproxy(task);
+	nsproxy = task_nsproxy(task);
 	if (nsproxy)
 		ns = get_ipc_ns(nsproxy->ipc_ns);
-	task_unlock(task);
+	clear_reader_nsproxy(task);
 
 	return ns ? &ns->ns : NULL;
 }

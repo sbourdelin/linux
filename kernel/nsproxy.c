@@ -11,6 +11,7 @@
  *  Jun 2006 - namespaces support
  *             OpenVZ, SWsoft Inc.
  *             Pavel Emelianov <xemul@openvz.org>
+ *  Feb 2016 - setns() performance work, Davidlohr Bueso.
  */
 
 #include <linux/slab.h>
@@ -200,17 +201,28 @@ out:
 
 void switch_task_namespaces(struct task_struct *p, struct nsproxy *new)
 {
-	struct nsproxy *ns;
+	struct nsproxy *old, *cur = task_nsproxy(p);
 
 	might_sleep();
 
+	/*
+	 * On success, cmpxchg barrier pairs with xchg()
+	 * barrier in reader paths.
+	 */
+	old = cmpxchg(&p->nsproxy, cur, new);
+	if (old == cur)
+		goto put_old;
+
+	/*
+	 * Slowpath, default to task_lock() alternative.
+	 */
 	task_lock(p);
-	ns = p->nsproxy;
+	old = p->nsproxy;
 	p->nsproxy = new;
 	task_unlock(p);
-
-	if (ns && atomic_dec_and_test(&ns->count))
-		free_nsproxy(ns);
+put_old:
+	if (old)
+		put_nsproxy(old);
 }
 
 void exit_task_namespaces(struct task_struct *p)
