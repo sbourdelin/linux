@@ -268,7 +268,8 @@ void dwc3_gadget_giveback(struct dwc3_ep *dep, struct dwc3_request *req,
 	trace_dwc3_gadget_giveback(req);
 
 	spin_unlock(&dwc->lock);
-	usb_gadget_giveback_request(&dep->endpoint, &req->request);
+	if (req->request.complete)
+		usb_gadget_giveback_request(&dep->endpoint, &req->request);
 	spin_lock(&dwc->lock);
 }
 
@@ -1195,6 +1196,16 @@ static int dwc3_gadget_ep_queue(struct usb_ep *ep, struct usb_request *request,
 	int				ret;
 
 	spin_lock_irqsave(&dwc->lock, flags);
+
+	if (WARN(!request->complete, "request %p complete function is NULL\n",
+				request)) {
+		dwc3_trace(trace_dwc3_gadget,
+				"request %p complete function is NULL\n",
+				request);
+		spin_unlock_irqrestore(&dwc->lock, flags);
+		return -EINVAL;
+	}
+
 	ret = __dwc3_gadget_ep_queue(dep, req);
 
 	/*
