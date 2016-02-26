@@ -29,6 +29,7 @@
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/fcntl.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/poll.h>
 #include <linux/smp.h>
@@ -42,8 +43,12 @@
 
 #include <asm/processor.h>
 #include <asm/msr.h>
+#include "msr_whitelist.h"
 
 static struct class *msr_class;
+struct msr_session_info {
+	int rawio_allowed;
+};
 
 static ssize_t msr_read(struct file *file, char __user *buf,
 			size_t count, loff_t *ppos)
@@ -54,9 +59,13 @@ static ssize_t msr_read(struct file *file, char __user *buf,
 	int cpu = iminor(file_inode(file));
 	int err = 0;
 	ssize_t bytes = 0;
+	struct msr_session_info *myinfo = file->private_data;
 
 	if (count % 8)
 		return -EINVAL;	/* Invalid chunk size */
+
+	if (!myinfo->rawio_allowed && !msr_whitelist_maskexists(reg))
+		return -EACCES;
 
 	for (; count; count -= 8) {
 		err = rdmsr_safe_on_cpu(cpu, reg, &data[0], &data[1]);
@@ -77,20 +86,41 @@ static ssize_t msr_write(struct file *file, const char __user *buf,
 			 size_t count, loff_t *ppos)
 {
 	const u32 __user *tmp = (const u32 __user *)buf;
+	u32 curdata[2];
 	u32 data[2];
 	u32 reg = *ppos;
+	u64 mask;
 	int cpu = iminor(file_inode(file));
 	int err = 0;
 	ssize_t bytes = 0;
+	struct msr_session_info *myinfo = file->private_data;
 
 	if (count % 8)
 		return -EINVAL;	/* Invalid chunk size */
+
+	mask = myinfo->rawio_allowed ? 0xffffffffffffffff :
+						msr_whitelist_writemask(reg);
+
+	if (!myinfo->rawio_allowed && mask == 0)
+		return -EACCES;
 
 	for (; count; count -= 8) {
 		if (copy_from_user(&data, tmp, 8)) {
 			err = -EFAULT;
 			break;
 		}
+
+		if (mask != 0xffffffffffffffff) {
+			err = rdmsr_safe_on_cpu(cpu, reg,
+						&curdata[0], &curdata[1]);
+			if (err)
+				break;
+
+			*(u64 *)&curdata[0] &= ~mask;
+			*(u64 *)&data[0] &= mask;
+			*(u64 *)&data[0] |= *(u64 *)&curdata[0];
+		}
+
 		err = wrmsr_safe_on_cpu(cpu, reg, data[0], data[1]);
 		if (err)
 			break;
@@ -153,9 +183,7 @@ static int msr_open(struct inode *inode, struct file *file)
 {
 	unsigned int cpu = iminor(file_inode(file));
 	struct cpuinfo_x86 *c;
-
-	if (!capable(CAP_SYS_RAWIO))
-		return -EPERM;
+	struct msr_session_info *myinfo;
 
 	if (cpu >= nr_cpu_ids || !cpu_online(cpu))
 		return -ENXIO;	/* No such CPU */
@@ -164,6 +192,20 @@ static int msr_open(struct inode *inode, struct file *file)
 	if (!cpu_has(c, X86_FEATURE_MSR))
 		return -EIO;	/* MSR not supported */
 
+	myinfo = kmalloc(sizeof(*myinfo), GFP_KERNEL);
+	if (!myinfo)
+		return -ENOMEM;
+
+	myinfo->rawio_allowed = capable(CAP_SYS_RAWIO);
+	file->private_data = myinfo;
+
+	return 0;
+}
+
+static int msr_close(struct inode *inode, struct file *file)
+{
+	kfree(file->private_data);
+	file->private_data = 0;
 	return 0;
 }
 
@@ -178,6 +220,7 @@ static const struct file_operations msr_fops = {
 	.open = msr_open,
 	.unlocked_ioctl = msr_ioctl,
 	.compat_ioctl = msr_ioctl,
+	.release = msr_close
 };
 
 static int msr_device_create(int cpu)
@@ -227,10 +270,15 @@ static int __init msr_init(void)
 	int i, err = 0;
 	i = 0;
 
+	err = msr_whitelist_init();
+	if (err != 0) {
+		pr_err("failed to initialize whitelist for msr\n");
+		goto out;
+	}
 	if (__register_chrdev(MSR_MAJOR, 0, NR_CPUS, "cpu/msr", &msr_fops)) {
 		pr_err("unable to get major %d for msr\n", MSR_MAJOR);
 		err = -EBUSY;
-		goto out;
+		goto out_wlist;
 	}
 	msr_class = class_create(THIS_MODULE, "msr");
 	if (IS_ERR(msr_class)) {
@@ -259,6 +307,8 @@ out_class:
 	class_destroy(msr_class);
 out_chrdev:
 	__unregister_chrdev(MSR_MAJOR, 0, NR_CPUS, "cpu/msr");
+out_wlist:
+	msr_whitelist_cleanup();
 out:
 	return err;
 }
@@ -274,6 +324,7 @@ static void __exit msr_exit(void)
 	__unregister_chrdev(MSR_MAJOR, 0, NR_CPUS, "cpu/msr");
 	__unregister_hotcpu_notifier(&msr_class_cpu_notifier);
 	cpu_notifier_register_done();
+	msr_whitelist_cleanup();
 }
 
 module_init(msr_init);
