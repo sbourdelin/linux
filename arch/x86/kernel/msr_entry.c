@@ -44,6 +44,7 @@
 #include <asm/processor.h>
 #include <asm/msr.h>
 #include "msr_whitelist.h"
+#include "msr_batch.h"
 
 static struct class *msr_class;
 struct msr_session_info {
@@ -270,10 +271,15 @@ static int __init msr_init(void)
 	int i, err = 0;
 	i = 0;
 
+	err = msrbatch_init();
+	if (err != 0) {
+		pr_err("failed to initialize msrbatch\n");
+		goto out;
+	}
 	err = msr_whitelist_init();
 	if (err != 0) {
 		pr_err("failed to initialize whitelist for msr\n");
-		goto out;
+		goto out_batch;
 	}
 	if (__register_chrdev(MSR_MAJOR, 0, NR_CPUS, "cpu/msr", &msr_fops)) {
 		pr_err("unable to get major %d for msr\n", MSR_MAJOR);
@@ -309,6 +315,8 @@ out_chrdev:
 	__unregister_chrdev(MSR_MAJOR, 0, NR_CPUS, "cpu/msr");
 out_wlist:
 	msr_whitelist_cleanup();
+out_batch:
+	msrbatch_cleanup();
 out:
 	return err;
 }
@@ -325,6 +333,7 @@ static void __exit msr_exit(void)
 	__unregister_hotcpu_notifier(&msr_class_cpu_notifier);
 	cpu_notifier_register_done();
 	msr_whitelist_cleanup();
+	msrbatch_cleanup();
 }
 
 module_init(msr_init);

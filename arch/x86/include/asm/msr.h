@@ -299,6 +299,7 @@ int rdmsrl_safe_on_cpu(unsigned int cpu, u32 msr_no, u64 *q);
 int wrmsrl_safe_on_cpu(unsigned int cpu, u32 msr_no, u64 q);
 int rdmsr_safe_regs_on_cpu(unsigned int cpu, u32 regs[8]);
 int wrmsr_safe_regs_on_cpu(unsigned int cpu, u32 regs[8]);
+int msr_safe_batch(struct msr_batch_array *oa);
 #else  /*  CONFIG_SMP  */
 static inline int rdmsr_on_cpu(unsigned int cpu, u32 msr_no, u32 *l, u32 *h)
 {
@@ -354,6 +355,37 @@ static inline int rdmsr_safe_regs_on_cpu(unsigned int cpu, u32 regs[8])
 static inline int wrmsr_safe_regs_on_cpu(unsigned int cpu, u32 regs[8])
 {
 	return wrmsr_safe_regs(regs);
+}
+static inline int msr_safe_batch(struct msr_batch_array *oa)
+{
+	struct msr_batch_op *op;
+	int result = 0;
+	u32 *dp;
+	u64 oldmsr;
+	u64 newmsr;
+
+	for (op = oa->ops; op < oa->ops + oa->numops; ++op) {
+		op->err = 0;
+		dp = (u32 *)&oldmsr;
+		if (rdmsr_safe(op->msr, &dp[0], &dp[1])) {
+			op->err = -EIO;
+			result = op->err;
+			continue;
+		}
+		if (op->isrdmsr) {
+			op->msrdata = oldmsr;
+			continue;
+		}
+
+		newmsr = op->msrdata & op->wmask;
+		newmsr |= (oldmsr & ~op->wmask);
+		dp = (u32 *)&newmsr;
+		if (wrmsr_safe(op->msr, dp[0], dp[1])) {
+			op->err = -EIO;
+			result = op->err;
+		}
+	}
+	return result;
 }
 #endif  /* CONFIG_SMP */
 #endif /* __ASSEMBLY__ */
