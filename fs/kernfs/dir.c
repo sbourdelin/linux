@@ -44,7 +44,7 @@ static int kernfs_name_locked(struct kernfs_node *kn, char *buf, size_t buflen)
 	return strlcpy(buf, kn->parent ? kn->name : "/", buflen);
 }
 
-static char * __must_check kernfs_path_locked(struct kernfs_node *kn, char *buf,
+static char * __must_check __kernfs_path(struct kernfs_node *kn, char *buf,
 					      size_t buflen)
 {
 	char *p = buf + buflen;
@@ -131,11 +131,32 @@ char *kernfs_path(struct kernfs_node *kn, char *buf, size_t buflen)
 	char *p;
 
 	spin_lock_irqsave(&kernfs_rename_lock, flags);
-	p = kernfs_path_locked(kn, buf, buflen);
+	p = __kernfs_path(kn, buf, buflen);
 	spin_unlock_irqrestore(&kernfs_rename_lock, flags);
 	return p;
 }
 EXPORT_SYMBOL_GPL(kernfs_path);
+
+/* Raw version. Used by tracepoints only without acquiring lock */
+size_t kernfs_path_len_unlocked(struct kernfs_node *kn)
+{
+	size_t len = 0;
+
+	do {
+		len += strlen(kn->name) + 1;
+		kn = kn->parent;
+	} while (kn && kn->parent);
+
+	return len;
+}
+
+char *kernfs_path_unlocked(struct kernfs_node *kn, char *buf, size_t buflen)
+{
+	char *p;
+
+	p = __kernfs_path(kn, buf, buflen);
+	return p;
+}
 
 /**
  * pr_cont_kernfs_name - pr_cont name of a kernfs_node
@@ -168,7 +189,7 @@ void pr_cont_kernfs_path(struct kernfs_node *kn)
 
 	spin_lock_irqsave(&kernfs_rename_lock, flags);
 
-	p = kernfs_path_locked(kn, kernfs_pr_cont_buf,
+	p = __kernfs_path(kn, kernfs_pr_cont_buf,
 			       sizeof(kernfs_pr_cont_buf));
 	if (p)
 		pr_cont("%s", p);
@@ -1405,6 +1426,9 @@ int kernfs_rename_ns(struct kernfs_node *kn, struct kernfs_node *new_parent,
 
 	kn->hash = kernfs_name_hash(kn->name, kn->ns);
 	kernfs_link_sibling(kn);
+
+	/* Tracepoints are protected by rcu_read_lock_sched */
+	synchronize_sched();
 
 	kernfs_put(old_parent);
 	kfree_const(old_name);

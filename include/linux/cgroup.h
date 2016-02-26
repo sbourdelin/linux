@@ -538,6 +538,16 @@ static inline char * __must_check cgroup_path(struct cgroup *cgrp, char *buf,
 	return kernfs_path(cgrp->kn, buf, buflen);
 }
 
+/*
+ * Without acquiring kernfs_rename_lock in _kernfs_path.
+ * Used by tracepoints only.
+ */
+static inline char * __must_check cgroup_path_unlocked(struct cgroup *cgrp, char *buf,
+					      size_t buflen)
+{
+	return kernfs_path_unlocked(cgrp->kn, buf, buflen);
+}
+
 static inline void pr_cont_cgroup_name(struct cgroup *cgrp)
 {
 	pr_cont_kernfs_name(cgrp->kn);

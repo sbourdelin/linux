@@ -136,7 +136,7 @@ DEFINE_EVENT(writeback_dirty_inode_template, writeback_dirty_inode,
 
 static inline size_t __trace_wb_cgroup_size(struct bdi_writeback *wb)
 {
-	return kernfs_path_len(wb->memcg_css->cgroup->kn) + 1;
+	return kernfs_path_len_unlocked(wb->memcg_css->cgroup->kn) + 1;
 }
 
 static inline void __trace_wb_assign_cgroup(char *buf, struct bdi_writeback *wb)
@@ -144,7 +144,8 @@ static inline void __trace_wb_assign_cgroup(char *buf, struct bdi_writeback *wb)
 	struct cgroup *cgrp = wb->memcg_css->cgroup;
 	char *path;
 
-	path = cgroup_path(cgrp, buf, kernfs_path_len(cgrp->kn) + 1);
+	path = cgroup_path_unlocked(cgrp, buf,
+				    kernfs_path_len_unlocked(cgrp->kn) + 1);
 	WARN_ON_ONCE(path != buf);
 }
 
