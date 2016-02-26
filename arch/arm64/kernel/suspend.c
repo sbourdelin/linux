@@ -1,4 +1,5 @@
 #include <linux/ftrace.h>
+#include <linux/kasan.h>
 #include <linux/percpu.h>
 #include <linux/slab.h>
 #include <asm/cacheflush.h>
@@ -105,6 +106,10 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
 		 */
 		if (hw_breakpoint_restore)
 			hw_breakpoint_restore(NULL);
+#ifdef CONFIG_KASAN
+		/* Unpoison the stack above the current frame. */
+		kasan_cpu_resume();
+#endif
 	}
 
 	unpause_graph_tracing();

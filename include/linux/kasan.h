@@ -62,6 +62,11 @@ void kasan_slab_free(struct kmem_cache *s, void *object);
 int kasan_module_alloc(void *addr, size_t size);
 void kasan_free_shadow(const struct vm_struct *vm);
 
+#ifdef CONFIG_ARM64
+void kasan_stack_watermark(void);
+void kasan_cpu_resume(void);
+#endif
+
 #else /* CONFIG_KASAN */
 
 static inline void kasan_unpoison_shadow(const void *address, size_t size) {}

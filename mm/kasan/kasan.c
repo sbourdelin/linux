@@ -550,3 +550,35 @@ static int __init kasan_memhotplug_init(void)
 
 module_init(kasan_memhotplug_init);
 #endif
+
+#ifdef CONFIG_ARM64
+static DEFINE_PER_CPU(unsigned long, cpu_stack_watermark);
+
+/* Record the stack pointer before the CPU is suspended. The recorded value
+ * will be used upon resume to unpoison the dirty stack frames.
+ */
+void kasan_stack_watermark(void)
+{
+	unsigned long *watermark = this_cpu_ptr(&cpu_stack_watermark);
+
+	*watermark = __builtin_frame_address(0);
+}
+EXPORT_SYMBOL_GPL(kasan_stack_watermark);
+
+void kasan_cpu_resume(void)
+{
+	unsigned long sp = __builtin_frame_address(0);
+	unsigned long *watermark = this_cpu_ptr(&cpu_stack_watermark);
+
+	if (*watermark == 0) {
+		WARN_ON_ONCE(*watermark == 0);
+		*watermark = sp;
+		return;
+	}
+	if (sp > *watermark) {
+		kasan_unpoison_shadow(*watermark, sp - *watermark);
+		*watermark = 0;
+	}
+}
+EXPORT_SYMBOL_GPL(kasan_cpu_resume);
+#endif

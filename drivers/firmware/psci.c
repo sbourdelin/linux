@@ -15,6 +15,7 @@
 
 #include <linux/arm-smccc.h>
 #include <linux/errno.h>
+#include <linux/kasan.h>
 #include <linux/linkage.h>
 #include <linux/of.h>
 #include <linux/pm.h>
@@ -122,6 +123,10 @@ static unsigned long __invoke_psci_fn_smc(unsigned long function_id,
 {
 	struct arm_smccc_res res;
 
+#ifdef CONFIG_KASAN
+	/* Notify KASAN it should unpoison the stack up to this point. */
+	kasan_stack_watermark();
+#endif
 	arm_smccc_smc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
 	return res.a0;
 }
