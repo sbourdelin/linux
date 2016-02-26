@@ -467,10 +467,12 @@ do {									\
 	cpu = raw_smp_processor_id();					\
 	old_cpu = atomic_cmpxchg(&panic_cpu, PANIC_CPU_INVALID, cpu);	\
 									\
-	if (old_cpu == PANIC_CPU_INVALID)				\
+	if (old_cpu == PANIC_CPU_INVALID) {				\
+		printk_nmi_exit();					\
 		panic(fmt, ##__VA_ARGS__);				\
-	else if (old_cpu != cpu)					\
+	} else if (old_cpu != cpu) {					\
 		nmi_panic_self_stop(regs);				\
+	}								\
 } while (0)
 
 /*

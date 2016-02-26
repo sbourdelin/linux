@@ -2409,6 +2409,7 @@ void console_flush_on_panic(void)
 	 */
 	console_trylock();
 	console_may_schedule = 0;
+	printk_nmi_flush();
 	console_unlock();
 }
 
