@@ -61,6 +61,23 @@ struct clk_rate_request {
 };
 
 /**
+ * struct clk_phase_request - Structure encoding the clk constraints that
+ * a clock user might require.
+ *
+ * @phase:		Requested clock phase. This field will be adjusted by
+ *			clock drivers according to hardware capabilities.
+ * @min_phase:		Minimum phase imposed by clk users.
+ * @max_phase:		Maximum phase imposed by clk users.
+ *
+ */
+struct clk_phase_request {
+	int phase;
+	unsigned long min_phase;
+	unsigned long max_phase;
+};
+
+
+/**
  * struct clk_ops -  Callback operations for hardware clocks; these are to
  * be provided by the clock implementation, and will be called by drivers
  * through the clk_* api.
@@ -212,6 +229,9 @@ struct clk_ops {
 					   unsigned long parent_accuracy);
 	int		(*get_phase)(struct clk_hw *hw);
 	int		(*set_phase)(struct clk_hw *hw, int degrees);
+	int		(*round_phase)(struct clk_hw *hw, int degrees);
+	int		(*determine_phase)(struct clk_hw *hw,
+					  struct clk_phase_request *req);
 	void		(*init)(struct clk_hw *hw);
 	int		(*debug_init)(struct clk_hw *hw, struct dentry *dentry);
 };

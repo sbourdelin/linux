@@ -325,6 +325,29 @@ void devm_clk_put(struct device *dev, struct clk *clk);
 long clk_round_rate(struct clk *clk, unsigned long rate);
 
 /**
+ * clk_round_phase - adjust a phase to the exact phase a clock can provide
+ * @clk: clock source
+ * @phase: desired clock phase in degrees
+ *
+ * This answers the question "if I were to pass @phase to clk_set_phase(),
+ * what clock phase would I end up with?" without changing the hardware
+ * in any way.  In other words:
+ *
+ *   phase = clk_round_phase(clk, p);
+ *
+ * and:
+ *
+ *   clk_set_phase(clk, p);
+ *   phase = clk_get_phase(clk);
+ *
+ * are equivalent except the former does not modify the clock hardware
+ * in any way.
+ *
+ * Returns rounded clock phase in degrees, or negative errno.
+ */
+long clk_round_phase(struct clk *clk, int phase);
+
+/**
  * clk_set_rate - set the clock rate for a clock source
  * @clk: clock source
  * @rate: desired clock rate in Hz
