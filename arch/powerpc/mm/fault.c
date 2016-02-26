@@ -294,11 +294,10 @@ int __kprobes do_page_fault(struct pt_regs *regs, unsigned long address,
 	 * can result in fault, which will cause a deadlock when called with
 	 * mmap_sem held
 	 */
-	if (user_mode(regs))
-		store_update_sp = store_updates_sp(regs);
-
-	if (user_mode(regs))
+	if (user_mode(regs)) {
 		flags |= FAULT_FLAG_USER;
+		store_update_sp = store_updates_sp(regs);
+	}
 
 	/* When running in the kernel we expect faults to occur only to
 	 * addresses in user space.  All other faults represent errors in the
