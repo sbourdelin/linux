@@ -393,6 +393,7 @@ static void txstate(struct musb *musb, struct musb_request *req)
 					request->dma + request->actual,
 					request_size);
 			if (!use_dma) {
+				unmap_dma_buffer(req, musb);
 				c->channel_release(musb_ep->dma);
 				musb_ep->dma = NULL;
 				csr &= ~MUSB_TXCSR_DMAENAB;
