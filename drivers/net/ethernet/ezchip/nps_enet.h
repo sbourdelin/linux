@@ -52,12 +52,23 @@ struct nps_enet_tx_ctl {
 		 * nt: Length in bytes of Tx frame loaded to Tx buffer
 		 */
 		struct {
+#ifdef CONFIG_CPU_BIG_ENDIAN
 			u32
 			__reserved_1:16,
 			ct:1,
 			et:1,
 			__reserved_2:3,
 			nt:11;
+
+#else
+			u32
+			nt:11,
+			__reserved_2:3,
+			et:1,
+			ct:1,
+			__reserved_1:16;
+
+#endif
 		};
 
 		u32 value;
@@ -75,6 +86,7 @@ struct nps_enet_rx_ctl {
 		 * nr:  Length in bytes of Rx frame loaded by MAC to Rx buffer
 		 */
 		struct {
+#ifdef CONFIG_CPU_BIG_ENDIAN
 			u32
 			__reserved_1:16,
 			cr:1,
@@ -82,6 +94,15 @@ struct nps_enet_rx_ctl {
 			crc:1,
 			__reserved_2:2,
 			nr:11;
+#else
+			u32
+			nr:11,
+			__reserved_2:2,
+			crc:1,
+			er:1,
+			cr:1,
+			__reserved_1:16;
+#endif
 		};
 
 		u32 value;
@@ -97,10 +118,17 @@ struct nps_enet_buf_int_enable {
 		 *          was read from TX buffer
 		 */
 		struct {
+#ifdef CONFIG_CPU_BIG_ENDIAN
 			u32
 			__reserved:30,
 			tx_done:1,
 			rx_rdy:1;
+#else
+			u32
+			rx_rdy:1,
+			tx_done:1,
+			__reserved:30;
+#endif
 		};
 
 		u32 value;
@@ -128,6 +156,7 @@ struct nps_enet_ge_mac_cfg_0 {
 		 * rx_en:              Receive Enable
 		 */
 		struct {
+#ifdef CONFIG_CPU_BIG_ENDIAN
 			u32
 			tx_pr_len:4,
 			tx_ifg_nib:4,
@@ -145,6 +174,25 @@ struct nps_enet_ge_mac_cfg_0 {
 			tx_fc_en:1,
 			tx_en:1,
 			rx_en:1;
+#else
+			u32
+			rx_en:1,
+			tx_en:1,
+			tx_fc_en:1,
+			tx_pad_en:1,
+			tx_crc_en:1,
+			rx_fc_en:1,
+			rx_crc_strip:1,
+			rx_crc_ignore:1,
+			rx_length_check_en:1,
+			tx_fc_retr:3,
+			rx_ifg:4,
+			tx_ifg:6,
+			rx_pr_check_en:1,
+			nib_mode:1,
+			tx_ifg_nib:4,
+			tx_pr_len:4;
+#endif
 		};
 
 		u32 value;
@@ -160,11 +208,19 @@ struct nps_enet_ge_mac_cfg_1 {
 		 * octet_0: MAC address octet 0
 		 */
 		struct {
+#ifdef CONFIG_CPU_BIG_ENDIAN
 			u32
 			octet_3:8,
 			octet_2:8,
 			octet_1:8,
 			octet_0:8;
+#else
+			u32
+			octet_0:8,
+			octet_1:8,
+			octet_2:8,
+			octet_3:8;
+#endif
 		};
 
 		u32 value;
@@ -184,6 +240,7 @@ struct nps_enet_ge_mac_cfg_2 {
 		 * octet_4:           MAC address octet 4
 		 */
 		struct {
+#ifdef CONFIG_CPU_BIG_ENDIAN
 			u32
 			transmit_flush_en:1,
 			__reserved_1:5,
@@ -195,6 +252,19 @@ struct nps_enet_ge_mac_cfg_2 {
 			__reserved_3:4,
 			octet_5:8,
 			octet_4:8;
+#else
+			u32
+			octet_4:8,
+			octet_5:8,
+			__reserved_3:4,
+			disc_mc:1,
+			disc_bc:1,
+			disc_da:1,
+			__reserved_2:1,
+			stat_en:2,
+			__reserved_1:5,
+			transmit_flush_en:1;
+#endif
 		};
 
 		u32 value;
@@ -219,6 +289,7 @@ struct nps_enet_ge_mac_cfg_3 {
 		 * tm_hd_mode:        TM header mode
 		 */
 		struct {
+#ifdef CONFIG_CPU_BIG_ENDIAN
 			u32
 			ext_oob_cbfc_sel:2,
 			max_len:14,
@@ -230,6 +301,19 @@ struct nps_enet_ge_mac_cfg_3 {
 			rx_cbfc_redir_en:1,
 			rx_cbfc_en:1,
 			tm_hd_mode:1;
+#else
+			u32
+			tm_hd_mode:1,
+			rx_cbfc_en:1,
+			rx_cbfc_redir_en:1,
+			redirect_cbfc_sel:2,
+			cf_drop:1,
+			cf_timeout:4,
+			rx_ifg_th:5,
+			tx_cbfc_en:1,
+			max_len:14,
+			ext_oob_cbfc_sel:2;
+#endif
 		};
 
 		u32 value;
@@ -243,11 +327,19 @@ struct nps_enet_ge_rst {
 		 * spcs_0: SGMII PCS reset
 		 */
 		struct {
+#ifdef CONFIG_CPU_BIG_ENDIAN
 			u32
 			__reserved_1:23,
 			gmac_0:1,
 			__reserved_2:7,
 			spcs_0:1;
+#else
+			u32
+			spcs_0:1,
+			__reserved_2:7,
+			gmac_0:1,
+			__reserved_1:23;
+#endif
 		};
 
 		u32 value;
@@ -261,10 +353,17 @@ struct nps_enet_phase_fifo_ctl {
 		 * rst:  reset serdes TX phase sync FIFO
 		 */
 		struct {
+#ifdef CONFIG_CPU_BIG_ENDIAN
 			u32
 			__reserved:30,
 			init:1,
 			rst:1;
+#else
+			u32
+			rst:1,
+			init:1,
+			__reserved:30;
+#endif
 		};
 
 		u32 value;

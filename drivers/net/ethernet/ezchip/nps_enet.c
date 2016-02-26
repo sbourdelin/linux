@@ -44,11 +44,15 @@ static void nps_enet_read_rx_fifo(struct net_device *ndev,
 
 	/* In case dst is not aligned we need an intermediate buffer */
 	if (dst_is_aligned)
-		for (i = 0; i < len; i++, reg++)
+		for (i = 0; i < len; i++, reg++) {
 			*reg = nps_enet_reg_get(priv, NPS_ENET_REG_RX_BUF);
+			/* In case of LE we need to swap bytes */
+			*reg = be32_to_cpu(*reg);
+		}
 	else { /* !dst_is_aligned */
 		for (i = 0; i < len; i++, reg++) {
 			u32 buf = nps_enet_reg_get(priv, NPS_ENET_REG_RX_BUF);
+			buf = be32_to_cpu(buf);
 			put_unaligned(buf, reg);
 		}
 	}
@@ -56,7 +60,8 @@ static void nps_enet_read_rx_fifo(struct net_device *ndev,
 	/* copy last bytes (if any) */
 	if (last) {
 		u32 buf = nps_enet_reg_get(priv, NPS_ENET_REG_RX_BUF);
-		memcpy((u8*)reg, &buf, last);
+		buf = be32_to_cpu(buf);
+		memcpy((u8 *)reg, &buf, last);
 	}
 }
 
@@ -368,11 +373,13 @@ static void nps_enet_send_frame(struct net_device *ndev,
 	/* In case src is not aligned we need an intermediate buffer */
 	if (src_is_aligned)
 		for (i = 0; i < len; i++, src++)
-			nps_enet_reg_set(priv, NPS_ENET_REG_TX_BUF, *src);
+			/* Restore endian swapped during register reading */
+			nps_enet_reg_set(priv, NPS_ENET_REG_TX_BUF,
+					 cpu_to_be32(*src));
 	else /* !src_is_aligned */
 		for (i = 0; i < len; i++, src++)
 			nps_enet_reg_set(priv, NPS_ENET_REG_TX_BUF,
-					 get_unaligned(src));
+					 cpu_to_be32(get_unaligned(src)));
 
 	/* Write the length of the Frame */
 	tx_ctrl.nt = length;
