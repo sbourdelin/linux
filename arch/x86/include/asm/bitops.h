@@ -333,7 +333,7 @@ static int test_bit(int nr, const volatile unsigned long *addr);
 #endif
 
 #define test_bit(nr, addr)			\
-	(__builtin_constant_p((nr))		\
+	(IS_IMMEDIATE((nr))			\
 	 ? constant_test_bit((nr), (addr))	\
 	 : variable_test_bit((nr), (addr)))
 
