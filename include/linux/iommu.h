@@ -82,6 +82,11 @@ struct iommu_domain {
 	void *handler_token;
 	struct iommu_domain_geometry geometry;
 	void *iova_cookie;
+	void *reserved_iova_cookie;
+	/* rb tree indexed by PA, for reserved bindings only */
+	struct rb_root reserved_binding_list;
+	/* protects reserved cookie and rbtree manipulation */
+	struct mutex reserved_mutex;
 };
 
 enum iommu_cap {
