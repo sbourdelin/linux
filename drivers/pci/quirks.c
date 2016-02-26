@@ -3705,6 +3705,20 @@ DECLARE_PCI_FIXUP_HEADER(0x1283, 0x8892, quirk_use_pcie_bridge_dma_alias);
 DECLARE_PCI_FIXUP_HEADER(0x8086, 0x244e, quirk_use_pcie_bridge_dma_alias);
 
 /*
+ * Writing to BAR 0 on Broadcom Vulcan bridges can trigger a hardware
+ * problem in the device.  Linux doesn't need any BARs on these devices, so
+ * mark the device as having non-compliant BARs so we will ignore them.
+ */
+static void quirk_bridge_brcm_vulcan_internal(struct pci_dev *pdev)
+{
+	pdev->non_compliant_bars = 1;
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_BROADCOM, 0x9000,
+			quirk_bridge_brcm_vulcan_internal);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_BROADCOM, 0x9039,
+			quirk_bridge_brcm_vulcan_internal);
+
+/*
  * Intersil/Techwell TW686[4589]-based video capture cards have an empty (zero)
  * class code.  Fix it.
  */
