@@ -84,6 +84,11 @@ the operations defined in clk.h:
 					    u8 index);
 		unsigned long	(*recalc_accuracy)(struct clk_hw *hw,
 						unsigned long parent_accuracy);
+		int		(*get_phase)(struct clk_hw *hw);
+		int		(*set_phase)(struct clk_hw *hw, int degrees);
+		long		(*round_phase)(struct clk_hw *hw, int degrees);
+		int		(*determine_phase)(struct clk_hw *hw,
+						   struct clk_phase_request *req);
 		void		(*init)(struct clk_hw *hw);
 		int		(*debug_init)(struct clk_hw *hw,
 					      struct dentry *dentry);
