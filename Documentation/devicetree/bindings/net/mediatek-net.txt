@@ -1,0 +1,113 @@
+iMEdiatek Frame Engine Ethernet controller
+=======================================
+
+The frame engine ethernet controller can be found on Ralink and Mediatek SoCs
+(RT288x, RT3x5x, RT366x, RT388x, rt5350, mt7620, mt7621, mt76x8).
+
+Depending on the SoC, there is a number of ports connected to the CPU port
+directly and/or via a (gigabit-)switch. Newer gigabit SoCs can support
+a dual MAC setup.
+
+* Ethernet controller node
+
+Required properties:
+- compatible: Should be one of "ralink,rt2880-eth", "ralink,rt3050-eth",
+  "ralink,rt3050-eth", "ralink,rt3883-eth", "ralink,rt5350-eth",
+  "mediatek,mt7620-eth", "mediatek,mt7621-eth", "mediatek,mt7623-eth"
+- reg: Address and length of the register set for the device
+- interrupts: Should contain the frame engines interrupt
+- mediatek,ethsys: phandle to the syscon node that handles the port setup
+
+Required properties for ARM based SoCs:
+- clocks: the clock used by the core
+- clock-names: the names of the clock listed in the clocks property
+- power-domains: phandle the to power domain that the ethernet is part of
+
+Optional properties:
+- interrupt-parent: Should be the phandle for the interrupt controller
+  that services interrupts for this device
+- mediatek,switch : phandle pointing at the device node of the switch device
+
+
+* Ethernet port node for MT7620
+
+We need to define which physical port is wired and how it should be setup.
+
+Required properties:
+- compatible: Should be "mediatek,eth-port"
+- reg: The number of the physical port
+- phy-handle: reference to the node describing the phy
+
+
+* Ethernet MAC node - dual MAC SoCs only
+
+Required properties:
+- compatible: Should be "mediatek,eth-mac"
+- reg: The number of the MAC
+
+
+Example for singel MAC SoC:
+
+mdio-bus {
+	status = "okay";
+
+	phy4: ethernet-phy@4 {
+		reg = <4>;
+		phy-mode = "rgmii";
+	};
+};
+
+eth: ethernet@10100000 {
+	compatible = "mediatek,mt7620-eth";
+	reg = <0x10100000 10000>;
+
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	interrupt-parent = <&cpuintc>;
+	interrupts = <5>;
+
+	mediatek,switch = <&gsw>;
+
+	port@4 {
+		status = "okay";
+		phy-mode = "rgmii";
+		phy-handle = <&phy4>;
+	};
+};
+
+
+Example for dual MAC SoC:
+
+eth: ethernet@1b100000 {
+	compatible = "mediatek,mt7623-eth";
+	reg = <0 0x1b100000 0 0x10000>;
+
+	clocks = <&topckgen CLK_TOP_ETHIF_SEL>;
+	clock-names = "ethif";
+
+	interrupts = <GIC_SPI 200 IRQ_TYPE_LEVEL_LOW>;
+	power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
+
+	mediatek,ethsys = <&ethsys>;
+	mediatek,switch = <&gsw>;
+
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	status = "disabled";
+
+	gmac1: mac@0 {
+		compatible = "mediatek,eth-mac";
+		reg = <0>;
+
+		status = "okay";
+	};
+
+	gmac2: mac@1 {
+		compatible = "mediatek,eth-mac";
+		reg = <1>;
+
+		status = "okay";
+	};
+};
