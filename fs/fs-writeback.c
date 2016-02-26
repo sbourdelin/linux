@@ -1616,7 +1616,6 @@ static long wb_writeback(struct bdi_writeback *wb,
 	work->older_than_this = &oldest_jif;
 
 	blk_start_plug(&plug);
-	spin_lock(&wb->list_lock);
 	for (;;) {
 		/*
 		 * Stop writeback when nr_pages has been consumed
@@ -1654,15 +1653,19 @@ static long wb_writeback(struct bdi_writeback *wb,
 			oldest_jif = jiffies;
 
 		trace_writeback_start(wb, work);
+
+		spin_lock(&wb->list_lock);
 		if (list_empty(&wb->b_io))
 			queue_io(wb, work);
 		if (work->sb)
 			progress = writeback_sb_inodes(work->sb, wb, work);
 		else
 			progress = __writeback_inodes_wb(wb, work);
-		trace_writeback_written(wb, work);
 
 		wb_update_bandwidth(wb, wb_start);
+		spin_unlock(&wb->list_lock);
+
+		trace_writeback_written(wb, work);
 
 		/*
 		 * Did we write something? Try for more
@@ -1686,15 +1689,14 @@ static long wb_writeback(struct bdi_writeback *wb,
 		 */
 		if (!list_empty(&wb->b_more_io))  {
 			trace_writeback_wait(wb, work);
+			spin_lock(&wb->list_lock);
 			inode = wb_inode(wb->b_more_io.prev);
-			spin_lock(&inode->i_lock);
 			spin_unlock(&wb->list_lock);
+			spin_lock(&inode->i_lock);
 			/* This function drops i_lock... */
 			inode_sleep_on_writeback(inode);
-			spin_lock(&wb->list_lock);
 		}
 	}
-	spin_unlock(&wb->list_lock);
 	blk_finish_plug(&plug);
 
 	return nr_pages - work->nr_pages;
