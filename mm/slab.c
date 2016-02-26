@@ -3374,9 +3374,21 @@ free_done:
 static inline void __cache_free(struct kmem_cache *cachep, void *objp,
 				unsigned long caller)
 {
+#ifdef CONFIG_KASAN
+	if (kasan_slab_free(cachep, objp))
+		/* The object has been put into the quarantine, don't touch it
+		 * for now.
+		 */
+		return;
+#endif
+	___cache_free(cachep, objp, caller);
+}
+
+void ___cache_free(struct kmem_cache *cachep, void *objp,
+		unsigned long caller)
+{
 	struct array_cache *ac;
 
-	kasan_slab_free(cachep, objp);
 	ac = cpu_cache_get(cachep);
 
 	check_irq_off();
