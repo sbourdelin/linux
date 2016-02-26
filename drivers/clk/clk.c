@@ -554,6 +554,15 @@ void clk_hw_set_rate_range(struct clk_hw *hw, unsigned long min_rate,
 }
 EXPORT_SYMBOL_GPL(clk_hw_set_rate_range);
 
+void clk_hw_set_phase_range(struct clk_hw *hw, unsigned long min_phase,
+			   unsigned long max_phase)
+{
+	hw->core->min_phase = min_phase;
+	hw->core->max_phase = max_phase;
+}
+EXPORT_SYMBOL_GPL(clk_hw_set_phase_range);
+
+
 /*
  * Helper for finding best parent to provide a given frequency. This can be used
  * directly as a determine_rate callback (e.g. for a mux), or from a more
