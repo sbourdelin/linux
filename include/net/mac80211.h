@@ -565,6 +565,18 @@ struct ieee80211_bss_conf {
 	struct ieee80211_p2p_noa_attr p2p_noa_attr;
 };
 
+typedef u64 codel_time_t;
+
+/*
+ * struct codel_params - contains codel parameters
+ * @interval:	initial drop rate
+ * @target:     maximum persistent sojourn time
+ */
+struct codel_params {
+	codel_time_t	interval;
+	codel_time_t	target;
+};
+
 /**
  * enum mac80211_tx_info_flags - flags to describe transmission information/status
  *
@@ -888,8 +900,18 @@ struct ieee80211_tx_info {
 				/* only needed before rate control */
 				unsigned long jiffies;
 			};
-			/* NB: vif can be NULL for injected frames */
-			struct ieee80211_vif *vif;
+			union {
+				/* NB: vif can be NULL for injected frames */
+				struct ieee80211_vif *vif;
+
+				/* When packets are enqueued on txq it's easy
+				 * to re-construct the vif pointer. There's no
+				 * more space in tx_info so it can be used to
+				 * store the necessary enqueue time for packet
+				 * sojourn time computation.
+				 */
+				codel_time_t enqueue_time;
+			};
 			struct ieee80211_key_conf *hw_key;
 			u32 flags;
 			/* 4 bytes free */
@@ -2108,8 +2130,8 @@ enum ieee80211_hw_flags {
  * @cipher_schemes: a pointer to an array of cipher scheme definitions
  *	supported by HW.
  *
- * @txq_ac_max_pending: maximum number of frames per AC pending in all txq
- *	entries for a vif.
+ * @txq_cparams: codel parameters to control tx queueing dropping behavior
+ * @txq_limit: maximum number of frames queuesd
  */
 struct ieee80211_hw {
 	struct ieee80211_conf conf;
@@ -2139,7 +2161,8 @@ struct ieee80211_hw {
 	u8 uapsd_max_sp_len;
 	u8 n_cipher_schemes;
 	const struct ieee80211_cipher_scheme *cipher_schemes;
-	int txq_ac_max_pending;
+	struct codel_params txq_cparams;
+	u32 txq_limit;
 };
 
 static inline bool _ieee80211_hw_check(struct ieee80211_hw *hw,
@@ -5621,6 +5644,9 @@ struct sk_buff *ieee80211_tx_dequeue(struct ieee80211_hw *hw,
  * The values are not guaranteed to be coherent with regard to each other, i.e.
  * txq state can change half-way of this function and the caller may end up
  * with "new" frame_cnt and "old" byte_cnt or vice-versa.
+ *
+ * Moreover returned values are best-case, i.e. assuming queueing algorithm
+ * will not drop frames due to excess latency.
  *
  * @txq: pointer obtained from station or virtual interface
  * @frame_cnt: pointer to store frame count
