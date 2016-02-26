@@ -498,12 +498,21 @@ struct vfio_iommu_type1_info {
  *
  * Map process virtual addresses to IO virtual addresses using the
  * provided struct vfio_dma_map. Caller sets argsz. READ &/ WRITE required.
+ *
+ * In case MSI_RESERVED_IOVA flag is set, the API only aims at registering an
+ * IOVA region which will be used on some platforms to map the host MSI frame.
+ * in that specific case, vaddr and prot are ignored. The requirement for
+ * provisioning such IOVA range can be checked by calling VFIO_IOMMU_GET_INFO
+ * with the VFIO_IOMMU_INFO_REQUIRE_MSI_MAP attribute. A single
+ * MSI_RESERVED_IOVA region can be registered
  */
 struct vfio_iommu_type1_dma_map {
 	__u32	argsz;
 	__u32	flags;
 #define VFIO_DMA_MAP_FLAG_READ (1 << 0)		/* readable from device */
 #define VFIO_DMA_MAP_FLAG_WRITE (1 << 1)	/* writable from device */
+/* reserved iova for MSI vectors*/
+#define VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA (1 << 2)
 	__u64	vaddr;				/* Process virtual address */
 	__u64	iova;				/* IO virtual address */
 	__u64	size;				/* Size of mapping (bytes) */
@@ -519,7 +528,8 @@ struct vfio_iommu_type1_dma_map {
  * Caller sets argsz.  The actual unmapped size is returned in the size
  * field.  No guarantee is made to the user that arbitrary unmaps of iova
  * or size different from those used in the original mapping call will
- * succeed.
+ * succeed. A Reserved DMA region must be unmapped with MSI_RESERVED_IOVA
+ * flag set.
  */
 struct vfio_iommu_type1_dma_unmap {
 	__u32	argsz;
