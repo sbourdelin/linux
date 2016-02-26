@@ -104,6 +104,19 @@ intel_dp_update_link_train(struct intel_dp *intel_dp)
 	return ret == intel_dp->lane_count;
 }
 
+static void intel_dp_link_training_delay(struct intel_dp *intel_dp,
+					 int retry_count)
+{
+	if (intel_dp->dpcd[DP_TRAINING_AUX_RD_INTERVAL]) {
+		mdelay(intel_dp->dpcd[DP_TRAINING_AUX_RD_INTERVAL] * 4);
+	} else {
+		if (retry_count)
+			mdelay(retry_count * 4);
+		else
+			udelay(400);
+	}
+}
+
 /* Enable corresponding port and start training pattern 1 */
 static void
 intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp)
@@ -150,7 +163,8 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp)
 	for (;;) {
 		uint8_t link_status[DP_LINK_STATUS_SIZE];
 
-		drm_dp_link_train_clock_recovery_delay(intel_dp->dpcd);
+		intel_dp_link_training_delay(intel_dp, loop_tries);
+
 		if (!intel_dp_get_link_status(intel_dp, link_status)) {
 			DRM_ERROR("failed to get link status\n");
 			break;
@@ -184,7 +198,7 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp)
 				break;
 		if (i == intel_dp->lane_count) {
 			++loop_tries;
-			if (loop_tries == 5) {
+			if (loop_tries == 10) {
 				DRM_ERROR("too many full retries, give up\n");
 				break;
 			}
@@ -275,7 +289,8 @@ intel_dp_link_training_channel_equalization(struct intel_dp *intel_dp)
 			break;
 		}
 
-		drm_dp_link_train_channel_eq_delay(intel_dp->dpcd);
+		intel_dp_link_training_delay(intel_dp, cr_tries);
+
 		if (!intel_dp_get_link_status(intel_dp, link_status)) {
 			DRM_ERROR("failed to get link status\n");
 			break;
