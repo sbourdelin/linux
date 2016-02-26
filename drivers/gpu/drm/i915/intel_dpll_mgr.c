@@ -447,6 +447,12 @@ static uint32_t hsw_pll_to_ddi_pll_sel(struct intel_shared_dpll *pll)
 		return PORT_CLK_SEL_WRPLL2;
 	case DPLL_ID_SPLL:
 		return PORT_CLK_SEL_SPLL;
+	case DPLL_ID_LCPLL_810:
+		return PORT_CLK_SEL_LCPLL_810;
+	case DPLL_ID_LCPLL_1350:
+		return PORT_CLK_SEL_LCPLL_1350;
+	case DPLL_ID_LCPLL_2700:
+		return PORT_CLK_SEL_LCPLL_2700;
 	default:
 		return PORT_CLK_SEL_NONE;
 	}
@@ -671,8 +677,12 @@ static struct intel_shared_dpll *
 hsw_get_dpll(struct intel_crtc *crtc, struct intel_crtc_state *crtc_state,
 	     struct intel_encoder *encoder)
 {
+	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
 	struct intel_shared_dpll *pll;
 	int clock = crtc_state->port_clock;
+
+	memset(&crtc_state->dpll_hw_state, 0,
+	       sizeof(crtc_state->dpll_hw_state));
 
 	if (encoder->type == INTEL_OUTPUT_HDMI) {
 		uint32_t val;
@@ -684,20 +694,36 @@ hsw_get_dpll(struct intel_crtc *crtc, struct intel_crtc_state *crtc_state,
 		      WRPLL_DIVIDER_REFERENCE(r2) | WRPLL_DIVIDER_FEEDBACK(n2) |
 		      WRPLL_DIVIDER_POST(p);
 
-		memset(&crtc_state->dpll_hw_state, 0,
-		       sizeof(crtc_state->dpll_hw_state));
-
 		crtc_state->dpll_hw_state.wrpll = val;
 
 		pll = intel_find_shared_dpll(crtc, crtc_state,
 					     DPLL_ID_WRPLL1, DPLL_ID_WRPLL2);
 
+	} else if (encoder->type == INTEL_OUTPUT_DISPLAYPORT ||
+		   encoder->type == INTEL_OUTPUT_DP_MST ||
+		   encoder->type == INTEL_OUTPUT_EDP) {
+		enum intel_dpll_id pll_id;
+
+		switch (clock / 2) {
+		case 81000:
+			pll_id = DPLL_ID_LCPLL_810;
+			break;
+		case 135000:
+			pll_id = DPLL_ID_LCPLL_1350;
+			break;
+		case 270000:
+			pll_id = DPLL_ID_LCPLL_2700;
+			break;
+		default:
+			DRM_DEBUG_KMS("Invalid clock for DP: %d\n", clock);
+			return NULL;
+		}
+
+		pll = intel_get_shared_dpll_by_id(dev_priv, pll_id);
+
 	} else if (encoder->type == INTEL_OUTPUT_ANALOG) {
 		if (WARN_ON(crtc_state->port_clock / 2 != 135000))
 			return NULL;
-
-		memset(&crtc_state->dpll_hw_state, 0,
-		       sizeof(crtc_state->dpll_hw_state));
 
 		crtc_state->dpll_hw_state.spll =
 			SPLL_PLL_ENABLE | SPLL_PLL_FREQ_1350MHz | SPLL_PLL_SSC;
@@ -729,6 +755,38 @@ static const struct intel_shared_dpll_funcs hsw_ddi_spll_funcs = {
 	.enable = hsw_ddi_spll_enable,
 	.disable = hsw_ddi_spll_disable,
 	.get_hw_state = hsw_ddi_spll_get_hw_state,
+};
+
+static void hsw_ddi_lcpll_enable(struct drm_i915_private *dev_priv,
+				 struct intel_shared_dpll *pll)
+{
+}
+
+static void hsw_ddi_lcpll_disable(struct drm_i915_private *dev_priv,
+				  struct intel_shared_dpll *pll)
+{
+}
+
+static bool hsw_ddi_lcpll_get_hw_state(struct drm_i915_private *dev_priv,
+				       struct intel_shared_dpll *pll,
+				       struct intel_dpll_hw_state *hw_state)
+{
+	/*
+	 * LC PLL is kept enabled all the time since it drives CDCLK. The
+	 * state checker still expects it to be disabled when it is not used
+	 * by any crtc. To avoid adding a case to LC PLL, just tell the
+	 * state checker what it expects.
+	 */
+	if (pll->config.crtc_mask)
+		return true;
+	else
+		return false;
+}
+
+static const struct intel_shared_dpll_funcs hsw_ddi_lcpll_funcs = {
+	.enable = hsw_ddi_lcpll_enable,
+	.disable = hsw_ddi_lcpll_disable,
+	.get_hw_state = hsw_ddi_lcpll_get_hw_state,
 };
 
 struct skl_dpll_regs {
@@ -1559,9 +1617,12 @@ static const struct intel_dpll_mgr pch_pll_mgr = {
 };
 
 static const struct dpll_info hsw_plls[] = {
-	{ "WRPLL 1", DPLL_ID_WRPLL1, &hsw_ddi_wrpll_funcs },
-	{ "WRPLL 2", DPLL_ID_WRPLL2, &hsw_ddi_wrpll_funcs },
-	{ "SPLL",    DPLL_ID_SPLL,   &hsw_ddi_spll_funcs },
+	{ "WRPLL 1",    DPLL_ID_WRPLL1,     &hsw_ddi_wrpll_funcs },
+	{ "WRPLL 2",    DPLL_ID_WRPLL2,     &hsw_ddi_wrpll_funcs },
+	{ "SPLL",       DPLL_ID_SPLL,       &hsw_ddi_spll_funcs },
+	{ "LCPLL 810",  DPLL_ID_LCPLL_810,  &hsw_ddi_lcpll_funcs },
+	{ "LCPLL 1350", DPLL_ID_LCPLL_1350, &hsw_ddi_lcpll_funcs },
+	{ "LCPLL 2700", DPLL_ID_LCPLL_2700, &hsw_ddi_lcpll_funcs },
 	{ NULL, -1, NULL, },
 };
 

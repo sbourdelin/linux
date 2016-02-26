@@ -9660,13 +9660,19 @@ static void haswell_get_ddi_pll(struct drm_i915_private *dev_priv,
 	case PORT_CLK_SEL_SPLL:
 		id = DPLL_ID_SPLL;
 		break;
+	case PORT_CLK_SEL_LCPLL_810:
+		id = DPLL_ID_LCPLL_810;
+		break;
+	case PORT_CLK_SEL_LCPLL_1350:
+		id = DPLL_ID_LCPLL_1350;
+		break;
+	case PORT_CLK_SEL_LCPLL_2700:
+		id = DPLL_ID_LCPLL_2700;
+		break;
 	default:
 		MISSING_CASE(pipe_config->ddi_pll_sel);
 		/* fall through */
 	case PORT_CLK_SEL_NONE:
-	case PORT_CLK_SEL_LCPLL_810:
-	case PORT_CLK_SEL_LCPLL_1350:
-	case PORT_CLK_SEL_LCPLL_2700:
 		return;
 	}
 
@@ -9695,8 +9701,17 @@ static void haswell_get_ddi_port_state(struct intel_crtc *crtc,
 
 	pll = pipe_config->shared_dpll;
 	if (pll) {
-		WARN_ON(!pll->funcs.get_hw_state(dev_priv, pll,
-						 &pipe_config->dpll_hw_state));
+		bool enabled =
+			pll->funcs.get_hw_state(dev_priv, pll,
+						&pipe_config->dpll_hw_state);
+
+		/*
+		 * We keep LCPLL always enabled but its ->get_hw_state() return
+		 * value relies on the crtc_mask to please the state checker.
+		 * That may not have been set yet, so just ignore the value for
+		 * those PLLs, since it shouldn't really matter.
+		 */
+		WARN_ON(pll->id < DPLL_ID_LCPLL_810 && !enabled);
 	}
 
 	/*
@@ -15466,8 +15481,6 @@ static void intel_modeset_readout_hw_state(struct drm_device *dev)
 	for (i = 0; i < dev_priv->num_shared_dpll; i++) {
 		struct intel_shared_dpll *pll = &dev_priv->shared_dplls[i];
 
-		pll->on = pll->funcs.get_hw_state(dev_priv, pll,
-						  &pll->config.hw_state);
 		pll->active = 0;
 		pll->config.crtc_mask = 0;
 		for_each_intel_crtc(dev, crtc) {
@@ -15476,6 +15489,14 @@ static void intel_modeset_readout_hw_state(struct drm_device *dev)
 				pll->config.crtc_mask |= 1 << crtc->pipe;
 			}
 		}
+
+		/*
+		 *  Set this after updating crtc_mask because of LCPLL in HSW,
+		 *  since that's always kept enabled and the return value of
+		 *  get_hw_state() depends on that mask.
+		 */
+		pll->on = pll->funcs.get_hw_state(dev_priv, pll,
+						  &pll->config.hw_state);
 
 		DRM_DEBUG_KMS("%s hw state readout: crtc_mask 0x%08x, on %i\n",
 			      pll->name, pll->config.crtc_mask, pll->on);
