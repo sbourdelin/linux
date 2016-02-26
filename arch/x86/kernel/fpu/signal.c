@@ -316,12 +316,11 @@ static int __fpu__restore_sig(void __user *buf, void __user *buf_fx, int size)
 			sanitize_restored_xstate(tsk, &env, xfeatures, fx_only);
 		}
 
+		preempt_disable();
 		fpu->fpstate_active = 1;
-		if (use_eager_fpu()) {
-			preempt_disable();
+		if (use_eager_fpu())
 			fpu__restore(fpu);
-			preempt_enable();
-		}
+		preempt_enable();
 
 		return err;
 	} else {
