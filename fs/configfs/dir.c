@@ -899,28 +899,6 @@ static void configfs_detach_group(struct config_item *item)
 }
 
 /*
- * After the item has been detached from the filesystem view, we are
- * ready to tear it out of the hierarchy.  Notify the client before
- * we do that so they can perform any cleanup that requires
- * navigating the hierarchy.  A client does not need to provide this
- * callback.  The subsystem semaphore MUST be held by the caller, and
- * references must be valid for both items.  It also assumes the
- * caller has validated ci_type.
- */
-static void client_disconnect_notify(struct config_item *parent_item,
-				     struct config_item *item)
-{
-	struct config_item_type *type;
-
-	type = parent_item->ci_type;
-	BUG_ON(!type);
-
-	if (type->ct_group_ops && type->ct_group_ops->disconnect_notify)
-		type->ct_group_ops->disconnect_notify(to_config_group(parent_item),
-						      item);
-}
-
-/*
  * Drop the initial reference from make_item()/make_group()
  * This function assumes that reference is held on item
  * and that item holds a valid reference to the parent.  Also, it
@@ -1406,7 +1384,6 @@ out_unlink:
 		/* Tear down everything we built up */
 		mutex_lock(&subsys->su_mutex);
 
-		client_disconnect_notify(parent_item, item);
 		if (group)
 			unlink_group(group);
 		else
@@ -1510,13 +1487,11 @@ static int configfs_rmdir(struct inode *dir, struct dentry *dentry)
 		configfs_detach_group(item);
 
 		mutex_lock(&subsys->su_mutex);
-		client_disconnect_notify(parent_item, item);
 		unlink_group(to_config_group(item));
 	} else {
 		configfs_detach_item(item);
 
 		mutex_lock(&subsys->su_mutex);
-		client_disconnect_notify(parent_item, item);
 		unlink_obj(item);
 	}
 
