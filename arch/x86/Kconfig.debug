@@ -5,6 +5,23 @@ config TRACE_IRQFLAGS_SUPPORT
 
 source "lib/Kconfig.debug"
 
+config XPFO
+	bool "Enable eXclusive Page Frame Ownership (XPFO)"
+	default n
+	depends on DEBUG_KERNEL
+	depends on X86_64
+	select DEBUG_TLBFLUSH
+	---help---
+	  This option offers protection against 'ret2dir' (kernel) attacks.
+	  When enabled, every time a page frame is allocated to user space, it
+	  is unmapped from the direct mapped RAM region in kernel space
+	  (physmap). Similarly, whenever page frames are freed/reclaimed, they
+	  are mapped back to physmap. Special care is taken to minimize the
+	  impact on performance by reducing TLB shootdowns and unnecessary page
+	  zero fills.
+
+	  If in doubt, say "N".
+
 config X86_VERBOSE_BOOTUP
 	bool "Enable verbose x86 bootup info messages"
 	default y

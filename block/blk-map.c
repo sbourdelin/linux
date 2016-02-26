@@ -107,7 +107,12 @@ int blk_rq_map_user_iov(struct request_queue *q, struct request *rq,
 		prv.iov_len = iov.iov_len;
 	}
 
-	if (unaligned || (q->dma_pad_mask & iter->count) || map_data)
+	/*
+	 * juergh: Temporary hack to force the use of a bounce buffer if XPFO
+	 * is enabled. Results in an XPFO page fault otherwise.
+	 */
+	if (unaligned || (q->dma_pad_mask & iter->count) || map_data ||
+	    IS_ENABLED(CONFIG_XPFO))
 		bio = bio_copy_user_iov(q, map_data, iter, gfp_mask);
 	else
 		bio = bio_map_user_iov(q, iter, gfp_mask);
