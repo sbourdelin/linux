@@ -807,6 +807,8 @@ static void sd_config_write_same(struct scsi_disk *sdkp)
 	if (sdkp->max_ws_blocks > SD_MAX_WS10_BLOCKS)
 		sdkp->max_ws_blocks = min_not_zero(sdkp->max_ws_blocks,
 						   (u32)SD_MAX_WS16_BLOCKS);
+	else if (sdkp->max_ws_blocks == 0 && sdkp->device->no_report_opcodes)
+		sdkp->device->no_write_same = 1;
 	else if (sdkp->ws16 || sdkp->ws10 || sdkp->device->no_report_opcodes)
 		sdkp->max_ws_blocks = min_not_zero(sdkp->max_ws_blocks,
 						   (u32)SD_MAX_WS10_BLOCKS);
