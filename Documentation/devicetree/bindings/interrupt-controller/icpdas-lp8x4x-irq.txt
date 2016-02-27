@@ -1,0 +1,49 @@
+ICP DAS LP-8841 FPGA Interrupt Controller
+
+ICP DAS LP-8841 contains FPGA chip. The chip functions as a interrupt
+source providing 16 additional interrupts among other things.
+
+Required properties:
+- compatible : should be "icpdas,lp8x4x-irq"
+
+- reg: physical base address of the controller and length of memory mapped
+  region.
+
+- interrupt-controller : identifies the node as an interrupt controller
+
+- #interrupt-cells : should be 1
+
+- interrupts : should provide interrupt
+
+Optional properties:
+
+- interrupt-parent : should provide a link to interrupt controller either
+		     explicitly and implicitly from a parent node
+
+Example:
+
+fpgairq: irq@9006 {
+	compatible = "icpdas,lp8841-irq";
+	reg = <0x9006 0x16>;
+	interrupt-parent = <&gpio>;
+	interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
+	#interrupt-cells = <1>;
+	interrupt-controller;
+	status = "okay";
+};
+
+serial@9050 {
+	compatible = "icpdas,lp8841-uart";
+	reg =  <0x9050 0x10
+		0x9030 0x02>;
+	interrupts = <13>;
+	status = "okay";
+};
+
+serial@9060 {
+	compatible = "icpdas,lp8841-uart";
+	reg =  <0x9060 0x10
+		0x9032 0x02>;
+	interrupts = <14>;
+	status = "okay";
+};

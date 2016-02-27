@@ -218,3 +218,8 @@ config IRQ_MXS
 	def_bool y if MACH_ASM9260 || ARCH_MXS
 	select IRQ_DOMAIN
 	select STMP_DEVICE
+
+config LP8841_IRQ
+	bool
+	def_bool y if MACH_PXA27X_DT
+	select IRQ_DOMAIN
