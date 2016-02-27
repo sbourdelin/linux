@@ -249,6 +249,7 @@ static int hackrf_set_params(struct hackrf_dev *dev)
 	unsigned int uitmp, uitmp1, uitmp2;
 	const bool rx = test_bit(RX_ON, &dev->flags);
 	const bool tx = test_bit(TX_ON, &dev->flags);
+
 	static const struct {
 		u32 freq;
 	} bandwidth_lut[] = {
