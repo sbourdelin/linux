@@ -4144,6 +4144,8 @@ change:
 		new_effective_prio = rt_mutex_get_effective_prio(p, newprio);
 		if (new_effective_prio == oldprio) {
 			__setscheduler_params(p, attr);
+			if (p->sched_class == &dl_sched_class)
+				p->sched_class->prio_changed(rq, p, oldprio);
 			task_rq_unlock(rq, p, &flags);
 			return 0;
 		}
