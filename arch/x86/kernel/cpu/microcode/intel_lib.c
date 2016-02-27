@@ -49,7 +49,7 @@ int microcode_sanity_check(void *mc, int print_err)
 	unsigned long total_size, data_size, ext_table_size;
 	struct microcode_header_intel *mc_header = mc;
 	struct extended_sigtable *ext_header = NULL;
-	int sum, orig_sum, ext_sigcount = 0, i;
+	u32 sum, orig_sum, ext_sigcount = 0, i;
 	struct extended_signature *ext_sig;
 
 	total_size = get_totalsize(mc_header);
