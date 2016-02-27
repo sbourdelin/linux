@@ -1,0 +1,682 @@
+/*
+ *  Copyright (C) Robert Jarzmik <robert.jarzmik@free.fr>
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License version 2 as
+ *  publishhed by the Free Software Foundation.
+ */
+
+/dts-v1/;
+#include "pxa3xx.dtsi"
+#include "include/dt-bindings/gpio/gpio.h"
+#include "include/dt-bindings/clock/pxa-clock.h"
+#include "dt-bindings/interrupt-controller/irq.h"
+
+/ {
+	model = "Marvell Zylonite System Development Platform";
+	compatible = "marvell,pxa310", "marvell,pxa3xx";
+
+	chosen {
+		bootargs = "console=ttyS0,115200 earlyprintk root=/dev/ram0 ip=dhcp";
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0xa0000000 0x04000000>;
+
+		reserved-memory {
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			pstore_region:region@0xa2000000 {
+				compatible = "linux,contiguous-memory-region";
+				reg = <0xa2000000 1048576>;
+			};
+		};
+	};
+
+	reg_vcc3v3: vcc3v3 {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc3v3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+	};
+
+	pxabus {
+		pxai2c1: i2c@40301680 {
+			mrvl,i2c-fast-mode;
+
+			pinctrl-names = "default";
+			pinctrl-0 = <&pmux_i2c_default>;
+
+			status = "okay";
+
+			ext_gpio1: gpio@74 {
+				compatible = "nxp,pca9539";
+				reg = <0x74>;
+				interrupts-extended = <&gpio 18 IRQ_TYPE_EDGE_BOTH>;
+				pinctrl-names = "default";
+				pinctrl-0 = < &pmux_pca9539_1_default >;
+				status = "okay";
+			};
+			ext_gpio2: gpio@75 {
+				compatible = "nxp,pca9539";
+				reg = <0x75>;
+				interrupts-extended = <&gpio 19 IRQ_TYPE_EDGE_BOTH>;
+				pinctrl-names = "default";
+				pinctrl-0 = < &pmux_pca9539_2_default >;
+				status = "okay";
+			};
+		};
+
+		gpio: gpio@40e00000 {
+			status = "okay";
+		};
+
+		ffuart: uart@40100000 {
+			pinctrl-names = "default";
+			pinctrl-0 = < &pmux_ffuart_default
+				      &pmux_ffuart_wak1_default >;
+			status = "okay";
+		};
+
+		btuart: uart@40200000 {
+			pinctrl-names = "default";
+			pinctrl-0 = < &pmux_btuart_default
+				      &pmux_btuart_wak1_default
+				      &pmux_btuart_wak2_default >;
+			status = "okay";
+		};
+
+		nand0: nand@43100000 {
+			num-cs = <1>;
+			marvell,nand-enable-arbiter;
+			marvell,nand-keep-config;
+			nand-on-flash-bbt;
+			marvell,detect-delay-ms = <200>;
+			status = "okay";
+
+			partitions {
+				compatible = "fixed-partitions";
+				#address-cells = <1>;
+				#size-cells = <1>;
+		
+				partition@0 {
+					label = "TIMH";
+					reg = <0x0000000 0x20000>;
+					read-only;
+				};
+		
+				obmi@20000 {
+					reg = <0x0020000 0x20000>;
+					read-only;
+				};
+
+				barebox@40000 {
+					reg = <0x0040000 0xc0000>;
+					read-only;
+				};
+
+				barebox-env@100000 {
+					reg = <0x0100000 0x40000>;
+					read-only;
+				};
+
+				kernel@140000 {
+					reg = <0x0100000 0xc00000>;
+					read-only;
+				};
+
+				root@d40000 {
+					reg = <0x0d40000 0x2520000>;
+					read-only;
+				};
+			};
+		};
+
+		mmc0: mmc@41100000 {
+			vmmc-supply = <&reg_vcc3v3>;
+			cd-gpios = <&gpio 1 GPIO_ACTIVE_HIGH>;
+			wp-gpios = <&gpio 5 GPIO_ACTIVE_HIGH>;
+			marvell,detect-delay-ms = <200>;
+			pinctrl-names = "default";
+			pinctrl-0 = < &pmux_mmc1_default &pmux_mmc1_wak_default >;
+			status = "okay";
+		};
+
+		mmc1: mmc@42000000 {
+			vmmc-supply = <&reg_vcc3v3>;
+			cd-gpios = <&gpio 4 GPIO_ACTIVE_HIGH>;
+			wp-gpios = <&gpio 6 GPIO_ACTIVE_HIGH>;
+			marvell,detect-delay-ms = <200>;
+			pinctrl-names = "default";
+			pinctrl-0 = < &pmux_mmc2_default &pmux_mmc2_wak_default >;
+			status = "okay";
+		};
+
+		lcd-controller@40500000 {
+			status = "okay";
+			pinctrl-names = "default";
+			pinctrl-0 = <&pmux_lcd_ds01x_default  &pmux_lcd_ds02x_default>;
+			port {
+				lcdc_out: endpoint {
+					remote-endpoint = <&panel_in>;
+					bus-width = <16>;
+				};
+			};
+		};
+
+		lan: smc91c111@14000300 {
+			compatible = "smsc,lan91c111";
+			reg = <0x14000300 0xfffff>;
+			interrupts-extended = <&gpio 102 IRQ_TYPE_EDGE_RISING>;
+			reg-io-width = <2>;
+			dmas = <&pdma 0xffffffff 3>;
+			dma-names = "data";
+			pinctrl-names = "default";
+			pinctrl-0 = < &pmux_lan_default >;
+		};
+
+		keypad: keypad@41500000 {
+			status = "okay";
+			pinctrl-names = "default";
+			pinctrl-0 = < &pmux_keypad_out_default
+				      &pmux_keypad_wak_default >;
+
+			keypad,num-rows = <8>;
+			keypad,num-columns = <8>;
+			linux,keymap = <
+				0x00000041	/* A */
+				0x00010042	/* B */
+				0x00020043	/* C */
+				0x00050044	/* D */
+
+				0x01000045	/* E */
+				0x01010046	/* F */
+				0x01020047	/* G */
+				0x01050048	/* H */
+
+				0x02000049	/* I */
+				0x0201004a	/* J */
+				0x0202004b	/* K */
+				0x0205004c	/* L */
+
+				0x0300004d	/* M */
+				0x0301004e	/* N */
+				0x0302004f	/* O */
+				0x03050050	/* P */
+
+				0x05000051	/* Q */
+				0x05010052	/* R */
+				0x05020053	/* S */
+				0x05050054	/* T */
+
+				0x06000055	/* U */
+				0x06010056	/* V */
+				0x06020057	/* W */
+				0x06050058	/* X */
+
+				0x07010059	/* Y */
+				0x0702005a	/* Z */
+
+				0x04040030	/* 0 */
+				0x01030031	/* 1 */
+				0x04010032	/* 2 */
+				0x01040033	/* 3 */
+				0x02030034	/* 4 */
+				0x04020035	/* 5 */
+				0x02040036	/* 6 */
+				0x03030037	/* 7 */
+				0x04030038	/* 8 */
+				0x03040039	/* 9 */
+
+				0x04050020	/*   */
+				0x0503002a	/* * */
+				0x05040023	/* # */
+
+				0x00070067	/* KEY_UP */
+				0x0107006c	/* KEY_DOWN */
+				0x02070069	/* KEY_LEFT */
+				0x0307006a	/* KEY_RIGHT */
+				0x02060066	/* KEY_HOME */
+				0x0306006b	/* KEY_END */
+				0x0604006f	/* KEY_DELETE */
+				0x0606000e	/* KEY_BACK */
+				0x0603003a	/* KEY_CAPSLOCK */
+
+				0x0406001c	/* KEY_ENTER */
+				0x0507001c	/* KEY_ENTER */
+
+				0x000400d7	/* KEY_EMAIL */
+				0x050600e7	/* KEY_SEND */
+				0x0400018d	/* KEY_CALENDAR */
+				0x070600a7	/* KEY_RECORD */
+				0x06070073	/* KEY_VOLUMEUP */
+				0x07070072	/* KEY_VOLUMEDOWN */
+
+				0x000600c0	/* KEY_F22 */
+				0x010600c1	/* KEY_F23 */
+				0x00030186 >;	/* KEY_AUX */
+
+			marvell,rotary0 = <0x006c0067>;	/* KEY_UP & KEY_DOWN */
+			marvell,debounce-interval = <30>;
+		};
+
+		pxa3xx_ohci: usb@4c000000 {
+			marvell,port-mode = <3>;
+			marvell,enable-port1;
+			marvell,enable-port2;
+			marvell,power-control-low;
+			marvell,port-sense-low;
+			pinctrl-names = "default";
+			pinctrl-0 = < &pmux_usbh_default >;
+			status = "okay";
+		};
+
+		ssp3: ssp@41900000 {
+			compatible = "mrvl,pxa3xx-ssp";
+			reg = <0x41900000 0x40>;
+			interrupts = <0>;
+			clocks = < &clks CLK_SSP3 >;
+			dmas = <&pdma 66 3
+				&pdma 67 3>;
+			dma-names = "rx", "tx";
+			pinctrl-names = "default";
+			pinctrl-0 = < &pmux_ssp3_low_default
+				      &pmux_ssp3_float_default >;
+			status = "okay";
+		};
+
+		ssp_dai0: ssp_dai@0 {
+			compatible = "mrvl,pxa-ssp-dai";
+			port = <&ssp3>;
+			#sound-dai-cells = <0>;
+		};
+		ac97: sound@40500000 {
+		      	compatible = "marvell,pxa2xx-ac97";
+			reg = < 0x40500000 0x1000 >;
+			interrupts = <14>;
+			reset-gpio = <&gpio 113 GPIO_ACTIVE_HIGH>;
+			#sound-dai-cells = <1>;
+			pinctrl-names = "default";
+			pinctrl-0 = < &pmux_ac97_default >;
+			status = "okay";
+		};
+
+		pxa_pcm_audio: snd_soc_pxa_audio {
+			compatible = "mrvl,pxa-pcm-audio";
+			#sound-dai-cells = <1>;
+		};
+		pxa_ssp_dai: snd_soc_pxa_audio {
+			compatible = "mrvl,pxa-pcm-audio";
+			#sound-dai-cells = <1>;
+		};
+
+		wm9713: wm9713@0 {
+			compatible = "wlf,wm9713";
+			#sound-dai-cells = <1>;
+			pinctrl-names = "default";
+			pinctrl-0 = < &pmux_wm9713_default >;
+			status = "okay";
+		};
+	};
+
+	panel {
+		compatible = "sharp,ls037";
+		lcd-type = "color-tft";
+
+		/*
+		power-supply = <&lcd_supply>;
+		backlight = <&lcd_backlight>;
+		*/
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&lcdc_out>;
+			};
+		};
+
+		display-timings {
+			native-mode = <&timing0>;
+			timing0: 480p {
+				/* 480x640p24 */
+				clock-frequency = <39700>;
+				hactive = <240>;
+				vactive = <320>;
+				hfront-porch = <81>;
+				hback-porch = <81>;
+				hsync-len = <8>;
+				vback-porch = <2>;
+				vfront-porch = <7>;
+				vsync-len = <1>;
+				vsync-active = <0>;
+			};
+		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		yellow1-led {
+			label = "zylonite:yellow:1";
+			gpios = <&ext_gpio1 25 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "heartbeat";
+		};
+
+		yellow2-led {
+			label = "zylonite:yellow:2";
+			gpios = <&ext_gpio1 26 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "default-on";
+		};
+	};
+
+	backlight {
+		compatible = "pwm-backlight";
+		pwms = <&pwm1 0 10000>;
+		pwm-names = "backlight";
+
+		brightness-levels = <0 4 8 16 32 64 128 255>;
+		default-brightness-level = <2>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = < &pmux_backlight_default >;
+	};
+
+	sound {
+		compatible = "simple-audio-card";
+		simple-audio-card,name = "Zylonite-Sound-Card";
+		simple-audio-card,format = "ac97";
+		simple-audio-card,widgets =
+			"Headphone", "Headphone",
+			"Microphone", "Headset Microphone",
+			"Microphone", "Handset Microphone",
+			"Speaker", "Multiactor",
+			"Speaker", "Headset Earpiece";
+		simple-audio-card,routing =
+			"Headphone", "HPL",		/* Headphone output */
+			"Headphone", "HPR",		/* connected to HPL/HPR */
+			"Headset Earpiece", "OUT3",	/* On-board earpiece */
+			"MIC2A", "Mic Bias",			/* Headphone mic */
+			"Mic Bias", "Headset Microphone",	/* Headphone mic */
+			"MIC1", "Mic Bias",			/* On-board mic */
+			"Mic Bias", "Handset Microphone",	/* On-board mic */
+			"Multiactor", "SPKL",		/* Multiactor differentially */
+			"Multiactor", "SPKR";		/* connected over SPKL/SPKR */
+	
+		simple-audio-card,dai-link@0 {		/* AC97 */
+			format = "ac97";
+			cpu {
+				sound-dai = <&ac97 0>;
+			};
+			codec {
+				sound-dai = <&wm9713 0>;
+			};
+			plat {
+				sound-dai = <&pxa_pcm_audio 0>;
+			};
+		};
+		simple-audio-card,dai-link@1 {		/* AC97 Aux */
+			format = "ac97";
+			cpu {
+				sound-dai = <&ac97 1>;
+			};
+			codec {
+				sound-dai = <&wm9713 1>;
+			};
+			plat {
+				sound-dai = <&pxa_pcm_audio 0>;
+			};
+		};
+		simple-audio-card,dai-link@2 {		/* AC97 Voice */
+			format = "i2s";
+			cpu {
+				sound-dai = <&ssp_dai0>;
+			};
+			codec {
+				sound-dai = <&wm9713 2>;
+			};
+			plat {
+				sound-dai = <&pxa_pcm_audio 0>;
+			};
+		};
+	};
+};
+
+&pinctrl {
+	status = "okay";
+
+	pmux_i2c_default: i2c-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(21) MFP_AF1
+			MFP_PIN_PXA310(22) MFP_AF1 >;
+		pinctrl-single,low-power-mode = MFP_LPM(MFP_LPM_PULL_HIGH);
+		pinctrl-single,drive-strength = MFP_DS03X;
+	};
+
+	pmux_pca9539_1_default: pca9539-1-default {
+		pinctrl-single,pins = <	MFP_PIN_PXA310(18) MFP_AF0 >;
+		pinctrl-single,low-power-mode = MFP_LPM(MFP_LPM_PULL_HIGH);
+		pinctrl-single,drive-strength = MFP_DS03X;
+	};
+
+	pmux_pca9539_2_default: pca9539-2-default {
+		pinctrl-single,pins = <	MFP_PIN_PXA310(19) MFP_AF0 >;
+		pinctrl-single,low-power-mode = MFP_LPM(MFP_LPM_PULL_HIGH);
+		pinctrl-single,drive-strength = MFP_DS03X;
+	};
+
+	pmux_lcd_ds01x_default: lcd-ds01x-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(54) MFP_AF1	/* LDD_0 */
+			MFP_PIN_PXA310(55) MFP_AF1	/* LDD_1 */
+			MFP_PIN_PXA310(56) MFP_AF1	/* LDD_2 */
+			MFP_PIN_PXA310(57) MFP_AF1	/* LDD_3 */
+			MFP_PIN_PXA310(58) MFP_AF1	/* LDD_4 */
+			MFP_PIN_PXA310(59) MFP_AF1	/* LDD_5 */
+			MFP_PIN_PXA310(60) MFP_AF1	/* LDD_6 */
+			MFP_PIN_PXA310(61) MFP_AF1	/* LDD_7 */
+			MFP_PIN_PXA310(62) MFP_AF1	/* LDD_8 */
+			MFP_PIN_PXA310(63) MFP_AF1	/* LDD_9 */
+			MFP_PIN_PXA310(64) MFP_AF1	/* LDD_10 */
+			MFP_PIN_PXA310(65) MFP_AF1	/* LDD_11 */
+			MFP_PIN_PXA310(66) MFP_AF1	/* LDD_12 */
+			MFP_PIN_PXA310(67) MFP_AF1	/* LDD_13 */
+			MFP_PIN_PXA310(68) MFP_AF1	/* LDD_14 */
+			MFP_PIN_PXA310(69) MFP_AF1	/* LDD_15 */
+			MFP_PIN_PXA310(72) MFP_AF1	/* FCLK */
+			MFP_PIN_PXA310(73) MFP_AF1	/* LCLK */
+			MFP_PIN_PXA310(75) MFP_AF1	/* BIAS */
+			MFP_PIN_PXA310(76) MFP_AF2	/* VSYNC */
+			MFP_PIN_PXA310(127) MFP_AF1	/* CS_N */
+		>;
+		pinctrl-single,drive-strength = MFP_DS01X;
+	};
+
+	pmux_lcd_ds02x_default: lcd-ds02x-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(74) MFP_AF1	/* LDD_0 */
+		>;
+		pinctrl-single,drive-strength = MFP_DS02X;
+	};
+
+	pmux_backlight_default: backlight-default  {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(20) MFP_AF1	/* PWM3_OUT */
+		>;
+		pinctrl-single,drive-strength = MFP_DS03X;
+	};
+
+	pmux_btuart_default: btuart-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(111) MFP_AF1	/* UART2_RTS */
+			MFP_PIN_PXA310(113) MFP_AF1	/* UART2_TXD */
+		>;
+		pinctrl-single,low-power-mode = MFP_LPM(MFP_LPM_FLOAT);
+	};
+	pmux_btuart_wak1_default: btuart-wake-fall-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(112) MFP_AF1	/* UART2_RXD */
+		>;
+		pinctrl-single,low-power-mode = MFP_LPM(MFP_LPM_FLOAT | MFP_LPM_EDGE_FALL);
+	};
+	pmux_btuart_wak2_default: btuart-wake-both-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(114) MFP_AF1	/* UART2_CTS */
+		>;
+		pinctrl-single,low-power-mode = MFP_LPM(MFP_LPM_FLOAT | MFP_LPM_EDGE_BOTH);
+	};
+
+	pmux_ffuart_default: ffuart-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(99) MFP_AF1	/* UART1_RXD */
+			MFP_PIN_PXA310(100) MFP_AF1	/* UART1_TXD */
+			MFP_PIN_PXA310(101) MFP_AF1	/* UART1_CTS */
+			MFP_PIN_PXA310(106) MFP_AF1	/* UART1_RTS */
+		>;
+		pinctrl-single,low-power-mode = MFP_LPM(MFP_LPM_FLOAT);
+		pinctrl-single,drive-strength = MFP_DS03X;
+	};
+	pmux_ffuart_wak1_default: ffuart-wake-both-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(99) MFP_AF1	/* UART1_RXD */
+		>;
+		pinctrl-single,low-power-mode = MFP_LPM(MFP_LPM_EDGE_BOTH);
+	};
+
+	pmux_lan_default: lan-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(2) MFP_AF1	/* nCS3 */
+			MFP_PIN_PXA310(102) MFP_AF0	/* GPIO 102 */
+		>;
+		pinctrl-single,drive-strength = MFP_DS03X;
+	};
+
+	pmux_mmc1_default: mmc1-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(3) MFP_AF4	/* MMC1_DAT0 */
+			MFP_PIN_PXA310(5) MFP_AF4	/* MMC1_DAT2 */
+			MFP_PIN_PXA310(6) MFP_AF4	/* MMC1_DAT3 */
+			MFP_PIN_PXA310(7) MFP_AF4	/* MMC1_CLK */
+			MFP_PIN_PXA310(8) MFP_AF4	/* MMC1_CMD */
+			MFP_PIN_PXA310(15) MFP_AF0	/* CMD1 default as GPIO for slot 0 */
+		>;
+		pinctrl-single,drive-strength = MFP_DS03X;
+		pinctrl-single,low-power-mode = MFP_LPM(MFP_LPM_DRIVE_HIGH);
+	};
+	pmux_mmc1_wak_default: mmc1-wake-both-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(4) MFP_AF4	/* MMC1_DAT1 */
+		>;
+		pinctrl-single,drive-strength = MFP_DS03X;
+		pinctrl-single,low-power-mode = MFP_LPM(MFP_LPM_EDGE_BOTH);
+	};
+
+	pmux_mmc2_default: mmc2-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(9) MFP_AF4	/* MMC2_DAT0 */
+			MFP_PIN_PXA310(11) MFP_AF4	/* MMC2_DAT2 */
+			MFP_PIN_PXA310(12) MFP_AF4	/* MMC2_DAT3 */
+			MFP_PIN_PXA310(13) MFP_AF4	/* MMC2_CLK */
+			MFP_PIN_PXA310(14) MFP_AF4	/* MMC2_CMD */
+		>;
+		pinctrl-single,drive-strength = MFP_DS03X;
+		pinctrl-single,low-power-mode = MFP_LPM(MFP_LPM_PULL_HIGH);
+	};
+	pmux_mmc2_wak_default: mmc2-wake-both-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(10) MFP_AF4	/* MMC2_DAT1 */
+		>;
+		pinctrl-single,drive-strength = MFP_DS03X;
+		pinctrl-single,low-power-mode = MFP_LPM(MFP_LPM_EDGE_BOTH | MFP_LPM_PULL_HIGH);
+	};
+
+	pmux_mmc3_default: mmc3-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(256 + 7) MFP_AF1		/* MMC3_DAT0 */
+			MFP_PIN_PXA310(256 + 9) MFP_AF1		/* MMC3_DAT2 */
+			MFP_PIN_PXA310(256 + 10) MFP_AF1	/* MMC3_DAT3 */
+			MFP_PIN_PXA310(103) MFP_AF2		/* MMC3_CLK */
+			MFP_PIN_PXA310(105) MFP_AF2		/* MMC3_CMD */
+		>;
+		pinctrl-single,drive-strength = MFP_DS03X;
+	};
+	pmux_mmc3_wak_default: mmc3-wake-both-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(256 + 8) MFP_AF1	/* MMC3_DAT1 */
+		>;
+		pinctrl-single,drive-strength = MFP_DS03X;
+		pinctrl-single,low-power-mode = MFP_LPM(MFP_LPM_EDGE_BOTH);
+	};
+
+	pmux_usbh_default: usbh-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(256 + 0) MFP_AF1	/* USBH_PEN */
+			MFP_PIN_PXA310(256 + 1) MFP_AF1	/* USBH_PWR */
+		>;
+		pinctrl-single,drive-strength = MFP_DS03X;
+	};
+
+	pmux_keypad_out_default: keypad-out-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(121) MFP_AF1	/* MKOUT_0 */
+			MFP_PIN_PXA310(122) MFP_AF1	/* MKOUT_1 */
+			MFP_PIN_PXA310(123) MFP_AF1	/* MKOUT_2 */
+			MFP_PIN_PXA310(124) MFP_AF1	/* MKOUT_3 */
+			MFP_PIN_PXA310(125) MFP_AF1	/* MKOUT_4 */
+			MFP_PIN_PXA310(256 + 5) MFP_AF1	/* MKOUT_5 */
+			MFP_PIN_PXA310(256 + 6) MFP_AF1	/* MKOUT_6 */
+			MFP_PIN_PXA310(256 + 7) MFP_AF1	/* MKOUT_7 */
+		>;
+		pinctrl-single,drive-strength = MFP_DS03X;
+	};
+	pmux_keypad_wak_default: keypad-wake-both-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(107) MFP_AF2	/* KP_DKIN_0 */
+			MFP_PIN_PXA310(108) MFP_AF2	/* KP_DKIN_0 */
+			MFP_PIN_PXA310(115) MFP_AF1	/* KP_MKIN_0 */
+			MFP_PIN_PXA310(116) MFP_AF1	/* KP_MKIN_1 */
+			MFP_PIN_PXA310(117) MFP_AF1	/* KP_MKIN_2 */
+			MFP_PIN_PXA310(118) MFP_AF1	/* KP_MKIN_3 */
+			MFP_PIN_PXA310(119) MFP_AF1	/* KP_MKIN_4 */
+			MFP_PIN_PXA310(120) MFP_AF1	/* KP_MKIN_5 */
+			MFP_PIN_PXA310(256 + 2) MFP_AF1	/* KP_MKIN_6 */
+			MFP_PIN_PXA310(256 + 3) MFP_AF1	/* KP_MKIN_7 */
+			>;
+		pinctrl-single,low-power-mode = MFP_LPM(MFP_LPM_FLOAT | MFP_LPM_EDGE_BOTH);
+	};
+
+	pmux_ac97_default: ac97-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(23) MFP_AF1	/* AC97_nACRESET */
+			MFP_PIN_PXA310(24) MFP_AF1	/* AC97_SYSCLK */
+			MFP_PIN_PXA310(29) MFP_AF1	/* AC97_BITCLK */
+			MFP_PIN_PXA310(25) MFP_AF1	/* AC97_SDATA_IN_0 */
+			MFP_PIN_PXA310(27) MFP_AF1	/* AC97_SDATA_OUT */
+			MFP_PIN_PXA310(28) MFP_AF1	/* AC97_SYNC */
+			MFP_PIN_PXA310(17) MFP_AF0	/* GPIO unused */
+		>;
+		pinctrl-single,drive-strength = MFP_DS03X;
+	};
+	pmux_wm9713_default: wm9713-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(26) MFP_AF0	/* WM9713 IRQ */
+		>;
+	};
+
+	pmux_ssp3_low_default: ssp3-low-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(92) MFP_AF1	/* SSP3_FRM */
+			MFP_PIN_PXA310(93) MFP_AF1	/* SSP3_TXD */
+		>;
+		pinctrl-single,drive-strength = MFP_DS08X;
+		pinctrl-single,low-power-mode = MFP_LPM(MFP_LPM_DRIVE_LOW);
+	};
+	pmux_ssp3_float_default: ssp3-float-default {
+		pinctrl-single,pins = <
+			MFP_PIN_PXA310(91) MFP_AF1	/* SSP3_SCLK */
+			MFP_PIN_PXA310(94) MFP_AF1	/* SSP3_RXD */
+		>;
+		pinctrl-single,drive-strength = MFP_DS08X;
+		pinctrl-single,low-power-mode = MFP_LPM(MFP_LPM_FLOAT);
+	};
+};
