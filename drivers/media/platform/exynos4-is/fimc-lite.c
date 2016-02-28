@@ -1010,7 +1010,7 @@ static int fimc_lite_link_setup(struct media_entity *entity,
 	case FLITE_SD_PAD_SOURCE_DMA:
 		if (!(flags & MEDIA_LNK_FL_ENABLED))
 			atomic_set(&fimc->out_path, FIMC_IO_NONE);
-		else if (is_media_entity_v4l2_io(remote->entity))
+		else if (is_media_entity_video_device(remote->entity))
 			atomic_set(&fimc->out_path, FIMC_IO_DMA);
 		else
 			ret = -EINVAL;
