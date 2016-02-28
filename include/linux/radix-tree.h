@@ -308,6 +308,14 @@ unsigned long radix_tree_range_tag_if_tagged(struct radix_tree_root *root,
 int radix_tree_tagged(struct radix_tree_root *root, unsigned int tag);
 unsigned long radix_tree_locate_item(struct radix_tree_root *root, void *item);
 
+void *radix_tree_lookup_lock(struct radix_tree_root *root, wait_queue_head_t *wq,
+			     unsigned long index, spinlock_t *lock);
+void radix_tree_unlock(struct radix_tree_root *root, wait_queue_head_t *wq,
+		       unsigned long index);
+void radix_tree_delete_unlock(struct radix_tree_root *root, wait_queue_head_t *wq,
+			      unsigned long index);
+
+
 static inline void radix_tree_preload_end(void)
 {
 	preempt_enable();
