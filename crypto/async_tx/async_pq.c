@@ -442,7 +442,7 @@ static int __init async_pq_init(void)
 	return -ENOMEM;
 }
 
-static void __exit async_pq_exit(void)
+static void async_pq_exit(void)
 {
 	put_page(pq_scribble_page);
 }
