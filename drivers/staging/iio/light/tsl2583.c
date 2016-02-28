@@ -241,7 +241,8 @@ static int taos_get_lux(struct iio_dev *indio_dev)
 	}
 
 	/* clear status, really interrupt status (interrupts are off), but
-	 * we use the bit anyway - don't forget 0x80 - this is a command*/
+	 * we use the bit anyway - don't forget 0x80 - this is a command
+	 */
 	ret = i2c_smbus_write_byte(chip->client,
 				   (TSL258X_CMD_REG | TSL258X_CMD_SPL_FN |
 				    TSL258X_CMD_ALS_INT_CLR));
@@ -430,7 +431,8 @@ static int taos_chip_on(struct iio_dev *indio_dev)
 	chip->als_time_scale = (als_time + 25) / 50;
 
 	/* TSL258x Specific power-on / adc enable sequence
-	 * Power on the device 1st. */
+	 * Power on the device 1st.
+	 */
 	utmp = TSL258X_CNTL_PWR_ON;
 	ret = i2c_smbus_write_byte_data(chip->client,
 					TSL258X_CMD_REG | TSL258X_CNTRL, utmp);
@@ -440,7 +442,8 @@ static int taos_chip_on(struct iio_dev *indio_dev)
 	}
 
 	/* Use the following shadow copy for our delay before enabling ADC.
-	 * Write all the registers. */
+	 * Write all the registers.
+	 */
 	for (i = 0, uP = chip->taos_config; i < TSL258X_REG_MAX; i++) {
 		ret = i2c_smbus_write_byte_data(chip->client,
 						TSL258X_CMD_REG + i,
@@ -454,7 +457,8 @@ static int taos_chip_on(struct iio_dev *indio_dev)
 
 	usleep_range(3000, 3500);
 	/* NOW enable the ADC
-	 * initialize the desired mode of operation */
+	 * initialize the desired mode of operation
+	 */
 	utmp = TSL258X_CNTL_PWR_ON | TSL258X_CNTL_ADC_ENBL;
 	ret = i2c_smbus_write_byte_data(chip->client,
 					TSL258X_CMD_REG | TSL258X_CNTRL,
@@ -696,7 +700,8 @@ static ssize_t taos_luxtable_show(struct device *dev,
 				  taos_device_lux[i].ch1);
 		if (taos_device_lux[i].ratio == 0) {
 			/* We just printed the first "0" entry.
-			 * Now get rid of the extra "," and break. */
+			 * Now get rid of the extra "," and break.
+			 */
 			offset--;
 			break;
 		}
