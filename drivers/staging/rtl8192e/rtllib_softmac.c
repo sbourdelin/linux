@@ -13,7 +13,6 @@
  * released under the GPL
  */
 
-
 #include "rtllib.h"
 
 #include <linux/random.h>
@@ -24,7 +23,6 @@
 #include "dot11d.h"
 
 static void rtllib_sta_wakeup(struct rtllib_device *ieee, short nl);
-
 
 static short rtllib_is_54g(struct rtllib_network *net)
 {
