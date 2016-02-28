@@ -1591,6 +1591,7 @@ struct task_struct {
 
 	unsigned long sas_ss_sp;
 	size_t sas_ss_size;
+	unsigned sas_ss_flags;
 
 	struct callback_head *task_works;
 

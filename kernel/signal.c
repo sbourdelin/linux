@@ -3100,13 +3100,14 @@ do_sigaltstack (const stack_t __user *uss, stack_t __user *uoss, unsigned long s
 	if (uss) {
 		void __user *ss_sp;
 		size_t ss_size;
-		int ss_flags;
+		unsigned ss_flags;
+		unsigned ss_xflags;
 
 		error = -EFAULT;
 		if (!access_ok(VERIFY_READ, uss, sizeof(*uss)))
 			goto out;
 		error = __get_user(ss_sp, &uss->ss_sp) |
-			__get_user(ss_flags, &uss->ss_flags) |
+			__get_user(ss_xflags, &uss->ss_flags) |
 			__get_user(ss_size, &uss->ss_size);
 		if (error)
 			goto out;
@@ -3115,14 +3116,8 @@ do_sigaltstack (const stack_t __user *uss, stack_t __user *uoss, unsigned long s
 		if (on_sig_stack(sp))
 			goto out;
 
+		ss_flags = ss_xflags & SS_VALMASK;
 		error = -EINVAL;
-		/*
-		 * Note - this code used to test ss_flags incorrectly:
-		 *  	  old code may have been written using ss_flags==0
-		 *	  to mean ss_flags==SS_ONSTACK (as this was the only
-		 *	  way that worked) - this fix preserves that older
-		 *	  mechanism.
-		 */
 		if (ss_flags != SS_DISABLE && ss_flags != SS_ONSTACK && ss_flags != 0)
 			goto out;
 
@@ -3137,6 +3132,7 @@ do_sigaltstack (const stack_t __user *uss, stack_t __user *uoss, unsigned long s
 
 		current->sas_ss_sp = (unsigned long) ss_sp;
 		current->sas_ss_size = ss_size;
+		current->sas_ss_flags = ss_xflags;
 	}
 
 	error = 0;
@@ -3167,9 +3163,14 @@ int restore_altstack(const stack_t __user *uss)
 int __save_altstack(stack_t __user *uss, unsigned long sp)
 {
 	struct task_struct *t = current;
-	return  __put_user((void __user *)t->sas_ss_sp, &uss->ss_sp) |
-		__put_user(sas_ss_flags(sp), &uss->ss_flags) |
+	int err = __put_user((void __user *)t->sas_ss_sp, &uss->ss_sp) |
+		__put_user(t->sas_ss_flags, &uss->ss_flags) |
 		__put_user(t->sas_ss_size, &uss->ss_size);
+	if (err)
+		return err;
+	if (t->sas_ss_flags & SS_AUTODISARM)
+		t->sas_ss_size = 0;
+	return 0;
 }
 
 #ifdef CONFIG_COMPAT
