@@ -1952,27 +1952,25 @@ err:
 	return -ENOMEM;
 }
 
+/**
+ *	Synchronously pushes the terminal flip buffers to the line discipline
+ *	and checks for available data.
+ *
+ *	Must not be called from IRQ context.
+ */
 static inline int input_available_p(struct tty_struct *tty, int poll)
 {
 	struct n_tty_data *ldata = tty->disc_data;
-	int amt = poll && !TIME_CHAR(tty) && MIN_CHAR(tty) ? MIN_CHAR(tty) : 1;
+	int amt;
+
+	flush_work(&tty->port->buf.work);
+
+	amt = poll && !TIME_CHAR(tty) && MIN_CHAR(tty) ? MIN_CHAR(tty) : 1;
 
 	if (ldata->icanon && !L_EXTPROC(tty))
 		return ldata->canon_head != ldata->read_tail;
 	else
 		return ldata->commit_head - ldata->read_tail >= amt;
-}
-
-static inline int check_other_done(struct tty_struct *tty)
-{
-	int done = test_bit(TTY_OTHER_DONE, &tty->flags);
-	if (done) {
-		/* paired with cmpxchg() in check_other_closed(); ensures
-		 * read buffer head index is not stale
-		 */
-		smp_mb__after_atomic();
-	}
-	return done;
 }
 
 /**
@@ -2170,7 +2168,7 @@ static ssize_t n_tty_read(struct tty_struct *tty, struct file *file,
 	struct n_tty_data *ldata = tty->disc_data;
 	unsigned char __user *b = buf;
 	DEFINE_WAIT_FUNC(wait, woken_wake_function);
-	int c, done;
+	int c;
 	int minimum, time;
 	ssize_t retval = 0;
 	long timeout;
@@ -2238,10 +2236,8 @@ static ssize_t n_tty_read(struct tty_struct *tty, struct file *file,
 		    ((minimum - (b - buf)) >= 1))
 			ldata->minimum_to_wake = (minimum - (b - buf));
 
-		done = check_other_done(tty);
-
 		if (!input_available_p(tty, 0)) {
-			if (done) {
+			if (test_bit(TTY_OTHER_CLOSED, &tty->flags)) {
 				retval = -EIO;
 				break;
 			}
@@ -2445,12 +2441,12 @@ static unsigned int n_tty_poll(struct tty_struct *tty, struct file *file,
 
 	poll_wait(file, &tty->read_wait, wait);
 	poll_wait(file, &tty->write_wait, wait);
-	if (check_other_done(tty))
-		mask |= POLLHUP;
 	if (input_available_p(tty, 1))
 		mask |= POLLIN | POLLRDNORM;
 	if (tty->packet && tty->link->ctrl_status)
 		mask |= POLLPRI | POLLIN | POLLRDNORM;
+	if (test_bit(TTY_OTHER_CLOSED, &tty->flags))
+		mask |= POLLHUP;
 	if (tty_hung_up_p(file))
 		mask |= POLLHUP;
 	if (!(mask & (POLLHUP | POLLIN | POLLRDNORM))) {

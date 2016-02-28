@@ -600,7 +600,7 @@ static ssize_t n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
 	add_wait_queue(&tty->read_wait, &wait);
 
 	for (;;) {
-		if (test_bit(TTY_OTHER_DONE, &tty->flags)) {
+		if (test_bit(TTY_OTHER_CLOSED, &tty->flags)) {
 			ret = -EIO;
 			break;
 		}
