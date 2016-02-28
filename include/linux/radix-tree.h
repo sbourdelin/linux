@@ -40,8 +40,13 @@
  * Indirect pointer in fact is also used to tag the last pointer of a node
  * when it is shrunk, before we rcu free the node. See shrink code for
  * details.
+ *
+ * To allow an exception entry to only lose one bit, we ignore
+ * the INDIRECT bit when the exception bit is set.  So an entry is
+ * indirect if the least significant 2 bits are 01.
  */
 #define RADIX_TREE_INDIRECT_PTR		1
+#define RADIX_TREE_INDIRECT_MASK	3
 /*
  * A common use of the radix tree is to store pointers to struct pages;
  * but shmem/tmpfs needs also to store swap entries in the same tree:
@@ -53,7 +58,8 @@
 
 static inline int radix_tree_is_indirect_ptr(void *ptr)
 {
-	return (int)((unsigned long)ptr & RADIX_TREE_INDIRECT_PTR);
+	return ((unsigned long)ptr & RADIX_TREE_INDIRECT_MASK)
+		== RADIX_TREE_INDIRECT_PTR;
 }
 
 /*** radix-tree API starts here ***/
@@ -221,7 +227,8 @@ static inline void *radix_tree_deref_slot_protected(void **pslot,
  */
 static inline int radix_tree_deref_retry(void *arg)
 {
-	return unlikely((unsigned long)arg & RADIX_TREE_INDIRECT_PTR);
+	return unlikely(((unsigned long)arg & RADIX_TREE_INDIRECT_MASK)
+			== RADIX_TREE_INDIRECT_PTR);
 }
 
 /**
