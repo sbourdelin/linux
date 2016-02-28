@@ -1255,6 +1255,10 @@ end:
 	if (ret) {
 		clear_probe_trace_event(tev);
 		tf->ntevs--;
+		if (tf->ntevs != 0) {
+			pr_debug("Ignoring error as atleast one probe point found.\n");
+			ret = 0;
+		}
 	}
 	free(args);
 	return ret;
