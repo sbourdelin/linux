@@ -1913,6 +1913,13 @@ static int rcar_vin_get_selection(struct soc_camera_device *icd,
 	return 0;
 }
 
+static int rcar_vin_cropcap(struct soc_camera_device *icd,
+			    struct v4l2_cropcap *crop)
+{
+	/* TODO */
+	return 0;
+}
+
 static struct soc_camera_host_ops rcar_vin_host_ops = {
 	.owner		= THIS_MODULE,
 	.add		= rcar_vin_add_device,
@@ -1928,6 +1935,7 @@ static struct soc_camera_host_ops rcar_vin_host_ops = {
 	.set_bus_param	= rcar_vin_set_bus_param,
 	.init_videobuf2	= rcar_vin_init_videobuf2,
 	.get_selection	= rcar_vin_get_selection,
+	.cropcap	= rcar_vin_cropcap,
 };
 
 #ifdef CONFIG_OF
