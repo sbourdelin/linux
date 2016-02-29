@@ -34,6 +34,7 @@
 #include <drm/drm_edid.h>
 #include <drm/drmP.h>
 #include "intel_drv.h"
+#include "intel_dsi.h"
 #include <drm/i915_drm.h>
 #include "i915_drv.h"
 #include "i915_trace.h"
@@ -9969,11 +9970,66 @@ static void haswell_get_ddi_port_state(struct intel_crtc *crtc,
 	}
 }
 
+enum pipe pipe_linked_to_dsi_port(struct drm_device *dev, enum port port)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	enum pipe pipe = INVALID_PIPE;
+	uint32_t dsi_ctrl;
+
+	dsi_ctrl = I915_READ(MIPI_CTRL(port));
+	switch (dsi_ctrl & BXT_PIPE_SELECT_MASK) {
+	case BXT_PIPE_SELECT(PIPE_A):
+		pipe = PIPE_A;
+		break;
+	case BXT_PIPE_SELECT(PIPE_B):
+		pipe = PIPE_B;
+		break;
+	case BXT_PIPE_SELECT(PIPE_C):
+		pipe = PIPE_C;
+		break;
+	default:
+		WARN(1, "unknown pipe linked to dsi transcoder\n");
+	}
+
+	return pipe;
+}
+
+struct intel_encoder *bxt_get_dsi_encoder_for_crtc(struct intel_crtc *crtc,
+					struct intel_crtc_state *pipe_config)
+{
+	struct drm_device *dev = crtc->base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_encoder *intel_encoder;
+	struct intel_dsi *intel_dsi;
+	enum port port;
+
+	for_each_intel_encoder(dev, intel_encoder) {
+		if (intel_encoder->type == INTEL_OUTPUT_DSI) {
+			intel_dsi = enc_to_intel_dsi(&intel_encoder->base);
+			if (!intel_dsi)
+				continue;
+
+			for_each_dsi_port(port, intel_dsi->ports) {
+				if (!(I915_READ(BXT_MIPI_PORT_CTRL(port)) &
+								DPI_ENABLE))
+					continue;
+				if (pipe_linked_to_dsi_port(dev, port) ==
+								crtc->pipe) {
+					pipe_config->has_dsi_encoder = true;
+					return intel_encoder;
+				}
+			}
+		}
+	}
+	return NULL;
+}
+
 static bool haswell_get_pipe_config(struct intel_crtc *crtc,
 				    struct intel_crtc_state *pipe_config)
 {
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_encoder *intel_encoder, *attached_encoder = NULL;
 	enum intel_display_power_domain power_domain;
 	unsigned long power_domain_mask;
 	uint32_t tmp;
@@ -10011,18 +10067,40 @@ static bool haswell_get_pipe_config(struct intel_crtc *crtc,
 			pipe_config->cpu_transcoder = TRANSCODER_EDP;
 	}
 
+	for_each_encoder_on_crtc(dev, &crtc->base, intel_encoder)
+		attached_encoder = intel_encoder;
+
+	/*
+	 * attached_encoder will be NULL, if there is no modeset from the
+	 * kernel bootup.
+	 */
+	if (!attached_encoder && dev_priv->vbt.has_mipi && IS_BROXTON(dev))
+		attached_encoder =
+				bxt_get_dsi_encoder_for_crtc(crtc, pipe_config);
+
 	power_domain = POWER_DOMAIN_TRANSCODER(pipe_config->cpu_transcoder);
 	if (!intel_display_power_get_if_enabled(dev_priv, power_domain))
 		goto out;
 	power_domain_mask |= BIT(power_domain);
 
-	tmp = I915_READ(PIPECONF(pipe_config->cpu_transcoder));
-	if (!(tmp & PIPECONF_ENABLE))
-		goto out;
+	if (attached_encoder && attached_encoder->get_pipe_config)
+		/*
+		 * BXT doesn't have the PIPE timing registers.
+		 * Hence retrieved the pipe detail from PORT register.
+		 * And timing parameters are obtained from VBT
+		 */
+		attached_encoder->get_pipe_config(attached_encoder,
+								pipe_config);
+	else {
+		tmp = I915_READ(PIPECONF(pipe_config->cpu_transcoder));
+		if (!(tmp & PIPECONF_ENABLE))
+			goto out;
 
-	haswell_get_ddi_port_state(crtc, pipe_config);
+		if (!IS_VALLEYVIEW(dev))
+			haswell_get_ddi_port_state(crtc, pipe_config);
 
-	intel_get_pipe_timings(crtc, pipe_config);
+		intel_get_pipe_timings(crtc, pipe_config);
+	}
 
 	if (INTEL_INFO(dev)->gen >= 9) {
 		skl_init_scalers(dev, crtc, pipe_config);

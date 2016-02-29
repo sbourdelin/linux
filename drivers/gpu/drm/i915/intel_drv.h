@@ -152,6 +152,13 @@ struct intel_encoder {
 	void (*get_config)(struct intel_encoder *,
 			   struct intel_crtc_state *pipe_config);
 	/*
+	 * Retrives the PIPE config from the PORT registers where PIPE
+	 * registers are invalid and only PORT registers will hold the timing
+	 * parameters.
+	 */
+	void (*get_pipe_config)(struct intel_encoder *,
+			   struct intel_crtc_state *pipe_config);
+	/*
 	 * Called during system suspend after all pending requests for the
 	 * encoder are flushed (for example for DP AUX transactions) and
 	 * device interrupts are disabled.
@@ -1312,7 +1319,7 @@ int intel_dp_mst_encoder_init(struct intel_digital_port *intel_dig_port, int con
 void intel_dp_mst_encoder_cleanup(struct intel_digital_port *intel_dig_port);
 /* intel_dsi.c */
 void intel_dsi_init(struct drm_device *dev);
-
+enum pipe pipe_linked_to_dsi_port(struct drm_device *dev, enum port port);
 
 /* intel_dvo.c */
 void intel_dvo_init(struct drm_device *dev);
