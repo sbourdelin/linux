@@ -85,6 +85,7 @@ enum pcie_port_type {
 
 struct pcie_port_config {
 	bool suspend_allowed;
+	bool runtime_suspend_allowed;
 };
 
 static const struct pcie_port_config pcie_port_configs[] = {
@@ -154,6 +155,11 @@ static bool pcie_port_suspend_allowed(struct pci_dev *pdev)
 	return pcie_port_can_suspend(pdev);
 }
 
+static bool pcie_port_runtime_suspend_allowed(struct pci_dev *pdev)
+{
+	return pcie_port_get_config(pdev)->runtime_suspend_allowed;
+}
+
 static int pcie_port_suspend_noirq(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
@@ -188,6 +194,34 @@ static int pcie_port_resume_noirq(struct device *dev)
 	return 0;
 }
 
+static int pcie_port_runtime_suspend(struct device *dev)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	/*
+	 * All devices behind the port are assumed to be in D3cold so
+	 * update their state now.
+	 */
+	__pci_bus_set_current_state(pdev->subordinate, PCI_D3cold);
+	return 0;
+}
+
+static int pcie_port_runtime_resume(struct device *dev)
+{
+	return 0;
+}
+
+static int pcie_port_runtime_idle(struct device *dev)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	if (pcie_port_can_suspend(pdev)) {
+		pm_schedule_suspend(dev, 10);
+		return 0;
+	}
+	return -EBUSY;
+}
+
 static const struct dev_pm_ops pcie_portdrv_pm_ops = {
 	.suspend	= pcie_port_device_suspend,
 	.resume		= pcie_port_device_resume,
@@ -197,11 +231,19 @@ static const struct dev_pm_ops pcie_portdrv_pm_ops = {
 	.restore	= pcie_port_device_resume,
 	.suspend_noirq	= pcie_port_suspend_noirq,
 	.resume_noirq	= pcie_port_resume_noirq,
+	.runtime_suspend = pcie_port_runtime_suspend,
+	.runtime_resume	= pcie_port_runtime_resume,
+	.runtime_idle	= pcie_port_runtime_idle,
 };
 
 #define PCIE_PORTDRV_PM_OPS	(&pcie_portdrv_pm_ops)
 
 #else /* !PM */
+
+static inline bool pcie_port_runtime_suspend_allowed(struct pci_dev *pdev)
+{
+	return false;
+}
 
 #define PCIE_PORTDRV_PM_OPS	NULL
 #endif /* !PM */
@@ -230,11 +272,18 @@ static int pcie_portdrv_probe(struct pci_dev *dev,
 		return status;
 
 	pci_save_state(dev);
+
+	if (pcie_port_runtime_suspend_allowed(dev))
+		pm_runtime_put_noidle(&dev->dev);
+
 	return 0;
 }
 
 static void pcie_portdrv_remove(struct pci_dev *dev)
 {
+	if (pcie_port_runtime_suspend_allowed(dev))
+		pm_runtime_get_noresume(&dev->dev);
+
 	pcie_port_device_remove(dev);
 }
 
