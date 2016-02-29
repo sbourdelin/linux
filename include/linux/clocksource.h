@@ -259,6 +259,6 @@ static inline void clocksource_probe(void) {}
 #endif
 
 #define CLOCKSOURCE_ACPI_DECLARE(name, table_id, fn)		\
-	ACPI_DECLARE_PROBE_ENTRY(clksrc, name, table_id, 0, NULL, 0, fn)
+	ACPI_DECLARE_PROBE_ENTRY(clksrc, name, table_id, fn, NULL)
 
 #endif /* _LINUX_CLOCKSOURCE_H */
