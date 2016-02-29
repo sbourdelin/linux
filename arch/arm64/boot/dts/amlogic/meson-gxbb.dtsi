@@ -117,7 +117,9 @@
 		gic: interrupt-controller@c4301000 {
 			compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
 			reg = <0x0 0xc4301000 0 0x1000>,
-			      <0x0 0xc4302000 0 0x0100>;
+			      <0x0 0xc4302000 0 0x0100>,
+			      <0x0 0xc4304000 0 0x2000>,
+			      <0x0 0xc4306000 0 0x2000>;
 			interrupt-controller;
 			interrupts = <GIC_PPI 9
 				(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
