@@ -2786,6 +2786,12 @@ static int _regulator_do_set_voltage(struct regulator_dev *rdev,
 			delay = 0;
 		}
 
+		if (delay && rdev->constraints &&
+		    rdev->constraints->ramp_delay_scale) {
+			delay *= rdev->constraints->ramp_delay_scale;
+			delay = DIV_ROUND_UP(delay, 100);
+		}
+
 		/* Insert any necessary delays */
 		if (delay >= 1000) {
 			mdelay(delay / 1000);

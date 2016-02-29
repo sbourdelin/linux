@@ -100,6 +100,12 @@ struct regulator_state {
  * @initial_state: Suspend state to set by default.
  * @initial_mode: Mode to set at startup.
  * @ramp_delay: Time to settle down after voltage change (unit: uV/us)
+ * @ramp_delay_scale: Scaling in ramp delay to provide extra guard time
+ *		      to settle down after voltage change. This is
+ *		      provided in terms of percentage like 200% means
+ *		      2x of calculated ramp delay for given voltage change.
+ *		      The final delay is calucated as:
+			DIV_ROUND_UP(ramp_delay * ramp_delay_scale, 100);
  * @enable_time: Turn-on time of the rails (unit: microseconds)
  */
 struct regulation_constraints {
@@ -139,6 +145,7 @@ struct regulation_constraints {
 
 	unsigned int ramp_delay;
 	unsigned int enable_time;
+	unsigned int ramp_delay_scale;
 
 	/* constraint flags */
 	unsigned always_on:1;	/* regulator never off when system is on */
