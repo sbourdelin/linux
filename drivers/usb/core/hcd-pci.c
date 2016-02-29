@@ -74,6 +74,16 @@ static void for_each_companion(struct pci_dev *pdev, struct usb_hcd *hcd,
 		if (companion->bus != pdev->bus ||
 				PCI_SLOT(companion->devfn) != slot)
 			continue;
+
+		/*
+		 * On certain platforms Host Controller and Device Controller
+		 * figure as same device with different device function. HCD
+		 * should not pass data to Device Controller. Checking if
+		 * companion device is Device Controller and omitting it.
+		 */
+		if (companion->class == ((PCI_CLASS_SERIAL_USB << 8) | 0xfe))
+			continue;
+
 		companion_hcd = pci_get_drvdata(companion);
 		if (!companion_hcd || !companion_hcd->self.root_hub)
 			continue;
