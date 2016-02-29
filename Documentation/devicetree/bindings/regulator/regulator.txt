@@ -16,6 +16,13 @@ Optional properties:
 - regulator-ramp-delay: ramp delay for regulator(in uV/uS)
   For hardware which supports disabling ramp rate, it should be explicitly
   initialised to zero (regulator-ramp-delay = <0>) for disabling ramp delay.
+- regulator-ramp-delay-scale: Platform specific scaling in ramp delay to
+  provide extra guard time to settle down voltage after its change. This will
+  help to wait for extra time for voltage settling based on platform behavior.
+  This is provided in terms of percentage scaling like 300% means final delay
+  will become 3x of calculated ramp delay for voltage change.
+  The final delay is calculated as:
+	delay = DIV_ROUND_UP(ramp-delay * ramp-delay-scale, 100)
 - regulator-enable-ramp-delay: The time taken, in microseconds, for the supply
   rail to reach the target voltage, plus/minus whatever tolerance the board
   design requires. This property describes the total system ramp time
