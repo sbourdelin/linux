@@ -71,6 +71,17 @@ static const char * const th_names[] = {
 	"execution_unit",
 };
 
+/* Define HWID to IP type mappings for Scalable MCA */
+struct amd_hwid amd_hwid_mappings[] = {
+	[SMCA_F17H_CORE_BLOCK]	= { "f17h_core", 0xB0 },
+	[SMCA_DF_BLOCK]		= { "df", 0x2E },
+	[SMCA_UMC_BLOCK]	= { "umc", 0x96 },
+	[SMCA_PB_BLOCK]		= { "pb", 0x5 },
+	[SMCA_PSP_BLOCK]	= { "psp", 0xFF },
+	[SMCA_SMU_BLOCK]	= { "smu", 0x1 },
+};
+EXPORT_SYMBOL_GPL(amd_hwid_mappings);
+
 static DEFINE_PER_CPU(struct threshold_bank **, threshold_banks);
 static DEFINE_PER_CPU(unsigned char, bank_map);	/* see which banks are on */
 
