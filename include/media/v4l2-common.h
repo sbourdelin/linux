@@ -189,4 +189,32 @@ const struct v4l2_frmsize_discrete *v4l2_find_nearest_format(
 
 void v4l2_get_timestamp(struct timeval *tv);
 
+#ifdef CONFIG_MEDIA_CONTROLLER
+/**
+ * is_media_entity_v4l2_io() - Check if the entity is a video_device and can do I/O
+ * @entity:	pointer to entity
+ *
+ * Return: true if the entity is an instance of a video_device object and can
+ * safely be cast to a struct video_device using the container_of() macro and
+ * can do I/O, or false otherwise.
+ */
+static inline bool is_media_entity_v4l2_io(struct media_entity *entity)
+{
+	struct video_device *vdev;
+
+	if (!is_media_entity_v4l2_video_device(entity))
+		return false;
+	vdev = container_of(entity, struct video_device, entity);
+	/*
+	 * For now assume that is device_caps == 0, then I/O is available
+	 * unless it is a radio device.
+	 * Eventually all drivers should set vdev->device_caps and then
+	 * this assumption should be removed.
+	 */
+	if (vdev->device_caps == 0)
+		return vdev->vfl_type != VFL_TYPE_RADIO;
+	return vdev->device_caps & (V4L2_CAP_READWRITE | V4L2_CAP_STREAMING);
+}
+#endif
+
 #endif /* V4L2_COMMON_H_ */
