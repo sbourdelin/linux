@@ -2158,6 +2158,7 @@ static const struct file_operations proc_map_files_operations = {
 	.llseek		= default_llseek,
 };
 
+#ifdef CONFIG_CHECKPOINT_RESTORE
 struct timers_private {
 	struct pid *pid;
 	struct task_struct *task;
@@ -2256,6 +2257,7 @@ static const struct file_operations proc_timers_operations = {
 	.llseek		= seq_lseek,
 	.release	= seq_release_private,
 };
+#endif
 
 static int proc_pident_instantiate(struct inode *dir,
 	struct dentry *dentry, struct task_struct *task, const void *ptr)
