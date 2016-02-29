@@ -81,6 +81,7 @@ static int pcie_portdrv_restore_config(struct pci_dev *dev)
 
 enum pcie_port_type {
 	PCIE_PORT_DEFAULT,
+	PCIE_PORT_SPT,
 };
 
 struct pcie_port_config {
@@ -91,6 +92,10 @@ struct pcie_port_config {
 static const struct pcie_port_config pcie_port_configs[] = {
 	[PCIE_PORT_DEFAULT] = {
 		.suspend_allowed = true,
+	},
+	[PCIE_PORT_SPT] = {
+		.suspend_allowed = true,
+		.runtime_suspend_allowed = true,
 	},
 };
 
@@ -431,6 +436,9 @@ static void pcie_portdrv_err_resume(struct pci_dev *dev)
  * LINUX Device Driver Model
  */
 static const struct pci_device_id port_pci_ids[] = {
+	/* Intel Sunrisepoint */
+	{ PCI_VDEVICE(INTEL, 0x9d14), .driver_data = PCIE_PORT_SPT },
+	{ PCI_VDEVICE(INTEL, 0x9d15), .driver_data = PCIE_PORT_SPT },
 	/* handle any PCI-Express port */
 	{ PCI_DEVICE_CLASS(((PCI_CLASS_BRIDGE_PCI << 8) | 0x00), ~0),
 	  .driver_data = PCIE_PORT_DEFAULT },
