@@ -24,6 +24,10 @@
 #include <linux/bitmap.h>
 #include "asm/bug.h"
 
+#ifdef HAVE_UDIS86
+#include <udis86.h>
+#endif
+
 static char const		*script_name;
 static char const		*generate_script_lang;
 static bool			debug_mode;
@@ -58,6 +62,7 @@ enum perf_output_field {
 	PERF_OUTPUT_IREGS	    = 1U << 14,
 	PERF_OUTPUT_BRSTACK	    = 1U << 15,
 	PERF_OUTPUT_BRSTACKSYM	    = 1U << 16,
+	PERF_OUTPUT_ASM		    = 1U << 17,
 };
 
 struct output_option {
@@ -81,6 +86,7 @@ struct output_option {
 	{.str = "iregs", .field = PERF_OUTPUT_IREGS},
 	{.str = "brstack", .field = PERF_OUTPUT_BRSTACK},
 	{.str = "brstacksym", .field = PERF_OUTPUT_BRSTACKSYM},
+	{.str = "asm", .field = PERF_OUTPUT_ASM},
 };
 
 /* default set to maintain compatibility with current format */
@@ -264,7 +270,11 @@ static int perf_evsel__check_attr(struct perf_evsel *evsel,
 		       "selected. Hence, no address to lookup the source line number.\n");
 		return -EINVAL;
 	}
-
+	if (PRINT_FIELD(ASM) && !PRINT_FIELD(IP)) {
+		pr_err("Display of assembler requested but sample IP is not\n"
+		       "selected.\n");
+		return -EINVAL;
+	}
 	if ((PRINT_FIELD(PID) || PRINT_FIELD(TID)) &&
 		perf_evsel__check_stype(evsel, PERF_SAMPLE_TID, "TID",
 					PERF_OUTPUT_TID|PERF_OUTPUT_PID))
@@ -403,6 +413,89 @@ static void print_sample_iregs(union perf_event *event __maybe_unused,
 		u64 val = regs->regs[i++];
 		printf("%5s:0x%"PRIx64" ", perf_reg_name(r), val);
 	}
+}
+
+#ifdef HAVE_UDIS86
+
+struct perf_ud {
+	ud_t ud_obj;
+	struct thread *thread;
+	u8 cpumode;
+	int cpu;
+};
+
+static const char *dis_resolve(struct ud *u, uint64_t addr, int64_t *off)
+{
+	struct perf_ud *ud = container_of(u, struct perf_ud, ud_obj);
+	struct addr_location al;
+
+	memset(&al, 0, sizeof(struct addr_location));
+
+	thread__find_addr_map(ud->thread, ud->cpumode, MAP__FUNCTION, addr, &al);
+	if (!al.map)
+		thread__find_addr_map(ud->thread, ud->cpumode, MAP__VARIABLE,
+					addr, &al);
+	al.cpu = ud->cpu;
+	al.sym = NULL;
+
+	if (al.map)
+		al.sym = map__find_symbol(al.map, al.addr, NULL);
+
+	if (!al.sym)
+		return NULL;
+
+	if (addr < al.sym->end)
+		*off = addr - al.sym->start;
+	else
+		*off = addr - al.map->start - al.sym->start;
+	return al.sym->name;
+}
+#endif
+
+static void print_sample_asm(union perf_event *event __maybe_unused,
+			     struct perf_sample *sample __maybe_unused,
+			     struct thread *thread __maybe_unused,
+			     struct perf_event_attr *attr __maybe_unused,
+			     struct addr_location *al __maybe_unused,
+			     struct machine *machine __maybe_unused)
+{
+#ifdef HAVE_UDIS86
+	static bool ud_initialized = false;
+	static struct perf_ud ud;
+	u8 buffer[32];
+	int len;
+	u64 offset;
+
+	if (!ud_initialized) {
+		ud_initialized = true;
+		ud_init(&ud.ud_obj);
+		ud_set_syntax(&ud.ud_obj, UD_SYN_ATT);
+		ud_set_sym_resolver(&ud.ud_obj, dis_resolve);
+	}
+	ud.thread = thread;
+	ud.cpumode = event->header.misc & PERF_RECORD_MISC_CPUMODE_MASK;
+	ud.cpu = sample->cpu;
+
+	if (!al->map || !al->map->dso)
+		return;
+	if (al->map->dso->data.status == DSO_DATA_STATUS_ERROR)
+		return;
+
+	/* Load maps to ensure dso->is_64_bit has been updated */
+	map__load(al->map, machine->symbol_filter);
+
+	offset = al->map->map_ip(al->map, sample->ip);
+	len = dso__data_read_offset(al->map->dso, machine,
+				    offset, buffer, 32);
+	if (len <= 0)
+		return;
+
+	ud_set_mode(&ud.ud_obj, al->map->dso->is_64_bit ? 64 : 32);
+	ud_set_pc(&ud.ud_obj, sample->ip);
+	ud_set_input_buffer(&ud.ud_obj, buffer, len);
+	ud_disassemble(&ud.ud_obj);
+	printf("\t%s", ud_insn_asm(&ud.ud_obj));
+#endif
 }
 
 static void print_sample_start(struct perf_sample *sample,
@@ -636,7 +729,8 @@ static int perf_evlist__max_name_len(struct perf_evlist *evlist)
 
 static void process_event(struct perf_script *script, union perf_event *event,
 			  struct perf_sample *sample, struct perf_evsel *evsel,
-			  struct addr_location *al)
+			  struct addr_location *al,
+			  struct machine *machine)
 {
 	struct thread *thread = al->thread;
 	struct perf_event_attr *attr = &evsel->attr;
@@ -664,7 +758,7 @@ static void process_event(struct perf_script *script, union perf_event *event,
 
 	if (is_bts_event(attr)) {
 		print_sample_bts(event, sample, evsel, thread, al);
-		return;
+		goto print_rest;
 	}
 
 	if (PRINT_FIELD(TRACE))
@@ -687,10 +781,14 @@ static void process_event(struct perf_script *script, union perf_event *event,
 	if (PRINT_FIELD(IREGS))
 		print_sample_iregs(event, sample, thread, attr);
 
+print_rest:
 	if (PRINT_FIELD(BRSTACK))
 		print_sample_brstack(event, sample, thread, attr);
 	else if (PRINT_FIELD(BRSTACKSYM))
 		print_sample_brstacksym(event, sample, thread, attr);
+
+	if (PRINT_FIELD(ASM))
+		print_sample_asm(event, sample, thread, attr, al, machine);
 
 	printf("\n");
 }
@@ -798,7 +896,7 @@ static int process_sample_event(struct perf_tool *tool,
 	if (scripting_ops)
 		scripting_ops->process_event(event, sample, evsel, &al);
 	else
-		process_event(scr, event, sample, evsel, &al);
+		process_event(scr, event, sample, evsel, &al, machine);
 
 out_put:
 	addr_location__put(&al);
@@ -1913,7 +2011,7 @@ int cmd_script(int argc, const char **argv, const char *prefix __maybe_unused)
 		     "comma separated output fields prepend with 'type:'. "
 		     "Valid types: hw,sw,trace,raw. "
 		     "Fields: comm,tid,pid,time,cpu,event,trace,ip,sym,dso,"
-		     "addr,symoff,period,iregs,brstack,brstacksym,flags", parse_output_fields),
+		     "addr,symoff,period,iregs,brstack,brstacksym,flags,asm", parse_output_fields),
 	OPT_BOOLEAN('a', "all-cpus", &system_wide,
 		    "system-wide collection from all CPUs"),
 	OPT_STRING('S', "symbols", &symbol_conf.sym_list_str, "symbol[,symbol...]",
