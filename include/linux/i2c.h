@@ -350,6 +350,12 @@ extern struct i2c_client *
 i2c_new_dummy(struct i2c_adapter *adap, u16 address);
 
 extern void i2c_unregister_device(struct i2c_client *);
+
+extern struct i2c_client *devm_i2c_new_dummy(struct device *dev,
+					     struct i2c_adapter *adapter,
+					     u16 address);
+extern void devm_i2c_unregister_device(struct device *dev,
+				       struct i2c_client *client);
 #endif /* I2C */
 
 /* Mainboard arch_initcall() code should register all its I2C devices.
