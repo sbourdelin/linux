@@ -1004,4 +1004,14 @@ static inline struct fwnode_handle *acpi_get_next_subnode(struct device *dev,
 #define acpi_probe_device_table(t)	({ int __r = 0; __r;})
 #endif
 
+struct uart_port;
+#ifdef CONFIG_ACPI_SPCR_TABLE
+bool acpi_console_check(struct uart_port *uport);
+#else
+static inline bool acpi_console_check(struct uart_port *uport)
+{
+	return FALSE;
+}
+#endif
+
 #endif	/*_LINUX_ACPI_H*/
