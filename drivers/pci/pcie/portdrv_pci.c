@@ -20,6 +20,7 @@
 
 #include "portdrv.h"
 #include "aer/aerdrv.h"
+#include "../pci.h"
 
 /*
  * Version Information
@@ -78,10 +79,104 @@ static int pcie_portdrv_restore_config(struct pci_dev *dev)
 	return 0;
 }
 
+enum pcie_port_type {
+	PCIE_PORT_DEFAULT,
+};
+
+struct pcie_port_config {
+	bool suspend_allowed;
+};
+
+static const struct pcie_port_config pcie_port_configs[] = {
+	[PCIE_PORT_DEFAULT] = {
+		.suspend_allowed = true,
+	},
+};
+
 #ifdef CONFIG_PM
+static const struct pcie_port_config *pcie_port_get_config(struct pci_dev *pdev)
+{
+	const struct pci_device_id *id = pci_match_id(pdev->driver->id_table,
+						      pdev);
+	return &pcie_port_configs[id->driver_data];
+}
+
+static int pcie_port_check_d3cold(struct pci_dev *pdev, void *data)
+{
+	bool *d3cold_ok = data;
+
+	if (pdev->no_d3cold || !pdev->d3cold_allowed)
+		*d3cold_ok = false;
+	if (device_may_wakeup(&pdev->dev) && !pci_pme_capable(pdev, PCI_D3cold))
+		*d3cold_ok = false;
+
+	return !*d3cold_ok;
+}
+
+static bool pcie_port_can_suspend(struct pci_dev *pdev)
+{
+	bool d3cold_ok = true;
+
+	/*
+	 * When the port is put to D3hot the devices behind the port are
+	 * effectively in D3cold as their config space cannot be accessed
+	 * anymore and the link may be powered down.
+	 *
+	 * We only allow the port to go to D3hot the devices:
+	 *  - Are allowed to go to D3cold
+	 *  - Can wake up from D3cold if they are wake capable
+	 */
+	pci_walk_bus(pdev->subordinate, pcie_port_check_d3cold, &d3cold_ok);
+	return d3cold_ok;
+}
+
+static bool pcie_port_suspend_allowed(struct pci_dev *pdev)
+{
+	const struct pcie_port_config *config = pcie_port_get_config(pdev);
+
+	/*
+	 * Older hardware is not capable of moving PCIe ports to D3 so
+	 * anything earlier than 2015 is assumed not to support this.
+	 */
+	if (dmi_available) {
+		unsigned year;
+
+		if (!dmi_get_date(DMI_BIOS_DATE, &year, NULL, NULL) ||
+		    year < 2015) {
+			return false;
+		}
+	}
+
+	/* Per port configuration can forbid it as well */
+	if (!config->suspend_allowed)
+		return false;
+
+	return pcie_port_can_suspend(pdev);
+}
+
+static int pcie_port_suspend_noirq(struct device *dev)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	if (pcie_port_suspend_allowed(pdev)) {
+		pci_save_state(pdev);
+		pci_set_power_state(pdev, PCI_D3hot);
+		/*
+		 * All devices behind the port are assumed to be in D3cold
+		 * so update their state now.
+		 */
+		__pci_bus_set_current_state(pdev->subordinate, PCI_D3cold);
+	}
+
+	return 0;
+}
+
 static int pcie_port_resume_noirq(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
+
+	pci_set_power_state(pdev, PCI_D0);
+	pci_restore_state(pdev);
 
 	/*
 	 * Some BIOSes forget to clear Root PME Status bits after system wakeup
@@ -100,6 +195,7 @@ static const struct dev_pm_ops pcie_portdrv_pm_ops = {
 	.thaw		= pcie_port_device_resume,
 	.poweroff	= pcie_port_device_suspend,
 	.restore	= pcie_port_device_resume,
+	.suspend_noirq	= pcie_port_suspend_noirq,
 	.resume_noirq	= pcie_port_resume_noirq,
 };
 
@@ -285,10 +381,11 @@ static void pcie_portdrv_err_resume(struct pci_dev *dev)
 /*
  * LINUX Device Driver Model
  */
-static const struct pci_device_id port_pci_ids[] = { {
+static const struct pci_device_id port_pci_ids[] = {
 	/* handle any PCI-Express port */
-	PCI_DEVICE_CLASS(((PCI_CLASS_BRIDGE_PCI << 8) | 0x00), ~0),
-	}, { /* end: all zeroes */ }
+	{ PCI_DEVICE_CLASS(((PCI_CLASS_BRIDGE_PCI << 8) | 0x00), ~0),
+	  .driver_data = PCIE_PORT_DEFAULT },
+	{ /* end: all zeroes */ }
 };
 MODULE_DEVICE_TABLE(pci, port_pci_ids);
 
