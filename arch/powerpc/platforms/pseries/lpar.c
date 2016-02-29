@@ -310,7 +310,7 @@ static long pSeries_lpar_hpte_updatepp(unsigned long slot,
 
 	pr_devel("ok\n");
 
-	BUG_ON(lpar_rc != H_SUCCESS);
+	WARN_RATELIMIT(lpar_rc != H_SUCCESS, "H_PROTECT returned %lu\n", lpar_rc);
 
 	return 0;
 }
