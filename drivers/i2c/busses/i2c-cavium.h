@@ -119,6 +119,10 @@ struct octeon_i2c {
 #ifdef CONFIG_ARCH_THUNDER
 	struct msix_entry       i2c_msix;
 #endif
+#ifdef CONFIG_I2C_SMBUS
+	struct i2c_smbus_alert_setup alert_data;
+	struct i2c_client	*ara;
+#endif
 };
 
 static inline void writeqflush(u64 val, void __iomem *addr)
