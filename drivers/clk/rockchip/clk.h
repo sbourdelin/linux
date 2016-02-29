@@ -96,6 +96,7 @@ struct clk;
 enum rockchip_pll_type {
 	pll_rk3036,
 	pll_rk3066,
+	pll_rk3399,
 };
 
 #define RK3036_PLL_RATE(_rate, _refdiv, _fbdiv, _postdiv1,	\
@@ -128,6 +129,18 @@ enum rockchip_pll_type {
 	.nb = _nb,						\
 }
 
+#define RK3399_PLL_RATE(_rate, _refdiv, _fbdiv, _postdiv1,	\
+			_postdiv2, _dsmpd, _frac)		\
+{								\
+	.rate	= _rate##U,					\
+	.fbdiv = _fbdiv,					\
+	.postdiv1 = _postdiv1,					\
+	.refdiv = _refdiv,					\
+	.postdiv2 = _postdiv2,					\
+	.dsmpd = _dsmpd,					\
+	.frac = _frac,						\
+}
+
 /**
  * struct rockchip_clk_provider: information about clock provider
  * @reg_base: virtual address for the register base.
@@ -148,7 +161,7 @@ struct rockchip_pll_rate_table {
 	unsigned int nf;
 	unsigned int no;
 	unsigned int nb;
-	/* for RK3036 */
+	/* for RK3036/RK3399 */
 	unsigned int fbdiv;
 	unsigned int postdiv1;
 	unsigned int refdiv;
