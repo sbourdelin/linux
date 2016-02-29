@@ -142,6 +142,15 @@ static int nmi_vprintk(const char *fmt, va_list args)
 	return seq_buf_used(&s->seq) - len;
 }
 
+static bool idling(void)
+{
+	if (!is_idle_task(current))
+		return false;
+
+	/* Account for nmi_enter() having been called once. */
+	return hardirq_count() == HARDIRQ_OFFSET && !in_softirq();
+}
+
 bool nmi_cpu_backtrace(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
@@ -151,11 +160,16 @@ bool nmi_cpu_backtrace(struct pt_regs *regs)
 
 		/* Replace printk to write into the NMI seq */
 		this_cpu_write(printk_func, nmi_vprintk);
-		pr_warn("NMI backtrace for cpu %d\n", cpu);
-		if (regs)
-			show_regs(regs);
-		else
-			dump_stack();
+		if (idling()) {
+			pr_warn("NMI backtrace for cpu %d skipped: idle\n",
+				cpu);
+		} else {
+			pr_warn("NMI backtrace for cpu %d\n", cpu);
+			if (regs)
+				show_regs(regs);
+			else
+				dump_stack();
+		}
 		this_cpu_write(printk_func, printk_func_save);
 
 		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
