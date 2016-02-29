@@ -20,7 +20,7 @@
  * and wakeup interrupts can be hooked to.
  */
 
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/slab.h>
@@ -1289,13 +1289,3 @@ static int __init samsung_pinctrl_drv_register(void)
 	return platform_driver_register(&samsung_pinctrl_driver);
 }
 postcore_initcall(samsung_pinctrl_drv_register);
-
-static void __exit samsung_pinctrl_drv_unregister(void)
-{
-	platform_driver_unregister(&samsung_pinctrl_driver);
-}
-module_exit(samsung_pinctrl_drv_unregister);
-
-MODULE_AUTHOR("Thomas Abraham <thomas.ab@samsung.com>");
-MODULE_DESCRIPTION("Samsung pinctrl driver");
-MODULE_LICENSE("GPL v2");
