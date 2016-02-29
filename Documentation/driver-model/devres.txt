@@ -253,6 +253,10 @@ GPIO
   devm_gpiod_get_optional()
   devm_gpiod_put()
 
+I2C
+  devm_i2c_new_dummy()
+  devm_i2c_unregister_device()
+
 IIO
   devm_iio_device_alloc()
   devm_iio_device_free()
