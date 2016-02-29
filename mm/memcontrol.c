@@ -4275,6 +4275,8 @@ static void mem_cgroup_css_offline(struct cgroup_subsys_state *css)
 
 	memcg_offline_kmem(memcg);
 	wb_memcg_offline(memcg);
+
+	memcg->low = 0;
 }
 
 static void mem_cgroup_css_released(struct cgroup_subsys_state *css)
