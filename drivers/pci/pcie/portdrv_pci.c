@@ -436,6 +436,11 @@ static void pcie_portdrv_err_resume(struct pci_dev *dev)
  * LINUX Device Driver Model
  */
 static const struct pci_device_id port_pci_ids[] = {
+	/* Intel Broxton */
+	{ PCI_VDEVICE(INTEL, 0x1ad6), .driver_data = PCIE_PORT_SPT },
+	{ PCI_VDEVICE(INTEL, 0x1ad7), .driver_data = PCIE_PORT_SPT },
+	{ PCI_VDEVICE(INTEL, 0x5ad8), .driver_data = PCIE_PORT_SPT },
+	{ PCI_VDEVICE(INTEL, 0x5ada), .driver_data = PCIE_PORT_SPT },
 	/* Intel Sunrisepoint */
 	{ PCI_VDEVICE(INTEL, 0x9d14), .driver_data = PCIE_PORT_SPT },
 	{ PCI_VDEVICE(INTEL, 0x9d15), .driver_data = PCIE_PORT_SPT },
