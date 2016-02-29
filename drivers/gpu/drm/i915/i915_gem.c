@@ -2400,6 +2400,64 @@ i915_gem_object_get_pages(struct drm_i915_gem_object *obj)
 	return 0;
 }
 
+/**
+ * i915_gem_object_vmap_range - map some or all of a GEM object into kernel space
+ * @obj: the GEM object to be mapped
+ * @start: offset in bytes of the start of the range to be mapped
+ * @len: length in bytes of the range to be mapped
+ *
+ * Map a given range of a GEM object into kernel virtual space. The range will
+ * be extended at both ends, if necessary, to span a whole number of pages. The
+ * caller must make sure the associated pages are gathered and pinned before
+ * calling this function, and is responsible for unmapping the returned address
+ * when it is no longer required.
+ *
+ * Returns the address at which the object has been mapped, or NULL on failure.
+ */
+void *i915_gem_object_vmap_range(struct drm_i915_gem_object *obj,
+				 unsigned long start,
+				 unsigned long nbytes)
+{
+	struct scatterlist *sg = obj->pages->sgl;
+	struct sg_page_iter sg_iter;
+	struct page **pages;
+	unsigned long first, npages, i;
+	int nents;
+	void *addr;
+
+	/* Check requested range against underlying sg list */
+	nents = sg_nents_for_len(sg, start + nbytes);
+	if (nents < 0) {
+		DRM_DEBUG_DRIVER("Invalid page count\n");
+		return NULL;
+	}
+
+	/* Work in pages from now on */
+	first = start >> PAGE_SHIFT;
+	npages = DIV_ROUND_UP(start + nbytes, PAGE_SIZE) - first;
+
+	pages = drm_malloc_gfp(npages, sizeof(*pages), GFP_TEMPORARY);
+	if (pages == NULL) {
+		DRM_DEBUG_DRIVER("Failed to get space for pages\n");
+		return NULL;
+	}
+
+	i = 0;
+	for_each_sg_page(sg, &sg_iter, nents, first) {
+		pages[i] = sg_page_iter_page(&sg_iter);
+		if (++i >= npages)
+			break;
+	}
+	WARN_ON(i != npages);
+
+	addr = vmap(pages, npages, 0, PAGE_KERNEL);
+	if (addr == NULL)
+		DRM_DEBUG_DRIVER("Failed to vmap pages\n");
+	drm_free_large(pages);
+
+	return addr;
+}
+
 void i915_vma_move_to_active(struct i915_vma *vma,
 			     struct drm_i915_gem_request *req)
 {

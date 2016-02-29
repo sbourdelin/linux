@@ -2994,6 +2994,10 @@ static inline void i915_gem_object_unpin_pages(struct drm_i915_gem_object *obj)
 	obj->pages_pin_count--;
 }
 
+void *__must_check i915_gem_object_vmap_range(struct drm_i915_gem_object *obj,
+					      unsigned long start,
+					      unsigned long nbytes);
+
 int __must_check i915_mutex_lock_interruptible(struct drm_device *dev);
 int i915_gem_object_sync(struct drm_i915_gem_object *obj,
 			 struct intel_engine_cs *to,
