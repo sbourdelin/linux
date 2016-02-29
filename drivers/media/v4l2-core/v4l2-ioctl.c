@@ -2158,10 +2158,36 @@ static int v4l_cropcap(const struct v4l2_ioctl_ops *ops,
 {
 	struct v4l2_cropcap *p = arg;
 	struct v4l2_selection s = { .type = p->type };
-	int ret;
+	int ret = -ENOTTY;
 
 	if (ops->vidioc_g_selection == NULL)
 		return ops->vidioc_cropcap(file, fh, p);
+
+	/*
+	 * Let cropcap fill in the pixelaspect if cropcap is available.
+	 * There is still no other way of obtaining this information.
+	 */
+	if (ops->vidioc_cropcap) {
+		ret = ops->vidioc_cropcap(file, fh, p);
+
+		/*
+		 * If cropcap reports that it isn't implemented,
+		 * then just keep going.
+		 */
+		if (ret && ret != -ENOTTY && ret != -ENOIOCTLCMD)
+			return ret;
+	}
+
+	if (ret) {
+		/*
+		 * cropcap wasn't implemented, so assume a 1:1 pixel
+		 * aspect ratio, otherwise keep what cropcap gave us.
+		 */
+		p->pixelaspect.numerator = 1;
+		p->pixelaspect.denominator = 1;
+	}
+
+	/* Use g_selection() to fill in the bounds and defrect rectangles */
 
 	/* obtaining bounds */
 	if (V4L2_TYPE_IS_OUTPUT(p->type))
@@ -2184,13 +2210,6 @@ static int v4l_cropcap(const struct v4l2_ioctl_ops *ops,
 	if (ret)
 		return ret;
 	p->defrect = s.r;
-
-	/* setting trivial pixelaspect */
-	p->pixelaspect.numerator = 1;
-	p->pixelaspect.denominator = 1;
-
-	if (ops->vidioc_cropcap)
-		return ops->vidioc_cropcap(file, fh, p);
 
 	return 0;
 }
