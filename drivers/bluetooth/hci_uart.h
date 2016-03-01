@@ -35,7 +35,7 @@
 #define HCIUARTGETFLAGS		_IOR('U', 204, int)
 
 /* UART protocols */
-#define HCI_UART_MAX_PROTO	10
+#define HCI_UART_MAX_PROTO	11
 
 #define HCI_UART_H4	0
 #define HCI_UART_BCSP	1
@@ -47,6 +47,7 @@
 #define HCI_UART_BCM	7
 #define HCI_UART_QCA	8
 #define HCI_UART_AG6XX	9
+#define HCI_UART_MRVL	10
 
 #define HCI_UART_RAW_DEVICE	0
 #define HCI_UART_RESET_ON_INIT	1
@@ -95,11 +96,16 @@ struct hci_uart {
 /* HCI_UART proto flag bits */
 #define HCI_UART_PROTO_SET	0
 #define HCI_UART_REGISTERED	1
+#define HCI_UART_DNLD_FW	2
 
 /* TX states  */
 #define HCI_UART_SENDING	1
 #define HCI_UART_TX_WAKEUP	2
 
+#ifdef CONFIG_BT_HCIUART_MRVL
+void hci_uart_recv_data(struct hci_uart *hu, u8 *buf, int len);
+int hci_uart_dnld_fw(struct hci_uart *hu);
+#endif
 int hci_uart_register_proto(const struct hci_uart_proto *p);
 int hci_uart_unregister_proto(const struct hci_uart_proto *p);
 int hci_uart_tx_wakeup(struct hci_uart *hu);
@@ -187,4 +193,9 @@ int qca_deinit(void);
 #ifdef CONFIG_BT_HCIUART_AG6XX
 int ag6xx_init(void);
 int ag6xx_deinit(void);
+#endif
+
+#ifdef CONFIG_BT_HCIUART_MRVL
+int mrvl_init(void);
+int mrvl_deinit(void);
 #endif
