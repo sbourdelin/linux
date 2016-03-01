@@ -941,7 +941,8 @@ static uint16_t vlv_compute_wm_level(struct intel_plane *plane,
 	if (WARN_ON(htotal == 0))
 		htotal = 1;
 
-	if (plane->base.type == DRM_PLANE_TYPE_CURSOR) {
+	if (plane->base.type == DRM_PLANE_TYPE_CURSOR &&
+	    pipe_has_cursor_plane(dev_priv, plane->pipe)) {
 		/*
 		 * FIXME the formula gives values that are
 		 * too big for the cursor FIFO, and hence we
@@ -970,7 +971,8 @@ static void vlv_compute_fifo(struct intel_crtc *crtc)
 		struct intel_plane_state *state =
 			to_intel_plane_state(plane->base.state);
 
-		if (plane->base.type == DRM_PLANE_TYPE_CURSOR)
+		if (plane->base.type == DRM_PLANE_TYPE_CURSOR &&
+		    pipe_has_cursor_plane(dev->dev_private, plane->pipe))
 			continue;
 
 		if (state->visible) {
@@ -984,7 +986,8 @@ static void vlv_compute_fifo(struct intel_crtc *crtc)
 			to_intel_plane_state(plane->base.state);
 		unsigned int rate;
 
-		if (plane->base.type == DRM_PLANE_TYPE_CURSOR) {
+		if (plane->base.type == DRM_PLANE_TYPE_CURSOR &&
+		    pipe_has_cursor_plane(dev->dev_private, plane->pipe)) {
 			plane->wm.fifo_size = 63;
 			continue;
 		}
@@ -1008,7 +1011,8 @@ static void vlv_compute_fifo(struct intel_crtc *crtc)
 		if (fifo_left == 0)
 			break;
 
-		if (plane->base.type == DRM_PLANE_TYPE_CURSOR)
+		if (plane->base.type == DRM_PLANE_TYPE_CURSOR &&
+		    pipe_has_cursor_plane(dev->dev_private, plane->pipe))
 			continue;
 
 		/* give it all to the first plane if none are active */
@@ -1028,6 +1032,7 @@ static void vlv_invert_wms(struct intel_crtc *crtc)
 {
 	struct vlv_wm_state *wm_state = &crtc->wm_state;
 	int level;
+	enum drm_plane_type plane_type;
 
 	for (level = 0; level < wm_state->num_levels; level++) {
 		struct drm_device *dev = crtc->base.dev;
@@ -1038,7 +1043,13 @@ static void vlv_invert_wms(struct intel_crtc *crtc)
 		wm_state->sr[level].cursor = 63 - wm_state->sr[level].cursor;
 
 		for_each_intel_plane_on_crtc(dev, crtc, plane) {
-			switch (plane->base.type) {
+			plane_type = plane->base.type;
+
+			if (plane_type == DRM_PLANE_TYPE_CURSOR &&
+			    !pipe_has_cursor_plane(to_i915(dev), plane->pipe))
+				plane_type = DRM_PLANE_TYPE_OVERLAY;
+
+			switch (plane_type) {
 				int sprite;
 			case DRM_PLANE_TYPE_CURSOR:
 				wm_state->wm[level].cursor = plane->wm.fifo_size -
@@ -1065,6 +1076,7 @@ static void vlv_compute_wm(struct intel_crtc *crtc)
 	struct intel_plane *plane;
 	int sr_fifo_size = INTEL_INFO(dev)->num_pipes * 512 - 1;
 	int level;
+	enum drm_plane_type plane_type;
 
 	memset(wm_state, 0, sizeof(*wm_state));
 
@@ -1092,10 +1104,15 @@ static void vlv_compute_wm(struct intel_crtc *crtc)
 		if (!state->visible)
 			continue;
 
+		plane_type = plane->base.type;
+		if (plane_type == DRM_PLANE_TYPE_CURSOR &&
+		    !pipe_has_cursor_plane(to_i915(dev), plane->pipe))
+			plane_type = DRM_PLANE_TYPE_OVERLAY;
+
 		/* normal watermarks */
 		for (level = 0; level < wm_state->num_levels; level++) {
 			int wm = vlv_compute_wm_level(plane, crtc, state, level);
-			int max_wm = plane->base.type == DRM_PLANE_TYPE_CURSOR ? 63 : 511;
+			int max_wm = plane_type == DRM_PLANE_TYPE_CURSOR ? 63 : 511;
 
 			/* hack */
 			if (WARN_ON(level == 0 && wm > max_wm))
@@ -1104,7 +1121,7 @@ static void vlv_compute_wm(struct intel_crtc *crtc)
 			if (wm > plane->wm.fifo_size)
 				break;
 
-			switch (plane->base.type) {
+			switch (plane_type) {
 				int sprite;
 			case DRM_PLANE_TYPE_CURSOR:
 				wm_state->wm[level].cursor = wm;
@@ -1125,7 +1142,7 @@ static void vlv_compute_wm(struct intel_crtc *crtc)
 			continue;
 
 		/* maxfifo watermarks */
-		switch (plane->base.type) {
+		switch (plane_type) {
 			int sprite, level;
 		case DRM_PLANE_TYPE_CURSOR:
 			for (level = 0; level < wm_state->num_levels; level++)
@@ -1166,9 +1183,16 @@ static void vlv_pipe_set_fifo_size(struct intel_crtc *crtc)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_plane *plane;
 	int sprite0_start = 0, sprite1_start = 0, fifo_size = 0;
+	enum drm_plane_type plane_type;
 
 	for_each_intel_plane_on_crtc(dev, crtc, plane) {
-		if (plane->base.type == DRM_PLANE_TYPE_CURSOR) {
+		plane_type = plane->base.type;
+
+		if (plane_type == DRM_PLANE_TYPE_CURSOR &&
+		    !pipe_has_cursor_plane(to_i915(dev), plane->pipe))
+			plane_type = DRM_PLANE_TYPE_OVERLAY;
+
+		if (plane_type == DRM_PLANE_TYPE_CURSOR) {
 			WARN_ON(plane->wm.fifo_size != 63);
 			continue;
 		}
@@ -3996,11 +4020,18 @@ void vlv_wm_get_hw_state(struct drm_device *dev)
 	struct intel_plane *plane;
 	enum pipe pipe;
 	u32 val;
+	enum drm_plane_type plane_type;
 
 	vlv_read_wm_values(dev_priv, wm);
 
 	for_each_intel_plane(dev, plane) {
-		switch (plane->base.type) {
+		plane_type = plane->base.type;
+
+		if (plane_type == DRM_PLANE_TYPE_CURSOR &&
+		    !pipe_has_cursor_plane(to_i915(dev), plane->pipe))
+			plane_type = DRM_PLANE_TYPE_OVERLAY;
+
+		switch (plane_type) {
 			int sprite;
 		case DRM_PLANE_TYPE_CURSOR:
 			plane->wm.fifo_size = 63;
