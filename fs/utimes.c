@@ -24,7 +24,8 @@
  * must be owner or have write permission.
  * Else, update from *times, must be owner or super user.
  */
-SYSCALL_DEFINE2(utime, char __user *, filename, struct utimbuf __user *, times)
+SYSCALL_DEFINE2(utime, const char __user *, filename,
+		const struct utimbuf __user *, times)
 {
 	struct timespec tv[2];
 
@@ -48,7 +49,7 @@ static bool nsec_valid(long nsec)
 	return nsec >= 0 && nsec <= 999999999;
 }
 
-static int utimes_common(struct path *path, struct timespec *times)
+static int utimes_common(struct path *path, const struct timespec *times)
 {
 	int error;
 	struct iattr newattrs;
@@ -133,8 +134,8 @@ out:
  * must be owner or have write permission.
  * Else, update from *times, must be owner or super user.
  */
-long do_utimes(int dfd, const char __user *filename, struct timespec *times,
-	       int flags)
+long do_utimes(int dfd, const char __user *filename,
+	       const struct timespec *times, int flags)
 {
 	int error = -EINVAL;
 
@@ -183,7 +184,7 @@ out:
 }
 
 SYSCALL_DEFINE4(utimensat, int, dfd, const char __user *, filename,
-		struct timespec __user *, utimes, int, flags)
+		const struct timespec __user *, utimes, int, flags)
 {
 	struct timespec tstimes[2];
 
@@ -201,7 +202,7 @@ SYSCALL_DEFINE4(utimensat, int, dfd, const char __user *, filename,
 }
 
 SYSCALL_DEFINE3(futimesat, int, dfd, const char __user *, filename,
-		struct timeval __user *, utimes)
+		const struct timeval __user *, utimes)
 {
 	struct timeval times[2];
 	struct timespec tstimes[2];
@@ -228,8 +229,8 @@ SYSCALL_DEFINE3(futimesat, int, dfd, const char __user *, filename,
 	return do_utimes(dfd, filename, utimes ? tstimes : NULL, 0);
 }
 
-SYSCALL_DEFINE2(utimes, char __user *, filename,
-		struct timeval __user *, utimes)
+SYSCALL_DEFINE2(utimes, const char __user *, filename,
+		const struct timeval __user *, utimes)
 {
 	return sys_futimesat(AT_FDCWD, filename, utimes);
 }

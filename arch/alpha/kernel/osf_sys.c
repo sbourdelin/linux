@@ -1065,7 +1065,7 @@ SYSCALL_DEFINE3(osf_setitimer, int, which, struct itimerval32 __user *, in,
 }
 
 SYSCALL_DEFINE2(osf_utimes, const char __user *, filename,
-		struct timeval32 __user *, tvs)
+		const struct timeval32 __user *, tvs)
 {
 	struct timespec tv[2];
 

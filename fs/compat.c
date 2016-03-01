@@ -73,7 +73,7 @@ int compat_printk(const char *fmt, ...)
  * of sys_utimes.
  */
 COMPAT_SYSCALL_DEFINE2(utime, const char __user *, filename,
-		       struct compat_utimbuf __user *, t)
+		       const struct compat_utimbuf __user *, t)
 {
 	struct timespec tv[2];
 
@@ -87,7 +87,9 @@ COMPAT_SYSCALL_DEFINE2(utime, const char __user *, filename,
 	return do_utimes(AT_FDCWD, filename, t ? tv : NULL, 0);
 }
 
-COMPAT_SYSCALL_DEFINE4(utimensat, unsigned int, dfd, const char __user *, filename, struct compat_timespec __user *, t, int, flags)
+COMPAT_SYSCALL_DEFINE4(utimensat, unsigned int, dfd,
+		       const char __user *, filename,
+		       const struct compat_timespec __user *, t, int, flags)
 {
 	struct timespec tv[2];
 
@@ -102,7 +104,9 @@ COMPAT_SYSCALL_DEFINE4(utimensat, unsigned int, dfd, const char __user *, filena
 	return do_utimes(dfd, filename, t ? tv : NULL, flags);
 }
 
-COMPAT_SYSCALL_DEFINE3(futimesat, unsigned int, dfd, const char __user *, filename, struct compat_timeval __user *, t)
+COMPAT_SYSCALL_DEFINE3(futimesat, unsigned int, dfd,
+		       const char __user *, filename,
+		       const struct compat_timeval __user *, t)
 {
 	struct timespec tv[2];
 
@@ -121,7 +125,8 @@ COMPAT_SYSCALL_DEFINE3(futimesat, unsigned int, dfd, const char __user *, filena
 	return do_utimes(dfd, filename, t ? tv : NULL, 0);
 }
 
-COMPAT_SYSCALL_DEFINE2(utimes, const char __user *, filename, struct compat_timeval __user *, t)
+COMPAT_SYSCALL_DEFINE2(utimes, const char __user *, filename,
+		       const struct compat_timeval __user *, t)
 {
 	return compat_sys_futimesat(AT_FDCWD, filename, t);
 }

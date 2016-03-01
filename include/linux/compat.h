@@ -453,10 +453,10 @@ asmlinkage long compat_sys_epoll_pwait(int epfd,
 			compat_size_t sigsetsize);
 
 asmlinkage long compat_sys_utime(const char __user *filename,
-				 struct compat_utimbuf __user *t);
+				 const struct compat_utimbuf __user *t);
 asmlinkage long compat_sys_utimensat(unsigned int dfd,
 				     const char __user *filename,
-				     struct compat_timespec __user *t,
+				     const struct compat_timespec __user *t,
 				     int flags);
 
 asmlinkage long compat_sys_time(compat_time_t __user *tloc);
@@ -477,9 +477,9 @@ asmlinkage long compat_sys_move_pages(pid_t pid, compat_ulong_t nr_pages,
 				      int flags);
 asmlinkage long compat_sys_futimesat(unsigned int dfd,
 				     const char __user *filename,
-				     struct compat_timeval __user *t);
+				     const struct compat_timeval __user *t);
 asmlinkage long compat_sys_utimes(const char __user *filename,
-				  struct compat_timeval __user *t);
+				  const struct compat_timeval __user *t);
 asmlinkage long compat_sys_newstat(const char __user *filename,
 				   struct compat_stat __user *statbuf);
 asmlinkage long compat_sys_newlstat(const char __user *filename,

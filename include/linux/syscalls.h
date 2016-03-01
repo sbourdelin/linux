@@ -550,10 +550,10 @@ asmlinkage long sys_getgid16(void);
 asmlinkage long sys_getegid16(void);
 #endif
 
-asmlinkage long sys_utime(char __user *filename,
-				struct utimbuf __user *times);
-asmlinkage long sys_utimes(char __user *filename,
-				struct timeval __user *utimes);
+asmlinkage long sys_utime(const char __user *filename,
+			  const struct utimbuf __user *times);
+asmlinkage long sys_utimes(const char __user *filename,
+			   const struct timeval __user *utimes);
 asmlinkage long sys_lseek(unsigned int fd, off_t offset,
 			  unsigned int whence);
 asmlinkage long sys_llseek(unsigned int fd, unsigned long offset_high,
@@ -765,7 +765,7 @@ asmlinkage long sys_renameat2(int olddfd, const char __user *oldname,
 			      int newdfd, const char __user *newname,
 			      unsigned int flags);
 asmlinkage long sys_futimesat(int dfd, const char __user *filename,
-			      struct timeval __user *utimes);
+			      const struct timeval __user *utimes);
 asmlinkage long sys_faccessat(int dfd, const char __user *filename, int mode);
 asmlinkage long sys_fchmodat(int dfd, const char __user * filename,
 			     umode_t mode);
@@ -778,7 +778,7 @@ asmlinkage long sys_newfstatat(int dfd, const char __user *filename,
 asmlinkage long sys_readlinkat(int dfd, const char __user *path, char __user *buf,
 			       int bufsiz);
 asmlinkage long sys_utimensat(int dfd, const char __user *filename,
-				struct timespec __user *utimes, int flags);
+			      const struct timespec __user *utimes, int flags);
 asmlinkage long sys_unshare(unsigned long unshare_flags);
 
 asmlinkage long sys_splice(int fd_in, loff_t __user *off_in,
