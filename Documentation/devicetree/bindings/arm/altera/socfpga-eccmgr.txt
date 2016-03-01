@@ -13,7 +13,8 @@ Subcomponents:
 
 L2 Cache ECC
 Required Properties:
-- compatible : Should be "altr,socfpga-l2-ecc"
+- compatible : Should be "altr,socfpga-l2-ecc" or
+	       "altr,socfpga-a10-l2-ecc"
 - reg : Address and size for ECC error interrupt clear registers.
 - interrupts : Should be single bit error interrupt, then double bit error
 	interrupt. Note the rising edge type.
