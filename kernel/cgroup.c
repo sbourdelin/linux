@@ -5138,6 +5138,8 @@ static void kill_css(struct cgroup_subsys_state *css)
 	 * See seq_css() for details.
 	 */
 	css_clear_dir(css, NULL);
+	if (css->ss->css_reset)
+		css->ss->css_reset(css);
 
 	/*
 	 * Killing would put the base ref, but we need to keep it alive
