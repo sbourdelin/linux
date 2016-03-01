@@ -2056,7 +2056,7 @@ static int init_phys_status_page(struct intel_engine_cs *ring)
 void intel_unpin_ringbuffer_obj(struct intel_ringbuffer *ringbuf)
 {
 	if (HAS_LLC(ringbuf->obj->base.dev) && !ringbuf->obj->stolen)
-		vunmap(ringbuf->virtual_start);
+		i915_gem_object_unpin_vmap(ringbuf->obj);
 	else
 		iounmap(ringbuf->virtual_start);
 	ringbuf->virtual_start = NULL;
@@ -2080,9 +2080,10 @@ int intel_pin_and_map_ringbuffer_obj(struct drm_device *dev,
 		if (ret)
 			goto unpin;
 
-		ringbuf->virtual_start = i915_gem_object_vmap_range(obj, 0, 0);
-		if (ringbuf->virtual_start == NULL) {
-			ret = -ENOMEM;
+		ringbuf->virtual_start = i915_gem_object_pin_vmap(obj);
+		if (IS_ERR(ringbuf->virtual_start)) {
+			ret = PTR_ERR(ringbuf->virtual_start);
+			ringbuf->virtual_start = NULL;
 			goto unpin;
 		}
 	} else {
