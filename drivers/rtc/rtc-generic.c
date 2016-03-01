@@ -9,7 +9,7 @@
 #include <linux/platform_device.h>
 #include <linux/rtc.h>
 
-#include <asm/rtc.h>
+#include <asm-generic/rtc.h>
 
 static int generic_get_time(struct device *dev, struct rtc_time *tm)
 {
