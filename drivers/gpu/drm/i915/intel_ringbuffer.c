@@ -2064,27 +2064,6 @@ void intel_unpin_ringbuffer_obj(struct intel_ringbuffer *ringbuf)
 	i915_gem_object_ggtt_unpin(ringbuf->obj);
 }
 
-static u32 *vmap_obj(struct drm_i915_gem_object *obj)
-{
-	struct sg_page_iter sg_iter;
-	struct page **pages;
-	void *addr;
-	int i;
-
-	pages = drm_malloc_ab(obj->base.size >> PAGE_SHIFT, sizeof(*pages));
-	if (pages == NULL)
-		return NULL;
-
-	i = 0;
-	for_each_sg_page(obj->pages->sgl, &sg_iter, obj->pages->nents, 0)
-		pages[i++] = sg_page_iter_page(&sg_iter);
-
-	addr = vmap(pages, i, 0, PAGE_KERNEL);
-	drm_free_large(pages);
-
-	return addr;
-}
-
 int intel_pin_and_map_ringbuffer_obj(struct drm_device *dev,
 				     struct intel_ringbuffer *ringbuf)
 {
@@ -2101,7 +2080,7 @@ int intel_pin_and_map_ringbuffer_obj(struct drm_device *dev,
 		if (ret)
 			goto unpin;
 
-		ringbuf->virtual_start = vmap_obj(obj);
+		ringbuf->virtual_start = i915_gem_object_vmap_range(obj, 0, 0);
 		if (ringbuf->virtual_start == NULL) {
 			ret = -ENOMEM;
 			goto unpin;
