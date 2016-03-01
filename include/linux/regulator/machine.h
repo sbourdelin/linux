@@ -100,6 +100,8 @@ struct regulator_state {
  * @initial_state: Suspend state to set by default.
  * @initial_mode: Mode to set at startup.
  * @ramp_delay: Time to settle down after voltage change (unit: uV/us)
+ * @active_discharge: Enable/disable active discharge. The values are:
+ *		      -1: Default, 0: Disable, 1: Enable.
  * @enable_time: Turn-on time of the rails (unit: microseconds)
  */
 struct regulation_constraints {
@@ -139,6 +141,8 @@ struct regulation_constraints {
 
 	unsigned int ramp_delay;
 	unsigned int enable_time;
+
+	int active_discharge;
 
 	/* constraint flags */
 	unsigned always_on:1;	/* regulator never off when system is on */
