@@ -1683,6 +1683,23 @@ int intel_engine_reset(struct intel_engine_cs *engine)
 	return gen8_do_engine_reset(engine);
 }
 
+int intel_guc_reset(struct drm_i915_private *dev_priv)
+{
+	int ret;
+
+	if (!i915.enable_guc_submission)
+		return -EINVAL;
+
+	intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
+
+	__raw_i915_write32(dev_priv, GEN6_GDRST, GEN9_GRDOM_GUC);
+	ret = wait_for_engine_reset(dev_priv, GEN9_GRDOM_GUC);
+
+	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+
+	return ret;
+}
+
 bool intel_uncore_unclaimed_mmio(struct drm_i915_private *dev_priv)
 {
 	return check_for_unclaimed_mmio(dev_priv);
