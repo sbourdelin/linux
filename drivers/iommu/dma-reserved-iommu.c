@@ -132,3 +132,118 @@ void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
 	mutex_unlock(&domain->reserved_mutex);
 }
 EXPORT_SYMBOL_GPL(iommu_free_reserved_iova_domain);
+
+int iommu_get_single_reserved(struct iommu_domain *domain,
+			      phys_addr_t addr, int prot,
+			      dma_addr_t *iova)
+{
+	unsigned long order = __ffs(domain->ops->pgsize_bitmap);
+	size_t page_size = 1 << order;
+	phys_addr_t mask = page_size - 1;
+	phys_addr_t aligned_addr = addr & ~mask;
+	phys_addr_t offset  = addr - aligned_addr;
+	struct iommu_reserved_binding *b;
+	struct iova *p_iova;
+	struct iova_domain *iovad =
+		(struct iova_domain *)domain->reserved_iova_cookie;
+	int ret;
+
+	if (!iovad)
+		return -EINVAL;
+
+	mutex_lock(&domain->reserved_mutex);
+
+	b = find_reserved_binding(domain, aligned_addr, page_size);
+	if (b) {
+		*iova = b->iova + offset;
+		kref_get(&b->kref);
+		ret = 0;
+		goto unlock;
+	}
+
+	/* there is no existing reserved iova for this pa */
+	p_iova = alloc_iova(iovad, 1, iovad->dma_32bit_pfn, true);
+	if (!p_iova) {
+		ret = -ENOMEM;
+		goto unlock;
+	}
+	*iova = p_iova->pfn_lo << order;
+
+	b = kzalloc(sizeof(*b), GFP_KERNEL);
+	if (!b) {
+		ret = -ENOMEM;
+		goto free_iova_unlock;
+	}
+
+	ret = iommu_map(domain, *iova, aligned_addr, page_size, prot);
+	if (ret)
+		goto free_binding_iova_unlock;
+
+	kref_init(&b->kref);
+	kref_get(&b->kref);
+	b->domain = domain;
+	b->addr = aligned_addr;
+	b->iova = *iova;
+	b->size = page_size;
+
+	link_reserved_binding(domain, b);
+
+	*iova += offset;
+	goto unlock;
+
+free_binding_iova_unlock:
+	kfree(b);
+free_iova_unlock:
+	free_iova(iovad, *iova >> order);
+unlock:
+	mutex_unlock(&domain->reserved_mutex);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(iommu_get_single_reserved);
+
+/* called with reserved_mutex locked */
+static void reserved_binding_release(struct kref *kref)
+{
+	struct iommu_reserved_binding *b =
+		container_of(kref, struct iommu_reserved_binding, kref);
+	struct iommu_domain *d = b->domain;
+	struct iova_domain *iovad =
+		(struct iova_domain *)d->reserved_iova_cookie;
+	unsigned long order = __ffs(b->size);
+
+	iommu_unmap(d, b->iova, b->size);
+	free_iova(iovad, b->iova >> order);
+	unlink_reserved_binding(d, b);
+	kfree(b);
+}
+
+void iommu_put_single_reserved(struct iommu_domain *domain, dma_addr_t iova)
+{
+	unsigned long order;
+	phys_addr_t aligned_addr;
+	dma_addr_t aligned_iova, page_size, mask, offset;
+	struct iommu_reserved_binding *b;
+
+	order = __ffs(domain->ops->pgsize_bitmap);
+	page_size = (uint64_t)1 << order;
+	mask = page_size - 1;
+
+	aligned_iova = iova & ~mask;
+	offset = iova - aligned_iova;
+
+	aligned_addr = iommu_iova_to_phys(domain, aligned_iova);
+
+	mutex_lock(&domain->reserved_mutex);
+
+	b = find_reserved_binding(domain, aligned_addr, page_size);
+	if (!b)
+		goto unlock;
+	kref_put(&b->kref, reserved_binding_release);
+
+unlock:
+	mutex_unlock(&domain->reserved_mutex);
+}
+EXPORT_SYMBOL_GPL(iommu_put_single_reserved);
+
+
+

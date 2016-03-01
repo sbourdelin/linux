@@ -40,6 +40,32 @@ int iommu_alloc_reserved_iova_domain(struct iommu_domain *domain,
  */
 void iommu_free_reserved_iova_domain(struct iommu_domain *domain);
 
+/**
+ * iommu_get_single_reserved: allocate a reserved iova page and bind
+ * it onto the page that contains a physical address (@addr)
+ *
+ * @domain: iommu domain handle
+ * @addr: physical address to bind
+ * @prot: mapping protection attribute
+ * @iova: returned iova
+ *
+ * In case the 2 pages already are bound simply return @iova and
+ * increment a ref count
+ */
+int iommu_get_single_reserved(struct iommu_domain *domain,
+			      phys_addr_t addr, int prot,
+			      dma_addr_t *iova);
+
+/**
+ * iommu_put_single_reserved: decrement a ref count of the iova page
+ *
+ * @domain: iommu domain handle
+ * @iova: iova whose binding ref count is decremented
+ *
+ * if the binding ref count is null, unmap the iova page and release the iova
+ */
+void iommu_put_single_reserved(struct iommu_domain *domain, dma_addr_t iova);
+
 #endif	/* CONFIG_IOMMU_DMA_RESERVED */
 #endif	/* __KERNEL__ */
 #endif	/* __DMA_RESERVED_IOMMU_H */
