@@ -169,6 +169,7 @@ SYSCALL_DEFINE4(kexec_load, unsigned long, entry, unsigned long, nr_segments,
 	dest_image = &kexec_image;
 	if (flags & KEXEC_ON_CRASH)
 		dest_image = &kexec_crash_image;
+
 	if (nr_segments > 0) {
 		unsigned long i;
 
@@ -190,22 +191,25 @@ SYSCALL_DEFINE4(kexec_load, unsigned long, entry, unsigned long, nr_segments,
 						   segments, flags);
 		}
 		if (result)
-			goto out;
+			goto unmap_page;
 
 		if (flags & KEXEC_PRESERVE_CONTEXT)
 			image->preserve_context = 1;
 		result = machine_kexec_prepare(image);
 		if (result)
-			goto out;
+			goto unmap_page;
 
 		for (i = 0; i < nr_segments; i++) {
 			result = kimage_load_segment(image, &image->segment[i]);
 			if (result)
-				goto out;
+				goto unmap_page;
 		}
 		kimage_terminate(image);
+unmap_page:
 		if (flags & KEXEC_ON_CRASH)
 			crash_unmap_reserved_pages();
+		if (result)
+			goto out;
 	}
 	/* Install the new kernel, and  Uninstall the old */
 	image = xchg(dest_image, image);
