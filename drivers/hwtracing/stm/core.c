@@ -44,9 +44,15 @@ static ssize_t masters_show(struct device *dev,
 			    char *buf)
 {
 	struct stm_device *stm = to_stm_device(dev);
-	int ret;
+	int ret, sw_start, sw_end;
 
-	ret = sprintf(buf, "%u %u\n", stm->data->sw_start, stm->data->sw_end);
+	sw_start = stm->data->sw_start;
+	sw_end = stm->data->sw_end;
+
+	if (stm->data->mshared)
+		sw_start = sw_end = STM_SHARED_MASTERID;
+
+	ret = sprintf(buf, "%d %d\n", sw_start, sw_end);
 
 	return ret;
 }
@@ -618,7 +624,15 @@ int stm_register_device(struct device *parent, struct stm_data *stm_data,
 	if (!stm_data->packet || !stm_data->sw_nchannels)
 		return -EINVAL;
 
+	/*
+	 * MasterIDs are assigned at HW design phase. As such the core is
+	 * using a single master for interaction with this device.
+	 */
+	if (stm_data->mshared)
+		stm_data->sw_start = stm_data->sw_end = 1;
+
 	nmasters = stm_data->sw_end - stm_data->sw_start;
+
 	stm = kzalloc(sizeof(*stm) + nmasters * sizeof(void *), GFP_KERNEL);
 	if (!stm)
 		return -ENOMEM;
