@@ -2631,6 +2631,7 @@ struct drm_i915_cmd_table {
 #define HAS_LLC(dev)		(INTEL_INFO(dev)->has_llc)
 #define HAS_WT(dev)		((IS_HASWELL(dev) || IS_BROADWELL(dev)) && \
 				 __I915__(dev)->ellc_size)
+#define HAS_SNOOP(dev)		(!IS_BXT_REVID(dev, 0, BXT_REVID_A1))
 #define I915_NEED_GFX_HWS(dev)	(INTEL_INFO(dev)->need_gfx_hws)
 
 #define HAS_HW_CONTEXTS(dev)	(INTEL_INFO(dev)->gen >= 6)
