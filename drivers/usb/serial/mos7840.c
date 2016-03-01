@@ -182,6 +182,9 @@
 #define LED_ON_MS	500
 #define LED_OFF_MS	500
 
+/* Command-line option to force RS485 mode */
+static int force_rs485 = -1;
+
 enum mos7840_flag {
 	MOS7840_FLAG_CTRL_BUSY,
 	MOS7840_FLAG_LED_BUSY,
@@ -853,6 +856,9 @@ static int mos7840_open(struct tty_struct *tty, struct usb_serial_port *port)
 	struct moschip_port *mos7840_port;
 	struct moschip_port *port0;
 
+	/* Req'd to check for RS485 devices and enable appropriate mode */
+	u16 product = le16_to_cpu(port->serial->dev->descriptor.idProduct);
+
 	if (mos7840_port_paranoia_check(port, __func__))
 		return -ENODEV;
 
@@ -990,6 +996,22 @@ static int mos7840_open(struct tty_struct *tty, struct usb_serial_port *port)
 	Data = Data & ~SERIAL_LCR_DLAB;
 	status = mos7840_set_uart_reg(port, LINE_CONTROL_REGISTER, Data);
 	mos7840_port->shadowLCR = Data;
+
+	if (!(force_rs485 == 0)) {
+		if ((force_rs485 == 1) ||
+			(product == BANDB_DEVICE_ID_USOPTL4_4P) ||
+			(product == BANDB_DEVICE_ID_USOPTL4_2P)) {
+			/* Enable RS485 mode by setting bytes in
+			 * scratchpad register:
+			 * 0x00  RS485 mode disabled
+			 * 0x80  = RS485 mode enabled, DTR Low on tx
+			 * 0xC0  = RS485 mode enabled, DTR High on tx 
+			 */
+			dev_notice(&port->dev, "Detected B&B Electronics USOPTL4_4P, enabling RS485 mode.\n");
+			Data = 0xC0;
+			status = mos7840_set_uart_reg(port, SCRATCH_PAD_REGISTER, Data);
+		}
+	}
 
 	/* clearing Bulkin and Bulkout Fifo */
 	Data = 0x0;
@@ -2402,6 +2424,9 @@ static struct usb_serial_driver * const serial_drivers[] = {
 };
 
 module_usb_serial_driver(serial_drivers, id_table);
+
+module_param(force_rs485, int, S_IRUGO);
+MODULE_PARM_DESC(force_rs845, "Force RS-485 mode (1 = force enable, 0 = force enable).  Otherwise automatically enabled for B&B Elec. USOPTL4-4P and USOPTL4-2P.");
 
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
