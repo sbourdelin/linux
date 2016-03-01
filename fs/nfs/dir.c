@@ -1446,7 +1446,7 @@ static fmode_t flags_to_mode(int flags)
 
 static struct nfs_open_context *create_nfs_open_context(struct dentry *dentry, int open_flags)
 {
-	return alloc_nfs_open_context(dentry, flags_to_mode(open_flags));
+	return alloc_nfs_open_context(dentry, d_select_inode(dentry, open_flags), flags_to_mode(open_flags));
 }
 
 static int do_open(struct inode *inode, struct file *filp)
