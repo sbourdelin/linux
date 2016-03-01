@@ -1527,6 +1527,7 @@ static void uart_hangup(struct tty_struct *tty)
 		wake_up_interruptible(&port->delta_msr_wait);
 	}
 	mutex_unlock(&port->mutex);
+	tty_ldisc_flush(tty);
 }
 
 static void uart_port_shutdown(struct tty_port *port)
