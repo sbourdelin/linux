@@ -44,6 +44,7 @@ struct poll_table_struct;
  * @p_u16:	Pointer to a 16-bit unsigned value.
  * @p_u32:	Pointer to a 32-bit unsigned value.
  * @p_char:	Pointer to a string.
+ * @p_vp8_frame_hdr:	Pointer to a struct v4l2_ctrl_vp8_frame_hdr.
  * @p:		Pointer to a compound value.
  */
 union v4l2_ctrl_ptr {
@@ -53,6 +54,7 @@ union v4l2_ctrl_ptr {
 	u16 *p_u16;
 	u32 *p_u32;
 	char *p_char;
+	struct v4l2_ctrl_vp8_frame_hdr *p_vp8_frame_hdr;
 	void *p;
 };
 
