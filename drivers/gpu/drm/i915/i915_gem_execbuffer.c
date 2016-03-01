@@ -1686,8 +1686,8 @@ i915_gem_execbuffer(struct drm_device *dev, void *data,
 	}
 
 	/* Copy in the exec list from userland */
-	exec_list = drm_malloc_ab(sizeof(*exec_list), args->buffer_count);
-	exec2_list = drm_malloc_ab(sizeof(*exec2_list), args->buffer_count);
+	exec_list = drm_malloc_ab(args->buffer_count, sizeof(*exec_list));
+	exec2_list = drm_malloc_ab(args->buffer_count, sizeof(*exec2_list));
 	if (exec_list == NULL || exec2_list == NULL) {
 		DRM_DEBUG("Failed to allocate exec list for %d buffers\n",
 			  args->buffer_count);
@@ -1775,8 +1775,8 @@ i915_gem_execbuffer2(struct drm_device *dev, void *data,
 		return -EINVAL;
 	}
 
-	exec2_list = drm_malloc_gfp(sizeof(*exec2_list),
-				    args->buffer_count,
+	exec2_list = drm_malloc_gfp(args->buffer_count,
+				    sizeof(*exec2_list),
 				    GFP_TEMPORARY);
 	if (exec2_list == NULL) {
 		DRM_DEBUG("Failed to allocate exec list for %d buffers\n",

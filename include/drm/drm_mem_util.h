@@ -29,7 +29,7 @@
 
 #include <linux/vmalloc.h>
 
-static __inline__ void *drm_calloc_large(size_t nmemb, size_t size)
+static __inline__ void *drm_calloc_large(size_t nmemb, const size_t size)
 {
 	if (size != 0 && nmemb > SIZE_MAX / size)
 		return NULL;
@@ -41,8 +41,15 @@ static __inline__ void *drm_calloc_large(size_t nmemb, size_t size)
 			 GFP_KERNEL | __GFP_HIGHMEM | __GFP_ZERO, PAGE_KERNEL);
 }
 
+#define	drm_calloc_large(nmemb, size)					\
+({									\
+	BUILD_BUG_ON_MSG(!__builtin_constant_p(size),			\
+		"Non-constant 'size' - check argument ordering?");	\
+	(drm_calloc_large)(nmemb, size);				\
+})
+
 /* Modeled after cairo's malloc_ab, it's like calloc but without the zeroing. */
-static __inline__ void *drm_malloc_ab(size_t nmemb, size_t size)
+static __inline__ void *drm_malloc_ab(size_t nmemb, const size_t size)
 {
 	if (size != 0 && nmemb > SIZE_MAX / size)
 		return NULL;
@@ -54,7 +61,14 @@ static __inline__ void *drm_malloc_ab(size_t nmemb, size_t size)
 			 GFP_KERNEL | __GFP_HIGHMEM, PAGE_KERNEL);
 }
 
-static __inline__ void *drm_malloc_gfp(size_t nmemb, size_t size, gfp_t gfp)
+#define	drm_malloc_ab(nmemb, size)					\
+({									\
+	BUILD_BUG_ON_MSG(!__builtin_constant_p(size),			\
+		"Non-constant 'size' - check argument ordering?");	\
+	(drm_malloc_ab)(nmemb, size);					\
+})
+
+static __inline__ void *drm_malloc_gfp(size_t nmemb, const size_t size, gfp_t gfp)
 {
 	if (size != 0 && nmemb > SIZE_MAX / size)
 		return NULL;
@@ -72,6 +86,13 @@ static __inline__ void *drm_malloc_gfp(size_t nmemb, size_t size, gfp_t gfp)
 	return __vmalloc(size * nmemb,
 			 gfp | __GFP_HIGHMEM, PAGE_KERNEL);
 }
+
+#define	drm_malloc_gfp(nmemb, size, gfp)				\
+({									\
+	BUILD_BUG_ON_MSG(!__builtin_constant_p(size),			\
+		"Non-constant 'size' - check argument ordering?");	\
+	(drm_malloc_gfp)(nmemb, size, gfp);				\
+})
 
 static __inline void drm_free_large(void *ptr)
 {
