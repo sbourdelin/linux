@@ -225,24 +225,6 @@ static int vr41xx_rtc_ioctl(struct device *dev, unsigned int cmd, unsigned long 
 	return 0;
 }
 
-static int vr41xx_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
-{
-	spin_lock_irq(&rtc_lock);
-	if (enabled) {
-		if (!alarm_enabled) {
-			enable_irq(aie_irq);
-			alarm_enabled = 1;
-		}
-	} else {
-		if (alarm_enabled) {
-			disable_irq(aie_irq);
-			alarm_enabled = 0;
-		}
-	}
-	spin_unlock_irq(&rtc_lock);
-	return 0;
-}
-
 static irqreturn_t elapsedtime_interrupt(int irq, void *dev_id)
 {
 	struct platform_device *pdev = (struct platform_device *)dev_id;
