@@ -59,10 +59,10 @@
 #include "free-space-cache.h"
 #include "backref.h"
 #include "tests/btrfs-tests.h"
-
 #include "qgroup.h"
 #define CREATE_TRACE_POINTS
 #include <trace/events/btrfs.h>
+#include "encrypt.h"
 
 static const struct super_operations btrfs_super_ops;
 static struct file_system_type btrfs_fs_type;
@@ -91,6 +91,9 @@ const char *btrfs_decode_error(int errno)
 		break;
 	case -ENOENT:
 		errstr = "No such entry";
+		break;
+	case -ENOKEY:
+		errstr = "Required key not available";
 		break;
 	}
 

@@ -60,6 +60,7 @@
 #include "hash.h"
 #include "props.h"
 #include "qgroup.h"
+#include "encrypt.h"
 
 struct btrfs_iget_args {
 	struct btrfs_key *location;
@@ -206,6 +207,8 @@ static int insert_inline_extent(struct btrfs_trans_handle *trans,
 		}
 		btrfs_set_file_extent_compression(leaf, ei,
 						  compress_type);
+		if (compress_type == BTRFS_ENCRYPT_AES)
+			btrfs_set_file_extent_encryption(leaf, ei, 1);
 	} else {
 		page = find_get_page(inode->i_mapping,
 				     start >> PAGE_CACHE_SHIFT);
@@ -581,7 +584,7 @@ cont:
 		 * win, compare the page count read with the blocks on disk
 		 */
 		total_in = ALIGN(total_in, PAGE_CACHE_SIZE);
-		if (total_compressed >= total_in) {
+		if (total_compressed >= total_in && compress_type != BTRFS_ENCRYPT_AES) {
 			will_compress = 0;
 		} else {
 			num_bytes = total_in;
@@ -6720,6 +6723,8 @@ static noinline int uncompress_inline(struct btrfs_path *path,
 	max_size = min_t(unsigned long, PAGE_CACHE_SIZE, max_size);
 	ret = btrfs_decompress(compress_type, tmp, page,
 			       extent_offset, inline_size, max_size);
+	if (ret && ret == -ENOKEY)
+		ret = 0;
 	kfree(tmp);
 	return ret;
 }
@@ -9399,6 +9404,20 @@ static int btrfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	u64 root_objectid;
 	int ret;
 	u64 old_ino = btrfs_ino(old_inode);
+	u64 root_flags;
+	u64 dest_flags;
+
+	/*
+	 * As of now block an encrypted file/dir to move across
+	 * subvol which potentially has different key.
+	 */
+	root_flags = btrfs_root_flags(&root->root_item);
+	dest_flags = btrfs_root_flags(&dest->root_item);
+	if (root != dest &&
+		((root_flags & BTRFS_ROOT_SUBVOL_ENCRYPT) ||
+		(dest_flags & BTRFS_ROOT_SUBVOL_ENCRYPT))) {
+		return -EOPNOTSUPP;
+	}
 
 	if (btrfs_ino(new_dir) == BTRFS_EMPTY_SUBVOL_DIR_OBJECTID)
 		return -EPERM;
@@ -10059,6 +10078,22 @@ static int btrfs_permission(struct inode *inode, int mask)
 		if (BTRFS_I(inode)->flags & BTRFS_INODE_READONLY)
 			return -EACCES;
 	}
+
+	/*
+	 * Get the required key as we encrypt only file data, this
+	 * this applies only files as of now.
+	 */
+	if (S_ISREG(mode)) {
+		int ret = 0;
+		u64 root_flags;
+		root_flags = btrfs_root_flags(&root->root_item);
+		if (root_flags & BTRFS_ROOT_SUBVOL_ENCRYPT) {
+			ret = btrfs_update_key_data_to_binode(inode);
+			if (ret)
+				return -ENOKEY;
+		}
+	}
+
 	return generic_permission(inode, mask);
 }
 

@@ -41,6 +41,7 @@
 #include "compression.h"
 #include "extent_io.h"
 #include "extent_map.h"
+#include "encrypt.h"
 
 struct compressed_bio {
 	/* number of bios pending for this compressed extent */
@@ -182,7 +183,7 @@ static void end_compressed_bio_read(struct bio *bio)
 				      cb->orig_bio->bi_vcnt,
 				      cb->compressed_len);
 csum_failed:
-	if (ret)
+	if (ret && ret != -ENOKEY)
 		cb->errors = 1;
 
 	/* release the compressed pages */
@@ -751,6 +752,7 @@ static struct {
 static const struct btrfs_compress_op * const btrfs_compress_op[] = {
 	&btrfs_zlib_compress,
 	&btrfs_lzo_compress,
+	&btrfs_encrypt_ops,
 };
 
 void __init btrfs_init_compress(void)
@@ -780,6 +782,10 @@ static struct list_head *find_workspace(int type)
 	atomic_t *alloc_ws		= &btrfs_comp_ws[idx].alloc_ws;
 	wait_queue_head_t *ws_wait	= &btrfs_comp_ws[idx].ws_wait;
 	int *num_ws			= &btrfs_comp_ws[idx].num_ws;
+
+	if (type == BTRFS_ENCRYPT_AES)
+		return NULL;
+
 again:
 	spin_lock(ws_lock);
 	if (!list_empty(idle_ws)) {
@@ -824,6 +830,9 @@ static void free_workspace(int type, struct list_head *workspace)
 	wait_queue_head_t *ws_wait	= &btrfs_comp_ws[idx].ws_wait;
 	int *num_ws			= &btrfs_comp_ws[idx].num_ws;
 
+	if (!workspace)
+		return;
+
 	spin_lock(ws_lock);
 	if (*num_ws < num_online_cpus()) {
 		list_add(workspace, idle_ws);
@@ -862,6 +871,38 @@ static void free_workspaces(void)
 	}
 }
 
+void print_data_encode_status(struct inode *inode, int direction,
+					char *prefix, int type, int ret)
+{
+#ifdef CONFIG_BTRFS_DEBUG
+	char what[10];
+
+	if (type == BTRFS_ENCRYPT_AES) {
+		if (!direction)
+			strcpy(what, "Encrypt");
+		else
+			strcpy(what, "Decrypt");
+	} else {
+		if (!direction)
+			strcpy(what, "Compress");
+		else
+			strcpy(what, "Uncpress");
+	}
+
+	switch (ret) {
+	case 0:
+		pr_debug("%s %s: success     : inode %lu\n",what, prefix, inode->i_ino);
+		return;
+	case -ENOKEY:
+		pr_debug("%s %s: Failed NOKEY: inode %lu\n",what, prefix, inode->i_ino);
+		return;
+	default:
+		pr_debug("%s %s: Failed %d   : inode %lu\n",what, prefix, ret, inode->i_ino);
+	}
+#else
+#endif
+}
+
 /*
  * given an address space and start/len, compress the bytes.
  *
@@ -894,7 +935,7 @@ int btrfs_compress_pages(int type, struct address_space *mapping,
 	int ret;
 
 	workspace = find_workspace(type);
-	if (IS_ERR(workspace))
+	if (workspace && IS_ERR(workspace))
 		return PTR_ERR(workspace);
 
 	ret = btrfs_compress_op[type-1]->compress_pages(workspace, mapping,
@@ -903,6 +944,8 @@ int btrfs_compress_pages(int type, struct address_space *mapping,
 						      total_in, total_out,
 						      max_out);
 	free_workspace(type, workspace);
+
+	print_data_encode_status(mapping->host, 0, "    ", type, ret);
 	return ret;
 }
 
@@ -930,13 +973,14 @@ static int btrfs_decompress_biovec(int type, struct page **pages_in,
 	int ret;
 
 	workspace = find_workspace(type);
-	if (IS_ERR(workspace))
+	if (workspace && IS_ERR(workspace))
 		return PTR_ERR(workspace);
 
 	ret = btrfs_compress_op[type-1]->decompress_biovec(workspace, pages_in,
 							 disk_start,
 							 bvec, vcnt, srclen);
 	free_workspace(type, workspace);
+	print_data_encode_status(bvec->bv_page->mapping->host, 1, "bio ", type, ret);
 	return ret;
 }
 
@@ -952,7 +996,7 @@ int btrfs_decompress(int type, unsigned char *data_in, struct page *dest_page,
 	int ret;
 
 	workspace = find_workspace(type);
-	if (IS_ERR(workspace))
+	if (workspace && IS_ERR(workspace))
 		return PTR_ERR(workspace);
 
 	ret = btrfs_compress_op[type-1]->decompress(workspace, data_in,
@@ -960,6 +1004,7 @@ int btrfs_decompress(int type, unsigned char *data_in, struct page *dest_page,
 						  srclen, destlen);
 
 	free_workspace(type, workspace);
+	print_data_encode_status(dest_page->mapping->host, 1, "page", type, ret);
 	return ret;
 }
 

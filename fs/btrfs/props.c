@@ -22,9 +22,15 @@
 #include "hash.h"
 #include "transaction.h"
 #include "xattr.h"
+#include "encrypt.h"
 
 #define BTRFS_PROP_HANDLERS_HT_BITS 8
 static DEFINE_HASHTABLE(prop_handlers_ht, BTRFS_PROP_HANDLERS_HT_BITS);
+
+#define BTRFS_PROP_INHERIT_NONE		(1U << 0)
+#define BTRFS_PROP_INHERIT_FOR_DIR	(1U << 1)
+#define BTRFS_PROP_INHERIT_FOR_CLONE	(1U << 2)
+#define BTRFS_PROP_INHERIT_FOR_SUBVOL	(1U << 3)
 
 struct prop_handler {
 	struct hlist_node node;
@@ -41,13 +47,28 @@ static int prop_compression_apply(struct inode *inode,
 				  size_t len);
 static const char *prop_compression_extract(struct inode *inode);
 
+static int prop_encrypt_validate(const char *value, size_t len);
+static int prop_encrypt_apply(struct inode *inode,
+				  const char *value, size_t len);
+static const char *prop_encrypt_extract(struct inode *inode);
+
 static struct prop_handler prop_handlers[] = {
 	{
 		.xattr_name = XATTR_BTRFS_PREFIX "compression",
 		.validate = prop_compression_validate,
 		.apply = prop_compression_apply,
 		.extract = prop_compression_extract,
-		.inheritable = 1
+		.inheritable = BTRFS_PROP_INHERIT_FOR_DIR| \
+				BTRFS_PROP_INHERIT_FOR_CLONE| \
+				BTRFS_PROP_INHERIT_FOR_SUBVOL,
+	},
+	{
+		.xattr_name = XATTR_BTRFS_PREFIX "encrypt",
+		.validate = prop_encrypt_validate,
+		.apply = prop_encrypt_apply,
+		.extract = prop_encrypt_extract,
+		.inheritable = BTRFS_PROP_INHERIT_FOR_DIR| \
+				BTRFS_PROP_INHERIT_FOR_CLONE,
 	},
 };
 
@@ -315,6 +336,13 @@ static int inherit_props(struct btrfs_trans_handle *trans,
 		if (!h->inheritable)
 			continue;
 
+		//is_subvolume_inode(); ?
+		if (btrfs_ino(inode) == BTRFS_FIRST_FREE_OBJECTID) {
+			if (!strcmp(h->xattr_name, "btrfs.encrypt")) {
+				continue;
+			}
+		}
+
 		value = h->extract(parent);
 		if (!value)
 			continue;
@@ -425,4 +453,114 @@ static const char *prop_compression_extract(struct inode *inode)
 	return NULL;
 }
 
+static int btrfs_create_encrypt_key_tuplet(char *algo, char *tag, char *val_out)
+{
+	return snprintf(val_out, 32, "%s@%s", algo, tag);
+}
 
+static int btrfs_split_key_tuplet(const char *val, size_t len,
+					char *keyalgo, char *keytag)
+{
+	char *tmp;
+	char *tmp1;
+	char *tmp2;
+
+	tmp1 = tmp = kstrdup(val, GFP_NOFS);
+	tmp[len] = '\0';
+	tmp2 = strsep(&tmp, "@");
+	if (!tmp2) {
+		kfree(tmp1);
+		return -EINVAL;
+	}
+
+	if (strlen(tmp2) > 16 || strlen(tmp) > 16) {
+		kfree(tmp1);
+		return -EINVAL;
+	}
+	strcpy(keyalgo, tmp2);
+	strcpy(keytag, tmp);
+
+	return 0;
+}
+
+/*
+ * The required foramt in the value is <encrypt_algo>@<key_tag>
+ * eg: btrfs.encrypt="aes@btrfs:61e0d004"
+ */
+static int prop_encrypt_validate(const char *value, size_t len)
+{
+	int ret;
+	char keytag[16];
+	char keyalgo[16];
+	size_t keylen;
+
+	if (!len)
+		return 0;
+
+	ret = btrfs_split_key_tuplet(value, len, keyalgo, keytag);
+	if (ret)
+		return ret;
+
+	keylen = btrfs_check_encrypt_type(keyalgo);
+	if (!keylen)
+		return -ENOTSUPP;
+
+	return ret;
+}
+
+static int prop_encrypt_apply(struct inode *inode,
+				const char *value, size_t len)
+{
+	int ret;
+	u64 root_flags;
+	char keytag[16];
+	char keyalgo[16];
+	struct btrfs_root_item *root_item;
+
+	root_item = &(BTRFS_I(inode)->root->root_item);
+
+	if (len == 0) {
+		BTRFS_I(inode)->flags &= ~BTRFS_INODE_ENCRYPT;
+		BTRFS_I(inode)->force_compress = 0;
+
+		if (btrfs_ino(inode) == BTRFS_FIRST_FREE_OBJECTID) {
+			root_flags = btrfs_root_flags(root_item);
+			btrfs_set_root_flags(root_item, root_flags | ~BTRFS_ROOT_SUBVOL_ENCRYPT);
+			memset(root_item->encrypt_algo, '\0', 16);
+			memset(root_item->encrypt_keytag, '\0', 16);
+		}
+		return 0;
+	}
+
+	BTRFS_I(inode)->flags |= BTRFS_INODE_ENCRYPT;
+	BTRFS_I(inode)->force_compress = BTRFS_ENCRYPT_AES;
+
+	ret = btrfs_split_key_tuplet(value, len, keyalgo, keytag);
+	if (ret)
+		return ret;
+
+	/* do it only for the subvol or snapshot */
+	if (btrfs_ino(inode) == BTRFS_FIRST_FREE_OBJECTID) {
+		root_flags = btrfs_root_flags(root_item);
+		btrfs_set_root_flags(root_item, root_flags | BTRFS_ROOT_SUBVOL_ENCRYPT);
+		/* TODO: this is not right, fix it */
+		strncpy(root_item->encrypt_algo, keyalgo, 16);
+		strncpy(root_item->encrypt_keytag, keytag, 16);
+	}
+
+	return 0;
+}
+
+static const char *prop_encrypt_extract(struct inode *inode)
+{
+	int ret;
+	char val[32];
+	struct btrfs_root_item *ri;
+
+	ri = &(BTRFS_I(inode)->root->root_item);
+
+	ret = btrfs_create_encrypt_key_tuplet(ri->encrypt_algo,
+					ri->encrypt_keytag, val);
+
+	return kstrdup(val, GFP_NOFS);
+}

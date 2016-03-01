@@ -722,8 +722,9 @@ enum btrfs_compression_type {
 	BTRFS_COMPRESS_NONE  = 0,
 	BTRFS_COMPRESS_ZLIB  = 1,
 	BTRFS_COMPRESS_LZO   = 2,
-	BTRFS_COMPRESS_TYPES = 2,
-	BTRFS_COMPRESS_LAST  = 3,
+	BTRFS_ENCRYPT_AES    = 3,
+	BTRFS_COMPRESS_TYPES = 3,
+	BTRFS_COMPRESS_LAST  = 4,
 };
 
 struct btrfs_inode_item {
@@ -774,6 +775,7 @@ struct btrfs_dir_item {
  * still visible as a directory
  */
 #define BTRFS_ROOT_SUBVOL_DEAD		(1ULL << 48)
+#define BTRFS_ROOT_SUBVOL_ENCRYPT	(1ULL << 49)
 
 struct btrfs_root_item {
 	struct btrfs_inode_item inode;
@@ -817,7 +819,9 @@ struct btrfs_root_item {
 	struct btrfs_timespec otime;
 	struct btrfs_timespec stime;
 	struct btrfs_timespec rtime;
-	__le64 reserved[8]; /* for future */
+	char encrypt_algo[16];
+	char encrypt_keytag[16];
+	__le64 reserved[4]; /* for future */
 } __attribute__ ((__packed__));
 
 /*
@@ -2383,6 +2387,7 @@ do {                                                                   \
 #define BTRFS_INODE_NOATIME		(1 << 9)
 #define BTRFS_INODE_DIRSYNC		(1 << 10)
 #define BTRFS_INODE_COMPRESS		(1 << 11)
+#define BTRFS_INODE_ENCRYPT		(1 << 12)
 
 #define BTRFS_INODE_ROOT_ITEM_INIT	(1 << 31)
 

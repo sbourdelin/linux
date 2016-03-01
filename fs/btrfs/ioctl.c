@@ -2134,8 +2134,15 @@ static noinline int btrfs_ioctl_tree_search(struct file *file,
 	int ret;
 	size_t buf_size;
 
+#if 0
+	/*
+	 * Todo: Workaround as of now instead of introduing a new ioctl,
+	 * so that non root user can find info about the subvol
+	 * they own/create. This must be fixed in final.
+	 */
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
+#endif
 
 	uargs = (struct btrfs_ioctl_search_args __user *)argp;
 

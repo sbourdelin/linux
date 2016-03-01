@@ -197,6 +197,8 @@ struct btrfs_inode {
 	long delayed_iput_count;
 
 	struct inode vfs_inode;
+
+	unsigned char key_payload[16];
 };
 
 extern unsigned char btrfs_filetype_table[];
