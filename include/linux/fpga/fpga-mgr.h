@@ -107,7 +107,10 @@ struct fpga_manager {
 	void *priv;
 };
 
-#define to_fpga_manager(d) container_of(d, struct fpga_manager, dev)
+static inline struct fpga_manager *to_fpga_manager(struct device *d)
+{
+	return container_of(d, struct fpga_manager, dev);
+}
 
 int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags,
 		      const char *buf, size_t count);
