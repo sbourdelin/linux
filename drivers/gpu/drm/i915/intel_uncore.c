@@ -1616,6 +1616,73 @@ bool intel_has_gpu_reset(struct drm_device *dev)
 	return intel_get_gpu_reset(dev) != NULL;
 }
 
+static int wait_for_engine_reset(struct drm_i915_private *dev_priv,
+				 unsigned int grdom)
+{
+	int ret;
+
+#define _CND ((__raw_i915_read32(dev_priv, GEN6_GDRST) & grdom) == 0)
+
+	/*
+	 * Spin waiting for the device to ack the reset request.
+	 * Times out after 500 us
+	 */
+	ret = wait_for_atomic_us(_CND, 500);
+#undef _CND
+
+	return ret;
+}
+
+static int gen8_do_engine_reset(struct intel_engine_cs *engine)
+{
+	struct drm_device *dev = engine->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	u32 reset_ctl;
+	int ret;
+	int engine_mask[I915_NUM_RINGS] = {
+		[RCS] = GEN6_GRDOM_RENDER,
+		[BCS] = GEN6_GRDOM_BLT,
+		[VCS] = GEN6_GRDOM_MEDIA,
+		[VCS2] = GEN8_GRDOM_MEDIA2,
+		[VECS] = GEN6_GRDOM_VECS,
+	};
+
+	if (WARN_ON_ONCE(!intel_ring_initialized(engine)))
+		return -EINVAL;
+
+	intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
+
+	/* reset engine */
+	__raw_i915_write32(dev_priv, GEN6_GDRST, engine_mask[engine->id]);
+
+	ret = wait_for_engine_reset(dev_priv, engine_mask[engine->id]);
+	if (ret)
+		goto out;
+
+	/* Confirm that reset control register is back to normal after reset */
+	reset_ctl = I915_READ(RING_RESET_CTL(engine->mmio_base));
+	WARN((reset_ctl & (RESET_CTL_REQUEST_RESET | RESET_CTL_READY_TO_RESET)),
+	     "%s reset control still active after reset !! (0x%08x)\n",
+	     engine->name, reset_ctl);
+
+out:
+	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+	return ret;
+}
+
+int intel_engine_reset(struct intel_engine_cs *engine)
+{
+	struct drm_device *dev = engine->dev;
+
+	if (INTEL_INFO(dev)->gen < 8) {
+		DRM_ERROR("Engine Reset not supported on Gen%d\n",
+			  INTEL_INFO(dev)->gen);
+		return -EINVAL;
+	}
+
+	return gen8_do_engine_reset(engine);
+}
+
 bool intel_uncore_unclaimed_mmio(struct drm_i915_private *dev_priv)
 {
 	return check_for_unclaimed_mmio(dev_priv);

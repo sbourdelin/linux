@@ -2752,6 +2752,7 @@ extern long i915_compat_ioctl(struct file *filp, unsigned int cmd,
 			      unsigned long arg);
 #endif
 extern int intel_gpu_reset(struct drm_device *dev);
+extern int intel_engine_reset(struct intel_engine_cs *engine);
 extern bool intel_has_gpu_reset(struct drm_device *dev);
 extern int i915_reset(struct drm_device *dev);
 extern unsigned long i915_chipset_val(struct drm_i915_private *dev_priv);
