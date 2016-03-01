@@ -541,6 +541,21 @@ static inline struct inode *d_inode(const struct dentry *dentry)
 }
 
 /**
+ * d_select_inode - Get the actual inode of this dentry
+ * @dentry: The dentry to query
+ * @flags: open flags passed
+ *
+ * This is the helper to select the underlying true inode associated with
+ * a dentry to cover cases of translating overlay filesystem.
+ */
+static inline struct inode *d_select_inode(struct dentry *dentry, int flags)
+{
+	if (dentry->d_flags & DCACHE_OP_SELECT_INODE)
+		return dentry->d_op->d_select_inode(dentry, flags);
+	return dentry->d_inode;
+}
+
+/**
  * d_inode_rcu - Get the actual inode of this dentry with ACCESS_ONCE()
  * @dentry: The dentry to query
  *
