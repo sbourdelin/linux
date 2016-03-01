@@ -1,0 +1,44 @@
+= NVMEM cell compositor =
+
+This binding is designed to provide a way for a developer to combine
+portions of other NVMEM cell and acces that data as a signle NVMEM
+cell using NVMEM consumer API.
+
+Required properties:
+- compatible: should be "nvmem-composite"
+- layout: specifies which sources comprise data in nvmem device
+  	  format is "<nvmem-cell-phandle offset size>"
+
+= Data cells =
+Are child nodes of nvmem-composite, bindings of which as described in
+bindings/nvmem/nvmem.txt
+
+Example:
+
+	composite-nvmem {
+		compatible = "nvmem-composite";
+		layout = <&another_cell_a 0 2
+ 			  &another_cell_b 0 1
+			  &another_cell_c 3 2>;
+
+		cell1: cell@0 {
+			reg = <0 5>;
+		};
+	}
+
+the result of reading variable cell1 would be:
+
+[a[0] a[1] b[0] c[3] c[4]],
+
+where a[i], b[i], c[i], represnet i-th bytes of NVMEM cells
+another_cell_a, another_cell_b and another_cell_c respectively
+
+= Data consumers =
+Are device nodes which consume nvmem data cells.
+
+Example:
+
+	a-node {
+		nvmem-cells = <&cell1>;
+		nvmem-cell-names = "some-data";
+	};
