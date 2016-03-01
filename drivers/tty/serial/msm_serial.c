@@ -1580,7 +1580,6 @@ static int msm_serial_probe(struct platform_device *pdev)
 		if (IS_ERR(msm_port->pclk))
 			return PTR_ERR(msm_port->pclk);
 
-		clk_set_rate(msm_port->clk, 1843200);
 	}
 
 	port->uartclk = clk_get_rate(msm_port->clk);
