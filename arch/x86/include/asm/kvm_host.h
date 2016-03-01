@@ -265,7 +265,7 @@ struct kvm_mmu_page {
 	/* The page is obsolete if mmu_valid_gen != kvm->arch.mmu_valid_gen.  */
 	unsigned long mmu_valid_gen;
 
-	DECLARE_BITMAP(unsync_child_bitmap, 512);
+	DECLARE_BITMAP(unsync_child_bitmap, PT64_ENT_PER_PAGE);
 
 #ifdef CONFIG_X86_32
 	/*

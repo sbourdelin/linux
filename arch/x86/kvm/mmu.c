@@ -1806,7 +1806,7 @@ static int __mmu_unsync_walk(struct kvm_mmu_page *sp,
 {
 	int i, ret, nr_unsync_leaf = 0;
 
-	for_each_set_bit(i, sp->unsync_child_bitmap, 512) {
+	for_each_set_bit(i, sp->unsync_child_bitmap, PT64_ENT_PER_PAGE) {
 		struct kvm_mmu_page *child;
 		u64 ent = sp->spt[i];
 
