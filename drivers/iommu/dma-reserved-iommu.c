@@ -116,7 +116,7 @@ unlock:
 }
 EXPORT_SYMBOL_GPL(iommu_alloc_reserved_iova_domain);
 
-void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
+void __iommu_free_reserved_iova_domain(struct iommu_domain *domain)
 {
 	struct iova_domain *iovad =
 		(struct iova_domain *)domain->reserved_iova_cookie;
@@ -124,11 +124,14 @@ void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
 	if (!iovad)
 		return;
 
-	mutex_lock(&domain->reserved_mutex);
-
 	put_iova_domain(iovad);
 	kfree(iovad);
+}
 
+void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
+{
+	mutex_lock(&domain->reserved_mutex);
+	__iommu_free_reserved_iova_domain(domain);
 	mutex_unlock(&domain->reserved_mutex);
 }
 EXPORT_SYMBOL_GPL(iommu_free_reserved_iova_domain);
@@ -244,6 +247,24 @@ unlock:
 	mutex_unlock(&domain->reserved_mutex);
 }
 EXPORT_SYMBOL_GPL(iommu_put_single_reserved);
+
+void iommu_unmap_reserved(struct iommu_domain *domain)
+{
+	struct rb_node *node;
+
+	mutex_lock(&domain->reserved_mutex);
+	while ((node = rb_first(&domain->reserved_binding_list))) {
+		struct iommu_reserved_binding *b =
+			rb_entry(node, struct iommu_reserved_binding, node);
+
+		while (!kref_put(&b->kref, reserved_binding_release))
+			;
+	}
+	domain->reserved_binding_list = RB_ROOT;
+	__iommu_free_reserved_iova_domain(domain);
+	mutex_unlock(&domain->reserved_mutex);
+}
+EXPORT_SYMBOL_GPL(iommu_unmap_reserved);
 
 
 
