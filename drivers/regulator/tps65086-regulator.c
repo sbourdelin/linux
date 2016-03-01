@@ -191,7 +191,7 @@ static int tps65086_of_parse_cb(struct device_node *dev,
 
 	/* Check for decay mode */
 	if (desc->id <= BUCK6 && of_property_read_bool(config->of_node, "ti,regulator-decay")) {
-		ret = regmap_write_bits(config->regmap,
+		ret = regmap_force_update_bits(config->regmap,
 					regulators[desc->id].decay_reg,
 					regulators[desc->id].decay_mask,
 					regulators[desc->id].decay_mask);

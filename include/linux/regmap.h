@@ -67,6 +67,8 @@ struct reg_sequence {
 
 #define	regmap_update_bits(map, reg, mask, val) \
 	regmap_update_bits_base(map, reg, mask, val, NULL, false, false)
+#define	regmap_force_update_bits(map, reg, mask, val) \
+	regmap_update_bits_base(map, reg, mask, val, NULL, false, true)
 #define	regmap_update_bits_async(map, reg, mask, val)\
 	regmap_update_bits_base(map, reg, mask, val, NULL, true, false)
 #define	regmap_update_bits_check(map, reg, mask, val, change)\
