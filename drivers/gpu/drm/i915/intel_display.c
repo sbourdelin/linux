@@ -10441,7 +10441,7 @@ bool intel_get_load_detect_pipe(struct drm_connector *connector,
 	struct intel_crtc_state *crtc_state;
 	int ret, i = -1;
 
-	DRM_DEBUG_KMS("[CONNECTOR:%d:%s], [ENCODER:%d:%s]\n",
+	DRM_ERROR("[CONNECTOR:%d:%s], [ENCODER:%d:%s]\n",
 		      connector->base.id, connector->name,
 		      encoder->base.id, encoder->name);
 
@@ -10497,7 +10497,7 @@ retry:
 	 * If we didn't find an unused CRTC, don't use any.
 	 */
 	if (!crtc) {
-		DRM_DEBUG_KMS("no pipe available for load-detect\n");
+		DRM_ERROR("no pipe available for load-detect\n");
 		goto fail;
 	}
 
@@ -10548,12 +10548,12 @@ found:
 	 */
 	fb = mode_fits_in_fbdev(dev, mode);
 	if (fb == NULL) {
-		DRM_DEBUG_KMS("creating tmp fb for load-detection\n");
+		DRM_ERROR("creating tmp fb for load-detection\n");
 		fb = intel_framebuffer_create_for_mode(dev, mode, 24, 32);
 	} else
-		DRM_DEBUG_KMS("reusing fbdev for load-detection framebuffer\n");
+		DRM_ERROR("reusing fbdev for load-detection framebuffer\n");
 	if (IS_ERR(fb)) {
-		DRM_DEBUG_KMS("failed to allocate framebuffer for load-detection\n");
+		DRM_ERROR("failed to allocate framebuffer for load-detection\n");
 		goto fail;
 	}
 
@@ -10573,13 +10573,13 @@ found:
 	if (!ret)
 		ret = PTR_ERR_OR_ZERO(drm_atomic_get_plane_state(restore_state, crtc->primary));
 	if (ret) {
-		DRM_DEBUG_KMS("Failed to create a copy of old state to restore: %i\n", ret);
+		DRM_ERROR("Failed to create a copy of old state to restore: %i\n", ret);
 		goto fail;
 	}
 
 	ret = drm_atomic_commit(state);
 	if (ret) {
-		DRM_DEBUG_KMS("failed to set mode on load-detect pipe\n");
+		DRM_ERROR("failed to set mode on load-detect pipe\n");
 		goto fail;
 	}
 
@@ -10598,6 +10598,7 @@ fail:
 		drm_modeset_backoff(ctx);
 		goto retry;
 	}
+	DRM_ERROR("Failed with %i\n", ret);
 
 	return false;
 }
