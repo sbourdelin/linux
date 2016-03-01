@@ -24,6 +24,7 @@
  */
 static struct lock_class_key percpu_list_key;
 
+#ifdef CONFIG_PERCPU_LIST
 /*
  * Initialize the per-cpu list head
  */
@@ -76,7 +77,7 @@ void pcpu_list_add(struct pcpu_list_node *node, struct pcpu_list_head *head)
  * (becomes NULL or to a different one), we assume that the deletion was done
  * elsewhere.
  */
-void pcpu_list_del(struct pcpu_list_node *node)
+void pcpu_list_del(struct pcpu_list_node *node, struct pcpu_list_head *unused)
 {
 	spinlock_t *lock = READ_ONCE(node->lockptr);
 
@@ -98,3 +99,24 @@ void pcpu_list_del(struct pcpu_list_node *node)
 	}
 	spin_unlock(lock);
 }
+
+#else /* CONFIG_PERCPU_LIST */
+/*
+ * Initialize the per-cpu list head
+ */
+int init_pcpu_list_head(struct pcpu_list_head **phead)
+{
+	struct pcpu_list_head *head = kmalloc(sizeof(struct pcpu_list_head),
+					      GFP_KERNEL);
+
+	if (!head)
+		return -ENOMEM;
+
+	INIT_LIST_HEAD(&head->list);
+	head->lock = __SPIN_LOCK_UNLOCKED(&head->lock);
+	lockdep_set_class(&head->lock, &percpu_list_key);
+
+	*phead = head;
+	return 0;
+}
+#endif /* CONFIG_PERCPU_LIST */

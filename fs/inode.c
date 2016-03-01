@@ -437,7 +437,7 @@ EXPORT_SYMBOL_GPL(inode_sb_list_add);
 static inline void inode_sb_list_del(struct inode *inode)
 {
 	if (!list_empty(&inode->i_sb_list.list))
-		pcpu_list_del(&inode->i_sb_list);
+		pcpu_list_del(&inode->i_sb_list, inode->i_sb->s_inodes);
 }
 
 static unsigned long hash(struct super_block *sb, unsigned long hashval)

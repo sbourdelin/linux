@@ -80,6 +80,7 @@ static inline void init_pcpu_list_state(struct pcpu_list_state *state)
  */
 #define pcpu_list_next_entry(pos, member) list_next_entry(pos, member.list)
 
+#ifdef CONFIG_PERCPU_LIST
 /*
  * Per-cpu node data structure
  */
@@ -212,7 +213,97 @@ static inline bool pcpu_list_iterate_safe(struct pcpu_list_head *head,
 
 extern void pcpu_list_add(struct pcpu_list_node *node,
 			  struct pcpu_list_head *head);
-extern void pcpu_list_del(struct pcpu_list_node *node);
+extern void pcpu_list_del(struct pcpu_list_node *node,
+			  struct pcpu_list_head *head);
+
+#else /* CONFIG_PERCPU_LIST */
+
+#include <linux/slab.h>
+
+/*
+ * The per-cpu lists will now be degenerated into a single global list
+ */
+struct pcpu_list_node {
+	struct list_head list;
+};
+
+static inline void init_pcpu_list_node(struct pcpu_list_node *node)
+{
+	INIT_LIST_HEAD(&node->list);
+}
+
+static inline void free_pcpu_list_head(struct pcpu_list_head **phead)
+{
+	kfree(*phead);
+	*phead = NULL;
+}
+
+static inline bool pcpu_list_empty(struct pcpu_list_head *head)
+{
+	return list_empty(&head->list);
+}
+
+static inline void
+pcpu_list_add(struct pcpu_list_node *node, struct pcpu_list_head *head)
+{
+	spin_lock(&head->lock);
+	list_add(&node->list, &head->list);
+	spin_unlock(&head->lock);
+}
+
+static inline void
+pcpu_list_del(struct pcpu_list_node *node, struct pcpu_list_head *head)
+{
+	spin_lock(&head->lock);
+	list_del_init(&node->list);
+	spin_unlock(&head->lock);
+}
+
+static inline bool pcpu_list_iterate(struct pcpu_list_head *head,
+				     struct pcpu_list_state *state)
+{
+	/*
+	 * Find next entry
+	 */
+	if (state->curr) {
+		state->curr = list_next_entry(state->curr, list);
+	} else {
+		spin_lock(&head->lock);
+		state->lock = &head->lock;
+		state->curr = list_entry(head->list.next,
+					 struct pcpu_list_node, list);
+	}
+	if (&state->curr->list == &head->list) {
+		spin_unlock(&head->lock);
+		return false;	/* The list has been exhausted */
+	}
+	return true;	/* Continue the iteration */
+}
+
+static inline bool pcpu_list_iterate_safe(struct pcpu_list_head *head,
+					  struct pcpu_list_state *state)
+{
+	/*
+	 * Find next entry
+	 */
+	if (state->curr) {
+		state->curr = state->next;
+		state->next = list_next_entry(state->next, list);
+	} else {
+		spin_lock(&head->lock);
+		state->lock = &head->lock;
+		state->curr = list_entry(head->list.next,
+					 struct pcpu_list_node, list);
+		state->next = list_next_entry(state->curr, list);
+	}
+	if (&state->curr->list == &head->list) {
+		spin_unlock(&head->lock);
+		return false;	/* The list has been exhausted */
+	}
+	return true;	/* Continue the iteration */
+}
+#endif /* CONFIG_PERCPU_LIST */
+
 extern int  init_pcpu_list_head(struct pcpu_list_head **ppcpu_head);
 
 #endif /* __LINUX_PERCPU_LIST_H */

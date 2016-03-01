@@ -536,4 +536,18 @@ config ARCH_HAS_PMEM_API
 config ARCH_HAS_MMIO_FLUSH
 	bool
 
+#
+# Per-cpu list
+#
+config PERCPU_LIST
+	bool "Enable the use of per-cpu lists"
+	default y
+	depends on SMP
+	help
+	  Enables the use of per-cpu list to allow parallel insertion
+	  and deletion of list entry at the expense of a bit more
+	  overhead in list iteration as well as larger list node entry.
+	  This can help improve performance on system with a lot of
+	  cpu cores.
+
 endmenu
