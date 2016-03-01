@@ -193,6 +193,13 @@ int led_classdev_register(struct device *parent, struct led_classdev *led_cdev)
 	char name[64];
 	int ret;
 
+	/*
+	 * for now reading back the color is not supported as multiple
+	 * HSV -> RGB -> HSV conversions may distort the color due to
+	 * rounding issues in the conversion algorithm
+	 */
+	WARN_ON(led_cdev->flags & LED_DEV_CAP_RGB && led_cdev->brightness_get);
+
 	ret = led_classdev_next_name(led_cdev->name, name, sizeof(name));
 	if (ret < 0)
 		return ret;
