@@ -13,6 +13,13 @@ menuconfig NEW_LEDS
 
 if NEW_LEDS
 
+config LEDS_RGB
+	bool "RGB LED Support"
+	help
+	 This option enables support for RGB LED devices.
+	 Sysfs attribute brightness is interpreted as a HSV color value.
+	 For details see Documentation/leds/leds-class.txt.
+
 config LEDS_CLASS
 	tristate "LED Class Support"
 	help
@@ -28,6 +35,10 @@ config LEDS_CLASS_FLASH
 	  and kernel internal API to it. You'll need this to provide support
 	  for the flash related features of a LED device. It can be built
 	  as a module.
+
+if LEDS_RGB
+comment "RGB LED drivers"
+endif # LEDS_RGB
 
 comment "LED drivers"
 
