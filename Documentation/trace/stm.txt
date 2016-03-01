@@ -47,6 +47,12 @@ through 127 in it. Now, any producer (trace source) identifying itself
 with "user" identification string will be allocated a master and
 channel from within these ranges.
 
+$ cat /config/stp-policy/dummy_stm.my-policy/user/masters
+-1 -1
+
+Would indicate the masters for this rule are set in hardware and
+not configurable in user space.
+
 These rules can be nested, for example, one can define a rule "dummy"
 under "user" directory from the example above and this new rule will
 be used for trace sources with the id string of "user/dummy".
