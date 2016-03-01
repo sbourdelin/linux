@@ -60,6 +60,16 @@ void kasan_unpoison_shadow(const void *address, size_t size)
 	}
 }
 
+/*
+ * Remove any poison left on the stack from a prior hot-unplug.
+ */
+void kasan_unpoison_task_stack(struct task_struct *idle)
+{
+	void *base = task_stack_page(idle) + sizeof(struct thread_info);
+	size_t size = THREAD_SIZE - sizeof(struct thread_info);
+
+	kasan_unpoison_shadow(base, size);
+}
 
 /*
  * All functions below always inlined so compiler could
