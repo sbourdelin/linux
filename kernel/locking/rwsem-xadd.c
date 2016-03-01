@@ -146,8 +146,10 @@ __rwsem_do_wake(struct rw_semaphore *sem, enum rwsem_wake_type wake_type)
 struct rw_semaphore __sched *rwsem_down_read_failed(struct rw_semaphore *sem)
 {
 	long count, adjustment = -RWSEM_ACTIVE_READ_BIAS;
-	struct rwsem_waiter waiter;
 	struct task_struct *tsk = current;
+	struct rwsem_waiter waiter = {
+		.list = LIST_HEAD_INIT(waiter.list),
+	};
 
 	/* set up my own style of waitqueue */
 	waiter.task = tsk;

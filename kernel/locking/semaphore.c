@@ -205,7 +205,9 @@ static inline int __sched __down_common(struct semaphore *sem, long state,
 								long timeout)
 {
 	struct task_struct *task = current;
-	struct semaphore_waiter waiter;
+	struct semaphore_waiter waiter = {
+		.list = LIST_HEAD_INIT(waiter.list),
+	};
 
 	list_add_tail(&waiter.list, &sem->wait_list);
 	waiter.task = task;
