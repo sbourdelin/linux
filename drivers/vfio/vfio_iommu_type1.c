@@ -36,6 +36,7 @@
 #include <linux/uaccess.h>
 #include <linux/vfio.h>
 #include <linux/workqueue.h>
+#include <linux/dma-reserved-iommu.h>
 
 #define DRIVER_VERSION  "0.2"
 #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
@@ -403,10 +404,22 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
 	vfio_lock_acct(-unlocked);
 }
 
+static void vfio_unmap_reserved(struct vfio_iommu *iommu)
+{
+#ifdef CONFIG_IOMMU_DMA_RESERVED
+	struct vfio_domain *d;
+
+	list_for_each_entry(d, &iommu->domain_list, next)
+		iommu_unmap_reserved(d->domain);
+#endif
+}
+
 static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
 {
 	if (likely(dma->type != VFIO_IOVA_RESERVED))
 		vfio_unmap_unpin(iommu, dma);
+	else
+		vfio_unmap_reserved(iommu);
 	vfio_unlink_dma(iommu, dma);
 	kfree(dma);
 }
@@ -489,7 +502,8 @@ static int vfio_dma_do_unmap(struct vfio_iommu *iommu,
 	 */
 	if (iommu->v2) {
 		dma = vfio_find_dma(iommu, unmap->iova, 0);
-		if (dma && dma->iova != unmap->iova) {
+		if (dma && (dma->iova != unmap->iova ||
+			   (dma->type == VFIO_IOVA_RESERVED))) {
 			ret = -EINVAL;
 			goto unlock;
 		}
@@ -501,6 +515,10 @@ static int vfio_dma_do_unmap(struct vfio_iommu *iommu,
 	}
 
 	while ((dma = vfio_find_dma(iommu, unmap->iova, unmap->size))) {
+		if (dma->type == VFIO_IOVA_RESERVED) {
+			ret = -EINVAL;
+			goto unlock;
+		}
 		if (!iommu->v2 && unmap->iova > dma->iova)
 			break;
 		unmapped += dma->size;
@@ -648,6 +666,114 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
 
 	mutex_unlock(&iommu->lock);
 	return ret;
+}
+
+static int vfio_register_reserved_iova_range(struct vfio_iommu *iommu,
+			   struct vfio_iommu_type1_dma_map *map)
+{
+#ifdef CONFIG_IOMMU_DMA_RESERVED
+	dma_addr_t iova = map->iova;
+	size_t size = map->size;
+	uint64_t mask;
+	struct vfio_dma *dma;
+	int ret = 0;
+	struct vfio_domain *d;
+	unsigned long order;
+
+	/* Verify that none of our __u64 fields overflow */
+	if (map->size != size || map->iova != iova)
+		return -EINVAL;
+
+	order =  __ffs(vfio_pgsize_bitmap(iommu));
+	mask = ((uint64_t)1 << order) - 1;
+
+	WARN_ON(mask & PAGE_MASK);
+
+	if (!size || (size | iova) & mask)
+		return -EINVAL;
+
+	/* Don't allow IOVA address wrap */
+	if (iova + size - 1 < iova)
+		return -EINVAL;
+
+	mutex_lock(&iommu->lock);
+
+	if (vfio_find_dma(iommu, iova, size)) {
+		ret =  -EEXIST;
+		goto out;
+	}
+
+	dma = kzalloc(sizeof(*dma), GFP_KERNEL);
+	if (!dma) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	dma->iova = iova;
+	dma->size = size;
+	dma->type = VFIO_IOVA_RESERVED;
+
+	list_for_each_entry(d, &iommu->domain_list, next)
+		ret |= iommu_alloc_reserved_iova_domain(d->domain, iova,
+							size, order);
+
+	if (ret) {
+		list_for_each_entry(d, &iommu->domain_list, next)
+			iommu_free_reserved_iova_domain(d->domain);
+		goto out;
+	}
+
+	vfio_link_dma(iommu, dma);
+
+out:
+	mutex_unlock(&iommu->lock);
+	return ret;
+#else /* CONFIG_IOMMU_DMA_RESERVED */
+	return -ENODEV;
+#endif
+}
+
+static void vfio_unregister_reserved_iova_range(struct vfio_iommu *iommu,
+				struct vfio_iommu_type1_dma_unmap *unmap)
+{
+#ifdef CONFIG_IOMMU_DMA_RESERVED
+	dma_addr_t iova = unmap->iova;
+	struct vfio_dma *dma;
+	size_t size = unmap->size;
+	uint64_t mask;
+	unsigned long order;
+
+	/* Verify that none of our __u64 fields overflow */
+	if (unmap->size != size || unmap->iova != iova)
+		return;
+
+	order =  __ffs(vfio_pgsize_bitmap(iommu));
+	mask = ((uint64_t)1 << order) - 1;
+
+	WARN_ON(mask & PAGE_MASK);
+
+	if (!size || (size | iova) & mask)
+		return;
+
+	/* Don't allow IOVA address wrap */
+	if (iova + size - 1 < iova)
+		return;
+
+	mutex_lock(&iommu->lock);
+
+	dma = vfio_find_dma(iommu, iova, size);
+
+	if (!dma || (dma->type != VFIO_IOVA_RESERVED)) {
+		unmap->size = 0;
+		goto out;
+	}
+
+	unmap->size =  dma->size;
+	vfio_remove_dma(iommu, dma);
+
+out:
+	mutex_unlock(&iommu->lock);
+#endif
 }
 
 static int vfio_bus_type(struct device *dev, void *data)
@@ -946,6 +1072,7 @@ static void vfio_iommu_type1_release(void *iommu_data)
 	struct vfio_group *group, *group_tmp;
 
 	vfio_iommu_unmap_unpin_all(iommu);
+	vfio_unmap_reserved(iommu);
 
 	list_for_each_entry_safe(domain, domain_tmp,
 				 &iommu->domain_list, next) {
@@ -1019,7 +1146,8 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
 	} else if (cmd == VFIO_IOMMU_MAP_DMA) {
 		struct vfio_iommu_type1_dma_map map;
 		uint32_t mask = VFIO_DMA_MAP_FLAG_READ |
-				VFIO_DMA_MAP_FLAG_WRITE;
+				VFIO_DMA_MAP_FLAG_WRITE |
+				VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA;
 
 		minsz = offsetofend(struct vfio_iommu_type1_dma_map, size);
 
@@ -1028,6 +1156,9 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
 
 		if (map.argsz < minsz || map.flags & ~mask)
 			return -EINVAL;
+
+		if (map.flags & VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA)
+			return vfio_register_reserved_iova_range(iommu, &map);
 
 		return vfio_dma_do_map(iommu, &map);
 
@@ -1043,10 +1174,16 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
 		if (unmap.argsz < minsz || unmap.flags)
 			return -EINVAL;
 
+		if (unmap.flags & VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA) {
+			vfio_unregister_reserved_iova_range(iommu, &unmap);
+			goto out;
+		}
+
 		ret = vfio_dma_do_unmap(iommu, &unmap);
 		if (ret)
 			return ret;
 
+out:
 		return copy_to_user((void __user *)arg, &unmap, minsz);
 	}
 
