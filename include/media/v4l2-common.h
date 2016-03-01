@@ -189,4 +189,16 @@ const struct v4l2_frmsize_discrete *v4l2_find_nearest_format(
 
 void v4l2_get_timestamp(struct timeval *tv);
 
+#ifdef CONFIG_MEDIA_CONTROLLER
+/**
+ * is_media_entity_v4l2_io() - Check if the entity is an I/O video_device
+ * @entity:	pointer to entity
+ *
+ * Return: true if the entity is an instance of a video_device object (and can
+ * safely be cast to a struct video_device using the container_of() macro) and
+ * can do I/O, or false otherwise.
+ */
+bool is_media_entity_v4l2_io(struct media_entity *entity);
+#endif
+
 #endif /* V4L2_COMMON_H_ */

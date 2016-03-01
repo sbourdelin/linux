@@ -405,3 +405,24 @@ void v4l2_get_timestamp(struct timeval *tv)
 	tv->tv_usec = ts.tv_nsec / NSEC_PER_USEC;
 }
 EXPORT_SYMBOL_GPL(v4l2_get_timestamp);
+
+#if defined(CONFIG_MEDIA_CONTROLLER)
+bool is_media_entity_v4l2_io(struct media_entity *entity)
+{
+	struct video_device *vdev;
+
+	if (!is_media_entity_v4l2_video_device(entity))
+		return false;
+	vdev = container_of(entity, struct video_device, entity);
+	/*
+	 * For now assume that is device_caps == 0, then I/O is available
+	 * unless it is a radio device.
+	 * Eventually all drivers should set vdev->device_caps and then
+	 * this assumption should be removed.
+	 */
+	if (vdev->device_caps == 0)
+		return vdev->vfl_type != VFL_TYPE_RADIO;
+	return vdev->device_caps & (V4L2_CAP_READWRITE | V4L2_CAP_STREAMING);
+}
+EXPORT_SYMBOL_GPL(is_media_entity_v4l2_io);
+#endif
