@@ -644,6 +644,37 @@ static int acpi_cpufreq_blacklist(struct cpuinfo_x86 *c)
 }
 #endif
 
+static int x86_get_turbo_activation_ratio(int cpu, u64 *tar)
+{
+	u64 plat_info;
+	int err;
+
+	err = rdmsrl_safe_on_cpu(cpu, MSR_PLATFORM_INFO, &plat_info);
+	/* Check number of config TDP levels > 0 */
+	if (!err && ((plat_info >> 33) & 0x03) > 0)
+		err = rdmsrl_safe_on_cpu(cpu, MSR_TURBO_ACTIVATION_RATIO,
+					 tar);
+	else
+		err = -EOPNOTSUPP;
+
+	return err;
+}
+
+static ssize_t show_base_frequency(struct cpufreq_policy *policy, char *buf)
+{
+	u64 tar;
+	int err;
+
+	err = x86_get_turbo_activation_ratio(policy->cpu, &tar);
+	if (!err)
+		/* Refer to IA64, IA32 SDM table 35-20, unit = 100 MHz */
+		return sprintf(buf, "%llu\n", tar * 100000);
+
+	return err;
+}
+
+cpufreq_freq_attr_ro(base_frequency);
+
 static int acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
 {
 	unsigned int i;
@@ -886,6 +917,7 @@ static struct freq_attr *acpi_cpufreq_attr[] = {
 #ifdef CONFIG_X86_ACPI_CPUFREQ_CPB
 	&cpb,
 #endif
+	NULL, /* Extra space for base_frequency attr, if required */
 	NULL,
 };
 
@@ -969,6 +1001,19 @@ static int __init acpi_cpufreq_init(void)
 			}
 	}
 #endif
+
+	if (boot_cpu_has(X86_FEATURE_IDA)) {
+		u64 tar;
+
+		if (!x86_get_turbo_activation_ratio(0, &tar)) {
+			struct freq_attr **attr;
+
+			for (attr = acpi_cpufreq_attr; *attr; attr++)
+			;
+			*attr = &base_frequency;
+		}
+	}
+
 	acpi_cpufreq_boost_init();
 
 	ret = cpufreq_register_driver(&acpi_cpufreq_driver);

@@ -1,0 +1,27 @@
+Additional sysfs attributes for acpi-cpufreq
+
+acpi-cpufreq sysfs has following sysfs attributes in addition to standard
+cpufreq attributes:
+
+base_frequency :		Max non-turbo frequency
+				For example:
+				scaling_available_frequencies displays list
+				of available frequencies.
+
+				>cat scaling_available_frequencies
+				2301000 2300000 2200000 2000000 1900000
+				1800000 1700000 1500000 1400000 1300000
+				1100000 1000000 900000 800000 600000
+				500000
+
+				If the base_frequency attribute is present
+				and readable, then any frequency above
+				base_frequency is turbo frequency. For example
+
+				>cat base_frequency
+				2200000
+
+				Then in the above displayed list of
+				scaling_available_frequencies, 2300000 and
+				2301000 are turbo frequencies.
+
