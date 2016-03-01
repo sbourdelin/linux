@@ -195,4 +195,81 @@ struct altr_sdram_mc_data {
 	const struct altr_sdram_prv_data *data;
 };
 
+/************************** EDAC Device Defines **************************/
+struct altr_edac_device_dev;
+
+struct edac_device_prv_data {
+	int (*setup)(struct platform_device *pdev,
+		     struct altr_edac_device_dev *drvdata);
+	int ce_clear_mask;
+	int ue_clear_mask;
+	int clear_err_ofst;
+	int ce_status_mask;
+	int ue_status_mask;
+	int err_status_ofst;
+	char dbgfs_name[20];
+	void * (*alloc_mem)(size_t size, void **other);
+	void (*free_mem)(void *p, size_t size, void *other);
+	int ecc_enable_mask;
+	int ecc_en_ofst;
+	int ce_set_mask;
+	int ue_set_mask;
+	int set_err_ofst;
+	int trig_alloc_sz;
+	int irq_flags;
+};
+
+struct altr_edac_device_dev {
+	void __iomem *base;
+	void __iomem *status;
+	int sb_irq;
+	int db_irq;
+	const struct edac_device_prv_data *data;
+	struct dentry *debugfs_dir;
+	char *edac_dev_name;
+};
+
+/***** General Device Trigger Defines *****/
+/* Trigger for UE */
+#define ALTR_UE_TRIGGER_CHAR            'U'
+/* Line size x 4 */
+#define ALTR_TRIGGER_READ_WRD_CNT       32
+#define ALTR_TRIG_OCRAM_BYTE_SIZE       128
+/* Full Page */
+#define ALTR_TRIG_L2C_BYTE_SIZE         4096
+
+/******* Cyclone5 and Arria5 Defines *******/
+/* OCRAM ECC Management Group Defines */
+#define ALTR_MAN_GRP_OCRAM_ECC_OFFSET   0x04
+#define ALTR_OCR_ECC_REG_OFFSET         0x00
+#define ALTR_OCR_ECC_EN                 BIT(0)
+#define ALTR_OCR_ECC_INJS               BIT(1)
+#define ALTR_OCR_ECC_INJD               BIT(2)
+#define ALTR_OCR_ECC_SERR               BIT(3)
+#define ALTR_OCR_ECC_DERR               BIT(4)
+
+/* L2 ECC Management Group Defines */
+#define ALTR_MAN_GRP_L2_ECC_OFFSET      0x00
+#define ALTR_L2_ECC_EN                  BIT(0)
+#define ALTR_L2_ECC_INJS                BIT(1)
+#define ALTR_L2_ECC_INJD                BIT(2)
+
+/************* Arria10 Defines *************/
+/* Arria 10 L2 ECC Management Group Defines */
+#define ALTR_A10_L2_ECC_CTL_OFFSET      0x0
+#define ALTR_A10_L2_ECC_EN_CTL          BIT(0)
+
+#define ALTR_A10_L2_ECC_STATUS          0xFFD060A4
+#define ALTR_A10_L2_ECC_STAT_OFFSET     0x0
+#define ALTR_A10_L2_ECC_CE_STAT         BIT(15)
+#define ALTR_A10_L2_ECC_UE_STAT         BIT(31)
+
+#define ALTR_A10_L2_ECC_CLR_OFFSET      0x4
+#define ALTR_A10_L2_ECC_CE_CLR          BIT(15)
+#define ALTR_A10_L2_ECC_UE_CLR          BIT(31)
+
+#define ALTR_A10_L2_ECC_INJ_OFFSET      ALTR_A10_L2_ECC_CTL_OFFSET
+#define ALTR_A10_L2_ECC_CE_INJ_MASK     0x00000101
+#define ALTR_A10_L2_ECC_UE_INJ_MASK     0x00010101
+
 #endif	/* #ifndef _ALTERA_EDAC_H */

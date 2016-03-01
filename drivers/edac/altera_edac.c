@@ -78,26 +78,6 @@ static const struct altr_sdram_prv_data a10_data = {
 	.ue_set_mask        = A10_DIAGINT_TDERRA_MASK,
 };
 
-/************************** EDAC Device Defines **************************/
-
-/* OCRAM ECC Management Group Defines */
-#define ALTR_MAN_GRP_OCRAM_ECC_OFFSET   0x04
-#define ALTR_OCR_ECC_EN                 BIT(0)
-#define ALTR_OCR_ECC_INJS               BIT(1)
-#define ALTR_OCR_ECC_INJD               BIT(2)
-#define ALTR_OCR_ECC_SERR               BIT(3)
-#define ALTR_OCR_ECC_DERR               BIT(4)
-
-/* L2 ECC Management Group Defines */
-#define ALTR_MAN_GRP_L2_ECC_OFFSET      0x00
-#define ALTR_L2_ECC_EN                  BIT(0)
-#define ALTR_L2_ECC_INJS                BIT(1)
-#define ALTR_L2_ECC_INJD                BIT(2)
-
-#define ALTR_UE_TRIGGER_CHAR            'U'   /* Trigger for UE */
-#define ALTR_TRIGGER_READ_WRD_CNT       32    /* Line size x 4 */
-#define ALTR_TRIG_OCRAM_BYTE_SIZE       128   /* Line size x 4 */
-#define ALTR_TRIG_L2C_BYTE_SIZE         4096  /* Full Page */
 
 /*********************** EDAC Memory Controller Functions ****************/
 
@@ -570,28 +550,7 @@ module_platform_driver(altr_edac_driver);
 
 const struct edac_device_prv_data ocramecc_data;
 const struct edac_device_prv_data l2ecc_data;
-
-struct edac_device_prv_data {
-	int (*setup)(struct platform_device *pdev, void __iomem *base);
-	int ce_clear_mask;
-	int ue_clear_mask;
-	char dbgfs_name[20];
-	void * (*alloc_mem)(size_t size, void **other);
-	void (*free_mem)(void *p, size_t size, void *other);
-	int ecc_enable_mask;
-	int ce_set_mask;
-	int ue_set_mask;
-	int trig_alloc_sz;
-};
-
-struct altr_edac_device_dev {
-	void __iomem *base;
-	int sb_irq;
-	int db_irq;
-	const struct edac_device_prv_data *data;
-	struct dentry *debugfs_dir;
-	char *edac_dev_name;
-};
+const struct edac_device_prv_data a10_l2ecc_data;
 
 static irqreturn_t altr_edac_device_handler(int irq, void *dev_id)
 {
@@ -599,18 +558,32 @@ static irqreturn_t altr_edac_device_handler(int irq, void *dev_id)
 	struct edac_device_ctl_info *dci = dev_id;
 	struct altr_edac_device_dev *drvdata = dci->pvt_info;
 	const struct edac_device_prv_data *priv = drvdata->data;
+	void __iomem *status_addr = drvdata->status + priv->err_status_ofst;
+	void __iomem *clear_addr = drvdata->status + priv->clear_err_ofst;
 
+	/*
+	 * CycloneV is directly mapped to a specific IRQ. Arria10
+	 * shares the IRQ with other ECCs so we must match first.
+	 */
 	if (irq == drvdata->sb_irq) {
-		if (priv->ce_clear_mask)
-			writel(priv->ce_clear_mask, drvdata->base);
-		edac_device_handle_ce(dci, 0, 0, drvdata->edac_dev_name);
-		ret_value = IRQ_HANDLED;
+		if (!priv->ce_status_mask ||
+		    (priv->ce_status_mask & readl(status_addr))) {
+			if (priv->ce_clear_mask)
+				writel(priv->ce_clear_mask, clear_addr);
+			edac_device_handle_ce(dci, 0, 0,
+					      drvdata->edac_dev_name);
+			ret_value = IRQ_HANDLED;
+		}
 	} else if (irq == drvdata->db_irq) {
-		if (priv->ue_clear_mask)
-			writel(priv->ue_clear_mask, drvdata->base);
-		edac_device_handle_ue(dci, 0, 0, drvdata->edac_dev_name);
-		panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
-		ret_value = IRQ_HANDLED;
+		if (!priv->ue_status_mask ||
+		    (priv->ue_status_mask & readl(status_addr))) {
+			if (priv->ue_clear_mask)
+				writel(priv->ue_clear_mask, clear_addr);
+			edac_device_handle_ue(dci, 0, 0,
+					      drvdata->edac_dev_name);
+			panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
+			ret_value = IRQ_HANDLED;
+		}
 	} else {
 		WARN_ON(1);
 	}
@@ -665,8 +638,9 @@ static ssize_t altr_edac_device_trig(struct file *file,
 		if (ACCESS_ONCE(ptemp[i]))
 			result = -1;
 		/* Toggle Error bit (it is latched), leave ECC enabled */
-		writel(error_mask, drvdata->base);
-		writel(priv->ecc_enable_mask, drvdata->base);
+		writel(error_mask, (drvdata->base + priv->set_err_ofst));
+		writel(priv->ecc_enable_mask, (drvdata->base +
+					       priv->set_err_ofst));
 		ptemp[i] = i;
 	}
 	/* Ensure it has been written out */
@@ -715,6 +689,8 @@ static void altr_create_edacdev_dbgfs(struct edac_device_ctl_info *edac_dci,
 static const struct of_device_id altr_edac_device_of_match[] = {
 #ifdef CONFIG_EDAC_ALTERA_L2C
 	{ .compatible = "altr,socfpga-l2-ecc", .data = (void *)&l2ecc_data },
+	{ .compatible = "altr,socfpga-a10-l2-ecc",
+	  .data = (void *)&a10_l2ecc_data },
 #endif
 #ifdef CONFIG_EDAC_ALTERA_OCRAM
 	{ .compatible = "altr,socfpga-ocram-ecc",
@@ -784,12 +760,15 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 	if (!drvdata->base)
 		goto fail1;
 
+	/* Except for A10 L2 cache, status reg is within alloced base mem */
+	drvdata->status = drvdata->base;
+
 	/* Get driver specific data for this EDAC device */
 	drvdata->data = of_match_node(altr_edac_device_of_match, np)->data;
 
 	/* Check specific dependencies for the module */
 	if (drvdata->data->setup) {
-		res = drvdata->data->setup(pdev, drvdata->base);
+		res = drvdata->data->setup(pdev, drvdata);
 		if (res)
 			goto fail1;
 	}
@@ -797,14 +776,16 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 	drvdata->sb_irq = platform_get_irq(pdev, 0);
 	res = devm_request_irq(&pdev->dev, drvdata->sb_irq,
 			       altr_edac_device_handler,
-			       0, dev_name(&pdev->dev), dci);
+			       drvdata->data->irq_flags,
+			       dev_name(&pdev->dev), dci);
 	if (res)
 		goto fail1;
 
 	drvdata->db_irq = platform_get_irq(pdev, 1);
 	res = devm_request_irq(&pdev->dev, drvdata->db_irq,
 			       altr_edac_device_handler,
-			       0, dev_name(&pdev->dev), dci);
+			       drvdata->data->irq_flags,
+			       dev_name(&pdev->dev), dci);
 	if (res)
 		goto fail1;
 
@@ -900,9 +881,12 @@ static void ocram_free_mem(void *p, size_t size, void *other)
  *	memory will cause CE/UE errors possibly causing an ABORT.
  */
 static int altr_ocram_check_deps(struct platform_device *pdev,
-				 void __iomem *base)
+				 struct altr_edac_device_dev *drvdata)
 {
-	if (readl(base) & ALTR_OCR_ECC_EN)
+	void __iomem  *base = drvdata->base;
+	const struct edac_device_prv_data *prv = drvdata->data;
+
+	if (readl(base + prv->ecc_en_ofst) & prv->ecc_enable_mask)
 		return 0;
 
 	edac_printk(KERN_ERR, EDAC_DEVICE,
@@ -914,13 +898,21 @@ const struct edac_device_prv_data ocramecc_data = {
 	.setup = altr_ocram_check_deps,
 	.ce_clear_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_SERR),
 	.ue_clear_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_DERR),
+	.clear_err_ofst = ALTR_OCR_ECC_REG_OFFSET,
+	/* Cyclone5 & Arria5 have separate IRQs so status = 0 */
+	.ce_status_mask = 0,
+	.ue_status_mask = 0,
+	.err_status_ofst = 0,
 	.dbgfs_name = "altr_ocram_trigger",
 	.alloc_mem = ocram_alloc_mem,
 	.free_mem = ocram_free_mem,
 	.ecc_enable_mask = ALTR_OCR_ECC_EN,
+	.ecc_en_ofst = ALTR_OCR_ECC_REG_OFFSET,
 	.ce_set_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_INJS),
 	.ue_set_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_INJD),
+	.set_err_ofst = ALTR_OCR_ECC_REG_OFFSET,
 	.trig_alloc_sz = ALTR_TRIG_OCRAM_BYTE_SIZE,
+	.irq_flags = 0,
 };
 
 #endif	/* CONFIG_EDAC_ALTERA_OCRAM */
@@ -967,27 +959,81 @@ static void l2_free_mem(void *p, size_t size, void *other)
  *	Note that L2 Cache Enable is forced at build time.
  */
 static int altr_l2_check_deps(struct platform_device *pdev,
-			      void __iomem *base)
+			      struct altr_edac_device_dev *drvdata)
 {
-	if (readl(base) & ALTR_L2_ECC_EN)
+	void __iomem  *status_base, *base = drvdata->base;
+	const struct edac_device_prv_data *prv = drvdata->data;
+
+	if ((readl(base + prv->ecc_en_ofst) & prv->ecc_enable_mask) !=
+	     prv->ecc_enable_mask) {
+		edac_printk(KERN_ERR, EDAC_DEVICE,
+			    "L2: No ECC present, or ECC disabled\n");
+		return -ENODEV;
+	}
+
+	if (!of_machine_is_compatible("altr,socfpga-arria10"))
 		return 0;
 
-	edac_printk(KERN_ERR, EDAC_DEVICE,
-		    "L2: No ECC present, or ECC disabled\n");
-	return -ENODEV;
+	/* A10 L2 cache status registers are not contiguous with base */
+	if (!devm_request_mem_region(&pdev->dev, ALTR_A10_L2_ECC_STATUS,
+				     2 * sizeof(u32), dev_name(&pdev->dev))) {
+		edac_printk(KERN_ERR, EDAC_DEVICE,
+			    "Unable to request mem region\n");
+		return -EBUSY;
+	}
+
+	status_base = devm_ioremap(&pdev->dev, ALTR_A10_L2_ECC_STATUS,
+				   2 * sizeof(u32));
+	if (!status_base) {
+		edac_printk(KERN_ERR, EDAC_DEVICE,
+			    "Unable to ioremap L2 status\n");
+		return -ENOMEM;
+	}
+
+	drvdata->status = status_base;
+
+	return 0;
 }
 
 const struct edac_device_prv_data l2ecc_data = {
 	.setup = altr_l2_check_deps,
 	.ce_clear_mask = 0,
 	.ue_clear_mask = 0,
+	.clear_err_ofst = ALTR_MAN_GRP_L2_ECC_OFFSET,
+	/* Cyclone5 & Arria5 have separate IRQs so status = 0 */
+	.ce_status_mask = 0,
+	.ue_status_mask = 0,
+	.err_status_ofst = 0,
 	.dbgfs_name = "altr_l2_trigger",
 	.alloc_mem = l2_alloc_mem,
 	.free_mem = l2_free_mem,
 	.ecc_enable_mask = ALTR_L2_ECC_EN,
+	.ecc_en_ofst = ALTR_MAN_GRP_L2_ECC_OFFSET,
 	.ce_set_mask = (ALTR_L2_ECC_EN | ALTR_L2_ECC_INJS),
 	.ue_set_mask = (ALTR_L2_ECC_EN | ALTR_L2_ECC_INJD),
+	.set_err_ofst = ALTR_MAN_GRP_L2_ECC_OFFSET,
 	.trig_alloc_sz = ALTR_TRIG_L2C_BYTE_SIZE,
+	.irq_flags = 0,
+};
+
+const struct edac_device_prv_data a10_l2ecc_data = {
+	.setup = altr_l2_check_deps,
+	.ce_clear_mask = ALTR_A10_L2_ECC_CE_CLR,
+	.ue_clear_mask = ALTR_A10_L2_ECC_UE_CLR,
+	.clear_err_ofst = ALTR_A10_L2_ECC_CLR_OFFSET,
+	.ce_status_mask = ALTR_A10_L2_ECC_CE_STAT,
+	.ue_status_mask = ALTR_A10_L2_ECC_UE_STAT,
+	.err_status_ofst = ALTR_A10_L2_ECC_STAT_OFFSET,
+	.dbgfs_name = "altr_l2_trigger",
+	.alloc_mem = l2_alloc_mem,
+	.free_mem = l2_free_mem,
+	.ecc_enable_mask = ALTR_A10_L2_ECC_EN_CTL,
+	.ecc_en_ofst = ALTR_A10_L2_ECC_CTL_OFFSET,
+	.ce_set_mask = ALTR_A10_L2_ECC_CE_INJ_MASK,
+	.ue_set_mask = ALTR_A10_L2_ECC_UE_INJ_MASK,
+	.set_err_ofst = ALTR_A10_L2_ECC_INJ_OFFSET,
+	.trig_alloc_sz = ALTR_TRIG_L2C_BYTE_SIZE,
+	.irq_flags = IRQF_SHARED,
 };
 
 #endif	/* CONFIG_EDAC_ALTERA_L2C */
