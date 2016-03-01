@@ -496,17 +496,25 @@ static int hpwdt_pretimeout(unsigned int ulReason, struct pt_regs *regs)
 
 	if (!is_icru && !is_uefi) {
 		if (cmn_regs.u1.ral == 0) {
-			panic("An NMI occurred, "
+			nmi_panic(regs, "An NMI occurred, "
 				"but unable to determine source.\n");
+			goto handled;
 		}
 	}
-	panic("An NMI occurred. Depending on your system the reason "
+	nmi_panic(regs, "An NMI occurred. Depending on your system the reason "
 		"for the NMI is logged in any one of the following "
 		"resources:\n"
 		"1. Integrated Management Log (IML)\n"
 		"2. OA Syslog\n"
 		"3. OA Forward Progress Log\n"
 		"4. iLO Event Log");
+
+handled:
+	/*
+	 * Returning from nmi_panic() means this CPU was processing panic()
+	 * before NMI.  Return NMI_HANDLED and go back to panic routines.
+	 */
+	return NMI_HANDLED;
 
 out:
 	return NMI_DONE;
