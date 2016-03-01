@@ -2995,10 +2995,12 @@ int sdhci_add_host(struct sdhci_host *host)
 	 * mask, but PIO does not need the hw shim so we set a new
 	 * mask here in that case.
 	 */
-	if (!(host->flags & (SDHCI_USE_SDMA | SDHCI_USE_ADMA))) {
+	if (!(host->flags & (SDHCI_USE_SDMA | SDHCI_USE_ADMA)))
 		host->dma_mask = DMA_BIT_MASK(64);
-		mmc_dev(mmc)->dma_mask = &host->dma_mask;
-	}
+
+	if (host->dma_mask &&
+	    dma_set_mask_and_coherent(mmc_dev(mmc), host->dma_mask))
+		pr_warn("%s: cannot set DMA mask\n", mmc_hostname(mmc));
 
 	if (host->version >= SDHCI_SPEC_300)
 		host->max_clk = (caps[0] & SDHCI_CLOCK_V3_BASE_MASK)
