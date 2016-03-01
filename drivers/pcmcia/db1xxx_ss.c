@@ -35,6 +35,19 @@
 
 #include <asm/mach-au1x00/au1000.h>
 #include <asm/mach-db1x00/bcsr.h>
+#include <asm/mach-au1x00/gpio-au1000.h>
+#include <asm/mach-au1x00/gpio-au1300.h>
+
+static inline int __au_irq_to_gpio(unsigned int irq)
+{
+	switch (alchemy_get_cputype()) {
+	case ALCHEMY_CPU_AU1000...ALCHEMY_CPU_AU1200:
+		return alchemy_irq_to_gpio(irq);
+	case ALCHEMY_CPU_AU1300:
+		return au1300_irq_to_gpio(irq);
+	}
+	return -EINVAL;
+}
 
 #define MEM_MAP_SIZE	0x400000
 #define IO_MAP_SIZE	0x1000
@@ -83,7 +96,7 @@ static int db1200_card_inserted(struct db1x_pcmcia_sock *sock)
 /* carddetect gpio: low-active */
 static int db1000_card_inserted(struct db1x_pcmcia_sock *sock)
 {
-	return !gpio_get_value(irq_to_gpio(sock->insert_irq));
+	return !gpio_get_value(__au_irq_to_gpio(sock->insert_irq));
 }
 
 static int db1x_card_inserted(struct db1x_pcmcia_sock *sock)
