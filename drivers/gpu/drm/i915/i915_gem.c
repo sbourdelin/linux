@@ -2421,7 +2421,8 @@ void *i915_gem_object_vmap_range(struct drm_i915_gem_object *obj,
 	unsigned long max_pages = obj->base.size >> PAGE_SHIFT;
 	struct scatterlist *sg = obj->pages->sgl;
 	struct sg_page_iter sg_iter;
-	struct page **pages;
+	struct page *stack_pages[32];
+	struct page **pages = stack_pages;
 	unsigned long i = 0;
 	void *addr = NULL;
 
@@ -2435,10 +2436,13 @@ void *i915_gem_object_vmap_range(struct drm_i915_gem_object *obj,
 	if (npages == 0)
 		npages = max_pages - first;
 
-	pages = drm_malloc_gfp(npages, sizeof(*pages), GFP_TEMPORARY);
-	if (pages == NULL) {
-		DRM_DEBUG_DRIVER("Failed to get space for pages\n");
-		return NULL;
+	if (npages > ARRAY_SIZE(stack_pages)) {
+		/* Too big for stack -- allocate temporary array instead */
+		pages = drm_malloc_gfp(npages, sizeof(*pages), GFP_TEMPORARY);
+		if (pages == NULL) {
+			DRM_DEBUG_DRIVER("Failed to get space for pages\n");
+			return NULL;
+		}
 	}
 
 	for_each_sg_page(sg, &sg_iter, max_pages, first) {
@@ -2454,7 +2458,8 @@ void *i915_gem_object_vmap_range(struct drm_i915_gem_object *obj,
 	if (addr == NULL)
 		DRM_DEBUG_DRIVER("Failed to vmap pages\n");
 
-	drm_free_large(pages);
+	if (pages != stack_pages)
+		drm_free_large(pages);
 
 	return addr;
 }
