@@ -1,0 +1,20 @@
+Additional sysfs attribute for acpi-cpufreq
+
+In addition to the standard sysfs interface as defined in the
+user-guide.txt under section "Preferred Interface: sysfs",
+acpi-cpufreq can have following additional sysfs attribute:
+
+base_frequency: 	Max non-turbo frequency
+For example:
+scaling_available_frequencies displays list of available frequencies which
+can be used to set max/min or current scaling frequency.
+>cat scaling_available_frequencies
+2301000 2300000 2200000 2000000 1900000 1800000 1700000 1500000 1400000
+1300000 1100000 1000000 900000 800000 600000 500000
+If the base_frequency attribute is present, then any frequency above is
+purely opportunistic or turbo frequency. For example
+>cat base_frequency
+2200000
+Then in the above displayed list of scaling_available_frequencies, any
+frequency 2300000 or 2301000 is opportunistic or turbo frequency.
+
