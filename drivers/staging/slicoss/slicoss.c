@@ -792,7 +792,6 @@ static bool slic_mac_filter(struct adapter *adapter,
 		return true;
 	}
 	return false;
-
 }
 
 static int slic_mac_set_address(struct net_device *dev, void *ptr)
@@ -1769,7 +1768,6 @@ static void slic_init_cleanup(struct adapter *adapter)
 	if (adapter->intrregistered) {
 		adapter->intrregistered = 0;
 		free_irq(adapter->netdev->irq, adapter->netdev);
-
 	}
 	if (adapter->pshmem) {
 		pci_free_consistent(adapter->pcidev,
