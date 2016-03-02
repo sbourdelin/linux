@@ -262,7 +262,7 @@
 				};
 			};
 		};
-		
+
 		enet2: ethernet@26000 {
 			#address-cells = <1>;
 			#size-cells = <1>;
