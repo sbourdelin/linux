@@ -2936,13 +2936,6 @@ static int patch_generic_hdmi(struct hda_codec *codec)
 			is_broxton(codec))
 		codec->core.link_power_control = 1;
 
-	if (codec_has_acomp(codec)) {
-		codec->depop_delay = 0;
-		spec->i915_audio_ops.audio_ptr = codec;
-		spec->i915_audio_ops.pin_eld_notify = intel_pin_eld_notify;
-		snd_hdac_i915_register_notifier(&spec->i915_audio_ops);
-	}
-
 	if (hdmi_parse_codec(codec) < 0) {
 		if (spec->i915_bound)
 			snd_hdac_i915_exit(&codec->bus->core);
@@ -2963,6 +2956,13 @@ static int patch_generic_hdmi(struct hda_codec *codec)
 	generic_hdmi_init_per_pins(codec);
 
 	init_channel_allocations();
+
+	if (codec_has_acomp(codec)) {
+		codec->depop_delay = 0;
+		spec->i915_audio_ops.audio_ptr = codec;
+		spec->i915_audio_ops.pin_eld_notify = intel_pin_eld_notify;
+		snd_hdac_i915_register_notifier(&spec->i915_audio_ops);
+	}
 
 	WARN_ON(spec->dyn_pcm_assign && !codec_has_acomp(codec));
 	return 0;
