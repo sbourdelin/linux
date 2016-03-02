@@ -1713,8 +1713,6 @@ void omap3isp_print_status(struct isp_device *isp)
 	dev_dbg(isp->dev, "--------------------------------------------\n");
 }
 
-#ifdef CONFIG_PM
-
 /*
  * Power management support.
  *
@@ -1784,15 +1782,6 @@ static void isp_pm_complete(struct device *dev)
 	isp_enable_interrupts(isp);
 	isp_resume_modules(isp);
 }
-
-#else
-
-#define isp_pm_prepare	NULL
-#define isp_pm_suspend	NULL
-#define isp_pm_resume	NULL
-#define isp_pm_complete	NULL
-
-#endif /* CONFIG_PM */
 
 static void isp_unregister_entities(struct isp_device *isp)
 {
@@ -2606,7 +2595,7 @@ static struct platform_driver omap3isp_driver = {
 	.id_table = omap3isp_id_table,
 	.driver = {
 		.name = "omap3isp",
-		.pm	= &omap3isp_pm_ops,
+		.pm	= IS_ENABLED(CONFIG_PM) ? &omap3isp_pm_ops : NULL,
 		.of_match_table = omap3isp_of_table,
 	},
 };
