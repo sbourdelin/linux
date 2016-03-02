@@ -951,7 +951,7 @@ static void tgt_agent_fetch_work(struct work_struct *work)
 
 	while (next_orb && tgt_agent_check_active(agent)) {
 		req = sbp_mgt_get_req(sess, sess->card, next_orb);
-		if (!req) {
+		if (IS_ERR(req)) {
 			spin_lock_bh(&agent->lock);
 			agent->state = AGENT_STATE_DEAD;
 			spin_unlock_bh(&agent->lock);
