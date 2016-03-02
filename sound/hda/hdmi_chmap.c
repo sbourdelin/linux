@@ -243,7 +243,7 @@ static int get_channel_allocation_order(int ca)
 	return i;
 }
 
-void snd_print_channel_allocation(int spk_alloc, char *buf, int buflen)
+void snd_hdmi_print_channel_allocation(int spk_alloc, char *buf, int buflen)
 {
 	int i, j;
 
@@ -254,7 +254,7 @@ void snd_print_channel_allocation(int spk_alloc, char *buf, int buflen)
 	}
 	buf[j] = '\0';	/* necessary when j == 0 */
 }
-EXPORT_SYMBOL_GPL(snd_print_channel_allocation);
+EXPORT_SYMBOL_GPL(snd_hdmi_print_channel_allocation);
 
 /*
  * The transformation takes two steps:
@@ -312,7 +312,7 @@ static int hdmi_channel_allocation_spk_alloc_blk(struct hdac_device *codec,
 		}
 	}
 
-	snd_print_channel_allocation(spk_alloc, buf, sizeof(buf));
+	snd_hdmi_print_channel_allocation(spk_alloc, buf, sizeof(buf));
 	dev_dbg(&codec->dev, "HDMI: select CA 0x%x for %d-channel allocation: %s\n",
 		    ca, channels, buf);
 
