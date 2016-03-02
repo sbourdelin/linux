@@ -5,6 +5,7 @@
 #ifndef __SOUND_HDMI_CHMAP_H
 #define __SOUND_HDMI_CHMAP_H
 
+#include <sound/pcm.h>
 #include <sound/hdaudio.h>
 
 #define SND_PRINT_CHANNEL_ALLOCATION_ADVISED_BUFSIZE 80
@@ -67,5 +68,8 @@ struct hdmi_chmap {
 };
 
 void snd_hdmi_register_chmap_ops(struct hdac_device *hdac,
+				struct hdmi_chmap *chmap);
+void snd_print_channel_allocation(int spk_alloc, char *buf, int buflen);
+int snd_hdmi_add_chmap_ctls(struct snd_pcm *pcm, int pcm_idx,
 				struct hdmi_chmap *chmap);
 #endif /* __SOUND_HDMI_CHMAP_H */
