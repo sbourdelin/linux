@@ -2300,6 +2300,21 @@ out:
 	raw_spin_unlock_irqrestore(&logbuf_lock, flags);
 }
 
+static void printk_echo(char *fmt, ...)
+{
+	unsigned long flags;
+	va_list args;
+	char buf[128];
+	int len = 0;
+
+	va_start(args, fmt);
+	len += vsprintf(buf + len, fmt, args);
+	va_end(args);
+	local_irq_save(flags);
+	call_console_drivers(0, NULL, 0, buf, len);
+	local_irq_restore(flags);
+}
+
 /*
  * When oops happens and there are more messages to be printed in the printk
  * buffer that this, skip some mesages and print only this many newest messages.
@@ -2437,9 +2452,9 @@ skip:
 		call_console_drivers(level, ext_text, ext_len, text, len);
 		start_critical_timings();
 		local_irq_restore(flags);
-
 		if (do_cond_resched)
 			cond_resched();
+		mdelay(len);
 	}
 	console_locked = 0;
 
@@ -2806,6 +2821,18 @@ int unregister_console(struct console *console)
 }
 EXPORT_SYMBOL(unregister_console);
 
+static void do_print(struct work_struct *work)
+{
+	char buf[75];
+	int i;
+
+	sprintf(buf, "%p: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", work);
+	for (i = 0; i < 15; i++)
+		printk(buf);
+}
+
+static struct delayed_work print_work[100];
+
 /*
  * Some boot consoles access data that is in the init section and which will
  * be discarded after the initcalls have been run. To make sure that no code
@@ -2824,6 +2851,12 @@ EXPORT_SYMBOL(unregister_console);
 static int __init printk_late_init(void)
 {
 	struct console *con;
+	int i;
+
+	for (i = 0; i < 100; i++) {
+		INIT_DELAYED_WORK(&print_work[i], do_print);
+		schedule_delayed_work(&print_work[i], HZ * 180);
+	}
 
 	for_each_console(con) {
 		if (!keep_bootcon && con->flags & CON_BOOT) {
