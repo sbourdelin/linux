@@ -16,6 +16,7 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 #define DISABLE_BRANCH_PROFILING
 
+#include <linux/cpu.h>
 #include <linux/export.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -537,16 +538,36 @@ static int kasan_mem_notifier(struct notifier_block *nb,
 {
 	return (action == MEM_GOING_ONLINE) ? NOTIFY_BAD : NOTIFY_OK;
 }
+#endif
 
-static int __init kasan_memhotplug_init(void)
+static int kasan_cpu_callback(struct notifier_block *nfb,
+			unsigned long action, void *hcpu)
 {
-	pr_err("WARNING: KASAN doesn't support memory hot-add\n");
-	pr_err("Memory hot-add will be disabled\n");
+	unsigned int cpu = (unsigned long)hcpu;
 
-	hotplug_memory_notifier(kasan_mem_notifier, 0);
+	if ((action == CPU_UP_PREPARE) || (action == CPU_UP_PREPARE_FROZEN)) {
+		struct task_struct *tidle = idle_thread_get(cpu);
+		kasan_unpoison_shadow(task_stack_page(tidle), THREAD_SIZE);
+	}
+	return NOTIFY_OK;
+}
+
+static struct notifier_block kasan_cpu_notifier =
+{
+	.notifier_call = kasan_cpu_callback,
+};
+
+static int __init kasan_notifiers_init(void)
+{
+	if (IS_ENABLED(CONFIG_MEMORY_HOTPLUG)) {
+		pr_err("WARNING: KASAN doesn't support memory hot-add\n");
+		pr_err("Memory hot-add will be disabled\n");
+		hotplug_memory_notifier(kasan_mem_notifier, 0);
+	}
+
+	register_hotcpu_notifier(&kasan_cpu_notifier);
 
 	return 0;
 }
 
-module_init(kasan_memhotplug_init);
-#endif
+module_init(kasan_notifiers_init);
