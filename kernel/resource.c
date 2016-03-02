@@ -1449,6 +1449,75 @@ void __devm_release_region(struct device *dev, struct resource *parent,
 EXPORT_SYMBOL(__devm_release_region);
 
 /*
+ * Remove function for devm_insert_resource() and devm_remove_resource().
+ */
+static void devm_resource_remove(struct device *dev, void *ptr)
+{
+	struct resource **r = ptr;
+
+	remove_resource(*r);
+}
+
+/**
+ * devm_insert_resource() - insert an I/O or memory resource
+ * @dev: device for which to produce the resource
+ * @root: root of the resource tree
+ * @new: descriptor of the new resource
+ *
+ * This is a device-managed version of insert_resource(). There is usually
+ * no need to release resources requested by this function explicitly since
+ * that will be taken care of when the device is unbound from its bus driver.
+ * If for some reason the resource needs to be released explicitly, because
+ * of ordering issues for example, bus drivers must call devm_remove_resource()
+ * rather than the regular remove_resource().
+ *
+ * devm_insert_resource() is intended for producers of resources, such as
+ * FW modules and bus drivers.
+ *
+ * Returns 0 on success or a negative error code on failure.
+ */
+int devm_insert_resource(struct device *dev, struct resource *root,
+			  struct resource *new)
+{
+	struct resource **ptr;
+	int ret;
+
+	ptr = devres_alloc(devm_resource_remove, sizeof(*ptr), GFP_KERNEL);
+	if (!ptr)
+		return -ENOMEM;
+
+	*ptr = new;
+
+	ret = insert_resource(root, new);
+	if (ret) {
+		dev_err(dev, "unable to insert resource: %pR (%d)\n", new, ret);
+		devres_free(ptr);
+		return -EBUSY;
+	}
+
+	devres_add(dev, ptr);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(devm_insert_resource);
+
+/**
+ * devm_remove_resource() - remove a previously inserted resource
+ * @dev: device for which to remove the resource
+ * @old: descriptor of the resource
+ *
+ * Remove a resource previously inserted using devm_insert_resource().
+ *
+ * devm_remove_resource() is intended for producers of resources, such as
+ * FW modules and bus drivers.
+ */
+void devm_remove_resource(struct device *dev, struct resource *old)
+{
+	WARN_ON(devres_release(dev, devm_resource_remove, devm_resource_match,
+			       old));
+}
+EXPORT_SYMBOL_GPL(devm_remove_resource);
+
+/*
  * Called from init/main.c to reserve IO ports.
  */
 #define MAXRESERVE 4

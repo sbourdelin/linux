@@ -259,6 +259,11 @@ extern struct resource * __devm_request_region(struct device *dev,
 
 extern void __devm_release_region(struct device *dev, struct resource *parent,
 				  resource_size_t start, resource_size_t n);
+
+extern int devm_insert_resource(struct device *dev, struct resource *root,
+				 struct resource *new);
+extern void devm_remove_resource(struct device *dev, struct resource *old);
+
 extern int iomem_map_sanity_check(resource_size_t addr, unsigned long size);
 extern int iomem_is_exclusive(u64 addr);
 
