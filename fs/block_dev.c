@@ -237,8 +237,7 @@ struct super_block *freeze_bdev(struct block_device *bdev)
 		 */
 		sb = get_super(bdev);
 		drop_super(sb);
-		mutex_unlock(&bdev->bd_fsfreeze_mutex);
-		return sb;
+		goto out_unlock;
 	}
 
 	sb = get_active_super(bdev);
@@ -251,12 +250,13 @@ struct super_block *freeze_bdev(struct block_device *bdev)
 	if (error) {
 		deactivate_super(sb);
 		bdev->bd_fsfreeze_count--;
-		mutex_unlock(&bdev->bd_fsfreeze_mutex);
-		return ERR_PTR(error);
+		sb = ERR_PTR(error);
+		goto out_unlock;
 	}
 	deactivate_super(sb);
- out:
+out:
 	sync_blockdev(bdev);
+out_unlock:
 	mutex_unlock(&bdev->bd_fsfreeze_mutex);
 	return sb;	/* thaw_bdev releases s->s_umount */
 }
@@ -288,14 +288,11 @@ int thaw_bdev(struct block_device *bdev, struct super_block *sb)
 		error = sb->s_op->thaw_super(sb);
 	else
 		error = thaw_super(sb);
-	if (error) {
+	if (error)
 		bdev->bd_fsfreeze_count++;
-		mutex_unlock(&bdev->bd_fsfreeze_mutex);
-		return error;
-	}
 out:
 	mutex_unlock(&bdev->bd_fsfreeze_mutex);
-	return 0;
+	return error;
 }
 EXPORT_SYMBOL(thaw_bdev);
 
