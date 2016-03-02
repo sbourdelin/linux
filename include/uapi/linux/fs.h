@@ -222,6 +222,15 @@ struct fsxattr {
 #define BLKSECDISCARD _IO(0x12,125)
 #define BLKROTATIONAL _IO(0x12,126)
 #define BLKZEROOUT _IO(0x12,127)
+struct blkzeroout2 {
+	__u64 start;
+	__u64 length;
+	__u32 flags;
+	__u32 padding;
+	__u64 padding2;
+};
+#define BLKZEROOUT2_DISCARD_OK	1
+#define BLKZEROOUT2 _IOR(0x12, 127, struct blkzeroout2)
 #define BLKDAXGET _IO(0x12,129)
 
 #define BMAP_IOCTL 1		/* obsolete - kept for compatibility */
