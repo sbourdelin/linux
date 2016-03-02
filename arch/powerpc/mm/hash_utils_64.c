@@ -831,6 +831,57 @@ void __init early_init_mmu(void)
 	slb_initialize();
 }
 
+/*
+ * PAPR says that each record contains 3 * 32 bit element, hence 12 bytes.
+ * First two element contains the abbreviated virtual address (high order
+ * 32 bits and low order 32 bits generates the abbreviated virtual address
+ * of 64 bits which need to be concatenated with 12 bits of 0 at the end
+ * to generate the actual 76 bit reserved virtual address) and size of the
+ * reserved virtual address range is encoded in next 32 bit element as number
+ * of 4K pages.
+ */
+#define	BYTES_PER_RVA_RECORD	12
+
+/*
+ * Linux uses 65 bits (MAX_PHYSMEM_BITS + CONTEXT_BITS) from available 78
+ * bit wide virtual address range. As reserved virtual address range comes
+ * as an abbreviated form of 64 bits, we will use a partial address mask
+ * (65 bit mask >> 12) to match it for simplicity.
+ */
+#define	PARTIAL_USED_VA_MASK	0x1FFFFFFFFFFFFFULL
+
+void __init validate_reserved_va_range(void)
+{
+	struct device_node *np;
+	struct property *prop;
+	unsigned int size, count, i;
+	const __be32 *value;
+	__be64 vaddr;
+
+	np = of_find_node_by_name(NULL, "vdevice");
+	if (!np)
+		return;
+
+	prop = of_find_property(np, "ibm,reserved-virtual-addresses", NULL);
+	if (!prop)
+		return;
+
+	value = of_get_property(np, "ibm,reserved-virtual-addresses", &size);
+	if (!value)
+		return;
+
+	count = size / BYTES_PER_RVA_RECORD;
+	for (i = 0; i < count; i++) {
+		vaddr = ((__be64) value[i * 3] << 32) | value[i * 3 + 1];
+		if (vaddr & ~PARTIAL_USED_VA_MASK) {
+			pr_info("Reserved virtual address range starting "
+				"at [%llx000] verified for overlap\n", vaddr);
+			continue;
+		}
+		BUG_ON("Reserved virtual address range overlapping");
+	}
+}
+
 #ifdef CONFIG_SMP
 void early_init_mmu_secondary(void)
 {

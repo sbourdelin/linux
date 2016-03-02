@@ -546,6 +546,8 @@ void __init setup_system(void)
 	smp_release_cpus();
 #endif
 
+	validate_reserved_va_range();
+
 	pr_info("Starting Linux %s %s\n", init_utsname()->machine,
 		 init_utsname()->version);
 

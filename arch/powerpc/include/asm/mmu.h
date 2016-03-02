@@ -125,6 +125,7 @@ extern unsigned int __start___mmu_ftr_fixup, __stop___mmu_ftr_fixup;
 /* MMU initialization */
 extern void early_init_mmu(void);
 extern void early_init_mmu_secondary(void);
+extern void validate_reserved_va_range(void);
 
 extern void setup_initial_memory_limit(phys_addr_t first_memblock_base,
 				       phys_addr_t first_memblock_size);
