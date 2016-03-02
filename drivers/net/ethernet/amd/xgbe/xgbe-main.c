@@ -829,8 +829,7 @@ static int xgbe_remove(struct platform_device *pdev)
 	return 0;
 }
 
-#ifdef CONFIG_PM
-static int xgbe_suspend(struct device *dev)
+static int __maybe_unused xgbe_suspend(struct device *dev)
 {
 	struct net_device *netdev = dev_get_drvdata(dev);
 	struct xgbe_prv_data *pdata = netdev_priv(netdev);
@@ -850,7 +849,7 @@ static int xgbe_suspend(struct device *dev)
 	return ret;
 }
 
-static int xgbe_resume(struct device *dev)
+static int __maybe_unused xgbe_resume(struct device *dev)
 {
 	struct net_device *netdev = dev_get_drvdata(dev);
 	struct xgbe_prv_data *pdata = netdev_priv(netdev);
@@ -868,7 +867,6 @@ static int xgbe_resume(struct device *dev)
 
 	return ret;
 }
-#endif /* CONFIG_PM */
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id xgbe_acpi_match[] = {
