@@ -1571,6 +1571,30 @@ static int ars_status_process_records(struct nvdimm_bus *nvdimm_bus,
 	return 0;
 }
 
+static int acpi_nfit_insert_resource(struct acpi_nfit_desc *acpi_desc,
+		struct nd_region_desc *ndr_desc)
+{
+	struct resource *res, *nd_res = ndr_desc->res;
+	size_t size = nd_res->end - nd_res->start + 1;
+
+	/* No operation if the region is already registered as PMEM */
+	if (region_intersects(nd_res->start, size, IORESOURCE_MEM,
+			IORES_DESC_PERSISTENT_MEMORY) == REGION_INTERSECTS)
+		return 0;
+
+	res = devm_kzalloc(acpi_desc->dev, sizeof(*res), GFP_KERNEL);
+	if (!res)
+		return -ENOMEM;
+
+	res->name = "Persistent Memory";
+	res->start = nd_res->start;
+	res->end = nd_res->end;
+	res->flags = IORESOURCE_MEM;
+	res->desc = IORES_DESC_PERSISTENT_MEMORY;
+
+	return devm_insert_resource(acpi_desc->dev, &iomem_resource, res);
+}
+
 static int acpi_nfit_find_poison(struct acpi_nfit_desc *acpi_desc,
 		struct nd_region_desc *ndr_desc)
 {
@@ -1781,6 +1805,12 @@ static int acpi_nfit_register_region(struct acpi_nfit_desc *acpi_desc,
 
 	nvdimm_bus = acpi_desc->nvdimm_bus;
 	if (nfit_spa_type(spa) == NFIT_SPA_PM) {
+		rc = acpi_nfit_insert_resource(acpi_desc, ndr_desc);
+		if (rc)
+			dev_warn(acpi_desc->dev,
+				"failed to insert pmem resource to iomem: %d\n",
+				rc);
+
 		rc = acpi_nfit_find_poison(acpi_desc, ndr_desc);
 		if (rc) {
 			dev_err(acpi_desc->dev,
