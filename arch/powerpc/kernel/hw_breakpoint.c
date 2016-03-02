@@ -29,6 +29,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/smp.h>
+#include <linux/perf_event.h>
 
 #include <asm/hw_breakpoint.h>
 #include <asm/processor.h>
@@ -110,7 +111,7 @@ void arch_unregister_hw_breakpoint(struct perf_event *bp)
 	 * and the single_step_dabr_instruction(), then cleanup the breakpoint
 	 * restoration variables to prevent dangling pointers.
 	 */
-	if (bp->ctx && bp->ctx->task)
+	if (bp->ctx && bp->ctx->task && bp->ctx->task != TASK_TOMBSTONE)
 		bp->ctx->task->thread.last_hit_ubp = NULL;
 }
 

@@ -1193,4 +1193,6 @@ _name##_show(struct device *dev,					\
 									\
 static struct device_attribute format_attr_##_name = __ATTR_RO(_name)
 
+#define TASK_TOMBSTONE ((void *)-1L)
+
 #endif /* _LINUX_PERF_EVENT_H */
