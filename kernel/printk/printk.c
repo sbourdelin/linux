@@ -267,6 +267,9 @@ static u64 console_seq;
 static u32 console_idx;
 static enum log_flags console_prev;
 
+/* current record sequence when oops happened */
+static u64 oops_start_seq;
+
 /* the next printk record to read after the last 'clear' command */
 static u64 clear_seq;
 static u32 clear_idx;
@@ -1785,6 +1788,8 @@ asmlinkage int vprintk_emit(int facility, int level,
 					 NULL, 0, recursion_msg,
 					 strlen(recursion_msg));
 	}
+	if (oops_in_progress && !printk_sync && !oops_start_seq)
+		oops_start_seq = log_next_seq;
 
 	/*
 	 * The printf needs to come first; we need the syslog
@@ -2295,6 +2300,12 @@ out:
 	raw_spin_unlock_irqrestore(&logbuf_lock, flags);
 }
 
+/*
+ * When oops happens and there are more messages to be printed in the printk
+ * buffer that this, skip some mesages and print only this many newest messages.
+ */
+#define PRINT_MSGS_BEFORE_OOPS 100
+
 /**
  * console_unlock - unlock the console system
  *
@@ -2351,7 +2362,28 @@ again:
 			seen_seq = log_next_seq;
 		}
 
-		if (console_seq < log_first_seq) {
+		/*
+		 * If oops happened and there are more than
+		 * PRINT_MSGS_BEFORE_OOPS messages pending before oops message,
+		 * skip them to make oops appear faster.
+		 */
+		if (oops_start_seq &&
+		    console_seq + PRINT_MSGS_BEFORE_OOPS < oops_start_seq) {
+			len = sprintf(text,
+				"** %u printk messages dropped due to oops ** ",
+				(unsigned)(oops_start_seq - console_seq -
+					   PRINT_MSGS_BEFORE_OOPS));
+			if (console_seq < log_first_seq) {
+				console_seq = log_first_seq;
+				console_idx = log_first_idx;
+			}
+			while (console_seq <
+			       oops_start_seq - PRINT_MSGS_BEFORE_OOPS) {
+				console_idx = log_next(console_idx);
+				console_seq++;
+			}
+			console_prev = 0;
+		} else if (console_seq < log_first_seq) {
 			len = sprintf(text, "** %u printk messages dropped ** ",
 				      (unsigned)(log_first_seq - console_seq));
 
