@@ -3131,10 +3131,8 @@ static void __sched notrace __schedule(bool preempt)
 	struct task_struct *prev, *next;
 	unsigned long *switch_count;
 	struct rq *rq;
-	int cpu;
 
-	cpu = smp_processor_id();
-	rq = cpu_rq(cpu);
+	rq = this_rq();
 	prev = rq->curr;
 
 	/*
