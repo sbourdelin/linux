@@ -529,7 +529,8 @@ void intel_audio_codec_enable(struct intel_encoder *intel_encoder)
 	intel_dig_port->audio_connector = connector;
 	mutex_unlock(&dev_priv->av_mutex);
 
-	if (acomp && acomp->audio_ops && acomp->audio_ops->pin_eld_notify)
+	if (acomp && acomp->audio_ops && acomp->audio_ops->pin_eld_notify &&
+	    acomp->audio_ops->audio_ptr)
 		acomp->audio_ops->pin_eld_notify(acomp->audio_ops->audio_ptr, (int) port);
 }
 
@@ -556,7 +557,8 @@ void intel_audio_codec_disable(struct intel_encoder *intel_encoder)
 	intel_dig_port->audio_connector = NULL;
 	mutex_unlock(&dev_priv->av_mutex);
 
-	if (acomp && acomp->audio_ops && acomp->audio_ops->pin_eld_notify)
+	if (acomp && acomp->audio_ops && acomp->audio_ops->pin_eld_notify &&
+	    acomp->audio_ops->audio_ptr)
 		acomp->audio_ops->pin_eld_notify(acomp->audio_ops->audio_ptr, (int) port);
 }
 
