@@ -7,6 +7,8 @@
 
 #include <sound/hdaudio.h>
 
+#define SND_PRINT_CHANNEL_ALLOCATION_ADVISED_BUFSIZE 80
+
 struct hdmi_cea_channel_speaker_allocation {
 	int ca_index;
 	int speakers[8];
@@ -24,12 +26,13 @@ struct hdmi_chmap_ops {
 	 */
 	int (*chmap_cea_alloc_validate_get_type)(struct hdmi_chmap *chmap,
 		struct hdmi_cea_channel_speaker_allocation *cap, int channels);
-	void (*cea_alloc_to_tlv_chmap)
-		(struct hdmi_cea_channel_speaker_allocation *cap,
+	void (*cea_alloc_to_tlv_chmap)(struct hdmi_chmap *hchmap,
+		struct hdmi_cea_channel_speaker_allocation *cap,
 		unsigned int *chmap, int channels);
 
 	/* check that the user-given chmap is supported */
-	int (*chmap_validate)(int ca, int channels, unsigned char *chmap);
+	int (*chmap_validate)(struct hdmi_chmap *hchmap, int ca,
+			int channels, unsigned char *chmap);
 
 	void (*get_chmap)(struct hdac_device *hdac, int pcm_idx,
 					unsigned char *chmap);
@@ -44,6 +47,17 @@ struct hdmi_chmap_ops {
 			hda_nid_t pin_nid, int asp_slot, int channel);
 	void (*set_channel_count)(struct hdac_device *codec,
 				hda_nid_t cvt_nid, int chs);
+	int (*get_active_channels)(int ca);
+	void (*setup_channel_mapping)(struct hdmi_chmap *chmap,
+			hda_nid_t pin_nid, bool non_pcm, int ca,
+			int channels, unsigned char *map,
+			bool chmap_set);
+	int (*channel_allocation)(struct hdac_device *hdac, int spk_alloc,
+				int channels, bool chmap_set,
+				bool non_pcm, unsigned char *map);
+	struct hdmi_cea_channel_speaker_allocation *(*get_cap_from_ca)(int ca);
+	int (*alsa_chmap_to_spk_mask)(unsigned char c);
+	int (*spk_to_alsa_chmap)(int spk);
 };
 
 struct hdmi_chmap {
