@@ -65,6 +65,10 @@ startup_64:
 	 * tables and then reload them.
 	 */
 
+	/* Setup a stack for verify_cpu */
+	movq    stack_start - __START_KERNEL_map, %rsp
+	subq	$__START_KERNEL_map, %rsp
+
 	/* Sanitize CPU configuration */
 	call verify_cpu
 
