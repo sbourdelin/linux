@@ -502,6 +502,16 @@ config AXP20X_POWER
 	  This driver provides support for the power supply features of
 	  AXP20x PMIC.
 
+config CHARGER_CROS_USB_PD
+	tristate "Chrome OS EC based USB PD charger"
+	depends on MFD_CROS_EC
+	default y
+	help
+	  Say Y here to enable Chrome OS EC based USB PD charger driver. This
+	  driver gets various bits of information about what is connected to
+	  USB PD ports from the EC and converts that into power_supply
+	  properties.
+
 endif # POWER_SUPPLY
 
 source "drivers/power/reset/Kconfig"
