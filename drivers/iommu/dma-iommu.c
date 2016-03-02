@@ -190,7 +190,8 @@ static void __iommu_dma_free_pages(struct page **pages, int count)
 	kvfree(pages);
 }
 
-static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
+static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp,
+					     struct dma_attrs *attrs)
 {
 	struct page **pages;
 	unsigned int i = 0, array_size = count * sizeof(*pages);
@@ -202,6 +203,10 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
 		pages = vzalloc(array_size);
 	if (!pages)
 		return NULL;
+
+	/* Go straight to 4K chunks if caller says it's OK. */
+	if (dma_get_attr(DMA_ATTR_ALLOC_SINGLE_PAGES, attrs))
+		order = 0;
 
 	/* IOMMU can map any pages, so himem can also be used here */
 	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
@@ -268,6 +273,7 @@ void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
  * @size: Size of buffer in bytes
  * @gfp: Allocation flags
  * @prot: IOMMU mapping flags
+ * @attrs: DMA attributes flags
  * @handle: Out argument for allocated DMA handle
  * @flush_page: Arch callback which must ensure PAGE_SIZE bytes from the
  *		given VA/PA are visible to the given non-coherent device.
@@ -278,8 +284,8 @@ void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
  * Return: Array of struct page pointers describing the buffer,
  *	   or NULL on failure.
  */
-struct page **iommu_dma_alloc(struct device *dev, size_t size,
-		gfp_t gfp, int prot, dma_addr_t *handle,
+struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
+		int prot, struct dma_attrs *attrs, dma_addr_t *handle,
 		void (*flush_page)(struct device *, const void *, phys_addr_t))
 {
 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
@@ -292,7 +298,7 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size,
 
 	*handle = DMA_ERROR_CODE;
 
-	pages = __iommu_dma_alloc_pages(count, gfp);
+	pages = __iommu_dma_alloc_pages(count, gfp, attrs);
 	if (!pages)
 		return NULL;
 
