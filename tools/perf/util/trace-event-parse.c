@@ -56,7 +56,7 @@ int common_lock_depth(struct scripting_context *context)
 	static int size;
 	int ret;
 
-	ret = get_common_field(context, &size, &offset,
+	ret = get_common_field(context, &offset, &size,
 			       "common_lock_depth");
 	if (ret < 0)
 		return -1;
@@ -70,7 +70,7 @@ int common_flags(struct scripting_context *context)
 	static int size;
 	int ret;
 
-	ret = get_common_field(context, &size, &offset,
+	ret = get_common_field(context, &offset, &size,
 			       "common_flags");
 	if (ret < 0)
 		return -1;
@@ -84,7 +84,7 @@ int common_pc(struct scripting_context *context)
 	static int size;
 	int ret;
 
-	ret = get_common_field(context, &size, &offset,
+	ret = get_common_field(context, &offset, &size,
 			       "common_preempt_count");
 	if (ret < 0)
 		return -1;
