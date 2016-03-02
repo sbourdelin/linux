@@ -139,6 +139,8 @@ static int tangox_wdt_probe(struct platform_device *pdev)
 		return err;
 
 	dev->clk_rate = clk_get_rate(dev->clk);
+	if (!dev->clk_rate)
+		return -EINVAL;
 
 	dev->wdt.parent = &pdev->dev;
 	dev->wdt.info = &tangox_wdt_info;
