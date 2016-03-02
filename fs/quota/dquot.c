@@ -1420,6 +1420,8 @@ static int __dquot_initialize(struct inode *inode, int type)
 
 	dquots = i_dquot(inode);
 
+	memset(got, 0, 3 * sizeof(struct dquot *));
+
 	/* First get references to structures we might need. */
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
 		struct kqid qid;
