@@ -1927,8 +1927,13 @@ static int unqueue_me(struct futex_q *q)
 
 	/* In the common case we don't take the spinlock, which is nice. */
 retry:
-	lock_ptr = q->lock_ptr;
-	barrier();
+	/*
+	 *  On s390x, it was observed that compiler generates such code that spin_lock() will operate on
+	 *  another load of q->lock_ptr, instead of on @lock_ptr, and since q->lock_ptr might change between
+	 *  the test of non-nullness and the spin_lock(), which leads to problem. So use READ_ONCE() here to
+	 *  prevent this compiler "optimization".
+	 */
+	lock_ptr = READ_ONCE(q->lock_ptr);
 	if (lock_ptr != NULL) {
 		spin_lock(lock_ptr);
 		/*
