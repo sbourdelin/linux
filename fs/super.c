@@ -1272,26 +1272,21 @@ static void sb_freeze_unlock(struct super_block *sb)
  */
 int freeze_super(struct super_block *sb)
 {
-	int ret;
+	int ret = 0;
 
 	atomic_inc(&sb->s_active);
 	down_write(&sb->s_umount);
 	if (sb->s_writers.frozen != SB_UNFROZEN) {
 		deactivate_locked_super(sb);
-		return -EBUSY;
+		ret = -EBUSY;
+		goto out;
 	}
 
-	if (!(sb->s_flags & MS_BORN)) {
-		up_write(&sb->s_umount);
-		return 0;	/* sic - it's "nothing to do" */
-	}
+	if (!(sb->s_flags & MS_BORN))
+		goto out_unlock; /* nothing to do */
 
-	if (sb->s_flags & MS_RDONLY) {
-		/* Nothing to do really... */
-		sb->s_writers.frozen = SB_FREEZE_COMPLETE;
-		up_write(&sb->s_umount);
-		return 0;
-	}
+	if (sb->s_flags & MS_RDONLY)
+		goto out_complete; /* nothing to do */
 
 	sb->s_writers.frozen = SB_FREEZE_WRITE;
 	/* Release s_umount to preserve sb_start_write -> s_umount ordering */
@@ -1319,16 +1314,19 @@ int freeze_super(struct super_block *sb)
 			sb_freeze_unlock(sb);
 			wake_up(&sb->s_writers.wait_unfrozen);
 			deactivate_locked_super(sb);
-			return ret;
+			goto out;
 		}
 	}
 	/*
 	 * This is just for debugging purposes so that fs can warn if it
 	 * sees write activity when frozen is set to SB_FREEZE_COMPLETE.
 	 */
+out_complete:
 	sb->s_writers.frozen = SB_FREEZE_COMPLETE;
+out_unlock:
 	up_write(&sb->s_umount);
-	return 0;
+out:
+	return ret;
 }
 EXPORT_SYMBOL(freeze_super);
 
@@ -1340,34 +1338,36 @@ EXPORT_SYMBOL(freeze_super);
  */
 int thaw_super(struct super_block *sb)
 {
-	int error;
+	int ret = 0;
 
 	down_write(&sb->s_umount);
 	if (sb->s_writers.frozen == SB_UNFROZEN) {
 		up_write(&sb->s_umount);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out;
 	}
 
 	if (sb->s_flags & MS_RDONLY) {
 		sb->s_writers.frozen = SB_UNFROZEN;
-		goto out;
+		goto out_wake;
 	}
 
 	if (sb->s_op->unfreeze_fs) {
-		error = sb->s_op->unfreeze_fs(sb);
-		if (error) {
+		ret = sb->s_op->unfreeze_fs(sb);
+		if (ret) {
 			printk(KERN_ERR
 				"VFS:Filesystem thaw failed\n");
 			up_write(&sb->s_umount);
-			return error;
+			goto out;
 		}
 	}
 
 	sb->s_writers.frozen = SB_UNFROZEN;
 	sb_freeze_unlock(sb);
-out:
+out_wake:
 	wake_up(&sb->s_writers.wait_unfrozen);
 	deactivate_locked_super(sb);
-	return 0;
+out:
+	return ret;
 }
 EXPORT_SYMBOL(thaw_super);
