@@ -30,6 +30,12 @@ struct hdmi_chmap_ops {
 
 	/* check that the user-given chmap is supported */
 	int (*chmap_validate)(int ca, int channels, unsigned char *chmap);
+
+	void (*get_chmap)(struct hdac_device *hdac, int pcm_idx,
+					unsigned char *chmap);
+	void (*set_chmap)(struct hdac_device *hdac, int pcm_idx,
+			unsigned char *chmap, int prepared);
+	bool (*is_monitor_connected)(struct hdac_device *hdac, int pcm_idx);
 };
 
 struct hdmi_chmap {
