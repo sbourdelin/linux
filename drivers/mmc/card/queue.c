@@ -212,6 +212,16 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 	if (mmc_can_erase(card))
 		mmc_queue_setup_discard(mq->queue, card);
 
+	/*
+	 * Set maximum block count accepted by the card.
+	 * For eMMC, this can be 16 bit value,
+	 * for SD, this can be 32 bit value
+	 */
+	if (mmc_card_mmc(card))
+		blk_queue_max_dev_sectors(mq->queue, 0xffff);
+	else if (mmc_card_sd(card))
+		blk_queue_max_dev_sectors(mq->queue, 0xffffffff);
+
 #ifdef CONFIG_MMC_BLOCK_BOUNCE
 	if (host->max_segs == 1) {
 		unsigned int bouncesz;
