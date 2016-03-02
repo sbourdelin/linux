@@ -1929,7 +1929,9 @@ again:
 		goto again;
 
 done:
-	__intel_pmu_enable_all(0, true);
+	/* Only restore pmu when it's active. */
+	if (cpuc->enabled != 0)
+		__intel_pmu_enable_all(0, true);
 	/*
 	 * Only unmask the NMI after the overflow counters
 	 * have been reset. This avoids spurious NMIs on
