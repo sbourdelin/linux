@@ -1,5 +1,5 @@
 /*
- * f_midi.c -- USB MIDI class function driver
+ * f_midi.c -- USB-MIDI class function driver
  *
  * Copyright (C) 2006 Thumtronics Pty Ltd.
  * Developed for Thumtronics by Grey Innovation
@@ -16,7 +16,7 @@
  *   Copyright (C) 2006 Thumtronics Pty Ltd.
  *   Ben Williamson <ben.williamson@greyinnovation.com>
  *
- * Licensed under the GPL-2 or later.
+ * Licensed under the GPLv2.
  */
 
 #include <linux/kernel.h>
@@ -41,8 +41,8 @@
 MODULE_AUTHOR("Ben Williamson");
 MODULE_LICENSE("GPL v2");
 
-static const char f_midi_shortname[] = "f_midi";
-static const char f_midi_longname[] = "MIDI Gadget";
+static const char f_midi_shortname[] =	"f_midi";
+static const char f_midi_longname[] =	"MIDI Gadget";
 
 /*
  * We can only handle 16 cables on one single endpoint, as cable numbers are
@@ -78,28 +78,31 @@ struct gmidi_in_port {
 };
 
 struct f_midi {
-	struct usb_function	func;
-	struct usb_gadget	*gadget;
-	struct usb_ep		*in_ep, *out_ep;
-	struct snd_card		*card;
-	struct snd_rawmidi	*rmidi;
-	u8			ms_id;
-
-	struct snd_rawmidi_substream *out_substream[MAX_PORTS];
-
-	unsigned long		out_triggered;
-	struct tasklet_struct	tasklet;
+	struct usb_function func;
+	struct usb_gadget *gadget;
+	struct usb_ep *in_ep, *out_ep;
+	u8 ms_id;
+	unsigned long out_triggered;
 	unsigned int in_ports;
 	unsigned int out_ports;
-	int index;
-	char *id;
-	unsigned int buflen, qlen;
+	unsigned int buflen;
+	unsigned int qlen;
+	unsigned int len;
+
 	/* This fifo is used as a buffer ring for pre-allocated IN usb_requests */
 	DECLARE_KFIFO_PTR(in_req_fifo, struct usb_request *);
 	spinlock_t transmit_lock;
-	unsigned int in_last_port;
 
-	struct gmidi_in_port	in_ports_array[/* in_ports */];
+	/* ALSA stuff */
+	struct snd_card *card;
+	struct snd_rawmidi *rmidi;
+	struct snd_rawmidi_substream *out_substream[MAX_PORTS];
+	struct tasklet_struct tasklet;
+	unsigned int in_last_port;
+	int index;
+	char *id;
+
+	struct gmidi_in_port in_ports_array[/* in_ports */];
 };
 
 static inline struct f_midi *func_to_midi(struct usb_function *f)
@@ -191,7 +194,7 @@ static struct usb_ms_endpoint_descriptor_16 ms_in_desc = {
 
 /* string IDs are assigned dynamically */
 
-#define STRING_FUNC_IDX			0
+#define STRING_FUNC_IDX 0
 
 static struct usb_string midi_string_defs[] = {
 	[STRING_FUNC_IDX].s = "MIDI function",
@@ -199,7 +202,7 @@ static struct usb_string midi_string_defs[] = {
 };
 
 static struct usb_gadget_strings midi_stringtab = {
-	.language	= 0x0409,	/* en-us */
+	.language	= 0x0409, /* en-us */
 	.strings	= midi_string_defs,
 };
 
@@ -409,7 +412,7 @@ static int f_midi_snd_free(struct snd_device *device)
 }
 
 /*
- * Converts MIDI commands to USB MIDI packets.
+ * Converts MIDI commands to USB-MIDI packets.
  */
 static void f_midi_transmit_byte(struct usb_request *req,
 				 struct gmidi_in_port *port, uint8_t b)
@@ -956,15 +959,15 @@ static int f_midi_bind(struct usb_configuration *c, struct usb_function *f)
 		in_emb->iJack			= 0;
 		midi_function[i++] = (struct usb_descriptor_header *) in_emb;
 
-		out_ext->bLength =		USB_DT_MIDI_OUT_SIZE(1);
-		out_ext->bDescriptorType =	USB_DT_CS_INTERFACE;
-		out_ext->bDescriptorSubtype =	USB_MS_MIDI_OUT_JACK;
-		out_ext->bJackType =		USB_MS_EXTERNAL;
-		out_ext->bJackID =		jack++;
-		out_ext->bNrInputPins =		1;
-		out_ext->iJack =		0;
-		out_ext->pins[0].baSourceID =	in_emb->bJackID;
-		out_ext->pins[0].baSourcePin =	1;
+		out_ext->bLength		= USB_DT_MIDI_OUT_SIZE(1);
+		out_ext->bDescriptorType	= USB_DT_CS_INTERFACE;
+		out_ext->bDescriptorSubtype	= USB_MS_MIDI_OUT_JACK;
+		out_ext->bJackType		= USB_MS_EXTERNAL;
+		out_ext->bJackID		= jack++;
+		out_ext->bNrInputPins		= 1;
+		out_ext->iJack			= 0;
+		out_ext->pins[0].baSourceID	= in_emb->bJackID;
+		out_ext->pins[0].baSourcePin	= 1;
 		midi_function[i++] = (struct usb_descriptor_header *) out_ext;
 
 		/* link it to the endpoint */
@@ -1251,12 +1254,12 @@ static struct usb_function *f_midi_alloc(struct usb_function_instance *fi)
 		status = -ENOMEM;
 		goto setup_fail;
 	}
-	midi->in_ports = opts->in_ports;
-	midi->out_ports = opts->out_ports;
-	midi->index = opts->index;
-	midi->buflen = opts->buflen;
-	midi->qlen = opts->qlen;
-	midi->in_last_port = 0;
+	midi->in_ports		= opts->in_ports;
+	midi->out_ports		= opts->out_ports;
+	midi->index		= opts->index;
+	midi->buflen		= opts->buflen;
+	midi->qlen		= opts->qlen;
+	midi->in_last_port	= 0;
 
 	status = kfifo_alloc(&midi->in_req_fifo, midi->qlen, GFP_KERNEL);
 	if (status)
