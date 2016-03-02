@@ -901,6 +901,12 @@ static inline struct file *get_file(struct file *f)
 #define MAX_LFS_FILESIZE 	((loff_t)0x7fffffffffffffffLL)
 #endif
 
+#define MAX_VFS_TIME	S64_MAX
+#define MIN_VFS_TIME	S64_MIN
+
+#define MAX_INVALID_VFS_TIME	S64_MIN
+#define MIN_INVALID_VFS_TIME	S64_MAX
+
 #define FL_POSIX	1
 #define FL_FLOCK	2
 #define FL_DELEG	4	/* NFSv4 delegation */
@@ -1317,7 +1323,12 @@ struct super_block {
 
 	/* Granularity of c/m/atime in ns.
 	   Cannot be worse than a second */
-	u32		   s_time_gran;
+	u32		s_time_gran;
+	/* Max and min values for timestamps
+	 * according to the range supported by filesystems.
+	 */
+	time64_t	s_time_max;
+	time64_t	s_time_min;
 
 	/*
 	 * The next field is for VFS *only*. No filesystems have any business
