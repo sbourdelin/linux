@@ -1596,8 +1596,8 @@ static int tcm_usbg_make_nexus(struct usbg_tpg *tpg, char *name)
 #define MAKE_NEXUS_MSG "core_tpg_check_initiator_node_acl() failed for %s\n"
 		pr_debug(MAKE_NEXUS_MSG, name);
 #undef MAKE_NEXUS_MSG
-		kfree(tv_nexus);
 		ret = PTR_ERR(tv_nexus->tvn_se_sess);
+		kfree(tv_nexus);
 	}
 
 out_unlock:
