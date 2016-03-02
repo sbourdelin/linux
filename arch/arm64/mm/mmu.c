@@ -29,6 +29,8 @@
 #include <linux/io.h>
 #include <linux/slab.h>
 #include <linux/stop_machine.h>
+#include <linux/acpi.h>
+#include <linux/of_fdt.h>
 
 #include <asm/cputype.h>
 #include <asm/fixmap.h>
@@ -458,6 +460,9 @@ void __init paging_init(void)
 
 	map_mem();
 	fixup_executable();
+
+	if (acpi_disabled)
+		unflatten_device_tree();
 
 	/* allocate the zero page. */
 	zero_page = early_alloc(PAGE_SIZE);
