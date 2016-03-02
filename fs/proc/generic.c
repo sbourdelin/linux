@@ -191,23 +191,24 @@ int proc_alloc_inum(unsigned int *inum)
 {
 	unsigned int i;
 	int error;
+	unsigned long flags;
 
 retry:
 	if (!ida_pre_get(&proc_inum_ida, GFP_KERNEL))
 		return -ENOMEM;
 
-	spin_lock_irq(&proc_inum_lock);
+	spin_lock_irqsave(&proc_inum_lock, flags);
 	error = ida_get_new(&proc_inum_ida, &i);
-	spin_unlock_irq(&proc_inum_lock);
+	spin_unlock_irqrestore(&proc_inum_lock, flags);
 	if (error == -EAGAIN)
 		goto retry;
 	else if (error)
 		return error;
 
 	if (i > UINT_MAX - PROC_DYNAMIC_FIRST) {
-		spin_lock_irq(&proc_inum_lock);
+		spin_lock_irqsave(&proc_inum_lock, flags);
 		ida_remove(&proc_inum_ida, i);
-		spin_unlock_irq(&proc_inum_lock);
+		spin_unlock_irqrestore(&proc_inum_lock, flags);
 		return -ENOSPC;
 	}
 	*inum = PROC_DYNAMIC_FIRST + i;
