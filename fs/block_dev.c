@@ -32,6 +32,9 @@
 #include <asm/uaccess.h>
 #include "internal.h"
 
+#define CREATE_TRACE_POINTS
+#include <trace/events/fs_bdev.h>
+
 struct bdev_inode {
 	struct block_device bdev;
 	struct inode vfs_inode;
@@ -228,6 +231,8 @@ struct super_block *freeze_bdev(struct block_device *bdev)
 	struct super_block *sb;
 	int error = 0;
 
+	trace_freeze_bdev_enter(bdev);
+
 	mutex_lock(&bdev->bd_fsfreeze_mutex);
 	if (++bdev->bd_fsfreeze_count > 1) {
 		/*
@@ -258,6 +263,9 @@ out:
 	sync_blockdev(bdev);
 out_unlock:
 	mutex_unlock(&bdev->bd_fsfreeze_mutex);
+
+	trace_freeze_bdev_exit(bdev, sb);
+
 	return sb;	/* thaw_bdev releases s->s_umount */
 }
 EXPORT_SYMBOL(freeze_bdev);
@@ -272,6 +280,8 @@ EXPORT_SYMBOL(freeze_bdev);
 int thaw_bdev(struct block_device *bdev, struct super_block *sb)
 {
 	int error = -EINVAL;
+
+	trace_thaw_bdev_enter(bdev, sb);
 
 	mutex_lock(&bdev->bd_fsfreeze_mutex);
 	if (!bdev->bd_fsfreeze_count)
@@ -292,6 +302,9 @@ int thaw_bdev(struct block_device *bdev, struct super_block *sb)
 		bdev->bd_fsfreeze_count++;
 out:
 	mutex_unlock(&bdev->bd_fsfreeze_mutex);
+
+	trace_thaw_bdev_exit(bdev, sb, error);
+
 	return error;
 }
 EXPORT_SYMBOL(thaw_bdev);

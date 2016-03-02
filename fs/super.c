@@ -35,6 +35,8 @@
 #include <linux/lockdep.h>
 #include "internal.h"
 
+#define CREATE_TRACE_POINTS
+#include <trace/events/fs.h>
 
 static LIST_HEAD(super_blocks);
 static DEFINE_SPINLOCK(sb_lock);
@@ -1274,6 +1276,8 @@ int freeze_super(struct super_block *sb)
 {
 	int ret = 0;
 
+	trace_freeze_super_enter(sb);
+
 	atomic_inc(&sb->s_active);
 	down_write(&sb->s_umount);
 	if (sb->s_writers.frozen != SB_UNFROZEN) {
@@ -1326,6 +1330,8 @@ out_complete:
 out_unlock:
 	up_write(&sb->s_umount);
 out:
+	trace_freeze_super_exit(sb, ret);
+
 	return ret;
 }
 EXPORT_SYMBOL(freeze_super);
@@ -1339,6 +1345,8 @@ EXPORT_SYMBOL(freeze_super);
 int thaw_super(struct super_block *sb)
 {
 	int ret = 0;
+
+	trace_thaw_super_enter(sb);
 
 	down_write(&sb->s_umount);
 	if (sb->s_writers.frozen == SB_UNFROZEN) {
@@ -1368,6 +1376,8 @@ out_wake:
 	wake_up(&sb->s_writers.wait_unfrozen);
 	deactivate_locked_super(sb);
 out:
+	trace_thaw_super_exit(sb, ret);
+
 	return ret;
 }
 EXPORT_SYMBOL(thaw_super);
