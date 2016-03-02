@@ -503,6 +503,8 @@ static int _cpu_up(unsigned int cpu, int tasks_frozen)
 		goto out;
 	}
 
+	init_idle(idle, cpu);
+
 	ret = smpboot_create_threads(cpu);
 	if (ret)
 		goto out;
