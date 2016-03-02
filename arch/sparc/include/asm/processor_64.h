@@ -97,6 +97,25 @@ struct thread_struct {
 struct task_struct;
 unsigned long thread_saved_pc(struct task_struct *);
 
+#ifdef CONFIG_SPARC_ADI
+extern struct adi_caps *get_adi_caps(void);
+extern long get_sparc_adicaps(unsigned long);
+extern long set_sparc_pstate_mcde(unsigned long);
+extern long enable_sparc_adi(unsigned long, unsigned long);
+extern long disable_sparc_adi(unsigned long, unsigned long);
+extern long get_sparc_adi_status(unsigned long);
+extern bool adi_capable(void);
+
+#define GET_SPARC_ADICAPS(a)	get_sparc_adicaps(a)
+#define SET_SPARC_MCDE(a)	set_sparc_pstate_mcde(a)
+#define ENABLE_SPARC_ADI(a, b)	enable_sparc_adi(a, b)
+#define DISABLE_SPARC_ADI(a, b)	disable_sparc_adi(a, b)
+#define GET_SPARC_ADI_STATUS(a)	get_sparc_adi_status(a)
+#define ADI_CAPABLE()		adi_capable()
+#else
+#define ADI_CAPABLE()		0
+#endif
+
 /* On Uniprocessor, even in RMO processes see TSO semantics */
 #ifdef CONFIG_SMP
 #define TSTATE_INITIAL_MM	TSTATE_TSO

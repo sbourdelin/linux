@@ -103,6 +103,21 @@
 #ifndef SET_FP_MODE
 # define SET_FP_MODE(a,b)	(-EINVAL)
 #endif
+#ifndef GET_SPARC_ADICAPS
+# define GET_SPARC_ADICAPS(a)		(-EINVAL)
+#endif
+#ifndef SET_SPARC_MCDE
+# define SET_SPARC_MCDE(a)		(-EINVAL)
+#endif
+#ifndef ENABLE_SPARC_ADI
+# define ENABLE_SPARC_ADI(a, b)		(-EINVAL)
+#endif
+#ifndef DISABLE_SPARC_ADI
+# define DISABLE_SPARC_ADI(a, b)	(-EINVAL)
+#endif
+#ifndef GET_SPARC_ADI_STATUS
+# define GET_SPARC_ADI_STATUS(a)	(-EINVAL)
+#endif
 
 /*
  * this is where the system-wide overflow UID and GID are defined, for
@@ -2265,6 +2280,21 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 		break;
 	case PR_GET_FP_MODE:
 		error = GET_FP_MODE(me);
+		break;
+	case PR_GET_SPARC_ADICAPS:
+		error = GET_SPARC_ADICAPS(arg2);
+		break;
+	case PR_SET_SPARC_ADI:
+		error = SET_SPARC_MCDE(arg2);
+		break;
+	case PR_ENABLE_SPARC_ADI:
+		error = ENABLE_SPARC_ADI(arg2, arg3);
+		break;
+	case PR_DISABLE_SPARC_ADI:
+		error = DISABLE_SPARC_ADI(arg2, arg3);
+		break;
+	case PR_GET_SPARC_ADI_STATUS:
+		error = GET_SPARC_ADI_STATUS(arg2);
 		break;
 	default:
 		error = -EINVAL;

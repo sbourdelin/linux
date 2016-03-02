@@ -12,6 +12,7 @@
 #include <linux/miscdevice.h>
 #include <linux/bootmem.h>
 #include <linux/export.h>
+#include <linux/prctl.h>
 
 #include <asm/cpudata.h>
 #include <asm/hypervisor.h>
@@ -512,6 +513,11 @@ EXPORT_SYMBOL(mdesc_node_name);
 
 static u64 max_cpus = 64;
 
+static struct {
+	bool enabled;
+	struct adi_caps caps;
+} adi_state;
+
 static void __init report_platform_properties(void)
 {
 	struct mdesc_handle *hp = mdesc_grab();
@@ -1007,6 +1013,80 @@ static int mdesc_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
+bool adi_capable(void)
+{
+	return adi_state.enabled;
+}
+
+struct adi_caps *get_adi_caps(void)
+{
+	return &adi_state.caps;
+}
+
+void __init
+init_adi(void)
+{
+	struct mdesc_handle *hp = mdesc_grab();
+	const char *prop;
+	u64 pn, *val;
+	int len;
+
+	adi_state.enabled = false;
+
+	if (!hp)
+		return;
+
+	pn = mdesc_node_by_name(hp, MDESC_NODE_NULL, "cpu");
+	if (pn == MDESC_NODE_NULL)
+		goto out;
+
+	prop = mdesc_get_property(hp, pn, "hwcap-list", &len);
+	if (!prop)
+		goto out;
+
+	/*
+	 * Look for "adp" keyword in hwcap-list which would indicate
+	 * ADI support
+	 */
+	while (len) {
+		int plen;
+
+		if (!strcmp(prop, "adp")) {
+			adi_state.enabled = true;
+			break;
+		}
+
+		plen = strlen(prop) + 1;
+		prop += plen;
+		len -= plen;
+	}
+
+	if (!adi_state.enabled)
+		goto out;
+
+	pn = mdesc_node_by_name(hp, MDESC_NODE_NULL, "platform");
+	if (pn == MDESC_NODE_NULL)
+		goto out;
+
+	val = (u64 *) mdesc_get_property(hp, pn, "adp-blksz", &len);
+	if (!val)
+		goto out;
+	adi_state.caps.blksz = *val;
+
+	val = (u64 *) mdesc_get_property(hp, pn, "adp-nbits", &len);
+	if (!val)
+		goto out;
+	adi_state.caps.nbits = *val;
+
+	val = (u64 *) mdesc_get_property(hp, pn, "ue-on-adp", &len);
+	if (!val)
+		goto out;
+	adi_state.caps.ue_on_adi = *val;
+
+out:
+	mdesc_release(hp);
+}
+
 static ssize_t mdesc_read(struct file *file, char __user *buf,
 			  size_t len, loff_t *offp)
 {
@@ -1094,5 +1174,6 @@ void __init sun4v_mdesc_init(void)
 
 	cur_mdesc = hp;
 
+	init_adi();
 	report_platform_properties();
 }

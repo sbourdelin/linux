@@ -32,6 +32,8 @@
 #include <linux/sysrq.h>
 #include <linux/nmi.h>
 #include <linux/context_tracking.h>
+#include <linux/prctl.h>
+#include <linux/hugetlb.h>
 
 #include <asm/uaccess.h>
 #include <asm/page.h>
@@ -777,3 +779,222 @@ unsigned long get_wchan(struct task_struct *task)
 out:
 	return ret;
 }
+
+#ifdef CONFIG_SPARC_ADI
+long get_sparc_adicaps(unsigned long val)
+{
+	struct adi_caps *caps;
+
+	if (!ADI_CAPABLE())
+		return -EINVAL;
+
+	caps = get_adi_caps();
+	if (val)
+		if (copy_to_user((void *)val, caps, sizeof(struct adi_caps)))
+			return -EFAULT;
+	return 0;
+}
+
+long set_sparc_pstate_mcde(unsigned long val)
+{
+	unsigned long error;
+	struct pt_regs *regs;
+
+	if (!ADI_CAPABLE())
+		return -EINVAL;
+
+	/* We do not allow anonymous tasks to enable ADI because they
+	 * run in borrowed aadress space.
+	 */
+	if (current->mm == NULL)
+		return -EINVAL;
+
+	regs = task_pt_regs(current);
+	if (regs->tstate & TSTATE_MCDE)
+		error = 1;
+	else
+		error = 0;
+	switch (val) {
+	case 1:
+		regs->tstate |= TSTATE_MCDE;
+		current->mm->context.adi = 1;
+		break;
+	case 0:
+		regs->tstate &= ~TSTATE_MCDE;
+		current->mm->context.adi = 0;
+		break;
+	default:
+		break;
+	}
+
+	return error;
+}
+
+long enable_sparc_adi(unsigned long addr, unsigned long len)
+{
+	unsigned long end, pagemask;
+	int error;
+	struct vm_area_struct *vma, *vma2;
+	struct mm_struct *mm;
+
+	if (!ADI_CAPABLE())
+		return -EINVAL;
+
+	vma = find_vma(current->mm, addr);
+	if (unlikely(!vma) || (vma->vm_start > addr))
+		return -EFAULT;
+
+	/* ADI is supported for hugepages only
+	 */
+	if (!is_vm_hugetlb_page(vma))
+		return -EFAULT;
+
+	/* Is the start address page aligned and is the length multiple
+	 * of page size?
+	 */
+	pagemask = ~(vma_kernel_pagesize(vma) - 1);
+	if (addr & ~pagemask)
+		return -EINVAL;
+	if (len & ~pagemask)
+		return -EINVAL;
+
+	end = addr + len;
+	if (end == addr)
+		return 0;
+
+	/* Verify end of the region is not out of bounds
+	 */
+	vma2 = find_vma(current->mm, end-1);
+	if (unlikely(!vma2) || (vma2->vm_start > end))
+		return -EFAULT;
+
+	error = 0;
+	while (1) {
+		/* If the address space ADI is to be enabled in, does not cover
+		 * this vma in its entirety, we will need to split it.
+		 */
+		mm = vma->vm_mm;
+		if (addr != vma->vm_start) {
+			error = split_vma(mm, vma, addr, 1);
+			if (error)
+				goto out;
+		}
+
+		if (end < vma->vm_end) {
+			error = split_vma(mm, vma, end, 0);
+			if (error)
+				goto out;
+		}
+
+		/* Update the ADI info in vma and PTE
+		 */
+		vma->vm_flags |= VM_SPARC_ADI;
+
+		if (end > vma->vm_end) {
+			change_protection(vma, addr, vma->vm_end,
+					  vma->vm_page_prot,
+					  vma_wants_writenotify(vma), 0);
+			addr = vma->vm_end;
+		} else {
+			change_protection(vma, addr, end, vma->vm_page_prot,
+					vma_wants_writenotify(vma), 0);
+			break;
+		}
+
+		vma = find_vma(current->mm, addr);
+		if (unlikely(!vma) || (vma->vm_start > addr))
+			return -EFAULT;
+	}
+out:
+	if (error == -ENOMEM)
+		error = -EAGAIN;
+	return error;
+}
+
+long disable_sparc_adi(unsigned long addr, unsigned long len)
+{
+	unsigned long end, pagemask;
+	struct vm_area_struct *vma, *vma2, *prev;
+	struct mm_struct *mm;
+	pgoff_t pgoff;
+
+	if (!ADI_CAPABLE())
+		return -EINVAL;
+
+	vma = find_vma(current->mm, addr);
+	if (unlikely(!vma) || (vma->vm_start > addr))
+		return -EFAULT;
+
+	/* ADI is supported for hugepages only
+	 */
+	if (!is_vm_hugetlb_page(vma))
+		return -EINVAL;
+
+	/* Is the start address page aligned and is the length multiple
+	 * of page size?
+	 */
+	pagemask = ~(vma_kernel_pagesize(vma) - 1);
+	if (addr & ~pagemask)
+		return -EINVAL;
+	if (len & ~pagemask)
+		return -EINVAL;
+
+	end = addr + len;
+	if (end == addr)
+		return 0;
+
+	/* Verify end of the region is not out of bounds
+	 */
+	vma2 = find_vma(current->mm, end-1);
+	if (unlikely(!vma2) || (vma2->vm_start > end))
+		return -EFAULT;
+
+	while (1) {
+		mm = vma->vm_mm;
+
+		/* Update the ADI info in vma and check if this vma can
+		 * be merged with adjacent ones
+		 */
+		pgoff = vma->vm_pgoff + ((addr - vma->vm_start) >> PAGE_SHIFT);
+		prev = vma_merge(mm, prev, addr, end, vma->vm_flags,
+				 vma->anon_vma, vma->vm_file, pgoff,
+				 vma_policy(vma), vma->vm_userfaultfd_ctx);
+		if (prev)
+			vma = prev;
+
+		vma->vm_flags &= ~VM_SPARC_ADI;
+		if (end > vma->vm_end) {
+			change_protection(vma, addr, vma->vm_end,
+					  vma->vm_page_prot,
+					  vma_wants_writenotify(vma), 0);
+			addr = vma->vm_end;
+		} else {
+			change_protection(vma, addr, end, vma->vm_page_prot,
+					  vma_wants_writenotify(vma), 0);
+			break;
+		}
+
+		vma = find_vma_prev(current->mm, addr, &prev);
+		if (unlikely(!vma) || (vma->vm_start > addr))
+			return -EFAULT;
+	}
+	return 0;
+}
+
+long get_sparc_adi_status(unsigned long addr)
+{
+	struct vm_area_struct *vma;
+
+	if (!ADI_CAPABLE())
+		return -EINVAL;
+
+	vma = find_vma(current->mm, addr);
+	if (unlikely(!vma) || (vma->vm_start > addr))
+		return -EFAULT;
+
+	if (vma->vm_flags & VM_SPARC_ADI)
+		return 1;
+
+	return 0;
+}
+#endif
