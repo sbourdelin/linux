@@ -253,6 +253,30 @@ void blk_queue_max_hw_sectors(struct request_queue *q, unsigned int max_hw_secto
 EXPORT_SYMBOL(blk_queue_max_hw_sectors);
 
 /**
+ * blk_queue_max_dev_sectors - set max sectors supported by a device for
+ * this queue.
+ * @q:	the request queue for the device
+ * @max_dev_sectors:	max device sectors in the usual 512b unit
+ *
+ * Description:
+ *    Enables a low level driver to set a device supported upper limit,
+ *    max_dev_sectors, on the size of request. max_dev_sectors is set by
+ *    the device driver based upon the capabilities of the device.
+ *
+ *    max_dev_sectors is upper limit for max_hw_sectors value, thus
+ *    it should be set before changing the latter value.
+ **/
+void blk_queue_max_dev_sectors(struct request_queue *q,
+		unsigned int max_dev_sectors)
+{
+	struct queue_limits *limits = &q->limits;
+
+	limits->max_dev_sectors = min_t(unsigned int, max_dev_sectors,
+					BLK_DEF_MAX_SECTORS);
+}
+EXPORT_SYMBOL(blk_queue_max_dev_sectors);
+
+/**
  * blk_queue_chunk_sectors - set size of the chunk for this queue
  * @q:  the request queue for the device
  * @chunk_sectors:  chunk sectors in the usual 512b unit
