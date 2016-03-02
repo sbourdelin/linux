@@ -63,6 +63,14 @@ static unsigned int out_ports = 1;
 module_param(out_ports, uint, S_IRUGO);
 MODULE_PARM_DESC(out_ports, "Number of MIDI output ports");
 
+static unsigned int bmAttributes = USB_CONFIG_ATT_ONE;
+module_param(bmAttributes, uint, S_IRUGO);
+MODULE_PARM_DESC(bmAttributes, "Configuration Descriptor's bmAttributes parameter");
+
+static unsigned int MaxPower = CONFIG_USB_GADGET_VBUS_DRAW;
+module_param(MaxPower, uint, S_IRUGO);
+MODULE_PARM_DESC(MaxPower, "Used to calculate Configuration Descriptor's bMaxPower parameter");
+
 /* Thanks to Grey Innovation for donating this product ID.
  *
  * DO NOT REUSE THESE IDs with a protocol-incompatible driver!!  Ever!!
@@ -119,8 +127,8 @@ static struct usb_configuration midi_config = {
 	.label		= "MIDI Gadget",
 	.bConfigurationValue = 1,
 	/* .iConfiguration = DYNAMIC */
-	.bmAttributes	= USB_CONFIG_ATT_ONE,
-	.MaxPower	= CONFIG_USB_GADGET_VBUS_DRAW,
+	/* .bmAttributes	= DYNAMIC */
+	/* .MaxPower	= DYNAMIC */
 };
 
 static int midi_bind_config(struct usb_configuration *c)
@@ -163,6 +171,8 @@ static int midi_bind(struct usb_composite_dev *cdev)
 	device_desc.iManufacturer = strings_dev[USB_GADGET_MANUFACTURER_IDX].id;
 	device_desc.iProduct = strings_dev[USB_GADGET_PRODUCT_IDX].id;
 	midi_config.iConfiguration = strings_dev[STRING_DESCRIPTION_IDX].id;
+	midi_config.bmAttributes = bmAttributes;
+	midi_config.MaxPower = MaxPower;
 
 	status = usb_add_config(cdev, &midi_config, midi_bind_config);
 	if (status < 0)
