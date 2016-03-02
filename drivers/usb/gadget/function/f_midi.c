@@ -5,6 +5,9 @@
  * Developed for Thumtronics by Grey Innovation
  * Ben Williamson <ben.williamson@greyinnovation.com>
  *
+ * Copyright (C) 2015,2016 ROLI Ltd.
+ * Felipe F. Tonello <felipe.tonello@roli.com>
+ *
  * Rewritten for the composite framework
  *   Copyright (C) 2011 Daniel Mack <zonque@gmail.com>
  *
