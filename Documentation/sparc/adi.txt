@@ -1,0 +1,206 @@
+Application Data Integrity (ADI)
+================================
+
+Sparc M7 processor adds the Application Data Integrity (ADI) feature.
+ADI allows a task to set version tags on any subset of its address
+space. Once ADI is enabled and version tags are set for ranges of
+address space of a task, the processor will compare the tag in pointers
+to memory in these ranges to the version set by the application
+previously. Access to memory is granted only if the tag in given
+pointer matches the tag set by the application. In case of mismatch,
+processor raises an exception.  ADI can be enabled on pages that are
+locked in memory, i.e.  are not swappable.
+
+Following steps must be taken by a task to enable ADI fully:
+
+1. Set the user mode PSTATE.mcde bit
+
+2. Set TTE.mcd bit on any TLB entries that correspond to the range of
+addresses ADI is being enabled on.
+
+3. Set the version tag for memory addresses.
+
+Kernel provides prctl() calls to perform steps 1 (PR_SET_SPARC_ADI) and
+2 (PR_ENABLE_SPARC_ADI). Please see Documentation/prctl/sparc_adi.txt
+for more details on these prctl calls. Step 3 is performed with an
+stxa instruction on the address using ASI_MCD_PRIMARY or
+ASI_MCD_ST_BLKINIT_PRIMARY. Version tags are stoed in bits 63-60 of
+address and are set on a cache line. Version tag values of 0x0 and 0xf
+are reserved.
+
+NOTE:	ADI is supported on hugepage only. Hugepages are already locked
+	in memory.
+
+
+ADI related traps
+-----------------
+
+With ADI enabled, following new traps may occur:
+
+Disrupting memory corruption
+
+	When a store accesses a memory localtion that has TTE.mcd=1,
+	the task is running with ADI enabled (PSTATE.mcde=1), and the ADI
+	tag in the address used (bits 63:60) does not match the tag set on
+	the corresponding cacheline, a memory corruption trap occurs. By
+	default, it is a disrupting trap and is sent to the hypervisor
+	first. Hypervisor creates a sun4v error report and sends a
+	resumable error (TT=0x7e) trap to the kernel. The kernel sends
+	a SIGSEGV to the task that resulted in this trap with the following
+	info:
+
+		siginfo.si_signo = SIGSEGV;
+		siginfo.errno = 0;
+		siginfo.si_code = SEGV_ADIDERR;
+		siginfo.si_addr = addr; /* address that caused trap */
+		siginfo.si_trapno = 0;
+
+
+Precise memory corruption
+
+	When a store accesses a memory location that has TTE.mcd=1,
+	the task is running with ADI enabled (PSTATE.mcde=1), and the ADI
+	tag in the address used (bits 63:60) does not match the tag set on
+	the corresponding cacheline, a memory corruption trap occurs. If
+	MCD precise exception is enabled (MCDPERR=1), a precise
+	exception is sent to the kernel with TT=0x1a. The kernel sends
+	a SIGSEGV to the task that resulted in this trap with the following
+	info:
+
+		siginfo.si_signo = SIGSEGV;
+		siginfo.errno = 0;
+		siginfo.si_code = SEGV_ADIPERR;
+		siginfo.si_addr = addr;	/* address that caused trap */
+		siginfo.si_trapno = 0;
+
+	NOTE: ADI tag mismatch on a load always results in precise trap.
+
+
+MCD disabled
+
+	When a task has not enabled ADI and attempts to set ADI version
+	on a memory address, processor sends an MCD disabled trap. This
+	trap is handled by hypervisor first and the hypervisor vectors this
+	trap through to the kernel as Data Access Exception trap with
+	fault type set to 0xa (invalid ASI). When this occurs, the kernel
+	sends the task SIGBUS signal with following info:
+
+		siginfo.si_signo = SIGBUS;
+		siginfo.errno = 0;
+		siginfo.si_code = SEGV_ACCADI;
+		siginfo.si_addr = addr;	/* address that caused trap */
+		siginfo.si_trapno = 0;
+
+
+Sample program to use ADI
+-------------------------
+
+Following sample program is meant to illustrate how to use the ADI
+functionality with the default 8M hugepages.
+
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <asm/asi.h>
+#include <linux/prctl.h>
+
+#define BUFFER_SIZE	32*1024*1024
+
+struct adi_caps adicap;
+
+main()
+{
+	unsigned long i, mcde;
+	char *shmaddr, *tmp_addr, *end, *veraddr, *clraddr;
+	int shmid, version;
+
+	if ((shmid = shmget(2, BUFFER_SIZE,
+				SHM_HUGETLB | IPC_CREAT | SHM_R | SHM_W)) < 0) {
+		perror("shmget failed");
+		exit(1);
+	}
+
+	shmaddr = shmat(shmid, NULL, 0);
+	if (shmaddr == (char *)-1) {
+		perror("shm attach failed");
+		shmctl(shmid, IPC_RMID, NULL);
+		exit(1);
+	}
+
+	/* Get the values for various ADI capabilities bits. These will
+	 * be used later for setting the ADI tag
+	 */
+	if (prctl(PR_GET_SPARC_ADICAPS, &adicap) < 0) {
+		perror("PR_GET_SPARC_ADICAPS failed");
+		goto err_out;
+	}
+
+	/* Set PSTATE.mcde
+	 */
+	if ((mcde = prctl(PR_SET_SPARC_ADI, PR_SET_SPARC_ADI_SET)) < 0) {
+		perror("PR_SET_SPARC_ADI failed");
+		goto err_out;
+	}
+
+	/* Set TTE.mcd on the address range for shm segment
+	 */
+	if (prctl(PR_ENABLE_SPARC_ADI, shmaddr, BUFFER_SIZE) < 0) {
+		perror("prctl failed");
+		goto err_out;
+	}
+
+	/* Set the ADI version tag on the shm segment
+	 */
+	version = 10;
+	tmp_addr = shmaddr;
+	end = shmaddr + BUFFER_SIZE;
+	while (tmp_addr < end) {
+		asm volatile(
+			"stxa %1, [%0]ASI_MCD_PRIMARY\n\t"
+			:
+			: "r" (tmp_addr), "r" (version));
+		tmp_addr += adicap.blksz;
+	}
+
+	/* Create a versioned address from the normal address
+	 */
+	tmp_addr = (void *) ((unsigned long)shmaddr << adicap.nbits);
+	tmp_addr = (void *) ((unsigned long)tmp_addr >> adicap.nbits);
+	veraddr = (void *) (((unsigned long)version << (64-adicap.nbits))
+			| (unsigned long)tmp_addr);
+
+	printf("Starting the writes:\n");
+	for (i = 0; i < BUFFER_SIZE; i++) {
+		veraddr[i] = (char)(i);
+		if (!(i % (1024 * 1024)))
+			printf(".");
+	}
+	printf("\n");
+
+	printf("Verifying data...");
+	for (i = 0; i < BUFFER_SIZE; i++)
+		if (veraddr[i] != (char)i)
+			printf("\nIndex %lu mismatched\n", i);
+	printf("Done.\n");
+
+	/* Disable ADI and clean up
+	 */
+	if (prctl(PR_DISABLE_SPARC_ADI, shmaddr, BUFFER_SIZE) < 0) {
+		perror("prctl failed");
+		goto err_out;
+	}
+
+	if (shmdt((const void *)shmaddr) != 0)
+		perror("Detach failure");
+	shmctl(shmid, IPC_RMID, NULL);
+
+	exit(0);
+
+err_out:
+	if (shmdt((const void *)shmaddr) != 0)
+		perror("Detach failure");
+	shmctl(shmid, IPC_RMID, NULL);
+	exit(1);
+}

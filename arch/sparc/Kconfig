@@ -79,6 +79,7 @@ config SPARC64
 	select NO_BOOTMEM
 	select HAVE_ARCH_AUDITSYSCALL
 	select ARCH_SUPPORTS_ATOMIC_RMW
+	select SPARC_ADI
 
 config ARCH_DEFCONFIG
 	string
@@ -308,6 +309,17 @@ source "mm/Kconfig"
 if SPARC64
 source "kernel/power/Kconfig"
 endif
+
+config SPARC_ADI
+	bool "Application Data Integrity support"
+	def_bool y if SPARC64
+	help
+	  Support for Application Data Integrity (ADI). ADI feature allows
+	  a process to tag memory blocks with version tags. Once ADI is
+	  enabled and version tag is set on a memory block, any access to
+	  it is allowed only if the correct version tag is presented by
+	  a process. This feature is meant to help catch rogue accesses
+	  to memory.
 
 config SCHED_SMT
 	bool "SMT (Hyperthreading) scheduler support"
