@@ -46,15 +46,26 @@
 	  </row>
 	  <row>
 	    <entry><constant>MEDIA_ENT_F_CONN_RF</constant></entry>
-	    <entry>Connector for a Radio Frequency (RF) signal.</entry>
+	    <entry>Entity representing the logical connection associated with a
+		    single Radio Frequency (RF) signal connector. It
+		    corresponds to the logical input or output associated
+		    with the RF signal.</entry>
 	  </row>
 	  <row>
 	    <entry><constant>MEDIA_ENT_F_CONN_SVIDEO</constant></entry>
-	    <entry>Connector for a S-Video signal.</entry>
+	    <entry>Entity representing the logical connection associated
+		    with a sigle S-Video connector. Such entity should have
+		    two pads, one for the luminance signal (Y) and one
+		    for the chrominance signal (C). It corresponds to the
+		    logical input or output associated with S-Video Y and C
+		    signals.</entry>
 	  </row>
 	  <row>
 	    <entry><constant>MEDIA_ENT_F_CONN_COMPOSITE</constant></entry>
-	    <entry>Connector for a RGB composite signal.</entry>
+	    <entry>Entity representing the logical connection for a composite
+		    signal. It corresponds to the logical input or output
+		    associated with the single signal that carries both
+		    chrominance and luminance information (Y+C).</entry>
 	  </row>
 	  <row>
 	    <entry><constant>MEDIA_ENT_F_CAM_SENSOR</constant></entry>
