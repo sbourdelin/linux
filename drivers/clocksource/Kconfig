@@ -239,6 +239,7 @@ config ATMEL_PIT
 
 config ATMEL_ST
 	bool
+	depends on HAS_IOMEM	# For MFD_SYSCON
 	select CLKSRC_OF
 	select MFD_SYSCON
 
