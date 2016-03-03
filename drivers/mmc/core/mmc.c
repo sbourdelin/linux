@@ -585,6 +585,12 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		card->ext_csd.ffu_capable =
 			(ext_csd[EXT_CSD_SUPPORTED_MODE] & 0x1) &&
 			!(ext_csd[EXT_CSD_FW_CONFIG] & 0x1);
+		/*
+		* Enhance Strobe is supported since v5.1 which rev should be
+		* 8 but some eMMC devices can support it with rev 7. So handle
+		* Enhance Strobe here.
+		*/
+		card->ext_csd.strobe_support = ext_csd[EXT_CSD_STROBE_SUPPORT];
 	}
 out:
 	return err;
@@ -1097,14 +1103,60 @@ static int mmc_select_hs400(struct mmc_card *card)
 	}
 
 	/* Switch card to DDR */
+	val = EXT_CSD_DDR_BUS_WIDTH_8;
+	if (card->ext_csd.strobe_support && mmc_host_enhanced_strobe(host)) {
+		val |= EXT_CSD_BUS_WIDTH_STROBE;
+		/*
+		* Make sure we are in non-enhanced strobe mode before we
+		* actually enable it in ext_csd.
+		*/
+		if (host->ops->prepare_enhanced_strobe)
+			err = host->ops->prepare_enhanced_strobe(host, false);
+
+		if (err) {
+			pr_err("%s: unprepare_enhanced strobe failed, err:%d\n",
+				mmc_hostname(host), err);
+			return err;
+		}
+	}
+
 	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 			 EXT_CSD_BUS_WIDTH,
-			 EXT_CSD_DDR_BUS_WIDTH_8,
+			 val,
 			 card->ext_csd.generic_cmd6_time);
 	if (err) {
 		pr_err("%s: switch to bus width for hs400 failed, err:%d\n",
 			mmc_hostname(host), err);
 		return err;
+	}
+
+	if (card->ext_csd.strobe_support && mmc_host_enhanced_strobe(host)) {
+		/* Controller enable enhanced strobe function */
+		if (host->ops->prepare_enhanced_strobe)
+			err = host->ops->prepare_enhanced_strobe(host, true);
+
+		if (err) {
+			pr_err("%s: prepare enhanced strobe failed, err:%d\n",
+				mmc_hostname(host), err);
+			return err;
+		}
+
+		mmc_set_bus_width(host, MMC_BUS_WIDTH_8);
+		/*
+		 * If controller can't handle bus width test,
+		 * compare ext_csd previously read in 1 bit mode
+		 * against ext_csd at new bus width
+		 */
+		if (!(host->caps & MMC_CAP_BUS_WIDTH_TEST))
+			err = mmc_compare_ext_csds(card, MMC_BUS_WIDTH_8);
+		else
+			err = mmc_bus_test(card, MMC_BUS_WIDTH_8);
+
+		if (err) {
+			pr_warn("%s: switch to enhanced strobe failed\n",
+				mmc_hostname(host));
+			return err;
+		}
 	}
 
 	/* Switch card to HS400 */
