@@ -263,7 +263,9 @@ again:
 		goto again;
 
 done:
-	knc_pmu_enable_all(0);
+	/* Only restore pmu state when it's active. */
+	if (cpuc->enabled != 0)
+		knc_pmu_enable_all(0);
 
 	return handled;
 }
