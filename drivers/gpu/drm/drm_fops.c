@@ -246,6 +246,19 @@ static int drm_open_helper(struct file *filp, struct drm_minor *minor)
 
 	DRM_DEBUG("pid = %d, minor = %d\n", task_pid_nr(current), minor->index);
 
+	if (IS_ENABLED(CONFIG_LOCKDEP)) {
+		/* We depend upon the strict order of mmap_sem outside of
+		 * struct_mutex in order for the fault handlers and their
+		 * setup/teardown. Taint mmap_sem as early as possible in
+		 * order to define the proper order and flag ABBA errors
+		 * should the order ever be inverted.
+		 */
+		down_write(&current->mm->mmap_sem);
+		mutex_lock(&dev->struct_mutex);
+		mutex_unlock(&dev->struct_mutex);
+		up_write(&current->mm->mmap_sem);
+	}
+
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
