@@ -294,6 +294,14 @@ struct page *alloc_migrate_target(struct page *page, unsigned long private,
 		nodes_complement(dst, src);
 		return alloc_huge_page_node(page_hstate(compound_head(page)),
 					    next_node(page_to_nid(page), dst));
+	} else if (thp_migration_supported() && PageTransHuge(page)) {
+		struct page *thp;
+
+		thp = alloc_pages(GFP_TRANSHUGE, HPAGE_PMD_ORDER);
+		if (!thp)
+			return NULL;
+		prep_transhuge_page(thp);
+		return thp;
 	}
 
 	if (PageHighMem(page))
