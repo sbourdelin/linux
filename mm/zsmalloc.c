@@ -219,6 +219,10 @@ struct size_class {
 	int pages_per_zspage;
 	/* huge object: pages_per_zspage == 1 && maxobj_per_zspage == 1 */
 	bool huge;
+
+	bool compact_scheduled;
+	struct zs_pool *pool;
+	struct work_struct compact_work;
 };
 
 /*
@@ -1464,6 +1468,8 @@ static void obj_free(struct zs_pool *pool, struct size_class *class,
 	zs_stat_dec(class, OBJ_USED, 1);
 }
 
+static bool class_watermark_ok(struct size_class *class);
+
 void zs_free(struct zs_pool *pool, unsigned long handle)
 {
 	struct page *first_page, *f_page;
@@ -1492,6 +1498,11 @@ void zs_free(struct zs_pool *pool, unsigned long handle)
 		atomic_long_sub(class->pages_per_zspage,
 				&pool->pages_allocated);
 		free_zspage(first_page);
+	} else {
+		if (!class_watermark_ok(class) && !class->compact_scheduled) {
+			queue_work(system_long_wq, &class->compact_work);
+			class->compact_scheduled = true;
+		}
 	}
 	spin_unlock(&class->lock);
 	unpin_tag(handle);
@@ -1742,6 +1753,19 @@ static unsigned long zs_can_compact(struct size_class *class)
 	return obj_wasted * class->pages_per_zspage;
 }
 
+static bool class_watermark_ok(struct size_class *class)
+{
+	unsigned long pages_used = zs_stat_get(class, OBJ_ALLOCATED);
+
+	pages_used /= get_maxobj_per_zspage(class->size,
+			class->pages_per_zspage) * class->pages_per_zspage;
+
+	if (!pages_used)
+		return true;
+
+	return (100 * zs_can_compact(class) / pages_used) < 40;
+}
+
 static void __zs_compact(struct zs_pool *pool, struct size_class *class)
 {
 	struct zs_compact_control cc;
@@ -1786,7 +1810,15 @@ static void __zs_compact(struct zs_pool *pool, struct size_class *class)
 	if (src_page)
 		putback_zspage(pool, class, src_page);
 
+	class->compact_scheduled = false;
 	spin_unlock(&class->lock);
+}
+
+static void class_compaction_work(struct work_struct *work)
+{
+	struct size_class *class = container_of(work, struct size_class, compact_work);
+
+	__zs_compact(class->pool, class);
 }
 
 unsigned long zs_compact(struct zs_pool *pool)
@@ -1945,6 +1977,9 @@ struct zs_pool *zs_create_pool(const char *name, gfp_t flags)
 		if (pages_per_zspage == 1 &&
 			get_maxobj_per_zspage(size, pages_per_zspage) == 1)
 			class->huge = true;
+
+		INIT_WORK(&class->compact_work, class_compaction_work);
+		class->pool = pool;
 		spin_lock_init(&class->lock);
 		pool->size_class[i] = class;
 
@@ -1986,6 +2021,8 @@ void zs_destroy_pool(struct zs_pool *pool)
 
 		if (class->index != i)
 			continue;
+
+		cancel_work_sync(&class->compact_work);
 
 		for (fg = 0; fg < _ZS_NR_FULLNESS_GROUPS; fg++) {
 			if (class->fullness_list[fg]) {
