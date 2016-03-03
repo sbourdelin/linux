@@ -17,6 +17,7 @@
 #include <linux/delay.h>
 #include <linux/pm.h>
 #include <linux/gcd.h>
+#include <linux/clk.h>
 #include <linux/i2c.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
@@ -2474,6 +2475,8 @@ static int wm8994_set_bias_level(struct snd_soc_codec *codec,
 {
 	struct wm8994_priv *wm8994 = snd_soc_codec_get_drvdata(codec);
 	struct wm8994 *control = wm8994->wm8994;
+	struct wm8994_pdata *pdata = &control->pdata;
+	int i;
 
 	wm_hubs_set_bias_level(codec, level);
 
@@ -2495,8 +2498,13 @@ static int wm8994_set_bias_level(struct snd_soc_codec *codec,
 			break;
 		}
 
-		if (snd_soc_codec_get_bias_level(codec) == SND_SOC_BIAS_STANDBY)
+		if (snd_soc_codec_get_bias_level(codec) == SND_SOC_BIAS_STANDBY) {
 			active_reference(codec);
+
+			for (i = 0; i < WM8994_NUM_MCLK; i++)
+				if (!IS_ERR(pdata->mclk[i]))
+					clk_prepare_enable(pdata->mclk[i]);
+		}
 		break;
 
 	case SND_SOC_BIAS_STANDBY:
@@ -2524,8 +2532,13 @@ static int wm8994_set_bias_level(struct snd_soc_codec *codec,
 					    WM8994_LINEOUT2_DISCH);
 		}
 
-		if (snd_soc_codec_get_bias_level(codec) == SND_SOC_BIAS_PREPARE)
+		if (snd_soc_codec_get_bias_level(codec) == SND_SOC_BIAS_PREPARE) {
+			for (i = 0; i < WM8994_NUM_MCLK; i++)
+				if (!IS_ERR(pdata->mclk[i]))
+					clk_disable_unprepare(pdata->mclk[i]);
+
 			active_dereference(codec);
+		}
 
 		/* MICBIAS into bypass mode on newer devices */
 		switch (control->type) {

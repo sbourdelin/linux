@@ -18,6 +18,7 @@
 #define WM8994_NUM_LDO   2
 #define WM8994_NUM_GPIO 11
 #define WM8994_NUM_AIF   3
+#define WM8994_NUM_MCLK  2
 
 struct wm8994_ldo_pdata {
 	/** GPIOs to enable regulator, 0 or less if not available */
@@ -233,6 +234,8 @@ struct wm8994_pdata {
 	 * GPIO for the IRQ pin if host only supports edge triggering
 	 */
 	int irq_gpio;
+
+	struct clk *mclk[WM8994_NUM_MCLK];
 };
 
 #endif

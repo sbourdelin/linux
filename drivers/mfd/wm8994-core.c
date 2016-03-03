@@ -14,6 +14,7 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/clk.h>
 #include <linux/slab.h>
 #include <linux/i2c.h>
 #include <linux/err.h>
@@ -270,6 +271,7 @@ static int wm8994_set_pdata_from_of(struct wm8994 *wm8994)
 {
 	struct device_node *np = wm8994->dev->of_node;
 	struct wm8994_pdata *pdata = &wm8994->pdata;
+	char tmp[8];
 	int i;
 
 	if (!np)
@@ -309,6 +311,11 @@ static int wm8994_set_pdata_from_of(struct wm8994 *wm8994)
 	pdata->ldo[1].enable = of_get_named_gpio(np, "wlf,ldo2ena", 0);
 	if (pdata->ldo[1].enable < 0)
 		pdata->ldo[1].enable = 0;
+
+	for (i = 0; i < WM8994_NUM_MCLK; i++) {
+		sprintf(tmp, "MCLK%d", i + 1);
+		pdata->mclk[i] = devm_clk_get(wm8994->dev, tmp);
+	}
 
 	return 0;
 }
