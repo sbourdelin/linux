@@ -188,6 +188,11 @@ static struct dentry *zs_stat_root;
 static int zs_size_classes;
 
 /*
+ * All classes above this class_size are huge classes
+ */
+static size_t huge_class_size_watermark;
+
+/*
  * We assign a page to ZS_ALMOST_EMPTY fullness group when:
  *	n <= N / f, where
  * n = number of allocated objects
@@ -1241,6 +1246,12 @@ unsigned long zs_get_total_pages(struct zs_pool *pool)
 }
 EXPORT_SYMBOL_GPL(zs_get_total_pages);
 
+bool zs_huge_object(size_t sz)
+{
+	return sz > huge_class_size_watermark;
+}
+EXPORT_SYMBOL_GPL(zs_huge_object);
+
 /**
  * zs_map_object - get address of allocated object from handle.
  * @pool: pool from which the object was allocated
@@ -1919,6 +1930,8 @@ struct zs_pool *zs_create_pool(const char *name, gfp_t flags)
 		pool->size_class[i] = class;
 
 		prev_class = class;
+		if (!class->huge && !huge_class_size_watermark)
+			huge_class_size_watermark = size - ZS_HANDLE_SIZE;
 	}
 
 	pool->flags = flags;
