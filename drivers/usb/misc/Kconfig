@@ -3,6 +3,10 @@
 #
 comment "USB Miscellaneous drivers"
 
+config USB_MUX
+	select EXTCON
+	def_bool n
+
 config USB_EMI62
 	tristate "EMI 6|2m USB Audio interface support"
 	---help---
