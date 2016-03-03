@@ -127,6 +127,8 @@ static const char *hw_flag_names[] = {
 	FLAG(BEACON_TX_STATUS),
 	FLAG(NEEDS_UNIQUE_STA_ADDR),
 	FLAG(SUPPORTS_REORDERING_BUFFER),
+	FLAG(TX_AMSDU),
+	FLAG(TX_FRAG_LIST),
 #undef FLAG
 };
 
