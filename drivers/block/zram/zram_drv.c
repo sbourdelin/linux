@@ -711,7 +711,7 @@ static int zram_bvec_write(struct zram *zram, struct bio_vec *bvec, u32 index,
 		goto out;
 	}
 	src = zstrm->buffer;
-	if (unlikely(clen > max_zpage_size)) {
+	if (unlikely(zs_huge_object(clen))) {
 		clen = PAGE_SIZE;
 		if (is_partial_io(bvec))
 			src = uncmem;
