@@ -15,6 +15,7 @@
 #include <linux/platform_device.h>
 #include <linux/reboot.h>
 #include <linux/watchdog.h>
+#include <linux/delay.h>
 
 #include "at91sam9_wdt.h"
 
@@ -58,6 +59,8 @@ static int sama5d4_wdt_start(struct watchdog_device *wdd)
 	reg = wdt_read(wdt, AT91_WDT_MR);
 	reg &= ~AT91_WDT_WDDIS;
 	wdt_write(wdt, AT91_WDT_MR, reg);
+	udelay(125); /* > 4 cycles at 32,768 Hz */
+	wdt_write(wdt, AT91_WDT_CR, AT91_WDT_KEY | AT91_WDT_WDRSTT);
 
 	return 0;
 }
