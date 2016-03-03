@@ -100,6 +100,27 @@ def cpu_list(mask_name):
         yield cpu
 
 
+def each_online_cpu():
+    for cpu in cpu_list("cpu_online_mask"):
+        yield cpu
+
+
+def each_present_cpu():
+    for cpu in cpu_list("cpu_present_mask"):
+        yield cpu
+
+
+def each_possible_cpu():
+    for cpu in cpu_list("cpu_possible_mask"):
+        yield cpu
+
+
+def print_cpus():
+    gdb.write("Possible CPUS : {}\n".format(list(each_possible_cpu())))
+    gdb.write("Present CPUS  : {}\n".format(list(each_present_cpu())))
+    gdb.write("Online CPUS   : {}\n".format(list(each_online_cpu())))
+
+
 class PerCpu(gdb.Function):
     """Return per-cpu variable.
 
