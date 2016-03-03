@@ -45,6 +45,7 @@ config USB_XHCI_PLATFORM
 
 config USB_XHCI_MTK
 	tristate "xHCI support for Mediatek MT65xx"
+	depends on HAS_IOMEM	# For MFD_SYSCON
 	select MFD_SYSCON
 	depends on ARCH_MEDIATEK || COMPILE_TEST
 	---help---
