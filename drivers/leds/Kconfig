@@ -580,6 +580,17 @@ config LEDS_SN3218
 	  This driver can also be built as a module. If so the module
 	  will be called leds-sn3218.
 
+config LEDS_CHROMEOS_KEYBOARD
+	tristate "LED backlight support for Chrome OS keyboards"
+	depends on LEDS_CLASS && ACPI
+	depends on CHROME_PLATFORMS || COMPILE_TEST
+	help
+	  This option enables support for the keyboard backlight LEDs on
+	  select Chrome OS systems.
+
+	  This driver can also be built as a module. If so the module
+	  will be called leds-chromeos-keyboard.
+
 comment "LED driver for blink(1) USB RGB LED is under Special HID drivers (HID_THINGM)"
 
 config LEDS_BLINKM
