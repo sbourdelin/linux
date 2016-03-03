@@ -1082,6 +1082,8 @@ int copy_huge_pmd(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 		if (is_write_migration_entry(entry)) {
 			make_migration_entry_read(&entry);
 			pmd = swp_entry_to_pmd(entry);
+			if (pmd_swp_soft_dirty(pmd))
+				pmd = pmd_swp_mksoft_dirty(pmd);
 			set_pmd_at(src_mm, addr, src_pmd, pmd);
 		}
 		set_pmd_at(dst_mm, addr, dst_pmd, pmd);
@@ -1702,6 +1704,17 @@ int zap_huge_pmd(struct mmu_gather *tlb, struct vm_area_struct *vma,
 	return 1;
 }
 
+static pmd_t move_soft_dirty_pmd(pmd_t pmd)
+{
+#ifdef CONFIG_MEM_SOFT_DIRTY
+	if (unlikely(is_pmd_migration_entry(pmd)))
+		pmd = pmd_mksoft_dirty(pmd);
+	else if (pmd_present(pmd))
+		pmd = pmd_swp_mksoft_dirty(pmd);
+#endif
+	return pmd;
+}
+
 bool move_huge_pmd(struct vm_area_struct *vma, struct vm_area_struct *new_vma,
 		  unsigned long old_addr,
 		  unsigned long new_addr, unsigned long old_end,
@@ -1745,7 +1758,8 @@ bool move_huge_pmd(struct vm_area_struct *vma, struct vm_area_struct *new_vma,
 			pgtable = pgtable_trans_huge_withdraw(mm, old_pmd);
 			pgtable_trans_huge_deposit(mm, new_pmd, pgtable);
 		}
-		set_pmd_at(mm, new_addr, new_pmd, pmd_mksoft_dirty(pmd));
+		pmd = move_soft_dirty_pmd(pmd);
+		set_pmd_at(mm, new_addr, new_pmd, pmd);
 		if (new_ptl != old_ptl)
 			spin_unlock(new_ptl);
 		spin_unlock(old_ptl);
@@ -1784,6 +1798,17 @@ int change_huge_pmd(struct vm_area_struct *vma, pmd_t *pmd,
 		}
 
 		if (is_pmd_migration_entry(*pmd)) {
+			swp_entry_t entry = pmd_to_swp_entry(*pmd);
+
+			if (is_write_migration_entry(entry)) {
+				pmd_t newpmd;
+
+				make_migration_entry_read(&entry);
+				newpmd = swp_entry_to_pmd(entry);
+				if (pmd_swp_soft_dirty(newpmd))
+					newpmd = pmd_swp_mksoft_dirty(newpmd);
+				set_pmd_at(mm, addr, pmd, newpmd);
+			}
 			spin_unlock(ptl);
 			return ret;
 		}
@@ -3660,6 +3685,8 @@ int set_pmd_migration_entry(struct page *page, struct mm_struct *mm,
 	entry = make_migration_entry(page, pmd_write(pmdval));
 	pmdswp = swp_entry_to_pmd(entry);
 	pmdswp = pmd_mkhuge(pmdswp);
+	if (pmd_soft_dirty(pmdval))
+		pmdswp = pmd_swp_mksoft_dirty(pmdswp);
 	set_pmd_at(mm, addr, pmd, pmdswp);
 	page_remove_rmap(page, true);
 	page_cache_release(page);
@@ -3700,7 +3727,9 @@ int remove_migration_pmd(struct page *new, struct vm_area_struct *vma,
 	if (migration_entry_to_page(entry) != old)
 		goto unlock_ptl;
 	get_page(new);
-	pmde = mk_huge_pmd(new, vma->vm_page_prot);
+	pmde = pmd_mkold(mk_huge_pmd(new, vma->vm_page_prot));
+	if (pmd_swp_soft_dirty(pmde))
+		pmde = pmd_mksoft_dirty(pmde);
 	if (is_write_migration_entry(entry))
 		pmde = maybe_pmd_mkwrite(pmde, vma);
 	flush_cache_range(vma, mmun_start, mmun_end);
