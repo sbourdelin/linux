@@ -2629,6 +2629,7 @@ static void mvumi_shutdown(struct pci_dev *pdev)
 	mvumi_flush_cache(mhba);
 }
 
+#ifdef CONFIG_PM
 static int mvumi_suspend(struct pci_dev *pdev, pm_message_t state)
 {
 	struct mvumi_hba *mhba = NULL;
@@ -2716,6 +2717,7 @@ fail:
 
 	return ret;
 }
+#endif
 
 static struct pci_driver mvumi_pci_driver = {
 
