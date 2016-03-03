@@ -64,6 +64,9 @@ startup_64:
 	 * tables and then reload them.
 	 */
 
+	/* Setup stack for verify_cpu(). */
+	leaq	(__end_init_task - 8)(%rip), %rsp
+
 	/* Sanitize CPU configuration */
 	call verify_cpu
 
