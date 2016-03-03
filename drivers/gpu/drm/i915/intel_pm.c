@@ -2583,10 +2583,9 @@ static void ilk_compute_wm_results(struct drm_device *dev,
 		 * Always set WM1S_LP_EN when spr_val != 0, even if the
 		 * level is disabled. Doing otherwise could cause underruns.
 		 */
-		if (INTEL_INFO(dev)->gen <= 6 && r->spr_val) {
-			WARN_ON(wm_lp != 1);
+		if (INTEL_INFO(dev)->gen <= 6 && r->spr_val)
 			results->wm_lp_spr[wm_lp - 1] = WM1S_LP_EN | r->spr_val;
-		} else
+		else
 			results->wm_lp_spr[wm_lp - 1] = r->spr_val;
 	}
 
