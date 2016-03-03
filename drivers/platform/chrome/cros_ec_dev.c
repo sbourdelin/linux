@@ -131,13 +131,23 @@ static ssize_t ec_device_read(struct file *filp, char __user *buffer,
 static long ec_device_ioctl_xcmd(struct cros_ec_dev *ec, void __user *arg)
 {
 	long ret;
+	size_t data_size;
 	struct cros_ec_command u_cmd;
 	struct cros_ec_command *s_cmd;
 
 	if (copy_from_user(&u_cmd, arg, sizeof(u_cmd)))
 		return -EFAULT;
 
-	s_cmd = kmalloc(sizeof(*s_cmd) + max(u_cmd.outsize, u_cmd.insize),
+	/*
+	 * Prevent mallicious attack where .inside is so big that amount
+	 * kmalloc'ed rollover, allowing memcpy to write beyond the allocated
+	 * space.
+	 */
+	data_size = max(u_cmd.outsize, u_cmd.insize);
+	if (data_size + sizeof(*s_cmd) < data_size)
+		return -EINVAL;
+
+	s_cmd = kmalloc(sizeof(*s_cmd) + data_size,
 			GFP_KERNEL);
 	if (!s_cmd)
 		return -ENOMEM;
