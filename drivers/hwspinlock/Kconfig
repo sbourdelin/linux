@@ -21,6 +21,7 @@ config HWSPINLOCK_OMAP
 config HWSPINLOCK_QCOM
 	tristate "Qualcomm Hardware Spinlock device"
 	depends on ARCH_QCOM
+	depends on HAS_IOMEM	# For MFD_SYSCON
 	select HWSPINLOCK
 	select MFD_SYSCON
 	help
