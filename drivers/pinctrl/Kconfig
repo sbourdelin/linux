@@ -131,6 +131,7 @@ config PINCTRL_MESON
 
 config PINCTRL_ROCKCHIP
 	bool
+	depends on HAS_IOMEM	# For MFD_SYSCON
 	select PINMUX
 	select GENERIC_PINCONF
 	select GENERIC_IRQ_CHIP
