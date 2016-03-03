@@ -45,9 +45,18 @@ static int oom_pages = OOM_VBALLOON_DEFAULT_PAGES;
 module_param(oom_pages, int, S_IRUSR | S_IWUSR);
 MODULE_PARM_DESC(oom_pages, "pages to free on OOM");
 
+extern void get_free_pages(unsigned long *free_page_bitmap,
+			unsigned long *free_pages_num,
+			unsigned long lowmem);
+extern unsigned long get_total_pages_count(unsigned long lowmem);
+
+struct mem_layout {
+	unsigned long low_mem;
+};
+
 struct virtio_balloon {
 	struct virtio_device *vdev;
-	struct virtqueue *inflate_vq, *deflate_vq, *stats_vq;
+	struct virtqueue *inflate_vq, *deflate_vq, *stats_vq, *free_pages_vq;
 
 	/* Where the ballooning thread waits for config to change. */
 	wait_queue_head_t config_change;
@@ -74,6 +83,11 @@ struct virtio_balloon {
 	/* The array of pfns we tell the Host about. */
 	unsigned int num_pfns;
 	u32 pfns[VIRTIO_BALLOON_ARRAY_PFNS_MAX];
+
+	unsigned long *free_pages;
+	unsigned long free_pages_len;
+	unsigned long free_pages_num;
+	struct mem_layout mem_config;
 
 	/* Memory statistics */
 	int need_stats_update;
@@ -245,6 +259,34 @@ static void update_balloon_stats(struct virtio_balloon *vb)
 				pages_to_bytes(i.totalram));
 }
 
+static void update_free_pages_stats(struct virtio_balloon *vb)
+{
+	unsigned long total_page_count, bitmap_bytes;
+
+	total_page_count = get_total_pages_count(vb->mem_config.low_mem);
+	bitmap_bytes = ALIGN(total_page_count, BITS_PER_LONG) / 8;
+
+	if (!vb->free_pages)
+		vb->free_pages = kzalloc(bitmap_bytes, GFP_KERNEL);
+	else {
+		if (bitmap_bytes < vb->free_pages_len)
+			memset(vb->free_pages, 0, bitmap_bytes);
+		else {
+			kfree(vb->free_pages);
+			vb->free_pages = kzalloc(bitmap_bytes, GFP_KERNEL);
+		}
+	}
+	if (!vb->free_pages) {
+		vb->free_pages_len = 0;
+		vb->free_pages_num = 0;
+		return;
+	}
+
+	vb->free_pages_len = bitmap_bytes;
+	get_free_pages(vb->free_pages, &vb->free_pages_num,
+		       vb->mem_config.low_mem);
+}
+
 /*
  * While most virtqueues communicate guest-initiated requests to the hypervisor,
  * the stats queue operates in reverse.  The driver initializes the virtqueue
@@ -276,6 +318,39 @@ static void stats_handle_request(struct virtio_balloon *vb)
 	sg_init_one(&sg, vb->stats, sizeof(vb->stats));
 	virtqueue_add_outbuf(vq, &sg, 1, vb, GFP_KERNEL);
 	virtqueue_kick(vq);
+}
+
+static void free_pages_handle_rq(struct virtio_balloon *vb)
+{
+	struct virtqueue *vq;
+	struct scatterlist sg[3];
+	unsigned int len;
+	struct mem_layout *ptr_mem_layout;
+	struct scatterlist sg_in;
+
+	vq = vb->free_pages_vq;
+	ptr_mem_layout = virtqueue_get_buf(vq, &len);
+
+	if (!ptr_mem_layout)
+		return;
+	update_free_pages_stats(vb);
+	sg_init_table(sg, 3);
+	sg_set_buf(&sg[0], &(vb->free_pages_num), sizeof(vb->free_pages_num));
+	sg_set_buf(&sg[1], &(vb->free_pages_len), sizeof(vb->free_pages_len));
+	sg_set_buf(&sg[2], vb->free_pages, vb->free_pages_len);
+
+	sg_init_one(&sg_in, &vb->mem_config, sizeof(vb->mem_config));
+
+	virtqueue_add_outbuf(vq, &sg[0], 3, vb, GFP_KERNEL);
+	virtqueue_add_inbuf(vq, &sg_in, 1, &vb->mem_config, GFP_KERNEL);
+	virtqueue_kick(vq);
+}
+
+static void free_pages_rq(struct virtqueue *vq)
+{
+	struct virtio_balloon *vb = vq->vdev->priv;
+
+	free_pages_handle_rq(vb);
 }
 
 static void virtballoon_changed(struct virtio_device *vdev)
@@ -386,16 +461,22 @@ static int balloon(void *_vballoon)
 
 static int init_vqs(struct virtio_balloon *vb)
 {
-	struct virtqueue *vqs[3];
-	vq_callback_t *callbacks[] = { balloon_ack, balloon_ack, stats_request };
-	static const char * const names[] = { "inflate", "deflate", "stats" };
+	struct virtqueue *vqs[4];
+	vq_callback_t *callbacks[] = { balloon_ack, balloon_ack,
+					 stats_request, free_pages_rq };
+	const char *names[] = { "inflate", "deflate", "stats", "free_pages" };
 	int err, nvqs;
 
 	/*
 	 * We expect two virtqueues: inflate and deflate, and
 	 * optionally stat.
 	 */
-	nvqs = virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_STATS_VQ) ? 3 : 2;
+	if (virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_GET_FREE_PAGES))
+		nvqs = 4;
+	else
+		nvqs = virtio_has_feature(vb->vdev,
+					  VIRTIO_BALLOON_F_STATS_VQ) ? 3 : 2;
+
 	err = vb->vdev->config->find_vqs(vb->vdev, nvqs, vqs, callbacks, names);
 	if (err)
 		return err;
@@ -415,6 +496,16 @@ static int init_vqs(struct virtio_balloon *vb)
 		    < 0)
 			BUG();
 		virtqueue_kick(vb->stats_vq);
+	}
+	if (virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_GET_FREE_PAGES)) {
+		struct scatterlist sg_in;
+
+		vb->free_pages_vq = vqs[3];
+		sg_init_one(&sg_in, &vb->mem_config, sizeof(vb->mem_config));
+		if (virtqueue_add_inbuf(vb->free_pages_vq, &sg_in, 1,
+		    &vb->mem_config, GFP_KERNEL) < 0)
+			BUG();
+		virtqueue_kick(vb->free_pages_vq);
 	}
 	return 0;
 }
@@ -505,6 +596,9 @@ static int virtballoon_probe(struct virtio_device *vdev)
 	init_waitqueue_head(&vb->acked);
 	vb->vdev = vdev;
 	vb->need_stats_update = 0;
+	vb->free_pages_num = 0;
+	vb->free_pages_len = 0;
+	vb->free_pages = NULL;
 
 	balloon_devinfo_init(&vb->vb_dev_info);
 #ifdef CONFIG_BALLOON_COMPACTION
@@ -561,6 +655,7 @@ static void virtballoon_remove(struct virtio_device *vdev)
 	unregister_oom_notifier(&vb->nb);
 	kthread_stop(vb->thread);
 	remove_common(vb);
+	kfree(vb->free_pages);
 	kfree(vb);
 }
 
@@ -599,6 +694,7 @@ static unsigned int features[] = {
 	VIRTIO_BALLOON_F_MUST_TELL_HOST,
 	VIRTIO_BALLOON_F_STATS_VQ,
 	VIRTIO_BALLOON_F_DEFLATE_ON_OOM,
+	VIRTIO_BALLOON_F_GET_FREE_PAGES,
 };
 
 static struct virtio_driver virtio_balloon_driver = {
