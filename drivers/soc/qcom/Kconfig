@@ -4,6 +4,7 @@
 config QCOM_GSBI
         tristate "QCOM General Serial Bus Interface"
         depends on ARCH_QCOM
+        depends on HAS_IOMEM	# For MFD_SYSCON
         select MFD_SYSCON
         help
           Say y here to enable GSBI support.  The GSBI provides control
