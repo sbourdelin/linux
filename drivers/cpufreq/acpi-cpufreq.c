@@ -884,7 +884,7 @@ static struct freq_attr *acpi_cpufreq_attr[] = {
 	&cpufreq_freq_attr_scaling_available_freqs,
 	&freqdomain_cpus,
 #ifdef CONFIG_X86_ACPI_CPUFREQ_CPB
-	&cpb,
+	NULL,	/* Extra space for cpb if required */
 #endif
 	NULL,
 };
@@ -935,6 +935,7 @@ static void acpi_cpufreq_boost_exit(void)
 
 static int __init acpi_cpufreq_init(void)
 {
+	struct freq_attr **attr;
 	int ret;
 
 	if (acpi_disabled)
@@ -950,6 +951,10 @@ static int __init acpi_cpufreq_init(void)
 	if (ret)
 		return ret;
 
+	/* Find first empty entry */
+	for (attr = acpi_cpufreq_attr; *attr; attr++)
+		;
+
 #ifdef CONFIG_X86_ACPI_CPUFREQ_CPB
 	/* this is a sysfs file with a strange name and an even stranger
 	 * semantic - per CPU instantiation, but system global effect.
@@ -957,17 +962,11 @@ static int __init acpi_cpufreq_init(void)
 	 * only if configured. This is considered legacy code, which
 	 * will probably be removed at some point in the future.
 	 */
-	if (!check_amd_hwpstate_cpu(0)) {
-		struct freq_attr **attr;
-
+	if (check_amd_hwpstate_cpu(0))
+		*attr++ = &cpb;
+	else
 		pr_debug("CPB unsupported, do not expose it\n");
 
-		for (attr = acpi_cpufreq_attr; *attr; attr++)
-			if (*attr == &cpb) {
-				*attr = NULL;
-				break;
-			}
-	}
 #endif
 	acpi_cpufreq_boost_init();
 
