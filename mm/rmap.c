@@ -1431,6 +1431,11 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 	struct rmap_private *rp = arg;
 	enum ttu_flags flags = rp->flags;
 
+	if (!PageHuge(page) && PageTransHuge(page)) {
+		VM_BUG_ON_PAGE(!(flags & TTU_MIGRATION), page);
+		return set_pmd_migration_entry(page, mm, address);
+	}
+
 	/* munlock has nothing to gain from examining un-locked vmas */
 	if ((flags & TTU_MUNLOCK) && !(vma->vm_flags & VM_LOCKED))
 		goto out;
@@ -1613,8 +1618,6 @@ int try_to_unmap(struct page *page, enum ttu_flags flags)
 		.done = page_not_mapped,
 		.anon_lock = page_lock_anon_vma_read,
 	};
-
-	VM_BUG_ON_PAGE(!PageHuge(page) && PageTransHuge(page), page);
 
 	/*
 	 * During exec, a temporary VMA is setup and later moved.
