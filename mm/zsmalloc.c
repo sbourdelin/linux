@@ -73,13 +73,6 @@
  */
 #define ZS_ALIGN		8
 
-/*
- * A single 'zspage' is composed of up to 2^N discontiguous 0-order (single)
- * pages. ZS_MAX_ZSPAGE_ORDER defines upper limit on N.
- */
-#define ZS_MAX_ZSPAGE_ORDER 2
-#define ZS_MAX_PAGES_PER_ZSPAGE (_AC(1, UL) << ZS_MAX_ZSPAGE_ORDER)
-
 #define ZS_HANDLE_SIZE (sizeof(unsigned long))
 
 /*
@@ -95,7 +88,7 @@
 
 #ifndef MAX_PHYSMEM_BITS
 #ifdef CONFIG_HIGHMEM64G
-#define MAX_PHYSMEM_BITS 36
+#define MAX_PHYSMEM_BITS	36
 #else /* !CONFIG_HIGHMEM64G */
 /*
  * If this definition of MAX_PHYSMEM_BITS is used, OBJ_INDEX_BITS will just
@@ -104,7 +97,18 @@
 #define MAX_PHYSMEM_BITS BITS_PER_LONG
 #endif
 #endif
+
 #define _PFN_BITS		(MAX_PHYSMEM_BITS - PAGE_SHIFT)
+
+
+/*
+ * A single 'zspage' is composed of up to 2^N discontiguous 0-order (single)
+ * pages. ZS_MAX_ZSPAGE_ORDER defines upper limit on N.
+ */
+#define ZS_MAX_ZSPAGE_ORDER	2
+#define ZS_MAX_HUGE_ZSPAGE_ORDER	4
+#define ZS_MAX_PAGES_PER_ZSPAGE (_AC(1, UL) << ZS_MAX_ZSPAGE_ORDER)
+#define ZS_MAX_PAGES_PER_HUGE_ZSPAGE (_AC(1, UL) << ZS_MAX_HUGE_ZSPAGE_ORDER)
 
 /*
  * Memory for allocating for handle keeps object position by
@@ -747,13 +751,13 @@ out:
  * link together 3 PAGE_SIZE sized pages to form a zspage
  * since then we can perfectly fit in 8 such objects.
  */
-static int get_pages_per_zspage(int class_size)
+static int __get_pages_per_zspage(int class_size, int max_pages)
 {
 	int i, max_usedpc = 0;
 	/* zspage order which gives maximum used size per KB */
 	int max_usedpc_order = 1;
 
-	for (i = 1; i <= ZS_MAX_PAGES_PER_ZSPAGE; i++) {
+	for (i = 1; i <= max_pages; i++) {
 		int zspage_size;
 		int waste, usedpc;
 
@@ -768,6 +772,17 @@ static int get_pages_per_zspage(int class_size)
 	}
 
 	return max_usedpc_order;
+}
+
+static int get_pages_per_zspage(int class_size)
+{
+	int num = __get_pages_per_zspage(class_size,
+			ZS_MAX_PAGES_PER_ZSPAGE);
+
+	if (num == 1 && get_maxobj_per_zspage(class_size, num) == 1)
+		num = __get_pages_per_zspage(class_size,
+				ZS_MAX_PAGES_PER_HUGE_ZSPAGE);
+	return num;
 }
 
 /*
