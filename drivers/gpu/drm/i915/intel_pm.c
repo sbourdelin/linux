@@ -2802,8 +2802,6 @@ static void ilk_write_wm_values(struct drm_i915_private *dev_priv,
 		I915_WRITE(WM2_LP_ILK, results->wm_lp[1]);
 	if (dirty & WM_DIRTY_LP(3) && previous->wm_lp[2] != results->wm_lp[2])
 		I915_WRITE(WM3_LP_ILK, results->wm_lp[2]);
-
-	dev_priv->wm.hw = *results;
 }
 
 bool ilk_disable_lp_wm(struct drm_device *dev)
@@ -3731,7 +3729,10 @@ static void ilk_program_watermarks(struct drm_i915_private *dev_priv)
 
 	ilk_compute_wm_results(dev, best_lp_wm, partitioning, &results);
 
-	ilk_write_wm_values(dev_priv, &results);
+	if (config.num_pipes_active > 0)
+		ilk_write_wm_values(dev_priv, &results);
+
+	dev_priv->wm.hw = results;
 }
 
 static void ilk_initial_watermarks(struct intel_crtc_state *cstate)
