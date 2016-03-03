@@ -24,7 +24,9 @@
 #include "sdhci-pltfm.h"
 
 #define SDHCI_ARASAN_CLK_CTRL_OFFSET	0x2c
+#define SDHCI_ARASAN_VENDOR_REGISTER	0x78
 
+#define VENDOR_ENHANCED_STROBE		BIT(0)
 #define CLK_CTRL_TIMEOUT_SHIFT		16
 #define CLK_CTRL_TIMEOUT_MASK		(0xf << CLK_CTRL_TIMEOUT_SHIFT)
 #define CLK_CTRL_TIMEOUT_MIN_EXP	13
@@ -50,6 +52,21 @@ static unsigned int sdhci_arasan_get_timeout_clock(struct sdhci_host *host)
 	freq /= 1 << (CLK_CTRL_TIMEOUT_MIN_EXP + div);
 
 	return freq;
+}
+
+static int sdhci_arasan_enhanced_strobe(struct sdhci_host *host, bool enable)
+{
+	u32 vendor;
+
+	vendor = readl(host->ioaddr + SDHCI_ARASAN_VENDOR_REGISTER);
+	if (enable)
+		vendor |= VENDOR_ENHANCED_STROBE;
+	else
+		vendor &= (~VENDOR_ENHANCED_STROBE);
+
+	writel(vendor, host->ioaddr + SDHCI_ARASAN_VENDOR_REGISTER);
+
+	return 0;
 }
 
 static struct sdhci_ops sdhci_arasan_ops = {
@@ -171,6 +188,9 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
 
 	sdhci_get_of_property(pdev);
 	pltfm_host->clk = clk_xin;
+
+	host->mmc_host_ops.prepare_enhanced_strobe =
+					sdhci_arasan_enhanced_strobe;
 
 	ret = mmc_of_parse(host->mmc);
 	if (ret) {
