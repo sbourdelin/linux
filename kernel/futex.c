@@ -1927,8 +1927,11 @@ static int unqueue_me(struct futex_q *q)
 
 	/* In the common case we don't take the spinlock, which is nice. */
 retry:
-	lock_ptr = q->lock_ptr;
-	barrier();
+	 /*
+	  * Prevent the compiler to read q->lock_ptr twice (if and spin_lock),
+	  * or that would cause trouble since q->lock_ptr can change in between.
+	  */
+	lock_ptr = READ_ONCE(q->lock_ptr);
 	if (lock_ptr != NULL) {
 		spin_lock(lock_ptr);
 		/*
