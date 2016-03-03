@@ -281,3 +281,10 @@ config INTEL_MUX_GPIO
 	help
 	  Say Y here to enable support for Intel dual role port mux
 	  controlled by GPIOs.
+
+config INTEL_MUX_DRCFG
+	tristate "Intel dual role port mux controlled by register"
+	select USB_MUX
+	help
+	  Say Y here to enable support for Intel dual role port mux
+	  controlled by the Dual Role Configuration Registers.
