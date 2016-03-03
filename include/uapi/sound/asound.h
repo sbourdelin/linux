@@ -23,7 +23,11 @@
 #ifndef _UAPI__SOUND_ASOUND_H
 #define _UAPI__SOUND_ASOUND_H
 
+#ifdef __linux__
 #include <linux/types.h>
+#else
+#include <sys/ioctl.h>
+#endif
 
 #ifndef __KERNEL__
 #include <stdlib.h>
