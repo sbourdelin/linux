@@ -239,6 +239,13 @@ static struct super_block *alloc_super(struct file_system_type *type, int flags)
 	s->s_maxbytes = MAX_NON_LFS;
 	s->s_op = &default_op;
 	s->s_time_gran = 1000000000;
+	/*
+	 * Assign a default empty range [MAX_VFS_TIME, MIN_VFS_TIME].
+	 * This will help VFS detect filesystems that do not populate
+	 * these fields in the superblock.
+	 */
+	s->s_time_min = MAX_VFS_TIME;
+	s->s_time_max = MIN_VFS_TIME;
 	s->cleancache_poolid = CLEANCACHE_NO_POOL;
 
 	s->s_shrink.seeks = DEFAULT_SEEKS;
