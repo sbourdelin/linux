@@ -113,18 +113,21 @@ MTRR effects on PAT / non-PAT systems
 -------------------------------------
 
 The following table provides the effects of using write-combining MTRRs when
-using ioremap*() calls on x86 for both non-PAT and PAT systems. Ideally
-mtrr_add() usage will be phased out in favor of arch_phys_wc_add() which will
-be a no-op on PAT enabled systems. The region over which a arch_phys_wc_add()
+using ioremap*() calls on x86 for both non-PAT and PAT systems. As of v4.3
+mtrr_add() has been phased out in favor of arch_phys_wc_add(), these calls are
+a no-op on PAT enabled systems. The region over which an arch_phys_wc_add()
 is made, should already have been ioremapped with WC attributes or PAT entries,
-this can be done by using ioremap_wc() / set_memory_wc().  Devices which
-combine areas of IO memory desired to remain uncacheable with areas where
-write-combining is desirable should consider use of ioremap_uc() followed by
-set_memory_wc() to white-list effective write-combined areas.  Such use is
-nevertheless discouraged as the effective memory type is considered
-implementation defined, yet this strategy can be used as last resort on devices
-with size-constrained regions where otherwise MTRR write-combining would
-otherwise not be effective.
+this can be done by using ioremap_wc(). Devices which combine areas of IO
+memory desired to remain uncacheable with areas where write-combining is
+desirable should consider use of ioremap_wc() followed by an overlapping
+ioremap_uc() "hole". For an example of this strategy refer to commit 3cc2dac5be
+("drivers/video/fbdev/atyfb: Replace MTRR UC hole with strong UC").
+Such use is nevertheless heavily discouraged as the effective memory type is
+considered implementation defined. This strategy should only be used used as a
+last resort measure.
+
+Note you cannot use set_memory_*() helpers on ioremap'd regions, even though
+its use currently gives no hint of an error.
 
 ----------------------------------------------------------------------
 MTRR Non-PAT   PAT    Linux ioremap value        Effective memory type
