@@ -11405,6 +11405,7 @@ L:	linux-usb@vger.kernel.org
 S:	Supported
 F:	drivers/usb/misc/mux.c
 F:	include/linux/usb/mux.h
+F:	drivers/usb/misc/intel-mux-gpio.c
 
 USB PRINTER DRIVER (usblp)
 M:	Pete Zaitcev <zaitcev@redhat.com>

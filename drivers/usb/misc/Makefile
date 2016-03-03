@@ -31,3 +31,4 @@ obj-$(CONFIG_USB_SISUSBVGA)		+= sisusbvga/
 obj-$(CONFIG_USB_LINK_LAYER_TEST)	+= lvstest.o
 
 obj-$(CONFIG_USB_MUX)			+= mux.o
+obj-$(CONFIG_INTEL_MUX_GPIO)		+= intel-mux-gpio.o
