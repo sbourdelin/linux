@@ -157,6 +157,7 @@ config RENESAS_IRQC
 config ST_IRQCHIP
 	bool
 	select REGMAP
+	depends on HAS_IOMEM	# For MFD_SYSCON
 	select MFD_SYSCON
 	help
 	  Enables SysCfg Controlled IRQs on STi based platforms.
