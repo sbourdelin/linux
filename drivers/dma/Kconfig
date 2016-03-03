@@ -290,6 +290,7 @@ config LPC18XX_DMAMUX
 	bool "NXP LPC18xx/43xx DMA MUX for PL080"
 	depends on ARCH_LPC18XX || COMPILE_TEST
 	depends on OF && AMBA_PL08X
+	depends on HAS_IOMEM	# For MFD_SYSCON
 	select MFD_SYSCON
 	help
 	  Enable support for DMA on NXP LPC18xx/43xx platforms
