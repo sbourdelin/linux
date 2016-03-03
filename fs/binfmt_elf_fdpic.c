@@ -106,7 +106,7 @@ module_exit(exit_elf_fdpic_binfmt);
 
 static int is_elf(struct elfhdr *hdr, struct file *file)
 {
-	if (memcmp(hdr->e_ident, ELFMAG, SELFMAG) != 0)
+	if (!elf_check_linux_magic(hdr))
 		return 0;
 	if (hdr->e_type != ET_EXEC && hdr->e_type != ET_DYN)
 		return 0;

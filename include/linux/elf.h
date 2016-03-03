@@ -46,6 +46,15 @@ extern Elf64_Dyn _DYNAMIC [];
 struct file;
 struct coredump_params;
 
+/*
+ * Returns true if the ELF header corresponds with a valid ELF file that
+ * is supposed to be used on Linux.
+ */
+#define elf_check_linux_magic(hdr) \
+	(memcmp((hdr)->e_ident, ELFMAG, SELFMAG) == 0 && \
+	 ((hdr)->e_ident[EI_OSABI] == ELFOSABI_NONE || \
+	  (hdr)->e_ident[EI_OSABI] == ELFOSABI_LINUX))
+
 #ifndef ARCH_HAVE_EXTRA_ELF_NOTES
 static inline int elf_coredump_extra_notes_size(void) { return 0; }
 static inline int elf_coredump_extra_notes_write(struct coredump_params *cprm) { return 0; }

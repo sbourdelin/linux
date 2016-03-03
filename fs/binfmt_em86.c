@@ -32,7 +32,7 @@ static int load_em86(struct linux_binprm *bprm)
 	/* Make sure this is a Linux/Intel ELF executable... */
 	elf_ex = *((struct elfhdr *)bprm->buf);
 
-	if (memcmp(elf_ex.e_ident, ELFMAG, SELFMAG) != 0)
+	if (!elf_check_linux_magic(&elf_ex))
 		return  -ENOEXEC;
 
 	/* First of all, some simple consistency checks */

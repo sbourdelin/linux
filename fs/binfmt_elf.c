@@ -697,7 +697,7 @@ static int load_elf_binary(struct linux_binprm *bprm)
 
 	retval = -ENOEXEC;
 	/* First of all, some simple consistency checks */
-	if (memcmp(loc->elf_ex.e_ident, ELFMAG, SELFMAG) != 0)
+	if (!elf_check_linux_magic(&loc->elf_ex))
 		goto out;
 
 	if (loc->elf_ex.e_type != ET_EXEC && loc->elf_ex.e_type != ET_DYN)
@@ -800,7 +800,7 @@ static int load_elf_binary(struct linux_binprm *bprm)
 	if (elf_interpreter) {
 		retval = -ELIBBAD;
 		/* Not an ELF interpreter */
-		if (memcmp(loc->interp_elf_ex.e_ident, ELFMAG, SELFMAG) != 0)
+		if (!elf_check_linux_magic(&loc->interp_elf_ex))
 			goto out_free_dentry;
 		/* Verify the interpreter has a valid arch */
 		if (!elf_check_arch(&loc->interp_elf_ex))
@@ -1122,7 +1122,7 @@ static int load_elf_library(struct file *file)
 	if (retval != sizeof(elf_ex))
 		goto out;
 
-	if (memcmp(elf_ex.e_ident, ELFMAG, SELFMAG) != 0)
+	if (!elf_check_linux_magic(&elf_ex))
 		goto out;
 
 	/* First of all, some simple consistency checks */
