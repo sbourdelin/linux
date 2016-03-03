@@ -7,6 +7,7 @@ config PINCTRL_MVEBU
 
 config PINCTRL_DOVE
 	bool
+	depends on HAS_IOMEM	# For MFD_SYSCON
 	select PINCTRL_MVEBU
 	select MFD_SYSCON
 
