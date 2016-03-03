@@ -113,27 +113,50 @@ ssize_t apei_read_mce(struct mce *m, u64 *record_id)
 {
 	struct cper_mce_record rcd;
 	int rc, pos;
+	bool lookup_record = false;
 
 	rc = erst_get_record_id_begin(&pos);
 	if (rc)
 		return rc;
 retry:
-	rc = erst_get_record_id_next(&pos, record_id);
-	if (rc)
-		goto out;
+	/*
+	 * Some hardware is broken and doesn't actually advance the record id
+	 * returned by ACPI_ERST_GET_RECORD_ID when we read a record like the
+	 * spec says it is supposed to.  So instead use record_id == 0 to just
+	 * grab the first record in the erst, and fall back only if we trip over
+	 * a record that isn't a MCE record.
+	 */
+	if (lookup_record) {
+		rc = erst_get_record_id_next(&pos, record_id);
+		if (rc)
+			goto out;
+	} else {
+		*record_id = 0;
+	}
 	/* no more record */
 	if (*record_id == APEI_ERST_INVALID_RECORD_ID)
 		goto out;
 	rc = erst_read(*record_id, &rcd.hdr, sizeof(rcd));
-	/* someone else has cleared the record, try next one */
-	if (rc == -ENOENT)
-		goto retry;
-	else if (rc < 0)
+	/*
+	 * someone else has cleared the record, try next one if we are looking
+	 * up records.  If we aren't looking up the record id's then just bail
+	 * since this means we have an empty table.
+	 */
+	if (rc == -ENOENT) {
+		if (lookup_record)
+			goto retry;
+		rc = 0;
 		goto out;
-	/* try to skip other type records in storage */
-	else if (rc != sizeof(rcd) ||
-		 uuid_le_cmp(rcd.hdr.creator_id, CPER_CREATOR_MCE))
+	} else if (rc < 0) {
+		goto out;
+	} else if (rc != sizeof(rcd) ||
+		 uuid_le_cmp(rcd.hdr.creator_id, CPER_CREATOR_MCE)) {
+		/* try to skip other type records in storage */
+		lookup_record = true;
 		goto retry;
+	}
+	/* Use the record header as the source of truth for the record id. */
+	*record_id = rcd.hdr.record_id;
 	memcpy(m, &rcd.mce, sizeof(*m));
 	rc = sizeof(*m);
 out:
