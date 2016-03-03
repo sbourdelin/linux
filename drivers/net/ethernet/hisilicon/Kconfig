@@ -26,6 +26,7 @@ config HIX5HD2_GMAC
 config HIP04_ETH
 	tristate "HISILICON P04 Ethernet support"
 	select MARVELL_PHY
+	depends on HAS_IOMEM	# For MFD_SYSCON
 	select MFD_SYSCON
 	select HNS_MDIO
 	---help---
