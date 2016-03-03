@@ -11,6 +11,9 @@ Required properties:
 
 Optional properties:
 
+- label
+	Human readable identifier for the sensor. Readable via sysfs file 'label'.
+
 - shunt-resistor
 	Shunt resistor value in micro-Ohm
 

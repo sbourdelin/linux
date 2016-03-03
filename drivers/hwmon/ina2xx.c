@@ -108,6 +108,7 @@ struct ina2xx_data {
 	long rshunt;
 	struct mutex config_lock;
 	struct regmap *regmap;
+	const char *label;
 
 	const struct attribute_group *groups[INA2XX_MAX_ATTRIBUTE_GROUPS];
 };
@@ -368,6 +369,21 @@ static ssize_t ina226_show_interval(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%d\n", ina226_reg_to_interval(regval));
 }
 
+static ssize_t ina2xx_show_label(struct device *dev,
+			struct device_attribute *da, char *buf)
+{
+	struct ina2xx_data *data = dev_get_drvdata(dev);
+	ssize_t ret = 0;
+
+	if (data->label)
+		ret = scnprintf(buf, PAGE_SIZE, "%s\n", data->label);
+
+	return ret;
+}
+
+/* label */
+static SENSOR_DEVICE_ATTR(label, S_IRUGO, ina2xx_show_label, NULL,  0);
+
 /* shunt voltage */
 static SENSOR_DEVICE_ATTR(in0_input, S_IRUGO, ina2xx_show_value, NULL,
 			  INA2XX_SHUNT_VOLTAGE);
@@ -395,6 +411,7 @@ static SENSOR_DEVICE_ATTR(update_interval, S_IRUGO | S_IWUSR,
 
 /* pointers to created device attributes */
 static struct attribute *ina2xx_attrs[] = {
+	&sensor_dev_attr_label.dev_attr.attr,
 	&sensor_dev_attr_in0_input.dev_attr.attr,
 	&sensor_dev_attr_in1_input.dev_attr.attr,
 	&sensor_dev_attr_curr1_input.dev_attr.attr,
@@ -431,6 +448,8 @@ static int ina2xx_probe(struct i2c_client *client,
 
 	/* set the device type */
 	data->config = &ina2xx_config[id->driver_data];
+
+	of_property_read_string(dev->of_node, "label", &data->label);
 
 	if (of_property_read_u32(dev->of_node, "shunt-resistor", &val) < 0) {
 		struct ina2xx_platform_data *pdata = dev_get_platdata(dev);
