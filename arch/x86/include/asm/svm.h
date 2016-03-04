@@ -118,17 +118,8 @@ struct __attribute__ ((__packed__)) vmcb_control_area {
 
 #define V_TPR_MASK 0x0f
 
-#define V_IRQ_SHIFT 8
-#define V_IRQ_MASK (1 << V_IRQ_SHIFT)
-
-#define V_INTR_PRIO_SHIFT 16
-#define V_INTR_PRIO_MASK (0x0f << V_INTR_PRIO_SHIFT)
-
 #define V_IGN_TPR_SHIFT 20
 #define V_IGN_TPR_MASK (1 << V_IGN_TPR_SHIFT)
-
-#define V_INTR_MASKING_SHIFT 24
-#define V_INTR_MASKING_MASK (1 << V_INTR_MASKING_SHIFT)
 
 #define SVM_INTERRUPT_SHADOW_MASK 1
 
