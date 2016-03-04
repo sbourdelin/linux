@@ -7,6 +7,17 @@ Description:
 		have hardware brightness support so will just be turned on for
 		non-zero brightness settings. The value is between 0 and
 		/sys/class/leds/<led>/max_brightness.
+		If a driver uses the RGB LED feature then this attribute is
+		interpreted as a HSV color model value:
+		<0000000F><HHHHHHHH><SSSSSSSS><VVVVVVVV>
+		Usage of the least byte is identical to monochrome mode.
+		Saturation can be 0-255 and hue 0-251 (Colour circle is mapped
+		to 0-252). If hue and saturation both are 0 the current colour
+		is preserved and only the brightness is set. This ensures
+		backwards compatibility with monochrome mode, e.g. for
+		led_set_brightness() calls from triggers.
+		Flag F enables setting hue and saturation even if both are 0.
+		For details and examples see Documentation/leds/leds-class.txt
 
 What:		/sys/class/leds/<led>/max_brightness
 Date:		March 2006
