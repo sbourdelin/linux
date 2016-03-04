@@ -277,6 +277,26 @@ int dwc2_core_reset(struct dwc2_hsotg *hsotg)
 		}
 	} while (!(greset & GRSTCTL_AHBIDLE));
 
+	/*
+	 * Sleep for 10-15 ms after the reset to let it finish.
+	 *
+	 * It's been confirmed on at least one version of the controller
+	 * that this is a requirement that this is a requirement in order for
+	 * everything to settle.  Specifically if you:
+	 * - change GNPTXFSIZ or HPTXFSIZ before the reset
+	 * - do the reset
+	 * - read GNPTXFSIZ or HPTXFSIZ in a loop
+	 * ...you'll find that it takes almost exactly 10 ms for the registers
+	 * to return to their reset defaults.
+	 *
+	 * Note that it's possible that this 10 ms is the time referred to
+	 * in "Host Initialization" where it says to "Wait at least 10 ms for
+	 * the reset process to complete".  In "Device Initialization" there
+	 * is also talk of a reset lasting 10 ms.  That may be the source of
+	 * this delay.
+	 */
+	usleep_range(10000, 15000);
+
 	return 0;
 }
 
