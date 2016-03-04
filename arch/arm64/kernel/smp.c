@@ -37,6 +37,7 @@
 #include <linux/completion.h>
 #include <linux/of.h>
 #include <linux/irq_work.h>
+#include <linux/kexec.h>
 
 #include <asm/alternative.h>
 #include <asm/atomic.h>
@@ -44,6 +45,7 @@
 #include <asm/cpu.h>
 #include <asm/cputype.h>
 #include <asm/cpu_ops.h>
+#include <asm/kexec.h>
 #include <asm/mmu_context.h>
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -68,6 +70,7 @@ enum ipi_msg_type {
 	IPI_RESCHEDULE,
 	IPI_CALL_FUNC,
 	IPI_CPU_STOP,
+	IPI_CPU_CRASH_STOP,
 	IPI_TIMER,
 	IPI_IRQ_WORK,
 };
@@ -625,6 +628,7 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
 	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
 	S(IPI_CALL_FUNC, "Function call interrupts"),
 	S(IPI_CPU_STOP, "CPU stop interrupts"),
+	S(IPI_CPU_CRASH_STOP, "CPU stop (for crash dump) interrupts"),
 	S(IPI_TIMER, "Timer broadcast interrupts"),
 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
 };
@@ -701,6 +705,28 @@ static void ipi_cpu_stop(unsigned int cpu)
 		cpu_relax();
 }
 
+static atomic_t waiting_for_crash_ipi;
+
+static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
+{
+	crash_save_cpu(regs, cpu);
+
+	raw_spin_lock(&stop_lock);
+	pr_debug("CPU%u: stopping\n", cpu);
+	raw_spin_unlock(&stop_lock);
+
+	atomic_dec(&waiting_for_crash_ipi);
+
+	local_irq_disable();
+
+	if (cpu_ops[cpu]->cpu_die)
+		cpu_ops[cpu]->cpu_die(cpu);
+
+	/* just in case */
+	while (1)
+		wfi();
+}
+
 /*
  * Main handler for inter-processor interrupts
  */
@@ -728,6 +754,12 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 	case IPI_CPU_STOP:
 		irq_enter();
 		ipi_cpu_stop(cpu);
+		irq_exit();
+		break;
+
+	case IPI_CPU_CRASH_STOP:
+		irq_enter();
+		ipi_cpu_crash_stop(cpu, regs);
 		irq_exit();
 		break;
 
@@ -789,6 +821,30 @@ void smp_send_stop(void)
 
 	if (num_online_cpus() > 1)
 		pr_warning("SMP: failed to stop secondary CPUs\n");
+}
+
+void smp_send_crash_stop(void)
+{
+	cpumask_t mask;
+	unsigned long timeout;
+
+	if (num_online_cpus() == 1)
+		return;
+
+	cpumask_copy(&mask, cpu_online_mask);
+	cpumask_clear_cpu(smp_processor_id(), &mask);
+
+	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
+
+	smp_cross_call(&mask, IPI_CPU_CRASH_STOP);
+
+	/* Wait up to one second for other CPUs to stop */
+	timeout = USEC_PER_SEC;
+	while ((atomic_read(&waiting_for_crash_ipi) > 0) && timeout--)
+		udelay(1);
+
+	if (atomic_read(&waiting_for_crash_ipi) > 0)
+		pr_warn("SMP: failed to stop secondary CPUs\n");
 }
 
 /*
