@@ -176,6 +176,7 @@ static int l2cap_sock_connect(struct socket *sock, struct sockaddr *addr,
 	struct sock *sk = sock->sk;
 	struct l2cap_chan *chan = l2cap_pi(sk)->chan;
 	struct sockaddr_l2 la;
+	struct hci_dev *hdev;
 	int len, err = 0;
 
 	BT_DBG("sk %p", sk);
@@ -233,7 +234,9 @@ static int l2cap_sock_connect(struct socket *sock, struct sockaddr *addr,
 	if (chan->psm && bdaddr_type_is_le(chan->src_type))
 		chan->mode = L2CAP_MODE_LE_FLOWCTL;
 
-	err = l2cap_chan_connect(chan, la.l2_psm, __le16_to_cpu(la.l2_cid),
+	hdev = hci_get_route(&la.l2_bdaddr, &chan->src);
+	err = l2cap_chan_connect(chan, hdev, la.l2_psm,
+				 __le16_to_cpu(la.l2_cid),
 				 &la.l2_bdaddr, la.l2_bdaddr_type);
 	if (err)
 		return err;

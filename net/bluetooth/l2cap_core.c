@@ -7041,18 +7041,16 @@ static bool is_valid_psm(u16 psm, u8 dst_type) {
 	return ((psm & 0x0101) == 0x0001);
 }
 
-int l2cap_chan_connect(struct l2cap_chan *chan, __le16 psm, u16 cid,
-		       bdaddr_t *dst, u8 dst_type)
+int l2cap_chan_connect(struct l2cap_chan *chan, struct hci_dev *hdev,
+			__le16 psm, u16 cid, bdaddr_t *dst, u8 dst_type)
 {
 	struct l2cap_conn *conn;
 	struct hci_conn *hcon;
-	struct hci_dev *hdev;
 	int err;
 
 	BT_DBG("%pMR -> %pMR (type %u) psm 0x%2.2x", &chan->src, dst,
 	       dst_type, __le16_to_cpu(psm));
 
-	hdev = hci_get_route(dst, &chan->src);
 	if (!hdev)
 		return -EHOSTUNREACH;
 

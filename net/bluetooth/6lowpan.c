@@ -1113,6 +1113,7 @@ static inline __u8 bdaddr_type(__u8 type)
 
 static int bt_6lowpan_connect(bdaddr_t *addr, u8 dst_type)
 {
+	struct hci_dev *hdev;
 	struct l2cap_chan *chan;
 	int err;
 
@@ -1122,7 +1123,8 @@ static int bt_6lowpan_connect(bdaddr_t *addr, u8 dst_type)
 
 	chan->ops = &bt_6lowpan_chan_ops;
 
-	err = l2cap_chan_connect(chan, cpu_to_le16(L2CAP_PSM_IPSP), 0,
+	hdev = hci_get_route(addr, NULL);
+	err = l2cap_chan_connect(chan, hdev, cpu_to_le16(L2CAP_PSM_IPSP), 0,
 				 addr, dst_type);
 
 	BT_DBG("chan %p err %d", chan, err);
