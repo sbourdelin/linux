@@ -18,6 +18,7 @@
 #include <linux/linkage.h>
 
 #include <asm/assembler.h>
+#include <asm/virt.h>
 
 /*
  * u64 kvm_call_hyp(void *hypfn, ...);
@@ -38,6 +39,6 @@
  * arch/arm64/kernel/hyp_stub.S.
  */
 ENTRY(kvm_call_hyp)
-	hvc	#0
+	hvc	#HVC_CALL_HYP
 	ret
 ENDPROC(kvm_call_hyp)

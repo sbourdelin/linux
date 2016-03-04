@@ -43,6 +43,7 @@ el1_sync:				// Guest trapped into EL2
 
 	mrs	x1, esr_el2
 	lsr	x2, x1, #ESR_ELx_EC_SHIFT
+	and	x0, x1, #ESR_ELx_ISS_MASK
 
 	cmp	x2, #ESR_ELx_EC_HVC64
 	b.ne	el1_trap
@@ -51,14 +52,16 @@ el1_sync:				// Guest trapped into EL2
 	cbnz	x3, el1_trap		// called HVC
 
 	/* Here, we're pretty sure the host called HVC. */
+	mov	x18, x0
 	restore_x0_to_x3
 
-	/* Check for __hyp_get_vectors */
-	cbnz	x0, 1f
+	cmp	x18, #HVC_GET_VECTORS
+	b.ne	1f
 	mrs	x0, vbar_el2
 	b	2f
 
-1:	stp	lr, xzr, [sp, #-16]!
+1:     /* Default to HVC_CALL_HYP. */
+	push	lr, xzr
 
 	/*
 	 * Compute the function address in EL2, and shuffle the parameters.
