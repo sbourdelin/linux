@@ -3690,6 +3690,264 @@ static int mwait_interception(struct vcpu_svm *svm)
 	return nop_interception(svm);
 }
 
+enum avic_incmp_ipi_err_code {
+	AVIC_INCMP_IPI_ERR_INVALID_INT_TYPE,
+	AVIC_INCMP_IPI_ERR_TARGET_NOT_RUN,
+	AVIC_INCMP_IPI_ERR_INV_TARGET,
+	AVIC_INCMP_IPI_ERR_INV_BK_PAGE,
+};
+
+#define APIC_SHORT_MASK			0xc0000
+#define APIC_DEST_MASK			0x800
+static int avic_incomp_ipi_interception(struct vcpu_svm *svm)
+{
+	u32 icrh = svm->vmcb->control.exit_info_1 >> 32;
+	u32 icrl = svm->vmcb->control.exit_info_1;
+	u32 id = svm->vmcb->control.exit_info_2 >> 32;
+	u32 index = svm->vmcb->control.exit_info_2 && 0xFF;
+	struct kvm_lapic *apic = svm->vcpu.arch.apic;
+
+	pr_debug("%s: cpu=%#x, vcpu=%#x, icrh:icrl=%#010x:%08x, id=%u, index=%u\n",
+		 __func__, svm->vcpu.cpu, svm->vcpu.vcpu_id,
+		 icrh, icrl, id, index);
+
+	switch (id) {
+	case AVIC_INCMP_IPI_ERR_INVALID_INT_TYPE:
+		/*
+		 * AVIC hardware handles the generation of
+		 * IPIs when the specified Message Type is Fixed
+		 * (also known as fixed delivery mode) and
+		 * the Trigger Mode is edge-triggered. The hardware
+		 * also supports self and broadcast delivery modes
+		 * specified via the Destination Shorthand(DSH)
+		 * field of the ICRL. Logical and physical APIC ID
+		 * formats are supported. All other IPI types cause
+		 * a #VMEXIT, which needs to emulated.
+		 */
+		kvm_lapic_reg_write(apic, APIC_ICR2, icrh);
+		kvm_lapic_reg_write(apic, APIC_ICR, icrl);
+		break;
+	case AVIC_INCMP_IPI_ERR_TARGET_NOT_RUN: {
+		int i;
+		struct kvm_vcpu *vcpu;
+		struct kvm *kvm = svm->vcpu.kvm;
+		struct kvm_lapic *apic = svm->vcpu.arch.apic;
+
+		/*
+		 * At this point, we expect that the AVIC HW has already
+		 * set the appropriate IRR bits on the valid target
+		 * vcpus. So, we just need to kick the appropriate vcpu.
+		 */
+		kvm_for_each_vcpu(i, vcpu, kvm) {
+			if (!kvm_apic_match_dest(vcpu, apic,
+						 icrl & APIC_SHORT_MASK,
+						 GET_APIC_DEST_FIELD(icrh),
+						 icrl & APIC_DEST_MASK))
+				continue;
+
+			kvm_vcpu_kick(vcpu);
+		}
+		break;
+	}
+	case AVIC_INCMP_IPI_ERR_INV_TARGET:
+		pr_err("%s: Invalid IPI target (icr=%#08x:%08x, idx=%u)\n",
+		       __func__, icrh, icrl, index);
+		BUG();
+		break;
+	case AVIC_INCMP_IPI_ERR_INV_BK_PAGE:
+		pr_err("%s: Invalid bk page (icr=%#08x:%08x, idx=%u)\n",
+		       __func__, icrh, icrl, index);
+		BUG();
+		break;
+	default:
+		pr_err("Unknown IPI interception\n");
+	}
+
+	return 1;
+}
+
+static int avic_noaccel_trap_write(struct vcpu_svm *svm)
+{
+	u32 offset = svm->vmcb->control.exit_info_1 & 0xFF0;
+	struct svm_vm_data *vm_data = svm->vcpu.kvm->arch.arch_data;
+	struct kvm_lapic *apic = svm->vcpu.arch.apic;
+	u32 reg = *avic_get_bk_page_entry(svm, offset);
+
+	pr_debug("%s: offset=%#x, val=%#x, (cpu=%x) (vcpu_id=%x)\n",
+		 __func__, offset, reg, svm->vcpu.cpu, svm->vcpu.vcpu_id);
+
+	switch (offset) {
+	case APIC_ID: {
+		u32 aid = (reg >> 24) & 0xff;
+		struct svm_avic_phy_ait_entry *o_ent =
+				avic_get_phy_ait_entry(&svm->vcpu, svm->vcpu.vcpu_id);
+		struct svm_avic_phy_ait_entry *n_ent =
+				avic_get_phy_ait_entry(&svm->vcpu, aid);
+
+		if (!n_ent || !o_ent)
+			return 0;
+
+		pr_debug("%s: APIC_ID=%#x (id=%x)\n", __func__, reg, aid);
+
+		/* We need to move phy_apic_entry to new offset */
+		*n_ent = *o_ent;
+		*((u64 *)o_ent) = 0ULL;
+		break;
+	}
+	case APIC_LDR: {
+		int ret, lid;
+		int dlid = (reg >> 24) & 0xff;
+
+		if (!dlid)
+			return 0;
+
+		lid = ffs(dlid) - 1;
+		pr_debug("%s: LDR=%0#10x (lid=%x)\n", __func__, reg, lid);
+		ret = avic_init_log_apic_entry(&svm->vcpu, svm->vcpu.vcpu_id,
+					       lid);
+		if (ret)
+			return 0;
+
+		break;
+	}
+	case APIC_DFR: {
+		u32 mod = (*avic_get_bk_page_entry(svm, offset) >> 28) & 0xf;
+
+		pr_debug("%s: DFR=%#x (%s)\n", __func__,
+			 mod, (mod == 0xf) ? "flat" : "cluster");
+
+		/*
+		 * We assume that all local APICs are using the same type.
+		 * If this changes, we need to rebuild the AVIC logical
+		 * APID id table with subsequent write to APIC_LDR.
+		 */
+		if (vm_data->ldr_mode != mod) {
+			clear_page(page_address(vm_data->avic_log_ait_page));
+			vm_data->ldr_mode = mod;
+		}
+		break;
+	}
+	case APIC_TMICT: {
+		u32 val = kvm_apic_get_reg(apic, APIC_TMICT);
+
+		pr_debug("%s: TMICT=%#x,%#x\n", __func__, val, reg);
+		break;
+	}
+	case APIC_ESR: {
+		u32 val = kvm_apic_get_reg(apic, APIC_ESR);
+
+		pr_debug("%s: ESR=%#x,%#x\n", __func__, val, reg);
+		break;
+	}
+	case APIC_LVTERR: {
+		u32 val = kvm_apic_get_reg(apic, APIC_LVTERR);
+
+		pr_debug("%s: LVTERR=%#x,%#x\n", __func__, val, reg);
+		break;
+	}
+	default:
+		break;
+	}
+
+	kvm_lapic_reg_write(apic, offset, reg);
+
+	return 1;
+}
+
+static int avic_noaccel_fault_read(struct vcpu_svm *svm)
+{
+	u32 val;
+	u32 offset = svm->vmcb->control.exit_info_1 & 0xFF0;
+	struct kvm_lapic *apic = svm->vcpu.arch.apic;
+
+	pr_debug("%s: offset=%x\n", __func__, offset);
+
+	switch (offset) {
+	case APIC_TMCCT: {
+		if (kvm_lapic_reg_read(apic, offset, 4, &val))
+			return 0;
+
+		pr_debug("%s: TMCCT: rip=%#lx, next_rip=%#llx, val=%#x)\n",
+			 __func__, kvm_rip_read(&svm->vcpu), svm->next_rip, val);
+
+		*avic_get_bk_page_entry(svm, offset) = val;
+		break;
+	}
+	default:
+		pr_debug("%s: (rip=%#lx), offset=%#x\n", __func__,
+			 kvm_rip_read(&svm->vcpu), offset);
+		break;
+	}
+
+	return 1;
+}
+
+static int avic_noaccel_fault_write(struct vcpu_svm *svm)
+{
+	u32 offset = svm->vmcb->control.exit_info_1 & 0xFF0;
+
+	pr_debug("%s: offset=%x\n", __func__, offset);
+
+	switch (offset) {
+	case APIC_ARBPRI: /* APR: Arbitration Priority Register */
+	case APIC_TMCCT: /* Timer Current Count */
+		/* TODO */
+		break;
+	default:
+		BUG();
+	}
+
+	return 1;
+}
+
+static int avic_noaccel_interception(struct vcpu_svm *svm)
+{
+	int ret = 0;
+	u32 offset = svm->vmcb->control.exit_info_1 & 0xFF0;
+	u32 rw = (svm->vmcb->control.exit_info_1 >> 32) & 0x1;
+	u32 vector = svm->vmcb->control.exit_info_2 & 0xFFFFFFFF;
+
+	pr_debug("%s: offset=%#x, rw=%#x, vector=%#x, vcpu_id=%#x, cpu=%#x\n",
+		 __func__, offset, rw, vector, svm->vcpu.vcpu_id, svm->vcpu.cpu);
+
+	BUG_ON(offset >= 0x400);
+
+	switch (offset) {
+	case APIC_ID:
+	case APIC_EOI:
+	case APIC_RRR:
+	case APIC_LDR:
+	case APIC_DFR:
+	case APIC_SPIV:
+	case APIC_ESR:
+	case APIC_ICR:
+	case APIC_LVTT:
+	case APIC_LVTTHMR:
+	case APIC_LVTPC:
+	case APIC_LVT0:
+	case APIC_LVT1:
+	case APIC_LVTERR:
+	case APIC_TMICT:
+	case APIC_TDCR: {
+		/* Handling Trap */
+		if (!rw) /* Trap read should never happens */
+			BUG();
+		ret = avic_noaccel_trap_write(svm);
+		break;
+	}
+	default: {
+		/* Handling Fault */
+		if (rw)
+			ret = avic_noaccel_fault_write(svm);
+		else
+			ret = avic_noaccel_fault_read(svm);
+		skip_emulated_instruction(&svm->vcpu);
+	}
+	}
+
+	return ret;
+}
+
 static int (*const svm_exit_handlers[])(struct vcpu_svm *svm) = {
 	[SVM_EXIT_READ_CR0]			= cr_interception,
 	[SVM_EXIT_READ_CR3]			= cr_interception,
@@ -3753,6 +4011,8 @@ static int (*const svm_exit_handlers[])(struct vcpu_svm *svm) = {
 	[SVM_EXIT_XSETBV]			= xsetbv_interception,
 	[SVM_EXIT_NPF]				= pf_interception,
 	[SVM_EXIT_RSM]                          = emulate_on_interception,
+	[SVM_EXIT_AVIC_INCMP_IPI]		= avic_incomp_ipi_interception,
+	[SVM_EXIT_AVIC_NOACCEL]			= avic_noaccel_interception,
 };
 
 static void dump_vmcb(struct kvm_vcpu *vcpu)
