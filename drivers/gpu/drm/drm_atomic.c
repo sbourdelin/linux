@@ -1147,7 +1147,7 @@ drm_atomic_add_affected_connectors(struct drm_atomic_state *state,
 	 * current configuration.
 	 */
 	drm_for_each_connector(connector, state->dev) {
-		if (connector->state->crtc != crtc)
+		if (!connector->state || connector->state->crtc != crtc)
 			continue;
 
 		conn_state = drm_atomic_get_connector_state(state, connector);
