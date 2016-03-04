@@ -394,7 +394,7 @@ static int fimc_md_parse_port_node(struct fimc_md *fmd,
 	/* Assume here a port node can have only one endpoint node. */
 	ep = of_get_next_child(port, NULL);
 	if (!ep)
-		return 0;
+		return -EINVAL;
 
 	ret = v4l2_of_parse_endpoint(ep, &endpoint);
 	if (ret) {
