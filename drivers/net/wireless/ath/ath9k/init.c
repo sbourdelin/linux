@@ -346,15 +346,15 @@ static int ath9k_init_queues(struct ath_softc *sc)
 	int i = 0;
 
 	sc->beacon.beaconq = ath9k_hw_beaconq_setup(sc->sc_ah);
-	sc->beacon.cabq = ath_txq_setup(sc, ATH9K_TX_QUEUE_CAB, 0);
+	sc->beacon.cabq = ath_hwq_setup(sc, ATH9K_TX_QUEUE_CAB, 0);
 	ath_cabq_update(sc);
 
-	sc->tx.uapsdq = ath_txq_setup(sc, ATH9K_TX_QUEUE_UAPSD, 0);
+	sc->tx.uapsdq = ath_hwq_setup(sc, ATH9K_TX_QUEUE_UAPSD, 0);
 
 	for (i = 0; i < IEEE80211_NUM_ACS; i++) {
-		sc->tx.txq_map[i] = ath_txq_setup(sc, ATH9K_TX_QUEUE_DATA, i);
-		sc->tx.txq_map[i]->mac80211_qnum = i;
-		sc->tx.txq_max_pending[i] = ATH_MAX_QDEPTH;
+		sc->tx.hwq_map[i] = ath_hwq_setup(sc, ATH9K_TX_QUEUE_DATA, i);
+		sc->tx.hwq_map[i]->mac80211_qnum = i;
+		sc->tx.hwq_max_pending[i] = ATH_MAX_QDEPTH;
 	}
 	return 0;
 }
@@ -671,8 +671,8 @@ static int ath9k_init_softc(u16 devid, struct ath_softc *sc,
 
 err_btcoex:
 	for (i = 0; i < ATH9K_NUM_TX_QUEUES; i++)
-		if (ATH_TXQ_SETUP(sc, i))
-			ath_tx_cleanupq(sc, &sc->tx.txq[i]);
+		if (ATH_HWQ_SETUP(sc, i))
+			ath_tx_cleanupq(sc, &sc->tx.hwq[i]);
 err_queues:
 	ath9k_hw_deinit(ah);
 err_hw:
@@ -1001,8 +1001,8 @@ static void ath9k_deinit_softc(struct ath_softc *sc)
 	ath9k_deinit_btcoex(sc);
 
 	for (i = 0; i < ATH9K_NUM_TX_QUEUES; i++)
-		if (ATH_TXQ_SETUP(sc, i))
-			ath_tx_cleanupq(sc, &sc->tx.txq[i]);
+		if (ATH_HWQ_SETUP(sc, i))
+			ath_tx_cleanupq(sc, &sc->tx.hwq[i]);
 
 	del_timer_sync(&sc->sleep_timer);
 	ath9k_hw_deinit(sc->sc_ah);

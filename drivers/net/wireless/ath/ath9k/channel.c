@@ -1006,7 +1006,7 @@ static void ath_scan_send_probe(struct ath_softc *sc,
 	if (!ieee80211_tx_prepare_skb(sc->hw, vif, skb, band, NULL))
 		goto error;
 
-	txctl.txq = sc->tx.txq_map[IEEE80211_AC_VO];
+	txctl.hwq = sc->tx.hwq_map[IEEE80211_AC_VO];
 	txctl.force_channel = true;
 	if (ath_tx_start(sc->hw, skb, &txctl))
 		goto error;
@@ -1128,7 +1128,7 @@ ath_chanctx_send_vif_ps_frame(struct ath_softc *sc, struct ath_vif *avp,
 	}
 
 	memset(&txctl, 0, sizeof(txctl));
-	txctl.txq = sc->tx.txq_map[IEEE80211_AC_VO];
+	txctl.hwq = sc->tx.hwq_map[IEEE80211_AC_VO];
 	txctl.sta = sta;
 	txctl.force_channel = true;
 	if (ath_tx_start(sc->hw, skb, &txctl)) {

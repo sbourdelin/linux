@@ -80,7 +80,7 @@ int ath_descdma_setup(struct ath_softc *sc, struct ath_descdma *dd,
 /* RX / TX */
 /***********/
 
-#define	ATH_TXQ_SETUP(sc, i) ((sc)->tx.txqsetup & (1<<i))
+#define	ATH_HWQ_SETUP(sc, i) ((sc)->tx.hwqsetup & (1<<i))
 
 /* increment with wrap-around */
 #define INCR(_l, _sz)   do {			\
@@ -156,7 +156,7 @@ enum {
        WLAN_RC_PHY_CCK,
 };
 
-struct ath_txq {
+struct ath_hwq {
 	int mac80211_qnum; /* mac80211 queue number, -1 means not mac80211 Q */
 	u32 axq_qnum; /* ath9k hardware queue number */
 	void *axq_link;
@@ -166,9 +166,9 @@ struct ath_txq {
 	u32 axq_ampdu_depth;
 	bool stopped;
 	bool axq_tx_inprogress;
-	struct list_head txq_fifo[ATH_TXFIFO_DEPTH];
-	u8 txq_headidx;
-	u8 txq_tailidx;
+	struct list_head hwq_fifo[ATH_TXFIFO_DEPTH];
+	u8 hwq_headidx;
+	u8 hwq_tailidx;
 	int pending_frames;
 	struct sk_buff_head complete_q;
 };
@@ -176,7 +176,7 @@ struct ath_txq {
 struct ath_frame_info {
 	struct ath_buf *bf;
 	u16 framelen;
-	s8 txq;
+	s8 hwq;
 	u8 keyix;
 	u8 rtscts_rate;
 	u8 retries : 7;
@@ -235,7 +235,7 @@ struct ath_atx_tid {
 	struct sk_buff_head buf_q;
 	struct sk_buff_head retry_q;
 	struct ath_node *an;
-	struct ath_txq *txq;
+	struct ath_hwq *hwq;
 	unsigned long tx_buf[BITS_TO_LONGS(ATH_TID_MAX_BUFS)];
 	u16 seq_start;
 	u16 seq_next;
@@ -272,7 +272,7 @@ struct ath_node {
 };
 
 struct ath_tx_control {
-	struct ath_txq *txq;
+	struct ath_hwq *hwq;
 	struct ath_node *an;
 	struct ieee80211_sta *sta;
 	u8 paprd;
@@ -281,19 +281,19 @@ struct ath_tx_control {
 
 
 /**
- * @txq_map:  Index is mac80211 queue number.  This is
+ * @hwq_map:  Index is mac80211 queue number.  This is
  *  not necessarily the same as the hardware queue number
  *  (axq_qnum).
  */
 struct ath_tx {
-	u32 txqsetup;
+	u32 hwqsetup;
 	spinlock_t txbuflock;
 	struct list_head txbuf;
-	struct ath_txq txq[ATH9K_NUM_TX_QUEUES];
+	struct ath_hwq hwq[ATH9K_NUM_TX_QUEUES];
 	struct ath_descdma txdma;
-	struct ath_txq *txq_map[IEEE80211_NUM_ACS];
-	struct ath_txq *uapsdq;
-	u32 txq_max_pending[IEEE80211_NUM_ACS];
+	struct ath_hwq *hwq_map[IEEE80211_NUM_ACS];
+	struct ath_hwq *uapsdq;
+	u32 hwq_max_pending[IEEE80211_NUM_ACS];
 	u16 max_aggr_framelen[IEEE80211_NUM_ACS][4][32];
 };
 
@@ -550,19 +550,19 @@ u32 ath_calcrxfilter(struct ath_softc *sc);
 int ath_rx_init(struct ath_softc *sc, int nbufs);
 void ath_rx_cleanup(struct ath_softc *sc);
 int ath_rx_tasklet(struct ath_softc *sc, int flush, bool hp);
-struct ath_txq *ath_txq_setup(struct ath_softc *sc, int qtype, int subtype);
-void ath_txq_lock(struct ath_softc *sc, struct ath_txq *txq);
-void ath_txq_unlock(struct ath_softc *sc, struct ath_txq *txq);
-void ath_txq_unlock_complete(struct ath_softc *sc, struct ath_txq *txq);
-void ath_tx_cleanupq(struct ath_softc *sc, struct ath_txq *txq);
-bool ath_drain_all_txq(struct ath_softc *sc);
-void ath_draintxq(struct ath_softc *sc, struct ath_txq *txq);
+struct ath_hwq *ath_hwq_setup(struct ath_softc *sc, int qtype, int subtype);
+void ath_hwq_lock(struct ath_softc *sc, struct ath_hwq *hwq);
+void ath_hwq_unlock(struct ath_softc *sc, struct ath_hwq *hwq);
+void ath_hwq_unlock_complete(struct ath_softc *sc, struct ath_hwq *hwq);
+void ath_tx_cleanupq(struct ath_softc *sc, struct ath_hwq *hwq);
+bool ath_drain_all_hwq(struct ath_softc *sc);
+void ath_drainhwq(struct ath_softc *sc, struct ath_hwq *hwq);
 void ath_tx_node_init(struct ath_softc *sc, struct ath_node *an);
 void ath_tx_node_cleanup(struct ath_softc *sc, struct ath_node *an);
-void ath_txq_schedule(struct ath_softc *sc, struct ath_txq *txq);
-void ath_txq_schedule_all(struct ath_softc *sc);
+void ath_hwq_schedule(struct ath_softc *sc, struct ath_hwq *hwq);
+void ath_hwq_schedule_all(struct ath_softc *sc);
 int ath_tx_init(struct ath_softc *sc, int nbufs);
-int ath_txq_update(struct ath_softc *sc, int qnum,
+int ath_hwq_update(struct ath_softc *sc, int qnum,
 		   struct ath9k_tx_queue_info *q);
 void ath_update_max_aggr_framelen(struct ath_softc *sc, int queue, int txop);
 void ath_assign_seq(struct ath_common *common, struct sk_buff *skb);
@@ -677,7 +677,7 @@ struct ath_beacon {
 	int slottime;
 	int slotupdate;
 	struct ath_descdma bdma;
-	struct ath_txq *cabq;
+	struct ath_hwq *cabq;
 	struct list_head bbuf;
 
 	bool tx_processed;

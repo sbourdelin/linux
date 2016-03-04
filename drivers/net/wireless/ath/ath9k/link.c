@@ -24,7 +24,7 @@ void ath_tx_complete_poll_work(struct work_struct *work)
 {
 	struct ath_softc *sc = container_of(work, struct ath_softc,
 					    tx_complete_work.work);
-	struct ath_txq *txq;
+	struct ath_hwq *hwq;
 	int i;
 	bool needreset = false;
 
@@ -36,19 +36,19 @@ void ath_tx_complete_poll_work(struct work_struct *work)
 	}
 
 	for (i = 0; i < IEEE80211_NUM_ACS; i++) {
-		txq = sc->tx.txq_map[i];
+		hwq = sc->tx.hwq_map[i];
 
-		ath_txq_lock(sc, txq);
-		if (txq->axq_depth) {
-			if (txq->axq_tx_inprogress) {
+		ath_hwq_lock(sc, hwq);
+		if (hwq->axq_depth) {
+			if (hwq->axq_tx_inprogress) {
 				needreset = true;
-				ath_txq_unlock(sc, txq);
+				ath_hwq_unlock(sc, hwq);
 				break;
 			} else {
-				txq->axq_tx_inprogress = true;
+				hwq->axq_tx_inprogress = true;
 			}
 		}
-		ath_txq_unlock(sc, txq);
+		ath_hwq_unlock(sc, hwq);
 	}
 
 	if (needreset) {
@@ -175,7 +175,7 @@ static bool ath_paprd_send_frame(struct ath_softc *sc, struct sk_buff *skb, int 
 	unsigned long time_left;
 
 	memset(&txctl, 0, sizeof(txctl));
-	txctl.txq = sc->tx.txq_map[IEEE80211_AC_BE];
+	txctl.hwq = sc->tx.hwq_map[IEEE80211_AC_BE];
 
 	memset(tx_info, 0, sizeof(*tx_info));
 	tx_info->band = sc->cur_chandef.chan->band;

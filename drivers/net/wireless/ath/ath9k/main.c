@@ -54,14 +54,14 @@ u8 ath9k_parse_mpdudensity(u8 mpdudensity)
 	}
 }
 
-static bool ath9k_has_pending_frames(struct ath_softc *sc, struct ath_txq *txq,
+static bool ath9k_has_pending_frames(struct ath_softc *sc, struct ath_hwq *hwq,
 				     bool sw_pending)
 {
 	bool pending = false;
 
-	spin_lock_bh(&txq->axq_lock);
+	spin_lock_bh(&hwq->axq_lock);
 
-	if (txq->axq_depth) {
+	if (hwq->axq_depth) {
 		pending = true;
 		goto out;
 	}
@@ -69,15 +69,15 @@ static bool ath9k_has_pending_frames(struct ath_softc *sc, struct ath_txq *txq,
 	if (!sw_pending)
 		goto out;
 
-	if (txq->mac80211_qnum >= 0) {
+	if (hwq->mac80211_qnum >= 0) {
 		struct list_head *list;
 
-		list = &sc->cur_chan->acq[txq->mac80211_qnum];
+		list = &sc->cur_chan->acq[hwq->mac80211_qnum];
 		if (!list_empty(list))
 			pending = true;
 	}
 out:
-	spin_unlock_bh(&txq->axq_lock);
+	spin_unlock_bh(&hwq->axq_lock);
 	return pending;
 }
 
@@ -218,9 +218,9 @@ static bool ath_prepare_reset(struct ath_softc *sc)
 
 	if (AR_SREV_9300_20_OR_LATER(ah)) {
 		ret &= ath_stoprecv(sc);
-		ret &= ath_drain_all_txq(sc);
+		ret &= ath_drain_all_hwq(sc);
 	} else {
-		ret &= ath_drain_all_txq(sc);
+		ret &= ath_drain_all_hwq(sc);
 		ret &= ath_stoprecv(sc);
 	}
 
@@ -264,7 +264,7 @@ static bool ath_complete_reset(struct ath_softc *sc, bool start)
 		}
 	work:
 		ath_restart_work(sc);
-		ath_txq_schedule_all(sc);
+		ath_hwq_schedule_all(sc);
 	}
 
 	sc->gtt_cnt = 0;
@@ -805,14 +805,14 @@ static void ath9k_tx(struct ieee80211_hw *hw,
 	}
 
 	memset(&txctl, 0, sizeof(struct ath_tx_control));
-	txctl.txq = sc->tx.txq_map[skb_get_queue_mapping(skb)];
+	txctl.hwq = sc->tx.hwq_map[skb_get_queue_mapping(skb)];
 	txctl.sta = control->sta;
 
 	ath_dbg(common, XMIT, "transmitting packet, skb: %p\n", skb);
 
 	if (ath_tx_start(hw, skb, &txctl) != 0) {
 		ath_dbg(common, XMIT, "TX failed\n");
-		TX_STAT_INC(txctl.txq->axq_qnum, txfailed);
+		TX_STAT_INC(txctl.hwq->axq_qnum, txfailed);
 		goto exit;
 	}
 
@@ -1619,14 +1619,14 @@ static int ath9k_conf_tx(struct ieee80211_hw *hw,
 {
 	struct ath_softc *sc = hw->priv;
 	struct ath_common *common = ath9k_hw_common(sc->sc_ah);
-	struct ath_txq *txq;
+	struct ath_hwq *hwq;
 	struct ath9k_tx_queue_info qi;
 	int ret = 0;
 
 	if (queue >= IEEE80211_NUM_ACS)
 		return 0;
 
-	txq = sc->tx.txq_map[queue];
+	hwq = sc->tx.hwq_map[queue];
 
 	ath9k_ps_wakeup(sc);
 	mutex_lock(&sc->mutex);
@@ -1640,13 +1640,13 @@ static int ath9k_conf_tx(struct ieee80211_hw *hw,
 
 	ath_dbg(common, CONFIG,
 		"Configure tx [queue/halq] [%d/%d], aifs: %d, cw_min: %d, cw_max: %d, txop: %d\n",
-		queue, txq->axq_qnum, params->aifs, params->cw_min,
+		queue, hwq->axq_qnum, params->aifs, params->cw_min,
 		params->cw_max, params->txop);
 
 	ath_update_max_aggr_framelen(sc, queue, qi.tqi_burstTime);
-	ret = ath_txq_update(sc, txq->axq_qnum, &qi);
+	ret = ath_hwq_update(sc, hwq->axq_qnum, &qi);
 	if (ret)
-		ath_err(common, "TXQ Update failed\n");
+		ath_err(common, "HWQ Update failed\n");
 
 	mutex_unlock(&sc->mutex);
 	ath9k_ps_restore(sc);
@@ -2006,10 +2006,10 @@ static bool ath9k_has_tx_pending(struct ath_softc *sc,
 	int i, npend = 0;
 
 	for (i = 0; i < ATH9K_NUM_TX_QUEUES; i++) {
-		if (!ATH_TXQ_SETUP(sc, i))
+		if (!ATH_HWQ_SETUP(sc, i))
 			continue;
 
-		npend = ath9k_has_pending_frames(sc, &sc->tx.txq[i],
+		npend = ath9k_has_pending_frames(sc, &sc->tx.hwq[i],
 						 sw_pending);
 		if (npend)
 			break;
@@ -2054,7 +2054,7 @@ void __ath9k_flush(struct ieee80211_hw *hw, u32 queues, bool drop,
 	struct ath_hw *ah = sc->sc_ah;
 	struct ath_common *common = ath9k_hw_common(ah);
 	int timeout;
-	bool drain_txq;
+	bool drain_hwq;
 
 	cancel_delayed_work_sync(&sc->tx_complete_work);
 
@@ -2085,10 +2085,10 @@ void __ath9k_flush(struct ieee80211_hw *hw, u32 queues, bool drop,
 	if (drop) {
 		ath9k_ps_wakeup(sc);
 		spin_lock_bh(&sc->sc_pcu_lock);
-		drain_txq = ath_drain_all_txq(sc);
+		drain_hwq = ath_drain_all_hwq(sc);
 		spin_unlock_bh(&sc->sc_pcu_lock);
 
-		if (!drain_txq)
+		if (!drain_hwq)
 			ath_reset(sc, NULL);
 
 		ath9k_ps_restore(sc);

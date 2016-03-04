@@ -26,7 +26,7 @@ static ssize_t read_file_node_aggr(struct file *file, char __user *user_buf,
 	struct ath_node *an = file->private_data;
 	struct ath_softc *sc = an->sc;
 	struct ath_atx_tid *tid;
-	struct ath_txq *txq;
+	struct ath_hwq *hwq;
 	u32 len = 0, size = 4096;
 	char *buf;
 	size_t retval;
@@ -54,8 +54,8 @@ static ssize_t read_file_node_aggr(struct file *file, char __user *user_buf,
 
 	for (tidno = 0, tid = &an->tid[tidno];
 	     tidno < IEEE80211_NUM_TIDS; tidno++, tid++) {
-		txq = tid->txq;
-		ath_txq_lock(sc, txq);
+		hwq = tid->hwq;
+		ath_hwq_lock(sc, hwq);
 		if (tid->active) {
 			len += scnprintf(buf + len, size - len,
 					 "%3d%11d%10d%10d%10d%10d%9d%6d\n",
@@ -68,7 +68,7 @@ static ssize_t read_file_node_aggr(struct file *file, char __user *user_buf,
 					 tid->bar_index,
 					 !list_empty(&tid->list));
 		}
-		ath_txq_unlock(sc, txq);
+		ath_hwq_unlock(sc, hwq);
 	}
 exit:
 	retval = simple_read_from_buffer(user_buf, count, ppos, buf, len);
