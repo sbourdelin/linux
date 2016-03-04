@@ -2329,12 +2329,6 @@ static void kvm_mmu_commit_zap_page(struct kvm *kvm,
 		return;
 
 	/*
-	 * wmb: make sure everyone sees our modifications to the page tables
-	 * rmb: make sure we see changes to vcpu->mode
-	 */
-	smp_mb();
-
-	/*
 	 * Wait for all vcpus to exit guest mode and/or lockless shadow
 	 * page table walks.
 	 */
