@@ -42,7 +42,9 @@ extern int pm_clk_create(struct device *dev);
 extern void pm_clk_destroy(struct device *dev);
 extern int pm_clk_add(struct device *dev, const char *con_id);
 extern int pm_clk_add_clk(struct device *dev, struct clk *clk);
+extern int pm_clk_add_clks_of(struct device *dev);
 extern void pm_clk_remove(struct device *dev, const char *con_id);
+extern void pm_clk_remove_clk(struct device *dev, struct clk *clk);
 extern int pm_clk_suspend(struct device *dev);
 extern int pm_clk_resume(struct device *dev);
 #else
@@ -69,7 +71,14 @@ static inline int pm_clk_add_clk(struct device *dev, struct clk *clk)
 {
 	return -EINVAL;
 }
+static inline int pm_clk_add_clks_of(struct device *dev)
+{
+	return -EINVAL;
+}
 static inline void pm_clk_remove(struct device *dev, const char *con_id)
+{
+}
+static inline void pm_clk_remove_clk(struct device *dev, struct clk *clk)
 {
 }
 static inline int pm_clk_suspend(struct device *dev)
