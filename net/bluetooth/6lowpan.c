@@ -258,6 +258,36 @@ static struct lowpan_dev *lookup_dev(struct l2cap_conn *conn)
 	return dev;
 }
 
+static struct lowpan_peer *lookup_bdaddr(struct hci_dev *hdev, bdaddr_t *dst,
+					u8 dst_type)
+{
+	struct lowpan_dev *dev;
+	struct lowpan_peer *peer, *target = NULL;
+
+	rcu_read_lock();
+
+	list_for_each_entry_rcu(dev, &bt_6lowpan_devices, list) {
+		if (dev->hdev != hdev)
+			continue;
+
+		list_for_each_entry_rcu(peer, &dev->peers, list) {
+			if(!peer->chan)
+				continue;
+
+			if (!bacmp(dst, &peer->chan->dst) &&
+					dst_type == peer->chan->dst_type) {
+				target = peer;
+				goto rcu_unlock;
+			}
+		}
+	}
+
+rcu_unlock:
+	rcu_read_unlock();
+
+	return target;
+}
+
 static int give_skb_to_upper(struct sk_buff *skb, struct net_device *dev)
 {
 	struct sk_buff *skb_cp;
@@ -854,6 +884,51 @@ out:
 	return err;
 }
 
+static void cmd_add_network_complete(struct l2cap_chan *chan, int status,
+				int ifindex)
+{
+	struct hci_dev *hdev;
+	struct mgmt_pending_cmd *cmd;
+
+	hdev = hci_get_route(NULL, &chan->src);
+
+	if (!hdev) {
+		BT_DBG("No matching hci_dev for l2cap_chan %p", chan);
+		return;
+	}
+
+	cmd = mgmt_pending_find(HCI_CHANNEL_CONTROL, MGMT_OP_ADD_NETWORK,
+				hdev);
+	BT_DBG("cmd %p status %d state %d", cmd, status, chan->state);
+
+	if (cmd) {
+		struct mgmt_cp_add_network *cp = cmd->param;
+		struct mgmt_rp_add_network rp;
+
+		rp.ifindex = ifindex;
+		bacpy(&rp.dst.bdaddr, &cp->dst.bdaddr);
+		rp.dst.type = cp->dst.type;
+
+		mgmt_cmd_complete(cmd->sk, cmd->index, cmd->opcode,
+				status, &rp, sizeof(rp));
+	}
+
+	if (status == MGMT_STATUS_SUCCESS && chan->state == BT_CONNECTED) {
+		struct mgmt_ev_network_added ep;
+
+		ep.ifindex = ifindex;
+		bacpy(&ep.dst.bdaddr, &chan->dst);
+		ep.dst.type = chan->dst_type;
+
+		mgmt_send_event(MGMT_EV_NETWORK_ADDED, hdev,
+				HCI_CHANNEL_CONTROL, &ep, sizeof(ep),
+				HCI_SOCK_TRUSTED, cmd? cmd->sk: NULL);
+	}
+
+	if (cmd)
+		mgmt_pending_remove(cmd);
+}
+
 static inline void chan_ready_cb(struct l2cap_chan *chan)
 {
 	struct lowpan_dev *dev;
@@ -874,6 +949,9 @@ static inline void chan_ready_cb(struct l2cap_chan *chan)
 
 	add_peer_chan(chan, dev);
 	ifup(dev->netdev);
+
+	cmd_add_network_complete(chan, MGMT_STATUS_SUCCESS,
+				dev->netdev->ifindex);
 }
 
 static inline struct l2cap_chan *chan_new_conn_cb(struct l2cap_chan *pchan)
@@ -921,6 +999,8 @@ static void chan_close_cb(struct l2cap_chan *chan)
 		remove = false;
 	}
 
+	cmd_add_network_complete(chan, MGMT_STATUS_CONNECT_FAILED, 0);
+
 	spin_lock(&devices_lock);
 
 	list_for_each_entry_rcu(entry, &bt_6lowpan_devices, list) {
@@ -962,6 +1042,10 @@ static void chan_state_change_cb(struct l2cap_chan *chan, int state, int err)
 {
 	BT_DBG("chan %p conn %p state %s err %d", chan, chan->conn,
 	       state_to_string(state), err);
+
+	if (err < 0) {
+		cmd_add_network_complete(chan, MGMT_STATUS_CONNECT_FAILED, 0);
+	}
 }
 
 static struct sk_buff *chan_alloc_skb_cb(struct l2cap_chan *chan,
@@ -1103,33 +1187,85 @@ unlock:
 	return err;
 }
 
-static inline __u8 bdaddr_type(__u8 type)
+int bt_6lowpan_add_network(struct sock *sk, struct hci_dev *hdev,
+			void *data, u16 data_len)
 {
-	if (type == ADDR_LE_DEV_PUBLIC)
-		return BDADDR_LE_PUBLIC;
-	else
-		return BDADDR_LE_RANDOM;
-}
-
-static int bt_6lowpan_connect(bdaddr_t *addr, u8 dst_type)
-{
-	struct hci_dev *hdev;
-	struct l2cap_chan *chan;
+	struct mgmt_cp_add_network *cp = data;
+	struct mgmt_rp_add_network rp;
+	struct mgmt_pending_cmd *cmd;
 	int err;
+        struct l2cap_chan *chan;
+
+	BT_DBG("add network hdev %p data %p data len %d",
+		hdev, data, data_len);
+
+	rp.ifindex = 0;
+	bacpy(&rp.dst.bdaddr, &cp->dst.bdaddr);
+	rp.dst.type = cp->dst.type;
+
+	if (!lmp_le_capable(hdev))
+		return mgmt_cmd_complete(sk, hdev->id, MGMT_OP_ADD_NETWORK,
+					MGMT_STATUS_NOT_SUPPORTED, &rp,
+					sizeof(rp));
+
+	if (!bdaddr_type_is_le(cp->dst.type))
+		return mgmt_cmd_complete(sk, hdev->id, MGMT_OP_ADD_NETWORK,
+					MGMT_STATUS_NOT_SUPPORTED, &rp,
+					sizeof(rp));
+
+	hci_dev_lock(hdev);
+	if (mgmt_pending_find(HCI_CHANNEL_CONTROL, MGMT_OP_ADD_NETWORK,
+				hdev)) {
+		err = mgmt_cmd_status(sk, hdev->id, MGMT_OP_ADD_NETWORK,
+				MGMT_STATUS_BUSY);
+		goto unlock;
+	}
+
+	if (lookup_bdaddr(hdev, &rp.dst.bdaddr, rp.dst.type)) {
+		err = mgmt_cmd_complete(sk, hdev->id, MGMT_OP_ADD_NETWORK,
+					MGMT_STATUS_ALREADY_CONNECTED,
+					&rp, sizeof(rp));
+		goto unlock;
+	}
+
+	cmd = mgmt_pending_add(sk, MGMT_OP_ADD_NETWORK, hdev, data, data_len);
+	if (!cmd) {
+		err = -ENOMEM;
+		goto unlock;
+	}
 
 	chan = chan_create();
-	if (!chan)
-		return -EINVAL;
+	if (!chan) {
+		err = mgmt_cmd_complete(sk, hdev->id, MGMT_OP_ADD_NETWORK,
+					MGMT_STATUS_NO_RESOURCES,
+					&rp, sizeof(rp));
+		goto pending_remove;
+	}
 
 	chan->ops = &bt_6lowpan_chan_ops;
 
-	hdev = hci_get_route(addr, NULL);
-	err = l2cap_chan_connect(chan, hdev, cpu_to_le16(L2CAP_PSM_IPSP), 0,
-				 addr, dst_type);
+	hci_dev_unlock(hdev);
 
-	BT_DBG("chan %p err %d", chan, err);
-	if (err < 0)
+	err = l2cap_chan_connect(chan, hdev, cpu_to_le16(L2CAP_PSM_IPSP), 0,
+				&cp->dst.bdaddr, cp->dst.type);
+
+	if (err < 0) {
 		l2cap_chan_put(chan);
+
+		hci_dev_lock(hdev);
+		err = mgmt_cmd_complete(sk, hdev->id, MGMT_OP_ADD_NETWORK,
+					MGMT_STATUS_REJECTED,
+					&rp, sizeof(rp));
+		goto pending_remove;
+	}
+
+	return err;
+
+pending_remove:
+	mgmt_pending_remove(cmd);
+
+unlock:
+	hci_dev_unlock(hdev);
 
 	return err;
 }
@@ -1325,41 +1461,6 @@ static ssize_t lowpan_control_write(struct file *fp,
 		return -EFAULT;
 
 	buf[buf_size] = '\0';
-
-	if (memcmp(buf, "connect ", 8) == 0) {
-		ret = get_l2cap_conn(&buf[8], &addr, &addr_type, &conn);
-		if (ret == -EINVAL)
-			return ret;
-
-		if (listen_chan) {
-			l2cap_chan_close(listen_chan, 0);
-			l2cap_chan_put(listen_chan);
-			listen_chan = NULL;
-		}
-
-		if (conn) {
-			struct lowpan_peer *peer;
-
-			if (!is_bt_6lowpan(conn->hcon))
-				return -EINVAL;
-
-			peer = lookup_peer(conn);
-			if (peer) {
-				BT_DBG("6LoWPAN connection already exists");
-				return -EALREADY;
-			}
-
-			BT_DBG("conn %p dst %pMR type %d user %d", conn,
-			       &conn->hcon->dst, conn->hcon->dst_type,
-			       addr_type);
-		}
-
-		ret = bt_6lowpan_connect(&addr, addr_type);
-		if (ret < 0)
-			return ret;
-
-		return count;
-	}
 
 	if (memcmp(buf, "disconnect ", 11) == 0) {
 		ret = get_l2cap_conn(&buf[11], &addr, &addr_type, &conn);
