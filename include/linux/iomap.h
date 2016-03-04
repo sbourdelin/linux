@@ -17,4 +17,9 @@ struct iomap {
 	void		*priv;	/* fs private data associated with map */
 };
 
+static inline bool iomap_needs_allocation(struct iomap *iomap)
+{
+	return iomap->type == IOMAP_HOLE;
+}
+
 #endif /* _IOMAP_H */

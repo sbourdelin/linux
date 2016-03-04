@@ -68,8 +68,12 @@ extern int sysctl_protected_symlinks;
 extern int sysctl_protected_hardlinks;
 
 struct buffer_head;
+struct address_space;
+struct iomap;
 typedef int (get_block_t)(struct inode *inode, sector_t iblock,
 			struct buffer_head *bh_result, int create);
+typedef int (iomap_get_t)(struct address_space *mapping, loff_t pos,
+			  ssize_t length, struct iomap *iomap);
 typedef void (dio_iodone_t)(struct kiocb *iocb, loff_t offset,
 			ssize_t bytes, void *private);
 typedef void (dax_iodone_t)(struct buffer_head *bh_map, int uptodate);
@@ -314,7 +318,6 @@ enum positive_aop_returns {
  * oh the beauties of C type declarations.
  */
 struct page;
-struct address_space;
 struct writeback_control;
 
 #define IOCB_EVENTFD		(1 << 0)
@@ -2783,6 +2786,12 @@ extern int vfs_lstat(const char __user *, struct kstat *);
 extern int vfs_fstat(unsigned int, struct kstat *);
 extern int vfs_fstatat(int , const char __user *, struct kstat *, int);
 
+extern int __generic_iomap_fiemap(struct inode *inode,
+				  struct fiemap_extent_info *fieinfo,
+				  loff_t start, loff_t len, iomap_get_t iomap);
+extern int generic_iomap_fiemap(struct inode *inode,
+				struct fiemap_extent_info *fieinfo, u64 start,
+				u64 len, iomap_get_t iomap);
 extern int __generic_block_fiemap(struct inode *inode,
 				  struct fiemap_extent_info *fieinfo,
 				  loff_t start, loff_t len,
