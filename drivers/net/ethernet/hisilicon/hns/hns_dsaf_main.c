@@ -986,13 +986,49 @@ static void hns_dsaf_tbl_tcam_init(struct dsaf_device *dsaf_dev)
  * hns_dsaf_pfc_en_cfg - dsaf pfc pause cfg
  * @mac_cb: mac contrl block
  */
-static void hns_dsaf_pfc_en_cfg(struct dsaf_device *dsaf_dev,
-				int mac_id, int en)
+static int hns_dsaf_pfc_en_cfg(struct dsaf_device *dsaf_dev,
+			       int mac_id, int tc_en, int tx_en, int rx_en)
 {
-	if (!en)
-		dsaf_write_dev(dsaf_dev, DSAF_PFC_EN_0_REG + mac_id * 4, 0);
+	dsaf_write_dev(dsaf_dev, DSAF_PFC_EN_0_REG + mac_id * 4, tc_en);
+
+	if (AE_IS_VER1(dsaf_dev->dsaf_ver)) {
+		if (!tx_en || !rx_en) {
+			dev_err(dsaf_dev->dev, "dsaf v1 can not close pfc!\n");
+			return -EINVAL;
+		}
+	}
+
+	dsaf_set_dev_bit(dsaf_dev, DSAF_PAUSE_CFG_REG + mac_id * 4,
+			 DSAF_PFC_PAUSE_RX_EN_B, !!rx_en);
+	dsaf_set_dev_bit(dsaf_dev, DSAF_PAUSE_CFG_REG + mac_id * 4,
+			 DSAF_PFC_PAUSE_TX_EN_B, !!tx_en);
+	return 0;
+}
+
+int hns_dsaf_set_rx_mac_pause_en(struct dsaf_device *dsaf_dev, int mac_id,
+				 u32 en)
+{
+	if (AE_IS_VER1(dsaf_dev->dsaf_ver)) {
+		if (!en) {
+			dev_err(dsaf_dev->dev, "dsafv1 can't close rx_pause!\n");
+			return -EINVAL;
+		}
+	} else {
+		dsaf_set_dev_bit(dsaf_dev, DSAF_PAUSE_CFG_REG + mac_id * 4,
+				 DSAF_MAC_PAUSE_RX_EN_B, !!en);
+	}
+	return 0;
+}
+
+void hns_dsaf_get_rx_mac_pause_en(struct dsaf_device *dsaf_dev, int mac_id,
+				  u32 *en)
+{
+	if (AE_IS_VER1(dsaf_dev->dsaf_ver))
+		*en = 1;
 	else
-		dsaf_write_dev(dsaf_dev, DSAF_PFC_EN_0_REG + mac_id * 4, 0xff);
+		*en = dsaf_get_dev_bit(dsaf_dev,
+				       DSAF_PAUSE_CFG_REG + mac_id * 4,
+				       DSAF_MAC_PAUSE_RX_EN_B);
 }
 
 /**
@@ -1004,6 +1040,7 @@ static void hns_dsaf_comm_init(struct dsaf_device *dsaf_dev)
 {
 	u32 i;
 	u32 o_dsaf_cfg;
+	bool is_ver1 = AE_IS_VER1(dsaf_dev->dsaf_ver);
 
 	o_dsaf_cfg = dsaf_read_dev(dsaf_dev, DSAF_CFG_0_REG);
 	dsaf_set_bit(o_dsaf_cfg, DSAF_CFG_EN_S, dsaf_dev->dsaf_en);
@@ -1027,7 +1064,7 @@ static void hns_dsaf_comm_init(struct dsaf_device *dsaf_dev)
 
 	/*set dsaf pfc  to 0 for parseing rx pause*/
 	for (i = 0; i < DSAF_COMM_CHN; i++)
-		hns_dsaf_pfc_en_cfg(dsaf_dev, i, 0);
+		(void)hns_dsaf_pfc_en_cfg(dsaf_dev, i, 0, is_ver1, is_ver1);
 
 	/*msk and  clr exception irqs */
 	for (i = 0; i < DSAF_COMM_CHN; i++) {
