@@ -931,6 +931,10 @@ void hns_rcb_get_strings(int stringset, u8 *data, int index)
 void hns_rcb_get_common_regs(struct rcb_common_cb *rcb_com, void *data)
 {
 	u32 *regs = data;
+	bool is_ver1 = AE_IS_VER1(rcb_com->dsaf_dev->dsaf_ver);
+	bool is_dbg = (rcb_com->comm_index != HNS_DSAF_COMM_SERVICE_NW_IDX);
+	u32 reg_tmp;
+	u32 reg_num_tmp;
 	u32 i = 0;
 
 	/*rcb common registers */
@@ -984,12 +988,16 @@ void hns_rcb_get_common_regs(struct rcb_common_cb *rcb_com, void *data)
 			= dsaf_read_dev(rcb_com, RCB_CFG_PKTLINE_REG + 4 * i);
 	}
 
-	regs[70] = dsaf_read_dev(rcb_com, RCB_CFG_OVERTIME_REG);
-	regs[71] = dsaf_read_dev(rcb_com, RCB_CFG_PKTLINE_INT_NUM_REG);
-	regs[72] = dsaf_read_dev(rcb_com, RCB_CFG_OVERTIME_INT_NUM_REG);
+	reg_tmp = is_ver1 ? RCB_CFG_OVERTIME_REG : RCB_PORT_CFG_OVERTIME_REG;
+	reg_num_tmp = (is_ver1 || is_dbg) ? 1 : 6;
+	for (i = 0; i < reg_num_tmp; i++)
+		regs[70 + i] = dsaf_read_dev(rcb_com, reg_tmp);
+
+	regs[76] = dsaf_read_dev(rcb_com, RCB_CFG_PKTLINE_INT_NUM_REG);
+	regs[77] = dsaf_read_dev(rcb_com, RCB_CFG_OVERTIME_INT_NUM_REG);
 
 	/* mark end of rcb common regs */
-	for (i = 73; i < 80; i++)
+	for (i = 78; i < 80; i++)
 		regs[i] = 0xcccccccc;
 }
 
