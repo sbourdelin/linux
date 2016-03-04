@@ -14,6 +14,9 @@
  * the COPYING file in the top-level directory.
  *
  */
+
+#define pr_fmt(fmt) "SVM: " fmt
+
 #include <linux/kvm_host.h>
 
 #include "irq.h"
@@ -77,6 +80,11 @@ MODULE_DEVICE_TABLE(x86cpu, svm_cpu_id);
 #define TSC_RATIO_RSVD          0xffffff0000000000ULL
 #define TSC_RATIO_MIN		0x0000000000000001ULL
 #define TSC_RATIO_MAX		0x000000ffffffffffULL
+
+#define AVIC_HPA_MASK	~((0xFFFULL << 52) || 0xFFF)
+
+/* NOTE: Current max index allowed for physical APIC ID table is 255 */
+#define AVIC_PHY_APIC_ID_MAX	0xFF
 
 static bool erratum_383_found __read_mostly;
 
@@ -162,6 +170,37 @@ struct vcpu_svm {
 
 	/* cached guest cpuid flags for faster access */
 	bool nrips_enabled	: 1;
+
+	struct page *avic_bk_page;
+	void *in_kernel_lapic_regs;
+};
+
+struct __attribute__ ((__packed__))
+svm_avic_log_ait_entry {
+	u32 guest_phy_apic_id	: 8,
+	    res			: 23,
+	    valid		: 1;
+};
+
+struct __attribute__ ((__packed__))
+svm_avic_phy_ait_entry {
+	u64 host_phy_apic_id	: 8,
+	    res1		: 4,
+	    bk_pg_ptr		: 40,
+	    res2		: 10,
+	    is_running		: 1,
+	    valid		: 1;
+};
+
+/* Note: This structure is per VM */
+struct svm_vm_data {
+	atomic_t count;
+	u32 ldr_mode;
+	u32 avic_max_vcpu_id;
+	u32 avic_tag;
+
+	struct page *avic_log_ait_page;
+	struct page *avic_phy_ait_page;
 };
 
 static DEFINE_PER_CPU(u64, current_tsc_ratio);
@@ -205,6 +244,10 @@ module_param(npt, int, S_IRUGO);
 static int nested = true;
 module_param(nested, int, S_IRUGO);
 
+/* enable / disable AVIC */
+static int avic;
+module_param(avic, int, S_IRUGO);
+
 static void svm_set_cr0(struct kvm_vcpu *vcpu, unsigned long cr0);
 static void svm_flush_tlb(struct kvm_vcpu *vcpu);
 static void svm_complete_interrupts(struct vcpu_svm *svm);
@@ -233,6 +276,13 @@ enum {
 
 /* TPR and CR2 are always written before VMRUN */
 #define VMCB_ALWAYS_DIRTY_MASK	((1U << VMCB_INTR) | (1U << VMCB_CR2))
+
+#define VMCB_AVIC_APIC_BAR_MASK		0xFFFFFFFFFF000ULL
+
+static inline void avic_update_vapic_bar(struct vcpu_svm *svm, u64 data)
+{
+	svm->vmcb->control.avic_vapic_bar = data & VMCB_AVIC_APIC_BAR_MASK;
+}
 
 static inline void mark_all_dirty(struct vmcb *vmcb)
 {
@@ -923,6 +973,13 @@ static __init int svm_hardware_setup(void)
 	} else
 		kvm_disable_tdp();
 
+	if (avic && (!npt_enabled || !boot_cpu_has(X86_FEATURE_AVIC)))
+		avic = false;
+
+	if (avic) {
+		printk(KERN_INFO "kvm: AVIC enabled\n");
+	}
+
 	return 0;
 
 err:
@@ -998,6 +1055,41 @@ static void svm_adjust_tsc_offset_guest(struct kvm_vcpu *vcpu, s64 adjustment)
 				     svm->vmcb->control.tsc_offset);
 
 	mark_dirty(svm->vmcb, VMCB_INTERCEPTS);
+}
+
+static void avic_init_vmcb(struct vcpu_svm *svm)
+{
+	void *vapic_bkpg;
+	struct vmcb *vmcb = svm->vmcb;
+	struct svm_vm_data *vm_data = svm->vcpu.kvm->arch.arch_data;
+	phys_addr_t bpa = PFN_PHYS(page_to_pfn(svm->avic_bk_page));
+	phys_addr_t lpa = PFN_PHYS(page_to_pfn(vm_data->avic_log_ait_page));
+	phys_addr_t ppa = PFN_PHYS(page_to_pfn(vm_data->avic_phy_ait_page));
+
+	if (!vmcb)
+		return;
+
+	pr_debug("%s: bpa=%#llx, lpa=%#llx, ppa=%#llx\n",
+		 __func__, (unsigned long long)bpa,
+		 (unsigned long long)lpa, (unsigned long long)ppa);
+
+
+	/*
+	 * Here we copy the value from the emulated LAPIC register
+	 * to the vAPIC backign page, and then flip regs frame.
+	 */
+	if (!svm->in_kernel_lapic_regs)
+		svm->in_kernel_lapic_regs = svm->vcpu.arch.apic->regs;
+
+	vapic_bkpg = pfn_to_kaddr(page_to_pfn(svm->avic_bk_page));
+	memcpy(vapic_bkpg, svm->in_kernel_lapic_regs, PAGE_SIZE);
+	svm->vcpu.arch.apic->regs = vapic_bkpg;
+
+	vmcb->control.avic_bk_page = bpa & AVIC_HPA_MASK;
+	vmcb->control.avic_log_apic_id = lpa & AVIC_HPA_MASK;
+	vmcb->control.avic_phy_apic_id = ppa & AVIC_HPA_MASK;
+	vmcb->control.avic_phy_apic_id |= AVIC_PHY_APIC_ID_MAX;
+	vmcb->control.avic_enable = 1;
 }
 
 static void init_vmcb(struct vcpu_svm *svm)
@@ -1113,6 +1205,293 @@ static void init_vmcb(struct vcpu_svm *svm)
 	mark_all_dirty(svm->vmcb);
 
 	enable_gif(svm);
+
+	if (avic)
+		avic_init_vmcb(svm);
+}
+
+static struct svm_avic_phy_ait_entry *
+avic_get_phy_ait_entry(struct kvm_vcpu *vcpu, int index)
+{
+	struct svm_avic_phy_ait_entry *avic_phy_ait;
+	struct svm_vm_data *vm_data = vcpu->kvm->arch.arch_data;
+
+	if (!vm_data)
+		return NULL;
+
+	/* Note: APIC ID = 0xff is used for broadcast.
+	 *       APIC ID > 0xff is reserved.
+	 */
+	if (index >= 0xff)
+		return NULL;
+
+	avic_phy_ait = page_address(vm_data->avic_phy_ait_page);
+
+	return &avic_phy_ait[index];
+}
+
+struct svm_avic_log_ait_entry *
+avic_get_log_ait_entry(struct kvm_vcpu *vcpu, u8 mda, bool is_flat)
+{
+	struct svm_vm_data *vm_data = vcpu->kvm->arch.arch_data;
+	int index;
+	struct svm_avic_log_ait_entry *avic_log_ait;
+
+	if (!vm_data)
+		return NULL;
+
+	if (is_flat) { /* flat */
+		if (mda > 7)
+			return NULL;
+		index = mda;
+	} else { /* cluster */
+		int apic_id = mda & 0xf;
+		int cluster_id = (mda & 0xf0) >> 8;
+
+		if (apic_id > 4 || cluster_id >= 0xf)
+			return NULL;
+		index = (cluster_id << 2) + apic_id;
+	}
+	avic_log_ait = (struct svm_avic_log_ait_entry *)
+				page_address(vm_data->avic_log_ait_page);
+
+	return &avic_log_ait[index];
+}
+
+static inline void
+avic_set_bk_page_entry(struct vcpu_svm *svm, int reg_off, u32 val)
+{
+	void *avic_bk = page_address(svm->avic_bk_page);
+
+	*((u32 *) (avic_bk + reg_off)) = val;
+}
+
+static inline u32 *avic_get_bk_page_entry(struct vcpu_svm *svm, u32 offset)
+{
+	char *tmp = (char *)page_address(svm->avic_bk_page);
+
+	return (u32 *)(tmp+offset);
+}
+
+static int avic_init_log_apic_entry(struct kvm_vcpu *vcpu, u8 g_phy_apic_id,
+				    u8 log_apic_id)
+{
+	u32 mod;
+	struct svm_avic_log_ait_entry *entry;
+	struct vcpu_svm *svm = to_svm(vcpu);
+
+	if (!svm)
+		return -EINVAL;
+
+	mod = (*avic_get_bk_page_entry(svm, APIC_DFR) >> 28) & 0xf;
+	entry = avic_get_log_ait_entry(vcpu, log_apic_id, (mod == 0xf));
+	if (!entry)
+		return -EINVAL;
+	entry->guest_phy_apic_id = g_phy_apic_id;
+	entry->valid = 1;
+
+	return 0;
+}
+
+static int avic_init_bk_page(struct kvm_vcpu *vcpu)
+{
+	u64 addr;
+	struct page *page;
+	int id = vcpu->vcpu_id;
+	struct kvm *kvm = vcpu->kvm;
+	struct vcpu_svm *svm = to_svm(vcpu);
+
+	addr = APIC_DEFAULT_PHYS_BASE + (id * PAGE_SIZE);
+	page = gfn_to_page(kvm, addr >> PAGE_SHIFT);
+	if (is_error_page(page))
+		return -EFAULT;
+
+	/*
+	 * Do not pin the page in memory, so that memory hot-unplug
+	 * is able to migrate it.
+	 */
+	put_page(page);
+
+	/* Setting up AVIC Backing Page */
+	svm->avic_bk_page = page;
+
+	clear_page(kmap(page));
+	pr_debug("%s: vAPIC bk page: cpu=%u, addr=%#llx, pa=%#llx\n",
+		 __func__, id, addr,
+		 (unsigned long long) PFN_PHYS(page_to_pfn(page)));
+
+	avic_init_vmcb(svm);
+
+	return 0;
+}
+
+static inline void avic_unalloc_bk_page(struct kvm_vcpu *vcpu)
+{
+	struct vcpu_svm *svm = to_svm(vcpu);
+
+	if (svm->avic_bk_page)
+		kunmap(svm->avic_bk_page);
+}
+
+static int avic_alloc_bk_page(struct vcpu_svm *svm, int id)
+{
+	int ret = 0, i;
+	bool realloc = false;
+	struct kvm_vcpu *vcpu;
+	struct kvm *kvm = svm->vcpu.kvm;
+	struct svm_vm_data *vm_data = kvm->arch.arch_data;
+
+	mutex_lock(&kvm->slots_lock);
+
+	/* Check if we have already allocated vAPIC backing
+	 * page for this vCPU. If not, we need to realloc
+	 * a new one and re-assign all other vCPU.
+	 */
+	if (kvm->arch.apic_access_page_done &&
+	    (id > vm_data->avic_max_vcpu_id)) {
+		kvm_for_each_vcpu(i, vcpu, kvm)
+			avic_unalloc_bk_page(vcpu);
+
+		__x86_set_memory_region(kvm, APIC_ACCESS_PAGE_PRIVATE_MEMSLOT,
+					0, 0);
+		realloc = true;
+		vm_data->avic_max_vcpu_id = 0;
+	}
+
+	/*
+	 * We are allocating vAPIC backing page
+	 * upto the max vCPU ID
+	 */
+	if (id >= vm_data->avic_max_vcpu_id) {
+		ret = __x86_set_memory_region(kvm,
+					      APIC_ACCESS_PAGE_PRIVATE_MEMSLOT,
+					      APIC_DEFAULT_PHYS_BASE,
+					      PAGE_SIZE * (id + 1));
+		if (ret)
+			goto out;
+
+		vm_data->avic_max_vcpu_id = id;
+	}
+
+	/* Reinit vAPIC backing page for exisinting vcpus */
+	if (realloc)
+		kvm_for_each_vcpu(i, vcpu, kvm)
+			avic_init_bk_page(vcpu);
+
+	avic_init_bk_page(&svm->vcpu);
+
+	kvm->arch.apic_access_page_done = true;
+
+out:
+	mutex_unlock(&kvm->slots_lock);
+	return ret;
+}
+
+static void avic_vm_uninit(struct kvm *kvm)
+{
+	struct svm_vm_data *vm_data = kvm->arch.arch_data;
+
+	if (!vm_data)
+		return;
+
+	if (vm_data->avic_log_ait_page)
+		__free_page(vm_data->avic_log_ait_page);
+	if (vm_data->avic_phy_ait_page)
+		__free_page(vm_data->avic_phy_ait_page);
+	kfree(vm_data);
+	kvm->arch.arch_data = NULL;
+}
+
+static void avic_vcpu_uninit(struct kvm_vcpu *vcpu)
+{
+	struct vcpu_svm *svm = to_svm(vcpu);
+	struct svm_vm_data *vm_data = vcpu->kvm->arch.arch_data;
+
+	if (!avic)
+		return;
+
+	avic_unalloc_bk_page(vcpu);
+	svm->vcpu.arch.apic->regs = svm->in_kernel_lapic_regs;
+	svm->in_kernel_lapic_regs = NULL;
+
+	if (vm_data &&
+	    (atomic_read(&vm_data->count) == 0 ||
+	     atomic_dec_and_test(&vm_data->count)))
+		avic_vm_uninit(vcpu->kvm);
+}
+
+static atomic_t avic_tag_gen = ATOMIC_INIT(1);
+
+static inline u32 avic_get_next_tag(void)
+{
+	u32 tag = atomic_read(&avic_tag_gen);
+
+	atomic_inc(&avic_tag_gen);
+	return tag;
+}
+
+static int avic_vm_init(struct kvm *kvm)
+{
+	int err = -ENOMEM;
+	struct svm_vm_data *vm_data;
+	struct page *avic_phy_ait_page;
+	struct page *avic_log_ait_page;
+
+	vm_data = kzalloc(sizeof(struct svm_vm_data),
+				      GFP_KERNEL);
+	if (!vm_data)
+		return err;
+
+	kvm->arch.arch_data = vm_data;
+	atomic_set(&vm_data->count, 0);
+
+	/* Allocating physical APIC ID table (4KB) */
+	avic_phy_ait_page = alloc_page(GFP_KERNEL);
+	if (!avic_phy_ait_page)
+		goto free_avic;
+
+	vm_data->avic_phy_ait_page = avic_phy_ait_page;
+	clear_page(page_address(avic_phy_ait_page));
+
+	/* Allocating logical APIC ID table (4KB) */
+	avic_log_ait_page = alloc_page(GFP_KERNEL);
+	if (!avic_log_ait_page)
+		goto free_avic;
+
+	vm_data->avic_log_ait_page = avic_log_ait_page;
+	clear_page(page_address(avic_log_ait_page));
+
+	vm_data->avic_tag = avic_get_next_tag();
+
+	return 0;
+
+free_avic:
+	avic_vm_uninit(kvm);
+	return err;
+}
+
+static int avic_vcpu_init(struct kvm *kvm, struct vcpu_svm *svm, int id)
+{
+	int err;
+	struct svm_vm_data *vm_data = NULL;
+
+	/* Note: svm_vm_data is per VM */
+	if (!kvm->arch.arch_data) {
+		err = avic_vm_init(kvm);
+		if (err)
+			return err;
+	}
+
+	err = avic_alloc_bk_page(svm, id);
+	if (err) {
+		avic_vcpu_uninit(&svm->vcpu);
+		return err;
+	}
+
+	vm_data = kvm->arch.arch_data;
+	atomic_inc(&vm_data->count);
+
+	return 0;
 }
 
 static void svm_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
@@ -1131,6 +1510,9 @@ static void svm_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 
 	kvm_cpuid(vcpu, &eax, &dummy, &dummy, &dummy);
 	kvm_register_write(vcpu, VCPU_REGS_RDX, eax);
+
+	if (avic && !init_event)
+		avic_update_vapic_bar(svm, APIC_DEFAULT_PHYS_BASE);
 }
 
 static struct kvm_vcpu *svm_create_vcpu(struct kvm *kvm, unsigned int id)
@@ -1169,6 +1551,12 @@ static struct kvm_vcpu *svm_create_vcpu(struct kvm *kvm, unsigned int id)
 	if (!hsave_page)
 		goto free_page3;
 
+	if (avic) {
+		err = avic_vcpu_init(kvm, svm, id);
+		if (err)
+			goto free_page4;
+	}
+
 	svm->nested.hsave = page_address(hsave_page);
 
 	svm->msrpm = page_address(msrpm_pages);
@@ -1187,6 +1575,8 @@ static struct kvm_vcpu *svm_create_vcpu(struct kvm *kvm, unsigned int id)
 
 	return &svm->vcpu;
 
+free_page4:
+	__free_page(hsave_page);
 free_page3:
 	__free_pages(nested_msrpm_pages, MSRPM_ALLOC_ORDER);
 free_page2:
@@ -1209,6 +1599,7 @@ static void svm_free_vcpu(struct kvm_vcpu *vcpu)
 	__free_pages(virt_to_page(svm->msrpm), MSRPM_ALLOC_ORDER);
 	__free_page(virt_to_page(svm->nested.hsave));
 	__free_pages(virt_to_page(svm->nested.msrpm), MSRPM_ALLOC_ORDER);
+	avic_vcpu_uninit(vcpu);
 	kvm_vcpu_uninit(vcpu);
 	kmem_cache_free(kvm_vcpu_cache, svm);
 }
@@ -3382,6 +3773,7 @@ static void dump_vmcb(struct kvm_vcpu *vcpu)
 	pr_err("%-20s%08x\n", "exit_int_info_err:", control->exit_int_info_err);
 	pr_err("%-20s%lld\n", "nested_ctl:", control->nested_ctl);
 	pr_err("%-20s%016llx\n", "nested_cr3:", control->nested_cr3);
+	pr_err("%-20s%016llx\n", "avic_vapic_bar:", control->avic_vapic_bar);
 	pr_err("%-20s%08x\n", "event_inj:", control->event_inj);
 	pr_err("%-20s%08x\n", "event_inj_err:", control->event_inj_err);
 	pr_err("%-20s%lld\n", "lbr_ctl:", control->lbr_ctl);
@@ -3613,11 +4005,31 @@ static void svm_set_virtual_x2apic_mode(struct kvm_vcpu *vcpu, bool set)
 
 static bool svm_get_enable_apicv(void)
 {
-	return false;
+	return avic;
 }
 
+static void svm_hwapic_irr_update(struct kvm_vcpu *vcpu, int max_irr)
+{
+}
+
+static void svm_hwapic_isr_update(struct kvm *kvm, int isr)
+{
+}
+
+/* Note: Currently only used by Hyper-V. */
 static void svm_refresh_apicv_exec_ctrl(struct kvm_vcpu *vcpu)
 {
+	struct vcpu_svm *svm = to_svm(vcpu);
+	struct vmcb *vmcb = svm->vmcb;
+
+	if (!avic)
+		return;
+
+	if (!svm->in_kernel_lapic_regs)
+		return;
+
+	svm->vcpu.arch.apic->regs = svm->in_kernel_lapic_regs;
+	vmcb->control.avic_enable = 0;
 }
 
 static void svm_load_eoi_exitmap(struct kvm_vcpu *vcpu, u64 *eoi_exit_bitmap)
@@ -4387,6 +4799,8 @@ static struct kvm_x86_ops svm_x86_ops = {
 	.refresh_apicv_exec_ctrl = svm_refresh_apicv_exec_ctrl,
 	.load_eoi_exitmap = svm_load_eoi_exitmap,
 	.sync_pir_to_irr = svm_sync_pir_to_irr,
+	.hwapic_irr_update = svm_hwapic_irr_update,
+	.hwapic_isr_update = svm_hwapic_isr_update,
 
 	.set_tss_addr = svm_set_tss_addr,
 	.get_tdp_level = get_npt_level,
