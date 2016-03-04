@@ -7,6 +7,7 @@
 
 #define KVM_APIC_INIT		0
 #define KVM_APIC_SIPI		1
+#define KVM_APIC_LVT_NUM	6
 
 struct kvm_timer {
 	struct hrtimer timer;
@@ -56,6 +57,12 @@ void kvm_lapic_set_eoi(struct kvm_vcpu *vcpu);
 void kvm_lapic_set_base(struct kvm_vcpu *vcpu, u64 value);
 u64 kvm_lapic_get_base(struct kvm_vcpu *vcpu);
 void kvm_apic_set_version(struct kvm_vcpu *vcpu);
+void kvm_lapic_set_vector(int vec, void *bitmap);
+int kvm_lapic_reg_write(struct kvm_lapic *apic, u32 reg, u32 val);
+int kvm_lapic_reg_read(struct kvm_lapic *apic, u32 offset, int len,
+		       void *data);
+bool kvm_apic_match_dest(struct kvm_vcpu *vcpu, struct kvm_lapic *source,
+			   int short_hand, unsigned int dest, int dest_mode);
 
 void __kvm_apic_update_irr(u32 *pir, void *regs);
 void kvm_apic_update_irr(struct kvm_vcpu *vcpu, u32 *pir);
