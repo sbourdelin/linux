@@ -71,6 +71,8 @@ MODULE_DEVICE_TABLE(x86cpu, svm_cpu_id);
 #define SVM_FEATURE_DECODE_ASSIST  (1 <<  7)
 #define SVM_FEATURE_PAUSE_FILTER   (1 << 10)
 
+#define SVM_AVIC_DOORBELL	0xc001011b
+
 #define NESTED_EXIT_HOST	0	/* Exit handled on host level */
 #define NESTED_EXIT_DONE	1	/* Exit caused nested vmexit  */
 #define NESTED_EXIT_CONTINUE	2	/* Further checks needed      */
@@ -235,6 +237,8 @@ static bool npt_enabled = true;
 #else
 static bool npt_enabled;
 #endif
+
+static struct kvm_x86_ops svm_x86_ops;
 
 /* allow nested paging (virtualized MMU) for all guests */
 static int npt = true;
@@ -978,6 +982,8 @@ static __init int svm_hardware_setup(void)
 
 	if (avic) {
 		printk(KERN_INFO "kvm: AVIC enabled\n");
+	} else {
+		svm_x86_ops.deliver_posted_interrupt = NULL;
 	}
 
 	return 0;
@@ -3071,8 +3077,10 @@ static int clgi_interception(struct vcpu_svm *svm)
 	disable_gif(svm);
 
 	/* After a CLGI no interrupts should come */
-	svm_clear_vintr(svm);
-	svm->vmcb->control.v_irq = 0;
+	if (!avic) {
+		svm_clear_vintr(svm);
+		svm->vmcb->control.v_irq = 0;
+	}
 
 	mark_dirty(svm->vmcb, VMCB_INTR);
 
@@ -3647,6 +3655,9 @@ static int msr_interception(struct vcpu_svm *svm)
 
 static int interrupt_window_interception(struct vcpu_svm *svm)
 {
+	if (avic)
+		BUG();
+
 	kvm_make_request(KVM_REQ_EVENT, &svm->vcpu);
 	svm_clear_vintr(svm);
 	svm->vmcb->control.v_irq = 0;
@@ -3961,7 +3972,7 @@ static inline void svm_inject_irq(struct vcpu_svm *svm, int irq)
 {
 	struct vmcb_control_area *control;
 
-
+	/* The following fields are ignored when AVIC is enabled */
 	control = &svm->vmcb->control;
 	control->int_vector = irq;
 	control->v_intr_prio = 0xf;
@@ -4042,6 +4053,20 @@ static void svm_sync_pir_to_irr(struct kvm_vcpu *vcpu)
 	return;
 }
 
+static void svm_deliver_avic_intr(struct kvm_vcpu *vcpu, int vec)
+{
+	struct vcpu_svm *svm = to_svm(vcpu);
+
+	kvm_lapic_set_vector(vec, avic_get_bk_page_entry(svm, APIC_IRR));
+
+	if (vcpu->mode == IN_GUEST_MODE) {
+		wrmsrl(SVM_AVIC_DOORBELL,
+		       __default_cpu_present_to_apicid(vcpu->cpu));
+	} else {
+		kvm_vcpu_kick(vcpu);
+	}
+}
+
 static int svm_nmi_allowed(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_svm *svm = to_svm(vcpu);
@@ -4102,6 +4127,9 @@ static void enable_irq_window(struct kvm_vcpu *vcpu)
 	 * get that intercept, this function will be called again though and
 	 * we'll get the vintr intercept.
 	 */
+	if (avic)
+		return;
+
 	if (gif_set(svm) && nested_svm_intr(svm)) {
 		svm_set_vintr(svm);
 		svm_inject_irq(svm, 0x0);
@@ -4834,6 +4862,7 @@ static struct kvm_x86_ops svm_x86_ops = {
 	.sched_in = svm_sched_in,
 
 	.pmu_ops = &amd_pmu_ops,
+	.deliver_posted_interrupt = svm_deliver_avic_intr,
 };
 
 static int __init svm_init(void)
