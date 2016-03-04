@@ -5099,8 +5099,18 @@ static void port_event(struct usb_hub *hub, int port1)
 			usb_reset_device(udev);
 			usb_unlock_device(udev);
 			usb_lock_port(port_dev);
-			connect_change = 0;
 		}
+
+		ret = hub_port_status(hub, i,
+				&portstatus, &portchange);
+		if (ret < 0)
+			return;
+
+		if ((portstatus & USB_PORT_STAT_CONNECTION) && !udev &&
+				portstatus & USB_PORT_STAT_ENABLE)
+			connect_change = 1;
+		else
+			connect_change = 0;
 	}
 
 	if (connect_change)
