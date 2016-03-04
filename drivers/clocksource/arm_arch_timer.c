@@ -805,7 +805,8 @@ static void __init arch_timer_mem_init(struct device_node *np)
 		best_frame = of_node_get(frame);
 	}
 
-	base = arch_counter_base = of_iomap(best_frame, 0);
+	base = arch_counter_base = of_io_request_and_map(best_frame, 0,
+							 "arch_mem_timer");
 	if (!base) {
 		pr_err("arch_timer: Can't map frame's registers\n");
 		goto out;
