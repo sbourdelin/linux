@@ -128,6 +128,7 @@ config PHY_RCAR_GEN3_USB2
 config OMAP_CONTROL_PHY
 	tristate "OMAP CONTROL PHY Driver"
 	depends on ARCH_OMAP2PLUS || COMPILE_TEST
+	depends on HAS_IOMEM
 	help
 	  Enable this to add support for the PHY part present in the control
 	  module. This driver has API to power on the USB2 PHY and to write to
@@ -415,6 +416,7 @@ config PHY_BRCMSTB_SATA
 config PHY_CYGNUS_PCIE
 	tristate "Broadcom Cygnus PCIe PHY driver"
 	depends on OF && (ARCH_BCM_CYGNUS || COMPILE_TEST)
+	depends on HAS_IOMEM
 	select GENERIC_PHY
 	default ARCH_BCM_CYGNUS
 	help
