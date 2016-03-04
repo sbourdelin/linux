@@ -263,6 +263,7 @@ struct ufs_pwr_mode_info {
  * @suspend: called during host controller PM callback
  * @resume: called during host controller PM callback
  * @dbg_register_dump: used to dump controller debug information
+ * @custom_phy_initialization: used to initialize phys in DWC Cores
  */
 struct ufs_hba_variant_ops {
 	const char *name;
@@ -284,6 +285,7 @@ struct ufs_hba_variant_ops {
 	int     (*suspend)(struct ufs_hba *, enum ufs_pm_op);
 	int     (*resume)(struct ufs_hba *, enum ufs_pm_op);
 	void	(*dbg_register_dump)(struct ufs_hba *hba);
+	int	(*custom_phy_initialization)(struct ufs_hba *);
 };
 
 /* clock gating state  */
