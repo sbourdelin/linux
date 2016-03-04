@@ -72,8 +72,14 @@ static inline int pm_clk_add_clk(struct device *dev, struct clk *clk)
 static inline void pm_clk_remove(struct device *dev, const char *con_id)
 {
 }
-#define pm_clk_suspend	NULL
-#define pm_clk_resume	NULL
+static inline int pm_clk_suspend(struct device *dev)
+{
+	return -EINVAL;
+}
+static inline int pm_clk_resume(struct device *dev)
+{
+	return -EINVAL;
+}
 #endif
 
 #ifdef CONFIG_HAVE_CLK

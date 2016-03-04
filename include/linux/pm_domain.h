@@ -17,7 +17,11 @@
 #include <linux/notifier.h>
 
 /* Defines used for the flags field in the struct generic_pm_domain */
+#ifdef CONFIG_PM_CLK
 #define GENPD_FLAG_PM_CLK	(1U << 0) /* PM domain uses PM clk */
+#else
+#define GENPD_FLAG_PM_CLK	0
+#endif
 
 #define GENPD_MAX_NUM_STATES	8 /* Number of possible low power states */
 
