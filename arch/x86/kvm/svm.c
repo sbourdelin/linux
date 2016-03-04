@@ -1265,6 +1265,16 @@ static void svm_vcpu_put(struct kvm_vcpu *vcpu)
 		wrmsrl(host_save_user_msrs[i], svm->host_user_msrs[i]);
 }
 
+static void svm_vcpu_blocking(struct kvm_vcpu *vcpu)
+{
+	avic_set_running(vcpu, false);
+}
+
+static void svm_vcpu_unblocking(struct kvm_vcpu *vcpu)
+{
+	avic_set_running(vcpu, true);
+}
+
 static unsigned long svm_get_rflags(struct kvm_vcpu *vcpu)
 {
 	return to_svm(vcpu)->vmcb->save.rflags;
@@ -4321,6 +4331,8 @@ static struct kvm_x86_ops svm_x86_ops = {
 	.prepare_guest_switch = svm_prepare_guest_switch,
 	.vcpu_load = svm_vcpu_load,
 	.vcpu_put = svm_vcpu_put,
+	.vcpu_blocking = svm_vcpu_blocking,
+	.vcpu_unblocking = svm_vcpu_unblocking,
 
 	.update_bp_intercept = update_bp_intercept,
 	.get_msr = svm_get_msr,
