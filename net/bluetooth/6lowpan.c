@@ -33,7 +33,6 @@
 #define VERSION "0.1"
 
 static struct dentry *lowpan_enable_debugfs;
-static struct dentry *lowpan_control_debugfs;
 
 #define IFACE_NAME_TEMPLATE "bt%d"
 
@@ -929,6 +928,46 @@ static void cmd_add_network_complete(struct l2cap_chan *chan, int status,
 		mgmt_pending_remove(cmd);
 }
 
+static void cmd_remove_network_complete(struct l2cap_chan *chan, int status)
+{
+	struct hci_dev *hdev;
+	struct mgmt_pending_cmd *cmd;
+
+	hdev = hci_get_route(NULL, &chan->src);
+
+	if (!hdev) {
+		BT_DBG("No matching hci_dev for l2cap_chan %p", chan);
+		return;
+	}
+
+	cmd = mgmt_pending_find(HCI_CHANNEL_CONTROL, MGMT_OP_REMOVE_NETWORK,
+				hdev);
+	if (cmd) {
+		struct mgmt_cp_remove_network *cp = cmd->param;
+		struct mgmt_rp_remove_network rp;
+
+		bacpy(&rp.dst.bdaddr, &cp->dst.bdaddr);
+		rp.dst.type = cp->dst.type;
+
+		mgmt_cmd_complete(cmd->sk, cmd->index, cmd->opcode,
+				status, &rp, sizeof(rp));
+	}
+
+	if (status == MGMT_STATUS_SUCCESS && chan->state == BT_DISCONN) {
+		struct mgmt_ev_network_removed ep;
+
+		bacpy(&ep.dst.bdaddr, &chan->dst);
+		ep.dst.type = chan->dst_type;
+
+		mgmt_send_event(MGMT_EV_NETWORK_REMOVED, hdev,
+				HCI_CHANNEL_CONTROL, &ep, sizeof(ep),
+				HCI_SOCK_TRUSTED, cmd? cmd->sk: NULL);
+	}
+
+	if (cmd)
+		mgmt_pending_remove(cmd);
+}
+
 static inline void chan_ready_cb(struct l2cap_chan *chan)
 {
 	struct lowpan_dev *dev;
@@ -1000,6 +1039,7 @@ static void chan_close_cb(struct l2cap_chan *chan)
 	}
 
 	cmd_add_network_complete(chan, MGMT_STATUS_CONNECT_FAILED, 0);
+	cmd_remove_network_complete(chan, MGMT_STATUS_SUCCESS);
 
 	spin_lock(&devices_lock);
 
@@ -1045,6 +1085,7 @@ static void chan_state_change_cb(struct l2cap_chan *chan, int state, int err)
 
 	if (err < 0) {
 		cmd_add_network_complete(chan, MGMT_STATUS_CONNECT_FAILED, 0);
+		cmd_remove_network_complete(chan, MGMT_STATUS_CONNECT_FAILED);
 	}
 }
 
@@ -1270,21 +1311,60 @@ unlock:
 	return err;
 }
 
-static int bt_6lowpan_disconnect(struct l2cap_conn *conn, u8 dst_type)
+int bt_6lowpan_remove_network(struct sock *sk, struct hci_dev *hdev,
+			void *data, u16 data_len)
 {
+	struct mgmt_cp_remove_network *cp = data;
+	int err = 0;
 	struct lowpan_peer *peer;
+	struct mgmt_pending_cmd *cmd;
 
-	BT_DBG("conn %p dst type %d", conn, dst_type);
+	BT_DBG("remove network hdev %p data %p data len %d",
+		hdev, data, data_len);
 
-	peer = lookup_peer(conn);
-	if (!peer)
-		return -ENOENT;
+	if (!lmp_le_capable(hdev)) {
+		err = mgmt_cmd_complete(sk, hdev->id, MGMT_OP_REMOVE_NETWORK,
+					MGMT_STATUS_NOT_SUPPORTED, cp,
+					sizeof(*cp));
+		goto failed;
+	}
 
-	BT_DBG("peer %p chan %p", peer, peer->chan);
+	if (!bdaddr_type_is_le(cp->dst.type)) {
+		err = mgmt_cmd_complete(sk, hdev->id, MGMT_OP_REMOVE_NETWORK,
+					MGMT_STATUS_INVALID_PARAMS, cp,
+					sizeof(*cp));
+		goto failed;
+	}
 
-	l2cap_chan_close(peer->chan, ENOENT);
+	hci_dev_lock(hdev);
 
-	return 0;
+	if (mgmt_pending_find(HCI_CHANNEL_CONTROL, MGMT_OP_REMOVE_NETWORK,
+				hdev)) {
+		err = mgmt_cmd_status(sk, hdev->id, MGMT_OP_REMOVE_NETWORK,
+				MGMT_STATUS_BUSY);
+		goto unlock;
+	}
+
+	peer = lookup_bdaddr(hdev, &cp->dst.bdaddr, cp->dst.type);
+	if (!peer) {
+		err = mgmt_cmd_complete(sk, hdev->id, MGMT_OP_REMOVE_NETWORK,
+					MGMT_STATUS_FAILED,
+					cp, sizeof(*cp));
+		goto unlock;
+	}
+
+	cmd = mgmt_pending_add(sk, MGMT_OP_REMOVE_NETWORK, hdev,
+			data, data_len);
+	if (!cmd)
+		err = -ENOMEM;
+
+	l2cap_chan_close(peer->chan, 0);
+
+unlock:
+	hci_dev_unlock(hdev);
+
+failed:
+	return err;
 }
 
 static struct l2cap_chan *bt_6lowpan_listen(void)
@@ -1316,40 +1396,6 @@ static struct l2cap_chan *bt_6lowpan_listen(void)
 	}
 
 	return chan;
-}
-
-static int get_l2cap_conn(char *buf, bdaddr_t *addr, u8 *addr_type,
-			  struct l2cap_conn **conn)
-{
-	struct hci_conn *hcon;
-	struct hci_dev *hdev;
-	bdaddr_t *src = BDADDR_ANY;
-	int n;
-
-	n = sscanf(buf, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx %hhu",
-		   &addr->b[5], &addr->b[4], &addr->b[3],
-		   &addr->b[2], &addr->b[1], &addr->b[0],
-		   addr_type);
-
-	if (n < 7)
-		return -EINVAL;
-
-	hdev = hci_get_route(addr, src);
-	if (!hdev)
-		return -ENOENT;
-
-	hci_dev_lock(hdev);
-	hcon = hci_conn_hash_lookup_le(hdev, addr, *addr_type);
-	hci_dev_unlock(hdev);
-
-	if (!hcon)
-		return -ENOENT;
-
-	*conn = (struct l2cap_conn *)hcon->l2cap_data;
-
-	BT_DBG("conn %p dst %pMR type %d", *conn, &hcon->dst, hcon->dst_type);
-
-	return 0;
 }
 
 static void disconnect_all_peers(void)
@@ -1445,44 +1491,6 @@ static int lowpan_enable_get(void *data, u64 *val)
 DEFINE_SIMPLE_ATTRIBUTE(lowpan_enable_fops, lowpan_enable_get,
 			lowpan_enable_set, "%llu\n");
 
-static ssize_t lowpan_control_write(struct file *fp,
-				    const char __user *user_buffer,
-				    size_t count,
-				    loff_t *position)
-{
-	char buf[32];
-	size_t buf_size = min(count, sizeof(buf) - 1);
-	int ret;
-	bdaddr_t addr;
-	u8 addr_type;
-	struct l2cap_conn *conn = NULL;
-
-	if (copy_from_user(buf, user_buffer, buf_size))
-		return -EFAULT;
-
-	buf[buf_size] = '\0';
-
-	if (memcmp(buf, "disconnect ", 11) == 0) {
-		ret = get_l2cap_conn(&buf[11], &addr, &addr_type, &conn);
-		if (ret < 0)
-			return ret;
-
-		ret = bt_6lowpan_disconnect(conn, addr_type);
-		if (ret < 0)
-			return ret;
-
-		return count;
-	}
-
-	return count;
-}
-
-static const struct file_operations lowpan_control_fops = {
-	.write		= lowpan_control_write,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
-
 static void disconnect_devices(void)
 {
 	struct lowpan_dev *entry, *tmp, *new_dev;
@@ -1555,9 +1563,6 @@ int bt_6lowpan_init(void)
 	lowpan_enable_debugfs = debugfs_create_file("6lowpan_enable", 0644,
 						    bt_debugfs, NULL,
 						    &lowpan_enable_fops);
-	lowpan_control_debugfs = debugfs_create_file("6lowpan_control", 0644,
-						     bt_debugfs, NULL,
-						     &lowpan_control_fops);
 
 	return register_netdevice_notifier(&bt_6lowpan_dev_notifier);
 }
@@ -1565,7 +1570,6 @@ int bt_6lowpan_init(void)
 void bt_6lowpan_exit(void)
 {
 	debugfs_remove(lowpan_enable_debugfs);
-	debugfs_remove(lowpan_control_debugfs);
 
 	if (listen_chan) {
 		l2cap_chan_close(listen_chan, 0);

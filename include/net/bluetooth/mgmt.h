@@ -606,6 +606,15 @@ struct mgmt_rp_add_network {
 	int ifindex;
 } __packed;
 
+#define MGMT_OP_REMOVE_NETWORK          0x0044
+#define MGMT_REMOVE_NETWORK_SIZE        7
+struct mgmt_cp_remove_network {
+	struct mgmt_addr_info dst;
+} __packed;
+struct mgmt_rp_remove_network {
+	struct mgmt_addr_info dst;
+} __packed;
+
 #define MGMT_EV_CMD_COMPLETE		0x0001
 struct mgmt_ev_cmd_complete {
 	__le16	opcode;
@@ -824,4 +833,9 @@ struct mgmt_ev_advertising_removed {
 struct mgmt_ev_network_added {
 	struct mgmt_addr_info dst;
 	int ifindex;
+} __packed;
+
+#define MGMT_EV_NETWORK_REMOVED         0x0026
+struct mgmt_ev_network_removed {
+	struct mgmt_addr_info dst;
 } __packed;

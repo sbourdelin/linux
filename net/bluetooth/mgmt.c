@@ -107,6 +107,7 @@ static const u16 mgmt_commands[] = {
 	MGMT_OP_START_LIMITED_DISCOVERY,
 	MGMT_OP_GET_NETWORKS,
 	MGMT_OP_ADD_NETWORK,
+	MGMT_OP_REMOVE_NETWORK,
 };
 
 static const u16 mgmt_events[] = {
@@ -145,6 +146,7 @@ static const u16 mgmt_events[] = {
 	MGMT_EV_ADVERTISING_ADDED,
 	MGMT_EV_ADVERTISING_REMOVED,
 	MGMT_EV_NETWORK_ADDED,
+	MGMT_EV_NETWORK_REMOVED,
 };
 
 static const u16 mgmt_untrusted_commands[] = {
@@ -6342,6 +6344,7 @@ static const struct hci_mgmt_handler mgmt_handlers[] = {
 	{ start_limited_discovery, MGMT_START_DISCOVERY_SIZE },
 	{ bt_6lowpan_get_networks, MGMT_GET_NETWORKS_SIZE },
 	{ bt_6lowpan_add_network,  MGMT_ADD_NETWORK_SIZE },
+	{ bt_6lowpan_remove_network, MGMT_REMOVE_NETWORK_SIZE },
 };
 
 void mgmt_index_added(struct hci_dev *hdev)
