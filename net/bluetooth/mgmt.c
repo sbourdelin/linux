@@ -31,6 +31,7 @@
 #include <net/bluetooth/hci_core.h>
 #include <net/bluetooth/hci_sock.h>
 #include <net/bluetooth/l2cap.h>
+#include <net/bluetooth/6lowpan.h>
 #include <net/bluetooth/mgmt.h>
 
 #include "hci_request.h"
@@ -104,6 +105,7 @@ static const u16 mgmt_commands[] = {
 	MGMT_OP_REMOVE_ADVERTISING,
 	MGMT_OP_GET_ADV_SIZE_INFO,
 	MGMT_OP_START_LIMITED_DISCOVERY,
+	MGMT_OP_GET_NETWORKS,
 };
 
 static const u16 mgmt_events[] = {
@@ -6336,6 +6338,7 @@ static const struct hci_mgmt_handler mgmt_handlers[] = {
 	{ remove_advertising,	   MGMT_REMOVE_ADVERTISING_SIZE },
 	{ get_adv_size_info,       MGMT_GET_ADV_SIZE_INFO_SIZE },
 	{ start_limited_discovery, MGMT_START_DISCOVERY_SIZE },
+	{ bt_6lowpan_get_networks, MGMT_GET_NETWORKS_SIZE },
 };
 
 void mgmt_index_added(struct hci_dev *hdev)

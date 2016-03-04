@@ -586,6 +586,16 @@ struct mgmt_rp_get_adv_size_info {
 
 #define MGMT_OP_START_LIMITED_DISCOVERY	0x0041
 
+#define MGMT_OP_GET_NETWORKS            0x0042
+#define MGMT_GET_NETWORKS_SIZE          0
+struct mgmt_rp_get_networks {
+	__u16 count;
+} __packed; /* followed by zero or more struct mgmt_rp_network */
+struct mgmt_rp_network {
+	struct mgmt_addr_info dst;
+	int ifindex;
+} __packed;
+
 #define MGMT_EV_CMD_COMPLETE		0x0001
 struct mgmt_ev_cmd_complete {
 	__le16	opcode;
