@@ -406,7 +406,7 @@ void ath9k_deinit_btcoex(struct ath_softc *sc)
 
 int ath9k_init_btcoex(struct ath_softc *sc)
 {
-	struct ath_txq *txq;
+	struct ath_hwq *hwq;
 	struct ath_hw *ah = sc->sc_ah;
 	int r;
 
@@ -421,8 +421,8 @@ int ath9k_init_btcoex(struct ath_softc *sc)
 	case ATH_BTCOEX_CFG_3WIRE:
 		ath9k_hw_btcoex_init_3wire(sc->sc_ah);
 		ath_init_btcoex_timer(sc);
-		txq = sc->tx.txq_map[IEEE80211_AC_BE];
-		ath9k_hw_init_btcoex_hw(sc->sc_ah, txq->axq_qnum);
+		hwq = sc->tx.hwq_map[IEEE80211_AC_BE];
+		ath9k_hw_init_btcoex_hw(sc->sc_ah, hwq->axq_qnum);
 		break;
 	case ATH_BTCOEX_CFG_MCI:
 		ath_init_btcoex_timer(sc);

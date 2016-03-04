@@ -35,7 +35,7 @@ static void ath9k_beaconq_config(struct ath_softc *sc)
 	struct ath_hw *ah = sc->sc_ah;
 	struct ath_common *common = ath9k_hw_common(ah);
 	struct ath9k_tx_queue_info qi, qi_be;
-	struct ath_txq *txq;
+	struct ath_hwq *hwq;
 
 	ath9k_hw_get_txq_props(ah, sc->beacon.beaconq, &qi);
 
@@ -47,8 +47,8 @@ static void ath9k_beaconq_config(struct ath_softc *sc)
 		qi.tqi_cwmax = 0;
 	} else {
 		/* Adhoc mode; important thing is to use 2x cwmin. */
-		txq = sc->tx.txq_map[IEEE80211_AC_BE];
-		ath9k_hw_get_txq_props(ah, txq->axq_qnum, &qi_be);
+		hwq = sc->tx.hwq_map[IEEE80211_AC_BE];
+		ath9k_hw_get_txq_props(ah, hwq->axq_qnum, &qi_be);
 		qi.tqi_aifs = qi_be.tqi_aifs;
 		if (ah->slottime == ATH9K_SLOT_TIME_20)
 			qi.tqi_cwmin = 2*qi_be.tqi_cwmin;
@@ -117,7 +117,7 @@ static struct ath_buf *ath9k_beacon_generate(struct ieee80211_hw *hw,
 	struct ath_buf *bf;
 	struct ath_vif *avp = (void *)vif->drv_priv;
 	struct sk_buff *skb;
-	struct ath_txq *cabq = sc->beacon.cabq;
+	struct ath_hwq *cabq = sc->beacon.cabq;
 	struct ieee80211_tx_info *info;
 	struct ieee80211_mgmt *mgmt_hdr;
 	int cabq_depth;
@@ -180,7 +180,7 @@ static struct ath_buf *ath9k_beacon_generate(struct ieee80211_hw *hw,
 		if (sc->cur_chan->nvifs > 1) {
 			ath_dbg(common, BEACON,
 				"Flushing previous cabq traffic\n");
-			ath_draintxq(sc, cabq);
+			ath_drainhwq(sc, cabq);
 		}
 	}
 

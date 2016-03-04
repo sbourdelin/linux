@@ -621,34 +621,34 @@ static int read_file_xmit(struct seq_file *file, void *data)
 	return 0;
 }
 
-static void print_queue(struct ath_softc *sc, struct ath_txq *txq,
+static void print_queue(struct ath_softc *sc, struct ath_hwq *hwq,
 			struct seq_file *file)
 {
-	ath_txq_lock(sc, txq);
+	ath_hwq_lock(sc, hwq);
 
-	seq_printf(file, "%s: %d ", "qnum", txq->axq_qnum);
-	seq_printf(file, "%s: %2d ", "qdepth", txq->axq_depth);
-	seq_printf(file, "%s: %2d ", "ampdu-depth", txq->axq_ampdu_depth);
-	seq_printf(file, "%s: %3d ", "pending", txq->pending_frames);
-	seq_printf(file, "%s: %d\n", "stopped", txq->stopped);
+	seq_printf(file, "%s: %d ", "qnum", hwq->axq_qnum);
+	seq_printf(file, "%s: %2d ", "qdepth", hwq->axq_depth);
+	seq_printf(file, "%s: %2d ", "ampdu-depth", hwq->axq_ampdu_depth);
+	seq_printf(file, "%s: %3d ", "pending", hwq->pending_frames);
+	seq_printf(file, "%s: %d\n", "stopped", hwq->stopped);
 
-	ath_txq_unlock(sc, txq);
+	ath_hwq_unlock(sc, hwq);
 }
 
 static int read_file_queues(struct seq_file *file, void *data)
 {
 	struct ieee80211_hw *hw = dev_get_drvdata(file->private);
 	struct ath_softc *sc = hw->priv;
-	struct ath_txq *txq;
+	struct ath_hwq *hwq;
 	int i;
 	static const char *qname[4] = {
 		"VO", "VI", "BE", "BK"
 	};
 
 	for (i = 0; i < IEEE80211_NUM_ACS; i++) {
-		txq = sc->tx.txq_map[i];
+		hwq = sc->tx.hwq_map[i];
 		seq_printf(file, "(%s):  ", qname[i]);
-		print_queue(sc, txq, file);
+		print_queue(sc, hwq, file);
 	}
 
 	seq_puts(file, "(CAB): ");
@@ -782,10 +782,10 @@ static int read_file_reset(struct seq_file *file, void *data)
 }
 
 void ath_debug_stat_tx(struct ath_softc *sc, struct ath_buf *bf,
-		       struct ath_tx_status *ts, struct ath_txq *txq,
+		       struct ath_tx_status *ts, struct ath_hwq *hwq,
 		       unsigned int flags)
 {
-	int qnum = txq->axq_qnum;
+	int qnum = hwq->axq_qnum;
 
 	TX_STAT_INC(qnum, tx_pkts_all);
 	sc->debug.stats.txstats[qnum].tx_bytes_all += bf->bf_mpdu->len;
@@ -1329,13 +1329,13 @@ int ath9k_init_debug(struct ath_hw *ah)
 	debugfs_create_devm_seqfile(sc->dev, "queues", sc->debug.debugfs_phy,
 				    read_file_queues);
 	debugfs_create_u32("qlen_bk", S_IRUSR | S_IWUSR, sc->debug.debugfs_phy,
-			   &sc->tx.txq_max_pending[IEEE80211_AC_BK]);
+			   &sc->tx.hwq_max_pending[IEEE80211_AC_BK]);
 	debugfs_create_u32("qlen_be", S_IRUSR | S_IWUSR, sc->debug.debugfs_phy,
-			   &sc->tx.txq_max_pending[IEEE80211_AC_BE]);
+			   &sc->tx.hwq_max_pending[IEEE80211_AC_BE]);
 	debugfs_create_u32("qlen_vi", S_IRUSR | S_IWUSR, sc->debug.debugfs_phy,
-			   &sc->tx.txq_max_pending[IEEE80211_AC_VI]);
+			   &sc->tx.hwq_max_pending[IEEE80211_AC_VI]);
 	debugfs_create_u32("qlen_vo", S_IRUSR | S_IWUSR, sc->debug.debugfs_phy,
-			   &sc->tx.txq_max_pending[IEEE80211_AC_VO]);
+			   &sc->tx.hwq_max_pending[IEEE80211_AC_VO]);
 	debugfs_create_devm_seqfile(sc->dev, "misc", sc->debug.debugfs_phy,
 				    read_file_misc);
 	debugfs_create_devm_seqfile(sc->dev, "reset", sc->debug.debugfs_phy,

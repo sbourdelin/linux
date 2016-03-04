@@ -20,7 +20,7 @@
 #include "hw.h"
 #include "dfs_debug.h"
 
-struct ath_txq;
+struct ath_hwq;
 struct ath_buf;
 struct fft_sample_tlv;
 
@@ -194,7 +194,7 @@ struct ath_tx_stats {
 /*
  * Various utility macros to print TX/Queue counters.
  */
-#define PR_QNUM(_n) sc->tx.txq_map[_n]->axq_qnum
+#define PR_QNUM(_n) sc->tx.hwq_map[_n]->axq_qnum
 #define TXSTATS sc->debug.stats.txstats
 #define PR(str, elem)							\
 	do {								\
@@ -253,7 +253,7 @@ void ath9k_deinit_debug(struct ath_softc *sc);
 
 void ath_debug_stat_interrupt(struct ath_softc *sc, enum ath9k_int status);
 void ath_debug_stat_tx(struct ath_softc *sc, struct ath_buf *bf,
-		       struct ath_tx_status *ts, struct ath_txq *txq,
+		       struct ath_tx_status *ts, struct ath_hwq *hwq,
 		       unsigned int flags);
 void ath_debug_stat_rx(struct ath_softc *sc, struct ath_rx_status *rs);
 int ath9k_get_et_sset_count(struct ieee80211_hw *hw,
@@ -290,7 +290,7 @@ static inline void ath_debug_stat_interrupt(struct ath_softc *sc,
 static inline void ath_debug_stat_tx(struct ath_softc *sc,
 				     struct ath_buf *bf,
 				     struct ath_tx_status *ts,
-				     struct ath_txq *txq,
+				     struct ath_hwq *hwq,
 				     unsigned int flags)
 {
 }
