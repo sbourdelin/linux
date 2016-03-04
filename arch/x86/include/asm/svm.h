@@ -67,10 +67,24 @@ struct __attribute__ ((__packed__)) vmcb_control_area {
 	u32 asid;
 	u8 tlb_ctl;
 	u8 reserved_2[3];
-	u32 int_ctl;
+	union { /* Offset 0x60 */
+		u32 int_ctl;
+
+		struct __attribute__ ((__packed__)) {
+			u32 v_tpr		: 8,
+			    v_irq		: 1,
+			    reserved_3		: 7,
+			    v_intr_prio		: 4,
+			    v_ign_tpr		: 1,
+			    reserved_4		: 3,
+			    v_intr_masking	: 1,
+			    reserved_5		: 6,
+			    avic_enable		: 1;
+		};
+	};
 	u32 int_vector;
 	u32 int_state;
-	u8 reserved_3[4];
+	u8 reserved_6[4];
 	u32 exit_code;
 	u32 exit_code_hi;
 	u64 exit_info_1;
@@ -78,17 +92,22 @@ struct __attribute__ ((__packed__)) vmcb_control_area {
 	u32 exit_int_info;
 	u32 exit_int_info_err;
 	u64 nested_ctl;
-	u8 reserved_4[16];
+	u64 avic_vapic_bar;
+	u8 reserved_7[8];
 	u32 event_inj;
 	u32 event_inj_err;
 	u64 nested_cr3;
 	u64 lbr_ctl;
 	u32 clean;
-	u32 reserved_5;
+	u32 reserved_8;
 	u64 next_rip;
 	u8 insn_len;
 	u8 insn_bytes[15];
-	u8 reserved_6[800];
+	u64 avic_bk_page;	/* Offset 0xe0 */
+	u8 reserved_9[8];	/* Offset 0xe8 */
+	u64 avic_log_apic_id;	/* Offset 0xf0 */
+	u64 avic_phy_apic_id;	/* Offset 0xf8 */
+	u8 reserved_10[768];
 };
 
 
