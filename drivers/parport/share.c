@@ -273,6 +273,9 @@ int __parport_register_driver(struct parport_driver *drv, struct module *owner,
 		/* using device model */
 		int ret;
 
+		if (!parport_bus_type.p)
+			return -EAGAIN;
+
 		/* initialize common driver fields */
 		drv->driver.name = drv->name;
 		drv->driver.bus = &parport_bus_type;
