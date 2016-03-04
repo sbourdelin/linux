@@ -1387,7 +1387,7 @@ static struct notifier_block bt_6lowpan_dev_notifier = {
 	.notifier_call = device_event,
 };
 
-static int __init bt_6lowpan_init(void)
+int bt_6lowpan_init(void)
 {
 	lowpan_enable_debugfs = debugfs_create_file("6lowpan_enable", 0644,
 						    bt_debugfs, NULL,
@@ -1399,7 +1399,7 @@ static int __init bt_6lowpan_init(void)
 	return register_netdevice_notifier(&bt_6lowpan_dev_notifier);
 }
 
-static void __exit bt_6lowpan_exit(void)
+void bt_6lowpan_exit(void)
 {
 	debugfs_remove(lowpan_enable_debugfs);
 	debugfs_remove(lowpan_control_debugfs);
@@ -1413,11 +1413,3 @@ static void __exit bt_6lowpan_exit(void)
 
 	unregister_netdevice_notifier(&bt_6lowpan_dev_notifier);
 }
-
-module_init(bt_6lowpan_init);
-module_exit(bt_6lowpan_exit);
-
-MODULE_AUTHOR("Jukka Rissanen <jukka.rissanen@linux.intel.com>");
-MODULE_DESCRIPTION("Bluetooth 6LoWPAN");
-MODULE_VERSION(VERSION);
-MODULE_LICENSE("GPL");

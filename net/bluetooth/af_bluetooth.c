@@ -29,6 +29,7 @@
 #include <asm/ioctls.h>
 
 #include <net/bluetooth/bluetooth.h>
+#include <net/bluetooth/6lowpan.h>
 #include <linux/proc_fs.h>
 
 #include "selftest.h"
@@ -747,8 +748,16 @@ static int __init bt_init(void)
 		goto sock_err;
 	}
 
+	err = bt_6lowpan_init();
+	if (err < 0) {
+		sco_exit();
+		l2cap_exit();
+		goto sock_err;
+	}
+
 	err = mgmt_init();
 	if (err < 0) {
+		bt_6lowpan_exit();
 		sco_exit();
 		l2cap_exit();
 		goto sock_err;
@@ -769,6 +778,8 @@ error:
 static void __exit bt_exit(void)
 {
 	mgmt_exit();
+
+	bt_6lowpan_exit();
 
 	sco_exit();
 
