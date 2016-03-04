@@ -229,13 +229,13 @@ static inline int v4l_vb2q_enable_media_source(struct vb2_queue *q)
 	return 0;
 }
 
-int v4l2_pipeline_pm_use(struct media_entity *entity, int use);
+static inline int v4l2_pipeline_pm_use(struct media_entity *entity, int use)
 {
 	return 0;
 }
 
-int v4l2_pipeline_link_notify(struct media_link *link, u32 flags,
-			      unsigned int notification);
+static inline int v4l2_pipeline_link_notify(struct media_link *link, u32 flags,
+			      unsigned int notification)
 {
 	return 0;
 }
