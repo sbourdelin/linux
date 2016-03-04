@@ -35,6 +35,7 @@
 #include <linux/trace_events.h>
 #include <linux/slab.h>
 
+#include <asm/apic.h>
 #include <asm/perf_event.h>
 #include <asm/tlbflush.h>
 #include <asm/desc.h>
@@ -175,6 +176,7 @@ struct vcpu_svm {
 
 	struct page *avic_bk_page;
 	void *in_kernel_lapic_regs;
+	bool avic_was_running;
 };
 
 struct __attribute__ ((__packed__))
@@ -1508,6 +1510,146 @@ static int avic_vcpu_init(struct kvm *kvm, struct vcpu_svm *svm, int id)
 	return 0;
 }
 
+static inline int
+avic_update_iommu(struct kvm_vcpu *vcpu, int cpu, phys_addr_t pa, bool r)
+{
+	if (!kvm_arch_has_assigned_device(vcpu->kvm))
+		return 0;
+
+	/* TODO: We will hook up with IOMMU API at later time */
+	return 0;
+}
+
+static int avic_vcpu_load(struct kvm_vcpu *vcpu, int cpu, bool is_load)
+{
+	int g_phy_apic_id, h_phy_apic_id;
+	struct svm_avic_phy_ait_entry *entry, new_entry;
+	struct vcpu_svm *svm = to_svm(vcpu);
+	int ret = 0;
+
+	if (!avic)
+		return 0;
+
+	if (!svm)
+		return -EINVAL;
+
+	/* Note: APIC ID = 0xff is used for broadcast.
+	 *       APIC ID > 0xff is reserved.
+	 */
+	g_phy_apic_id = vcpu->vcpu_id;
+	h_phy_apic_id = __default_cpu_present_to_apicid(cpu);
+
+	if ((g_phy_apic_id >= AVIC_PHY_APIC_ID_MAX) ||
+	    (h_phy_apic_id >= AVIC_PHY_APIC_ID_MAX))
+		return -EINVAL;
+
+	entry = avic_get_phy_ait_entry(vcpu, g_phy_apic_id);
+	if (!entry)
+		return -EINVAL;
+
+	if (is_load) {
+		/* Handle vcpu load */
+		phys_addr_t pa = PFN_PHYS(page_to_pfn(svm->avic_bk_page));
+
+		new_entry = READ_ONCE(*entry);
+
+		BUG_ON(new_entry.is_running);
+
+		new_entry.bk_pg_ptr = (pa >> 12) & 0xffffffffff;
+		new_entry.valid = 1;
+		new_entry.host_phy_apic_id = h_phy_apic_id;
+
+		if (svm->avic_was_running) {
+			/**
+			 * Restore AVIC running flag if it was set during
+			 * vcpu unload.
+			 */
+			new_entry.is_running = 1;
+		}
+		ret = avic_update_iommu(vcpu, h_phy_apic_id, pa,
+					   svm->avic_was_running);
+		WRITE_ONCE(*entry, new_entry);
+
+	} else {
+		/* Handle vcpu unload */
+		new_entry = READ_ONCE(*entry);
+		if (new_entry.is_running) {
+			phys_addr_t pa = PFN_PHYS(page_to_pfn(svm->avic_bk_page));
+
+			/**
+			 * This handles the case when vcpu is scheduled out
+			 * and has not yet not called blocking. We save the
+			 * AVIC running flag so that we can restore later.
+			 */
+			svm->avic_was_running = true;
+
+			/**
+			 * We need to also clear the AVIC running flag
+			 * and communicate the changes to IOMMU.
+			 */
+			ret = avic_update_iommu(vcpu, h_phy_apic_id, pa, 0);
+
+			new_entry.is_running = 0;
+			WRITE_ONCE(*entry, new_entry);
+		} else {
+			svm->avic_was_running = false;
+		}
+	}
+
+	return ret;
+}
+
+/**
+ * This function is called during VCPU halt/unhalt.
+ */
+static int avic_set_running(struct kvm_vcpu *vcpu, bool is_run)
+{
+	int ret = 0;
+	int g_phy_apic_id, h_phy_apic_id;
+	struct svm_avic_phy_ait_entry *entry, new_entry;
+	struct vcpu_svm *svm = to_svm(vcpu);
+	phys_addr_t pa = PFN_PHYS(page_to_pfn(svm->avic_bk_page));
+
+	if (!avic)
+		return 0;
+
+	/* Note: APIC ID = 0xff is used for broadcast.
+	 *       APIC ID > 0xff is reserved.
+	 */
+	g_phy_apic_id = vcpu->vcpu_id;
+	h_phy_apic_id = __default_cpu_present_to_apicid(vcpu->cpu);
+
+	if ((g_phy_apic_id >= AVIC_PHY_APIC_ID_MAX) ||
+	    (h_phy_apic_id >= AVIC_PHY_APIC_ID_MAX))
+		return -EINVAL;
+
+	entry = avic_get_phy_ait_entry(vcpu, g_phy_apic_id);
+	if (!entry)
+		return -EINVAL;
+
+	if (is_run) {
+		/**
+		 * Handle vcpu unblocking after HLT
+		 */
+		new_entry = READ_ONCE(*entry);
+		new_entry.is_running = is_run;
+		WRITE_ONCE(*entry, new_entry);
+
+		ret = avic_update_iommu(vcpu, h_phy_apic_id, pa, is_run);
+	} else {
+		/**
+		 * Handle vcpu blocking due to HLT
+		 */
+		ret = avic_update_iommu(vcpu, h_phy_apic_id, pa, is_run);
+
+		new_entry = READ_ONCE(*entry);
+		new_entry.is_running = is_run;
+		WRITE_ONCE(*entry, new_entry);
+	}
+
+	return ret;
+}
+
 static void svm_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 {
 	struct vcpu_svm *svm = to_svm(vcpu);
@@ -1648,12 +1790,16 @@ static void svm_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 	/* This assumes that the kernel never uses MSR_TSC_AUX */
 	if (static_cpu_has(X86_FEATURE_RDTSCP))
 		wrmsrl(MSR_TSC_AUX, svm->tsc_aux);
+
+	avic_vcpu_load(vcpu, cpu, true);
 }
 
 static void svm_vcpu_put(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_svm *svm = to_svm(vcpu);
 	int i;
+
+	avic_vcpu_load(vcpu, 0, false);
 
 	++vcpu->stat.host_state_reload;
 	kvm_load_ldt(svm->host.ldt);
