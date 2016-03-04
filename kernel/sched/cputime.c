@@ -276,7 +276,7 @@ static __always_inline bool steal_account_process_tick(void)
 		this_rq()->prev_steal_time += cputime_to_nsecs(steal_ct);
 
 		account_steal_time(steal_ct);
-		return steal_ct;
+		return cputime_to_jiffies(steal_ct);
 	}
 #endif
 	return false;
