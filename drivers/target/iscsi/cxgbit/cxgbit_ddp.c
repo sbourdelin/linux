@@ -179,7 +179,7 @@ cxgbit_dump_sgl(const char *cap, struct scatterlist *sgl, int nents)
 	for_each_sg(sgl, sg, nents, i)
 		pr_info("\t%d/%u, 0x%p: len %u, off %u, pg 0x%p, dma 0x%llx, %u\n",
 			i, nents, sg, sg->length, sg->offset, sg_page(sg),
-			sg_dma_address(sg), sg_dma_len(sg));
+			(u64)sg_dma_address(sg), sg_dma_len(sg));
 }
 
 static int cxgbit_ddp_sgl_check(struct scatterlist *sgl, int nents)
