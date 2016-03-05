@@ -108,20 +108,15 @@ struct mvneta_bm {
 };
 
 struct mvneta_bm_pool {
+	struct hwbm_pool hwbm_pool;
 	/* Pool number in the range 0-3 */
 	u8 id;
 	enum mvneta_bm_type type;
 
-	/* Buffer Pointers Pool External (BPPE) size in number of bytes */
-	int size;
-	/* Number of buffers used by this pool */
-	int buf_num;
-	/* Pool buffer size */
-	int buf_size;
 	/* Packet size */
 	int pkt_size;
-	/* Single frag size */
-	u32 frag_size;
+	/* Size of the buffer acces through DMA*/
+	u32 buf_size;
 
 	/* BPPE virtual base address */
 	u32 *virt_addr;
