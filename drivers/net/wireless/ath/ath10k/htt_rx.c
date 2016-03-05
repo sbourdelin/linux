@@ -2051,7 +2051,12 @@ void ath10k_htt_t2h_msg_handler(struct ath10k *ar, struct sk_buff *skb)
 			break;
 		}
 
-		ath10k_txrx_tx_unref(htt, &tx_done);
+		status = ath10k_txrx_tx_unref(htt, &tx_done);
+		if (!status) {
+			spin_lock_bh(&htt->tx_lock);
+			htt->num_pending_mgmt_tx--;
+			spin_unlock_bh(&htt->tx_lock);
+		}
 		break;
 	}
 	case HTT_T2H_MSG_TYPE_TX_COMPL_IND:
