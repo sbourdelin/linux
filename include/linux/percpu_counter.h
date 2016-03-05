@@ -16,8 +16,14 @@
 
 #ifdef CONFIG_SMP
 
+/*
+ * The per-cpu counter will be degenerated into a global counter when limit
+ * is set at initialization time. It will change back to a real per-cpu
+ * counter once the count exceed the given limit.
+ */
 struct percpu_counter {
 	raw_spinlock_t lock;
+	u32 limit;
 	s64 count;
 #ifdef CONFIG_HOTPLUG_CPU
 	struct list_head list;	/* All percpu_counters are on a list */
@@ -42,6 +48,7 @@ void percpu_counter_set(struct percpu_counter *fbc, s64 amount);
 void __percpu_counter_add(struct percpu_counter *fbc, s64 amount, s32 batch);
 s64 __percpu_counter_sum(struct percpu_counter *fbc);
 int __percpu_counter_compare(struct percpu_counter *fbc, s64 rhs, s32 batch);
+void percpu_counter_set_limit(struct percpu_counter *fbc, u32 percpu_limit);
 
 static inline int percpu_counter_compare(struct percpu_counter *fbc, s64 rhs)
 {
@@ -169,6 +176,9 @@ static inline int percpu_counter_initialized(struct percpu_counter *fbc)
 {
 	return 1;
 }
+
+static inline void percpu_counter_set_limit(struct percpu_counter *fbc,
+					    u32 percpu_limit) { }
 
 #endif	/* CONFIG_SMP */
 
