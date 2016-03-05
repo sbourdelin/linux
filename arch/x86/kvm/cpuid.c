@@ -447,6 +447,9 @@ static inline int __do_cpuid_ent(struct kvm_cpuid_entry2 *entry, u32 function,
 			entry->ebx |= F(TSC_ADJUST);
 			entry->ecx &= kvm_supported_word11_x86_features;
 			cpuid_mask(&entry->ecx, 13);
+			if (!tdp_enabled)
+				/* PKU is not yet implemented for shadow paging. */
+				entry->ecx &= ~F(PKU);
 		} else {
 			entry->ebx = 0;
 			entry->ecx = 0;
