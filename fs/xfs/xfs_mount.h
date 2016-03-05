@@ -205,6 +205,11 @@ typedef struct xfs_mount {
 #define	XFS_WSYNC_WRITEIO_LOG	14	/* 16k */
 
 /*
+ * FD blocks batch size for per-cpu compare
+ */
+#define XFS_FDBLOCKS_BATCH	1024
+
+/*
  * Allow large block sizes to be reported to userspace programs if the
  * "largeio" mount option is used.
  *

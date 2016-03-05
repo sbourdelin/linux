@@ -1145,7 +1145,6 @@ xfs_mod_ifree(
  * a large batch count (1024) to minimise global counter updates except when
  * we get near to ENOSPC and we have to be very accurate with our updates.
  */
-#define XFS_FDBLOCKS_BATCH	1024
 int
 xfs_mod_fdblocks(
 	struct xfs_mount	*mp,

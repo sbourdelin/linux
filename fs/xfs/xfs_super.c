@@ -1453,6 +1453,12 @@ xfs_reinit_percpu_counters(
 	percpu_counter_set(&mp->m_icount, mp->m_sb.sb_icount);
 	percpu_counter_set(&mp->m_ifree, mp->m_sb.sb_ifree);
 	percpu_counter_set(&mp->m_fdblocks, mp->m_sb.sb_fdblocks);
+
+	/*
+	 * Use default batch size for m_ifree
+	 */
+	percpu_counter_set_limit(&mp->m_ifree, 0);
+	percpu_counter_set_limit(&mp->m_fdblocks, 4 * XFS_FDBLOCKS_BATCH);
 }
 
 static void
