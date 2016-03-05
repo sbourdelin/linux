@@ -4176,6 +4176,7 @@ gpa_t kvm_mmu_gva_to_gpa_read(struct kvm_vcpu *vcpu, gva_t gva,
 			      struct x86_exception *exception)
 {
 	u32 access = (kvm_x86_ops->get_cpl(vcpu) == 3) ? PFERR_USER_MASK : 0;
+	access |= kvm_read_cr4_bits(vcpu, X86_CR4_PKE) ? PFERR_PK_MASK : 0;
 	return vcpu->arch.walk_mmu->gva_to_gpa(vcpu, gva, access, exception);
 }
 
@@ -4192,6 +4193,7 @@ gpa_t kvm_mmu_gva_to_gpa_write(struct kvm_vcpu *vcpu, gva_t gva,
 {
 	u32 access = (kvm_x86_ops->get_cpl(vcpu) == 3) ? PFERR_USER_MASK : 0;
 	access |= PFERR_WRITE_MASK;
+	access |= kvm_read_cr4_bits(vcpu, X86_CR4_PKE) ? PFERR_PK_MASK : 0;
 	return vcpu->arch.walk_mmu->gva_to_gpa(vcpu, gva, access, exception);
 }
 
@@ -4242,10 +4244,13 @@ static int kvm_fetch_guest_virt(struct x86_emulate_ctxt *ctxt,
 	u32 access = (kvm_x86_ops->get_cpl(vcpu) == 3) ? PFERR_USER_MASK : 0;
 	unsigned offset;
 	int ret;
+	gpa_t gpa;
+
+	access |= kvm_read_cr4_bits(vcpu, X86_CR4_PKE) ? PFERR_PK_MASK : 0;
 
 	/* Inline kvm_read_guest_virt_helper for speed.  */
-	gpa_t gpa = vcpu->arch.walk_mmu->gva_to_gpa(vcpu, addr, access|PFERR_FETCH_MASK,
-						    exception);
+	gpa = vcpu->arch.walk_mmu->gva_to_gpa(vcpu, addr,
+			access | PFERR_FETCH_MASK, exception);
 	if (unlikely(gpa == UNMAPPED_GVA))
 		return X86EMUL_PROPAGATE_FAULT;
 
@@ -4266,6 +4271,7 @@ int kvm_read_guest_virt(struct x86_emulate_ctxt *ctxt,
 {
 	struct kvm_vcpu *vcpu = emul_to_vcpu(ctxt);
 	u32 access = (kvm_x86_ops->get_cpl(vcpu) == 3) ? PFERR_USER_MASK : 0;
+	access |= kvm_read_cr4_bits(vcpu, X86_CR4_PKE) ? PFERR_PK_MASK : 0;
 
 	return kvm_read_guest_virt_helper(addr, val, bytes, vcpu, access,
 					  exception);
@@ -4298,9 +4304,13 @@ int kvm_write_guest_virt_system(struct x86_emulate_ctxt *ctxt,
 	void *data = val;
 	int r = X86EMUL_CONTINUE;
 
+	u32 access = PFERR_WRITE_MASK;
+
+	access |= kvm_read_cr4_bits(vcpu, X86_CR4_PKE) ? PFERR_PK_MASK : 0;
+
 	while (bytes) {
 		gpa_t gpa =  vcpu->arch.walk_mmu->gva_to_gpa(vcpu, addr,
-							     PFERR_WRITE_MASK,
+							     access,
 							     exception);
 		unsigned offset = addr & (PAGE_SIZE-1);
 		unsigned towrite = min(bytes, (unsigned)PAGE_SIZE - offset);
