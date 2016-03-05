@@ -590,6 +590,7 @@ acpi_ev_execute_reg_method(union acpi_operand_object *region_obj, u32 function)
 	union acpi_operand_object *args[3];
 	union acpi_operand_object *region_obj2;
 	acpi_status status;
+	bool sp;
 
 	ACPI_FUNCTION_TRACE(ev_execute_reg_method);
 
@@ -598,9 +599,28 @@ acpi_ev_execute_reg_method(union acpi_operand_object *region_obj, u32 function)
 		return_ACPI_STATUS(AE_NOT_EXIST);
 	}
 
+	/*
+	 * For the default space_IDs, (the IDs for which there are default region handlers
+	 * installed) Only execute the _REG methods if the global initialization _REG
+	 * methods have already been run (via acpi_initialize_objects). In other words,
+	 * we will defer the execution of the _REG methods for these space_IDs until
+	 * execution of acpi_initialize_objects. This is done because we need the handlers
+	 * for the default spaces (mem/io/pci/table) to be installed before we can run
+	 * any control methods (or _REG methods). There is known BIOS code that depends
+	 * on this.
+	 *
+	 * For all other space_IDs, we can safely execute the _REG methods immediately.
+	 * This means that for IDs like embedded_controller, this function should be called
+	 * only after acpi_enable_subsystem has been called.
+	 */
+
+	sp = (region_obj->region.space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY ||
+	      region_obj->region.space_id == ACPI_ADR_SPACE_SYSTEM_IO ||
+	      region_obj->region.space_id == ACPI_ADR_SPACE_PCI_CONFIG ||
+	      region_obj->region.space_id == ACPI_ADR_SPACE_DATA_TABLE);
 	if (region_obj2->extra.method_REG == NULL ||
 	    region_obj->region.handler == NULL ||
-	    !acpi_gbl_reg_methods_enabled) {
+	    (sp && !acpi_gbl_reg_methods_enabled)) {
 		return_ACPI_STATUS(AE_OK);
 	}
 
