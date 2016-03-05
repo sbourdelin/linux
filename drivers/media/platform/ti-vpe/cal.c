@@ -498,7 +498,7 @@ static inline void cal_runtime_put(struct cal_dev *dev)
 
 static void cal_quickdump_regs(struct cal_dev *dev)
 {
-	cal_info(dev, "CAL Registers @ 0x%pa:\n", &dev->res->start);
+	cal_info(dev, "CAL Registers @ %pa:\n", &dev->res->start);
 	print_hex_dump(KERN_INFO, "", DUMP_PREFIX_OFFSET, 16, 4,
 		       (__force const void *)dev->base,
 		       resource_size(dev->res), false);

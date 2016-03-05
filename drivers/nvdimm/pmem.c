@@ -172,7 +172,7 @@ static struct pmem_device *pmem_alloc(struct device *dev,
 
 	if (!devm_request_mem_region(dev, pmem->phys_addr, pmem->size,
 			dev_name(dev))) {
-		dev_warn(dev, "could not reserve region [0x%pa:0x%zx]\n",
+		dev_warn(dev, "could not reserve region [%pa:0x%zx]\n",
 				&pmem->phys_addr, pmem->size);
 		return ERR_PTR(-EBUSY);
 	}
