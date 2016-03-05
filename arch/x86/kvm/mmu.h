@@ -3,6 +3,7 @@
 
 #include <linux/kvm_host.h>
 #include "kvm_cache_regs.h"
+#include "x86.h"
 
 #define PT64_PT_BITS 9
 #define PT64_ENT_PER_PAGE (1 << PT64_PT_BITS)
@@ -24,6 +25,7 @@
 #define PT_PAGE_SIZE_MASK (1ULL << PT_PAGE_SIZE_SHIFT)
 #define PT_PAT_MASK (1ULL << 7)
 #define PT_GLOBAL_MASK (1ULL << 8)
+
 #define PT64_NX_SHIFT 63
 #define PT64_NX_MASK (1ULL << PT64_NX_SHIFT)
 
@@ -44,6 +46,10 @@
 #define PT_DIRECTORY_LEVEL 2
 #define PT_PAGE_TABLE_LEVEL 1
 #define PT_MAX_HUGEPAGE_LEVEL (PT_PAGE_TABLE_LEVEL + KVM_NR_PAGE_SIZES - 1)
+
+#define PKRU_READ   0
+#define PKRU_WRITE  1
+#define PKRU_ATTRS  2
 
 static inline u64 rsvd_bits(int s, int e)
 {
@@ -145,10 +151,50 @@ static inline bool is_write_protection(struct kvm_vcpu *vcpu)
  * fault with the given access (in ACC_* format)?
  */
 static inline bool permission_fault(struct kvm_vcpu *vcpu, struct kvm_mmu *mmu,
-				    unsigned pte_access, unsigned pfec)
+		unsigned pte_access, unsigned pte_pkeys, unsigned pfec)
 {
-	int cpl = kvm_x86_ops->get_cpl(vcpu);
-	unsigned long rflags = kvm_x86_ops->get_rflags(vcpu);
+	unsigned long smap, rflags;
+	u32 pkru, pkru_bits;
+	int cpl, index;
+	bool wf, uf;
+
+	cpl = kvm_x86_ops->get_cpl(vcpu);
+	rflags = kvm_x86_ops->get_rflags(vcpu);
+
+	/*
+	* PKU is computed dynamically in permission_fault.
+	* 2nd and 6th conditions:
+	* 2.EFER_LMA=1
+	* 6.PKRU.AD=1
+	*	or The access is a data write and PKRU.WD=1 and
+	*	   either CR0.WP=1 or it is a user mode access
+	*/
+	pkru = is_long_mode(vcpu) ? read_pkru() : 0;
+	if (unlikely(pkru) && (pfec & PFERR_PK_MASK))
+	{
+		/*
+		* PKRU defines 32 bits, there are 16 domains and 2 attribute bits per
+		* domain in pkru, pkey is the index to a defined domain, so the value
+		* of pkey * PKRU_ATTRS is offset of a defined domain.
+		*/
+		pkru_bits = (pkru >> (pte_pkeys * PKRU_ATTRS)) & 3;
+
+		wf = pfec & PFERR_WRITE_MASK;
+		uf = pfec & PFERR_USER_MASK;
+
+		/*
+		* Ignore PKRU.WD if not relevant to this access (a read,
+		* or a supervisor mode access if CR0.WP=0).
+		* So 6th conditions is equivalent to "pkru_bits != 0"
+		*/
+		if (!wf || (!uf && !is_write_protection(vcpu)))
+			pkru_bits &= ~(1 << PKRU_WRITE);
+
+		/* Flip pfec on PK bit if pkru_bits is zero */
+		pfec ^= pkru_bits ? 0 : PFERR_PK_MASK;
+	}
+	else
+		pfec &= ~PFERR_PK_MASK;
 
 	/*
 	 * If CPL < 3, SMAP prevention are disabled if EFLAGS.AC = 1.
@@ -163,8 +209,8 @@ static inline bool permission_fault(struct kvm_vcpu *vcpu, struct kvm_mmu *mmu,
 	 * but it will be one in index if SMAP checks are being overridden.
 	 * It is important to keep this branchless.
 	 */
-	unsigned long smap = (cpl - 3) & (rflags & X86_EFLAGS_AC);
-	int index = (pfec >> 1) +
+	smap = (cpl - 3) & (rflags & X86_EFLAGS_AC);
+	index = (pfec >> 1) +
 		    (smap >> (X86_EFLAGS_AC_BIT - PFERR_RSVD_BIT + 1));
 
 	WARN_ON(pfec & PFERR_RSVD_MASK);

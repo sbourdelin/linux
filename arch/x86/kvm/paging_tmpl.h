@@ -253,6 +253,15 @@ static int FNAME(update_accessed_dirty_bits)(struct kvm_vcpu *vcpu,
 	}
 	return 0;
 }
+static inline unsigned FNAME(gpte_pkeys)(struct kvm_vcpu *vcpu, u64 gpte)
+{
+	unsigned pkeys = 0;
+#if PTTYPE == 64
+	pte_t pte = {.pte = gpte};
+	pkeys = pte_flags_pkey(pte_flags(pte));
+#endif
+	return pkeys;
+}
 
 /*
  * Fetch a guest pte for a guest virtual address
@@ -265,12 +274,13 @@ static int FNAME(walk_addr_generic)(struct guest_walker *walker,
 	pt_element_t pte;
 	pt_element_t __user *uninitialized_var(ptep_user);
 	gfn_t table_gfn;
-	unsigned index, pt_access, pte_access, accessed_dirty;
+	unsigned index, pt_access, pte_access, accessed_dirty, pte_pkeys;
 	gpa_t pte_gpa;
 	int offset;
 	const int write_fault = access & PFERR_WRITE_MASK;
 	const int user_fault  = access & PFERR_USER_MASK;
 	const int fetch_fault = access & PFERR_FETCH_MASK;
+	const int pk_fault = access & PFERR_PK_MASK;
 	u16 errcode = 0;
 	gpa_t real_gpa;
 	gfn_t gfn;
@@ -356,7 +366,9 @@ retry_walk:
 		walker->ptes[walker->level - 1] = pte;
 	} while (!is_last_gpte(mmu, walker->level, pte));
 
-	if (unlikely(permission_fault(vcpu, mmu, pte_access, access))) {
+	pte_pkeys = FNAME(gpte_pkeys)(vcpu, pte);
+	if (unlikely(permission_fault(vcpu, mmu, pte_access, pte_pkeys,
+					access))) {
 		errcode |= PFERR_PRESENT_MASK;
 		goto error;
 	}
@@ -399,7 +411,7 @@ retry_walk:
 	return 1;
 
 error:
-	errcode |= write_fault | user_fault;
+	errcode |= write_fault | user_fault | pk_fault;
 	if (fetch_fault && (mmu->nx ||
 			    kvm_read_cr4_bits(vcpu, X86_CR4_SMEP)))
 		errcode |= PFERR_FETCH_MASK;
