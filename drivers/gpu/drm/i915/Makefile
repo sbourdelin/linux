@@ -37,6 +37,7 @@ i915-y += i915_cmd_parser.o \
 	  i915_trace_points.o \
 	  intel_lrc.o \
 	  intel_mocs.o \
+	  i915_rpm.o \
 	  intel_ringbuffer.o \
 	  intel_uncore.o
 
@@ -89,7 +90,8 @@ i915-y += dvo_ch7017.o \
 	  intel_lvds.o \
 	  intel_panel.o \
 	  intel_sdvo.o \
-	  intel_tv.o
+	  intel_tv.o \
+	  hdmi_audio_if.o
 
 # virtual gpu code
 i915-y += i915_vgpu.o
