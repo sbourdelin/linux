@@ -1489,6 +1489,7 @@ static void rtllib_associate_complete_wq(void *data)
 				     struct rtllib_device,
 				     associate_complete_wq);
 	struct rt_pwr_save_ctrl *pPSC = &(ieee->PowerSaveControl);
+
 	netdev_info(ieee->dev, "Associated successfully\n");
 	if (!ieee->is_silent_reset) {
 		netdev_info(ieee->dev, "normal associate\n");
@@ -2707,6 +2708,7 @@ static void rtllib_link_change_wq(void *data)
 				     struct rtllib_device, link_change_wq);
 	ieee->link_change(ieee->dev);
 }
+
 /* called only in userspace context */
 void rtllib_disassociate(struct rtllib_device *ieee)
 {
