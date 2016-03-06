@@ -5,7 +5,11 @@ else
 PLUGINCC := $(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-plugin.sh "$(HOSTCC)" "$(HOSTCXX)" "$(CC)")
 endif
 ifneq ($(PLUGINCC),)
-export PLUGINCC GCC_PLUGINS_CFLAGS GCC_PLUGINS_AFLAGS
+ifdef CONFIG_GCC_PLUGIN_CYC_COMPLEXITY
+GCC_PLUGIN_CYC_COMPLEXITY_CFLAGS := -fplugin=$(objtree)/tools/gcc/cyc_complexity_plugin.so
+endif
+GCC_PLUGINS_CFLAGS := $(GCC_PLUGIN_CYC_COMPLEXITY_CFLAGS)
+export PLUGINCC GCC_PLUGINS_CFLAGS GCC_PLUGINS_AFLAGS GCC_PLUGIN_CYC_COMPLEXITY
 ifeq ($(KBUILD_EXTMOD),)
 gcc-plugins:
 	$(Q)$(MAKE) $(build)=tools/gcc

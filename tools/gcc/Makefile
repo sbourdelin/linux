@@ -12,4 +12,8 @@ endif
 
 export GCCPLUGINS_DIR HOSTLIBS
 
+$(HOSTLIBS)-$(CONFIG_GCC_PLUGIN_CYC_COMPLEXITY) := cyc_complexity_plugin.so
+
 always := $($(HOSTLIBS)-y)
+
+cyc_complexity_plugin-objs := cyc_complexity_plugin.o
