@@ -205,13 +205,15 @@ static inline void debugfs_remove(struct dentry *dentry)
 static inline void debugfs_remove_recursive(struct dentry *dentry)
 { }
 
-static int debugfs_use_file_start(const struct dentry *dentry, int *srcu_idx)
+static inline int debugfs_use_file_start(const struct dentry *dentry,
+					int *srcu_idx)
 	__acquires(&debugfs_srcu)
 {
 	return 0;
 }
 
-static void debugfs_use_file_finish(int srcu_idx) __releases(&debugfs_srcu)
+static inline void debugfs_use_file_finish(int srcu_idx)
+	__releases(&debugfs_srcu)
 { }
 
 #define DEFINE_DEBUGFS_ATTRIBUTE(__fops, __get, __set, __fmt)	\
