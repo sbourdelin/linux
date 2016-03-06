@@ -1339,6 +1339,7 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 static int flashio(struct ddb *dev, u8 *wbuf, u32 wlen, u8 *rbuf, u32 rlen)
 {
 	u32 data, shift;
+	int val;
 
 	if (wlen > 4)
 		ddbwritel(1, SPI_CONTROL);
@@ -1348,8 +1349,9 @@ static int flashio(struct ddb *dev, u8 *wbuf, u32 wlen, u8 *rbuf, u32 rlen)
 		wbuf += 4;
 		wlen -= 4;
 		ddbwritel(data, SPI_DATA);
-		while (ddbreadl(SPI_CONTROL) & 0x0004)
-			;
+		do {
+			val = ddbreadl(SPI_CONTROL);
+		} while (val >= 0 && val & 0x0004);
 	}
 
 	if (rlen)
@@ -1368,8 +1370,9 @@ static int flashio(struct ddb *dev, u8 *wbuf, u32 wlen, u8 *rbuf, u32 rlen)
 	if (shift)
 		data <<= shift;
 	ddbwritel(data, SPI_DATA);
-	while (ddbreadl(SPI_CONTROL) & 0x0004)
-		;
+	do {
+		val = ddbreadl(SPI_CONTROL);
+	} while (val >= 0 && val & 0x0004);
 
 	if (!rlen) {
 		ddbwritel(0, SPI_CONTROL);
@@ -1380,8 +1383,9 @@ static int flashio(struct ddb *dev, u8 *wbuf, u32 wlen, u8 *rbuf, u32 rlen)
 
 	while (rlen > 4) {
 		ddbwritel(0xffffffff, SPI_DATA);
-		while (ddbreadl(SPI_CONTROL) & 0x0004)
-			;
+		do {
+			val = ddbreadl(SPI_CONTROL);
+		} while (val >= 0 && val & 0x0004);
 		data = ddbreadl(SPI_DATA);
 		*(u32 *) rbuf = swab32(data);
 		rbuf += 4;
@@ -1389,8 +1393,9 @@ static int flashio(struct ddb *dev, u8 *wbuf, u32 wlen, u8 *rbuf, u32 rlen)
 	}
 	ddbwritel(0x0003 | ((rlen << (8 + 3)) & 0x1F00), SPI_CONTROL);
 	ddbwritel(0xffffffff, SPI_DATA);
-	while (ddbreadl(SPI_CONTROL) & 0x0004)
-		;
+	do {
+		val = ddbreadl(SPI_CONTROL);
+	} while (val >= 0 && val & 0x0004);
 
 	data = ddbreadl(SPI_DATA);
 	ddbwritel(0, SPI_CONTROL);
