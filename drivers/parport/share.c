@@ -135,9 +135,18 @@ static struct bus_type parport_bus_type = {
 	.probe = parport_probe,
 };
 
+static bool is_registered;
+
 int parport_bus_init(void)
 {
-	return bus_register(&parport_bus_type);
+	int ret;
+
+	ret = bus_register(&parport_bus_type);
+	if (ret)
+		return ret;
+
+	is_registered = true;
+	return 0;
 }
 
 void parport_bus_exit(void)
@@ -272,6 +281,9 @@ int __parport_register_driver(struct parport_driver *drv, struct module *owner,
 	if (drv->devmodel) {
 		/* using device model */
 		int ret;
+
+		if (!is_registered)
+			return -EAGAIN;
 
 		/* initialize common driver fields */
 		drv->driver.name = drv->name;
