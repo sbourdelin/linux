@@ -42,6 +42,7 @@
 #include <linux/nls.h>
 #include <linux/of.h>
 #include "ufshcd.h"
+#include "ufs_quirks.h"
 #include "unipro.h"
 
 #define UFSHCD_ENABLE_INTRS	(UTP_TRANSFER_REQ_COMPL |\
@@ -4591,6 +4592,7 @@ static int ufshcd_probe_hba(struct ufs_hba *hba)
 	if (ret)
 		goto out;
 
+	ufs_advertise_fixup_device(hba);
 	/* UFS device is also active now */
 	ufshcd_set_ufs_dev_active(hba);
 	ufshcd_force_reset_auto_bkops(hba);
