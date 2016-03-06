@@ -50,7 +50,7 @@ const struct file_operations debugfs_noop_file_operations = {
 
 /**
  * debugfs_use_file_start - mark the beginning of file data access
- * @file: the file object whose data is being accessed.
+ * @dentry: the dentry object whose data is being accessed.
  * @srcu_idx: a pointer to some memory to store a SRCU index in.
  *
  * Up to a matching call to debugfs_use_file_finish(), any
