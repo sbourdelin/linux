@@ -36,8 +36,6 @@ MODULE_AUTHOR("Antonio Ospite <ospite@studenti.unina.it>");
 MODULE_DESCRIPTION("GSPCA/Kinect Sensor Device USB Camera Driver");
 MODULE_LICENSE("GPL");
 
-static bool depth_mode;
-
 struct pkt_hdr {
 	uint8_t magic[2];
 	uint8_t pad;
@@ -424,7 +422,7 @@ static void sd_pkt_scan(struct gspca_dev *gspca_dev, u8 *__data, int len)
 
 /* sub-driver description */
 static const struct sd_desc sd_desc_video = {
-	.name      = MODULE_NAME,
+	.name      = MODULE_NAME "_video",
 	.config    = sd_config_video,
 	.init      = sd_init,
 	.start     = sd_start_video,
@@ -436,7 +434,7 @@ static const struct sd_desc sd_desc_video = {
 	*/
 };
 static const struct sd_desc sd_desc_depth = {
-	.name      = MODULE_NAME,
+	.name      = MODULE_NAME "_depth",
 	.config    = sd_config_depth,
 	.init      = sd_init,
 	.start     = sd_start_depth,
@@ -460,12 +458,19 @@ MODULE_DEVICE_TABLE(usb, device_table);
 /* -- device connect -- */
 static int sd_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
-	if (depth_mode)
-		return gspca_dev_probe(intf, id, &sd_desc_depth,
-				       sizeof(struct sd), THIS_MODULE);
-	else
-		return gspca_dev_probe(intf, id, &sd_desc_video,
-				       sizeof(struct sd), THIS_MODULE);
+	int res;
+
+	res = gspca_dev_probe(intf, id, &sd_desc_video, sizeof(struct sd),
+			      THIS_MODULE);
+	if (res < 0)
+		return res;
+
+	res = gspca_dev_probe(intf, id, &sd_desc_depth, sizeof(struct sd),
+			      THIS_MODULE);
+	if (res < 0)
+		gspca_disconnect(intf);
+
+	return res;
 }
 
 static struct usb_driver sd_driver = {
@@ -481,6 +486,3 @@ static struct usb_driver sd_driver = {
 };
 
 module_usb_driver(sd_driver);
-
-module_param(depth_mode, bool, 0644);
-MODULE_PARM_DESC(depth_mode, "0=video 1=depth");
