@@ -99,7 +99,7 @@ static irqreturn_t st_rc_rx_interrupt(int irq, void *data)
 	unsigned int symbol, mark = 0;
 	struct st_rc_device *dev = data;
 	int last_symbol = 0;
-	u32 status;
+	int status;
 	DEFINE_IR_RAW_EVENT(ev);
 
 	if (dev->irq_wake)
@@ -107,7 +107,7 @@ static irqreturn_t st_rc_rx_interrupt(int irq, void *data)
 
 	status  = readl(dev->rx_base + IRB_RX_STATUS);
 
-	while (status & (IRB_FIFO_NOT_EMPTY | IRB_OVERFLOW)) {
+	while (status > 0 && (status & (IRB_FIFO_NOT_EMPTY | IRB_OVERFLOW))) {
 		u32 int_status = readl(dev->rx_base + IRB_RX_INT_STATUS);
 		if (unlikely(int_status & IRB_RX_OVERRUN_INT)) {
 			/* discard the entire collection in case of errors!  */
