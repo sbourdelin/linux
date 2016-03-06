@@ -207,6 +207,7 @@ struct gspca_dev {
 	__u8 alt;			/* USB alternate setting */
 	int xfer_ep;			/* USB transfer endpoint address */
 	u8 audio;			/* presence of audio device */
+	struct gspca_dev *next_dev;	/* next device sharing USB interface */
 
 	/* (*) These variables are proteced by both usb_lock and queue_lock,
 	   that is any code setting them is holding *both*, which means that

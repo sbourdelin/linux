@@ -2004,8 +2004,9 @@ static const struct video_device gspca_template = {
 /*
  * probe and create a new gspca device
  *
- * This function must be called by the sub-driver when it is
- * called for probing a new device.
+ * This function must be called by the sub-driver when it is called for probing
+ * a new device. It may be called multiple times per USB interface, resulting in
+ * multiple video device nodes.
  */
 int gspca_dev_probe2(struct usb_interface *intf,
 		const struct usb_device_id *id,
@@ -2037,6 +2038,7 @@ int gspca_dev_probe2(struct usb_interface *intf,
 	gspca_dev->dev = dev;
 	gspca_dev->iface = intf->cur_altsetting->desc.bInterfaceNumber;
 	gspca_dev->xfer_ep = -1;
+	gspca_dev->next_dev = usb_get_intfdata(intf);
 
 	/* check if any audio device */
 	if (dev->actconfig->desc.bNumInterfaces != 1) {
@@ -2169,41 +2171,50 @@ EXPORT_SYMBOL(gspca_dev_probe);
  */
 void gspca_disconnect(struct usb_interface *intf)
 {
-	struct gspca_dev *gspca_dev = usb_get_intfdata(intf);
+	struct gspca_dev *gspca_dev = usb_get_intfdata(intf), *next_dev;
 #if IS_ENABLED(CONFIG_INPUT)
 	struct input_dev *input_dev;
 #endif
 
-	PDEBUG(D_PROBE, "%s disconnect",
-		video_device_node_name(&gspca_dev->vdev));
+	while (gspca_dev) {
+		PDEBUG(D_PROBE, "%s disconnect",
+			video_device_node_name(&gspca_dev->vdev));
 
-	mutex_lock(&gspca_dev->usb_lock);
+		mutex_lock(&gspca_dev->usb_lock);
 
-	gspca_dev->present = 0;
-	destroy_urbs(gspca_dev);
+		gspca_dev->present = 0;
+		destroy_urbs(gspca_dev);
 
 #if IS_ENABLED(CONFIG_INPUT)
-	gspca_input_destroy_urb(gspca_dev);
-	input_dev = gspca_dev->input_dev;
-	if (input_dev) {
-		gspca_dev->input_dev = NULL;
-		input_unregister_device(input_dev);
-	}
+		gspca_input_destroy_urb(gspca_dev);
+		input_dev = gspca_dev->input_dev;
+		if (input_dev) {
+			gspca_dev->input_dev = NULL;
+			input_unregister_device(input_dev);
+		}
 #endif
-	/* Free subdriver's streaming resources / stop sd workqueue(s) */
-	if (gspca_dev->sd_desc->stop0 && gspca_dev->streaming)
-		gspca_dev->sd_desc->stop0(gspca_dev);
-	gspca_dev->streaming = 0;
-	gspca_dev->dev = NULL;
-	wake_up_interruptible(&gspca_dev->wq);
+		/* Free subdriver's streaming resources / stop sd
+		 * workqueue(s)
+		 */
+		if (gspca_dev->sd_desc->stop0 && gspca_dev->streaming)
+			gspca_dev->sd_desc->stop0(gspca_dev);
+		gspca_dev->streaming = 0;
+		gspca_dev->dev = NULL;
+		wake_up_interruptible(&gspca_dev->wq);
 
-	v4l2_device_disconnect(&gspca_dev->v4l2_dev);
-	video_unregister_device(&gspca_dev->vdev);
+		v4l2_device_disconnect(&gspca_dev->v4l2_dev);
+		video_unregister_device(&gspca_dev->vdev);
 
-	mutex_unlock(&gspca_dev->usb_lock);
+		mutex_unlock(&gspca_dev->usb_lock);
 
-	/* (this will call gspca_release() immediately or on last close) */
-	v4l2_device_put(&gspca_dev->v4l2_dev);
+		next_dev = gspca_dev->next_dev;
+		/* (this will call gspca_release() immediately or on last
+		 * close)
+		 */
+		v4l2_device_put(&gspca_dev->v4l2_dev);
+
+		gspca_dev = next_dev;
+	}
 }
 EXPORT_SYMBOL(gspca_disconnect);
 
@@ -2212,21 +2223,27 @@ int gspca_suspend(struct usb_interface *intf, pm_message_t message)
 {
 	struct gspca_dev *gspca_dev = usb_get_intfdata(intf);
 
-	gspca_input_destroy_urb(gspca_dev);
+	while (gspca_dev) {
+		gspca_input_destroy_urb(gspca_dev);
 
-	if (!gspca_dev->streaming)
-		return 0;
+		if (!gspca_dev->streaming) {
+			gspca_dev = gspca_dev->next_dev;
+			continue;
+		}
 
-	mutex_lock(&gspca_dev->usb_lock);
-	gspca_dev->frozen = 1;		/* avoid urb error messages */
-	gspca_dev->usb_err = 0;
-	if (gspca_dev->sd_desc->stopN)
-		gspca_dev->sd_desc->stopN(gspca_dev);
-	destroy_urbs(gspca_dev);
-	gspca_set_alt0(gspca_dev);
-	if (gspca_dev->sd_desc->stop0)
-		gspca_dev->sd_desc->stop0(gspca_dev);
-	mutex_unlock(&gspca_dev->usb_lock);
+		mutex_lock(&gspca_dev->usb_lock);
+		gspca_dev->frozen = 1;		/* avoid urb error messages */
+		gspca_dev->usb_err = 0;
+		if (gspca_dev->sd_desc->stopN)
+			gspca_dev->sd_desc->stopN(gspca_dev);
+		destroy_urbs(gspca_dev);
+		gspca_set_alt0(gspca_dev);
+		if (gspca_dev->sd_desc->stop0)
+			gspca_dev->sd_desc->stop0(gspca_dev);
+		mutex_unlock(&gspca_dev->usb_lock);
+
+		gspca_dev = gspca_dev->next_dev;
+	}
 
 	return 0;
 }
@@ -2237,22 +2254,26 @@ int gspca_resume(struct usb_interface *intf)
 	struct gspca_dev *gspca_dev = usb_get_intfdata(intf);
 	int streaming, ret = 0;
 
-	mutex_lock(&gspca_dev->usb_lock);
-	gspca_dev->frozen = 0;
-	gspca_dev->usb_err = 0;
-	gspca_dev->sd_desc->init(gspca_dev);
-	/*
-	 * Most subdrivers send all ctrl values on sd_start and thus
-	 * only write to the device registers on s_ctrl when streaming ->
-	 * Clear streaming to avoid setting all ctrls twice.
-	 */
-	streaming = gspca_dev->streaming;
-	gspca_dev->streaming = 0;
-	if (streaming)
-		ret = gspca_init_transfer(gspca_dev);
-	else
-		gspca_input_create_urb(gspca_dev);
-	mutex_unlock(&gspca_dev->usb_lock);
+	while (gspca_dev) {
+		mutex_lock(&gspca_dev->usb_lock);
+		gspca_dev->frozen = 0;
+		gspca_dev->usb_err = 0;
+		gspca_dev->sd_desc->init(gspca_dev);
+		/*
+		 * Most subdrivers send all ctrl values on sd_start and thus
+		 * only write to the device registers on s_ctrl when streaming -
+		 * Clear streaming to avoid setting all ctrls twice.
+		 */
+		streaming = gspca_dev->streaming;
+		gspca_dev->streaming = 0;
+		if (streaming)
+			ret |= gspca_init_transfer(gspca_dev);
+		else
+			gspca_input_create_urb(gspca_dev);
+		mutex_unlock(&gspca_dev->usb_lock);
+
+		gspca_dev = gspca_dev->next_dev;
+	}
 
 	return ret;
 }
