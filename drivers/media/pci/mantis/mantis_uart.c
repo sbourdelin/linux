@@ -91,7 +91,7 @@ static void mantis_uart_read(struct mantis_pci *mantis)
 static void mantis_uart_work(struct work_struct *work)
 {
 	struct mantis_pci *mantis = container_of(work, struct mantis_pci, uart_work);
-	u32 stat;
+	int stat;
 
 	stat = mmread(MANTIS_UART_STAT);
 
@@ -102,7 +102,7 @@ static void mantis_uart_work(struct work_struct *work)
 	 * MANTIS_UART_RXFIFO_DATA is only set if at least
 	 * config->bytes + 1 bytes are in the FIFO.
 	 */
-	while (stat & MANTIS_UART_RXFIFO_DATA) {
+	while ((stat >= 0) && (stat & MANTIS_UART_RXFIFO_DATA)) {
 		mantis_uart_read(mantis);
 		stat = mmread(MANTIS_UART_STAT);
 	}

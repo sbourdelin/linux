@@ -54,11 +54,8 @@
 	}												\
 } while(0)
 
-#define mwrite(dat, addr)	writel((dat), addr)
-#define mread(addr)		readl(addr)
-
-#define mmwrite(dat, addr)	mwrite((dat), (mantis->mmio + (addr)))
-#define mmread(addr)		mread(mantis->mmio + (addr))
+#define mmwrite(dat, addr)	writel((dat), (mantis->mmio + (addr)))
+#define mmread(addr)		readl(mantis->mmio + (addr))
 
 #define MANTIS_TS_188		0
 #define MANTIS_TS_204		1
