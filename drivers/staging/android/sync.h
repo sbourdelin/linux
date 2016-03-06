@@ -93,16 +93,13 @@ struct sync_timeline {
 	struct kref		kref;
 	const struct sync_timeline_ops	*ops;
 	char			name[32];
-
 	/* protected by child_list_lock */
 	bool			destroyed;
 	int			context, value;
-
 	struct list_head	child_list_head;
+	/* lock to protect child_list_head */
 	spinlock_t		child_list_lock;
-
 	struct list_head	active_list_head;
-
 #ifdef CONFIG_DEBUG_FS
 	struct list_head	sync_timeline_list;
 #endif
@@ -122,7 +119,6 @@ struct sync_timeline {
  */
 struct sync_pt {
 	struct fence base;
-
 	struct list_head	child_list;
 	struct list_head	active_list;
 };
@@ -159,10 +155,8 @@ struct sync_fence {
 	struct list_head	sync_fence_list;
 #endif
 	int num_fences;
-
 	wait_queue_head_t	wq;
 	atomic_t		status;
-
 	struct sync_fence_cb	cbs[];
 };
 
@@ -361,6 +355,6 @@ void sync_dump(void);
 # define sync_dump()
 #endif
 int sync_fence_wake_up_wq(wait_queue_t *curr, unsigned mode,
-				 int wake_flags, void *key);
+			  int wake_flags, void *key);
 
 #endif /* _LINUX_SYNC_H */

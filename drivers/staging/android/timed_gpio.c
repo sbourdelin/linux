@@ -28,6 +28,7 @@
 struct timed_gpio_data {
 	struct timed_output_dev dev;
 	struct hrtimer timer;
+	/* lock protects gpio access while setting it's value */
 	spinlock_t lock;
 	unsigned gpio;
 	int max_timeout;
