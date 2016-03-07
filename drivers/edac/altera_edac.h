@@ -232,6 +232,7 @@ struct edac_device_prv_data {
 	int ecc_en_ofst;
 	int ce_set_mask;
 	int ue_set_mask;
+	int set_err_ofst;
 	int trig_alloc_sz;
 };
 
