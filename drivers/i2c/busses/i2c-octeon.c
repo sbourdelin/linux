@@ -68,9 +68,7 @@ struct octeon_i2c {
 	int irq;
 	u32 twsi_freq;
 	int sys_freq;
-	resource_size_t twsi_phys;
 	void __iomem *twsi_base;
-	resource_size_t regsize;
 	struct device *dev;
 };
 
@@ -508,8 +506,6 @@ static int octeon_i2c_probe(struct platform_device *pdev)
 		result = -ENXIO;
 		goto out;
 	}
-	i2c->twsi_phys = res_mem->start;
-	i2c->regsize = resource_size(res_mem);
 
 	/*
 	 * "clock-rate" is a legacy binding, the official binding is
@@ -526,12 +522,13 @@ static int octeon_i2c_probe(struct platform_device *pdev)
 
 	i2c->sys_freq = octeon_get_io_clock_rate();
 
-	if (!devm_request_mem_region(&pdev->dev, i2c->twsi_phys, i2c->regsize,
-				     res_mem->name)) {
+	if (!devm_request_mem_region(&pdev->dev, res_mem->start,
+				     resource_size(res_mem), res_mem->name)) {
 		dev_err(i2c->dev, "request_mem_region failed\n");
 		goto out;
 	}
-	i2c->twsi_base = devm_ioremap(&pdev->dev, i2c->twsi_phys, i2c->regsize);
+	i2c->twsi_base = devm_ioremap(&pdev->dev, res_mem->start,
+				      resource_size(res_mem));
 
 	init_waitqueue_head(&i2c->queue);
 
