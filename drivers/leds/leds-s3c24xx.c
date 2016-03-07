@@ -59,15 +59,6 @@ static void s3c24xx_led_set(struct led_classdev *led_cdev,
 	}
 }
 
-static int s3c24xx_led_remove(struct platform_device *dev)
-{
-	struct s3c24xx_gpio_led *led = pdev_to_gpio(dev);
-
-	led_classdev_unregister(&led->cdev);
-
-	return 0;
-}
-
 static int s3c24xx_led_probe(struct platform_device *dev)
 {
 	struct s3c24xx_led_platdata *pdata = dev_get_platdata(&dev->dev);
@@ -104,7 +95,7 @@ static int s3c24xx_led_probe(struct platform_device *dev)
 
 	/* register our new led device */
 
-	ret = led_classdev_register(&dev->dev, &led->cdev);
+	ret = devm_led_classdev_register(&dev->dev, &led->cdev);
 	if (ret < 0)
 		dev_err(&dev->dev, "led_classdev_register failed\n");
 
@@ -113,7 +104,6 @@ static int s3c24xx_led_probe(struct platform_device *dev)
 
 static struct platform_driver s3c24xx_led_driver = {
 	.probe		= s3c24xx_led_probe,
-	.remove		= s3c24xx_led_remove,
 	.driver		= {
 		.name		= "s3c24xx_led",
 	},
