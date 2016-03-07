@@ -556,7 +556,15 @@ int btrfs_find_free_objectid(struct btrfs_root *root, u64 *objectid)
 	mutex_lock(&root->objectid_mutex);
 
 	if (unlikely(root->highest_objectid >= BTRFS_LAST_FREE_OBJECTID)) {
-		ret = -ENOSPC;
+		static bool __warned = false;
+
+		if (unlikely(!__warned)) {
+			btrfs_warn(root->fs_info,
+				   "The objectid of root %llu reaches its highest value.\n",
+				   root->root_key.objectid);
+			__warned = true;
+		}
+		ret = -EOVERFLOW;
 		goto out;
 	}
 
