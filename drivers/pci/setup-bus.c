@@ -411,11 +411,11 @@ static void __assign_resources_sorted(struct list_head *head,
 
 		/*
 		 * There are two kinds of additional resources in the list:
-		 * 1. bridge resource  -- IORESOURCE_STARTALIGN
-		 * 2. SR-IOV resource   -- IORESOURCE_SIZEALIGN
+		 * 1. bridge resource -- IORESOURCE_WINDOW
+		 * 2. SR-IOV resource
 		 * Here just fix the additional alignment for bridge
 		 */
-		if (!(dev_res->res->flags & IORESOURCE_STARTALIGN))
+		if (!(dev_res->res->flags & IORESOURCE_WINDOW))
 			continue;
 
 		add_align = get_res_add_align(realloc_head, dev_res->res);
@@ -956,7 +956,7 @@ static void pbus_size_io(struct pci_bus *bus, resource_size_t min_size,
 
 	b_res->start = min_align;
 	b_res->end = b_res->start + size0 - 1;
-	b_res->flags |= IORESOURCE_STARTALIGN;
+	b_res->flags |= IORESOURCE_STARTALIGN | IORESOURCE_WINDOW;
 	if (size1 > size0 && realloc_head) {
 		add_to_list(realloc_head, bus->self, b_res, size1-size0,
 			    min_align);
@@ -1104,7 +1104,7 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask,
 	}
 	b_res->start = min_align;
 	b_res->end = size0 + min_align - 1;
-	b_res->flags |= IORESOURCE_STARTALIGN;
+	b_res->flags |= IORESOURCE_STARTALIGN | IORESOURCE_WINDOW;
 	if (size1 > size0 && realloc_head) {
 		add_to_list(realloc_head, bus->self, b_res, size1-size0, add_align);
 		dev_printk(KERN_DEBUG, &bus->self->dev, "bridge window %pR to %pR add_size %llx add_align %llx\n",
@@ -1140,7 +1140,8 @@ static void pci_bus_size_cardbus(struct pci_bus *bus,
 	 */
 	b_res[0].start = pci_cardbus_io_size;
 	b_res[0].end = b_res[0].start + pci_cardbus_io_size - 1;
-	b_res[0].flags |= IORESOURCE_IO | IORESOURCE_STARTALIGN;
+	b_res[0].flags |= IORESOURCE_IO | IORESOURCE_STARTALIGN |
+			  IORESOURCE_WINDOW;
 	if (realloc_head) {
 		b_res[0].end -= pci_cardbus_io_size;
 		add_to_list(realloc_head, bridge, b_res, pci_cardbus_io_size,
@@ -1152,7 +1153,8 @@ handle_b_res_1:
 		goto handle_b_res_2;
 	b_res[1].start = pci_cardbus_io_size;
 	b_res[1].end = b_res[1].start + pci_cardbus_io_size - 1;
-	b_res[1].flags |= IORESOURCE_IO | IORESOURCE_STARTALIGN;
+	b_res[1].flags |= IORESOURCE_IO | IORESOURCE_STARTALIGN |
+			  IORESOURCE_WINDOW;
 	if (realloc_head) {
 		b_res[1].end -= pci_cardbus_io_size;
 		add_to_list(realloc_head, bridge, b_res+1, pci_cardbus_io_size,
@@ -1190,7 +1192,7 @@ handle_b_res_2:
 		b_res[2].start = pci_cardbus_mem_size;
 		b_res[2].end = b_res[2].start + pci_cardbus_mem_size - 1;
 		b_res[2].flags |= IORESOURCE_MEM | IORESOURCE_PREFETCH |
-				  IORESOURCE_STARTALIGN;
+				  IORESOURCE_STARTALIGN | IORESOURCE_WINDOW;
 		if (realloc_head) {
 			b_res[2].end -= pci_cardbus_mem_size;
 			add_to_list(realloc_head, bridge, b_res+2,
@@ -1206,7 +1208,8 @@ handle_b_res_3:
 		goto handle_done;
 	b_res[3].start = pci_cardbus_mem_size;
 	b_res[3].end = b_res[3].start + b_res_3_size - 1;
-	b_res[3].flags |= IORESOURCE_MEM | IORESOURCE_STARTALIGN;
+	b_res[3].flags |= IORESOURCE_MEM | IORESOURCE_STARTALIGN |
+			  IORESOURCE_WINDOW;
 	if (realloc_head) {
 		b_res[3].end -= b_res_3_size;
 		add_to_list(realloc_head, bridge, b_res+3, b_res_3_size,
