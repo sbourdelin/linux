@@ -1,0 +1,9 @@
+#
+# USB port mux driver configuration
+#
+menu "USB Port MUX drivers"
+config INTEL_USB_MUX
+	select EXTCON
+	def_bool n
+
+endmenu
