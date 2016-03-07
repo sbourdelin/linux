@@ -225,6 +225,7 @@ struct edac_device_prv_data {
 		     struct altr_edac_device_dev *drvdata);
 	int ce_clear_mask;
 	int ue_clear_mask;
+	int clear_err_ofst;
 	char dbgfs_name[20];
 	void * (*alloc_mem)(size_t size, void **other);
 	void (*free_mem)(void *p, size_t size, void *other);
@@ -238,6 +239,7 @@ struct edac_device_prv_data {
 
 struct altr_edac_device_dev {
 	void __iomem *base;
+	void __iomem *status;
 	int sb_irq;
 	int db_irq;
 	const struct edac_device_prv_data *data;

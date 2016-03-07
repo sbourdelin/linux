@@ -556,15 +556,16 @@ static irqreturn_t altr_edac_device_handler(int irq, void *dev_id)
 	struct edac_device_ctl_info *dci = dev_id;
 	struct altr_edac_device_dev *drvdata = dci->pvt_info;
 	const struct edac_device_prv_data *priv = drvdata->data;
+	void __iomem *clear_addr = drvdata->status + priv->clear_err_ofst;
 
 	if (irq == drvdata->sb_irq) {
 		if (priv->ce_clear_mask)
-			writel(priv->ce_clear_mask, drvdata->base);
+			writel(priv->ce_clear_mask, clear_addr);
 		edac_device_handle_ce(dci, 0, 0, drvdata->edac_dev_name);
 		ret_value = IRQ_HANDLED;
 	} else if (irq == drvdata->db_irq) {
 		if (priv->ue_clear_mask)
-			writel(priv->ue_clear_mask, drvdata->base);
+			writel(priv->ue_clear_mask, clear_addr);
 		edac_device_handle_ue(dci, 0, 0, drvdata->edac_dev_name);
 		panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
 		ret_value = IRQ_HANDLED;
@@ -742,6 +743,9 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 	if (!drvdata->base)
 		goto fail1;
 
+	/* Except for A10 L2 cache, status reg is within alloced base mem */
+	drvdata->status = drvdata->base;
+
 	/* Get driver specific data for this EDAC device */
 	drvdata->data = of_match_node(altr_edac_device_of_match, np)->data;
 
@@ -875,6 +879,7 @@ const struct edac_device_prv_data ocramecc_data = {
 	.setup = altr_ocram_check_deps,
 	.ce_clear_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_SERR),
 	.ue_clear_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_DERR),
+	.clear_err_ofst = ALTR_OCR_ECC_REG_OFFSET,
 	.dbgfs_name = "altr_ocram_trigger",
 	.alloc_mem = ocram_alloc_mem,
 	.free_mem = ocram_free_mem,
@@ -949,6 +954,7 @@ const struct edac_device_prv_data l2ecc_data = {
 	.setup = altr_l2_check_deps,
 	.ce_clear_mask = 0,
 	.ue_clear_mask = 0,
+	.clear_err_ofst = ALTR_L2_ECC_REG_OFFSET,
 	.dbgfs_name = "altr_l2_trigger",
 	.alloc_mem = l2_alloc_mem,
 	.free_mem = l2_free_mem,
