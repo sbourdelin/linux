@@ -599,6 +599,20 @@
 			reg = <0xffe00000 0x40000>;
 		};
 
+		eccmgr: eccmgr@ffd06090 {
+			compatible = "altr,socfpga-ecc-manager";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges;
+
+			l2-ecc@ffd06010 {
+				compatible = "altr,socfpga-a10-l2-ecc";
+				reg = <0xffd06010 0x4>;
+				interrupts = <0 2 IRQ_TYPE_LEVEL_HIGH>,
+					     <0 0 IRQ_TYPE_LEVEL_HIGH>;
+			};
+		};
+
 		rst: rstmgr@ffd05000 {
 			#reset-cells = <1>;
 			compatible = "altr,rst-mgr";
