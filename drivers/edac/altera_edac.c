@@ -549,6 +549,7 @@ module_platform_driver(altr_edac_driver);
 
 const struct edac_device_prv_data ocramecc_data;
 const struct edac_device_prv_data l2ecc_data;
+const struct edac_device_prv_data a10_l2ecc_data;
 
 static irqreturn_t altr_edac_device_handler(int irq, void *dev_id)
 {
@@ -687,6 +688,8 @@ static void altr_create_edacdev_dbgfs(struct edac_device_ctl_info *edac_dci,
 static const struct of_device_id altr_edac_device_of_match[] = {
 #ifdef CONFIG_EDAC_ALTERA_L2C
 	{ .compatible = "altr,socfpga-l2-ecc", .data = (void *)&l2ecc_data },
+	{ .compatible = "altr,socfpga-a10-l2-ecc",
+	  .data = (void *)&a10_l2ecc_data },
 #endif
 #ifdef CONFIG_EDAC_ALTERA_OCRAM
 	{ .compatible = "altr,socfpga-ocram-ecc",
@@ -970,6 +973,40 @@ static int altr_l2_check_deps(struct platform_device *pdev,
 	return -ENODEV;
 }
 
+static int altr_a10_l2_check_deps(struct platform_device *pdev,
+				  struct altr_edac_device_dev *drvdata)
+{
+	void __iomem  *status_base, *base = drvdata->base;
+	const struct edac_device_prv_data *prv = drvdata->data;
+
+	if ((readl(base + prv->ecc_en_ofst) & prv->ecc_enable_mask) !=
+	     prv->ecc_enable_mask) {
+		edac_printk(KERN_ERR, EDAC_DEVICE,
+			    "L2: No ECC present, or ECC disabled\n");
+		return -ENODEV;
+	}
+
+	/* A10 L2 cache status registers are not contiguous with base */
+	if (!devm_request_mem_region(&pdev->dev, ALTR_A10_L2_ECC_STATUS,
+				     2 * sizeof(u32), dev_name(&pdev->dev))) {
+		edac_printk(KERN_ERR, EDAC_DEVICE,
+			    "Unable to request mem region\n");
+		return -EBUSY;
+	}
+
+	status_base = devm_ioremap(&pdev->dev, ALTR_A10_L2_ECC_STATUS,
+				   2 * sizeof(u32));
+	if (!status_base) {
+		edac_printk(KERN_ERR, EDAC_DEVICE,
+			    "Unable to ioremap L2 status\n");
+		return -ENOMEM;
+	}
+
+	drvdata->status = status_base;
+
+	return 0;
+}
+
 const struct edac_device_prv_data l2ecc_data = {
 	.setup = altr_l2_check_deps,
 	.ce_clear_mask = 0,
@@ -989,6 +1026,26 @@ const struct edac_device_prv_data l2ecc_data = {
 	.set_err_ofst = ALTR_L2_ECC_REG_OFFSET,
 	.trig_alloc_sz = ALTR_TRIG_L2C_BYTE_SIZE,
 	.irq_flags = 0,
+};
+
+const struct edac_device_prv_data a10_l2ecc_data = {
+	.setup = altr_a10_l2_check_deps,
+	.ce_clear_mask = ALTR_A10_L2_ECC_SERR_CLR,
+	.ue_clear_mask = ALTR_A10_L2_ECC_MERR_CLR,
+	.clear_err_ofst = ALTR_A10_L2_ECC_CLR_OFST,
+	.ce_status_mask = ALTR_A10_L2_ECC_SERR_PEND,
+	.ue_status_mask = ALTR_A10_L2_ECC_MERR_PEND,
+	.err_status_ofst = ALTR_A10_L2_ECC_STAT_OFST,
+	.dbgfs_name = "altr_l2_trigger",
+	.alloc_mem = l2_alloc_mem,
+	.free_mem = l2_free_mem,
+	.ecc_enable_mask = ALTR_A10_L2_ECC_EN_CTL,
+	.ecc_en_ofst = ALTR_A10_L2_ECC_CTL_OFST,
+	.ce_set_mask = ALTR_A10_L2_ECC_CE_INJ_MASK,
+	.ue_set_mask = ALTR_A10_L2_ECC_UE_INJ_MASK,
+	.set_err_ofst = ALTR_A10_L2_ECC_INJ_OFST,
+	.trig_alloc_sz = ALTR_TRIG_L2C_BYTE_SIZE,
+	.irq_flags = IRQF_SHARED,
 };
 
 #endif	/* CONFIG_EDAC_ALTERA_L2C */

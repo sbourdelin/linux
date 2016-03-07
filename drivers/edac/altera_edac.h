@@ -196,12 +196,13 @@ struct altr_sdram_mc_data {
 };
 
 /************************** EDAC Device Defines **************************/
-
+/***** General Device Trigger Defines *****/
 #define ALTR_UE_TRIGGER_CHAR            'U'   /* Trigger for UE */
 #define ALTR_TRIGGER_READ_WRD_CNT       32    /* Line size x 4 */
 #define ALTR_TRIG_OCRAM_BYTE_SIZE       128   /* Line size x 4 */
 #define ALTR_TRIG_L2C_BYTE_SIZE         4096  /* Full Page */
 
+/******* Cyclone5 and Arria5 Defines *******/
 /* OCRAM ECC Management Group Defines */
 #define ALTR_MAN_GRP_OCRAM_ECC_OFFSET   0x04
 #define ALTR_OCR_ECC_REG_OFFSET         0x00
@@ -217,6 +218,24 @@ struct altr_sdram_mc_data {
 #define ALTR_L2_ECC_EN                  BIT(0)
 #define ALTR_L2_ECC_INJS                BIT(1)
 #define ALTR_L2_ECC_INJD                BIT(2)
+
+/************* Arria10 Defines *************/
+/* Arria 10 L2 ECC Management Group Defines */
+#define ALTR_A10_L2_ECC_CTL_OFST        0x0
+#define ALTR_A10_L2_ECC_EN_CTL          BIT(0)
+
+#define ALTR_A10_L2_ECC_STATUS          0xFFD060A4
+#define ALTR_A10_L2_ECC_STAT_OFST       0x0
+#define ALTR_A10_L2_ECC_SERR_PEND       BIT(15)
+#define ALTR_A10_L2_ECC_MERR_PEND       BIT(31)
+
+#define ALTR_A10_L2_ECC_CLR_OFST        0x4
+#define ALTR_A10_L2_ECC_SERR_CLR        BIT(15)
+#define ALTR_A10_L2_ECC_MERR_CLR        BIT(31)
+
+#define ALTR_A10_L2_ECC_INJ_OFST        ALTR_A10_L2_ECC_CTL_OFST
+#define ALTR_A10_L2_ECC_CE_INJ_MASK     0x00000101
+#define ALTR_A10_L2_ECC_UE_INJ_MASK     0x00010101
 
 struct altr_edac_device_dev;
 
