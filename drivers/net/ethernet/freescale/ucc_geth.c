@@ -3238,7 +3238,7 @@ static int ucc_geth_rx(struct ucc_geth_private *ugeth, u8 rxQ, int rx_work_limit
 	return howmany;
 }
 
-static int ucc_geth_tx(struct net_device *dev, u8 txQ)
+static void ucc_geth_tx(struct net_device *dev, u8 txQ)
 {
 	/* Start from the next BD that should be filled */
 	struct ucc_geth_private *ugeth = netdev_priv(dev);
@@ -3281,7 +3281,6 @@ static int ucc_geth_tx(struct net_device *dev, u8 txQ)
 		bd_status = in_be32((u32 __iomem *)bd);
 	}
 	ugeth->confBd[txQ] = bd;
-	return 0;
 }
 
 static int ucc_geth_poll(struct napi_struct *napi, int budget)
