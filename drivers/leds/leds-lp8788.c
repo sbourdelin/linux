@@ -154,7 +154,7 @@ static int lp8788_led_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	ret = led_classdev_register(dev, &led->led_dev);
+	ret = devm_led_classdev_register(dev, &led->led_dev);
 	if (ret) {
 		dev_err(dev, "led register err: %d\n", ret);
 		return ret;
@@ -163,18 +163,8 @@ static int lp8788_led_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int lp8788_led_remove(struct platform_device *pdev)
-{
-	struct lp8788_led *led = platform_get_drvdata(pdev);
-
-	led_classdev_unregister(&led->led_dev);
-
-	return 0;
-}
-
 static struct platform_driver lp8788_led_driver = {
 	.probe = lp8788_led_probe,
-	.remove = lp8788_led_remove,
 	.driver = {
 		.name = LP8788_DEV_KEYLED,
 	},
