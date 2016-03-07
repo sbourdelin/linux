@@ -1585,3 +1585,80 @@ void setup_initial_memory_limit(phys_addr_t first_memblock_base,
 	/* Finally limit subsequent allocations */
 	memblock_set_current_limit(ppc64_rma_size);
 }
+
+/*
+ * PAPR says that each reserved virtual address range record
+ * contains three be32 elements which is of toal 12 bytes.
+ * First two be32 elements contain the abbreviated virtual
+ * address (high order 32 bits and low order 32 bits that
+ * generate the abbreviated virtual address of 64 bits which
+ * need to be concatenated with 24 bits of 0 at the end) and
+ * the third be32 element contains the size of the reserved
+ * virtual address range as number of consecutive 4K pages.
+ */
+struct reserved_va_record {
+	__be32	high_addr;
+	__be32	low_addr;
+	__be32	nr_pages_4K;
+};
+
+/*
+ * Linux uses 65 bits (CONTEXT_BITS + ESID_BITS + SID_SHIFT)
+ * of virtual address. As reserved virtual address comes in
+ * as an abbreviated form (64 bits) from the device tree, we
+ * will use a partial address bit mask (65 >> 24) to match it
+ * for simplicity.
+ */
+#define RVA_LESS_BITS		24
+#define LINUX_VA_BITS		(CONTEXT_BITS + ESID_BITS + SID_SHIFT)
+#define PARTIAL_LINUX_VA_MASK	((1ULL << (LINUX_VA_BITS - RVA_LESS_BITS)) - 1)
+
+static int __init validate_reserved_va_range(void)
+{
+	struct reserved_va_record rva;
+	struct device_node *np;
+	int records, ret, i;
+	__be64 vaddr;
+
+	np = of_find_node_by_name(NULL, "vdevice");
+	if (!np)
+		return -ENODEV;
+
+	records = of_property_count_elems_of_size(np,
+			"ibm,reserved-virtual-addresses",
+				sizeof(struct reserved_va_record));
+	if (records < 0)
+		return records;
+
+	for (i = 0; i < records; i++) {
+		ret = of_property_read_u32_index(np,
+			"ibm,reserved-virtual-addresses",
+				3 * i, &rva.high_addr);
+		if (ret)
+			return ret;
+
+		ret = of_property_read_u32_index(np,
+			"ibm,reserved-virtual-addresses",
+				3 * i + 1, &rva.low_addr);
+		if (ret)
+			return ret;
+
+		ret = of_property_read_u32_index(np,
+			"ibm,reserved-virtual-addresses",
+				3 * i + 2, &rva.nr_pages_4K);
+		if (ret)
+			return ret;
+
+		vaddr =  rva.high_addr;
+		vaddr =  (vaddr << 32) | rva.low_addr;
+		if (vaddr & cpu_to_be64(~PARTIAL_LINUX_VA_MASK))
+			continue;
+
+		pr_err("RVA [0x%llx000000 (0x%x in bytes)] overlapped\n",
+					vaddr, rva.nr_pages_4K * 4096);
+		BUG();
+	}
+	of_node_put(np);
+	return 0;
+}
+__initcall(validate_reserved_va_range);
