@@ -2922,6 +2922,8 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 				windows need to be expanded.
 				noresize: Don't change the resources' sizes when
 				reassigning alignment.
+				Note that this option will not work if
+				PCI_PROBE_ONLY is set.
 		ecrc=		Enable/disable PCIe ECRC (transaction layer
 				end-to-end CRC checking).
 				bios: Use BIOS/firmware settings. This is the

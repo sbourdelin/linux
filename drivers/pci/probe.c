@@ -1719,7 +1719,8 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
 	pci_fixup_device(pci_fixup_header, dev);
 
 	/* moved out from quirk header fixup code */
-	pci_reassigndev_resource_alignment(dev);
+	if (!pci_has_flag(PCI_PROBE_ONLY))
+		pci_reassigndev_resource_alignment(dev);
 
 	/* Clear the state_saved flag. */
 	dev->state_saved = false;
