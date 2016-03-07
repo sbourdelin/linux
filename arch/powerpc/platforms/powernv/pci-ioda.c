@@ -1955,6 +1955,20 @@ static struct iommu_table_ops pnv_ioda2_iommu_ops = {
 	.free = pnv_ioda2_table_free,
 };
 
+static bool pnv_ioda_iommu_capable(enum iommu_cap cap)
+{
+	switch (cap) {
+	case IOMMU_CAP_INTR_REMAP:
+		return true;
+	default:
+		return false;
+	}
+}
+
+static struct iommu_ops pnv_ioda_iommu_ops = {
+	.capable = pnv_ioda_iommu_capable,
+};
+
 static void pnv_pci_ioda_setup_dma_pe(struct pnv_phb *phb,
 				      struct pnv_ioda_pe *pe, unsigned int base,
 				      unsigned int segs)
@@ -3078,6 +3092,9 @@ static void pnv_pci_ioda_fixup(void)
 
 	/* Link NPU IODA tables to their PCI devices. */
 	pnv_npu_ioda_fixup();
+
+	/* Add IOMMU_CAP_INTR_REMAP */
+	bus_set_iommu(&pci_bus_type, &pnv_ioda_iommu_ops);
 }
 
 /*
