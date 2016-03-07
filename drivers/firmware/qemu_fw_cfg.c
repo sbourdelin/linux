@@ -77,12 +77,26 @@ static inline u16 fw_cfg_sel_endianness(u16 key)
 static inline void fw_cfg_read_blob(u16 key,
 				    void *buf, loff_t pos, size_t count)
 {
+#ifdef CONFIG_ACPI
+	u32 glk;
+	int status;
+	status = acpi_acquire_global_lock(ACPI_WAIT_FOREVER, &glk);
+	if (ACPI_FAILURE(status)) {
+		/* Should never get here */
+		WARN(1, "fw_cfg_read_blob: Failed to lock ACPI!\n");
+		memset(buf, 0, count);
+		return;
+	}
+#endif
 	mutex_lock(&fw_cfg_dev_lock);
 	iowrite16(fw_cfg_sel_endianness(key), fw_cfg_reg_ctrl);
 	while (pos-- > 0)
 		ioread8(fw_cfg_reg_data);
 	ioread8_rep(fw_cfg_reg_data, buf, count);
 	mutex_unlock(&fw_cfg_dev_lock);
+#ifdef CONFIG_ACPI
+	acpi_release_global_lock(glk);
+#endif
 }
 
 /* clean up fw_cfg device i/o */
