@@ -363,6 +363,8 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
 		ret = phy_init(phy);
 		if (ret < 0)
 			return ret;
+	} else if (PTR_ERR(phy) == -EPROBE_DEFER) {
+		return PTR_ERR(phy);
 	}
 
 	/* index 2 is to read PCI DEVICE_ID */
