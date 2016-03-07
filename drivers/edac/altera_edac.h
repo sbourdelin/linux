@@ -204,6 +204,7 @@ struct altr_sdram_mc_data {
 
 /* OCRAM ECC Management Group Defines */
 #define ALTR_MAN_GRP_OCRAM_ECC_OFFSET   0x04
+#define ALTR_OCR_ECC_REG_OFFSET         0x00
 #define ALTR_OCR_ECC_EN                 BIT(0)
 #define ALTR_OCR_ECC_INJS               BIT(1)
 #define ALTR_OCR_ECC_INJD               BIT(2)
@@ -212,18 +213,23 @@ struct altr_sdram_mc_data {
 
 /* L2 ECC Management Group Defines */
 #define ALTR_MAN_GRP_L2_ECC_OFFSET      0x00
+#define ALTR_L2_ECC_REG_OFFSET          0x00
 #define ALTR_L2_ECC_EN                  BIT(0)
 #define ALTR_L2_ECC_INJS                BIT(1)
 #define ALTR_L2_ECC_INJD                BIT(2)
 
+struct altr_edac_device_dev;
+
 struct edac_device_prv_data {
-	int (*setup)(struct platform_device *pdev, void __iomem *base);
+	int (*setup)(struct platform_device *pdev,
+		     struct altr_edac_device_dev *drvdata);
 	int ce_clear_mask;
 	int ue_clear_mask;
 	char dbgfs_name[20];
 	void * (*alloc_mem)(size_t size, void **other);
 	void (*free_mem)(void *p, size_t size, void *other);
 	int ecc_enable_mask;
+	int ecc_en_ofst;
 	int ce_set_mask;
 	int ue_set_mask;
 	int trig_alloc_sz;

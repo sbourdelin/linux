@@ -746,7 +746,7 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 
 	/* Check specific dependencies for the module */
 	if (drvdata->data->setup) {
-		res = drvdata->data->setup(pdev, drvdata->base);
+		res = drvdata->data->setup(pdev, drvdata);
 		if (res)
 			goto fail1;
 	}
@@ -857,9 +857,12 @@ static void ocram_free_mem(void *p, size_t size, void *other)
  *	memory will cause CE/UE errors possibly causing an ABORT.
  */
 static int altr_ocram_check_deps(struct platform_device *pdev,
-				 void __iomem *base)
+				 struct altr_edac_device_dev *drvdata)
 {
-	if (readl(base) & ALTR_OCR_ECC_EN)
+	void __iomem  *base = drvdata->base;
+	const struct edac_device_prv_data *prv = drvdata->data;
+
+	if (readl(base + prv->ecc_en_ofst) & prv->ecc_enable_mask)
 		return 0;
 
 	edac_printk(KERN_ERR, EDAC_DEVICE,
@@ -875,6 +878,7 @@ const struct edac_device_prv_data ocramecc_data = {
 	.alloc_mem = ocram_alloc_mem,
 	.free_mem = ocram_free_mem,
 	.ecc_enable_mask = ALTR_OCR_ECC_EN,
+	.ecc_en_ofst = ALTR_OCR_ECC_REG_OFFSET,
 	.ce_set_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_INJS),
 	.ue_set_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_INJD),
 	.trig_alloc_sz = ALTR_TRIG_OCRAM_BYTE_SIZE,
@@ -924,10 +928,15 @@ static void l2_free_mem(void *p, size_t size, void *other)
  *	Note that L2 Cache Enable is forced at build time.
  */
 static int altr_l2_check_deps(struct platform_device *pdev,
-			      void __iomem *base)
+			      struct altr_edac_device_dev *drvdata)
 {
-	if (readl(base) & ALTR_L2_ECC_EN)
+	void __iomem  *base = drvdata->base;
+	const struct edac_device_prv_data *prv = drvdata->data;
+
+	if ((readl(base + prv->ecc_en_ofst) & prv->ecc_enable_mask) ==
+	     prv->ecc_enable_mask) {
 		return 0;
+	}
 
 	edac_printk(KERN_ERR, EDAC_DEVICE,
 		    "L2: No ECC present, or ECC disabled\n");
@@ -942,6 +951,7 @@ const struct edac_device_prv_data l2ecc_data = {
 	.alloc_mem = l2_alloc_mem,
 	.free_mem = l2_free_mem,
 	.ecc_enable_mask = ALTR_L2_ECC_EN,
+	.ecc_en_ofst = ALTR_L2_ECC_REG_OFFSET,
 	.ce_set_mask = (ALTR_L2_ECC_EN | ALTR_L2_ECC_INJS),
 	.ue_set_mask = (ALTR_L2_ECC_EN | ALTR_L2_ECC_INJD),
 	.trig_alloc_sz = ALTR_TRIG_L2C_BYTE_SIZE,
