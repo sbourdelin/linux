@@ -592,13 +592,14 @@ static long vfio_pci_ioctl(void *device_data,
 			    IORESOURCE_MEM && !pci_resources_share_page(pdev,
 			    info.index)) {
 				info.flags |= VFIO_REGION_INFO_FLAG_MMAP;
-				if (info.index == vdev->msix_bar) {
+				if (!iommu_capable(pdev->dev.bus,
+					IOMMU_CAP_INTR_REMAP) &&
+					info.index == vdev->msix_bar) {
 					ret = msix_sparse_mmap_cap(vdev, &caps);
 					if (ret)
 						return ret;
 				}
 			}
-
 			break;
 		case VFIO_PCI_ROM_REGION_INDEX:
 		{
@@ -1028,7 +1029,8 @@ static int vfio_pci_mmap(void *device_data, struct vm_area_struct *vma)
 	if (phys_len < PAGE_SIZE || req_start + req_len > phys_len)
 		return -EINVAL;
 
-	if (index == vdev->msix_bar) {
+	if (!iommu_capable(pdev->dev.bus, IOMMU_CAP_INTR_REMAP) &&
+		index == vdev->msix_bar) {
 		/*
 		 * Disallow mmaps overlapping the MSI-X table; users don't
 		 * get to touch this directly.  We could find somewhere
