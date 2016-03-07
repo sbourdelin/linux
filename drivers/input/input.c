@@ -401,8 +401,7 @@ static void input_handle_event(struct input_dev *dev,
 		if (dev->num_vals >= 2)
 			input_pass_values(dev, dev->vals, dev->num_vals);
 		dev->num_vals = 0;
-	} else if (dev->num_vals >= dev->max_vals - 2) {
-		dev->vals[dev->num_vals++] = input_value_sync;
+	} else if (dev->num_vals >= dev->max_vals - 1) {
 		input_pass_values(dev, dev->vals, dev->num_vals);
 		dev->num_vals = 0;
 	}
