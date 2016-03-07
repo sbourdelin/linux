@@ -128,6 +128,10 @@ int pamu_enable_liodn(int liodn)
 	mb();
 
 	set_bf(ppaace->addr_bitfields, PAACE_AF_V, PAACE_V_VALID);
+	/*
+	 * Ensure that I/O devices use the new PAACE entry
+	 * right after this function returns
+	 */
 	mb();
 
 	return 0;
@@ -150,6 +154,10 @@ int pamu_disable_liodn(int liodn)
 	}
 
 	set_bf(ppaace->addr_bitfields, PAACE_AF_V, PAACE_V_INVALID);
+	/*
+	 * Ensure that I/O devices no longer use this PAACE entry
+	 * right after this function returns
+	 */
 	mb();
 
 	return 0;
@@ -226,16 +234,17 @@ static struct paace *pamu_get_spaace(struct paace *paace, u32 wnum)
  * function returns the index of the first SPAACE entry. The remaining
  * SPAACE entries are reserved contiguously from that index.
  *
- * Returns a valid fspi index in the range of 0 - SPAACE_NUMBER_ENTRIES on success.
- * If no SPAACE entry is available or the allocator can not reserve the required
- * number of contiguous entries function returns ULONG_MAX indicating a failure.
- *
+ * Returns a valid fspi index in the range of 0 - SPAACE_NUMBER_ENTRIES on
+ * success. If no SPAACE entry is available or the allocator can not reserve
+ * the required number of contiguous entries function returns ULONG_MAX
+ * indicating a failure.
  */
 static unsigned long pamu_get_fspi_and_allocate(u32 subwin_cnt)
 {
 	unsigned long spaace_addr;
 
-	spaace_addr = gen_pool_alloc(spaace_pool, subwin_cnt * sizeof(struct paace));
+	spaace_addr = gen_pool_alloc(spaace_pool, subwin_cnt *
+						  sizeof(struct paace));
 	if (!spaace_addr)
 		return ULONG_MAX;
 
@@ -257,16 +266,17 @@ void pamu_free_subwins(int liodn)
 	if (get_bf(ppaace->addr_bitfields, PPAACE_AF_MW)) {
 		subwin_cnt = 1UL << (get_bf(ppaace->impl_attr, PAACE_IA_WCE) + 1);
 		size = (subwin_cnt - 1) * sizeof(struct paace);
-		gen_pool_free(spaace_pool, (unsigned long)&spaact[ppaace->fspi], size);
+		gen_pool_free(spaace_pool,
+			      (unsigned long)&spaact[ppaace->fspi], size);
 		set_bf(ppaace->addr_bitfields, PPAACE_AF_MW, 0);
 	}
 }
 
 /*
- * Function used for updating stash destination for the coressponding
+ * Function used for updating stash destination for the corresponding
  * LIODN.
  */
-int  pamu_update_paace_stash(int liodn, u32 subwin, u32 value)
+int pamu_update_paace_stash(int liodn, u32 subwin, u32 value)
 {
 	struct paace *paace;
 
@@ -282,6 +292,10 @@ int  pamu_update_paace_stash(int liodn, u32 subwin, u32 value)
 	}
 	set_bf(paace->impl_attr, PAACE_IA_CID, value);
 
+	/*
+	 * Ensure that I/O devices see the new stash id
+	 * just after this function returns
+	 */
 	mb();
 
 	return 0;
@@ -307,6 +321,10 @@ int pamu_disable_spaace(int liodn, u32 subwin)
 		       PAACE_AP_PERMS_DENIED);
 	}
 
+	/*
+	 * Ensure that I/O devices no longer use this PAACE entry
+	 * right after this function returns
+	 */
 	mb();
 
 	return 0;
@@ -399,6 +417,10 @@ int pamu_config_ppaace(int liodn, phys_addr_t win_addr, phys_addr_t win_size,
 		set_bf(ppaace->impl_attr, PAACE_IA_WCE, 0);
 		set_bf(ppaace->addr_bitfields, PPAACE_AF_MW, 0);
 	}
+	/*
+	 * Ensure that I/O devices see the updated PPAACE entry
+	 * right after this function returns
+	 */
 	mb();
 
 	return 0;
@@ -483,11 +505,16 @@ int pamu_config_spaace(int liodn, u32 subwin_cnt, u32 subwin,
 	if (~stashid != 0)
 		set_bf(paace->impl_attr, PAACE_IA_CID, stashid);
 
+	/* Ensure that this SPAACE entry updates before we enable it */
 	smp_wmb();
 
 	if (enable)
 		set_bf(paace->addr_bitfields, PAACE_AF_V, PAACE_V_VALID);
 
+	/*
+	 * Ensure that I/O devices use this PAACE entry
+	 * right after this function returns
+	 */
 	mb();
 
 	return 0;
@@ -553,7 +580,8 @@ u32 get_stash_id(u32 stash_dest_hint, u32 vcpu)
 found_cpu_node:
 
 	/* find the hwnode that represents the cache */
-	for (cache_level = PAMU_ATTR_CACHE_L1; (cache_level < PAMU_ATTR_CACHE_L3) && found; cache_level++) {
+	for (cache_level = PAMU_ATTR_CACHE_L1;
+	     (cache_level < PAMU_ATTR_CACHE_L3) && found; cache_level++) {
 		if (stash_dest_hint == cache_level) {
 			prop = of_get_property(node, "cache-stash-id", NULL);
 			if (!prop) {
@@ -598,26 +626,28 @@ found_cpu_node:
  * Memory accesses to QMAN and BMAN private memory need not be coherent, so
  * clear the PAACE entry coherency attribute for them.
  */
-static void setup_qbman_paace(struct paace *ppaace, int  paace_type)
+static void setup_qbman_paace(struct paace *ppaace, int paace_type)
 {
 	switch (paace_type) {
 	case QMAN_PAACE:
 		set_bf(ppaace->impl_attr, PAACE_IA_OTM, PAACE_OTM_INDEXED);
 		ppaace->op_encode.index_ot.omi = OMI_QMAN_PRIV;
 		/* setup QMAN Private data stashing for the L3 cache */
-		set_bf(ppaace->impl_attr, PAACE_IA_CID, get_stash_id(PAMU_ATTR_CACHE_L3, 0));
-		set_bf(ppaace->domain_attr.to_host.coherency_required, PAACE_DA_HOST_CR,
-		       0);
+		set_bf(ppaace->impl_attr, PAACE_IA_CID,
+		       get_stash_id(PAMU_ATTR_CACHE_L3, 0));
+		set_bf(ppaace->domain_attr.to_host.coherency_required,
+		       PAACE_DA_HOST_CR, 0);
 		break;
 	case QMAN_PORTAL_PAACE:
 		set_bf(ppaace->impl_attr, PAACE_IA_OTM, PAACE_OTM_INDEXED);
 		ppaace->op_encode.index_ot.omi = OMI_QMAN;
 		/* Set DQRR and Frame stashing for the L3 cache */
-		set_bf(ppaace->impl_attr, PAACE_IA_CID, get_stash_id(PAMU_ATTR_CACHE_L3, 0));
+		set_bf(ppaace->impl_attr, PAACE_IA_CID,
+		       get_stash_id(PAMU_ATTR_CACHE_L3, 0));
 		break;
 	case BMAN_PAACE:
-		set_bf(ppaace->domain_attr.to_host.coherency_required, PAACE_DA_HOST_CR,
-		       0);
+		set_bf(ppaace->domain_attr.to_host.coherency_required,
+		       PAACE_DA_HOST_CR, 0);
 		break;
 	}
 }
@@ -675,7 +705,8 @@ static void get_pamu_cap_values(unsigned long pamu_reg_base)
 }
 
 /* Setup PAMU registers pointing to PAACT, SPAACT and OMT */
-static int setup_one_pamu(unsigned long pamu_reg_base, unsigned long pamu_reg_size,
+static int setup_one_pamu(unsigned long pamu_reg_base,
+			  unsigned long pamu_reg_size,
 			  phys_addr_t ppaact_phys, phys_addr_t spaact_phys,
 			  phys_addr_t omt_phys)
 {
@@ -752,6 +783,10 @@ static void setup_liodns(void)
 				setup_qbman_paace(ppaace, QMAN_PAACE);
 			if (of_device_is_compatible(node, "fsl,bman"))
 				setup_qbman_paace(ppaace, BMAN_PAACE);
+			/*
+			 * Ensure that the PAACE entry is updated before
+			 * enabling it
+			 */
 			mb();
 			pamu_enable_liodn(liodn);
 		}
@@ -814,7 +849,8 @@ static irqreturn_t pamu_av_isr(int irq, void *arg)
 				pics &= ~PAMU_ACCESS_VIOLATION_ENABLE;
 			} else {
 				/* Disable the LIODN */
-				ret = pamu_disable_liodn(avs1 >> PAMU_AVS1_LIODN_SHIFT);
+				ret = pamu_disable_liodn(avs1 >>
+							 PAMU_AVS1_LIODN_SHIFT);
 				BUG_ON(ret);
 				pr_emerg("Disabling liodn %x\n",
 					 avs1 >> PAMU_AVS1_LIODN_SHIFT);
@@ -957,9 +993,11 @@ static int create_csd(phys_addr_t phys, size_t size, u32 csd_port_id)
 
 	law[i].lawbarh = upper_32_bits(phys);
 	law[i].lawbarl = lower_32_bits(phys);
+	/* Ensure LAW entry is updated before enabling it */
 	wmb();
 	law[i].lawar = LAWAR_EN | law_target | (csd_id << LAWAR_CSDID_SHIFT) |
 		(LAW_SIZE_4K + get_order(size));
+	/* Ensure LAW entry is enabled before moving on */
 	wmb();
 
 error:
@@ -979,10 +1017,10 @@ error:
  * Table of SVRs and the corresponding PORT_ID values. Port ID corresponds to a
  * bit map of snoopers for a given range of memory mapped by a LAW.
  *
- * All future CoreNet-enabled SOCs will have this erratum(A-004510) fixed, so this
- * table should never need to be updated.  SVRs are guaranteed to be unique, so
- * there is no worry that a future SOC will inadvertently have one of these
- * values.
+ * All future CoreNet-enabled SOCs will have this erratum(A-004510) fixed,
+ * so this table should never need to be updated. SVRs are guaranteed to be
+ * unique, so there is no worry that a future SOC will inadvertently have one
+ * of these values.
  */
 static const struct {
 	u32 svr;
@@ -1081,7 +1119,7 @@ static int fsl_pamu_probe(struct platform_device *pdev)
 	get_pamu_cap_values((unsigned long)pamu_regs);
 	/*
 	 * To simplify the allocation of a coherency domain, we allocate the
-	 * PAACT and the OMT in the same memory buffer.  Unfortunately, this
+	 * PAACT and the OMT in the same memory buffer. Unfortunately, this
 	 * wastes more memory compared to allocating the buffers separately.
 	 */
 	/* Determine how much memory we need */
@@ -1215,7 +1253,7 @@ static __init int fsl_pamu_init(void)
 
 	/*
 	 * The normal OF process calls the probe function at some
-	 * indeterminate later time, after most drivers have loaded.  This is
+	 * indeterminate later time, after most drivers have loaded. This is
 	 * too late for us, because PAMU clients (like the Qman driver)
 	 * depend on PAMU being initialized early.
 	 *
@@ -1224,11 +1262,11 @@ static __init int fsl_pamu_init(void)
 	 */
 
 	/*
-	 * We assume that there is only one PAMU node in the device tree.  A
+	 * We assume that there is only one PAMU node in the device tree. A
 	 * single PAMU node represents all of the PAMU devices in the SOC
-	 * already.   Everything else already makes that assumption, and the
+	 * already. Everything else already makes that assumption, and the
 	 * binding for the PAMU nodes doesn't allow for any parent-child
-	 * relationships anyway.  In other words, support for more than one
+	 * relationships anyway. In other words, support for more than one
 	 * PAMU node would require significant changes to a lot of code.
 	 */
 

@@ -66,8 +66,9 @@ struct pamu_mmap_regs {
 #define PAMU_AVS1_LAV   0x1c00
 #define PAMU_AVS1_GCV   0x2000
 #define PAMU_AVS1_PDV   0x4000
-#define PAMU_AV_MASK    (PAMU_AVS1_AV | PAMU_AVS1_OTV | PAMU_AVS1_APV | PAMU_AVS1_WAV \
-			 | PAMU_AVS1_LAV | PAMU_AVS1_GCV | PAMU_AVS1_PDV)
+#define PAMU_AV_MASK    (PAMU_AVS1_AV | PAMU_AVS1_OTV | PAMU_AVS1_APV | \
+			 PAMU_AVS1_WAV | PAMU_AVS1_LAV | PAMU_AVS1_GCV | \
+			 PAMU_AVS1_PDV)
 #define PAMU_AVS1_LIODN_SHIFT 16
 #define PAMU_LAV_LIODN_NOT_IN_PPAACT 0x400
 
@@ -270,7 +271,7 @@ struct pamu_mmap_regs {
 /* primary / secondary paact structure */
 struct paace {
 	/* PAACE Offset 0x00 */
-	u32 wbah;				/* only valid for Primary PAACE */
+	u32 wbah;			/* only valid for Primary PAACE */
 	u32 addr_bitfields;		/* See P/S PAACE_AF_* */
 
 	/* PAACE Offset 0x08 */
@@ -294,7 +295,10 @@ struct paace {
 		} to_io;
 	} domain_attr;
 
-	/* Implementation attributes + window count + address & operation translation modes */
+	/*
+	 * Implementation attributes + window count +
+	 * address & operation translation modes
+	 */
 	u32 impl_attr;			/* See PAACE_IA_* */
 
 	/* PAACE Offset 0x10 */
@@ -304,7 +308,7 @@ struct paace {
 
 	/* PAACE Offset 0x18 */
 	/* first secondary paace entry */
-	u32 fspi;				/* only valid for Primary PAACE */
+	u32 fspi;			/* only valid for Primary PAACE */
 	union {
 		struct {
 			u8 ioea;
@@ -324,11 +328,12 @@ struct paace {
 
 /* OME : Operation mapping entry
  * MOE : Mapped Operation Encodings
- * The operation mapping table is table containing operation mapping entries (OME).
- * The index of a particular OME is programmed in the PAACE entry for translation
- * in bound I/O operations corresponding to an LIODN. The OMT is used for translation
- * specifically in case of the indexed translation mode. Each OME contains a 128
- * byte mapped operation encoding (MOE), where each byte represents an MOE.
+ * The operation mapping table is table containing operation mapping entries
+ * (OME). The index of a particular OME is programmed in the PAACE entry for
+ * translation in bound I/O operations corresponding to an LIODN. The OMT is
+ * used for translation specifically in case of the indexed translation mode.
+ * Each OME contains a 128 byte mapped operation encoding (MOE), where each
+ * byte represents an MOE.
  */
 #define NUM_MOE 128
 struct ome {
@@ -396,8 +401,8 @@ int pamu_enable_liodn(int liodn);
 int pamu_disable_liodn(int liodn);
 void pamu_free_subwins(int liodn);
 int pamu_config_ppaace(int liodn, phys_addr_t win_addr, phys_addr_t win_size,
-		       u32 omi, unsigned long rpn, u32 snoopid, uint32_t stashid,
-		       u32 subwin_cnt, int prot);
+		       u32 omi, unsigned long rpn, u32 snoopid,
+		       uint32_t stashid, u32 subwin_cnt, int prot);
 int pamu_config_spaace(int liodn, u32 subwin_cnt, u32 subwin_addr,
 		       phys_addr_t subwin_size, u32 omi, unsigned long rpn,
 		       uint32_t snoopid, u32 stashid, int enable, int prot);
