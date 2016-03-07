@@ -14,7 +14,7 @@ do
                 echo "removing $f"
                 rm -f "/boot/initramfs-$f.img" "/boot/System.map-$f"
                 rm -f "/boot/vmlinuz-$f"   "/boot/config-$f"
-                rm -rf "/lib/modules/$f"
+                rm -rf "/lib/modules/$f" "/boot/initramfs-${f}kdump.img"
                 new-kernel-pkg --remove $f
         fi
 done
