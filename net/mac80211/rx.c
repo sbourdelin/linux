@@ -3464,6 +3464,8 @@ static bool ieee80211_accept_frame(struct ieee80211_rx_data *rx)
 				return false;
 			if (ieee80211_is_public_action(hdr, skb->len))
 				return true;
+			if (ieee80211_is_probe_resp(hdr->frame_control))
+				return true;
 			return ieee80211_is_beacon(hdr->frame_control);
 		}
 
