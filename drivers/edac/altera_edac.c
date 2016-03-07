@@ -556,19 +556,32 @@ static irqreturn_t altr_edac_device_handler(int irq, void *dev_id)
 	struct edac_device_ctl_info *dci = dev_id;
 	struct altr_edac_device_dev *drvdata = dci->pvt_info;
 	const struct edac_device_prv_data *priv = drvdata->data;
+	void __iomem *status_addr = drvdata->status + priv->err_status_ofst;
 	void __iomem *clear_addr = drvdata->status + priv->clear_err_ofst;
 
+	/*
+	 * CycloneV is directly mapped to a specific IRQ. Arria10
+	 * shares the IRQ with other ECCs so we must match first.
+	 */
 	if (irq == drvdata->sb_irq) {
-		if (priv->ce_clear_mask)
-			writel(priv->ce_clear_mask, clear_addr);
-		edac_device_handle_ce(dci, 0, 0, drvdata->edac_dev_name);
-		ret_value = IRQ_HANDLED;
+		if (!priv->ce_status_mask ||
+		    (priv->ce_status_mask & readl(status_addr))) {
+			if (priv->ce_clear_mask)
+				writel(priv->ce_clear_mask, clear_addr);
+			edac_device_handle_ce(dci, 0, 0,
+					      drvdata->edac_dev_name);
+			ret_value = IRQ_HANDLED;
+		}
 	} else if (irq == drvdata->db_irq) {
-		if (priv->ue_clear_mask)
-			writel(priv->ue_clear_mask, clear_addr);
-		edac_device_handle_ue(dci, 0, 0, drvdata->edac_dev_name);
-		panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
-		ret_value = IRQ_HANDLED;
+		if (!priv->ue_status_mask ||
+		    (priv->ue_status_mask & readl(status_addr))) {
+			if (priv->ue_clear_mask)
+				writel(priv->ue_clear_mask, clear_addr);
+			edac_device_handle_ue(dci, 0, 0,
+					      drvdata->edac_dev_name);
+			panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
+			ret_value = IRQ_HANDLED;
+		}
 	} else {
 		WARN_ON(1);
 	}
@@ -882,6 +895,10 @@ const struct edac_device_prv_data ocramecc_data = {
 	.ce_clear_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_SERR),
 	.ue_clear_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_DERR),
 	.clear_err_ofst = ALTR_OCR_ECC_REG_OFFSET,
+	/* Cyclone5 & Arria5 have separate IRQs so status = 0 */
+	.ce_status_mask = 0,
+	.ue_status_mask = 0,
+	.err_status_ofst = 0,
 	.dbgfs_name = "altr_ocram_trigger",
 	.alloc_mem = ocram_alloc_mem,
 	.free_mem = ocram_free_mem,
@@ -957,7 +974,11 @@ const struct edac_device_prv_data l2ecc_data = {
 	.setup = altr_l2_check_deps,
 	.ce_clear_mask = 0,
 	.ue_clear_mask = 0,
-	.clear_err_ofst = ALTR_L2_ECC_REG_OFFSET,
+	.clear_err_ofst = ALTR_MAN_GRP_L2_ECC_OFFSET,
+	/* Cyclone5 & Arria5 have separate IRQs so status = 0 */
+	.ce_status_mask = 0,
+	.ue_status_mask = 0,
+	.err_status_ofst = 0,
 	.dbgfs_name = "altr_l2_trigger",
 	.alloc_mem = l2_alloc_mem,
 	.free_mem = l2_free_mem,

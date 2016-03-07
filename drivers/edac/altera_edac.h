@@ -226,6 +226,9 @@ struct edac_device_prv_data {
 	int ce_clear_mask;
 	int ue_clear_mask;
 	int clear_err_ofst;
+	int ce_status_mask;
+	int ue_status_mask;
+	int err_status_ofst;
 	char dbgfs_name[20];
 	void * (*alloc_mem)(size_t size, void **other);
 	void (*free_mem)(void *p, size_t size, void *other);
