@@ -6,4 +6,13 @@ config INTEL_USB_MUX
 	select EXTCON
 	def_bool n
 
+config INTEL_MUX_GPIO
+	tristate "Intel dual role port mux controlled by GPIOs"
+	depends on GPIOLIB
+	depends on X86 && ACPI
+	select INTEL_USB_MUX
+	help
+	  Say Y here to enable support for Intel dual role port mux
+	  controlled by GPIOs.
+
 endmenu
