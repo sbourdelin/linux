@@ -1528,6 +1528,10 @@ static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
 	 (pci_resource_end((dev), (bar)) -		\
 	  pci_resource_start((dev), (bar)) + 1))
 
+extern bool pci_resources_page_aligned;
+
+bool pci_resources_share_page(struct pci_dev *dev, int resno);
+
 /* Similar to the helpers above, these manipulate per-pci_dev
  * driver-specific data.  They are really just a wrapper around
  * the generic device structure functions of these calls.
