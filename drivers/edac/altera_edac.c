@@ -759,14 +759,16 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 	drvdata->sb_irq = platform_get_irq(pdev, 0);
 	res = devm_request_irq(&pdev->dev, drvdata->sb_irq,
 			       altr_edac_device_handler,
-			       0, dev_name(&pdev->dev), dci);
+			       drvdata->data->irq_flags,
+			       dev_name(&pdev->dev), dci);
 	if (res)
 		goto fail1;
 
 	drvdata->db_irq = platform_get_irq(pdev, 1);
 	res = devm_request_irq(&pdev->dev, drvdata->db_irq,
 			       altr_edac_device_handler,
-			       0, dev_name(&pdev->dev), dci);
+			       drvdata->data->irq_flags,
+			       dev_name(&pdev->dev), dci);
 	if (res)
 		goto fail1;
 
@@ -889,6 +891,7 @@ const struct edac_device_prv_data ocramecc_data = {
 	.ue_set_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_INJD),
 	.set_err_ofst = ALTR_OCR_ECC_REG_OFFSET,
 	.trig_alloc_sz = ALTR_TRIG_OCRAM_BYTE_SIZE,
+	.irq_flags = 0,
 };
 
 #endif	/* CONFIG_EDAC_ALTERA_OCRAM */
@@ -964,6 +967,7 @@ const struct edac_device_prv_data l2ecc_data = {
 	.ue_set_mask = (ALTR_L2_ECC_EN | ALTR_L2_ECC_INJD),
 	.set_err_ofst = ALTR_L2_ECC_REG_OFFSET,
 	.trig_alloc_sz = ALTR_TRIG_L2C_BYTE_SIZE,
+	.irq_flags = 0,
 };
 
 #endif	/* CONFIG_EDAC_ALTERA_L2C */

@@ -235,6 +235,7 @@ struct edac_device_prv_data {
 	int ue_set_mask;
 	int set_err_ofst;
 	int trig_alloc_sz;
+	int irq_flags;
 };
 
 struct altr_edac_device_dev {
