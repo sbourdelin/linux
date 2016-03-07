@@ -72,6 +72,10 @@ struct octeon_i2c {
 	struct device *dev;
 };
 
+static int timeout = 2;
+module_param(timeout, int, 0444);
+MODULE_PARM_DESC(timeout, "Low-level device timeout (ms)");
+
 /**
  * octeon_i2c_write_sw - write an I2C core register
  * @i2c: The struct octeon_i2c
@@ -425,7 +429,6 @@ static struct i2c_adapter octeon_i2c_ops = {
 	.owner = THIS_MODULE,
 	.name = "OCTEON adapter",
 	.algo = &octeon_i2c_algo,
-	.timeout = HZ / 50,
 };
 
 /* calculate and set clock divisors */
@@ -561,6 +564,8 @@ static int octeon_i2c_probe(struct platform_device *pdev)
 	octeon_i2c_setclock(i2c);
 
 	i2c->adap = octeon_i2c_ops;
+	i2c->adap.timeout = msecs_to_jiffies(timeout);
+	i2c->adap.retries = 10;
 	i2c->adap.dev.parent = &pdev->dev;
 	i2c->adap.dev.of_node = node;
 	i2c_set_adapdata(&i2c->adap, i2c);
