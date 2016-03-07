@@ -289,6 +289,130 @@ static ssize_t sta_ht_capa_read(struct file *file, char __user *userbuf,
 }
 STA_OPS(ht_capa);
 
+static ssize_t sta_rx_stats_read(struct file *file, char __user *userbuf,
+				 size_t count, loff_t *ppos)
+{
+#ifdef CONFIG_MAC80211_DEBUG_PER_STA_RX_STATS
+#define RX_STATS_HIST_FMT(n) \
+	do { \
+		if ((i + 1) % n == 0) \
+			len += scnprintf(buf + len, size - len, "\n\t\t"); \
+	} while (0)
+	int retval = 0, len = 0;
+	char *buf;
+	const int size = 3072;
+	struct sta_info *sta = file->private_data;
+	struct ieee80211_local *local = sta->local;
+	int i;
+	char *bw_str[IEEE80211_BW_NUM] = {"20", "40", "80", "160"};
+	char *nss_str[IEEE80211_NSS_NUM] = {"1x1", "2x2", "3x3", "4x4"};
+	char *gi_str[IEEE80211_GI_NUM] = {"LGI", "SGI"};
+	char *legacy_str[IEEE80211_LEGACY_RATE_NUM] = {"1", "2", "5.5",
+						       "11", "6", "9",
+						       "12", "18", "24",
+						       "36", "48", "54"};
+	buf = kzalloc(size, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	len += scnprintf(buf + len, size - len, "VHT MCS packets: ");
+	for (i = 0; i < IEEE80211_VHT_MCS_NUM; i++) {
+		len += scnprintf(buf + len, size - len, "MCS %d: %llu, ",
+				 i, sta->rx_vht_pkt[i]);
+		RX_STATS_HIST_FMT(5);
+	}
+
+	len += scnprintf(buf + len, size - len, "\nHT MCS packets: ");
+	for (i = 0; i < IEEE80211_HT_MCS_NUM; i++) {
+		len += scnprintf(buf + len, size - len, "MCS %d: %llu, ",
+				 i, sta->rx_ht_pkt[i]);
+		RX_STATS_HIST_FMT(5);
+	}
+
+	len += scnprintf(buf + len, size - len, "\n\nBW packets: ");
+	for (i = 0; i < IEEE80211_BW_NUM; i++)
+		len += scnprintf(buf + len, size - len, "\t%sMhz: %llu",
+				 bw_str[i], sta->rx_bw_pkt[i]);
+
+	len += scnprintf(buf + len, size - len, "\n\nNSS packets: ");
+	for (i = 0; i < IEEE80211_NSS_NUM; i++)
+		len += scnprintf(buf + len, size - len, "\t%s: %llu",
+				 nss_str[i], sta->rx_nss_pkt[i]);
+
+	len += scnprintf(buf + len, size - len, "\n\nGI packets: ");
+	for (i = 0; i < IEEE80211_GI_NUM; i++)
+		len += scnprintf(buf + len, size - len, "\t%s: %llu",
+				 gi_str[i], sta->rx_gi_pkt[i]);
+
+	len += scnprintf(buf + len, size - len, "\n\nLegacy rate packets: ");
+	for (i = 0; i < IEEE80211_LEGACY_RATE_NUM; i++) {
+		len += scnprintf(buf + len, size - len, "\t%sMbps: %llu",
+				 legacy_str[i], sta->rx_legacy_pkt[i]);
+		RX_STATS_HIST_FMT(4);
+	}
+
+	len += scnprintf(buf + len, size - len, "\nRate table packets:  ");
+	for (i = 0; i < IEEE80211_RATE_TABLE_NUM; i++) {
+		len += scnprintf(buf + len, size - len, "\t%llu",
+				 sta->rx_rate_pkt[i]);
+		RX_STATS_HIST_FMT(8);
+	}
+
+	len += scnprintf(buf + len, size - len, "\nVHT MCS bytes: ");
+	for (i = 0; i < IEEE80211_VHT_MCS_NUM; i++) {
+		len += scnprintf(buf + len, size - len, "MCS %d: %llu, ",
+				 i, sta->rx_vht_byte[i]);
+		RX_STATS_HIST_FMT(5);
+	}
+
+	len += scnprintf(buf + len, size - len, "\nHT MCS bytes: ");
+	for (i = 0; i < IEEE80211_HT_MCS_NUM; i++) {
+		len += scnprintf(buf + len, size - len, "MCS %d: %llu, ",
+				 i, sta->rx_ht_byte[i]);
+		RX_STATS_HIST_FMT(5);
+	}
+
+	len += scnprintf(buf + len, size - len, "\n\nNSS bytes: ");
+	for (i = 0; i < IEEE80211_NSS_NUM; i++)
+		len += scnprintf(buf + len, size - len, "\t%s: %llu",
+				 nss_str[i], sta->rx_nss_byte[i]);
+
+	len += scnprintf(buf + len, size - len, "\n\nBW bytes: ");
+	for (i = 0; i < IEEE80211_BW_NUM; i++)
+		len += scnprintf(buf + len, size - len, "\t%sMhz: %llu",
+				 bw_str[i], sta->rx_bw_byte[i]);
+
+	len += scnprintf(buf + len, size - len, "\n\nGI bytes: ");
+	for (i = 0; i < IEEE80211_GI_NUM; i++)
+		len += scnprintf(buf + len, size - len, "\t%s: %llu",
+				 gi_str[i], sta->rx_gi_byte[i]);
+
+	len += scnprintf(buf + len, size - len, "\n\nLegacy rate bytes: ");
+	for (i = 0; i < IEEE80211_LEGACY_RATE_NUM; i++) {
+		len += scnprintf(buf + len, size - len, "\t%sMbps: %llu",
+				 legacy_str[i], sta->rx_legacy_byte[i]);
+		RX_STATS_HIST_FMT(4);
+	}
+
+	len += scnprintf(buf + len, size - len, "\nRate table bytes:  ");
+	for (i = 0; i < IEEE80211_RATE_TABLE_NUM; i++) {
+		len += scnprintf(buf + len, size - len, "\t%llu",
+				 sta->rx_rate_byte[i]);
+		RX_STATS_HIST_FMT(8);
+	}
+
+	if (len > size)
+		len = size;
+	retval = simple_read_from_buffer(userbuf, count, ppos, buf, len);
+	kfree(buf);
+
+#undef RX_STATS_HIST_FMT
+	return retval;
+#endif
+	return -EINVAL;
+}
+STA_OPS(rx_stats);
+
 static ssize_t sta_vht_capa_read(struct file *file, char __user *userbuf,
 				 size_t count, loff_t *ppos)
 {
@@ -332,6 +456,106 @@ STA_OPS(vht_capa);
 		debugfs_create_u64(#name, 0400, sta->debugfs.dir,	\
 			(u64 *) &sta->field);
 
+#ifdef CONFIG_MAC80211_DEBUG_PER_STA_RX_STATS
+static int legacy_rate_to_index(u16 rate)
+{
+	int legacy_rate[] = {10, 20, 55, 110, 60, 90, 120,
+			     180, 240, 360, 480, 540};
+	int i;
+
+	for (i = 0; i < IEEE80211_LEGACY_RATE_NUM - 1; i++)
+		if (rate == legacy_rate[i])
+			return i;
+	return -1;
+}
+#endif
+
+void ieee80211_rx_h_sta_stats(struct sta_info *sta, struct sk_buff *skb)
+{
+#ifdef CONFIG_MAC80211_DEBUG_PER_STA_RX_STATS
+	struct ieee80211_rx_status *status = IEEE80211_SKB_RXCB(skb);
+	unsigned int pkt_len = skb->len;
+	unsigned int bw_idx, gi_idx, mcs_idx = 0, nss_idx = 0, i;
+
+	/* Not support 5Mhz and 10Mhz currently  */
+	if (status->flag & (RX_FLAG_5MHZ | RX_FLAG_10MHZ))
+		goto out;
+
+	if (status->vht_flag & RX_VHT_FLAG_160MHZ)
+		bw_idx = 3;
+	else if (status->vht_flag & RX_VHT_FLAG_80MHZ)
+		bw_idx = 2;
+	else if (status->flag & RX_FLAG_40MHZ)
+		bw_idx = 1;
+	else
+		bw_idx = 0;
+
+	if (status->flag & RX_FLAG_HT) {
+		mcs_idx = status->rate_idx;
+		nss_idx = (mcs_idx >> 3) - 1;
+
+		if (status->rate_idx > IEEE80211_HT_MCS_NUM - 1 ||
+		    nss_idx > IEEE80211_NSS_NUM - 1)
+			goto out;
+
+		sta->rx_ht_pkt[mcs_idx]++;
+		sta->rx_ht_byte[mcs_idx] += pkt_len;
+		sta->rx_nss_pkt[nss_idx]++;
+		sta->rx_nss_byte[nss_idx] += pkt_len;
+		/* To fit into rate table for HT packets */
+		mcs_idx = mcs_idx % 8;
+	} else if (status->flag & RX_FLAG_VHT) {
+		mcs_idx = status->rate_idx;
+		nss_idx = status->vht_nss - 1;
+
+		if (nss_idx > IEEE80211_NSS_NUM - 1 ||
+		    mcs_idx > (IEEE80211_VHT_MCS_NUM - 1))
+			goto out;
+
+		sta->rx_vht_pkt[mcs_idx]++;
+		sta->rx_vht_byte[mcs_idx] += pkt_len;
+		sta->rx_nss_pkt[nss_idx]++;
+		sta->rx_nss_byte[nss_idx] += pkt_len;
+	}
+
+	gi_idx = (status->flag & RX_FLAG_SHORT_GI) ? 1 : 0;
+	sta->rx_gi_pkt[gi_idx]++;
+	sta->rx_gi_byte[gi_idx] += pkt_len;
+	sta->rx_bw_pkt[bw_idx]++;
+	sta->rx_bw_byte[bw_idx] += pkt_len;
+
+	if (status->flag & (RX_FLAG_HT | RX_FLAG_VHT)) {
+		/* Update Rate table based on http://mcsindex.com/ */
+		i = mcs_idx * 8 + 8 * 10 * nss_idx;
+		i += bw_idx * 2 + gi_idx;
+		sta->rx_rate_pkt[i]++;
+		sta->rx_rate_byte[i] += pkt_len;
+	} else {
+		struct ieee80211_local *local = sta->local;
+		struct ieee80211_sub_if_data *sdata = sta->sdata;
+		enum ieee80211_band band = ieee80211_get_sdata_band(sdata);
+		struct ieee80211_supported_band *sband;
+		int shift = ieee80211_vif_get_shift(&sta->sdata->vif);
+		u16 brate, legacy_rate;
+
+		if (status->rate_idx > IEEE80211_LEGACY_RATE_NUM - 1)
+			goto out;
+
+		sband = local->hw.wiphy->bands[band];
+		brate = sband->bitrates[status->rate_idx].bitrate;
+		legacy_rate = DIV_ROUND_UP(brate, 1 << shift);
+		i = legacy_rate_to_index(legacy_rate);
+		if (i < 0)
+			goto out;
+
+		sta->rx_legacy_pkt[i]++;
+		sta->rx_legacy_byte[i] += pkt_len;
+	}
+out:
+	return;
+#endif
+}
+
 void ieee80211_sta_debugfs_add(struct sta_info *sta)
 {
 	struct ieee80211_local *local = sta->local;
@@ -365,6 +589,7 @@ void ieee80211_sta_debugfs_add(struct sta_info *sta)
 	DEBUGFS_ADD(agg_status);
 	DEBUGFS_ADD(ht_capa);
 	DEBUGFS_ADD(vht_capa);
+	DEBUGFS_ADD(rx_stats);
 
 	DEBUGFS_ADD_COUNTER(rx_duplicates, rx_stats.num_duplicates);
 	DEBUGFS_ADD_COUNTER(rx_fragments, rx_stats.fragments);
