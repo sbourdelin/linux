@@ -975,6 +975,7 @@ int dss_mgr_register_framedone_handler(struct omap_overlay_manager *mgr,
 		void (*handler)(void *), void *data);
 void dss_mgr_unregister_framedone_handler(struct omap_overlay_manager *mgr,
 		void (*handler)(void *), void *data);
+bool dss_lcd_mgr_config_get_stallmode(const struct dss_lcd_mgr_config *config);
 
 static inline bool omapdss_device_is_connected(struct omap_dss_device *dssdev)
 {
