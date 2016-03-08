@@ -61,6 +61,7 @@ struct machdep_calls {
 					       unsigned long addr,
 					       unsigned char *hpte_slot_array,
 					       int psize, int ssize, int local);
+	int		(*resize_hpt)(unsigned long shift);
 	/*
 	 * Special for kexec.
 	 * To be called in real mode with interrupts disabled. No locks are
