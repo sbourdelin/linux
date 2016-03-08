@@ -68,6 +68,13 @@ struct kvm_resize_hpt {
 	/* Private to the work thread, until RESIZE_HPT_FAILED is set,
 	 * thereafter read-only */
 	int error;
+
+	/* Private to the work thread, until RESIZE_HPT_PREPARED, then
+	 * protected by kvm->mmu_lock until the resize struct is
+	 * unlinked from struct kvm, then private to the work thread
+	 * again */
+	struct kvm_hpt_info hpt;
+	unsigned long *rmap[KVM_USER_MEM_SLOTS];
 };
 
 #ifdef DEBUG_RESIZE_HPT
@@ -1173,6 +1180,31 @@ void kvmppc_unpin_guest_page(struct kvm *kvm, void *va, unsigned long gpa,
 static int resize_hpt_allocate(struct kvm_resize_hpt *resize,
 			       struct kvm_memslots *slots)
 {
+	struct kvm_memory_slot *memslot;
+	int rc;
+
+	rc = kvmppc_allocate_hpt(&resize->hpt, resize->order);
+	if (rc == -ENOMEM)
+		return H_NO_MEM;
+	else if (rc < 0)
+		return H_HARDWARE;
+
+	resize_hpt_debug(resize, "HPT @ 0x%lx\n", resize->hpt.virt);
+
+	kvm_for_each_memslot(memslot, slots) {
+		unsigned long *rmap;
+
+		if (memslot->flags & KVM_MEMSLOT_INVALID)
+			continue;
+
+		rmap = vzalloc(memslot->npages * sizeof(*rmap));
+		if (!rmap)
+			return H_NO_MEM;
+		resize->rmap[memslot->id] = rmap;
+		resize_hpt_debug(resize, "Memslot %d (%lu pages): %p\n",
+				 memslot->id, memslot->npages, rmap);
+	}
+
 	return H_SUCCESS;
 }
 
@@ -1193,6 +1225,13 @@ static void resize_hpt_flush_rmaps(struct kvm_resize_hpt *resize,
 
 static void resize_hpt_free(struct kvm_resize_hpt *resize)
 {
+	int i;
+	if (resize->hpt.virt)
+		kvmppc_free_hpt(&resize->hpt);
+
+	for (i = 0; i < KVM_USER_MEM_SLOTS; i++)
+		if (resize->rmap[i])
+			vfree(resize->rmap[i]);
 }
 
 static void resize_hpt_work(struct work_struct *work)
@@ -1204,6 +1243,9 @@ static void resize_hpt_work(struct work_struct *work)
 	struct kvm_memslots *slots;
 
 	resize_hpt_debug(resize, "Starting work, order = %d\n", resize->order);
+
+	memset(&resize->hpt, 0, sizeof(resize->hpt));
+	memset(&resize->rmap, 0, sizeof(resize->rmap));
 
 	mutex_lock(&kvm->arch.resize_hpt_mutex);
 
