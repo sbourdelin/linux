@@ -1331,15 +1331,12 @@ MODULE_VERSION(DRIVER_VERSION);
 static int usbatm_print_packet(struct usbatm_data *instance,
 			       const unsigned char *data, int len)
 {
-	unsigned char buffer[256];
-	int i = 0, j = 0;
+	int i, j;
 
 	for (i = 0; i < len;) {
-		buffer[0] = '\0';
-		sprintf(buffer, "%.3d :", i);
-		for (j = 0; (j < 16) && (i < len); j++, i++)
-			sprintf(buffer, "%s %2.2x", buffer, data[i]);
-		dev_dbg(&instance->usb_intf->dev, "%s", buffer);
+		j = min(16, len-i);
+		dev_dbg(&instance->usb_intf->dev, "%.3d : %*ph", i, j, data + i);
+		i += j;
 	}
 	return i;
 }
