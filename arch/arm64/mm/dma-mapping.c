@@ -169,6 +169,9 @@ static void *__dma_alloc(struct device *dev, size_t size,
 
 	/* create a coherent mapping */
 	page = virt_to_page(ptr);
+	if (dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs))
+		return page;
+
 	coherent_ptr = dma_common_contiguous_remap(page, size, VM_USERMAP,
 						   prot, NULL);
 	if (!coherent_ptr)
@@ -194,7 +197,8 @@ static void __dma_free(struct device *dev, size_t size,
 	if (!is_device_dma_coherent(dev)) {
 		if (__free_from_pool(vaddr, size))
 			return;
-		vunmap(vaddr);
+		if (!dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs))
+			vunmap(vaddr);
 	}
 	__dma_free_coherent(dev, size, swiotlb_addr, dma_handle, attrs);
 }
@@ -567,6 +571,9 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
 		if (!pages)
 			return NULL;
 
+		if (dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs))
+			return pages;
+
 		addr = dma_common_pages_remap(pages, size, VM_USERMAP, prot,
 					      __builtin_return_address(0));
 		if (!addr)
@@ -624,18 +631,32 @@ static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
 		if (WARN_ON(!area || !area->pages))
 			return;
 		iommu_dma_free(dev, area->pages, iosize, &handle);
-		dma_common_free_remap(cpu_addr, size, VM_USERMAP);
+		if (!dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs))
+			dma_common_free_remap(cpu_addr, size, VM_USERMAP);
 	} else {
 		iommu_dma_unmap_page(dev, handle, iosize, 0, NULL);
 		__free_pages(virt_to_page(cpu_addr), get_order(size));
 	}
 }
 
+static struct page **__iommu_get_pages(void *cpu_addr, struct dma_attrs *attrs)
+{
+	struct vm_struct *area;
+
+	if (dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs))
+		return cpu_addr;
+
+	area = find_vm_area(cpu_addr);
+	if (area)
+		return area->pages;
+	return NULL;
+}
+
 static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
 			      void *cpu_addr, dma_addr_t dma_addr, size_t size,
 			      struct dma_attrs *attrs)
 {
-	struct vm_struct *area;
+	struct page **pages;
 	int ret;
 
 	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot,
@@ -644,11 +665,11 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
 	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
 		return ret;
 
-	area = find_vm_area(cpu_addr);
-	if (WARN_ON(!area || !area->pages))
+	pages = __iommu_get_pages(cpu_addr, attrs);
+	if (WARN_ON(!pages))
 		return -ENXIO;
 
-	return iommu_dma_mmap(area->pages, size, vma);
+	return iommu_dma_mmap(pages, size, vma);
 }
 
 static int __iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
@@ -656,12 +677,12 @@ static int __iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
 			       size_t size, struct dma_attrs *attrs)
 {
 	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-	struct vm_struct *area = find_vm_area(cpu_addr);
+	struct page **pages = __iommu_get_pages(cpu_addr, attrs);
 
-	if (WARN_ON(!area || !area->pages))
+	if (WARN_ON(!pages))
 		return -ENXIO;
 
-	return sg_alloc_table_from_pages(sgt, area->pages, count, 0, size,
+	return sg_alloc_table_from_pages(sgt, pages, count, 0, size,
 					 GFP_KERNEL);
 }
 
