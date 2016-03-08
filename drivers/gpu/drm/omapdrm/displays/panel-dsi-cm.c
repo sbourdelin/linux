@@ -931,7 +931,7 @@ static int dsicm_update(struct omap_dss_device *dssdev,
 	struct omap_dss_device *in = ddata->in;
 	int r;
 
-	dev_dbg(&ddata->pdev->dev, "update %d, %d, %d x %d\n", x, y, w, h);
+	dev_dbg_ratelimited(&ddata->pdev->dev, "update %d, %d, %d x %d\n", x, y, w, h);
 
 	mutex_lock(&ddata->lock);
 	in->ops.dsi->bus_lock(in);
@@ -978,14 +978,14 @@ static int dsicm_sync(struct omap_dss_device *dssdev)
 	struct panel_drv_data *ddata = to_panel_data(dssdev);
 	struct omap_dss_device *in = ddata->in;
 
-	dev_dbg(&ddata->pdev->dev, "sync\n");
+	dev_dbg_ratelimited(&ddata->pdev->dev, "sync\n");
 
 	mutex_lock(&ddata->lock);
 	in->ops.dsi->bus_lock(in);
 	in->ops.dsi->bus_unlock(in);
 	mutex_unlock(&ddata->lock);
 
-	dev_dbg(&ddata->pdev->dev, "sync done\n");
+	dev_dbg_ratelimited(&ddata->pdev->dev, "sync done\n");
 
 	return 0;
 }
