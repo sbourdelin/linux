@@ -9,6 +9,8 @@ struct task_struct;
 
 /* for sysctl */
 extern int print_fatal_signals;
+extern int srop_disabled;
+
 /*
  * Real Time signals may be queued.
  */
