@@ -35,7 +35,7 @@ void wl18xx_get_last_tx_rate(struct wl1271 *wl, struct ieee80211_vif *vif,
 	u8 fw_rate = wl->fw_status->counters.tx_last_rate;
 
 	if (fw_rate > CONF_HW_RATE_INDEX_MAX) {
-		wl1271_error("last Tx rate invalid: %d", fw_rate);
+		dev_err(wl->dev, "last Tx rate invalid: %d\n", fw_rate);
 		rate->idx = 0;
 		rate->flags = 0;
 		return;
@@ -82,7 +82,7 @@ static void wl18xx_tx_complete_packet(struct wl1271 *wl, u8 tx_stat_byte)
 
 	/* check for id legality */
 	if (unlikely(id >= wl->num_tx_desc || wl->tx_frames[id] == NULL)) {
-		wl1271_warning("illegal id in tx completion: %d", id);
+		dev_warn(wl->dev, "illegal id in tx completion: %d\n", id);
 		return;
 	}
 
@@ -155,8 +155,8 @@ void wl18xx_tx_immediate_complete(struct wl1271 *wl)
 		     priv->last_fw_rls_idx, status_priv->fw_release_idx);
 
 	if (status_priv->fw_release_idx >= WL18XX_FW_MAX_TX_STATUS_DESC) {
-		wl1271_error("invalid desc release index %d",
-			     status_priv->fw_release_idx);
+		dev_err(wl->dev, "invalid desc release index %d\n",
+			status_priv->fw_release_idx);
 		WARN_ON(1);
 		return;
 	}

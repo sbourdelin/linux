@@ -51,7 +51,7 @@ int wl18xx_acx_host_if_cfg_bitmap(struct wl1271 *wl, u32 host_cfg_bitmap,
 	ret = wl1271_cmd_configure(wl, ACX_HOST_IF_CFG_BITMAP,
 				   bitmap_conf, sizeof(*bitmap_conf));
 	if (ret < 0) {
-		wl1271_warning("wl1271 bitmap config opt failed: %d", ret);
+		dev_warn(wl->dev, "wl1271 bitmap config opt failed: %d\n", ret);
 		goto out;
 	}
 
@@ -78,7 +78,7 @@ int wl18xx_acx_set_checksum_state(struct wl1271 *wl)
 
 	ret = wl1271_cmd_configure(wl, ACX_CSUM_CONFIG, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("failed to set Tx checksum state: %d", ret);
+		dev_warn(wl->dev, "failed to set Tx checksum state: %d\n", ret);
 		goto out;
 	}
 
@@ -102,7 +102,8 @@ int wl18xx_acx_clear_statistics(struct wl1271 *wl)
 
 	ret = wl1271_cmd_configure(wl, ACX_CLEAR_STATISTICS, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("failed to clear firmware statistics: %d", ret);
+		dev_warn(wl->dev, "failed to clear firmware statistics: %d\n",
+			 ret);
 		goto out;
 	}
 
@@ -132,7 +133,8 @@ int wl18xx_acx_peer_ht_operation_mode(struct wl1271 *wl, u8 hlid, bool wide)
 				   sizeof(*acx));
 
 	if (ret < 0) {
-		wl1271_warning("acx peer ht operation mode failed: %d", ret);
+		dev_warn(wl->dev, "acx peer ht operation mode failed: %d\n",
+			 ret);
 		goto out;
 	}
 
@@ -187,7 +189,8 @@ int wl18xx_acx_set_peer_cap(struct wl1271 *wl,
 
 	ret = wl1271_cmd_configure(wl, ACX_PEER_CAP, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("acx ht capabilities setting failed: %d", ret);
+		dev_warn(wl->dev, "acx ht capabilities setting failed: %d\n",
+			 ret);
 		goto out;
 	}
 
@@ -215,7 +218,8 @@ int wl18xx_acx_interrupt_notify_config(struct wl1271 *wl,
 	acx->enable = action;
 	ret = wl1271_cmd_configure(wl, ACX_INTERRUPT_NOTIFY, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("acx interrupt notify setting failed: %d", ret);
+		dev_warn(wl->dev, "acx interrupt notify setting failed: %d\n",
+			 ret);
 		goto out;
 	}
 
@@ -242,8 +246,8 @@ int wl18xx_acx_rx_ba_filter(struct wl1271 *wl, bool action)
 	acx->enable = (u32)action;
 	ret = wl1271_cmd_configure(wl, ACX_RX_BA_FILTER, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("acx rx ba activity filter setting failed: %d",
-			       ret);
+		dev_warn(wl->dev, "acx rx ba activity filter setting failed: %d\n",
+			 ret);
 		goto out;
 	}
 
@@ -274,7 +278,7 @@ int wl18xx_acx_ap_sleep(struct wl1271 *wl)
 
 	ret = wl1271_cmd_configure(wl, ACX_AP_SLEEP_CFG, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("acx config ap-sleep failed: %d", ret);
+		dev_warn(wl->dev, "acx config ap-sleep failed: %d\n", ret);
 		goto out;
 	}
 
@@ -302,7 +306,8 @@ int wl18xx_acx_dynamic_fw_traces(struct wl1271 *wl)
 	ret = wl1271_cmd_configure(wl, ACX_DYNAMIC_TRACES_CFG,
 				   acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("acx config dynamic fw traces failed: %d", ret);
+		dev_warn(wl->dev, "acx config dynamic fw traces failed: %d\n",
+			 ret);
 		goto out;
 	}
 out:

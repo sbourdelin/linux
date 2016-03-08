@@ -55,8 +55,8 @@ int wl18xx_cmd_channel_switch(struct wl1271 *wl,
 		cmd->band = WLCORE_BAND_5GHZ;
 		break;
 	default:
-		wl1271_error("invalid channel switch band: %d",
-			     ch_switch->chandef.chan->band);
+		dev_err(wl->dev, "invalid channel switch band: %d\n",
+			ch_switch->chandef.chan->band);
 		ret = -EINVAL;
 		goto out_free;
 	}
@@ -74,7 +74,7 @@ int wl18xx_cmd_channel_switch(struct wl1271 *wl,
 
 	ret = wl1271_cmd_send(wl, CMD_CHANNEL_SWITCH, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to send channel switch command");
+		dev_err(wl->dev, "failed to send channel switch command\n");
 		goto out_free;
 	}
 
@@ -102,7 +102,7 @@ int wl18xx_cmd_smart_config_start(struct wl1271 *wl, u32 group_bitmap)
 
 	ret = wl1271_cmd_send(wl, CMD_SMART_CONFIG_START, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to send smart config start command");
+		dev_err(wl->dev, "failed to send smart config start command\n");
 		goto out_free;
 	}
 
@@ -127,7 +127,7 @@ int wl18xx_cmd_smart_config_stop(struct wl1271 *wl)
 
 	ret = wl1271_cmd_send(wl, CMD_SMART_CONFIG_STOP, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to send smart config stop command");
+		dev_err(wl->dev, "failed to send smart config stop command\n");
 		goto out_free;
 	}
 
@@ -147,7 +147,7 @@ int wl18xx_cmd_smart_config_set_group_key(struct wl1271 *wl, u16 group_id,
 		     group_id);
 
 	if (key_len != sizeof(cmd->key)) {
-		wl1271_error("invalid group key size: %d", key_len);
+		dev_err(wl->dev, "invalid group key size: %d\n", key_len);
 		return -E2BIG;
 	}
 
@@ -163,7 +163,7 @@ int wl18xx_cmd_smart_config_set_group_key(struct wl1271 *wl, u16 group_id,
 	ret = wl1271_cmd_send(wl, CMD_SMART_CONFIG_SET_GROUP_KEY, cmd,
 			      sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to send smart config set group key cmd");
+		dev_err(wl->dev, "failed to send smart config set group key cmd\n");
 		goto out_free;
 	}
 
@@ -195,7 +195,7 @@ int wl18xx_cmd_set_cac(struct wl1271 *wl, struct wl12xx_vif *wlvif, bool start)
 			      start ? CMD_CAC_START : CMD_CAC_STOP,
 			      cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to send cac command");
+		dev_err(wl->dev, "failed to send cac command\n");
 		goto out_free;
 	}
 
@@ -221,7 +221,7 @@ int wl18xx_cmd_radar_detection_debug(struct wl1271 *wl, u8 channel)
 	ret = wl1271_cmd_send(wl, CMD_DFS_RADAR_DETECTION_DEBUG,
 			      cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to send radar detection debug command");
+		dev_err(wl->dev, "failed to send radar detection debug command\n");
 		goto out_free;
 	}
 
@@ -247,7 +247,7 @@ int wl18xx_cmd_dfs_master_restart(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 	ret = wl1271_cmd_send(wl, CMD_DFS_MASTER_RESTART,
 			      cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to send dfs master restart command");
+		dev_err(wl->dev, "failed to send dfs master restart command\n");
 		goto out_free;
 	}
 out_free:

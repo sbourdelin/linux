@@ -162,7 +162,7 @@ static int wl1271_scan_send(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 					 wl->scan.req->ie,
 					 wl->scan.req->ie_len, NULL, 0, false);
 	if (ret < 0) {
-		wl1271_error("PROBE request template failed");
+		dev_err(wl->dev, "PROBE request template failed\n");
 		goto out;
 	}
 
@@ -170,7 +170,7 @@ static int wl1271_scan_send(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 	ret = wl1271_cmd_send(wl, CMD_TRIGGER_SCAN_TO, trigger,
 			      sizeof(*trigger), 0);
 	if (ret < 0) {
-		wl1271_error("trigger scan to failed for hw scan");
+		dev_err(wl->dev, "trigger scan to failed for hw scan\n");
 		goto out;
 	}
 
@@ -178,7 +178,7 @@ static int wl1271_scan_send(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	ret = wl1271_cmd_send(wl, CMD_SCAN, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("SCAN failed");
+		dev_err(wl->dev, "SCAN failed\n");
 		goto out;
 	}
 
@@ -207,7 +207,7 @@ int wl12xx_scan_stop(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 	ret = wl1271_cmd_send(wl, CMD_STOP_SCAN, cmd,
 			      sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("cmd stop_scan failed");
+		dev_err(wl->dev, "cmd stop_scan failed\n");
 		goto out;
 	}
 out:
@@ -292,7 +292,7 @@ void wl1271_scan_stm(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 		break;
 
 	default:
-		wl1271_error("invalid scan state");
+		dev_err(wl->dev, "invalid scan state\n");
 		break;
 	}
 
@@ -371,7 +371,7 @@ int wl1271_scan_sched_scan_config(struct wl1271 *wl,
 	if (!wlcore_set_scan_chan_params(wl, cfg_channels, req->channels,
 					 req->n_channels, req->n_ssids,
 					 SCAN_TYPE_PERIODIC)) {
-		wl1271_error("scan channel list is empty");
+		dev_err(wl->dev, "scan channel list is empty\n");
 		ret = -EINVAL;
 		goto out;
 	}
@@ -389,7 +389,7 @@ int wl1271_scan_sched_scan_config(struct wl1271 *wl,
 						 ies->common_ie_len,
 						 true);
 		if (ret < 0) {
-			wl1271_error("2.4GHz PROBE request template failed");
+			dev_err(wl->dev, "2.4GHz PROBE request template failed\n");
 			goto out;
 		}
 	}
@@ -406,7 +406,7 @@ int wl1271_scan_sched_scan_config(struct wl1271 *wl,
 						 ies->common_ie_len,
 						 true);
 		if (ret < 0) {
-			wl1271_error("5GHz PROBE request template failed");
+			dev_err(wl->dev, "5GHz PROBE request template failed\n");
 			goto out;
 		}
 	}
@@ -416,7 +416,7 @@ int wl1271_scan_sched_scan_config(struct wl1271 *wl,
 	ret = wl1271_cmd_send(wl, CMD_CONNECTION_SCAN_CFG, cfg,
 			      sizeof(*cfg), 0);
 	if (ret < 0) {
-		wl1271_error("SCAN configuration failed");
+		dev_err(wl->dev, "SCAN configuration failed\n");
 		goto out;
 	}
 out:
@@ -449,7 +449,7 @@ int wl1271_scan_sched_scan_start(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 	ret = wl1271_cmd_send(wl, CMD_START_PERIODIC_SCAN, start,
 			      sizeof(*start), 0);
 	if (ret < 0) {
-		wl1271_error("failed to send scan start command");
+		dev_err(wl->dev, "failed to send scan start command\n");
 		goto out_free;
 	}
 
@@ -481,7 +481,7 @@ void wl12xx_scan_sched_scan_stop(struct wl1271 *wl,  struct wl12xx_vif *wlvif)
 	/* FIXME: what to do if alloc'ing to stop fails? */
 	stop = kzalloc(sizeof(*stop), GFP_KERNEL);
 	if (!stop) {
-		wl1271_error("failed to alloc memory to send sched scan stop");
+		dev_err(wl->dev, "failed to alloc memory to send sched scan stop\n");
 		return;
 	}
 
@@ -491,7 +491,7 @@ void wl12xx_scan_sched_scan_stop(struct wl1271 *wl,  struct wl12xx_vif *wlvif)
 	ret = wl1271_cmd_send(wl, CMD_STOP_PERIODIC_SCAN, stop,
 			      sizeof(*stop), 0);
 	if (ret < 0) {
-		wl1271_error("failed to send sched scan stop command");
+		dev_err(wl->dev, "failed to send sched scan stop command\n");
 		goto out_free;
 	}
 

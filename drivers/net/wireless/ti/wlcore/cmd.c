@@ -94,7 +94,7 @@ static int __wlcore_cmd_send(struct wl1271 *wl, u16 id, void *buf,
 
 	while (!(intr & WL1271_ACX_INTR_CMD_COMPLETE)) {
 		if (time_after(jiffies, timeout)) {
-			wl1271_error("command complete timeout");
+			dev_err(wl->dev, "command complete timeout\n");
 			return -ETIMEDOUT;
 		}
 
@@ -145,7 +145,7 @@ static int wlcore_cmd_send_failsafe(struct wl1271 *wl, u16 id, void *buf,
 
 	if (ret >= MAX_COMMAND_STATUS ||
 	    !test_bit(ret, &valid_rets)) {
-		wl1271_error("command execute failure %d", ret);
+		dev_err(wl->dev, "command execute failure %d\n", ret);
 		ret = -EIO;
 		goto fail;
 	}
@@ -256,7 +256,7 @@ int wl12xx_cmd_role_enable(struct wl1271 *wl, u8 *addr, u8 role_type,
 
 	ret = wl1271_cmd_send(wl, CMD_ROLE_ENABLE, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to initiate cmd role enable");
+		dev_err(wl->dev, "failed to initiate cmd role enable\n");
 		goto out_free;
 	}
 
@@ -289,7 +289,7 @@ int wl12xx_cmd_role_disable(struct wl1271 *wl, u8 *role_id)
 
 	ret = wl1271_cmd_send(wl, CMD_ROLE_DISABLE, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to initiate cmd role disable");
+		dev_err(wl->dev, "failed to initiate cmd role disable\n");
 		goto out_free;
 	}
 
@@ -455,7 +455,7 @@ static int wl12xx_cmd_role_start_dev(struct wl1271 *wl,
 
 	ret = wl1271_cmd_send(wl, CMD_ROLE_START, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to initiate cmd role enable");
+		dev_err(wl->dev, "failed to initiate cmd role enable\n");
 		goto err_hlid;
 	}
 
@@ -495,7 +495,7 @@ static int wl12xx_cmd_role_stop_dev(struct wl1271 *wl,
 
 	ret = wl1271_cmd_send(wl, CMD_ROLE_STOP, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to initiate cmd role stop");
+		dev_err(wl->dev, "failed to initiate cmd role stop\n");
 		goto out_free;
 	}
 
@@ -565,7 +565,7 @@ int wl12xx_cmd_role_start_sta(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 
 	ret = wl1271_cmd_send(wl, CMD_ROLE_START, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to initiate cmd role start sta");
+		dev_err(wl->dev, "failed to initiate cmd role start sta\n");
 		goto err_hlid;
 	}
 
@@ -606,7 +606,7 @@ int wl12xx_cmd_role_stop_sta(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 
 	ret = wl1271_cmd_send(wl, CMD_ROLE_STOP, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to initiate cmd role stop sta");
+		dev_err(wl->dev, "failed to initiate cmd role stop sta\n");
 		goto out_free;
 	}
 
@@ -631,7 +631,7 @@ int wl12xx_cmd_role_start_ap(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 
 	/* trying to use hidden SSID with an old hostapd version */
 	if (wlvif->ssid_len == 0 && !bss_conf->hidden_ssid) {
-		wl1271_error("got a null SSID from beacon/bss");
+		dev_err(wl->dev, "got a null SSID from beacon/bss\n");
 		ret = -EINVAL;
 		goto out;
 	}
@@ -700,14 +700,15 @@ int wl12xx_cmd_role_start_ap(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 		cmd->band = WLCORE_BAND_5GHZ;
 		break;
 	default:
-		wl1271_warning("ap start - unknown band: %d", (int)wlvif->band);
+		dev_warn(wl->dev, "ap start - unknown band: %d\n",
+			 (int)wlvif->band);
 		cmd->band = WLCORE_BAND_2_4GHZ;
 		break;
 	}
 
 	ret = wl1271_cmd_send(wl, CMD_ROLE_START, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to initiate cmd role start ap");
+		dev_err(wl->dev, "failed to initiate cmd role start ap\n");
 		goto out_free_bcast;
 	}
 
@@ -743,7 +744,7 @@ int wl12xx_cmd_role_stop_ap(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 
 	ret = wl1271_cmd_send(wl, CMD_ROLE_STOP, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to initiate cmd role stop ap");
+		dev_err(wl->dev, "failed to initiate cmd role stop ap\n");
 		goto out_free;
 	}
 
@@ -803,7 +804,7 @@ int wl12xx_cmd_role_start_ibss(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 
 	ret = wl1271_cmd_send(wl, CMD_ROLE_START, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to initiate cmd role enable");
+		dev_err(wl->dev, "failed to initiate cmd role enable\n");
 		goto err_hlid;
 	}
 
@@ -842,7 +843,7 @@ int wl1271_cmd_test(struct wl1271 *wl, void *buf, size_t buf_len, u8 answer)
 	ret = wl1271_cmd_send(wl, CMD_TEST, buf, buf_len, res_len);
 
 	if (ret < 0) {
-		wl1271_warning("TEST command failed");
+		dev_warn(wl->dev, "TEST command failed\n");
 		return ret;
 	}
 
@@ -873,7 +874,7 @@ int wl1271_cmd_interrogate(struct wl1271 *wl, u16 id, void *buf,
 
 	ret = wl1271_cmd_send(wl, CMD_INTERROGATE, acx, cmd_len, res_len);
 	if (ret < 0)
-		wl1271_error("INTERROGATE command failed");
+		dev_err(wl->dev, "INTERROGATE command failed\n");
 
 	return ret;
 }
@@ -907,7 +908,7 @@ int wlcore_cmd_configure_failsafe(struct wl1271 *wl, u16 id, void *buf,
 	ret = wlcore_cmd_send_failsafe(wl, CMD_CONFIGURE, acx, len, 0,
 				       valid_rets);
 	if (ret < 0) {
-		wl1271_warning("CONFIGURE command NOK");
+		dev_warn(wl->dev, "CONFIGURE command NOK\n");
 		return ret;
 	}
 
@@ -955,8 +956,8 @@ int wl1271_cmd_data_path(struct wl1271 *wl, bool enable)
 
 	ret = wl1271_cmd_send(wl, cmd_rx, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("rx %s cmd for channel %d failed",
-			     enable ? "start" : "stop", cmd->channel);
+		dev_err(wl->dev, "rx %s cmd for channel %d failed\n",
+			enable ? "start" : "stop", cmd->channel);
 		goto out;
 	}
 
@@ -965,8 +966,8 @@ int wl1271_cmd_data_path(struct wl1271 *wl, bool enable)
 
 	ret = wl1271_cmd_send(wl, cmd_tx, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("tx %s cmd for channel %d failed",
-			     enable ? "start" : "stop", cmd->channel);
+		dev_err(wl->dev, "tx %s cmd for channel %d failed\n",
+			enable ? "start" : "stop", cmd->channel);
 		goto out;
 	}
 
@@ -1000,7 +1001,7 @@ int wl1271_cmd_ps_mode(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 	ret = wl1271_cmd_send(wl, CMD_SET_PS_MODE, ps_params,
 			      sizeof(*ps_params), 0);
 	if (ret < 0) {
-		wl1271_error("cmd set_ps_mode failed");
+		dev_err(wl->dev, "cmd set_ps_mode failed\n");
 		goto out;
 	}
 
@@ -1042,7 +1043,7 @@ int wl1271_cmd_template_set(struct wl1271 *wl, u8 role_id,
 
 	ret = wl1271_cmd_send(wl, CMD_SET_TEMPLATE, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_warning("cmd set_template failed: %d", ret);
+		dev_warn(wl->dev, "cmd set_template failed: %d\n", ret);
 		goto out_free;
 	}
 
@@ -1080,7 +1081,7 @@ int wl12xx_cmd_build_null_data(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 out:
 	dev_kfree_skb(skb);
 	if (ret)
-		wl1271_warning("cmd buld null data failed %d", ret);
+		dev_warn(wl->dev, "cmd buld null data failed %d\n", ret);
 
 	return ret;
 
@@ -1105,7 +1106,7 @@ int wl12xx_cmd_build_klv_null_data(struct wl1271 *wl,
 out:
 	dev_kfree_skb(skb);
 	if (ret)
-		wl1271_warning("cmd build klv null data failed %d", ret);
+		dev_warn(wl->dev, "cmd build klv null data failed %d\n", ret);
 
 	return ret;
 
@@ -1205,7 +1206,7 @@ struct sk_buff *wl1271_cmd_build_ap_probe_req(struct wl1271 *wl,
 					      skb->data, skb->len, 0, rate);
 
 	if (ret < 0)
-		wl1271_error("Unable to set ap probe request template.");
+		dev_err(wl->dev, "Unable to set ap probe request template\n");
 
 out:
 	return skb;
@@ -1224,7 +1225,7 @@ int wl1271_cmd_build_arp_rsp(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 	skb = dev_alloc_skb(sizeof(*hdr) + sizeof(__le16) + sizeof(*tmpl) +
 			    WL1271_EXTRA_SPACE_MAX);
 	if (!skb) {
-		wl1271_error("failed to allocate buffer for arp rsp template");
+		dev_err(wl->dev, "failed to allocate buffer for arp rsp template\n");
 		return -ENOMEM;
 	}
 
@@ -1264,8 +1265,8 @@ int wl1271_cmd_build_arp_rsp(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 		extra = 0;
 		break;
 	default:
-		wl1271_warning("Unknown encryption type: %d",
-			       wlvif->encryption_type);
+		dev_warn(wl->dev, "Unknown encryption type: %d\n",
+			 wlvif->encryption_type);
 		ret = -EINVAL;
 		goto out;
 	}
@@ -1348,7 +1349,7 @@ int wl12xx_cmd_set_default_wep_key(struct wl1271 *wl, u8 id, u8 hlid)
 
 	ret = wl1271_cmd_send(wl, CMD_SET_KEYS, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_warning("cmd set_default_wep_key failed: %d", ret);
+		dev_warn(wl->dev, "cmd set_default_wep_key failed: %d\n", ret);
 		goto out;
 	}
 
@@ -1413,7 +1414,7 @@ int wl1271_cmd_set_sta_key(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	ret = wl1271_cmd_send(wl, CMD_SET_KEYS, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_warning("could not set keys");
+		dev_warn(wl->dev, "could not set keys\n");
 	goto out;
 	}
 
@@ -1480,7 +1481,7 @@ int wl1271_cmd_set_ap_key(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	ret = wl1271_cmd_send(wl, CMD_SET_KEYS, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_warning("could not set ap keys");
+		dev_warn(wl->dev, "could not set ap keys\n");
 		goto out;
 	}
 
@@ -1512,7 +1513,7 @@ int wl12xx_cmd_set_peer_state(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	ret = wl1271_cmd_send(wl, CMD_SET_PEER_STATE, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to send set peer state command");
+		dev_err(wl->dev, "failed to send set peer state command\n");
 		goto out_free;
 	}
 
@@ -1571,7 +1572,7 @@ int wl12xx_cmd_add_peer(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	ret = wl1271_cmd_send(wl, CMD_ADD_PEER, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to initiate cmd add peer");
+		dev_err(wl->dev, "failed to initiate cmd add peer\n");
 		goto out_free;
 	}
 
@@ -1605,7 +1606,7 @@ int wl12xx_cmd_remove_peer(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	ret = wl1271_cmd_send(wl, CMD_REMOVE_PEER, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to initiate cmd remove peer");
+		dev_err(wl->dev, "failed to initiate cmd remove peer\n");
 		goto out_free;
 	}
 
@@ -1628,7 +1629,8 @@ out:
 	return ret;
 }
 
-static int wlcore_get_reg_conf_ch_idx(enum ieee80211_band band, u16 ch)
+static int wlcore_get_reg_conf_ch_idx(struct wl1271 *wl,
+				      enum ieee80211_band band, u16 ch)
 {
 	/*
 	 * map the given band/channel to the respective predefined
@@ -1665,7 +1667,8 @@ static int wlcore_get_reg_conf_ch_idx(enum ieee80211_band band, u16 ch)
 		break;
 	}
 
-	wl1271_error("%s: unknown band/channel: %d/%d", __func__, band, ch);
+	dev_err(wl->dev, "%s: unknown band/channel: %d/%d\n",
+		__func__, band, ch);
 	return -1;
 }
 
@@ -1677,7 +1680,7 @@ void wlcore_set_pending_regdomain_ch(struct wl1271 *wl, u16 channel,
 	if (!(wl->quirks & WLCORE_QUIRK_REGDOMAIN_CONF))
 		return;
 
-	ch_bit_idx = wlcore_get_reg_conf_ch_idx(band, channel);
+	ch_bit_idx = wlcore_get_reg_conf_ch_idx(wl, band, channel);
 
 	if (ch_bit_idx >= 0 && ch_bit_idx <= WL1271_MAX_CHANNELS)
 		set_bit(ch_bit_idx, (long *)wl->reg_ch_conf_pending);
@@ -1714,7 +1717,7 @@ int wlcore_cmd_regdomain_config_locked(struct wl1271 *wl)
 			    channel->dfs_state != NL80211_DFS_AVAILABLE)
 				continue;
 
-			ch_bit_idx = wlcore_get_reg_conf_ch_idx(b, ch);
+			ch_bit_idx = wlcore_get_reg_conf_ch_idx(wl, b, ch);
 			if (ch_bit_idx < 0)
 				continue;
 
@@ -1739,12 +1742,12 @@ int wlcore_cmd_regdomain_config_locked(struct wl1271 *wl)
 	cmd->dfs_region = wl->dfs_region;
 
 	wl1271_debug(DEBUG_CMD,
-		     "cmd reg domain bitmap1: 0x%08x, bitmap2: 0x%08x",
+		     "cmd reg domain bitmap1: 0x%08x, bitmap2: 0x%08x\n",
 		     cmd->ch_bit_map1, cmd->ch_bit_map2);
 
 	ret = wl1271_cmd_send(wl, CMD_DFS_CHANNEL_CONFIG, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to send reg domain dfs config");
+		dev_err(wl->dev, "failed to send reg domain dfs config\n");
 		goto out;
 	}
 
@@ -1752,8 +1755,8 @@ int wlcore_cmd_regdomain_config_locked(struct wl1271 *wl)
 				      WLCORE_EVENT_DFS_CONFIG_COMPLETE,
 				      &timeout);
 	if (ret < 0 || timeout) {
-		wl1271_error("reg domain conf %serror",
-			     timeout ? "completion " : "");
+		dev_err(wl->dev, "reg domain conf %serror\n",
+			timeout ? "completion " : "");
 		ret = timeout ? -ETIMEDOUT : ret;
 		goto out;
 	}
@@ -1787,7 +1790,7 @@ int wl12xx_cmd_config_fwlog(struct wl1271 *wl)
 
 	ret = wl1271_cmd_send(wl, CMD_CONFIG_FWLOGGER, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to send config firmware logger command");
+		dev_err(wl->dev, "failed to send config firmware logger command\n");
 		goto out_free;
 	}
 
@@ -1813,7 +1816,7 @@ int wl12xx_cmd_start_fwlog(struct wl1271 *wl)
 
 	ret = wl1271_cmd_send(wl, CMD_START_FWLOGGER, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to send start firmware logger command");
+		dev_err(wl->dev, "failed to send start firmware logger command\n");
 		goto out_free;
 	}
 
@@ -1839,7 +1842,7 @@ int wl12xx_cmd_stop_fwlog(struct wl1271 *wl)
 
 	ret = wl1271_cmd_send(wl, CMD_STOP_FWLOGGER, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to send stop firmware logger command");
+		dev_err(wl->dev, "failed to send stop firmware logger command\n");
 		goto out_free;
 	}
 
@@ -1877,7 +1880,7 @@ static int wl12xx_cmd_roc(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 		cmd->band = WLCORE_BAND_5GHZ;
 		break;
 	default:
-		wl1271_error("roc - unknown band: %d", (int)wlvif->band);
+		dev_err(wl->dev, "roc - unknown band: %d\n", (int)wlvif->band);
 		ret = -EINVAL;
 		goto out_free;
 	}
@@ -1885,7 +1888,7 @@ static int wl12xx_cmd_roc(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	ret = wl1271_cmd_send(wl, CMD_REMAIN_ON_CHANNEL, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to send ROC command");
+		dev_err(wl->dev, "failed to send ROC command\n");
 		goto out_free;
 	}
 
@@ -1913,7 +1916,7 @@ static int wl12xx_cmd_croc(struct wl1271 *wl, u8 role_id)
 	ret = wl1271_cmd_send(wl, CMD_CANCEL_REMAIN_ON_CHANNEL, cmd,
 			      sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to send ROC command");
+		dev_err(wl->dev, "failed to send ROC command\n");
 		goto out_free;
 	}
 
@@ -1982,7 +1985,7 @@ int wl12xx_cmd_stop_channel_switch(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 
 	ret = wl1271_cmd_send(wl, CMD_STOP_CHANNEL_SWICTH, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to stop channel switch command");
+		dev_err(wl->dev, "failed to stop channel switch command\n");
 		goto out_free;
 	}
 
@@ -2087,7 +2090,7 @@ int wlcore_cmd_generic_cfg(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	ret = wl1271_cmd_send(wl, CMD_GENERIC_CFG, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to send generic cfg command");
+		dev_err(wl->dev, "failed to send generic cfg command\n");
 		goto out_free;
 	}
 out_free:

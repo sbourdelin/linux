@@ -53,7 +53,7 @@ int wlcore_event_fw_logger(struct wl1271 *wl)
 
 	buffer = kzalloc(WL18XX_LOGGER_SDIO_BUFF_MAX, GFP_KERNEL);
 	if (!buffer) {
-		wl1271_error("Fail to allocate fw logger memory");
+		dev_err(wl->dev, "Fail to allocate fw logger memory\n");
 		fw_log.actual_buff_size = cpu_to_le32(0);
 		goto out;
 	}
@@ -61,8 +61,8 @@ int wlcore_event_fw_logger(struct wl1271 *wl)
 	ret = wlcore_read(wl, addr, buffer, WL18XX_LOGGER_SDIO_BUFF_MAX,
 			  false);
 	if (ret < 0) {
-		wl1271_error("Fail to read logger buffer, error_id = %d",
-			     ret);
+		dev_err(wl->dev, "Fail to read logger buffer, error_id = %d\n",
+			ret);
 		fw_log.actual_buff_size = cpu_to_le32(0);
 		goto free_out;
 	}
@@ -97,8 +97,8 @@ int wlcore_event_fw_logger(struct wl1271 *wl)
 
 	/* double check that clear address and write pointer are the same */
 	if (clear_addr != le32_to_cpu(fw_log.buff_write_ptr)) {
-		wl1271_error("Calculate of clear addr Clear = %x, write = %x",
-			     clear_addr, le32_to_cpu(fw_log.buff_write_ptr));
+		dev_err(wl->dev, "Calculate of clear addr Clear = %x, write = %x\n",
+			clear_addr, le32_to_cpu(fw_log.buff_write_ptr));
 	}
 
 	/* indicate FW about Clear buffer */
@@ -246,7 +246,7 @@ EXPORT_SYMBOL_GPL(wlcore_event_channel_switch);
 void wlcore_event_dummy_packet(struct wl1271 *wl)
 {
 	if (wl->plt) {
-		wl1271_info("Got DUMMY_PACKET event in PLT mode.  FW bug, ignoring.");
+		dev_info(wl->dev, "Got DUMMY_PACKET event in PLT mode.  FW bug, ignoring.\n");
 		return;
 	}
 
@@ -322,7 +322,7 @@ void wlcore_event_beacon_loss(struct wl1271 *wl, unsigned long roles_bitmap)
 	int delay = wl->conf.conn.synch_fail_thold *
 				wl->conf.conn.bss_lose_timeout;
 
-	wl1271_info("Beacon loss detected. roles:0x%lx", roles_bitmap);
+	dev_info(wl->dev, "Beacon loss detected. roles:0x%lx\n", roles_bitmap);
 
 	wl12xx_for_each_wlvif_sta(wl, wlvif) {
 		if (wlvif->role_id == WL12XX_INVALID_ROLE_ID ||

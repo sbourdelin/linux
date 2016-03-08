@@ -103,7 +103,7 @@ static int wl1271_tm_cmd_test(struct wl1271 *wl, struct nlattr *tb[])
 
 	ret = wl1271_cmd_test(wl, buf, buf_len, answer);
 	if (ret < 0) {
-		wl1271_warning("testmode cmd test failed: %d", ret);
+		dev_warn(wl->dev, "testmode cmd test failed: %d\n", ret);
 		goto out_sleep;
 	}
 
@@ -116,11 +116,11 @@ static int wl1271_tm_cmd_test(struct wl1271 *wl, struct nlattr *tb[])
 
 		if (params->test.id == TEST_CMD_P2G_CAL &&
 		    radio_status < 0)
-			wl1271_warning("testmode cmd: radio status=%d",
-					radio_status);
+			dev_warn(wl->dev, "testmode cmd: radio status=%d\n",
+				 radio_status);
 		else
-			wl1271_info("testmode cmd: radio status=%d",
-					radio_status);
+			dev_info(wl->dev, "testmode cmd: radio status=%d\n",
+				 radio_status);
 
 		len = nla_total_size(buf_len);
 		skb = cfg80211_testmode_alloc_reply_skb(wl->hw->wiphy, len);
@@ -182,7 +182,7 @@ static int wl1271_tm_cmd_interrogate(struct wl1271 *wl, struct nlattr *tb[])
 	ret = wl1271_cmd_interrogate(wl, ie_id, cmd,
 				     sizeof(struct acx_header), sizeof(*cmd));
 	if (ret < 0) {
-		wl1271_warning("testmode cmd interrogate failed: %d", ret);
+		dev_warn(wl->dev, "testmode cmd interrogate failed: %d\n", ret);
 		goto out_free;
 	}
 
@@ -237,7 +237,7 @@ static int wl1271_tm_cmd_configure(struct wl1271 *wl, struct nlattr *tb[])
 	mutex_unlock(&wl->mutex);
 
 	if (ret < 0) {
-		wl1271_warning("testmode cmd configure failed: %d", ret);
+		dev_warn(wl->dev, "testmode cmd configure failed: %d\n", ret);
 		return ret;
 	}
 

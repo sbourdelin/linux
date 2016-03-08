@@ -267,7 +267,7 @@ static ssize_t radar_detection_write(struct file *file,
 
 	ret = kstrtou8_from_user(user_buf, count, 10, &channel);
 	if (ret < 0) {
-		wl1271_warning("illegal channel");
+		dev_warn(wl->dev, "illegal channel\n");
 		return -EINVAL;
 	}
 

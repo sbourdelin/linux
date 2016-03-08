@@ -384,12 +384,12 @@ static int wl1271_prepare_tx_frame(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 	bool is_gem = false;
 
 	if (!skb) {
-		wl1271_error("discarding null skb");
+		dev_err(wl->dev, "discarding null skb\n");
 		return -EINVAL;
 	}
 
 	if (hlid == WL12XX_INVALID_LINK_ID) {
-		wl1271_error("invalid hlid. dropping skb 0x%p", skb);
+		dev_err(wl->dev, "invalid hlid - dropping skb 0x%p\n", skb);
 		return -EINVAL;
 	}
 
@@ -921,7 +921,7 @@ static void wl1271_tx_complete_packet(struct wl1271 *wl,
 
 	/* check for id legality */
 	if (unlikely(id >= wl->num_tx_desc || wl->tx_frames[id] == NULL)) {
-		wl1271_warning("TX result illegal id: %d", id);
+		dev_warn(wl->dev, "TX result illegal id: %d\n", id);
 		return;
 	}
 
@@ -1009,7 +1009,8 @@ int wlcore_tx_complete(struct wl1271 *wl)
 
 	/* verify that the result buffer is not getting overrun */
 	if (unlikely(count > TX_HW_RESULT_QUEUE_LEN))
-		wl1271_warning("TX result overflow from chipset: %d", count);
+		dev_warn(wl->dev, "TX result overflow from chipset: %d\n",
+			 count);
 
 	/* process the results */
 	for (i = 0; i < count; i++) {
@@ -1182,9 +1183,8 @@ void wl1271_tx_flush(struct wl1271 *wl)
 		}
 	}
 
-	wl1271_warning("Unable to flush all TX buffers, "
-		       "timed out (timeout %d ms",
-		       WL1271_TX_FLUSH_TIMEOUT / 1000);
+	dev_warn(wl->dev, "Unable to flush all TX buffers, timed out (timeout %d ms\n",
+		 WL1271_TX_FLUSH_TIMEOUT / 1000);
 
 	/* forcibly flush all Tx buffers on our queues */
 	for (i = 0; i < wl->num_links; i++)

@@ -67,7 +67,7 @@ static int wlcore_boot_parse_fw_ver(struct wl1271 *wl,
 		     &wl->chip.fw_ver[4]);
 
 	if (ret != 5) {
-		wl1271_warning("fw version incorrect value");
+		dev_warn(wl->dev, "fw version incorrect value\n");
 		memset(wl->chip.fw_ver, 0, sizeof(wl->chip.fw_ver));
 		ret = -EINVAL;
 		goto out;
@@ -127,13 +127,12 @@ fail:
 			snprintf(min_fw_str, sizeof(min_fw_str),
 				  "%s%u.", min_fw_str, min_ver[i]);
 
-	wl1271_error("Your WiFi FW version (%u.%u.%u.%u.%u) is invalid.\n"
-		     "Please use at least FW %s\n"
-		     "You can get the latest firmwares at:\n"
-		     "git://github.com/TI-OpenLink/firmwares.git",
-		     fw_ver[FW_VER_CHIP], fw_ver[FW_VER_IF_TYPE],
-		     fw_ver[FW_VER_MAJOR], fw_ver[FW_VER_SUBTYPE],
-		     fw_ver[FW_VER_MINOR], min_fw_str);
+	dev_err(wl->dev, "Your WiFi FW version (%u.%u.%u.%u.%u) is invalid\n",
+		fw_ver[FW_VER_CHIP], fw_ver[FW_VER_IF_TYPE],
+		fw_ver[FW_VER_MAJOR], fw_ver[FW_VER_SUBTYPE],
+		fw_ver[FW_VER_MINOR]);
+	dev_err(wl->dev, "Please use at least FW '%s'\n", min_fw_str);
+	dev_err(wl->dev, "You can get the latest firmwares at: git://github.com/TI-OpenLink/firmwares.git");
 	return -EINVAL;
 }
 
@@ -187,13 +186,13 @@ static int wl1271_boot_upload_firmware_chunk(struct wl1271 *wl, void *buf,
 		     fw_data_len, CHUNK_SIZE);
 
 	if ((fw_data_len % 4) != 0) {
-		wl1271_error("firmware length not multiple of four");
+		dev_err(wl->dev, "firmware length not multiple of four\n");
 		return -EIO;
 	}
 
 	chunk = kmalloc(CHUNK_SIZE, GFP_KERNEL);
 	if (!chunk) {
-		wl1271_error("allocation for firmware upload chunk failed");
+		dev_err(wl->dev, "allocation for firmware upload chunk failed\n");
 		return -ENOMEM;
 	}
 
@@ -265,7 +264,7 @@ int wlcore_boot_upload_firmware(struct wl1271 *wl)
 		fw += sizeof(u32);
 
 		if (len > 300000) {
-			wl1271_info("firmware chunk too long: %u", len);
+			dev_info(wl->dev, "firmware chunk too long: %u\n", len);
 			return -EINVAL;
 		}
 		wl1271_debug(DEBUG_BOOT, "chunk %d addr 0x%x len %u",
@@ -289,7 +288,7 @@ int wlcore_boot_upload_nvs(struct wl1271 *wl)
 	int ret;
 
 	if (wl->nvs == NULL) {
-		wl1271_error("NVS file is needed during boot");
+		dev_err(wl->dev, "NVS file is needed during boot\n");
 		return -ENODEV;
 	}
 
@@ -310,7 +309,7 @@ int wlcore_boot_upload_nvs(struct wl1271 *wl)
 		if (wl->nvs_len != sizeof(struct wl1271_nvs_file) &&
 		    (wl->nvs_len != WL1271_INI_LEGACY_NVS_FILE_SIZE ||
 		     wl->enable_11a)) {
-			wl1271_error("nvs size is not as expected: %zu != %zu",
+			dev_err(wl->dev, "nvs size is not as expected: %zu != %zu\n",
 				wl->nvs_len, sizeof(struct wl1271_nvs_file));
 			kfree(wl->nvs);
 			wl->nvs = NULL;
@@ -328,9 +327,9 @@ int wlcore_boot_upload_nvs(struct wl1271 *wl)
 			if (nvs->general_params.dual_mode_select)
 				wl->enable_11a = true;
 		} else {
-			wl1271_error("nvs size is not as expected: %zu != %zu",
-				     wl->nvs_len,
-				     sizeof(struct wl128x_nvs_file));
+			dev_err(wl->dev, "nvs size is not as expected: %zu != %zu\n",
+				wl->nvs_len,
+				sizeof(struct wl128x_nvs_file));
 			kfree(wl->nvs);
 			wl->nvs = NULL;
 			wl->nvs_len = 0;
@@ -429,7 +428,7 @@ int wlcore_boot_upload_nvs(struct wl1271 *wl)
 	return ret;
 
 out_badnvs:
-	wl1271_error("nvs data is malformed");
+	dev_err(wl->dev, "nvs data is malformed\n");
 	return -EILSEQ;
 }
 EXPORT_SYMBOL_GPL(wlcore_boot_upload_nvs);
@@ -455,7 +454,7 @@ int wlcore_boot_run_firmware(struct wl1271 *wl)
 	wl1271_debug(DEBUG_BOOT, "chip id after firmware boot: 0x%x", chip_id);
 
 	if (chip_id != wl->chip.id) {
-		wl1271_error("chip id doesn't match after firmware boot");
+		dev_err(wl->dev, "chip id doesn't match after firmware boot\n");
 		return -EIO;
 	}
 
@@ -468,8 +467,7 @@ int wlcore_boot_run_firmware(struct wl1271 *wl)
 			return ret;
 
 		if (intr == 0xffffffff) {
-			wl1271_error("error reading hardware complete "
-				     "init indication");
+			dev_err(wl->dev, "error reading hardware complete init indication\n");
 			return -EIO;
 		}
 		/* check that ACX_INTR_INIT_COMPLETE is enabled */
@@ -483,8 +481,7 @@ int wlcore_boot_run_firmware(struct wl1271 *wl)
 	}
 
 	if (loop > INIT_LOOP) {
-		wl1271_error("timeout waiting for the hardware to "
-			     "complete initialization");
+		dev_err(wl->dev, "timeout waiting for the hardware to complete initialization\n");
 		return -EIO;
 	}
 
@@ -507,7 +504,7 @@ int wlcore_boot_run_firmware(struct wl1271 *wl)
 
 	ret = wlcore_boot_static_data(wl);
 	if (ret < 0) {
-		wl1271_error("error getting static data");
+		dev_err(wl->dev, "error getting static data\n");
 		return ret;
 	}
 
@@ -519,7 +516,7 @@ int wlcore_boot_run_firmware(struct wl1271 *wl)
 	/* unmask required mbox events  */
 	ret = wl1271_event_unmask(wl);
 	if (ret < 0) {
-		wl1271_error("EVENT mask setting failed");
+		dev_err(wl->dev, "EVENT mask setting failed\n");
 		return ret;
 	}
 

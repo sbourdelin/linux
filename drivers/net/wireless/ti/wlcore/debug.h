@@ -61,18 +61,6 @@ extern u32 wl12xx_debug_level;
 
 #define DEBUG_DUMP_LIMIT 1024
 
-#define wl1271_error(fmt, arg...) \
-	pr_err(DRIVER_PREFIX "ERROR " fmt "\n", ##arg)
-
-#define wl1271_warning(fmt, arg...) \
-	pr_warn(DRIVER_PREFIX "WARNING " fmt "\n", ##arg)
-
-#define wl1271_notice(fmt, arg...) \
-	pr_info(DRIVER_PREFIX fmt "\n", ##arg)
-
-#define wl1271_info(fmt, arg...) \
-	pr_info(DRIVER_PREFIX fmt "\n", ##arg)
-
 /* define the debug macro differently if dynamic debug is supported */
 #if defined(CONFIG_DYNAMIC_DEBUG)
 #define wl1271_debug(level, fmt, arg...) \
@@ -84,7 +72,7 @@ extern u32 wl12xx_debug_level;
 #define wl1271_debug(level, fmt, arg...) \
 	do { \
 		if (unlikely(level & wl12xx_debug_level)) \
-			printk(KERN_DEBUG pr_fmt(DRIVER_PREFIX fmt "\n"), \
+			printk(KERN_DEBUG DRIVER_PREFIX fmt "\n", \
 			       ##arg); \
 	} while (0)
 #endif

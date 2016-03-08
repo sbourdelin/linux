@@ -117,7 +117,7 @@ static void wlcore_event_time_sync(struct wl1271 *wl, u16 tsf_msb, u16 tsf_lsb)
 	u32 clock;
 	/* convert the MSB+LSB to a u32 TSF value */
 	clock = (tsf_msb << 16) | tsf_lsb;
-	wl1271_info("TIME_SYNC_EVENT_ID: clock %u", clock);
+	dev_info(wl->dev, "TIME_SYNC_EVENT_ID: clock %u\n", clock);
 }
 
 int wl18xx_process_mailbox_events(struct wl1271 *wl)
@@ -142,9 +142,9 @@ int wl18xx_process_mailbox_events(struct wl1271 *wl)
 				mbox->time_sync_tsf_lsb);
 
 	if (vector & RADAR_DETECTED_EVENT_ID) {
-		wl1271_info("radar event: channel %d type %s",
-			    mbox->radar_channel,
-			    wl18xx_radar_type_decode(mbox->radar_type));
+		dev_info(wl->dev, "radar event: channel %d type %s\n",
+			 mbox->radar_channel,
+			 wl18xx_radar_type_decode(mbox->radar_type));
 
 		ieee80211_radar_detected(wl->hw);
 	}

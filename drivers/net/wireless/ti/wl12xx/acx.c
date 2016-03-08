@@ -42,7 +42,7 @@ int wl1271_acx_host_if_cfg_bitmap(struct wl1271 *wl, u32 host_cfg_bitmap)
 	ret = wl1271_cmd_configure(wl, ACX_HOST_IF_CFG_BITMAP,
 				   bitmap_conf, sizeof(*bitmap_conf));
 	if (ret < 0) {
-		wl1271_warning("wl1271 bitmap config opt failed: %d", ret);
+		dev_warn(wl->dev, "wl1271 bitmap config opt failed: %d\n", ret);
 		goto out;
 	}
 

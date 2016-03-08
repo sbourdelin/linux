@@ -20,6 +20,8 @@
  *
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/module.h>
 #include <linux/firmware.h>
 #include <linux/etherdevice.h>
@@ -71,7 +73,7 @@ static int wl12xx_set_authorized(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 	if (ret < 0)
 		return ret;
 
-	wl1271_info("Association completed.");
+	dev_info(wl->dev, "Association completed\n");
 	return 0;
 }
 
@@ -292,8 +294,8 @@ static void wl12xx_tx_watchdog_work(struct work_struct *work)
 		goto out;
 	}
 
-	wl1271_error("Tx stuck (in FW) for %d ms. Starting recovery",
-		     wl->conf.tx.tx_watchdog_timeout);
+	dev_err(wl->dev, "Tx stuck (in FW) for %d ms. Starting recovery.\n",
+		wl->conf.tx.tx_watchdog_timeout);
 	wl12xx_queue_recovery_work(wl);
 
 out:
@@ -314,7 +316,8 @@ static void wlcore_adjust_conf(struct wl1271 *wl)
 			wl->conf.fwlog.mem_blocks = 0;
 			wl->conf.fwlog.output = WL12XX_FWLOG_OUTPUT_NONE;
 		} else {
-			wl1271_error("Unknown fwlog parameter %s", fwlog_param);
+			dev_err(wl->dev, "Unknown fwlog parameter %s\n",
+				fwlog_param);
 		}
 	}
 
@@ -558,7 +561,7 @@ static int wlcore_irq_locked(struct wl1271 *wl)
 		}
 
 		if (unlikely(intr & WL1271_ACX_INTR_WATCHDOG)) {
-			wl1271_error("HW watchdog interrupt received! starting recovery.");
+			dev_err(wl->dev, "HW watchdog interrupt received! starting recovery.\n");
 			wl->watchdog_recovery = true;
 			ret = -EIO;
 
@@ -567,8 +570,7 @@ static int wlcore_irq_locked(struct wl1271 *wl)
 		}
 
 		if (unlikely(intr & WL1271_ACX_SW_INTR_WATCHDOG)) {
-			wl1271_error("SW watchdog interrupt received! "
-				     "starting recovery.");
+			dev_err(wl->dev, "SW watchdog interrupt received! starting recovery.\n");
 			wl->watchdog_recovery = true;
 			ret = -EIO;
 
@@ -748,13 +750,14 @@ static int wl12xx_fetch_firmware(struct wl1271 *wl, bool plt)
 	ret = request_firmware(&fw, fw_name, wl->dev);
 
 	if (ret < 0) {
-		wl1271_error("could not get firmware %s: %d", fw_name, ret);
+		dev_err(wl->dev, "could not get firmware %s: %d\n",
+			fw_name, ret);
 		return ret;
 	}
 
 	if (fw->size % 4) {
-		wl1271_error("firmware size is not multiple of 32 bits: %zu",
-			     fw->size);
+		dev_err(wl->dev, "firmware size is not multiple of 32 bits: %zu\n",
+			fw->size);
 		ret = -EILSEQ;
 		goto out;
 	}
@@ -765,7 +768,7 @@ static int wl12xx_fetch_firmware(struct wl1271 *wl, bool plt)
 	wl->fw = vmalloc(wl->fw_len);
 
 	if (!wl->fw) {
-		wl1271_error("could not allocate memory for the firmware");
+		dev_err(wl->dev, "could not allocate memory for the firmware\n");
 		ret = -ENOMEM;
 		goto out;
 	}
@@ -815,7 +818,7 @@ static void wl12xx_read_fwlog_panic(struct wl1271 *wl)
 	if (wl->quirks & WLCORE_QUIRK_FWLOG_NOT_IMPLEMENTED)
 		return;
 
-	wl1271_info("Reading FW panic log");
+	dev_info(wl->dev, "Reading FW panic log\n");
 
 	/*
 	 * Make sure the chip is awake and the logger isn't active.
@@ -882,8 +885,8 @@ static void wlcore_print_recovery(struct wl1271 *wl)
 	u32 hint_sts = 0;
 	int ret;
 
-	wl1271_info("Hardware recovery in progress. FW ver: %s",
-		    wl->chip.fw_ver_str);
+	dev_info(wl->dev, "Hardware recovery in progress. FW ver: %s\n",
+		 wl->chip.fw_ver_str);
 
 	/* change partitions momentarily so we can read the FW pc */
 	ret = wlcore_set_partition(wl, &wl->ptable[PART_BOOT]);
@@ -898,8 +901,8 @@ static void wlcore_print_recovery(struct wl1271 *wl)
 	if (ret < 0)
 		return;
 
-	wl1271_info("pc: 0x%x, hint_sts: 0x%08x count: %d",
-				pc, hint_sts, ++wl->recovery_count);
+	dev_info(wl->dev, "pc: 0x%x, hint_sts: 0x%08x count: %d\n",
+		 pc, hint_sts, ++wl->recovery_count);
 
 	wlcore_set_partition(wl, &wl->ptable[PART_WORK]);
 }
@@ -927,7 +930,7 @@ static void wl1271_recovery_work(struct work_struct *work)
 	       !test_bit(WL1271_FLAG_INTENDED_FW_RECOVERY, &wl->flags));
 
 	if (wl->conf.recovery.no_recovery) {
-		wl1271_info("No recovery (chosen on module load). Fw will remain stuck.");
+		dev_info(wl->dev, "No recovery (chosen on module load). Fw will remain stuck.\n");
 		goto out_unlock;
 	}
 
@@ -1072,11 +1075,11 @@ int wl1271_plt_start(struct wl1271 *wl, const enum plt_mode plt_mode)
 
 	mutex_lock(&wl->mutex);
 
-	wl1271_notice("power up");
+	dev_notice(wl->dev, "power up\n");
 
 	if (wl->state != WLCORE_STATE_OFF) {
-		wl1271_error("cannot go into PLT state because not "
-			     "in off state: %d", wl->state);
+		dev_err(wl->dev, "cannot go into PLT state because not in off state: %d\n",
+			wl->state);
 		ret = -EBUSY;
 		goto out;
 	}
@@ -1098,9 +1101,9 @@ int wl1271_plt_start(struct wl1271 *wl, const enum plt_mode plt_mode)
 		}
 
 		wl->state = WLCORE_STATE_ON;
-		wl1271_notice("firmware booted in PLT mode %s (%s)",
-			      PLT_MODE[plt_mode],
-			      wl->chip.fw_ver_str);
+		dev_notice(wl->dev, "firmware booted in PLT mode %s (%s)\n",
+			   PLT_MODE[plt_mode],
+			   wl->chip.fw_ver_str);
 
 		/* update hw/fw version info in wiphy struct */
 		wiphy->hw_version = wl->chip.id;
@@ -1116,8 +1119,8 @@ power_off:
 	wl->plt = false;
 	wl->plt_mode = PLT_OFF;
 
-	wl1271_error("firmware boot in PLT mode failed despite %d retries",
-		     WL1271_BOOT_RETRIES);
+	dev_err(wl->dev, "firmware boot in PLT mode failed despite %d retries\n",
+		WL1271_BOOT_RETRIES);
 out:
 	mutex_unlock(&wl->mutex);
 
@@ -1128,7 +1131,7 @@ int wl1271_plt_stop(struct wl1271 *wl)
 {
 	int ret = 0;
 
-	wl1271_notice("power down");
+	dev_notice(wl->dev, "power down\n");
 
 	/*
 	 * Interrupts must be disabled before setting the state to OFF.
@@ -1147,8 +1150,8 @@ int wl1271_plt_stop(struct wl1271 *wl)
 		 */
 		wlcore_enable_interrupts(wl);
 
-		wl1271_error("cannot power down because not in PLT "
-			     "state: %d", wl->state);
+		dev_err(wl->dev, "cannot power down because not in PLT state: %d\n",
+			wl->state);
 		ret = -EBUSY;
 		goto out;
 	}
@@ -1293,7 +1296,7 @@ static struct sk_buff *wl12xx_alloc_dummy_packet(struct wl1271 *wl)
 
 	skb = dev_alloc_skb(TOTAL_TX_DUMMY_PACKET_SIZE);
 	if (!skb) {
-		wl1271_warning("Failed to allocate a dummy packet skb");
+		dev_warn(wl->dev, "Failed to allocate a dummy packet skb\n");
 		return NULL;
 	}
 
@@ -1320,13 +1323,14 @@ static struct sk_buff *wl12xx_alloc_dummy_packet(struct wl1271 *wl)
 
 #ifdef CONFIG_PM
 static int
-wl1271_validate_wowlan_pattern(struct cfg80211_pkt_pattern *p)
+wl1271_validate_wowlan_pattern(struct wl1271 *wl,
+			       struct cfg80211_pkt_pattern *p)
 {
 	int num_fields = 0, in_field = 0, fields_size = 0;
 	int i, pattern_len = 0;
 
 	if (!p->mask) {
-		wl1271_warning("No mask in WoWLAN pattern");
+		dev_warn(wl->dev, "No mask in WoWLAN pattern\n");
 		return -EINVAL;
 	}
 
@@ -1369,12 +1373,12 @@ wl1271_validate_wowlan_pattern(struct cfg80211_pkt_pattern *p)
 	}
 
 	if (num_fields > WL1271_RX_FILTER_MAX_FIELDS) {
-		wl1271_warning("RX Filter too complex. Too many segments");
+		dev_warn(wl->dev, "RX Filter too complex - too many segments\n");
 		return -EINVAL;
 	}
 
 	if (fields_size > WL1271_RX_FILTER_MAX_FIELDS_SIZE) {
-		wl1271_warning("RX filter pattern is too big");
+		dev_warn(wl->dev, "RX filter pattern is too big\n");
 		return -E2BIG;
 	}
 
@@ -1399,14 +1403,15 @@ void wl1271_rx_filter_free(struct wl12xx_rx_filter *filter)
 	kfree(filter);
 }
 
-int wl1271_rx_filter_alloc_field(struct wl12xx_rx_filter *filter,
-				 u16 offset, u8 flags,
-				 const u8 *pattern, u8 len)
+static int wl1271_rx_filter_alloc_field(struct wl1271 *wl,
+					struct wl12xx_rx_filter *filter,
+					u16 offset, u8 flags,
+					const u8 *pattern, u8 len)
 {
 	struct wl12xx_rx_filter_field *field;
 
 	if (filter->num_fields == WL1271_RX_FILTER_MAX_FIELDS) {
-		wl1271_warning("Max fields per RX filter. can't alloc another");
+		dev_warn(wl->dev, "Max fields per RX filter - can't alloc another\n");
 		return -EINVAL;
 	}
 
@@ -1414,7 +1419,7 @@ int wl1271_rx_filter_alloc_field(struct wl12xx_rx_filter *filter,
 
 	field->pattern = kzalloc(len, GFP_KERNEL);
 	if (!field->pattern) {
-		wl1271_warning("Failed to allocate RX filter pattern");
+		dev_warn(wl->dev, "Failed to allocate RX filter pattern\n");
 		return -ENOMEM;
 	}
 
@@ -1464,7 +1469,8 @@ void wl1271_rx_filter_flatten_fields(struct wl12xx_rx_filter *filter,
  * which needs to be freed using rx_filter_free()
  */
 static int
-wl1271_convert_wowlan_pattern_to_rx_filter(struct cfg80211_pkt_pattern *p,
+wl1271_convert_wowlan_pattern_to_rx_filter(struct wl1271 *wl,
+					   struct cfg80211_pkt_pattern *p,
 					   struct wl12xx_rx_filter **f)
 {
 	int i, j, ret = 0;
@@ -1474,7 +1480,7 @@ wl1271_convert_wowlan_pattern_to_rx_filter(struct cfg80211_pkt_pattern *p,
 
 	filter = wl1271_rx_filter_alloc();
 	if (!filter) {
-		wl1271_warning("Failed to alloc rx filter");
+		dev_warn(wl->dev, "Failed to alloc rx filter\n");
 		ret = -ENOMEM;
 		goto err;
 	}
@@ -1505,7 +1511,7 @@ wl1271_convert_wowlan_pattern_to_rx_filter(struct cfg80211_pkt_pattern *p,
 
 		len = j - i;
 
-		ret = wl1271_rx_filter_alloc_field(filter,
+		ret = wl1271_rx_filter_alloc_field(wl, filter,
 						   offset,
 						   flags,
 						   &p->pattern[i], len);
@@ -1550,9 +1556,9 @@ static int wl1271_configure_wowlan(struct wl1271 *wl,
 
 	/* Validate all incoming patterns before clearing current FW state */
 	for (i = 0; i < wow->n_patterns; i++) {
-		ret = wl1271_validate_wowlan_pattern(&wow->patterns[i]);
+		ret = wl1271_validate_wowlan_pattern(wl, &wow->patterns[i]);
 		if (ret) {
-			wl1271_warning("Bad wowlan pattern %d", i);
+			dev_warn(wl->dev, "Bad wowlan pattern %d\n", i);
 			return ret;
 		}
 	}
@@ -1572,10 +1578,11 @@ static int wl1271_configure_wowlan(struct wl1271 *wl,
 
 		p = &wow->patterns[i];
 
-		ret = wl1271_convert_wowlan_pattern_to_rx_filter(p, &filter);
+		ret = wl1271_convert_wowlan_pattern_to_rx_filter(wl,
+								 p, &filter);
 		if (ret) {
-			wl1271_warning("Failed to create an RX filter from "
-				       "wowlan pattern %d", i);
+			dev_warn(wl->dev, "Failed to create an RX filter from wowlan pattern %d\n",
+				 i);
 			goto out;
 		}
 
@@ -1616,7 +1623,8 @@ static int wl1271_configure_suspend_sta(struct wl1271 *wl,
 				    wl->conf.conn.suspend_listen_interval);
 
 	if (ret < 0)
-		wl1271_error("suspend: set wake up conditions failed: %d", ret);
+		dev_err(wl->dev, "suspend: set wake up conditions failed: %d\n",
+			ret);
 out:
 	return ret;
 
@@ -1682,8 +1690,8 @@ static void wl1271_configure_resume(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 				    wl->conf.conn.listen_interval);
 
 		if (ret < 0)
-			wl1271_error("resume: wake up conditions failed: %d",
-				     ret);
+			dev_err(wl->dev, "resume: wake up conditions failed: %d\n",
+				ret);
 
 	} else if (is_ap) {
 		ret = wl1271_acx_beacon_filter_opt(wl, wlvif, false);
@@ -1702,7 +1710,7 @@ static int wl1271_op_suspend(struct ieee80211_hw *hw,
 
 	/* we want to perform the recovery before suspending */
 	if (test_bit(WL1271_FLAG_RECOVERY_IN_PROGRESS, &wl->flags)) {
-		wl1271_warning("postponing suspend to perform recovery");
+		dev_warn(wl->dev, "postponing suspend to perform recovery\n");
 		return -EBUSY;
 	}
 
@@ -1724,7 +1732,7 @@ static int wl1271_op_suspend(struct ieee80211_hw *hw,
 		ret = wl1271_configure_suspend(wl, wlvif, wow);
 		if (ret < 0) {
 			mutex_unlock(&wl->mutex);
-			wl1271_warning("couldn't prepare device to suspend");
+			dev_warn(wl->dev, "couldn't prepare device to suspend\n");
 			return ret;
 		}
 	}
@@ -1745,7 +1753,7 @@ out_sleep:
 	mutex_unlock(&wl->mutex);
 
 	if (ret < 0) {
-		wl1271_warning("couldn't prepare device to suspend");
+		dev_warn(wl->dev, "couldn't prepare device to suspend\n");
 		return ret;
 	}
 
@@ -1820,7 +1828,7 @@ static int wl1271_op_resume(struct ieee80211_hw *hw)
 	}
 
 	if (pending_recovery) {
-		wl1271_warning("queuing forgotten recovery on resume");
+		dev_warn(wl->dev, "queuing forgotten recovery on resume\n");
 		ieee80211_queue_work(wl->hw, &wl->recovery_work);
 		goto out_sleep;
 	}
@@ -2015,7 +2023,8 @@ static void wlcore_channel_switch_work(struct work_struct *work)
 	wlvif = container_of(dwork, struct wl12xx_vif, channel_switch_work);
 	wl = wlvif->wl;
 
-	wl1271_info("channel switch failed (role_id: %d).", wlvif->role_id);
+	dev_info(wl->dev, "channel switch failed (role_id: %d)\n",
+		 wlvif->role_id);
 
 	mutex_lock(&wl->mutex);
 
@@ -2051,7 +2060,8 @@ static void wlcore_connection_loss_work(struct work_struct *work)
 	wlvif = container_of(dwork, struct wl12xx_vif, connection_loss_work);
 	wl = wlvif->wl;
 
-	wl1271_info("Connection loss work (role_id: %d).", wlvif->role_id);
+	dev_info(wl->dev, "Connection loss work (role_id: %d)\n",
+		 wlvif->role_id);
 
 	mutex_lock(&wl->mutex);
 
@@ -2170,7 +2180,7 @@ static u8 wl12xx_get_role_type(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 		return WL1271_ROLE_IBSS;
 
 	default:
-		wl1271_error("invalid bss_type: %d", wlvif->bss_type);
+		dev_err(wl->dev, "invalid bss_type: %d\n", wlvif->bss_type);
 	}
 	return WL12XX_INVALID_ROLE_TYPE;
 }
@@ -2313,12 +2323,12 @@ power_off:
 	}
 
 	if (!booted) {
-		wl1271_error("firmware boot failed despite %d retries",
-			     WL1271_BOOT_RETRIES);
+		dev_err(wl->dev, "firmware boot failed despite %d retries\n",
+			WL1271_BOOT_RETRIES);
 		goto out;
 	}
 
-	wl1271_info("firmware booted (%s)", wl->chip.fw_ver_str);
+	dev_info(wl->dev, "firmware booted (%s)\n", wl->chip.fw_ver_str);
 
 	/* update hw/fw version info in wiphy struct */
 	wiphy->hw_version = wl->chip.id;
@@ -2488,7 +2498,7 @@ static int wl1271_op_add_interface(struct ieee80211_hw *hw,
 	u8 role_type;
 
 	if (wl->plt) {
-		wl1271_error("Adding Interface not allowed while in PLT mode");
+		dev_err(wl->dev, "Adding Interface not allowed while in PLT mode\n");
 		return -EBUSY;
 	}
 
@@ -2611,7 +2621,7 @@ static void __wl1271_op_remove_interface(struct wl1271 *wl,
 	if (wl->state == WLCORE_STATE_OFF)
 		return;
 
-	wl1271_info("down");
+	dev_info(wl->dev, "down\n");
 
 	if (wl->scan.state != WL1271_SCAN_STATE_IDLE &&
 	    wl->scan_wlvif == wlvif) {
@@ -2805,7 +2815,7 @@ static int wlcore_join(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 	 * users who really like to roam a lot :)
 	 */
 	if (test_bit(WLVIF_FLAG_STA_ASSOCIATED, &wlvif->flags))
-		wl1271_info("JOIN while associated.");
+		dev_info(wl->dev, "JOIN while associated\n");
 
 	/* clear encryption type */
 	wlvif->encryption_type = KEY_NONE;
@@ -2831,21 +2841,21 @@ static int wlcore_join(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 	return ret;
 }
 
-static int wl1271_ssid_set(struct wl12xx_vif *wlvif, struct sk_buff *skb,
-			    int offset)
+static int wl1271_ssid_set(struct wl1271 *wl, struct wl12xx_vif *wlvif,
+			   struct sk_buff *skb, int offset)
 {
 	u8 ssid_len;
 	const u8 *ptr = cfg80211_find_ie(WLAN_EID_SSID, skb->data + offset,
 					 skb->len - offset);
 
 	if (!ptr) {
-		wl1271_error("No SSID in IEs!");
+		dev_err(wl->dev, "No SSID in IEs!\n");
 		return -ENOENT;
 	}
 
 	ssid_len = ptr[1];
 	if (ssid_len > IEEE80211_MAX_SSID_LEN) {
-		wl1271_error("SSID is too long!");
+		dev_err(wl->dev, "SSID is too long!\n");
 		return -EINVAL;
 	}
 
@@ -2870,7 +2880,7 @@ static int wlcore_set_ssid(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 
 	ieoffset = offsetof(struct ieee80211_mgmt,
 			    u.probe_req.variable);
-	wl1271_ssid_set(wlvif, skb, ieoffset);
+	wl1271_ssid_set(wl, wlvif, skb, ieoffset);
 	dev_kfree_skb(skb);
 
 	return 0;
@@ -2909,7 +2919,7 @@ static int wlcore_set_assoc(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 							NULL);
 	ieoffset = offsetof(struct ieee80211_mgmt,
 			    u.probe_req.variable);
-	wl1271_ssid_set(wlvif, wlvif->probereq, ieoffset);
+	wl1271_ssid_set(wl, wlvif, wlvif->probereq, ieoffset);
 
 	/* enable the connection monitoring feature */
 	ret = wl1271_acx_conn_monit_params(wl, wlvif, true);
@@ -3068,7 +3078,7 @@ static int wl1271_op_config(struct ieee80211_hw *hw, u32 changed)
 	int ret = 0;
 
 	wl1271_debug(DEBUG_MAC80211, "mac80211 config psm %s power %d %s"
-		     " changed 0x%x",
+		     " changed 0x%x\n",
 		     conf->flags & IEEE80211_CONF_PS ? "on" : "off",
 		     conf->power_level,
 		     conf->flags & IEEE80211_CONF_IDLE ? "idle" : "in use",
@@ -3115,10 +3125,8 @@ static u64 wl1271_op_prepare_multicast(struct ieee80211_hw *hw,
 	struct netdev_hw_addr *ha;
 
 	fp = kzalloc(sizeof(*fp), GFP_ATOMIC);
-	if (!fp) {
-		wl1271_error("Out of memory setting filters.");
+	if (!fp)
 		return 0;
-	}
 
 	/* update multicast filtering parameters */
 	fp->mc_list_length = 0;
@@ -3153,7 +3161,8 @@ static void wl1271_op_configure_filter(struct ieee80211_hw *hw,
 	int ret;
 
 	wl1271_debug(DEBUG_MAC80211, "mac80211 configure filter changed %x"
-		     " total %x", changed, *total);
+		     "total %x\n",
+		     changed, *total);
 
 	mutex_lock(&wl->mutex);
 
@@ -3222,7 +3231,7 @@ static int wl1271_record_ap_key(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 			break;
 
 		if (wlvif->ap.recorded_keys[i]->id == id) {
-			wl1271_warning("trying to record key replacement");
+			dev_warn(wl->dev, "trying to record key replacement\n");
 			return -EINVAL;
 		}
 	}
@@ -3472,7 +3481,7 @@ int wlcore_set_key(struct wl1271 *wl, enum set_key_cmd cmd,
 		key_type = KEY_GEM;
 		break;
 	default:
-		wl1271_error("Unknown key algo 0x%x", key_conf->cipher);
+		dev_err(wl->dev, "Unknown key algo 0x%x\n", key_conf->cipher);
 
 		return -EOPNOTSUPP;
 	}
@@ -3484,7 +3493,7 @@ int wlcore_set_key(struct wl1271 *wl, enum set_key_cmd cmd,
 				 key_conf->keylen, key_conf->key,
 				 tx_seq_32, tx_seq_16, sta);
 		if (ret < 0) {
-			wl1271_error("Could not add or replace key");
+			dev_err(wl->dev, "Could not add or replace key\n");
 			return ret;
 		}
 
@@ -3498,7 +3507,8 @@ int wlcore_set_key(struct wl1271 *wl, enum set_key_cmd cmd,
 			wlvif->encryption_type = key_type;
 			ret = wl1271_cmd_build_arp_rsp(wl, wlvif);
 			if (ret < 0) {
-				wl1271_warning("build arp rsp failed: %d", ret);
+				dev_warn(wl->dev, "build arp rsp failed: %d\n",
+					 ret);
 				return ret;
 			}
 		}
@@ -3510,13 +3520,13 @@ int wlcore_set_key(struct wl1271 *wl, enum set_key_cmd cmd,
 				     key_conf->keylen, key_conf->key,
 				     0, 0, sta);
 		if (ret < 0) {
-			wl1271_error("Could not remove key");
+			dev_err(wl->dev, "Could not remove key\n");
 			return ret;
 		}
 		break;
 
 	default:
-		wl1271_error("Unsupported key cmd 0x%x", cmd);
+		dev_err(wl->dev, "Unsupported key cmd 0x%x\n", cmd);
 		return -EOPNOTSUPP;
 	}
 
@@ -3771,7 +3781,8 @@ static int wl1271_op_set_frag_threshold(struct ieee80211_hw *hw, u32 value)
 
 	ret = wl1271_acx_frag_threshold(wl, value);
 	if (ret < 0)
-		wl1271_warning("wl1271_op_set_frag_threshold failed: %d", ret);
+		dev_warn(wl->dev, "wl1271_op_set_frag_threshold failed: %d\n",
+			 ret);
 
 	wl1271_ps_elp_sleep(wl);
 
@@ -3801,7 +3812,8 @@ static int wl1271_op_set_rts_threshold(struct ieee80211_hw *hw, u32 value)
 	wl12xx_for_each_wlvif(wl, wlvif) {
 		ret = wl1271_acx_rts_threshold(wl, wlvif, value);
 		if (ret < 0)
-			wl1271_warning("set rts threshold failed: %d", ret);
+			dev_warn(wl->dev, "set rts threshold failed: %d\n",
+				 ret);
 	}
 	wl1271_ps_elp_sleep(wl);
 
@@ -3891,7 +3903,7 @@ static int wl1271_ap_set_probe_resp_tmpl_legacy(struct wl1271 *wl,
 					       rates);
 
 	if (probe_rsp_len + bss_conf->ssid_len > WL1271_CMD_TEMPL_MAX_SIZE) {
-		wl1271_error("probe_rsp template too big");
+		dev_err(wl->dev, "probe_rsp template too big\n");
 		return -EINVAL;
 	}
 
@@ -3901,7 +3913,7 @@ static int wl1271_ap_set_probe_resp_tmpl_legacy(struct wl1271 *wl,
 	ptr = cfg80211_find_ie(WLAN_EID_SSID, probe_rsp_data + ie_offset,
 			       probe_rsp_len - ie_offset);
 	if (!ptr) {
-		wl1271_error("No SSID in beacon!");
+		dev_err(wl->dev, "No SSID in beacon!\n");
 		return -EINVAL;
 	}
 
@@ -3942,7 +3954,7 @@ static int wl1271_bss_erp_info_changed(struct wl1271 *wl,
 		else
 			ret = wl1271_acx_slot(wl, wlvif, SLOT_TIME_LONG);
 		if (ret < 0) {
-			wl1271_warning("Set slot time failed %d", ret);
+			dev_warn(wl->dev, "Set slot time failed %d\n", ret);
 			goto out;
 		}
 	}
@@ -3962,7 +3974,7 @@ static int wl1271_bss_erp_info_changed(struct wl1271 *wl,
 			ret = wl1271_acx_cts_protect(wl, wlvif,
 						     CTSPROTECT_DISABLE);
 		if (ret < 0) {
-			wl1271_warning("Set ctsprotect failed %d", ret);
+			dev_warn(wl->dev, "Set ctsprotect failed %d\n", ret);
 			goto out;
 		}
 	}
@@ -3990,7 +4002,7 @@ static int wlcore_set_beacon_template(struct wl1271 *wl,
 
 	wl1271_debug(DEBUG_MASTER, "beacon updated");
 
-	ret = wl1271_ssid_set(wlvif, beacon, ieoffset);
+	ret = wl1271_ssid_set(wl, wlvif, beacon, ieoffset);
 	if (ret < 0) {
 		dev_kfree_skb(beacon);
 		goto out;
@@ -4093,7 +4105,7 @@ static int wl1271_bss_beacon_info_changed(struct wl1271 *wl,
 	}
 out:
 	if (ret != 0)
-		wl1271_error("beacon info change failed: %d", ret);
+		dev_err(wl->dev, "beacon info change failed: %d\n", ret);
 	return ret;
 }
 
@@ -4116,7 +4128,8 @@ static void wl1271_bss_info_changed_ap(struct wl1271 *wl,
 
 		ret = wl1271_init_ap_rates(wl, wlvif);
 		if (ret < 0) {
-			wl1271_error("AP rate policy change failed %d", ret);
+			dev_err(wl->dev, "AP rate policy change failed %d\n",
+				ret);
 			goto out;
 		}
 
@@ -4182,7 +4195,8 @@ static void wl1271_bss_info_changed_ap(struct wl1271 *wl,
 		ret = wl1271_acx_set_ht_information(wl, wlvif,
 					bss_conf->ht_operation_mode);
 		if (ret < 0) {
-			wl1271_warning("Set ht information failed %d", ret);
+			dev_warn(wl->dev, "Set ht information failed %d\n",
+				 ret);
 			goto out;
 		}
 	}
@@ -4397,7 +4411,7 @@ static void wl1271_bss_info_changed_sta(struct wl1271 *wl,
 	if (do_join) {
 		ret = wlcore_join(wl, wlvif);
 		if (ret < 0) {
-			wl1271_warning("cmd join failed %d", ret);
+			dev_warn(wl->dev, "cmd join failed %d\n", ret);
 			goto out;
 		}
 	}
@@ -4435,8 +4449,8 @@ static void wl1271_bss_info_changed_sta(struct wl1271 *wl,
 
 			ret = wl1271_ps_set_mode(wl, wlvif, ps_mode);
 			if (ret < 0)
-				wl1271_warning("enter %s ps failed %d",
-					       ps_mode_str, ret);
+				dev_warn(wl->dev, "enter %s ps failed %d\n",
+					 ps_mode_str, ret);
 		} else if (!bss_conf->ps &&
 			   test_bit(WLVIF_FLAG_IN_PS, &wlvif->flags)) {
 			wl1271_debug(DEBUG_PSM, "auto ps disabled");
@@ -4444,7 +4458,8 @@ static void wl1271_bss_info_changed_sta(struct wl1271 *wl,
 			ret = wl1271_ps_set_mode(wl, wlvif,
 						 STATION_ACTIVE_MODE);
 			if (ret < 0)
-				wl1271_warning("exit auto ps failed %d", ret);
+				dev_warn(wl->dev, "exit auto ps failed %d\n",
+					 ret);
 		}
 	}
 
@@ -4459,7 +4474,7 @@ static void wl1271_bss_info_changed_sta(struct wl1271 *wl,
 					     wlvif->rate_set,
 					     wlvif->sta.hlid);
 		if (ret < 0) {
-			wl1271_warning("Set ht cap failed %d", ret);
+			dev_warn(wl->dev, "Set ht cap failed %d\n", ret);
 			goto out;
 
 		}
@@ -4468,8 +4483,8 @@ static void wl1271_bss_info_changed_sta(struct wl1271 *wl,
 			ret = wl1271_acx_set_ht_information(wl, wlvif,
 						bss_conf->ht_operation_mode);
 			if (ret < 0) {
-				wl1271_warning("Set ht information failed %d",
-					       ret);
+				dev_warn(wl->dev, "Set ht information failed %d\n",
+					 ret);
 				goto out;
 			}
 		}
@@ -4492,7 +4507,8 @@ static void wl1271_bss_info_changed_sta(struct wl1271 *wl,
 			 */
 			ret = wl1271_cmd_build_arp_rsp(wl, wlvif);
 			if (ret < 0) {
-				wl1271_warning("build arp rsp failed: %d", ret);
+				dev_warn(wl->dev, "build arp rsp failed: %d\n",
+					 ret);
 				goto out;
 			}
 
@@ -4899,14 +4915,14 @@ static int wl1271_allocate_sta(struct wl1271 *wl,
 
 
 	if (wl->active_sta_count >= wl->max_ap_stations) {
-		wl1271_warning("could not allocate HLID - too much stations");
+		dev_warn(wl->dev, "could not allocate HLID - too many stations\n");
 		return -EBUSY;
 	}
 
 	wl_sta = (struct wl1271_station *)sta->drv_priv;
 	ret = wl12xx_allocate_link(wl, wlvif, &wl_sta->hlid);
 	if (ret < 0) {
-		wl1271_warning("could not allocate HLID - too many links");
+		dev_warn(wl->dev, "could not allocate HLID - too many links\n");
 		return -EBUSY;
 	}
 
@@ -5242,14 +5258,14 @@ static int wl1271_op_ampdu_action(struct ieee80211_hw *hw,
 
 		if (wl->ba_rx_session_count >= wl->ba_rx_session_count_max) {
 			ret = -EBUSY;
-			wl1271_error("exceeded max RX BA sessions");
+			dev_err(wl->dev, "exceeded max RX BA sessions\n");
 			break;
 		}
 
 		if (*ba_bitmap & BIT(tid)) {
 			ret = -EINVAL;
-			wl1271_error("cannot enable RX BA session on active "
-				     "tid: %d", tid);
+			dev_err(wl->dev, "cannot enable RX BA session on active tid: %d\n",
+				tid);
 			break;
 		}
 
@@ -5295,7 +5311,7 @@ static int wl1271_op_ampdu_action(struct ieee80211_hw *hw,
 		break;
 
 	default:
-		wl1271_error("Incorrect ampdu action id=%x\n", action);
+		dev_err(wl->dev, "Incorrect ampdu action id=%x\n", action);
 		ret = -EINVAL;
 	}
 
@@ -5452,7 +5468,7 @@ static void wlcore_op_channel_switch_beacon(struct ieee80211_hw *hw,
 
 	ret = wlcore_get_csa_count(wl, wlvif, &ch_switch.count);
 	if (ret < 0) {
-		wl1271_error("error getting beacon (for CSA counter)");
+		dev_err(wl->dev, "error getting beacon (for CSA counter)\n");
 		return;
 	}
 
@@ -5878,13 +5894,13 @@ u8 wlcore_rate_to_idx(struct wl1271 *wl, u8 rate, enum ieee80211_band band)
 	BUG_ON(band >= 2);
 
 	if (unlikely(rate >= wl->hw_tx_rate_tbl_size)) {
-		wl1271_error("Illegal RX rate from HW: %d", rate);
+		dev_err(wl->dev, "Illegal RX rate from HW: %d\n", rate);
 		return 0;
 	}
 
 	idx = wl->band_rate_to_idx[band][rate];
 	if (unlikely(idx == CONF_HW_RXTX_RATE_UNSUPPORTED)) {
-		wl1271_error("Unsupported RX rate from HW: %d", rate);
+		dev_err(wl->dev, "Unsupported RX rate from HW: %d\n", rate);
 		return 0;
 	}
 
@@ -5899,7 +5915,7 @@ static void wl12xx_derive_mac_addresses(struct wl1271 *wl, u32 oui, u32 nic)
 		     oui, nic);
 
 	if (nic + WLCORE_NUM_MAC_ADDRESSES - wl->num_mac_addr > 0xffffff)
-		wl1271_warning("NIC part of the MAC address wraps around!");
+		dev_warn(wl->dev, "NIC part of the MAC address wraps around!\n");
 
 	for (i = 0; i < wl->num_mac_addr; i++) {
 		wl->addresses[i].addr[0] = (u8)(oui >> 16);
@@ -5984,7 +6000,7 @@ static int wl1271_register_hw(struct wl1271 *wl)
 
 	ret = ieee80211_register_hw(wl->hw);
 	if (ret < 0) {
-		wl1271_error("unable to register mac80211 hw: %d", ret);
+		dev_err(wl->dev, "unable to register mac80211 hw: %d\n", ret);
 		goto out;
 	}
 
@@ -5992,7 +6008,7 @@ static int wl1271_register_hw(struct wl1271 *wl)
 
 	wl1271_debugfs_init(wl);
 
-	wl1271_notice("loaded");
+	dev_notice(wl->dev, "loaded\n");
 
 out:
 	return ret;
@@ -6158,7 +6174,7 @@ struct ieee80211_hw *wlcore_alloc_hw(size_t priv_size, u32 aggr_buf_size,
 
 	hw = ieee80211_alloc_hw(sizeof(*wl), &wl1271_ops);
 	if (!hw) {
-		wl1271_error("could not alloc ieee80211_hw");
+		pr_err("could not alloc ieee80211_hw\n");
 		ret = -ENOMEM;
 		goto err_hw_alloc;
 	}
@@ -6168,7 +6184,7 @@ struct ieee80211_hw *wlcore_alloc_hw(size_t priv_size, u32 aggr_buf_size,
 
 	wl->priv = kzalloc(priv_size, GFP_KERNEL);
 	if (!wl->priv) {
-		wl1271_error("could not alloc wl priv");
+		dev_err(wl->dev, "could not alloc wl priv\n");
 		ret = -ENOMEM;
 		goto err_priv_alloc;
 	}
@@ -6361,7 +6377,7 @@ static void wlcore_nvs_cb(const struct firmware *fw, void *context)
 	if (fw) {
 		wl->nvs = kmemdup(fw->data, fw->size, GFP_KERNEL);
 		if (!wl->nvs) {
-			wl1271_error("Could not allocate nvs data");
+			dev_err(wl->dev, "Could not allocate nvs data\n");
 			goto out;
 		}
 		wl->nvs_len = fw->size;
@@ -6383,7 +6399,7 @@ static void wlcore_nvs_cb(const struct firmware *fw, void *context)
 
 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	if (!res) {
-		wl1271_error("Could not get IRQ resource");
+		dev_err(wl->dev, "Could not get IRQ resource\n");
 		goto out_free_nvs;
 	}
 
@@ -6402,7 +6418,7 @@ static void wlcore_nvs_cb(const struct firmware *fw, void *context)
 
 	ret = wl12xx_get_hw_info(wl);
 	if (ret < 0) {
-		wl1271_error("couldn't get hw info");
+		dev_err(wl->dev, "couldn't get hw info\n");
 		wl1271_power_off(wl);
 		goto out_free_nvs;
 	}
@@ -6410,7 +6426,7 @@ static void wlcore_nvs_cb(const struct firmware *fw, void *context)
 	ret = request_threaded_irq(wl->irq, hardirq_fn, wlcore_irq,
 				   wl->irq_flags, pdev->name, wl);
 	if (ret < 0) {
-		wl1271_error("interrupt configuration failed");
+		dev_err(wl->dev, "interrupt configuration failed\n");
 		wl1271_power_off(wl);
 		goto out_free_nvs;
 	}
@@ -6475,7 +6491,7 @@ int wlcore_probe(struct wl1271 *wl, struct platform_device *pdev)
 				      WL12XX_NVS_NAME, &pdev->dev, GFP_KERNEL,
 				      wl, wlcore_nvs_cb);
 	if (ret < 0) {
-		wl1271_error("request_firmware_nowait failed: %d", ret);
+		dev_err(wl->dev, "request_firmware_nowait failed: %d\n", ret);
 		complete_all(&wl->nvs_loading_complete);
 	}
 

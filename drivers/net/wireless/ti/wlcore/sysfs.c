@@ -52,7 +52,7 @@ static ssize_t wl1271_sysfs_store_bt_coex_state(struct device *dev,
 
 	ret = kstrtoul(buf, 10, &res);
 	if (ret < 0) {
-		wl1271_warning("incorrect value written to bt_coex_mode");
+		dev_warn(wl->dev, "incorrect value written to bt_coex_mode\n");
 		return count;
 	}
 
@@ -150,21 +150,21 @@ int wlcore_sysfs_init(struct wl1271 *wl)
 	/* Create sysfs file to control bt coex state */
 	ret = device_create_file(wl->dev, &dev_attr_bt_coex_state);
 	if (ret < 0) {
-		wl1271_error("failed to create sysfs file bt_coex_state");
+		dev_err(wl->dev, "failed to create sysfs file bt_coex_state\n");
 		goto out;
 	}
 
 	/* Create sysfs file to get HW PG version */
 	ret = device_create_file(wl->dev, &dev_attr_hw_pg_ver);
 	if (ret < 0) {
-		wl1271_error("failed to create sysfs file hw_pg_ver");
+		dev_err(wl->dev, "failed to create sysfs file hw_pg_ver\n");
 		goto out_bt_coex_state;
 	}
 
 	/* Create sysfs file for the FW log */
 	ret = device_create_bin_file(wl->dev, &fwlog_attr);
 	if (ret < 0) {
-		wl1271_error("failed to create sysfs file fwlog");
+		dev_err(wl->dev, "failed to create sysfs file fwlog\n");
 		goto out_hw_pg_ver;
 	}
 

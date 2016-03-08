@@ -121,7 +121,7 @@ static int wl18xx_scan_send(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 				 0,
 				 false);
 		if (ret < 0) {
-			wl1271_error("2.4GHz PROBE request template failed");
+			dev_err(wl->dev, "2.4GHz PROBE request template failed\n");
 			goto out;
 		}
 	}
@@ -138,7 +138,7 @@ static int wl18xx_scan_send(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 				 0,
 				 false);
 		if (ret < 0) {
-			wl1271_error("5GHz PROBE request template failed");
+			dev_err(wl->dev, "5GHz PROBE request template failed\n");
 			goto out;
 		}
 	}
@@ -147,7 +147,7 @@ static int wl18xx_scan_send(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	ret = wl1271_cmd_send(wl, CMD_SCAN, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("SCAN failed");
+		dev_err(wl->dev, "SCAN failed\n");
 		goto out;
 	}
 
@@ -264,7 +264,7 @@ int wl18xx_scan_sched_scan_config(struct wl1271 *wl,
 				 ies->common_ie_len,
 				 true);
 		if (ret < 0) {
-			wl1271_error("2.4GHz PROBE request template failed");
+			dev_err(wl->dev, "2.4GHz PROBE request template failed\n");
 			goto out;
 		}
 	}
@@ -281,7 +281,7 @@ int wl18xx_scan_sched_scan_config(struct wl1271 *wl,
 				 ies->common_ie_len,
 				 true);
 		if (ret < 0) {
-			wl1271_error("5GHz PROBE request template failed");
+			dev_err(wl->dev, "5GHz PROBE request template failed\n");
 			goto out;
 		}
 	}
@@ -290,7 +290,7 @@ int wl18xx_scan_sched_scan_config(struct wl1271 *wl,
 
 	ret = wl1271_cmd_send(wl, CMD_SCAN, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("SCAN failed");
+		dev_err(wl->dev, "SCAN failed\n");
 		goto out;
 	}
 
@@ -317,7 +317,7 @@ static int __wl18xx_scan_stop(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	stop = kzalloc(sizeof(*stop), GFP_KERNEL);
 	if (!stop) {
-		wl1271_error("failed to alloc memory to send sched scan stop");
+		dev_err(wl->dev, "failed to alloc memory to send sched scan stop\n");
 		return -ENOMEM;
 	}
 
@@ -326,7 +326,7 @@ static int __wl18xx_scan_stop(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	ret = wl1271_cmd_send(wl, CMD_STOP_SCAN, stop, sizeof(*stop), 0);
 	if (ret < 0) {
-		wl1271_error("failed to send sched scan stop command");
+		dev_err(wl->dev, "failed to send sched scan stop command\n");
 		goto out_free;
 	}
 

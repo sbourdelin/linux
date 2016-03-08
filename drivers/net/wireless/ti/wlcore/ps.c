@@ -148,7 +148,7 @@ int wl1271_ps_elp_wakeup(struct wl1271 *wl)
 		ret = wait_for_completion_timeout(
 			&compl, msecs_to_jiffies(WL1271_WAKEUP_TIMEOUT));
 		if (ret == 0) {
-			wl1271_error("ELP wakeup timeout!");
+			dev_err(wl->dev, "ELP wakeup timeout!\n");
 			wl12xx_queue_recovery_work(wl);
 			ret = -ETIMEDOUT;
 			goto err;
@@ -188,7 +188,7 @@ int wl1271_ps_set_mode(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 					    wl->conf.conn.wake_up_event,
 					    wl->conf.conn.listen_interval);
 		if (ret < 0) {
-			wl1271_error("couldn't set wake up conditions");
+			dev_err(wl->dev, "couldn't set wake up conditions\n");
 			return ret;
 		}
 
@@ -227,7 +227,8 @@ int wl1271_ps_set_mode(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 		clear_bit(WLVIF_FLAG_IN_PS, &wlvif->flags);
 		break;
 	default:
-		wl1271_warning("trying to set ps to unsupported mode %d", mode);
+		dev_warn(wl->dev, "trying to set ps to unsupported mode %d\n",
+			 mode);
 		ret = -EINVAL;
 	}
 
@@ -290,8 +291,8 @@ void wl12xx_ps_link_start(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 	rcu_read_lock();
 	sta = ieee80211_find_sta(vif, wl->links[hlid].addr);
 	if (!sta) {
-		wl1271_error("could not find sta %pM for starting ps",
-			     wl->links[hlid].addr);
+		dev_err(wl->dev, "could not find sta %pM for starting ps\n",
+			wl->links[hlid].addr);
 		rcu_read_unlock();
 		return;
 	}
@@ -321,8 +322,8 @@ void wl12xx_ps_link_end(struct wl1271 *wl, struct wl12xx_vif *wlvif, u8 hlid)
 	rcu_read_lock();
 	sta = ieee80211_find_sta(vif, wl->links[hlid].addr);
 	if (!sta) {
-		wl1271_error("could not find sta %pM for ending ps",
-			     wl->links[hlid].addr);
+		dev_err(wl->dev, "could not find sta %pM for ending ps\n",
+			wl->links[hlid].addr);
 		goto end;
 	}
 

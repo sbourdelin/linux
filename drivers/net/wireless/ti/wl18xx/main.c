@@ -19,6 +19,8 @@
  *
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/ip.h>
@@ -696,13 +698,13 @@ static int wl18xx_identify_chip(struct wl1271 *wl)
 				      0, 0, 0, 0);
 		break;
 	case CHIP_ID_185x_PG10:
-		wl1271_warning("chip id 0x%x (185x PG10) is deprecated",
-			       wl->chip.id);
+		dev_warn(wl->dev, "chip id 0x%x (185x PG10) is deprecated\n",
+			 wl->chip.id);
 		ret = -ENODEV;
 		goto out;
 
 	default:
-		wl1271_warning("unsupported chip id: 0x%x", wl->chip.id);
+		dev_warn(wl->dev, "unsupported chip id: 0x%x\n", wl->chip.id);
 		ret = -ENODEV;
 		goto out;
 	}
@@ -931,7 +933,7 @@ static int wl18xx_pre_upload(struct wl1271 *wl)
 
 	ret = irq_get_trigger_type(wl->irq);
 	if ((ret == IRQ_TYPE_LEVEL_LOW) || (ret == IRQ_TYPE_EDGE_FALLING)) {
-		wl1271_info("using inverted interrupt logic: %d", ret);
+		dev_info(wl->dev, "using inverted interrupt logic: %d\n", ret);
 		ret = wlcore_set_partition(wl,
 					   &wl->ptable[PART_TOP_PRCM_ELP_SOC]);
 		if (ret < 0)
@@ -1381,8 +1383,8 @@ static int wl18xx_get_pg_ver(struct wl1271 *wl, s8 *ver)
 
 	rdl_ver = (fuse & WL18XX_RDL_VER_MASK) >> WL18XX_RDL_VER_OFFSET;
 
-	wl1271_info("wl18xx HW: %s, PG %d.%d (ROM 0x%x)",
-		    wl18xx_rdl_name(rdl_ver), pg_ver, metal, rom);
+	dev_info(wl->dev, "wl18xx HW: %s, PG %d.%d (ROM 0x%x)\n",
+		 wl18xx_rdl_name(rdl_ver), pg_ver, metal, rom);
 
 	if (ver)
 		*ver = pg_ver;
@@ -1404,14 +1406,14 @@ static int wl18xx_load_conf_file(struct device *dev, struct wlcore_conf *conf,
 
 	ret = request_firmware(&fw, WL18XX_CONF_FILE_NAME, dev);
 	if (ret < 0) {
-		wl1271_error("could not get configuration binary %s: %d",
-			     WL18XX_CONF_FILE_NAME, ret);
+		dev_err(dev, "could not get configuration binary %s: %d\n",
+			WL18XX_CONF_FILE_NAME, ret);
 		return ret;
 	}
 
 	if (fw->size != WL18XX_CONF_SIZE) {
-		wl1271_error("configuration binary file size is wrong, expected %zu got %zu",
-			     WL18XX_CONF_SIZE, fw->size);
+		dev_err(dev, "configuration binary file size is wrong, expected %zu got %zu\n",
+			WL18XX_CONF_SIZE, fw->size);
 		ret = -EINVAL;
 		goto out_release;
 	}
@@ -1419,17 +1421,15 @@ static int wl18xx_load_conf_file(struct device *dev, struct wlcore_conf *conf,
 	conf_file = (struct wlcore_conf_file *) fw->data;
 
 	if (conf_file->header.magic != cpu_to_le32(WL18XX_CONF_MAGIC)) {
-		wl1271_error("configuration binary file magic number mismatch, "
-			     "expected 0x%0x got 0x%0x", WL18XX_CONF_MAGIC,
-			     conf_file->header.magic);
+		dev_err(dev, "configuration binary file magic number mismatch, expected 0x%0x got 0x%0x\n",
+			WL18XX_CONF_MAGIC, conf_file->header.magic);
 		ret = -EINVAL;
 		goto out_release;
 	}
 
 	if (conf_file->header.version != cpu_to_le32(WL18XX_CONF_VERSION)) {
-		wl1271_error("configuration binary file version not supported, "
-			     "expected 0x%08x got 0x%08x",
-			     WL18XX_CONF_VERSION, conf_file->header.version);
+		dev_err(dev, "configuration binary file version not supported, expected 0x%08x got 0x%08x\n",
+			WL18XX_CONF_VERSION, conf_file->header.version);
 		ret = -EINVAL;
 		goto out_release;
 	}
@@ -1447,7 +1447,7 @@ static int wl18xx_conf_init(struct wl1271 *wl, struct device *dev)
 	struct wl18xx_priv *priv = wl->priv;
 
 	if (wl18xx_load_conf_file(dev, &wl->conf, &priv->conf) < 0) {
-		wl1271_warning("falling back to default config");
+		dev_warn(wl->dev, "falling back to default config\n");
 
 		/* apply driver default configuration */
 		memcpy(&wl->conf, &wl18xx_conf, sizeof(wl->conf));
@@ -1465,7 +1465,7 @@ static int wl18xx_plt_init(struct wl1271 *wl)
 
 	/* calibrator based auto/fem detect not supported for 18xx */
 	if (wl->plt_mode == PLT_FEM_DETECT) {
-		wl1271_error("wl18xx_plt_init: PLT FEM_DETECT not supported");
+		dev_err(wl->dev, "wl18xx_plt_init: PLT FEM_DETECT not supported\n");
 		return -EINVAL;
 	}
 
@@ -1505,7 +1505,7 @@ static int wl18xx_get_mac(struct wl1271 *wl)
 
 		wl->fuse_oui_addr = (mac[0] << 16) + (mac[1] << 8) + mac[2];
 		wl->fuse_nic_addr = (mac[3] << 16) + (mac[4] << 8) + mac[5];
-		wl1271_warning("MAC address from fuse not available, using random locally administered addresses.");
+		dev_warn(wl->dev, "MAC address from fuse not available, using random locally administered addresses\n");
 	}
 
 	ret = wlcore_set_partition(wl, &wl->ptable[PART_DOWN]);
@@ -1526,7 +1526,8 @@ static int wl18xx_handle_static_data(struct wl1271 *wl,
 	/* make sure the string is NULL-terminated */
 	wl->chip.phy_fw_ver_str[sizeof(wl->chip.phy_fw_ver_str) - 1] = '\0';
 
-	wl1271_info("PHY firmware version: %s", static_data_priv->phy_version);
+	dev_info(wl->dev, "PHY firmware version: %s\n",
+		 static_data_priv->phy_version);
 
 	return 0;
 }
@@ -1945,14 +1946,14 @@ static int wl18xx_setup(struct wl1271 *wl)
 		} else if (!strcmp(board_type_param, "com8")) {
 			priv->conf.phy.board_type = BOARD_TYPE_COM8_18XX;
 		} else {
-			wl1271_error("invalid board type '%s'",
+			dev_err(wl->dev, "invalid board type '%s'\n",
 				board_type_param);
 			return -EINVAL;
 		}
 	}
 
 	if (priv->conf.phy.board_type >= NUM_BOARD_TYPES) {
-		wl1271_error("invalid board type '%d'",
+		dev_err(wl->dev, "invalid board type '%d'\n",
 			priv->conf.phy.board_type);
 		return -EINVAL;
 	}
@@ -1985,7 +1986,8 @@ static int wl18xx_setup(struct wl1271 *wl)
 		else if (!strcmp(ht_mode_param, "siso20"))
 			priv->conf.ht.mode = HT_MODE_SISO20;
 		else {
-			wl1271_error("invalid ht_mode '%s'", ht_mode_param);
+			dev_err(wl->dev, "invalid ht_mode '%s'\n",
+				ht_mode_param);
 			return -EINVAL;
 		}
 	}
@@ -2038,7 +2040,7 @@ static int wl18xx_probe(struct platform_device *pdev)
 			     WL18XX_AGGR_BUFFER_SIZE,
 			     sizeof(struct wl18xx_event_mailbox));
 	if (IS_ERR(hw)) {
-		wl1271_error("can't allocate hw");
+		pr_err("can't allocate hw\n");
 		ret = PTR_ERR(hw);
 		goto out;
 	}

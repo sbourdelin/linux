@@ -19,6 +19,8 @@
  *
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/module.h>
 #include <linux/platform_device.h>
 
@@ -642,8 +644,8 @@ static int wl12xx_identify_chip(struct wl1271 *wl)
 
 	switch (wl->chip.id) {
 	case CHIP_ID_127X_PG10:
-		wl1271_warning("chip id 0x%x (1271 PG10) support is obsolete",
-			       wl->chip.id);
+		dev_warn(wl->dev, "chip id 0x%x (1271 PG10) support is obsolete\n",
+			 wl->chip.id);
 
 		wl->quirks |= WLCORE_QUIRK_LEGACY_NVS |
 			      WLCORE_QUIRK_DUAL_PROBE_TMPL |
@@ -712,7 +714,7 @@ static int wl12xx_identify_chip(struct wl1271 *wl)
 		break;
 	case CHIP_ID_128X_PG10:
 	default:
-		wl1271_warning("unsupported chip id: 0x%x", wl->chip.id);
+		dev_warn(wl->dev, "unsupported chip id: 0x%x\n", wl->chip.id);
 		ret = -ENODEV;
 		goto out;
 	}
@@ -782,13 +784,13 @@ static int __must_check wl12xx_top_reg_read(struct wl1271 *wl, int addr,
 	} while (!(val & OCP_READY_MASK) && --timeout);
 
 	if (!timeout) {
-		wl1271_warning("Top register access timed out.");
+		dev_warn(wl->dev, "Top register access timed out\n");
 		return -ETIMEDOUT;
 	}
 
 	/* check data status and return if OK */
 	if ((val & OCP_STATUS_MASK) != OCP_STATUS_OK) {
-		wl1271_warning("Top register access returned error.");
+		dev_warn(wl->dev, "Top register access returned error\n");
 		return -EIO;
 	}
 
@@ -1073,7 +1075,7 @@ static int wl1271_boot_soft_reset(struct wl1271 *wl)
 		if (time_after(jiffies, timeout)) {
 			/* 1.2 check pWhalBus->uSelfClearTime if the
 			 * timeout was reached */
-			wl1271_error("soft reset timeout");
+			dev_err(wl->dev, "soft reset timeout\n");
 			return -1;
 		}
 
@@ -1836,10 +1838,10 @@ static int wl12xx_setup(struct wl1271 *wl)
 						pdev_data->ref_clock_freq,
 						pdev_data->ref_clock_xtal);
 		if (priv->ref_clock < 0) {
-			wl1271_error("Invalid ref_clock frequency (%d Hz, %s)",
-				     pdev_data->ref_clock_freq,
-				     pdev_data->ref_clock_xtal ?
-				     "XTAL" : "not XTAL");
+			dev_err(wl->dev, "Invalid ref_clock frequency (%d Hz, %s)\n",
+				pdev_data->ref_clock_freq,
+				pdev_data->ref_clock_xtal ?
+				"XTAL" : "not XTAL");
 
 			return priv->ref_clock;
 		}
@@ -1857,7 +1859,8 @@ static int wl12xx_setup(struct wl1271 *wl)
 		else if (!strcmp(fref_param, "52"))
 			priv->ref_clock = WL12XX_REFCLOCK_52;
 		else
-			wl1271_error("Invalid fref parameter %s", fref_param);
+			dev_err(wl->dev, "Invalid fref parameter %s\n",
+				fref_param);
 	}
 
 	if (!tcxo_param && pdev_data->tcxo_clock_freq) {
@@ -1865,8 +1868,8 @@ static int wl12xx_setup(struct wl1271 *wl)
 						pdev_data->tcxo_clock_freq,
 						true);
 		if (priv->tcxo_clock < 0) {
-			wl1271_error("Invalid tcxo_clock frequency (%d Hz)",
-				     pdev_data->tcxo_clock_freq);
+			dev_err(wl->dev, "Invalid tcxo_clock frequency (%d Hz)\n",
+				pdev_data->tcxo_clock_freq);
 
 			return priv->tcxo_clock;
 		}
@@ -1888,7 +1891,8 @@ static int wl12xx_setup(struct wl1271 *wl)
 		else if (!strcmp(tcxo_param, "33.6"))
 			priv->tcxo_clock = WL12XX_TCXOCLOCK_33_6;
 		else
-			wl1271_error("Invalid tcxo parameter %s", tcxo_param);
+			dev_err(wl->dev, "Invalid tcxo parameter %s\n",
+				tcxo_param);
 	}
 
 	priv->rx_mem_addr = kmalloc(sizeof(*priv->rx_mem_addr), GFP_KERNEL);
@@ -1908,7 +1912,7 @@ static int wl12xx_probe(struct platform_device *pdev)
 			     WL12XX_AGGR_BUFFER_SIZE,
 			     sizeof(struct wl12xx_event_mailbox));
 	if (IS_ERR(hw)) {
-		wl1271_error("can't allocate hw");
+		pr_err("can't allocate hw\n");
 		ret = PTR_ERR(hw);
 		goto out;
 	}

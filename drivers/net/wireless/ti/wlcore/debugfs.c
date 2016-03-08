@@ -114,7 +114,7 @@ static void chip_op_handler(struct wl1271 *wl, unsigned long value,
 	int (*chip_op) (struct wl1271 *wl);
 
 	if (!arg) {
-		wl1271_warning("debugfs chip_op_handler with no callback");
+		dev_warn(wl->dev, "debugfs chip_op_handler with no callback\n");
 		return;
 	}
 
@@ -158,12 +158,12 @@ static inline void no_write_handler(struct wl1271 *wl,
 									\
 	ret = kstrtoul_from_user(user_buf, count, 10, &value);		\
 	if (ret < 0) {							\
-		wl1271_warning("illegal value for " #param);		\
+		dev_warn(wl->dev, "illegal value for " #param "\n");	\
 		return -EINVAL;						\
 	}								\
 									\
 	if (value < min_val || value > max_val) {			\
-		wl1271_warning(#param " is not in valid range");	\
+		dev_warn(wl->dev, #param " is not in valid range\n");	\
 		return -ERANGE;						\
 	}								\
 									\
@@ -214,7 +214,7 @@ static ssize_t gpio_power_write(struct file *file,
 
 	ret = kstrtoul_from_user(user_buf, count, 10, &value);
 	if (ret < 0) {
-		wl1271_warning("illegal value in gpio_power");
+		dev_warn(wl->dev, "illegal value in gpio_power\n");
 		return -EINVAL;
 	}
 
@@ -276,12 +276,12 @@ static ssize_t dynamic_ps_timeout_write(struct file *file,
 
 	ret = kstrtoul_from_user(user_buf, count, 10, &value);
 	if (ret < 0) {
-		wl1271_warning("illegal value in dynamic_ps");
+		dev_warn(wl->dev, "illegal value in dynamic_ps\n");
 		return -EINVAL;
 	}
 
 	if (value < 1 || value > 65535) {
-		wl1271_warning("dyanmic_ps_timeout is not in valid range");
+		dev_warn(wl->dev, "dyanmic_ps_timeout is not in valid range\n");
 		return -ERANGE;
 	}
 
@@ -340,12 +340,12 @@ static ssize_t forced_ps_write(struct file *file,
 
 	ret = kstrtoul_from_user(user_buf, count, 10, &value);
 	if (ret < 0) {
-		wl1271_warning("illegal value in forced_ps");
+		dev_warn(wl->dev, "illegal value in forced_ps\n");
 		return -EINVAL;
 	}
 
 	if (value != 1 && value != 0) {
-		wl1271_warning("forced_ps should be either 0 or 1");
+		dev_warn(wl->dev, "forced_ps should be either 0 or 1\n");
 		return -ERANGE;
 	}
 
@@ -408,12 +408,12 @@ static ssize_t split_scan_timeout_write(struct file *file,
 
 	ret = kstrtoul_from_user(user_buf, count, 10, &value);
 	if (ret < 0) {
-		wl1271_warning("illegal value in split_scan_timeout");
+		dev_warn(wl->dev, "illegal value in split_scan_timeout\n");
 		return -EINVAL;
 	}
 
 	if (value == 0)
-		wl1271_info("split scan will be disabled");
+		dev_info(wl->dev, "split scan will be disabled\n");
 
 	mutex_lock(&wl->mutex);
 
@@ -664,12 +664,12 @@ static ssize_t dtim_interval_write(struct file *file,
 
 	ret = kstrtoul_from_user(user_buf, count, 10, &value);
 	if (ret < 0) {
-		wl1271_warning("illegal value for dtim_interval");
+		dev_warn(wl->dev, "illegal value for dtim_interval\n");
 		return -EINVAL;
 	}
 
 	if (value < 1 || value > 10) {
-		wl1271_warning("dtim value is not in valid range");
+		dev_warn(wl->dev, "dtim value is not in valid range\n");
 		return -ERANGE;
 	}
 
@@ -725,12 +725,12 @@ static ssize_t suspend_dtim_interval_write(struct file *file,
 
 	ret = kstrtoul_from_user(user_buf, count, 10, &value);
 	if (ret < 0) {
-		wl1271_warning("illegal value for suspend_dtim_interval");
+		dev_warn(wl->dev, "illegal value for suspend_dtim_interval\n");
 		return -EINVAL;
 	}
 
 	if (value < 1 || value > 10) {
-		wl1271_warning("suspend_dtim value is not in valid range");
+		dev_warn(wl->dev, "suspend_dtim value is not in valid range\n");
 		return -ERANGE;
 	}
 
@@ -780,12 +780,12 @@ static ssize_t beacon_interval_write(struct file *file,
 
 	ret = kstrtoul_from_user(user_buf, count, 10, &value);
 	if (ret < 0) {
-		wl1271_warning("illegal value for beacon_interval");
+		dev_warn(wl->dev, "illegal value for beacon_interval\n");
 		return -EINVAL;
 	}
 
 	if (value < 1 || value > 255) {
-		wl1271_warning("beacon interval value is not in valid range");
+		dev_warn(wl->dev, "beacon interval value is not in valid range\n");
 		return -ERANGE;
 	}
 
@@ -824,13 +824,13 @@ static ssize_t rx_streaming_interval_write(struct file *file,
 
 	ret = kstrtoul_from_user(user_buf, count, 10, &value);
 	if (ret < 0) {
-		wl1271_warning("illegal value in rx_streaming_interval!");
+		dev_warn(wl->dev, "illegal value in rx_streaming_interval!\n");
 		return -EINVAL;
 	}
 
 	/* valid values: 0, 10-100 */
 	if (value && (value < 10 || value > 100)) {
-		wl1271_warning("value is not in range!");
+		dev_warn(wl->dev, "value is not in range!\n");
 		return -ERANGE;
 	}
 
@@ -879,13 +879,13 @@ static ssize_t rx_streaming_always_write(struct file *file,
 
 	ret = kstrtoul_from_user(user_buf, count, 10, &value);
 	if (ret < 0) {
-		wl1271_warning("illegal value in rx_streaming_write!");
+		dev_warn(wl->dev, "illegal value in rx_streaming_write!\n");
 		return -EINVAL;
 	}
 
 	/* valid values: 0, 10-100 */
 	if (!(value == 0 || value == 1)) {
-		wl1271_warning("value is not in valid!");
+		dev_warn(wl->dev, "value is not in valid!\n");
 		return -EINVAL;
 	}
 
@@ -934,7 +934,7 @@ static ssize_t beacon_filtering_write(struct file *file,
 
 	ret = kstrtoul_from_user(user_buf, count, 0, &value);
 	if (ret < 0) {
-		wl1271_warning("illegal value for beacon_filtering!");
+		dev_warn(wl->dev, "illegal value for beacon_filtering!\n");
 		return -EINVAL;
 	}
 
@@ -999,13 +999,13 @@ static ssize_t sleep_auth_write(struct file *file,
 
 	ret = kstrtoul_from_user(user_buf, count, 0, &value);
 	if (ret < 0) {
-		wl1271_warning("illegal value in sleep_auth");
+		dev_warn(wl->dev, "illegal value in sleep_auth\n");
 		return -EINVAL;
 	}
 
 	if (value > WL1271_PSM_MAX) {
-		wl1271_warning("sleep_auth must be between 0 and %d",
-			       WL1271_PSM_MAX);
+		dev_warn(wl->dev, "sleep_auth must be between 0 and %d\n",
+			 WL1271_PSM_MAX);
 		return -ERANGE;
 	}
 
@@ -1239,17 +1239,17 @@ static ssize_t fw_logger_write(struct file *file,
 
 	ret = kstrtoul_from_user(user_buf, count, 0, &value);
 	if (ret < 0) {
-		wl1271_warning("illegal value in fw_logger");
+		dev_warn(wl->dev, "illegal value in fw_logger\n");
 		return -EINVAL;
 	}
 
 	if ((value > 2) || (value == 0)) {
-		wl1271_warning("fw_logger value must be 1-UART 2-SDIO");
+		dev_warn(wl->dev, "fw_logger value must be 1-UART 2-SDIO\n");
 		return -ERANGE;
 	}
 
 	if (wl->conf.fwlog.output == 0) {
-		wl1271_warning("iligal opperation - fw logger disabled by default, please change mode via wlconf");
+		dev_warn(wl->dev, "invalid operation - fw logger disabled by default, please change mode via wlconf\n");
 		return -EINVAL;
 	}
 

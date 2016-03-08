@@ -76,7 +76,7 @@ void wl1271_scan_complete_work(struct work_struct *work)
 	wl1271_ps_elp_sleep(wl);
 
 	if (wl->scan.failed) {
-		wl1271_info("Scan completed due to error.");
+		dev_info(wl->dev, "Scan completed due to error\n");
 		wl12xx_queue_recovery_work(wl);
 	}
 
@@ -466,7 +466,7 @@ wlcore_scan_sched_scan_ssid_list(struct wl1271 *wl,
 	ret = wl1271_cmd_send(wl, CMD_CONNECTION_SCAN_SSID_CFG, cmd,
 			      sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("cmd sched scan ssid list failed");
+		dev_err(wl->dev, "cmd sched scan ssid list failed\n");
 		goto out_free;
 	}
 

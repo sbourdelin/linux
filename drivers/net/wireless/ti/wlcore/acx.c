@@ -56,7 +56,8 @@ int wl1271_acx_wake_up_conditions(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 	ret = wl1271_cmd_configure(wl, ACX_WAKE_UP_CONDITIONS,
 				   wake_up, sizeof(*wake_up));
 	if (ret < 0) {
-		wl1271_warning("could not set wake up conditions: %d", ret);
+		dev_warn(wl->dev, "could not set wake up conditions: %d\n",
+			 ret);
 		goto out;
 	}
 
@@ -82,8 +83,8 @@ int wl1271_acx_sleep_auth(struct wl1271 *wl, u8 sleep_auth)
 
 	ret = wl1271_cmd_configure(wl, ACX_SLEEP_AUTH, auth, sizeof(*auth));
 	if (ret < 0) {
-		wl1271_error("could not configure sleep_auth to %d: %d",
-			     sleep_auth, ret);
+		dev_err(wl->dev, "could not configure sleep_auth to %d: %d\n",
+			sleep_auth, ret);
 		goto out;
 	}
 
@@ -116,7 +117,7 @@ int wl1271_acx_tx_power(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	ret = wl1271_cmd_configure(wl, DOT11_CUR_TX_PWR, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("configure of tx power failed: %d", ret);
+		dev_warn(wl->dev, "configure of tx power failed: %d\n", ret);
 		goto out;
 	}
 
@@ -146,7 +147,7 @@ int wl1271_acx_feature_cfg(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 	ret = wl1271_cmd_configure(wl, ACX_FEATURE_CFG,
 				   feature, sizeof(*feature));
 	if (ret < 0) {
-		wl1271_error("Couldnt set HW encryption");
+		dev_err(wl->dev, "Couldnt set HW encryption\n");
 		goto out;
 	}
 
@@ -187,7 +188,7 @@ int wl1271_acx_rx_msdu_life_time(struct wl1271 *wl)
 	ret = wl1271_cmd_configure(wl, DOT11_RX_MSDU_LIFE_TIME,
 				   acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("failed to set rx msdu life time: %d", ret);
+		dev_warn(wl->dev, "failed to set rx msdu life time: %d\n", ret);
 		goto out;
 	}
 
@@ -216,7 +217,7 @@ int wl1271_acx_slot(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	ret = wl1271_cmd_configure(wl, ACX_SLOT, slot, sizeof(*slot));
 	if (ret < 0) {
-		wl1271_warning("failed to set slot time: %d", ret);
+		dev_warn(wl->dev, "failed to set slot time: %d\n", ret);
 		goto out;
 	}
 
@@ -248,7 +249,7 @@ int wl1271_acx_group_address_tbl(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 	ret = wl1271_cmd_configure(wl, DOT11_GROUP_ADDRESS_TBL,
 				   acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("failed to set group addr table: %d", ret);
+		dev_warn(wl->dev, "failed to set group addr table: %d\n", ret);
 		goto out;
 	}
 
@@ -278,8 +279,8 @@ int wl1271_acx_service_period_timeout(struct wl1271 *wl,
 	ret = wl1271_cmd_configure(wl, ACX_SERVICE_PERIOD_TIMEOUT,
 				   rx_timeout, sizeof(*rx_timeout));
 	if (ret < 0) {
-		wl1271_warning("failed to set service period timeout: %d",
-			       ret);
+		dev_warn(wl->dev, "failed to set service period timeout: %d\n",
+			 ret);
 		goto out;
 	}
 
@@ -314,7 +315,7 @@ int wl1271_acx_rts_threshold(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	ret = wl1271_cmd_configure(wl, DOT11_RTS_THRESHOLD, rts, sizeof(*rts));
 	if (ret < 0) {
-		wl1271_warning("failed to set rts threshold: %d", ret);
+		dev_warn(wl->dev, "failed to set rts threshold: %d\n", ret);
 		goto out;
 	}
 
@@ -343,7 +344,8 @@ int wl1271_acx_dco_itrim_params(struct wl1271 *wl)
 	ret = wl1271_cmd_configure(wl, ACX_SET_DCO_ITRIM_PARAMS,
 				   dco, sizeof(*dco));
 	if (ret < 0) {
-		wl1271_warning("failed to set dco itrim parameters: %d", ret);
+		dev_warn(wl->dev, "failed to set dco itrim parameters: %d\n",
+			 ret);
 		goto out;
 	}
 
@@ -383,7 +385,7 @@ int wl1271_acx_beacon_filter_opt(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 	ret = wl1271_cmd_configure(wl, ACX_BEACON_FILTER_OPT,
 				   beacon_filter, sizeof(*beacon_filter));
 	if (ret < 0) {
-		wl1271_warning("failed to set beacon filter opt: %d", ret);
+		dev_warn(wl->dev, "failed to set beacon filter opt: %d\n", ret);
 		goto out;
 	}
 
@@ -439,7 +441,8 @@ int wl1271_acx_beacon_filter_table(struct wl1271 *wl,
 	ret = wl1271_cmd_configure(wl, ACX_BEACON_FILTER_TABLE,
 				   ie_table, sizeof(*ie_table));
 	if (ret < 0) {
-		wl1271_warning("failed to set beacon filter table: %d", ret);
+		dev_warn(wl->dev, "failed to set beacon filter table: %d\n",
+			 ret);
 		goto out;
 	}
 
@@ -479,8 +482,8 @@ int wl1271_acx_conn_monit_params(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 	ret = wl1271_cmd_configure(wl, ACX_CONN_MONIT_PARAMS,
 				   acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("failed to set connection monitor "
-			       "parameters: %d", ret);
+		dev_warn(wl->dev, "failed to set connection monitor parameters: %d\n",
+			 ret);
 		goto out;
 	}
 
@@ -510,7 +513,7 @@ int wl1271_acx_sg_enable(struct wl1271 *wl, bool enable)
 
 	ret = wl1271_cmd_configure(wl, ACX_SG_ENABLE, pta, sizeof(*pta));
 	if (ret < 0) {
-		wl1271_warning("failed to set softgemini enable: %d", ret);
+		dev_warn(wl->dev, "failed to set softgemini enable: %d\n", ret);
 		goto out;
 	}
 
@@ -540,7 +543,7 @@ int wl12xx_acx_sg_cfg(struct wl1271 *wl)
 
 	ret = wl1271_cmd_configure(wl, ACX_SG_CFG, param, sizeof(*param));
 	if (ret < 0) {
-		wl1271_warning("failed to set sg config: %d", ret);
+		dev_warn(wl->dev, "failed to set sg config: %d\n", ret);
 		goto out;
 	}
 
@@ -568,7 +571,7 @@ int wl1271_acx_cca_threshold(struct wl1271 *wl)
 	ret = wl1271_cmd_configure(wl, ACX_CCA_THRESHOLD,
 				   detection, sizeof(*detection));
 	if (ret < 0)
-		wl1271_warning("failed to set cca threshold: %d", ret);
+		dev_warn(wl->dev, "failed to set cca threshold: %d\n", ret);
 
 out:
 	kfree(detection);
@@ -596,7 +599,7 @@ int wl1271_acx_bcn_dtim_options(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 
 	ret = wl1271_cmd_configure(wl, ACX_BCN_DTIM_OPTIONS, bb, sizeof(*bb));
 	if (ret < 0) {
-		wl1271_warning("failed to set rx config: %d", ret);
+		dev_warn(wl->dev, "failed to set rx config: %d\n", ret);
 		goto out;
 	}
 
@@ -623,7 +626,7 @@ int wl1271_acx_aid(struct wl1271 *wl, struct wl12xx_vif *wlvif, u16 aid)
 
 	ret = wl1271_cmd_configure(wl, ACX_AID, acx_aid, sizeof(*acx_aid));
 	if (ret < 0) {
-		wl1271_warning("failed to set aid: %d", ret);
+		dev_warn(wl->dev, "failed to set aid: %d\n", ret);
 		goto out;
 	}
 
@@ -652,7 +655,8 @@ int wl1271_acx_event_mbox_mask(struct wl1271 *wl, u32 event_mask)
 	ret = wl1271_cmd_configure(wl, ACX_EVENT_MBOX_MASK,
 				   mask, sizeof(*mask));
 	if (ret < 0) {
-		wl1271_warning("failed to set acx_event_mbox_mask: %d", ret);
+		dev_warn(wl->dev, "failed to set acx_event_mbox_mask: %d\n",
+			 ret);
 		goto out;
 	}
 
@@ -680,7 +684,7 @@ int wl1271_acx_set_preamble(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	ret = wl1271_cmd_configure(wl, ACX_PREAMBLE_TYPE, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("Setting of preamble failed: %d", ret);
+		dev_warn(wl->dev, "Setting of preamble failed: %d\n", ret);
 		goto out;
 	}
 
@@ -708,7 +712,7 @@ int wl1271_acx_cts_protect(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	ret = wl1271_cmd_configure(wl, ACX_CTS_PROTECTION, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("Setting of ctsprotect failed: %d", ret);
+		dev_warn(wl->dev, "Setting of ctsprotect failed: %d\n", ret);
 		goto out;
 	}
 
@@ -727,7 +731,7 @@ int wl1271_acx_statistics(struct wl1271 *wl, void *stats)
 				     sizeof(struct acx_header),
 				     wl->stats.fw_stats_len);
 	if (ret < 0) {
-		wl1271_warning("acx statistics failed: %d", ret);
+		dev_warn(wl->dev, "acx statistics failed: %d\n", ret);
 		return -ENOMEM;
 	}
 
@@ -761,7 +765,7 @@ int wl1271_acx_sta_rate_policies(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 
 	ret = wl1271_cmd_configure(wl, ACX_RATE_POLICY, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("Setting of rate policies failed: %d", ret);
+		dev_warn(wl->dev, "Setting of rate policies failed: %d\n", ret);
 		goto out;
 	}
 
@@ -777,7 +781,7 @@ int wl1271_acx_sta_rate_policies(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 
 	ret = wl1271_cmd_configure(wl, ACX_RATE_POLICY, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("Setting of rate policies failed: %d", ret);
+		dev_warn(wl->dev, "Setting of rate policies failed: %d\n", ret);
 		goto out;
 	}
 
@@ -795,7 +799,7 @@ int wl1271_acx_sta_rate_policies(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 
 	ret = wl1271_cmd_configure(wl, ACX_RATE_POLICY, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("Setting of rate policies failed: %d", ret);
+		dev_warn(wl->dev, "Setting of rate policies failed: %d\n", ret);
 		goto out;
 	}
 
@@ -828,7 +832,8 @@ int wl1271_acx_ap_rate_policy(struct wl1271 *wl, struct conf_tx_rate_class *c,
 
 	ret = wl1271_cmd_configure(wl, ACX_RATE_POLICY, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("Setting of ap rate policy failed: %d", ret);
+		dev_warn(wl->dev, "Setting of ap rate policy failed: %d\n",
+			 ret);
 		goto out;
 	}
 
@@ -862,7 +867,7 @@ int wl1271_acx_ac_cfg(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	ret = wl1271_cmd_configure(wl, ACX_AC_CFG, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("acx ac cfg failed: %d", ret);
+		dev_warn(wl->dev, "acx ac cfg failed: %d\n", ret);
 		goto out;
 	}
 
@@ -899,7 +904,7 @@ int wl1271_acx_tid_cfg(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	ret = wl1271_cmd_configure(wl, ACX_TID_CFG, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("Setting of tid config failed: %d", ret);
+		dev_warn(wl->dev, "Setting of tid config failed: %d\n", ret);
 		goto out;
 	}
 
@@ -932,7 +937,8 @@ int wl1271_acx_frag_threshold(struct wl1271 *wl, u32 frag_threshold)
 	acx->frag_threshold = cpu_to_le16((u16)frag_threshold);
 	ret = wl1271_cmd_configure(wl, ACX_FRAG_CFG, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("Setting of frag threshold failed: %d", ret);
+		dev_warn(wl->dev, "Setting of frag threshold failed: %d\n",
+			 ret);
 		goto out;
 	}
 
@@ -959,7 +965,7 @@ int wl1271_acx_tx_config_options(struct wl1271 *wl)
 	acx->tx_compl_threshold = cpu_to_le16(wl->conf.tx.tx_compl_threshold);
 	ret = wl1271_cmd_configure(wl, ACX_TX_CONFIG_OPT, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("Setting of tx options failed: %d", ret);
+		dev_warn(wl->dev, "Setting of tx options failed: %d\n", ret);
 		goto out;
 	}
 
@@ -999,7 +1005,7 @@ int wl12xx_acx_mem_cfg(struct wl1271 *wl)
 	ret = wl1271_cmd_configure(wl, ACX_MEM_CFG, mem_conf,
 				   sizeof(*mem_conf));
 	if (ret < 0) {
-		wl1271_warning("wl1271 mem config failed: %d", ret);
+		dev_warn(wl->dev, "wl1271 mem config failed: %d\n", ret);
 		goto out;
 	}
 
@@ -1016,7 +1022,7 @@ int wl1271_acx_init_mem_config(struct wl1271 *wl)
 	wl->target_mem_map = kzalloc(sizeof(struct wl1271_acx_mem_map),
 				     GFP_KERNEL);
 	if (!wl->target_mem_map) {
-		wl1271_error("couldn't allocate target memory map");
+		dev_err(wl->dev, "couldn't allocate target memory map\n");
 		return -ENOMEM;
 	}
 
@@ -1024,7 +1030,7 @@ int wl1271_acx_init_mem_config(struct wl1271 *wl)
 	ret = wl1271_acx_mem_map(wl, (void *)wl->target_mem_map,
 				 sizeof(struct wl1271_acx_mem_map));
 	if (ret < 0) {
-		wl1271_error("couldn't retrieve firmware memory map");
+		dev_err(wl->dev, "couldn't retrieve firmware memory map\n");
 		kfree(wl->target_mem_map);
 		wl->target_mem_map = NULL;
 		return ret;
@@ -1061,7 +1067,7 @@ int wl1271_acx_init_rx_interrupt(struct wl1271 *wl)
 	ret = wl1271_cmd_configure(wl, ACX_RX_CONFIG_OPT, rx_conf,
 				   sizeof(*rx_conf));
 	if (ret < 0) {
-		wl1271_warning("wl1271 rx config opt failed: %d", ret);
+		dev_warn(wl->dev, "wl1271 rx config opt failed: %d\n", ret);
 		goto out;
 	}
 
@@ -1093,7 +1099,7 @@ int wl1271_acx_bet_enable(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	ret = wl1271_cmd_configure(wl, ACX_BET_ENABLE, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("acx bet enable failed: %d", ret);
+		dev_warn(wl->dev, "acx bet enable failed: %d\n", ret);
 		goto out;
 	}
 
@@ -1126,7 +1132,7 @@ int wl1271_acx_arp_ip_filter(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 	ret = wl1271_cmd_configure(wl, ACX_ARP_IP_FILTER,
 				   acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("failed to set arp ip filter: %d", ret);
+		dev_warn(wl->dev, "failed to set arp ip filter: %d\n", ret);
 		goto out;
 	}
 
@@ -1154,7 +1160,7 @@ int wl1271_acx_pm_config(struct wl1271 *wl)
 
 	ret = wl1271_cmd_configure(wl, ACX_PM_CONFIG, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("acx pm config failed: %d", ret);
+		dev_warn(wl->dev, "acx pm config failed: %d\n", ret);
 		goto out;
 	}
 
@@ -1183,7 +1189,7 @@ int wl1271_acx_keep_alive_mode(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	ret = wl1271_cmd_configure(wl, ACX_KEEP_ALIVE_MODE, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("acx keep alive mode failed: %d", ret);
+		dev_warn(wl->dev, "acx keep alive mode failed: %d\n", ret);
 		goto out;
 	}
 
@@ -1215,7 +1221,7 @@ int wl1271_acx_keep_alive_config(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 	ret = wl1271_cmd_configure(wl, ACX_SET_KEEP_ALIVE_CONFIG,
 				   acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("acx keep alive config failed: %d", ret);
+		dev_warn(wl->dev, "acx keep alive config failed: %d\n", ret);
 		goto out;
 	}
 
@@ -1256,7 +1262,8 @@ int wl1271_acx_rssi_snr_trigger(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	ret = wl1271_cmd_configure(wl, ACX_RSSI_SNR_TRIGGER, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("acx rssi snr trigger setting failed: %d", ret);
+		dev_warn(wl->dev, "acx rssi snr trigger setting failed: %d\n",
+			 ret);
 		goto out;
 	}
 
@@ -1288,7 +1295,8 @@ int wl1271_acx_rssi_snr_avg_weights(struct wl1271 *wl,
 
 	ret = wl1271_cmd_configure(wl, ACX_RSSI_SNR_WEIGHTS, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("acx rssi snr trigger weights failed: %d", ret);
+		dev_warn(wl->dev, "acx rssi snr trigger weights failed: %d\n",
+			 ret);
 		goto out;
 	}
 
@@ -1335,7 +1343,8 @@ int wl1271_acx_set_ht_capabilities(struct wl1271 *wl,
 
 	ret = wl1271_cmd_configure(wl, ACX_PEER_HT_CAP, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("acx ht capabilities setting failed: %d", ret);
+		dev_warn(wl->dev, "acx ht capabilities setting failed: %d\n",
+			 ret);
 		goto out;
 	}
 
@@ -1373,7 +1382,8 @@ int wl1271_acx_set_ht_information(struct wl1271 *wl,
 	ret = wl1271_cmd_configure(wl, ACX_HT_BSS_OPERATION, acx, sizeof(*acx));
 
 	if (ret < 0) {
-		wl1271_warning("acx ht information setting failed: %d", ret);
+		dev_warn(wl->dev, "acx ht information setting failed: %d\n",
+			 ret);
 		goto out;
 	}
 
@@ -1408,7 +1418,7 @@ int wl12xx_acx_set_ba_initiator_policy(struct wl1271 *wl,
 				   acx,
 				   sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("acx ba initiator policy failed: %d", ret);
+		dev_warn(wl->dev, "acx ba initiator policy failed: %d\n", ret);
 		goto out;
 	}
 
@@ -1442,13 +1452,13 @@ int wl12xx_acx_set_ba_receiver_session(struct wl1271 *wl, u8 tid_index,
 					    sizeof(*acx),
 					    BIT(CMD_STATUS_NO_RX_BA_SESSION));
 	if (ret < 0) {
-		wl1271_warning("acx ba receiver session failed: %d", ret);
+		dev_warn(wl->dev, "acx ba receiver session failed: %d\n", ret);
 		goto out;
 	}
 
 	/* sometimes we can't start the session */
 	if (ret == CMD_STATUS_NO_RX_BA_SESSION) {
-		wl1271_warning("no fw rx ba on tid %d", tid_index);
+		dev_warn(wl->dev, "no fw rx ba on tid %d\n", tid_index);
 		ret = -EBUSY;
 		goto out;
 	}
@@ -1476,7 +1486,7 @@ int wl12xx_acx_tsf_info(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 	ret = wl1271_cmd_interrogate(wl, ACX_TSF_INFO, tsf_info,
 				sizeof(struct acx_header), sizeof(*tsf_info));
 	if (ret < 0) {
-		wl1271_warning("acx tsf info interrogate failed");
+		dev_warn(wl->dev, "acx tsf info interrogate failed\n");
 		goto out;
 	}
 
@@ -1528,7 +1538,8 @@ int wl1271_acx_ps_rx_streaming(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 					   rx_streaming,
 					   sizeof(*rx_streaming));
 		if (ret < 0) {
-			wl1271_warning("acx ps rx streaming failed: %d", ret);
+			dev_warn(wl->dev, "acx ps rx streaming failed: %d\n",
+				 ret);
 			goto out;
 		}
 	}
@@ -1553,7 +1564,7 @@ int wl1271_acx_ap_max_tx_retry(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 
 	ret = wl1271_cmd_configure(wl, ACX_MAX_TX_FAILURE, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("acx ap max tx retry failed: %d", ret);
+		dev_warn(wl->dev, "acx ap max tx retry failed: %d\n", ret);
 		goto out;
 	}
 
@@ -1583,7 +1594,7 @@ int wl12xx_acx_config_ps(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 				   sizeof(*config_ps));
 
 	if (ret < 0) {
-		wl1271_warning("acx config ps failed: %d", ret);
+		dev_warn(wl->dev, "acx config ps failed: %d\n", ret);
 		goto out;
 	}
 
@@ -1610,7 +1621,7 @@ int wl1271_acx_set_inconnection_sta(struct wl1271 *wl,
 	ret = wl1271_cmd_configure(wl, ACX_UPDATE_INCONNECTION_STA_LIST,
 				   acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("acx set inconnaction sta failed: %d", ret);
+		dev_warn(wl->dev, "acx set inconnaction sta failed: %d\n", ret);
 		goto out;
 	}
 
@@ -1650,7 +1661,7 @@ int wl1271_acx_fm_coex(struct wl1271 *wl)
 
 	ret = wl1271_cmd_configure(wl, ACX_FM_COEX_CFG, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("acx fm coex setting failed: %d", ret);
+		dev_warn(wl->dev, "acx fm coex setting failed: %d\n", ret);
 		goto out;
 	}
 
@@ -1692,7 +1703,7 @@ int wl12xx_acx_set_rate_mgmt_params(struct wl1271 *wl)
 	ret = wl1271_cmd_configure(wl, ACX_SET_RATE_MGMT_PARAMS,
 				   acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("acx set rate mgmt params failed: %d", ret);
+		dev_warn(wl->dev, "acx set rate mgmt params failed: %d\n", ret);
 		goto out;
 	}
 
@@ -1731,7 +1742,7 @@ int wl12xx_acx_config_hangover(struct wl1271 *wl)
 				   sizeof(*acx));
 
 	if (ret < 0) {
-		wl1271_warning("acx config hangover failed: %d", ret);
+		dev_warn(wl->dev, "acx config hangover failed: %d\n", ret);
 		goto out;
 	}
 
@@ -1759,7 +1770,7 @@ int wlcore_acx_average_rssi(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 	ret = wl1271_cmd_interrogate(wl, ACX_ROAMING_STATISTICS_TBL,
 				     acx, sizeof(*acx), sizeof(*acx));
 	if (ret	< 0) {
-		wl1271_warning("acx roaming statistics failed: %d", ret);
+		dev_warn(wl->dev, "acx roaming statistics failed: %d\n", ret);
 		ret = -ENOMEM;
 		goto out;
 	}
@@ -1791,7 +1802,8 @@ int wl1271_acx_default_rx_filter_enable(struct wl1271 *wl, bool enable,
 	ret = wl1271_cmd_configure(wl, ACX_ENABLE_RX_DATA_FILTER, acx,
 				   sizeof(*acx));
 	if (ret < 0) {
-		wl1271_warning("acx default rx filter enable failed: %d", ret);
+		dev_warn(wl->dev, "acx default rx filter enable failed: %d\n",
+			 ret);
 		goto out;
 	}
 
@@ -1842,7 +1854,7 @@ int wl1271_acx_set_rx_filter(struct wl1271 *wl, u8 index, bool enable,
 
 	ret = wl1271_cmd_configure(wl, ACX_SET_RX_DATA_FILTER, acx, acx_size);
 	if (ret < 0) {
-		wl1271_warning("setting rx filter failed: %d", ret);
+		dev_warn(wl->dev, "setting rx filter failed: %d\n", ret);
 		goto out;
 	}
 

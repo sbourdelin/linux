@@ -101,8 +101,8 @@ static void wl1271_rx_status(struct wl1271 *wl,
 
 		if (unlikely(desc_err_code & WL1271_RX_DESC_MIC_FAIL)) {
 			status->flag |= RX_FLAG_MMIC_ERROR;
-			wl1271_warning("Michael MIC error. Desc: 0x%x",
-				       desc_err_code);
+			dev_warn(wl->dev, "Michael MIC error. Desc: 0x%x\n",
+				 desc_err_code);
 		}
 	}
 
@@ -133,8 +133,8 @@ static int wl1271_rx_handle_data(struct wl1271 *wl, u8 *data, u32 length,
 
 	pkt_data_len = wlcore_hw_get_rx_packet_len(wl, data, length);
 	if (!pkt_data_len) {
-		wl1271_error("Invalid packet arrived from HW. length %d",
-			     length);
+		dev_err(wl->dev, "Invalid packet arrived from HW. length %d\n",
+			length);
 		return -EINVAL;
 	}
 
@@ -155,9 +155,9 @@ static int wl1271_rx_handle_data(struct wl1271 *wl, u8 *data, u32 length,
 	/* discard corrupted packets */
 	if (desc->status & WL1271_RX_DESC_DECRYPT_FAIL) {
 		hdr = (void *)(data + sizeof(*desc) + offset_to_data);
-		wl1271_warning("corrupted packet in RX: status: 0x%x len: %d",
-			       desc->status & WL1271_RX_DESC_STATUS_MASK,
-			       pkt_data_len);
+		dev_warn(wl->dev, "corrupted packet in RX: status: 0x%x len: %d\n",
+			 desc->status & WL1271_RX_DESC_STATUS_MASK,
+			 pkt_data_len);
 		wl1271_dump((DEBUG_RX|DEBUG_CMD), "PKT: ", data + sizeof(*desc),
 			    min(pkt_data_len,
 				ieee80211_hdrlen(hdr->frame_control)));
@@ -167,7 +167,7 @@ static int wl1271_rx_handle_data(struct wl1271 *wl, u8 *data, u32 length,
 	/* skb length not including rx descriptor */
 	skb = __dev_alloc_skb(pkt_data_len + reserved, GFP_KERNEL);
 	if (!skb) {
-		wl1271_error("Couldn't allocate RX frame");
+		dev_err(wl->dev, "Couldn't allocate RX frame\n");
 		return -ENOMEM;
 	}
 
@@ -238,7 +238,7 @@ int wlcore_rx(struct wl1271 *wl, struct wl_fw_status *status)
 		}
 
 		if (buf_size == 0) {
-			wl1271_warning("received empty data");
+			dev_warn(wl->dev, "received empty data\n");
 			break;
 		}
 
@@ -309,16 +309,16 @@ int wl1271_rx_filter_enable(struct wl1271 *wl,
 	int ret;
 
 	if (!!test_bit(index, wl->rx_filter_enabled) == enable) {
-		wl1271_warning("Request to enable an already "
-			     "enabled rx filter %d", index);
+		dev_warn(wl->dev, "Request to enable an already enabled rx filter %d\n",
+			 index);
 		return 0;
 	}
 
 	ret = wl1271_acx_set_rx_filter(wl, index, enable, filter);
 
 	if (ret) {
-		wl1271_error("Failed to %s rx data filter %d (err=%d)",
-			     enable ? "enable" : "disable", index, ret);
+		dev_err(wl->dev, "Failed to %s rx data filter %d (err=%d)\n",
+			enable ? "enable" : "disable", index, ret);
 		return ret;
 	}
 

@@ -54,7 +54,7 @@ int wl1271_cmd_ext_radio_parms(struct wl1271 *wl)
 
 	ret = wl1271_cmd_test(wl, ext_radio_parms, sizeof(*ext_radio_parms), 0);
 	if (ret < 0)
-		wl1271_warning("TEST_CMD_INI_FILE_RF_EXTENDED_PARAM failed");
+		dev_warn(wl->dev, "TEST_CMD_INI_FILE_RF_EXTENDED_PARAM failed\n");
 
 	kfree(ext_radio_parms);
 	return ret;
@@ -73,7 +73,7 @@ int wl1271_cmd_general_parms(struct wl1271 *wl)
 		return -ENODEV;
 
 	if (gp->tx_bip_fem_manufacturer >= WL1271_INI_FEM_MODULE_COUNT) {
-		wl1271_warning("FEM index from INI out of bounds");
+		dev_warn(wl->dev, "FEM index from INI out of bounds\n");
 		return -EINVAL;
 	}
 
@@ -97,7 +97,7 @@ int wl1271_cmd_general_parms(struct wl1271 *wl)
 
 	ret = wl1271_cmd_test(wl, gen_parms, sizeof(*gen_parms), answer);
 	if (ret < 0) {
-		wl1271_warning("CMD_INI_FILE_GENERAL_PARAM failed");
+		dev_warn(wl->dev, "CMD_INI_FILE_GENERAL_PARAM failed\n");
 		goto out;
 	}
 
@@ -105,7 +105,7 @@ int wl1271_cmd_general_parms(struct wl1271 *wl)
 		gen_parms->general_params.tx_bip_fem_manufacturer;
 
 	if (gp->tx_bip_fem_manufacturer >= WL1271_INI_FEM_MODULE_COUNT) {
-		wl1271_warning("FEM index from FW out of bounds");
+		dev_warn(wl->dev, "FEM index from FW out of bounds\n");
 		ret = -EINVAL;
 		goto out;
 	}
@@ -140,7 +140,7 @@ int wl128x_cmd_general_parms(struct wl1271 *wl)
 		return -ENODEV;
 
 	if (gp->tx_bip_fem_manufacturer >= WL1271_INI_FEM_MODULE_COUNT) {
-		wl1271_warning("FEM index from ini out of bounds");
+		dev_warn(wl->dev, "FEM index from ini out of bounds\n");
 		return -EINVAL;
 	}
 
@@ -165,7 +165,7 @@ int wl128x_cmd_general_parms(struct wl1271 *wl)
 
 	ret = wl1271_cmd_test(wl, gen_parms, sizeof(*gen_parms), answer);
 	if (ret < 0) {
-		wl1271_warning("CMD_INI_FILE_GENERAL_PARAM failed");
+		dev_warn(wl->dev, "CMD_INI_FILE_GENERAL_PARAM failed\n");
 		goto out;
 	}
 
@@ -173,7 +173,7 @@ int wl128x_cmd_general_parms(struct wl1271 *wl)
 		gen_parms->general_params.tx_bip_fem_manufacturer;
 
 	if (gp->tx_bip_fem_manufacturer >= WL1271_INI_FEM_MODULE_COUNT) {
-		wl1271_warning("FEM index from FW out of bounds");
+		dev_warn(wl->dev, "FEM index from FW out of bounds\n");
 		ret = -EINVAL;
 		goto out;
 	}
@@ -233,7 +233,7 @@ int wl1271_cmd_radio_parms(struct wl1271 *wl)
 
 	ret = wl1271_cmd_test(wl, radio_parms, sizeof(*radio_parms), 0);
 	if (ret < 0)
-		wl1271_warning("CMD_INI_FILE_RADIO_PARAM failed");
+		dev_warn(wl->dev, "CMD_INI_FILE_RADIO_PARAM failed\n");
 
 	kfree(radio_parms);
 	return ret;
@@ -279,7 +279,7 @@ int wl128x_cmd_radio_parms(struct wl1271 *wl)
 
 	ret = wl1271_cmd_test(wl, radio_parms, sizeof(*radio_parms), 0);
 	if (ret < 0)
-		wl1271_warning("CMD_INI_FILE_RADIO_PARAM failed");
+		dev_warn(wl->dev, "CMD_INI_FILE_RADIO_PARAM failed\n");
 
 	kfree(radio_parms);
 	return ret;
@@ -311,7 +311,7 @@ int wl12xx_cmd_channel_switch(struct wl1271 *wl,
 
 	ret = wl1271_cmd_send(wl, CMD_CHANNEL_SWITCH, cmd, sizeof(*cmd), 0);
 	if (ret < 0) {
-		wl1271_error("failed to send channel switch command");
+		dev_err(wl->dev, "failed to send channel switch command\n");
 		goto out_free;
 	}
 
