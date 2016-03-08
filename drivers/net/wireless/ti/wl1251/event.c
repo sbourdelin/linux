@@ -68,7 +68,7 @@ static int wl1251_event_ps_report(struct wl1251 *wl,
 			wl->psm_entry_retry++;
 			ret = wl1251_ps_set_mode(wl, STATION_POWER_SAVE_MODE);
 		} else {
-			wl1251_error("Power save entry failed, giving up");
+			wiphy_err(wl->hw->wiphy, "Power save entry failed, giving up\n");
 			wl->psm_entry_retry = 0;
 		}
 		break;

@@ -62,7 +62,7 @@ static void wl1251_spi_reset(struct wl1251 *wl)
 
 	cmd = kzalloc(WSPI_INIT_CMD_LEN, GFP_KERNEL);
 	if (!cmd) {
-		wl1251_error("could not allocate cmd for spi reset");
+		wiphy_err(wl->hw->wiphy, "could not allocate cmd for spi reset\n");
 		return;
 	}
 
@@ -89,7 +89,7 @@ static void wl1251_spi_wake(struct wl1251 *wl)
 	u8 *cmd = kzalloc(WSPI_INIT_CMD_LEN, GFP_KERNEL);
 
 	if (!cmd) {
-		wl1251_error("could not allocate cmd for spi init");
+		wiphy_err(wl->hw->wiphy, "could not allocate cmd for spi init\n");
 		return;
 	}
 
@@ -247,7 +247,7 @@ static int wl1251_spi_probe(struct spi_device *spi)
 	int ret;
 
 	if (!np && !pdata) {
-		wl1251_error("no platform data");
+		wiphy_err(wl->hw->wiphy, "no platform data\n");
 		return -ENODEV;
 	}
 
@@ -269,7 +269,7 @@ static int wl1251_spi_probe(struct spi_device *spi)
 
 	ret = spi_setup(spi);
 	if (ret < 0) {
-		wl1251_error("spi_setup failed");
+		wiphy_err(wl->hw->wiphy, "spi_setup failed\n");
 		goto out_free;
 	}
 
@@ -290,18 +290,19 @@ static int wl1251_spi_probe(struct spi_device *spi)
 		ret = devm_gpio_request_one(&spi->dev, wl->power_gpio,
 					GPIOF_OUT_INIT_LOW, "wl1251 power");
 		if (ret) {
-			wl1251_error("Failed to request gpio: %d\n", ret);
+			wiphy_err(wl->hw->wiphy, "Failed to request gpio: %d\n",
+				  ret);
 			goto out_free;
 		}
 	} else {
-		wl1251_error("set power gpio missing in platform data");
+		wiphy_err(wl->hw->wiphy, "set power gpio missing in platform data\n");
 		ret = -ENODEV;
 		goto out_free;
 	}
 
 	wl->irq = spi->irq;
 	if (wl->irq < 0) {
-		wl1251_error("irq missing in platform data");
+		wiphy_err(wl->hw->wiphy, "irq missing in platform data\n");
 		ret = -ENODEV;
 		goto out_free;
 	}
@@ -310,7 +311,7 @@ static int wl1251_spi_probe(struct spi_device *spi)
 	ret = devm_request_irq(&spi->dev, wl->irq, wl1251_irq, 0,
 							DRIVER_NAME, wl);
 	if (ret < 0) {
-		wl1251_error("request_irq() failed: %d", ret);
+		wiphy_err(wl->hw->wiphy, "request_irq() failed: %d\n", ret);
 		goto out_free;
 	}
 
@@ -319,7 +320,7 @@ static int wl1251_spi_probe(struct spi_device *spi)
 	wl->vio = devm_regulator_get(&spi->dev, "vio");
 	if (IS_ERR(wl->vio)) {
 		ret = PTR_ERR(wl->vio);
-		wl1251_error("vio regulator missing: %d", ret);
+		wiphy_err(wl->hw->wiphy, "vio regulator missing: %d\n", ret);
 		goto out_free;
 	}
 

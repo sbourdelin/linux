@@ -19,6 +19,8 @@
  *
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/module.h>
 #include <linux/interrupt.h>
 #include <linux/firmware.h>
@@ -72,13 +74,13 @@ static int wl1251_fetch_firmware(struct wl1251 *wl)
 	ret = request_firmware(&fw, WL1251_FW_NAME, dev);
 
 	if (ret < 0) {
-		wl1251_error("could not get firmware: %d", ret);
+		wiphy_err(wl->hw->wiphy, "could not get firmware: %d\n", ret);
 		return ret;
 	}
 
 	if (fw->size % 4) {
-		wl1251_error("firmware size is not multiple of 32 bits: %zu",
-			     fw->size);
+		wiphy_err(wl->hw->wiphy, "firmware size is not multiple of 32 bits: %zu\n",
+			  fw->size);
 		ret = -EILSEQ;
 		goto out;
 	}
@@ -87,7 +89,7 @@ static int wl1251_fetch_firmware(struct wl1251 *wl)
 	wl->fw = vmalloc(wl->fw_len);
 
 	if (!wl->fw) {
-		wl1251_error("could not allocate memory for the firmware");
+		wiphy_err(wl->hw->wiphy, "could not allocate memory for the firmware\n");
 		ret = -ENOMEM;
 		goto out;
 	}
@@ -111,13 +113,13 @@ static int wl1251_fetch_nvs(struct wl1251 *wl)
 	ret = request_firmware(&fw, WL1251_NVS_NAME, dev);
 
 	if (ret < 0) {
-		wl1251_error("could not get nvs file: %d", ret);
+		wiphy_err(wl->hw->wiphy, "could not get nvs file: %d\n", ret);
 		return ret;
 	}
 
 	if (fw->size % 4) {
-		wl1251_error("nvs size is not multiple of 32 bits: %zu",
-			     fw->size);
+		wiphy_err(wl->hw->wiphy, "nvs size is not multiple of 32 bits: %zu\n",
+			  fw->size);
 		ret = -EILSEQ;
 		goto out;
 	}
@@ -126,7 +128,7 @@ static int wl1251_fetch_nvs(struct wl1251 *wl)
 	wl->nvs = kmemdup(fw->data, wl->nvs_len, GFP_KERNEL);
 
 	if (!wl->nvs) {
-		wl1251_error("could not allocate memory for the nvs file");
+		wiphy_err(wl->hw->wiphy, "could not allocate memory for the nvs file\n");
 		ret = -ENOMEM;
 		goto out;
 	}
@@ -191,7 +193,8 @@ static int wl1251_chip_wakeup(struct wl1251 *wl)
 		break;
 	case CHIP_ID_1251_PG10:
 	default:
-		wl1251_error("unsupported chip id: 0x%x", wl->chip_id);
+		wiphy_err(wl->hw->wiphy, "unsupported chip id: 0x%x\n",
+			  wl->chip_id);
 		ret = -ENODEV;
 		goto out;
 	}
@@ -396,8 +399,8 @@ static int wl1251_op_start(struct ieee80211_hw *hw)
 	mutex_lock(&wl->mutex);
 
 	if (wl->state != WL1251_STATE_OFF) {
-		wl1251_error("cannot start because not in off state: %d",
-			     wl->state);
+		wiphy_err(wl->hw->wiphy, "cannot start because not in off state: %d\n",
+			  wl->state);
 		ret = -EBUSY;
 		goto out;
 	}
@@ -743,7 +746,7 @@ static u64 wl1251_op_prepare_multicast(struct ieee80211_hw *hw,
 
 	fp = kzalloc(sizeof(*fp), GFP_ATOMIC);
 	if (!fp) {
-		wl1251_error("Out of memory setting filters.");
+		wiphy_err(wl->hw->wiphy, "Out of memory setting filters\n");
 		return 0;
 	}
 
@@ -872,7 +875,8 @@ static int wl1251_set_key_type(struct wl1251 *wl,
 		mac80211_key->flags |= IEEE80211_KEY_FLAG_GENERATE_IV;
 		break;
 	default:
-		wl1251_error("Unknown key cipher 0x%x", mac80211_key->cipher);
+		wiphy_err(wl->hw->wiphy, "Unknown key cipher 0x%x\n",
+			  mac80211_key->cipher);
 		return -EOPNOTSUPP;
 	}
 
@@ -928,7 +932,7 @@ static int wl1251_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		wl_cmd->key_action = KEY_REMOVE;
 		break;
 	default:
-		wl1251_error("Unsupported key cmd 0x%x", cmd);
+		wiphy_err(wl->hw->wiphy, "Unsupported key cmd 0x%x\n", cmd);
 		break;
 	}
 
@@ -938,7 +942,7 @@ static int wl1251_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 
 	ret = wl1251_set_key_type(wl, wl_cmd, cmd, key, addr);
 	if (ret < 0) {
-		wl1251_error("Set KEY type failed");
+		wiphy_err(wl->hw->wiphy, "Set KEY type failed\n");
 		goto out_sleep;
 	}
 
@@ -1454,7 +1458,8 @@ static int wl1251_register_hw(struct wl1251 *wl)
 
 	ret = ieee80211_register_hw(wl->hw);
 	if (ret < 0) {
-		wl1251_error("unable to register mac80211 hw: %d", ret);
+		wiphy_err(wl->hw->wiphy, "unable to register mac80211 hw: %d\n",
+			  ret);
 		return ret;
 	}
 
@@ -1512,7 +1517,7 @@ struct ieee80211_hw *wl1251_alloc_hw(void)
 
 	hw = ieee80211_alloc_hw(sizeof(*wl), &wl1251_ops);
 	if (!hw) {
-		wl1251_error("could not alloc ieee80211_hw");
+		pr_err("could not alloc ieee80211_hw\n");
 		return ERR_PTR(-ENOMEM);
 	}
 
@@ -1573,7 +1578,7 @@ struct ieee80211_hw *wl1251_alloc_hw(void)
 
 	wl->rx_descriptor = kmalloc(sizeof(*wl->rx_descriptor), GFP_KERNEL);
 	if (!wl->rx_descriptor) {
-		wl1251_error("could not allocate memory for rx descriptor");
+		wiphy_err(wl->hw->wiphy, "could not allocate memory for rx descriptor\n");
 		ieee80211_free_hw(hw);
 		return ERR_PTR(-ENOMEM);
 	}

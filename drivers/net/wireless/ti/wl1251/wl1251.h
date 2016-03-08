@@ -54,9 +54,6 @@ enum {
 
 #define DEBUG_DUMP_LIMIT 1024
 
-#define wl1251_error(fmt, arg...) \
-	printk(KERN_ERR DRIVER_PREFIX "ERROR " fmt "\n", ##arg)
-
 #define wl1251_warning(fmt, arg...) \
 	printk(KERN_WARNING DRIVER_PREFIX "WARNING " fmt "\n", ##arg)
 

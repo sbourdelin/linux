@@ -223,7 +223,7 @@ static int wl1251_tx_send_packet(struct wl1251 *wl, struct sk_buff *skb,
 								 GFP_KERNEL);
 
 			if (unlikely(newskb == NULL)) {
-				wl1251_error("Can't allocate skb!");
+				wiphy_err(wl->hw->wiphy, "Can't allocate skb!\n");
 				return -EINVAL;
 			}
 
@@ -419,7 +419,8 @@ static void wl1251_tx_packet_cb(struct wl1251 *wl,
 
 	skb = wl->tx_frames[result->id];
 	if (skb == NULL) {
-		wl1251_error("SKB for packet %d is NULL", result->id);
+		wiphy_err(wl->hw->wiphy, "SKB for packet %d is NULL\n",
+			  result->id);
 		return;
 	}
 

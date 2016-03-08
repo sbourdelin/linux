@@ -28,7 +28,7 @@ int wl1251_acx_frame_rates(struct wl1251 *wl, u8 ctrl_rate, u8 ctrl_mod,
 	ret = wl1251_cmd_configure(wl, ACX_FW_GEN_FRAME_RATES,
 				   rates, sizeof(*rates));
 	if (ret < 0) {
-		wl1251_error("Failed to set FW rates and modulation");
+		wiphy_err(wl->hw->wiphy, "Failed to set FW rates and modulation\n");
 		goto out;
 	}
 
@@ -74,7 +74,7 @@ int wl1251_acx_default_key(struct wl1251 *wl, u8 key_id)
 	ret = wl1251_cmd_configure(wl, DOT11_DEFAULT_KEY,
 				   default_key, sizeof(*default_key));
 	if (ret < 0) {
-		wl1251_error("Couldn't set default key");
+		wiphy_err(wl->hw->wiphy, "Couldn't set default key\n");
 		goto out;
 	}
 
@@ -208,7 +208,7 @@ int wl1251_acx_feature_cfg(struct wl1251 *wl, u32 data_flow_options)
 	ret = wl1251_cmd_configure(wl, ACX_FEATURE_CFG,
 				   feature, sizeof(*feature));
 	if (ret < 0) {
-		wl1251_error("Couldn't set HW encryption");
+		wiphy_err(wl->hw->wiphy, "Couldn't set HW encryption\n");
 		goto out;
 	}
 

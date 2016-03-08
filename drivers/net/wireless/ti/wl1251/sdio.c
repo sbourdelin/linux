@@ -19,6 +19,9 @@
  * Copyright (C) 2008 Google Inc
  * Copyright (C) 2009 Bob Copeland (me@bobcopeland.com)
  */
+
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/mod_devicetable.h>
@@ -77,7 +80,7 @@ static void wl1251_sdio_read(struct wl1251 *wl, int addr,
 	sdio_claim_host(func);
 	ret = sdio_memcpy_fromio(func, buf, addr, len);
 	if (ret)
-		wl1251_error("sdio read failed (%d)", ret);
+		wiphy_err(wl->hw->wiphy, "sdio read failed (%d)\n", ret);
 	sdio_release_host(func);
 }
 
@@ -90,7 +93,7 @@ static void wl1251_sdio_write(struct wl1251 *wl, int addr,
 	sdio_claim_host(func);
 	ret = sdio_memcpy_toio(func, addr, buf, len);
 	if (ret)
-		wl1251_error("sdio write failed (%d)", ret);
+		wiphy_err(wl->hw->wiphy, "sdio write failed (%d)\n", ret);
 	sdio_release_host(func);
 }
 
@@ -111,7 +114,7 @@ static void wl1251_sdio_read_elp(struct wl1251 *wl, int addr, u32 *val)
 	sdio_release_host(func);
 
 	if (ret)
-		wl1251_error("sdio_readb failed (%d)", ret);
+		wiphy_err(wl->hw->wiphy, "sdio_readb failed (%d)\n", ret);
 }
 
 static void wl1251_sdio_write_elp(struct wl1251 *wl, int addr, u32 val)
@@ -125,7 +128,7 @@ static void wl1251_sdio_write_elp(struct wl1251 *wl, int addr, u32 val)
 	sdio_release_host(func);
 
 	if (ret)
-		wl1251_error("sdio_writeb failed (%d)", ret);
+		wiphy_err(wl->hw->wiphy, "sdio_writeb failed (%d)\n", ret);
 	else
 		wl_sdio->elp_val = val;
 }
@@ -267,7 +270,8 @@ static int wl1251_sdio_probe(struct sdio_func *func,
 		ret = devm_gpio_request(&func->dev, wl->power_gpio,
 								"wl1251 power");
 		if (ret) {
-			wl1251_error("Failed to request gpio: %d\n", ret);
+			wiphy_err(wl->hw->wiphy, "Failed to request gpio: %d\n",
+				  ret);
 			goto disable;
 		}
 	}
@@ -276,7 +280,8 @@ static int wl1251_sdio_probe(struct sdio_func *func,
 		irq_set_status_flags(wl->irq, IRQ_NOAUTOEN);
 		ret = request_irq(wl->irq, wl1251_line_irq, 0, "wl1251", wl);
 		if (ret < 0) {
-			wl1251_error("request_irq() failed: %d", ret);
+			wiphy_err(wl->hw->wiphy, "request_irq() failed: %d\n",
+				  ret);
 			goto disable;
 		}
 
@@ -370,7 +375,7 @@ static int __init wl1251_sdio_init(void)
 
 	err = sdio_register_driver(&wl1251_sdio_driver);
 	if (err)
-		wl1251_error("failed to register sdio driver: %d", err);
+		pr_err("failed to register sdio driver: %d\n", err);
 	return err;
 }
 

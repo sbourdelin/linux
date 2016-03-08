@@ -53,7 +53,7 @@ int wl1251_boot_soft_reset(struct wl1251 *wl)
 		if (time_after(jiffies, timeout)) {
 			/* 1.2 check pWhalBus->uSelfClearTime if the
 			 * timeout was reached */
-			wl1251_error("soft reset timeout");
+			wiphy_err(wl->hw->wiphy, "soft reset timeout\n");
 			return -1;
 		}
 
@@ -231,7 +231,7 @@ int wl1251_boot_run_firmware(struct wl1251 *wl)
 	wl1251_debug(DEBUG_BOOT, "chip id after firmware boot: 0x%x", chip_id);
 
 	if (chip_id != wl->chip_id) {
-		wl1251_error("chip id doesn't match after firmware boot");
+		wiphy_err(wl->hw->wiphy, "chip id doesn't match after firmware boot\n");
 		return -EIO;
 	}
 
@@ -242,8 +242,7 @@ int wl1251_boot_run_firmware(struct wl1251 *wl)
 		acx_intr = wl1251_reg_read32(wl, ACX_REG_INTERRUPT_NO_CLEAR);
 
 		if (acx_intr == 0xffffffff) {
-			wl1251_error("error reading hardware complete "
-				     "init indication");
+			wiphy_err(wl->hw->wiphy, "error reading hardware complete init indication\n");
 			return -EIO;
 		}
 		/* check that ACX_INTR_INIT_COMPLETE is enabled */
@@ -255,8 +254,7 @@ int wl1251_boot_run_firmware(struct wl1251 *wl)
 	}
 
 	if (loop > INIT_LOOP) {
-		wl1251_error("timeout waiting for the hardware to "
-			     "complete initialization");
+		wiphy_err(wl->hw->wiphy, "timeout waiting for the hardware to complete initialization\n");
 		return -EIO;
 	}
 
@@ -304,7 +302,7 @@ int wl1251_boot_run_firmware(struct wl1251 *wl)
 
 	ret = wl1251_event_unmask(wl);
 	if (ret < 0) {
-		wl1251_error("EVENT mask setting failed");
+		wiphy_err(wl->hw->wiphy, "EVENT mask setting failed\n");
 		return ret;
 	}
 
@@ -333,13 +331,13 @@ static int wl1251_boot_upload_firmware(struct wl1251 *wl)
 		CHUNK_SIZE);
 
 	if ((fw_data_len % 4) != 0) {
-		wl1251_error("firmware length not multiple of four");
+		wiphy_err(wl->hw->wiphy, "firmware length not multiple of four\n");
 		return -EIO;
 	}
 
 	buf = kmalloc(CHUNK_SIZE, GFP_KERNEL);
 	if (!buf) {
-		wl1251_error("allocation for firmware upload chunk failed");
+		wiphy_err(wl->hw->wiphy, "allocation for firmware upload chunk failed\n");
 		return -ENOMEM;
 	}
 
@@ -536,7 +534,7 @@ int wl1251_boot(struct wl1251 *wl)
 	 * pWhalBus->uBootData and start uploading firmware
 	 */
 	if ((boot_data & ECPU_CONTROL_HALT) == 0) {
-		wl1251_error("boot failed, ECPU_CONTROL_HALT not set");
+		wiphy_err(wl->hw->wiphy, "boot failed, ECPU_CONTROL_HALT not set\n");
 		ret = -EIO;
 		goto out;
 	}

@@ -88,7 +88,7 @@ int wl1251_ps_elp_wakeup(struct wl1251 *wl)
 	 */
 	while (!(elp_reg & ELPCTRL_WLAN_READY)) {
 		if (time_after(jiffies, timeout)) {
-			wl1251_error("elp wakeup timeout");
+			wiphy_err(wl->hw->wiphy, "elp wakeup timeout\n");
 			return -ETIMEDOUT;
 		}
 		msleep(1);

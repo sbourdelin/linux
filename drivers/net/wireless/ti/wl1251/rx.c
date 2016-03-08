@@ -172,7 +172,7 @@ static void wl1251_rx_body(struct wl1251 *wl,
 
 	skb = __dev_alloc_skb(length, GFP_KERNEL);
 	if (!skb) {
-		wl1251_error("Couldn't allocate RX frame");
+		wiphy_err(wl->hw->wiphy, "Couldn't allocate RX frame\n");
 		return;
 	}
 

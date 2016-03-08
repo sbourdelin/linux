@@ -211,7 +211,7 @@ int wl1251_hw_init_mem_config(struct wl1251 *wl)
 	wl->target_mem_map = kzalloc(sizeof(struct wl1251_acx_mem_map),
 					  GFP_KERNEL);
 	if (!wl->target_mem_map) {
-		wl1251_error("couldn't allocate target memory map");
+		wiphy_err(wl->hw->wiphy, "couldn't allocate target memory map\n");
 		return -ENOMEM;
 	}
 
@@ -219,7 +219,7 @@ int wl1251_hw_init_mem_config(struct wl1251 *wl)
 	ret = wl1251_acx_mem_map(wl, wl->target_mem_map,
 				 sizeof(struct wl1251_acx_mem_map));
 	if (ret < 0) {
-		wl1251_error("couldn't retrieve firmware memory map");
+		wiphy_err(wl->hw->wiphy, "couldn't retrieve firmware memory map\n");
 		kfree(wl->target_mem_map);
 		wl->target_mem_map = NULL;
 		return ret;
@@ -228,7 +228,8 @@ int wl1251_hw_init_mem_config(struct wl1251 *wl)
 	return 0;
 }
 
-static int wl1251_hw_init_txq_fill(u8 qid,
+static int wl1251_hw_init_txq_fill(struct wl1251 *wl,
+				   u8 qid,
 				   struct acx_tx_queue_qos_config *config,
 				   u32 num_blocks)
 {
@@ -260,7 +261,7 @@ static int wl1251_hw_init_txq_fill(u8 qid,
 			(QOS_TX_LOW_VO_DEF * num_blocks) / 100;
 		break;
 	default:
-		wl1251_error("Invalid TX queue id: %d", qid);
+		wiphy_err(wl->hw->wiphy, "Invalid TX queue id: %d\n", qid);
 		return -EINVAL;
 	}
 
@@ -282,7 +283,7 @@ static int wl1251_hw_init_tx_queue_config(struct wl1251 *wl)
 	}
 
 	for (i = 0; i < MAX_NUM_OF_AC; i++) {
-		ret = wl1251_hw_init_txq_fill(i, config,
+		ret = wl1251_hw_init_txq_fill(wl, i, config,
 					      wl_mem_map->num_tx_mem_blocks);
 		if (ret < 0)
 			goto out;
@@ -311,7 +312,7 @@ static int wl1251_hw_init_data_path_config(struct wl1251 *wl)
 	wl->data_path = kzalloc(sizeof(struct acx_data_path_params_resp),
 				GFP_KERNEL);
 	if (!wl->data_path) {
-		wl1251_error("Couldnt allocate data path parameters");
+		wiphy_err(wl->hw->wiphy, "Couldnt allocate data path parameters\n");
 		return -ENOMEM;
 	}
 

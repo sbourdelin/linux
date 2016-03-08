@@ -40,7 +40,7 @@ int wl1251_cmd_send(struct wl1251 *wl, u16 id, void *buf, size_t len)
 	intr = wl1251_reg_read32(wl, ACX_REG_INTERRUPT_NO_CLEAR);
 	while (!(intr & WL1251_ACX_INTR_CMD_COMPLETE)) {
 		if (time_after(jiffies, timeout)) {
-			wl1251_error("command complete timeout");
+			wiphy_err(wl->hw->wiphy, "command complete timeout\n");
 			ret = -ETIMEDOUT;
 			goto out;
 		}
@@ -91,8 +91,8 @@ int wl1251_cmd_test(struct wl1251 *wl, void *buf, size_t buf_len, u8 answer)
 		cmd_answer = buf;
 
 		if (cmd_answer->header.status != CMD_STATUS_SUCCESS)
-			wl1251_error("TEST command answer error: %d",
-				     cmd_answer->header.status);
+			wiphy_err(wl->hw->wiphy, "TEST command answer error: %d\n",
+				  cmd_answer->header.status);
 	}
 
 	return 0;
@@ -120,7 +120,7 @@ int wl1251_cmd_interrogate(struct wl1251 *wl, u16 id, void *buf, size_t len)
 
 	ret = wl1251_cmd_send(wl, CMD_INTERROGATE, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1251_error("INTERROGATE command failed");
+		wiphy_err(wl->hw->wiphy, "INTERROGATE command failed\n");
 		goto out;
 	}
 
@@ -129,8 +129,8 @@ int wl1251_cmd_interrogate(struct wl1251 *wl, u16 id, void *buf, size_t len)
 
 	acx = buf;
 	if (acx->cmd.status != CMD_STATUS_SUCCESS)
-		wl1251_error("INTERROGATE command error: %d",
-			     acx->cmd.status);
+		wiphy_err(wl->hw->wiphy, "INTERROGATE command error: %d\n",
+			  acx->cmd.status);
 
 out:
 	return ret;
@@ -194,7 +194,7 @@ int wl1251_cmd_vbm(struct wl1251 *wl, u8 identity,
 
 	ret = wl1251_cmd_send(wl, CMD_VBM, vbm, sizeof(*vbm));
 	if (ret < 0) {
-		wl1251_error("VBM command failed");
+		wiphy_err(wl->hw->wiphy, "VBM command failed\n");
 		goto out;
 	}
 
@@ -226,8 +226,8 @@ int wl1251_cmd_data_path_rx(struct wl1251 *wl, u8 channel, bool enable)
 
 	ret = wl1251_cmd_send(wl, cmd_rx, cmd, sizeof(*cmd));
 	if (ret < 0) {
-		wl1251_error("rx %s cmd for channel %d failed",
-			     enable ? "start" : "stop", channel);
+		wiphy_err(wl->hw->wiphy, "rx %s cmd for channel %d failed\n",
+			  enable ? "start" : "stop", channel);
 		goto out;
 	}
 
@@ -260,8 +260,8 @@ int wl1251_cmd_data_path_tx(struct wl1251 *wl, u8 channel, bool enable)
 
 	ret = wl1251_cmd_send(wl, cmd_tx, cmd, sizeof(*cmd));
 	if (ret < 0)
-		wl1251_error("tx %s cmd for channel %d failed",
-			     enable ? "start" : "stop", channel);
+		wiphy_err(wl->hw->wiphy, "tx %s cmd for channel %d failed\n",
+			  enable ? "start" : "stop", channel);
 	else
 		wl1251_debug(DEBUG_BOOT, "tx %s cmd channel %d",
 			     enable ? "start" : "stop", channel);
@@ -306,7 +306,7 @@ int wl1251_cmd_join(struct wl1251 *wl, u8 bss_type, u8 channel,
 
 	ret = wl1251_cmd_send(wl, CMD_START_JOIN, join, sizeof(*join));
 	if (ret < 0) {
-		wl1251_error("failed to initiate cmd join");
+		wiphy_err(wl->hw->wiphy, "failed to initiate cmd join\n");
 		goto out;
 	}
 
@@ -337,7 +337,7 @@ int wl1251_cmd_ps_mode(struct wl1251 *wl, u8 ps_mode)
 	ret = wl1251_cmd_send(wl, CMD_SET_PS_MODE, ps_params,
 			      sizeof(*ps_params));
 	if (ret < 0) {
-		wl1251_error("cmd set_ps_mode failed");
+		wiphy_err(wl->hw->wiphy, "cmd set_ps_mode failed\n");
 		goto out;
 	}
 
@@ -368,7 +368,8 @@ int wl1251_cmd_read_memory(struct wl1251 *wl, u32 addr, void *answer,
 
 	ret = wl1251_cmd_send(wl, CMD_READ_MEMORY, cmd, sizeof(*cmd));
 	if (ret < 0) {
-		wl1251_error("read memory command failed: %d", ret);
+		wiphy_err(wl->hw->wiphy, "read memory command failed: %d\n",
+			  ret);
 		goto out;
 	}
 
@@ -376,8 +377,8 @@ int wl1251_cmd_read_memory(struct wl1251 *wl, u32 addr, void *answer,
 	wl1251_mem_read(wl, wl->cmd_box_addr, cmd, sizeof(*cmd));
 
 	if (cmd->header.status != CMD_STATUS_SUCCESS)
-		wl1251_error("error in read command result: %d",
-			     cmd->header.status);
+		wiphy_err(wl->hw->wiphy, "error in read command result: %d\n",
+			  cmd->header.status);
 
 	memcpy(answer, cmd->value, len);
 
@@ -471,15 +472,15 @@ int wl1251_cmd_scan(struct wl1251 *wl, u8 *ssid, size_t ssid_len,
 
 	ret = wl1251_cmd_send(wl, CMD_SCAN, cmd, sizeof(*cmd));
 	if (ret < 0) {
-		wl1251_error("cmd scan failed: %d", ret);
+		wiphy_err(wl->hw->wiphy, "cmd scan failed: %d\n", ret);
 		goto out;
 	}
 
 	wl1251_mem_read(wl, wl->cmd_box_addr, cmd, sizeof(*cmd));
 
 	if (cmd->header.status != CMD_STATUS_SUCCESS) {
-		wl1251_error("cmd scan status wasn't success: %d",
-			     cmd->header.status);
+		wiphy_err(wl->hw->wiphy, "cmd scan status wasn't success: %d\n",
+			  cmd->header.status);
 		ret = -EIO;
 		goto out;
 	}
@@ -504,7 +505,8 @@ int wl1251_cmd_trigger_scan_to(struct wl1251 *wl, u32 timeout)
 
 	ret = wl1251_cmd_send(wl, CMD_TRIGGER_SCAN_TO, cmd, sizeof(*cmd));
 	if (ret < 0) {
-		wl1251_error("cmd trigger scan to failed: %d", ret);
+		wiphy_err(wl->hw->wiphy, "cmd trigger scan to failed: %d\n",
+			  ret);
 		goto out;
 	}
 

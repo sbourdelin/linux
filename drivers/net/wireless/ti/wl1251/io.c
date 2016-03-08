@@ -46,7 +46,8 @@ static int wl1251_translate_reg_addr(struct wl1251 *wl, int addr)
 	if (addr < REGISTERS_BASE) {
 		/* Make sure we don't go over the table */
 		if (addr >= ACX_REG_TABLE_LEN) {
-			wl1251_error("address out of range (%d)", addr);
+			wiphy_err(wl->hw->wiphy, "address out of range (%d)\n",
+				  addr);
 			return -EINVAL;
 		}
 		addr = wl1251_io_reg_table[addr];
