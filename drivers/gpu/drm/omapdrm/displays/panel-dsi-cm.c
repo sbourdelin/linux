@@ -45,6 +45,8 @@ struct panel_drv_data {
 	struct omap_dss_device *in;
 
 	struct omap_video_timings timings;
+	int offset_x;
+	int offset_y;
 
 	struct platform_device *pdev;
 
@@ -203,12 +205,17 @@ static int dsicm_set_update_window(struct panel_drv_data *ddata,
 {
 	struct omap_dss_device *in = ddata->in;
 	int r;
-	u16 x1 = x;
-	u16 x2 = x + w - 1;
-	u16 y1 = y;
-	u16 y2 = y + h - 1;
-
 	u8 buf[5];
+	u16 x1, x2, y1, y2;
+
+	x += ddata->offset_x;
+	y += ddata->offset_y;
+
+	x1 = x;
+	x2 = x + w - 1;
+	y1 = y;
+	y2 = y + h - 1;
+
 	buf[0] = MIPI_DCS_SET_COLUMN_ADDRESS;
 	buf[1] = (x1 >> 8) & 0xff;
 	buf[2] = (x1 >> 0) & 0xff;
@@ -1244,6 +1251,8 @@ static int dsicm_probe_of(struct platform_device *pdev)
 
 	of_property_read_u32(node, "resolution-x", (u32*) &ddata->timings.x_res);
 	of_property_read_u32(node, "resolution-y", (u32*) &ddata->timings.y_res);
+	of_property_read_u32(node, "offset-x", &ddata->offset_x);
+	of_property_read_u32(node, "offset-y", &ddata->offset_y);
 
 	ddata->timings.pixelclock = ddata->timings.x_res * ddata->timings.y_res * 60;
 
@@ -1273,6 +1282,8 @@ static int dsicm_probe(struct platform_device *pdev)
 	ddata->timings.x_res = 864;
 	ddata->timings.y_res = 480;
 	ddata->timings.pixelclock = 864 * 480 * 60;
+	ddata->offset_x = 0;
+	ddata->offset_y = 0;
 
 	if (dev_get_platdata(dev)) {
 		r = dsicm_probe_pdata(pdev);
