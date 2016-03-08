@@ -35,32 +35,6 @@ static DEFINE_MUTEX(ghes_edac_lock);
 static int ghes_edac_mc_num;
 
 
-/* Memory Device - Type 17 of SMBIOS spec */
-struct memdev_dmi_entry {
-	u8 type;
-	u8 length;
-	u16 handle;
-	u16 phys_mem_array_handle;
-	u16 mem_err_info_handle;
-	u16 total_width;
-	u16 data_width;
-	u16 size;
-	u8 form_factor;
-	u8 device_set;
-	u8 device_locator;
-	u8 bank_locator;
-	u8 memory_type;
-	u16 type_detail;
-	u16 speed;
-	u8 manufacturer;
-	u8 serial_number;
-	u8 asset_tag;
-	u8 part_number;
-	u8 attributes;
-	u32 extended_size;
-	u16 conf_mem_clk_speed;
-} __attribute__((__packed__));
-
 struct ghes_edac_dimm_fill {
 	struct mem_ctl_info *mci;
 	unsigned count;
