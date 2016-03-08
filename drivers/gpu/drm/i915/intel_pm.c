@@ -3805,6 +3805,7 @@ static void skl_update_wm(struct drm_crtc *crtc)
 	struct intel_crtc_state *cstate = to_intel_crtc_state(crtc->state);
 	struct skl_pipe_wm *pipe_wm = &cstate->wm.optimal.skl;
 
+	mutex_lock(&dev_priv->wm.wm_mutex);
 
 	/* Clear all dirty flags */
 	memset(results->dirty, 0, sizeof(bool) * I915_MAX_PIPES);
@@ -3815,7 +3816,7 @@ static void skl_update_wm(struct drm_crtc *crtc)
 	skl_set_plane_pixel_rate(crtc);
 
 	if (!skl_update_pipe_wm(crtc, &results->ddb, pipe_wm))
-		return;
+		goto out;
 
 	skl_compute_wm_results(dev, pipe_wm, results, intel_crtc);
 	results->dirty[intel_crtc->pipe] = true;
@@ -3826,6 +3827,9 @@ static void skl_update_wm(struct drm_crtc *crtc)
 
 	/* store the new configuration */
 	dev_priv->wm.skl_hw = *results;
+
+out:
+	mutex_unlock(&dev_priv->wm.wm_mutex);
 }
 
 static void ilk_compute_wm_config(struct drm_device *dev,
