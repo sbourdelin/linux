@@ -47,6 +47,7 @@ enum {
 	DEBUG_MAC80211	= BIT(11),
 	DEBUG_CMD	= BIT(12),
 	DEBUG_ACX	= BIT(13),
+	DEBUG_ALWAYS	= BIT(31),
 	DEBUG_ALL	= ~0,
 };
 
@@ -54,12 +55,9 @@ enum {
 
 #define DEBUG_DUMP_LIMIT 1024
 
-#define wl1251_info(fmt, arg...) \
-	printk(KERN_DEBUG DRIVER_PREFIX fmt "\n", ##arg)
-
 #define wl1251_debug(level, fmt, arg...) \
 	do { \
-		if (level & DEBUG_LEVEL) \
+		if (level == DEBUG_ALWAYS || (level & DEBUG_LEVEL))	\
 			printk(KERN_DEBUG DRIVER_PREFIX fmt "\n", ##arg); \
 	} while (0)
 

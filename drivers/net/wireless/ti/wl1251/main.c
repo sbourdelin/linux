@@ -423,7 +423,7 @@ static int wl1251_op_start(struct ieee80211_hw *hw)
 
 	wl->state = WL1251_STATE_ON;
 
-	wl1251_info("firmware booted (%s)", wl->fw_ver);
+	wl1251_debug(DEBUG_ALWAYS, "firmware booted (%s)", wl->fw_ver);
 
 	/* update hw/fw version info in wiphy struct */
 	wiphy->hw_version = wl->chip_id;
@@ -442,7 +442,7 @@ static void wl1251_op_stop(struct ieee80211_hw *hw)
 {
 	struct wl1251 *wl = hw->priv;
 
-	wl1251_info("down");
+	wl1251_debug(DEBUG_ALWAYS, "down");
 
 	wl1251_debug(DEBUG_MAC80211, "mac80211 stop");
 

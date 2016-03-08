@@ -290,12 +290,12 @@ static int wl1251_sdio_probe(struct sdio_func *func,
 		wl1251_sdio_ops.enable_irq = wl1251_enable_line_irq;
 		wl1251_sdio_ops.disable_irq = wl1251_disable_line_irq;
 
-		wl1251_info("using dedicated interrupt line");
+		wl1251_debug(DEBUG_ALWAYS, "using dedicated interrupt line");
 	} else {
 		wl1251_sdio_ops.enable_irq = wl1251_sdio_enable_irq;
 		wl1251_sdio_ops.disable_irq = wl1251_sdio_disable_irq;
 
-		wl1251_info("using SDIO interrupt");
+		wl1251_debug(DEBUG_ALWAYS, "using SDIO interrupt");
 	}
 
 	ret = wl1251_init_ieee80211(wl);

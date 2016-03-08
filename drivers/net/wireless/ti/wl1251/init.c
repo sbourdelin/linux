@@ -411,11 +411,11 @@ int wl1251_hw_init(struct wl1251 *wl)
 		goto out_free_data_path;
 
 	wl_mem_map = wl->target_mem_map;
-	wl1251_info("%d tx blocks at 0x%x, %d rx blocks at 0x%x",
-		    wl_mem_map->num_tx_mem_blocks,
-		    wl->data_path->tx_control_addr,
-		    wl_mem_map->num_rx_mem_blocks,
-		    wl->data_path->rx_control_addr);
+	wl1251_debug(DEBUG_ALWAYS, "%d tx blocks at 0x%x, %d rx blocks at 0x%x",
+		     wl_mem_map->num_tx_mem_blocks,
+		     wl->data_path->tx_control_addr,
+		     wl_mem_map->num_rx_mem_blocks,
+		     wl->data_path->rx_control_addr);
 
 	return 0;
 
