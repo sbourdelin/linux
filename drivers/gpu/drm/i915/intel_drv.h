@@ -334,6 +334,9 @@ struct intel_plane_state {
 
 	/* async flip related structures */
 	struct drm_i915_gem_request *wait_req;
+
+	/* Stores the adjusted plane pixel rate for WM calculation for SKL+ */
+	uint32_t plane_pixel_rate;
 };
 
 struct intel_initial_plane_config {
