@@ -1317,9 +1317,9 @@ static int dsicm_probe(struct platform_device *pdev)
 			return r;
 		}
 
-		r = devm_request_irq(dev, gpio_to_irq(ddata->ext_te_gpio),
-				dsicm_te_isr,
-				IRQF_TRIGGER_RISING,
+		r = devm_request_threaded_irq(dev, gpio_to_irq(ddata->ext_te_gpio),
+				NULL, dsicm_te_isr,
+				IRQF_TRIGGER_RISING | IRQF_ONESHOT,
 				"taal vsync", ddata);
 
 		if (r) {
