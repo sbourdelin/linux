@@ -63,7 +63,7 @@
 		ranges;
 
 		amba {
-			compatible = "arm,amba-bus";
+			compatible = "arm,amba-bus", "simple-bus";
 			#address-cells = <1>;
 			#size-cells = <1>;
 			ranges;
