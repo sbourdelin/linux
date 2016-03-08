@@ -74,11 +74,6 @@ static struct tracer_opt dummy_tracer_opt[] = {
 	{ }
 };
 
-static struct tracer_flags dummy_tracer_flags = {
-	.val = 0,
-	.opts = dummy_tracer_opt
-};
-
 static int
 dummy_set_flag(struct trace_array *tr, u32 old_flags, u32 bit, int set)
 {
@@ -1258,11 +1253,19 @@ int __init register_tracer(struct tracer *type)
 
 	if (!type->set_flag)
 		type->set_flag = &dummy_set_flag;
-	if (!type->flags)
-		type->flags = &dummy_tracer_flags;
-	else
+	if (!type->flags) {
+		/*allocate a dummy tracer_flags*/
+		type->flags = kmalloc(sizeof(*type->flags), GFP_KERNEL);
+		if (!type->flags)
+			return -ENOMEM;
+		type->flags->val = 0;
+		type->flags->opts = dummy_tracer_opt;
+	} else
 		if (!type->flags->opts)
 			type->flags->opts = dummy_tracer_opt;
+
+	/* store the tracer for __set_tracer_option */
+	type->flags->trace = type;
 
 	ret = run_tracer_selftest(type);
 	if (ret < 0)
@@ -3505,7 +3508,7 @@ static int __set_tracer_option(struct trace_array *tr,
 			       struct tracer_flags *tracer_flags,
 			       struct tracer_opt *opts, int neg)
 {
-	struct tracer *trace = tr->current_trace;
+	struct tracer *trace = tracer_flags->trace;
 	int ret;
 
 	ret = trace->set_flag(tr, tracer_flags->val, opts->bit, !neg);
@@ -6196,6 +6199,14 @@ trace_options_write(struct file *filp, const char __user *ubuf, size_t cnt,
 	if (val != 0 && val != 1)
 		return -EINVAL;
 
+	if (topt->flags->trace != topt->tr->current_trace) {
+		printk(KERN_DEBUG "Tracer flag %s is for %s trace,"
+			" first please set the current tracer to %s\n",
+			topt->opt->name, topt->flags->trace->name,
+			topt->flags->trace->name);
+		return -EINVAL;
+	}
+
 	if (!!(topt->flags->val & topt->opt->bit) != val) {
 		mutex_lock(&trace_types_lock);
 		ret = __set_tracer_option(topt->tr, topt->flags,
@@ -6373,7 +6384,6 @@ create_trace_option_files(struct trace_array *tr, struct tracer *tracer)
 	struct tracer_flags *flags;
 	struct tracer_opt *opts;
 	int cnt;
-	int i;
 
 	if (!tracer)
 		return;
