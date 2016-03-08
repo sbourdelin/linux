@@ -19,6 +19,7 @@ struct firmware {
 
 struct module;
 struct device;
+struct dma_attrs;
 
 struct builtin_fw {
 	char *name;
@@ -47,6 +48,10 @@ int request_firmware_nowait(
 	void (*cont)(const struct firmware *fw, void *context));
 int request_firmware_direct(const struct firmware **fw, const char *name,
 			    struct device *device);
+int request_firmware_dma(const struct firmware **firmware_p, const char *name,
+		     struct device *device, void *cpu_addr, dma_addr_t dma_addr,
+		     unsigned long offset, size_t size,
+		     struct dma_attrs *attrs);
 
 void release_firmware(const struct firmware *fw);
 #else
@@ -71,6 +76,14 @@ static inline void release_firmware(const struct firmware *fw)
 static inline int request_firmware_direct(const struct firmware **fw,
 					  const char *name,
 					  struct device *device)
+{
+	return -EINVAL;
+}
+
+static inline int request_firmware_dma(const struct firmware **firmware_p,
+	const char *name, struct device *device, void *cpu_addr,
+	dma_addr_t dma_addr, unsigned long offset, size_t size,
+	struct dma_attrs *attrs)
 {
 	return -EINVAL;
 }
