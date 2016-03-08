@@ -253,6 +253,10 @@ static void omap_crtc_dss_set_lcd_config(struct omap_overlay_manager *mgr,
 	omap_crtc->manually_updated = dss_lcd_mgr_config_get_stallmode(config);
 
 	dispc_mgr_set_lcd_config(omap_crtc->channel, config);
+
+	drm_for_each_plane(plane, dev) {
+		omap_plane_update_fifo(plane);
+	}
 }
 
 static int omap_crtc_dss_register_framedone(
