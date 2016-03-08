@@ -12,3 +12,66 @@ Examples:
 		compatible = "atmel,at91rm9200-pmc";
 		reg = <0xfffffc00 0x100>;
 	};
+
+PMC Fast Startup Signals
+
+The PMC Fast Start Signals are used as the wake up source to trigger the PMC
+to wake up the system from the ULP1 mode.
+
+required properties:
+- compatible: Should be "atmel,sama5d2-pmc-fast-startup".
+
+optional properties:
+- atmel,wkup-trigger: boolean, WKUP input can trigger a fast restart signal.
+- atmel,secumod-trigger: boolean, SECUMOD can trigger a fast restart signal.
+- atmel,piobu0-trigger: boolean, PIOBU0 input can trigger a fast restart signal.
+- atmel,piobu1-trigger: boolean, PIOBU1 input can trigger a fast restart signal.
+- atmel,piobu2-trigger: boolean, PIOBU2 input can trigger a fast restart signal.
+- atmel,piobu3-trigger: boolean, PIOBU3 input can trigger a fast restart signal.
+- atmel,piobu4-trigger: boolean, PIOBU4 input can trigger a fast restart signal.
+- atmel,piobu5-trigger: boolean, PIOBU5 input can trigger a fast restart signal.
+- atmel,piobu6-trigger: boolean, PIOBU6 input can trigger a fast restart signal.
+- atmel,piobu7-trigger: boolean, PIOBU7 input can trigger a fast restart signal.
+- atmel,gmac-wol-trigger: boolean, GMAC_WOL can trigger a fast restart signal.
+- atmel,rtc-alarm-trigger: boolean, RTC alarm can trigger a fast restart signal.
+- atmel,usb-resume-trigger: boolean, USB resume can trigger a fast restart
+  signal.
+- atmel,sdmmc-cd-trigger: boolean, SDMMC card detect can trigger a fast
+  restart signal.
+- atmel,rxlp-match-trigger: boolean, Matching condition on RXLP can trigger
+  a fast restart signal.
+- atmel,acc-comparison-trigger: boolean, ACC comparison can trigger a fast
+  restart signal.
+
+- atmel,wkup-trigger-level: int, defines the active polarity of the wake-up
+  input. Supported values are: 1 or 0.
+- atmel,piobu0-trigger-level: int, defines the active polarity of
+  the corresponding PIOBU0 input. Supported values are: 1 or 0.
+- atmel,piobu1-trigger-level: int, defines the active polarity of
+  the corresponding PIOBU1 input. Supported values are: 1 or 0.
+- atmel,piobu2-trigger-level: int, defines the active polarity of
+  the corresponding PIOBU2 input. Supported values are: 1 or 0".
+- atmel,piobu3-trigger-level: int, defines the active polarity of
+  the corresponding PIOBU3 input. Supported values are: 1 or 0.
+- atmel,piobu4-trigger-level: int, defines the active polarity of
+  the corresponding PIOBU4 input. Supported values are: 1 or 0.
+- atmel,piobu5-trigger-level: int, defines the active polarity of
+  the corresponding PIOBU5 input. Supported values are: 1 or 0.
+- atmel,piobu6-trigger-level: int, defines the active polarity of
+  the corresponding PIOBU6 input. Supported values are: 1 or 0.
+- atmel,piobu7-trigger-level: int, defines the active polarity of
+  the corresponding PIOBU7 input. Supported values are: 1 or 0.
+
+Example:
+
+	pmc: pmc@f0014000 {
+		compatible = "atmel,sama5d2-pmc";
+		reg = <0xf0014000 0x160>;
+
+		pmc_fast_restart {
+			compatible = "atmel,sama5d2-pmc-fast-startup";
+			atmel,wkup-trigger;
+			atmel,rtc-alarm-trigger;
+			atmel,wkup-trigger-level = <0>;
+		};
+	};
