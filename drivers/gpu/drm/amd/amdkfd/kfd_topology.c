@@ -484,34 +484,34 @@ static int kfd_parse_crat_table(void *crat_image)
 }
 
 
-#define sysfs_show_gen_prop(buffer, fmt, ...) \
-		snprintf(buffer, PAGE_SIZE, "%s"fmt, buffer, __VA_ARGS__)
-#define sysfs_show_32bit_prop(buffer, name, value) \
-		sysfs_show_gen_prop(buffer, "%s %u\n", name, value)
-#define sysfs_show_64bit_prop(buffer, name, value) \
-		sysfs_show_gen_prop(buffer, "%s %llu\n", name, value)
-#define sysfs_show_32bit_val(buffer, value) \
-		sysfs_show_gen_prop(buffer, "%u\n", value)
-#define sysfs_show_str_val(buffer, value) \
-		sysfs_show_gen_prop(buffer, "%s\n", value)
+#define sysfs_show_gen_prop(buffer, len, fmt, ...)			\
+	scnprintf(buffer + len, PAGE_SIZE - len, fmt, ##__VA_ARGS__)
+#define sysfs_show_32bit_prop(buffer, len, name, value)			\
+	sysfs_show_gen_prop(buffer, len, "%s %u\n", name, value)
+#define sysfs_show_64bit_prop(buffer, len, name, value)			\
+	sysfs_show_gen_prop(buffer, len, "%s %llu\n", name, value)
+#define sysfs_show_32bit_val(buffer, len, value)			\
+	sysfs_show_gen_prop(buffer, len, "%u\n", value)
+#define sysfs_show_str_val(buffer, len, value)				\
+	sysfs_show_gen_prop(buffer, len, "%s\n", value)
 
 static ssize_t sysprops_show(struct kobject *kobj, struct attribute *attr,
 		char *buffer)
 {
-	ssize_t ret;
+	ssize_t ret = 0;
 
 	/* Making sure that the buffer is an empty string */
 	buffer[0] = 0;
 
 	if (attr == &sys_props.attr_genid) {
-		ret = sysfs_show_32bit_val(buffer, sys_props.generation_count);
+		ret += sysfs_show_32bit_val(buffer, ret, sys_props.generation_count);
 	} else if (attr == &sys_props.attr_props) {
-		sysfs_show_64bit_prop(buffer, "platform_oem",
-				sys_props.platform_oem);
-		sysfs_show_64bit_prop(buffer, "platform_id",
-				sys_props.platform_id);
-		ret = sysfs_show_64bit_prop(buffer, "platform_rev",
-				sys_props.platform_rev);
+		ret += sysfs_show_64bit_prop(buffer, ret, "platform_oem",
+					sys_props.platform_oem);
+		ret += sysfs_show_64bit_prop(buffer, ret, "platform_id",
+					sys_props.platform_id);
+		ret += sysfs_show_64bit_prop(buffer, ret, "platform_rev",
+					sys_props.platform_rev);
 	} else {
 		ret = -EINVAL;
 	}
@@ -530,26 +530,26 @@ static struct kobj_type sysprops_type = {
 static ssize_t iolink_show(struct kobject *kobj, struct attribute *attr,
 		char *buffer)
 {
-	ssize_t ret;
+	ssize_t ret = 0;
 	struct kfd_iolink_properties *iolink;
 
 	/* Making sure that the buffer is an empty string */
 	buffer[0] = 0;
 
 	iolink = container_of(attr, struct kfd_iolink_properties, attr);
-	sysfs_show_32bit_prop(buffer, "type", iolink->iolink_type);
-	sysfs_show_32bit_prop(buffer, "version_major", iolink->ver_maj);
-	sysfs_show_32bit_prop(buffer, "version_minor", iolink->ver_min);
-	sysfs_show_32bit_prop(buffer, "node_from", iolink->node_from);
-	sysfs_show_32bit_prop(buffer, "node_to", iolink->node_to);
-	sysfs_show_32bit_prop(buffer, "weight", iolink->weight);
-	sysfs_show_32bit_prop(buffer, "min_latency", iolink->min_latency);
-	sysfs_show_32bit_prop(buffer, "max_latency", iolink->max_latency);
-	sysfs_show_32bit_prop(buffer, "min_bandwidth", iolink->min_bandwidth);
-	sysfs_show_32bit_prop(buffer, "max_bandwidth", iolink->max_bandwidth);
-	sysfs_show_32bit_prop(buffer, "recommended_transfer_size",
-			iolink->rec_transfer_size);
-	ret = sysfs_show_32bit_prop(buffer, "flags", iolink->flags);
+	ret += sysfs_show_32bit_prop(buffer, ret, "type", iolink->iolink_type);
+	ret += sysfs_show_32bit_prop(buffer, ret, "version_major", iolink->ver_maj);
+	ret += sysfs_show_32bit_prop(buffer, ret, "version_minor", iolink->ver_min);
+	ret += sysfs_show_32bit_prop(buffer, ret, "node_from", iolink->node_from);
+	ret += sysfs_show_32bit_prop(buffer, ret, "node_to", iolink->node_to);
+	ret += sysfs_show_32bit_prop(buffer, ret, "weight", iolink->weight);
+	ret += sysfs_show_32bit_prop(buffer, ret, "min_latency", iolink->min_latency);
+	ret += sysfs_show_32bit_prop(buffer, ret, "max_latency", iolink->max_latency);
+	ret += sysfs_show_32bit_prop(buffer, ret, "min_bandwidth", iolink->min_bandwidth);
+	ret += sysfs_show_32bit_prop(buffer, ret, "max_bandwidth", iolink->max_bandwidth);
+	ret += sysfs_show_32bit_prop(buffer, ret, "recommended_transfer_size",
+				iolink->rec_transfer_size);
+	ret += sysfs_show_32bit_prop(buffer, ret, "flags", iolink->flags);
 
 	return ret;
 }
@@ -565,18 +565,18 @@ static struct kobj_type iolink_type = {
 static ssize_t mem_show(struct kobject *kobj, struct attribute *attr,
 		char *buffer)
 {
-	ssize_t ret;
+	ssize_t ret = 0;
 	struct kfd_mem_properties *mem;
 
 	/* Making sure that the buffer is an empty string */
 	buffer[0] = 0;
 
 	mem = container_of(attr, struct kfd_mem_properties, attr);
-	sysfs_show_32bit_prop(buffer, "heap_type", mem->heap_type);
-	sysfs_show_64bit_prop(buffer, "size_in_bytes", mem->size_in_bytes);
-	sysfs_show_32bit_prop(buffer, "flags", mem->flags);
-	sysfs_show_32bit_prop(buffer, "width", mem->width);
-	ret = sysfs_show_32bit_prop(buffer, "mem_clk_max", mem->mem_clk_max);
+	ret += sysfs_show_32bit_prop(buffer, ret, "heap_type", mem->heap_type);
+	ret += sysfs_show_64bit_prop(buffer, ret, "size_in_bytes", mem->size_in_bytes);
+	ret += sysfs_show_32bit_prop(buffer, ret, "flags", mem->flags);
+	ret += sysfs_show_32bit_prop(buffer, ret, "width", mem->width);
+	ret += sysfs_show_32bit_prop(buffer, ret, "mem_clk_max", mem->mem_clk_max);
 
 	return ret;
 }
@@ -592,7 +592,7 @@ static struct kobj_type mem_type = {
 static ssize_t kfd_cache_show(struct kobject *kobj, struct attribute *attr,
 		char *buffer)
 {
-	ssize_t ret;
+	ssize_t ret = 0;
 	uint32_t i;
 	struct kfd_cache_properties *cache;
 
@@ -600,20 +600,20 @@ static ssize_t kfd_cache_show(struct kobject *kobj, struct attribute *attr,
 	buffer[0] = 0;
 
 	cache = container_of(attr, struct kfd_cache_properties, attr);
-	sysfs_show_32bit_prop(buffer, "processor_id_low",
-			cache->processor_id_low);
-	sysfs_show_32bit_prop(buffer, "level", cache->cache_level);
-	sysfs_show_32bit_prop(buffer, "size", cache->cache_size);
-	sysfs_show_32bit_prop(buffer, "cache_line_size", cache->cacheline_size);
-	sysfs_show_32bit_prop(buffer, "cache_lines_per_tag",
-			cache->cachelines_per_tag);
-	sysfs_show_32bit_prop(buffer, "association", cache->cache_assoc);
-	sysfs_show_32bit_prop(buffer, "latency", cache->cache_latency);
-	sysfs_show_32bit_prop(buffer, "type", cache->cache_type);
-	snprintf(buffer, PAGE_SIZE, "%ssibling_map ", buffer);
+	ret += sysfs_show_32bit_prop(buffer, ret, "processor_id_low",
+				cache->processor_id_low);
+	ret += sysfs_show_32bit_prop(buffer, ret, "level", cache->cache_level);
+	ret += sysfs_show_32bit_prop(buffer, ret, "size", cache->cache_size);
+	ret += sysfs_show_32bit_prop(buffer, ret, "cache_line_size", cache->cacheline_size);
+	ret += sysfs_show_32bit_prop(buffer, ret, "cache_lines_per_tag",
+				cache->cachelines_per_tag);
+	ret += sysfs_show_32bit_prop(buffer, ret, "association", cache->cache_assoc);
+	ret += sysfs_show_32bit_prop(buffer, ret, "latency", cache->cache_latency);
+	ret += sysfs_show_32bit_prop(buffer, ret, "type", cache->cache_type);
+	ret += scnprintf(buffer + ret, PAGE_SIZE - ret, "sibling_map ");
 	for (i = 0; i < KFD_TOPOLOGY_CPU_SIBLINGS; i++)
-		ret = snprintf(buffer, PAGE_SIZE, "%s%d%s",
-				buffer, cache->sibling_map[i],
+		ret += scnprintf(buffer + ret, PAGE_SIZE - ret, "%d%s",
+				cache->sibling_map[i],
 				(i == KFD_TOPOLOGY_CPU_SIBLINGS-1) ?
 						"\n" : ",");
 
@@ -631,6 +631,7 @@ static struct kobj_type cache_type = {
 static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 		char *buffer)
 {
+	ssize_t ret = 0;
 	struct kfd_topology_device *dev;
 	char public_name[KFD_TOPOLOGY_PUBLIC_NAME_SIZE];
 	uint32_t i;
@@ -642,7 +643,7 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 	if (strcmp(attr->name, "gpu_id") == 0) {
 		dev = container_of(attr, struct kfd_topology_device,
 				attr_gpuid);
-		return sysfs_show_32bit_val(buffer, dev->gpu_id);
+		return sysfs_show_32bit_val(buffer, ret, dev->gpu_id);
 	}
 
 	if (strcmp(attr->name, "name") == 0) {
@@ -655,58 +656,58 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 				break;
 		}
 		public_name[KFD_TOPOLOGY_PUBLIC_NAME_SIZE-1] = 0x0;
-		return sysfs_show_str_val(buffer, public_name);
+		return sysfs_show_str_val(buffer, ret, public_name);
 	}
 
 	dev = container_of(attr, struct kfd_topology_device,
 			attr_props);
-	sysfs_show_32bit_prop(buffer, "cpu_cores_count",
-			dev->node_props.cpu_cores_count);
-	sysfs_show_32bit_prop(buffer, "simd_count",
-			dev->node_props.simd_count);
+	ret += sysfs_show_32bit_prop(buffer, ret, "cpu_cores_count",
+				dev->node_props.cpu_cores_count);
+	ret += sysfs_show_32bit_prop(buffer, ret, "simd_count",
+				dev->node_props.simd_count);
 
 	if (dev->mem_bank_count < dev->node_props.mem_banks_count) {
 		pr_warn("kfd: mem_banks_count truncated from %d to %d\n",
 				dev->node_props.mem_banks_count,
 				dev->mem_bank_count);
-		sysfs_show_32bit_prop(buffer, "mem_banks_count",
-				dev->mem_bank_count);
+		ret += sysfs_show_32bit_prop(buffer, ret, "mem_banks_count",
+					dev->mem_bank_count);
 	} else {
-		sysfs_show_32bit_prop(buffer, "mem_banks_count",
-				dev->node_props.mem_banks_count);
+		ret += sysfs_show_32bit_prop(buffer, ret, "mem_banks_count",
+					dev->node_props.mem_banks_count);
 	}
 
-	sysfs_show_32bit_prop(buffer, "caches_count",
+	ret += sysfs_show_32bit_prop(buffer, ret, "caches_count",
 			dev->node_props.caches_count);
-	sysfs_show_32bit_prop(buffer, "io_links_count",
+	ret += sysfs_show_32bit_prop(buffer, ret, "io_links_count",
 			dev->node_props.io_links_count);
-	sysfs_show_32bit_prop(buffer, "cpu_core_id_base",
+	ret += sysfs_show_32bit_prop(buffer, ret, "cpu_core_id_base",
 			dev->node_props.cpu_core_id_base);
-	sysfs_show_32bit_prop(buffer, "simd_id_base",
+	ret += sysfs_show_32bit_prop(buffer, ret, "simd_id_base",
 			dev->node_props.simd_id_base);
-	sysfs_show_32bit_prop(buffer, "max_waves_per_simd",
+	ret += sysfs_show_32bit_prop(buffer, ret, "max_waves_per_simd",
 			dev->node_props.max_waves_per_simd);
-	sysfs_show_32bit_prop(buffer, "lds_size_in_kb",
+	ret += sysfs_show_32bit_prop(buffer, ret, "lds_size_in_kb",
 			dev->node_props.lds_size_in_kb);
-	sysfs_show_32bit_prop(buffer, "gds_size_in_kb",
+	ret += sysfs_show_32bit_prop(buffer, ret, "gds_size_in_kb",
 			dev->node_props.gds_size_in_kb);
-	sysfs_show_32bit_prop(buffer, "wave_front_size",
+	ret += sysfs_show_32bit_prop(buffer, ret, "wave_front_size",
 			dev->node_props.wave_front_size);
-	sysfs_show_32bit_prop(buffer, "array_count",
+	ret += sysfs_show_32bit_prop(buffer, ret, "array_count",
 			dev->node_props.array_count);
-	sysfs_show_32bit_prop(buffer, "simd_arrays_per_engine",
+	ret += sysfs_show_32bit_prop(buffer, ret, "simd_arrays_per_engine",
 			dev->node_props.simd_arrays_per_engine);
-	sysfs_show_32bit_prop(buffer, "cu_per_simd_array",
+	ret += sysfs_show_32bit_prop(buffer, ret, "cu_per_simd_array",
 			dev->node_props.cu_per_simd_array);
-	sysfs_show_32bit_prop(buffer, "simd_per_cu",
+	ret += sysfs_show_32bit_prop(buffer, ret, "simd_per_cu",
 			dev->node_props.simd_per_cu);
-	sysfs_show_32bit_prop(buffer, "max_slots_scratch_cu",
+	ret += sysfs_show_32bit_prop(buffer, ret, "max_slots_scratch_cu",
 			dev->node_props.max_slots_scratch_cu);
-	sysfs_show_32bit_prop(buffer, "vendor_id",
+	ret += sysfs_show_32bit_prop(buffer, ret, "vendor_id",
 			dev->node_props.vendor_id);
-	sysfs_show_32bit_prop(buffer, "device_id",
+	ret += sysfs_show_32bit_prop(buffer, ret, "device_id",
 			dev->node_props.device_id);
-	sysfs_show_32bit_prop(buffer, "location_id",
+	ret += sysfs_show_32bit_prop(buffer, ret, "location_id",
 			dev->node_props.location_id);
 
 	if (dev->gpu) {
@@ -723,23 +724,24 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 				HSA_CAP_WATCH_POINTS_TOTALBITS_MASK);
 		}
 
-		sysfs_show_32bit_prop(buffer, "max_engine_clk_fcompute",
+		ret += sysfs_show_32bit_prop(buffer, ret, "max_engine_clk_fcompute",
 			dev->gpu->kfd2kgd->get_max_engine_clock_in_mhz(
 					dev->gpu->kgd));
 
-		sysfs_show_64bit_prop(buffer, "local_mem_size",
+		ret += sysfs_show_64bit_prop(buffer, ret, "local_mem_size",
 				(unsigned long long int) 0);
 
-		sysfs_show_32bit_prop(buffer, "fw_version",
+		ret += sysfs_show_32bit_prop(buffer, ret, "fw_version",
 			dev->gpu->kfd2kgd->get_fw_version(
 						dev->gpu->kgd,
 						KGD_ENGINE_MEC1));
-		sysfs_show_32bit_prop(buffer, "capability",
+		ret += sysfs_show_32bit_prop(buffer, ret, "capability",
 				dev->node_props.capability);
 	}
 
-	return sysfs_show_32bit_prop(buffer, "max_engine_clk_ccompute",
+	ret += sysfs_show_32bit_prop(buffer, ret, "max_engine_clk_ccompute",
 					cpufreq_quick_get_max(0)/1000);
+	return ret;
 }
 
 static const struct sysfs_ops node_ops = {
