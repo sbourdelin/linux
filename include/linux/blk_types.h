@@ -26,8 +26,6 @@ struct bio_vec {
 	unsigned int	bv_offset;
 };
 
-#ifdef CONFIG_BLOCK
-
 struct bvec_iter {
 	sector_t		bi_sector;	/* device address in 512 byte
 						   sectors */
@@ -38,6 +36,8 @@ struct bvec_iter {
 	unsigned int            bi_bvec_done;	/* number of bytes completed in
 						   current bvec */
 };
+
+#ifdef CONFIG_BLOCK
 
 /*
  * main unit of I/O for the block layer and lower layers (ie drivers and
