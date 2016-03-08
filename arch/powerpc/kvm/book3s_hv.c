@@ -3041,6 +3041,12 @@ static int kvmppc_core_init_vm_hv(struct kvm *kvm)
 		lpcr |= LPCR_ONL;
 	kvm->arch.lpcr = lpcr;
 
+
+	/* Initialization for future HPT resizes */
+	kvm->arch.resize_hpt = NULL;
+	mutex_init(&kvm->arch.resize_hpt_mutex);
+	init_waitqueue_head(&kvm->arch.resize_hpt_wq);
+
 	/*
 	 * Track that we now have a HV mode VM active. This blocks secondary
 	 * CPU threads from coming online.
