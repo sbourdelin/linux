@@ -1510,6 +1510,21 @@ static int ironlake_do_reset(struct drm_device *dev)
 	return 0;
 }
 
+static int gen6_domain_reset(struct drm_i915_private *dev_priv,
+			     u32 hw_domain_mask)
+{
+	int ret;
+
+	__raw_i915_write32(dev_priv, GEN6_GDRST, hw_domain_mask);
+
+#define ACKED ((__raw_i915_read32(dev_priv, GEN6_GDRST) & hw_domain_mask) == 0)
+	/* Spin waiting for the device to ack the reset requests */
+	ret = wait_for_atomic_us(ACKED, 500);
+#undef ACKED
+
+	return ret;
+}
+
 static int gen6_do_reset(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
