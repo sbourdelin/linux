@@ -633,8 +633,6 @@ static void walk_pfn(unsigned long voffset,
 	unsigned long pages;
 	unsigned long i;
 
-	memset(cgi, 0, sizeof cgi);
-
 	while (count) {
 		batch = min_t(unsigned long, count, KPAGEFLAGS_BATCH);
 		pages = kpageflags_read(buf, index, batch);
