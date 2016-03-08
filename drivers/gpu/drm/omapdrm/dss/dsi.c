@@ -5274,6 +5274,28 @@ static int dsi_init_pll_data(struct platform_device *dsidev)
 	return 0;
 }
 
+static int _dsi_wait_reset(struct platform_device *dsidev)
+{
+	int t = 0;
+
+	while (REG_GET(dsidev, DSI_SYSSTATUS, 0, 0) == 0) {
+		 if (++t > 5) {
+		DSSERR("soft reset failed\n");
+			return -ENODEV;
+		 }
+		 udelay(1);
+	}
+
+	return 0;
+}
+
+static int _dsi_reset(struct platform_device *dsidev)
+{
+	/* Soft reset */
+	dsi_write_reg(dsidev, DSI_SYSCONFIG, 0x2);
+	return _dsi_wait_reset(dsidev);
+}
+
 /* DSI1 HW IP initialisation */
 static int dsi_bind(struct device *dev, struct device *master, void *data)
 {
@@ -5431,6 +5453,8 @@ static int dsi_bind(struct device *dev, struct device *master, void *data)
 	r = dsi_runtime_get(dsidev);
 	if (r)
 		goto err_runtime_get;
+
+	_dsi_reset(dsidev);
 
 	rev = dsi_read_reg(dsidev, DSI_REVISION);
 	dev_dbg(&dsidev->dev, "OMAP DSI rev %d.%d\n",
