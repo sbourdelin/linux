@@ -935,6 +935,12 @@ int dispc_ovl_setup(enum omap_plane plane, const struct omap_overlay_info *oi,
 		bool replication, const struct omap_video_timings *mgr_timings,
 		bool mem_to_mem);
 
+void dispc_ovl_compute_fifo_thresholds(enum omap_plane plane,
+		u32 *fifo_low, u32 *fifo_high, bool use_fifomerge,
+		bool manual_update);
+void dispc_ovl_set_fifo_threshold(enum omap_plane plane, u32 low, u32 high);
+
+
 int omapdss_compat_init(void);
 void omapdss_compat_uninit(void);
 
