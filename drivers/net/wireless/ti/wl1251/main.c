@@ -1469,7 +1469,7 @@ static int wl1251_register_hw(struct wl1251 *wl)
 
 	wl->mac80211_registered = true;
 
-	wl1251_notice("loaded");
+	wiphy_info(wl->hw->wiphy, "loaded\n");
 
 	return 0;
 }
@@ -1503,7 +1503,7 @@ int wl1251_init_ieee80211(struct wl1251 *wl)
 		goto out;
 
 	wl1251_debugfs_init(wl);
-	wl1251_notice("initialized");
+	wiphy_info(wl->hw->wiphy, "initialized\n");
 
 	ret = 0;
 

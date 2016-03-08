@@ -382,7 +382,7 @@ static int __init wl1251_sdio_init(void)
 static void __exit wl1251_sdio_exit(void)
 {
 	sdio_unregister_driver(&wl1251_sdio_driver);
-	wl1251_notice("unloaded");
+	pr_info("unloaded\n");
 }
 
 module_init(wl1251_sdio_init);
