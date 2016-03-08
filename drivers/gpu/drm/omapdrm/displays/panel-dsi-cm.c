@@ -1240,7 +1240,12 @@ static int dsicm_probe_of(struct platform_device *pdev)
 
 	ddata->in = in;
 
-	/* TODO: ulps, backlight */
+	ddata->use_dsi_backlight = of_property_read_bool(node, "has-dsi-backlight");
+
+	of_property_read_u32(node, "resolution-x", (u32*) &ddata->timings.x_res);
+	of_property_read_u32(node, "resolution-y", (u32*) &ddata->timings.y_res);
+
+	ddata->timings.pixelclock = ddata->timings.x_res * ddata->timings.y_res * 60;
 
 	return 0;
 }
@@ -1263,6 +1268,12 @@ static int dsicm_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, ddata);
 	ddata->pdev = pdev;
 
+	/* setup defaults */
+	ddata->ulps_timeout = 500;
+	ddata->timings.x_res = 864;
+	ddata->timings.y_res = 480;
+	ddata->timings.pixelclock = 864 * 480 * 60;
+
 	if (dev_get_platdata(dev)) {
 		r = dsicm_probe_pdata(pdev);
 		if (r)
@@ -1274,10 +1285,6 @@ static int dsicm_probe(struct platform_device *pdev)
 	} else {
 		return -ENODEV;
 	}
-
-	ddata->timings.x_res = 864;
-	ddata->timings.y_res = 480;
-	ddata->timings.pixelclock = 864 * 480 * 60;
 
 	dssdev = &ddata->dssdev;
 	dssdev->dev = dev;
