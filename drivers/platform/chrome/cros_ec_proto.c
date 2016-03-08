@@ -486,3 +486,26 @@ int cros_ec_cmd_xfer_status(struct cros_ec_device *ec_dev,
 	return ret;
 }
 EXPORT_SYMBOL(cros_ec_cmd_xfer_status);
+
+u32 cros_ec_get_host_event(struct cros_ec_device *ec_dev)
+{
+	u32 host_event;
+
+	if (!ec_dev->mkbp_event_supported) {
+		dev_warn(ec_dev->dev,
+			 "This EC does not support EC_MKBP_EVENT_HOST_EVENT");
+		return -EPROTONOSUPPORT;
+	}
+
+	if (ec_dev->event_data.event_type != EC_MKBP_EVENT_HOST_EVENT)
+		return 0;
+
+	if (ec_dev->event_size != sizeof(host_event)) {
+		dev_warn(ec_dev->dev, "Invalid host event size\n");
+		return 0;
+	}
+
+	host_event = get_unaligned_le32(&ec_dev->event_data.data.host_event);
+	return host_event;
+}
+EXPORT_SYMBOL(cros_ec_get_host_event);
