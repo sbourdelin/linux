@@ -681,7 +681,7 @@ int kvmppc_book3s_hv_page_fault(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		/* don't lose previous R and C bits */
 		r |= be64_to_cpu(hptep[1]) & (HPTE_R_R | HPTE_R_C);
 	} else {
-		kvmppc_add_revmap_chain(kvm, rev, rmap, index, 0);
+		kvmppc_add_revmap_chain(&kvm->arch.hpt, rev, rmap, index, 0);
 	}
 
 	hptep[1] = cpu_to_be64(r);
@@ -1249,9 +1249,171 @@ static int resize_hpt_allocate(struct kvm_resize_hpt *resize,
 	return H_SUCCESS;
 }
 
+static unsigned long resize_hpt_rehash_hpte(struct kvm *kvm,
+					    struct kvm_resize_hpt *resize,
+					    unsigned long pteg, int slot)
+{
+
+	struct kvm_hpt_info *old = &kvm->arch.hpt;
+	struct kvm_hpt_info *new = &resize->hpt;
+	unsigned long old_idx = pteg * HPTES_PER_GROUP + slot;
+	unsigned long new_idx;
+	__be64 *hptep, *new_hptep;
+	unsigned long old_hash_mask = (1ULL << (old->order - 7)) - 1;
+	unsigned long new_hash_mask = (1ULL << (new->order - 7)) - 1;
+	unsigned long pte0, pte1, guest_pte1;
+	unsigned long avpn;
+	unsigned long psize, a_psize;
+	unsigned long hash, new_pteg, replace_pte0;
+	unsigned long gpa, gfn;
+	struct kvm_memory_slot *memslot;
+	struct revmap_entry *new_rev;
+	unsigned long mmu_seq;
+
+	mmu_seq = kvm->mmu_notifier_seq;
+	smp_rmb();
+
+	hptep = (__be64 *)(old->virt + (old_idx << 4));
+	if (!try_lock_hpte(hptep, HPTE_V_HVLOCK))
+		return H_HARDWARE;
+
+	pte0 = be64_to_cpu(hptep[0]);
+	pte1 = be64_to_cpu(hptep[1]);
+	guest_pte1 = old->rev[old_idx].guest_rpte;
+
+	unlock_hpte(hptep, pte0);
+
+	if (!(pte0 & HPTE_V_VALID) && !(pte0 & HPTE_V_ABSENT))
+		/* Nothing to do */
+		return H_SUCCESS;
+
+	if (!(pte0 & HPTE_V_BOLTED))
+		/* Don't bother rehashing non-bolted HPTEs */
+		return H_SUCCESS;
+
+	pte1 = be64_to_cpu(hptep[1]);
+	psize = hpte_base_page_size(pte0, pte1);
+	if (WARN_ON(!psize))
+		return H_HARDWARE;
+
+	avpn = HPTE_V_AVPN_VAL(pte0) & ~((psize - 1) >> 23);
+
+	if (pte0 & HPTE_V_SECONDARY)
+		pteg = ~pteg;
+
+	if (!(pte0 & HPTE_V_1TB_SEG)) {
+		unsigned long offset, vsid;
+
+		/* We only have 28 - 23 bits of offset in avpn */
+		offset = (avpn & 0x1f) << 23;
+		vsid = avpn >> 5;
+		/* We can find more bits from the pteg value */
+		if (psize < (1ULL << 23))
+			offset |= ((vsid ^ pteg) & old_hash_mask) * psize;
+
+		hash = vsid ^ (offset / psize);
+	} else {
+		unsigned long offset, vsid;
+
+		/* We only have 40 - 23 bits of seg_off in avpn */
+		offset = (avpn & 0x1ffff) << 23;
+		vsid = avpn >> 17;
+		if (psize < (1ULL << 23))
+			offset |= ((vsid ^ (vsid << 25) ^ pteg) & old_hash_mask) * psize;
+
+		hash = vsid ^ (vsid << 25) ^ (offset / psize);
+	}
+
+	new_pteg = hash & new_hash_mask;
+	if (pte0 & HPTE_V_SECONDARY) {
+		BUG_ON(~pteg != (hash & old_hash_mask));
+		new_pteg = ~new_pteg;
+	} else {
+		BUG_ON(pteg != (hash & old_hash_mask));
+	}
+
+	new_idx = new_pteg * HPTES_PER_GROUP + slot;
+	new_hptep = (__be64 *)(new->virt + (new_idx << 4));
+	replace_pte0 = be64_to_cpu(new_hptep[0]);
+
+	if (replace_pte0 & HPTE_V_VALID) {
+		BUG_ON(new->order >= old->order);
+
+		if (replace_pte0 & HPTE_V_BOLTED) {
+			if (pte0 & HPTE_V_BOLTED)
+				/* Bolted collision, nothing we can do */
+				return H_PTEG_FULL;
+			else
+				/* Discard this hpte */
+				return H_SUCCESS;
+		}
+		// FIXME: clean up old HPTE
+		BUG();
+	}
+
+	/* Update the rmap */
+	new_rev = &new->rev[new_idx];
+	new_rev->guest_rpte = guest_pte1;
+
+	a_psize = hpte_page_size(pte0, pte1);
+	gpa = (guest_pte1 & HPTE_R_RPN) & ~(a_psize - 1);
+	gfn = gpa >> PAGE_SHIFT;
+	memslot = __gfn_to_memslot(kvm_memslots_raw(kvm), gfn);
+	if (memslot && !(memslot->flags & KVM_MEMSLOT_INVALID)) {
+		unsigned long *old_rmap =
+			&memslot->arch.rmap[gfn - memslot->base_gfn];
+		unsigned long *new_rmap =
+			&resize->rmap[memslot->id][gfn - memslot->base_gfn];
+
+		lock_rmap(old_rmap);
+		lock_rmap(new_rmap);
+		/* Check for pending invalidations under the rmap chain lock */
+		if (mmu_notifier_retry(kvm, mmu_seq)) {
+			/* inval in progress, write a non-present HPTE */
+			pte0 |= HPTE_V_ABSENT;
+			pte0 &= ~HPTE_V_VALID;
+			unlock_rmap(new_rmap);
+			unlock_rmap(old_rmap);
+		} else {
+			unsigned long rcbits;
+
+			kvmppc_add_revmap_chain(&resize->hpt, new_rev,
+						new_rmap, new_idx, false);
+			/* Only set R/C in real HPTE if already set in *rmap */
+			rcbits = *old_rmap >> KVMPPC_RMAP_RC_SHIFT;
+			rcbits |= *new_rmap >> KVMPPC_RMAP_RC_SHIFT;
+			unlock_rmap(old_rmap);
+			pte1 &= rcbits | ~(HPTE_R_R | HPTE_R_C);
+		}
+	} else {
+		/* Emulated MMIO, no rmap */
+	}
+
+	new_hptep[1] = cpu_to_be64(pte1);
+	/* Don't need a barrier here, because the hpt isn't in use yet */
+	new_hptep[0] = cpu_to_be64(replace_pte0);
+	unlock_hpte(new_hptep, pte0);
+	
+	return H_SUCCESS;
+}
+
 static int resize_hpt_rehash(struct kvm_resize_hpt *resize)
 {
-	return H_HARDWARE;
+	struct kvm *kvm = resize->kvm;
+	uint64_t n_ptegs = 1ULL << (kvm->arch.hpt.order - 7);
+	uint64_t pteg;
+	int slot;
+	int rc;
+
+	for (pteg = 0; pteg < n_ptegs; pteg++) {
+		for (slot = 0; slot < HPTES_PER_GROUP; slot++) {
+			rc = resize_hpt_rehash_hpte(kvm, resize, pteg, slot);
+			if (rc != H_SUCCESS)
+				return rc;
+		}
+	}
+
+	return H_SUCCESS;
 }
 
 static void resize_hpt_pivot(struct kvm_resize_hpt *resize,
