@@ -1280,11 +1280,11 @@ static void mem_cgroup_out_of_memory(struct mem_cgroup *memcg, gfp_t gfp_mask,
 	mutex_lock(&oom_lock);
 
 	/*
-	 * If current has a pending SIGKILL or is exiting, then automatically
-	 * select it.  The goal is to allow it to allocate so that it may
-	 * quickly exit and free its memory.
+	 * If current has a pending SIGKILL, then automatically select it.
+	 * The goal is to allow it to allocate so that it may quickly exit
+	 * and free its memory.
 	 */
-	if (fatal_signal_pending(current) || task_will_free_mem(current)) {
+	if (fatal_signal_pending(current)) {
 		mark_oom_victim(current);
 		goto unlock;
 	}
