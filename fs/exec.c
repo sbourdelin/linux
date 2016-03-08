@@ -56,6 +56,7 @@
 #include <linux/pipe_fs_i.h>
 #include <linux/oom.h>
 #include <linux/compat.h>
+#include <linux/random.h>
 
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
@@ -1134,6 +1135,8 @@ void setup_new_exec(struct linux_binprm * bprm)
 
 	/* This is the point of no return */
 	current->sas_ss_sp = current->sas_ss_size = 0;
+
+	get_random_bytes(&current->sig_cookie, sizeof(current->sig_cookie));
 
 	if (uid_eq(current_euid(), current_uid()) && gid_eq(current_egid(), current_gid()))
 		set_dumpable(current->mm, SUID_DUMP_USER);

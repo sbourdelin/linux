@@ -280,6 +280,8 @@ extern int get_signal(struct ksignal *ksig);
 extern void signal_setup_done(int failed, struct ksignal *ksig, int stepping);
 extern void exit_signals(struct task_struct *tsk);
 extern void kernel_sigaction(int, __sighandler_t);
+extern int set_sigcookie(unsigned long __user *location);
+extern int verify_clear_sigcookie(unsigned long __user *sig_cookie_ptr);
 
 static inline void allow_signal(int sig)
 {
