@@ -3861,7 +3861,7 @@ static void update_permission_bitmask(struct kvm_vcpu *vcpu,
 			u = bit & ACC_USER_MASK;
 
 			if (!ept) {
-				/* Not really needed: !nx will cause pte.nx to fault */
+				/* Not really needed: if !nx, ff will always be zero */
 				x |= !mmu->nx;
 				/* Allow supervisor writes if !cr0.wp */
 				w |= !is_write_protection(vcpu) && !uf;

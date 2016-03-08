@@ -269,13 +269,24 @@ static int FNAME(walk_addr_generic)(struct guest_walker *walker,
 	gpa_t pte_gpa;
 	int offset;
 	const int write_fault = access & PFERR_WRITE_MASK;
-	const int user_fault  = access & PFERR_USER_MASK;
-	const int fetch_fault = access & PFERR_FETCH_MASK;
-	u16 errcode = 0;
+	u16 errcode;
 	gpa_t real_gpa;
 	gfn_t gfn;
 
 	trace_kvm_mmu_pagetable_walk(addr, access);
+
+	/*
+	 * Do not modify PFERR_FETCH_MASK in access.  It is used later in the call to
+	 * mmu->translate_gpa and, when nested virtualization is in use, the X or NX
+	 * bit of nested page tables always applies---even if NX and SMEP are disabled
+	 * in the guest.
+	 *
+	 * TODO: cache the result of the NX and SMEP test in struct kvm_mmu?
+	 */
+	errcode = access;
+	if (!(mmu->nx || kvm_read_cr4_bits(vcpu, X86_CR4_SMEP)))
+		errcode &= ~PFERR_FETCH_MASK;
+
 retry_walk:
 	walker->level = mmu->root_level;
 	pte           = mmu->get_cr3(vcpu);
@@ -386,9 +397,7 @@ retry_walk:
 
 	if (unlikely(!accessed_dirty)) {
 		ret = FNAME(update_accessed_dirty_bits)(vcpu, mmu, walker, write_fault);
-		if (unlikely(ret < 0))
-			goto error;
-		else if (ret)
+		if (ret > 0)
 			goto retry_walk;
 	}
 
@@ -399,11 +408,6 @@ retry_walk:
 	return 1;
 
 error:
-	errcode |= write_fault | user_fault;
-	if (fetch_fault && (mmu->nx ||
-			    kvm_read_cr4_bits(vcpu, X86_CR4_SMEP)))
-		errcode |= PFERR_FETCH_MASK;
-
 	walker->fault.vector = PF_VECTOR;
 	walker->fault.error_code_valid = true;
 	walker->fault.error_code = errcode;
