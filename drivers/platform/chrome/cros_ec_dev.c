@@ -22,6 +22,7 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
+#include <linux/mfd/core.h>
 
 #include "cros_ec_dev.h"
 
@@ -84,6 +85,30 @@ static int ec_get_version(struct cros_ec_dev *ec, char *str, int maxlen)
 	ret = 0;
 exit:
 	kfree(msg);
+	return ret;
+}
+
+static int cros_ec_has_usb_pd_ports(struct cros_ec_dev *ec)
+{
+	struct cros_ec_command *msg;
+	struct ec_response_usb_pd_ports *resp;
+	int ret;
+
+	msg = kmalloc(sizeof(*msg) + sizeof(*resp), GFP_KERNEL);
+	if (!msg)
+		return -ENOMEM;
+
+	msg->version = 0;
+	msg->command = EC_CMD_USB_PD_PORTS + ec->cmd_offset;
+	msg->insize = sizeof(struct ec_response_usb_pd_ports);
+	msg->outsize = 0;
+
+	ret = cros_ec_cmd_xfer(ec->ec_dev, msg);
+	resp = (struct ec_response_usb_pd_ports *)msg->data;
+	ret = ret >= 0 && msg->result == EC_RES_SUCCESS && resp->num_ports;
+
+	kfree(msg);
+
 	return ret;
 }
 
@@ -217,6 +242,13 @@ static void __remove(struct device *dev)
 	kfree(ec);
 }
 
+static const struct mfd_cell cros_usb_pd_charger_devs[] = {
+	{
+		.name = "cros-usb-pd-charger",
+		.id   = -1,
+	},
+};
+
 static int ec_device_probe(struct platform_device *pdev)
 {
 	int retval = -ENOMEM;
@@ -269,8 +301,20 @@ static int ec_device_probe(struct platform_device *pdev)
 		goto dev_reg_failed;
 	}
 
+	if (cros_ec_has_usb_pd_ports(ec)) {
+		retval = mfd_add_devices(dev, 0, cros_usb_pd_charger_devs,
+					 ARRAY_SIZE(cros_usb_pd_charger_devs),
+					 NULL, 0, NULL);
+		if (retval) {
+			dev_err(dev, "failed to add usb-pd-charger device\n");
+			goto pd_reg_failed;
+		}
+	}
+
 	return 0;
 
+pd_reg_failed:
+	put_device(&ec->class_dev);
 dev_reg_failed:
 set_named_failed:
 	dev_set_drvdata(dev, NULL);
