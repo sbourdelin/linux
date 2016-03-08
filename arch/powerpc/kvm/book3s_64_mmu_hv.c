@@ -1416,9 +1416,45 @@ static int resize_hpt_rehash(struct kvm_resize_hpt *resize)
 	return H_SUCCESS;
 }
 
+static void resize_hpt_pivot_cpu(void *opaque)
+{
+	/* Nothing to do, just force a KVM exit */
+}
+
 static void resize_hpt_pivot(struct kvm_resize_hpt *resize,
 			     struct kvm_memslots *slots)
 {
+	struct kvm *kvm = resize->kvm;
+	struct kvm_memory_slot *memslot;
+	struct kvm_hpt_info hpt_tmp;
+
+	/* Exchange the pending tables in the resize structure with
+	 * the active tables */
+
+	resize_hpt_debug(resize, "PIVOT!\n");
+
+	kvm_for_each_memslot(memslot, slots) {
+		unsigned long *tmp;
+
+		tmp = memslot->arch.rmap;
+		memslot->arch.rmap = resize->rmap[memslot->id];
+		resize->rmap[memslot->id] = tmp;
+	}
+
+	hpt_tmp = kvm->arch.hpt;
+	kvmppc_set_hpt(kvm, &resize->hpt);
+	resize->hpt = hpt_tmp;
+
+	spin_unlock(&kvm->mmu_lock);
+
+	synchronize_srcu_expedited(&kvm->srcu);
+
+	/* Force an exit on every vcpu, to make sure the real SDR1
+	 * gets updated */
+
+	on_each_cpu(resize_hpt_pivot_cpu, NULL, 1);
+
+	spin_lock(&kvm->mmu_lock);
 }
 
 static void resize_hpt_flush_rmaps(struct kvm_resize_hpt *resize,
