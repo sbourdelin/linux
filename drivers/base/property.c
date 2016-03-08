@@ -820,11 +820,13 @@ void device_remove_property_set(struct device *dev)
 	 * the pset. If there is no real firmware node (ACPI/DT) primary
 	 * will hold the pset.
 	 */
-	if (!is_pset_node(fwnode))
+	if (is_pset_node(fwnode))
+		dev->fwnode = NULL;
+	else
 		fwnode = fwnode->secondary;
 	if (!IS_ERR(fwnode) && is_pset_node(fwnode))
-		pset_free_set(to_pset_node(fwnode));
-	set_secondary_fwnode(dev, NULL);
+		set_secondary_fwnode(dev, NULL);
+	pset_free_set(to_pset_node(fwnode));
 }
 EXPORT_SYMBOL_GPL(device_remove_property_set);
 
