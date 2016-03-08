@@ -1,7 +1,7 @@
 Bindings for the Generic PWM Regulator
 ======================================
 
-Currently supports 2 modes of operation:
+Currently supports following modes of operation:
 
 Voltage Table:		When in this mode, a voltage table (See below) of
 			predefined voltage <=> duty-cycle values must be
@@ -23,20 +23,34 @@ Continuous Voltage:	This mode uses the regulator's maximum and minimum
 			regulator voltage to run at half way between the
 			supplied max_uV and min_uV values.
 
+Linear Equal Step:	This modes divides the regulator's maximum and minimum
+			supplied voltages into specified equal steps. The
+			number of steps must equally divides the PWM periods.
+			On this case, step is translated into number of pulse
+			in PWM periods and then multiplied by voltage
+			selectors number to get the duty cycles of PWM.
+
 Required properties:
 --------------------
 - compatible:		Should be "pwm-regulator"
 
 - pwms:			PWM specification (See: ../pwm/pwm.txt)
 
-Only required for Voltage Table Mode:
+Optional properties:
+--------------------
+For Voltage Table Mode, following properties must be supplied:
 - voltage-table: 	Voltage and Duty-Cycle table consisting of 2 cells
 			    First cell is voltage in microvolts (uV)
 			    Second cell is duty-cycle in percent (%)
 
+For Linear Equal Steps, following properties must be supplied:
+- regulator-n-voltages:	Number of voltage steps between regulator's minimum
+			and maximum.
+
 NB: To be clear, if voltage-table is provided, then the device will be used
-in Voltage Table Mode.  If no voltage-table is provided, then the device will
-be used in Continuous Voltage Mode.
+in Voltage Table Mode.  If regulator-n-voltages is provided then the device
+will be used in Linear Equal Step Mode. If both properties are not provided,
+then the device will be used in Continuous Voltage Mode.
 
 Any property defined as part of the core regulator binding can also be used.
 (See: ../regulator/regulator.txt)
@@ -65,4 +79,14 @@ Voltage Table Example:
 				<1056000 30>,
 				<1036000 40>,
 				<1016000 50>;
+	};
+
+Linear Equal Step Mode Example:
+	pwm-regulator@1 {
+		compatible = "pwm-regulator";
+		pwms = <&pwm 1 4880>;
+		regulator-name = "vdd-gpu";
+		regulator-min-microvolt = <710000>;
+		regulator-max-microvolt = <1320000>;
+		regulator-n-voltages = <62>;
 	};
