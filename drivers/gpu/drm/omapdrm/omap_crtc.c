@@ -207,12 +207,16 @@ static int omap_crtc_dss_enable(struct omap_overlay_manager *mgr)
 			&omap_crtc->timings);
 	omap_crtc_set_enabled(&omap_crtc->base, true);
 
+	set_bit(crtc_enabled, &omap_crtc->state);
+
 	return 0;
 }
 
 static void omap_crtc_dss_disable(struct omap_overlay_manager *mgr)
 {
 	struct omap_crtc *omap_crtc = omap_crtcs[mgr->id];
+
+	clear_bit(crtc_enabled, &omap_crtc->state);
 
 	omap_crtc_set_enabled(&omap_crtc->base, false);
 }
