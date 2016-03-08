@@ -11400,6 +11400,13 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git
 S:	Maintained
 F:	drivers/usb/phy/
 
+USB PORT MUX DRIVER
+M:	Lu Baolu <baolu.lu@linux.intel.com>
+L:	linux-usb@vger.kernel.org
+S:	Supported
+F:	drivers/usb/mux/intel-mux.c
+F:	include/linux/usb/intel-mux.h
+
 USB PRINTER DRIVER (usblp)
 M:	Pete Zaitcev <zaitcev@redhat.com>
 L:	linux-usb@vger.kernel.org
