@@ -23,6 +23,7 @@
 #include <linux/user-return-notifier.h>
 #include <linux/uprobes.h>
 #include <linux/context_tracking.h>
+#include <linux/hash.h>
 
 #include <asm/processor.h>
 #include <asm/ucontext.h>
@@ -61,7 +62,9 @@
 	regs->seg = GET_SEG(seg) | 3;			\
 } while (0)
 
-int restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc)
+
+int restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc,
+	               void __user **user_cookie)
 {
 	unsigned long buf_val;
 	void __user *buf;
@@ -112,8 +115,14 @@ int restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc)
 		buf = (void __user *)buf_val;
 	} get_user_catch(err);
 
-	err |= fpu__restore_sig(buf, config_enabled(CONFIG_X86_32));
 
+	if (buf_val != 0)
+		*user_cookie = (void __user *)
+			(buf_val + fpu__getsize(config_enabled(CONFIG_X86_32)));
+	else
+		*user_cookie = NULL;
+
+	err |= fpu__restore_sig(buf, config_enabled(CONFIG_X86_32));
 	force_iret();
 
 	return err;
@@ -200,7 +209,7 @@ static unsigned long align_sigframe(unsigned long sp)
 
 static void __user *
 get_sigframe(struct k_sigaction *ka, struct pt_regs *regs, size_t frame_size,
-	     void __user **fpstate)
+	     void __user **fpstate, void __user **cookie)
 {
 	/* Default to using normal stack */
 	unsigned long math_size = 0;
@@ -227,13 +236,26 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs *regs, size_t frame_size,
 		}
 	}
 
+
+	/*
+	 * Allocate space for cookie above FP/Frame. It will sit in
+	 * the padding of the saved FP state, or if there is no FP
+	 * state it will sit in the padding of the sig frame.
+	 */
+	sp -= sizeof(unsigned long);
+
 	if (fpu->fpstate_active) {
 		sp = fpu__alloc_mathframe(sp, config_enabled(CONFIG_X86_32),
 					  &buf_fx, &math_size);
 		*fpstate = (void __user *)sp;
+		*cookie = (void __user *)sp + math_size;
 	}
 
 	sp = align_sigframe(sp - frame_size);
+
+	if (!fpu->fpstate_active)
+		*cookie = (void __user *) (sp + frame_size);
+
 
 	/*
 	 * If we are on the alternate signal stack and would overflow it, don't.
@@ -281,13 +303,18 @@ __setup_frame(int sig, struct ksignal *ksig, sigset_t *set,
 	void __user *restorer;
 	int err = 0;
 	void __user *fpstate = NULL;
+	void __user *cookie_location;
 
-	frame = get_sigframe(&ksig->ka, regs, sizeof(*frame), &fpstate);
+	frame = get_sigframe(&ksig->ka, regs, sizeof(*frame),
+			     &fpstate, &cookie_location);
 
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		return -EFAULT;
 
 	if (__put_user(sig, &frame->sig))
+		return -EFAULT;
+
+	if (set_sigcookie(cookie_location))
 		return -EFAULT;
 
 	if (setup_sigcontext(&frame->sc, fpstate, regs, set->sig[0]))
@@ -344,10 +371,15 @@ static int __setup_rt_frame(int sig, struct ksignal *ksig,
 	void __user *restorer;
 	int err = 0;
 	void __user *fpstate = NULL;
+	void __user *cookie_location;
 
-	frame = get_sigframe(&ksig->ka, regs, sizeof(*frame), &fpstate);
+	frame = get_sigframe(&ksig->ka, regs, sizeof(*frame),
+			&fpstate, &cookie_location);
 
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
+		return -EFAULT;
+
+	if (set_sigcookie(cookie_location))
 		return -EFAULT;
 
 	put_user_try {
@@ -408,9 +440,11 @@ static int __setup_rt_frame(int sig, struct ksignal *ksig,
 {
 	struct rt_sigframe __user *frame;
 	void __user *fp = NULL;
+	void __user *cookie_location;
 	int err = 0;
 
-	frame = get_sigframe(&ksig->ka, regs, sizeof(struct rt_sigframe), &fp);
+	frame = get_sigframe(&ksig->ka, regs, sizeof(*frame),
+			     &fp, &cookie_location);
 
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		return -EFAULT;
@@ -419,6 +453,9 @@ static int __setup_rt_frame(int sig, struct ksignal *ksig,
 		if (copy_siginfo_to_user(&frame->info, &ksig->info))
 			return -EFAULT;
 	}
+
+	if (set_sigcookie(cookie_location))
+		return -EFAULT;
 
 	put_user_try {
 		/* Create the ucontext.  */
@@ -476,8 +513,10 @@ static int x32_setup_rt_frame(struct ksignal *ksig,
 	void __user *restorer;
 	int err = 0;
 	void __user *fpstate = NULL;
+	void __user *cookie_location;
 
-	frame = get_sigframe(&ksig->ka, regs, sizeof(*frame), &fpstate);
+	frame = get_sigframe(&ksig->ka, regs, sizeof(*frame),
+			     &fpstate, &cookie_location);
 
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		return -EFAULT;
@@ -486,6 +525,9 @@ static int x32_setup_rt_frame(struct ksignal *ksig,
 		if (copy_siginfo_to_user32(&frame->info, &ksig->info))
 			return -EFAULT;
 	}
+
+	if (set_sigcookie(cookie_location))
+		return -EFAULT;
 
 	put_user_try {
 		/* Create the ucontext.  */
@@ -541,6 +583,7 @@ asmlinkage unsigned long sys_sigreturn(void)
 {
 	struct pt_regs *regs = current_pt_regs();
 	struct sigframe __user *frame;
+	void __user *user_cookie;
 	sigset_t set;
 
 	frame = (struct sigframe __user *)(regs->sp - 8);
@@ -554,8 +597,15 @@ asmlinkage unsigned long sys_sigreturn(void)
 
 	set_current_blocked(&set);
 
-	if (restore_sigcontext(regs, &frame->sc))
+	if (restore_sigcontext(regs, &frame->sc, &user_cookie))
 		goto badframe;
+
+	if (user_cookie == NULL)
+		user_cookie = (void __user *) (((unsigned long) frame) + sizeof(*frame));
+
+	if (verify_clear_sigcookie(user_cookie))
+		goto badframe;
+
 	return regs->ax;
 
 badframe:
@@ -569,6 +619,7 @@ asmlinkage long sys_rt_sigreturn(void)
 {
 	struct pt_regs *regs = current_pt_regs();
 	struct rt_sigframe __user *frame;
+	void __user *user_cookie;
 	sigset_t set;
 
 	frame = (struct rt_sigframe __user *)(regs->sp - sizeof(long));
@@ -579,7 +630,13 @@ asmlinkage long sys_rt_sigreturn(void)
 
 	set_current_blocked(&set);
 
-	if (restore_sigcontext(regs, &frame->uc.uc_mcontext))
+	if (restore_sigcontext(regs, &frame->uc.uc_mcontext, &user_cookie))
+		goto badframe;
+
+	if (user_cookie == NULL)
+		user_cookie = (void __user *) (((unsigned long) frame) + sizeof(*frame));
+
+	if (verify_clear_sigcookie(user_cookie))
 		goto badframe;
 
 	if (restore_altstack(&frame->uc.uc_stack))
@@ -740,7 +797,7 @@ void do_signal(struct pt_regs *regs)
 	restore_saved_sigmask();
 }
 
-void signal_fault(struct pt_regs *regs, void __user *frame, char *where)
+void signal_fault(struct pt_regs *regs, void __user *frame, const char *where)
 {
 	struct task_struct *me = current;
 
@@ -762,6 +819,7 @@ asmlinkage long sys32_x32_rt_sigreturn(void)
 {
 	struct pt_regs *regs = current_pt_regs();
 	struct rt_sigframe_x32 __user *frame;
+	void __user *user_cookie;
 	sigset_t set;
 
 	frame = (struct rt_sigframe_x32 __user *)(regs->sp - 8);
@@ -773,7 +831,13 @@ asmlinkage long sys32_x32_rt_sigreturn(void)
 
 	set_current_blocked(&set);
 
-	if (restore_sigcontext(regs, &frame->uc.uc_mcontext))
+	if (restore_sigcontext(regs, &frame->uc.uc_mcontext, &user_cookie))
+		goto badframe;
+
+	if (user_cookie == NULL)
+		user_cookie = (void __user *) (((unsigned long) frame) + sizeof(*frame));
+
+	if (verify_clear_sigcookie(user_cookie))
 		goto badframe;
 
 	if (compat_restore_altstack(&frame->uc.uc_stack))

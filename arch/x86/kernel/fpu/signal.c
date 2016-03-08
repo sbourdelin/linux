@@ -344,6 +344,16 @@ static inline int xstate_sigframe_size(void)
 	return use_xsave() ? xstate_size + FP_XSTATE_MAGIC2_SIZE : xstate_size;
 }
 
+unsigned long fpu__getsize(int ia32_frame)
+{
+	unsigned long frame_size = xstate_sigframe_size();
+
+	if (ia32_frame && use_fxsr())
+		frame_size += sizeof(struct fregs_state);
+
+	return frame_size;
+}
+
 /*
  * Restore FPU state from a sigframe:
  */

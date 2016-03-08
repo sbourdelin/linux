@@ -27,6 +27,7 @@ extern void convert_to_fxsr(struct task_struct *tsk,
 unsigned long
 fpu__alloc_mathframe(unsigned long sp, int ia32_frame,
 		     unsigned long *buf_fx, unsigned long *size);
+unsigned long fpu__getsize(int ia32_frame);
 
 extern void fpu__init_prepare_fx_sw_frame(void);
 
