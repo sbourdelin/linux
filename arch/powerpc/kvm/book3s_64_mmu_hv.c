@@ -1457,9 +1457,66 @@ static void resize_hpt_pivot(struct kvm_resize_hpt *resize,
 	spin_lock(&kvm->mmu_lock);
 }
 
+static void resize_hpt_harvest_rc(struct kvm_hpt_info *hpt,
+				  unsigned long *rmapp)
+{
+	unsigned long idx;
+
+	if (!(*rmapp & KVMPPC_RMAP_PRESENT))
+		return;
+
+	idx = *rmapp & KVMPPC_RMAP_INDEX;
+	do {
+		struct revmap_entry *rev = &hpt->rev[idx];
+		__be64 *hptep = (__be64 *)(hpt->virt + (idx << 4));
+		unsigned long hpte0 = be64_to_cpu(hptep[0]);
+		unsigned long hpte1 = be64_to_cpu(hptep[1]);
+		unsigned long psize = hpte_page_size(hpte0, hpte1);
+		unsigned long rcbits = hpte1 & (HPTE_R_R | HPTE_R_C);
+
+		*rmapp |= rcbits << KVMPPC_RMAP_RC_SHIFT;
+		if (rcbits & HPTE_R_C)
+			kvmppc_update_rmap_change(rmapp, psize);
+
+		idx = rev->forw;
+	} while (idx != (*rmapp & KVMPPC_RMAP_INDEX));
+}
+
 static void resize_hpt_flush_rmaps(struct kvm_resize_hpt *resize,
 				   struct kvm_memslots *slots)
 {
+	struct kvm_memory_slot *memslot;
+
+	kvm_for_each_memslot(memslot, slots) {
+		unsigned long *old_rmap = resize->rmap[memslot->id];
+		unsigned long *new_rmap = memslot->arch.rmap;
+		unsigned long i;
+
+		resize_hpt_debug(resize, "Flushing RMAPS for memslot %d\n", memslot->id);
+
+		for (i = 0; i < memslot->npages; i++) {
+			lock_rmap(old_rmap);
+
+			resize_hpt_harvest_rc(&resize->hpt, old_rmap);
+
+			lock_rmap(new_rmap);
+
+			*new_rmap |= *old_rmap & (KVMPPC_RMAP_REFERENCED
+						  | KVMPPC_RMAP_CHANGED);
+			if ((*old_rmap & KVMPPC_RMAP_CHG_ORDER)
+			    > (*new_rmap & KVMPPC_RMAP_CHG_ORDER)) {
+				*new_rmap &= ~KVMPPC_RMAP_CHG_ORDER;
+				*new_rmap |= *old_rmap & KVMPPC_RMAP_CHG_ORDER;
+			}
+			unlock_rmap(new_rmap);
+			unlock_rmap(old_rmap);
+
+			old_rmap++;
+			new_rmap++;
+		}
+
+		resize_hpt_debug(resize, "Flushed RMAPS for memslot %d\n", memslot->id);
+	}
 }
 
 static void resize_hpt_free(struct kvm_resize_hpt *resize)
