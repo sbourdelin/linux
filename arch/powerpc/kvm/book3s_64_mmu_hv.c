@@ -1128,6 +1128,7 @@ long kvmppc_hv_get_dirty_log(struct kvm *kvm, struct kvm_memory_slot *memslot,
 	unsigned long *rmapp;
 	struct kvm_vcpu *vcpu;
 
+	mutex_lock(&kvm->arch.resize_hpt_mutex); /* exclude a concurrent HPT resize */
 	preempt_disable();
 	rmapp = memslot->arch.rmap;
 	for (i = 0; i < memslot->npages; ++i) {
@@ -1152,6 +1153,7 @@ long kvmppc_hv_get_dirty_log(struct kvm *kvm, struct kvm_memory_slot *memslot,
 		spin_unlock(&vcpu->arch.vpa_update_lock);
 	}
 	preempt_enable();
+	mutex_unlock(&kvm->arch.resize_hpt_mutex);
 	return 0;
 }
 
