@@ -1163,6 +1163,41 @@ static void dsicm_ulps_work(struct work_struct *work)
 	mutex_unlock(&ddata->lock);
 }
 
+static void dsicm_get_timings(struct omap_dss_device *dssdev,
+		struct omap_video_timings *timings)
+{
+	struct panel_drv_data *ddata = to_panel_data(dssdev);
+
+	*timings = ddata->timings;
+}
+
+static int dsicm_check_timings(struct omap_dss_device *dssdev,
+		struct omap_video_timings *timings)
+{
+	struct panel_drv_data *ddata = to_panel_data(dssdev);
+	int ret = 0;
+
+	if (timings->x_res != ddata->timings.x_res)
+		ret = -EINVAL;
+	else if (timings->y_res != ddata->timings.y_res)
+		ret = -EINVAL;
+
+	/* pixelclock is modified by dsi, so not easily checkable */
+
+	/* vfp, vbp, hfp, hbp are (re-)configured automatically by dsi */
+
+	if (ret) {
+		dev_warn(dssdev->dev, "wrong resolution: %d x %d",
+			timings->x_res, timings->y_res);
+		dev_warn(dssdev->dev, "panel resolution: %d x %d",
+			ddata->timings.x_res, ddata->timings.y_res);
+	} else {
+		dev_dbg(dssdev->dev, "mode check: ok");
+	}
+
+	return ret;
+}
+
 static struct omap_dss_driver dsicm_ops = {
 	.connect	= dsicm_connect,
 	.disconnect	= dsicm_disconnect,
@@ -1180,6 +1215,9 @@ static struct omap_dss_driver dsicm_ops = {
 	.get_te		= dsicm_get_te,
 
 	.memory_read	= dsicm_memory_read,
+
+	.get_timings	= dsicm_get_timings,
+	.check_timings	= dsicm_check_timings,
 };
 
 static int dsicm_probe_pdata(struct platform_device *pdev)
