@@ -277,16 +277,18 @@ static int pwm_regulator_probe(struct platform_device *pdev)
 
 	drvdata->pwm = devm_pwm_get(&pdev->dev, NULL);
 	if (IS_ERR(drvdata->pwm)) {
-		dev_err(&pdev->dev, "Failed to get PWM\n");
-		return PTR_ERR(drvdata->pwm);
+		ret = PTR_ERR(drvdata->pwm);
+		dev_err(&pdev->dev, "Failed to get PWM, %d\n", ret);
+		return ret;
 	}
 
 	regulator = devm_regulator_register(&pdev->dev,
 					    &drvdata->desc, &config);
 	if (IS_ERR(regulator)) {
-		dev_err(&pdev->dev, "Failed to register regulator %s\n",
-			drvdata->desc.name);
-		return PTR_ERR(regulator);
+		ret = PTR_ERR(regulator);
+		dev_err(&pdev->dev, "Failed to register regulator %s, %d\n",
+			drvdata->desc.name, ret);
+		return ret;
 	}
 
 	return 0;
