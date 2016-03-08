@@ -136,6 +136,16 @@ void free_initmem(void)
 	free_initmem_default(POISON_FREE_INITMEM);
 }
 
+void mark_rodata_ro(void)
+{
+	unsigned long start = (unsigned long) &__ro_after_init;
+	unsigned long end = (unsigned long) &_edata;
+
+	printk(KERN_INFO "Write protecting post-init read-only data: %luk\n",
+	       (end - start) >> 10);
+	set_memory_ro(start, (end - start) >> PAGE_SHIFT);
+}
+
 #ifdef CONFIG_BLK_DEV_INITRD
 void __init free_initrd_mem(unsigned long start, unsigned long end)
 {

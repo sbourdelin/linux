@@ -52,6 +52,12 @@ SECTIONS
 
 	RW_DATA_SECTION(0x100, PAGE_SIZE, THREAD_SIZE)
 
+	. = ALIGN(PAGE_SIZE)
+	__ro_after_init = .;
+	.arch_ro_after_init : {
+		*(.arch_ro_after_init)	/* Read only after init */
+	}
+
 	_edata = .;		/* End of data section */
 
 	/* will be freed after init */

@@ -15,4 +15,6 @@
 
 #define __read_mostly __attribute__((__section__(".data..read_mostly")))
 
+#define __ro_after_init __attribute__((__section__(".arch_ro_after_init")))
+
 #endif

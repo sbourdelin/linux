@@ -3,6 +3,6 @@
 
 #include <asm-generic/sections.h>
 
-extern char _eshared[], _ehead[];
+extern char _eshared[], _ehead[], __ro_after_init[];
 
 #endif
