@@ -49,6 +49,7 @@
 #include <linux/pm.h>
 #include <linux/pm_runtime.h>
 #include <linux/oom.h>
+#include <linux/dmi.h>
 
 
 static int i915_getparam(struct drm_device *dev, void *data,
@@ -973,6 +974,33 @@ static void i915_mmio_cleanup(struct drm_device *dev)
 	pci_iounmap(dev->pdev, dev_priv->regs);
 }
 
+static void dmi_decode_memory_info(const struct dmi_header *hdr, void *priv)
+{
+	struct drm_i915_private *dev_priv = (struct drm_i915_private *) priv;
+	const struct memdev_dmi_entry *memdev =
+		(const struct memdev_dmi_entry *)hdr;
+	uint16_t mem_speed = 0;
+
+	if (hdr->type != DMI_ENTRY_MEM_DEVICE)
+		return;
+
+	/* Get the speed */
+	if (hdr->length > offsetof(struct memdev_dmi_entry, conf_mem_clk_speed))
+		mem_speed = memdev->conf_mem_clk_speed;
+	else if (hdr->length > offsetof(struct memdev_dmi_entry, speed))
+		mem_speed = memdev->speed;
+	else
+		return;
+
+	dev_priv->dmi.mem_channel++;
+
+	/* All channels are expected to have same the speed */
+	if (dev_priv->dmi.mem_speed == 0)
+		dev_priv->dmi.mem_speed = mem_speed;
+	else if (mem_speed != dev_priv->dmi.mem_speed)
+		dev_priv->dmi.valid = false;
+}
+
 /**
  * i915_driver_load - setup chip and create an initial config
  * @dev: DRM device
@@ -999,6 +1027,12 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 
 	dev->dev_private = dev_priv;
 	dev_priv->dev = dev;
+
+	/* walk the dmi device table for getting platform memory information */
+	dev_priv->dmi.valid = true;
+	dmi_walk(dmi_decode_memory_info, dev_priv);
+	if (!dev_priv->dmi.mem_speed)
+		dev_priv->dmi.valid = false;
 
 	/* Setup the write-once "constant" device info */
 	device_info = (struct intel_device_info *)&dev_priv->info;
