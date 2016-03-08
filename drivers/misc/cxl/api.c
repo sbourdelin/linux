@@ -296,6 +296,14 @@ struct cxl_context *cxl_fops_get_context(struct file *file)
 }
 EXPORT_SYMBOL_GPL(cxl_fops_get_context);
 
+void cxl_set_driver_ops(struct cxl_context *ctx,
+			struct cxl_afu_driver_ops *ops)
+{
+	WARN_ON(!ops->event_pending || !ops->deliver_event);
+	ctx->afu_driver_ops = ops;
+}
+EXPORT_SYMBOL_GPL(cxl_set_driver_ops);
+
 int cxl_start_work(struct cxl_context *ctx,
 		   struct cxl_ioctl_start_work *work)
 {
