@@ -168,6 +168,38 @@
 #define		AT91_PMC_WPVS		(0x1  <<  0)		/* Write Protect Violation Status */
 #define		AT91_PMC_WPVSRC		(0xffff  <<  8)		/* Write Protect Violation Source */
 
+#define AT91_PMC_FSMR		0x70		/* Fast Startup Mode Register */
+#define AT91_PMC_FSTT0		BIT(0)		/* WKUP Pin Enable */
+#define AT91_PMC_FSTT1		BIT(1)		/* Security Module Enable */
+#define AT91_PMC_FSTT2		BIT(2)		/* PIOBU0 Input Enable */
+#define AT91_PMC_FSTT3		BIT(3)		/* PIOBU1 Input Enable */
+#define AT91_PMC_FSTT4		BIT(4)		/* PIOBU2 Input Enable */
+#define AT91_PMC_FSTT5		BIT(5)		/* PIOBU3 Input Enable */
+#define AT91_PMC_FSTT6		BIT(6)		/* PIOBU4 Input Enable */
+#define AT91_PMC_FSTT7		BIT(7)		/* PIOBU5 Input Enable */
+#define AT91_PMC_FSTT8		BIT(8)		/* PIOBU6 Input Enable */
+#define AT91_PMC_FSTT9		BIT(9)		/* PIOBU7 Input Enable */
+#define AT91_PMC_FSTT10		BIT(10)		/* GMAC Wake-up On LAN Enable */
+#define AT91_PMC_RTCAL		BIT(17)		/* RTC Alarm Enable */
+#define AT91_PMC_USBAL		BIT(18)		/* USB Resume Enable */
+#define AT91_PMC_SDMMC_CD	BIT(19)		/* SDMMC Card Detect Enable */
+#define AT91_PMC_LPM		BIT(20)		/* Low-power Mode */
+#define AT91_PMC_RXLP_MCE	BIT(24)		/* Backup UART Receive Enable */
+#define AT91_PMC_ACC_CE		BIT(25)		/* ACC Enable */
+
+#define AT91_PMC_FSPR		0x74		/* Fast Startup Polarity Reg */
+#define AT91_PMC_FSTP0		BIT(0)		/* WKUP Pin Polarity */
+#define AT91_PMC_FSTP1		BIT(1)		/* Security Module Polarity */
+#define AT91_PMC_FSTP2		BIT(2)		/* PIOBU0 Pin Polarity */
+#define AT91_PMC_FSTP3		BIT(3)		/* PIOBU1 Pin Polarity */
+#define AT91_PMC_FSTP4		BIT(4)		/* PIOBU2 Pin Polarity */
+#define AT91_PMC_FSTP5		BIT(5)		/* PIOBU3 Pin Polarity */
+#define AT91_PMC_FSTP6		BIT(6)		/* PIOBU4 Pin Polarity */
+#define AT91_PMC_FSTP7		BIT(7)		/* PIOBU5 Pin Polarity */
+#define AT91_PMC_FSTP8		BIT(8)		/* PIOBU6 Pin Polarity */
+#define AT91_PMC_FSTP9		BIT(9)		/* PIOBU7 Pin Polarity */
+#define AT91_PMC_FSTP10		BIT(10)		/* Wake-up On LAN Polarity */
+
 #define AT91_PMC_VERSION	0xfc
 
 #define AT91_PMC_PCER1		0x100			/* Peripheral Clock Enable Register 1 [SAMA5 only]*/

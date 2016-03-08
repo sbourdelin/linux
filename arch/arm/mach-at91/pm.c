@@ -24,6 +24,8 @@
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/clk/at91_pmc.h>
+#include <linux/mfd/syscon.h>
+#include <linux/regmap.h>
 
 #include <asm/irq.h>
 #include <linux/atomic.h>
@@ -461,6 +463,116 @@ static void __init at91_pm_init(void (*pm_idle)(void))
 		pr_info("AT91: PM not supported, due to no SRAM allocated\n");
 }
 
+static int __init at91_pmc_fast_startup_init(void)
+{
+	struct device_node *np;
+	struct regmap *regmap;
+	u32 mode = 0, polarity = 0, value = 0;
+
+	np = of_find_compatible_node(NULL, NULL,
+				     "atmel,sama5d2-pmc-fast-startup");
+	if (!np)
+		return -ENODEV;
+
+	regmap = syscon_node_to_regmap(of_get_parent(np));
+	if (IS_ERR(regmap)) {
+		pr_info("AT91: failed to find PMC fast startup\n");
+		return PTR_ERR(regmap);
+	}
+
+	mode |= of_property_read_bool(np, "atmel,wkup-trigger") ?
+		AT91_PMC_FSTT0 : 0;
+	mode |= of_property_read_bool(np, "atmel,secumod-trigger") ?
+		AT91_PMC_FSTT1 : 0;
+	mode |= of_property_read_bool(np, "atmel,piobu0-trigger") ?
+		AT91_PMC_FSTT2 : 0;
+	mode |= of_property_read_bool(np, "atmel,piobu1-trigger") ?
+		AT91_PMC_FSTT3 : 0;
+	mode |= of_property_read_bool(np, "atmel,piobu2-trigger") ?
+		AT91_PMC_FSTT4 : 0;
+	mode |= of_property_read_bool(np, "atmel,piobu3-trigger") ?
+		AT91_PMC_FSTT5 : 0;
+	mode |= of_property_read_bool(np, "atmel,piobu4-trigger") ?
+		AT91_PMC_FSTT6 : 0;
+	mode |= of_property_read_bool(np, "atmel,piobu5-trigger") ?
+		AT91_PMC_FSTT7 : 0;
+	mode |= of_property_read_bool(np, "atmel,piobu6-trigger") ?
+		AT91_PMC_FSTT8 : 0;
+	mode |= of_property_read_bool(np, "atmel,piobu7-trigger") ?
+		AT91_PMC_FSTT9 : 0;
+	mode |= of_property_read_bool(np, "atmel,gmac-wol-trigger") ?
+		AT91_PMC_FSTT10 : 0;
+	mode |= of_property_read_bool(np, "atmel,rtc-alarm-trigger") ?
+		AT91_PMC_RTCAL : 0;
+	mode |= of_property_read_bool(np, "atmel,usb-resume-trigger") ?
+		AT91_PMC_USBAL : 0;
+	mode |= of_property_read_bool(np, "atmel,sdmmc-cd-trigger") ?
+		AT91_PMC_SDMMC_CD : 0;
+	mode |= of_property_read_bool(np, "atmel,rxlp-match-trigger") ?
+		AT91_PMC_RXLP_MCE : 0;
+	mode |= of_property_read_bool(np, "atmel,acc-comparison-trigger") ?
+		AT91_PMC_ACC_CE : 0;
+
+	if (!of_property_read_u32(np, "atmel,wkup-trigger-level", &value)) {
+		if (value)
+			polarity |= AT91_PMC_FSTP0;
+	}
+
+	if (mode & AT91_PMC_FSTT1)
+		polarity |= AT91_PMC_FSTP1;
+
+	if (!of_property_read_u32(np, "atmel,piobu0-trigger-level", &value)) {
+		if (value)
+			polarity |= AT91_PMC_FSTP2;
+	}
+
+	if (!of_property_read_u32(np, "atmel,piobu1-trigger-level", &value)) {
+		if (value)
+			polarity |= AT91_PMC_FSTP3;
+	}
+
+	if (!of_property_read_u32(np, "atmel,piobu2-trigger-level", &value)) {
+		if (value)
+			polarity |= AT91_PMC_FSTP4;
+	}
+
+	if (!of_property_read_u32(np, "atmel,piobu3-trigger-level", &value)) {
+		if (value)
+			polarity |= AT91_PMC_FSTP5;
+	}
+
+	if (!of_property_read_u32(np, "atmel,piobu4-trigger-level", &value)) {
+		if (value)
+			polarity |= AT91_PMC_FSTP6;
+	}
+
+	if (!of_property_read_u32(np, "atmel,piobu5-trigger-level", &value)) {
+		if (value)
+			polarity |= AT91_PMC_FSTP7;
+	}
+
+	if (!of_property_read_u32(np, "atmel,piobu6-trigger-level", &value)) {
+		if (value)
+			polarity |= AT91_PMC_FSTP8;
+	}
+
+	if (!of_property_read_u32(np, "atmel,piobu7-trigger-level", &value)) {
+		if (value)
+			polarity |= AT91_PMC_FSTP9;
+	}
+
+	if (mode & AT91_PMC_FSTT10)
+		polarity |= AT91_PMC_FSTP10;
+
+	regmap_write(regmap, AT91_PMC_FSMR, mode);
+
+	regmap_write(regmap, AT91_PMC_FSPR, polarity);
+
+	of_node_put(np);
+
+	return 0;
+}
+
 void __init at91rm9200_pm_init(void)
 {
 	at91_dt_ramc();
@@ -509,4 +621,6 @@ void __init sama5_pm_init(void)
 
 	if (readl(pmc + AT91_PMC_VERSION) >= SAMA5D2_PMC_VERSION)
 		at91_pm_data.ulp_mode = ULP1_MODE;
+
+	at91_pmc_fast_startup_init();
 }
