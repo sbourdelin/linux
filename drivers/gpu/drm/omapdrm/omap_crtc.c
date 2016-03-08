@@ -48,6 +48,7 @@ struct omap_crtc {
 	struct omap_overlay_manager *mgr;
 
 	struct omap_video_timings timings;
+	bool manually_updated;
 
 	struct omap_drm_irq vblank_irq;
 	struct omap_drm_irq error_irq;
@@ -88,6 +89,12 @@ int omap_crtc_wait_pending(struct drm_crtc *crtc)
 	return wait_event_timeout(omap_crtc->pending_wait,
 				  !test_bit(crtc_pending, &omap_crtc->state),
 				  msecs_to_jiffies(50));
+}
+
+bool omap_crtc_is_manual_updated(struct drm_crtc *crtc)
+{
+	struct omap_crtc *omap_crtc = to_omap_crtc(crtc);
+	return omap_crtc->manually_updated;
 }
 
 /* -----------------------------------------------------------------------------
@@ -152,6 +159,11 @@ static void omap_crtc_set_enabled(struct drm_crtc *crtc, bool enable)
 		 * first frame when enabling, so we need to ignore those.
 		 */
 		omap_crtc->ignore_digit_sync_lost = true;
+	}
+
+	if (omap_crtc->manually_updated) {
+		dev_dbg(dev->dev, "stallmode detected, not waiting for irq");
+		return;
 	}
 
 	framedone_irq = dispc_mgr_get_framedone_irq(channel);
@@ -233,7 +245,13 @@ static void omap_crtc_dss_set_lcd_config(struct omap_overlay_manager *mgr,
 		const struct dss_lcd_mgr_config *config)
 {
 	struct omap_crtc *omap_crtc = omap_crtcs[mgr->id];
-	DBG("%s", omap_crtc->name);
+	struct drm_device *dev = omap_crtc->base.dev;
+	struct drm_plane *plane;
+
+	dev_dbg(dev->dev, "set lcd config for %s", omap_crtc->name);
+
+	omap_crtc->manually_updated = dss_lcd_mgr_config_get_stallmode(config);
+
 	dispc_mgr_set_lcd_config(omap_crtc->channel, config);
 }
 
@@ -358,9 +376,17 @@ static bool omap_crtc_mode_fixup(struct drm_crtc *crtc,
 static void omap_crtc_enable(struct drm_crtc *crtc)
 {
 	struct omap_crtc *omap_crtc = to_omap_crtc(crtc);
+	struct omap_dss_device *display = omap_crtc->mgr->output->dst;
 	struct drm_device *dev = crtc->dev;
 
 	DBG("%s", omap_crtc->name);
+
+	/* manual updated display will not trigger vsync irq */
+	/* omap_crtc->manually_updated is not yet set */
+	if (display->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE) {
+		dev_dbg(dev->dev, "manual update display detected!");
+		return;
+	}
 
 	if (test_and_set_bit(crtc_pending, &omap_crtc->state))
 		dev_warn(dev->dev, "crtc enable while pending bit set!");
@@ -406,6 +432,9 @@ static void omap_crtc_atomic_flush(struct drm_crtc *crtc,
 	struct drm_device *dev = crtc->dev;
 
 	WARN_ON(omap_crtc->vblank_irq.registered);
+
+	if (omap_crtc->manually_updated)
+		return;
 
 	if (dispc_mgr_is_enabled(omap_crtc->channel)) {
 
