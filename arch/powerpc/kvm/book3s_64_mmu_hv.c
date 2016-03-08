@@ -97,6 +97,17 @@ static void resize_hpt_set_state(struct kvm_resize_hpt *resize,
 	wake_up_all(&kvm->arch.resize_hpt_wq);
 }
 
+static struct kvm_resize_hpt *kvm_active_resize_hpt(struct kvm *kvm)
+{
+	struct kvm_resize_hpt *resize = kvm->arch.resize_hpt;
+
+	if (resize && (resize->state & RESIZE_HPT_PREPARED)
+	    && !(resize->state & RESIZE_HPT_FAILED))
+		return resize;
+
+	return NULL;
+}
+
 static long kvmppc_virtmode_do_h_enter(struct kvm *kvm, unsigned long flags,
 				long pte_index, unsigned long pteh,
 				unsigned long ptel, unsigned long *pte_idx_ret);
@@ -755,6 +766,7 @@ static int kvm_handle_hva_range(struct kvm *kvm,
 	int retval = 0;
 	struct kvm_memslots *slots;
 	struct kvm_memory_slot *memslot;
+	struct kvm_resize_hpt *resize = kvm_active_resize_hpt(kvm);
 
 	slots = kvm_memslots(kvm);
 	kvm_for_each_memslot(memslot, slots) {
@@ -776,6 +788,10 @@ static int kvm_handle_hva_range(struct kvm *kvm,
 		retval |= kvm_handle_hva_range_slot(kvm, &kvm->arch.hpt,
 						    memslot, memslot->arch.rmap,
 						    gfn, gfn_end, handler);
+		if (resize)
+			retval |= kvm_handle_hva_range_slot(kvm, &resize->hpt,
+				memslot, resize->rmap[memslot->id],
+				gfn, gfn_end, handler);
 	}
 
 	return retval;
