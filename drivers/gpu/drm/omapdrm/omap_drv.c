@@ -95,6 +95,10 @@ static void omap_atomic_complete(struct omap_atomic_state_commit *commit)
 	/* Apply the atomic update. */
 	dispc_runtime_get();
 
+	dev_dbg(dev->dev, "omap_atomic_complete");
+
+	omap_atomic_wait_for_completion(dev, old_state);
+
 	drm_atomic_helper_commit_modeset_disables(dev, old_state);
 	drm_atomic_helper_commit_planes(dev, old_state, false);
 	drm_atomic_helper_commit_modeset_enables(dev, old_state);
