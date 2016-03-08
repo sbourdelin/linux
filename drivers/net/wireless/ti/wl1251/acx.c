@@ -103,7 +103,8 @@ int wl1251_acx_wake_up_conditions(struct wl1251 *wl, u8 wake_up_event,
 	ret = wl1251_cmd_configure(wl, ACX_WAKE_UP_CONDITIONS,
 				   wake_up, sizeof(*wake_up));
 	if (ret < 0) {
-		wl1251_warning("could not set wake up conditions: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "could not set wake up conditions: %d\n",
+			   ret);
 		goto out;
 	}
 
@@ -144,7 +145,7 @@ int wl1251_acx_fw_version(struct wl1251 *wl, char *buf, size_t len)
 
 	ret = wl1251_cmd_interrogate(wl, ACX_FW_REV, rev, sizeof(*rev));
 	if (ret < 0) {
-		wl1251_warning("ACX_FW_REV interrogate failed");
+		wiphy_warn(wl->hw->wiphy, "ACX_FW_REV interrogate failed\n");
 		goto out;
 	}
 
@@ -181,7 +182,8 @@ int wl1251_acx_tx_power(struct wl1251 *wl, int power)
 
 	ret = wl1251_cmd_configure(wl, DOT11_CUR_TX_PWR, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1251_warning("configure of tx power failed: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "configure of tx power failed: %d\n",
+			   ret);
 		goto out;
 	}
 
@@ -265,10 +267,11 @@ int wl1251_acx_data_path_params(struct wl1251 *wl,
 				     resp, sizeof(*resp));
 
 	if (ret < 0) {
-		wl1251_warning("failed to read data path parameters: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "failed to read data path parameters: %d\n",
+			   ret);
 		goto out;
 	} else if (resp->header.cmd.status != CMD_STATUS_SUCCESS) {
-		wl1251_warning("data path parameter acx status failed");
+		wiphy_warn(wl->hw->wiphy, "data path parameter acx status failed\n");
 		ret = -EIO;
 		goto out;
 	}
@@ -293,7 +296,8 @@ int wl1251_acx_rx_msdu_life_time(struct wl1251 *wl, u32 life_time)
 	ret = wl1251_cmd_configure(wl, DOT11_RX_MSDU_LIFE_TIME,
 				   acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1251_warning("failed to set rx msdu life time: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "failed to set rx msdu life time: %d\n",
+			   ret);
 		goto out;
 	}
 
@@ -319,7 +323,7 @@ int wl1251_acx_rx_config(struct wl1251 *wl, u32 config, u32 filter)
 	ret = wl1251_cmd_configure(wl, ACX_RX_CFG,
 				   rx_config, sizeof(*rx_config));
 	if (ret < 0) {
-		wl1251_warning("failed to set rx config: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "failed to set rx config: %d\n", ret);
 		goto out;
 	}
 
@@ -343,7 +347,8 @@ int wl1251_acx_pd_threshold(struct wl1251 *wl)
 
 	ret = wl1251_cmd_configure(wl, ACX_PD_THRESHOLD, pd, sizeof(*pd));
 	if (ret < 0) {
-		wl1251_warning("failed to set pd threshold: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "failed to set pd threshold: %d\n",
+			   ret);
 		goto out;
 	}
 
@@ -368,7 +373,8 @@ int wl1251_acx_slot(struct wl1251 *wl, enum acx_slot_type slot_time)
 
 	ret = wl1251_cmd_configure(wl, ACX_SLOT, slot, sizeof(*slot));
 	if (ret < 0) {
-		wl1251_warning("failed to set slot time: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "failed to set slot time: %d\n",
+			   ret);
 		goto out;
 	}
 
@@ -397,7 +403,8 @@ int wl1251_acx_group_address_tbl(struct wl1251 *wl, bool enable,
 	ret = wl1251_cmd_configure(wl, DOT11_GROUP_ADDRESS_TBL,
 				   acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1251_warning("failed to set group addr table: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "failed to set group addr table: %d\n",
+			   ret);
 		goto out;
 	}
 
@@ -423,8 +430,8 @@ int wl1251_acx_service_period_timeout(struct wl1251 *wl)
 	ret = wl1251_cmd_configure(wl, ACX_SERVICE_PERIOD_TIMEOUT,
 				   rx_timeout, sizeof(*rx_timeout));
 	if (ret < 0) {
-		wl1251_warning("failed to set service period timeout: %d",
-			       ret);
+		wiphy_warn(wl->hw->wiphy, "failed to set service period timeout: %d\n",
+			   ret);
 		goto out;
 	}
 
@@ -448,7 +455,8 @@ int wl1251_acx_rts_threshold(struct wl1251 *wl, u16 rts_threshold)
 
 	ret = wl1251_cmd_configure(wl, DOT11_RTS_THRESHOLD, rts, sizeof(*rts));
 	if (ret < 0) {
-		wl1251_warning("failed to set rts threshold: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "failed to set rts threshold: %d\n",
+			   ret);
 		goto out;
 	}
 
@@ -474,7 +482,8 @@ int wl1251_acx_beacon_filter_opt(struct wl1251 *wl, bool enable_filter)
 	ret = wl1251_cmd_configure(wl, ACX_BEACON_FILTER_OPT,
 				   beacon_filter, sizeof(*beacon_filter));
 	if (ret < 0) {
-		wl1251_warning("failed to set beacon filter opt: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "failed to set beacon filter opt: %d\n",
+			   ret);
 		goto out;
 	}
 
@@ -503,7 +512,8 @@ int wl1251_acx_beacon_filter_table(struct wl1251 *wl)
 	ret = wl1251_cmd_configure(wl, ACX_BEACON_FILTER_TABLE,
 				   ie_table, sizeof(*ie_table));
 	if (ret < 0) {
-		wl1251_warning("failed to set beacon filter table: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "failed to set beacon filter table: %d\n",
+			   ret);
 		goto out;
 	}
 
@@ -529,8 +539,8 @@ int wl1251_acx_conn_monit_params(struct wl1251 *wl)
 	ret = wl1251_cmd_configure(wl, ACX_CONN_MONIT_PARAMS,
 				   acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1251_warning("failed to set connection monitor "
-			       "parameters: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "failed to set connection monitor parameters: %d\n",
+			   ret);
 		goto out;
 	}
 
@@ -554,7 +564,8 @@ int wl1251_acx_sg_enable(struct wl1251 *wl)
 
 	ret = wl1251_cmd_configure(wl, ACX_SG_ENABLE, pta, sizeof(*pta));
 	if (ret < 0) {
-		wl1251_warning("failed to set softgemini enable: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "failed to set softgemini enable: %d\n",
+			   ret);
 		goto out;
 	}
 
@@ -606,7 +617,7 @@ int wl1251_acx_sg_cfg(struct wl1251 *wl)
 
 	ret = wl1251_cmd_configure(wl, ACX_SG_CFG, param, sizeof(*param));
 	if (ret < 0) {
-		wl1251_warning("failed to set sg config: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "failed to set sg config: %d\n", ret);
 		goto out;
 	}
 
@@ -632,7 +643,8 @@ int wl1251_acx_cca_threshold(struct wl1251 *wl)
 	ret = wl1251_cmd_configure(wl, ACX_CCA_THRESHOLD,
 				   detection, sizeof(*detection));
 	if (ret < 0)
-		wl1251_warning("failed to set cca threshold: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "failed to set cca threshold: %d\n",
+			   ret);
 
 	kfree(detection);
 	return ret;
@@ -656,7 +668,7 @@ int wl1251_acx_bcn_dtim_options(struct wl1251 *wl)
 
 	ret = wl1251_cmd_configure(wl, ACX_BCN_DTIM_OPTIONS, bb, sizeof(*bb));
 	if (ret < 0) {
-		wl1251_warning("failed to set rx config: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "failed to set rx config: %d\n", ret);
 		goto out;
 	}
 
@@ -680,7 +692,7 @@ int wl1251_acx_aid(struct wl1251 *wl, u16 aid)
 
 	ret = wl1251_cmd_configure(wl, ACX_AID, acx_aid, sizeof(*acx_aid));
 	if (ret < 0) {
-		wl1251_warning("failed to set aid: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "failed to set aid: %d\n", ret);
 		goto out;
 	}
 
@@ -708,7 +720,8 @@ int wl1251_acx_event_mbox_mask(struct wl1251 *wl, u32 event_mask)
 	ret = wl1251_cmd_configure(wl, ACX_EVENT_MBOX_MASK,
 				   mask, sizeof(*mask));
 	if (ret < 0) {
-		wl1251_warning("failed to set acx_event_mbox_mask: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "failed to set acx_event_mbox_mask: %d\n",
+			   ret);
 		goto out;
 	}
 
@@ -736,7 +749,8 @@ int wl1251_acx_low_rssi(struct wl1251 *wl, s8 threshold, u8 weight,
 
 	ret = wl1251_cmd_configure(wl, ACX_LOW_RSSI, rssi, sizeof(*rssi));
 	if (ret < 0)
-		wl1251_warning("failed to set low rssi threshold: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "failed to set low rssi threshold: %d\n",
+			   ret);
 
 	kfree(rssi);
 	return ret;
@@ -757,7 +771,8 @@ int wl1251_acx_set_preamble(struct wl1251 *wl, enum acx_preamble_type preamble)
 
 	ret = wl1251_cmd_configure(wl, ACX_PREAMBLE_TYPE, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1251_warning("Setting of preamble failed: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "Setting of preamble failed: %d\n",
+			   ret);
 		goto out;
 	}
 
@@ -782,7 +797,8 @@ int wl1251_acx_cts_protect(struct wl1251 *wl,
 
 	ret = wl1251_cmd_configure(wl, ACX_CTS_PROTECTION, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1251_warning("Setting of ctsprotect failed: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "Setting of ctsprotect failed: %d\n",
+			   ret);
 		goto out;
 	}
 
@@ -803,7 +819,7 @@ int wl1251_acx_tsf_info(struct wl1251 *wl, u64 *mactime)
 	ret = wl1251_cmd_interrogate(wl, ACX_TSF_INFO,
 				     tsf_info, sizeof(*tsf_info));
 	if (ret < 0) {
-		wl1251_warning("ACX_FW_REV interrogate failed");
+		wiphy_warn(wl->hw->wiphy, "ACX_FW_REV interrogate failed\n");
 		goto out;
 	}
 
@@ -824,7 +840,7 @@ int wl1251_acx_statistics(struct wl1251 *wl, struct acx_statistics *stats)
 	ret = wl1251_cmd_interrogate(wl, ACX_STATISTICS, stats,
 				     sizeof(*stats));
 	if (ret < 0) {
-		wl1251_warning("acx statistics failed: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "acx statistics failed: %d\n", ret);
 		return -ENOMEM;
 	}
 
@@ -857,7 +873,8 @@ int wl1251_acx_rate_policies(struct wl1251 *wl)
 
 	ret = wl1251_cmd_configure(wl, ACX_RATE_POLICY, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1251_warning("Setting of rate policies failed: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "Setting of rate policies failed: %d\n",
+			   ret);
 		goto out;
 	}
 
@@ -902,7 +919,8 @@ int wl1251_acx_mem_cfg(struct wl1251 *wl)
 	ret = wl1251_cmd_configure(wl, ACX_MEM_CFG, mem_conf,
 				   sizeof(*mem_conf));
 	if (ret < 0) {
-		wl1251_warning("wl1251 mem config failed: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "wl1251 mem config failed: %d\n",
+			   ret);
 		goto out;
 	}
 
@@ -928,7 +946,8 @@ int wl1251_acx_wr_tbtt_and_dtim(struct wl1251 *wl, u16 tbtt, u8 dtim)
 	ret = wl1251_cmd_configure(wl, ACX_WR_TBTT_AND_DTIM,
 				   acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1251_warning("failed to set tbtt and dtim: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "failed to set tbtt and dtim: %d\n",
+			   ret);
 		goto out;
 	}
 
@@ -954,7 +973,8 @@ int wl1251_acx_bet_enable(struct wl1251 *wl, enum wl1251_acx_bet_mode mode,
 
 	ret = wl1251_cmd_configure(wl, ACX_BET_ENABLE, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1251_warning("wl1251 acx bet enable failed: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "wl1251 acx bet enable failed: %d\n",
+			   ret);
 		goto out;
 	}
 
@@ -983,7 +1003,8 @@ int wl1251_acx_arp_ip_filter(struct wl1251 *wl, bool enable, __be32 address)
 	ret = wl1251_cmd_configure(wl, ACX_ARP_IP_FILTER,
 				   acx, sizeof(*acx));
 	if (ret < 0)
-		wl1251_warning("failed to set arp ip filter: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "failed to set arp ip filter: %d\n",
+			   ret);
 
 	kfree(acx);
 	return ret;
@@ -1010,7 +1031,7 @@ int wl1251_acx_ac_cfg(struct wl1251 *wl, u8 ac, u8 cw_min, u16 cw_max,
 
 	ret = wl1251_cmd_configure(wl, ACX_AC_CFG, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1251_warning("acx ac cfg failed: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "acx ac cfg failed: %d\n", ret);
 		goto out;
 	}
 
@@ -1043,7 +1064,7 @@ int wl1251_acx_tid_cfg(struct wl1251 *wl, u8 queue,
 
 	ret = wl1251_cmd_configure(wl, ACX_TID_CFG, acx, sizeof(*acx));
 	if (ret < 0) {
-		wl1251_warning("acx tid cfg failed: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "acx tid cfg failed: %d\n", ret);
 		goto out;
 	}
 

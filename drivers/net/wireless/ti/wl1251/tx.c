@@ -289,13 +289,13 @@ static void enable_tx_for_packet_injection(struct wl1251 *wl)
 	ret = wl1251_cmd_join(wl, BSS_TYPE_STA_BSS, wl->channel,
 			      wl->beacon_int, wl->dtim_period);
 	if (ret < 0) {
-		wl1251_warning("join failed");
+		wiphy_warn(wl->hw->wiphy, "join failed\n");
 		return;
 	}
 
 	ret = wl1251_event_wait(wl, JOIN_EVENT_COMPLETE_ID, 100);
 	if (ret < 0) {
-		wl1251_warning("join timeout");
+		wiphy_warn(wl->hw->wiphy, "join timeout\n");
 		return;
 	}
 

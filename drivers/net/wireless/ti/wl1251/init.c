@@ -35,13 +35,13 @@ int wl1251_hw_init_hwenc_config(struct wl1251 *wl)
 
 	ret = wl1251_acx_feature_cfg(wl, 0);
 	if (ret < 0) {
-		wl1251_warning("couldn't set feature config");
+		wiphy_warn(wl->hw->wiphy, "couldn't set feature config\n");
 		return ret;
 	}
 
 	ret = wl1251_acx_default_key(wl, wl->default_key);
 	if (ret < 0) {
-		wl1251_warning("couldn't set default key");
+		wiphy_warn(wl->hw->wiphy, "couldn't set default key\n");
 		return ret;
 	}
 

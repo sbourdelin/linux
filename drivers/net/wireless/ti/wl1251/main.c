@@ -150,7 +150,7 @@ static void wl1251_fw_wakeup(struct wl1251 *wl)
 	elp_reg = wl1251_read_elp(wl, HW_ACCESS_ELP_CTRL_REG_ADDR);
 
 	if (!(elp_reg & ELPCTRL_WLAN_READY))
-		wl1251_warning("WLAN not ready");
+		wiphy_warn(wl->hw->wiphy, "WLAN not ready\n");
 }
 
 static int wl1251_chip_wakeup(struct wl1251 *wl)
@@ -264,9 +264,9 @@ static void wl1251_irq_work(struct work_struct *work)
 				intr |= WL1251_ACX_INTR_RX1_DATA;
 				break;
 			default:
-				wl1251_warning(
-					"RX: FW and host out of sync: %d",
-					wl->rx_counter - wl->rx_handled);
+				wiphy_warn(wl->hw->wiphy,
+					   "RX: FW and host out of sync: %d\n",
+					   wl->rx_counter - wl->rx_handled);
 				break;
 			}
 
@@ -352,7 +352,7 @@ static int wl1251_join(struct wl1251 *wl, u8 bss_type, u8 channel,
 
 	ret = wl1251_event_wait(wl, JOIN_EVENT_COMPLETE_ID, 100);
 	if (ret < 0)
-		wl1251_warning("join timeout");
+		wiphy_warn(wl->hw->wiphy, "join timeout\n");
 
 out:
 	return ret;
@@ -577,7 +577,8 @@ static int wl1251_build_null_data(struct wl1251 *wl)
 out:
 	dev_kfree_skb(skb);
 	if (ret)
-		wl1251_warning("cmd buld null data failed: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "cmd buld null data failed: %d\n",
+			   ret);
 
 	return ret;
 }
@@ -973,7 +974,7 @@ static int wl1251_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 
 	ret = wl1251_cmd_send(wl, CMD_SET_KEYS, wl_cmd, sizeof(*wl_cmd));
 	if (ret < 0) {
-		wl1251_warning("could not set keys");
+		wiphy_warn(wl->hw->wiphy, "could not set keys\n");
 		goto out_sleep;
 	}
 
@@ -1084,7 +1085,8 @@ static int wl1251_op_set_rts_threshold(struct ieee80211_hw *hw, u32 value)
 
 	ret = wl1251_acx_rts_threshold(wl, (u16) value);
 	if (ret < 0)
-		wl1251_warning("wl1251_op_set_rts_threshold failed: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "wl1251_op_set_rts_threshold failed: %d\n",
+			   ret);
 
 	wl1251_ps_elp_sleep(wl);
 
@@ -1172,7 +1174,8 @@ static void wl1251_op_bss_info_changed(struct ieee80211_hw *hw,
 		else
 			ret = wl1251_acx_slot(wl, SLOT_TIME_LONG);
 		if (ret < 0) {
-			wl1251_warning("Set slot time failed %d", ret);
+			wiphy_warn(wl->hw->wiphy, "Set slot time failed %d\n",
+				   ret);
 			goto out_sleep;
 		}
 	}
@@ -1190,7 +1193,8 @@ static void wl1251_op_bss_info_changed(struct ieee80211_hw *hw,
 		else
 			ret = wl1251_acx_cts_protect(wl, CTSPROTECT_DISABLE);
 		if (ret < 0) {
-			wl1251_warning("Set ctsprotect failed %d", ret);
+			wiphy_warn(wl->hw->wiphy, "Set ctsprotect failed %d\n",
+				   ret);
 			goto out_sleep;
 		}
 	}
@@ -1436,7 +1440,7 @@ static int wl1251_read_eeprom_mac(struct wl1251 *wl)
 
 	ret = wl1251_read_eeprom(wl, 0x1c, mac, sizeof(mac));
 	if (ret < 0) {
-		wl1251_warning("failed to read MAC address from EEPROM");
+		wiphy_warn(wl->hw->wiphy, "failed to read MAC address from EEPROM\n");
 		return ret;
 	}
 

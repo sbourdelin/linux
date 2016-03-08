@@ -74,7 +74,7 @@ int wl1251_cmd_test(struct wl1251 *wl, void *buf, size_t buf_len, u8 answer)
 	ret = wl1251_cmd_send(wl, CMD_TEST, buf, buf_len);
 
 	if (ret < 0) {
-		wl1251_warning("TEST command failed");
+		wiphy_warn(wl->hw->wiphy, "TEST command failed\n");
 		return ret;
 	}
 
@@ -158,7 +158,7 @@ int wl1251_cmd_configure(struct wl1251 *wl, u16 id, void *buf, size_t len)
 
 	ret = wl1251_cmd_send(wl, CMD_CONFIGURE, acx, len);
 	if (ret < 0) {
-		wl1251_warning("CONFIGURE command NOK");
+		wiphy_warn(wl->hw->wiphy, "CONFIGURE command NOK\n");
 		return ret;
 	}
 
@@ -182,8 +182,8 @@ int wl1251_cmd_vbm(struct wl1251 *wl, u8 identity,
 	/* Count and period will be filled by the target */
 	vbm->tim.bitmap_ctrl = bitmap_control;
 	if (bitmap_len > PARTIAL_VBM_MAX) {
-		wl1251_warning("cmd vbm len is %d B, truncating to %d",
-			       bitmap_len, PARTIAL_VBM_MAX);
+		wiphy_warn(wl->hw->wiphy, "cmd vbm len is %d B, truncating to %d\n",
+			   bitmap_len, PARTIAL_VBM_MAX);
 		bitmap_len = PARTIAL_VBM_MAX;
 	}
 	memcpy(vbm->tim.pvb_field, bitmap, bitmap_len);
@@ -413,7 +413,7 @@ int wl1251_cmd_template_set(struct wl1251 *wl, u16 cmd_id,
 
 	ret = wl1251_cmd_send(wl, cmd_id, cmd, cmd_len);
 	if (ret < 0) {
-		wl1251_warning("cmd set_template failed: %d", ret);
+		wiphy_warn(wl->hw->wiphy, "cmd set_template failed: %d\n", ret);
 		goto out;
 	}
 

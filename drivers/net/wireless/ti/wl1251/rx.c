@@ -158,8 +158,8 @@ static void wl1251_rx_body(struct wl1251 *wl,
 	last_id_inc = (wl->rx_last_id + 1) % (RX_MAX_PACKET_ID + 1);
 
 	if (last_id_inc != curr_id) {
-		wl1251_warning("curr ID:%d, last ID inc:%d",
-			       curr_id, last_id_inc);
+		wiphy_warn(wl->hw->wiphy, "curr ID:%d, last ID inc:%d\n",
+			   curr_id, last_id_inc);
 		wl->rx_last_id = curr_id;
 	} else {
 		wl->rx_last_id = last_id_inc;
