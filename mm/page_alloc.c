@@ -2776,6 +2776,13 @@ __alloc_pages_may_oom(gfp_t gfp_mask, unsigned int order,
 	}
 out:
 	mutex_unlock(&oom_lock);
+	if (*did_some_progress && !page) {
+		/*
+		 * Give the killed process a good chance to exit before trying
+		 * to allocate memory again.
+		 */
+		schedule_timeout_killable(1);
+	}
 	return page;
 }
 
