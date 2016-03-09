@@ -4,6 +4,7 @@
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
  *  Copyright (C) 2002       Dominik Brodowski <devel@brodo.de>
+ *  Copyright (c) 2015, The Linux Foundation. All rights reserved.
  *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *
@@ -439,7 +440,6 @@ static int acpi_pci_link_set(struct acpi_pci_link *link, int irq)
  * enabled system.
  */
 
-#define ACPI_MAX_IRQS		256
 #define ACPI_MAX_ISA_IRQ	16
 
 #define PIRQ_PENALTY_PCI_POSSIBLE	(16*16)
@@ -448,7 +448,7 @@ static int acpi_pci_link_set(struct acpi_pci_link *link, int irq)
 #define PIRQ_PENALTY_ISA_USED		(16*16*16*16*16)
 #define PIRQ_PENALTY_ISA_ALWAYS		(16*16*16*16*16*16)
 
-static int acpi_irq_penalty[ACPI_MAX_IRQS] = {
+static int acpi_irq_isa_penalty[ACPI_MAX_ISA_IRQ] = {
 	PIRQ_PENALTY_ISA_ALWAYS,	/* IRQ0 timer */
 	PIRQ_PENALTY_ISA_ALWAYS,	/* IRQ1 keyboard */
 	PIRQ_PENALTY_ISA_ALWAYS,	/* IRQ2 cascade */
@@ -465,7 +465,6 @@ static int acpi_irq_penalty[ACPI_MAX_IRQS] = {
 	PIRQ_PENALTY_ISA_USED,		/* IRQ13 fpe, sometimes */
 	PIRQ_PENALTY_ISA_USED,		/* IRQ14 ide0 */
 	PIRQ_PENALTY_ISA_USED,		/* IRQ15 ide1 */
-	/* >IRQ15 */
 };
 
 static int acpi_irq_pci_sharing_penalty(int irq)
@@ -502,7 +501,7 @@ static int acpi_irq_get_penalty(int irq)
 	int penalty = 0;
 
 	if (irq < ACPI_MAX_ISA_IRQ)
-		penalty += acpi_irq_penalty[irq];
+		penalty += acpi_irq_isa_penalty[irq];
 
 	if (irq == acpi_gbl_FADT.sci_interrupt)
 		penalty += PIRQ_PENALTY_PCI_USING;
@@ -556,12 +555,12 @@ static int acpi_pci_link_allocate(struct acpi_pci_link *link)
 		 * the use of IRQs 9, 10, 11, and >15.
 		 */
 		for (i = (link->irq.possible_count - 1); i >= 0; i--) {
-			if (acpi_irq_penalty[irq] >
-			    acpi_irq_penalty[link->irq.possible[i]])
+			if (acpi_irq_get_penalty(irq) >
+			    acpi_irq_get_penalty(link->irq.possible[i]))
 				irq = link->irq.possible[i];
 		}
 	}
-	if (acpi_irq_penalty[irq] >= PIRQ_PENALTY_ISA_ALWAYS) {
+	if (acpi_irq_get_penalty(irq) >= PIRQ_PENALTY_ISA_ALWAYS) {
 		printk(KERN_ERR PREFIX "No IRQ available for %s [%s]. "
 			    "Try pci=noacpi or acpi=off\n",
 			    acpi_device_name(link->device),
@@ -786,7 +785,7 @@ static void acpi_pci_link_remove(struct acpi_device *device)
 }
 
 /*
- * modify acpi_irq_penalty[] from cmdline
+ * modify acpi_irq_isa_penalty[] from cmdline
  */
 static int __init acpi_irq_penalty_update(char *str, int used)
 {
@@ -812,7 +811,7 @@ static int __init acpi_irq_penalty_update(char *str, int used)
 		else
 			new_penalty = 0;
 
-		acpi_irq_penalty[irq] = new_penalty;
+		acpi_irq_isa_penalty[irq] = new_penalty;
 		if (retval != 2)	/* no next number */
 			break;
 	}
@@ -828,15 +827,15 @@ static int __init acpi_irq_penalty_update(char *str, int used)
  */
 void acpi_penalize_isa_irq(int irq, int active)
 {
-	if ((irq >= 0) && (irq < ARRAY_SIZE(acpi_irq_penalty)))
-		acpi_irq_penalty[irq] = active ?
+	if ((irq >= 0) && (irq < ARRAY_SIZE(acpi_irq_isa_penalty)))
+		acpi_irq_isa_penalty[irq] = active ?
 			PIRQ_PENALTY_ISA_USED : PIRQ_PENALTY_PCI_USING;
 }
 
 bool acpi_isa_irq_available(int irq)
 {
-	return irq >= 0 && (irq >= ARRAY_SIZE(acpi_irq_penalty) ||
-			    acpi_irq_penalty[irq] < PIRQ_PENALTY_ISA_ALWAYS);
+	return irq >= 0 &&
+		(acpi_irq_get_penalty(irq) < PIRQ_PENALTY_ISA_ALWAYS);
 }
 
 /*
