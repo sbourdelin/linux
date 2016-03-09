@@ -59,6 +59,7 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
 	return __find_linux_pte_or_hugepte(mm->pgd, addr, NULL, NULL);
 }
 
+#if !defined(CONFIG_PPC_64K_PAGES) || !defined(CONFIG_PPC_BOOK3S_64)
 static int __hugepte_alloc(struct mm_struct *mm, hugepd_t *hpdp,
 			   unsigned long address, unsigned pdshift, unsigned pshift)
 {
@@ -116,6 +117,7 @@ static int __hugepte_alloc(struct mm_struct *mm, hugepd_t *hpdp,
 	spin_unlock(&mm->page_table_lock);
 	return 0;
 }
+#endif /* !defined(CONFIG_PPC_64K_PAGES) || !defined(CONFIG_PPC_BOOK3S_64) */
 
 /*
  * These macros define how to determine which level of the page table holds
@@ -130,6 +132,7 @@ static int __hugepte_alloc(struct mm_struct *mm, hugepd_t *hpdp,
 #endif
 
 #ifdef CONFIG_PPC_BOOK3S_64
+#ifdef CONFIG_PPC_4K_PAGES
 /*
  * At this point we do the placement change only for BOOK3S 64. This would
  * possibly work on other subarchs.
@@ -145,32 +148,23 @@ pte_t *huge_pte_alloc(struct mm_struct *mm, unsigned long addr, unsigned long sz
 
 	addr &= ~(sz-1);
 	pg = pgd_offset(mm, addr);
-
-	if (pshift == PGDIR_SHIFT)
-		/* 16GB huge page */
-		return (pte_t *) pg;
-	else if (pshift > PUD_SHIFT)
-		/*
-		 * We need to use hugepd table
-		 */
+	if (pshift > PUD_SHIFT) {
 		hpdp = (hugepd_t *)pg;
-	else {
-		pdshift = PUD_SHIFT;
-		pu = pud_alloc(mm, pg, addr);
-		if (pshift == PUD_SHIFT)
-			return (pte_t *)pu;
-		else if (pshift > PMD_SHIFT)
-			hpdp = (hugepd_t *)pu;
-		else {
-			pdshift = PMD_SHIFT;
-			pm = pmd_alloc(mm, pu, addr);
-			if (pshift == PMD_SHIFT)
-				/* 16MB hugepage */
-				return (pte_t *)pm;
-			else
-				hpdp = (hugepd_t *)pm;
-		}
+		goto hugepd_search;
 	}
+
+	pdshift = PUD_SHIFT;
+	pu = pud_alloc(mm, pg, addr);
+	if (pshift > PMD_SHIFT) {
+		hpdp = (hugepd_t *)pu;
+		goto hugepd_search;
+	}
+
+	pdshift = PMD_SHIFT;
+	pm = pmd_alloc(mm, pu, addr);
+	hpdp = (hugepd_t *)pm;
+
+hugepd_search:
 	if (!hpdp)
 		return NULL;
 
@@ -182,6 +176,31 @@ pte_t *huge_pte_alloc(struct mm_struct *mm, unsigned long addr, unsigned long sz
 	return hugepte_offset(*hpdp, addr, pdshift);
 }
 
+#else
+pte_t *huge_pte_alloc(struct mm_struct *mm, unsigned long addr, unsigned long sz)
+{
+	pgd_t *pg;
+	pud_t *pu;
+	pmd_t *pm;
+	unsigned pshift = __ffs(sz);
+
+	addr &= ~(sz-1);
+	pg = pgd_offset(mm, addr);
+
+	if (pshift == PGDIR_SHIFT)	/* 16GB Huge Page */
+		return (pte_t *)pg;
+
+	pu = pud_alloc(mm, pg, addr);	/* NA, skipped */
+	if (pshift == PUD_SHIFT)
+		return (pte_t *)pu;
+
+	pm = pmd_alloc(mm, pu, addr);	/* 16MB Huge Page */
+	if (pshift == PMD_SHIFT)
+		return (pte_t *)pm;
+
+	return NULL;
+}
+#endif
 #else
 
 pte_t *huge_pte_alloc(struct mm_struct *mm, unsigned long addr, unsigned long sz)
