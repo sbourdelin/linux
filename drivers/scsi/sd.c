@@ -2670,9 +2670,6 @@ static void sd_read_block_limits(struct scsi_disk *sdkp)
 
 		sdkp->max_ws_blocks = (u32)get_unaligned_be64(&buffer[36]);
 
-		if (!sdkp->lbpme)
-			goto out;
-
 		lba_count = get_unaligned_be32(&buffer[20]);
 		desc_count = get_unaligned_be32(&buffer[24]);
 
@@ -2746,9 +2743,6 @@ static void sd_read_block_provisioning(struct scsi_disk *sdkp)
 {
 	unsigned char *buffer;
 	const int vpd_len = 8;
-
-	if (sdkp->lbpme == 0)
-		return;
 
 	buffer = kmalloc(vpd_len, GFP_KERNEL);
 
