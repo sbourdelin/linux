@@ -1645,6 +1645,7 @@ static int unix_dgram_sendmsg(struct socket *sock, struct msghdr *msg,
 	struct sock *other = NULL;
 	int namelen = 0; /* fake GCC */
 	int err;
+	bool send_sigpipe = false;
 	unsigned int hash;
 	struct sk_buff *skb;
 	long timeo;
@@ -1673,6 +1674,12 @@ static int unix_dgram_sendmsg(struct socket *sock, struct msghdr *msg,
 		other = unix_peer_get(sk);
 		if (!other)
 			goto out;
+	}
+
+	if (sk->sk_shutdown & SEND_SHUTDOWN && sock->type == SOCK_SEQPACKET) {
+		send_sigpipe = true;
+		err = -EPIPE;
+		goto out;
 	}
 
 	if (test_bit(SOCK_PASSCRED, &sock->flags) && !u->addr
@@ -1769,8 +1776,11 @@ restart_locked:
 	}
 
 	err = -EPIPE;
-	if (other->sk_shutdown & RCV_SHUTDOWN)
+	if (other->sk_shutdown & RCV_SHUTDOWN) {
+		if (sock->type == SOCK_SEQPACKET)
+			send_sigpipe = true;
 		goto out_unlock;
+	}
 
 	if (sk->sk_type != SOCK_SEQPACKET) {
 		err = security_unix_may_send(sk->sk_socket, other->sk_socket);
@@ -1837,6 +1847,8 @@ out:
 	if (other)
 		sock_put(other);
 	scm_destroy(&scm);
+	if (send_sigpipe && !(msg->msg_flags & MSG_NOSIGNAL))
+		send_sig(SIGPIPE, current, 0);
 	return err;
 }
 
