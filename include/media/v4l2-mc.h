@@ -94,7 +94,8 @@ enum if_aud_dec_pad_index {
  * @DEMOD_NUM_PADS:	Maximum number of output pads.
  */
 enum demod_pad_index {
-	DEMOD_PAD_IF_INPUT,
+	DEMOD_PAD_IF_INPUT, /* S-Video Y input or Composite */
+	DEMOD_PAD_C_INPUT,  /* S-Video C input or Composite */
 	DEMOD_PAD_VID_OUT,
 	DEMOD_PAD_VBI_OUT,
 	DEMOD_PAD_AUDIO_OUT,
