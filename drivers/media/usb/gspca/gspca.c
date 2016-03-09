@@ -1402,13 +1402,6 @@ static int vidioc_reqbufs(struct file *file, void *priv,
 	if (mutex_lock_interruptible(&gspca_dev->queue_lock))
 		return -ERESTARTSYS;
 
-	if (gspca_dev->memory != GSPCA_MEMORY_NO
-	    && gspca_dev->memory != GSPCA_MEMORY_READ
-	    && gspca_dev->memory != rb->memory) {
-		ret = -EBUSY;
-		goto out;
-	}
-
 	/* only one file may do the capture */
 	if (gspca_dev->capt_file != NULL
 	    && gspca_dev->capt_file != file) {
