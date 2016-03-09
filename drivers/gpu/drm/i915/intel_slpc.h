@@ -205,4 +205,5 @@ void intel_slpc_set_param(struct drm_device *dev, enum slpc_param_id id,
 			  u32 value);
 void intel_slpc_get_param(struct drm_device *dev, enum slpc_param_id id,
 			  int *overriding, u32 *value);
+void intel_slpc_query_task_state(struct drm_device *dev);
 #endif
