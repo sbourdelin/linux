@@ -27,6 +27,7 @@ int		sort__has_sym = 0;
 int		sort__has_dso = 0;
 int		sort__has_socket = 0;
 int		sort__has_thread = 0;
+int		sort__has_comm = 0;
 enum sort_mode	sort__mode = SORT_MODE__NORMAL;
 
 /*
@@ -2253,6 +2254,8 @@ static int sort_dimension__add(const char *tok, struct perf_evlist *evlist,
 			sort__has_socket = 1;
 		} else if (sd->entry == &sort_thread) {
 			sort__has_thread = 1;
+		} else if (sd->entry == &sort_comm) {
+			sort__has_comm = 1;
 		}
 
 		return __sort_dimension__add(sd, level);
