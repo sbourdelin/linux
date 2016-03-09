@@ -33,6 +33,10 @@ config HAVE_SETUP_PER_CPU_AREA
 config NEED_PER_CPU_EMBED_FIRST_CHUNK
 	def_bool PPC64
 
+config ARCH_WANT_GENERAL_HUGETLB
+	depends on PPC_64K_PAGES && PPC_BOOK3S_64
+	def_bool y
+
 config NR_IRQS
 	int "Number of virtual interrupt numbers"
 	range 32 32768

@@ -59,42 +59,7 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
 	/* Only called for hugetlbfs pages, hence can ignore THP */
 	return __find_linux_pte_or_hugepte(mm->pgd, addr, NULL, NULL);
 }
-#else
-pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
-{
-	pgd_t pgd, *pgdp;
-	pud_t pud, *pudp;
-	pmd_t pmd, *pmdp;
 
-	pgdp = mm->pgd + pgd_index(addr);
-	pgd  = READ_ONCE(*pgdp);
-
-	if (pgd_none(pgd))
-		return NULL;
-
-	if (pgd_huge(pgd))
-		return (pte_t *)pgdp;
-
-	pudp = pud_offset(&pgd, addr);
-	pud  = READ_ONCE(*pudp);
-	if (pud_none(pud))
-		return NULL;
-
-	if (pud_huge(pud))
-		return (pte_t *)pudp;
-
-	pmdp = pmd_offset(&pud, addr);
-	pmd  = READ_ONCE(*pmdp);
-	if (pmd_none(pmd))
-		return NULL;
-
-	if (pmd_huge(pmd))
-		return (pte_t *)pmdp;
-	return NULL;
-}
-#endif /* !defined(CONFIG_PPC_64K_PAGES) || !defined(CONFIG_PPC_BOOK3S_64) */
-
-#if !defined(CONFIG_PPC_64K_PAGES) || !defined(CONFIG_PPC_BOOK3S_64)
 static int __hugepte_alloc(struct mm_struct *mm, hugepd_t *hpdp,
 			   unsigned long address, unsigned pdshift, unsigned pshift)
 {
@@ -209,31 +174,6 @@ hugepd_search:
 		return NULL;
 
 	return hugepte_offset(*hpdp, addr, pdshift);
-}
-
-#else
-pte_t *huge_pte_alloc(struct mm_struct *mm, unsigned long addr, unsigned long sz)
-{
-	pgd_t *pg;
-	pud_t *pu;
-	pmd_t *pm;
-	unsigned pshift = __ffs(sz);
-
-	addr &= ~(sz-1);
-	pg = pgd_offset(mm, addr);
-
-	if (pshift == PGDIR_SHIFT)	/* 16GB Huge Page */
-		return (pte_t *)pg;
-
-	pu = pud_alloc(mm, pg, addr);	/* NA, skipped */
-	if (pshift == PUD_SHIFT)
-		return (pte_t *)pu;
-
-	pm = pmd_alloc(mm, pu, addr);	/* 16MB Huge Page */
-	if (pshift == PMD_SHIFT)
-		return (pte_t *)pm;
-
-	return NULL;
 }
 #endif
 #else
