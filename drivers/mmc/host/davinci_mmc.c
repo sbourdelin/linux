@@ -1252,17 +1252,19 @@ static int __init davinci_mmcsd_probe(struct platform_device *pdev)
 	host = mmc_priv(mmc);
 	host->mmc = mmc;	/* Important */
 
-	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
-	if (!r)
-		dev_warn(&pdev->dev, "RX DMA resource not specified\n");
-	else
-		host->rxdma = r->start;
+	if (!pdev->dev.of_node) {
+		r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+		if (!r)
+			dev_warn(&pdev->dev, "RX DMA resource not specified\n");
+		else
+			host->rxdma = r->start;
 
-	r = platform_get_resource(pdev, IORESOURCE_DMA, 1);
-	if (!r)
-		dev_warn(&pdev->dev, "TX DMA resource not specified\n");
-	else
-		host->txdma = r->start;
+		r = platform_get_resource(pdev, IORESOURCE_DMA, 1);
+		if (!r)
+			dev_warn(&pdev->dev, "TX DMA resource not specified\n");
+		else
+			host->txdma = r->start;
+	}
 
 	host->mem_res = mem;
 	host->base = ioremap(mem->start, mem_size);
