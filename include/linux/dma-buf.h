@@ -70,6 +70,9 @@ struct dma_buf_attachment;
  * @vmap: [optional] creates a virtual mapping for the buffer into kernel
  *	  address space. Same restrictions as for vmap and friends apply.
  * @vunmap: [optional] unmaps a vmap from the buffer
+ * @ioctl: [optional] ioctls supported by the exporter.
+ *	   It is up to the exporter to do the proper copy_{from/to}_user
+ *	   calls. Should return -EINVAL in case of error.
  */
 struct dma_buf_ops {
 	int (*attach)(struct dma_buf *, struct device *,
@@ -104,6 +107,8 @@ struct dma_buf_ops {
 
 	void *(*vmap)(struct dma_buf *);
 	void (*vunmap)(struct dma_buf *, void *vaddr);
+
+	int (*ioctl)(struct dma_buf *, unsigned int cmd, unsigned long arg);
 };
 
 /**

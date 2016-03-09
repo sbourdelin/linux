@@ -291,6 +291,9 @@ static long dma_buf_ioctl(struct file *file,
 
 		return 0;
 	default:
+		if (dmabuf->ops->ioctl)
+			return dmabuf->ops->ioctl(dmabuf, cmd, arg);
+
 		return -ENOTTY;
 	}
 }
