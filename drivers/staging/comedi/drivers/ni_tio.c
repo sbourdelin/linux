@@ -189,7 +189,7 @@ static void ni_tio_reset_count_and_disarm(struct ni_gpct *counter)
 static uint64_t ni_tio_clock_period_ps(const struct ni_gpct *counter,
 				       unsigned generic_clock_source)
 {
-	uint64_t clock_period_ps;
+	u64 clock_period_ps;
 
 	switch (generic_clock_source & NI_GPCT_CLOCK_SRC_SELECT_MASK) {
 	case NI_GPCT_TIMEBASE_1_CLOCK_SRC_BITS:
@@ -222,7 +222,7 @@ static uint64_t ni_tio_clock_period_ps(const struct ni_gpct *counter,
 		clock_period_ps *= 8;
 		break;
 	default:
-		BUG();
+		WARN_ON(1);
 		break;
 	}
 	return clock_period_ps;
@@ -304,7 +304,7 @@ static unsigned ni_m_series_clock_src_select(const struct ni_gpct *counter)
 		}
 		if (i <= NI_M_MAX_PFI_CHAN)
 			break;
-		BUG();
+		WARN_ON(1);
 		break;
 	}
 	clock_source |= ni_tio_clock_src_modifiers(counter);
@@ -361,7 +361,7 @@ static unsigned ni_660x_clock_src_select(const struct ni_gpct *counter)
 		}
 		if (i <= NI_660X_MAX_SRC_PIN)
 			break;
-		BUG();
+		WARN_ON(1);
 		break;
 	}
 	clock_source |= ni_tio_clock_src_modifiers(counter);
@@ -385,9 +385,9 @@ static void ni_tio_set_sync_mode(struct ni_gpct *counter, int force_alt_sync)
 	struct ni_gpct_device *counter_dev = counter->counter_dev;
 	unsigned cidx = counter->counter_index;
 	const unsigned counting_mode_reg = NITIO_CNT_MODE_REG(cidx);
-	static const uint64_t min_normal_sync_period_ps = 25000;
+	static const u64 min_normal_sync_period_ps = 25000;
 	unsigned mode;
-	uint64_t clock_period_ps;
+	u64 clock_period_ps;
 
 	if (ni_tio_counting_mode_registers_present(counter_dev) == 0)
 		return;
@@ -584,7 +584,7 @@ static unsigned ni_660x_clk_src(unsigned int clock_source)
 		if (i <= NI_660X_MAX_SRC_PIN)
 			break;
 		ni_660x_clock = 0;
-		BUG();
+		WARN_ON(1);
 		break;
 	}
 	return GI_SRC_SEL(ni_660x_clock);
@@ -643,7 +643,7 @@ static unsigned ni_m_clk_src(unsigned int clock_source)
 			break;
 		pr_err("invalid clock source 0x%lx\n",
 		       (unsigned long)clock_source);
-		BUG();
+		WARN_ON(1);
 		ni_m_series_clock = 0;
 		break;
 	}
@@ -730,7 +730,7 @@ static void ni_tio_get_clock_src(struct ni_gpct *counter,
 				 unsigned int *clock_source,
 				 unsigned int *period_ns)
 {
-	uint64_t temp64;
+	u64 temp64;
 
 	*clock_source = ni_tio_generic_clock_src_select(counter);
 	temp64 = ni_tio_clock_period_ps(counter, *clock_source);
@@ -946,7 +946,7 @@ int ni_tio_set_gate_src(struct ni_gpct *counter, unsigned gate_index,
 		case ni_gpct_variant_660x:
 			return ni_660x_set_gate2(counter, gate_source);
 		default:
-			BUG();
+			WARN_ON(1);
 			break;
 		}
 		break;
@@ -1015,7 +1015,7 @@ static unsigned ni_660x_gate_to_generic_gate(unsigned gate)
 			if (gate == NI_660X_PIN_GATE_SEL(i))
 				return NI_GPCT_GATE_PIN_GATE_SELECT(i);
 		}
-		BUG();
+		WARN_ON(1);
 		break;
 	}
 	return 0;
@@ -1051,7 +1051,7 @@ static unsigned ni_m_gate_to_generic_gate(unsigned gate)
 			if (gate == NI_M_PFI_GATE_SEL(i))
 				return NI_GPCT_PFI_GATE_SELECT(i);
 		}
-		BUG();
+		WARN_ON(1);
 		break;
 	}
 	return 0;
@@ -1083,7 +1083,7 @@ static unsigned ni_660x_gate2_to_generic_gate(unsigned gate)
 			if (gate == NI_660X_UD_PIN_GATE2_SEL(i))
 				return NI_GPCT_UP_DOWN_PIN_GATE_SELECT(i);
 		}
-		BUG();
+		WARN_ON(1);
 		break;
 	}
 	return 0;
@@ -1119,7 +1119,7 @@ static int ni_tio_get_gate_src(struct ni_gpct *counter, unsigned gate_index,
 		}
 
 		gate = GI_BITS_TO_GATE(ni_tio_get_soft_copy(counter,
-						NITIO_INPUT_SEL_REG(cidx)));
+				       NITIO_INPUT_SEL_REG(cidx)));
 
 		switch (counter_dev->variant) {
 		case ni_gpct_variant_e_series:
