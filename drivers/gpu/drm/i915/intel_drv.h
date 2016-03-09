@@ -1589,8 +1589,15 @@ bool chv_phy_powergate_ch(struct drm_i915_private *dev_priv, enum dpio_phy phy,
 
 static inline int intel_slpc_active(struct drm_device *dev)
 {
-	return 0;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	int ret = 0;
+
+	if (dev_priv->guc.slpc.shared_data_obj)
+		ret = 1;
+
+	return ret;
 }
+
 
 /* intel_pm.c */
 void intel_init_clock_gating(struct drm_device *dev);
