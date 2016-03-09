@@ -17,6 +17,8 @@ struct thunder_uncore *event_to_thunder_uncore(struct perf_event *event)
 {
 	if (event->pmu->type == thunder_l2c_tad_pmu.type)
 		return thunder_uncore_l2c_tad;
+	else if (event->pmu->type == thunder_l2c_cbc_pmu.type)
+		return thunder_uncore_l2c_cbc;
 	else
 		return NULL;
 }
@@ -300,6 +302,7 @@ static int __init thunder_uncore_init(void)
 	pr_info("PMU version: %d\n", thunder_uncore_version);
 
 	thunder_uncore_l2c_tad_setup();
+	thunder_uncore_l2c_cbc_setup();
 	return 0;
 }
 late_initcall(thunder_uncore_init);
