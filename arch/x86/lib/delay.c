@@ -92,17 +92,22 @@ static void delay_tsc(unsigned long __loops)
 static void delay_mwaitx(unsigned long __loops)
 {
 	u64 start, end, delay, loops = __loops;
+	struct tss_struct *t;
+
+	/*
+	 * Use cpu_tss as a cacheline-aligned, seldomly accessed per-cpu
+	 * variable as the monitor target.
+	 */
+	preempt_disable();
+	t = this_cpu_ptr(&cpu_tss);
+	preempt_enable();
 
 	start = rdtsc_ordered();
 
 	for (;;) {
 		delay = min_t(u64, MWAITX_MAX_LOOPS, loops);
 
-		/*
-		 * Use cpu_tss as a cacheline-aligned, seldomly
-		 * accessed per-cpu variable as the monitor target.
-		 */
-		__monitorx(this_cpu_ptr(&cpu_tss), 0, 0);
+		__monitorx(t, 0, 0);
 
 		/*
 		 * AMD, like Intel, supports the EAX hint and EAX=0xf
