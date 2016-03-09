@@ -26,6 +26,7 @@
 
 #include "intel_guc_fwif.h"
 #include "i915_guc_reg.h"
+#include "intel_slpc.h"
 
 struct i915_guc_client {
 	struct drm_i915_gem_object *client_obj;
