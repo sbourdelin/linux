@@ -2065,6 +2065,8 @@ static bool has_locked_children(struct mount *mnt, struct dentry *dentry)
 	list_for_each_entry(child, &mnt->mnt_mounts, mnt_child) {
 		if (!is_subdir(child->mnt_mountpoint, dentry))
 			continue;
+		if (is_empty_dir_inode(child->mnt_mountpoint->d_inode))
+			continue;
 
 		if (child->mnt.mnt_flags & MNT_LOCKED)
 			return true;
