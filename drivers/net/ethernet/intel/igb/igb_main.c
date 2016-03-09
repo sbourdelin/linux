@@ -743,9 +743,22 @@ static void igb_cache_ring_register(struct igb_adapter *adapter)
 	}
 }
 
-u32 igb_rd32(struct e1000_hw *hw, u32 reg)
+static void igb_check_remove(struct e1000_hw *hw, u32 reg, u8 __iomem 
+*hw_addr)
 {
 	struct igb_adapter *igb = container_of(hw, struct igb_adapter, hw);
+
+	/* E1000_VET is always 0x8100 and can't be all F's */
+	if ((reg == E1000_VET) || (!(~readl(&hw_addr[E1000_VET])))) {
+		struct net_device *netdev = igb->netdev;
+
+		hw->hw_addr = NULL;
+		netif_device_detach(netdev);
+		netdev_err(netdev, "PCIe link lost, device now detached\n");
+	}
+}
+
+u32 igb_rd32(struct e1000_hw *hw, u32 reg) {
 	u8 __iomem *hw_addr = ACCESS_ONCE(hw->hw_addr);
 	u32 value = 0;
 
@@ -755,12 +768,8 @@ u32 igb_rd32(struct e1000_hw *hw, u32 reg)
 	value = readl(&hw_addr[reg]);
 
 	/* reads should not return all F's */
-	if (!(~value) && (!reg || !(~readl(hw_addr)))) {
-		struct net_device *netdev = igb->netdev;
-		hw->hw_addr = NULL;
-		netif_device_detach(netdev);
-		netdev_err(netdev, "PCIe link lost, device now detached\n");
-	}
+	if (unlikely(!(~value)))
+		igb_check_remove(hw, reg, hw_addr);
 
 	return value;
 }
