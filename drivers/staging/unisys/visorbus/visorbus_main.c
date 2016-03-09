@@ -306,21 +306,17 @@ devmajorminor_create_file(struct visor_device *dev, const char *name,
 {
 	int maxdevnodes = ARRAY_SIZE(dev->devnodes) / sizeof(dev->devnodes[0]);
 	struct devmajorminor_attribute *myattr = NULL;
-	int x = -1, rc = 0, slot = -1;
+	int x = -1, slot = -1;
 
 	register_devmajorminor_attributes(dev);
 	for (slot = 0; slot < maxdevnodes; slot++)
 		if (!dev->devnodes[slot].attr)
 			break;
-	if (slot == maxdevnodes) {
-		rc = -ENOMEM;
-		goto away;
-	}
+	if (slot == maxdevnodes)
+		return -ENOMEM;
 	myattr = kzalloc(sizeof(*myattr), GFP_KERNEL);
-	if (!myattr) {
-		rc = -ENOMEM;
-		goto away;
-	}
+	if (!myattr)
+		return -ENOMEM;
 	myattr->show = DEVMAJORMINOR_ATTR;
 	myattr->store = NULL;
 	myattr->slot = slot;
@@ -331,17 +327,12 @@ devmajorminor_create_file(struct visor_device *dev, const char *name,
 	dev->devnodes[slot].minor = minor;
 	x = sysfs_create_file(&dev->kobjdevmajorminor, &myattr->attr);
 	if (x < 0) {
-		rc = x;
-		goto away;
+		kfree(myattr);
+		dev->devnodes[slot].attr = NULL;
+		return x;
 	}
 	kobject_uevent(&dev->device.kobj, KOBJ_ONLINE);
-away:
-	if (rc < 0) {
-		kfree(myattr);
-		myattr = NULL;
-		dev->devnodes[slot].attr = NULL;
-	}
-	return rc;
+	return 0;
 }
 
 static void
