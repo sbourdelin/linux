@@ -116,6 +116,21 @@ static void direct_interrupts_to_guc(struct drm_i915_private *dev_priv)
 	I915_WRITE(GUC_WD_VECS_IER, ~irqs);
 }
 
+static void slpc_enable_sanitize(struct drm_device *dev)
+{
+	/* handle default case */
+	if (i915.enable_slpc < 0)
+		i915.enable_slpc = HAS_SLPC(dev);
+
+	/* slpc requires hardware support and compatible firmware */
+	if (!HAS_SLPC(dev))
+		i915.enable_slpc = 0;
+
+	/* slpc requires guc submission */
+	if (!i915.enable_guc_submission)
+		i915.enable_slpc = 0;
+}
+
 static void slpc_version_check(struct drm_device *dev, struct intel_guc_fw *guc_fw)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -125,6 +140,8 @@ static void slpc_version_check(struct drm_device *dev, struct intel_guc_fw *guc_
 		info = (struct intel_device_info *) &dev_priv->info;
 		info->has_slpc = 0;
 	}
+
+	slpc_enable_sanitize(dev);
 }
 
 static u32 get_gttype(struct drm_i915_private *dev_priv)
