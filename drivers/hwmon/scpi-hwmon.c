@@ -31,10 +31,8 @@ struct sensor_data {
 };
 
 struct scpi_thermal_zone {
-	struct list_head list;
 	int sensor_id;
 	struct scpi_sensors *scpi_sensors;
-	struct thermal_zone_device *tzd;
 };
 
 struct scpi_sensors {
@@ -90,20 +88,6 @@ scpi_show_label(struct device *dev, struct device_attribute *attr, char *buf)
 	sensor = container_of(attr, struct sensor_data, dev_attr_label);
 
 	return sprintf(buf, "%s\n", sensor->info.name);
-}
-
-static void
-unregister_thermal_zones(struct platform_device *pdev,
-			 struct scpi_sensors *scpi_sensors)
-{
-	struct list_head *pos;
-
-	list_for_each(pos, &scpi_sensors->thermal_zones) {
-		struct scpi_thermal_zone *zone;
-
-		zone = list_entry(pos, struct scpi_thermal_zone, list);
-		thermal_zone_of_sensor_unregister(&pdev->dev, zone->tzd);
-	}
 }
 
 static struct thermal_zone_of_device_ops scpi_sensor_ops = {
@@ -224,6 +208,7 @@ static int scpi_hwmon_probe(struct platform_device *pdev)
 	INIT_LIST_HEAD(&scpi_sensors->thermal_zones);
 	for (i = 0; i < nr_sensors; i++) {
 		struct sensor_data *sensor = &scpi_sensors->data[i];
+		struct thermal_zone_device *z;
 		struct scpi_thermal_zone *zone;
 
 		if (sensor->info.class != TEMPERATURE)
@@ -232,40 +217,31 @@ static int scpi_hwmon_probe(struct platform_device *pdev)
 		zone = devm_kzalloc(dev, sizeof(*zone), GFP_KERNEL);
 		if (!zone) {
 			ret = -ENOMEM;
-			goto unregister_tzd;
+			goto mfail;
 		}
 
 		zone->sensor_id = i;
 		zone->scpi_sensors = scpi_sensors;
-		zone->tzd = thermal_zone_of_sensor_register(dev,
-				sensor->info.sensor_id, zone, &scpi_sensor_ops);
+		z = devm_thermal_zone_of_sensor_register(dev,
+							 sensor->info.sensor_id,
+							 zone,
+							 &scpi_sensor_ops);
 		/*
 		 * The call to thermal_zone_of_sensor_register returns
 		 * an error for sensors that are not associated with
 		 * any thermal zones or if the thermal subsystem is
 		 * not configured.
 		 */
-		if (IS_ERR(zone->tzd)) {
+		if (IS_ERR(z)) {
 			devm_kfree(dev, zone);
 			continue;
 		}
-		list_add(&zone->list, &scpi_sensors->thermal_zones);
 	}
 
 	return 0;
 
-unregister_tzd:
-	unregister_thermal_zones(pdev, scpi_sensors);
+mfail:
 	return ret;
-}
-
-static int scpi_hwmon_remove(struct platform_device *pdev)
-{
-	struct scpi_sensors *scpi_sensors = platform_get_drvdata(pdev);
-
-	unregister_thermal_zones(pdev, scpi_sensors);
-
-	return 0;
 }
 
 static const struct of_device_id scpi_of_match[] = {
@@ -280,7 +256,6 @@ static struct platform_driver scpi_hwmon_platdrv = {
 		.of_match_table = scpi_of_match,
 	},
 	.probe		= scpi_hwmon_probe,
-	.remove		= scpi_hwmon_remove,
 };
 module_platform_driver(scpi_hwmon_platdrv);
 
