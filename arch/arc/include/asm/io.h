@@ -129,15 +129,17 @@ static inline void __raw_writel(u32 w, volatile void __iomem *addr)
 #define writel(v,c)		({ __iowmb(); writel_relaxed(v,c); })
 
 /*
- * Relaxed API for drivers which can handle any ordering themselves
+ * This are defined to perform little endian accesses
  */
 #define readb_relaxed(c)	__raw_readb(c)
-#define readw_relaxed(c)	__raw_readw(c)
-#define readl_relaxed(c)	__raw_readl(c)
+#define readw_relaxed(c) ({ u16 __r = le16_to_cpu((__force __le16) \
+					__raw_readw(c)); __r; })
+#define readl_relaxed(c) ({ u32 __r = le32_to_cpu((__force __le32) \
+					__raw_readl(c)); __r; })
 
 #define writeb_relaxed(v,c)	__raw_writeb(v,c)
-#define writew_relaxed(v,c)	__raw_writew(v,c)
-#define writel_relaxed(v,c)	__raw_writel(v,c)
+#define writew_relaxed(v,c)	__raw_writew((__force u16) cpu_to_le16(v),c)
+#define writel_relaxed(v,c)	__raw_writel((__force u32) cpu_to_le32(v),c)
 
 #include <asm-generic/io.h>
 
