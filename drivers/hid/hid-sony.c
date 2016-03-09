@@ -62,7 +62,8 @@
 				DUALSHOCK4_CONTROLLER | MOTION_CONTROLLER |\
 				NAVIGATION_CONTROLLER)
 #define SONY_BATTERY_SUPPORT (SIXAXIS_CONTROLLER | DUALSHOCK4_CONTROLLER |\
-				MOTION_CONTROLLER_BT | NAVIGATION_CONTROLLER)
+				MOTION_CONTROLLER_BT | NAVIGATION_CONTROLLER |\
+				PS3REMOTE)
 #define SONY_FF_SUPPORT (SIXAXIS_CONTROLLER | DUALSHOCK4_CONTROLLER |\
 				MOTION_CONTROLLER)
 
@@ -1187,7 +1188,12 @@ static void sixaxis_parse_report(struct sony_sc *sc, u8 *rd, int size)
 	 * It does not report the actual level while charging so it
 	 * is set to 100% while charging is in progress.
 	 */
-	offset = (sc->quirks & MOTION_CONTROLLER) ? 12 : 30;
+	if (sc->quirks & MOTION_CONTROLLER)
+		offset = 12;
+	else if (sc->quirks & PS3REMOTE)
+		offset = 11;
+	else
+		offset = 30;
 
 	if (rd[offset] >= 0xee) {
 		battery_capacity = 100;
@@ -1310,6 +1316,9 @@ static int sony_raw_event(struct hid_device *hdev, struct hid_report *report,
 		sixaxis_parse_report(sc, rd, size);
 	} else if ((sc->quirks & NAVIGATION_CONTROLLER) && rd[0] == 0x01 &&
 			size == 49) {
+		sixaxis_parse_report(sc, rd, size);
+	} else if ((sc->quirks & PS3REMOTE) && rd[0] == 0x01 &&
+			size == 12) {
 		sixaxis_parse_report(sc, rd, size);
 	} else if (((sc->quirks & DUALSHOCK4_CONTROLLER_USB) && rd[0] == 0x01 &&
 			size == 64) || ((sc->quirks & DUALSHOCK4_CONTROLLER_BT)
