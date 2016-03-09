@@ -1032,9 +1032,6 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 	intel_init_display_callbacks(dev_priv);
 	intel_init_clock_gating_callbacks(dev_priv);
 	intel_init_audio_callbacks(dev_priv);
-
-	intel_runtime_pm_get(dev_priv);
-
 	intel_display_crc_init(dev);
 
 	i915_dump_device_info(dev_priv);
@@ -1048,6 +1045,8 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 			 "It may not be fully functional.\n");
 
 	/* Init phase: setup device MMIO */
+	intel_runtime_pm_get(dev_priv);
+
 	if (i915_get_bridge_dev(dev)) {
 		ret = -EIO;
 		goto out_runtime_pm_put;
