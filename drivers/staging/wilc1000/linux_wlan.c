@@ -849,10 +849,10 @@ static int wlan_initialize_threads(struct net_device *dev)
 	PRINT_D(INIT_DBG, "Creating kthread for transmission\n");
 	wilc->txq_thread = kthread_run(linux_wlan_txq_task, (void *)dev,
 				     "K_TXQ_TASK");
-	if (!wilc->txq_thread) {
+	if (IS_ERR(wilc->txq_thread)) {
 		PRINT_ER("couldn't create TXQ thread\n");
 		wilc->close = 0;
-		return -ENOBUFS;
+		return PTR_ERR(wilc->txq_thread);
 	}
 	down(&wilc->txq_thread_started);
 
