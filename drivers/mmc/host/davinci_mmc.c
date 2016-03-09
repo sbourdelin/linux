@@ -1274,9 +1274,9 @@ static int __init davinci_mmcsd_probe(struct platform_device *pdev)
 		ret = PTR_ERR(host->clk);
 		goto clk_get_fail;
 	}
-	ret = clk_enable(host->clk);
+	ret = clk_prepare_enable(host->clk);
 	if (ret)
-		goto clk_enable_fail;
+		goto clk_prepare_enable_fail;
 
 	host->mmc_input_clk = clk_get_rate(host->clk);
 
@@ -1375,7 +1375,7 @@ mmc_add_host_fail:
 cpu_freq_fail:
 	davinci_release_dma_channels(host);
 	clk_disable(host->clk);
-clk_enable_fail:
+clk_prepare_enable_fail:
 	clk_put(host->clk);
 clk_get_fail:
 	iounmap(host->base);
