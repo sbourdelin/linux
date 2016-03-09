@@ -13820,6 +13820,8 @@ static int intel_atomic_commit(struct drm_device *dev,
 	if (hw_check)
 		intel_modeset_check_state(dev, state);
 
+	intel_slpc_update_atomic_commit_info(dev, state);
+
 	drm_atomic_state_free(state);
 
 	/* As one of the primary mmio accessors, KMS has a high likelihood
