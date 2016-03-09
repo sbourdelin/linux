@@ -28,6 +28,24 @@
 
 #include "br_private.h"
 
+static int switchdev_bridge_if(struct net_device *dev, struct net_bridge *br,
+			       bool join)
+{
+	struct switchdev_attr attr = {
+		.orig_dev = br->dev,
+		.id = SWITCHDEV_ATTR_ID_PORT_BRIDGE_IF,
+		.flags = SWITCHDEV_F_SKIP_EOPNOTSUPP,
+		.u.join = join,
+	};
+	int err;
+
+	err = switchdev_port_attr_set(dev, &attr);
+	if (err && err != -EOPNOTSUPP)
+		return err;
+
+	return 0;
+}
+
 /*
  * Determine initial path cost based on speed.
  * using recommendations from 802.1d standard
@@ -297,6 +315,10 @@ static void del_nbp(struct net_bridge_port *p)
 	br_netpoll_disable(p);
 
 	call_rcu(&p->rcu, destroy_nbp_rcu);
+
+	if (switchdev_bridge_if(dev, br, false))
+		br_warn(br, "error unbridging port %u(%s)\n",
+			(unsigned int) p->port_no, dev->name);
 }
 
 /* Delete bridge device */
@@ -347,6 +369,11 @@ static struct net_bridge_port *new_nbp(struct net_bridge *br,
 {
 	int index;
 	struct net_bridge_port *p;
+	int err;
+
+	err = switchdev_bridge_if(dev, br, true);
+	if (err)
+		return ERR_PTR(err);
 
 	index = find_portno(br);
 	if (index < 0)
