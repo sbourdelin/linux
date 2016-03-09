@@ -101,8 +101,12 @@ nouveau_vga_init(struct nouveau_drm *drm)
 		runtime = true;
 	vga_switcheroo_register_client(dev->pdev, &nouveau_switcheroo_ops, runtime);
 
-	if (runtime && nouveau_is_v1_dsm() && !nouveau_is_optimus())
-		vga_switcheroo_init_domain_pm_ops(drm->dev->dev, &drm->vga_pm_domain);
+	if (runtime) {
+		if (nouveau_is_v1_dsm() && !nouveau_is_optimus())
+			vga_switcheroo_init_domain_pm_ops(drm->dev->dev, &drm->vga_pm_domain);
+		else if (nouveau_is_optimus())
+			vga_switcheroo_init_parent_pr3_ops(drm->dev->dev, &drm->vga_pm_domain);
+	}
 }
 
 void
@@ -117,7 +121,7 @@ nouveau_vga_fini(struct nouveau_drm *drm)
 		runtime = true;
 
 	vga_switcheroo_unregister_client(dev->pdev);
-	if (runtime && nouveau_is_v1_dsm() && !nouveau_is_optimus())
+	if (runtime && (nouveau_is_v1_dsm() || nouveau_is_optimus()))
 		vga_switcheroo_fini_domain_pm_ops(drm->dev->dev);
 	vga_client_register(dev->pdev, NULL, NULL, NULL);
 }
