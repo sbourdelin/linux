@@ -370,6 +370,63 @@ static void rockchip_configure_pd_cnt(struct rockchip_pmu *pmu,
 	regmap_write(pmu->regmap, domain_reg_offset + 4, count);
 }
 
+static int rockchip_pm_add_subdomain(struct rockchip_pmu *pmu,
+				     struct device_node *parent)
+{
+	struct device_node *np;
+	struct generic_pm_domain *child_domain, *parent_domain;
+	int error;
+
+	for_each_child_of_node(parent, np) {
+		u32 idx = ~0;
+
+		if (of_property_read_u32(parent, "reg", &idx)) {
+			dev_err(pmu->dev,
+				"%s: failed to retrieve domain id (reg)\n",
+				parent->name);
+			goto err_out;
+		}
+		parent_domain = pmu->genpd_data.domains[idx];
+
+		error = rockchip_pm_add_one_domain(pmu, np);
+		if (error) {
+			dev_err(pmu->dev, "failed to handle node %s: %d\n",
+				np->name, error);
+			goto err_out;
+		}
+
+		if (of_property_read_u32(np, "reg", &idx)) {
+			dev_err(pmu->dev,
+				"%s: failed to retrieve domain id (reg)\n",
+				np->name);
+			goto err_out;
+		}
+		child_domain = pmu->genpd_data.domains[idx];
+
+		if (pm_genpd_add_subdomain(parent_domain, child_domain)) {
+			dev_err(pmu->dev, "%s failed to add subdomain: %s\n",
+				parent_domain->name, child_domain->name);
+			goto err_out;
+		} else {
+			dev_dbg(pmu->dev, "%s add subdomain: %s\n",
+				parent_domain->name, child_domain->name);
+		}
+
+		error = rockchip_pm_add_subdomain(pmu, np);
+		if (error < 0)
+			goto rm_sub_domain;
+	}
+	return 0;
+
+err_out:
+	of_node_put(parent);
+	of_node_put(np);
+	return -EINVAL;
+rm_sub_domain:
+	pm_genpd_remove_subdomain(parent_domain, child_domain);
+	return error;
+}
+
 static int rockchip_pm_domain_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -438,6 +495,13 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
 			dev_err(dev, "failed to handle node %s: %d\n",
 				node->name, error);
 			of_node_put(node);
+			goto err_out;
+		}
+
+		error = rockchip_pm_add_subdomain(pmu, node);
+		if (error < 0) {
+			dev_err(dev, "failed to handle subdomain node %s: %d\n",
+				node->name, error);
 			goto err_out;
 		}
 	}
