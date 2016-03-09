@@ -978,7 +978,7 @@ create_visor_device(struct visor_device *dev)
 		POSTCODE_LINUX_3(DEVICE_CREATE_FAILURE_PC, chipset_dev_no,
 				 DIAG_SEVERITY_ERR);
 		rc = -EINVAL;
-		goto away;
+		goto err_put;
 	}
 
 	/* bus_id must be a unique name with respect to this bus TYPE
@@ -1008,23 +1008,23 @@ create_visor_device(struct visor_device *dev)
 	if (rc < 0) {
 		POSTCODE_LINUX_3(DEVICE_ADD_PC, chipset_bus_no,
 				 DIAG_SEVERITY_ERR);
-		goto away;
+		goto err_put;
 	}
 
 	rc = register_devmajorminor_attributes(dev);
 	if (rc < 0) {
 		POSTCODE_LINUX_3(DEVICE_REGISTER_FAILURE_PC, chipset_dev_no,
 				 DIAG_SEVERITY_ERR);
-		goto away_unregister;
+		goto err_unregister;
 	}
 
 	list_add_tail(&dev->list_all, &list_all_device_instances);
-	return 0;
+	return 0; /* success: reference kept via unmatched get_device() */
 
-away_unregister:
+err_unregister:
 	device_unregister(&dev->device);
 
-away:
+err_put:
 	put_device(&dev->device);
 	return rc;
 }
