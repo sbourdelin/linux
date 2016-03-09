@@ -3551,6 +3551,9 @@ static int load_module(struct load_info *info, const char __user *uargs,
 	return do_init_module(mod);
 
  coming_cleanup:
+	mutex_lock(&module_mutex);
+	mod->state = MODULE_STATE_GOING;
+	mutex_unlock(&module_mutex);
 	blocking_notifier_call_chain(&module_notify_list,
 				     MODULE_STATE_GOING, mod);
 
