@@ -1345,6 +1345,7 @@ static void check_low_water_mark(struct pool *pool, dm_block_t free_blocks)
 		spin_lock_irqsave(&pool->lock, flags);
 		pool->low_water_triggered = true;
 		spin_unlock_irqrestore(&pool->lock, flags);
+		dm_set_disk_event(pool->pool_md, DISK_EVENT_LOWAT);
 		dm_table_event(pool->ti->table);
 	}
 }
@@ -4058,6 +4059,7 @@ static int thin_ctr(struct dm_target *ti, unsigned argc, char **argv)
 		goto bad;
 	}
 	atomic_set(&tc->refcount, 1);
+	dm_enable_disk_event(pool_md, DISK_EVENT_LOWAT);
 	init_completion(&tc->can_destroy);
 	list_add_tail_rcu(&tc->list, &tc->pool->active_thins);
 	spin_unlock_irqrestore(&tc->pool->lock, flags);

@@ -198,6 +198,7 @@ struct mapped_device {
 	wait_queue_head_t eventq;
 	atomic_t uevent_seq;
 	struct list_head uevent_list;
+	unsigned int disk_events;
 	spinlock_t uevent_lock; /* Protect access to uevent_list */
 
 	/*
@@ -554,6 +555,16 @@ static int dm_blk_getgeo(struct block_device *bdev, struct hd_geometry *geo)
 	struct mapped_device *md = bdev->bd_disk->private_data;
 
 	return dm_get_geometry(md, geo);
+}
+
+static unsigned int dm_check_events(struct gendisk *disk, unsigned int mask)
+{
+	struct mapped_device *md = disk->private_data;
+	unsigned int pending = md->disk_events & mask;
+
+	md->disk_events &= ~mask;
+
+	return pending;
 }
 
 static int dm_get_live_table_for_ioctl(struct mapped_device *md,
@@ -2459,6 +2470,8 @@ static void event_callback(void *context)
 
 	dm_send_uevents(&uevents, &disk_to_dev(md->disk)->kobj);
 
+	disk_clear_events(md->disk, md->disk_events);
+
 	atomic_inc(&md->event_nr);
 	wake_up(&md->eventq);
 }
@@ -3425,6 +3438,19 @@ void dm_uevent_add(struct mapped_device *md, struct list_head *elist)
 	spin_unlock_irqrestore(&md->uevent_lock, flags);
 }
 
+void dm_set_disk_event(struct mapped_device *md, unsigned int evt)
+{
+	md->disk_events |= evt;
+}
+EXPORT_SYMBOL_GPL(dm_set_disk_event);
+
+void dm_enable_disk_event(struct mapped_device *md, unsigned int evt)
+{
+	md->disk->events |= evt;
+	md->disk->async_events |= evt;
+}
+EXPORT_SYMBOL_GPL(dm_enable_disk_event);
+
 /*
  * The gendisk is only valid as long as you have a reference
  * count on 'md'.
@@ -3680,6 +3706,7 @@ static const struct block_device_operations dm_blk_dops = {
 	.ioctl = dm_blk_ioctl,
 	.getgeo = dm_blk_getgeo,
 	.pr_ops = &dm_pr_ops,
+	.check_events = dm_check_events,
 	.owner = THIS_MODULE
 };
 

@@ -83,7 +83,8 @@ void dm_unlock_md_type(struct mapped_device *md);
 void dm_set_md_type(struct mapped_device *md, unsigned type);
 unsigned dm_get_md_type(struct mapped_device *md);
 struct target_type *dm_get_immutable_target_type(struct mapped_device *md);
-
+void dm_set_disk_event(struct mapped_device *md, unsigned int evt);
+void dm_enable_disk_event(struct mapped_device *md, unsigned int evt);
 int dm_setup_md_queue(struct mapped_device *md);
 
 /*
