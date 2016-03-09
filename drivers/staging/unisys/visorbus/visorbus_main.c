@@ -374,22 +374,19 @@ static struct kobj_type devmajorminor_kobj_type = {
 static int
 register_devmajorminor_attributes(struct visor_device *dev)
 {
-	int rc = 0, x = 0;
+	int x;
 
 	if (dev->kobjdevmajorminor.parent)
-		goto away;	/* already registered */
+		return 0;	/* already registered */
 	x = kobject_init_and_add(&dev->kobjdevmajorminor,
 				 &devmajorminor_kobj_type, &dev->device.kobj,
 				 "devmajorminor");
-	if (x < 0) {
-		rc = x;
-		goto away;
-	}
+	if (x < 0)
+		return x;
 
 	kobject_uevent(&dev->kobjdevmajorminor, KOBJ_ADD);
 
-away:
-	return rc;
+	return 0;
 }
 
 static void
