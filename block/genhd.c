@@ -1636,6 +1636,7 @@ unsigned int disk_clear_events(struct gendisk *disk, unsigned int mask)
 
 	return pending;
 }
+EXPORT_SYMBOL_GPL(disk_clear_events);
 
 /*
  * Separate this part out so that a different pointer for clearing_ptr can be

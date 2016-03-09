@@ -114,6 +114,7 @@ static int sd_init_command(struct scsi_cmnd *SCpnt);
 static void sd_uninit_command(struct scsi_cmnd *SCpnt);
 static int sd_done(struct scsi_cmnd *);
 static int sd_eh_action(struct scsi_cmnd *, int);
+static void sd_ua_event(struct scsi_device *, enum scsi_device_event);
 static void sd_read_capacity(struct scsi_disk *sdkp, unsigned char *buffer);
 static void scsi_disk_release(struct device *cdev);
 static void sd_print_sense_hdr(struct scsi_disk *, struct scsi_sense_hdr *);
@@ -525,6 +526,7 @@ static struct scsi_driver sd_template = {
 	.uninit_command		= sd_uninit_command,
 	.done			= sd_done,
 	.eh_action		= sd_eh_action,
+	.ua_event		= sd_ua_event,
 };
 
 /*
@@ -1415,6 +1417,14 @@ static unsigned int sd_check_events(struct gendisk *disk, unsigned int clearing)
 		goto out;
 	}
 
+	if (sdp->changed) {
+		/*
+		 * Media change AN
+		 */
+		sdp->changed = 0;
+		return DISK_EVENT_MEDIA_CHANGE;
+	}
+
 	/*
 	 * Using TEST_UNIT_READY enables differentiation between drive with
 	 * no cartridge loaded - NOT READY, drive with changed cartridge -
@@ -1704,6 +1714,22 @@ static int sd_eh_action(struct scsi_cmnd *scmd, int eh_disp)
 	}
 
 	return eh_disp;
+}
+
+/**
+ *	sd_ua_event - unit attention event callback
+ *	@scmd:		sd-issued command which triggered the UA
+ *	@evt_type:	Triggered event type
+ *
+ **/
+static void sd_ua_event(struct scsi_device *sdev, enum scsi_device_event evt)
+{
+	struct scsi_disk *sdkp = dev_get_drvdata(&sdev->sdev_gendev);
+
+	if (evt == SDEV_EVT_MEDIA_CHANGE) {
+		sdev->changed = 1;
+		disk_clear_events(sdkp->disk, DISK_EVENT_MEDIA_CHANGE);
+	}
 }
 
 static unsigned int sd_completed_bytes(struct scsi_cmnd *scmd)

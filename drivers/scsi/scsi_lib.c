@@ -2692,8 +2692,13 @@ EXPORT_SYMBOL(scsi_device_set_state);
  */
 static void scsi_evt_emit(struct scsi_device *sdev, struct scsi_event *evt)
 {
+	struct device *dev = &sdev->sdev_gendev;
+	struct scsi_driver *sdrv = to_scsi_driver(dev->driver);
 	int idx = 0;
 	char *envp[3];
+
+	if (sdrv->ua_event && test_bit(evt->evt_type, sdev->supported_events))
+		sdrv->ua_event(sdev, evt->evt_type);
 
 	switch (evt->evt_type) {
 	case SDEV_EVT_MEDIA_CHANGE:
@@ -2778,16 +2783,6 @@ void scsi_evt_thread(struct work_struct *work)
 void sdev_evt_send(struct scsi_device *sdev, struct scsi_event *evt)
 {
 	unsigned long flags;
-
-#if 0
-	/* FIXME: currently this check eliminates all media change events
-	 * for polled devices.  Need to update to discriminate between AN
-	 * and polled events */
-	if (!test_bit(evt->evt_type, sdev->supported_events)) {
-		kfree(evt);
-		return;
-	}
-#endif
 
 	spin_lock_irqsave(&sdev->list_lock, flags);
 	list_add_tail(&evt->node, &sdev->event_list);

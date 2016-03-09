@@ -7,6 +7,7 @@ struct module;
 struct request;
 struct scsi_cmnd;
 struct scsi_device;
+enum scsi_device_event;
 
 struct scsi_driver {
 	struct device_driver	gendrv;
@@ -16,6 +17,7 @@ struct scsi_driver {
 	void (*uninit_command)(struct scsi_cmnd *);
 	int (*done)(struct scsi_cmnd *);
 	int (*eh_action)(struct scsi_cmnd *, int);
+	void (*ua_event)(struct scsi_device *, enum scsi_device_event evt);
 };
 #define to_scsi_driver(drv) \
 	container_of((drv), struct scsi_driver, gendrv)
