@@ -53,11 +53,46 @@ static unsigned nr_gpages;
 
 #define hugepd_none(hpd)	((hpd).pd == 0)
 
+#if !defined(CONFIG_PPC_64K_PAGES) || !defined(CONFIG_PPC_BOOK3S_64)
 pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
 {
 	/* Only called for hugetlbfs pages, hence can ignore THP */
 	return __find_linux_pte_or_hugepte(mm->pgd, addr, NULL, NULL);
 }
+#else
+pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
+{
+	pgd_t pgd, *pgdp;
+	pud_t pud, *pudp;
+	pmd_t pmd, *pmdp;
+
+	pgdp = mm->pgd + pgd_index(addr);
+	pgd  = READ_ONCE(*pgdp);
+
+	if (pgd_none(pgd))
+		return NULL;
+
+	if (pgd_huge(pgd))
+		return (pte_t *)pgdp;
+
+	pudp = pud_offset(&pgd, addr);
+	pud  = READ_ONCE(*pudp);
+	if (pud_none(pud))
+		return NULL;
+
+	if (pud_huge(pud))
+		return (pte_t *)pudp;
+
+	pmdp = pmd_offset(&pud, addr);
+	pmd  = READ_ONCE(*pmdp);
+	if (pmd_none(pmd))
+		return NULL;
+
+	if (pmd_huge(pmd))
+		return (pte_t *)pmdp;
+	return NULL;
+}
+#endif /* !defined(CONFIG_PPC_64K_PAGES) || !defined(CONFIG_PPC_BOOK3S_64) */
 
 #if !defined(CONFIG_PPC_64K_PAGES) || !defined(CONFIG_PPC_BOOK3S_64)
 static int __hugepte_alloc(struct mm_struct *mm, hugepd_t *hpdp,
