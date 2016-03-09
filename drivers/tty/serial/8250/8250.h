@@ -15,6 +15,8 @@
 #include <linux/serial_reg.h>
 #include <linux/dmaengine.h>
 
+#include "../serial_mctrl_gpio.h"
+
 struct uart_8250_dma {
 	int (*tx_dma)(struct uart_8250_port *p);
 	int (*rx_dma)(struct uart_8250_port *p, unsigned int iir);
