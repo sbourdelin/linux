@@ -15,11 +15,13 @@
  * It is necessary for @reason to be a static string declared with
  * __tracepoint_string.
  */
-TRACE_EVENT(ipi_raise,
+TRACE_EVENT_CONDITION(ipi_raise,
 
 	TP_PROTO(const struct cpumask *mask, const char *reason),
 
 	TP_ARGS(mask, reason),
+
+	TP_CONDITION(cpu_online(raw_smp_processor_id())),
 
 	TP_STRUCT__entry(
 		__bitmask(target_cpus, nr_cpumask_bits)
