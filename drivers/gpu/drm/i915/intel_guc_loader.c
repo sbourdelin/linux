@@ -116,6 +116,17 @@ static void direct_interrupts_to_guc(struct drm_i915_private *dev_priv)
 	I915_WRITE(GUC_WD_VECS_IER, ~irqs);
 }
 
+static void slpc_version_check(struct drm_device *dev, struct intel_guc_fw *guc_fw)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_device_info *info;
+
+	if (IS_SKYLAKE(dev) && (guc_fw->guc_fw_major_found != 6)) {
+		info = (struct intel_device_info *) &dev_priv->info;
+		info->has_slpc = 0;
+	}
+}
+
 static u32 get_gttype(struct drm_i915_private *dev_priv)
 {
 	/* XXX: GT type based on PCI device ID? field seems unused by fw */
@@ -537,6 +548,8 @@ static void guc_fw_fetch(struct drm_device *dev, struct intel_guc_fw *guc_fw)
 	DRM_DEBUG_DRIVER("firmware version %d.%d OK (minimum %d.%d)\n",
 			guc_fw->guc_fw_major_found, guc_fw->guc_fw_minor_found,
 			guc_fw->guc_fw_major_wanted, guc_fw->guc_fw_minor_wanted);
+
+	slpc_version_check(dev, guc_fw);
 
 	mutex_lock(&dev->struct_mutex);
 	obj = i915_gem_object_create_from_data(dev, fw->data, fw->size);
