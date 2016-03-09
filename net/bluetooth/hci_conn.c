@@ -719,6 +719,27 @@ done:
 	hci_dev_unlock(hdev);
 }
 
+static bool conn_use_rpa(struct hci_conn *conn)
+{
+	struct hci_dev *hdev = conn->hdev;
+
+	/* If privacy is not enabled don't use RPA */
+	if (!hci_dev_test_flag(hdev, HCI_PRIVACY))
+		return false;
+
+	/* If privacy is enabled in the basic mode use RPA */
+	if (!hci_dev_test_flag(hdev, HCI_LIMITED_PRIVACY))
+		return true;
+
+	/* If the limited privacy mode is enabled use an RPA only if
+	 * we're already paired.
+	 */
+	if (hci_find_ltk(hdev, &conn->dst, conn->dst_type, conn->role))
+		return true;
+
+	return false;
+}
+
 static void hci_req_add_le_create_conn(struct hci_request *req,
 				       struct hci_conn *conn)
 {
@@ -726,13 +747,14 @@ static void hci_req_add_le_create_conn(struct hci_request *req,
 	struct hci_dev *hdev = conn->hdev;
 	u8 own_addr_type;
 
-	memset(&cp, 0, sizeof(cp));
-
 	/* Update random address, but set require_privacy to false so
 	 * that we never connect with an non-resolvable address.
 	 */
-	if (hci_update_random_address(req, false, &own_addr_type))
+	if (hci_update_random_address(req, false, conn_use_rpa(conn),
+				      &own_addr_type))
 		return;
+
+	memset(&cp, 0, sizeof(cp));
 
 	/* Set window to be the same value as the interval to enable
 	 * continuous scanning.
@@ -774,7 +796,8 @@ static void hci_req_directed_advertising(struct hci_request *req,
 	/* Set require_privacy to false so that the remote device has a
 	 * chance of identifying us.
 	 */
-	if (hci_update_random_address(req, false, &own_addr_type) < 0)
+	if (hci_update_random_address(req, false, conn_use_rpa(conn),
+				      &own_addr_type) < 0)
 		return;
 
 	memset(&cp, 0, sizeof(cp));
