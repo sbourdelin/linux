@@ -746,6 +746,9 @@ static int uart_set_info(struct tty_struct *tty, struct tty_port *port,
 	 * allocations, we should treat type changes the same as
 	 * IO port changes.
 	 */
+	if ((unsigned long)new_info->iomem_base == 0xffffffff)
+		new_info->iomem_base = (unsigned char *)uport->mapbase;
+
 	change_port = !(uport->flags & UPF_FIXED_PORT)
 		&& (new_port != uport->iobase ||
 		    (unsigned long)new_info->iomem_base != uport->mapbase ||
