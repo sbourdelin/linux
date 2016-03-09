@@ -21,6 +21,8 @@ struct thunder_uncore *event_to_thunder_uncore(struct perf_event *event)
 		return thunder_uncore_l2c_cbc;
 	else if (event->pmu->type == thunder_lmc_pmu.type)
 		return thunder_uncore_lmc;
+	else if (event->pmu->type == thunder_ocx_tlk_pmu.type)
+		return thunder_uncore_ocx_tlk;
 	else
 		return NULL;
 }
@@ -306,6 +308,7 @@ static int __init thunder_uncore_init(void)
 	thunder_uncore_l2c_tad_setup();
 	thunder_uncore_l2c_cbc_setup();
 	thunder_uncore_lmc_setup();
+	thunder_uncore_ocx_tlk_setup();
 	return 0;
 }
 late_initcall(thunder_uncore_init);
