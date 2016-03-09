@@ -991,6 +991,7 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 	int ret = 0;
 	uint32_t aperture_size;
 
+	/* Init phase: setup state not requiring accessing the device. */
 	info = (struct intel_device_info *) flags;
 
 	dev_priv = kzalloc(sizeof(*dev_priv), GFP_KERNEL);
@@ -1036,6 +1037,7 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 		DRM_INFO("This is an early pre-production Haswell machine. "
 			 "It may not be fully functional.\n");
 
+	/* Init phase: setup device MMIO */
 	if (i915_get_bridge_dev(dev)) {
 		ret = -EIO;
 		goto out_runtime_pm_put;
@@ -1050,6 +1052,7 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 
 	intel_uncore_init(dev);
 
+	/* Init phase: setup state requiring accessing the device. */
 	ret = i915_gem_gtt_init(dev);
 	if (ret)
 		goto out_uncore_fini;
