@@ -2169,6 +2169,17 @@ int i915_ppgtt_init_hw(struct drm_device *dev)
 {
 	gtt_write_workarounds(dev);
 
+	if (HAS_TRTT(dev) && USES_FULL_48BIT_PPGTT(dev)) {
+		struct drm_i915_private *dev_priv = dev->dev_private;
+		/*
+		 * Globally enable TR-TT support in Hw.
+		 * Still TR-TT enabling on per context basis is required.
+		 * Non-trtt contexts are not affected by this setting.
+		 */
+		I915_WRITE(GEN9_TR_CHICKEN_BIT_VECTOR,
+			   GEN9_TRTT_BYPASS_DISABLE);
+	}
+
 	/* In the case of execlists, PPGTT is enabled by the context descriptor
 	 * and the PDPs are contained within the context itself.  We don't
 	 * need to do anything here. */
@@ -3366,6 +3377,57 @@ i915_gem_obj_lookup_or_create_ggtt_vma(struct drm_i915_gem_object *obj,
 
 	return vma;
 
+}
+
+void intel_trtt_context_destroy_vma(struct i915_vma *vma)
+{
+	struct i915_address_space *vm = vma->vm;
+
+	WARN_ON(!list_empty(&vma->obj_link));
+	WARN_ON(!list_empty(&vma->vm_link));
+	WARN_ON(!list_empty(&vma->exec_list));
+
+	drm_mm_remove_node(&vma->node);
+	i915_ppgtt_put(i915_vm_to_ppgtt(vm));
+	kmem_cache_free(to_i915(vm->dev)->vmas, vma);
+}
+
+struct i915_vma *
+intel_trtt_context_allocate_vma(struct i915_address_space *vm,
+				uint64_t segment_base_addr)
+{
+	struct i915_vma *vma;
+	int ret;
+
+	vma = kmem_cache_zalloc(to_i915(vm->dev)->vmas, GFP_KERNEL);
+	if (!vma)
+		return ERR_PTR(-ENOMEM);
+
+	INIT_LIST_HEAD(&vma->obj_link);
+	INIT_LIST_HEAD(&vma->vm_link);
+	INIT_LIST_HEAD(&vma->exec_list);
+	vma->vm = vm;
+	i915_ppgtt_get(i915_vm_to_ppgtt(vm));
+
+	/* Mark the vma as permanently pinned */
+	vma->pin_count = 1;
+
+	/* Reserve from the 48 bit PPGTT space */
+	vma->node.start = segment_base_addr;
+	vma->node.size = GEN9_TRTT_SEGMENT_SIZE;
+	ret = drm_mm_reserve_node(&vm->mm, &vma->node);
+	if (ret) {
+		ret = i915_gem_evict_for_vma(vma);
+		if (ret == 0)
+			ret = drm_mm_reserve_node(&vm->mm, &vma->node);
+	}
+	if (ret) {
+		DRM_ERROR("Reservation for TRTT segment failed: %i\n", ret);
+		intel_trtt_context_destroy_vma(vma);
+		return ERR_PTR(ret);
+	}
+
+	return vma;
 }
 
 static struct scatterlist *
