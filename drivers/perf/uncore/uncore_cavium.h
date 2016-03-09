@@ -7,7 +7,7 @@
 #define pr_fmt(fmt)     "thunderx_uncore: " fmt
 
 enum uncore_type {
-	NOP_TYPE,
+	L2C_TAD_TYPE,
 };
 
 extern int thunder_uncore_version;
@@ -65,6 +65,9 @@ static inline struct thunder_uncore_node *get_node(u64 config,
 extern struct attribute_group thunder_uncore_attr_group;
 extern struct device_attribute format_attr_node;
 
+extern struct thunder_uncore *thunder_uncore_l2c_tad;
+extern struct pmu thunder_l2c_tad_pmu;
+
 /* Prototypes */
 struct thunder_uncore *event_to_thunder_uncore(struct perf_event *event);
 void thunder_uncore_del(struct perf_event *event, int flags);
@@ -76,3 +79,5 @@ int thunder_uncore_setup(struct thunder_uncore *uncore, int id,
 ssize_t thunder_events_sysfs_show(struct device *dev,
 				  struct device_attribute *attr,
 				  char *page);
+
+int thunder_uncore_l2c_tad_setup(void);
