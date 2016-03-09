@@ -751,20 +751,21 @@ visordriver_probe_device(struct device *xdev)
 	wmb();
 	get_device(&dev->device);
 	if (!drv->probe) {
-		up(&dev->visordriver_callback_lock);
 		rc = -ENODEV;
-		goto away;
+		goto err_put_and_up;
 	}
 	rc = drv->probe(dev);
 	if (rc < 0)
-		goto away;
+		goto err_put_and_up;
 
 	fix_vbus_dev_info(dev);
 	up(&dev->visordriver_callback_lock);
+	return 0; /* success: reference kept via unmatched get_device() */
 	rc = 0;
-away:
-	if (rc != 0)
-		put_device(&dev->device);
+
+err_put_and_up:
+	put_device(&dev->device);
+	up(&dev->visordriver_callback_lock);
 	return rc;
 }
 
