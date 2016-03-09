@@ -2684,7 +2684,7 @@ scsi_device_set_state(struct scsi_device *sdev, enum scsi_device_state state)
 EXPORT_SYMBOL(scsi_device_set_state);
 
 /**
- * 	sdev_evt_emit - emit a single SCSI device uevent
+ *	sdev_evt_emit - emit a single SCSI device uevent
  *	@sdev: associated SCSI device
  *	@evt: event to emit
  *
@@ -2712,7 +2712,7 @@ static void scsi_evt_emit(struct scsi_device *sdev, struct scsi_event *evt)
 		envp[idx++] = "SDEV_UA=CAPACITY_DATA_HAS_CHANGED";
 		break;
 	case SDEV_EVT_SOFT_THRESHOLD_REACHED_REPORTED:
-	       envp[idx++] = "SDEV_UA=THIN_PROVISIONING_SOFT_THRESHOLD_REACHED";
+		envp[idx++] = "SDEV_UA=THIN_PROVISIONING_SOFT_THRESHOLD_REACHED";
 		break;
 	case SDEV_EVT_MODE_PARAMETER_CHANGE_REPORTED:
 		envp[idx++] = "SDEV_UA=MODE_PARAMETERS_CHANGED";
@@ -2734,7 +2734,7 @@ static void scsi_evt_emit(struct scsi_device *sdev, struct scsi_event *evt)
 }
 
 /**
- * 	sdev_evt_thread - send a uevent for each scsi event
+ *	sdev_evt_thread - send a uevent for each scsi event
  *	@work: work struct for scsi_device
  *
  *	Dispatch queued events to their associated scsi_device kobjects
@@ -2774,7 +2774,7 @@ void scsi_evt_thread(struct work_struct *work)
 }
 
 /**
- * 	sdev_evt_send - send asserted event to uevent thread
+ *	sdev_evt_send - send asserted event to uevent thread
  *	@sdev: scsi_device event occurred on
  *	@evt: event to send
  *
@@ -2792,7 +2792,7 @@ void sdev_evt_send(struct scsi_device *sdev, struct scsi_event *evt)
 EXPORT_SYMBOL_GPL(sdev_evt_send);
 
 /**
- * 	sdev_evt_alloc - allocate a new scsi event
+ *	sdev_evt_alloc - allocate a new scsi event
  *	@evt_type: type of event to allocate
  *	@gfpflags: GFP flags for allocation
  *

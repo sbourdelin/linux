@@ -1437,11 +1437,13 @@ struct disk_events {
 static const char *disk_events_strs[] = {
 	[ilog2(DISK_EVENT_MEDIA_CHANGE)]	= "media_change",
 	[ilog2(DISK_EVENT_EJECT_REQUEST)]	= "eject_request",
+	[ilog2(DISK_EVENT_LOWAT)]		= "low_water_mark",
 };
 
 static char *disk_uevents[] = {
 	[ilog2(DISK_EVENT_MEDIA_CHANGE)]	= "DISK_MEDIA_CHANGE=1",
 	[ilog2(DISK_EVENT_EJECT_REQUEST)]	= "DISK_EJECT_REQUEST=1",
+	[ilog2(DISK_EVENT_LOWAT)]		= "DISK_LOW_WATER_MARK=1",
 };
 
 /* list of all disk_events */

@@ -94,6 +94,7 @@ struct scsi_disk {
 	unsigned	lbpvpd : 1;
 	unsigned	ws10 : 1;
 	unsigned	ws16 : 1;
+	unsigned	tp_lowat : 1;	/* TP soft threshold reached */
 };
 #define to_scsi_disk(obj) container_of(obj,struct scsi_disk,dev)
 

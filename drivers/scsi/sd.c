@@ -1425,6 +1425,16 @@ static unsigned int sd_check_events(struct gendisk *disk, unsigned int clearing)
 		return DISK_EVENT_MEDIA_CHANGE;
 	}
 
+	if (sdkp->tp_lowat) {
+		/*
+		 * Thin Provisioning Low Watermark reached;
+		 * don't send TEST_UNIT_READY but rather return
+		 * immediately.
+		 */
+		sdkp->tp_lowat = false;
+		return DISK_EVENT_LOWAT;
+	}
+
 	/*
 	 * Using TEST_UNIT_READY enables differentiation between drive with
 	 * no cartridge loaded - NOT READY, drive with changed cartridge -
@@ -1729,6 +1739,9 @@ static void sd_ua_event(struct scsi_device *sdev, enum scsi_device_event evt)
 	if (evt == SDEV_EVT_MEDIA_CHANGE) {
 		sdev->changed = 1;
 		disk_clear_events(sdkp->disk, DISK_EVENT_MEDIA_CHANGE);
+	} else if (evt == SDEV_EVT_SOFT_THRESHOLD_REACHED_REPORTED) {
+		sdkp->tp_lowat = true;
+		disk_clear_events(sdkp->disk, DISK_EVENT_LOWAT);
 	}
 }
 
@@ -3043,6 +3056,12 @@ static void sd_probe_async(void *data, async_cookie_t cookie)
 	if (sdp->removable) {
 		gd->flags |= GENHD_FL_REMOVABLE;
 		gd->events |= DISK_EVENT_MEDIA_CHANGE;
+	}
+	if (sdkp->lbpme) {
+		gd->events |= DISK_EVENT_LOWAT;
+		gd->async_events |= DISK_EVENT_LOWAT;
+		set_bit(SDEV_EVT_SOFT_THRESHOLD_REACHED_REPORTED,
+			sdp->supported_events);
 	}
 
 	blk_pm_runtime_init(sdp->request_queue, dev);

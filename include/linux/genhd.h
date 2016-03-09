@@ -143,6 +143,7 @@ struct hd_struct {
 enum {
 	DISK_EVENT_MEDIA_CHANGE			= 1 << 0, /* media changed */
 	DISK_EVENT_EJECT_REQUEST		= 1 << 1, /* eject requested */
+	DISK_EVENT_LOWAT			= 1 << 2, /* Low watermark reached */
 };
 
 #define BLK_SCSI_MAX_CMDS	(256)
