@@ -977,10 +977,6 @@ static struct packet_type dsa_pack_type __read_mostly = {
 	.func	= dsa_switch_rcv,
 };
 
-static struct notifier_block dsa_netdevice_nb __read_mostly = {
-	.notifier_call	= dsa_slave_netdevice_event,
-};
-
 #ifdef CONFIG_PM_SLEEP
 static int dsa_suspend(struct device *d)
 {
@@ -1047,8 +1043,6 @@ static int __init dsa_init_module(void)
 {
 	int rc;
 
-	register_netdevice_notifier(&dsa_netdevice_nb);
-
 	rc = platform_driver_register(&dsa_driver);
 	if (rc)
 		return rc;
@@ -1061,7 +1055,6 @@ module_init(dsa_init_module);
 
 static void __exit dsa_cleanup_module(void)
 {
-	unregister_netdevice_notifier(&dsa_netdevice_nb);
 	dev_remove_pack(&dsa_pack_type);
 	platform_driver_unregister(&dsa_driver);
 }

@@ -305,16 +305,38 @@ static int dsa_slave_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	return -EOPNOTSUPP;
 }
 
-static int dsa_slave_stp_update(struct net_device *dev, u8 state)
+static int dsa_slave_bridge_if(struct net_device *dev,
+			       const struct switchdev_attr *attr,
+			       struct switchdev_trans *trans)
 {
 	struct dsa_slave_priv *p = netdev_priv(dev);
 	struct dsa_switch *ds = p->parent;
-	int ret = -EOPNOTSUPP;
+	int err;
 
-	if (ds->drv->port_stp_update)
-		ret = ds->drv->port_stp_update(ds, p->port, state);
+	if (switchdev_trans_ph_prepare(trans)) {
+		if (!ds->drv->port_join_bridge || !ds->drv->port_leave_bridge)
+			return -EOPNOTSUPP;
+		return 0;
+	}
 
-	return ret;
+	if (attr->u.join) {
+		err = ds->drv->port_join_bridge(ds, p->port, attr->orig_dev);
+		if (!err)
+			p->bridge_dev = attr->orig_dev;
+	} else {
+		err = ds->drv->port_leave_bridge(ds, p->port);
+
+		/* When a port leaves a bridge, the bridge layer sets its STP
+		 * state to DISABLED. Restore FORWARDING to keep it functional.
+		 */
+		if (ds->drv->port_stp_update)
+			ds->drv->port_stp_update(ds, p->port,
+						 BR_STATE_FORWARDING);
+
+		p->bridge_dev = NULL;
+	}
+
+	return err;
 }
 
 static int dsa_slave_vlan_filtering(struct net_device *dev,
@@ -353,6 +375,9 @@ static int dsa_slave_port_attr_set(struct net_device *dev,
 		break;
 	case SWITCHDEV_ATTR_ID_BRIDGE_VLAN_FILTERING:
 		ret = dsa_slave_vlan_filtering(dev, attr, trans);
+		break;
+	case SWITCHDEV_ATTR_ID_PORT_BRIDGE_IF:
+		ret = dsa_slave_bridge_if(dev, attr, trans);
 		break;
 	default:
 		ret = -EOPNOTSUPP;
@@ -437,41 +462,6 @@ static int dsa_slave_port_obj_dump(struct net_device *dev,
 	}
 
 	return err;
-}
-
-static int dsa_slave_bridge_port_join(struct net_device *dev,
-				      struct net_device *br)
-{
-	struct dsa_slave_priv *p = netdev_priv(dev);
-	struct dsa_switch *ds = p->parent;
-	int ret = -EOPNOTSUPP;
-
-	p->bridge_dev = br;
-
-	if (ds->drv->port_join_bridge)
-		ret = ds->drv->port_join_bridge(ds, p->port, br);
-
-	return ret;
-}
-
-static int dsa_slave_bridge_port_leave(struct net_device *dev)
-{
-	struct dsa_slave_priv *p = netdev_priv(dev);
-	struct dsa_switch *ds = p->parent;
-	int ret = -EOPNOTSUPP;
-
-
-	if (ds->drv->port_leave_bridge)
-		ret = ds->drv->port_leave_bridge(ds, p->port);
-
-	p->bridge_dev = NULL;
-
-	/* Port left the bridge, put in BR_STATE_DISABLED by the bridge layer,
-	 * so allow it to be in BR_STATE_FORWARDING to be kept functional
-	 */
-	dsa_slave_stp_update(dev, BR_STATE_FORWARDING);
-
-	return ret;
 }
 
 static int dsa_slave_port_attr_get(struct net_device *dev,
@@ -1135,47 +1125,4 @@ void dsa_slave_destroy(struct net_device *slave_dev)
 		phy_disconnect(p->phy);
 	unregister_netdev(slave_dev);
 	free_netdev(slave_dev);
-}
-
-static bool dsa_slave_dev_check(struct net_device *dev)
-{
-	return dev->netdev_ops == &dsa_slave_netdev_ops;
-}
-
-static int dsa_slave_master_changed(struct net_device *dev)
-{
-	struct net_device *master = netdev_master_upper_dev_get(dev);
-	struct dsa_slave_priv *p = netdev_priv(dev);
-	int err = 0;
-
-	if (master && master->rtnl_link_ops &&
-	    !strcmp(master->rtnl_link_ops->kind, "bridge"))
-		err = dsa_slave_bridge_port_join(dev, master);
-	else if (dsa_port_is_bridged(p))
-		err = dsa_slave_bridge_port_leave(dev);
-
-	return err;
-}
-
-int dsa_slave_netdevice_event(struct notifier_block *unused,
-			      unsigned long event, void *ptr)
-{
-	struct net_device *dev;
-	int err = 0;
-
-	switch (event) {
-	case NETDEV_CHANGEUPPER:
-		dev = netdev_notifier_info_to_dev(ptr);
-		if (!dsa_slave_dev_check(dev))
-			goto out;
-
-		err = dsa_slave_master_changed(dev);
-		if (err && err != -EOPNOTSUPP)
-			netdev_warn(dev, "failed to reflect master change\n");
-
-		break;
-	}
-
-out:
-	return NOTIFY_DONE;
 }
