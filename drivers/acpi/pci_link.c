@@ -840,15 +840,6 @@ bool acpi_isa_irq_available(int irq)
 }
 
 /*
- * Penalize IRQ used by ACPI SCI. If ACPI SCI pin attributes conflict with
- * PCI IRQ attributes, mark ACPI SCI as ISA_ALWAYS so it won't be use for
- * PCI IRQs.
- */
-void acpi_penalize_sci_irq(int irq, int trigger, int polarity)
-{
-}
-
-/*
  * Over-ride default table to reserve additional IRQs for use by ISA
  * e.g. acpi_irq_isa=5
  * Useful for telling ACPI how not to interfere with your ISA sound card.
