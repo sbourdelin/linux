@@ -172,6 +172,7 @@ void vga_switcheroo_set_dynamic_switch(struct pci_dev *pdev, enum vga_switcheroo
 int vga_switcheroo_init_domain_pm_ops(struct device *dev, struct dev_pm_domain *domain);
 void vga_switcheroo_fini_domain_pm_ops(struct device *dev);
 int vga_switcheroo_init_domain_pm_optimus_hdmi_audio(struct device *dev, struct dev_pm_domain *domain);
+int vga_switcheroo_init_parent_pr3_ops(struct device *dev, struct dev_pm_domain *domain);
 #else
 
 static inline void vga_switcheroo_unregister_client(struct pci_dev *dev) {}
@@ -195,6 +196,6 @@ static inline void vga_switcheroo_set_dynamic_switch(struct pci_dev *pdev, enum 
 static inline int vga_switcheroo_init_domain_pm_ops(struct device *dev, struct dev_pm_domain *domain) { return -EINVAL; }
 static inline void vga_switcheroo_fini_domain_pm_ops(struct device *dev) {}
 static inline int vga_switcheroo_init_domain_pm_optimus_hdmi_audio(struct device *dev, struct dev_pm_domain *domain) { return -EINVAL; }
-
+static inline int vga_switcheroo_init_parent_pr3_ops(struct device *dev, struct dev_pm_domain *domain) { return -EINVAL; }
 #endif
 #endif /* _LINUX_VGA_SWITCHEROO_H_ */

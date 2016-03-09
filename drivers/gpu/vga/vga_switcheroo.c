@@ -42,7 +42,7 @@
 #include <linux/uaccess.h>
 #include <linux/vgaarb.h>
 #include <linux/vga_switcheroo.h>
-
+#include <linux/acpi.h>
 /**
  * DOC: Overview
  *
@@ -1110,3 +1110,55 @@ vga_switcheroo_init_domain_pm_optimus_hdmi_audio(struct device *dev,
 	return -EINVAL;
 }
 EXPORT_SYMBOL(vga_switcheroo_init_domain_pm_optimus_hdmi_audio);
+
+/* With Windows 10 the runtime suspend/resume can use power
+   resources on the parent device */
+static int vga_acpi_switcheroo_runtime_suspend(struct device *dev)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	int ret;
+	struct acpi_device *adev;
+
+	ret = dev->bus->pm->runtime_suspend(dev);
+	if (ret)
+		return ret;
+
+	ret = acpi_bus_get_device(ACPI_HANDLE(&pdev->dev), &adev);
+	if (!ret)
+		acpi_device_set_power(adev->parent, ACPI_STATE_D3_COLD);
+	return 0;
+}
+
+static int vga_acpi_switcheroo_runtime_resume(struct device *dev)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	struct acpi_device *adev;
+	int ret;
+
+	ret = acpi_bus_get_device(ACPI_HANDLE(&pdev->dev), &adev);
+	if (!ret)
+		acpi_device_set_power(adev->parent, ACPI_STATE_D0);
+	ret = dev->bus->pm->runtime_resume(dev);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+int vga_switcheroo_init_parent_pr3_ops(struct device *dev,
+				       struct dev_pm_domain *domain)
+
+{
+	/* copy over all the bus versions */
+	if (dev->bus && dev->bus->pm) {
+		domain->ops = *dev->bus->pm;
+		domain->ops.runtime_suspend = vga_acpi_switcheroo_runtime_suspend;
+		domain->ops.runtime_resume = vga_acpi_switcheroo_runtime_resume;
+
+		dev_pm_domain_set(dev, domain);
+		return 0;
+	}
+	dev_pm_domain_set(dev, NULL);
+	return -EINVAL;
+}
+EXPORT_SYMBOL(vga_switcheroo_init_parent_pr3_ops);
