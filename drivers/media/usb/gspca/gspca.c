@@ -1664,7 +1664,7 @@ static int frame_ready_nolock(struct gspca_dev *gspca_dev, struct file *file,
 		return -ENODEV;
 	if (gspca_dev->capt_file != file || gspca_dev->memory != memory ||
 			!gspca_dev->streaming)
-		return -EINVAL;
+		return -EBUSY;
 
 	/* check if a frame is ready */
 	return gspca_dev->fr_o != atomic_read(&gspca_dev->fr_i);
