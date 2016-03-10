@@ -105,6 +105,7 @@
 #include "locking.h"
 #include "check-integrity.h"
 #include "rcu-string.h"
+#include "compression.h"
 
 #define BTRFSIC_BLOCK_HASHTABLE_SIZE 0x10000
 #define BTRFSIC_BLOCK_LINK_HASHTABLE_SIZE 0x10000
