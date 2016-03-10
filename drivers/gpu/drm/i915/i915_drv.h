@@ -2701,6 +2701,7 @@ struct i915_params {
 	int guc_log_level;
 	int use_mmio_flip;
 	int mmio_debug;
+	bool force_dp_sst;
 	bool verbose_state_checks;
 	bool nuclear_pageflip;
 	int edp_vswing;

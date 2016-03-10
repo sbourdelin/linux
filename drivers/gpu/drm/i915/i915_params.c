@@ -51,6 +51,7 @@ struct i915_params i915 __read_mostly = {
 	.disable_vtd_wa = 0,
 	.use_mmio_flip = 0,
 	.mmio_debug = 0,
+	.force_dp_sst = false,
 	.verbose_state_checks = 1,
 	.nuclear_pageflip = 0,
 	.edp_vswing = 0,
@@ -180,6 +181,10 @@ module_param_named(mmio_debug, i915.mmio_debug, int, 0600);
 MODULE_PARM_DESC(mmio_debug,
 	"Enable the MMIO debug code for the first N failures (default: off). "
 	"This may negatively affect performance.");
+
+module_param_named_unsafe(force_dp_sst, i915.force_dp_sst, bool, 0600);
+MODULE_PARM_DESC(force_dp_sst,
+	"Force single-stream transport (SST; disable MST) for new DisplayPort sinks (default: false). ");
 
 module_param_named(verbose_state_checks, i915.verbose_state_checks, bool, 0600);
 MODULE_PARM_DESC(verbose_state_checks,
