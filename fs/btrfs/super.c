@@ -190,12 +190,12 @@ static const char * const logtypes[] = {
 
 void btrfs_printk(const struct btrfs_fs_info *fs_info, const char *fmt, ...)
 {
-	struct super_block *sb = fs_info->sb;
 	char lvl[4];
 	struct va_format vaf;
 	va_list args;
 	const char *type = logtypes[4];
 	int kern_level;
+	struct btrfs_fs_devices *fs_devs = fs_info->fs_devices;
 
 	va_start(args, fmt);
 
@@ -212,7 +212,7 @@ void btrfs_printk(const struct btrfs_fs_info *fs_info, const char *fmt, ...)
 	vaf.fmt = fmt;
 	vaf.va = &args;
 
-	printk("%sBTRFS %s (device %s): %pV\n", lvl, type, sb->s_id, &vaf);
+	printk("%sBTRFS: %pU %s: %pV\n", lvl, fs_devs->fsid, type, &vaf);
 
 	va_end(args);
 }
