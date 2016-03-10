@@ -170,9 +170,15 @@ static int snd_compr_free(struct inode *inode, struct file *f)
 static int snd_compr_update_tstamp(struct snd_compr_stream *stream,
 		struct snd_compr_tstamp *tstamp)
 {
+	int ret;
+
 	if (!stream->ops->pointer)
 		return -ENOTSUPP;
-	stream->ops->pointer(stream, tstamp);
+
+	ret = stream->ops->pointer(stream, tstamp);
+	if (ret < 0)
+		return ret;
+
 	pr_debug("dsp consumed till %d total %d bytes\n",
 		tstamp->byte_offset, tstamp->copied_total);
 	if (stream->direction == SND_COMPRESS_PLAYBACK)
@@ -182,18 +188,24 @@ static int snd_compr_update_tstamp(struct snd_compr_stream *stream,
 	return 0;
 }
 
-static size_t snd_compr_calc_avail(struct snd_compr_stream *stream,
+static int snd_compr_calc_avail(struct snd_compr_stream *stream,
 		struct snd_compr_avail *avail)
 {
+	int ret;
+
 	memset(avail, 0, sizeof(*avail));
-	snd_compr_update_tstamp(stream, &avail->tstamp);
+	ret = snd_compr_update_tstamp(stream, &avail->tstamp);
+	if (ret < 0)
+		return ret;
+
 	/* Still need to return avail even if tstamp can't be filled in */
 
 	if (stream->runtime->total_bytes_available == 0 &&
 			stream->runtime->state == SNDRV_PCM_STATE_SETUP &&
 			stream->direction == SND_COMPRESS_PLAYBACK) {
 		pr_debug("detected init and someone forgot to do a write\n");
-		return stream->runtime->buffer_size;
+		avail->avail = stream->runtime->buffer_size;
+		return 0;
 	}
 	pr_debug("app wrote %lld, DSP consumed %lld\n",
 			stream->runtime->total_bytes_available,
@@ -202,9 +214,11 @@ static size_t snd_compr_calc_avail(struct snd_compr_stream *stream,
 				stream->runtime->total_bytes_transferred) {
 		if (stream->direction == SND_COMPRESS_PLAYBACK) {
 			pr_debug("both pointers are same, returning full avail\n");
-			return stream->runtime->buffer_size;
+			avail->avail = stream->runtime->buffer_size;
+			return 0;
 		} else {
 			pr_debug("both pointers are same, returning no avail\n");
+			avail->avail = 0;
 			return 0;
 		}
 	}
@@ -215,24 +229,30 @@ static size_t snd_compr_calc_avail(struct snd_compr_stream *stream,
 		avail->avail = stream->runtime->buffer_size - avail->avail;
 
 	pr_debug("ret avail as %lld\n", avail->avail);
-	return avail->avail;
+	return 0;
 }
 
-static inline size_t snd_compr_get_avail(struct snd_compr_stream *stream)
+static inline int snd_compr_get_avail(struct snd_compr_stream *stream,
+				      size_t *avail)
 {
-	struct snd_compr_avail avail;
+	struct snd_compr_avail full_avail;
+	int ret;
 
-	return snd_compr_calc_avail(stream, &avail);
+	ret = snd_compr_calc_avail(stream, &full_avail);
+	*avail = full_avail.avail;
+
+	return ret;
 }
 
 static int
 snd_compr_ioctl_avail(struct snd_compr_stream *stream, unsigned long arg)
 {
 	struct snd_compr_avail ioctl_avail;
-	size_t avail;
+	int ret;
 
-	avail = snd_compr_calc_avail(stream, &ioctl_avail);
-	ioctl_avail.avail = avail;
+	ret = snd_compr_calc_avail(stream, &ioctl_avail);
+	if (ret < 0)
+		return ret;
 
 	if (copy_to_user((__u64 __user *)arg,
 				&ioctl_avail, sizeof(ioctl_avail)))
@@ -287,11 +307,14 @@ static ssize_t snd_compr_write(struct file *f, const char __user *buf,
 	/* write is allowed when stream is running or has been steup */
 	if (stream->runtime->state != SNDRV_PCM_STATE_SETUP &&
 			stream->runtime->state != SNDRV_PCM_STATE_RUNNING) {
-		mutex_unlock(&stream->device->lock);
-		return -EBADFD;
+		retval = -EBADFD;
+		goto out;
 	}
 
-	avail = snd_compr_get_avail(stream);
+	retval = snd_compr_get_avail(stream, &avail);
+	if (retval < 0)
+		goto out;
+
 	pr_debug("avail returned %ld\n", (unsigned long)avail);
 	/* calculate how much we can write to buffer */
 	if (avail > count)
@@ -313,6 +336,7 @@ static ssize_t snd_compr_write(struct file *f, const char __user *buf,
 		pr_debug("stream prepared, Houston we are good to go\n");
 	}
 
+out:
 	mutex_unlock(&stream->device->lock);
 	return retval;
 }
@@ -346,7 +370,10 @@ static ssize_t snd_compr_read(struct file *f, char __user *buf,
 		goto out;
 	}
 
-	avail = snd_compr_get_avail(stream);
+	retval = snd_compr_get_avail(stream, &avail);
+	if (retval < 0)
+		goto out;
+
 	pr_debug("avail returned %ld\n", (unsigned long)avail);
 	/* calculate how much we can read from buffer */
 	if (avail > count)
@@ -399,7 +426,10 @@ static unsigned int snd_compr_poll(struct file *f, poll_table *wait)
 	}
 	poll_wait(f, &stream->runtime->sleep, wait);
 
-	avail = snd_compr_get_avail(stream);
+	retval = snd_compr_get_avail(stream, &avail);
+	if (retval < 0)
+		goto out;
+
 	pr_debug("avail is %ld\n", (unsigned long)avail);
 	/* check if we have at least one fragment to fill */
 	switch (stream->runtime->state) {
