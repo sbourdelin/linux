@@ -1888,8 +1888,11 @@ again:
 
 	/*
 	 * PEBS overflow sets bit 62 in the global status register
+	 * This is racy with overflows of non-PEBS counters, so we
+	 * status may not have bit 62 set yet pebs counters may have overflowed
 	 */
-	if (__test_and_clear_bit(62, (unsigned long *)&status)) {
+	if (__test_and_clear_bit(62, (unsigned long *)&status)
+	    || (status & cpuc->pebs_enabled)) {
 		handled++;
 		x86_pmu.drain_pebs(regs);
 		/*
@@ -1902,6 +1905,9 @@ again:
 		 */
 		status &= ~cpuc->pebs_enabled;
 		status &= x86_pmu.intel_ctrl | GLOBAL_STATUS_TRACE_TOPAPMI;
+
+		/* make sure bit 62 is acked in any case */
+		orig_status |= 1ULL << 62;
 	}
 
 	/*
