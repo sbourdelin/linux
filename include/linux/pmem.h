@@ -66,14 +66,16 @@ static inline void arch_invalidate_pmem(void __pmem *addr, size_t size)
 #endif
 
 /*
- * Architectures that define ARCH_HAS_PMEM_API must provide
- * implementations for arch_memcpy_to_pmem(), arch_wmb_pmem(),
- * arch_copy_from_iter_pmem(), arch_clear_pmem(), arch_wb_cache_pmem()
- * and arch_has_wmb_pmem().
+ * memcpy_from_pmem - read from persistent memory with error handling
+ * @dst: destination buffer
+ * @src: source buffer
+ *
+ * Returns 0 on success -EIO on failure.
  */
-static inline void memcpy_from_pmem(void *dst, void __pmem const *src, size_t size)
+static inline int memcpy_from_pmem(void *dst, void __pmem const *src,
+		size_t size)
 {
-	memcpy(dst, (void __force const *) src, size);
+	return arch_memcpy_from_pmem(dst, src, size);
 }
 
 static inline bool arch_has_pmem_api(void)
