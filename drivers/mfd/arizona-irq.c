@@ -154,17 +154,48 @@ static void arizona_irq_disable(struct irq_data *data)
 {
 }
 
+static void arizona_irq_lock(struct irq_data *data)
+{
+	struct arizona *arizona = irq_data_get_irq_chip_data(data);
+
+	mutex_lock(&arizona->irq_lock);
+}
+
+static void arizona_irq_sync_unlock(struct irq_data *data)
+{
+	struct arizona *arizona = irq_data_get_irq_chip_data(data);
+	int i;
+
+	if (arizona->pending_wake_count < 0)
+		for (i = arizona->pending_wake_count; i < 0; i++)
+			irq_set_irq_wake(arizona->irq, 0);
+	else if (arizona->pending_wake_count > 0)
+		for (i = 0; i < arizona->pending_wake_count; i++)
+			irq_set_irq_wake(arizona->irq, 1);
+
+	arizona->pending_wake_count = 0;
+
+	mutex_unlock(&arizona->irq_lock);
+}
+
 static int arizona_irq_set_wake(struct irq_data *data, unsigned int on)
 {
 	struct arizona *arizona = irq_data_get_irq_chip_data(data);
 
-	return irq_set_irq_wake(arizona->irq, on);
+	if (on)
+		arizona->pending_wake_count++;
+	else
+		arizona->pending_wake_count--;
+
+	return 0;
 }
 
 static struct irq_chip arizona_irq_chip = {
 	.name			= "arizona",
 	.irq_disable		= arizona_irq_disable,
 	.irq_enable		= arizona_irq_enable,
+	.irq_bus_lock		= arizona_irq_lock,
+	.irq_bus_sync_unlock	= arizona_irq_sync_unlock,
 	.irq_set_wake		= arizona_irq_set_wake,
 };
 
@@ -192,6 +223,8 @@ int arizona_irq_init(struct arizona *arizona)
 	int ret, i;
 	const struct regmap_irq_chip *aod, *irq;
 	struct irq_data *irq_data;
+
+	mutex_init(&arizona->irq_lock);
 
 	arizona->ctrlif_error = true;
 
