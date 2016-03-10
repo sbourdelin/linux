@@ -219,6 +219,11 @@ static inline int v4l_enable_media_source(struct video_device *vdev)
 	return 0;
 }
 
+static inline int v4l_change_media_source(struct video_device *vdev)
+{
+	return 0;
+}
+
 static inline void v4l_disable_media_source(struct video_device *vdev)
 {
 }
