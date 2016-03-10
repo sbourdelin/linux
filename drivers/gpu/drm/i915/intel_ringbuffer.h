@@ -438,8 +438,8 @@ int intel_pin_and_map_ringbuffer_obj(struct drm_device *dev,
 void intel_unpin_ringbuffer_obj(struct intel_ringbuffer *ringbuf);
 void intel_ringbuffer_free(struct intel_ringbuffer *ring);
 
-void intel_stop_ring_buffer(struct intel_engine_cs *engine);
-void intel_cleanup_ring_buffer(struct intel_engine_cs *engine);
+void intel_stop_engine(struct intel_engine_cs *engine);
+void intel_cleanup_engine(struct intel_engine_cs *engine);
 
 int intel_ring_alloc_request_extras(struct drm_i915_gem_request *request);
 
@@ -465,7 +465,7 @@ static inline void intel_ring_advance(struct intel_engine_cs *engine)
 int __intel_ring_space(int head, int tail, int size);
 void intel_ring_update_space(struct intel_ringbuffer *ringbuf);
 int intel_ring_space(struct intel_ringbuffer *ringbuf);
-bool intel_ring_stopped(struct intel_engine_cs *engine);
+bool intel_engine_stopped(struct intel_engine_cs *engine);
 
 int __must_check intel_engine_idle(struct intel_engine_cs *engine);
 void intel_ring_init_seqno(struct intel_engine_cs *engine, u32 seqno);
