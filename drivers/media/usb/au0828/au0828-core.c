@@ -456,7 +456,9 @@ static int au0828_media_device_register(struct au0828_dev *dev,
 {
 #ifdef CONFIG_MEDIA_CONTROLLER
 	int ret;
-	struct media_entity *entity, *demod = NULL, *tuner = NULL;
+	struct media_entity *entity;
+	struct media_entity *demod = NULL, *tuner = NULL, *decoder = NULL;
+	struct media_link *link;
 
 	if (!dev->media_dev)
 		return 0;
@@ -490,18 +492,19 @@ static int au0828_media_device_register(struct au0828_dev *dev,
 	media_device_for_each_entity(entity, dev->media_dev) {
 		if (entity->function == MEDIA_ENT_F_DTV_DEMOD)
 			demod = entity;
+		else if (entity->function == MEDIA_ENT_F_ATV_DECODER)
+			decoder = entity;
 		else if (entity->function == MEDIA_ENT_F_TUNER)
 			tuner = entity;
 	}
-	/* Disable link between tuner and demod */
-	if (tuner && demod) {
-		struct media_link *link;
 
-		list_for_each_entry(link, &demod->links, list) {
-			if (link->sink->entity == demod &&
-			    link->source->entity == tuner) {
+	/* Disable link between tuner->demod and/or tuner->decoder */
+	if (tuner) {
+		list_for_each_entry(link, &tuner->links, list) {
+			if (demod && link->sink->entity == demod)
 				media_entity_setup_link(link, 0);
-			}
+			if (decoder && link->sink->entity == decoder)
+				media_entity_setup_link(link, 0);
 		}
 	}
 
