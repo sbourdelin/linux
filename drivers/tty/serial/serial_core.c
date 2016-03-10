@@ -748,7 +748,6 @@ static int uart_set_info(struct tty_struct *tty, struct tty_port *port,
 	 */
 	change_port = !(uport->flags & UPF_FIXED_PORT)
 		&& (new_port != uport->iobase ||
-		    (unsigned long)new_info->iomem_base != uport->mapbase ||
 		    new_info->hub6 != uport->hub6 ||
 		    new_info->io_type != uport->iotype ||
 		    new_info->iomem_reg_shift != uport->regshift ||
@@ -804,11 +803,10 @@ static int uart_set_info(struct tty_struct *tty, struct tty_port *port,
 	}
 
 	if (change_port) {
-		unsigned long old_iobase, old_mapbase;
+		unsigned long old_iobase;
 		unsigned int old_type, old_iotype, old_hub6, old_shift;
 
 		old_iobase = uport->iobase;
-		old_mapbase = uport->mapbase;
 		old_type = uport->type;
 		old_hub6 = uport->hub6;
 		old_iotype = uport->iotype;
@@ -825,7 +823,6 @@ static int uart_set_info(struct tty_struct *tty, struct tty_port *port,
 		uport->hub6 = new_info->hub6;
 		uport->iotype = new_info->io_type;
 		uport->regshift = new_info->iomem_reg_shift;
-		uport->mapbase = (unsigned long)new_info->iomem_base;
 
 		/*
 		 * Claim and map the new regions
@@ -847,7 +844,6 @@ static int uart_set_info(struct tty_struct *tty, struct tty_port *port,
 			uport->hub6 = old_hub6;
 			uport->iotype = old_iotype;
 			uport->regshift = old_shift;
-			uport->mapbase = old_mapbase;
 
 			if (old_type != PORT_UNKNOWN) {
 				retval = uport->ops->request_port(uport);
