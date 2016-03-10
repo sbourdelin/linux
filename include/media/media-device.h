@@ -309,9 +309,11 @@ struct media_entity_notify {
  * @pm_count_walk: Graph walk for power state walk. Access serialised using
  *		   graph_mutex.
  *
- * @source_priv: Driver Private data for enable/disable source handlers
+ * @source_priv: Driver Private data for enable/disable/change source
+ *		 handlers
  * @enable_source: Enable Source Handler function pointer
  * @disable_source: Disable Source Handler function pointer
+ * @change_source: Change Source Handler function pointer
  *
  * @link_notify: Link state change notification callback
  *
@@ -326,13 +328,21 @@ struct media_entity_notify {
  * be unique.
  *
  * @enable_source is a handler to find source entity for the
- * sink entity  and activate the link between them if source
+ * sink entity and activate the link between them if source
  * entity is free. Drivers should call this handler before
  * accessing the source.
  *
  * @disable_source is a handler to find source entity for the
- * sink entity  and deactivate the link between them. Drivers
+ * sink entity and deactivate the link between them. Drivers
  * should call this handler to release the source.
+ *
+ * @change_source is a handler to find source entity for the
+ * sink entity and deactivate the link between them. Once the
+ * existing link is deactivated, it will find and activate the
+ * source for the sink for the newly selected input. Drivers
+ * should call this handler to change the source when user
+ * changes input. Using change_source helps not loose the hold
+ * on the media resource when a new input is selected.
  *
  * Note: Bridge driver is expected to implement and set the
  * handler when media_device is registered or when
@@ -381,6 +391,8 @@ struct media_device {
 	int (*enable_source)(struct media_entity *entity,
 			     struct media_pipeline *pipe);
 	void (*disable_source)(struct media_entity *entity);
+	int (*change_source)(struct media_entity *entity,
+			     struct media_pipeline *pipe);
 
 	int (*link_notify)(struct media_link *link, u32 flags,
 			   unsigned int notification);
