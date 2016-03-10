@@ -53,5 +53,6 @@
 #include "i915_drv.h"
 
 int intel_rcs_context_init_mocs(struct drm_i915_gem_request *req);
+void intel_program_mocs_engines(struct drm_device *dev);
 
 #endif
