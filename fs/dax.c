@@ -680,7 +680,9 @@ int __dax_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 		if (error)
 			goto unlock_page;
 		vmf->page = page;
-		return VM_FAULT_LOCKED;
+		if (page)
+			return VM_FAULT_LOCKED;
+		return 0;
 	}
 
 	/* Check we didn't race with a read fault installing a new page */
