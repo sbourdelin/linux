@@ -22,6 +22,12 @@ Required properties for GPIO node:
       4 = active high level-sensitive.
       8 = active low level-sensitive.
 
+Option properties:
+- fsl,gpio-wakeup : map GPIOs to WKPU unit, 3 argument cells per phandle
+      cell 1: First GPIO (relative to the GPIO block)
+      cell 2: First GPIO of the WKPU unit
+      cell 3: Number of consecutive GPIO's
+
 Note: Each GPIO port should have an alias correctly numbered in "aliases"
 node.
 
