@@ -1305,7 +1305,7 @@ static inline void radix_tree_shrink(struct radix_tree_root *root)
 		 * to force callers to retry.
 		 */
 		if (root->height == 0)
-			*((unsigned long *)&to_free->slots[0]) |=
+			*((unsigned long *)&to_free->slots[0]) =
 						RADIX_TREE_INDIRECT_PTR;
 
 		radix_tree_node_free(to_free);
