@@ -1796,6 +1796,7 @@ static int gpmc_probe_nand_child(struct platform_device *pdev,
 
 	gpmc_nand_data->cs = val;
 	gpmc_nand_data->of_node = child;
+	gpmc_nand_data->gpmc_dev = &pdev->dev;
 
 	/* Detect availability of ELM module */
 	gpmc_nand_data->elm_of_node = of_parse_phandle(child, "ti,elm-id", 0);

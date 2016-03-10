@@ -80,5 +80,7 @@ struct omap_nand_platform_data {
 	/* for passing the partitions */
 	struct device_node	*of_node;
 	struct device_node	*elm_of_node;
+
+	struct device		*gpmc_dev;
 };
 #endif
