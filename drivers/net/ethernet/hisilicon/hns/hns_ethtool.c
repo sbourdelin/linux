@@ -1178,7 +1178,7 @@ hns_get_rss_key_size(struct net_device *netdev)
 	if (AE_IS_VER1(priv->enet_ver)) {
 		netdev_err(netdev,
 			   "RSS feature is not supported on this hardware\n");
-		return -EOPNOTSUPP;
+		return (u32)-EOPNOTSUPP;
 	}
 
 	ops = priv->ae_handle->dev->ops;
@@ -1197,7 +1197,7 @@ hns_get_rss_indir_size(struct net_device *netdev)
 	if (AE_IS_VER1(priv->enet_ver)) {
 		netdev_err(netdev,
 			   "RSS feature is not supported on this hardware\n");
-		return -EOPNOTSUPP;
+		return (u32)-EOPNOTSUPP;
 	}
 
 	ops = priv->ae_handle->dev->ops;
@@ -1226,7 +1226,7 @@ hns_get_rss(struct net_device *netdev, u32 *indir, u8 *key, u8 *hfunc)
 
 	ret = ops->get_rss(priv->ae_handle, indir, key, hfunc);
 
-	return 0;
+	return ret;
 }
 
 static int
@@ -1254,7 +1254,7 @@ hns_set_rss(struct net_device *netdev, const u32 *indir, const u8 *key,
 
 	ret = ops->set_rss(priv->ae_handle, indir, key, hfunc);
 
-	return 0;
+	return ret;
 }
 
 static struct ethtool_ops hns_ethtool_ops = {
