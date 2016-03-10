@@ -44,8 +44,12 @@
 static DEFINE_SPINLOCK(hose_spinlock);
 LIST_HEAD(hose_list);
 
-/* XXX kill that some day ... */
-static int global_phb_number;		/* Global phb counter */
+/* Global PHB counter list */
+struct global_phb_number {
+	bool used;
+	struct list_head node;
+};
+LIST_HEAD(global_phb_number_list);
 
 /* ISA Memory physical address */
 resource_size_t isa_mem_base;
@@ -64,6 +68,42 @@ struct dma_map_ops *get_pci_dma_ops(void)
 }
 EXPORT_SYMBOL(get_pci_dma_ops);
 
+static int get_phb_number(void)
+{
+	struct global_phb_number *ptr;
+	int latest_number = 0;
+
+	list_for_each_entry(ptr, &global_phb_number_list, node) {
+		if (!ptr->used) {
+			ptr->used = true;
+			return latest_number;
+		}
+		latest_number++;
+	}
+
+	ptr = zalloc_maybe_bootmem(sizeof(struct global_phb_number), GFP_KERNEL);
+	BUG_ON(ptr == NULL);
+
+	ptr->used = true;
+	list_add_tail(&ptr->node, &global_phb_number_list);
+
+	return latest_number;
+}
+
+static void release_phb_number(int phb_number)
+{
+	struct global_phb_number *ptr;
+	int current_number = 0;
+
+	list_for_each_entry(ptr, &global_phb_number_list, node) {
+		if (current_number == phb_number) {
+			ptr->used = false;
+			return;
+		}
+		current_number++;
+	}
+}
+
 struct pci_controller *pcibios_alloc_controller(struct device_node *dev)
 {
 	struct pci_controller *phb;
@@ -72,7 +112,7 @@ struct pci_controller *pcibios_alloc_controller(struct device_node *dev)
 	if (phb == NULL)
 		return NULL;
 	spin_lock(&hose_spinlock);
-	phb->global_number = global_phb_number++;
+	phb->global_number = get_phb_number();
 	list_add_tail(&phb->list_node, &hose_list);
 	spin_unlock(&hose_spinlock);
 	phb->dn = dev;
@@ -94,6 +134,7 @@ EXPORT_SYMBOL_GPL(pcibios_alloc_controller);
 void pcibios_free_controller(struct pci_controller *phb)
 {
 	spin_lock(&hose_spinlock);
+	release_phb_number(phb->global_number);
 	list_del(&phb->list_node);
 	spin_unlock(&hose_spinlock);
 
