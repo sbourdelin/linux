@@ -15,6 +15,7 @@
 #include <linux/omap-gpmc.h>
 #include <linux/mtd/nand.h>
 #include <linux/platform_data/mtd-nand-omap2.h>
+#include <linux/of_platform.h>
 
 #include <asm/mach/flash.h>
 
@@ -77,6 +78,9 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
 	int err	= 0;
 	struct gpmc_settings s;
 	struct platform_device *pdev;
+	struct platform_device *gpmc_dev;
+	struct device_node *gpmc_node;
+
 	struct resource gpmc_nand_res[] = {
 		{ .flags = IORESOURCE_MEM, },
 		{ .flags = IORESOURCE_IRQ, },
@@ -134,8 +138,18 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
 	if (pdev) {
 		err = platform_device_add_resources(pdev, gpmc_nand_res,
 						    ARRAY_SIZE(gpmc_nand_res));
-		if (!err)
+		if (!err) {
 			pdev->dev.platform_data = gpmc_nand_data;
+
+			gpmc_node = of_get_parent(gpmc_nand_data->of_node);
+
+			if (gpmc_node) {
+				gpmc_dev = of_find_device_by_node(gpmc_node);
+
+				if (gpmc_dev)
+					pdev->dev.parent = &gpmc_dev->dev;
+			}
+		}
 	} else {
 		err = -ENOMEM;
 	}
