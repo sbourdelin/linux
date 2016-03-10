@@ -855,6 +855,7 @@ struct i915_ctx_hang_stats {
 #define DEFAULT_CONTEXT_HANDLE 0
 
 #define CONTEXT_NO_ZEROMAP (1<<0)
+#define CONTEXT_USE_TRTT   (1 << 1)
 /**
  * struct intel_context - as the name implies, represents a context.
  * @ref: reference count.
@@ -869,6 +870,8 @@ struct i915_ctx_hang_stats {
  * @ppgtt: virtual memory space used by this context.
  * @legacy_hw_ctx: render context backing object and whether it is correctly
  *                initialized (legacy ring submission mechanism only).
+ * @trtt_info: Programming parameters for tr-tt (redirection tables for
+ *             userspace, for sparse resource management)
  * @link: link in the global list of contexts.
  *
  * Contexts are memory images used by the hardware to store copies of their
@@ -879,7 +882,7 @@ struct intel_context {
 	int user_handle;
 	uint8_t remap_slice;
 	struct drm_i915_private *i915;
-	int flags;
+	unsigned int flags;
 	struct drm_i915_file_private *file_priv;
 	struct i915_ctx_hang_stats hang_stats;
 	struct i915_hw_ppgtt *ppgtt;
@@ -899,6 +902,15 @@ struct intel_context {
 		u64 lrc_desc;
 		uint32_t *lrc_reg_state;
 	} engine[I915_NUM_RINGS];
+
+	/* TRTT info */
+	struct intel_context_trtt {
+		u32 invd_tile_val;
+		u32 null_tile_val;
+		u64 l3_table_address;
+		u64 segment_base_addr;
+		struct i915_vma *vma;
+	} trtt_info;
 
 	struct list_head link;
 };
@@ -2701,6 +2713,8 @@ struct drm_i915_cmd_table {
 #define HAS_CORE_RING_FREQ(dev)	(INTEL_INFO(dev)->gen >= 6 && \
 				 !IS_VALLEYVIEW(dev) && !IS_CHERRYVIEW(dev) && \
 				 !IS_BROXTON(dev))
+
+#define HAS_TRTT(dev)		(IS_GEN9(dev))
 
 #define INTEL_PCH_DEVICE_ID_MASK		0xff00
 #define INTEL_PCH_IBX_DEVICE_ID_TYPE		0x3b00

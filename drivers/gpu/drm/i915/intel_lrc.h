@@ -107,6 +107,7 @@ void intel_lr_context_reset(struct drm_device *dev,
 			struct intel_context *ctx);
 uint64_t intel_lr_context_descriptor(struct intel_context *ctx,
 				     struct intel_engine_cs *ring);
+int intel_lr_rcs_context_setup_trtt(struct intel_context *ctx);
 
 u32 intel_execlists_ctx_id(struct intel_context *ctx,
 			   struct intel_engine_cs *ring);
