@@ -1454,9 +1454,17 @@ unsigned int cpufreq_quick_get(unsigned int cpu)
 {
 	struct cpufreq_policy *policy;
 	unsigned int ret_freq = 0;
+	unsigned long flags;
+
+	read_lock_irqsave(&cpufreq_driver_lock, flags);
 
 	if (cpufreq_driver && cpufreq_driver->setpolicy && cpufreq_driver->get)
-		return cpufreq_driver->get(cpu);
+		ret_freq = cpufreq_driver->get(cpu);
+
+	read_unlock_irqrestore(&cpufreq_driver_lock, flags);
+
+	if (ret_freq)
+		return ret_freq;
 
 	policy = cpufreq_cpu_get(cpu);
 	if (policy) {
