@@ -32,6 +32,7 @@
 #include "i915_vgpu.h"
 #include "i915_trace.h"
 #include "intel_drv.h"
+#include "intel_mocs.h"
 #include <linux/shmem_fs.h>
 #include <linux/slab.h>
 #include <linux/swap.h>
@@ -4881,6 +4882,12 @@ i915_gem_init_hw(struct drm_device *dev)
 		if (ret)
 			goto out;
 	}
+
+	/*
+	 * lets program the mocs values for all engines the RCS will
+	 * send a batch on context start, but that will have to happen
+	 */
+	intel_program_mocs_all_engines(dev);
 
 	/* We can't enable contexts until all firmware is loaded */
 	if (HAS_GUC_UCODE(dev)) {
