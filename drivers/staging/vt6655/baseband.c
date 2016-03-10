@@ -36,8 +36,10 @@
  * Revision History:
  *      06-10-2003 Bryan YC Fan:  Re-write codes to support VT3253 spec.
  *      08-07-2003 Bryan YC Fan:  Add MAXIM2827/2825 and RFMD2959 support.
- *      08-26-2003 Kyle Hsu    :  Modify BBuGetFrameTime() and BBvCalculateParameter().
- *                                cancel the setting of MAC_REG_SOFTPWRCTL on BBbVT3253Init().
+ *      08-26-2003 Kyle Hsu    :  Modify BBuGetFrameTime() and
+ *								  BBvCalculateParameter().
+ *                                cancel the setting of MAC_REG_SOFTPWRCTL
+ *								  on BBbVT3253Init().
  *                                Add the comments.
  *      09-01-2003 Bryan YC Fan:  RF & BB tables updated.
  *                                Modified BBvLoopbackOn & BBvLoopbackOff().
@@ -2160,10 +2162,12 @@ bool BBbVT3253Init(struct vnt_private *priv)
 
 
 		/* {{ RobertYu:20050223, request by JerryChung */
-		/* Init ANT B select,TX Config CR09 = 0x61->0x45, 0x45->0x41(VC1/VC2 define, make the ANT_A, ANT_B inverted) */
-		/*bResult &= BBbWriteEmbedded(dwIoBase,0x09,0x41);*/
-		/* Init ANT B select,RX Config CR10 = 0x28->0x2A, 0x2A->0x28(VC1/VC2 define, make the ANT_A, ANT_B inverted) */
-		/*bResult &= BBbWriteEmbedded(dwIoBase,0x0a,0x28);*/
+		/* Init ANT B select,TX Config CR09 = 0x61->0x45, */
+		/* 0x45->0x41(VC1/VC2 define, make the ANT_A, ANT_B inverted) */
+		/* bResult &= BBbWriteEmbedded(dwIoBase,0x09,0x41);*/
+		/* Init ANT B select,RX Config CR10 = 0x28->0x2A, 0x2A->0x28 */
+		/* (VC1/VC2 define, make the ANT_A, ANT_B inverted) */
+		/* bResult &= BBbWriteEmbedded(dwIoBase,0x0a,0x28);*/
 		/* Select VC1/VC2, CR215 = 0x02->0x06 */
 		bResult &= BBbWriteEmbedded(priv, 0xd7, 0x06);
 		/* }} */
