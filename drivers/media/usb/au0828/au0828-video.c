@@ -1468,12 +1468,10 @@ static int vidioc_s_input(struct file *file, void *priv, unsigned int index)
 	au0828_s_input(dev, index);
 
 	/*
-	 * Input has been changed. Disable the media source
-	 * associated with the old input and enable source
-	 * for the newly set input
+	 * Input has been changed. Change to media source
+	 * associated with the for the newly set input.
 	 */
-	v4l_disable_media_source(vfd);
-	return v4l_enable_media_source(vfd);
+	return v4l_change_media_source(vfd);
 }
 
 static int vidioc_enumaudio(struct file *file, void *priv, struct v4l2_audio *a)
