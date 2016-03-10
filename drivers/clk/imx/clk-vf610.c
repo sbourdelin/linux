@@ -117,6 +117,11 @@ static struct clk_div_table pll4_audio_div_table[] = {
 static struct clk *clk[VF610_CLK_END];
 static struct clk_onecell_data clk_data;
 
+static u32 anadig_pll3_ctrl;
+static u32 anadig_pll4_ctrl;
+static u32 anadig_pll5_ctrl;
+static u32 anadig_pll6_ctrl;
+static u32 anadig_pll7_ctrl;
 static u32 cscmr1;
 static u32 cscmr2;
 static u32 cscdr1;
@@ -147,6 +152,12 @@ static int vf610_clk_suspend(void)
 {
 	int i;
 
+	anadig_pll3_ctrl = readl_relaxed(PLL3_CTRL);
+	anadig_pll4_ctrl = readl_relaxed(PLL4_CTRL);
+	anadig_pll5_ctrl = readl_relaxed(PLL5_CTRL);
+	anadig_pll6_ctrl = readl_relaxed(PLL6_CTRL);
+	anadig_pll7_ctrl = readl_relaxed(PLL7_CTRL);
+
 	cscmr1 = readl_relaxed(CCM_CSCMR1);
 	cscmr2 = readl_relaxed(CCM_CSCMR2);
 
@@ -163,6 +174,12 @@ static int vf610_clk_suspend(void)
 static void vf610_clk_resume(void)
 {
 	int i;
+
+	writel_relaxed(anadig_pll3_ctrl, PLL3_CTRL);
+	writel_relaxed(anadig_pll4_ctrl, PLL4_CTRL);
+	writel_relaxed(anadig_pll5_ctrl, PLL5_CTRL);
+	writel_relaxed(anadig_pll6_ctrl, PLL6_CTRL);
+	writel_relaxed(anadig_pll7_ctrl, PLL7_CTRL);
 
 	writel_relaxed(cscmr1, CCM_CSCMR1);
 	writel_relaxed(cscmr2, CCM_CSCMR2);
