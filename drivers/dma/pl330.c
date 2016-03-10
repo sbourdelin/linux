@@ -1258,7 +1258,7 @@ static inline int _loop(unsigned dry_run, u8 buf[],
 	lpend.bjump = 0;
 	szlpend = _emit_LPEND(1, buf, &lpend);
 
-	if (lcnt0) {
+	if (lcnt0 > 1) {
 		szlp *= 2;
 		szlpend *= 2;
 	}
@@ -1274,7 +1274,7 @@ static inline int _loop(unsigned dry_run, u8 buf[],
 
 	off = 0;
 
-	if (lcnt0) {
+	if (lcnt0 > 1) {
 		off += _emit_LP(dry_run, &buf[off], 0, lcnt0);
 		ljmp0 = off;
 	}
@@ -1290,7 +1290,7 @@ static inline int _loop(unsigned dry_run, u8 buf[],
 	lpend.bjump = off - ljmp1;
 	off += _emit_LPEND(dry_run, &buf[off], &lpend);
 
-	if (lcnt0) {
+	if (lcnt0 > 1) {
 		lpend.cond = ALWAYS;
 		lpend.forever = false;
 		lpend.loop = 0;
@@ -1299,7 +1299,7 @@ static inline int _loop(unsigned dry_run, u8 buf[],
 	}
 
 	*bursts = lcnt1 * cyc;
-	if (lcnt0)
+	if (lcnt0 > 1)
 		*bursts *= lcnt0;
 
 	return off;
