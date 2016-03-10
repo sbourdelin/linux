@@ -2349,6 +2349,7 @@ static int __spi_split_transfer_maxsize(struct spi_master *master,
  * @master:    the @spi_master for this transfer
  * @msg:   the @spi_message to transform
  * @maxsize:  the maximum when to apply this
+ * @gfp: GFP allocation flags
  *
  * Return: status of transformation
  */
