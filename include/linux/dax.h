@@ -18,6 +18,7 @@ int dax_zero_page_range(struct inode *, loff_t from, unsigned len, get_block_t);
 int dax_truncate_page(struct inode *, loff_t from, get_block_t);
 int dax_fault(struct vm_area_struct *, struct vm_fault *, get_block_t);
 int __dax_fault(struct vm_area_struct *, struct vm_fault *, get_block_t);
+int dax_delete_mapping_entry(struct address_space *mapping, pgoff_t index);
 
 #ifdef CONFIG_FS_DAX
 struct page *read_dax_sector(struct block_device *bdev, sector_t n);
