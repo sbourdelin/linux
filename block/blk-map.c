@@ -126,7 +126,7 @@ int blk_rq_map_user_iov(struct request_queue *q, struct request *rq,
 			const struct iov_iter *iter, gfp_t gfp_mask)
 {
 	struct iovec iov, prv = {.iov_base = NULL, .iov_len = 0};
-	bool copy = (q->dma_pad_mask & iter->count) || map_data;
+	bool copy;
 	struct bio *bio = NULL;
 	struct iov_iter i;
 	int ret;
@@ -134,6 +134,7 @@ int blk_rq_map_user_iov(struct request_queue *q, struct request *rq,
 	if (!iter || !iter->count)
 		return -EINVAL;
 
+	copy = (q->dma_pad_mask & iter->count) || map_data;
 	iov_for_each(iov, i, *iter) {
 		unsigned long uaddr = (unsigned long) iov.iov_base;
 
