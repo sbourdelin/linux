@@ -334,6 +334,7 @@
 325	common	mlock2			sys_mlock2
 326	common	copy_file_range		sys_copy_file_range
 327	64	madvisev		sys_madvisev
+328	common	cpuid			sys_cpuid
 
 #
 # x32-specific system call numbers start at 512 to avoid cache impact

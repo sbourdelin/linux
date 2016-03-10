@@ -11,8 +11,10 @@ static void early_init_transmeta(struct cpuinfo_x86 *c)
 	/* Transmeta-defined flags: level 0x80860001 */
 	xlvl = cpuid_eax(0x80860000);
 	if ((xlvl & 0xffff0000) == 0x80860000) {
-		if (xlvl >= 0x80860001)
-			c->x86_capability[CPUID_8086_0001_EDX] = cpuid_edx(0x80860001);
+		if (xlvl >= 0x80860001) {
+			c->x86_capability[CPUID_80860001_0_EDX] = cpuid_edx(0x80860001);
+			cpuid_overrides[CPUID_80860001_0_EDX] = &(c->x86_capability[CPUID_80860001_0_EDX]);
+		}
 	}
 }
 
@@ -82,7 +84,8 @@ static void init_transmeta(struct cpuinfo_x86 *c)
 	/* Unhide possibly hidden capability flags */
 	rdmsr(0x80860004, cap_mask, uk);
 	wrmsr(0x80860004, ~0, uk);
-	c->x86_capability[CPUID_1_EDX] = cpuid_edx(0x00000001);
+	c->x86_capability[CPUID_00000001_0_EDX] = cpuid_edx(0x00000001);
+	cpuid_overrides[CPUID_00000001_0_EDX] = &(c->x86_capability[CPUID_00000001_0_EDX]);
 	wrmsr(0x80860004, cap_mask, uk);
 
 	/* All Transmeta CPUs have a constant TSC */

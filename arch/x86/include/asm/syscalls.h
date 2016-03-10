@@ -2,6 +2,7 @@
  * syscalls.h - Linux syscall interfaces (arch-specific)
  *
  * Copyright (c) 2008 Jaswinder Singh Rajput
+ * Copyright (c) 2016 Piotr Henryk Dabrowski <ultr@ultr.pl>
  *
  * This file is released under the GPLv2.
  * See the file COPYING for more details.
@@ -29,6 +30,11 @@ asmlinkage long sys_rt_sigreturn(void);
 /* kernel/tls.c */
 asmlinkage long sys_set_thread_area(struct user_desc __user *);
 asmlinkage long sys_get_thread_area(struct user_desc __user *);
+
+/* kernel/common.c */
+asmlinkage long sys_cpuid(const u32 level, const u32 count,
+			  u32 __user *eax, u32 __user *ebx,
+			  u32 __user *ecx, u32 __user *edx);
 
 /* X86_32 only */
 #ifdef CONFIG_X86_32
