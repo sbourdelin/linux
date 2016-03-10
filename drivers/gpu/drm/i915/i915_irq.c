@@ -1829,35 +1829,33 @@ static irqreturn_t cherryview_irq_handler(int irq, void *arg)
 	/* IRQs are synced during runtime_suspend, we don't require a wakeref */
 	disable_rpm_wakeref_asserts(dev_priv);
 
-	for (;;) {
-		master_ctl = I915_READ(GEN8_MASTER_IRQ) & ~GEN8_MASTER_IRQ_CONTROL;
-		iir = I915_READ(VLV_IIR);
+	master_ctl = I915_READ(GEN8_MASTER_IRQ) & ~GEN8_MASTER_IRQ_CONTROL;
+	iir = I915_READ(VLV_IIR);
 
-		if (master_ctl == 0 && iir == 0)
-			break;
+	if (master_ctl == 0 && iir == 0)
+		break;
 
-		ret = IRQ_HANDLED;
+	ret = IRQ_HANDLED;
 
-		I915_WRITE(GEN8_MASTER_IRQ, 0);
+	I915_WRITE(GEN8_MASTER_IRQ, 0);
 
-		/* Find, clear, then process each source of interrupt */
+	/* Find, clear, then process each source of interrupt */
 
-		if (iir) {
-			/* Consume port before clearing IIR or we'll miss events */
-			if (iir & I915_DISPLAY_PORT_INTERRUPT)
-				i9xx_hpd_irq_handler(dev);
-			I915_WRITE(VLV_IIR, iir);
-		}
-
-		gen8_gt_irq_handler(dev_priv, master_ctl);
-
-		/* Call regardless, as some status bits might not be
-		 * signalled in iir */
-		valleyview_pipestat_irq_handler(dev, iir);
-
-		I915_WRITE(GEN8_MASTER_IRQ, DE_MASTER_IRQ_CONTROL);
-		POSTING_READ(GEN8_MASTER_IRQ);
+	if (iir) {
+		/* Consume port before clearing IIR or we'll miss events */
+		if (iir & I915_DISPLAY_PORT_INTERRUPT)
+			i9xx_hpd_irq_handler(dev);
+		I915_WRITE(VLV_IIR, iir);
 	}
+
+	gen8_gt_irq_handler(dev_priv, master_ctl);
+
+	/* Call regardless, as some status bits might not be
+	 * signalled in iir */
+	valleyview_pipestat_irq_handler(dev, iir);
+
+	I915_WRITE(GEN8_MASTER_IRQ, DE_MASTER_IRQ_CONTROL);
+	POSTING_READ(GEN8_MASTER_IRQ);
 
 	enable_rpm_wakeref_asserts(dev_priv);
 
