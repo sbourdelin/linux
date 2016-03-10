@@ -3,7 +3,13 @@
 
 #include <linux/fs.h>
 #include <linux/mm.h>
+#include <linux/radix-tree.h>
 #include <asm/pgtable.h>
+
+/*
+ * Since exceptional entries do not use indirect bit, we reuse it as a lock bit
+ */
+#define DAX_ENTRY_LOCK RADIX_TREE_INDIRECT_PTR
 
 ssize_t dax_do_io(struct kiocb *, struct inode *, struct iov_iter *, loff_t,
 		  get_block_t, dio_iodone_t, int flags);
