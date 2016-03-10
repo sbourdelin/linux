@@ -2861,10 +2861,10 @@ int wm_adsp_compr_handle_irq(struct wm_adsp *dsp)
 		goto out;
 	}
 
+out:
 	if (compr && compr->stream)
 		snd_compr_fragment_elapsed(compr->stream);
 
-out:
 	mutex_unlock(&dsp->pwr_lock);
 
 	return ret;
@@ -2926,6 +2926,10 @@ int wm_adsp_compr_pointer(struct snd_compr_stream *stream,
 					 ret);
 				goto out;
 			}
+
+			ret = wm_adsp_buffer_check_error(buf);
+			if (ret < 0)
+				goto out;
 		}
 	}
 
