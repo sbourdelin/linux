@@ -236,6 +236,20 @@ void v4l_disable_media_source(struct video_device *vdev)
 }
 EXPORT_SYMBOL_GPL(v4l_disable_media_source);
 
+int v4l_change_media_source(struct video_device *vdev)
+{
+	struct media_device *mdev = vdev->entity.graph_obj.mdev;
+	int ret;
+
+	if (!mdev || !mdev->change_source)
+		return 0;
+	ret = mdev->change_source(&vdev->entity, &vdev->pipe);
+	if (ret)
+		return -EBUSY;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(v4l_change_media_source);
+
 int v4l_vb2q_enable_media_source(struct vb2_queue *q)
 {
 	struct v4l2_fh *fh = q->owner;

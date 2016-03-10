@@ -154,8 +154,26 @@ int v4l_enable_media_source(struct video_device *vdev);
  */
 void v4l_disable_media_source(struct video_device *vdev);
 
+/**
+ * v4l_change_media_source() -	Hold media source for exclusive use
+ *				if free
+ *
+ * @vdev:	pointer to struct video_device
+ *
+ * This interface calls change_source handler to change
+ * the current source it is holding. The change_source
+ * disables the current source and starts pipeline to
+ * the new source. This interface should be used when
+ * user changes source using s_input handler to keep
+ * the previously granted permission for exclusive use
+ * with a new input source.
+ *
+ * Return: returns zero on success or a negative error code.
+ */
+int v4l_change_media_source(struct video_device *vdev);
+
 /*
- * v4l_vb2q_enable_media_tuner -  Hold media source for exclusive use
+ * v4l_vb2q_enable_media_source - Hold media source for exclusive use
  *				  if free.
  * @q - pointer to struct vb2_queue
  *
