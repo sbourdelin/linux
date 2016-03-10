@@ -46,6 +46,9 @@
 #define DM_GPR_DATA	0x1f
 #define DM_CHIP_ID	0x2c
 #define DM_MODE_CTRL	0x91	/* only on dm9620 */
+#define	DM_USB_CTRL	0xf4
+
+#define	USB_CTRL_EP3ACK	0x20
 
 /* chip id values */
 #define ID_DM9601	0
@@ -414,6 +417,9 @@ static int dm9601_bind(struct usbnet *dev, struct usb_interface *intf)
 			goto out;
 		}
 		dm_write_reg(dev, DM_MODE_CTRL, mode & 0x7f);
+
+		/* Always return 8-bytes data to host per interrupt-interval */
+		dm_write_reg(dev, DM_USB_CTRL, USB_CTRL_EP3ACK);
 	}
 
 	/* power up phy */
