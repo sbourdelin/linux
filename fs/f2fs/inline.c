@@ -81,15 +81,13 @@ int f2fs_read_inline_data(struct inode *inode, struct page *page)
 {
 	struct page *ipage;
 
+	if (!f2fs_has_inline_data(inode))
+		return -EAGAIN;
+
 	ipage = get_node_page(F2FS_I_SB(inode), inode->i_ino);
 	if (IS_ERR(ipage)) {
 		unlock_page(page);
 		return PTR_ERR(ipage);
-	}
-
-	if (!f2fs_has_inline_data(inode)) {
-		f2fs_put_page(ipage, 1);
-		return -EAGAIN;
 	}
 
 	if (page->index)
