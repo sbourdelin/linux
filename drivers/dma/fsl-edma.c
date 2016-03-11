@@ -885,20 +885,23 @@ static int fsl_edma_probe(struct platform_device *pdev)
 
 		res = platform_get_resource(pdev, IORESOURCE_MEM, 1 + i);
 		fsl_edma->muxbase[i] = devm_ioremap_resource(&pdev->dev, res);
-		if (IS_ERR(fsl_edma->muxbase[i]))
-			return PTR_ERR(fsl_edma->muxbase[i]);
+		if (IS_ERR(fsl_edma->muxbase[i])) {
+			ret = PTR_ERR(fsl_edma->muxbase[i]);
+			goto err_clk;
+		}
 
 		sprintf(clkname, "dmamux%d", i);
 		fsl_edma->muxclk[i] = devm_clk_get(&pdev->dev, clkname);
 		if (IS_ERR(fsl_edma->muxclk[i])) {
 			dev_err(&pdev->dev, "Missing DMAMUX block clock.\n");
-			return PTR_ERR(fsl_edma->muxclk[i]);
+			ret = PTR_ERR(fsl_edma->muxclk[i]);
+			goto err_clk;
 		}
 
 		ret = clk_prepare_enable(fsl_edma->muxclk[i]);
 		if (ret) {
 			dev_err(&pdev->dev, "DMAMUX clk block failed.\n");
-			return ret;
+			goto err_clk;
 		}
 
 	}
@@ -923,7 +926,7 @@ static int fsl_edma_probe(struct platform_device *pdev)
 	edma_writel(fsl_edma, ~0, fsl_edma->membase + EDMA_INTR);
 	ret = fsl_edma_irq_init(pdev, fsl_edma);
 	if (ret)
-		return ret;
+		goto err_allclk;
 
 	dma_cap_set(DMA_PRIVATE, fsl_edma->dma_dev.cap_mask);
 	dma_cap_set(DMA_SLAVE, fsl_edma->dma_dev.cap_mask);
@@ -952,20 +955,28 @@ static int fsl_edma_probe(struct platform_device *pdev)
 	ret = dma_async_device_register(&fsl_edma->dma_dev);
 	if (ret) {
 		dev_err(&pdev->dev, "Can't register Freescale eDMA engine.\n");
-		return ret;
+		goto err_allclk;
 	}
 
 	ret = of_dma_controller_register(np, fsl_edma_xlate, fsl_edma);
 	if (ret) {
 		dev_err(&pdev->dev, "Can't register Freescale eDMA of_dma.\n");
-		dma_async_device_unregister(&fsl_edma->dma_dev);
-		return ret;
+		goto err_async;
 	}
 
 	/* enable round robin arbitration */
 	edma_writel(fsl_edma, EDMA_CR_ERGA | EDMA_CR_ERCA, fsl_edma->membase + EDMA_CR);
 
 	return 0;
+
+err_async:
+	dma_async_device_unregister(&fsl_edma->dma_dev);
+err_allclk:
+	i = DMAMUX_NR;
+err_clk:
+	while (--i >= 0)
+		clk_disable_unprepare(fsl_edma->muxclk[i]);
+	return ret;
 }
 
 static int fsl_edma_remove(struct platform_device *pdev)
