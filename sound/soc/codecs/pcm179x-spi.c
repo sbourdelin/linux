@@ -43,12 +43,6 @@ static int pcm179x_spi_remove(struct spi_device *spi)
 	return pcm179x_common_exit(&spi->dev);
 }
 
-static const struct of_device_id pcm179x_of_match[] = {
-	{ .compatible = "ti,pcm1792a", },
-	{ }
-};
-MODULE_DEVICE_TABLE(of, pcm179x_of_match);
-
 static const struct spi_device_id pcm179x_spi_ids[] = {
 	{ "pcm179x", 0 },
 	{ },

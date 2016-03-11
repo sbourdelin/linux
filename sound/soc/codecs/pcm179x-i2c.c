@@ -44,12 +44,6 @@ static int pcm179x_i2c_remove(struct i2c_client *client)
 	return pcm179x_common_exit(&client->dev);
 }
 
-static const struct of_device_id pcm179x_of_match[] = {
-	{ .compatible = "ti,pcm1792a", },
-	{ }
-};
-MODULE_DEVICE_TABLE(of, pcm179x_of_match);
-
 static const struct i2c_device_id pcm179x_i2c_ids[] = {
 	{ "pcm179x", 0 },
 	{ }
