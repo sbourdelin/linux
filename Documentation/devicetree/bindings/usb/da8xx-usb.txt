@@ -1,0 +1,45 @@
+TI DA8xx MUSB
+~~~~~~~~~~~~~
+For DA8xx/OMAP-L1x/AM17xx/AM18xx platforms.
+
+Required properties:
+~~~~~~~~~~~~~~~~~~~~
+ - compatible : Should be set to "ti,da830-musb".
+
+ - reg: Offset and length of the USB controller register set.
+
+ - interrupts: The USB interrupt number.
+
+ - interrupt-names: Should be set to "mc".
+
+ - dr_mode: The USB operation mode. Should be one of "host", "peripheral" or "otg".
+
+ - vbus-supply: Phandle to a regulator providing the USB bus power.
+
+ - ti,usb2-phy-refclock-hz : Integer. Frequency in Hz of the USB 2.0 PHY reference clock,
+     either provided by the internal PLL or an external source.
+     The supported values are: 12MHz, 13MHz, 19.2MHz, 20MHz, 24MHz, 26MHz, 38.4MHz, 40MHz, 48MHz.
+
+
+Optional properties:
+~~~~~~~~~~~~~~~~~~~~
+ - ti,usb2-phy-clkmux-refclkin: Boolean. Defines the USB 2.0 PHY reference clock source.
+     If present the the external USB_REFCLKIN pin is used as a clock source, otherwise
+     the internal PLL is used.
+
+Example:
+
+	usb20: usb@1e00000 {
+		compatible = "ti,da830-musb";
+		reg =   <0x00200000 0x10000>;
+		interrupt-parent = <&intc>;
+		interrupts = <58>;
+		interrupt-names = "mc";
+
+		dr_mode = "host";
+		vbus-supply = <&usb_vbus>;
+
+		ti,usb2-phy-refclock-hz = <24000000>;
+
+		status = "okay";
+	};
