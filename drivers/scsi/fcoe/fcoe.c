@@ -1334,10 +1334,8 @@ static void fcoe_percpu_thread_destroy(unsigned int cpu)
 		 * will reach this case and we will drop all skbs and later
 		 * stop the thread.
 		 */
-		spin_lock_bh(&p->fcoe_rx_list.lock);
 		while ((skb = __skb_dequeue(&p->fcoe_rx_list)) != NULL)
 			kfree_skb(skb);
-		spin_unlock_bh(&p->fcoe_rx_list.lock);
 	}
 	put_cpu();
 
