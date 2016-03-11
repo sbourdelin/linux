@@ -1284,7 +1284,7 @@ static void fcoe_percpu_thread_destroy(unsigned int cpu)
 	struct task_struct *thread;
 	struct page *crc_eof;
 	struct sk_buff *skb;
-	struct fcoe_percpu_s *p0;
+	struct fcoe_percpu_s *p_target;
 	unsigned targ_cpu = get_cpu();
 
 	FCOE_DBG("Destroying receive thread for CPU %d\n", cpu);
@@ -1305,15 +1305,15 @@ static void fcoe_percpu_thread_destroy(unsigned int cpu)
 	 * can easily happen when the module is removed.
 	 */
 	if (cpu != targ_cpu) {
-		p0 = &per_cpu(fcoe_percpu, targ_cpu);
-		spin_lock_bh(&p0->fcoe_rx_list.lock);
-		if (p0->thread) {
+		p_target = &per_cpu(fcoe_percpu, targ_cpu);
+		spin_lock_bh(&p_target->fcoe_rx_list.lock);
+		if (p_target->thread) {
 			FCOE_DBG("Moving frames from CPU %d to CPU %d\n",
 				 cpu, targ_cpu);
 
 			while ((skb = __skb_dequeue(&p->fcoe_rx_list)) != NULL)
-				__skb_queue_tail(&p0->fcoe_rx_list, skb);
-			spin_unlock_bh(&p0->fcoe_rx_list.lock);
+				__skb_queue_tail(&p_target->fcoe_rx_list, skb);
+			spin_unlock_bh(&p_target->fcoe_rx_list.lock);
 		} else {
 			/*
 			 * The targeted CPU is not initialized and cannot accept
@@ -1322,7 +1322,7 @@ static void fcoe_percpu_thread_destroy(unsigned int cpu)
 			 */
 			while ((skb = __skb_dequeue(&p->fcoe_rx_list)) != NULL)
 				kfree_skb(skb);
-			spin_unlock_bh(&p0->fcoe_rx_list.lock);
+			spin_unlock_bh(&p_target->fcoe_rx_list.lock);
 		}
 	} else {
 		/*
