@@ -1819,7 +1819,7 @@ static int iscsi_user_scan_session(struct device *dev, void *data)
 		    (scan_data->id == SCAN_WILD_CARD ||
 		     scan_data->id == id))
 			scsi_scan_target(&session->dev, 0, id,
-					 scan_data->lun, 1);
+					 scan_data->lun, 2);
 	}
 
 user_scan_exit:

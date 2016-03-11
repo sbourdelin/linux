@@ -1739,7 +1739,7 @@ static int sas_user_scan(struct Scsi_Host *shost, uint channel,
 		if ((channel == SCAN_WILD_CARD || channel == 0) &&
 		    (id == SCAN_WILD_CARD || id == rphy->scsi_target_id)) {
 			scsi_scan_target(&rphy->dev, 0,
-					 rphy->scsi_target_id, lun, 1);
+					 rphy->scsi_target_id, lun, 2);
 		}
 	}
 	mutex_unlock(&sas_host->lock);

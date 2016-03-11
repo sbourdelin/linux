@@ -96,10 +96,11 @@ MODULE_PARM_DESC(max_luns,
 #define SCSI_SCAN_TYPE_DEFAULT "sync"
 #endif
 
-char scsi_scan_type[6] = SCSI_SCAN_TYPE_DEFAULT;
+char scsi_scan_type[9] = SCSI_SCAN_TYPE_DEFAULT;
 
-module_param_string(scan, scsi_scan_type, sizeof(scsi_scan_type), S_IRUGO);
-MODULE_PARM_DESC(scan, "sync, async or none");
+module_param_string(scan, scsi_scan_type, sizeof(scsi_scan_type),
+		    S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(scan, "sync, async, disabled, or none");
 
 static unsigned int scsi_inq_timeout = SCSI_TIMEOUT/HZ + 18;
 
@@ -1604,7 +1605,9 @@ static void __scsi_scan_target(struct device *parent, unsigned int channel,
  * @channel:	channel to scan
  * @id:		target id to scan
  * @lun:	Specific LUN to scan or SCAN_WILD_CARD
- * @rescan:	passed to LUN scanning routines
+ * @rescan:	passed to LUN scanning routines; 0 for no rescan, 1 to rescan
+ *              existing LUNs, and 2 to override any 'scan_disabled' setting
+ *              from the host.
  *
  * Description:
  *     Scan the target id on @parent, @channel, and @id. Scan at least LUN 0,
@@ -1619,6 +1622,9 @@ void scsi_scan_target(struct device *parent, unsigned int channel,
 	struct Scsi_Host *shost = dev_to_shost(parent);
 
 	if (strncmp(scsi_scan_type, "none", 4) == 0)
+		return;
+
+	if (rescan < 2 && strncmp(scsi_scan_type, "disabled", 8) == 0)
 		return;
 
 	mutex_lock(&shost->scan_mutex);
@@ -1844,7 +1850,8 @@ void scsi_scan_host(struct Scsi_Host *shost)
 {
 	struct async_scan_data *data;
 
-	if (strncmp(scsi_scan_type, "none", 4) == 0)
+	if (strncmp(scsi_scan_type, "none", 4) == 0 ||
+	    strncmp(scsi_scan_type, "disabled", 8) == 0)
 		return;
 	if (scsi_autopm_get_host(shost) < 0)
 		return;
