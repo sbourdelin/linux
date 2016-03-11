@@ -1636,6 +1636,9 @@ static void pci_init_capabilities(struct pci_dev *dev)
 	pci_enable_acs(dev);
 
 	pci_cleanup_aer_error_status_regs(dev);
+
+	/* Enable PTM Capabilities */
+	pci_enable_ptm(dev);
 }
 
 /*
