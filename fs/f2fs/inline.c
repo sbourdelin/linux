@@ -173,8 +173,7 @@ int f2fs_convert_inline_inode(struct inode *inode)
 
 	set_new_dnode(&dn, inode, ipage, ipage, 0);
 
-	if (f2fs_has_inline_data(inode))
-		err = f2fs_convert_inline_page(&dn, page);
+	err = f2fs_convert_inline_page(&dn, page);
 
 	f2fs_put_dnode(&dn);
 out:
