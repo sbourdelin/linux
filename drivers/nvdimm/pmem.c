@@ -264,7 +264,6 @@ static int pmem_attach_disk(struct device *dev,
 	disk->queue		= pmem->pmem_queue;
 	disk->flags		= GENHD_FL_EXT_DEVT;
 	nvdimm_namespace_disk_name(ndns, disk->disk_name);
-	disk->driverfs_dev = dev;
 	set_capacity(disk, (pmem->size - pmem->pfn_pad - pmem->data_offset)
 			/ 512);
 	pmem->pmem_disk = disk;
@@ -274,7 +273,7 @@ static int pmem_attach_disk(struct device *dev,
 	nvdimm_namespace_add_poison(ndns, &pmem->bb, pmem->data_offset);
 
 	disk->bb = &pmem->bb;
-	add_disk(disk);
+	device_add_disk(dev, disk);
 	revalidate_disk(disk);
 
 	return 0;

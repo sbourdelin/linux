@@ -261,7 +261,6 @@ static int nd_blk_attach_disk(struct nd_namespace_common *ndns,
 		return -ENOMEM;
 	}
 
-	disk->driverfs_dev	= &ndns->dev;
 	disk->first_minor	= 0;
 	disk->fops		= &nd_blk_fops;
 	disk->private_data	= blk_dev;
@@ -269,7 +268,7 @@ static int nd_blk_attach_disk(struct nd_namespace_common *ndns,
 	disk->flags		= GENHD_FL_EXT_DEVT;
 	nvdimm_namespace_disk_name(ndns, disk->disk_name);
 	set_capacity(disk, 0);
-	add_disk(disk);
+	device_add_disk(&ndns->dev, disk);
 
 	if (nd_blk_meta_size(blk_dev)) {
 		int rc = nd_integrity_init(disk, nd_blk_meta_size(blk_dev));

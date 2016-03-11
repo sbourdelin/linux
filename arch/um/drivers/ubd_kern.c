@@ -823,12 +823,11 @@ static int ubd_disk_register(int major, u64 size, int unit,
 		ubd_devs[unit].pdev.dev.release = ubd_device_release;
 		dev_set_drvdata(&ubd_devs[unit].pdev.dev, &ubd_devs[unit]);
 		platform_device_register(&ubd_devs[unit].pdev);
-		disk->driverfs_dev = &ubd_devs[unit].pdev.dev;
 	}
 
 	disk->private_data = &ubd_devs[unit];
 	disk->queue = ubd_devs[unit].queue;
-	add_disk(disk);
+	device_add_disk(&ubd_devs[unit].pdev.dev, disk);
 
 	*disk_out = disk;
 	return 0;
