@@ -105,6 +105,46 @@ find_section(const void *_bdb, int section_id)
 	return NULL;
 }
 
+bool
+intel_bios_is_port_hpd_inverted(struct drm_device *dev, enum port port)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	int i;
+
+	if (!IS_BROXTON(dev)) {
+		DRM_ERROR("Bit inversion is not required in this platform\n");
+		return false;
+	}
+
+	for (i = 0; i < dev_priv->vbt.child_dev_num; i++) {
+
+		if (dev_priv->vbt.child_dev[i].common.hpd_invert == 1) {
+
+			switch (dev_priv->vbt.child_dev[i].common.dvo_port) {
+			case DVO_PORT_DPA:
+			case DVO_PORT_HDMIA:
+				if (port == PORT_A)
+					return true;
+				break;
+			case DVO_PORT_DPB:
+			case DVO_PORT_HDMIB:
+				if (port == PORT_B)
+					return true;
+				break;
+			case DVO_PORT_DPC:
+			case DVO_PORT_HDMIC:
+				if (port == PORT_C)
+					return true;
+				break;
+			default:
+				break;
+			}
+		}
+	}
+
+	return false;
+}
+
 static void
 fill_detail_timing_data(struct drm_display_mode *panel_fixed_mode,
 			const struct lvds_dvo_timing *dvo_timing)
