@@ -319,17 +319,19 @@ struct fcoe_transport {
 
 /**
  * struct fcoe_percpu_s - The context for FCoE receive thread(s)
- * @thread:	    The thread context
+ * @kthread:	    The thread context of the smp_hotplug_thread
  * @fcoe_rx_list:   The queue of pending packets to process
  * @page:	    The memory page for calculating frame trailer CRCs
  * @crc_eof_offset: The offset into the CRC page pointing to available
  *		    memory for a new trailer
+ * @active:	    true if the queue is active and not being removed
  */
 struct fcoe_percpu_s {
-	struct task_struct *thread;
+	struct task_struct *kthread;
 	struct sk_buff_head fcoe_rx_list;
 	struct page *crc_eof_page;
 	int crc_eof_offset;
+	bool active;
 };
 
 /**
