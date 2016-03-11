@@ -8,16 +8,34 @@
  * PFN_SG_LAST - pfn references a page and is the last scatterlist entry
  * PFN_DEV - pfn is not covered by system memmap by default
  * PFN_MAP - pfn has a dynamic page mapping established by a device driver
+ *
+ * Note that the bottom two bits in the pfn_t match the bottom two bits in the
+ * scatterlist so sg_is_chain() and sg_is_last() work.  These bits are also
+ * used by the radix tree for its own purposes, but a PFN cannot be in both a
+ * radix tree and a scatterlist simultaneously.  If a PFN is moved between the
+ * two usages, care should be taken to clear/set these bits appropriately.
  */
-#define PFN_FLAGS_MASK (((u64) ~PAGE_MASK) << (BITS_PER_LONG_LONG - PAGE_SHIFT))
-#define PFN_SG_CHAIN (1ULL << (BITS_PER_LONG_LONG - 1))
-#define PFN_SG_LAST (1ULL << (BITS_PER_LONG_LONG - 2))
-#define PFN_DEV (1ULL << (BITS_PER_LONG_LONG - 3))
-#define PFN_MAP (1ULL << (BITS_PER_LONG_LONG - 4))
+#define PFN_FLAG_BITS	4
+#define PFN_FLAGS_MASK	((1 << PFN_FLAG_BITS) - 1)
+#define __PFN_MAX	((1 << (BITS_PER_LONG - PFN_FLAG_BITS)) - 1)
+#define PFN_SG_CHAIN	0x01UL
+#define PFN_SG_LAST	0x02UL
+#define PFN_SG_MASK	(PFN_SG_CHAIN | PFN_SG_LAST)
+#define PFN_DEV		0x04UL
+#define PFN_MAP		0x08UL
+
+#if 0
+#define PFN_T_BUG_ON(x)	BUG_ON(x)
+#else
+#define PFN_T_BUG_ON(x)	BUILD_BUG_ON_INVALID(x)
+#endif
 
 static inline pfn_t __pfn_to_pfn_t(unsigned long pfn, u64 flags)
 {
-	pfn_t pfn_t = { .val = pfn | (flags & PFN_FLAGS_MASK), };
+	pfn_t pfn_t = { .val = (pfn << PFN_FLAG_BITS) | flags };
+
+	PFN_T_BUG_ON(pfn & ~__PFN_MAX);
+	PFN_T_BUG_ON(flags & ~PFN_FLAGS_MASK);
 
 	return pfn_t;
 }
@@ -28,16 +46,17 @@ static inline pfn_t pfn_to_pfn_t(unsigned long pfn)
 	return __pfn_to_pfn_t(pfn, 0);
 }
 
+static inline unsigned long pfn_t_to_pfn(pfn_t pfn)
+{
+	unsigned long v = pfn.val;
+	return v >> PFN_FLAG_BITS;
+}
+
 extern pfn_t phys_to_pfn_t(phys_addr_t addr, u64 flags);
 
 static inline bool pfn_t_has_page(pfn_t pfn)
 {
 	return (pfn.val & PFN_MAP) == PFN_MAP || (pfn.val & PFN_DEV) == 0;
-}
-
-static inline unsigned long pfn_t_to_pfn(pfn_t pfn)
-{
-	return pfn.val & ~PFN_FLAGS_MASK;
 }
 
 static inline struct page *pfn_t_to_page(pfn_t pfn)
