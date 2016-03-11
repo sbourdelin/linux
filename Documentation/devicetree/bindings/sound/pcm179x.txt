@@ -5,6 +5,8 @@ This driver supports both the I2C and SPI bus.
 Required properties:
 
  - compatible: "ti,pcm1792a"
+ - compatible: "ti,pcm1795"
+ - compatible: "ti,pcm1796"
 
 For required properties on SPI, please consult
 Documentation/devicetree/bindings/spi/spi-bus.txt
