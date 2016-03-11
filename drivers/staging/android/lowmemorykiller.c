@@ -140,7 +140,9 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 			task_unlock(p);
 			continue;
 		}
-		tasksize = get_mm_rss(p->mm);
+		tasksize = get_mm_rss(p->mm) +
+			get_mm_counter(p->mm, MM_SWAPENTS) +
+			atomic_long_read(&p->mm->nr_ptes) + mm_nr_pmds(p->mm);
 		task_unlock(p);
 		if (tasksize <= 0)
 			continue;
