@@ -8,14 +8,21 @@
  * PFN_SG_LAST - pfn references a page and is the last scatterlist entry
  * PFN_DEV - pfn is not covered by system memmap by default
  * PFN_MAP - pfn has a dynamic page mapping established by a device driver
+ * PFN_HUGE - pfn represents a huge page
  *
  * Note that the bottom two bits in the pfn_t match the bottom two bits in the
  * scatterlist so sg_is_chain() and sg_is_last() work.  These bits are also
  * used by the radix tree for its own purposes, but a PFN cannot be in both a
  * radix tree and a scatterlist simultaneously.  If a PFN is moved between the
  * two usages, care should be taken to clear/set these bits appropriately.
+ *
+ * If PFN_HUGE is set, the bottom PMD_SHIFT-PAGE_SHIFT bits are known to be
+ * zero.  We reuse them to indicate whether the PFN represents a PMD or a PUD.
+ *
+ * This scheme supports 27 bits on a 32-bit system (512GB of physical address
+ * space) and 59 bits on a 64-bit system (2048EB of physical address space).
  */
-#define PFN_FLAG_BITS	4
+#define PFN_FLAG_BITS	5
 #define PFN_FLAGS_MASK	((1 << PFN_FLAG_BITS) - 1)
 #define __PFN_MAX	((1 << (BITS_PER_LONG - PFN_FLAG_BITS)) - 1)
 #define PFN_SG_CHAIN	0x01UL
@@ -23,6 +30,11 @@
 #define PFN_SG_MASK	(PFN_SG_CHAIN | PFN_SG_LAST)
 #define PFN_DEV		0x04UL
 #define PFN_MAP		0x08UL
+#define PFN_HUGE	0x10UL
+#define PFN_SIZE_MASK	0x30UL
+#define PFN_SIZE_PTE	0x00UL
+#define PFN_SIZE_PMD	0x10UL
+#define PFN_SIZE_PUD	0x30UL
 
 #if 0
 #define PFN_T_BUG_ON(x)	BUG_ON(x)
@@ -35,7 +47,7 @@ static inline pfn_t __pfn_to_pfn_t(unsigned long pfn, u64 flags)
 	pfn_t pfn_t = { .val = (pfn << PFN_FLAG_BITS) | flags };
 
 	PFN_T_BUG_ON(pfn & ~__PFN_MAX);
-	PFN_T_BUG_ON(flags & ~PFN_FLAGS_MASK);
+	PFN_T_BUG_ON(flags & ~(PFN_FLAGS_MASK | PFN_SIZE_MASK));
 
 	return pfn_t;
 }
@@ -46,9 +58,12 @@ static inline pfn_t pfn_to_pfn_t(unsigned long pfn)
 	return __pfn_to_pfn_t(pfn, 0);
 }
 
+/* The bottom bits of the PFN may be set if PFN_HUGE is set */
 static inline unsigned long pfn_t_to_pfn(pfn_t pfn)
 {
 	unsigned long v = pfn.val;
+	if (v & PFN_HUGE)
+		v &= ~PFN_SIZE_MASK;
 	return v >> PFN_FLAG_BITS;
 }
 
