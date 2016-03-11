@@ -1146,7 +1146,11 @@ int call_sync_on_phys_cpu(unsigned cpu, int (*func)(void *), void *par)
 	if (ret)
 		goto out;
 
+	preempt_disable();
+	pin_vcpu(cpu);
 	ret = func(par);
+	pin_vcpu(-1);
+	preempt_enable();
 
 	set_cpus_allowed_ptr(current, old_mask);
 

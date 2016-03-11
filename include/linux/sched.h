@@ -61,6 +61,9 @@ struct sched_param {
 #include <linux/cgroup-defs.h>
 
 #include <asm/processor.h>
+#ifdef CONFIG_HYPERVISOR_GUEST
+#include <asm/hypervisor.h>
+#endif
 
 #define SCHED_ATTR_SIZE_VER0	48	/* sizeof first published struct */
 
@@ -2230,6 +2233,17 @@ static inline void rcu_copy_process(struct task_struct *p)
 #endif /* #ifdef CONFIG_TASKS_RCU */
 }
 
+#ifdef CONFIG_HYPERVISOR_GUEST
+static inline void pin_vcpu(int cpu)
+{
+	hypervisor_pin_vcpu(cpu);
+}
+#else
+static inline void pin_vcpu(int cpu)
+{
+}
+#endif
+
 static inline void tsk_restore_flags(struct task_struct *task,
 				unsigned long orig_flags, unsigned long flags)
 {
@@ -2263,10 +2277,18 @@ static inline int set_cpus_allowed_ptr(struct task_struct *p,
 static inline int call_sync_on_phys_cpu(unsigned cpu, int (*func)(void *),
 					void *par)
 {
+	int ret;
+
 	if (cpu != 0)
 		return -EINVAL;
 
-	return func(par);
+	preempt_disable();
+	pin_vcpu(0);
+	ret = func(par);
+	pin_vcpu(-1);
+	preempt_enable();
+
+	return ret;
 }
 #endif
 
