@@ -2189,6 +2189,14 @@ int is_console_locked(void)
 	return console_locked;
 }
 
+#ifdef CONFIG_DEBUG_SPINLOCK
+int console_sem_spin_is_held(void)
+{
+	return raw_spin_is_locked(&console_sem.lock) &&
+			(console_sem.lock.owner == current);
+}
+#endif
+
 static void console_cont_flush(char *text, size_t size)
 {
 	unsigned long flags;

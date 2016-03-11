@@ -49,7 +49,7 @@ void __rwlock_init(rwlock_t *lock, const char *name,
 
 EXPORT_SYMBOL(__rwlock_init);
 
-static void spin_dump(raw_spinlock_t *lock, const char *msg)
+static void __spin_dump(raw_spinlock_t *lock, const char *msg)
 {
 	struct task_struct *owner = NULL;
 
@@ -65,6 +65,37 @@ static void spin_dump(raw_spinlock_t *lock, const char *msg)
 		owner ? task_pid_nr(owner) : -1,
 		lock->owner_cpu);
 	dump_stack();
+}
+
+extern int console_sem_spin_is_held(void);
+
+static void __spin_dump_deferred(raw_spinlock_t *lock, const char *msg)
+{
+	printk_func_t s;
+
+	s = this_cpu_read(printk_func);
+	this_cpu_write(printk_func, vprintk_deferred);
+
+	/*
+	 * To change printk_func, it must be in preempt disabled and irq
+	 * disabled. WARN_ON() should be called after the change because
+	 * the default printk_func which may be called from WARN_ON()
+	 * is prohibited in this context.
+	 */
+	WARN_ON(!preempt_count() || !irqs_disabled());
+	__spin_dump(lock, msg);
+
+	this_cpu_write(printk_func, s);
+
+	printk_pending_output();
+}
+
+static void spin_dump(raw_spinlock_t *lock, const char *msg)
+{
+	if (unlikely(console_sem_spin_is_held()))
+		__spin_dump_deferred(lock, msg);
+	else
+		__spin_dump(lock, msg);
 }
 
 static void spin_bug(raw_spinlock_t *lock, const char *msg)
