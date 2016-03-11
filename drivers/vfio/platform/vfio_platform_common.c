@@ -165,12 +165,8 @@ static void vfio_platform_release(void *device_data)
 	mutex_lock(&driver_lock);
 
 	if (!(--vdev->refcnt)) {
-		if (vdev->reset) {
-			dev_info(vdev->device, "reset\n");
-			vdev->reset(vdev);
-		} else {
-			dev_warn(vdev->device, "no reset function found!\n");
-		}
+		dev_info(vdev->device, "reset\n");
+		vdev->reset(vdev);
 		vfio_platform_regions_cleanup(vdev);
 		vfio_platform_irq_cleanup(vdev);
 	}
@@ -634,7 +630,13 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
 		return ret;
 	}
 
-	vfio_platform_get_reset(vdev);
+	ret = vfio_platform_get_reset(vdev);
+	if (ret) {
+		pr_err("vfio: no reset function found for device %s\n",
+		       vdev->name);
+		iommu_group_put(group);
+		return ret;
+	}
 	mutex_init(&vdev->igate);
 
 	return 0;
