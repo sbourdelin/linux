@@ -1192,8 +1192,7 @@ write:
 
 	err = -EAGAIN;
 	f2fs_lock_op(sbi);
-	if (f2fs_has_inline_data(inode))
-		err = f2fs_write_inline_data(inode, page);
+	err = f2fs_write_inline_data(inode, page);
 	if (err == -EAGAIN)
 		err = do_write_data_page(&fio);
 	f2fs_unlock_op(sbi);
