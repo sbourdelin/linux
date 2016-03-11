@@ -764,6 +764,45 @@ static const struct net_device_ops arc_emac_netdev_ops = {
 #endif
 };
 
+#ifdef CONFIG_OF
+static void emac_reset_phy(struct net_device *pdev)
+{
+	int err, phy_reset;
+	bool active_high = false;
+	int msec = 10;
+	struct device *dev = pdev->dev.parent;
+	struct device_node *np = dev->of_node;
+
+	if (!np)
+		return;
+
+	of_property_read_u32(np, "phy-reset-duration", &msec);
+	/* A sane reset duration should not be longer than 1s */
+	if (msec > 1000)
+		msec = 1;
+
+	phy_reset = of_get_named_gpio(np, "phy-reset-gpios", 0);
+	if (!gpio_is_valid(phy_reset))
+		return;
+
+	active_high = of_property_read_bool(np, "phy-reset-active-high");
+
+	err = devm_gpio_request_one(dev, phy_reset, active_high ?
+				    GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW,
+				    "phy-reset");
+	if (err) {
+		dev_err(dev, "failed to get phy-reset-gpios: %d\n", err);
+		return;
+	}
+	msleep(msec);
+	gpio_set_value_cansleep(phy_reset, !active_high);
+}
+#else
+static void emac_reset_phy(struct platform_device *pdev)
+{
+}
+#endif /* CONFIG_OF */
+
 int arc_emac_probe(struct net_device *ndev, int interface)
 {
 	struct device *dev = ndev->dev.parent;
@@ -802,6 +841,8 @@ int arc_emac_probe(struct net_device *ndev, int interface)
 	ndev->watchdog_timeo = TX_TIMEOUT;
 	/* FIXME :: no multicast support yet */
 	ndev->flags &= ~IFF_MULTICAST;
+
+	emac_reset_phy(ndev);
 
 	priv = netdev_priv(ndev);
 	priv->dev = dev;
