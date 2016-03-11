@@ -33,6 +33,12 @@
 #define CFGCHIP2_REFFREQ_12MHZ	(1 << 0)
 #define CFGCHIP2_REFFREQ_24MHZ	(2 << 0)
 #define CFGCHIP2_REFFREQ_48MHZ	(3 << 0)
+#define CFGCHIP2_REFFREQ_19_2MHZ	(4 << 0)
+#define CFGCHIP2_REFFREQ_38_4MHZ	(5 << 0)
+#define CFGCHIP2_REFFREQ_13MHZ	(6 << 0)
+#define CFGCHIP2_REFFREQ_26MHZ	(7 << 0)
+#define CFGCHIP2_REFFREQ_20MHZ	(8 << 0)
+#define CFGCHIP2_REFFREQ_40MHZ	(9 << 0)
 
 struct	da8xx_ohci_root_hub;
 
