@@ -65,6 +65,11 @@ On all -  write a character to /proc/sysrq-trigger.  e.g.:
 
 *  What are the 'command' keys?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'a'     - Attempt to semi-gracefully reboot via kernel_restart(NULL). This
+          is in-kernel only (bypasses init), but is cleaner than a hard
+          reboot such as sysrq-b. sysrq-a is functionally similar to 'o' but
+          calls kernel_restart() instead of kernel_power_off().
+
 'b'     - Will immediately reboot the system without syncing or unmounting
           your disks.
 

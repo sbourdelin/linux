@@ -16,6 +16,7 @@
 #include <linux/syscalls.h>
 #include <linux/syscore_ops.h>
 #include <linux/uaccess.h>
+#include <linux/sysrq.h>
 
 /*
  * this indicates whether you can reboot with ctrl-alt-del: the default is yes
@@ -555,3 +556,42 @@ static int __init reboot_setup(char *str)
 	return 1;
 }
 __setup("reboot=", reboot_setup);
+
+
+/*
+ * When the user hits Sys-Rq 'a' to kernel_restart the machine this is the
+ * callback we use.
+ */
+
+static void do_krestart(struct work_struct *dummy)
+{
+	/* are these two necessary? */
+	lockdep_off();
+	local_irq_enable();
+
+	/* restart */
+	kernel_restart(NULL);
+}
+
+static DECLARE_WORK(krestart_work, do_krestart);
+
+static void handle_krestart(int key)
+{
+	/* run sysrq krestart on boot cpu */
+	schedule_work_on(cpumask_first(cpu_online_mask), &krestart_work);
+}
+
+static struct sysrq_key_op	sysrq_krestart_op = {
+	.handler        = handle_krestart,
+	.help_msg       = "kernel_restart(a)",
+	.action_msg     = "Gracefullish Restart",
+	.enable_mask	= SYSRQ_ENABLE_BOOT,
+};
+
+static int __init pm_sysrq_krestart_init(void)
+{
+	register_sysrq_key('a', &sysrq_krestart_op);
+	return 0;
+}
+
+subsys_initcall(pm_sysrq_krestart_init);
