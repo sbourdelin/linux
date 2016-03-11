@@ -1640,6 +1640,76 @@ static int gen9_init_render_ring(struct intel_engine_cs *ring)
 	return init_workarounds_ring(ring);
 }
 
+static int gen9_init_rcs_context_trtt(struct drm_i915_gem_request *req)
+{
+	struct intel_ringbuffer *ringbuf = req->ringbuf;
+	int ret;
+
+	ret = intel_logical_ring_begin(req, 2 + 2);
+	if (ret)
+		return ret;
+
+	intel_logical_ring_emit(ringbuf, MI_LOAD_REGISTER_IMM(1));
+
+	intel_logical_ring_emit_reg(ringbuf, GEN9_TRTT_TABLE_CONTROL);
+	intel_logical_ring_emit(ringbuf, 0);
+
+	intel_logical_ring_emit(ringbuf, MI_NOOP);
+	intel_logical_ring_advance(ringbuf);
+
+	return 0;
+}
+
+static int gen9_emit_trtt_regs(struct drm_i915_gem_request *req)
+{
+	struct intel_context *ctx = req->ctx;
+	struct intel_ringbuffer *ringbuf = req->ringbuf;
+	u64 masked_l3_gfx_address =
+		ctx->trtt_info.l3_table_address & GEN9_TRTT_L3_GFXADDR_MASK;
+	u32 trva_data_value =
+		(ctx->trtt_info.segment_base_addr >> GEN9_TRTT_SEG_SIZE_SHIFT) &
+		GEN9_TRVA_DATA_MASK;
+	const int num_lri_cmds = 6;
+	int ret;
+
+	/*
+	 * Emitting LRIs to update the TRTT registers is most reliable, instead
+	 * of directly updating the context image, as this will ensure that
+	 * update happens in a serialized manner for the context and also
+	 * lite-restore scenario will get handled.
+	 */
+	ret = intel_logical_ring_begin(req, num_lri_cmds * 2 + 2);
+	if (ret)
+		return ret;
+
+	intel_logical_ring_emit(ringbuf, MI_LOAD_REGISTER_IMM(num_lri_cmds));
+
+	intel_logical_ring_emit_reg(ringbuf, GEN9_TRTT_L3_POINTER_DW0);
+	intel_logical_ring_emit(ringbuf, lower_32_bits(masked_l3_gfx_address));
+
+	intel_logical_ring_emit_reg(ringbuf, GEN9_TRTT_L3_POINTER_DW1);
+	intel_logical_ring_emit(ringbuf, upper_32_bits(masked_l3_gfx_address));
+
+	intel_logical_ring_emit_reg(ringbuf, GEN9_TRTT_NULL_TILE_REG);
+	intel_logical_ring_emit(ringbuf, ctx->trtt_info.null_tile_val);
+
+	intel_logical_ring_emit_reg(ringbuf, GEN9_TRTT_INVD_TILE_REG);
+	intel_logical_ring_emit(ringbuf, ctx->trtt_info.invd_tile_val);
+
+	intel_logical_ring_emit_reg(ringbuf, GEN9_TRTT_VA_MASKDATA);
+	intel_logical_ring_emit(ringbuf,
+				GEN9_TRVA_MASK_VALUE | trva_data_value);
+
+	intel_logical_ring_emit_reg(ringbuf, GEN9_TRTT_TABLE_CONTROL);
+	intel_logical_ring_emit(ringbuf,
+				GEN9_TRTT_IN_GFX_VA_SPACE | GEN9_TRTT_ENABLE);
+
+	intel_logical_ring_emit(ringbuf, MI_NOOP);
+	intel_logical_ring_advance(ringbuf);
+
+	return 0;
+}
+
 static int intel_logical_ring_emit_pdps(struct drm_i915_gem_request *req)
 {
 	struct i915_hw_ppgtt *ppgtt = req->ctx->ppgtt;
@@ -1994,6 +2064,25 @@ static int gen8_init_rcs_context(struct drm_i915_gem_request *req)
 	return intel_lr_context_render_state_init(req);
 }
 
+static int gen9_init_rcs_context(struct drm_i915_gem_request *req)
+{
+	int ret;
+
+	/*
+	 * Explictily disable TR-TT at the start of a new context.
+	 * Otherwise on switching from a TR-TT context to a new Non TR-TT
+	 * context the TR-TT settings of the outgoing context could get
+	 * spilled on to the new incoming context as only the Ring Context
+	 * part is loaded on the first submission of a new context, due to
+	 * the setting of ENGINE_CTX_RESTORE_INHIBIT bit.
+	 */
+	ret = gen9_init_rcs_context_trtt(req);
+	if (ret)
+		return ret;
+
+	return gen8_init_rcs_context(req);
+}
+
 /**
  * intel_logical_ring_cleanup() - deallocate the Engine Command Streamer
  *
@@ -2125,11 +2214,14 @@ static int logical_render_ring_init(struct drm_device *dev)
 	logical_ring_default_vfuncs(dev, ring);
 
 	/* Override some for render ring. */
-	if (INTEL_INFO(dev)->gen >= 9)
+	if (INTEL_INFO(dev)->gen >= 9) {
 		ring->init_hw = gen9_init_render_ring;
-	else
+		ring->init_context = gen9_init_rcs_context;
+	} else {
 		ring->init_hw = gen8_init_render_ring;
-	ring->init_context = gen8_init_rcs_context;
+		ring->init_context = gen8_init_rcs_context;
+	}
+
 	ring->cleanup = intel_fini_pipe_control;
 	ring->emit_flush = gen8_emit_flush_render;
 	ring->emit_request = gen8_emit_request_render;
@@ -2668,4 +2760,30 @@ void intel_lr_context_reset(struct drm_device *dev,
 		ringbuf->head = 0;
 		ringbuf->tail = 0;
 	}
+}
+
+int intel_lr_rcs_context_setup_trtt(struct intel_context *ctx)
+{
+	struct intel_engine_cs *ring = &(ctx->i915->ring[RCS]);
+	struct drm_i915_gem_request *req;
+	int ret;
+
+	if (!ctx->engine[RCS].state) {
+		ret = intel_lr_context_deferred_alloc(ctx, ring);
+		if (ret)
+			return ret;
+	}
+
+	req = i915_gem_request_alloc(ring, ctx);
+	if (IS_ERR(req))
+		return PTR_ERR(req);
+
+	ret = gen9_emit_trtt_regs(req);
+	if (ret) {
+		i915_gem_request_cancel(req);
+		return ret;
+	}
+
+	i915_add_request(req);
+	return 0;
 }
