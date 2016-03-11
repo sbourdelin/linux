@@ -168,9 +168,10 @@ extern struct fcoe_percpu_s bnx2fc_global;
 extern struct workqueue_struct *bnx2fc_wq;
 
 struct bnx2fc_percpu_s {
-	struct task_struct *iothread;
+	struct task_struct *kthread;
 	struct list_head work_list;
 	spinlock_t fp_work_lock;
+	bool active;
 };
 
 struct bnx2fc_fw_stats {

@@ -1049,14 +1049,14 @@ int bnx2fc_process_new_cqes(struct bnx2fc_rport *tgt)
 
 			fps = &per_cpu(bnx2fc_percpu, cpu);
 			spin_lock_bh(&fps->fp_work_lock);
-			if (unlikely(!fps->iothread))
+			if (unlikely(!fps->active))
 				goto unlock;
 
 			work = bnx2fc_alloc_work(tgt, wqe);
 			if (work) {
 				list_add_tail(&work->list,
 					      &fps->work_list);
-				wake_up_process(fps->iothread);
+				wake_up_process(fps->kthread);
 				process = false;
 			}
 unlock:
