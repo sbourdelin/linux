@@ -1839,8 +1839,6 @@ struct task_struct {
 #endif
 #ifdef CONFIG_MEMCG
 	struct mem_cgroup *memcg_in_oom;
-	gfp_t memcg_oom_gfp_mask;
-	int memcg_oom_order;
 
 	/* number of pages to reclaim on returning to userland */
 	unsigned int memcg_nr_pages_over_high;

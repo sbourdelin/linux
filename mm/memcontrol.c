@@ -1236,14 +1236,13 @@ static unsigned long mem_cgroup_get_limit(struct mem_cgroup *memcg)
 	return limit;
 }
 
-static bool mem_cgroup_out_of_memory(struct mem_cgroup *memcg, gfp_t gfp_mask,
-				     int order)
+static bool mem_cgroup_out_of_memory(struct mem_cgroup *memcg)
 {
 	struct oom_control oc = {
 		.zonelist = NULL,
 		.nodemask = NULL,
-		.gfp_mask = gfp_mask,
-		.order = order,
+		.gfp_mask = GFP_KERNEL,
+		.order = 0,
 	};
 	struct mem_cgroup *iter;
 	unsigned long chosen_points = 0;
@@ -1609,8 +1608,6 @@ static void mem_cgroup_oom(struct mem_cgroup *memcg, gfp_t mask, int order)
 	 */
 	css_get(&memcg->css);
 	current->memcg_in_oom = memcg;
-	current->memcg_oom_gfp_mask = mask;
-	current->memcg_oom_order = order;
 }
 
 /**
@@ -1660,8 +1657,7 @@ bool mem_cgroup_oom_synchronize(bool handle)
 	if (locked && !memcg->oom_kill_disable) {
 		mem_cgroup_unmark_under_oom(memcg);
 		finish_wait(&memcg_oom_waitq, &owait.wait);
-		mem_cgroup_out_of_memory(memcg, current->memcg_oom_gfp_mask,
-					 current->memcg_oom_order);
+		mem_cgroup_out_of_memory(memcg);
 	} else {
 		schedule();
 		mem_cgroup_unmark_under_oom(memcg);
@@ -5067,7 +5063,7 @@ static ssize_t memory_max_write(struct kernfs_open_file *of,
 		}
 
 		mem_cgroup_events(memcg, MEMCG_OOM, 1);
-		if (!mem_cgroup_out_of_memory(memcg, GFP_KERNEL, 0))
+		if (!mem_cgroup_out_of_memory(memcg))
 			break;
 	}
 
