@@ -1311,8 +1311,8 @@ static void fcoe_percpu_thread_destroy(unsigned int cpu)
 			FCOE_DBG("Moving frames from CPU %d to CPU %d\n",
 				 cpu, targ_cpu);
 
-			while ((skb = __skb_dequeue(&p->fcoe_rx_list)) != NULL)
-				__skb_queue_tail(&p_target->fcoe_rx_list, skb);
+			skb_queue_splice_tail(&p->fcoe_rx_list,
+					      &p_target->fcoe_rx_list);
 			spin_unlock_bh(&p_target->fcoe_rx_list.lock);
 		} else {
 			/*
