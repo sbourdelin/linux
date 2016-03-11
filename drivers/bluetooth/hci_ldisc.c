@@ -638,6 +638,7 @@ static int hci_uart_set_proto(struct hci_uart *hu, int id)
 		return err;
 
 	hu->proto = p;
+	set_bit(HCI_UART_PROTO_SET, &hu->flags);
 
 	err = hci_uart_register_dev(hu);
 	if (err) {
@@ -692,14 +693,15 @@ static int hci_uart_tty_ioctl(struct tty_struct *tty, struct file *file,
 
 	switch (cmd) {
 	case HCIUARTSETPROTO:
-		if (!test_and_set_bit(HCI_UART_PROTO_SET, &hu->flags)) {
-			err = hci_uart_set_proto(hu, arg);
-			if (err) {
-				clear_bit(HCI_UART_PROTO_SET, &hu->flags);
-				return err;
-			}
-		} else
+		if (test_and_set_bit(HCI_UART_PROTO_BUSY, &hu->flags))
 			return -EBUSY;
+		if (test_bit(HCI_UART_PROTO_SET, &hu->flags))
+			err = -EBUSY;
+		else
+			err = hci_uart_set_proto(hu, arg);
+		clear_bit(HCI_UART_PROTO_BUSY, &hu->flags);
+		if (err)
+			return err;
 		break;
 
 	case HCIUARTGETPROTO:
