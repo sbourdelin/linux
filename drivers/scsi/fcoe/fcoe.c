@@ -1284,10 +1284,8 @@ static void fcoe_percpu_thread_destroy(unsigned int cpu)
 	struct task_struct *thread;
 	struct page *crc_eof;
 	struct sk_buff *skb;
-#ifdef CONFIG_SMP
 	struct fcoe_percpu_s *p0;
 	unsigned targ_cpu = get_cpu();
-#endif /* CONFIG_SMP */
 
 	FCOE_DBG("Destroying receive thread for CPU %d\n", cpu);
 
@@ -1301,7 +1299,6 @@ static void fcoe_percpu_thread_destroy(unsigned int cpu)
 	p->crc_eof_offset = 0;
 	spin_unlock_bh(&p->fcoe_rx_list.lock);
 
-#ifdef CONFIG_SMP
 	/*
 	 * Don't bother moving the skb's if this context is running
 	 * on the same CPU that is having its thread destroyed. This
@@ -1343,16 +1340,6 @@ static void fcoe_percpu_thread_destroy(unsigned int cpu)
 		spin_unlock_bh(&p->fcoe_rx_list.lock);
 	}
 	put_cpu();
-#else
-	/*
-	 * This a non-SMP scenario where the singular Rx thread is
-	 * being removed. Free all skbs and stop the thread.
-	 */
-	spin_lock_bh(&p->fcoe_rx_list.lock);
-	while ((skb = __skb_dequeue(&p->fcoe_rx_list)) != NULL)
-		kfree_skb(skb);
-	spin_unlock_bh(&p->fcoe_rx_list.lock);
-#endif
 
 	if (thread)
 		kthread_stop(thread);
