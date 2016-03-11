@@ -8784,9 +8784,7 @@ static void haswell_set_pipeconf(struct drm_crtc *crtc)
 
 static bool ironlake_compute_clocks(struct drm_crtc *crtc,
 				    struct intel_crtc_state *crtc_state,
-				    intel_clock_t *clock,
-				    bool *has_reduced_clock,
-				    intel_clock_t *reduced_clock)
+				    intel_clock_t *clock)
 {
 	struct drm_device *dev = crtc->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -8829,8 +8827,7 @@ static bool ironlake_needs_fb_cb_tune(struct dpll *dpll, int factor)
 
 static uint32_t ironlake_compute_dpll(struct intel_crtc *intel_crtc,
 				      struct intel_crtc_state *crtc_state,
-				      u32 *fp,
-				      intel_clock_t *reduced_clock, u32 *fp2)
+				      u32 *fp)
 {
 	struct drm_crtc *crtc = &intel_crtc->base;
 	struct drm_device *dev = crtc->dev;
@@ -8876,9 +8873,6 @@ static uint32_t ironlake_compute_dpll(struct intel_crtc *intel_crtc,
 
 	if (ironlake_needs_fb_cb_tune(&crtc_state->dpll, factor))
 		*fp |= FP_CB_TUNE;
-
-	if (fp2 && (reduced_clock->m < factor * reduced_clock->n))
-		*fp2 |= FP_CB_TUNE;
 
 	dpll = 0;
 
@@ -8927,22 +8921,18 @@ static int ironlake_crtc_compute_clock(struct intel_crtc *crtc,
 				       struct intel_crtc_state *crtc_state)
 {
 	struct drm_device *dev = crtc->base.dev;
-	intel_clock_t clock, reduced_clock;
-	u32 dpll = 0, fp = 0, fp2 = 0;
-	bool ok, has_reduced_clock = false;
-	bool is_lvds = false;
+	intel_clock_t clock;
+	u32 dpll = 0, fp = 0;
+	bool ok;
 	struct intel_shared_dpll *pll;
 
 	memset(&crtc_state->dpll_hw_state, 0,
 	       sizeof(crtc_state->dpll_hw_state));
 
-	is_lvds = intel_pipe_will_have_type(crtc_state, INTEL_OUTPUT_LVDS);
-
 	WARN(!(HAS_PCH_IBX(dev) || HAS_PCH_CPT(dev)),
 	     "Unexpected PCH type %d\n", INTEL_PCH_TYPE(dev));
 
-	ok = ironlake_compute_clocks(&crtc->base, crtc_state, &clock,
-				     &has_reduced_clock, &reduced_clock);
+	ok = ironlake_compute_clocks(&crtc->base, crtc_state, &clock);
 	if (!ok && !crtc_state->clock_set) {
 		DRM_ERROR("Couldn't find PLL settings for mode!\n");
 		return -EINVAL;
@@ -8959,19 +8949,12 @@ static int ironlake_crtc_compute_clock(struct intel_crtc *crtc,
 	/* CPU eDP is the only output that doesn't need a PCH PLL of its own. */
 	if (crtc_state->has_pch_encoder) {
 		fp = i9xx_dpll_compute_fp(&crtc_state->dpll);
-		if (has_reduced_clock)
-			fp2 = i9xx_dpll_compute_fp(&reduced_clock);
 
-		dpll = ironlake_compute_dpll(crtc, crtc_state,
-					     &fp, &reduced_clock,
-					     has_reduced_clock ? &fp2 : NULL);
+		dpll = ironlake_compute_dpll(crtc, crtc_state, &fp);
 
 		crtc_state->dpll_hw_state.dpll = dpll;
 		crtc_state->dpll_hw_state.fp0 = fp;
-		if (has_reduced_clock)
-			crtc_state->dpll_hw_state.fp1 = fp2;
-		else
-			crtc_state->dpll_hw_state.fp1 = fp;
+		crtc_state->dpll_hw_state.fp1 = fp;
 
 		pll = intel_get_shared_dpll(crtc, crtc_state, NULL);
 		if (pll == NULL) {
@@ -8981,10 +8964,7 @@ static int ironlake_crtc_compute_clock(struct intel_crtc *crtc,
 		}
 	}
 
-	if (is_lvds && has_reduced_clock)
-		crtc->lowfreq_avail = true;
-	else
-		crtc->lowfreq_avail = false;
+	crtc->lowfreq_avail = false;
 
 	return 0;
 }
