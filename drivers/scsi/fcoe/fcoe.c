@@ -1299,6 +1299,8 @@ static void fcoe_percpu_thread_destroy(unsigned int cpu)
 	p->crc_eof_offset = 0;
 	spin_unlock_bh(&p->fcoe_rx_list.lock);
 
+	if (crc_eof)
+		put_page(crc_eof);
 	/*
 	 * Don't bother moving the skb's if this context is running
 	 * on the same CPU that is having its thread destroyed. This
@@ -1342,9 +1344,6 @@ static void fcoe_percpu_thread_destroy(unsigned int cpu)
 
 	if (thread)
 		kthread_stop(thread);
-
-	if (crc_eof)
-		put_page(crc_eof);
 }
 
 /**
