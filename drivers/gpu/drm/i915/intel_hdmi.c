@@ -1397,6 +1397,7 @@ intel_hdmi_detect(struct drm_connector *connector, bool force)
 	enum drm_connector_status status;
 	struct intel_hdmi *intel_hdmi = intel_attached_hdmi(connector);
 	struct drm_i915_private *dev_priv = to_i915(connector->dev);
+	struct drm_device *dev = connector->dev;
 	bool live_status = true;
 	unsigned int try = 8;
 
@@ -1404,14 +1405,21 @@ intel_hdmi_detect(struct drm_connector *connector, bool force)
 		      connector->base.id, connector->name);
 
 	intel_display_power_get(dev_priv, POWER_DOMAIN_GMBUS);
-	live_status = intel_digital_port_connected(dev_priv,
-		hdmi_to_dig_port(intel_hdmi));
-	while (!live_status && try--) {
-		msleep(10);
+
+	/*
+	* The live status register doesn't work reliably with certain
+	* cables/monitors, on old platforms. So restrict the live status
+	* check to be applied from VLV onwards.
+	*/
+	if (INTEL_INFO(dev)->gen >= 7 && !IS_IVYBRIDGE(dev)) {
 		live_status = intel_digital_port_connected(dev_priv,
 			hdmi_to_dig_port(intel_hdmi));
+		while (!live_status && try--) {
+			msleep(10);
+			live_status = intel_digital_port_connected(dev_priv,
+				hdmi_to_dig_port(intel_hdmi));
+		}
 	}
-
 	intel_hdmi_unset_edid(connector);
 
 	if (intel_hdmi_set_edid(connector, live_status)) {
