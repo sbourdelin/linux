@@ -2247,6 +2247,7 @@ extern void do_set_cpus_allowed(struct task_struct *p,
 
 extern int set_cpus_allowed_ptr(struct task_struct *p,
 				const struct cpumask *new_mask);
+int call_sync_on_phys_cpu(unsigned cpu, int (*func)(void *), void *par);
 #else
 static inline void do_set_cpus_allowed(struct task_struct *p,
 				      const struct cpumask *new_mask)
@@ -2258,6 +2259,14 @@ static inline int set_cpus_allowed_ptr(struct task_struct *p,
 	if (!cpumask_test_cpu(0, new_mask))
 		return -EINVAL;
 	return 0;
+}
+static inline int call_sync_on_phys_cpu(unsigned cpu, int (*func)(void *),
+					void *par)
+{
+	if (cpu != 0)
+		return -EINVAL;
+
+	return func(par);
 }
 #endif
 

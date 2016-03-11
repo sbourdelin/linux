@@ -1130,6 +1130,32 @@ int set_cpus_allowed_ptr(struct task_struct *p, const struct cpumask *new_mask)
 }
 EXPORT_SYMBOL_GPL(set_cpus_allowed_ptr);
 
+int call_sync_on_phys_cpu(unsigned cpu, int (*func)(void *), void *par)
+{
+	cpumask_var_t old_mask;
+	int ret;
+
+	if (cpu >= nr_cpu_ids)
+		return -EINVAL;
+
+	if (!alloc_cpumask_var(&old_mask, GFP_KERNEL))
+		return -ENOMEM;
+
+	cpumask_copy(old_mask, &current->cpus_allowed);
+	ret = set_cpus_allowed_ptr(current, cpumask_of(cpu));
+	if (ret)
+		goto out;
+
+	ret = func(par);
+
+	set_cpus_allowed_ptr(current, old_mask);
+
+out:
+	free_cpumask_var(old_mask);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(call_sync_on_phys_cpu);
+
 void set_task_cpu(struct task_struct *p, unsigned int new_cpu)
 {
 #ifdef CONFIG_SCHED_DEBUG
