@@ -40,11 +40,19 @@
 static bool boot_cpu_done;
 
 static int __read_mostly __pat_enabled = IS_ENABLED(CONFIG_X86_PAT);
+static void pat_disable_init(void);
 
-static inline void pat_disable(const char *reason)
+void pat_disable(const char *reason)
 {
+	if (boot_cpu_done) {
+		pr_info("x86/PAT: PAT cannot be disabled after initialized\n");
+		return;
+	}
+
 	__pat_enabled = 0;
 	pr_info("x86/PAT: %s\n", reason);
+
+	pat_disable_init();
 }
 
 static int __init nopat(char *str)
@@ -207,9 +215,6 @@ static void pat_bsp_init(u64 pat)
 		return;
 	}
 
-	if (!pat_enabled())
-		goto done;
-
 	rdmsrl(MSR_IA32_CR_PAT, tmp_pat);
 	if (!tmp_pat) {
 		pat_disable("PAT MSR is 0, disabled.");
@@ -218,15 +223,11 @@ static void pat_bsp_init(u64 pat)
 
 	wrmsrl(MSR_IA32_CR_PAT, pat);
 
-done:
 	pat_init_cache_modes(pat);
 }
 
 static void pat_ap_init(u64 pat)
 {
-	if (!pat_enabled())
-		return;
-
 	if (!cpu_has_pat) {
 		/*
 		 * If this happens we are on a secondary CPU, but switched to
@@ -238,38 +239,55 @@ static void pat_ap_init(u64 pat)
 	wrmsrl(MSR_IA32_CR_PAT, pat);
 }
 
+static void pat_disable_init(void)
+{
+	u64 pat;
+	static int disable_init_done;
+
+	if (disable_init_done)
+		return;
+
+	/*
+	 * No PAT. Emulate the PAT table that corresponds to the two
+	 * cache bits, PWT (Write Through) and PCD (Cache Disable). This
+	 * setup is the same as the BIOS default setup when the system
+	 * has PAT but the "nopat" boot option has been specified. This
+	 * emulated PAT table is used when MSR_IA32_CR_PAT returns 0.
+	 *
+	 * PTE encoding:
+	 *
+	 *       PCD
+	 *       |PWT  PAT
+	 *       ||    slot
+	 *       00    0    WB : _PAGE_CACHE_MODE_WB
+	 *       01    1    WT : _PAGE_CACHE_MODE_WT
+	 *       10    2    UC-: _PAGE_CACHE_MODE_UC_MINUS
+	 *       11    3    UC : _PAGE_CACHE_MODE_UC
+	 *
+	 * NOTE: When WC or WP is used, it is redirected to UC- per
+	 * the default setup in __cachemode2pte_tbl[].
+	 */
+	pat = PAT(0, WB) | PAT(1, WT) | PAT(2, UC_MINUS) | PAT(3, UC) |
+	      PAT(4, WB) | PAT(5, WT) | PAT(6, UC_MINUS) | PAT(7, UC);
+
+	pat_init_cache_modes(pat);
+
+	disable_init_done = 1;
+}
+
 void pat_init(void)
 {
 	u64 pat;
 	struct cpuinfo_x86 *c = &boot_cpu_data;
 
 	if (!pat_enabled()) {
-		/*
-		 * No PAT. Emulate the PAT table that corresponds to the two
-		 * cache bits, PWT (Write Through) and PCD (Cache Disable). This
-		 * setup is the same as the BIOS default setup when the system
-		 * has PAT but the "nopat" boot option has been specified. This
-		 * emulated PAT table is used when MSR_IA32_CR_PAT returns 0.
-		 *
-		 * PTE encoding:
-		 *
-		 *       PCD
-		 *       |PWT  PAT
-		 *       ||    slot
-		 *       00    0    WB : _PAGE_CACHE_MODE_WB
-		 *       01    1    WT : _PAGE_CACHE_MODE_WT
-		 *       10    2    UC-: _PAGE_CACHE_MODE_UC_MINUS
-		 *       11    3    UC : _PAGE_CACHE_MODE_UC
-		 *
-		 * NOTE: When WC or WP is used, it is redirected to UC- per
-		 * the default setup in __cachemode2pte_tbl[].
-		 */
-		pat = PAT(0, WB) | PAT(1, WT) | PAT(2, UC_MINUS) | PAT(3, UC) |
-		      PAT(4, WB) | PAT(5, WT) | PAT(6, UC_MINUS) | PAT(7, UC);
+		pat_disable_init();
+		return;
+	}
 
-	} else if ((c->x86_vendor == X86_VENDOR_INTEL) &&
-		   (((c->x86 == 0x6) && (c->x86_model <= 0xd)) ||
-		    ((c->x86 == 0xf) && (c->x86_model <= 0x6)))) {
+	if ((c->x86_vendor == X86_VENDOR_INTEL) &&
+	    (((c->x86 == 0x6) && (c->x86_model <= 0xd)) ||
+	     ((c->x86 == 0xf) && (c->x86_model <= 0x6)))) {
 		/*
 		 * PAT support with the lower four entries. Intel Pentium 2,
 		 * 3, M, and 4 are affected by PAT errata, which makes the
