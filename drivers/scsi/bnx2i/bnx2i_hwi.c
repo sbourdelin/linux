@@ -1860,47 +1860,6 @@ static void bnx2i_process_cmd_cleanup_resp(struct iscsi_session *session,
 	complete(&bnx2i_conn->cmd_cleanup_cmpl);
 }
 
-
-/**
- * bnx2i_percpu_io_thread - thread per cpu for ios
- *
- * @arg:	ptr to bnx2i_percpu_info structure
- */
-int bnx2i_percpu_io_thread(void *arg)
-{
-	struct bnx2i_percpu_s *p = arg;
-	struct bnx2i_work *work, *tmp;
-	LIST_HEAD(work_list);
-
-	set_user_nice(current, MIN_NICE);
-
-	while (!kthread_should_stop()) {
-		spin_lock_bh(&p->p_work_lock);
-		while (!list_empty(&p->work_list)) {
-			list_splice_init(&p->work_list, &work_list);
-			spin_unlock_bh(&p->p_work_lock);
-
-			list_for_each_entry_safe(work, tmp, &work_list, list) {
-				list_del_init(&work->list);
-				/* work allocated in the bh, freed here */
-				bnx2i_process_scsi_cmd_resp(work->session,
-							    work->bnx2i_conn,
-							    &work->cqe);
-				atomic_dec(&work->bnx2i_conn->work_cnt);
-				kfree(work);
-			}
-			spin_lock_bh(&p->p_work_lock);
-		}
-		set_current_state(TASK_INTERRUPTIBLE);
-		spin_unlock_bh(&p->p_work_lock);
-		schedule();
-	}
-	__set_current_state(TASK_RUNNING);
-
-	return 0;
-}
-
-
 /**
  * bnx2i_queue_scsi_cmd_resp - queue cmd completion to the percpu thread
  * @bnx2i_conn:		bnx2i connection
@@ -1941,7 +1900,7 @@ static int bnx2i_queue_scsi_cmd_resp(struct iscsi_session *session,
 
 	p = &per_cpu(bnx2i_percpu, cpu);
 	spin_lock(&p->p_work_lock);
-	if (unlikely(!p->iothread)) {
+	if (unlikely(!p->active)) {
 		rc = -EINVAL;
 		goto err;
 	}
@@ -1954,7 +1913,7 @@ static int bnx2i_queue_scsi_cmd_resp(struct iscsi_session *session,
 		memcpy(&bnx2i_work->cqe, cqe, sizeof(struct cqe));
 		list_add_tail(&bnx2i_work->list, &p->work_list);
 		atomic_inc(&bnx2i_conn->work_cnt);
-		wake_up_process(p->iothread);
+		wake_up_process(p->kthread);
 		spin_unlock(&p->p_work_lock);
 		goto done;
 	} else

@@ -775,9 +775,10 @@ struct bnx2i_work {
 };
 
 struct bnx2i_percpu_s {
-	struct task_struct *iothread;
+	struct task_struct *kthread;
 	struct list_head work_list;
 	spinlock_t p_work_lock;
+	bool active;
 };
 
 
@@ -875,7 +876,6 @@ extern void bnx2i_print_active_cmd_queue(struct bnx2i_conn *conn);
 extern void bnx2i_print_xmit_pdu_queue(struct bnx2i_conn *conn);
 extern void bnx2i_print_recv_state(struct bnx2i_conn *conn);
 
-extern int bnx2i_percpu_io_thread(void *arg);
 extern int bnx2i_process_scsi_cmd_resp(struct iscsi_session *session,
 				       struct bnx2i_conn *bnx2i_conn,
 				       struct cqe *cqe);
