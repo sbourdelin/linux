@@ -1603,6 +1603,8 @@ static int gen8_init_common_ring(struct intel_engine_cs *ring)
 
 	memset(&ring->hangcheck, 0, sizeof(ring->hangcheck));
 
+	program_mocs_control_table(ring);
+
 	return 0;
 }
 
@@ -2150,6 +2152,8 @@ static int logical_render_ring_init(struct drm_device *dev)
 		DRM_ERROR("WA batch buffer initialization failed: %d\n",
 			  ret);
 	}
+
+	program_mocs_control_table(ring);
 
 	ret = logical_ring_init(dev, ring);
 	if (ret) {
