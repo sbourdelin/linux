@@ -1320,9 +1320,10 @@ static void fcoe_percpu_thread_destroy(unsigned int cpu)
 			 * new	skbs. Unlock the targeted CPU and drop the skbs
 			 * on the CPU that is going offline.
 			 */
+			spin_unlock_bh(&p_target->fcoe_rx_list.lock);
+
 			while ((skb = __skb_dequeue(&p->fcoe_rx_list)) != NULL)
 				kfree_skb(skb);
-			spin_unlock_bh(&p_target->fcoe_rx_list.lock);
 		}
 	} else {
 		/*
