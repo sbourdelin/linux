@@ -121,6 +121,7 @@ struct ib_uverbs_file {
 	struct ib_event_handler			event_handler;
 	struct ib_uverbs_event_file	       *async_file;
 	struct list_head			list;
+	struct completion			fcomp;
 	int					is_closed;
 };
 
