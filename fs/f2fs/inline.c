@@ -195,15 +195,13 @@ int f2fs_write_inline_data(struct inode *inode, struct page *page)
 	struct dnode_of_data dn;
 	int err;
 
+	if (!f2fs_has_inline_data(inode))
+		return -EAGAIN;
+
 	set_new_dnode(&dn, inode, NULL, NULL, 0);
 	err = get_dnode_of_data(&dn, 0, LOOKUP_NODE);
 	if (err)
 		return err;
-
-	if (!f2fs_has_inline_data(inode)) {
-		f2fs_put_dnode(&dn);
-		return -EAGAIN;
-	}
 
 	f2fs_bug_on(F2FS_I_SB(inode), page->index);
 
