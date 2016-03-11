@@ -30,6 +30,7 @@
 #include <linux/balloon_compaction.h>
 #include <linux/oom.h>
 #include <linux/wait.h>
+#include <linux/anon_inodes.h>
 
 /*
  * Balloon device works in 4K page units.  So each page is pointed to by
@@ -476,6 +477,7 @@ static int virtballoon_migratepage(struct balloon_dev_info *vb_dev_info,
 
 	mutex_unlock(&vb->balloon_lock);
 
+	ClearPageIsolated(page);
 	put_page(page); /* balloon reference */
 
 	return MIGRATEPAGE_SUCCESS;
@@ -509,6 +511,8 @@ static int virtballoon_probe(struct virtio_device *vdev)
 	balloon_devinfo_init(&vb->vb_dev_info);
 #ifdef CONFIG_BALLOON_COMPACTION
 	vb->vb_dev_info.migratepage = virtballoon_migratepage;
+	vb->vb_dev_info.inode = anon_inode_new();
+	vb->vb_dev_info.inode->i_mapping->a_ops = &balloon_aops;
 #endif
 
 	err = init_vqs(vb);
