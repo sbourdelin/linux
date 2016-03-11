@@ -2461,11 +2461,9 @@ static void fcoe_percpu_clean(struct fc_lport *lport)
 	struct sk_buff *skb;
 	unsigned int cpu;
 
-	for_each_possible_cpu(cpu) {
+	get_online_cpus();
+	for_each_online_cpu(cpu) {
 		pp = &per_cpu(fcoe_percpu, cpu);
-
-		if (!pp->thread || !cpu_online(cpu))
-			continue;
 
 		skb = dev_alloc_skb(0);
 		if (!skb)
@@ -2481,6 +2479,7 @@ static void fcoe_percpu_clean(struct fc_lport *lport)
 
 		wait_for_completion(&fcoe_flush_completion);
 	}
+	put_online_cpus();
 }
 
 /**
