@@ -84,6 +84,14 @@ static inline bool compaction_deferred(struct zone *zone, int order)
 	return true;
 }
 
+static inline bool isolate_movable_page(struct page *page, isolate_mode_t mode)
+{
+	return false;
+}
+
+static inline void putback_movable_page(struct page *page)
+{
+}
 #endif /* CONFIG_COMPACTION */
 
 #if defined(CONFIG_COMPACTION) && defined(CONFIG_SYSFS) && defined(CONFIG_NUMA)
