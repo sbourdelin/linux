@@ -41,6 +41,7 @@
 #include "intel_lrc.h"
 #include "i915_gem_gtt.h"
 #include "i915_gem_render_state.h"
+#include <linux/acpi.h>
 #include <linux/io-mapping.h>
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
@@ -1665,6 +1666,12 @@ struct intel_wm_config {
 	bool sprites_scaled;
 };
 
+struct acpi_i2c_data_node {
+	struct list_head head;
+	int i2c_bus_number;
+	int i2c_slave_address;
+};
+
 struct drm_i915_private {
 	struct drm_device *dev;
 	struct kmem_cache *objects;
@@ -1749,6 +1756,8 @@ struct drm_i915_private {
 	/* backlight registers and fields in struct intel_panel */
 	struct mutex backlight_lock;
 
+	struct list_head acpi_i2c_list;
+
 	/* LVDS info */
 	bool no_aux_handshake;
 
@@ -1818,6 +1827,7 @@ struct drm_i915_private {
 	int dpio_phy_iosf_port[I915_NUM_PHYS_VLV];
 
 	struct i915_workarounds workarounds;
+
 
 	/* Reclocking support */
 	bool render_reclock_avail;
@@ -3366,6 +3376,7 @@ intel_opregion_notify_adapter(struct drm_device *dev, pci_power_t state)
 #ifdef CONFIG_ACPI
 extern void intel_register_dsm_handler(void);
 extern void intel_unregister_dsm_handler(void);
+extern acpi_status intel_acpi_find_i2c(struct drm_i915_private *dev_priv);
 #else
 static inline void intel_register_dsm_handler(void) { return; }
 static inline void intel_unregister_dsm_handler(void) { return; }
