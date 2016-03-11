@@ -67,6 +67,22 @@ static inline unsigned long pfn_t_to_pfn(pfn_t pfn)
 	return v >> PFN_FLAG_BITS;
 }
 
+static inline __must_check pfn_t pfn_t_add(const pfn_t pfn, int val)
+{
+	pfn_t tmp = pfn;
+	if (tmp.val & PFN_HUGE)
+		tmp.val &= ~PFN_SIZE_MASK;
+	tmp.val &= ~PFN_SG_MASK;
+	tmp.val += val << PFN_FLAG_BITS;
+	return tmp;
+}
+
+/* Like memcmp, returns <0 if a<b, 0 if a=b and >0 if b>a */
+static inline int pfn_t_cmp(pfn_t a, pfn_t b)
+{
+	return pfn_t_to_pfn(b) - pfn_t_to_pfn(a);
+}
+
 extern pfn_t phys_to_pfn_t(phys_addr_t addr, u64 flags);
 
 static inline bool pfn_t_has_page(pfn_t pfn)
