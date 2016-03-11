@@ -22,6 +22,7 @@
 #include <linux/rbtree.h>
 #include <linux/poll.h>
 #include <linux/workqueue.h>
+#include <linux/atomic.h>
 
 /** Max number of pages that can be used in a single read request */
 #define FUSE_MAX_PAGES_PER_REQ 32
@@ -243,6 +244,7 @@ struct fuse_args {
 
 /** The request IO state (for asynchronous processing) */
 struct fuse_io_priv {
+	atomic_t refcnt;
 	int async;
 	spinlock_t lock;
 	unsigned reqs;
@@ -255,6 +257,19 @@ struct fuse_io_priv {
 	struct file *file;
 	struct completion *done;
 };
+
+static inline void fuse_io_ref(struct fuse_io_priv *io)
+{
+	atomic_inc(&io->refcnt);
+}
+
+static inline void fuse_io_unref(struct fuse_io_priv *io)
+{
+	int cnt = atomic_dec_return(&io->refcnt);
+	BUG_ON(cnt < 0);
+	if (cnt == 0)
+		kfree(io);
+}
 
 /**
  * Request flags
