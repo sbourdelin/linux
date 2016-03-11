@@ -844,7 +844,7 @@ out:
 
 static int kexec_apply_relocations(struct kimage *image)
 {
-	int i, ret;
+	int i, ret = 0;
 	struct purgatory_info *pi = &image->purgatory_info;
 	Elf_Shdr *sechdrs = pi->sechdrs;
 
