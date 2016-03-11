@@ -566,14 +566,12 @@ int f2fs_inline_data_fiemap(struct inode *inode,
 	struct page *ipage;
 	int err = 0;
 
+	if (!f2fs_has_inline_data(inode))
+		return -EAGAIN;
+
 	ipage = get_node_page(F2FS_I_SB(inode), inode->i_ino);
 	if (IS_ERR(ipage))
 		return PTR_ERR(ipage);
-
-	if (!f2fs_has_inline_data(inode)) {
-		err = -EAGAIN;
-		goto out;
-	}
 
 	ilen = min_t(size_t, MAX_INLINE_DATA, i_size_read(inode));
 	if (start >= ilen)
