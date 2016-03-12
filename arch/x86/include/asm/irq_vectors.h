@@ -17,8 +17,9 @@
  *  Vectors   0 ...  31 : system traps and exceptions - hardcoded events
  *  Vectors  32 ... 127 : device interrupts
  *  Vector  128         : legacy int80 syscall interface
- *  Vectors 129 ... INVALIDATE_TLB_VECTOR_START-1 except 204 : device interrupts
- *  Vectors INVALIDATE_TLB_VECTOR_START ... 255 : special interrupts
+ *  Vectors 129 ... 238 : device interrupts
+ *  Vectors 239(0xef)   : special(system) interrupt LOCAL_TIMER_VECTOR
+ *  Vectors 240 ... 255 : special(system) interrupts, see definition below for details.
  *
  * 64-bit x86 has per CPU IDT tables, 32-bit has one shared IDT table.
  *
@@ -55,40 +56,71 @@
 #define ISA_IRQ_VECTOR(irq)		(((FIRST_EXTERNAL_VECTOR + 16) & ~15) + irq)
 
 /*
- * Special IRQ vectors used by the SMP architecture, 0xf0-0xff
+ * Special IRQ vectors: 0xef - 0xff, for system vectors.
  *
  *  some of the following vectors are 'rare', they are merged
  *  into a single vector (CALL_FUNCTION_VECTOR) to save vector space.
  *  TLB, reschedule and local APIC vectors are performance-critical.
+ *
+ *  Layout:
+ *  0xff, 0xfe:
+ *	Two highest vectors, granted for spurious vector and error vector.
+ *  0xfd - 0xf9:
+ *	CONFIG_SMP dependent vectors. On morden machines these are achieved
+ *	via local APIC, but not neccessary.
+ *  0xf8 - 0xf0:
+ *      Local APIC dependent vectors. Some are only depending on Local ACPI,
+ *      but some are depending on more.
+ *  0xef:
+ *      Local APIC timer vector.
  */
 
-#define SPURIOUS_APIC_VECTOR		0xff
 /*
- * Sanity check
+ * Grant highest 2 vectors for two special vectors:
+ * Spurious Vector and Error Vector.
  */
-#if ((SPURIOUS_APIC_VECTOR & 0x0F) != 0x0F)
-# error SPURIOUS_APIC_VECTOR definition error
+#define SPURIOUS_APIC_VECTOR		0xff
+#define ERROR_APIC_VECTOR		0xfe
+
+#if SPURIOUS_APIC_VECTOR != 0xff
+# error SPURIOUS_APIC_VECTOR definition error, should grant it: 0xff
 #endif
 
-#define ERROR_APIC_VECTOR		0xfe
+#if ERROR_APIC_VECTOR  != 0xfe
+# error ERROR_APIC_VECTOR definition error, should grant it: 0xfe
+#endif
+
+
+/*
+ * SMP dependent vectors
+ */
+/* CPU-to-CPU reschedule-helper IPI, driven by wakeup.*/
 #define RESCHEDULE_VECTOR		0xfd
+
+/* IPI for generic function call */
 #define CALL_FUNCTION_VECTOR		0xfc
+
+/* IPI for generic single function call */
 #define CALL_FUNCTION_SINGLE_VECTOR	0xfb
-#define THERMAL_APIC_VECTOR		0xfa
-#define THRESHOLD_APIC_VECTOR		0xf9
-#define REBOOT_VECTOR			0xf8
+
+/* IPI used for rebooting/stopping */
+#define REBOOT_VECTOR			0xfa
+
+/* IPI for X86 platform specific use */
+#define X86_PLATFORM_IPI_VECTOR		0xf9
 
 /*
- * Generic system vector for platform specific use
+ * Local APCI dependent only vectors, these may or may not depend on SMP.
  */
-#define X86_PLATFORM_IPI_VECTOR		0xf7
+/* IRQ work vector: a mechanism that allows running code in IRQ context */
+#define IRQ_WORK_VECTOR			0xf8
 
-#define POSTED_INTR_WAKEUP_VECTOR	0xf1
 /*
- * IRQ work vector:
+ * Local APCI dependent vectors, but also depend on other configurations
+ * (MCE, virtualization, etc)
  */
-#define IRQ_WORK_VECTOR			0xf6
-
+#define THERMAL_APIC_VECTOR		0xf7
+#define THRESHOLD_APIC_VECTOR		0xf6
 #define UV_BAU_MESSAGE			0xf5
 #define DEFERRED_ERROR_VECTOR		0xf4
 
@@ -99,6 +131,9 @@
 #ifdef CONFIG_HAVE_KVM
 #define POSTED_INTR_VECTOR		0xf2
 #endif
+#define POSTED_INTR_WAKEUP_VECTOR	0xf1
+
+/* Vector 0xf0 is not used yet, reserved */
 
 /*
  * Local APIC timer IRQ vector is on a different priority level,
@@ -106,6 +141,9 @@
  * sources per level' errata.
  */
 #define LOCAL_TIMER_VECTOR		0xef
+
+/* --- end of special vectors definitions ---  */
+
 
 #define NR_VECTORS			 256
 
