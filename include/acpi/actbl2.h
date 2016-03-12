@@ -403,17 +403,6 @@ struct acpi_table_dbgp {
  *
  ******************************************************************************/
 
-struct acpi_table_dmar {
-	struct acpi_table_header header;	/* Common ACPI table header */
-	u8 width;		/* Host Address Width */
-	u8 flags;
-	u8 reserved[10];
-};
-
-/* Masks for Flags field above */
-
-#define ACPI_DMAR_INTR_REMAP        (1)
-
 /* DMAR subtable header */
 
 struct acpi_dmar_header {
@@ -434,12 +423,18 @@ enum acpi_dmar_type {
 
 /* DMAR Device Scope structure */
 
+struct acpi_dmar_pci_path {
+	u8 device;
+	u8 function;
+};
+
 struct acpi_dmar_device_scope {
 	u8 entry_type;
 	u8 length;
 	u16 reserved;
 	u8 enumeration_id;
 	u8 bus;
+	struct acpi_dmar_pci_path path[0];
 };
 
 /* Values for entry_type in struct acpi_dmar_device_scope - device types */
@@ -454,10 +449,17 @@ enum acpi_dmar_scope_type {
 	ACPI_DMAR_SCOPE_TYPE_RESERVED = 6	/* 6 and greater are reserved */
 };
 
-struct acpi_dmar_pci_path {
-	u8 device;
-	u8 function;
+struct acpi_table_dmar {
+	struct acpi_table_header header;	/* Common ACPI table header */
+	u8 width;		/* Host Address Width */
+	u8 flags;
+	u8 reserved[10];
+	struct acpi_dmar_header remapping_entries[0];
 };
+
+/* Masks for Flags field above */
+
+#define ACPI_DMAR_INTR_REMAP        (1)
 
 /*
  * DMAR Subtables, correspond to Type in struct acpi_dmar_header
@@ -471,6 +473,7 @@ struct acpi_dmar_hardware_unit {
 	u8 reserved;
 	u16 segment;
 	u64 address;		/* Register Base Address */
+	struct acpi_dmar_device_scope dev_scope[0];
 };
 
 /* Masks for Flags field above */

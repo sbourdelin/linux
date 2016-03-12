@@ -225,7 +225,6 @@ int dmar_insert_dev_scope(struct dmar_pci_notify_info *info,
 	int i, level;
 	struct device *tmp, *dev = &info->dev->dev;
 	struct acpi_dmar_device_scope *scope;
-	struct acpi_dmar_pci_path *path;
 
 	if (segment != info->seg)
 		return 0;
@@ -236,9 +235,8 @@ int dmar_insert_dev_scope(struct dmar_pci_notify_info *info,
 		    scope->entry_type != ACPI_DMAR_SCOPE_TYPE_BRIDGE)
 			continue;
 
-		path = (struct acpi_dmar_pci_path *)(scope + 1);
-		level = (scope->length - sizeof(*scope)) / sizeof(*path);
-		if (!dmar_match_pci_path(info, scope->bus, path, level))
+		level = (scope->length - sizeof(*scope)) / sizeof(*scope->path);
+		if (!dmar_match_pci_path(info, scope->bus, scope->path, level))
 			continue;
 
 		if ((scope->entry_type == ACPI_DMAR_SCOPE_TYPE_ENDPOINT) ^
@@ -394,7 +392,7 @@ static int dmar_parse_one_drhd(struct acpi_dmar_header *header, void *arg)
 	dmaru->reg_base_addr = drhd->address;
 	dmaru->segment = drhd->segment;
 	dmaru->include_all = drhd->flags & 0x1; /* BIT0: INCLUDE_ALL */
-	dmaru->devices = dmar_alloc_dev_scope((void *)(drhd + 1),
+	dmaru->devices = dmar_alloc_dev_scope(drhd->dev_scope,
 					      ((void *)drhd) + drhd->header.length,
 					      &dmaru->devices_cnt);
 	if (dmaru->devices_cnt && dmaru->devices == NULL) {
@@ -580,7 +578,7 @@ static int dmar_walk_remapping_entries(struct acpi_dmar_header *start,
 static inline int dmar_walk_dmar_table(struct acpi_table_dmar *dmar,
 				       struct dmar_res_callback *cb)
 {
-	return dmar_walk_remapping_entries((void *)(dmar + 1),
+	return dmar_walk_remapping_entries(dmar->remapping_entries,
 			dmar->header.length - sizeof(*dmar), cb);
 }
 
@@ -686,12 +684,11 @@ static void __init dmar_acpi_insert_dev_scope(u8 device_number,
 	struct acpi_dmar_device_scope *scope;
 	struct device *tmp;
 	int i;
-	struct acpi_dmar_pci_path *path;
 
 	for_each_drhd_unit(dmaru) {
 		drhd = (struct acpi_dmar_hardware_unit *)dmaru->hdr;
 
-		for (scope = (void *)(drhd + 1);
+		for (scope = drhd->dev_scope;
 		     (unsigned long)scope < ((unsigned long)drhd) + drhd->header.length;
 		     scope = ((void *)scope) + scope->length) {
 			if (scope->entry_type != ACPI_DMAR_SCOPE_TYPE_NAMESPACE)
@@ -699,15 +696,16 @@ static void __init dmar_acpi_insert_dev_scope(u8 device_number,
 			if (scope->enumeration_id != device_number)
 				continue;
 
-			path = (void *)(scope + 1);
 			pr_info("ACPI device \"%s\" under DMAR at %llx as %02x:%02x.%d\n",
 				dev_name(&adev->dev), dmaru->reg_base_addr,
-				scope->bus, path->device, path->function);
+				scope->bus, scope->path->device,
+				scope->path->function);
 			for_each_dev_scope(dmaru->devices, dmaru->devices_cnt, i, tmp)
 				if (tmp == NULL) {
 					dmaru->devices[i].bus = scope->bus;
-					dmaru->devices[i].devfn = PCI_DEVFN(path->device,
-									    path->function);
+					dmaru->devices[i].devfn =
+					  PCI_DEVFN(scope->path->device,
+						    scope->path->function);
 					rcu_assign_pointer(dmaru->devices[i].dev,
 							   get_device(&adev->dev));
 					return;
