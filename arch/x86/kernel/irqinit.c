@@ -121,47 +121,55 @@ static void __init smp_intr_init(void)
 
 	/* IPI used for rebooting/stopping */
 	alloc_intr_gate(REBOOT_VECTOR, reboot_interrupt);
+
+	/* IPI for X86 platform specific use */
+	alloc_intr_gate(X86_PLATFORM_IPI_VECTOR, x86_platform_ipi);
 #endif /* CONFIG_SMP */
 }
 
 static void __init apic_intr_init(void)
 {
-	smp_intr_init();
-
-#ifdef CONFIG_X86_THERMAL_VECTOR
-	alloc_intr_gate(THERMAL_APIC_VECTOR, thermal_interrupt);
-#endif
-#ifdef CONFIG_X86_MCE_THRESHOLD
-	alloc_intr_gate(THRESHOLD_APIC_VECTOR, threshold_interrupt);
-#endif
-
-#ifdef CONFIG_X86_MCE_AMD
-	alloc_intr_gate(DEFERRED_ERROR_VECTOR, deferred_error_interrupt);
-#endif
-
 #ifdef CONFIG_X86_LOCAL_APIC
-	/* self generated IPI for local APIC timer */
-	alloc_intr_gate(LOCAL_TIMER_VECTOR, apic_timer_interrupt);
-
-	/* IPI for X86 platform specific use */
-	alloc_intr_gate(X86_PLATFORM_IPI_VECTOR, x86_platform_ipi);
-#ifdef CONFIG_HAVE_KVM
-	/* IPI for KVM to deliver posted interrupt */
-	alloc_intr_gate(POSTED_INTR_VECTOR, kvm_posted_intr_ipi);
-	/* IPI for KVM to deliver interrupt to wake up tasks */
-	alloc_intr_gate(POSTED_INTR_WAKEUP_VECTOR, kvm_posted_intr_wakeup_ipi);
-#endif
 
 	/* IPI vectors for APIC spurious and error interrupts */
 	alloc_intr_gate(SPURIOUS_APIC_VECTOR, spurious_interrupt);
 	alloc_intr_gate(ERROR_APIC_VECTOR, error_interrupt);
 
-	/* IRQ work interrupts: */
-# ifdef CONFIG_IRQ_WORK
-	alloc_intr_gate(IRQ_WORK_VECTOR, irq_work_interrupt);
+	/* self generated IPI for local APIC timer */
+	alloc_intr_gate(LOCAL_TIMER_VECTOR, apic_timer_interrupt);
+
+# ifdef CONFIG_X86_THERMAL_VECTOR
+	alloc_intr_gate(THERMAL_APIC_VECTOR, thermal_interrupt);
+# endif
+
+# ifdef CONFIG_X86_MCE_THRESHOLD
+         alloc_intr_gate(THRESHOLD_APIC_VECTOR, threshold_interrupt);
+# endif
+
+# ifdef CONFIG_X86_MCE_AMD
+         alloc_intr_gate(DEFERRED_ERROR_VECTOR, deferred_error_interrupt);
+# endif
+
+# ifdef CONFIG_HAVE_KVM
+         /* IPI for KVM to deliver posted interrupt */
+         alloc_intr_gate(POSTED_INTR_VECTOR, kvm_posted_intr_ipi);
+         /* IPI for KVM to deliver interrupt to wake up tasks */
+         alloc_intr_gate(POSTED_INTR_WAKEUP_VECTOR, kvm_posted_intr_wakeup_ipi);
 # endif
 
 #endif
+}
+
+/* See asm/irq_vectors.h for sepcial vector definiton */
+static void __init system_intr_init(void)
+{
+	smp_intr_init();
+
+#ifdef CONFIG_IRQ_WORK
+	alloc_intr_gate(IRQ_WORK_VECTOR, irq_work_interrupt);
+#endif
+
+	apic_intr_init();
 }
 
 void __init native_init_IRQ(void)
@@ -171,10 +179,11 @@ void __init native_init_IRQ(void)
 	/* Execute any quirks before the call gates are initialised: */
 	x86_init.irqs.pre_vector_init();
 
-	apic_intr_init();
+	/* First, init system vectors, will update 'first_system_vector' */
+	system_intr_init();
 
 	/*
-	 * Cover the whole vector space, no vector can escape
+	 * Second, cover the whole vector space, no vector can escape
 	 * us. (some of these will be overridden and become
 	 * 'special' SMP interrupts)
 	 */
@@ -187,11 +196,14 @@ void __init native_init_IRQ(void)
 		set_intr_gate(i, irq_entries_start +
 				8 * (i - FIRST_EXTERNAL_VECTOR));
 	}
+
+	/* Third, mark all spare vector as spurious. */
 #ifdef CONFIG_X86_LOCAL_APIC
 	for_each_clear_bit_from(i, used_vectors, NR_VECTORS)
 		set_intr_gate(i, spurious_interrupt);
 #endif
 
+	/* Fourth, fixup for legacy PIC */
 	if (!acpi_ioapic && !of_ioapic && nr_legacy_irqs())
 		setup_irq(2, &irq2);
 
