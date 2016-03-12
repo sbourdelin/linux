@@ -458,9 +458,9 @@ static int pvscsi_allocate_rings(struct pvscsi_adapter *adapter)
 	if (!adapter->cmp_ring)
 		return -ENOMEM;
 
-	BUG_ON(!IS_ALIGNED(adapter->ringStatePA, PAGE_SIZE));
-	BUG_ON(!IS_ALIGNED(adapter->reqRingPA, PAGE_SIZE));
-	BUG_ON(!IS_ALIGNED(adapter->cmpRingPA, PAGE_SIZE));
+	BUG_ON(!PAGE_ALIGNED(adapter->ringStatePA));
+	BUG_ON(!PAGE_ALIGNED(adapter->reqRingPA));
+	BUG_ON(!PAGE_ALIGNED(adapter->cmpRingPA));
 
 	if (!adapter->use_msg)
 		return 0;
@@ -472,7 +472,7 @@ static int pvscsi_allocate_rings(struct pvscsi_adapter *adapter)
 						 &adapter->msgRingPA);
 	if (!adapter->msg_ring)
 		return -ENOMEM;
-	BUG_ON(!IS_ALIGNED(adapter->msgRingPA, PAGE_SIZE));
+	BUG_ON(!PAGE_ALIGNED(adapter->msgRingPA));
 
 	return 0;
 }
@@ -1287,7 +1287,7 @@ static int pvscsi_allocate_sg(struct pvscsi_adapter *adapter)
 		ctx->sgl = (void *)__get_free_pages(GFP_KERNEL,
 						    get_order(SGL_SIZE));
 		ctx->sglPA = 0;
-		BUG_ON(!IS_ALIGNED(((unsigned long)ctx->sgl), PAGE_SIZE));
+		BUG_ON(!PAGE_ALIGNED(((unsigned long)ctx->sgl)));
 		if (!ctx->sgl) {
 			for (; i >= 0; --i, --ctx) {
 				free_pages((unsigned long)ctx->sgl,
