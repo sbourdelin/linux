@@ -383,8 +383,10 @@ static inline void alloc_system_vector(int vector)
 {
 	if (!test_bit(vector, used_vectors)) {
 		set_bit(vector, used_vectors);
+#ifdef CONFIG_X86_LOCAL_APIC
 		if (first_system_vector > vector)
 			first_system_vector = vector;
+#endif
 	} else {
 		BUG();
 	}

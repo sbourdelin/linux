@@ -188,9 +188,6 @@ void __init native_init_IRQ(void)
 	 * 'special' SMP interrupts)
 	 */
 	i = FIRST_EXTERNAL_VECTOR;
-#ifndef CONFIG_X86_LOCAL_APIC
-#define first_system_vector NR_VECTORS
-#endif
 	for_each_clear_bit_from(i, used_vectors, first_system_vector) {
 		/* IA32_SYSCALL_VECTOR could be used in trap_init already. */
 		set_intr_gate(i, irq_entries_start +
