@@ -108,7 +108,6 @@ static int open_proxy_open(struct inode *inode, struct file *filp)
 
 	r = debugfs_use_file_start(dentry, &srcu_idx);
 	if (r) {
-		debugfs_use_file_finish(srcu_idx);
 		r = -ENOENT;
 		goto out;
 	}
