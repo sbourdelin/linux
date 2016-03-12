@@ -110,8 +110,20 @@ static int func_prolog_dec(struct trace_array *tr,
 
 	local_save_flags(*flags);
 	/* slight chance to get a false positive on tracing_cpu */
-	if (!irqs_disabled_flags(*flags))
-		return 0;
+	switch (trace_type) {
+	case (TRACER_IRQS_OFF | TRACER_PREEMPT_OFF):
+		if (!preempt_trace() && !irqs_disabled_flags(*flags))
+			return 0;
+		break;
+	case TRACER_IRQS_OFF:
+		if (!irqs_disabled_flags(*flags))
+			return 0;
+		break;
+	case TRACER_PREEMPT_OFF:
+		if (!preempt_trace())
+			return 0;
+		break;
+	}
 
 	*data = per_cpu_ptr(tr->trace_buffer.data, cpu);
 	disabled = atomic_inc_return(&(*data)->disabled);
