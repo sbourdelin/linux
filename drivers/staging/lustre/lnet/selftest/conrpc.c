@@ -60,7 +60,7 @@ lstcon_rpc_done(srpc_client_rpc_t *rpc)
 	spin_lock(&rpc->crpc_lock);
 
 	if (!crpc->crp_trans) {
-		/*
+		/**
 		 * Orphan RPC is not in any transaction,
 		 * I'm just a poor body and nobody loves me
 		 */
@@ -242,7 +242,7 @@ lstcon_rpc_trans_prep(struct list_head *translist,
 
 	if (translist) {
 		list_for_each_entry(trans, translist, tas_link) {
-			/*
+			/**
 			 * Can't enqueue two private transaction on
 			 * the same object
 			 */
@@ -296,8 +296,8 @@ lstcon_rpc_trans_abort(lstcon_rpc_trans_t *trans, int error)
 
 		spin_lock(&rpc->crpc_lock);
 
-		if (!crpc->crp_posted || /* not posted */
-		    crpc->crp_stamp) { /* rpc done or aborted already */
+		if (!crpc->crp_posted ||	/* not posted */
+		    crpc->crp_stamp) {		/* rpc done or aborted already */
 			if (!crpc->crp_stamp) {
 				crpc->crp_stamp = cfs_time_current();
 				crpc->crp_status = -EINTR;
@@ -563,11 +563,11 @@ lstcon_rpc_trans_destroy(lstcon_rpc_trans_t *trans)
 			continue;
 		}
 
-		/*
-		 * rpcs can be still not callbacked (even LNetMDUnlink is called)
-		 * because huge timeout for inaccessible network, don't make
-		 * user wait for them, just abandon them, they will be recycled
-		 * in callback
+		/**
+		 * rpcs can be still not callbacked (even LNetMDUnlink is
+		 * called) because huge timeout for inaccessible network,
+		 * don't make user wait for them, just abandon them, they
+		 * will be recycled in callback
 		 */
 		LASSERT(crpc->crp_status);
 
@@ -941,7 +941,7 @@ lstcon_sesnew_stat_reply(lstcon_rpc_trans_t *trans,
 
 	if (!trans->tas_feats_updated) {
 		spin_lock(&console_session.ses_rpc_lock);
-		if (!trans->tas_feats_updated) { /* recheck with lock */
+		if (!trans->tas_feats_updated) {	/* recheck with lock */
 			trans->tas_feats_updated = 1;
 			trans->tas_features = reply->msg_ses_feats;
 		}
@@ -1181,7 +1181,8 @@ lstcon_rpc_pinger(void *arg)
 	int count = 0;
 	int rc;
 
-	/* RPC pinger is a special case of transaction,
+	/**
+	 * RPC pinger is a special case of transaction,
 	 * it's called by timer at 8 seconds interval.
 	 */
 	mutex_lock(&console_session.ses_mutex);

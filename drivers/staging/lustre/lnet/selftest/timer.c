@@ -42,14 +42,14 @@
 
 #include "selftest.h"
 
-/*
+/**
  * Timers are implemented as a sorted queue of expiry times. The queue
  * is slotted, with each slot holding timers which expire in a
  * 2**STTIMER_MINPOLL (8) second period. The timers in each slot are
  * sorted by increasing expiry time. The number of slots is 2**7 (128),
  * to cover a time period of 1024 seconds into the future before wrapping.
  */
-#define STTIMER_MINPOLL        3   /* log2 min poll interval (8 s) */
+#define STTIMER_MINPOLL        3	/* log2 min poll interval (8 s) */
 #define STTIMER_SLOTTIME       (1 << STTIMER_MINPOLL)
 #define STTIMER_SLOTTIMEMASK   (~(STTIMER_SLOTTIME - 1))
 #define STTIMER_NSLOTS	       (1 << 7)
@@ -92,7 +92,7 @@ stt_add_timer(struct stt_timer *timer)
 	spin_unlock(&stt_data.stt_lock);
 }
 
-/*
+/**
  * The function returns whether it has deactivated a pending timer or not.
  * (ie. del_timer() of an inactive timer returns 0, del_timer() of an
  * active timer returns 1.)

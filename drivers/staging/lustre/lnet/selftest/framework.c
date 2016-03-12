@@ -226,7 +226,7 @@ __must_hold(&sfw_data.fw_lock)
 	}
 
 	if (nactive)
-		return;   /* wait for active batches to stop */
+		return;	/* wait for active batches to stop */
 
 	list_del_init(&sn->sn_list);
 	spin_unlock(&sfw_data.fw_lock);
@@ -382,7 +382,7 @@ sfw_get_stats(srpc_stat_reqst_t *request, srpc_stat_reply_t *reply)
 	lnet_counters_get(&reply->str_lnet);
 	srpc_get_counters(&reply->str_rpc);
 
-	/*
+	/**
 	 * send over the msecs since the session was started
 	 * with 32 bits to send, this is ~49 days
 	 */
@@ -435,7 +435,7 @@ sfw_make_session(srpc_mksn_reqst_t *request, srpc_mksn_reply_t *reply)
 		}
 	}
 
-	/*
+	/**
 	 * reject the request if it requires unknown features
 	 * NB: old version will always accept all features because it's not
 	 * aware of srpc_msg_t::msg_ses_feats, it's a defect but it's also
@@ -576,7 +576,7 @@ sfw_load_test(struct sfw_test_instance *tsi)
 	if (rc) {
 		CWARN("Failed to reserve enough buffers: service %s, %d needed: %d\n",
 		      svc->sv_name, nbuf, rc);
-		/*
+		/**
 		 * NB: this error handler is not strictly correct, because
 		 * it may release more buffers than already allocated,
 		 * but it doesn't matter because request portal should
@@ -604,7 +604,7 @@ sfw_unload_test(struct sfw_test_instance *tsi)
 	if (tsi->tsi_is_client)
 		return;
 
-	/*
+	/**
 	 * shrink buffers, because request portal is lazy portal
 	 * which can grow buffers at runtime so we may leave
 	 * some buffers behind, but never mind...
@@ -693,7 +693,7 @@ sfw_unpack_addtest_req(srpc_msg_t *msg)
 	LASSERT(req->tsr_is_client);
 
 	if (msg->msg_magic == SRPC_MSG_MAGIC)
-		return; /* no flipping needed */
+		return;	/* no flipping needed */
 
 	LASSERT(msg->msg_magic == __swab32(SRPC_MSG_MAGIC));
 
@@ -789,7 +789,7 @@ sfw_add_test_instance(sfw_batch_t *tsb, struct srpc_server_rpc *rpc)
 		int j;
 
 		dests = page_address(bk->bk_iovs[i / SFW_ID_PER_PAGE].kiov_page);
-		LASSERT(dests);  /* my pages are within KVM always */
+		LASSERT(dests);		/* my pages are within KVM always */
 		id = dests[i % SFW_ID_PER_PAGE];
 		if (msg->msg_magic != SRPC_MSG_MAGIC)
 			sfw_unpack_id(id);
@@ -844,8 +844,8 @@ sfw_test_unit_done(sfw_test_unit_t *tsu)
 
 	spin_lock(&sfw_data.fw_lock);
 
-	if (!atomic_dec_and_test(&tsb->bat_nactive) ||/* tsb still active */
-	    sn == sfw_data.fw_session) {		  /* sn also active */
+	if (!atomic_dec_and_test(&tsb->bat_nactive) ||	/* tsb still active */
+	    sn == sfw_data.fw_session) {		/* sn also active */
 		spin_unlock(&sfw_data.fw_lock);
 		return;
 	}
@@ -978,7 +978,7 @@ sfw_run_test(swi_workitem_t *wi)
 	return 0;
 
 test_done:
-	/*
+	/**
 	 * No one can schedule me now since:
 	 * - previous RPC, if any, has done and
 	 * - no new RPC is initiated.

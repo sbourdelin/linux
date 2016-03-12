@@ -276,7 +276,7 @@ srpc_service_init(struct srpc_service *svc)
 		scd->scd_ev.ev_data = scd;
 		scd->scd_ev.ev_type = SRPC_REQUEST_RCVD;
 
-		/*
+		/**
 		 * NB: don't use lst_sched_serial for adding buffer,
 		 * see details in srpc_service_add_buffers()
 		 */
@@ -284,7 +284,7 @@ srpc_service_init(struct srpc_service *svc)
 				  srpc_add_buffer, lst_sched_test[i]);
 
 		if (i && srpc_serv_is_framework(svc)) {
-			/*
+			/**
 			 * NB: framework service only needs srpc_service_cd for
 			 * one partition, but we allocate for all to make
 			 * it easier to implement, it will waste a little
@@ -415,7 +415,7 @@ srpc_post_active_rdma(int portal, __u64 matchbits, void *buf, int len,
 		return -ENOMEM;
 	}
 
-	/*
+	/**
 	 * this is kind of an abuse of the LNET_MD_OP_{PUT,GET} options.
 	 * they're only meaningful for MDs attached to an ME (i.e. passive
 	 * buffers...
@@ -434,7 +434,7 @@ srpc_post_active_rdma(int portal, __u64 matchbits, void *buf, int len,
 		       options & LNET_MD_OP_PUT ? "Put" : "Get",
 		       libcfs_id2str(peer), portal, matchbits, rc);
 
-		/*
+		/**
 		 * The forthcoming unlink event will complete this operation
 		 * with failure, so fall through and return success here.
 		 */
@@ -479,7 +479,7 @@ __must_hold(&scd->scd_lock)
 				      msg, sizeof(*msg), &buf->buf_mdh,
 				      &scd->scd_ev);
 
-	/*
+	/**
 	 * At this point, a RPC (new or delayed) may have arrived in
 	 * msg and its event handler has been called. So we must add
 	 * buf to scd_buf_posted _before_ dropping scd_lock
@@ -491,7 +491,7 @@ __must_hold(&scd->scd_lock)
 			return 0;
 
 		spin_unlock(&scd->scd_lock);
-		/*
+		/**
 		 * srpc_shutdown_service might have tried to unlink me
 		 * when my buf_mdh was still invalid
 		 */
@@ -520,7 +520,7 @@ srpc_add_buffer(struct swi_workitem *wi)
 	struct srpc_buffer *buf;
 	int rc = 0;
 
-	/*
+	/**
 	 * it's called by workitem scheduler threads, these threads
 	 * should have been set CPT affinity, so buffers will be posted
 	 * on CPT local list of Portal
@@ -602,7 +602,7 @@ srpc_service_add_buffers(struct srpc_service *sv, int nbuffer)
 
 	cfs_percpt_for_each(scd, i, sv->sv_cpt_data) {
 		spin_lock(&scd->scd_lock);
-		/*
+		/**
 		 * NB: srpc_service_add_buffers() can be called inside
 		 * thread context of lst_sched_serial, and we don't normally
 		 * allow to sleep inside thread context of WI scheduler
@@ -740,7 +740,7 @@ srpc_abort_service(struct srpc_service *sv)
 	cfs_percpt_for_each(scd, i, sv->sv_cpt_data) {
 		spin_lock(&scd->scd_lock);
 
-		/*
+		/**
 		 * schedule in-flight RPCs to notice the abort, NB:
 		 * racing with incoming RPCs; complete fix should make test
 		 * RPCs carry session ID in its headers
@@ -782,7 +782,7 @@ srpc_shutdown_service(srpc_service_t *sv)
 
 		spin_unlock(&scd->scd_lock);
 
-		/*
+		/**
 		 * OK to traverse scd_buf_posted without lock, since no one
 		 * touches scd_buf_posted now
 		 */
@@ -927,7 +927,7 @@ srpc_server_rpc_done(struct srpc_server_rpc *rpc, int status)
 	spin_lock(&scd->scd_lock);
 
 	if (rpc->srpc_reqstbuf) {
-		/*
+		/**
 		 * NB might drop sv_lock in srpc_service_recycle_buffer, but
 		 * sv won't go away for scd_rpc_active must not be empty
 		 */
@@ -937,7 +937,7 @@ srpc_server_rpc_done(struct srpc_server_rpc *rpc, int status)
 
 	list_del(&rpc->srpc_list); /* from scd->scd_rpc_active */
 
-	/*
+	/**
 	 * No one can schedule me now since:
 	 * - I'm not on scd_rpc_active.
 	 * - all LNet events have been fired.
@@ -1110,7 +1110,7 @@ srpc_add_client_rpc_timer(srpc_client_rpc_t *rpc)
 	stt_add_timer(timer);
 }
 
-/*
+/**
  * Called with rpc->crpc_lock held.
  *
  * Upon exit the RPC expiry timer is not queued and the handler is not
@@ -1157,7 +1157,7 @@ srpc_client_rpc_done(srpc_client_rpc_t *rpc, int status)
 		     rpc->crpc_service, libcfs_id2str(rpc->crpc_dest),
 		     swi_state2str(wi->swi_state), rpc->crpc_aborted, status);
 
-	/*
+	/**
 	 * No one can schedule me now since:
 	 * - RPC timer has been defused.
 	 * - all LNet events have been fired.
@@ -1222,7 +1222,7 @@ srpc_send_rpc(swi_workitem_t *wi)
 		break;
 
 	case SWI_STATE_REQUEST_SUBMITTED:
-		/*
+		/**
 		 * CAVEAT EMPTOR: rqtev, rpyev, and bulkev may come in any
 		 * order; however, they're processed in a strict order:
 		 * rqt, rpy, and bulk.
@@ -1273,7 +1273,7 @@ srpc_send_rpc(swi_workitem_t *wi)
 
 		rc = do_bulk ? rpc->crpc_bulkev.ev_status : 0;
 
-		/*
+		/**
 		 * Bulk buffer was unlinked due to remote error. Clear error
 		 * since reply buffer still contains valid data.
 		 * NB rpc->crpc_done shouldn't look into bulk data in case of
@@ -1332,8 +1332,8 @@ srpc_abort_rpc(srpc_client_rpc_t *rpc, int why)
 {
 	LASSERT(why);
 
-	if (rpc->crpc_aborted || /* already aborted */
-	    rpc->crpc_closed)	 /* callback imminent */
+	if (rpc->crpc_aborted ||	/* already aborted */
+	    rpc->crpc_closed)		/* callback imminent */
 		return;
 
 	CDEBUG(D_NET, "Aborting RPC: service %d, peer %s, state %s, why %d\n",
@@ -1377,7 +1377,7 @@ srpc_send_reply(struct srpc_server_rpc *rpc)
 	spin_lock(&scd->scd_lock);
 
 	if (!sv->sv_shuttingdown && !srpc_serv_is_framework(sv)) {
-		/*
+		/**
 		 * Repost buffer before replying since test client
 		 * might send me another RPC once it gets the reply
 		 */
@@ -1401,7 +1401,7 @@ srpc_send_reply(struct srpc_server_rpc *rpc)
 				   rpc->srpc_peer, rpc->srpc_self,
 				   &rpc->srpc_replymdh, ev);
 	if (rc)
-		ev->ev_fired = 1;  /* no more event expected */
+		ev->ev_fired = 1; /* no more event expected */
 	return rc;
 }
 
@@ -1494,7 +1494,7 @@ srpc_lnet_ev_handler(lnet_event_t *ev)
 		scd->scd_buf_nposted--;
 
 		if (sv->sv_shuttingdown) {
-			/*
+			/**
 			 * Leave buffer on scd->scd_buf_nposted since
 			 * srpc_finish_service needs to traverse it.
 			 */
@@ -1509,7 +1509,7 @@ srpc_lnet_ev_handler(lnet_event_t *ev)
 			scd->scd_buf_err = 0;
 		}
 
-		if (!scd->scd_buf_err && /* adding buffer is enabled */
+		if (!scd->scd_buf_err &&	/* adding buffer is enabled */
 		    !scd->scd_buf_adjust &&
 		    scd->scd_buf_nposted < scd->scd_buf_low) {
 			scd->scd_buf_adjust = max(scd->scd_buf_total / 2,
@@ -1531,7 +1531,7 @@ srpc_lnet_ev_handler(lnet_event_t *ev)
 			       ev->status, ev->mlength,
 			       msg->msg_type, msg->msg_magic);
 
-			/*
+			/**
 			 * NB can't call srpc_service_recycle_buffer here since
 			 * it may call LNetM[DE]Attach. The invalid magic tells
 			 * srpc_handle_rpc to drop this RPC

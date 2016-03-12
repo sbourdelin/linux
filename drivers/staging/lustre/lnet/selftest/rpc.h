@@ -281,7 +281,7 @@ srpc_unpack_msg_hdr(srpc_msg_t *msg)
 	if (msg->msg_magic == SRPC_MSG_MAGIC)
 		return; /* no flipping needed */
 
-	/*
+	/**
 	 * We do not swap the magic number here as it is needed to
 	 * determine whether the body needs to be swapped.
 	 */

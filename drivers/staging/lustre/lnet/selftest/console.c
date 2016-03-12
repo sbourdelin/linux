@@ -104,7 +104,7 @@ lstcon_node_find(lnet_process_id_t id, lstcon_node_t **ndpp, int create)
 	ndl->ndl_node->nd_timeout = 0;
 	memset(&ndl->ndl_node->nd_ping, 0, sizeof(lstcon_rpc_t));
 
-	/*
+	/**
 	 * queued in global hash & list, no refcount is taken by
 	 * global hash & list, if caller release his refcount,
 	 * node will be released
@@ -276,7 +276,7 @@ lstcon_group_find(const char *name, lstcon_group_t **grpp)
 		if (strncmp(grp->grp_name, name, LST_NAME_SIZE))
 			continue;
 
-		lstcon_group_addref(grp);  /* +1 ref for caller */
+		lstcon_group_addref(grp); /* +1 ref for caller */
 		*grpp = grp;
 		return 0;
 	}
@@ -608,7 +608,7 @@ lstcon_group_del(char *name)
 	lstcon_rpc_trans_destroy(trans);
 
 	lstcon_group_decref(grp);
-	/*
+	/**
 	 * -ref for session, it's destroyed,
 	 * status can't be rolled back, destroy group anyway
 	 */
@@ -1289,7 +1289,7 @@ lstcon_test_add(char *batch_name, int type, int loop,
 	lstcon_group_t *dst_grp = NULL;
 	lstcon_batch_t *batch = NULL;
 
-	/*
+	/**
 	 * verify that a batch of the given name exists, and the groups
 	 * that will be part of the batch exist and have at least one
 	 * active node
@@ -1447,7 +1447,8 @@ lstcon_test_batch_query(char *name, int testidx, int client,
 
 	lstcon_rpc_trans_postwait(trans, timeout);
 
-	if (!testidx && /* query a batch, not a test */
+	/* query a batch, not a test */
+	if (!testidx &&
 	    !lstcon_rpc_stat_failure(lstcon_trans_stat(), 0) &&
 	    !lstcon_tsbqry_stat_run(lstcon_trans_stat(), 0)) {
 		/* all RPCs finished, and no active test */

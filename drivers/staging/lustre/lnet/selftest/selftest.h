@@ -71,7 +71,8 @@ struct srpc_service_cd;
 struct sfw_test_unit;
 struct sfw_test_instance;
 
-/* services below SRPC_FRAMEWORK_SERVICE_MAX_ID are framework
+/**
+ * services below SRPC_FRAMEWORK_SERVICE_MAX_ID are framework
  * services, e.g. create/modify session.
  */
 #define SRPC_SERVICE_DEBUG		0

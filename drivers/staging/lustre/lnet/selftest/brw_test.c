@@ -86,7 +86,7 @@ brw_client_init(sfw_test_instance_t *tsi)
 		opc = breq->blk_opc;
 		flags = breq->blk_flags;
 		npg = breq->blk_npg;
-		/*
+		/**
 		 * NB: this is not going to work for variable page size,
 		 * but we have to keep it for compatibility
 		 */
@@ -95,7 +95,7 @@ brw_client_init(sfw_test_instance_t *tsi)
 	} else {
 		test_bulk_req_v1_t *breq = &tsi->tsi_u.bulk_v1;
 
-		/*
+		/**
 		 * I should never get this step if it's unknown feature
 		 * because make_session will reject unknown feature
 		 */
@@ -283,7 +283,7 @@ brw_client_prep_rpc(sfw_test_unit_t *tsu,
 	} else {
 		test_bulk_req_v1_t *breq = &tsi->tsi_u.bulk_v1;
 
-		/*
+		/**
 		 * I should never get this step if it's unknown feature
 		 * because make_session will reject unknown feature
 		 */
@@ -329,7 +329,7 @@ brw_client_done_rpc(sfw_test_unit_t *tsu, srpc_client_rpc_t *rpc)
 	if (rpc->crpc_status) {
 		CERROR("BRW RPC to %s failed with %d\n",
 		       libcfs_id2str(rpc->crpc_dest), rpc->crpc_status);
-		if (!tsi->tsi_stopping) /* rpc could have been aborted */
+		if (!tsi->tsi_stopping)	/* rpc could have been aborted */
 			atomic_inc(&sn->sn_brw_errors);
 		return;
 	}
