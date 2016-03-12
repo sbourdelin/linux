@@ -77,6 +77,7 @@
 #include <asm/pci_x86.h>
 #include <asm/pat.h>
 #include <asm/cpu.h>
+#include <asm/cpuid_leafs.h>
 
 #ifdef CONFIG_ACPI
 #include <linux/acpi.h>
@@ -1655,7 +1656,7 @@ asmlinkage __visible void __init xen_start_kernel(void)
 	cpu_detect(&new_cpu_data);
 	set_cpu_cap(&new_cpu_data, X86_FEATURE_FPU);
 	new_cpu_data.wp_works_ok = 1;
-	new_cpu_data.x86_capability[CPUID_1_EDX] = cpuid_edx(1);
+	new_cpu_data.x86_capability[CPUID_00000001_0_EDX] = cpuid_edx(1);
 #endif
 
 	if (xen_start_info->mod_start) {

@@ -22,6 +22,7 @@ struct vm86;
 #include <asm/nops.h>
 #include <asm/special_insns.h>
 #include <asm/fpu/types.h>
+#include <asm/cpuid_leafs.h>
 
 #include <linux/personality.h>
 #include <linux/cache.h>
@@ -159,6 +160,7 @@ extern struct cpuinfo_x86	new_cpu_data;
 extern struct tss_struct	doublefault_tss;
 extern __u32			cpu_caps_cleared[NCAPINTS];
 extern __u32			cpu_caps_set[NCAPINTS];
+extern __u32			*cpuid_overrides[CPUID_LEAFS_COUNT];
 
 #ifdef CONFIG_SMP
 DECLARE_PER_CPU_READ_MOSTLY(struct cpuinfo_x86, cpu_info);
@@ -487,6 +489,53 @@ static inline void load_sp0(struct tss_struct *tss,
 #define set_iopl_mask native_set_iopl_mask
 #endif /* CONFIG_PARAVIRT */
 
+static inline void __kernel_cpuid(unsigned int *eax, unsigned int *ebx,
+				  unsigned int *ecx, unsigned int *edx)
+{
+	unsigned int op = *eax;
+	unsigned int count = *ecx;
+	unsigned int *oeax, *oebx, *oecx, *oedx;
+
+	__cpuid(eax, ebx, ecx, edx);
+
+	oeax = oebx = oecx = oedx = 0;
+	if (op == 0x00000001) {
+		oecx = cpuid_overrides[CPUID_00000001_0_ECX];
+		oedx = cpuid_overrides[CPUID_00000001_0_EDX];
+	} else if (op == 0x00000006) {
+		oeax = cpuid_overrides[CPUID_00000006_0_EAX];
+	} else if (op == 0x00000007) {
+		oebx = cpuid_overrides[CPUID_00000007_0_EBX];
+		oecx = cpuid_overrides[CPUID_00000007_0_ECX];
+	} else if (op == 0x0000000D && count == 1) {
+		oeax = cpuid_overrides[CPUID_0000000D_1_EAX];
+	} else if (op == 0x0000000F && count == 0) {
+		oedx = cpuid_overrides[CPUID_0000000F_0_EDX];
+	} else if (op == 0x0000000F && count == 1) {
+		oedx = cpuid_overrides[CPUID_0000000F_1_EDX];
+	} else if (op == 0x80000001) {
+		oecx = cpuid_overrides[CPUID_80000001_0_ECX];
+		oedx = cpuid_overrides[CPUID_80000001_0_EDX];
+	} else if (op == 0x80000008) {
+		oebx = cpuid_overrides[CPUID_80000008_0_EBX];
+	} else if (op == 0x8000000A) {
+		oedx = cpuid_overrides[CPUID_8000000A_0_EDX];
+	} else if (op == 0x80860001) {
+		oedx = cpuid_overrides[CPUID_80860001_0_EDX];
+	} else if (op == 0xC0000001) {
+		oedx = cpuid_overrides[CPUID_C0000001_0_EDX];
+	}
+
+	if (oeax)
+		*eax = *oeax;
+	if (oebx)
+		*ebx = *oebx;
+	if (oecx)
+		*ecx = *oecx;
+	if (oedx)
+		*edx = *oedx;
+}
+
 typedef struct {
 	unsigned long		seg;
 } mm_segment_t;
@@ -527,36 +576,83 @@ static inline void cpuid_count(unsigned int op, int count,
 static inline unsigned int cpuid_eax(unsigned int op)
 {
 	unsigned int eax, ebx, ecx, edx;
-
 	cpuid(op, &eax, &ebx, &ecx, &edx);
-
 	return eax;
 }
 
 static inline unsigned int cpuid_ebx(unsigned int op)
 {
 	unsigned int eax, ebx, ecx, edx;
-
 	cpuid(op, &eax, &ebx, &ecx, &edx);
-
 	return ebx;
 }
 
 static inline unsigned int cpuid_ecx(unsigned int op)
 {
 	unsigned int eax, ebx, ecx, edx;
-
 	cpuid(op, &eax, &ebx, &ecx, &edx);
-
 	return ecx;
 }
 
 static inline unsigned int cpuid_edx(unsigned int op)
 {
 	unsigned int eax, ebx, ecx, edx;
-
 	cpuid(op, &eax, &ebx, &ecx, &edx);
+	return edx;
+}
 
+/*
+ * Kernel-adjusted CPUID function
+ * clear %ecx since some cpus (Cyrix MII) do not set or clear %ecx
+ * resulting in stale register contents being returned.
+ */
+static inline void kernel_cpuid(unsigned int op,
+				unsigned int *eax, unsigned int *ebx,
+				unsigned int *ecx, unsigned int *edx)
+{
+	*eax = op;
+	*ecx = 0;
+	__kernel_cpuid(eax, ebx, ecx, edx);
+}
+
+/* Some CPUID calls want 'count' to be placed in ecx */
+static inline void kernel_cpuid_count(unsigned int op, int count,
+				      unsigned int *eax, unsigned int *ebx,
+				      unsigned int *ecx, unsigned int *edx)
+{
+	*eax = op;
+	*ecx = count;
+	__kernel_cpuid(eax, ebx, ecx, edx);
+}
+
+/*
+ * CPUID functions returning a single datum
+ */
+static inline unsigned int kernel_cpuid_eax(unsigned int op)
+{
+	unsigned int eax, ebx, ecx, edx;
+	kernel_cpuid(op, &eax, &ebx, &ecx, &edx);
+	return eax;
+}
+
+static inline unsigned int kernel_cpuid_ebx(unsigned int op)
+{
+	unsigned int eax, ebx, ecx, edx;
+	kernel_cpuid(op, &eax, &ebx, &ecx, &edx);
+	return ebx;
+}
+
+static inline unsigned int kernel_cpuid_ecx(unsigned int op)
+{
+	unsigned int eax, ebx, ecx, edx;
+	kernel_cpuid(op, &eax, &ebx, &ecx, &edx);
+	return ecx;
+}
+
+static inline unsigned int kernel_cpuid_edx(unsigned int op)
+{
+	unsigned int eax, ebx, ecx, edx;
+	kernel_cpuid(op, &eax, &ebx, &ecx, &edx);
 	return edx;
 }
 

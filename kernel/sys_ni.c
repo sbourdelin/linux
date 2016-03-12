@@ -187,6 +187,7 @@ cond_syscall(sys_spu_create);
 cond_syscall(sys_subpage_prot);
 cond_syscall(sys_s390_pci_mmio_read);
 cond_syscall(sys_s390_pci_mmio_write);
+cond_syscall(sys_cpuid);
 
 /* mmu depending weak syscall entries */
 cond_syscall(sys_mprotect);

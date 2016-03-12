@@ -34,6 +34,7 @@
 #define stub_execve sys_execve
 #define stub_execveat sys_execveat
 #define stub_rt_sigreturn sys_rt_sigreturn
+#define stub_cpuid sys_cpuid
 
 #define __SYSCALL_64(nr, sym, qual) extern asmlinkage long sym(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long) ;
 #include <asm/syscalls_64.h>

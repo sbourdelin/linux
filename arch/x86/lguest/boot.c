@@ -76,6 +76,7 @@
 #include <asm/kvm_para.h>
 #include <asm/pci_x86.h>
 #include <asm/pci-direct.h>
+#include <asm/cpuid_leafs.h>
 
 /*G:010
  * Welcome to the Guest!
@@ -1529,7 +1530,7 @@ __init void lguest_init(void)
 	 */
 	cpu_detect(&new_cpu_data);
 	/* head.S usually sets up the first capability word, so do it here. */
-	new_cpu_data.x86_capability[CPUID_1_EDX] = cpuid_edx(1);
+	new_cpu_data.x86_capability[CPUID_00000001_0_EDX] = cpuid_edx(1);
 
 	/* Math is always hard! */
 	set_cpu_cap(&new_cpu_data, X86_FEATURE_FPU);

@@ -14,6 +14,8 @@
 #include <linux/smp.h>
 #include <linux/io.h>
 #include <linux/syscore_ops.h>
+#include <linux/string.h>
+#include <linux/syscalls.h>
 
 #include <asm/stackprotector.h>
 #include <asm/perf_event.h>
@@ -43,6 +45,8 @@
 #include <asm/pat.h>
 #include <asm/microcode.h>
 #include <asm/microcode_intel.h>
+#include <asm/cpufeature.h>
+#include <asm/cpuid_leafs.h>
 
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/uv/uv.h>
@@ -146,8 +150,105 @@ DEFINE_PER_CPU_PAGE_ALIGNED(struct gdt_page, gdt_page) = { .gdt = {
 } };
 EXPORT_PER_CPU_SYMBOL_GPL(gdt_page);
 
+int forcefully_ignore_caps_requested = 0;
+__u32 forcefully_ignored_caps[NCAPINTS] = {};
+
+/*
+ * Print actually forcefully ignored CPU capabilities.
+ * Stay silent if no such ignore was requested from command line.
+ */
+static void print_forcefully_ignored_caps(void)
+{
+	unsigned long bit;
+	int n = 0;
+	static char buf[COMMAND_LINE_SIZE];
+
+	if (forcefully_ignore_caps_requested == 0)
+		return;
+
+	buf[0] = '\0';
+	for (bit = 0; bit < 32 * NCAPINTS; bit++)
+	{
+		if (test_bit(bit, (unsigned long *)forcefully_ignored_caps)) {
+			int len = strlen(buf);
+#ifdef CONFIG_X86_FEATURE_NAMES
+			if (x86_cap_flags[bit] != NULL)
+				snprintf(buf + len, sizeof(buf) - len,
+					 " %s", x86_cap_flags[bit]);
+			else
+#endif
+				snprintf(buf + len, sizeof(buf) - len,
+					 " %lu", bit);
+			n++;
+		}
+	}
+	if (n == 0)
+		sprintf(buf, " -");
+	printk(KERN_INFO "CPU: CPU features forcefully ignored:%s\n", buf);
+}
+
+/*
+ * Forcefully ignore CPU capability.
+ */
+static void forcefully_ignore_cap(unsigned long bit)
+{
+	forcefully_ignore_caps_requested = 1;
+
+	if (boot_cpu_has(bit)) {
+		setup_clear_cpu_cap(bit);
+		set_bit(bit, (unsigned long *)forcefully_ignored_caps);
+	}
+
+	/* for X86_FEATURE_CLFLUSH clear also X86_FEATURE_CLFLUSHOPT */
+	if (bit == X86_FEATURE_CLFLUSH) {
+		forcefully_ignore_cap(X86_FEATURE_CLFLUSHOPT);
+	}
+}
+
+/*
+ * Forcefully ignore CPU capabilities specified with the cpu-= cmdline argument.
+ */
+static int __init setup_forcefully_ignore_caps(char *arg)
+{
+	static char c_arg[COMMAND_LINE_SIZE];
+	int i;
+	unsigned long bit;
+
+	forcefully_ignore_caps_requested = 1;
+
+	snprintf(c_arg, sizeof(c_arg), ",%s,", arg);
+	for (i = 0; i < sizeof(c_arg); i++) {
+		if (c_arg[i] == '\0')
+			break;
+		c_arg[i] = tolower(c_arg[i]);
+	}
+
+	for (bit = 0; bit < 32 * NCAPINTS; bit++)
+	{
+		char c_feature[128];
+		sprintf(c_feature, ",%lu,", bit);
+		if (strstr(c_arg, c_feature) != 0) {
+			forcefully_ignore_cap(bit);
+			continue;
+		}
+#ifdef CONFIG_X86_FEATURE_NAMES
+		if (x86_cap_flags[bit] != NULL) {
+			sprintf(c_feature, ",%s,", x86_cap_flags[bit]);
+			if (strstr(c_arg, c_feature) != 0) {
+				forcefully_ignore_cap(bit);
+			}
+		}
+#endif
+	}
+
+	return 1;
+}
+__setup("cpu-=", setup_forcefully_ignore_caps);
+
 static int __init x86_mpx_setup(char *s)
 {
+	printk(KERN_INFO "nompx: deprecated, use cpu-=mpx\n");
+
 	/* require an exact match without trailing characters */
 	if (strlen(s))
 		return 0;
@@ -156,11 +257,11 @@ static int __init x86_mpx_setup(char *s)
 	if (!boot_cpu_has(X86_FEATURE_MPX))
 		return 1;
 
-	setup_clear_cpu_cap(X86_FEATURE_MPX);
+	forcefully_ignore_cap(X86_FEATURE_MPX);
 	pr_info("nompx: Intel Memory Protection Extensions (MPX) disabled\n");
 	return 1;
 }
-__setup("nompx", x86_mpx_setup);
+__setup("nompx", x86_mpx_setup); /* deprecated by cpu-=mpx */
 
 static int __init x86_noinvpcid_setup(char *s)
 {
@@ -191,10 +292,11 @@ __setup("cachesize=", cachesize_setup);
 
 static int __init x86_sep_setup(char *s)
 {
-	setup_clear_cpu_cap(X86_FEATURE_SEP);
+	printk(KERN_INFO "nosep: deprecated, use cpu-=sep\n");
+	forcefully_ignore_cap(X86_FEATURE_SEP);
 	return 1;
 }
-__setup("nosep", x86_sep_setup);
+__setup("nosep", x86_sep_setup); /* deprecated by cpu-=sep */
 
 /* Standard macro to see if a specific flag is changeable */
 static inline int flag_is_changeable_p(u32 flag)
@@ -269,10 +371,11 @@ static inline void squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
 
 static __init int setup_disable_smep(char *arg)
 {
-	setup_clear_cpu_cap(X86_FEATURE_SMEP);
+	printk(KERN_INFO "nosmep: deprecated, use cpu-=smep\n");
+	forcefully_ignore_cap(X86_FEATURE_SMEP);
 	return 1;
 }
-__setup("nosmep", setup_disable_smep);
+__setup("nosmep", setup_disable_smep); /* deprecated by cpu-=smep */
 
 static __always_inline void setup_smep(struct cpuinfo_x86 *c)
 {
@@ -282,10 +385,11 @@ static __always_inline void setup_smep(struct cpuinfo_x86 *c)
 
 static __init int setup_disable_smap(char *arg)
 {
-	setup_clear_cpu_cap(X86_FEATURE_SMAP);
+	printk(KERN_INFO "nosmap: deprecated, use cpu-=smap\n");
+	forcefully_ignore_cap(X86_FEATURE_SMAP);
 	return 1;
 }
-__setup("nosmap", setup_disable_smap);
+__setup("nosmap", setup_disable_smap); /* deprecated by cpu-=smap */
 
 static __always_inline void setup_smap(struct cpuinfo_x86 *c)
 {
@@ -424,6 +528,7 @@ static const char *table_lookup_model(struct cpuinfo_x86 *c)
 
 __u32 cpu_caps_cleared[NCAPINTS];
 __u32 cpu_caps_set[NCAPINTS];
+__u32 *cpuid_overrides[CPUID_LEAFS_COUNT];
 
 void load_percpu_segment(int cpu)
 {
@@ -656,25 +761,33 @@ void get_cpu_cap(struct cpuinfo_x86 *c)
 	if (c->cpuid_level >= 0x00000001) {
 		cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
 
-		c->x86_capability[CPUID_1_ECX] = ecx;
-		c->x86_capability[CPUID_1_EDX] = edx;
+		c->x86_capability[CPUID_00000001_0_ECX] = ecx;
+		cpuid_overrides[CPUID_00000001_0_ECX] = &(c->x86_capability[CPUID_00000001_0_ECX]);
+
+		c->x86_capability[CPUID_00000001_0_EDX] = edx;
+		cpuid_overrides[CPUID_00000001_0_EDX] = &(c->x86_capability[CPUID_00000001_0_EDX]);
 	}
 
 	/* Additional Intel-defined flags: level 0x00000007 */
 	if (c->cpuid_level >= 0x00000007) {
 		cpuid_count(0x00000007, 0, &eax, &ebx, &ecx, &edx);
 
-		c->x86_capability[CPUID_7_0_EBX] = ebx;
+		c->x86_capability[CPUID_00000007_0_EBX] = ebx;
+		cpuid_overrides[CPUID_00000007_0_EBX] = &(c->x86_capability[CPUID_00000007_0_EBX]);
 
-		c->x86_capability[CPUID_6_EAX] = cpuid_eax(0x00000006);
-		c->x86_capability[CPUID_7_ECX] = ecx;
+		c->x86_capability[CPUID_00000007_0_ECX] = ecx;
+		cpuid_overrides[CPUID_00000007_0_ECX] = &(c->x86_capability[CPUID_00000007_0_ECX]);
+
+		c->x86_capability[CPUID_00000006_0_EAX] = cpuid_eax(0x00000006);
+		cpuid_overrides[CPUID_00000006_0_EAX] = &(c->x86_capability[CPUID_00000006_0_EAX]);
 	}
 
 	/* Extended state features: level 0x0000000d */
 	if (c->cpuid_level >= 0x0000000d) {
 		cpuid_count(0x0000000d, 1, &eax, &ebx, &ecx, &edx);
 
-		c->x86_capability[CPUID_D_1_EAX] = eax;
+		c->x86_capability[CPUID_0000000D_1_EAX] = eax;
+		cpuid_overrides[CPUID_0000000D_1_EAX] = &(c->x86_capability[CPUID_0000000D_1_EAX]);
 	}
 
 	/* Additional Intel-defined flags: level 0x0000000F */
@@ -682,7 +795,8 @@ void get_cpu_cap(struct cpuinfo_x86 *c)
 
 		/* QoS sub-leaf, EAX=0Fh, ECX=0 */
 		cpuid_count(0x0000000F, 0, &eax, &ebx, &ecx, &edx);
-		c->x86_capability[CPUID_F_0_EDX] = edx;
+		c->x86_capability[CPUID_0000000F_0_EDX] = edx;
+		cpuid_overrides[CPUID_0000000F_0_EDX] = &(c->x86_capability[CPUID_0000000F_0_EDX]);
 
 		if (cpu_has(c, X86_FEATURE_CQM_LLC)) {
 			/* will be overridden if occupancy monitoring exists */
@@ -690,7 +804,8 @@ void get_cpu_cap(struct cpuinfo_x86 *c)
 
 			/* QoS sub-leaf, EAX=0Fh, ECX=1 */
 			cpuid_count(0x0000000F, 1, &eax, &ebx, &ecx, &edx);
-			c->x86_capability[CPUID_F_1_EDX] = edx;
+			c->x86_capability[CPUID_0000000F_1_EDX] = edx;
+			cpuid_overrides[CPUID_0000000F_1_EDX] = &(c->x86_capability[CPUID_0000000F_1_EDX]);
 
 			if (cpu_has(c, X86_FEATURE_CQM_OCCUP_LLC)) {
 				c->x86_cache_max_rmid = ecx;
@@ -710,8 +825,11 @@ void get_cpu_cap(struct cpuinfo_x86 *c)
 		if (eax >= 0x80000001) {
 			cpuid(0x80000001, &eax, &ebx, &ecx, &edx);
 
-			c->x86_capability[CPUID_8000_0001_ECX] = ecx;
-			c->x86_capability[CPUID_8000_0001_EDX] = edx;
+			c->x86_capability[CPUID_80000001_0_ECX] = ecx;
+			cpuid_overrides[CPUID_80000001_0_ECX] = &(c->x86_capability[CPUID_80000001_0_ECX]);
+
+			c->x86_capability[CPUID_80000001_0_EDX] = edx;
+			cpuid_overrides[CPUID_80000001_0_EDX] = &(c->x86_capability[CPUID_80000001_0_EDX]);
 		}
 	}
 
@@ -720,7 +838,8 @@ void get_cpu_cap(struct cpuinfo_x86 *c)
 
 		c->x86_virt_bits = (eax >> 8) & 0xff;
 		c->x86_phys_bits = eax & 0xff;
-		c->x86_capability[CPUID_8000_0008_EBX] = ebx;
+		c->x86_capability[CPUID_80000008_0_EBX] = ebx;
+		cpuid_overrides[CPUID_80000008_0_EBX] = &(c->x86_capability[CPUID_80000008_0_EBX]);
 	}
 #ifdef CONFIG_X86_32
 	else if (cpu_has(c, X86_FEATURE_PAE) || cpu_has(c, X86_FEATURE_PSE36))
@@ -731,7 +850,10 @@ void get_cpu_cap(struct cpuinfo_x86 *c)
 		c->x86_power = cpuid_edx(0x80000007);
 
 	if (c->extended_cpuid_level >= 0x8000000a)
-		c->x86_capability[CPUID_8000_000A_EDX] = cpuid_edx(0x8000000a);
+	{
+		c->x86_capability[CPUID_8000000A_0_EDX] = cpuid_edx(0x8000000a);
+		cpuid_overrides[CPUID_8000000A_0_EDX] = &(c->x86_capability[CPUID_8000000A_0_EDX]);
+	}
 
 	init_scattered_cpuid_features(c);
 }
@@ -1167,11 +1289,11 @@ __setup("show_msr=", setup_show_msr);
 
 static __init int setup_noclflush(char *arg)
 {
-	setup_clear_cpu_cap(X86_FEATURE_CLFLUSH);
-	setup_clear_cpu_cap(X86_FEATURE_CLFLUSHOPT);
+	printk(KERN_INFO "noclflush: deprecated, use cpu-=clflush\n");
+	forcefully_ignore_cap(X86_FEATURE_CLFLUSH);
 	return 1;
 }
-__setup("noclflush", setup_noclflush);
+__setup("noclflush", setup_noclflush); /* deprecated by cpu-=clflush */
 
 void print_cpu_info(struct cpuinfo_x86 *c)
 {
@@ -1212,14 +1334,16 @@ static __init int setup_disablecpuid(char *arg)
 {
 	int bit;
 
+	printk(KERN_INFO "clearcpuid: deprecated, use cpu-=\n");
+
 	if (get_option(&arg, &bit) && bit < NCAPINTS*32)
-		setup_clear_cpu_cap(bit);
+		forcefully_ignore_cap(bit);
 	else
 		return 0;
 
 	return 1;
 }
-__setup("clearcpuid=", setup_disablecpuid);
+__setup("clearcpuid=", setup_disablecpuid); /* deprecated by cpu-= */
 
 #ifdef CONFIG_X86_64
 struct desc_ptr idt_descr = { NR_VECTORS * 16 - 1, (unsigned long) idt_table };
@@ -1502,6 +1626,8 @@ void cpu_init(void)
 
 	if (is_uv_system())
 		uv_cpu_init();
+
+	print_forcefully_ignored_caps();
 }
 
 #else
@@ -1557,6 +1683,8 @@ void cpu_init(void)
 	dbg_restore_debug_regs();
 
 	fpu__init_cpu();
+
+	print_forcefully_ignored_caps();
 }
 #endif
 
@@ -1576,3 +1704,11 @@ static int __init init_cpu_syscore(void)
 	return 0;
 }
 core_initcall(init_cpu_syscore);
+
+SYSCALL_DEFINE6(cpuid, const u32, level, const u32, count,
+		u32 __user *, eax, u32 __user *, ebx,
+		u32 __user *, ecx, u32 __user *, edx)
+{
+	kernel_cpuid_count(level, count, eax, ebx, ecx, edx);
+	return 0;
+}

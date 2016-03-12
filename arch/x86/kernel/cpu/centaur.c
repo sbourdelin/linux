@@ -5,6 +5,7 @@
 #include <asm/e820.h>
 #include <asm/mtrr.h>
 #include <asm/msr.h>
+#include <asm/cpuid_leafs.h>
 
 #include "cpu.h"
 
@@ -43,7 +44,8 @@ static void init_c3(struct cpuinfo_x86 *c)
 		/* store Centaur Extended Feature Flags as
 		 * word 5 of the CPU capability bit array
 		 */
-		c->x86_capability[CPUID_C000_0001_EDX] = cpuid_edx(0xC0000001);
+		c->x86_capability[CPUID_C0000001_0_EDX] = cpuid_edx(0xC0000001);
+		cpuid_overrides[CPUID_C0000001_0_EDX] = &(c->x86_capability[CPUID_C0000001_0_EDX]);
 	}
 #ifdef CONFIG_X86_32
 	/* Cyrix III family needs CX8 & PGE explicitly enabled. */
