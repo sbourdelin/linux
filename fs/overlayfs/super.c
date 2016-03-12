@@ -1019,6 +1019,12 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 			pr_err("overlayfs: failed to clone upperpath\n");
 			goto out_put_lowerpath;
 		}
+		if (ufs->upper_mnt->mnt_flags & MNT_NOSUID)
+			sb->s_iflags |= SB_I_NOSUID;
+		if (ufs->upper_mnt->mnt_flags & MNT_NOEXEC)
+			sb->s_iflags |= SB_I_NOEXEC;
+		if (ufs->upper_mnt->mnt_flags & MNT_NODEV)
+			sb->s_iflags |= SB_I_NODEV;
 
 		ufs->workdir = ovl_workdir_create(ufs->upper_mnt, workpath.dentry);
 		err = PTR_ERR(ufs->workdir);
@@ -1047,7 +1053,12 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 		 * will fail instead of modifying lower fs.
 		 */
 		mnt->mnt_flags |= MNT_READONLY;
-
+		if (mnt->mnt_flags & MNT_NOSUID)
+			sb->s_iflags |= SB_I_NOSUID;
+		if (mnt->mnt_flags & MNT_NOEXEC)
+			sb->s_iflags |= SB_I_NOEXEC;
+		if (mnt->mnt_flags & MNT_NODEV)
+			sb->s_iflags |= SB_I_NODEV;
 		ufs->lower_mnt[ufs->numlower] = mnt;
 		ufs->numlower++;
 	}

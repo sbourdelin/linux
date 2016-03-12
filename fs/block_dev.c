@@ -1841,7 +1841,7 @@ struct block_device *lookup_bdev(const char *pathname)
 	if (!S_ISBLK(inode->i_mode))
 		goto fail;
 	error = -EACCES;
-	if (path.mnt->mnt_flags & MNT_NODEV)
+	if (path_nodev(&path))
 		goto fail;
 	error = -ENOMEM;
 	bdev = bd_acquire(inode);

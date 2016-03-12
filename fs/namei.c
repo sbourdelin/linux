@@ -2752,7 +2752,7 @@ static int may_open(struct path *path, int acc_mode, int flag)
 		break;
 	case S_IFBLK:
 	case S_IFCHR:
-		if (path->mnt->mnt_flags & MNT_NODEV)
+		if (path_nodev(path))
 			return -EACCES;
 		/*FALLTHRU*/
 	case S_IFIFO:
