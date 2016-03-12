@@ -410,7 +410,8 @@ drivers/base/power/runtime.c and include/linux/pm_runtime.h:
       field was previously zero, this prevents subsystem-level runtime PM
       callbacks from being run for the device), make sure that all of the
       pending runtime PM operations on the device are either completed or
-      canceled; returns 1 if there was a resume request pending and it was
+      canceled (although this depends on disabling autosuspend before
+      calling this); returns 1 if there was a resume request pending and it was
       necessary to execute the subsystem-level resume callback for the device
       to satisfy that request, otherwise 0 is returned
 
@@ -585,6 +586,10 @@ notifications in __device_release_driver().  This requires bus types and
 drivers to make their ->remove() callbacks avoid races with runtime PM directly,
 but also it allows of more flexibility in the handling of devices during the
 removal of their drivers.
+
+Drivers in ->remove() callback should undo the runtime PM changes done
+in ->probe(). Usually this means calling pm_runtime_disable(),
+pm_runtime_dont_use_autosuspend() etc.
 
 The user space can effectively disallow the driver of the device to power manage
 it at run time by changing the value of its /sys/devices/.../power/control
