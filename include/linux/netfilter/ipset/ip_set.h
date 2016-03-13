@@ -234,6 +234,9 @@ struct ip_set {
 	spinlock_t lock;
 	/* References to the set */
 	u32 ref;
+	/* the above ref can be swapped out by ip_set_swap and
+	   cannot be used to keep track of references within ipset code */
+	u32 ref_kernel;
 	/* The core set type */
 	struct ip_set_type *type;
 	/* The type variant doing the real job */
