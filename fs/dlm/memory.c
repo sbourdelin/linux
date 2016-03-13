@@ -21,13 +21,11 @@ static struct kmem_cache *rsb_cache;
 
 int __init dlm_memory_init(void)
 {
-	lkb_cache = kmem_cache_create("dlm_lkb", sizeof(struct dlm_lkb),
-				__alignof__(struct dlm_lkb), 0, NULL);
+	lkb_cache = KMEM_CACHE(dlm_lkb, 0);
 	if (!lkb_cache)
 		return -ENOMEM;
 
-	rsb_cache = kmem_cache_create("dlm_rsb", sizeof(struct dlm_rsb),
-				__alignof__(struct dlm_rsb), 0, NULL);
+	rsb_cache = KMEM_CACHE(dlm_rsb, 0);
 	if (!rsb_cache) {
 		kmem_cache_destroy(lkb_cache);
 		return -ENOMEM;
