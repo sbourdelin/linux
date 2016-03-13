@@ -4819,7 +4819,7 @@ static int dgap_tty_ioctl(struct tty_struct *tty, unsigned int cmd,
 
 	case TCSBRKP:
 		/* support for POSIX tcsendbreak()
-
+		 * 
 		 * According to POSIX.1 spec (7.2.2.1.2) breaks should be
 		 * between 0.25 and 0.5 seconds so we'll ask for something
 		 * in the middle: 0.375 seconds.
