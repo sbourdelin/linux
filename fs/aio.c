@@ -1004,7 +1004,7 @@ static inline struct aio_kiocb *aio_get_req(struct kioctx *ctx)
 			return NULL;
 	}
 
-	req = kmem_cache_alloc(kiocb_cachep, GFP_KERNEL|__GFP_ZERO);
+	req = kmem_cache_zalloc(kiocb_cachep, GFP_KERNEL);
 	if (unlikely(!req))
 		goto out_put;
 
