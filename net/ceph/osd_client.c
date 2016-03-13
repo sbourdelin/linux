@@ -2783,10 +2783,7 @@ EXPORT_SYMBOL(ceph_osdc_writepages);
 int ceph_osdc_setup(void)
 {
 	BUG_ON(ceph_osd_request_cache);
-	ceph_osd_request_cache = kmem_cache_create("ceph_osd_request",
-					sizeof (struct ceph_osd_request),
-					__alignof__(struct ceph_osd_request),
-					0, NULL);
+	ceph_osd_request_cache = KMEM_CACHE(ceph_osd_request, 0);
 
 	return ceph_osd_request_cache ? 0 : -ENOMEM;
 }
