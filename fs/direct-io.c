@@ -857,7 +857,7 @@ static void clean_blockdev_aliases(struct dio *dio, struct buffer_head *map_bh)
  * `end' is zero if we're doing the start of the IO, 1 at the end of the
  * IO.
  */
-static inline void dio_zero_block(struct dio *dio, struct dio_submit *sdio,
+static void dio_zero_block(struct dio *dio, struct dio_submit *sdio,
 		int end, struct buffer_head *map_bh)
 {
 	unsigned dio_blocks_per_fs_block;
