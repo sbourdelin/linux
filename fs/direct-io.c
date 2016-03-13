@@ -710,7 +710,7 @@ static inline int dio_bio_add_page(struct dio_submit *sdio)
  * The caller of this function is responsible for removing cur_page from the
  * dio, and for dropping the refcount which came from that presence.
  */
-static inline int dio_send_cur_page(struct dio *dio, struct dio_submit *sdio,
+static int dio_send_cur_page(struct dio *dio, struct dio_submit *sdio,
 		struct buffer_head *map_bh)
 {
 	int ret = 0;
