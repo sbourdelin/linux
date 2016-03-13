@@ -1414,6 +1414,22 @@ sub raw_line {
 	return $line;
 }
 
+sub cooked_line {
+	my ($linenr, $cnt) = @_;
+
+	my $offset = $linenr - 1;
+	$cnt++;
+
+	my $line;
+	while ($cnt) {
+		$line = $lines[$offset++];
+		next if (defined($line) && $line =~ /^-/);
+		$cnt--;
+	}
+
+	return $line;
+}
+
 sub cat_vet {
 	my ($vet) = @_;
 	my ($res, $coded);
@@ -5654,6 +5670,33 @@ sub process {
 				 "__func__ should be used instead of gcc specific __FUNCTION__\n"  . $herecurr) &&
 			    $fix) {
 				$fixed[$fixlinenr] =~ s/\b__FUNCTION__\b/__func__/g;
+			}
+		}
+
+# check how __func__ is formatted, prefer "%s:...',  __func__
+		if ($^V && $^V ge 5.10.0 &&
+		    defined $stat &&
+		    $stat =~ /\b__func__\b/ &&
+		    $stat =~ /^\+\s*$logFunctions\s*\(\s*[^"]*$String\s*,\s*__func__\b/m &&
+		    (() = $stat =~ /^\+|\n\+/g) == 1 &&
+		    (() = $stat =~ /;/g) <= 1) {
+			my $herectx = $here . "\n";
+			my $cooked_linenr = -1;
+			my $cooked_line = "";
+			my $raw_line = "";
+			my $cnt = statement_rawlines($stat);
+			for (my $n = 0; $n < $cnt; $n++) {
+				$herectx .= raw_line($linenr, $n) . "\n";
+				if ($cooked_linenr == -1 && cooked_line($linenr, $n) =~ /$String/) {
+					$cooked_linenr = $linenr + $n;
+					$cooked_line = cooked_line($linenr, $n);
+					$raw_line = raw_line($linenr, $n);
+				}
+			}
+			my $qs = get_quoted_string($cooked_line, $raw_line);
+			if ($qs !~ /^"%s:/) {
+				WARN("FUNC_STYLE",
+				     "Prefer using formatting style '%s:' for __func__\n" . $herectx);
 			}
 		}
 
