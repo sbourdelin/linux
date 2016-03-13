@@ -43,9 +43,9 @@ enum adi_spi_state {
 struct adi_spi_master;
 
 struct adi_spi_transfer_ops {
-	void (*write) (struct adi_spi_master *);
-	void (*read) (struct adi_spi_master *);
-	void (*duplex) (struct adi_spi_master *);
+	void (*write)(struct adi_spi_master *);
+	void (*read)(struct adi_spi_master *);
+	void (*duplex)(struct adi_spi_master *);
 };
 
 /* runtime info for spi master */
@@ -150,10 +150,12 @@ static int adi_spi_flush(struct adi_spi_master *drv_data)
 }
 
 /* Chip select operation functions for cs_change flag */
-static void adi_spi_cs_active(struct adi_spi_master *drv_data, struct adi_spi_device *chip)
+static void adi_spi_cs_active(struct adi_spi_master *drv_data,
+			      struct adi_spi_device *chip)
 {
 	if (likely(chip->cs < MAX_CTRL_CS)) {
 		u32 reg;
+
 		reg = ioread32(&drv_data->regs->ssel);
 		reg &= ~chip->ssel;
 		iowrite32(reg, &drv_data->regs->ssel);
@@ -167,6 +169,7 @@ static void adi_spi_cs_deactive(struct adi_spi_master *drv_data,
 {
 	if (likely(chip->cs < MAX_CTRL_CS)) {
 		u32 reg;
+
 		reg = ioread32(&drv_data->regs->ssel);
 		reg |= chip->ssel;
 		iowrite32(reg, &drv_data->regs->ssel);
@@ -185,6 +188,7 @@ static inline void adi_spi_cs_enable(struct adi_spi_master *drv_data,
 {
 	if (chip->cs < MAX_CTRL_CS) {
 		u32 reg;
+
 		reg = ioread32(&drv_data->regs->ssel);
 		reg |= chip->ssel >> 8;
 		iowrite32(reg, &drv_data->regs->ssel);
@@ -196,6 +200,7 @@ static inline void adi_spi_cs_disable(struct adi_spi_master *drv_data,
 {
 	if (chip->cs < MAX_CTRL_CS) {
 		u32 reg;
+
 		reg = ioread32(&drv_data->regs->ssel);
 		reg &= ~(chip->ssel >> 8);
 		iowrite32(reg, &drv_data->regs->ssel);
@@ -686,8 +691,9 @@ static int adi_spi_setup(struct spi_device *spi)
 			}
 		} else {
 			chip->cs_gpio = chip->cs - MAX_CTRL_CS;
-			ret = gpio_request_one(chip->cs_gpio, GPIOF_OUT_INIT_HIGH,
-						dev_name(&spi->dev));
+			ret = gpio_request_one(chip->cs_gpio,
+					       GPIOF_OUT_INIT_HIGH,
+					       dev_name(&spi->dev));
 			if (ret) {
 				dev_err(&spi->dev, "gpio_request_one() error\n");
 				goto error;
