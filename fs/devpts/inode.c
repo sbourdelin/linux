@@ -27,6 +27,7 @@
 #include <linux/parser.h>
 #include <linux/fsnotify.h>
 #include <linux/seq_file.h>
+#include <linux/user_namespace.h>
 
 #define DEVPTS_DEFAULT_MODE 0600
 /*
@@ -250,10 +251,35 @@ static int mknod_ptmx(struct super_block *sb)
 	kuid_t root_uid;
 	kgid_t root_gid;
 
-	root_uid = make_kuid(current_user_ns(), 0);
-	root_gid = make_kgid(current_user_ns(), 0);
-	if (!uid_valid(root_uid) || !gid_valid(root_gid))
-		return -EINVAL;
+	/*
+	 * For a new devpts instance, ptmx is owned by the creating user
+	 * namespace's owner.  Usually, that will be 0 as seen by the
+	 * user namespace, but for unprivileged sandbox namespaces,
+	 * there may not be a uid 0 or gid 0 at all.
+	 */
+	root_uid = current_user_ns()->owner;
+	root_gid = current_user_ns()->group;
+
+	if (!uid_valid(root_uid) || !gid_valid(root_gid)) {
+		/*
+		 * It's very unlikely for us to get here if the userns
+		 * owner is not mapped, but it's possible -- we'd have
+		 * to be running in the userns with capabilities granted
+		 * by unshare or setns, since there is no inner
+		 * privileged user.  Nonetheless, this could happen, and
+		 * we don't want ptmx to be owned by an unmapped user or
+		 * group.
+		 *
+		 * If this happens fall back to historical behavior:
+		 * try to have ptmx be owned by 0:0.
+		 */
+		root_uid = make_kuid(current_user_ns(), 0);
+		root_gid = make_kgid(current_user_ns(), 0);
+
+		/* If this still doesn't work, give up. */
+		if (!uid_valid(root_uid) || !gid_valid(root_gid))
+			return -EINVAL;
+	}
 
 	inode_lock(d_inode(root));
 
