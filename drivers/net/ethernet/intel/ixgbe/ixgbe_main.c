@@ -7602,6 +7602,11 @@ static void ixgbe_atr(struct ixgbe_ring *ring,
 #endif /* CONFIG_IXGBE_VXLAN */
 	}
 
+	if (skb->protocol != htons(ETH_P_IP) &&
+	    skb->protocol != htons(ETH_P_IPV6) &&
+	    skb->protocol != htons(ETH_P_ARP))
+		return;
+
 	/* Currently only IPv4/IPv6 with TCP is supported */
 	switch (hdr.ipv4->version) {
 	case IPVERSION:
