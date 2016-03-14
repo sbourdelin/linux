@@ -45,7 +45,6 @@ static phys_addr_t hyp_idmap_vector;
 #define hyp_pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
 
 #define huge_pmd(_x)		(pmd_huge(_x) || pmd_trans_huge(_x))
-#define kvm_pud_huge(_x)	pud_huge(_x)
 
 #define KVM_S2PTE_FLAG_IS_IOMAP		(1UL << 0)
 #define KVM_S2_FLAG_LOGGING_ACTIVE	(1UL << 1)
