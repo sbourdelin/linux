@@ -165,7 +165,7 @@ static void clear_pgd_entry(struct kvm *kvm, pgd_t *pgd, phys_addr_t addr)
 static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
 {
 	pmd_t *pmd_table = pmd_offset(pud, 0);
-	VM_BUG_ON(pud_huge(*pud));
+	VM_BUG_ON(kvm_pud_huge(kvm, *pud));
 	pud_clear(pud);
 	kvm_tlb_flush_vmid_ipa(kvm, addr);
 	pmd_free(NULL, pmd_table);
@@ -236,7 +236,7 @@ static void unmap_pmds(struct kvm *kvm, pud_t *pud,
 
 	start_pmd = pmd = pmd_offset(pud, addr);
 	do {
-		next = kvm_pmd_addr_end(addr, end);
+		next = kvm_pmd_addr_end(kvm, addr, end);
 		if (!pmd_none(*pmd)) {
 			if (huge_pmd(*pmd)) {
 				pmd_t old_pmd = *pmd;
@@ -265,9 +265,9 @@ static void unmap_puds(struct kvm *kvm, pgd_t *pgd,
 
 	start_pud = pud = pud_offset(pgd, addr);
 	do {
-		next = kvm_pud_addr_end(addr, end);
+		next = kvm_pud_addr_end(kvm, addr, end);
 		if (!pud_none(*pud)) {
-			if (pud_huge(*pud)) {
+			if (kvm_pud_huge(kvm, *pud)) {
 				pud_t old_pud = *pud;
 
 				pud_clear(pud);
@@ -294,9 +294,9 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
 	phys_addr_t addr = start, end = start + size;
 	phys_addr_t next;
 
-	pgd = pgdp + kvm_pgd_index(addr);
+	pgd = pgdp + kvm_pgd_index(kvm, addr);
 	do {
-		next = kvm_pgd_addr_end(addr, end);
+		next = kvm_pgd_addr_end(kvm, addr, end);
 		if (!pgd_none(*pgd))
 			unmap_puds(kvm, pgd, addr, next);
 	} while (pgd++, addr = next, addr != end);
@@ -322,7 +322,7 @@ static void stage2_flush_pmds(struct kvm *kvm, pud_t *pud,
 
 	pmd = pmd_offset(pud, addr);
 	do {
-		next = kvm_pmd_addr_end(addr, end);
+		next = kvm_pmd_addr_end(kvm, addr, end);
 		if (!pmd_none(*pmd)) {
 			if (huge_pmd(*pmd))
 				kvm_flush_dcache_pmd(*pmd);
@@ -340,9 +340,9 @@ static void stage2_flush_puds(struct kvm *kvm, pgd_t *pgd,
 
 	pud = pud_offset(pgd, addr);
 	do {
-		next = kvm_pud_addr_end(addr, end);
+		next = kvm_pud_addr_end(kvm, addr, end);
 		if (!pud_none(*pud)) {
-			if (pud_huge(*pud))
+			if (kvm_pud_huge(kvm, *pud))
 				kvm_flush_dcache_pud(*pud);
 			else
 				stage2_flush_pmds(kvm, pud, addr, next);
@@ -358,9 +358,9 @@ static void stage2_flush_memslot(struct kvm *kvm,
 	phys_addr_t next;
 	pgd_t *pgd;
 
-	pgd = kvm->arch.pgd + kvm_pgd_index(addr);
+	pgd = kvm->arch.pgd + kvm_pgd_index(kvm, addr);
 	do {
-		next = kvm_pgd_addr_end(addr, end);
+		next = kvm_pgd_addr_end(kvm, addr, end);
 		stage2_flush_puds(kvm, pgd, addr, next);
 	} while (pgd++, addr = next, addr != end);
 }
@@ -802,7 +802,7 @@ static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache *cache
 	pgd_t *pgd;
 	pud_t *pud;
 
-	pgd = kvm->arch.pgd + kvm_pgd_index(addr);
+	pgd = kvm->arch.pgd + kvm_pgd_index(kvm, addr);
 	if (WARN_ON(pgd_none(*pgd))) {
 		if (!cache)
 			return NULL;
@@ -1040,7 +1040,7 @@ static void stage2_wp_pmds(pud_t *pud, phys_addr_t addr, phys_addr_t end)
 	pmd = pmd_offset(pud, addr);
 
 	do {
-		next = kvm_pmd_addr_end(addr, end);
+		next = kvm_pmd_addr_end(NULL, addr, end);
 		if (!pmd_none(*pmd)) {
 			if (huge_pmd(*pmd)) {
 				if (!kvm_s2pmd_readonly(pmd))
@@ -1067,10 +1067,10 @@ static void  stage2_wp_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
 
 	pud = pud_offset(pgd, addr);
 	do {
-		next = kvm_pud_addr_end(addr, end);
+		next = kvm_pud_addr_end(NULL, addr, end);
 		if (!pud_none(*pud)) {
 			/* TODO:PUD not supported, revisit later if supported */
-			BUG_ON(kvm_pud_huge(*pud));
+			BUG_ON(kvm_pud_huge(NULL, *pud));
 			stage2_wp_pmds(pud, addr, next);
 		}
 	} while (pud++, addr = next, addr != end);
@@ -1087,7 +1087,7 @@ static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
 	pgd_t *pgd;
 	phys_addr_t next;
 
-	pgd = kvm->arch.pgd + kvm_pgd_index(addr);
+	pgd = kvm->arch.pgd + kvm_pgd_index(kvm, addr);
 	do {
 		/*
 		 * Release kvm_mmu_lock periodically if the memory region is
@@ -1099,7 +1099,7 @@ static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
 		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
 			cond_resched_lock(&kvm->mmu_lock);
 
-		next = kvm_pgd_addr_end(addr, end);
+		next = kvm_pgd_addr_end(kvm, addr, end);
 		if (pgd_present(*pgd))
 			stage2_wp_puds(pgd, addr, next);
 	} while (pgd++, addr = next, addr != end);

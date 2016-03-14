@@ -71,6 +71,7 @@
 #include <asm/cacheflush.h>
 #include <asm/mmu_context.h>
 #include <asm/pgtable.h>
+#include <linux/hugetlb.h>
 
 #define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
 
@@ -141,11 +142,28 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
 	return (pmd_val(*pmd) & PMD_S2_RDWR) == PMD_S2_RDONLY;
 }
 
-#define kvm_pud_huge(_x)	pud_huge(_x)
+static inline int kvm_pud_huge(struct kvm *kvm, pud_t pud)
+{
+	return pud_huge(pud);
+}
 
-#define kvm_pgd_addr_end(addr, end)	pgd_addr_end(addr, end)
-#define kvm_pud_addr_end(addr, end)	pud_addr_end(addr, end)
-#define kvm_pmd_addr_end(addr, end)	pmd_addr_end(addr, end)
+static inline phys_addr_t
+kvm_pgd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
+{
+	return	pgd_addr_end(addr, end);
+}
+
+static inline phys_addr_t
+kvm_pud_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
+{
+	return	pud_addr_end(addr, end);
+}
+
+static inline phys_addr_t
+kvm_pmd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
+{
+	return	pmd_addr_end(addr, end);
+}
 
 /*
  * In the case where PGDIR_SHIFT is larger than KVM_PHYS_SHIFT, we can address
@@ -161,7 +179,10 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
 #endif
 #define PTRS_PER_S2_PGD		(1 << PTRS_PER_S2_PGD_SHIFT)
 
-#define kvm_pgd_index(addr)	(((addr) >> PGDIR_SHIFT) & (PTRS_PER_S2_PGD - 1))
+static inline phys_addr_t kvm_pgd_index(struct kvm *kvm, phys_addr_t addr)
+{
+	return (addr >> PGDIR_SHIFT) & (PTRS_PER_S2_PGD - 1);
+}
 
 /*
  * If we are concatenating first level stage-2 page tables, we would have less

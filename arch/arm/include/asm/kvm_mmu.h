@@ -45,6 +45,7 @@
 #ifndef __ASSEMBLY__
 
 #include <linux/highmem.h>
+#include <linux/hugetlb.h>
 #include <asm/cacheflush.h>
 #include <asm/pgalloc.h>
 
@@ -135,22 +136,37 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
 	return (pmd_val(*pmd) & L_PMD_S2_RDWR) == L_PMD_S2_RDONLY;
 }
 
-#define kvm_pud_huge(_x)	pud_huge(_x)
+static inline int kvm_pud_huge(struct kvm *kvm, pud_t pud)
+{
+	return pud_huge(pud);
+}
+
 
 /* Open coded p*d_addr_end that can deal with 64bit addresses */
-#define kvm_pgd_addr_end(addr, end)					\
-({	u64 __boundary = ((addr) + PGDIR_SIZE) & PGDIR_MASK;		\
-	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
-})
+static inline phys_addr_t
+kvm_pgd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
+{
+	phys_addr_t boundary = (addr + PGDIR_SIZE) & PGDIR_MASK;
+	return (boundary - 1 < end - 1) ? boundary : end;
+}
 
-#define kvm_pud_addr_end(addr,end)		(end)
+static inline phys_addr_t
+kvm_pud_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
+{
+	return end;
+}
 
-#define kvm_pmd_addr_end(addr, end)					\
-({	u64 __boundary = ((addr) + PMD_SIZE) & PMD_MASK;		\
-	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
-})
+static inline phys_addr_t
+kvm_pmd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
+{
+	phys_addr_t boundary = (addr + PMD_SIZE) & PMD_MASK;
+	return (boundary - 1 < end - 1) ? boundary : end;
+}
 
-#define kvm_pgd_index(addr)			pgd_index(addr)
+static inline phys_addr_t kvm_pgd_index(struct kvm *kvm, phys_addr_t addr)
+{
+	return pgd_index(addr);
+}
 
 static inline bool kvm_page_empty(void *ptr)
 {
