@@ -587,14 +587,15 @@ int __must_check media_device_register_entity(struct media_device *mdev,
 		media_gobj_create(mdev, MEDIA_GRAPH_PAD,
 			       &entity->pads[i].graph_obj);
 
+	spin_unlock(&mdev->lock);
+
 	/* invoke entity_notify callbacks */
 	list_for_each_entry_safe(notify, next, &mdev->entity_notify, list) {
 		(notify)->notify(entity, notify->notify_data);
 	}
 
-	spin_unlock(&mdev->lock);
-
 	mutex_lock(&mdev->graph_mutex);
+
 	if (mdev->entity_internal_idx_max
 	    >= mdev->pm_count_walk.ent_enum.idx_max) {
 		struct media_entity_graph new = { .top = 0 };
