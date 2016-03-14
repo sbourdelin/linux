@@ -1173,8 +1173,7 @@ struct page *__pageblock_pfn_to_page(unsigned long start_pfn,
 
 	end_page = pfn_to_page(end_pfn);
 
-	/* This gives a shorter code than deriving page_zone(end_page) */
-	if (page_zone_id(start_page) != page_zone_id(end_page))
+	if (zone != page_zone(end_page))
 		return NULL;
 
 	return start_page;
