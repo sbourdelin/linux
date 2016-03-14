@@ -826,6 +826,11 @@ static void fix_this_cpu(void *dummy)
 		msr_bits &= ~0x2;
 		wrmsrl(MSR_IA32_POWER_CTL, msr_bits);
 	}
+
+	if (icpu->byt_auto_demotion_disable_flag) {
+		wrmsrl(MSR_CC6_DEMOTION_POLICY_CONFIG, 0);
+		wrmsrl(MSR_MC6_DEMOTION_POLICY_CONFIG, 0);
+	}
 }
 
 static const struct idle_cpu idle_cpu_nehalem = {
@@ -1082,11 +1087,6 @@ static int __init intel_idle_cpuidle_driver_init(void)
 			cpuidle_state_table[cstate];
 
 		drv->state_count += 1;
-	}
-
-	if (icpu->byt_auto_demotion_disable_flag) {
-		wrmsrl(MSR_CC6_DEMOTION_POLICY_CONFIG, 0);
-		wrmsrl(MSR_MC6_DEMOTION_POLICY_CONFIG, 0);
 	}
 
 	return 0;
