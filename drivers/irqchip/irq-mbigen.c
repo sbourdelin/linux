@@ -242,6 +242,8 @@ static int mbigen_device_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct irq_domain *domain;
 	u32 num_pins;
+	struct platform_device *child_pdev;
+	struct device_node *np;
 
 	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
 	if (!mgn_chip)
@@ -251,25 +253,35 @@ static int mbigen_device_probe(struct platform_device *pdev)
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	mgn_chip->base = devm_ioremap_resource(&pdev->dev, res);
+
 	if (IS_ERR(mgn_chip->base))
 		return PTR_ERR(mgn_chip->base);
 
-	if (of_property_read_u32(pdev->dev.of_node, "num-pins", &num_pins) < 0) {
-		dev_err(&pdev->dev, "No num-pins property\n");
-		return -EINVAL;
-	}
+	for_each_child_of_node(pdev->dev.of_node, np) {
+		if (!of_property_read_bool(np, "interrupt-controller"))
+			continue;
 
-	domain = platform_msi_create_device_domain(&pdev->dev, num_pins,
+		child_pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
+		if (IS_ERR(child_pdev))
+			return PTR_ERR(child_pdev);
+
+		if (of_property_read_u32(child_pdev->dev.of_node, "num-pins", &num_pins) < 0) {
+			dev_err(&pdev->dev, "No num-pins property\n");
+			return -EINVAL;
+		}
+
+		domain = platform_msi_create_device_domain(&child_pdev->dev, num_pins,
 							mbigen_write_msg,
 							&mbigen_domain_ops,
 							mgn_chip);
 
-	if (!domain)
-		return -ENOMEM;
+		if (!domain)
+			return -ENOMEM;
+
+		dev_info(&child_pdev->dev, "Allocated %d MSIs\n", num_pins);
+	}
 
 	platform_set_drvdata(pdev, mgn_chip);
-
-	dev_info(&pdev->dev, "Allocated %d MSIs\n", num_pins);
 
 	return 0;
 }
