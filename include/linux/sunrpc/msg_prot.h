@@ -149,6 +149,7 @@ typedef __be32	rpc_fraghdr;
 #define RPCBIND_NETID_UDP	"udp"
 #define RPCBIND_NETID_TCP	"tcp"
 #define RPCBIND_NETID_RDMA	"rdma"
+#define RPCBIND_NETID_RDMA6	"rdma6"
 #define RPCBIND_NETID_SCTP	"sctp"
 #define RPCBIND_NETID_UDP6	"udp6"
 #define RPCBIND_NETID_TCP6	"tcp6"
