@@ -32,6 +32,10 @@ uint cxl_verbose;
 module_param_named(verbose, cxl_verbose, uint, 0600);
 MODULE_PARM_DESC(verbose, "Enable verbose dmesg output");
 
+uint cxl_psl_timebase;
+module_param_named(psl_timebase, cxl_psl_timebase, uint, 0600);
+MODULE_PARM_DESC(psl_timebase, "Require PSL timebase synchronization");
+
 static inline void _cxl_slbia(struct cxl_context *ctx, struct mm_struct *mm)
 {
 	struct task_struct *task;

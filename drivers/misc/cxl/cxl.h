@@ -27,6 +27,7 @@
 #include <uapi/misc/cxl.h>
 
 extern uint cxl_verbose;
+extern uint cxl_psl_timebase;
 
 #define CXL_TIMEOUT 5
 

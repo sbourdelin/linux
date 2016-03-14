@@ -1189,8 +1189,11 @@ static int cxl_configure_adapter(struct cxl *adapter, struct pci_dev *dev)
 	if ((rc = pnv_phb_to_cxl_mode(dev, OPAL_PHB_CAPI_MODE_SNOOP_ON)))
 		goto err;
 
-	if ((rc = cxl_setup_psl_timebase(adapter, dev)))
-		goto err;
+	if ((rc = cxl_setup_psl_timebase(adapter, dev))) {
+		if (cxl_psl_timebase)
+			goto err;
+		pr_err("PSL: Timebase sync: ignoring error\n");
+	}
 
 	if ((rc = cxl_register_psl_err_irq(adapter)))
 		goto err;
