@@ -222,7 +222,7 @@ static uint64_t ni_tio_clock_period_ps(const struct ni_gpct *counter,
 		clock_period_ps *= 8;
 		break;
 	default:
-		BUG();
+		WARN_ON(1);
 		break;
 	}
 	return clock_period_ps;
@@ -304,7 +304,7 @@ static unsigned ni_m_series_clock_src_select(const struct ni_gpct *counter)
 		}
 		if (i <= NI_M_MAX_PFI_CHAN)
 			break;
-		BUG();
+		WARN_ON(1);
 		break;
 	}
 	clock_source |= ni_tio_clock_src_modifiers(counter);
@@ -361,7 +361,7 @@ static unsigned ni_660x_clock_src_select(const struct ni_gpct *counter)
 		}
 		if (i <= NI_660X_MAX_SRC_PIN)
 			break;
-		BUG();
+		WARN_ON(1);
 		break;
 	}
 	clock_source |= ni_tio_clock_src_modifiers(counter);
@@ -584,7 +584,7 @@ static unsigned ni_660x_clk_src(unsigned int clock_source)
 		if (i <= NI_660X_MAX_SRC_PIN)
 			break;
 		ni_660x_clock = 0;
-		BUG();
+		WARN_ON(1);
 		break;
 	}
 	return GI_SRC_SEL(ni_660x_clock);
@@ -643,7 +643,7 @@ static unsigned ni_m_clk_src(unsigned int clock_source)
 			break;
 		pr_err("invalid clock source 0x%lx\n",
 		       (unsigned long)clock_source);
-		BUG();
+		WARN_ON(1);
 		ni_m_series_clock = 0;
 		break;
 	}
@@ -946,7 +946,7 @@ int ni_tio_set_gate_src(struct ni_gpct *counter, unsigned gate_index,
 		case ni_gpct_variant_660x:
 			return ni_660x_set_gate2(counter, gate_source);
 		default:
-			BUG();
+			WARN_ON(1);
 			break;
 		}
 		break;
@@ -1015,7 +1015,7 @@ static unsigned ni_660x_gate_to_generic_gate(unsigned gate)
 			if (gate == NI_660X_PIN_GATE_SEL(i))
 				return NI_GPCT_GATE_PIN_GATE_SELECT(i);
 		}
-		BUG();
+		WARN_ON(1);
 		break;
 	}
 	return 0;
@@ -1051,7 +1051,7 @@ static unsigned ni_m_gate_to_generic_gate(unsigned gate)
 			if (gate == NI_M_PFI_GATE_SEL(i))
 				return NI_GPCT_PFI_GATE_SELECT(i);
 		}
-		BUG();
+		WARN_ON(1);
 		break;
 	}
 	return 0;
@@ -1083,7 +1083,7 @@ static unsigned ni_660x_gate2_to_generic_gate(unsigned gate)
 			if (gate == NI_660X_UD_PIN_GATE2_SEL(i))
 				return NI_GPCT_UP_DOWN_PIN_GATE_SELECT(i);
 		}
-		BUG();
+		WARN_ON(1);
 		break;
 	}
 	return 0;
