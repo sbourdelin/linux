@@ -113,6 +113,8 @@ struct intel_shared_dpll_funcs {
 };
 
 struct intel_shared_dpll {
+	struct mutex lock;
+
 	struct intel_shared_dpll_config config;
 
 	unsigned active_mask; /* mask of active CRTCs (i.e. DPMS on) */
