@@ -113,6 +113,7 @@
 #define VTCR_EL2_TG0_MASK	(3 << 14)
 #define VTCR_EL2_TG0_4K		(0 << 14)
 #define VTCR_EL2_TG0_64K	(1 << 14)
+#define VTCR_EL2_TG0_16K	(2 << 14)
 #define VTCR_EL2_SH0_MASK	(3 << 12)
 #define VTCR_EL2_SH0_INNER	(3 << 12)
 #define VTCR_EL2_ORGN0_MASK	(3 << 10)
@@ -134,7 +135,7 @@
  * (see hyp-init.S).
  *
  * Note that when using 4K pages, we concatenate two first level page tables
- * together.
+ * together. With 16K pages, we concatenate 16 first level page tables.
  *
  * The magic numbers used for VTTBR_X in this patch can be found in Tables
  * D4-23 and D4-25 in ARM DDI 0487A.b.
@@ -150,6 +151,14 @@
  */
 #define VTCR_EL2_TGRAN_FLAGS	(VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1)
 #define VTTBR_X_TGRAN_MAGIC		38
+#elif defined(CONFIG_ARM64_16K_PAGES)
+/*
+ * Stage2 translation configuration:
+ * 16kB pages (TG0 = 2)
+ * 2 level page tables (SL = 1)
+ */
+#define VTCR_EL2_TGRAN_FLAGS	(VTCR_EL2_TG0_16K | VTCR_EL2_SL0_LVL1)
+#define VTTBR_X_TGRAN_MAGIC	42
 #else
 /*
  * Stage2 translation configuration:
