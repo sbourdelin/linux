@@ -21,9 +21,9 @@
  * @fence:	returns the fd of the new fence to userspace
  */
 struct sync_merge_data {
-	__s32	fd2; /* fd of second fence */
-	char	name[32]; /* name of new fence */
-	__s32	fence; /* fd on newly created fence */
+	__s32	fd2;
+	char	name[32];
+	__s32	fence;
 };
 
 /**
