@@ -48,6 +48,7 @@
 #include <linux/hugetlb.h>
 #include <asm/cacheflush.h>
 #include <asm/pgalloc.h>
+#include <asm/stage2_pgtable.h>
 
 int create_hyp_mappings(void *from, void *to);
 int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
@@ -141,26 +142,90 @@ static inline int kvm_pud_huge(struct kvm *kvm, pud_t pud)
 	return pud_huge(pud);
 }
 
+static inline int kvm_pgd_none(struct kvm *kvm, pgd_t pgd)
+{
+	return pgd_none(pgd);
+}
 
-/* Open coded p*d_addr_end that can deal with 64bit addresses */
+static inline void kvm_pgd_clear(struct kvm *kvm, pgd_t *pgdp)
+{
+	pgd_clear(pgdp);
+}
+
+static inline int kvm_pgd_present(struct kvm *kvm, pgd_t pgd)
+{
+	return pgd_present(pgd);
+}
+
+static inline void
+kvm_pgd_populate(struct kvm *kvm, struct mm_struct *mm, pgd_t *pgd, pud_t *pud)
+{
+	pgd_populate(mm, pgd, pud);
+}
+
+static inline pud_t *
+kvm_pud_offset(struct kvm *kvm, pgd_t *pgd, phys_addr_t address)
+{
+	return pud_offset(pgd, address);
+}
+
+static inline int kvm_pud_none(struct kvm *kvm, pud_t pud)
+{
+	return pud_none(pud);
+}
+
+static inline void kvm_pud_clear(struct kvm *kvm, pud_t *pudp)
+{
+	pud_clear(pudp);
+}
+
+static inline int kvm_pud_present(struct kvm *kvm, pud_t pud)
+{
+	return pud_present(pud);
+}
+
+static inline void kvm_pud_free(struct kvm *kvm, struct mm_struct *mm, pud_t *pudp)
+{
+	pud_free(mm, pudp);
+}
+
+static inline void
+kvm_pud_populate(struct kvm *kvm, struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
+{
+	pud_populate(mm, pud, pmd);
+}
+
+static inline pmd_t *
+kvm_pmd_offset(struct kvm *kvm, pud_t *pud, phys_addr_t address)
+{
+	return pmd_offset(pud, address);
+}
+
+static inline void kvm_pmd_free(struct kvm *kvm, struct mm_struct *mm, pmd_t *pmd)
+{
+	pmd_free(mm, pmd);
+}
+
+/*
+ * stage2_p.d_addr_end can handle 64bit address, use them explicitly for
+ * hyp and stage2.
+ */
 static inline phys_addr_t
 kvm_pgd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
 {
-	phys_addr_t boundary = (addr + PGDIR_SIZE) & PGDIR_MASK;
-	return (boundary - 1 < end - 1) ? boundary : end;
+	return stage2_pgd_addr_end(addr, end);
 }
 
 static inline phys_addr_t
 kvm_pud_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
 {
-	return end;
+	return stage2_pud_addr_end(addr, end);
 }
 
 static inline phys_addr_t
 kvm_pmd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
 {
-	phys_addr_t boundary = (addr + PMD_SIZE) & PMD_MASK;
-	return (boundary - 1 < end - 1) ? boundary : end;
+	return stage2_pmd_addr_end(addr, end);
 }
 
 static inline phys_addr_t kvm_pgd_index(struct kvm *kvm, phys_addr_t addr)
@@ -174,9 +239,21 @@ static inline bool kvm_page_empty(void *ptr)
 	return page_count(ptr_page) == 1;
 }
 
-#define kvm_pte_table_empty(kvm, ptep) kvm_page_empty(ptep)
-#define kvm_pmd_table_empty(kvm, pmdp) kvm_page_empty(pmdp)
-#define kvm_pud_table_empty(kvm, pudp) (0)
+static inline bool kvm_pte_table_empty(struct kvm *kvm, pte_t *ptep)
+{
+	return kvm_page_empty(ptep);
+}
+
+static inline bool kvm_pmd_table_empty(struct kvm *kvm, pmd_t *pmdp)
+{
+	return kvm_page_empty(pmdp);
+}
+
+static inline bool kvm_pud_table_empty(struct kvm *kvm, pud_t *pudp)
+{
+	return 0;
+}
+
 
 static inline void *kvm_get_hwpgd(struct kvm *kvm)
 {
