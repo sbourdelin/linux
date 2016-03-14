@@ -217,20 +217,19 @@ int media_entity_pads_init(struct media_entity *entity, u16 num_pads,
 
 	entity->num_pads = num_pads;
 	entity->pads = pads;
-
-	if (mdev)
-		spin_lock(&mdev->lock);
-
 	for (i = 0; i < num_pads; i++) {
 		pads[i].entity = entity;
 		pads[i].index = i;
-		if (mdev)
-			media_gobj_create(mdev, MEDIA_GRAPH_PAD,
-					&entity->pads[i].graph_obj);
 	}
 
-	if (mdev)
-		spin_unlock(&mdev->lock);
+	if (mdev == NULL)
+		return 0;
+
+	spin_lock(&mdev->lock);
+	for (i = 0; i < num_pads; i++)
+		media_gobj_create(mdev, MEDIA_GRAPH_PAD,
+				  &entity->pads[i].graph_obj);
+	spin_unlock(&mdev->lock);
 
 	return 0;
 }
