@@ -49,13 +49,10 @@ static void inject_mce(struct mce *m)
 
 static void raise_poll(struct mce *m)
 {
-	unsigned long flags;
 	mce_banks_t b;
 
 	memset(&b, 0xff, sizeof(mce_banks_t));
-	local_irq_save(flags);
-	machine_check_poll(0, &b);
-	local_irq_restore(flags);
+	mce_call(MCE_CALL_POLL, &b);
 	m->finished = 0;
 }
 
@@ -72,7 +69,7 @@ static void raise_exception(struct mce *m, struct pt_regs *pregs)
 	}
 	/* in mcheck exeception handler, irq will be disabled */
 	local_irq_save(flags);
-	do_machine_check(pregs, 0);
+	mce_call(MCE_CALL_MC, pregs);
 	local_irq_restore(flags);
 	m->finished = 0;
 }

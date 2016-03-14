@@ -198,13 +198,34 @@ void mce_log(struct mce *mce)
 	set_bit(0, &mce_need_notify);
 }
 
-void mce_inject_log(struct mce *m)
+void mce_call(enum mce_call_cmds cmd, void *t)
 {
-	mutex_lock(&mce_chrdev_read_mutex);
-	mce_log(m);
-	mutex_unlock(&mce_chrdev_read_mutex);
+	switch (cmd) {
+	case MCE_CALL_DECODE:
+		mutex_lock(&mce_chrdev_read_mutex);
+		mce_log((struct mce *)t);
+		mutex_unlock(&mce_chrdev_read_mutex);
+		break;
+
+	case MCE_CALL_MC:
+		do_machine_check((struct pt_regs *)t, 0);
+		break;
+
+	case MCE_CALL_POLL: {
+		unsigned long flags;
+
+		local_irq_save(flags);
+		machine_check_poll(0, (mce_flags_t *)t);
+		local_irq_restore(flags);
+		}
+		break;
+
+	default:
+		WARN_ON_ONCE(1);
+		break;
+	}
 }
-EXPORT_SYMBOL_GPL(mce_inject_log);
+EXPORT_SYMBOL_GPL(mce_call);
 
 static struct notifier_block mce_srao_nb;
 
@@ -666,7 +687,6 @@ bool machine_check_poll(enum mcp_flags flags, mce_banks_t *b)
 
 	return error_seen;
 }
-EXPORT_SYMBOL_GPL(machine_check_poll);
 
 /*
  * Do a quick check if any of the events requires a panic.
@@ -1180,7 +1200,6 @@ out:
 done:
 	ist_exit(regs);
 }
-EXPORT_SYMBOL_GPL(do_machine_check);
 
 #ifndef CONFIG_MEMORY_FAILURE
 int memory_failure(unsigned long pfn, int vector, int flags)

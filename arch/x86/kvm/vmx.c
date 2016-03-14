@@ -5247,7 +5247,7 @@ static void kvm_machine_check(void)
 		.flags = X86_EFLAGS_IF,
 	};
 
-	do_machine_check(&regs, 0);
+	mce_call(MCE_CALL_MC, &regs);
 #endif
 }
 

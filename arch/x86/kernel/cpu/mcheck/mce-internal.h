@@ -13,6 +13,8 @@ enum severity_level {
 	MCE_PANIC_SEVERITY,
 };
 
+void do_machine_check(struct pt_regs *, long);
+bool machine_check_poll(enum mcp_flags flags, mce_banks_t *b);
 extern struct atomic_notifier_head x86_mce_decoder_chain;
 
 #define ATTR_LEN		16
@@ -79,5 +81,3 @@ static inline int apei_clear_mce(u64 record_id)
 	return -EINVAL;
 }
 #endif
-
-void mce_inject_log(struct mce *m);

@@ -224,7 +224,6 @@ enum mcp_flags {
 	MCP_UC		= BIT(1),	/* log uncorrected errors */
 	MCP_DONTLOG	= BIT(2),	/* only clear, don't log */
 };
-bool machine_check_poll(enum mcp_flags flags, mce_banks_t *b);
 
 int mce_notify_irq(void);
 
@@ -243,7 +242,6 @@ extern void mce_disable_bank(int bank);
 
 /* Call the installed machine check handler for this CPU setup. */
 extern void (*machine_check_vector)(struct pt_regs *, long error_code);
-void do_machine_check(struct pt_regs *, long);
 
 /*
  * Threshold handler
@@ -286,5 +284,13 @@ static inline void mcheck_intel_therm_init(void) { }
 struct cper_sec_mem_err;
 extern void apei_mce_report_mem_error(int corrected,
 				      struct cper_sec_mem_err *mem_err);
+
+enum mce_call_cmds = {
+	MCE_CALL_DECODE,	/* A struct mce for decoding is being supplied. */
+	MCE_CALL_MC,		/* Invoke #MC exception handler. */
+	MCE_CALL_POLL,		/* Poll MCA banks. */
+};
+
+void mce_call(enum mce_call_cmds cmd, struct mce *m);
 
 #endif /* _ASM_X86_MCE_H */
