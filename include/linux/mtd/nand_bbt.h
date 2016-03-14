@@ -18,6 +18,8 @@
 #ifndef __LINUX_MTD_NAND_BBT_H
 #define __LINUX_MTD_NAND_BBT_H
 
+struct mtd_info;
+
 /* The maximum number of NAND chips in an array */
 #define NAND_MAX_CHIPS		8
 
@@ -114,5 +116,70 @@ struct nand_bbt_descr {
 
 /* The maximum number of blocks to scan for a bbt */
 #define NAND_BBT_SCAN_MAXBLOCKS	4
+
+struct nand_bbt;
+
+/**
+ * struct nand_bbt_ops - bad block table operations
+ * @is_bad_bbm:	check if a block is factory bad block
+ * @erase:	erase block bypassing resvered checks
+ */
+struct nand_bbt_ops {
+	/*
+	 * This is important to abstract out of nand_bbt.c and provide
+	 * separately in nand_base.c and spi-nand-base.c -- it's sort of
+	 * duplicated in nand_block_bad() (nand_base) and
+	 * scan_block_fast() (nand_bbt) right now
+	 *
+	 * Note that this also means nand_chip.badblock_pattern should
+	 * be removed from nand_bbt.c
+	 */
+	int (*is_bad_bbm)(struct mtd_info *mtd, loff_t ofs);
+
+	/* Erase a block, bypassing reserved checks */
+	int (*erase)(struct mtd_info *mtd, loff_t ofs);
+};
+
+/**
+ * struct nand_chip_layout_info - strucure contains all chip layout
+ * information that BBT needed.
+ * @numchips:	number of physical chips, required for NAND_BBT_PERCHIP
+ * @chipsize:	the size of one chip for multichip arrays
+ * @chip_shift:	number of address bits in one chip
+ * @bbt_erase_shift:	number of address bits in a bbt entry
+ * @page_shift:	number of address bits in a page
+ */
+struct nand_chip_layout_info {
+	int numchips;
+	u64 chipsize;
+	int chip_shift;
+	int bbt_erase_shift;
+	int page_shift;
+};
+
+/**
+ * struct nand_bbt - bad block table structure
+ * @mtd:	pointer to MTD device structure
+ * @bbt_options:	bad block specific options. All options used
+ *			here must come from nand_bbt.h.
+ * @bbt_ops:	struct nand_bbt_ops pointer.
+ * @info:	struct nand_chip_layout_info pointer.
+ * @bbt_td:	bad block table descriptor for flash lookup.
+ * @bbt_md:	bad block table mirror descriptor
+ * @bbt:	bad block table pointer
+ */
+struct nand_bbt {
+	struct mtd_info *mtd;
+	unsigned int bbt_options;
+	const struct nand_bbt_ops *bbt_ops;
+	struct nand_chip_layout_info *info;
+	/*
+	 * Discourage new custom usages here; suggest usage of the
+	 * relevant NAND_BBT_* options instead
+	 */
+	struct nand_bbt_descr *bbt_td;
+	struct nand_bbt_descr *bbt_md;
+	u8 *bbt;
+};
 
 #endif	/* __LINUX_MTD_NAND_BBT_H */
