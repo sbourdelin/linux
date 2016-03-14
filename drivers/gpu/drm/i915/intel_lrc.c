@@ -1921,7 +1921,7 @@ static int gen8_emit_request_render(struct drm_i915_gem_request *request)
 	 * need a prior CS_STALL, which is emitted by the flush
 	 * following the batch.
 	 */
-	intel_logical_ring_emit(ringbuf, GFX_OP_PIPE_CONTROL(5));
+	intel_logical_ring_emit(ringbuf, GFX_OP_PIPE_CONTROL(6));
 	intel_logical_ring_emit(ringbuf,
 				(PIPE_CONTROL_GLOBAL_GTT_IVB |
 				 PIPE_CONTROL_CS_STALL |
@@ -1929,6 +1929,7 @@ static int gen8_emit_request_render(struct drm_i915_gem_request *request)
 	intel_logical_ring_emit(ringbuf, hws_seqno_address(request->ring));
 	intel_logical_ring_emit(ringbuf, 0);
 	intel_logical_ring_emit(ringbuf, i915_gem_request_get_seqno(request));
+	intel_logical_ring_emit(ringbuf, 0);
 	intel_logical_ring_emit(ringbuf, MI_USER_INTERRUPT);
 	return intel_logical_ring_advance_and_submit(request);
 }
