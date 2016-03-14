@@ -810,21 +810,21 @@ static struct notifier_block cpu_hotplug_notifier = {
 	.notifier_call = cpu_hotplug_notify,
 };
 
-static void auto_demotion_disable(void *dummy)
+static void fix_this_cpu(void *dummy)
 {
 	unsigned long long msr_bits;
 
-	rdmsrl(MSR_NHM_SNB_PKG_CST_CFG_CTL, msr_bits);
-	msr_bits &= ~(icpu->auto_demotion_disable_flags);
-	wrmsrl(MSR_NHM_SNB_PKG_CST_CFG_CTL, msr_bits);
-}
-static void c1e_promotion_disable(void *dummy)
-{
-	unsigned long long msr_bits;
+	if (icpu->auto_demotion_disable_flags) {
+		rdmsrl(MSR_NHM_SNB_PKG_CST_CFG_CTL, msr_bits);
+		msr_bits &= ~(icpu->auto_demotion_disable_flags);
+		wrmsrl(MSR_NHM_SNB_PKG_CST_CFG_CTL, msr_bits);
+	}
 
-	rdmsrl(MSR_IA32_POWER_CTL, msr_bits);
-	msr_bits &= ~0x2;
-	wrmsrl(MSR_IA32_POWER_CTL, msr_bits);
+	if (icpu->disable_promotion_to_c1e) {
+		rdmsrl(MSR_IA32_POWER_CTL, msr_bits);
+		msr_bits &= ~0x2;
+		wrmsrl(MSR_IA32_POWER_CTL, msr_bits);
+	}
 }
 
 static const struct idle_cpu idle_cpu_nehalem = {
@@ -1074,16 +1074,12 @@ static int __init intel_idle_cpuidle_driver_init(void)
 		drv->state_count += 1;
 	}
 
-	if (icpu->auto_demotion_disable_flags)
-		on_each_cpu(auto_demotion_disable, NULL, 1);
-
 	if (icpu->byt_auto_demotion_disable_flag) {
 		wrmsrl(MSR_CC6_DEMOTION_POLICY_CONFIG, 0);
 		wrmsrl(MSR_MC6_DEMOTION_POLICY_CONFIG, 0);
 	}
 
-	if (icpu->disable_promotion_to_c1e)	/* each-cpu is redundant */
-		on_each_cpu(c1e_promotion_disable, NULL, 1);
+	on_each_cpu(fix_this_cpu, NULL, 1);
 
 	return 0;
 }
@@ -1108,11 +1104,7 @@ static int intel_idle_cpu_init(int cpu)
 		return -EIO;
 	}
 
-	if (icpu->auto_demotion_disable_flags)
-		smp_call_function_single(cpu, auto_demotion_disable, NULL, 1);
-
-	if (icpu->disable_promotion_to_c1e)
-		smp_call_function_single(cpu, c1e_promotion_disable, NULL, 1);
+	smp_call_function_single(cpu, fix_this_cpu, NULL, 1);
 
 	return 0;
 }
