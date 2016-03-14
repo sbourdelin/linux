@@ -466,13 +466,15 @@ static int dio_bio_complete(struct dio *dio, struct bio *bio)
 {
 	struct bio_vec *bvec;
 	unsigned i;
-	int err;
 
-	if (bio->bi_error)
+	/* Only EIO and ENOSPC should be returned to userspace. */
+	if (bio->bi_error == 0 ||
+	    bio->bi_error == -ENOSPC || bio->bi_error == -EIO)
+		dio->io_error = bio->bi_error;
+	else
 		dio->io_error = -EIO;
 
 	if (dio->is_async && dio->rw == READ && dio->should_dirty) {
-		err = bio->bi_error;
 		bio_check_pages_dirty(bio);	/* transfers ownership */
 	} else {
 		bio_for_each_segment_all(bvec, bio, i) {
@@ -483,10 +485,9 @@ static int dio_bio_complete(struct dio *dio, struct bio *bio)
 				set_page_dirty_lock(page);
 			page_cache_release(page);
 		}
-		err = bio->bi_error;
 		bio_put(bio);
 	}
-	return err;
+	return dio->io_error;
 }
 
 /*
