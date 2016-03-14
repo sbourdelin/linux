@@ -8591,30 +8591,9 @@ static int ironlake_get_refclk(struct intel_crtc_state *crtc_state)
 {
 	struct drm_device *dev = crtc_state->base.crtc->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	struct drm_atomic_state *state = crtc_state->base.state;
-	struct drm_connector *connector;
-	struct drm_connector_state *connector_state;
-	struct intel_encoder *encoder;
-	int num_connectors = 0, i;
-	bool is_lvds = false;
 
-	for_each_connector_in_state(state, connector, connector_state, i) {
-		if (connector_state->crtc != crtc_state->base.crtc)
-			continue;
-
-		encoder = to_intel_encoder(connector_state->best_encoder);
-
-		switch (encoder->type) {
-		case INTEL_OUTPUT_LVDS:
-			is_lvds = true;
-			break;
-		default:
-			break;
-		}
-		num_connectors++;
-	}
-
-	if (is_lvds && intel_panel_use_ssc(dev_priv) && num_connectors < 2) {
+	if (intel_pipe_will_have_type(crtc_state, INTEL_OUTPUT_LVDS) &&
+	    intel_panel_use_ssc(dev_priv)) {
 		DRM_DEBUG_KMS("using SSC reference clock of %d kHz\n",
 			      dev_priv->vbt.lvds_ssc_freq);
 		return dev_priv->vbt.lvds_ssc_freq;
@@ -8840,7 +8819,7 @@ static uint32_t ironlake_compute_dpll(struct intel_crtc *intel_crtc,
 	struct drm_connector_state *connector_state;
 	struct intel_encoder *encoder;
 	uint32_t dpll;
-	int factor, num_connectors = 0, i;
+	int factor, i;
 	bool is_lvds = false, is_sdvo = false;
 
 	for_each_connector_in_state(state, connector, connector_state, i) {
@@ -8860,8 +8839,6 @@ static uint32_t ironlake_compute_dpll(struct intel_crtc *intel_crtc,
 		default:
 			break;
 		}
-
-		num_connectors++;
 	}
 
 	/* Enable autotuning of the PLL clock (if permissible) */
@@ -8915,7 +8892,7 @@ static uint32_t ironlake_compute_dpll(struct intel_crtc *intel_crtc,
 		break;
 	}
 
-	if (is_lvds && intel_panel_use_ssc(dev_priv) && num_connectors < 2)
+	if (is_lvds && intel_panel_use_ssc(dev_priv))
 		dpll |= PLLB_REF_INPUT_SPREADSPECTRUMIN;
 	else
 		dpll |= PLL_REF_INPUT_DREFCLK;
