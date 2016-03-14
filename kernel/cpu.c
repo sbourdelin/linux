@@ -654,7 +654,7 @@ out:
 
 static int __init alloc_frozen_cpus(void)
 {
-	if (!alloc_cpumask_var(&frozen_cpus, GFP_KERNEL|__GFP_ZERO))
+	if (!zalloc_cpumask_var(&frozen_cpus, GFP_KERNEL))
 		return -ENOMEM;
 	return 0;
 }
