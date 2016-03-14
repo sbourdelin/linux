@@ -47,7 +47,7 @@ static DEFINE_SPINLOCK(limit_lock);
 
    See Alexey's formal explanation in net/sched/sch_tbf.c.
 
-   To get the maxmum range, we multiply by this factor (ie. you get N
+   To get the maximum range, we multiply by this factor (ie. you get N
    credits per jiffy).  We want to allow a rate as low as 1 per day
    (slowest userspace tool allows), which means
    CREDITS_PER_JIFFY*HZ*60*60*24 < 2^32. ie. */
