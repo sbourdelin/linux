@@ -61,6 +61,7 @@
 #include <linux/notifier.h>
 #include <linux/cpu.h>
 #include <linux/module.h>
+#include <linux/syscore_ops.h>
 #include <asm/cpu_device_id.h>
 #include <asm/mwait.h>
 #include <asm/msr.h>
@@ -1026,6 +1027,15 @@ void intel_idle_state_table_update(void)
 	return;
 }
 
+static void intel_idle_resume(void)
+{
+	on_each_cpu(fix_this_cpu, NULL, 1);
+}
+
+static struct syscore_ops intel_idle_syscore_ops = {
+	.resume = intel_idle_resume,
+};
+
 /*
  * intel_idle_cpuidle_driver_init()
  * allocate, initialize cpuidle_states
@@ -1119,6 +1129,7 @@ static int __init intel_idle_init(void)
 	if (retval)
 		return retval;
 
+	register_syscore_ops(&intel_idle_syscore_ops);
 	intel_idle_cpuidle_driver_init();
 	retval = cpuidle_register_driver(&intel_idle_driver);
 	if (retval) {
@@ -1153,6 +1164,7 @@ static void __exit intel_idle_exit(void)
 {
 	intel_idle_cpuidle_devices_uninit();
 	cpuidle_unregister_driver(&intel_idle_driver);
+	unregister_syscore_ops(&intel_idle_syscore_ops);
 
 	cpu_notifier_register_begin();
 
