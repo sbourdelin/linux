@@ -3583,7 +3583,6 @@ static void skl_clear_wm(struct skl_wm_values *watermarks, enum pipe pipe)
 	       sizeof(uint32_t) * 8 * I915_MAX_PLANES);
 	memset(watermarks->plane_trans[pipe],
 	       0, sizeof(uint32_t) * I915_MAX_PLANES);
-	watermarks->plane_trans[pipe][PLANE_CURSOR] = 0;
 
 	/* Clear ddb entries for pipe */
 	memset(&watermarks->ddb.pipe[pipe], 0, sizeof(struct skl_ddb_entry));
@@ -3591,9 +3590,6 @@ static void skl_clear_wm(struct skl_wm_values *watermarks, enum pipe pipe)
 	       sizeof(struct skl_ddb_entry) * I915_MAX_PLANES);
 	memset(&watermarks->ddb.y_plane[pipe], 0,
 	       sizeof(struct skl_ddb_entry) * I915_MAX_PLANES);
-	memset(&watermarks->ddb.plane[pipe][PLANE_CURSOR], 0,
-	       sizeof(struct skl_ddb_entry));
-
 }
 
 static void skl_update_wm(struct drm_crtc *crtc)
