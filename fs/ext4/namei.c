@@ -959,6 +959,10 @@ static int htree_dirblock_to_tree(struct file *dir_file,
 	bh = ext4_read_dirblock(dir, block, DIRENT);
 	if (IS_ERR(bh))
 		return PTR_ERR(bh);
+	if (fatal_signal_pending(current)) {
+		brelse(bh);
+		return -ERESTARTSYS;
+	}
 
 	de = (struct ext4_dir_entry_2 *) bh->b_data;
 	top = (struct ext4_dir_entry_2 *) ((char *) de +
