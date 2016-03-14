@@ -119,6 +119,7 @@ static struct scsi_host_template fnic_host_template = {
 	.max_sectors = 0xffff,
 	.shost_attrs = fnic_attrs,
 	.track_queue_depth = 1,
+	.disable_blk_mq = 1,
 };
 
 static void
