@@ -502,6 +502,15 @@ config AXP20X_POWER
 	  This driver provides support for the power supply features of
 	  AXP20x PMIC.
 
+config UCS1002_POWER
+	tristate "UCS1002-2 power supply driver"
+	depends on I2C
+	depends on GPIOLIB || COMPILE_TEST
+	select REGMAP_I2C
+	help
+	  This driver provices support for UCS1002-2 Programmable USB Port
+	  Power Controller.
+
 endif # POWER_SUPPLY
 
 source "drivers/power/reset/Kconfig"
