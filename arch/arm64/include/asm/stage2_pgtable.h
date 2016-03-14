@@ -16,37 +16,60 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __ARM64_S2_PGTABLE_H_
-#define __ARM64_S2_PGTABLE_H_
+#ifndef __ARM64_STAGE2_PGTABLE_H_
+#define __ARM64_STAGE2_PGTABLE_H_
 
 #include <asm/pgtable.h>
 
 /*
- * In the case where PGDIR_SHIFT is larger than KVM_PHYS_SHIFT, we can address
- * the entire IPA input range with a single pgd entry, and we would only need
- * one pgd entry.  Note that in this case, the pgd is actually not used by
- * the MMU for Stage-2 translations, but is merely a fake pgd used as a data
- * structure for the kernel pgtable macros to work.
+ * The hardware mandates concatenation of upto 16 tables at stage2 entry level.
+ * Now, the minimum number of bits resolved at any level is (PAGE_SHIFT - 3),
+ * or in other words log2(PTRS_PER_PTE). On arm64, the smallest PAGE_SIZE
+ * supported is 4k, which means (PAGE_SHIFT - 3) > 4 holds for all page sizes.
+ * This implies, the total number of page table levels at stage2 expected
+ * by the hardware is actually the number of levels required for (KVM_PHYS_SHIFT - 4)
+ * in normal translations(e.g, stage-1), since we cannot have another level in
+ * the range (KVM_PHYS_SHIFT, KVM_PHYS_SHIFT - 4).
  */
-#if PGDIR_SHIFT > KVM_PHYS_SHIFT
-#define PTRS_PER_S2_PGD_SHIFT	0
-#else
-#define PTRS_PER_S2_PGD_SHIFT	(KVM_PHYS_SHIFT - PGDIR_SHIFT)
-#endif
-#define PTRS_PER_S2_PGD		(1 << PTRS_PER_S2_PGD_SHIFT)
+#define STAGE2_PGTABLE_LEVELS		ARM64_HW_PGTABLE_LEVELS(KVM_PHYS_SHIFT - 4)
 
 /*
- * If we are concatenating first level stage-2 page tables, we would have less
- * than or equal to 16 pointers in the fake PGD, because that's what the
- * architecture allows.  In this case, (4 - CONFIG_PGTABLE_LEVELS)
- * represents the first level for the host, and we add 1 to go to the next
- * level (which uses contatenation) for the stage-2 tables.
+ * At the moment, we do not support a combination of guest IPA and host VA_BITS
+ * where
+ * 	STAGE2_PGTABLE_LEVELS > CONFIG_PGTABLE_LEVELS
+ *
+ * We base our stage-2 page table walker helpers based on this assumption and
+ * fallback to using the host version of the helper wherever possible.
+ * i.e, if a particular level is not folded (e.g, PUD) at stage2, we fall back
+ * to using the host version, since it is guaranteed it is not folded at host.
+ *
+ * TODO: We could lift this limitation easily by rearranging the host level
+ * definitions to a more reusable version.
  */
-#if PTRS_PER_S2_PGD <= 16
-#define KVM_PREALLOC_LEVEL	(4 - CONFIG_PGTABLE_LEVELS + 1)
-#else
-#define KVM_PREALLOC_LEVEL	(0)
+#if STAGE2_PGTABLE_LEVELS > CONFIG_PGTABLE_LEVELS
+#error "Unsupported combination of guest IPA and host VA_BITS."
 #endif
+
+
+#define S2_PGDIR_SHIFT			ARM64_HW_PGTABLE_LEVEL_SHIFT(4 - STAGE2_PGTABLE_LEVELS)
+#define S2_PGDIR_SIZE			(_AC(1, UL) << S2_PGDIR_SHIFT)
+#define S2_PGDIR_MASK			(~(S2_PGDIR_SIZE - 1))
+
+/* We can have concatenated tables at stage2 entry. */
+#define PTRS_PER_S2_PGD			(1 << (KVM_PHYS_SHIFT - S2_PGDIR_SHIFT))
+
+/*
+ * KVM_MMU_CACHE_MIN_PAGES is the number of stage2 page table translation
+ * levels in addition to the PGD.
+ */
+#define KVM_MMU_CACHE_MIN_PAGES		(STAGE2_PGTABLE_LEVELS - 1)
+
+
+#if STAGE2_PGTABLE_LEVELS > 3
+
+#define S2_PUD_SHIFT			ARM64_HW_PGTABLE_LEVEL_SHIFT(1)
+#define S2_PUD_SIZE			(_AC(1, UL) << S2_PUD_SHIFT)
+#define S2_PUD_MASK			(~(S2_PUD_SIZE - 1))
 
 #define stage2_pgd_none(pgd)				pgd_none(pgd)
 #define stage2_pgd_clear(pgd)				pgd_clear(pgd)
@@ -54,6 +77,17 @@
 #define stage2_pgd_populate(mm, pgd, pud)		pgd_populate(mm, pgd, pud)
 #define stage2_pud_offset(pgd, address)			pud_offset(pgd, address)
 #define stage2_pud_free(mm, pud)			pud_free(mm, pud)
+
+#define stage2_pud_table_empty(pudp)			kvm_page_empty(pudp)
+
+#endif		/* STAGE2_PGTABLE_LEVELS > 3 */
+
+
+#if STAGE2_PGTABLE_LEVELS > 2
+
+#define S2_PMD_SHIFT			ARM64_HW_PGTABLE_LEVEL_SHIFT(2)
+#define S2_PMD_SIZE			(_AC(1, UL) << S2_PMD_SHIFT)
+#define S2_PMD_MASK			(~(S2_PMD_SIZE - 1))
 
 #define stage2_pud_none(pud)				pud_none(pud)
 #define stage2_pud_clear(pud)				pud_clear(pud)
@@ -63,23 +97,38 @@
 #define stage2_pmd_free(mm, pmd)			pmd_free(mm, pmd)
 
 #define stage2_pud_huge(pud)				pud_huge(pud)
+#define stage2_pmd_table_empty(pmdp)			kvm_page_empty(pmdp)
 
-#define stage2_pgd_addr_end(address, end)		pgd_addr_end(address, end)
-#define stage2_pud_addr_end(address, end)		pud_addr_end(address, end)
-#define stage2_pmd_addr_end(address, end)		pmd_addr_end(address, end)
+#endif		/* STAGE2_PGTABLE_LEVELS > 2 */
 
-#ifdef __PGTABLE_PMD_FOLDED
-#define stage2_pmd_table_empty(pmdp)			(0)
-#else
-#define stage2_pmd_table_empty(pmdp)			((KVM_PREALLOC_LEVEL < 2) && kvm_page_empty(pmdp))
+#if STAGE2_PGTABLE_LEVELS == 2
+#include <asm/stage2_pgtable-nopmd.h>
+#elif STAGE2_PGTABLE_LEVELS == 3
+#include <asm/stage2_pgtable-nopud.h>
 #endif
 
-#ifdef __PGTABLE_PUD_FOLDED
-#define stage2_pmd_table_empty(pmdp)			(0)
-#else
-#define stage2_pud_table_empty(pudp)			((KVM_PREALLOC_LEVEL < 1) && kvm_page_empty(pudp))
+#ifndef stage2_pgd_addr_end
+#define stage2_pgd_addr_end(addr, end)							\
+({	phys_addr_t __boundary = (((addr) + S2_PGDIR_SIZE) & S2_PGDIR_MASK);		\
+	(__boundary - 1 < (end) - 1) ? __boundary : (end);				\
+})
 #endif
 
-#define stage2_pgd_index(addr)				(((addr) >> PGDIR_SHIFT) & (PTRS_PER_S2_PGD - 1))
+#ifndef stage2_pud_addr_end
+#define stage2_pud_addr_end(addr, end)							\
+({	phys_addr_t __boundary = (((addr) + S2_PUD_SIZE) & S2_PUD_MASK);		\
+	(__boundary - 1 < (end) - 1) ? __boundary : (end);				\
+})
+#endif
 
-#endif	/* __ARM64_S2_PGTABLE_H_ */
+#ifndef stage2_pmd_addr_end
+#define stage2_pmd_addr_end(addr, end)							\
+({	phys_addr_t __boundary = (((addr) + S2_PMD_SIZE) & S2_PMD_MASK);		\
+	(__boundary - 1 < (end) - 1) ? __boundary : (end);				\
+})
+#endif
+
+
+#define stage2_pgd_index(addr)				(((addr) >> S2_PGDIR_SHIFT) & (PTRS_PER_S2_PGD - 1))
+
+#endif	/* __ARM64_STAGE2_PGTABLE_H_ */
