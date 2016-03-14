@@ -1079,8 +1079,6 @@ static int __init intel_idle_cpuidle_driver_init(void)
 		wrmsrl(MSR_MC6_DEMOTION_POLICY_CONFIG, 0);
 	}
 
-	on_each_cpu(fix_this_cpu, NULL, 1);
-
 	return 0;
 }
 
