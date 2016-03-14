@@ -1208,6 +1208,28 @@ static int tvp5150_registered_async(struct v4l2_subdev *sd)
 	return 0;
 }
 
+static int __maybe_unused tvp5150_pad_init(struct v4l2_subdev *sd)
+{
+	struct tvp5150 *core = to_tvp5150(sd);
+	int res;
+
+#if defined(CONFIG_MEDIA_CONTROLLER)
+	core->pads[DEMOD_PAD_IF_INPUT].flags = MEDIA_PAD_FL_SINK;
+	core->pads[DEMOD_PAD_VID_OUT].flags = MEDIA_PAD_FL_SOURCE;
+	core->pads[DEMOD_PAD_VBI_OUT].flags = MEDIA_PAD_FL_SOURCE;
+
+	sd->entity.function = MEDIA_ENT_F_ATV_DECODER;
+
+	res = media_entity_pads_init(&sd->entity, DEMOD_NUM_PADS, core->pads);
+	if (res < 0)
+		return res;
+
+	sd->entity.ops = &tvp5150_sd_media_ops;
+#endif
+	return 0;
+}
+
+
 /* ----------------------------------------------------------------------- */
 
 static const struct v4l2_ctrl_ops tvp5150_ctrl_ops = {
@@ -1246,6 +1268,9 @@ static const struct v4l2_subdev_vbi_ops tvp5150_vbi_ops = {
 };
 
 static const struct v4l2_subdev_pad_ops tvp5150_pad_ops = {
+#ifdef CONFIG_MEDIA_CONTROLLER
+	.pad_init = tvp5150_pad_init,
+#endif
 	.enum_mbus_code = tvp5150_enum_mbus_code,
 	.enum_frame_size = tvp5150_enum_frame_size,
 	.set_fmt = tvp5150_fill_fmt,
@@ -1474,20 +1499,6 @@ static int tvp5150_probe(struct i2c_client *c,
 
 	v4l2_i2c_subdev_init(sd, c, &tvp5150_ops);
 	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
-
-#if defined(CONFIG_MEDIA_CONTROLLER)
-	core->pads[DEMOD_PAD_IF_INPUT].flags = MEDIA_PAD_FL_SINK;
-	core->pads[DEMOD_PAD_VID_OUT].flags = MEDIA_PAD_FL_SOURCE;
-	core->pads[DEMOD_PAD_VBI_OUT].flags = MEDIA_PAD_FL_SOURCE;
-
-	sd->entity.function = MEDIA_ENT_F_ATV_DECODER;
-
-	res = media_entity_pads_init(&sd->entity, DEMOD_NUM_PADS, core->pads);
-	if (res < 0)
-		return res;
-
-	sd->entity.ops = &tvp5150_sd_media_ops;
-#endif
 
 	res = tvp5150_detect_version(core);
 	if (res < 0)

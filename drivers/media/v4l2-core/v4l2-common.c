@@ -112,6 +112,14 @@ EXPORT_SYMBOL(v4l2_ctrl_query_fill);
 void v4l2_i2c_subdev_init(struct v4l2_subdev *sd, struct i2c_client *client,
 		const struct v4l2_subdev_ops *ops)
 {
+	/*
+	 * Initialize the MC pads - for now, this will be called
+	 * unconditionally, since the current implementation will defer
+	 * the pads initialization until the media_dev is created.
+	 */
+	if (v4l2_subdev_has_op(sd, pad, pad_init))
+		sd->ops->pad->pad_init(sd);
+
 	v4l2_subdev_init(sd, ops);
 	sd->flags |= V4L2_SUBDEV_FL_IS_I2C;
 	/* the owner is the same as the i2c_client's driver owner */

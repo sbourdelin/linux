@@ -572,6 +572,9 @@ struct v4l2_subdev_pad_config {
 /**
  * struct v4l2_subdev_pad_ops - v4l2-subdev pad level operations
  *
+ * @pad_init: callback that initializes the media-controller specific part
+ *	      of the subdev driver, creating its pads
+ *
  * @enum_mbus_code: callback for VIDIOC_SUBDEV_ENUM_MBUS_CODE ioctl handler
  *		    code.
  * @enum_frame_size: callback for VIDIOC_SUBDEV_ENUM_FRAME_SIZE ioctl handler
@@ -607,6 +610,7 @@ struct v4l2_subdev_pad_config {
  *                  may be adjusted by the subdev driver to device capabilities.
  */
 struct v4l2_subdev_pad_ops {
+	int (*pad_init)(struct v4l2_subdev *sd);
 	int (*enum_mbus_code)(struct v4l2_subdev *sd,
 			      struct v4l2_subdev_pad_config *cfg,
 			      struct v4l2_subdev_mbus_code_enum *code);
