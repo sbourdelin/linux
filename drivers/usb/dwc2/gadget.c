@@ -2558,7 +2558,9 @@ irq_retry:
 		for (idx = 1; idx < hsotg->num_of_eps; idx++) {
 			hs_ep = hsotg->eps_in[idx];
 
-			if (!hs_ep->isochronous || hs_ep->has_correct_parity)
+			if (!hs_ep ||
+			    !hs_ep->isochronous ||
+			    hs_ep->has_correct_parity)
 				continue;
 
 			epctl_reg = DIEPCTL(idx);
@@ -2575,7 +2577,9 @@ irq_retry:
 		for (idx = 1; idx < hsotg->num_of_eps; idx++) {
 			hs_ep = hsotg->eps_out[idx];
 
-			if (!hs_ep->isochronous || hs_ep->has_correct_parity)
+			if (!hs_ep ||
+			    !hs_ep->isochronous ||
+			    hs_ep->has_correct_parity)
 				continue;
 
 			epctl_reg = DOEPCTL(idx);
