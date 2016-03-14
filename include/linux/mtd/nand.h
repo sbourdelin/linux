@@ -204,6 +204,12 @@ typedef enum {
  */
 #define NAND_USE_BOUNCE_BUFFER	0x00100000
 
+/*
+ * Flag to mark that the badblock_pattern is allocated dynamicaly and must
+ * be freed in nand_release().
+ */
+#define NAND_BADBLOCK_PATTERN_ALLOC	0x08000000
+
 /* Options set by nand scan */
 /* Nand scan has allocated controller struct */
 #define NAND_CONTROLLER_ALLOC	0x80000000
@@ -646,6 +652,8 @@ struct nand_buffers {
  * @onfi_set_features:	[REPLACEABLE] set the features for ONFI nand
  * @onfi_get_features:	[REPLACEABLE] get the features for ONFI nand
  * @bbt:		[INTERN] bad block table pointer
+ * @nand_bbt:		[INTERN] pointer to bad block table structure, which
+ *			includes all information needed by Bad Block Management
  * @bbt_td:		[REPLACEABLE] bad block table descriptor for flash
  *			lookup.
  * @bbt_md:		[REPLACEABLE] bad block table mirror descriptor
@@ -732,6 +740,7 @@ struct nand_chip {
 	struct nand_hw_control hwcontrol;
 
 	uint8_t *bbt;
+	struct nand_bbt *nand_bbt;
 	struct nand_bbt_descr *bbt_td;
 	struct nand_bbt_descr *bbt_md;
 
@@ -884,7 +893,6 @@ struct nand_manufacturers {
 extern struct nand_flash_dev nand_flash_ids[];
 extern struct nand_manufacturers nand_manuf_ids[];
 
-extern int nand_default_bbt(struct mtd_info *mtd);
 extern int nand_markbad_bbt(struct mtd_info *mtd, loff_t offs);
 extern int nand_isreserved_bbt(struct mtd_info *mtd, loff_t offs);
 extern int nand_isbad_bbt(struct mtd_info *mtd, loff_t offs, int allowbbt);
@@ -1012,6 +1020,11 @@ static inline int jedec_feature(struct nand_chip *chip)
 {
 	return chip->jedec_version ? le16_to_cpu(chip->jedec_params.features)
 		: 0;
+}
+
+static inline struct nand_bbt *nand_get_bbt(struct nand_chip *chip)
+{
+	return chip->nand_bbt;
 }
 
 /*
