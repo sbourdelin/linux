@@ -595,8 +595,8 @@ static inline void rmv_page_order(struct page *page)
  *
  * For recording page's order, we use page_private(page).
  */
-static inline int page_is_buddy(struct page *page, struct page *buddy,
-							unsigned int order)
+static inline int page_is_buddy(struct zone *zone, struct page *page,
+				struct page *buddy, unsigned int order, int mt)
 {
 	if (!pfn_valid_within(page_to_pfn(buddy)))
 		return 0;
@@ -618,6 +618,15 @@ static inline int page_is_buddy(struct page *page, struct page *buddy,
 		 */
 		if (page_zone_id(page) != page_zone_id(buddy))
 			return 0;
+
+		if (unlikely(has_isolate_pageblock(zone) &&
+			order >= pageblock_order)) {
+			int buddy_mt = get_pageblock_migratetype(buddy);
+
+			if (mt != buddy_mt && (is_migrate_isolate(mt) ||
+					is_migrate_isolate(buddy_mt)))
+				return 0;
+		}
 
 		VM_BUG_ON_PAGE(page_count(buddy) != 0, buddy);
 
@@ -666,17 +675,8 @@ static inline void __free_one_page(struct page *page,
 	VM_BUG_ON_PAGE(page->flags & PAGE_FLAGS_CHECK_AT_PREP, page);
 
 	VM_BUG_ON(migratetype == -1);
-	if (is_migrate_isolate(migratetype)) {
-		/*
-		 * We restrict max order of merging to prevent merge
-		 * between freepages on isolate pageblock and normal
-		 * pageblock. Without this, pageblock isolation
-		 * could cause incorrect freepage accounting.
-		 */
-		max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1);
-	} else {
+	if (!is_migrate_isolate(migratetype))
 		__mod_zone_freepage_state(zone, 1 << order, migratetype);
-	}
 
 	page_idx = pfn & ((1 << max_order) - 1);
 
@@ -686,7 +686,7 @@ static inline void __free_one_page(struct page *page,
 	while (order < max_order - 1) {
 		buddy_idx = __find_buddy_index(page_idx, order);
 		buddy = page + (buddy_idx - page_idx);
-		if (!page_is_buddy(page, buddy, order))
+		if (!page_is_buddy(zone, page, buddy, order, migratetype))
 			break;
 		/*
 		 * Our buddy is free or it is CONFIG_DEBUG_PAGEALLOC guard page,
@@ -720,7 +720,8 @@ static inline void __free_one_page(struct page *page,
 		higher_page = page + (combined_idx - page_idx);
 		buddy_idx = __find_buddy_index(combined_idx, order + 1);
 		higher_buddy = higher_page + (buddy_idx - combined_idx);
-		if (page_is_buddy(higher_page, higher_buddy, order + 1)) {
+		if (page_is_buddy(zone, higher_page, higher_buddy,
+					order + 1, migratetype)) {
 			list_add_tail(&page->lru,
 				&zone->free_area[order].free_list[migratetype]);
 			goto out;
