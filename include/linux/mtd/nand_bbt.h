@@ -192,5 +192,6 @@ void nand_bbt_destroy(struct nand_bbt *bbt);
 int nand_bbt_markbad(struct nand_bbt *bbt, loff_t offs);
 int nand_bbt_isreserved(struct nand_bbt *bbt, loff_t offs);
 int nand_bbt_isbad(struct nand_bbt *bbt, loff_t offs);
+int nand_bbt_markbad_factory(struct nand_bbt *bbt, loff_t offs);
 
 #endif	/* __LINUX_MTD_NAND_BBT_H */
