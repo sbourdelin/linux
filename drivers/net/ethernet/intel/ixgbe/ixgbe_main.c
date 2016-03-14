@@ -7574,6 +7574,11 @@ static void ixgbe_atr(struct ixgbe_ring *ring,
 	if (!ring->atr_sample_rate)
 		return;
 
+	/* this function only handles IPv4 or IPv6 */
+	if (first->protocol != htons(ETH_P_IP) &&
+	    first->protocol != htons(ETH_P_IPV6))
+		return;
+
 	ring->atr_count++;
 
 	/* snag network header to get L4 type and address */
