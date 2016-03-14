@@ -1591,7 +1591,7 @@ static int gen8_init_common_ring(struct intel_engine_cs *ring)
 
 	memset(&ring->hangcheck, 0, sizeof(ring->hangcheck));
 
-	return 0;
+	return intel_mocs_init_engine(ring);
 }
 
 static int gen8_init_render_ring(struct intel_engine_cs *ring)
