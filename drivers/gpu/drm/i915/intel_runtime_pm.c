@@ -617,13 +617,6 @@ void skl_enable_dc6(struct drm_i915_private *dev_priv)
 
 }
 
-void skl_disable_dc6(struct drm_i915_private *dev_priv)
-{
-	DRM_DEBUG_KMS("Disabling DC6\n");
-
-	gen9_set_dc_state(dev_priv, DC_STATE_DISABLE);
-}
-
 static void skl_set_power_well(struct drm_i915_private *dev_priv,
 			struct i915_power_well *power_well, bool enable)
 {
