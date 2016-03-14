@@ -419,14 +419,23 @@ static void monitor_thermal_zone(struct thermal_zone_device *tz)
 	mutex_unlock(&tz->lock);
 }
 
-static void handle_non_critical_trips(struct thermal_zone_device *tz,
+static int handle_non_critical_trips(struct thermal_zone_device *tz,
 			int trip, enum thermal_trip_type trip_type)
 {
+	int trip_temp;
+	int ret = 0;
+
 	tz->governor ? tz->governor->throttle(tz, trip) :
 		       def_governor->throttle(tz, trip);
+
+	tz->ops->get_trip_temp(tz, trip, &trip_temp);
+	if (tz->temperature >= trip_temp)
+		ret = 1;
+
+	return ret;
 }
 
-static void handle_critical_trips(struct thermal_zone_device *tz,
+static int handle_critical_trips(struct thermal_zone_device *tz,
 				int trip, enum thermal_trip_type trip_type)
 {
 	int trip_temp;
@@ -435,7 +444,7 @@ static void handle_critical_trips(struct thermal_zone_device *tz,
 
 	/* If we have not crossed the trip_temp, we do not care. */
 	if (trip_temp <= 0 || tz->temperature < trip_temp)
-		return;
+		return 0;
 
 	trace_thermal_zone_trip(tz, trip, trip_type);
 
@@ -448,23 +457,28 @@ static void handle_critical_trips(struct thermal_zone_device *tz,
 			  tz->temperature / 1000);
 		orderly_poweroff(true);
 	}
+
+	return 1;
 }
 
-static void handle_thermal_trip(struct thermal_zone_device *tz, int trip)
+static int handle_thermal_trip(struct thermal_zone_device *tz, int trip)
 {
+	int ret = 0;
 	enum thermal_trip_type type;
 
 	tz->ops->get_trip_type(tz, trip, &type);
 
 	if (type == THERMAL_TRIP_CRITICAL || type == THERMAL_TRIP_HOT)
-		handle_critical_trips(tz, trip, type);
+		ret = handle_critical_trips(tz, trip, type);
 	else
-		handle_non_critical_trips(tz, trip, type);
+		ret = handle_non_critical_trips(tz, trip, type);
 	/*
 	 * Alright, we handled this trip successfully.
 	 * So, start monitoring again.
 	 */
 	monitor_thermal_zone(tz);
+
+	return ret;
 }
 
 /**
@@ -556,7 +570,7 @@ static void thermal_zone_device_reset(struct thermal_zone_device *tz)
 void thermal_zone_device_update(struct thermal_zone_device *tz)
 {
 	int count;
-
+	int trips = 0;
 	if (atomic_read(&in_suspend))
 		return;
 
@@ -566,7 +580,10 @@ void thermal_zone_device_update(struct thermal_zone_device *tz)
 	update_temperature(tz);
 
 	for (count = 0; count < tz->trips; count++)
-		handle_thermal_trip(tz, count);
+		trips += handle_thermal_trip(tz, count);
+
+	if (trips)
+		sysfs_notify(&tz->device.kobj, NULL, "temp");
 }
 EXPORT_SYMBOL_GPL(thermal_zone_device_update);
 
@@ -1638,6 +1655,7 @@ void thermal_cdev_update(struct thermal_cooling_device *cdev)
 	cdev->updated = true;
 	trace_cdev_update(cdev, target);
 	dev_dbg(&cdev->device, "set to state %lu\n", target);
+	sysfs_notify(&cdev->device.kobj, NULL, "cur_state");
 }
 EXPORT_SYMBOL(thermal_cdev_update);
 
