@@ -18,11 +18,10 @@ int fb_is_primary_device(struct fb_info *info)
 	struct pci_dev *default_device = vga_default_device();
 	struct resource *res = NULL;
 
-	if (device)
-		pci_dev = to_pci_dev(device);
-
-	if (!pci_dev)
+	if (!device || !dev_is_pci(device))
 		return 0;
+
+	pci_dev = to_pci_dev(device);
 
 	if (default_device) {
 		if (pci_dev == default_device)
