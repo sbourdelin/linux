@@ -526,6 +526,15 @@ config VEXPRESS_SYSCFG
 	  bus. System Configuration interface is one of the possible means
 	  of generating transactions on this bus.
 
+config NI_RT_FEATURES
+	bool "NI 903x/913x support"
+	depends on X86 && ACPI
+	help
+	  This driver exposes LEDs and other features of NI 903x/913x Real-Time
+	  controllers.
+
+	  If unsure, say N (but it's safe to say "Y").
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
