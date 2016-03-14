@@ -182,4 +182,15 @@ struct nand_bbt {
 	u8 *bbt;
 };
 
+struct nand_bbt *nand_bbt_create(struct mtd_info *mtd,
+		const struct nand_bbt_ops *ops,
+		struct nand_chip_layout_info *info,
+		unsigned int options,
+		struct nand_bbt_descr *bbt_td,
+		struct nand_bbt_descr *bbt_md);
+void nand_bbt_destroy(struct nand_bbt *bbt);
+int nand_bbt_markbad(struct nand_bbt *bbt, loff_t offs);
+int nand_bbt_isreserved(struct nand_bbt *bbt, loff_t offs);
+int nand_bbt_isbad(struct nand_bbt *bbt, loff_t offs);
+
 #endif	/* __LINUX_MTD_NAND_BBT_H */

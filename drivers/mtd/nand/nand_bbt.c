@@ -1373,3 +1373,116 @@ int nand_markbad_bbt(struct mtd_info *mtd, loff_t offs)
 
 	return ret;
 }
+
+/**
+ * nand_bbt_init - Initialize and locate/create a bad block table
+ * @bbt: NAND BBT structure
+ *
+ * This function selects the default bad block table support for the device and
+ * scans for an existing table, or else creates one.
+ */
+static int nand_bbt_init(struct nand_bbt *bbt)
+{
+	/*
+	 * FIXME: For now, we call nand_default_bbt() directly. It will change
+	 * when we use struct nand_bbt instead of struct nand_chip.
+	 */
+	return nand_default_bbt(bbt->mtd);
+}
+
+static void nand_bbt_release(struct nand_bbt *bbt)
+{
+	kfree(bbt->bbt);
+}
+
+/**
+ * nand_bbt_create - [NAND BBT Interface] create BBT structures for certain
+ * MTD device
+ * @mtd: MTD structure
+ */
+struct nand_bbt *nand_bbt_create(struct mtd_info *mtd,
+			const struct nand_bbt_ops *ops,
+			struct nand_chip_layout_info *info,
+			unsigned int options,
+			struct nand_bbt_descr *bbt_td,
+			struct nand_bbt_descr *bbt_md)
+{
+	struct nand_bbt *bbt = kzalloc(sizeof(struct nand_bbt),
+					GFP_KERNEL);
+	int ret;
+
+	if (!bbt)
+		return ERR_PTR(-ENOMEM);
+
+	bbt->mtd = mtd;
+	bbt->bbt_options = options;
+	bbt->bbt_ops = ops;
+	bbt->info = info;
+	bbt->bbt_td = bbt_td;
+	bbt->bbt_md = bbt_md;
+
+	ret = nand_bbt_init(bbt);
+	if (ret)
+		return ERR_PTR(ret);
+
+	return bbt;
+}
+EXPORT_SYMBOL(nand_bbt_create);
+
+/**
+ * nand_bbt_destroy - [NAND BBT Interface] Destroy BBT structures
+ * @bbt: NAND BBT structure
+ */
+void nand_bbt_destroy(struct nand_bbt *bbt)
+{
+	nand_bbt_release(bbt);
+	kfree(bbt);
+}
+EXPORT_SYMBOL(nand_bbt_destroy);
+
+/**
+ * nand_bbt_isreserved - [NAND BBT Interface] Check if a block is reserved
+ * @bbt: NAND BBT structure
+ * @offs: offset in the device
+ */
+int nand_bbt_isreserved(struct nand_bbt *bbt, loff_t offs)
+{
+	/*
+	 * FIXME: For now, we call nand_isreserved_bbt() directly. It will
+	 * change when we use struct nand_bbt instead of struct nand_chip.
+	 */
+	return nand_isreserved_bbt(bbt->mtd, offs);
+}
+EXPORT_SYMBOL(nand_bbt_isreserved);
+
+/**
+ * nand_bbt_isbad - [NAND BBT Interface] Check if a block is bad
+ * @bbt: NAND BBT structure
+ * @offs: offset in the device
+ */
+int nand_bbt_isbad(struct nand_bbt *bbt, loff_t offs)
+{
+	/*
+	 * FIXME: For now, we call nand_isbad_bbt() directly. It will change
+	 * when we use struct nand_bbt instead of struct nand_chip.
+	 * Since we already have nand_bbt_isreserved(), we don't need to
+	 * check pass down allow_bbt.
+	 */
+	return nand_isbad_bbt(bbt->mtd, offs, 1);
+}
+EXPORT_SYMBOL(nand_bbt_isbad);
+
+/**
+ * nand_bbt_markbad - [NAND BBT Interface] Mark a block bad in the BBT
+ * @bbt: NAND BBT structure
+ * @offs: offset of the bad block
+ */
+int nand_bbt_markbad(struct nand_bbt *bbt, loff_t offs)
+{
+	/*
+	 * FIXME: For now, we call nand_markbad_bbt() directly. It will change
+	 * when we use struct nand_bbt instead of struct nand_chip.
+	 */
+	return nand_markbad_bbt(bbt->mtd, offs);
+}
+EXPORT_SYMBOL(nand_bbt_markbad);
