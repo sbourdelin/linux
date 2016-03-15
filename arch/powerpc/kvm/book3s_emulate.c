@@ -99,7 +99,6 @@ int kvmppc_core_emulate_op_pr(struct kvm_run *run, struct kvm_vcpu *vcpu,
 
 	switch (get_op(inst)) {
 	case 0:
-		emulated = EMULATE_FAIL;
 		if ((kvmppc_get_msr(vcpu) & MSR_LE) &&
 		    (inst == swab32(inst_sc))) {
 			/*
@@ -112,6 +111,9 @@ int kvmppc_core_emulate_op_pr(struct kvm_run *run, struct kvm_vcpu *vcpu,
 			kvmppc_set_gpr(vcpu, 3, EV_UNIMPLEMENTED);
 			kvmppc_set_pc(vcpu, kvmppc_get_pc(vcpu) + 4);
 			emulated = EMULATE_DONE;
+		} else {
+			kvmppc_core_queue_program(vcpu, SRR1_PROGILL);
+			emulated = EMULATE_AGAIN;
 		}
 		break;
 	case 19:
