@@ -454,6 +454,14 @@ static int skl_codec_create(struct hdac_ext_bus *ebus)
 	return 0;
 }
 
+/*
+ * codec destructor
+ */
+static void skl_codecs_remove(struct hdac_ext_bus *ebus)
+{
+	snd_hdac_ext_bus_device_remove(ebus);
+}
+
 static const struct hdac_bus_ops bus_core_ops = {
 	.command = snd_hdac_bus_send_cmd,
 	.get_response = snd_hdac_bus_get_response,
@@ -725,6 +733,7 @@ static void skl_remove(struct pci_dev *pci)
 	if (pci_dev_run_wake(pci))
 		pm_runtime_get_noresume(&pci->dev);
 	pci_dev_put(pci);
+	skl_codecs_remove(ebus);
 	skl_platform_unregister(&pci->dev);
 	skl_free_dsp(skl);
 	skl_machine_device_unregister(skl);
