@@ -157,7 +157,7 @@ static void print_checkstop_reason(const char *level,
 	case CHECKSTOP_TYPE_NX:
 		print_nx_checkstop_reason(level, hmi_evt);
 		break;
-	case CHECKSTOP_TYPE_UNKNOWN:
+	default:
 		printk("%s	Unknown Malfunction Alert.\n", level);
 		break;
 	}
