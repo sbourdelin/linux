@@ -221,8 +221,8 @@ struct aio_kiocb {
 	struct fs_struct	*ki_fs;
 	struct files_struct	*ki_files;
 	const struct cred	*ki_cred;
-	aio_destruct_fn_t	ki_destruct_fn;
 #endif
+	aio_destruct_fn_t	ki_destruct_fn;
 };
 
 /*------ sysctl variables----*/
