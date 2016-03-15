@@ -274,6 +274,7 @@ static int cs35l32_handle_of_data(struct i2c_client *i2c_client,
 	if (of_property_read_u32(np, "cirrus,sdout-share", &val) >= 0)
 		pdata->sdout_share = val;
 
+	val = UINT_MAX;
 	of_property_read_u32(np, "cirrus,boost-manager", &val);
 	switch (val) {
 	case CS35L32_BOOST_MGR_AUTO:
@@ -288,6 +289,7 @@ static int cs35l32_handle_of_data(struct i2c_client *i2c_client,
 		pdata->boost_mng = CS35L32_BOOST_MGR_BYPASS;
 	}
 
+	val = UINT_MAX;
 	of_property_read_u32(np, "cirrus,sdout-datacfg", &val);
 	switch (val) {
 	case CS35L32_DATA_CFG_LR_VP:
@@ -302,6 +304,7 @@ static int cs35l32_handle_of_data(struct i2c_client *i2c_client,
 		pdata->sdout_datacfg = CS35L32_DATA_CFG_LR;
 	}
 
+	val = UINT_MAX;
 	of_property_read_u32(np, "cirrus,battery-threshold", &val);
 	switch (val) {
 	case CS35L32_BATT_THRESH_3_1V:
@@ -316,6 +319,7 @@ static int cs35l32_handle_of_data(struct i2c_client *i2c_client,
 		pdata->batt_thresh = CS35L32_BATT_THRESH_3_3V;
 	}
 
+	val = UINT_MAX;
 	of_property_read_u32(np, "cirrus,battery-recovery", &val);
 	switch (val) {
 	case CS35L32_BATT_RECOV_3_1V:
