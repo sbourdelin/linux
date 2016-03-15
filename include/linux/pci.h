@@ -790,6 +790,7 @@ void pcibios_fixup_bus(struct pci_bus *);
 int __must_check pcibios_enable_device(struct pci_dev *, int mask);
 /* Architecture-specific versions may override this (weak) */
 char *pcibios_setup(char *str);
+void pci_init_archdata(struct pci_dev *pdev, struct pci_dev *virtfn);
 
 /* Used only when drivers/pci/setup.c is used */
 resource_size_t pcibios_align_resource(void *, const struct resource *,

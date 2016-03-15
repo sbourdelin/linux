@@ -994,6 +994,13 @@ void pcibios_set_master(struct pci_dev *dev)
 	/* No special bus mastering setup handling */
 }
 
+void pci_init_archdata(struct pci_dev *pdev, struct pci_dev *virtfn)
+{
+	/* Copy dev_archdata from PF to VF */
+	memcpy(&virtfn->dev.archdata, &pdev->dev.archdata,
+			sizeof(struct dev_archdata));
+}
+
 static int __init pcibios_init(void)
 {
 	pci_dfl_cache_line_size = 64 >> 2;

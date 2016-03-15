@@ -19,6 +19,10 @@
 
 #define VIRTFN_ID_LEN	16
 
+void __weak pci_init_archdata(struct pci_dev *pdev, struct pci_dev *virtfn)
+{
+}
+
 int pci_iov_virtfn_bus(struct pci_dev *dev, int vf_id)
 {
 	if (!dev->is_physfn)
@@ -141,6 +145,7 @@ static int virtfn_add(struct pci_dev *dev, int id, int reset)
 	virtfn->physfn = pci_dev_get(dev);
 	virtfn->is_virtfn = 1;
 	virtfn->multifunction = 0;
+	pci_init_archdata(dev, virtfn);
 
 	for (i = 0; i < PCI_SRIOV_NUM_BARS; i++) {
 		res = &dev->resource[i + PCI_IOV_RESOURCES];
