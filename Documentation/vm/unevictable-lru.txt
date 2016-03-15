@@ -461,6 +461,25 @@ unevictable LRU is enabled, the work of compaction is mostly handled by
 the page migration code and the same work flow as described in MIGRATING
 MLOCKED PAGES will apply.
 
+MLOCKING TRANSPARENT HUGE PAGES
+-------------------------------
+
+Transparent huge page is represented by single entry on a lru list and
+therefore we can only make unevictable entire compound page, not
+individual subpages.
+
+We allow a part of transparent huge page to be mapped PTEs (i.e. after
+mremap() or mprotect()) and VMA with PTE-mapped huge page can be mlocked.
+
+That means we need to be careful, not making entire huge page unevicable
+if user mlock() only part of it.
+
+We handle this by forbidding mlocking PTE-mapped huge pages. This way we
+keep the huge page accessible for vmscan. Under memory pressure the page
+will be split, subpages from VM_LOCKED VMAs moved to unevictable lru and
+the rest can be evicted.
+
+See also comment in follow_trans_huge_pmd().
 
 mmap(MAP_LOCKED) SYSTEM CALL HANDLING
 -------------------------------------
