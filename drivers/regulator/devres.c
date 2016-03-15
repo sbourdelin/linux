@@ -171,8 +171,9 @@ int devm_regulator_bulk_get(struct device *dev, int num_consumers,
 								NORMAL_GET);
 		if (IS_ERR(consumers[i].consumer)) {
 			ret = PTR_ERR(consumers[i].consumer);
-			dev_err(dev, "Failed to get supply '%s': %d\n",
-				consumers[i].supply, ret);
+			if (ret != -EPROBE_DEFER)
+				dev_err(dev, "Failed to get supply '%s': %d\n",
+					consumers[i].supply, ret);
 			consumers[i].consumer = NULL;
 			goto err;
 		}
