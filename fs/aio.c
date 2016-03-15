@@ -1777,25 +1777,23 @@ static long aio_do_unlinkat(int fd, const char *filename, int flags, int mode)
 
 static long aio_thread_op_foo_at(struct aio_kiocb *req)
 {
-	u64 buf, offset;
-	long ret;
-	u32 fd;
+	struct iocb iocb;
+	int fd;
+	const char __user *filename;
+	int flags, mode;
+	do_foo_at_t do_foo_at;
 
-	if (unlikely(get_user(fd, &req->ki_user_iocb->aio_fildes)))
-		ret = -EFAULT;
-	else if (unlikely(get_user(buf, &req->ki_user_iocb->aio_buf)))
-		ret = -EFAULT;
-	else if (unlikely(get_user(offset, &req->ki_user_iocb->aio_offset)))
-		ret = -EFAULT;
-	else {
-		do_foo_at_t do_foo_at = (void *)req->ki_data;
+	if (copy_from_user(&iocb, req->ki_user_iocb, sizeof(struct iocb)))
+		return -EFAULT;
 
-		ret = do_foo_at((s32)fd,
-				(const char __user *)(long)buf,
-				(int)offset,
-				(unsigned short)(offset >> 32));
-	}
-	return ret;
+	fd = (s32)iocb.aio_fildes;
+	filename = (const char __user *)(uintptr_t)iocb.aio_buf;
+	flags = (int)lower_32_bits(iocb.aio_offset);
+	mode = (unsigned short)upper_32_bits(iocb.aio_offset);
+
+	do_foo_at = (void *)req->ki_data;
+
+	return do_foo_at(fd, filename, flags, mode);
 }
 
 static void openat_destruct(struct aio_kiocb *req)
