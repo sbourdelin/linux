@@ -730,6 +730,8 @@ int bio_add_pc_page(struct request_queue *q, struct bio *bio, struct page
 	 */
 	if (bio->bi_vcnt > 0) {
 		struct bio_vec *prev = &bio->bi_io_vec[bio->bi_vcnt - 1];
+		struct bio_vec bv = {.bv_page = page, .bv_len = len,
+				     .bv_offset = offset};
 
 		if (page == prev->bv_page &&
 		    offset == prev->bv_offset + prev->bv_len) {
@@ -742,7 +744,7 @@ int bio_add_pc_page(struct request_queue *q, struct bio *bio, struct page
 		 * If the queue doesn't support SG gaps and adding this
 		 * offset would create a gap, disallow it.
 		 */
-		if (bvec_gap_to_prev(q, prev, offset))
+		if (bvec_gap_to_prev(q, prev, &bv))
 			return 0;
 	}
 

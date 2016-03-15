@@ -1373,10 +1373,11 @@ static inline void put_dev_sector(Sector p)
 }
 
 static inline bool __bvec_gap_to_prev(struct request_queue *q,
-				struct bio_vec *bprv, unsigned int offset)
+				struct bio_vec *bprv, struct bio_vec *bnxt)
 {
-	return offset ||
-		((bprv->bv_offset + bprv->bv_len) & queue_virt_boundary(q));
+	if (bprv->bv_page == bnxt->bv_page)
+		return bnxt->bv_offset != bprv->bv_offset + bprv->bv_len;
+	return (bprv->bv_offset + bprv->bv_len) & queue_virt_boundary(q);
 }
 
 /*
@@ -1384,11 +1385,11 @@ static inline bool __bvec_gap_to_prev(struct request_queue *q,
  * the SG list. Most drivers don't care about this, but some do.
  */
 static inline bool bvec_gap_to_prev(struct request_queue *q,
-				struct bio_vec *bprv, unsigned int offset)
+				struct bio_vec *bprv, struct bio_vec *bnxt)
 {
 	if (!queue_virt_boundary(q))
 		return false;
-	return __bvec_gap_to_prev(q, bprv, offset);
+	return __bvec_gap_to_prev(q, bprv, bnxt);
 }
 
 static inline bool bio_will_gap(struct request_queue *q, struct bio *prev,
@@ -1400,7 +1401,7 @@ static inline bool bio_will_gap(struct request_queue *q, struct bio *prev,
 		bio_get_last_bvec(prev, &pb);
 		bio_get_first_bvec(next, &nb);
 
-		return __bvec_gap_to_prev(q, &pb, nb.bv_offset);
+		return __bvec_gap_to_prev(q, &pb, &nb);
 	}
 
 	return false;
@@ -1545,7 +1546,7 @@ static inline bool integrity_req_gap_back_merge(struct request *req,
 	struct bio_integrity_payload *bip_next = bio_integrity(next);
 
 	return bvec_gap_to_prev(req->q, &bip->bip_vec[bip->bip_vcnt - 1],
-				bip_next->bip_vec[0].bv_offset);
+				&bip_next->bip_vec[0]);
 }
 
 static inline bool integrity_req_gap_front_merge(struct request *req,
@@ -1555,7 +1556,7 @@ static inline bool integrity_req_gap_front_merge(struct request *req,
 	struct bio_integrity_payload *bip_next = bio_integrity(req->bio);
 
 	return bvec_gap_to_prev(req->q, &bip->bip_vec[bip->bip_vcnt - 1],
-				bip_next->bip_vec[0].bv_offset);
+				&bip_next->bip_vec[0]);
 }
 
 #else /* CONFIG_BLK_DEV_INTEGRITY */

@@ -100,7 +100,7 @@ static struct bio *blk_bio_segment_split(struct request_queue *q,
 		 * If the queue doesn't support SG gaps and adding this
 		 * offset would create a gap, disallow it.
 		 */
-		if (bvprvp && bvec_gap_to_prev(q, bvprvp, bv.bv_offset))
+		if (bvprvp && bvec_gap_to_prev(q, bvprvp, &bv))
 			goto split;
 
 		if (sectors + (bv.bv_len >> 9) > max_sectors) {
