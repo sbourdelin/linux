@@ -525,7 +525,7 @@ int skb_p80211_to_ether(wlandevice_t *wlandev, u32 ethconv,
 *	May be called in interrupt or non-interrupt context
 *----------------------------------------------------------------
 */
-int p80211_stt_findproto(u16 proto)
+inline int p80211_stt_findproto(u16 proto)
 {
 	/* Always return found for now.  This is the behavior used by the */
 	/* Zoom Win95 driver when 802.1h mode is selected */
