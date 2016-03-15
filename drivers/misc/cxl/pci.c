@@ -340,12 +340,15 @@ static void dump_afu_descriptor(struct cxl_afu *afu)
 #undef show_reg
 }
 
+#define CPU_IS_NAPLES() (cur_cpu_spec->pvr_value == 0x004c0000)
+
 static int init_implementation_adapter_regs(struct cxl *adapter, struct pci_dev *dev)
 {
 	struct device_node *np;
 	const __be32 *prop;
 	u64 psl_dsnctl;
 	u64 chipid;
+	u64 phb_index;
 
 	if (!(np = pnv_pci_get_phb_node(dev)))
 		return -ENODEV;
@@ -355,10 +358,20 @@ static int init_implementation_adapter_regs(struct cxl *adapter, struct pci_dev 
 	if (!np)
 		return -ENODEV;
 	chipid = be32_to_cpup(prop);
-	of_node_put(np);
 
 	/* Tell PSL where to route data to */
 	psl_dsnctl = 0x02E8900002000000ULL | (chipid << (63-5));
+	if (CPU_IS_NAPLES()) {
+		prop = of_get_property(np, "ibm,phb-index", NULL);
+		if (!prop) {
+			of_node_put(np);
+			return -ENODEV;
+		}
+		phb_index = be32_to_cpup(prop);
+		psl_dsnctl |= (phb_index << (63-11));
+	}
+	of_node_put(np);
+
 	cxl_p1_write(adapter, CXL_PSL_DSNDCTL, psl_dsnctl);
 	cxl_p1_write(adapter, CXL_PSL_RESLCKTO, 0x20000000200ULL);
 	/* snoop write mask */
