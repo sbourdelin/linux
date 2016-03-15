@@ -79,6 +79,38 @@ static u8 oui_rfc1042[] = { 0x00, 0x00, 0x00 };
 static u8 oui_8021h[] = { 0x00, 0x00, 0xf8 };
 
 /*----------------------------------------------------------------
+* p80211_stt_findproto
+*
+* Searches the 802.1h Selective Translation Table for a given
+* protocol.
+*
+* Arguments:
+*	proto	protocol number (in host order) to search for.
+*
+* Returns:
+*	1 - if the table is empty or a match is found.
+*	0 - if the table is non-empty and a match is not found.
+*
+* Call context:
+*	May be called in interrupt or non-interrupt context
+*----------------------------------------------------------------
+*/
+static inline int p80211_stt_findproto(u16 proto)
+{
+	/* Always return found for now.  This is the behavior used by the */
+	/* Zoom Win95 driver when 802.1h mode is selected */
+	/* TODO: If necessary, add an actual search we'll probably
+	 * need this to match the CMAC's way of doing things.
+	 * Need to do some testing to confirm.
+	 */
+
+	if (proto == ETH_P_AARP)	/* APPLETALK */
+		return 1;
+
+	return 0;
+}
+
+/*----------------------------------------------------------------
 * p80211pb_ether_to_80211
 *
 * Uses the contents of the ether frame and the etherconv setting
@@ -504,38 +536,6 @@ int skb_p80211_to_ether(wlandevice_t *wlandev, u32 ethconv,
 
 	/* Free the metadata */
 	p80211skb_rxmeta_detach(skb);
-
-	return 0;
-}
-
-/*----------------------------------------------------------------
-* p80211_stt_findproto
-*
-* Searches the 802.1h Selective Translation Table for a given
-* protocol.
-*
-* Arguments:
-*	proto	protocol number (in host order) to search for.
-*
-* Returns:
-*	1 - if the table is empty or a match is found.
-*	0 - if the table is non-empty and a match is not found.
-*
-* Call context:
-*	May be called in interrupt or non-interrupt context
-*----------------------------------------------------------------
-*/
-int p80211_stt_findproto(u16 proto)
-{
-	/* Always return found for now.  This is the behavior used by the */
-	/* Zoom Win95 driver when 802.1h mode is selected */
-	/* TODO: If necessary, add an actual search we'll probably
-	 * need this to match the CMAC's way of doing things.
-	 * Need to do some testing to confirm.
-	 */
-
-	if (proto == ETH_P_AARP)	/* APPLETALK */
-		return 1;
 
 	return 0;
 }
