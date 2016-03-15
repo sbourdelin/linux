@@ -6212,6 +6212,14 @@ enum skl_disp_power_wells {
 #define  PORTB_HOTPLUG_SHORT_DETECT	(1 << 0)
 #define  PORTB_HOTPLUG_LONG_DETECT	(2 << 0)
 
+/* BXT hotplug control */
+#define BXT_DDIA_HPD_INVERT		(1 << 27)
+#define BXT_DDIC_HPD_INVERT		(1 << 11)
+#define BXT_DDIB_HPD_INVERT		(1 << 3)
+#define BXT_DDI_HPD_INVERT_MASK		(BXT_DDIA_HPD_INVERT | \
+					BXT_DDIB_HPD_INVERT | \
+					BXT_DDIC_HPD_INVERT)
+
 #define PCH_PORT_HOTPLUG2		_MMIO(0xc403C)	/* SHOTPLUG_CTL2 SPT+ */
 #define  PORTE_HOTPLUG_ENABLE		(1 << 4)
 #define  PORTE_HOTPLUG_STATUS_MASK	(3 << 0)
