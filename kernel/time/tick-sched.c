@@ -264,7 +264,7 @@ static void tick_nohz_dep_set_all(unsigned long *dep,
 {
 	unsigned long prev;
 
-	prev = fetch_or(dep, BIT_MASK(bit));
+	prev = xchg_or(dep, BIT_MASK(bit));
 	if (!prev)
 		tick_nohz_full_kick_all();
 }
@@ -294,7 +294,7 @@ void tick_nohz_dep_set_cpu(int cpu, enum tick_dep_bits bit)
 
 	ts = per_cpu_ptr(&tick_cpu_sched, cpu);
 
-	prev = fetch_or(&ts->tick_dep_mask, BIT_MASK(bit));
+	prev = xchg_or(&ts->tick_dep_mask, BIT_MASK(bit));
 	if (!prev) {
 		preempt_disable();
 		/* Perf needs local kick that is NMI safe */
