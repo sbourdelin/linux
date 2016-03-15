@@ -525,7 +525,7 @@ static int nwl_pcie_init_irq_domain(struct nwl_pcie *pcie)
 	legacy_intc_node = of_get_next_child(node, NULL);
 	if (!legacy_intc_node) {
 		dev_err(pcie->dev, "No legacy intc node found\n");
-		return PTR_ERR(legacy_intc_node);
+		return -EINVAL;
 	}
 
 	pcie->legacy_irq_domain = irq_domain_add_linear(legacy_intc_node,
