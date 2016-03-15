@@ -10,9 +10,6 @@
 #define _ASM_ARC_PCI_H
 
 #ifdef __KERNEL__
-#include <asm-generic/pci-dma-compat.h>
-#include <asm-generic/pci-bridge.h>
-
 #include <linux/ioport.h>
 
 #define PCIBIOS_MIN_IO 0x100
