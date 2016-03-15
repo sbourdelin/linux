@@ -44,8 +44,11 @@
 static DEFINE_SPINLOCK(hose_spinlock);
 LIST_HEAD(hose_list);
 
-/* XXX kill that some day ... */
-static int global_phb_number;		/* Global phb counter */
+/* For dynamic PHB numbering on get_phb_number(): max number of PHBs. */
+#define	MAX_PHBS	8192
+
+/* For dynamic PHB numbering: used/free PHBs tracking bitmap. */
+DECLARE_BITMAP(global_phb_bitmap, MAX_PHBS);
 
 /* ISA Memory physical address */
 resource_size_t isa_mem_base;
@@ -64,6 +67,39 @@ struct dma_map_ops *get_pci_dma_ops(void)
 }
 EXPORT_SYMBOL(get_pci_dma_ops);
 
+static int get_phb_number(struct device_node *dn)
+{
+	const __be64 *prop64;
+	const __be32 *regs;
+	int phb_id = 0;
+
+	/* try fixed PHB numbering first */
+	if (machine_is(pseries)) {
+		regs = of_get_property(dn, "reg", NULL);
+		if (regs)
+			return (int)(be32_to_cpu(regs[1]) & 0xFFFF);
+	}
+
+	else { /* maybe PowerNV? */
+		prop64 = of_get_property(dn, "ibm,opal-phbid", NULL);
+		if (prop64)
+			return (int)(be64_to_cpup(prop64) & 0xFFFF);
+	}
+
+	/* dynamic PHB numbering mechanism */
+	while ((phb_id < MAX_PHBS) && test_bit(phb_id, global_phb_bitmap))
+		phb_id++;
+
+	BUG_ON(phb_id >= MAX_PHBS); /* reached maximum number of PHBs */
+	set_bit(phb_id, global_phb_bitmap);
+	return phb_id;
+}
+
+static void release_phb_number(int phb_id)
+{
+	clear_bit(phb_id, global_phb_bitmap);
+}
+
 struct pci_controller *pcibios_alloc_controller(struct device_node *dev)
 {
 	struct pci_controller *phb;
@@ -72,7 +108,7 @@ struct pci_controller *pcibios_alloc_controller(struct device_node *dev)
 	if (phb == NULL)
 		return NULL;
 	spin_lock(&hose_spinlock);
-	phb->global_number = global_phb_number++;
+	phb->global_number = get_phb_number(dev);
 	list_add_tail(&phb->list_node, &hose_list);
 	spin_unlock(&hose_spinlock);
 	phb->dn = dev;
@@ -94,6 +130,7 @@ EXPORT_SYMBOL_GPL(pcibios_alloc_controller);
 void pcibios_free_controller(struct pci_controller *phb)
 {
 	spin_lock(&hose_spinlock);
+	release_phb_number(phb->global_number);
 	list_del(&phb->list_node);
 	spin_unlock(&hose_spinlock);
 
