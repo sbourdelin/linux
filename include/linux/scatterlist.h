@@ -266,6 +266,10 @@ int sg_alloc_table_from_pages(struct sg_table *sgt,
 	unsigned long offset, unsigned long size,
 	gfp_t gfp_mask);
 
+void sg_free_chained(struct sg_table *table, bool first_chunk);
+int sg_alloc_chained(struct sg_table *table, int nents,
+	struct scatterlist *first_chunk, gfp_t gfp);
+
 size_t sg_copy_buffer(struct scatterlist *sgl, unsigned int nents, void *buf,
 		      size_t buflen, off_t skip, bool to_buffer);
 
@@ -284,6 +288,14 @@ size_t sg_pcopy_to_buffer(struct scatterlist *sgl, unsigned int nents,
  * a list larger than this is required then chaining will be utilized.
  */
 #define SG_MAX_SINGLE_ALLOC		(PAGE_SIZE / sizeof(struct scatterlist))
+
+/*
+ * The maximum number of SG segments that we will put inside a
+ * scatterlist.
+ *
+ * XXX: what's the best number?
+ */
+#define SG_MAX_SEGMENTS			128
 
 /*
  * sg page iterator
