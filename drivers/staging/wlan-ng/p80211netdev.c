@@ -465,11 +465,11 @@ static int p80211netdev_ethtool(wlandevice_t *wlandev, void __user *useraddr)
 	struct ethtool_drvinfo info;
 	struct ethtool_value edata;
 
-	memset(&info, 0, sizeof(info));
-	memset(&edata, 0, sizeof(edata));
-
 	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
 		return -EFAULT;
+
+	memset(&info, 0, sizeof(info));
+	memset(&edata, 0, sizeof(edata));
 
 	switch (ethcmd) {
 	case ETHTOOL_GDRVINFO:
