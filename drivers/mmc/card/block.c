@@ -693,7 +693,7 @@ static int mmc_blk_ioctl(struct block_device *bdev, fmode_t mode,
 	 * whole block device, not on a partition.  This prevents overspray
 	 * between sibling partitions.
 	 */
-	if ((!capable(CAP_SYS_RAWIO)) || (bdev != bdev->bd_contains))
+	if (!capable(CAP_SYS_RAWIO))
 		return -EPERM;
 
 	switch (cmd) {
@@ -701,6 +701,9 @@ static int mmc_blk_ioctl(struct block_device *bdev, fmode_t mode,
 		return mmc_blk_ioctl_cmd(bdev,
 				(struct mmc_ioc_cmd __user *)arg);
 	case MMC_IOC_MULTI_CMD:
+        if (bdev != bdev->bd_contains)
+            return -EPERM;
+
 		return mmc_blk_ioctl_multi_cmd(bdev,
 				(struct mmc_ioc_multi_cmd __user *)arg);
 	default:
