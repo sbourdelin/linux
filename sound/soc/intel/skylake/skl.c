@@ -732,7 +732,6 @@ static void skl_remove(struct pci_dev *pci)
 
 	if (pci_dev_run_wake(pci))
 		pm_runtime_get_noresume(&pci->dev);
-	pci_dev_put(pci);
 	skl_codecs_remove(ebus);
 	skl_platform_unregister(&pci->dev);
 	skl_free_dsp(skl);
