@@ -170,7 +170,7 @@ static void clocksource_watchdog(unsigned long data)
 {
 	struct clocksource *cs;
 	cycle_t csnow, wdnow, cslast, wdlast, delta;
-	int64_t wd_nsec, cs_nsec;
+	int64_t wd_nsec, wd_max_nsec, cs_nsec;
 	int next_cpu, reset_pending;
 
 	spin_lock(&watchdog_lock);
@@ -178,6 +178,8 @@ static void clocksource_watchdog(unsigned long data)
 		goto out;
 
 	reset_pending = atomic_read(&watchdog_reset_pending);
+	wd_max_nsec = clocksource_cyc2ns(watchdog->max_cycles, watchdog->mult,
+					watchdog->shift);
 
 	list_for_each_entry(cs, &watchdog_list, wd_list) {
 
@@ -216,8 +218,12 @@ static void clocksource_watchdog(unsigned long data)
 		if (atomic_read(&watchdog_reset_pending))
 			continue;
 
-		/* Check the deviation from the watchdog clocksource. */
-		if (abs(cs_nsec - wd_nsec) > WATCHDOG_THRESHOLD) {
+		/*
+		 * Check the deviation from the watchdog clocksource,
+		 * accounting for a possible watchdog overflow.
+		 */
+		if (abs(cs_nsec - wd_nsec) > WATCHDOG_THRESHOLD &&
+			cs_nsec < wd_max_nsec) {
 			pr_warn("timekeeping watchdog on CPU%d: Marking clocksource '%s' as unstable because the skew is too large:\n",
 				smp_processor_id(), cs->name);
 			pr_warn("                      '%s' wd_now: %llx wd_last: %llx mask: %llx\n",
