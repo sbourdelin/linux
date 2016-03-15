@@ -3206,9 +3206,11 @@ intel_dp_dpcd_read_wake(struct drm_dp_aux *aux, unsigned int offset,
 
 	for (i = 0; i < 3; i++) {
 		ret = drm_dp_dpcd_read(aux, offset, buffer, size);
-		if (ret == size)
+		if (ret == size) {
+			usleep_range(50000, 50100);
 			return ret;
-		msleep(1);
+		}
+		usleep_range(1000, 1100);
 	}
 
 	return ret;
