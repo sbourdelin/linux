@@ -278,7 +278,9 @@ static int at803x_probe(struct phy_device *phydev)
 		return -ENOMEM;
 
 	gpiod_reset = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
-	if (IS_ERR(gpiod_reset))
+	if (PTR_ERR(gpiod_reset) == -ENOSYS)
+		gpiod_reset = NULL;
+	else if (IS_ERR(gpiod_reset))
 		return PTR_ERR(gpiod_reset);
 
 	priv->gpiod_reset = gpiod_reset;
