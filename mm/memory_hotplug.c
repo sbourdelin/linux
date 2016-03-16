@@ -1828,7 +1828,9 @@ repeat:
 	 */
 	dissolve_free_huge_pages(start_pfn, end_pfn);
 	/* check again */
+	spin_lock_irqsave(&zone->lock, flags);
 	offlined_pages = check_pages_isolated(start_pfn, end_pfn);
+	spin_unlock_irqrestore(&zone->lock, flags);
 	if (offlined_pages < 0) {
 		ret = -EBUSY;
 		goto failed_removal;

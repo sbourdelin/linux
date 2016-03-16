@@ -246,12 +246,18 @@ __test_page_isolated_in_pageblock(unsigned long pfn, unsigned long end_pfn,
 	return pfn;
 }
 
+/*
+ * Test all pages in the range are isolated.
+ * All pages in [start_pfn...end_pfn) must be in the same zone.
+ * zone->lock must be held before call this.
+ *
+ * Returns 0 if all pages in the range are isolated.
+ */
 int test_pages_isolated(unsigned long start_pfn, unsigned long end_pfn,
 			bool skip_hwpoisoned_pages)
 {
-	unsigned long pfn, flags;
+	unsigned long pfn;
 	struct page *page;
-	struct zone *zone;
 
 	/*
 	 * Note: pageblock_nr_pages != MAX_ORDER. Then, chunks of free pages
@@ -267,11 +273,8 @@ int test_pages_isolated(unsigned long start_pfn, unsigned long end_pfn,
 	if ((pfn < end_pfn) || !page)
 		return -EBUSY;
 	/* Check all pages are free or marked as ISOLATED */
-	zone = page_zone(page);
-	spin_lock_irqsave(&zone->lock, flags);
 	pfn = __test_page_isolated_in_pageblock(start_pfn, end_pfn,
 						skip_hwpoisoned_pages);
-	spin_unlock_irqrestore(&zone->lock, flags);
 
 	trace_test_pages_isolated(start_pfn, end_pfn, pfn);
 

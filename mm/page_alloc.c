@@ -6702,14 +6702,15 @@ static int __alloc_contig_migrate_range(struct compact_control *cc,
 int alloc_contig_range(unsigned long start, unsigned long end,
 		       unsigned migratetype)
 {
-	unsigned long outer_start, outer_end;
+	struct zone *zone = page_zone(pfn_to_page(start));
+	unsigned long outer_start, outer_end, flags;
 	unsigned int order;
 	int ret = 0;
 
 	struct compact_control cc = {
 		.nr_migratepages = 0,
 		.order = -1,
-		.zone = page_zone(pfn_to_page(start)),
+		.zone = zone,
 		.mode = MIGRATE_SYNC,
 		.ignore_skip_hint = true,
 	};
@@ -6775,6 +6776,7 @@ int alloc_contig_range(unsigned long start, unsigned long end,
 
 	order = 0;
 	outer_start = start;
+	spin_lock_irqsave(&zone->lock, flags);
 	while (!PageBuddy(pfn_to_page(outer_start))) {
 		if (++order >= MAX_ORDER) {
 			outer_start = start;
@@ -6797,10 +6799,11 @@ int alloc_contig_range(unsigned long start, unsigned long end,
 	}
 
 	/* Make sure the range is really isolated. */
-	if (test_pages_isolated(outer_start, end, false)) {
+	ret = test_pages_isolated(outer_start, end, false);
+	spin_unlock_irqrestore(&zone->lock, flags);
+	if (ret) {
 		pr_info("%s: [%lx, %lx) PFNs busy\n",
 			__func__, outer_start, end);
-		ret = -EBUSY;
 		goto done;
 	}
 
