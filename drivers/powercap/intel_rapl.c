@@ -489,12 +489,23 @@ static int get_max_time_window(struct powercap_zone *power_zone, int id,
 
 	if (rapl_read_data_raw(rd, MAX_TIME_WINDOW, true, &val))
 		ret = -EIO;
-	else
+	else {
 		*data = val;
-
+		if (val == 0)
+			pr_warn_once(FW_BUG "intel_rapl: Maximum Time Window is zero.  This is a BIOS bug that should be reported to your hardware or BIOS vendor.  The value of zero may prevent Intel RAPL from functioning properly.  Most bugs can be avoided by setting the ignore_max_time_window_check module parameter.\n");
+	}
 	put_online_cpus();
 	return ret;
 }
+
+/* Some BIOSes incorrectly program the maximum time window in the
+ * MSR_PKG_POWER_INFO register.  Some of these systems still have functional
+ * RAPL registers, etc., so give the user the option of disabling the maximum
+ * time window check.
+ */
+static int ignore_max_time_window_check;
+module_param(ignore_max_time_window_check, int, 0444);
+MODULE_PARM_DESC(ignore_max_time_window_check, "Ignore maximum time window check.  A bug should be reported to your hardware or BIOS vendor if this parameter is used.");
 
 static int set_time_window(struct powercap_zone *power_zone, int id,
 								u64 window)
@@ -516,7 +527,8 @@ static int set_time_window(struct powercap_zone *power_zone, int id,
 	 * The MSR_RAPL_POWER_UNIT register, read during initialization,
 	 * does contain the smallest unit of time that can be measured.
 	 */
-	if ((window > max_window) || (window < rp->time_unit)) {
+	if ((!ignore_max_time_window_check && (window > max_window)) ||
+	    (window < rp->time_unit)) {
 		ret = -EINVAL;
 		goto out;
 	}
