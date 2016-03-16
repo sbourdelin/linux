@@ -214,27 +214,17 @@ enum raw_event_type {
 
 struct ir_raw_event {
 	union {
-		u32             duration;
-
-		struct {
-			u32     carrier;
-			u8      duty_cycle;
-		};
+		u32	duration;
+		u32	carrier;
 	};
-
-	unsigned                pulse:1;
-	unsigned                reset:1;
-	unsigned                timeout:1;
-	unsigned                carrier_report:1;
+	u8		duty_cycle;
+	u8		pulse:1;
+	u8		reset:1;
+	u8		timeout:1;
+	u8		carrier_report:1;
 };
 
-#define DEFINE_IR_RAW_EVENT(event) \
-	struct ir_raw_event event = { \
-		{ .duration = 0 } , \
-		.pulse = 0, \
-		.reset = 0, \
-		.timeout = 0, \
-		.carrier_report = 0 }
+#define DEFINE_IR_RAW_EVENT(event) struct ir_raw_event event = {}
 
 static inline void init_ir_raw_event(struct ir_raw_event *ev)
 {
