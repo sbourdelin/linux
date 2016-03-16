@@ -1439,119 +1439,150 @@ void of_print_phandle_args(const char *msg, const struct of_phandle_args *args)
 	printk("\n");
 }
 
+int of_phandle_iterator_init(struct of_phandle_iterator *it,
+			     const struct device_node *np,
+			     const char *list_name,
+			     const char *cells_name,
+			     int cell_count)
+{
+	const __be32 *list;
+	int size;
+
+	/* Retrieve the phandle list property */
+	list = of_get_property(np, list_name, &size);
+	if (!list)
+		return -ENOENT;
+
+	it->np		= np;
+	it->node	= NULL;
+	it->list	= list;
+	it->phandle_end	= list;
+	it->list_end	= list + size / sizeof(*list);
+	it->cells_name	= cells_name;
+	it->cell_count	= cell_count;
+	it->cur_index	= -1;
+
+	return 0;
+}
+
+int of_phandle_iterator_next(struct of_phandle_iterator *it)
+{
+	phandle phandle = 0;
+	uint32_t count = 0;
+
+	if (it->phandle_end >= it->list_end)
+		return -ENOENT;
+
+	if (it->node) {
+		of_node_put(it->node);
+		it->node = NULL;
+	}
+
+	it->list	 = it->phandle_end;
+	it->cur_index	+= 1;
+	phandle		 = be32_to_cpup(it->list++);
+
+	if (phandle) {
+		if (it->cells_name) {
+			it->node = of_find_node_by_phandle(phandle);
+			if (!it->node)
+				goto no_node;
+
+			if (of_property_read_u32(it->node,
+						 it->cells_name,
+						 &count))
+				goto no_property;
+		} else {
+			count = it->cell_count;
+		}
+
+		if (it->list + count > it->list_end)
+			goto too_many_args;
+	}
+
+	it->phandle_end = it->list + count;
+	it->cur_count   = count;
+	it->phandle	= phandle;
+
+	return 0;
+
+no_node:
+	pr_err("%s: could not find phandle\n", it->np->full_name);
+
+	return -EINVAL;
+
+no_property:
+	pr_err("%s: could not get %s for %s\n", it->np->full_name,
+	       it->cells_name, it->node->full_name);
+
+	return -EINVAL;
+
+too_many_args:
+	pr_err("%s: arguments longer than property\n", it->np->full_name);
+
+	return -EINVAL;
+}
+
+int of_phandle_iterator_args(struct of_phandle_iterator *it,
+			     uint32_t *args,
+			     int size)
+{
+	int i, count;
+
+	count = it->cur_count;
+
+	if (WARN_ON(size < count))
+		count = size;
+
+	for (i = 0; i < count; i++)
+		args[i] = be32_to_cpup(it->list++);
+
+	return count;
+}
+
 static int __of_parse_phandle_with_args(const struct device_node *np,
 					const char *list_name,
 					const char *cells_name,
 					int cell_count, int index,
 					struct of_phandle_args *out_args)
 {
-	const __be32 *list, *list_end;
-	int rc = 0, size, cur_index = 0;
-	uint32_t count = 0;
-	struct device_node *node = NULL;
-	phandle phandle;
+	struct of_phandle_iterator it;
+	int rc;
 
-	/* Retrieve the phandle list property */
-	list = of_get_property(np, list_name, &size);
-	if (!list)
-		return -ENOENT;
-	list_end = list + size / sizeof(*list);
+	rc = of_phandle_iterator_init(&it, np, list_name,
+				      cells_name, cell_count);
+	if (rc)
+		return rc;
 
-	/* Loop over the phandles until all the requested entry is found */
-	while (list < list_end) {
-		rc = -EINVAL;
-		count = 0;
+	while ((rc = of_phandle_iterator_next(&it)) == 0) {
+		uint32_t count;
+		int cur_index;
 
-		/*
-		 * If phandle is 0, then it is an empty entry with no
-		 * arguments.  Skip forward to the next entry.
-		 */
-		phandle = be32_to_cpup(list++);
-		if (phandle) {
-			/*
-			 * Find the provider node and parse the #*-cells
-			 * property to determine the argument length.
-			 *
-			 * This is not needed if the cell count is hard-coded
-			 * (i.e. cells_name not set, but cell_count is set),
-			 * except when we're going to return the found node
-			 * below.
-			 */
-			if (cells_name || cur_index == index) {
-				node = of_find_node_by_phandle(phandle);
-				if (!node) {
-					pr_err("%s: could not find phandle\n",
-						np->full_name);
-					goto err;
-				}
-			}
+		count     = of_phandle_iterator_count(&it);
+		cur_index = of_phandle_iterator_index(&it);
 
-			if (cells_name) {
-				if (of_property_read_u32(node, cells_name,
-							 &count)) {
-					pr_err("%s: could not get %s for %s\n",
-						np->full_name, cells_name,
-						node->full_name);
-					goto err;
-				}
-			} else {
-				count = cell_count;
-			}
-
-			/*
-			 * Make sure that the arguments actually fit in the
-			 * remaining property data length
-			 */
-			if (list + count > list_end) {
-				pr_err("%s: arguments longer than property\n",
-					 np->full_name);
-				goto err;
-			}
-		}
-
-		/*
-		 * All of the error cases above bail out of the loop, so at
-		 * this point, the parsing is successful. If the requested
-		 * index matches, then fill the out_args structure and return,
-		 * or return -ENOENT for an empty entry.
-		 */
 		rc = -ENOENT;
 		if (cur_index == index) {
-			if (!phandle)
-				goto err;
+			if (!of_phandle_iterator_phandle(&it))
+				break;
 
-			if (out_args) {
-				int i;
-				if (WARN_ON(count > MAX_PHANDLE_ARGS))
-					count = MAX_PHANDLE_ARGS;
-				out_args->np = node;
-				out_args->args_count = count;
-				for (i = 0; i < count; i++)
-					out_args->args[i] = be32_to_cpup(list++);
-			} else {
-				of_node_put(node);
-			}
+			rc = 0;
 
 			/* Found it! return success */
-			return 0;
-		}
+			if (!out_args)
+				break;
 
-		of_node_put(node);
-		node = NULL;
-		list += count;
-		cur_index++;
+			out_args->np	     = of_phandle_iterator_node(&it);
+			out_args->args_count = of_phandle_iterator_args(&it,
+									out_args->args,
+									MAX_PHANDLE_ARGS);
+
+			break;
+		}
 	}
 
-	/*
-	 * Unlock node before returning result; will be one of:
-	 * -ENOENT : index is for empty phandle
-	 * -EINVAL : parsing error on data
-	 * [1..n]  : Number of phandle (count mode; when index = -1)
-	 */
-	rc = index < 0 ? cur_index : -ENOENT;
- err:
-	if (node)
-		of_node_put(node);
+	of_phandle_iterator_destroy(&it);
+
 	return rc;
 }
 
