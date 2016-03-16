@@ -69,48 +69,48 @@
  * Register map
  */
 #define DT2821_ADCSR_REG		0x00
-#define DT2821_ADCSR_ADERR		(1 << 15)
-#define DT2821_ADCSR_ADCLK		(1 << 9)
-#define DT2821_ADCSR_MUXBUSY		(1 << 8)
-#define DT2821_ADCSR_ADDONE		(1 << 7)
-#define DT2821_ADCSR_IADDONE		(1 << 6)
-#define DT2821_ADCSR_GS(x)		(((x) & 0x3) << 4)
-#define DT2821_ADCSR_CHAN(x)		(((x) & 0xf) << 0)
+#define DT2821_ADCSR_ADERR		0x8000u
+#define DT2821_ADCSR_ADCLK		0x0200u
+#define DT2821_ADCSR_MUXBUSY		0x0100u
+#define DT2821_ADCSR_ADDONE		0x0080u
+#define DT2821_ADCSR_IADDONE		0x0040u
+#define DT2821_ADCSR_GS(x)	       (0x0030u & ((x) << 4))
+#define DT2821_ADCSR_CHAN(x)	       (0x000fu & (x))
 #define DT2821_CHANCSR_REG		0x02
-#define DT2821_CHANCSR_LLE		(1 << 15)
-#define DT2821_CHANCSR_PRESLA(x)	(((x) & 0xf) >> 8)
-#define DT2821_CHANCSR_NUMB(x)		((((x) - 1) & 0xf) << 0)
+#define DT2821_CHANCSR_LLE		0x8000u
+#define DT2821_CHANCSR_PRESLA(x)	(((x) & 0xf) >> 8) /* always 0? */
+#define DT2821_CHANCSR_NUMB(x)	       (0x000fu & ((x) - 1))
 #define DT2821_ADDAT_REG		0x04
 #define DT2821_DACSR_REG		0x06
-#define DT2821_DACSR_DAERR		(1 << 15)
-#define DT2821_DACSR_YSEL(x)		((x) << 9)
-#define DT2821_DACSR_SSEL		(1 << 8)
-#define DT2821_DACSR_DACRDY		(1 << 7)
-#define DT2821_DACSR_IDARDY		(1 << 6)
-#define DT2821_DACSR_DACLK		(1 << 5)
-#define DT2821_DACSR_HBOE		(1 << 1)
-#define DT2821_DACSR_LBOE		(1 << 0)
+#define DT2821_DACSR_DAERR		0x8000u
+#define DT2821_DACSR_YSEL(x)	       (0x7e00u & (x) << 9)
+#define DT2821_DACSR_SSEL		0x0100u
+#define DT2821_DACSR_DACRDY		0x0080u
+#define DT2821_DACSR_IDARDY		0x0040u
+#define DT2821_DACSR_DACLK		0x0020u
+#define DT2821_DACSR_HBOE		0x0002u
+#define DT2821_DACSR_LBOE		0x0001u
 #define DT2821_DADAT_REG		0x08
 #define DT2821_DIODAT_REG		0x0a
 #define DT2821_SUPCSR_REG		0x0c
-#define DT2821_SUPCSR_DMAD		(1 << 15)
-#define DT2821_SUPCSR_ERRINTEN		(1 << 14)
-#define DT2821_SUPCSR_CLRDMADNE		(1 << 13)
-#define DT2821_SUPCSR_DDMA		(1 << 12)
-#define DT2821_SUPCSR_DS_PIO		(0 << 10)
-#define DT2821_SUPCSR_DS_AD_CLK		(1 << 10)
-#define DT2821_SUPCSR_DS_DA_CLK		(2 << 10)
-#define DT2821_SUPCSR_DS_AD_TRIG	(3 << 10)
-#define DT2821_SUPCSR_BUFFB		(1 << 9)
-#define DT2821_SUPCSR_SCDN		(1 << 8)
-#define DT2821_SUPCSR_DACON		(1 << 7)
-#define DT2821_SUPCSR_ADCINIT		(1 << 6)
-#define DT2821_SUPCSR_DACINIT		(1 << 5)
-#define DT2821_SUPCSR_PRLD		(1 << 4)
-#define DT2821_SUPCSR_STRIG		(1 << 3)
-#define DT2821_SUPCSR_XTRIG		(1 << 2)
-#define DT2821_SUPCSR_XCLK		(1 << 1)
-#define DT2821_SUPCSR_BDINIT		(1 << 0)
+#define DT2821_SUPCSR_DMAD		0x8000u
+#define DT2821_SUPCSR_ERRINTEN		0x4000u
+#define DT2821_SUPCSR_CLRDMADNE		0x2000u
+#define DT2821_SUPCSR_DDMA		0x1000u
+#define DT2821_SUPCSR_DS_PIO	       (0x0c00u & (0u << 10))
+#define DT2821_SUPCSR_DS_AD_CLK	       (0x0c00u & (1u << 10))
+#define DT2821_SUPCSR_DS_DA_CLK	       (0x0c00u & (2u << 10))
+#define DT2821_SUPCSR_DS_AD_TRIG       (0x0c00u & (3u << 10))
+#define DT2821_SUPCSR_BUFFB		0x0200u
+#define DT2821_SUPCSR_SCDN		0x0100u
+#define DT2821_SUPCSR_DACON		0x0080u
+#define DT2821_SUPCSR_ADCINIT		0x0040u
+#define DT2821_SUPCSR_DACINIT		0x0020u
+#define DT2821_SUPCSR_PRLD		0x0010u
+#define DT2821_SUPCSR_STRIG		0x0008u
+#define DT2821_SUPCSR_XTRIG		0x0004u
+#define DT2821_SUPCSR_XCLK		0x0002u
+#define DT2821_SUPCSR_BDINIT		0x0001u
 #define DT2821_TMRCTR_REG		0x0e
 
 static const struct comedi_lrange range_dt282x_ai_lo_bipolar = {
