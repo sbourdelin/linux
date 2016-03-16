@@ -79,6 +79,8 @@ static atomic_t therm_throt_en	= ATOMIC_INIT(0);
 
 static u32 lvtthmr_init __read_mostly;
 
+static bool thermal_hwp_interrupt_support;
+
 #ifdef CONFIG_SYSFS
 #define define_therm_throt_device_one_ro(_name)				\
 	static DEVICE_ATTR(_name, 0444,					\
@@ -385,6 +387,9 @@ static void intel_thermal_interrupt(void)
 {
 	__u64 msr_val;
 
+	if (thermal_hwp_interrupt_support)
+		wrmsrl_safe(MSR_HWP_STATUS, 0);
+
 	rdmsrl(MSR_IA32_THERM_STATUS, msr_val);
 
 	/* Check for violation of core thermal thresholds*/
@@ -552,6 +557,9 @@ void intel_init_thermal(struct cpuinfo_x86 *c)
 
 	rdmsr(MSR_IA32_MISC_ENABLE, l, h);
 	wrmsr(MSR_IA32_MISC_ENABLE, l | MSR_IA32_MISC_ENABLE_TM1, h);
+
+	if (static_cpu_has(X86_FEATURE_HWP))
+		thermal_hwp_interrupt_support = true;
 
 	/* Unmask the thermal vector: */
 	l = apic_read(APIC_LVTTHMR);
