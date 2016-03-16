@@ -28,6 +28,8 @@
 #include <linux/list.h>
 #include <linux/kallsyms.h>
 #include <linux/livepatch.h>
+#include <linux/elf.h>
+#include <linux/moduleloader.h>
 #include <asm/cacheflush.h>
 
 /**
@@ -50,6 +52,14 @@ struct klp_ops {
 };
 
 /*
+ * Buffers for storing temporary object and symbol names.
+ */
+struct klp_buf {
+	char symname[KSYM_SYMBOL_LEN];
+	char objname[MODULE_NAME_LEN];
+};
+
+/*
  * The klp_mutex protects the global lists and state transitions of any
  * structure reachable from them.  References to any structure must be obtained
  * under mutex protection (except in klp_ftrace_handler(), which uses RCU to
@@ -61,6 +71,11 @@ static LIST_HEAD(klp_patches);
 static LIST_HEAD(klp_ops);
 
 static struct kobject *klp_root_kobj;
+
+static inline void klp_clear_buf(struct klp_buf *buf)
+{
+	memset(buf, 0, sizeof(*buf));
+}
 
 static struct klp_ops *klp_find_ops(unsigned long old_addr)
 {
@@ -204,75 +219,87 @@ static int klp_find_object_symbol(const char *objname, const char *name,
 	return -EINVAL;
 }
 
-/*
- * external symbols are located outside the parent object (where the parent
- * object is either vmlinux or the kmod being patched).
- */
-static int klp_find_external_symbol(struct module *pmod, const char *name,
-				    unsigned long *addr)
+static int klp_resolve_symbols(Elf_Shdr *relasec, struct module *pmod)
 {
-	const struct kernel_symbol *sym;
+	int i, cnt, vmlinux, ret;
+	struct klp_buf bufs = {0};
+	Elf_Rela *relas;
+	Elf_Sym *sym;
+	char *symname;
+	unsigned long sympos;
 
-	/* first, check if it's an exported symbol */
-	preempt_disable();
-	sym = find_symbol(name, NULL, NULL, true, true);
-	if (sym) {
-		*addr = sym->value;
-		preempt_enable();
-		return 0;
+	relas = (Elf_Rela *) relasec->sh_addr;
+	/* For each rela in this klp relocation section */
+	for (i = 0; i < relasec->sh_size / sizeof(Elf_Rela); i++) {
+		sym = pmod->core_kallsyms.symtab + ELF_R_SYM(relas[i].r_info);
+		if (sym->st_shndx != SHN_LIVEPATCH)
+			return -EINVAL;
+
+		klp_clear_buf(&bufs);
+
+		/* Format: .klp.sym.objname.symbol_name,sympos */
+		symname = pmod->core_kallsyms.strtab + sym->st_name;
+		cnt = sscanf(symname, ".klp.sym.%64[^.].%128[^,],%lu",
+			     bufs.objname, bufs.symname, &sympos);
+		if (cnt != 3)
+			return -EINVAL;
+
+		/* klp_find_object_symbol() treats a NULL objname as vmlinux */
+		vmlinux = !strcmp(bufs.objname, "vmlinux");
+		ret = klp_find_object_symbol(vmlinux ? NULL : bufs.objname,
+					     bufs.symname, sympos,
+					     (unsigned long *) &sym->st_value);
+		if (ret)
+			return ret;
 	}
-	preempt_enable();
 
-	/*
-	 * Check if it's in another .o within the patch module. This also
-	 * checks that the external symbol is unique.
-	 */
-	return klp_find_object_symbol(pmod->name, name, 0, addr);
+	return 0;
 }
 
 static int klp_write_object_relocations(struct module *pmod,
 					struct klp_object *obj)
 {
-	int ret = 0;
-	unsigned long val;
-	struct klp_reloc *reloc;
+	int i, cnt, ret = 0;
+	const char *objname, *secname;
+	struct klp_buf bufs = {0};
+	Elf_Shdr *sec;
 
 	if (WARN_ON(!klp_is_object_loaded(obj)))
 		return -EINVAL;
 
-	if (WARN_ON(!obj->relocs))
-		return -EINVAL;
+	objname = klp_is_module(obj) ? obj->name : "vmlinux";
 
 	module_disable_ro(pmod);
+	/* For each klp relocation section */
+	for (i = 1; i < pmod->klp_info->hdr.e_shnum; i++) {
+		sec = pmod->klp_info->sechdrs + i;
+		if (!(sec->sh_flags & SHF_RELA_LIVEPATCH))
+			continue;
 
-	for (reloc = obj->relocs; reloc->name; reloc++) {
-		/* discover the address of the referenced symbol */
-		if (reloc->external) {
-			if (reloc->sympos > 0) {
-				pr_err("non-zero sympos for external reloc symbol '%s' is not supported\n",
-				       reloc->name);
-				ret = -EINVAL;
-				goto out;
-			}
-			ret = klp_find_external_symbol(pmod, reloc->name, &val);
-		} else
-			ret = klp_find_object_symbol(obj->name,
-						     reloc->name,
-						     reloc->sympos,
-						     &val);
-		if (ret)
-			goto out;
+		klp_clear_buf(&bufs);
 
-		ret = klp_write_module_reloc(pmod, reloc->type, reloc->loc,
-					     val + reloc->addend);
-		if (ret) {
-			pr_err("relocation failed for symbol '%s' at 0x%016lx (%d)\n",
-			       reloc->name, val, ret);
-			goto out;
+		/* Check if this klp relocation section belongs to obj */
+		secname = pmod->klp_info->secstrings + sec->sh_name;
+		cnt = sscanf(secname, ".klp.rela.%64[^.]", bufs.objname);
+		if (cnt != 1) {
+			ret = -EINVAL;
+			break;
 		}
+
+		if (strcmp(bufs.objname, objname))
+			continue;
+
+		ret = klp_resolve_symbols(sec, pmod);
+		if (ret)
+			break;
+
+		ret = apply_relocate_add(pmod->klp_info->sechdrs,
+					 pmod->core_kallsyms.strtab,
+					 pmod->klp_info->symndx, i, pmod);
+		if (ret)
+			break;
 	}
 
-out:
 	module_enable_ro(pmod);
 	return ret;
 }
@@ -703,11 +730,9 @@ static int klp_init_object_loaded(struct klp_patch *patch,
 	struct klp_func *func;
 	int ret;
 
-	if (obj->relocs) {
-		ret = klp_write_object_relocations(patch->mod, obj);
-		if (ret)
-			return ret;
-	}
+	ret = klp_write_object_relocations(patch->mod, obj);
+	if (ret)
+		return ret;
 
 	klp_for_each_func(obj, func) {
 		ret = klp_find_object_symbol(obj->name, func->old_name,
@@ -841,6 +866,9 @@ EXPORT_SYMBOL_GPL(klp_unregister_patch);
 int klp_register_patch(struct klp_patch *patch)
 {
 	int ret;
+
+	if (!is_livepatch_module(patch->mod))
+		return -EINVAL;
 
 	if (!klp_initialized())
 		return -ENODEV;
