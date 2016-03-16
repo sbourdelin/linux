@@ -13,6 +13,7 @@
 #include <linux/platform_device.h>
 #include <linux/power_supply.h>
 #include <linux/slab.h>
+#include <linux/usb/usb_charger.h>
 
 #include <linux/mfd/wm831x/core.h>
 #include <linux/mfd/wm831x/auxadc.h>
@@ -31,6 +32,8 @@ struct wm831x_power {
 	char usb_name[20];
 	char battery_name[20];
 	bool have_battery;
+	struct usb_charger *usb_charger;
+	struct notifier_block usb_notify;
 };
 
 static int wm831x_power_check_online(struct wm831x *wm831x, int supply,
@@ -124,6 +127,43 @@ static enum power_supply_property wm831x_usb_props[] = {
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 };
+
+/* In milliamps */
+static unsigned int wm831x_usb_limits[] = {
+	0,
+	2,
+	100,
+	500,
+	900,
+	1500,
+	1800,
+	550,
+};
+
+static int wm831x_usb_limit_change(struct notifier_block *nb,
+				   unsigned long limit, void *data)
+{
+	struct wm831x_power *wm831x_power = container_of(nb,
+							 struct wm831x_power,
+							 usb_notify);
+	int i, best;
+
+	/* Find the highest supported limit */
+	best = 0;
+	for (i = 0; i < ARRAY_SIZE(wm831x_usb_limits); i++) {
+		if (limit >= wm831x_usb_limits[i] &&
+		    wm831x_usb_limits[best] < wm831x_usb_limits[i])
+			best = i;
+	}
+
+	dev_dbg(wm831x_power->wm831x->dev,
+		"Limiting USB current to %dmA", wm831x_usb_limits[best]);
+
+	wm831x_set_bits(wm831x_power->wm831x, WM831X_POWER_STATE,
+		        WM831X_USB_ILIM_MASK, best);
+
+	return 0;
+}
 
 /*********************************************************************
  *		Battery properties
@@ -607,8 +647,31 @@ static int wm831x_power_probe(struct platform_device *pdev)
 		}
 	}
 
+	if (wm831x_pdata && wm831x_pdata->usb_gadget) {
+		power->usb_charger =
+			usb_charger_find_by_name(wm831x_pdata->usb_gadget);
+		if (IS_ERR(power->usb_charger)) {
+			ret = PTR_ERR(power->usb_charger);
+			dev_err(&pdev->dev,
+				"Failed to find USB gadget: %d\n", ret);
+			goto err_bat_irq;
+		}
+
+		power->usb_notify.notifier_call = wm831x_usb_limit_change;
+
+		ret = usb_charger_register_notify(power->usb_charger,
+						  &power->usb_notify);
+		if (ret != 0) {
+			dev_err(&pdev->dev,
+				"Failed to register notifier: %d\n", ret);
+			goto err_usb_charger;
+		}
+	}
+
 	return ret;
 
+err_usb_charger:
+	/* put_device on charger */
 err_bat_irq:
 	--i;
 	for (; i >= 0; i--) {
@@ -636,6 +699,12 @@ static int wm831x_power_remove(struct platform_device *pdev)
 	struct wm831x_power *wm831x_power = platform_get_drvdata(pdev);
 	struct wm831x *wm831x = wm831x_power->wm831x;
 	int irq, i;
+
+	if (wm831x_power->usb_charger) {
+		usb_charger_unregister_notify(wm831x_power->usb_charger,
+					      &wm831x_power->usb_notify);
+		/* Free charger */
+	}
 
 	for (i = 0; i < ARRAY_SIZE(wm831x_bat_irqs); i++) {
 		irq = wm831x_irq(wm831x, 
