@@ -51,8 +51,6 @@ static int mmc_queue_thread(void *d)
 	struct mmc_queue *mq = d;
 	struct request_queue *q = mq->queue;
 
-	current->flags |= PF_MEMALLOC;
-
 	down(&mq->thread_sem);
 	do {
 		struct request *req = NULL;
