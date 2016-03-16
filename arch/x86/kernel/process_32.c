@@ -130,7 +130,8 @@ void release_thread(struct task_struct *dead_task)
 }
 
 int copy_thread_tls(unsigned long clone_flags, unsigned long sp,
-	unsigned long arg, struct task_struct *p, unsigned long tls)
+	unsigned long arg, struct task_struct *p, unsigned long tls,
+	int return_to_kernel)
 {
 	struct pt_regs *childregs = task_pt_regs(p);
 	struct task_struct *tsk;
@@ -140,7 +141,7 @@ int copy_thread_tls(unsigned long clone_flags, unsigned long sp,
 	p->thread.sp0 = (unsigned long) (childregs+1);
 	memset(p->thread.ptrace_bps, 0, sizeof(p->thread.ptrace_bps));
 
-	if (unlikely(p->flags & PF_KTHREAD)) {
+	if (unlikely(p->flags & PF_KTHREAD) || return_to_kernel) {
 		/* kernel thread */
 		memset(childregs, 0, sizeof(struct pt_regs));
 		p->thread.ip = (unsigned long) ret_from_kernel_thread;

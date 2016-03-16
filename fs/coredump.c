@@ -496,33 +496,50 @@ static void wait_for_dump_helpers(struct file *file)
 	pipe_unlock(pipe);
 }
 
-/*
- * umh_pipe_setup
- * helper function to customize the process used
- * to collect the core in userspace.  Specifically
- * it sets up a pipe and installs it as fd 0 (stdin)
- * for the process.  Returns 0 on success, or
- * PTR_ERR on failure.
- * Note that it also sets the core limit to 1.  This
- * is a special value that we use to trap recursive
- * core dumps
- */
-static int umh_pipe_setup(struct subprocess_info *info, struct cred *new)
+struct pipeprg_data {
+	char **argv;
+	struct coredump_params *cp;
+};
+
+static int fork_callback(void *data)
 {
+	struct pipeprg_data *ppd = (struct pipeprg_data *)data;
 	struct file *files[2];
-	struct coredump_params *cp = (struct coredump_params *)info->data;
-	int err = create_pipe_files(files, 0);
-	if (err)
-		return err;
+	int ret;
 
-	cp->file = files[1];
+	/*
+	 * Sets up a pipe and installs it as fd 0 (stdin)
+	 * for the process.
+	 */
+	ret = create_pipe_files(files, 0);
+	if (ret)
+		do_exit(0);
 
-	err = replace_fd(0, files[0], 0);
+	ppd->cp->file = files[1];
+
+	ret = replace_fd(0, files[0], 0);
 	fput(files[0]);
-	/* and disallow core files too */
+	if (ret < 0)
+		do_exit(0);
+
+	/*
+	 * Sets the core limit to 1.  This
+	 * is a special value that we use to trap recursive
+	 * core dumps
+	 */
 	current->signal->rlim[RLIMIT_CORE] = (struct rlimit){1, 1};
 
-	return err;
+	set_fs(KERNEL_DS);
+	ret = do_execve(getname_kernel(ppd->argv[0]),
+			(const char __user *const __user *)ppd->argv,
+			(const char __user *const __user *)NULL);
+	if (ret) {
+		printk(KERN_WARNING "execute pipe program failed: %s ret=%d\n",
+		       ppd->argv[0], ret);
+		do_exit(0);
+	}
+
+	return ret;
 }
 
 void do_coredump(const siginfo_t *siginfo)
@@ -551,6 +568,8 @@ void do_coredump(const siginfo_t *siginfo)
 		 */
 		.mm_flags = mm->flags,
 	};
+	struct pipeprg_data ppd;
+	pid_t pid;
 
 	audit_core_dumps(siginfo->si_signo);
 
@@ -586,7 +605,6 @@ void do_coredump(const siginfo_t *siginfo)
 	if (ispipe) {
 		int dump_count;
 		char **helper_argv;
-		struct subprocess_info *sub_info;
 
 		if (ispipe < 0) {
 			printk(KERN_WARNING "format_corename failed\n");
@@ -633,19 +651,17 @@ void do_coredump(const siginfo_t *siginfo)
 			goto fail_dropcount;
 		}
 
-		retval = -ENOMEM;
-		sub_info = call_usermodehelper_setup(helper_argv[0],
-						helper_argv, NULL, GFP_KERNEL,
-						umh_pipe_setup, NULL, &cprm);
-		if (sub_info)
-			retval = call_usermodehelper_exec(sub_info,
-							  UMH_WAIT_EXEC);
+		ppd.argv = helper_argv;
+		ppd.cp = &cprm;
 
+		pid = _do_fork(CLONE_VFORK, (unsigned long)fork_callback,
+			       (unsigned long)&ppd, NULL, NULL, 0, 1);
 		argv_free(helper_argv);
-		if (retval) {
+		if (pid < 0) {
 			printk(KERN_INFO "Core dump to |%s pipe failed\n",
 			       cn.corename);
-			goto close_fail;
+			retval = pid;
+			goto fail_dropcount;
 		}
 	} else {
 		struct inode *inode;

@@ -2612,7 +2612,7 @@ extern void mm_release(struct task_struct *, struct mm_struct *);
 
 #ifdef CONFIG_HAVE_COPY_THREAD_TLS
 extern int copy_thread_tls(unsigned long, unsigned long, unsigned long,
-			struct task_struct *, unsigned long);
+			struct task_struct *, unsigned long, int);
 #else
 extern int copy_thread(unsigned long, unsigned long, unsigned long,
 			struct task_struct *);
@@ -2644,7 +2644,8 @@ extern int do_execveat(int, struct filename *,
 		       const char __user * const __user *,
 		       const char __user * const __user *,
 		       int);
-extern long _do_fork(unsigned long, unsigned long, unsigned long, int __user *, int __user *, unsigned long);
+extern long _do_fork(unsigned long, unsigned long, unsigned long, int __user *,
+		     int __user *, unsigned long, int);
 extern long do_fork(unsigned long, unsigned long, unsigned long, int __user *, int __user *);
 struct task_struct *fork_idle(int);
 extern pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags);

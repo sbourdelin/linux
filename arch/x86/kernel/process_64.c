@@ -153,7 +153,8 @@ static inline u32 read_32bit_tls(struct task_struct *t, int tls)
 }
 
 int copy_thread_tls(unsigned long clone_flags, unsigned long sp,
-		unsigned long arg, struct task_struct *p, unsigned long tls)
+		unsigned long arg, struct task_struct *p, unsigned long tls,
+		int return_to_kernel)
 {
 	int err;
 	struct pt_regs *childregs;
@@ -173,7 +174,7 @@ int copy_thread_tls(unsigned long clone_flags, unsigned long sp,
 	savesegment(ds, p->thread.ds);
 	memset(p->thread.ptrace_bps, 0, sizeof(p->thread.ptrace_bps));
 
-	if (unlikely(p->flags & PF_KTHREAD)) {
+	if (unlikely(p->flags & PF_KTHREAD) || return_to_kernel) {
 		/* kernel thread */
 		memset(childregs, 0, sizeof(struct pt_regs));
 		childregs->sp = (unsigned long)childregs;
