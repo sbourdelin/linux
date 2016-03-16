@@ -119,4 +119,13 @@ config CFAG12864B_RATE
 	  If you compile this as a module, you can still override this
 	  value using the module parameters.
 
+config HT16K33
+	tristate "Holtek Ht16K33 LED controller with keyscan"
+	depends on FB && OF && I2C && INPUT
+	select INPUT_MATRIXKMAP
+	select FB_BACKLIGHT
+	help
+	  Say yes here to add support for Holtek HT16K33, RAM mapping 16*8
+	  LED controller driver with keyscan.
+
 endif # AUXDISPLAY
