@@ -248,6 +248,28 @@ e_out:
 	return -1;
 }
 
+/*
+ * Return newly allocated copy of string "in" with all trailing new lines and
+ * carriage returns removed.
+ */
+static char *chomp(char *in)
+{
+	size_t last = strlen(in);
+	char *copy;
+
+	copy = malloc(last + 1);
+	if (!copy)
+		return NULL;
+
+	strcpy(copy, in);
+	if (last)
+		last--;
+	while (last  && (copy[last] == '\r' || copy[last] == '\n'))
+		copy[last--] = '\0';
+
+	return copy;
+}
+
 int conf_read_simple(const char *name, int def)
 {
 	FILE *in = NULL;
