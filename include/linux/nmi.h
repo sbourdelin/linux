@@ -31,38 +31,75 @@ static inline void hardlockup_detector_disable(void) {}
 #endif
 
 /*
- * Create trigger_all_cpu_backtrace() out of the arch-provided
- * base function. Return whether such support was available,
+ * Create trigger_all_cpu_backtrace() etc out of the arch-provided
+ * base function(s). Return whether such support was available,
  * to allow calling code to fall back to some other mechanism:
  */
-#ifdef arch_trigger_all_cpu_backtrace
 static inline bool trigger_all_cpu_backtrace(void)
 {
+#if defined(arch_trigger_all_cpu_backtrace)
 	arch_trigger_all_cpu_backtrace(true);
-
 	return true;
+#elif defined(arch_trigger_cpumask_backtrace)
+	arch_trigger_cpumask_backtrace(cpu_online_mask);
+	return true;
+#else
+	return false;
+#endif
 }
+
 static inline bool trigger_allbutself_cpu_backtrace(void)
 {
+#if defined(arch_trigger_all_cpu_backtrace)
 	arch_trigger_all_cpu_backtrace(false);
 	return true;
+#elif defined(arch_trigger_cpumask_backtrace)
+	cpumask_var_t mask;
+	int cpu = get_cpu();
+
+	if (!alloc_cpumask_var(&mask, GFP_KERNEL))
+		return false;
+	cpumask_copy(mask, cpu_online_mask);
+	cpumask_clear_cpu(cpu, mask);
+	arch_trigger_cpumask_backtrace(mask);
+	put_cpu();
+	free_cpumask_var(mask);
+	return true;
+#else
+	return false;
+#endif
+}
+
+static inline bool trigger_cpumask_backtrace(struct cpumask *mask)
+{
+#if defined(arch_trigger_cpumask_backtrace)
+	arch_trigger_cpumask_backtrace(mask);
+	return true;
+#else
+	return false;
+#endif
+}
+
+static inline bool trigger_single_cpu_backtrace(int cpu)
+{
+#if defined(arch_trigger_cpumask_backtrace)
+	cpumask_var_t mask;
+
+	if (!zalloc_cpumask_var(&mask, GFP_KERNEL))
+		return false;
+	cpumask_set_cpu(cpu, mask);
+	arch_trigger_cpumask_backtrace(mask);
+	free_cpumask_var(mask);
+	return true;
+#else
+	return false;
+#endif
 }
 
 /* generic implementation */
-void nmi_trigger_all_cpu_backtrace(bool include_self,
+void nmi_trigger_cpumask_backtrace(const cpumask_t *mask,
 				   void (*raise)(cpumask_t *mask));
 bool nmi_cpu_backtrace(struct pt_regs *regs);
-
-#else
-static inline bool trigger_all_cpu_backtrace(void)
-{
-	return false;
-}
-static inline bool trigger_allbutself_cpu_backtrace(void)
-{
-	return false;
-}
-#endif
 
 #ifdef CONFIG_LOCKUP_DETECTOR
 int hw_nmi_is_cpu_stuck(struct pt_regs *);

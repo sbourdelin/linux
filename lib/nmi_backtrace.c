@@ -18,7 +18,7 @@
 #include <linux/nmi.h>
 #include <linux/seq_buf.h>
 
-#ifdef arch_trigger_all_cpu_backtrace
+#ifdef arch_trigger_cpumask_backtrace
 /* For reliability, we're prepared to waste bits here. */
 static DECLARE_BITMAP(backtrace_mask, NR_CPUS) __read_mostly;
 static cpumask_t printtrace_mask;
@@ -44,12 +44,12 @@ static void print_seq_line(struct nmi_seq_buf *s, int start, int end)
 }
 
 /*
- * When raise() is called it will be is passed a pointer to the
+ * When raise() is called it will be passed a pointer to the
  * backtrace_mask. Architectures that call nmi_cpu_backtrace()
  * directly from their raise() functions may rely on the mask
  * they are passed being updated as a side effect of this call.
  */
-void nmi_trigger_all_cpu_backtrace(bool include_self,
+void nmi_trigger_cpumask_backtrace(const cpumask_t *mask,
 				   void (*raise)(cpumask_t *mask))
 {
 	struct nmi_seq_buf *s;
@@ -64,10 +64,7 @@ void nmi_trigger_all_cpu_backtrace(bool include_self,
 		return;
 	}
 
-	cpumask_copy(to_cpumask(backtrace_mask), cpu_online_mask);
-	if (!include_self)
-		cpumask_clear_cpu(this_cpu, to_cpumask(backtrace_mask));
-
+	cpumask_copy(to_cpumask(backtrace_mask), mask);
 	cpumask_copy(&printtrace_mask, to_cpumask(backtrace_mask));
 
 	/*
@@ -80,8 +77,8 @@ void nmi_trigger_all_cpu_backtrace(bool include_self,
 	}
 
 	if (!cpumask_empty(to_cpumask(backtrace_mask))) {
-		pr_info("Sending NMI to %s CPUs:\n",
-			(include_self ? "all" : "other"));
+		pr_info("Sending NMI from CPU %d to CPUs %*pbl:\n",
+			this_cpu, nr_cpumask_bits, to_cpumask(backtrace_mask));
 		raise(to_cpumask(backtrace_mask));
 	}
 
