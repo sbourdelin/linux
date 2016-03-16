@@ -1,0 +1,69 @@
+Freescale i.MX audio complex with WM8958 codec
+
+Required properties:
+
+  - compatible		   : "fsl,imx-audio-wm8958"
+
+  - model		   : The user-visible name of this sound complex
+
+  - audio-codec            : The phandle of the WM8958 audio codec
+
+  - audio-routing	   : A list of the connections between audio components.
+			     Each entry is a pair of strings, the first being
+			     the connection's sink, the second being the
+			     connection's source. Valid names could be power
+			     supplies, WM8958 pins, and the jacks on the board:
+
+			     Power supplies:
+			      * MICBIAS1
+			      * MICBIAS2
+
+			     Board connectors:
+			      * Headphone Jack
+			      * Ext Spk
+
+Optional properties:
+
+ - cpu-dai1		   : The phandle of CPU DAI1 controller, which is for
+			     aif1 of wm8958. At least one cpu dai is required.
+
+ - cpu-dai2                : The phandle of CPU DAI2 controller, which is for
+			     aif2 of wm8958. At least one cpu dai is required.
+
+ - cpu-dai3                : The phandle of CPU DAI3 controller, which is for
+			     aif3 of wm8958. At least one cpu dai is required.
+
+ - dai-link1-name	   : If present, set the dai link1 name and stream name
+			     to the specific strings. Otherwise, set the dai
+			     link1 name and stream name to "AIF1-DAI".
+
+ - dai-link2-name	   : If present, set the dai link2 name and stream name
+			     to the specific strings. Otherwise, set the dai
+			     link2 name and stream name to "AIF2-DAI".
+
+ - dai-link3-name          : If present, set the dai link3 name and stream name
+			     to the specific strings. Otherwise, set the dai
+			     link3 name and stream name to "AIF3-DAI".
+
+ - fsl,cpu-dai1-master   : If present, cpu dai1 works as master, and will
+			   provide bit clock and frame clock. Otherwise,
+			   cpu dai1 works as slave.
+
+Example:
+
+sound {
+		compatible = "fsl,imx6ul-ddr3-arm2-wm8958",
+			   "fsl,imx-audio-wm8958";
+		model = "wm8958-audio";
+		cpu-dai1 = <&sai1>;
+		dai-link1-name = "Hifi";
+		audio-codec = <&codec>;
+		audio-routing =
+			"Headphone Jack", "HPOUT1L",
+			"Headphone Jack", "HPOUT1R",
+			"Ext Spk", "SPKOUTLP",
+			"Ext Spk", "SPKOUTLN",
+			"Ext Spk", "SPKOUTRP",
+			"Ext Spk", "SPKOUTRN",
+			"IN1LN", "MICBIAS2";
+};
