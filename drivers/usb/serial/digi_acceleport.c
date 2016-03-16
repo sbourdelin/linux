@@ -1260,6 +1260,11 @@ static int digi_startup(struct usb_serial *serial)
 
 	spin_lock_init(&serial_priv->ds_serial_lock);
 	serial_priv->ds_oob_port_num = serial->type->num_ports;
+	if (!(serial_priv->ds_oob_port_num == 2 && serial->type == &digi_acceleport_2_device)
+		&& !(serial_priv->ds_oob_port_num == 4 && serial->type == &digi_acceleport_4_device)) {
+		kfree(serial_priv);
+		return -EINVAL;
+	}
 	serial_priv->ds_oob_port = serial->port[serial_priv->ds_oob_port_num];
 
 	ret = digi_port_init(serial_priv->ds_oob_port,
