@@ -244,11 +244,6 @@ static void nfs_readpage_retry(struct rpc_task *task,
 
 	/* This is a short read! */
 	nfs_inc_stats(hdr->inode, NFSIOS_SHORTREAD);
-	/* Has the server at least made some progress? */
-	if (resp->count == 0) {
-		nfs_set_pgio_error(hdr, -EIO, argp->offset);
-		return;
-	}
 
 	/* For non rpc-based layout drivers, retry-through-MDS */
 	if (!task->tk_ops) {
