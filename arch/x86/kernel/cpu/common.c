@@ -987,11 +987,11 @@ void enable_sep_cpu(void)
 	struct tss_struct *tss;
 	int cpu;
 
+	if (!boot_cpu_has(X86_FEATURE_SEP))
+		return;
+
 	cpu = get_cpu();
 	tss = &per_cpu(cpu_tss, cpu);
-
-	if (!boot_cpu_has(X86_FEATURE_SEP))
-		goto out;
 
 	/*
 	 * We cache MSR_IA32_SYSENTER_CS's value in the TSS's ss1 field --
@@ -1007,7 +1007,6 @@ void enable_sep_cpu(void)
 
 	wrmsr(MSR_IA32_SYSENTER_EIP, (unsigned long)entry_SYSENTER_32, 0);
 
-out:
 	put_cpu();
 }
 #endif
