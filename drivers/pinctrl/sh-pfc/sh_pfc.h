@@ -94,6 +94,7 @@ struct pinmux_func {
 };
 
 struct pinmux_cfg_reg {
+	const char *name;
 	u32 reg;
 	u8 reg_width, field_width;
 	const u16 *enum_ids;
@@ -110,7 +111,8 @@ struct pinmux_cfg_reg {
  * (from left to right, i.e. MSB to LSB), 2^f_width enum IDs must be specified,
  * one for each possible combination of the register field bit values.
  */
-#define PINMUX_CFG_REG(name, r, r_width, f_width) \
+#define PINMUX_CFG_REG(_name, r, r_width, f_width) \
+	.name = _name, \
 	.reg = r, .reg_width = r_width, .field_width = f_width,		\
 	.enum_ids = (const u16 [(r_width / f_width) * (1 << f_width)])
 
@@ -125,7 +127,8 @@ struct pinmux_cfg_reg {
  * (from left to right, i.e. MSB to LSB), 2^var_fwi enum IDs must be specified,
  * one for each possible combination of the register field bit values.
  */
-#define PINMUX_CFG_REG_VAR(name, r, r_width, var_fw0, var_fwn...) \
+#define PINMUX_CFG_REG_VAR(_name, r, r_width, var_fw0, var_fwn...) \
+	.name = _name, \
 	.reg = r, .reg_width = r_width,	\
 	.var_field_width = (const u8 [r_width]) \
 		{ var_fw0, var_fwn, 0 }, \
@@ -465,7 +468,7 @@ struct sh_pfc_soc_info {
  */
 #define PORTCR(nr, reg)							\
 	{								\
-		PINMUX_CFG_REG_VAR("PORT" nr "CR", reg, 8, 2, 2, 1, 3) {\
+		PINMUX_CFG_REG_VAR("PORT" #nr "CR", reg, 8, 2, 2, 1, 3) {\
 			/* PULMD[1:0], handled by .set_bias() */	\
 			0, 0, 0, 0,					\
 			/* IE and OE */					\
