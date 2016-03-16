@@ -13,6 +13,8 @@
 #include <linux/nls.h>
 #include <linux/dma-mapping.h>
 
+#include <acpi/acpi_drivers.h>
+
 #include <asm/pgtable.h>
 
 #include "internal.h"
@@ -22,7 +24,6 @@ ACPI_MODULE_NAME("scan");
 extern struct acpi_device *acpi_root;
 
 #define ACPI_BUS_CLASS			"system_bus"
-#define ACPI_BUS_HID			"LNXSYBUS"
 #define ACPI_BUS_DEVICE_NAME		"System Bus"
 
 #define ACPI_IS_ROOT_DEVICE(device)    (!(device)->parent)
