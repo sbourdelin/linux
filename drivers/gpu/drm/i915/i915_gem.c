@@ -3470,45 +3470,26 @@ i915_gem_object_bind_to_vm(struct drm_i915_gem_object *obj,
 	u32 fence_alignment, unfenced_alignment;
 	u32 search_flag, alloc_flag;
 	u64 start, end;
-	u64 size, fence_size;
+	u64 size, obj_size, fence_size;
 	struct i915_vma *vma;
 	int ret;
 
 	if (i915_is_ggtt(vm)) {
-		u32 view_size;
-
 		if (WARN_ON(!ggtt_view))
 			return ERR_PTR(-EINVAL);
 
-		view_size = i915_ggtt_view_size(obj, ggtt_view);
-
-		fence_size = i915_gem_get_gtt_size(dev,
-						   view_size,
-						   obj->tiling_mode);
-		fence_alignment = i915_gem_get_gtt_alignment(dev,
-							     view_size,
-							     obj->tiling_mode,
-							     true);
-		unfenced_alignment = i915_gem_get_gtt_alignment(dev,
-								view_size,
-								obj->tiling_mode,
-								false);
-		size = flags & PIN_MAPPABLE ? fence_size : view_size;
+		obj_size = i915_ggtt_view_size(obj, ggtt_view);
 	} else {
-		fence_size = i915_gem_get_gtt_size(dev,
-						   obj->base.size,
-						   obj->tiling_mode);
-		fence_alignment = i915_gem_get_gtt_alignment(dev,
-							     obj->base.size,
-							     obj->tiling_mode,
-							     true);
-		unfenced_alignment =
-			i915_gem_get_gtt_alignment(dev,
-						   obj->base.size,
-						   obj->tiling_mode,
-						   false);
-		size = flags & PIN_MAPPABLE ? fence_size : obj->base.size;
+		obj_size = obj->base.size;
 	}
+
+	fence_size = i915_gem_get_gtt_size(dev, obj_size, obj->tiling_mode);
+	fence_alignment = i915_gem_get_gtt_alignment(dev, obj_size,
+						     obj->tiling_mode, true);
+	unfenced_alignment = i915_gem_get_gtt_alignment(dev, obj_size,
+							obj->tiling_mode,
+							false);
+	size = flags & PIN_MAPPABLE ? fence_size : obj_size;
 
 	start = flags & PIN_OFFSET_BIAS ? flags & PIN_OFFSET_MASK : 0;
 	end = vm->total;
