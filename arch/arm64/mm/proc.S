@@ -48,11 +48,13 @@
  *
  *	Idle the processor (wait for interrupt).
  */
+	.pushsection ".cpuidle.text","ax"
 ENTRY(cpu_do_idle)
 	dsb	sy				// WFI may enter a low-power mode
 	wfi
 	ret
 ENDPROC(cpu_do_idle)
+	.popsection
 
 #ifdef CONFIG_CPU_PM
 /**
