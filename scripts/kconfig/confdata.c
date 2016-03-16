@@ -396,8 +396,12 @@ load:
 			if (conf_set_sym_val(sym, def, def_flags, p))
 				continue;
 		} else {
-			if (line[0] != '\r' && line[0] != '\n')
-				conf_warning("unexpected data");
+			if (line[0] != '\r' && line[0] != '\n') {
+				char *tmp = chomp(line);
+
+				conf_warning("unexpected data: %s", tmp);
+				free(tmp);
+			}
 			continue;
 		}
 setsym:
