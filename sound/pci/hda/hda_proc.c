@@ -636,7 +636,7 @@ static void print_conn_list(struct snd_info_buffer *buffer,
 	}
 
 	/* Get Cache connections info */
-	cache_len = snd_hda_get_conn_list(codec, nid, &list);
+	cache_len = snd_hda_get_conn_list(codec, nid, 0, &list);
 	if (cache_len >= 0 && (cache_len != conn_len ||
 			      memcmp(list, conn, conn_len) != 0)) {
 		snd_iprintf(buffer, "  In-driver Connection: %d\n", cache_len);

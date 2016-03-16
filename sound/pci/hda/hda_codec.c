@@ -110,23 +110,24 @@ struct hda_conn_list {
 	struct list_head list;
 	int len;
 	hda_nid_t nid;
+	int dev_id;
 	hda_nid_t conns[0];
 };
 
 /* look up the cached results */
 static struct hda_conn_list *
-lookup_conn_list(struct hda_codec *codec, hda_nid_t nid)
+lookup_conn_list(struct hda_codec *codec, hda_nid_t nid, int dev_id)
 {
 	struct hda_conn_list *p;
 	list_for_each_entry(p, &codec->conn_list, list) {
-		if (p->nid == nid)
+		if ((p->nid == nid) && (p->dev_id == dev_id))
 			return p;
 	}
 	return NULL;
 }
 
-static int add_conn_list(struct hda_codec *codec, hda_nid_t nid, int len,
-			 const hda_nid_t *list)
+static int add_conn_list(struct hda_codec *codec, hda_nid_t nid,
+			 int dev_id, int len, const hda_nid_t *list)
 {
 	struct hda_conn_list *p;
 
@@ -135,6 +136,7 @@ static int add_conn_list(struct hda_codec *codec, hda_nid_t nid, int len,
 		return -ENOMEM;
 	p->len = len;
 	p->nid = nid;
+	p->dev_id = dev_id;
 	memcpy(p->conns, list, len * sizeof(hda_nid_t));
 	list_add(&p->list, &codec->conn_list);
 	return 0;
@@ -150,8 +152,13 @@ static void remove_conn_list(struct hda_codec *codec)
 	}
 }
 
-/* read the connection and add to the cache */
-static int read_and_add_raw_conns(struct hda_codec *codec, hda_nid_t nid)
+/*
+ * read the connection and add to the cache
+ * the caller should select the device entry by sending the
+ * corresponding verb if necessary before calling this function
+ */
+static int read_and_add_raw_conns(struct hda_codec *codec, hda_nid_t nid,
+				  int dev_id)
 {
 	hda_nid_t list[32];
 	hda_nid_t *result = list;
@@ -166,7 +173,8 @@ static int read_and_add_raw_conns(struct hda_codec *codec, hda_nid_t nid)
 		len = snd_hda_get_raw_connections(codec, nid, result, len);
 	}
 	if (len >= 0)
-		len = snd_hda_override_conn_list(codec, nid, len, result);
+		len = snd_hda_override_conn_list(codec, nid, dev_id,
+						 len, result);
 	if (result != list)
 		kfree(result);
 	return len;
@@ -176,6 +184,7 @@ static int read_and_add_raw_conns(struct hda_codec *codec, hda_nid_t nid)
  * snd_hda_get_conn_list - get connection list
  * @codec: the HDA codec
  * @nid: NID to parse
+ * @dev_id: device entry id
  * @listp: the pointer to store NID list
  *
  * Parses the connection list of the given widget and stores the pointer
@@ -188,7 +197,7 @@ static int read_and_add_raw_conns(struct hda_codec *codec, hda_nid_t nid)
  * concurrently, protect with a mutex appropriately.
  */
 int snd_hda_get_conn_list(struct hda_codec *codec, hda_nid_t nid,
-			  const hda_nid_t **listp)
+			  int dev_id, const hda_nid_t **listp)
 {
 	bool added = false;
 
@@ -197,7 +206,7 @@ int snd_hda_get_conn_list(struct hda_codec *codec, hda_nid_t nid,
 		const struct hda_conn_list *p;
 
 		/* if the connection-list is already cached, read it */
-		p = lookup_conn_list(codec, nid);
+		p = lookup_conn_list(codec, nid, dev_id);
 		if (p) {
 			if (listp)
 				*listp = p->conns;
@@ -206,7 +215,7 @@ int snd_hda_get_conn_list(struct hda_codec *codec, hda_nid_t nid,
 		if (snd_BUG_ON(added))
 			return -EINVAL;
 
-		err = read_and_add_raw_conns(codec, nid);
+		err = read_and_add_raw_conns(codec, nid, dev_id);
 		if (err < 0)
 			return err;
 		added = true;
@@ -218,6 +227,7 @@ EXPORT_SYMBOL_GPL(snd_hda_get_conn_list);
  * snd_hda_get_connections - copy connection list
  * @codec: the HDA codec
  * @nid: NID to parse
+ * @dev_id: device entry id
  * @conn_list: connection list array; when NULL, checks only the size
  * @max_conns: max. number of connections to store
  *
@@ -227,10 +237,11 @@ EXPORT_SYMBOL_GPL(snd_hda_get_conn_list);
  * Returns the number of connections, or a negative error code.
  */
 int snd_hda_get_connections(struct hda_codec *codec, hda_nid_t nid,
-			    hda_nid_t *conn_list, int max_conns)
+			    int dev_id, hda_nid_t *conn_list,
+			    int max_conns)
 {
 	const hda_nid_t *list;
-	int len = snd_hda_get_conn_list(codec, nid, &list);
+	int len = snd_hda_get_conn_list(codec, nid, dev_id, &list);
 
 	if (len > 0 && conn_list) {
 		if (len > max_conns) {
@@ -249,6 +260,7 @@ EXPORT_SYMBOL_GPL(snd_hda_get_connections);
  * snd_hda_override_conn_list - add/modify the connection-list to cache
  * @codec: the HDA codec
  * @nid: NID to parse
+ * @dev_id: device entry id
  * @len: number of connection list entries
  * @list: the list of connection entries
  *
@@ -257,18 +269,18 @@ EXPORT_SYMBOL_GPL(snd_hda_get_connections);
  *
  * Returns zero or a negative error code.
  */
-int snd_hda_override_conn_list(struct hda_codec *codec, hda_nid_t nid, int len,
-			       const hda_nid_t *list)
+int snd_hda_override_conn_list(struct hda_codec *codec, hda_nid_t nid,
+			       int dev_id, int len, const hda_nid_t *list)
 {
 	struct hda_conn_list *p;
 
-	p = lookup_conn_list(codec, nid);
+	p = lookup_conn_list(codec, nid, dev_id);
 	if (p) {
 		list_del(&p->list);
 		kfree(p);
 	}
 
-	return add_conn_list(codec, nid, len, list);
+	return add_conn_list(codec, nid, dev_id, len, list);
 }
 EXPORT_SYMBOL_GPL(snd_hda_override_conn_list);
 
@@ -277,6 +289,7 @@ EXPORT_SYMBOL_GPL(snd_hda_override_conn_list);
  * @codec: the HDA codec
  * @mux: NID containing the list
  * @nid: NID to select
+ * @dev_id: device entry id
  * @recursive: 1 when searching NID recursively, otherwise 0
  *
  * Parses the connection list of the widget @mux and checks whether the
@@ -284,12 +297,12 @@ EXPORT_SYMBOL_GPL(snd_hda_override_conn_list);
  * Otherwise it returns -1.
  */
 int snd_hda_get_conn_index(struct hda_codec *codec, hda_nid_t mux,
-			   hda_nid_t nid, int recursive)
+			   hda_nid_t nid, int dev_id, int recursive)
 {
 	const hda_nid_t *conn;
 	int i, nums;
 
-	nums = snd_hda_get_conn_list(codec, mux, &conn);
+	nums = snd_hda_get_conn_list(codec, mux, dev_id, &conn);
 	for (i = 0; i < nums; i++)
 		if (conn[i] == nid)
 			return i;
@@ -304,7 +317,8 @@ int snd_hda_get_conn_index(struct hda_codec *codec, hda_nid_t mux,
 		unsigned int type = get_wcaps_type(get_wcaps(codec, conn[i]));
 		if (type == AC_WID_PIN || type == AC_WID_AUD_OUT)
 			continue;
-		if (snd_hda_get_conn_index(codec, conn[i], nid, recursive) >= 0)
+		if (snd_hda_get_conn_index(codec, conn[i], nid, dev_id,
+					   recursive) >= 0)
 			return i;
 	}
 	return -1;

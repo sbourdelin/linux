@@ -1851,17 +1851,17 @@ static void alc889_fixup_dac_route(struct hda_codec *codec,
 		/* fake the connections during parsing the tree */
 		hda_nid_t conn1[2] = { 0x0c, 0x0d };
 		hda_nid_t conn2[2] = { 0x0e, 0x0f };
-		snd_hda_override_conn_list(codec, 0x14, 2, conn1);
-		snd_hda_override_conn_list(codec, 0x15, 2, conn1);
-		snd_hda_override_conn_list(codec, 0x18, 2, conn2);
-		snd_hda_override_conn_list(codec, 0x1a, 2, conn2);
+		snd_hda_override_conn_list(codec, 0x14, 0, 2, conn1);
+		snd_hda_override_conn_list(codec, 0x15, 0, 2, conn1);
+		snd_hda_override_conn_list(codec, 0x18, 0, 2, conn2);
+		snd_hda_override_conn_list(codec, 0x1a, 0, 2, conn2);
 	} else if (action == HDA_FIXUP_ACT_PROBE) {
 		/* restore the connections */
 		hda_nid_t conn[5] = { 0x0c, 0x0d, 0x0e, 0x0f, 0x26 };
-		snd_hda_override_conn_list(codec, 0x14, 5, conn);
-		snd_hda_override_conn_list(codec, 0x15, 5, conn);
-		snd_hda_override_conn_list(codec, 0x18, 5, conn);
-		snd_hda_override_conn_list(codec, 0x1a, 5, conn);
+		snd_hda_override_conn_list(codec, 0x14, 0, 5, conn);
+		snd_hda_override_conn_list(codec, 0x15, 0, 5, conn);
+		snd_hda_override_conn_list(codec, 0x18, 0, 5, conn);
+		snd_hda_override_conn_list(codec, 0x1a, 0, 5, conn);
 	}
 }
 
@@ -4607,8 +4607,8 @@ static void alc290_fixup_mono_speakers(struct hda_codec *codec,
 		   make sure 0x14 (front speaker) and 0x15 (headphones) use the
 		   stereo DAC, while leaving 0x17 (bass speaker) for node 0x03. */
 		hda_nid_t conn1[2] = { 0x0c };
-		snd_hda_override_conn_list(codec, 0x14, 1, conn1);
-		snd_hda_override_conn_list(codec, 0x15, 1, conn1);
+		snd_hda_override_conn_list(codec, 0x14, 0, 1, conn1);
+		snd_hda_override_conn_list(codec, 0x15, 0, 1, conn1);
 	}
 }
 

@@ -984,7 +984,7 @@ static int stac_create_spdif_mux_ctls(struct hda_codec *codec)
 	if (cfg->dig_outs < 1)
 		return 0;
 
-	num_cons = snd_hda_get_num_conns(codec, cfg->dig_out_pins[0]);
+	num_cons = snd_hda_get_num_conns(codec, cfg->dig_out_pins[0], 0);
 	if (num_cons <= 1)
 		return 0;
 
@@ -4543,7 +4543,7 @@ static int patch_stac92hd73xx(struct hda_codec *codec)
 	spec->gen.mixer_nid = 0x1d;
 	spec->have_spdif_mux = 1;
 
-	num_dacs = snd_hda_get_num_conns(codec, 0x0a) - 1;
+	num_dacs = snd_hda_get_num_conns(codec, 0x0a, 0) - 1;
 	if (num_dacs < 3 || num_dacs > 5) {
 		codec_warn(codec,
 			   "Could not determine number of channels defaulting to DAC count\n");
