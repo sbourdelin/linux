@@ -81,11 +81,13 @@ struct atmel_hlcdc_plane_properties {
  * @layer: HLCDC layer structure
  * @properties: pointer to the property definitions structure
  * @rotation: current rotation status
+ * @prepared: flagging the plane has prepared for an atomic update
  */
 struct atmel_hlcdc_plane {
 	struct drm_plane base;
 	struct atmel_hlcdc_layer layer;
 	struct atmel_hlcdc_plane_properties *properties;
+	bool prepared;
 };
 
 static inline struct atmel_hlcdc_plane *
