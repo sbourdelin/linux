@@ -573,7 +573,6 @@ static void xvip_composite_v4l2_cleanup(struct xvip_composite_device *xdev)
 {
 	v4l2_device_unregister(&xdev->v4l2_dev);
 	media_device_unregister(&xdev->media_dev);
-	media_device_cleanup(&xdev->media_dev);
 }
 
 static int xvip_composite_v4l2_init(struct xvip_composite_device *xdev)
@@ -592,7 +591,7 @@ static int xvip_composite_v4l2_init(struct xvip_composite_device *xdev)
 	if (ret < 0) {
 		dev_err(xdev->dev, "V4L2 device registration failed (%d)\n",
 			ret);
-		media_device_cleanup(&xdev->media_dev);
+		media_device_unregister(&xdev->media_dev);
 		return ret;
 	}
 

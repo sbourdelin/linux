@@ -684,14 +684,12 @@ void media_device_init(struct media_device *mdev)
 }
 EXPORT_SYMBOL_GPL(media_device_init);
 
-void media_device_cleanup(struct media_device *mdev)
+static void media_device_cleanup(struct media_device *mdev)
 {
 	ida_destroy(&mdev->entity_internal_idx);
 	mdev->entity_internal_idx_max = 0;
 	media_entity_graph_walk_cleanup(&mdev->pm_count_walk);
-	mutex_destroy(&mdev->graph_mutex);
 }
-EXPORT_SYMBOL_GPL(media_device_cleanup);
 
 int __must_check __media_device_register(struct media_device *mdev,
 					 struct module *owner)
@@ -789,11 +787,12 @@ static void do_media_device_unregister(struct kref *kref)
 	}
 
 	/* Check if mdev devnode was registered */
-	if (!media_devnode_is_registered(&mdev->devnode))
-		return;
+	if (media_devnode_is_registered(&mdev->devnode)) {
+		device_remove_file(&mdev->devnode.dev, &dev_attr_model);
+		media_devnode_unregister(&mdev->devnode);
+	}
 
-	device_remove_file(&mdev->devnode.dev, &dev_attr_model);
-	media_devnode_unregister(&mdev->devnode);
+	media_device_cleanup(mdev);
 
 	dev_dbg(mdev->dev, "Media device unregistered\n");
 }

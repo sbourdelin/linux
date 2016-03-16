@@ -438,7 +438,6 @@ static void dvb_usbv2_media_device_unregister(struct dvb_usb_adapter *adap)
 		return;
 
 	media_device_unregister(adap->dvb_adap.mdev);
-	media_device_cleanup(adap->dvb_adap.mdev);
 	kfree(adap->dvb_adap.mdev);
 	adap->dvb_adap.mdev = NULL;
 

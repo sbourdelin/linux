@@ -375,7 +375,7 @@ static void *siano_media_device_register(struct smsusb_device_t *dev,
 
 	ret = media_device_register(mdev);
 	if (ret) {
-		media_device_cleanup(mdev);
+		media_device_unregister(mdev);
 		kfree(mdev);
 		return NULL;
 	}

@@ -813,7 +813,6 @@ static void saa7134_unregister_media_device(struct saa7134_dev *dev)
 	if (!dev->media_dev)
 		return;
 	media_device_unregister(dev->media_dev);
-	media_device_cleanup(dev->media_dev);
 	kfree(dev->media_dev);
 	dev->media_dev = NULL;
 #endif

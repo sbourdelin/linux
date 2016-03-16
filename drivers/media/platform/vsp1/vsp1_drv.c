@@ -213,7 +213,6 @@ static void vsp1_destroy_entities(struct vsp1_device *vsp1)
 
 	v4l2_device_unregister(&vsp1->v4l2_dev);
 	media_device_unregister(&vsp1->media_dev);
-	media_device_cleanup(&vsp1->media_dev);
 
 	if (!vsp1->info->uapi)
 		vsp1_drm_cleanup(vsp1);

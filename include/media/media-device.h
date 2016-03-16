@@ -430,16 +430,6 @@ static inline __must_check int media_entity_enum_init(
 void media_device_init(struct media_device *mdev);
 
 /**
- * media_device_cleanup() - Cleanups a media device element
- *
- * @mdev:	pointer to struct &media_device
- *
- * This function that will destroy the graph_mutex that is
- * initialized in media_device_init().
- */
-void media_device_cleanup(struct media_device *mdev);
-
-/**
  * __media_device_register() - Registers a media device element
  *
  * @mdev:	pointer to struct &media_device

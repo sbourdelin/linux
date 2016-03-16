@@ -1501,7 +1501,7 @@ err_clk:
 err_m_ent:
 	fimc_md_unregister_entities(fmd);
 err_md:
-	media_device_cleanup(&fmd->media_dev);
+	media_device_unregister(&fmd->media_dev);
 	v4l2_device_unregister(&fmd->v4l2_dev);
 	return ret;
 }
@@ -1521,7 +1521,6 @@ static int fimc_md_remove(struct platform_device *pdev)
 	fimc_md_unregister_entities(fmd);
 	fimc_md_pipelines_free(fmd);
 	media_device_unregister(&fmd->media_dev);
-	media_device_cleanup(&fmd->media_dev);
 	fimc_md_put_clocks(fmd);
 
 	return 0;

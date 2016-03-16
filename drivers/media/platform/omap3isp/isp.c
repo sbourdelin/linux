@@ -1598,7 +1598,6 @@ static void isp_unregister_entities(struct isp_device *isp)
 
 	v4l2_device_unregister(&isp->v4l2_dev);
 	media_device_unregister(&isp->media_dev);
-	media_device_cleanup(&isp->media_dev);
 }
 
 static int isp_link_entity(
