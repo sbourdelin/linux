@@ -698,6 +698,15 @@ int __must_check __media_device_register(struct media_device *mdev,
 {
 	int ret;
 
+	/* Check if mdev was ever registered at all */
+	mutex_lock(&mdev->graph_mutex);
+	if (media_devnode_is_registered(&mdev->devnode)) {
+		kref_get(&mdev->kref);
+		mutex_unlock(&mdev->graph_mutex);
+		return 0;
+	}
+	kref_init(&mdev->kref);
+
 	/* Register the device node. */
 	mdev->devnode.fops = &media_device_fops;
 	mdev->devnode.parent = mdev->dev;
@@ -707,8 +716,10 @@ int __must_check __media_device_register(struct media_device *mdev,
 	mdev->topology_version = 0;
 
 	ret = media_devnode_register(&mdev->devnode, owner);
-	if (ret < 0)
+	if (ret < 0) {
+		media_devnode_unregister(&mdev->devnode);
 		return ret;
+	}
 
 	ret = device_create_file(&mdev->devnode.dev, &dev_attr_model);
 	if (ret < 0) {
@@ -716,6 +727,7 @@ int __must_check __media_device_register(struct media_device *mdev,
 		return ret;
 	}
 
+	mutex_unlock(&mdev->graph_mutex);
 	dev_dbg(mdev->dev, "Media device registered\n");
 
 	return 0;
@@ -750,23 +762,15 @@ void media_device_unregister_entity_notify(struct media_device *mdev,
 }
 EXPORT_SYMBOL_GPL(media_device_unregister_entity_notify);
 
-void media_device_unregister(struct media_device *mdev)
+static void do_media_device_unregister(struct kref *kref)
 {
+	struct media_device *mdev;
 	struct media_entity *entity;
 	struct media_entity *next;
 	struct media_interface *intf, *tmp_intf;
 	struct media_entity_notify *notify, *nextp;
 
-	if (mdev == NULL)
-		return;
-
-	mutex_lock(&mdev->graph_mutex);
-
-	/* Check if mdev was ever registered at all */
-	if (!media_devnode_is_registered(&mdev->devnode)) {
-		mutex_unlock(&mdev->graph_mutex);
-		return;
-	}
+	mdev = container_of(kref, struct media_device, kref);
 
 	/* Remove all entities from the media device */
 	list_for_each_entry_safe(entity, next, &mdev->entities, graph_obj.list)
@@ -784,12 +788,25 @@ void media_device_unregister(struct media_device *mdev)
 		kfree(intf);
 	}
 
-	mutex_unlock(&mdev->graph_mutex);
+	/* Check if mdev devnode was registered */
+	if (!media_devnode_is_registered(&mdev->devnode))
+		return;
 
 	device_remove_file(&mdev->devnode.dev, &dev_attr_model);
 	media_devnode_unregister(&mdev->devnode);
 
 	dev_dbg(mdev->dev, "Media device unregistered\n");
+}
+
+void media_device_unregister(struct media_device *mdev)
+{
+	if (mdev == NULL)
+		return;
+
+	mutex_lock(&mdev->graph_mutex);
+	kref_put(&mdev->kref, do_media_device_unregister);
+	mutex_unlock(&mdev->graph_mutex);
+
 }
 EXPORT_SYMBOL_GPL(media_device_unregister);
 
@@ -802,13 +819,16 @@ struct media_device *media_device_get_devres(struct device *dev)
 	struct media_device *mdev;
 
 	mdev = devres_find(dev, media_device_release_devres, NULL, NULL);
-	if (mdev)
+	if (mdev) {
+		kref_get(&mdev->kref);
 		return mdev;
+	}
 
 	mdev = devres_alloc(media_device_release_devres,
 				sizeof(struct media_device), GFP_KERNEL);
 	if (!mdev)
 		return NULL;
+
 	return devres_get(dev, mdev, NULL, NULL);
 }
 EXPORT_SYMBOL_GPL(media_device_get_devres);
