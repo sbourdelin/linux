@@ -33,6 +33,7 @@
 #include <linux/cpu.h>
 #include <linux/err.h>
 #include <linux/ftrace.h>
+#include <linux/irqchip/mips-gic.h>
 #include <linux/irqdomain.h>
 #include <linux/of.h>
 #include <linux/of_irq.h>
@@ -242,6 +243,13 @@ static int __init mips_smp_ipi_init(void)
 	unsigned int call_virq, sched_virq;
 	struct irq_domain *ipidomain;
 	struct device_node *node;
+
+	/*
+	 * If the config says GIC is present, but the harware doesn't actually
+	 * have it we could get stuffed, so double check that GIC is present
+	 */
+	if (WARN_ON(!gic_present))
+		return 0;
 
 	node = of_irq_find_parent(of_root);
 	ipidomain = irq_find_matching_host(node, DOMAIN_BUS_IPI);
