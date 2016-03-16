@@ -271,7 +271,7 @@ static void __init exynos_dt_machine_init(void)
 
 	exynos_cpufreq_init();
 
-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+	of_platform_default_populate(NULL, NULL, NULL);
 }
 
 static char const *const exynos_dt_compat[] __initconst = {

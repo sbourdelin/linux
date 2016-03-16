@@ -35,8 +35,7 @@ static const struct of_dev_auxdata const pxa3xx_auxdata_lookup[] __initconst = {
 
 static void __init pxa3xx_dt_init(void)
 {
-	of_platform_populate(NULL, of_default_bus_match_table,
-			     pxa3xx_auxdata_lookup, NULL);
+	of_platform_default_populate(NULL, pxa3xx_auxdata_lookup, NULL);
 }
 
 static const char *const pxa3xx_dt_board_compat[] __initconst = {
