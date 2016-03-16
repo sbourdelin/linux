@@ -97,7 +97,7 @@ const char *btrfs_decode_error(int errno)
 	return errstr;
 }
 
-static void save_error_info(struct btrfs_fs_info *fs_info)
+static void set_fs_error(struct btrfs_fs_info *fs_info)
 {
 	/*
 	 * today we only save the error info into ram.  Long term we'll
@@ -171,7 +171,7 @@ void __btrfs_std_error(struct btrfs_fs_info *fs_info, const char *function,
 #endif
 
 	/* Don't go through full error handling during mount */
-	save_error_info(fs_info);
+	set_fs_error(fs_info);
 	if (sb->s_flags & MS_BORN)
 		btrfs_handle_error(fs_info);
 }
