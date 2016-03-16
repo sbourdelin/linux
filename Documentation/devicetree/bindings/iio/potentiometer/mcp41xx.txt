@@ -1,0 +1,51 @@
+* Microchip MCP414X/416X/424X/426X Digital Potentiometer driver
+
+The node for this driver must be a child node of a SPI controller, hence
+all mandatory properties described in
+
+        Documentation/devicetree/bindings/spi/spi-bus.txt
+
+must be specified.
+
+Required properties:
+	- compatible:  	Must be one of the following, depending on the
+			model:
+			"microchip,mcp4113x-502"
+			"microchip,mcp4113x-103"
+			"microchip,mcp4113x-503"
+			"microchip,mcp4113x-104"
+			"microchip,mcp4114x-502"
+			"microchip,mcp4114x-103"
+			"microchip,mcp4114x-503"
+			"microchip,mcp4114x-104"
+			"microchip,mcp4115x-502"
+			"microchip,mcp4115x-103"
+			"microchip,mcp4115x-503"
+			"microchip,mcp4115x-104"
+			"microchip,mcp4116x-502"
+			"microchip,mcp4116x-103"
+			"microchip,mcp4116x-503"
+			"microchip,mcp4116x-104"
+			"microchip,mcp4123x-502"
+			"microchip,mcp4123x-103"
+			"microchip,mcp4123x-503"
+			"microchip,mcp4123x-104"
+			"microchip,mcp4124x-502"
+			"microchip,mcp4124x-103"
+			"microchip,mcp4124x-503"
+			"microchip,mcp4124x-104"
+			"microchip,mcp4125x-502"
+			"microchip,mcp4125x-103"
+			"microchip,mcp4125x-503"
+			"microchip,mcp4125x-104"
+			"microchip,mcp4126x-502"
+			"microchip,mcp4126x-103"
+			"microchip,mcp4126x-503"
+			"microchip,mcp4126x-104"
+
+Example:
+mcp41xx: mcp41xx@0 {
+	compatible = "mcp416x-502";
+	reg = <0>;
+	spi-max-frequency = <500000>;
+};

@@ -1,0 +1,86 @@
+Industrial I/O driver for MCP414X/416X/424X/426X Digital POTs
+-------------------------------------------------------------
+
+Datasheet: http://ww1.microchip.com/downloads/en/DeviceDoc/22059a.pdf
+
+sysfs interface
+---------------
+N is the wiper number (0 = first wiper, 1 = second wiper)
+
+File:	/sys/bus/iio/devices/../decr_wiperN
+Mode:	Write
+Description:
+	Write anything to this file to decrease wiper N position by one step.
+Example:
+	echo > decr_wiper0
+
+
+File:	/sys/bus/iio/devices/../incr_wiperN
+Mode:	Write
+Description:
+	Write anything to this file to increase wiper N position by one step.
+Example:
+	echo > incr_wiper0
+
+
+File:	/sys/bus/iio/devices/../memory_map
+Mode:	Read/Write
+Description:
+	Read the whole memory or write value to given memory address.
+	Read outputs two columns. First column is address and second column is
+	value at that address.
+	For write use hex values with leading 0x. First hex is address second
+	hex is the value.
+Example:
+	cat memory_map
+	echo "0x00 0x80" > memory_map
+
+
+File:	/sys/bus/iio/devices/../nv_wiperN
+Mode:	Read/Write
+Description:
+	Read or write to non volatile memory of wiper N.
+	Read outputs decimal value that corresponds to wiper position.
+	For write use decimal value that corresponds to wiper position.
+Example:
+	cat nv_wiper0
+	echo "128" > nv_wiper0
+
+
+File:	/sys/bus/iio/devices/../out_resistance_scale
+Mode:	Read
+Description:
+	Read the resistance scale of one step (in ohms).
+Example:
+	cat out_resistance_scale
+
+
+File:	/sys/bus/iio/devices/../out_resistanceN_raw
+Mode:	Read/Write
+Description:
+	Read or write to volatile memory of wiper N.
+	Read outputs decimal value that corresponds to wiper position.
+	For write use decimal value that corresponds to wiper position.
+Example:
+	cat out_resistance0_raw
+	echo "128" > out_resistance0_raw
+
+
+File:	/sys/bus/iio/devices/../status_register
+Mode:	Read
+Description:
+	Read status register.
+	Read outputs content in binary format.
+Example:
+	cat status_register
+
+
+File:	/sys/bus/iio/devices/../tcon_register
+Mode:	ead/Write
+Description:
+	Read or write to tcon register.
+	Read outputs content in binary format.
+	For write use binary format string.
+Example:
+	cat tcon_register
+	echo "111111100" > tcon_register
