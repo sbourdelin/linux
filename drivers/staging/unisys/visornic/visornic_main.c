@@ -1215,11 +1215,13 @@ visornic_rx(struct uiscmdrsp *cmdrsp)
 					"repost_return failed");
 			return rx_count;
 		}
-		/* length rcvd is greater than firstfrag in this skb rcv buf  */
-		skb->tail += RCVPOST_BUF_SIZE;	/* amount in skb->data */
-		skb->data_len = skb->len - RCVPOST_BUF_SIZE;	/* amount that
-								   will be in
-								   frag_list */
+		/* length rcvd is greater than firstfrag in this skb rcv buf*/
+
+		/*amount in skb->data */
+		skb->tail += RCVPOST_BUF_SIZE;
+
+		/* amount that will be in frag_list */
+		skb->data_len = skb->len - RCVPOST_BUF_SIZE;
 	} else {
 		/* data fits in this skb - no chaining - do
 		 * PRECAUTIONARY check
@@ -1313,14 +1315,18 @@ visornic_rx(struct uiscmdrsp *cmdrsp)
 						break;
 					}
 				}
+
+				/* accept packet, dest matches a multicast
+				 * address
+				 */
 				if (found_mc)
-					break;	/* accept packet, dest
-						   matches a multicast
-						   address */
+					break;
 			}
+
+		/* accept packet, dest matches a multicast address */
 		} else if (skb->pkt_type == PACKET_HOST) {
-			break;	/* accept packet, h_dest must match vnic
-				   mac address */
+			break;
+
 		} else if (skb->pkt_type == PACKET_OTHERHOST) {
 			/* something is not right */
 			dev_err(&devdata->netdev->dev,
@@ -1618,8 +1624,7 @@ service_resp_queue(struct uiscmdrsp *cmdrsp, struct visornic_devdata *devdata,
 	unsigned long flags;
 	struct net_device *netdev;
 
-	/* TODO: CLIENT ACQUIRE -- Don't really need this at the
-	 * moment */
+	/* TODO: CLIENT ACQUIRE -- Don't really need this at the moment */
 	for (;;) {
 		if (!visorchannel_signalremove(devdata->dev->visorchannel,
 					       IOCHAN_FROM_IOPART,
