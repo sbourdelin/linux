@@ -483,11 +483,22 @@ static void eoi_pirq(struct irq_data *data)
 	int evtchn = evtchn_from_irq(data->irq);
 	struct physdev_eoi eoi = { .irq = pirq_from_irq(data->irq) };
 	int rc = 0;
+	int need_unmask = 0;
 
-	irq_move_irq(data);
+	if (unlikely(irqd_is_setaffinity_pending(data))) {
+		if (VALID_EVTCHN(evtchn))
+			need_unmask = !test_and_set_mask(evtchn);
+	}
 
 	if (VALID_EVTCHN(evtchn))
 		clear_evtchn(evtchn);
+
+	irq_move_irq(data);
+
+	if (VALID_EVTCHN(evtchn)) {
+		if (unlikely(need_unmask))
+			unmask_evtchn(evtchn);
+	}
 
 	if (pirq_needs_eoi(data->irq)) {
 		rc = HYPERVISOR_physdev_op(PHYSDEVOP_eoi, &eoi);
@@ -1356,11 +1367,22 @@ static void disable_dynirq(struct irq_data *data)
 static void ack_dynirq(struct irq_data *data)
 {
 	int evtchn = evtchn_from_irq(data->irq);
+	int need_unmask = 0;
 
-	irq_move_irq(data);
+	if (unlikely(irqd_is_setaffinity_pending(data))) {
+		if (VALID_EVTCHN(evtchn))
+			need_unmask = !test_and_set_mask(evtchn);
+	}
 
 	if (VALID_EVTCHN(evtchn))
 		clear_evtchn(evtchn);
+
+	irq_move_irq(data);
+
+	if (VALID_EVTCHN(evtchn)) {
+		if (unlikely(need_unmask))
+			unmask_evtchn(evtchn);
+	}
 }
 
 static void mask_ack_dynirq(struct irq_data *data)
