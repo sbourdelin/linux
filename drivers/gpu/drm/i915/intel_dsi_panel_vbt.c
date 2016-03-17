@@ -198,7 +198,7 @@ static const u8 *mipi_exec_delay(struct intel_dsi *intel_dsi, const u8 *data)
 
 static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
 {
-	u8 gpio_index, action;
+	u8 gpio_source, gpio_index, action, port;
 	u16 function, pad;
 	u32 val;
 	struct drm_device *dev = intel_dsi->base.base.dev;
@@ -208,6 +208,9 @@ static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
 		data++;
 
 	gpio_index = *data++;
+
+	/* gpio source in sequence v2 only */
+	gpio_source = (*data >> 1) & 3;
 
 	/* pull up/down */
 	action = *data++ & 1;
@@ -225,6 +228,17 @@ static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
 	if (dev_priv->vbt.dsi.seq_version >= 3) {
 		DRM_DEBUG_KMS("GPIO element v3 not supported\n");
 		goto out;
+	} else if (dev_priv->vbt.dsi.seq_version == 2) {
+		if (gpio_source == 0) {
+			port = IOSF_PORT_GPIO_NC;
+		} else if (gpio_source == 1) {
+			port = IOSF_PORT_GPIO_SC;
+		} else {
+			DRM_DEBUG_KMS("unknown gpio source %u\n", gpio_source);
+			goto out;
+		}
+	} else {
+		port = IOSF_PORT_GPIO_NC;
 	}
 
 	function = gtable[gpio_index].function_reg;
@@ -234,15 +248,14 @@ static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
 	if (!gtable[gpio_index].init) {
 		/* program the function */
 		/* FIXME: remove constant below */
-		vlv_iosf_sb_write(dev_priv, IOSF_PORT_GPIO_NC, function,
-				  0x2000CC00);
+		vlv_iosf_sb_write(dev_priv, port, function, 0x2000CC00);
 		gtable[gpio_index].init = 1;
 	}
 
 	val = 0x4 | action;
 
 	/* pull up/down */
-	vlv_iosf_sb_write(dev_priv, IOSF_PORT_GPIO_NC, pad, val);
+	vlv_iosf_sb_write(dev_priv, port, pad, val);
 	mutex_unlock(&dev_priv->sb_lock);
 
 out:
