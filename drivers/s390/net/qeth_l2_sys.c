@@ -258,6 +258,10 @@ void qeth_l2_setup_bridgeport_attrs(struct qeth_card *card)
 		return;
 	if (!card->options.sbp.supported_funcs)
 		return;
+
+	/* Allow to set promiscuous by default */
+	card->options.sbp.reflect_promisc = 1;
+
 	if (card->options.sbp.role != QETH_SBP_ROLE_NONE) {
 		/* Conditional to avoid spurious error messages */
 		qeth_bridgeport_setrole(card, card->options.sbp.role);
