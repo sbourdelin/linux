@@ -517,6 +517,16 @@ int blk_get_reserved_space(struct block_device *bdev, sector_t *nr_sects)
 }
 EXPORT_SYMBOL_GPL(blk_get_reserved_space);
 
+int blk_provision_space(struct block_device *bdev, sector_t offset, sector_t len)
+{
+	const struct block_device_operations *ops = bdev->bd_disk->fops;
+
+	if (!ops->provision_space)
+		return -EOPNOTSUPP;
+	return ops->provision_space(bdev, offset, len);
+}
+EXPORT_SYMBOL_GPL(blk_provision_space);
+
 /*
  * pseudo-fs
  */

@@ -1655,6 +1655,7 @@ struct block_device_operations {
 	void (*swap_slot_free_notify) (struct block_device *, unsigned long);
 	int (*reserve_space) (struct block_device *, sector_t);
 	int (*get_reserved_space) (struct block_device *, sector_t *);
+	int (*provision_space) (struct block_device *, sector_t, sector_t);
 	struct module *owner;
 	const struct pr_ops *pr_ops;
 };
@@ -1668,6 +1669,7 @@ extern long bdev_direct_access(struct block_device *, struct blk_dax_ctl *);
 
 extern int blk_reserve_space(struct block_device *, sector_t);
 extern int blk_get_reserved_space(struct block_device *, sector_t *);
+extern int blk_provision_space(struct block_device *, sector_t, sector_t);
 #else /* CONFIG_BLOCK */
 
 struct block_device;
