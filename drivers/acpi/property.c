@@ -638,6 +638,7 @@ int acpi_dev_prop_read_single(struct acpi_device *adev, const char *propname,
 {
 	return adev ? acpi_data_prop_read_single(&adev->data, propname, proptype, val) : -EINVAL;
 }
+EXPORT_SYMBOL_GPL(acpi_dev_prop_read_single);
 
 static int acpi_copy_property_array_u8(const union acpi_object *items, u8 *val,
 				       size_t nval)
@@ -772,6 +773,7 @@ int acpi_dev_prop_read(struct acpi_device *adev, const char *propname,
 {
 	return adev ? acpi_data_prop_read(&adev->data, propname, proptype, val, nval) : -EINVAL;
 }
+EXPORT_SYMBOL_GPL(acpi_dev_prop_read);
 
 /**
  * acpi_node_prop_read - retrieve the value of an ACPI property with given name.
