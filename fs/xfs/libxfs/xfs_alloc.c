@@ -35,6 +35,7 @@
 #include "xfs_trans.h"
 #include "xfs_buf_item.h"
 #include "xfs_log.h"
+#include "xfs_thin.h"
 
 struct workqueue_struct *xfs_alloc_wq;
 
@@ -2650,6 +2651,11 @@ xfs_alloc_vextent(
 				goto error0;
 		}
 
+		if (mp->m_thin_reserve) {
+			error = xfs_thin_provision(mp, args->fsbno, args->len);
+			WARN_ON(error);
+			error = 0;
+		}
 	}
 	xfs_perag_put(args->pag);
 	return 0;

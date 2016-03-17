@@ -548,11 +548,22 @@ xfs_trans_unreserve_and_mod_sb(
 	int64_t			rtxdelta = 0;
 	int64_t			idelta = 0;
 	int64_t			ifreedelta = 0;
+	int64_t			resdelta = 0;
 	int			error;
 
 	/* calculate deltas */
-	if (tp->t_blk_res > 0)
+	if (tp->t_blk_res > 0) {
+		/*
+		 * Distinguish between what should be unreserved from an
+		 * underlying thin pool and and what is only returned to the
+		 * free blocks counter.
+		 */
 		blkdelta = tp->t_blk_res;
+		if (tp->t_blk_res > tp->t_blk_res_used) {
+			resdelta = tp->t_blk_res - tp->t_blk_res_used;
+			blkdelta -= resdelta;
+		}
+	}
 	if ((tp->t_fdblocks_delta != 0) &&
 	    (xfs_sb_version_haslazysbcount(&mp->m_sb) ||
 	     (tp->t_flags & XFS_TRANS_SB_DIRTY)))
@@ -571,10 +582,16 @@ xfs_trans_unreserve_and_mod_sb(
 	}
 
 	/* apply the per-cpu counters */
-	if (blkdelta) {
-		error = xfs_mod_fdblocks(mp, blkdelta, rsvd);
+	if (resdelta) {
+		error = __xfs_mod_fdblocks(mp, resdelta, rsvd, true);
 		if (error)
 			goto out;
+	}
+
+	if (blkdelta) {
+		error = __xfs_mod_fdblocks(mp, blkdelta, rsvd, false);
+		if (error)
+			goto out_undo_resblocks;
 	}
 
 	if (idelta) {
@@ -681,6 +698,9 @@ out_undo_icount:
 out_undo_fdblocks:
 	if (blkdelta)
 		xfs_mod_fdblocks(mp, -blkdelta, rsvd);
+out_undo_resblocks:
+	if (resdelta)
+		xfs_mod_fdblocks(mp, -resdelta, rsvd);
 out:
 	ASSERT(error == 0);
 	return;

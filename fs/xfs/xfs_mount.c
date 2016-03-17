@@ -41,6 +41,7 @@
 #include "xfs_trace.h"
 #include "xfs_icache.h"
 #include "xfs_sysfs.h"
+#include "xfs_thin.h"
 
 
 static DEFINE_MUTEX(xfs_uuid_table_mutex);
@@ -947,6 +948,8 @@ xfs_mountfs(
 		xfs_qm_mount_quotas(mp);
 	}
 
+	xfs_thin_init(mp);
+
 	/*
 	 * Now we are mounted, reserve a small amount of unused space for
 	 * privileged transactions. This is needed so that transaction
@@ -1165,21 +1168,32 @@ xfs_mod_ifree(
  */
 #define XFS_FDBLOCKS_BATCH	1024
 int
-xfs_mod_fdblocks(
+__xfs_mod_fdblocks(
 	struct xfs_mount	*mp,
 	int64_t			delta,
-	bool			rsvd)
+	bool			rsvd,
+	bool			unres)
 {
 	int64_t			lcounter;
 	long long		res_used;
 	s32			batch;
+	int			error;
+	int64_t			res_delta = 0;
 
 	if (delta > 0) {
 		/*
-		 * If the reserve pool is depleted, put blocks back into it
-		 * first. Most of the time the pool is full.
+		 * If the reserve pool is full (the typical case), return the
+		 * blocks to the general fs pool. Otherwise, return what we can
+		 * to the reserve pool first.
 		 */
 		if (likely(mp->m_resblks == mp->m_resblks_avail)) {
+main_pool:
+			if (mp->m_thin_reserve && unres) {
+				error = xfs_thin_unreserve(mp, delta);
+				if (error)
+					return error;
+			}
+
 			percpu_counter_add(&mp->m_fdblocks, delta);
 			return 0;
 		}
@@ -1187,15 +1201,54 @@ xfs_mod_fdblocks(
 		spin_lock(&mp->m_sb_lock);
 		res_used = (long long)(mp->m_resblks - mp->m_resblks_avail);
 
-		if (res_used > delta) {
-			mp->m_resblks_avail += delta;
+		/*
+		 * The reserve pool is not full. Blocks in the reserve pool must
+		 * hold a bdev reservation which means we may need to re-reserve
+		 * blocks depending on what the caller is giving us.
+		 *
+		 * If the blocks are already reserved (i.e., via a transaction
+		 * reservation), simply update the reserve pool counter. If not,
+		 * reserve as many blocks as we can, return those to the reserve
+		 * pool, and then jump back above to return whatever is left
+		 * back to the general filesystem pool.
+		 */
+		if (!unres) {
+			while (!unres && delta) {
+				if (res_delta >= res_used)
+					break;
+
+				/* XXX: shouldn't call this w/ m_sb_lock */
+				error = xfs_thin_reserve(mp, 1);
+				if (error)
+					break;
+
+				res_delta++;
+				delta--;
+			}
 		} else {
-			delta -= res_used;
-			mp->m_resblks_avail = mp->m_resblks;
-			percpu_counter_add(&mp->m_fdblocks, delta);
+			res_delta = min(delta, res_used);
+			delta -= res_delta;
 		}
+
+		if (res_used > res_delta)
+			mp->m_resblks_avail += res_delta;
+		else
+			mp->m_resblks_avail = mp->m_resblks;
 		spin_unlock(&mp->m_sb_lock);
+		if (delta)
+			goto main_pool;
 		return 0;
+	}
+
+	/* res calls take positive value */
+	if (mp->m_thin_reserve) {
+		error = xfs_thin_reserve(mp, -delta);
+		if (error == -ENOSPC && rsvd) {
+			spin_lock(&mp->m_sb_lock);
+			goto fdblocks_rsvd;
+		}
+		if (error)
+			return error;
 	}
 
 	/*
@@ -1228,6 +1281,7 @@ xfs_mod_fdblocks(
 	if (!rsvd)
 		goto fdblocks_enospc;
 
+fdblocks_rsvd:
 	lcounter = (long long)mp->m_resblks_avail + delta;
 	if (lcounter >= 0) {
 		mp->m_resblks_avail = lcounter;
@@ -1241,6 +1295,15 @@ xfs_mod_fdblocks(
 fdblocks_enospc:
 	spin_unlock(&mp->m_sb_lock);
 	return -ENOSPC;
+}
+
+int
+xfs_mod_fdblocks(
+	struct xfs_mount	*mp,
+	int64_t			delta,
+	bool			rsvd)
+{
+	return __xfs_mod_fdblocks(mp, delta, rsvd, true);
 }
 
 int

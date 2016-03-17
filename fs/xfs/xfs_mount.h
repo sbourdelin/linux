@@ -328,6 +328,8 @@ extern void	xfs_unmountfs(xfs_mount_t *);
 
 extern int	xfs_mod_icount(struct xfs_mount *mp, int64_t delta);
 extern int	xfs_mod_ifree(struct xfs_mount *mp, int64_t delta);
+extern int	__xfs_mod_fdblocks(struct xfs_mount *mp, int64_t delta,
+				   bool reserved, bool unres);
 extern int	xfs_mod_fdblocks(struct xfs_mount *mp, int64_t delta,
 				 bool reserved);
 extern int	xfs_mod_frextents(struct xfs_mount *mp, int64_t delta);
