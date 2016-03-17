@@ -350,8 +350,8 @@ static int mv_cesa_get_sram(struct platform_device *pdev, int idx)
 	if (IS_ERR(engine->sram))
 		return PTR_ERR(engine->sram);
 
-	engine->sram_dma = phys_to_dma(cesa->dev,
-				       (phys_addr_t)res->start);
+	engine->sram_dma = dma_map_single(cesa->dev, engine->sram,
+					  DMA_TO_DEVICE);
 
 	return 0;
 }
