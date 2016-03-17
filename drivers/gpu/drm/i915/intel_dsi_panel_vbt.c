@@ -185,38 +185,21 @@ static const u8 *mipi_exec_delay(struct intel_dsi *intel_dsi, const u8 *data)
 	return data;
 }
 
-static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
+static void vlv_exec_gpio(struct drm_i915_private *dev_priv,
+			  u8 gpio_source, u8 gpio_index, u8 action)
 {
-	u8 gpio_source, gpio_index, action, port;
-	u16 function, pad;
 	u32 val;
-	struct drm_device *dev = intel_dsi->base.base.dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-
-	if (dev_priv->vbt.dsi.seq_version >= 3)
-		data++;
-
-	gpio_index = *data++;
-
-	/* gpio source in sequence v2 only */
-	gpio_source = (*data >> 1) & 3;
-
-	/* pull up/down */
-	action = *data++ & 1;
+	u16 function, pad;
+	u8 port;
 
 	if (gpio_index >= ARRAY_SIZE(gtable)) {
-		DRM_DEBUG_KMS("unknown gpio index %u\n", gpio_index);
-		goto out;
-	}
-
-	if (!IS_VALLEYVIEW(dev_priv)) {
-		DRM_DEBUG_KMS("GPIO element not supported on this platform\n");
-		goto out;
+		DRM_DEBUG_KMS("unknown gpio %u\n", gpio_index);
+		return;
 	}
 
 	if (dev_priv->vbt.dsi.seq_version >= 3) {
 		DRM_DEBUG_KMS("GPIO element v3 not supported\n");
-		goto out;
+		return;
 	} else if (dev_priv->vbt.dsi.seq_version == 2) {
 		if (gpio_source == 0) {
 			port = IOSF_PORT_GPIO_NC;
@@ -224,7 +207,7 @@ static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
 			port = IOSF_PORT_GPIO_SC;
 		} else {
 			DRM_DEBUG_KMS("unknown gpio source %u\n", gpio_source);
-			goto out;
+			return;
 		}
 	} else {
 		port = IOSF_PORT_GPIO_NC;
@@ -246,8 +229,30 @@ static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
 	/* pull up/down */
 	vlv_iosf_sb_write(dev_priv, port, pad, val);
 	mutex_unlock(&dev_priv->sb_lock);
+}
 
-out:
+static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
+{
+	struct drm_device *dev = intel_dsi->base.base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	u8 gpio_source, gpio_index, action;
+
+	if (dev_priv->vbt.dsi.seq_version >= 3)
+		data++;
+
+	gpio_index = *data++;
+
+	/* gpio source in sequence v2 only */
+	gpio_source = (*data >> 1) & 3;
+
+	/* pull up/down */
+	action = *data++ & 1;
+
+	if (IS_VALLEYVIEW(dev_priv))
+		vlv_exec_gpio(dev_priv, gpio_source, gpio_index, action);
+	else
+		DRM_DEBUG_KMS("GPIO element not supported on this platform\n");
+
 	return data;
 }
 
