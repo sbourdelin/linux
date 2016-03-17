@@ -4389,6 +4389,52 @@ static int thin_get_reserved_space(struct dm_target *ti, sector_t *nr_sects)
 	return 0;
 }
 
+static int thin_provision_space(struct dm_target *ti, sector_t offset, sector_t len)
+{
+	struct thin_c *tc = ti->private;
+	struct pool *pool = tc->pool;
+	sector_t end;
+	dm_block_t pblock;
+	dm_block_t vblock;
+	int error;
+	struct dm_thin_lookup_result lookup;
+	sector_t count;
+
+	if (!is_factor(offset, pool->sectors_per_block))
+		return -EINVAL;
+
+	if (!len || !is_factor(len, pool->sectors_per_block))
+		return -EINVAL;
+
+	end = offset + len;
+
+	count = 0;
+	while (offset < end) {
+		vblock = offset / pool->sectors_per_block;
+
+		error = dm_thin_find_block(tc->td, vblock, true, &lookup);
+		if (error == 0)
+			goto next;
+		if (error != -ENODATA)
+			return error;
+
+		error = alloc_data_block(tc, &pblock);
+		if (error)
+			return error;
+
+		error = dm_thin_insert_block(tc->td, vblock, pblock);
+		if (error)
+			return error;
+
+		count += pool->sectors_per_block;
+next:
+		offset += pool->sectors_per_block;
+	}
+
+	/* XXX: int -> sector_t ! */
+	return count;
+}
+
 static struct target_type thin_target = {
 	.name = "thin",
 	.version = {1, 18, 0},
@@ -4405,6 +4451,7 @@ static struct target_type thin_target = {
 	.io_hints = thin_io_hints,
 	.reserve_space = thin_reserve_space,
 	.get_reserved_space = thin_get_reserved_space,
+	.provision_space = thin_provision_space,
 };
 
 /*----------------------------------------------------------------*/
