@@ -989,3 +989,19 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
 	dev->archdata.dma_coherent = coherent;
 	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
 }
+
+phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
+{
+	phys_addr_t phys = (phys_addr_t)dev_addr;
+
+#ifdef CONFIG_IOMMU_DMA
+	struct iommu_domain *domain;
+
+	domain = iommu_get_domain_for_dev(dev);
+	if (domain)
+		phys = iommu_iova_to_phys(domain, dev_addr);
+#endif
+
+	return phys;
+}
+EXPORT_SYMBOL(dma_to_phys);

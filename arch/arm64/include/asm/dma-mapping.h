@@ -69,10 +69,7 @@ static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
 	return (dma_addr_t)paddr;
 }
 
-static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
-{
-	return (phys_addr_t)dev_addr;
-}
+phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr);
 
 static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
 {
