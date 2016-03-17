@@ -3814,6 +3814,7 @@ DRM DRIVERS FOR STI
 M:	Benjamin Gaignard <benjamin.gaignard@linaro.org>
 M:	Vincent Abriou <vincent.abriou@st.com>
 L:	dri-devel@lists.freedesktop.org
+L:	kernel@stlinux.com
 T:	git http://git.linaro.org/people/benjamin.gaignard/kernel.git
 S:	Maintained
 F:	drivers/gpu/drm/sti
