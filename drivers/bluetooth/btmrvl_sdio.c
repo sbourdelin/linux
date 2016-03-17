@@ -490,8 +490,8 @@ static int btmrvl_sdio_download_fw_w_helper(struct btmrvl_sdio_card *card)
 	ret = request_firmware(&fw_firmware, card->firmware,
 							&card->func->dev);
 	if ((ret < 0) || !fw_firmware) {
-		BT_ERR("request_firmware(firmware) failed, error code = %d",
-									ret);
+		BT_ERR("Requesting firmware %s failed, error code = %d",
+							card->firmware, ret);
 		ret = -ENOENT;
 		goto done;
 	}
