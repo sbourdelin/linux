@@ -1429,7 +1429,8 @@ static bool dec_reserve_count(struct thin_c *tc, dm_block_t free_blocks)
 static int set_reserve_count(struct thin_c *tc, dm_block_t count)
 {
 	int r;
-	dm_block_t free_blocks, delta;
+	dm_block_t free_blocks;
+	int64_t delta;
 	unsigned long flags;
 
 	r = get_free_blocks(tc->pool, &free_blocks);
@@ -1437,8 +1438,6 @@ static int set_reserve_count(struct thin_c *tc, dm_block_t count)
 		return r;
 
 	spin_lock_irqsave(&tc->pool->lock, flags);
-	if (count <= tc->reserve_count)
-		goto out_unlock; /* nothing to do */
 	delta = count - tc->reserve_count;
 	if (tc->pool->reserve_count + delta > free_blocks)
 		r = -ENOSPC;
@@ -1446,7 +1445,6 @@ static int set_reserve_count(struct thin_c *tc, dm_block_t count)
 		tc->reserve_count = count;
 		tc->pool->reserve_count += delta;
 	}
-out_unlock:
 	spin_unlock_irqrestore(&tc->pool->lock, flags);
 
 	return r;
@@ -4369,7 +4367,7 @@ static int thin_reserve_space(struct dm_target *ti, sector_t nr_sects)
 	 * @nr_sects must always be a factor of the pool's blocksize;
 	 * upper layers can rely on the bdev's minimum_io_size for this.
 	 */
-	if (!nr_sects || !is_factor(nr_sects, pool->sectors_per_block))
+	if (!is_factor(nr_sects, pool->sectors_per_block))
 		return -EINVAL;
 
 	blocks = nr_sects;
