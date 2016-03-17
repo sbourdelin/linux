@@ -53,6 +53,11 @@
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
 
+static inline void __user *to_user_ptr(u64 address)
+{
+	return (void __user *)(uintptr_t)address;
+}
+
 /*
  * This looks more complex than it should be. But we need to
  * get the type for the ~ right in round_down (it needs to be

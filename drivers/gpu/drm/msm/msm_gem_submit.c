@@ -28,11 +28,6 @@
 #define BO_LOCKED   0x4000
 #define BO_PINNED   0x2000
 
-static inline void __user *to_user_ptr(u64 address)
-{
-	return (void __user *)(uintptr_t)address;
-}
-
 static struct msm_gem_submit *submit_create(struct drm_device *dev,
 		struct msm_gpu *gpu, int nr)
 {
