@@ -2,7 +2,7 @@
  * I2C Link Layer for Samsung S3FWRN5 NCI based Driver
  *
  * Copyright (C) 2015 Samsung Electrnoics
- * Robert Baldyga <r.baldyga@samsung.com>
+ * Robert Baldyga <r.baldyga@hackerion.com>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -303,4 +303,4 @@ module_i2c_driver(s3fwrn5_i2c_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("I2C driver for Samsung S3FWRN5");
-MODULE_AUTHOR("Robert Baldyga <r.baldyga@samsung.com>");
+MODULE_AUTHOR("Robert Baldyga <r.baldyga@hackerion.com>");
