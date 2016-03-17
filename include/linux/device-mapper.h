@@ -118,6 +118,7 @@ typedef int (*dm_busy_fn) (struct dm_target *ti);
 
 typedef int (*dm_reserve_space_fn) (struct dm_target *ti, sector_t nr_sects);
 typedef int (*dm_get_reserved_space_fn) (struct dm_target *ti, sector_t *nr_sects);
+typedef int (*dm_provision_space_fn) (struct dm_target *ti, sector_t offset, sector_t len);
 
 void dm_error(const char *message);
 
@@ -167,6 +168,7 @@ struct target_type {
 	dm_io_hints_fn io_hints;
 	dm_reserve_space_fn reserve_space;
 	dm_get_reserved_space_fn get_reserved_space;
+	dm_provision_space_fn provision_space;
 
 	/* For internal device-mapper use. */
 	struct list_head list;
