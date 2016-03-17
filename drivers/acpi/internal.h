@@ -145,6 +145,8 @@ void acpi_early_processor_set_pdc(void);
 static inline void acpi_early_processor_set_pdc(void) {}
 #endif
 
+void acpi_early_processor_set_osc(void);
+
 /* --------------------------------------------------------------------------
                                   Embedded Controller
    -------------------------------------------------------------------------- */
