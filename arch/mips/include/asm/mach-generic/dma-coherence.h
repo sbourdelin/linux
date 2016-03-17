@@ -58,20 +58,4 @@ static inline void plat_post_dma_flush(struct device *dev)
 }
 #endif
 
-#ifdef CONFIG_SWIOTLB
-static inline dma_addr_t swiotlb_phys_to_dma(struct device *dev,
-					     phys_addr_t paddr)
-{
-	return paddr;
-}
-#define swiotlb_phys_to_dma swiotlb_phys_to_dma
-
-static inline phys_addr_t swiotlb_dma_to_phys(struct device *dev,
-					      dma_addr_t daddr)
-{
-	return daddr;
-}
-#define swiotlb_dma_to_phys swiotlb_dma_to_phys
-#endif
-
 #endif /* __ASM_MACH_GENERIC_DMA_COHERENCE_H */

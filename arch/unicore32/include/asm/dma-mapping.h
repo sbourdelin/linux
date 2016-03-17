@@ -36,20 +36,6 @@ static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
 	return 1;
 }
 
-static inline dma_addr_t swiotlb_phys_to_dma(struct device *dev,
-					     phys_addr_t paddr)
-{
-	return paddr;
-}
-#define swiotlb_phys_to_dma swiotlb_phys_to_dma
-
-static inline phys_addr_t swiotlb_dma_to_phys(struct device *dev,
-					      dma_addr_t daddr)
-{
-	return daddr;
-}
-#define swiotlb_dma_to_phys swiotlb_dma_to_phys
-
 static inline void dma_mark_clean(void *addr, size_t size) {}
 
 static inline void dma_cache_sync(struct device *dev, void *vaddr,
