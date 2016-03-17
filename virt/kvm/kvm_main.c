@@ -2054,13 +2054,8 @@ out:
 EXPORT_SYMBOL_GPL(kvm_vcpu_block);
 
 #ifndef CONFIG_S390
-/*
- * Kick a sleeping VCPU, or a guest VCPU in guest mode, into host kernel mode.
- */
-void kvm_vcpu_kick(struct kvm_vcpu *vcpu)
+void kvm_vcpu_wake_up(struct kvm_vcpu *vcpu)
 {
-	int me;
-	int cpu = vcpu->cpu;
 	wait_queue_head_t *wqp;
 
 	wqp = kvm_arch_vcpu_wq(vcpu);
@@ -2068,6 +2063,18 @@ void kvm_vcpu_kick(struct kvm_vcpu *vcpu)
 		wake_up_interruptible(wqp);
 		++vcpu->stat.halt_wakeup;
 	}
+}
+EXPORT_SYMBOL_GPL(kvm_vcpu_wake_up);
+
+/*
+ * Kick a sleeping VCPU, or a guest VCPU in guest mode, into host kernel mode.
+ */
+void kvm_vcpu_kick(struct kvm_vcpu *vcpu)
+{
+	int me;
+	int cpu = vcpu->cpu;
+
+	kvm_vcpu_wake_up(vcpu);
 
 	me = get_cpu();
 	if (cpu != me && (unsigned)cpu < nr_cpu_ids && cpu_online(cpu))
