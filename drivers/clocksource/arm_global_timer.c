@@ -209,7 +209,7 @@ static void gt_resume(struct clocksource *cs)
 
 static struct clocksource gt_clocksource = {
 	.name	= "arm_global_timer",
-	.rating	= 300,
+	.rating	= 150,
 	.read	= gt_clocksource_read,
 	.mask	= CLOCKSOURCE_MASK(64),
 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
