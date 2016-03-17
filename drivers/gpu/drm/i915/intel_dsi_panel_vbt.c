@@ -77,6 +77,23 @@ static inline struct vbt_panel *to_vbt_panel(struct drm_panel *panel)
 
 #define VLV_FUNCTION_TO_PAD_REG(reg) ((reg) + 8)
 
+#define CHV_MAX_GPIO_NUM_N		72
+#define CHV_MAX_GPIO_NUM_SE		99
+#define CHV_MAX_GPIO_NUM_SW		197
+#define CHV_MIN_GPIO_NUM_SE		73
+#define CHV_MIN_GPIO_NUM_SW		100
+#define CHV_MIN_GPIO_NUM_E		198
+
+#define CHV_PAD_FMLY_BASE		0x4400
+#define CHV_PAD_FMLY_SIZE		0x400
+#define CHV_PAD_CFG_0_1_REG_SIZE	0x8
+#define CHV_PAD_CFG_REG_SIZE		0x4
+#define CHV_VBT_MAX_PINS_PER_FMLY	15
+
+#define CHV_GPIO_CFG_UNLOCK		0x00000000
+#define CHV_GPIO_CFG_HIZ		0x00008100
+#define CHV_GPIO_CFG_TX_STATE_SHIFT	1
+
 struct gpio_table {
 	u16 function_reg;
 	bool init;
@@ -243,6 +260,52 @@ static void vlv_exec_gpio(struct drm_i915_private *dev_priv,
 	mutex_unlock(&dev_priv->sb_lock);
 }
 
+static void chv_exec_gpio(struct drm_i915_private *dev_priv,
+			  u8 gpio_source, u8 gpio_index, u8 action)
+{
+	u16 function, pad;
+	u16 family_num;
+	u8 port;
+
+	if (dev_priv->vbt.dsi.seq_version >= 3) {
+		if (gpio_index <= CHV_MAX_GPIO_NUM_N) {
+			port = CHV_IOSF_PORT_GPIO_N;
+		} else if (gpio_index <= CHV_MAX_GPIO_NUM_SE) {
+			port = CHV_IOSF_PORT_GPIO_SE;
+			gpio_index = gpio_index - CHV_MIN_GPIO_NUM_SE;
+		} else if (gpio_index <= CHV_MAX_GPIO_NUM_SW) {
+			port = CHV_IOSF_PORT_GPIO_SW;
+			gpio_index = gpio_index - CHV_MIN_GPIO_NUM_SW;
+		} else {
+			port = CHV_IOSF_PORT_GPIO_E;
+			gpio_index = gpio_index - CHV_MIN_GPIO_NUM_E;
+		}
+	} else if (dev_priv->vbt.dsi.seq_version == 2) {
+		if (gpio_source == 0) {
+			port = IOSF_PORT_GPIO_NC;
+		} else if (gpio_source == 1) {
+			port = IOSF_PORT_GPIO_SC;
+		} else {
+			DRM_DEBUG_KMS("unknown gpio source %u\n", gpio_source);
+			return;
+		}
+	} else {
+		port = IOSF_PORT_GPIO_NC;
+	}
+
+	family_num = gpio_index / CHV_VBT_MAX_PINS_PER_FMLY;
+	gpio_index = gpio_index - (family_num * CHV_VBT_MAX_PINS_PER_FMLY);
+	pad = CHV_PAD_FMLY_BASE + (family_num * CHV_PAD_FMLY_SIZE) +
+		(((u16)gpio_index) * CHV_PAD_CFG_0_1_REG_SIZE);
+	function = pad + CHV_PAD_CFG_REG_SIZE;
+
+	mutex_lock(&dev_priv->sb_lock);
+	vlv_iosf_sb_write(dev_priv, port, function, CHV_GPIO_CFG_UNLOCK);
+	vlv_iosf_sb_write(dev_priv, port, pad, CHV_GPIO_CFG_HIZ |
+			  (action << CHV_GPIO_CFG_TX_STATE_SHIFT));
+	mutex_unlock(&dev_priv->sb_lock);
+}
+
 static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
 {
 	struct drm_device *dev = intel_dsi->base.base.dev;
@@ -262,6 +325,8 @@ static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
 
 	if (IS_VALLEYVIEW(dev_priv))
 		vlv_exec_gpio(dev_priv, gpio_source, gpio_index, action);
+	else if (IS_CHERRYVIEW(dev_priv))
+		chv_exec_gpio(dev_priv, gpio_source, gpio_index, action);
 	else
 		DRM_DEBUG_KMS("GPIO element not supported on this platform\n");
 
