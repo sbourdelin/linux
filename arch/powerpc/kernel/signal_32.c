@@ -129,8 +129,8 @@ static inline int get_sigset_t(sigset_t *set,
 	return 0;
 }
 
-#define to_user_ptr(p)		ptr_to_compat(p)
-#define from_user_ptr(p)	compat_ptr(p)
+#define __to_user_ptr(p)	ptr_to_compat(p)
+#define __from_user_ptr(p)	compat_ptr(p)
 
 static inline int save_general_regs(struct pt_regs *regs,
 		struct mcontext __user *frame)
@@ -178,8 +178,8 @@ static inline int get_sigset_t(sigset_t *set, const sigset_t __user *uset)
 	return copy_from_user(set, uset, sizeof(*uset));
 }
 
-#define to_user_ptr(p)		((unsigned long)(p))
-#define from_user_ptr(p)	((void __user *)(p))
+#define __to_user_ptr(p)	((unsigned long)(p))
+#define __from_user_ptr(p)	((void __user *)(p))
 
 static inline int save_general_regs(struct pt_regs *regs,
 		struct mcontext __user *frame)
@@ -992,7 +992,7 @@ int handle_rt_signal32(struct ksignal *ksig, sigset_t *oldset,
 	if (copy_siginfo_to_user(&rt_sf->info, &ksig->info)
 	    || __put_user(0, &rt_sf->uc.uc_flags)
 	    || __save_altstack(&rt_sf->uc.uc_stack, regs->gpr[1])
-	    || __put_user(to_user_ptr(&rt_sf->uc.uc_mcontext),
+	    || __put_user(__to_user_ptr(&rt_sf->uc.uc_mcontext),
 		    &rt_sf->uc.uc_regs)
 	    || put_sigset_t(&rt_sf->uc.uc_sigmask, oldset))
 		goto badframe;
@@ -1181,7 +1181,7 @@ long sys_swapcontext(struct ucontext __user *old_ctx,
 		if (!access_ok(VERIFY_WRITE, old_ctx, ctx_size)
 		    || save_user_regs(regs, mctx, NULL, 0, ctx_has_vsx_region)
 		    || put_sigset_t(&old_ctx->uc_sigmask, &current->blocked)
-		    || __put_user(to_user_ptr(mctx), &old_ctx->uc_regs))
+		    || __put_user(__to_user_ptr(mctx), &old_ctx->uc_regs))
 			return -EFAULT;
 	}
 	if (new_ctx == NULL)
@@ -1414,14 +1414,14 @@ int handle_signal32(struct ksignal *ksig, sigset_t *oldset, struct pt_regs *regs
 #if _NSIG != 64
 #error "Please adjust handle_signal()"
 #endif
-	if (__put_user(to_user_ptr(ksig->ka.sa.sa_handler), &sc->handler)
+	if (__put_user(__to_user_ptr(ksig->ka.sa.sa_handler), &sc->handler)
 	    || __put_user(oldset->sig[0], &sc->oldmask)
 #ifdef CONFIG_PPC64
 	    || __put_user((oldset->sig[0] >> 32), &sc->_unused[3])
 #else
 	    || __put_user(oldset->sig[1], &sc->_unused[3])
 #endif
-	    || __put_user(to_user_ptr(&frame->mctx), &sc->regs)
+	    || __put_user(__to_user_ptr(&frame->mctx), &sc->regs)
 	    || __put_user(ksig->sig, &sc->signal))
 		goto badframe;
 
@@ -1526,7 +1526,7 @@ long sys_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
 	} else
 #endif
 	{
-		sr = (struct mcontext __user *)from_user_ptr(sigctx.regs);
+		sr = (struct mcontext __user *)__from_user_ptr(sigctx.regs);
 		addr = sr;
 		if (!access_ok(VERIFY_READ, sr, sizeof(*sr))
 		    || restore_user_regs(regs, sr, 1))
