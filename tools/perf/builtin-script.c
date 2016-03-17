@@ -60,28 +60,61 @@ enum perf_output_field {
 	PERF_OUTPUT_BRSTACKSYM	    = 1U << 16,
 };
 
-struct output_option {
+#define ALL_OUTPUT_OPTS_LIST				\
+	OPT_FIRST("comm", PERF_OUTPUT_COMM)		\
+	OPT("tid", PERF_OUTPUT_TID)			\
+	OPT("pid", PERF_OUTPUT_PID)			\
+	OPT("time", PERF_OUTPUT_TIME)			\
+	OPT("cpu", PERF_OUTPUT_CPU)			\
+	OPT("event", PERF_OUTPUT_EVNAME)		\
+	OPT("trace", PERF_OUTPUT_TRACE)			\
+	OPT("ip", PERF_OUTPUT_IP)			\
+	OPT("sym", PERF_OUTPUT_SYM)			\
+	OPT("dso", PERF_OUTPUT_DSO)			\
+	OPT("addr", PERF_OUTPUT_ADDR)			\
+	OPT("symoff", PERF_OUTPUT_SYMOFFSET)		\
+	OPT("srcline", PERF_OUTPUT_SRCLINE)		\
+	OPT("period", PERF_OUTPUT_PERIOD)		\
+	OPT("iregs", PERF_OUTPUT_IREGS)			\
+	OPT("brstack", PERF_OUTPUT_BRSTACK)		\
+	OPT("brstacksym", PERF_OUTPUT_BRSTACKSYM)
+
+#define OPT_FIRST(s, f)		{.str = s, .field = f},
+#define OPT(s, f)		OPT_FIRST(s, f)
+
+static const struct output_option {
 	const char *str;
 	enum perf_output_field field;
 } all_output_options[] = {
-	{.str = "comm",  .field = PERF_OUTPUT_COMM},
-	{.str = "tid",   .field = PERF_OUTPUT_TID},
-	{.str = "pid",   .field = PERF_OUTPUT_PID},
-	{.str = "time",  .field = PERF_OUTPUT_TIME},
-	{.str = "cpu",   .field = PERF_OUTPUT_CPU},
-	{.str = "event", .field = PERF_OUTPUT_EVNAME},
-	{.str = "trace", .field = PERF_OUTPUT_TRACE},
-	{.str = "ip",    .field = PERF_OUTPUT_IP},
-	{.str = "sym",   .field = PERF_OUTPUT_SYM},
-	{.str = "dso",   .field = PERF_OUTPUT_DSO},
-	{.str = "addr",  .field = PERF_OUTPUT_ADDR},
-	{.str = "symoff", .field = PERF_OUTPUT_SYMOFFSET},
-	{.str = "srcline", .field = PERF_OUTPUT_SRCLINE},
-	{.str = "period", .field = PERF_OUTPUT_PERIOD},
-	{.str = "iregs", .field = PERF_OUTPUT_IREGS},
-	{.str = "brstack", .field = PERF_OUTPUT_BRSTACK},
-	{.str = "brstacksym", .field = PERF_OUTPUT_BRSTACKSYM},
+	ALL_OUTPUT_OPTS_LIST
 };
+
+#define ALL_OUTPUT_TYPES_LIST			\
+	OPT_FIRST("hw", PERF_TYPE_HARDWARE)	\
+	OPT("sw", PERF_TYPE_SOFTWARE)		\
+	OPT("trace", PERF_TYPE_TRACEPOINT)	\
+	OPT("raw", PERF_TYPE_RAW)		\
+	OPT("break", PERF_TYPE_BREAKPOINT)
+
+static const struct output_type {
+	const char *str;
+	enum perf_type_id field;
+} all_output_types[] = {
+	ALL_OUTPUT_TYPES_LIST
+};
+
+#undef OPT_FIRST
+#undef OPT
+
+#define OPT_FIRST(s, f)		s
+#define OPT(s, f)		"," s
+static const char *help_fields =
+	"comma separated output fields prepend with 'type:'. "
+	"Valid types: " ALL_OUTPUT_TYPES_LIST ". "
+	"Fields: " ALL_OUTPUT_OPTS_LIST ",flags";
+#undef OPT_FIRST
+#undef OPT
+
 
 /* default set to maintain compatibility with current format */
 static struct {
@@ -1195,7 +1228,7 @@ static int parse_output_fields(const struct option *opt __maybe_unused,
 			    const char *arg, int unset __maybe_unused)
 {
 	char *tok;
-	int i, imax = ARRAY_SIZE(all_output_options);
+	int i, imax;
 	int j;
 	int rc = 0;
 	char *str = strdup(arg);
@@ -1212,17 +1245,15 @@ static int parse_output_fields(const struct option *opt __maybe_unused,
 	if (tok) {
 		*tok = '\0';
 		tok++;
-		if (!strcmp(str, "hw"))
-			type = PERF_TYPE_HARDWARE;
-		else if (!strcmp(str, "sw"))
-			type = PERF_TYPE_SOFTWARE;
-		else if (!strcmp(str, "trace"))
-			type = PERF_TYPE_TRACEPOINT;
-		else if (!strcmp(str, "raw"))
-			type = PERF_TYPE_RAW;
-		else if (!strcmp(str, "break"))
-			type = PERF_TYPE_BREAKPOINT;
-		else {
+
+		imax = ARRAY_SIZE(all_output_types);
+		for (i = 0; i < imax; ++i) {
+			if (strcmp(str, all_output_types[i].str) == 0) {
+				type = all_output_types[i].field;
+				break;
+			}
+		}
+		if (i == imax) {
 			fprintf(stderr, "Invalid event type in field string.\n");
 			rc = -EINVAL;
 			goto out;
@@ -1255,6 +1286,7 @@ static int parse_output_fields(const struct option *opt __maybe_unused,
 		}
 	}
 
+	imax = ARRAY_SIZE(all_output_options);
 	for (tok = strtok(tok, ","); tok; tok = strtok(NULL, ",")) {
 		for (i = 0; i < imax; ++i) {
 			if (strcmp(tok, all_output_options[i].str) == 0)
@@ -1910,10 +1942,7 @@ int cmd_script(int argc, const char **argv, const char *prefix __maybe_unused)
 	OPT_STRING(0, "symfs", &symbol_conf.symfs, "directory",
 		    "Look for files with symbols relative to this directory"),
 	OPT_CALLBACK('F', "fields", NULL, "str",
-		     "comma separated output fields prepend with 'type:'. "
-		     "Valid types: hw,sw,trace,raw. "
-		     "Fields: comm,tid,pid,time,cpu,event,trace,ip,sym,dso,"
-		     "addr,symoff,period,iregs,brstack,brstacksym,flags", parse_output_fields),
+		     help_fields, parse_output_fields),
 	OPT_BOOLEAN('a', "all-cpus", &system_wide,
 		    "system-wide collection from all CPUs"),
 	OPT_STRING('S', "symbols", &symbol_conf.sym_list_str, "symbol[,symbol...]",
