@@ -795,6 +795,8 @@ static int rv3029_probe(struct i2c_client *client,
 	if (IS_ERR(rtc))
 		return PTR_ERR(rtc);
 
+	rtc->uie_unsupported = 1;
+
 	i2c_set_clientdata(client, rtc);
 
 	return 0;
