@@ -31,14 +31,18 @@ static inline struct dma_map_ops *get_dma_ops(struct device *dev)
 void dma_cache_sync(struct device *dev, void *vaddr, size_t size,
 		    enum dma_data_direction direction);
 
-static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+static inline dma_addr_t swiotlb_phys_to_dma(struct device *dev,
+					     phys_addr_t paddr)
 {
 	return (dma_addr_t)paddr;
 }
+#define swiotlb_phys_to_dma swiotlb_phys_to_dma
 
-static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t daddr)
+static inline phys_addr_t swiotlb_dma_to_phys(struct device *dev,
+					      dma_addr_t daddr)
 {
 	return (phys_addr_t)daddr;
 }
+#define swiotlb_dma_to_phys swiotlb_dma_to_phys
 
 #endif	/* _XTENSA_DMA_MAPPING_H */

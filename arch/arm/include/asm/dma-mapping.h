@@ -129,17 +129,21 @@ static inline bool is_device_dma_coherent(struct device *dev)
 	return dev->archdata.dma_coherent;
 }
 
-static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+static inline dma_addr_t swiotlb_phys_to_dma(struct device *dev,
+					     phys_addr_t paddr)
 {
 	unsigned int offset = paddr & ~PAGE_MASK;
 	return pfn_to_dma(dev, __phys_to_pfn(paddr)) + offset;
 }
+#define swiotlb_phys_to_dma swiotlb_phys_to_dma
 
-static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
+static inline phys_addr_t swiotlb_dma_to_phys(struct device *dev,
+					      dma_addr_t dev_addr)
 {
 	unsigned int offset = dev_addr & ~PAGE_MASK;
 	return __pfn_to_phys(dma_to_pfn(dev, dev_addr)) + offset;
 }
+#define swiotlb_dma_to_phys swiotlb_dma_to_phys
 
 static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
 {

@@ -61,8 +61,11 @@ static inline void plat_post_dma_flush(struct device *dev)
 {
 }
 
-dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr);
-phys_addr_t dma_to_phys(struct device *dev, dma_addr_t daddr);
+dma_addr_t swiotlb_phys_to_dma(struct device *dev, phys_addr_t paddr);
+#define swiotlb_phys_to_dma swiotlb_phys_to_dma
+
+phys_addr_t swiotlb_dma_to_phys(struct device *dev, dma_addr_t daddr);
+#define swiotlb_dma_to_phys swiotlb_dma_to_phys
 
 struct dma_map_ops;
 extern struct dma_map_ops *octeon_pci_dma_map_ops;

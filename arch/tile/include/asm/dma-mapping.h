@@ -47,15 +47,19 @@ static inline void set_dma_offset(struct device *dev, dma_addr_t off)
 	dev->archdata.dma_offset = off;
 }
 
-static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+static inline dma_addr_t swiotlb_phys_to_dma(struct device *dev,
+					     phys_addr_t paddr)
 {
 	return paddr;
 }
+#define swiotlb_phys_to_dma swiotlb_phys_to_dma
 
-static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t daddr)
+static inline phys_addr_t swiotlb_dma_to_phys(struct device *dev,
+					      dma_addr_t daddr)
 {
 	return daddr;
 }
+#define swiotlb_dma_to_phys swiotlb_dma_to_phys
 
 static inline void dma_mark_clean(void *addr, size_t size) {}
 
