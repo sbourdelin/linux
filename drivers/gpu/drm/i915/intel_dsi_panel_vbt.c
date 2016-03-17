@@ -58,6 +58,10 @@ static inline struct vbt_panel *to_vbt_panel(struct drm_panel *panel)
 
 #define NS_KHZ_RATIO 1000000
 
+#define VLV_IOSF_MAX_GPIO_NUM_NC	26
+#define VLV_IOSF_MAX_GPIO_NUM_SC	128
+#define VLV_IOSF_MAX_GPIO_NUM		172
+
 #define VLV_GPIO_NC_0_HV_DDI0_HPD	0x4130
 #define VLV_GPIO_NC_1_HV_DDI0_DDC_SDA	0x4120
 #define VLV_GPIO_NC_2_HV_DDI0_DDC_SCL	0x4110
@@ -198,8 +202,16 @@ static void vlv_exec_gpio(struct drm_i915_private *dev_priv,
 	}
 
 	if (dev_priv->vbt.dsi.seq_version >= 3) {
-		DRM_DEBUG_KMS("GPIO element v3 not supported\n");
-		return;
+		if (gpio_index <= VLV_IOSF_MAX_GPIO_NUM_NC) {
+			port = IOSF_PORT_GPIO_NC;
+		} else if (gpio_index <= VLV_IOSF_MAX_GPIO_NUM_SC) {
+			port = IOSF_PORT_GPIO_SC;
+		} else if (gpio_index <= VLV_IOSF_MAX_GPIO_NUM) {
+			port = IOSF_PORT_GPIO_SUS;
+		} else {
+			DRM_DEBUG_KMS("invalid gpio index %u\n", gpio_index);
+			return;
+		}
 	} else if (dev_priv->vbt.dsi.seq_version == 2) {
 		if (gpio_source == 0) {
 			port = IOSF_PORT_GPIO_NC;
