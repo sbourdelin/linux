@@ -41,7 +41,7 @@
 
 #define SNIC_DRV_NAME		"snic"
 #define SNIC_DRV_DESCRIPTION	"Cisco SCSI NIC Driver"
-#define SNIC_DRV_VERSION	"0.0.1.18"
+#define SNIC_DRV_VERSION	"0.0.1.26"
 #define PFX			SNIC_DRV_NAME ":"
 #define DFX			SNIC_DRV_NAME "%d: "
 
