@@ -1315,12 +1315,14 @@ visornic_rx(struct uiscmdrsp *cmdrsp)
 				}
 				if (found_mc)
 					break;	/* accept packet, dest
-						   matches a multicast
-						   address */
+						 * matches a multicast
+						 * address
+						 */
 			}
 		} else if (skb->pkt_type == PACKET_HOST) {
 			break;	/* accept packet, h_dest must match vnic
-				   mac address */
+				 * mac address
+				 */
 		} else if (skb->pkt_type == PACKET_OTHERHOST) {
 			/* something is not right */
 			dev_err(&devdata->netdev->dev,
@@ -1618,8 +1620,7 @@ service_resp_queue(struct uiscmdrsp *cmdrsp, struct visornic_devdata *devdata,
 	unsigned long flags;
 	struct net_device *netdev;
 
-	/* TODO: CLIENT ACQUIRE -- Don't really need this at the
-	 * moment */
+	/* TODO: CLIENT ACQUIRE -- Don't really need this at the moment */
 	for (;;) {
 		if (!visorchannel_signalremove(devdata->dev->visorchannel,
 					       IOCHAN_FROM_IOPART,
