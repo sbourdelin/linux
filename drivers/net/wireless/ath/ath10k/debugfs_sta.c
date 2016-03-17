@@ -35,6 +35,28 @@ void ath10k_sta_update_rx_duration(struct ath10k *ar, struct list_head *head)
 	rcu_read_unlock();
 }
 
+void ath10k_sta_statistics(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+			   struct ieee80211_sta *sta,
+			   struct station_info *sinfo)
+{
+	struct ath10k_sta *arsta = (struct ath10k_sta *)sta->drv_priv;
+	struct ath10k *ar = arsta->arvif->ar;
+
+	mutex_lock(&ar->conf_mutex);
+
+	if (ar->state != ATH10K_STATE_ON &&
+	    ar->state != ATH10K_STATE_RESTARTED)
+		goto out;
+
+	if (!ath10k_peer_stats_enabled(ar))
+		goto out;
+
+	sinfo->rx_duration = arsta->rx_duration;
+	sinfo->filled |= 1ULL << NL80211_STA_INFO_RX_DURATION;
+out:
+	mutex_unlock(&ar->conf_mutex);
+}
+
 static ssize_t ath10k_dbg_sta_read_aggr_mode(struct file *file,
 					     char __user *user_buf,
 					     size_t count, loff_t *ppos)
