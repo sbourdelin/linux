@@ -93,11 +93,11 @@ int FillH2CCmd(struct rtw_adapter *padapter, u8 ElementID, u32 CmdLen,
 
 		if (h2c_cmd & BIT(7)) {
 			msgbox_ex_addr = REG_HMEBOX_EXT_0 + (h2c_box_num * EX_MESSAGE_BOX_SIZE);
-			h2c_cmd_ex = le16_to_cpu(h2c_cmd_ex);
+			le16_to_cpus(&h2c_cmd_ex);
 			rtl8723au_write16(padapter, msgbox_ex_addr, h2c_cmd_ex);
 		}
 		msgbox_addr = REG_HMEBOX_0 + (h2c_box_num * MESSAGE_BOX_SIZE);
-		h2c_cmd = le32_to_cpu(h2c_cmd);
+		le32_to_cpus(&h2c_cmd);
 		rtl8723au_write32(padapter, msgbox_addr, h2c_cmd);
 
 		bcmd_down = true;
