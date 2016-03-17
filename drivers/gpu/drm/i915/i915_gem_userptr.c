@@ -500,20 +500,22 @@ __i915_gem_userptr_get_pages_worker(struct work_struct *_work)
 		pvec = drm_malloc_ab(npages, sizeof(struct page *));
 	if (pvec != NULL) {
 		struct mm_struct *mm = obj->userptr.mm->mm;
+		int locked = 1;
 
 		down_read(&mm->mmap_sem);
 		while (pinned < npages) {
-			ret = get_user_pages(work->task, mm,
-					     obj->userptr.ptr + pinned * PAGE_SIZE,
-					     npages - pinned,
-					     !obj->userptr.read_only, 0,
-					     pvec + pinned, NULL);
+			ret = get_user_pages_locked(work->task, mm,
+						    obj->userptr.ptr + pinned * PAGE_SIZE,
+						    npages - pinned,
+						    !obj->userptr.read_only, 0,
+						    pvec + pinned, &locked);
 			if (ret < 0)
 				break;
 
 			pinned += ret;
 		}
-		up_read(&mm->mmap_sem);
+		if (locked)
+			up_read(&mm->mmap_sem);
 	}
 
 	mutex_lock(&dev->struct_mutex);
