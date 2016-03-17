@@ -2185,6 +2185,33 @@ DEFINE_DISCARD_EVENT(xfs_discard_toosmall);
 DEFINE_DISCARD_EVENT(xfs_discard_exclude);
 DEFINE_DISCARD_EVENT(xfs_discard_busy);
 
+DECLARE_EVENT_CLASS(xfs_thin_class,
+	TP_PROTO(struct xfs_mount *mp, sector_t total, sector_t res),
+	TP_ARGS(mp, total, res),
+	TP_STRUCT__entry(
+		__field(dev_t, dev)
+		__field(sector_t, total)
+		__field(sector_t, res)
+	),
+	TP_fast_assign(
+		__entry->dev = mp->m_super->s_dev;
+		__entry->total = total;
+		__entry->res = res;
+	),
+	TP_printk("dev %d:%d total %lu res %lu",
+		  MAJOR(__entry->dev), MINOR(__entry->dev), __entry->total,
+		  __entry->res)
+)
+
+#define DEFINE_THIN_EVENT(name) \
+DEFINE_EVENT(xfs_thin_class, name, \
+	TP_PROTO(struct xfs_mount *mp, sector_t total, sector_t res), \
+	TP_ARGS(mp, total, res))
+DEFINE_THIN_EVENT(xfs_thin_reserve);
+DEFINE_THIN_EVENT(xfs_thin_reserve_enospc);
+DEFINE_THIN_EVENT(xfs_thin_unreserve);
+DEFINE_THIN_EVENT(xfs_thin_provision);
+
 #endif /* _TRACE_XFS_H */
 
 #undef TRACE_INCLUDE_PATH
