@@ -123,7 +123,7 @@ static int virtio_gpu_execbuffer(struct drm_device *dev,
 			return -ENOMEM;
 		}
 
-		user_bo_handles = (void __user *)(uintptr_t)exbuf->bo_handles;
+		user_bo_handles = u64_to_user_ptr(exbuf->bo_handles);
 		if (copy_from_user(bo_handles, user_bo_handles,
 				   exbuf->num_bo_handles * sizeof(uint32_t))) {
 			ret = -EFAULT;
@@ -158,8 +158,7 @@ static int virtio_gpu_execbuffer(struct drm_device *dev,
 		ret = -ENOMEM;
 		goto out_unresv;
 	}
-	if (copy_from_user(buf, (void __user *)(uintptr_t)exbuf->command,
-			   exbuf->size)) {
+	if (copy_from_user(buf, u64_to_user_ptr(exbuf->command), exbuf->size)) {
 		kfree(buf);
 		ret = -EFAULT;
 		goto out_unresv;

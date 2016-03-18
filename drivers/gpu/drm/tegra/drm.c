@@ -329,12 +329,9 @@ int tegra_drm_submit(struct tegra_drm_context *context,
 	unsigned int num_cmdbufs = args->num_cmdbufs;
 	unsigned int num_relocs = args->num_relocs;
 	unsigned int num_waitchks = args->num_waitchks;
-	struct drm_tegra_cmdbuf __user *cmdbufs =
-		(void __user *)(uintptr_t)args->cmdbufs;
-	struct drm_tegra_reloc __user *relocs =
-		(void __user *)(uintptr_t)args->relocs;
-	struct drm_tegra_waitchk __user *waitchks =
-		(void __user *)(uintptr_t)args->waitchks;
+	struct drm_tegra_cmdbuf __user *cmdbufs;
+	struct drm_tegra_reloc __user *relocs;
+	struct drm_tegra_waitchk __user *waitchks;
 	struct drm_tegra_syncpt syncpt;
 	struct host1x_job *job;
 	int err;
@@ -353,6 +350,10 @@ int tegra_drm_submit(struct tegra_drm_context *context,
 	job->client = (u32)args->context;
 	job->class = context->client->base.class;
 	job->serialize = true;
+
+	cmdbufs = u64_to_user_ptr(args->cmdbufs);
+	relocs = u64_to_user_ptr(args->relocs);
+	waitchks = u64_to_user_ptr(args->waitchks);
 
 	while (num_cmdbufs) {
 		struct drm_tegra_cmdbuf cmdbuf;
@@ -389,7 +390,7 @@ int tegra_drm_submit(struct tegra_drm_context *context,
 		goto fail;
 	}
 
-	if (copy_from_user(&syncpt, (void __user *)(uintptr_t)args->syncpts,
+	if (copy_from_user(&syncpt, u64_to_user_ptr(args->syncpts),
 			   sizeof(syncpt))) {
 		err = -EFAULT;
 		goto fail;

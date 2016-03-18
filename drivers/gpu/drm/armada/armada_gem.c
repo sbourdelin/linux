@@ -382,7 +382,7 @@ int armada_gem_pwrite_ioctl(struct drm_device *dev, void *data,
 	if (args->size == 0)
 		return 0;
 
-	ptr = (char __user *)(uintptr_t)args->ptr;
+	ptr = u64_to_user_ptr(args->ptr);
 
 	if (!access_ok(VERIFY_READ, ptr, args->size))
 		return -EFAULT;

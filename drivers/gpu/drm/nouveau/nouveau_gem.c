@@ -467,10 +467,11 @@ validate_list(struct nouveau_channel *chan, struct nouveau_cli *cli,
 	      uint64_t user_pbbo_ptr)
 {
 	struct nouveau_drm *drm = chan->drm;
-	struct drm_nouveau_gem_pushbuf_bo __user *upbbo =
-				(void __force __user *)(uintptr_t)user_pbbo_ptr;
+	struct drm_nouveau_gem_pushbuf_bo __user *upbbo;
 	struct nouveau_bo *nvbo;
 	int ret, relocs = 0;
+
+	upbbo = u64_to_user_ptr(user_pbbo_ptr);
 
 	list_for_each_entry(nvbo, list, entry) {
 		struct drm_nouveau_gem_pushbuf_bo *b = &pbbo[nvbo->pbbo_index];
@@ -565,7 +566,7 @@ static inline void *
 u_memcpya(uint64_t user, unsigned nmemb, unsigned size)
 {
 	void *mem;
-	void __user *userptr = (void __force __user *)(uintptr_t)user;
+	void __user *userptr = u64_to_user_ptr(user);
 
 	size *= nmemb;
 

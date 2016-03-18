@@ -500,8 +500,8 @@ vc4_create_shader_bo_ioctl(struct drm_device *dev, void *data,
 		return PTR_ERR(bo);
 
 	if (copy_from_user(bo->base.vaddr,
-			     (void __user *)(uintptr_t)args->data,
-			     args->size)) {
+			   u64_to_user_ptr(args->data),
+			   args->size)) {
 		ret = -EFAULT;
 		goto fail;
 	}
