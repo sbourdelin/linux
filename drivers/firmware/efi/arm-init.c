@@ -19,6 +19,7 @@
 #include <linux/mm_types.h>
 #include <linux/of.h>
 #include <linux/of_fdt.h>
+#include <linux/platform_device.h>
 #include <linux/screen_info.h>
 
 #include <asm/efi.h>
@@ -76,6 +77,10 @@ static void __init init_screen_info(void)
 		screen_info = *si;
 		early_memunmap(si, sizeof(*si));
 	}
+
+	if (screen_info.orig_video_isVGA == VIDEO_TYPE_EFI &&
+	    memblock_is_map_memory(screen_info.lfb_base))
+		memblock_mark_nomap(screen_info.lfb_base, screen_info.lfb_size);
 }
 
 static int __init uefi_init(void)
@@ -235,3 +240,16 @@ void __init efi_init(void)
 
 	init_screen_info();
 }
+
+static int __init register_gop_device(void)
+{
+	void *pd;
+
+	if (screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
+		return 0;
+
+	/* the efifb driver accesses screen_info directly, no need to pass it */
+	pd = platform_device_register_simple("efi-framebuffer", 0, NULL, 0);
+	return PTR_ERR_OR_ZERO(pd);
+}
+subsys_initcall(register_gop_device);
