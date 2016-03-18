@@ -189,7 +189,8 @@ int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
  */
 
 int copy_thread(unsigned long clone_flags, unsigned long usp_thread_fn,
-		unsigned long thread_fn_arg, struct task_struct *p)
+		unsigned long thread_fn_arg, struct task_struct *p,
+		int return_to_kernel)
 {
 	struct pt_regs *childregs = task_pt_regs(p);
 
@@ -203,7 +204,7 @@ int copy_thread(unsigned long clone_flags, unsigned long usp_thread_fn,
 
 	p->thread.sp = (unsigned long)childregs;
 
-	if (!(p->flags & PF_KTHREAD)) {
+	if (!(p->flags & PF_KTHREAD) && !return_to_kernel) {
 		struct pt_regs *regs = current_pt_regs();
 		unsigned long usp = usp_thread_fn ?
 			usp_thread_fn : regs->areg[1];

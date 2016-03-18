@@ -112,13 +112,14 @@ void start_thread(struct pt_regs *regs, unsigned int pc, unsigned long usp)
  */
 int copy_thread(unsigned long clone_flags, unsigned long usp,
 		unsigned long ustk_size,
-		struct task_struct *p)
+		struct task_struct *p,
+		int return_to_kernel)
 {
 	struct pt_regs *childregs;
 
 	childregs = task_pt_regs(p);
 
-	if (unlikely(p->flags & PF_KTHREAD)) {
+	if (unlikely(p->flags & PF_KTHREAD) || return_to_kernel) {
 		/* case of  __kernel_thread: we return to supervisor space */
 		memset(childregs, 0, sizeof(struct pt_regs));
 		childregs->sp = (unsigned long)(childregs + 1);

@@ -222,7 +222,7 @@ asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
 
 int
 copy_thread(unsigned long clone_flags, unsigned long stack_start,
-	    unsigned long stk_sz, struct task_struct *p)
+	    unsigned long stk_sz, struct task_struct *p, int return_to_kernel)
 {
 	struct thread_info *thread = task_thread_info(p);
 	struct pt_regs *childregs = task_pt_regs(p);
@@ -239,7 +239,7 @@ copy_thread(unsigned long clone_flags, unsigned long stack_start,
 	thread->cpu_domain = get_domain();
 #endif
 
-	if (likely(!(p->flags & PF_KTHREAD))) {
+	if (likely(!(p->flags & PF_KTHREAD)) && !return_to_kernel) {
 		*childregs = *current_pt_regs();
 		childregs->ARM_r0 = 0;
 		if (stack_start)

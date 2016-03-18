@@ -281,11 +281,12 @@ asmlinkage void syscall_return(void);
 
 int copy_thread(unsigned long clone_flags, unsigned long usp,
 		unsigned long arg,
-		struct task_struct *p)
+		struct task_struct *p,
+		int return_to_kernel)
 {
 	struct pt_regs *childregs = task_pt_regs(p);
 
-	if (unlikely(p->flags & PF_KTHREAD)) {
+	if (unlikely(p->flags & PF_KTHREAD) || return_to_kernel) {
 		memset(childregs, 0, sizeof(struct pt_regs));
 		p->thread.cpu_context.r0 = arg;
 		p->thread.cpu_context.r1 = usp; /* fn */

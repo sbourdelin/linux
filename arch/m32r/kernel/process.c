@@ -129,13 +129,13 @@ int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpu)
 }
 
 int copy_thread(unsigned long clone_flags, unsigned long spu,
-	unsigned long arg, struct task_struct *tsk)
+	unsigned long arg, struct task_struct *tsk, int return_to_kernel)
 {
 	struct pt_regs *childregs = task_pt_regs(tsk);
 	extern void ret_from_fork(void);
 	extern void ret_from_kernel_thread(void);
 
-	if (unlikely(tsk->flags & PF_KTHREAD)) {
+	if (unlikely(tsk->flags & PF_KTHREAD) || return_to_kernel) {
 		memset(childregs, 0, sizeof(struct pt_regs));
 		childregs->psw = M32R_PSW_BIE;
 		childregs->r1 = spu;	/* fn */

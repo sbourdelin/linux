@@ -142,7 +142,7 @@ int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
  */
 int copy_thread(unsigned long clone_flags,
 		unsigned long c_usp, unsigned long ustk_size,
-		struct task_struct *p)
+		struct task_struct *p, int return_to_kernel)
 {
 	struct thread_info *ti = task_thread_info(p);
 	struct pt_regs *c_regs;
@@ -163,7 +163,7 @@ int copy_thread(unsigned long clone_flags,
 	p->thread.wchan	= p->thread.pc;
 	p->thread.usp	= c_usp;
 
-	if (unlikely(p->flags & PF_KTHREAD)) {
+	if (unlikely(p->flags & PF_KTHREAD) || return_to_kernel) {
 		memset(c_regs, 0, sizeof(struct pt_regs));
 		c_regs->a0 = c_usp; /* function */
 		c_regs->d0 = ustk_size; /* argument */

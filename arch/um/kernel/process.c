@@ -155,7 +155,8 @@ void fork_handler(void)
 }
 
 int copy_thread(unsigned long clone_flags, unsigned long sp,
-		unsigned long arg, struct task_struct * p)
+		unsigned long arg, struct task_struct *p,
+		int return_to_kernel)
 {
 	void (*handler)(void);
 	int kthread = current->flags & PF_KTHREAD;
@@ -163,7 +164,7 @@ int copy_thread(unsigned long clone_flags, unsigned long sp,
 
 	p->thread = (struct thread_struct) INIT_THREAD;
 
-	if (!kthread) {
+	if (!kthread && !return_to_kernel) {
 	  	memcpy(&p->thread.regs.regs, current_pt_regs(),
 		       sizeof(p->thread.regs.regs));
 		PT_REGS_SET_SYSCALL_RETURN(&p->thread.regs, 0);
@@ -182,15 +183,16 @@ int copy_thread(unsigned long clone_flags, unsigned long sp,
 
 	new_thread(task_stack_page(p), &p->thread.switch_buf, handler);
 
-	if (!kthread) {
-		clear_flushed_tls(p);
+	if (kthread || return_to_kernel)
+		return ret;
 
-		/*
-		 * Set a new TLS for the child thread?
-		 */
-		if (clone_flags & CLONE_SETTLS)
-			ret = arch_copy_tls(p);
-	}
+	clear_flushed_tls(p);
+
+	/*
+	 * Set a new TLS for the child thread?
+	 */
+	if (clone_flags & CLONE_SETTLS)
+		ret = arch_copy_tls(p);
 
 	return ret;
 }

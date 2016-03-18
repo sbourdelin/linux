@@ -100,7 +100,7 @@ void arch_release_thread_info(struct thread_info *info)
 static void save_arch_state(struct thread_struct *t);
 
 int copy_thread(unsigned long clone_flags, unsigned long sp,
-		unsigned long arg, struct task_struct *p)
+		unsigned long arg, struct task_struct *p, int return_to_kernel)
 {
 	struct pt_regs *childregs = task_pt_regs(p);
 	unsigned long ksp;
@@ -126,7 +126,7 @@ int copy_thread(unsigned long clone_flags, unsigned long sp,
 	/* Record the pid of the task that created this one. */
 	p->thread.creator_pid = current->pid;
 
-	if (unlikely(p->flags & PF_KTHREAD)) {
+	if (unlikely(p->flags & PF_KTHREAD) || return_to_kernel) {
 		/* kernel thread */
 		memset(childregs, 0, sizeof(struct pt_regs));
 		memset(&callee_regs[2], 0,

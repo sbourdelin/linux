@@ -127,7 +127,7 @@ inline unsigned long user_stack(const struct pt_regs *regs)
  */
 int copy_thread(unsigned long clone_flags,
 		unsigned long usp, unsigned long arg,
-		struct task_struct *p)
+		struct task_struct *p, int return_to_kernel)
 {
 	struct pt_regs *childregs;
 
@@ -144,7 +144,7 @@ int copy_thread(unsigned long clone_flags,
 	p->thread.lr	 = 0;
 	p->thread.frame0 = childregs;
 
-	if (unlikely(p->flags & PF_KTHREAD)) {
+	if (unlikely(p->flags & PF_KTHREAD) || return_to_kernel) {
 		childregs->gr9 = usp; /* function */
 		childregs->gr8 = arg;
 		p->thread.pc = (unsigned long) ret_from_kernel_thread;

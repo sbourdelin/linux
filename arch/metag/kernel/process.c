@@ -178,7 +178,8 @@ void show_regs(struct pt_regs *regs)
  * Copy architecture-specific thread state
  */
 int copy_thread(unsigned long clone_flags, unsigned long usp,
-		unsigned long kthread_arg, struct task_struct *tsk)
+		unsigned long kthread_arg, struct task_struct *tsk,
+		int return_to_kernel)
 {
 	struct pt_regs *childregs = task_pt_regs(tsk);
 	void *kernel_context = ((void *) childregs +
@@ -195,7 +196,7 @@ int copy_thread(unsigned long clone_flags, unsigned long usp,
 						     ret_from_fork,
 						     0, 0);
 
-	if (unlikely(tsk->flags & PF_KTHREAD)) {
+	if (unlikely(tsk->flags & PF_KTHREAD) || return_to_kernel) {
 		/*
 		 * Make sure we don't leak any kernel data to child's regs
 		 * if kernel thread becomes a userspace thread in the future

@@ -88,7 +88,7 @@ asmlinkage void ret_from_fork(void);
  */
 int copy_thread(unsigned long clone_flags,
 		unsigned long usp, unsigned long kthread_arg,
-		struct task_struct *p)
+		struct task_struct *p, int return_to_kernel)
 {
 	struct pt_regs *c_regs;        /* child's pt_regs */
 	unsigned long *childksp;       /* to unwind out of __switch_to() */
@@ -115,7 +115,7 @@ int copy_thread(unsigned long clone_flags,
 	childksp[0] = 0;			/* fp */
 	childksp[1] = (unsigned long)ret_from_fork; /* blink */
 
-	if (unlikely(p->flags & PF_KTHREAD)) {
+	if (unlikely(p->flags & PF_KTHREAD) || return_to_kernel) {
 		memset(c_regs, 0, sizeof(struct pt_regs));
 
 		c_callee->r13 = kthread_arg;

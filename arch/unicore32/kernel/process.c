@@ -229,14 +229,14 @@ asmlinkage void ret_from_kernel_thread(void) __asm__("ret_from_kernel_thread");
 
 int
 copy_thread(unsigned long clone_flags, unsigned long stack_start,
-	    unsigned long stk_sz, struct task_struct *p)
+	    unsigned long stk_sz, struct task_struct *p, int return_to_kernel)
 {
 	struct thread_info *thread = task_thread_info(p);
 	struct pt_regs *childregs = task_pt_regs(p);
 
 	memset(&thread->cpu_context, 0, sizeof(struct cpu_context_save));
 	thread->cpu_context.sp = (unsigned long)childregs;
-	if (unlikely(p->flags & PF_KTHREAD)) {
+	if (unlikely(p->flags & PF_KTHREAD) || return_to_kernel) {
 		thread->cpu_context.pc = (unsigned long)ret_from_kernel_thread;
 		thread->cpu_context.r4 = stack_start;
 		thread->cpu_context.r5 = stk_sz;

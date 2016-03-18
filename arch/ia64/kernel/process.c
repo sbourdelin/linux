@@ -333,7 +333,7 @@ ia64_load_extra (struct task_struct *task)
 int
 copy_thread(unsigned long clone_flags,
 	     unsigned long user_stack_base, unsigned long user_stack_size,
-	     struct task_struct *p)
+	     struct task_struct *p, int return_to_kernel)
 {
 	extern char ia64_ret_from_clone;
 	struct switch_stack *child_stack, *stack;
@@ -375,7 +375,7 @@ copy_thread(unsigned long clone_flags,
 
 	ia64_drop_fpu(p);	/* don't pick up stale state from a CPU's fph */
 
-	if (unlikely(p->flags & PF_KTHREAD)) {
+	if (unlikely(p->flags & PF_KTHREAD) || return_to_kernel) {
 		if (unlikely(!user_stack_base)) {
 			/* fork_idle() called us */
 			return 0;

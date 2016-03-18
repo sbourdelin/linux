@@ -245,13 +245,14 @@ int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
 asmlinkage void ret_from_fork(void) asm("ret_from_fork");
 
 int copy_thread(unsigned long clone_flags, unsigned long stack_start,
-		unsigned long stk_sz, struct task_struct *p)
+		unsigned long stk_sz, struct task_struct *p,
+		int return_to_kernel)
 {
 	struct pt_regs *childregs = task_pt_regs(p);
 
 	memset(&p->thread.cpu_context, 0, sizeof(struct cpu_context));
 
-	if (likely(!(p->flags & PF_KTHREAD))) {
+	if (likely(!(p->flags & PF_KTHREAD)) && !return_to_kernel) {
 		*childregs = *current_pt_regs();
 		childregs->regs[0] = 0;
 

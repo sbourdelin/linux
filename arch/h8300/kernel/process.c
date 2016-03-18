@@ -104,13 +104,13 @@ void flush_thread(void)
 
 int copy_thread(unsigned long clone_flags,
 		unsigned long usp, unsigned long topstk,
-		struct task_struct *p)
+		struct task_struct *p, int return_to_kernel)
 {
 	struct pt_regs *childregs;
 
 	childregs = (struct pt_regs *) (THREAD_SIZE + task_stack_page(p)) - 1;
 
-	if (unlikely(p->flags & PF_KTHREAD)) {
+	if (unlikely(p->flags & PF_KTHREAD) || return_to_kernel) {
 		memset(childregs, 0, sizeof(struct pt_regs));
 		childregs->retpc = (unsigned long) ret_from_kernel_thread;
 		childregs->er4 = topstk; /* arg */

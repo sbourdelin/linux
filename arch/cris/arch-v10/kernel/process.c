@@ -95,7 +95,7 @@ asmlinkage void ret_from_fork(void);
 asmlinkage void ret_from_kernel_thread(void);
 
 int copy_thread(unsigned long clone_flags, unsigned long usp,
-		unsigned long arg, struct task_struct *p)
+		unsigned long arg, struct task_struct *p, int return_to_kernel)
 {
 	struct pt_regs *childregs = task_pt_regs(p);
 	struct switch_stack *swstack = ((struct switch_stack *)childregs) - 1;
@@ -104,7 +104,7 @@ int copy_thread(unsigned long clone_flags, unsigned long usp,
 	 * remember that the task_struct doubles as the kernel stack for the task
 	 */
 
-	if (unlikely(p->flags & PF_KTHREAD)) {
+	if (unlikely(p->flags & PF_KTHREAD) || return_to_kernel) {
 		memset(swstack, 0,
 			sizeof(struct switch_stack) + sizeof(struct pt_regs));
 		swstack->r1 = usp;

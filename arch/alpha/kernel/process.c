@@ -241,7 +241,7 @@ release_thread(struct task_struct *dead_task)
 int
 copy_thread(unsigned long clone_flags, unsigned long usp,
 	    unsigned long kthread_arg,
-	    struct task_struct *p)
+	    struct task_struct *p, int return_to_kernel)
 {
 	extern void ret_from_fork(void);
 	extern void ret_from_kernel_thread(void);
@@ -255,7 +255,7 @@ copy_thread(unsigned long clone_flags, unsigned long usp,
 	childti->pcb.ksp = (unsigned long) childstack;
 	childti->pcb.flags = 1;	/* set FEN, clear everything else */
 
-	if (unlikely(p->flags & PF_KTHREAD)) {
+	if (unlikely(p->flags & PF_KTHREAD) || return_to_kernel) {
 		/* kernel thread */
 		memset(childstack, 0,
 			sizeof(struct switch_stack) + sizeof(struct pt_regs));
