@@ -90,6 +90,60 @@ static void mcb_shutdown(struct device *dev)
 		mdrv->shutdown(mdev);
 }
 
+static ssize_t revision_show(struct device *dev, struct device_attribute *attr,
+			 char *buf)
+{
+	struct mcb_bus *bus = to_mcb_bus(dev);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", bus->revision);
+}
+static DEVICE_ATTR_RO(revision);
+
+static ssize_t model_show(struct device *dev, struct device_attribute *attr,
+			 char *buf)
+{
+	struct mcb_bus *bus = to_mcb_bus(dev);
+
+	return scnprintf(buf, PAGE_SIZE, "%c\n", bus->model);
+}
+static DEVICE_ATTR_RO(model);
+
+static ssize_t minor_show(struct device *dev, struct device_attribute *attr,
+			 char *buf)
+{
+	struct mcb_bus *bus = to_mcb_bus(dev);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", bus->minor);
+}
+static DEVICE_ATTR_RO(minor);
+
+static ssize_t name_show(struct device *dev, struct device_attribute *attr,
+			 char *buf)
+{
+	struct mcb_bus *bus = to_mcb_bus(dev);
+
+	return scnprintf(buf, PAGE_SIZE, "%s\n", bus->name);
+}
+static DEVICE_ATTR_RO(name);
+
+static struct attribute *mcb_bus_attrs[] = {
+	&dev_attr_revision.attr,
+	&dev_attr_model.attr,
+	&dev_attr_minor.attr,
+	&dev_attr_name.attr,
+	NULL,
+};
+
+static const struct attribute_group mcb_carrier_group = {
+	.attrs = mcb_bus_attrs,
+};
+
+static const struct attribute_group *mcb_carrier_groups[] = {
+	&mcb_carrier_group,
+	NULL,
+};
+
+
 static struct bus_type mcb_bus_type = {
 	.name = "mcb",
 	.match = mcb_match,
@@ -97,6 +151,11 @@ static struct bus_type mcb_bus_type = {
 	.probe = mcb_probe,
 	.remove = mcb_remove,
 	.shutdown = mcb_shutdown,
+};
+
+static struct device_type mcb_carrier_device_type = {
+	.name = "mcb-carrier",
+	.groups = mcb_carrier_groups,
 };
 
 /**
