@@ -48,6 +48,23 @@ static int omap3_enable_st_clock(unsigned int id, bool enable)
 		return omap2_clk_allow_idle(mcbsp_iclks[id]);
 }
 
+static bool omap3_mcbsp_has_st(struct omap_hwmod *oh)
+{
+	struct omap_hwmod_irq_info *ohii;
+	int i = 0;
+
+	if (!oh || !oh->mpu_irqs)
+		return false;
+
+	do {
+		ohii = &oh->mpu_irqs[i++];
+		if (!strcmp(ohii->name, "sidetone"))
+			return true;
+	} while (ohii->irq != -1);
+
+	return false;
+}
+
 static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
 {
 	int id, count = 1;
@@ -56,6 +73,7 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
 	struct omap_mcbsp_platform_data *pdata = NULL;
 	struct platform_device *pdev;
 	char clk_name[11];
+	bool has_sidetone = false;
 
 	sscanf(oh->name, "mcbsp%d", &id);
 
@@ -96,11 +114,19 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
 	if (oh->dev_attr) {
 		oh_device[1] = omap_hwmod_lookup((
 		(struct omap_mcbsp_dev_attr *)(oh->dev_attr))->sidetone);
+		count++;
+
+		has_sidetone = true;
+	} else {
+		has_sidetone = omap3_mcbsp_has_st(oh);
+	}
+
+	if (has_sidetone) {
 		pdata->enable_st_clock = omap3_enable_st_clock;
 		sprintf(clk_name, "mcbsp%d_ick", id);
 		mcbsp_iclks[id] = clk_get(NULL, clk_name);
-		count++;
 	}
+
 	pdev = omap_device_build_ss(name, id, oh_device, count, pdata,
 				    sizeof(*pdata));
 	kfree(pdata);
