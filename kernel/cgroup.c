@@ -2745,6 +2745,42 @@ out_unlock_threadgroup:
 }
 
 /**
+ * cgroup_match_groups - check if tsk1 and tsk2 belong to same cgroups
+ * in all hierarchies
+ */
+bool cgroup_match_groups(struct task_struct *tsk1, struct task_struct *tsk2)
+{
+	struct cgroup_root *root;
+	bool result = true;
+
+	mutex_lock(&cgroup_mutex);
+	for_each_root(root) {
+		struct cgroup *cg_tsk1;
+		struct cgroup *cg_tsk2;
+
+		if (root == &cgrp_dfl_root)
+			continue;
+
+		if (!root->subsys_mask)
+			continue;
+
+		spin_lock_bh(&css_set_lock);
+		cg_tsk1 = task_cgroup_from_root(tsk1, root);
+		cg_tsk2 = task_cgroup_from_root(tsk2, root);
+		spin_unlock_bh(&css_set_lock);
+
+		if (cg_tsk1 != cg_tsk2) {
+			result = false;
+			break;
+		}
+	}
+	mutex_unlock(&cgroup_mutex);
+
+	return result;
+}
+EXPORT_SYMBOL_GPL(cgroup_match_groups);
+
+/**
  * cgroup_attach_task_all - attach task 'tsk' to all cgroups of task 'from'
  * @from: attach to all cgroups of a given task
  * @tsk: the task to be attached
