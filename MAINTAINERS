@@ -11407,6 +11407,7 @@ S:	Supported
 F:	include/linux/usb/intel-mux.h
 F:	drivers/usb/mux/intel-mux.c
 F:	drivers/usb/mux/intel-mux-gpio.c
+F:	drivers/usb/mux/intel-mux-drcfg.c
 
 USB PRINTER DRIVER (usblp)
 M:	Pete Zaitcev <zaitcev@redhat.com>
