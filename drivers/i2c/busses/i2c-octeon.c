@@ -119,6 +119,8 @@ struct octeon_i2c {
 	void __iomem *twsi_base;
 	struct device *dev;
 	bool hlc_enabled;
+	bool broken_irq_mode;
+	bool broken_irq_check;
 	void (*int_en)(struct octeon_i2c *);
 	void (*int_dis)(struct octeon_i2c *);
 	void (*hlc_int_en)(struct octeon_i2c *);
@@ -375,10 +377,33 @@ static int octeon_i2c_wait(struct octeon_i2c *i2c)
 	long time_left;
 	int first = 1;
 
+	if (i2c->broken_irq_mode) {
+		/*
+		 * Some chip revisions seem to not assert the irq in
+		 * the interrupt controller.  So we must poll for the
+		 * IFLG change.
+		 */
+		u64 end = get_jiffies_64() + i2c->adap.timeout;
+
+		while (!octeon_i2c_test_iflg(i2c) &&
+		       time_before64(get_jiffies_64(), end))
+			udelay(50);
+
+		return octeon_i2c_test_iflg(i2c) ? 0 : -ETIMEDOUT;
+	}
+
 	i2c->int_en(i2c);
 	time_left = wait_event_timeout(i2c->queue, poll_iflg(i2c, &first),
 				       i2c->adap.timeout);
 	i2c->int_dis(i2c);
+
+	if (time_left <= 0 && i2c->broken_irq_check &&
+	    octeon_i2c_test_iflg(i2c)) {
+		dev_err(i2c->dev,
+			"broken irq connection detected, switching to polling mode.\n");
+		i2c->broken_irq_mode = true;
+		return 0;
+	}
 	if (!time_left) {
 		dev_dbg(i2c->dev, "%s: timeout\n", __func__);
 		return -ETIMEDOUT;
@@ -512,17 +537,40 @@ static int octeon_i2c_hlc_wait(struct octeon_i2c *i2c)
 {
 	int time_left;
 
+	if (i2c->broken_irq_mode) {
+		/*
+		 * Some cn38xx boards did not assert the irq in
+		 * the interrupt controller.  So we must poll for the
+		 * IFLG change.
+		 */
+		u64 end = get_jiffies_64() + i2c->adap.timeout;
+
+		while (!octeon_i2c_hlc_test_ready(i2c) &&
+		       time_before64(get_jiffies_64(), end))
+			udelay(50);
+
+		return octeon_i2c_hlc_test_ready(i2c) ? 0 : -ETIMEDOUT;
+	}
+
 	i2c->hlc_int_en(i2c);
 	time_left = wait_event_interruptible_timeout(i2c->queue,
 					octeon_i2c_hlc_test_ready(i2c),
 					i2c->adap.timeout);
 	i2c->hlc_int_dis(i2c);
-	if (!time_left) {
+	if (!time_left)
 		octeon_i2c_hlc_int_clear(i2c);
+
+	if (time_left <= 0 && i2c->broken_irq_check &&
+	    octeon_i2c_hlc_test_ready(i2c)) {
+		dev_err(i2c->dev, "broken irq connection detected, switching to polling mode.\n");
+			i2c->broken_irq_mode = true;
+			return 0;
+	}
+
+	if (!time_left) {
 		dev_dbg(i2c->dev, "%s: timeout\n", __func__);
 		return -ETIMEDOUT;
 	}
-
 	if (time_left < 0) {
 		dev_dbg(i2c->dev, "%s: wait interrupted\n", __func__);
 		return time_left;
@@ -1153,6 +1201,9 @@ static int octeon_i2c_probe(struct platform_device *pdev)
 		dev_err(i2c->dev, "failed to attach interrupt\n");
 		goto out;
 	}
+
+	if (OCTEON_IS_MODEL(OCTEON_CN38XX))
+		i2c->broken_irq_check = true;
 
 	result = octeon_i2c_init_lowlevel(i2c);
 	if (result) {
