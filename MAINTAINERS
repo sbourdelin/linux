@@ -5603,6 +5603,12 @@ L:	linux-pm@vger.kernel.org
 S:	Supported
 F:	drivers/cpufreq/intel_pstate.c
 
+INTEL VIRTUAL USB PORT DRIVER
+M:	Lu Baolu <baolu.lu@linux.intel.com>
+L:	linux-usb@vger.kernel.org
+S:	Supported
+F:	drivers/mfd/intel-vuport.c
+
 INTEL FRAMEBUFFER DRIVER (excluding 810 and 815)
 M:	Maik Broemme <mbroemme@plusserver.de>
 L:	linux-fbdev@vger.kernel.org
