@@ -282,8 +282,8 @@ static int cxgb_close(struct net_device *dev)
 	    !(adapter->open_device_map & PORT_MASK)) {
 		/* Stop statistics accumulation. */
 		smp_mb__after_atomic();
-		spin_lock(&adapter->work_lock);   /* sync with update task */
-		spin_unlock(&adapter->work_lock);
+		/* sync with update task */
+		spin_unlock_wait(&adapter->work_lock);
 		cancel_mac_stats_update(adapter);
 	}
 
