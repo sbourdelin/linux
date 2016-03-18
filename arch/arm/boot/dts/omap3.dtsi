@@ -507,7 +507,7 @@
 				     <4>;  /* Sidetone */
 			interrupt-names = "common", "tx", "rx", "sidetone";
 			ti,buffer-size = <1280>;
-			ti,hwmods = "mcbsp2", "mcbsp2_sidetone";
+			ti,hwmods = "mcbsp2";
 			dmas = <&sdma 33>,
 			       <&sdma 34>;
 			dma-names = "tx", "rx";
@@ -525,7 +525,7 @@
 				     <5>;  /* Sidetone */
 			interrupt-names = "common", "tx", "rx", "sidetone";
 			ti,buffer-size = <128>;
-			ti,hwmods = "mcbsp3", "mcbsp3_sidetone";
+			ti,hwmods = "mcbsp3";
 			dmas = <&sdma 17>,
 			       <&sdma 18>;
 			dma-names = "tx", "rx";
