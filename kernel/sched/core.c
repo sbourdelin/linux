@@ -3023,6 +3023,17 @@ notrace unsigned long get_parent_ip(unsigned long addr)
 #if defined(CONFIG_PREEMPT) && (defined(CONFIG_DEBUG_PREEMPT) || \
 				defined(CONFIG_PREEMPT_TRACER))
 
+static inline void preempt_disable_check(int val)
+{
+	if (preempt_count() == val) {
+		unsigned long ip = get_parent_ip(CALLER_ADDR1);
+#ifdef CONFIG_DEBUG_PREEMPT
+		current->preempt_disable_ip = ip;
+#endif
+		trace_preempt_off(CALLER_ADDR0, ip);
+	}
+}
+
 void preempt_count_add(int val)
 {
 #ifdef CONFIG_DEBUG_PREEMPT
@@ -3040,16 +3051,16 @@ void preempt_count_add(int val)
 	DEBUG_LOCKS_WARN_ON((preempt_count() & PREEMPT_MASK) >=
 				PREEMPT_MASK - 10);
 #endif
-	if (preempt_count() == val) {
-		unsigned long ip = get_parent_ip(CALLER_ADDR1);
-#ifdef CONFIG_DEBUG_PREEMPT
-		current->preempt_disable_ip = ip;
-#endif
-		trace_preempt_off(CALLER_ADDR0, ip);
-	}
+	preempt_disable_check(val);
 }
 EXPORT_SYMBOL(preempt_count_add);
 NOKPROBE_SYMBOL(preempt_count_add);
+
+static inline void preempt_enable_check(int val)
+{
+	if (preempt_count() == val)
+		trace_preempt_on(CALLER_ADDR0, get_parent_ip(CALLER_ADDR1));
+}
 
 void preempt_count_sub(int val)
 {
@@ -3067,13 +3078,15 @@ void preempt_count_sub(int val)
 		return;
 #endif
 
-	if (preempt_count() == val)
-		trace_preempt_on(CALLER_ADDR0, get_parent_ip(CALLER_ADDR1));
+	preempt_enable_check(val);
 	__preempt_count_sub(val);
 }
 EXPORT_SYMBOL(preempt_count_sub);
 NOKPROBE_SYMBOL(preempt_count_sub);
 
+#else
+static inline void preempt_disable_check(int val) { }
+static inline void preempt_enable_check(int val) { }
 #endif
 
 /*
@@ -3349,7 +3362,14 @@ static void __sched notrace preempt_schedule_common(void)
 {
 	do {
 		preempt_disable_notrace();
+		/*
+		 * Function tracer requires disabling preemption before
+		 * tracing functions. But we still want to trace
+		 * preemption off locations.
+		 */
+		preempt_disable_check(1);
 		__schedule(true);
+		preempt_enable_check(1);
 		preempt_enable_no_resched_notrace();
 
 		/*
@@ -3403,6 +3423,12 @@ asmlinkage __visible void __sched notrace preempt_schedule_notrace(void)
 	do {
 		preempt_disable_notrace();
 		/*
+		 * Function tracer requires disabling preemption before
+		 * tracing functions. But we still want to trace
+		 * preemption off locations.
+		 */
+		preempt_disable_check(1);
+		/*
 		 * Needs preempt disabled in case user_exit() is traced
 		 * and the tracer calls preempt_enable_notrace() causing
 		 * an infinite recursion.
@@ -3411,6 +3437,7 @@ asmlinkage __visible void __sched notrace preempt_schedule_notrace(void)
 		__schedule(true);
 		exception_exit(prev_ctx);
 
+		preempt_enable_check(1);
 		preempt_enable_no_resched_notrace();
 	} while (need_resched());
 }
