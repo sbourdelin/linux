@@ -189,7 +189,7 @@ static ssize_t perf_copy(struct pthr_ctx *pctx, char *dst,
 	dma_cookie_t cookie;
 	size_t src_off, dst_off;
 	struct perf_mw *mw = &perf->mw;
-	u64 vbase, dst_vaddr;
+	uintptr_t vbase, dst_vaddr;
 	dma_addr_t dst_phys;
 	int retries = 0;
 
@@ -210,8 +210,8 @@ static ssize_t perf_copy(struct pthr_ctx *pctx, char *dst,
 	if (!is_dma_copy_aligned(device, src_off, dst_off, size))
 		return -ENODEV;
 
-	vbase = (u64)(u64 *)mw->vbase;
-	dst_vaddr = (u64)(u64 *)dst;
+	vbase = (uintptr_t)(u64 *)mw->vbase;
+	dst_vaddr = (uintptr_t)(u64 *)dst;
 	dst_phys = mw->phys_addr + (dst_vaddr - vbase);
 
 	unmap = dmaengine_get_unmap_data(device->dev, 1, GFP_NOWAIT);
