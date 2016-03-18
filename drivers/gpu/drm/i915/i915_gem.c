@@ -3467,48 +3467,23 @@ i915_gem_object_bind_to_vm(struct drm_i915_gem_object *obj,
 {
 	struct drm_device *dev = obj->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	u32 fence_alignment, unfenced_alignment;
+	u32 min_alignment;
 	u32 search_flag, alloc_flag;
 	u64 start, end;
-	u64 size, fence_size;
+	u64 size;
 	struct i915_vma *vma;
 	int ret;
 
-	if (i915_is_ggtt(vm)) {
-		u32 view_size;
+	if (i915_is_ggtt(vm))
+		size = i915_ggtt_view_size(obj, ggtt_view);
+	else
+		size = obj->base.size;
 
-		if (WARN_ON(!ggtt_view))
-			return ERR_PTR(-EINVAL);
-
-		view_size = i915_ggtt_view_size(obj, ggtt_view);
-
-		fence_size = i915_gem_get_gtt_size(dev,
-						   view_size,
-						   obj->tiling_mode);
-		fence_alignment = i915_gem_get_gtt_alignment(dev,
-							     view_size,
-							     obj->tiling_mode,
-							     true);
-		unfenced_alignment = i915_gem_get_gtt_alignment(dev,
-								view_size,
-								obj->tiling_mode,
-								false);
-		size = flags & PIN_MAPPABLE ? fence_size : view_size;
-	} else {
-		fence_size = i915_gem_get_gtt_size(dev,
-						   obj->base.size,
-						   obj->tiling_mode);
-		fence_alignment = i915_gem_get_gtt_alignment(dev,
-							     obj->base.size,
-							     obj->tiling_mode,
-							     true);
-		unfenced_alignment =
-			i915_gem_get_gtt_alignment(dev,
-						   obj->base.size,
+	min_alignment = i915_gem_get_gtt_alignment(dev, size,
 						   obj->tiling_mode,
-						   false);
-		size = flags & PIN_MAPPABLE ? fence_size : obj->base.size;
-	}
+						   flags & PIN_MAPPABLE);
+	if (flags & PIN_MAPPABLE)
+		size = i915_gem_get_gtt_size(dev, size, obj->tiling_mode);
 
 	start = flags & PIN_OFFSET_BIAS ? flags & PIN_OFFSET_MASK : 0;
 	end = vm->total;
@@ -3518,9 +3493,8 @@ i915_gem_object_bind_to_vm(struct drm_i915_gem_object *obj,
 		end = min_t(u64, end, (1ULL << 32) - PAGE_SIZE);
 
 	if (alignment == 0)
-		alignment = flags & PIN_MAPPABLE ? fence_alignment :
-						unfenced_alignment;
-	if (flags & PIN_MAPPABLE && alignment & (fence_alignment - 1)) {
+		alignment = min_alignment;
+	if (flags & PIN_MAPPABLE && alignment & (min_alignment - 1)) {
 		DRM_DEBUG("Invalid object (view type=%u) alignment requested %u\n",
 			  ggtt_view ? ggtt_view->type : 0,
 			  alignment);
