@@ -48,8 +48,13 @@ endif
 upto_gcc44    :=  $(call cc-ifversion, -le, 0404, y)
 atleast_gcc44 :=  $(call cc-ifversion, -ge, 0404, y)
 atleast_gcc48 :=  $(call cc-ifversion, -ge, 0408, y)
+is_gcc48      :=  $(call cc-ifversion, -eq, 0408, y)
 
 cflags-$(atleast_gcc44)			+= -fsection-anchors
+
+# gcc 4.8 spits out false positives for default -O3
+# disable these for 4.8 and revisit when we upgrade to newer ver
+cflags-$(is_gcc48)			+= $(call cc-disable-warning,maybe-uninitialized,)
 
 cflags-$(CONFIG_ARC_HAS_LLSC)		+= -mlock
 cflags-$(CONFIG_ARC_HAS_SWAPE)		+= -mswape
