@@ -2845,10 +2845,14 @@ done:
 			/* The xHC may think the device is already reset,
 			 * so ignore the status.
 			 */
-			if (hcd->driver->reset_device)
-				hcd->driver->reset_device(hcd, udev);
-
-			usb_set_device_state(udev, USB_STATE_DEFAULT);
+			if (hcd->driver->reset_device) {
+				status = hcd->driver->reset_device(hcd, udev);
+				if (status == 0)
+					usb_set_device_state(udev, USB_STATE_DEFAULT);
+				else
+					usb_set_device_state(udev, USB_STATE_NOTATTACHED);
+			} else
+				usb_set_device_state(udev, USB_STATE_DEFAULT);
 		}
 	} else {
 		if (udev)

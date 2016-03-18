@@ -1272,9 +1272,9 @@ void xhci_handle_command_timeout(unsigned long data)
 		spin_unlock_irqrestore(&xhci->lock, flags);
 		xhci_dbg(xhci, "Command timeout\n");
 		ret = xhci_abort_cmd_ring(xhci);
+		xhci_cleanup_command_queue(xhci);
 		if (unlikely(ret == -ESHUTDOWN)) {
 			xhci_err(xhci, "Abort command ring failed\n");
-			xhci_cleanup_command_queue(xhci);
 			usb_hc_died(xhci_to_hcd(xhci)->primary_hcd);
 			xhci_dbg(xhci, "xHCI host controller is dead.\n");
 		}
