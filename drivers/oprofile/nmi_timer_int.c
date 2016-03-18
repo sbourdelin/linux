@@ -63,7 +63,7 @@ static int nmi_timer_cpu_notifier(struct notifier_block *b, unsigned long action
 				  void *data)
 {
 	int cpu = (unsigned long)data;
-	switch (action) {
+	switch (action & ~CPU_TASKS_FROZEN) {
 	case CPU_DOWN_FAILED:
 	case CPU_ONLINE:
 		nmi_timer_start_cpu(cpu);
