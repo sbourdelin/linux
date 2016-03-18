@@ -3356,6 +3356,14 @@ i915_gem_obj_lookup_or_create_ggtt_vma(struct drm_i915_gem_object *obj,
 	if (WARN_ON(!view))
 		return ERR_PTR(-EINVAL);
 
+	if (view->type == I915_GGTT_VIEW_PARTIAL) {
+		unsigned int page_count = obj->base.size >> PAGE_SHIFT;
+		if (WARN_ON(view->params.partial.offset > page_count ||
+			    view->params.partial.size > page_count  -
+			    view->params.partial.offset))
+			return ERR_PTR(-EINVAL);
+	}
+
 	vma = i915_gem_obj_to_ggtt_view(obj, view);
 
 	if (IS_ERR(vma))
