@@ -1700,8 +1700,8 @@ static int tegra_dc_init(struct host1x_client *client)
 	unsigned long flags = HOST1X_SYNCPT_CLIENT_MANAGED;
 	struct tegra_dc *dc = host1x_client_to_dc(client);
 	struct tegra_drm *tegra = drm->dev_private;
-	struct drm_plane *primary = NULL;
-	struct drm_plane *cursor = NULL;
+	struct drm_plane *primary;
+	struct drm_plane *cursor;
 	u32 value;
 	int err;
 
@@ -1723,21 +1723,22 @@ static int tegra_dc_init(struct host1x_client *client)
 	primary = tegra_dc_primary_plane_create(drm, dc);
 	if (IS_ERR(primary)) {
 		err = PTR_ERR(primary);
-		goto cleanup;
+		goto detach_iommu;
 	}
 
+	cursor = NULL;
 	if (dc->soc->supports_cursor) {
 		cursor = tegra_dc_cursor_plane_create(drm, dc);
 		if (IS_ERR(cursor)) {
 			err = PTR_ERR(cursor);
-			goto cleanup;
+			goto cleanup_primary;
 		}
 	}
 
 	err = drm_crtc_init_with_planes(drm, &dc->base, primary, cursor,
 					&tegra_crtc_funcs, NULL);
 	if (err < 0)
-		goto cleanup;
+		goto cleanup_cursor;
 
 	drm_mode_crtc_set_gamma_size(&dc->base, 256);
 	drm_crtc_helper_add(&dc->base, &tegra_crtc_helper_funcs);
@@ -1752,12 +1753,12 @@ static int tegra_dc_init(struct host1x_client *client)
 	err = tegra_dc_rgb_init(drm, dc);
 	if (err < 0 && err != -ENODEV) {
 		dev_err(dc->dev, "failed to initialize RGB output: %d\n", err);
-		goto cleanup;
+		goto cleanup_cursor;
 	}
 
 	err = tegra_dc_add_planes(drm, dc);
 	if (err < 0)
-		goto cleanup;
+		goto rgb_exit;
 
 	if (IS_ENABLED(CONFIG_DEBUG_FS)) {
 		err = tegra_dc_debugfs_init(dc, drm->primary);
@@ -1770,7 +1771,7 @@ static int tegra_dc_init(struct host1x_client *client)
 	if (err < 0) {
 		dev_err(dc->dev, "failed to request IRQ#%u: %d\n", dc->irq,
 			err);
-		goto cleanup;
+		goto remove_debugfs;
 	}
 
 	/* initialize display controller */
@@ -1816,13 +1817,18 @@ static int tegra_dc_init(struct host1x_client *client)
 
 	return 0;
 
-cleanup:
-	if (cursor)
+remove_debugfs:
+	tegra_dc_debugfs_exit(dc);
+rgb_exit:
+	tegra_dc_rgb_exit(dc);
+cleanup_cursor:
+	if (dc->soc->supports_cursor)
 		drm_plane_cleanup(cursor);
 
-	if (primary)
-		drm_plane_cleanup(primary);
+cleanup_primary:
+	drm_plane_cleanup(primary);
 
+detach_iommu:
 	if (tegra->domain) {
 		iommu_detach_device(tegra->domain, dc->dev);
 		dc->domain = NULL;
