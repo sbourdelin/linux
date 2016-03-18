@@ -107,14 +107,25 @@ static void __spin_lock_debug(raw_spinlock_t *lock)
 {
 	u64 i;
 	u64 loops = loops_per_jiffy * HZ;
+	static raw_spinlock_t *suspected_lock = NULL;
 
 	for (i = 0; i < loops; i++) {
 		if (arch_spin_trylock(&lock->raw_lock))
 			return;
 		__delay(1);
 	}
-	/* lockup suspected: */
-	spin_dump(lock, "lockup suspected");
+
+	/*
+	 * When we suspect a lockup, it's good enough to inform it once for
+	 * the same lock. Otherwise it could cause an infinite recursion if
+	 * it's within printk().
+	 */
+	if (suspected_lock != lock) {
+		suspected_lock = lock;
+		/* lockup suspected: */
+		spin_dump(lock, "lockup suspected");
+		suspected_lock = NULL;
+	}
 #ifdef CONFIG_SMP
 	trigger_all_cpu_backtrace();
 #endif
