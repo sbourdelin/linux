@@ -821,6 +821,7 @@ translate_table(struct net *net, struct xt_table_info *newinfo, void *entry0,
 	struct ip6t_entry *iter;
 	unsigned int i;
 	int ret = 0;
+	s64 remain;
 
 	newinfo->size = repl->size;
 	newinfo->number = repl->num_entries;
@@ -834,7 +835,7 @@ translate_table(struct net *net, struct xt_table_info *newinfo, void *entry0,
 	duprintf("translate_table: size %u\n", newinfo->size);
 	i = 0;
 	/* Walk through entries, checking offsets. */
-	xt_entry_foreach(iter, entry0, newinfo->size) {
+	__xt_entry_foreach(iter, entry0, newinfo->size, remain) {
 		ret = check_entry_size_and_hooks(iter, newinfo, entry0,
 						 entry0 + repl->size,
 						 repl->hook_entry,
@@ -846,6 +847,11 @@ translate_table(struct net *net, struct xt_table_info *newinfo, void *entry0,
 		if (strcmp(ip6t_get_target(iter)->u.user.name,
 		    XT_ERROR_TARGET) == 0)
 			++newinfo->stacksize;
+	}
+
+	if (remain < 0) {
+		pr_debug("translate_table: cannot check %lld bytes\n", remain);
+		return -EINVAL;
 	}
 
 	if (i != repl->num_entries) {
@@ -1671,6 +1677,7 @@ translate_compat_table(struct net *net,
 	struct ip6t_entry *iter1;
 	unsigned int size;
 	int ret = 0;
+	s64 remain;
 
 	info = *pinfo;
 	entry0 = *pentry0;
@@ -1688,7 +1695,7 @@ translate_compat_table(struct net *net,
 	xt_compat_lock(AF_INET6);
 	xt_compat_init_offsets(AF_INET6, number);
 	/* Walk through entries, checking offsets. */
-	xt_entry_foreach(iter0, entry0, total_size) {
+	__xt_entry_foreach(iter0, entry0, total_size, remain) {
 		ret = check_compat_entry_size_and_hooks(iter0, info, &size,
 							entry0,
 							entry0 + total_size,
@@ -1701,6 +1708,11 @@ translate_compat_table(struct net *net,
 	}
 
 	ret = -EINVAL;
+	if (remain < 0) {
+		pr_debug("translate_compat_table: cannot check %lld bytes\n", remain);
+		goto out_unlock;
+	}
+
 	if (j != number) {
 		duprintf("translate_compat_table: %u not %u entries\n",
 			 j, number);

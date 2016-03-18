@@ -411,6 +411,16 @@ xt_get_per_cpu_counter(struct xt_counters *cnt, unsigned int cpu)
 struct nf_hook_ops *xt_hook_link(const struct xt_table *, nf_hookfn *);
 void xt_hook_unlink(const struct xt_table *, struct nf_hook_ops *);
 
+/* Similar to xt_entry_foreach, but this tell us how many bytes are remaining
+ * after the iteration. If remain is < 0 then this table we're iterating over
+ * is wrong.
+ */
+#define __xt_entry_foreach(pos, ehead, esize, remain)			\
+	for ((pos) = (typeof(pos))(ehead), (remain) = (esize);		\
+	     (pos) < (typeof(pos))((char *)(ehead) + (esize));		\
+	     (remain) -= (pos)->next_offset,				\
+	     (pos) = (typeof(pos))((char *)(pos) + (pos)->next_offset))
+
 #ifdef CONFIG_COMPAT
 #include <net/compat.h>
 

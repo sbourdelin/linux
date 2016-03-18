@@ -637,6 +637,7 @@ static int translate_table(struct xt_table_info *newinfo, void *entry0,
 	struct arpt_entry *iter;
 	unsigned int i;
 	int ret = 0;
+	s64 remain;
 
 	newinfo->size = repl->size;
 	newinfo->number = repl->num_entries;
@@ -651,7 +652,7 @@ static int translate_table(struct xt_table_info *newinfo, void *entry0,
 	i = 0;
 
 	/* Walk through entries, checking offsets. */
-	xt_entry_foreach(iter, entry0, newinfo->size) {
+	__xt_entry_foreach(iter, entry0, newinfo->size, remain) {
 		ret = check_entry_size_and_hooks(iter, newinfo, entry0,
 						 entry0 + repl->size,
 						 repl->hook_entry,
@@ -664,6 +665,12 @@ static int translate_table(struct xt_table_info *newinfo, void *entry0,
 		    XT_ERROR_TARGET) == 0)
 			++newinfo->stacksize;
 	}
+
+	if (remain < 0) {
+		pr_debug("translate_table: cannot check %lld bytes\n", remain);
+		return -EINVAL;
+	}
+
 	duprintf("translate_table: ARPT_ENTRY_ITERATE gives %d\n", ret);
 	if (ret != 0)
 		return ret;
@@ -1340,6 +1347,7 @@ static int translate_compat_table(const char *name,
 	struct arpt_entry *iter1;
 	unsigned int size;
 	int ret = 0;
+	s64 remain;
 
 	info = *pinfo;
 	entry0 = *pentry0;
@@ -1357,7 +1365,7 @@ static int translate_compat_table(const char *name,
 	xt_compat_lock(NFPROTO_ARP);
 	xt_compat_init_offsets(NFPROTO_ARP, number);
 	/* Walk through entries, checking offsets. */
-	xt_entry_foreach(iter0, entry0, total_size) {
+	__xt_entry_foreach(iter0, entry0, total_size, remain) {
 		ret = check_compat_entry_size_and_hooks(iter0, info, &size,
 							entry0,
 							entry0 + total_size,
@@ -1370,6 +1378,11 @@ static int translate_compat_table(const char *name,
 	}
 
 	ret = -EINVAL;
+	if (remain < 0) {
+		pr_debug("translate_compat_table: cannot check %lld bytes\n", remain);
+		goto out_unlock;
+	}
+
 	if (j != number) {
 		duprintf("translate_compat_table: %u not %u entries\n",
 			 j, number);
