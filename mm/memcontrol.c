@@ -1916,9 +1916,6 @@ static int memcg_cpu_hotplug_callback(struct notifier_block *nb,
 	int cpu = (unsigned long)hcpu;
 	struct memcg_stock_pcp *stock;
 
-	if (action == CPU_ONLINE)
-		return NOTIFY_OK;
-
 	if (action != CPU_DEAD && action != CPU_DEAD_FROZEN)
 		return NOTIFY_OK;
 
