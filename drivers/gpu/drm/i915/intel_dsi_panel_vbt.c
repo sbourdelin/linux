@@ -77,23 +77,24 @@ static inline struct vbt_panel *to_vbt_panel(struct drm_panel *panel)
 
 struct vlv_gpio_map {
 	u8 gpio_index;
+	u8 port;
 	u16 base_offset;
 	bool init;
 };
 
 static struct vlv_gpio_map vlv_gpio_table[] = {
-	{ 0, VLV_GPIO_NC_0_HV_DDI0_HPD },
-	{ 1, VLV_GPIO_NC_1_HV_DDI0_DDC_SDA },
-	{ 2, VLV_GPIO_NC_2_HV_DDI0_DDC_SCL },
-	{ 3, VLV_GPIO_NC_3_PANEL0_VDDEN },
-	{ 4, VLV_GPIO_NC_4_PANEL0_BLKEN },
-	{ 5, VLV_GPIO_NC_5_PANEL0_BLKCTL },
-	{ 6, VLV_GPIO_NC_6_PCONF0 },
-	{ 7, VLV_GPIO_NC_7_PCONF0 },
-	{ 8, VLV_GPIO_NC_8_PCONF0 },
-	{ 9, VLV_GPIO_NC_9_PCONF0 },
-	{ 10, VLV_GPIO_NC_10_PCONF0 },
-	{ 11, VLV_GPIO_NC_11_PCONF0 },
+	{ 0, IOSF_PORT_GPIO_NC, VLV_GPIO_NC_0_HV_DDI0_HPD },
+	{ 1, IOSF_PORT_GPIO_NC, VLV_GPIO_NC_1_HV_DDI0_DDC_SDA },
+	{ 2, IOSF_PORT_GPIO_NC, VLV_GPIO_NC_2_HV_DDI0_DDC_SCL },
+	{ 3, IOSF_PORT_GPIO_NC, VLV_GPIO_NC_3_PANEL0_VDDEN },
+	{ 4, IOSF_PORT_GPIO_NC, VLV_GPIO_NC_4_PANEL0_BLKEN },
+	{ 5, IOSF_PORT_GPIO_NC, VLV_GPIO_NC_5_PANEL0_BLKCTL },
+	{ 6, IOSF_PORT_GPIO_NC, VLV_GPIO_NC_6_PCONF0 },
+	{ 7, IOSF_PORT_GPIO_NC, VLV_GPIO_NC_7_PCONF0 },
+	{ 8, IOSF_PORT_GPIO_NC, VLV_GPIO_NC_8_PCONF0 },
+	{ 9, IOSF_PORT_GPIO_NC, VLV_GPIO_NC_9_PCONF0 },
+	{ 10, IOSF_PORT_GPIO_NC, VLV_GPIO_NC_10_PCONF0 },
+	{ 11, IOSF_PORT_GPIO_NC, VLV_GPIO_NC_11_PCONF0 },
 };
 
 static inline enum port intel_dsi_seq_port_to_port(u8 port)
@@ -210,8 +211,7 @@ static void vlv_exec_gpio(struct drm_i915_private *dev_priv,
 	}
 
 	if (dev_priv->vbt.dsi.seq_version >= 3) {
-		DRM_DEBUG_KMS("GPIO element v3 not supported\n");
-		return;
+		port = map->port;
 	} else {
 		if (gpio_source == 0) {
 			port = IOSF_PORT_GPIO_NC;
