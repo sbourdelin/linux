@@ -181,10 +181,29 @@ static void __cpuidle_driver_init(struct cpuidle_driver *drv)
 static int poll_idle(struct cpuidle_device *dev,
 		struct cpuidle_driver *drv, int index)
 {
+	/*
+	 * Polling is state 0; break out of the polling loop after the
+	 * threshold for the next power state has passed. Doing this several
+	 * times in a row should cause the menu governor to immediately
+	 * select a deeper power state.
+	 */
+	u64 limit = drv->states[1].target_residency * NSEC_PER_USEC;
+	ktime_t start = ktime_get();
+	int i = 0;
+
 	local_irq_enable();
 	if (!current_set_polling_and_test()) {
-		while (!need_resched())
+		while (!need_resched()) {
+			ktime_t now;
 			cpu_relax();
+
+			/* Occasionally check for a timeout. */
+			if (!(i % 1000)) {
+				now = ktime_get();
+				if (ktime_to_ns(ktime_sub(now, start)) > limit)
+					break;
+			}
+		}
 	}
 	current_clr_polling();
 
