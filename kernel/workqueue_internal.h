@@ -52,6 +52,10 @@ struct worker {
 
 	/* used only by rescuers to point to the target workqueue */
 	struct workqueue_struct	*rescue_wq;	/* I: the workqueue to rescue */
+
+	/* for cgroups */
+	bool attach_pending;
+	struct task_struct *attach_to;
 };
 
 /**

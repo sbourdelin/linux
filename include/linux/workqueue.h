@@ -131,6 +131,7 @@ struct workqueue_attrs {
 	int			nice;		/* nice level */
 	cpumask_var_t		cpumask;	/* allowed CPUs */
 	bool			no_numa;	/* disable NUMA affinity */
+	bool                    cg_enabled;     /* cgroups aware */
 };
 
 static inline struct delayed_work *to_delayed_work(struct work_struct *work)
@@ -308,6 +309,7 @@ enum {
 	 * http://thread.gmane.org/gmane.linux.kernel/1480396
 	 */
 	WQ_POWER_EFFICIENT	= 1 << 7,
+	WQ_CGROUPS              = 1 << 8,
 
 	__WQ_DRAINING		= 1 << 16, /* internal: workqueue is draining */
 	__WQ_ORDERED		= 1 << 17, /* internal: workqueue is ordered */
