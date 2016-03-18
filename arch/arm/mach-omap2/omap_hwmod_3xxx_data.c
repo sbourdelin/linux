@@ -1175,11 +1175,8 @@ static struct omap_hwmod_irq_info omap3xxx_mcbsp2_irqs[] = {
 	{ .name = "common", .irq = 17 + OMAP_INTC_START, },
 	{ .name = "tx", .irq = 62 + OMAP_INTC_START, },
 	{ .name = "rx", .irq = 63 + OMAP_INTC_START, },
+	{ .name = "sidetone", .irq = 4 + OMAP_INTC_START, },
 	{ .irq = -1 },
-};
-
-static struct omap_mcbsp_dev_attr omap34xx_mcbsp2_dev_attr = {
-	.sidetone	= "mcbsp2_sidetone",
 };
 
 static struct omap_hwmod omap3xxx_mcbsp2_hwmod = {
@@ -1199,7 +1196,6 @@ static struct omap_hwmod omap3xxx_mcbsp2_hwmod = {
 	},
 	.opt_clks	= mcbsp234_opt_clks,
 	.opt_clks_cnt	= ARRAY_SIZE(mcbsp234_opt_clks),
-	.dev_attr	= &omap34xx_mcbsp2_dev_attr,
 };
 
 /* mcbsp3 */
@@ -1207,11 +1203,8 @@ static struct omap_hwmod_irq_info omap3xxx_mcbsp3_irqs[] = {
 	{ .name = "common", .irq = 22 + OMAP_INTC_START, },
 	{ .name = "tx", .irq = 89 + OMAP_INTC_START, },
 	{ .name = "rx", .irq = 90 + OMAP_INTC_START, },
+	{ .name = "sidetone", .irq = 5 + OMAP_INTC_START, },
 	{ .irq = -1 },
-};
-
-static struct omap_mcbsp_dev_attr omap34xx_mcbsp3_dev_attr = {
-	.sidetone	= "mcbsp3_sidetone",
 };
 
 static struct omap_hwmod omap3xxx_mcbsp3_hwmod = {
@@ -1231,7 +1224,6 @@ static struct omap_hwmod omap3xxx_mcbsp3_hwmod = {
 	},
 	.opt_clks	= mcbsp234_opt_clks,
 	.opt_clks_cnt	= ARRAY_SIZE(mcbsp234_opt_clks),
-	.dev_attr	= &omap34xx_mcbsp3_dev_attr,
 };
 
 /* mcbsp4 */
@@ -1298,62 +1290,6 @@ static struct omap_hwmod omap3xxx_mcbsp5_hwmod = {
 	},
 	.opt_clks	= mcbsp15_opt_clks,
 	.opt_clks_cnt	= ARRAY_SIZE(mcbsp15_opt_clks),
-};
-
-/* 'mcbsp sidetone' class */
-static struct omap_hwmod_class_sysconfig omap3xxx_mcbsp_sidetone_sysc = {
-	.sysc_offs	= 0x0010,
-	.sysc_flags	= SYSC_HAS_AUTOIDLE,
-	.sysc_fields	= &omap_hwmod_sysc_type1,
-};
-
-static struct omap_hwmod_class omap3xxx_mcbsp_sidetone_hwmod_class = {
-	.name = "mcbsp_sidetone",
-	.sysc = &omap3xxx_mcbsp_sidetone_sysc,
-};
-
-/* mcbsp2_sidetone */
-static struct omap_hwmod_irq_info omap3xxx_mcbsp2_sidetone_irqs[] = {
-	{ .name = "irq", .irq = 4 + OMAP_INTC_START, },
-	{ .irq = -1 },
-};
-
-static struct omap_hwmod omap3xxx_mcbsp2_sidetone_hwmod = {
-	.name		= "mcbsp2_sidetone",
-	.class		= &omap3xxx_mcbsp_sidetone_hwmod_class,
-	.mpu_irqs	= omap3xxx_mcbsp2_sidetone_irqs,
-	.main_clk	= "mcbsp2_fck",
-	.prcm		= {
-		.omap2 = {
-			.prcm_reg_id = 1,
-			 .module_bit = OMAP3430_EN_MCBSP2_SHIFT,
-			.module_offs = OMAP3430_PER_MOD,
-			.idlest_reg_id = 1,
-			.idlest_idle_bit = OMAP3430_ST_MCBSP2_SHIFT,
-		},
-	},
-};
-
-/* mcbsp3_sidetone */
-static struct omap_hwmod_irq_info omap3xxx_mcbsp3_sidetone_irqs[] = {
-	{ .name = "irq", .irq = 5 + OMAP_INTC_START, },
-	{ .irq = -1 },
-};
-
-static struct omap_hwmod omap3xxx_mcbsp3_sidetone_hwmod = {
-	.name		= "mcbsp3_sidetone",
-	.class		= &omap3xxx_mcbsp_sidetone_hwmod_class,
-	.mpu_irqs	= omap3xxx_mcbsp3_sidetone_irqs,
-	.main_clk	= "mcbsp3_fck",
-	.prcm		= {
-		.omap2 = {
-			.prcm_reg_id = 1,
-			.module_bit = OMAP3430_EN_MCBSP3_SHIFT,
-			.module_offs = OMAP3430_PER_MOD,
-			.idlest_reg_id = 1,
-			.idlest_idle_bit = OMAP3430_ST_MCBSP3_SHIFT,
-		},
-	},
 };
 
 /* SR common */
@@ -3108,6 +3044,12 @@ static struct omap_hwmod_addr_space omap3xxx_mcbsp2_addrs[] = {
 		.pa_end		= 0x490220ff,
 		.flags		= ADDR_TYPE_RT
 	},
+	{
+		.name		= "sidetone",
+		.pa_start	= 0x49028000,
+		.pa_end		= 0x490280ff,
+		.flags		= ADDR_TYPE_RT
+	},
 	{ }
 };
 
@@ -3125,6 +3067,12 @@ static struct omap_hwmod_addr_space omap3xxx_mcbsp3_addrs[] = {
 		.name		= "mpu",
 		.pa_start	= 0x49024000,
 		.pa_end		= 0x490240ff,
+		.flags		= ADDR_TYPE_RT
+	},
+	{
+		.name		= "sidetone",
+		.pa_start	= 0x4902A000,
+		.pa_end		= 0x4902A0ff,
 		.flags		= ADDR_TYPE_RT
 	},
 	{ }
@@ -3175,44 +3123,6 @@ static struct omap_hwmod_ocp_if omap3xxx_l4_core__mcbsp5 = {
 	.clk		= "mcbsp5_ick",
 	.addr		= omap3xxx_mcbsp5_addrs,
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
-static struct omap_hwmod_addr_space omap3xxx_mcbsp2_sidetone_addrs[] = {
-	{
-		.name		= "sidetone",
-		.pa_start	= 0x49028000,
-		.pa_end		= 0x490280ff,
-		.flags		= ADDR_TYPE_RT
-	},
-	{ }
-};
-
-/* l4_per -> mcbsp2_sidetone */
-static struct omap_hwmod_ocp_if omap3xxx_l4_per__mcbsp2_sidetone = {
-	.master		= &omap3xxx_l4_per_hwmod,
-	.slave		= &omap3xxx_mcbsp2_sidetone_hwmod,
-	.clk		= "mcbsp2_ick",
-	.addr		= omap3xxx_mcbsp2_sidetone_addrs,
-	.user		= OCP_USER_MPU,
-};
-
-static struct omap_hwmod_addr_space omap3xxx_mcbsp3_sidetone_addrs[] = {
-	{
-		.name		= "sidetone",
-		.pa_start	= 0x4902A000,
-		.pa_end		= 0x4902A0ff,
-		.flags		= ADDR_TYPE_RT
-	},
-	{ }
-};
-
-/* l4_per -> mcbsp3_sidetone */
-static struct omap_hwmod_ocp_if omap3xxx_l4_per__mcbsp3_sidetone = {
-	.master		= &omap3xxx_l4_per_hwmod,
-	.slave		= &omap3xxx_mcbsp3_sidetone_hwmod,
-	.clk		= "mcbsp3_ick",
-	.addr		= omap3xxx_mcbsp3_sidetone_addrs,
-	.user		= OCP_USER_MPU,
 };
 
 /* l4_core -> mailbox */
@@ -3651,8 +3561,6 @@ static struct omap_hwmod_ocp_if *omap3xxx_hwmod_ocp_ifs[] __initdata = {
 	&omap3xxx_l4_per__mcbsp3,
 	&omap3xxx_l4_per__mcbsp4,
 	&omap3xxx_l4_core__mcbsp5,
-	&omap3xxx_l4_per__mcbsp2_sidetone,
-	&omap3xxx_l4_per__mcbsp3_sidetone,
 	&omap34xx_l4_core__mcspi1,
 	&omap34xx_l4_core__mcspi2,
 	&omap34xx_l4_core__mcspi3,
