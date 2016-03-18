@@ -123,6 +123,9 @@ static struct pid_namespace *create_pid_namespace(struct user_namespace *user_ns
 	for (i = 1; i < PIDMAP_ENTRIES; i++)
 		atomic_set(&ns->pidmap[i].nr_free, BITS_PER_PAGE);
 
+	strncpy(ns->core_pattern, parent_pid_ns->core_pattern,
+		sizeof(ns->core_pattern));
+
 	return ns;
 
 out_free_map:

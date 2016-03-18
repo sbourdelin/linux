@@ -100,7 +100,6 @@
 extern int suid_dumpable;
 #ifdef CONFIG_COREDUMP
 extern int core_uses_pid;
-extern char core_pattern[];
 extern unsigned int core_pipe_limit;
 #endif
 extern int pid_max;
@@ -480,7 +479,7 @@ static struct ctl_table kern_table[] = {
 	},
 	{
 		.procname	= "core_pattern",
-		.data		= core_pattern,
+		.data		= NULL,
 		.maxlen		= CORENAME_MAX_SIZE,
 		.mode		= 0644,
 		.proc_handler	= proc_dostring_coredump,
@@ -2312,6 +2311,8 @@ int proc_dointvec_minmax(struct ctl_table *table, int write,
 static void validate_coredump_safety(void)
 {
 #ifdef CONFIG_COREDUMP
+	char *core_pattern = current->nsproxy->pid_ns_for_children->core_pattern;
+
 	if (suid_dumpable == SUID_DUMP_ROOT &&
 	    core_pattern[0] != '/' && core_pattern[0] != '|') {
 		printk(KERN_WARNING "Unsafe core_pattern used with "\
@@ -2334,10 +2335,19 @@ static int proc_dointvec_minmax_coredump(struct ctl_table *table, int write,
 static int proc_dostring_coredump(struct ctl_table *table, int write,
 		  void __user *buffer, size_t *lenp, loff_t *ppos)
 {
-	int error = proc_dostring(table, write, buffer, lenp, ppos);
-	if (!error)
-		validate_coredump_safety();
-	return error;
+	int ret;
+
+	if (write && *ppos && sysctl_writes_strict == SYSCTL_WRITES_WARN)
+		warn_sysctl_write(table);
+
+	ret = _proc_do_string(current->nsproxy->pid_ns_for_children->core_pattern,
+			      table->maxlen, write,
+			      (char __user *)buffer, lenp, ppos);
+	if (ret)
+		return ret;
+
+	validate_coredump_safety();
+	return 0;
 }
 #endif
 
