@@ -2764,10 +2764,10 @@ bool cgroup_match_groups(struct task_struct *tsk1, struct task_struct *tsk2)
 		if (!root->subsys_mask)
 			continue;
 
-		spin_lock_bh(&css_set_lock);
+		spin_lock_irq(&css_set_lock);
 		cg_tsk1 = task_cgroup_from_root(tsk1, root);
 		cg_tsk2 = task_cgroup_from_root(tsk2, root);
-		spin_unlock_bh(&css_set_lock);
+		spin_unlock_irq(&css_set_lock);
 
 		if (cg_tsk1 != cg_tsk2) {
 			result = false;
@@ -2797,9 +2797,9 @@ int cgroup_attach_task_all(struct task_struct *from, struct task_struct *tsk)
 		if (root == &cgrp_dfl_root)
 			continue;
 
-		spin_lock_bh(&css_set_lock);
+		spin_lock_irq(&css_set_lock);
 		from_cgrp = task_cgroup_from_root(from, root);
-		spin_unlock_bh(&css_set_lock);
+		spin_unlock_irq(&css_set_lock);
 
 		retval = cgroup_attach_task(from_cgrp, tsk, false);
 		if (retval)
