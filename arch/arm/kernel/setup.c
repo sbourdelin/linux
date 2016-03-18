@@ -1036,11 +1036,11 @@ void __init setup_arch(char **cmdline_p)
 #endif
 	setup_dma_zone(mdesc);
 	efi_init();
-	sanity_check_meminfo();
 	arm_memblock_init(mdesc);
 
 	early_ioremap_reset();
 
+	sanity_check_meminfo();
 	paging_init(mdesc);
 	request_standard_resources(mdesc);
 
