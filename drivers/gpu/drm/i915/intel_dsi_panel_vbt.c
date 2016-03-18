@@ -75,24 +75,25 @@ static inline struct vbt_panel *to_vbt_panel(struct drm_panel *panel)
 #define VLV_GPIO_PCONF0(base_offset)	(base_offset)
 #define VLV_GPIO_PAD_VAL(base_offset)	((base_offset) + 8)
 
-struct gpio_table {
+struct vlv_gpio_map {
+	u8 gpio_index;
 	u16 base_offset;
 	bool init;
 };
 
-static struct gpio_table vlv_gpio_table[] = {
-	{ VLV_GPIO_NC_0_HV_DDI0_HPD },
-	{ VLV_GPIO_NC_1_HV_DDI0_DDC_SDA },
-	{ VLV_GPIO_NC_2_HV_DDI0_DDC_SCL },
-	{ VLV_GPIO_NC_3_PANEL0_VDDEN },
-	{ VLV_GPIO_NC_4_PANEL0_BLKEN },
-	{ VLV_GPIO_NC_5_PANEL0_BLKCTL },
-	{ VLV_GPIO_NC_6_PCONF0 },
-	{ VLV_GPIO_NC_7_PCONF0 },
-	{ VLV_GPIO_NC_8_PCONF0 },
-	{ VLV_GPIO_NC_9_PCONF0 },
-	{ VLV_GPIO_NC_10_PCONF0 },
-	{ VLV_GPIO_NC_11_PCONF0 },
+static struct vlv_gpio_map vlv_gpio_table[] = {
+	{ 0, VLV_GPIO_NC_0_HV_DDI0_HPD },
+	{ 1, VLV_GPIO_NC_1_HV_DDI0_DDC_SDA },
+	{ 2, VLV_GPIO_NC_2_HV_DDI0_DDC_SCL },
+	{ 3, VLV_GPIO_NC_3_PANEL0_VDDEN },
+	{ 4, VLV_GPIO_NC_4_PANEL0_BLKEN },
+	{ 5, VLV_GPIO_NC_5_PANEL0_BLKCTL },
+	{ 6, VLV_GPIO_NC_6_PCONF0 },
+	{ 7, VLV_GPIO_NC_7_PCONF0 },
+	{ 8, VLV_GPIO_NC_8_PCONF0 },
+	{ 9, VLV_GPIO_NC_9_PCONF0 },
+	{ 10, VLV_GPIO_NC_10_PCONF0 },
+	{ 11, VLV_GPIO_NC_11_PCONF0 },
 };
 
 static inline enum port intel_dsi_seq_port_to_port(u8 port)
@@ -194,6 +195,8 @@ static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
 	u32 val;
 	struct drm_device *dev = intel_dsi->base.base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct vlv_gpio_map *map = NULL;
+	int i;
 
 	if (dev_priv->vbt.dsi.seq_version >= 3)
 		data++;
@@ -209,13 +212,20 @@ static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
 	/* pull up/down */
 	action = *data++ & 1;
 
-	if (gpio_index >= ARRAY_SIZE(vlv_gpio_table)) {
-		DRM_DEBUG_KMS("unknown gpio index %u\n", gpio_index);
+	if (!IS_VALLEYVIEW(dev_priv)) {
+		DRM_DEBUG_KMS("GPIO element not supported on this platform\n");
 		goto out;
 	}
 
-	if (!IS_VALLEYVIEW(dev_priv)) {
-		DRM_DEBUG_KMS("GPIO element not supported on this platform\n");
+	for (i = 0; i < ARRAY_SIZE(vlv_gpio_table); i++) {
+		if (gpio_index == vlv_gpio_table[i].gpio_index) {
+			map = &vlv_gpio_table[i];
+			break;
+		}
+	}
+
+	if (!map) {
+		DRM_DEBUG_KMS("invalid gpio index %u\n", gpio_index);
 		goto out;
 	}
 
@@ -233,15 +243,15 @@ static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
 		}
 	}
 
-	pconf0 = VLV_GPIO_PCONF0(vlv_gpio_table[gpio_index].base_offset);
-	padval = VLV_GPIO_PAD_VAL(vlv_gpio_table[gpio_index].base_offset);
+	pconf0 = VLV_GPIO_PCONF0(map->base_offset);
+	padval = VLV_GPIO_PAD_VAL(map->base_offset);
 
 	mutex_lock(&dev_priv->sb_lock);
-	if (!vlv_gpio_table[gpio_index].init) {
+	if (!map->init) {
 		/* program the function */
 		/* FIXME: remove constant below */
 		vlv_iosf_sb_write(dev_priv, port, pconf0, 0x2000CC00);
-		vlv_gpio_table[gpio_index].init = true;
+		map->init = true;
 	}
 
 	val = 0x4 | action;
