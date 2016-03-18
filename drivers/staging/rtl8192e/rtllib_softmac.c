@@ -389,7 +389,8 @@ static void rtllib_send_beacon(struct rtllib_device *ieee)
 
 	if (ieee->beacon_txing && ieee->ieee_up)
 		mod_timer(&ieee->beacon_timer, jiffies +
-			  (msecs_to_jiffies(ieee->current_network.beacon_interval - 5)));
+			  (msecs_to_jiffies
+			   (ieee->current_network.beacon_interval - 5)));
 }
 
 
@@ -601,7 +602,8 @@ static void rtllib_softmac_scan_wq(void *data)
 			(ieee->current_network.channel + 1) %
 			MAX_CHANNEL_NUMBER;
 		if (ieee->scan_watch_dog++ > MAX_CHANNEL_NUMBER) {
-			if (!ieee->active_channel_map[ieee->current_network.channel])
+			if (!ieee->active_channel_map[ieee->
+					current_network.channel])
 				ieee->current_network.channel = 6;
 			goto out; /* no good chans */
 		}
@@ -1716,8 +1718,9 @@ inline void rtllib_softmac_new_net(struct rtllib_device *ieee,
 			if (ieee->iw_mode == IW_MODE_INFRA) {
 				/* Join the network for the first time */
 				ieee->AsocRetryCount = 0;
-				if ((ieee->current_network.qos_data.supported == 1) &&
-				    ieee->current_network.bssht.bdSupportHT)
+				if ((ieee->current_network.qos_data.supported 
+				      == 1) && 
+				       ieee->current_network.bssht.bdSupportHT)
 					HTResetSelfAndSavePeerSetting(ieee,
 						 &(ieee->current_network));
 				else
@@ -2044,8 +2047,8 @@ static short rtllib_sta_ps_sleep(struct rtllib_device *ieee, u64 *time)
 			}
 
 		*time = ieee->current_network.last_dtim_sta_time
-			+ msecs_to_jiffies(ieee->current_network.beacon_interval *
-			LPSAwakeIntvl_tmp);
+			+ msecs_to_jiffies(ieee->
+			current_network.beacon_interval * LPSAwakeIntvl_tmp);
 	}
 	}
 
@@ -2237,11 +2240,15 @@ inline int rtllib_rx_assoc_resp(struct rtllib_device *ieee, struct sk_buff *skb,
 			ieee->assoc_id = aid;
 			ieee->softmac_stats.rx_ass_ok++;
 			/* station support qos */
-			/* Let the register setting default with Legacy station */
-			assoc_resp = (struct rtllib_assoc_response_frame *)skb->data;
+			/* Let the register setting default */
+		        /*	with Legacy station */
+			assoc_resp = (struct 
+				rtllib_assoc_response_frame *)skb->data;
 			if (ieee->current_network.qos_data.supported == 1) {
-				if (rtllib_parse_info_param(ieee, assoc_resp->info_element,
-							rx_stats->len - sizeof(*assoc_resp),
+				if (rtllib_parse_info_param
+						(ieee, assoc_resp->info_element,
+							rx_stats->len - sizeof
+							(*assoc_resp),
 							network, rx_stats)) {
 					kfree(network);
 					return 1;
@@ -2254,8 +2261,9 @@ inline int rtllib_rx_assoc_resp(struct rtllib_device *ieee, struct sk_buff *skb,
 				       network->bssht.bdHTInfoLen);
 				if (ieee->handle_assoc_response != NULL)
 					ieee->handle_assoc_response(ieee->dev,
-						 (struct rtllib_assoc_response_frame *)header,
-						 network);
+						 (struct 
+						  rtllib_assoc_response_frame *)
+						   header, network);
 			}
 			kfree(network);
 
@@ -2595,7 +2603,8 @@ static void rtllib_start_ibss_wq(void *data)
 
 	if (ieee->current_network.ssid_len == 0) {
 		strcpy(ieee->current_network.ssid, RTLLIB_DEFAULT_TX_ESSID);
-		ieee->current_network.ssid_len = strlen(RTLLIB_DEFAULT_TX_ESSID);
+		ieee->current_network.ssid_len = 
+			                    strlen(RTLLIB_DEFAULT_TX_ESSID);
 		ieee->ssid_set = 1;
 	}
 
