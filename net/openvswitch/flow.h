@@ -63,7 +63,11 @@ struct sw_flow_key {
 		u32	skb_mark;	/* SKB mark. */
 		u16	in_port;	/* Input switch port (or DP_MAX_PORTS). */
 	} __packed phy; /* Safe when right after 'tun_key'. */
-	u8 tun_proto;			/* Protocol of encapsulating tunnel. */
+	struct {
+		__be16 src;		/* TCP/UDP/SCTP source port. */
+		__be16 dst;		/* TCP/UDP/SCTP destination port. */
+		__be16 flags;		/* TCP flags. */
+	} tp;
 	u32 ovs_flow_hash;		/* Datapath computed hash value.  */
 	u32 recirc_id;			/* Recirculation ID.  */
 	struct {
@@ -83,11 +87,6 @@ struct sw_flow_key {
 			u8     frag;	/* One of OVS_FRAG_TYPE_*. */
 		} ip;
 	};
-	struct {
-		__be16 src;		/* TCP/UDP/SCTP source port. */
-		__be16 dst;		/* TCP/UDP/SCTP destination port. */
-		__be16 flags;		/* TCP flags. */
-	} tp;
 	union {
 		struct {
 			struct {
@@ -114,11 +113,12 @@ struct sw_flow_key {
 	};
 	struct {
 		/* Connection tracking fields. */
-		u16 zone;
 		u32 mark;
+		u16 zone;
 		u8 state;
 		struct ovs_key_ct_labels labels;
 	} ct;
+	u8 tun_proto;			/* Protocol of encapsulating tunnel. */
 
 } __aligned(BITS_PER_LONG/8); /* Ensure that we can do comparisons as longs. */
 
