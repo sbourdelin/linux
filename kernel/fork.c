@@ -1785,6 +1785,12 @@ pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 		(unsigned long)arg, NULL, NULL, 0, 0);
 }
 
+pid_t user_thread(int (*fn)(void *), void *arg, unsigned long flags)
+{
+	return _do_fork(flags, (unsigned long)fn,
+		(unsigned long)arg, NULL, NULL, 0, 1);
+}
+
 #ifdef __ARCH_WANT_SYS_FORK
 SYSCALL_DEFINE0(fork)
 {
