@@ -18,7 +18,7 @@ if NET_VENDOR_CHELSIO
 
 config CHELSIO_T1
 	tristate "Chelsio 10Gb Ethernet support"
-	depends on PCI
+	depends on PCI && ANCIENT_NETDEVICES
 	select CRC32
 	select MDIO
 	---help---
