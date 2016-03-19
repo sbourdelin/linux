@@ -1647,7 +1647,7 @@ static int Handle_Key(struct wilc_vif *vif,
 			up(&hif_drv->sem_test_key_block);
 		} else if (pstrHostIFkeyAttr->action & ADDKEY) {
 			pu8keybuf = kzalloc(RX_MIC_KEY_MSG_LEN, GFP_KERNEL);
-			if (pu8keybuf == NULL) {
+			if (!pu8keybuf) {
 				ret = -ENOMEM;
 				goto _WPARxGtk_end_case_;
 			}
