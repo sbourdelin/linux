@@ -196,7 +196,7 @@
        
      * Title: "Writing Linux Device Drivers"
        Author: Michael K. Johnson.
-       URL: http://users.evitech.fi/~tk/rtos/writing_linux_device_d.html
+       URL: http://www.tldp.org/LDP/khg/HyperNews/get/khg.html
        Keywords: files, VFS, file operations, kernel interface, character
        vs block devices, I/O access, hardware interrupts, DMA, access to
        user memory, memory allocation, timers.
