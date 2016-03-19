@@ -284,6 +284,7 @@ static int kvm_vfio_create(struct kvm_device *dev, u32 type)
 	return 0;
 }
 
+#ifdef CONFIG_KVM_VFIO
 int kvm_vfio_ops_init(void)
 {
 	return kvm_register_device_ops(&kvm_vfio_ops, KVM_DEV_TYPE_VFIO);
@@ -293,3 +294,4 @@ void kvm_vfio_ops_exit(void)
 {
 	kvm_unregister_device_ops(KVM_DEV_TYPE_VFIO);
 }
+#endif
