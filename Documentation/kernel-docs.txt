@@ -376,7 +376,7 @@
      * Title: "Porting Linux 2.0 Drivers To Linux 2.2: Changes and New
        Features "
        Author: Alan Cox.
-       URL: http://www.linux-mag.com/1999-05/gear_01.html
+       URL: http://www.linux-mag.com/id/216/
        Keywords: ports, porting.
        Description: Article from Linux Magazine on porting from 2.0 to
        2.2 kernels.
