@@ -21,6 +21,25 @@ menuconfig NETDEVICES
 
 	  If unsure, say Y.
 
+menuconfig ANCIENT_NETDEVICES
+	   default n
+	   depends on NET && NETDEVICES
+	   bool "Network ancient device support"
+	   ---help---
+	   Many old devices are no longer manufactured.
+
+	   The drivers for these devices likely worked with the original
+	   kernel version when the devices were manufactured, but do not
+	   necessarily function well today.
+
+	   If these devices still exist and are still functional, the drivers
+	   for these devices get scant testing.
+
+	   The drivers for these devices are unmaintained and not supported by
+	   the vendor.
+
+	   If you are unsure that you need drivers for old hardware, say N.
+
 # All the following symbols are dependent on NETDEVICES - do not repeat
 # that for each of the symbols.
 if NETDEVICES
