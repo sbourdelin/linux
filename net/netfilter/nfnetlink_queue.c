@@ -60,7 +60,8 @@ struct nfqnl_instance {
 	unsigned int copy_range;
 	unsigned int queue_dropped;
 	unsigned int queue_user_dropped;
-
+        unsigned int queue_failopened;
+        unsigned int nobuf_failopened;
 
 	u_int16_t queue_num;			/* number of this queue */
 	u_int8_t copy_mode;
@@ -551,6 +552,7 @@ nla_put_failure:
 	return NULL;
 }
 
+
 static int
 __nfqnl_enqueue_packet(struct net *net, struct nfqnl_instance *queue,
 			struct nf_queue_entry *entry)
@@ -569,6 +571,7 @@ __nfqnl_enqueue_packet(struct net *net, struct nfqnl_instance *queue,
 
 	if (queue->queue_total >= queue->queue_maxlen) {
 		if (queue->flags & NFQA_CFG_F_FAIL_OPEN) {
+		        queue->queue_failopened++;
 			failopen = 1;
 			err = 0;
 		} else {
@@ -582,10 +585,17 @@ __nfqnl_enqueue_packet(struct net *net, struct nfqnl_instance *queue,
 	*packet_id_ptr = htonl(entry->id);
 
 	/* nfnetlink_unicast will either free the nskb or add it to a socket */
-	err = nfnetlink_unicast(nskb, net, queue->peer_portid, MSG_DONTWAIT);
+	err = nfnetlink_unicast_nofree(nskb, net, queue->peer_portid, MSG_DONTWAIT);
 	if (err < 0) {
-		queue->queue_user_dropped++;
-		goto err_out_unlock;
+		if (queue->flags & NFQA_CFG_F_FAIL_OPEN) {
+		        queue->nobuf_failopened++;
+		        failopen = 1;
+			err = 0;
+		}
+		else {
+		    queue->queue_user_dropped++;
+		}
+		goto err_out_free_nskb;
 	}
 
 	__enqueue_entry(queue, entry);
@@ -595,7 +605,6 @@ __nfqnl_enqueue_packet(struct net *net, struct nfqnl_instance *queue,
 
 err_out_free_nskb:
 	kfree_skb(nskb);
-err_out_unlock:
 	spin_unlock_bh(&queue->lock);
 	if (failopen)
 		nf_reinject(entry, NF_ACCEPT);
@@ -1327,12 +1336,14 @@ static int seq_show(struct seq_file *s, void *v)
 {
 	const struct nfqnl_instance *inst = v;
 
-	seq_printf(s, "%5u %6u %5u %1u %5u %5u %5u %8u %2d\n",
+	seq_printf(s, "%5u %6u %5u %1u %5u %5u %5u %8u %5u %5u %2d\n",
 		   inst->queue_num,
 		   inst->peer_portid, inst->queue_total,
 		   inst->copy_mode, inst->copy_range,
 		   inst->queue_dropped, inst->queue_user_dropped,
-		   inst->id_sequence, 1);
+		   inst->id_sequence,
+		   inst->queue_failopened, inst->nobuf_failopened,
+		   2);
 	return 0;
 }
 

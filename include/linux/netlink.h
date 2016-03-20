@@ -79,6 +79,7 @@ netlink_alloc_skb(struct sock *ssk, unsigned int size, u32 dst_portid,
 	return __netlink_alloc_skb(ssk, size, 0, dst_portid, gfp_mask);
 }
 
+extern int netlink_unicast_nofree(struct sock *ssk, struct sk_buff *skb, __u32 portid, int nonblock);
 extern int netlink_unicast(struct sock *ssk, struct sk_buff *skb, __u32 portid, int nonblock);
 extern int netlink_broadcast(struct sock *ssk, struct sk_buff *skb, __u32 portid,
 			     __u32 group, gfp_t allocation);
@@ -92,6 +93,8 @@ extern int netlink_unregister_notifier(struct notifier_block *nb);
 
 /* finegrained unicast helpers: */
 struct sock *netlink_getsockbyfilp(struct file *filp);
+int netlink_attachskb_nofree(struct sock *sk, struct sk_buff *skb,
+		      long *timeo, struct sock *ssk);
 int netlink_attachskb(struct sock *sk, struct sk_buff *skb,
 		      long *timeo, struct sock *ssk);
 void netlink_detachskb(struct sock *sk, struct sk_buff *skb);
