@@ -3271,7 +3271,9 @@ struct rtnl_link_stats64 *lan78xx_get_stats64(struct net_device *netdev,
 	 * periodic reading from HW will prevent from entering USB auto suspend.
 	 * if autosuspend is disabled, read from HW.
 	 */
+#ifdef CONFIG_PM
 	if (!dev->udev->dev.power.runtime_auto)
+#endif
 		lan78xx_update_stats(dev);
 
 	mutex_lock(&dev->stats.access_lock);
