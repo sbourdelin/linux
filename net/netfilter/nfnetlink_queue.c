@@ -1126,6 +1126,31 @@ static int nfqnl_recv_verdict(struct net *net, struct sock *ctnl,
 			ct = nfqnl_ct_parse(nfnl_ct, nlh, nfqa, entry, &ctinfo);
 	}
 
+	if (nfqa[NFQA_VLAN]) {
+		struct nlattr *vlan_tci =
+			nla_find_nested(nfqa[NFQA_VLAN], NFQA_VLAN_TCI);
+		struct nlattr *vlan_proto =
+			nla_find_nested(nfqa[NFQA_VLAN], NFQA_VLAN_PROTO);
+
+		if (vlan_tci)
+			entry->skb->vlan_tci = ntohs(nla_get_be16(vlan_tci));
+
+		if (vlan_proto)
+			entry->skb->vlan_proto = nla_get_be16(vlan_proto);
+	}
+
+	if (nfqa[NFQA_L2HDR]) {
+		int mac_header_len = entry->skb->network_header -
+			entry->skb->mac_header;
+
+		if (mac_header_len != nla_len(nfqa[NFQA_L2HDR]))
+			verdict = NF_DROP;
+		else if (mac_header_len > 0)
+			memcpy(skb_mac_header(entry->skb),
+			       nla_data(nfqa[NFQA_L2HDR]),
+			       mac_header_len);
+	}
+
 	if (nfqa[NFQA_PAYLOAD]) {
 		u16 payload_len = nla_len(nfqa[NFQA_PAYLOAD]);
 		int diff = payload_len - entry->skb->len;
