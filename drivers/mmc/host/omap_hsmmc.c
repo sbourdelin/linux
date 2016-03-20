@@ -1779,7 +1779,7 @@ static int omap_hsmmc_configure_wake_irq(struct omap_hsmmc_host *host)
 	 */
 	if (host->pdata->controller_flags & OMAP_HSMMC_SWAKEUP_MISSING) {
 		struct pinctrl *p = devm_pinctrl_get(host->dev);
-		if (!p) {
+		if (!p || IS_ERR(p)) {
 			ret = -ENODEV;
 			goto err_free_irq;
 		}
