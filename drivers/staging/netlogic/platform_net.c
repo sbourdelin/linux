@@ -182,8 +182,8 @@ static void xls_gmac_init(void)
 			ndata0.phy_addr[mac] = mac + 0x10;
 
 			xlr_resource_init(&xlr_net0_res[mac * 2],
-					xlr_gmac_offsets[mac],
-					xlr_gmac_irqs[mac]);
+					  xlr_gmac_offsets[mac],
+					  xlr_gmac_irqs[mac]);
 		}
 		xlr_net_dev0.num_resources = 8;
 		platform_device_register(&xlr_net_dev0);
