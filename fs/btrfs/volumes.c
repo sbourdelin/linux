@@ -2326,7 +2326,10 @@ int btrfs_init_new_device(struct btrfs_root *root, char *device_path)
 	if (seeding_dev) {
 		sb->s_flags &= ~MS_RDONLY;
 		ret = btrfs_prepare_sprout(root);
-		BUG_ON(ret); /* -ENOMEM */
+		if (ret) {
+			btrfs_abort_transaction(trans, root, ret);
+			goto error_trans;
+		}
 	}
 
 	device->fs_devices = root->fs_info->fs_devices;
