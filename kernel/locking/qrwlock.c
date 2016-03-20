@@ -23,6 +23,14 @@
 #include <asm/qrwlock.h>
 
 /*
+ * More than one reader will be allowed to spin on the lock waiting for the
+ * writer to exit. When more readers are allowed, it reduces the reader lock
+ * acquisition latency, but increases the amount of cacheline contention and
+ * probably power consumption.
+ */
+#define MAX_SPINNING_READERS	4
+
+/*
  * This internal data structure is used for optimizing access to some of
  * the subfields within the atomic_t cnts.
  */
@@ -43,29 +51,14 @@ struct __qrwlock {
 };
 
 /**
- * rspin_until_writer_unlock - inc reader count & spin until writer is gone
- * @lock  : Pointer to queue rwlock structure
- * @writer: Current queue rwlock writer status byte
- *
- * In interrupt context or at the head of the queue, the reader will just
- * increment the reader count & wait until the writer releases the lock.
- */
-static __always_inline void
-rspin_until_writer_unlock(struct qrwlock *lock, u32 cnts)
-{
-	while ((cnts & _QW_WMASK) == _QW_LOCKED) {
-		cpu_relax_lowlatency();
-		cnts = atomic_read_acquire(&lock->cnts);
-	}
-}
-
-/**
  * queued_read_lock_slowpath - acquire read lock of a queue rwlock
  * @lock: Pointer to queue rwlock structure
  * @cnts: Current qrwlock lock value
  */
 void queued_read_lock_slowpath(struct qrwlock *lock, u32 cnts)
 {
+	bool locked = true;
+
 	/*
 	 * Readers come here when they cannot get the lock without waiting
 	 */
@@ -78,7 +71,10 @@ void queued_read_lock_slowpath(struct qrwlock *lock, u32 cnts)
 		 * semantics) until the lock is available without waiting in
 		 * the queue.
 		 */
-		rspin_until_writer_unlock(lock, cnts);
+		while ((cnts & _QW_WMASK) == _QW_LOCKED) {
+			cpu_relax_lowlatency();
+			cnts = atomic_read_acquire(&lock->cnts);
+		}
 		return;
 	}
 	atomic_sub(_QR_BIAS, &lock->cnts);
@@ -92,14 +88,31 @@ void queued_read_lock_slowpath(struct qrwlock *lock, u32 cnts)
 	 * The ACQUIRE semantics of the following spinning code ensure
 	 * that accesses can't leak upwards out of our subsequent critical
 	 * section in the case that the lock is currently held for write.
+	 *
+	 * The reader increments the reader count & wait until the writer
+	 * releases the lock.
 	 */
 	cnts = atomic_add_return_acquire(_QR_BIAS, &lock->cnts) - _QR_BIAS;
-	rspin_until_writer_unlock(lock, cnts);
+	while ((cnts & _QW_WMASK) == _QW_LOCKED) {
+		if (locked && ((cnts >> _QR_SHIFT) < MAX_SPINNING_READERS)) {
+			/*
+			 * Unlock the wait queue so that more readers can
+			 * come forward and waiting for the writer to exit
+			 * as long as no more than MAX_SPINNING_READERS
+			 * readers are present.
+			 */
+			arch_spin_unlock(&lock->wait_lock);
+			locked = false;
+		}
+		cpu_relax_lowlatency();
+		cnts = atomic_read_acquire(&lock->cnts);
+	}
 
 	/*
 	 * Signal the next one in queue to become queue head
 	 */
-	arch_spin_unlock(&lock->wait_lock);
+	if (locked)
+		arch_spin_unlock(&lock->wait_lock);
 }
 EXPORT_SYMBOL(queued_read_lock_slowpath);
 
