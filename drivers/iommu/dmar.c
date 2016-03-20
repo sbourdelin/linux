@@ -364,6 +364,18 @@ dmar_find_dmaru(struct acpi_dmar_hardware_unit *drhd)
 	return NULL;
 }
 
+static void warn_invalid_dmar(u64 addr, const char *message)
+{
+	WARN_TAINT_ONCE(
+		1, TAINT_FIRMWARE_WORKAROUND,
+		"Your BIOS is broken; DMAR reported at address %llx%s!\n"
+		"BIOS vendor: %s; Ver: %s; Product Version: %s\n",
+		addr, message,
+		dmi_get_system_info(DMI_BIOS_VENDOR),
+		dmi_get_system_info(DMI_BIOS_VERSION),
+		dmi_get_system_info(DMI_PRODUCT_VERSION));
+}
+
 /**
  * dmar_parse_one_drhd - parses exactly one DMA remapping hardware definition
  * structure which uniquely represent one DMA remapping hardware unit
@@ -379,6 +391,11 @@ static int dmar_parse_one_drhd(struct acpi_dmar_header *header, void *arg)
 	dmaru = dmar_find_dmaru(drhd);
 	if (dmaru)
 		goto out;
+
+	if (!drhd->address) {
+		warn_invalid_dmar(0, "");
+		return -EINVAL;
+	}
 
 	dmaru = kzalloc(sizeof(*dmaru) + header->length, GFP_KERNEL);
 	if (!dmaru)
@@ -809,18 +826,6 @@ int __init dmar_table_init(void)
 	return dmar_table_initialized < 0 ? dmar_table_initialized : 0;
 }
 
-static void warn_invalid_dmar(u64 addr, const char *message)
-{
-	WARN_TAINT_ONCE(
-		1, TAINT_FIRMWARE_WORKAROUND,
-		"Your BIOS is broken; DMAR reported at address %llx%s!\n"
-		"BIOS vendor: %s; Ver: %s; Product Version: %s\n",
-		addr, message,
-		dmi_get_system_info(DMI_BIOS_VENDOR),
-		dmi_get_system_info(DMI_BIOS_VERSION),
-		dmi_get_system_info(DMI_PRODUCT_VERSION));
-}
-
 static int __ref
 dmar_validate_one_drhd(struct acpi_dmar_header *entry, void *arg)
 {
@@ -995,11 +1000,6 @@ static int alloc_iommu(struct dmar_drhd_unit *drhd)
 	int agaw = 0;
 	int msagaw = 0;
 	int err;
-
-	if (!drhd->reg_base_addr) {
-		warn_invalid_dmar(0, "");
-		return -EINVAL;
-	}
 
 	iommu = kzalloc(sizeof(*iommu), GFP_KERNEL);
 	if (!iommu)
