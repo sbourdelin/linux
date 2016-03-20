@@ -8617,7 +8617,7 @@ err_alloc:
 	 * If event_file is set, the fput() above will have called ->release()
 	 * and that will take care of freeing the event.
 	 */
-	if (!event_file)
+	if (IS_ERR_OR_NULL(event_file))
 		free_event(event);
 err_cpus:
 	put_online_cpus();
