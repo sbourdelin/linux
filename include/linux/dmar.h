@@ -52,7 +52,6 @@ struct dmar_dev_scope {
 extern struct acpi_table_header *dmar_tbl;
 struct dmar_drhd_unit {
 	struct list_head list;		/* list of drhd units	*/
-	struct  acpi_dmar_header *hdr;	/* ACPI header		*/
 	u64	reg_base_addr;		/* register base address*/
 	struct	dmar_dev_scope *devices;/* target device array	*/
 	int	devices_cnt;		/* target device count	*/
@@ -60,6 +59,7 @@ struct dmar_drhd_unit {
 	u8	ignored:1; 		/* ignore drhd		*/
 	u8	include_all:1;
 	struct intel_iommu *iommu;
+	struct  acpi_dmar_header hdr[0];/* ACPI header		*/
 };
 
 struct dmar_pci_path {
