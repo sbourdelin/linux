@@ -168,8 +168,9 @@ static void xls_gmac_init(void)
 
 		xlr_net_dev0.num_resources = 2;
 
-		xlr_resource_init(&xlr_net0_res[0], xlr_gmac_offsets[0],
-				xlr_gmac_irqs[0]);
+		xlr_resource_init(&xlr_net0_res[0],
+				  xlr_gmac_offsets[0],
+				  xlr_gmac_irqs[0]);
 		platform_device_register(&xlr_net_dev0);
 
 		/* second block is XAUI, not supported yet */
