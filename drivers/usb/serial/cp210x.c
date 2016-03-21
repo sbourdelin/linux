@@ -31,8 +31,8 @@
  */
 static int cp210x_open(struct tty_struct *tty, struct usb_serial_port *);
 static void cp210x_close(struct usb_serial_port *);
-static void cp210x_get_termios(struct tty_struct *, struct usb_serial_port *);
-static void cp210x_get_termios_port(struct usb_serial_port *port,
+static int cp210x_get_termios(struct tty_struct *, struct usb_serial_port *);
+static int cp210x_get_termios_port(struct usb_serial_port *port,
 	unsigned int *cflagp, unsigned int *baudp);
 static void cp210x_change_speed(struct tty_struct *, struct usb_serial_port *,
 							struct ktermios *);
@@ -598,7 +598,9 @@ static int cp210x_open(struct tty_struct *tty, struct usb_serial_port *port)
 	}
 
 	/* Configure the termios structure */
-	cp210x_get_termios(tty, port);
+	result = cp210x_get_termios(tty, port);
+	if (result)
+		return result;
 
 	/* The baud rate must be initialised on cp2104 */
 	if (tty)
@@ -668,27 +670,29 @@ static bool cp210x_tx_empty(struct usb_serial_port *port)
  * from the device, corrects any unsupported values, and configures the
  * termios structure to reflect the state of the device
  */
-static void cp210x_get_termios(struct tty_struct *tty,
+static int cp210x_get_termios(struct tty_struct *tty,
 	struct usb_serial_port *port)
 {
 	unsigned int baud;
+	int err;
 
 	if (tty) {
-		cp210x_get_termios_port(tty->driver_data,
+		err = cp210x_get_termios_port(tty->driver_data,
 			&tty->termios.c_cflag, &baud);
 		tty_encode_baud_rate(tty, baud, baud);
 	} else {
 		unsigned int cflag;
 		cflag = 0;
-		cp210x_get_termios_port(port, &cflag, &baud);
+		err = cp210x_get_termios_port(port, &cflag, &baud);
 	}
+	return err;
 }
 
 /*
  * cp210x_get_termios_port
  * This is the heart of cp210x_get_termios which always uses a &usb_serial_port.
  */
-static void cp210x_get_termios_port(struct usb_serial_port *port,
+static int cp210x_get_termios_port(struct usb_serial_port *port,
 	unsigned int *cflagp, unsigned int *baudp)
 {
 	struct device *dev = &port->dev;
@@ -697,15 +701,19 @@ static void cp210x_get_termios_port(struct usb_serial_port *port,
 	u32 baud;
 	u16 old_bits;
 	u16 bits;
+	int err;
 
-	cp210x_read_u32_reg(port, CP210X_GET_BAUDRATE, &baud);
-
+	err = cp210x_read_u32_reg(port, CP210X_GET_BAUDRATE, &baud);
+	if (err)
+		return err;
 	dev_dbg(dev, "%s - baud rate = %d\n", __func__, baud);
 	*baudp = baud;
 
 	cflag = *cflagp;
 
-	cp210x_get_line_ctl(port, &bits);
+	err = cp210x_get_line_ctl(port, &bits);
+	if (err)
+		return err;
 	old_bits = bits;
 	cflag &= ~CSIZE;
 	switch (bits & BITS_DATA_MASK) {
@@ -788,11 +796,16 @@ static void cp210x_get_termios_port(struct usb_serial_port *port,
 		break;
 	}
 
-	if (bits != old_bits)
-		cp210x_write_u16_reg(port, CP210X_SET_LINE_CTL, bits);
+	if (bits != old_bits) {
+		err = cp210x_write_u16_reg(port, CP210X_SET_LINE_CTL, bits);
+		if (err)
+			return err;
+	}
 
-	cp210x_read_reg_block(port, CP210X_GET_FLOW, modem_ctl,
+	err = cp210x_read_reg_block(port, CP210X_GET_FLOW, modem_ctl,
 			sizeof(modem_ctl));
+	if (err)
+		return err;
 	if (modem_ctl[0] & 0x08) { /* if SERIAL_CTS_HANDSHAKE */
 		dev_dbg(dev, "%s - flow control = CRTSCTS\n", __func__);
 		cflag |= CRTSCTS;
@@ -802,6 +815,8 @@ static void cp210x_get_termios_port(struct usb_serial_port *port,
 	}
 
 	*cflagp = cflag;
+
+	return 0;
 }
 
 /*
