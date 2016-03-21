@@ -958,7 +958,6 @@ static void cp210x_set_termios(struct tty_struct *tty,
 			modem_ctl[0] &= ~0x7B;
 			modem_ctl[0] |= 0x09;
 			modem_ctl[4] = 0x80;
-			modem_ctl[7] = 0;
 			dev_dbg(dev, "%s - flow control = CRTSCTS\n", __func__);
 		} else {
 			modem_ctl[0] &= ~0x7B;
@@ -966,6 +965,7 @@ static void cp210x_set_termios(struct tty_struct *tty,
 			modem_ctl[4] = 0x40;
 			dev_dbg(dev, "%s - flow control = NONE\n", __func__);
 		}
+		modem_ctl[7] = 0;
 
 		dev_dbg(dev, "%s - write modem controls = %02x .. .. .. %02x .. .. %02x\n",
 			__func__, modem_ctl[0], modem_ctl[4], modem_ctl[7]);
