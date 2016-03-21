@@ -734,6 +734,13 @@ static int i915_audio_component_get_eld(struct device *dev, int port,
 			ret = drm_eld_size(eld);
 			memcpy(buf, eld, min(max_bytes, ret));
 		}
+	} else {
+		/* dev_priv->dig_port_map[port] will be set NULL in
+		 * intel_audio_codec_disable when disconnecting monitor.
+		 * We need clear the eld buf.
+		 */
+		memset(buf, 0, max_bytes);
+		ret = 0;
 	}
 
 	mutex_unlock(&dev_priv->av_mutex);
