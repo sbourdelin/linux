@@ -3434,6 +3434,18 @@ int drm_mode_addfb2(struct drm_device *dev,
 	return 0;
 }
 
+struct drm_mode_rmfb_work {
+	struct work_struct work;
+	struct drm_framebuffer *fb;
+};
+
+static void drm_mode_rmfb_work_fn(struct work_struct *w)
+{
+	struct drm_mode_rmfb_work *arg = container_of(w, typeof(*arg), work);
+
+	drm_framebuffer_remove(arg->fb);
+}
+
 /**
  * drm_mode_rmfb - remove an FB from the configuration
  * @dev: drm device for the ioctl
@@ -3454,6 +3466,7 @@ int drm_mode_rmfb(struct drm_device *dev,
 	struct drm_framebuffer *fbl = NULL;
 	uint32_t *id = data;
 	int found = 0;
+	struct drm_mode_rmfb_work arg;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EINVAL;
@@ -3474,7 +3487,12 @@ int drm_mode_rmfb(struct drm_device *dev,
 	mutex_unlock(&dev->mode_config.fb_lock);
 	mutex_unlock(&file_priv->fbs_lock);
 
-	drm_framebuffer_unreference(fb);
+	INIT_WORK_ONSTACK(&arg.work, drm_mode_rmfb_work_fn);
+	arg.fb = fb;
+
+	schedule_work(&arg.work);
+	flush_work(&arg.work);
+	destroy_work_on_stack(&arg.work);
 
 	return 0;
 
