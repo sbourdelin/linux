@@ -39,6 +39,7 @@ struct cpuidle_state {
 	char		name[CPUIDLE_NAME_LEN];
 	char		desc[CPUIDLE_DESC_LEN];
 
+	unsigned int	limit; /* compared to Package C-state Limit */
 	unsigned int	flags;
 	unsigned int	exit_latency; /* in US */
 	int		power_usage; /* in mW */
