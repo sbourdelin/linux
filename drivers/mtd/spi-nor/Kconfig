@@ -29,6 +29,18 @@ config MTD_SPI_NOR_USE_4K_SECTORS
 	  Please note that some tools/drivers/filesystems may not work with
 	  4096 B erase size (e.g. UBIFS requires 15 KiB as a minimum).
 
+config MTD_SPI_NOR_USE_4B_OPCODES
+	bool "Use 4-byte address op codes"
+	default n
+	help
+	  This is an alternative to the "Enter/Exit 4-byte mode" commands and
+	  Base Address Register (BAR) updates to support flash size above 16MiB.
+	  Using dedicated 4-byte address op codes for (Fast) Read, Page Program
+	  and Sector Erase operations avoids changing the internal state of the
+	  SPI NOR memory. Hence if a CPU reset occurs, early bootloaders can
+	  still use regular 3-byte address op codes and read from the very first
+	  16MiB of the flash memory.
+
 config SPI_FSL_QUADSPI
 	tristate "Freescale Quad SPI controller"
 	depends on ARCH_MXC || SOC_LS1021A || ARCH_LAYERSCAPE || COMPILE_TEST
