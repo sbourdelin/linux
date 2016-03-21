@@ -1,4 +1,5 @@
-/* Driver for Realtek PCI-Express card reader
+/*
+ * Driver for Realtek PCI-Express card reader
  *
  * Copyright(c) 2009-2013 Realtek Semiconductor Corp. All rights reserved.
  *
@@ -81,17 +82,20 @@ static int slave_alloc(struct scsi_device *sdev)
 
 static int slave_configure(struct scsi_device *sdev)
 {
-	/* Scatter-gather buffers (all but the last) must have a length
+	/*
+	 * Scatter-gather buffers (all but the last) must have a length
 	 * divisible by the bulk maxpacket size.  Otherwise a data packet
 	 * would end up being short, causing a premature end to the data
 	 * transfer.  Since high-speed bulk pipes have a maxpacket size
 	 * of 512, we'll use that as the scsi device queue's DMA alignment
 	 * mask.  Guaranteeing proper alignment of the first buffer will
 	 * have the desired effect because, except at the beginning and
-	 * the end, scatter-gather buffers follow page boundaries. */
+	 * the end, scatter-gather buffers follow page boundaries.
+	 */
 	blk_queue_dma_alignment(sdev->request_queue, (512 - 1));
 
-	/* Set the SCSI level to at least 2.  We'll leave it at 3 if that's
+	/*
+	 * Set the SCSI level to at least 2.  We'll leave it at 3 if that's
 	 * what is originally reported.  We need this to avoid confusing
 	 * the SCSI layer with devices that report 0 or 1, but need 10-byte
 	 * commands (ala ATAPI devices behind certain bridges, or devices
@@ -186,8 +190,10 @@ static int command_abort(struct scsi_cmnd *srb)
 	return SUCCESS;
 }
 
-/* This invokes the transport reset mechanism to reset the state of the
- * device */
+/*
+ * This invokes the transport reset mechanism to reset the state of the
+ * device
+ */
 static int device_reset(struct scsi_cmnd *srb)
 {
 	int result = 0;
@@ -500,8 +506,8 @@ SkipForAbort:
 		mutex_unlock(&dev->dev_mutex);
 	} /* for (;;) */
 
-	/* notify the exit routine that we're actually exiting now
-	 *
+	/*
+	 * notify the exit routine that we're actually exiting now
 	 * complete()/wait_for_completion() is similar to up()/down(),
 	 * except that complete() is safe in the case where the structure
 	 * is getting deleted in a parallel mode of execution (i.e. just
@@ -633,7 +639,8 @@ static void rtsx_release_resources(struct rtsx_dev *dev)
 {
 	dev_info(&dev->pci->dev, "-- %s\n", __func__);
 
-	/* Tell the control thread to exit.  The SCSI host must
+	/*
+	 * Tell the control thread to exit.  The SCSI host must
 	 * already have been removed so it won't try to queue
 	 * any more commands.
 	 */
@@ -665,15 +672,19 @@ static void rtsx_release_resources(struct rtsx_dev *dev)
 	kfree(dev->chip);
 }
 
-/* First stage of disconnect processing: stop all commands and remove
- * the host */
+/*
+ * First stage of disconnect processing: stop all commands and remove
+ * the host
+ */
 static void quiesce_and_remove_host(struct rtsx_dev *dev)
 {
 	struct Scsi_Host *host = rtsx_to_host(dev);
 	struct rtsx_chip *chip = dev->chip;
 
-	/* Prevent new transfers, stop the current command, and
-	 * interrupt a SCSI-scan or device-reset delay */
+	/*
+	 * Prevent new transfers, stop the current command, and
+	 * interrupt a SCSI-scan or device-reset delay
+	 */
 	mutex_lock(&dev->dev_mutex);
 	scsi_lock(host);
 	rtsx_set_stat(chip, RTSX_STAT_DISCONNECT);
@@ -685,9 +696,11 @@ static void quiesce_and_remove_host(struct rtsx_dev *dev)
 	/* Wait some time to let other threads exist */
 	wait_timeout(100);
 
-	/* queuecommand won't accept any new commands and the control
+	/*
+	 * queuecommand won't accept any new commands and the control
 	 * thread won't execute a previously-queued command.  If there
-	 * is such a command pending, complete it with an error. */
+	 * is such a command pending, complete it with an error.
+	 */
 	mutex_lock(&dev->dev_mutex);
 	if (chip->srb) {
 		chip->srb->result = DID_NO_CONNECT << 16;
@@ -707,8 +720,10 @@ static void release_everything(struct rtsx_dev *dev)
 {
 	rtsx_release_resources(dev);
 
-	/* Drop our reference to the host; the SCSI core will free it
-	 * when the refcount becomes 0. */
+	/*
+	 * Drop our reference to the host; the SCSI core will free it
+	 * when the refcount becomes 0.
+	 */
 	scsi_host_put(rtsx_to_host(dev));
 }
 
@@ -950,8 +965,10 @@ static int rtsx_probe(struct pci_dev *pci,
 
 	rtsx_init_chip(dev->chip);
 
-	/* set the supported max_lun and max_id for the scsi host
-	 * NOTE: the minimal value of max_id is 1 */
+	/*
+	 * set the supported max_lun and max_id for the scsi host
+	 * NOTE: the minimal value of max_id is 1
+	 */
 	host->max_id = 1;
 	host->max_lun = dev->chip->max_lun;
 
