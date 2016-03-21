@@ -245,9 +245,22 @@ static void send_user_sigtrap(int si_code)
 	force_sig_info(SIGTRAP, &info, current);
 }
 
+extern unsigned long el1_irq_ss_entry[];
+
 static int single_step_handler(unsigned long addr, unsigned int esr,
 			       struct pt_regs *regs)
 {
+	void *pc = (void *)instruction_pointer(regs);
+
+	if (pc == &el1_irq_ss_entry) {
+		struct pt_regs *irq_regs = (struct pt_regs *)(regs->sp);
+
+		irq_regs->pstate |= irq_single_step_enable_bps();
+		kernel_disable_single_step();
+
+		return 0;
+	}
+
 	/*
 	 * If we are stepping a pending breakpoint, call the hw_breakpoint
 	 * handler first.

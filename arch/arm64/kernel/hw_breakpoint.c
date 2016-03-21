@@ -540,11 +540,12 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
  * exception level at the register level.
  * This is used when single-stepping after a breakpoint exception.
  */
-static void toggle_bp_registers(int reg, enum dbg_active_el el, int enable)
+static bool toggle_bp_registers(int reg, enum dbg_active_el el, int enable)
 {
 	int i, max_slots, privilege;
 	u32 ctrl;
 	struct perf_event **slots;
+	bool origin_state = false;
 
 	switch (reg) {
 	case AARCH64_DBG_REG_BCR:
@@ -556,7 +557,7 @@ static void toggle_bp_registers(int reg, enum dbg_active_el el, int enable)
 		max_slots = core_num_wrps;
 		break;
 	default:
-		return;
+		return false;
 	}
 
 	for (i = 0; i < max_slots; ++i) {
@@ -568,12 +569,16 @@ static void toggle_bp_registers(int reg, enum dbg_active_el el, int enable)
 			continue;
 
 		ctrl = read_wb_reg(reg, i);
+		if (ctrl & 0x1)
+			origin_state = true;
 		if (enable)
 			ctrl |= 0x1;
 		else
 			ctrl &= ~0x1;
 		write_wb_reg(reg, i, ctrl);
 	}
+
+	return origin_state;
 }
 
 /*
@@ -980,6 +985,41 @@ u64 signal_single_step_enable_bps(void)
 	else
 		user_disable_single_step(current);
 	return retval;
+}
+
+u64 irq_single_step_enable_bps(void)
+{
+	u64 retval = 0;
+
+	if (!toggle_bp_registers(AARCH64_DBG_REG_WCR, DBG_ACTIVE_EL1, 1))
+		retval |= PSR_LINUX_HW_WP_SS;
+
+	if (!toggle_bp_registers(AARCH64_DBG_REG_BCR, DBG_ACTIVE_EL1, 1))
+		retval |= PSR_LINUX_HW_BP_SS;
+
+	return retval;
+}
+
+void irq_reinstall_single_step(struct pt_regs *regs)
+{
+	u64 pstate = regs->pstate;
+
+	if (likely(!(regs->pstate & PSR_LINUX_HW_SS)))
+		return;
+
+	if (!user_mode(regs)) {
+		if (pstate & PSR_LINUX_HW_BP_SS)
+			toggle_bp_registers(AARCH64_DBG_REG_BCR,
+					    DBG_ACTIVE_EL1, 0);
+		if (pstate & PSR_LINUX_HW_WP_SS)
+			toggle_bp_registers(AARCH64_DBG_REG_WCR,
+					    DBG_ACTIVE_EL1, 0);
+
+		if (!kernel_active_single_step()) {
+			asm volatile ("msr     daifset, #8\n");
+			kernel_enable_single_step(regs);
+		}
+	}
 }
 
 void signal_reinstall_single_step(u64 pstate)

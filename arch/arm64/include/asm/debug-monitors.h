@@ -133,7 +133,10 @@ int kernel_active_single_step(void);
 #ifdef CONFIG_HAVE_HW_BREAKPOINT
 int reinstall_suspended_bps(struct pt_regs *regs);
 u64 signal_single_step_enable_bps(void);
+u64 irq_single_step_enable_bps(void);
+
 void signal_reinstall_single_step(u64 pstate);
+void irq_reinstall_single_step(struct pt_regs *regs);
 #else
 static inline int reinstall_suspended_bps(struct pt_regs *regs)
 {
@@ -145,7 +148,13 @@ static inline u64 signal_single_step_enable_bps(void)
 	return 0;
 }
 
+static inline u64 irq_single_step_enable_bps(void)
+{
+	return 0;
+}
+
 static inline void signal_reinstall_single_step(u64 pstate) { }
+static inline void irq_reinstall_single_step(struct pt_regs *regs) { }
 #endif
 
 int aarch32_break_handler(struct pt_regs *regs);

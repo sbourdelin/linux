@@ -402,12 +402,18 @@ ENDPROC(el1_sync)
 el1_irq:
 	kernel_entry 1
 	enable_dbg
+	.global el1_irq_ss_entry
+el1_irq_ss_entry:
 #ifdef CONFIG_TRACE_IRQFLAGS
 	bl	trace_hardirqs_off
 #endif
 
 	get_thread_info tsk
 	irq_handler
+#ifdef CONFIG_HAVE_HW_BREAKPOINT
+	mov	x0, sp
+	bl	irq_reinstall_single_step
+#endif
 
 #ifdef CONFIG_PREEMPT
 	ldr	w24, [tsk, #TI_PREEMPT]		// get preempt count
