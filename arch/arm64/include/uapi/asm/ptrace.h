@@ -52,6 +52,16 @@
 #define PSR_N_BIT	0x80000000
 
 /*
+ * pstat in pt_regs and user_pt_regs are 64 bits. The highest 32 bits
+ * of it can be used by kernel. One user of them is signal handler.
+ */
+#define PSR_LINUX_MASK        0xffffffff00000000UL
+#define PSR_LINUX_HW_BP_SS    0x0000000100000000UL    /* Single step and disable breakpoints */
+#define PSR_LINUX_HW_WP_SS    0x0000000200000000UL    /* Single step and disable watchpoints */
+
+#define PSR_LINUX_HW_SS    (PSR_LINUX_HW_BP_SS | PSR_LINUX_HW_WP_SS)
+
+/*
  * Groups of PSR bits
  */
 #define PSR_f		0xff000000	/* Flags		*/

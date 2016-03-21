@@ -151,6 +151,7 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
 	if (restore_altstack(&frame->uc.uc_stack))
 		goto badframe;
 
+	signal_reinstall_single_step(regs->pstate);
 	return regs->regs[0];
 
 badframe:
@@ -292,6 +293,7 @@ static void handle_signal(struct ksignal *ksig, struct pt_regs *regs)
 	int usig = ksig->sig;
 	int ret;
 
+	regs->pstate |= signal_single_step_enable_bps();
 	/*
 	 * Set up the stack frame
 	 */

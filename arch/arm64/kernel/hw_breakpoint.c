@@ -954,3 +954,52 @@ int hw_breakpoint_exceptions_notify(struct notifier_block *unused,
 {
 	return NOTIFY_DONE;
 }
+
+u64 signal_single_step_enable_bps(void)
+{
+	struct debug_info *debug_info = &current->thread.debug;
+	u64 retval = 0;
+
+	if (likely(!debug_info->bps_disabled && !debug_info->wps_disabled))
+		return 0;
+
+	if (debug_info->bps_disabled) {
+		retval |= PSR_LINUX_HW_BP_SS;
+		toggle_bp_registers(AARCH64_DBG_REG_BCR, DBG_ACTIVE_EL0, 1);
+		debug_info->bps_disabled = 0;
+	}
+
+	if (debug_info->wps_disabled) {
+		retval |= PSR_LINUX_HW_WP_SS;
+		toggle_bp_registers(AARCH64_DBG_REG_WCR, DBG_ACTIVE_EL0, 1);
+		debug_info->wps_disabled = 0;
+	}
+
+	if (debug_info->suspended_step)
+		debug_info->suspended_step = 0;
+	else
+		user_disable_single_step(current);
+	return retval;
+}
+
+void signal_reinstall_single_step(u64 pstate)
+{
+	struct debug_info *debug_info = &current->thread.debug;
+
+	if (likely(!(pstate & PSR_LINUX_HW_SS)))
+		return;
+
+	if (pstate & PSR_LINUX_HW_BP_SS) {
+		debug_info->bps_disabled = 1;
+		toggle_bp_registers(AARCH64_DBG_REG_BCR, DBG_ACTIVE_EL0, 0);
+	}
+	if (pstate & PSR_LINUX_HW_WP_SS) {
+		debug_info->wps_disabled = 1;
+		toggle_bp_registers(AARCH64_DBG_REG_WCR, DBG_ACTIVE_EL0, 0);
+	}
+
+	if (test_thread_flag(TIF_SINGLESTEP))
+		debug_info->suspended_step = 1;
+	else
+		user_enable_single_step(current);
+}
