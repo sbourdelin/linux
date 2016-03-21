@@ -958,16 +958,12 @@ static void cp210x_set_termios(struct tty_struct *tty,
 			modem_ctl[0] &= ~0x7B;
 			modem_ctl[0] |= 0x09;
 			modem_ctl[4] = 0x80;
-			/* FIXME - why clear reserved bits just read? */
-			modem_ctl[5] = 0;
-			modem_ctl[6] = 0;
 			modem_ctl[7] = 0;
 			dev_dbg(dev, "%s - flow control = CRTSCTS\n", __func__);
 		} else {
 			modem_ctl[0] &= ~0x7B;
 			modem_ctl[0] |= 0x01;
-			/* FIXME - OR here instead of assignment looks wrong */
-			modem_ctl[4] |= 0x40;
+			modem_ctl[4] = 0x40;
 			dev_dbg(dev, "%s - flow control = NONE\n", __func__);
 		}
 
