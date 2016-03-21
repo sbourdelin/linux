@@ -332,6 +332,7 @@ static int cond_insertf(struct avtab *a, struct avtab_key *k, struct avtab_datum
 	list = kzalloc(sizeof(struct cond_av_list), GFP_KERNEL);
 	if (!list) {
 		rc = -ENOMEM;
+		kfree(node_ptr);
 		goto err;
 	}
 
