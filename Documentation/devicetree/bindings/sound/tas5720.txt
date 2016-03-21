@@ -1,0 +1,37 @@
+Texas Instruments TAS5720 Mono Audio amplifier
+
+The TAS5720 serial control bus communicates through the I2C protocol only.
+
+Required properties:
+
+- compatible : "ti,tas5720"
+- reg : I2C slave address
+
+Optional properties:
+
+- dvdd-supply : phandle to a 3.3-V supply for the digital circuitry
+- pvdd-supply : phandle to a supply used for the Class-D amp and the analog
+- interrupts  : reference to a GPIO pin connected to the TAS5720 FAULTZ pin for
+                error reporting purposes
+
+Note that in case of codec errors the driver relies on the TAS5720 datasheet-
+proposed "Auto Recovery Circuit" (connection between the FAULTZ and SDZ device
+pins) for continued operation. This connection should always be made independent
+of whether the optional interrupt-based fault-reporting feature is used.
+
+For more product information please see the links below:
+
+http://www.ti.com/product/TAS5720L
+http://www.ti.com/product/TAS5720M
+
+Example:
+
+tas5720: tas5720@6c {
+	status = "okay";
+	compatible = "ti,tas5720";
+	reg = <0x6c>;
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&tas572x_int_pin>;
+	interrupts-extended = <&gpio1 28 IRQ_TYPE_EDGE_FALLING>;
+};
