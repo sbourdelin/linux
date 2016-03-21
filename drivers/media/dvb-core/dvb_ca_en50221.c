@@ -148,6 +148,9 @@ struct dvb_ca_private {
 	/* Flag indicating if the CA device is open */
 	unsigned int open:1;
 
+	/* Flag indicating if the CA device is released */
+	unsigned int released:1;
+
 	/* Flag indicating the thread should wake up now */
 	unsigned int wakeup:1;
 
@@ -1392,6 +1395,11 @@ static int dvb_ca_en50221_io_read_condition(struct dvb_ca_private *ca,
 	int found = 0;
 	u8 hdr[2];
 
+	if (ca->released) {
+		*result = -ENODEV;
+		return 1;
+	}
+
 	slot = ca->next_read_slot;
 	while ((slot_count < ca->slot_count) && (!found)) {
 		if (ca->slot_info[slot].slot_state != DVB_CA_SLOTSTATE_RUNNING)
@@ -1595,6 +1603,9 @@ static int dvb_ca_en50221_io_release(struct inode *inode, struct file *file)
 
 	err = dvb_generic_release(inode, file);
 
+	if (ca->released)
+		dvb_ca_private_free(ca);
+
 	module_put(ca->pub->owner);
 
 	return err;
@@ -1701,6 +1712,7 @@ int dvb_ca_en50221_init(struct dvb_adapter *dvb_adapter,
 	}
 	init_waitqueue_head(&ca->wait_queue);
 	ca->open = 0;
+	ca->released = 0;
 	ca->wakeup = 0;
 	ca->next_read_slot = 0;
 	pubca->private = ca;
@@ -1765,12 +1777,21 @@ void dvb_ca_en50221_release(struct dvb_ca_en50221 *pubca)
 
 	dprintk("%s\n", __func__);
 
+	BUG_ON(ca->released);
+
 	/* shutdown the thread if there was one */
 	kthread_stop(ca->thread);
 
 	for (i = 0; i < ca->slot_count; i++) {
 		dvb_ca_en50221_slot_shutdown(ca, i);
 	}
-	dvb_ca_private_free(ca);
+
+	if (ca->open) {
+		ca->released = 1;
+		mb();
+		wake_up_interruptible(&ca->wait_queue);
+	} else
+		dvb_ca_private_free(ca);
+
 	pubca->private = NULL;
 }
