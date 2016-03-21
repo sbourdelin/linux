@@ -477,13 +477,42 @@ static int get_current_power_limit(struct powercap_zone *power_zone, int id,
 	return ret;
 }
 
+static int get_max_time_window(struct powercap_zone *power_zone, int id,
+			       u64 *data)
+{
+	struct rapl_domain *rd;
+	int ret = 0;
+	u64 val;
+
+	get_online_cpus();
+	rd = power_zone_to_rapl_domain(power_zone);
+
+	if (rapl_read_data_raw(rd, MAX_TIME_WINDOW, true, &val))
+		ret = -EIO;
+	else
+		*data = val;
+
+	put_online_cpus();
+	return ret;
+}
+
 static int set_time_window(struct powercap_zone *power_zone, int id,
 								u64 window)
 {
 	struct rapl_domain *rd;
 	int ret = 0;
+	u64 max_window;
 
 	get_online_cpus();
+	ret = get_max_time_window(power_zone, id, &max_window);
+	if (ret < 0)
+		goto out;
+
+	if (window > max_window) {
+		ret = -EINVAL;
+		goto out;
+	}
+
 	rd = power_zone_to_rapl_domain(power_zone);
 	switch (rd->rpl[id].prim_id) {
 	case PL1_ENABLE:
@@ -495,6 +524,7 @@ static int set_time_window(struct powercap_zone *power_zone, int id,
 	default:
 		ret = -EINVAL;
 	}
+out:
 	put_online_cpus();
 	return ret;
 }
@@ -574,6 +604,7 @@ static const struct powercap_zone_constraint_ops constraint_ops = {
 	.set_time_window_us = set_time_window,
 	.get_time_window_us = get_time_window,
 	.get_max_power_uw = get_max_power,
+	.get_max_time_window_us = get_max_time_window,
 	.get_name = get_constraint_name,
 };
 

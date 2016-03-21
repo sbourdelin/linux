@@ -101,7 +101,7 @@ static ssize_t store_constraint_##_attr(struct device *dev,\
 	int err; \
 	u64 value; \
 	struct powercap_zone *power_zone = to_powercap_zone(dev); \
-	int id; \
+	int id, ret; \
 	struct powercap_zone_constraint *pconst;\
 	\
 	if (!sscanf(dev_attr->attr.name, "constraint_%d_", &id)) \
@@ -113,8 +113,10 @@ static ssize_t store_constraint_##_attr(struct device *dev,\
 	if (err) \
 		return -EINVAL; \
 	if (pconst && pconst->ops && pconst->ops->set_##_attr) { \
-		if (!pconst->ops->set_##_attr(power_zone, id, value)) \
+		ret = pconst->ops->set_##_attr(power_zone, id, value); \
+		if (!ret) \
 			return count; \
+		return ret; \
 	} \
 	\
 	return -ENODATA; \
