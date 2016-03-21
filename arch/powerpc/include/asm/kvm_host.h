@@ -229,8 +229,6 @@ struct kvm_arch_memory_slot {
 struct kvm_hpt_info {
 	unsigned long virt;
 	struct revmap_entry *rev;
-	unsigned long npte;
-	unsigned long mask;
 	u32 order;
 	int cma;
 };
