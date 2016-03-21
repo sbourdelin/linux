@@ -95,6 +95,12 @@ static int dvb_usb_stop_feed(struct dvb_demux_feed *dvbdmxfeed)
 	return dvb_usb_ctrl_feed(dvbdmxfeed, 0);
 }
 
+static void dvb_usb_media_device_release(struct media_device *mdev)
+{
+	media_device_cleanup(mdev);
+	kfree(mdev);
+}
+
 static int dvb_usb_media_device_init(struct dvb_usb_adapter *adap)
 {
 #ifdef CONFIG_MEDIA_CONTROLLER_DVB
@@ -113,6 +119,7 @@ static int dvb_usb_media_device_init(struct dvb_usb_adapter *adap)
 	strcpy(mdev->bus_info, udev->devpath);
 	mdev->hw_revision = le16_to_cpu(udev->descriptor.bcdDevice);
 	mdev->driver_version = LINUX_VERSION_CODE;
+	mdev->release = dvb_usb_media_device_release;
 
 	media_device_init(mdev);
 
@@ -138,10 +145,11 @@ static void dvb_usb_media_device_unregister(struct dvb_usb_adapter *adap)
 	if (!adap->dvb_adap.mdev)
 		return;
 
-	media_device_unregister(adap->dvb_adap.mdev);
-	media_device_cleanup(adap->dvb_adap.mdev);
-	kfree(adap->dvb_adap.mdev);
+	struct media_device *mdev = adap->dvb_adap.mdev;
 	adap->dvb_adap.mdev = NULL;
+	media_device_unregister(mdev);
+	/* media_device_cleanup() and kfree() will be called by the
+	   callback function dvb_usb_media_device_release() */
 #endif
 }
 
