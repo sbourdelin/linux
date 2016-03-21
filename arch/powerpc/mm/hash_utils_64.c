@@ -34,6 +34,7 @@
 #include <linux/signal.h>
 #include <linux/memblock.h>
 #include <linux/context_tracking.h>
+#include <linux/debugfs.h>
 
 #include <asm/processor.h>
 #include <asm/pgtable.h>
@@ -1589,3 +1590,30 @@ void setup_initial_memory_limit(phys_addr_t first_memblock_base,
 	/* Finally limit subsequent allocations */
 	memblock_set_current_limit(ppc64_rma_size);
 }
+
+static int ppc64_pft_size_get(void *data, u64 *val)
+{
+	*val = ppc64_pft_size;
+	return 0;
+}
+
+static int ppc64_pft_size_set(void *data, u64 val)
+{
+	if (!ppc_md.resize_hpt)
+		return -ENODEV;
+	return ppc_md.resize_hpt(val);
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(fops_ppc64_pft_size,
+			ppc64_pft_size_get, ppc64_pft_size_set,	"%llu\n");
+
+static int __init hash64_debugfs(void)
+{
+	if (!debugfs_create_file("pft-size", 0600, powerpc_debugfs_root,
+				 NULL, &fops_ppc64_pft_size)) {
+		pr_err("lpar: unable to create ppc64_pft_size debugsfs file\n");
+	}
+
+	return 0;
+}
+machine_device_initcall(pseries, hash64_debugfs);
