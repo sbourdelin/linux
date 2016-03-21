@@ -294,6 +294,8 @@
 
 /* Platform specific hcalls, used by KVM */
 #define H_RTAS			0xf000
+#define H_RESIZE_HPT_PREPARE	0xf003
+#define H_RESIZE_HPT_COMMIT	0xf004
 
 /* "Platform specific hcalls", provided by PHYP */
 #define H_GET_24X7_CATALOG_PAGE	0xF078
