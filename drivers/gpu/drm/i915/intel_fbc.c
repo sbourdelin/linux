@@ -823,21 +823,14 @@ static bool intel_fbc_can_choose(struct intel_crtc *crtc)
 {
 	struct drm_i915_private *dev_priv = crtc->base.dev->dev_private;
 	struct intel_fbc *fbc = &dev_priv->fbc;
-	bool enable_by_default = IS_HASWELL(dev_priv) ||
-				 IS_BROADWELL(dev_priv);
 
 	if (intel_vgpu_active(dev_priv->dev)) {
 		fbc->no_fbc_reason = "VGPU is active";
 		return false;
 	}
 
-	if (i915.enable_fbc < 0 && !enable_by_default) {
-		fbc->no_fbc_reason = "disabled per chip default";
-		return false;
-	}
-
 	if (!i915.enable_fbc) {
-		fbc->no_fbc_reason = "disabled per module param";
+		fbc->no_fbc_reason = "disabled per module param or by default";
 		return false;
 	}
 
@@ -1238,6 +1231,16 @@ void intel_fbc_init(struct drm_i915_private *dev_priv)
 	fbc->enabled = false;
 	fbc->active = false;
 	fbc->work.scheduled = false;
+
+	/* The DDX driver changes its behavior depending on the value it reads
+	 * from i915.enable_fbc, so sanitize the value in order to allow it to
+	 * know what's going on. */
+	if (i915.enable_fbc < 0) {
+		i915.enable_fbc = IS_HASWELL(dev_priv) ||
+				  IS_BROADWELL(dev_priv);
+		DRM_DEBUG_KMS("Sanitized enable_fbc value: %d\n",
+			      i915.enable_fbc);
+	}
 
 	if (!HAS_FBC(dev_priv)) {
 		fbc->no_fbc_reason = "unsupported by this chipset";
