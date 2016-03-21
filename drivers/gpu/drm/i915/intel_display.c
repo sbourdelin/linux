@@ -14027,6 +14027,7 @@ static struct drm_plane *intel_primary_plane_create(struct drm_device *dev,
 	struct intel_plane_state *state;
 	const uint32_t *intel_primary_formats;
 	unsigned int num_formats;
+	int ret;
 
 	primary = kzalloc(sizeof(*primary), GFP_KERNEL);
 	if (primary == NULL)
@@ -14078,10 +14079,14 @@ static struct drm_plane *intel_primary_plane_create(struct drm_device *dev,
 		primary->disable_plane = i9xx_disable_primary_plane;
 	}
 
-	drm_universal_plane_init(dev, &primary->base, 0,
-				 &intel_plane_funcs,
-				 intel_primary_formats, num_formats,
-				 DRM_PLANE_TYPE_PRIMARY, NULL);
+	ret = drm_universal_plane_init(dev, &primary->base, 0,
+				       &intel_plane_funcs,
+				       intel_primary_formats, num_formats,
+				       DRM_PLANE_TYPE_PRIMARY, NULL);
+	if (ret) {
+		kfree(primary);
+		return ERR_PTR(ret);
+	}
 
 	if (INTEL_INFO(dev)->gen >= 4)
 		intel_create_rotation_property(dev, primary);
@@ -14207,6 +14212,7 @@ static struct drm_plane *intel_cursor_plane_create(struct drm_device *dev,
 {
 	struct intel_plane *cursor;
 	struct intel_plane_state *state;
+	int ret;
 
 	cursor = kzalloc(sizeof(*cursor), GFP_KERNEL);
 	if (cursor == NULL)
@@ -14228,11 +14234,15 @@ static struct drm_plane *intel_cursor_plane_create(struct drm_device *dev,
 	cursor->update_plane = intel_update_cursor_plane;
 	cursor->disable_plane = intel_disable_cursor_plane;
 
-	drm_universal_plane_init(dev, &cursor->base, 0,
-				 &intel_plane_funcs,
-				 intel_cursor_formats,
-				 ARRAY_SIZE(intel_cursor_formats),
-				 DRM_PLANE_TYPE_CURSOR, NULL);
+	ret = drm_universal_plane_init(dev, &cursor->base, 0,
+				       &intel_plane_funcs,
+				       intel_cursor_formats,
+				       ARRAY_SIZE(intel_cursor_formats),
+				       DRM_PLANE_TYPE_CURSOR, NULL);
+	if (ret) {
+		kfree(cursor);
+		return ERR_PTR(ret);
+	}
 
 	if (INTEL_INFO(dev)->gen >= 4) {
 		if (!dev->mode_config.rotation_property)
@@ -14301,11 +14311,11 @@ static void intel_crtc_init(struct drm_device *dev, int pipe)
 	}
 
 	primary = intel_primary_plane_create(dev, pipe);
-	if (!primary)
+	if (IS_ERR_OR_NULL(primary))
 		goto fail;
 
 	cursor = intel_cursor_plane_create(dev, pipe);
-	if (!cursor)
+	if (IS_ERR_OR_NULL(cursor))
 		goto fail;
 
 	ret = drm_crtc_init_with_planes(dev, &intel_crtc->base, primary,
