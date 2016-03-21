@@ -134,6 +134,13 @@
 			};
 		};
 
+		i2c@119100 {
+			gpio@22 {
+				compatible = "pcf8575";
+				reg = <0x22>;
+			};
+		};
+
 		usb1: usb@211000 {
 			dr_mode = "host";
 		};
