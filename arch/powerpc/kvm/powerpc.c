@@ -1302,6 +1302,12 @@ static int kvm_vm_ioctl_enable_cap(struct kvm *kvm,
 		unsigned long hcall = cap->args[0];
 
 		r = -EINVAL;
+		/* Hack: until we have proper hcall numbers allocated */
+		if ((hcall == H_RESIZE_HPT_PREPARE)
+		    || (hcall == H_RESIZE_HPT_COMMIT)) {
+			r = 0;
+			break;
+		}
 		if (hcall > MAX_HCALL_OPCODE || (hcall & 3) ||
 		    cap->args[1] > 1)
 			break;

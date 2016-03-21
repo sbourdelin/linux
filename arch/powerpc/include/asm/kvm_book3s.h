@@ -191,6 +191,12 @@ extern void kvmppc_copy_to_svcpu(struct kvmppc_book3s_shadow_vcpu *svcpu,
 				 struct kvm_vcpu *vcpu);
 extern void kvmppc_copy_from_svcpu(struct kvm_vcpu *vcpu,
 				   struct kvmppc_book3s_shadow_vcpu *svcpu);
+extern unsigned long do_h_resize_hpt_prepare(struct kvm_vcpu *vcpu,
+					     unsigned long flags,
+					     unsigned long shift);
+extern unsigned long do_h_resize_hpt_commit(struct kvm_vcpu *vcpu,
+					    unsigned long flags,
+					    unsigned long shift);
 
 static inline struct kvmppc_vcpu_book3s *to_book3s(struct kvm_vcpu *vcpu)
 {
