@@ -861,6 +861,17 @@ int hns_mac_get_sset_count(struct hns_mac_cb *mac_cb, int stringset)
 	return mac_ctrl_drv->get_sset_count(stringset);
 }
 
+int hns_mac_set_promisc(struct hns_mac_cb *mac_cb, u8 en)
+{
+	struct mac_driver *mac_ctrl_drv = hns_mac_get_drv(mac_cb);
+	int ret = 0;
+
+	if (mac_ctrl_drv->set_promiscuous)
+		ret = mac_ctrl_drv->set_promiscuous(mac_ctrl_drv, en);
+
+	return ret;
+}
+
 int hns_mac_get_regs_count(struct hns_mac_cb *mac_cb)
 {
 	struct mac_driver *mac_ctrl_drv = hns_mac_get_drv(mac_cb);
