@@ -63,9 +63,11 @@ static void virtio_gpu_plane_atomic_update(struct drm_plane *plane,
 {
 	struct drm_device *dev = plane->dev;
 	struct virtio_gpu_device *vgdev = dev->dev_private;
-	struct virtio_gpu_output *output = drm_crtc_to_virtio_gpu_output(plane->crtc);
+	struct drm_crtc *crtc = plane->crtc;
+	struct virtio_gpu_output *output = drm_crtc_to_virtio_gpu_output(crtc);
 	struct virtio_gpu_framebuffer *vgfb;
 	struct virtio_gpu_object *bo;
+	unsigned long flags;
 	uint32_t handle;
 
 	if (plane->state->fb) {
@@ -96,6 +98,11 @@ static void virtio_gpu_plane_atomic_update(struct drm_plane *plane,
 				      plane->state->crtc_y,
 				      plane->state->crtc_w,
 				      plane->state->crtc_h);
+
+	spin_lock_irqsave(&crtc->dev->event_lock, flags);
+	if (crtc->state->event)
+		drm_crtc_send_vblank_event(crtc, crtc->state->event);
+	spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
 }
 
 
