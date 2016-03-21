@@ -326,6 +326,8 @@ struct media_device {
 
 	int (*link_notify)(struct media_link *link, u32 flags,
 			   unsigned int notification);
+
+	void (*release)(struct media_device *mdev);
 };
 
 #ifdef CONFIG_MEDIA_CONTROLLER

@@ -528,9 +528,14 @@ static DEVICE_ATTR(model, S_IRUGO, show_model, NULL);
  * Registration/unregistration
  */
 
-static void media_device_release(struct media_devnode *mdev)
+static void media_device_release(struct media_devnode *devnode)
 {
-	dev_dbg(mdev->parent, "Media device released\n");
+	struct media_device *mdev = to_media_device(devnode);
+
+	dev_dbg(devnode->parent, "Media device released\n");
+
+	if (mdev->release)
+		mdev->release(mdev);
 }
 
 /**
