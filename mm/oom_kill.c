@@ -428,28 +428,17 @@ static bool __oom_reap_task(struct task_struct *tsk)
 	struct mmu_gather tlb;
 	struct vm_area_struct *vma;
 	struct mm_struct *mm;
-	struct task_struct *p;
 	struct zap_details details = {.check_swap_entries = true,
 				      .ignore_dirty = true};
 	bool ret = true;
 
-	/*
-	 * Make sure we find the associated mm_struct even when the particular
-	 * thread has already terminated and cleared its mm.
-	 * We might have race with exit path so consider our work done if there
-	 * is no mm.
-	 */
-	p = find_lock_task_mm(tsk);
-	if (!p)
-		return true;
-
-	mm = p->mm;
-	if (!atomic_inc_not_zero(&mm->mm_users)) {
-		task_unlock(p);
+	task_lock(tsk);
+	mm = tsk->mm;
+	if (!mm || !atomic_inc_not_zero(&mm->mm_users)) {
+		task_unlock(tsk);
 		return true;
 	}
-
-	task_unlock(p);
+	task_unlock(tsk);
 
 	if (!down_read_trylock(&mm->mmap_sem)) {
 		ret = false;
@@ -493,7 +482,6 @@ static bool __oom_reap_task(struct task_struct *tsk)
 	 * improvements. This also means that selecting this task doesn't
 	 * make any sense.
 	 */
-	tsk->signal->oom_score_adj = OOM_SCORE_ADJ_MIN;
 	exit_oom_victim(tsk);
 out:
 	mmput(mm);
@@ -679,19 +667,6 @@ void oom_kill_process(struct oom_control *oc, struct task_struct *p,
 					      DEFAULT_RATELIMIT_BURST);
 	bool can_oom_reap;
 
-	/*
-	 * If the task is already exiting, don't alarm the sysadmin or kill
-	 * its children or threads, just set TIF_MEMDIE so it can die quickly
-	 */
-	task_lock(p);
-	if (p->mm && task_will_free_mem(p)) {
-		mark_oom_victim(p);
-		task_unlock(p);
-		put_task_struct(p);
-		return;
-	}
-	task_unlock(p);
-
 	if (__ratelimit(&oom_rs))
 		dump_header(oc, p, memcg);
 
@@ -743,13 +718,6 @@ void oom_kill_process(struct oom_control *oc, struct task_struct *p,
 	/* Make sure we do not try to oom reap the mm multiple times */
 	can_oom_reap = !test_and_set_bit(MMF_OOM_KILLED, &mm->flags);
 
-	/*
-	 * We should send SIGKILL before setting TIF_MEMDIE in order to prevent
-	 * the OOM victim from depleting the memory reserves from the user
-	 * space under its control.
-	 */
-	do_send_sig_info(SIGKILL, SEND_SIG_FORCED, victim, true);
-	mark_oom_victim(victim);
 	pr_err("Killed process %d (%s) total-vm:%lukB, anon-rss:%lukB, file-rss:%lukB, shmem-rss:%lukB\n",
 		task_pid_nr(victim), victim->comm, K(victim->mm->total_vm),
 		K(get_mm_counter(victim->mm, MM_ANONPAGES)),
@@ -770,8 +738,6 @@ void oom_kill_process(struct oom_control *oc, struct task_struct *p,
 	for_each_process(p) {
 		if (!process_shares_mm(p, mm))
 			continue;
-		if (same_thread_group(p, victim))
-			continue;
 		if (unlikely(p->flags & PF_KTHREAD) || is_global_init(p) ||
 		    p->signal->oom_score_adj == OOM_SCORE_ADJ_MIN) {
 			/*
@@ -782,12 +748,43 @@ void oom_kill_process(struct oom_control *oc, struct task_struct *p,
 			can_oom_reap = false;
 			continue;
 		}
+		/*
+		 * We should send SIGKILL before setting TIF_MEMDIE in order to
+		 * prevent the OOM victim from depleting the memory reserves
+		 * from the user space under its control.
+		 */
 		do_send_sig_info(SIGKILL, SEND_SIG_FORCED, p, true);
+		for_each_thread(p, t) {
+			task_lock(t);
+			if (t->mm)
+				mark_oom_victim(t);
+			task_unlock(t);
+		}
+		/*
+		 * Mark this process as no longer OOM-killable in order to
+		 * prevent the OOM killer (including SysRq-f) from selecting
+		 * the same process forever.
+		 */
+		task_lock(p);
+		p->signal->oom_score_adj = OOM_SCORE_ADJ_MIN;
+		task_unlock(p);
 	}
 	rcu_read_unlock();
 
-	if (can_oom_reap)
-		wake_oom_reaper(victim);
+	/*
+	 * If we can call the OOM reaper, queue all TIF_MEMDIE threads because
+	 * the OOM reaper is responsible for clearing TIF_MEMDIE in order to
+	 * allow the OOM killer to select next victim if the OOM situation
+	 * still remains after reaping the mm completed.
+	 */
+	if (can_oom_reap) {
+		rcu_read_lock();
+		for_each_process_thread(p, t) {
+			if (t->mm == mm)
+				wake_oom_reaper(t);
+		}
+		rcu_read_unlock();
+	}
 
 	mmdrop(mm);
 	put_task_struct(victim);
@@ -857,20 +854,6 @@ bool out_of_memory(struct oom_control *oc)
 	if (freed > 0)
 		/* Got some memory back in the last second. */
 		return true;
-
-	/*
-	 * If current has a pending SIGKILL or is exiting, then automatically
-	 * select it.  The goal is to allow it to allocate so that it may
-	 * quickly exit and free its memory.
-	 *
-	 * But don't select if current has already released its mm and cleared
-	 * TIF_MEMDIE flag at exit_mm(), otherwise an OOM livelock may occur.
-	 */
-	if (current->mm &&
-	    (fatal_signal_pending(current) || task_will_free_mem(current))) {
-		mark_oom_victim(current);
-		return true;
-	}
 
 	/*
 	 * Check if there were limitations on the allocation (only relevant for
