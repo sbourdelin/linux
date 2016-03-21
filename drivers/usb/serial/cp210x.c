@@ -793,7 +793,7 @@ static void cp210x_get_termios_port(struct usb_serial_port *port,
 
 	cp210x_read_reg_block(port, CP210X_GET_FLOW, modem_ctl,
 			sizeof(modem_ctl));
-	if (modem_ctl[0] & 0x08) {
+	if (modem_ctl[0] & 0x08) { /* if SERIAL_CTS_HANDSHAKE */
 		dev_dbg(dev, "%s - flow control = CRTSCTS\n", __func__);
 		cflag |= CRTSCTS;
 	} else {
@@ -955,17 +955,47 @@ static void cp210x_set_termios(struct tty_struct *tty,
 			__func__, modem_ctl[0], modem_ctl[4], modem_ctl[7]);
 
 		if (cflag & CRTSCTS) {
-			modem_ctl[0] &= ~0x7B;
+			modem_ctl[0] &= ~0x7B; /* keep reserved D2 and D7 */
+			/*
+			 * D1-D0 SERIAL_DTR_MASK     =01b: DTR is held active
+			 * D3 SERIAL_CTS_HANDSHAKE   =1: CTS is a handshake line
+			 * D4 SERIAL_DSR_HANDSHAKE   =0
+			 * D5 SERIAL_DCD_HANDSHAKE   =0
+			 * D6 SERIAL_DSR_SENSITIVITY =0
+			 */
 			modem_ctl[0] |= 0x09;
+			/*
+			 * D0 SERIAL_AUTO_TRANSMIT  =0
+			 * D1 SERIAL_AUTO_RECEIVE   =0
+			 * D2 SERIAL_ERROR_CHAR     =0
+			 * D3 SERIAL_NULL_STRIPPING =0
+			 * D4 SERIAL_BREAK_CHAR     =0
+			 * D7-D6 SERIAL_RTS_MASK =10b: RTS for rcv flow control
+			 */
 			modem_ctl[4] = 0x80;
 			dev_dbg(dev, "%s - flow control = CRTSCTS\n", __func__);
 		} else {
-			modem_ctl[0] &= ~0x7B;
+			modem_ctl[0] &= ~0x7B; /* keep reserved D2 and D7 */
+			/*
+			 * D1-D0 SERIAL_DTR_MASK     = 01b: DTR is held active
+			 * D3 SERIAL_CTS_HANDSHAKE   = 0: CTS is a status input.
+			 * D4 SERIAL_DSR_HANDSHAKE   = 0
+			 * D5 SERIAL_DCD_HANDSHAKE   = 0
+			 * D6 SERIAL_DSR_SENSITIVITY = 0
+			 */
 			modem_ctl[0] |= 0x01;
+			/*
+			 * D0 SERIAL_AUTO_TRANSMIT  = 0
+			 * D1 SERIAL_AUTO_RECEIVE   = 0
+			 * D2 SERIAL_ERROR_CHAR     = 0
+			 * D3 SERIAL_NULL_STRIPPING = 0
+			 * D4 SERIAL_BREAK_CHAR     = 0
+			 * D7-D6 SERIAL_RTS_MASK =01b: RTS is statically active
+			 */
 			modem_ctl[4] = 0x40;
 			dev_dbg(dev, "%s - flow control = NONE\n", __func__);
 		}
-		modem_ctl[7] = 0;
+		modem_ctl[7] = 0; /* SERIAL_XOFF_CONTINUE = 0 */
 
 		dev_dbg(dev, "%s - write modem controls = %02x .. .. .. %02x .. .. %02x\n",
 			__func__, modem_ctl[0], modem_ctl[4], modem_ctl[7]);
