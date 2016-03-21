@@ -226,11 +226,19 @@ struct kvm_arch_memory_slot {
 #endif /* CONFIG_KVM_BOOK3S_HV_POSSIBLE */
 };
 
+struct kvm_hpt_info {
+	unsigned long virt;
+	struct revmap_entry *rev;
+	unsigned long npte;
+	unsigned long mask;
+	u32 order;
+	int cma;
+};
+
 struct kvm_arch {
 	unsigned int lpid;
 #ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
-	unsigned long hpt_virt;
-	struct revmap_entry *revmap;
+	struct kvm_hpt_info hpt;
 	unsigned int host_lpid;
 	unsigned long host_lpcr;
 	unsigned long sdr1;
@@ -239,14 +247,10 @@ struct kvm_arch {
 	unsigned long lpcr;
 	unsigned long vrma_slb_v;
 	int hpte_setup_done;
-	u32 hpt_order;
 	atomic_t vcpus_running;
 	u32 online_vcores;
-	unsigned long hpt_npte;
-	unsigned long hpt_mask;
 	atomic_t hpte_mod_interest;
 	cpumask_t need_tlb_flush;
-	int hpt_cma_alloc;
 	struct dentry *debugfs_dir;
 	struct dentry *htab_dentry;
 #endif /* CONFIG_KVM_BOOK3S_HV_POSSIBLE */
