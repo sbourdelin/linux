@@ -154,6 +154,13 @@ int nfnetlink_unicast(struct sk_buff *skb, struct net *net, u32 portid,
 }
 EXPORT_SYMBOL_GPL(nfnetlink_unicast);
 
+int nfnetlink_unicast_nofree(struct sk_buff *skb, struct net *net, u32 portid,
+                      int flags)
+{
+    return netlink_unicast_nofree(net->nfnl, skb, portid, flags);
+}
+EXPORT_SYMBOL_GPL(nfnetlink_unicast_nofree);
+
 /* Process one complete nfnetlink message. */
 static int nfnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 {

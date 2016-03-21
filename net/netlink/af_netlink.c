@@ -1710,17 +1710,26 @@ static struct sk_buff *netlink_alloc_large_skb(unsigned int size,
 	return skb;
 }
 
+int netlink_attachskb(struct sock *sk, struct sk_buff *skb,
+			     long *timeo, struct sock *ssk)
+{
+    int ret = netlink_attachskb_nofree(sk, skb, timeo, ssk);
+    if (ret < 0)
+	kfree_skb(skb);
+    return ret;
+}
+
 /*
  * Attach a skb to a netlink socket.
  * The caller must hold a reference to the destination socket. On error, the
  * reference is dropped. The skb is not send to the destination, just all
  * all error checks are performed and memory in the queue is reserved.
  * Return values:
- * < 0: error. skb freed, reference to sock dropped.
+ * < 0: error. reference to sock dropped.
  * 0: continue
  * 1: repeat lookup - reference dropped while waiting for socket memory.
  */
-int netlink_attachskb(struct sock *sk, struct sk_buff *skb,
+int netlink_attachskb_nofree(struct sock *sk, struct sk_buff *skb,
 		      long *timeo, struct sock *ssk)
 {
 	struct netlink_sock *nlk;
@@ -1735,7 +1744,6 @@ int netlink_attachskb(struct sock *sk, struct sk_buff *skb,
 			if (!ssk || netlink_is_kernel(ssk))
 				netlink_overrun(sk);
 			sock_put(sk);
-			kfree_skb(skb);
 			return -EAGAIN;
 		}
 
@@ -1752,7 +1760,6 @@ int netlink_attachskb(struct sock *sk, struct sk_buff *skb,
 		sock_put(sk);
 
 		if (signal_pending(current)) {
-			kfree_skb(skb);
 			return sock_intr_errno(*timeo);
 		}
 		return 1;
@@ -1833,8 +1840,6 @@ static int netlink_unicast_kernel(struct sock *sk, struct sk_buff *skb,
 		netlink_deliver_tap_kernel(sk, ssk, skb);
 		nlk->netlink_rcv(skb);
 		consume_skb(skb);
-	} else {
-		kfree_skb(skb);
 	}
 	sock_put(sk);
 	return ret;
@@ -1842,6 +1847,16 @@ static int netlink_unicast_kernel(struct sock *sk, struct sk_buff *skb,
 
 int netlink_unicast(struct sock *ssk, struct sk_buff *skb,
 		    u32 portid, int nonblock)
+{
+    int ret = netlink_unicast_nofree(ssk, skb, portid, nonblock);
+    if (ret < 0)
+	kfree_skb(skb);
+    return ret;
+}
+EXPORT_SYMBOL(netlink_unicast);
+
+int netlink_unicast_nofree(struct sock *ssk, struct sk_buff *skb,
+			   u32 portid, int nonblock)
 {
 	struct sock *sk;
 	int err;
@@ -1853,20 +1868,18 @@ int netlink_unicast(struct sock *ssk, struct sk_buff *skb,
 retry:
 	sk = netlink_getsockbyportid(ssk, portid);
 	if (IS_ERR(sk)) {
-		kfree_skb(skb);
 		return PTR_ERR(sk);
 	}
 	if (netlink_is_kernel(sk))
 		return netlink_unicast_kernel(sk, skb, ssk);
 
-	if (sk_filter(sk, skb)) {
-		err = skb->len;
-		kfree_skb(skb);
+	err = sk_filter(sk, skb);
+	if (err) {
 		sock_put(sk);
 		return err;
 	}
 
-	err = netlink_attachskb(sk, skb, &timeo, ssk);
+	err = netlink_attachskb_nofree(sk, skb, &timeo, ssk);
 	if (err == 1)
 		goto retry;
 	if (err)
@@ -1874,7 +1887,7 @@ retry:
 
 	return netlink_sendskb(sk, skb);
 }
-EXPORT_SYMBOL(netlink_unicast);
+EXPORT_SYMBOL(netlink_unicast_nofree);
 
 struct sk_buff *__netlink_alloc_skb(struct sock *ssk, unsigned int size,
 				    unsigned int ldiff, u32 dst_portid,
