@@ -418,6 +418,10 @@
 	dr_mode = "host";
 };
 
+&rga {
+	status = "okay";
+};
+
 &vopb {
 	status = "okay";
 };
