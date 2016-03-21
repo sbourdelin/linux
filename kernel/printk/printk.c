@@ -46,6 +46,7 @@
 #include <linux/utsname.h>
 #include <linux/ctype.h>
 #include <linux/uio.h>
+#include <linux/kthread.h>
 
 #include <asm/uaccess.h>
 #include <asm-generic/sections.h>
@@ -284,6 +285,105 @@ static u32 clear_idx;
 static char __log_buf[__LOG_BUF_LEN] __aligned(LOG_ALIGN);
 static char *log_buf = __log_buf;
 static u32 log_buf_len = __LOG_BUF_LEN;
+
+/*
+ * When true, printing to console will happen synchronously unless someone else
+ * is already printing messages.
+ *
+ * The default value on UP systems is 'true'.
+ */
+static bool __read_mostly printk_sync = !IS_ENABLED(CONFIG_SMP);
+module_param_named(synchronous, printk_sync, bool, S_IRUGO);
+MODULE_PARM_DESC(synchronous, "make printing to console synchronous");
+
+/* Printing kthread for async vprintk_emit() */
+static struct task_struct *printk_kthread;
+/* When `true' - printing thread has messages to print */
+static bool need_flush_console;
+
+static int printing_func(void *data)
+{
+	while (1) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		if (!need_flush_console)
+			schedule();
+
+		__set_current_state(TASK_RUNNING);
+		need_flush_console = false;
+
+		console_lock();
+		console_unlock();
+	}
+
+	return 0;
+}
+
+static int __init init_printk_kthread(void)
+{
+	struct task_struct *thread;
+
+	if (printk_sync)
+		return 0;
+
+	thread = kthread_run(printing_func, NULL, "printk");
+	if (IS_ERR(thread)) {
+		pr_err("printk: unable to create printing thread\n");
+		printk_sync = true;
+	} else {
+		printk_kthread = thread;
+	}
+	return 0;
+}
+late_initcall(init_printk_kthread);
+
+/*
+ * Delayed printk version, for scheduler-internal messages:
+ */
+#define PRINTK_PENDING_WAKEUP	(1<<0)
+#define PRINTK_PENDING_OUTPUT	(1<<1)
+
+static DEFINE_PER_CPU(int, printk_pending);
+
+static void wake_up_klogd_work_func(struct irq_work *irq_work)
+{
+	int pending = __this_cpu_xchg(printk_pending, 0);
+
+	if (pending & PRINTK_PENDING_OUTPUT) {
+		/* If trylock fails, someone else is doing the printing */
+		if (console_trylock())
+			console_unlock();
+	}
+
+	if (pending & PRINTK_PENDING_WAKEUP)
+		wake_up_interruptible(&log_wait);
+}
+
+static DEFINE_PER_CPU(struct irq_work, wake_up_klogd_work) = {
+	.func = wake_up_klogd_work_func,
+	.flags = IRQ_WORK_LAZY,
+};
+
+void wake_up_klogd(void)
+{
+	preempt_disable();
+	if (waitqueue_active(&log_wait)) {
+		this_cpu_or(printk_pending, PRINTK_PENDING_WAKEUP);
+		irq_work_queue(this_cpu_ptr(&wake_up_klogd_work));
+	}
+	preempt_enable();
+}
+
+int printk_deferred(const char *fmt, ...)
+{
+	va_list args;
+	int r;
+
+	va_start(args, fmt);
+	r = vprintk_emit(0, LOGLEVEL_SCHED, NULL, 0, fmt, args);
+	va_end(args);
+
+	return r;
+}
 
 /* Return log buffer address */
 char *log_buf_addr_get(void)
@@ -1609,6 +1709,8 @@ asmlinkage int vprintk_emit(int facility, int level,
 			    const char *dict, size_t dictlen,
 			    const char *fmt, va_list args)
 {
+	/* cpu currently holding logbuf_lock in this function */
+	static unsigned int logbuf_cpu = UINT_MAX;
 	static bool recursion_bug;
 	static char textbuf[LOG_LINE_MAX];
 	char *text = textbuf;
@@ -1619,12 +1721,21 @@ asmlinkage int vprintk_emit(int facility, int level,
 	int printed_len = 0;
 	int nmi_message_lost;
 	bool in_sched = false;
-	/* cpu currently holding logbuf_lock in this function */
-	static unsigned int logbuf_cpu = UINT_MAX;
+	bool in_panic = console_loglevel == CONSOLE_LOGLEVEL_MOTORMOUTH;
+	bool sync_print = printk_sync;
+
+	/* disable async printk */
+	if (in_panic)
+		printk_sync = true;
 
 	if (level == LOGLEVEL_SCHED) {
 		level = LOGLEVEL_DEFAULT;
+		/*
+		 * Deferred sched messages must not be printed
+		 * synchronously regardless the @printk_sync or @in_panic.
+		 */
 		in_sched = true;
+		sync_print = false;
 	}
 
 	boot_delay_msec(level);
@@ -1656,6 +1767,14 @@ asmlinkage int vprintk_emit(int facility, int level,
 	/* This stops the holder of console_sem just where we want him */
 	raw_spin_lock(&logbuf_lock);
 	logbuf_cpu = this_cpu;
+
+	/*
+	 * Set printing_func() sleep condition early, under the @logbuf_lock.
+	 * So printing kthread (if RUNNING) will go to console_lock() and spin
+	 * on @logbuf_lock.
+	 */
+	if (!printk_sync)
+		need_flush_console = true;
 
 	if (unlikely(recursion_bug)) {
 		static const char recursion_msg[] =
@@ -1762,10 +1881,38 @@ asmlinkage int vprintk_emit(int facility, int level,
 	logbuf_cpu = UINT_MAX;
 	raw_spin_unlock(&logbuf_lock);
 	lockdep_on();
+	/*
+	 * By default we print message to console asynchronously so that kernel
+	 * doesn't get stalled due to slow serial console. That can lead to
+	 * softlockups, lost interrupts, or userspace timing out under heavy
+	 * printing load.
+	 *
+	 * However we resort to synchronous printing of messages during early
+	 * boot, when synchronous printing was explicitly requested by
+	 * kernel parameter, or when console_verbose() was called to print
+	 * everything during panic / oops.
+	 */
+	if (!sync_print) {
+		if (in_sched) {
+			/*
+			 * @in_sched messages may come too early, when we don't
+			 * yet have @printk_kthread. We can't print deferred
+			 * messages directly, because this may deadlock, route
+			 * them via IRQ context.
+			 */
+			__this_cpu_or(printk_pending,
+					PRINTK_PENDING_OUTPUT);
+			irq_work_queue(this_cpu_ptr(&wake_up_klogd_work));
+		} else if (printk_kthread && !in_panic) {
+			/* Offload printing to a schedulable context. */
+			wake_up_process(printk_kthread);
+		} else {
+			sync_print = true;
+		}
+	}
 	local_irq_restore(flags);
 
-	/* If called from the scheduler, we can not call up(). */
-	if (!in_sched) {
+	if (sync_print) {
 		lockdep_off();
 		/*
 		 * Try to acquire and then immediately release the console
@@ -2715,60 +2862,6 @@ static int __init printk_late_init(void)
 late_initcall(printk_late_init);
 
 #if defined CONFIG_PRINTK
-/*
- * Delayed printk version, for scheduler-internal messages:
- */
-#define PRINTK_PENDING_WAKEUP	0x01
-#define PRINTK_PENDING_OUTPUT	0x02
-
-static DEFINE_PER_CPU(int, printk_pending);
-
-static void wake_up_klogd_work_func(struct irq_work *irq_work)
-{
-	int pending = __this_cpu_xchg(printk_pending, 0);
-
-	if (pending & PRINTK_PENDING_OUTPUT) {
-		/* If trylock fails, someone else is doing the printing */
-		if (console_trylock())
-			console_unlock();
-	}
-
-	if (pending & PRINTK_PENDING_WAKEUP)
-		wake_up_interruptible(&log_wait);
-}
-
-static DEFINE_PER_CPU(struct irq_work, wake_up_klogd_work) = {
-	.func = wake_up_klogd_work_func,
-	.flags = IRQ_WORK_LAZY,
-};
-
-void wake_up_klogd(void)
-{
-	preempt_disable();
-	if (waitqueue_active(&log_wait)) {
-		this_cpu_or(printk_pending, PRINTK_PENDING_WAKEUP);
-		irq_work_queue(this_cpu_ptr(&wake_up_klogd_work));
-	}
-	preempt_enable();
-}
-
-int printk_deferred(const char *fmt, ...)
-{
-	va_list args;
-	int r;
-
-	preempt_disable();
-	va_start(args, fmt);
-	r = vprintk_emit(0, LOGLEVEL_SCHED, NULL, 0, fmt, args);
-	va_end(args);
-
-	__this_cpu_or(printk_pending, PRINTK_PENDING_OUTPUT);
-	irq_work_queue(this_cpu_ptr(&wake_up_klogd_work));
-	preempt_enable();
-
-	return r;
-}
-
 /*
  * printk rate limiting, lifted from the networking subsystem.
  *
