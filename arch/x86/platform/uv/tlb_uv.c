@@ -37,7 +37,7 @@ static int timeout_base_ns[] = {
 };
 
 static int timeout_us;
-static int nobau;
+static int nobau = 1;
 static int nobau_perm;
 static cycles_t congested_cycles;
 
@@ -106,13 +106,22 @@ static char *stat_description[] = {
 	"enable:   number times use of the BAU was re-enabled"
 };
 
-static int __init
-setup_nobau(char *arg)
+static int __init setup_bau(char *arg)
 {
-	nobau = 1;
+	if (!arg)
+		return -EINVAL;
+
+	if (!strncmp(arg, "on", 2)) {
+		nobau = 0;
+		pr_info("UV BAU Enabled\n");
+	} else if (!strncmp(arg, "off", 3)) {
+		nobau = 1;
+		pr_info("UV BAU Disabled\n");
+	}
+
 	return 0;
 }
-early_param("nobau", setup_nobau);
+early_param("bau", setup_bau);
 
 /* base pnode in this partition */
 static int uv_base_pnode __read_mostly;
