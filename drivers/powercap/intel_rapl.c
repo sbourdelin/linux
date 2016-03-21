@@ -500,6 +500,7 @@ static int set_time_window(struct powercap_zone *power_zone, int id,
 								u64 window)
 {
 	struct rapl_domain *rd;
+	struct rapl_package *rp;
 	int ret = 0;
 	u64 max_window;
 
@@ -508,12 +509,18 @@ static int set_time_window(struct powercap_zone *power_zone, int id,
 	if (ret < 0)
 		goto out;
 
-	if (window > max_window) {
+	rd = power_zone_to_rapl_domain(power_zone);
+	rp = find_package_by_id(rd->package_id);
+	/*
+	 * The Intel ASDM doesn't explicitly define a minimum time window.
+	 * The MSR_RAPL_POWER_UNIT register, read during initialization,
+	 * does contain the smallest unit of time that can be measured.
+	 */
+	if ((window > max_window) || (window < rp->time_unit)) {
 		ret = -EINVAL;
 		goto out;
 	}
 
-	rd = power_zone_to_rapl_domain(power_zone);
 	switch (rd->rpl[id].prim_id) {
 	case PL1_ENABLE:
 		rapl_write_data_raw(rd, TIME_WINDOW1, window);
