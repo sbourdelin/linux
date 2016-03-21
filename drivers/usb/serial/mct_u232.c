@@ -378,6 +378,10 @@ static int mct_u232_port_probe(struct usb_serial_port *port)
 {
 	struct mct_u232_private *priv;
 
+	/* check first to simplify error handling */
+	if (!port->serial->port[1] || !port->serial->port[1]->interrupt_in_urb)
+		return -ENODEV;
+
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
