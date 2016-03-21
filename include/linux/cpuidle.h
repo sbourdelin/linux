@@ -29,8 +29,14 @@ struct cpuidle_driver;
  * CPUIDLE DEVICE INTERFACE *
  ****************************/
 
+enum cpuidle_state_disable {
+	CPUIDLE_STATE_ENABLE = 0,
+	CPUIDLE_STATE_DISABLE = 1,
+	CPUIDLE_STATE_HW_DISABLE = 2,
+};
+
 struct cpuidle_state_usage {
-	unsigned long long	disable;
+	enum cpuidle_state_disable disable;
 	unsigned long long	usage;
 	unsigned long long	time; /* in US */
 };
@@ -44,7 +50,7 @@ struct cpuidle_state {
 	unsigned int	exit_latency; /* in US */
 	int		power_usage; /* in mW */
 	unsigned int	target_residency; /* in US */
-	bool		disabled; /* disabled on all CPUs */
+	enum cpuidle_state_disable	disabled; /* disabled on all CPUs */
 
 	int (*enter)	(struct cpuidle_device *dev,
 			struct cpuidle_driver *drv,

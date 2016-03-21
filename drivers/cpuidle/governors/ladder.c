@@ -143,6 +143,9 @@ static int ladder_enable_device(struct cpuidle_driver *drv,
 		state = &drv->states[i];
 		lstate = &ldev->states[i];
 
+		/* Some states may be disabled by hardware */
+		dev->states_usage[i].disable = drv->states[i].disabled;
+
 		lstate->stats.promotion_count = 0;
 		lstate->stats.demotion_count = 0;
 

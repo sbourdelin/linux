@@ -1142,10 +1142,12 @@ static int __init intel_idle_cpuidle_driver_init(void)
 
 		/* Has this state been disabled in hardware? */
 		if (limit < cpuidle_state_table[cstate].limit) {
-			cpuidle_state_table[cstate].disabled = 1;
-			pr_debug(PREFIX "state %s (0x%x) is disabled.  Max Package limit is 0x%x.\n",
+			cpuidle_state_table[cstate].disabled =
+						       CPUIDLE_STATE_HW_DISABLE;
+			pr_debug(PREFIX "state %s (0x%x) is disabled and set to %d.  Max Package limit is 0x%x.\n",
 				 cpuidle_state_table[cstate].name,
 				 cpuidle_state_table[cstate].limit,
+				 cpuidle_state_table[cstate].disabled,
 				 limit);
 
 		}

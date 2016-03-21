@@ -461,6 +461,10 @@ static int menu_enable_device(struct cpuidle_driver *drv,
 	for(i = 0; i < BUCKETS; i++)
 		data->correction_factor[i] = RESOLUTION * DECAY;
 
+	/* Some states may be disabled by hardware */
+	for (i = CPUIDLE_DRIVER_STATE_START; i < drv->state_count; i++)
+		dev->states_usage[i].disable = drv->states[i].disabled;
+
 	return 0;
 }
 
