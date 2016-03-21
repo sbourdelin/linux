@@ -814,9 +814,9 @@ static void auto_demotion_disable(void *dummy)
 {
 	unsigned long long msr_bits;
 
-	rdmsrl(MSR_NHM_SNB_PKG_CST_CFG_CTL, msr_bits);
+	rdmsrl(MSR_PKG_CST_CONFIG_CONTROL, msr_bits);
 	msr_bits &= ~(icpu->auto_demotion_disable_flags);
-	wrmsrl(MSR_NHM_SNB_PKG_CST_CFG_CTL, msr_bits);
+	wrmsrl(MSR_PKG_CST_CONFIG_CONTROL, msr_bits);
 }
 static void c1e_promotion_disable(void *dummy)
 {

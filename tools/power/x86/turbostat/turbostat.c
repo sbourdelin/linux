@@ -1384,12 +1384,12 @@ dump_nhm_cst_cfg(void)
 {
 	unsigned long long msr;
 
-	get_msr(base_cpu, MSR_NHM_SNB_PKG_CST_CFG_CTL, &msr);
+	get_msr(base_cpu, MSR_PKG_CST_CONFIG_CONTROL, &msr);
 
 #define SNB_C1_AUTO_UNDEMOTE              (1UL << 27)
 #define SNB_C3_AUTO_UNDEMOTE              (1UL << 28)
 
-	fprintf(stderr, "cpu%d: MSR_NHM_SNB_PKG_CST_CFG_CTL: 0x%08llx", base_cpu, msr);
+	fprintf(stderr, "cpu%d: MSR_PKG_CST_CONFIG_CONTROL: 0x%08llx", base_cpu, msr);
 
 	fprintf(stderr, " (%s%s%s%s%slocked: pkg-cstate-limit=%d: %s)\n",
 		(msr & SNB_C3_AUTO_UNDEMOTE) ? "UNdemote-C3, " : "",
@@ -1808,7 +1808,7 @@ void check_permissions()
  * MSR_SMI_COUNT                   0x00000034
  *
  * MSR_PLATFORM_INFO               0x000000ce
- * MSR_NHM_SNB_PKG_CST_CFG_CTL     0x000000e2
+ * MSR_PKG_CST_CONFIG_CONTROL     0x000000e2
  *
  * MSR_PKG_C3_RESIDENCY            0x000003f8
  * MSR_PKG_C6_RESIDENCY            0x000003f9
@@ -1816,7 +1816,7 @@ void check_permissions()
  * MSR_CORE_C6_RESIDENCY           0x000003fd
  *
  * Side effect:
- * sets global pkg_cstate_limit to decode MSR_NHM_SNB_PKG_CST_CFG_CTL
+ * sets global pkg_cstate_limit to decode MSR_PKG_CST_CONFIG_CONTROL
  */
 int probe_nhm_msrs(unsigned int family, unsigned int model)
 {
@@ -1873,7 +1873,7 @@ int probe_nhm_msrs(unsigned int family, unsigned int model)
 	default:
 		return 0;
 	}
-	get_msr(base_cpu, MSR_NHM_SNB_PKG_CST_CFG_CTL, &msr);
+	get_msr(base_cpu, MSR_PKG_CST_CONFIG_CONTROL, &msr);
 	pkg_cstate_limit = pkg_cstate_limits[msr & 0xF];
 
 	get_msr(base_cpu, MSR_PLATFORM_INFO, &msr);
