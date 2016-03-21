@@ -1694,6 +1694,8 @@ i915_gem_sw_finish_ioctl(struct drm_device *dev, void *data,
 		goto unlock;
 	}
 
+	intel_fb_obj_mmap_wa(obj, FB_MMAP_WA_DISABLE);
+
 	/* Pinned buffers may be scanout, so flush the cache */
 	if (obj->pin_display)
 		i915_gem_object_flush_cpu_write_domain(obj);
@@ -1726,7 +1728,7 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 		    struct drm_file *file)
 {
 	struct drm_i915_gem_mmap *args = data;
-	struct drm_gem_object *obj;
+	struct drm_i915_gem_object *obj;
 	unsigned long addr;
 
 	if (args->flags & ~(I915_MMAP_WC))
@@ -1735,19 +1737,19 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 	if (args->flags & I915_MMAP_WC && !cpu_has_pat)
 		return -ENODEV;
 
-	obj = drm_gem_object_lookup(dev, file, args->handle);
-	if (obj == NULL)
+	obj = to_intel_bo(drm_gem_object_lookup(dev, file, args->handle));
+	if (&obj->base == NULL)
 		return -ENOENT;
 
 	/* prime objects have no backing filp to GEM mmap
 	 * pages from.
 	 */
-	if (!obj->filp) {
-		drm_gem_object_unreference_unlocked(obj);
+	if (!obj->base.filp) {
+		drm_gem_object_unreference_unlocked(&obj->base);
 		return -EINVAL;
 	}
 
-	addr = vm_mmap(obj->filp, 0, args->size,
+	addr = vm_mmap(obj->base.filp, 0, args->size,
 		       PROT_READ | PROT_WRITE, MAP_SHARED,
 		       args->offset);
 	if (args->flags & I915_MMAP_WC) {
@@ -1763,9 +1765,11 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 			addr = -ENOMEM;
 		up_write(&mm->mmap_sem);
 	}
-	drm_gem_object_unreference_unlocked(obj);
+	drm_gem_object_unreference_unlocked(&obj->base);
 	if (IS_ERR((void *)addr))
 		return addr;
+
+	intel_fb_obj_mmap_wa(obj, FB_MMAP_WA_CPU);
 
 	args->addr_ptr = (uint64_t) addr;
 
@@ -2101,6 +2105,7 @@ i915_gem_mmap_gtt(struct drm_file *file,
 		goto out;
 
 	*offset = drm_vma_node_offset_addr(&obj->base.vma_node);
+	intel_fb_obj_mmap_wa(obj, FB_MMAP_WA_GTT);
 
 out:
 	drm_gem_object_unreference(&obj->base);

@@ -904,6 +904,13 @@ enum fb_op_origin {
 	ORIGIN_DIRTYFB,
 };
 
+enum fb_mmap_wa_flags {
+	FB_MMAP_WA_CPU =	1 << 0,
+	FB_MMAP_WA_GTT =	1 << 1,
+	FB_MMAP_WA_DISABLE = 	1 << 2,
+	FB_MMAP_WA_FLAG_COUNT =	3,
+};
+
 struct intel_fbc {
 	/* This is always the inner lock when overlapping with struct_mutex and
 	 * it's the outer lock when overlapping with stolen_lock. */
@@ -941,6 +948,7 @@ struct intel_fbc {
 			unsigned int stride;
 			int fence_reg;
 			unsigned int tiling_mode;
+			unsigned int mmap_wa_flags;
 		} fb;
 	} state_cache;
 
@@ -2163,6 +2171,7 @@ struct drm_i915_gem_object {
 	unsigned int cache_dirty:1;
 
 	unsigned int frontbuffer_bits:INTEL_FRONTBUFFER_BITS;
+	unsigned int fb_mmap_wa_flags:FB_MMAP_WA_FLAG_COUNT;
 
 	unsigned int pin_display;
 
