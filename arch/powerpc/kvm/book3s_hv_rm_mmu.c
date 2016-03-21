@@ -71,7 +71,7 @@ static int global_invalidates(struct kvm *kvm, unsigned long flags)
  * Add this HPTE into the chain for the real page.
  * Must be called with the chain locked; it unlocks the chain.
  */
-void kvmppc_add_revmap_chain(struct kvm *kvm, struct revmap_entry *rev,
+void kvmppc_add_revmap_chain(struct kvm_hpt_info *hpt, struct revmap_entry *rev,
 			     unsigned long *rmap, long pte_index, int realmode)
 {
 	struct revmap_entry *head, *tail;
@@ -79,10 +79,10 @@ void kvmppc_add_revmap_chain(struct kvm *kvm, struct revmap_entry *rev,
 
 	if (*rmap & KVMPPC_RMAP_PRESENT) {
 		i = *rmap & KVMPPC_RMAP_INDEX;
-		head = &kvm->arch.hpt.rev[i];
+		head = &hpt->rev[i];
 		if (realmode)
 			head = real_vmalloc_addr(head);
-		tail = &kvm->arch.hpt.rev[head->back];
+		tail = &hpt->rev[head->back];
 		if (realmode)
 			tail = real_vmalloc_addr(tail);
 		rev->forw = i;
@@ -353,8 +353,8 @@ long kvmppc_do_h_enter(struct kvm *kvm, unsigned long flags,
 			pteh &= ~HPTE_V_VALID;
 			unlock_rmap(rmap);
 		} else {
-			kvmppc_add_revmap_chain(kvm, rev, rmap, pte_index,
-						realmode);
+			kvmppc_add_revmap_chain(&kvm->arch.hpt, rev, rmap,
+						pte_index, realmode);
 			/* Only set R/C in real HPTE if already set in *rmap */
 			rcbits = *rmap >> KVMPPC_RMAP_RC_SHIFT;
 			ptel &= rcbits | ~(HPTE_R_R | HPTE_R_C);
