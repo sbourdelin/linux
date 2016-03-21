@@ -54,6 +54,10 @@ struct kvm_resize_hpt {
 	/* These fields protected by kvm->lock */
 	int error;
 	bool prepare_done;
+
+	/* Private to the work thread, until prepare_done is true,
+	 * then protected by kvm->resize_hpt_sem */
+	struct kvm_hpt_info hpt;
 };
 
 #ifdef DEBUG_RESIZE_HPT
@@ -1157,6 +1161,17 @@ void kvmppc_unpin_guest_page(struct kvm *kvm, void *va, unsigned long gpa,
  */
 static int resize_hpt_allocate(struct kvm_resize_hpt *resize)
 {
+	int rc;
+
+	rc = kvmppc_allocate_hpt(&resize->hpt, resize->order);
+	if (rc == -ENOMEM)
+		return H_NO_MEM;
+	else if (rc < 0)
+		return H_HARDWARE;
+
+	resize_hpt_debug(resize, "resize_hpt_allocate(): HPT @ 0x%lx\n",
+			 resize->hpt.virt);
+
 	return H_SUCCESS;
 }
 
@@ -1172,6 +1187,10 @@ static void resize_hpt_pivot(struct kvm_resize_hpt *resize)
 static void resize_hpt_release(struct kvm *kvm, struct kvm_resize_hpt *resize)
 {
 	BUG_ON(kvm->arch.resize_hpt != resize);
+
+	if (resize->hpt.virt)
+		kvmppc_free_hpt(&resize->hpt);
+
 	kvm->arch.resize_hpt = NULL;
 	kfree(resize);
 }
