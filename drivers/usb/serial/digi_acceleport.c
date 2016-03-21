@@ -1252,7 +1252,8 @@ static int digi_port_init(struct usb_serial_port *port, unsigned port_num)
 static int digi_startup(struct usb_serial *serial)
 {
 	struct digi_serial *serial_priv;
-	int ret;
+	int ret = -ENODEV;
+	int i;
 
 	serial_priv = kzalloc(sizeof(*serial_priv), GFP_KERNEL);
 	if (!serial_priv)
@@ -1260,18 +1261,31 @@ static int digi_startup(struct usb_serial *serial)
 
 	spin_lock_init(&serial_priv->ds_serial_lock);
 	serial_priv->ds_oob_port_num = serial->type->num_ports;
+
+	/* Check whether the expected number of ports matches the device */
+	if (serial->num_ports < serial_priv->ds_oob_port_num)
+		goto error;
+	/* all features must be present */
+	for (i = 0; i < serial->type->num_ports + 1 ; i++) {
+		if (!serial->port[i]->read_urb)
+			goto error;
+		if (!serial->port[i]->write_urb)
+			goto error;
+	}
+
 	serial_priv->ds_oob_port = serial->port[serial_priv->ds_oob_port_num];
 
 	ret = digi_port_init(serial_priv->ds_oob_port,
 						serial_priv->ds_oob_port_num);
-	if (ret) {
-		kfree(serial_priv);
-		return ret;
-	}
+	if (ret)
+		goto error;
 
 	usb_set_serial_data(serial, serial_priv);
 
 	return 0;
+error:
+	kfree(serial_priv);
+	return ret;
 }
 
 
