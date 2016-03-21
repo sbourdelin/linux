@@ -2312,8 +2312,13 @@ got_data:
 	}
 	blk_queue_logical_block_size(sdp->request_queue, sector_size);
 
+	/*
+	 * Note: up to this point sdkp->capacity carries the
+	 * _unscaled_ capacity (cf the scaling after this block).
+	 */
 	{
 		char cap_str_2[10], cap_str_10[10];
+		size_t new_capacity = sdkp->capacity >> (ilog2(sector_size) - 9);
 
 		string_get_size(sdkp->capacity, sector_size,
 				STRING_UNITS_2, cap_str_2, sizeof(cap_str_2));
@@ -2321,7 +2326,7 @@ got_data:
 				STRING_UNITS_10, cap_str_10,
 				sizeof(cap_str_10));
 
-		if (sdkp->first_scan || old_capacity != sdkp->capacity) {
+		if (sdkp->first_scan || old_capacity != new_capacity) {
 			sd_printk(KERN_NOTICE, sdkp,
 				  "%llu %d-byte logical blocks: (%s/%s)\n",
 				  (unsigned long long)sdkp->capacity,
