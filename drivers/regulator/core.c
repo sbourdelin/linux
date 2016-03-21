@@ -4376,6 +4376,11 @@ static int __init regulator_init(void)
 /* init early to allow our consumers to complete system booting */
 core_initcall(regulator_init);
 
+static int __init regulator_late_resolve_supply(struct device *dev, void *data)
+{
+	return regulator_resolve_supply(dev_to_rdev(dev));
+}
+
 static int __init regulator_late_cleanup(struct device *dev, void *data)
 {
 	struct regulator_dev *rdev = dev_to_rdev(dev);
@@ -4435,6 +4440,14 @@ static int __init regulator_init_complete(void)
 	 */
 	if (of_have_populated_dt())
 		has_full_constraints = true;
+
+	/* At this point there may be regulators that were not looked
+	 * up by a client driver, so its parent supply was not resolved
+	 * and could be wrongly disabled when needed to remain enabled
+	 * to meet their child constraints.
+	 */
+	class_for_each_device(&regulator_class, NULL, NULL,
+			      regulator_late_resolve_supply);
 
 	/* If we have a full configuration then disable any regulators
 	 * we have permission to change the status for and which are
