@@ -720,13 +720,13 @@ static int i915_audio_component_get_eld(struct device *dev, int port,
 	struct intel_encoder *intel_encoder;
 	struct intel_digital_port *intel_dig_port;
 	const u8 *eld;
-	int ret = -EINVAL;
+	int ret = 0;
 
+	*enabled = false;
 	mutex_lock(&dev_priv->av_mutex);
 	intel_encoder = dev_priv->dig_port_map[port];
 	/* intel_encoder might be NULL for DP MST */
 	if (intel_encoder) {
-		ret = 0;
 		intel_dig_port = enc_to_dig_port(&intel_encoder->base);
 		*enabled = intel_dig_port->audio_connector != NULL;
 		if (*enabled) {
