@@ -64,6 +64,16 @@ struct ion_device {
 	struct dentry *clients_debug_root;
 };
 
+struct ion_device *of_ion_device_get(struct device_node *node)
+{
+	struct miscdevice *mdev = of_misc_get(node);
+
+	if (IS_ERR(mdev))
+		return ERR_PTR(PTR_ERR(mdev));
+
+	return container_of(mdev, struct ion_device, dev);
+}
+
 /**
  * struct ion_client - a process/hw block local address space
  * @node:		node in the tree of all clients
