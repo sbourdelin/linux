@@ -152,7 +152,7 @@ Date:		April 2005
 KernelVersion:	2.6.12
 Contact:	netdev@vger.kernel.org
 Description:
-		Indicates the system-wide interface unique index identifier a
+		Indicates the system-wide interface unique index identifier
 		the interface is linked to. Format is decimal. This attribute is
 		used to resolve interfaces chaining, linking and stacking.
 		Physical interfaces have the same 'ifindex' and 'iflink' values.
@@ -224,7 +224,7 @@ Description:
 		an integer representing the link speed in Mbits/sec.
 
 		Note: this attribute is only valid for interfaces that implement
-		the ethtool get_settings method (mostly Ethernet ).
+		the ethtool get_settings method (mostly Ethernet).
 
 What:		/sys/class/net/<iface>/tx_queue_len
 Date:		April 2005
