@@ -53,6 +53,29 @@
 #define IRQ_STATUS			0x184
 #define MSI_IRQ_OFFSET			4
 
+/*
+ * error IRQ bits. Enable following errors
+ *  - ERR_AER  - ECRC error - BIT(5)
+ *  - ERR_AXI  - AXI tag lookup fatal error BIT(4)
+ *  - ERR_CORR - Correctable error BIT(3)
+ *  - ERR_NONFATAL - Non fatal error BIT(2)
+ *  - ERR_FATAL - Fatal error BIT(1)
+ *  - ERR_SYS - System error (fatal, nonfatal or correctable error)
+ */
+#define ERR_AER				BIT(5)
+#define ERR_AXI				BIT(4)
+#define ERR_CORR			BIT(3)
+#define ERR_NONFATAL			BIT(2)
+#define ERR_FATAL			BIT(1)
+#define ERR_SYS				BIT(0)
+#define ERR_IRQ_ALL			(ERR_AER | ERR_AXI | ERR_CORR | \
+					ERR_NONFATAL | ERR_FATAL | ERR_SYS)
+#define ERR_FATAL_IRQ			(ERR_FATAL | ERR_AXI)
+#define ERR_IRQ_STATUS_RAW		0x1c0
+#define ERR_IRQ_STATUS			0x1c4
+#define ERR_IRQ_ENABLE_SET		0x1c8
+#define ERR_IRQ_ENABLE_CLR		0x1cc
+
 /* Config space registers */
 #define DEBUG0				0x728
 
@@ -241,6 +264,29 @@ void ks_dw_pcie_handle_legacy_irq(struct keystone_pcie *ks_pcie, int offset)
 
 	/* EOI the INTx interrupt */
 	writel(offset, ks_pcie->va_app_base + IRQ_EOI);
+}
+
+void ks_dw_pcie_enable_error_irq(void __iomem *reg_base)
+{
+	writel(ERR_IRQ_ALL, reg_base + ERR_IRQ_ENABLE_SET);
+}
+
+bool ks_dw_pcie_handle_error_irq(struct device *dev, void __iomem *reg_base)
+{
+	u32 status;
+	bool ret = false;
+
+	status = readl(reg_base + ERR_IRQ_STATUS_RAW) & ERR_IRQ_ALL;
+	if (status) {
+		/* The PCIESS interrupt status buts are "write 1 to clear" */
+		if (status & ERR_FATAL_IRQ)
+			dev_err(dev, "PCIE fatal error detected\n");
+
+		/* ack the irq event. */
+		writel(status, reg_base + ERR_IRQ_STATUS);
+		ret = true;
+	}
+	return ret;
 }
 
 static void ks_dw_pcie_ack_legacy_irq(struct irq_data *d)
