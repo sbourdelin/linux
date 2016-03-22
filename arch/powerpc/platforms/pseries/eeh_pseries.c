@@ -614,30 +614,61 @@ static int pseries_eeh_get_log(struct eeh_pe *pe, int severity, char *drv_log, u
 static int pseries_eeh_configure_bridge(struct eeh_pe *pe)
 {
 	int config_addr;
-	int ret;
+	int ret = -1;
+	/* Waiting 0.2s maximum before skipping configuration */
+	int max_wait = 200;
+	int mwait;
 
 	/* Figure out the PE address */
 	config_addr = pe->config_addr;
 	if (pe->addr)
 		config_addr = pe->addr;
 
-	/* Use new configure-pe function, if supported */
-	if (ibm_configure_pe != RTAS_UNKNOWN_SERVICE) {
-		ret = rtas_call(ibm_configure_pe, 3, 1, NULL,
-				config_addr, BUID_HI(pe->phb->buid),
-				BUID_LO(pe->phb->buid));
-	} else if (ibm_configure_bridge != RTAS_UNKNOWN_SERVICE) {
-		ret = rtas_call(ibm_configure_bridge, 3, 1, NULL,
-				config_addr, BUID_HI(pe->phb->buid),
-				BUID_LO(pe->phb->buid));
-	} else {
-		return -EFAULT;
+	while (1) {
+		if (max_wait < 0)
+			goto err;
+
+		/* Use new configure-pe function, if supported */
+		if (ibm_configure_pe != RTAS_UNKNOWN_SERVICE) {
+			ret = rtas_call(ibm_configure_pe, 3, 1, NULL,
+					config_addr, BUID_HI(pe->phb->buid),
+					BUID_LO(pe->phb->buid));
+		} else if (ibm_configure_bridge != RTAS_UNKNOWN_SERVICE) {
+			ret = rtas_call(ibm_configure_bridge, 3, 1, NULL,
+					config_addr, BUID_HI(pe->phb->buid),
+					BUID_LO(pe->phb->buid));
+		} else {
+			return -EFAULT;
+		}
+
+		/*
+		 * If RTAS returns a delay value, it expects software to sleep
+		 * for 10^x milliseconds.  The max value it can return is thus
+		 * 10^5 (RTAS_EXTENDED_DELAY_MAX), which is way too long.
+		 */
+
+		switch (ret) {
+		case 0:
+			return ret;
+		case RTAS_EXTENDED_DELAY_MIN:
+			mwait = 1;
+			break;
+		case RTAS_EXTENDED_DELAY_MAX:
+			mwait = 10;
+			break;
+		case RTAS_EXTENDED_DELAY_MIN+2:
+			mwait = 100;
+			break;
+		default:
+			goto err;
+		}
+
+		max_wait -= mwait;
+		msleep(mwait);
 	}
-
-	if (ret)
-		pr_warn("%s: Unable to configure bridge PHB#%d-PE#%x (%d)\n",
-			__func__, pe->phb->global_number, pe->addr, ret);
-
+ err:
+	pr_warn("%s: Unable to configure bridge PHB#%d-PE#%x (%d)\n",
+		__func__, pe->phb->global_number, pe->addr, ret);
 	return ret;
 }
 
