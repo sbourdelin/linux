@@ -91,7 +91,7 @@ int __hash_page_4K(unsigned long ea, unsigned long access, unsigned long vsid,
 	    !cpu_has_feature(CPU_FTR_COHERENT_ICACHE)) {
 
 		/*
-		 * No CPU has hugepages but lacks no execute, so we
+		 * No CPU has huge pages but lacks no execute, so we
 		 * don't need to worry about that case
 		 */
 		rflags = hash_page_do_lazy_icache(rflags, __pte(old_pte), trap);
