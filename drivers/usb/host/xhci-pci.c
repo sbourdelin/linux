@@ -142,9 +142,11 @@ static void xhci_pci_quirks(struct device *dev, struct xhci_hcd *xhci)
 		 * switch the ports from xHCI to EHCI on shutdown.  We can't use
 		 * DMI information to find those particular boards (since each
 		 * vendor will change the board name), so we have to key off all
-		 * PPT chipsets.
+		 * PPT chipsets. Yet a T430 is reported to not work
+		 * but also need XHCI_SLOW_SUSPEND
 		 */
 		xhci->quirks |= XHCI_SPURIOUS_REBOOT;
+		xhci->quirks |= XHCI_SLOW_SUSPEND;
 	}
 	if (pdev->vendor == PCI_VENDOR_ID_INTEL &&
 		pdev->device == PCI_DEVICE_ID_INTEL_LYNXPOINT_LP_XHCI) {
