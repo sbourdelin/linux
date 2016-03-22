@@ -2385,6 +2385,7 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
 	return 0;
 }
 OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
+EARLYCON_DECLARE(pl011, pl011_early_console_setup);
 
 #else
 #define AMBA_CONSOLE	NULL
