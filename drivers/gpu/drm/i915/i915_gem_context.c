@@ -94,7 +94,7 @@
  * I've seen in a spec to date, and that was a workaround for a non-shipping
  * part. It should be safe to decrease this, but it's more future proof as is.
  */
-#define GEN6_CONTEXT_ALIGN (64<<10)
+#define GEN6_CONTEXT_ALIGN (256<<10)
 #define GEN7_CONTEXT_ALIGN 4096
 
 static size_t get_context_alignment(struct drm_device *dev)
