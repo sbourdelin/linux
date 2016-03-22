@@ -155,7 +155,8 @@ static ssize_t dax_io(struct inode *inode, struct iov_iter *iter,
 	loff_t pos = start, max = start, bh_max = start;
 	bool hole = false, need_wmb = false;
 	struct block_device *bdev = NULL;
-	int rw = iov_iter_rw(iter), rc;
+	int rc = 0;
+	int rw = iov_iter_rw(iter);
 	long map_len = 0;
 	struct blk_dax_ctl dax = {
 		.addr = (void __pmem *) ERR_PTR(-EIO),
