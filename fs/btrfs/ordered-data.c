@@ -227,6 +227,8 @@ static int __btrfs_add_ordered_extent(struct inode *inode, u64 file_offset,
 		}
 		entry->hash->bytenr = hash->bytenr;
 		entry->hash->num_bytes = hash->num_bytes;
+		entry->hash->disk_num_bytes = hash->disk_num_bytes;
+		entry->hash->compression = hash->compression;
 		memcpy(entry->hash->hash, hash->hash,
 		       btrfs_dedupe_sizes[dedupe_info->hash_type]);
 	}

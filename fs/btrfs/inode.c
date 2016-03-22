@@ -2314,6 +2314,8 @@ static int insert_reserved_file_extent(struct btrfs_trans_handle *trans,
 	if (hash && hash->bytenr == 0) {
 		hash->bytenr = ins.objectid;
 		hash->num_bytes = ins.offset;
+		hash->disk_num_bytes = hash->num_bytes;
+		hash->compression = BTRFS_COMPRESS_NONE;
 		ret = btrfs_dedupe_add(trans, root->fs_info, hash);
 	}
 

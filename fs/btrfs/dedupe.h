@@ -53,6 +53,8 @@ static int btrfs_dedupe_sizes[] = { 32 };
 struct btrfs_dedupe_hash {
 	u64 bytenr;
 	u32 num_bytes;
+	u32 disk_num_bytes;
+	u8 compression;
 
 	/* last field is a variable length array of dedupe hash */
 	u8 hash[];
