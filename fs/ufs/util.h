@@ -88,7 +88,7 @@ ufs_get_fs_npsect(struct super_block *sb, struct ufs_super_block_first *usb1,
 static inline u64
 ufs_get_fs_qbmask(struct super_block *sb, struct ufs_super_block_third *usb3)
 {
-	__fs64 tmp;
+	__fs64 tmp = 0;
 
 	switch (UFS_SB(sb)->s_flags & UFS_ST_MASK) {
 	case UFS_ST_SUNOS:
@@ -112,7 +112,7 @@ ufs_get_fs_qbmask(struct super_block *sb, struct ufs_super_block_third *usb3)
 static inline u64
 ufs_get_fs_qfmask(struct super_block *sb, struct ufs_super_block_third *usb3)
 {
-	__fs64 tmp;
+	__fs64 tmp = 0;
 
 	switch (UFS_SB(sb)->s_flags & UFS_ST_MASK) {
 	case UFS_ST_SUNOS:
