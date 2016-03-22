@@ -1001,7 +1001,7 @@ static void intel_idle_cpuidle_devices_uninit(void)
  * Currently used to access tuned IVT multi-socket targets
  * Assumption: num_sockets == (max_package_num + 1)
  */
-void intel_idle_state_table_update(void)
+static void intel_idle_state_table_update(void)
 {
 	/* IVT uses a different table for 1-2, 3-4, and > 4 sockets */
 	if (boot_cpu_data.x86_model == 0x3e) { /* IVT */
