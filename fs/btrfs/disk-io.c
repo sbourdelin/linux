@@ -51,6 +51,7 @@
 #include "sysfs.h"
 #include "qgroup.h"
 #include "compression.h"
+#include "dedupe.h"
 
 #ifdef CONFIG_X86
 #include <asm/cpufeature.h>
@@ -2156,7 +2157,7 @@ static void btrfs_stop_all_workers(struct btrfs_fs_info *fs_info)
 	btrfs_destroy_workqueue(fs_info->extent_workers);
 }
 
-static void free_root_extent_buffers(struct btrfs_root *root)
+void free_root_extent_buffers(struct btrfs_root *root)
 {
 	if (root) {
 		free_extent_buffer(root->node);
@@ -2490,7 +2491,21 @@ static int btrfs_read_roots(struct btrfs_fs_info *fs_info,
 		fs_info->free_space_root = root;
 	}
 
-	return 0;
+	location.objectid = BTRFS_DEDUPE_TREE_OBJECTID;
+	root = btrfs_read_tree_root(tree_root, &location);
+	if (IS_ERR(root)) {
+		ret = PTR_ERR(root);
+		if (ret != -ENOENT)
+			return ret;
+		return 0;
+	}
+	set_bit(BTRFS_ROOT_TRACK_DIRTY, &root->state);
+	ret = btrfs_dedupe_resume(fs_info, root);
+	if (ret < 0) {
+		free_root_extent_buffers(root);
+		kfree(root);
+	}
+	return ret;
 }
 
 int open_ctree(struct super_block *sb,
@@ -3884,6 +3899,8 @@ void close_ctree(struct btrfs_root *root)
 	smp_mb();
 
 	btrfs_free_qgroup_config(fs_info);
+
+	btrfs_dedupe_cleanup(fs_info);
 
 	if (percpu_counter_sum(&fs_info->delalloc_bytes)) {
 		btrfs_info(fs_info, "at unmount delalloc count %lld",
