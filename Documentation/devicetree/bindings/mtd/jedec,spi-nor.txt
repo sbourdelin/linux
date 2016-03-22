@@ -66,6 +66,17 @@ Optional properties:
                    Refer to your chips' datasheet to check if this is supported
                    by your chip.
 
+- m25p,4byte-opcodes: For memory size above 16MiB (128Mib), use the dedicated
+                      4byte-address opcodes instead of entering the 4byte
+                      address mode. This mode changes the internal state of the
+                      chip so may conflict with some early boot loaders, which
+                      expect to use the regular (Fast) Read opcodes with 3byte
+                      address.
+                      However 4byte-address opcodes are not supported by all
+                      chips and support for them can not be detected at runtime.
+                      Refer to you chip's datasheet to check if this is
+                      supported by your chip.
+
 Example:
 
 	flash: m25p80@0 {
