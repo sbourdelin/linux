@@ -196,29 +196,32 @@ static int sur40_command(struct sur40_state *dev,
 /* Initialization routine, called from sur40_open */
 static int sur40_init(struct sur40_state *dev)
 {
-	int result;
-	u8 buffer[24];
+	int result = -ENOMEM;
+	u8 *buffer;
 
+	buffer = kmalloc(24, GFP_KERNEL);
+	if (!buffer)
+		goto error;
 	/* stupidly replay the original MS driver init sequence */
 	result = sur40_command(dev, SUR40_GET_VERSION, 0x00, buffer, 12);
 	if (result < 0)
-		return result;
+		goto error;
 
 	result = sur40_command(dev, SUR40_GET_VERSION, 0x01, buffer, 12);
 	if (result < 0)
-		return result;
+		goto error;
 
 	result = sur40_command(dev, SUR40_GET_VERSION, 0x02, buffer, 12);
 	if (result < 0)
-		return result;
+		goto error;
 
 	result = sur40_command(dev, SUR40_UNKNOWN2,    0x00, buffer, 24);
 	if (result < 0)
-		return result;
+		goto error;
 
 	result = sur40_command(dev, SUR40_UNKNOWN1,    0x00, buffer,  5);
 	if (result < 0)
-		return result;
+		goto error;
 
 	result = sur40_command(dev, SUR40_GET_VERSION, 0x03, buffer, 12);
 
@@ -226,7 +229,8 @@ static int sur40_init(struct sur40_state *dev)
 	 * Discard the result buffer - no known data inside except
 	 * some version strings, maybe extract these sometime...
 	 */
-
+error:
+	kfree(buffer);
 	return result;
 }
 
