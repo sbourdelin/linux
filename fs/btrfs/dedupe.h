@@ -58,6 +58,8 @@ struct btrfs_dedupe_hash {
 	u8 hash[];
 };
 
+struct btrfs_root;
+
 struct btrfs_dedupe_info {
 	/* dedupe blocksize */
 	u64 blocksize;
@@ -73,6 +75,9 @@ struct btrfs_dedupe_info {
 	struct list_head lru_list;
 	u64 limit_nr;
 	u64 current_nr;
+
+	/* for persist data like dedup-hash and dedupe status */
+	struct btrfs_root *dedupe_root;
 };
 
 struct btrfs_trans_handle;

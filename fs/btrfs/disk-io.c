@@ -183,6 +183,7 @@ static struct btrfs_lockdep_keyset {
 	{ .id = BTRFS_DATA_RELOC_TREE_OBJECTID,	.name_stem = "dreloc"	},
 	{ .id = BTRFS_UUID_TREE_OBJECTID,	.name_stem = "uuid"	},
 	{ .id = BTRFS_FREE_SPACE_TREE_OBJECTID,	.name_stem = "free-space" },
+	{ .id = BTRFS_DEDUPE_TREE_OBJECTID,	.name_stem = "dedupe"	},
 	{ .id = 0,				.name_stem = "tree"	},
 };
 
