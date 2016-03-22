@@ -934,6 +934,9 @@ static void shrink_dentry_list(struct list_head *list)
 
 	while (!list_empty(list)) {
 		struct inode *inode;
+
+		cond_resched();
+
 		dentry = list_entry(list->prev, struct dentry, d_lru);
 		spin_lock(&dentry->d_lock);
 		parent = lock_parent(dentry);
