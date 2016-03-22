@@ -689,8 +689,6 @@ static int dt282x_ai_cmdtest(struct comedi_device *dev,
 
 	err |= comedi_check_trigger_arg_min(&cmd->convert_arg, 4000);
 
-#define SLOWEST_TIMER	(250*(1<<15)*255)
-	err |= comedi_check_trigger_arg_max(&cmd->convert_arg, SLOWEST_TIMER);
 	err |= comedi_check_trigger_arg_min(&cmd->convert_arg, board->ai_speed);
 	err |= comedi_check_trigger_arg_is(&cmd->scan_end_arg,
 					   cmd->chanlist_len);
