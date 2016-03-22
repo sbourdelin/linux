@@ -1,0 +1,107 @@
+HiSilicon RoCE DT description
+
+HiSilicon RoCE engine is a part of network subsystem.
+It works depending on other part of network wubsytem, such as, gmac and
+dsa fabric.
+
+Additional properties are described here:
+
+Required properties:
+- compatible: Should contain "hisilicon,hns-roce-v1".
+- reg: Physical base address of the roce driver and
+length of memory mapped region.
+- eth-handle: phandle, specifies a reference to a node
+representing a ethernet device.
+- dsaf-handle: phandle, specifies a reference to a node
+representing a dsaf device.
+- #address-cells: must be 2
+- #size-cells: must be 2
+Optional properties:
+- dma-coherent: Present if DMA operations are coherent.
+- interrupt-parent: the interrupt parent of this device.
+- interrupts: should contain 32 completion event irq,1 async event irq
+and 1 event overflow irq.
+- interrupt-names:should be one of 34 irqs for roce device
+  - roce_ce0_irq ~ roce_ce31_irq: 32 complete event irq
+  - roce_ae_irq: 1 async event irq
+  - roce_common_irq: named common exception warning irq
+Example:
+	infiniband@c4000000 {
+			compatible = "hisilicon,hns-roce-v1";
+			reg = <0x0 0xc4000000 0x0 0x100000>;
+			dma-coherent;
+			eth-handle = <&eth2 &eth3 &eth4 &eth5 &eth6 &eth7>;
+			dsaf-handle = <&soc0_dsa>;
+			#address-cells = <2>;
+			#size-cells = <2>;
+			interrupt-parent = <&mbigen_dsa>;
+			interrupts = <722 1>,
+					<723 1>,
+					<724 1>,
+					<725 1>,
+					<726 1>,
+					<727 1>,
+					<728 1>,
+					<729 1>,
+					<730 1>,
+					<731 1>,
+					<732 1>,
+					<733 1>,
+					<734 1>,
+					<735 1>,
+					<736 1>,
+					<737 1>,
+					<738 1>,
+					<739 1>,
+					<740 1>,
+					<741 1>,
+					<742 1>,
+					<743 1>,
+					<744 1>,
+					<745 1>,
+					<746 1>,
+					<747 1>,
+					<748 1>,
+					<749 1>,
+					<750 1>,
+					<751 1>,
+					<752 1>,
+					<753 1>,
+					<785 1>,
+					<754 4>;
+
+			interrupt-names = "roce_ce0_irq",
+					"roce_ce1_irq",
+					"roce_ce2_irq",
+					"roce_ce3_irq",
+					"roce_ce4_irq",
+					"roce_ce5_irq",
+					"roce_ce6_irq",
+					"roce_ce7_irq",
+					"roce_ce8_irq",
+					"roce_ce9_irq",
+					"roce_ce10_irq",
+					"roce_ce11_irq",
+					"roce_ce12_irq",
+					"roce_ce13_irq",
+					"roce_ce14_irq",
+					"roce_ce15_irq",
+					"roce_ce16_irq",
+					"roce_ce17_irq",
+					"roce_ce18_irq",
+					"roce_ce19_irq",
+					"roce_ce20_irq",
+					"roce_ce21_irq",
+					"roce_ce22_irq",
+					"roce_ce23_irq",
+					"roce_ce24_irq",
+					"roce_ce25_irq",
+					"roce_ce26_irq",
+					"roce_ce27_irq",
+					"roce_ce28_irq",
+					"roce_ce29_irq",
+					"roce_ce30_irq",
+					"roce_ce31_irq",
+					"roce_ae_irq",
+					"roce_common_irq";
+		};
