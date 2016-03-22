@@ -22,6 +22,7 @@
 #include <linux/btrfs.h>
 #include <linux/wait.h>
 #include <crypto/hash.h>
+#include "compression.h"
 
 /*
  * Dedup storage backend
@@ -87,6 +88,13 @@ struct btrfs_trans_handle;
 static inline int btrfs_dedupe_hash_hit(struct btrfs_dedupe_hash *hash)
 {
 	return (hash && hash->bytenr);
+}
+
+static inline int
+btrfs_dedupe_hash_compressed_hit(struct btrfs_dedupe_hash *hash)
+{
+	/* This judgment implied hash->bytenr != 0 */
+	return (hash && hash->compression != BTRFS_COMPRESS_NONE);
 }
 
 static inline int btrfs_dedupe_hash_size(u16 type)
