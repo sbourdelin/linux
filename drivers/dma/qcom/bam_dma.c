@@ -384,6 +384,7 @@ struct bam_device {
 	struct device_dma_parameters dma_parms;
 	struct bam_chan *channels;
 	u32 num_channels;
+	bool bam_ctrl_remote;
 
 	/* execution environment ID, from DT */
 	u32 ee;
@@ -1036,9 +1037,6 @@ static int bam_init(struct bam_device *bdev)
 	if (bdev->ee >= val)
 		return -EINVAL;
 
-	val = readl_relaxed(bam_addr(bdev, 0, BAM_NUM_PIPES));
-	bdev->num_channels = val & BAM_NUM_PIPES_MASK;
-
 	/* s/w reset bam */
 	/* after reset all pipes are disabled and idle */
 	val = readl_relaxed(bam_addr(bdev, 0, BAM_CTRL));
@@ -1095,7 +1093,7 @@ static int bam_dma_probe(struct platform_device *pdev)
 	struct bam_device *bdev;
 	const struct of_device_id *match;
 	struct resource *iores;
-	int ret, i;
+	int ret, i, val;
 
 	bdev = devm_kzalloc(&pdev->dev, sizeof(*bdev), GFP_KERNEL);
 	if (!bdev)
@@ -1136,9 +1134,15 @@ static int bam_dma_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	ret = bam_init(bdev);
-	if (ret)
-		goto err_disable_clk;
+	val = readl_relaxed(bam_addr(bdev, 0, BAM_NUM_PIPES));
+	bdev->num_channels = val & BAM_NUM_PIPES_MASK;
+
+	bdev->bam_ctrl_remote = of_property_read_bool(pdev->dev.of_node,
+						"qcom,bam_ctrl_remote");
+	if (bdev->bam_ctrl_remote != true)
+		ret = bam_init(bdev);
+		if (ret)
+			goto err_disable_clk;
 
 	tasklet_init(&bdev->task, dma_tasklet, (unsigned long)bdev);
 

@@ -13,6 +13,8 @@ Required properties:
 - clock-names: must contain "bam_clk" entry
 - qcom,ee : indicates the active Execution Environment identifier (0-7) used in
   the secure world.
+- qcom,bam_ctrl_remote: Use when BAM global device control is managed remotely
+  and not locally by the application processor.
 
 Example:
 
@@ -24,6 +26,7 @@ Example:
 		clock-names = "bam_clk";
 		#dma-cells = <1>;
 		qcom,ee = <0>;
+		qcom,bam_ctrl_remote;
 	};
 
 DMA clients must use the format described in the dma.txt file, using a two cell
