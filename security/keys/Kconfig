@@ -81,3 +81,14 @@ config ENCRYPTED_KEYS
 	  Userspace only ever sees/stores encrypted blobs.
 
 	  If you are unsure as to whether this is required, answer N.
+
+config DERIVED_KEYS
+	tristate "Derived keys"
+	depends on KEYS
+	select CRYPTO
+	select CRYPTO_SHA256
+	select CRYPTO_RNG
+	help
+	  This option provides support for derived key type.
+
+	  If you are unsure as to whether this is required, answer N.

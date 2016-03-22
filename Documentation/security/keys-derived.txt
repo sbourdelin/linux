@@ -1,0 +1,82 @@
+			Derived Keys
+
+Derived is a keytype of the kernel keyring facility.
+The key secret is derived from the secret value given by user.
+Optionally user may specify:
+	- hash function used for derivation;
+	- salt value;
+	- number of iterations.
+Both secret value and salt value may be given in one of the formats:
+	- plain data;
+	- hex string;
+	- size of data to generate randomly.
+If no optional parameters are specified, the key is derived from
+the plain secret value with sha256, no salt, 1 iteration.
+Derived keys store as a payload:
+	- derived key;
+	- salt;
+	- number of iterations;
+	- name of derivation algorithm;
+	- name of RNG algorithm.
+From userspace only the derived key value is returned on read.
+
+Usage:
+	keyctl add derived name "key [options]" ring
+
+	mandatory parameter:
+		key					- key secret value
+
+	options:
+		kf=, keyformat=		- key secret value format, see dataformat below
+		s=,  salt=			- salt value,
+								default is empty (no salt)
+		sf=, saltformat=	- salt value format, see dataformat below
+		i=,  iterations=	- number of itaretions,
+								default is 1, maximum is 0x000FFFFF
+		a=,  algorithm=		- name of crypto API hash derivation algorithm,
+								default is sha256
+		r=,  rng=			- name of crypto API RNG algorithm,
+								default is stdrng
+
+	dataformat:
+		plain				- data is a plain value, used by default
+		hex					- data is a hex string
+		rand				- data is a size of random value to be generated
+
+Examples:
+
+Create a simple derived key
+
+	$ keyctl add derived key0 secret0 @u
+	925448848
+
+	$ keyctl read 925448848
+	32 bytes of data in key:
+	97699b7c c0a0ed83 b78b2002 f0e57046 ee561be6 942bec25 6fe201ab ba552a9e
+
+Create a derived key from plain secret, hex salt
+
+	$ keyctl add derived key0 "secret0 s=65a4fe09 sf=hex" @u
+	847728695
+
+	$ keyctl read 847728695
+	32 bytes of data in key:
+	1c64cbb9 cc4dffff a94f8efe dce813d0 5def4a28 97c02336 6c95737b f2b152be
+
+Create a derived key from hex secret value, 32-byte random salt, 65536 iterations
+
+	$keyctl add derived key0 "09afde6781ff kf=hex s=32 sf=rand i=65536" @u
+	604146072
+
+	$ keyctl read 604146072
+	32 bytes of data in key:
+	a5b494b3 b6e3e26c bb9511b1 b16ce60e 99edf63e d8fbc3c2 ba38b195 229e3f43
+
+Create a derived key with sha1 algorithm
+
+	$ keyctl add derived key0 "secret0 a=sha1" @u
+	56670858
+
+	$ keyctl read 56670858
+	20 bytes of data in key:
+	d16cd26f bc3d44a6 16b8d0b2 ce8b5ddc c93e964d
