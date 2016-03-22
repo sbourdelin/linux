@@ -415,7 +415,7 @@ static void ath9k_hw_set_4k_power_per_rate_table(struct ath_hw *ah,
 						 u16 powerLimit)
 {
 #define CMP_TEST_GRP \
-	(((cfgCtl & ~CTL_MODE_M)| (pCtlMode[ctlMode] & CTL_MODE_M)) ==	\
+	(((cfgCtl & ~CTL_MODE_M) | (pCtlMode[ctlMode] & CTL_MODE_M)) ==	\
 	 pEepData->ctlIndex[i])						\
 	|| (((cfgCtl & ~CTL_MODE_M) | (pCtlMode[ctlMode] & CTL_MODE_M)) == \
 	    ((pEepData->ctlIndex[i] & CTL_MODE_M) | SD_NO_CTL))

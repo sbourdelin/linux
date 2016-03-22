@@ -90,7 +90,7 @@ static const struct ieee80211_channel ath9k_5ghz_chantable[] = {
 
 /* Atheros hardware rate code addition for short premble */
 #define SHPCHECK(__hw_rate, __flags) \
-	((__flags & IEEE80211_RATE_SHORT_PREAMBLE) ? (__hw_rate | 0x04 ) : 0)
+	((__flags & IEEE80211_RATE_SHORT_PREAMBLE) ? (__hw_rate | 0x04) : 0)
 
 #define RATE(_bitrate, _hw_rate, _flags) {              \
 	.bitrate        = (_bitrate),                   \

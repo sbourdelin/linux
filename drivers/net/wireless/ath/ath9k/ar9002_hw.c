@@ -92,7 +92,7 @@ static int ar9002_hw_init_mode_regs(struct ath_hw *ah)
 
 		if (!AR_SREV_5416_22_OR_LATER(ah)) {
 			/* override CLKDRV value */
-			INI_RA(addac, 31,1) = 0;
+			INI_RA(addac, 31, 1) = 0;
 		}
 	}
 	if (AR_SREV_9287_11_OR_LATER(ah)) {

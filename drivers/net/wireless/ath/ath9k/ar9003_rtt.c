@@ -211,7 +211,7 @@ bool ar9003_hw_rtt_restore(struct ath_hw *ah, struct ath9k_channel *chan)
 		return false;
 
 	if (test_bit(SW_PKDET_DONE, &ah->caldata->cal_flags)) {
-		if (IS_CHAN_2GHZ(chan)){
+		if (IS_CHAN_2GHZ(chan)) {
 			REG_RMW_FIELD(ah, AR_PHY_65NM_RXRF_AGC(0),
 				      AR_PHY_65NM_RXRF_AGC_AGC2G_CALDAC_OVR,
 				      ah->caldata->caldac[0]);

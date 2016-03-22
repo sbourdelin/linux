@@ -18,9 +18,9 @@
 
 void ath9k_hw_analog_shift_regwrite(struct ath_hw *ah, u32 reg, u32 val)
 {
-        REG_WRITE(ah, reg, val);
+	REG_WRITE(ah, reg, val);
 
-        if (ah->config.analog_shiftreg)
+	if (ah->config.analog_shiftreg)
 		udelay(100);
 }
 

@@ -267,7 +267,7 @@ static void ath9k_multi_regread(void *hw_priv, u32 *addr,
        }
 
        ret = ath9k_wmi_cmd(priv->wmi, WMI_REG_READ_CMDID,
-			   (u8 *)tmpaddr , sizeof(u32) * count,
+			   (u8 *)tmpaddr, sizeof(u32) * count,
 			   (u8 *)tmpval, sizeof(u32) * count,
 			   100);
 	if (unlikely(ret)) {

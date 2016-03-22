@@ -2909,7 +2909,7 @@ u64 ath9k_hw_gettsf64(struct ath_hw *ah)
 		tsf_upper1 = tsf_upper2;
 	}
 
-	WARN_ON( i == ATH9K_MAX_TSF_READ );
+	WARN_ON(i == ATH9K_MAX_TSF_READ);
 
 	return (((u64)tsf_upper1 << 32) | tsf_lower);
 }
@@ -2956,8 +2956,7 @@ void ath9k_hw_set11nmac2040(struct ath_hw *ah, struct ath9k_channel *chan)
 
 /* HW Generic timers configuration */
 
-static const struct ath_gen_timer_configuration gen_tmr_configuration[] =
-{
+static const struct ath_gen_timer_configuration gen_tmr_configuration[] = {
 	{AR_NEXT_NDP_TIMER, AR_NDP_PERIOD, AR_TIMER_MODE, 0x0080},
 	{AR_NEXT_NDP_TIMER, AR_NDP_PERIOD, AR_TIMER_MODE, 0x0080},
 	{AR_NEXT_NDP_TIMER, AR_NDP_PERIOD, AR_TIMER_MODE, 0x0080},
@@ -3216,7 +3215,7 @@ static const char *ath9k_hw_mac_bb_name(u32 mac_bb_version)
 {
 	int i;
 
-	for (i=0; i<ARRAY_SIZE(ath_mac_bb_names); i++) {
+	for (i = 0; i < ARRAY_SIZE(ath_mac_bb_names); i++) {
 		if (ath_mac_bb_names[i].version == mac_bb_version) {
 			return ath_mac_bb_names[i].name;
 		}
@@ -3233,7 +3232,7 @@ static const char *ath9k_hw_rf_name(u16 rf_version)
 {
 	int i;
 
-	for (i=0; i<ARRAY_SIZE(ath_rf_names); i++) {
+	for (i = 0; i < ARRAY_SIZE(ath_rf_names); i++) {
 		if (ath_rf_names[i].version == rf_version) {
 			return ath_rf_names[i].name;
 		}

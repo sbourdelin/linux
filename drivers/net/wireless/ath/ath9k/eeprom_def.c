@@ -454,7 +454,7 @@ static void ath9k_hw_def_set_gain(struct ath_hw *ah,
 			      pModal->xatten2Db[i]);
 		} else {
 			REG_RMW(ah, AR_PHY_GAIN_2GHZ + regChainOffset,
-				SM(pModal-> bswMargin[i], AR_PHY_GAIN_2GHZ_BSW_MARGIN),
+				SM(pModal->bswMargin[i], AR_PHY_GAIN_2GHZ_BSW_MARGIN),
 				AR_PHY_GAIN_2GHZ_BSW_MARGIN);
 			REG_RMW(ah, AR_PHY_GAIN_2GHZ + regChainOffset,
 				SM(pModal->bswAtten[i], AR_PHY_GAIN_2GHZ_BSW_ATTEN),
@@ -759,7 +759,7 @@ static void ath9k_adjust_pdadc_values(struct ath_hw *ah,
 	if (AR_SREV_9280_20_OR_LATER(ah)) {
 		if (AR5416_PWR_TABLE_OFFSET_DB != pwr_table_offset) {
 			/* shift the table to start at the new offset */
-			for (k = 0; k < (u16)NUM_PDADC(diff); k++ ) {
+			for (k = 0; k < (u16)NUM_PDADC(diff); k++) {
 				pdadcValues[k] = pdadcValues[k + diff];
 			}
 

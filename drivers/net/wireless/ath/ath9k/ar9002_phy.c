@@ -458,7 +458,7 @@ static void ar9002_hw_set_bt_ant_diversity(struct ath_hw *ah, bool enable)
 
 	regval = REG_READ(ah, AR_PHY_MULTICHAIN_GAIN_CTL);
 	regval &= (~(AR_PHY_9285_ANT_DIV_CTL_ALL));
-        /*
+	/*
 	 * Clear ant_fast_div_bias [14:9] since for WB195,
 	 * the main LNA is always LNA1.
 	 */

@@ -81,14 +81,14 @@
 #define AR_WOW_BEACON_FAIL              0x00200000
 
 #define AR_WOW_STATUS(x)                (x & (AR_WOW_PATTERN_FOUND_MASK | \
-                                              AR_WOW_MAGIC_PAT_FOUND    | \
-                                              AR_WOW_KEEP_ALIVE_FAIL    | \
-                                              AR_WOW_BEACON_FAIL))
+					      AR_WOW_MAGIC_PAT_FOUND    | \
+					      AR_WOW_KEEP_ALIVE_FAIL    | \
+					      AR_WOW_BEACON_FAIL))
 #define AR_WOW_CLEAR_EVENTS(x)          (x & ~(AR_WOW_PATTERN_EN(0xff) | \
-                                               AR_WOW_MAGIC_EN |	\
-                                               AR_WOW_MAC_INTR_EN |	\
-                                               AR_WOW_BEACON_FAIL |	\
-                                               AR_WOW_KEEP_ALIVE_FAIL))
+					       AR_WOW_MAGIC_EN |	\
+					       AR_WOW_MAC_INTR_EN |	\
+					       AR_WOW_BEACON_FAIL |	\
+					       AR_WOW_KEEP_ALIVE_FAIL))
 
 #define AR_WOW2_PATTERN_EN(x)           ((x & 0xff) << 0)
 #define AR_WOW2_PATTERN_FOUND_SHIFT     8

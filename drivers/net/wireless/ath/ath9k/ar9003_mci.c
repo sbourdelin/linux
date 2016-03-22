@@ -890,7 +890,7 @@ static void ar9003_mci_set_btcoex_ctrl_9462(struct ath_hw *ah)
 {
 	u32 regval;
 
-        regval = SM(1, AR_BTCOEX_CTRL_AR9462_MODE) |
+	regval = SM(1, AR_BTCOEX_CTRL_AR9462_MODE) |
 		 SM(1, AR_BTCOEX_CTRL_WBTIMER_EN) |
 		 SM(1, AR_BTCOEX_CTRL_PA_SHARED) |
 		 SM(1, AR_BTCOEX_CTRL_LNA_SHARED) |

@@ -700,15 +700,15 @@ static bool ar9003_hw_calc_iq_corr(struct ath_hw *ah,
 	}
 
 	if ((i2_p_q2_a0_d0 < 1024) || (i2_p_q2_a0_d0 > 2047) ||
-            (i2_p_q2_a1_d0 < 0) || (i2_p_q2_a1_d1 < 0) ||
-            (i2_p_q2_a0_d0 <= i2_m_q2_a0_d0) ||
-            (i2_p_q2_a0_d0 <= iq_corr_a0_d0) ||
-            (i2_p_q2_a0_d1 <= i2_m_q2_a0_d1) ||
-            (i2_p_q2_a0_d1 <= iq_corr_a0_d1) ||
-            (i2_p_q2_a1_d0 <= i2_m_q2_a1_d0) ||
-            (i2_p_q2_a1_d0 <= iq_corr_a1_d0) ||
-            (i2_p_q2_a1_d1 <= i2_m_q2_a1_d1) ||
-            (i2_p_q2_a1_d1 <= iq_corr_a1_d1)) {
+	    (i2_p_q2_a1_d0 < 0) || (i2_p_q2_a1_d1 < 0) ||
+	    (i2_p_q2_a0_d0 <= i2_m_q2_a0_d0) ||
+	    (i2_p_q2_a0_d0 <= iq_corr_a0_d0) ||
+	    (i2_p_q2_a0_d1 <= i2_m_q2_a0_d1) ||
+	    (i2_p_q2_a0_d1 <= iq_corr_a0_d1) ||
+	    (i2_p_q2_a1_d0 <= i2_m_q2_a1_d0) ||
+	    (i2_p_q2_a1_d0 <= iq_corr_a1_d0) ||
+	    (i2_p_q2_a1_d1 <= i2_m_q2_a1_d1) ||
+	    (i2_p_q2_a1_d1 <= iq_corr_a1_d1)) {
 		return false;
 	}
 
@@ -1327,7 +1327,7 @@ static void ar9003_hw_do_pcoem_manual_peak_cal(struct ath_hw *ah,
 		set_bit(SW_PKDET_DONE, &caldata->cal_flags);
 
 	if ((ah->caps.hw_caps & ATH9K_HW_CAP_RTT) && caldata) {
-		if (IS_CHAN_2GHZ(chan)){
+		if (IS_CHAN_2GHZ(chan)) {
 			caldata->caldac[0] = REG_READ_FIELD(ah,
 						    AR_PHY_65NM_RXRF_AGC(0),
 						    AR_PHY_65NM_RXRF_AGC_AGC2G_CALDAC_OVR);

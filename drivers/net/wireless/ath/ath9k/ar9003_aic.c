@@ -363,7 +363,7 @@ static bool ar9003_aic_cal_post_process(struct ath_hw *ah)
 				(start_idx - end_idx) +
 				aic_sram[start_idx].quad_path_gain_lin;
 
-		} else if (start_idx >= 0){
+		} else if (start_idx >= 0) {
 			/* interpolation */
 			aic_sram[i].dir_path_gain_lin =
 				(((end_idx - i) * aic_sram[start_idx].dir_path_gain_lin) +

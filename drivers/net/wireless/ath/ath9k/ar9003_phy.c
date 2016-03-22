@@ -518,7 +518,7 @@ static void ar9003_hw_spur_ofdm_work(struct ath_hw *ah,
 
 	} else {
 		spur_subchannel_sd = 0;
-		spur_freq_sd = (freq_offset << 9) /11;
+		spur_freq_sd = (freq_offset << 9) / 11;
 		spur_delta_phase = (freq_offset << 18) / 5;
 	}
 
@@ -2087,7 +2087,7 @@ bool ar9003_hw_bb_watchdog_check(struct ath_hw *ah)
 {
 	u32 val;
 
-	switch(ah->bb_watchdog_last_status) {
+	switch (ah->bb_watchdog_last_status) {
 	case 0x04000539:
 		val = REG_READ(ah, AR_PHY_RADAR_0);
 		val &= (~AR_PHY_RADAR_0_FIRPWR);

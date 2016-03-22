@@ -393,8 +393,8 @@ static struct ath_buf* ath_clone_txbuf(struct ath_softc *sc, struct ath_buf *bf)
 }
 
 static void ath_tx_count_frames(struct ath_softc *sc, struct ath_buf *bf,
-			        struct ath_tx_status *ts, int txok,
-			        int *nframes, int *nbad)
+				struct ath_tx_status *ts, int txok,
+				int *nframes, int *nbad)
 {
 	struct ath_frame_info *fi;
 	u16 seq_st = 0;
@@ -2259,7 +2259,7 @@ static int ath_tx_prepare(struct ieee80211_hw *hw, struct sk_buff *skb,
 	ath_assign_seq(ath9k_hw_common(sc->sc_ah), skb);
 
 	if ((vif && vif->type != NL80211_IFTYPE_AP &&
-	            vif->type != NL80211_IFTYPE_AP_VLAN) ||
+		    vif->type != NL80211_IFTYPE_AP_VLAN) ||
 	    !ieee80211_is_data(hdr->frame_control))
 		info->flags |= IEEE80211_TX_CTL_CLEAR_PS_FILT;
 
@@ -2443,7 +2443,7 @@ void ath_tx_cabq(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			break;
 
 		skb = ieee80211_get_buffered_bc(hw, vif);
-	} while(skb);
+	} while (skb);
 
 	if (skb)
 		ieee80211_free_txskb(hw, skb);
@@ -2494,7 +2494,7 @@ static void ath_tx_complete(struct ath_softc *sc, struct sk_buff *skb,
 
 	padpos = ieee80211_hdrlen(hdr->frame_control);
 	padsize = padpos & 3;
-	if (padsize && skb->len>padpos+padsize) {
+	if (padsize && skb->len > padpos+padsize) {
 		/*
 		 * Remove MAC header padding before giving the frame back to
 		 * mac80211.
@@ -2604,7 +2604,7 @@ static void ath_tx_rc_status(struct ath_softc *sc, struct ath_buf *bf,
 		 * This itself should also alleviate congestion on the bus.
 		 */
 		if (unlikely(ts->ts_flags & (ATH9K_TX_DATA_UNDERRUN |
-		                             ATH9K_TX_DELIM_UNDERRUN)) &&
+					     ATH9K_TX_DELIM_UNDERRUN)) &&
 		    ieee80211_is_data(hdr->frame_control) &&
 		    ah->tx_trig_level >= sc->sc_ah->config.max_txtrig_level)
 			tx_info->status.rates[tx_rateindex].count =

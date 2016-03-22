@@ -142,7 +142,7 @@ void ath9k_cmn_rx_skb_postprocess(struct ath_common *common,
 	 * not try to remove padding from short control frames that do
 	 * not have payload. */
 	padsize = padpos & 3;
-	if (padsize && skb->len>=padpos+padsize+FCS_LEN) {
+	if (padsize && skb->len >= padpos+padsize+FCS_LEN) {
 		memmove(skb->data + padsize, skb->data, padpos);
 		skb_pull(skb, padsize);
 	}

@@ -290,9 +290,9 @@
 				  AR_MCI_INTERRUPT_CONT_INFO_TIMEOUT)
 
 #define AR_MCI_INTERRUPT_MSG_FAIL_MASK (AR_MCI_INTERRUPT_RX_HW_MSG_FAIL | \
-                                        AR_MCI_INTERRUPT_RX_SW_MSG_FAIL | \
-                                        AR_MCI_INTERRUPT_TX_HW_MSG_FAIL | \
-                                        AR_MCI_INTERRUPT_TX_SW_MSG_FAIL)
+					AR_MCI_INTERRUPT_RX_SW_MSG_FAIL | \
+					AR_MCI_INTERRUPT_TX_HW_MSG_FAIL | \
+					AR_MCI_INTERRUPT_TX_SW_MSG_FAIL)
 
 #define AR_MCI_INTERRUPT_RX_HW_MSG_MASK (AR_MCI_INTERRUPT_RX_MSG_SCHD_INFO   | \
 					 AR_MCI_INTERRUPT_RX_MSG_LNA_CONTROL | \
@@ -302,9 +302,9 @@
 					 AR_MCI_INTERRUPT_RX_MSG_CONT_RST)
 
 #define AR_MCI_INTERRUPT_RX_MSG_DEFAULT (AR_MCI_INTERRUPT_RX_MSG_GPM           | \
-                                         AR_MCI_INTERRUPT_RX_MSG_REMOTE_RESET  | \
-                                         AR_MCI_INTERRUPT_RX_MSG_SYS_WAKING    | \
-                                         AR_MCI_INTERRUPT_RX_MSG_SYS_SLEEPING  | \
-                                         AR_MCI_INTERRUPT_RX_MSG_REQ_WAKE)
+					 AR_MCI_INTERRUPT_RX_MSG_REMOTE_RESET  | \
+					 AR_MCI_INTERRUPT_RX_MSG_SYS_WAKING    | \
+					 AR_MCI_INTERRUPT_RX_MSG_SYS_SLEEPING  | \
+					 AR_MCI_INTERRUPT_RX_MSG_REQ_WAKE)
 
 #endif /* REG_MCI_H */

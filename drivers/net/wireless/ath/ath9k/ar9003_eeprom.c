@@ -2080,7 +2080,7 @@ static const struct ar9300_eeprom ar9300_x112 = {
 		.tempSlopeLow = 72,
 		.tempSlopeHigh = 105,
 		.xatten1DBLow = {0x10, 0x14, 0x10},
-		.xatten1MarginLow = {0x19, 0x19 , 0x19},
+		.xatten1MarginLow = {0x19, 0x19, 0x19},
 		.xatten1DBHigh = {0x1d, 0x20, 0x24},
 		.xatten1MarginHigh = {0x10, 0x10, 0x10}
 	},
@@ -4441,9 +4441,9 @@ static int ar9003_hw_tx_power_regwrite(struct ath_hw *ah, u8 * pPwrArray)
 		  POW_SM(pPwrArray[ALL_TARGET_LEGACY_1L_5L], 0)
 	    );
 
-        /* Write the power for duplicated frames - HT40 */
+	/* Write the power for duplicated frames - HT40 */
 
-        /* dup40_cck (LSB), dup40_ofdm, ext20_cck, ext20_ofdm (MSB) */
+	/* dup40_cck (LSB), dup40_ofdm, ext20_cck, ext20_ofdm (MSB) */
 	REG_WRITE(ah, AR_PHY_POWER_TX_RATE(8),
 		  POW_SM(pPwrArray[ALL_TARGET_LEGACY_6_24], 24) |
 		  POW_SM(pPwrArray[ALL_TARGET_LEGACY_1L_5L], 16) |
@@ -5340,7 +5340,7 @@ static void ath9k_hw_ar9300_set_txpower(struct ath_hw *ah,
 	unsigned int i = 0, paprd_scale_factor = 0;
 	u8 pwr_idx, min_pwridx = 0;
 
-	memset(targetPowerValT2, 0 , sizeof(targetPowerValT2));
+	memset(targetPowerValT2, 0, sizeof(targetPowerValT2));
 
 	/*
 	 * Get target powers from EEPROM - our baseline for TX Power

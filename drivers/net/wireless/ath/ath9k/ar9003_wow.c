@@ -52,7 +52,7 @@ static void ath9k_hw_set_powermode_wow_sleep(struct ath_hw *ah)
 	if (AR_SREV_9462(ah) || AR_SREV_9565(ah)) {
 		if (!REG_READ(ah, AR_MAC_PCU_GEN_TIMER_TSF_SEL))
 			REG_CLR_BIT(ah, AR_DIRECT_CONNECT, AR_DC_TSF2_ENABLE);
-	} else if (AR_SREV_9485(ah)){
+	} else if (AR_SREV_9485(ah)) {
 		if (!(REG_READ(ah, AR_NDP2_TIMER_MODE) &
 		      AR_GEN_TIMERS2_MODE_ENABLE_MASK))
 			REG_CLR_BIT(ah, AR_DIRECT_CONNECT, AR_DC_TSF2_ENABLE);
@@ -310,9 +310,9 @@ void ath9k_hw_wow_enable(struct ath_hw *ah, u32 pattern_enable)
 	 * to generate next wow signal.
 	 */
 	REG_SET_BIT(ah, AR_PCIE_PM_CTRL, AR_PMCTRL_HOST_PME_EN |
-		    			 AR_PMCTRL_PWR_PM_CTRL_ENA |
-		    			 AR_PMCTRL_AUX_PWR_DET |
-		    			 AR_PMCTRL_WOW_PME_CLR);
+					 AR_PMCTRL_PWR_PM_CTRL_ENA |
+					 AR_PMCTRL_AUX_PWR_DET |
+					 AR_PMCTRL_WOW_PME_CLR);
 	REG_CLR_BIT(ah, AR_PCIE_PM_CTRL, AR_PMCTRL_WOW_PME_CLR);
 
 	/*
@@ -330,8 +330,8 @@ void ath9k_hw_wow_enable(struct ath_hw *ah, u32 pattern_enable)
 	 * AIFS time, Slot time, Keep Alive count.
 	 */
 	REG_SET_BIT(ah, AR_WOW_COUNT, AR_WOW_AIFS_CNT(AR_WOW_CNT_AIFS_CNT) |
-		    		      AR_WOW_SLOT_CNT(AR_WOW_CNT_SLOT_CNT) |
-		    		      AR_WOW_KEEP_ALIVE_CNT(AR_WOW_CNT_KA_CNT));
+				      AR_WOW_SLOT_CNT(AR_WOW_CNT_SLOT_CNT) |
+				      AR_WOW_KEEP_ALIVE_CNT(AR_WOW_CNT_KA_CNT));
 	/*
 	 * Beacon timeout.
 	 */

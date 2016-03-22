@@ -314,7 +314,7 @@ static void ath_select_ant_div_from_quick_scan(struct ath_ant_comb *antcomb,
 		antcomb->rssi_first = main_rssi_avg;
 		antcomb->rssi_third = alt_rssi_avg;
 
-		switch(antcomb->second_quick_scan_conf) {
+		switch (antcomb->second_quick_scan_conf) {
 		case ATH_ANT_DIV_COMB_LNA1:
 			antcomb->rssi_lna1 = alt_rssi_avg;
 			break;
