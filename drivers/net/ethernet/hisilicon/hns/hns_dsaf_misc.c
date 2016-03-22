@@ -87,18 +87,22 @@ void hns_dsaf_rst(struct dsaf_device *dsaf_dev, u32 val)
 	u32 xbar_reg_addr;
 	u32 nt_reg_addr;
 
-	if (!val) {
-		xbar_reg_addr = DSAF_SUB_SC_XBAR_RESET_REQ_REG;
-		nt_reg_addr = DSAF_SUB_SC_NT_RESET_REQ_REG;
-	} else {
-		xbar_reg_addr = DSAF_SUB_SC_XBAR_RESET_DREQ_REG;
-		nt_reg_addr = DSAF_SUB_SC_NT_RESET_DREQ_REG;
-	}
+	if (AE_IS_VER1(dsaf_dev->dsaf_ver)) {
+		if (!val) {
+			xbar_reg_addr = DSAF_SUB_SC_XBAR_RESET_REQ_REG;
+			nt_reg_addr = DSAF_SUB_SC_NT_RESET_REQ_REG;
+		} else {
+			xbar_reg_addr = DSAF_SUB_SC_XBAR_RESET_DREQ_REG;
+			nt_reg_addr = DSAF_SUB_SC_NT_RESET_DREQ_REG;
+		}
 
-	dsaf_write_reg(dsaf_dev->sc_base, xbar_reg_addr,
-		       RESET_REQ_OR_DREQ);
-	dsaf_write_reg(dsaf_dev->sc_base, nt_reg_addr,
-		       RESET_REQ_OR_DREQ);
+		dsaf_write_reg(dsaf_dev->sc_base, xbar_reg_addr,
+			       RESET_REQ_OR_DREQ);
+		dsaf_write_reg(dsaf_dev->sc_base, nt_reg_addr,
+			       RESET_REQ_OR_DREQ);
+	} else {
+		hns_dsaf_srst_chns(dsaf_dev, 0xfffff, val);
+	}
 }
 
 void hns_dsaf_xge_srst_by_port(struct dsaf_device *dsaf_dev, u32 port, u32 val)
@@ -137,6 +141,44 @@ void hns_dsaf_xge_core_srst_by_port(struct dsaf_device *dsaf_dev,
 		reg_addr = DSAF_SUB_SC_XGE_RESET_DREQ_REG;
 
 	dsaf_write_reg(dsaf_dev->sc_base, reg_addr, reg_val);
+}
+
+/**
+ * hns_dsaf_srst_chns - reset dsaf channels
+ * @dsaf_dev: dsaf device struct pointer
+ * @msk: xbar channels mask value:
+ * bit0-5 for xge0-5
+ * bit6-11 for ppe0-5
+ * bit12-17 for roce0-5
+ * bit18-19 for com/dfx
+ * @val: 0 - request reset , 1 - drop reset
+ */
+void hns_dsaf_srst_chns(struct dsaf_device *dsaf_dev, u32 msk, u32 val)
+{
+	u32 reg_addr;
+
+	if (val == 0)
+		reg_addr = DSAF_SUB_SC_DSAF_RESET_REQ_REG;
+	else
+		reg_addr = DSAF_SUB_SC_DSAF_RESET_DREQ_REG;
+
+	dsaf_write_reg(dsaf_dev->sc_base, reg_addr, msk);
+}
+
+void hns_dsaf_roce_srst(struct dsaf_device *dsaf_dev, u32 val)
+{
+	if (val == 0) {
+		dsaf_write_reg(dsaf_dev->sc_base,
+			       DSAF_SUB_SC_ROCEE_RESET_REQ_REG, 1);
+	} else {
+		dsaf_write_reg(dsaf_dev->sc_base,
+			       DSAF_SUB_SC_ROCEE_CLK_DIS_REG, 1);
+		dsaf_write_reg(dsaf_dev->sc_base,
+			       DSAF_SUB_SC_ROCEE_RESET_DREQ_REG, 1);
+		msleep(20);
+		dsaf_write_reg(dsaf_dev->sc_base,
+			       DSAF_SUB_SC_ROCEE_CLK_EN_REG, 1);
+	}
 }
 
 void hns_dsaf_ge_srst_by_port(struct dsaf_device *dsaf_dev, u32 port, u32 val)

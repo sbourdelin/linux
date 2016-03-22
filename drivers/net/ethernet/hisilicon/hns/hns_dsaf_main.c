@@ -12,6 +12,7 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/netdevice.h>
+#include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
@@ -2592,6 +2593,89 @@ static struct platform_driver g_dsaf_driver = {
 };
 
 module_platform_driver(g_dsaf_driver);
+
+/**
+ * hns_dsaf_roce_reset - reset dsaf and roce
+ * @dsaf_fwnode: Pointer to framework node for the dasf
+ * @val: 0 - request reset , 1 - drop reset
+ * retuen 0 - success , negative -fail
+ */
+int hns_dsaf_roce_reset(struct fwnode_handle *dsaf_fwnode, u32 val)
+{
+	struct dsaf_device *dsaf_dev;
+	struct platform_device *pdev;
+	unsigned int mp;
+	unsigned int sl;
+	unsigned int credit;
+	int i;
+	const u32 port_map[DSAF_ROCE_CREDIT_CHN][DSAF_ROCE_CHAN_MODE_NUM] = {
+		{DSAF_ROCE_PORT_0, DSAF_ROCE_PORT_0, DSAF_ROCE_PORT_0},
+		{DSAF_ROCE_PORT_1, DSAF_ROCE_PORT_0, DSAF_ROCE_PORT_0},
+		{DSAF_ROCE_PORT_2, DSAF_ROCE_PORT_1, DSAF_ROCE_PORT_0},
+		{DSAF_ROCE_PORT_3, DSAF_ROCE_PORT_1, DSAF_ROCE_PORT_0},
+		{DSAF_ROCE_PORT_4, DSAF_ROCE_PORT_2, DSAF_ROCE_PORT_1},
+		{DSAF_ROCE_PORT_4, DSAF_ROCE_PORT_2, DSAF_ROCE_PORT_1},
+		{DSAF_ROCE_PORT_5, DSAF_ROCE_PORT_3, DSAF_ROCE_PORT_1},
+		{DSAF_ROCE_PORT_5, DSAF_ROCE_PORT_3, DSAF_ROCE_PORT_1},
+	};
+	const u32 sl_map[DSAF_ROCE_CREDIT_CHN][DSAF_ROCE_CHAN_MODE_NUM] = {
+		{DSAF_ROCE_SL_0, DSAF_ROCE_SL_0, DSAF_ROCE_SL_0},
+		{DSAF_ROCE_SL_0, DSAF_ROCE_SL_1, DSAF_ROCE_SL_1},
+		{DSAF_ROCE_SL_0, DSAF_ROCE_SL_0, DSAF_ROCE_SL_2},
+		{DSAF_ROCE_SL_0, DSAF_ROCE_SL_1, DSAF_ROCE_SL_3},
+		{DSAF_ROCE_SL_0, DSAF_ROCE_SL_0, DSAF_ROCE_SL_0},
+		{DSAF_ROCE_SL_1, DSAF_ROCE_SL_1, DSAF_ROCE_SL_1},
+		{DSAF_ROCE_SL_0, DSAF_ROCE_SL_0, DSAF_ROCE_SL_2},
+		{DSAF_ROCE_SL_1, DSAF_ROCE_SL_1, DSAF_ROCE_SL_3},
+	};
+
+	if (!is_of_node(dsaf_fwnode)) {
+		pr_err("Only support DT node!\n");
+		return -EINVAL;
+	}
+	pdev = of_find_device_by_node(to_of_node(dsaf_fwnode));
+	dsaf_dev = dev_get_drvdata(&pdev->dev);
+	if (AE_IS_VER1(dsaf_dev->dsaf_ver)) {
+		dev_err(dsaf_dev->dev, "%s v1 chip do not support roce!\n",
+			dsaf_dev->ae_dev.name);
+		return -ENODEV;
+	}
+
+	if (!val) {
+		/* Reset rocee-channels in dsaf and rocee */
+		hns_dsaf_srst_chns(dsaf_dev, 0x3f000, 0);
+		hns_dsaf_roce_srst(dsaf_dev, 0);
+	} else {
+		/* Configure dsaf tx roce correspond to port map and sl map */
+		mp = dsaf_read_dev(dsaf_dev, DSAF_ROCE_PORT_MAP_REG);
+		for (i = 0; i < DSAF_ROCE_CREDIT_CHN; i++)
+			dsaf_set_field(mp, 7 << i * 3, i * 3,
+				       port_map[i][DSAF_ROCE_6PORT_MODE]);
+		dsaf_set_field(mp, 3 << i * 3, i * 3, 0);
+		dsaf_write_dev(dsaf_dev, DSAF_ROCE_PORT_MAP_REG, mp);
+
+		sl = dsaf_read_dev(dsaf_dev, DSAF_ROCE_SL_MAP_REG);
+		for (i = 0; i < DSAF_ROCE_CREDIT_CHN; i++)
+			dsaf_set_field(sl, 3 << i * 2, i * 2,
+				       sl_map[i][DSAF_ROCE_6PORT_MODE]);
+		dsaf_write_dev(dsaf_dev, DSAF_ROCE_SL_MAP_REG, sl);
+
+		/* De-reset rocee-channels in dsaf and rocee */
+		hns_dsaf_srst_chns(dsaf_dev, 0x3f000, 1);
+		msleep(20);
+		hns_dsaf_roce_srst(dsaf_dev, 1);
+
+		/* Eanble dsaf channel rocee credit */
+		credit = dsaf_read_dev(dsaf_dev, DSAF_SBM_ROCEE_CFG_REG_REG);
+		dsaf_set_bit(credit, DSAF_SBM_ROCEE_CFG_CRD_EN_B, 0);
+		dsaf_write_dev(dsaf_dev, DSAF_SBM_ROCEE_CFG_REG_REG, credit);
+
+		dsaf_set_bit(credit, DSAF_SBM_ROCEE_CFG_CRD_EN_B, 1);
+		dsaf_write_dev(dsaf_dev, DSAF_SBM_ROCEE_CFG_REG_REG, credit);
+	}
+	return 0;
+}
+EXPORT_SYMBOL(hns_dsaf_roce_reset);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Huawei Tech. Co., Ltd.");
