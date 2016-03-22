@@ -1679,6 +1679,11 @@ struct btrfs_root *btrfs_get_fs_root(struct btrfs_fs_info *fs_info,
 	if (location->objectid == BTRFS_FREE_SPACE_TREE_OBJECTID)
 		return fs_info->free_space_root ? fs_info->free_space_root :
 						  ERR_PTR(-ENOENT);
+	if (location->objectid == BTRFS_DEDUPE_TREE_OBJECTID) {
+		if (fs_info->dedupe_enabled && fs_info->dedupe_info)
+			return fs_info->dedupe_info->dedupe_root;
+		return ERR_PTR(-ENOENT);
+	}
 again:
 	root = btrfs_lookup_fs_root(fs_info, location->objectid);
 	if (root) {
