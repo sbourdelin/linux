@@ -807,7 +807,8 @@ static irqreturn_t bam_dma_irq(int irq, void *data)
 	/* don't allow reorder of the various accesses to the BAM registers */
 	mb();
 
-	writel_relaxed(clr_mask, bam_addr(bdev, 0, BAM_IRQ_CLR));
+	if (srcs & BAM_IRQ)
+		writel_relaxed(clr_mask, bam_addr(bdev, 0, BAM_IRQ_CLR));
 
 	return IRQ_HANDLED;
 }
