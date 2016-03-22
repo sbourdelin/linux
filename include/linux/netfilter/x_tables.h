@@ -413,6 +413,9 @@ xt_get_per_cpu_counter(struct xt_counters *cnt, unsigned int cpu)
 
 struct nf_hook_ops *xt_hook_ops_alloc(const struct xt_table *, nf_hookfn *);
 
+int xt_check_entry_target(const void *base, unsigned int target_offset,
+			  unsigned int next_offset);
+
 #ifdef CONFIG_COMPAT
 #include <net/compat.h>
 

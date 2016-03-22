@@ -541,6 +541,28 @@ int xt_compat_match_to_user(const struct xt_entry_match *m,
 EXPORT_SYMBOL_GPL(xt_compat_match_to_user);
 #endif /* CONFIG_COMPAT */
 
+/* check that arp/ip/ip6t_entry target_offset is sane */
+int xt_check_entry_target(const void *base, unsigned int target_offset,
+			  unsigned int next_offset)
+{
+	const struct xt_entry_target *t;
+	const char *e = base;
+
+	if (target_offset + sizeof(struct xt_entry_target) > next_offset)
+		return -EINVAL;
+
+	t = (void *) (e + target_offset);
+	if (target_offset + t->u.target_size > next_offset)
+		return -EINVAL;
+
+	if (strcmp(t->u.user.name, XT_STANDARD_TARGET) == 0 &&
+	    target_offset + sizeof(struct xt_standard_target) > next_offset)
+		return -EINVAL;
+
+	return 0;
+}
+EXPORT_SYMBOL(xt_check_entry_target);
+
 int xt_check_target(struct xt_tgchk_param *par,
 		    unsigned int size, u_int8_t proto, bool inv_proto)
 {
