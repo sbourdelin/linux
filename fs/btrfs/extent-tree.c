@@ -6256,8 +6256,12 @@ static int btrfs_update_reserved_bytes(struct btrfs_block_group_cache *cache,
 		cache->reserved -= num_bytes;
 		space_info->bytes_reserved -= num_bytes;
 
-		if (delalloc)
-			cache->delalloc_bytes -= num_bytes;
+		if (delalloc) {
+			if (WARN_ON(num_bytes > cache->delalloc_bytes))
+				cache->delalloc_bytes = 0;
+			else
+				cache->delalloc_bytes -= num_bytes;
+		}
 	}
 	spin_unlock(&cache->lock);
 	spin_unlock(&space_info->lock);

@@ -3045,7 +3045,10 @@ static void btrfs_release_delalloc_bytes(struct btrfs_root *root,
 	ASSERT(cache);
 
 	spin_lock(&cache->lock);
-	cache->delalloc_bytes -= len;
+	if (WARN_ON(len > cache->delalloc_bytes))
+		cache->delalloc_bytes = 0;
+	else
+		cache->delalloc_bytes -= len;
 	spin_unlock(&cache->lock);
 
 	btrfs_put_block_group(cache);
@@ -3154,6 +3157,9 @@ static int btrfs_finish_ordered_io(struct btrfs_ordered_extent *ordered_extent)
 						ordered_extent->file_offset +
 						logical_len);
 	} else {
+		/* Must be checked before hash modified*/
+		int hash_hit = btrfs_dedupe_hash_hit(ordered_extent->hash);
+
 		BUG_ON(root == root->fs_info->tree_root);
 		ret = insert_reserved_file_extent(trans, inode,
 						ordered_extent->file_offset,
@@ -3163,7 +3169,8 @@ static int btrfs_finish_ordered_io(struct btrfs_ordered_extent *ordered_extent)
 						compress_type, 0, 0,
 						BTRFS_FILE_EXTENT_REG,
 						ordered_extent->hash);
-		if (!ret)
+		/* Hash hit case doesn't reserved delalloc bytes */
+		if (!ret && !hash_hit)
 			btrfs_release_delalloc_bytes(root,
 						     ordered_extent->start,
 						     ordered_extent->disk_len);
