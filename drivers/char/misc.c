@@ -275,6 +275,44 @@ static char *misc_devnode(struct device *dev, umode_t *mode)
 	return NULL;
 }
 
+#ifdef CONFIG_OF
+static int misc_of_node_match(struct device *dev, const void *data)
+{
+	return dev->of_node == data;
+}
+
+struct miscdevice *of_misc_get(struct device_node *node)
+{
+	struct miscdevice *m;
+	struct device *dev;
+	int ret = -ENODEV;
+
+	dev = class_find_device(misc_class, NULL, node,
+				misc_of_node_match);
+	if (!dev)
+		return ERR_PTR(-ENODEV);
+
+	m = dev_get_drvdata(dev);
+	if (!m)
+		goto err_dev;
+
+	if (!try_module_get(dev->parent->driver->owner))
+		goto err_dev;
+
+	return m;
+
+err_dev:
+	put_device(dev);
+	return ERR_PTR(ret);
+}
+#else
+struct misc_device *of_misc_get(struct device_node *)
+{
+	return ERR_PTR(-ENODEV);
+}
+#endif
+EXPORT_SYMBOL(of_misc_get);
+
 static int __init misc_init(void)
 {
 	int err;
