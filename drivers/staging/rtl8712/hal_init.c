@@ -296,8 +296,7 @@ static u8 rtl8712_dl_fw(struct _adapter *padapter)
 			goto exit_fail;
 
 		tmp8 = r8712_read8(padapter, 0x1025000A);
-		if (tmp8 & BIT(4)) /* When boot from EEPROM,
-				    & FW need more time to read EEPROM */
+		if (tmp8 & BIT(4)) /* When boot from EEPROM, & FW need more time to read EEPROM */
 			i = 60;
 		else			/* boot from EFUSE */
 			i = 30;
@@ -331,8 +330,7 @@ uint rtl8712_hal_init(struct _adapter *padapter)
 	netdev_info(padapter->pnetdev, "1 RCR=0x%x\n",
 		    r8712_read32(padapter, RCR));
 	val32 = r8712_read32(padapter, RCR);
-	r8712_write32(padapter, RCR, (val32 | BIT(26))); /* Enable RX TCP
-							    Checksum offload */
+	r8712_write32(padapter, RCR, (val32 | BIT(26))); /* Enable RX TCP Checksum offload */
 	netdev_info(padapter->pnetdev, "2 RCR=0x%x\n",
 		    r8712_read32(padapter, RCR));
 	val32 = r8712_read32(padapter, RCR);
@@ -345,8 +343,7 @@ uint rtl8712_hal_init(struct _adapter *padapter)
 	       BIT(0)); /* page = 128bytes */
 	r8712_write8(padapter, 0x102500BD, r8712_read8(padapter, 0x102500BD) |
 	       BIT(7)); /* enable usb rx aggregation */
-	r8712_write8(padapter, 0x102500D9, 1); /* TH=1 => means that invalidate
-						*  usb rx aggregation */
+	r8712_write8(padapter, 0x102500D9, 1); /* TH=1 => means that invalidate usb rx aggregation */
 	r8712_write8(padapter, 0x1025FE5B, 0x04); /* 1.7ms/4 */
 	/* Fix the RX FIFO issue(USB error) */
 	r8712_write8(padapter, 0x1025fe5C, r8712_read8(padapter, 0x1025fe5C)
@@ -366,8 +363,7 @@ uint rtl8712_hal_deinit(struct _adapter *padapter)
 	r8712_write8(padapter, SYS_CLKR + 1, 0x38); /* Switch Control Path */
 	r8712_write8(padapter, SYS_FUNC_EN + 1, 0x70);
 	r8712_write8(padapter, PMC_FSM, 0x06);  /* Enable Loader Data Keep */
-	r8712_write8(padapter, SYS_ISO_CTRL, 0xF9); /* Isolation signals from
-						     * CORE, PLL */
+	r8712_write8(padapter, SYS_ISO_CTRL, 0xF9); /* Isolation signals from CORE, PLL */
 	r8712_write8(padapter, SYS_ISO_CTRL + 1, 0xe8); /* Enable EFUSE 1.2V */
 	r8712_write8(padapter, AFE_PLL_CTRL, 0x00); /* Disable AFE PLL. */
 	r8712_write8(padapter, LDOA15_CTRL, 0x54);  /* Disable A15V */
