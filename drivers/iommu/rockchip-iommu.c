@@ -346,13 +346,7 @@ static int rk_iommu_enable_stall(struct rk_iommu *iommu)
 
 	rk_iommu_command(iommu, RK_MMU_CMD_ENABLE_STALL);
 
-	ret = rk_wait_for(rk_iommu_is_stall_active(iommu), 1);
-	if (ret)
-		for (i = 0; i < iommu->num_mmu; i++)
-			dev_err(iommu->dev, "Enable stall request timed out, status: %#08x\n",
-				rk_iommu_read(iommu->bases[i], RK_MMU_STATUS));
-
-	return ret;
+	return rk_wait_for(rk_iommu_is_stall_active(iommu), 1);
 }
 
 static int rk_iommu_disable_stall(struct rk_iommu *iommu)
@@ -798,8 +792,12 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
 		return 0;
 
 	ret = rk_iommu_enable_stall(iommu);
-	if (ret)
+	if (ret) {
+		for (i = 0; i < iommu->num_mmu; i++)
+			dev_err(iommu->dev, "Enable stall request timed out, status: %#08x\n",
+				rk_iommu_read(iommu->bases[i], RK_MMU_STATUS));
 		return ret;
+	}
 
 	ret = rk_iommu_force_reset(iommu);
 	if (ret)
