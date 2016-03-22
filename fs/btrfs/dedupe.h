@@ -146,6 +146,7 @@ int btrfs_dedupe_calc_hash(struct btrfs_fs_info *fs_info,
  * *INCREASED*, and hash->bytenr/num_bytes will record the existing
  * extent data.
  * Return 0 for a hash miss. Nothing is done
+ * Return < 0 for error
  */
 int btrfs_dedupe_search(struct btrfs_fs_info *fs_info,
 			struct inode *inode, u64 file_pos,
