@@ -37,6 +37,9 @@
 #define BTRFS_DEDUPE_BLOCKSIZE_MIN	(16 * 1024)
 #define BTRFS_DEDUPE_BLOCKSIZE_DEFAULT	(128 * 1024)
 
+/* Default dedupe limit on number of hash */
+#define BTRFS_DEDUPE_LIMIT_NR_DEFAULT	(32 * 1024)
+
 /* Hash algorithm, only support SHA256 yet */
 #define BTRFS_DEDUPE_HASH_SHA256		0
 
@@ -79,8 +82,17 @@ static inline int btrfs_dedupe_hash_hit(struct btrfs_dedupe_hash *hash)
 	return (hash && hash->bytenr);
 }
 
-int btrfs_dedupe_hash_size(u16 type);
-struct btrfs_dedupe_hash *btrfs_dedupe_alloc_hash(u16 type);
+static inline int btrfs_dedupe_hash_size(u16 type)
+{
+	if (WARN_ON(type >= ARRAY_SIZE(btrfs_dedupe_sizes)))
+		return -EINVAL;
+	return sizeof(struct btrfs_dedupe_hash) + btrfs_dedupe_sizes[type];
+}
+
+static inline struct btrfs_dedupe_hash *btrfs_dedupe_alloc_hash(u16 type)
+{
+	return kzalloc(btrfs_dedupe_hash_size(type), GFP_NOFS);
+}
 
 /*
  * Initial inband dedupe info
