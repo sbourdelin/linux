@@ -31,6 +31,7 @@
 #include "async-thread.h"
 #include "free-space-cache.h"
 #include "inode-map.h"
+#include "dedupe.h"
 
 /*
  * backref_node, mapping_node and tree_block start with this
@@ -3909,6 +3910,7 @@ static noinline_for_stack int relocate_block_group(struct reloc_control *rc)
 	struct btrfs_trans_handle *trans = NULL;
 	struct btrfs_path *path;
 	struct btrfs_extent_item *ei;
+	struct btrfs_fs_info *fs_info = rc->extent_root->fs_info;
 	u64 flags;
 	u32 item_size;
 	int ret;
@@ -4032,6 +4034,20 @@ restart:
 			}
 		}
 
+		/*
+		 * This data extent will be replaced, but normal
+		 * dedupe_del() will only happen at run_delayed_ref()
+		 * time, which is too late, so delete dedupe hash early
+		 * to prevent its ref get increased.
+		 */
+		if (rc->stage == MOVE_DATA_EXTENTS &&
+		    (flags & BTRFS_EXTENT_FLAG_DATA)) {
+			ret = btrfs_dedupe_del(trans, fs_info, key.objectid);
+			if (ret < 0) {
+				err = ret;
+				break;
+			}
+		}
 		btrfs_end_transaction_throttle(trans, rc->extent_root);
 		btrfs_btree_balance_dirty(rc->extent_root);
 		trans = NULL;
