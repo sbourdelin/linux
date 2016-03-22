@@ -1161,7 +1161,7 @@ xfs_buf_ioapply_map(
 
 next_chunk:
 	atomic_inc(&bp->b_io_remaining);
-	nr_pages = BIO_MAX_SECTORS >> (PAGE_SHIFT - BBSHIFT);
+	nr_pages = BIO_MAX_PAGES;
 	if (nr_pages > total_nr_pages)
 		nr_pages = total_nr_pages;
 
