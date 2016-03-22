@@ -135,12 +135,12 @@ out:
 }
 
 int btrfs_dedupe_enable(struct btrfs_fs_info *fs_info, u16 type, u16 backend,
-			u64 blocksize, u64 limit_nr)
+			u64 blocksize, u64 limit_nr, u64 limit_mem)
 {
 	struct btrfs_dedupe_info *dedupe_info;
 	int create_tree;
 	u64 compat_ro_flag = btrfs_super_compat_ro_flags(fs_info->super_copy);
-	u64 limit = limit_nr;
+	u64 limit;
 	int ret = 0;
 
 	/* Sanity check */
@@ -153,11 +153,22 @@ int btrfs_dedupe_enable(struct btrfs_fs_info *fs_info, u16 type, u16 backend,
 		return -EINVAL;
 	if (backend >= BTRFS_DEDUPE_BACKEND_COUNT)
 		return -EINVAL;
+	/* Only one limit is accept */
+	if (limit_nr && limit_mem)
+		return -EINVAL;
 
-	if (backend == BTRFS_DEDUPE_BACKEND_INMEMORY && limit_nr == 0)
-		limit = BTRFS_DEDUPE_LIMIT_NR_DEFAULT;
-	if (backend == BTRFS_DEDUPE_BACKEND_ONDISK && limit_nr != 0)
+	if (backend == BTRFS_DEDUPE_BACKEND_INMEMORY) {
+		if (!limit_nr && !limit_mem)
+			limit = BTRFS_DEDUPE_LIMIT_NR_DEFAULT;
+		else if (limit_nr)
+			limit = limit_nr;
+		else
+			limit = limit_mem / (sizeof(struct inmem_hash) +
+					btrfs_dedupe_sizes[type]);
+	}
+	if (backend == BTRFS_DEDUPE_BACKEND_ONDISK)
 		limit = 0;
+
 	/* Ondisk backend needs DEDUP RO compat feature */
 	if (!(compat_ro_flag & BTRFS_FEATURE_COMPAT_RO_DEDUPE) &&
 	    backend == BTRFS_DEDUPE_BACKEND_ONDISK)
@@ -207,6 +218,33 @@ out:
 		kfree(dedupe_info);
 	}
 	return ret;
+}
+
+void btrfs_dedupe_status(struct btrfs_fs_info *fs_info,
+			 struct btrfs_ioctl_dedupe_args *dargs)
+{
+	struct btrfs_dedupe_info *dedupe_info = fs_info->dedupe_info;
+
+	if (!fs_info->dedupe_enabled || !dedupe_info) {
+		dargs->status = 0;
+		dargs->blocksize = 0;
+		dargs->backend = 0;
+		dargs->hash_type = 0;
+		dargs->limit_nr = 0;
+		dargs->current_nr = 0;
+		return;
+	}
+	mutex_lock(&dedupe_info->lock);
+	dargs->status = 1;
+	dargs->blocksize = dedupe_info->blocksize;
+	dargs->backend = dedupe_info->backend;
+	dargs->hash_type = dedupe_info->hash_type;
+	dargs->limit_nr = dedupe_info->limit_nr;
+	dargs->limit_mem = dedupe_info->limit_nr *
+		(sizeof(struct inmem_hash) +
+		 btrfs_dedupe_sizes[dedupe_info->hash_type]);
+	dargs->current_nr = dedupe_info->current_nr;
+	mutex_unlock(&dedupe_info->lock);
 }
 
 int btrfs_dedupe_resume(struct btrfs_fs_info *fs_info,
