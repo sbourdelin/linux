@@ -22,6 +22,7 @@
 #include <linux/sizes.h>
 #include <linux/of.h>
 #include <linux/of_fdt.h>
+#include <linux/acpi.h>
 
 #ifdef CONFIG_FIX_EARLYCON_MEM
 #include <asm/fixmap.h>
@@ -206,11 +207,15 @@ static int __init param_setup_earlycon(char *buf)
 	int err;
 
 	/*
-	 * Just 'earlycon' is a valid param for devicetree earlycons;
-	 * don't generate a warning from parse_early_params() in that case
+	 * Just 'earlycon' is a valid param for devicetree and ACPI SPCR
+	 * earlycons; don't generate a warning from parse_early_params()
+	 * in that case
 	 */
-	if (!buf || !buf[0])
-		return early_init_dt_scan_chosen_serial();
+	if (!buf || !buf[0]) {
+		init_spcr_earlycon();
+		early_init_dt_scan_chosen_serial();
+		return 0;
+	}
 
 	err = setup_earlycon(buf);
 	if (err == -ENOENT || err == -EALREADY)
