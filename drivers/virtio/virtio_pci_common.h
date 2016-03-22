@@ -36,7 +36,7 @@ struct virtio_pci_vq_info {
 	struct virtqueue *vq;
 
 	/* the number of entries in the queue */
-	int num;
+	u16 num;
 
 	/* the virtual address of the ring queue */
 	void *queue;

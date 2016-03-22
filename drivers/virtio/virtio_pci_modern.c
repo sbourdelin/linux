@@ -293,7 +293,7 @@ static size_t vring_pci_size(u16 num)
 	return PAGE_ALIGN(vring_size(num, SMP_CACHE_BYTES));
 }
 
-static void *alloc_virtqueue_pages(int *num)
+static void *alloc_virtqueue_pages(u16 *num)
 {
 	void *pages;
 
@@ -360,7 +360,7 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
 	}
 
 	/* activate the queue */
-	vp_iowrite16(num, &cfg->queue_size);
+	vp_iowrite16(info->num, &cfg->queue_size);
 	vp_iowrite64_twopart(virt_to_phys(info->queue),
 			     &cfg->queue_desc_lo, &cfg->queue_desc_hi);
 	vp_iowrite64_twopart(virt_to_phys(virtqueue_get_avail(vq)),
