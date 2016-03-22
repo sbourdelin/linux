@@ -597,28 +597,53 @@ static void init_vp_index(struct vmbus_channel *channel, u16 dev_type)
 
 static void vmbus_wait_for_unload(void)
 {
-	int cpu = smp_processor_id();
-	void *page_addr = hv_context.synic_message_page[cpu];
+	int cpu;
+	void *page_addr =
+		hv_context.synic_message_page[vmbus_connection.init_cpu];
 	struct hv_message *msg = (struct hv_message *)page_addr +
 				  VMBUS_MESSAGE_SINT;
 	struct vmbus_channel_message_header *hdr;
-	bool unloaded = false;
+	enum vmbus_channel_message_type msgtype;
 
+	printk("vmbus_wait_for_unload: %d (%d)\n", vmbus_connection.init_cpu, smp_processor_id());
+
+	/*
+	 * CHANNELMSG_UNLOAD_RESPONSE is always delivered to the CPU which was
+	 * used to initate contact (see vmbus_negotiate_version()). When we're
+	 * crashing on a different CPU let's hope that IRQ handler on that CPU
+	 * is still functional and vmbus_unload_response() will complete
+	 * vmbus_connection.unload_event. If not, the last thing we can do is
+	 * read message page for that CPU regardless of what CPU we're on.
+	 */
 	while (1) {
+		if (completion_done(&vmbus_connection.unload_event))
+			break;
+
 		if (READ_ONCE(msg->header.message_type) == HVMSG_NONE) {
 			mdelay(10);
 			continue;
 		}
 
 		hdr = (struct vmbus_channel_message_header *)msg->u.payload;
-		if (hdr->msgtype == CHANNELMSG_UNLOAD_RESPONSE)
-			unloaded = true;
-
+		msgtype = hdr->msgtype;
 		vmbus_signal_eom(msg);
 
-		if (unloaded)
+		if (msgtype == CHANNELMSG_UNLOAD_RESPONSE)
 			break;
 	}
+
+	/*
+	 * We're crashing and already got the UNLOAD_RESPONSE, cleanup all
+	 * maybe-pending messages on all CPUs to be able to receive new
+	 * messages after we reconnect.
+	 */
+	for_each_online_cpu(cpu) {
+		page_addr = hv_context.synic_message_page[cpu];
+		msg = (struct hv_message *)page_addr + VMBUS_MESSAGE_SINT;
+		msg->header.message_type = HVMSG_NONE;
+	}
+
+	printk("vmbus_wait_for_unload done: %d (%d)\n", vmbus_connection.init_cpu, smp_processor_id());
 }
 
 /*

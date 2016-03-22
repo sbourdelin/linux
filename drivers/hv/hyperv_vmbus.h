@@ -563,6 +563,9 @@ struct vmbus_connection {
 
 	atomic_t next_gpadl_handle;
 
+	/* CPU which was used to initiate contact */
+	int init_cpu;
+
 	struct completion  unload_event;
 	/*
 	 * Represents channel interrupts. Each bit position represents a

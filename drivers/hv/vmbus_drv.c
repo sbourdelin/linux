@@ -732,6 +732,7 @@ void vmbus_on_msg_dpc(unsigned long data)
 		goto msg_handled;
 	}
 
+	printk("vmbus_on_msg_dpc: %d on %d\n", hdr->msgtype, cpu);
 	entry = &channel_message_table[hdr->msgtype];
 	if (entry->handler_type	== VMHT_BLOCKING) {
 		ctx = kmalloc(sizeof(*ctx), GFP_ATOMIC);

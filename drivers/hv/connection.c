@@ -70,7 +70,7 @@ static __u32 vmbus_get_next_version(__u32 current_version)
 static int vmbus_negotiate_version(struct vmbus_channel_msginfo *msginfo,
 					__u32 version)
 {
-	int ret = 0;
+	int ret = 0, cpu = smp_processor_id();
 	struct vmbus_channel_initiate_contact *msg;
 	unsigned long flags;
 
@@ -91,12 +91,16 @@ static int vmbus_negotiate_version(struct vmbus_channel_msginfo *msginfo,
 	 * For post win8 hosts, we support receiving channel messagges on
 	 * all the CPUs. This is needed for kexec to work correctly where
 	 * the CPU attempting to connect may not be CPU 0.
+	 * We need to remember the CPU we use here as in case of unload
+	 * CHANNELMSG_UNLOAD_RESPONSE will be delivered to this CPU.
 	 */
 	if (version >= VERSION_WIN8_1) {
-		msg->target_vcpu = hv_context.vp_index[get_cpu()];
-		put_cpu();
+		printk("vmbus_negotiate_version: %d %d\n", cpu, hv_context.vp_index[cpu]);
+		msg->target_vcpu = hv_context.vp_index[cpu];
+		vmbus_connection.init_cpu = cpu;
 	} else {
 		msg->target_vcpu = 0;
+		vmbus_connection.init_cpu = 0;
 	}
 
 	/*
