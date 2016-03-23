@@ -1240,6 +1240,16 @@ _GLOBAL(ftrace_caller)
 	std     r7, _NIP(r1)
 	std     r7, _LINK(r1)
 
+#ifdef CONFIG_LIVEPATCH
+	mr	r14,r7		/* remember old NIP */
+
+	/* Test whether R2 is odd */
+	andi.	r3,r2,1
+	xor	r2,r2,r3
+	mfcr	r3		/* remember CR0 */
+	stw	r3,8(r1)
+#endif
+
 	/* Save callee's TOC in the ABI compliant location */
 	std	r2, 24(r1)
 	ld	r2,PACATOC(r13)	/* get kernel TOC in r2 */
@@ -1273,8 +1283,16 @@ ftrace_call:
 	ld	r3, _NIP(r1)
 	mtctr	r3
 
+#ifdef CONFIG_LIVEPATCH
+	lwa	r0,8(r1)
+	mtcr	r0		/* recall "global call" info in CR0 */
+
+	cmp	5,1,r14,r3	/* has NIP been altered? */
+#endif
+
 	/* Restore gprs */
-	REST_8GPRS(0,r1)
+	REST_GPR(3,r1)		/* 0:scratch, 1:SP, 2:manually below */
+	REST_4GPRS(4,r1)
 	REST_8GPRS(8,r1)
 	REST_8GPRS(16,r1)
 	REST_8GPRS(24,r1)
@@ -1288,6 +1306,30 @@ ftrace_call:
 	/* Restore original LR for return to B */
 	ld	r0, LRSAVE(r1)
 	mtlr	r0
+
+#ifdef CONFIG_LIVEPATCH
+	beq+	cr5,4f		/* likely(old_NIP == new_NIP) */
+	bne	6f		/* It was a global call already */
+
+	/* find klp_return_helper's address from here */
+	bl	5f
+5:	mflr	r12
+	addi	r12, r12, (klp_return_helper + 4 - .)@l
+
+	cmpd    r12,r0		/* sibling call? bail out! */
+	beq-	6f
+
+	subf    r0,r0,r2	/* calculate TOC - LR */
+	stw     r0,12(r1)	/* and save the delta in the reserved field */
+	std	r12, LRSAVE(r1)
+	std	r2, 24(r1)	/* save TOC now, unconditionally. */
+	mtlr	r12
+	mr	r0,r12
+6:
+	mfctr	r12		/* allow for TOC calculation in newfunc */
+	bctr
+4:
+#endif
 
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 	stdu	r1, -112(r1)
@@ -1305,6 +1347,24 @@ _GLOBAL(ftrace_graph_stub)
 
 _GLOBAL(ftrace_stub)
 	blr
+#ifdef CONFIG_LIVEPATCH
+/* Helper function for local calls that are becoming global
+ * due to live patching.
+ * We can't simply patch the NOP after the original call,
+ * because, depending on the consistency model, some kernel
+ * threads may still have called the original, local function
+ * *without* saving their TOC in the respective stack frame slot,
+ * so the decision is made per-thread during function return by
+ * maybe inserting a klp_return_helper or not.
+*/
+klp_return_helper:
+	ld	r2, 24(r1)	/* restore TOC (saved by ftrace_caller) */
+	lwa	r0,12(r1)	/* get TOC - LR */
+	subf    r0,r0,r2	/* and calculate the real return address */
+	mtlr	r0
+	blr
+#endif
+
 #else
 _GLOBAL_TOC(_mcount)
 	/* Taken from output of objdump from lib64/glibc */

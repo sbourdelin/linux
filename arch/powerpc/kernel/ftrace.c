@@ -41,6 +41,59 @@ ftrace_call_replace(unsigned long ip, unsigned long addr, int link)
 	return op;
 }
 
+#ifdef CONFIG_LIVEPATCH
+static int
+odd_TOC(unsigned long ip, bool enable)
+{
+	unsigned int *addi_loc = 0;
+	unsigned int new, replaced;
+
+	/* In case of DYNAMIC_FTRACE, mark the global entry with an odd TOC
+	 * value for live patching. 2 instructions later (what we just patched)
+	 * we'll be in ftrace_caller anyway, which will straighten it up again.
+	 */
+
+	/* This test should only succeed when a "leaf+" function
+	 * is at the beginning of a page. Those functions need no global
+	 * call indicator anyway. All (other) functions are aligned 16 bytes.
+	 */
+	if ( (ip & 0xFFFF) < 12 ) /* ip too close to beginning of a page? */
+		return 0;
+
+	addi_loc = (unsigned int *)ip;
+	addi_loc -= 2;		/* ip - 8 */
+
+	if (probe_kernel_read(&replaced, addi_loc, MCOUNT_INSN_SIZE))
+		return -EFAULT;
+
+	/* look for the 2nd 16-bit add that calculates the TOC */
+	if ( (replaced & 0xFFFF0000) != 0x38420000) { /* "addi r2,r2,#UI" */
+		addi_loc--;	/* ip - 12, older GCCs */
+
+		if (probe_kernel_read(&replaced, addi_loc, MCOUNT_INSN_SIZE))
+			return -EFAULT;
+
+		/* So is this a -mprofile-kernel _mcount site at all? */
+		if ( (replaced & 0xFFFF0000) != 0x38420000)
+			return 0;
+	}
+
+	/* Did we enable or disable ftracing here? clear or set the odd bit
+	 * accordingly.
+	 */
+	if (enable)
+		new = replaced | 1;
+	else
+		new = replaced & ~1;
+	
+	if (patch_instruction(addi_loc, new))
+		return -EPERM;
+	return 0;
+}
+#else
+static int odd_TOC(unsigned long ip, bool enable) {return 0;}
+#endif
+
 static int
 ftrace_modify_code(unsigned long ip, unsigned int old, unsigned int new)
 {
@@ -71,7 +124,7 @@ ftrace_modify_code(unsigned long ip, unsigned int old, unsigned int new)
 	if (patch_instruction((unsigned int *)ip, new))
 		return -EPERM;
 
-	return 0;
+	return odd_TOC(ip, (new != PPC_INST_NOP));
 }
 
 /*
@@ -194,7 +247,7 @@ __ftrace_make_nop(struct module *mod,
 		return -EPERM;
 	}
 
-	return 0;
+	return odd_TOC(ip, false);
 }
 
 #else /* !PPC64 */
@@ -384,7 +437,7 @@ __ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
 		return -EINVAL;
 	}
 
-	return 0;
+	return odd_TOC((unsigned long)ip, true);
 }
 
 #ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
