@@ -886,17 +886,15 @@ static int ir_parse_one_ioapic_scope(struct acpi_dmar_device_scope *scope,
 	return 0;
 }
 
-static int ir_parse_ioapic_hpet_scope(struct acpi_dmar_header *header,
+static int ir_parse_ioapic_hpet_scope(struct acpi_dmar_hardware_unit *drhd,
 				      struct intel_iommu *iommu)
 {
 	int ret = 0;
-	struct acpi_dmar_hardware_unit *drhd;
 	struct acpi_dmar_device_scope *scope;
 	void *start, *end;
 
-	drhd = (struct acpi_dmar_hardware_unit *)header;
 	start = (void *)(drhd + 1);
-	end = ((void *)drhd) + header->length;
+	end = ((void *)drhd) + drhd->header.length;
 
 	while (start < end && ret == 0) {
 		scope = start;
@@ -940,7 +938,7 @@ static int __init parse_ioapics_under_ir(void)
 		if (!ecap_ir_support(iommu->ecap))
 			continue;
 
-		ret = ir_parse_ioapic_hpet_scope(drhd->hdr, iommu);
+		ret = ir_parse_ioapic_hpet_scope(drhd->drhd, iommu);
 		if (ret)
 			return ret;
 
@@ -1420,7 +1418,7 @@ static int dmar_ir_add(struct dmar_drhd_unit *dmaru, struct intel_iommu *iommu)
 		return -ENODEV;
 	}
 
-	if (ir_parse_ioapic_hpet_scope(dmaru->hdr, iommu)) {
+	if (ir_parse_ioapic_hpet_scope(dmaru->drhd, iommu)) {
 		pr_warn("DRHD %Lx: failed to parse managed IOAPIC/HPET\n",
 			iommu->reg_phys);
 		return -ENODEV;
