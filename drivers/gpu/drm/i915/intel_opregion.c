@@ -682,11 +682,11 @@ static void set_did(struct intel_opregion *opregion, int i, u32 val)
 	}
 }
 
-static u32 acpi_display_type(struct drm_connector *connector)
+static u32 acpi_display_type(struct intel_connector *connector)
 {
 	u32 display_type;
 
-	switch (connector->connector_type) {
+	switch (connector->base.connector_type) {
 	case DRM_MODE_CONNECTOR_VGA:
 	case DRM_MODE_CONNECTOR_DVIA:
 		display_type = ACPI_DISPLAY_TYPE_VGA;
@@ -715,7 +715,7 @@ static u32 acpi_display_type(struct drm_connector *connector)
 		display_type = ACPI_DISPLAY_TYPE_OTHER;
 		break;
 	default:
-		MISSING_CASE(connector->connector_type);
+		MISSING_CASE(connector->base.connector_type);
 		display_type = ACPI_DISPLAY_TYPE_OTHER;
 		break;
 	}
@@ -727,33 +727,9 @@ static void intel_didl_outputs(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_opregion *opregion = &dev_priv->opregion;
-	struct drm_connector *connector;
-	acpi_handle handle;
-	struct acpi_device *acpi_dev, *acpi_cdev, *acpi_video_bus = NULL;
-	unsigned long long device_id;
-	acpi_status status;
-	u32 temp, max_outputs;
-	int i = 0;
-
-	handle = ACPI_HANDLE(&dev->pdev->dev);
-	if (!handle || acpi_bus_get_device(handle, &acpi_dev))
-		return;
-
-	if (acpi_is_video_device(handle))
-		acpi_video_bus = acpi_dev;
-	else {
-		list_for_each_entry(acpi_cdev, &acpi_dev->children, node) {
-			if (acpi_is_video_device(acpi_cdev->handle)) {
-				acpi_video_bus = acpi_cdev;
-				break;
-			}
-		}
-	}
-
-	if (!acpi_video_bus) {
-		DRM_DEBUG_KMS("No ACPI video bus found\n");
-		return;
-	}
+	struct intel_connector *connector;
+	int i = 0, max_outputs;
+	int display_index[16] = {};
 
 	/*
 	 * In theory, did2, the extended didl, gets added at opregion version
@@ -765,45 +741,32 @@ static void intel_didl_outputs(struct drm_device *dev)
 	max_outputs = ARRAY_SIZE(opregion->acpi->didl) +
 		ARRAY_SIZE(opregion->acpi->did2);
 
-	list_for_each_entry(acpi_cdev, &acpi_video_bus->children, node) {
-		if (i >= max_outputs) {
-			DRM_DEBUG_KMS("More than %u outputs detected via ACPI\n",
-				      max_outputs);
-			return;
-		}
-		status = acpi_evaluate_integer(acpi_cdev->handle, "_ADR",
-					       NULL, &device_id);
-		if (ACPI_SUCCESS(status)) {
-			if (!device_id)
-				goto blind_set;
-			set_did(opregion, i++, (u32)(device_id & 0x0f0f));
-		}
+	for_each_intel_connector(dev, connector) {
+		u32 device_id, type;
+
+		device_id = acpi_display_type(connector);
+		device_id |= ACPI_DEVICE_ID_SCHEME;
+
+		/* Use display type specific display index. */
+		type = (device_id & ACPI_DISPLAY_TYPE_MASK)
+			>> ACPI_DISPLAY_TYPE_SHIFT;
+		device_id |= display_index[type]++ << ACPI_DISPLAY_INDEX_SHIFT;
+
+		connector->acpi_device_id = device_id;
+		if (i < max_outputs)
+			set_did(opregion, i, device_id);
+		i++;
 	}
 
-end:
 	DRM_DEBUG_KMS("%d outputs detected\n", i);
+
+	if (i > max_outputs)
+		DRM_ERROR("More than %d outputs in connector list\n",
+			  max_outputs);
 
 	/* If fewer than max outputs, the list must be null terminated */
 	if (i < max_outputs)
 		set_did(opregion, i, 0);
-	return;
-
-blind_set:
-	i = 0;
-	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
-		int display_type = acpi_display_type(connector);
-
-		if (i >= max_outputs) {
-			DRM_DEBUG_KMS("More than %u outputs in connector list\n",
-				      max_outputs);
-			return;
-		}
-
-		temp = get_did(opregion, i);
-		set_did(opregion, i, temp | (1 << 31) | display_type | i);
-		i++;
-	}
-	goto end;
 }
 
 static void intel_setup_cadls(struct drm_device *dev)
