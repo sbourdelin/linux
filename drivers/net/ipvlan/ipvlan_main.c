@@ -120,6 +120,7 @@ static int ipvlan_init(struct net_device *dev)
 	dev->features |= NETIF_F_LLTX;
 	dev->gso_max_size = phy_dev->gso_max_size;
 	dev->gso_max_segs = phy_dev->gso_max_segs;
+	dev->gso_min_segs = phy_dev->gso_min_segs;
 	dev->hard_header_len = phy_dev->hard_header_len;
 
 	ipvlan_set_lockdep_class(dev);
@@ -594,6 +595,7 @@ static int ipvlan_device_event(struct notifier_block *unused,
 			ipvlan->dev->features = dev->features & IPVLAN_FEATURES;
 			ipvlan->dev->gso_max_size = dev->gso_max_size;
 			ipvlan->dev->gso_max_segs = dev->gso_max_segs;
+			ipvlan->dev->gso_min_segs = dev->gso_min_segs;
 			netdev_features_change(ipvlan->dev);
 		}
 		break;

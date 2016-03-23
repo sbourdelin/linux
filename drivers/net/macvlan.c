@@ -1534,6 +1534,7 @@ static int macvlan_device_event(struct notifier_block *unused,
 		list_for_each_entry(vlan, &port->vlans, list) {
 			vlan->dev->gso_max_size = dev->gso_max_size;
 			vlan->dev->gso_max_segs = dev->gso_max_segs;
+			vlan->dev->gso_min_segs = dev->gso_min_segs;
 			netdev_update_features(vlan->dev);
 		}
 		break;
