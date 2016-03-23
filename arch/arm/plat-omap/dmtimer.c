@@ -679,6 +679,66 @@ int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on,
 }
 EXPORT_SYMBOL_GPL(omap_dm_timer_set_pwm);
 
+int omap_dm_timer_set_capture_mode(struct omap_dm_timer *timer, int capt_mode,
+				   int transition_cap_mode)
+{
+	u32 l;
+
+	if (unlikely(!timer))
+		return -EINVAL;
+
+	omap_dm_timer_enable(timer);
+
+	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
+	l &= ~(OMAP_TIMER_CTRL_GPOCFG | OMAP_TIMER_CTRL_SCPWM |
+	       OMAP_TIMER_CTRL_PT | (0x03 << 10));
+
+	/* Set as input pin */
+	l |= OMAP_TIMER_CTRL_GPOCFG;
+
+	l &= ~OMAP_TIMER_CTRL_CAPTMODE;
+	switch (capt_mode) {
+	case OMAP_TIMER_CAPTMODE_SINGLE:
+		break;
+	case OMAP_TIMER_CAPTMODE_SECOND:
+		l |= OMAP_TIMER_CTRL_CAPTMODE;
+		break;
+	default:
+		pr_err("%s: Invalid timer capture mode %d\n",
+		       __func__, capt_mode);
+		return -EINVAL;
+	}
+
+	l &= ~OMAP_TIMER_CTRL_TCM_BOTHEDGES;
+	switch (transition_cap_mode) {
+	case OMAP_TIMER_CAPTURE_NONE:
+		break;
+	case OMAP_TIMER_CAPTURE_LOWTOHIGH:
+		l |= OMAP_TIMER_CTRL_TCM_LOWTOHIGH;
+		break;
+	case OMAP_TIMER_CAPTURE_HIGHTOLOW:
+		l |= OMAP_TIMER_CTRL_TCM_HIGHTOLOW;
+		break;
+	case OMAP_TIMER_CAPTURE_BOTHEDGES:
+		l |= OMAP_TIMER_CTRL_TCM_BOTHEDGES;
+		break;
+	default:
+		pr_err("%s: Invalid timer transition capture mode %d\n",
+		       __func__, transition_cap_mode);
+		return -EINVAL;
+	}
+
+	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
+
+	/* Save the context */
+	timer->context.tclr = l;
+
+	omap_dm_timer_disable(timer);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(omap_dm_timer_set_capture_mode);
+
 int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer, int prescaler)
 {
 	u32 l;
@@ -828,6 +888,27 @@ int omap_dm_timer_write_counter(struct omap_dm_timer *timer, unsigned int value)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(omap_dm_timer_write_counter);
+
+int omap_dm_timer_read_counter_captures(struct omap_dm_timer *timer, u32 *tcar1,
+					u32 *tcar2)
+{
+	unsigned long flags;
+
+	if (unlikely(!timer || pm_runtime_suspended(&timer->pdev->dev))) {
+		pr_err("%s: timer not available or enabled.\n", __func__);
+		return -EINVAL;
+	}
+
+	raw_spin_lock_irqsave(&timer->raw_lock, flags);
+
+	*tcar1 = timer->context.tcar1;
+	*tcar2 = timer->context.tcar2;
+
+	raw_spin_unlock_irqrestore(&timer->raw_lock, flags);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(omap_dm_timer_read_counter_captures);
 
 int omap_dm_timers_active(void)
 {

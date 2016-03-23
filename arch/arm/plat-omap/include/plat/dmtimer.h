@@ -54,6 +54,16 @@
 #define OMAP_TIMER_TRIGGER_OVERFLOW		0x01
 #define OMAP_TIMER_TRIGGER_OVERFLOW_AND_COMPARE	0x02
 
+/* transition capture mode on PIEVENTCAPT input pin */
+#define OMAP_TIMER_CAPTURE_NONE			0x00
+#define OMAP_TIMER_CAPTURE_LOWTOHIGH		0x01
+#define OMAP_TIMER_CAPTURE_HIGHTOLOW		0x02
+#define OMAP_TIMER_CAPTURE_BOTHEDGES		0x03
+
+/* capture mode */
+#define OMAP_TIMER_CAPTMODE_SINGLE		0x00
+#define OMAP_TIMER_CAPTMODE_SECOND		0x01
+
 /* posted mode types */
 #define OMAP_TIMER_NONPOSTED			0x00
 #define OMAP_TIMER_POSTED			0x01
@@ -170,6 +180,8 @@ int omap_dm_timer_set_load(struct omap_dm_timer *timer, int autoreload, unsigned
 int omap_dm_timer_set_load_start(struct omap_dm_timer *timer, int autoreload, unsigned int value);
 int omap_dm_timer_set_match(struct omap_dm_timer *timer, int enable, unsigned int match);
 int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on, int toggle, int trigger);
+int omap_dm_timer_set_capture_mode(struct omap_dm_timer *timer, int capt_mode,
+				   int trigger_out_mode);
 int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer, int prescaler);
 
 int omap_dm_timer_set_int_enable(struct omap_dm_timer *timer, unsigned int value);
@@ -180,6 +192,8 @@ unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer);
 int omap_dm_timer_write_status(struct omap_dm_timer *timer, unsigned int value);
 unsigned int omap_dm_timer_read_counter(struct omap_dm_timer *timer);
 int omap_dm_timer_write_counter(struct omap_dm_timer *timer, unsigned int value);
+int omap_dm_timer_read_counter_captures(struct omap_dm_timer *timer, u32 *tcar1,
+					u32 *tcar2);
 
 int omap_dm_timers_active(void);
 
