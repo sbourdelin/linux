@@ -432,12 +432,12 @@ static int gre_rcv(struct sk_buff *skb)
 		goto drop;
 
 	if (ipgre_rcv(skb, &tpi) == PACKET_RCVD)
-		return 0;
+		return NET_RX_SUCCESS;
 
 	icmp_send(skb, ICMP_DEST_UNREACH, ICMP_PORT_UNREACH, 0);
 drop:
 	kfree_skb(skb);
-	return 0;
+	return NET_RX_DROP;
 }
 
 static __sum16 gre_checksum(struct sk_buff *skb)
