@@ -382,11 +382,12 @@ static int sbs_get_battery_property(struct i2c_client *client,
 
 		if (ret & BATTERY_FULL_CHARGED)
 			val->intval = POWER_SUPPLY_STATUS_FULL;
-		else if (ret & BATTERY_FULL_DISCHARGED)
-			val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
-		else if (ret & BATTERY_DISCHARGING)
-			val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
-		else
+		else if (ret & BATTERY_DISCHARGING) {
+			if (ret & BATTERY_FULL_DISCHARGED)
+				val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
+			else
+				val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+		} else
 			val->intval = POWER_SUPPLY_STATUS_CHARGING;
 
 		if (chip->poll_time == 0)
@@ -702,11 +703,12 @@ static void sbs_delayed_work(struct work_struct *work)
 
 	if (ret & BATTERY_FULL_CHARGED)
 		ret = POWER_SUPPLY_STATUS_FULL;
-	else if (ret & BATTERY_FULL_DISCHARGED)
-		ret = POWER_SUPPLY_STATUS_NOT_CHARGING;
-	else if (ret & BATTERY_DISCHARGING)
-		ret = POWER_SUPPLY_STATUS_DISCHARGING;
-	else
+	else if (ret & BATTERY_DISCHARGING) {
+		if (ret & BATTERY_FULL_DISCHARGED)
+			ret = POWER_SUPPLY_STATUS_NOT_CHARGING;
+		else
+			ret = POWER_SUPPLY_STATUS_DISCHARGING;
+	} else
 		ret = POWER_SUPPLY_STATUS_CHARGING;
 
 	if (chip->last_state != ret) {
