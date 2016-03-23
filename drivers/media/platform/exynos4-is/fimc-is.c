@@ -165,6 +165,7 @@ static int fimc_is_parse_sensor_config(struct fimc_is *is, unsigned int index,
 						struct device_node *node)
 {
 	struct fimc_is_sensor *sensor = &is->sensor[index];
+	struct device_node *ep, *port;
 	u32 tmp = 0;
 	int ret;
 
@@ -175,16 +176,18 @@ static int fimc_is_parse_sensor_config(struct fimc_is *is, unsigned int index,
 		return -EINVAL;
 	}
 
-	node = of_graph_get_next_endpoint(node, NULL);
-	if (!node)
+	ep = of_graph_get_next_endpoint(node, NULL);
+	if (!ep)
 		return -ENXIO;
 
-	node = of_graph_get_remote_port(node);
-	if (!node)
+	port = of_graph_get_remote_port(ep);
+	of_node_put(ep);
+	if (!port)
 		return -ENXIO;
 
 	/* Use MIPI-CSIS channel id to determine the ISP I2C bus index. */
-	ret = of_property_read_u32(node, "reg", &tmp);
+	ret = of_property_read_u32(port, "reg", &tmp);
+	of_node_put(port);
 	if (ret < 0) {
 		dev_err(&is->pdev->dev, "reg property not found at: %s\n",
 							 node->full_name);
