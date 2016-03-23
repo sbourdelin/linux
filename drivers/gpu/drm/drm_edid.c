@@ -1075,6 +1075,19 @@ static bool drm_edid_is_zero(const u8 *in_edid, int length)
 	return true;
 }
 
+static struct edid *
+drm_do_get_override_edid(struct drm_connector *connector)
+{
+	struct edid *edid = NULL;
+
+	if (connector->override_edid && connector->edid_blob_ptr->data) {
+		edid = kmemdup(connector->edid_blob_ptr->data,
+			       connector->edid_blob_ptr->length, GFP_KERNEL);
+	}
+
+	return edid;
+}
+
 /**
  * drm_edid_block_valid - Sanity check the EDID block (base or extension)
  * @raw_edid: pointer to raw EDID block
@@ -1385,10 +1398,14 @@ struct edid *drm_get_edid(struct drm_connector *connector,
 {
 	struct edid *edid;
 
-	if (!drm_probe_ddc(adapter))
-		return NULL;
+	if (!connector->override_edid) {
+		if (!drm_probe_ddc(adapter))
+			return NULL;
+		edid = drm_do_get_edid(connector, drm_do_probe_ddc_edid, adapter);
+	} else {
+		edid = drm_do_get_override_edid(connector);
+	}
 
-	edid = drm_do_get_edid(connector, drm_do_probe_ddc_edid, adapter);
 	if (edid)
 		drm_get_displayid(connector, edid);
 	return edid;
