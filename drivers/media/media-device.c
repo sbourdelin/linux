@@ -720,7 +720,6 @@ int __must_check __media_device_register(struct media_device *mdev,
 {
 	int ret;
 
-	/* Check if mdev was ever registered at all */
 	mutex_lock(&mdev->graph_mutex);
 
 	/* Register the device node. */
