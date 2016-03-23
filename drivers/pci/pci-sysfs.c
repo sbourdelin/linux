@@ -1342,6 +1342,9 @@ static int pci_create_capabilities_sysfs(struct pci_dev *dev)
 	/* Active State Power Management */
 	pcie_aspm_create_sysfs_dev_files(dev);
 
+	/* PTM */
+	pci_create_ptm_sysfs(dev);
+
 	if (!pci_probe_reset_function(dev)) {
 		retval = device_create_file(&dev->dev, &reset_attr);
 		if (retval)
@@ -1436,6 +1439,10 @@ static void pci_remove_capabilities_sysfs(struct pci_dev *dev)
 	}
 
 	pcie_aspm_remove_sysfs_dev_files(dev);
+
+	/* PTM */
+	pci_release_ptm_sysfs(dev);
+
 	if (dev->reset_fn) {
 		device_remove_file(&dev->dev, &reset_attr);
 		dev->reset_fn = 0;

@@ -81,3 +81,11 @@ endchoice
 config PCIE_PME
 	def_bool y
 	depends on PCIEPORTBUS && PM
+
+config PCIE_PTM
+	bool "Turn on Precision Time Management by default"
+	depends on PCIEPORTBUS
+	help
+	  Say Y here to enable PTM feature on PCI Express devices that
+	  support them as they are found during device enumeration. Otherwise
+	  the feature can be enabled manually through sysfs entries.
