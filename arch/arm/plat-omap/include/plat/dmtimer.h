@@ -99,6 +99,24 @@ struct timer_regs {
 	u32 towr;
 };
 
+struct timer_irq_stats {
+	u32 capture;
+	u32 overflow;
+	u32 match;
+	u64 all;
+};
+
+enum timer_irq_event {
+	MATCH = 1,
+	OVERFLOW,
+	CAPTURE
+};
+
+struct omap_dm_timer;
+
+typedef void (*omap_dm_timer_isr_callback_t)(struct omap_dm_timer *timer,
+					     enum timer_irq_event irq_event);
+
 struct omap_dm_timer {
 	int id;
 	int irq;
@@ -115,6 +133,7 @@ struct omap_dm_timer {
 	unsigned reserved:1;
 	unsigned posted:1;
 	struct timer_regs context;
+	struct timer_irq_stats irq_stats;
 	int (*get_context_loss_count)(struct device *);
 	int ctx_loss_count;
 	int revision;
@@ -122,6 +141,10 @@ struct omap_dm_timer {
 	u32 errata;
 	struct platform_device *pdev;
 	struct list_head node;
+	omap_dm_timer_isr_callback_t isr_callback;
+
+	/* protects tcar1, tcar2 and timer_irq_stats from concurent access */
+	raw_spinlock_t raw_lock;
 };
 
 int omap_dm_timer_reserve_systimer(int id);
@@ -151,13 +174,16 @@ int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer, int prescaler);
 
 int omap_dm_timer_set_int_enable(struct omap_dm_timer *timer, unsigned int value);
 int omap_dm_timer_set_int_disable(struct omap_dm_timer *timer, u32 mask);
-
+int omap_dm_timer_set_isr_callback(struct omap_dm_timer *timer,
+				   omap_dm_timer_isr_callback_t cb);
 unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer);
 int omap_dm_timer_write_status(struct omap_dm_timer *timer, unsigned int value);
 unsigned int omap_dm_timer_read_counter(struct omap_dm_timer *timer);
 int omap_dm_timer_write_counter(struct omap_dm_timer *timer, unsigned int value);
 
 int omap_dm_timers_active(void);
+
+int print_timer_irq_statistics(struct omap_dm_timer *timer);
 
 /*
  * Do not use the defines below, they are not needed. They should be only

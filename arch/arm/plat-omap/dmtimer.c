@@ -46,6 +46,7 @@
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/platform_data/dmtimer-omap.h>
+#include <linux/interrupt.h>
 
 #include <plat/dmtimer.h>
 
@@ -749,6 +750,33 @@ int omap_dm_timer_set_int_disable(struct omap_dm_timer *timer, u32 mask)
 }
 EXPORT_SYMBOL_GPL(omap_dm_timer_set_int_disable);
 
+/**
+ * omap_dm_timer_set_isr_callback - sets a callback called from the timer isr
+ * @timer:  pointer to timer handle
+ * @cb:     callback to be called from the timer ISR
+ *
+ * Returns 0 on success and error code otherwise
+ */
+int omap_dm_timer_set_isr_callback(struct omap_dm_timer *timer,
+				   omap_dm_timer_isr_callback_t cb)
+{
+	if (unlikely(!timer)) {
+		pr_err("%s: Invalid timer handle.\n", __func__);
+		return -EINVAL;
+	}
+
+	if (!cb) {
+		pr_err("%s: invalid callback pointer\n", __func__);
+		return -EINVAL;
+	}
+
+	timer->isr_callback = cb;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(omap_dm_timer_set_isr_callback);
+
+
 unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer)
 {
 	unsigned int l;
@@ -818,7 +846,83 @@ int omap_dm_timers_active(void)
 }
 EXPORT_SYMBOL_GPL(omap_dm_timers_active);
 
+int print_timer_irq_statistics(struct omap_dm_timer *timer)
+{
+	u32 capture, overflow, match;
+	u64 all;
+
+	if (!timer) {
+		pr_err("Invalid timer handle.\n");
+		return -EINVAL;
+	}
+
+	raw_spin_lock(&timer->raw_lock);
+
+	capture = timer->irq_stats.capture;
+	overflow = timer->irq_stats.overflow;
+	match = timer->irq_stats.match;
+	all = timer->irq_stats.all;
+
+	raw_spin_unlock(&timer->raw_lock);
+
+	pr_info("dmtimer: %s irq statistics:\n", timer->pdev->name);
+	pr_info("capture %u\n", capture);
+	pr_info("overflow_irqs %u\n", overflow);
+	pr_info("match %u\n", match);
+	pr_info("all %llu\n", all);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(print_timer_irq_statistics);
+
 static const struct of_device_id omap_timer_match[];
+
+static irqreturn_t timer_irq_handler(int irq_no, void *data)
+{
+	struct omap_dm_timer *timer = (struct omap_dm_timer *) data;
+	unsigned int status;
+
+	if (!data)
+		return IRQ_NONE;
+
+	raw_spin_lock(&timer->raw_lock);
+
+	status = readl_relaxed(timer->irq_stat);
+
+	if (status & OMAP_TIMER_INT_CAPTURE) {
+		timer->context.tcar1 = __omap_dm_timer_read(timer,
+					OMAP_TIMER_CAPTURE_REG, timer->posted);
+		timer->context.tcar2 = __omap_dm_timer_read(timer,
+					OMAP_TIMER_CAPTURE2_REG, timer->posted);
+		timer->irq_stats.capture++;
+		if (timer->isr_callback)
+			timer->isr_callback(timer, CAPTURE);
+	}
+
+	if (status & OMAP_TIMER_INT_OVERFLOW) {
+		timer->irq_stats.overflow++;
+		if (timer->isr_callback)
+			timer->isr_callback(timer, OVERFLOW);
+	}
+
+	if (status & OMAP_TIMER_INT_MATCH) {
+		timer->irq_stats.match++;
+		if (timer->isr_callback)
+			timer->isr_callback(timer, MATCH);
+	}
+
+	timer->irq_stats.all++;
+
+	/*
+	 * Instruct timer to deassert the interrupt, also it will trigger
+	 * another capture process.
+	 */
+	writel_relaxed(status, timer->irq_stat);
+
+	raw_spin_unlock(&timer->raw_lock);
+
+	return IRQ_HANDLED;
+}
 
 /**
  * omap_dm_timer_probe - probe function called for every registered device
@@ -889,6 +993,23 @@ static int omap_dm_timer_probe(struct platform_device *pdev)
 
 	timer->irq = irq->start;
 	timer->pdev = pdev;
+
+	/*
+	 * Initialize the non preemptible spinlock that protects the captured
+	 * timer values.
+	 */
+	raw_spin_lock_init(&timer->raw_lock);
+
+	/* set up irq for timer */
+	pr_info("dmtimer: %s request irq by no: %d\n",
+		dev_name(dev), timer->irq);
+	ret = request_irq(timer->irq, timer_irq_handler, IRQF_TIMER,
+			  pdev->name, timer);
+	if (ret) {
+		dev_err(dev, "Failed to reserve irq line %d for timer %s\n",
+			timer->irq, pdev->name);
+		return ret;
+	}
 
 	/* Skip pm_runtime_enable for OMAP1 */
 	if (!(timer->capability & OMAP_TIMER_NEEDS_RESET)) {
