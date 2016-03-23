@@ -136,7 +136,7 @@ void media_snd_stream_delete(struct snd_usb_substream *subs)
 		struct media_device *mdev;
 
 		mdev = mctl->media_dev;
-		if (mdev && media_devnode_is_registered(&mdev->devnode)) {
+		if (mdev && media_devnode_is_registered(mdev->devnode)) {
 			media_devnode_remove(mctl->intf_devnode);
 			media_device_unregister_entity(&mctl->media_entity);
 			media_entity_cleanup(&mctl->media_entity);
@@ -241,14 +241,14 @@ static void media_snd_mixer_delete(struct snd_usb_audio *chip)
 		if (!mixer->media_mixer_ctl)
 			continue;
 
-		if (media_devnode_is_registered(&mdev->devnode)) {
+		if (media_devnode_is_registered(mdev->devnode)) {
 			media_device_unregister_entity(&mctl->media_entity);
 			media_entity_cleanup(&mctl->media_entity);
 		}
 		kfree(mctl);
 		mixer->media_mixer_ctl = NULL;
 	}
-	if (media_devnode_is_registered(&mdev->devnode))
+	if (media_devnode_is_registered(mdev->devnode))
 		media_devnode_remove(chip->ctl_intf_media_devnode);
 	chip->ctl_intf_media_devnode = NULL;
 }
@@ -268,7 +268,7 @@ int media_snd_device_create(struct snd_usb_audio *chip,
 	if (!mdev->dev)
 		media_device_usb_init(mdev, usbdev, NULL);
 
-	if (!media_devnode_is_registered(&mdev->devnode)) {
+	if (!media_devnode_is_registered(mdev->devnode)) {
 		ret = media_device_register(mdev);
 		if (ret) {
 			dev_err(&usbdev->dev,
