@@ -1,4 +1,4 @@
-# drivers/media/platform/samsung/tvout/Makefile
+# drivers/media/platform/s5p-tv/Makefile
 #
 # Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
 #	http://www.samsung.com/
