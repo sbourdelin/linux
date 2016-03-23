@@ -650,24 +650,6 @@ static struct notifier_block intel_opregion_notifier = {
  * (version 3)
  */
 
-static u32 get_did(struct intel_opregion *opregion, int i)
-{
-	u32 did;
-
-	if (i < ARRAY_SIZE(opregion->acpi->didl)) {
-		did = opregion->acpi->didl[i];
-	} else {
-		i -= ARRAY_SIZE(opregion->acpi->didl);
-
-		if (WARN_ON(i >= ARRAY_SIZE(opregion->acpi->did2)))
-			return 0;
-
-		did = opregion->acpi->did2[i];
-	}
-
-	return did;
-}
-
 static void set_did(struct intel_opregion *opregion, int i, u32 val)
 {
 	if (i < ARRAY_SIZE(opregion->acpi->didl)) {
@@ -680,6 +662,14 @@ static void set_did(struct intel_opregion *opregion, int i, u32 val)
 
 		opregion->acpi->did2[i] = val;
 	}
+}
+
+static void set_cad(struct intel_opregion *opregion, int i, u32 val)
+{
+	if (WARN_ON(i >= ARRAY_SIZE(opregion->acpi->cadl)))
+		return;
+
+	opregion->acpi->cadl[i] = val;
 }
 
 static u32 acpi_display_type(struct intel_connector *connector)
@@ -769,23 +759,37 @@ static void intel_didl_outputs(struct drm_device *dev)
 		set_did(opregion, i, 0);
 }
 
-static void intel_setup_cadls(struct drm_device *dev)
+/* Update CADL to reflect active outputs. */
+void intel_opregion_update_cadl(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_opregion *opregion = &dev_priv->opregion;
-	int i = 0;
-	u32 disp_id;
+	struct intel_crtc *crtc;
+	int i = 0, max_active = ARRAY_SIZE(opregion->acpi->cadl);
 
-	/* Initialize the CADL field by duplicating the DIDL values.
-	 * Technically, this is not always correct as display outputs may exist,
-	 * but not active. This initialization is necessary for some Clevo
-	 * laptops that check this field before processing the brightness and
-	 * display switching hotkeys. Just like DIDL, CADL is NULL-terminated if
-	 * there are less than eight devices. */
-	do {
-		disp_id = get_did(opregion, i);
-		opregion->acpi->cadl[i] = disp_id;
-	} while (++i < 8 && disp_id != 0);
+	for_each_intel_crtc(dev, crtc) {
+		struct intel_encoder *encoder;
+
+		if (!crtc->active)
+			continue;
+
+		for_each_encoder_on_crtc(dev, &crtc->base, encoder) {
+			struct intel_connector *connector;
+
+			for_each_connector_on_encoder(dev, &encoder->base, connector) {
+				if (i >= max_active) {
+					DRM_DEBUG_KMS("too many outputs active\n");
+					return;
+				}
+
+				set_cad(opregion, i++, connector->acpi_device_id);
+			}
+		}
+	}
+
+	/* If fewer than max active outputs, the list must be null terminated */
+	if (i < max_active)
+		set_cad(opregion, i, 0);
 }
 
 void intel_opregion_init(struct drm_device *dev)
@@ -798,7 +802,7 @@ void intel_opregion_init(struct drm_device *dev)
 
 	if (opregion->acpi) {
 		intel_didl_outputs(dev);
-		intel_setup_cadls(dev);
+		intel_opregion_update_cadl(dev);
 
 		/* Notify BIOS we are ready to handle ACPI video ext notifs.
 		 * Right now, all the events are handled by the ACPI video module.

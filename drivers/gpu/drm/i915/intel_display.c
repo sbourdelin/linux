@@ -13613,6 +13613,8 @@ static int intel_atomic_commit(struct drm_device *dev,
 
 	drm_atomic_state_free(state);
 
+	intel_opregion_update_cadl(dev);
+
 	/* As one of the primary mmio accessors, KMS has a high likelihood
 	 * of triggering bugs in unclaimed access. After we finish
 	 * modesetting, see if an error has been flagged, and if so
