@@ -403,6 +403,7 @@ rename:
 	ret = sysfs_create_link_nowarn(group->devices_kobj,
 				       &dev->kobj, device->name);
 	if (ret) {
+		sysfs_remove_link(group->devices_kobj, device->name);
 		kfree(device->name);
 		if (ret == -EEXIST && i >= 0) {
 			/*
