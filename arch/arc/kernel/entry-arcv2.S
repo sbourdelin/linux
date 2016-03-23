@@ -69,8 +69,11 @@ ENTRY(handle_interrupt)
 
 	clri		; To make status32.IE agree with CPU internal state
 
-	lr  r0, [ICAUSE]
+#ifdef CONFIG_TRACE_IRQFLAGS
+	TRACE_ASM_IRQ_DISABLE
+#endif
 
+	lr  r0, [ICAUSE]
 	mov   blink, ret_from_exception
 
 	b.d  arch_do_IRQ
@@ -173,6 +176,15 @@ END(EV_TLBProtV)
 	lr	r10, [AUX_IRQ_ACT]
 
 	bmsk	r11, r10, 15	; AUX_IRQ_ACT.ACTIVE
+#ifdef CONFIG_TRACE_IRQFLAGS
+	push r0
+	push r10
+	push r11
+	TRACE_ASM_IRQ_ENABLE
+	pop r11
+	pop r10
+	pop r0
+#endif
 	breq	r11, 0, .Lexcept_ret	; No intr active, ret from Exception
 
 ;####### Return from Intr #######

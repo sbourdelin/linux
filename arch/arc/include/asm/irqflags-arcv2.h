@@ -15,8 +15,13 @@
 #define STATUS_AD_BIT	19   /* Disable Align chk: core supports non-aligned */
 #define STATUS_IE_BIT	31
 
+/* status32 Bits stored on clri instruction */
+#define CLRI_STATUS_IE_BIT	4
+
 #define STATUS_AD_MASK		(1<<STATUS_AD_BIT)
 #define STATUS_IE_MASK		(1<<STATUS_IE_BIT)
+#define CLRI_STATUS_E_MASK	(0xF)
+#define CLRI_STATUS_IE_MASK	(1<<CLRI_STATUS_IE_BIT)
 
 #define AUX_USER_SP		0x00D
 #define AUX_IRQ_CTRL		0x00E
@@ -100,6 +105,9 @@ static inline long arch_local_save_flags(void)
 	:
 	: "memory");
 
+	temp = (1 << 5) |
+		((!!(temp & STATUS_IE_MASK)) << CLRI_STATUS_IE_BIT) |
+		(temp & CLRI_STATUS_E_MASK);
 	return temp;
 }
 
@@ -108,7 +116,7 @@ static inline long arch_local_save_flags(void)
  */
 static inline int arch_irqs_disabled_flags(unsigned long flags)
 {
-	return !(flags & (STATUS_IE_MASK));
+	return !(flags & (CLRI_STATUS_IE_MASK));
 }
 
 static inline int arch_irqs_disabled(void)
@@ -128,11 +136,32 @@ static inline void arc_softirq_clear(int irq)
 
 #else
 
+#ifdef CONFIG_TRACE_IRQFLAGS
+
+.macro TRACE_ASM_IRQ_DISABLE
+	bl	trace_hardirqs_off
+.endm
+
+.macro TRACE_ASM_IRQ_ENABLE
+	bl	trace_hardirqs_on
+.endm
+
+#else
+
+.macro TRACE_ASM_IRQ_DISABLE
+.endm
+
+.macro TRACE_ASM_IRQ_ENABLE
+.endm
+
+#endif
 .macro IRQ_DISABLE  scratch
 	clri
+	TRACE_ASM_IRQ_DISABLE
 .endm
 
 .macro IRQ_ENABLE  scratch
+	TRACE_ASM_IRQ_ENABLE
 	seti
 .endm
 
