@@ -2616,29 +2616,25 @@ static int aliasing_gtt_bind_vma(struct i915_vma *vma,
 	struct drm_device *dev = vma->vm->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct drm_i915_gem_object *obj = vma->obj;
-	struct sg_table *pages = obj->pages;
 	u32 pte_flags = 0;
 	int ret;
 
 	ret = i915_get_ggtt_vma_pages(vma);
 	if (ret)
 		return ret;
-	pages = vma->ggtt_view.pages;
 
 	/* Currently applicable only to VLV */
 	if (obj->gt_ro)
 		pte_flags |= PTE_READ_ONLY;
 
-
-	if (flags & GLOBAL_BIND) {
-		vma->vm->insert_entries(vma->vm, pages,
+	if (flags & GLOBAL_BIND)
+		vma->vm->insert_entries(vma->vm, vma->ggtt_view.pages,
 					vma->node.start,
 					cache_level, pte_flags);
-	}
 
 	if (flags & LOCAL_BIND) {
 		struct i915_hw_ppgtt *appgtt = dev_priv->mm.aliasing_ppgtt;
-		appgtt->base.insert_entries(&appgtt->base, pages,
+		appgtt->base.insert_entries(&appgtt->base, vma->ggtt_view.pages,
 					    vma->node.start,
 					    cache_level, pte_flags);
 	}
