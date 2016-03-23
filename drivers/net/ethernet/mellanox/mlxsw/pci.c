@@ -643,7 +643,6 @@ static void mlxsw_pci_cqe_sdq_handle(struct mlxsw_pci *mlxsw_pci,
 				     u16 consumer_counter_limit,
 				     char *cqe)
 {
-	struct pci_dev *pdev = mlxsw_pci->pdev;
 	struct mlxsw_pci_queue_elem_info *elem_info;
 	char *wqe;
 	struct sk_buff *skb;
@@ -659,7 +658,7 @@ static void mlxsw_pci_cqe_sdq_handle(struct mlxsw_pci *mlxsw_pci,
 	elem_info->u.sdq.skb = NULL;
 
 	if (q->consumer_counter++ != consumer_counter_limit)
-		dev_dbg_ratelimited(&pdev->dev, "Consumer counter does not match limit in SDQ\n");
+		dev_dbg_ratelimited(&mlxsw_pci->pdev->dev, "Consumer counter does not match limit in SDQ\n");
 	spin_unlock(&q->lock);
 }
 
@@ -668,7 +667,6 @@ static void mlxsw_pci_cqe_rdq_handle(struct mlxsw_pci *mlxsw_pci,
 				     u16 consumer_counter_limit,
 				     char *cqe)
 {
-	struct pci_dev *pdev = mlxsw_pci->pdev;
 	struct mlxsw_pci_queue_elem_info *elem_info;
 	char *wqe;
 	struct sk_buff *skb;
@@ -684,7 +682,7 @@ static void mlxsw_pci_cqe_rdq_handle(struct mlxsw_pci *mlxsw_pci,
 	mlxsw_pci_wqe_frag_unmap(mlxsw_pci, wqe, 0, DMA_FROM_DEVICE);
 
 	if (q->consumer_counter++ != consumer_counter_limit)
-		dev_dbg_ratelimited(&pdev->dev, "Consumer counter does not match limit in RDQ\n");
+		dev_dbg_ratelimited(&mlxsw_pci->pdev->dev, "Consumer counter does not match limit in RDQ\n");
 
 	if (mlxsw_pci_cqe_lag_get(cqe)) {
 		rx_info.is_lag = true;
@@ -706,7 +704,7 @@ static void mlxsw_pci_cqe_rdq_handle(struct mlxsw_pci *mlxsw_pci,
 	memset(wqe, 0, q->elem_size);
 	err = mlxsw_pci_rdq_skb_alloc(mlxsw_pci, elem_info);
 	if (err)
-		dev_dbg_ratelimited(&pdev->dev, "Failed to alloc skb for RDQ\n");
+		dev_dbg_ratelimited(&mlxsw_pci->pdev->dev, "Failed to alloc skb for RDQ\n");
 	/* Everything is set up, ring doorbell to pass elem to HW */
 	q->producer_counter++;
 	mlxsw_pci_queue_doorbell_producer_ring(mlxsw_pci, q);
