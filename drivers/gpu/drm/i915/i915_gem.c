@@ -4321,7 +4321,7 @@ i915_gem_object_ggtt_unpin_view(struct drm_i915_gem_object *obj,
 {
 	struct i915_vma *vma = i915_gem_obj_to_ggtt_view(obj, view);
 
-	BUG_ON(!vma);
+	BUG_ON(IS_ERR_OR_NULL(vma));
 	WARN_ON(vma->pin_count == 0);
 	WARN_ON(!i915_gem_obj_ggtt_bound_view(obj, view));
 
