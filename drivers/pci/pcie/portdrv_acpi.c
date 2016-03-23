@@ -35,10 +35,15 @@
 int pcie_port_acpi_setup(struct pci_dev *port, int *srv_mask)
 {
 	struct acpi_pci_root *root;
+	struct pci_host_bridge *host_bridge;
 	acpi_handle handle;
 	u32 flags;
 
 	if (acpi_pci_disabled)
+		return 0;
+
+	host_bridge = pci_find_host_bridge(port->bus);
+	if (host_bridge && host_bridge->no_acpi)
 		return 0;
 
 	handle = acpi_find_root_bridge_handle(port);

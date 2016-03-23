@@ -531,6 +531,7 @@ static int vmd_find_free_domain(void)
 static int vmd_enable_domain(struct vmd_dev *vmd)
 {
 	struct pci_sysdata *sd = &vmd->sysdata;
+	struct pci_host_bridge *host_bridge;
 	struct resource *res;
 	u32 upper_bits;
 	unsigned long flags;
@@ -608,6 +609,9 @@ static int vmd_enable_domain(struct vmd_dev *vmd)
 		irq_domain_remove(vmd->irq_domain);
 		return -ENODEV;
 	}
+
+	host_bridge = to_pci_host_bridge(vmd->bus->bridge);
+	host_bridge->no_acpi = true;
 
 	vmd_attach_resources(vmd);
 	vmd_setup_dma_ops(vmd);
