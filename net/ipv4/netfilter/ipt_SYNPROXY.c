@@ -18,10 +18,10 @@
 #include <net/netfilter/nf_conntrack_synproxy.h>
 
 static struct iphdr *
-synproxy_build_ip(struct sk_buff *skb, __be32 saddr, __be32 daddr)
+synproxy_build_ip(struct net *net, struct sk_buff *skb, __be32 saddr,
+		  __be32 daddr)
 {
 	struct iphdr *iph;
-	struct net *net = sock_net(skb->sk);
 
 	skb_reset_network_header(skb);
 	iph = (struct iphdr *)skb_put(skb, sizeof(*iph));
@@ -91,7 +91,8 @@ synproxy_send_client_synack(const struct synproxy_net *snet,
 		return;
 	skb_reserve(nskb, MAX_TCP_HEADER);
 
-	niph = synproxy_build_ip(nskb, iph->daddr, iph->saddr);
+	niph = synproxy_build_ip(nf_ct_net(snet->tmpl), nskb, iph->daddr,
+				 iph->saddr);
 
 	skb_reset_transport_header(nskb);
 	nth = (struct tcphdr *)skb_put(nskb, tcp_hdr_size);
@@ -132,7 +133,8 @@ synproxy_send_server_syn(const struct synproxy_net *snet,
 		return;
 	skb_reserve(nskb, MAX_TCP_HEADER);
 
-	niph = synproxy_build_ip(nskb, iph->saddr, iph->daddr);
+	niph = synproxy_build_ip(nf_ct_net(snet->tmpl), nskb, iph->saddr,
+				 iph->daddr);
 
 	skb_reset_transport_header(nskb);
 	nth = (struct tcphdr *)skb_put(nskb, tcp_hdr_size);
@@ -177,7 +179,8 @@ synproxy_send_server_ack(const struct synproxy_net *snet,
 		return;
 	skb_reserve(nskb, MAX_TCP_HEADER);
 
-	niph = synproxy_build_ip(nskb, iph->daddr, iph->saddr);
+	niph = synproxy_build_ip(nf_ct_net(snet->tmpl), nskb, iph->daddr,
+				 iph->saddr);
 
 	skb_reset_transport_header(nskb);
 	nth = (struct tcphdr *)skb_put(nskb, tcp_hdr_size);
@@ -215,7 +218,8 @@ synproxy_send_client_ack(const struct synproxy_net *snet,
 		return;
 	skb_reserve(nskb, MAX_TCP_HEADER);
 
-	niph = synproxy_build_ip(nskb, iph->saddr, iph->daddr);
+	niph = synproxy_build_ip(nf_ct_net(snet->tmpl), nskb, iph->saddr,
+				 iph->daddr);
 
 	skb_reset_transport_header(nskb);
 	nth = (struct tcphdr *)skb_put(nskb, tcp_hdr_size);
