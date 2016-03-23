@@ -1778,9 +1778,14 @@ static int omap_hsmmc_configure_wake_irq(struct omap_hsmmc_host *host)
 	 * and need to remux SDIO DAT1 to GPIO for wake-up from idle.
 	 */
 	if (host->pdata->controller_flags & OMAP_HSMMC_SWAKEUP_MISSING) {
+#ifndef CONFIG_PINCTRL
+		dev_info(host->dev, "missing pinctrl support\n");
+		ret = -ENODEV;
+		goto err_free_irq;
+#else
 		struct pinctrl *p = devm_pinctrl_get(host->dev);
-		if (!p) {
-			ret = -ENODEV;
+		if (IS_ERR(p)) {
+			ret = PTR_ERR(p);
 			goto err_free_irq;
 		}
 		if (IS_ERR(pinctrl_lookup_state(p, PINCTRL_STATE_DEFAULT))) {
@@ -1797,6 +1802,7 @@ static int omap_hsmmc_configure_wake_irq(struct omap_hsmmc_host *host)
 			goto err_free_irq;
 		}
 		devm_pinctrl_put(p);
+#endif
 	}
 
 	OMAP_HSMMC_WRITE(host->base, HCTL,
