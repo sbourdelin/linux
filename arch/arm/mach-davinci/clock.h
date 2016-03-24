@@ -124,7 +124,12 @@ struct clk {
 		.clk = ck,	\
 	}			\
 
-int davinci_clk_init(struct clk_lookup *clocks);
+int _davinci_clk_init(struct clk_lookup *clocks);
+static inline void davinci_clk_init(struct davinci_soc_info *soc_info)
+{
+	if (soc_info->cpu_clks && _davinci_clk_init(soc_info->cpu_clks))
+		panic("davinci_clk_init: Failed to init clocks.\n");
+}
 int davinci_set_pllrate(struct pll_data *pll, unsigned int prediv,
 				unsigned int mult, unsigned int postdiv);
 int davinci_set_sysclk_rate(struct clk *clk, unsigned long rate);
