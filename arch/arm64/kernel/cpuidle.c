@@ -19,7 +19,8 @@ int __init arm_cpuidle_init(unsigned int cpu)
 {
 	int ret = -EOPNOTSUPP;
 
-	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_init_idle)
+	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_suspend &&
+			cpu_ops[cpu]->cpu_init_idle)
 		ret = cpu_ops[cpu]->cpu_init_idle(cpu);
 
 	return ret;
@@ -36,10 +37,5 @@ int arm_cpuidle_suspend(int index)
 {
 	int cpu = smp_processor_id();
 
-	/*
-	 * If suspend has not been initialized, cpu_suspend call fails early.
-	 */
-	if (!cpu_ops[cpu]->cpu_suspend)
-		return -EOPNOTSUPP;
 	return cpu_ops[cpu]->cpu_suspend(index);
 }
