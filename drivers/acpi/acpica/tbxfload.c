@@ -175,7 +175,7 @@ acpi_status acpi_tb_load_namespace(void)
 	 * the DSDT.
 	 */
 	if (acpi_gbl_copy_dsdt_locally) {
-		new_dsdt = acpi_tb_copy_dsdt(acpi_gbl_dsdt_index);
+		new_dsdt = acpi_tb_copy_dsdt();
 		if (new_dsdt) {
 			acpi_gbl_DSDT = new_dsdt;
 		}

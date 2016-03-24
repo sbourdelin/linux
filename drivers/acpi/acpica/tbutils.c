@@ -141,7 +141,7 @@ void acpi_tb_check_dsdt_header(void)
  *
  * FUNCTION:    acpi_tb_copy_dsdt
  *
- * PARAMETERS:  table_desc          - Installed table to copy
+ * PARAMETERS:  None
  *
  * RETURN:      None
  *
@@ -151,12 +151,12 @@ void acpi_tb_check_dsdt_header(void)
  *
  ******************************************************************************/
 
-struct acpi_table_header *acpi_tb_copy_dsdt(u32 table_index)
+struct acpi_table_header *acpi_tb_copy_dsdt(void)
 {
 	struct acpi_table_header *new_table;
 	struct acpi_table_desc *table_desc;
 
-	table_desc = &acpi_gbl_root_table_list.tables[table_index];
+	table_desc = &acpi_gbl_root_table_list.tables[acpi_gbl_dsdt_index];
 
 	new_table = ACPI_ALLOCATE(table_desc->length);
 	if (!new_table) {
@@ -168,8 +168,7 @@ struct acpi_table_header *acpi_tb_copy_dsdt(u32 table_index)
 	memcpy(new_table, table_desc->pointer, table_desc->length);
 	acpi_tb_uninstall_table(table_desc);
 
-	acpi_tb_init_table_descriptor(&acpi_gbl_root_table_list.
-				      tables[acpi_gbl_dsdt_index],
+	acpi_tb_init_table_descriptor(table_desc,
 				      ACPI_PTR_TO_PHYSADDR(new_table),
 				      ACPI_TABLE_ORIGIN_INTERNAL_VIRTUAL,
 				      new_table);

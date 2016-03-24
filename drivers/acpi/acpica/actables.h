@@ -149,7 +149,7 @@ acpi_tb_verify_checksum(struct acpi_table_header *table, u32 length);
 
 void acpi_tb_check_dsdt_header(void);
 
-struct acpi_table_header *acpi_tb_copy_dsdt(u32 table_index);
+struct acpi_table_header *acpi_tb_copy_dsdt(void);
 
 void
 acpi_tb_install_table_with_override(struct acpi_table_desc *new_table_desc,
