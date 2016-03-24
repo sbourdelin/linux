@@ -163,9 +163,8 @@ static struct i2c_client *at24_translate_offset(struct at24_data *at24,
 	return at24->client[i];
 }
 
-static ssize_t __attribute__((unused))
-at24cs_serial_read(struct at24_data *at24,
-		   char *buf, loff_t off, size_t count)
+static ssize_t at24cs_serial_read(struct at24_data *at24,
+				  char *buf, loff_t off, size_t count)
 {
 	unsigned long timeout, read_time;
 	struct i2c_client *client;
@@ -615,8 +614,12 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	at24->chip = chip;
 	at24->num_addresses = num_addresses;
 
-	at24->read_func = at24_read;
-	at24->write_func = at24_write;
+	if (chip.flags & AT24_FLAG_SERIAL) {
+		at24->read_func = at24cs_serial_read;
+	} else {
+		at24->read_func = at24_read;
+		at24->write_func = at24_write;
+	}
 
 	writable = !(chip.flags & AT24_FLAG_READONLY);
 	if (writable) {
