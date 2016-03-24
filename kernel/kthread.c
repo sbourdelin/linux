@@ -593,6 +593,7 @@ repeat:
 	if (work) {
 		__set_current_state(TASK_RUNNING);
 		work->func(work);
+		cond_resched_rcu_qs();
 	} else if (!freezing(current))
 		schedule();
 

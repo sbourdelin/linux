@@ -1770,13 +1770,14 @@ static void scsi_request_fn(struct request_queue *q)
 	struct Scsi_Host *shost;
 	struct scsi_cmnd *cmd;
 	struct request *req;
+	int i;
 
 	/*
-	 * To start with, we keep looping until the queue is empty, or until
-	 * the host is no longer able to accept any more requests.
+	 * Loop until the queue is empty, until the host is no longer able to
+	 * accept any more requests or until 64 requests have been processed.
 	 */
 	shost = sdev->host;
-	for (;;) {
+	for (i = 64; i > 0; i--) {
 		int rtn;
 		/*
 		 * get next queueable request.  We do this early to make sure
@@ -1860,6 +1861,9 @@ static void scsi_request_fn(struct request_queue *q)
 		}
 		spin_lock_irq(q->queue_lock);
 	}
+
+	if (unlikely(i == 0))
+		blk_delay_queue(q, 0);
 
 	return;
 
