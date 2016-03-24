@@ -37,10 +37,9 @@ int arm_cpuidle_suspend(int index)
 	int cpu = smp_processor_id();
 
 	/*
-	 * If cpu_ops have not been registered or suspend
-	 * has not been initialized, cpu_suspend call fails early.
+	 * If suspend has not been initialized, cpu_suspend call fails early.
 	 */
-	if (!cpu_ops[cpu] || !cpu_ops[cpu]->cpu_suspend)
+	if (!cpu_ops[cpu]->cpu_suspend)
 		return -EOPNOTSUPP;
 	return cpu_ops[cpu]->cpu_suspend(index);
 }
