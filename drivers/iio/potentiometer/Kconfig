@@ -5,6 +5,17 @@
 
 menu "Digital potentiometers"
 
+config MAX5487
+        tristate "Maxim MAX5487/MAX5488/MAX5489  Digital Potentiometer driver"
+        depends on SPI
+        help
+          Say yes here to build support for the Maxim
+          MAX5487, MAX5488, MAX5489 digital potentiomenter
+	  chips.
+
+          To compile this driver as a module, choose M here: the
+          module will be called max5487.
+
 config MCP4531
 	tristate "Microchip MCP45xx/MCP46xx Digital Potentiometer driver"
 	depends on I2C
