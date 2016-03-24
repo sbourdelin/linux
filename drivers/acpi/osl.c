@@ -809,6 +809,7 @@ void __init acpi_initrd_initialize_tables(void)
 	int table_offset = 0;
 	int table_index = 0;
 	u32 table_length;
+	u32 ddb;
 	struct acpi_table_header *table;
 
 	if (!acpi_tables_addr)
@@ -835,7 +836,7 @@ void __init acpi_initrd_initialize_tables(void)
 
 		acpi_table_taint(table);
 		acpi_os_unmap_memory(table, ACPI_HEADER_SIZE);
-		acpi_install_table(acpi_tables_addr + table_offset, TRUE);
+		acpi_install_table(acpi_tables_addr + table_offset, TRUE, &ddb);
 		set_bit(table_index, acpi_initrd_installed);
 next_table:
 		table_offset += table_length;

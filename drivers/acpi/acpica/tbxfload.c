@@ -263,6 +263,7 @@ unlock_and_exit:
  * PARAMETERS:  address             - Address of the ACPI table to be installed.
  *              physical            - Whether the address is a physical table
  *                                    address or not
+ *              out_table_index     - Where the table index is returned
  *
  * RETURN:      Status
  *
@@ -272,12 +273,12 @@ unlock_and_exit:
  *
  ******************************************************************************/
 
-acpi_status __init
-acpi_install_table(acpi_physical_address address, u8 physical)
+acpi_status
+acpi_install_table(acpi_physical_address address,
+		   u8 physical, u32 *out_table_index)
 {
 	acpi_status status;
 	u8 flags;
-	u32 table_index;
 
 	ACPI_FUNCTION_TRACE(acpi_install_table);
 
@@ -288,12 +289,45 @@ acpi_install_table(acpi_physical_address address, u8 physical)
 	}
 
 	status = acpi_tb_verify_and_install_table(address, flags,
-						  FALSE, FALSE, &table_index);
+						  FALSE, FALSE,
+						  out_table_index);
 
 	return_ACPI_STATUS(status);
 }
 
 ACPI_EXPORT_SYMBOL_INIT(acpi_install_table)
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_uninstall_table
+ *
+ * PARAMETERS:  table_index         - Table index
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Dynamically uninstall an ACPI table.
+ *              Note: This function should only be invoked after
+ *                    acpi_initialize_tables() and before acpi_load_tables().
+ *
+ ******************************************************************************/
+void acpi_uninstall_table(u32 table_index)
+{
+
+	ACPI_FUNCTION_TRACE(acpi_uninstall_table);
+
+	/*
+	 * This function can only be used during early stage, so the table mutex
+	 * isn't required to be held.
+	 */
+	if (table_index < acpi_gbl_root_table_list.current_table_count) {
+		acpi_tb_uninstall_table(&acpi_gbl_root_table_list.
+					tables[table_index]);
+	}
+
+	return_VOID;
+}
+
+ACPI_EXPORT_SYMBOL_INIT(acpi_uninstall_table)
 
 /*******************************************************************************
  *

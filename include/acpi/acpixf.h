@@ -469,7 +469,9 @@ ACPI_EXTERNAL_RETURN_STATUS(acpi_status
  */
 ACPI_EXTERNAL_RETURN_STATUS(acpi_status __init
 			    acpi_install_table(acpi_physical_address address,
-					       u8 physical))
+					       u8 physical,
+					       u32 *out_table_index))
+ACPI_EXTERNAL_RETURN_VOID(void acpi_uninstall_table(u32 table_index))
 
 ACPI_EXTERNAL_RETURN_STATUS(acpi_status
 			    acpi_load_table(struct acpi_table_header *table))
