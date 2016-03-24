@@ -60,7 +60,8 @@ fw_domain_reset(const struct intel_uncore_forcewake_domain *d)
 static inline void
 fw_domain_arm_timer(struct intel_uncore_forcewake_domain *d)
 {
-	mod_timer_pinned(&d->timer, jiffies + 1);
+	if (!mod_timer_pinned(&d->timer, jiffies + 1))
+		d->wake_count++;
 }
 
 static inline void
@@ -491,7 +492,6 @@ static void __intel_uncore_forcewake_put(struct drm_i915_private *dev_priv,
 		if (--domain->wake_count)
 			continue;
 
-		domain->wake_count++;
 		fw_domain_arm_timer(domain);
 	}
 }
@@ -733,7 +733,6 @@ static inline void __force_wake_get(struct drm_i915_private *dev_priv,
 		}
 
 		domain->wake_count++;
-		fw_domain_arm_timer(domain);
 	}
 
 	if (fw_domains)
