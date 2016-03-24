@@ -181,11 +181,13 @@ static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
 	*np_temp = of_find_node_by_name(np_pcie, controller);
 	if (!(*np_temp)) {
 		dev_err(dev, "Node for %s is absent\n", controller);
-		goto out;
+		return ret;
 	}
 	temp = of_irq_count(*np_temp);
-	if (!temp)
-		goto out;
+	if (!temp) {
+		dev_err(dev, "No entries in %s\n", controller);
+		return ret;
+	}
 	if (temp > max_host_irqs)
 		dev_warn(dev, "Too many %s interrupts defined %u\n",
 			(legacy ? "legacy" : "MSI"), temp);
@@ -203,7 +205,6 @@ static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
 		*num_irqs = temp;
 		ret = 0;
 	}
-out:
 	return ret;
 }
 
@@ -231,6 +232,7 @@ static void ks_pcie_setup_interrupts(struct keystone_pcie *ks_pcie)
 	/* enable error interrupt */
 	if (ks_pcie->error_irq > 0)
 		ks_dw_pcie_enable_error_irq(ks_pcie->va_app_base);
+
 }
 
 /*
