@@ -335,6 +335,7 @@ ACPI_EXPORT_SYMBOL_INIT(acpi_uninstall_table)
  *
  * PARAMETERS:  table               - Pointer to a buffer containing the ACPI
  *                                    table to be loaded.
+ *              out_table_index     - Where the table index is returned
  *
  * RETURN:      Status
  *
@@ -345,7 +346,8 @@ ACPI_EXPORT_SYMBOL_INIT(acpi_uninstall_table)
  *              to ensure that the table is not deleted or unmapped.
  *
  ******************************************************************************/
-acpi_status acpi_load_table(struct acpi_table_header *table)
+acpi_status
+acpi_load_table(struct acpi_table_header *table, u32 *out_table_index)
 {
 	acpi_status status;
 	u32 table_index;
@@ -354,6 +356,9 @@ acpi_status acpi_load_table(struct acpi_table_header *table)
 
 	/* Parameter validation */
 
+	if (out_table_index) {
+		*out_table_index = ACPI_INVALID_TABLE_INDEX;
+	}
 	if (!table) {
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
@@ -400,6 +405,9 @@ acpi_status acpi_load_table(struct acpi_table_header *table)
 	}
 
 unlock_and_exit:
+	if (out_table_index && ACPI_SUCCESS(status)) {
+		*out_table_index = table_index;
+	}
 	(void)acpi_ut_release_mutex(ACPI_MTX_INTERPRETER);
 	return_ACPI_STATUS(status);
 }
@@ -476,35 +484,9 @@ acpi_status acpi_unload_parent_table(acpi_handle object)
 			break;
 		}
 
-		/* Ensure the table is actually loaded */
-
-		if (!acpi_tb_is_table_loaded(i)) {
-			status = AE_NOT_EXIST;
-			break;
-		}
-
-		/* Invoke table handler if present */
-
-		if (acpi_gbl_table_handler) {
-			(void)acpi_gbl_table_handler(ACPI_TABLE_EVENT_UNLOAD,
-						     acpi_gbl_root_table_list.
-						     tables[i].pointer,
-						     acpi_gbl_table_handler_context);
-		}
-
-		/*
-		 * Delete all namespace objects owned by this table. Note that
-		 * these objects can appear anywhere in the namespace by virtue
-		 * of the AML "Scope" operator. Thus, we need to track ownership
-		 * by an ID, not simply a position within the hierarchy.
-		 */
-		status = acpi_tb_delete_namespace_by_owner(i);
-		if (ACPI_FAILURE(status)) {
-			break;
-		}
-
-		status = acpi_tb_release_owner_id(i);
-		acpi_tb_set_table_loaded_flag(i, FALSE);
+		(void)acpi_ut_release_mutex(ACPI_MTX_INTERPRETER);
+		status = acpi_unload_table(i);
+		(void)acpi_ut_acquire_mutex(ACPI_MTX_INTERPRETER);
 		break;
 	}
 
@@ -513,3 +495,64 @@ acpi_status acpi_unload_parent_table(acpi_handle object)
 }
 
 ACPI_EXPORT_SYMBOL(acpi_unload_parent_table)
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_unload_table
+ *
+ * PARAMETERS:  table_index         - The table index
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Unload a definition block table.
+ *
+ ******************************************************************************/
+acpi_status acpi_unload_table(u32 table_index)
+{
+	acpi_status status;
+
+	ACPI_FUNCTION_TRACE(acpi_unload_table);
+
+	/* Must acquire the interpreter lock during this operation */
+
+	status = acpi_ut_acquire_mutex(ACPI_MTX_INTERPRETER);
+	if (ACPI_FAILURE(status)) {
+		return_ACPI_STATUS(status);
+	}
+
+	/* Ensure the table is actually loaded */
+
+	if (!acpi_tb_is_table_loaded(table_index)) {
+		status = AE_NOT_EXIST;
+		goto error_exit;
+	}
+
+	/* Invoke table handler if present */
+
+	if (acpi_gbl_table_handler) {
+		(void)acpi_gbl_table_handler(ACPI_TABLE_EVENT_UNLOAD,
+					     acpi_gbl_root_table_list.
+					     tables[table_index].pointer,
+					     acpi_gbl_table_handler_context);
+	}
+
+	/*
+	 * Delete all namespace objects owned by this table. Note that
+	 * these objects can appear anywhere in the namespace by virtue
+	 * of the AML "Scope" operator. Thus, we need to track ownership
+	 * by an ID, not simply a position within the hierarchy.
+	 */
+	status = acpi_tb_delete_namespace_by_owner(table_index);
+	if (ACPI_FAILURE(status)) {
+		goto error_exit;
+	}
+
+	status = acpi_tb_release_owner_id(table_index);
+	acpi_tb_set_table_loaded_flag(table_index, FALSE);
+
+error_exit:
+	(void)acpi_ut_release_mutex(ACPI_MTX_INTERPRETER);
+	return_ACPI_STATUS(status);
+}
+
+ACPI_EXPORT_SYMBOL(acpi_unload_table)

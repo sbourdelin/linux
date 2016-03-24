@@ -355,7 +355,7 @@ static int enable_slot(struct hotplug_slot *bss_hotplug_slot)
 	if (SN_ACPI_BASE_SUPPORT() && ssdt) {
 		acpi_status ret;
 
-		ret = acpi_load_table((struct acpi_table_header *)ssdt);
+		ret = acpi_load_table((struct acpi_table_header *)ssdt, NULL);
 		if (ACPI_FAILURE(ret)) {
 			printk(KERN_ERR "%s: acpi_load_table failed (0x%x)\n",
 			       __func__, ret);
