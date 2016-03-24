@@ -250,7 +250,7 @@ acpi_ex_load_table_op(struct acpi_walk_state *walk_state,
 		}
 	}
 
-	status = acpi_get_table_by_index(table_index, &table);
+	status = acpi_tb_validate_table_by_index(table_index, &table);
 	if (ACPI_SUCCESS(status)) {
 		ACPI_INFO(("Dynamic OEM Table Load:"));
 		acpi_tb_print_table_header(0, table);
@@ -599,7 +599,7 @@ acpi_status acpi_ex_unload_table(union acpi_operand_object *ddb_handle)
 	/* Invoke table handler if present */
 
 	if (acpi_gbl_table_handler) {
-		status = acpi_get_table_by_index(table_index, &table);
+		status = acpi_tb_validate_table_by_index(table_index, &table);
 		if (ACPI_SUCCESS(status)) {
 			(void)acpi_gbl_table_handler(ACPI_TABLE_EVENT_UNLOAD,
 						     table,

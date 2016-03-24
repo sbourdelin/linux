@@ -535,7 +535,7 @@ acpi_ds_eval_table_region_operands(struct acpi_walk_state *walk_state,
 		goto cleanup;
 	}
 
-	status = acpi_get_table_by_index(table_index, &table);
+	status = acpi_tb_validate_table_by_index(table_index, &table);
 	if (ACPI_FAILURE(status)) {
 		goto cleanup;
 	}

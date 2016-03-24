@@ -78,16 +78,16 @@ acpi_status acpi_tb_initialize_facs(void)
 	} else if (acpi_gbl_FADT.Xfacs &&
 		   (!acpi_gbl_FADT.facs
 		    || !acpi_gbl_use32_bit_facs_addresses)) {
-		(void)acpi_get_table_by_index(acpi_gbl_xfacs_index,
-					      ACPI_CAST_INDIRECT_PTR(struct
-								     acpi_table_header,
-								     &facs));
+		(void)acpi_tb_validate_table_by_index(acpi_gbl_xfacs_index,
+						      ACPI_CAST_INDIRECT_PTR
+						      (struct acpi_table_header,
+						       &facs));
 		acpi_gbl_FACS = facs;
 	} else if (acpi_gbl_FADT.facs) {
-		(void)acpi_get_table_by_index(acpi_gbl_facs_index,
-					      ACPI_CAST_INDIRECT_PTR(struct
-								     acpi_table_header,
-								     &facs));
+		(void)acpi_tb_validate_table_by_index(acpi_gbl_facs_index,
+						      ACPI_CAST_INDIRECT_PTR
+						      (struct acpi_table_header,
+						       &facs));
 		acpi_gbl_FACS = facs;
 	}
 
@@ -406,4 +406,61 @@ u8 acpi_is_valid_signature(char *signature)
 	}
 
 	return (TRUE);
+}
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_tb_validate_table_by_index
+ *
+ * PARAMETERS:  table_index         - Table index
+ *              out_table           - Where the pointer to the table is returned
+ *
+ * RETURN:      Status and pointer to the requested table
+ *
+ * DESCRIPTION: Obtain a table by an index into the global table list. Used
+ *              internally only as the table will be put into the state of
+ *              "VALIDATED" by internal references.
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_tb_validate_table_by_index(u32 table_index,
+				struct acpi_table_header ** out_table)
+{
+	acpi_status status = AE_OK;
+	struct acpi_table_desc *table_desc;
+
+	ACPI_FUNCTION_TRACE(acpi_tb_validate_table_by_index);
+
+	/* Parameter validation */
+
+	if (!out_table) {
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
+	}
+
+	(void)acpi_ut_acquire_mutex(ACPI_MTX_TABLES);
+
+	/* Validate index */
+
+	if (table_index >= acpi_gbl_root_table_list.current_table_count) {
+		status = AE_BAD_PARAMETER;
+		goto unlock_and_exit;
+	}
+	table_desc = &acpi_gbl_root_table_list.tables[table_index];
+
+	if (!(table_desc->flags & ACPI_TABLE_IS_VALIDATED)) {
+
+		/* Table is not validated, validate it */
+
+		status = acpi_tb_validate_table(table_desc);
+		if (ACPI_FAILURE(status)) {
+			goto unlock_and_exit;
+		}
+		table_desc->flags |= ACPI_TABLE_IS_VALIDATED;
+	}
+	*out_table = table_desc->pointer;
+
+unlock_and_exit:
+	(void)acpi_ut_release_mutex(ACPI_MTX_TABLES);
+	return_ACPI_STATUS(status);
 }

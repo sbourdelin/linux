@@ -364,7 +364,7 @@ ACPI_EXPORT_SYMBOL(acpi_get_table)
  * RETURN:      Status and pointer to the requested table
  *
  * DESCRIPTION: Obtain a table by an index into the global table list. Used
- *              internally also.
+ *              externally only.
  *
  ******************************************************************************/
 acpi_status

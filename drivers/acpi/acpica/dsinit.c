@@ -232,7 +232,7 @@ acpi_ds_initialize_objects(u32 table_index,
 	}
 	(void)acpi_ut_release_mutex(ACPI_MTX_NAMESPACE);
 
-	status = acpi_get_table_by_index(table_index, &table);
+	status = acpi_tb_validate_table_by_index(table_index, &table);
 	if (ACPI_FAILURE(status)) {
 		return_ACPI_STATUS(status);
 	}

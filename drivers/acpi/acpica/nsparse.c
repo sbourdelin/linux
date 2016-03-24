@@ -78,7 +78,7 @@ acpi_ns_one_complete_parse(u32 pass_number,
 
 	ACPI_FUNCTION_TRACE(ns_one_complete_parse);
 
-	status = acpi_get_table_by_index(table_index, &table);
+	status = acpi_tb_validate_table_by_index(table_index, &table);
 	if (ACPI_FAILURE(status)) {
 		return_ACPI_STATUS(status);
 	}

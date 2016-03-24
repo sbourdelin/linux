@@ -163,6 +163,10 @@ acpi_status acpi_tb_parse_root_table(acpi_physical_address rsdp_address);
 
 u8 acpi_is_valid_signature(char *signature);
 
+acpi_status
+acpi_tb_validate_table_by_index(u32 table_index,
+				struct acpi_table_header **out_table);
+
 /*
  * tbxfload
  */
