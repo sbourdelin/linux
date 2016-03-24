@@ -31,6 +31,7 @@
 static const struct regmap_config bmc150_i2c_regmap_conf = {
 	.reg_bits = 8,
 	.val_bits = 8,
+	.max_register = 0x3f,
 };
 
 static int bmc150_accel_probe(struct i2c_client *client,
