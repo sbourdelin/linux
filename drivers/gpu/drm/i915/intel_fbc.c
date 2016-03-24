@@ -1270,7 +1270,8 @@ void intel_fbc_init(struct drm_i915_private *dev_priv)
 	 * know what's going on. */
 	if (i915.enable_fbc < 0) {
 		i915.enable_fbc = IS_HASWELL(dev_priv) ||
-				  IS_BROADWELL(dev_priv);
+				  IS_BROADWELL(dev_priv) ||
+				  INTEL_INFO(dev_priv)->gen >= 9;
 		DRM_DEBUG_KMS("Sanitized enable_fbc value: %d\n",
 			      i915.enable_fbc);
 	}
