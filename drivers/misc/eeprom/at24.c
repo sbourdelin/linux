@@ -119,6 +119,10 @@ static const struct i2c_device_id at24_ids[] = {
 	{ "24c02",	AT24_DEVICE_MAGIC(2048 / 8,	0) },
 	{ "24cs02",	AT24_DEVICE_MAGIC(128 / 8,
 				AT24_FLAG_SERIAL | AT24_FLAG_READONLY) },
+	{ "24mac402",	AT24_DEVICE_MAGIC(48 / 8,
+				AT24_FLAG_MAC | AT24_FLAG_READONLY) },
+	{ "24mac602",	AT24_DEVICE_MAGIC(64 / 8,
+				AT24_FLAG_MAC | AT24_FLAG_READONLY) },
 	/* spd is a 24c02 in memory DIMMs */
 	{ "spd",	AT24_DEVICE_MAGIC(2048 / 8,
 				AT24_FLAG_READONLY | AT24_FLAG_IRUGO) },
