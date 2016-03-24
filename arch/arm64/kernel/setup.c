@@ -313,6 +313,7 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	local_async_enable();
 
+	xen_early_init();
 	efi_init();
 	arm64_memblock_init();
 
@@ -334,7 +335,6 @@ void __init setup_arch(char **cmdline_p)
 	} else {
 		psci_acpi_init();
 	}
-	xen_early_init();
 
 	cpu_read_bootcpu_ops();
 	smp_init_cpus();
