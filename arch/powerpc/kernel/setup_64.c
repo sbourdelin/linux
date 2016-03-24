@@ -823,3 +823,29 @@ static int __init disable_hardlockup_detector(void)
 }
 early_initcall(disable_hardlockup_detector);
 #endif
+
+int func_with_lots_of_args(int a, int b, int c, int d, int e, int f, int g,
+			   int h, int i, int j, int k, int l)
+{
+	printk("%s: %d %d %d %d %d %d %d %d %d %d %d %d\n",
+	       __func__, a, b, c, d, e, f, g, h, i, j, k, l);
+
+	return a + b + c + d + e + f + g + h + i + j + k + l;
+}
+EXPORT_SYMBOL(func_with_lots_of_args);
+
+int func_with_nested_func(int a, int b, int c)
+{
+	volatile int z;
+
+	int noinline nested_sum (int x, int y) {
+		return z + x + y;
+	}
+
+	z = a + b;
+
+	printk("%s: %d %d\n", __func__, nested_sum(a, b), nested_sum(a, c));
+
+	return nested_sum(nested_sum(a, b), nested_sum(b, c));
+}
+EXPORT_SYMBOL(func_with_nested_func);
