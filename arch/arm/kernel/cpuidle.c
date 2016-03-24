@@ -143,8 +143,12 @@ int __init arm_cpuidle_init(int cpu)
 		return -ENODEV;
 
 	ret = arm_cpuidle_read_ops(cpu_node, cpu);
-	if (!ret && cpuidle_ops[cpu].init)
-		ret = cpuidle_ops[cpu].init(cpu_node, cpu);
+	if (!ret) {
+		if (cpuidle_ops[cpu].init)
+			ret = cpuidle_ops[cpu].init(cpu_node, cpu);
+		else
+			ret = -EOPNOTSUPP;
+	}
 
 	of_node_put(cpu_node);
 
