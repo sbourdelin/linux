@@ -491,10 +491,12 @@ acpi_ex_load_op(union acpi_operand_object *obj_desc,
 	/*
 	 * Note: Now table is "INSTALLED", it must be validated before
 	 * loading.
+	 * As Table pointer has been installed, no code from here will still be
+	 * using the original pointer. Furthermore, the table handler actually
+	 * wants a validation result of the table. So this pointer is refilled
+	 * by the returning value of acpi_tb_validate_table_by_index().
 	 */
-	status =
-	    acpi_tb_validate_table(&acpi_gbl_root_table_list.
-				   tables[table_index]);
+	status = acpi_tb_validate_table_by_index(table_index, &table);
 	if (ACPI_FAILURE(status)) {
 		return_ACPI_STATUS(status);
 	}
