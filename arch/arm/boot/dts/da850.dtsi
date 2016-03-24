@@ -313,6 +313,11 @@
 					36
 					>;
 		};
+		usbphy: usbphy {
+			compatible = "ti,da830-usbphy";
+			#phy-cells = <1>;
+			status = "disabled";
+		};
 		gpio: gpio@226000 {
 			compatible = "ti,dm6441-gpio";
 			gpio-controller;
