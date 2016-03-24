@@ -52,13 +52,9 @@ int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
  */
 int arm_cpuidle_suspend(int index)
 {
-	int ret = -EOPNOTSUPP;
 	int cpu = smp_processor_id();
 
-	if (cpuidle_ops[cpu].suspend)
-		ret = cpuidle_ops[cpu].suspend(index);
-
-	return ret;
+	return cpuidle_ops[cpu].suspend(index);
 }
 
 /**
@@ -144,7 +140,7 @@ int __init arm_cpuidle_init(int cpu)
 
 	ret = arm_cpuidle_read_ops(cpu_node, cpu);
 	if (!ret) {
-		if (cpuidle_ops[cpu].init)
+		if (cpuidle_ops[cpu].init && cpuidle_ops[cpu].suspend)
 			ret = cpuidle_ops[cpu].init(cpu_node, cpu);
 		else
 			ret = -EOPNOTSUPP;
