@@ -397,10 +397,6 @@ int btrfs_dev_replace_start(struct btrfs_root *root,
 	args->result = BTRFS_IOCTL_DEV_REPLACE_RESULT_NO_ERROR;
 	btrfs_dev_replace_unlock(dev_replace, 1);
 
-	ret = btrfs_sysfs_add_device_link(tgt_device->fs_devices, tgt_device);
-	if (ret)
-		btrfs_err(fs_info, "kobj add dev failed %d\n", ret);
-
 	btrfs_wait_ordered_roots(fs_info, -1);
 
 	/* force writing the updated state information to disk */
@@ -427,6 +423,9 @@ int btrfs_dev_replace_start(struct btrfs_root *root,
 	} else {
 		WARN_ON(ret);
 	}
+
+	if (btrfs_sysfs_add_device_link(tgt_device->fs_devices, tgt_device))
+		btrfs_err(fs_info, "kobj add dev failed during replace\n");
 
 	return ret;
 
