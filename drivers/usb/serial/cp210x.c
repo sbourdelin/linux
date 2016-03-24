@@ -47,6 +47,7 @@ static void cp210x_break_ctl(struct tty_struct *, int);
 static int cp210x_port_probe(struct usb_serial_port *);
 static int cp210x_port_remove(struct usb_serial_port *);
 static void cp210x_dtr_rts(struct usb_serial_port *p, int on);
+static void cp210x_process_read_urb(struct urb *urb);
 
 static const struct usb_device_id id_table[] = {
 	{ USB_DEVICE(0x045B, 0x0053) }, /* Renesas RX610 RX-Stick */
@@ -202,9 +203,21 @@ static const struct usb_device_id id_table[] = {
 
 MODULE_DEVICE_TABLE(usb, id_table);
 
+#define CP210X_ESCCHAR		0x1e
+enum cp210x_rx_state {
+	CP210X_STATE_IDLE = 0,
+	CP210X_STATE_ESC,
+	CP210X_STATE_LS0,
+	CP210X_STATE_LS1,
+	CP210X_STATE_LS,
+	CP210X_STATE_MS
+};
+
+
 struct cp210x_port_private {
 	__u8			bInterfaceNumber;
 	bool			has_swapped_line_ctl;
+	enum cp210x_rx_state	rx_state;
 };
 
 static struct usb_serial_driver cp210x_device = {
@@ -225,7 +238,8 @@ static struct usb_serial_driver cp210x_device = {
 	.tiocmset		= cp210x_tiocmset,
 	.port_probe		= cp210x_port_probe,
 	.port_remove		= cp210x_port_remove,
-	.dtr_rts		= cp210x_dtr_rts
+	.dtr_rts		= cp210x_dtr_rts,
+	.process_read_urb       = cp210x_process_read_urb
 };
 
 static struct usb_serial_driver * const serial_drivers[] = {
@@ -591,6 +605,11 @@ static int cp210x_open(struct tty_struct *tty, struct usb_serial_port *port)
 {
 	int result;
 
+	struct usb_serial *serial = port->serial;
+	struct cp210x_port_private *spriv = usb_get_serial_data(serial);
+
+	spriv->rx_state = CP210X_STATE_IDLE;
+
 	result = cp210x_write_u16_reg(port, CP210X_IFC_ENABLE, UART_ENABLE);
 	if (result) {
 		dev_err(&port->dev, "%s - Unable to enable UART\n", __func__);
@@ -603,6 +622,15 @@ static int cp210x_open(struct tty_struct *tty, struct usb_serial_port *port)
 	/* The baud rate must be initialised on cp2104 */
 	if (tty)
 		cp210x_change_speed(tty, port, NULL);
+
+	/* Enable events embedding to data stream */
+	result = cp210x_write_u16_reg(port, CP210X_EMBED_EVENTS,
+								CP210X_ESCCHAR);
+	if (result) {
+		dev_err(&port->dev, "%s - Unable to enable event embedding on UART\n",
+				__func__);
+		return result;
+	}
 
 	return usb_serial_generic_open(tty, port);
 }
@@ -660,6 +688,94 @@ static bool cp210x_tx_empty(struct usb_serial_port *port)
 		return true;
 
 	return !count;
+}
+
+static void cp210x_process_read_urb(struct urb *urb)
+{
+	struct usb_serial_port *port = urb->context;
+	char *ch = (char *)urb->transfer_buffer;
+	char *tbuf = (char *)urb->transfer_buffer;
+	int i;
+	int tcnt = 0;
+	struct usb_serial *serial = port->serial;
+	struct cp210x_port_private *spriv = usb_get_serial_data(serial);
+
+	if (!urb->actual_length)
+		return;
+
+	/* Process escape chars */
+	for (i = 0; i < urb->actual_length; i++) {
+		char c = ch[i];
+
+		switch (spriv->rx_state) {
+		case CP210X_STATE_IDLE:
+			if (c == CP210X_ESCCHAR)
+				spriv->rx_state = CP210X_STATE_ESC;
+			else
+				tbuf[tcnt++] = c;
+			break;
+
+		case CP210X_STATE_ESC:
+			if (c == 0x01)
+				spriv->rx_state = CP210X_STATE_LS0;
+			else if (c == 0x02)
+				spriv->rx_state = CP210X_STATE_LS;
+			else if (c == 0x03)
+				spriv->rx_state = CP210X_STATE_MS;
+			else {
+				tbuf[tcnt++] = (c == 0x00) ? CP210X_ESCCHAR : c;
+				spriv->rx_state = CP210X_STATE_IDLE;
+			}
+			break;
+
+		case CP210X_STATE_LS0:
+			spriv->rx_state = CP210X_STATE_LS1;
+			break;
+
+		case CP210X_STATE_LS1:
+			tbuf[tcnt++] = c;
+			spriv->rx_state = CP210X_STATE_IDLE;
+			break;
+
+		case CP210X_STATE_LS:
+			spriv->rx_state = CP210X_STATE_IDLE;
+			break;
+
+		case CP210X_STATE_MS:
+			if (c & 0x08) {
+				/* DCD change event */
+				struct tty_struct *tty;
+
+				port->icount.dcd++;
+				tty = tty_port_tty_get(&port->port);
+				if (tty)
+					usb_serial_handle_dcd_change(port, tty,
+							c & 0x80);
+				tty_kref_put(tty);
+
+			}
+			wake_up_interruptible(&port->port.delta_msr_wait);
+			spriv->rx_state = CP210X_STATE_IDLE;
+			break;
+		}
+	}
+
+	/*
+	 * The per character mucking around with sysrq path it too slow for
+	 * stuff like 3G modems, so shortcircuit it in the 99.9999999% of
+	 * cases where the USB serial is not a console anyway.
+	 */
+	if (!port->port.console || !port->sysrq) {
+		tty_insert_flip_string(&port->port, tbuf, tcnt);
+	} else {
+		ch = tbuf;
+		for (i = 0; i < tcnt; i++, ch++) {
+			if (!usb_serial_handle_sysrq_char(port, *ch))
+				tty_insert_flip_char(&port->port, *ch,
+						TTY_NORMAL);
+		}
+	}
+	tty_flip_buffer_push(&port->port);
 }
 
 /*
