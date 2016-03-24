@@ -1548,6 +1548,12 @@ intel_hdmi_set_property(struct drm_connector *connector,
 		case DRM_MODE_PICTURE_ASPECT_16_9:
 			intel_hdmi->aspect_ratio = HDMI_PICTURE_ASPECT_16_9;
 			break;
+		case DRM_MODE_PICTURE_ASPECT_64_27:
+			intel_hdmi->aspect_ratio = HDMI_PICTURE_ASPECT_64_27;
+			break;
+		case DRM_MODE_PICTURE_ASPECT_256_135:
+			intel_hdmi->aspect_ratio = HDMI_PICTURE_ASPECT_256_135;
+			break;
 		default:
 			return -EINVAL;
 		}
