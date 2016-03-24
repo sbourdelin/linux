@@ -241,3 +241,35 @@ void intel_frontbuffer_flip(struct drm_device *dev,
 
 	intel_frontbuffer_flush(dev, frontbuffer_bits, ORIGIN_FLIP);
 }
+
+/**
+ * intel_fb_obj_mmap_wa - notifies about objects being mmapped
+ * @obj: GEM object being mmapped
+ * @flags: new flags to be set to @obj
+ *
+ * This function gets called whenever an object gets mmapped. Not every user
+ * space application follows the protocol assumed by the frontbuffer tracking
+ * subsystem when it was created, so this mmap notify callback can be used to
+ * completely disable frontbuffer features such as FBC and PSR. Even if at some
+ * point we fix ever user space application, there's still the possibility that
+ * the user may have a new Kernel with the old user space.
+ *
+ * Also notice that there's no munmap API because user space calls munmap()
+ * directly. Even if we had, it probably wouldn't help since munmap() calls are
+ * not common.
+ */
+void intel_fb_obj_mmap_wa(struct drm_i915_gem_object *obj, unsigned int flags)
+{
+	struct drm_i915_private *dev_priv = obj->base.dev->dev_private;
+
+	if (!IS_SKYLAKE(dev_priv))
+		return;
+
+	obj->fb_mmap_wa_flags |= flags;
+
+	if (!obj->frontbuffer_bits)
+		return;
+
+	intel_fbc_mmap_wa(dev_priv, obj->frontbuffer_bits,
+			  obj->fb_mmap_wa_flags);
+}
