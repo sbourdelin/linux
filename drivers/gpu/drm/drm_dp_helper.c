@@ -179,7 +179,7 @@ static int drm_dp_dpcd_access(struct drm_dp_aux *aux, u8 request,
 {
 	struct drm_dp_aux_msg msg;
 	unsigned int retry;
-	int err;
+	int err = 0;
 
 	memset(&msg, 0, sizeof(msg));
 	msg.address = offset;
@@ -194,6 +194,10 @@ static int drm_dp_dpcd_access(struct drm_dp_aux *aux, u8 request,
 	 * sufficient, bump to 32 which makes Dell 4k monitors happier.
 	 */
 	for (retry = 0; retry < 32; retry++) {
+		if (err != 0 && err != -ETIMEDOUT) {
+			usleep_range(AUX_RETRY_INTERVAL,
+				     AUX_RETRY_INTERVAL + 100);
+		}
 
 		mutex_lock(&aux->hw_mutex);
 		err = aux->transfer(aux, &msg);
@@ -205,7 +209,6 @@ static int drm_dp_dpcd_access(struct drm_dp_aux *aux, u8 request,
 			return err;
 		}
 
-
 		switch (msg.reply & DP_AUX_NATIVE_REPLY_MASK) {
 		case DP_AUX_NATIVE_REPLY_ACK:
 			if (err < size)
@@ -214,10 +217,6 @@ static int drm_dp_dpcd_access(struct drm_dp_aux *aux, u8 request,
 
 		case DP_AUX_NATIVE_REPLY_NACK:
 			return -EIO;
-
-		case DP_AUX_NATIVE_REPLY_DEFER:
-			usleep_range(AUX_RETRY_INTERVAL, AUX_RETRY_INTERVAL + 100);
-			break;
 		}
 	}
 
