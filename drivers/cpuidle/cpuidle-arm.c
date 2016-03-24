@@ -23,6 +23,13 @@
 
 #include "dt_idle_states.h"
 
+static int arm_enter_wfi_state(struct cpuidle_device *dev,
+			       struct cpuidle_driver *drv, int idx)
+{
+	cpu_do_idle();
+	return 0;
+}
+
 /*
  * arm_enter_idle_state - Programs CPU to enter the specified state
  *
@@ -37,11 +44,6 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
 				struct cpuidle_driver *drv, int idx)
 {
 	int ret;
-
-	if (!idx) {
-		cpu_do_idle();
-		return idx;
-	}
 
 	ret = cpu_pm_enter();
 	if (!ret) {
@@ -69,7 +71,7 @@ static struct cpuidle_driver arm_idle_driver = {
 	 * handler for idle state index 0.
 	 */
 	.states[0] = {
-		.enter                  = arm_enter_idle_state,
+		.enter                  = arm_enter_wfi_state,
 		.exit_latency           = 1,
 		.target_residency       = 1,
 		.power_usage		= UINT_MAX,
