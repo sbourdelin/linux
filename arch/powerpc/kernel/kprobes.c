@@ -281,8 +281,10 @@ no_kprobe:
 static void __used kretprobe_trampoline_holder(void)
 {
 	asm volatile(".global kretprobe_trampoline\n"
+			".type kretprobe_trampoline, @function\n"
 			"kretprobe_trampoline:\n"
-			"nop\n");
+			"nop\n"
+			".size kretprobe_trampoline, .-kretprobe_trampoline\n");
 }
 
 /*
