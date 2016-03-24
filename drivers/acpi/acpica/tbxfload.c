@@ -287,8 +287,8 @@ acpi_install_table(acpi_physical_address address, u8 physical)
 		flags = ACPI_TABLE_ORIGIN_EXTERNAL_VIRTUAL;
 	}
 
-	status = acpi_tb_install_standard_table(address, flags,
-						FALSE, FALSE, &table_index);
+	status = acpi_tb_verify_and_install_table(address, flags,
+						  FALSE, FALSE, &table_index);
 
 	return_ACPI_STATUS(status);
 }
@@ -336,9 +336,9 @@ acpi_status acpi_load_table(struct acpi_table_header *table)
 	ACPI_INFO(("Host-directed Dynamic ACPI Table Load:"));
 	(void)acpi_ut_acquire_mutex(ACPI_MTX_TABLES);
 
-	status = acpi_tb_install_standard_table(ACPI_PTR_TO_PHYSADDR(table),
-						ACPI_TABLE_ORIGIN_EXTERNAL_VIRTUAL,
-						TRUE, FALSE, &table_index);
+	status = acpi_tb_verify_and_install_table(ACPI_PTR_TO_PHYSADDR(table),
+						  ACPI_TABLE_ORIGIN_EXTERNAL_VIRTUAL,
+						  TRUE, FALSE, &table_index);
 
 	(void)acpi_ut_release_mutex(ACPI_MTX_TABLES);
 	if (ACPI_FAILURE(status)) {

@@ -168,10 +168,8 @@ struct acpi_table_header *acpi_tb_copy_dsdt(void)
 	memcpy(new_table, table_desc->pointer, table_desc->length);
 	acpi_tb_uninstall_table(table_desc);
 
-	acpi_tb_init_table_descriptor(table_desc,
-				      ACPI_PTR_TO_PHYSADDR(new_table),
-				      ACPI_TABLE_ORIGIN_INTERNAL_VIRTUAL,
-				      new_table);
+	acpi_tb_install_table(table_desc, ACPI_PTR_TO_PHYSADDR(new_table),
+			      ACPI_TABLE_ORIGIN_INTERNAL_VIRTUAL, new_table);
 
 	ACPI_INFO(("Forced DSDT copy: length 0x%05X copied locally, original unmapped", new_table->length));
 
@@ -358,10 +356,10 @@ acpi_status __init acpi_tb_parse_root_table(acpi_physical_address rsdp_address)
 			goto next_table;
 		}
 
-		status = acpi_tb_install_standard_table(address,
-							ACPI_TABLE_ORIGIN_INTERNAL_PHYSICAL,
-							FALSE, TRUE,
-							&table_index);
+		status = acpi_tb_verify_and_install_table(address,
+							  ACPI_TABLE_ORIGIN_INTERNAL_PHYSICAL,
+							  FALSE, TRUE,
+							  &table_index);
 
 		if (ACPI_SUCCESS(status) &&
 		    ACPI_COMPARE_NAME(&acpi_gbl_root_table_list.

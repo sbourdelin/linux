@@ -63,9 +63,9 @@ acpi_tb_get_next_table_descriptor(u32 *table_index,
 				  struct acpi_table_desc **table_desc);
 
 void
-acpi_tb_init_table_descriptor(struct acpi_table_desc *table_desc,
-			      acpi_physical_address address,
-			      u8 flags, struct acpi_table_header *table);
+acpi_tb_install_table(struct acpi_table_desc *table_desc,
+		      acpi_physical_address address,
+		      u8 flags, struct acpi_table_header *table);
 
 acpi_status
 acpi_tb_acquire_temp_table(struct acpi_table_desc *table_desc,
@@ -117,9 +117,9 @@ acpi_tb_release_table(struct acpi_table_header *table,
 		      u32 table_length, u8 table_flags);
 
 acpi_status
-acpi_tb_install_standard_table(acpi_physical_address address,
-			       u8 flags,
-			       u8 reload, u8 override, u32 *table_index);
+acpi_tb_verify_and_install_table(acpi_physical_address address,
+				 u8 flags,
+				 u8 reload, u8 override, u32 *table_index);
 
 void acpi_tb_uninstall_table(struct acpi_table_desc *table_desc);
 

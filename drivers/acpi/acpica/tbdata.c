@@ -51,7 +51,7 @@ ACPI_MODULE_NAME("tbdata")
 
 /*******************************************************************************
  *
- * FUNCTION:    acpi_tb_init_table_descriptor
+ * FUNCTION:    acpi_tb_install_table
  *
  * PARAMETERS:  table_desc              - Table descriptor
  *              address                 - Physical address of the table
@@ -60,13 +60,14 @@ ACPI_MODULE_NAME("tbdata")
  *
  * RETURN:      None
  *
- * DESCRIPTION: Initialize a new table descriptor
+ * DESCRIPTION: This function is called to install the table, the returned
+ *              table descriptor is in "INSTALLED" state.
  *
  ******************************************************************************/
 void
-acpi_tb_init_table_descriptor(struct acpi_table_desc *table_desc,
-			      acpi_physical_address address,
-			      u8 flags, struct acpi_table_header *table)
+acpi_tb_install_table(struct acpi_table_desc *table_desc,
+		      acpi_physical_address address,
+		      u8 flags, struct acpi_table_header *table)
 {
 
 	/*
@@ -78,6 +79,41 @@ acpi_tb_init_table_descriptor(struct acpi_table_desc *table_desc,
 	table_desc->length = table->length;
 	table_desc->flags = flags;
 	ACPI_MOVE_32_TO_32(table_desc->signature.ascii, table->signature);
+}
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_tb_uninstall_table
+ *
+ * PARAMETERS:  table_desc          - Table descriptor
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Uninstall one internal ACPI table, this is the inverse of
+ *              acpi_tb_install_table().
+ *
+ ******************************************************************************/
+
+void acpi_tb_uninstall_table(struct acpi_table_desc *table_desc)
+{
+
+	ACPI_FUNCTION_TRACE(tb_uninstall_table);
+
+	/* Table must be installed */
+
+	if (!table_desc->address) {
+		return_VOID;
+	}
+
+	acpi_tb_invalidate_table(table_desc);
+
+	if ((table_desc->flags & ACPI_TABLE_ORIGIN_MASK) ==
+	    ACPI_TABLE_ORIGIN_INTERNAL_VIRTUAL) {
+		ACPI_FREE(ACPI_PHYSADDR_TO_PTR(table_desc->address));
+	}
+
+	table_desc->address = ACPI_PTR_TO_PHYSADDR(NULL);
+	return_VOID;
 }
 
 /*******************************************************************************
@@ -205,8 +241,7 @@ acpi_tb_acquire_temp_table(struct acpi_table_desc *table_desc,
 			return (AE_NO_MEMORY);
 		}
 
-		acpi_tb_init_table_descriptor(table_desc, address, flags,
-					      table_header);
+		acpi_tb_install_table(table_desc, address, flags, table_header);
 		acpi_os_unmap_memory(table_header,
 				     sizeof(struct acpi_table_header));
 		return (AE_OK);
@@ -220,8 +255,7 @@ acpi_tb_acquire_temp_table(struct acpi_table_desc *table_desc,
 			return (AE_NO_MEMORY);
 		}
 
-		acpi_tb_init_table_descriptor(table_desc, address, flags,
-					      table_header);
+		acpi_tb_install_table(table_desc, address, flags, table_header);
 		return (AE_OK);
 
 	default:
@@ -343,7 +377,7 @@ acpi_status acpi_tb_validate_temp_table(struct acpi_table_desc *table_desc)
 		 * Note that Length contains the size of the mapping after invoking
 		 * this work around, this value is required by
 		 * acpi_tb_release_temp_table().
-		 * We can do this because in acpi_init_table_descriptor(), the Length
+		 * We can do this because in acpi_tb_install_table(), the Length
 		 * field of the installed descriptor is filled with the actual
 		 * table length obtaining from the table header.
 		 */

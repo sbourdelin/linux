@@ -136,10 +136,9 @@ acpi_tb_install_table_with_override(struct acpi_table_desc *new_table_desc,
 		acpi_tb_override_table(new_table_desc);
 	}
 
-	acpi_tb_init_table_descriptor(&acpi_gbl_root_table_list.tables[i],
-				      new_table_desc->address,
-				      new_table_desc->flags,
-				      new_table_desc->pointer);
+	acpi_tb_install_table(&acpi_gbl_root_table_list.tables[i],
+			      new_table_desc->address, new_table_desc->flags,
+			      new_table_desc->pointer);
 
 	acpi_tb_print_table_header(new_table_desc->address,
 				   new_table_desc->pointer);
@@ -157,7 +156,7 @@ acpi_tb_install_table_with_override(struct acpi_table_desc *new_table_desc,
 
 /*******************************************************************************
  *
- * FUNCTION:    acpi_tb_install_standard_table
+ * FUNCTION:    acpi_tb_verify_and_install_table
  *
  * PARAMETERS:  address             - Address of the table (might be a virtual
  *                                    address depending on the table_flags)
@@ -177,9 +176,9 @@ acpi_tb_install_table_with_override(struct acpi_table_desc *new_table_desc,
  ******************************************************************************/
 
 acpi_status
-acpi_tb_install_standard_table(acpi_physical_address address,
-			       u8 flags,
-			       u8 reload, u8 override, u32 *table_index)
+acpi_tb_verify_and_install_table(acpi_physical_address address,
+				 u8 flags,
+				 u8 reload, u8 override, u32 *table_index)
 {
 	u32 i;
 	acpi_status status = AE_OK;
@@ -382,46 +381,11 @@ finish_override:
 	 * Replace the original table descriptor and keep its state as
 	 * "VALIDATED".
 	 */
-	acpi_tb_init_table_descriptor(old_table_desc, new_table_desc.address,
-				      new_table_desc.flags,
-				      new_table_desc.pointer);
+	acpi_tb_install_table(old_table_desc, new_table_desc.address,
+			      new_table_desc.flags, new_table_desc.pointer);
 	acpi_tb_validate_temp_table(old_table_desc);
 
 	/* Release the temporary table descriptor */
 
 	acpi_tb_release_temp_table(&new_table_desc);
-}
-
-/*******************************************************************************
- *
- * FUNCTION:    acpi_tb_uninstall_table
- *
- * PARAMETERS:  table_desc          - Table descriptor
- *
- * RETURN:      None
- *
- * DESCRIPTION: Delete one internal ACPI table
- *
- ******************************************************************************/
-
-void acpi_tb_uninstall_table(struct acpi_table_desc *table_desc)
-{
-
-	ACPI_FUNCTION_TRACE(tb_uninstall_table);
-
-	/* Table must be installed */
-
-	if (!table_desc->address) {
-		return_VOID;
-	}
-
-	acpi_tb_invalidate_table(table_desc);
-
-	if ((table_desc->flags & ACPI_TABLE_ORIGIN_MASK) ==
-	    ACPI_TABLE_ORIGIN_INTERNAL_VIRTUAL) {
-		ACPI_FREE(ACPI_PHYSADDR_TO_PTR(table_desc->address));
-	}
-
-	table_desc->address = ACPI_PTR_TO_PHYSADDR(NULL);
-	return_VOID;
 }

@@ -475,9 +475,9 @@ acpi_ex_load_op(union acpi_operand_object *obj_desc,
 	ACPI_INFO(("Dynamic OEM Table Load:"));
 	(void)acpi_ut_acquire_mutex(ACPI_MTX_TABLES);
 
-	status = acpi_tb_install_standard_table(ACPI_PTR_TO_PHYSADDR(table),
-						ACPI_TABLE_ORIGIN_INTERNAL_VIRTUAL,
-						TRUE, TRUE, &table_index);
+	status = acpi_tb_verify_and_install_table(ACPI_PTR_TO_PHYSADDR(table),
+						  ACPI_TABLE_ORIGIN_INTERNAL_VIRTUAL,
+						  TRUE, TRUE, &table_index);
 
 	(void)acpi_ut_release_mutex(ACPI_MTX_TABLES);
 	if (ACPI_FAILURE(status)) {
