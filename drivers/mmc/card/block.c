@@ -46,6 +46,9 @@
 
 #include "queue.h"
 
+#define CREATE_TRACE_POINTS
+#include <trace/events/mmc.h>
+
 MODULE_ALIAS("mmc:block");
 #ifdef MODULE_PARAM_PREFIX
 #undef MODULE_PARAM_PREFIX
@@ -1717,6 +1720,7 @@ static u8 mmc_blk_prep_packed_list(struct mmc_queue *mq, struct request *req)
 		if (phys_segments > max_phys_segs)
 			break;
 
+		trace_mmc_block_packed_req(next);
 		list_add_tail(&next->queuelist, &mqrq->packed->list);
 		cur = next;
 		reqs++;
@@ -1878,6 +1882,7 @@ static int mmc_blk_end_packed_req(struct mmc_queue_req *mq_rq)
 		}
 		list_del_init(&prq->queuelist);
 		blk_end_request(prq, 0, blk_rq_bytes(prq));
+		trace_mmc_block_req_done(prq);
 		i++;
 	}
 
@@ -1993,6 +1998,7 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 			} else {
 				ret = blk_end_request(req, 0,
 						brq->data.bytes_xfered);
+				trace_mmc_block_req_done(req);
 			}
 
 			/*

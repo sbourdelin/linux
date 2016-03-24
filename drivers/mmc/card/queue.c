@@ -16,6 +16,7 @@
 #include <linux/kthread.h>
 #include <linux/scatterlist.h>
 #include <linux/dma-mapping.h>
+#include <trace/events/mmc.h>
 
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
@@ -63,6 +64,9 @@ static int mmc_queue_thread(void *d)
 		req = blk_fetch_request(q);
 		mq->mqrq_cur->req = req;
 		spin_unlock_irq(q->queue_lock);
+
+		if (req)
+			trace_mmc_queue_fetch(req);
 
 		if (req || mq->mqrq_prev->req) {
 			set_current_state(TASK_RUNNING);
