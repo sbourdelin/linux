@@ -323,6 +323,89 @@ out:
 }
 
 static const char *
+scsi_trace_zbc_in(struct trace_seq *p, unsigned char *cdb, int len)
+{
+	const char *ret = trace_seq_buffer_ptr(p), *cmd;
+	sector_t zone_id = 0;
+	u32 alloc_len = 0;
+	u8 options;
+
+	switch (SERVICE_ACTION16(cdb)) {
+	case ZI_REPORT_ZONES:
+		cmd = "REPORT_ZONES";
+		break;
+	default:
+		trace_seq_puts(p, "UNKNOWN");
+		goto out;
+	}
+
+	zone_id |= ((u64)cdb[2] << 56);
+	zone_id |= ((u64)cdb[3] << 48);
+	zone_id |= ((u64)cdb[4] << 40);
+	zone_id |= ((u64)cdb[5] << 32);
+	zone_id |= (cdb[6] << 24);
+	zone_id |= (cdb[7] << 16);
+	zone_id |= (cdb[8] << 8);
+	zone_id |=  cdb[9];
+	alloc_len |= (cdb[10] << 24);
+	alloc_len |= (cdb[11] << 16);
+	alloc_len |= (cdb[12] << 8);
+	alloc_len |=  cdb[13];
+	options = cdb[14] & 0x3f;
+
+	trace_seq_printf(p, "%s zone=%llu alloc_len=%u options=%u partial=%u",
+			 cmd, (unsigned long long)zone_id, alloc_len,
+			 options, (cdb[14] >> 7) & 1);
+
+out:
+	trace_seq_putc(p, 0);
+
+	return ret;
+}
+
+static const char *
+scsi_trace_zbc_out(struct trace_seq *p, unsigned char *cdb, int len)
+{
+	const char *ret = trace_seq_buffer_ptr(p), *cmd;
+	sector_t zone_id = 0;
+
+	switch (SERVICE_ACTION16(cdb)) {
+	case ZO_CLOSE_ZONE:
+		cmd = "CLOSE_ZONE";
+		break;
+	case ZO_FINISH_ZONE:
+		cmd = "FINISH_ZONE";
+		break;
+	case ZO_OPEN_ZONE:
+		cmd = "OPEN_ZONE";
+		break;
+	case ZO_RESET_WRITE_POINTER:
+		cmd = "RESET_WRITE_POINTER";
+		break;
+	default:
+		trace_seq_puts(p, "UNKNOWN");
+		goto out;
+	}
+
+	zone_id |= ((u64)cdb[2] << 56);
+	zone_id |= ((u64)cdb[3] << 48);
+	zone_id |= ((u64)cdb[4] << 40);
+	zone_id |= ((u64)cdb[5] << 32);
+	zone_id |= (cdb[6] << 24);
+	zone_id |= (cdb[7] << 16);
+	zone_id |= (cdb[8] << 8);
+	zone_id |=  cdb[9];
+
+	trace_seq_printf(p, "%s zone=%llu all=%u", cmd,
+			 (unsigned long long)zone_id, cdb[14] & 1);
+
+out:
+	trace_seq_putc(p, 0);
+
+	return ret;
+}
+
+static const char *
 scsi_trace_varlen(struct trace_seq *p, unsigned char *cdb, int len)
 {
 	switch (SERVICE_ACTION32(cdb)) {
@@ -378,6 +461,10 @@ scsi_trace_parse_cdb(struct trace_seq *p, unsigned char *cdb, int len)
 		return scsi_trace_maintenance_in(p, cdb, len);
 	case MAINTENANCE_OUT:
 		return scsi_trace_maintenance_out(p, cdb, len);
+	case ZBC_IN:
+		return scsi_trace_zbc_in(p, cdb, len);
+	case ZBC_OUT:
+		return scsi_trace_zbc_out(p, cdb, len);
 	default:
 		return scsi_trace_misc(p, cdb, len);
 	}
