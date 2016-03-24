@@ -103,6 +103,31 @@ static inline void debug_spin_unlock(raw_spinlock_t *lock)
 	lock->owner_cpu = -1;
 }
 
+static raw_spinlock_t *sus_lock;
+static unsigned int sus_cpu = -1;
+static pid_t sus_pid = -1;
+
+static inline void enter_lockup_suspected(raw_spinlock_t *lock)
+{
+	sus_lock = lock;
+	sus_cpu = raw_smp_processor_id();
+	sus_pid = task_pid_nr(current);
+}
+
+static inline void exit_lockup_suspected(raw_spinlock_t *lock)
+{
+	sus_lock = NULL;
+	sus_cpu = -1;
+	sus_pid = -1;
+}
+
+static inline int detect_recursive_lockup_suspected(raw_spinlock_t *lock)
+{
+	return sus_lock == lock &&
+	       sus_cpu == raw_smp_processor_id() &&
+	       sus_pid == task_pid_nr(current);
+}
+
 static void __spin_lock_debug(raw_spinlock_t *lock)
 {
 	u64 i;
@@ -114,7 +139,11 @@ static void __spin_lock_debug(raw_spinlock_t *lock)
 		__delay(1);
 	}
 	/* lockup suspected: */
-	spin_dump(lock, "lockup suspected");
+	if (likely(!detect_recursive_lockup_suspected(lock))) {
+		enter_lockup_suspected(lock);
+		spin_dump(lock, "lockup suspected");
+		exit_lockup_suspected(lock);
+	}
 #ifdef CONFIG_SMP
 	trigger_all_cpu_backtrace();
 #endif
