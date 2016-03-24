@@ -152,7 +152,7 @@ acpi_hw_validate_register(struct acpi_generic_address *reg,
  *
  ******************************************************************************/
 
-acpi_status acpi_hw_read(u32 *value, struct acpi_generic_address *reg)
+acpi_status acpi_hw_read(u32 *value, struct acpi_generic_address * reg)
 {
 	u64 address;
 	u64 value64;
