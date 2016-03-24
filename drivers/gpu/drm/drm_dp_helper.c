@@ -244,6 +244,13 @@ static int drm_dp_dpcd_access(struct drm_dp_aux *aux, u8 request,
 ssize_t drm_dp_dpcd_read(struct drm_dp_aux *aux, unsigned int offset,
 			 void *buffer, size_t size)
 {
+	/*
+	 * Sometimes we just get the same incorrect byte repeated over the
+	 * entire buffer. Doing one throw away read initially seems to "solve"
+	 * it.
+	 */
+	drm_dp_dpcd_access(aux, DP_AUX_NATIVE_READ, DP_DPCD_REV, buffer, 1);
+
 	return drm_dp_dpcd_access(aux, DP_AUX_NATIVE_READ, offset, buffer,
 				  size);
 }
