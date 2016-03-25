@@ -81,7 +81,8 @@ static bool init_stack_slab(void **prealloc)
 {
 	if (!*prealloc)
 		return false;
-	/* This smp_load_acquire() pairs with smp_store_release() to
+	/*
+	 * This smp_load_acquire() pairs with smp_store_release() to
 	 * |next_slab_inited| below and in depot_alloc_stack().
 	 */
 	if (smp_load_acquire(&next_slab_inited))
@@ -90,7 +91,8 @@ static bool init_stack_slab(void **prealloc)
 		stack_slabs[depot_index] = *prealloc;
 	} else {
 		stack_slabs[depot_index + 1] = *prealloc;
-		/* This smp_store_release pairs with smp_load_acquire() from
+		/*
+		 * This smp_store_release pairs with smp_load_acquire() from
 		 * |next_slab_inited| above and in depot_save_stack().
 		 */
 		smp_store_release(&next_slab_inited, 1);
@@ -116,7 +118,8 @@ static struct stack_record *depot_alloc_stack(unsigned long *entries, int size,
 		}
 		depot_index++;
 		depot_offset = 0;
-		/* smp_store_release() here pairs with smp_load_acquire() from
+		/*
+		 * smp_store_release() here pairs with smp_load_acquire() from
 		 * |next_slab_inited| in depot_save_stack() and
 		 * init_stack_slab().
 		 */
@@ -186,7 +189,7 @@ void depot_fetch_stack(depot_stack_handle_t handle, struct stack_trace *trace)
 	trace->skip = 0;
 }
 
-/*
+/**
  * depot_save_stack - save stack in a stack depot.
  * @trace - the stacktrace to save.
  * @alloc_flags - flags for allocating additional memory if required.
@@ -213,8 +216,8 @@ depot_stack_handle_t depot_save_stack(struct stack_trace *trace,
 
 	bucket = &stack_table[hash & STACK_HASH_MASK];
 
-	/* Fast path: look the stack trace up without locking.
-	 *
+	/*
+	 * Fast path: look the stack trace up without locking.
 	 * The smp_load_acquire() here pairs with smp_store_release() to
 	 * |bucket| below.
 	 */
@@ -223,7 +226,8 @@ depot_stack_handle_t depot_save_stack(struct stack_trace *trace,
 	if (found)
 		goto exit;
 
-	/* Check if the current or the next stack slab need to be initialized.
+	/*
+	 * Check if the current or the next stack slab need to be initialized.
 	 * If so, allocate the memory - we won't be able to do that under the
 	 * lock.
 	 *
@@ -231,7 +235,8 @@ depot_stack_handle_t depot_save_stack(struct stack_trace *trace,
 	 * |next_slab_inited| in depot_alloc_stack() and init_stack_slab().
 	 */
 	if (unlikely(!smp_load_acquire(&next_slab_inited))) {
-		/* Zero out zone modifiers, as we don't have specific zone
+		/*
+		 * Zero out zone modifiers, as we don't have specific zone
 		 * requirements. Keep the flags related to allocation in atomic
 		 * contexts and I/O.
 		 */
@@ -251,7 +256,8 @@ depot_stack_handle_t depot_save_stack(struct stack_trace *trace,
 					  hash, &prealloc, alloc_flags);
 		if (new) {
 			new->next = *bucket;
-			/* This smp_store_release() pairs with
+			/*
+			 * This smp_store_release() pairs with
 			 * smp_load_acquire() from |bucket| above.
 			 */
 			smp_store_release(bucket, new);
