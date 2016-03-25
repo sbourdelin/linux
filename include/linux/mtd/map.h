@@ -155,7 +155,7 @@ static inline int map_bankwidth(void *map)
 #define MAX_MAP_BANKWIDTH 1
 #endif
 
-static inline int map_bankwidth_supported(int w)
+static inline bool map_bankwidth_supported(int w)
 {
 	switch (w) {
 #ifdef CONFIG_MTD_MAP_BANK_WIDTH_1
@@ -176,10 +176,10 @@ static inline int map_bankwidth_supported(int w)
 #ifdef CONFIG_MTD_MAP_BANK_WIDTH_32
 	case 32:
 #endif
-		return 1;
+		return true;
 
 	default:
-		return 0;
+		return false;
 	}
 }
 
