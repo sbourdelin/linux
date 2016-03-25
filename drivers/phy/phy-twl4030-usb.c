@@ -735,7 +735,7 @@ static int twl4030_usb_probe(struct platform_device *pdev)
 	}
 
 	if (pdata)
-		err = phy_create_lookup(phy, "usb", "musb-hdrc.0");
+		err = phy_create_lookup(phy, "usb", "musb-hdrc.0.auto");
 	if (err)
 		return err;
 
