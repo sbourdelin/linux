@@ -133,6 +133,7 @@ config AT91_ADC
 
 config AT91_SAMA5D2_ADC
 	tristate "Atmel AT91 SAMA5D2 ADC"
+	depends on HAS_IOMEM
 	depends on ARCH_AT91 || COMPILE_TEST
 	help
 	  Say yes here to build support for Atmel SAMA5D2 ADC which is
