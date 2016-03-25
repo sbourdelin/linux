@@ -26,6 +26,48 @@ static struct gen_pool *mce_evt_pool;
 static LLIST_HEAD(mce_event_llist);
 static char gen_pool_buf[MCE_POOLSZ];
 
+static bool duplicate_mce_record(struct mce_evt_llist *t, struct mce_evt_llist *l)
+{
+	struct mce_evt_llist *node;
+	struct mce *m1, *m2;
+
+	m1 = &t->mce;
+
+	llist_for_each_entry(node, &l->llnode, llnode) {
+		m2 = &node->mce;
+
+		if (dup_mce_record(m1, m2))
+			return true;
+	}
+	return false;
+}
+
+/*
+ * The system has paniced - we'd like to peruse the list of mce records
+ * that have been queued, but not seen by anyone yet.  The list is in
+ * reverse time order, so we need to reverse it. While doing that we can
+ * also drop duplicate records (these were logged because some banks are
+ * shared between cores or by all threads on a socket).
+ */
+struct llist_node *mce_gen_pool_panic(void)
+{
+	struct llist_node *head;
+	LLIST_HEAD(new_head);
+	struct mce_evt_llist *node, *t;
+
+	head = llist_del_all(&mce_event_llist);
+	if (!head)
+		return NULL;
+
+	/* squeeze out duplicates while reversing order */
+	llist_for_each_entry_safe(node, t, head, llnode) {
+		if (!duplicate_mce_record(node, t))
+			llist_add(&node->llnode, &new_head);
+	}
+
+	return new_head.first;
+}
+
 void mce_gen_pool_process(void)
 {
 	struct llist_node *head;

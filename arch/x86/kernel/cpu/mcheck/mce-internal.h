@@ -35,6 +35,7 @@ void mce_gen_pool_process(void);
 bool mce_gen_pool_empty(void);
 int mce_gen_pool_add(struct mce *mce);
 int mce_gen_pool_init(void);
+struct llist_node *mce_gen_pool_panic(void);
 
 extern int (*mce_severity)(struct mce *a, int tolerant, char **msg, bool is_excp);
 struct dentry *mce_get_debugfs_dir(void);
@@ -81,3 +82,12 @@ static inline int apei_clear_mce(u64 record_id)
 #endif
 
 void mce_inject_log(struct mce *m);
+
+/*
+ * We consider records to be duplicate if bank+status+addr+misc all match
+ */
+static inline bool dup_mce_record(struct mce *m1, struct mce *m2)
+{
+	return m1->bank == m2->bank && m1->status == m2->status &&
+		m1->addr == m2->addr && m1->misc == m2->misc;
+}
