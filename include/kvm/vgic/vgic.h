@@ -206,6 +206,21 @@ int kvm_vgic_hyp_init(void);
 
 int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
 			bool level);
+int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+			       bool level);
+
+/*
+ * This is not really needed, but we need this type to keep the arch
+ * timer compatible with the old VGIC implementation.
+ * This should be removed upon retiring the old VGIC.
+ */
+struct irq_phys_map {};
+
+struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+					   u32 virt_irq, u32 irq);
+int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map,
+			    u32 intid);
+bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, u32 intid);
 
 int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
 
