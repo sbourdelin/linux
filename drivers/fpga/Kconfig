@@ -20,6 +20,7 @@ config FPGA_MGR_SOCFPGA
 	  FPGA manager driver support for Altera SOCFPGA.
 
 config FPGA_MGR_ZYNQ_FPGA
+	depends on HAS_DMA
 	tristate "Xilinx Zynq FPGA"
 	help
 	  FPGA manager driver support for Xilinx Zynq FPGAs.
