@@ -319,6 +319,51 @@ static ssize_t sta_vht_capa_read(struct file *file, char __user *userbuf,
 }
 STA_OPS(vht_capa);
 
+static ssize_t sta_txqs_read(struct file *file,
+			     char __user *userbuf,
+			     size_t count,
+			     loff_t *ppos)
+{
+	struct sta_info *sta = file->private_data;
+	struct txq_info *txqi;
+	char *buf;
+	int buflen;
+	int len;
+	int res;
+	int i;
+
+	len = 0;
+	buflen = 200 * IEEE80211_NUM_TIDS;
+	buf = kzalloc(buflen, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	for (i = 0; i < IEEE80211_NUM_TIDS; i++) {
+		if (!sta->sta.txq[i])
+			break;
+
+		txqi = to_txq_info(sta->sta.txq[i]);
+		len += scnprintf(buf + len, buflen - len,
+				 "TID %d AC %d backlog %ub %up flows %u drops %u overlimit %u collisions %u tx %ub %up\n",
+				 i,
+				 txqi->txq.ac,
+				 txqi->backlog_bytes,
+				 txqi->backlog_packets,
+				 txqi->flows,
+				 txqi->drop_codel,
+				 txqi->drop_overlimit,
+				 txqi->collisions,
+				 txqi->tx_bytes,
+				 txqi->tx_packets);
+	}
+
+	res = simple_read_from_buffer(userbuf, count, ppos, buf, len);
+	kfree(buf);
+
+	return res;
+}
+STA_OPS(txqs);
+
 
 #define DEBUGFS_ADD(name) \
 	debugfs_create_file(#name, 0400, \
@@ -365,6 +410,7 @@ void ieee80211_sta_debugfs_add(struct sta_info *sta)
 	DEBUGFS_ADD(agg_status);
 	DEBUGFS_ADD(ht_capa);
 	DEBUGFS_ADD(vht_capa);
+	DEBUGFS_ADD(txqs);
 
 	DEBUGFS_ADD_COUNTER(rx_duplicates, rx_stats.num_duplicates);
 	DEBUGFS_ADD_COUNTER(rx_fragments, rx_stats.fragments);

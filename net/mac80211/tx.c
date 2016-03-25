@@ -36,6 +36,11 @@
 #include "rate.h"
 #include "codel.h"
 
+static unsigned int fq_flows_cnt = 4096;
+module_param(fq_flows_cnt, uint, 0644);
+MODULE_PARM_DESC(fq_flows_cnt,
+		 "Maximum number of txq fair queuing flows. ");
+
 /* misc utils */
 
 static inline void ieee80211_tx_stats(struct net_device *dev, u32 len)
@@ -1347,7 +1352,7 @@ int ieee80211_setup_flows(struct ieee80211_local *local)
 	memset(fq, 0, sizeof(fq[0]));
 	INIT_LIST_HEAD(&fq->backlogs);
 	spin_lock_init(&fq->lock);
-	fq->flows_cnt = 4096;
+	fq->flows_cnt = max_t(u32, fq_flows_cnt, 1);
 	fq->perturbation = prandom_u32();
 	fq->quantum = 300;
 	fq->txq_limit = 8192;
