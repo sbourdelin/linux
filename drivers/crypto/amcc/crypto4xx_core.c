@@ -90,6 +90,7 @@ static void crypto4xx_hw_init(struct crypto4xx_device *dev)
 	writel(ring_ctrl.w, dev->ce_base + CRYPTO4XX_RING_CTRL);
 	device_ctrl = readl(dev->ce_base + CRYPTO4XX_DEVICE_CTRL);
 	device_ctrl |= PPC4XX_DC_3DES_EN;
+	device_ctrl |= PPC4XX_TRNGE;
 	writel(device_ctrl, dev->ce_base + CRYPTO4XX_DEVICE_CTRL);
 	writel(dev->gdr_pa, dev->ce_base + CRYPTO4XX_GATH_RING_BASE);
 	writel(dev->sdr_pa, dev->ce_base + CRYPTO4XX_SCAT_RING_BASE);
