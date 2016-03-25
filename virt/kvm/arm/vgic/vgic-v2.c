@@ -13,13 +13,28 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef __KVM_ARM_VGIC_NEW_H__
-#define __KVM_ARM_VGIC_NEW_H__
 
-struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
-			      u32 intid);
-bool vgic_queue_irq(struct kvm *kvm, struct vgic_irq *irq);
+#include <linux/kvm.h>
+#include <linux/kvm_host.h>
 
-void vgic_v2_irq_change_affinity(struct kvm *kvm, u32 intid, u8 target);
+#include "vgic.h"
 
-#endif
+void vgic_v2_irq_change_affinity(struct kvm *kvm, u32 intid, u8 new_targets)
+{
+	struct vgic_dist *dist = &kvm->arch.vgic;
+	struct vgic_irq *irq;
+	int target;
+
+	BUG_ON(intid <= VGIC_MAX_PRIVATE);
+	BUG_ON(dist->vgic_model != KVM_DEV_TYPE_ARM_VGIC_V2);
+
+	irq = vgic_get_irq(kvm, NULL, intid);
+
+	spin_lock(&irq->irq_lock);
+	irq->targets = new_targets;
+
+	target = ffs(irq->targets);
+	target = target ? (target - 1) : 0;
+	irq->target_vcpu = kvm_get_vcpu(kvm, target);
+	spin_unlock(&irq->irq_lock);
+}
