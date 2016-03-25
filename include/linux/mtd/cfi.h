@@ -81,7 +81,7 @@ static inline int cfi_interleave(void *cfi)
 }
 #endif
 
-static inline int cfi_interleave_supported(int i)
+static inline bool cfi_interleave_supported(int i)
 {
 	switch (i) {
 #ifdef CONFIG_MTD_CFI_I1
@@ -96,10 +96,10 @@ static inline int cfi_interleave_supported(int i)
 #ifdef CONFIG_MTD_CFI_I8
 	case 8:
 #endif
-		return 1;
+		return true;
 
 	default:
-		return 0;
+		return false;
 	}
 }
 
