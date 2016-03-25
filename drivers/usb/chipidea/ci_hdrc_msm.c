@@ -5,6 +5,7 @@
  * only version 2 as published by the Free Software Foundation.
  */
 
+#include <linux/dma-mapping.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
@@ -56,6 +57,7 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
 {
 	struct platform_device *plat_ci;
 	struct usb_phy *phy;
+	int ret;
 
 	dev_dbg(&pdev->dev, "ci_hdrc_msm_probe\n");
 
@@ -69,6 +71,10 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
 		return PTR_ERR(phy);
 
 	ci_hdrc_msm_platdata.usb_phy = phy;
+
+	ret = ci_hdrc_set_dma_mask(&pdev->dev, DMA_BIT_MASK(64));
+	if (ret)
+		return ret;
 
 	plat_ci = ci_hdrc_add_device(&pdev->dev,
 				pdev->resource, pdev->num_resources,

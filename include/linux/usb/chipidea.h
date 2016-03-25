@@ -84,4 +84,6 @@ struct platform_device *ci_hdrc_add_device(struct device *dev,
 /* Remove ci hdrc device */
 void ci_hdrc_remove_device(struct platform_device *pdev);
 
+int ci_hdrc_set_dma_mask(struct device *dev, u64 ci_coherent_dma_mask);
+
 #endif

@@ -62,6 +62,7 @@
 #include <linux/usb/chipidea.h>
 #include <linux/usb/of.h>
 #include <linux/of.h>
+#include <linux/of_device.h>
 #include <linux/phy.h>
 #include <linux/regulator/consumer.h>
 #include <linux/usb/ehci_def.h>
@@ -807,6 +808,30 @@ static void ci_extcon_unregister(struct ci_hdrc *ci)
 }
 
 static DEFINE_IDA(ci_ida);
+
+/**
+ * ci_hdrc_set_dma_mask
+ *
+ * Set dma mask and coherent dma mask for glue layer device, and the core
+ * device will inherit these values. If the 'dma-ranges' is specified at
+ * DT, it will use this value for both dma mask and coherent dma mask.
+ *
+ * @dev: a pointer to the device struct of glue layer device
+ * @ci_coherent_dma_mask: the mask for both dma_mask and cohrent_dma_mask
+ */
+int ci_hdrc_set_dma_mask(struct device *dev, u64 ci_coherent_dma_mask)
+{
+	int ret = dma_set_mask_and_coherent(dev, ci_coherent_dma_mask);
+	if (ret) {
+		dev_err(dev, "dma_set_mask_and_coherent fails\n");
+		return ret;
+	}
+
+	if (dev_of_node(dev))
+		of_dma_configure(dev, dev->of_node);
+
+	return ret;
+}
 
 struct platform_device *ci_hdrc_add_device(struct device *dev,
 			struct resource *res, int nres,
