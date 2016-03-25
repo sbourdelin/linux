@@ -149,13 +149,38 @@
 						rx = <&pio3 5 ALT1 IN>;
 					};
 				};
+
+				pinctrl_sbc_serial0_rts: sbc_serial0_rts {
+					st,pins {
+						rts = <&pio3 7 ALT1 OUT>;
+					};
+				};
+
+				pinctrl_sbc_serial0_cts: sbc_serial0_cts {
+					st,pins {
+						cts = <&pio3 6 ALT1 IN>;
+					};
+				};
 			};
+
 			/* SBC_ASC1 - UART11 */
 			sbc_serial1 {
 				pinctrl_sbc_serial1: sbc_serial1-0 {
 					st,pins {
 						tx = <&pio2 6 ALT3 OUT>;
 						rx = <&pio2 7 ALT3 IN>;
+					};
+				};
+
+				pinctrl_sbc_serial1_rts: sbc_serial1_rts {
+					st,pins {
+						rts = <&pio3 1 ALT3 OUT>;
+					};
+				};
+
+				pinctrl_sbc_serial1_cts: sbc_serial1_cts {
+					st,pins {
+						cts = <&pio3 0 ALT3 IN>;
 					};
 				};
 			};
@@ -478,6 +503,18 @@
 						rx = <&pio15 1 ALT1 IN>;
 					};
 				};
+
+				pinctrl_serial0_rts: serial0_rts {
+					st,pins {
+						rts = <&pio17 3 ALT1 OUT>;
+					};
+				};
+
+				pinctrl_serial0_cts: serial0_cts {
+					st,pins {
+						cts = <&pio17 2 ALT1 IN>;
+					};
+				};
 			};
 
 			mmc1 {
@@ -495,6 +532,18 @@
 						sd_wp = <&pio19 1 ALT6 IN>;
 					};
 				};
+
+				pinctrl_serial1_rts: serial1_rts {
+					st,pins {
+						rts = <&pio16 3 ALT1 OUT>;
+					};
+				};
+
+				pinctrl_serial1_cts: serial1_cts {
+					st,pins {
+						cts = <&pio16 2 ALT1 IN>;
+					};
+				};
 			};
 
 
@@ -503,6 +552,18 @@
 					st,pins {
 						sda = <&pio10 6 ALT2 BIDIR>;
 						scl = <&pio10 5 ALT2 BIDIR>;
+					};
+				};
+
+				pinctrl_serial2_rts: serial2_rts {
+					st,pins {
+						rts = <&pio15 3 ALT1 OUT>;
+					};
+				};
+
+				pinctrl_serial2_cts: serial2_cts {
+					st,pins {
+						cts = <&pio15 2 ALT1 IN>;
 					};
 				};
 			};
@@ -1072,6 +1133,18 @@
 					st,pins {
 						tx = <&pio31 3 ALT1 OUT>;
 						rx = <&pio31 4 ALT1 IN>;
+					};
+				};
+
+				pinctrl_serial3_rts: serial3_rts {
+					st,pins {
+						rts = <&pio31 6 ALT1 OUT>;
+					};
+				};
+
+				pinctrl_serial3_cts: serial3_cts {
+					st,pins {
+						cts = <&pio31 5 ALT1 IN>;
 					};
 				};
 			};
