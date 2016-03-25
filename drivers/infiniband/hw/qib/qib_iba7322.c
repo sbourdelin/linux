@@ -3355,10 +3355,10 @@ static void reset_dca_notifier(struct qib_devdata *dd, struct qib_msix_entry *m)
 		"Disabling notifier on HCA %d irq %d\n",
 		dd->unit,
 		m->msix.vector);
-	irq_set_affinity_notifier(
-		m->msix.vector,
-		NULL);
-	m->notifier = NULL;
+	if (m->notifier != NULL) {
+		irq_del_affinity_notifier(&m->notifier->notify);
+		m->notifier = NULL;
+	}
 }
 
 static void setup_dca_notifier(struct qib_devdata *dd, struct qib_msix_entry *m)

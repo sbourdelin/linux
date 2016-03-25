@@ -267,6 +267,8 @@ extern int irq_set_affinity_hint(unsigned int irq, const struct cpumask *m);
 
 extern int
 irq_set_affinity_notifier(unsigned int irq, struct irq_affinity_notify *notify);
+extern int
+irq_del_affinity_notifier(struct irq_affinity_notify *notify);
 
 #else /* CONFIG_SMP */
 

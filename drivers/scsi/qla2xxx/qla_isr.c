@@ -3017,7 +3017,7 @@ qla24xx_disable_msix(struct qla_hw_data *ha)
 		qentry = &ha->msix_entries[i];
 		if (qentry->have_irq) {
 			/* un-register irq cpu affinity notification */
-			irq_set_affinity_notifier(qentry->vector, NULL);
+			irq_del_affinity_notifier(&qentry->irq_notify);
 			free_irq(qentry->vector, qentry->rsp);
 		}
 	}

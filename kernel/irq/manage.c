@@ -282,39 +282,67 @@ out:
 }
 
 /**
- *	irq_set_affinity_notifier - control notification of IRQ affinity changes
- *	@irq:		Interrupt for which to enable/disable notification
- *	@notify:	Context for notification, or %NULL to disable
- *			notification.  Function pointers must be initialised;
+ *	irq_set_affinity_notifier - set notification of IRQ affinity changes
+ *	@irq:		Interrupt for which to enable notification
+ *	@notify:	Context for notification.
+ *			Function pointers must be initialised;
  *			the other fields will be initialised by this function.
  *
- *	Must be called in process context.  Notification may only be enabled
- *	after the IRQ is allocated and must be disabled before the IRQ is
- *	freed using free_irq().
+ *	Notification may only be enabled after the IRQ is allocated.
  */
 int
 irq_set_affinity_notifier(unsigned int irq, struct irq_affinity_notify *notify)
 {
 	struct irq_desc *desc = irq_to_desc(irq);
+	unsigned long flags;
+
+	if (!desc)
+		return -EINVAL;
+	if (!notify)
+		return -EINVAL;
+
+	raw_spin_lock_irqsave(&desc->lock, flags);
+	if (desc->affinity_notify != NULL) {
+		raw_spin_unlock_irqrestore(&desc->lock, flags);
+		return -EEXIST;
+	}
+	notify->irq = irq;
+	kref_init(&notify->kref);
+	INIT_WORK(&notify->work, irq_affinity_notify);
+
+	desc->affinity_notify = notify;
+	raw_spin_unlock_irqrestore(&desc->lock, flags);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(irq_set_affinity_notifier);
+
+/**
+ *	irq_del_affinity_notifier - delete notification of IRQ affinity changes
+ *	@notify:	Context for notification.
+ *
+ *	Must be called in process context.  Notification must be disabled
+ *	before the IRQ is freed using free_irq().
+ */
+int
+irq_del_affinity_notifier(struct irq_affinity_notify *notify)
+{
+	struct irq_desc *desc;
 	struct irq_affinity_notify *old_notify;
 	unsigned long flags;
 
 	/* The release function is promised process context */
 	might_sleep();
 
+	if (!notify)
+		return -EINVAL;
+	desc = irq_to_desc(notify->irq);
 	if (!desc)
 		return -EINVAL;
 
-	/* Complete initialisation of *notify */
-	if (notify) {
-		notify->irq = irq;
-		kref_init(&notify->kref);
-		INIT_WORK(&notify->work, irq_affinity_notify);
-	}
-
 	raw_spin_lock_irqsave(&desc->lock, flags);
 	old_notify = desc->affinity_notify;
-	desc->affinity_notify = notify;
+	desc->affinity_notify = NULL;
 	raw_spin_unlock_irqrestore(&desc->lock, flags);
 
 	if (old_notify)
@@ -322,7 +350,7 @@ irq_set_affinity_notifier(unsigned int irq, struct irq_affinity_notify *notify)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(irq_set_affinity_notifier);
+EXPORT_SYMBOL_GPL(irq_del_affinity_notifier);
 
 #ifndef CONFIG_AUTO_IRQ_AFFINITY
 /*
