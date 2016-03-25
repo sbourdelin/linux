@@ -334,7 +334,7 @@ static void handle_tx(struct vhost_net *net)
 		head = vhost_get_vq_desc(vq, vq->iov,
 					 ARRAY_SIZE(vq->iov),
 					 &out, &in,
-					 NULL, NULL);
+					 NULL, NULL, VHOST_ACCESS_RO);
 		/* On error, stop handling until the next kick. */
 		if (unlikely(head < 0))
 			break;
@@ -470,7 +470,7 @@ static int get_rx_bufs(struct vhost_virtqueue *vq,
 		}
 		r = vhost_get_vq_desc(vq, vq->iov + seg,
 				      ARRAY_SIZE(vq->iov) - seg, &out,
-				      &in, log, log_num);
+				      &in, log, log_num, VHOST_ACCESS_WO);
 		if (unlikely(r < 0))
 			goto err;
 
@@ -1083,7 +1083,7 @@ static long vhost_net_ioctl(struct file *f, unsigned int ioctl,
 		r = vhost_dev_ioctl(&n->dev, ioctl, argp);
 		if (r == -ENOIOCTLCMD)
 			r = vhost_vring_ioctl(&n->dev, ioctl, argp);
-		else
+		else if (ioctl != VHOST_UPDATE_IOTLB)
 			vhost_net_flush(n);
 		mutex_unlock(&n->dev.mutex);
 		return r;
