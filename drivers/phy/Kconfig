@@ -127,6 +127,7 @@ config PHY_RCAR_GEN3_USB2
 
 config OMAP_CONTROL_PHY
 	tristate "OMAP CONTROL PHY Driver"
+	depends on HAS_IOMEM
 	depends on ARCH_OMAP2PLUS || COMPILE_TEST
 	help
 	  Enable this to add support for the PHY part present in the control
