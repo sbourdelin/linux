@@ -993,18 +993,18 @@ static inline bool nand_is_slc(struct nand_chip *chip)
  * Check if the opcode's address should be sent only on the lower 8 bits
  * @command: opcode to check
  */
-static inline int nand_opcode_8bits(unsigned int command)
+static inline bool nand_opcode_8bits(unsigned int command)
 {
 	switch (command) {
 	case NAND_CMD_READID:
 	case NAND_CMD_PARAM:
 	case NAND_CMD_GET_FEATURES:
 	case NAND_CMD_SET_FEATURES:
-		return 1;
+		return true;
 	default:
 		break;
 	}
-	return 0;
+	return false;
 }
 
 /* return the supported JEDEC features. */
