@@ -1867,8 +1867,10 @@ int bitmap_copy_from_slot(struct mddev *mddev, int slot,
 	struct bitmap_counts *counts;
 	struct bitmap *bitmap = bitmap_create(mddev, slot);
 
-	if (IS_ERR(bitmap))
+	if (IS_ERR(bitmap)) {
+		bitmap_destroy(mddev);
 		return PTR_ERR(bitmap);
+	}
 
 	rv = bitmap_init_from_disk(bitmap, 0);
 	if (rv)
@@ -1900,7 +1902,7 @@ int bitmap_copy_from_slot(struct mddev *mddev, int slot,
 	*low = lo;
 	*high = hi;
 err:
-	bitmap_free(bitmap);
+	bitmap_destroy(mddev);
 	return rv;
 }
 EXPORT_SYMBOL_GPL(bitmap_copy_from_slot);
@@ -2172,14 +2174,14 @@ location_store(struct mddev *mddev, const char *buf, size_t len)
 				else {
 					mddev->bitmap = bitmap;
 					rv = bitmap_load(mddev);
-					if (rv) {
-						bitmap_destroy(mddev);
+					if (rv)
 						mddev->bitmap_info.offset = 0;
-					}
 				}
 				mddev->pers->quiesce(mddev, 0);
-				if (rv)
+				if (rv) {
+					bitmap_destroy(mddev);
 					return rv;
+				}
 			}
 		}
 	}
