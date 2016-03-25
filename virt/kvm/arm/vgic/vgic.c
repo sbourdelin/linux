@@ -273,3 +273,207 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
 	vgic_update_irq_pending(kvm, vcpu, intid, level);
 	return 0;
 }
+
+/**
+ * vgic_prune_ap_list - Remove non-relevant interrupts from the list
+ *
+ * @vcpu: The VCPU pointer
+ *
+ * Go over the list of "interesting" interrupts, and prune those that we
+ * won't have to consider in the near future.
+ */
+static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
+{
+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+	struct vgic_irq *irq, *tmp;
+
+retry:
+	spin_lock(&vgic_cpu->ap_list_lock);
+
+	list_for_each_entry_safe(irq, tmp, &vgic_cpu->ap_list_head, ap_list) {
+		struct kvm_vcpu *target_vcpu, *vcpuA, *vcpuB;
+
+		spin_lock(&irq->irq_lock);
+
+		BUG_ON(vcpu != irq->vcpu);
+
+		target_vcpu = vgic_target_oracle(irq);
+
+		if (!target_vcpu) {
+			/*
+			 * We don't need to process this interrupt any
+			 * further, move it off the list.
+			 */
+			list_del_init(&irq->ap_list);
+			irq->vcpu = NULL;
+			spin_unlock(&irq->irq_lock);
+			continue;
+		}
+
+		if (target_vcpu == vcpu) {
+			/* We're on the right CPU */
+			spin_unlock(&irq->irq_lock);
+			continue;
+		}
+
+		/* This interrupt looks like it has to be migrated. */
+
+		spin_unlock(&irq->irq_lock);
+		spin_unlock(&vgic_cpu->ap_list_lock);
+
+		/*
+		 * Ensure locking order by always locking the smallest
+		 * ID first.
+		 */
+		if (vcpu->vcpu_id < target_vcpu->vcpu_id) {
+			vcpuA = vcpu;
+			vcpuB = target_vcpu;
+		} else {
+			vcpuA = target_vcpu;
+			vcpuB = vcpu;
+		}
+
+		spin_lock(&vcpuA->arch.vgic_cpu.ap_list_lock);
+		spin_lock(&vcpuB->arch.vgic_cpu.ap_list_lock);
+		spin_lock(&irq->irq_lock);
+
+		/*
+		 * If the affinity has been preserved, move the
+		 * interrupt around. Otherwise, it means things have
+		 * changed while the interrupt was unlocked, and we
+		 * need to replay this.
+		 *
+		 * In all cases, we cannot trust the list not to have
+		 * changed, so we restart from the beginning.
+		 */
+		if (target_vcpu == vgic_target_oracle(irq)) {
+			struct vgic_cpu *new_cpu = &target_vcpu->arch.vgic_cpu;
+
+			list_del_init(&irq->ap_list);
+			irq->vcpu = target_vcpu;
+			list_add_tail(&irq->ap_list, &new_cpu->ap_list_head);
+		}
+
+		spin_unlock(&irq->irq_lock);
+		spin_unlock(&vcpuB->arch.vgic_cpu.ap_list_lock);
+		spin_unlock(&vcpuA->arch.vgic_cpu.ap_list_lock);
+		goto retry;
+	}
+
+	spin_unlock(&vgic_cpu->ap_list_lock);
+}
+
+static inline void vgic_process_maintenance_interrupt(struct kvm_vcpu *vcpu)
+{
+	if (kvm_vgic_global_state.type == VGIC_V2)
+		vgic_v2_process_maintenance(vcpu);
+	else
+		WARN(1, "GICv3 Not Implemented\n");
+}
+
+static inline void vgic_fold_lr_state(struct kvm_vcpu *vcpu)
+{
+	if (kvm_vgic_global_state.type == VGIC_V2)
+		vgic_v2_fold_lr_state(vcpu);
+	else
+		WARN(1, "GICv3 Not Implemented\n");
+}
+
+/*
+ * Requires the ap_lock to be held.
+ * If irq is not NULL, requires the IRQ lock to be held as well.
+ * If irq is NULL, the list register gets cleared.
+ */
+static inline void vgic_populate_lr(struct kvm_vcpu *vcpu,
+				    struct vgic_irq *irq, int lr)
+{
+	if (kvm_vgic_global_state.type == VGIC_V2)
+		vgic_v2_populate_lr(vcpu, irq, lr);
+	else
+		WARN(1, "GICv3 Not Implemented\n");
+}
+
+static inline void vgic_set_underflow(struct kvm_vcpu *vcpu)
+{
+	if (kvm_vgic_global_state.type == VGIC_V2)
+		vgic_v2_set_underflow(vcpu);
+	else
+		WARN(1, "GICv3 Not Implemented\n");
+}
+
+static int compute_ap_list_depth(struct kvm_vcpu *vcpu)
+{
+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+	struct vgic_irq *irq;
+	int count = 0;
+
+	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
+		spin_lock(&irq->irq_lock);
+		/* GICv2 SGIs can count for more than one... */
+		if (irq->intid < VGIC_NR_SGIS && irq->source)
+			count += hweight8(irq->source);
+		else
+			count++;
+		spin_unlock(&irq->irq_lock);
+	}
+	return count;
+}
+
+/* requires the vcpu ap_lock to be held */
+static void vgic_populate_lrs(struct kvm_vcpu *vcpu)
+{
+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+	u32 model = vcpu->kvm->arch.vgic.vgic_model;
+	struct vgic_irq *irq;
+	int count = 0;
+
+	if (compute_ap_list_depth(vcpu) > vcpu->arch.vgic_cpu.nr_lr) {
+		vgic_set_underflow(vcpu);
+		vgic_sort_ap_list(vcpu);
+	}
+
+	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
+		spin_lock(&irq->irq_lock);
+
+		if (unlikely(vgic_target_oracle(irq) != vcpu))
+			goto next;
+
+		/*
+		 * If we get an SGI with multiple sources, try to get
+		 * them in all at once.
+		 */
+		if (model == KVM_DEV_TYPE_ARM_VGIC_V2 &&
+		    irq->intid < VGIC_NR_SGIS) {
+			while (irq->source && count < vcpu->arch.vgic_cpu.nr_lr)
+				vgic_populate_lr(vcpu, irq, count++);
+		} else {
+			vgic_populate_lr(vcpu, irq, count++);
+		}
+
+next:
+		spin_unlock(&irq->irq_lock);
+
+		if (count == vcpu->arch.vgic_cpu.nr_lr)
+			break;
+	}
+
+	vcpu->arch.vgic_cpu.used_lrs = count;
+
+	/* Nuke remaining LRs */
+	for ( ; count < vcpu->arch.vgic_cpu.nr_lr; count++)
+		vgic_populate_lr(vcpu, NULL, count);
+}
+
+void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+{
+	vgic_process_maintenance_interrupt(vcpu);
+	vgic_fold_lr_state(vcpu);
+	vgic_prune_ap_list(vcpu);
+}
+
+void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+{
+	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
+	vgic_populate_lrs(vcpu);
+	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
+}
