@@ -310,9 +310,9 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
 
 	/* Some boards don't have PCIe reset GPIO. */
 	if (imx6_pcie->reset_gpio) {
-		gpiod_set_value_cansleep(imx6_pcie->reset_gpio, 0);
-		msleep(100);
 		gpiod_set_value_cansleep(imx6_pcie->reset_gpio, 1);
+		msleep(100);
+		gpiod_set_value_cansleep(imx6_pcie->reset_gpio, 0);
 	}
 	return 0;
 
