@@ -188,6 +188,8 @@ void blk_mq_insert_request(struct request *, bool, bool, bool);
 void blk_mq_free_request(struct request *rq);
 void blk_mq_free_hctx_request(struct blk_mq_hw_ctx *, struct request *rq);
 bool blk_mq_can_queue(struct blk_mq_hw_ctx *);
+int blk_mq_estimate_hw_queue_node(unsigned int total_queues,
+	unsigned int index);
 
 enum {
 	BLK_MQ_REQ_NOWAIT	= (1 << 0), /* return when out of requests */

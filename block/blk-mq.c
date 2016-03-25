@@ -2331,6 +2331,27 @@ void blk_mq_free_tag_set(struct blk_mq_tag_set *set)
 }
 EXPORT_SYMBOL(blk_mq_free_tag_set);
 
+int blk_mq_estimate_hw_queue_node(unsigned int total_queues,
+	unsigned int index)
+{
+	unsigned int *map;
+	int node;
+
+	if (total_queues == 1)
+		return NUMA_NO_NODE;
+	map = kzalloc(sizeof(*map) * nr_cpu_ids, GFP_KERNEL);
+	if (!map)
+		return NUMA_NO_NODE;
+	if (blk_mq_update_queue_map(map, total_queues, cpu_online_mask)) {
+		kfree(map);
+		return NUMA_NO_NODE;
+	}
+	node = blk_mq_hw_queue_to_node(map, index);
+	kfree(map);
+	return node;
+}
+EXPORT_SYMBOL(blk_mq_estimate_hw_queue_node);
+
 int blk_mq_update_nr_requests(struct request_queue *q, unsigned int nr)
 {
 	struct blk_mq_tag_set *set = q->tag_set;
