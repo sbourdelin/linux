@@ -17,7 +17,10 @@ config RTLLIB_CRYPTO_CCMP
 	select CRYPTO_AES
 	default y
 	---help---
-	  CCMP crypto driver for rtllib.
+	  CCMP crypto driver for rtllib. This makes
+          the driver compliant with the IEEE 80211i
+          standard. Refer to said standard for more
+          details.
 
 	  If you enabled RTLLIB, you want this.
 
@@ -28,7 +31,9 @@ config RTLLIB_CRYPTO_TKIP
 	select CRYPTO_MICHAEL_MIC
 	default y
 	---help---
-	  TKIP crypto driver for rtllib.
+	  TKIP crypto driver for rtllib.This makes
+          the driver comply with IEEE 80211i standard.
+          Refer to said standard for further details.
 
 	  If you enabled RTLLIB, you want this.
 
@@ -39,6 +44,8 @@ config RTLLIB_CRYPTO_WEP
 	default y
 	---help---
 	  TKIP crypto driver for rtllib.
+          This makes the driver comply with IEEE
+          80211i standard.
 
 	  If you enabled RTLLIB, you want this.
 
