@@ -1220,10 +1220,11 @@ static int fsl_pullup(struct usb_gadget *gadget, int is_on)
 
 	udc = container_of(gadget, struct fsl_udc, gadget);
 
+	udc->softconnect = !!is_on;
+
 	if (!udc->vbus_active)
 		return -EOPNOTSUPP;
 
-	udc->softconnect = (is_on != 0);
 	if (can_pullup(udc))
 		fsl_writel((fsl_readl(&dr_regs->usbcmd) | USB_CMD_RUN_STOP),
 				&dr_regs->usbcmd);
