@@ -826,15 +826,15 @@ void mtd_part_parser_cleanup(struct mtd_partitions *parts)
 	}
 }
 
-int mtd_is_partition(const struct mtd_info *mtd)
+bool mtd_is_partition(const struct mtd_info *mtd)
 {
 	struct mtd_part *part;
-	int ispart = 0;
+	bool ispart = false;
 
 	mutex_lock(&mtd_partitions_mutex);
 	list_for_each_entry(part, &mtd_partitions, list)
 		if (&part->mtd == mtd) {
-			ispart = 1;
+			ispart = true;
 			break;
 		}
 	mutex_unlock(&mtd_partitions_mutex);
