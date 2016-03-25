@@ -951,6 +951,41 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
 	NODE_DATA(nid)->node_spanned_pages = spanned_pages;
 }
 
+#ifndef CONFIG_NO_BOOTMEM
+static void __init setup_bootmem(struct pglist_data *pgdat,
+				 unsigned long start_pfn,
+				 unsigned long end_pfn)
+{
+	unsigned long map_size, addr;
+	phys_addr_t cur[2], range[2];
+	u64 i;
+
+	/* Memory required for bootmem bitmap */
+	map_size = bootmem_bootmap_pages(end_pfn - start_pfn);
+	map_size <<= PAGE_SHIFT;
+	addr = memblock_alloc_try_nid(map_size,
+				      SMP_CACHE_BYTES, pgdat->node_id);
+
+	/* Initialize bootmem allocator */
+	pgdat->bdata = &bootmem_node_data[pgdat->node_id];
+	init_bootmem_node(pgdat, PHYS_PFN(addr), start_pfn, end_pfn);
+
+	/* Release free pages in memblock */
+	range[0] = PFN_PHYS(start_pfn);
+	range[1] = PFN_PHYS(end_pfn);
+	for_each_free_mem_range(i, pgdat->node_id, MEMBLOCK_NONE,
+				&cur[0], &cur[1], NULL) {
+		cur[0] = clamp(cur[0], range[0], range[1]);
+		cur[1] = clamp(cur[1], range[0], range[1]);
+		if (cur[0] >= cur[1])
+			continue;
+
+		memblock_free_early_nid(cur[0], cur[1] - cur[0],
+					pgdat->node_id);
+	}
+}
+#endif /* !CONFIG_NO_BOOTMEM */
+
 void __init initmem_init(void)
 {
 	int nid, cpu;
@@ -977,6 +1012,9 @@ void __init initmem_init(void)
 
 		get_pfn_range_for_nid(nid, &start_pfn, &end_pfn);
 		setup_node_data(nid, start_pfn, end_pfn);
+#ifndef CONFIG_NO_BOOTMEM
+		setup_bootmem(NODE_DATA(nid), start_pfn, end_pfn);
+#endif
 		sparse_memory_present_with_active_regions(nid);
 	}
 
