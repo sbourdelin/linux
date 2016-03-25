@@ -34,6 +34,7 @@
 #include "wpa.h"
 #include "wme.h"
 #include "rate.h"
+#include "codel.h"
 
 /* misc utils */
 
@@ -1232,27 +1233,323 @@ ieee80211_tx_prepare(struct ieee80211_sub_if_data *sdata,
 	return TX_CONTINUE;
 }
 
-static void ieee80211_drv_tx(struct ieee80211_local *local,
-			     struct ieee80211_vif *vif,
-			     struct ieee80211_sta *pubsta,
-			     struct sk_buff *skb)
+static inline u64
+custom_codel_get_enqueue_time(struct sk_buff *skb)
+{
+	return IEEE80211_SKB_CB(skb)->control.enqueue_time;
+}
+
+static inline struct sk_buff *
+flow_dequeue(struct ieee80211_local *local, struct txq_flow *flow)
+{
+	struct ieee80211_fq *fq = &local->fq;
+	struct txq_info *txqi = flow->txqi;
+	struct txq_flow *i;
+	struct sk_buff *skb;
+
+	skb = __skb_dequeue(&flow->queue);
+	if (!skb)
+		return NULL;
+
+	txqi->backlog_bytes -= skb->len;
+	txqi->backlog_packets--;
+	flow->backlog -= skb->len;
+	fq->backlog--;
+
+	if (flow->backlog == 0) {
+		list_del_init(&flow->backlogchain);
+	} else {
+		i = flow;
+
+		list_for_each_entry_continue(i, &fq->backlogs, backlogchain)
+			if (i->backlog < flow->backlog)
+				break;
+
+		list_move_tail(&flow->backlogchain, &i->backlogchain);
+	}
+
+	return skb;
+}
+
+static inline struct sk_buff *
+custom_dequeue(struct codel_vars *vars, void *ptr)
+{
+	struct txq_flow *flow = ptr;
+	struct txq_info *txqi = flow->txqi;
+	struct ieee80211_vif *vif = txqi->txq.vif;
+	struct ieee80211_sub_if_data *sdata = vif_to_sdata(vif);
+	struct ieee80211_local *local = sdata->local;
+
+	return flow_dequeue(local, flow);
+}
+
+static inline void
+custom_drop(struct sk_buff *skb, void *ptr)
+{
+	struct txq_flow *flow = ptr;
+	struct txq_info *txqi = flow->txqi;
+	struct ieee80211_vif *vif = txqi->txq.vif;
+	struct ieee80211_sub_if_data *sdata = vif_to_sdata(vif);
+	struct ieee80211_local *local = sdata->local;
+	struct ieee80211_hw *hw = &local->hw;
+
+	ieee80211_free_txskb(hw, skb);
+
+	txqi->drop_codel++;
+	local->fq.drop_codel++;
+}
+
+static u32 fq_hash(struct ieee80211_fq *fq, struct sk_buff *skb)
+{
+	u32 hash = skb_get_hash_perturb(skb, fq->perturbation);
+
+	return reciprocal_scale(hash, fq->flows_cnt);
+}
+
+static void fq_drop(struct ieee80211_local *local)
+{
+	struct ieee80211_hw *hw = &local->hw;
+	struct ieee80211_fq *fq = &local->fq;
+	struct txq_flow *flow;
+	struct sk_buff *skb;
+
+	flow = list_first_entry_or_null(&fq->backlogs, struct txq_flow,
+					backlogchain);
+	if (WARN_ON_ONCE(!flow))
+		return;
+
+	skb = flow_dequeue(local, flow);
+	if (WARN_ON_ONCE(!skb))
+		return;
+
+	ieee80211_free_txskb(hw, skb);
+
+	flow->txqi->drop_overlimit++;
+	fq->drop_overlimit++;
+}
+
+void ieee80211_init_flow(struct txq_flow *flow)
+{
+	INIT_LIST_HEAD(&flow->flowchain);
+	INIT_LIST_HEAD(&flow->backlogchain);
+	__skb_queue_head_init(&flow->queue);
+	codel_vars_init(&flow->cvars);
+}
+
+int ieee80211_setup_flows(struct ieee80211_local *local)
+{
+	struct ieee80211_fq *fq = &local->fq;
+	int i;
+
+	if (!local->ops->wake_tx_queue)
+		return 0;
+
+	memset(fq, 0, sizeof(fq[0]));
+	INIT_LIST_HEAD(&fq->backlogs);
+	spin_lock_init(&fq->lock);
+	fq->flows_cnt = 4096;
+	fq->perturbation = prandom_u32();
+	fq->quantum = 300;
+	fq->txq_limit = 8192;
+	fq->cparams.target = MS2TIME(20);
+	fq->cparams.interval = MS2TIME(100);
+
+	fq->flows = kcalloc(fq->flows_cnt, sizeof(fq->flows[0]), GFP_KERNEL);
+	if (!fq->flows)
+		return -ENOMEM;
+
+	for (i = 0; i < fq->flows_cnt; i++)
+		ieee80211_init_flow(&fq->flows[i]);
+
+	return 0;
+}
+
+static void ieee80211_reset_flow(struct ieee80211_local *local,
+				 struct txq_flow *flow)
+{
+	if (!list_empty(&flow->flowchain))
+		list_del_init(&flow->flowchain);
+
+	if (!list_empty(&flow->backlogchain))
+		list_del_init(&flow->backlogchain);
+
+	ieee80211_purge_tx_queue(&local->hw, &flow->queue);
+
+	flow->deficit = 0;
+	flow->txqi = NULL;
+}
+
+void ieee80211_purge_txq(struct ieee80211_local *local, struct txq_info *txqi)
+{
+	struct txq_flow *flow;
+	int i;
+
+	for (i = 0; i < local->fq.flows_cnt; i++) {
+		flow = &local->fq.flows[i];
+
+		if (flow->txqi != txqi)
+			continue;
+
+		ieee80211_reset_flow(local, flow);
+	}
+
+	ieee80211_reset_flow(local, &txqi->flow);
+
+	txqi->backlog_bytes = 0;
+	txqi->backlog_packets = 0;
+}
+
+void ieee80211_teardown_flows(struct ieee80211_local *local)
+{
+	struct ieee80211_fq *fq = &local->fq;
+	struct ieee80211_sub_if_data *sdata;
+	struct sta_info *sta;
+	int i;
+
+	if (!local->ops->wake_tx_queue)
+		return;
+
+	list_for_each_entry_rcu(sta, &local->sta_list, list)
+		for (i = 0; i < IEEE80211_NUM_TIDS; i++)
+			ieee80211_purge_txq(local,
+					    to_txq_info(sta->sta.txq[i]));
+
+	list_for_each_entry_rcu(sdata, &local->interfaces, list)
+		ieee80211_purge_txq(local, to_txq_info(sdata->vif.txq));
+
+	for (i = 0; i < fq->flows_cnt; i++)
+		ieee80211_reset_flow(local, &fq->flows[i]);
+
+	kfree(fq->flows);
+
+	fq->flows = NULL;
+	fq->flows_cnt = 0;
+}
+
+static void ieee80211_txq_enqueue(struct ieee80211_local *local,
+				  struct txq_info *txqi,
+				  struct sk_buff *skb)
+{
+	struct ieee80211_fq *fq = &local->fq;
+	struct txq_flow *flow;
+	struct txq_flow *i;
+	size_t idx = fq_hash(fq, skb);
+
+	lockdep_assert_held(&fq->lock);
+
+	flow = &fq->flows[idx];
+
+	if (flow->txqi && flow->txqi != txqi) {
+		flow = &txqi->flow;
+		txqi->collisions++;
+	}
+
+	if (!flow->txqi)
+		txqi->flows++;
+
+	/* The following overwrites `vif` pointer effectively. It is later
+	 * restored using txq structure.
+	 */
+	IEEE80211_SKB_CB(skb)->control.enqueue_time = codel_get_time();
+
+	flow->txqi = txqi;
+	flow->backlog += skb->len;
+	txqi->backlog_bytes += skb->len;
+	txqi->backlog_packets++;
+	fq->backlog++;
+
+	if (list_empty(&flow->backlogchain))
+		list_add_tail(&flow->backlogchain, &fq->backlogs);
+
+	i = flow;
+	list_for_each_entry_continue_reverse(i, &fq->backlogs, backlogchain)
+		if (i->backlog > flow->backlog)
+			break;
+
+	list_move(&flow->backlogchain, &i->backlogchain);
+
+	if (list_empty(&flow->flowchain)) {
+		flow->deficit = fq->quantum;
+		list_add_tail(&flow->flowchain, &txqi->new_flows);
+	}
+
+	__skb_queue_tail(&flow->queue, skb);
+
+	if (fq->backlog > fq->txq_limit)
+		fq_drop(local);
+}
+
+static struct sk_buff *ieee80211_txq_dequeue(struct ieee80211_local *local,
+					     struct txq_info *txqi)
+{
+	struct ieee80211_fq *fq = &local->fq;
+	struct txq_flow *flow;
+	struct list_head *head;
+	struct sk_buff *skb;
+
+begin:
+	head = &txqi->new_flows;
+	if (list_empty(head)) {
+		head = &txqi->old_flows;
+		if (list_empty(head))
+			return NULL;
+	}
+
+	flow = list_first_entry(head, struct txq_flow, flowchain);
+
+	if (flow->deficit <= 0) {
+		flow->deficit += fq->quantum;
+		list_move_tail(&flow->flowchain, &txqi->old_flows);
+		goto begin;
+	}
+
+	skb = codel_dequeue(flow,
+			    &flow->backlog,
+			    0,
+			    &flow->cvars,
+			    &fq->cparams,
+			    codel_get_time(),
+			    false);
+	if (!skb) {
+		if ((head == &txqi->new_flows) &&
+		    !list_empty(&txqi->old_flows)) {
+			list_move_tail(&flow->flowchain, &txqi->old_flows);
+		} else {
+			list_del_init(&flow->flowchain);
+			flow->txqi = NULL;
+		}
+		goto begin;
+	}
+
+	flow->deficit -= skb->len;
+	txqi->tx_bytes += skb->len;
+	txqi->tx_packets++;
+
+	/* The `vif` pointer was overwritten with enqueue time during
+	 * enqueuing. Restore it before handing to driver.
+	 */
+	IEEE80211_SKB_CB(skb)->control.vif = flow->txqi->txq.vif;
+
+	return skb;
+}
+
+static struct txq_info *
+ieee80211_get_txq(struct ieee80211_local *local,
+		  struct ieee80211_vif *vif,
+		  struct ieee80211_sta *pubsta,
+		  struct sk_buff *skb)
 {
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *) skb->data;
-	struct ieee80211_sub_if_data *sdata = vif_to_sdata(vif);
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
-	struct ieee80211_tx_control control = {
-		.sta = pubsta,
-	};
 	struct ieee80211_txq *txq = NULL;
-	struct txq_info *txqi;
-	u8 ac;
 
 	if ((info->flags & IEEE80211_TX_CTL_SEND_AFTER_DTIM) ||
+	    (info->flags & IEEE80211_TX_INTFL_OFFCHAN_TX_OK) ||
 	    (info->control.flags & IEEE80211_TX_CTRL_PS_RESPONSE))
-		goto tx_normal;
+		return NULL;
 
 	if (!ieee80211_is_data(hdr->frame_control))
-		goto tx_normal;
+		return NULL;
 
 	if (pubsta) {
 		u8 tid = skb->priority & IEEE80211_QOS_CTL_TID_MASK;
@@ -1263,57 +1560,34 @@ static void ieee80211_drv_tx(struct ieee80211_local *local,
 	}
 
 	if (!txq)
-		goto tx_normal;
+		return NULL;
 
-	ac = txq->ac;
-	txqi = to_txq_info(txq);
-	atomic_inc(&sdata->txqs_len[ac]);
-	if (atomic_read(&sdata->txqs_len[ac]) >= local->hw.txq_ac_max_pending)
-		netif_stop_subqueue(sdata->dev, ac);
-
-	spin_lock_bh(&txqi->queue.lock);
-	txqi->byte_cnt += skb->len;
-	__skb_queue_tail(&txqi->queue, skb);
-	spin_unlock_bh(&txqi->queue.lock);
-
-	drv_wake_tx_queue(local, txqi);
-
-	return;
-
-tx_normal:
-	drv_tx(local, &control, skb);
+	return to_txq_info(txq);
 }
 
 struct sk_buff *ieee80211_tx_dequeue(struct ieee80211_hw *hw,
 				     struct ieee80211_txq *txq)
 {
 	struct ieee80211_local *local = hw_to_local(hw);
-	struct ieee80211_sub_if_data *sdata = vif_to_sdata(txq->vif);
+	struct ieee80211_fq *fq = &local->fq;
+	struct ieee80211_tx_info *info;
 	struct txq_info *txqi = container_of(txq, struct txq_info, txq);
 	struct ieee80211_hdr *hdr;
 	struct sk_buff *skb = NULL;
-	u8 ac = txq->ac;
 
-	spin_lock_bh(&txqi->queue.lock);
+	spin_lock_bh(&fq->lock);
 
 	if (test_bit(IEEE80211_TXQ_STOP, &txqi->flags))
 		goto out;
 
-	skb = __skb_dequeue(&txqi->queue);
+	skb = ieee80211_txq_dequeue(local, txqi);
 	if (!skb)
 		goto out;
-
-	txqi->byte_cnt -= skb->len;
-
-	atomic_dec(&sdata->txqs_len[ac]);
-	if (__netif_subqueue_stopped(sdata->dev, ac))
-		ieee80211_propagate_queue_wake(local, sdata->vif.hw_queue[ac]);
 
 	hdr = (struct ieee80211_hdr *)skb->data;
 	if (txq->sta && ieee80211_is_data_qos(hdr->frame_control)) {
 		struct sta_info *sta = container_of(txq->sta, struct sta_info,
 						    sta);
-		struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 
 		hdr->seq_ctrl = ieee80211_tx_next_seq(sta, txq->tid);
 		if (test_bit(IEEE80211_TXQ_AMPDU, &txqi->flags))
@@ -1323,7 +1597,7 @@ struct sk_buff *ieee80211_tx_dequeue(struct ieee80211_hw *hw,
 	}
 
 out:
-	spin_unlock_bh(&txqi->queue.lock);
+	spin_unlock_bh(&fq->lock);
 
 	return skb;
 }
@@ -1335,7 +1609,10 @@ static bool ieee80211_tx_frags(struct ieee80211_local *local,
 			       struct sk_buff_head *skbs,
 			       bool txpending)
 {
+	struct ieee80211_fq *fq = &local->fq;
+	struct ieee80211_tx_control control = {};
 	struct sk_buff *skb, *tmp;
+	struct txq_info *txqi;
 	unsigned long flags;
 
 	skb_queue_walk_safe(skbs, skb, tmp) {
@@ -1349,6 +1626,21 @@ static bool ieee80211_tx_frags(struct ieee80211_local *local,
 			continue;
 		}
 #endif
+
+		txqi = ieee80211_get_txq(local, vif, sta, skb);
+		if (txqi) {
+			info->control.vif = vif;
+
+			__skb_unlink(skb, skbs);
+
+			spin_lock_bh(&fq->lock);
+			ieee80211_txq_enqueue(local, txqi, skb);
+			spin_unlock_bh(&fq->lock);
+
+			drv_wake_tx_queue(local, txqi);
+
+			continue;
+		}
 
 		spin_lock_irqsave(&local->queue_stop_reason_lock, flags);
 		if (local->queue_stop_reasons[q] ||
@@ -1392,9 +1684,10 @@ static bool ieee80211_tx_frags(struct ieee80211_local *local,
 		spin_unlock_irqrestore(&local->queue_stop_reason_lock, flags);
 
 		info->control.vif = vif;
+		control.sta = sta;
 
 		__skb_unlink(skb, skbs);
-		ieee80211_drv_tx(local, vif, sta, skb);
+		drv_tx(local, &control, skb);
 	}
 
 	return true;
