@@ -27,6 +27,7 @@ config NVMEM_IMX_OCOTP
 
 config NVMEM_LPC18XX_EEPROM
 	tristate "NXP LPC18XX EEPROM Memory Support"
+	depends on HAS_IOMEM
 	depends on ARCH_LPC18XX || COMPILE_TEST
 	help
 	  Say Y here to include support for NXP LPC18xx EEPROM memory found in
@@ -48,6 +49,7 @@ config NVMEM_MXS_OCOTP
 
 config MTK_EFUSE
 	tristate "Mediatek SoCs EFUSE support"
+	depends on HAS_IOMEM
 	depends on ARCH_MEDIATEK || COMPILE_TEST
 	select REGMAP_MMIO
 	help
