@@ -5,11 +5,17 @@ Required properties:
 - mediatek,audio-codec: the phandles of rt5650 codecs
 - mediatek,platform: the phandle of MT8173 ASoC platform
 
+Optional properties:
+- mediatek,rt5650_i2s: I2S mode of rt5650
+  0: using I2S1 on rt5650 for record
+  1: using I2S2 on rt5650 for record
+
 Example:
 
 	sound {
 		compatible = "mediatek,mt8173-rt5650";
 		mediatek,audio-codec = <&rt5650>;
 		mediatek,platform = <&afe>;
+		mediatek,rt5650_i2s = <0>;
 	};
 
