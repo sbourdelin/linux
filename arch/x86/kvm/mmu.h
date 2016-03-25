@@ -154,7 +154,7 @@ static inline u8 permission_fault(struct kvm_vcpu *vcpu, struct kvm_mmu *mmu,
 				  unsigned pfec)
 {
 	int cpl = kvm_x86_ops->get_cpl(vcpu);
-	unsigned long rflags = kvm_x86_ops->get_rflags(vcpu);
+	unsigned long errcode, rflags = kvm_x86_ops->get_rflags(vcpu);
 
 	/*
 	 * If CPL < 3, SMAP prevention are disabled if EFLAGS.AC = 1.
@@ -175,7 +175,7 @@ static inline u8 permission_fault(struct kvm_vcpu *vcpu, struct kvm_mmu *mmu,
 	bool fault = (mmu->permissions[index] >> pte_access) & 1;
 
 	WARN_ON(pfec & (PFERR_PK_MASK | PFERR_RSVD_MASK));
-	pfec |= PFERR_PRESENT_MASK;
+	errcode = PFERR_PRESENT_MASK;
 
 	if (unlikely(mmu->pkru_mask)) {
 		u32 pkru_bits, offset;
@@ -193,11 +193,11 @@ static inline u8 permission_fault(struct kvm_vcpu *vcpu, struct kvm_mmu *mmu,
 			((pte_access & PT_USER_MASK) << (PFERR_RSVD_BIT - PT_USER_SHIFT));
 
 		pkru_bits &= mmu->pkru_mask >> offset;
-		pfec |= -pkru_bits & PFERR_PK_MASK;
+		errcode |= -pkru_bits & PFERR_PK_MASK;
 		fault |= (pkru_bits != 0);
 	}
 
-	return -(uint32_t)fault & pfec;
+	return -(uint32_t)fault & errcode;
 }
 
 void kvm_mmu_invalidate_zap_all_pages(struct kvm *kvm);
