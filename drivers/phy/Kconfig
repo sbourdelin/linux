@@ -416,6 +416,7 @@ config PHY_BRCMSTB_SATA
 
 config PHY_CYGNUS_PCIE
 	tristate "Broadcom Cygnus PCIe PHY driver"
+	depends on HAS_IOMEM
 	depends on OF && (ARCH_BCM_CYGNUS || COMPILE_TEST)
 	select GENERIC_PHY
 	default ARCH_BCM_CYGNUS
