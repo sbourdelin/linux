@@ -45,6 +45,7 @@ config OMAP_MBOX_KFIFO_SIZE
 
 config ROCKCHIP_MBOX
 	bool "Rockchip Soc Intergrated Mailbox Support"
+	depends on HAS_IOMEM
 	depends on ARCH_ROCKCHIP || COMPILE_TEST
 	help
 	  This driver provides support for inter-processor communication
