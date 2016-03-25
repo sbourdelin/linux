@@ -2916,8 +2916,8 @@ int nand_erase_nand(struct mtd_info *mtd, struct erase_info *instr,
 	/* Select the NAND device */
 	chip->select_chip(mtd, chipnr);
 
-	/* Check, if it is write protected */
-	if (nand_check_wp(mtd)) {
+	/* Check if it is write protected, unless we're erasing BBT */
+	if (nand_check_wp(mtd) && !allowbbt) {
 		pr_debug("%s: device is write protected!\n",
 				__func__);
 		instr->state = MTD_ERASE_FAILED;

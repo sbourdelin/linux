@@ -662,6 +662,7 @@ static int write_bbt(struct mtd_info *mtd, uint8_t *buf,
 			page = td->pages[chip];
 			goto write;
 		}
+	next:
 
 		/*
 		 * Automatic placement of the bad block table. Search direction
@@ -787,14 +788,46 @@ static int write_bbt(struct mtd_info *mtd, uint8_t *buf,
 		einfo.addr = to;
 		einfo.len = 1 << this->bbt_erase_shift;
 		res = nand_erase_nand(mtd, &einfo, 1);
-		if (res < 0)
+		if (res == -EIO) {
+			/* This block is bad. Mark it as such and see if
+			 * there's another block available in the BBT area. */
+			int block = page >>
+				(this->bbt_erase_shift - this->page_shift);
+			pr_info("nand_bbt: failed to erase block %d when writing BBT\n",
+				block);
+			bbt_mark_entry(this, block, BBT_BLOCK_WORN);
+
+			res = this->block_markbad(mtd, block);
+			if (res)
+				pr_warn("nand_bbt: error %d while marking block %d bad\n",
+					res, block);
+			td->pages[chip] = -1;
+			goto next;
+		} else if (res < 0) {
 			goto outerr;
+		}
 
 		res = scan_write_bbt(mtd, to, len, buf,
 				td->options & NAND_BBT_NO_OOB ? NULL :
 				&buf[len]);
-		if (res < 0)
+		if (res == -EIO) {
+			/* This block is bad. Mark it as such and see if
+			 * there's another block available in the BBT area. */
+			int block = page >>
+				(this->bbt_erase_shift - this->page_shift);
+			pr_info("nand_bbt: failed to write block %d when writing BBT\n",
+				block);
+			bbt_mark_entry(this, block, BBT_BLOCK_WORN);
+
+			res = this->block_markbad(mtd, block);
+			if (res)
+				pr_warn("nand_bbt: error %d while marking block %d bad\n",
+					res, block);
+			td->pages[chip] = -1;
+			goto next;
+		} else if (res < 0) {
 			goto outerr;
+		}
 
 		pr_info("Bad block table written to 0x%012llx, version 0x%02X\n",
 			 (unsigned long long)to, td->version[chip]);
