@@ -206,7 +206,7 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
 	run->mmio.is_write	= is_write;
 	run->mmio.phys_addr	= fault_ipa;
 	run->mmio.len		= len;
-	if (is_write)
+	if (is_write || !ret)
 		memcpy(run->mmio.data, data_buf, len);
 
 	if (!ret) {
