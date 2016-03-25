@@ -62,11 +62,13 @@ static int sdhci_at91_runtime_suspend(struct device *dev)
 	struct sdhci_at91_priv *priv = sdhci_pltfm_priv(pltfm_host);
 	int ret;
 
-	ret = sdhci_runtime_suspend_host(host);
+	ret = sdhci_runtime_suspend_host(host, SDHCI_INT_CARD_INT | SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE);
 
 	clk_disable_unprepare(priv->gck);
-	clk_disable_unprepare(priv->hclock);
+	//clk_disable_unprepare(priv->hclock);
 	clk_disable_unprepare(priv->mainck);
+
+	printk("sdhci_at91_runtime_suspend\n");
 
 	return ret;
 }
@@ -78,17 +80,18 @@ static int sdhci_at91_runtime_resume(struct device *dev)
 	struct sdhci_at91_priv *priv = sdhci_pltfm_priv(pltfm_host);
 	int ret;
 
+	printk("sdhci_at91_runtime_resume\n");
 	ret = clk_prepare_enable(priv->mainck);
 	if (ret) {
 		dev_err(dev, "can't enable mainck\n");
 		return ret;
 	}
 
-	ret = clk_prepare_enable(priv->hclock);
-	if (ret) {
-		dev_err(dev, "can't enable hclock\n");
-		return ret;
-	}
+	//ret = clk_prepare_enable(priv->hclock);
+	//if (ret) {
+	//	dev_err(dev, "can't enable hclock\n");
+	//	return ret;
+	//}
 
 	ret = clk_prepare_enable(priv->gck);
 	if (ret) {
@@ -204,25 +207,6 @@ static int sdhci_at91_probe(struct platform_device *pdev)
 	ret = sdhci_add_host(host);
 	if (ret)
 		goto pm_runtime_disable;
-
-	/*
-	 * When calling sdhci_runtime_suspend_host(), the sdhci layer makes
-	 * the assumption that all the clocks of the controller are disabled.
-	 * It means we can't get irq from it when it is runtime suspended.
-	 * For that reason, it is not planned to wake-up on a card detect irq
-	 * from the controller.
-	 * If we want to use runtime PM and to be able to wake-up on card
-	 * insertion, we have to use a GPIO for the card detection or we can
-	 * use polling. Be aware that using polling will resume/suspend the
-	 * controller between each attempt.
-	 * Disable SDHCI_QUIRK_BROKEN_CARD_DETECTION to be sure nobody tries
-	 * to enable polling via device tree with broken-cd property.
-	 */
-	if (!(host->mmc->caps & MMC_CAP_NONREMOVABLE) &&
-	    IS_ERR_VALUE(mmc_gpio_get_cd(host->mmc))) {
-		host->mmc->caps |= MMC_CAP_NEEDS_POLL;
-		host->quirks &= ~SDHCI_QUIRK_BROKEN_CARD_DETECTION;
-	}
 
 	pm_runtime_put_autosuspend(&pdev->dev);
 

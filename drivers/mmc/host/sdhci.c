@@ -2467,11 +2467,6 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
 
 	spin_lock(&host->lock);
 
-	if (host->runtime_suspended && !sdhci_sdio_irq_enabled(host)) {
-		spin_unlock(&host->lock);
-		return IRQ_NONE;
-	}
-
 	intmask = sdhci_readl(host, SDHCI_INT_STATUS);
 	if (!intmask || intmask == 0xffffffff) {
 		result = IRQ_NONE;
@@ -2709,7 +2704,7 @@ static void sdhci_runtime_pm_bus_off(struct sdhci_host *host)
 	pm_runtime_put_noidle(host->mmc->parent);
 }
 
-int sdhci_runtime_suspend_host(struct sdhci_host *host)
+int sdhci_runtime_suspend_host(struct sdhci_host *host, u32 wakeup_irqs)
 {
 	unsigned long flags;
 
@@ -2717,7 +2712,10 @@ int sdhci_runtime_suspend_host(struct sdhci_host *host)
 	mmc_retune_needed(host->mmc);
 
 	spin_lock_irqsave(&host->lock, flags);
-	host->ier &= SDHCI_INT_CARD_INT;
+	if (wakeup_irqs)
+		host->ier = wakeup_irqs;
+	else
+		host->ier &= SDHCI_INT_CARD_INT;
 	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
 	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
 	spin_unlock_irqrestore(&host->lock, flags);
