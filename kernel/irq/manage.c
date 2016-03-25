@@ -202,6 +202,7 @@ int irq_do_set_affinity(struct irq_data *data, const struct cpumask *mask,
 int irq_set_affinity_locked(struct irq_data *data, const struct cpumask *mask,
 			    bool force)
 {
+	struct irq_affinity_notify *notify;
 	struct irq_chip *chip = irq_data_get_irq_chip(data);
 	struct irq_desc *desc = irq_data_to_desc(data);
 	int ret = 0;
@@ -216,9 +217,9 @@ int irq_set_affinity_locked(struct irq_data *data, const struct cpumask *mask,
 		irq_copy_pending(desc, mask);
 	}
 
-	if (desc->affinity_notify) {
-		kref_get(&desc->affinity_notify->kref);
-		schedule_work(&desc->affinity_notify->work);
+	list_for_each_entry(notify, &desc->affinity_notify_list, list) {
+		kref_get(&notify->kref);
+		schedule_work(&notify->work);
 	}
 	irqd_set(data, IRQD_AFFINITY_SET);
 
@@ -282,7 +283,7 @@ out:
 }
 
 /**
- *	irq_set_affinity_notifier - set notification of IRQ affinity changes
+ *	irq_add_affinity_notifier - set notification of IRQ affinity changes
  *	@irq:		Interrupt for which to enable notification
  *	@notify:	Context for notification.
  *			Function pointers must be initialised;
@@ -291,7 +292,7 @@ out:
  *	Notification may only be enabled after the IRQ is allocated.
  */
 int
-irq_set_affinity_notifier(unsigned int irq, struct irq_affinity_notify *notify)
+irq_add_affinity_notifier(unsigned int irq, struct irq_affinity_notify *notify)
 {
 	struct irq_desc *desc = irq_to_desc(irq);
 	unsigned long flags;
@@ -302,20 +303,16 @@ irq_set_affinity_notifier(unsigned int irq, struct irq_affinity_notify *notify)
 		return -EINVAL;
 
 	raw_spin_lock_irqsave(&desc->lock, flags);
-	if (desc->affinity_notify != NULL) {
-		raw_spin_unlock_irqrestore(&desc->lock, flags);
-		return -EEXIST;
-	}
 	notify->irq = irq;
 	kref_init(&notify->kref);
 	INIT_WORK(&notify->work, irq_affinity_notify);
 
-	desc->affinity_notify = notify;
+	list_add(&notify->list, &desc->affinity_notify_list);
 	raw_spin_unlock_irqrestore(&desc->lock, flags);
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(irq_set_affinity_notifier);
+EXPORT_SYMBOL_GPL(irq_add_affinity_notifier);
 
 /**
  *	irq_del_affinity_notifier - delete notification of IRQ affinity changes
@@ -328,7 +325,6 @@ int
 irq_del_affinity_notifier(struct irq_affinity_notify *notify)
 {
 	struct irq_desc *desc;
-	struct irq_affinity_notify *old_notify;
 	unsigned long flags;
 
 	/* The release function is promised process context */
@@ -341,12 +337,10 @@ irq_del_affinity_notifier(struct irq_affinity_notify *notify)
 		return -EINVAL;
 
 	raw_spin_lock_irqsave(&desc->lock, flags);
-	old_notify = desc->affinity_notify;
-	desc->affinity_notify = NULL;
+	list_del(&notify->list);
 	raw_spin_unlock_irqrestore(&desc->lock, flags);
 
-	if (old_notify)
-		kref_put(&old_notify->kref, old_notify->release);
+	kref_put(&notify->kref, notify->release);
 
 	return 0;
 }
@@ -1571,14 +1565,22 @@ EXPORT_SYMBOL_GPL(remove_irq);
  */
 void free_irq(unsigned int irq, void *dev_id)
 {
+#ifdef CONFIG_SMP
+	struct irq_affinity_notify *notify, *notifytmp;
+#endif
 	struct irq_desc *desc = irq_to_desc(irq);
 
 	if (!desc || WARN_ON(irq_settings_is_per_cpu_devid(desc)))
 		return;
 
 #ifdef CONFIG_SMP
-	if (WARN_ON(desc->affinity_notify))
-		desc->affinity_notify = NULL;
+	list_for_each_entry_safe(notify, notifytmp, &desc->affinity_notify_list,
+				 list) {
+		if (notify->irq != irq)
+			continue;
+		__WARN();
+		list_del(&notify->list);
+	}
 #endif
 
 	kfree(__free_irq(irq, dev_id));

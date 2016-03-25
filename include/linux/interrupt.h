@@ -220,6 +220,7 @@ struct irq_affinity_notify {
 	struct work_struct work;
 	void (*notify)(struct irq_affinity_notify *, const cpumask_t *mask);
 	void (*release)(struct kref *ref);
+	struct list_head list;
 };
 
 #if defined(CONFIG_SMP)
@@ -266,7 +267,7 @@ extern int irq_select_affinity(unsigned int irq);
 extern int irq_set_affinity_hint(unsigned int irq, const struct cpumask *m);
 
 extern int
-irq_set_affinity_notifier(unsigned int irq, struct irq_affinity_notify *notify);
+irq_add_affinity_notifier(unsigned int irq, struct irq_affinity_notify *notify);
 extern int
 irq_del_affinity_notifier(struct irq_affinity_notify *notify);
 
@@ -296,7 +297,13 @@ static inline int irq_set_affinity_hint(unsigned int irq,
 }
 
 static inline int
-irq_set_affinity_notifier(unsigned int irq, struct irq_affinity_notify *notify)
+irq_add_affinity_notifier(unsigned int irq, struct irq_affinity_notify *notify)
+{
+	return 0;
+}
+
+static inline int
+irq_del_affinity_notifier(struct irq_affinity_notify *notify)
 {
 	return 0;
 }

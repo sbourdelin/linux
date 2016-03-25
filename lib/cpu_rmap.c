@@ -297,7 +297,7 @@ int irq_cpu_rmap_add(struct cpu_rmap *rmap, int irq)
 	glue->rmap = rmap;
 	cpu_rmap_get(rmap);
 	glue->index = cpu_rmap_add(rmap, glue);
-	rc = irq_set_affinity_notifier(irq, &glue->notify);
+	rc = irq_add_affinity_notifier(irq, &glue->notify);
 	if (rc) {
 		cpu_rmap_put(glue->rmap);
 		kfree(glue);

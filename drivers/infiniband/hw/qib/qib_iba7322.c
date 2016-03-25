@@ -3380,7 +3380,7 @@ static void setup_dca_notifier(struct qib_devdata *dd, struct qib_msix_entry *m)
 		qib_devinfo(dd->pcidev,
 			"set notifier irq %d rcv %d notify %p\n",
 			n->notify.irq, n->rcv, &n->notify);
-		ret = irq_set_affinity_notifier(
+		ret = irq_add_affinity_notifier(
 				n->notify.irq,
 				&n->notify);
 		if (ret) {

@@ -3105,7 +3105,7 @@ qla24xx_enable_msix(struct qla_hw_data *ha, struct rsp_que *rsp)
 		rsp->msix = qentry;
 
 		/* Register for CPU affinity notification. */
-		irq_set_affinity_notifier(qentry->vector, &qentry->irq_notify);
+		irq_add_affinity_notifier(qentry->vector, &qentry->irq_notify);
 
 		/* Schedule work (ie. trigger a notification) to read cpu
 		 * mask for this specific irq.
