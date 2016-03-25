@@ -33,6 +33,12 @@ unsigned long min_low_pfn;
 unsigned long max_pfn;
 unsigned long long max_possible_pfn;
 
+bool __init __reserved_bootmem_region(unsigned long base,
+				      unsigned long size)
+{
+	return memblock_is_region_reserved(base, size);
+}
+
 static void * __init __alloc_memory_core_early(int nid, u64 size, u64 align,
 					u64 goal, u64 limit)
 {

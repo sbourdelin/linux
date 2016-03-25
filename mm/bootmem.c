@@ -173,7 +173,7 @@ void __init free_bootmem_late(unsigned long physaddr, unsigned long size)
 static unsigned long __init free_all_bootmem_core(bootmem_data_t *bdata)
 {
 	struct page *page;
-	unsigned long *map, start, end, pages, cur, count = 0;
+	unsigned long *map, start, end, cur, count = 0;
 
 	if (!bdata->node_bootmem_map)
 		return 0;
@@ -230,14 +230,21 @@ static unsigned long __init free_all_bootmem_core(bootmem_data_t *bdata)
 		}
 	}
 
-	cur = bdata->node_min_pfn;
+	/*
+	 * The information tracked by bootmem bitmap can be released when
+	 * deferred page initialization is disabled. Otherwise, we have
+	 * to release it right after deferred page initialization
+	 */
+#ifndef CONFIG_DEFERRED_STRUCT_PAGE_INIT
+	cur = PFN_DOWN(virt_to_phys(bdata->node_bootmem_map));
 	page = virt_to_page(bdata->node_bootmem_map);
-	pages = bdata->node_low_pfn - bdata->node_min_pfn;
-	pages = bootmem_bootmap_pages(pages);
-	count += pages;
-	while (pages--)
+	end = bdata->node_low_pfn - bdata->node_min_pfn;
+	end = bootmem_bootmap_pages(end);
+	count += end;
+	while (end--)
 		__free_pages_bootmem(page++, cur++, 0);
 	bdata->node_bootmem_map = NULL;
+#endif
 
 	bdebug("nid=%td released=%lx\n", bdata - bootmem_node_data, count);
 
@@ -496,6 +503,32 @@ static unsigned long __init align_off(struct bootmem_data *bdata,
 	/* Same as align_idx for byte offsets */
 
 	return ALIGN(base + off, align) - base;
+}
+
+bool __init __reserved_bootmem_region(unsigned long base, unsigned long size)
+{
+	struct pglist_data *pgdat;
+	struct bootmem_data *bdata;
+	unsigned long pfn, start, end, idx;
+	int nid;
+
+	start = PFN_DOWN(base);
+	end = PFN_UP(base + size);
+	for (pfn = start; pfn < end; pfn++) {
+		nid = early_pfn_to_nid(pfn);
+		pgdat = NODE_DATA(nid);
+		bdata = pgdat ? pgdat->bdata : NULL;
+		if (!bdata ||
+		    pfn < bdata->node_min_pfn ||
+		    pfn > bdata->node_low_pfn)
+			continue;
+
+		idx = pfn - bdata->node_min_pfn;
+		if (test_bit(idx, bdata->node_bootmem_map))
+			return true;
+	}
+
+	return false;
 }
 
 static void * __init alloc_bootmem_bdata(struct bootmem_data *bdata,

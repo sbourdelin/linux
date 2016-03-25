@@ -1125,6 +1125,57 @@ static void __init deferred_free_range(struct page *page,
 		__free_pages_boot_core(page, pfn, 0);
 }
 
+#ifndef CONFIG_NO_BOOTMEM
+static unsigned long __init deferred_free_bootmem_bitmap(int nid)
+{
+	struct pglist_data *pgdat = NODE_DATA(nid);
+	struct bootmem_data *bdata = pgdat->bdata;
+	struct zone *zone;
+	struct page *page;
+	unsigned long pfn, cur, pages, count;
+	int zid;
+
+	if (!bdata || !bdata->node_bootmem_map)
+		return 0UL;
+
+	pfn = PFN_DOWN(virt_to_phys(bdata->node_bootmem_map));
+	page = virt_to_page(bdata->node_bootmem_map);
+	bdata->node_bootmem_map = NULL;
+	pages = bdata->node_low_pfn - bdata->node_min_pfn;
+	pages = bootmem_bootmap_pages(pages);
+
+	/*
+	 * We won't lose much performance to release pages one by one
+	 * as the amount of reserved memory for bootmem bitmap is usually
+	 * very small
+	 */
+	for (count = 0UL, cur = 0UL; cur < pages; cur++) {
+		for (zid = 0; zid < MAX_NR_ZONES; zid++) {
+			zone = &pgdat->node_zones[zid];
+			if (!zone->spanned_pages)
+				continue;
+
+			if (pfn >= zone->zone_start_pfn &&
+			    pfn < zone->zone_start_pfn + zone->spanned_pages)
+				break;
+		}
+
+		if (zid < MAX_NR_ZONES) {
+			pr_info("%s: nid#%d, %s, 0x%lx\n",
+				__func__, nid, zone_names[zid], pfn);
+			__init_single_page(page, pfn, zid, nid);
+			__free_pages_boot_core(page, pfn, 0);
+			count++;
+		}
+
+		page++;
+		pfn++;
+	}
+
+	return count;
+}
+#endif /* !CONFIG_NO_BOOTMEM */
+
 /* Completion tracking for deferred_init_memmap() threads */
 static atomic_t pgdat_init_n_undone __initdata;
 static __initdata DECLARE_COMPLETION(pgdat_init_all_done_comp);
@@ -1199,7 +1250,9 @@ static int __init deferred_init_memmap(void *data)
 				}
 			}
 
-			if (!meminit_pfn_in_nid(pfn, nid, &nid_init_state)) {
+			if (!meminit_pfn_in_nid(pfn, nid, &nid_init_state) ||
+			    __reserved_bootmem_region(PFN_PHYS(pfn),
+						      PAGE_SIZE)) {
 				page = NULL;
 				goto free_range;
 			}
@@ -1248,6 +1301,9 @@ free_range:
 	/* Sanity check that the next zone really is unpopulated */
 	WARN_ON(++zid < MAX_NR_ZONES && populated_zone(++zone));
 
+#ifndef CONFIG_NO_BOOTMEM
+	nr_pages += deferred_free_bootmem_bitmap(nid);
+#endif
 	pr_info("node %d initialised, %lu pages in %ums\n", nid, nr_pages,
 					jiffies_to_msecs(jiffies - start));
 

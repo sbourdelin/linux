@@ -78,6 +78,8 @@ extern int reserve_bootmem_node(pg_data_t *pgdat,
 				unsigned long size,
 				int flags);
 
+extern bool __reserved_bootmem_region(unsigned long base,
+				      unsigned long size);
 extern void *__alloc_bootmem(unsigned long size,
 			     unsigned long align,
 			     unsigned long goal);
