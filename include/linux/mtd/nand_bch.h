@@ -16,7 +16,7 @@ struct nand_bch_control;
 
 #if defined(CONFIG_MTD_NAND_ECC_BCH)
 
-static inline int mtd_nand_has_bch(void) { return 1; }
+static inline bool mtd_nand_has_bch(void) { return true; }
 
 /*
  * Calculate BCH ecc code
@@ -40,7 +40,7 @@ void nand_bch_free(struct nand_bch_control *nbc);
 
 #else /* !CONFIG_MTD_NAND_ECC_BCH */
 
-static inline int mtd_nand_has_bch(void) { return 0; }
+static inline bool mtd_nand_has_bch(void) { return false; }
 
 static inline int
 nand_bch_calculate_ecc(struct mtd_info *mtd, const u_char *dat,
