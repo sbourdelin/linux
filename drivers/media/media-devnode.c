@@ -44,6 +44,7 @@
 #include <linux/uaccess.h>
 
 #include <media/media-devnode.h>
+#include <media/media-dev-allocator.h>
 
 #define MEDIA_NUM_DEVICES	256
 #define MEDIA_NAME		"media"
@@ -186,6 +187,7 @@ static int media_open(struct inode *inode, struct file *filp)
 		}
 	}
 
+	media_device_get_ref(mdev->parent);
 	return 0;
 }
 
@@ -201,6 +203,7 @@ static int media_release(struct inode *inode, struct file *filp)
 	   return value is ignored. */
 	put_device(&mdev->dev);
 	filp->private_data = NULL;
+	media_device_put(mdev->parent);
 	return 0;
 }
 

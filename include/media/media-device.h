@@ -284,6 +284,8 @@ struct media_entity_notify {
  * struct media_device - Media device
  * @dev:	Parent device
  * @devnode:	Media device node
+ * @refcount:	Media device register reference count. Used when more
+ *		than one driver owns the device.
  * @driver_name: Optional device driver name. If not set, calls to
  *		%MEDIA_IOC_DEVICE_INFO will return dev->driver->name.
  *		This is needed for USB drivers for example, as otherwise
@@ -348,6 +350,7 @@ struct media_device {
 	/* dev->driver_data points to this struct. */
 	struct device *dev;
 	struct media_devnode devnode;
+	struct kref refcount;
 
 	char model[32];
 	char driver_name[32];
@@ -501,6 +504,17 @@ int __must_check __media_device_register(struct media_device *mdev,
 #define media_device_register(mdev) __media_device_register(mdev, THIS_MODULE)
 
 /**
+ * media_device_register_ref() - Increments media device register refcount
+ *
+ * @mdev:	pointer to struct &media_device
+ *
+ * When more than one driver is associated with the media device, it is
+ * necessary to refcount the number of registrations to avoid unregister
+ * when it is still in use.
+ */
+void media_device_register_ref(struct media_device *mdev);
+
+/**
  * media_device_unregister() - Unregisters a media device element
  *
  * @mdev:	pointer to struct &media_device
@@ -510,6 +524,18 @@ int __must_check __media_device_register(struct media_device *mdev,
  * media device.
  */
 void media_device_unregister(struct media_device *mdev);
+
+/**
+ * media_device_unregister_put() - Unregisters a media device element
+ *
+ * @mdev:	pointer to struct &media_device
+ *
+ * Should be called to unregister media device allocated with Media Device
+ * Allocator API media_device_get() interface.
+ * It is safe to call this function on an unregistered (but initialised)
+ * media device.
+ */
+void media_device_unregister_put(struct media_device *mdev);
 
 /**
  * media_device_register_entity() - registers a media entity inside a
@@ -681,7 +707,13 @@ static inline int media_device_register(struct media_device *mdev)
 {
 	return 0;
 }
+static inline void media_device_register_ref(struct media_device *mdev)
+{
+}
 static inline void media_device_unregister(struct media_device *mdev)
+{
+}
+static inline void media_device_unregister_put(struct media_device *mdev)
 {
 }
 static inline int media_device_register_entity(struct media_device *mdev,

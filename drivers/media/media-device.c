@@ -36,6 +36,7 @@
 #include <media/media-device.h>
 #include <media/media-devnode.h>
 #include <media/media-entity.h>
+#include <media/media-dev-allocator.h>
 
 #ifdef CONFIG_MEDIA_CONTROLLER
 
@@ -702,6 +703,7 @@ void media_device_init(struct media_device *mdev)
 	INIT_LIST_HEAD(&mdev->entity_notify);
 	mutex_init(&mdev->graph_mutex);
 	ida_init(&mdev->entity_internal_idx);
+	kref_init(&mdev->refcount);
 
 	dev_dbg(mdev->dev, "Media device initialized\n");
 }
@@ -729,6 +731,13 @@ int __must_check __media_device_register(struct media_device *mdev,
 	/* Check if mdev was ever registered at all */
 	mutex_lock(&mdev->graph_mutex);
 
+	/* if media device is already registered, bump the register refcount */
+	if (media_devnode_is_registered(&mdev->devnode)) {
+		kref_get(&mdev->refcount);
+		mutex_unlock(&mdev->graph_mutex);
+		return 0;
+	}
+
 	/* Register the device node. */
 	mdev->devnode.fops = &media_device_fops;
 	mdev->devnode.parent = mdev->dev;
@@ -754,6 +763,22 @@ err:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(__media_device_register);
+
+void media_device_register_ref(struct media_device *mdev)
+{
+	if (!mdev)
+		return;
+
+	pr_info("%s: mdev %p\n", __func__, mdev);
+	mutex_lock(&mdev->graph_mutex);
+
+	/* Check if mdev is registered - bump registered refcount */
+	if (media_devnode_is_registered(&mdev->devnode))
+		kref_get(&mdev->refcount);
+
+	mutex_unlock(&mdev->graph_mutex);
+}
+EXPORT_SYMBOL_GPL(media_device_register_ref);
 
 int __must_check media_device_register_entity_notify(struct media_device *mdev,
 					struct media_entity_notify *nptr)
@@ -825,6 +850,34 @@ void media_device_unregister(struct media_device *mdev)
 	mutex_unlock(&mdev->graph_mutex);
 }
 EXPORT_SYMBOL_GPL(media_device_unregister);
+
+static void __media_device_unregister_kref(struct kref *kref)
+{
+	struct media_device *mdev;
+
+	mdev = container_of(kref, struct media_device, refcount);
+	__media_device_unregister(mdev);
+}
+
+void media_device_unregister_put(struct media_device *mdev)
+{
+	int ret;
+
+	if (mdev == NULL)
+		return;
+
+	pr_info("%s: mdev=%p\n", __func__, mdev);
+	ret = kref_put_mutex(&mdev->refcount, __media_device_unregister_kref,
+			     &mdev->graph_mutex);
+	if (ret) {
+		/* __media_device_unregister() ran */
+		__media_device_cleanup(mdev);
+		mutex_unlock(&mdev->graph_mutex);
+		mutex_destroy(&mdev->graph_mutex);
+		media_device_set_to_delete_state(mdev->dev);
+	}
+}
+EXPORT_SYMBOL_GPL(media_device_unregister_put);
 
 static void media_device_release_devres(struct device *dev, void *res)
 {
