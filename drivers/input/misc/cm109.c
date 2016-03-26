@@ -76,8 +76,8 @@ enum {
 
 	BUZZER_ON = 1 << 5,
 
-	/* up to 256 normal keys, up to 16 special keys */
-	KEYMAP_SIZE = 256 + 16,
+	/* up to 256 keys on the normal keymap */
+	KEYMAP_SIZE = 256,
 };
 
 /* CM109 protocol packet */
@@ -129,24 +129,13 @@ struct cm109_dev {
 	int key_code;		/* last reported key */
 	int keybit;		/* 0=new scan  1,2,4,8=scan columns  */
 	u8 gpi;			/* Cached value of GPI (high nibble) */
+	bool volup_cached;	/* Cached state of volume up button */
+	bool voldown_cached;	/* Cached state of volume down button */
 };
 
 /******************************************************************************
  * CM109 key interface
  *****************************************************************************/
-
-static unsigned short special_keymap(int code)
-{
-	if (code > 0xff) {
-		switch (code - 0xff) {
-		case RECORD_MUTE:	return KEY_MUTE;
-		case PLAYBACK_MUTE:	return KEY_MUTE;
-		case VOLUME_DOWN:	return KEY_VOLUMEDOWN;
-		case VOLUME_UP:		return KEY_VOLUMEUP;
-		}
-	}
-	return KEY_RESERVED;
-}
 
 /* Map device buttons to internal key events.
  *
@@ -191,7 +180,7 @@ static unsigned short keymap_kip1000(int scancode)
 	case 0x48: return KEY_ESC;			/*   hangup     */
 	case 0x28: return KEY_LEFT;			/*   IN         */
 	case 0x18: return KEY_RIGHT;			/*   OUT        */
-	default:   return special_keymap(scancode);
+	default:   return KEY_RESERVED;
 	}
 }
 
@@ -224,7 +213,7 @@ static unsigned short keymap_gtalk(int scancode)
 	case 0x28: return KEY_ESC;		/* End (red handset) */
 	case 0x48: return KEY_UP;		/* Menu up (rocker switch) */
 	case 0x88: return KEY_DOWN;		/* Menu down (rocker switch) */
-	default:   return special_keymap(scancode);
+	default:   return KEY_RESERVED;
 	}
 }
 
@@ -253,7 +242,7 @@ static unsigned short keymap_usbph01(int scancode)
 	case 0x28: return KEY_ESC;			/*   hangup     */
 	case 0x48: return KEY_LEFT;			/*   IN         */
 	case 0x88: return KEY_RIGHT;			/*   OUT        */
-	default:   return special_keymap(scancode);
+	default:   return KEY_RESERVED;
 	}
 }
 
@@ -284,7 +273,7 @@ static unsigned short keymap_atcom(int scancode)
 	case 0x28: return KEY_ESC;			/*   hangup     */
 	case 0x48: return KEY_LEFT;			/* left arrow   */
 	case 0x88: return KEY_RIGHT;			/* right arrow  */
-	default:   return special_keymap(scancode);
+	default:   return KEY_RESERVED;
 	}
 }
 
@@ -338,8 +327,12 @@ static void cm109_submit_buzz_toggle(struct cm109_dev *dev)
 static void cm109_urb_irq_callback(struct urb *urb)
 {
 	struct cm109_dev *dev = urb->context;
+	struct input_dev *idev = dev->idev;
 	const int status = urb->status;
 	int error;
+
+	bool volup_pressed = !!(dev->irq_data->byte[HID_IR0] & VOLUME_UP);
+	bool voldown_pressed = !!(dev->irq_data->byte[HID_IR0] & VOLUME_DOWN);
 
 	dev_dbg(&dev->intf->dev, "### URB IRQ: [0x%02x 0x%02x 0x%02x 0x%02x] keybit=0x%02x\n",
 	     dev->irq_data->byte[0],
@@ -356,13 +349,35 @@ static void cm109_urb_irq_callback(struct urb *urb)
 		goto out;
 	}
 
-	/* Special keys */
-	if (dev->irq_data->byte[HID_IR0] & 0x0f) {
-		const int code = (dev->irq_data->byte[HID_IR0] & 0x0f);
-		report_key(dev, dev->keymap[0xff + code]);
+	/* Report volume up / down button changes */
+	if (volup_pressed != dev->volup_cached) {
+		input_report_key(idev, KEY_VOLUMEUP, volup_pressed);
+		input_sync(idev);
+		dev->volup_cached = volup_pressed;
 	}
 
-	/* Scan key column */
+	if (voldown_pressed != dev->voldown_cached) {
+		input_report_key(idev, KEY_VOLUMEDOWN, voldown_pressed);
+		input_sync(idev);
+		dev->voldown_cached = voldown_pressed;
+	}
+
+	/* Playback / record mute buttons: simulate press-n-release */
+	if (dev->irq_data->byte[HID_IR0] & PLAYBACK_MUTE) {
+		input_report_key(idev, KEY_MUTE, 1);
+		input_sync(idev);
+		input_report_key(idev, KEY_MUTE, 0);
+		input_sync(idev);
+	}
+
+	if (dev->irq_data->byte[HID_IR0] & RECORD_MUTE) {
+		input_report_key(idev, KEY_MICMUTE, 1);
+		input_sync(idev);
+		input_report_key(idev, KEY_MICMUTE, 0);
+		input_sync(idev);
+	}
+
+	/* Normal keymap: Scan key column */
 	if (dev->keybit == 0xf) {
 
 		/* Any changes ? */
@@ -777,6 +792,12 @@ static int cm109_usb_probe(struct usb_interface *intf,
 		__set_bit(k, input_dev->keybit);
 	}
 	__clear_bit(KEY_RESERVED, input_dev->keybit);
+
+	/* register available special key events */
+	__set_bit(KEY_VOLUMEUP, input_dev->keybit);
+	__set_bit(KEY_VOLUMEDOWN, input_dev->keybit);
+	__set_bit(KEY_MUTE, input_dev->keybit);
+	__set_bit(KEY_MICMUTE, input_dev->keybit);
 
 	error = input_register_device(dev->idev);
 	if (error)
