@@ -106,6 +106,14 @@ else
 endif
 endif
 
+localdefconfig: $(obj)/conf
+ifeq ($(KBUILD_LOCALDEFCONFIG),)
+	$(Q)$< $(silent) $(Kconfig)
+else
+	@$(kecho) "*** Default configuration is based on '$(KBUILD_LOCALDEFCONFIG)'"
+	$(Q)$< $(silent) --defconfig=$(KBUILD_LOCALDEFCONFIG) $(Kconfig)
+endif
+
 %_defconfig: $(obj)/conf
 	$(Q)$< $(silent) --defconfig=arch/$(SRCARCH)/configs/$@ $(Kconfig)
 
@@ -148,6 +156,7 @@ help:
 	@echo  '  alldefconfig    - New config with all symbols set to default'
 	@echo  '  randconfig	  - New config with random answer to all options'
 	@echo  '  listnewconfig   - List new options'
+	@echo  '  localdefconfig  - New config with defaults from KBUILD_LOCALDEFCONFIG'
 	@echo  '  olddefconfig	  - Same as silentoldconfig but sets new symbols to their'
 	@echo  '                    default value'
 	@echo  '  kvmconfig	  - Enable additional options for kvm guest kernel support'
