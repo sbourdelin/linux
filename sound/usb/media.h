@@ -21,6 +21,7 @@
 
 #include <media/media-device.h>
 #include <media/media-entity.h>
+#include <media/media-dev-allocator.h>
 #include <sound/asound.h>
 
 struct media_ctl {

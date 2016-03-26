@@ -12,6 +12,7 @@
 #include <linux/uvcvideo.h>
 #include <linux/videodev2.h>
 #include <media/media-device.h>
+#include <media/media-dev-allocator.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-fh.h>
@@ -543,7 +544,7 @@ struct uvc_device {
 
 	/* Video control interface */
 #ifdef CONFIG_MEDIA_CONTROLLER
-	struct media_device mdev;
+	struct media_device *mdev;
 #endif
 	struct v4l2_device vdev;
 	__u16 uvc_version;

@@ -260,7 +260,7 @@ int media_snd_device_create(struct snd_usb_audio *chip,
 	struct usb_device *usbdev = interface_to_usbdev(iface);
 	int ret;
 
-	mdev = media_device_get_devres(&usbdev->dev);
+	mdev = media_device_get(&usbdev->dev);
 	if (!mdev)
 		return -ENOMEM;
 
@@ -268,15 +268,18 @@ int media_snd_device_create(struct snd_usb_audio *chip,
 	if (!mdev->dev)
 		media_device_usb_init(mdev, usbdev, NULL);
 
+	/* register if needed, otherwise get register reference */
 	if (!media_devnode_is_registered(&mdev->devnode)) {
 		ret = media_device_register(mdev);
 		if (ret) {
+			media_device_put(mdev->dev);
 			dev_err(&usbdev->dev,
 				"Couldn't register media device. Error: %d\n",
 				ret);
 			return ret;
 		}
-	}
+	} else
+		media_device_register_ref(mdev);
 
 	/* save media device - avoid lookups */
 	chip->media_dev = mdev;
@@ -303,7 +306,8 @@ void media_snd_device_delete(struct snd_usb_audio *chip)
 	media_snd_mixer_delete(chip);
 
 	if (mdev) {
-		media_device_unregister_devres(mdev);
+		media_device_unregister_put(mdev);
+		media_device_put(mdev->dev);
 		chip->media_dev = NULL;
 	}
 }

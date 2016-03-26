@@ -1674,9 +1674,8 @@ static void uvc_delete(struct uvc_device *dev)
 	if (dev->vdev.dev)
 		v4l2_device_unregister(&dev->vdev);
 #ifdef CONFIG_MEDIA_CONTROLLER
-	if (media_devnode_is_registered(&dev->mdev.devnode))
-		media_device_unregister(&dev->mdev);
-	media_device_cleanup(&dev->mdev);
+	if (media_devnode_is_registered(&dev->mdev->devnode))
+		media_device_unregister_put(dev->mdev);
 #endif
 
 	list_for_each_safe(p, n, &dev->chains) {
@@ -1929,17 +1928,20 @@ static int uvc_probe(struct usb_interface *intf,
 
 	/* Initialize the media device and register the V4L2 device. */
 #ifdef CONFIG_MEDIA_CONTROLLER
-	dev->mdev.dev = &intf->dev;
-	strlcpy(dev->mdev.model, dev->name, sizeof(dev->mdev.model));
+	dev->mdev = media_device_get(&intf->dev);
+	if (!dev->mdev)
+		goto media_device_get_error;
+	dev->mdev->dev = &intf->dev;
+	strlcpy(dev->mdev->model, dev->name, sizeof(dev->mdev->model));
 	if (udev->serial)
-		strlcpy(dev->mdev.serial, udev->serial,
-			sizeof(dev->mdev.serial));
-	strcpy(dev->mdev.bus_info, udev->devpath);
-	dev->mdev.hw_revision = le16_to_cpu(udev->descriptor.bcdDevice);
-	dev->mdev.driver_version = LINUX_VERSION_CODE;
-	media_device_init(&dev->mdev);
+		strlcpy(dev->mdev->serial, udev->serial,
+			sizeof(dev->mdev->serial));
+	strcpy(dev->mdev->bus_info, udev->devpath);
+	dev->mdev->hw_revision = le16_to_cpu(udev->descriptor.bcdDevice);
+	dev->mdev->driver_version = LINUX_VERSION_CODE;
+	media_device_init(dev->mdev);
 
-	dev->vdev.mdev = &dev->mdev;
+	dev->vdev.mdev = dev->mdev;
 #endif
 	if (v4l2_device_register(&intf->dev, &dev->vdev) < 0)
 		goto error;
@@ -1958,7 +1960,7 @@ static int uvc_probe(struct usb_interface *intf,
 
 #ifdef CONFIG_MEDIA_CONTROLLER
 	/* Register the media device node */
-	if (media_device_register(&dev->mdev) < 0)
+	if (media_device_register(dev->mdev) < 0)
 		goto error;
 #endif
 	/* Save our data pointer in the interface data. */
@@ -1976,6 +1978,8 @@ static int uvc_probe(struct usb_interface *intf,
 	return 0;
 
 error:
+	media_device_put(&intf->dev);
+media_device_get_error:
 	uvc_unregister_video(dev);
 	return -ENODEV;
 }
