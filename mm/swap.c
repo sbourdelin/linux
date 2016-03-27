@@ -360,9 +360,10 @@ static void __lru_cache_activate_page(struct page *page)
  */
 void mark_page_accessed(struct page *page)
 {
-	page = compound_head(page);
-	if (!PageActive(page) && !PageUnevictable(page) &&
-			PageReferenced(page)) {
+	struct head_page *head = compound_head_t(page);
+	page = &head->page;
+	if (!PageActive(head) && !PageUnevictable(head) &&
+			PageReferenced(head)) {
 
 		/*
 		 * If the page is on the LRU, queue it for activation via
@@ -370,15 +371,15 @@ void mark_page_accessed(struct page *page)
 		 * pagevec, mark it active and it'll be moved to the active
 		 * LRU on the next drain.
 		 */
-		if (PageLRU(page))
+		if (PageLRU(head))
 			activate_page(page);
 		else
 			__lru_cache_activate_page(page);
-		ClearPageReferenced(page);
+		ClearPageReferenced(head);
 		if (page_is_file_cache(page))
 			workingset_activation(page);
-	} else if (!PageReferenced(page)) {
-		SetPageReferenced(page);
+	} else if (!PageReferenced(head)) {
+		SetPageReferenced(head);
 	}
 	if (page_is_idle(page))
 		clear_page_idle(page);
