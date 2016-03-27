@@ -133,7 +133,9 @@ enum pageflags {
 
 #ifndef __GENERATING_BOUNDS_H
 
-struct page;	/* forward declaration */
+/* forward declaration */
+struct page;
+struct head_page;
 
 static inline struct page *compound_head(struct page *page)
 {
@@ -142,6 +144,11 @@ static inline struct page *compound_head(struct page *page)
 	if (unlikely(head & 1))
 		return (struct page *) (head - 1);
 	return page;
+}
+
+static inline struct head_page *compound_head_t(struct page *page)
+{
+	return (struct head_page *)compound_head(page);
 }
 
 static __always_inline int PageTail(struct page *page)

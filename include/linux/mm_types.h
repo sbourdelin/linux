@@ -225,6 +225,10 @@ struct page {
 #endif
 ;
 
+struct head_page {
+	struct page page;
+};
+
 struct page_frag {
 	struct page *page;
 #if (BITS_PER_LONG > 32) || (PAGE_SIZE >= 65536)
