@@ -951,9 +951,19 @@ out:
 	return ret;
 }
 
-static int _mv88e6xxx_atu_cmd(struct dsa_switch *ds, u16 cmd)
+static int _mv88e6xxx_atu_cmd(struct dsa_switch *ds, u16 fid, u16 cmd)
 {
 	int ret;
+
+	if (mv88e6xxx_6097_family(ds) || mv88e6xxx_6165_family(ds) ||
+	    mv88e6xxx_6351_family(ds) || mv88e6xxx_6352_family(ds)) {
+		/* 88E6352 and similar have their own ATU FID register */
+		ret = _mv88e6xxx_reg_write(ds, REG_GLOBAL, GLOBAL_ATU_FID, fid);
+		if (ret < 0)
+			return ret;
+	} else {
+		return -EOPNOTSUPP;
+	}
 
 	ret = _mv88e6xxx_reg_write(ds, REG_GLOBAL, GLOBAL_ATU_OP, cmd);
 	if (ret < 0)
@@ -1001,11 +1011,6 @@ static int _mv88e6xxx_atu_flush_move(struct dsa_switch *ds,
 		return err;
 
 	if (entry->fid) {
-		err = _mv88e6xxx_reg_write(ds, REG_GLOBAL, GLOBAL_ATU_FID,
-					   entry->fid);
-		if (err)
-			return err;
-
 		op = static_too ? GLOBAL_ATU_OP_FLUSH_MOVE_ALL_DB :
 			GLOBAL_ATU_OP_FLUSH_MOVE_NON_STATIC_DB;
 	} else {
@@ -1013,7 +1018,7 @@ static int _mv88e6xxx_atu_flush_move(struct dsa_switch *ds,
 			GLOBAL_ATU_OP_FLUSH_MOVE_NON_STATIC;
 	}
 
-	return _mv88e6xxx_atu_cmd(ds, op);
+	return _mv88e6xxx_atu_cmd(ds, entry->fid, op);
 }
 
 static int _mv88e6xxx_atu_flush(struct dsa_switch *ds, u16 fid, bool static_too)
@@ -1973,11 +1978,7 @@ static int _mv88e6xxx_atu_load(struct dsa_switch *ds,
 	if (ret < 0)
 		return ret;
 
-	ret = _mv88e6xxx_reg_write(ds, REG_GLOBAL, GLOBAL_ATU_FID, entry->fid);
-	if (ret < 0)
-		return ret;
-
-	return _mv88e6xxx_atu_cmd(ds, GLOBAL_ATU_OP_LOAD_DB);
+	return _mv88e6xxx_atu_cmd(ds, entry->fid, GLOBAL_ATU_OP_LOAD_DB);
 }
 
 static int _mv88e6xxx_port_fdb_load(struct dsa_switch *ds, int port,
@@ -2060,11 +2061,7 @@ static int _mv88e6xxx_atu_getnext(struct dsa_switch *ds, u16 fid,
 	if (ret < 0)
 		return ret;
 
-	ret = _mv88e6xxx_reg_write(ds, REG_GLOBAL, GLOBAL_ATU_FID, fid);
-	if (ret < 0)
-		return ret;
-
-	ret = _mv88e6xxx_atu_cmd(ds, GLOBAL_ATU_OP_GET_NEXT_DB);
+	ret = _mv88e6xxx_atu_cmd(ds, fid, GLOBAL_ATU_OP_GET_NEXT_DB);
 	if (ret < 0)
 		return ret;
 
