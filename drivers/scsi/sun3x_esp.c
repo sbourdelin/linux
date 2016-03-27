@@ -1,13 +1,14 @@
 /* sun3x_esp.c: ESP front-end for Sun3x systems.
  *
  * Copyright (C) 2007,2008 Thomas Bogendoerfer (tsbogend@alpha.franken.de)
+ *
+ * License: GPL
  */
 
 #include <linux/kernel.h>
 #include <linux/gfp.h>
 #include <linux/types.h>
 #include <linux/delay.h>
-#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
@@ -268,33 +269,11 @@ fail:
 	return err;
 }
 
-static int esp_sun3x_remove(struct platform_device *dev)
-{
-	struct esp *esp = dev_get_drvdata(&dev->dev);
-	unsigned int irq = esp->host->irq;
-	u32 val;
-
-	scsi_esp_unregister(esp);
-
-	/* Disable interrupts.  */
-	val = dma_read32(DMA_CSR);
-	dma_write32(val & ~DMA_INT_ENAB, DMA_CSR);
-
-	free_irq(irq, esp);
-	dma_free_coherent(esp->dev, 16,
-			  esp->command_block,
-			  esp->command_block_dma);
-
-	scsi_host_put(esp->host);
-
-	return 0;
-}
-
 static struct platform_driver esp_sun3x_driver = {
 	.probe          = esp_sun3x_probe,
-	.remove         = esp_sun3x_remove,
 	.driver = {
-		.name   = "sun3x_esp",
+		.name			= "sun3x_esp",
+		.suppress_bind_attrs	= true,
 	},
 };
 
@@ -302,17 +281,4 @@ static int __init sun3x_esp_init(void)
 {
 	return platform_driver_register(&esp_sun3x_driver);
 }
-
-static void __exit sun3x_esp_exit(void)
-{
-	platform_driver_unregister(&esp_sun3x_driver);
-}
-
-MODULE_DESCRIPTION("Sun3x ESP SCSI driver");
-MODULE_AUTHOR("Thomas Bogendoerfer (tsbogend@alpha.franken.de)");
-MODULE_LICENSE("GPL");
-MODULE_VERSION(DRV_VERSION);
-
-module_init(sun3x_esp_init);
-module_exit(sun3x_esp_exit);
-MODULE_ALIAS("platform:sun3x_esp");
+device_initcall(sun3x_esp_init);
