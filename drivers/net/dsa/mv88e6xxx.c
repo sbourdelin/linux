@@ -1575,7 +1575,11 @@ static int _mv88e6xxx_fid_new(struct dsa_switch *ds, u16 *fid)
 	struct mv88e6xxx_priv_state *ps = ds_to_priv(ds);
 	DECLARE_BITMAP(fid_bitmap, MV88E6XXX_N_FID);
 	struct mv88e6xxx_vtu_stu_entry vlan;
+	u16 max = 4095;
 	int i, err;
+
+	if (mv88e6xxx_6185_family(ds))
+		max = 256;
 
 	bitmap_zero(fid_bitmap, MV88E6XXX_N_FID);
 
@@ -1608,7 +1612,7 @@ static int _mv88e6xxx_fid_new(struct dsa_switch *ds, u16 *fid)
 	 * databases are not needed. Return the next positive available.
 	 */
 	*fid = find_next_zero_bit(fid_bitmap, MV88E6XXX_N_FID, 1);
-	if (unlikely(*fid == MV88E6XXX_N_FID))
+	if (unlikely(*fid > max))
 		return -ENOSPC;
 
 	/* Clear the database */
