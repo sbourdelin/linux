@@ -13,7 +13,6 @@
 
 #include <linux/init.h>
 #include <linux/types.h>
-#include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/interrupt.h>
 #include <linux/sysfs.h>
@@ -408,5 +407,4 @@ static int __init brcm_gisb_driver_init(void)
 	return platform_driver_probe(&brcmstb_gisb_arb_driver,
 				     brcmstb_gisb_arb_probe);
 }
-
-module_init(brcm_gisb_driver_init);
+device_initcall(brcm_gisb_driver_init);
