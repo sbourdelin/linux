@@ -2740,7 +2740,7 @@ static struct fman *read_dts_node(struct platform_device *of_dev)
 
 	fm_node = of_node_get(of_dev->dev.of_node);
 
-	u32_prop = (const u32 *)of_get_property(fm_node, "cell-index", &lenp);
+	u32_prop = of_get_property(fm_node, "cell-index", &lenp);
 	if (!u32_prop) {
 		dev_err(&of_dev->dev, "%s: of_get_property(%s, cell-index) failed\n",
 			__func__, fm_node->full_name);
@@ -2796,7 +2796,7 @@ static struct fman *read_dts_node(struct platform_device *of_dev)
 	/* Rounding to MHz */
 	fman->dts_params.clk_freq = DIV_ROUND_UP(clk_rate, 1000000);
 
-	u32_prop = (const u32 *)of_get_property(fm_node,
+	u32_prop = of_get_property(fm_node,
 						"fsl,qman-channel-range",
 						&lenp);
 	if (!u32_prop) {
