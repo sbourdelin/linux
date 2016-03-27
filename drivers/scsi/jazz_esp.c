@@ -1,12 +1,13 @@
 /* jazz_esp.c: ESP front-end for MIPS JAZZ systems.
  *
- * Copyright (C) 2007 Thomas Bogendörfer (tsbogend@alpha.frankende)
+ * Copyright (C) 2007 Thomas Bogendörfer (tsbogend@alpha.franken.de)
+ *
+ * License: GPL
  */
 
 #include <linux/kernel.h>
 #include <linux/gfp.h>
 #include <linux/types.h>
-#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
@@ -201,31 +202,11 @@ fail:
 	return err;
 }
 
-static int esp_jazz_remove(struct platform_device *dev)
-{
-	struct esp *esp = dev_get_drvdata(&dev->dev);
-	unsigned int irq = esp->host->irq;
-
-	scsi_esp_unregister(esp);
-
-	free_irq(irq, esp);
-	dma_free_coherent(esp->dev, 16,
-			  esp->command_block,
-			  esp->command_block_dma);
-
-	scsi_host_put(esp->host);
-
-	return 0;
-}
-
-/* work with hotplug and coldplug */
-MODULE_ALIAS("platform:jazz_esp");
-
 static struct platform_driver esp_jazz_driver = {
 	.probe		= esp_jazz_probe,
-	.remove		= esp_jazz_remove,
 	.driver	= {
-		.name	= "jazz_esp",
+		.name			= "jazz_esp",
+		.suppress_bind_attrs	= true,
 	},
 };
 
@@ -233,16 +214,4 @@ static int __init jazz_esp_init(void)
 {
 	return platform_driver_register(&esp_jazz_driver);
 }
-
-static void __exit jazz_esp_exit(void)
-{
-	platform_driver_unregister(&esp_jazz_driver);
-}
-
-MODULE_DESCRIPTION("JAZZ ESP SCSI driver");
-MODULE_AUTHOR("Thomas Bogendoerfer (tsbogend@alpha.franken.de)");
-MODULE_LICENSE("GPL");
-MODULE_VERSION(DRV_VERSION);
-
-module_init(jazz_esp_init);
-module_exit(jazz_esp_exit);
+device_initcall(jazz_esp_init);
