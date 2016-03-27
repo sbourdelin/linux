@@ -1208,7 +1208,7 @@ static void const *XGI_GetLcdPtr(struct XGI330_LCDDataTablStruct const *table,
 		if (pVBInfo->LCDInfo & EnableScalingLCD)
 			tempdx &= (~PanelResInfo);
 
-		if (table[i].PANELID == tempdx) {
+		if (tempdx == table[i].PANELID) {
 			tempbx = table[i].MASK;
 			tempdx = pVBInfo->LCDInfo;
 
@@ -3902,7 +3902,7 @@ static struct XGI301C_Tap4TimingStruct const
 
 	i = 0;
 	while (Tap4TimingPtr[i].DE != 0xFFFF) {
-		if (Tap4TimingPtr[i].DE == tempax)
+		if (tempax == Tap4TimingPtr[i].DE)
 			break;
 		i++;
 	}
