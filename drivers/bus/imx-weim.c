@@ -7,7 +7,7 @@
  * License version 2. This program is licensed "as is" without any
  * warranty of any kind, whether express or implied.
  */
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/of_device.h>
@@ -57,7 +57,6 @@ static const struct of_device_id weim_id_table[] = {
 	{ .compatible = "fsl,imx51-weim", .data = &imx51_weim_devtype, },
 	{ }
 };
-MODULE_DEVICE_TABLE(of, weim_id_table);
 
 static int __init imx_weim_gpr_setup(struct platform_device *pdev)
 {
@@ -210,8 +209,4 @@ static struct platform_driver weim_driver = {
 		.of_match_table	= weim_id_table,
 	},
 };
-module_platform_driver_probe(weim_driver, weim_probe);
-
-MODULE_AUTHOR("Freescale Semiconductor Inc.");
-MODULE_DESCRIPTION("i.MX EIM Controller Driver");
-MODULE_LICENSE("GPL");
+builtin_platform_driver_probe(weim_driver, weim_probe);
