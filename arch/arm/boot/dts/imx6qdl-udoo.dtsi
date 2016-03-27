@@ -10,6 +10,13 @@
  */
 
 / {
+	aliases {
+		backlight = &backlight;
+		panelchan = &panelchan;
+		panel7 = &panel7;
+		touchscreenp7 = &touchscreenp7;
+	};
+
 	chosen {
 		stdout-path = &uart2;
 	};
@@ -33,6 +40,14 @@
 			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
 			gpio = <&gpio7 12 0>;
 		};
+
+		reg_panel: regulator@1 {
+			compatible = "regulator-fixed";
+			reg = <1>;
+			regulator-name = "lcd_panel";
+			enable-active-high;
+			gpio = <&gpio1 2 0>;
+		};
 	};
 
 	sound {
@@ -45,6 +60,34 @@
 			"Headphone Jack", "TX";
 		mux-int-port = <1>;
 		mux-ext-port = <6>;
+	};
+
+	backlight: backlight {
+		compatible = "gpio-backlight";
+		gpios = <&gpio1 4 0>;
+		default-on;
+		status = "disabled";
+	};
+
+	panel7: panel7 {
+		/*
+		 * in reality it is a -20t (parallel) model,
+		 * but with LVDS bridge chip attached,
+		 * so it is equivalent to -19t model in drive
+		 * characteristics
+		 */
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_panel>;
+		compatible = "urt,umsh-8596md-19t";
+		power-supply = <&reg_panel>;
+		backlight = <&backlight>;
+		status = "disabled";
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&lvds0_out>;
+			};
+		};
 	};
 };
 
@@ -151,6 +194,27 @@
 				MX6QDL_PAD_EIM_EB2__GPIO2_IO30		0x1b0b0
 			>;
 		};
+
+		pinctrl_panel: panelgrp {
+			fsl,pins = <
+				MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x70
+				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x70
+			>;
+		};
+
+		pinctrl_i2c3: i2c3grp {
+			fsl,pins = <
+				MX6QDL_PAD_GPIO_5__I2C3_SCL		0x4001f8b1
+				MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001f8b1
+			>;
+		};
+
+		pinctrl_touchscreenp7: touchscreenp7grp {
+			fsl,pins = <
+				MX6QDL_PAD_SD2_DAT0__GPIO1_IO15		0x70
+				MX6QDL_PAD_SD2_DAT2__GPIO1_IO13		0x1b0b0
+			>;
+		};
 	};
 };
 
@@ -188,4 +252,36 @@
 	pinctrl-2 = <&pinctrl_ac97_warm_reset>;
 	ac97-gpios = <&gpio4 19 0 &gpio4 18 0 &gpio2 30 0>;
 	status = "okay";
+};
+
+&ldb {
+	status = "okay";
+
+	panelchan: lvds-channel@0 {
+		port@4 {
+			reg = <4>;
+
+			lvds0_out: endpoint {
+				remote-endpoint = <&panel_in>;
+			};
+		};
+	};
+};
+
+&i2c3 {
+	clock-frequency = <100000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c3>;
+	status = "okay";
+
+	touchscreenp7: touchscreenp7@55 {
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_touchscreenp7>;
+		compatible = "sitronix,st1232";
+		reg = <0x55>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <13 8>;
+		gpios = <&gpio1 15 0>;
+		status = "disabled";
+	};
 };
