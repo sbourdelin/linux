@@ -6,23 +6,23 @@ fatal() {
 }
 
 any() {
-	echo "(__p)"
+	echo "((struct page *)(__p))"
 }
 
 head() {
-	echo "compound_head(__p)"
+	echo "compound_head((struct page *)(__p))"
 }
 
 no_tail() {
 	local enforce="${1:+VM_BUG_ON_PGFLAGS(PageTail(__p), __p);}"
 
-	echo "({$enforce compound_head(__p);})"
+	echo "({$enforce compound_head((struct page *)(__p));})"
 }
 
 no_compound() {
 	local enforce="${1:+VM_BUG_ON_PGFLAGS(PageCompound(__p), __p);}"
 
-	echo "({$enforce __p;})"
+	echo "({$enforce ((struct page *)(__p));})"
 }
 
 generate_test() {
@@ -34,7 +34,9 @@ generate_test() {
 	cat <<EOF
 #define $uname(__p) ({								\\
 	int ret;								\\
-	if (__builtin_types_compatible_p(typeof(*(__p)), struct page))		\\
+	if (__builtin_types_compatible_p(typeof(*(__p)), struct head_page))	\\
+		ret = $op(PG_$lname, &((struct head_page *)(__p))->page.flags);	\\
+	else if (__builtin_types_compatible_p(typeof(*(__p)), struct page))	\\
 		ret = $op(PG_$lname, &$page->flags);				\\
 	else									\\
 		BUILD_BUG();							\\
@@ -52,7 +54,9 @@ generate_mod() {
 
 	cat <<EOF
 #define $uname(__p) do {							\\
-	if (__builtin_types_compatible_p(typeof(*(__p)), struct page))		\\
+	if (__builtin_types_compatible_p(typeof(*(__p)), struct head_page))	\\
+		$op(PG_$lname, &((struct head_page *)(__p))->page.flags);	\\
+	else if (__builtin_types_compatible_p(typeof(*(__p)), struct page))	\\
 		$op(PG_$lname, &$page->flags);					\\
 	else									\\
 		BUILD_BUG();							\\
