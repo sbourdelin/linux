@@ -260,6 +260,13 @@ config ARMADA_THERMAL
 	  Enable this option if you want to have support for thermal management
 	  controller present in Armada 370 and Armada XP SoC.
 
+config TANGO_THERMAL
+	tristate "Tango thermal management"
+	depends on ARCH_TANGO || COMPILE_TEST
+	help
+	  Enable the Tango temperature sensor driver, which provides support
+	  for the sensors used since the SMP8758.
+
 config TEGRA_SOCTHERM
 	tristate "Tegra SOCTHERM thermal management"
 	depends on ARCH_TEGRA
