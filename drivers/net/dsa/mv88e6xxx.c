@@ -1355,6 +1355,17 @@ static int _mv88e6xxx_vtu_getnext(struct dsa_switch *ds,
 				return ret;
 
 			next.sid = ret & GLOBAL_VTU_SID_MASK;
+		} else if (mv88e6xxx_6185_family(ds)) {
+			/* VTU DBNum[7:4] are located in VTU Operation 11:8, and
+			 * VTU DBNum[3:0] are located in VTU Operation 3:0
+			 */
+			ret = _mv88e6xxx_reg_read(ds, REG_GLOBAL,
+						  GLOBAL_VTU_OP);
+			if (ret < 0)
+				return ret;
+
+			next.fid = (ret & 0xf00) >> 4;
+			next.fid |= ret & 0xf;
 		}
 	}
 
@@ -1416,6 +1427,7 @@ unlock:
 static int _mv88e6xxx_vtu_loadpurge(struct dsa_switch *ds,
 				    struct mv88e6xxx_vtu_stu_entry *entry)
 {
+	u16 op = GLOBAL_VTU_OP_VTU_LOAD_PURGE;
 	u16 reg = 0;
 	int ret;
 
@@ -1442,6 +1454,12 @@ static int _mv88e6xxx_vtu_loadpurge(struct dsa_switch *ds,
 		ret = _mv88e6xxx_reg_write(ds, REG_GLOBAL, GLOBAL_VTU_FID, reg);
 		if (ret < 0)
 			return ret;
+	} else if (mv88e6xxx_6185_family(ds)) {
+		/* VTU DBNum[7:4] are located in VTU Operation 11:8, and
+		 * VTU DBNum[3:0] are located in VTU Operation 3:0
+		 */
+		op |= (entry->fid & 0xf0) << 8;
+		op |= entry->fid & 0xf;
 	}
 
 	reg = GLOBAL_VTU_VID_VALID;
@@ -1451,7 +1469,7 @@ loadpurge:
 	if (ret < 0)
 		return ret;
 
-	return _mv88e6xxx_vtu_cmd(ds, GLOBAL_VTU_OP_VTU_LOAD_PURGE);
+	return _mv88e6xxx_vtu_cmd(ds, op);
 }
 
 static int _mv88e6xxx_stu_getnext(struct dsa_switch *ds, u8 sid,

@@ -376,7 +376,7 @@ struct mv88e6xxx_atu_entry {
 struct mv88e6xxx_vtu_stu_entry {
 	/* VTU only */
 	u16	vid;
-	u16	fid;
+	u16	fid; /* 8-bit DBNum in 88E6185 family */
 
 	/* VTU and STU */
 	u8	sid;
