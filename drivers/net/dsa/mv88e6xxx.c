@@ -961,6 +961,20 @@ static int _mv88e6xxx_atu_cmd(struct dsa_switch *ds, u16 fid, u16 cmd)
 		ret = _mv88e6xxx_reg_write(ds, REG_GLOBAL, GLOBAL_ATU_FID, fid);
 		if (ret < 0)
 			return ret;
+	} else if (mv88e6xxx_6185_family(ds)) {
+		/* ATU DBNum[7:4] are located in ATU Control 15:12 */
+		ret = _mv88e6xxx_reg_read(ds, REG_GLOBAL, GLOBAL_ATU_CONTROL);
+		if (ret < 0)
+			return ret;
+
+		ret = _mv88e6xxx_reg_write(ds, REG_GLOBAL, GLOBAL_ATU_CONTROL,
+					   (ret & 0xfff) |
+					   ((fid << 8) & 0xf000));
+		if (ret < 0)
+			return ret;
+
+		/* ATU DBNum[3:0] are located in ATU Operation 3:0 */
+		cmd |= fid & 0xf;
 	} else {
 		return -EOPNOTSUPP;
 	}

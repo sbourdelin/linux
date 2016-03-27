@@ -366,7 +366,7 @@ struct mv88e6xxx_switch_id {
 };
 
 struct mv88e6xxx_atu_entry {
-	u16	fid;
+	u16	fid; /* 8-bit DBNum in 88E6185 family */
 	u8	state;
 	bool	trunk;
 	u16	portv_trunkid;
