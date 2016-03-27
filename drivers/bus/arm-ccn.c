@@ -9,6 +9,8 @@
  * GNU General Public License for more details.
  *
  * Copyright (C) 2014 ARM Limited
+ *
+ * Author: Pawel Moll <pawel.moll@arm.com>
  */
 
 #include <linux/ctype.h>
@@ -16,7 +18,7 @@
 #include <linux/idr.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
-#include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/perf_event.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
@@ -1302,20 +1304,6 @@ error_cpu_notifier:
 	return err;
 }
 
-static void arm_ccn_pmu_cleanup(struct arm_ccn *ccn)
-{
-	int i;
-
-	irq_set_affinity(ccn->irq, cpu_possible_mask);
-	unregister_cpu_notifier(&ccn->dt.cpu_nb);
-	for (i = 0; i < ccn->num_xps; i++)
-		writel(0, ccn->xp[i].base + CCN_XP_DT_CONTROL);
-	writel(0, ccn->dt.base + CCN_DT_PMCR);
-	perf_pmu_unregister(&ccn->dt.pmu);
-	ida_simple_remove(&arm_ccn_pmu_ida, ccn->dt.id);
-}
-
-
 static int arm_ccn_for_each_valid_region(struct arm_ccn *ccn,
 		int (*callback)(struct arm_ccn *ccn, int region,
 		void __iomem *base, u32 type, u32 id))
@@ -1507,15 +1495,6 @@ static int arm_ccn_probe(struct platform_device *pdev)
 	return arm_ccn_pmu_init(ccn);
 }
 
-static int arm_ccn_remove(struct platform_device *pdev)
-{
-	struct arm_ccn *ccn = platform_get_drvdata(pdev);
-
-	arm_ccn_pmu_cleanup(ccn);
-
-	return 0;
-}
-
 static const struct of_device_id arm_ccn_match[] = {
 	{ .compatible = "arm,ccn-504", },
 	{},
@@ -1525,9 +1504,9 @@ static struct platform_driver arm_ccn_driver = {
 	.driver = {
 		.name = "arm-ccn",
 		.of_match_table = arm_ccn_match,
+		.suppress_bind_attrs = true,
 	},
 	.probe = arm_ccn_probe,
-	.remove = arm_ccn_remove,
 };
 
 static int __init arm_ccn_init(void)
@@ -1539,14 +1518,4 @@ static int __init arm_ccn_init(void)
 
 	return platform_driver_register(&arm_ccn_driver);
 }
-
-static void __exit arm_ccn_exit(void)
-{
-	platform_driver_unregister(&arm_ccn_driver);
-}
-
-module_init(arm_ccn_init);
-module_exit(arm_ccn_exit);
-
-MODULE_AUTHOR("Pawel Moll <pawel.moll@arm.com>");
-MODULE_LICENSE("GPL");
+device_initcall(arm_ccn_init);
