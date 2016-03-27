@@ -15,6 +15,10 @@
 #include <sound/pcm_params.h>
 #include "amdtp-stream.h"
 
+/* Always support tracepoints enabled by Linux tracing subsystem. */
+#define CREATE_TRACE_POINTS
+#include "amdtp-stream-trace.h"
+
 #define TICKS_PER_CYCLE		3072
 #define CYCLES_PER_SECOND	8000
 #define TICKS_PER_SECOND	(TICKS_PER_CYCLE * CYCLES_PER_SECOND)
@@ -426,6 +430,10 @@ static int handle_out_packet(struct amdtp_stream *s, unsigned int data_blocks,
 	s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
 
 	payload_length = 8 + data_blocks * 4 * s->data_block_quadlets;
+
+	trace_out_packet(be32_to_cpu(buffer[0]), be32_to_cpu(buffer[1]),
+			 payload_length / 4, s->packet_index);
+
 	if (queue_out_packet(s, payload_length, false) < 0)
 		return -EIO;
 
@@ -450,6 +458,9 @@ static int handle_in_packet(struct amdtp_stream *s,
 
 	cip_header[0] = be32_to_cpu(buffer[0]);
 	cip_header[1] = be32_to_cpu(buffer[1]);
+
+	trace_in_packet(cip_header[0], cip_header[1], payload_quadlets,
+			s->packet_index);
 
 	/*
 	 * This module supports 'Two-quadlet CIP header with SYT field'.
@@ -523,7 +534,11 @@ static int handle_in_packet(struct amdtp_stream *s,
 		dev_err(&s->unit->device,
 			"Detect discontinuity of CIP: %02X %02X\n",
 			s->data_block_counter, data_block_counter);
-		return -EIO;
+		if (!trace_in_packet_enabled())
+			return -EIO;
+
+		/* To identifying this situation. */
+		trace_in_packet(0xffffffff, 0xffffffff, 999, 99);
 	}
 
 	pcm_frames = s->process_data_blocks(s, buffer + 2, *data_blocks, &syt);
