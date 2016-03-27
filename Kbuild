@@ -3,8 +3,9 @@
 # This file takes care of the following:
 # 1) Generate bounds.h
 # 2) Generate timeconst.h
-# 3) Generate asm-offsets.h (may need bounds.h and timeconst.h)
-# 4) Check for missing system calls
+# 3) Generate page-flags.h
+# 4) Generate asm-offsets.h (may need bounds.h, timeconst.h and page-flags.h)
+# 5) Check for missing system calls
 
 # Default sed regexp - multiline due to syntax constraints
 define sed-y
@@ -66,7 +67,25 @@ $(obj)/$(timeconst-file): kernel/time/timeconst.bc FORCE
 	$(call filechk,gentimeconst)
 
 #####
-# 3) Generate asm-offsets.h
+# 3) Generate page-flags.h
+
+pageflags-file := include/generated/page-flags.h
+
+targets += $(pageflags-file)
+
+quiet_cmd_genpageflags = GEN     $@
+define cmd_genpageflags
+	$(srctree)/scripts/mkpageflags.sh <$< >$@
+endef
+define filechk_genpageflags
+	$(srctree)/scripts/mkpageflags.sh <$<
+endef
+
+$(obj)/$(pageflags-file): mm/page-flags.tbl FORCE
+	$(call filechk,genpageflags)
+
+#####
+# 4) Generate asm-offsets.h
 #
 
 offsets-file := include/generated/asm-offsets.h
@@ -76,7 +95,8 @@ targets += arch/$(SRCARCH)/kernel/asm-offsets.s
 
 # We use internal kbuild rules to avoid the "is up to date" message from make
 arch/$(SRCARCH)/kernel/asm-offsets.s: arch/$(SRCARCH)/kernel/asm-offsets.c \
-                                      $(obj)/$(timeconst-file) $(obj)/$(bounds-file) FORCE
+                                      $(obj)/$(timeconst-file) $(obj)/$(bounds-file) \
+                                      $(obj)/$(pageflags-file) FORCE
 	$(Q)mkdir -p $(dir $@)
 	$(call if_changed_dep,cc_s_c)
 
@@ -84,7 +104,7 @@ $(obj)/$(offsets-file): arch/$(SRCARCH)/kernel/asm-offsets.s FORCE
 	$(call filechk,offsets,__ASM_OFFSETS_H__)
 
 #####
-# 4) Check for missing system calls
+# 5) Check for missing system calls
 #
 
 always += missing-syscalls
