@@ -277,13 +277,13 @@ void purge_inprogress_ops(void)
 					 next,
 					 &htable_ops_in_progress[i],
 					 list) {
-			set_op_state_purged(op);
 			gossip_debug(GOSSIP_DEV_DEBUG,
 				     "%s: op:%s: op_state:%d: process:%s:\n",
 				     __func__,
 				     get_opname_string(op),
 				     op->op_state,
 				     current->comm);
+			set_op_state_purged(op);
 		}
 		spin_unlock(&htable_ops_in_progress_lock);
 	}
