@@ -1511,8 +1511,12 @@ loadpurge:
 static int _mv88e6xxx_port_fid(struct dsa_switch *ds, int port, u16 *new,
 			       u16 *old)
 {
+	u16 upper_mask = PORT_CONTROL_1_FID_11_4_MASK;
 	u16 fid;
 	int ret;
+
+	if (mv88e6xxx_6185_family(ds))
+		upper_mask = PORT_CONTROL_1_DBNUM_7_4_MASK;
 
 	/* Port's default FID bits 3:0 are located in reg 0x06, offset 12 */
 	ret = _mv88e6xxx_reg_read(ds, REG_PORT(port), PORT_BASE_VLAN);
@@ -1536,11 +1540,11 @@ static int _mv88e6xxx_port_fid(struct dsa_switch *ds, int port, u16 *new,
 	if (ret < 0)
 		return ret;
 
-	fid |= (ret & PORT_CONTROL_1_FID_11_4_MASK) << 4;
+	fid |= (ret & upper_mask) << 4;
 
 	if (new) {
-		ret &= ~PORT_CONTROL_1_FID_11_4_MASK;
-		ret |= (*new >> 4) & PORT_CONTROL_1_FID_11_4_MASK;
+		ret &= ~upper_mask;
+		ret |= (*new >> 4) & upper_mask;
 
 		ret = _mv88e6xxx_reg_write(ds, REG_PORT(port), PORT_CONTROL_1,
 					   ret);
