@@ -651,9 +651,13 @@ out_hotkey:
 
 static int acpi_pcc_hotkey_remove(struct acpi_device *device)
 {
-	struct pcc_acpi *pcc = acpi_driver_data(device);
+	struct pcc_acpi *pcc;
 
-	if (!device || !pcc)
+	if (!device)
+		return -EINVAL;
+
+	pcc = acpi_driver_data(device);
+	if (!pcc)
 		return -EINVAL;
 
 	sysfs_remove_group(&device->dev.kobj, &pcc_attr_group);
