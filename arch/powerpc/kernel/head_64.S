@@ -611,7 +611,7 @@ __after_prom_start:
 	sub	r5,r5,r11
 #else
 	/* just copy interrupts */
-	LOAD_REG_IMMEDIATE(r5, __end_interrupts - _stext)
+	LOAD_REG_IMMEDIATE(r5, __end_handlers - _stext)
 #endif
 	b	5f
 3:

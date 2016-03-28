@@ -10,6 +10,7 @@
 
 extern char __start_interrupts[];
 extern char __end_interrupts[];
+extern char __end_handlers[];
 
 extern char __prom_init_toc_start[];
 extern char __prom_init_toc_end[];
@@ -39,7 +40,7 @@ static inline int overlaps_interrupt_vector_text(unsigned long start,
 {
 	unsigned long real_start, real_end;
 	real_start = __start_interrupts - _stext;
-	real_end = __end_interrupts - _stext;
+	real_end = __end_handlers - _stext;
 
 	return start < (unsigned long)__va(real_end) &&
 		(unsigned long)__va(real_start) < end;
