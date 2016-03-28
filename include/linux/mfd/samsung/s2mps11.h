@@ -173,10 +173,19 @@ enum s2mps11_regulators {
 
 #define S2MPS11_LDO_VSEL_MASK	0x3F
 #define S2MPS11_BUCK_VSEL_MASK	0xFF
+#define S2MPS11_BUCK9_MIN_VSEL	0x40
 #define S2MPS11_ENABLE_MASK	(0x03 << S2MPS11_ENABLE_SHIFT)
 #define S2MPS11_ENABLE_SHIFT	0x06
 #define S2MPS11_LDO_N_VOLTAGES	(S2MPS11_LDO_VSEL_MASK + 1)
 #define S2MPS11_BUCK_N_VOLTAGES (S2MPS11_BUCK_VSEL_MASK + 1)
+/*
+ * Buck9 supports only 32 voltages (values from 0x40 to 0x5F) but bootloader
+ * initializes the register with value of 0xff so when probing this would
+ * cause a failure (Odroid XU3):
+ *	vdd_2.8v_ldo: failed to get the current voltage(-22)
+ * Instead pretend we support up to 0xff (5 V).
+ */
+#define S2MPS11_BUCK9_N_VOLTAGES	192
 #define S2MPS11_RAMP_DELAY	25000		/* uV/us */
 
 #define S2MPS11_CTRL1_PWRHOLD_MASK	BIT(4)
