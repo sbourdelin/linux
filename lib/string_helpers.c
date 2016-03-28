@@ -10,6 +10,7 @@
 #include <linux/export.h>
 #include <linux/ctype.h>
 #include <linux/errno.h>
+#include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/string_helpers.h>
@@ -562,3 +563,37 @@ char *kstrdup_quotable(char *src)
 	return dst;
 }
 EXPORT_SYMBOL_GPL(kstrdup_quotable);
+
+/*
+ * Returns allocated NULL-terminated string containing process
+ * command line, with inter-argument NULLs replaced with spaces,
+ * and other special characters escaped.
+ */
+char *kstrdup_quotable_cmdline(struct task_struct *task)
+{
+	char *buffer, *quoted;
+	int i, res;
+
+	buffer = kmalloc(PAGE_SIZE, GFP_TEMPORARY);
+	if (!buffer)
+		return NULL;
+
+	res = get_cmdline(task, buffer, PAGE_SIZE - 1);
+	buffer[res] = '\0';
+
+	/* Collapse trailing NULLs. */
+	for (; res > 0; res--)
+		if (buffer[res-1] != '\0')
+			break;
+
+	/* Replace inter-argument NULLs. */
+	for (i = 0; i < res; i++)
+		if (buffer[i] == '\0')
+			buffer[i] = ' ';
+
+	/* Make sure result is printable. */
+	quoted = kstrdup_quotable(buffer);
+	kfree(buffer);
+	return quoted;
+}
+EXPORT_SYMBOL_GPL(kstrdup_quotable_cmdline);

@@ -69,5 +69,6 @@ static inline int string_escape_str_any_np(const char *src, char *dst,
 }
 
 char *kstrdup_quotable(char *src);
+char *kstrdup_quotable_cmdline(struct task_struct *task);
 
 #endif
