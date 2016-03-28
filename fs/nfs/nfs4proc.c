@@ -1794,10 +1794,12 @@ static int nfs4_handle_delegation_recall_error(struct nfs_server *server, struct
 		default:
 			printk(KERN_ERR "NFS: %s: unhandled error "
 					"%d.\n", __func__, err);
+			break;
 		case 0:
 		case -ENOENT:
 		case -EAGAIN:
 		case -ESTALE:
+			clear_bit(NFS_DELEGATED_STATE, &state->flags);
 			break;
 		case -NFS4ERR_BADSESSION:
 		case -NFS4ERR_BADSLOT:
@@ -1857,7 +1859,6 @@ int nfs4_open_delegation_recall(struct nfs_open_context *ctx,
 	write_seqlock(&state->seqlock);
 	nfs4_stateid_copy(&state->stateid, &state->open_stateid);
 	write_sequnlock(&state->seqlock);
-	clear_bit(NFS_DELEGATED_STATE, &state->flags);
 	switch (type & (FMODE_READ|FMODE_WRITE)) {
 	case FMODE_READ|FMODE_WRITE:
 	case FMODE_WRITE:
