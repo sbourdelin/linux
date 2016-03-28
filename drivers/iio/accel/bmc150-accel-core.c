@@ -547,7 +547,7 @@ static int bmc150_accel_get_axis(struct bmc150_accel_data *data,
 {
 	int ret;
 	int axis = chan->scan_index;
-	unsigned int raw_val;
+	__le16 raw_val;
 
 	mutex_lock(&data->mutex);
 	ret = bmc150_accel_set_power_state(data, true);
@@ -564,7 +564,7 @@ static int bmc150_accel_get_axis(struct bmc150_accel_data *data,
 		mutex_unlock(&data->mutex);
 		return ret;
 	}
-	*val = sign_extend32(raw_val >> chan->scan_type.shift,
+	*val = sign_extend32(le16_to_cpu(raw_val) >> chan->scan_type.shift,
 			     chan->scan_type.realbits - 1);
 	ret = bmc150_accel_set_power_state(data, false);
 	mutex_unlock(&data->mutex);
@@ -988,6 +988,7 @@ static const struct iio_event_spec bmc150_accel_event = {
 		.realbits = (bits),					\
 		.storagebits = 16,					\
 		.shift = 16 - (bits),					\
+		.endianness = IIO_LE,					\
 	},								\
 	.event_spec = &bmc150_accel_event,				\
 	.num_event_specs = 1						\
