@@ -28,11 +28,6 @@
 
 #include "bmc150-accel.h"
 
-static const struct regmap_config bmc150_i2c_regmap_conf = {
-	.reg_bits = 8,
-	.val_bits = 8,
-};
-
 static int bmc150_accel_probe(struct i2c_client *client,
 			      const struct i2c_device_id *id)
 {

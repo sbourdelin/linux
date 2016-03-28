@@ -25,12 +25,6 @@
 
 #include "bmc150-accel.h"
 
-static const struct regmap_config bmc150_spi_regmap_conf = {
-	.reg_bits = 8,
-	.val_bits = 8,
-	.max_register = 0x3f,
-};
-
 static int bmc150_accel_probe(struct spi_device *spi)
 {
 	struct regmap *regmap;
