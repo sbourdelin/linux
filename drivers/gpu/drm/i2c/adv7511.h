@@ -10,6 +10,8 @@
 #define __DRM_I2C_ADV7511_H__
 
 #include <linux/hdmi.h>
+#include <linux/gpio/consumer.h>
+#include <drm/drmP.h>
 
 #define ADV7511_REG_CHIP_REVISION		0x00
 #define ADV7511_REG_N0				0x01
@@ -285,5 +287,44 @@ struct adv7511_video_config {
 	bool hdmi_mode;
 	struct hdmi_avi_infoframe avi_infoframe;
 };
+
+struct adv7511 {
+	struct i2c_client *i2c_main;
+	struct i2c_client *i2c_edid;
+
+	struct regmap *regmap;
+	struct regmap *packet_memory_regmap;
+	enum drm_connector_status status;
+	bool powered;
+
+	unsigned int f_tmds;
+	unsigned int f_audio;
+
+	unsigned int audio_source;
+
+	unsigned int current_edid_segment;
+	uint8_t edid_buf[256];
+	bool edid_read;
+
+	wait_queue_head_t wq;
+	struct drm_encoder *encoder;
+
+	bool embedded_sync;
+	enum adv7511_sync_polarity vsync_polarity;
+	enum adv7511_sync_polarity hsync_polarity;
+	bool rgb;
+
+	struct edid *edid;
+
+	struct gpio_desc *gpio_pd;
+};
+
+int adv7511_packet_enable(struct adv7511 *adv7511, unsigned int packet);
+int adv7511_packet_disable(struct adv7511 *adv7511, unsigned int packet);
+
+#ifdef CONFIG_DRM_I2C_ADV7511_AUDIO
+int adv7511_audio_init(struct device *dev);
+void adv7511_audio_exit(struct device *dev);
+#endif
 
 #endif /* __DRM_I2C_ADV7511_H__ */
