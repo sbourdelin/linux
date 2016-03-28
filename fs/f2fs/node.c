@@ -832,7 +832,7 @@ int truncate_inode_blocks(struct inode *inode, pgoff_t from)
 	trace_f2fs_truncate_inode_blocks_enter(inode, from);
 
 	level = get_node_path(inode, from, offset, noffset);
-restart:
+
 	page = get_node_page(sbi, inode->i_ino);
 	if (IS_ERR(page)) {
 		trace_f2fs_truncate_inode_blocks_exit(inode, PTR_ERR(page));
@@ -840,7 +840,7 @@ restart:
 	}
 
 	set_new_dnode(&dn, inode, page, NULL, 0);
-	unlock_page(page);
+	dn.inode_page_locked = true;
 
 	ri = F2FS_INODE(page);
 	switch (level) {
@@ -895,22 +895,16 @@ skip_partial:
 			goto fail;
 		if (offset[1] == 0 &&
 				ri->i_nid[offset[0] - NODE_DIR1_BLOCK]) {
-			lock_page(page);
-			if (unlikely(page->mapping != NODE_MAPPING(sbi))) {
-				f2fs_put_page(page, 1);
-				goto restart;
-			}
 			f2fs_wait_on_page_writeback(page, NODE, true);
 			ri->i_nid[offset[0] - NODE_DIR1_BLOCK] = 0;
 			set_page_dirty(page);
-			unlock_page(page);
 		}
 		offset[1] = 0;
 		offset[0]++;
 		nofs += err;
 	}
 fail:
-	f2fs_put_page(page, 0);
+	f2fs_put_page(page, 1);
 	trace_f2fs_truncate_inode_blocks_exit(inode, err);
 	return err > 0 ? 0 : err;
 }
