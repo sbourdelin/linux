@@ -283,6 +283,21 @@ TRACE_MAKE_SYSTEM_STR();
 		trace_print_symbols_seq(p, value, symbols);		\
 	})
 
+#undef __print_ns_to_secs
+#define __print_ns_to_secs(value)			\
+	({						\
+		u64 ____val = (u64)value;		\
+		do_div(____val, NSEC_PER_SEC);		\
+		____val;				\
+	})
+
+#undef __print_ns_without_secs
+#define __print_ns_without_secs(value)			\
+	({						\
+		u64 ____val = (u64)value;		\
+		(u32) do_div(____val, NSEC_PER_SEC);	\
+	})
+
 #undef __print_symbolic_u64
 #if BITS_PER_LONG == 32
 #define __print_symbolic_u64(value, symbol_array...)			\
@@ -719,6 +734,16 @@ static inline void ftrace_test_probe_##call(void)			\
 #undef __get_str
 #undef __get_bitmask
 #undef __print_array
+
+/*
+ * The below is not executed in the kernel. It is only what is
+ * displayed in the print format for userspace to parse.
+ */
+#undef __print_ns_to_secs
+#define __print_ns_to_secs(val) val / 1000000000UL
+
+#undef __print_ns_without_secs
+#define __print_ns_without_secs(val) val % 1000000000UL
 
 #undef TP_printk
 #define TP_printk(fmt, args...) "\"" fmt "\", "  __stringify(args)
