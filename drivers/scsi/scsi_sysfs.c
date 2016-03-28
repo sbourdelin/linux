@@ -1270,9 +1270,26 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 	return error;
 }
 
+static int scsi_return_dev(struct device *dev, void *data)
+{
+	struct device **childp = data;
+
+	*childp = dev;
+	return 0;
+}
+
+/* Caller must call put_device() if this function does not return NULL. */
+static struct device *scsi_get_child_dev(struct device *dev)
+{
+	struct device *child = NULL;
+
+	device_for_each_child(dev, &child, scsi_return_dev);
+	return get_device(child);
+}
+
 void __scsi_remove_device(struct scsi_device *sdev)
 {
-	struct device *dev = &sdev->sdev_gendev;
+	struct device *dev = &sdev->sdev_gendev, *sdkp = NULL;
 
 	/*
 	 * This cleanup path is not reentrant and while it is impossible
@@ -1287,6 +1304,7 @@ void __scsi_remove_device(struct scsi_device *sdev)
 			return;
 
 		bsg_unregister_queue(sdev->request_queue);
+		sdkp = scsi_get_child_dev(dev);
 		device_unregister(&sdev->sdev_dev);
 		transport_remove_device(dev);
 		scsi_dh_remove_device(sdev);
@@ -1302,6 +1320,16 @@ void __scsi_remove_device(struct scsi_device *sdev)
 	scsi_device_set_state(sdev, SDEV_DEL);
 	blk_cleanup_queue(sdev->request_queue);
 	cancel_work_sync(&sdev->requeue_work);
+
+	/*
+	 * blk_cleanup_queue() unregisters the BDI device. The name of the
+	 * BDI device is derived from the dev_t of the /dev/sd<n> device.
+	 * Keep a reference to the /dev/sd<n> device until the BDI device
+	 * has been unregistered to avoid that a BDI device with the same
+	 * name gets registered before blk_cleanup_queue() has finished.
+	 */
+	if (sdkp)
+		put_device(sdkp);
 
 	if (sdev->host->hostt->slave_destroy)
 		sdev->host->hostt->slave_destroy(sdev);
