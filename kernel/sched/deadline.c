@@ -17,6 +17,7 @@
 #include "sched.h"
 
 #include <linux/slab.h>
+#include <trace/events/sched.h>
 
 struct dl_bandwidth def_dl_bandwidth;
 
@@ -351,6 +352,7 @@ static inline void setup_new_dl_entity(struct sched_dl_entity *dl_se,
 	 */
 	dl_se->deadline = rq_clock(rq) + pi_se->dl_deadline;
 	dl_se->runtime = pi_se->dl_runtime;
+	trace_sched_deadline_replenish(dl_se);
 }
 
 /*
@@ -416,6 +418,8 @@ static void replenish_dl_entity(struct sched_dl_entity *dl_se,
 		dl_se->deadline = rq_clock(rq) + pi_se->dl_deadline;
 		dl_se->runtime = pi_se->dl_runtime;
 	}
+
+	trace_sched_deadline_replenish(dl_se);
 
 	if (dl_se->dl_yielded)
 		dl_se->dl_yielded = 0;
@@ -496,6 +500,7 @@ static void update_dl_entity(struct sched_dl_entity *dl_se,
 	    dl_entity_overflow(dl_se, pi_se, rq_clock(rq))) {
 		dl_se->deadline = rq_clock(rq) + pi_se->dl_deadline;
 		dl_se->runtime = pi_se->dl_runtime;
+		trace_sched_deadline_replenish(dl_se);
 	}
 }
 
@@ -729,7 +734,9 @@ static void update_curr_dl(struct rq *rq)
 
 throttle:
 	if (dl_runtime_exceeded(dl_se) || dl_se->dl_yielded) {
+		trace_sched_deadline_yield(&rq->curr->dl);
 		dl_se->dl_throttled = 1;
+		trace_sched_deadline_throttle(dl_se);
 		__dequeue_task_dl(rq, curr, 0);
 		if (unlikely(dl_se->dl_boosted || !start_dl_timer(curr)))
 			enqueue_task_dl(rq, curr, ENQUEUE_REPLENISH);
@@ -906,6 +913,7 @@ enqueue_dl_entity(struct sched_dl_entity *dl_se,
 static void dequeue_dl_entity(struct sched_dl_entity *dl_se)
 {
 	__dequeue_dl_entity(dl_se);
+	trace_sched_deadline_block(dl_se);
 }
 
 static void enqueue_task_dl(struct rq *rq, struct task_struct *p, int flags)

@@ -562,6 +562,94 @@ TRACE_EVENT(sched_wake_idle_without_ipi,
 
 	TP_printk("cpu=%d", __entry->cpu)
 );
+
+/*
+ * Tracepoint for runtime replenishment of deadline tasks:
+ */
+TRACE_EVENT(sched_deadline_replenish,
+
+	TP_PROTO(struct sched_dl_entity *dl_se),
+
+	TP_ARGS(dl_se),
+
+	TP_STRUCT__entry(
+		__array(	char,	comm,	TASK_COMM_LEN	)
+		__field(	pid_t,	pid			)
+		__field(	u64,	now			)
+		__field(	u64,	deadline		)
+		__field(	s64,	runtime			)
+	),
+
+	TP_fast_assign(
+		memcpy(__entry->comm, dl_task_of(dl_se)->comm, TASK_COMM_LEN);
+		__entry->now		= rq_clock(rq_of_dl_rq(dl_rq_of_se(dl_se)));
+		__entry->pid		= dl_task_of(dl_se)->pid;
+		__entry->deadline	= dl_se->deadline;
+		__entry->runtime	= dl_se->runtime;
+	),
+
+	TP_printk("comm=%s pid=%d now=%llu.%09u deadline=%llu.%09u runtime=%lld",
+		  __entry->comm,
+		  __entry->pid,
+		  __print_ns_to_secs(__entry->now),
+		  __print_ns_without_secs(__entry->now),
+		  __print_ns_to_secs(__entry->deadline),
+		  __print_ns_without_secs(__entry->deadline),
+		  __entry->runtime)
+);
+
+DECLARE_EVENT_CLASS(sched_deadline_template,
+
+	TP_PROTO(struct sched_dl_entity *dl_se),
+
+	TP_ARGS(dl_se),
+
+	TP_STRUCT__entry(
+		__field(	u64,	now			)
+		__field(	u64,	deadline		)
+		__field(	s64,	runtime			)
+	),
+
+	TP_fast_assign(
+		__entry->now		= rq_clock(rq_of_dl_rq(dl_rq_of_se(dl_se)));
+		__entry->deadline	= dl_se->deadline;
+		__entry->runtime	= dl_se->runtime;
+	),
+
+	TP_printk("now=%llu.%09u deadline=%llu.%09u remaining_runtime=%lld",
+		  __print_ns_to_secs(__entry->now),
+		  __print_ns_without_secs(__entry->now),
+		  __print_ns_to_secs(__entry->deadline),
+		  __print_ns_without_secs(__entry->deadline),
+		  __entry->runtime)
+);
+
+/*
+ * Tracepoint for sched_yield() of a deadline task (the task
+ * went to sleep waiting for the next period).
+ */
+DEFINE_EVENT_CONDITION(sched_deadline_template, sched_deadline_yield,
+	     TP_PROTO(struct sched_dl_entity *dl_se),
+	     TP_ARGS(dl_se),
+	     TP_CONDITION(dl_se->dl_yielded));
+
+/*
+ * Tracepoint for throttling of a deadline task that consumed all its
+ * runtime.
+ */
+DEFINE_EVENT_CONDITION(sched_deadline_template, sched_deadline_throttle,
+	     TP_PROTO(struct sched_dl_entity *dl_se),
+	     TP_ARGS(dl_se),
+	     TP_CONDITION(!dl_se->dl_yielded));
+
+/*
+ * Tracepoint for blocking of a deadline task. The deadline task was
+ * dequeued, but neither by being throttled nor yielding.
+ */
+DEFINE_EVENT_CONDITION(sched_deadline_template, sched_deadline_block,
+	     TP_PROTO(struct sched_dl_entity *dl_se),
+	     TP_ARGS(dl_se),
+	     TP_CONDITION(!dl_se->dl_yielded && !dl_se->dl_throttled));
 #endif /* _TRACE_SCHED_H */
 
 /* This part must be outside protection */
