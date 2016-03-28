@@ -160,7 +160,7 @@ int drm_dp_bw_code_to_link_rate(u8 link_bw)
 }
 EXPORT_SYMBOL(drm_dp_bw_code_to_link_rate);
 
-#define AUX_RETRY_INTERVAL 500 /* us */
+#define AUX_RETRY_INTERVAL 1000 /* us */
 
 /**
  * DOC: dp helpers
