@@ -3,6 +3,8 @@
 
 #include <linux/types.h>
 
+struct file;
+
 /* Descriptions of the types of units to
  * print in */
 enum string_size_units {
@@ -70,5 +72,6 @@ static inline int string_escape_str_any_np(const char *src, char *dst,
 
 char *kstrdup_quotable(char *src);
 char *kstrdup_quotable_cmdline(struct task_struct *task);
+char *kstrdup_quotable_file(struct file *file);
 
 #endif
