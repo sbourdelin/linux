@@ -749,6 +749,24 @@ static inline void rq_clock_skip_update(struct rq *rq, bool skip)
 		rq->clock_skip_update &= ~RQCF_REQ_SKIP;
 }
 
+static inline struct task_struct *dl_task_of(struct sched_dl_entity *dl_se)
+{
+	return container_of(dl_se, struct task_struct, dl);
+}
+
+static inline struct rq *rq_of_dl_rq(struct dl_rq *dl_rq)
+{
+	return container_of(dl_rq, struct rq, dl);
+}
+
+static inline struct dl_rq *dl_rq_of_se(struct sched_dl_entity *dl_se)
+{
+	struct task_struct *p = dl_task_of(dl_se);
+	struct rq *rq = task_rq(p);
+
+	return &rq->dl;
+}
+
 #ifdef CONFIG_NUMA
 enum numa_topology_type {
 	NUMA_DIRECT,
