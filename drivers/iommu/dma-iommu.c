@@ -190,11 +190,13 @@ static void __iommu_dma_free_pages(struct page **pages, int count)
 	kvfree(pages);
 }
 
-static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
+static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp,
+					     unsigned long pgsize_bitmap)
 {
 	struct page **pages;
 	unsigned int i = 0, array_size = count * sizeof(*pages);
-	unsigned int order = MAX_ORDER;
+	int min_order = get_order(1 << __ffs(pgsize_bitmap));
+	int order = MAX_ORDER;
 
 	if (array_size <= PAGE_SIZE)
 		pages = kzalloc(array_size, GFP_KERNEL);
@@ -213,13 +215,16 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
 		/*
 		 * Higher-order allocations are a convenience rather
 		 * than a necessity, hence using __GFP_NORETRY until
-		 * falling back to single-page allocations.
+		 * falling back to min size allocations.
 		 */
-		for (order = min_t(unsigned int, order, __fls(count));
-		     order > 0; order--) {
-			page = alloc_pages(gfp | __GFP_NORETRY, order);
+		for (order = min_t(int, order, __fls(count));
+		     order >= min_order; order--) {
+			page = alloc_pages((order == min_order) ? gfp :
+					   gfp | __GFP_NORETRY, order);
 			if (!page)
 				continue;
+			if (!order)
+				break;
 			if (PageCompound(page)) {
 				if (!split_huge_page(page))
 					break;
@@ -229,8 +234,6 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
 				break;
 			}
 		}
-		if (!page)
-			page = alloc_page(gfp);
 		if (!page) {
 			__iommu_dma_free_pages(pages, i);
 			return NULL;
@@ -292,7 +295,8 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size,
 
 	*handle = DMA_ERROR_CODE;
 
-	pages = __iommu_dma_alloc_pages(count, gfp);
+	pages = __iommu_dma_alloc_pages(count, gfp,
+					domain->ops->pgsize_bitmap);
 	if (!pages)
 		return NULL;
 
