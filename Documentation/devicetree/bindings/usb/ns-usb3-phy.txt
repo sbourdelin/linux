@@ -1,0 +1,14 @@
+Driver for Broadcom Northstar USB 3.0 PHY
+
+Required properties:
+- compatible: brcm,ns-usb3-phy
+- bus: phandle of brcm,bus-axi
+
+To initialize USB 3.0 PHY driver needs to access various bus cores (devices).
+This is why phandle to bcma bus is needed.
+
+Example:
+	usb3-phy {
+		compatible = "brcm,ns-usb3-phy";
+		bus = <&axi>;
+	};

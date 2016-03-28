@@ -18,6 +18,14 @@ config AB8500_USB
 	  This transceiver supports high and full speed devices plus,
 	  in host mode, low speed.
 
+config BCM_NS_USB3_PHY
+	tristate "Broadcom Northstar USB 3.0 PHY Driver"
+	depends on BCMA
+	select USB_PHY
+	help
+	  Enable this to support USB 3.0 PHY connected to the USB controller on
+	  bcma bus.
+
 config FSL_USB2_OTG
 	bool "Freescale USB OTG Transceiver Driver"
 	depends on USB_EHCI_FSL && USB_FSL_USB2 && USB_OTG_FSM && PM
