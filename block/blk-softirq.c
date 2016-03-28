@@ -21,10 +21,22 @@ static DEFINE_PER_CPU(struct list_head, blk_cpu_done);
 static void blk_done_softirq(struct softirq_action *h)
 {
 	struct list_head *cpu_list, local_list;
+	struct request *e;
+	bool reraise = false;
+	int i = 0;
 
 	local_irq_disable();
 	cpu_list = this_cpu_ptr(&blk_cpu_done);
+	list_for_each_entry(e, cpu_list, ipi_list) {
+		if (++i < 256)
+			continue;
+		list_cut_position(&local_list, cpu_list, &e->ipi_list);
+		reraise = true;
+		goto enable_irq;
+	}
 	list_replace_init(cpu_list, &local_list);
+
+enable_irq:
 	local_irq_enable();
 
 	while (!list_empty(&local_list)) {
@@ -34,6 +46,14 @@ static void blk_done_softirq(struct softirq_action *h)
 		list_del_init(&rq->ipi_list);
 		rq->q->softirq_done_fn(rq);
 	}
+
+	if (!reraise)
+		return;
+
+	local_irq_disable();
+	if (!list_empty(cpu_list))
+		raise_softirq_irqoff(BLOCK_SOFTIRQ);
+	local_irq_enable();
 }
 
 #ifdef CONFIG_SMP
