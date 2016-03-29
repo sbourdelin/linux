@@ -68,6 +68,7 @@ LIST_HEAD(gpio_devices);
 static void gpiochip_free_hogs(struct gpio_chip *chip);
 static void gpiochip_irqchip_remove(struct gpio_chip *gpiochip);
 
+static bool gpiolib_initialized;
 
 static inline void desc_set_label(struct gpio_desc *d, const char *label)
 {
@@ -457,6 +458,9 @@ static void gpiodevice_release(struct device *dev)
  * the gpio framework's arch_initcall().  Otherwise sysfs initialization
  * for GPIOs will fail rudely.
  *
+ * gpiochip_add_data() must only be called after gpiolib initialization,
+ * ie after core_initcall().
+ *
  * If chip->base is negative, this requests dynamic assignment of
  * a range of valid GPIOs.
  */
@@ -467,6 +471,11 @@ int gpiochip_add_data(struct gpio_chip *chip, void *data)
 	unsigned	i;
 	int		base = chip->base;
 	struct gpio_device *gdev;
+
+	if (!gpiolib_initialized) {
+		WARN(1, "gpiolib not initialized\n");
+		return -EPROBE_DEFER;
+	}
 
 	/*
 	 * First: allocate and populate the internal stat container, and
@@ -2829,6 +2838,8 @@ static int __init gpiolib_dev_init(void)
 	if (ret < 0) {
 		pr_err("gpiolib: failed to allocate char dev region\n");
 		bus_unregister(&gpio_bus_type);
+	} else {
+		gpiolib_initialized = true;
 	}
 	return ret;
 }
