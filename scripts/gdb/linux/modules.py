@@ -74,7 +74,8 @@ class LxLsmod(gdb.Command):
 
         for module in module_list():
             gdb.write("{address} {name:<19} {size:>8}  {ref}".format(
-                address=str(module['module_core']).split()[0],
+                module_layout=module['core_layout']
+                addressr=str(module_layout['base'])
                 name=module['name'].string(),
                 size=str(module['core_size']),
                 ref=str(module['refcnt']['counter'])))

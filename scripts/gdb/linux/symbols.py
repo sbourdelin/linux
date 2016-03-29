@@ -108,7 +108,8 @@ lx-symbols command."""
 
     def load_module_symbols(self, module):
         module_name = module['name'].string()
-        module_addr = str(module['module_core']).split()[0]
+        module_layout = module['core_layout']
+        module_addr = str(module_layout['base'])
 
         module_file = self._get_module_file(module_name)
         if not module_file and not self.module_files_updated:
