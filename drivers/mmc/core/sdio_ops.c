@@ -204,6 +204,70 @@ int mmc_io_rw_extended(struct mmc_card *card, int write, unsigned fn,
 	return 0;
 }
 
+int mmc_io_rw_extended_sg(struct mmc_card *card, int write, unsigned fn,
+			  unsigned addr, int incr_addr,
+			  struct sg_table *sgt, unsigned blksz)
+{
+	struct mmc_request mrq = {NULL};
+	struct mmc_command cmd = {0};
+	struct mmc_data data = {0};
+	struct scatterlist *sg_ptr;
+	unsigned blocks = 0;
+	int i;
+
+	WARN_ON(!card || !card->host);
+	WARN_ON(fn > 7);
+	WARN_ON(blksz == 0);
+	for_each_sg(sgt->sgl, sg_ptr, sgt->nents, i) {
+		WARN_ON(sg_ptr->length > card->host->max_seg_size);
+		blocks += DIV_ROUND_UP(sg_ptr->length, blksz);
+	}
+
+	/* sanity check */
+	if (addr & ~0x1FFFF)
+		return -EINVAL;
+
+	mrq.cmd = &cmd;
+	mrq.data = &data;
+
+	cmd.opcode = SD_IO_RW_EXTENDED;
+	cmd.arg = write ? 0x80000000 : 0x00000000;
+	cmd.arg |= fn << 28;
+	cmd.arg |= incr_addr ? 0x04000000 : 0x00000000;
+	cmd.arg |= addr << 9;
+	cmd.arg |= 0x08000000 | blocks;
+	cmd.flags = MMC_RSP_SPI_R5 | MMC_RSP_R5 | MMC_CMD_ADTC;
+
+	data.blksz = blksz;
+	data.blocks = blocks;
+	data.flags = write ? MMC_DATA_WRITE : MMC_DATA_READ;
+
+	data.sg = sgt->sgl;
+	data.sg_len = sgt->nents;
+
+	mmc_set_data_timeout(&data, card);
+	mmc_wait_for_req(card->host, &mrq);
+
+	if (cmd.error)
+		return cmd.error;
+	if (data.error)
+		return data.error;
+
+	if (mmc_host_is_spi(card->host)) {
+		/* host driver already reported errors */
+	} else {
+		if (cmd.resp[0] & R5_ERROR)
+			return -EIO;
+		if (cmd.resp[0] & R5_FUNCTION_NUMBER)
+			return -EINVAL;
+		if (cmd.resp[0] & R5_OUT_OF_RANGE)
+			return -ERANGE;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(mmc_io_rw_extended_sg);
+
 int sdio_reset(struct mmc_host *host)
 {
 	int ret;
