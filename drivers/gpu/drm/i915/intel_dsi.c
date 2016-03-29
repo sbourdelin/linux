@@ -1220,10 +1220,30 @@ void intel_dsi_init(struct drm_device *dev)
 	else
 		intel_encoder->crtc_mask = BIT(PIPE_B);
 
-	if (dev_priv->vbt.dsi.config->dual_link)
+	if (dev_priv->vbt.dsi.config->dual_link) {
 		intel_dsi->ports = BIT(PORT_A) | BIT(PORT_C);
-	else
+
+		/*
+		 * Based on the VBT value assign the ports on
+		 * which Panel PWM On/OFF DCS coomands needs to be sent
+		 */
+		switch (dev_priv->vbt.dsi.config->dl_panel_pwm_ports) {
+		case PANEL_PWM_PORT_A:
+			intel_dsi->panel_pwm_dcs_ports = BIT(PORT_A);
+			break;
+		case PANEL_PWM_PORT_C:
+			intel_dsi->panel_pwm_dcs_ports = BIT(PORT_C);
+			break;
+		case PANEL_PWM_PORT_A_AND_C:
+			intel_dsi->panel_pwm_dcs_ports = BIT(PORT_A) | BIT(PORT_C);
+			break;
+		default:
+			intel_dsi->panel_pwm_dcs_ports = BIT(PORT_A) | BIT(PORT_C);
+		}
+	} else {
 		intel_dsi->ports = BIT(port);
+		intel_dsi->panel_pwm_dcs_ports = BIT(port);
+	}
 
 	/* Create a DSI host (and a device) for each port. */
 	for_each_dsi_port(port, intel_dsi->ports) {
