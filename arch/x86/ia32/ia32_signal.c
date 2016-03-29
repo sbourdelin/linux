@@ -68,7 +68,8 @@
 }
 
 static int ia32_restore_sigcontext(struct pt_regs *regs,
-				   struct sigcontext_32 __user *sc)
+				   struct sigcontext_32 __user *sc,
+				   void **user_cookie_ptr)
 {
 	unsigned int tmpflags, err = 0;
 	void __user *buf;
@@ -105,6 +106,16 @@ static int ia32_restore_sigcontext(struct pt_regs *regs,
 		buf = compat_ptr(tmp);
 	} get_user_catch(err);
 
+	/*
+	 * If there is fp state get cookie from the top of the fp state,
+	 * else get it from the top of the sig frame.
+	 */
+
+	if (tmp != 0)
+		*user_cookie_ptr = compat_ptr(tmp + fpu__getsize(1));
+	else
+		*user_cookie_ptr = NULL;
+
 	err |= fpu__restore_sig(buf, 1);
 
 	force_iret();
@@ -117,6 +128,7 @@ asmlinkage long sys32_sigreturn(void)
 	struct pt_regs *regs = current_pt_regs();
 	struct sigframe_ia32 __user *frame = (struct sigframe_ia32 __user *)(regs->sp-8);
 	sigset_t set;
+	void __user *user_cookie;
 
 	if (!access_ok(VERIFY_READ, frame, sizeof(*frame)))
 		goto badframe;
@@ -129,8 +141,16 @@ asmlinkage long sys32_sigreturn(void)
 
 	set_current_blocked(&set);
 
-	if (ia32_restore_sigcontext(regs, &frame->sc))
+	if (ia32_restore_sigcontext(regs, &frame->sc, &user_cookie))
 		goto badframe;
+
+	if (user_cookie == NULL)
+		user_cookie = compat_ptr(((unsigned long) frame) +
+					 sizeof(frame));
+
+	if (verify_clear_sigcookie(user_cookie))
+ 		goto badframe;
+
 	return regs->ax;
 
 badframe:
@@ -143,6 +163,7 @@ asmlinkage long sys32_rt_sigreturn(void)
 	struct pt_regs *regs = current_pt_regs();
 	struct rt_sigframe_ia32 __user *frame;
 	sigset_t set;
+	void __user *user_cookie;
 
 	frame = (struct rt_sigframe_ia32 __user *)(regs->sp - 4);
 
@@ -153,8 +174,16 @@ asmlinkage long sys32_rt_sigreturn(void)
 
 	set_current_blocked(&set);
 
-	if (ia32_restore_sigcontext(regs, &frame->uc.uc_mcontext))
+	if (ia32_restore_sigcontext(regs, &frame->uc.uc_mcontext, &user_cookie))
 		goto badframe;
+
+	if (user_cookie == NULL)
+		user_cookie = compat_ptr(((unsigned long) frame) +
+					 sizeof(*frame));
+
+	if (verify_clear_sigcookie(user_cookie))
+ 		goto badframe;
+
 
 	if (compat_restore_altstack(&frame->uc.uc_stack))
 		goto badframe;
@@ -213,7 +242,8 @@ static int ia32_setup_sigcontext(struct sigcontext_32 __user *sc,
  */
 static void __user *get_sigframe(struct ksignal *ksig, struct pt_regs *regs,
 				 size_t frame_size,
-				 void __user **fpstate)
+				 void __user **fpstate,
+				 void __user **cookie_ptr)
 {
 	struct fpu *fpu = &current->thread.fpu;
 	unsigned long sp;
@@ -230,11 +260,20 @@ static void __user *get_sigframe(struct ksignal *ksig, struct pt_regs *regs,
 		 ksig->ka.sa.sa_restorer)
 		sp = (unsigned long) ksig->ka.sa.sa_restorer;
 
+	/*
+	 * Allocate space for cookie above FP/Frame. It will sit in
+	 * the padding of the saved FP state, or if there is no FP
+	 * state it will sit in the padding of the sig frame.
+	 */
+	sp -= sizeof(unsigned long);
+
 	if (fpu->fpstate_active) {
 		unsigned long fx_aligned, math_size;
 
 		sp = fpu__alloc_mathframe(sp, 1, &fx_aligned, &math_size);
 		*fpstate = (struct _fpstate_32 __user *) sp;
+		*cookie_ptr = (void __user *) sp + math_size;
+
 		if (copy_fpstate_to_sigframe(*fpstate, (void __user *)fx_aligned,
 				    math_size) < 0)
 			return (void __user *) -1L;
@@ -244,6 +283,10 @@ static void __user *get_sigframe(struct ksignal *ksig, struct pt_regs *regs,
 	/* Align the stack pointer according to the i386 ABI,
 	 * i.e. so that on function entry ((sp + 4) & 15) == 0. */
 	sp = ((sp + 4) & -16ul) - 4;
+
+	if (!fpu->fpstate_active)
+		*cookie_ptr = (void __user *) (sp + frame_size);
+
 	return (void __user *) sp;
 }
 
@@ -254,6 +297,7 @@ int ia32_setup_frame(int sig, struct ksignal *ksig,
 	void __user *restorer;
 	int err = 0;
 	void __user *fpstate = NULL;
+	void __user *cookie_location;
 
 	/* copy_to_user optimizes that into a single 8 byte store */
 	static const struct {
@@ -266,12 +310,16 @@ int ia32_setup_frame(int sig, struct ksignal *ksig,
 		0x80cd,		/* int $0x80 */
 	};
 
-	frame = get_sigframe(ksig, regs, sizeof(*frame), &fpstate);
+	frame = get_sigframe(ksig, regs, sizeof(*frame),
+			     &fpstate, &cookie_location);
 
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		return -EFAULT;
 
 	if (__put_user(sig, &frame->sig))
+		return -EFAULT;
+
+	if (set_sigcookie(cookie_location))
 		return -EFAULT;
 
 	if (ia32_setup_sigcontext(&frame->sc, fpstate, regs, set->sig[0]))
@@ -332,6 +380,7 @@ int ia32_setup_rt_frame(int sig, struct ksignal *ksig,
 	void __user *restorer;
 	int err = 0;
 	void __user *fpstate = NULL;
+	void __user *cookie_location;
 
 	/* __copy_to_user optimizes that into a single 8 byte store */
 	static const struct {
@@ -346,9 +395,13 @@ int ia32_setup_rt_frame(int sig, struct ksignal *ksig,
 		0,
 	};
 
-	frame = get_sigframe(ksig, regs, sizeof(*frame), &fpstate);
+	frame = get_sigframe(ksig, regs, sizeof(*frame),
+			     &fpstate, &cookie_location);
 
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
+		return -EFAULT;
+
+	if (set_sigcookie(cookie_location))
 		return -EFAULT;
 
 	put_user_try {
