@@ -1923,6 +1923,7 @@ struct cfg80211_bss_selection {
  * @pbss: if set, connect to a PCP instead of AP. Valid for DMG
  *	networks.
  * @bss_select: criteria to be used for BSS selection.
+ * @prev_bssid: previous BSSID, if not %NULL use reassociate frame
  */
 struct cfg80211_connect_params {
 	struct ieee80211_channel *channel;
@@ -1947,6 +1948,7 @@ struct cfg80211_connect_params {
 	struct ieee80211_vht_cap vht_capa_mask;
 	bool pbss;
 	struct cfg80211_bss_selection bss_select;
+	const u8 *prev_bssid;
 };
 
 /**
