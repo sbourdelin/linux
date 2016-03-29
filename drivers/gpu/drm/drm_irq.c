@@ -155,24 +155,10 @@ static void drm_reset_vblank_timestamp(struct drm_device *dev, unsigned int pipe
 	spin_unlock(&dev->vblank_time_lock);
 }
 
-/**
- * drm_update_vblank_count - update the master vblank counter
- * @dev: DRM device
- * @pipe: counter to update
- *
- * Call back into the driver to update the appropriate vblank counter
- * (specified by @pipe).  Deal with wraparound, if it occurred, and
- * update the last read value so we can deal with wraparound on the next
- * call if necessary.
- *
- * Only necessary when going from off->on, to account for frames we
- * didn't get an interrupt for.
- *
- * Note: caller must hold dev->vbl_lock since this reads & writes
- * device vblank fields.
- */
-static void drm_update_vblank_count(struct drm_device *dev, unsigned int pipe,
-				    unsigned long flags)
+static u32 __drm_accurate_vblank_count_and_time(struct drm_device *dev, unsigned int pipe,
+						const struct timeval *t_old,
+						unsigned long flags, u32 *pdiff,
+					        struct timeval *tv_ret)
 {
 	struct drm_vblank_crtc *vblank = &dev->vblank[pipe];
 	u32 cur_vblank, diff;
@@ -202,10 +188,8 @@ static void drm_update_vblank_count(struct drm_device *dev, unsigned int pipe,
 		/* trust the hw counter when it's around */
 		diff = (cur_vblank - vblank->last) & dev->max_vblank_count;
 	} else if (rc && framedur_ns) {
-		const struct timeval *t_old;
 		u64 diff_ns;
 
-		t_old = &vblanktimestamp(dev, pipe, vblank->count);
 		diff_ns = timeval_to_ns(&t_vblank) - timeval_to_ns(t_old);
 
 		/*
@@ -286,9 +270,13 @@ static void drm_update_vblank_count(struct drm_device *dev, unsigned int pipe,
 		      " current=%u, diff=%u, hw=%u hw_last=%u\n",
 		      pipe, vblank->count, diff, cur_vblank, vblank->last);
 
+	*pdiff = diff;
+	*tv_ret = t_vblank;
+
 	if (diff == 0) {
 		WARN_ON_ONCE(cur_vblank != vblank->last);
-		return;
+
+		return cur_vblank;
 	}
 
 	/*
@@ -298,9 +286,65 @@ static void drm_update_vblank_count(struct drm_device *dev, unsigned int pipe,
 	 * for now, to mark the vblanktimestamp as invalid.
 	 */
 	if (!rc && (flags & DRM_CALLED_FROM_VBLIRQ) == 0)
-		t_vblank = (struct timeval) {0, 0};
+		*tv_ret = (struct timeval) {0, 0};
 
-	store_vblank(dev, pipe, diff, &t_vblank, cur_vblank);
+	return cur_vblank;
+}
+
+/**
+ * drm_accurate_vblank_count_and_time - retrieve the master vblank counter
+ * @crtc: which counter to retrieve
+ * @tv_ret: last time counter was updated
+ *
+ * This function is similar to @drm_update_vblank_count_and_time but
+ * this function interpolates to handle a race with vblank irq's, and
+ * is only useful for crtc's that have no hw vblank counter.
+ */
+
+u32 drm_accurate_vblank_count_and_time(struct drm_crtc *crtc,
+				       struct timeval *tv_ret)
+{
+	struct drm_device *dev = crtc->dev;
+	u32 pdiff, old_vblank;
+	struct timeval tv_old = {};
+
+	WARN(dev->max_vblank_count, "This function is only useful when a hw counter is unavailable.");
+
+	old_vblank = drm_crtc_vblank_count_and_time(crtc, &tv_old);
+
+	__drm_accurate_vblank_count_and_time(dev, drm_crtc_index(crtc),
+					     &tv_old, 0, &pdiff, tv_ret);
+
+	return old_vblank + pdiff;
+}
+EXPORT_SYMBOL(drm_accurate_vblank_count_and_time);
+
+/**
+ * drm_update_vblank_count - update the master vblank counter
+ * @dev: DRM device
+ * @pipe: counter to update
+ *
+ * Call back into the driver to update the appropriate vblank counter
+ * (specified by @pipe).  Deal with wraparound, if it occurred, and
+ * update the last read value so we can deal with wraparound on the next
+ * call if necessary.
+ *
+ * Only necessary when going from off->on, to account for frames we
+ * didn't get an interrupt for.
+ *
+ * Note: caller must hold dev->vbl_lock since this reads & writes
+ * device vblank fields.
+ */
+static void drm_update_vblank_count(struct drm_device *dev, unsigned int pipe,
+				    unsigned long flags)
+{
+	u32 diff, cur_vblank, old_vblank = dev->vblank[pipe].count;
+	struct timeval t_vblank;
+	const struct timeval *tv_old = &vblanktimestamp(dev, pipe, old_vblank);
+
+	cur_vblank = __drm_accurate_vblank_count_and_time(dev, pipe, tv_old, flags, &diff, &t_vblank);
+	if (diff)
+		store_vblank(dev, pipe, diff, &t_vblank, cur_vblank);
 }
 
 /*
