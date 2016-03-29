@@ -746,6 +746,16 @@ parse_mipi_config(struct drm_i915_private *dev_priv,
 		return;
 	}
 
+	/*
+	 * These fileds are introduced from the VBT version 197 onwards,
+	 * so making sure that these bits are set zero in the pervious
+	 * versions.
+	 */
+	if (dev_priv->vbt.dsi.config->dual_link && bdb->version < 197) {
+		dev_priv->vbt.dsi.config->dl_cabc_ports = 0;
+		dev_priv->vbt.dsi.config->dl_panel_pwm_ports = 0;
+	}
+
 	/* We have mandatory mipi config blocks. Initialize as generic panel */
 	dev_priv->vbt.dsi.panel_id = MIPI_DSI_GENERIC_PANEL_ID;
 }
