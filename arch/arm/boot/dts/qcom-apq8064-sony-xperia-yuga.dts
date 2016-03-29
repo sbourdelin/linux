@@ -432,5 +432,9 @@
 				pinctrl-0 = <&sdcc3_pin_a>, <&sdcc3_cd_pin_a>;
 			};
 		};
+
+		wcnss@3204000 {
+			status = "okay";
+		};
 	};
 };
