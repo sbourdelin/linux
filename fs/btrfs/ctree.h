@@ -1569,6 +1569,7 @@ struct btrfs_fs_info {
 	struct mutex tree_log_mutex;
 	struct mutex transaction_kthread_mutex;
 	struct mutex cleaner_mutex;
+	struct mutex casualty_mutex;
 	struct mutex chunk_mutex;
 	struct mutex volume_mutex;
 
@@ -1686,6 +1687,7 @@ struct btrfs_fs_info {
 	struct btrfs_workqueue *extent_workers;
 	struct task_struct *transaction_kthread;
 	struct task_struct *cleaner_kthread;
+	struct task_struct *casualty_kthread;
 	int thread_pool_size;
 
 	struct kobject *space_info_kobj;

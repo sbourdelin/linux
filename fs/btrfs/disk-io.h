@@ -156,4 +156,6 @@ static inline void btrfs_set_buffer_lockdep_class(u64 objectid,
 {
 }
 #endif
+
+int btrfs_check_devices(struct btrfs_fs_devices *fs_devices);
 #endif
