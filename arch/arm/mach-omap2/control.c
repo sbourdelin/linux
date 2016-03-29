@@ -225,10 +225,8 @@ void omap3_ctrl_write_boot_mode(u8 bootmode)
 	 * describing the boot process can be stored there,
 	 * cf. OMAP34xx TRM, Initialization / Software Booting
 	 * Configuration.
-	 *
-	 * XXX This should use some omap_ctrl_writel()-type function
 	 */
-	writel_relaxed(l, OMAP2_L4_IO_ADDRESS(OMAP343X_SCRATCHPAD + 4));
+	omap_ctrl_writel(l, OMAP343X_CONTROL_SCRATCHPAD_BOOT_MODE);
 }
 
 #endif
