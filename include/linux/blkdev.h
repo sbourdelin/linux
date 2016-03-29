@@ -1153,7 +1153,11 @@ extern int blk_verify_command(unsigned char *cmd, fmode_t has_write_perm);
 enum blk_default_limits {
 	BLK_MAX_SEGMENTS	= 128,
 	BLK_SAFE_MAX_SECTORS	= 255,
-	BLK_DEF_MAX_SECTORS	= 2560,
+	/*
+	 * if you change this, please also change bvec_alloc and BIO_MAX_PAGES.
+	 * Otherwise bio_alloc_bioset will break.
+	 */
+	BLK_DEF_MAX_SECTORS	= BIO_MAX_SECTORS,
 	BLK_MAX_SEGMENT_SIZE	= 65536,
 	BLK_SEG_BOUNDARY_MASK	= 0xFFFFFFFFUL,
 };
