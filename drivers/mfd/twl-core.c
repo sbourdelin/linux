@@ -721,7 +721,7 @@ add_regulator(int num, struct regulator_init_data *pdata,
  */
 
 static int
-add_children(struct twl4030_platform_data *pdata, unsigned irq_base,
+add_children(struct twl_platform_data *pdata, unsigned irq_base,
 		unsigned long features)
 {
 	struct device	*child;
@@ -1083,7 +1083,7 @@ static struct of_dev_auxdata twl_auxdata_lookup[] = {
 static int
 twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
-	struct twl4030_platform_data	*pdata = dev_get_platdata(&client->dev);
+	struct twl_platform_data	*pdata = dev_get_platdata(&client->dev);
 	struct device_node		*node = client->dev.of_node;
 	struct platform_device		*pdev;
 	const struct regmap_config	*twl_regmap_config;

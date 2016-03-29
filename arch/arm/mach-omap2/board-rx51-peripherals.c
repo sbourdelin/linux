@@ -957,7 +957,7 @@ static struct twl4030_audio_data rx51_audio_data __initdata = {
 	.vibra		= &rx51_vibra_data,
 };
 
-static struct twl4030_platform_data rx51_twldata __initdata = {
+static struct twl_platform_data rx51_twldata __initdata = {
 	/* platform_data for children goes here */
 	.gpio			= &rx51_gpio_data,
 	.keypad			= &rx51_kp_data,

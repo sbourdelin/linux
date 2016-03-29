@@ -704,7 +704,8 @@ struct twl4030_audio_data {
 	unsigned int irq_base;
 };
 
-struct twl4030_platform_data {
+struct twl_platform_data {
+	/* TWL4030 platform data */
 	struct twl4030_clock_init_data		*clock;
 	struct twl4030_bci_platform_data	*bci;
 	struct twl4030_gpio_platform_data	*gpio;

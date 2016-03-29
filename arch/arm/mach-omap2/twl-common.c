@@ -55,7 +55,7 @@ static int twl_get_voltage(void *data)
 
 void __init omap_pmic_init(int bus, u32 clkrate,
 			   const char *pmic_type, int pmic_irq,
-			   struct twl4030_platform_data *pmic_data)
+			   struct twl_platform_data *pmic_data)
 {
 	omap_mux_init_signal("sys_nirq", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE);
 	strlcpy(pmic_i2c_board_info.type, pmic_type,
@@ -68,7 +68,7 @@ void __init omap_pmic_init(int bus, u32 clkrate,
 
 #ifdef CONFIG_ARCH_OMAP4
 void __init omap4_pmic_init(const char *pmic_type,
-		    struct twl4030_platform_data *pmic_data,
+		    struct twl_platform_data *pmic_data,
 		    struct i2c_board_info *devices, int nr_devices)
 {
 	/* PMIC part*/
@@ -205,7 +205,7 @@ static struct twl_regulator_driver_data omap3_vdd2_drvdata = {
 	.set_voltage = twl_set_voltage,
 };
 
-void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
+void __init omap3_pmic_get_config(struct twl_platform_data *pmic_data,
 				  u32 pdata_flags, u32 regulators_flags)
 {
 	if (!pmic_data->vdd1) {
@@ -470,7 +470,7 @@ static struct regulator_init_data omap4_v2v1_idata = {
 	.consumer_supplies	= omap4_v2v1_supply,
 };
 
-void __init omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
+void __init omap4_pmic_get_config(struct twl_platform_data *pmic_data,
 				  u32 pdata_flags, u32 regulators_flags)
 {
 	if (!pmic_data->vdd1) {

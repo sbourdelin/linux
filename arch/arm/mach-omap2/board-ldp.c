@@ -321,7 +321,7 @@ static struct regulator_init_data ldp_vpll2 = {
 	.consumer_supplies	= ldp_vpll2_supplies,
 };
 
-static struct twl4030_platform_data ldp_twldata = {
+static struct twl_platform_data ldp_twldata = {
 	/* platform_data for children goes here */
 	.vmmc1		= &ldp_vmmc1,
 	.vaux1		= &ldp_vaux1,
