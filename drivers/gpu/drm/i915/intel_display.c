@@ -12557,6 +12557,9 @@ intel_pipe_config_compare(struct drm_device *dev,
 			  bool adjust)
 {
 	bool ret = true;
+	struct intel_crtc *crtc = to_intel_crtc(current_config->base.crtc);
+	struct intel_encoder *intel_encoder;
+	struct intel_dsi *intel_dsi = NULL;
 
 #define INTEL_ERR_OR_DBG_KMS(fmt, ...) \
 	do { \
@@ -12592,6 +12595,54 @@ intel_pipe_config_compare(struct drm_device *dev,
 			  pipe_config->name); \
 		ret = false; \
 	}
+
+/*
+ * In case of BXT DSI, HW pipe_config will be retrieved from the port's timing
+ * configuration. This retrival includes some errors due to the DIV_ROUND_UP.
+ * So we are considering the max possible error at the comparison.
+ */
+/*
+ * htotal = hactive + hfp + hsync + hbp. Here last three lements might have
+ * the converson error, hence we consider the 3 times of error as tolerance.
+ */
+
+#define MAX_BXT_DSI_TIMING_RETRIVAL_ERR \
+		(intel_dsi == NULL ? 0 : \
+		DIV_ROUND_UP((3 * 8 * intel_dsi->lane_count * 100), \
+		(dsi_pixel_format_bpp(intel_dsi->pixel_format) * \
+			intel_dsi->burst_mode_ratio)))
+
+#define BXT_DSI_PIPE_CONF_CHECK_I_RANGE(name) { \
+	for_each_encoder_on_crtc(dev, &crtc->base, \
+					intel_encoder) { \
+		if (intel_encoder->type == INTEL_OUTPUT_DSI) { \
+			intel_dsi = enc_to_intel_dsi(&intel_encoder->base); \
+		} \
+	} \
+	if (!(current_config->name < pipe_config->name && \
+		current_config->name >= (pipe_config->name - \
+			MAX_BXT_DSI_TIMING_RETRIVAL_ERR))) { \
+		INTEL_ERR_OR_DBG_KMS("mismatch in " #name " " \
+		  "(expected %i, found %i(Err tolerance considered))\n", \
+		  current_config->name, \
+		  pipe_config->name); \
+		ret = false; \
+	} \
+}
+
+#define PIPE_CONF_CHECK_I_RANGE(name) { \
+	if (current_config->name != pipe_config->name) { \
+		if (IS_BROXTON(dev) && crtc->config->has_dsi_encoder) { \
+			BXT_DSI_PIPE_CONF_CHECK_I_RANGE(name) \
+		} else { \
+			INTEL_ERR_OR_DBG_KMS("mismatch in " #name " " \
+			  "(expected %i, found %i)\n", \
+			  current_config->name, \
+			  pipe_config->name); \
+			ret = false; \
+		} \
+	} \
+}
 
 #define PIPE_CONF_CHECK_M_N(name) \
 	if (!intel_compare_link_m_n(&current_config->name, \
@@ -12697,11 +12748,11 @@ intel_pipe_config_compare(struct drm_device *dev,
 	PIPE_CONF_CHECK_I(has_dsi_encoder);
 
 	PIPE_CONF_CHECK_I(base.adjusted_mode.crtc_hdisplay);
-	PIPE_CONF_CHECK_I(base.adjusted_mode.crtc_htotal);
-	PIPE_CONF_CHECK_I(base.adjusted_mode.crtc_hblank_start);
-	PIPE_CONF_CHECK_I(base.adjusted_mode.crtc_hblank_end);
-	PIPE_CONF_CHECK_I(base.adjusted_mode.crtc_hsync_start);
-	PIPE_CONF_CHECK_I(base.adjusted_mode.crtc_hsync_end);
+	PIPE_CONF_CHECK_I_RANGE(base.adjusted_mode.crtc_htotal);
+	PIPE_CONF_CHECK_I_RANGE(base.adjusted_mode.crtc_hblank_start);
+	PIPE_CONF_CHECK_I_RANGE(base.adjusted_mode.crtc_hblank_end);
+	PIPE_CONF_CHECK_I_RANGE(base.adjusted_mode.crtc_hsync_start);
+	PIPE_CONF_CHECK_I_RANGE(base.adjusted_mode.crtc_hsync_end);
 
 	PIPE_CONF_CHECK_I(base.adjusted_mode.crtc_vdisplay);
 	PIPE_CONF_CHECK_I(base.adjusted_mode.crtc_vtotal);
@@ -12779,6 +12830,7 @@ intel_pipe_config_compare(struct drm_device *dev,
 
 #undef PIPE_CONF_CHECK_X
 #undef PIPE_CONF_CHECK_I
+#undef PIPE_CONF_CHECK_I_RANGE
 #undef PIPE_CONF_CHECK_P
 #undef PIPE_CONF_CHECK_I_ALT
 #undef PIPE_CONF_CHECK_FLAGS
