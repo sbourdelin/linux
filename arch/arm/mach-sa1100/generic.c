@@ -321,6 +321,15 @@ static int __init sa1100_init(void)
 
 arch_initcall(sa1100_init);
 
+static int __init sa1100_gpio_init(void)
+{
+	sa1100_init_gpio();
+
+	return 0;
+}
+
+postcore_initcall(sa1100_gpio_init);
+
 void __init sa11x0_init_late(void)
 {
 	sa11x0_pm_init();
@@ -386,8 +395,6 @@ void __init sa1100_init_irq(void)
 	request_resource(&iomem_resource, &irq_resource);
 
 	sa11x0_init_irq_nodt(IRQ_GPIO0_SC, irq_resource.start);
-
-	sa1100_init_gpio();
 }
 
 /*
