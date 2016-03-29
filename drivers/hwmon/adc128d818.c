@@ -298,6 +298,13 @@ static SENSOR_DEVICE_ATTR_2(in6_min, S_IWUSR | S_IRUGO,
 static SENSOR_DEVICE_ATTR_2(in6_max, S_IWUSR | S_IRUGO,
 			    adc128_show_in, adc128_set_in, 6, 2);
 
+static SENSOR_DEVICE_ATTR_2(in7_input, S_IRUGO,
+			    adc128_show_in, NULL, 7, 0);
+static SENSOR_DEVICE_ATTR_2(in7_min, S_IWUSR | S_IRUGO,
+			    adc128_show_in, adc128_set_in, 7, 1);
+static SENSOR_DEVICE_ATTR_2(in7_max, S_IWUSR | S_IRUGO,
+			    adc128_show_in, adc128_set_in, 7, 2);
+
 static SENSOR_DEVICE_ATTR(temp1_input, S_IRUGO, adc128_show_temp, NULL, 0);
 static SENSOR_DEVICE_ATTR(temp1_max, S_IWUSR | S_IRUGO,
 			  adc128_show_temp, adc128_set_temp, 1);
@@ -311,6 +318,7 @@ static SENSOR_DEVICE_ATTR(in3_alarm, S_IRUGO, adc128_show_alarm, NULL, 3);
 static SENSOR_DEVICE_ATTR(in4_alarm, S_IRUGO, adc128_show_alarm, NULL, 4);
 static SENSOR_DEVICE_ATTR(in5_alarm, S_IRUGO, adc128_show_alarm, NULL, 5);
 static SENSOR_DEVICE_ATTR(in6_alarm, S_IRUGO, adc128_show_alarm, NULL, 6);
+static SENSOR_DEVICE_ATTR(in7_alarm, S_IRUGO, adc128_show_alarm, NULL, 7);
 static SENSOR_DEVICE_ATTR(temp1_max_alarm, S_IRUGO, adc128_show_alarm, NULL, 7);
 
 static struct attribute *adc128m0_attrs[] = {
@@ -349,6 +357,42 @@ static struct attribute *adc128m0_attrs[] = {
 	NULL
 };
 ATTRIBUTE_GROUPS(adc128m0);
+static struct attribute *adc128m1_attrs[] = {
+	&sensor_dev_attr_in0_min.dev_attr.attr,
+	&sensor_dev_attr_in1_min.dev_attr.attr,
+	&sensor_dev_attr_in2_min.dev_attr.attr,
+	&sensor_dev_attr_in3_min.dev_attr.attr,
+	&sensor_dev_attr_in4_min.dev_attr.attr,
+	&sensor_dev_attr_in5_min.dev_attr.attr,
+	&sensor_dev_attr_in6_min.dev_attr.attr,
+	&sensor_dev_attr_in7_min.dev_attr.attr,
+	&sensor_dev_attr_in0_max.dev_attr.attr,
+	&sensor_dev_attr_in1_max.dev_attr.attr,
+	&sensor_dev_attr_in2_max.dev_attr.attr,
+	&sensor_dev_attr_in3_max.dev_attr.attr,
+	&sensor_dev_attr_in4_max.dev_attr.attr,
+	&sensor_dev_attr_in5_max.dev_attr.attr,
+	&sensor_dev_attr_in6_max.dev_attr.attr,
+	&sensor_dev_attr_in7_max.dev_attr.attr,
+	&sensor_dev_attr_in0_input.dev_attr.attr,
+	&sensor_dev_attr_in1_input.dev_attr.attr,
+	&sensor_dev_attr_in2_input.dev_attr.attr,
+	&sensor_dev_attr_in3_input.dev_attr.attr,
+	&sensor_dev_attr_in4_input.dev_attr.attr,
+	&sensor_dev_attr_in5_input.dev_attr.attr,
+	&sensor_dev_attr_in6_input.dev_attr.attr,
+	&sensor_dev_attr_in7_input.dev_attr.attr,
+	&sensor_dev_attr_in0_alarm.dev_attr.attr,
+	&sensor_dev_attr_in1_alarm.dev_attr.attr,
+	&sensor_dev_attr_in2_alarm.dev_attr.attr,
+	&sensor_dev_attr_in3_alarm.dev_attr.attr,
+	&sensor_dev_attr_in4_alarm.dev_attr.attr,
+	&sensor_dev_attr_in5_alarm.dev_attr.attr,
+	&sensor_dev_attr_in6_alarm.dev_attr.attr,
+	&sensor_dev_attr_in7_alarm.dev_attr.attr,
+	NULL
+};
+ATTRIBUTE_GROUPS(adc128m1);
 
 static int adc128_detect(struct i2c_client *client, struct i2c_board_info *info)
 {
@@ -456,7 +500,9 @@ static int adc128_probe(struct i2c_client *client,
 	data->mode = 0;
 	groups = adc128m0_groups;
 	if (of_property_read_u8(dev->of_node, "mode", &data->mode) == 0) {
-		if (data->mode != 0) {
+		if (data->mode == 1) {
+			groups = adc128m1_groups;
+		} else if (data->mode != 0) {
 			dev_err(dev, "unsupported operation mode %d",
 				data->mode);
 			err = -EINVAL;
