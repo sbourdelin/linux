@@ -423,13 +423,11 @@ ssize_t tpm_transmit_cmd(struct tpm_chip *chip, void *cmd,
 }
 
 #define TPM_INTERNAL_RESULT_SIZE 200
-#define TPM_ORD_GET_CAP cpu_to_be32(101)
-#define TPM_ORD_GET_RANDOM cpu_to_be32(70)
 
 static const struct tpm_input_header tpm_getcap_header = {
 	.tag = TPM_TAG_RQU_COMMAND,
 	.length = cpu_to_be32(22),
-	.ordinal = TPM_ORD_GET_CAP
+	.ordinal = TPM1_ORD_GET_CAP
 };
 
 ssize_t tpm_getcap(struct device *dev, __be32 subcap_id, cap_t *cap,
@@ -475,14 +473,13 @@ void tpm_gen_interrupt(struct tpm_chip *chip)
 }
 EXPORT_SYMBOL_GPL(tpm_gen_interrupt);
 
-#define TPM_ORD_STARTUP cpu_to_be32(153)
 #define TPM_ST_CLEAR cpu_to_be16(1)
 #define TPM_ST_STATE cpu_to_be16(2)
 #define TPM_ST_DEACTIVATED cpu_to_be16(3)
 static const struct tpm_input_header tpm_startup_header = {
 	.tag = TPM_TAG_RQU_COMMAND,
 	.length = cpu_to_be32(12),
-	.ordinal = TPM_ORD_STARTUP
+	.ordinal = TPM1_ORD_STARTUP
 };
 
 static int tpm_startup(struct tpm_chip *chip, __be16 startup_type)
@@ -631,13 +628,12 @@ duration:
 }
 EXPORT_SYMBOL_GPL(tpm_get_timeouts);
 
-#define TPM_ORD_CONTINUE_SELFTEST 83
 #define CONTINUE_SELFTEST_RESULT_SIZE 10
 
 static struct tpm_input_header continue_selftest_header = {
 	.tag = TPM_TAG_RQU_COMMAND,
 	.length = cpu_to_be32(10),
-	.ordinal = cpu_to_be32(TPM_ORD_CONTINUE_SELFTEST),
+	.ordinal = TPM1_ORD_CONTINUE_SELFTEST
 };
 
 /**
@@ -655,30 +651,6 @@ static int tpm_continue_selftest(struct tpm_chip *chip)
 	cmd.header.in = continue_selftest_header;
 	rc = tpm_transmit_cmd(chip, &cmd, CONTINUE_SELFTEST_RESULT_SIZE,
 			      "continue selftest");
-	return rc;
-}
-
-#define TPM_ORDINAL_PCRREAD cpu_to_be32(21)
-#define READ_PCR_RESULT_SIZE 30
-static struct tpm_input_header pcrread_header = {
-	.tag = TPM_TAG_RQU_COMMAND,
-	.length = cpu_to_be32(14),
-	.ordinal = TPM_ORDINAL_PCRREAD
-};
-
-int tpm_pcr_read_dev(struct tpm_chip *chip, int pcr_idx, u8 *res_buf)
-{
-	int rc;
-	struct tpm_cmd_t cmd;
-
-	cmd.header.in = pcrread_header;
-	cmd.params.pcrread_in.pcr_idx = cpu_to_be32(pcr_idx);
-	rc = tpm_transmit_cmd(chip, &cmd, READ_PCR_RESULT_SIZE,
-			      "attempting to read a pcr value");
-
-	if (rc == 0)
-		memcpy(res_buf, cmd.params.pcrread_out.pcr_result,
-		       TPM_DIGEST_SIZE);
 	return rc;
 }
 
@@ -728,7 +700,7 @@ int tpm_pcr_read(u32 chip_num, int pcr_idx, u8 *res_buf)
 	if (chip->flags & TPM_CHIP_FLAG_TPM2)
 		rc = tpm2_pcr_read(chip, pcr_idx, res_buf);
 	else
-		rc = tpm_pcr_read_dev(chip, pcr_idx, res_buf);
+		rc = tpm1_pcr_read(chip, pcr_idx, res_buf);
 	tpm_put_ops(chip);
 	return rc;
 }
@@ -744,12 +716,11 @@ EXPORT_SYMBOL_GPL(tpm_pcr_read);
  * isn't, protect against the chip disappearing, by incrementing
  * the module usage count.
  */
-#define TPM_ORD_PCR_EXTEND cpu_to_be32(20)
 #define EXTEND_PCR_RESULT_SIZE 34
 static struct tpm_input_header pcrextend_header = {
 	.tag = TPM_TAG_RQU_COMMAND,
 	.length = cpu_to_be32(34),
-	.ordinal = TPM_ORD_PCR_EXTEND
+	.ordinal = TPM1_ORD_PCR_EXTEND
 };
 
 int tpm_pcr_extend(u32 chip_num, int pcr_idx, const u8 *hash)
@@ -795,7 +766,7 @@ int tpm_do_selftest(struct tpm_chip *chip)
 	unsigned long duration;
 	struct tpm_cmd_t cmd;
 
-	duration = tpm_calc_ordinal_duration(chip, TPM_ORD_CONTINUE_SELFTEST);
+	duration = tpm_calc_ordinal_duration(chip, TPM1_ORD_CONTINUE_SELFTEST);
 
 	loops = jiffies_to_msecs(duration) / delay_msec;
 
@@ -808,9 +779,12 @@ int tpm_do_selftest(struct tpm_chip *chip)
 
 	do {
 		/* Attempt to read a PCR value */
-		cmd.header.in = pcrread_header;
+		cmd.header.in.tag = TPM_TAG_RQU_COMMAND;
+		cmd.header.in.length = sizeof(struct tpm_input_header) +
+				       sizeof(struct tpm_pcrread_in);
+		cmd.header.in.ordinal = TPM1_ORD_PCRREAD;
 		cmd.params.pcrread_in.pcr_idx = cpu_to_be32(0);
-		rc = tpm_transmit(chip, (u8 *) &cmd, READ_PCR_RESULT_SIZE);
+		rc = tpm_transmit(chip, (u8 *) &cmd, sizeof(cmd));
 		/* Some buggy TPMs will not respond to tpm_tis_ready() for
 		 * around 300ms while the self test is ongoing, keep trying
 		 * until the self test duration expires. */
@@ -920,13 +894,12 @@ again:
 }
 EXPORT_SYMBOL_GPL(wait_for_tpm_stat);
 
-#define TPM_ORD_SAVESTATE cpu_to_be32(152)
 #define SAVESTATE_RESULT_SIZE 10
 
 static struct tpm_input_header savestate_header = {
 	.tag = TPM_TAG_RQU_COMMAND,
 	.length = cpu_to_be32(10),
-	.ordinal = TPM_ORD_SAVESTATE
+	.ordinal = TPM1_ORD_SAVESTATE
 };
 
 /*
@@ -1009,7 +982,7 @@ EXPORT_SYMBOL_GPL(tpm_pm_resume);
 static struct tpm_input_header tpm_getrandom_header = {
 	.tag = TPM_TAG_RQU_COMMAND,
 	.length = cpu_to_be32(14),
-	.ordinal = TPM_ORD_GET_RANDOM
+	.ordinal = TPM1_ORD_GET_RANDOM
 };
 
 /**

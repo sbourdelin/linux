@@ -65,6 +65,16 @@ enum tpm_duration {
 
 #define TPM_HEADER_SIZE		10
 
+enum tpm1_ordinals {
+	TPM1_ORD_PCR_EXTEND		= cpu_to_be32(20),
+	TPM1_ORD_PCRREAD		= cpu_to_be32(21),
+	TPM1_ORD_GET_RANDOM		= cpu_to_be32(70),
+	TPM1_ORD_CONTINUE_SELFTEST	= cpu_to_be32(83),
+	TPM1_ORD_GET_CAP		= cpu_to_be32(101),
+	TPM1_ORD_SAVESTATE		= cpu_to_be32(152),
+	TPM1_ORD_STARTUP		= cpu_to_be32(153),
+};
+
 enum tpm2_const {
 	TPM2_PLATFORM_PCR	= 24,
 	TPM2_PCR_SELECT_MIN	= ((TPM2_PLATFORM_PCR + 7) / 8),
@@ -520,7 +530,6 @@ extern void tpm_chip_unregister(struct tpm_chip *chip);
 int tpm_sysfs_add_device(struct tpm_chip *chip);
 void tpm_sysfs_del_device(struct tpm_chip *chip);
 
-int tpm_pcr_read_dev(struct tpm_chip *chip, int pcr_idx, u8 *res_buf);
 
 #ifdef CONFIG_ACPI
 extern void tpm_add_ppi(struct tpm_chip *chip);
@@ -529,6 +538,12 @@ static inline void tpm_add_ppi(struct tpm_chip *chip)
 {
 }
 #endif
+
+/* TPM1 commands */
+
+int tpm1_pcr_read(struct tpm_chip *chip, int pcr_idx, u8 *res_buf);
+
+/* TPM2 commands */
 
 int tpm2_pcr_read(struct tpm_chip *chip, int pcr_idx, u8 *res_buf);
 int tpm2_pcr_extend(struct tpm_chip *chip, int pcr_idx, const u8 *hash);
