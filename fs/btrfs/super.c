@@ -2349,6 +2349,8 @@ static int __init init_btrfs_fs(void)
 	if (err)
 		goto free_hash;
 
+	btrfs_init_procfs();
+
 	btrfs_init_compress();
 
 	err = btrfs_init_cachep();
@@ -2427,6 +2429,7 @@ free_cachep:
 	btrfs_destroy_cachep();
 free_compress:
 	btrfs_exit_compress();
+	btrfs_exit_procfs();
 	btrfs_exit_sysfs();
 free_hash:
 	btrfs_hash_exit();
@@ -2446,6 +2449,7 @@ static void __exit exit_btrfs_fs(void)
 	btrfs_interface_exit();
 	btrfs_end_io_wq_exit();
 	unregister_filesystem(&btrfs_fs_type);
+	btrfs_exit_procfs();
 	btrfs_exit_sysfs();
 	btrfs_cleanup_fs_uuids();
 	btrfs_exit_compress();

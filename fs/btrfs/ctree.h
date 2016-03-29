@@ -4591,4 +4591,8 @@ static inline int btrfs_test_is_dummy_root(struct btrfs_root *root)
 	return 0;
 }
 
+/* procfs.c */
+void btrfs_exit_procfs(void);
+void btrfs_init_procfs(void);
+
 #endif
