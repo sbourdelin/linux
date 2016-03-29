@@ -946,3 +946,27 @@ void btrfs_bio_counter_inc_blocked(struct btrfs_fs_info *fs_info)
 				     &fs_info->fs_state));
 	}
 }
+
+int btrfs_auto_replace_start(struct btrfs_root *root,
+				struct btrfs_device *src_device)
+{
+	int ret;
+	char *tgt_path;
+
+	if (btrfs_get_spare_device(&tgt_path)) {
+		btrfs_err(root->fs_info,
+			"No spare device found/configured in the kernel");
+		return -EINVAL;
+	}
+
+	ret = btrfs_dev_replace_start(root, tgt_path,
+					src_device->devid,
+					rcu_str_deref(src_device->name),
+		BTRFS_IOCTL_DEV_REPLACE_CONT_READING_FROM_SRCDEV_MODE_AVOID);
+	if (ret)
+		btrfs_put_spare_device(tgt_path);
+
+	kfree(tgt_path);
+
+	return 0;
+}
