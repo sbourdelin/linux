@@ -933,7 +933,7 @@ config GPIO_TPS65912
 
 config GPIO_TWL4030
 	tristate "TWL4030, TWL5030, and TPS659x0 GPIOs"
-	depends on TWL4030_CORE
+	depends on TWL_CORE
 	help
 	  Say yes here to access the GPIO signals of various multi-function
 	  power management chips from Texas Instruments.

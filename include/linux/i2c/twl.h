@@ -214,7 +214,7 @@ int twl6030_interrupt_unmask(u8 bit_mask, u8 offset);
 int twl6030_interrupt_mask(u8 bit_mask, u8 offset);
 
 /* Card detect Configuration for MMC1 Controller on OMAP4 */
-#ifdef CONFIG_TWL4030_CORE
+#ifdef CONFIG_TWL_CORE
 int twl6030_mmc_card_detect_config(void);
 #else
 static inline int twl6030_mmc_card_detect_config(void)
@@ -225,7 +225,7 @@ static inline int twl6030_mmc_card_detect_config(void)
 #endif
 
 /* MMC1 Controller on OMAP4 uses Phoenix irq for Card detect */
-#ifdef CONFIG_TWL4030_CORE
+#ifdef CONFIG_TWL_CORE
 int twl6030_mmc_card_detect(struct device *dev, int slot);
 #else
 static inline int twl6030_mmc_card_detect(struct device *dev, int slot)

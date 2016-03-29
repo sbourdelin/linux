@@ -413,7 +413,7 @@ config  PWM_TIPWMSS
 
 config PWM_TWL
 	tristate "TWL4030/6030 PWM support"
-	depends on TWL4030_CORE
+	depends on TWL_CORE
 	help
 	  Generic PWM framework driver for TWL4030/6030.
 
@@ -422,7 +422,7 @@ config PWM_TWL
 
 config PWM_TWL_LED
 	tristate "TWL4030/6030 PWM support for LED drivers"
-	depends on TWL4030_CORE
+	depends on TWL_CORE
 	help
 	  Generic PWM framework driver for TWL4030/6030 LED terminals.
 

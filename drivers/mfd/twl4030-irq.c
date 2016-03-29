@@ -54,7 +54,7 @@
  *	base + 8  .. base + 15	SIH for PWR_INT
  *	base + 16 .. base + 33	SIH for GPIO
  */
-#define TWL4030_CORE_NR_IRQS	8
+#define TWL_CORE_NR_IRQS	8
 #define TWL4030_PWR_NR_IRQS	8
 
 /* PIH register offsets */
@@ -693,7 +693,7 @@ int twl4030_init_irq(struct device *dev, int irq_num)
 	 * the hwirqs numbers are defined contiguously from 1 to 15.
 	 * Create only one domain for both.
 	 */
-	nr_irqs = TWL4030_PWR_NR_IRQS + TWL4030_CORE_NR_IRQS;
+	nr_irqs = TWL4030_PWR_NR_IRQS + TWL_CORE_NR_IRQS;
 
 	irq_base = irq_alloc_descs(-1, 0, nr_irqs, 0);
 	if (IS_ERR_VALUE(irq_base)) {
@@ -704,7 +704,7 @@ int twl4030_init_irq(struct device *dev, int irq_num)
 	irq_domain_add_legacy(node, nr_irqs, irq_base, 0,
 			      &irq_domain_simple_ops, NULL);
 
-	irq_end = irq_base + TWL4030_CORE_NR_IRQS;
+	irq_end = irq_base + TWL_CORE_NR_IRQS;
 
 	/*
 	 * Mask and clear all TWL4030 interrupts since initially we do

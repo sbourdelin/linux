@@ -412,7 +412,7 @@ config BACKLIGHT_OT200
 
 config BACKLIGHT_PANDORA
 	tristate "Backlight driver for Pandora console"
-	depends on TWL4030_CORE
+	depends on TWL_CORE
 	help
 	  If you have a Pandora console, say Y to enable the
 	  backlight driver.

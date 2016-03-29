@@ -123,7 +123,7 @@ static inline int omap_devinit_smartreflex(void)
 static inline void omap_enable_smartreflex_on_init(void) {}
 #endif
 
-#ifdef CONFIG_TWL4030_CORE
+#ifdef CONFIG_TWL_CORE
 extern int omap3_twl_init(void);
 extern int omap4_twl_init(void);
 extern int omap3_twl_set_sr_bit(bool enable);
