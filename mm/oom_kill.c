@@ -872,6 +872,10 @@ bool out_of_memory(struct oom_control *oc)
 		return true;
 	}
 
+	/* The OOM killer does not compensate for IO-less reclaim. */
+	if (!(oc->gfp_mask & __GFP_FS))
+		return true;
+
 	/*
 	 * Check if there were limitations on the allocation (only relevant for
 	 * NUMA) that may require different handling.
