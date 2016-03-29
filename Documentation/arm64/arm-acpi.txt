@@ -57,11 +57,11 @@ The short form of the rationale for ACPI on ARM is:
 
 -- The new ACPI governance process works well and Linux is now at the same
    table as hardware vendors and other OS vendors.  In fact, there is no
-   longer any reason to feel that ACPI is only belongs to Windows or that
+   longer any reason to feel that ACPI only belongs to Windows or that
    Linux is in any way secondary to Microsoft in this arena.  The move of
    ACPI governance into the UEFI forum has significantly opened up the
    specification development process, and currently, a large portion of the
-   changes being made to ACPI is being driven by Linux.
+   changes being made to ACPI are being driven by Linux.
 
 Key to the use of ACPI is the support model.  For servers in general, the
 responsibility for hardware behaviour cannot solely be the domain of the
@@ -159,7 +159,7 @@ Further, the ACPI core will only use the 64-bit address fields in the FADT
 (Fixed ACPI Description Table).  Any 32-bit address fields in the FADT will
 be ignored on arm64.
 
-Hardware reduced mode (see Section 4.1 of the ACPI 5.1 specification) will
+Hardware reduced mode (see Section 4.1 of the ACPI 6.1 specification) will
 be enforced by the ACPI core on arm64.  Doing so allows the ACPI core to
 run less complex code since it no longer has to provide support for legacy
 hardware from other architectures.  Any fields that are not to be used for
@@ -167,7 +167,7 @@ hardware reduced mode must be set to zero.
 
 For the ACPI core to operate properly, and in turn provide the information
 the kernel needs to configure devices, it expects to find the following
-tables (all section numbers refer to the ACPI 5.1 specfication):
+tables (all section numbers refer to the ACPI 6.1 specfication):
 
     -- RSDP (Root System Description Pointer), section 5.2.5
 
@@ -185,9 +185,22 @@ tables (all section numbers refer to the ACPI 5.1 specfication):
     -- If PCI is supported, the MCFG (Memory mapped ConFiGuration
        Table), section 5.2.6, specifically Table 5-31.
 
+    -- If booting without a console=<device> kernel parameter is
+       supported, the SPCR (Serial Port Console Redirection table),
+       section 5.2.6, specifically Table 5-31.
+
+    -- If virtualization is supported, the IORT (Input Output Remapping
+       Table, section 5.2.6, specifically Table 5-31.
+
+    -- If NUMA is supported, the SRAT (System Resource Affinity Table)
+       and SLIT (System Locality distance Information Table), sections
+       5.2.16 and 5.2.17, respectively.
+
 If the above tables are not all present, the kernel may or may not be
 able to boot properly since it may not be able to configure all of the
-devices available.
+devices available.  This list of tables is not meant to be all inclusive;
+in some environments other tables may be needed (e.g., any of the APEI
+tables from section 18) to support specific functionality.
 
 
 ACPI Detection
@@ -233,7 +246,7 @@ that looks like this: Name(KEY0, "value0").  An ACPI device driver would
 then retrieve the value of the property by evaluating the KEY0 object.
 However, using Name() this way has multiple problems: (1) ACPI limits
 names ("KEY0") to four characters unlike DT; (2) there is no industry
-wide registry that maintains a list of names, minimzing re-use; (3)
+wide registry that maintains a list of names, minimizing re-use; (3)
 there is also no registry for the definition of property values ("value0"),
 again making re-use difficult; and (4) how does one maintain backward
 compatibility as new hardware comes out?  The _DSD method was created
@@ -434,7 +447,8 @@ The ACPI specification changes regularly.  During the year 2014, for instance,
 version 5.1 was released and version 6.0 substantially completed, with most of
 the changes being driven by ARM-specific requirements.  Proposed changes are
 presented and discussed in the ASWG (ACPI Specification Working Group) which
-is a part of the UEFI Forum.
+is a part of the UEFI Forum.  The current version of the ACPI specification
+is 6.1 release in January 2016.
 
 Participation in this group is open to all UEFI members.  Please see
 http://www.uefi.org/workinggroup for details on group membership.
