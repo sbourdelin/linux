@@ -3611,6 +3611,7 @@ static void valleyview_display_irqs_install(struct drm_i915_private *dev_priv)
 {
 	u32 pipestat_mask;
 	u32 iir_mask;
+	u32 adpa_reg;
 	enum pipe pipe;
 
 	pipestat_mask = PIPESTAT_INT_STATUS_MASK |
@@ -3626,6 +3627,12 @@ static void valleyview_display_irqs_install(struct drm_i915_private *dev_priv)
 	i915_enable_pipestat(dev_priv, PIPE_A, PIPE_GMBUS_INTERRUPT_STATUS);
 	for_each_pipe(dev_priv, pipe)
 		      i915_enable_pipestat(dev_priv, pipe, pipestat_mask);
+
+	if (IS_VALLEYVIEW(dev_priv)) {
+		adpa_reg = I915_READ(VLV_ADPA);
+		adpa_reg |= ADPA_CRT_HOTPLUG_ENABLE;
+		I915_WRITE(VLV_ADPA, adpa_reg);
+	}
 
 	iir_mask = I915_DISPLAY_PORT_INTERRUPT |
 		   I915_DISPLAY_PIPE_A_EVENT_INTERRUPT |
@@ -3645,7 +3652,14 @@ static void valleyview_display_irqs_uninstall(struct drm_i915_private *dev_priv)
 {
 	u32 pipestat_mask;
 	u32 iir_mask;
+	u32 adpa_reg;
 	enum pipe pipe;
+
+	if (IS_VALLEYVIEW(dev_priv)) {
+		adpa_reg = I915_READ(VLV_ADPA);
+		adpa_reg &= ~ADPA_CRT_HOTPLUG_ENABLE;
+		I915_WRITE(VLV_ADPA, adpa_reg);
+	}
 
 	iir_mask = I915_DISPLAY_PORT_INTERRUPT |
 		   I915_DISPLAY_PIPE_A_EVENT_INTERRUPT |
