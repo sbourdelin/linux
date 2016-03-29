@@ -78,14 +78,39 @@ static unsigned long hugetlb_get_unmapped_area_bottomup(struct file *file,
 {
 	struct hstate *h = hstate_file(file);
 	struct vm_unmapped_area_info info;
+	bool pud_size_align = false;
+	unsigned long ret_addr;
+
+	/*
+	 * If PMD sharing is enabled, align to PUD_SIZE to facilitate
+	 * sharing.  Only attempt alignment if no address was passed in,
+	 * flags indicate sharing and size is big enough.
+	 */
+	if (IS_ENABLED(CONFIG_ARCH_WANT_HUGE_PMD_SHARE) &&
+	    !addr && flags & MAP_SHARED && len >= PUD_SIZE)
+		pud_size_align = true;
 
 	info.flags = 0;
 	info.length = len;
 	info.low_limit = current->mm->mmap_legacy_base;
 	info.high_limit = TASK_SIZE;
-	info.align_mask = PAGE_MASK & ~huge_page_mask(h);
+	if (pud_size_align)
+		info.align_mask = PAGE_MASK & (PUD_SIZE - 1);
+	else
+		info.align_mask = PAGE_MASK & ~huge_page_mask(h);
 	info.align_offset = 0;
-	return vm_unmapped_area(&info);
+	ret_addr = vm_unmapped_area(&info);
+
+	/*
+	 * If failed with PUD_SIZE alignment, try again with huge page
+	 * size alignment.
+	 */
+	if ((ret_addr & ~PAGE_MASK) && pud_size_align) {
+		info.align_mask = PAGE_MASK & ~huge_page_mask(h);
+		ret_addr = vm_unmapped_area(&info);
+	}
+
+	return ret_addr;
 }
 
 static unsigned long hugetlb_get_unmapped_area_topdown(struct file *file,
@@ -95,14 +120,36 @@ static unsigned long hugetlb_get_unmapped_area_topdown(struct file *file,
 	struct hstate *h = hstate_file(file);
 	struct vm_unmapped_area_info info;
 	unsigned long addr;
+	bool pud_size_align = false;
+
+	/*
+	 * If PMD sharing is enabled, align to PUD_SIZE to facilitate
+	 * sharing.  Only attempt alignment if no address was passed in,
+	 * flags indicate sharing and size is big enough.
+	 */
+	if (IS_ENABLED(CONFIG_ARCH_WANT_HUGE_PMD_SHARE) &&
+	    !addr0 && flags & MAP_SHARED && len >= PUD_SIZE)
+		pud_size_align = true;
 
 	info.flags = VM_UNMAPPED_AREA_TOPDOWN;
 	info.length = len;
 	info.low_limit = PAGE_SIZE;
 	info.high_limit = current->mm->mmap_base;
-	info.align_mask = PAGE_MASK & ~huge_page_mask(h);
+	if (pud_size_align)
+		info.align_mask = PAGE_MASK & (PUD_SIZE - 1);
+	else
+		info.align_mask = PAGE_MASK & ~huge_page_mask(h);
 	info.align_offset = 0;
 	addr = vm_unmapped_area(&info);
+
+	/*
+	 * If failed with PUD_SIZE alignment, try again with huge page
+	 * size alignment.
+	 */
+	if ((addr & ~PAGE_MASK) && pud_size_align) {
+		info.align_mask = PAGE_MASK & ~huge_page_mask(h);
+		addr = vm_unmapped_area(&info);
+	}
 
 	/*
 	 * A failed mmap() very likely causes application failure,
@@ -115,7 +162,18 @@ static unsigned long hugetlb_get_unmapped_area_topdown(struct file *file,
 		info.flags = 0;
 		info.low_limit = TASK_UNMAPPED_BASE;
 		info.high_limit = TASK_SIZE;
+		if (pud_size_align)
+			info.align_mask = PAGE_MASK & (PUD_SIZE - 1);
 		addr = vm_unmapped_area(&info);
+
+		/*
+		 * If failed again with PUD_SIZE alignment, finally try with
+		 * huge page size alignment.
+		 */
+		if (addr & ~PAGE_MASK) {
+			info.align_mask = PAGE_MASK & ~huge_page_mask(h);
+			addr = vm_unmapped_area(&info);
+		}
 	}
 
 	return addr;
