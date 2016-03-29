@@ -11,6 +11,7 @@
 #include <linux/firmware.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/of.h>
 #include <linux/usb/phy.h>
 
 #include "xhci.h"
@@ -76,6 +77,16 @@ static void xhci_rcar_start_gen2(struct usb_hcd *hcd)
 	writel(RCAR_USB3_TX_POL_VAL, hcd->regs + RCAR_USB3_TX_POL);
 }
 
+static int xhci_rcar_is_gen2(struct device *dev)
+{
+	struct device_node *node = dev->of_node;
+
+	return of_device_is_compatible(node, "renesas,xhci-r8a7790") ||
+		of_device_is_compatible(node, "renesas,xhci-r8a7791") ||
+		of_device_is_compatible(node, "renesas,xhci-r8a7793") ||
+		of_device_is_compatible(node, "renensas,rcar-gen2-xhci");
+}
+
 void xhci_rcar_start(struct usb_hcd *hcd)
 {
 	u32 temp;
@@ -85,7 +96,7 @@ void xhci_rcar_start(struct usb_hcd *hcd)
 		temp = readl(hcd->regs + RCAR_USB3_INT_ENA);
 		temp |= RCAR_USB3_INT_ENA_VAL;
 		writel(temp, hcd->regs + RCAR_USB3_INT_ENA);
-		if (xhci_plat_type_is(hcd, XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2))
+		if (xhci_rcar_is_gen2(hcd->self.controller))
 			xhci_rcar_start_gen2(hcd);
 	}
 }
