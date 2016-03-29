@@ -1003,5 +1003,5 @@ static void __exit amd_iommu_v2_exit(void)
 	destroy_workqueue(iommu_wq);
 }
 
-module_init(amd_iommu_v2_init);
+subsys_initcall(amd_iommu_v2_init);
 module_exit(amd_iommu_v2_exit);
