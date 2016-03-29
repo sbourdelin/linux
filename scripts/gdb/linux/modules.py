@@ -73,8 +73,9 @@ class LxLsmod(gdb.Command):
                 "        " if utils.get_long_type().sizeof == 8 else ""))
 
         for module in module_list():
+            module_layout=module['core_layout']
             gdb.write("{address} {name:<19} {size:>8}  {ref}".format(
-                address=str(module['module_core']).split()[0],
+                address=str(module_layout['base']),
                 name=module['name'].string(),
                 size=str(module['core_size']),
                 ref=str(module['refcnt']['counter'])))
