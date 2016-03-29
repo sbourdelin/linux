@@ -85,6 +85,9 @@ static int denali_dt_probe(struct platform_device *ofdev)
 		denali->dev->dma_mask = NULL;
 	}
 
+	of_property_read_u32(ofdev->dev.of_node, "max-banks",
+			     &denali->max_banks);
+
 	dt->clk = devm_clk_get(&ofdev->dev, NULL);
 	if (IS_ERR(dt->clk)) {
 		dev_err(&ofdev->dev, "no clk available\n");
