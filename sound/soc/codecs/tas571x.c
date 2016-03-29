@@ -57,6 +57,10 @@ static int tas571x_register_size(struct tas571x_private *priv, unsigned int reg)
 	case TAS571X_CH1_VOL_REG:
 	case TAS571X_CH2_VOL_REG:
 		return priv->chip->vol_reg_size;
+	case TAS571X_INPUT_MUX_REG:
+	case TAS571X_CH4_SRC_SELECT_REG:
+	case TAS571X_PWM_MUX_REG:
+		return 4;
 	default:
 		return 1;
 	}
