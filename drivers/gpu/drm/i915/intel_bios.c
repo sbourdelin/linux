@@ -284,6 +284,7 @@ parse_lfp_backlight(struct drm_i915_private *dev_priv,
 {
 	const struct bdb_lfp_backlight_data *backlight_data;
 	const struct bdb_lfp_backlight_data_entry *entry;
+	const struct bdb_lfp_backlight_control_data *bl_ctrl_data;
 
 	backlight_data = find_section(bdb, BDB_LVDS_BACKLIGHT);
 	if (!backlight_data)
@@ -296,12 +297,23 @@ parse_lfp_backlight(struct drm_i915_private *dev_priv,
 	}
 
 	entry = &backlight_data->data[panel_type];
+	bl_ctrl_data = &backlight_data->blc_ctl[panel_type];
 
 	dev_priv->vbt.backlight.present = entry->type == BDB_BACKLIGHT_TYPE_PWM;
 	if (!dev_priv->vbt.backlight.present) {
 		DRM_DEBUG_KMS("PWM backlight not present in VBT (type %u)\n",
 			      entry->type);
 		return;
+	}
+
+	/*
+	 * IF the VBT version is less than 191, set the
+	 * pwm controller as PMIC by default.
+	 */
+	dev_priv->vbt.backlight.pwm_pin = BLC_CONTROL_PIN_PMIC;
+	if (bdb->version >= 191) {
+		dev_priv->vbt.backlight.pwm_pin = bl_ctrl_data->pin;
+		dev_priv->vbt.backlight.pwm_controller = bl_ctrl_data->controller;
 	}
 
 	dev_priv->vbt.backlight.pwm_freq_hz = entry->pwm_freq_hz;

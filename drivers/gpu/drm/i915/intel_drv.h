@@ -124,6 +124,11 @@
 #define INTEL_I2C_BUS_DVO 1
 #define INTEL_I2C_BUS_SDVO 2
 
+#define BLC_CONTROL_PIN_PMIC		0
+#define BLC_CONTROL_PIN_LPSS_PWM	1
+#define BLC_CONTROL_PIN_DDI		2
+#define BLC_CONTROL_PIN_PANEL_PWM	3
+
 /* these are outputs from the chip - integrated only
    external chips are via DVO or SDVO output */
 enum intel_output_type {

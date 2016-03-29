@@ -1472,6 +1472,8 @@ struct intel_vbt_data {
 		bool present;
 		bool active_low_pwm;
 		u8 min_brightness;	/* min_brightness/255 of max */
+		u8 pwm_pin;		/* Source of PWM */
+		u8 pwm_controller;	/* Controller used in particular PWM */
 	} backlight;
 
 	/* MIPI DSI */
