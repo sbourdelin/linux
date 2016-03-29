@@ -8210,6 +8210,7 @@ enum skl_disp_power_wells {
 #define  BXT_PIPE_SELECT_SHIFT				7
 #define  BXT_PIPE_SELECT_MASK				(7 << 7)
 #define  BXT_PIPE_SELECT(pipe)				((pipe) << 7)
+#define  BXT_PORT_TO_PIPE(ctrl)		((ctrl & BXT_PIPE_SELECT_MASK) >> 7)
 
 #define _MIPIA_DATA_ADDRESS		(dev_priv->mipi_mmio_base + 0xb108)
 #define _MIPIC_DATA_ADDRESS		(dev_priv->mipi_mmio_base + 0xb908)

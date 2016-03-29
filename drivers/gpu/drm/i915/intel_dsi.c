@@ -740,13 +740,117 @@ out_put_power:
 	return active;
 }
 
+/* return pixels equvalent to txbyteclkhs */
+static u16 pixels_from_txbyteclkhs(u16 clk_hs, int bpp, int lane_count,
+		       u16 burst_mode_ratio)
+{
+	return DIV_ROUND_UP((clk_hs * lane_count * 8 * 100),
+						(bpp * burst_mode_ratio));
+}
+
+static void bxt_dsi_get_pipe_config(struct intel_encoder *encoder,
+				 struct intel_crtc_state *pipe_config)
+{
+	struct drm_device *dev = encoder->base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_display_mode *adjusted_mode =
+					&pipe_config->base.adjusted_mode;
+	struct intel_dsi *intel_dsi =
+				enc_to_intel_dsi(&encoder->base);
+	unsigned int bpp = mipi_dsi_pixel_format_to_bpp(intel_dsi->pixel_format);
+	unsigned int lane_count = intel_dsi->lane_count;
+	enum port port;
+	enum pipe dsi_pipe;
+	u16 hactive, hfp, hsync, hbp, vfp, vsync, vbp;
+	uint32_t tmp;
+
+	for_each_dsi_port(port, intel_dsi->ports) {
+		if (!(I915_READ(BXT_MIPI_PORT_CTRL(port)) & DPI_ENABLE))
+			continue;
+
+		/* In terms of pixels */
+		adjusted_mode->crtc_hdisplay =
+					I915_READ(BXT_MIPI_TRANS_HACTIVE(port));
+		adjusted_mode->crtc_vdisplay =
+					I915_READ(BXT_MIPI_TRANS_VACTIVE(port));
+		adjusted_mode->crtc_vtotal =
+					I915_READ(BXT_MIPI_TRANS_VTOTAL(port));
+
+		hactive = adjusted_mode->crtc_hdisplay;
+		hfp = I915_READ(MIPI_HFP_COUNT(port));
+
+		/*
+		 * meaningful for video mode non-burst sync pulse mode only,
+		 * can be zero for non-burst sync events and burst modes
+		 */
+		hsync = I915_READ(MIPI_HSYNC_PADDING_COUNT(port));
+		hbp = I915_READ(MIPI_HBP_COUNT(port));
+
+		/* horizontal values are in terms of high speed byte clock */
+		hfp = pixels_from_txbyteclkhs(hfp, bpp, lane_count,
+						intel_dsi->burst_mode_ratio);
+		hsync = pixels_from_txbyteclkhs(hsync, bpp, lane_count,
+						intel_dsi->burst_mode_ratio);
+		hbp = pixels_from_txbyteclkhs(hbp, bpp, lane_count,
+						intel_dsi->burst_mode_ratio);
+
+		if (intel_dsi->dual_link) {
+			hfp *= 2;
+			hsync *= 2;
+			hbp *= 2;
+		}
+
+		/* vertical values are in terms of lines */
+		vfp = I915_READ(MIPI_VFP_COUNT(port));
+		vsync = I915_READ(MIPI_VSYNC_PADDING_COUNT(port));
+		vbp = I915_READ(MIPI_VBP_COUNT(port));
+
+		adjusted_mode->crtc_htotal = hactive + hfp + hsync + hbp;
+		adjusted_mode->crtc_hsync_start =
+					hfp + adjusted_mode->crtc_hdisplay;
+		adjusted_mode->crtc_hsync_end =
+					hsync + adjusted_mode->crtc_hsync_start;
+		adjusted_mode->crtc_hblank_start = adjusted_mode->crtc_hdisplay;
+		adjusted_mode->crtc_hblank_end = adjusted_mode->crtc_htotal;
+
+		adjusted_mode->crtc_vsync_start =
+					vfp + adjusted_mode->crtc_vdisplay;
+		adjusted_mode->crtc_vsync_end =
+					vsync + adjusted_mode->crtc_vsync_start;
+		adjusted_mode->crtc_vblank_start = adjusted_mode->crtc_vdisplay;
+		adjusted_mode->crtc_vblank_end = adjusted_mode->crtc_vtotal;
+
+		pipe_config->pipe_bpp =
+			mipi_dsi_pixel_format_to_bpp(intel_dsi->pixel_format);
+
+		dsi_pipe = BXT_PORT_TO_PIPE(I915_READ(MIPI_CTRL(port)));
+		if (dsi_pipe > PIPE_C) {
+			DRM_ERROR("Invalid PIPE configured\n");
+			break;
+		}
+
+		tmp = I915_READ(PIPESRC(dsi_pipe));
+		pipe_config->pipe_src_h = (tmp & 0xffff) + 1;
+		pipe_config->pipe_src_w = ((tmp >> 16) & 0xffff) + 1;
+
+		pipe_config->base.mode.vdisplay = pipe_config->pipe_src_h;
+		pipe_config->base.mode.hdisplay = pipe_config->pipe_src_w;
+		break;
+	}
+}
+
+
 static void intel_dsi_get_config(struct intel_encoder *encoder,
 				 struct intel_crtc_state *pipe_config)
 {
+	struct drm_device *dev = encoder->base.dev;
 	u32 pclk;
 	DRM_DEBUG_KMS("\n");
 
 	pipe_config->has_dsi_encoder = true;
+
+	if (IS_BROXTON(dev))
+		bxt_dsi_get_pipe_config(encoder, pipe_config);
 
 	/*
 	 * DPLL_MD is not used in case of DSI, reading will get some default value

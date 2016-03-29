@@ -9941,11 +9941,40 @@ static void haswell_get_ddi_port_state(struct intel_crtc *crtc,
 	}
 }
 
+struct intel_encoder *bxt_get_dsi_encoder_for_crtc(struct intel_crtc *crtc,
+					struct intel_crtc_state *pipe_config)
+{
+	struct drm_device *dev = crtc->base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_encoder *intel_encoder;
+	struct intel_dsi *intel_dsi;
+	enum port port;
+	u32 tmp;
+
+	for_each_intel_encoder(dev, intel_encoder) {
+		if (intel_encoder->type == INTEL_OUTPUT_DSI) {
+			intel_dsi = enc_to_intel_dsi(&intel_encoder->base);
+			for_each_dsi_port(port, intel_dsi->ports) {
+				if (!(I915_READ(BXT_MIPI_PORT_CTRL(port)) &
+								DPI_ENABLE))
+					break;
+
+				tmp = I915_READ(MIPI_CTRL(port));
+				if ((tmp & BXT_PIPE_SELECT_MASK) ==
+						BXT_PIPE_SELECT(crtc->pipe))
+					return intel_encoder;
+			}
+		}
+	}
+	return NULL;
+}
+
 static bool haswell_get_pipe_config(struct intel_crtc *crtc,
 				    struct intel_crtc_state *pipe_config)
 {
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_encoder *intel_encoder, *attached_encoder = NULL;
 	enum intel_display_power_domain power_domain;
 	unsigned long power_domain_mask;
 	bool active;
@@ -9965,6 +9994,21 @@ static bool haswell_get_pipe_config(struct intel_crtc *crtc,
 		WARN_ON(active && pipe_config->has_dsi_encoder);
 		if (pipe_config->has_dsi_encoder)
 			active = true;
+
+		for_each_encoder_on_crtc(dev, &crtc->base, intel_encoder)
+			attached_encoder = intel_encoder;
+
+		/*
+		 * attached_encoder will be NULL, if there is no modeset from
+		 * the kernel bootup.
+		 */
+		if (!attached_encoder && pipe_config->has_dsi_encoder)
+			attached_encoder =
+				bxt_get_dsi_encoder_for_crtc(crtc, pipe_config);
+
+		if (attached_encoder && attached_encoder->get_config)
+			attached_encoder->get_config(attached_encoder,
+								pipe_config);
 	}
 
 	if (!active)
