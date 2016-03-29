@@ -9959,7 +9959,7 @@ static bool haswell_get_pipe_config(struct intel_crtc *crtc,
 
 	active = hsw_get_transcoder_state(crtc, pipe_config, &power_domain_mask);
 
-	if (IS_BROXTON(dev_priv)) {
+	if (IS_BROXTON(dev)) {
 		bxt_get_dsi_transcoder_state(crtc, pipe_config,
 					     &power_domain_mask);
 		WARN_ON(active && pipe_config->has_dsi_encoder);
