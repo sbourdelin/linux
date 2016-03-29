@@ -587,5 +587,7 @@ void btrfs_set_fs_info_ptr(struct btrfs_fs_info *fs_info);
 void btrfs_reset_fs_info_ptr(struct btrfs_fs_info *fs_info);
 int btrfs_check_degradable(struct btrfs_fs_info *fs_info, unsigned flags);
 void btrfs_force_device_close(struct btrfs_device *dev, char *why);
+int btrfs_get_spare_device(char **path);
+void btrfs_put_spare_device(char *path);
 
 #endif

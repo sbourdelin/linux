@@ -2164,6 +2164,15 @@ static int btrfs_control_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
+void btrfs_put_spare_device(char *path)
+{
+	struct btrfs_fs_devices *fs_devices;
+
+	if (btrfs_scan_one_device(path, FMODE_READ,
+				    &btrfs_fs_type, &fs_devices))
+		printk(KERN_INFO "failed to return spare device\n");
+}
+
 /*
  * used by btrfsctl to scan devices when no FS is mounted
  */
