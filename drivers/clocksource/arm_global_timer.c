@@ -140,26 +140,31 @@ static int gt_clockevent_set_next_event(unsigned long evt,
 static irqreturn_t gt_clockevent_interrupt(int irq, void *dev_id)
 {
 	struct clock_event_device *evt = dev_id;
+	bool workaround = clockevent_state_oneshot(evt);
 
 	if (!(readl_relaxed(gt_base + GT_INT_STATUS) &
 				GT_INT_STATUS_EVENT_FLAG))
 		return IRQ_NONE;
 
 	/**
-	 * ERRATA 740657( Global Timer can send 2 interrupts for
+	 * ERRATA 740657 (Global Timer can send 2 interrupts for
 	 * the same event in single-shot mode)
 	 * Workaround:
-	 *	Either disable single-shot mode.
-	 *	Or
-	 *	Modify the Interrupt Handler to avoid the
-	 *	offending sequence. This is achieved by clearing
-	 *	the Global Timer flag _after_ having incremented
-	 *	the Comparator register	value to a higher value.
+	 * - Read the ICCIAR (Interrupt Acknowledge) register
+	 * - Modify the comparator value, to set it to a higher value
+	 * - Clear the Global Timer flag
+	 * - Clear the Pending Status information for Interrupt 27 (Global
+	 *   Timer interrupt) in the Distributor of the Interrupt Controller.
+	 * - Write the ICCEOIR (End of Interrupt) register
 	 */
-	if (clockevent_state_oneshot(evt))
+	if (workaround)
 		gt_compare_set(ULONG_MAX, 0);
 
 	writel_relaxed(GT_INT_STATUS_EVENT_FLAG, gt_base + GT_INT_STATUS);
+
+	if (workaround)
+		irq_set_irqchip_state(irq, IRQCHIP_STATE_PENDING, false);
+
 	evt->event_handler(evt);
 
 	return IRQ_HANDLED;
