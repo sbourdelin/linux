@@ -2404,7 +2404,7 @@ static void ctx_sched_out(struct perf_event_context *ctx,
 
 	is_active ^= ctx->is_active; /* changed bits */
 
-	if (is_active & EVENT_TIME) {
+	if (ctx->is_active & EVENT_TIME) {
 		/* update (and stop) ctx time */
 		update_context_time(ctx);
 		update_cgrp_time_from_cpuctx(cpuctx);
