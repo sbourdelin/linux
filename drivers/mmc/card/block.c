@@ -35,6 +35,7 @@
 #include <linux/capability.h>
 #include <linux/compat.h>
 #include <linux/pm_runtime.h>
+#include <linux/of.h>
 
 #include <linux/mmc/ioctl.h>
 #include <linux/mmc/card.h>
@@ -2190,6 +2191,7 @@ static struct mmc_blk_data *mmc_blk_alloc_req(struct mmc_card *card,
 {
 	struct mmc_blk_data *md;
 	int devidx, ret;
+	int idx = 0;
 
 	devidx = find_first_zero_bit(dev_use, max_devices);
 	if (devidx >= max_devices)
@@ -2209,7 +2211,20 @@ static struct mmc_blk_data *mmc_blk_alloc_req(struct mmc_card *card,
 	 * index anymore so we keep track of a name index.
 	 */
 	if (!subname) {
-		md->name_idx = find_first_zero_bit(name_use, max_devices);
+		if (card->dev.parent->parent->of_node)
+			idx = of_alias_get_id(card->dev.parent->parent->of_node,
+					"mmc");
+
+		if (idx < 0)
+			md->name_idx = find_first_zero_bit(name_use,
+					max_devices);
+		else {
+			if (test_bit(idx, name_use))
+				md->name_idx = find_first_zero_bit(name_use,
+						max_devices);
+			else
+				md->name_idx = (unsigned int)idx;
+		}
 		__set_bit(md->name_idx, name_use);
 	} else
 		md->name_idx = ((struct mmc_blk_data *)
