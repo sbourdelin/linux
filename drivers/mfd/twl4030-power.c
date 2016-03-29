@@ -265,7 +265,7 @@ out:
 }
 
 static int
-twl4030_config_wakeup12_sequence(const struct twl4030_power_data *pdata,
+twl4030_config_wakeup12_sequence(const struct twl_power_data *pdata,
 				 u8 address)
 {
 	int err = 0;
@@ -462,7 +462,7 @@ static int twl4030_configure_resource(struct twl4030_resconfig *rconfig)
 	return 0;
 }
 
-static int load_twl4030_script(const struct twl4030_power_data *pdata,
+static int load_twl4030_script(const struct twl_power_data *pdata,
 			       struct twl4030_script *tscript,
 			       u8 address)
 {
@@ -564,7 +564,7 @@ int twl4030_remove_script(u8 flags)
 }
 
 static int
-twl4030_power_configure_scripts(const struct twl4030_power_data *pdata)
+twl4030_power_configure_scripts(const struct twl_power_data *pdata)
 {
 	int err;
 	int i;
@@ -598,7 +598,7 @@ static void twl4030_patch_rconfig(struct twl4030_resconfig *common,
 }
 
 static int
-twl4030_power_configure_resources(const struct twl4030_power_data *pdata)
+twl4030_power_configure_resources(const struct twl_power_data *pdata)
 {
 	struct twl4030_resconfig *resconfig = pdata->resource_config;
 	struct twl4030_resconfig *boardconf = pdata->board_config;
@@ -677,7 +677,7 @@ void twl4030_power_off(void)
 		pr_err("TWL4030 Unable to power off\n");
 }
 
-static bool twl4030_power_use_poweroff(const struct twl4030_power_data *pdata,
+static bool twl4030_power_use_poweroff(const struct twl_power_data *pdata,
 					struct device_node *node)
 {
 	if (pdata && pdata->use_poweroff)
@@ -725,7 +725,7 @@ static struct twl4030_resconfig omap3_rconfig[] = {
 	{ 0, 0 },
 };
 
-static struct twl4030_power_data omap3_reset = {
+static struct twl_power_data omap3_reset = {
 	.scripts		= omap3_reset_scripts,
 	.num			= ARRAY_SIZE(omap3_reset_scripts),
 	.resource_config	= omap3_rconfig,
@@ -814,7 +814,7 @@ static struct twl4030_resconfig omap3_idle_rconfig[] = {
 	{ /* Terminator */ },
 };
 
-static struct twl4030_power_data omap3_idle = {
+static struct twl_power_data omap3_idle = {
 	.scripts		= omap3_idle_scripts,
 	.num			= ARRAY_SIZE(omap3_idle_scripts),
 	.resource_config	= omap3_idle_rconfig,
@@ -826,21 +826,21 @@ static struct twl4030_resconfig osc_off_rconfig[] = {
 	{ /* Terminator */ },
 };
 
-static struct twl4030_power_data osc_off_idle = {
+static struct twl_power_data osc_off_idle = {
 	.scripts		= omap3_idle_scripts,
 	.num			= ARRAY_SIZE(omap3_idle_scripts),
 	.resource_config	= omap3_idle_rconfig,
 	.board_config		= osc_off_rconfig,
 };
 
-static struct twl4030_power_data omap3_idle_ac_quirk = {
+static struct twl_power_data omap3_idle_ac_quirk = {
 	.scripts		= omap3_idle_scripts,
 	.num			= ARRAY_SIZE(omap3_idle_scripts),
 	.resource_config	= omap3_idle_rconfig,
 	.ac_charger_quirk	= true,
 };
 
-static struct twl4030_power_data omap3_idle_ac_quirk_osc_off = {
+static struct twl_power_data omap3_idle_ac_quirk_osc_off = {
 	.scripts		= omap3_idle_scripts,
 	.num			= ARRAY_SIZE(omap3_idle_scripts),
 	.resource_config	= omap3_idle_rconfig,
@@ -883,7 +883,7 @@ MODULE_DEVICE_TABLE(of, twl4030_power_of_match);
 
 static int twl4030_power_probe(struct platform_device *pdev)
 {
-	const struct twl4030_power_data *pdata = dev_get_platdata(&pdev->dev);
+	const struct twl_power_data *pdata = dev_get_platdata(&pdev->dev);
 	struct device_node *node = pdev->dev.of_node;
 	const struct of_device_id *match;
 	int err = 0;

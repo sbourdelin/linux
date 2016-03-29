@@ -668,7 +668,7 @@ struct twl4030_resconfig {
 	u8 remap_sleep;	/* sleep state remapping */
 };
 
-struct twl4030_power_data {
+struct twl_power_data {
 	struct twl4030_script **scripts;
 	unsigned num;
 	struct twl4030_resconfig *resource_config;
@@ -693,7 +693,7 @@ struct twl4030_vibra_data {
 	unsigned int	coexist;
 };
 
-struct twl4030_audio_data {
+struct twl_audio_data {
 	unsigned int	audio_mclk;
 	struct twl4030_codec_data *codec;
 	struct twl4030_vibra_data *vibra;
@@ -705,6 +705,10 @@ struct twl4030_audio_data {
 };
 
 struct twl_platform_data {
+	/* Common platform data */
+	struct twl_audio_data			*audio;
+	struct twl_power_data			*power;
+
 	/* TWL4030 platform data */
 	struct twl4030_clock_init_data		*clock;
 	struct twl4030_bci_platform_data	*bci;
@@ -712,8 +716,6 @@ struct twl_platform_data {
 	struct twl4030_madc_platform_data	*madc;
 	struct twl4030_keypad_data		*keypad;
 	struct twl4030_usb_data			*usb;
-	struct twl4030_power_data		*power;
-	struct twl4030_audio_data		*audio;
 
 	/* Common LDO regulators for TWL4030/TWL6030 */
 	struct regulator_init_data		*vdac;

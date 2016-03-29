@@ -122,7 +122,7 @@ static struct twl4030_madc_platform_data omap3_madc_pdata = {
 
 static struct twl4030_codec_data omap3_codec;
 
-static struct twl4030_audio_data omap3_audio_pdata = {
+static struct twl_audio_data omap3_audio_pdata = {
 	.audio_mclk = 26000000,
 	.codec = &omap3_codec,
 };
@@ -537,7 +537,7 @@ void __init omap4_pmic_get_config(struct twl_platform_data *pmic_data,
 #include <linux/platform_data/omap-twl4030.h>
 
 /* Commonly used configuration */
-static struct omap_tw4030_pdata omap_twl4030_audio_data;
+static struct omap_tw4030_pdata omap_twl_audio_data;
 
 static struct platform_device audio_device = {
 	.name		= "omap-twl4030",
@@ -548,7 +548,7 @@ void omap_twl4030_audio_init(char *card_name,
 				    struct omap_tw4030_pdata *pdata)
 {
 	if (!pdata)
-		pdata = &omap_twl4030_audio_data;
+		pdata = &omap_twl_audio_data;
 
 	pdata->card_name = card_name;
 

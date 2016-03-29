@@ -942,7 +942,7 @@ static struct twl4030_resconfig twl4030_rconfig[] __initdata = {
 	{ 0, 0},
 };
 
-static struct twl4030_power_data rx51_t2scripts_data __initdata = {
+static struct twl_power_data rx51_t2scripts_data __initdata = {
 	.scripts        = twl4030_scripts,
 	.num = ARRAY_SIZE(twl4030_scripts),
 	.resource_config = twl4030_rconfig,
@@ -952,7 +952,7 @@ static struct twl4030_vibra_data rx51_vibra_data __initdata = {
 	.coexist	= 0,
 };
 
-static struct twl4030_audio_data rx51_audio_data __initdata = {
+static struct twl_audio_data rx51_audio_data __initdata = {
 	.audio_mclk	= 26000000,
 	.vibra		= &rx51_vibra_data,
 };
