@@ -989,7 +989,6 @@ enum dwc2_halt_status {
  * and the DWC_otg controller
  */
 extern int dwc2_core_reset(struct dwc2_hsotg *hsotg);
-extern int dwc2_core_reset_and_force_dr_mode(struct dwc2_hsotg *hsotg);
 extern int dwc2_enter_hibernation(struct dwc2_hsotg *hsotg);
 extern int dwc2_exit_hibernation(struct dwc2_hsotg *hsotg, bool restore);
 
