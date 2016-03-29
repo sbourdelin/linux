@@ -1124,7 +1124,8 @@ static void mwifiex_deaggr_sdio_pkt(struct mwifiex_adapter *adapter,
 			break;
 		}
 		skb_deaggr = mwifiex_alloc_dma_align_buf(pkt_len,
-							 GFP_KERNEL | GFP_DMA);
+							 GFP_KERNEL | GFP_DMA |
+							 __GFP_REPEAT);
 		if (!skb_deaggr)
 			break;
 		skb_put(skb_deaggr, pkt_len);
@@ -1374,7 +1375,8 @@ static int mwifiex_sdio_card_to_host_mp_aggr(struct mwifiex_adapter *adapter,
 			/* copy pkt to deaggr buf */
 			skb_deaggr = mwifiex_alloc_dma_align_buf(len_arr[pind],
 								 GFP_KERNEL |
-								 GFP_DMA);
+								 GFP_DMA |
+								 __GFP_REPEAT);
 			if (!skb_deaggr) {
 				mwifiex_dbg(adapter, ERROR, "skb allocation failure\t"
 					    "drop pkt len=%d type=%d\n",
@@ -1416,7 +1418,8 @@ rx_curr_single:
 		mwifiex_dbg(adapter, INFO, "info: RX: port: %d, rx_len: %d\n",
 			    port, rx_len);
 
-		skb = mwifiex_alloc_dma_align_buf(rx_len, GFP_KERNEL | GFP_DMA);
+		skb = mwifiex_alloc_dma_align_buf(rx_len, GFP_KERNEL | GFP_DMA |
+						  __GFP_REPEAT);
 		if (!skb) {
 			mwifiex_dbg(adapter, ERROR,
 				    "single skb allocated fail,\t"
@@ -1521,7 +1524,8 @@ static int mwifiex_process_int_status(struct mwifiex_adapter *adapter)
 		rx_len = (u16) (rx_blocks * MWIFIEX_SDIO_BLOCK_SIZE);
 		mwifiex_dbg(adapter, INFO, "info: rx_len = %d\n", rx_len);
 
-		skb = mwifiex_alloc_dma_align_buf(rx_len, GFP_KERNEL | GFP_DMA);
+		skb = mwifiex_alloc_dma_align_buf(rx_len, GFP_KERNEL | GFP_DMA |
+						  __GFP_REPEAT);
 		if (!skb)
 			return -1;
 
