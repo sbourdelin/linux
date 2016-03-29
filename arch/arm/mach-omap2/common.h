@@ -258,6 +258,7 @@ extern bool gic_dist_disabled(void);
 extern void gic_timer_retrigger(void);
 extern void omap_smc1(u32 fn, u32 arg);
 extern void __iomem *omap4_get_sar_ram_base(void);
+extern void omap4_sar_ram_write_boot_mode(const char *cmd);
 extern void omap_do_wfi(void);
 
 #ifdef CONFIG_SMP

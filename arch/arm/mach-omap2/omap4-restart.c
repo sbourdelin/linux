@@ -22,6 +22,6 @@
  */
 void omap44xx_restart(enum reboot_mode mode, const char *cmd)
 {
-	/* XXX Should save 'cmd' into scratchpad for use after reboot */
+	omap4_sar_ram_write_boot_mode(cmd);
 	omap_prm_reset_system();
 }

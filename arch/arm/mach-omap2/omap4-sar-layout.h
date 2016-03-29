@@ -20,6 +20,7 @@
 #define SAR_BANK4_OFFSET		0x3000
 
 /* Scratch pad memory offsets from SAR_BANK1 */
+#define BOOT_MODE_OFFSET			0xa0c
 #define SCU_OFFSET0				0xfe4
 #define SCU_OFFSET1				0xfe8
 #define OMAP_TYPE_OFFSET			0xfec
@@ -27,6 +28,8 @@
 #define L2X0_SAVE_OFFSET1			0xff4
 #define L2X0_AUXCTRL_OFFSET			0xff8
 #define L2X0_PREFETCH_CTRL_OFFSET		0xffc
+
+#define BOOT_MODE_SIZE				0xf
 
 /* CPUx Wakeup Non-Secure Physical Address offsets in SAR_BANK3 */
 #define CPU0_WAKEUP_NS_PA_ADDR_OFFSET		0xa04

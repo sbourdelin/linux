@@ -265,6 +265,18 @@ void __iomem *omap4_get_sar_ram_base(void)
 	return sar_ram_base;
 }
 
+void omap4_sar_ram_write_boot_mode(const char *cmd)
+{
+	void __iomem *sar_base;
+
+	sar_base = omap4_get_sar_ram_base();
+
+	if (!cmd)
+		strncpy(sar_base + BOOT_MODE_OFFSET, "", BOOT_MODE_SIZE);
+	else
+		strncpy(sar_base + BOOT_MODE_OFFSET, cmd, BOOT_MODE_SIZE);
+}
+
 /*
  * SAR RAM used to save and restore the HW
  * context in low power modes
