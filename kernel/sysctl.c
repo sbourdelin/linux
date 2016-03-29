@@ -536,6 +536,14 @@ static struct ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
 	},
+	{
+		.procname	= "disable-srop-protection",
+		.data		= &srop_disabled,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+
+	},
 #ifdef CONFIG_SPARC
 	{
 		.procname	= "reboot-cmd",

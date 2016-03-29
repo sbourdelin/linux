@@ -52,6 +52,7 @@
 static struct kmem_cache *sigqueue_cachep;
 
 int print_fatal_signals __read_mostly;
+int srop_disabled __read_mostly;
 
 static void __user *sig_handler(struct task_struct *t, int sig)
 {
@@ -2452,18 +2453,26 @@ int verify_clear_sigcookie(unsigned long __user *sig_cookie_ptr)
 	unsigned long user_cookie;
 	unsigned long calculated_cookie;
 
+	if (srop_disabled)
+		goto out;
+
 	if (get_user(user_cookie, sig_cookie_ptr))
 		return 1;
 
 	calculated_cookie = gen_sigcookie(sig_cookie_ptr);
 
 	if (user_cookie != calculated_cookie) {
-		pr_warn("Signal protector does not match what kernel set it to"\
-			". Possible exploit attempt or buggy program!\n");
+		pr_warn("kernel/signal.c: Signal protector does not match what"\
+			" kernel set it to.\n"				\
+			"Possible exploit attempt or buggy program!\nIf you"\
+			" believe this is an error you can disable SROP "\
+			" Protection by #echo 1 > /proc/sys/kernel/"\
+			"disable-srop-protection\n");
 		return 1;
 
 	}
 
+out:
 	user_cookie = 0;
 	return put_user(user_cookie, sig_cookie_ptr);
 }
