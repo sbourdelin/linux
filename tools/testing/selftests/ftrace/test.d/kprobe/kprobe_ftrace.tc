@@ -4,33 +4,39 @@
 [ -f kprobe_events ] || exit_unsupported # this is configurable
 grep function available_tracers || exit_unsupported # this is configurable
 
+if [ "$(uname -m)" = "ppc64" ]; then
+    FILTER_FUNCTION="._do_fork"
+else
+    FILTER_FUNCTION="_do_fork"
+fi
+
 # prepare
 echo nop > current_tracer
-echo _do_fork > set_ftrace_filter
+echo $FILTER_FUNCTION > set_ftrace_filter
 echo 0 > events/enable
 echo > kprobe_events
-echo 'p:testprobe _do_fork' > kprobe_events
+echo "p:testprobe $FILTER_FUNCTION" > kprobe_events
 
 # kprobe on / ftrace off
 echo 1 > events/kprobes/testprobe/enable
 echo > trace
 ( echo "forked")
 grep testprobe trace
-! grep '_do_fork <-' trace
+! grep "$FILTER_FUNCTION <-" trace
 
 # kprobe on / ftrace on
 echo function > current_tracer
 echo > trace
 ( echo "forked")
 grep testprobe trace
-grep '_do_fork <-' trace
+grep "$FILTER_FUNCTION <-" trace
 
 # kprobe off / ftrace on
 echo 0 > events/kprobes/testprobe/enable
 echo > trace
 ( echo "forked")
 ! grep testprobe trace
-grep '_do_fork <-' trace
+grep "$FILTER_FUNCTION <-" trace
 
 # kprobe on / ftrace on
 echo 1 > events/kprobes/testprobe/enable
@@ -38,14 +44,14 @@ echo function > current_tracer
 echo > trace
 ( echo "forked")
 grep testprobe trace
-grep '_do_fork <-' trace
+grep "$FILTER_FUNCTION <-" trace
 
 # kprobe on / ftrace off
 echo nop > current_tracer
 echo > trace
 ( echo "forked")
 grep testprobe trace
-! grep '_do_fork <-' trace
+! grep "$FILTER_FUNCTION <-" trace
 
 # cleanup
 echo nop > current_tracer
