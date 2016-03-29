@@ -5605,7 +5605,7 @@ static bool yield_to_task_fair(struct rq *rq, struct task_struct *p, bool preemp
  *   W_i,0 = \Sum_j w_i,j                                             (2)
  *
  * Where w_i,j is the weight of the j-th runnable task on cpu i. This weight
- * is derived from the nice value as per prio_to_weight[].
+ * is derived from the nice value as per sched_prio_to_weight[].
  *
  * The weight average is an exponential decay average of the instantaneous
  * weight:
