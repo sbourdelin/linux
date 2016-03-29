@@ -154,9 +154,9 @@
 		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
 		interrupt-parent = <&intc>;
 
-		power {
+		twl_power: power {
 			compatible = "ti,twl4030-power";
-			ti,use_poweroff;
+			ti,system-power-controller;
 		};
 	};
 };
