@@ -262,6 +262,9 @@ struct zs_pool {
 #ifdef CONFIG_ZSMALLOC_STAT
 	struct dentry *stat_dentry;
 #endif
+#ifdef CONFIG_ZPOOL
+	struct work_struct zpool_destroy_work;
+#endif
 };
 
 /*
@@ -327,9 +330,17 @@ static void *zs_zpool_create(const char *name, gfp_t gfp,
 	return zs_create_pool(name, gfp);
 }
 
+static void zs_zpool_destroy_work(struct work_struct *work)
+{
+	zs_destroy_pool(container_of(work, struct zs_pool, zpool_destroy_work));
+}
+
 static void zs_zpool_destroy(void *pool)
 {
-	zs_destroy_pool(pool);
+	struct zs_pool *zs_pool = pool;
+
+	INIT_WORK(&zs_pool->zpool_destroy_work, zs_zpool_destroy_work);
+	schedule_work(&zs_pool->zpool_destroy_work);
 }
 
 static int zs_zpool_malloc(void *pool, size_t size, gfp_t gfp,
