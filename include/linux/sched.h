@@ -1502,6 +1502,13 @@ struct task_struct {
 	unsigned long stack_canary;
 #endif
 	/*
+	 * Canary value for signal frames placed on user stack.
+	 * This helps mitigate "Signal Return oriented program"
+	 * exploits in userland.
+	 */
+	unsigned long sig_cookie;
+
+	/*
 	 * pointers to (original) parent process, youngest child, younger sibling,
 	 * older sibling, respectively.  (p->father can be replaced with
 	 * p->real_parent->pid)
