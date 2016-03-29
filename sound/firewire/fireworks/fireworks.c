@@ -21,26 +21,14 @@ MODULE_DESCRIPTION("Echo Fireworks driver");
 MODULE_AUTHOR("Takashi Sakamoto <o-takashi@sakamocchi.jp>");
 MODULE_LICENSE("GPL v2");
 
-static int index[SNDRV_CARDS]	= SNDRV_DEFAULT_IDX;
-static char *id[SNDRV_CARDS]	= SNDRV_DEFAULT_STR;
-static bool enable[SNDRV_CARDS]	= SNDRV_DEFAULT_ENABLE_PNP;
 unsigned int snd_efw_resp_buf_size	= 1024;
 bool snd_efw_resp_buf_debug		= false;
 
-module_param_array(index, int, NULL, 0444);
-MODULE_PARM_DESC(index, "card index");
-module_param_array(id, charp, NULL, 0444);
-MODULE_PARM_DESC(id, "ID string");
-module_param_array(enable, bool, NULL, 0444);
-MODULE_PARM_DESC(enable, "enable Fireworks sound card");
 module_param_named(resp_buf_size, snd_efw_resp_buf_size, uint, 0444);
 MODULE_PARM_DESC(resp_buf_size,
 		 "response buffer size (max 4096, default 1024)");
 module_param_named(resp_buf_debug, snd_efw_resp_buf_debug, bool, 0444);
 MODULE_PARM_DESC(resp_buf_debug, "store all responses to buffer");
-
-static DEFINE_MUTEX(devices_mutex);
-static DECLARE_BITMAP(devices_used, SNDRV_CARDS);
 
 #define VENDOR_LOUD			0x000ff2
 #define  MODEL_MACKIE_400F		0x00400f
@@ -201,12 +189,6 @@ efw_card_free(struct snd_card *card)
 
 	kfree(efw->resp_buf);
 
-	if (efw->card_index >= 0) {
-		mutex_lock(&devices_mutex);
-		clear_bit(efw->card_index, devices_used);
-		mutex_unlock(&devices_mutex);
-	}
-
 	mutex_destroy(&efw->mutex);
 }
 
@@ -216,27 +198,13 @@ efw_probe(struct fw_unit *unit,
 {
 	struct snd_card *card;
 	struct snd_efw *efw;
-	int card_index, err;
+	int err;
 
-	mutex_lock(&devices_mutex);
-
-	/* check registered cards */
-	for (card_index = 0; card_index < SNDRV_CARDS; ++card_index) {
-		if (!test_bit(card_index, devices_used) && enable[card_index])
-			break;
-	}
-	if (card_index >= SNDRV_CARDS) {
-		err = -ENOENT;
-		goto end;
-	}
-
-	err = snd_card_new(&unit->device, index[card_index], id[card_index],
-			   THIS_MODULE, sizeof(struct snd_efw), &card);
+	err = snd_card_new(&unit->device, -1, NULL, THIS_MODULE,
+			   sizeof(struct snd_efw), &card);
 	if (err < 0)
-		goto end;
+		return err;
 	efw = card->private_data;
-	efw->card_index = card_index;
-	set_bit(card_index, devices_used);
 	card->private_free = efw_card_free;
 
 	efw->card = card;
@@ -287,12 +255,9 @@ efw_probe(struct fw_unit *unit,
 	}
 
 	dev_set_drvdata(&unit->device, efw);
-end:
-	mutex_unlock(&devices_mutex);
 	return err;
 error:
 	snd_efw_transaction_remove_instance(efw);
-	mutex_unlock(&devices_mutex);
 	snd_card_free(card);
 	return err;
 }
