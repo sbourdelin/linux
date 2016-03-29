@@ -25,6 +25,8 @@
 #include <linux/sched.h>
 #include <linux/ktime.h>
 #include <linux/mm.h>
+#include <linux/bcma/bcma.h>
+#include <linux/bcma/bcma_regs.h>
 #include <asm/dma.h>	/* isa_dma_bridge_buggy */
 #include "pci.h"
 
@@ -3281,6 +3283,31 @@ DECLARE_PCI_FIXUP_RESUME_EARLY(PCI_VENDOR_ID_INTEL, 0x1547,
 DECLARE_PCI_FIXUP_RESUME_EARLY(PCI_VENDOR_ID_INTEL, 0x156d,
 			       quirk_apple_wait_for_thunderbolt);
 #endif
+
+/*
+ * Broadcom 4331 wireless cards built into Apple Macs unleash an IRQ storm
+ * on boot until they are reset, causing spurious interrupts if the IRQ is
+ * shared. Apparently the EFI bootloader enables the device to phone home
+ * to Cupertino and does not disable it before passing control to the OS.
+ */
+static void quirk_apple_b43_reset(struct pci_dev *dev)
+{
+	void __iomem *mmio;
+
+	if (!dmi_match(DMI_BOARD_VENDOR, "Apple Inc.") || !dev->bus->self ||
+	    pci_pcie_type(dev->bus->self) != PCI_EXP_TYPE_ROOT_PORT)
+		return;
+
+	mmio = pci_iomap(dev, 0, 0);
+	if (!mmio) {
+		pr_err("b43 quirk: Cannot iomap device, IRQ storm ahead\n");
+		return;
+	}
+	iowrite32(BCMA_RESET_CTL_RESET,
+		  mmio + (1 * BCMA_CORE_SIZE) + BCMA_RESET_CTL);
+	pci_iounmap(dev, mmio);
+}
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_BROADCOM, 0x4331, quirk_apple_b43_reset);
 
 static void pci_do_fixups(struct pci_dev *dev, struct pci_fixup *f,
 			  struct pci_fixup *end)
