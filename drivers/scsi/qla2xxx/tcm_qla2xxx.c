@@ -48,6 +48,10 @@
 #include "qla_target.h"
 #include "tcm_qla2xxx.h"
 
+int jam_host = -1;
+module_param(jam_host, int, 0644);
+MODULE_PARM_DESC(jam_host, "Host to jam >=0 Enable jammer");
+
 static struct workqueue_struct *tcm_qla2xxx_free_wq;
 static struct workqueue_struct *tcm_qla2xxx_cmd_wq;
 
@@ -475,6 +479,11 @@ static int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 	if (!se_sess) {
 		pr_err("Unable to locate active struct se_session\n");
 		return -EINVAL;
+	}
+
+	if (unlikely(vha->host_no == jam_host)) {
+		/* return, and dont run target_submit_cmd,discarding command */
+		return 0;
 	}
 
 	cmd->vha->tgt_counters.qla_core_sbt_cmd++;
@@ -1967,6 +1976,7 @@ static void tcm_qla2xxx_deregister_configfs(void)
 static int __init tcm_qla2xxx_init(void)
 {
 	int ret;
+	jam_host = -1;
 
 	ret = tcm_qla2xxx_register_configfs();
 	if (ret < 0)

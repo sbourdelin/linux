@@ -1,0 +1,31 @@
+tcm_qla2xxx jammer parameter usage
+----------------------------------
+There is now a new module parameter added to the tcm_qla2xx module
+parm:           jam_host:Host to jam >=0 Enable jammer (int)
+
+Use this parameter to control the discarding of SCSI commands to a selected
+host.
+This may be useful for testing error handling and simulating slow drain
+and other fabric issues.
+
+Any value >=0 that matches a fc_host # will discard the commands for that host.
+Reset back to -1 to stop the jamming.
+
+Enable host 6 to be jammed
+echo 6 > /sys/module/tcm_qla2xxx/parameters/jam_host
+
+Disable jamming on host 6
+echo -1 > /sys/module/tcm_qla2xxx/parameters/jam_host
+
+Usage example script:
+
+#!/bin/bash
+sleep_time=120  ### Time to jam for
+echo 6 >  /sys/module/tcm_qla2xxx/parameters/jam_host
+host=`cat /sys/module/tcm_qla2xxx/parameters/jam_host`
+echo "We start to discard commands on SCSI host $host"
+logger "Jammer started"
+sleep $sleep_time
+echo -1 >  /sys/module/tcm_qla2xxx/parameters/jam_host
+echo "We stopped the jammer"
+logger "Jammer stopped"
