@@ -175,6 +175,17 @@ hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
 	struct vm_area_struct *vma;
 	struct hstate *h = hstate_file(file);
 	struct vm_unmapped_area_info info;
+	bool pud_size_align = false;
+	unsigned long ret_addr;
+
+	/*
+	 * If PMD sharing is enabled, align to PUD_SIZE to facilitate
+	 * sharing.  Only attempt alignment if no address was passed in,
+	 * flags indicate sharing and size is big enough.
+	 */
+	if (IS_ENABLED(CONFIG_ARCH_WANT_HUGE_PMD_SHARE) &&
+	    !addr && flags & MAP_SHARED && len >= PUD_SIZE)
+		pud_size_align = true;
 
 	if (len & ~huge_page_mask(h))
 		return -EINVAL;
@@ -199,9 +210,23 @@ hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
 	info.length = len;
 	info.low_limit = TASK_UNMAPPED_BASE;
 	info.high_limit = TASK_SIZE;
-	info.align_mask = PAGE_MASK & ~huge_page_mask(h);
+	if (pud_size_align)
+		info.align_mask = PAGE_MASK & (PUD_SIZE - 1);
+	else
+		info.align_mask = PAGE_MASK & ~huge_page_mask(h);
 	info.align_offset = 0;
-	return vm_unmapped_area(&info);
+	ret_addr = vm_unmapped_area(&info);
+
+	/*
+	 * If failed with PUD_SIZE alignment, try again with huge page
+	 * size alignment.
+	 */
+	if ((ret_addr & ~PAGE_MASK) && pud_size_align) {
+		info.align_mask = PAGE_MASK & ~huge_page_mask(h);
+		ret_addr = vm_unmapped_area(&info);
+	}
+
+	return ret_addr;
 }
 #endif
 
