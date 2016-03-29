@@ -764,8 +764,8 @@ kvmppc_skip_Hinterrupt:
 #endif
 
 /*
- * Code from here down to __end_handlers is invoked from the
- * exception prologs above.  Because the prologs assemble the
+ * Code from here down to end of out of line handlers is invoked from
+ * the exception prologs above.  Because the prologs assemble the
  * addresses of these handlers using the LOAD_HANDLER macro,
  * which uses an ori instruction, these handlers must be in
  * the first 64k of the kernel image.
@@ -952,11 +952,6 @@ hv_facility_unavailable_relon_trampoline:
 	b	denorm_exception_hv
 #endif
 	STD_RELON_EXCEPTION_PSERIES(0x5700, 0x1700, altivec_assist)
-
-	/* Other future vectors */
-	.align	7
-	.globl	__end_interrupts
-__end_interrupts:
 
 	.align	7
 system_call_entry:
@@ -1230,10 +1225,6 @@ END_FTR_SECTION_IFSET(CPU_FTR_VSX)
 	STD_EXCEPTION_COMMON(0xf60, facility_unavailable, facility_unavailable_exception)
 	STD_EXCEPTION_COMMON(0xf80, hv_facility_unavailable, facility_unavailable_exception)
 
-	.align	7
-	.globl	__end_handlers
-__end_handlers:
-
 	/* Equivalents to the above handlers for relocation-on interrupt vectors */
 	STD_RELON_EXCEPTION_HV_OOL(0xe40, emulation_assist)
 	MASKABLE_RELON_EXCEPTION_HV_OOL(0xe80, h_doorbell)
@@ -1243,6 +1234,16 @@ __end_handlers:
 	STD_RELON_EXCEPTION_PSERIES_OOL(0xf40, vsx_unavailable)
 	STD_RELON_EXCEPTION_PSERIES_OOL(0xf60, facility_unavailable)
 	STD_RELON_EXCEPTION_HV_OOL(0xf80, hv_facility_unavailable)
+
+	/* FIXME: For now, let us move the __end_interrupts marker down past
+	 * the out-of-line handlers, to make sure we also copy OOL handlers
+	 * to real adress 0x100 when running a relocatable kernel. This helps
+	 * in cases where interrupt vectors are not long enough (like 0x4f00,
+	 * 0x4f20, etc.) to branch out to OOL handlers with LOAD_HANDLER().
+	 */
+	.align	7
+	.globl	__end_interrupts
+__end_interrupts:
 
 #if defined(CONFIG_PPC_PSERIES) || defined(CONFIG_PPC_POWERNV)
 /*
