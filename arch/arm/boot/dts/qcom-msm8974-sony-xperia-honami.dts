@@ -59,6 +59,10 @@
 	};
 
 	smd {
+		pronto {
+			status = "ok";
+		};
+
 		rpm {
 			rpm_requests {
 				pm8841-regulators {
