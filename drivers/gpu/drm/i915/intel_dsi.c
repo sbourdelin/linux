@@ -1240,9 +1240,28 @@ void intel_dsi_init(struct drm_device *dev)
 		default:
 			intel_dsi->panel_pwm_dcs_ports = BIT(PORT_A) | BIT(PORT_C);
 		}
+
+		/*
+		 * Based on the VBT value assign the ports on
+		 * which CABC ON/OFF comands needs to be sent
+		 */
+		switch (dev_priv->vbt.dsi.config->dl_cabc_ports) {
+		case CABC_PORT_A:
+			intel_dsi->cabc_dcs_ports = BIT(PORT_A);
+			break;
+		case CABC_PORT_C:
+			intel_dsi->cabc_dcs_ports = BIT(PORT_C);
+			break;
+		case CABC_PORT_A_AND_C:
+			intel_dsi->cabc_dcs_ports = BIT(PORT_A) | BIT(PORT_C);
+			break;
+		default:
+			intel_dsi->cabc_dcs_ports = BIT(PORT_A) | BIT(PORT_C);
+		}
 	} else {
 		intel_dsi->ports = BIT(port);
 		intel_dsi->panel_pwm_dcs_ports = BIT(port);
+                intel_dsi->cabc_dcs_ports = BIT(port);
 	}
 
 	/* Create a DSI host (and a device) for each port. */

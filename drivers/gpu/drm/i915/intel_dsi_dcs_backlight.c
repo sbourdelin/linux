@@ -33,6 +33,11 @@
 #define PANEL_PWM_DISP_DIMMING		(1 << 3)
 #define PANEL_PWM_BCTRL			(1 << 5)
 
+#define CABC_OFF			(0 << 0)
+#define CABC_USER_INTERFACE_IMAGE	(1 << 0)
+#define CABC_STILL_PICTURE		(2 << 0)
+#define CABC_VIDEO_MODE			(3 << 0)
+
 #define PANEL_PWM_MAX_VALUE		0xFF
 
 static u32 panel_pwm_get_backlight(struct intel_connector *connector)
@@ -81,6 +86,8 @@ static void panel_pwm_set_backlight(struct intel_connector *connector, u32 level
 
 static void panel_pwm_disable_backlight(struct intel_connector *connector)
 {
+	struct drm_device *dev = connector->base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_encoder *encoder = connector->encoder;
 	struct intel_dsi *intel_dsi = enc_to_intel_dsi(&encoder->base);
 	struct mipi_dsi_device *dsi_device;
@@ -88,6 +95,16 @@ static void panel_pwm_disable_backlight(struct intel_connector *connector)
 	u8 data;
 
 	panel_pwm_set_backlight(connector, 0);
+
+	if (dev_priv->vbt.dsi.config->cabc_supported) {
+		data = 0;
+		for_each_dsi_port(port, intel_dsi->cabc_dcs_ports) {
+			dsi_device = intel_dsi->dsi_hosts[port]->device;
+			data = CABC_OFF;
+			mipi_dsi_dcs_write(dsi_device, MIPI_DCS_WRITE_POWER_SAVE,
+					&data, sizeof(data));
+		}
+	}
 
 	for_each_dsi_port(port, intel_dsi->panel_pwm_dcs_ports) {
 		dsi_device = intel_dsi->dsi_hosts[port]->device;
@@ -101,6 +118,8 @@ static void panel_pwm_disable_backlight(struct intel_connector *connector)
 
 static void panel_pwm_enable_backlight(struct intel_connector *connector)
 {
+	struct drm_device *dev = connector->base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_encoder *encoder = connector->encoder;
 	struct intel_dsi *intel_dsi = enc_to_intel_dsi(&encoder->base);
 	struct intel_panel *panel = &connector->panel;
@@ -115,6 +134,17 @@ static void panel_pwm_enable_backlight(struct intel_connector *connector)
 			| PANEL_PWM_BCTRL; /* Brightness control Block On */
 		mipi_dsi_dcs_write(dsi_device, MIPI_DCS_WRITE_CONTROL_DISPLAY,
 					&data, sizeof(data));
+	}
+
+	if (dev_priv->vbt.dsi.config->cabc_supported) {
+		data = 0;
+		for_each_dsi_port(port, intel_dsi->cabc_dcs_ports) {
+			dsi_device = intel_dsi->dsi_hosts[port]->device;
+			/* Enabling CABC in still mode */
+			data = CABC_STILL_PICTURE;
+			mipi_dsi_dcs_write(dsi_device, MIPI_DCS_WRITE_POWER_SAVE,
+					&data, sizeof(data));
+		}
 	}
 
 	panel_pwm_set_backlight(connector, panel->backlight.level);

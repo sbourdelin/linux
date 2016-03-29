@@ -37,6 +37,9 @@
 #define PANEL_PWM_PORT_A		0x00
 #define PANEL_PWM_PORT_C		0x01
 #define PANEL_PWM_PORT_A_AND_C		0x02
+#define CABC_PORT_A			0x00
+#define CABC_PORT_C			0x01
+#define CABC_PORT_A_AND_C		0x02
 
 struct intel_dsi_host;
 
