@@ -619,20 +619,43 @@ static int pseries_eeh_configure_bridge(struct eeh_pe *pe)
 {
 	int config_addr;
 	int ret;
+	/* Waiting 0.2s maximum before skipping configuration */
+	int max_wait = 200;
+	int mwait;
 
 	/* Figure out the PE address */
 	config_addr = pe->config_addr;
 	if (pe->addr)
 		config_addr = pe->addr;
 
-	ret = rtas_call(ibm_configure_pe, 3, 1, NULL,
-			config_addr, BUID_HI(pe->phb->buid),
-			BUID_LO(pe->phb->buid));
+	while (max_wait > 0) {
+		ret = rtas_call(ibm_configure_pe, 3, 1, NULL,
+				config_addr, BUID_HI(pe->phb->buid),
+				BUID_LO(pe->phb->buid));
 
-	if (ret)
-		pr_warn("%s: Unable to configure bridge PHB#%d-PE#%x (%d)\n",
-			__func__, pe->phb->global_number, pe->addr, ret);
+		/*
+		 * RTAS can return a delay value of up to 10^5 milliseconds
+		 * (RTAS_EXTENDED_DELAY_MAX), which is too long.  Only respect
+		 * the delay if it's 100ms or less.
+		 */
 
+		switch (ret) {
+		case 0:
+			return ret;
+		case RTAS_EXTENDED_DELAY_MIN:
+		case RTAS_EXTENDED_DELAY_MIN+1:
+		case RTAS_EXTENDED_DELAY_MIN+2:
+			mwait = rtas_busy_delay(ret);
+			break;
+		default:
+			goto err;
+		}
+
+		max_wait -= mwait;
+	}
+err:
+	pr_warn("%s: Unable to configure bridge PHB#%d-PE#%x (%d)\n",
+		__func__, pe->phb->global_number, pe->addr, ret);
 	return ret;
 }
 
