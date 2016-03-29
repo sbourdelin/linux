@@ -18,20 +18,6 @@ MODULE_DESCRIPTION("BridgeCo BeBoB driver");
 MODULE_AUTHOR("Takashi Sakamoto <o-takashi@sakamocchi.jp>");
 MODULE_LICENSE("GPL v2");
 
-static int index[SNDRV_CARDS]	= SNDRV_DEFAULT_IDX;
-static char *id[SNDRV_CARDS]	= SNDRV_DEFAULT_STR;
-static bool enable[SNDRV_CARDS]	= SNDRV_DEFAULT_ENABLE_PNP;
-
-module_param_array(index, int, NULL, 0444);
-MODULE_PARM_DESC(index, "card index");
-module_param_array(id, charp, NULL, 0444);
-MODULE_PARM_DESC(id, "ID string");
-module_param_array(enable, bool, NULL, 0444);
-MODULE_PARM_DESC(enable, "enable BeBoB sound card");
-
-static DEFINE_MUTEX(devices_mutex);
-static DECLARE_BITMAP(devices_used, SNDRV_CARDS);
-
 /* Offsets from information register. */
 #define INFO_OFFSET_BEBOB_VERSION	0x08
 #define INFO_OFFSET_GUID		0x10
@@ -142,12 +128,6 @@ bebob_card_free(struct snd_card *card)
 
 	kfree(bebob->maudio_special_quirk);
 
-	if (bebob->card_index >= 0) {
-		mutex_lock(&devices_mutex);
-		clear_bit(bebob->card_index, devices_used);
-		mutex_unlock(&devices_mutex);
-	}
-
 	mutex_destroy(&bebob->mutex);
 }
 
@@ -183,19 +163,7 @@ bebob_probe(struct fw_unit *unit,
 	struct snd_card *card;
 	struct snd_bebob *bebob;
 	const struct snd_bebob_spec *spec;
-	unsigned int card_index;
 	int err;
-
-	mutex_lock(&devices_mutex);
-
-	for (card_index = 0; card_index < SNDRV_CARDS; card_index++) {
-		if (!test_bit(card_index, devices_used) && enable[card_index])
-			break;
-	}
-	if (card_index >= SNDRV_CARDS) {
-		err = -ENOENT;
-		goto end;
-	}
 
 	if ((entry->vendor_id == VEN_FOCUSRITE) &&
 	    (entry->model_id == MODEL_FOCUSRITE_SAFFIRE_BOTH))
@@ -210,19 +178,16 @@ bebob_probe(struct fw_unit *unit,
 	if (spec == NULL) {
 		if ((entry->vendor_id == VEN_MAUDIO1) ||
 		    (entry->vendor_id == VEN_MAUDIO2))
-			err = snd_bebob_maudio_load_firmware(unit);
+			return snd_bebob_maudio_load_firmware(unit);
 		else
-			err = -ENOSYS;
-		goto end;
+			return -ENOSYS;
 	}
 
-	err = snd_card_new(&unit->device, index[card_index], id[card_index],
-			   THIS_MODULE, sizeof(struct snd_bebob), &card);
+	err = snd_card_new(&unit->device, -1, NULL, THIS_MODULE,
+			   sizeof(struct snd_bebob), &card);
 	if (err < 0)
-		goto end;
+		return err;
 	bebob = card->private_data;
-	bebob->card_index = card_index;
-	set_bit(card_index, devices_used);
 	card->private_free = bebob_card_free;
 
 	bebob->card = card;
@@ -291,11 +256,9 @@ bebob_probe(struct fw_unit *unit,
 	}
 
 	dev_set_drvdata(&unit->device, bebob);
-end:
-	mutex_unlock(&devices_mutex);
+
 	return err;
 error:
-	mutex_unlock(&devices_mutex);
 	snd_card_free(card);
 	return err;
 }
