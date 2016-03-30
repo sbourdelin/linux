@@ -41,6 +41,33 @@ static inline struct inmem_hash *inmem_alloc_hash(u16 type)
 			GFP_NOFS);
 }
 
+void btrfs_dedupe_status(struct btrfs_fs_info *fs_info,
+			 struct btrfs_ioctl_dedupe_args *dargs)
+{
+	struct btrfs_dedupe_info *dedupe_info = fs_info->dedupe_info;
+
+	if (!fs_info->dedupe_enabled || !dedupe_info) {
+		dargs->status = 0;
+		dargs->blocksize = 0;
+		dargs->backend = 0;
+		dargs->hash_type = 0;
+		dargs->limit_nr = 0;
+		dargs->current_nr = 0;
+		return;
+	}
+	mutex_lock(&dedupe_info->lock);
+	dargs->status = 1;
+	dargs->blocksize = dedupe_info->blocksize;
+	dargs->backend = dedupe_info->backend;
+	dargs->hash_type = dedupe_info->hash_type;
+	dargs->limit_nr = dedupe_info->limit_nr;
+	dargs->limit_mem = dedupe_info->limit_nr *
+		(sizeof(struct inmem_hash) +
+		 btrfs_dedupe_sizes[dedupe_info->hash_type]);
+	dargs->current_nr = dedupe_info->current_nr;
+	mutex_unlock(&dedupe_info->lock);
+}
+
 static int init_dedupe_info(struct btrfs_dedupe_info **ret_info, u16 type,
 			    u16 backend, u64 blocksize, u64 limit)
 {
@@ -369,6 +396,27 @@ static void inmem_destroy(struct btrfs_dedupe_info *dedupe_info)
 	list_for_each_entry_safe(entry, tmp, &dedupe_info->lru_list, lru_list)
 		__inmem_del(dedupe_info, entry);
 	mutex_unlock(&dedupe_info->lock);
+}
+
+int btrfs_dedupe_cleanup(struct btrfs_fs_info *fs_info)
+{
+	struct btrfs_dedupe_info *dedupe_info;
+
+	fs_info->dedupe_enabled = 0;
+	/* same as disable */
+	smp_wmb();
+	dedupe_info = fs_info->dedupe_info;
+	fs_info->dedupe_info = NULL;
+
+	if (!dedupe_info)
+		return 0;
+
+	if (dedupe_info->backend == BTRFS_DEDUPE_BACKEND_INMEMORY)
+		inmem_destroy(dedupe_info);
+
+	crypto_free_shash(dedupe_info->dedupe_driver);
+	kfree(dedupe_info);
+	return 0;
 }
 
 int btrfs_dedupe_disable(struct btrfs_fs_info *fs_info)
