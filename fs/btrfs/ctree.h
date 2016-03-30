@@ -984,8 +984,13 @@ struct btrfs_dedupe_status_item {
  * Used for hash <-> bytenr search
  */
 struct btrfs_dedupe_hash_item {
-	/* length of dedupe range */
+	/* length of dedupe range in memory */
 	__le32 len;
+
+	/* length of dedupe range on disk */
+	__le32 disk_len;
+
+	u8 compression;
 
 	/* Hash follows */
 } __attribute__ ((__packed__));
@@ -3324,6 +3329,10 @@ BTRFS_SETGET_FUNCS(dedupe_status_backend, struct btrfs_dedupe_status_item,
 
 /* btrfs_dedupe_hash_item */
 BTRFS_SETGET_FUNCS(dedupe_hash_len, struct btrfs_dedupe_hash_item, len, 32);
+BTRFS_SETGET_FUNCS(dedupe_hash_disk_len, struct btrfs_dedupe_hash_item,
+		   disk_len, 32);
+BTRFS_SETGET_FUNCS(dedupe_hash_compression, struct btrfs_dedupe_hash_item,
+		   compression, 8);
 
 /* struct btrfs_file_extent_item */
 BTRFS_SETGET_FUNCS(file_extent_type, struct btrfs_file_extent_item, type, 8);
