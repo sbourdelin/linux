@@ -245,7 +245,7 @@ __packed __aligned(4)
  * within the scheduler's rq lock. It must be released before calling
  * console_unlock() or anything else that might wake up a process.
  */
-static DEFINE_RAW_SPINLOCK(logbuf_lock);
+DEFINE_RAW_SPINLOCK(logbuf_lock);
 
 #ifdef CONFIG_PRINTK
 DECLARE_WAIT_QUEUE_HEAD(log_wait);
@@ -1764,8 +1764,16 @@ asmlinkage int vprintk_emit(int facility, int level,
 	lockdep_on();
 	local_irq_restore(flags);
 
-	/* If called from the scheduler, we can not call up(). */
-	if (!in_sched) {
+	/*
+	 * Console calls must be deferred when called from the scheduler.
+	 *
+	 * Many architectures never call vprintk_emit() in NMI context,
+	 * see vprintk_nmi(). The only exception is when the NMI buffers
+	 * are flushed on panic. In this case, the consoles are called
+	 * later explicitly only when crashdump does not work, see
+	 * console_flush_on_panic().
+	 */
+	if (!in_sched && !deferred_console_in_nmi()) {
 		lockdep_off();
 		/*
 		 * Try to acquire and then immediately release the console

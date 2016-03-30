@@ -123,15 +123,19 @@ void early_printk(const char *s, ...) { }
 #endif
 
 #ifdef CONFIG_PRINTK_NMI
+#define deferred_console_in_nmi() in_nmi()
 extern void printk_nmi_init(void);
 extern void printk_nmi_enter(void);
 extern void printk_nmi_exit(void);
 extern void printk_nmi_flush(void);
+extern void printk_nmi_flush_on_panic(void);
 #else
+#define deferred_console_in_nmi() 0
 static inline void printk_nmi_init(void) { }
 static inline void printk_nmi_enter(void) { }
 static inline void printk_nmi_exit(void) { }
 static inline void printk_nmi_flush(void) { }
+static inline void printk_nmi_flush_on_panic(void) { }
 #endif /* PRINTK_NMI */
 
 #ifdef CONFIG_PRINTK

@@ -194,6 +194,41 @@ void printk_nmi_flush(void)
 		__printk_nmi_flush(&per_cpu(nmi_print_seq, cpu).work);
 }
 
+/**
+ * printk_nmi_flush_on_panic - flush all per-cpu nmi buffers when the system
+ *	goes down.
+ *
+ * Similar to printk_nmi_flush() but it can be called even in NMI context when
+ * the system goes down. It does the best effort to get NMI messages into
+ * the main ring buffer.
+ *
+ * Note that it could try harder when there is only one CPU online.
+ */
+void printk_nmi_flush_on_panic(void)
+{
+	if (in_nmi()) {
+		/*
+		 * Make sure that we could access the main ring buffer.
+		 * Do not risk a double release when more CPUs are up.
+		 */
+		if (raw_spin_is_locked(&logbuf_lock)) {
+			if (num_online_cpus() > 1)
+				return;
+
+			debug_locks_off();
+			raw_spin_lock_init(&logbuf_lock);
+		}
+
+		/*
+		 * Flush the messages using the default printk handler
+		 * to store them into the main ring buffer.
+		 */
+		this_cpu_write(printk_func, vprintk_default);
+	}
+
+	printk_nmi_flush();
+}
+
 void __init printk_nmi_init(void)
 {
 	int cpu;
