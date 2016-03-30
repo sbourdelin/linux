@@ -114,6 +114,24 @@ static struct fb_ops intelfb_ops = {
 	.fb_debug_leave = drm_fb_helper_debug_leave,
 };
 
+static struct intel_fbdev *intel_fbdev_get_if_active(struct drm_device *dev)
+{
+	struct drm_i915_device *dev_priv = to_i915(dev);
+	struct fb_info *info;
+
+	if (dev_priv->fbdev == NULL)
+		return NULL;
+
+	info = ifbdev->helper.fbdev;
+	if (info->screen_base == NULL)
+		return NULL;
+
+	if (info->state != FBINFO_STATE_RUNNING)
+		return NULL;
+
+	return dev_priv->fbdev;
+}
+
 static int intelfb_alloc(struct drm_fb_helper *helper,
 			 struct drm_fb_helper_surface_size *sizes)
 {
@@ -766,6 +784,8 @@ void intel_fbdev_set_suspend(struct drm_device *dev, int state, bool synchronous
 		return;
 
 	info = ifbdev->helper.fbdev;
+	if (info->screen_base == NULL)
+		return;
 
 	if (synchronous) {
 		/* Flush any pending work to turn the console on, and then
@@ -807,32 +827,24 @@ void intel_fbdev_set_suspend(struct drm_device *dev, int state, bool synchronous
 
 void intel_fbdev_output_poll_changed(struct drm_device *dev)
 {
-	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_fbdev *ifbdev = intel_fbdev_get_if_active(dev);
 
-	async_synchronize_full();
-	if (dev_priv->fbdev)
-		drm_fb_helper_hotplug_event(&dev_priv->fbdev->helper);
+	if (ifbdev == NULL)
+		return;
+
+	drm_fb_helper_hotplug_event(&ifbdev->helper);
 }
 
 void intel_fbdev_restore_mode(struct drm_device *dev)
 {
-	int ret;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	struct intel_fbdev *ifbdev = dev_priv->fbdev;
-	struct drm_fb_helper *fb_helper;
+	struct intel_fbdev *ifbdev = intel_fbdev_get_if_active(dev);
 
-	async_synchronize_full();
-	if (!ifbdev)
+	if (ifbdev == NULL)
 		return;
 
-	fb_helper = &ifbdev->helper;
-
-	ret = drm_fb_helper_restore_fbdev_mode_unlocked(fb_helper);
-	if (ret) {
-		DRM_DEBUG("failed to restore crtc mode\n");
-	} else {
-		mutex_lock(&fb_helper->dev->struct_mutex);
+	if (drm_fb_helper_restore_fbdev_mode_unlocked(&ifbdev->helper) == 0) {
+		mutex_lock(&dev->struct_mutex);
 		intel_fb_obj_invalidate(ifbdev->fb->obj, ORIGIN_GTT);
-		mutex_unlock(&fb_helper->dev->struct_mutex);
+		mutex_unlock(&dev->struct_mutex);
 	}
 }
