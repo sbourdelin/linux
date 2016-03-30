@@ -284,7 +284,7 @@ int tpm2_pcr_read(struct tpm_chip *chip, int pcr_idx, u8 *res_buf)
 
 	rc = tpm_transmit_cmd(chip, &cmd, sizeof(cmd),
 			      "attempting to read a pcr value");
-	if (rc == 0) {
+	if (rc == 0 && res_buf) {
 		buf = cmd.params.pcrread_out.digest;
 		memcpy(res_buf, buf, TPM_DIGEST_SIZE);
 	}
@@ -861,7 +861,6 @@ int tpm2_do_selftest(struct tpm_chip *chip)
 	unsigned int loops;
 	unsigned int delay_msec = 100;
 	unsigned long duration;
-	struct tpm2_cmd cmd;
 	int i;
 
 	duration = tpm2_calc_ordinal_duration(chip, TPM2_CC_SELF_TEST);
@@ -874,19 +873,10 @@ int tpm2_do_selftest(struct tpm_chip *chip)
 
 	for (i = 0; i < loops; i++) {
 		/* Attempt to read a PCR value */
-		cmd.header.in = tpm2_pcrread_header;
-		cmd.params.pcrread_in.pcr_selects_cnt = cpu_to_be32(1);
-		cmd.params.pcrread_in.hash_alg = cpu_to_be16(TPM2_ALG_SHA1);
-		cmd.params.pcrread_in.pcr_select_size = TPM2_PCR_SELECT_MIN;
-		cmd.params.pcrread_in.pcr_select[0] = 0x01;
-		cmd.params.pcrread_in.pcr_select[1] = 0x00;
-		cmd.params.pcrread_in.pcr_select[2] = 0x00;
-
-		rc = tpm_transmit_cmd(chip, (u8 *) &cmd, sizeof(cmd), NULL);
+		rc = tpm2_pcr_read(chip, 0, NULL);
 		if (rc < 0)
 			break;
 
-		rc = be32_to_cpu(cmd.header.out.return_code);
 		if (rc != TPM2_RC_TESTING)
 			break;
 

@@ -520,7 +520,7 @@ extern void tpm_chip_unregister(struct tpm_chip *chip);
 int tpm_sysfs_add_device(struct tpm_chip *chip);
 void tpm_sysfs_del_device(struct tpm_chip *chip);
 
-int tpm_pcr_read_dev(struct tpm_chip *chip, int pcr_idx, u8 *res_buf);
+int tpm1_pcr_read(struct tpm_chip *chip, int pcr_idx, u8 *res_buf);
 
 #ifdef CONFIG_ACPI
 extern void tpm_add_ppi(struct tpm_chip *chip);
