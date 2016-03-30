@@ -311,13 +311,6 @@ static void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *cmd)
  */
 static int tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
 {
-	struct qla_tgt_cmd *cmd;
-
-	if ((se_cmd->se_cmd_flags & SCF_SCSI_TMR_CDB) == 0) {
-		cmd = container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
-		cmd->cmd_flags |= BIT_14;
-	}
-
 	return target_put_sess_cmd(se_cmd);
 }
 
