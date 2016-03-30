@@ -22,6 +22,8 @@
 #include <linux/net.h>
 #include <linux/rwsem.h>
 #include <linux/security.h>
+#include <crypto/public_key.h>
+#include <keys/asymmetric-type.h>
 
 struct alg_type_list {
 	const struct af_alg_type *type;
@@ -201,8 +203,40 @@ unlock:
 	return err;
 }
 
+static int alg_setkey_id(void *private, const u8 *key, unsigned int keylen,
+			 int (*setkey)(void *private, const u8 *key,
+				       unsigned int keylen))
+{
+	struct key *keyring;
+	struct public_key *pkey;
+	char key_name[12];
+	u32 keyid = *((u32 *)key);
+	int err;
+
+	sprintf(key_name, "id:%08x", keyid);
+	keyring = request_key(&key_type_asymmetric, key_name, NULL);
+
+	err = -ENOKEY;
+	if (IS_ERR(keyring))
+		goto out;
+
+	pkey = keyring->payload.data[asym_crypto];
+	if (!pkey)
+		goto out_put_key;
+
+	if (!public_key_query_sw_key(pkey))
+		goto out_put_key;
+
+	err = setkey(private, pkey->key, pkey->keylen);
+
+out_put_key:
+	key_put(keyring);
+out:
+	return err;
+}
+
 static int alg_setkey(struct sock *sk, char __user *ukey,
-		      unsigned int keylen,
+		      unsigned int keylen, bool key_id,
 		      int (*setkey)(void *private, const u8 *key,
 				    unsigned int keylen))
 {
@@ -221,7 +255,8 @@ static int alg_setkey(struct sock *sk, char __user *ukey,
 	if (copy_from_user(key, ukey, keylen))
 		goto out;
 
-	err = setkey(ask->private, key, keylen);
+	err = key_id ? alg_setkey_id(ask->private, key, keylen, setkey) :
+		       setkey(ask->private, key, keylen);
 
 out:
 	sock_kzfree_s(sk, key, keylen);
@@ -236,6 +271,8 @@ static int alg_setsockopt(struct socket *sock, int level, int optname,
 	struct alg_sock *ask = alg_sk(sk);
 	const struct af_alg_type *type;
 	int err = -EBUSY;
+	bool key_id = ((optname == ALG_SET_PUBKEY_ID) ||
+		       (optname == ALG_SET_KEY_ID));
 
 	lock_sock(sk);
 	if (ask->refcnt)
@@ -249,16 +286,21 @@ static int alg_setsockopt(struct socket *sock, int level, int optname,
 
 	switch (optname) {
 	case ALG_SET_KEY:
+	case ALG_SET_KEY_ID:
 		if (sock->state == SS_CONNECTED)
 			goto unlock;
+		/* ALG_SET_KEY_ID is only for akcipher */
+		if (!strcmp(type->name, "akcipher") && key_id)
+			goto unlock;
 
-		err = alg_setkey(sk, optval, optlen, type->setkey);
+		err = alg_setkey(sk, optval, optlen, key_id, type->setkey);
 		break;
 	case ALG_SET_PUBKEY:
+	case ALG_SET_PUBKEY_ID:
 		if (sock->state == SS_CONNECTED)
 			goto unlock;
 
-		err = alg_setkey(sk, optval, optlen, type->setpubkey);
+		err = alg_setkey(sk, optval, optlen, key_id, type->setpubkey);
 		break;
 	case ALG_SET_AEAD_AUTHSIZE:
 		if (sock->state == SS_CONNECTED)
