@@ -134,16 +134,14 @@ static int drm_set_busid(struct drm_device *dev, struct drm_file *file_priv)
 			drm_unset_busid(dev, master);
 			return ret;
 		}
-	} else {
-		if (WARN(dev->unique == NULL,
-			 "No drm_driver.set_busid() implementation provided by "
-			 "%ps. Use drm_dev_set_unique() to set the unique "
-			 "name explicitly.", dev->driver))
-			return -EINVAL;
-
+	} else if (dev->unique) {
 		master->unique = kstrdup(dev->unique, GFP_KERNEL);
 		if (master->unique)
 			master->unique_len = strlen(dev->unique);
+	} else {
+		master->unique = kstrdup(dev->driver->name, GFP_KERNEL);
+		if (master->unique)
+			master->unique_len = strlen(dev->driver->name);
 	}
 
 	return 0;
