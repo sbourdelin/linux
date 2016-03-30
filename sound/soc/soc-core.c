@@ -1828,6 +1828,58 @@ int snd_soc_runtime_set_dai_fmt(struct snd_soc_pcm_runtime *rtd,
 }
 EXPORT_SYMBOL_GPL(snd_soc_runtime_set_dai_fmt);
 
+/**
+ * snd_soc_set_card_names() - Set the shortname/drivername/longname/component
+ * of a ASoC card.
+ * @card: The card to set names
+ * @board: The board name or product name
+ * @vendor: The vendor name
+ * @firmware: The firmware name
+ *
+ * This function adds more information for the userspace to distinguish
+ * different products:
+ *   card driver name --->  machine driver name
+ *   card short name  --->  DMI_PRODUCT_NAME or DMI_BOARD_NAME
+ *   card long name and
+ *   card component   --->  short name:driver name(:DMI_SYS_VENDOR)
+ *                          (:firmware name)
+ *
+ * Returns 0 on success, otherwise a negative error code.
+ */
+int snd_soc_set_card_names(struct snd_soc_card *card, const char *board,
+		const char *vendor, const char *firmware)
+{
+	int ret = 0;
+	char *name;
+
+	if (!board) {
+		dev_err(card->dev, "ASoC: the board/product name is empty!\n");
+		return -1;
+	}
+	/* card driver name */
+	card->driver_name = card->name;
+	/* card short name */
+	card->name = board;
+	/* card long name / card component */
+	name = kstrdup(card->name, GFP_KERNEL);
+	if (!name)
+		return -ENOMEM;
+	strcat(name, ":");
+	strcat(name, card->driver_name);
+	strcat(name, ":");
+	if (vendor)
+		strcat(name, vendor);
+	strcat(name, ":");
+	if (firmware)
+		strcat(name, firmware);
+	ret = snd_component_add(card->snd_card, name);
+	card->long_name = card->snd_card->components;
+
+	kfree(name);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(snd_soc_set_card_names);
+
 static int snd_soc_instantiate_card(struct snd_soc_card *card)
 {
 	struct snd_soc_codec *codec;
