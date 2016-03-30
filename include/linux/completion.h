@@ -8,7 +8,7 @@
  * See kernel/sched/completion.c for details.
  */
 
-#include <linux/wait.h>
+#include <linux/swait.h>
 
 /*
  * struct completion - structure used to maintain state for a "completion"
@@ -22,13 +22,22 @@
  * reinit_completion(), and macros DECLARE_COMPLETION(),
  * DECLARE_COMPLETION_ONSTACK().
  */
+
+#define COMPLETION_DEFER (1 << 0)
+
 struct completion {
-	unsigned int done;
-	wait_queue_head_t wait;
+	union {
+		struct {
+			unsigned short flags;
+			unsigned short done;
+		};
+		unsigned int val;
+	};
+	struct swait_queue_head wait;
 };
 
 #define COMPLETION_INITIALIZER(work) \
-	{ 0, __WAIT_QUEUE_HEAD_INITIALIZER((work).wait) }
+	{ 0, 0, __SWAIT_QUEUE_HEAD_INITIALIZER((work).wait) }
 
 #define COMPLETION_INITIALIZER_ONSTACK(work) \
 	({ init_completion(&work); work; })
@@ -72,8 +81,8 @@ struct completion {
  */
 static inline void init_completion(struct completion *x)
 {
-	x->done = 0;
-	init_waitqueue_head(&x->wait);
+	x->val = 0;
+	init_swait_queue_head(&x->wait);
 }
 
 /**
@@ -85,7 +94,7 @@ static inline void init_completion(struct completion *x)
  */
 static inline void reinit_completion(struct completion *x)
 {
-	x->done = 0;
+	x->val = 0;
 }
 
 extern void wait_for_completion(struct completion *);
