@@ -5631,6 +5631,30 @@ intel_dp_drrs_init(struct intel_connector *intel_connector,
 	return downclock_mode;
 }
 
+/*
+ * Called on DP connector initialization to check for aux backlight control
+ * capability on the sink device and if present, initialize it.
+ */
+static void intel_dp_init_aux_backlight(struct intel_dp *intel_dp,
+		struct drm_connector *connector)
+{
+	struct intel_connector *intel_connector = to_intel_connector(connector);
+
+	if (is_edp(intel_dp))
+		return;
+
+	if (i915.enable_dpcd_backlight &&
+			(intel_dp_dpcd_read_wake(&intel_dp->aux, DP_EDP_DPCD_REV,
+					intel_dp->edp_dpcd, sizeof(intel_dp->edp_dpcd)) ==
+							sizeof(intel_dp->edp_dpcd)) &&
+							intel_dp_aux_init_backlight_funcs(intel_connector) == 0) {
+		intel_panel_setup_backlight(connector, INVALID_PIPE);
+
+		intel_connector->panel.backlight.power = intel_dp_aux_backlight_power;
+		intel_connector->panel.backlight.enabled = true;
+		}
+}
+
 static bool intel_edp_init_connector(struct intel_dp *intel_dp,
 				     struct intel_connector *intel_connector)
 {
@@ -5868,6 +5892,7 @@ intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 		goto fail;
 	}
 
+	intel_dp_init_aux_backlight(intel_dp, connector);
 	intel_dp_add_properties(intel_dp, connector);
 
 	/* For G4X desktop chip, PEG_BAND_GAP_DATA 3:0 must first be written
