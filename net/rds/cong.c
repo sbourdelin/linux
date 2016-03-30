@@ -144,6 +144,7 @@ static struct rds_cong_map *rds_cong_from_addr(__be32 addr)
 	if (!map)
 		return NULL;
 
+	spin_lock_init(&map->m_lock);
 	map->m_addr = addr;
 	init_waitqueue_head(&map->m_waitq);
 	INIT_LIST_HEAD(&map->m_conn_list);
@@ -292,6 +293,7 @@ void rds_cong_set_bit(struct rds_cong_map *map, __be16 port)
 {
 	unsigned long i;
 	unsigned long off;
+	unsigned long flags;
 
 	rdsdebug("setting congestion for %pI4:%u in map %p\n",
 	  &map->m_addr, ntohs(port), map);
@@ -299,13 +301,16 @@ void rds_cong_set_bit(struct rds_cong_map *map, __be16 port)
 	i = be16_to_cpu(port) / RDS_CONG_MAP_PAGE_BITS;
 	off = be16_to_cpu(port) % RDS_CONG_MAP_PAGE_BITS;
 
+	spin_lock_irqsave(&map->m_lock, flags);
 	__set_bit_le(off, (void *)map->m_page_addrs[i]);
+	spin_unlock_irqrestore(&map->m_lock, flags);
 }
 
 void rds_cong_clear_bit(struct rds_cong_map *map, __be16 port)
 {
 	unsigned long i;
 	unsigned long off;
+	unsigned long flags;
 
 	rdsdebug("clearing congestion for %pI4:%u in map %p\n",
 	  &map->m_addr, ntohs(port), map);
@@ -313,7 +318,9 @@ void rds_cong_clear_bit(struct rds_cong_map *map, __be16 port)
 	i = be16_to_cpu(port) / RDS_CONG_MAP_PAGE_BITS;
 	off = be16_to_cpu(port) % RDS_CONG_MAP_PAGE_BITS;
 
+	spin_lock_irqsave(&map->m_lock, flags);
 	__clear_bit_le(off, (void *)map->m_page_addrs[i]);
+	spin_unlock_irqrestore(&map->m_lock, flags);
 }
 
 static int rds_cong_test_bit(struct rds_cong_map *map, __be16 port)

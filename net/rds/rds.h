@@ -59,6 +59,7 @@ struct rds_cong_map {
 	__be32			m_addr;
 	wait_queue_head_t	m_waitq;
 	struct list_head	m_conn_list;
+	spinlock_t		m_lock;
 	unsigned long		m_page_addrs[RDS_CONG_MAP_PAGES];
 };
 
