@@ -716,14 +716,22 @@ retry:
 						   NULL, NULL, 0);
 		inode_dio_end(inode);
 	} else {
+		ssize_t ret_saved = 0;
+
 locked:
-		if (IS_DAX(inode))
+		if (IS_DAX(inode)) {
 			ret = dax_do_io(iocb, inode, iter, offset,
 					ext4_dio_get_block, NULL, DIO_LOCKING);
-		else
-			ret = blockdev_direct_IO(iocb, inode, iter, offset,
-						 ext4_dio_get_block);
-
+			if (ret == -EIO && iov_iter_rw(iter) == WRITE)
+				ret_saved = ret;
+			else
+				goto skip_dio;
+		}
+		ret = blockdev_direct_IO(iocb, inode, iter, offset,
+					 ext4_get_block);
+		if (ret < 0 && ret_saved)
+			ret = ret_saved;
+skip_dio:
 		if (unlikely(iov_iter_rw(iter) == WRITE && ret < 0)) {
 			loff_t isize = i_size_read(inode);
 			loff_t end = offset + count;

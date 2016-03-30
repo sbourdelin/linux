@@ -166,13 +166,24 @@ blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter, loff_t offset)
 {
 	struct file *file = iocb->ki_filp;
 	struct inode *inode = bdev_file_inode(file);
+	ssize_t ret, ret_saved = 0;
 
-	if (IS_DAX(inode))
-		return dax_do_io(iocb, inode, iter, offset, blkdev_get_block,
+	if (IS_DAX(inode)) {
+		ret = dax_do_io(iocb, inode, iter, offset, blkdev_get_block,
 				NULL, DIO_SKIP_DIO_COUNT);
-	return __blockdev_direct_IO(iocb, inode, I_BDEV(inode), iter, offset,
+		if (ret == -EIO && (iov_iter_rw(iter) == WRITE))
+			ret_saved = ret;
+		else
+			return ret;
+	}
+
+	ret = __blockdev_direct_IO(iocb, inode, I_BDEV(inode), iter, offset,
 				    blkdev_get_block, NULL, NULL,
 				    DIO_SKIP_DIO_COUNT);
+	if (ret < 0 && ret_saved)
+		return ret_saved;
+
+	return ret;
 }
 
 int __sync_blockdev(struct block_device *bdev, int wait)

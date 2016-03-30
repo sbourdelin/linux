@@ -3341,7 +3341,7 @@ static ssize_t ext4_ext_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 {
 	struct file *file = iocb->ki_filp;
 	struct inode *inode = file->f_mapping->host;
-	ssize_t ret;
+	ssize_t ret, ret_saved = 0;
 	size_t count = iov_iter_count(iter);
 	int overwrite = 0;
 	get_block_t *get_block_func = NULL;
@@ -3401,15 +3401,22 @@ static ssize_t ext4_ext_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 #ifdef CONFIG_EXT4_FS_ENCRYPTION
 	BUG_ON(ext4_encrypted_inode(inode) && S_ISREG(inode->i_mode));
 #endif
-	if (IS_DAX(inode))
+	if (IS_DAX(inode)) {
 		ret = dax_do_io(iocb, inode, iter, offset, get_block_func,
 				ext4_end_io_dio, dio_flags);
-	else
-		ret = __blockdev_direct_IO(iocb, inode,
-					   inode->i_sb->s_bdev, iter, offset,
-					   get_block_func,
-					   ext4_end_io_dio, NULL, dio_flags);
+		if (ret == -EIO && iov_iter_rw(iter) == WRITE)
+			ret_saved = ret;
+		else
+			goto skip_dio;
+	}
 
+	ret = __blockdev_direct_IO(iocb, inode,
+				   inode->i_sb->s_bdev, iter, offset,
+				   get_block_func,
+				   ext4_end_io_dio, NULL, dio_flags);
+	if (ret < 0 && ret_saved)
+		ret = ret_saved;
+ skip_dio:
 	if (ret > 0 && !overwrite && ext4_test_inode_state(inode,
 						EXT4_STATE_DIO_UNWRITTEN)) {
 		int err;

@@ -859,14 +859,22 @@ ext2_direct_IO(struct kiocb *iocb, struct iov_iter *iter, loff_t offset)
 	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
 	size_t count = iov_iter_count(iter);
-	ssize_t ret;
+	ssize_t ret, ret_saved = 0;
 
-	if (IS_DAX(inode))
-		ret = dax_do_io(iocb, inode, iter, offset, ext2_get_block, NULL,
-				DIO_LOCKING);
-	else
-		ret = blockdev_direct_IO(iocb, inode, iter, offset,
-					 ext2_get_block);
+	if (IS_DAX(inode)) {
+		ret = dax_do_io(iocb, inode, iter, offset, ext2_get_block,
+				NULL, DIO_LOCKING | DIO_SKIP_HOLES);
+		if (ret == -EIO && iov_iter_rw(iter) == WRITE)
+			ret_saved = ret;
+		else
+			goto out;
+	}
+
+	ret = blockdev_direct_IO(iocb, inode, iter, offset, ext2_get_block);
+	if (ret < 0 && ret_saved)
+		ret = ret_saved;
+
+ out:
 	if (ret < 0 && iov_iter_rw(iter) == WRITE)
 		ext2_write_failed(mapping, offset + count);
 	return ret;

@@ -1413,6 +1413,7 @@ xfs_vm_direct_IO(
 	dio_iodone_t		*endio = NULL;
 	int			flags = 0;
 	struct block_device	*bdev;
+	ssize_t 		ret, ret_saved = 0;
 
 	if (iov_iter_rw(iter) == WRITE) {
 		endio = xfs_end_io_direct_write;
@@ -1420,13 +1421,22 @@ xfs_vm_direct_IO(
 	}
 
 	if (IS_DAX(inode)) {
-		return dax_do_io(iocb, inode, iter, offset,
+		ret = dax_do_io(iocb, inode, iter, offset,
 				 xfs_get_blocks_direct, endio, 0);
+		if (ret == -EIO && iov_iter_rw(iter) == WRITE)
+			ret_saved = ret;
+		else
+			return ret;
 	}
 
 	bdev = xfs_find_bdev_for_inode(inode);
-	return  __blockdev_direct_IO(iocb, inode, bdev, iter, offset,
+	ret = __blockdev_direct_IO(iocb, inode, bdev, iter, offset,
 			xfs_get_blocks_direct, endio, NULL, flags);
+
+	if (ret < 0 && ret_saved)
+		ret = ret_saved;
+
+	return ret;
 }
 
 /*
