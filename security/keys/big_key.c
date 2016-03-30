@@ -14,8 +14,10 @@
 #include <linux/file.h>
 #include <linux/shmem_fs.h>
 #include <linux/err.h>
+#include <linux/scatterlist.h>
 #include <keys/user-type.h>
 #include <keys/big_key-type.h>
+#include <crypto/rng.h>
 
 /*
  * Layout of key payload words.
@@ -28,11 +30,44 @@ enum {
 };
 
 /*
+ * Crypto operation with big_key data
+ */
+enum {
+	ENC,
+	DEC,
+};
+
+/*
  * If the data is under this limit, there's no point creating a shm file to
  * hold it as the permanently resident metadata for the shmem fs will be at
  * least as large as the data.
  */
 #define BIG_KEY_FILE_THRESHOLD (sizeof(struct inode) + sizeof(struct dentry))
+
+/*
+ * Key size for big_key data encryption
+ */
+#define ENC_KEY_SIZE	16
+
+/*
+ * Block size for big_key data encryption
+ */
+#define ENC_BLOCK_SIZE	16
+
+/*
+ * Aligned data length of big_key encryption
+ */
+#define ALIGNED_LEN(l)	(l + ENC_BLOCK_SIZE - l % ENC_BLOCK_SIZE)
+
+/*
+ * RNG name for generating big_key data encryption key
+ */
+static const char *rng_name = "stdrng";
+
+/*
+ * Algorithm name for big_key data encryption
+ */
+static const char *alg_name = "ecb(aes)";
 
 /*
  * big_key defined keys take an arbitrary string as the description and an
@@ -50,12 +85,71 @@ struct key_type key_type_big_key = {
 };
 
 /*
+ * Generate random key to encrypt big_key data
+ */
+static int gen_enckey(u8 *key)
+{
+	int ret = -EINVAL;
+	struct crypto_rng *rng = NULL;
+
+	rng = crypto_alloc_rng(rng_name, 0, 0);
+	if (IS_ERR(rng))
+		return -EFAULT;
+
+	ret = crypto_rng_reset(rng, NULL, crypto_rng_seedsize(rng));
+
+	if (!ret)
+		ret = crypto_rng_get_bytes(rng, key, ENC_KEY_SIZE);
+
+	if (rng)
+		crypto_free_rng(rng);
+	return ret;
+}
+
+/*
+ * Encrypt/decrypt big_key data
+ */
+static int big_crypt(u8 op, u8 *data, size_t datalen, u8 *key)
+{
+	int ret = -EINVAL;
+	struct crypto_blkcipher *blkcipher = NULL;
+	struct scatterlist sgio;
+	struct blkcipher_desc desc;
+
+	blkcipher = crypto_alloc_blkcipher(alg_name, 0, 0);
+	if (IS_ERR(blkcipher))
+		return -EFAULT;
+
+	if (crypto_blkcipher_setkey(blkcipher, key, ENC_KEY_SIZE)) {
+		ret = -EAGAIN;
+		goto error;
+	}
+
+	desc.flags = 0;
+	desc.tfm = blkcipher;
+
+	sg_init_one(&sgio, data, datalen);
+
+	if (op == ENC)
+		ret = crypto_blkcipher_encrypt(&desc, &sgio, &sgio, datalen);
+	else
+		ret = crypto_blkcipher_decrypt(&desc, &sgio, &sgio, datalen);
+
+error:
+	if (blkcipher)
+		crypto_free_blkcipher(blkcipher);
+	return ret;
+}
+
+/*
  * Preparse a big key
  */
 int big_key_preparse(struct key_preparsed_payload *prep)
 {
 	struct path *path = (struct path *)&prep->payload.data[big_key_path];
 	struct file *file;
+	u8 *enckey;
+	u8 *data = NULL;
 	ssize_t written;
 	size_t datalen = prep->datalen;
 	int ret;
@@ -73,16 +167,43 @@ int big_key_preparse(struct key_preparsed_payload *prep)
 		/* Create a shmem file to store the data in.  This will permit the data
 		 * to be swapped out if needed.
 		 *
-		 * TODO: Encrypt the stored data with a temporary key.
+		 * File content is stored encrypted with randomly generated key.
 		 */
-		file = shmem_kernel_file_setup("", datalen, 0);
-		if (IS_ERR(file)) {
-			ret = PTR_ERR(file);
+		size_t enclen = ALIGNED_LEN(datalen);
+
+		/* prepare aligned data to encrypt */
+		data = kmalloc(enclen, GFP_KERNEL);
+		if (!data)
+			return -ENOMEM;
+
+		memcpy(data, prep->data, datalen);
+		memset(data + datalen, 0x00, enclen - datalen);
+
+		/* generate random key */
+		enckey = kmalloc(ENC_KEY_SIZE, GFP_KERNEL);
+		if (!enckey) {
+			ret = -ENOMEM;
 			goto error;
 		}
 
-		written = kernel_write(file, prep->data, prep->datalen, 0);
-		if (written != datalen) {
+		ret = gen_enckey(enckey);
+		if (ret)
+			goto err_enckey;
+
+		/* encrypt aligned data */
+		ret = big_crypt(ENC, data, enclen, enckey);
+		if (ret)
+			goto err_enckey;
+
+		/* save aligned data to file */
+		file = shmem_kernel_file_setup("", enclen, 0);
+		if (IS_ERR(file)) {
+			ret = PTR_ERR(file);
+			goto err_enckey;
+		}
+
+		written = kernel_write(file, data, enclen, 0);
+		if (written != enclen) {
 			ret = written;
 			if (written >= 0)
 				ret = -ENOMEM;
@@ -92,12 +213,15 @@ int big_key_preparse(struct key_preparsed_payload *prep)
 		/* Pin the mount and dentry to the key so that we can open it again
 		 * later
 		 */
+		prep->payload.data[big_key_data] = enckey;
 		*path = file->f_path;
 		path_get(path);
 		fput(file);
+		kfree(data);
 	} else {
 		/* Just store the data in a buffer */
 		void *data = kmalloc(datalen, GFP_KERNEL);
+
 		if (!data)
 			return -ENOMEM;
 
@@ -108,7 +232,10 @@ int big_key_preparse(struct key_preparsed_payload *prep)
 
 err_fput:
 	fput(file);
+err_enckey:
+	kfree(enckey);
 error:
+	kfree(data);
 	return ret;
 }
 
@@ -119,10 +246,10 @@ void big_key_free_preparse(struct key_preparsed_payload *prep)
 {
 	if (prep->datalen > BIG_KEY_FILE_THRESHOLD) {
 		struct path *path = (struct path *)&prep->payload.data[big_key_path];
+
 		path_put(path);
-	} else {
-		kfree(prep->payload.data[big_key_data]);
 	}
+	kfree(prep->payload.data[big_key_data]);
 }
 
 /*
@@ -147,15 +274,15 @@ void big_key_destroy(struct key *key)
 {
 	size_t datalen = (size_t)key->payload.data[big_key_len];
 
-	if (datalen) {
+	if (datalen > BIG_KEY_FILE_THRESHOLD) {
 		struct path *path = (struct path *)&key->payload.data[big_key_path];
+
 		path_put(path);
 		path->mnt = NULL;
 		path->dentry = NULL;
-	} else {
-		kfree(key->payload.data[big_key_data]);
-		key->payload.data[big_key_data] = NULL;
 	}
+	kfree(key->payload.data[big_key_data]);
+	key->payload.data[big_key_data] = NULL;
 }
 
 /*
@@ -188,17 +315,41 @@ long big_key_read(const struct key *key, char __user *buffer, size_t buflen)
 	if (datalen > BIG_KEY_FILE_THRESHOLD) {
 		struct path *path = (struct path *)&key->payload.data[big_key_path];
 		struct file *file;
-		loff_t pos;
+		u8 *data;
+		u8 *enckey = (u8 *)key->payload.data[big_key_data];
+		size_t enclen = ALIGNED_LEN(datalen);
+
+		data = kmalloc(enclen, GFP_KERNEL);
+		if (!data)
+			return -ENOMEM;
 
 		file = dentry_open(path, O_RDONLY, current_cred());
-		if (IS_ERR(file))
-			return PTR_ERR(file);
+		if (IS_ERR(file)) {
+			ret = PTR_ERR(file);
+			goto error;
+		}
 
-		pos = 0;
-		ret = vfs_read(file, buffer, datalen, &pos);
-		fput(file);
-		if (ret >= 0 && ret != datalen)
+		/* read file to kernel and decrypt */
+		ret = kernel_read(file, 0, data, enclen);
+		if (ret >= 0 && ret != enclen) {
 			ret = -EIO;
+			goto err_fput;
+		}
+
+		ret = big_crypt(DEC, data, enclen, enckey);
+		if (ret)
+			goto err_fput;
+
+		ret = datalen;
+
+		/* copy decrypted data to user */
+		if (copy_to_user(buffer, data, datalen) != 0)
+			ret = -EFAULT;
+
+err_fput:
+		fput(file);
+error:
+		kfree(data);
 	} else {
 		ret = datalen;
 		if (copy_to_user(buffer, key->payload.data[big_key_data],
