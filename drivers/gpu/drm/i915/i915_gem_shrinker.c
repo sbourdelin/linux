@@ -313,7 +313,9 @@ i915_gem_shrinker_oom(struct notifier_block *nb, unsigned long event, void *ptr)
 	was_interruptible = dev_priv->mm.interruptible;
 	dev_priv->mm.interruptible = false;
 
+	intel_runtime_pm_get(dev_priv);
 	freed_pages = i915_gem_shrink_all(dev_priv);
+	intel_runtime_pm_put(dev_priv);
 
 	dev_priv->mm.interruptible = was_interruptible;
 
