@@ -387,6 +387,43 @@ static int of_thermal_get_crit_temp(struct thermal_zone_device *tz,
 	return -EINVAL;
 }
 
+static bool of_thermal_enb_temp_notify(struct thermal_zone_device *tz, int trip)
+{
+	bool ret = true;
+	struct __thermal_zone *data = tz->devdata;
+
+	if (trip >= data->ntrips || trip < 0)
+		ret = false;
+
+	return ret;
+}
+
+static int of_thermal_get_trip_state(struct thermal_zone_device *tz, int trip,
+				     enum thermal_trip_state *state)
+{
+	struct __thermal_zone *data = tz->devdata;
+
+	if (trip >= data->ntrips || trip < 0)
+		return -EDOM;
+
+	*state = data->trips[trip].state;
+
+	return 0;
+}
+
+static int of_thermal_set_trip_state(struct thermal_zone_device *tz, int trip,
+				     enum thermal_trip_state state)
+{
+	struct __thermal_zone *data = tz->devdata;
+
+	if (trip >= data->ntrips || trip < 0)
+		return -EDOM;
+
+	data->trips[trip].state = state;
+
+	return 0;
+}
+
 static struct thermal_zone_device_ops of_thermal_ops = {
 	.get_mode = of_thermal_get_mode,
 	.set_mode = of_thermal_set_mode,
@@ -400,6 +437,10 @@ static struct thermal_zone_device_ops of_thermal_ops = {
 
 	.bind = of_thermal_bind,
 	.unbind = of_thermal_unbind,
+
+	.get_trip_state = of_thermal_get_trip_state,
+	.set_trip_state = of_thermal_set_trip_state,
+	.enb_temp_notify = of_thermal_enb_temp_notify,
 };
 
 /***   sensor API   ***/
@@ -789,6 +830,8 @@ static int thermal_of_populate_trip(struct device_node *np,
 		pr_err("wrong trip type property\n");
 		return ret;
 	}
+
+	trip->state = THERMAL_TRIP_NOT_TRIPPED;
 
 	/* Required for cooling map matching */
 	trip->np = np;
