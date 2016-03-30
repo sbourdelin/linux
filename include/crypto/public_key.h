@@ -29,6 +29,26 @@ enum key_being_used_for {
 extern const char *const key_being_used_for[NR__KEY_BEING_USED_FOR];
 
 /*
+ * Info indicating where a key is stored.
+ * For instance if the key is stored in software, then it can be accessed
+ * by SW. If the key is stored in hardware e.g. (TPM) then it can not be
+ * directly accessed by SW.
+ */
+enum public_key_info_storage {
+	KEY_INFO_STOR_HW,
+	KEY_INFO_STOR_SW
+};
+
+/*
+ * Information describing public_key.
+ * Struct sotres information about the key i.e.
+ * where key is stored, what operation it supports, etc.
+ */
+struct public_key_info {
+	enum public_key_info_storage stored;
+};
+
+/*
  * Cryptographic data for the public-key subtype of the asymmetric key type.
  *
  * Note that this may include private part of the key as well as the public
@@ -39,6 +59,7 @@ struct public_key {
 	u32 keylen;
 	const char *id_type;
 	const char *pkey_algo;
+	struct public_key_info info;
 };
 
 extern void public_key_destroy(void *payload);
@@ -54,6 +75,16 @@ struct public_key_signature {
 	const char *pkey_algo;
 	const char *hash_algo;
 };
+
+static inline bool public_key_query_sw_key(struct public_key *pkey)
+{
+	return pkey->info.stored == KEY_INFO_STOR_SW;
+}
+
+static inline bool public_key_query_hw_key(struct public_key *pkey)
+{
+	return pkey->info.stored == KEY_INFO_STOR_HW;
+}
 
 extern struct asymmetric_key_subtype public_key_subtype;
 struct key;

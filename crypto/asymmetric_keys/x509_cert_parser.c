@@ -107,6 +107,7 @@ struct x509_certificate *x509_cert_parse(const void *data, size_t datalen)
 		goto error_decode;
 
 	cert->pub->keylen = ctx->key_size;
+	cert->pub->info.stored = KEY_INFO_STOR_SW;
 
 	/* Generate cert issuer + serial number key ID */
 	kid = asymmetric_key_generate_id(cert->raw_serial,
