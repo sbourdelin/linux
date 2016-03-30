@@ -59,6 +59,11 @@ temperature) and throttle appropriate devices.
 			will be fired.
 	.set_emul_temp: set the emulation temperature which helps in debugging
 			different threshold temperature points.
+	.get_trip_state: get the current state (TRIPPED or NOT_TRIPPED) of a
+		certain trip point.
+	.set_trip_state: set the state of a certain trip point.
+	.enb_temp_notify: check if temperature notifications are enabled for a
+		certain trip point.
     tzp: thermal zone platform parameters.
     passive_delay: number of milliseconds to wait between polls when
 	performing passive cooling.
