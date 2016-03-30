@@ -419,6 +419,32 @@ static void monitor_thermal_zone(struct thermal_zone_device *tz)
 	mutex_unlock(&tz->lock);
 }
 
+static void handle_temp_notify(struct thermal_zone_device *tz, int trip)
+{
+	int trip_temp, hyst = 0;
+	enum thermal_trip_state s, ns;
+
+	s = ns = THERMAL_TRIP_NOT_TRIPPED;
+	tz->ops->get_trip_temp(tz, trip, &trip_temp);
+	tz->ops->get_trip_hyst(tz, trip, &hyst);
+
+	if (tz->ops->get_trip_state)
+		tz->ops->get_trip_state(tz, trip, &s);
+
+	if (s == THERMAL_TRIP_TRIPPED && tz->temperature < trip_temp - hyst)
+		ns = THERMAL_TRIP_NOT_TRIPPED;
+	else if (s == THERMAL_TRIP_NOT_TRIPPED && tz->temperature >= trip_temp)
+		ns = THERMAL_TRIP_TRIPPED;
+
+	if (tz->ops->set_trip_state)
+		tz->ops->set_trip_state(tz, trip, ns);
+
+	/* send if notifications are enabled and state has changed */
+	if (s != ns && tz->ops->enb_temp_notify &&
+		tz->ops->enb_temp_notify(tz, trip))
+		sysfs_notify(&tz->device.kobj, NULL, "temp");
+}
+
 static void handle_non_critical_trips(struct thermal_zone_device *tz,
 			int trip, enum thermal_trip_type trip_type)
 {
@@ -464,6 +490,8 @@ static void handle_thermal_trip(struct thermal_zone_device *tz, int trip)
 		handle_critical_trips(tz, trip, type);
 	else
 		handle_non_critical_trips(tz, trip, type);
+
+	handle_temp_notify(tz, trip);
 	/*
 	 * Alright, we handled this trip successfully.
 	 * So, start monitoring again.

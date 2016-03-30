@@ -84,6 +84,11 @@ enum thermal_trip_type {
 	THERMAL_TRIP_CRITICAL,
 };
 
+enum thermal_trip_state {
+	THERMAL_TRIP_NOT_TRIPPED = 0,
+	THERMAL_TRIP_TRIPPED
+};
+
 enum thermal_trend {
 	THERMAL_TREND_STABLE, /* temperature is stable */
 	THERMAL_TREND_RAISING, /* temperature is raising */
@@ -114,6 +119,11 @@ struct thermal_zone_device_ops {
 			  enum thermal_trend *);
 	int (*notify) (struct thermal_zone_device *, int,
 		       enum thermal_trip_type);
+	int (*get_trip_state)(struct thermal_zone_device *, int,
+			enum thermal_trip_state *);
+	int (*set_trip_state)(struct thermal_zone_device *, int,
+			enum thermal_trip_state);
+	bool (*enb_temp_notify)(struct thermal_zone_device *, int);
 };
 
 struct thermal_cooling_device_ops {
@@ -349,6 +359,7 @@ struct thermal_zone_of_device_ops {
  * @temperature: temperature value in miliCelsius
  * @hysteresis: relative hysteresis in miliCelsius
  * @type: trip point type
+ * @state: trip point state
  */
 
 struct thermal_trip {
@@ -356,6 +367,7 @@ struct thermal_trip {
 	unsigned long int temperature;
 	unsigned long int hysteresis;
 	enum thermal_trip_type type;
+	enum thermal_trip_state state;
 };
 
 /* Function declarations */
