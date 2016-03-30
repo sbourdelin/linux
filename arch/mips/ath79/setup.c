@@ -214,6 +214,7 @@ void __init plat_mem_setup(void)
 						 AR71XX_PLL_SIZE);
 		ath79_detect_sys_type();
 		ath79_ddr_ctrl_init();
+	}
 
 	detect_memory_region(0, ATH79_MEM_SIZE_MIN, ATH79_MEM_SIZE_MAX);
 	/* OF machines should use the reset driver */
