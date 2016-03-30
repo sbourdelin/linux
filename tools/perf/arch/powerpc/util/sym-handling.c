@@ -19,12 +19,6 @@ bool elf__needs_adjust_symbols(GElf_Ehdr ehdr)
 	       ehdr.e_type == ET_DYN;
 }
 
-#if defined(_CALL_ELF) && _CALL_ELF == 2
-void arch__elf_sym_adjust(GElf_Sym *sym)
-{
-	sym->st_value += PPC64_LOCAL_ENTRY_OFFSET(sym->st_other);
-}
-#endif
 #endif
 
 #if !defined(_CALL_ELF) || _CALL_ELF != 2
@@ -68,7 +62,8 @@ bool arch__prefers_symtab(void)
 #define PPC64LE_LEP_OFFSET	8
 
 void arch__fix_tev_from_maps(struct perf_probe_event *pev,
-			     struct probe_trace_event *tev, struct map *map)
+			     struct probe_trace_event *tev, struct map *map,
+			     struct symbol *sym)
 {
 	/*
 	 * ppc64 ABIv2 local entry point is currently always 2 instructions
@@ -77,6 +72,9 @@ void arch__fix_tev_from_maps(struct perf_probe_event *pev,
 	if (!pev->uprobes && map->dso->symtab_type == DSO_BINARY_TYPE__KALLSYMS) {
 		tev->point.address += PPC64LE_LEP_OFFSET;
 		tev->point.offset += PPC64LE_LEP_OFFSET;
+	} else if (PPC64_LOCAL_ENTRY_OFFSET(sym->elf_st_other)) {
+		tev->point.address += PPC64_LOCAL_ENTRY_OFFSET(sym->elf_st_other);
+		tev->point.offset += PPC64_LOCAL_ENTRY_OFFSET(sym->elf_st_other);
 	}
 }
 #endif
