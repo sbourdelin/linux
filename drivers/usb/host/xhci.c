@@ -4171,6 +4171,12 @@ int xhci_set_usb2_hardware_lpm(struct usb_hcd *hcd,
 
 	port_array = xhci->usb2_ports;
 	port_num = udev->portnum - 1;
+	if (port_num >= xhci->num_usb2_ports) {
+		dev_warn(&udev->dev, "%s: udev portnum exceeds num_usb2_ports, pretending there is no power management.\n",
+				__func__);
+		spin_unlock_irqrestore(&xhci->lock, flags);
+		return 0;
+	}
 	pm_addr = port_array[port_num] + PORTPMSC;
 	pm_val = readl(pm_addr);
 	hlpm_addr = port_array[port_num] + PORTHLPMC;
