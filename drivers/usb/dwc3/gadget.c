@@ -1873,7 +1873,7 @@ static void dwc3_gadget_free_endpoints(struct dwc3 *dwc)
 
 /* -------------------------------------------------------------------------- */
 
-static int __dwc3_cleanup_done_trbs(struct dwc3 *dwc, struct dwc3_ep *dep,
+static int __dwc3_cleanup_one_trb(struct dwc3 *dwc, struct dwc3_ep *dep,
 		struct dwc3_request *req, struct dwc3_trb *trb,
 		const struct dwc3_event_depevt *event, int status)
 {
@@ -1975,7 +1975,7 @@ static int dwc3_cleanup_done_reqs(struct dwc3 *dwc, struct dwc3_ep *dep,
 			slot %= DWC3_TRB_NUM;
 			trb = &dep->trb_pool[slot];
 
-			ret = __dwc3_cleanup_done_trbs(dwc, dep, req, trb,
+			ret = __dwc3_cleanup_one_trb(dwc, dep, req, trb,
 					event, status);
 			if (ret)
 				break;
