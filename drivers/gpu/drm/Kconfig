@@ -83,6 +83,7 @@ config DRM_LOAD_EDID_FIRMWARE
 config DRM_TTM
 	tristate
 	depends on DRM
+	depends on (AGP || AGP=n)
 	help
 	  GPU memory management subsystem for devices with multiple
 	  GPU memory types. Will be enabled automatically if a device driver
