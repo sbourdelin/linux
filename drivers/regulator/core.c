@@ -3118,6 +3118,20 @@ EXPORT_SYMBOL_GPL(regulator_sync_voltage);
 static int _regulator_get_voltage(struct regulator_dev *rdev)
 {
 	int sel, ret;
+	bool bypassed;
+
+	if (rdev->desc->ops->get_bypass) {
+		ret = rdev->desc->ops->get_bypass(rdev, &bypassed);
+		if (ret < 0)
+			return ret;
+		if (bypassed) {
+			if (rdev->supply) {
+				ret = _regulator_get_voltage(rdev->supply->rdev);
+			} else {
+				return -EINVAL;
+			}
+		}
+	}
 
 	if (rdev->desc->ops->get_voltage_sel) {
 		sel = rdev->desc->ops->get_voltage_sel(rdev);
