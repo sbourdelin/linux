@@ -146,7 +146,7 @@ i915_gem_get_aperture_ioctl(struct drm_device *dev, void *data,
 			pinned += vma->node.size;
 	mutex_unlock(&dev->struct_mutex);
 
-	args->aper_size = dev_priv->ggtt.base.total;
+	args->aper_size = ggtt->base.total;
 	args->aper_available_size = args->aper_size - pinned;
 
 	return 0;
@@ -3712,6 +3712,9 @@ i915_gem_object_flush_cpu_write_domain(struct drm_i915_gem_object *obj)
 int
 i915_gem_object_set_to_gtt_domain(struct drm_i915_gem_object *obj, bool write)
 {
+	struct drm_device *dev = obj->base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct i915_ggtt *ggtt = &dev_priv->ggtt;
 	uint32_t old_write_domain, old_read_domains;
 	struct i915_vma *vma;
 	int ret;
@@ -3766,7 +3769,7 @@ i915_gem_object_set_to_gtt_domain(struct drm_i915_gem_object *obj, bool write)
 	vma = i915_gem_obj_to_ggtt(obj);
 	if (vma && drm_mm_node_allocated(&vma->node) && !obj->active)
 		list_move_tail(&vma->vm_link,
-			       &to_i915(obj->base.dev)->ggtt.base.inactive_list);
+			       &ggtt->base.inactive_list);
 
 	return 0;
 }
@@ -4297,9 +4300,13 @@ i915_gem_object_ggtt_pin(struct drm_i915_gem_object *obj,
 			 uint32_t alignment,
 			 uint64_t flags)
 {
+	struct drm_device *dev = obj->base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct i915_ggtt *ggtt = &dev_priv->ggtt;
+
 	BUG_ON(!view);
 
-	return i915_gem_object_do_pin(obj, i915_obj_to_ggtt(obj), view,
+	return i915_gem_object_do_pin(obj, &ggtt->base, view,
 				      alignment, flags | PIN_GLOBAL);
 }
 
@@ -4611,13 +4618,15 @@ struct i915_vma *i915_gem_obj_to_vma(struct drm_i915_gem_object *obj,
 struct i915_vma *i915_gem_obj_to_ggtt_view(struct drm_i915_gem_object *obj,
 					   const struct i915_ggtt_view *view)
 {
-	struct i915_address_space *ggtt = i915_obj_to_ggtt(obj);
+	struct drm_device *dev = obj->base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct i915_ggtt *ggtt = &dev_priv->ggtt;
 	struct i915_vma *vma;
 
 	BUG_ON(!view);
 
 	list_for_each_entry(vma, &obj->vma_list, obj_link)
-		if (vma->vm == ggtt &&
+		if (vma->vm == &ggtt->base &&
 		    i915_ggtt_view_equal(&vma->ggtt_view, view))
 			return vma;
 	return NULL;
@@ -5210,11 +5219,13 @@ u64 i915_gem_obj_offset(struct drm_i915_gem_object *o,
 u64 i915_gem_obj_ggtt_offset_view(struct drm_i915_gem_object *o,
 				  const struct i915_ggtt_view *view)
 {
-	struct i915_address_space *ggtt = i915_obj_to_ggtt(o);
+	struct drm_device *dev = o->base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct i915_ggtt *ggtt = &dev_priv->ggtt;
 	struct i915_vma *vma;
 
 	list_for_each_entry(vma, &o->vma_list, obj_link)
-		if (vma->vm == ggtt &&
+		if (vma->vm == &ggtt->base &&
 		    i915_ggtt_view_equal(&vma->ggtt_view, view))
 			return vma->node.start;
 
@@ -5241,11 +5252,13 @@ bool i915_gem_obj_bound(struct drm_i915_gem_object *o,
 bool i915_gem_obj_ggtt_bound_view(struct drm_i915_gem_object *o,
 				  const struct i915_ggtt_view *view)
 {
-	struct i915_address_space *ggtt = i915_obj_to_ggtt(o);
+	struct drm_device *dev = o->base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct i915_ggtt *ggtt = &dev_priv->ggtt;
 	struct i915_vma *vma;
 
 	list_for_each_entry(vma, &o->vma_list, obj_link)
-		if (vma->vm == ggtt &&
+		if (vma->vm == &ggtt->base &&
 		    i915_ggtt_view_equal(&vma->ggtt_view, view) &&
 		    drm_mm_node_allocated(&vma->node))
 			return true;

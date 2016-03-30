@@ -629,7 +629,7 @@ i915_gem_object_create_stolen_for_preallocated(struct drm_device *dev,
 					       u32 size)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	struct i915_address_space *ggtt = &dev_priv->ggtt.base;
+	struct i915_ggtt *ggtt = &dev_priv->ggtt;
 	struct drm_i915_gem_object *obj;
 	struct drm_mm_node *stolen;
 	struct i915_vma *vma;
@@ -675,7 +675,7 @@ i915_gem_object_create_stolen_for_preallocated(struct drm_device *dev,
 	if (gtt_offset == I915_GTT_OFFSET_NONE)
 		return obj;
 
-	vma = i915_gem_obj_lookup_or_create_vma(obj, ggtt);
+	vma = i915_gem_obj_lookup_or_create_vma(obj, &ggtt->base);
 	if (IS_ERR(vma)) {
 		ret = PTR_ERR(vma);
 		goto err;
@@ -688,8 +688,8 @@ i915_gem_object_create_stolen_for_preallocated(struct drm_device *dev,
 	 */
 	vma->node.start = gtt_offset;
 	vma->node.size = size;
-	if (drm_mm_initialized(&ggtt->mm)) {
-		ret = drm_mm_reserve_node(&ggtt->mm, &vma->node);
+	if (drm_mm_initialized(&ggtt->base.mm)) {
+		ret = drm_mm_reserve_node(&ggtt->base.mm, &vma->node);
 		if (ret) {
 			DRM_DEBUG_KMS("failed to allocate stolen GTT space\n");
 			goto err;
@@ -697,7 +697,7 @@ i915_gem_object_create_stolen_for_preallocated(struct drm_device *dev,
 
 		vma->bound |= GLOBAL_BIND;
 		__i915_vma_set_map_and_fenceable(vma);
-		list_add_tail(&vma->vm_link, &ggtt->inactive_list);
+		list_add_tail(&vma->vm_link, &ggtt->base.inactive_list);
 	}
 
 	list_add_tail(&obj->global_list, &dev_priv->mm.bound_list);
