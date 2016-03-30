@@ -164,11 +164,6 @@ static int create_fixed_stream_quirk(struct snd_usb_audio *chip,
 		fp->rate_table = rate_table;
 	}
 
-	stream = (fp->endpoint & USB_DIR_IN)
-		? SNDRV_PCM_STREAM_CAPTURE : SNDRV_PCM_STREAM_PLAYBACK;
-	err = snd_usb_add_audio_stream(chip, stream, fp);
-	if (err < 0)
-		goto error;
 	if (fp->iface != get_iface_desc(&iface->altsetting[0])->bInterfaceNumber ||
 	    fp->altset_idx >= iface->num_altsetting) {
 		err = -EINVAL;
@@ -180,6 +175,17 @@ static int create_fixed_stream_quirk(struct snd_usb_audio *chip,
 		err = -EINVAL;
 		goto error;
 	}
+
+	stream = (fp->endpoint & USB_DIR_IN)
+		? SNDRV_PCM_STREAM_CAPTURE : SNDRV_PCM_STREAM_PLAYBACK;
+	err = snd_usb_add_audio_stream(chip, stream, fp);
+	if (err < 0)
+		goto error;
+
+	/* From this point error paths should jump to
+	 * error_after_add_audio_stream: not to error: as fp
+	 * and rate_table will be freed on stream removal
+	 */
 
 	fp->protocol = altsd->bInterfaceProtocol;
 
@@ -195,6 +201,7 @@ static int create_fixed_stream_quirk(struct snd_usb_audio *chip,
  error:
 	kfree(fp);
 	kfree(rate_table);
+ error_after_add_audio_stream:
 	return err;
 }
 

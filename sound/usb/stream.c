@@ -349,7 +349,10 @@ int snd_usb_add_audio_stream(struct snd_usb_audio *chip,
 		if (err < 0)
 			return err;
 		snd_usb_init_substream(as, stream, fp);
-		return add_chmap(as->pcm, stream, subs);
+		err = add_chmap(as->pcm, stream, subs);
+		if (err < 0)
+			list_del_init(&fp->list);
+		return err;
 	}
 
 	/* create a new pcm */
@@ -391,7 +394,10 @@ int snd_usb_add_audio_stream(struct snd_usb_audio *chip,
 
 	snd_usb_proc_pcm_format_add(as);
 
-	return add_chmap(pcm, stream, &as->substream[stream]);
+	err = add_chmap(pcm, stream, &as->substream[stream]);
+	if (err < 0)
+		list_del_init(&fp->list);
+	return err;
 }
 
 static int parse_uac_endpoint_attributes(struct snd_usb_audio *chip,
