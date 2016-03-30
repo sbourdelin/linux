@@ -708,6 +708,18 @@ static void end_dedupe_extent(struct inode *inode, u64 start,
 	}
 }
 
+static inline int inode_need_dedupe(struct btrfs_fs_info *fs_info,
+				    struct inode *inode)
+{
+	if (!fs_info->dedupe_enabled)
+		return 0;
+
+	if (BTRFS_I(inode)->flags & BTRFS_INODE_NODEDUPE)
+		return 0;
+
+	return 1;
+}
+
 /*
  * phase two of compressed writeback.  This is the ordered portion
  * of the code, which only gets called in the order the work was
@@ -1680,7 +1692,8 @@ static int run_delalloc_range(struct inode *inode, struct page *locked_page,
 	} else if (BTRFS_I(inode)->flags & BTRFS_INODE_PREALLOC && !force_cow) {
 		ret = run_delalloc_nocow(inode, locked_page, start, end,
 					 page_started, 0, nr_written);
-	} else if (!inode_need_compress(inode) && !fs_info->dedupe_enabled) {
+	} else if (!inode_need_compress(inode) &&
+		   !inode_need_dedupe(fs_info, inode)) {
 		ret = cow_file_range(inode, locked_page, start, end,
 				      page_started, nr_written, 1, NULL);
 	} else {
