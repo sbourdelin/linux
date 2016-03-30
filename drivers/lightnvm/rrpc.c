@@ -998,10 +998,14 @@ static int rrpc_l2p_update(u64 slba, u32 nlb, __le64 *entries, void *private)
 {
 	struct rrpc *rrpc = (struct rrpc *)private;
 	struct nvm_dev *dev = rrpc->dev;
-	struct rrpc_addr *addr = rrpc->trans_map + slba;
-	struct rrpc_rev_addr *raddr = rrpc->rev_trans_map;
-	u64 elba = slba + nlb;
-	u64 i;
+	struct rrpc_addr *addr;
+	struct rrpc_rev_addr *raddr;
+	u64 elba, i;
+
+	slba -= rrpc->soffset >> (ilog2(dev->sec_size) - 9);
+	addr = rrpc->trans_map + slba;
+	raddr = rrpc->rev_trans_map;
+	elba = slba + nlb;
 
 	if (unlikely(elba > dev->total_secs)) {
 		pr_err("nvm: L2P data from device is out of bounds!\n");
