@@ -1223,7 +1223,7 @@ static int rrpc_area_init(struct rrpc *rrpc, sector_t *begin)
 {
 	struct nvm_dev *dev = rrpc->dev;
 	struct nvmm_type *mt = dev->mt;
-	sector_t size = rrpc->nr_sects * dev->sec_size;
+	sector_t size = dev->sec_size * dev->sec_per_lun * rrpc->nr_luns;
 
 	size >>= 9;
 
