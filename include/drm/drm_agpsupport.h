@@ -93,7 +93,7 @@ static inline struct drm_agp_head *drm_agp_init(struct drm_device *dev)
 	return NULL;
 }
 
-static inline void drm_agp_clear(struct drm_device *dev)
+static inline void drm_legacy_agp_clear(struct drm_device *dev)
 {
 }
 
