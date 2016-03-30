@@ -603,7 +603,7 @@ static void __init reserve_crashkernel(void)
 	crashk_res.start = crash_base;
 	crashk_res.end = crash_base + crash_size - 1;
 	insert_resource(&iomem_resource, &crashk_res);
-	memblock_remove(crash_base, crash_size);
+	memblock_reserve(crash_base, crash_size);
 	pr_info("Reserving %lluMB of memory at %lluMB "
 		"for crashkernel (System RAM: %luMB)\n",
 		crash_size >> 20, crash_base >> 20,
@@ -871,7 +871,6 @@ void __init setup_arch(char **cmdline_p)
 	setup_memory();
 
 	check_initrd();
-	reserve_crashkernel();
 #ifdef CONFIG_CRASH_DUMP
 	/*
 	 * Be aware that smp_save_dump_cpus() triggers a system reset.
@@ -890,7 +889,9 @@ void __init setup_arch(char **cmdline_p)
 	/*
 	 * Create kernel page tables and switch to virtual addressing.
 	 */
-        paging_init();
+	paging_init();
+
+	reserve_crashkernel();
 
         /* Setup default console */
 	conmode_default();

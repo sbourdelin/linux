@@ -35,6 +35,52 @@ extern const unsigned long long relocate_kernel_len;
 #ifdef CONFIG_CRASH_DUMP
 
 /*
+ * Map or unmap crashkernel memory
+ */
+static void crash_map_pages(int enable)
+{
+	unsigned long size = resource_size(&crashk_res);
+
+	BUG_ON(crashk_res.start % KEXEC_CRASH_MEM_ALIGN ||
+	       size % KEXEC_CRASH_MEM_ALIGN);
+	if (enable)
+		vmem_add_mapping(crashk_res.start, size);
+	else {
+		vmem_remove_mapping(crashk_res.start, size);
+		if (size)
+			os_info_crashkernel_add(crashk_res.start, size);
+		else
+			os_info_crashkernel_add(0, 0);
+	}
+}
+
+/*
+ * Map crashkernel memory
+ */
+static void crash_map_reserved_pages(void)
+{
+	crash_map_pages(1);
+}
+
+/*
+ * Unmap crashkernel memory
+ */
+static void crash_unmap_reserved_pages(void)
+{
+	crash_map_pages(0);
+}
+
+void arch_kexec_protect_crashkres(void)
+{
+	crash_unmap_reserved_pages();
+}
+
+void arch_kexec_unprotect_crashkres(void)
+{
+	crash_map_reserved_pages();
+}
+
+/*
  * PM notifier callback for kdump
  */
 static int machine_kdump_pm_cb(struct notifier_block *nb, unsigned long action,
@@ -43,12 +89,12 @@ static int machine_kdump_pm_cb(struct notifier_block *nb, unsigned long action,
 	switch (action) {
 	case PM_SUSPEND_PREPARE:
 	case PM_HIBERNATION_PREPARE:
-		if (crashk_res.start)
+		if (kexec_crash_image)
 			crash_map_reserved_pages();
 		break;
 	case PM_POST_SUSPEND:
 	case PM_POST_HIBERNATION:
-		if (crashk_res.start)
+		if (kexec_crash_image)
 			crash_unmap_reserved_pages();
 		break;
 	default:
@@ -144,42 +190,6 @@ static int kdump_csum_valid(struct kimage *image)
 #else
 	return -EINVAL;
 #endif
-}
-
-/*
- * Map or unmap crashkernel memory
- */
-static void crash_map_pages(int enable)
-{
-	unsigned long size = resource_size(&crashk_res);
-
-	BUG_ON(crashk_res.start % KEXEC_CRASH_MEM_ALIGN ||
-	       size % KEXEC_CRASH_MEM_ALIGN);
-	if (enable)
-		vmem_add_mapping(crashk_res.start, size);
-	else {
-		vmem_remove_mapping(crashk_res.start, size);
-		if (size)
-			os_info_crashkernel_add(crashk_res.start, size);
-		else
-			os_info_crashkernel_add(0, 0);
-	}
-}
-
-/*
- * Map crashkernel memory
- */
-void crash_map_reserved_pages(void)
-{
-	crash_map_pages(1);
-}
-
-/*
- * Unmap crashkernel memory
- */
-void crash_unmap_reserved_pages(void)
-{
-	crash_map_pages(0);
 }
 
 /*
