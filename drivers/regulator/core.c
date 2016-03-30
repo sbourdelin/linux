@@ -2772,6 +2772,17 @@ static int _regulator_do_set_voltage(struct regulator_dev *rdev,
 		old_selector = rdev->desc->ops->get_voltage_sel(rdev);
 		if (old_selector < 0)
 			return old_selector;
+
+	} else if (_regulator_is_enabled(rdev) &&
+		   rdev->desc->ops->set_voltage_time_sel &&
+		   rdev->desc->ops->get_voltage) {
+		int uV = rdev->desc->ops->get_voltage(rdev);
+
+		if (uV > 0) {
+			old_selector = regulator_map_voltage(rdev, uV, uV);
+			if (old_selector < 0)
+				return old_selector;
+		}
 	}
 
 	if (rdev->desc->ops->set_voltage) {
