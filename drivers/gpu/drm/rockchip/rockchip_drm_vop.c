@@ -833,6 +833,12 @@ int rockchip_drm_crtc_mode_config(struct drm_crtc *crtc,
 }
 EXPORT_SYMBOL_GPL(rockchip_drm_crtc_mode_config);
 
+bool rockchip_drm_crtc_has_pending_event(struct drm_crtc *crtc)
+{
+	return to_vop(crtc)->event;
+}
+EXPORT_SYMBOL_GPL(rockchip_drm_crtc_has_pending_event);
+
 static int vop_crtc_enable_vblank(struct drm_crtc *crtc)
 {
 	struct vop *vop = to_vop(crtc);

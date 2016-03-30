@@ -280,7 +280,19 @@ int rockchip_drm_atomic_commit(struct drm_device *dev,
 {
 	struct rockchip_drm_private *private = dev->dev_private;
 	struct rockchip_atomic_commit *commit = &private->commit;
-	int ret;
+	struct drm_crtc_state *crtc_state;
+	struct drm_crtc *crtc;
+	int i, ret;
+
+	for_each_crtc_in_state(state, crtc, crtc_state, i) {
+		if (crtc->state->event ||
+		    rockchip_drm_crtc_has_pending_event(crtc)) {
+			if (async)
+				return -EBUSY;
+			else
+				rockchip_crtc_wait_for_update(crtc);
+		}
+	}
 
 	ret = drm_atomic_helper_prepare_planes(dev, state);
 	if (ret)
