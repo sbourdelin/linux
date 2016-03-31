@@ -11752,6 +11752,15 @@ W:	http://en.wikipedia.org/wiki/Util-linux
 T:	git git://git.kernel.org/pub/scm/utils/util-linux/util-linux.git
 S:	Maintained
 
+UV PLATFORM
+M:     Nathan Zimmer <nzimmmer@sgi.com>
+L:     uv_kernel@sgi.com
+S:     Supported
+F:     arch/x86/kernel/apic/x2apic_uv_x.c
+F:     arch/x86/platform/uv/*
+F:     arch/x86/include/asm/uv/*
+F:     drivers/char/uv_mmtimer.c
+
 UVESAFB DRIVER
 M:	Michal Januszewski <spock@gentoo.org>
 L:	linux-fbdev@vger.kernel.org
