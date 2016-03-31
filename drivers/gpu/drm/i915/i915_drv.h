@@ -3136,8 +3136,8 @@ struct i915_vma *
 i915_gem_obj_to_vma(struct drm_i915_gem_object *obj,
 		    struct i915_address_space *vm);
 struct i915_vma *
-i915_gem_obj_to_ggtt_view(struct drm_i915_gem_object *obj,
-			  const struct i915_ggtt_view *view);
+i915_ggtt_view_to_vma(struct drm_i915_gem_object *obj,
+		      const struct i915_ggtt_view *view);
 
 struct i915_vma *
 i915_gem_obj_lookup_or_create_vma(struct drm_i915_gem_object *obj,
@@ -3149,7 +3149,7 @@ i915_gem_obj_lookup_or_create_ggtt_vma(struct drm_i915_gem_object *obj,
 static inline struct i915_vma *
 i915_gem_obj_to_ggtt(struct drm_i915_gem_object *obj)
 {
-	return i915_gem_obj_to_ggtt_view(obj, &i915_ggtt_view_normal);
+	return i915_ggtt_view_to_vma(obj, &i915_ggtt_view_normal);
 }
 bool i915_gem_obj_is_pinned(struct drm_i915_gem_object *obj);
 

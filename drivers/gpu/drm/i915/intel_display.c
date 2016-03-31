@@ -2854,7 +2854,7 @@ u32 intel_plane_obj_offset(struct intel_plane *intel_plane,
 	intel_fill_fb_ggtt_view(&view, intel_plane->base.state->fb,
 				intel_plane->base.state->rotation);
 
-	vma = i915_gem_obj_to_ggtt_view(obj, &view);
+	vma = i915_ggtt_view_to_vma(obj, &view);
 	if (WARN(!vma, "ggtt vma for display object not found! (view=%u)\n",
 		view.type))
 		return -1;

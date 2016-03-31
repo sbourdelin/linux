@@ -4232,7 +4232,7 @@ i915_gem_object_do_pin(struct drm_i915_gem_object *obj,
 	if (WARN_ON(i915_is_ggtt(vm) != !!ggtt_view))
 		return -EINVAL;
 
-	vma = ggtt_view ? i915_gem_obj_to_ggtt_view(obj, ggtt_view) :
+	vma = ggtt_view ? i915_ggtt_view_to_vma(obj, ggtt_view) :
 			  i915_gem_obj_to_vma(obj, vm);
 
 	if (vma) {
@@ -4307,7 +4307,7 @@ void
 i915_gem_object_ggtt_unpin_view(struct drm_i915_gem_object *obj,
 				const struct i915_ggtt_view *view)
 {
-	struct i915_vma *vma = i915_gem_obj_to_ggtt_view(obj, view);
+	struct i915_vma *vma = i915_ggtt_view_to_vma(obj, view);
 
 	BUG_ON(!vma);
 	WARN_ON(vma->pin_count == 0);
@@ -4608,8 +4608,8 @@ struct i915_vma *i915_gem_obj_to_vma(struct drm_i915_gem_object *obj,
 	return NULL;
 }
 
-struct i915_vma *i915_gem_obj_to_ggtt_view(struct drm_i915_gem_object *obj,
-					   const struct i915_ggtt_view *view)
+struct i915_vma *i915_ggtt_view_to_vma(struct drm_i915_gem_object *obj,
+				       const struct i915_ggtt_view *view)
 {
 	struct i915_address_space *ggtt = i915_obj_to_ggtt(obj);
 	struct i915_vma *vma;
