@@ -508,6 +508,10 @@ EXPORT_SYMBOL(iov_iter_copy_from_user_atomic);
 
 void iov_iter_advance(struct iov_iter *i, size_t size)
 {
+	if (unlikely(size > i->count))
+		size = i->count;
+	if (unlikely(!size))
+		return 0;
 	iterate_and_advance(i, size, v, 0, 0, 0)
 }
 EXPORT_SYMBOL(iov_iter_advance);
