@@ -1838,6 +1838,7 @@ int sta_info_move_state(struct sta_info *sta,
 				atomic_dec(&sta->sdata->bss->num_mcast_sta);
 			clear_bit(WLAN_STA_AUTHORIZED, &sta->_flags);
 			ieee80211_clear_fast_xmit(sta);
+			ieee80211_clear_fast_rx(sta);
 		}
 		break;
 	case IEEE80211_STA_AUTHORIZED:
@@ -1848,6 +1849,7 @@ int sta_info_move_state(struct sta_info *sta,
 				atomic_inc(&sta->sdata->bss->num_mcast_sta);
 			set_bit(WLAN_STA_AUTHORIZED, &sta->_flags);
 			ieee80211_check_fast_xmit(sta);
+			ieee80211_check_fast_rx(sta);
 		}
 		break;
 	default:
