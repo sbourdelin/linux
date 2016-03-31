@@ -1253,6 +1253,72 @@ void *mtd_kmalloc_up_to(const struct mtd_info *mtd, size_t *size)
 }
 EXPORT_SYMBOL_GPL(mtd_kmalloc_up_to);
 
+#ifdef CONFIG_HAS_DMA
+/**
+ * mtd_map_buf - create an SG table and prepare it for DMA operations
+ *
+ * @mtd: mtd device description object pointer
+ * @dev: device handling the DMA operation
+ * @buf: buf used to create the SG table
+ * @len: length of buf
+ * @constraints: optional constraints to take into account when creating
+ *		 the SG table. Can be NULL if no specific constraints
+ *		 are required.
+ * @dir: direction of the DMA operation
+ *
+ * This function should be used when an MTD driver wants to do DMA operations
+ * on a buffer passed by the MTD layer. This functions takes care of
+ * vmallocated buffer constraints, and return and sg_table that you can safely
+ * use.
+ */
+int mtd_map_buf(struct mtd_info *mtd, struct device *dev,
+		struct sg_table *sgt, const void *buf, size_t len,
+		const struct sg_constraints *constraints,
+		enum dma_data_direction dir)
+{
+	int ret;
+
+	ret = sg_alloc_table_from_buf(sgt, buf, len, constraints, GFP_KERNEL);
+	if (ret)
+		return ret;
+
+	ret = dma_map_sg(dev, sgt->sgl, sgt->nents, dir);
+	if (!ret)
+		ret = -ENOMEM;
+
+	if (ret < 0) {
+		sg_free_table(sgt);
+		return ret;
+	}
+
+	sgt->nents = ret;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(mtd_map_buf);
+
+/**
+ * mtd_unmap_buf - unmap an SG table and release its resources
+ *
+ * @mtd: mtd device description object pointer
+ * @dev: device handling the DMA operation
+ * @sgt: SG table
+ * @dir: direction of the DMA operation
+ *
+ * This function unmaps a previously mapped SG table and release SG table
+ * resources. Should be called when your DMA operation is done.
+ */
+void mtd_unmap_buf(struct mtd_info *mtd, struct device *dev,
+		   struct sg_table *sgt, enum dma_data_direction dir)
+{
+	if (sgt->orig_nents) {
+		dma_unmap_sg(dev, sgt->sgl, sgt->orig_nents, dir);
+		sg_free_table(sgt);
+	}
+}
+EXPORT_SYMBOL_GPL(mtd_unmap_buf);
+#endif /* !CONFIG_HAS_DMA */
+
 #ifdef CONFIG_PROC_FS
 
 /*====================================================================*/
