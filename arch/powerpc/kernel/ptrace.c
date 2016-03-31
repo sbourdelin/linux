@@ -1755,6 +1755,45 @@ long arch_ptrace(struct task_struct *child, long request,
 					     REGSET_SPE, 0, 35 * sizeof(u32),
 					     datavp);
 #endif
+	case PTRACE_GET_REGS_USAGE:
+		{
+			u32 *u32_datap = (u32 *)datavp;
+			u32 reg_usage = 0;
+
+			if (addr != sizeof(u32))
+				return -EINVAL;
+
+#ifdef CONFIG_ALTIVEC
+			if (child->thread.used_vr)
+				reg_usage |= (1 << PTRACE_REGS_USAGE_BIT_VR);
+#endif
+#ifdef CONFIG_VSX
+			if (child->thread.used_vsr)
+				reg_usage |= (1 << PTRACE_REGS_USAGE_BIT_VSR);
+#endif
+			return put_user(reg_usage, u32_datap);
+		}
+	case PTRACE_SET_REGS_USAGE:
+		{
+			u32 *u32_datap = (u32 *)datavp;
+			u32 reg_usage = 0;
+
+			if (addr != sizeof(u32))
+				return -EINVAL;
+
+			ret = get_user(reg_usage, u32_datap);
+			if (ret)
+				return ret;
+#ifdef CONFIG_ALTIVEC
+			child->thread.used_vr =
+				((reg_usage >> PTRACE_REGS_USAGE_BIT_VR) & 1);
+#endif
+#ifdef CONFIG_VSX
+			child->thread.used_vsr =
+				((reg_usage >> PTRACE_REGS_USAGE_BIT_VSR) & 1);
+#endif
+			break;
+		}
 
 	default:
 		ret = ptrace_request(child, request, addr, data);
