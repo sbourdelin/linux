@@ -25,6 +25,7 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/syscalls.h>
+#include <asm/cpufeature.h>
 
 asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
 			 unsigned long prot, unsigned long flags,
@@ -38,6 +39,9 @@ asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
 
 SYSCALL_DEFINE1(arm64_personality, unsigned int, personality)
 {
+	if (personality(personality) == PER_LINUX32 &&
+		!system_supports_32bit_el0())
+		return -EINVAL;
 	return sys_personality(personality);
 }
 
