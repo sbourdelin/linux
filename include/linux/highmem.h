@@ -41,6 +41,14 @@ void kmap_flush_unused(void);
 
 struct page *kmap_to_page(void *addr);
 
+static inline bool is_highmem_addr(const void *x)
+{
+	unsigned long vaddr = (unsigned long)x;
+
+	return vaddr >=  PKMAP_BASE &&
+	       vaddr < ((PKMAP_BASE + LAST_PKMAP) * PAGE_SIZE);
+}
+
 #else /* CONFIG_HIGHMEM */
 
 static inline unsigned int nr_free_highpages(void) { return 0; }
@@ -48,6 +56,11 @@ static inline unsigned int nr_free_highpages(void) { return 0; }
 static inline struct page *kmap_to_page(void *addr)
 {
 	return virt_to_page(addr);
+}
+
+static inline bool is_highmem_addr(const void *x)
+{
+	return false;
 }
 
 #define totalhigh_pages 0UL
