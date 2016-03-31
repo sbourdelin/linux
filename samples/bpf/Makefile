@@ -2,23 +2,23 @@
 obj- := dummy.o
 
 # List of programs to build
-hostprogs-y := test_verifier test_maps
-hostprogs-y += sock_example
-hostprogs-y += fds_example
-hostprogs-y += sockex1
-hostprogs-y += sockex2
-hostprogs-y += sockex3
-hostprogs-y += tracex1
-hostprogs-y += tracex2
-hostprogs-y += tracex3
-hostprogs-y += tracex4
-hostprogs-y += tracex5
-hostprogs-y += tracex6
-hostprogs-y += trace_output
-hostprogs-y += lathist
-hostprogs-y += offwaketime
-hostprogs-y += spintest
-hostprogs-y += map_perf_test
+hostprogs-$(CONFIG_SAMPLE_BPF) := test_verifier test_maps
+hostprogs-$(CONFIG_SAMPLE_BPF) += sock_example
+hostprogs-$(CONFIG_SAMPLE_BPF) += fds_example
+hostprogs-$(CONFIG_SAMPLE_BPF) += sockex1
+hostprogs-$(CONFIG_SAMPLE_BPF) += sockex2
+hostprogs-$(CONFIG_SAMPLE_BPF) += sockex3
+hostprogs-$(CONFIG_SAMPLE_BPF) += tracex1
+hostprogs-$(CONFIG_SAMPLE_BPF) += tracex2
+hostprogs-$(CONFIG_SAMPLE_BPF) += tracex3
+hostprogs-$(CONFIG_SAMPLE_BPF) += tracex4
+hostprogs-$(CONFIG_SAMPLE_BPF) += tracex5
+hostprogs-$(CONFIG_SAMPLE_BPF) += tracex6
+hostprogs-$(CONFIG_SAMPLE_BPF) += trace_output
+hostprogs-$(CONFIG_SAMPLE_BPF) += lathist
+hostprogs-$(CONFIG_SAMPLE_BPF) += offwaketime
+hostprogs-$(CONFIG_SAMPLE_BPF) += spintest
+hostprogs-$(CONFIG_SAMPLE_BPF) += map_perf_test
 
 test_verifier-objs := test_verifier.o libbpf.o
 test_maps-objs := test_maps.o libbpf.o
@@ -39,8 +39,8 @@ offwaketime-objs := bpf_load.o libbpf.o offwaketime_user.o
 spintest-objs := bpf_load.o libbpf.o spintest_user.o
 map_perf_test-objs := bpf_load.o libbpf.o map_perf_test_user.o
 
-# Tell kbuild to always build the programs
-always := $(hostprogs-y)
+ifdef CONFIG_SAMPLE_BPF
+always := $(hostprogs-$(CONFIG_SAMPLE_BPF))
 always += sockex1_kern.o
 always += sockex2_kern.o
 always += sockex3_kern.o
@@ -56,6 +56,7 @@ always += lathist_kern.o
 always += offwaketime_kern.o
 always += spintest_kern.o
 always += map_perf_test_kern.o
+endif
 
 HOSTCFLAGS += -I$(objtree)/usr/include
 
