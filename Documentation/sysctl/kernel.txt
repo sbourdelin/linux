@@ -917,6 +917,7 @@ can be ORed together:
        signature.
 16384 - A soft lockup has previously occurred on the system.
 32768 - The kernel has been live patched.
+65536 - ACPI SSDT overlays have been loaded.
 
 ==============================================================
 
