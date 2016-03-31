@@ -1425,6 +1425,20 @@ intel_hdmi_detect(struct drm_connector *connector, bool force)
 	} else
 		status = connector_status_disconnected;
 
+	/*
+	 * The above call to intel_hdmi_set_edid() checked for a valid EDID.
+	 * However, the EDID can get corrupted for several reasons, resulting
+	 * in a disconnected status despite the connector being connected.
+	 * Hence, let's try one more time, by only probing the DDC.
+	 *
+	 * This allows the DRM core to fallback to builtin or user-provided
+	 * EDID firmware, e.g. in drm_helper_probe_single_connector_modes.
+	 */
+	if (status == connector_status_disconnected)
+		if (drm_probe_ddc(intel_gmbus_get_adapter(dev_priv,
+						intel_hdmi->ddc_bus)))
+			status = connector_status_connected;
+
 	intel_display_power_put(dev_priv, POWER_DOMAIN_GMBUS);
 
 	return status;
