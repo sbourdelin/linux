@@ -2259,6 +2259,10 @@ static int i40evf_change_mtu(struct net_device *netdev, int new_mtu)
 	return 0;
 }
 
+#define I40EVF_VLAN_FEATURES (NETIF_F_HW_VLAN_CTAG_TX |\
+                              NETIF_F_HW_VLAN_CTAG_RX |\
+                              NETIF_F_HW_VLAN_CTAG_FILTER)
+
 static const struct net_device_ops i40evf_netdev_ops = {
 	.ndo_open		= i40evf_open,
 	.ndo_stop		= i40evf_close,
@@ -2320,16 +2324,6 @@ int i40evf_process_config(struct i40evf_adapter *adapter)
 		return -ENODEV;
 	}
 
-	if (adapter->vf_res->vf_offload_flags
-	    & I40E_VIRTCHNL_VF_OFFLOAD_VLAN) {
-		netdev->vlan_features = netdev->features &
-					~(NETIF_F_HW_VLAN_CTAG_TX |
-					  NETIF_F_HW_VLAN_CTAG_RX |
-					  NETIF_F_HW_VLAN_CTAG_FILTER);
-		netdev->features |= NETIF_F_HW_VLAN_CTAG_TX |
-				    NETIF_F_HW_VLAN_CTAG_RX |
-				    NETIF_F_HW_VLAN_CTAG_FILTER;
-	}
 	netdev->features |= NETIF_F_HIGHDMA |
 			    NETIF_F_SG |
 			    NETIF_F_IP_CSUM |
@@ -2358,6 +2352,13 @@ int i40evf_process_config(struct i40evf_adapter *adapter)
 	/* copy netdev features into list of user selectable features */
 	netdev->hw_features |= netdev->features;
 	netdev->hw_features &= ~NETIF_F_RXCSUM;
+	netdev->hw_features &= ~(I40EVF_VLAN_FEATURES);
+	netdev->features &= ~(I40EVF_VLAN_FEATURES);
+
+	if (vfres->vf_offload_flags & I40E_VIRTCHNL_VF_OFFLOAD_VLAN) {
+		netdev->vlan_features = netdev->features;
+		netdev->features |= I40EVF_VLAN_FEATURES;
+	}
 
 	adapter->vsi.id = adapter->vsi_res->vsi_id;
 
