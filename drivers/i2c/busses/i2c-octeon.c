@@ -342,6 +342,28 @@ static int octeon_i2c_test_iflg(struct octeon_i2c *i2c)
 	return (octeon_i2c_read_ctl(i2c) & TWSI_CTL_IFLG) != 0;
 }
 
+#define I2C_OCTEON_IFLG_WAIT 80	/* microseconds */
+
+/*
+ * Wait-helper which addresses the delayed-IFLAG problem by re-polling for
+ * missing TWSI_CTL[IFLG] a few us later, when irq has signalled an event,
+ * but none found. Skip this re-poll on the first (non-wakeup) call.
+ */
+static int poll_iflg(struct octeon_i2c *i2c, int *first_p)
+{
+	int iflg = octeon_i2c_test_iflg(i2c);
+
+	if (iflg)
+		return 1;
+	if (*first_p)
+		*first_p = 0;
+	else {
+		usleep_range(I2C_OCTEON_IFLG_WAIT, 2 * I2C_OCTEON_IFLG_WAIT);
+		iflg = octeon_i2c_test_iflg(i2c);
+	}
+	return iflg;
+}
+
 /**
  * octeon_i2c_wait - wait for the IFLG to be set
  * @i2c: The struct octeon_i2c
@@ -351,9 +373,10 @@ static int octeon_i2c_test_iflg(struct octeon_i2c *i2c)
 static int octeon_i2c_wait(struct octeon_i2c *i2c)
 {
 	long time_left;
+	int first = 1;
 
 	i2c->int_en(i2c);
-	time_left = wait_event_timeout(i2c->queue, octeon_i2c_test_iflg(i2c),
+	time_left = wait_event_timeout(i2c->queue, poll_iflg(i2c, &first),
 				       i2c->adap.timeout);
 	i2c->int_dis(i2c);
 	if (!time_left) {
