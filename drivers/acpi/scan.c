@@ -1916,6 +1916,8 @@ static int acpi_bus_scan_fixed(void)
 	return result < 0 ? result : 0;
 }
 
+static bool acpi_scan_initialized;
+
 int __init acpi_scan_init(void)
 {
 	int result;
@@ -1960,6 +1962,8 @@ int __init acpi_scan_init(void)
 
 	acpi_update_all_gpes();
 
+	acpi_scan_initialized = true;
+
  out:
 	mutex_unlock(&acpi_scan_lock);
 	return result;
@@ -2003,3 +2007,61 @@ int __init __acpi_probe_device_table(struct acpi_probe_entry *ap_head, int nr)
 
 	return count;
 }
+
+static BLOCKING_NOTIFIER_HEAD(acpi_reconfig_chain);
+
+struct acpi_table_events_work {
+	struct work_struct work;
+	void *table;
+	u32 event;
+};
+
+void acpi_table_events_fn(struct work_struct *work)
+{
+	struct acpi_table_events_work *tew;
+	enum acpi_reconfig_event event;
+
+	tew = container_of(work, struct acpi_table_events_work, work);
+
+	acpi_scan_lock_acquire();
+	acpi_bus_scan(ACPI_ROOT_OBJECT);
+	acpi_scan_lock_release();
+
+	if (tew->event == ACPI_TABLE_EVENT_LOAD)
+		event = ACPI_RECONFIG_TABLE_LOAD;
+	else
+		event = ACPI_RECONFIG_TABLE_UNLOAD;
+
+	blocking_notifier_call_chain(&acpi_reconfig_chain, event, tew->table);
+	kfree(tew);
+}
+
+void acpi_scan_table_handler(u32 event, void *table, void *context)
+{
+	struct acpi_table_events_work *tew;
+
+	if (!acpi_scan_initialized)
+		return;
+
+	tew = kmalloc(sizeof(*tew), GFP_KERNEL);
+	if (!tew)
+		return;
+
+	INIT_WORK(&tew->work, acpi_table_events_fn);
+	tew->table = table;
+	tew->event = event;
+
+	schedule_work(&tew->work);
+}
+
+int acpi_reconfig_notifier_register(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_register(&acpi_reconfig_chain, nb);
+}
+EXPORT_SYMBOL(acpi_reconfig_notifier_register);
+
+int acpi_reconfig_notifier_unregister(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_unregister(&acpi_reconfig_chain, nb);
+}
+EXPORT_SYMBOL(acpi_reconfig_notifier_unregister);
