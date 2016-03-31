@@ -2432,3 +2432,38 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
 	return 0;
 }
 #endif /* CONFIG_COMPAT */
+
+
+SYSCALL_DEFINE4(leftpad, char *, src, char, pad, char *, dst, size_t, dst_len)
+{
+	char *buf;
+	long ret;
+	size_t len = strlen_user(src);
+	size_t pad_len = dst_len - len;
+
+	if (dst_len <= len || dst_len > 4096) {
+		return -EINVAL;
+	}
+
+	buf = kmalloc(dst_len, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	memset(buf, pad, pad_len);
+	ret = copy_from_user(buf + pad_len, src, len);
+	if (ret) {
+		ret = -EFAULT;
+		goto out;
+	}
+
+	ret = copy_to_user(dst, buf, dst_len);
+	if (ret) {
+		ret = -EFAULT;
+		goto out;
+	}
+
+	ret = pad_len;
+out:
+	kfree(buf);
+	return ret;
+}

@@ -898,4 +898,5 @@ asmlinkage long sys_copy_file_range(int fd_in, loff_t __user *off_in,
 
 asmlinkage long sys_mlock2(unsigned long start, size_t len, int flags);
 
+asmlinkage long sys_leftpad(char *str, char pad, char *dst, size_t dst_len);
 #endif
