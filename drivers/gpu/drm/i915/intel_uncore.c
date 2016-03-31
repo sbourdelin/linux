@@ -1161,7 +1161,7 @@ static void intel_uncore_fw_domains_init(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	if (INTEL_INFO(dev_priv->dev)->gen <= 5)
+	if (INTEL_INFO(dev_priv)->gen <= 5)
 		return;
 
 	if (IS_GEN9(dev)) {

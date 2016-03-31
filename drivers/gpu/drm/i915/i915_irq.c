@@ -2828,7 +2828,7 @@ semaphore_wait_to_signaller_ring(struct intel_engine_cs *engine, u32 ipehr,
 	struct drm_i915_private *dev_priv = engine->dev->dev_private;
 	struct intel_engine_cs *signaller;
 
-	if (INTEL_INFO(dev_priv->dev)->gen >= 8) {
+	if (INTEL_INFO(dev_priv)->gen >= 8) {
 		for_each_engine(signaller, dev_priv) {
 			if (engine == signaller)
 				continue;

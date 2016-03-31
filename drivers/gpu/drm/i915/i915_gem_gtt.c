@@ -2306,7 +2306,7 @@ void i915_check_and_clear_faults(struct drm_device *dev)
 
 static void i915_ggtt_flush(struct drm_i915_private *dev_priv)
 {
-	if (INTEL_INFO(dev_priv->dev)->gen < 6) {
+	if (INTEL_INFO(dev_priv)->gen < 6) {
 		intel_gtt_chipset_flush();
 	} else {
 		I915_WRITE(GFX_FLSH_CNTL_GEN6, GFX_FLSH_CNTL_EN);
