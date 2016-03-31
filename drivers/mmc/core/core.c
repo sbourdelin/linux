@@ -1639,6 +1639,8 @@ power_cycle:
 	if (err) {
 		pr_debug("%s: Signal voltage switch failed, "
 			"power cycling card\n", mmc_hostname(host));
+		/* Reset OCR mask */
+		ocr =  host->ocr_avail;
 		mmc_power_cycle(host, ocr);
 	}
 
