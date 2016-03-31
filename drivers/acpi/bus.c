@@ -37,8 +37,13 @@
 #include <acpi/apei.h>
 #include <linux/dmi.h>
 #include <linux/suspend.h>
+#include <linux/initrd.h>
+#include <linux/earlycpio.h>
 
 #include "internal.h"
+
+#undef pr_fmt
+#define pr_fmt(fmt) "ACPI: " fmt
 
 #define _COMPONENT		ACPI_BUS_COMPONENT
 ACPI_MODULE_NAME("bus");
@@ -877,6 +882,62 @@ static int __init acpi_bus_init_irq(void)
 	return 0;
 }
 
+void __init acpi_load_initrd_ssdts(void)
+{
+	void *data = (void *)initrd_start;
+	int size = initrd_end - initrd_start;
+	const char *path = "kernel/firmware/acpi/overlay";
+	long offset = 0;
+	struct cpio_data file;
+	struct acpi_table_header *header;
+	void *table;
+	acpi_status status;
+
+	while (true) {
+		file = find_cpio_data(path, data, size, &offset);
+		if (!file.data)
+			break;
+
+		data += offset;
+		size -= offset;
+
+		if (file.size < sizeof(struct acpi_table_header)) {
+			pr_err("initrd table smaller than ACPI header [%s%s]\n",
+			       path, file.name);
+			continue;
+		}
+
+		header = file.data;
+
+		if (file.size != header->length) {
+			pr_err("initrd file / table length mismatch [%s%s]\n",
+			       path, file.name);
+			continue;
+		}
+
+		if (memcmp(header->signature, ACPI_SIG_SSDT, 4)) {
+			pr_warn("skipping non-SSDT initrd table [%s%s]\n",
+				path, file.name);
+			continue;
+		}
+
+		table = kmemdup(file.data, file.size, GFP_KERNEL);
+		if (!table)
+			continue;
+
+		status = acpi_install_table((uintptr_t)table, 0);
+		if (ACPI_FAILURE(status)) {
+			pr_err("failed to install SSDT from initrd [%s%s]\n",
+			       path, file.name);
+			kfree(table);
+		}
+
+		pr_info("installed SSDT table found in initrd [%s%s][0x%x]\n",
+			path, file.name, header->length);
+		add_taint(TAINT_OVERLAY_ACPI_TABLE, LOCKDEP_STILL_OK);
+	}
+}
+
 /**
  * acpi_early_init - Initialize ACPICA and populate the ACPI namespace.
  *
@@ -924,6 +985,8 @@ void __init acpi_early_init(void)
 		       "Unable to initialize the ACPI Interpreter\n");
 		goto error0;
 	}
+
+	acpi_load_initrd_ssdts();
 
 	status = acpi_load_tables();
 	if (ACPI_FAILURE(status)) {
