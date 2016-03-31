@@ -725,7 +725,7 @@ int intel_fbdev_init(struct drm_device *dev)
 	return 0;
 }
 
-static void intel_fbdev_initial_config(void *data, async_cookie_t cookie)
+static void intel_fbdev_initial_config(void *data, async_cookie_t init_cookie)
 {
 	struct drm_i915_private *dev_priv = data;
 	struct intel_fbdev *ifbdev = dev_priv->fbdev;
@@ -738,7 +738,11 @@ static void intel_fbdev_initial_config(void *data, async_cookie_t cookie)
 
 void intel_fbdev_initial_config_async(struct drm_device *dev)
 {
-	async_schedule(intel_fbdev_initial_config, to_i915(dev));
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_fbdev *ifbdev = dev_priv->fbdev;
+
+	ifbdev->init_cookie = async_schedule(intel_fbdev_initial_config,
+					     dev_priv);
 }
 
 void intel_fbdev_fini(struct drm_device *dev)
@@ -750,7 +754,7 @@ void intel_fbdev_fini(struct drm_device *dev)
 	flush_work(&dev_priv->fbdev_suspend_work);
 
 	if (!current_is_async())
-		async_synchronize_full();
+		async_synchronize_cookie(dev_priv->fbdev->init_cookie);
 	intel_fbdev_destroy(dev, dev_priv->fbdev);
 	kfree(dev_priv->fbdev);
 	dev_priv->fbdev = NULL;
@@ -809,7 +813,7 @@ void intel_fbdev_output_poll_changed(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	async_synchronize_full();
+	async_synchronize_cookie(dev_priv->fbdev->init_cookie);
 	if (dev_priv->fbdev)
 		drm_fb_helper_hotplug_event(&dev_priv->fbdev->helper);
 }
@@ -821,7 +825,7 @@ void intel_fbdev_restore_mode(struct drm_device *dev)
 	struct intel_fbdev *ifbdev = dev_priv->fbdev;
 	struct drm_fb_helper *fb_helper;
 
-	async_synchronize_full();
+	async_synchronize_cookie(dev_priv->fbdev->init_cookie);
 	if (!ifbdev)
 		return;
 

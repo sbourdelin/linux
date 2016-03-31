@@ -158,6 +158,7 @@ struct intel_framebuffer {
 struct intel_fbdev {
 	struct drm_fb_helper helper;
 	struct intel_framebuffer *fb;
+	async_cookie_t init_cookie;
 	int preferred_bpp;
 };
 
