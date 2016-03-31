@@ -758,7 +758,6 @@ mvneta_rxq_next_desc_get(struct mvneta_rx_queue *rxq)
 	int rx_desc = rxq->next_desc_to_proc;
 
 	rxq->next_desc_to_proc = MVNETA_QUEUE_NEXT_DESC(rxq, rx_desc);
-	prefetch(rxq->descs + rxq->next_desc_to_proc);
 	return rxq->descs + rx_desc;
 }
 
