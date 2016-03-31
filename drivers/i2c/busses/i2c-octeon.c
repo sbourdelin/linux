@@ -928,53 +928,6 @@ static int octeon_i2c_start(struct octeon_i2c *i2c, int first)
 }
 
 /**
- * octeon_i2c_write - send data to the bus via low-level controller
- * @i2c: The struct octeon_i2c
- * @target: Target address
- * @data: Pointer to the data to be sent
- * @length: Length of the data
- * @last: is last msg in combined operation?
- *
- * The address is sent over the bus, then the data.
- *
- * Returns 0 on success, otherwise a negative errno.
- */
-static int octeon_i2c_write(struct octeon_i2c *i2c, int target,
-			    const u8 *data, int length, int first, int last)
-{
-	int i, result;
-
-	result = octeon_i2c_start(i2c, first);
-	if (result)
-		return result;
-
-	octeon_i2c_write_sw(i2c, SW_TWSI_EOP_TWSI_DATA, target << 1);
-	octeon_i2c_write_sw(i2c, SW_TWSI_EOP_TWSI_CTL, TWSI_CTL_ENAB);
-
-	result = octeon_i2c_wait(i2c);
-	if (result)
-		return result;
-
-	for (i = 0; i < length; i++) {
-		result = check_arb(i2c, false);
-		if (result)
-			return result;
-
-		octeon_i2c_write_sw(i2c, SW_TWSI_EOP_TWSI_DATA, data[i]);
-		octeon_i2c_write_sw(i2c, SW_TWSI_EOP_TWSI_CTL, TWSI_CTL_ENAB);
-
-		result = octeon_i2c_wait(i2c);
-		if (result)
-			return result;
-		result = check_arb(i2c, false);
-		if (result)
-			return result;
-	}
-
-	return 0;
-}
-
-/**
  * octeon_i2c_read - receive data from the bus via low-level controller
  * @i2c: The struct octeon_i2c
  * @target: Target address
@@ -1036,6 +989,53 @@ static int octeon_i2c_read(struct octeon_i2c *i2c, int target, u8 *data,
 		}
 	}
 	*rlength = length;
+	return 0;
+}
+
+/**
+ * octeon_i2c_write - send data to the bus via low-level controller
+ * @i2c: The struct octeon_i2c
+ * @target: Target address
+ * @data: Pointer to the data to be sent
+ * @length: Length of the data
+ * @last: is last msg in combined operation?
+ *
+ * The address is sent over the bus, then the data.
+ *
+ * Returns 0 on success, otherwise a negative errno.
+ */
+static int octeon_i2c_write(struct octeon_i2c *i2c, int target,
+			    const u8 *data, int length, int first, int last)
+{
+	int i, result;
+
+	result = octeon_i2c_start(i2c, first);
+	if (result)
+		return result;
+
+	octeon_i2c_write_sw(i2c, SW_TWSI_EOP_TWSI_DATA, target << 1);
+	octeon_i2c_write_sw(i2c, SW_TWSI_EOP_TWSI_CTL, TWSI_CTL_ENAB);
+
+	result = octeon_i2c_wait(i2c);
+	if (result)
+		return result;
+
+	for (i = 0; i < length; i++) {
+		result = check_arb(i2c, false);
+		if (result)
+			return result;
+
+		octeon_i2c_write_sw(i2c, SW_TWSI_EOP_TWSI_DATA, data[i]);
+		octeon_i2c_write_sw(i2c, SW_TWSI_EOP_TWSI_CTL, TWSI_CTL_ENAB);
+
+		result = octeon_i2c_wait(i2c);
+		if (result)
+			return result;
+		result = check_arb(i2c, false);
+		if (result)
+			return result;
+	}
+
 	return 0;
 }
 
