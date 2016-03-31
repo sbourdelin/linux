@@ -41,6 +41,27 @@ struct sg_table {
 	unsigned int orig_nents;	/* original size of list */
 };
 
+/**
+ * struct sg_constraints - SG constraints structure
+ *
+ * @max_segment_size: maximum segment length. Each SG entry has to be smaller
+ *		      than this value. Zero means no constraint.
+ * @required_alignment: minimum alignment. Is used for both size and pointer
+ *			alignment. If this constraint is not met, the function
+ *			should return -EINVAL.
+ * @preferred_alignment: preferred alignment. Mainly used to optimize
+ *			 throughput when the DMA engine performs better when
+ *			 doing aligned accesses.
+ *
+ * This structure is here to help sg_alloc_table_from_buf() create the optimal
+ * SG list based on DMA engine constraints.
+ */
+struct sg_constraints {
+	size_t max_segment_size;
+	size_t required_alignment;
+	size_t preferred_alignment;
+};
+
 /*
  * Notes on SG table design.
  *
@@ -265,6 +286,9 @@ int sg_alloc_table_from_pages(struct sg_table *sgt,
 	struct page **pages, unsigned int n_pages,
 	unsigned long offset, unsigned long size,
 	gfp_t gfp_mask);
+int sg_alloc_table_from_buf(struct sg_table *sgt, const void *buf, size_t len,
+			    const struct sg_constraints *constraints,
+			    gfp_t gfp_mask);
 
 size_t sg_copy_buffer(struct scatterlist *sgl, unsigned int nents, void *buf,
 		      size_t buflen, off_t skip, bool to_buffer);
