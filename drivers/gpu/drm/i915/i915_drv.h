@@ -1880,7 +1880,6 @@ struct drm_i915_private {
 #ifdef CONFIG_DRM_FBDEV_EMULATION
 	/* list of fbdev register on this device */
 	struct intel_fbdev *fbdev;
-	struct work_struct fbdev_suspend_work;
 #endif
 
 	struct drm_property *broadcast_rgb_property;

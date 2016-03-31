@@ -534,8 +534,7 @@ static const struct drm_fb_helper_funcs intel_fb_helper_funcs = {
 	.fb_probe = intelfb_create,
 };
 
-static void intel_fbdev_destroy(struct drm_device *dev,
-				struct intel_fbdev *ifbdev)
+static void intel_fbdev_destroy(struct intel_fbdev *ifbdev)
 {
 	/* We rely on the object-free to release the VMA pinning for
 	 * the info->screen_base mmaping. Leaking the VMA is simpler than
@@ -681,13 +680,56 @@ out:
 	return false;
 }
 
+static void __intel_fbdev_set_suspend(struct intel_fbdev *ifbdev,
+				      int state, bool synchronous)
+{
+	if (synchronous) {
+		/* Flush any pending work to turn the console on, and then
+		 * wait to turn it off. It must be synchronous as we are
+		 * about to suspend or unload the driver.
+		 *
+		 * Note that from within the work-handler, we cannot flush
+		 * ourselves, so only flush outstanding work upon suspend!
+		 */
+		if (state != FBINFO_STATE_RUNNING)
+			flush_work(&ifbdev->suspend_work);
+		console_lock();
+	} else {
+		/*
+		 * The console lock can be pretty contented on resume due
+		 * to all the printk activity.  Try to keep it out of the hot
+		 * path of resume if possible.
+		 */
+		WARN_ON(state != FBINFO_STATE_RUNNING);
+		if (!console_trylock()) {
+			/* Don't block our own workqueue as this can
+			 * be run in parallel with other i915.ko tasks.
+			 */
+			schedule_work(&ifbdev->suspend_work);
+			return;
+		}
+	}
+
+	/* On resume from hibernation: If the object is shmemfs backed, it has
+	 * been restored from swap. If the object is stolen however, it will be
+	 * full of whatever garbage was left in there.
+	 */
+	if (state == FBINFO_STATE_RUNNING && ifbdev->fb->obj->stolen) {
+		struct fb_info *info = ifbdev->helper.fbdev;
+		memset_io(info->screen_base, 0, info->screen_size);
+	}
+
+	drm_fb_helper_set_suspend(&ifbdev->helper, state);
+	console_unlock();
+}
+
 static void intel_fbdev_suspend_worker(struct work_struct *work)
 {
-	intel_fbdev_set_suspend(container_of(work,
-					     struct drm_i915_private,
-					     fbdev_suspend_work)->dev,
-				FBINFO_STATE_RUNNING,
-				true);
+	__intel_fbdev_set_suspend(container_of(work,
+					       struct intel_fbdev,
+					       suspend_work),
+				  FBINFO_STATE_RUNNING,
+				  true);
 }
 
 int intel_fbdev_init(struct drm_device *dev)
@@ -716,9 +758,9 @@ int intel_fbdev_init(struct drm_device *dev)
 	}
 
 	ifbdev->helper.atomic = true;
+	INIT_WORK(&ifbdev->suspend_work, intel_fbdev_suspend_worker);
 
 	dev_priv->fbdev = ifbdev;
-	INIT_WORK(&dev_priv->fbdev_suspend_work, intel_fbdev_suspend_worker);
 
 	drm_fb_helper_single_add_all_connectors(&ifbdev->helper);
 
@@ -743,17 +785,21 @@ void intel_fbdev_initial_config_async(struct drm_device *dev)
 
 void intel_fbdev_fini(struct drm_device *dev)
 {
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	if (!dev_priv->fbdev)
+	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct intel_fbdev *ifbdev;
+
+	ifbdev = dev_priv->fbdev;
+	if (ifbdev == NULL)
 		return;
 
-	flush_work(&dev_priv->fbdev_suspend_work);
+	dev_priv->fbdev = NULL;
 
 	if (!current_is_async())
 		async_synchronize_full();
-	intel_fbdev_destroy(dev, dev_priv->fbdev);
-	kfree(dev_priv->fbdev);
-	dev_priv->fbdev = NULL;
+	flush_work(&ifbdev->suspend_work);
+
+	intel_fbdev_destroy(ifbdev);
+	kfree(ifbdev);
 }
 
 static struct intel_fbdev *intel_fbdev_get(struct drm_device *dev)
@@ -788,53 +834,16 @@ static struct intel_fbdev *intel_fbdev_get_if_active(struct drm_device *dev)
 	return ifbdev;
 }
 
-void intel_fbdev_set_suspend(struct drm_device *dev, int state, bool synchronous)
+void intel_fbdev_set_suspend(struct drm_device *dev, int state)
 {
-	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_fbdev *ifbdev;
 
 	ifbdev = intel_fbdev_get(dev);
 	if (ifbdev == NULL)
 		return;
 
-	if (synchronous) {
-		/* Flush any pending work to turn the console on, and then
-		 * wait to turn it off. It must be synchronous as we are
-		 * about to suspend or unload the driver.
-		 *
-		 * Note that from within the work-handler, we cannot flush
-		 * ourselves, so only flush outstanding work upon suspend!
-		 */
-		if (state != FBINFO_STATE_RUNNING)
-			flush_work(&dev_priv->fbdev_suspend_work);
-		console_lock();
-	} else {
-		/*
-		 * The console lock can be pretty contented on resume due
-		 * to all the printk activity.  Try to keep it out of the hot
-		 * path of resume if possible.
-		 */
-		WARN_ON(state != FBINFO_STATE_RUNNING);
-		if (!console_trylock()) {
-			/* Don't block our own workqueue as this can
-			 * be run in parallel with other i915.ko tasks.
-			 */
-			schedule_work(&dev_priv->fbdev_suspend_work);
-			return;
-		}
-	}
-
-	/* On resume from hibernation: If the object is shmemfs backed, it has
-	 * been restored from swap. If the object is stolen however, it will be
-	 * full of whatever garbage was left in there.
-	 */
-	if (state == FBINFO_STATE_RUNNING && ifbdev->fb->obj->stolen) {
-		struct fb_info *info = ifbdev->helper.fbdev;
-		memset_io(info->screen_base, 0, info->screen_size);
-	}
-
-	drm_fb_helper_set_suspend(&ifbdev->helper, state);
-	console_unlock();
+	__intel_fbdev_set_suspend(ifbdev, state,
+				  state != FBINFO_STATE_RUNNING);
 }
 
 void intel_fbdev_output_poll_changed(struct drm_device *dev)

@@ -634,7 +634,7 @@ static int i915_drm_suspend(struct drm_device *dev)
 	intel_uncore_forcewake_reset(dev, false);
 	intel_opregion_fini(dev);
 
-	intel_fbdev_set_suspend(dev, FBINFO_STATE_SUSPENDED, true);
+	intel_fbdev_set_suspend(dev, FBINFO_STATE_SUSPENDED);
 
 	dev_priv->suspend_count++;
 
@@ -784,7 +784,7 @@ static int i915_drm_resume(struct drm_device *dev)
 
 	intel_opregion_init(dev);
 
-	intel_fbdev_set_suspend(dev, FBINFO_STATE_RUNNING, false);
+	intel_fbdev_set_suspend(dev, FBINFO_STATE_RUNNING);
 
 	mutex_lock(&dev_priv->modeset_restore_lock);
 	dev_priv->modeset_restore = MODESET_DONE;

@@ -158,6 +158,7 @@ struct intel_framebuffer {
 struct intel_fbdev {
 	struct drm_fb_helper helper;
 	struct intel_framebuffer *fb;
+	struct work_struct suspend_work;
 	int preferred_bpp;
 };
 
@@ -1335,7 +1336,7 @@ void intel_dvo_init(struct drm_device *dev);
 extern int intel_fbdev_init(struct drm_device *dev);
 extern void intel_fbdev_initial_config_async(struct drm_device *dev);
 extern void intel_fbdev_fini(struct drm_device *dev);
-extern void intel_fbdev_set_suspend(struct drm_device *dev, int state, bool synchronous);
+extern void intel_fbdev_set_suspend(struct drm_device *dev, int state);
 extern void intel_fbdev_output_poll_changed(struct drm_device *dev);
 extern void intel_fbdev_restore_mode(struct drm_device *dev);
 #else
@@ -1352,7 +1353,7 @@ static inline void intel_fbdev_fini(struct drm_device *dev)
 {
 }
 
-static inline void intel_fbdev_set_suspend(struct drm_device *dev, int state, bool synchronous)
+static inline void intel_fbdev_set_suspend(struct drm_device *dev, int state)
 {
 }
 
