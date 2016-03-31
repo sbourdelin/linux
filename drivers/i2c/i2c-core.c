@@ -151,7 +151,8 @@ static acpi_status acpi_i2c_add_device(acpi_handle handle, u32 level,
 
 	if (acpi_bus_get_device(handle, &adev))
 		return AE_OK;
-	if (acpi_bus_get_status(adev) || !adev->status.present)
+	if (acpi_bus_get_status(adev) || !adev->status.present ||
+	    acpi_device_enumerated(adev))
 		return AE_OK;
 
 	memset(&info, 0, sizeof(info));
@@ -190,6 +191,9 @@ static acpi_status acpi_i2c_add_device(acpi_handle handle, u32 level,
 
 	adev->power.flags.ignore_parent = true;
 	strlcpy(info.type, dev_name(&adev->dev), sizeof(info.type));
+
+	adev->flags.visited = true;
+
 	if (!i2c_new_device(adapter, &info)) {
 		adev->power.flags.ignore_parent = false;
 		dev_err(&adapter->dev,
@@ -225,8 +229,36 @@ static void acpi_i2c_register_devices(struct i2c_adapter *adap)
 		dev_warn(&adap->dev, "failed to enumerate I2C slaves\n");
 }
 
+static int acpi_i2c_table_load(struct device *dev, void *data)
+{
+	struct i2c_adapter *adapter = i2c_verify_adapter(dev);
+
+	if (!adapter)
+		return 0;
+
+	acpi_i2c_register_devices(adapter);
+	return 0;
+}
+
+static int acpi_i2c_notify(struct notifier_block *nb, unsigned long value,
+			   void *arg)
+{
+	switch (value) {
+	case ACPI_RECONFIG_TABLE_LOAD:
+		bus_find_device(&i2c_bus_type, NULL, NULL,
+				acpi_i2c_table_load);
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block i2c_acpi_notifier = {
+	.notifier_call = acpi_i2c_notify,
+};
 #else /* CONFIG_ACPI */
 static inline void acpi_i2c_register_devices(struct i2c_adapter *adap) { }
+extern struct notifier_block i2c_acpi_notifier;
 #endif /* CONFIG_ACPI */
 
 #ifdef CONFIG_ACPI_I2C_OPREGION
@@ -2121,6 +2153,8 @@ static int __init i2c_init(void)
 
 	if (IS_ENABLED(CONFIG_OF_DYNAMIC))
 		WARN_ON(of_reconfig_notifier_register(&i2c_of_notifier));
+	if (IS_ENABLED(CONFIG_ACPI))
+		WARN_ON(acpi_reconfig_notifier_register(&i2c_acpi_notifier));
 
 	return 0;
 
@@ -2136,6 +2170,8 @@ bus_err:
 
 static void __exit i2c_exit(void)
 {
+	if (IS_ENABLED(CONFIG_ACPI))
+		WARN_ON(acpi_reconfig_notifier_unregister(&i2c_acpi_notifier));
 	if (IS_ENABLED(CONFIG_OF_DYNAMIC))
 		WARN_ON(of_reconfig_notifier_unregister(&i2c_of_notifier));
 	i2c_del_driver(&dummy_driver);
