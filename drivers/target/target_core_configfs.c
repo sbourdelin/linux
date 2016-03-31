@@ -99,6 +99,36 @@ static ssize_t target_core_item_version_show(struct config_item *item,
 
 CONFIGFS_ATTR_RO(target_core_item_, version);
 
+char db_root[DB_ROOT_LEN] = DB_ROOT_DEFAULT;
+
+static ssize_t target_core_item_dbroot_show(struct config_item *item,
+					    char *page)
+{
+	return sprintf(page, "%s\n", db_root);
+}
+
+static ssize_t target_core_item_dbroot_store(struct config_item *item,
+					const char *page, size_t count)
+{
+	ssize_t read_bytes;
+
+	if (count > (DB_ROOT_LEN - 1)) {
+		pr_err("db_root count: %d exceeds DB_ROOT_LEN-1: %u\n",
+		       (int)count, DB_ROOT_LEN - 1);
+		return -EINVAL;
+	}
+
+	read_bytes = snprintf(db_root, DB_ROOT_LEN, "%s", page);
+	if (!read_bytes)
+		return -EINVAL;
+	if (db_root[read_bytes - 1] == '\n')
+		db_root[read_bytes - 1] = '\0';
+
+	return read_bytes;
+}
+
+CONFIGFS_ATTR(target_core_item_, dbroot);
+
 static struct target_fabric_configfs *target_core_get_fabric(
 	const char *name)
 {
@@ -239,6 +269,7 @@ static struct configfs_group_operations target_core_fabric_group_ops = {
  */
 static struct configfs_attribute *target_core_fabric_item_attrs[] = {
 	&target_core_item_attr_version,
+	&target_core_item_attr_dbroot,
 	NULL,
 };
 
