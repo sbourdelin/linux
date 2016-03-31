@@ -1765,6 +1765,7 @@ int genpd_dev_pm_attach(struct device *dev)
 {
 	struct of_phandle_args pd_args;
 	struct generic_pm_domain *pd;
+	struct gpd_timing_data td;
 	unsigned int i;
 	int ret;
 
@@ -1799,10 +1800,16 @@ int genpd_dev_pm_attach(struct device *dev)
 		return -EPROBE_DEFER;
 	}
 
+	memset(&td, 0, sizeof(td));
+	of_property_read_u64(dev->of_node, "suspend-latency",
+			&td.suspend_latency_ns);
+	of_property_read_u64(dev->of_node, "resume-latency",
+			&td.resume_latency_ns);
+
 	dev_dbg(dev, "adding to PM domain %s\n", pd->name);
 
 	for (i = 1; i < GENPD_RETRY_MAX_MS; i <<= 1) {
-		ret = pm_genpd_add_device(pd, dev);
+		ret = __pm_genpd_add_device(pd, dev, &td);
 		if (ret != -EAGAIN)
 			break;
 
