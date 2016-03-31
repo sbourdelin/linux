@@ -1,0 +1,55 @@
+.\" Copyright (c) 2016 sigma-star gmbh
+.\" (office@sigma-star.at)
+.\"
+.\" %%%LICENSE_START(GPLv2+_DOC_FULL)
+.\" This is free documentation; you can redistribute it and/or
+.\" modify it under the terms of the GNU General Public License as
+.\" published by the Free Software Foundation; either version 2 of
+.\" the License, or (at your option) any later version.
+.\"
+.\" The GNU General Public License's references to "object code"
+.\" and "executables" are to be interpreted as the output of any
+.\" document formatting or typesetting system, including
+.\" intermediate and printed output.
+.\"
+.\" This manual is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public
+.\" License along with this manual; if not, see
+.\" <http://www.gnu.org/licenses/>.
+.\" %%%LICENSE_END
+.\"
+.TH LEFTPAD 2 2016-04-01 "Linux" "Linux Programmer's Manual"
+.SH NAME
+leftpad
+.SH SYNOPSIS
+.nf
+.B #include <sys/types.h>
+
+.BI "int leftpad(char *src, char pad, char *dst, size_t dst_len);
+.fi
+.SH DESCRIPTION
+This function provides left padding for strings.
+.LP
+The string in
+.I src
+will be left padded with the chosen padding character
+.I pad
+and stored in
+.I dst
+ .
+.SH RETURN VALUE
+On success, returns the number of padding characters added.
+.SH ERRORS
+.TP
+.B EINVAL
+The size of the destination buffer
+.I dst
+is shorter than the source string
+.I src
+ . Or the destination string is longer than 4096 bytes.
+.SH SEE ALSO
+.BR snprintf (3)
