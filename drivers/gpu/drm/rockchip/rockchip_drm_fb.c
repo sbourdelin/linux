@@ -282,6 +282,9 @@ int rockchip_drm_atomic_commit(struct drm_device *dev,
 	struct rockchip_atomic_commit *commit = &private->commit;
 	int ret;
 
+	if (async && work_busy(&commit->work))
+		return -EBUSY;
+
 	ret = drm_atomic_helper_prepare_planes(dev, state);
 	if (ret)
 		return ret;
