@@ -148,9 +148,6 @@ struct ath10k_pci_pipe {
 
 	/* protects compl_free and num_send_allowed */
 	spinlock_t pipe_lock;
-
-	struct ath10k_pci *ar_pci;
-	struct tasklet_struct intr;
 };
 
 struct ath10k_pci_supp_chip {
@@ -171,14 +168,10 @@ struct ath10k_pci {
 	void __iomem *mem;
 	size_t mem_len;
 
-	/*
-	 * Number of MSI interrupts granted, 0 --> using legacy PCI line
-	 * interrupts.
-	 */
-	int num_msi_intrs;
+	/* Operating interrupt mode */
+	u8 oper_irq_mode;
 
 	struct tasklet_struct intr_tq;
-	struct tasklet_struct msi_fw_err;
 
 	struct ath10k_pci_pipe pipe_info[CE_COUNT_MAX];
 
