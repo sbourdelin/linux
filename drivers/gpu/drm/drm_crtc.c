@@ -3434,6 +3434,18 @@ int drm_mode_addfb2(struct drm_device *dev,
 	return 0;
 }
 
+struct drm_mode_rmfb_work {
+	struct work_struct work;
+	struct drm_framebuffer *fb;
+};
+
+static void drm_mode_rmfb_work_fn(struct work_struct *w)
+{
+	struct drm_mode_rmfb_work *arg = container_of(w, typeof(*arg), work);
+
+	drm_framebuffer_remove(arg->fb);
+}
+
 /**
  * drm_mode_rmfb - remove an FB from the configuration
  * @dev: drm device for the ioctl
@@ -3474,7 +3486,22 @@ int drm_mode_rmfb(struct drm_device *dev,
 	mutex_unlock(&dev->mode_config.fb_lock);
 	mutex_unlock(&file_priv->fbs_lock);
 
-	drm_framebuffer_unreference(fb);
+	/*
+	 * drm_framebuffer_remove may fail with -EINTR on pending signals,
+	 * so run this in a separate stack as there's no way to correctly
+	 * handle this after the fb is already removed from the lookup table.
+	 */
+	if (atomic_read(&fb->refcount.refcount) > 1) {
+		struct drm_mode_rmfb_work arg;
+
+		INIT_WORK_ONSTACK(&arg.work, drm_mode_rmfb_work_fn);
+		arg.fb = fb;
+
+		schedule_work(&arg.work);
+		flush_work(&arg.work);
+		destroy_work_on_stack(&arg.work);
+	} else
+		drm_framebuffer_unreference(fb);
 
 	return 0;
 
