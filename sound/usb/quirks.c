@@ -150,6 +150,7 @@ static int create_fixed_stream_quirk(struct snd_usb_audio *chip,
 		usb_audio_err(chip, "cannot memdup\n");
 		return -ENOMEM;
 	}
+	INIT_LIST_HEAD(&fp->list);
 	if (fp->nr_rates > MAX_NR_RATES) {
 		kfree(fp);
 		return -EINVAL;
@@ -193,6 +194,7 @@ static int create_fixed_stream_quirk(struct snd_usb_audio *chip,
 	return 0;
 
  error:
+	list_del(&fp->list); /* unlink for avoiding double-free */
 	kfree(fp);
 	kfree(rate_table);
 	return err;
