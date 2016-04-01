@@ -26,4 +26,7 @@ static inline bool dl_time_before(u64 a, u64 b)
 	return (s64)(a - b) < 0;
 }
 
+extern void *dl_pi_waiters_lock(struct task_struct *p);
+extern void dl_pi_waiters_unlock(void *lockdata);
+
 #endif /* _SCHED_DEADLINE_H */

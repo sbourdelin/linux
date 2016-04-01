@@ -224,6 +224,7 @@ rt_mutex_enqueue_pi(struct task_struct *task, struct rt_mutex_waiter *waiter)
 	struct rb_node *parent = NULL;
 	struct rt_mutex_waiter *entry;
 	int leftmost = 1;
+	void *dl_lockdata = NULL;
 
 	while (*link) {
 		parent = *link;
@@ -236,24 +237,38 @@ rt_mutex_enqueue_pi(struct task_struct *task, struct rt_mutex_waiter *waiter)
 		}
 	}
 
+	if (dl_task(task))
+		dl_lockdata = dl_pi_waiters_lock(task);
+
 	if (leftmost)
 		task->pi_waiters_leftmost = &waiter->pi_tree_entry;
 
 	rb_link_node(&waiter->pi_tree_entry, parent, link);
 	rb_insert_color(&waiter->pi_tree_entry, &task->pi_waiters);
+
+	if (dl_lockdata)
+		dl_pi_waiters_unlock(dl_lockdata);
 }
 
 static void
 rt_mutex_dequeue_pi(struct task_struct *task, struct rt_mutex_waiter *waiter)
 {
+	void *dl_lockdata = NULL;
+
 	if (RB_EMPTY_NODE(&waiter->pi_tree_entry))
 		return;
+
+	if (dl_task(task))
+		dl_lockdata = dl_pi_waiters_lock(task);
 
 	if (task->pi_waiters_leftmost == &waiter->pi_tree_entry)
 		task->pi_waiters_leftmost = rb_next(&waiter->pi_tree_entry);
 
 	rb_erase(&waiter->pi_tree_entry, &task->pi_waiters);
 	RB_CLEAR_NODE(&waiter->pi_tree_entry);
+
+	if (dl_lockdata)
+		dl_pi_waiters_unlock(dl_lockdata);
 }
 
 /*
@@ -271,6 +286,9 @@ int rt_mutex_getprio(struct task_struct *task)
 		   task->normal_prio);
 }
 
+/*
+ * rq->lock of @task must be held.
+ */
 struct task_struct *rt_mutex_get_top_task(struct task_struct *task)
 {
 	if (likely(!task_has_pi_waiters(task)))

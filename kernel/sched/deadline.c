@@ -930,6 +930,23 @@ static void dequeue_dl_entity(struct sched_dl_entity *dl_se)
 	__dequeue_dl_entity(dl_se);
 }
 
+/*
+ * dl_pi_waiters_lock()/dl_pi_waiters_unlock() are needed by
+ * rt_mutex_enqueue_pi() and rt_mutex_dequeue_pi() to protect
+ * PI waiters accessed by rt_mutex_get_top_task().
+ */
+void *dl_pi_waiters_lock(struct task_struct *p)
+{
+	lockdep_assert_held(&p->pi_lock);
+
+	return __task_rq_lock(p);
+}
+
+void dl_pi_waiters_unlock(void *lockdata)
+{
+	__task_rq_unlock((struct rq *)lockdata);
+}
+
 static void enqueue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct task_struct *pi_task = rt_mutex_get_top_task(p);
