@@ -61,7 +61,7 @@ static int nfs42_proc_fallocate(struct rpc_message *msg, struct file *filep,
 	struct nfs_lock_context *lock;
 	int err;
 
-	lock = nfs_get_lock_context(nfs_file_open_context(filep));
+	lock = nfs_find_lock_context(nfs_file_open_context(filep));
 	if (IS_ERR(lock))
 		return PTR_ERR(lock);
 
@@ -171,7 +171,7 @@ loff_t nfs42_proc_llseek(struct file *filep, loff_t offset, int whence)
 	struct nfs_lock_context *lock;
 	loff_t err;
 
-	lock = nfs_get_lock_context(nfs_file_open_context(filep));
+	lock = nfs_find_lock_context(nfs_file_open_context(filep));
 	if (IS_ERR(lock))
 		return PTR_ERR(lock);
 
@@ -365,14 +365,14 @@ int nfs42_proc_clone(struct file *src_f, struct file *dst_f,
 	if (!nfs_server_capable(inode, NFS_CAP_CLONE))
 		return -EOPNOTSUPP;
 
-	src_lock = nfs_get_lock_context(nfs_file_open_context(src_f));
+	src_lock = nfs_find_lock_context(nfs_file_open_context(src_f));
 	if (IS_ERR(src_lock))
 		return PTR_ERR(src_lock);
 
 	src_exception.inode = file_inode(src_f);
 	src_exception.state = src_lock->open_context->state;
 
-	dst_lock = nfs_get_lock_context(nfs_file_open_context(dst_f));
+	dst_lock = nfs_find_lock_context(nfs_file_open_context(dst_f));
 	if (IS_ERR(dst_lock)) {
 		err = PTR_ERR(dst_lock);
 		goto out_put_src_lock;
