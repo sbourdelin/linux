@@ -74,10 +74,7 @@ extern void kvmppc_handler_highmem(void);
 extern void kvmppc_dump_vcpu(struct kvm_vcpu *vcpu);
 extern int kvmppc_handle_load(struct kvm_run *run, struct kvm_vcpu *vcpu,
                               unsigned int rt, unsigned int bytes,
-			      int is_default_endian);
-extern int kvmppc_handle_loads(struct kvm_run *run, struct kvm_vcpu *vcpu,
-                               unsigned int rt, unsigned int bytes,
-			       int is_default_endian);
+			      int is_default_endian, u8 is_sign_extend);
 extern int kvmppc_handle_store(struct kvm_run *run, struct kvm_vcpu *vcpu,
 			       u64 val, unsigned int bytes,
 			       int is_default_endian);
