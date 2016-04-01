@@ -14,6 +14,7 @@
 #include <linux/smp.h>
 #include <linux/cpu.h>
 #include <linux/sched.h>
+#include <linux/hypervisor.h>
 
 #include "smpboot.h"
 
@@ -758,9 +759,14 @@ struct smp_sync_call_struct {
 static void smp_call_sync_callback(struct work_struct *work)
 {
 	struct smp_sync_call_struct *sscs;
+	unsigned int cpu;
 
 	sscs = container_of(work, struct smp_sync_call_struct, work);
+	cpu = get_cpu();
+	hypervisor_pin_vcpu(cpu);
 	sscs->ret = sscs->func(sscs->data);
+	hypervisor_pin_vcpu(-1);
+	put_cpu();
 
 	complete(&sscs->done);
 }

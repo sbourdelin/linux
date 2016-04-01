@@ -6,6 +6,7 @@
 #include <linux/kernel.h>
 #include <linux/export.h>
 #include <linux/smp.h>
+#include <linux/hypervisor.h>
 
 int smp_call_function_single(int cpu, void (*func) (void *info), void *info,
 				int wait)
@@ -85,9 +86,17 @@ EXPORT_SYMBOL(on_each_cpu_cond);
 
 int smp_call_sync_on_phys_cpu(unsigned int cpu, int (*func)(void *), void *par)
 {
+	int ret;
+
 	if (cpu != 0)
 		return -EINVAL;
 
-	return func(par);
+	preempt_disable();
+	hypervisor_pin_vcpu(0);
+	ret = func(par);
+	hypervisor_pin_vcpu(-1);
+	preempt_enable();
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(smp_call_sync_on_phys_cpu);
