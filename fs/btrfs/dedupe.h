@@ -31,8 +31,7 @@
 #define BTRFS_DEDUPE_BACKEND_INMEMORY		0
 #define BTRFS_DEDUPE_BACKEND_ONDISK		1
 
-/* Only support inmemory yet, so count is still only 1 */
-#define BTRFS_DEDUPE_BACKEND_COUNT		1
+#define BTRFS_DEDUPE_BACKEND_COUNT		2
 
 /* Dedup block size limit and default value */
 #define BTRFS_DEDUPE_BLOCKSIZE_MAX	(8 * 1024 * 1024)
