@@ -2849,15 +2849,15 @@ skl_wm_plane_id(const struct intel_plane *plane)
 static void
 skl_ddb_get_pipe_allocation_limits(struct drm_device *dev,
 				   const struct intel_crtc_state *cstate,
-				   const struct intel_wm_config *config,
+				   const unsigned active_crtcs,
 				   struct skl_ddb_entry *alloc /* out */)
 {
-	struct drm_crtc *for_crtc = cstate->base.crtc;
-	struct drm_crtc *crtc;
+	struct drm_crtc *crtc = cstate->base.crtc;
 	unsigned int pipe_size, ddb_size;
+	unsigned int num_active = hweight32(active_crtcs);
 	int nth_active_pipe;
 
-	if (!cstate->base.active) {
+	if (!cstate->base.active || WARN_ON(num_active == 0)) {
 		alloc->start = 0;
 		alloc->end = 0;
 		return;
@@ -2870,25 +2870,16 @@ skl_ddb_get_pipe_allocation_limits(struct drm_device *dev,
 
 	ddb_size -= 4; /* 4 blocks for bypass path allocation */
 
-	nth_active_pipe = 0;
-	for_each_crtc(dev, crtc) {
-		if (!to_intel_crtc(crtc)->active)
-			continue;
+	nth_active_pipe = hweight32(active_crtcs & (drm_crtc_mask(crtc) - 1));
 
-		if (crtc == for_crtc)
-			break;
-
-		nth_active_pipe++;
-	}
-
-	pipe_size = ddb_size / config->num_pipes_active;
-	alloc->start = nth_active_pipe * ddb_size / config->num_pipes_active;
+	pipe_size = ddb_size / num_active;
+	alloc->start = nth_active_pipe * ddb_size / num_active;
 	alloc->end = alloc->start + pipe_size;
 }
 
-static unsigned int skl_cursor_allocation(const struct intel_wm_config *config)
+static unsigned int skl_cursor_allocation(const unsigned active_crtcs)
 {
-	if (config->num_pipes_active == 1)
+	if (hweight32(active_crtcs) == 1)
 		return 32;
 
 	return 8;
@@ -3018,14 +3009,13 @@ skl_get_total_relative_data_rate(const struct intel_crtc_state *cstate)
 	return total_data_rate;
 }
 
-static void
+static int
 skl_allocate_pipe_ddb(struct intel_crtc_state *cstate,
 		      struct skl_ddb_allocation *ddb /* out */)
 {
 	struct drm_crtc *crtc = cstate->base.crtc;
 	struct drm_device *dev = crtc->dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
-	struct intel_wm_config *config = &dev_priv->wm.config;
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 	struct intel_plane *intel_plane;
 	enum pipe pipe = intel_crtc->pipe;
@@ -3034,17 +3024,43 @@ skl_allocate_pipe_ddb(struct intel_crtc_state *cstate,
 	uint16_t minimum[I915_MAX_PLANES];
 	uint16_t y_minimum[I915_MAX_PLANES];
 	unsigned int total_data_rate;
+	unsigned active_crtcs = 0;
 
-	skl_ddb_get_pipe_allocation_limits(dev, cstate, config, alloc);
+	if (!cstate->base.active) {
+		ddb->pipe[pipe].start = ddb->pipe[pipe].end = 0;
+		memset(ddb->plane[pipe], 0,
+		       I915_MAX_PLANES * sizeof(struct skl_ddb_entry));
+		memset(ddb->y_plane[pipe], 0,
+		       I915_MAX_PLANES * sizeof(struct skl_ddb_entry));
+		return 0;
+	}
+
+	/*
+	 * TODO:  At the moment we might call this on either an in-flight CRTC
+	 * state or an already-committed state, so look up the number of
+	 * active CRTC's accordingly.  Eventually this will only be called
+	 * on in-flight states and we'll be able to drop some of this extra
+	 * logic.
+	 */
+	if (cstate->base.state) {
+		struct intel_atomic_state *intel_state =
+			to_intel_atomic_state(cstate->base.state);
+
+		active_crtcs = intel_state->active_crtcs;
+	} else {
+		active_crtcs = dev_priv->active_crtcs;
+	}
+
+	skl_ddb_get_pipe_allocation_limits(dev, cstate, active_crtcs, alloc);
 	alloc_size = skl_ddb_entry_size(alloc);
 	if (alloc_size == 0) {
 		memset(ddb->plane[pipe], 0, sizeof(ddb->plane[pipe]));
 		memset(&ddb->plane[pipe][PLANE_CURSOR], 0,
 		       sizeof(ddb->plane[pipe][PLANE_CURSOR]));
-		return;
+		return 0;
 	}
 
-	cursor_blocks = skl_cursor_allocation(config);
+	cursor_blocks = skl_cursor_allocation(active_crtcs);
 	ddb->plane[pipe][PLANE_CURSOR].start = alloc->end - cursor_blocks;
 	ddb->plane[pipe][PLANE_CURSOR].end = alloc->end;
 
@@ -3054,15 +3070,30 @@ skl_allocate_pipe_ddb(struct intel_crtc_state *cstate,
 	/* 1. Allocate the mininum required blocks for each active plane */
 	for_each_intel_plane_on_crtc(dev, intel_crtc, intel_plane) {
 		struct drm_plane *plane = &intel_plane->base;
+		struct drm_plane_state *pstate;
 		struct drm_framebuffer *fb = plane->state->fb;
 		int id = skl_wm_plane_id(intel_plane);
 
-		if (!to_intel_plane_state(plane->state)->visible)
+		/*
+		 * TODO: Remove support for already-committed state once we
+		 * only allocate DDB on in-flight states.
+		 */
+		if (cstate->base.state) {
+			pstate = drm_atomic_get_plane_state(cstate->base.state,
+							    plane);
+			if (IS_ERR(pstate))
+				return PTR_ERR(pstate);
+		} else {
+			pstate = plane->state;
+		}
+
+		if (!to_intel_plane_state(pstate)->visible)
 			continue;
 
 		if (plane->type == DRM_PLANE_TYPE_CURSOR)
 			continue;
 
+		fb = pstate->fb;
 		minimum[id] = 8;
 		alloc_size -= minimum[id];
 		y_minimum[id] = (fb->pixel_format == DRM_FORMAT_NV12) ? 8 : 0;
@@ -3078,12 +3109,25 @@ skl_allocate_pipe_ddb(struct intel_crtc_state *cstate,
 	total_data_rate = skl_get_total_relative_data_rate(cstate);
 
 	start = alloc->start;
-	for_each_intel_plane_on_crtc(dev, intel_crtc, intel_plane) {
+	for_each_intel_plane_mask(dev, intel_plane, cstate->base.plane_mask) {
 		struct drm_plane *plane = &intel_plane->base;
-		struct drm_plane_state *pstate = intel_plane->base.state;
+		struct drm_plane_state *pstate;
 		unsigned int data_rate, y_data_rate;
 		uint16_t plane_blocks, y_plane_blocks = 0;
 		int id = skl_wm_plane_id(intel_plane);
+
+		/*
+		 * TODO: Remove support for already-committed state once we
+		 * only allocate DDB on in-flight states.
+		 */
+		if (cstate->base.state) {
+			pstate = drm_atomic_get_plane_state(cstate->base.state,
+							    plane);
+			if (WARN_ON(IS_ERR(pstate)))
+				return PTR_ERR(pstate);
+		} else {
+			pstate = plane->state;
+		}
 
 		if (!to_intel_plane_state(pstate)->visible)
 			continue;
@@ -3125,6 +3169,7 @@ skl_allocate_pipe_ddb(struct intel_crtc_state *cstate,
 
 	}
 
+	return 0;
 }
 
 static uint32_t skl_pipe_pixel_rate(const struct intel_crtc_state *config)
@@ -3615,7 +3660,7 @@ static bool skl_update_pipe_wm(struct drm_crtc *crtc,
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 	struct intel_crtc_state *cstate = to_intel_crtc_state(crtc->state);
 
-	skl_allocate_pipe_ddb(cstate, ddb);
+	WARN_ON(skl_allocate_pipe_ddb(cstate, ddb) != 0);
 	skl_build_pipe_wm(cstate, ddb, pipe_wm);
 
 	if (!memcmp(&intel_crtc->wm.active.skl, pipe_wm, sizeof(*pipe_wm)))
