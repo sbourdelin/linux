@@ -302,7 +302,7 @@ typedef struct {
 	lnet_ping_info_t	*rcd_pinginfo;	/* ping buffer */
 } lnet_rc_data_t;
 
-typedef struct lnet_peer {
+struct lnet_peer {
 	struct list_head	 lp_hashlist;	/* chain on peer hash */
 	struct list_head	 lp_txq;	/* messages blocking for
 						   tx credits */
@@ -343,7 +343,7 @@ typedef struct lnet_peer {
 	unsigned int		 lp_ping_feats;
 	struct list_head	 lp_routes;	/* routers on this peer */
 	lnet_rc_data_t		*lp_rcd;	/* router checker state */
-} lnet_peer_t;
+};
 
 /* peer hash size */
 #define LNET_PEER_HASH_BITS	9
@@ -369,7 +369,7 @@ struct lnet_peer_table {
 typedef struct {
 	struct list_head	 lr_list;	/* chain on net */
 	struct list_head	 lr_gwlist;	/* chain on gateway */
-	lnet_peer_t		*lr_gateway;	/* router node */
+	struct lnet_peer	*lr_gateway;	/* router node */
 	__u32			 lr_net;	/* remote network number */
 	int			 lr_seq;	/* sequence for round-robin */
 	unsigned int		 lr_downis;	/* number of down NIs */
