@@ -800,14 +800,16 @@ void nfs4_close_sync(struct nfs4_state *state, fmode_t fmode)
  * that is compatible with current->files
  */
 static struct nfs4_lock_state *
-__nfs4_find_lock_state(struct nfs4_state *state, fl_owner_t fl_owner)
+__nfs4_find_lock_state(struct nfs4_state *state,
+		const struct nfs_lockowner *lockowner)
 {
 	struct nfs4_lock_state *pos;
 	list_for_each_entry(pos, &state->lock_states, ls_locks) {
-		if (pos->ls_owner != fl_owner)
-			continue;
-		atomic_inc(&pos->ls_count);
-		return pos;
+		if (pos->ls_owner == lockowner->l_owner_posix ||
+			pos->ls_owner == lockowner->l_owner_ofd) {
+			atomic_inc(&pos->ls_count);
+			return pos;
+		}
 	}
 	return NULL;
 }
@@ -854,10 +856,13 @@ void nfs4_free_lock_state(struct nfs_server *server, struct nfs4_lock_state *lsp
 static struct nfs4_lock_state *nfs4_get_lock_state(struct nfs4_state *state, fl_owner_t owner)
 {
 	struct nfs4_lock_state *lsp, *new = NULL;
+	const struct nfs_lockowner lockowner = {
+		.l_owner_posix = owner,
+	};
 	
 	for(;;) {
 		spin_lock(&state->state_lock);
-		lsp = __nfs4_find_lock_state(state, owner);
+		lsp = __nfs4_find_lock_state(state, &lockowner);
 		if (lsp != NULL)
 			break;
 		if (new != NULL) {
@@ -942,7 +947,6 @@ static int nfs4_copy_lock_stateid(nfs4_stateid *dst,
 		const struct nfs_lockowner *lockowner)
 {
 	struct nfs4_lock_state *lsp;
-	fl_owner_t fl_owner;
 	int ret = -ENOENT;
 
 
@@ -952,9 +956,8 @@ static int nfs4_copy_lock_stateid(nfs4_stateid *dst,
 	if (test_bit(LK_STATE_IN_USE, &state->flags) == 0)
 		goto out;
 
-	fl_owner = lockowner->l_owner_posix;
 	spin_lock(&state->state_lock);
-	lsp = __nfs4_find_lock_state(state, fl_owner);
+	lsp = __nfs4_find_lock_state(state, lockowner);
 	if (lsp && test_bit(NFS_LOCK_LOST, &lsp->ls_flags))
 		ret = -EIO;
 	else if (lsp != NULL && test_bit(NFS_LOCK_INITIALIZED, &lsp->ls_flags) != 0) {
