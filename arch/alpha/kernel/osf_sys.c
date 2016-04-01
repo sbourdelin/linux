@@ -952,7 +952,7 @@ struct itimerval32
 };
 
 static inline long
-get_tv32(struct timeval *o, struct timeval32 __user *i)
+get_tv32(struct timeval *o, const struct timeval32 __user *i)
 {
 	return (!access_ok(VERIFY_READ, i, sizeof(*i)) ||
 		(__get_user(o->tv_sec, &i->tv_sec) |
@@ -1065,7 +1065,7 @@ SYSCALL_DEFINE3(osf_setitimer, int, which, struct itimerval32 __user *, in,
 }
 
 SYSCALL_DEFINE2(osf_utimes, const char __user *, filename,
-		struct timeval32 __user *, tvs)
+		const struct timeval32 __user *, tvs)
 {
 	struct timespec tv[2];
 
