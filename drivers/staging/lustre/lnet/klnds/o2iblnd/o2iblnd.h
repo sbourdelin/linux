@@ -509,7 +509,7 @@ typedef struct kib_tx                         /* transmit message */
 	int                   tx_status;      /* LNET completion status */
 	unsigned long         tx_deadline;    /* completion deadline */
 	__u64                 tx_cookie;      /* completion cookie */
-	lnet_msg_t *tx_lntmsg[2]; /* lnet msgs to finalize on completion */
+	struct lnet_msg *tx_lntmsg[2]; /* lnet msgs to finalize on completion */
 	kib_msg_t             *tx_msg;        /* message buffer (host vaddr) */
 	__u64                 tx_msgaddr;     /* message buffer (I/O addr) */
 	DECLARE_PCI_UNMAP_ADDR(tx_msgunmap);  /* for dma_unmap_single() */
@@ -1003,7 +1003,7 @@ void kiblnd_pack_msg(lnet_ni_t *ni, kib_msg_t *msg, int version,
 int  kiblnd_unpack_msg(kib_msg_t *msg, int nob);
 int  kiblnd_post_rx(kib_rx_t *rx, int credit);
 
-int  kiblnd_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg);
-int  kiblnd_recv(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg, int delayed,
+int  kiblnd_send(lnet_ni_t *ni, void *private, struct lnet_msg *lntmsg);
+int  kiblnd_recv(lnet_ni_t *ni, void *private, struct lnet_msg *lntmsg, int delayed,
 		 unsigned int niov, struct kvec *iov, lnet_kiov_t *kiov,
 		 unsigned int offset, unsigned int mlen, unsigned int rlen);

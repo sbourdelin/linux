@@ -393,7 +393,7 @@ ksocknal_receive(ksock_conn_t *conn)
 void
 ksocknal_tx_done(lnet_ni_t *ni, ksock_tx_t *tx)
 {
-	lnet_msg_t *lnetmsg = tx->tx_lnetmsg;
+	struct lnet_msg *lnetmsg = tx->tx_lnetmsg;
 	int rc = (!tx->tx_resid && !tx->tx_zc_aborted) ? 0 : -EIO;
 
 	LASSERT(ni || tx->tx_conn);
@@ -932,7 +932,7 @@ ksocknal_launch_packet(lnet_ni_t *ni, ksock_tx_t *tx, lnet_process_id_t id)
 }
 
 int
-ksocknal_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
+ksocknal_send(lnet_ni_t *ni, void *private, struct lnet_msg *lntmsg)
 {
 	int mpflag = 1;
 	int type = lntmsg->msg_type;
@@ -1324,7 +1324,7 @@ ksocknal_process_receive(ksock_conn_t *conn)
 }
 
 int
-ksocknal_recv(lnet_ni_t *ni, void *private, lnet_msg_t *msg, int delayed,
+ksocknal_recv(lnet_ni_t *ni, void *private, struct lnet_msg *msg, int delayed,
 	      unsigned int niov, struct kvec *iov, lnet_kiov_t *kiov,
 	      unsigned int offset, unsigned int mlen, unsigned int rlen)
 {

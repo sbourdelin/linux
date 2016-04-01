@@ -53,7 +53,7 @@
 /* forward refs */
 struct lnet_libmd;
 
-typedef struct lnet_msg {
+struct lnet_msg {
 	struct list_head	msg_activelist;
 	struct list_head	msg_list;	   /* Q for credits/MD */
 
@@ -105,7 +105,7 @@ typedef struct lnet_msg {
 
 	lnet_event_t		 msg_ev;
 	lnet_hdr_t		 msg_hdr;
-} lnet_msg_t;
+};
 
 typedef struct lnet_libhandle {
 	struct list_head	lh_hash_chain;
@@ -209,7 +209,7 @@ struct lnet_lnd {
 	 * non-zero for immediate failure, otherwise complete later with
 	 * lnet_finalize()
 	 */
-	int (*lnd_send)(struct lnet_ni *ni, void *private, lnet_msg_t *msg);
+	int (*lnd_send)(struct lnet_ni *ni, void *private, struct lnet_msg *msg);
 
 	/*
 	 * Start receiving 'mlen' bytes of payload data, skipping the following
@@ -218,7 +218,7 @@ struct lnet_lnd {
 	 * complete later with lnet_finalize().  This also gives back a receive
 	 * credit if the LND does flow control.
 	 */
-	int (*lnd_recv)(struct lnet_ni *ni, void *private, lnet_msg_t *msg,
+	int (*lnd_recv)(struct lnet_ni *ni, void *private, struct lnet_msg *msg,
 			int delayed, unsigned int niov,
 			struct kvec *iov, lnet_kiov_t *kiov,
 			unsigned int offset, unsigned int mlen,
@@ -233,7 +233,7 @@ struct lnet_lnd {
 	 * release resources; lnd_recv() will not be called.
 	 */
 	int (*lnd_eager_recv)(struct lnet_ni *ni, void *private,
-			      lnet_msg_t *msg, void **new_privatep);
+			      struct lnet_msg *msg, void **new_privatep);
 
 	/* notification of peer health */
 	void (*lnd_notify)(struct lnet_ni *ni, lnet_nid_t peer, int alive);

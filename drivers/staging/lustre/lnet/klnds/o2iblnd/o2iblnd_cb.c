@@ -54,7 +54,7 @@ static void kiblnd_unmap_tx(lnet_ni_t *ni, kib_tx_t *tx);
 static void
 kiblnd_tx_done(lnet_ni_t *ni, kib_tx_t *tx)
 {
-	lnet_msg_t *lntmsg[2];
+	struct lnet_msg *lntmsg[2];
 	kib_net_t *net = ni->ni_data;
 	int rc;
 	int i;
@@ -1486,7 +1486,7 @@ kiblnd_launch_tx(lnet_ni_t *ni, kib_tx_t *tx, lnet_nid_t nid)
 }
 
 int
-kiblnd_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
+kiblnd_send(lnet_ni_t *ni, void *private, struct lnet_msg *lntmsg)
 {
 	lnet_hdr_t *hdr = &lntmsg->msg_hdr;
 	int type = lntmsg->msg_type;
@@ -1656,7 +1656,7 @@ kiblnd_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
 }
 
 static void
-kiblnd_reply(lnet_ni_t *ni, kib_rx_t *rx, lnet_msg_t *lntmsg)
+kiblnd_reply(lnet_ni_t *ni, kib_rx_t *rx, struct lnet_msg *lntmsg)
 {
 	lnet_process_id_t target = lntmsg->msg_target;
 	unsigned int niov = lntmsg->msg_niov;
@@ -1717,7 +1717,7 @@ kiblnd_reply(lnet_ni_t *ni, kib_rx_t *rx, lnet_msg_t *lntmsg)
 }
 
 int
-kiblnd_recv(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg, int delayed,
+kiblnd_recv(lnet_ni_t *ni, void *private, struct lnet_msg *lntmsg, int delayed,
 	    unsigned int niov, struct kvec *iov, lnet_kiov_t *kiov,
 	    unsigned int offset, unsigned int mlen, unsigned int rlen)
 {
