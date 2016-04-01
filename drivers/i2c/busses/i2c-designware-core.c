@@ -90,6 +90,7 @@
 					 DW_IC_INTR_STOP_DET)
 
 #define DW_IC_STATUS_ACTIVITY	0x1
+#define DW_IC_STATUS_TX_EMPTY	0x2
 
 #define DW_IC_ERR_TX_ABRT	0x1
 
@@ -383,6 +384,8 @@ int i2c_dw_init(struct dw_i2c_dev *dev)
 	/* configure the i2c master */
 	dw_writel(dev, dev->master_cfg , DW_IC_CON);
 
+	__i2c_dw_enable(dev, true);
+
 	if (dev->release_lock)
 		dev->release_lock(dev);
 	return 0;
@@ -412,9 +415,16 @@ static void i2c_dw_xfer_init(struct dw_i2c_dev *dev)
 {
 	struct i2c_msg *msgs = dev->msgs;
 	u32 ic_con, ic_tar = 0;
+	bool need_reenable = false;
+	u32 ic_status;
 
-	/* Disable the adapter */
-	__i2c_dw_enable(dev, false);
+	/* check ic_tar and ic_con can be dynamically updated */
+	ic_status = dw_readl(dev, DW_IC_STATUS);
+	if (ic_status & DW_IC_STATUS_ACTIVITY
+		|| !(ic_status & DW_IC_STATUS_TX_EMPTY)) {
+		need_reenable = true;
+		__i2c_dw_enable(dev, false);
+	}
 
 	/* if the slave address is ten bit address, enable 10BITADDR */
 	ic_con = dw_readl(dev, DW_IC_CON);
@@ -442,8 +452,8 @@ static void i2c_dw_xfer_init(struct dw_i2c_dev *dev)
 	/* enforce disabled interrupts (due to HW issues) */
 	i2c_dw_disable_int(dev);
 
-	/* Enable the adapter */
-	__i2c_dw_enable(dev, true);
+	if (need_reenable)
+		__i2c_dw_enable(dev, true);
 
 	/* Clear and enable interrupts */
 	dw_readl(dev, DW_IC_CLR_INTR);
@@ -624,7 +634,8 @@ static int i2c_dw_handle_tx_abort(struct dw_i2c_dev *dev)
 }
 
 /*
- * Prepare controller for a transaction and call i2c_dw_xfer_msg
+ * Prepare controller for a transaction and start transfer by calling
+ * i2c_dw_xfer_init()
  */
 static int
 i2c_dw_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
@@ -665,21 +676,10 @@ i2c_dw_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	/* wait for tx to complete */
 	if (!wait_for_completion_timeout(&dev->cmd_complete, HZ)) {
 		dev_err(dev->dev, "controller timed out\n");
-		/* i2c_dw_init implicitly disables the adapter */
 		i2c_dw_init(dev);
 		ret = -ETIMEDOUT;
 		goto done;
 	}
-
-	/*
-	 * We must disable the adapter before returning and signaling the end
-	 * of the current transfer. Otherwise the hardware might continue
-	 * generating interrupts which in turn causes a race condition with
-	 * the following transfer.  Needs some more investigation if the
-	 * additional interrupts are a hardware bug or this driver doesn't
-	 * handle them correctly yet.
-	 */
-	__i2c_dw_enable(dev, false);
 
 	if (dev->msg_err) {
 		ret = dev->msg_err;
@@ -818,9 +818,21 @@ static irqreturn_t i2c_dw_isr(int this_irq, void *dev_id)
 	 */
 
 tx_aborted:
-	if ((stat & (DW_IC_INTR_TX_ABRT | DW_IC_INTR_STOP_DET)) || dev->msg_err)
+	if ((stat & (DW_IC_INTR_TX_ABRT | DW_IC_INTR_STOP_DET))
+			|| dev->msg_err) {
+		/*
+		 * We must disable interruts before returning and signaling
+		 * the end of the current transfer. Otherwise the hardware
+		 * might continue generating interrupts which in turn causes a
+		 * race condition with next transfer.  Needs some more
+		 * investigation if the additional interrupts are a hardware
+		 * bug or this driver doesn't handle them correctly yet.
+		 */
+		i2c_dw_disable_int(dev);
+		dw_readl(dev, DW_IC_CLR_INTR);
+
 		complete(&dev->cmd_complete);
-	else if (unlikely(dev->accessor_flags & ACCESS_INTR_MASK)) {
+	} else if (unlikely(dev->accessor_flags & ACCESS_INTR_MASK)) {
 		/* workaround to trigger pending interrupt */
 		stat = dw_readl(dev, DW_IC_INTR_MASK);
 		i2c_dw_disable_int(dev);
