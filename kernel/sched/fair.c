@@ -2878,12 +2878,24 @@ static inline u64 cfs_rq_clock_task(struct cfs_rq *cfs_rq);
 static inline int update_cfs_rq_load_avg(u64 now, struct cfs_rq *cfs_rq)
 {
 	struct sched_avg *sa = &cfs_rq->avg;
+	struct sched_avg *cpu_sa = NULL;
 	int decayed, removed = 0;
+	int cpu = cpu_of(rq_of(cfs_rq));
+
+	if (&cpu_rq(cpu)->cfs != cfs_rq)
+		cpu_sa = &cpu_rq(cpu)->cfs.avg;
 
 	if (atomic_long_read(&cfs_rq->removed_load_avg)) {
 		s64 r = atomic_long_xchg(&cfs_rq->removed_load_avg, 0);
 		sa->load_avg = max_t(long, sa->load_avg - r, 0);
 		sa->load_sum = max_t(s64, sa->load_sum - r * LOAD_AVG_MAX, 0);
+
+		if (cpu_sa) {
+			cpu_sa->load_avg = max_t(long, cpu_sa->load_avg - r, 0);
+			cpu_sa->load_sum = max_t(s64,
+					cpu_sa->load_sum - r * LOAD_AVG_MAX, 0);
+		}
+
 		removed = 1;
 	}
 
@@ -2891,6 +2903,12 @@ static inline int update_cfs_rq_load_avg(u64 now, struct cfs_rq *cfs_rq)
 		long r = atomic_long_xchg(&cfs_rq->removed_util_avg, 0);
 		sa->util_avg = max_t(long, sa->util_avg - r, 0);
 		sa->util_sum = max_t(s32, sa->util_sum - r * LOAD_AVG_MAX, 0);
+
+		if (cpu_sa) {
+			cpu_sa->util_avg = max_t(long, cpu_sa->util_avg - r, 0);
+			cpu_sa->util_sum = max_t(s64,
+					cpu_sa->util_sum - r * LOAD_AVG_MAX, 0);
+		}
 	}
 
 	decayed = __update_load_avg(now, cpu_of(rq_of(cfs_rq)), sa,
@@ -2949,6 +2967,8 @@ static inline void update_load_avg(struct sched_entity *se, int update_tg)
 
 static void attach_entity_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *se)
 {
+	int cpu = cpu_of(rq_of(cfs_rq));
+
 	if (!sched_feat(ATTACH_AGE_LOAD))
 		goto skip_aging;
 
@@ -2972,6 +2992,13 @@ skip_aging:
 	cfs_rq->avg.load_sum += se->avg.load_sum;
 	cfs_rq->avg.util_avg += se->avg.util_avg;
 	cfs_rq->avg.util_sum += se->avg.util_sum;
+
+	if (&cpu_rq(cpu)->cfs != cfs_rq) {
+		cpu_rq(cpu)->cfs.avg.load_avg += se->avg.load_avg;
+		cpu_rq(cpu)->cfs.avg.load_sum += se->avg.load_sum;
+		cpu_rq(cpu)->cfs.avg.util_avg += se->avg.util_avg;
+		cpu_rq(cpu)->cfs.avg.util_sum += se->avg.util_sum;
+	}
 }
 
 static void detach_entity_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *se)
