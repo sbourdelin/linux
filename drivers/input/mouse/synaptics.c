@@ -943,6 +943,8 @@ static void synaptics_report_mt_data(struct psmouse *psmouse,
 		input_report_abs(dev, ABS_MT_PRESSURE, hw[i]->z);
 	}
 
+	input_report_abs(dev, ABS_TOOL_WIDTH, hw[0]->w);
+
 	input_mt_drop_unused(dev);
 
 	/* Don't use active slot count to generate BTN_TOOL events. */
