@@ -677,7 +677,7 @@ static void synaptics_parse_agm(const unsigned char buf[],
 		agm->w = hw->w;
 		agm->x = (((buf[4] & 0x0f) << 8) | buf[1]) << 1;
 		agm->y = (((buf[4] & 0xf0) << 4) | buf[2]) << 1;
-		agm->z = ((buf[3] & 0x30) | (buf[5] & 0x0f)) << 1;
+		agm->z = ((buf[3] & 0x30) | (buf[5] & 0x0f)) << 2;
 		break;
 
 	case 2:
