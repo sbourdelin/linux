@@ -161,7 +161,8 @@ void btrfs_update_iflags(struct inode *inode)
 /*
  * Inherit flags from the parent inode.
  *
- * Currently only the compression flags and the cow flags are inherited.
+ * Currently only the compression flags, dedupe flags and the cow flags
+ * are inherited.
  */
 void btrfs_inherit_iflags(struct inode *inode, struct inode *dir)
 {
@@ -185,6 +186,9 @@ void btrfs_inherit_iflags(struct inode *inode, struct inode *dir)
 		if (S_ISREG(inode->i_mode))
 			BTRFS_I(inode)->flags |= BTRFS_INODE_NODATASUM;
 	}
+
+	if (flags & BTRFS_INODE_NODEDUPE)
+		BTRFS_I(inode)->flags |= BTRFS_INODE_NODEDUPE;
 
 	btrfs_update_iflags(inode);
 }
