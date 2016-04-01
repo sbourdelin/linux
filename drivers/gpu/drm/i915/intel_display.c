@@ -13185,7 +13185,6 @@ static int intel_modeset_checks(struct drm_atomic_state *state)
 	}
 
 	intel_state->modeset = true;
-	intel_state->active_crtcs = dev_priv->active_crtcs;
 
 	for_each_crtc_in_state(state, crtc, crtc_state, i) {
 		if (crtc_state->active)
@@ -13280,6 +13279,8 @@ static int intel_atomic_check(struct drm_device *dev,
 	ret = drm_atomic_helper_check_modeset(dev, state);
 	if (ret)
 		return ret;
+
+	intel_state->active_crtcs = dev_priv->active_crtcs;
 
 	for_each_crtc_in_state(state, crtc, crtc_state, i) {
 		struct intel_crtc_state *pipe_config =
