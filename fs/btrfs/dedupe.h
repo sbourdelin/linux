@@ -123,6 +123,19 @@ void btrfs_dedupe_status(struct btrfs_fs_info *fs_info,
  */
 int btrfs_dedupe_disable(struct btrfs_fs_info *fs_info);
 
+ /*
+ * Restore previous dedupe setup from disk
+ * Called at mount time
+ */
+int btrfs_dedupe_resume(struct btrfs_fs_info *fs_info,
+		       struct btrfs_root *dedupe_root);
+
+/*
+ * Cleanup current btrfs_dedupe_info
+ * Called in umount time
+ */
+int btrfs_dedupe_cleanup(struct btrfs_fs_info *fs_info);
+
 /*
  * Cleanup current btrfs_dedupe_info
  * Called in umount time

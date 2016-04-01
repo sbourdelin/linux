@@ -2162,7 +2162,7 @@ static void btrfs_stop_all_workers(struct btrfs_fs_info *fs_info)
 	btrfs_destroy_workqueue(fs_info->extent_workers);
 }
 
-static void free_root_extent_buffers(struct btrfs_root *root)
+void free_root_extent_buffers(struct btrfs_root *root)
 {
 	if (root) {
 		free_extent_buffer(root->node);
@@ -2496,7 +2496,28 @@ static int btrfs_read_roots(struct btrfs_fs_info *fs_info,
 		fs_info->free_space_root = root;
 	}
 
-	return 0;
+	location.objectid = BTRFS_DEDUPE_TREE_OBJECTID;
+	root = btrfs_read_tree_root(tree_root, &location);
+	if (IS_ERR(root)) {
+		ret = PTR_ERR(root);
+		if (ret != -ENOENT)
+			return ret;
+		return 0;
+	}
+
+	set_bit(BTRFS_ROOT_TRACK_DIRTY, &root->state);
+	ret = btrfs_dedupe_resume(fs_info, root);
+	if (ret < 0) {
+		if (ret == -EINVAL)
+			btrfs_err(fs_info,
+				"invalid dedupe parameter found");
+		if (ret == -EOPNOTSUPP)
+			btrfs_err(fs_info,
+				"unsupported dedupe parameter found");
+		free_root_extent_buffers(root);
+		kfree(root);
+	}
+	return ret;
 }
 
 int open_ctree(struct super_block *sb,
