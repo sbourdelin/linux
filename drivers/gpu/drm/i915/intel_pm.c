@@ -2953,8 +2953,7 @@ skl_plane_relative_data_rate(const struct intel_crtc_state *cstate,
 	}
 
 	/* for packed formats */
-	return intel_crtc->config->pipe_src_w *
-		intel_crtc->config->pipe_src_h *
+	return cstate->pipe_src_w * cstate->pipe_src_h *
 		drm_format_plane_cpp(fb->pixel_format, 0);
 }
 
