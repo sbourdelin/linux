@@ -14,7 +14,7 @@
 
 #ifndef __ASSEMBLY__
 
-#ifdef CONFIG_PPC64
+#if defined(CONFIG_PPC64) && (!defined(_CALL_ELF) || _CALL_ELF != 2)
 #define FUNCTION_DESCR_SIZE	24
 #else
 #define FUNCTION_DESCR_SIZE	0
@@ -53,6 +53,10 @@
 				     ___PPC_RA(base) | IMM_L(i))
 #define PPC_STWU(r, base, i)	EMIT(PPC_INST_STWU | ___PPC_RS(r) |	      \
 				     ___PPC_RA(base) | IMM_L(i))
+#define PPC_STH(r, base, i)	EMIT(PPC_INST_STH | ___PPC_RS(r) |	      \
+				     ___PPC_RA(base) | IMM_L(i))
+#define PPC_STB(r, base, i)	EMIT(PPC_INST_STB | ___PPC_RS(r) |	      \
+				     ___PPC_RA(base) | IMM_L(i))
 
 #define PPC_LBZ(r, base, i)	EMIT(PPC_INST_LBZ | ___PPC_RT(r) |	      \
 				     ___PPC_RA(base) | IMM_L(i))
@@ -64,6 +68,31 @@
 				     ___PPC_RA(base) | IMM_L(i))
 #define PPC_LHBRX(r, base, b)	EMIT(PPC_INST_LHBRX | ___PPC_RT(r) |	      \
 				     ___PPC_RA(base) | ___PPC_RB(b))
+#define PPC_LDBRX(r, base, b)	EMIT(PPC_INST_LDBRX | ___PPC_RT(r) |	      \
+				     ___PPC_RA(base) | ___PPC_RB(b))
+
+/*
+ * TODO: Ugly hack for now, as these are defined in ppc-opcode.h
+ * There are two ways to address this:
+ * 1. move all these generic instruction macros PPC_* to ppc-opcode.h and change
+ *    bpf_jit_comp.c to simply use EMIT(PPC_*)
+ * 2. rename all PPC_* macros here to PPC_BPF_* macros and change bpf_jit_comp.c
+ *    to use the new names.
+ * The former may be preferable if these generic macros will be useful elsewhere
+ * in the kernel.
+ */
+#undef PPC_LDARX
+#define PPC_LDARX(t, a, b, eh)	EMIT(PPC_INST_LDARX | ___PPC_RT(t) |	      \
+					___PPC_RA(a) | ___PPC_RB(b) |	      \
+					__PPC_EH(eh))
+#undef PPC_LWARX
+#define PPC_LWARX(t, a, b, eh)	EMIT(PPC_INST_LWARX | ___PPC_RT(t) |	      \
+					___PPC_RA(a) | ___PPC_RB(b) |	      \
+					__PPC_EH(eh))
+#define PPC_STWCX(s, a, b)	EMIT(PPC_INST_STWCX | ___PPC_RS(s) |	      \
+					___PPC_RA(a) | ___PPC_RB(b))
+#define PPC_STDCX(s, a, b)	EMIT(PPC_INST_STDCX | ___PPC_RS(s) |	      \
+					___PPC_RA(a) | ___PPC_RB(b))
 
 #ifdef CONFIG_PPC64
 #define PPC_BPF_LL(r, base, i) do { PPC_LD(r, base, i); } while(0)
@@ -77,13 +106,22 @@
 
 #define PPC_CMPWI(a, i)		EMIT(PPC_INST_CMPWI | ___PPC_RA(a) | IMM_L(i))
 #define PPC_CMPDI(a, i)		EMIT(PPC_INST_CMPDI | ___PPC_RA(a) | IMM_L(i))
+#define PPC_CMPW(a, b)		EMIT(PPC_INST_CMPW | ___PPC_RA(a) |	      \
+					___PPC_RB(b))
+#define PPC_CMPD(a, b)		EMIT(PPC_INST_CMPD | ___PPC_RA(a) |	      \
+					___PPC_RB(b))
 #define PPC_CMPLWI(a, i)	EMIT(PPC_INST_CMPLWI | ___PPC_RA(a) | IMM_L(i))
+#define PPC_CMPLDI(a, i)	EMIT(PPC_INST_CMPLDI | ___PPC_RA(a) | IMM_L(i))
 #define PPC_CMPLW(a, b)		EMIT(PPC_INST_CMPLW | ___PPC_RA(a) |	      \
+					___PPC_RB(b))
+#define PPC_CMPLD(a, b)		EMIT(PPC_INST_CMPLD | ___PPC_RA(a) |	      \
 					___PPC_RB(b))
 
 #define PPC_SUB(d, a, b)	EMIT(PPC_INST_SUB | ___PPC_RT(d) |	      \
 				     ___PPC_RB(a) | ___PPC_RA(b))
 #define PPC_ADD(d, a, b)	EMIT(PPC_INST_ADD | ___PPC_RT(d) |	      \
+				     ___PPC_RA(a) | ___PPC_RB(b))
+#define PPC_MULD(d, a, b)	EMIT(PPC_INST_MULLD | ___PPC_RT(d) |	      \
 				     ___PPC_RA(a) | ___PPC_RB(b))
 #define PPC_MULW(d, a, b)	EMIT(PPC_INST_MULLW | ___PPC_RT(d) |	      \
 				     ___PPC_RA(a) | ___PPC_RB(b))
@@ -92,6 +130,8 @@
 #define PPC_MULI(d, a, i)	EMIT(PPC_INST_MULLI | ___PPC_RT(d) |	      \
 				     ___PPC_RA(a) | IMM_L(i))
 #define PPC_DIVWU(d, a, b)	EMIT(PPC_INST_DIVWU | ___PPC_RT(d) |	      \
+				     ___PPC_RA(a) | ___PPC_RB(b))
+#define PPC_DIVD(d, a, b)	EMIT(PPC_INST_DIVD | ___PPC_RT(d) |	      \
 				     ___PPC_RA(a) | ___PPC_RB(b))
 #define PPC_AND(d, a, b)	EMIT(PPC_INST_AND | ___PPC_RA(d) |	      \
 				     ___PPC_RS(a) | ___PPC_RB(b))
@@ -113,11 +153,26 @@
 				     ___PPC_RS(a) | IMM_L(i))
 #define PPC_SLW(d, a, s)	EMIT(PPC_INST_SLW | ___PPC_RA(d) |	      \
 				     ___PPC_RS(a) | ___PPC_RB(s))
+#define PPC_SLD(d, a, s)	EMIT(PPC_INST_SLD | ___PPC_RA(d) |	      \
+				     ___PPC_RS(a) | ___PPC_RB(s))
 #define PPC_SRW(d, a, s)	EMIT(PPC_INST_SRW | ___PPC_RA(d) |	      \
 				     ___PPC_RS(a) | ___PPC_RB(s))
+#define PPC_SRD(d, a, s)	EMIT(PPC_INST_SRD | ___PPC_RA(d) |	      \
+				     ___PPC_RS(a) | ___PPC_RB(s))
+#define PPC_SRAD(d, a, s)	EMIT(PPC_INST_SRAD | ___PPC_RA(d) |	      \
+				     ___PPC_RS(a) | ___PPC_RB(s))
+#define PPC_SRADI(d, a, i)	EMIT(PPC_INST_SRADI | ___PPC_RA(d) |	      \
+				     ___PPC_RS(a) | __PPC_SH(i) |             \
+				     (((i) & 0x20) >> 4))
 #define PPC_RLWINM(d, a, i, mb, me)	EMIT(PPC_INST_RLWINM | ___PPC_RA(d) | \
 					___PPC_RS(a) | __PPC_SH(i) |	      \
 					__PPC_MB(mb) | __PPC_ME(me))
+#define PPC_RLWIMI(d, a, i, mb, me)	EMIT(PPC_INST_RLWIMI | ___PPC_RA(d) | \
+					___PPC_RS(a) | __PPC_SH(i) |	      \
+					__PPC_MB(mb) | __PPC_ME(me))
+#define PPC_RLDICL(d, a, i, mb)		EMIT(PPC_INST_RLDICL | ___PPC_RA(d) | \
+					___PPC_RS(a) | __PPC_SH(i) |	      \
+					__PPC_MB64(mb) | (((i) & 0x20) >> 4))
 #define PPC_RLDICR(d, a, i, me)		EMIT(PPC_INST_RLDICR | ___PPC_RA(d) | \
 					___PPC_RS(a) | __PPC_SH(i) |	      \
 					__PPC_ME64(me) | (((i) & 0x20) >> 4))
@@ -128,6 +183,8 @@
 #define PPC_SRWI(d, a, i)	PPC_RLWINM(d, a, 32-(i), i, 31)
 /* sldi = rldicr Rx, Ry, n, 63-n */
 #define PPC_SLDI(d, a, i)	PPC_RLDICR(d, a, i, 63-(i))
+/* sldi = rldicl Rx, Ry, 64-n, n */
+#define PPC_SRDI(d, a, i)	PPC_RLDICL(d, a, 64-(i), i)
 
 #define PPC_NEG(d, a)		EMIT(PPC_INST_NEG | ___PPC_RT(d) | ___PPC_RA(a))
 
@@ -149,6 +206,13 @@
 			if (IMM_L(i))					      \
 				PPC_ORI(d, d, IMM_L(i));		      \
 		} } while(0)
+
+/* Unsigned 32-bit immediate load */
+#define PPC_LI32U(d, i)		do {					      \
+		PPC_LI32(d, i);						      \
+		if ((int)(uintptr_t)(i) < 0)				      \
+			PPC_RLWINM(d, d, 0, 0, 31);			      \
+		} while (0)
 
 #define PPC_LI64(d, i)		do {					      \
 		if ((long)(i) >= -2147483648 &&				      \
