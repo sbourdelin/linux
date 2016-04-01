@@ -8010,6 +8010,10 @@ static void sched_dl_do_global(void)
 		raw_spin_unlock_irqrestore(&dl_b->lock, flags);
 
 		rcu_read_unlock_sched();
+		if (dl_b->bw == -1)
+			cpu_rq(cpu)->dl.non_deadline_bw = 0;
+		else
+			cpu_rq(cpu)->dl.non_deadline_bw = (1 << 20) - new_bw;
 	}
 }
 

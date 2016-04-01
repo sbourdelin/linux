@@ -526,6 +526,12 @@ struct dl_rq {
 	 * task blocks
 	 */
 	s64 running_bw;
+
+	/*
+	 * Fraction of the CPU utilization that cannot be reclaimed
+	 * by the GRUB algorithm.
+	 */
+	s64 non_deadline_bw;
 };
 
 #ifdef CONFIG_SMP
