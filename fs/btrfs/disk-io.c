@@ -51,6 +51,7 @@
 #include "sysfs.h"
 #include "qgroup.h"
 #include "compression.h"
+#include "dedupe.h"
 
 #ifdef CONFIG_X86
 #include <asm/cpufeature.h>
@@ -3883,6 +3884,8 @@ void close_ctree(struct btrfs_root *root)
 	smp_mb();
 
 	btrfs_free_qgroup_config(fs_info);
+
+	btrfs_dedupe_cleanup(fs_info);
 
 	if (percpu_counter_sum(&fs_info->delalloc_bytes)) {
 		btrfs_info(fs_info, "at unmount delalloc count %lld",

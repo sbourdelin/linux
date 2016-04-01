@@ -103,11 +103,26 @@ static inline struct btrfs_dedupe_hash *btrfs_dedupe_alloc_hash(u16 type)
 int btrfs_dedupe_enable(struct btrfs_fs_info *fs_info, u16 type, u16 backend,
 			u64 blocksize, u64 limit_nr, u64 limit_mem);
 
+
+ /*
+ * Get inband dedupe info
+ * Since it needs to access different backends' hash size, which
+ * is not exported, we need such simple function.
+ */
+void btrfs_dedupe_status(struct btrfs_fs_info *fs_info,
+			 struct btrfs_ioctl_dedupe_args *dargs);
+
 /*
  * Disable dedupe and invalidate all its dedupe data.
  * Called at dedupe disable time.
  */
 int btrfs_dedupe_disable(struct btrfs_fs_info *fs_info);
+
+/*
+ * Cleanup current btrfs_dedupe_info
+ * Called in umount time
+ */
+int btrfs_dedupe_cleanup(struct btrfs_fs_info *fs_info);
 
 /*
  * Calculate hash for dedup.
