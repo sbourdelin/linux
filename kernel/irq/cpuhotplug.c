@@ -30,6 +30,8 @@ static bool migrate_one_irq(struct irq_desc *desc)
 		return false;
 
 	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
+		if (irq_settings_has_no_balance_set(desc))
+			irqd_clear(d, IRQD_NO_BALANCING);
 		affinity = cpu_online_mask;
 		ret = true;
 	}
