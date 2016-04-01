@@ -732,14 +732,12 @@ static int decode_wcc_attr(struct xdr_stream *xdr, struct nfs_fattr *fattr)
 		goto out_overflow;
 
 	fattr->valid |= NFS_ATTR_FATTR_PRESIZE
-		| NFS_ATTR_FATTR_PRECHANGE
 		| NFS_ATTR_FATTR_PREMTIME
 		| NFS_ATTR_FATTR_PRECTIME;
 
 	p = xdr_decode_size3(p, &fattr->pre_size);
 	p = xdr_decode_nfstime3(p, &fattr->pre_mtime);
 	xdr_decode_nfstime3(p, &fattr->pre_ctime);
-	fattr->pre_change_attr = nfs_timespec_to_change_attr(&fattr->pre_ctime);
 
 	return 0;
 out_overflow:
