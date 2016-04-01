@@ -56,7 +56,8 @@ struct nfs_access_entry {
 };
 
 struct nfs_lockowner {
-	fl_owner_t l_owner;
+	fl_owner_t l_owner_posix;
+	fl_owner_t l_owner_ofd;
 	pid_t l_pid;
 };
 
@@ -542,7 +543,7 @@ nfs_have_writebacks(struct inode *inode)
 extern int  nfs_readpage(struct file *, struct page *);
 extern int  nfs_readpages(struct file *, struct address_space *,
 		struct list_head *, unsigned);
-extern int  nfs_readpage_async(struct nfs_open_context *, struct inode *,
+extern int  nfs_readpage_async(struct nfs_lock_context *, struct inode *,
 			       struct page *);
 
 /*

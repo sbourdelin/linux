@@ -700,22 +700,25 @@ out:
 }
 EXPORT_SYMBOL_GPL(nfs_getattr);
 
-static void nfs_init_lock_context(struct nfs_lock_context *l_ctx)
+static void nfs_init_lock_context(struct nfs_lock_context *l_ctx, struct file *file)
 {
 	atomic_set(&l_ctx->count, 1);
-	l_ctx->lockowner.l_owner = current->files;
+	l_ctx->lockowner.l_owner_posix = current->files;
+	l_ctx->lockowner.l_owner_ofd = file;
 	l_ctx->lockowner.l_pid = current->tgid;
 	INIT_LIST_HEAD(&l_ctx->list);
 	atomic_set(&l_ctx->io_count, 0);
 }
 
-static struct nfs_lock_context *__nfs_find_lock_context(struct nfs_open_context *ctx)
+static struct nfs_lock_context *__nfs_find_lock_context(struct nfs_open_context *ctx, struct file *file)
 {
 	struct nfs_lock_context *head = &ctx->lock_context;
 	struct nfs_lock_context *pos = head;
 
 	do {
-		if (pos->lockowner.l_owner != current->files)
+		if (pos->lockowner.l_owner_posix != current->files)
+			continue;
+		if (pos->lockowner.l_owner_ofd != file)
 			continue;
 		if (pos->lockowner.l_pid != current->tgid)
 			continue;
@@ -725,21 +728,22 @@ static struct nfs_lock_context *__nfs_find_lock_context(struct nfs_open_context 
 	return NULL;
 }
 
-struct nfs_lock_context *nfs_find_lock_context(struct nfs_open_context *ctx)
+struct nfs_lock_context *nfs_find_lock_context(struct file *file)
 {
+	struct nfs_open_context *ctx = nfs_file_open_context(file);
 	struct nfs_lock_context *res, *new = NULL;
 	struct inode *inode = d_inode(ctx->dentry);
 
 	spin_lock(&inode->i_lock);
-	res = __nfs_find_lock_context(ctx);
+	res = __nfs_find_lock_context(ctx, file);
 	if (res == NULL) {
 		spin_unlock(&inode->i_lock);
 		new = kmalloc(sizeof(*new), GFP_KERNEL);
 		if (new == NULL)
 			return ERR_PTR(-ENOMEM);
-		nfs_init_lock_context(new);
+		nfs_init_lock_context(new, file);
 		spin_lock(&inode->i_lock);
-		res = __nfs_find_lock_context(ctx);
+		res = __nfs_find_lock_context(ctx, file);
 		if (res == NULL) {
 			list_add_tail(&new->list, &ctx->lock_context.list);
 			new->open_context = ctx;
@@ -826,7 +830,7 @@ struct nfs_open_context *alloc_nfs_open_context(struct dentry *dentry, fmode_t f
 	ctx->mode = f_mode;
 	ctx->flags = 0;
 	ctx->error = 0;
-	nfs_init_lock_context(&ctx->lock_context);
+	nfs_init_lock_context(&ctx->lock_context, NULL);
 	ctx->lock_context.open_context = ctx;
 	INIT_LIST_HEAD(&ctx->list);
 	ctx->mdsthreshold = NULL;
@@ -893,6 +897,7 @@ EXPORT_SYMBOL_GPL(nfs_inode_attach_open_context);
 void nfs_file_set_open_context(struct file *filp, struct nfs_open_context *ctx)
 {
 	filp->private_data = get_nfs_open_context(ctx);
+	ctx->lock_context.lockowner.l_owner_ofd = filp;
 	if (list_empty(&ctx->list))
 		nfs_inode_attach_open_context(ctx);
 }

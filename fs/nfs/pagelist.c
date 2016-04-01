@@ -314,27 +314,20 @@ nfs_page_group_destroy(struct kref *kref)
  * User should ensure it is safe to sleep in this function.
  */
 struct nfs_page *
-nfs_create_request(struct nfs_open_context *ctx, struct page *page,
+nfs_create_request(struct nfs_lock_context *l_ctx, struct page *page,
 		   struct nfs_page *last, unsigned int offset,
 		   unsigned int count)
 {
 	struct nfs_page		*req;
-	struct nfs_lock_context *l_ctx;
 
-	if (test_bit(NFS_CONTEXT_BAD, &ctx->flags))
+	if (test_bit(NFS_CONTEXT_BAD, &l_ctx->open_context->flags))
 		return ERR_PTR(-EBADF);
 	/* try to allocate the request struct */
 	req = nfs_page_alloc();
 	if (req == NULL)
 		return ERR_PTR(-ENOMEM);
 
-	/* get lock context early so we can deal with alloc failures */
-	l_ctx = nfs_find_lock_context(ctx);
-	if (IS_ERR(l_ctx)) {
-		nfs_page_free(req);
-		return ERR_CAST(l_ctx);
-	}
-	req->wb_lock_context = l_ctx;
+	req->wb_lock_context = get_nfs_lock_context(l_ctx);
 	atomic_inc(&l_ctx->io_count);
 
 	/* Initialize the request struct. Initially, we assume a
@@ -346,7 +339,7 @@ nfs_create_request(struct nfs_open_context *ctx, struct page *page,
 	req->wb_offset  = offset;
 	req->wb_pgbase	= offset;
 	req->wb_bytes   = count;
-	req->wb_context = get_nfs_open_context(ctx);
+	req->wb_context = get_nfs_open_context(l_ctx->open_context);
 	kref_init(&req->wb_kref);
 	nfs_page_group_init(req, last);
 	return req;
@@ -865,7 +858,7 @@ static void nfs_pageio_cleanup_mirroring(struct nfs_pageio_descriptor *pgio)
 static bool nfs_match_lock_context(const struct nfs_lock_context *l1,
 		const struct nfs_lock_context *l2)
 {
-	return l1->lockowner.l_owner == l2->lockowner.l_owner
+	return l1->lockowner.l_owner_posix == l2->lockowner.l_owner_posix
 		&& l1->lockowner.l_pid == l2->lockowner.l_pid;
 }
 
@@ -1024,7 +1017,7 @@ static int __nfs_pageio_add_request(struct nfs_pageio_descriptor *desc,
 		pgbase += subreq->wb_bytes;
 
 		if (bytes_left) {
-			subreq = nfs_create_request(req->wb_context,
+			subreq = nfs_create_request(req->wb_lock_context,
 					req->wb_page,
 					subreq, pgbase, bytes_left);
 			if (IS_ERR(subreq))
@@ -1115,7 +1108,7 @@ int nfs_pageio_add_request(struct nfs_pageio_descriptor *desc,
 			     lastreq = lastreq->wb_this_page)
 				;
 
-			dupreq = nfs_create_request(req->wb_context,
+			dupreq = nfs_create_request(req->wb_lock_context,
 					req->wb_page, lastreq, pgbase, bytes);
 
 			if (IS_ERR(dupreq)) {

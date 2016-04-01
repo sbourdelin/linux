@@ -114,26 +114,26 @@ static inline void nfs_fscache_invalidate_page(struct page *page,
 /*
  * Retrieve a page from an inode data storage object.
  */
-static inline int nfs_readpage_from_fscache(struct nfs_open_context *ctx,
+static inline int nfs_readpage_from_fscache(struct nfs_lock_context *l_ctx,
 					    struct inode *inode,
 					    struct page *page)
 {
 	if (NFS_I(inode)->fscache)
-		return __nfs_readpage_from_fscache(ctx, inode, page);
+		return __nfs_readpage_from_fscache(l_ctx, inode, page);
 	return -ENOBUFS;
 }
 
 /*
  * Retrieve a set of pages from an inode data storage object.
  */
-static inline int nfs_readpages_from_fscache(struct nfs_open_context *ctx,
+static inline int nfs_readpages_from_fscache(struct nfs_lock_context *l_ctx,
 					     struct inode *inode,
 					     struct address_space *mapping,
 					     struct list_head *pages,
 					     unsigned *nr_pages)
 {
 	if (NFS_I(inode)->fscache)
-		return __nfs_readpages_from_fscache(ctx, inode, mapping, pages,
+		return __nfs_readpages_from_fscache(l_ctx, inode, mapping, pages,
 						    nr_pages);
 	return -ENOBUFS;
 }
@@ -199,13 +199,13 @@ static inline void nfs_fscache_invalidate_page(struct page *page,
 static inline void nfs_fscache_wait_on_page_write(struct nfs_inode *nfsi,
 						  struct page *page) {}
 
-static inline int nfs_readpage_from_fscache(struct nfs_open_context *ctx,
+static inline int nfs_readpage_from_fscache(struct nfs_lock_context *l_ctx,
 					    struct inode *inode,
 					    struct page *page)
 {
 	return -ENOBUFS;
 }
-static inline int nfs_readpages_from_fscache(struct nfs_open_context *ctx,
+static inline int nfs_readpages_from_fscache(struct nfs_lock_context *l_ctx,
 					     struct inode *inode,
 					     struct address_space *mapping,
 					     struct list_head *pages,

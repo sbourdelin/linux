@@ -2695,7 +2695,8 @@ static int _nfs4_do_setattr(struct inode *inode, struct rpc_cred *cred,
 		/* Use that stateid */
 	} else if (truncate && state != NULL) {
 		struct nfs_lockowner lockowner = {
-			.l_owner = current->files,
+			.l_owner_posix = current->files,
+			.l_owner_ofd = sattr->ia_file,
 			.l_pid = current->tgid,
 		};
 		if (!nfs4_valid_open_stateid(state))
