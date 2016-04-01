@@ -130,23 +130,15 @@ static inline const char *i8k_get_dmi_data(int field)
 /*
  * Call the System Management Mode BIOS. Code provided by Jonathan Buzzard.
  */
-static int i8k_smm(struct smm_regs *regs)
+static int i8k_smm_func(void *par)
 {
 	int rc;
+	struct smm_regs *regs = par;
 	int eax = regs->eax;
-	cpumask_var_t old_mask;
 
 	/* SMM requires CPU 0 */
-	if (!alloc_cpumask_var(&old_mask, GFP_KERNEL))
-		return -ENOMEM;
-	cpumask_copy(old_mask, &current->cpus_allowed);
-	rc = set_cpus_allowed_ptr(current, cpumask_of(0));
-	if (rc)
-		goto out;
-	if (smp_processor_id() != 0) {
-		rc = -EBUSY;
-		goto out;
-	}
+	if (smp_processor_id() != 0)
+		return -EBUSY;
 
 #if defined(CONFIG_X86_64)
 	asm volatile("pushq %%rax\n\t"
@@ -204,10 +196,15 @@ static int i8k_smm(struct smm_regs *regs)
 	if (rc != 0 || (regs->eax & 0xffff) == 0xffff || regs->eax == eax)
 		rc = -EINVAL;
 
-out:
-	set_cpus_allowed_ptr(current, old_mask);
-	free_cpumask_var(old_mask);
 	return rc;
+}
+
+/*
+ * Call the System Management Mode BIOS.
+ */
+static int i8k_smm(struct smm_regs *regs)
+{
+	return smp_call_sync_on_phys_cpu(0, i8k_smm_func, regs);
 }
 
 /*
