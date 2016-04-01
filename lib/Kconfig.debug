@@ -1486,7 +1486,7 @@ config CPU_HOTPLUG_STATE_CONTROL
 	  option for now as the hotplug machinery cannot be stopped and
 	  restarted at arbitrary points yet.
 
-	  Say N if your are unsure.
+	  Say N if you are unsure.
 
 config NOTIFIER_ERROR_INJECTION
 	tristate "Notifier error injection"
