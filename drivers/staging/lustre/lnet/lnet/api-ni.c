@@ -269,15 +269,15 @@ static void lnet_assert_wire_constants(void)
 	CLASSERT((int)sizeof(((lnet_hdr_t *)0)->msg.hello.type) == 4);
 }
 
-static lnd_t *
+static struct lnet_lnd *
 lnet_find_lnd_by_type(__u32 type)
 {
-	lnd_t *lnd;
+	struct lnet_lnd *lnd;
 	struct list_head *tmp;
 
 	/* holding lnd mutex */
 	list_for_each(tmp, &the_lnet.ln_lnds) {
-		lnd = list_entry(tmp, lnd_t, lnd_list);
+		lnd = list_entry(tmp, struct lnet_lnd, lnd_list);
 
 		if (lnd->lnd_type == type)
 			return lnd;
@@ -287,7 +287,7 @@ lnet_find_lnd_by_type(__u32 type)
 }
 
 void
-lnet_register_lnd(lnd_t *lnd)
+lnet_register_lnd(struct lnet_lnd *lnd)
 {
 	mutex_lock(&the_lnet.ln_lnd_mutex);
 
@@ -304,7 +304,7 @@ lnet_register_lnd(lnd_t *lnd)
 EXPORT_SYMBOL(lnet_register_lnd);
 
 void
-lnet_unregister_lnd(lnd_t *lnd)
+lnet_unregister_lnd(struct lnet_lnd *lnd)
 {
 	mutex_lock(&the_lnet.ln_lnd_mutex);
 
@@ -1220,7 +1220,7 @@ lnet_startup_lndni(struct lnet_ni *ni, __s32 peer_timeout,
 {
 	int rc = -EINVAL;
 	int lnd_type;
-	lnd_t *lnd;
+	struct lnet_lnd *lnd;
 	struct lnet_tx_queue *tq;
 	int i;
 
@@ -1460,7 +1460,7 @@ void lnet_lib_exit(void)
 
 	while (!list_empty(&the_lnet.ln_lnds))
 		lnet_unregister_lnd(list_entry(the_lnet.ln_lnds.next,
-					       lnd_t, lnd_list));
+					       struct lnet_lnd, lnd_list));
 	lnet_destroy_locks();
 }
 

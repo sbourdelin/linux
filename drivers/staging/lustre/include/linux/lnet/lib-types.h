@@ -178,7 +178,7 @@ typedef struct {
 
 struct lnet_ni;			/* forward ref */
 
-typedef struct lnet_lnd {
+struct lnet_lnd {
 	/* fields managed by portals */
 	struct list_head	lnd_list;	/* stash in the LND table */
 	int			lnd_refcount;	/* # active instances */
@@ -244,7 +244,7 @@ typedef struct lnet_lnd {
 
 	/* accept a new connection */
 	int (*lnd_accept)(struct lnet_ni *ni, struct socket *sock);
-} lnd_t;
+};
 
 struct lnet_tx_queue {
 	int			tq_credits;	/* # tx credits free */
@@ -268,7 +268,7 @@ typedef struct lnet_ni {
 	__u32			 *ni_cpts;	/* bond NI on some CPTs */
 	lnet_nid_t		  ni_nid;	/* interface's NID */
 	void			 *ni_data;	/* instance-specific data */
-	lnd_t			 *ni_lnd;	/* procedural interface */
+	struct lnet_lnd		 *ni_lnd;	/* procedural interface */
 	struct lnet_tx_queue	**ni_tx_queues;	/* percpt TX queues */
 	int			**ni_refs;	/* percpt reference count */
 	time64_t		  ni_last_alive;/* when I was last alive */
