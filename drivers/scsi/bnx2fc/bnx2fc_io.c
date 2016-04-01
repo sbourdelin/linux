@@ -15,6 +15,8 @@
 
 #define RESERVE_FREE_LIST_INDEX num_possible_cpus()
 
+extern uint bnx2fc_tm_timeout;
+
 static int bnx2fc_split_bd(struct bnx2fc_cmd *io_req, u64 addr, int sg_len,
 			   int bd_index);
 static int bnx2fc_map_sg(struct bnx2fc_cmd *io_req);
@@ -770,7 +772,7 @@ retry_tmf:
 	spin_unlock_bh(&tgt->tgt_lock);
 
 	rc = wait_for_completion_timeout(&io_req->tm_done,
-					 BNX2FC_TM_TIMEOUT * HZ);
+					 bnx2fc_tm_timeout * HZ);
 	spin_lock_bh(&tgt->tgt_lock);
 
 	io_req->wait_for_comp = 0;
