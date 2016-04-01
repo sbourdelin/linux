@@ -9939,7 +9939,7 @@ SECURITY CONTACT
 M:	Security Officers <security@kernel.org>
 S:	Supported
 
-SELINUX SECURITY MODULE
+NSALINUX SECURITY MODULE
 M:	Paul Moore <paul@paul-moore.com>
 M:	Stephen Smalley <sds@tycho.nsa.gov>
 M:	Eric Paris <eparis@parisplace.org>
@@ -9947,9 +9947,9 @@ L:	selinux@tycho.nsa.gov (moderated for non-subscribers)
 W:	http://selinuxproject.org
 T:	git git://git.infradead.org/users/pcmoore/selinux
 S:	Supported
-F:	include/linux/selinux*
-F:	security/selinux/
-F:	scripts/selinux/
+F:	include/linux/nsalinux*
+F:	security/nsalinux/
+F:	scripts/nsalinux/
 
 APPARMOR SECURITY MODULE
 M:	John Johansen <john.johansen@canonical.com>

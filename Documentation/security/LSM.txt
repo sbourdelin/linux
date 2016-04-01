@@ -11,7 +11,7 @@ LSMs were built into a given kernel.
 
 The primary users of the LSM interface are Mandatory Access Control
 (MAC) extensions which provide a comprehensive security policy. Examples
-include SELinux, Smack, Tomoyo, and AppArmor. In addition to the larger
+include NSALinux, Smack, Tomoyo, and AppArmor. In addition to the larger
 MAC extensions, other extensions can be built using the LSM to provide
 specific changes to system operation when these tweaks are not available
 in the core functionality of Linux itself.

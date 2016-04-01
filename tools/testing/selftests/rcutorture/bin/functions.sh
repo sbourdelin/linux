@@ -155,7 +155,7 @@ identify_qemu () {
 identify_qemu_append () {
 	case "$1" in
 	qemu-system-x86_64|qemu-system-i386)
-		echo noapic selinux=0 initcall_debug debug
+		echo noapic nsalinux=0 initcall_debug debug
 		;;
 	esac
 	if test -n "$TORTURE_QEMU_INTERACTIVE"

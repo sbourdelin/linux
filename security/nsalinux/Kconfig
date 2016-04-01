@@ -1,0 +1,133 @@
+config SECURITY_NSALINUX
+	bool "NSALinux Support"
+	depends on SECURITY_NETWORK && AUDIT && NET && INET
+	select NETWORK_SECMARK
+	default n
+	help
+	  This selects NSALinux.
+	  You will also need a policy configuration and a labeled filesystem.
+	  If you are unsure how to answer this question, answer N.
+
+config SECURITY_NSALINUX_BOOTPARAM
+	bool "NSALinux boot parameter"
+	depends on SECURITY_NSALINUX
+	default n
+	help
+	  This option adds a kernel parameter 'nsalinux', which allows NSALinux
+	  to be disabled at boot.  If this option is selected, NSALinux
+	  functionality can be disabled with nsalinux=0 on the kernel
+	  command line.  The purpose of this option is to allow a single
+	  kernel image to be distributed with NSALinux built in, but not
+	  necessarily enabled.
+
+	  If you are unsure how to answer this question, answer N.
+
+config SECURITY_NSALINUX_BOOTPARAM_VALUE
+	int "NSALinux boot parameter default value"
+	depends on SECURITY_NSALINUX_BOOTPARAM
+	range 0 1
+	default 1
+	help
+	  This option sets the default value for the kernel parameter
+	  'nsalinux', which allows NSALinux to be disabled at boot.  If this
+	  option is set to 0 (zero), the NSALinux kernel parameter will
+	  default to 0, disabling NSALinux at bootup.  If this option is
+	  set to 1 (one), the NSALinux kernel parameter will default to 1,
+	  enabling NSALinux at bootup.
+
+	  If you are unsure how to answer this question, answer 1.
+
+config SECURITY_NSALINUX_DISABLE
+	bool "NSALinux runtime disable"
+	depends on SECURITY_NSALINUX
+	default n
+	help
+	  This option enables writing to a nsalinuxfs node 'disable', which
+	  allows NSALinux to be disabled at runtime prior to the policy load.
+	  NSALinux will then remain disabled until the next boot.
+	  This option is similar to the nsalinux=0 boot parameter, but is to
+	  support runtime disabling of NSALinux, e.g. from /sbin/init, for
+	  portability across platforms where boot parameters are difficult
+	  to employ.
+
+	  If you are unsure how to answer this question, answer N.
+
+config SECURITY_NSALINUX_DEVELOP
+	bool "NSALinux Development Support"
+	depends on SECURITY_NSALINUX
+	default y
+	help
+	  This enables the development support option of NSALinux,
+	  which is useful for experimenting with NSALinux and developing
+	  policies.  If unsure, say Y.  With this option enabled, the
+	  kernel will start in permissive mode (log everything, deny nothing)
+	  unless you specify enforcing=1 on the kernel command line.  You
+	  can interactively toggle the kernel between enforcing mode and
+	  permissive mode (if permitted by the policy) via /nsalinux/enforce.
+
+config SECURITY_NSALINUX_AVC_STATS
+	bool "NSALinux AVC Statistics"
+	depends on SECURITY_NSALINUX
+	default y
+	help
+	  This option collects access vector cache statistics to
+	  /nsalinux/avc/cache_stats, which may be monitored via
+	  tools such as avcstat.
+
+config SECURITY_NSALINUX_CHECKREQPROT_VALUE
+	int "NSALinux checkreqprot default value"
+	depends on SECURITY_NSALINUX
+	range 0 1
+	default 0
+	help
+	  This option sets the default value for the 'checkreqprot' flag
+	  that determines whether NSALinux checks the protection requested
+	  by the application or the protection that will be applied by the
+	  kernel (including any implied execute for read-implies-exec) for
+	  mmap and mprotect calls.  If this option is set to 0 (zero),
+	  NSALinux will default to checking the protection that will be applied
+	  by the kernel.  If this option is set to 1 (one), NSALinux will
+	  default to checking the protection requested by the application.
+	  The checkreqprot flag may be changed from the default via the
+	  'checkreqprot=' boot parameter.  It may also be changed at runtime
+	  via /nsalinux/checkreqprot if authorized by policy.
+
+	  If you are unsure how to answer this question, answer 0.
+
+config SECURITY_NSALINUX_POLICYDB_VERSION_MAX
+	bool "NSALinux maximum supported policy format version"
+	depends on SECURITY_NSALINUX
+	default n
+	help
+	  This option enables the maximum policy format version supported
+	  by NSALinux to be set to a particular value.  This value is reported
+	  to userspace via /nsalinux/policyvers and used at policy load time.
+	  It can be adjusted downward to support legacy userland (init) that
+	  does not correctly handle kernels that support newer policy versions.
+
+	  Examples:
+	  For the Fedora Core 3 or 4 Linux distributions, enable this option
+	  and set the value via the next option. For Fedora Core 5 and later,
+	  do not enable this option.
+
+	  If you are unsure how to answer this question, answer N.
+
+config SECURITY_NSALINUX_POLICYDB_VERSION_MAX_VALUE
+	int "NSALinux maximum supported policy format version value"
+	depends on SECURITY_NSALINUX_POLICYDB_VERSION_MAX
+	range 15 23
+	default 19
+	help
+	  This option sets the value for the maximum policy format version
+	  supported by NSALinux.
+
+	  Examples:
+	  For Fedora Core 3, use 18.
+	  For Fedora Core 4, use 19.
+
+	  If you are unsure how to answer this question, look for the
+	  policy format version supported by your policy toolchain, by
+	  running 'checkpolicy -V'. Or look at what policy you have
+	  installed under /etc/nsalinux/$NSALINUXTYPE/policy, where
+	  NSALINUXTYPE is defined in your /etc/nsalinux/config.
+

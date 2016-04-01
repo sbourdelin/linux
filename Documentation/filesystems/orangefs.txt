@@ -82,7 +82,7 @@ prove things are working with:
 
 /opt/osf/bin/pvfs2-ls /mymountpoint
 
-You might not want to enforce selinux, it doesn't seem to matter by
+You might not want to enforce nsalinux, it doesn't seem to matter by
 linux 3.11...
 
 If stuff seems to be working, turn on the client core:

@@ -59,7 +59,7 @@ config F2FS_FS_SECURITY
 	depends on F2FS_FS_XATTR
 	help
 	  Security labels provide an access control facility to support Linux
-	  Security Models (LSMs) accepted by AppArmor, SELinux, Smack and TOMOYO
+	  Security Models (LSMs) accepted by AppArmor, NSALinux, Smack and TOMOYO
 	  Linux. This option enables an extended attribute handler for file
 	  security labels in the f2fs filesystem, so that it requires enabling
 	  the extended attribute support in advance.

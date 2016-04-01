@@ -51,7 +51,7 @@ int reiserfs_security_init(struct inode *dir, struct inode *inode,
 
 	sec->name = NULL;
 
-	/* Don't add selinux attributes on xattrs - they'll never get used */
+	/* Don't add nsalinux attributes on xattrs - they'll never get used */
 	if (IS_PRIVATE(dir))
 		return 0;
 

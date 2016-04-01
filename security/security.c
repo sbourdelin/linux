@@ -627,7 +627,7 @@ int security_inode_setxattr(struct dentry *dentry, const char *name,
 	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
 		return 0;
 	/*
-	 * SELinux and Smack integrate the cap call,
+	 * NSALinux and Smack integrate the cap call,
 	 * so assume that all LSMs supplying this call do so.
 	 */
 	ret = call_int_hook(inode_setxattr, 1, dentry, name, value, size,
@@ -673,7 +673,7 @@ int security_inode_removexattr(struct dentry *dentry, const char *name)
 	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
 		return 0;
 	/*
-	 * SELinux and Smack integrate the cap call,
+	 * NSALinux and Smack integrate the cap call,
 	 * so assume that all LSMs supplying this call do so.
 	 */
 	ret = call_int_hook(inode_removexattr, 1, dentry, name);
@@ -1464,7 +1464,7 @@ int security_xfrm_state_pol_flow_match(struct xfrm_state *x,
 	/*
 	 * Since this function is expected to return 0 or 1, the judgment
 	 * becomes difficult if multiple LSMs supply this call. Fortunately,
-	 * we can use the first LSM's judgment because currently only SELinux
+	 * we can use the first LSM's judgment because currently only NSALinux
 	 * supplies this call.
 	 *
 	 * For speed optimization, we explicitly break the loop rather than

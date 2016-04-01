@@ -9,7 +9,7 @@
  * 	Casey Schaufler <casey@schaufler-ca.com>
  * 	Ahmed S. Darwish <darwish.07@gmail.com>
  *
- * Special thanks to the authors of selinuxfs.
+ * Special thanks to the authors of nsalinuxfs.
  *
  *	Karl MacMillan <kmacmillan@tresys.com>
  *	James Morris <jmorris@redhat.com>

@@ -1,6 +1,6 @@
 /*
  * Common LSM logging functions
- * Heavily borrowed from selinux/avc.h
+ * Heavily borrowed from nsalinux/avc.h
  *
  * Author : Etienne BASSET  <etienne.basset@ensta.org>
  *
@@ -81,8 +81,8 @@ struct common_audit_data {
 #ifdef CONFIG_SECURITY_SMACK
 		struct smack_audit_data *smack_audit_data;
 #endif
-#ifdef CONFIG_SECURITY_SELINUX
-		struct selinux_audit_data *selinux_audit_data;
+#ifdef CONFIG_SECURITY_NSALINUX
+		struct nsalinux_audit_data *nsalinux_audit_data;
 #endif
 #ifdef CONFIG_SECURITY_APPARMOR
 		struct apparmor_audit_data *apparmor_audit_data;

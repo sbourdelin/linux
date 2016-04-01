@@ -145,7 +145,7 @@ Hugh Dickins [Dickins02a] and an implementation by Mingming Cao
 different CPUs [McKenney04b], a dissertation describing use of RCU in a
 number of operating-system kernels [PaulEdwardMcKenneyPhD], a paper
 describing how to make RCU safe for soft-realtime applications [Sarma04c],
-and a paper describing SELinux performance with RCU [JamesMorris04b].
+and a paper describing NSALinux performance with RCU [JamesMorris04b].
 
 2005 brought further adaptation of RCU to realtime use, permitting
 preemption of RCU realtime critical sections [PaulMcKenney05a,
@@ -1195,7 +1195,7 @@ Oregon Health and Sciences University"
 
 @unpublished{JamesMorris04a
 ,Author="James Morris"
-,Title="{[PATCH 2/3] SELinux} scalability - convert {AVC} to {RCU}"
+,Title="{[PATCH 2/3] NSALinux} scalability - convert {AVC} to {RCU}"
 ,day="15"
 ,month="November"
 ,year="2004"
@@ -1209,14 +1209,14 @@ Oregon Health and Sciences University"
 
 @unpublished{JamesMorris04b
 ,Author="James Morris"
-,Title="Recent Developments in {SELinux} Kernel Performance"
+,Title="Recent Developments in {NSALinux} Kernel Performance"
 ,month="December"
 ,year="2004"
 ,note="Available:
 \url{http://www.livejournal.com/users/james_morris/2153.html}
 [Viewed December 10, 2004]"
 ,annotation={
-	RCU helps SELinux performance.  ;-)  Made LWN.
+	RCU helps NSALinux performance.  ;-)  Made LWN.
 }
 }
 

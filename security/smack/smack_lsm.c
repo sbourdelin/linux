@@ -1553,11 +1553,11 @@ static void smack_inode_getsecid(struct inode *inode, u32 *secid)
  * There is no smack_file_permission hook
  *
  * Should access checks be done on each read or write?
- * UNICOS and SELinux say yes.
+ * UNICOS and NSALinux say yes.
  * Trusted Solaris, Trusted Irix, and just about everyone else says no.
  *
  * I'll say no for now. Smack does not do the frequent
- * label changing that SELinux does.
+ * label changing that NSALinux does.
  */
 
 /**
@@ -2216,7 +2216,7 @@ static int smack_task_movememory(struct task_struct *p)
  *
  * Return 0 if write access is permitted
  *
- * The secid behavior is an artifact of an SELinux hack
+ * The secid behavior is an artifact of an NSALinux hack
  * in the USB code. Someday it may go away.
  */
 static int smack_task_kill(struct task_struct *p, struct siginfo *info,

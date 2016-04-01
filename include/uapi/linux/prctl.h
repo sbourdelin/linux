@@ -166,7 +166,7 @@ struct prctl_mm_map {
  * capset, etc.) will still work.  Drop those privileges if you want them gone.
  *
  * Changing LSM security domain is considered a new privilege.  So, for example,
- * asking selinux for a specific new context (e.g. with runcon) will result
+ * asking nsalinux for a specific new context (e.g. with runcon) will result
  * in execve returning -EPERM.
  *
  * See Documentation/prctl/no_new_privs.txt for more details.

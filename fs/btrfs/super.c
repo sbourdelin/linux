@@ -1488,7 +1488,7 @@ static int setup_security_options(struct btrfs_fs_info *fs_info,
 		memcpy(&fs_info->security_opts, sec_opts, sizeof(*sec_opts));
 	} else {
 		/*
-		 * Since SELinux(the only one supports security_mnt_opts) does
+		 * Since NSALinux(the only one supports security_mnt_opts) does
 		 * NOT support changing context during remount/mount same sb,
 		 * This must be the same or part of the same security options,
 		 * just free it.

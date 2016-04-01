@@ -148,7 +148,7 @@ struct netlbl_lsm_cache {
  * This structure is used to represent category bitmaps.  Due to the large
  * number of categories supported by most labeling protocols it is not
  * practical to transfer a full bitmap internally so NetLabel adopts a sparse
- * bitmap structure modeled after SELinux's ebitmap structure.
+ * bitmap structure modeled after NSALinux's ebitmap structure.
  * The catmap bitmap field MUST be a power of two in length and large
  * enough to hold at least 240 bits.  Special care (i.e. check the code!)
  * should be used when changing these values as the LSM implementation

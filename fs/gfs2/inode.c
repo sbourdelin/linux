@@ -1976,7 +1976,7 @@ static ssize_t gfs2_getxattr(struct dentry *dentry, const char *name,
 	struct gfs2_holder gh;
 	int ret;
 
-	/* For selinux during lookup */
+	/* For nsalinux during lookup */
 	if (gfs2_glock_is_locked_by_me(ip->i_gl))
 		return generic_getxattr(dentry, name, data, size);
 

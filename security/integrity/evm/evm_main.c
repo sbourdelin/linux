@@ -36,8 +36,8 @@ char *evm_hash = "sha1";
 int evm_hmac_attrs;
 
 char *evm_config_xattrnames[] = {
-#ifdef CONFIG_SECURITY_SELINUX
-	XATTR_NAME_SELINUX,
+#ifdef CONFIG_SECURITY_NSALINUX
+	XATTR_NAME_NSALINUX,
 #endif
 #ifdef CONFIG_SECURITY_SMACK
 	XATTR_NAME_SMACK,

@@ -2,8 +2,8 @@
 	- this file.
 LSM.txt
 	- description of the Linux Security Module framework.
-SELinux.txt
-	- how to get started with the SELinux security enhancement.
+NSALinux.txt
+	- how to get started with the NSALinux security enhancement.
 Smack.txt
 	- documentation on the Smack Linux Security Module.
 Yama.txt

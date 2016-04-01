@@ -1,5 +1,5 @@
 /* audit.c -- Auditing support
- * Gateway between the kernel (e.g., selinux) and the user-space audit daemon.
+ * Gateway between the kernel (e.g., nsalinux) and the user-space audit daemon.
  * System-call specific features have moved to auditsc.c
  *
  * Copyright 2003-2007 Red Hat Inc., Durham, North Carolina.
@@ -2034,12 +2034,12 @@ void audit_log(struct audit_context *ctx, gfp_t gfp_mask, int type,
 
 #ifdef CONFIG_SECURITY
 /**
- * audit_log_secctx - Converts and logs SELinux context
+ * audit_log_secctx - Converts and logs NSALinux context
  * @ab: audit_buffer
  * @secid: security number
  *
  * This is a helper function that calls security_secid_to_secctx to convert
- * secid to secctx and then adds the (converted) SELinux context to the audit
+ * secid to secctx and then adds the (converted) NSALinux context to the audit
  * log by calling audit_log_format, thus also preventing leak of internal secid
  * to userspace. If secid cannot be converted audit_panic is called.
  */

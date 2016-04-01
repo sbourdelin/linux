@@ -6351,7 +6351,7 @@ static int btrfs_mknod(struct inode *dir, struct dentry *dentry,
 	/*
 	 * 2 for inode item and ref
 	 * 2 for dir items
-	 * 1 for xattr if selinux is on
+	 * 1 for xattr if nsalinux is on
 	 */
 	trans = btrfs_start_transaction(root, 5);
 	if (IS_ERR(trans))
@@ -6422,7 +6422,7 @@ static int btrfs_create(struct inode *dir, struct dentry *dentry,
 	/*
 	 * 2 for inode item and ref
 	 * 2 for dir items
-	 * 1 for xattr if selinux is on
+	 * 1 for xattr if nsalinux is on
 	 */
 	trans = btrfs_start_transaction(root, 5);
 	if (IS_ERR(trans))
@@ -6570,7 +6570,7 @@ static int btrfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	/*
 	 * 2 items for inode and ref
 	 * 2 items for dir items
-	 * 1 for xattr if selinux is on
+	 * 1 for xattr if nsalinux is on
 	 */
 	trans = btrfs_start_transaction(root, 5);
 	if (IS_ERR(trans))
@@ -9799,7 +9799,7 @@ static int btrfs_symlink(struct inode *dir, struct dentry *dentry,
 	 * 2 items for dir items
 	 * 1 item for updating parent inode item
 	 * 1 item for the inline extent item
-	 * 1 item for xattr if selinux is on
+	 * 1 item for xattr if nsalinux is on
 	 */
 	trans = btrfs_start_transaction(root, 7);
 	if (IS_ERR(trans))

@@ -2,7 +2,7 @@
  *
  * Copyright (C) 2008 Red Hat, Inc. All Rights Reserved.
  * Written by David Howells (dhowells@redhat.com)
- * - Derived from security/selinux/hooks.c
+ * - Derived from security/nsalinux/hooks.c
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public Licence

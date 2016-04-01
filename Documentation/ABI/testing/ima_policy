@@ -62,7 +62,7 @@ Description:
 			# SECURITYFS_MAGIC
 			dont_measure fsmagic=0x73636673
 			dont_appraise fsmagic=0x73636673
-			# SELINUX_MAGIC
+			# NSALINUX_MAGIC
 			dont_measure fsmagic=0xf97cff8c
 			dont_appraise fsmagic=0xf97cff8c
 			# CGROUP_SUPER_MAGIC
@@ -86,7 +86,7 @@ Description:
 
 		Examples of LSM specific definitions:
 
-		SELinux:
+		NSALinux:
 			dont_measure obj_type=var_log_t
 			dont_appraise obj_type=var_log_t
 			dont_measure obj_type=auditd_log_t

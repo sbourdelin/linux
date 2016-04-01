@@ -119,7 +119,7 @@ static u32 netlbl_domhsh_hash(const char *key)
 	u32 len;
 
 	/* This is taken (with slight modification) from
-	 * security/selinux/ss/symtab.c:symhash() */
+	 * security/nsalinux/ss/symtab.c:symhash() */
 
 	for (iter = 0, val = 0, len = strlen(key); iter < len; iter++)
 		val = (val << 4 | (val >> (8 * sizeof(u32) - 4))) ^ key[iter];

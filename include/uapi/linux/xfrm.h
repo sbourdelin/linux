@@ -41,7 +41,7 @@ struct xfrm_sec_ctx {
 
 /* Security Context Algorithms */
 #define XFRM_SC_ALG_RESERVED 0
-#define XFRM_SC_ALG_SELINUX 1
+#define XFRM_SC_ALG_NSALINUX 1
 
 /* Selector, used as selector both on policy rules (SPD) and SAs. */
 
@@ -227,7 +227,7 @@ enum {
 struct xfrm_user_sec_ctx {
 	__u16			len;
 	__u16			exttype;
-	__u8			ctx_alg;  /* LSMs: e.g., selinux == 1 */
+	__u8			ctx_alg;  /* LSMs: e.g., nsalinux == 1 */
 	__u8			ctx_doi;
 	__u16			ctx_len;
 };

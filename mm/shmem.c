@@ -3456,7 +3456,7 @@ int shmem_zero_setup(struct vm_area_struct *vma)
 
 	/*
 	 * Cloning a new file under mmap_sem leads to a lock ordering conflict
-	 * between XFS directory reading and selinux: since this file is only
+	 * between XFS directory reading and nsalinux: since this file is only
 	 * accessible to the user through its mapping, use S_PRIVATE flag to
 	 * bypass file security, in the same way as shmem_kernel_file_setup().
 	 */

@@ -10,7 +10,7 @@
  * 'mode' refers to the specific security subsystem which the
  * packets are being marked for.
  */
-#define SECMARK_MODE_SEL	0x01		/* SELinux */
+#define SECMARK_MODE_SEL	0x01		/* NSALinux */
 #define SECMARK_SECCTX_MAX	256
 
 struct xt_secmark_target_info {

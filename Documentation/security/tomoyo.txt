@@ -47,7 +47,7 @@ History of TOMOYO?
 We believe that inode based security and name based security are complementary
 and both should be used together. But unfortunately, so far, we cannot enable
 multiple LSM modules at the same time. We feel sorry that you have to give up
-SELinux/SMACK/AppArmor etc. when you want to use TOMOYO.
+NSALinux/SMACK/AppArmor etc. when you want to use TOMOYO.
 
 We hope that LSM becomes stackable in future. Meanwhile, you can use non-LSM
 version of TOMOYO, available at http://tomoyo.sourceforge.jp/1.7/ .

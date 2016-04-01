@@ -1246,7 +1246,7 @@ config DEBUG_CREDENTIALS
 	  see that this number never exceeds the usage count of the cred
 	  struct.
 
-	  Furthermore, if SELinux is enabled, this also checks that the
+	  Furthermore, if NSALinux is enabled, this also checks that the
 	  security pointer in the cred struct is never seen to be invalid.
 
 	  If unsure, say N.

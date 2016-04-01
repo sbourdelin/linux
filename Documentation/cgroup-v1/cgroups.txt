@@ -664,7 +664,7 @@ using kernel memory and it's advised to keep the usage at minimum.  This
 is the reason why user defined extended attributes are not supported, since
 any user can do it and there's no limit in the value size.
 
-The current known users for this feature are SELinux to limit cgroup usage
+The current known users for this feature are NSALinux to limit cgroup usage
 in containers and systemd for assorted meta data like main PID in a cgroup
 (systemd creates a cgroup per service).
 

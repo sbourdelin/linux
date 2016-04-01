@@ -45,7 +45,7 @@ j) Add GUI tool to configure /proc/fs/cifs settings and for display of
 the CIFS statistics (started)
 
 k) implement support for security and trusted categories of xattrs
-(requires minor protocol extension) to enable better support for SELINUX
+(requires minor protocol extension) to enable better support for NSALINUX
 
 l) Implement O_DIRECT flag on open (already supported on mount)
 

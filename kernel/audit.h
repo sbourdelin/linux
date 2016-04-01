@@ -250,7 +250,7 @@ struct audit_net {
 	struct sock *nlsk;
 };
 
-extern int selinux_audit_rule_update(void);
+extern int nsalinux_audit_rule_update(void);
 
 extern struct mutex audit_filter_mutex;
 extern int audit_del_rule(struct audit_entry *);

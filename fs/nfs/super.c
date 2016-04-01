@@ -2040,14 +2040,14 @@ static int nfs23_validate_mount_data(void *options,
 					NFS_MOUNT_LOCAL_FCNTL);
 		/*
 		 * The legacy version 6 binary mount data from userspace has a
-		 * field used only to transport selinux information into the
+		 * field used only to transport nsalinux information into the
 		 * the kernel.  To continue to support that functionality we
-		 * have a touch of selinux knowledge here in the NFS code. The
+		 * have a touch of nsalinux knowledge here in the NFS code. The
 		 * userspace code converted context=blah to just blah so we are
-		 * converting back to the full string selinux understands.
+		 * converting back to the full string nsalinux understands.
 		 */
 		if (data->context[0]){
-#ifdef CONFIG_SECURITY_SELINUX
+#ifdef CONFIG_SECURITY_NSALINUX
 			int rc;
 			char *opts_str = kmalloc(sizeof(data->context) + 8, GFP_KERNEL);
 			if (!opts_str)

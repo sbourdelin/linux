@@ -220,7 +220,7 @@ struct sadb_x_nat_t_port {
 struct sadb_x_sec_ctx {
 	__u16	sadb_x_sec_len;
 	__u16	sadb_x_sec_exttype;
-	__u8		sadb_x_ctx_alg;  /* LSMs: e.g., selinux == 1 */
+	__u8		sadb_x_ctx_alg;  /* LSMs: e.g., nsalinux == 1 */
 	__u8		sadb_x_ctx_doi;
 	__u16	sadb_x_ctx_len;
 } __attribute__((packed));

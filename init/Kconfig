@@ -298,7 +298,7 @@ config AUDIT
 	depends on NET
 	help
 	  Enable auditing infrastructure that can be used with another
-	  kernel subsystem, such as SELinux (which requires this for
+	  kernel subsystem, such as NSALinux (which requires this for
 	  logging of avc messages output).  System call auditing is included
 	  on architectures which support it.
 

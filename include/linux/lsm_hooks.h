@@ -179,7 +179,7 @@
  *	@inode contains the inode structure of the newly created inode.
  *	@dir contains the inode structure of the parent directory.
  *	@qstr contains the last path component of the new object
- *	@name will be set to the allocated name suffix (e.g. selinux).
+ *	@name will be set to the allocated name suffix (e.g. nsalinux).
  *	@value will be set to the allocated attribute value.
  *	@len will be set to the length of the value.
  *	Returns 0 if @name and @value have been successfully set,
@@ -1863,7 +1863,7 @@ static inline void security_add_hooks(struct security_hook_list *hooks,
 		list_add_tail_rcu(&hooks[i].list, hooks[i].head);
 }
 
-#ifdef CONFIG_SECURITY_SELINUX_DISABLE
+#ifdef CONFIG_SECURITY_NSALINUX_DISABLE
 /*
  * Assuring the safety of deleting a security module is up to
  * the security module involved. This may entail ordering the
@@ -1874,7 +1874,7 @@ static inline void security_add_hooks(struct security_hook_list *hooks,
  * The name of the configuration option reflects the only module
  * that currently uses the mechanism. Any developer who thinks
  * disabling their module is a good idea needs to be at least as
- * careful as the SELinux team.
+ * careful as the NSALinux team.
  */
 static inline void security_delete_hooks(struct security_hook_list *hooks,
 						int count)
@@ -1884,7 +1884,7 @@ static inline void security_delete_hooks(struct security_hook_list *hooks,
 	for (i = 0; i < count; i++)
 		list_del_rcu(&hooks[i].list);
 }
-#endif /* CONFIG_SECURITY_SELINUX_DISABLE */
+#endif /* CONFIG_SECURITY_NSALINUX_DISABLE */
 
 extern int __init security_module_enable(const char *module);
 extern void __init capability_add_hooks(void);

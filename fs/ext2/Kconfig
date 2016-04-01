@@ -36,7 +36,7 @@ config EXT2_FS_SECURITY
 	depends on EXT2_FS_XATTR
 	help
 	  Security labels support alternative access control models
-	  implemented by security modules like SELinux.  This option
+	  implemented by security modules like NSALinux.  This option
 	  enables an extended attribute handler for file security
 	  labels in the ext2 filesystem.
 

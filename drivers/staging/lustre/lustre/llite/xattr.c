@@ -37,7 +37,7 @@
 #include <linux/fs.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
-#include <linux/selinux.h>
+#include <linux/nsalinux.h>
 
 #define DEBUG_SUBSYSTEM S_LLITE
 
@@ -138,9 +138,9 @@ int ll_setxattr_common(struct inode *inode, const char *name,
 	     strcmp(name, "security.capability") == 0))
 		return 0;
 
-	/* LU-549:  Disable security.selinux when selinux is disabled */
-	if (xattr_type == XATTR_SECURITY_T && !selinux_is_enabled() &&
-	    strcmp(name, "security.selinux") == 0)
+	/* LU-549:  Disable security.nsalinux when nsalinux is disabled */
+	if (xattr_type == XATTR_SECURITY_T && !nsalinux_is_enabled() &&
+	    strcmp(name, "security.nsalinux") == 0)
 		return -EOPNOTSUPP;
 
 #ifdef CONFIG_FS_POSIX_ACL
@@ -314,9 +314,9 @@ int ll_getxattr_common(struct inode *inode, const char *name,
 	     strcmp(name, "security.capability") == 0))
 		return -ENODATA;
 
-	/* LU-549:  Disable security.selinux when selinux is disabled */
-	if (xattr_type == XATTR_SECURITY_T && !selinux_is_enabled() &&
-	    strcmp(name, "security.selinux") == 0)
+	/* LU-549:  Disable security.nsalinux when nsalinux is disabled */
+	if (xattr_type == XATTR_SECURITY_T && !nsalinux_is_enabled() &&
+	    strcmp(name, "security.nsalinux") == 0)
 		return -EOPNOTSUPP;
 
 #ifdef CONFIG_FS_POSIX_ACL

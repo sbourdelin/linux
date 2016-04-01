@@ -107,7 +107,7 @@ parameter is applicable:
 			A lot of drivers have their options described inside
 			the Documentation/scsi/ sub-directory.
 	SECURITY Different security models are enabled.
-	SELINUX SELinux support is enabled.
+	NSALINUX NSALinux support is enabled.
 	APPARMOR AppArmor support is enabled.
 	SERIAL	Serial support is enabled.
 	SH	SuperH architecture is enabled.
@@ -624,15 +624,15 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			nosocket -- Disable socket memory accounting.
 			nokmem -- Disable kernel memory accounting.
 
-	checkreqprot	[SELINUX] Set initial checkreqprot flag value.
+	checkreqprot	[NSALINUX] Set initial checkreqprot flag value.
 			Format: { "0" | "1" }
-			See security/selinux/Kconfig help text.
+			See security/nsalinux/Kconfig help text.
 			0 -- check protection applied by kernel (includes
 				any implied execute protection).
 			1 -- check protection requested by application.
 			Default value is set via a kernel config option.
 			Value can be changed at runtime via
-				/selinux/checkreqprot.
+				/nsalinux/checkreqprot.
 
 	cio_ignore=	[S390]
 			See Documentation/s390/CommonIO for details.
@@ -1193,13 +1193,13 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			(in particular on some ATI chipsets).
 			The kernel tries to set a reasonable default.
 
-	enforcing	[SELINUX] Set initial enforcing status.
+	enforcing	[NSALINUX] Set initial enforcing status.
 			Format: {"0" | "1"}
-			See security/selinux/Kconfig help text.
+			See security/nsalinux/Kconfig help text.
 			0 -- permissive (log only, no denials).
 			1 -- enforcing (deny and log).
 			Default value is 0.
-			Value can be changed at runtime via /selinux/enforce.
+			Value can be changed at runtime via /nsalinux/enforce.
 
 	erst_disable	[ACPI]
 			Disable Error Record Serialization Table (ERST)
@@ -3604,13 +3604,13 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			loaded. An invalid security module name will be treated
 			as if no module has been chosen.
 
-	selinux=	[SELINUX] Disable or enable SELinux at boot time.
+	nsalinux=	[NSALINUX] Disable or enable NSALinux at boot time.
 			Format: { "0" | "1" }
-			See security/selinux/Kconfig help text.
+			See security/nsalinux/Kconfig help text.
 			0 -- disable.
 			1 -- enable.
 			Default value is set via kernel config option.
-			If enabled at boot time, /selinux/disable can be used
+			If enabled at boot time, /nsalinux/disable can be used
 			later to disable prior to initial policy load.
 
 	apparmor=	[APPARMOR] Disable or enable AppArmor at boot time

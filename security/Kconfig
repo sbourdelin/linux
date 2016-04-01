@@ -36,7 +36,7 @@ config SECURITYFS
 	help
 	  This will build the securityfs filesystem.  It is currently used by
 	  the TPM bios character driver and IMA, an integrity provider.  It is
-	  not used by SELinux or SMACK.
+	  not used by NSALinux or SMACK.
 
 	  If you are unsure how to answer this question, answer N.
 
@@ -103,7 +103,7 @@ config INTEL_TXT
 
 config LSM_MMAP_MIN_ADDR
 	int "Low address space for LSM to protect from user allocation"
-	depends on SECURITY && SECURITY_SELINUX
+	depends on SECURITY && SECURITY_NSALINUX
 	default 32768 if ARM || (ARM64 && COMPAT)
 	default 65536
 	help
@@ -118,7 +118,7 @@ config LSM_MMAP_MIN_ADDR
 	  this low address space will need the permission specific to the
 	  systems running LSM.
 
-source security/selinux/Kconfig
+source security/nsalinux/Kconfig
 source security/smack/Kconfig
 source security/tomoyo/Kconfig
 source security/apparmor/Kconfig
@@ -128,7 +128,7 @@ source security/integrity/Kconfig
 
 choice
 	prompt "Default security module"
-	default DEFAULT_SECURITY_SELINUX if SECURITY_SELINUX
+	default DEFAULT_SECURITY_NSALINUX if SECURITY_NSALINUX
 	default DEFAULT_SECURITY_SMACK if SECURITY_SMACK
 	default DEFAULT_SECURITY_TOMOYO if SECURITY_TOMOYO
 	default DEFAULT_SECURITY_APPARMOR if SECURITY_APPARMOR
@@ -138,8 +138,8 @@ choice
 	  Select the security module that will be used by default if the
 	  kernel parameter security= is not specified.
 
-	config DEFAULT_SECURITY_SELINUX
-		bool "SELinux" if SECURITY_SELINUX=y
+	config DEFAULT_SECURITY_NSALINUX
+		bool "NSALinux" if SECURITY_NSALINUX=y
 
 	config DEFAULT_SECURITY_SMACK
 		bool "Simplified Mandatory Access Control" if SECURITY_SMACK=y
@@ -157,7 +157,7 @@ endchoice
 
 config DEFAULT_SECURITY
 	string
-	default "selinux" if DEFAULT_SECURITY_SELINUX
+	default "nsalinux" if DEFAULT_SECURITY_NSALINUX
 	default "smack" if DEFAULT_SECURITY_SMACK
 	default "tomoyo" if DEFAULT_SECURITY_TOMOYO
 	default "apparmor" if DEFAULT_SECURITY_APPARMOR

@@ -1,7 +1,7 @@
 /*
  * common LSM auditing functions
  *
- * Based on code written for SELinux by :
+ * Based on code written for NSALinux by :
  *			Stephen Smalley, <sds@epoch.ncsc.mil>
  * 			James Morris <jmorris@redhat.com>
  * Author : Etienne Basset, <etienne.basset@ensta.org>

@@ -2600,7 +2600,7 @@ S: Nashua, NH 03062
 N: James Morris
 E: jmorris@namei.org
 W: http://namei.org/
-D: Netfilter, Linux Security Modules (LSM), SELinux, IPSec,
+D: Netfilter, Linux Security Modules (LSM), NSALinux, IPSec,
 D: Crypto API, general networking, miscellaneous.
 S: PO Box 707
 S: Spit Junction NSW 2088
