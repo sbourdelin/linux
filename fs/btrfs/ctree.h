@@ -982,8 +982,22 @@ struct btrfs_dedupe_status_item {
  * Offset: Bytenr of the hash
  *
  * Used for hash <-> bytenr search
- * Hash exclude the last 64 bit follows
  */
+struct btrfs_dedupe_hash_item {
+	/*
+	 * length of dedupe range on disk
+	 * For in-memory length, it's always
+	 * dedupe_info->block_size
+	 */
+	__le32 disk_len;
+
+	u8 compression;
+
+	/*
+	 * Hash follows, exclude the last 64bit,
+	 * as it's already in key.objectid.
+	 */
+} __attribute__ ((__packed__));
 
 /*
  * Objectid: bytenr
@@ -3315,6 +3329,12 @@ BTRFS_SETGET_FUNCS(dedupe_status_hash_type, struct btrfs_dedupe_status_item,
 		   hash_type, 16);
 BTRFS_SETGET_FUNCS(dedupe_status_backend, struct btrfs_dedupe_status_item,
 		   backend, 16);
+
+/* btrfs_dedupe_hash_item */
+BTRFS_SETGET_FUNCS(dedupe_hash_disk_len, struct btrfs_dedupe_hash_item,
+		   disk_len, 32);
+BTRFS_SETGET_FUNCS(dedupe_hash_compression, struct btrfs_dedupe_hash_item,
+		   compression, 8);
 
 /* struct btrfs_file_extent_item */
 BTRFS_SETGET_FUNCS(file_extent_type, struct btrfs_file_extent_item, type, 8);
