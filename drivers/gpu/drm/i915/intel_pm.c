@@ -2969,18 +2969,36 @@ skl_plane_relative_data_rate(const struct intel_crtc_state *cstate,
 static unsigned int
 skl_get_total_relative_data_rate(const struct intel_crtc_state *cstate)
 {
-	struct intel_crtc *intel_crtc = to_intel_crtc(cstate->base.crtc);
-	struct drm_device *dev = intel_crtc->base.dev;
-	const struct intel_plane *intel_plane;
+	struct drm_atomic_state *state = cstate->base.state;
+	struct drm_crtc *crtc = cstate->base.crtc;
+	struct drm_device *dev = crtc->dev;
+	struct drm_plane *plane;
 	unsigned int total_data_rate = 0;
 
-	for_each_intel_plane_on_crtc(dev, intel_crtc, intel_plane) {
-		const struct drm_plane_state *pstate = intel_plane->base.state;
+	drm_for_each_plane_mask(plane, dev, cstate->base.plane_mask) {
+		struct drm_plane_state *pstate;
 
-		if (pstate->fb == NULL)
+		/*
+		 * FIXME: At the moment this function can be called on either
+		 * an in-flight or a committed state object.  If it's in-flight
+		 * we want to also use the in-flight plane state; otherwise
+		 * use the committed plane state.
+		 *
+		 * Once we finish moving our DDB allocation to the atomic check
+		 * phase, we'll only be calling this function on in-flight
+		 * state objects and should never see a NULL state here.
+		 */
+		if (state) {
+			pstate = drm_atomic_get_plane_state(state, plane);
+			if (IS_ERR(pstate))
+				return PTR_ERR(pstate);
+		} else {
+			pstate = plane->state;
+		}
+
+		if (!to_intel_plane_state(pstate)->visible)
 			continue;
-
-		if (intel_plane->base.type == DRM_PLANE_TYPE_CURSOR)
+		if (plane->type == DRM_PLANE_TYPE_CURSOR)
 			continue;
 
 		/* packed/uv */
@@ -2994,6 +3012,8 @@ skl_get_total_relative_data_rate(const struct intel_crtc_state *cstate)
 									pstate,
 									1);
 	}
+
+	WARN_ON(cstate->base.plane_mask && total_data_rate == 0);
 
 	return total_data_rate;
 }
