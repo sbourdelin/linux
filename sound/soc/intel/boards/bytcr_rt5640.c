@@ -152,6 +152,8 @@ static const struct dmi_system_id byt_rt5640_quirk_table[] = {
 	{}
 };
 
+static struct snd_soc_card byt_rt5640_card;
+
 static int byt_rt5640_init(struct snd_soc_pcm_runtime *runtime)
 {
 	int ret;
@@ -159,6 +161,19 @@ static int byt_rt5640_init(struct snd_soc_pcm_runtime *runtime)
 	struct snd_soc_card *card = runtime->card;
 	const struct snd_soc_dapm_route *custom_map;
 	int num_routes;
+	const char *board, *vendor;
+	struct sst_acpi_mach *mach = byt_rt5640_card.dev->platform_data;
+
+	/* Add board/product/vendor/firmware name for userspace */
+	board = dmi_get_system_info(DMI_BOARD_NAME);
+	if (!board)
+		board = dmi_get_system_info(DMI_PRODUCT_NAME);
+	vendor = dmi_get_system_info(DMI_SYS_VENDOR);
+	ret = snd_soc_set_card_names(card, board, vendor, mach->fw_filename);
+	if (ret < 0) {
+		dev_err(card->dev, "unable to set card names\n");
+		return ret;
+	}
 
 	card->dapm.idle_bias_off = true;
 
