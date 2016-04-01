@@ -725,7 +725,7 @@ static struct nfs_lock_context *__nfs_find_lock_context(struct nfs_open_context 
 	return NULL;
 }
 
-struct nfs_lock_context *nfs_get_lock_context(struct nfs_open_context *ctx)
+struct nfs_lock_context *nfs_find_lock_context(struct nfs_open_context *ctx)
 {
 	struct nfs_lock_context *res, *new = NULL;
 	struct inode *inode = d_inode(ctx->dentry);
@@ -751,7 +751,14 @@ struct nfs_lock_context *nfs_get_lock_context(struct nfs_open_context *ctx)
 	kfree(new);
 	return res;
 }
-EXPORT_SYMBOL_GPL(nfs_get_lock_context);
+EXPORT_SYMBOL_GPL(nfs_find_lock_context);
+
+struct nfs_lock_context *get_nfs_lock_context(struct nfs_lock_context *l_ctx)
+{
+	atomic_inc(&l_ctx->count);
+	return l_ctx;
+}
+EXPORT_SYMBOL_GPL(get_nfs_lock_context);
 
 void nfs_put_lock_context(struct nfs_lock_context *l_ctx)
 {

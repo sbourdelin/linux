@@ -329,7 +329,7 @@ nfs_create_request(struct nfs_open_context *ctx, struct page *page,
 		return ERR_PTR(-ENOMEM);
 
 	/* get lock context early so we can deal with alloc failures */
-	l_ctx = nfs_get_lock_context(ctx);
+	l_ctx = nfs_find_lock_context(ctx);
 	if (IS_ERR(l_ctx)) {
 		nfs_page_free(req);
 		return ERR_CAST(l_ctx);
