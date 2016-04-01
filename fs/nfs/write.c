@@ -1162,6 +1162,7 @@ int nfs_flush_incompatible(struct file *file, struct page *page)
 		    !(list_empty_careful(&flctx->flc_posix) &&
 		      list_empty_careful(&flctx->flc_flock))) {
 			do_flush |= l_ctx->lockowner.l_owner_posix != current->files
+				|| l_ctx->lockowner.l_owner_ofd != file
 				|| l_ctx->lockowner.l_pid != current->tgid;
 		}
 		nfs_release_request(req);
