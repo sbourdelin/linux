@@ -616,7 +616,7 @@ bool sched_can_stop_tick(struct rq *rq)
 	}
 
 	/* Normal multitasking need periodic preemption checks */
-	if (rq->cfs.nr_running > 1)
+	if (rq->nr_running > 1)
 		return false;
 
 	return true;
