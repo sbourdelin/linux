@@ -300,7 +300,7 @@ static void nfs_fscache_inode_now_uncached(void *cookie_netfs_data)
  */
 static void nfs_fh_get_context(void *cookie_netfs_data, void *context)
 {
-	get_nfs_open_context(context);
+	get_nfs_lock_context(context);
 }
 
 /*
@@ -311,7 +311,7 @@ static void nfs_fh_get_context(void *cookie_netfs_data, void *context)
 static void nfs_fh_put_context(void *cookie_netfs_data, void *context)
 {
 	if (context)
-		put_nfs_open_context(context);
+		put_nfs_lock_context(context);
 }
 
 /*

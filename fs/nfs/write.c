@@ -1101,7 +1101,7 @@ out_err:
  * if we have to add a new request. Also assumes that the caller has
  * already called nfs_flush_incompatible() if necessary.
  */
-static struct nfs_page * nfs_setup_write_request(struct nfs_open_context* ctx,
+static struct nfs_page * nfs_setup_write_request(struct nfs_lock_context *l_ctx,
 		struct page *page, unsigned int offset, unsigned int bytes)
 {
 	struct inode *inode = page_file_mapping(page)->host;
@@ -1110,7 +1110,7 @@ static struct nfs_page * nfs_setup_write_request(struct nfs_open_context* ctx,
 	req = nfs_try_to_update_request(inode, page, offset, bytes);
 	if (req != NULL)
 		goto out;
-	req = nfs_create_request(ctx, page, NULL, offset, bytes);
+	req = nfs_create_request(l_ctx, page, NULL, offset, bytes);
 	if (IS_ERR(req))
 		goto out;
 	nfs_inode_add_request(inode, req);
@@ -1118,12 +1118,12 @@ out:
 	return req;
 }
 
-static int nfs_writepage_setup(struct nfs_open_context *ctx, struct page *page,
+static int nfs_writepage_setup(struct nfs_lock_context *l_ctx, struct page *page,
 		unsigned int offset, unsigned int count)
 {
 	struct nfs_page	*req;
 
-	req = nfs_setup_write_request(ctx, page, offset, count);
+	req = nfs_setup_write_request(l_ctx, page, offset, count);
 	if (IS_ERR(req))
 		return PTR_ERR(req);
 	/* Update file length */
@@ -1161,7 +1161,7 @@ int nfs_flush_incompatible(struct file *file, struct page *page)
 		if (l_ctx && flctx &&
 		    !(list_empty_careful(&flctx->flc_posix) &&
 		      list_empty_careful(&flctx->flc_flock))) {
-			do_flush |= l_ctx->lockowner.l_owner != current->files
+			do_flush |= l_ctx->lockowner.l_owner_posix != current->files
 				|| l_ctx->lockowner.l_pid != current->tgid;
 		}
 		nfs_release_request(req);
@@ -1279,7 +1279,7 @@ static int nfs_can_extend_write(struct file *file, struct page *page, struct ino
 int nfs_updatepage(struct file *file, struct page *page,
 		unsigned int offset, unsigned int count)
 {
-	struct nfs_open_context *ctx = nfs_file_open_context(file);
+	struct nfs_lock_context *l_ctx = nfs_find_lock_context(file);
 	struct inode	*inode = page_file_mapping(page)->host;
 	int		status = 0;
 
@@ -1293,11 +1293,13 @@ int nfs_updatepage(struct file *file, struct page *page,
 		offset = 0;
 	}
 
-	status = nfs_writepage_setup(ctx, page, offset, count);
+	status = nfs_writepage_setup(l_ctx, page, offset, count);
 	if (status < 0)
 		nfs_set_pageerror(page);
 	else
 		__set_page_dirty_nobuffers(page);
+
+	nfs_put_lock_context(l_ctx);
 
 	dprintk("NFS:       nfs_updatepage returns %d (isize %lld)\n",
 			status, (long long)i_size_read(inode));

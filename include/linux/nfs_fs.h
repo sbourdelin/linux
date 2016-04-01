@@ -56,7 +56,8 @@ struct nfs_access_entry {
 };
 
 struct nfs_lockowner {
-	fl_owner_t l_owner;
+	fl_owner_t l_owner_posix;
+	fl_owner_t l_owner_ofd;
 	pid_t l_pid;
 };
 
@@ -365,7 +366,7 @@ extern struct nfs_open_context *alloc_nfs_open_context(struct dentry *dentry, fm
 extern void nfs_inode_attach_open_context(struct nfs_open_context *ctx);
 extern void nfs_file_set_open_context(struct file *filp, struct nfs_open_context *ctx);
 extern void nfs_file_clear_open_context(struct file *flip);
-extern struct nfs_lock_context *nfs_find_lock_context(struct nfs_open_context *ctx);
+extern struct nfs_lock_context *nfs_find_lock_context(struct file *file);
 extern struct nfs_lock_context *get_nfs_lock_context(struct nfs_lock_context *l_ctx);
 extern void nfs_put_lock_context(struct nfs_lock_context *l_ctx);
 extern u64 nfs_compat_user_ino64(u64 fileid);
@@ -542,7 +543,7 @@ nfs_have_writebacks(struct inode *inode)
 extern int  nfs_readpage(struct file *, struct page *);
 extern int  nfs_readpages(struct file *, struct address_space *,
 		struct list_head *, unsigned);
-extern int  nfs_readpage_async(struct nfs_open_context *, struct inode *,
+extern int  nfs_readpage_async(struct nfs_lock_context *, struct inode *,
 			       struct page *);
 
 /*

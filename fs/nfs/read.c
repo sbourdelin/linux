@@ -102,7 +102,7 @@ static void nfs_readpage_release(struct nfs_page *req)
 	nfs_release_request(req);
 }
 
-int nfs_readpage_async(struct nfs_open_context *ctx, struct inode *inode,
+int nfs_readpage_async(struct nfs_lock_context *l_ctx, struct inode *inode,
 		       struct page *page)
 {
 	struct nfs_page	*new;
@@ -113,7 +113,7 @@ int nfs_readpage_async(struct nfs_open_context *ctx, struct inode *inode,
 	len = nfs_page_length(page);
 	if (len == 0)
 		return nfs_return_empty_page(page);
-	new = nfs_create_request(ctx, page, NULL, 0, len);
+	new = nfs_create_request(l_ctx, page, NULL, 0, len);
 	if (IS_ERR(new)) {
 		unlock_page(page);
 		return PTR_ERR(new);
@@ -291,6 +291,7 @@ static void nfs_readpage_result(struct rpc_task *task,
 int nfs_readpage(struct file *file, struct page *page)
 {
 	struct nfs_open_context *ctx;
+	struct nfs_lock_context *l_ctx;
 	struct inode *inode = page_file_mapping(page)->host;
 	int		error;
 
@@ -321,19 +322,22 @@ int nfs_readpage(struct file *file, struct page *page)
 		ctx = nfs_find_open_context(inode, NULL, FMODE_READ);
 		if (ctx == NULL)
 			goto out_unlock;
-	} else
-		ctx = get_nfs_open_context(nfs_file_open_context(file));
+		l_ctx = get_nfs_lock_context(&ctx->lock_context);
+		put_nfs_open_context(ctx);
+	} else {
+		l_ctx = nfs_find_lock_context(file);
+	}
 
 	if (!IS_SYNC(inode)) {
-		error = nfs_readpage_from_fscache(ctx, inode, page);
+		error = nfs_readpage_from_fscache(l_ctx, inode, page);
 		if (error == 0)
 			goto out;
 	}
 
-	error = nfs_readpage_async(ctx, inode, page);
+	error = nfs_readpage_async(l_ctx, inode, page);
 
 out:
-	put_nfs_open_context(ctx);
+	nfs_put_lock_context(l_ctx);
 	return error;
 out_unlock:
 	unlock_page(page);
@@ -342,7 +346,7 @@ out_unlock:
 
 struct nfs_readdesc {
 	struct nfs_pageio_descriptor *pgio;
-	struct nfs_open_context *ctx;
+	struct nfs_lock_context *l_ctx;
 };
 
 static int
@@ -357,7 +361,7 @@ readpage_async_filler(void *data, struct page *page)
 	if (len == 0)
 		return nfs_return_empty_page(page);
 
-	new = nfs_create_request(desc->ctx, page, NULL, 0, len);
+	new = nfs_create_request(desc->l_ctx, page, NULL, 0, len);
 	if (IS_ERR(new))
 		goto out_error;
 
@@ -382,6 +386,7 @@ int nfs_readpages(struct file *filp, struct address_space *mapping,
 {
 	struct nfs_pageio_descriptor pgio;
 	struct nfs_pgio_mirror *pgm;
+	struct nfs_open_context *ctx;
 	struct nfs_readdesc desc = {
 		.pgio = &pgio,
 	};
@@ -399,16 +404,19 @@ int nfs_readpages(struct file *filp, struct address_space *mapping,
 		goto out;
 
 	if (filp == NULL) {
-		desc.ctx = nfs_find_open_context(inode, NULL, FMODE_READ);
-		if (desc.ctx == NULL)
+		ctx = nfs_find_open_context(inode, NULL, FMODE_READ);
+		if (ctx == NULL)
 			return -EBADF;
-	} else
-		desc.ctx = get_nfs_open_context(nfs_file_open_context(filp));
+		desc.l_ctx = get_nfs_lock_context(&ctx->lock_context);
+		put_nfs_open_context(ctx);
+	} else {
+		desc.l_ctx = nfs_find_lock_context(filp);
+	}
 
 	/* attempt to read as many of the pages as possible from the cache
 	 * - this returns -ENOBUFS immediately if the cookie is negative
 	 */
-	ret = nfs_readpages_from_fscache(desc.ctx, inode, mapping,
+	ret = nfs_readpages_from_fscache(desc.l_ctx, inode, mapping,
 					 pages, &nr_pages);
 	if (ret == 0)
 		goto read_complete; /* all pages were read */
@@ -428,7 +436,7 @@ int nfs_readpages(struct file *filp, struct address_space *mapping,
 		 PAGE_CACHE_SHIFT;
 	nfs_add_stats(inode, NFSIOS_READPAGES, npages);
 read_complete:
-	put_nfs_open_context(desc.ctx);
+	nfs_put_lock_context(desc.l_ctx);
 out:
 	return ret;
 }
