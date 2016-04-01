@@ -3736,6 +3736,58 @@ static void skl_clear_wm(struct skl_wm_values *watermarks, enum pipe pipe)
 
 }
 
+static int
+skl_compute_ddb(struct drm_atomic_state *state)
+{
+	struct drm_device *dev = state->dev;
+	struct intel_atomic_state *intel_state = to_intel_atomic_state(state);
+	struct intel_crtc *intel_crtc;
+	unsigned realloc_pipes = intel_state->active_crtcs;
+	int ret;
+
+	/*
+	 * If the modeset changes which CRTC's are active, we need to
+	 * recompute the DDB allocation for *all* active pipes, even
+	 * those that weren't otherwise being modified in any way by this
+	 * atomic commit.  Due to the shrinking of the per-pipe allocations
+	 * when new active CRTC's are added, it's possible for a pipe that
+	 * we were already using and aren't changing at all here to suddenly
+	 * become invalid if its DDB needs exceeds its new allocation.
+	 *
+	 * Note that if we wind up doing a full DDB recompute, we can't let
+	 * any other display updates race with this transaction, so we need
+	 * to grab the lock on *all* CRTC's.
+	 */
+	if (intel_state->active_crtcs != to_i915(dev)->active_crtcs)
+		realloc_pipes = ~0;
+
+	for_each_intel_crtc_mask(dev, intel_crtc, realloc_pipes) {
+		struct intel_crtc_state *cstate;
+
+		cstate = intel_atomic_get_crtc_state(state, intel_crtc);
+		if (IS_ERR(cstate))
+			return PTR_ERR(cstate);
+
+		ret = skl_allocate_pipe_ddb(cstate, &intel_state->ddb);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+static int
+skl_compute_wm(struct drm_atomic_state *state)
+{
+	int ret;
+
+	ret = skl_compute_ddb(state);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
 static void skl_update_wm(struct drm_crtc *crtc)
 {
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
@@ -7252,6 +7304,7 @@ void intel_init_pm(struct drm_device *dev)
 	if (INTEL_INFO(dev)->gen >= 9) {
 		skl_setup_wm_latency(dev);
 		dev_priv->display.update_wm = skl_update_wm;
+		dev_priv->display.compute_global_watermarks = skl_compute_wm;
 	} else if (HAS_PCH_SPLIT(dev)) {
 		ilk_setup_wm_latency(dev);
 
