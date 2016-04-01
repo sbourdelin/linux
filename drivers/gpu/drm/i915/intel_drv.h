@@ -1667,6 +1667,27 @@ intel_atomic_get_existing_plane_state(struct drm_atomic_state *state,
 	return to_intel_plane_state(plane_state);
 }
 
+/*
+ * If cstate is in-flight, return in-flight plane state, otherwise
+ * return committed plane state.
+ */
+static inline struct intel_plane_state *
+intel_pstate_for_cstate_plane(struct intel_crtc_state *cstate,
+			      struct intel_plane *plane)
+{
+	struct drm_atomic_state *state = cstate->base.state;
+	struct drm_plane_state *pstate;
+
+	if (state == NULL)
+		return to_intel_plane_state(plane->base.state);
+
+	pstate = drm_atomic_get_plane_state(state, &plane->base);
+
+	return to_intel_plane_state(pstate);
+}
+
+
+
 int intel_atomic_setup_scalers(struct drm_device *dev,
 	struct intel_crtc *intel_crtc,
 	struct intel_crtc_state *crtc_state);
