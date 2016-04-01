@@ -58,6 +58,15 @@ struct dyn_arch_ftrace {
 	struct module *mod;
 };
 #endif /*  CONFIG_DYNAMIC_FTRACE */
+
+#if CONFIG_PPC64 && (!defined(_CALL_ELF) || _CALL_ELF != 2)
+#define ARCH_HAS_FTRACE_MATCH_ADJUST
+static inline void arch_ftrace_match_adjust(char **str, char *search)
+{
+	if ((*str)[0] == '.' && search[0] != '.')
+		(*str)++;
+}
+#endif /* CONFIG_PPC64 && (!defined(_CALL_ELF) || _CALL_ELF != 2) */
 #endif /* __ASSEMBLY__ */
 
 #ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS

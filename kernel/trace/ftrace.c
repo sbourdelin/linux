@@ -3444,10 +3444,23 @@ struct ftrace_glob {
 	int type;
 };
 
+#ifndef ARCH_HAS_FTRACE_MATCH_ADJUST
+/*
+ * If symbols in an architecture don't correspond exactly to the user-visible
+ * name of what they represent, it is possible to define this function to
+ * perform the necessary adjustments.
+*/
+static inline void arch_ftrace_match_adjust(char **str, char *search)
+{
+}
+#endif
+
 static int ftrace_match(char *str, struct ftrace_glob *g)
 {
 	int matched = 0;
 	int slen;
+
+	arch_ftrace_match_adjust(&str, g->search);
 
 	switch (g->type) {
 	case MATCH_FULL:
