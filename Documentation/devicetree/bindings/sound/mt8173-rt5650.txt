@@ -5,11 +5,17 @@ Required properties:
 - mediatek,audio-codec: the phandles of rt5650 codecs
 - mediatek,platform: the phandle of MT8173 ASoC platform
 
+Optional properties:
+- mediatek,audio-codec-dai-capture: audio codec dai on capture path
+  rt5645-aif1: Default setting. Connect rt5650 I2S1 for capture
+  rt5645-aif2: Connect rt5650 I2S2 for capture
+
 Example:
 
 	sound {
 		compatible = "mediatek,mt8173-rt5650";
 		mediatek,audio-codec = <&rt5650>;
 		mediatek,platform = <&afe>;
+		mediatek,audio-codec-dai-capture = "rt5645-aif2";
 	};
 
