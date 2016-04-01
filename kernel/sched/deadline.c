@@ -1282,10 +1282,6 @@ static int find_later_rq(struct task_struct *task)
 	int this_cpu = smp_processor_id();
 	int best_cpu, cpu = task_cpu(task);
 
-	/* Make sure the mask is initialized first */
-	if (unlikely(!later_mask))
-		return -1;
-
 	if (task->nr_cpus_allowed == 1)
 		return -1;
 
