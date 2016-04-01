@@ -748,7 +748,7 @@ int phys_mem_access_prot_allowed(struct file *file, unsigned long pfn,
 	      boot_cpu_has(X86_FEATURE_K6_MTRR) ||
 	      boot_cpu_has(X86_FEATURE_CYRIX_ARR) ||
 	      boot_cpu_has(X86_FEATURE_CENTAUR_MCR)) &&
-	    (pfn << PAGE_SHIFT) >= __pa(high_memory)) {
+	    (pfn << PAGE_SHIFT) >= __pa_nodebug(high_memory)) {
 		pcm = _PAGE_CACHE_MODE_UC;
 	}
 #endif
