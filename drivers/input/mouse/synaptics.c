@@ -1032,7 +1032,7 @@ static void synaptics_process_packet(struct psmouse *psmouse)
 
 	if (hw.z > 0 && hw.x > 1) {
 		num_fingers = 1;
-		finger_width = 5;
+		finger_width = 4;
 		if (SYN_CAP_EXTENDED(priv->capabilities)) {
 			switch (hw.w) {
 			case 0 ... 1:
