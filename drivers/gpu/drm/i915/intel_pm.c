@@ -2966,26 +2966,15 @@ skl_get_total_relative_data_rate(const struct intel_crtc_state *cstate)
 	struct drm_plane *plane;
 	unsigned int total_data_rate = 0;
 
+	if (WARN_ON(!state))
+		return 0;
+
 	drm_for_each_plane_mask(plane, dev, cstate->base.plane_mask) {
 		struct drm_plane_state *pstate;
 
-		/*
-		 * FIXME: At the moment this function can be called on either
-		 * an in-flight or a committed state object.  If it's in-flight
-		 * we want to also use the in-flight plane state; otherwise
-		 * use the committed plane state.
-		 *
-		 * Once we finish moving our DDB allocation to the atomic check
-		 * phase, we'll only be calling this function on in-flight
-		 * state objects and should never see a NULL state here.
-		 */
-		if (state) {
-			pstate = drm_atomic_get_plane_state(state, plane);
-			if (IS_ERR(pstate))
-				return PTR_ERR(pstate);
-		} else {
-			pstate = plane->state;
-		}
+		pstate = drm_atomic_get_plane_state(state, plane);
+		if (IS_ERR(pstate))
+			return PTR_ERR(pstate);
 
 		if (!to_intel_plane_state(pstate)->visible)
 			continue;
@@ -3015,9 +3004,9 @@ skl_allocate_pipe_ddb(struct intel_crtc_state *cstate,
 {
 	struct drm_crtc *crtc = cstate->base.crtc;
 	struct drm_device *dev = crtc->dev;
-	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 	struct intel_plane *intel_plane;
+	struct intel_atomic_state *intel_state;
 	enum pipe pipe = intel_crtc->pipe;
 	struct skl_ddb_entry *alloc = &ddb->pipe[pipe];
 	uint16_t alloc_size, start, cursor_blocks;
@@ -3035,21 +3024,11 @@ skl_allocate_pipe_ddb(struct intel_crtc_state *cstate,
 		return 0;
 	}
 
-	/*
-	 * TODO:  At the moment we might call this on either an in-flight CRTC
-	 * state or an already-committed state, so look up the number of
-	 * active CRTC's accordingly.  Eventually this will only be called
-	 * on in-flight states and we'll be able to drop some of this extra
-	 * logic.
-	 */
-	if (cstate->base.state) {
-		struct intel_atomic_state *intel_state =
-			to_intel_atomic_state(cstate->base.state);
+	if (WARN_ON(!cstate->base.state))
+		return 0;
 
-		active_crtcs = intel_state->active_crtcs;
-	} else {
-		active_crtcs = dev_priv->active_crtcs;
-	}
+	intel_state = to_intel_atomic_state(cstate->base.state);
+	active_crtcs = intel_state->active_crtcs;
 
 	skl_ddb_get_pipe_allocation_limits(dev, cstate, active_crtcs, alloc);
 	alloc_size = skl_ddb_entry_size(alloc);
@@ -3074,18 +3053,9 @@ skl_allocate_pipe_ddb(struct intel_crtc_state *cstate,
 		struct drm_framebuffer *fb = plane->state->fb;
 		int id = skl_wm_plane_id(intel_plane);
 
-		/*
-		 * TODO: Remove support for already-committed state once we
-		 * only allocate DDB on in-flight states.
-		 */
-		if (cstate->base.state) {
-			pstate = drm_atomic_get_plane_state(cstate->base.state,
-							    plane);
-			if (IS_ERR(pstate))
-				return PTR_ERR(pstate);
-		} else {
-			pstate = plane->state;
-		}
+		pstate = drm_atomic_get_plane_state(cstate->base.state, plane);
+		if (IS_ERR(pstate))
+			return PTR_ERR(pstate);
 
 		if (!to_intel_plane_state(pstate)->visible)
 			continue;
@@ -3116,18 +3086,9 @@ skl_allocate_pipe_ddb(struct intel_crtc_state *cstate,
 		uint16_t plane_blocks, y_plane_blocks = 0;
 		int id = skl_wm_plane_id(intel_plane);
 
-		/*
-		 * TODO: Remove support for already-committed state once we
-		 * only allocate DDB on in-flight states.
-		 */
-		if (cstate->base.state) {
-			pstate = drm_atomic_get_plane_state(cstate->base.state,
-							    plane);
-			if (WARN_ON(IS_ERR(pstate)))
-				return PTR_ERR(pstate);
-		} else {
-			pstate = plane->state;
-		}
+		pstate = drm_atomic_get_plane_state(cstate->base.state, plane);
+		if (WARN_ON(IS_ERR(pstate)))
+			return PTR_ERR(pstate);
 
 		if (!to_intel_plane_state(pstate)->visible)
 			continue;
@@ -3660,7 +3621,6 @@ static bool skl_update_pipe_wm(struct drm_crtc *crtc,
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 	struct intel_crtc_state *cstate = to_intel_crtc_state(crtc->state);
 
-	WARN_ON(skl_allocate_pipe_ddb(cstate, ddb) != 0);
 	skl_build_pipe_wm(cstate, ddb, pipe_wm);
 
 	if (!memcmp(&intel_crtc->wm.active.skl, pipe_wm, sizeof(*pipe_wm)))
@@ -3724,16 +3684,6 @@ static void skl_clear_wm(struct skl_wm_values *watermarks, enum pipe pipe)
 	memset(watermarks->plane_trans[pipe],
 	       0, sizeof(uint32_t) * I915_MAX_PLANES);
 	watermarks->plane_trans[pipe][PLANE_CURSOR] = 0;
-
-	/* Clear ddb entries for pipe */
-	memset(&watermarks->ddb.pipe[pipe], 0, sizeof(struct skl_ddb_entry));
-	memset(&watermarks->ddb.plane[pipe], 0,
-	       sizeof(struct skl_ddb_entry) * I915_MAX_PLANES);
-	memset(&watermarks->ddb.y_plane[pipe], 0,
-	       sizeof(struct skl_ddb_entry) * I915_MAX_PLANES);
-	memset(&watermarks->ddb.plane[pipe][PLANE_CURSOR], 0,
-	       sizeof(struct skl_ddb_entry));
-
 }
 
 static int
