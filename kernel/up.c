@@ -82,3 +82,12 @@ void on_each_cpu_cond(bool (*cond_func)(int cpu, void *info),
 	preempt_enable();
 }
 EXPORT_SYMBOL(on_each_cpu_cond);
+
+int smp_call_sync_on_phys_cpu(unsigned int cpu, int (*func)(void *), void *par)
+{
+	if (cpu != 0)
+		return -EINVAL;
+
+	return func(par);
+}
+EXPORT_SYMBOL_GPL(smp_call_sync_on_phys_cpu);

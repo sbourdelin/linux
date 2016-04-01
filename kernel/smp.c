@@ -739,3 +739,47 @@ void wake_up_all_idle_cpus(void)
 	preempt_enable();
 }
 EXPORT_SYMBOL_GPL(wake_up_all_idle_cpus);
+
+/**
+ * smp_call_sync_on_phys_cpu - Call a function on a specific physical cpu
+ *
+ * Used to call a function on a specific physical cpu. Even if the specified
+ * cpu isn't the current one, return only after the called function has
+ * returned.
+ */
+struct smp_sync_call_struct {
+	struct work_struct	work;
+	struct completion	done;
+	int			(*func)(void *);
+	void			*data;
+	int			ret;
+};
+
+static void smp_call_sync_callback(struct work_struct *work)
+{
+	struct smp_sync_call_struct *sscs;
+
+	sscs = container_of(work, struct smp_sync_call_struct, work);
+	sscs->ret = sscs->func(sscs->data);
+
+	complete(&sscs->done);
+}
+
+int smp_call_sync_on_phys_cpu(unsigned int cpu, int (*func)(void *), void *par)
+{
+	struct smp_sync_call_struct sscs = {
+		.work = __WORK_INITIALIZER(sscs.work, smp_call_sync_callback),
+		.done = COMPLETION_INITIALIZER_ONSTACK(sscs.done),
+		.func = func,
+		.data = par,
+	};
+
+	if (cpu >= nr_cpu_ids)
+		return -EINVAL;
+
+	queue_work_on(cpu, system_wq, &sscs.work);
+	wait_for_completion(&sscs.done);
+
+	return sscs.ret;
+}
+EXPORT_SYMBOL_GPL(smp_call_sync_on_phys_cpu);
