@@ -1160,7 +1160,7 @@ static void assert_fdi_tx(struct drm_i915_private *dev_priv,
 	enum transcoder cpu_transcoder = intel_pipe_to_cpu_transcoder(dev_priv,
 								      pipe);
 
-	if (HAS_DDI(dev_priv->dev)) {
+	if (HAS_DDI(dev_priv)) {
 		/* DDI does not have a specific FDI_TX register */
 		u32 val = I915_READ(TRANS_DDI_FUNC_CTL(cpu_transcoder));
 		cur_state = !!(val & TRANS_DDI_FUNC_ENABLE);
@@ -1196,11 +1196,11 @@ static void assert_fdi_tx_pll_enabled(struct drm_i915_private *dev_priv,
 	u32 val;
 
 	/* ILK FDI PLL is always enabled */
-	if (INTEL_INFO(dev_priv->dev)->gen == 5)
+	if (INTEL_INFO(dev_priv)->gen == 5)
 		return;
 
 	/* On Haswell, DDI ports are responsible for the FDI PLL setup */
-	if (HAS_DDI(dev_priv->dev))
+	if (HAS_DDI(dev_priv))
 		return;
 
 	val = I915_READ(FDI_TX_CTL(pipe));
@@ -1408,11 +1408,11 @@ static bool dp_pipe_enabled(struct drm_i915_private *dev_priv,
 	if ((val & DP_PORT_EN) == 0)
 		return false;
 
-	if (HAS_PCH_CPT(dev_priv->dev)) {
+	if (HAS_PCH_CPT(dev_priv)) {
 		u32 trans_dp_ctl = I915_READ(TRANS_DP_CTL(pipe));
 		if ((trans_dp_ctl & TRANS_DP_PORT_SEL_MASK) != port_sel)
 			return false;
-	} else if (IS_CHERRYVIEW(dev_priv->dev)) {
+	} else if (IS_CHERRYVIEW(dev_priv)) {
 		if ((val & DP_PIPE_MASK_CHV) != DP_PIPE_SELECT_CHV(pipe))
 			return false;
 	} else {
@@ -1428,10 +1428,10 @@ static bool hdmi_pipe_enabled(struct drm_i915_private *dev_priv,
 	if ((val & SDVO_ENABLE) == 0)
 		return false;
 
-	if (HAS_PCH_CPT(dev_priv->dev)) {
+	if (HAS_PCH_CPT(dev_priv)) {
 		if ((val & SDVO_PIPE_SEL_MASK_CPT) != SDVO_PIPE_SEL_CPT(pipe))
 			return false;
-	} else if (IS_CHERRYVIEW(dev_priv->dev)) {
+	} else if (IS_CHERRYVIEW(dev_priv)) {
 		if ((val & SDVO_PIPE_SEL_MASK_CHV) != SDVO_PIPE_SEL_CHV(pipe))
 			return false;
 	} else {
@@ -1447,7 +1447,7 @@ static bool lvds_pipe_enabled(struct drm_i915_private *dev_priv,
 	if ((val & LVDS_PORT_EN) == 0)
 		return false;
 
-	if (HAS_PCH_CPT(dev_priv->dev)) {
+	if (HAS_PCH_CPT(dev_priv)) {
 		if ((val & PORT_TRANS_SEL_MASK) != PORT_TRANS_SEL_CPT(pipe))
 			return false;
 	} else {
@@ -1462,7 +1462,7 @@ static bool adpa_pipe_enabled(struct drm_i915_private *dev_priv,
 {
 	if ((val & ADPA_DAC_ENABLE) == 0)
 		return false;
-	if (HAS_PCH_CPT(dev_priv->dev)) {
+	if (HAS_PCH_CPT(dev_priv)) {
 		if ((val & PORT_TRANS_SEL_MASK) != PORT_TRANS_SEL_CPT(pipe))
 			return false;
 	} else {
@@ -1481,7 +1481,7 @@ static void assert_pch_dp_disabled(struct drm_i915_private *dev_priv,
 	     "PCH DP (0x%08x) enabled on transcoder %c, should be disabled\n",
 	     i915_mmio_reg_offset(reg), pipe_name(pipe));
 
-	I915_STATE_WARN(HAS_PCH_IBX(dev_priv->dev) && (val & DP_PORT_EN) == 0
+	I915_STATE_WARN(HAS_PCH_IBX(dev_priv) && (val & DP_PORT_EN) == 0
 	     && (val & DP_PIPEB_SELECT),
 	     "IBX PCH dp port still using transcoder B\n");
 }
@@ -1494,7 +1494,7 @@ static void assert_pch_hdmi_disabled(struct drm_i915_private *dev_priv,
 	     "PCH HDMI (0x%08x) enabled on transcoder %c, should be disabled\n",
 	     i915_mmio_reg_offset(reg), pipe_name(pipe));
 
-	I915_STATE_WARN(HAS_PCH_IBX(dev_priv->dev) && (val & SDVO_ENABLE) == 0
+	I915_STATE_WARN(HAS_PCH_IBX(dev_priv) && (val & SDVO_ENABLE) == 0
 	     && (val & SDVO_PIPE_B_SELECT),
 	     "IBX PCH hdmi port still using transcoder B\n");
 }
@@ -1534,7 +1534,7 @@ static void vlv_enable_pll(struct intel_crtc *crtc,
 	assert_pipe_disabled(dev_priv, crtc->pipe);
 
 	/* PLL is protected by panel, make sure we can write it */
-	if (IS_MOBILE(dev_priv->dev))
+	if (IS_MOBILE(dev_priv))
 		assert_panel_unlocked(dev_priv, crtc->pipe);
 
 	I915_WRITE(reg, dpll);
@@ -1818,7 +1818,7 @@ static void ironlake_enable_pch_transcoder(struct drm_i915_private *dev_priv,
 	val = I915_READ(reg);
 	pipeconf_val = I915_READ(PIPECONF(pipe));
 
-	if (HAS_PCH_IBX(dev_priv->dev)) {
+	if (HAS_PCH_IBX(dev_priv)) {
 		/*
 		 * Make the BPC in transcoder be consistent with
 		 * that in pipeconf reg. For HDMI we must use 8bpc
@@ -1833,7 +1833,7 @@ static void ironlake_enable_pch_transcoder(struct drm_i915_private *dev_priv,
 
 	val &= ~TRANS_INTERLACE_MASK;
 	if ((pipeconf_val & PIPECONF_INTERLACE_MASK) == PIPECONF_INTERLACED_ILK)
-		if (HAS_PCH_IBX(dev_priv->dev) &&
+		if (HAS_PCH_IBX(dev_priv) &&
 		    intel_pipe_has_type(intel_crtc, INTEL_OUTPUT_SDVO))
 			val |= TRANS_LEGACY_INTERLACED_ILK;
 		else
@@ -1852,7 +1852,7 @@ static void lpt_enable_pch_transcoder(struct drm_i915_private *dev_priv,
 	u32 val, pipeconf_val;
 
 	/* PCH only available on ILK+ */
-	BUG_ON(!HAS_PCH_SPLIT(dev_priv->dev));
+	BUG_ON(!HAS_PCH_SPLIT(dev_priv));
 
 	/* FDI must be feeding us bits for PCH ports */
 	assert_fdi_tx_enabled(dev_priv, (enum pipe) cpu_transcoder);
@@ -1948,7 +1948,7 @@ static void intel_enable_pipe(struct intel_crtc *crtc)
 	assert_cursor_disabled(dev_priv, pipe);
 	assert_sprites_disabled(dev_priv, pipe);
 
-	if (HAS_PCH_LPT(dev_priv->dev))
+	if (HAS_PCH_LPT(dev_priv))
 		pch_transcoder = TRANSCODER_A;
 	else
 		pch_transcoder = pipe;
@@ -1958,7 +1958,7 @@ static void intel_enable_pipe(struct intel_crtc *crtc)
 	 * a plane.  On ILK+ the pipe PLLs are integrated, so we don't
 	 * need the check.
 	 */
-	if (HAS_GMCH_DISPLAY(dev_priv->dev))
+	if (HAS_GMCH_DISPLAY(dev_priv))
 		if (crtc->config->has_dsi_encoder)
 			assert_dsi_pll_enabled(dev_priv);
 		else
@@ -6494,7 +6494,7 @@ static bool pipe_config_supports_ips(struct drm_i915_private *dev_priv,
 		return false;
 
 	/* HSW can handle pixel rate up to cdclk? */
-	if (IS_HASWELL(dev_priv->dev))
+	if (IS_HASWELL(dev_priv))
 		return true;
 
 	/*
@@ -9264,7 +9264,7 @@ static bool ironlake_get_pipe_config(struct intel_crtc *crtc,
 
 		ironlake_get_fdi_m_n_config(crtc, pipe_config);
 
-		if (HAS_PCH_IBX(dev_priv->dev)) {
+		if (HAS_PCH_IBX(dev_priv)) {
 			pll_id = (enum intel_dpll_id) crtc->pipe;
 		} else {
 			tmp = I915_READ(PCH_DPLL_SEL);
@@ -16159,7 +16159,7 @@ intel_display_capture_error_state(struct drm_device *dev)
 
 	/* Note: this does not include DSI transcoders. */
 	error->num_transcoders = INTEL_INFO(dev)->num_pipes;
-	if (HAS_DDI(dev_priv->dev))
+	if (HAS_DDI(dev_priv))
 		error->num_transcoders++; /* Account for eDP. */
 
 	for (i = 0; i < error->num_transcoders; i++) {
