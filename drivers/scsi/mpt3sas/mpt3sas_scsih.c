@@ -189,7 +189,6 @@ struct fw_event_work {
 	struct list_head	list;
 	struct work_struct	work;
 	u8			cancel_pending_work;
-	struct delayed_work	delayed_work;
 
 	struct MPT3SAS_ADAPTER *ioc;
 	u16			device_handle;
@@ -2804,12 +2803,12 @@ _scsih_fw_event_cleanup_queue(struct MPT3SAS_ADAPTER *ioc)
 		/*
 		 * Wait on the fw_event to complete. If this returns 1, then
 		 * the event was never executed, and we need a put for the
-		 * reference the delayed_work had on the fw_event.
+		 * reference the work had on the fw_event.
 		 *
 		 * If it did execute, we wait for it to finish, and the put will
 		 * happen from _firmware_event_work()
 		 */
-		if (cancel_delayed_work_sync(&fw_event->delayed_work))
+		if (cancel_work_sync(&fw_event->work))
 			fw_event_work_put(fw_event);
 
 		fw_event_work_put(fw_event);
