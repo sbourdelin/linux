@@ -68,14 +68,23 @@ extern struct asymmetric_key_id *asymmetric_key_generate_id(const void *val_1,
 							    size_t len_1,
 							    const void *val_2,
 							    size_t len_2);
+/*
+ * The payload is at the discretion of the subtype.
+ */
 static inline
 const struct asymmetric_key_ids *asymmetric_key_ids(const struct key *key)
 {
 	return key->payload.data[asym_key_ids];
 }
 
-/*
- * The payload is at the discretion of the subtype.
- */
+struct public_key_signature;
 
+int asymmetric_key_encrypt(const struct key *key, char *input, u32 insize,
+			   char *output, u32 *outsize);
+int asymmetric_key_decrypt(const struct key *key, char *input, u32 insize,
+			   char *output, u32 *outsize);
+int asymmetric_key_verify_signature(const struct key *key,
+				    const struct public_key_signature *sig);
+int asymmetric_key_create_signature(const struct key *key, char *data, u32 size,
+				    const struct public_key_signature **sig);
 #endif /* _KEYS_ASYMMETRIC_TYPE_H */

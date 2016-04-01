@@ -416,6 +416,94 @@ void unregister_asymmetric_key_parser(struct asymmetric_key_parser *parser)
 }
 EXPORT_SYMBOL_GPL(unregister_asymmetric_key_parser);
 
+/**
+ * asymmetric_key_encrypt - invoke encrypt operation on a key
+ *			    of the asymmetric subtype
+ * @key: key from the system keyring
+ * @input: data to be encrypted
+ * @insize: size of data to encrypt
+ * @output: output buffer
+ * @outsize: size of the output buffer. This will be updated to the actual
+ *	     size of encrypted data.
+ *
+ * return: 0 on success or errno on failure
+ */
+int asymmetric_key_encrypt(const struct key *key, char *input, u32 insize,
+			   char *output, u32 *outsize)
+{
+	struct asymmetric_key_subtype *subtype = asymmetric_key_subtype(key);
+
+	if (subtype && subtype->encrypt)
+		return subtype->encrypt(key, input, insize, output, outsize);
+
+	return -EOPNOTSUPP;
+}
+EXPORT_SYMBOL_GPL(asymmetric_key_encrypt);
+
+/**
+ * asymmetric_key_decrypt - invoke decrypt operation on a key
+ *			    of the asymmetric subtype
+ * @key: key from the system keyring
+ * @input: data to be decrypted
+ * @insize: size of data to decrypt
+ * @output: output buffer
+ * @outsize: size of the output buffer. This will be updated to the actual
+ *	     size of decrypted data.
+ *
+ * return: 0 on success or errno on failure
+ */
+int asymmetric_key_decrypt(const struct key *key, char *input, u32 insize,
+			   char *output, u32 *outsize)
+{
+	struct asymmetric_key_subtype *subtype = asymmetric_key_subtype(key);
+
+	if (subtype && subtype->decrypt)
+		return subtype->decrypt(key, input, insize, output, outsize);
+
+	return -EOPNOTSUPP;
+}
+EXPORT_SYMBOL_GPL(asymmetric_key_decrypt);
+
+/**
+ * asymmetric_key_verify_signature - invoke verify signature operation on a key
+ *			             of the asymmetric subtype
+ * @key: key from the system keyring
+ * @sig: signature to verify
+ *
+ * return: 0 on success or errno on failure
+ */
+int asymmetric_key_verify_signature(const struct key *key,
+				    const struct public_key_signature *sig)
+{
+	struct asymmetric_key_subtype *subtype = asymmetric_key_subtype(key);
+
+	if (subtype && subtype->verify_signature)
+		return subtype->verify_signature(key, sig);
+
+	return -EOPNOTSUPP;
+}
+EXPORT_SYMBOL_GPL(asymmetric_key_verify_signature);
+
+/**
+ * asymmetric_key_create_signature - invoke create signature operation on a key
+ *			             of the asymmetric subtype
+ * @key: key from the system keyring
+ * @sig: output signature
+ *
+ * return: 0 on success or errno on failure
+ */
+int asymmetric_key_create_signature(const struct key *key, char *data, u32 size,
+				    const struct public_key_signature **sig)
+{
+	struct asymmetric_key_subtype *subtype = asymmetric_key_subtype(key);
+
+	if (subtype && subtype->create_signature)
+		return subtype->create_signature(key, data, size, sig);
+
+	return -EOPNOTSUPP;
+}
+EXPORT_SYMBOL_GPL(asymmetric_key_create_signature);
+
 /*
  * Module stuff
  */

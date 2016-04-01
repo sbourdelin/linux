@@ -37,6 +37,16 @@ struct asymmetric_key_subtype {
 	/* Verify the signature on a key of this subtype (optional) */
 	int (*verify_signature)(const struct key *key,
 				const struct public_key_signature *sig);
+
+	/* Sign data using key and return the signature (optional) */
+	int (*create_signature)(const struct key *key, char *data, u32 size,
+				const struct public_key_signature **sig);
+
+	int (*encrypt)(const struct key *key, char *input, u32 insize,
+		       char *output, u32 *outsize);
+
+	int (*decrypt)(const struct key *key, char *input, u32 insize,
+		       char *output, u32 *outsize);
 };
 
 /**
