@@ -61,6 +61,7 @@ static int dwc3_of_simple_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	simple->dev = dev;
+	dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(32));
 
 	for (i = 0; i < simple->num_clocks; i++) {
 		struct clk	*clk;
