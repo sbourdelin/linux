@@ -211,6 +211,7 @@ static int ch341_configure(struct usb_device *dev, struct ch341_private *priv)
 	r = ch341_control_in(dev, CH341_VERSION, 0, 0, buffer, size);
 	if (r < 0)
 		goto out;
+	dev_dbg(&dev->dev, "chip version: %d\n", buffer[0]);
 
 	r = ch341_control_out(dev, CH341_SERIAL_INIT, 0, 0);
 	if (r < 0)
