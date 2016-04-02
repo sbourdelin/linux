@@ -62,6 +62,7 @@
  * the Net/FreeBSD uchcom.c driver by Takanori Watanabe.  Domo arigato.
  */
 
+#define CH341_MODEM_CTRL       0xA4
 #define CH341_REQ_WRITE_REG    0x9A
 #define CH341_REQ_READ_REG     0x95
 #define CH341_REG_BREAK1       0x05
@@ -163,7 +164,7 @@ static int ch341_set_baudrate(struct usb_device *dev,
 
 static int ch341_set_handshake(struct usb_device *dev, u8 control)
 {
-	return ch341_control_out(dev, 0xa4, ~control, 0);
+	return ch341_control_out(dev, CH341_MODEM_CTRL, ~control, 0);
 }
 
 static int ch341_get_status(struct usb_device *dev, struct ch341_private *priv)
