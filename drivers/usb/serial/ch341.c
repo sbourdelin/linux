@@ -107,7 +107,7 @@ static int ch341_control_out(struct usb_device *dev, u8 request,
 {
 	int r;
 
-	dev_dbg(&dev->dev, "ch341_control_out(%02x,%02x,%04x,%04x)\n",
+	dev_dbg(&dev->dev, "control_out(%02x,%02x,%04x,%04x)\n",
 			USB_DIR_OUT|0x40, (int)request, (int)value, (int)index);
 
 	r = usb_control_msg(dev, usb_sndctrlpipe(dev, 0), request,
@@ -123,9 +123,9 @@ static int ch341_control_in(struct usb_device *dev,
 {
 	int r;
 
-	dev_dbg(&dev->dev, "ch341_control_in(%02x,%02x,%04x,%04x,%p,%u)\n",
+	dev_dbg(&dev->dev, "control_in(%02x,%02x,%04x,%04x,%u)\n",
 			USB_DIR_IN|0x40, (int)request, (int)value, (int)index,
-			buf, (int)bufsize);
+			(int)bufsize);
 
 	r = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0), request,
 			USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_IN,
@@ -330,11 +330,11 @@ static int ch341_open(struct tty_struct *tty, struct usb_serial_port *port)
 	if (tty)
 		ch341_set_termios(tty, port, NULL);
 
-	dev_dbg(&port->dev, "%s - submitting interrupt urb\n", __func__);
+	dev_dbg(&port->dev, "Submitting interrupt URB\n");
 	r = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
 	if (r) {
-		dev_err(&port->dev, "%s - failed to submit interrupt urb: %d\n",
-				__func__, r);
+		dev_err(&port->dev,
+				"Failed to submit interrupt URB: %d\n", r);
 		goto out;
 	}
 
@@ -416,8 +416,7 @@ static void ch341_set_termios(struct tty_struct *tty,
 				CH341_REG_RTSCTS | ((uint16_t)CH341_REG_RTSCTS << 8),
 				0x0101);
 		if (r < 0) {
-			dev_err(&port->dev, "%s - USB control write error (%d)\n",
-					__func__, r);
+			dev_err(&port->dev, "USB control write error: %d\n", r);
 			tty->termios.c_cflag &= ~CRTSCTS;
 		}
 	}
@@ -439,29 +438,27 @@ static void ch341_break_ctl(struct tty_struct *tty, int break_state)
 	r = ch341_control_in(port->serial->dev, CH341_REQ_READ_REG,
 			ch341_break_reg, 0, break_reg, 2);
 	if (r < 0) {
-		dev_err(&port->dev, "%s - USB control read error (%d)\n",
-				__func__, r);
+		dev_err(&port->dev, "USB control read error: %d\n", r);
 		goto out;
 	}
-	dev_dbg(&port->dev, "%s - initial ch341 break register contents - reg1: %x, reg2: %x\n",
-			__func__, break_reg[0], break_reg[1]);
+	dev_dbg(&port->dev, "Initial break register contents - reg1: %x, reg2: %x\n",
+			break_reg[0], break_reg[1]);
 	if (break_state != 0) {
-		dev_dbg(&port->dev, "%s - Enter break state requested\n", __func__);
+		dev_dbg(&port->dev, "Enter break state requested\n");
 		break_reg[0] &= ~CH341_NBREAK_BITS_REG1;
 		break_reg[1] &= ~CH341_LCR_ENABLE_TX;
 	} else {
-		dev_dbg(&port->dev, "%s - Leave break state requested\n", __func__);
+		dev_dbg(&port->dev, "Leave break state requested\n");
 		break_reg[0] |= CH341_NBREAK_BITS_REG1;
 		break_reg[1] |= CH341_LCR_ENABLE_TX;
 	}
-	dev_dbg(&port->dev, "%s - New ch341 break register contents - reg1: %x, reg2: %x\n",
-			__func__, break_reg[0], break_reg[1]);
+	dev_dbg(&port->dev, "New break register contents - reg1: %x, reg2: %x\n",
+			break_reg[0], break_reg[1]);
 	reg_contents = get_unaligned_le16(break_reg);
 	r = ch341_control_out(port->serial->dev, CH341_REQ_WRITE_REG,
 			ch341_break_reg, reg_contents);
 	if (r < 0)
-		dev_err(&port->dev, "%s - USB control write error (%d)\n",
-				__func__, r);
+		dev_err(&port->dev, "USB control write error: %d\n", r);
 out:
 	kfree(break_reg);
 }
@@ -509,7 +506,7 @@ static void ch341_update_line_status(struct usb_serial_port *port,
 	spin_unlock_irqrestore(&priv->lock, flags);
 
 	if (data[1] & CH341_MULT_STAT)
-		dev_dbg(&port->dev, "%s - multiple status change\n", __func__);
+		dev_dbg(&port->dev, "Multiple status change\n");
 
 	if (!delta)
 		return;
@@ -548,12 +545,12 @@ static void ch341_read_int_callback(struct urb *urb)
 	case -ENOENT:
 	case -ESHUTDOWN:
 		/* this urb is terminated, clean up */
-		dev_dbg(&urb->dev->dev, "%s - urb shutting down: %d\n",
-				__func__, urb->status);
+		dev_dbg(&urb->dev->dev, "URB shutting down: %d\n",
+				urb->status);
 		return;
 	default:
-		dev_dbg(&urb->dev->dev, "%s - nonzero urb status: %d\n",
-				__func__, urb->status);
+		dev_dbg(&urb->dev->dev, "Nonzero URB status: %d\n",
+				urb->status);
 		goto exit;
 	}
 
@@ -562,8 +559,7 @@ static void ch341_read_int_callback(struct urb *urb)
 exit:
 	status = usb_submit_urb(urb, GFP_ATOMIC);
 	if (status) {
-		dev_err(&urb->dev->dev, "%s - usb_submit_urb failed: %d\n",
-				__func__, status);
+		dev_err(&urb->dev->dev, "URB submit failed: %d\n", status);
 	}
 }
 
@@ -588,7 +584,7 @@ static int ch341_tiocmget(struct tty_struct *tty)
 		  | ((status & CH341_BIT_RI)	? TIOCM_RI  : 0)
 		  | ((status & CH341_BIT_DCD)	? TIOCM_CD  : 0);
 
-	dev_dbg(&port->dev, "%s - result = %x\n", __func__, result);
+	dev_dbg(&port->dev, "Result = %x\n", result);
 
 	return result;
 }
