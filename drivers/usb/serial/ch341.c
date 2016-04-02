@@ -25,7 +25,6 @@
 #include <linux/serial.h>
 #include <asm/unaligned.h>
 
-#define DEFAULT_BAUD_RATE 9600
 #define DEFAULT_TIMEOUT   1000
 
 /* flags for IO-Bits */
@@ -235,10 +234,6 @@ static int ch341_configure(struct usb_device *dev, struct ch341_private *priv)
 	if (r < 0)
 		goto out;
 
-	r = ch341_init_set_baudrate(dev, priv, 0);
-	if (r < 0)
-		goto out;
-
 	r = ch341_set_handshake(dev, priv->line_control);
 	if (r < 0)
 		goto out;
@@ -261,8 +256,6 @@ static int ch341_port_probe(struct usb_serial_port *port)
 		return -ENOMEM;
 
 	spin_lock_init(&priv->lock);
-	priv->baud_rate = DEFAULT_BAUD_RATE;
-	priv->line_control = CH341_BIT_RTS | CH341_BIT_DTR;
 
 	r = ch341_configure(port->serial->dev, priv);
 	if (r < 0)
