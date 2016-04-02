@@ -32,11 +32,8 @@ int dwc3_host_init(struct dwc3 *dwc)
 		return -ENOMEM;
 	}
 
-	dma_set_coherent_mask(&xhci->dev, dwc->dev->coherent_dma_mask);
-
 	xhci->dev.parent	= dwc->dev;
-	xhci->dev.dma_mask	= dwc->dev->dma_mask;
-	xhci->dev.dma_parms	= dwc->dev->dma_parms;
+	dma_coerce_mask_and_coherent(&xhci->dev, dma_get_mask(dwc->dev));
 
 	dwc->xhci = xhci;
 
