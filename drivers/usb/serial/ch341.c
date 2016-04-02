@@ -116,7 +116,7 @@ static int ch341_control_out(struct usb_device *dev, u8 request,
 
 static int ch341_control_in(struct usb_device *dev,
 			    u8 request, u16 value, u16 index,
-			    char *buf, unsigned bufsize)
+			    unsigned char *buf, unsigned bufsize)
 {
 	int r;
 
@@ -169,9 +169,9 @@ static int ch341_set_handshake(struct usb_device *dev, u8 control)
 
 static int ch341_get_status(struct usb_device *dev, struct ch341_private *priv)
 {
-	char *buffer;
+	unsigned char *buffer;
 	int r;
-	const unsigned size = 8;
+	const unsigned size = 2;
 	unsigned long flags;
 
 	buffer = kmalloc(size, GFP_KERNEL);
@@ -199,9 +199,9 @@ out:	kfree(buffer);
 
 static int ch341_configure(struct usb_device *dev, struct ch341_private *priv)
 {
-	char *buffer;
+	unsigned char *buffer;
 	int r;
-	const unsigned size = 8;
+	const unsigned size = 2;
 
 	buffer = kmalloc(size, GFP_KERNEL);
 	if (!buffer)
