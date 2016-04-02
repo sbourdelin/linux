@@ -263,6 +263,8 @@ struct btrfs_fs_devices {
 	struct kobject fsid_kobj;
 	struct kobject *device_dir_kobj;
 	struct completion kobj_unregister;
+
+	int spare;
 };
 
 #define BTRFS_BIO_INLINE_CSUM_SIZE	64
