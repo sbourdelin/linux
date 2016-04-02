@@ -368,7 +368,6 @@ visornic_serverdown(struct visornic_devdata *devdata,
 		}
 		devdata->server_change_state = true;
 		devdata->server_down_complete_func = complete_func;
-		spin_unlock_irqrestore(&devdata->priv_lock, flags);
 		visornic_serverdown_complete(devdata);
 	} else if (devdata->server_change_state) {
 		dev_dbg(&devdata->dev->device, "%s changing state\n",
