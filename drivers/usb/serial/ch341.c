@@ -62,6 +62,8 @@
  * the Net/FreeBSD uchcom.c driver by Takanori Watanabe.  Domo arigato.
  */
 
+#define CH341_SERIAL_INIT      0xA1
+#define CH341_VERSION          0x5F
 #define CH341_MODEM_CTRL       0xA4
 #define CH341_REQ_WRITE_REG    0x9A
 #define CH341_REQ_READ_REG     0x95
@@ -130,8 +132,8 @@ static int ch341_control_in(struct usb_device *dev,
 	return r;
 }
 
-static int ch341_set_baudrate(struct usb_device *dev,
-			      struct ch341_private *priv)
+static int ch341_init_set_baudrate(struct usb_device *dev,
+			      struct ch341_private *priv, unsigned ctrl)
 {
 	short a, b;
 	int r;
@@ -155,9 +157,7 @@ static int ch341_set_baudrate(struct usb_device *dev,
 	a = (factor & 0xff00) | divisor;
 	b = factor & 0xff;
 
-	r = ch341_control_out(dev, 0x9a, 0x1312, a);
-	if (!r)
-		r = ch341_control_out(dev, 0x9a, 0x0f2c, b);
+	r = ch341_control_out(dev, CH341_SERIAL_INIT, 0x9c | (ctrl << 8) , a | 0x80);
 
 	return r;
 }
@@ -178,7 +178,7 @@ static int ch341_get_status(struct usb_device *dev, struct ch341_private *priv)
 	if (!buffer)
 		return -ENOMEM;
 
-	r = ch341_control_in(dev, 0x95, 0x0706, 0, buffer, size);
+	r = ch341_control_in(dev, CH341_REQ_READ_REG, 0x0706, 0, buffer, size);
 	if (r < 0)
 		goto out;
 
@@ -208,24 +208,20 @@ static int ch341_configure(struct usb_device *dev, struct ch341_private *priv)
 		return -ENOMEM;
 
 	/* expect two bytes 0x27 0x00 */
-	r = ch341_control_in(dev, 0x5f, 0, 0, buffer, size);
+	r = ch341_control_in(dev, CH341_VERSION, 0, 0, buffer, size);
 	if (r < 0)
 		goto out;
 
-	r = ch341_control_out(dev, 0xa1, 0, 0);
-	if (r < 0)
-		goto out;
-
-	r = ch341_set_baudrate(dev, priv);
+	r = ch341_control_out(dev, CH341_SERIAL_INIT, 0, 0);
 	if (r < 0)
 		goto out;
 
 	/* expect two bytes 0x56 0x00 */
-	r = ch341_control_in(dev, 0x95, 0x2518, 0, buffer, size);
+	r = ch341_control_in(dev, CH341_REQ_READ_REG, 0x2518, 0, buffer, size);
 	if (r < 0)
 		goto out;
 
-	r = ch341_control_out(dev, 0x9a, 0x2518, 0x0050);
+	r = ch341_control_out(dev, CH341_REQ_WRITE_REG, 0x2518, 0x00c3);
 	if (r < 0)
 		goto out;
 
@@ -234,11 +230,7 @@ static int ch341_configure(struct usb_device *dev, struct ch341_private *priv)
 	if (r < 0)
 		goto out;
 
-	r = ch341_control_out(dev, 0xa1, 0x501f, 0xd90a);
-	if (r < 0)
-		goto out;
-
-	r = ch341_set_baudrate(dev, priv);
+	r = ch341_init_set_baudrate(dev, priv, 0);
 	if (r < 0)
 		goto out;
 
@@ -353,16 +345,26 @@ static void ch341_set_termios(struct tty_struct *tty,
 	struct ch341_private *priv = usb_get_serial_port_data(port);
 	unsigned baud_rate;
 	unsigned long flags;
+	unsigned char ctrl;
+	int r;
+
+	/* redundant changes may cause the chip to lose bytes */
+	if (old_termios && !tty_termios_hw_change(&tty->termios, old_termios))
+		return;
 
 	baud_rate = tty_get_baud_rate(tty);
 
 	priv->baud_rate = baud_rate;
 
+	ctrl = CH341_LCR_ENABLE_RX | CH341_LCR_ENABLE_TX | CH341_LCR_CS8;
+
 	if (baud_rate) {
 		spin_lock_irqsave(&priv->lock, flags);
 		priv->line_control |= (CH341_BIT_DTR | CH341_BIT_RTS);
 		spin_unlock_irqrestore(&priv->lock, flags);
-		ch341_set_baudrate(port->serial->dev, priv);
+		r = ch341_init_set_baudrate(port->serial->dev, priv, ctrl);
+		if (r < 0)
+			priv->baud_rate = tty_termios_baud_rate(old_termios);
 	} else {
 		spin_lock_irqsave(&priv->lock, flags);
 		priv->line_control &= ~(CH341_BIT_DTR | CH341_BIT_RTS);
