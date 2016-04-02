@@ -825,9 +825,9 @@ out:
 		es->es_pblk = es1->es_pblk;
 		if (!ext4_es_is_referenced(es1))
 			ext4_es_set_referenced(es1);
-		stats->es_stats_cache_hits++;
+		percpu_stats_inc(&stats->es_stats, es_stats_cache_hits);
 	} else {
-		stats->es_stats_cache_misses++;
+		percpu_stats_inc(&stats->es_stats, es_stats_cache_misses);
 	}
 
 	read_unlock(&EXT4_I(inode)->i_es_lock);
@@ -1114,8 +1114,8 @@ int ext4_seq_es_shrinker_info_show(struct seq_file *seq, void *v)
 		   percpu_counter_sum_positive(&es_stats->es_stats_all_cnt),
 		   percpu_counter_sum_positive(&es_stats->es_stats_shk_cnt));
 	seq_printf(seq, "  %lu/%lu cache hits/misses\n",
-		   es_stats->es_stats_cache_hits,
-		   es_stats->es_stats_cache_misses);
+		   percpu_stats_sum(&es_stats->es_stats, es_stats_cache_hits),
+		   percpu_stats_sum(&es_stats->es_stats, es_stats_cache_misses));
 	if (inode_cnt)
 		seq_printf(seq, "  %d inodes on list\n", inode_cnt);
 
@@ -1142,8 +1142,6 @@ int ext4_es_register_shrinker(struct ext4_sb_info *sbi)
 	sbi->s_es_nr_inode = 0;
 	spin_lock_init(&sbi->s_es_lock);
 	sbi->s_es_stats.es_stats_shrunk = 0;
-	sbi->s_es_stats.es_stats_cache_hits = 0;
-	sbi->s_es_stats.es_stats_cache_misses = 0;
 	sbi->s_es_stats.es_stats_scan_time = 0;
 	sbi->s_es_stats.es_stats_max_scan_time = 0;
 	err = percpu_counter_init(&sbi->s_es_stats.es_stats_all_cnt, 0, GFP_KERNEL);
@@ -1153,15 +1151,20 @@ int ext4_es_register_shrinker(struct ext4_sb_info *sbi)
 	if (err)
 		goto err1;
 
+	err = percpu_stats_init(&sbi->s_es_stats.es_stats, es_stats_cnt);
+	if (err)
+		goto err2;
+
 	sbi->s_es_shrinker.scan_objects = ext4_es_scan;
 	sbi->s_es_shrinker.count_objects = ext4_es_count;
 	sbi->s_es_shrinker.seeks = DEFAULT_SEEKS;
 	err = register_shrinker(&sbi->s_es_shrinker);
 	if (err)
-		goto err2;
+		goto err3;
 
 	return 0;
-
+err3:
+	percpu_stats_destroy(&sbi->s_es_stats.es_stats);
 err2:
 	percpu_counter_destroy(&sbi->s_es_stats.es_stats_shk_cnt);
 err1:
@@ -1173,6 +1176,7 @@ void ext4_es_unregister_shrinker(struct ext4_sb_info *sbi)
 {
 	percpu_counter_destroy(&sbi->s_es_stats.es_stats_all_cnt);
 	percpu_counter_destroy(&sbi->s_es_stats.es_stats_shk_cnt);
+	percpu_stats_destroy(&sbi->s_es_stats.es_stats);
 	unregister_shrinker(&sbi->s_es_shrinker);
 }
 
