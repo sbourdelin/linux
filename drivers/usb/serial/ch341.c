@@ -69,6 +69,7 @@
 #define CH341_REQ_READ_REG     0x95
 #define CH341_REG_BREAK1       0x05
 #define CH341_REG_LCR          0x18
+#define CH341_REG_RTSCTS       0x27
 #define CH341_NBREAK_BITS_REG1 0x01
 
 #define CH341_LCR_ENABLE_RX    0x80
@@ -403,6 +404,16 @@ static void ch341_set_termios(struct tty_struct *tty,
 
 	ch341_set_handshake(port->serial->dev, priv->line_control);
 
+	if (cflag & CRTSCTS) {
+		r = ch341_control_out(port->serial->dev, CH341_REQ_WRITE_REG,
+				CH341_REG_RTSCTS | ((uint16_t)CH341_REG_RTSCTS << 8),
+				0x0101);
+		if (r < 0) {
+			dev_err(&port->dev, "%s - USB control write error (%d)\n",
+					__func__, r);
+			tty->termios.c_cflag &= ~CRTSCTS;
+		}
+	}
 }
 
 static void ch341_break_ctl(struct tty_struct *tty, int break_state)
