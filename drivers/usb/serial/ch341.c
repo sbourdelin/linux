@@ -65,10 +65,19 @@
 #define CH341_REQ_WRITE_REG    0x9A
 #define CH341_REQ_READ_REG     0x95
 #define CH341_REG_BREAK1       0x05
-#define CH341_REG_BREAK2       0x18
+#define CH341_REG_LCR          0x18
 #define CH341_NBREAK_BITS_REG1 0x01
-#define CH341_NBREAK_BITS_REG2 0x40
 
+#define CH341_LCR_ENABLE_RX    0x80
+#define CH341_LCR_ENABLE_TX    0x40
+#define CH341_LCR_MARK_SPACE   0x20
+#define CH341_LCR_PAR_EVEN     0x10
+#define CH341_LCR_ENABLE_PAR   0x08
+#define CH341_LCR_STOP_BITS_2  0x04
+#define CH341_LCR_CS8          0x03
+#define CH341_LCR_CS7          0x02
+#define CH341_LCR_CS6          0x01
+#define CH341_LCR_CS5          0x00
 
 static const struct usb_device_id id_table[] = {
 	{ USB_DEVICE(0x4348, 0x5523) },
@@ -371,7 +380,7 @@ static void ch341_set_termios(struct tty_struct *tty,
 static void ch341_break_ctl(struct tty_struct *tty, int break_state)
 {
 	const uint16_t ch341_break_reg =
-		CH341_REG_BREAK1 | ((uint16_t) CH341_REG_BREAK2 << 8);
+		CH341_REG_BREAK1 | ((uint16_t) CH341_REG_LCR << 8);
 	struct usb_serial_port *port = tty->driver_data;
 	int r;
 	uint16_t reg_contents;
@@ -393,11 +402,11 @@ static void ch341_break_ctl(struct tty_struct *tty, int break_state)
 	if (break_state != 0) {
 		dev_dbg(&port->dev, "%s - Enter break state requested\n", __func__);
 		break_reg[0] &= ~CH341_NBREAK_BITS_REG1;
-		break_reg[1] &= ~CH341_NBREAK_BITS_REG2;
+		break_reg[1] &= ~CH341_LCR_ENABLE_TX;
 	} else {
 		dev_dbg(&port->dev, "%s - Leave break state requested\n", __func__);
 		break_reg[0] |= CH341_NBREAK_BITS_REG1;
-		break_reg[1] |= CH341_NBREAK_BITS_REG2;
+		break_reg[1] |= CH341_LCR_ENABLE_TX;
 	}
 	dev_dbg(&port->dev, "%s - New ch341 break register contents - reg1: %x, reg2: %x\n",
 		__func__, break_reg[0], break_reg[1]);
