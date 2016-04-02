@@ -3,7 +3,8 @@
  * Copyright 2007, Werner Cornelius <werner@cornelius-consult.de>
  * Copyright 2009, Boris Hajduk <boris@hajduk.org>
  *
- * ch341.c implements a serial port driver for the Winchiphead CH341.
+ * ch341.c implements a serial port driver for the Winchiphead CH341,
+ * the second-worst USB serial chip in the world.
  *
  * The CH341 device can be used to implement an RS232 asynchronous
  * serial port, an IEEE-1284 parallel printer port or a memory-like
