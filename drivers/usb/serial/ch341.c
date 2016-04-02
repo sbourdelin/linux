@@ -545,9 +545,7 @@ static int ch341_reset_resume(struct usb_serial *serial)
 	priv = usb_get_serial_port_data(serial->port[0]);
 
 	/* reconfigure ch341 serial port after bus-reset */
-	ch341_configure(serial->dev, priv);
-
-	return 0;
+	return ch341_configure(serial->dev, priv);
 }
 
 static struct usb_serial_driver ch341_device = {
