@@ -3356,9 +3356,15 @@ static ssize_t ext4_ext_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 	 * Make all waiters for direct IO properly wait also for extent
 	 * conversion. This also disallows race between truncate() and
 	 * overwrite DIO as i_dio_count needs to be incremented under i_mutex.
+	 *
+	 * Both dax_do_io() and __blockdev_direct_IO() will unnecessarily
+	 * call inode_dio_begin()/inode_dio_end() again if the
+	 * DIO_SKIP_DIO_COUNT flag is not set.
 	 */
-	if (iov_iter_rw(iter) == WRITE)
+	if (iov_iter_rw(iter) == WRITE) {
+		dio_flags = DIO_SKIP_DIO_COUNT;
 		inode_dio_begin(inode);
+	}
 
 	/* If we do a overwrite dio, i_mutex locking can be released */
 	overwrite = *((int *)iocb->private);
@@ -3391,10 +3397,10 @@ static ssize_t ext4_ext_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 		get_block_func = ext4_dio_get_block_overwrite;
 	else if (is_sync_kiocb(iocb)) {
 		get_block_func = ext4_dio_get_block_unwritten_sync;
-		dio_flags = DIO_LOCKING;
+		dio_flags |= DIO_LOCKING;
 	} else {
 		get_block_func = ext4_dio_get_block_unwritten_async;
-		dio_flags = DIO_LOCKING;
+		dio_flags |= DIO_LOCKING;
 	}
 #ifdef CONFIG_EXT4_FS_ENCRYPTION
 	BUG_ON(ext4_encrypted_inode(inode) && S_ISREG(inode->i_mode));
