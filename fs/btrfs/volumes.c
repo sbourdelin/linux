@@ -7149,3 +7149,140 @@ out:
 	read_unlock(&map_tree->map_tree.lock);
 	return ret;
 }
+
+static void __close_device(struct work_struct *work)
+{
+	struct btrfs_device *device;
+
+	device = container_of(work, struct btrfs_device, rcu_work);
+
+	if (device->bdev)
+		blkdev_put(device->bdev, device->mode);
+
+	device->bdev = NULL;
+}
+
+static void close_device(struct rcu_head *head)
+{
+	struct btrfs_device *device;
+
+	device = container_of(head, struct btrfs_device, rcu);
+
+	INIT_WORK(&device->rcu_work, __close_device);
+	schedule_work(&device->rcu_work);
+}
+
+void btrfs_close_one_device_dont_free(struct btrfs_device *device)
+{
+	struct btrfs_fs_devices *fs_devices = device->fs_devices;
+
+	if (device->bdev)
+		fs_devices->open_devices--;
+
+	if (device->writeable &&
+	    device->devid != BTRFS_DEV_REPLACE_DEVID) {
+		list_del_init(&device->dev_alloc_list);
+		fs_devices->rw_devices--;
+	}
+
+	device->writeable = 0;
+
+	call_rcu(&device->rcu, close_device);
+}
+
+void force_device_close(struct btrfs_device *device)
+{
+	struct btrfs_device *next_device;
+	struct btrfs_fs_devices *fs_devices;
+
+	fs_devices = device->fs_devices;
+
+	mutex_lock(&fs_devices->device_list_mutex);
+	lock_chunks(fs_devices->fs_info->fs_root);
+
+	next_device = list_entry(fs_devices->devices.next,
+					struct btrfs_device, dev_list);
+	if (device->bdev == fs_devices->fs_info->sb->s_bdev)
+		fs_devices->fs_info->sb->s_bdev = next_device->bdev;
+
+	if (device->bdev == fs_devices->latest_bdev)
+		fs_devices->latest_bdev = next_device->bdev;
+
+	btrfs_close_one_device_dont_free(device);
+
+	/*
+	 * TODO: works for now, but its better to keep the state of
+	 * missing and offline different, and update rest of the
+	 * places where we check for only missing and not for failed
+	 * or offline as of now.
+	 */
+	device->missing = 1;
+	fs_devices->missing_devices++;
+	device->writeable = 0;
+
+	rcu_barrier();
+
+	unlock_chunks(fs_devices->fs_info->fs_root);
+	mutex_unlock(&fs_devices->device_list_mutex);
+}
+
+void btrfs_enforce_device_state(struct btrfs_device *dev, char *why)
+{
+	bool degrade_option;
+	int tolerated_fail;
+	struct btrfs_fs_info *fs_info;
+	struct btrfs_fs_devices *fs_devices;
+
+	fs_devices = dev->fs_devices;
+	fs_info = fs_devices->fs_info;
+	degrade_option = btrfs_test_opt(fs_info->fs_root, DEGRADED);
+
+	/* todo: support seed later */
+	if (fs_devices->seeding)
+		return;
+
+	/* this shouldn't be called if device is already missing */
+	if (dev->missing || !dev->bdev)
+		return;
+
+	if (dev->offline || dev->failed)
+		return;
+
+	/* Only RW device is requested to force close let FS handle it*/
+	if (fs_devices->rw_devices == 1) {
+		btrfs_std_error(fs_info, -EIO,
+			"force offline last RW device");
+		return;
+	}
+
+	if (!strcmp(why, "offline"))
+		dev->offline = 1;
+	else if (!strcmp(why, "failed"))
+		dev->failed = 1;
+	else
+		return;
+
+	btrfs_sysfs_rm_device_link(fs_devices, dev);
+
+	force_device_close(dev);
+
+	tolerated_fail = btrfs_check_degradable(fs_info,
+						fs_info->sb->s_flags);
+	if (tolerated_fail > 0) {
+		btrfs_warn_in_rcu(fs_info, "device %s %s, chunks degraded",
+					rcu_str_deref(dev->name), why);
+	} else if(tolerated_fail < 0) {
+		btrfs_warn_in_rcu(fs_info,
+		"device %s %s, chunks failed",
+			rcu_str_deref(dev->name), why);
+		btrfs_std_error(fs_info, -EIO, "devices below critical level");
+	} else {
+		btrfs_warn_in_rcu(fs_info,
+			"device %s %s, No chunks are degraded",
+			rcu_str_deref(dev->name), why);
+	}
+	btrfs_info_in_rcu(fs_info,
+		"num_devices %llu rw_devices %llu degraded-option: %s",
+		fs_devices->num_devices, fs_devices->rw_devices,
+		degrade_option ? "set":"unset");
+}
