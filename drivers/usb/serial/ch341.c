@@ -396,10 +396,12 @@ static void ch341_set_termios(struct tty_struct *tty,
 	if (cflag & CSTOPB)
 		ctrl |= CH341_LCR_STOP_BITS_2;
 
-	if (baud_rate) {
-		spin_lock_irqsave(&priv->lock, flags);
-		priv->line_control |= (CH341_BIT_DTR | CH341_BIT_RTS);
-		spin_unlock_irqrestore(&priv->lock, flags);
+	if ((cflag & CBAUD) != B0) {
+		if (old_termios && (old_termios->c_cflag & CBAUD) == B0) {
+			spin_lock_irqsave(&priv->lock, flags);
+			priv->line_control |= (CH341_BIT_DTR | CH341_BIT_RTS);
+			spin_unlock_irqrestore(&priv->lock, flags);
+		}
 		r = ch341_init_set_baudrate(port->serial->dev, priv, ctrl);
 		if (r < 0)
 			priv->baud_rate = tty_termios_baud_rate(old_termios);
@@ -411,7 +413,7 @@ static void ch341_set_termios(struct tty_struct *tty,
 
 	ch341_set_handshake(port->serial->dev, priv->line_control);
 
-	if (cflag & CRTSCTS) {
+	if ((cflag & CRTSCTS) && ((cflag & CBAUD) != B0)) {
 		r = ch341_control_out(port->serial->dev, CH341_REQ_WRITE_REG,
 				CH341_REG_RTSCTS | ((uint16_t)CH341_REG_RTSCTS << 8),
 				0x0101);
