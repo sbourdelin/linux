@@ -212,7 +212,8 @@ static int st_dwc3_probe(struct platform_device *pdev)
 	if (IS_ERR(regmap))
 		return PTR_ERR(regmap);
 
-	dma_set_coherent_mask(dev, dev->coherent_dma_mask);
+	dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(32));
+
 	dwc3_data->dev = dev;
 	dwc3_data->regmap = regmap;
 
