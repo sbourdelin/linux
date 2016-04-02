@@ -609,8 +609,10 @@ static void f_midi_transmit(struct f_midi *midi)
 
 	do {
 		ret = f_midi_do_transmit(midi, ep);
-		if (ret < 0)
+		if (ret < 0) {
+			spin_unlock_irqrestore(&midi->transmit_lock, flags);
 			goto drop_out;
+		}
 	} while (ret);
 
 	spin_unlock_irqrestore(&midi->transmit_lock, flags);
