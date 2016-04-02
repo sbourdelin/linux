@@ -28,6 +28,7 @@
 #include "skl-tplg-interface.h"
 #include "../common/sst-dsp.h"
 #include "../common/sst-dsp-priv.h"
+#include "skl-dsp-parse.h"
 
 #define SKL_CH_FIXUP_MASK		(1 << 0)
 #define SKL_RATE_FIXUP_MASK		(1 << 1)
@@ -1554,7 +1555,15 @@ static int skl_tplg_widget_load(struct snd_soc_component *cmpnt,
 		return -ENOMEM;
 
 	w->priv = mconfig;
+	memcpy(mconfig->guid, dfw_config->uuid,
+					ARRAY_SIZE(dfw_config->uuid));
+
+	ret = snd_skl_get_module_info(skl->skl_sst, mconfig->guid, dfw_config);
+	if (ret < 0)
+		return ret;
+
 	mconfig->id.module_id = dfw_config->module_id;
+	mconfig->is_loadable = dfw_config->is_loadable;
 	mconfig->id.instance_id = dfw_config->instance_id;
 	mconfig->mcps = dfw_config->max_mcps;
 	mconfig->ibs = dfw_config->ibs;
@@ -1562,7 +1571,7 @@ static int skl_tplg_widget_load(struct snd_soc_component *cmpnt,
 	mconfig->core_id = dfw_config->core_id;
 	mconfig->max_in_queue = dfw_config->max_in_queue;
 	mconfig->max_out_queue = dfw_config->max_out_queue;
-	mconfig->is_loadable = dfw_config->is_loadable;
+
 	skl_tplg_fill_fmt(mconfig->in_fmt, dfw_config->in_fmt,
 						MODULE_MAX_IN_PINS);
 	skl_tplg_fill_fmt(mconfig->out_fmt, dfw_config->out_fmt,
@@ -1582,10 +1591,6 @@ static int skl_tplg_widget_load(struct snd_soc_component *cmpnt,
 	mconfig->hw_conn_type = dfw_config->hw_conn_type;
 	mconfig->time_slot = dfw_config->time_slot;
 	mconfig->formats_config.caps_size = dfw_config->caps.caps_size;
-
-	if (dfw_config->is_loadable)
-		memcpy(mconfig->guid, dfw_config->uuid,
-					ARRAY_SIZE(dfw_config->uuid));
 
 	mconfig->m_in_pin = devm_kzalloc(bus->dev, (mconfig->max_in_queue) *
 						sizeof(*mconfig->m_in_pin),
