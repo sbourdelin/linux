@@ -164,13 +164,8 @@ retry:
 		memset(raw_key, 0x42, FS_AES_256_XTS_KEY_SIZE);
 		goto got_key;
 	}
-	memcpy(full_key_descriptor, FS_KEY_DESC_PREFIX,
-					FS_KEY_DESC_PREFIX_SIZE);
-	sprintf(full_key_descriptor + FS_KEY_DESC_PREFIX_SIZE,
-					"%*phN", FS_KEY_DESCRIPTOR_SIZE,
-					ctx.master_key_descriptor);
-	full_key_descriptor[FS_KEY_DESC_PREFIX_SIZE +
-					(2 * FS_KEY_DESCRIPTOR_SIZE)] = '\0';
+	sprintf(full_key_descriptor, FS_KEY_DESC_PREFIX "%*phN",
+		FS_KEY_DESCRIPTOR_SIZE, ctx.master_key_descriptor);
 	keyring_key = request_key(&key_type_logon, full_key_descriptor, NULL);
 	if (IS_ERR(keyring_key)) {
 		res = PTR_ERR(keyring_key);
