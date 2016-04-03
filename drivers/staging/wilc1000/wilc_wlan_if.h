@@ -1,11 +1,7 @@
-/* ///////////////////////////////////////////////////////////////////////// */
-/*  */
-/* Copyright (c) Atmel Corporation.  All rights reserved. */
-/*  */
-/* Module Name:  wilc_wlan_if.h */
-/*  */
-/*  */
-/* ///////////////////////////////////////////////////////////////////////// */
+/*
+ * Copyright (c) Atmel Corporation.  All rights reserved.
+ * Module Name:  wilc_wlan_if.h
+ */
 
 #ifndef WILC_WLAN_IF_H
 #define WILC_WLAN_IF_H
@@ -13,11 +9,7 @@
 #include <linux/semaphore.h>
 #include <linux/netdevice.h>
 
-/********************************************
- *
- *      Debug Flags
- *
- ********************************************/
+/* Debug Flags */
 
 #define N_INIT			0x00000001
 #define N_ERR			0x00000002
@@ -25,30 +17,18 @@
 #define N_INTR			0x00000008
 #define N_RXQ			0x00000010
 
-/********************************************
- *
- *      Host Interface Defines
- *
- ********************************************/
+/* Host Interface Defines */
 
 #define HIF_SDIO		(0)
 #define HIF_SPI			BIT(0)
 #define HIF_SDIO_GPIO_IRQ	BIT(2)
 
-/********************************************
- *
- *      Tx/Rx Buffer Size Defines
- *
- ********************************************/
+/* Tx/Rx Buffer Size Defines */
 
 #define CE_TX_BUFFER_SIZE	(64 * 1024)
 #define CE_RX_BUFFER_SIZE	(384 * 1024)
 
-/********************************************
- *
- *      Wlan Interface Defines
- *
- ********************************************/
+/* Wlan Interface Defines */
 
 struct sdio_cmd52 {
 	u32 read_write:		1;
@@ -87,11 +67,7 @@ typedef void (*wilc_tx_complete_func_t)(void *, int);
 
 #define WILC_TX_ERR_NO_BUF	(-2)
 
-/********************************************
- *
- *      Wlan Configuration ID
- *
- ********************************************/
+/* Wlan Configuration ID */
 #define WILC_MULTICAST_TABLE_SIZE	8
 #define MAX_SSID_LEN            33
 #define MAX_RATES_SUPPORTED     12
@@ -270,7 +246,7 @@ typedef enum {
 typedef enum {
 	STATIC_MODE		= 1,
 	DYNAMIC_MODE		= 2,
-	MIMO_MODE		= 3,	/* power save disable */
+	MIMO_MODE		= 3,	/* Power save disable */
 } N_SMPS_MODE_T;
 
 typedef enum {

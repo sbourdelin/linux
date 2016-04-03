@@ -1,11 +1,8 @@
-/* ////////////////////////////////////////////////////////////////////////// */
-/*  */
-/* Copyright (c) Atmel Corporation.  All rights reserved. */
-/*  */
-/* Module Name:  wilc_wlan_cfg.h */
-/*  */
-/*  */
-/* ///////////////////////////////////////////////////////////////////////// */
+/*
+/* Copyright (c) Atmel Corporation.  All rights reserved.
+ *
+ * Module Name:  wilc_wlan_cfg.h
+ */
 
 #ifndef WILC_WLAN_CFG_H
 #define WILC_WLAN_CFG_H

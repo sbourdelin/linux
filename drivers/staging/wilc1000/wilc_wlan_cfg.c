@@ -1,11 +1,8 @@
-/* ////////////////////////////////////////////////////////////////////////// */
-/*  */
-/* Copyright (c) Atmel Corporation.  All rights reserved. */
-/*  */
-/* Module Name:  wilc_wlan_cfg.c */
-/*  */
-/*  */
-/* ///////////////////////////////////////////////////////////////////////// */
+/*
+ * Copyright (c) Atmel Corporation.  All rights reserved.
+ *
+ * Module Name:  wilc_wlan_cfg.c
+ */
 
 #include <linux/string.h>
 #include "wilc_wlan_if.h"
@@ -13,11 +10,7 @@
 #include "wilc_wlan_cfg.h"
 #include "coreconfigurator.h"
 
-/********************************************
- *
- *      Global Data
- *
- ********************************************/
+/* Global Data */
 enum cfg_cmd_type {
 	CFG_BYTE_CMD	= 0,
 	CFG_HWORD_CMD	= 1,
@@ -157,11 +150,7 @@ static struct wilc_cfg_str g_cfg_str[] = {
 	{WID_NIL, NULL}
 };
 
-/********************************************
- *
- *      Configuration Functions
- *
- ********************************************/
+/* Configuration Functions */
 
 static int wilc_wlan_cfg_set_byte(u8 *frame, u32 offset, u16 id, u8 val8)
 {
@@ -263,11 +252,7 @@ static int wilc_wlan_cfg_set_bin(u8 *frame, u32 offset, u16 id, u8 *b, u32 size)
 	return (size + 5);
 }
 
-/********************************************
- *
- *      Configuration Response Functions
- *
- ********************************************/
+/* Configuration Response Functions */
 
 static void wilc_wlan_parse_response_frame(u8 *info, int size)
 {
@@ -367,11 +352,7 @@ static int wilc_wlan_parse_info_frame(u8 *info, int size)
 	return type;
 }
 
-/********************************************
- *
- *      Configuration Exported Functions
- *
- ********************************************/
+/* Configuration Exported Functions */
 
 int wilc_wlan_cfg_set_wid(u8 *frame, u32 offset, u16 id, u8 *buf, int size)
 {
@@ -506,13 +487,14 @@ int wilc_wlan_cfg_indicate_rx(struct wilc *wilc, u8 *frame, int size,
 	u8 msg_id;
 
 	msg_type = frame[0];
-	msg_id = frame[1];      /* seq no */
+	msg_id = frame[1]; /* Seq no */
 	frame += 4;
 	size -= 4;
 
-	/**
-	 *      The  valid types of response messages are 'R' (Response), 'I' (Information), and 'N' (Network Information)
-	 **/
+	/*
+	 * The  valid types of response messages are 'R' (Response),
+	 * 'I' (Information), and 'N' (Network Information)
+	 */
 
 	switch (msg_type) {
 	case 'R':

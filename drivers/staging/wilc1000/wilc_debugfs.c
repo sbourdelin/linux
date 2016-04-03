@@ -6,7 +6,6 @@
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
- *
  */
 
 #if defined(WILC_DEBUGFS)
@@ -20,9 +19,7 @@
 
 static struct dentry *wilc_dir;
 
-/*
- * --------------------------------------------------------------------------------
- */
+
 #define DEBUG           BIT(0)
 #define INFO            BIT(1)
 #define WRN             BIT(2)
@@ -31,10 +28,6 @@ static struct dentry *wilc_dir;
 #define DBG_LEVEL_ALL	(DEBUG | INFO | WRN | ERR)
 atomic_t WILC_DEBUG_LEVEL = ATOMIC_INIT(ERR);
 EXPORT_SYMBOL_GPL(WILC_DEBUG_LEVEL);
-
-/*
- * --------------------------------------------------------------------------------
- */
 
 
 static ssize_t wilc_debug_level_read(struct file *file, char __user *userbuf, size_t count, loff_t *ppos)
@@ -76,9 +69,6 @@ static ssize_t wilc_debug_level_write(struct file *filp, const char __user *buf,
 	return count;
 }
 
-/*
- * --------------------------------------------------------------------------------
- */
 
 #define FOPS(_open, _read, _write, _poll) { \
 		.owner	= THIS_MODULE, \

@@ -86,7 +86,7 @@ struct sta_info {
 	u8 au8Sta_AssociatedBss[MAX_NUM_STA][ETH_ALEN];
 };
 
-/*Parameters needed for host interface for  remaining on channel*/
+/* Parameters needed for host interface for  remaining on channel */
 struct wilc_wfi_p2pListenParams {
 	struct ieee80211_channel *pstrListenChan;
 	enum nl80211_channel_type tenuChannelType;
@@ -129,10 +129,8 @@ struct wilc_priv {
 	struct wilc_wfi_key *wilc_gtk[MAX_NUM_STA];
 	struct wilc_wfi_key *wilc_ptk[MAX_NUM_STA];
 	u8 wilc_groupkey;
-	/* semaphores */
 	struct semaphore SemHandleUpdateStats;
 	struct semaphore hSemScanReq;
-	/*  */
 	bool gbAutoRateAdjusted;
 
 	bool bInP2PlistenState;

@@ -60,8 +60,10 @@ void WILC_WFI_monitor_rx(u8 *buff, u32 size)
 	/* Get WILC header */
 	memcpy(&header, (buff - HOST_HDR_OFFSET), HOST_HDR_OFFSET);
 
-	/* The packet offset field conain info about what type of managment frame */
-	/* we are dealing with and ack status */
+	/*
+	 * The packet offset field conain info about what type of managment
+	 * frame we are dealing with and ack status
+	 */
 	pkt_offset = GET_PKT_OFFSET(header);
 
 	if (pkt_offset & IS_MANAGMEMENT_CALLBACK) {
@@ -128,7 +130,10 @@ static void mgmt_tx_complete(void *priv, int status)
 {
 	struct tx_complete_mon_data *pv_data = priv;
 
-	/* incase of fully hosting mode, the freeing will be done in response to the cfg packet */
+	/*
+	 * In case of fully hosting mode, the freeing will be done in response
+	 * to the cfg packet
+	 */
 	kfree(pv_data->buff);
 
 	kfree(pv_data);
@@ -227,8 +232,10 @@ static netdev_tx_t WILC_WFI_mon_xmit(struct sk_buff *skb,
 	/* Identify if Ethernet or MAC header (data or mgmt) */
 	memcpy(srcAdd, &skb->data[10], 6);
 	memcpy(bssid, &skb->data[16], 6);
-	/* if source address and bssid fields are equal>>Mac header */
-	/*send it to mgmt frames handler */
+	/*
+	 * If source address and bssid fields are equal>>Mac header
+	 * send it to mgmt frames handler
+	 */
 	if (!(memcmp(srcAdd, bssid, 6))) {
 		ret = mon_mgmt_tx(mon_priv->real_ndev, skb->data, skb->len);
 		if (ret)
@@ -260,7 +267,7 @@ struct net_device *WILC_WFI_init_mon_interface(const char *name, struct net_devi
 	u32 ret = 0;
 	struct WILC_WFI_mon_priv *priv;
 
-	/*If monitor interface is already initialized, return it*/
+	/* If monitor interface is already initialized, return it*/
 	if (wilc_wfi_mon)
 		return wilc_wfi_mon;
 

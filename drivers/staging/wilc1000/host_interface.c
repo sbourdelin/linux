@@ -263,7 +263,8 @@ static struct wilc_vif *join_req_vif;
 static void *host_int_ParseJoinBssParam(struct network_info *ptstrNetworkInfo);
 static int host_int_get_ipaddress(struct wilc_vif *vif, u8 *ip_addr, u8 idx);
 
-/* The u8IfIdx starts from 0 to NUM_CONCURRENT_IFC -1, but 0 index used as
+/*
+ * The u8IfIdx starts from 0 to NUM_CONCURRENT_IFC -1, but 0 index used as
  * special purpose in wilc device, so we add 1 to the index to starts from 1.
  * As a result, the returned index will be 1 to NUM_CONCURRENT_IFC.
  */
@@ -272,7 +273,8 @@ int wilc_get_vif_idx(struct wilc_vif *vif)
 	return vif->idx + 1;
 }
 
-/* We need to minus 1 from idx which is from wilc device to get real index
+/*
+ * We need to minus 1 from idx which is from wilc device to get real index
  * of wilc->vif[], because we add 1 when pass to wilc device in the function
  * wilc_get_vif_idx.
  * As a result, the index should be between 0 and NUM_CONCURRENT_IFC -1.

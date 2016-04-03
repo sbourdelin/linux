@@ -5,11 +5,7 @@
 
 #define ISWILC1000(id)			((id & 0xfffff000) == 0x100000 ? 1 : 0)
 
-/********************************************
- *
- *      Mac eth header length
- *
- ********************************************/
+/* Mac eth header length */
 #define DRIVER_HANDLER_SIZE		4
 #define MAX_MAC_HDR_LEN			26 /* QOS_MAC_HDR_LEN */
 #define SUB_MSDU_HEADER_LENGTH		14
@@ -35,11 +31,7 @@
 #define ETH_CONFIG_PKT_HDR_OFFSET	(ETH_ETHERNET_HDR_OFFSET + \
 					 ETH_CONFIG_PKT_HDR_LEN)
 
-/********************************************
- *
- *      Register Defines
- *
- ********************************************/
+/* Register Defines */
 #define WILC_PERIPH_REG_BASE		0x1000
 #define WILC_CHANGING_VIR_IF		0x108c
 #define WILC_CHIPID			WILC_PERIPH_REG_BASE
@@ -133,20 +125,17 @@
 
 #define MODALIAS		"WILC_SPI"
 #define GPIO_NUM		0x44
-/*******************************************/
-/*        E0 and later Interrupt flags.    */
-/*******************************************/
-/*******************************************/
-/*        E0 and later Interrupt flags.    */
-/*           IRQ Status word               */
-/* 15:0 = DMA count in words.              */
-/* 16: INT0 flag                           */
-/* 17: INT1 flag                           */
-/* 18: INT2 flag                           */
-/* 19: INT3 flag                           */
-/* 20: INT4 flag                           */
-/* 21: INT5 flag                           */
-/*******************************************/
+/*
+ * E0 and later Interrupt flags.
+ * IRQ Status word
+ * 15:0 = DMA count in words.
+ * 16: INT0 flag
+ * 17: INT1 flag
+ * 18: INT2 flag
+ * 19: INT3 flag
+ * 20: INT4 flag
+ * 21: INT5 flag
+ */
 #define IRG_FLAGS_OFFSET	16
 #define IRQ_DMA_WD_CNT_MASK	((1ul << IRG_FLAGS_OFFSET) - 1)
 #define INT_0			BIT(IRG_FLAGS_OFFSET)
@@ -157,19 +146,19 @@
 #define INT_5			BIT(IRG_FLAGS_OFFSET + 5)
 #define MAX_NUM_INT		6
 
-/*******************************************/
-/*        E0 and later Interrupt flags.    */
-/*           IRQ Clear word                */
-/* 0: Clear INT0                           */
-/* 1: Clear INT1                           */
-/* 2: Clear INT2                           */
-/* 3: Clear INT3                           */
-/* 4: Clear INT4                           */
-/* 5: Clear INT5                           */
-/* 6: Select VMM table 1                   */
-/* 7: Select VMM table 2                   */
-/* 8: Enable VMM                           */
-/*******************************************/
+/*
+ * E0 and later Interrupt flags.
+ * IRQ Clear word
+ * 0: Clear INT0
+ * 1: Clear INT1
+ * 2: Clear INT2
+ * 3: Clear INT3
+ * 4: Clear INT4
+ * 5: Clear INT5
+ * 6: Select VMM table 1
+ * 7: Select VMM table 2
+ * 8: Enable VMM
+ */
 #define CLR_INT0		BIT(0)
 #define CLR_INT1		BIT(1)
 #define CLR_INT2		BIT(2)
@@ -192,20 +181,12 @@
 
 #define ENABLE_RX_VMM		(SEL_VMM_TBL1 | EN_VMM)
 #define ENABLE_TX_VMM		(SEL_VMM_TBL0 | EN_VMM)
-/*time for expiring the semaphores of cfg packets*/
+/* Time for expiring the semaphores of cfg packets */
 #define CFG_PKTS_TIMEOUT	2000
-/********************************************
- *
- *      Debug Type
- *
- ********************************************/
+/* Debug Type */
 typedef void (*wilc_debug_func)(u32, char *, ...);
 
-/********************************************
- *
- *      Tx/Rx Queue Structure
- *
- ********************************************/
+/* Tx/Rx Queue Structure */
 
 struct txq_entry_t {
 	struct txq_entry_t *next;
@@ -225,11 +206,7 @@ struct rxq_entry_t {
 	int buffer_size;
 };
 
-/********************************************
- *
- *      Host IF Structure
- *
- ********************************************/
+/* Host IF Structure */
 struct wilc;
 struct wilc_hif_func {
 	int (*hif_init)(struct wilc *, bool resume);
@@ -251,11 +228,7 @@ struct wilc_hif_func {
 extern const struct wilc_hif_func wilc_hif_spi;
 extern const struct wilc_hif_func wilc_hif_sdio;
 
-/********************************************
- *
- *      Configuration Structure
- *
- ********************************************/
+/* Configuration Structure */
 
 #define MAX_CFG_FRAME_SIZE	1468
 
