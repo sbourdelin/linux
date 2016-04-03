@@ -263,7 +263,7 @@ static struct dentry *f2fs_lookup(struct inode *dir, struct dentry *dentry,
 	unsigned int root_ino = F2FS_ROOT_INO(F2FS_I_SB(dir));
 
 	if (f2fs_encrypted_inode(dir)) {
-		int res = fscrypt_get_encryption_info(dir);
+		int res = fscrypt_load_encryption_info(dir);
 
 		/*
 		 * DCACHE_ENCRYPTED_WITH_KEY is set if the dentry is
@@ -380,7 +380,7 @@ static int f2fs_symlink(struct inode *dir, struct dentry *dentry,
 	int err;
 
 	if (f2fs_encrypted_inode(dir)) {
-		err = fscrypt_get_encryption_info(dir);
+		err = fscrypt_load_encryption_info(dir);
 		if (err)
 			return err;
 
@@ -424,7 +424,7 @@ static int f2fs_symlink(struct inode *dir, struct dentry *dentry,
 			goto err_out;
 		}
 
-		err = fscrypt_get_encryption_info(inode);
+		err = fscrypt_load_encryption_info(inode);
 		if (err)
 			goto err_out;
 
@@ -616,7 +616,7 @@ out:
 static int f2fs_tmpfile(struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	if (f2fs_encrypted_inode(dir)) {
-		int err = fscrypt_get_encryption_info(dir);
+		int err = fscrypt_load_encryption_info(dir);
 		if (err)
 			return err;
 	}
@@ -1006,7 +1006,7 @@ static const char *f2fs_encrypted_get_link(struct dentry *dentry,
 	if (!dentry)
 		return ERR_PTR(-ECHILD);
 
-	res = fscrypt_get_encryption_info(inode);
+	res = fscrypt_load_encryption_info(inode);
 	if (res)
 		return ERR_PTR(res);
 

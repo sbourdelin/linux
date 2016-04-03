@@ -75,7 +75,7 @@ out:
 	return res;
 }
 
-static void put_crypt_info(struct fscrypt_info *ci)
+static void free_crypt_info(struct fscrypt_info *ci)
 {
 	if (!ci)
 		return;
@@ -85,7 +85,7 @@ static void put_crypt_info(struct fscrypt_info *ci)
 	kmem_cache_free(fscrypt_info_cachep, ci);
 }
 
-int get_crypt_info(struct inode *inode)
+int load_crypt_info(struct inode *inode)
 {
 	struct fscrypt_info *crypt_info;
 	u8 full_key_descriptor[FS_KEY_DESC_PREFIX_SIZE +
@@ -112,7 +112,7 @@ retry:
 		if (!crypt_info->ci_keyring_key ||
 				key_validate(crypt_info->ci_keyring_key) == 0)
 			return 0;
-		fscrypt_put_encryption_info(inode, crypt_info);
+		fscrypt_unload_encryption_info(inode, crypt_info);
 		goto retry;
 	}
 
@@ -224,7 +224,7 @@ got_key:
 
 	memzero_explicit(raw_key, sizeof(raw_key));
 	if (cmpxchg(&inode->i_crypt_info, NULL, crypt_info) != NULL) {
-		put_crypt_info(crypt_info);
+		free_crypt_info(crypt_info);
 		goto retry;
 	}
 	return 0;
@@ -232,12 +232,13 @@ got_key:
 out:
 	if (res == -ENOKEY)
 		res = 0;
-	put_crypt_info(crypt_info);
+	free_crypt_info(crypt_info);
 	memzero_explicit(raw_key, sizeof(raw_key));
 	return res;
 }
 
-void fscrypt_put_encryption_info(struct inode *inode, struct fscrypt_info *ci)
+void fscrypt_unload_encryption_info(struct inode *inode,
+				    struct fscrypt_info *ci)
 {
 	struct fscrypt_info *prev;
 
@@ -250,11 +251,11 @@ void fscrypt_put_encryption_info(struct inode *inode, struct fscrypt_info *ci)
 	if (prev != ci)
 		return;
 
-	put_crypt_info(ci);
+	free_crypt_info(ci);
 }
-EXPORT_SYMBOL(fscrypt_put_encryption_info);
+EXPORT_SYMBOL(fscrypt_unload_encryption_info);
 
-int fscrypt_get_encryption_info(struct inode *inode)
+int fscrypt_load_encryption_info(struct inode *inode)
 {
 	struct fscrypt_info *ci = inode->i_crypt_info;
 
@@ -263,7 +264,7 @@ int fscrypt_get_encryption_info(struct inode *inode)
 		 (ci->ci_keyring_key->flags & ((1 << KEY_FLAG_INVALIDATED) |
 					       (1 << KEY_FLAG_REVOKED) |
 					       (1 << KEY_FLAG_DEAD)))))
-		return get_crypt_info(inode);
+		return load_crypt_info(inode);
 	return 0;
 }
-EXPORT_SYMBOL(fscrypt_get_encryption_info);
+EXPORT_SYMBOL(fscrypt_load_encryption_info);

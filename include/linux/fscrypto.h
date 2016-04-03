@@ -279,9 +279,10 @@ extern int fscrypt_has_permitted_context(struct inode *, struct inode *);
 extern int fscrypt_inherit_context(struct inode *, struct inode *,
 					void *, bool);
 /* keyinfo.c */
-extern int get_crypt_info(struct inode *);
-extern int fscrypt_get_encryption_info(struct inode *);
-extern void fscrypt_put_encryption_info(struct inode *, struct fscrypt_info *);
+extern int load_crypt_info(struct inode *);
+extern int fscrypt_load_encryption_info(struct inode *);
+extern void fscrypt_unload_encryption_info(struct inode *,
+					   struct fscrypt_info *);
 
 /* fname.c */
 extern int fscrypt_setup_filename(struct inode *, const struct qstr *,
@@ -367,12 +368,12 @@ static inline int fscrypt_notsupp_inherit_context(struct inode *p,
 }
 
 /* keyinfo.c */
-static inline int fscrypt_notsupp_get_encryption_info(struct inode *i)
+static inline int fscrypt_notsupp_load_encryption_info(struct inode *i)
 {
 	return -EOPNOTSUPP;
 }
 
-static inline void fscrypt_notsupp_put_encryption_info(struct inode *i,
+static inline void fscrypt_notsupp_unload_encryption_info(struct inode *i,
 					struct fscrypt_info *f)
 {
 	return;

@@ -155,10 +155,10 @@ int fscrypt_has_permitted_context(struct inode *parent, struct inode *child)
 	/* if the child directory is not encrypted, this is always a problem */
 	if (!parent->i_sb->s_cop->is_encrypted(child))
 		return 0;
-	res = fscrypt_get_encryption_info(parent);
+	res = fscrypt_load_encryption_info(parent);
 	if (res)
 		return 0;
-	res = fscrypt_get_encryption_info(child);
+	res = fscrypt_load_encryption_info(child);
 	if (res)
 		return 0;
 	parent_ci = parent->i_crypt_info;
@@ -196,7 +196,7 @@ int fscrypt_inherit_context(struct inode *parent, struct inode *child,
 	if (!parent->i_sb->s_cop->set_context)
 		return -EOPNOTSUPP;
 
-	res = fscrypt_get_encryption_info(parent);
+	res = fscrypt_load_encryption_info(parent);
 	if (res < 0)
 		return res;
 
@@ -223,6 +223,6 @@ int fscrypt_inherit_context(struct inode *parent, struct inode *child,
 						sizeof(ctx), fs_data);
 	if (res)
 		return res;
-	return preload ? fscrypt_get_encryption_info(child): 0;
+	return preload ? fscrypt_load_encryption_info(child) : 0;
 }
 EXPORT_SYMBOL(fscrypt_inherit_context);
