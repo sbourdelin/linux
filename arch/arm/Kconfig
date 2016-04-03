@@ -810,8 +810,6 @@ source "arch/arm/mach-qcom/Kconfig"
 
 source "arch/arm/mach-realview/Kconfig"
 
-source "arch/arm/mach-rockchip/Kconfig"
-
 source "arch/arm/mach-sa1100/Kconfig"
 
 source "arch/arm/mach-spear/Kconfig"
