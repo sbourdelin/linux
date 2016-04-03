@@ -94,23 +94,41 @@ static int create_encryption_context_from_policy(struct inode *inode,
 
 int fscrypt_set_policy(struct inode *inode, const struct fscrypt_policy *policy)
 {
+	int ret = 0;
+
 	if (policy->version != 0)
 		return -EINVAL;
 
+	inode_lock(inode);
+
 	if (!inode_has_encryption_context(inode)) {
-		if (!inode->i_sb->s_cop->empty_dir)
-			return -EOPNOTSUPP;
-		if (!inode->i_sb->s_cop->empty_dir(inode))
-			return -ENOTEMPTY;
-		return create_encryption_context_from_policy(inode, policy);
+		/* A new policy may only be set on an empty directory or an
+		 * empty regular file. */
+		ret = -EINVAL;
+		if (S_ISDIR(inode->i_mode)) {
+			if (!inode->i_sb->s_cop->empty_dir)
+				ret = -EOPNOTSUPP;
+			else if (inode->i_sb->s_cop->empty_dir(inode))
+				ret = 0;
+			else
+				ret = -ENOTEMPTY;
+		} else if (S_ISREG(inode->i_mode)) {
+			ret = -ENOTEMPTY;
+			if (inode->i_size == 0)
+				ret = 0;
+		}
+		if (!ret) {
+			ret = create_encryption_context_from_policy(inode,
+								    policy);
+		}
+	} else if (!is_encryption_context_consistent_with_policy(inode, policy)) {
+		printk(KERN_WARNING
+		       "%s: Policy inconsistent with encryption context\n",
+		       __func__);
+		ret = -EINVAL;
 	}
-
-	if (is_encryption_context_consistent_with_policy(inode, policy))
-		return 0;
-
-	printk(KERN_WARNING "%s: Policy inconsistent with encryption context\n",
-	       __func__);
-	return -EINVAL;
+	inode_unlock(inode);
+	return ret;
 }
 EXPORT_SYMBOL(fscrypt_set_policy);
 
