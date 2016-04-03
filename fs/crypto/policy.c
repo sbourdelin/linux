@@ -96,6 +96,9 @@ int fscrypt_set_policy(struct inode *inode, const struct fscrypt_policy *policy)
 {
 	int ret = 0;
 
+	if (!inode_owner_or_capable(inode))
+		return -EACCES;
+
 	if (policy->version != 0)
 		return -EINVAL;
 
