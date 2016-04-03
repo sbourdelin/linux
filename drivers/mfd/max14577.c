@@ -19,7 +19,7 @@
  */
 
 #include <linux/err.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/of_device.h>
 #include <linux/mfd/core.h>
@@ -490,7 +490,6 @@ static const struct i2c_device_id max14577_i2c_id[] = {
 	{ "max77836", MAXIM_DEVICE_TYPE_MAX77836, },
 	{ }
 };
-MODULE_DEVICE_TABLE(i2c, max14577_i2c_id);
 
 #ifdef CONFIG_PM_SLEEP
 static int max14577_suspend(struct device *dev)
@@ -562,13 +561,3 @@ static int __init max14577_i2c_init(void)
 	return i2c_add_driver(&max14577_i2c_driver);
 }
 subsys_initcall(max14577_i2c_init);
-
-static void __exit max14577_i2c_exit(void)
-{
-	i2c_del_driver(&max14577_i2c_driver);
-}
-module_exit(max14577_i2c_exit);
-
-MODULE_AUTHOR("Chanwoo Choi <cw00.choi@samsung.com>, Krzysztof Kozlowski <k.kozlowski@samsung.com>");
-MODULE_DESCRIPTION("Maxim 14577/77836 multi-function core driver");
-MODULE_LICENSE("GPL");
