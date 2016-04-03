@@ -12,10 +12,10 @@
 #include <linux/string.h>
 #include <linux/fscrypto.h>
 
-static int inode_has_encryption_context(struct inode *inode)
+static bool inode_has_encryption_context(struct inode *inode)
 {
 	if (!inode->i_sb->s_cop->get_context)
-		return 0;
+		return false;
 	return (inode->i_sb->s_cop->get_context(inode, NULL, 0L) > 0);
 }
 
@@ -23,18 +23,18 @@ static int inode_has_encryption_context(struct inode *inode)
  * check whether the policy is consistent with the encryption context
  * for the inode
  */
-static int is_encryption_context_consistent_with_policy(struct inode *inode,
+static bool is_encryption_context_consistent_with_policy(struct inode *inode,
 				const struct fscrypt_policy *policy)
 {
 	struct fscrypt_context ctx;
 	int res;
 
 	if (!inode->i_sb->s_cop->get_context)
-		return 0;
+		return false;
 
 	res = inode->i_sb->s_cop->get_context(inode, &ctx, sizeof(ctx));
 	if (res != sizeof(ctx))
-		return 0;
+		return false;
 
 	return (memcmp(ctx.master_key_descriptor, policy->master_key_descriptor,
 			FS_KEY_DESCRIPTOR_SIZE) == 0 &&
@@ -139,7 +139,7 @@ int fscrypt_get_policy(struct inode *inode, struct fscrypt_policy *policy)
 }
 EXPORT_SYMBOL(fscrypt_get_policy);
 
-int fscrypt_has_permitted_context(struct inode *parent, struct inode *child)
+bool fscrypt_has_permitted_context(struct inode *parent, struct inode *child)
 {
 	struct fscrypt_info *parent_ci, *child_ci;
 	int res;
@@ -151,22 +151,22 @@ int fscrypt_has_permitted_context(struct inode *parent, struct inode *child)
 
 	/* no restrictions if the parent directory is not encrypted */
 	if (!parent->i_sb->s_cop->is_encrypted(parent))
-		return 1;
+		return true;
 	/* if the child directory is not encrypted, this is always a problem */
 	if (!parent->i_sb->s_cop->is_encrypted(child))
-		return 0;
+		return false;
 	res = fscrypt_load_encryption_info(parent);
 	if (res)
-		return 0;
+		return false;
 	res = fscrypt_load_encryption_info(child);
 	if (res)
-		return 0;
+		return false;
 	parent_ci = parent->i_crypt_info;
 	child_ci = child->i_crypt_info;
 	if (!parent_ci && !child_ci)
-		return 1;
+		return true;
 	if (!parent_ci || !child_ci)
-		return 0;
+		return false;
 
 	return (memcmp(parent_ci->ci_master_key,
 			child_ci->ci_master_key,

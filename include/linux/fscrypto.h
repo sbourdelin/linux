@@ -177,7 +177,7 @@ struct fscrypt_operations {
 	int (*get_context)(struct inode *, void *, size_t);
 	int (*prepare_context)(struct inode *);
 	int (*set_context)(struct inode *, const void *, size_t, void *);
-	int (*dummy_context)(struct inode *);
+	bool (*dummy_context)(struct inode *);
 	bool (*is_encrypted)(struct inode *);
 	bool (*empty_dir)(struct inode *);
 	unsigned (*max_namelen)(struct inode *);
@@ -229,12 +229,12 @@ static inline struct page *fscrypt_control_page(struct page *page)
 #endif
 }
 
-static inline int fscrypt_has_encryption_key(struct inode *inode)
+static inline bool fscrypt_has_encryption_key(struct inode *inode)
 {
 #if IS_ENABLED(CONFIG_FS_ENCRYPTION)
 	return (inode->i_crypt_info != NULL);
 #else
-	return 0;
+	return false;
 #endif
 }
 
@@ -275,7 +275,7 @@ extern int fscrypt_zeroout_range(struct inode *, pgoff_t, sector_t,
 /* policy.c */
 extern int fscrypt_set_policy(struct inode *, const struct fscrypt_policy *);
 extern int fscrypt_get_policy(struct inode *, struct fscrypt_policy *);
-extern int fscrypt_has_permitted_context(struct inode *, struct inode *);
+extern bool fscrypt_has_permitted_context(struct inode *, struct inode *);
 extern int fscrypt_inherit_context(struct inode *, struct inode *,
 					void *, bool);
 /* keyinfo.c */
@@ -355,10 +355,10 @@ static inline int fscrypt_notsupp_get_policy(struct inode *i,
 	return -EOPNOTSUPP;
 }
 
-static inline int fscrypt_notsupp_has_permitted_context(struct inode *p,
+static inline bool fscrypt_notsupp_has_permitted_context(struct inode *p,
 				struct inode *i)
 {
-	return 0;
+	return false;
 }
 
 static inline int fscrypt_notsupp_inherit_context(struct inode *p,
