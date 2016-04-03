@@ -1,3 +1,3 @@
 # This list sorted alphanumerically by CONFIG_* macro name.
 
-obj- += dummy.o
+obj-$(CONFIG_ARCH_UNIPHIER)		+= uniphier/
