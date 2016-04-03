@@ -1,5 +1,6 @@
 # This is sorted alphabetically by directory pathname.
 
+source "arch/arm/platforms/highbank/Kconfig"
 source "arch/arm/platforms/mediatek/Kconfig"
 source "arch/arm/platforms/rockchip/Kconfig"
 source "arch/arm/platforms/socfpga/Kconfig"
