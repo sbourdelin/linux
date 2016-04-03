@@ -208,8 +208,8 @@ retry:
 		goto out;
 got_key:
 	ctfm = crypto_alloc_skcipher(cipher_str, 0, 0);
-	if (!ctfm || IS_ERR(ctfm)) {
-		res = ctfm ? PTR_ERR(ctfm) : -ENOMEM;
+	if (IS_ERR(ctfm)) {
+		res = PTR_ERR(ctfm);
 		printk(KERN_DEBUG
 		       "%s: error %d (inode %u) allocating crypto tfm\n",
 		       __func__, res, (unsigned) inode->i_ino);
