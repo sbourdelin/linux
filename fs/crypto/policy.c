@@ -92,8 +92,7 @@ static int create_encryption_context_from_policy(struct inode *inode,
 	return inode->i_sb->s_cop->set_context(inode, &ctx, sizeof(ctx), NULL);
 }
 
-int fscrypt_process_policy(struct inode *inode,
-				const struct fscrypt_policy *policy)
+int fscrypt_set_policy(struct inode *inode, const struct fscrypt_policy *policy)
 {
 	if (policy->version != 0)
 		return -EINVAL;
@@ -113,7 +112,7 @@ int fscrypt_process_policy(struct inode *inode,
 	       __func__);
 	return -EINVAL;
 }
-EXPORT_SYMBOL(fscrypt_process_policy);
+EXPORT_SYMBOL(fscrypt_set_policy);
 
 int fscrypt_get_policy(struct inode *inode, struct fscrypt_policy *policy)
 {
