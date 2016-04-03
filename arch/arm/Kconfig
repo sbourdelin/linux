@@ -831,8 +831,6 @@ source "arch/arm/plat-samsung/Kconfig"
 
 source "arch/arm/mach-shmobile/Kconfig"
 
-source "arch/arm/mach-sunxi/Kconfig"
-
 source "arch/arm/mach-prima2/Kconfig"
 
 source "arch/arm/mach-tango/Kconfig"
