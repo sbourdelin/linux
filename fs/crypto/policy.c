@@ -11,6 +11,7 @@
 #include <linux/random.h>
 #include <linux/string.h>
 #include <linux/fscrypto.h>
+#include <linux/mount.h>
 
 static bool inode_has_encryption_context(struct inode *inode)
 {
@@ -92,15 +93,20 @@ static int create_encryption_context_from_policy(struct inode *inode,
 	return inode->i_sb->s_cop->set_context(inode, &ctx, sizeof(ctx), NULL);
 }
 
-int fscrypt_set_policy(struct inode *inode, const struct fscrypt_policy *policy)
+int fscrypt_set_policy(struct file *file, const struct fscrypt_policy *policy)
 {
-	int ret = 0;
+	struct inode *inode = file_inode(file);
+	int ret;
 
 	if (!inode_owner_or_capable(inode))
 		return -EACCES;
 
 	if (policy->version != 0)
 		return -EINVAL;
+
+	ret = mnt_want_write_file(file);
+	if (ret)
+		return ret;
 
 	inode_lock(inode);
 
@@ -131,6 +137,7 @@ int fscrypt_set_policy(struct inode *inode, const struct fscrypt_policy *policy)
 		ret = -EINVAL;
 	}
 	inode_unlock(inode);
+	mnt_drop_write_file(file);
 	return ret;
 }
 EXPORT_SYMBOL(fscrypt_set_policy);
