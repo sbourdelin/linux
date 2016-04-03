@@ -28,7 +28,7 @@
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/pm_runtime.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/mfd/core.h>
 #include <linux/mfd/max77686.h>
 #include <linux/mfd/max77686-private.h>
@@ -253,23 +253,11 @@ err_del_irqc:
 	return ret;
 }
 
-static int max77686_i2c_remove(struct i2c_client *i2c)
-{
-	struct max77686_dev *max77686 = i2c_get_clientdata(i2c);
-
-	mfd_remove_devices(max77686->dev);
-
-	regmap_del_irq_chip(max77686->irq, max77686->irq_data);
-
-	return 0;
-}
-
 static const struct i2c_device_id max77686_i2c_id[] = {
 	{ "max77686", TYPE_MAX77686 },
 	{ "max77802", TYPE_MAX77802 },
 	{ }
 };
-MODULE_DEVICE_TABLE(i2c, max77686_i2c_id);
 
 #ifdef CONFIG_PM_SLEEP
 static int max77686_suspend(struct device *dev)
@@ -314,10 +302,10 @@ static struct i2c_driver max77686_i2c_driver = {
 	.driver = {
 		   .name = "max77686",
 		   .pm = &max77686_pm,
+		   .suppress_bind_attrs = true,
 		   .of_match_table = of_match_ptr(max77686_pmic_dt_match),
 	},
 	.probe = max77686_i2c_probe,
-	.remove = max77686_i2c_remove,
 	.id_table = max77686_i2c_id,
 };
 
@@ -327,13 +315,3 @@ static int __init max77686_i2c_init(void)
 }
 /* init early so consumer devices can complete system boot */
 subsys_initcall(max77686_i2c_init);
-
-static void __exit max77686_i2c_exit(void)
-{
-	i2c_del_driver(&max77686_i2c_driver);
-}
-module_exit(max77686_i2c_exit);
-
-MODULE_DESCRIPTION("MAXIM 77686/802 multi-function core driver");
-MODULE_AUTHOR("Chiwoong Byun <woong.byun@samsung.com>");
-MODULE_LICENSE("GPL");
