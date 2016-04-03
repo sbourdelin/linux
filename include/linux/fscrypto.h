@@ -36,9 +36,8 @@
 #define FS_ENCRYPTION_MODE_AES_256_CTS		4
 
 /**
- * Encryption context for inode
+ * struct fscrypt_context: the on-disk format of an inode's encryption metadata
  *
- * Protector format:
  *  1 byte: Protector format (1 = this version)
  *  1 byte: File contents encryption mode
  *  1 byte: File names encryption mode
@@ -67,13 +66,36 @@ struct fscrypt_context {
 #define FS_KEY_DESC_PREFIX		"fscrypt:"
 #define FS_KEY_DESC_PREFIX_SIZE		8
 
-/* This is passed in from userspace into the kernel keyring */
+/**
+ * struct fscrypt_key - payload of a master encryption key, as passed into a
+ *			kernel keyring from userspace
+ *
+ * @mode: Currently unused
+ * @raw: Raw bytes of the key
+ * @size: Length of the key (number of bytes in @raw actually used)
+ */
 struct fscrypt_key {
 	u32 mode;
 	u8 raw[FS_MAX_KEY_SIZE];
 	u32 size;
 } __packed;
 
+/**
+ * struct fscrypt_info - the cipher, encryption modes, and master key reference
+ *			 for an inode
+ *
+ * @ci_data_mode: Encryption mode to use for the contents of regular files
+ * @ci_filename_mode: Encryption mode to use for filenames and symlink targets
+ * @ci_flags: See FS_POLICY_FLAGS_*.
+ * @ci_ctfm: Allocated symmetric cipher for this inode, using the inode's
+ *	     unique encryption key which is derived from the master key and the
+ *	     per-inode nonce.  If the inode is a regular file, this cipher uses
+ *	     the data encryption mode, whereas if the inode is a directory or
+ *	     symlink, this cipher uses the filename encryption mode.
+ * @ci_keyring_key: Reference to the master key in a kernel keyring, or NULL if
+ *		    the test-only "dummy" encryption mode is in effect
+ * @ci_master_key: The descriptor of the master key, in binary form
+ */
 struct fscrypt_info {
 	u8 ci_data_mode;
 	u8 ci_filename_mode;
@@ -86,13 +108,19 @@ struct fscrypt_info {
 #define FS_CTX_REQUIRES_FREE_ENCRYPT_FL		0x00000001
 #define FS_WRITE_PATH_FL			0x00000002
 
+/**
+ * struct fscrypt_ctx - holds pages being decrypted or encrypted
+ *
+ * This is a reusable structure, not tied to any particular inode.
+ */
 struct fscrypt_ctx {
 	union {
-		struct {
+		struct { /* Writing (encryption) */
 			struct page *bounce_page;	/* Ciphertext page */
 			struct page *control_page;	/* Original page  */
 		} w;
-		struct {
+
+		struct { /* Reading (decryption) */
 			struct bio *bio;
 			struct work_struct work;
 		} r;
@@ -171,7 +199,20 @@ struct fscrypt_name {
 #define fname_len(p)		((p)->disk_name.len)
 
 /*
- * crypto opertions for filesystems
+ * struct fscrypt_operations - crypto operations for filesystems
+ *
+ * @get_context - Retrieve the inode's persistent encryption metadata into the
+ *		  provided buffer.  Semantics are like getxattr().
+ * @set_context - Set the inode's persistent encryption metadata.  Return 0 or a
+ *		  negative errno value.
+ * @dummy_context - Test whether the inode uses the test-only "dummy" encryption
+ *		    mode
+ * @is_encrypted - Test whether the inode is encrypted
+ * @empty_dir - Test whether the directory inode is empty
+ * @max_namelen - Return the maximum length of an unencrypted name we might have
+ *		  to encrypt for the inode.  Note that for symlinks, we encrypt
+ *		  the symlink *target* which typically can be longer than a
+ *		  single filename.
  */
 struct fscrypt_operations {
 	int (*get_context)(struct inode *, void *, size_t);

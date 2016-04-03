@@ -83,8 +83,8 @@ EXPORT_SYMBOL(fscrypt_release_ctx);
  *
  * Allocates and initializes an encryption context.
  *
- * Return: An allocated and initialized encryption context on success; error
- * value or NULL otherwise.
+ * Return: An allocated and initialized encryption context on success; an error
+ * value otherwise.
  */
 struct fscrypt_ctx *fscrypt_get_ctx(struct inode *inode)
 {
@@ -222,7 +222,7 @@ static struct page *alloc_bounce_page(struct fscrypt_ctx *ctx)
  * release the bounce buffer and the encryption context.
  *
  * Return: An allocated page with the encrypted content on success. Else, an
- * error value or NULL.
+ * error value.
  */
 struct page *fscrypt_encrypt_page(struct inode *inode,
 				struct page *plaintext_page)
@@ -261,10 +261,10 @@ errout:
 EXPORT_SYMBOL(fscrypt_encrypt_page);
 
 /**
- * f2crypt_decrypt_page() - Decrypts a page in-place
+ * fscrypt_decrypt_page() - Decrypts a page in-place
  * @page: The page to decrypt. Must be locked.
  *
- * Decrypts page in-place using the ctx encryption context.
+ * Decrypts a page in-place using the host inode's encryption context.
  *
  * Called from the read completion callback.
  *
@@ -358,7 +358,6 @@ static int fscrypt_d_revalidate(struct dentry *dentry, unsigned int flags)
 					  (1 << KEY_FLAG_DEAD))))
 		ci = NULL;
 
-	/* this should eventually be an flag in d_flags */
 	spin_lock(&dentry->d_lock);
 	cached_with_key = dentry->d_flags & DCACHE_ENCRYPTED_WITH_KEY;
 	spin_unlock(&dentry->d_lock);
@@ -368,7 +367,7 @@ static int fscrypt_d_revalidate(struct dentry *dentry, unsigned int flags)
 	 * If the dentry was cached without the key, and it is a
 	 * negative dentry, it might be a valid name.  We can't check
 	 * if the key has since been made available due to locking
-	 * reasons, so we fail the validation so ext4_lookup() can do
+	 * reasons, so we fail the validation so ->lookup() can do
 	 * this check.
 	 *
 	 * We also fail the validation if the dentry was created with

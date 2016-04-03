@@ -178,8 +178,11 @@ static const char *lookup_table =
 /**
  * digest_encode() -
  *
- * Encodes the input digest using characters from the set [a-zA-Z0-9_+].
+ * Encodes the input digest using characters from the set [A-Za-z0-9+,].
  * The encoded string is roughly 4/3 times the size of the input string.
+ *
+ * Note that the result of this encoding is for presentation purposes only; it
+ * is not persisted in the filesystem.
  */
 static int digest_encode(const char *src, int len, char *dst)
 {
@@ -239,7 +242,7 @@ u32 fscrypt_fname_encrypted_size(struct inode *inode, u32 ilen)
 EXPORT_SYMBOL(fscrypt_fname_encrypted_size);
 
 /**
- * fscrypt_fname_crypto_alloc_obuff() -
+ * fscrypt_fname_alloc_buffer() -
  *
  * Allocates an output buffer that is sufficient for the crypto operation
  * specified by the context and the direction.
@@ -264,7 +267,7 @@ int fscrypt_fname_alloc_buffer(struct inode *inode,
 EXPORT_SYMBOL(fscrypt_fname_alloc_buffer);
 
 /**
- * fscrypt_fname_crypto_free_buffer() -
+ * fscrypt_fname_free_buffer() -
  *
  * Frees the buffer allocated for crypto operation.
  */
@@ -280,6 +283,12 @@ EXPORT_SYMBOL(fscrypt_fname_free_buffer);
 /**
  * fscrypt_fname_disk_to_usr() - converts a filename from disk space to user
  * space
+ *
+ * The caller must have used fscrypt_fname_alloc_buffer() to allocate sufficient
+ * memory for the @oname string.  Also, fscrypt_load_encryption_info() must have
+ * been already called on the inode.
+ *
+ * Return: the length of the user space name or a negative errno value.
  */
 int fscrypt_fname_disk_to_usr(struct inode *inode,
 			u32 hash, u32 minor_hash,
@@ -290,6 +299,7 @@ int fscrypt_fname_disk_to_usr(struct inode *inode,
 	char buf[24];
 	int ret;
 
+	/* Leave . and .. alone. */
 	if (fscrypt_is_dot_dotdot(&qname)) {
 		oname->name[0] = '.';
 		oname->name[iname->len - 1] = '.';
@@ -300,14 +310,19 @@ int fscrypt_fname_disk_to_usr(struct inode *inode,
 	if (iname->len < FS_CRYPTO_BLOCK_SIZE)
 		return -EUCLEAN;
 
+	/* Decrypt the name if we have the key. */
 	if (inode->i_crypt_info)
 		return fname_decrypt(inode, iname, oname);
 
 	if (iname->len <= FS_FNAME_CRYPTO_DIGEST_SIZE) {
+		/* Short name: encode the encrypted name. */
 		ret = digest_encode(iname->name, iname->len, oname->name);
 		oname->len = ret;
 		return ret;
 	}
+
+	/* Long name: encode the name hash (if a directory entry, not a symlink)
+	 * concatenated with the last 16 bytes of the encrypted name. */
 	if (hash) {
 		memcpy(buf, &hash, 4);
 		memcpy(buf + 4, &minor_hash, 4);
@@ -325,23 +340,33 @@ EXPORT_SYMBOL(fscrypt_fname_disk_to_usr);
 /**
  * fscrypt_fname_usr_to_disk() - converts a filename from user space to disk
  * space
+ *
+ * The caller must have used fscrypt_fname_alloc_buffer() to allocate sufficient
+ * memory for the @oname string.  Also, fscrypt_load_encryption_info() must have
+ * been already called on the inode.
+ *
+ * Return: the length of the disk space name or a negative errno value.
  */
 int fscrypt_fname_usr_to_disk(struct inode *inode,
 			const struct qstr *iname,
 			struct fscrypt_str *oname)
 {
+	/* Leave . and .. alone. */
 	if (fscrypt_is_dot_dotdot(iname)) {
 		oname->name[0] = '.';
 		oname->name[iname->len - 1] = '.';
 		oname->len = iname->len;
 		return oname->len;
 	}
+
+	/* Encrypt the name if we have the key. */
 	if (inode->i_crypt_info)
 		return fname_encrypt(inode, iname, oname);
+
 	/*
 	 * Without a proper key, a user is not allowed to modify the filenames
 	 * in a directory. Consequently, a user space name cannot be mapped to
-	 * a disk-space name
+	 * a disk-space name.
 	 */
 	return -EACCES;
 }

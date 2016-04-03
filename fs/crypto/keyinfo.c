@@ -255,6 +255,14 @@ void fscrypt_unload_encryption_info(struct inode *inode,
 }
 EXPORT_SYMBOL(fscrypt_unload_encryption_info);
 
+/*
+ * Try to load the fscrypt_info for an encrypted inode into memory.
+ *
+ * Return: 0 if the fscrypt_info was loaded or was already loaded, or also 0 if
+ * the master encryption key is not available (use fscrypt_has_encryption_key()
+ * to distingush the two cases); or a negative errno value if another error
+ * occurred.
+ */
 int fscrypt_load_encryption_info(struct inode *inode)
 {
 	struct fscrypt_info *ci = inode->i_crypt_info;
