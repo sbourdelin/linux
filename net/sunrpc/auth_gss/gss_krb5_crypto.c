@@ -78,6 +78,7 @@ krb5_encrypt(
 	memcpy(out, in, length);
 	sg_init_one(sg, out, length);
 
+	skcipher_request_set_tfm(req, tfm);
 	skcipher_request_set_callback(req, 0, NULL, NULL);
 	skcipher_request_set_crypt(req, sg, sg, length, local_iv);
 
@@ -115,6 +116,7 @@ krb5_decrypt(
 	memcpy(out, in, length);
 	sg_init_one(sg, out, length);
 
+	skcipher_request_set_tfm(req, tfm);
 	skcipher_request_set_callback(req, 0, NULL, NULL);
 	skcipher_request_set_crypt(req, sg, sg, length, local_iv);
 
