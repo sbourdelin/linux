@@ -2,7 +2,7 @@
  * max77693.c - mfd core driver for the MAX 77693
  *
  * Copyright (C) 2012 Samsung Electronics
- * SangYoung Son <hello.son@smasung.com>
+ * SangYoung Son <hello.son@samsung.com>
  *
  * This program is not provided / owned by Maxim Integrated Products.
  *
@@ -23,7 +23,7 @@
  * This driver is based on max8997.c
  */
 
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/i2c.h>
 #include <linux/err.h>
@@ -309,28 +309,10 @@ err_i2c_haptic:
 	return ret;
 }
 
-static int max77693_i2c_remove(struct i2c_client *i2c)
-{
-	struct max77693_dev *max77693 = i2c_get_clientdata(i2c);
-
-	mfd_remove_devices(max77693->dev);
-
-	regmap_del_irq_chip(max77693->irq, max77693->irq_data_muic);
-	regmap_del_irq_chip(max77693->irq, max77693->irq_data_chg);
-	regmap_del_irq_chip(max77693->irq, max77693->irq_data_topsys);
-	regmap_del_irq_chip(max77693->irq, max77693->irq_data_led);
-
-	i2c_unregister_device(max77693->i2c_muic);
-	i2c_unregister_device(max77693->i2c_haptic);
-
-	return 0;
-}
-
 static const struct i2c_device_id max77693_i2c_id[] = {
 	{ "max77693", TYPE_MAX77693 },
 	{ }
 };
-MODULE_DEVICE_TABLE(i2c, max77693_i2c_id);
 
 static int max77693_suspend(struct device *dev)
 {
@@ -374,10 +356,10 @@ static struct i2c_driver max77693_i2c_driver = {
 	.driver = {
 		   .name = "max77693",
 		   .pm = &max77693_pm,
+		   .suppress_bind_attrs = true,
 		   .of_match_table = of_match_ptr(max77693_dt_match),
 	},
 	.probe = max77693_i2c_probe,
-	.remove = max77693_i2c_remove,
 	.id_table = max77693_i2c_id,
 };
 
@@ -387,13 +369,3 @@ static int __init max77693_i2c_init(void)
 }
 /* init early so consumer devices can complete system boot */
 subsys_initcall(max77693_i2c_init);
-
-static void __exit max77693_i2c_exit(void)
-{
-	i2c_del_driver(&max77693_i2c_driver);
-}
-module_exit(max77693_i2c_exit);
-
-MODULE_DESCRIPTION("MAXIM 77693 multi-function core driver");
-MODULE_AUTHOR("SangYoung, Son <hello.son@samsung.com>");
-MODULE_LICENSE("GPL");
