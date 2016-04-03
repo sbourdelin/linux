@@ -100,12 +100,13 @@ static int fname_encrypt(struct inode *inode,
 	}
 	kfree(alloc_buf);
 	skcipher_request_free(req);
-	if (res < 0)
+	if (res < 0) {
 		printk_ratelimited(KERN_ERR
 				"%s: Error (error code %d)\n", __func__, res);
-
+		return res;
+	}
 	oname->len = ciphertext_len;
-	return res;
+	return ciphertext_len;
 }
 
 /*
