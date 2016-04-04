@@ -187,6 +187,15 @@ struct ocontext {
 			u32 addr[4];
 			u32 mask[4];
 		} node6;        /* IPv6 node information */
+		struct {
+			u64 subnet_prefix;
+			u16 low_pkey;
+			u16 high_pkey;
+		} pkey;
+		struct {
+			char *dev_name;
+			u8 port;
+		} ibdev;
 	} u;
 	union {
 		u32 sclass;  /* security class for genfs */
@@ -222,7 +231,9 @@ struct genfs {
 #define OCON_NODE  4	/* nodes */
 #define OCON_FSUSE 5	/* fs_use */
 #define OCON_NODE6 6	/* IPv6 nodes */
-#define OCON_NUM   7
+#define OCON_PKEY  7    /* Infiniband PKEYs */
+#define OCON_IBDEV 8    /* Infiniband devices */
+#define OCON_NUM   9
 
 /* The policy database */
 struct policydb {
