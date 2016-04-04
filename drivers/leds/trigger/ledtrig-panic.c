@@ -17,7 +17,7 @@ static struct led_trigger *trigger;
 
 static long led_panic_blink(int state)
 {
-	led_trigger_event(trigger, state ? LED_FULL : LED_OFF);
+	led_trigger_event_nosleep(trigger, state ? LED_FULL : LED_OFF);
 	return 0;
 }
 
