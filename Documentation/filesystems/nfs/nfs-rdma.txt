@@ -238,12 +238,13 @@ NFS/RDMA Setup
 
   - Start the NFS server
 
-    If the NFS/RDMA server was built as a module (CONFIG_SUNRPC_XPRT_RDMA=m in
-    kernel config), load the RDMA transport module:
+    If the NFS/RDMA was built as a module (CONFIG_SUNRPC_XPRT_RDMA=m in
+    kernel config), load the RDMA transport module which supports both client
+    and server:
 
-    $ modprobe svcrdma
+    $ modprobe rpcrdma
 
-    Regardless of how the server was built (module or built-in), start the
+    Regardless of how the rpcrdma was built (module or built-in), start the
     server:
 
     $ /etc/init.d/nfs start
@@ -258,15 +259,14 @@ NFS/RDMA Setup
 
   - On the client system
 
-    If the NFS/RDMA client was built as a module (CONFIG_SUNRPC_XPRT_RDMA=m in
-    kernel config), load the RDMA client module:
+    Regardless of how rpcrdma was built (module or built-in), use this command
+    to mount the NFS/RDMA server through IPv4 addressing:
 
-    $ modprobe xprtrdma.ko
+    $ mount -o rdma,port=20049 <IPoIB-server-name-or-IPv4-address>:/<export> /mnt
 
-    Regardless of how the client was built (module or built-in), use this
-    command to mount the NFS/RDMA server:
+    or through IPv6 addressing
 
-    $ mount -o rdma,port=20049 <IPoIB-server-name-or-address>:/<export> /mnt
+    $ mount -o rdma6,port=20049 [<IPoIB-server-name-or-IPv6-address>]:/<export> /mnt
 
     To verify that the mount is using RDMA, run "cat /proc/mounts" and check
     the "proto" field for the given mount.
