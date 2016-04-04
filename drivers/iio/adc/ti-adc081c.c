@@ -24,6 +24,9 @@
 #include <linux/of.h>
 
 #include <linux/iio/iio.h>
+#include <linux/iio/buffer.h>
+#include <linux/iio/trigger_consumer.h>
+#include <linux/iio/triggered_buffer.h>
 #include <linux/regulator/consumer.h>
 
 struct adc081c {
@@ -69,18 +72,31 @@ static int adc081c_read_raw(struct iio_dev *iio,
 	return -EINVAL;
 }
 
-static const struct iio_chan_spec adc081c_channel = {
-	.type = IIO_VOLTAGE,
-	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),
-	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),
-};
+#define ADCxx1C_CHAN(_bits) {					\
+	.type = IIO_VOLTAGE,					\
+	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),	\
+	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
+	.scan_type = {						\
+		.sign = 'u',					\
+		.realbits = (_bits),				\
+		.storagebits = 16,				\
+		.shift = 12 - (_bits),				\
+		.endianness = IIO_CPU,				\
+	},							\
+}
 
 struct adcxx1c_model {
+	const struct iio_chan_spec* channels;
 	int bits;
 };
 
 #define DEFINE_ADCxx1C_MODEL(_name, _bits)				\
+	static const struct iio_chan_spec _name ## _channels[] = {	\
+		ADCxx1C_CHAN((_bits)),					\
+		IIO_CHAN_SOFT_TIMESTAMP(1),				\
+	};								\
 	static const struct adcxx1c_model _name ## _model = {		\
+		.channels = _name ## _channels,				\
 		.bits = (_bits),					\
 	}
 
@@ -88,10 +104,30 @@ DEFINE_ADCxx1C_MODEL(adc081c,  8);
 DEFINE_ADCxx1C_MODEL(adc101c, 10);
 DEFINE_ADCxx1C_MODEL(adc121c, 12);
 
+#define ADC081C_NUM_CHANNELS 2
+
 static const struct iio_info adc081c_info = {
 	.read_raw = adc081c_read_raw,
 	.driver_module = THIS_MODULE,
 };
+
+static irqreturn_t adc081c_trigger_handler(int irq, void *p)
+{
+	struct iio_poll_func *pf = p;
+	struct iio_dev *indio_dev = pf->indio_dev;
+	struct adc081c *data = iio_priv(indio_dev);
+	u16 buf[indio_dev->scan_bytes / 2];
+	int ret;
+
+	ret = i2c_smbus_read_word_swapped(data->i2c, REG_CONV_RES);
+	if (ret < 0)
+		goto out;
+	buf[0] = ret;
+	iio_push_to_buffers_with_timestamp(indio_dev, buf, iio_get_time_ns());
+out:
+	iio_trigger_notify_done(indio_dev->trig);
+	return IRQ_HANDLED;
+}
 
 static int adc081c_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
@@ -125,18 +161,26 @@ static int adc081c_probe(struct i2c_client *client,
 	iio->modes = INDIO_DIRECT_MODE;
 	iio->info = &adc081c_info;
 
-	iio->channels = &adc081c_channel;
-	iio->num_channels = 1;
+	iio->channels = model->channels;
+	iio->num_channels = ADC081C_NUM_CHANNELS;
+
+	err = iio_triggered_buffer_setup(iio, NULL, adc081c_trigger_handler, NULL);
+	if (err < 0) {
+		dev_err(&client->dev, "iio triggered buffer setup failed\n");
+		goto err_regulator_disable;
+	}
 
 	err = iio_device_register(iio);
 	if (err < 0)
-		goto regulator_disable;
+		goto err_buffer_cleanup;
 
 	i2c_set_clientdata(client, iio);
 
 	return 0;
 
-regulator_disable:
+err_buffer_cleanup:
+	iio_triggered_buffer_cleanup(iio);
+err_regulator_disable:
 	regulator_disable(adc->ref);
 
 	return err;
@@ -148,6 +192,7 @@ static int adc081c_remove(struct i2c_client *client)
 	struct adc081c *adc = iio_priv(iio);
 
 	iio_device_unregister(iio);
+	iio_triggered_buffer_cleanup(iio);
 	regulator_disable(adc->ref);
 
 	return 0;
