@@ -5959,6 +5959,31 @@ out:
 	return err;
 }
 
+static int selinux_ibdev_smi(const char *dev_name, u8 port, void *security)
+{
+	struct common_audit_data ad;
+	int err;
+	u32 sid = 0;
+	struct infiniband_security_struct *sec = security;
+	struct lsm_ibdev_audit ibdev;
+
+	err = security_ibdev_sid(dev_name, port, &sid);
+
+	if (err)
+		goto out;
+
+	ad.type = LSM_AUDIT_DATA_IBDEV;
+	strncpy(ibdev.dev_name, dev_name, sizeof(ibdev.dev_name));
+	ibdev.port = port;
+	ad.u.ibdev = &ibdev;
+	err = avc_has_perm(sec->sid, sid,
+			   SECCLASS_INFINIBAND_DEVICE,
+			   INFINIBAND_DEVICE__SMI, &ad);
+
+out:
+	return err;
+}
+
 static int selinux_infiniband_alloc_security(void **security)
 {
 	struct infiniband_security_struct *sec;
@@ -6161,6 +6186,7 @@ static struct security_hook_list selinux_hooks[] = {
 
 #ifdef CONFIG_SECURITY_INFINIBAND
 	LSM_HOOK_INIT(pkey_access, selinux_pkey_access),
+	LSM_HOOK_INIT(ibdev_smi, selinux_ibdev_smi),
 	LSM_HOOK_INIT(infiniband_alloc_security,
 		      selinux_infiniband_alloc_security),
 	LSM_HOOK_INIT(infiniband_free_security,
