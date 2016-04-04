@@ -7308,6 +7308,7 @@ static void l2cap_connect_cfm(struct hci_conn *hcon, u8 status)
 		struct l2cap_chan *chan, *next;
 
 		/* Client fixed channels should override server ones */
+		mutex_lock(&conn->chan_lock);
 		if (__l2cap_get_chan_by_dcid(conn, pchan->scid))
 			goto next;
 
@@ -7324,6 +7325,7 @@ static void l2cap_connect_cfm(struct hci_conn *hcon, u8 status)
 
 		l2cap_chan_unlock(pchan);
 next:
+		mutex_unlock(&conn->chan_lock);
 		next = l2cap_global_fixed_chan(pchan, hcon);
 		l2cap_chan_put(pchan);
 		pchan = next;
