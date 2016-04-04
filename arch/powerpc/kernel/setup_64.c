@@ -825,4 +825,18 @@ static int __init disable_hardlockup_detector(void)
 	return 0;
 }
 early_initcall(disable_hardlockup_detector);
+
+static int __init update_cpu_user_features(void)
+{
+	/*
+	 * Firmware might have disabled TM by clearing the relevant
+	 * bit in the ibm,pa-features array. In this case we need to
+	 * tell userspace.
+	 */
+	if (!cpu_has_feature(CPU_FTR_TM))
+		cur_cpu_spec->cpu_user_features2 &= ~(PPC_FEATURE2_HTM|PPC_FEATURE2_HTM_NOSC);
+
+	return 0;
+}
+early_initcall(update_cpu_user_features);
 #endif
