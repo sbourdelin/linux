@@ -17,6 +17,8 @@
 
 /* Temparory solution for building, will be removed later */
 #include <linux/pci.h>
+#include <linux/iommu.h>
+#include <linux/dma-reserved-iommu.h>
 
 struct msi_desc *alloc_msi_entry(struct device *dev)
 {
@@ -56,6 +58,94 @@ static inline void irq_chip_write_msi_msg(struct irq_data *data,
 }
 
 /**
+ * msi_map_doorbell: make sure an IOMMU mapping exists on domain @d
+ * for the message physical address (aka. doorbell)
+ *
+ * Either allocate an IOVA and create a mapping or simply increment
+ * a reference count on the existing IOMMU mapping
+ * @d: iommu domain handle the mapping belongs to
+ * @msg: msi message handle
+ */
+static int msi_map_doorbell(struct iommu_domain *d, struct msi_msg *msg)
+{
+#ifdef CONFIG_IOMMU_DMA_RESERVED
+	phys_addr_t addr;
+	dma_addr_t iova;
+	int ret;
+
+	addr = msg_to_phys_addr(msg);
+	ret = iommu_get_reserved_iova(d, addr, sizeof(addr), IOMMU_WRITE, &iova);
+	if (!ret) {
+		msg->address_lo = lower_32_bits(iova);
+		msg->address_hi = upper_32_bits(iova);
+	}
+	return ret;
+#else
+	return -ENODEV;
+#endif
+}
+
+/**
+ * msi_unmap_doorbell: decrements the reference count on an existing
+ * doorbell IOMMU mapping
+ *
+ * @d: iommu domain the mapping is attached to
+ * @msg: msi message containing the doorbell IOVA to unbind
+ */
+static void msi_unmap_doorbell(struct iommu_domain *d, struct msi_msg *msg)
+{
+#ifdef CONFIG_IOMMU_DMA_RESERVED
+	dma_addr_t iova;
+
+	iova = msg_to_dma_addr(msg);
+	iommu_put_reserved_iova(d, iova);
+#endif
+}
+
+#ifdef CONFIG_IOMMU_API
+/**
+ * irq_data_to_msi_mapping_domain: checks if an irq corresponds to
+ * an MSI whose write address must be mapped in an IOMMU domain
+ *
+ * determine whether the irq corresponds to an MSI emitted by a device,
+ * upstream to an IOMMU, and if this IOMMU requires a binding of the
+ * MSI address
+ *
+ * @irq_data: irq data handle
+ */
+static struct iommu_domain *
+irq_data_to_msi_mapping_domain(struct irq_data *irq_data)
+{
+	struct iommu_domain *d;
+	struct msi_desc *desc;
+	struct device *dev;
+	int ret;
+
+	desc = irq_data_get_msi_desc(irq_data);
+	if (!desc)
+		return NULL;
+
+	dev = msi_desc_to_dev(desc);
+
+	d = iommu_get_domain_for_dev(dev);
+	if (!d || (d->type == IOMMU_DOMAIN_DMA))
+		return NULL;
+
+	ret = iommu_domain_get_attr(d, DOMAIN_ATTR_MSI_MAPPING, NULL);
+	if (!ret)
+		return d;
+	else
+		return NULL;
+}
+#else
+static inline struct iommu_domain *
+irq_data_to_msi_mapping_domain(struct irq_data *irq_data)
+{
+	return NULL;
+}
+#endif /* CONFIG_IOMMU_API */
+
+/**
  * msi_domain_set_affinity - Generic affinity setter function for MSI domains
  * @irq_data:	The irq data associated to the interrupt
  * @mask:	The affinity mask to set
@@ -73,8 +163,27 @@ int msi_domain_set_affinity(struct irq_data *irq_data,
 
 	ret = parent->chip->irq_set_affinity(parent, mask, force);
 	if (ret >= 0 && ret != IRQ_SET_MASK_OK_DONE) {
+		bool doorbell_change = false;
+		struct iommu_domain *d;
+		struct msi_msg old_msg;
+
+		d = irq_data_to_msi_mapping_domain(irq_data);
+		if (unlikely(d)) {
+			get_cached_msi_msg(irq_data->irq, &old_msg);
+			doorbell_change =
+				(old_msg.address_lo != msg.address_lo) ||
+				(old_msg.address_hi != msg.address_hi);
+		}
+
 		BUG_ON(irq_chip_compose_msi_msg(irq_data, &msg));
+
+		if (unlikely(doorbell_change))
+			WARN_ON(msi_map_doorbell(d, &msg));
+
 		irq_chip_write_msi_msg(irq_data, &msg);
+
+		if (unlikely(doorbell_change))
+			msi_unmap_doorbell(d, &old_msg);
 	}
 
 	return ret;
@@ -83,19 +192,33 @@ int msi_domain_set_affinity(struct irq_data *irq_data,
 static void msi_domain_activate(struct irq_domain *domain,
 				struct irq_data *irq_data)
 {
+	struct iommu_domain *d;
 	struct msi_msg msg;
 
+	d = irq_data_to_msi_mapping_domain(irq_data);
+
 	BUG_ON(irq_chip_compose_msi_msg(irq_data, &msg));
+	if (unlikely(d))
+		WARN_ON(msi_map_doorbell(d, &msg));
 	irq_chip_write_msi_msg(irq_data, &msg);
 }
 
 static void msi_domain_deactivate(struct irq_domain *domain,
 				  struct irq_data *irq_data)
 {
+	struct iommu_domain *d;
+	struct msi_msg old_msg;
 	struct msi_msg msg;
+
+	d = irq_data_to_msi_mapping_domain(irq_data);
+	if (unlikely(d))
+		get_cached_msi_msg(irq_data->irq, &old_msg);
 
 	memset(&msg, 0, sizeof(msg));
 	irq_chip_write_msi_msg(irq_data, &msg);
+
+	if (unlikely(d))
+		msi_unmap_doorbell(d, &old_msg);
 }
 
 static int msi_domain_alloc(struct irq_domain *domain, unsigned int virq,

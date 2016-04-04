@@ -10,6 +10,21 @@ struct msi_msg {
 	u32	data;		/* 16 bits of msi message data */
 };
 
+/* Helpers to convert the msi message address to a an iova/physical address */
+#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+#define msg_to_dma_addr(msg) \
+	(((dma_addr_t)((msg)->address_hi) << 32) | (msg)->address_lo)
+#else
+#define msg_to_dma_addr(msg) ((msg)->address_lo)
+#endif
+
+#ifdef CONFIG_PHYS_ADDR_T_64BIT
+#define msg_to_phys_addr(msg) \
+	(((phys_addr_t)((msg)->address_hi) << 32) | (msg)->address_lo)
+#else
+#define msg_to_phys_addr(msg)	((msg)->address_lo)
+#endif
+
 extern int pci_msi_ignore_mask;
 /* Helper functions */
 struct irq_data;
