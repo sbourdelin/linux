@@ -149,7 +149,10 @@ config DVB_NET
 	  You may want to disable the network support on embedded devices. If
 	  unsure say Y.
 
-# This Kconfig option is used by both PCI and USB drivers
+# Options used by both PCI and USB drivers
+config DVB_PTX_COMMON
+	tristate
+
 config TTPCI_EEPROM
 	tristate
 	depends on I2C
