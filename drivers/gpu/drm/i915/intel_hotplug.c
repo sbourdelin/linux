@@ -226,7 +226,7 @@ static void intel_hpd_irq_storm_reenable_work(struct work_struct *work)
 	intel_runtime_pm_put(dev_priv);
 }
 
-static bool intel_hpd_irq_event(struct drm_device *dev,
+bool intel_hpd_irq_event(struct drm_device *dev,
 				struct drm_connector *connector)
 {
 	enum drm_connector_status old_status;

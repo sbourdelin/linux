@@ -1540,7 +1540,7 @@ intel_hdmi_force(struct drm_connector *connector)
 	hdmi_to_dig_port(intel_hdmi)->base.type = INTEL_OUTPUT_HDMI;
 }
 
-static int intel_hdmi_get_modes(struct drm_connector *connector)
+int intel_hdmi_get_modes(struct drm_connector *connector)
 {
 	struct edid *edid;
 
@@ -1564,7 +1564,7 @@ intel_hdmi_detect_audio(struct drm_connector *connector)
 	return has_audio;
 }
 
-static int
+int
 intel_hdmi_set_property(struct drm_connector *connector,
 			struct drm_property *property,
 			uint64_t val)
@@ -2089,7 +2089,7 @@ static void chv_hdmi_pre_enable(struct intel_encoder *encoder)
 	}
 }
 
-static void intel_hdmi_destroy(struct drm_connector *connector)
+void intel_hdmi_destroy(struct drm_connector *connector)
 {
 	kfree(to_intel_connector(connector)->detect_edid);
 	drm_connector_cleanup(connector);
@@ -2118,7 +2118,7 @@ static const struct drm_encoder_funcs intel_hdmi_enc_funcs = {
 	.destroy = intel_encoder_destroy,
 };
 
-static void
+void
 intel_hdmi_add_properties(struct intel_hdmi *intel_hdmi, struct drm_connector *connector)
 {
 	intel_attach_force_audio_property(connector);

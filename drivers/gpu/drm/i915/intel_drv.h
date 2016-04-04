@@ -1413,7 +1413,12 @@ int intel_hdmi_init_minimum(struct intel_digital_port *intel_dig_port,
 struct intel_hdmi *enc_to_intel_hdmi(struct drm_encoder *encoder);
 bool intel_hdmi_compute_config(struct intel_encoder *encoder,
 			       struct intel_crtc_state *pipe_config);
-
+int intel_hdmi_get_modes(struct drm_connector *connector);
+int intel_hdmi_set_property(struct drm_connector *connector,
+		struct drm_property *property, uint64_t val);
+void intel_hdmi_destroy(struct drm_connector *connector);
+void intel_hdmi_add_properties(struct intel_hdmi *intel_hdmi,
+		struct drm_connector *connector);
 
 /* intel_lvds.c */
 void intel_lvds_init(struct drm_device *dev);
@@ -1501,6 +1506,10 @@ bool intel_display_power_get_if_enabled(struct drm_i915_private *dev_priv,
 					enum intel_display_power_domain domain);
 void intel_display_power_put(struct drm_i915_private *dev_priv,
 			     enum intel_display_power_domain domain);
+
+/* intel_hotplug.c */
+bool intel_hpd_irq_event(struct drm_device *dev,
+		struct drm_connector *connector);
 
 static inline void
 assert_rpm_device_not_suspended(struct drm_i915_private *dev_priv)

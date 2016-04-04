@@ -55,6 +55,178 @@ struct intel_lspcon *enc_to_lspcon(struct drm_encoder *encoder)
 	return &intel_dig_port->lspcon;
 }
 
+static struct intel_lspcon
+*intel_attached_lspcon(struct drm_connector *connector)
+{
+	return enc_to_lspcon(&intel_attached_encoder(connector)->base);
+}
+
+struct edid *lspcon_get_edid(struct intel_lspcon *lspcon, struct drm_connector
+						*connector)
+{
+	struct edid *edid = NULL;
+	struct intel_digital_port *dig_port = lspcon_to_dig_port(lspcon);
+	struct i2c_adapter *adapter = &dig_port->dp.aux.ddc;
+
+	if (lspcon->mode_of_op != lspcon_mode_ls) {
+		DRM_ERROR("EDID read supported in LS mode only\n");
+		return false;
+	}
+
+	/* LS mode, getting EDID using I2C over Aux */
+	edid = drm_do_get_edid(connector, drm_dp_dual_mode_get_edid,
+			(void *)adapter);
+	return edid;
+}
+
+static void
+lspcon_unset_edid(struct drm_connector *connector)
+{
+	struct intel_lspcon *lspcon = intel_attached_lspcon(connector);
+	struct intel_hdmi *intel_hdmi = lspcon_to_hdmi(lspcon);
+
+	intel_hdmi->has_hdmi_sink = false;
+	intel_hdmi->has_audio = false;
+	intel_hdmi->rgb_quant_range_selectable = false;
+
+	kfree(to_intel_connector(connector)->detect_edid);
+	to_intel_connector(connector)->detect_edid = NULL;
+}
+
+static bool
+lspcon_set_edid(struct drm_connector *connector, bool force)
+{
+	struct drm_i915_private *dev_priv = to_i915(connector->dev);
+	struct intel_lspcon *lspcon = intel_attached_lspcon(connector);
+	struct intel_hdmi *intel_hdmi = lspcon_to_hdmi(lspcon);
+	struct edid *edid = NULL;
+	bool connected = false;
+
+	if (force) {
+		intel_display_power_get(dev_priv, POWER_DOMAIN_GMBUS);
+		edid = lspcon_get_edid(lspcon, connector);
+		intel_display_power_put(dev_priv, POWER_DOMAIN_GMBUS);
+	}
+
+	to_intel_connector(connector)->detect_edid = edid;
+	if (edid && edid->input & DRM_EDID_INPUT_DIGITAL) {
+		intel_hdmi->rgb_quant_range_selectable =
+			drm_rgb_quant_range_selectable(edid);
+
+		intel_hdmi->has_audio = drm_detect_monitor_audio(edid);
+		if (intel_hdmi->force_audio != HDMI_AUDIO_AUTO)
+			intel_hdmi->has_audio =
+				intel_hdmi->force_audio == HDMI_AUDIO_ON;
+
+		if (intel_hdmi->force_audio != HDMI_AUDIO_OFF_DVI)
+			intel_hdmi->has_hdmi_sink =
+				drm_detect_hdmi_monitor(edid);
+
+		connected = true;
+	}
+	return connected;
+}
+
+static enum drm_connector_status
+lspcon_detect(struct drm_connector *connector, bool force)
+{
+	enum drm_connector_status status;
+	struct drm_i915_private *dev_priv = to_i915(connector->dev);
+	struct intel_lspcon *lspcon = intel_attached_lspcon(connector);
+	struct intel_hdmi *intel_hdmi = lspcon_to_hdmi(lspcon);
+
+	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n",
+		      connector->base.id, connector->name);
+	intel_display_power_get(dev_priv, POWER_DOMAIN_GMBUS);
+
+	lspcon_unset_edid(connector);
+	if (lspcon_set_edid(connector, true)) {
+		DRM_DEBUG_DRIVER("HDMI connected\n");
+		hdmi_to_dig_port(intel_hdmi)->base.type = INTEL_OUTPUT_HDMI;
+		status = connector_status_connected;
+	} else {
+		DRM_DEBUG_DRIVER("HDMI disconnected\n");
+		status = connector_status_disconnected;
+	}
+	intel_display_power_put(dev_priv, POWER_DOMAIN_GMBUS);
+	return status;
+}
+
+static int
+lspcon_set_property(struct drm_connector *connector,
+			struct drm_property *property,
+			uint64_t val)
+{
+	return intel_hdmi_set_property(connector, property, val);
+}
+
+static int
+lspcon_get_modes(struct drm_connector *connector)
+{
+	return intel_hdmi_get_modes(connector);
+}
+
+static void
+lspcon_destroy(struct drm_connector *connector)
+{
+	intel_hdmi_destroy(connector);
+}
+
+static enum drm_mode_status
+lspcon_mode_valid(struct drm_connector *connector,
+		      struct drm_display_mode *mode)
+{
+	int clock = mode->clock;
+	int max_dotclk = 675000; /* 4k@60 */
+	struct drm_device *dev = connector->dev;
+
+	if (mode->flags & DRM_MODE_FLAG_DBLSCAN)
+		return MODE_NO_DBLESCAN;
+
+	if ((mode->flags & DRM_MODE_FLAG_3D_MASK) ==
+		DRM_MODE_FLAG_3D_FRAME_PACKING)
+		clock *= 2;
+
+	if (mode->flags & DRM_MODE_FLAG_DBLCLK)
+		clock *= 2;
+
+	if (clock < 25000)
+		return MODE_CLOCK_LOW;
+
+	if (clock > max_dotclk)
+		return MODE_CLOCK_HIGH;
+
+	/* BXT DPLL can't generate 223-240 MHz */
+	if (IS_BROXTON(dev) && clock > 223333 && clock < 240000)
+		return MODE_CLOCK_RANGE;
+
+	/* todo: check for 12bpc here */
+	return MODE_OK;
+}
+
+void lspcon_add_properties(struct intel_digital_port *dig_port,
+		struct drm_connector *connector)
+{
+	intel_hdmi_add_properties(&dig_port->hdmi, connector);
+}
+
+static const struct drm_connector_funcs lspcon_connector_funcs = {
+	.dpms = drm_atomic_helper_connector_dpms,
+	.detect = lspcon_detect,
+	.fill_modes = drm_helper_probe_single_connector_modes,
+	.set_property = lspcon_set_property,
+	.atomic_get_property = intel_connector_atomic_get_property,
+	.destroy = lspcon_destroy,
+	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
+	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+};
+
+static const struct drm_connector_helper_funcs lspcon_connector_helper_funcs = {
+	.get_modes = lspcon_get_modes,
+	.mode_valid = lspcon_mode_valid,
+	.best_encoder = intel_best_encoder,
+};
+
 int intel_lspcon_init_connector(struct intel_digital_port *intel_dig_port)
 {
 	int ret;
@@ -73,18 +245,30 @@ int intel_lspcon_init_connector(struct intel_digital_port *intel_dig_port)
 	connector->interlace_allowed = true;
 	connector->doublescan_allowed = 0;
 
+	/* Load connector */
+	drm_connector_init(dev, connector, &lspcon_connector_funcs,
+			DRM_MODE_CONNECTOR_DisplayPort);
+	drm_connector_helper_add(connector, &lspcon_connector_helper_funcs);
+	intel_connector_attach_encoder(intel_connector, intel_encoder);
+	drm_connector_register(connector);
+
+	/* Add properties and functions */
+	lspcon_add_properties(intel_dig_port, connector);
+	intel_connector->get_hw_state = intel_ddi_connector_get_hw_state;
+	i915_debugfs_connector_add(connector);
+
 	/* init DP */
 	ret = intel_dp_init_minimum(intel_dig_port, intel_connector);
 	if (ret) {
 		DRM_ERROR("DP init for LSPCON failed\n");
-		return ret;
+		goto fail;
 	}
 
 	/* init HDMI */
 	ret = intel_hdmi_init_minimum(intel_dig_port, intel_connector);
 	if (ret) {
 		DRM_ERROR("HDMI init for LSPCON failed\n");
-		return ret;
+		goto fail;
 	}
 
 	/* Set up the hotplug pin. */
@@ -108,7 +292,7 @@ int intel_lspcon_init_connector(struct intel_digital_port *intel_dig_port)
 		break;
 	default:
 		DRM_ERROR("Invalid port to configure LSPCON\n");
-		return -EINVAL;
+		ret = -EINVAL;
 	}
 
 	/*
@@ -132,4 +316,9 @@ int intel_lspcon_init_connector(struct intel_digital_port *intel_dig_port)
 
 	DRM_DEBUG_DRIVER("Success: LSPCON connector init\n");
 	return 0;
+
+fail:
+	drm_connector_unregister(connector);
+	drm_connector_cleanup(connector);
+	return ret;
 }
