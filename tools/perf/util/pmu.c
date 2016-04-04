@@ -586,14 +586,14 @@ __u64 perf_pmu__format_bits(struct list_head *formats, const char *name)
 static void pmu_format_value(unsigned long *format, __u64 value, __u64 *v,
 			     bool zero)
 {
-	unsigned long fbit, vbit;
+	unsigned long fbit;
 
-	for (fbit = 0, vbit = 0; fbit < PERF_PMU_FORMAT_BITS; fbit++) {
+	for (fbit = 0; fbit < PERF_PMU_FORMAT_BITS; fbit++) {
 
 		if (!test_bit(fbit, format))
 			continue;
 
-		if (value & (1llu << vbit++))
+		if (value & (1llu << fbit))
 			*v |= (1llu << fbit);
 		else if (zero)
 			*v &= ~(1llu << fbit);
