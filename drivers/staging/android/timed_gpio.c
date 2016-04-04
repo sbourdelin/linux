@@ -29,7 +29,7 @@ struct timed_gpio_data {
 	struct timed_output_dev dev;
 	struct hrtimer timer;
 	spinlock_t lock;
-	unsigned gpio;
+	unsigned int gpio;
 	int max_timeout;
 	u8 active_low;
 };
