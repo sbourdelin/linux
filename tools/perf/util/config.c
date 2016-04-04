@@ -381,11 +381,11 @@ static int perf_buildid_config(const char *var, const char *value)
 {
 	/* same dir for all commands */
 	if (!strcmp(var, "buildid.dir")) {
-		const char *dirname = perf_config_dirname(var, value);
+		const char *v = perf_config_dirname(var, value);
 
-		if (!dirname)
+		if (!v)
 			return -1;
-		strncpy(buildid_dir, dirname, MAXPATHLEN-1);
+		strncpy(buildid_dir, v, MAXPATHLEN-1);
 		buildid_dir[MAXPATHLEN-1] = '\0';
 	}
 
