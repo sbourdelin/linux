@@ -2157,6 +2157,7 @@ struct drm_i915_gem_object {
 	unsigned int cache_dirty:1;
 
 	unsigned int frontbuffer_bits:INTEL_FRONTBUFFER_BITS;
+	unsigned int has_wc_mmap:1;
 
 	unsigned int pin_display;
 
