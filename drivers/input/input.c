@@ -401,12 +401,11 @@ static void input_handle_event(struct input_dev *dev,
 		if (dev->num_vals >= 2)
 			input_pass_values(dev, dev->vals, dev->num_vals);
 		dev->num_vals = 0;
-	} else if (dev->num_vals >= dev->max_vals - 2) {
-		dev->vals[dev->num_vals++] = input_value_sync;
-		input_pass_values(dev, dev->vals, dev->num_vals);
+	} else if (dev->num_vals == dev->max_vals) {
+		input_pass_values(dev, dev->vals, dev->num_vals - 1);
 		dev->num_vals = 0;
+		dev->vals[dev->num_vals++] = dev->vals[dev->max_vals - 1];
 	}
-
 }
 
 /**
