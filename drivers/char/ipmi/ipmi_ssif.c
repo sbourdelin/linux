@@ -1232,6 +1232,8 @@ static int do_cmd(struct i2c_client *client, int len, unsigned char *msg,
 			break;
 	}
 
+	if (ret == 0)
+		ret = -EINVAL;
 	if (ret > 0) {
 		/* Validate that the response is correct. */
 		if (ret < 3 ||
