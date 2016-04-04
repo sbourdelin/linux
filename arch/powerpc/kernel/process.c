@@ -511,23 +511,6 @@ void save_all(struct task_struct *tsk)
 	msr_check_and_clear(msr_all_available);
 }
 
-void flush_all_to_thread(struct task_struct *tsk)
-{
-	if (tsk->thread.regs) {
-		preempt_disable();
-		BUG_ON(tsk != current);
-		save_all(tsk);
-
-#ifdef CONFIG_SPE
-		if (tsk->thread.regs->msr & MSR_SPE)
-			tsk->thread.spefscr = mfspr(SPRN_SPEFSCR);
-#endif
-
-		preempt_enable();
-	}
-}
-EXPORT_SYMBOL(flush_all_to_thread);
-
 #ifdef CONFIG_PPC_ADV_DEBUG_REGS
 void do_send_trap(struct pt_regs *regs, unsigned long address,
 		  unsigned long error_code, int signal_code, int breakpt)
@@ -1046,6 +1029,23 @@ static inline void restore_sprs(struct thread_struct *old_thread,
 	}
 #endif
 }
+
+void flush_all_to_thread(struct task_struct *tsk)
+{
+	if (tsk->thread.regs) {
+		preempt_disable();
+		BUG_ON(tsk != current);
+		save_all(tsk);
+
+#ifdef CONFIG_SPE
+		if (tsk->thread.regs->msr & MSR_SPE)
+			tsk->thread.spefscr = mfspr(SPRN_SPEFSCR);
+#endif
+
+		preempt_enable();
+	}
+}
+EXPORT_SYMBOL(flush_all_to_thread);
 
 struct task_struct *__switch_to(struct task_struct *prev,
 	struct task_struct *new)
