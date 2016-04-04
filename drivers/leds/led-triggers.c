@@ -307,8 +307,9 @@ EXPORT_SYMBOL_GPL(devm_led_trigger_register);
 
 /* Simple LED Tigger Interface */
 
-void led_trigger_event(struct led_trigger *trig,
-			enum led_brightness brightness)
+static void do_led_trigger_event(struct led_trigger *trig,
+				 enum led_brightness brightness,
+				 bool nosleep)
 {
 	struct led_classdev *led_cdev;
 
@@ -316,11 +317,28 @@ void led_trigger_event(struct led_trigger *trig,
 		return;
 
 	read_lock(&trig->leddev_list_lock);
-	list_for_each_entry(led_cdev, &trig->led_cdevs, trig_list)
-		led_set_brightness(led_cdev, brightness);
+	list_for_each_entry(led_cdev, &trig->led_cdevs, trig_list) {
+		if (nosleep)
+			led_set_brightness_nosleep(led_cdev, brightness);
+		else
+			led_set_brightness(led_cdev, brightness);
+	}
 	read_unlock(&trig->leddev_list_lock);
 }
+
+void led_trigger_event(struct led_trigger *trig,
+		       enum led_brightness brightness)
+{
+	do_led_trigger_event(trig, brightness, false);
+}
 EXPORT_SYMBOL_GPL(led_trigger_event);
+
+void led_trigger_event_nosleep(struct led_trigger *trig,
+			       enum led_brightness brightness)
+{
+	do_led_trigger_event(trig, brightness, true);
+}
+EXPORT_SYMBOL_GPL(led_trigger_event_nosleep);
 
 static void led_trigger_blink_setup(struct led_trigger *trig,
 			     unsigned long *delay_on,

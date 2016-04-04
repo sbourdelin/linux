@@ -259,6 +259,8 @@ extern void led_trigger_register_simple(const char *name,
 extern void led_trigger_unregister_simple(struct led_trigger *trigger);
 extern void led_trigger_event(struct led_trigger *trigger,
 				enum led_brightness event);
+extern void led_trigger_event_nosleep(struct led_trigger *trigger,
+				enum led_brightness event);
 extern void led_trigger_blink(struct led_trigger *trigger,
 			      unsigned long *delay_on,
 			      unsigned long *delay_off);
@@ -304,6 +306,8 @@ static inline void led_trigger_register_simple(const char *name,
 					struct led_trigger **trigger) {}
 static inline void led_trigger_unregister_simple(struct led_trigger *trigger) {}
 static inline void led_trigger_event(struct led_trigger *trigger,
+				enum led_brightness event) {}
+static inline void led_trigger_event_nosleep(struct led_trigger *trigger,
 				enum led_brightness event) {}
 static inline void led_trigger_blink(struct led_trigger *trigger,
 				      unsigned long *delay_on,
