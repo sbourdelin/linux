@@ -1072,6 +1072,8 @@ static struct iommu_domain *__iommu_domain_alloc(struct bus_type *bus,
 
 	domain->ops  = bus->iommu_ops;
 	domain->type = type;
+	spin_lock_init(&domain->reserved_lock);
+	domain->reserved_binding_list = RB_ROOT;
 
 	return domain;
 }
