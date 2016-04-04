@@ -61,6 +61,144 @@ static struct intel_lspcon
 	return enc_to_lspcon(&intel_attached_encoder(connector)->base);
 }
 
+enum lspcon_mode lspcon_get_current_mode(struct intel_lspcon *lspcon)
+{
+	u8 data;
+	int err = 0;
+	struct intel_digital_port *dig_port = lspcon_to_dig_port(lspcon);
+	struct i2c_adapter *adapter = &dig_port->dp.aux.ddc;
+
+	/* Read Status: i2c over aux */
+	err = drm_dp_dual_mode_ioa_read(adapter, &data,
+		LSPCON_MODE_CHECK_OFFSET, sizeof(data));
+	if (err < 0) {
+		DRM_ERROR("LSPCON read mode ioa (0x80, 0x41) failed\n");
+		return lspcon_mode_invalid;
+	}
+
+	DRM_DEBUG_DRIVER("LSPCON mode (0x80, 0x41) = %x\n", (unsigned int)data);
+	return data & LSPCON_MODE_MASK ? lspcon_mode_pcon : lspcon_mode_ls;
+}
+
+int lspcon_change_mode(struct intel_lspcon *lspcon,
+	enum lspcon_mode mode, bool force)
+{
+	u8 data;
+	int err;
+	int time_out = 200;
+	enum lspcon_mode current_mode;
+	struct intel_digital_port *dig_port = lspcon_to_dig_port(lspcon);
+
+	current_mode = lspcon_get_current_mode(lspcon);
+	if (current_mode == lspcon_mode_invalid) {
+		DRM_ERROR("Failed to get current LSPCON mode\n");
+		return -EFAULT;
+	}
+
+	if (current_mode == mode && !force) {
+		DRM_DEBUG_DRIVER("Current mode = desired LSPCON mode\n");
+		return 0;
+	}
+
+	if (mode == lspcon_mode_ls)
+		data = ~LSPCON_MODE_MASK;
+	else
+		data = LSPCON_MODE_MASK;
+
+	/* Change mode */
+	err = drm_dp_dual_mode_ioa_write(&dig_port->dp.aux.ddc, &data,
+			LSPCON_MODE_CHANGE_OFFSET, sizeof(data));
+	if (err < 0) {
+		DRM_ERROR("LSPCON mode change failed\n");
+		return err;
+	}
+
+	/*
+	* Confirm mode change by reading the status bit.
+	* Sometimes, it takes a while to change the mode,
+	* so wait and retry until time out or done.
+	*/
+	while (time_out) {
+		current_mode = lspcon_get_current_mode(lspcon);
+		if (current_mode != mode) {
+			mdelay(10);
+			time_out -= 10;
+		} else {
+			lspcon->mode_of_op = mode;
+			DRM_DEBUG_DRIVER("LSPCON mode changed to %s\n",
+				mode == lspcon_mode_ls ? "LS" : "PCON");
+			return 0;
+		}
+	}
+
+	DRM_ERROR("LSPCON mode change timed out\n");
+	return -EFAULT;
+}
+
+bool lspcon_detect_identifier(struct intel_lspcon *lspcon)
+{
+	enum drm_dp_dual_mode_type adaptor_type;
+	struct intel_digital_port *dig_port = lspcon_to_dig_port(lspcon);
+	struct i2c_adapter *adapter = &dig_port->dp.aux.ddc;
+
+	/* Lets probe the adaptor and check its type */
+	adaptor_type = drm_dp_dual_mode_detect(adapter);
+	if (adaptor_type != DRM_DP_DUAL_MODE_TYPE2_LSPCON) {
+		DRM_DEBUG_DRIVER("No LSPCON detected, found %s\n",
+			drm_dp_get_dual_mode_type_name(adaptor_type));
+		return false;
+	}
+
+	/* Yay ... got a LSPCON device */
+	DRM_DEBUG_DRIVER("LSPCON detected\n");
+	return true;
+}
+
+enum lspcon_mode lspcon_probe(struct intel_lspcon *lspcon)
+{
+	enum lspcon_mode current_mode;
+
+	/* Detect a valid lspcon */
+	if (!lspcon_detect_identifier(lspcon)) {
+		DRM_DEBUG_DRIVER("Failed to find LSPCON identifier\n");
+		return false;
+	}
+
+	/* LSPCON's mode of operation */
+	current_mode = lspcon_get_current_mode(lspcon);
+	if (current_mode == lspcon_mode_invalid) {
+		DRM_ERROR("Failed to read LSPCON mode\n");
+		return false;
+	}
+
+	/* All is well */
+	lspcon->mode_of_op = current_mode;
+	lspcon->active = true;
+	return current_mode;
+}
+
+bool lspcon_device_init(struct intel_lspcon *lspcon)
+{
+
+	/* Lets check LSPCON now, probe the HW status */
+	lspcon->active = false;
+	lspcon->mode_of_op = lspcon_mode_invalid;
+	if (!lspcon_probe(lspcon)) {
+		DRM_ERROR("Failed to probe lspcon");
+		return false;
+	}
+
+	/* We wish to keep LSPCON in LS mode */
+	if (lspcon->active && lspcon->mode_of_op != lspcon_mode_ls) {
+		if (lspcon_change_mode(lspcon, lspcon_mode_ls, true) < 0) {
+			DRM_ERROR("LSPCON mode change to LS failed\n");
+			return false;
+		}
+	}
+	DRM_DEBUG_DRIVER("LSPCON init success\n");
+	return true;
+}
+
 struct edid *lspcon_get_edid(struct intel_lspcon *lspcon, struct drm_connector
 						*connector)
 {
@@ -233,6 +371,7 @@ int intel_lspcon_init_connector(struct intel_digital_port *intel_dig_port)
 	struct intel_encoder *intel_encoder = &intel_dig_port->base;
 	struct drm_device *dev = intel_encoder->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_lspcon *lspcon = &intel_dig_port->lspcon;
 	struct intel_connector *intel_connector;
 	struct drm_connector *connector;
 	enum port port = intel_dig_port->port;
@@ -312,6 +451,12 @@ int intel_lspcon_init_connector(struct intel_digital_port *intel_dig_port)
 		u32 temp = I915_READ(PEG_BAND_GAP_DATA);
 
 		I915_WRITE(PEG_BAND_GAP_DATA, (temp & ~0xf) | 0xd);
+	}
+
+	/* Now initialize the LSPCON device */
+	if (!lspcon_device_init(lspcon)) {
+		DRM_ERROR("LSPCON device init failed\n");
+		goto fail;
 	}
 
 	DRM_DEBUG_DRIVER("Success: LSPCON connector init\n");
