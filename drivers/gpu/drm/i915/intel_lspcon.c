@@ -61,6 +61,38 @@ static struct intel_lspcon
 	return enc_to_lspcon(&intel_attached_encoder(connector)->base);
 }
 
+enum irqreturn
+lspcon_hpd_pulse(struct intel_digital_port *intel_dig_port, bool long_hpd)
+{
+	struct drm_device *dev = intel_dig_port->base.base.dev;
+	struct intel_encoder *intel_encoder = &intel_dig_port->base;
+	struct intel_connector *intel_connector;
+	bool changed = false;
+
+	mutex_lock(&dev->mode_config.mutex);
+	if (intel_encoder->hot_plug)
+		intel_encoder->hot_plug(intel_encoder);
+
+	for_each_intel_connector(dev, intel_connector) {
+		if (intel_connector->encoder == intel_encoder) {
+			struct drm_connector *connector =
+				&intel_connector->base;
+
+			DRM_DEBUG_DRIVER("Hptplug: Connector %s (pin %i).\n",
+				connector->name, intel_encoder->hpd_pin);
+			if (intel_hpd_irq_event(dev, connector))
+				changed = true;
+		}
+	}
+	mutex_unlock(&dev->mode_config.mutex);
+
+	if (changed) {
+		DRM_DEBUG_DRIVER("Sending event for change\n");
+		drm_kms_helper_hotplug_event(dev);
+	}
+	return IRQ_HANDLED;
+}
+
 enum lspcon_mode lspcon_get_current_mode(struct intel_lspcon *lspcon)
 {
 	u8 data;
@@ -395,6 +427,9 @@ int intel_lspcon_init_connector(struct intel_digital_port *intel_dig_port)
 	lspcon_add_properties(intel_dig_port, connector);
 	intel_connector->get_hw_state = intel_ddi_connector_get_hw_state;
 	i915_debugfs_connector_add(connector);
+
+	/* HPD handler */
+	intel_dig_port->hpd_pulse = lspcon_hpd_pulse;
 
 	/* init DP */
 	ret = intel_dp_init_minimum(intel_dig_port, intel_connector);
