@@ -8,6 +8,7 @@
  * Copyright (C) 2001 Silicon Graphics, Inc. (Trust Technology Group)
  * Copyright (C) 2015 Intel Corporation.
  * Copyright (C) 2015 Casey Schaufler <casey@schaufler-ca.com>
+ * Copyright (C) 2016 Mellanox Techonologies. <danielj@mellanox.com>
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -876,6 +877,21 @@
  *	associated with the TUN device's security structure.
  *	@security pointer to the TUN devices's security structure.
  *
+ * Security hooks for Infiniband
+ *
+ * @pkey_access:
+ *	Check permission when modifing a QP or transmitting and receiving MADs.
+ * @ibdev_smi:
+ *	Check permissions to access the devices subnet management interface (SMI).
+ * @infiniband_alloc_security:
+ *	Allocate a security structure to be used by Infiniband QPs and MAD
+ *	agents.
+ * @infiniband_free_security:
+ *	Free an Infiniband security structure.
+ * @infiniband_flush:
+ *	Security modules can use this hook to notify IB core of policy changes
+ *	or when enforcement changes.
+ *
  * Security hooks for XFRM operations.
  *
  * @xfrm_policy_alloc_security:
@@ -1578,6 +1594,14 @@ union security_list_options {
 	int (*tun_dev_open)(void *security);
 #endif	/* CONFIG_SECURITY_NETWORK */
 
+#ifdef CONFIG_SECURITY_INFINIBAND
+	int (*pkey_access)(u64 subnet_prefix, u16 pkey, void *security);
+	int (*ibdev_smi)(const char *dev_name, u8 port, void *security);
+	int (*infiniband_alloc_security)(void **security);
+	void (*infiniband_free_security)(void *security);
+	void (*infiniband_flush)(void);
+#endif	/* CONFIG_SECURITY_INFINIBAND */
+
 #ifdef CONFIG_SECURITY_NETWORK_XFRM
 	int (*xfrm_policy_alloc_security)(struct xfrm_sec_ctx **ctxp,
 					  struct xfrm_user_sec_ctx *sec_ctx,
@@ -1806,6 +1830,13 @@ struct security_hook_heads {
 	struct list_head tun_dev_open;
 	struct list_head skb_owned_by;
 #endif	/* CONFIG_SECURITY_NETWORK */
+#ifdef CONFIG_SECURITY_INFINIBAND
+	struct list_head pkey_access;
+	struct list_head ibdev_smi;
+	struct list_head infiniband_alloc_security;
+	struct list_head infiniband_free_security;
+	struct list_head infiniband_flush;
+#endif	/* CONFIG_SECURITY_INFINIBAND */
 #ifdef CONFIG_SECURITY_NETWORK_XFRM
 	struct list_head xfrm_policy_alloc_security;
 	struct list_head xfrm_policy_clone_security;
@@ -1863,7 +1894,6 @@ static inline void security_add_hooks(struct security_hook_list *hooks,
 		list_add_tail_rcu(&hooks[i].list, hooks[i].head);
 }
 
-#ifdef CONFIG_SECURITY_SELINUX_DISABLE
 /*
  * Assuring the safety of deleting a security module is up to
  * the security module involved. This may entail ordering the
@@ -1871,10 +1901,12 @@ static inline void security_add_hooks(struct security_hook_list *hooks,
  * the module once a policy is loaded or any number of other
  * actions better imagined than described.
  *
- * The name of the configuration option reflects the only module
- * that currently uses the mechanism. Any developer who thinks
- * disabling their module is a good idea needs to be at least as
- * careful as the SELinux team.
+ * Any developer who thinks disabling their module is a good
+ * idea needs to be at least as careful as the SELinux team.
+ *
+ * ib_core is usually built as a module.  It may register a
+ * single instance to a single hook (infiniband_flush), and
+ * must be able to delete it when the module is unloaded.
  */
 static inline void security_delete_hooks(struct security_hook_list *hooks,
 						int count)
@@ -1884,7 +1916,6 @@ static inline void security_delete_hooks(struct security_hook_list *hooks,
 	for (i = 0; i < count; i++)
 		list_del_rcu(&hooks[i].list);
 }
-#endif /* CONFIG_SECURITY_SELINUX_DISABLE */
 
 extern int __init security_module_enable(const char *module);
 extern void __init capability_add_hooks(void);

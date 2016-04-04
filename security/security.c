@@ -4,6 +4,7 @@
  * Copyright (C) 2001 WireX Communications, Inc <chris@wirex.com>
  * Copyright (C) 2001-2002 Greg Kroah-Hartman <greg@kroah.com>
  * Copyright (C) 2001 Networks Associates Technology, Inc <ssmalley@nai.com>
+ * Copyright (C) 2016 Mellanox Technologies.  <danielj@mellanox.com>
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -1398,6 +1399,44 @@ EXPORT_SYMBOL(security_tun_dev_open);
 
 #endif	/* CONFIG_SECURITY_NETWORK */
 
+#ifdef CONFIG_SECURITY_INFINIBAND
+
+int security_pkey_access(u64 subnet_prefix, u16 pkey, void *security)
+{
+	return call_int_hook(pkey_access,
+			0,
+			subnet_prefix,
+			pkey,
+			security);
+}
+EXPORT_SYMBOL(security_pkey_access);
+
+int security_ibdev_smi(const char *dev_name, u8 port, void *security)
+{
+	return call_int_hook(ibdev_smi, 0, dev_name, port, security);
+}
+EXPORT_SYMBOL(security_ibdev_smi);
+
+int security_infiniband_alloc_security(void **security)
+{
+	return call_int_hook(infiniband_alloc_security, 0, security);
+}
+EXPORT_SYMBOL(security_infiniband_alloc_security);
+
+void security_infiniband_free_security(void *security)
+{
+	call_void_hook(infiniband_free_security, security);
+}
+EXPORT_SYMBOL(security_infiniband_free_security);
+
+void security_infiniband_flush(void)
+{
+	call_void_hook(infiniband_flush);
+}
+EXPORT_SYMBOL(security_infiniband_flush);
+
+#endif	/* CONFIG_SECURITY_INFINIBAND */
+
 #ifdef CONFIG_SECURITY_NETWORK_XFRM
 
 int security_xfrm_policy_alloc(struct xfrm_sec_ctx **ctxp,
@@ -1850,6 +1889,18 @@ struct security_hook_heads security_hook_heads = {
 	.tun_dev_open =	LIST_HEAD_INIT(security_hook_heads.tun_dev_open),
 	.skb_owned_by =	LIST_HEAD_INIT(security_hook_heads.skb_owned_by),
 #endif	/* CONFIG_SECURITY_NETWORK */
+
+#ifdef CONFIG_SECURITY_INFINIBAND
+	.pkey_access = LIST_HEAD_INIT(security_hook_heads.pkey_access),
+	.ibdev_smi = LIST_HEAD_INIT(security_hook_heads.ibdev_smi),
+	.infiniband_alloc_security =
+		LIST_HEAD_INIT(security_hook_heads.infiniband_alloc_security),
+	.infiniband_free_security =
+		LIST_HEAD_INIT(security_hook_heads.infiniband_free_security),
+	.infiniband_flush =
+		LIST_HEAD_INIT(security_hook_heads.infiniband_flush),
+#endif	/* CONFIG_SECURITY_INFINIBAND */
+
 #ifdef CONFIG_SECURITY_NETWORK_XFRM
 	.xfrm_policy_alloc_security =
 		LIST_HEAD_INIT(security_hook_heads.xfrm_policy_alloc_security),
@@ -1893,3 +1944,4 @@ struct security_hook_heads security_hook_heads = {
 		LIST_HEAD_INIT(security_hook_heads.audit_rule_free),
 #endif /* CONFIG_AUDIT */
 };
+EXPORT_SYMBOL(security_hook_heads);
