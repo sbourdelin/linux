@@ -3682,6 +3682,11 @@ static void skl_update_wm(struct drm_crtc *crtc)
 	skl_write_wm_values(dev_priv, results);
 	skl_flush_wm_values(dev_priv, results);
 
+	/* optional IPC enablement */
+	if (i915.enable_ipc)
+		I915_WRITE(DISP_ARB_CTL2,
+			I915_READ(DISP_ARB_CTL2) | DISP_ENABLE_IPC);
+
 	/* store the new configuration */
 	dev_priv->wm.skl_hw = *results;
 }
