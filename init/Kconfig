@@ -309,6 +309,16 @@ config AUDITSYSCALL
 	def_bool y
 	depends on AUDIT && HAVE_ARCH_AUDITSYSCALL
 
+config DEVICE_AUDIT
+        bool "Create audit records for devices added to the systems"
+        depends on AUDIT && USB
+       default y
+       help
+         Generate audit events in the system for USB devices that
+         are added or removed from the system from boot time onwards.
+         Records the manufacturer, product serial number, device major
+         and minor number and bus which the device was added to.
+
 config AUDIT_WATCH
 	def_bool y
 	depends on AUDITSYSCALL
