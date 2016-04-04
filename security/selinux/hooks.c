@@ -5935,6 +5935,30 @@ static int selinux_key_getsecurity(struct key *key, char **_buffer)
 #endif
 
 #ifdef CONFIG_SECURITY_INFINIBAND
+static int selinux_pkey_access(u64 subnet_prefix, u16 pkey_val, void *security)
+{
+	struct common_audit_data ad;
+	int err;
+	u32 sid = 0;
+	struct infiniband_security_struct *sec = security;
+	struct lsm_pkey_audit pkey;
+
+	err = security_pkey_sid(subnet_prefix, pkey_val, &sid);
+
+	if (err)
+		goto out;
+
+	ad.type = LSM_AUDIT_DATA_PKEY;
+	pkey.subnet_prefix = subnet_prefix;
+	pkey.pkey = pkey_val;
+	ad.u.pkey = &pkey;
+	err = avc_has_perm(sec->sid, sid,
+			   SECCLASS_INFINIBAND_PKEY,
+			   INFINIBAND_PKEY__ACCESS, &ad);
+out:
+	return err;
+}
+
 static int selinux_infiniband_alloc_security(void **security)
 {
 	struct infiniband_security_struct *sec;
@@ -6136,6 +6160,7 @@ static struct security_hook_list selinux_hooks[] = {
 	LSM_HOOK_INIT(tun_dev_open, selinux_tun_dev_open),
 
 #ifdef CONFIG_SECURITY_INFINIBAND
+	LSM_HOOK_INIT(pkey_access, selinux_pkey_access),
 	LSM_HOOK_INIT(infiniband_alloc_security,
 		      selinux_infiniband_alloc_security),
 	LSM_HOOK_INIT(infiniband_free_security,
