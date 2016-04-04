@@ -2050,7 +2050,7 @@ static int btrfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	int mixed = 0;
 
 	/*
-	 * holding chunk_muext to avoid allocating new chunks, holding
+	 * holding chunk_mutex to avoid allocating new chunks, holding
 	 * device_list_mutex to avoid the device being removed
 	 */
 	rcu_read_lock();
