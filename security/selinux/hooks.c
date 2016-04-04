@@ -17,6 +17,8 @@
  *	Paul Moore <paul@paul-moore.com>
  *  Copyright (C) 2007 Hitachi Software Engineering Co., Ltd.
  *		       Yuichi Nakamura <ynakam@hitachisoft.jp>
+ *  Copyright (C) 2016 Mellanox Technologies,
+ *					Dan Jurgens <danielj@mellanox.com>
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License version 2,
@@ -5932,6 +5934,26 @@ static int selinux_key_getsecurity(struct key *key, char **_buffer)
 
 #endif
 
+#ifdef CONFIG_SECURITY_INFINIBAND
+static int selinux_infiniband_alloc_security(void **security)
+{
+	struct infiniband_security_struct *sec;
+
+	sec = kzalloc(sizeof(*sec), GFP_ATOMIC);
+	if (!sec)
+		return -ENOMEM;
+	sec->sid = current_sid();
+
+	*security = sec;
+	return 0;
+}
+
+static void selinux_infiniband_free_security(void *security)
+{
+	kfree(security);
+}
+#endif
+
 static struct security_hook_list selinux_hooks[] = {
 	LSM_HOOK_INIT(binder_set_context_mgr, selinux_binder_set_context_mgr),
 	LSM_HOOK_INIT(binder_transaction, selinux_binder_transaction),
@@ -6112,6 +6134,13 @@ static struct security_hook_list selinux_hooks[] = {
 	LSM_HOOK_INIT(tun_dev_attach_queue, selinux_tun_dev_attach_queue),
 	LSM_HOOK_INIT(tun_dev_attach, selinux_tun_dev_attach),
 	LSM_HOOK_INIT(tun_dev_open, selinux_tun_dev_open),
+
+#ifdef CONFIG_SECURITY_INFINIBAND
+	LSM_HOOK_INIT(infiniband_alloc_security,
+		      selinux_infiniband_alloc_security),
+	LSM_HOOK_INIT(infiniband_free_security,
+		      selinux_infiniband_free_security),
+#endif
 
 #ifdef CONFIG_SECURITY_NETWORK_XFRM
 	LSM_HOOK_INIT(xfrm_policy_alloc_security, selinux_xfrm_policy_alloc),
