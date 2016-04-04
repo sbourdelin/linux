@@ -1577,6 +1577,8 @@ void start_thread(struct pt_regs *regs, unsigned long start, unsigned long sp)
 	current->thread.vr_state.vscr.u[3] = 0x00010000; /* Java mode disabled */
 	current->thread.vr_save_area = NULL;
 	current->thread.vrsave = 0;
+	if (cpu_has_feature(CPU_FTR_ALTIVEC))
+		mtspr(SPRN_VRSAVE, 0);
 	current->thread.used_vr = 0;
 #endif /* CONFIG_ALTIVEC */
 #ifdef CONFIG_SPE
@@ -1592,6 +1594,18 @@ void start_thread(struct pt_regs *regs, unsigned long start, unsigned long sp)
 	current->thread.tm_texasr = 0;
 	current->thread.tm_tfiar = 0;
 #endif /* CONFIG_PPC_TRANSACTIONAL_MEM */
+#ifdef CONFIG_PPC_BOOK3S_64
+	/*
+	 * Zero out the SPRs.
+	 * Don't touch the ones use by perf, it controls them.
+	 * Don't touch the EBB regs. This falls into the same category of
+	 *   responsibly as open file descriptors across exec(), the parent should
+	 *   sanitise if it feels it would be a problem
+	 */
+	current->thread.tar = 0;
+	if (cpu_has_feature(CPU_FTR_ARCH_206))
+		mtspr(SPRN_TAR, 0);
+#endif /* CONFIG_PPC_BOOK3S_64 */
 }
 EXPORT_SYMBOL(start_thread);
 
