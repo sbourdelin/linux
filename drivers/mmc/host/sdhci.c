@@ -1091,22 +1091,12 @@ static u16 sdhci_get_preset_value(struct sdhci_host *host)
 	return preset;
 }
 
-void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
+u16 sdhci_compute_clock_config(struct sdhci_host *host, unsigned int clock)
 {
 	int div = 0; /* Initialized for compiler warning */
 	int real_div = div, clk_mul = 1;
 	u16 clk = 0;
-	unsigned long timeout;
 	bool switch_base_clk = false;
-
-	host->mmc->actual_clock = 0;
-
-	sdhci_writew(host, 0, SDHCI_CLOCK_CONTROL);
-	if (host->quirks2 & SDHCI_QUIRK2_NEED_DELAY_AFTER_INT_CLK_RST)
-		mdelay(1);
-
-	if (clock == 0)
-		return;
 
 	if (host->version >= SDHCI_SPEC_300) {
 		if (host->preset_enabled) {
@@ -1188,6 +1178,27 @@ clock_set:
 	clk |= (div & SDHCI_DIV_MASK) << SDHCI_DIVIDER_SHIFT;
 	clk |= ((div & SDHCI_DIV_HI_MASK) >> SDHCI_DIV_MASK_LEN)
 		<< SDHCI_DIVIDER_HI_SHIFT;
+
+	return clk;
+}
+EXPORT_SYMBOL_GPL(sdhci_compute_clock_config);
+
+void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
+{
+	u16 clk;
+	unsigned long timeout;
+
+	host->mmc->actual_clock = 0;
+
+	sdhci_writew(host, 0, SDHCI_CLOCK_CONTROL);
+	if (host->quirks2 & SDHCI_QUIRK2_NEED_DELAY_AFTER_INT_CLK_RST)
+		mdelay(1);
+
+	if (clock == 0)
+		return;
+
+	clk = sdhci_compute_clock_config(host, clock);
+
 	clk |= SDHCI_CLOCK_INT_EN;
 	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
 
