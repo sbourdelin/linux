@@ -28,4 +28,20 @@
 			<GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
 			<GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
 	};
+
+	soc {
+		cpu_temp: thermal@920100 {
+			#thermal-sensor-cells = <0>;
+			compatible = "sigma,smp8758-thermal";
+			reg = <0x920100 12>;
+		};
+	};
+
+	thermal-zones {
+		cpu_thermal: cpu-thermal {
+			polling-delay-passive = <2003>;	/* ms */
+			polling-delay = <1009>;		/* ms */
+			thermal-sensors = <&cpu_temp>;
+		};
+	};
 };
