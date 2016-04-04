@@ -5094,6 +5094,11 @@ bool intel_dp_is_edp(struct drm_device *dev, enum port port)
 	return intel_bios_is_port_edp(dev_priv, port);
 }
 
+bool intel_dp_is_dual_mode(struct drm_i915_private *dev_priv, enum port port)
+{
+	return intel_bios_is_dp_dual_mode(dev_priv, port);
+}
+
 void
 intel_dp_add_properties(struct intel_dp *intel_dp, struct drm_connector *connector)
 {

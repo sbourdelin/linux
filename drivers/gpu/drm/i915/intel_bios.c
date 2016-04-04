@@ -1547,6 +1547,38 @@ bool intel_bios_is_port_edp(struct drm_i915_private *dev_priv, enum port port)
 	return false;
 }
 
+bool intel_bios_is_dp_dual_mode(struct drm_i915_private *dev_priv,
+				enum port port)
+{
+	const union child_device_config *p_child;
+	int i;
+	static const short port_mapping[] = {
+		[PORT_B] = DVO_PORT_DPB,
+		[PORT_C] = DVO_PORT_DPC,
+		[PORT_D] = DVO_PORT_DPD,
+		[PORT_E] = DVO_PORT_DPE,
+	};
+
+	if (port == PORT_A || port >= ARRAY_SIZE(port_mapping))
+		return false;
+
+	if (!dev_priv->vbt.child_dev_num)
+		return false;
+
+	for (i = 0; i < dev_priv->vbt.child_dev_num; i++) {
+		p_child = &dev_priv->vbt.child_dev[i];
+
+		if (p_child->common.dvo_port == port_mapping[port] &&
+		    (p_child->common.device_type &
+				DEVICE_TYPE_DP_DUAL_MODE_BITS) ==
+			(DEVICE_TYPE_DP_DUAL_MODE &
+				DEVICE_TYPE_DP_DUAL_MODE_BITS))
+			return true;
+	}
+	return false;
+}
+
+
 /**
  * intel_bios_is_dsi_present - is DSI present in VBT
  * @dev_priv:	i915 device instance
