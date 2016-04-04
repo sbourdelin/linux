@@ -2363,14 +2363,10 @@ populate_lr_context(struct intel_context *ctx, struct drm_i915_gem_object *ctx_o
 		    struct intel_ringbuffer *ringbuf)
 {
 	struct drm_device *dev = engine->dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct i915_hw_ppgtt *ppgtt = ctx->ppgtt;
 	struct page *page;
 	uint32_t *reg_state;
 	int ret;
-
-	if (!ppgtt)
-		ppgtt = dev_priv->mm.aliasing_ppgtt;
 
 	ret = i915_gem_object_set_to_cpu_domain(ctx_obj, true);
 	if (ret) {

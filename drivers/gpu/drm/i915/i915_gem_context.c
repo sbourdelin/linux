@@ -306,7 +306,8 @@ i915_gem_create_context(struct drm_device *dev,
 		}
 
 		ctx->ppgtt = ppgtt;
-	}
+	} else
+		ctx->ppgtt = to_i915(dev)->mm.aliasing_ppgtt;
 
 	trace_i915_context_create(ctx);
 
