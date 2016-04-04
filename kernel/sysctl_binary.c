@@ -1123,15 +1123,14 @@ static ssize_t bin_uuid(struct file *file,
 
 		result = kernel_read(file, 0, buf, sizeof(buf) - 1);
 		if (result < 0)
-			goto out;
+			return result;
 
 		buf[result] = '\0';
 
 		/* Convert the uuid to from a string to binary */
 		for (i = 0; i < 16; i++) {
-			result = -EIO;
 			if (!isxdigit(str[0]) || !isxdigit(str[1]))
-				goto out;
+				return -EIO;
 
 			uuid[i] = (hex_to_bin(str[0]) << 4) |
 					hex_to_bin(str[1]);
@@ -1143,15 +1142,12 @@ static ssize_t bin_uuid(struct file *file,
 		if (oldlen > 16)
 			oldlen = 16;
 
-		result = -EFAULT;
 		if (copy_to_user(oldval, uuid, oldlen))
-			goto out;
+			return -EFAULT;
 
 		copied = oldlen;
 	}
-	result = copied;
-out:
-	return result;
+	return copied;
 }
 
 static ssize_t bin_dn_node_address(struct file *file,
