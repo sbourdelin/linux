@@ -24,6 +24,7 @@
 
 #include <linux/oom.h>
 #include <linux/shmem_fs.h>
+#include <linux/migrate.h>
 #include <linux/slab.h>
 #include <linux/swap.h>
 #include <linux/pci.h>
@@ -85,6 +86,70 @@ static bool can_release_pages(struct drm_i915_gem_object *obj)
 	 * purgeable) or if we can move their contents out to swap.
 	 */
 	return swap_available() || obj->madv == I915_MADV_DONTNEED;
+}
+
+static bool can_migrate_page(struct drm_i915_gem_object *obj)
+{
+	/* Avoid the migration of page if being actively used by GPU */
+	if (obj->active)
+		return false;
+
+	/* Skip the migration for purgeable objects otherwise there
+	 * will be a deadlock when shmem will try to lock the page for
+	 * truncation, which is already locked by the caller before
+	 * migration.
+	 */
+	if (obj->madv == I915_MADV_DONTNEED)
+		return false;
+
+	/* Skip the migration for a pinned object */
+	if (obj->pages_pin_count != num_vma_bound(obj))
+		return false;
+
+	return true;
+}
+
+static int
+unsafe_drop_pages(struct drm_i915_gem_object *obj)
+{
+	struct i915_vma *vma, *next;
+	int ret;
+
+	drm_gem_object_reference(&obj->base);
+	list_for_each_entry_safe(vma, next, &obj->vma_list, obj_link)
+		if (i915_vma_unbind(vma))
+			break;
+
+	ret = i915_gem_object_put_pages(obj);
+	drm_gem_object_unreference(&obj->base);
+
+	return ret;
+}
+
+static int
+do_migrate_page(struct drm_i915_gem_object *obj)
+{
+	struct drm_i915_private *dev_priv = to_i915(obj->base.dev);
+	int ret = 0;
+
+	if (!can_migrate_page(obj))
+		return -EBUSY;
+
+	/* HW access would be required for a GGTT bound object, for which
+	 * device has to be kept awake. But a deadlock scenario can arise if
+	 * the attempt is made to resume the device, when either a suspend
+	 * or a resume operation is already happening concurrently from some
+	 * other path and that only also triggers compaction. So only unbind
+	 * if the device is currently awake.
+	 */
+	if (!intel_runtime_pm_get_if_in_use(dev_priv))
+		return -EBUSY;
+
+	if (unsafe_drop_pages(obj))
+		ret = -EBUSY;
+
+	intel_runtime_pm_put(dev_priv);
+	return ret;
 }
 
 /**
@@ -156,7 +221,6 @@ i915_gem_shrink(struct drm_i915_private *dev_priv,
 		INIT_LIST_HEAD(&still_in_list);
 		while (count < target && !list_empty(phase->list)) {
 			struct drm_i915_gem_object *obj;
-			struct i915_vma *vma, *v;
 
 			obj = list_first_entry(phase->list,
 					       typeof(*obj), global_list);
@@ -172,18 +236,8 @@ i915_gem_shrink(struct drm_i915_private *dev_priv,
 			if (!can_release_pages(obj))
 				continue;
 
-			drm_gem_object_reference(&obj->base);
-
-			/* For the unbound phase, this should be a no-op! */
-			list_for_each_entry_safe(vma, v,
-						 &obj->vma_list, obj_link)
-				if (i915_vma_unbind(vma))
-					break;
-
-			if (i915_gem_object_put_pages(obj) == 0)
+			if (unsafe_drop_pages(obj) == 0)
 				count += obj->base.size >> PAGE_SHIFT;
-
-			drm_gem_object_unreference(&obj->base);
 		}
 		list_splice(&still_in_list, phase->list);
 	}
@@ -356,6 +410,97 @@ i915_gem_shrinker_oom(struct notifier_block *nb, unsigned long event, void *ptr)
 	return NOTIFY_DONE;
 }
 
+#ifdef CONFIG_MIGRATION
+static int i915_gem_shrinker_migratepage(struct address_space *mapping,
+					 struct page *newpage,
+					 struct page *page,
+					 enum migrate_mode mode,
+					 void *dev_priv_data)
+{
+	struct drm_i915_private *dev_priv = dev_priv_data;
+	struct drm_device *dev = dev_priv->dev;
+	unsigned long timeout = msecs_to_jiffies(10) + 1;
+	bool unlock;
+	int ret;
+
+	WARN((page_count(newpage) != 1), "Unexpected ref count for newpage\n");
+
+	/*
+	 * Clear the private field of the new target page as it could have a
+	 * stale value in the private field. Otherwise later on if this page
+	 * itself gets migrated, without getting referred by the Driver
+	 * in between, the stale value would cause the i915_migratepage
+	 * function to go for a toss as object pointer is derived from it.
+	 * This should be safe since at the time of migration, private field
+	 * of the new page (which is actually an independent free 4KB page now)
+	 * should be like a don't care for the kernel.
+	 */
+	set_page_private(newpage, 0);
+
+	if (!page_private(page))
+		goto migrate;
+
+	/*
+	 * Check the page count, if Driver also has a reference then it should
+	 * be more than 2, as shmem will have one reference and one reference
+	 * would have been taken by the migration path itself. So if reference
+	 * is <=2, we can directly invoke the migration function.
+	 */
+	if (page_count(page) <= 2)
+		goto migrate;
+
+	/*
+	 * Use trylock here, with a timeout, for struct_mutex as
+	 * otherwise there is a possibility of deadlock due to lock
+	 * inversion. This path, which tries to migrate a particular
+	 * page after locking that page, can race with a path which
+	 * truncate/purge pages of the corresponding object (after
+	 * acquiring struct_mutex). Since page truncation will also
+	 * try to lock the page, a scenario of deadlock can arise.
+	 */
+	while (!i915_gem_shrinker_lock(dev, &unlock) && --timeout)
+		schedule_timeout_killable(1);
+	if (timeout == 0) {
+		DRM_DEBUG_DRIVER("Unable to acquire device mutex.\n");
+		return -EBUSY;
+	}
+
+	ret = 0;
+	if (!PageSwapCache(page) && page_private(page)) {
+		struct drm_i915_gem_object *obj =
+			(struct drm_i915_gem_object *)page_private(page);
+
+		ret = do_migrate_page(obj);
+	}
+
+	if (unlock)
+		mutex_unlock(&dev->struct_mutex);
+
+	if (ret)
+		return ret;
+
+	/*
+	 * Ideally here we don't expect the page count to be > 2, as driver
+	 * would have dropped its reference, but occasionally it has been seen
+	 * coming as 3 & 4. This leads to a situation of unexpected page count,
+	 * causing migration failure, with -EGAIN error. This then leads to
+	 * multiple attempts by the kernel to migrate the same set of pages.
+	 * And sometimes the repeated attempts proves detrimental for stability.
+	 * Also since we don't know who is the other owner, and for how long its
+	 * gonna keep the reference, its better to return -EBUSY.
+	 */
+	if (page_count(page) > 2)
+		return -EBUSY;
+
+migrate:
+	ret = migrate_page(mapping, newpage, page, mode);
+	if (ret)
+		DRM_DEBUG_DRIVER("page=%p migration returned %d\n", page, ret);
+
+	return ret;
+}
+#endif
+
 /**
  * i915_gem_shrinker_init - Initialize i915 shrinker
  * @dev_priv: i915 device
@@ -371,6 +516,11 @@ void i915_gem_shrinker_init(struct drm_i915_private *dev_priv)
 
 	dev_priv->mm.oom_notifier.notifier_call = i915_gem_shrinker_oom;
 	WARN_ON(register_oom_notifier(&dev_priv->mm.oom_notifier));
+
+	dev_priv->mm.shmem_info.dev_private_data = dev_priv;
+#ifdef CONFIG_MIGRATION
+	dev_priv->mm.shmem_info.dev_migratepage = i915_gem_shrinker_migratepage;
+#endif
 }
 
 /**

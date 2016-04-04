@@ -52,6 +52,7 @@
 #include <linux/intel-iommu.h>
 #include <linux/kref.h>
 #include <linux/pm_qos.h>
+#include <linux/shmem_fs.h>
 #include "intel_guc.h"
 #include "intel_dpll_mgr.h"
 
@@ -1234,6 +1235,8 @@ struct intel_l3_parity {
 };
 
 struct i915_gem_mm {
+	struct shmem_dev_info shmem_info;
+
 	/** Memory allocator for GTT stolen memory */
 	struct drm_mm stolen;
 	/** Protects the usage of the GTT stolen memory allocator. This is
