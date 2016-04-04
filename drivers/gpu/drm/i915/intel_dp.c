@@ -5987,6 +5987,37 @@ fail:
 	return false;
 }
 
+int intel_dp_init_minimum(struct intel_digital_port *intel_dig_port,
+	struct intel_connector *intel_connector)
+{
+	int ret;
+	enum port port = intel_dig_port->port;
+	struct intel_dp *intel_dp = &intel_dig_port->dp;
+	struct drm_device *dev = intel_dig_port->base.base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	intel_dig_port->dp.output_reg = DDI_BUF_CTL(port);
+	if (WARN(intel_dig_port->max_lanes < 1,
+		 "Not enough lanes (%d) for DP on port %c\n",
+		 intel_dig_port->max_lanes, port_name(port)))
+		return -EINVAL;
+
+	intel_dp->pps_pipe = INVALID_PIPE;
+	intel_dp->get_aux_clock_divider = skl_get_aux_clock_divider;
+	intel_dp->get_aux_send_ctl = skl_get_aux_send_ctl;
+	intel_dp->prepare_link_retrain = intel_ddi_prepare_link_retrain;
+	intel_dp->DP = I915_READ(intel_dp->output_reg);
+	intel_dp->attached_connector = intel_connector;
+	INIT_DELAYED_WORK(&intel_dp->panel_vdd_work,
+			  edp_panel_vdd_work);
+
+	ret = intel_dp_aux_init(intel_dp, intel_connector);
+	if (ret)
+		DRM_ERROR("Aux init for LSPCON failed\n");
+
+	return ret;
+}
+
 void
 intel_dp_init(struct drm_device *dev,
 	      i915_reg_t output_reg, enum port port)

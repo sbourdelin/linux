@@ -1341,6 +1341,8 @@ void intel_dp_compute_rate(struct intel_dp *intel_dp, int port_clock,
 bool intel_dp_source_supports_hbr2(struct intel_dp *intel_dp);
 bool
 intel_dp_get_link_status(struct intel_dp *intel_dp, uint8_t link_status[DP_LINK_STATUS_SIZE]);
+int intel_dp_init_minimum(struct intel_digital_port *intel_dig_port,
+		struct intel_connector *intel_connector);
 
 /* intel_dp_mst.c */
 int intel_dp_mst_encoder_init(struct intel_digital_port *intel_dig_port, int conn_id);
@@ -1406,6 +1408,8 @@ void intel_fbc_cleanup_cfb(struct drm_i915_private *dev_priv);
 void intel_hdmi_init(struct drm_device *dev, i915_reg_t hdmi_reg, enum port port);
 void intel_hdmi_init_connector(struct intel_digital_port *intel_dig_port,
 			       struct intel_connector *intel_connector);
+int intel_hdmi_init_minimum(struct intel_digital_port *intel_dig_port,
+				struct intel_connector *intel_connector);
 struct intel_hdmi *enc_to_intel_hdmi(struct drm_encoder *encoder);
 bool intel_hdmi_compute_config(struct intel_encoder *encoder,
 			       struct intel_crtc_state *pipe_config);

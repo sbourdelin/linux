@@ -54,3 +54,82 @@ struct intel_lspcon *enc_to_lspcon(struct drm_encoder *encoder)
 		container_of(encoder, struct intel_digital_port, base.base);
 	return &intel_dig_port->lspcon;
 }
+
+int intel_lspcon_init_connector(struct intel_digital_port *intel_dig_port)
+{
+	int ret;
+	struct intel_encoder *intel_encoder = &intel_dig_port->base;
+	struct drm_device *dev = intel_encoder->base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_connector *intel_connector;
+	struct drm_connector *connector;
+	enum port port = intel_dig_port->port;
+
+	intel_connector = intel_connector_alloc();
+	if (!intel_connector)
+		return -ENOMEM;
+
+	connector = &intel_connector->base;
+	connector->interlace_allowed = true;
+	connector->doublescan_allowed = 0;
+
+	/* init DP */
+	ret = intel_dp_init_minimum(intel_dig_port, intel_connector);
+	if (ret) {
+		DRM_ERROR("DP init for LSPCON failed\n");
+		return ret;
+	}
+
+	/* init HDMI */
+	ret = intel_hdmi_init_minimum(intel_dig_port, intel_connector);
+	if (ret) {
+		DRM_ERROR("HDMI init for LSPCON failed\n");
+		return ret;
+	}
+
+	/* Set up the hotplug pin. */
+	switch (port) {
+	case PORT_A:
+		intel_encoder->hpd_pin = HPD_PORT_A;
+		break;
+	case PORT_B:
+		intel_encoder->hpd_pin = HPD_PORT_B;
+		if (IS_BXT_REVID(dev, 0, BXT_REVID_A1))
+			intel_encoder->hpd_pin = HPD_PORT_A;
+		break;
+	case PORT_C:
+		intel_encoder->hpd_pin = HPD_PORT_C;
+		break;
+	case PORT_D:
+		intel_encoder->hpd_pin = HPD_PORT_D;
+		break;
+	case PORT_E:
+		intel_encoder->hpd_pin = HPD_PORT_E;
+		break;
+	default:
+		DRM_ERROR("Invalid port to configure LSPCON\n");
+		return -EINVAL;
+	}
+
+	/*
+	* On BXT A0/A1, sw needs to activate DDIA HPD logic and
+	* interrupts to check the external panel connection.
+	*/
+	if (IS_BXT_REVID(dev, 0, BXT_REVID_A1) && port == PORT_B)
+		dev_priv->hotplug.irq_port[PORT_A] = intel_dig_port;
+	else
+		dev_priv->hotplug.irq_port[port] = intel_dig_port;
+
+	/* For G4X desktop chip, PEG_BAND_GAP_DATA 3:0 must first be written
+	* 0xd.  Failure to do so will result in spurious interrupts being
+	* generated on the port when a cable is not attached.
+	*/
+	if (IS_G4X(dev) && !IS_GM45(dev)) {
+		u32 temp = I915_READ(PEG_BAND_GAP_DATA);
+
+		I915_WRITE(PEG_BAND_GAP_DATA, (temp & ~0xf) | 0xd);
+	}
+
+	DRM_DEBUG_DRIVER("Success: LSPCON connector init\n");
+	return 0;
+}
