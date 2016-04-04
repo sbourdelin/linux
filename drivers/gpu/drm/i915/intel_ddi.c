@@ -2194,6 +2194,21 @@ void intel_ddi_init(struct drm_device *dev, enum port port)
 	intel_encoder->crtc_mask = (1 << 0) | (1 << 1) | (1 << 2);
 	intel_encoder->cloneable = 0;
 
+
+	/* Check if LSPCON is configured on this port */
+	if (is_lspcon_present_on_port(dev_priv, intel_dig_port->port)) {
+		if (!intel_lspcon_init_connector(intel_dig_port)) {
+			DRM_DEBUG_KMS("LSPCON configured for port %c\n",
+				port_name(intel_dig_port->port));
+			return;
+		} else {
+			DRM_ERROR("Can't set LSPCON(port %c), falling to DP/HDMI\n",
+				port_name(intel_dig_port->port));
+			init_dp = true;
+			init_hdmi = true;
+		}
+	}
+
 	if (init_dp) {
 		if (!intel_ddi_init_dp_connector(intel_dig_port))
 			goto err;

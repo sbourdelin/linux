@@ -1354,6 +1354,10 @@ void intel_dsi_init(struct drm_device *dev);
 /* intel_dvo.c */
 void intel_dvo_init(struct drm_device *dev);
 
+/* intel_lspcon.c */
+int intel_lspcon_init_connector(struct intel_digital_port *intel_dig_port);
+bool is_lspcon_present_on_port(struct drm_i915_private * dev_priv,
+		enum port port);
 
 /* legacy fbdev emulation in intel_fbdev.c */
 #ifdef CONFIG_DRM_FBDEV_EMULATION

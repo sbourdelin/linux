@@ -397,6 +397,16 @@ static const struct drm_connector_helper_funcs lspcon_connector_helper_funcs = {
 	.best_encoder = intel_best_encoder,
 };
 
+bool is_lspcon_present_on_port(struct drm_i915_private *dev_priv, enum port port)
+{
+	/*
+	* TODO: HACK
+	* Replace this with proper VBT child dev config check
+	* logic once that patch is available in tree
+	*/
+	return IS_GEN9(dev_priv->dev) && (port == PORT_B);
+}
+
 int intel_lspcon_init_connector(struct intel_digital_port *intel_dig_port)
 {
 	int ret;
