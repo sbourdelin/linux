@@ -865,12 +865,28 @@ struct intel_dp {
 	bool compliance_test_active;
 };
 
+/* LSPCON possibe modes of operation */
+enum lspcon_mode {
+	/* Invalid */
+	lspcon_mode_invalid,
+	/* level shifter mode */
+	lspcon_mode_ls,
+	/* protocol converter mode */
+	lspcon_mode_pcon,
+};
+
+struct intel_lspcon {
+	bool active;
+	enum lspcon_mode mode_of_op;
+};
+
 struct intel_digital_port {
 	struct intel_encoder base;
 	enum port port;
 	u32 saved_port_bits;
 	struct intel_dp dp;
 	struct intel_hdmi hdmi;
+	struct intel_lspcon lspcon;
 	enum irqreturn (*hpd_pulse)(struct intel_digital_port *, bool);
 	bool release_cl2_override;
 	uint8_t max_lanes;
