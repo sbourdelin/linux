@@ -1,0 +1,15 @@
+What:		/sys/class/rpmb/
+Date:		Mar 2016
+KernelVersion:	TBD
+Contact:	Tomas Winkler <tomas.winkler@intel.com>
+Description:
+		The rpmb/ class sub-directory belongs to RPMB device class
+
+
+What:		/sys/class/rpmb/rpmbN/
+Date:		Mar 2016
+KernelVersion:	TBD
+Contact:	Tomas Winkler <tomas.winkler@intel.com>
+Description:
+		The /sys/class/rpmb/rpmbN directory is created for
+		each RPMB registered device
