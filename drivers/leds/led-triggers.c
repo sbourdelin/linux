@@ -148,6 +148,43 @@ void led_trigger_remove(struct led_classdev *led_cdev)
 }
 EXPORT_SYMBOL_GPL(led_trigger_remove);
 
+/*
+ * This is a called in a special context by the atomic panic
+ * notifier. This means the trigger can be changed without
+ * worrying about locking.
+ */
+static void led_trigger_set_panic(struct led_classdev *led_cdev)
+{
+	struct led_trigger *trig;
+
+	list_for_each_entry(trig, &trigger_list, next_trig) {
+		if (strcmp("panic", trig->name))
+			continue;
+		if (led_cdev->trigger)
+			list_del(&led_cdev->trig_list);
+		list_add_tail(&led_cdev->trig_list, &trig->led_cdevs);
+		led_cdev->trigger = trig;
+		if (trig->activate)
+			trig->activate(led_cdev);
+		break;
+	}
+}
+
+static int led_trigger_panic_notifier(struct notifier_block *nb,
+				      unsigned long code, void *unused)
+{
+	struct led_classdev *led_cdev;
+
+	list_for_each_entry(led_cdev, &leds_list, node)
+		if (led_cdev->flags & LED_BLINK_AT_PANIC)
+			led_trigger_set_panic(led_cdev);
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block led_trigger_panic_nb = {
+	.notifier_call = led_trigger_panic_notifier,
+};
+
 void led_trigger_set_default(struct led_classdev *led_cdev)
 {
 	struct led_trigger *trig;
@@ -355,6 +392,21 @@ void led_trigger_unregister_simple(struct led_trigger *trig)
 	kfree(trig);
 }
 EXPORT_SYMBOL_GPL(led_trigger_unregister_simple);
+
+static int __init leds_trigger_init(void)
+{
+	atomic_notifier_chain_register(&panic_notifier_list,
+				       &led_trigger_panic_nb);
+	return 0;
+}
+
+static void __exit leds_trigger_exit(void)
+{
+	atomic_notifier_chain_unregister(&panic_notifier_list,
+					 &led_trigger_panic_nb);
+}
+module_init(leds_trigger_init);
+module_exit(leds_trigger_exit);
 
 MODULE_AUTHOR("Richard Purdie");
 MODULE_LICENSE("GPL");
