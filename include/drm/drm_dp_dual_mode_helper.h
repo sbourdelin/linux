@@ -24,6 +24,7 @@
 #define DRM_DP_DUAL_MODE_HELPER_H
 
 #include <linux/types.h>
+#include <drm/drm_edid.h>
 
 /*
  * Optional for type 1 DVI adaptors
@@ -55,6 +56,7 @@
 #define  DP_DUAL_MODE_CEC_ENABLE 0x01
 #define DP_DUAL_MODE_I2C_SPEED_CTRL 0x22
 #define DP_DUAL_MODE_LAST_RESERVED 0xff
+#define DP_DUAL_MODE_DDC_SEGMENT_ADDR 0x30
 
 struct i2c_adapter;
 
@@ -69,6 +71,7 @@ enum drm_dp_dual_mode_type {
 	DRM_DP_DUAL_MODE_TYPE1_HDMI,
 	DRM_DP_DUAL_MODE_TYPE2_DVI,
 	DRM_DP_DUAL_MODE_TYPE2_HDMI,
+	DRM_DP_DUAL_MODE_TYPE2_LSPCON,
 };
 
 enum drm_dp_dual_mode_type drm_dp_dual_mode_detect(struct i2c_adapter *adapter);
@@ -80,5 +83,12 @@ int
 drm_dp_dual_mode_set_tmds_output(struct i2c_adapter *adapter, bool enable);
 const char
 *drm_dp_get_dual_mode_type_name(enum drm_dp_dual_mode_type type);
+
+int drm_dp_dual_mode_ioa_read(struct i2c_adapter *adapter, u8 *buffer,
+		u8 offset, u8 no_of_bytes);
+int drm_dp_dual_mode_ioa_write(struct i2c_adapter *adapter, u8 *buffer,
+		u8 offset, u8 no_of_bytes);
+int drm_dp_dual_mode_get_edid(void *data,
+	u8 *buf, unsigned int block, size_t len);
 
 #endif

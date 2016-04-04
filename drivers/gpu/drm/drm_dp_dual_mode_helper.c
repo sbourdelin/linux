@@ -132,6 +132,99 @@ ssize_t drm_dp_dual_mode_write(struct i2c_adapter *adapter,
 }
 EXPORT_SYMBOL(drm_dp_dual_mode_write);
 
+int drm_dp_dual_mode_get_edid(void *data,
+	u8 *buf, unsigned int block, size_t len)
+{
+	struct i2c_adapter *adapter = data;
+	unsigned char start = block * EDID_LENGTH;
+	unsigned char segment = block >> 1;
+	unsigned char xfers = segment ? 3 : 2;
+	int ret, retries = 5;
+
+	do {
+		struct i2c_msg msgs[] = {
+			{
+				.addr   = DP_DUAL_MODE_DDC_SEGMENT_ADDR,
+				.flags  = 0,
+				.len    = 1,
+				.buf    = &segment,
+			}, {
+				.addr   = DDC_ADDR,
+				.flags  = 0,
+				.len    = 1,
+				.buf    = &start,
+			}, {
+				.addr   = DDC_ADDR,
+				.flags  = I2C_M_RD,
+				.len    = len,
+				.buf    = buf,
+			}
+		};
+
+		ret = adapter->algo->master_xfer(adapter, &msgs[3 - xfers],
+						xfers);
+
+		if (ret == -ENXIO) {
+			DRM_ERROR("Non-existent adapter %s\n",
+				adapter->name);
+			break;
+		}
+	} while (ret != xfers && --retries);
+
+	return ret == xfers ? 0 : -1;
+}
+EXPORT_SYMBOL(drm_dp_dual_mode_get_edid);
+
+/*
+* drm_dp_dual_mode_ioa_xfer
+* Few dp->hdmi type 2 adaptors allow i2c_over_aux read/write
+* to the control and status registers. These functions help
+* to read/write from those.
+*/
+static int drm_dp_dual_mode_ioa_xfer(struct i2c_adapter *adapter,
+		u8 *buffer, u8 offset, u8 no_of_bytes, u8 rw_flag)
+{
+	int err = 0;
+
+	struct i2c_msg msgs[] = {
+			{
+				.addr	= DP_DUAL_MODE_SLAVE_ADDRESS,
+				.flags	= 0,
+				.len	= 1,
+				.buf	= &offset,
+			}, {
+				.addr	= DP_DUAL_MODE_SLAVE_ADDRESS,
+				.flags	= rw_flag,
+				.len	= no_of_bytes,
+				.buf	= buffer,
+			}
+	};
+
+	/* I2C over AUX here */
+	err = adapter->algo->master_xfer(adapter, msgs, 2);
+	if (err < 0)
+		DRM_ERROR("LSPCON: Failed I2C over Aux read(addr=0x%x)\n",
+				(unsigned int)offset);
+
+	return err;
+}
+
+int drm_dp_dual_mode_ioa_read(struct i2c_adapter *adapter, u8 *buffer,
+		u8 offset, u8 no_of_bytes)
+{
+	return drm_dp_dual_mode_ioa_xfer(adapter, buffer, offset,
+		no_of_bytes, I2C_M_RD);
+}
+EXPORT_SYMBOL(drm_dp_dual_mode_ioa_read);
+
+int drm_dp_dual_mode_ioa_write(struct i2c_adapter *adapter, u8 *buffer,
+		u8 offset, u8 no_of_bytes)
+{
+	return drm_dp_dual_mode_ioa_xfer(adapter, buffer, offset,
+		no_of_bytes, 0);
+}
+EXPORT_SYMBOL(drm_dp_dual_mode_ioa_write);
+
 static bool is_hdmi_adaptor(const char hdmi_id[DP_DUAL_MODE_HDMI_ID_LEN])
 {
 	static const char dp_dual_mode_hdmi_id[DP_DUAL_MODE_HDMI_ID_LEN] =
@@ -139,6 +232,11 @@ static bool is_hdmi_adaptor(const char hdmi_id[DP_DUAL_MODE_HDMI_ID_LEN])
 
 	return memcmp(hdmi_id, dp_dual_mode_hdmi_id,
 		      sizeof(dp_dual_mode_hdmi_id)) == 0;
+}
+
+bool is_lspcon_adaptor(const uint8_t adaptor_id)
+{
+	return adaptor_id == 0xa8;
 }
 
 /**
@@ -197,6 +295,8 @@ enum drm_dp_dual_mode_type drm_dp_dual_mode_detect(struct i2c_adapter *adapter)
 				    &adaptor_id, sizeof(adaptor_id));
 	if (ret || (adaptor_id != (DP_DUAL_MODE_TYPE_TYPE2 |
 				   DP_DUAL_MODE_REV_TYPE2))) {
+		if (is_lspcon_adaptor(adaptor_id))
+			return DRM_DP_DUAL_MODE_TYPE2_LSPCON;
 		if (is_hdmi_adaptor(hdmi_id))
 			return DRM_DP_DUAL_MODE_TYPE1_HDMI;
 		else
