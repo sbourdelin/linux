@@ -1037,6 +1037,8 @@ void flush_all_to_thread(struct task_struct *tsk)
 		BUG_ON(tsk != current);
 		save_all(tsk);
 
+		save_sprs(&tsk->thread);
+
 #ifdef CONFIG_SPE
 		if (tsk->thread.regs->msr & MSR_SPE)
 			tsk->thread.spefscr = mfspr(SPRN_SPEFSCR);
