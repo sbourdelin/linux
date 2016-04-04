@@ -1266,7 +1266,9 @@ static struct srpt_send_ioctx *srpt_get_send_ioctx(struct srpt_rdma_ch *ch)
 {
 	struct se_session *se_sess;
 	struct srpt_send_ioctx *ioctx;
-	int tag;
+	void *buf;
+	dma_addr_t dma;
+	int tag, index;
 
 	BUG_ON(!ch);
 	se_sess = ch->sess;
@@ -1277,12 +1279,19 @@ static struct srpt_send_ioctx *srpt_get_send_ioctx(struct srpt_rdma_ch *ch)
 		return NULL;
 	}
 	ioctx = &((struct srpt_send_ioctx *)se_sess->sess_cmd_map)[tag];
+	buf = ioctx->ioctx.buf;
+	dma = ioctx->ioctx.dma;
+	index = ioctx->ioctx.index;
+
 	memset(ioctx, 0, sizeof(struct srpt_send_ioctx));
 	ioctx->ch = ch;
 	spin_lock_init(&ioctx->spinlock);
 	ioctx->state = SRPT_STATE_NEW;
 	init_completion(&ioctx->tx_done);
 
+	ioctx->ioctx.buf = buf;
+	ioctx->ioctx.dma = dma;
+	ioctx->ioctx.index = index;
 	ioctx->cmd.map_tag = tag;
 
 	return ioctx;
@@ -1961,6 +1970,24 @@ static void srpt_free_ch(struct kref *kref)
 	kfree(ch);
 }
 
+static void srpt_free_sess_cmd_map_res(struct se_session *se_sess)
+{
+	struct srpt_rdma_ch *ch = se_sess->fabric_sess_ptr;
+	struct srpt_device *sdev = ch->sport->sdev;
+	struct srpt_send_ioctx *ioctx;
+	u32 i, dma_size = ch->rsp_size;
+
+	for (i = 0; i < ch->rq_size; i++) {
+		ioctx = &((struct srpt_send_ioctx *)se_sess->sess_cmd_map)[i];
+
+		if (!ib_dma_mapping_error(sdev->device, ioctx->ioctx.dma))
+			ib_dma_unmap_single(sdev->device, ioctx->ioctx.dma,
+					    dma_size, DMA_TO_DEVICE);
+		if (ioctx->ioctx.buf)
+			kfree(ioctx->ioctx.buf);
+	}
+}
+
 static void srpt_release_channel_work(struct work_struct *w)
 {
 	struct srpt_rdma_ch *ch;
@@ -1981,16 +2008,13 @@ static void srpt_release_channel_work(struct work_struct *w)
 	target_wait_for_sess_cmds(se_sess);
 
 	transport_deregister_session_configfs(se_sess);
+	srpt_free_sess_cmd_map_res(se_sess);
 	transport_deregister_session(se_sess);
 	ch->sess = NULL;
 
 	ib_destroy_cm_id(ch->cm_id);
 
 	srpt_destroy_ch_ib(ch);
-
-	srpt_free_ioctx_ring((struct srpt_ioctx **)ch->ioctx_ring,
-			     ch->sport->sdev, ch->rq_size,
-			     ch->rsp_size, DMA_TO_DEVICE);
 
 	mutex_lock(&sdev->mutex);
 	list_del_init(&ch->list);
@@ -2001,6 +2025,35 @@ static void srpt_release_channel_work(struct work_struct *w)
 	wake_up(&sdev->ch_releaseQ);
 
 	kref_put(&ch->kref, srpt_free_ch);
+}
+
+static int srpt_alloc_session_cb(struct se_portal_group *se_tpg,
+				 struct se_session *se_sess, void *p)
+{
+	struct srpt_rdma_ch *ch = p;
+	struct srpt_device *sdev = ch->sport->sdev;
+	struct srpt_send_ioctx *ioctx;
+	u32 i, dma_size = ch->rsp_size;
+
+	for (i = 0; i < ch->rq_size; i++) {
+		ioctx = &((struct srpt_send_ioctx *)se_sess->sess_cmd_map)[i];
+		ioctx->ioctx.index = i;
+
+		ioctx->ioctx.buf = kmalloc(dma_size, GFP_KERNEL);
+		if (!ioctx->ioctx.buf)
+			goto err_free_res;
+
+		ioctx->ioctx.dma = ib_dma_map_single(sdev->device, ioctx->ioctx.buf,
+						     dma_size, DMA_TO_DEVICE);
+		if (ib_dma_mapping_error(sdev->device, ioctx->ioctx.dma))
+			goto err_free_res;
+	}
+
+	return 0;
+
+err_free_res:
+	srpt_free_sess_cmd_map_res(se_sess);
+	return -ENOMEM;
 }
 
 /**
@@ -2136,20 +2189,13 @@ static int srpt_cm_req_recv(struct ib_cm_id *cm_id,
 	INIT_LIST_HEAD(&ch->cmd_wait_list);
 	ch->rsp_size = ch->sport->port_attrib.srp_max_rsp_size;
 
-	ch->ioctx_ring = (struct srpt_send_ioctx **)
-		srpt_alloc_ioctx_ring(ch->sport->sdev, ch->rq_size,
-				      sizeof(*ch->ioctx_ring[0]),
-				      ch->rsp_size, DMA_TO_DEVICE);
-	if (!ch->ioctx_ring)
-		goto free_ch;
-
 	ret = srpt_create_ch_ib(ch);
 	if (ret) {
 		rej->reason = cpu_to_be32(
 			      SRP_LOGIN_REJ_INSUFFICIENT_RESOURCES);
 		pr_err("rejected SRP_LOGIN_REQ because creating"
 		       " a new RDMA channel failed.\n");
-		goto free_ring;
+		goto free_ch;
 	}
 
 	ret = srpt_ch_qp_rtr(ch, ch->qp);
@@ -2175,7 +2221,8 @@ static int srpt_cm_req_recv(struct ib_cm_id *cm_id,
 try_again:
 	ch->sess = target_alloc_session(&sport->port_tpg_1, ch->rq_size,
 					sizeof(struct srpt_send_ioctx),
-					TARGET_PROT_NORMAL, p, ch, NULL);
+					TARGET_PROT_NORMAL, p, ch,
+					srpt_alloc_session_cb);
 	if (IS_ERR(ch->sess)) {
 		pr_info("Rejected login because no ACL has been"
 			" configured yet for initiator %s.\n", p);
@@ -2240,10 +2287,6 @@ release_channel:
 destroy_ib:
 	srpt_destroy_ch_ib(ch);
 
-free_ring:
-	srpt_free_ioctx_ring((struct srpt_ioctx **)ch->ioctx_ring,
-			     ch->sport->sdev, ch->rq_size,
-			     ch->rsp_size, DMA_TO_DEVICE);
 free_ch:
 	kfree(ch);
 
