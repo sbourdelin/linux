@@ -68,6 +68,13 @@ int iommu_get_reserved_iova(struct iommu_domain *domain,
  */
 void iommu_put_reserved_iova(struct iommu_domain *domain, dma_addr_t iova);
 
+/**
+ * iommu_unmap_reserved: unmap & destroy the reserved iova bindings
+ *
+ * @domain: iommu domain handle
+ */
+void iommu_unmap_reserved(struct iommu_domain *domain);
+
 #endif	/* CONFIG_IOMMU_DMA_RESERVED */
 #endif	/* __KERNEL__ */
 #endif	/* __DMA_RESERVED_IOMMU_H */
