@@ -136,3 +136,149 @@ void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
 	spin_unlock_irqrestore(&domain->reserved_lock, flags);
 }
 EXPORT_SYMBOL_GPL(iommu_free_reserved_iova_domain);
+
+static void delete_reserved_binding(struct iommu_domain *domain,
+				    struct iommu_reserved_binding *b)
+{
+	struct iova_domain *iovad =
+		(struct iova_domain *)domain->reserved_iova_cookie;
+	unsigned long order = iova_shift(iovad);
+
+	iommu_unmap(domain, b->iova, b->size);
+	free_iova(iovad, b->iova >> order);
+	kfree(b);
+}
+
+int iommu_get_reserved_iova(struct iommu_domain *domain,
+			      phys_addr_t addr, size_t size, int prot,
+			      dma_addr_t *iova)
+{
+	struct iova_domain *iovad =
+		(struct iova_domain *)domain->reserved_iova_cookie;
+	unsigned long order = iova_shift(iovad);
+	unsigned long  base_pfn, end_pfn, nb_iommu_pages;
+	size_t iommu_page_size = 1 << order, binding_size;
+	phys_addr_t aligned_base, offset;
+	struct iommu_reserved_binding *b, *newb;
+	unsigned long flags;
+	struct iova *p_iova;
+	bool unmap = false;
+	int ret;
+
+	base_pfn = addr >> order;
+	end_pfn = (addr + size - 1) >> order;
+	nb_iommu_pages = end_pfn - base_pfn + 1;
+	aligned_base = base_pfn << order;
+	offset = addr - aligned_base;
+	binding_size = nb_iommu_pages * iommu_page_size;
+
+	if (!iovad)
+		return -EINVAL;
+
+	spin_lock_irqsave(&domain->reserved_lock, flags);
+
+	b = find_reserved_binding(domain, aligned_base, binding_size);
+	if (b) {
+		*iova = b->iova + offset;
+		kref_get(&b->kref);
+		ret = 0;
+		goto unlock;
+	}
+
+	spin_unlock_irqrestore(&domain->reserved_lock, flags);
+
+	/*
+	 * no reserved IOVA was found for this PA, start allocating and
+	 * registering one while the spin-lock is not held. iommu_map/unmap
+	 * are not supposed to be atomic
+	 */
+
+	p_iova = alloc_iova(iovad, nb_iommu_pages, iovad->dma_32bit_pfn, true);
+	if (!p_iova)
+		return -ENOMEM;
+
+	*iova = iova_dma_addr(iovad, p_iova);
+
+	newb = kzalloc(sizeof(*b), GFP_KERNEL);
+	if (!newb) {
+		free_iova(iovad, p_iova->pfn_lo);
+		return -ENOMEM;
+	}
+
+	ret = iommu_map(domain, *iova, aligned_base, binding_size, prot);
+	if (ret) {
+		kfree(newb);
+		free_iova(iovad, p_iova->pfn_lo);
+		return ret;
+	}
+
+	spin_lock_irqsave(&domain->reserved_lock, flags);
+
+	/* re-check the PA was not mapped in our back when lock was not held */
+	b = find_reserved_binding(domain, aligned_base, binding_size);
+	if (b) {
+		*iova = b->iova + offset;
+		kref_get(&b->kref);
+		ret = 0;
+		unmap = true;
+		goto unlock;
+	}
+
+	kref_init(&newb->kref);
+	newb->domain = domain;
+	newb->addr = aligned_base;
+	newb->iova = *iova;
+	newb->size = binding_size;
+
+	link_reserved_binding(domain, newb);
+
+	*iova += offset;
+	goto unlock;
+
+unlock:
+	spin_unlock_irqrestore(&domain->reserved_lock, flags);
+	if (unmap)
+		delete_reserved_binding(domain, newb);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(iommu_get_reserved_iova);
+
+void iommu_put_reserved_iova(struct iommu_domain *domain, dma_addr_t iova)
+{
+	struct iova_domain *iovad =
+		(struct iova_domain *)domain->reserved_iova_cookie;
+	unsigned long order;
+	phys_addr_t aligned_addr;
+	dma_addr_t aligned_iova, page_size, mask, offset;
+	struct iommu_reserved_binding *b;
+	unsigned long flags;
+	bool unmap = false;
+
+	order = iova_shift(iovad);
+	page_size = (uint64_t)1 << order;
+	mask = page_size - 1;
+
+	aligned_iova = iova & ~mask;
+	offset = iova - aligned_iova;
+
+	aligned_addr = iommu_iova_to_phys(domain, aligned_iova);
+
+	spin_lock_irqsave(&domain->reserved_lock, flags);
+	b = find_reserved_binding(domain, aligned_addr, page_size);
+	if (!b)
+		goto unlock;
+
+	if (atomic_sub_and_test(1, &b->kref.refcount)) {
+		unlink_reserved_binding(domain, b);
+		unmap = true;
+	}
+
+unlock:
+	spin_unlock_irqrestore(&domain->reserved_lock, flags);
+	if (unmap)
+		delete_reserved_binding(domain, b);
+}
+EXPORT_SYMBOL_GPL(iommu_put_reserved_iova);
+
+
+
