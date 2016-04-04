@@ -1359,7 +1359,8 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 		jinfo = spi_nor_read_id(nor);
 		if (IS_ERR(jinfo)) {
 			return PTR_ERR(jinfo);
-		} else if (jinfo != info) {
+		} else if (jinfo->id_len != info->id_len ||
+			   memcmp(jinfo->id, info->id, info->id_len)) {
 			/*
 			 * JEDEC knows better, so overwrite platform ID. We
 			 * can't trust partitions any longer, but we'll let
