@@ -5009,6 +5009,10 @@ static void haswell_crtc_disable(struct drm_crtc *crtc)
 	if (intel_crtc->config->has_pch_encoder)
 		intel_set_pch_fifo_underrun_reporting(dev_priv, TRANSCODER_A,
 						      false);
+	else if (intel_crtc->config->dp_encoder_is_mst)
+		intel_set_cpu_fifo_underrun_reporting(dev_priv,
+						      intel_crtc->pipe, false);
+
 
 	for_each_encoder_on_crtc(dev, crtc, encoder) {
 		intel_opregion_notify_encoder(encoder, false);
@@ -5047,7 +5051,10 @@ static void haswell_crtc_disable(struct drm_crtc *crtc)
 
 		intel_set_pch_fifo_underrun_reporting(dev_priv, TRANSCODER_A,
 						      true);
-	}
+	} else if (intel_crtc->config->dp_encoder_is_mst)
+		intel_set_cpu_fifo_underrun_reporting(dev_priv,
+						      intel_crtc->pipe, true);
+
 }
 
 static void i9xx_pfit_enable(struct intel_crtc *crtc)
