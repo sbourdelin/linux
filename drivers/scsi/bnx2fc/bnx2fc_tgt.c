@@ -368,9 +368,13 @@ static int bnx2fc_init_tgt(struct bnx2fc_rport *tgt,
 		return -1;
 	}
 
+	mutex_lock(&hba->hba_mutex);
 	tgt->fcoe_conn_id = bnx2fc_alloc_conn_id(hba, tgt);
-	if (tgt->fcoe_conn_id == -1)
+	if (tgt->fcoe_conn_id == -1) {
+		mutex_unlock(&hba->hba_mutex);
 		return -1;
+	}
+	mutex_unlock(&hba->hba_mutex);
 
 	BNX2FC_TGT_DBG(tgt, "init_tgt - conn_id = 0x%x\n", tgt->fcoe_conn_id);
 
