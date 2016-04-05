@@ -408,7 +408,7 @@ int __inode_permission(struct inode *inode, int mask)
 		 * Nobody gets write access to an immutable file.
 		 */
 		if (IS_IMMUTABLE(inode))
-			return -EACCES;
+			return -EPERM;
 	}
 
 	retval = do_inode_permission(inode, mask);
