@@ -8892,7 +8892,11 @@ scsih_resume(struct pci_dev *pdev)
 	if (r)
 		return r;
 
-	mpt3sas_base_hard_reset_handler(ioc, CAN_SLEEP, SOFT_RESET);
+	r = mpt3sas_base_hard_reset_handler(ioc, CAN_SLEEP, SOFT_RESET);
+	if (r) {
+		mpt3sas_base_free_resources(ioc);
+		return r;
+	}
 	scsi_unblock_requests(shost);
 	mpt3sas_base_start_watchdog(ioc);
 	return 0;
