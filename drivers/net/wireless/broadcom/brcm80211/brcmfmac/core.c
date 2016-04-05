@@ -223,6 +223,7 @@ static netdev_tx_t brcmf_netdev_start_xmit(struct sk_buff *skb,
 	struct brcmf_if *ifp = netdev_priv(ndev);
 	struct brcmf_pub *drvr = ifp->drvr;
 	struct ethhdr *eh = (struct ethhdr *)(skb->data);
+	bool pend_8021x_cnt_increased = false;
 
 	brcmf_dbg(DATA, "Enter, bsscfgidx=%d\n", ifp->bsscfgidx);
 
@@ -260,14 +261,18 @@ static netdev_tx_t brcmf_netdev_start_xmit(struct sk_buff *skb,
 		goto done;
 	}
 
-	if (eh->h_proto == htons(ETH_P_PAE))
+	if (eh->h_proto == htons(ETH_P_PAE)) {
 		atomic_inc(&ifp->pend_8021x_cnt);
+		pend_8021x_cnt_increased = true;
+	}
 
 	ret = brcmf_fws_process_skb(ifp, skb);
 
 done:
 	if (ret) {
 		ifp->stats.tx_dropped++;
+		if (pend_8021x_cnt_increased)
+			atomic_dec(&ifp->pend_8021x_cnt);
 	} else {
 		ifp->stats.tx_packets++;
 		ifp->stats.tx_bytes += skb->len;
