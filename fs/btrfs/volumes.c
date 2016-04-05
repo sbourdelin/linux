@@ -1846,8 +1846,12 @@ int btrfs_rm_device(struct btrfs_root *root, char *device_path)
 				 struct btrfs_device, dev_list);
 	if (device->bdev == root->fs_info->sb->s_bdev)
 		root->fs_info->sb->s_bdev = next_device->bdev;
-	if (device->bdev == root->fs_info->fs_devices->latest_bdev)
+	if (device->bdev == root->fs_info->fs_devices->latest_bdev) {
 		root->fs_info->fs_devices->latest_bdev = next_device->bdev;
+		snprintf(root->fs_info->sb->s_id,
+			 sizeof(root->fs_info->sb->s_id), "%pg",
+			 next_device->bdev);
+	}
 
 	if (device->bdev) {
 		device->fs_devices->open_devices--;
@@ -2034,8 +2038,11 @@ void btrfs_destroy_dev_replace_tgtdev(struct btrfs_fs_info *fs_info,
 				 struct btrfs_device, dev_list);
 	if (tgtdev->bdev == fs_info->sb->s_bdev)
 		fs_info->sb->s_bdev = next_device->bdev;
-	if (tgtdev->bdev == fs_info->fs_devices->latest_bdev)
+	if (tgtdev->bdev == fs_info->fs_devices->latest_bdev) {
 		fs_info->fs_devices->latest_bdev = next_device->bdev;
+		snprintf(fs_info->sb->s_id, sizeof(fs_info->sb->s_id), "%pg",
+			 next_device->bdev);
+	}
 	list_del_rcu(&tgtdev->dev_list);
 
 	call_rcu(&tgtdev->rcu, free_device);

@@ -560,8 +560,11 @@ static int btrfs_dev_replace_finishing(struct btrfs_fs_info *fs_info,
 	tgt_device->commit_bytes_used = src_device->bytes_used;
 	if (fs_info->sb->s_bdev == src_device->bdev)
 		fs_info->sb->s_bdev = tgt_device->bdev;
-	if (fs_info->fs_devices->latest_bdev == src_device->bdev)
+	if (fs_info->fs_devices->latest_bdev == src_device->bdev) {
 		fs_info->fs_devices->latest_bdev = tgt_device->bdev;
+		snprintf(fs_info->sb->s_id, sizeof(fs_info->sb->s_id), "%pg",
+			 tgt_device->bdev);
+	}
 	list_add(&tgt_device->dev_alloc_list, &fs_info->fs_devices->alloc_list);
 	fs_info->fs_devices->rw_devices++;
 
