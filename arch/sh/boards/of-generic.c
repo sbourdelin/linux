@@ -186,8 +186,7 @@ static int __init sh_of_device_init(void)
 	pr_info("SH generic board support: populating platform devices\n");
 	if (of_have_populated_dt()) {
 		of_iommu_init();
-		of_platform_populate(NULL, of_default_bus_match_table,
-				     NULL, NULL);
+		of_platform_default_populate(NULL, NULL, NULL);
 	} else {
 		pr_crit("Device tree not populated\n");
 	}
