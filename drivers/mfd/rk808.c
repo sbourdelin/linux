@@ -213,7 +213,7 @@ static int rk808_probe(struct i2c_client *client,
 	rk808->i2c = client;
 	i2c_set_clientdata(client, rk808);
 
-	ret = mfd_add_devices(&client->dev, -1,
+	ret = devm_mfd_add_devices(&client->dev, -1,
 			      rk808s, ARRAY_SIZE(rk808s),
 			      NULL, 0, regmap_irq_get_domain(rk808->irq_data));
 	if (ret) {
@@ -240,7 +240,6 @@ static int rk808_remove(struct i2c_client *client)
 	struct rk808 *rk808 = i2c_get_clientdata(client);
 
 	regmap_del_irq_chip(client->irq, rk808->irq_data);
-	mfd_remove_devices(&client->dev);
 	pm_power_off = NULL;
 
 	return 0;
