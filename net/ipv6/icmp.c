@@ -607,7 +607,9 @@ static void icmpv6_echo_reply(struct sk_buff *skb)
 
 	hlimit = ip6_sk_dst_hoplimit(np, &fl6, dst);
 
+	rtnl_lock();
 	idev = __in6_dev_get(skb->dev);
+	rtnl_unlock();
 
 	msg.skb = skb;
 	msg.offset = 0;
