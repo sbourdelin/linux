@@ -482,9 +482,6 @@ static void das1800_handle_fifo_not_empty(struct comedi_device *dev,
 {
 	struct comedi_cmd *cmd = &s->async->cmd;
 	unsigned short dpnt;
-	int unipolar;
-
-	unipolar = inb(dev->iobase + DAS1800_CONTROL_C) & UB;
 
 	while (inb(dev->iobase + DAS1800_STATUS) & FNE) {
 		dpnt = inw(dev->iobase + DAS1800_FIFO);
