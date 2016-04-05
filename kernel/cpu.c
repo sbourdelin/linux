@@ -724,6 +724,8 @@ static int takedown_cpu(unsigned int cpu)
 		/* CPU didn't die: tell everyone.  Can't complain. */
 		cpu_notify_nofail(CPU_DOWN_FAILED, cpu);
 		irq_unlock_sparse();
+		kthread_unpark(per_cpu_ptr(&cpuhp_state, cpu)->thread);
+		/* smpboot threads are up via CPUHP_AP_SMPBOOT_THREADS */
 		return err;
 	}
 	BUG_ON(cpu_online(cpu));
@@ -787,6 +789,13 @@ void cpuhp_report_idle_dead(void)
 
 #ifdef CONFIG_HOTPLUG_CPU
 
+static void undo_cpu_down_work(struct work_struct *work)
+{
+	struct cpuhp_cpu_state *st = this_cpu_ptr(&cpuhp_state);
+
+	undo_cpu_down(smp_processor_id(), st, cpuhp_ap_states);
+}
+
 /* Requires cpu_add_remove_lock to be held */
 static int __ref _cpu_down(unsigned int cpu, int tasks_frozen,
 			   enum cpuhp_state target)
@@ -832,6 +841,15 @@ static int __ref _cpu_down(unsigned int cpu, int tasks_frozen,
 	 * to do the further cleanups.
 	 */
 	ret = cpuhp_down_callbacks(cpu, st, cpuhp_bp_states, target);
+	if (ret && st->state > CPUHP_TEARDOWN_CPU && st->state < prev_state) {
+		struct work_struct undo_work;
+
+		INIT_WORK_ONSTACK(&undo_work, undo_cpu_down_work);
+		st->target = prev_state;
+		schedule_work_on(cpu, &undo_work);
+		flush_work(&undo_work);
+		destroy_work_on_stack(&undo_work);
+	}
 
 	hasdied = prev_state != st->state && st->state == CPUHP_OFFLINE;
 out:
@@ -1249,6 +1267,7 @@ static struct cpuhp_step cpuhp_ap_states[] = {
 		.name			= "notify:online",
 		.startup		= notify_online,
 		.teardown		= notify_down_prepare,
+		.skip_onerr		= true,
 	},
 #endif
 	/*
