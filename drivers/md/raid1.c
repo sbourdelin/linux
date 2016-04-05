@@ -1044,6 +1044,18 @@ static void raid1_unplug(struct blk_plug_cb *cb, bool from_schedule)
 	kfree(plug);
 }
 
+static struct raid1_plug_cb *raid1_check_plugged(struct mddev *mddev)
+{
+	/* return (struct raid1_plug_cb*)blk_check_plugged(...); */
+	struct blk_plug_cb *cb;
+	struct raid1_plug_cb *plug = NULL;
+
+	cb = blk_check_plugged(raid1_unplug, mddev, sizeof(*plug));
+	if (cb)
+		plug = container_of(cb, struct raid1_plug_cb, cb);
+	return plug;
+}
+
 static void raid1_make_request(struct mddev *mddev, struct bio * bio)
 {
 	struct r1conf *conf = mddev->private;
@@ -1060,7 +1072,6 @@ static void raid1_make_request(struct mddev *mddev, struct bio * bio)
 					  & (REQ_DISCARD | REQ_SECURE));
 	const unsigned long do_same = (bio->bi_rw & REQ_WRITE_SAME);
 	struct md_rdev *blocked_rdev;
-	struct blk_plug_cb *cb;
 	struct raid1_plug_cb *plug = NULL;
 	int first_clone;
 	int sectors_handled;
@@ -1382,12 +1393,8 @@ read_again:
 
 		atomic_inc(&r1_bio->remaining);
 
-		cb = blk_check_plugged(raid1_unplug, mddev, sizeof(*plug));
-		if (cb)
-			plug = container_of(cb, struct raid1_plug_cb, cb);
-		else
-			plug = NULL;
 		spin_lock_irqsave(&conf->device_lock, flags);
+		plug = raid1_check_plugged(mddev);
 		if (plug) {
 			bio_list_add(&plug->pending, mbio);
 			plug->pending_cnt++;

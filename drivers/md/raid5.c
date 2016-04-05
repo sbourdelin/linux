@@ -5029,6 +5029,11 @@ static void release_stripe_plug(struct mddev *mddev,
 	}
 
 	cb = container_of(blk_cb, struct raid5_plug_cb, cb);
+/* FIXME
+ * Nothing protects current from being scheduled, which means cb, aka plug,
+ * may implicitly be "unplugged" any time now, before it even is initialized,
+ * and will then be a pointer to free()d space.
+ */
 
 	if (cb->list.next == NULL) {
 		int i;

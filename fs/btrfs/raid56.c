@@ -1774,6 +1774,11 @@ int raid56_parity_write(struct btrfs_root *root, struct bio *bio,
 	cb = blk_check_plugged(btrfs_raid_unplug, root->fs_info,
 			       sizeof(*plug));
 	if (cb) {
+/* FIXME
+ * Nothing protects current from being scheduled, which means cb, aka plug,
+ * may implicitly be "unplugged" any time now, before it even is initialized,
+ * and will then be a pointer to free()d space.
+ */
 		plug = container_of(cb, struct btrfs_plug_cb, cb);
 		if (!plug->info) {
 			plug->info = root->fs_info;
