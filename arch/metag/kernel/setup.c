@@ -415,8 +415,7 @@ static int __init customize_machine(void)
 	if (machine_desc->init_machine)
 		machine_desc->init_machine();
 	else
-		of_platform_populate(NULL, of_default_bus_match_table, NULL,
-				     NULL);
+		of_platform_default_populate(NULL, NULL, NULL);
 	return 0;
 }
 arch_initcall(customize_machine);
