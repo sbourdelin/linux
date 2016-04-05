@@ -48,6 +48,9 @@
 
 #define NAME_SIZE	32
 
+#define LONGNAME_SIZE	80	/* size of longname[] in struct snd_card */
+static char card_longname[LONGNAME_SIZE];
+
 #ifdef CONFIG_DEBUG_FS
 struct dentry *snd_soc_debugfs_root;
 EXPORT_SYMBOL_GPL(snd_soc_debugfs_root);
@@ -1827,6 +1830,70 @@ int snd_soc_runtime_set_dai_fmt(struct snd_soc_pcm_runtime *rtd,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(snd_soc_runtime_set_dai_fmt);
+
+/**
+ * snd_soc_set_card_names() - Register DMI names to card
+ * @card: The card to register DMI names
+ * @board: DMI_BOARD_NAME or DMI_PRODUCT_NAME
+ * @vendor: DMI_SYS_VENDOR, optional
+ * @firmware: The firmware name, optional
+ *
+ * This function registers DMI names to card for the userspace to distinguish
+ * different boards/products:
+ *   card driver name --->  machine driver name
+ *   card short name  --->  DMI_BOARD_NAME or DMI_PRODUCT_NAME
+ *   card long name and
+ *   card component   --->  short name;driver name;(DMI_SYS_VENDOR, optional)
+ *                          ;(firmware name, optional)
+ *
+ * Returns 0 on success, otherwise a negative error code.
+ */
+int snd_soc_set_card_names(struct snd_soc_card *card, const char *board,
+		const char *vendor, const char *firmware)
+{
+	int ret = 0;
+	size_t name_size;
+
+	if (!board) {
+		dev_err(card->dev, "ASoC: the board/product name is empty!\n");
+		return -EINVAL;
+	}
+
+	/* card driver name */
+	card->driver_name = card->name;
+
+	/* card short name */
+	card->name = board;
+
+	/* card long name */
+	name_size = strlen(card->name) + strlen(card->driver_name) + 4;
+	if (vendor)
+		name_size += strlen(vendor);
+	if (firmware)
+		name_size += strlen(firmware);
+	if (name_size > LONGNAME_SIZE)
+		return -ENOMEM;
+
+	snprintf(card_longname, LONGNAME_SIZE, "%s;%s;",
+			card->name, card->driver_name);
+	if (vendor)
+		strlcat(card_longname, vendor, LONGNAME_SIZE);
+	strlcat(card_longname, ";", LONGNAME_SIZE);
+	if (firmware)
+		strlcat(card_longname, firmware, LONGNAME_SIZE);
+
+	card->long_name = card_longname;
+
+	/* card component */
+	if (sizeof(card->snd_card->components) < name_size
+			+ strlen(card->snd_card->components))
+		return -ENOMEM;
+
+	ret = snd_component_add(card->snd_card, card->long_name);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(snd_soc_set_card_names);
 
 static int snd_soc_instantiate_card(struct snd_soc_card *card)
 {
