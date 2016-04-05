@@ -2233,7 +2233,10 @@ i915_gem_object_put_pages(struct drm_i915_gem_object *obj)
 	list_del(&obj->global_list);
 
 	if (obj->vmapping) {
-		vunmap(obj->vmapping);
+		if (obj->base.size == PAGE_SIZE)
+			kunmap(kmap_to_page(obj->vmapping));
+		else
+			vunmap(obj->vmapping);
 		obj->vmapping = NULL;
 	}
 
@@ -2416,15 +2419,22 @@ void *i915_gem_object_pin_vmap(struct drm_i915_gem_object *obj)
 	i915_gem_object_pin_pages(obj);
 
 	if (obj->vmapping == NULL) {
-		struct sg_page_iter sg_iter;
 		struct page **pages;
-		int n;
 
-		n = obj->base.size >> PAGE_SHIFT;
-		pages = drm_malloc_gfp(n, sizeof(*pages), GFP_TEMPORARY);
+		pages = NULL;
+		if (obj->base.size == PAGE_SIZE)
+			obj->vmapping = kmap(sg_page(obj->pages->sgl));
+		else
+			pages = drm_malloc_gfp(obj->base.size >> PAGE_SHIFT,
+					       sizeof(*pages),
+					       GFP_TEMPORARY);
 		if (pages != NULL) {
+			struct sg_page_iter sg_iter;
+			int n;
+
 			n = 0;
-			for_each_sg_page(obj->pages->sgl, &sg_iter, obj->pages->nents, 0)
+			for_each_sg_page(obj->pages->sgl, &sg_iter,
+					 obj->pages->nents, 0)
 				pages[n++] = sg_page_iter_page(&sg_iter);
 
 			obj->vmapping = vmap(pages, n, 0, PAGE_KERNEL);
