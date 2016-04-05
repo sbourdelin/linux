@@ -677,10 +677,9 @@ int psb_mmu_insert_pfn_sequence(struct psb_mmu_pd *pd, uint32_t start_pfn,
 	do {
 		next = psb_pd_addr_end(addr, end);
 		pt = psb_mmu_pt_alloc_map_lock(pd, addr);
-		if (!pt) {
-			ret = -ENOMEM;
+		if (!pt)
 			goto out;
-		}
+
 		do {
 			pte = psb_mmu_mask_pte(start_pfn++, type);
 			psb_mmu_set_pte(pt, addr, pte);
