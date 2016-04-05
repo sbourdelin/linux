@@ -906,7 +906,7 @@ void ima_policy_stop(struct seq_file *m, void *v)
 int ima_policy_show(struct seq_file *m, void *v)
 {
 	struct ima_rule_entry *entry = v;
-	int i = 0;
+	int i;
 	char tbuf[64] = {0,};
 
 	rcu_read_lock();
@@ -971,17 +971,7 @@ int ima_policy_show(struct seq_file *m, void *v)
 	}
 
 	if (entry->flags & IMA_FSUUID) {
-		seq_puts(m, "fsuuid=");
-		for (i = 0; i < ARRAY_SIZE(entry->fsuuid); ++i) {
-			switch (i) {
-			case 4:
-			case 6:
-			case 8:
-			case 10:
-				seq_puts(m, "-");
-			}
-			seq_printf(m, "%x", entry->fsuuid[i]);
-		}
+		seq_printf(m, "fsuuid=%pU", entry->fsuuid);
 		seq_puts(m, " ");
 	}
 
