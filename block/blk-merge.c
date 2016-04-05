@@ -79,6 +79,18 @@ static inline unsigned get_max_io_size(struct request_queue *q,
 	/* aligned to logical block size */
 	sectors &= ~(mask >> 9);
 
+	/*
+	 * With arbitrary bio size, the incoming bio may be very big.
+	 * We have to split the bio into small bios so that each holds
+	 * at most BIO_MAX_PAGES bvecs for safety reason, such as
+	 * bio_clone().
+	 *
+	 * In the future, the limit might be converted into per-queue
+	 * flag.
+	 */
+	sectors = min_t(unsigned, sectors, BIO_MAX_PAGES <<
+			(PAGE_CACHE_SHIFT - 9));
+
 	return sectors;
 }
 
