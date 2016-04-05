@@ -64,7 +64,10 @@ static int xfrm6_get_saddr(struct net *net, int oif,
 		return -EHOSTUNREACH;
 
 	dev = ip6_dst_idev(dst)->dev;
-	ipv6_dev_get_saddr(dev_net(dev), dev, &daddr->in6, 0, &saddr->in6);
+	if (ipv6_dev_get_saddr(dev_net(dev), dev, &daddr->in6, 0, &saddr->in6)) {
+		dst_release(dst);
+		return -EADDRNOTAVAIL;
+	}
 	dst_release(dst);
 	return 0;
 }
