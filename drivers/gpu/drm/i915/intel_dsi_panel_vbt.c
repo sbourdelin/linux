@@ -77,22 +77,23 @@ static inline struct vbt_panel *to_vbt_panel(struct drm_panel *panel)
 
 struct gpio_map {
 	u16 base_offset;
+	u8 port;
 	bool init;
 };
 
 static struct gpio_map vlv_gpio_table[] = {
-	{ VLV_GPIO_NC_0_HV_DDI0_HPD },
-	{ VLV_GPIO_NC_1_HV_DDI0_DDC_SDA },
-	{ VLV_GPIO_NC_2_HV_DDI0_DDC_SCL },
-	{ VLV_GPIO_NC_3_PANEL0_VDDEN },
-	{ VLV_GPIO_NC_4_PANEL0_BKLTEN },
-	{ VLV_GPIO_NC_5_PANEL0_BKLTCTL },
-	{ VLV_GPIO_NC_6_HV_DDI1_HPD },
-	{ VLV_GPIO_NC_7_HV_DDI1_DDC_SDA },
-	{ VLV_GPIO_NC_8_HV_DDI1_DDC_SCL },
-	{ VLV_GPIO_NC_9_PANEL1_VDDEN },
-	{ VLV_GPIO_NC_10_PANEL1_BKLTEN },
-	{ VLV_GPIO_NC_11_PANEL1_BKLTCTL },
+	{ .port = IOSF_PORT_GPIO_NC, .base_offset = VLV_GPIO_NC_0_HV_DDI0_HPD },
+	{ .port = IOSF_PORT_GPIO_NC, .base_offset = VLV_GPIO_NC_1_HV_DDI0_DDC_SDA },
+	{ .port = IOSF_PORT_GPIO_NC, .base_offset = VLV_GPIO_NC_2_HV_DDI0_DDC_SCL },
+	{ .port = IOSF_PORT_GPIO_NC, .base_offset = VLV_GPIO_NC_3_PANEL0_VDDEN },
+	{ .port = IOSF_PORT_GPIO_NC, .base_offset = VLV_GPIO_NC_4_PANEL0_BKLTEN },
+	{ .port = IOSF_PORT_GPIO_NC, .base_offset = VLV_GPIO_NC_5_PANEL0_BKLTCTL },
+	{ .port = IOSF_PORT_GPIO_NC, .base_offset = VLV_GPIO_NC_6_HV_DDI1_HPD },
+	{ .port = IOSF_PORT_GPIO_NC, .base_offset = VLV_GPIO_NC_7_HV_DDI1_DDC_SDA },
+	{ .port = IOSF_PORT_GPIO_NC, .base_offset = VLV_GPIO_NC_8_HV_DDI1_DDC_SCL },
+	{ .port = IOSF_PORT_GPIO_NC, .base_offset = VLV_GPIO_NC_9_PANEL1_VDDEN },
+	{ .port = IOSF_PORT_GPIO_NC, .base_offset = VLV_GPIO_NC_10_PANEL1_BKLTEN },
+	{ .port = IOSF_PORT_GPIO_NC, .base_offset = VLV_GPIO_NC_11_PANEL1_BKLTCTL },
 };
 
 static inline enum port intel_dsi_seq_port_to_port(u8 port)
@@ -203,8 +204,7 @@ static void vlv_exec_gpio(struct drm_i915_private *dev_priv,
 	map = &vlv_gpio_table[gpio_index];
 
 	if (dev_priv->vbt.dsi.seq_version >= 3) {
-		DRM_DEBUG_KMS("GPIO element v3 not supported\n");
-		return;
+		port = map->port;
 	} else {
 		if (gpio_source == 0) {
 			port = IOSF_PORT_GPIO_NC;
@@ -214,6 +214,9 @@ static void vlv_exec_gpio(struct drm_i915_private *dev_priv,
 			DRM_DEBUG_KMS("unknown gpio source %u\n", gpio_source);
 			return;
 		}
+
+		if (port != map->port)
+			DRM_DEBUG_KMS("suspect gpio source %u\n", gpio_source);
 	}
 
 	pconf0 = VLV_GPIO_PCONF0(map->base_offset);
