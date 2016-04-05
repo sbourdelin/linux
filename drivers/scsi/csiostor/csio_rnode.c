@@ -580,9 +580,9 @@ __csio_unreg_rnode(struct csio_rnode *rn)
 		ln->last_scan_ntgts--;
 	}
 
-	spin_unlock_irq(&hw->lock);
-	csio_unreg_rnode(rn);
 	spin_lock_irq(&hw->lock);
+	csio_unreg_rnode(rn);
+	spin_unlock_irq(&hw->lock);
 
 	/* Cleanup I/Os that were waiting for rnode to unregister */
 	if (cmpl)
