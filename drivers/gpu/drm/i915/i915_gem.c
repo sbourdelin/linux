@@ -2232,6 +2232,11 @@ i915_gem_object_put_pages(struct drm_i915_gem_object *obj)
 	 * lists early. */
 	list_del(&obj->global_list);
 
+	if (obj->vmapping) {
+		vunmap(obj->vmapping);
+		obj->vmapping = NULL;
+	}
+
 	ops->put_pages(obj);
 	obj->pages = NULL;
 
@@ -2398,6 +2403,46 @@ i915_gem_object_get_pages(struct drm_i915_gem_object *obj)
 	obj->get_page.last = 0;
 
 	return 0;
+}
+
+void *i915_gem_object_pin_vmap(struct drm_i915_gem_object *obj)
+{
+	int ret;
+
+	ret = i915_gem_object_get_pages(obj);
+	if (ret)
+		return ERR_PTR(ret);
+
+	i915_gem_object_pin_pages(obj);
+
+	if (obj->vmapping == NULL) {
+		struct sg_page_iter sg_iter;
+		struct page **pages;
+		int n;
+
+		n = obj->base.size >> PAGE_SHIFT;
+		pages = kmalloc(n*sizeof(*pages), GFP_TEMPORARY | __GFP_NOWARN);
+		if (pages == NULL)
+			pages = drm_malloc_ab(n, sizeof(*pages));
+		if (pages != NULL) {
+			n = 0;
+			for_each_sg_page(obj->pages->sgl, &sg_iter, obj->pages->nents, 0)
+				pages[n++] = sg_page_iter_page(&sg_iter);
+
+			obj->vmapping = vmap(pages, n, 0, PAGE_KERNEL);
+			if (obj->vmapping == NULL) {
+				i915_gem_shrink_all(to_i915(obj->base.dev));
+				obj->vmapping = vmap(pages, n, 0, PAGE_KERNEL);
+			}
+			drm_free_large(pages);
+		}
+		if (obj->vmapping == NULL) {
+			i915_gem_object_unpin_pages(obj);
+			return ERR_PTR(-ENOMEM);
+		}
+	}
+
+	return obj->vmapping;
 }
 
 void i915_vma_move_to_active(struct i915_vma *vma,
