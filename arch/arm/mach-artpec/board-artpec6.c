@@ -45,7 +45,7 @@ static void __init artpec6_init_machine(void)
 			     ARTPEC6_DMACFG_UARTS_BURST);
 	};
 
-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+	of_platform_default_populate(NULL, NULL, NULL);
 }
 
 static void artpec6_l2c310_write_sec(unsigned long val, unsigned reg)

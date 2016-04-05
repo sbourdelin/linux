@@ -27,10 +27,9 @@ static void __init bcm2835_init(void)
 
 	bcm2835_init_clocks();
 
-	ret = of_platform_populate(NULL, of_default_bus_match_table, NULL,
-				   NULL);
+	ret = of_platform_default_populate(NULL, NULL, NULL);
 	if (ret) {
-		pr_err("of_platform_populate failed: %d\n", ret);
+		pr_err("of_platform_default_populate failed: %d\n", ret);
 		BUG();
 	}
 }

@@ -145,7 +145,7 @@ static void __init mvebu_dt_init(void)
 	if (of_machine_is_compatible("marvell,armadaxp"))
 		i2c_quirk();
 
-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+	of_platform_default_populate(NULL, NULL, NULL);
 }
 
 static const char * const armada_370_xp_dt_compat[] __initconst = {

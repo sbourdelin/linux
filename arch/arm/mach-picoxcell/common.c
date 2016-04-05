@@ -54,7 +54,7 @@ static void __init picoxcell_map_io(void)
 
 static void __init picoxcell_init_machine(void)
 {
-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+	of_platform_default_populate(NULL, NULL, NULL);
 	picoxcell_setup_restart();
 }
 

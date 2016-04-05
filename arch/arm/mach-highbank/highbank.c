@@ -163,7 +163,7 @@ static void __init highbank_init(void)
 
 	pl320_ipc_register_notifier(&hb_keys_nb);
 
-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+	of_platform_default_populate(NULL, NULL, NULL);
 
 	if (psci_ops.cpu_suspend)
 		platform_device_register(&highbank_cpuidle_device);

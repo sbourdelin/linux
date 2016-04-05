@@ -60,7 +60,7 @@ static void bcm21664_restart(enum reboot_mode mode, const char *cmd)
 
 static void __init bcm21664_init(void)
 {
-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+	of_platform_default_populate(NULL, NULL, NULL);
 	kona_l2_cache_init();
 }
 

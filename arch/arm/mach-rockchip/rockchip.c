@@ -73,7 +73,7 @@ static void __init rockchip_timer_init(void)
 static void __init rockchip_dt_init(void)
 {
 	rockchip_suspend_init();
-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+	of_platform_default_populate(NULL, NULL, NULL);
 	platform_device_register_simple("cpufreq-dt", 0, NULL, 0);
 }
 
