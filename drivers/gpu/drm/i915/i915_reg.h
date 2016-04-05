@@ -6123,6 +6123,7 @@ enum skl_disp_power_wells {
 				 SDE_PORTB_HOTPLUG |	\
 				 SDE_PORTC_HOTPLUG |	\
 				 SDE_PORTD_HOTPLUG)
+
 #define SDE_TRANSB_CRC_DONE	(1 << 5)
 #define SDE_TRANSB_CRC_ERR	(1 << 4)
 #define SDE_TRANSB_FIFO_UNDER	(1 << 3)

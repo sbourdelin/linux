@@ -1430,6 +1430,11 @@ enum psr_lines_to_wait {
 	PSR_8_LINES_TO_WAIT
 };
 
+enum hpd_wakeup_state {
+	DISABLE_HOT_PLUG_AS_WAKE_EVENT = 0,
+	ENABLE_HOT_PLUG_AS_WAKE_EVENT
+};
+
 struct intel_vbt_data {
 	struct drm_display_mode *lfp_lvds_vbt_mode; /* if any */
 	struct drm_display_mode *sdvo_lvds_vbt_mode; /* if any */
@@ -1485,6 +1490,9 @@ struct intel_vbt_data {
 		u8 *data;
 		const u8 *sequence[MIPI_SEQ_MAX];
 	} dsi;
+
+	/* HPD as wakesoure for DC9 BXT */
+	enum hpd_wakeup_state hpd_wakeup_enabled;
 
 	int crt_ddc_pin;
 
