@@ -84,12 +84,14 @@ int main(int argc, char **argv)
 
 	while (count < 100) {
 		ret = ioctl(fd, MEDIA_IOC_DEVICE_INFO, &mdi);
-		if (ret < 0)
+		if (ret < 0) {
 			printf("Media Device Info errno %s\n", strerror(errno));
-		else
-			printf("Media device model %s driver %s\n",
-				mdi.model, mdi.driver);
+			break;
+		}
+		printf("Media device model %s driver %s\n",
+			mdi.model, mdi.driver);
 		sleep(10);
 		count++;
 	}
+	close(fd);
 }
