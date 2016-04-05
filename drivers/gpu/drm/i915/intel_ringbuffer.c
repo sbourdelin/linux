@@ -2564,6 +2564,14 @@ void intel_ring_init_seqno(struct intel_engine_cs *engine, u32 seqno)
 	}
 	memset(engine->semaphore.sync_seqno, 0,
 	       sizeof(engine->semaphore.sync_seqno));
+	if (dev_priv->semaphore_obj) {
+		struct drm_i915_gem_object *obj = dev_priv->semaphore_obj;
+		struct page *page = i915_gem_object_get_dirty_page(obj, 0);
+		uint64_t *semaphores = kmap(page);
+		memset(semaphores + engine->id * I915_NUM_ENGINES, 0,
+		       sizeof(*semaphores) * I915_NUM_ENGINES);
+		kunmap(page);
+	}
 
 	engine->set_seqno(engine, seqno);
 
