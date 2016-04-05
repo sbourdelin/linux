@@ -43,6 +43,9 @@ Optional properties:
   data stream (similar to BT.656). Defaults to separate H/V synchronization
   signals.
 
+- adi,enable-audio: If set the ADV7511 driver will register a codec interface
+  into ALSA SoC.
+
 Required nodes:
 
 The ADV7511 has two video ports. Their connections are modelled using the OF

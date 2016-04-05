@@ -329,6 +329,7 @@ static void adv7511_set_link_config(struct adv7511 *adv7511,
 	adv7511->hsync_polarity = config->hsync_polarity;
 	adv7511->vsync_polarity = config->vsync_polarity;
 	adv7511->rgb = config->input_colorspace == HDMI_COLORSPACE_RGB;
+	adv7511->enable_audio = config->enable_audio;
 }
 
 static void adv7511_power_on(struct adv7511 *adv7511)
@@ -822,6 +823,7 @@ static int adv7511_parse_dt(struct device_node *np,
 		return -EINVAL;
 
 	config->embedded_sync = of_property_read_bool(np, "adi,embedded-sync");
+	config->enable_audio = of_property_read_bool(np, "adi,enable-audio");
 
 	/* Hardcode the sync pulse configurations for now. */
 	config->sync_pulse = ADV7511_INPUT_SYNC_PULSE_NONE;
@@ -916,6 +918,12 @@ static int adv7511_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 
 	adv7511_set_link_config(adv7511, &link_config);
 
+	if (link_config.enable_audio) {
+		ret = adv7511_audio_init(&i2c->dev);
+		if (ret)
+			goto err_i2c_unregister_device;
+	}
+
 	return 0;
 
 err_i2c_unregister_device:
@@ -929,6 +937,9 @@ static int adv7511_remove(struct i2c_client *i2c)
 	struct adv7511 *adv7511 = i2c_get_clientdata(i2c);
 
 	i2c_unregister_device(adv7511->i2c_edid);
+
+	if (adv7511->enable_audio)
+		adv7511_audio_exit(&i2c->dev);
 
 	kfree(adv7511->edid);
 
