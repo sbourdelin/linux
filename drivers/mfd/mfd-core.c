@@ -334,6 +334,68 @@ void mfd_remove_devices(struct device *parent)
 }
 EXPORT_SYMBOL(mfd_remove_devices);
 
+static void devm_mfd_dev_release(struct device *dev, void *res)
+{
+	mfd_remove_devices(dev);
+}
+
+/**
+ * devm_mfd_add_devices - Resource managed version of mfd_add_devices()
+ *
+ * This returns the 0 on success otherwise error number in the failure.
+ * The allocated mfd devices will automatically be released when the
+ * device is unbound.
+ */
+int devm_mfd_add_devices(struct device *dev, int id,
+		    const struct mfd_cell *cells, int n_devs,
+		    struct resource *mem_base,
+		    int irq_base, struct irq_domain *domain)
+{
+	struct device **ptr;
+	int ret;
+
+	ptr = devres_alloc(devm_mfd_dev_release, sizeof(*ptr), GFP_KERNEL);
+	if (!ptr)
+		return -ENOMEM;
+
+	ret = mfd_add_devices(dev, id, cells, n_devs, mem_base,
+			      irq_base, domain);
+	if (!ret) {
+		*ptr = dev;
+		devres_add(dev, ptr);
+	} else {
+		devres_free(ptr);
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(devm_mfd_add_devices);
+
+static int devm_mfd_devs_match(struct device *dev, void *res, void *data)
+{
+	struct device **r = res;
+
+	if (WARN_ON(!r || !*r))
+		return 0;
+
+	return *r == data;
+}
+
+/**
+ * devm_mfd_remove_device - Resource managed version of mfd_remove_devices()
+ * @dev: Device for which which resource was allocated.
+ *
+ * Remove all mfd devices added on the device.
+ * Normally this function will not need to be called and the resource
+ * management code will ensure that the resource is freed.
+ */
+void devm_mfd_remove_devices(struct device *dev)
+{
+	WARN_ON(devres_release(dev, devm_mfd_dev_release,
+			       devm_mfd_devs_match, dev));
+}
+EXPORT_SYMBOL(devm_mfd_remove_devices);
+
 int mfd_clone_cell(const char *cell, const char **clones, size_t n_clones)
 {
 	struct mfd_cell cell_entry;
