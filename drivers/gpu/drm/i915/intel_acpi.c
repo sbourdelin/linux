@@ -17,13 +17,16 @@ static struct intel_dsm_priv {
 	acpi_handle dhandle;
 } intel_dsm_priv;
 
-static const u8 intel_dsm_guid[] = {
+static u8 intel_dsm_guid[] = {
 	0xd3, 0x73, 0xd8, 0x7e,
 	0xd0, 0xc2,
 	0x4f, 0x4e,
 	0xa8, 0x54,
 	0x0f, 0x13, 0x17, 0xb0, 0x1c, 0x2c
 };
+
+static u8 intel_bxt_dsm_guid[] __initdata =
+		"3E5B41C6-EB1D-4260-9D15-C71FBADAE414";
 
 static char *intel_dsm_port_name(u8 id)
 {
@@ -142,6 +145,9 @@ static bool intel_dsm_pci_probe(struct pci_dev *pdev)
 		return false;
 
 	intel_dsm_priv.dhandle = dhandle;
+
+	if (IS_BROXTON(dev))
+		acpi_str_to_uuid(intel_bxt_dsm_guid, intel_dsm_guid);
 
 	if (acpi_check_dsm(dhandle, intel_dsm_guid, INTEL_DSM_REVISION_ID,
 			    1 << INTEL_DSM_FN_PLATFORM_MUX_INFO))
