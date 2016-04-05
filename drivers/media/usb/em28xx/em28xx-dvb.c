@@ -12,6 +12,10 @@
 
  (c) 2012 Frank Schäfer <fschaefer.oss@googlemail.com>
 
+ (c) 2016 Nagahama Satoshi <sattnag@aim.com>
+	  Budi Rachmanto, AreMa Inc. <info@are.ma>
+	- PLEX PX-BCUD support
+
  Based on cx88-dvb, saa7134-dvb and videobuf-dvb originally written by:
 	(c) 2004, 2005 Chris Pascoe <c.pascoe@itee.uq.edu.au>
 	(c) 2004 Gerd Knorr <kraxel@bytesex.org> [SuSE Labs]
@@ -25,11 +29,10 @@
 #include <linux/slab.h>
 #include <linux/usb.h>
 
+#include "ptx_common.h"
 #include "em28xx.h"
 #include <media/v4l2-common.h>
-#include <dvb_demux.h>
 #include <dvb_net.h>
-#include <dmxdev.h>
 #include <media/tuner.h>
 #include "tuner-simple.h"
 #include <linux/gpio.h>
@@ -58,6 +61,8 @@
 #include "ts2020.h"
 #include "si2168.h"
 #include "si2157.h"
+#include "tc90522.h"
+#include "qm1d1c004x.h"
 
 MODULE_AUTHOR("Mauro Carvalho Chehab <mchehab@infradead.org>");
 MODULE_LICENSE("GPL");
@@ -786,6 +791,65 @@ static int em28xx_mt352_terratec_xs_init(struct dvb_frontend *fe)
 	mt352_write(fe, tuner_go,       sizeof(tuner_go));
 	return 0;
 }
+
+static void px_bcud_init(struct em28xx *dev)
+{
+	int i;
+	struct {
+		unsigned char r[4];
+		int len;
+	} regs1[] = {
+		{{ 0x0e, 0x77 }, 2},
+		{{ 0x0f, 0x77 }, 2},
+		{{ 0x03, 0x90 }, 2},
+	}, regs2[] = {
+		{{ 0x07, 0x01 }, 2},
+		{{ 0x08, 0x10 }, 2},
+		{{ 0x13, 0x00 }, 2},
+		{{ 0x17, 0x00 }, 2},
+		{{ 0x03, 0x01 }, 2},
+		{{ 0x10, 0xb1 }, 2},
+		{{ 0x11, 0x40 }, 2},
+		{{ 0x85, 0x7a }, 2},
+		{{ 0x87, 0x04 }, 2},
+	};
+	static struct em28xx_reg_seq gpio[] = {
+		{EM28XX_R06_I2C_CLK,		0x40,	0xff,	300},
+		{EM2874_R80_GPIO_P0_CTRL,	0xfd,	0xff,	60},
+		{EM28XX_R15_RGAIN,		0x20,	0xff,	0},
+		{EM28XX_R16_GGAIN,		0x20,	0xff,	0},
+		{EM28XX_R17_BGAIN,		0x20,	0xff,	0},
+		{EM28XX_R18_ROFFSET,		0x00,	0xff,	0},
+		{EM28XX_R19_GOFFSET,		0x00,	0xff,	0},
+		{EM28XX_R1A_BOFFSET,		0x00,	0xff,	0},
+		{EM28XX_R23_UOFFSET,		0x00,	0xff,	0},
+		{EM28XX_R24_VOFFSET,		0x00,	0xff,	0},
+		{EM28XX_R26_COMPR,		0x00,	0xff,	0},
+		{0x13,				0x08,	0xff,	0},
+		{EM28XX_R12_VINENABLE,		0x27,	0xff,	0},
+		{EM28XX_R0C_USBSUSP,		0x10,	0xff,	0},
+		{EM28XX_R27_OUTFMT,		0x00,	0xff,	0},
+		{EM28XX_R10_VINMODE,		0x00,	0xff,	0},
+		{EM28XX_R11_VINCTRL,		0x11,	0xff,	0},
+		{EM2874_R50_IR_CONFIG,		0x01,	0xff,	0},
+		{EM2874_R5F_TS_ENABLE,		0x80,	0xff,	0},
+		{EM28XX_R06_I2C_CLK,		0x46,	0xff,	0},
+	};
+	em28xx_write_reg(dev, EM28XX_R06_I2C_CLK, 0x46);
+	/* sleeping ISDB-T */
+	dev->dvb->i2c_client_demod->addr = 0x14;
+	for (i = 0; i < ARRAY_SIZE(regs1); i++)
+		i2c_master_send(dev->dvb->i2c_client_demod, regs1[i].r, regs1[i].len);
+	/* sleeping ISDB-S */
+	dev->dvb->i2c_client_demod->addr = 0x15;
+	for (i = 0; i < ARRAY_SIZE(regs2); i++)
+		i2c_master_send(dev->dvb->i2c_client_demod, regs2[i].r, regs2[i].len);
+	for (i = 0; i < ARRAY_SIZE(gpio); i++) {
+		em28xx_write_reg_bits(dev, gpio[i].reg, gpio[i].val, gpio[i].mask);
+		if (gpio[i].sleep > 0)
+			msleep(gpio[i].sleep);
+	}
+};
 
 static struct mt352_config terratec_xs_mt352_cfg = {
 	.demod_address = (0x1e >> 1),
@@ -1760,6 +1824,19 @@ static int em28xx_dvb_init(struct em28xx *dev)
 			}
 
 			dvb->i2c_client_tuner = client;
+		}
+		break;
+	case EM28178_BOARD_PLEX_PX_BCUD:
+		{
+			struct ptx_subdev_info	pxbcud_subdev_info =
+				{SYS_ISDBS, 0x15, TC90522_MODNAME, 0x61, QM1D1C004X_MODNAME};
+
+			dvb->fe[0] = ptx_register_fe(&dev->i2c_adap[dev->def_i2c_bus], NULL, &pxbcud_subdev_info);
+			if (!dvb->fe[0])
+                                goto out_free;
+			dvb->i2c_client_demod = dvb->fe[0]->demodulator_priv;
+                        dvb->i2c_client_tuner = dvb->fe[0]->tuner_priv;
+			px_bcud_init(dev);
 		}
 		break;
 	default:
