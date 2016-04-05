@@ -3569,6 +3569,34 @@ struct drm_connector *drm_select_eld(struct drm_encoder *encoder)
 EXPORT_SYMBOL(drm_select_eld);
 
 /**
+ * drm_edid_get_monitor_name - fetch the monitor name from the edid
+ * @edid: monitor EDID information
+ * @name: pointer to a character array of at least 13 chars to hold the name
+ *
+ * Return: True if the name could be extracted, false otherwise
+ */
+bool drm_edid_get_monitor_name(struct edid *edid, char *name)
+{
+	char *edid_name = NULL;
+	int mnl;
+
+	if (!edid || !name)
+		return false;
+
+	drm_for_each_detailed_block((u8 *)edid, monitor_name, &edid_name);
+	for (mnl = 0; edid_name && mnl < 13; mnl++) {
+		if (edid_name[mnl] == 0x0a) {
+			name[mnl] = '\0';
+			break;
+		}
+		name[mnl] = edid_name[mnl];
+	}
+
+	return mnl ? true : false;
+}
+EXPORT_SYMBOL(drm_edid_get_monitor_name);
+
+/**
  * drm_detect_hdmi_monitor - detect whether monitor is HDMI
  * @edid: monitor EDID information
  *
