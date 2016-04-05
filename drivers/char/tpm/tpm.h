@@ -493,8 +493,7 @@ extern const struct file_operations tpm_fops;
 extern struct idr dev_nums_idr;
 
 ssize_t	tpm_getcap(struct device *, __be32, cap_t *, const char *);
-ssize_t tpm_transmit(struct tpm_chip *chip, const char *buf,
-		     size_t bufsiz);
+ssize_t tpm_transmit(struct tpm_chip *chip, u8 *buf, size_t len);
 ssize_t tpm_transmit_cmd(struct tpm_chip *chip, void *cmd, int len,
 			 const char *desc);
 extern int tpm_get_timeouts(struct tpm_chip *);

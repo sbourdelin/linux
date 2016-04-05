@@ -330,29 +330,28 @@ EXPORT_SYMBOL_GPL(tpm_calc_ordinal_duration);
 /*
  * Internal kernel interface to transmit TPM commands
  */
-ssize_t tpm_transmit(struct tpm_chip *chip, const char *buf,
-		     size_t bufsiz)
+ssize_t tpm_transmit(struct tpm_chip *chip, u8 *buf, size_t len)
 {
 	ssize_t rc;
 	u32 count, ordinal;
 	unsigned long stop;
 
-	if (bufsiz > TPM_BUFSIZE)
-		bufsiz = TPM_BUFSIZE;
+	if (len > TPM_BUFSIZE)
+		len = TPM_BUFSIZE;
 
 	count = be32_to_cpu(*((__be32 *) (buf + 2)));
 	ordinal = be32_to_cpu(*((__be32 *) (buf + 6)));
 	if (count == 0)
 		return -ENODATA;
-	if (count > bufsiz) {
+	if (count > len) {
 		dev_err(&chip->dev,
-			"invalid count value %x %zx\n", count, bufsiz);
+			"invalid count value %x %zx\n", count, len);
 		return -E2BIG;
 	}
 
 	mutex_lock(&chip->tpm_mutex);
 
-	rc = chip->ops->send(chip, (u8 *) buf, count);
+	rc = chip->ops->send(chip, buf, count);
 	if (rc < 0) {
 		dev_err(&chip->dev,
 			"tpm_transmit: tpm_send: error %zd\n", rc);
@@ -388,7 +387,7 @@ ssize_t tpm_transmit(struct tpm_chip *chip, const char *buf,
 	goto out;
 
 out_recv:
-	rc = chip->ops->recv(chip, (u8 *) buf, bufsiz);
+	rc = chip->ops->recv(chip, buf, len);
 	if (rc < 0)
 		dev_err(&chip->dev,
 			"tpm_transmit: tpm_recv: error %zd\n", rc);
