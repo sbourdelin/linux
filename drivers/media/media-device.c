@@ -36,6 +36,7 @@
 #include <media/media-device.h>
 #include <media/media-devnode.h>
 #include <media/media-entity.h>
+#include <media/media-dev-allocator.h>
 
 #ifdef CONFIG_MEDIA_CONTROLLER
 
@@ -743,11 +744,30 @@ int __must_check __media_device_register(struct media_device *mdev,
 		return ret;
 	}
 
-	dev_dbg(mdev->dev, "Media device registered\n");
+	mdev->num_drivers++;
+	dev_dbg(mdev->dev, "Media device registered num_drivers %d\n",
+		mdev->num_drivers);
 
 	return 0;
 }
 EXPORT_SYMBOL_GPL(__media_device_register);
+
+void media_device_register_ref(struct media_device *mdev)
+{
+	if (!mdev)
+		return;
+
+	mutex_lock(&mdev->graph_mutex);
+
+	/* Check if mdev is registered - bump registered driver count */
+	if (media_devnode_is_registered(&mdev->devnode))
+		mdev->num_drivers++;
+
+	dev_dbg(mdev->dev, "%s: mdev %p num_drivers %d\n", __func__, mdev,
+		mdev->num_drivers);
+	mutex_unlock(&mdev->graph_mutex);
+}
+EXPORT_SYMBOL_GPL(media_device_register_ref);
 
 int __must_check media_device_register_entity_notify(struct media_device *mdev,
 					struct media_entity_notify *nptr)
@@ -819,6 +839,33 @@ void media_device_unregister(struct media_device *mdev)
 	dev_dbg(mdev->dev, "Media device unregistered\n");
 }
 EXPORT_SYMBOL_GPL(media_device_unregister);
+
+void media_device_unregister_put(struct media_device *mdev)
+{
+	if (mdev == NULL)
+		return;
+
+	dev_dbg(mdev->dev, "%s: mdev %p num_drivers %d\n", __func__, mdev,
+		mdev->num_drivers);
+
+	mutex_lock(&mdev->graph_mutex);
+	mdev->num_drivers--;
+	if (mdev->num_drivers == 0) {
+		mutex_unlock(&mdev->graph_mutex);
+
+		/* unregister media device and cleanup */
+		media_device_unregister(mdev);
+		media_device_cleanup(mdev);
+
+		/* mark the media device for deletion */
+		media_device_set_to_delete_state(mdev->dev);
+	} else
+		mutex_unlock(&mdev->graph_mutex);
+
+	dev_dbg(mdev->dev, "%s: end mdev %p num_drivers %d\n", __func__, mdev,
+		mdev->num_drivers);
+}
+EXPORT_SYMBOL_GPL(media_device_unregister_put);
 
 static void media_device_release_devres(struct device *dev, void *res)
 {
