@@ -343,7 +343,10 @@ static int psb_driver_load(struct drm_device *dev, unsigned long flags)
 					  dev_priv->stolen_base >> PAGE_SHIFT,
 					  pg->gatt_start,
 					  pg->stolen_size >> PAGE_SHIFT, 0);
+	if (ret)
+		goto unlock_err;
 	up_read(&pg->sem);
+
 
 	psb_mmu_set_pd_context(psb_mmu_get_default_pd(dev_priv->mmu), 0);
 	psb_mmu_set_pd_context(dev_priv->pf_pd, 1);
@@ -405,6 +408,8 @@ static int psb_driver_load(struct drm_device *dev, unsigned long flags)
 #endif
 	/* Intel drm driver load is done, continue doing pvr load */
 	return 0;
+unlock_err:
+	up_read(&pg->sem);
 out_err:
 	psb_driver_unload(dev);
 	return ret;
