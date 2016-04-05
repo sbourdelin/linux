@@ -103,16 +103,14 @@ static void dw8250_check_lcr(struct uart_port *p, int value)
 
 		dw8250_force_idle(p);
 
-#ifdef CONFIG_64BIT
-		__raw_writeq(value & 0xff, offset);
-#else
-		if (p->iotype == UPIO_MEM32)
+		if (IS_ENABLED(CONFIG_64BIT) && p->type == PORT_OCTEON)
+			__raw_writeq(value & 0xff, offset);
+		else if (p->iotype == UPIO_MEM32)
 			writel(value, offset);
 		else if (p->iotype == UPIO_MEM32BE)
 			iowrite32be(value, offset);
 		else
 			writeb(value, offset);
-#endif
 	}
 	/*
 	 * FIXME: this deadlocks if port->lock is already held
