@@ -3444,7 +3444,7 @@ EXPORT_SYMBOL(default_wake_function);
 /*
  * rt_mutex_setprio - set the current priority of a task
  * @p: task
- * @prio: prio value (kernel-internal form)
+ * @pi_top_task: top waiter, donating state
  *
  * This function changes the 'effective' priority of a task. It does
  * not touch ->normal_prio like __setscheduler().
@@ -3452,13 +3452,21 @@ EXPORT_SYMBOL(default_wake_function);
  * Used by the rt_mutex code to implement priority inheritance
  * logic. Call site only calls if the priority of the task changed.
  */
-void rt_mutex_setprio(struct task_struct *p, int prio)
+void rt_mutex_setprio(struct task_struct *p, struct task_struct *pi_top_task)
 {
-	int oldprio, queued, running, queue_flag = DEQUEUE_SAVE | DEQUEUE_MOVE;
-	struct rq *rq;
+	int prio, oldprio, queued, running;
+	int queue_flag = DEQUEUE_SAVE | DEQUEUE_MOVE;
 	const struct sched_class *prev_class;
+	struct rq *rq;
 
-	BUG_ON(prio > MAX_PRIO);
+	/*
+	 * For FIFO/RR we simply donate prio; for DL things are
+	 * more interesting.
+	 */
+	/* XXX used to be waiter->prio, not waiter->task->prio */
+	prio = min(pi_top_task->prio, p->normal_prio);
+	if (p->prio == prio && !dl_prio(prio))
+		return;
 
 	rq = __task_rq_lock(p);
 
@@ -3494,6 +3502,10 @@ void rt_mutex_setprio(struct task_struct *p, int prio)
 	if (running)
 		put_prev_task(rq, p);
 
+	if (pi_top_task == p)
+		pi_top_task = NULL;
+	p->pi_top_task = pi_top_task;
+
 	/*
 	 * Boosting condition are:
 	 * 1. -rt task is running and holds mutex A
@@ -3504,9 +3516,9 @@ void rt_mutex_setprio(struct task_struct *p, int prio)
 	 *          running task
 	 */
 	if (dl_prio(prio)) {
-		struct task_struct *pi_task = rt_mutex_get_top_task(p);
 		if (!dl_prio(p->normal_prio) ||
-		    (pi_task && dl_entity_preempt(&pi_task->dl, &p->dl))) {
+		    (pi_top_task &&
+			    dl_entity_preempt(&pi_top_task->dl, &p->dl))) {
 			p->dl.dl_boosted = 1;
 			queue_flag |= ENQUEUE_REPLENISH;
 		} else
@@ -3779,10 +3791,9 @@ static void __setscheduler(struct rq *rq, struct task_struct *p,
 	 * Keep a potential priority boosting if called from
 	 * sched_setscheduler().
 	 */
-	if (keep_boost)
-		p->prio = rt_mutex_get_effective_prio(p, normal_prio(p));
-	else
-		p->prio = normal_prio(p);
+	p->prio = normal_prio(p);
+	if (keep_boost && get_pi_top_task(p))
+		p->prio = min(p->prio, get_pi_top_task(p)->prio);
 
 	if (dl_prio(p->prio))
 		p->sched_class = &dl_sched_class;
@@ -4069,7 +4080,11 @@ change:
 		 * the runqueue. This will be done when the task deboost
 		 * itself.
 		 */
-		new_effective_prio = rt_mutex_get_effective_prio(p, newprio);
+		new_effective_prio = newprio;
+		if (get_pi_top_task(p))
+			new_effective_prio =
+			    min(new_effective_prio, get_pi_top_task(p)->prio);
+
 		if (new_effective_prio == oldprio)
 			queue_flags &= ~DEQUEUE_MOVE;
 	}

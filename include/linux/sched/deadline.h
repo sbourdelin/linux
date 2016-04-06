@@ -26,4 +26,16 @@ static inline bool dl_time_before(u64 a, u64 b)
 	return (s64)(a - b) < 0;
 }
 
+#ifdef CONFIG_RT_MUTEXES
+static inline struct task_struct *get_pi_top_task(struct task_struct *p)
+{
+	return p->pi_top_task;
+}
+#else
+static inline struct task_struct *get_pi_top_task(struct task_struct *p)
+{
+	return NULL;
+}
+#endif
+
 #endif /* _SCHED_DEADLINE_H */

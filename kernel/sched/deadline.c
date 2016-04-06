@@ -932,7 +932,7 @@ static void dequeue_dl_entity(struct sched_dl_entity *dl_se)
 
 static void enqueue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 {
-	struct task_struct *pi_task = rt_mutex_get_top_task(p);
+	struct task_struct *pi_task = get_pi_top_task(p);
 	struct sched_dl_entity *pi_se = &p->dl;
 
 	/*

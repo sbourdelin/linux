@@ -257,53 +257,18 @@ rt_mutex_dequeue_pi(struct task_struct *task, struct rt_mutex_waiter *waiter)
 }
 
 /*
- * Calculate task priority from the waiter tree priority
- *
- * Return task->normal_prio when the waiter tree is empty or when
- * the waiter is not allowed to do priority boosting
- */
-int rt_mutex_getprio(struct task_struct *task)
-{
-	if (likely(!task_has_pi_waiters(task)))
-		return task->normal_prio;
-
-	return min(task_top_pi_waiter(task)->prio,
-		   task->normal_prio);
-}
-
-struct task_struct *rt_mutex_get_top_task(struct task_struct *task)
-{
-	if (likely(!task_has_pi_waiters(task)))
-		return NULL;
-
-	return task_top_pi_waiter(task)->task;
-}
-
-/*
- * Called by sched_setscheduler() to get the priority which will be
- * effective after the change.
- */
-int rt_mutex_get_effective_prio(struct task_struct *task, int newprio)
-{
-	if (!task_has_pi_waiters(task))
-		return newprio;
-
-	if (task_top_pi_waiter(task)->task->prio <= newprio)
-		return task_top_pi_waiter(task)->task->prio;
-	return newprio;
-}
-
-/*
  * Adjust the priority of a task, after its pi_waiters got modified.
  *
  * This can be both boosting and unboosting. task->pi_lock must be held.
  */
 static void __rt_mutex_adjust_prio(struct task_struct *task)
 {
-	int prio = rt_mutex_getprio(task);
+	struct task_struct *pi_top_task = task;
 
-	if (task->prio != prio || dl_prio(prio))
-		rt_mutex_setprio(task, prio);
+	if (unlikely(task_has_pi_waiters(task)))
+		pi_top_task = task_top_pi_waiter(task)->task;
+
+	rt_mutex_setprio(task, pi_top_task);
 }
 
 /*
@@ -1390,12 +1355,28 @@ rt_mutex_fastunlock(struct rt_mutex *lock,
 	} else {
 		bool deboost = slowfn(lock, &wake_q);
 
-		wake_up_q(&wake_q);
-
-		/* Undo pi boosting if necessary: */
-		if (deboost)
-			rt_mutex_adjust_prio(current);
+		rt_mutex_postunlock(&wake_q, deboost);
 	}
+}
+
+/*
+ * Undo pi boosting (if necessary) and wake top waiter.
+ */
+void rt_mutex_postunlock(struct wake_q_head *wake_q, bool deboost)
+{
+	/*
+	 * We should deboost before waking the high-prio task such that
+	 * we don't run two tasks with the 'same' state. This however
+	 * can lead to prio-inversion if we would get preempted after
+	 * the deboost but before waking our high-prio task, hence the
+	 * preempt_disable.
+	 */
+	preempt_disable();
+	if (deboost)
+		rt_mutex_adjust_prio(current);
+
+	wake_up_q(wake_q);
+	preempt_enable();
 }
 
 /**
