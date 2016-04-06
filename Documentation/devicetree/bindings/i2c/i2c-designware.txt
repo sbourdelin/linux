@@ -20,6 +20,22 @@ Optional properties :
  - i2c-sda-falling-time-ns : should contain the SDA falling time in nanoseconds.
    This value which is by default 300ns is used to compute the tHIGH period.
 
+ - i2c-ss-scl-high-count : should contain the standard speed i2c clock SCL high
+   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
+   will be ignored.
+
+ - i2c-ss-scl-low-count : should contain the standard speed i2c clock SCL low
+   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
+   will be ignored.
+
+ - i2c-fs-scl-high-count : should contain the fast speed i2c clock SCL high
+   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
+   will be ignored.
+
+ - i2c-fs-scl-low-count : should contain the fast speed i2c clock SCL low
+   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
+   will be ignored.
+
 Example :
 
 	i2c@f0000 {

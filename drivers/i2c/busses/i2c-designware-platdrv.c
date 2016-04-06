@@ -188,6 +188,14 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 					 &dev->scl_falling_time);
 		device_property_read_u32(&pdev->dev, "clock-frequency",
 					 &clk_freq);
+		device_property_read_u16(&pdev->dev, "i2c-ss-scl-high-count",
+					 &dev->ss_hcnt);
+		device_property_read_u16(&pdev->dev, "i2c-ss-scl-low-count",
+					 &dev->ss_lcnt);
+		device_property_read_u16(&pdev->dev, "i2c-fs-scl-high-count",
+					 &dev->fs_hcnt);
+		device_property_read_u16(&pdev->dev, "i2c-fs-scl-low-count",
+					 &dev->fs_lcnt);
 	}
 
 	if (has_acpi_companion(&pdev->dev))
