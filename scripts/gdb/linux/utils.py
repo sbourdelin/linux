@@ -87,11 +87,16 @@ def get_target_endianness():
     return target_endianness
 
 
+# Compat between GDB built with python 2.7 vs 3.X
+def read_memoryview(inf, start, length):
+    return memoryview(inf.read_memory(start, length))
+
+
 def read_u16(buffer):
     if get_target_endianness() == LITTLE_ENDIAN:
-        return ord(buffer[0]) + (ord(buffer[1]) << 8)
+        return buffer[0] + (buffer[1] << 8)
     else:
-        return ord(buffer[1]) + (ord(buffer[0]) << 8)
+        return buffer[1] + (buffer[0] << 8)
 
 
 def read_u32(buffer):
