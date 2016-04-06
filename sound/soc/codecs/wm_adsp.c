@@ -2913,6 +2913,7 @@ int wm_adsp_compr_pointer(struct snd_compr_stream *stream,
 	}
 
 	if (compr->buf->error) {
+		snd_compr_stop_xrun(stream);
 		ret = -EIO;
 		goto out;
 	}
@@ -2930,8 +2931,11 @@ int wm_adsp_compr_pointer(struct snd_compr_stream *stream,
 		 */
 		if (buf->avail < wm_adsp_compr_frag_words(compr)) {
 			ret = wm_adsp_buffer_get_error(buf);
-			if (ret < 0)
+			if (ret < 0) {
+				if (compr->buf->error)
+					snd_compr_stop_xrun(stream);
 				goto out;
+			}
 
 			ret = wm_adsp_buffer_reenable_irq(buf);
 			if (ret < 0) {
@@ -3029,8 +3033,10 @@ static int wm_adsp_compr_read(struct wm_adsp_compr *compr,
 	if (!compr->buf)
 		return -ENXIO;
 
-	if (compr->buf->error)
+	if (compr->buf->error) {
+		snd_compr_stop_xrun(compr->stream);
 		return -EIO;
+	}
 
 	count /= WM_ADSP_DATA_WORD_SIZE;
 
