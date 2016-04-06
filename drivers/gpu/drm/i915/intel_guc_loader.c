@@ -136,7 +136,8 @@ static void slpc_version_check(struct drm_device *dev, struct intel_guc_fw *guc_
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_device_info *info;
 
-	if (IS_SKYLAKE(dev) && (guc_fw->guc_fw_major_found != 6)) {
+	if ((IS_SKYLAKE(dev) && (guc_fw->guc_fw_major_found != 6))
+	     || (IS_BROXTON(dev) && (guc_fw->guc_fw_major_found != 5))) {
 		info = (struct intel_device_info *) &dev_priv->info;
 		info->has_slpc = 0;
 	}
