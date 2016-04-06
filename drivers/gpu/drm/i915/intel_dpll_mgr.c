@@ -235,13 +235,14 @@ intel_reference_shared_dpll(struct intel_shared_dpll *pll,
 {
 	struct intel_shared_dpll_config *shared_dpll;
 	struct intel_crtc *crtc = to_intel_crtc(crtc_state->base.crtc);
+	unsigned int crtc_mask = 1 << drm_crtc_index(&crtc->base);
 	enum intel_dpll_id i = pll->id;
 
 	shared_dpll = intel_atomic_get_shared_dpll_state(crtc_state->base.state);
 
-	if (shared_dpll[i].crtc_mask == 0)
-		shared_dpll[i].hw_state =
-			crtc_state->dpll_hw_state;
+	if (shared_dpll[i].crtc_mask == 0 ||
+				shared_dpll[i].crtc_mask == crtc_mask)
+		shared_dpll[i].hw_state = crtc_state->dpll_hw_state;
 
 	crtc_state->shared_dpll = pll;
 	DRM_DEBUG_DRIVER("using %s for pipe %c\n", pll->name,
