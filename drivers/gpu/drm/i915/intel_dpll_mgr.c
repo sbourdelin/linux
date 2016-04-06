@@ -248,6 +248,7 @@ intel_reference_shared_dpll(struct intel_shared_dpll *pll,
 			 pipe_name(crtc->pipe));
 
 	intel_shared_dpll_config_get(shared_dpll, pll, crtc);
+	crtc_state->shared_dpll->config = shared_dpll[i];
 }
 
 void intel_shared_dpll_commit(struct drm_atomic_state *state)
