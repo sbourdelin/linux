@@ -305,6 +305,8 @@ long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
 	case PPC_PTRACE_GETHWDBGINFO:
 	case PPC_PTRACE_SETHWDEBUG:
 	case PPC_PTRACE_DELHWDEBUG:
+	case PTRACE_GET_REGS_USAGE:
+	case PTRACE_SET_REGS_USAGE:
 		ret = arch_ptrace(child, request, addr, data);
 		break;
 

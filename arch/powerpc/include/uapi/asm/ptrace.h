@@ -176,6 +176,17 @@ struct pt_regs {
 #define PTRACE_GETREGS64	  0x16
 #define PTRACE_SETREGS64	  0x17
 
+/*
+ * Get or set some register used bit.
+ * The flags will be saved in a 32 bit data.
+ * Currently it is only used for VR/VSR usage.
+ */
+#define PTRACE_GET_REGS_USAGE	  0x1e
+#define PTRACE_SET_REGS_USAGE	  0x1f
+
+#define PTRACE_REGS_USAGE_VR_BIT  0x00000001
+#define PTRACE_REGS_USAGE_VSR_BIT 0x00000002
+
 /* Calls to trace a 64bit program from a 32bit program */
 #define PPC_PTRACE_PEEKTEXT_3264 0x95
 #define PPC_PTRACE_PEEKDATA_3264 0x94
