@@ -304,17 +304,10 @@ unsigned char *choose_kernel_location(struct boot_params *boot_params,
 	unsigned long choice = (unsigned long)output;
 	unsigned long random;
 
-#ifdef CONFIG_HIBERNATION
-	if (!cmdline_find_option_bool("kaslr")) {
-		debug_putstr("KASLR disabled by default...\n");
-		goto out;
-	}
-#else
 	if (cmdline_find_option_bool("nokaslr")) {
 		debug_putstr("KASLR disabled by cmdline...\n");
 		goto out;
 	}
-#endif
 
 	boot_params->hdr.loadflags |= KASLR_FLAG;
 

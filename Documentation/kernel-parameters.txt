@@ -1774,8 +1774,8 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			Enable/disable kernel and module base offset ASLR
 			(Address Space Layout Randomization) if built into
 			the kernel. When CONFIG_HIBERNATION is selected,
-			kASLR is disabled by default. When kASLR is enabled,
-			hibernation will be disabled.
+			kASLR must be disabled for hibernation to be
+			available.
 
 	keepinitrd	[HW,ARM]
 
@@ -3513,6 +3513,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			(e.g. USB and MMC devices).
 
 	hibernate=	[HIBERNATION]
+			When CONFIG_RANDOMIZE_BASE is defined, hibernation
+			is disabled by default. Hibernation can be enabled
+			by passing "nokaslr" on the kernel command line.
 		noresume	Don't check if there's a hibernation image
 				present during boot.
 		nocompress	Don't compress/decompress hibernation images.

@@ -35,8 +35,13 @@
 
 
 static int nocompress;
+#ifdef CONFIG_RANDOMIZE_BASE
+static int noresume = 1;
+static int nohibernate = 1;
+#else
 static int noresume;
 static int nohibernate;
+#endif
 static int resume_wait;
 static unsigned int resume_delay;
 static char resume_file[256] = CONFIG_PM_STD_PARTITION;
@@ -1159,6 +1164,13 @@ static int __init kaslr_nohibernate_setup(char *str)
 	return nohibernate_setup(str);
 }
 
+static int __init nokaslr_hibernate_setup(char *str)
+{
+	noresume = 0;
+	nohibernate = 0;
+	return 1;
+}
+
 static int __init page_poison_nohibernate_setup(char *str)
 {
 #ifdef CONFIG_PAGE_POISONING_ZERO
@@ -1183,4 +1195,5 @@ __setup("resumewait", resumewait_setup);
 __setup("resumedelay=", resumedelay_setup);
 __setup("nohibernate", nohibernate_setup);
 __setup("kaslr", kaslr_nohibernate_setup);
+__setup("nokaslr", nokaslr_hibernate_setup);
 __setup("page_poison=", page_poison_nohibernate_setup);
