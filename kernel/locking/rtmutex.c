@@ -822,11 +822,24 @@ static int try_to_take_rt_mutex(struct rt_mutex *lock, struct task_struct *task,
 		 */
 		if (rt_mutex_has_waiters(lock)) {
 			/*
-			 * If @task->prio is greater than or equal to
-			 * the top waiter priority (kernel view),
+			 * If !deadline @task->prio is greater than or
+			 * equal to the top waiter priority (kernel view),
 			 * @task lost.
 			 */
-			if (task->prio >= rt_mutex_top_waiter(lock)->prio)
+			if (task->prio >= rt_mutex_top_waiter(lock)->prio &&
+			    !dl_prio(task->prio))
+				return 0;
+
+			/*
+			 * If the top waiter is deadline, @task must be
+			 * deadline, otherwise did return 0 above.
+			 *
+			 * If @task's deadline is not smaller than the
+			 * top waiter's, @task lost.
+			 */
+			if (dl_prio(rt_mutex_top_waiter(lock)->prio) &&
+			    !dl_time_before(task->dl.deadline,
+				  rt_mutex_top_waiter(lock)->task->dl.deadline))
 				return 0;
 
 			/*
