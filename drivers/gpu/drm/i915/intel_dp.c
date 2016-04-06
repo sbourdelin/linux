@@ -1595,6 +1595,41 @@ void intel_dp_set_link_params(struct intel_dp *intel_dp,
 	intel_dp->lane_count = pipe_config->lane_count;
 }
 
+void intel_dp_update_dpcd_params(struct intel_dp *intel_dp)
+{
+	intel_dp->dpcd[DP_MAX_LANE_COUNT] &= ~DP_MAX_LANE_COUNT_MASK;
+	intel_dp->dpcd[DP_MAX_LANE_COUNT] |=
+			intel_dp->lane_count & DP_MAX_LANE_COUNT_MASK;
+
+	intel_dp->dpcd[DP_MAX_LINK_RATE] =
+			drm_dp_link_rate_to_bw_code(intel_dp->link_rate);
+}
+
+bool intel_dp_get_link_retry_params(struct intel_dp *intel_dp,
+			uint8_t *lane_count, uint8_t *link_bw)
+{
+	/*
+	 * As per DP1.3 Spec, retry all link rates for a particular
+	 * lane count value, before reducing number of lanes.
+	 */
+	if (*link_bw == DP_LINK_BW_5_4) {
+		*link_bw = DP_LINK_BW_2_7;
+	} else if (*link_bw == DP_LINK_BW_2_7) {
+		*link_bw = DP_LINK_BW_1_62;
+	} else if (*lane_count == 4) {
+		*lane_count = 2;
+		*link_bw = intel_dp_max_link_bw(intel_dp);
+	} else if (*lane_count == 2) {
+		*lane_count = 1;
+		*link_bw = intel_dp_max_link_bw(intel_dp);
+	} else {
+		/* Tried all combinations, so exit */
+		return false;
+	}
+
+	return true;
+}
+
 static void intel_dp_prepare(struct intel_encoder *encoder)
 {
 	struct drm_device *dev = encoder->base.dev;
@@ -4578,6 +4613,135 @@ intel_dp_unset_edid(struct intel_dp *intel_dp)
 	intel_dp->has_audio = false;
 }
 
+static struct intel_crtc_state *intel_dp_upfront_get_crtc_state(
+				struct intel_crtc *crtc,
+				struct drm_modeset_acquire_ctx *ctx)
+{
+	struct drm_device *dev = crtc->base.dev;
+	struct drm_atomic_state *state;
+	struct intel_crtc_state *crtc_state;
+
+	state = drm_atomic_state_alloc(dev);
+	if (!state)
+		return ERR_PTR(-ENOMEM);
+
+	state->acquire_ctx = ctx;
+
+	crtc_state = intel_atomic_get_crtc_state(state, crtc);
+	if (IS_ERR(crtc_state)) {
+		drm_atomic_state_free(state);
+		state = NULL;
+	}
+
+	return crtc_state;
+}
+
+static int intel_dp_upfront_commit(struct intel_crtc *crtc,
+				struct drm_modeset_acquire_ctx *ctx)
+{
+	int ret;
+	struct intel_crtc_state *crtc_state;
+	enum pipe pipe = crtc->pipe;
+
+	crtc_state = intel_dp_upfront_get_crtc_state(crtc, ctx);
+	if (IS_ERR(crtc_state))
+		return PTR_ERR(crtc_state);
+
+	DRM_DEBUG_KMS("Disabling crtc %c for upfront link train\n", pipe_name(pipe));
+
+	crtc_state->base.active = false;
+	ret = drm_atomic_commit(crtc_state->base.state);
+	if (ret) {
+		drm_atomic_state_free(crtc_state->base.state);
+		crtc_state->base.state = NULL;
+	}
+	return ret;
+}
+
+static int intel_dp_upfront_link_train(struct drm_connector *connector)
+{
+	struct intel_dp *intel_dp = intel_attached_dp(connector);
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+	struct intel_encoder *intel_encoder = &intel_dig_port->base;
+	struct drm_device *dev = intel_encoder->base.dev;
+	struct drm_mode_config *config = &dev->mode_config;
+	struct drm_modeset_acquire_ctx ctx;
+	struct intel_crtc_state *crtc_state, *tmp_crtc_config;
+	struct intel_crtc *intel_crtc;
+	struct drm_crtc *crtc = NULL;
+	bool crtc_enabled = false;
+	int ret, status = 0;
+
+	if (!IS_BROXTON(dev))
+		return true;
+
+	drm_modeset_acquire_init(&ctx, 0);
+retry:
+	ret = drm_modeset_lock(&config->connection_mutex, &ctx);
+	if (ret)
+		goto exit_fail;
+
+	if (connector->state->crtc) {
+		crtc = connector->state->crtc;
+
+		ret = drm_modeset_lock(&crtc->mutex, &ctx);
+		if (ret)
+			goto exit_fail;
+
+		crtc_enabled = true;
+	} else {
+		crtc = intel_get_unused_crtc(&intel_encoder->base, &ctx);
+		if (IS_ERR_OR_NULL(crtc)) {
+			ret = PTR_ERR_OR_ZERO(crtc);
+			DRM_DEBUG_KMS("No pipe available for upfront link train:%d\n", ret);
+			goto exit_fail;
+		}
+		intel_encoder->base.crtc = crtc;
+	}
+
+	intel_crtc = to_intel_crtc(crtc);
+	DRM_DEBUG_KMS("Using pipe %c for upfront link training\n",
+					pipe_name(intel_crtc->pipe));
+
+	ret = drm_modeset_lock(&crtc->primary->mutex, &ctx);
+	if (ret)
+		goto exit_fail;
+
+	if (crtc_enabled) {
+		ret = intel_dp_upfront_commit(intel_crtc, &ctx);
+		if (ret)
+			goto exit_fail;
+	}
+
+	crtc_state = intel_dp_upfront_get_crtc_state(intel_crtc, &ctx);
+	if (IS_ERR(crtc_state)) {
+		ret = PTR_ERR(crtc_state);
+		goto exit_fail;
+	}
+
+	/* Save the existing config */
+	tmp_crtc_config = intel_crtc->config;
+	intel_crtc->config = crtc_state;
+
+	if (HAS_DDI(dev))
+		status = intel_ddi_upfront_link_train(intel_dp, intel_crtc);
+		/* Other platforms upfront link train call goes here..*/
+
+	/* Restore the saved config */
+	intel_crtc->config = tmp_crtc_config;
+	intel_encoder->base.crtc = crtc_enabled ? crtc : NULL;
+	drm_atomic_state_free(crtc_state->base.state);
+
+exit_fail:
+	if (ret == -EDEADLK) {
+		drm_modeset_backoff(&ctx);
+		goto retry;
+	}
+	drm_modeset_drop_locks(&ctx);
+	drm_modeset_acquire_fini(&ctx);
+	return status;
+}
+
 static void
 intel_dp_long_pulse(struct intel_connector *intel_connector)
 {
@@ -4588,7 +4752,7 @@ intel_dp_long_pulse(struct intel_connector *intel_connector)
 	struct drm_device *dev = connector->dev;
 	enum drm_connector_status status;
 	enum intel_display_power_domain power_domain;
-	bool ret;
+	bool ret, do_upfront_link_train;
 	u8 sink_irq_vector;
 
 	power_domain = intel_display_port_aux_power_domain(intel_encoder);
@@ -4634,7 +4798,11 @@ intel_dp_long_pulse(struct intel_connector *intel_connector)
 		drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
 		intel_dp_check_link_status(intel_dp);
 		drm_modeset_unlock(&dev->mode_config.connection_mutex);
-		goto out;
+		/*
+		 * If we are here, we have (re)read DPCD above and hence
+		 * need to do upfront link train again.
+		 */
+		goto upfront;
 	}
 
 	/*
@@ -4664,6 +4832,14 @@ intel_dp_long_pulse(struct intel_connector *intel_connector)
 			DRM_DEBUG_DRIVER("CP or sink specific irq unhandled\n");
 	}
 
+upfront:
+	/* Do not do upfront link train, if it is a compliance request */
+	do_upfront_link_train =
+		intel_encoder->type == INTEL_OUTPUT_DISPLAYPORT &&
+		intel_dp->compliance_test_type != DP_TEST_LINK_TRAINING;
+
+	if (do_upfront_link_train && intel_dp_upfront_link_train(connector))
+		status = connector_status_disconnected;
 out:
 	if (status != connector_status_connected) {
 		intel_dp_unset_edid(intel_dp);
