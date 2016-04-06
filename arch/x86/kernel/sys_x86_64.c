@@ -157,6 +157,13 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 		info.align_mask = get_align_mask();
 		info.align_offset += get_align_bits();
 	}
+	if (filp && IS_ENABLED(CONFIG_FS_DAX_PMD) && IS_DAX(file_inode(filp))) {
+		unsigned long off_end = info.align_offset + len;
+		unsigned long off_pmd = round_up(info.align_offset, PMD_SIZE);
+
+		if ((off_end > off_pmd) && ((off_end - off_pmd) >= PMD_SIZE))
+			info.align_mask |= (PMD_SIZE - 1);
+	}
 	return vm_unmapped_area(&info);
 }
 
@@ -199,6 +206,13 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
 	if (filp) {
 		info.align_mask = get_align_mask();
 		info.align_offset += get_align_bits();
+	}
+	if (filp && IS_ENABLED(CONFIG_FS_DAX_PMD) && IS_DAX(file_inode(filp))) {
+		unsigned long off_end = info.align_offset + len;
+		unsigned long off_pmd = round_up(info.align_offset, PMD_SIZE);
+
+		if ((off_end > off_pmd) && ((off_end - off_pmd) >= PMD_SIZE))
+			info.align_mask |= (PMD_SIZE - 1);
 	}
 	addr = vm_unmapped_area(&info);
 	if (!(addr & ~PAGE_MASK))
