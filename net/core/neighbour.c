@@ -896,7 +896,6 @@ static void neigh_timer_handler(unsigned long arg)
 			neigh_suspect(neigh);
 			next = now + NEIGH_VAR(neigh->parms, DELAY_PROBE_TIME);
 		} else {
-			neigh_dbg(2, "neigh %p is suspected\n", neigh);
 			neigh->nud_state = NUD_STALE;
 			neigh->updated = jiffies;
 			neigh_suspect(neigh);
