@@ -1630,7 +1630,7 @@ static const struct nla_policy nft_expr_policy[NFTA_EXPR_MAX + 1] = {
 };
 
 static int nf_tables_fill_expr_info(struct sk_buff *skb,
-				    const struct nft_expr *expr)
+				    const struct nft_expr *expr, bool reset)
 {
 	if (nla_put_string(skb, NFTA_EXPR_NAME, expr->ops->type->name))
 		goto nla_put_failure;
@@ -1639,8 +1639,13 @@ static int nf_tables_fill_expr_info(struct sk_buff *skb,
 		struct nlattr *data = nla_nest_start(skb, NFTA_EXPR_DATA);
 		if (data == NULL)
 			goto nla_put_failure;
-		if (expr->ops->dump(skb, expr) < 0)
-			goto nla_put_failure;
+		if (reset) {
+			if (expr->ops->reset(skb, expr) < 0)
+				goto nla_put_failure;
+		} else {
+			if (expr->ops->dump(skb, expr) < 0)
+				goto nla_put_failure;
+		}
 		nla_nest_end(skb, data);
 	}
 
@@ -1650,21 +1655,27 @@ nla_put_failure:
 	return -1;
 };
 
-int nft_expr_dump(struct sk_buff *skb, unsigned int attr,
-		  const struct nft_expr *expr)
+int __nft_expr_dump(struct sk_buff *skb, unsigned int attr,
+		    const struct nft_expr *expr, bool reset)
 {
 	struct nlattr *nest;
 
 	nest = nla_nest_start(skb, attr);
 	if (!nest)
 		goto nla_put_failure;
-	if (nf_tables_fill_expr_info(skb, expr) < 0)
+	if (nf_tables_fill_expr_info(skb, expr, reset) < 0)
 		goto nla_put_failure;
 	nla_nest_end(skb, nest);
 	return 0;
 
 nla_put_failure:
 	return -1;
+}
+
+int nft_expr_dump(struct sk_buff *skb, unsigned int attr,
+		  const struct nft_expr *expr)
+{
+	return __nft_expr_dump(skb, attr, expr, false);
 }
 
 struct nft_expr_info {
@@ -3921,10 +3932,27 @@ err1:
 	return err;
 }
 
+static int nft_nexpr_dump(struct sk_buff *skb, const struct nft_table *table,
+			  const struct nft_nexpr *nexpr, bool reset)
+{
+	if (nla_put_string(skb, NFTA_NEXPR_TABLE, table->name) ||
+	    nla_put_string(skb, NFTA_NEXPR_NAME, nexpr->name) ||
+	    nla_put_be32(skb, NFTA_NEXPR_USE, htonl(nexpr->use)))
+		goto nla_put_failure;
+
+	if (__nft_expr_dump(skb, NFTA_NEXPR_EXPR, nexpr->expr, reset))
+		goto nla_put_failure;
+
+	return 0;
+
+nla_put_failure:
+	return -1;
+}
+
 static int nf_tables_fill_nexpr_info(struct sk_buff *skb, struct net *net,
 				     u32 portid, u32 seq, int event, u32 flags,
 				     int family, const struct nft_table *table,
-				     const struct nft_nexpr *nexpr)
+				     const struct nft_nexpr *nexpr, bool reset)
 {
 	struct nlmsghdr *nlh;
 	struct nfgenmsg *nfmsg;
@@ -3939,10 +3967,7 @@ static int nf_tables_fill_nexpr_info(struct sk_buff *skb, struct net *net,
 	nfmsg->version		= NFNETLINK_V0;
 	nfmsg->res_id		= htons(net->nft.base_seq & 0xffff);
 
-	if (nla_put_string(skb, NFTA_NEXPR_TABLE, table->name) ||
-	    nla_put_string(skb, NFTA_NEXPR_NAME, nexpr->name) ||
-	    nla_put_be32(skb, NFTA_NEXPR_USE, htonl(nexpr->use)) ||
-	    nft_expr_dump(skb, NFTA_NEXPR_EXPR, nexpr->expr))
+	if (nft_nexpr_dump(skb, table, nexpr, reset))
 		goto nla_put_failure;
 
 	nlmsg_end(skb, nlh);
@@ -3963,6 +3988,10 @@ static int nf_tables_dump_nexpr(struct sk_buff *skb,
 	unsigned int idx = 0, s_idx = cb->args[0];
 	struct net *net = sock_net(skb->sk);
 	int family = nfmsg->nfgen_family;
+	bool reset = false;
+
+	if (NFNL_MSG_TYPE(cb->nlh->nlmsg_type) == NFT_MSG_GETNEXPR_RESET)
+		reset = true;
 
 	rcu_read_lock();
 	cb->seq = net->nft.base_seq;
@@ -3982,7 +4011,7 @@ static int nf_tables_dump_nexpr(struct sk_buff *skb,
 							      cb->nlh->nlmsg_seq,
 							      NFT_MSG_NEWNEXPR,
 							      NLM_F_MULTI | NLM_F_APPEND,
-							      afi->family, table, nexpr) < 0)
+							      afi->family, table, nexpr, reset) < 0)
 					goto done;
 
 				nl_dump_check_consistent(cb, nlmsg_hdr(skb));
@@ -4008,6 +4037,7 @@ static int nf_tables_getnexpr(struct net *net, struct sock *nlsk,
 	const struct nft_table *table;
 	struct nft_nexpr *nexpr;
 	struct sk_buff *skb2;
+	bool reset = false;
 	int err;
 
 	if (nlh->nlmsg_flags & NLM_F_DUMP) {
@@ -4035,9 +4065,12 @@ static int nf_tables_getnexpr(struct net *net, struct sock *nlsk,
 	if (!skb2)
 		return -ENOMEM;
 
+	if (NFNL_MSG_TYPE(nlh->nlmsg_type) == NFT_MSG_GETNEXPR_RESET)
+		reset = true;
+
 	err = nf_tables_fill_nexpr_info(skb2, net, NETLINK_CB(skb).portid,
 					nlh->nlmsg_seq, NFT_MSG_NEWNEXPR, 0,
-					family, table, nexpr);
+					family, table, nexpr, reset);
 	if (err < 0)
 		goto err;
 
@@ -4103,7 +4136,7 @@ static int nf_tables_nexpr_notify(const struct nft_ctx *ctx,
 
 	err = nf_tables_fill_nexpr_info(skb, ctx->net, ctx->portid, ctx->seq,
 					event, 0, ctx->afi->family, ctx->table,
-					nexpr);
+					nexpr, false);
 	if (err < 0) {
 		kfree_skb(skb);
 		goto err;
@@ -4210,6 +4243,11 @@ static const struct nfnl_callback nf_tables_cb[NFT_MSG_MAX] = {
 	},
 	[NFT_MSG_DELNEXPR] = {
 		.call_batch	= nf_tables_delnexpr,
+		.attr_count	= NFTA_NEXPR_MAX,
+		.policy		= nft_nexpr_policy,
+	},
+	[NFT_MSG_GETNEXPR_RESET] = {
+		.call		= nf_tables_getnexpr,
 		.attr_count	= NFTA_NEXPR_MAX,
 		.policy		= nft_nexpr_policy,
 	},

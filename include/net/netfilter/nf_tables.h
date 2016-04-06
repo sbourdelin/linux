@@ -611,6 +611,7 @@ struct nft_expr_type {
  *	@init: initialization function
  *	@destroy: destruction function
  *	@dump: function to dump parameters
+ *	@reset: function to dump parameters and to reset internal state
  *	@type: expression type
  *	@validate: validate expression, called during loop detection
  *	@data: extra data to attach to this expression operation
@@ -631,6 +632,8 @@ struct nft_expr_ops {
 						   const struct nft_expr *expr);
 	int				(*dump)(struct sk_buff *skb,
 						const struct nft_expr *expr);
+	int				(*reset)(struct sk_buff *skb,
+						 const struct nft_expr *expr);
 	int				(*validate)(const struct nft_ctx *ctx,
 						    const struct nft_expr *expr,
 						    const struct nft_data **data);

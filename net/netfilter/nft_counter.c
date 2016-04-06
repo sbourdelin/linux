@@ -47,21 +47,29 @@ static void nft_counter_eval(const struct nft_expr *expr,
 	local_bh_enable();
 }
 
-static void nft_counter_fetch(const struct nft_counter_percpu __percpu *counter,
-			      struct nft_counter *total)
+static void nft_counter_fetch(struct nft_counter_percpu __percpu *counter,
+			      struct nft_counter *total, bool reset)
 {
-	const struct nft_counter_percpu *cpu_stats;
+	struct nft_counter_percpu *cpu_stats;
 	u64 bytes, packets;
 	unsigned int seq;
 	int cpu;
 
 	memset(total, 0, sizeof(*total));
 	for_each_possible_cpu(cpu) {
+		if (reset)
+			bytes = packets = 0;
+
 		cpu_stats = per_cpu_ptr(counter, cpu);
 		do {
 			seq	= u64_stats_fetch_begin_irq(&cpu_stats->syncp);
-			bytes	= cpu_stats->counter.bytes;
-			packets	= cpu_stats->counter.packets;
+			if (reset) {
+				packets += xchg(&cpu_stats->counter.packets, 0);
+				bytes	+= xchg(&cpu_stats->counter.bytes, 0);
+			} else {
+				bytes	= cpu_stats->counter.bytes;
+				packets	= cpu_stats->counter.packets;
+			}
 		} while (u64_stats_fetch_retry_irq(&cpu_stats->syncp, seq));
 
 		total->packets += packets;
@@ -69,12 +77,13 @@ static void nft_counter_fetch(const struct nft_counter_percpu __percpu *counter,
 	}
 }
 
-static int nft_counter_dump(struct sk_buff *skb, const struct nft_expr *expr)
+static int __nft_counter_dump(struct sk_buff *skb, const struct nft_expr *expr,
+			      bool reset)
 {
 	struct nft_counter_percpu_priv *priv = nft_expr_priv(expr);
 	struct nft_counter total;
 
-	nft_counter_fetch(priv->counter, &total);
+	nft_counter_fetch(priv->counter, &total, reset);
 
 	if (nla_put_be64(skb, NFTA_COUNTER_BYTES, cpu_to_be64(total.bytes)) ||
 	    nla_put_be64(skb, NFTA_COUNTER_PACKETS, cpu_to_be64(total.packets)))
@@ -83,6 +92,16 @@ static int nft_counter_dump(struct sk_buff *skb, const struct nft_expr *expr)
 
 nla_put_failure:
 	return -1;
+}
+
+static int nft_counter_dump(struct sk_buff *skb, const struct nft_expr *expr)
+{
+	return __nft_counter_dump(skb, expr, false);
+}
+
+static int nft_counter_reset(struct sk_buff *skb, const struct nft_expr *expr)
+{
+	return __nft_counter_dump(skb, expr, true);
 }
 
 static const struct nla_policy nft_counter_policy[NFTA_COUNTER_MAX + 1] = {
@@ -133,7 +152,7 @@ static int nft_counter_clone(struct nft_expr *dst, const struct nft_expr *src)
 	struct nft_counter_percpu *this_cpu;
 	struct nft_counter total;
 
-	nft_counter_fetch(priv->counter, &total);
+	nft_counter_fetch(priv->counter, &total, false);
 
 	cpu_stats = __netdev_alloc_pcpu_stats(struct nft_counter_percpu,
 					      GFP_ATOMIC);
@@ -158,6 +177,7 @@ static const struct nft_expr_ops nft_counter_ops = {
 	.init		= nft_counter_init,
 	.destroy	= nft_counter_destroy,
 	.dump		= nft_counter_dump,
+	.reset		= nft_counter_reset,
 	.clone		= nft_counter_clone,
 };
 

@@ -88,6 +88,7 @@ enum nft_verdicts {
  * @NFT_MSG_NEWNEXPR: create a new named expression (enum nft_nexpr_attributes)
  * @NFT_MSG_GETNEXPR: get a named expression (enum nft_nexpr_attributes)
  * @NFT_MSG_DELNEXPR: delete a named expression (enum nft_nexpr_attributes)
+ * @NFT_MSG_GETNEXPR_RESET: get and reset a named expression (enum nft_nexpr_attributes)
  */
 enum nf_tables_msg_types {
 	NFT_MSG_NEWTABLE,
@@ -111,6 +112,7 @@ enum nf_tables_msg_types {
 	NFT_MSG_NEWNEXPR,
 	NFT_MSG_GETNEXPR,
 	NFT_MSG_DELNEXPR,
+	NFT_MSG_GETNEXPR_RESET,
 	NFT_MSG_MAX,
 };
 
