@@ -1083,7 +1083,9 @@ static unsigned int sata_dwc_qc_issue(struct ata_queued_cmd *qc)
 		sata_dwc_exec_command_by_tag(ap, &qc->tf, qc->tag,
 					     SATA_DWC_CMD_ISSUED_PEND);
 	} else {
-		ata_sff_qc_issue(qc);
+		/* Sync ata_port with qc->tag */
+		ap->link.active_tag = qc->tag;
+		return ata_bmdma_qc_issue(qc);
 	}
 	return 0;
 }
