@@ -1818,7 +1818,7 @@ bool proc_fill_cache(struct file *file, struct dir_context *ctx,
 	ino_t ino;
 
 	child = d_hash_and_lookup(dir, &qname);
-	if (!child) {
+	if (IS_ERR_OR_NULL(child)) {
 		child = d_alloc(dir, &qname);
 		if (!child)
 			goto end_instantiate;
