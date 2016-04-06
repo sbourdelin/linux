@@ -49,6 +49,7 @@
 #include <asm/debugreg.h>
 #include <asm/switch_to.h>
 #include <asm/xen/hypervisor.h>
+#include <asm/vdso.h>
 
 asmlinkage extern void ret_from_fork(void);
 
@@ -505,6 +506,83 @@ void set_personality_ia32(bool x32)
 }
 EXPORT_SYMBOL_GPL(set_personality_ia32);
 
+#if defined(CONFIG_IA32_EMULATION) && defined(CONFIG_CHECKPOINT_RESTORE)
+/*
+ * Check if there are still some vmas (except vdso) for current,
+ * which placed above compatible TASK_SIZE.
+ * Check also code, data, stack, args and env placements.
+ * Returns true if all mappings are compatible.
+ */
+static bool task_mappings_compatible(void)
+{
+	struct mm_struct *mm = current->mm;
+	unsigned long top_addr = IA32_PAGE_OFFSET;
+	struct vm_area_struct *vma = find_vma(mm, top_addr);
+
+	if (mm->end_code	> top_addr ||
+	    mm->end_data	> top_addr ||
+	    mm->start_stack	> top_addr ||
+	    mm->brk		> top_addr ||
+	    mm->arg_end		> top_addr ||
+	    mm->env_end		> top_addr)
+		return false;
+
+	while (vma) {
+		if ((vma->vm_start != (unsigned long)mm->context.vdso) &&
+		    (vma->vm_end != (unsigned long)mm->context.vdso))
+			return false;
+
+		top_addr = vma->vm_end;
+		vma = find_vma(mm, top_addr);
+	}
+
+	return true;
+}
+
+static int do_set_personality(bool compat, unsigned long addr)
+{
+	int ret;
+	unsigned long old_vdso_base;
+	unsigned long old_mmap_base = current->mm->mmap_base;
+
+	if (test_thread_flag(TIF_IA32) == compat) /* nothing to do */
+		return 0;
+
+	if (compat && !task_mappings_compatible())
+		return -EFAULT;
+
+	/*
+	 * We can't just remap vdso to needed location:
+	 * vdso compatible and native images differs
+	 */
+	old_vdso_base = unmap_vdso();
+
+	if (compat)
+		set_personality_ia32(false);
+	else
+		set_personality_64bit();
+
+	/*
+	 * Update mmap_base & get_unmapped_area helper, side effect:
+	 * one may change get_unmapped_area or mmap_base with personality()
+	 * or switching to and fro compatible mode
+	 */
+	arch_pick_mmap_layout(current->mm);
+
+	ret = map_vdso(compat, addr);
+	if (ret) {
+		current->mm->mmap_base = old_mmap_base;
+		if (compat)
+			set_personality_64bit();
+		else
+			set_personality_ia32(false);
+		WARN_ON(map_vdso(!compat, old_vdso_base));
+	}
+
+	return ret;
+}
+#endif
+
 long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 {
 	int ret = 0;
@@ -591,6 +669,15 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 		ret = put_user(base, (unsigned long __user *)addr);
 		break;
 	}
+
+#if defined(CONFIG_IA32_EMULATION) && defined(CONFIG_CHECKPOINT_RESTORE)
+	case ARCH_SET_COMPAT:
+		return do_set_personality(true, addr);
+	case ARCH_SET_NATIVE:
+		return do_set_personality(false, addr);
+	case ARCH_GET_PERSONALITY:
+		return test_thread_flag(TIF_IA32);
+#endif
 
 	default:
 		ret = -EINVAL;

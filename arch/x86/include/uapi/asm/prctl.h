@@ -6,4 +6,10 @@
 #define ARCH_GET_FS 0x1003
 #define ARCH_GET_GS 0x1004
 
+#if defined(CONFIG_IA32_EMULATION) && defined(CONFIG_CHECKPOINT_RESTORE)
+#define ARCH_SET_COMPAT		0x2001
+#define ARCH_SET_NATIVE		0x2002
+#define ARCH_GET_PERSONALITY	0x2003
+#endif
+
 #endif /* _ASM_X86_PRCTL_H */

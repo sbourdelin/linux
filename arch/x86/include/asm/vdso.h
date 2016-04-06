@@ -39,6 +39,11 @@ extern const struct vdso_image vdso_image_x32;
 extern const struct vdso_image vdso_image_32;
 #endif
 
+#if defined(CONFIG_IA32_EMULATION) && defined(CONFIG_CHECKPOINT_RESTORE)
+extern int map_vdso(bool to_compat, unsigned long addr);
+extern unsigned long unmap_vdso(void);
+#endif
+
 extern void __init init_vdso_image(const struct vdso_image *image);
 
 #endif /* __ASSEMBLER__ */

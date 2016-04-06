@@ -156,22 +156,21 @@ static int vvar_fault(const struct vm_special_mapping *sm,
 	return VM_FAULT_SIGBUS;
 }
 
-static int map_vdso(const struct vdso_image *image, bool calculate_addr)
+static int do_map_vdso(const struct vdso_image *image, bool calculate_addr,
+		unsigned long addr)
 {
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
-	unsigned long addr, text_start;
+	unsigned long text_start;
 	int ret = 0;
 	static const struct vm_special_mapping vvar_mapping = {
 		.name = "[vvar]",
 		.fault = vvar_fault,
 	};
 
-	if (calculate_addr) {
+	if (calculate_addr && !addr) {
 		addr = vdso_addr(current->mm->start_stack,
 				 image->size - image->sym_vvar_start);
-	} else {
-		addr = 0;
 	}
 
 	down_write(&mm->mmap_sem);
@@ -209,11 +208,11 @@ static int map_vdso(const struct vdso_image *image, bool calculate_addr)
 				       VM_PFNMAP,
 				       &vvar_mapping);
 
-	if (IS_ERR(vma)) {
+	if (IS_ERR(vma))
 		ret = PTR_ERR(vma);
-		goto up_fail;
-	}
 
+	if (ret)
+		do_munmap(mm, addr, image->size - image->sym_vvar_start);
 up_fail:
 	if (ret)
 		current->mm->context.vdso = NULL;
@@ -223,24 +222,28 @@ up_fail:
 }
 
 #if defined(CONFIG_X86_32) || defined(CONFIG_IA32_EMULATION)
-static int load_vdso32(void)
+static int load_vdso32(unsigned long addr)
 {
 	if (vdso32_enabled != 1)  /* Other values all mean "disabled" */
 		return 0;
 
-	return map_vdso(&vdso_image_32, false);
+	return do_map_vdso(&vdso_image_32, false, addr);
 }
 #endif
 
 #ifdef CONFIG_X86_64
-int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
+static int load_vdso64(unsigned long addr)
 {
 	if (!vdso64_enabled)
 		return 0;
 
-	return map_vdso(&vdso_image_64, true);
+	return do_map_vdso(&vdso_image_64, true, addr);
 }
 
+int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
+{
+	return load_vdso64(0);
+}
 #ifdef CONFIG_COMPAT
 int compat_arch_setup_additional_pages(struct linux_binprm *bprm,
 				       int uses_interp)
@@ -250,20 +253,59 @@ int compat_arch_setup_additional_pages(struct linux_binprm *bprm,
 		if (!vdso64_enabled)
 			return 0;
 
-		return map_vdso(&vdso_image_x32, true);
+		return do_map_vdso(&vdso_image_x32, true, 0);
 	}
 #endif
 #ifdef CONFIG_IA32_EMULATION
-	return load_vdso32();
+	return load_vdso32(0);
 #else
 	return 0;
 #endif
 }
-#endif
-#else
+#endif /* CONFIG_COMPAT */
+
+#if defined(CONFIG_IA32_EMULATION) && defined(CONFIG_CHECKPOINT_RESTORE)
+unsigned long unmap_vdso(void)
+{
+	struct vm_area_struct *vma;
+	unsigned long addr = (unsigned long)current->mm->context.vdso;
+
+	if (!addr)
+		return 0;
+
+	/* vvar pages */
+	vma = find_vma(current->mm, addr - 1);
+	if (vma)
+		vm_munmap(vma->vm_start, vma->vm_end - vma->vm_start);
+
+	/* vdso pages */
+	vma = find_vma(current->mm, addr);
+	if (vma)
+		vm_munmap(vma->vm_start, vma->vm_end - vma->vm_start);
+
+	current->mm->context.vdso = NULL;
+
+	return addr;
+}
+/*
+ * Maps needed vdso type: vdso_image_32/vdso_image_64
+ * @compatible - true for compatible, false for native vdso image
+ * @addr - specify addr for vdso mapping (0 for random/searching)
+ * NOTE: be sure to set/clear thread-specific flags before
+ * calling this function.
+ */
+int map_vdso(bool compatible, unsigned long addr)
+{
+	if (compatible)
+		return load_vdso32(addr);
+	else
+		return load_vdso64(addr);
+}
+#endif /* CONFIG_IA32_EMULATION && CONFIG_CHECKPOINT_RESTORE */
+#else /* !CONFIG_X86_64 */
 int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
 {
-	return load_vdso32();
+	return load_vdso32(0);
 }
 #endif
 
