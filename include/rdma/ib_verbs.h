@@ -1416,6 +1416,10 @@ struct ib_srq {
 	} ext;
 };
 
+struct ib_qp_security {
+	void *q_security;
+};
+
 struct ib_qp {
 	struct ib_device       *device;
 	struct ib_pd	       *pd;
@@ -1433,6 +1437,7 @@ struct ib_qp {
 	void		       *qp_context;
 	u32			qp_num;
 	enum ib_qp_type		qp_type;
+	struct ib_qp_security  *qp_sec;
 };
 
 struct ib_mr {
