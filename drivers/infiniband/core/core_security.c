@@ -328,4 +328,21 @@ int ib_security_modify_qp(struct ib_qp *qp,
 }
 EXPORT_SYMBOL(ib_security_modify_qp);
 
+int ib_security_enforce_mad_agent_pkey_access(struct ib_device *dev,
+					      u8 port_num,
+					      u16 pkey_index,
+					      struct ib_mad_agent *mad_agent)
+{
+	u64 subnet_prefix;
+	u16 pkey;
+	int err;
+
+	err = get_pkey_info(dev, port_num, pkey_index, &subnet_prefix, &pkey);
+	if (err)
+		return err;
+
+	return security_mad_agent_pkey_access(subnet_prefix, pkey, mad_agent);
+}
+EXPORT_SYMBOL(ib_security_enforce_mad_agent_pkey_access);
+
 #endif /* CONFIG_SECURITY_INFINIBAND */

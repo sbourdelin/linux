@@ -142,6 +142,11 @@ int ib_get_cached_subnet_prefix(struct ib_device *device,
 				u64              *sn_pfx);
 
 #ifdef CONFIG_SECURITY_INFINIBAND
+int ib_security_enforce_mad_agent_pkey_access(struct ib_device *dev,
+					      u8 port_num,
+					      u16 pkey_index,
+					      struct ib_mad_agent *mad_agent);
+
 int ib_security_modify_qp(struct ib_qp *qp,
 			  struct ib_qp_attr *qp_attr,
 			  int qp_attr_mask,
@@ -152,6 +157,15 @@ void ib_security_destroy_qp(struct ib_qp_security *sec);
 int ib_security_open_shared_qp(struct ib_qp *qp);
 void ib_security_close_shared_qp(struct ib_qp_security *sec);
 #else
+static inline int ib_security_enforce_mad_agent_pkey_access(
+					      struct ib_device *dev,
+					      u8 port_num,
+					      u16 pkey_index,
+					      struct ib_mad_agent *mad_agent)
+{
+	return 0;
+}
+
 static inline int ib_security_modify_qp(struct ib_qp *qp,
 					struct ib_qp_attr *qp_attr,
 					int qp_attr_mask,
