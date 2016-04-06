@@ -142,6 +142,8 @@ struct vop {
 	struct vop_win win[];
 };
 
+static void vop_crtc_wait_for_update(struct drm_crtc *crtc);
+
 static inline void vop_writel(struct vop *vop, uint32_t offset, uint32_t v)
 {
 	writel(v, vop->regs + offset);
@@ -503,6 +505,9 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
 
 	if (!vop->is_enabled)
 		return;
+
+	if (crtc->state->event || vop->event)
+		vop_crtc_wait_for_update(crtc);
 
 	/*
 	 * We need to make sure that all windows are disabled before we
