@@ -140,4 +140,45 @@ static inline bool rdma_is_upper_dev_rcu(struct net_device *dev,
 int ib_get_cached_subnet_prefix(struct ib_device *device,
 				u8                port_num,
 				u64              *sn_pfx);
+
+#ifdef CONFIG_SECURITY_INFINIBAND
+int ib_security_modify_qp(struct ib_qp *qp,
+			  struct ib_qp_attr *qp_attr,
+			  int qp_attr_mask,
+			  struct ib_udata *udata);
+
+int ib_security_create_qp_security(struct ib_qp *qp);
+void ib_security_destroy_qp(struct ib_qp_security *sec);
+int ib_security_open_shared_qp(struct ib_qp *qp);
+void ib_security_close_shared_qp(struct ib_qp_security *sec);
+#else
+static inline int ib_security_modify_qp(struct ib_qp *qp,
+					struct ib_qp_attr *qp_attr,
+					int qp_attr_mask,
+					struct ib_udata *udata)
+{
+	return qp->device->modify_qp(qp->real_qp,
+				     qp_attr,
+				     qp_attr_mask,
+				     udata);
+}
+
+static inline int ib_security_create_qp_security(struct ib_qp *qp)
+{
+	return 0;
+}
+
+static inline void ib_security_destroy_qp(struct ib_qp_security *sec)
+{
+}
+
+static inline int ib_security_open_shared_qp(struct ib_qp *qp)
+{
+	return 0;
+}
+
+static inline void ib_security_close_shared_qp(struct ib_qp_security *sec)
+{
+}
+#endif
 #endif /* _CORE_PRIV_H */
