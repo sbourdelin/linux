@@ -4,9 +4,15 @@
  * Author:      Vladimir Barinov, <vbarinov@embeddedalley.com>
  * Copyright:   (C) 2007 MontaVista Software, Inc., <source@mvista.com>
  *
+ * DT support	(c) 2016 Petr Kulhavy, Barix AG <petr@barix.com>
+ *		based on davinci-mcasp.c DT support
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
+ *
+ * TODO:
+ * on DA850 implement HW FIFOs instead of DMA into DXR and DRR registers
  */
 
 #include <linux/init.h>
@@ -648,15 +654,82 @@ static const struct snd_soc_component_driver davinci_i2s_component = {
 	.name		= "davinci-i2s",
 };
 
+static struct snd_platform_data*
+davinci_i2s_set_pdata_from_of(struct platform_device *pdev)
+{
+	struct snd_platform_data *pdata = NULL;
+	struct device_node *np;
+	struct of_phandle_args dma_spec;
+	int ret;
+
+	if (!IS_ENABLED(CONFIG_OF) || !pdev->dev.of_node)
+		return dev_get_platdata(&pdev->dev);
+
+	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+	if (!pdata)
+		return ERR_PTR(-ENOMEM);
+
+	np = pdev->dev.of_node;
+
+	ret = of_property_match_string(np, "dma-names", "tx");
+	if (ret >= 0) {
+		ret = of_parse_phandle_with_args(np, "dmas", "#dma-cells", ret,
+						 &dma_spec);
+		if (ret >= 0)
+			pdata->tx_dma_channel = dma_spec.args[0];
+	}
+
+	ret = of_property_match_string(np, "dma-names", "rx");
+	if (ret >= 0) {
+		ret = of_parse_phandle_with_args(np, "dmas", "#dma-cells", ret,
+						 &dma_spec);
+		if (ret >= 0)
+			pdata->rx_dma_channel = dma_spec.args[0];
+	}
+
+	/* optional parameters */
+
+	pdata->enable_channel_combine =
+		of_property_read_bool(np, "channel-combine");
+
+	/*
+	 * pdata->clk_input_pin is deliberately not exported to DT
+	 * and the default value of the clk_input_pin is MCBSP_CLKR.
+	 * The value MCBSP_CLKS makes no sense as it turns the CPU
+	 * to a bit clock master in the SND_SOC_DAIFMT_CBM_CFS mode
+	 * where it should be bit clock slave!
+	 */
+
+	return pdata;
+}
+
 static int davinci_i2s_probe(struct platform_device *pdev)
 {
+	struct snd_platform_data *pdata;
 	struct davinci_mcbsp_dev *dev;
 	struct resource *mem, *res;
 	void __iomem *io_base;
 	int *dma;
 	int ret;
 
-	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	pdata = davinci_i2s_set_pdata_from_of(pdev);
+	if (IS_ERR(pdata)) {
+		dev_err(&pdev->dev, "Error populating platform data, err %ld\n",
+			PTR_ERR(pdata));
+		return PTR_ERR(pdata);
+	}
+
+	mem = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mpu");
+	if (!mem) {
+		dev_warn(&pdev->dev,
+			 "\"mpu\" mem resource not found, using index 0\n");
+		mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+		if (!mem) {
+			dev_err(&pdev->dev, "no mem resource?\n");
+			return -ENODEV;
+		}
+	}
+
 	io_base = devm_ioremap_resource(&pdev->dev, mem);
 	if (IS_ERR(io_base))
 		return PTR_ERR(io_base);
@@ -680,25 +753,21 @@ static int davinci_i2s_probe(struct platform_device *pdev)
 	    (dma_addr_t)(mem->start + DAVINCI_MCBSP_DRR_REG);
 
 	/* first TX, then RX */
-	res = platform_get_resource(pdev, IORESOURCE_DMA, 0);
-	if (!res) {
-		dev_err(&pdev->dev, "no DMA resource\n");
-		ret = -ENXIO;
-		goto err_release_clk;
-	}
 	dma = &dev->dma_request[SNDRV_PCM_STREAM_PLAYBACK];
-	*dma = res->start;
 	dev->dma_data[SNDRV_PCM_STREAM_PLAYBACK].filter_data = dma;
+	res = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+	if (res)
+		*dma = res->start;
+	else
+		*dma = pdata->tx_dma_channel;
 
-	res = platform_get_resource(pdev, IORESOURCE_DMA, 1);
-	if (!res) {
-		dev_err(&pdev->dev, "no DMA resource\n");
-		ret = -ENXIO;
-		goto err_release_clk;
-	}
 	dma = &dev->dma_request[SNDRV_PCM_STREAM_CAPTURE];
-	*dma = res->start;
 	dev->dma_data[SNDRV_PCM_STREAM_CAPTURE].filter_data = dma;
+	res = platform_get_resource(pdev, IORESOURCE_DMA, 1);
+	if (res)
+		*dma = res->start;
+	else
+		*dma = pdata->rx_dma_channel;
 
 	dev->dev = &pdev->dev;
 	dev_set_drvdata(&pdev->dev, dev);
@@ -737,11 +806,18 @@ static int davinci_i2s_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static const struct of_device_id davinci_mcbsp_match[] = {
+	{ .compatible = "ti,da850-mcbsp-audio" },
+	{},
+};
+MODULE_DEVICE_TABLE(of, davinci_mcbsp_match);
+
 static struct platform_driver davinci_mcbsp_driver = {
 	.probe		= davinci_i2s_probe,
 	.remove		= davinci_i2s_remove,
 	.driver		= {
 		.name	= "davinci-mcbsp",
+		.of_match_table = of_match_ptr(davinci_mcbsp_match),
 	},
 };
 
