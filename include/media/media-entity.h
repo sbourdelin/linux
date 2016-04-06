@@ -179,6 +179,9 @@ struct media_pad {
  * @link_validate:	Return whether a link is valid from the entity point of
  *			view. The media_entity_pipeline_start() function
  *			validates all links by calling this operation. Optional.
+ *
+ * Note: Those ioctls should not touch the struct media_device.@graph_mutex
+ * field, as they're called with it already hold.
  */
 struct media_entity_operations {
 	int (*link_setup)(struct media_entity *entity,
