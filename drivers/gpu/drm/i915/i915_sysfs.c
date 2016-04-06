@@ -318,6 +318,8 @@ static ssize_t gt_cur_freq_mhz_show(struct device *kdev,
 	intel_runtime_pm_get(dev_priv);
 
 	mutex_lock(&dev_priv->rps.hw_lock);
+	if (intel_slpc_active(dev))
+		dev_priv->rps.cur_freq = (I915_READ(GEN6_RPNSWREQ) >> 23);
 	ret = intel_gpu_freq(dev_priv, dev_priv->rps.cur_freq);
 	mutex_unlock(&dev_priv->rps.hw_lock);
 
