@@ -10365,6 +10365,43 @@ static int intel_modeset_setup_plane_state(struct drm_atomic_state *state,
 	return 0;
 }
 
+/**
+ * intel_get_unused_crtc - Find an unused crtc for the given encoder
+ * @encoder: drm_encoder structure
+ * @ctx: ctx pointer to use with locking
+ *
+ * This function tries to find an unused crtc that can drive
+ * the given encoder. Returns NULL on failure.
+ */
+struct drm_crtc *intel_get_unused_crtc(struct drm_encoder *encoder,
+				struct drm_modeset_acquire_ctx *ctx)
+{
+	struct drm_crtc *possible_crtc;
+	struct drm_crtc *crtc = NULL;
+	struct drm_device *dev = encoder->dev;
+	int ret, i = -1;
+
+	for_each_crtc(dev, possible_crtc) {
+		i++;
+		if (!(encoder->possible_crtcs & (1 << i)))
+			continue;
+
+		ret = drm_modeset_lock(&possible_crtc->mutex, ctx);
+		if (ret)
+			return ERR_PTR(ret);
+
+		if (possible_crtc->state->enable) {
+			drm_modeset_unlock(&possible_crtc->mutex);
+			continue;
+		}
+
+		crtc = possible_crtc;
+		break;
+	}
+
+	return crtc;
+}
+
 bool intel_get_load_detect_pipe(struct drm_connector *connector,
 				struct drm_display_mode *mode,
 				struct intel_load_detect_pipe *old,
@@ -10373,7 +10410,6 @@ bool intel_get_load_detect_pipe(struct drm_connector *connector,
 	struct intel_crtc *intel_crtc;
 	struct intel_encoder *intel_encoder =
 		intel_attached_encoder(connector);
-	struct drm_crtc *possible_crtc;
 	struct drm_encoder *encoder = &intel_encoder->base;
 	struct drm_crtc *crtc = NULL;
 	struct drm_device *dev = encoder->dev;
@@ -10382,7 +10418,7 @@ bool intel_get_load_detect_pipe(struct drm_connector *connector,
 	struct drm_atomic_state *state = NULL, *restore_state = NULL;
 	struct drm_connector_state *connector_state;
 	struct intel_crtc_state *crtc_state;
-	int ret, i = -1;
+	int ret;
 
 	DRM_DEBUG_KMS("[CONNECTOR:%d:%s], [ENCODER:%d:%s]\n",
 		      connector->base.id, connector->name,
@@ -10412,39 +10448,15 @@ retry:
 		ret = drm_modeset_lock(&crtc->mutex, ctx);
 		if (ret)
 			goto fail;
-
-		/* Make sure the crtc and connector are running */
-		goto found;
-	}
-
-	/* Find an unused one (if possible) */
-	for_each_crtc(dev, possible_crtc) {
-		i++;
-		if (!(encoder->possible_crtcs & (1 << i)))
-			continue;
-
-		ret = drm_modeset_lock(&possible_crtc->mutex, ctx);
-		if (ret)
+	} else {
+		crtc = intel_get_unused_crtc(encoder, ctx);
+		if (IS_ERR_OR_NULL(crtc)) {
+			ret = PTR_ERR_OR_ZERO(crtc);
+			DRM_DEBUG_KMS("no pipe available for load-detect\n");
 			goto fail;
-
-		if (possible_crtc->state->enable) {
-			drm_modeset_unlock(&possible_crtc->mutex);
-			continue;
 		}
-
-		crtc = possible_crtc;
-		break;
 	}
 
-	/*
-	 * If we didn't find an unused CRTC, don't use any.
-	 */
-	if (!crtc) {
-		DRM_DEBUG_KMS("no pipe available for load-detect\n");
-		goto fail;
-	}
-
-found:
 	intel_crtc = to_intel_crtc(crtc);
 
 	ret = drm_modeset_lock(&crtc->primary->mutex, ctx);
