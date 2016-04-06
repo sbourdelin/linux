@@ -581,6 +581,31 @@ static void srpt_unregister_mad_agent(struct srpt_device *sdev)
 	}
 }
 
+static int srpt_init_ioctx(struct srpt_device *sdev,
+					  struct srpt_ioctx *ioctx,
+					  int dma_size,
+					  enum dma_data_direction dir)
+{
+	int ret = -ENOMEM;
+
+	ioctx->buf = kmalloc(dma_size, GFP_KERNEL);
+	if (!ioctx->buf)
+		goto out;
+
+	ioctx->dma = ib_dma_map_single(sdev->device, ioctx->buf, dma_size, dir);
+	if (ib_dma_mapping_error(sdev->device, ioctx->dma))
+		goto free_buf;
+
+	ret = 0;
+
+out:
+	return ret;
+
+free_buf:
+	kfree(ioctx->buf);
+	goto out;
+}
+
 /**
  * srpt_alloc_ioctx() - Allocate an SRPT I/O context structure.
  */
@@ -592,24 +617,34 @@ static struct srpt_ioctx *srpt_alloc_ioctx(struct srpt_device *sdev,
 
 	ioctx = kmalloc(ioctx_size, GFP_KERNEL);
 	if (!ioctx)
-		goto err;
+		goto out;
 
-	ioctx->buf = kmalloc(dma_size, GFP_KERNEL);
-	if (!ioctx->buf)
-		goto err_free_ioctx;
+	if (srpt_init_ioctx(sdev, ioctx, dma_size, dir) < 0)
+		goto free;
 
-	ioctx->dma = ib_dma_map_single(sdev->device, ioctx->buf, dma_size, dir);
-	if (ib_dma_mapping_error(sdev->device, ioctx->dma))
-		goto err_free_buf;
-
+out:
 	return ioctx;
 
-err_free_buf:
-	kfree(ioctx->buf);
-err_free_ioctx:
+free:
 	kfree(ioctx);
-err:
-	return NULL;
+	ioctx = NULL;
+	goto out;
+}
+
+/*
+ * Note: it is safe to call this function for a zero-initialized buffer
+ * even if srpt_init_ioctx() has not been called.
+ */
+static void srpt_cleanup_ioctx(struct srpt_device *sdev,
+			       struct srpt_ioctx *ioctx,
+			       int dma_size,
+			       enum dma_data_direction dir)
+{
+	if (!ioctx->buf)
+		return;
+
+	ib_dma_unmap_single(sdev->device, ioctx->dma, dma_size, dir);
+	kfree(ioctx->buf);
 }
 
 /**
@@ -621,8 +656,7 @@ static void srpt_free_ioctx(struct srpt_device *sdev, struct srpt_ioctx *ioctx,
 	if (!ioctx)
 		return;
 
-	ib_dma_unmap_single(sdev->device, ioctx->dma, dma_size, dir);
-	kfree(ioctx->buf);
+	srpt_cleanup_ioctx(sdev, ioctx, dma_size, dir);
 	kfree(ioctx);
 }
 
