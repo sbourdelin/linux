@@ -759,11 +759,112 @@ static int hpet_cpuhp_notify(struct notifier_block *n,
 #endif
 
 /*
+ * Reading the HPET counter is a very slow operation. If a large number of
+ * CPUs are trying to access the HPET counter simultaneously, it can cause
+ * massive delay and slow down system performance dramatically. This may
+ * happen when HPET is the default clock source instead of TSC. For a
+ * really large system with hundreds of CPUs, the slowdown may be so
+ * severe that it may actually crash the system because of a NMI watchdog
+ * soft lockup, for example.
+ *
+ * If multiple CPUs are trying to access the HPET counter at the same time,
+ * we don't actually need to read the counter multiple times. Instead, the
+ * other CPUs can use the counter value read by the first CPU in the group.
+ *
+ * A sequence number whose lsb is a lock bit is used to control which CPU
+ * has the right to read the HPET counter directly and which CPUs are going
+ * to get the indirect value read by the lock holder. For the later group,
+ * if the sequence number differs from the expected locked value, they
+ * can assume that the saved HPET value is up-to-date and return it.
+ *
+ * This mechanism is only activated on system with a large number of CPUs.
+ * Currently, it is enabled when nr_cpus > 64.
+ */
+static bool use_hpet_save __read_mostly;
+static struct {
+	/* Sequence number + bit lock */
+	int	seq ____cacheline_aligned_in_smp;
+
+	/* Current HPET value		*/
+	cycle_t hpet ____cacheline_aligned_in_smp;
+} hpet_save;
+#define HPET_SEQ_LOCKED(seq)	((seq) & 1)	/* Odd == locked */
+#define HPET_RESET_THRESHOLD	(1 << 14)
+#define HPET_REUSE_THRESHOLD	64
+
+/*
  * Clock source related code
  */
 static cycle_t read_hpet(struct clocksource *cs)
 {
-	return (cycle_t)hpet_readl(HPET_COUNTER);
+	int seq, cnt = 0;
+	cycle_t time;
+
+	if (!use_hpet_save)
+		return (cycle_t)hpet_readl(HPET_COUNTER);
+
+	seq = READ_ONCE(hpet_save.seq);
+	if (!HPET_SEQ_LOCKED(seq)) {
+		int old, new = seq + 1;
+		unsigned long flags;
+
+		local_irq_save(flags);
+		/*
+		 * Set the lock bit (lsb) to get the right to read HPET
+		 * counter directly. If successful, read the counter, save
+		 * its value, and increment the sequence number. Otherwise,
+		 * increment the sequnce number to the expected locked value
+		 * for comparison later on.
+		 */
+		old = cmpxchg(&hpet_save.seq, seq, new);
+		if (old == seq) {
+			time = (cycle_t)hpet_readl(HPET_COUNTER);
+			WRITE_ONCE(hpet_save.hpet, time);
+
+			/* Unlock */
+			smp_store_release(&hpet_save.seq, new + 1);
+			local_irq_restore(flags);
+			return time;
+		}
+		local_irq_restore(flags);
+		seq = new;
+	}
+
+	/*
+	 * Wait until the locked sequence number changes which indicates
+	 * that the saved HPET value is up-to-date.
+	 */
+	while (READ_ONCE(hpet_save.seq) == seq) {
+		/*
+		 * Since reading the HPET is much slower than a single
+		 * cpu_relax() instruction, we use two here in an attempt
+		 * to reduce the amount of cacheline contention in the
+		 * hpet_save.seq cacheline.
+		 */
+		cpu_relax();
+		cpu_relax();
+
+		if (likely(++cnt <= HPET_RESET_THRESHOLD))
+			continue;
+
+		/*
+		 * In the unlikely event that it takes too long for the lock
+		 * holder to read the HPET, we do it ourselves and try to
+		 * reset the lock. This will also break a deadlock if it
+		 * happens, for example, when the process context lock holder
+		 * gets killed in the middle of reading the HPET counter.
+		 */
+		time = (cycle_t)hpet_readl(HPET_COUNTER);
+		WRITE_ONCE(hpet_save.hpet, time);
+		if (READ_ONCE(hpet_save.seq) == seq) {
+			if (cmpxchg(&hpet_save.seq, seq, seq + 1) == seq)
+				pr_warn("read_hpet: reset hpet seq to 0x%x\n",
+					seq + 1);
+		}
+		return time;
+	}
+
+	return READ_ONCE(hpet_save.hpet);
 }
 
 static struct clocksource clocksource_hpet = {
@@ -955,6 +1056,13 @@ static __init int hpet_late_init(void)
 
 	hpet_reserve_platform_timers(hpet_readl(HPET_ID));
 	hpet_print_config();
+
+	/*
+	 * Reuse HPET value read by another CPU if there are more than
+	 * HPET_REUSE_THRESHOLD CPUs in the system.
+	 */
+	if (num_possible_cpus() > HPET_REUSE_THRESHOLD)
+		use_hpet_save = true;
 
 	if (hpet_msi_disable)
 		return 0;
