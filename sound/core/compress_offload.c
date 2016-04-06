@@ -67,6 +67,8 @@ struct snd_compr_file {
 	struct snd_compr_stream stream;
 };
 
+static void xrun_delayed_work(struct work_struct *work);
+
 /*
  * a note on stream states used:
  * we use following states in the compressed core
@@ -123,6 +125,9 @@ static int snd_compr_open(struct inode *inode, struct file *f)
 		snd_card_unref(compr->card);
 		return -ENOMEM;
 	}
+
+	INIT_DELAYED_WORK(&data->stream.xrun_work, xrun_delayed_work);
+
 	data->stream.ops = compr->ops;
 	data->stream.direction = dirn;
 	data->stream.private_data = compr->private_data;
@@ -152,6 +157,8 @@ static int snd_compr_free(struct inode *inode, struct file *f)
 {
 	struct snd_compr_file *data = f->private_data;
 	struct snd_compr_runtime *runtime = data->stream.runtime;
+
+	cancel_delayed_work_sync(&data->stream.xrun_work);
 
 	switch (runtime->state) {
 	case SNDRV_PCM_STATE_RUNNING:
@@ -236,6 +243,14 @@ snd_compr_ioctl_avail(struct snd_compr_stream *stream, unsigned long arg)
 
 	avail = snd_compr_calc_avail(stream, &ioctl_avail);
 	ioctl_avail.avail = avail;
+
+	switch (stream->runtime->state) {
+	case SNDRV_PCM_STATE_OPEN:
+	case SNDRV_PCM_STATE_XRUN:
+		return -EBADFD;
+	default:
+		break;
+	}
 
 	if (copy_to_user((__u64 __user *)arg,
 				&ioctl_avail, sizeof(ioctl_avail)))
@@ -397,10 +412,16 @@ static unsigned int snd_compr_poll(struct file *f, poll_table *wait)
 		return -EFAULT;
 
 	mutex_lock(&stream->device->lock);
-	if (stream->runtime->state == SNDRV_PCM_STATE_OPEN) {
+
+	switch (stream->runtime->state) {
+	case SNDRV_PCM_STATE_OPEN:
+	case SNDRV_PCM_STATE_XRUN:
 		retval = -EBADFD;
 		goto out;
+	default:
+		break;
 	}
+
 	poll_wait(f, &stream->runtime->sleep, wait);
 
 	avail = snd_compr_get_avail(stream);
@@ -419,6 +440,9 @@ static unsigned int snd_compr_poll(struct file *f, poll_table *wait)
 	case SNDRV_PCM_STATE_PAUSED:
 		if (avail >= stream->runtime->fragment_size)
 			retval = snd_compr_get_poll(stream);
+		break;
+	case SNDRV_PCM_STATE_XRUN:
+		retval = -EBADFD;
 		break;
 	default:
 		if (stream->direction == SND_COMPRESS_PLAYBACK)
@@ -697,6 +721,38 @@ static int snd_compr_stop(struct snd_compr_stream *stream)
 	}
 	return retval;
 }
+
+static void xrun_delayed_work(struct work_struct *work)
+{
+	struct snd_compr_stream *stream;
+
+	stream = container_of(work, struct snd_compr_stream, xrun_work.work);
+
+	mutex_lock(&stream->device->lock);
+	snd_compr_stop(stream);
+	mutex_unlock(&stream->device->lock);
+}
+
+/*
+ * snd_compr_stop_xrun: Report a fatal error on a stream
+ * @stream: pointer to stream
+ *
+ * Stop the stream and set its state to XRUN.
+ *
+ * Should be called with compressed device lock held.
+ */
+int snd_compr_stop_xrun(struct snd_compr_stream *stream)
+{
+	if (stream->runtime->state == SNDRV_PCM_STATE_XRUN)
+		return 0;
+
+	stream->runtime->state = SNDRV_PCM_STATE_XRUN;
+
+	queue_delayed_work(system_power_efficient_wq, &stream->xrun_work, 0);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(snd_compr_stop_xrun);
 
 static int snd_compress_wait_for_drain(struct snd_compr_stream *stream)
 {
