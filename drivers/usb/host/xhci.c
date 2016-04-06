@@ -1107,6 +1107,7 @@ int xhci_resume(struct xhci_hcd *xhci, bool hibernated)
 	if (retval == 0) {
 		/* Resume root hubs only when have pending events. */
 		status = readl(&xhci->op_regs->status);
+		xhci_dbg(xhci, "xhci_resume status reg = 0x%x\n", status);
 		if (status & STS_EINT) {
 			usb_hcd_resume_root_hub(xhci->shared_hcd);
 			usb_hcd_resume_root_hub(hcd);
