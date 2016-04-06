@@ -34,6 +34,7 @@
 #include <linux/ctype.h>
 #include <linux/slab.h>
 #include <linux/of.h>
+#include <linux/dmi.h>
 #include <sound/core.h>
 #include <sound/jack.h>
 #include <sound/pcm.h>
@@ -1827,6 +1828,90 @@ int snd_soc_runtime_set_dai_fmt(struct snd_soc_pcm_runtime *rtd,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(snd_soc_runtime_set_dai_fmt);
+
+/**
+ * snd_soc_set_card_names() - Register DMI names to card
+ * @card: The card to register DMI names
+ * @firmware: The firmware name, optional
+ *
+ * This function registers DMI names to card for the userspace to distinguish
+ * different boards/products:
+ *   card driver name     --->  machine driver name
+ *   card short name      --->  DMI_BOARD_NAME or DMI_PRODUCT_NAME
+ *   card long name and
+ *   card component       --->  short name;driver name;(DMI_SYS_VENDOR,
+ *                              optional);(firmware name, optional)
+ *
+ * Returns 0 on success, otherwise a negative error code.
+ */
+int snd_soc_set_card_names(struct snd_soc_card *card, const char *firmware)
+{
+	int ret = 0;
+	size_t buf_size, name_size;
+	const char *board, *vendor;
+	char *longname;
+
+	board = dmi_get_system_info(DMI_BOARD_NAME);
+	if (!board)
+		board = dmi_get_system_info(DMI_PRODUCT_NAME);
+	if (!board) {
+		dev_err(card->dev, "ASoC: the board/product name is empty!\n");
+		return -EINVAL;
+	}
+
+	vendor = dmi_get_system_info(DMI_SYS_VENDOR);
+
+	/* card driver name */
+	card->driver_name = card->name;
+
+	/* card short name */
+	card->name = board;
+
+	/* card long name */
+	buf_size = sizeof(card->snd_card->longname);
+	name_size = strlen(card->name) + strlen(card->driver_name) + 4;
+	if (vendor)
+		name_size += strlen(vendor);
+	if (firmware)
+		name_size += strlen(firmware);
+	if (name_size > buf_size)
+		return -ENOMEM;
+
+	longname = kmalloc(buf_size, GFP_KERNEL);
+	if (!longname)
+		return -ENOMEM;
+	snprintf(longname, buf_size, "%s;%s;",
+			card->name, card->driver_name);
+	if (vendor)
+		strlcat(longname, vendor, buf_size);
+	strlcat(longname, ";", buf_size);
+	if (firmware)
+		strlcat(longname, firmware, buf_size);
+
+	card->long_name = longname;
+
+	/* card component */
+	if (sizeof(card->snd_card->components) < name_size
+			+ strlen(card->snd_card->components))
+		return -ENOMEM;
+
+	ret = snd_component_add(card->snd_card, card->long_name);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(snd_soc_set_card_names);
+
+/**
+ * snd_soc_cleanup_card_names() - cleanup registered DMI names
+ * @card: The card to cleanup
+ *
+ * This function cleanup the registered DMI names from card
+ */
+void snd_soc_cleanup_card_names(struct snd_soc_card *card)
+{
+	kfree(card->long_name);
+}
+EXPORT_SYMBOL_GPL(snd_soc_cleanup_card_names);
 
 static int snd_soc_instantiate_card(struct snd_soc_card *card)
 {
