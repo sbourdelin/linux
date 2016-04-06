@@ -65,7 +65,8 @@
 #define NO_IRQ		0
 #endif
 
-#define AHB_DMA_BRST_DFLT	64	/* 16 data items burst length*/
+#define AHB_DMA_BRST_DFLT	64
+#define BRST_TRANS_LEN_DFLT	16
 
 enum {
 	SATA_DWC_MAX_PORTS = 1,
@@ -318,8 +319,8 @@ static struct dma_async_tx_descriptor *dma_dwc_xfer_setup(struct ata_queued_cmd 
 	}
 
 	sconf.direction = qc->dma_dir;
-	sconf.src_maxburst = AHB_DMA_BRST_DFLT;
-	sconf.dst_maxburst = AHB_DMA_BRST_DFLT;
+	sconf.src_maxburst = BRST_TRANS_LEN_DFLT;
+	sconf.dst_maxburst = BRST_TRANS_LEN_DFLT;
 	sconf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
 	sconf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
 
