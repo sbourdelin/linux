@@ -65,6 +65,7 @@ enum pt_capabilities {
 struct pt_pmu {
 	struct pmu		pmu;
 	u32			caps[PT_CPUID_REGS_NUM * PT_CPUID_LEAVES];
+	bool			vmx;
 };
 
 /**
@@ -111,6 +112,7 @@ struct pt_buffer {
 struct pt {
 	struct perf_output_handle handle;
 	int			handle_nmi;
+	int			vmx_on;
 };
 
 #endif /* __INTEL_PT_H__ */
