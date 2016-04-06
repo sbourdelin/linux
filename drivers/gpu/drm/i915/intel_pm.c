@@ -4581,6 +4581,9 @@ void gen6_rps_boost(struct drm_i915_private *dev_priv,
 
 void intel_set_rps(struct drm_device *dev, u8 val)
 {
+	if (intel_slpc_active(dev))
+		return;
+
 	if (IS_VALLEYVIEW(dev) || IS_CHERRYVIEW(dev))
 		valleyview_set_rps(dev, val);
 	else
