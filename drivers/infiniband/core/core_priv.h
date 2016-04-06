@@ -38,6 +38,14 @@
 
 #include <rdma/ib_verbs.h>
 
+struct pkey_index_qp_list {
+	struct list_head    pkey_index_list;
+	u16                 pkey_index;
+	/* Lock to hold while iterating the qp_list. */
+	spinlock_t          qp_list_lock;
+	struct list_head    qp_list;
+};
+
 #if IS_ENABLED(CONFIG_INFINIBAND_ADDR_TRANS_CONFIGFS)
 int cma_configfs_init(void);
 void cma_configfs_exit(void);
@@ -147,14 +155,22 @@ int ib_security_enforce_mad_agent_pkey_access(struct ib_device *dev,
 					      u16 pkey_index,
 					      struct ib_mad_agent *mad_agent);
 
+void ib_security_destroy_port_pkey_list(struct ib_device *device);
+
+void ib_security_cache_change(struct ib_device *device,
+			      u8 port_num,
+			      u64 subnet_prefix);
+
 int ib_security_modify_qp(struct ib_qp *qp,
 			  struct ib_qp_attr *qp_attr,
 			  int qp_attr_mask,
 			  struct ib_udata *udata);
 
-int ib_security_create_qp_security(struct ib_qp *qp);
-void ib_security_destroy_qp(struct ib_qp_security *sec);
-int ib_security_open_shared_qp(struct ib_qp *qp);
+int ib_security_create_qp_security(struct ib_qp *qp, struct ib_device *dev);
+void ib_security_destroy_qp_begin(struct ib_qp_security *sec);
+void ib_security_destroy_qp_abort(struct ib_qp_security *sec);
+void ib_security_destroy_qp_end(struct ib_qp_security *sec);
+int ib_security_open_shared_qp(struct ib_qp *qp, struct ib_device *dev);
 void ib_security_close_shared_qp(struct ib_qp_security *sec);
 #else
 static inline int ib_security_enforce_mad_agent_pkey_access(
@@ -164,6 +180,16 @@ static inline int ib_security_enforce_mad_agent_pkey_access(
 					      struct ib_mad_agent *mad_agent)
 {
 	return 0;
+}
+
+static inline void ib_security_destroy_port_pkey_list(struct ib_device *device)
+{
+}
+
+static inline void ib_security_cache_change(struct ib_device *device,
+					    u8 port_num,
+					    u64 subnet_prefix)
+{
 }
 
 static inline int ib_security_modify_qp(struct ib_qp *qp,
@@ -177,16 +203,26 @@ static inline int ib_security_modify_qp(struct ib_qp *qp,
 				     udata);
 }
 
-static inline int ib_security_create_qp_security(struct ib_qp *qp)
+static inline int ib_security_create_qp_security(struct ib_qp *qp,
+						 struct ib_device *dev)
 {
 	return 0;
 }
 
-static inline void ib_security_destroy_qp(struct ib_qp_security *sec)
+static inline void ib_security_destroy_qp_begin(struct ib_qp_security *sec)
 {
 }
 
-static inline int ib_security_open_shared_qp(struct ib_qp *qp)
+static inline void ib_security_destroy_qp_abort(struct ib_qp_security *sec)
+{
+}
+
+static inline void ib_security_destroy_qp_end(struct ib_qp_security *sec)
+{
+}
+
+static inline int ib_security_open_shared_qp(struct ib_qp *qp,
+					     struct ib_device *dev)
 {
 	return 0;
 }

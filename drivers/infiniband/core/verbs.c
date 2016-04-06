@@ -688,13 +688,13 @@ static struct ib_qp *__ib_open_qp(struct ib_qp *real_qp,
 	if (!qp)
 		return ERR_PTR(-ENOMEM);
 
-	qp->real_qp = real_qp;
-	err = ib_security_open_shared_qp(qp);
+	err = ib_security_open_shared_qp(qp, real_qp->device);
 	if (err) {
 		kfree(qp);
 		return ERR_PTR(err);
 	}
 
+	qp->real_qp = real_qp;
 	atomic_inc(&real_qp->usecnt);
 	qp->device = real_qp->device;
 	qp->event_handler = event_handler;
@@ -742,7 +742,7 @@ struct ib_qp *ib_create_qp(struct ib_pd *pd,
 	qp = device->create_qp(pd, qp_init_attr, NULL);
 
 	if (!IS_ERR(qp)) {
-		err = ib_security_create_qp_security(qp);
+		err = ib_security_create_qp_security(qp, device);
 		if (err)
 			goto destroy_qp;
 
@@ -1280,6 +1280,8 @@ int ib_destroy_qp(struct ib_qp *qp)
 	rcq  = qp->recv_cq;
 	srq  = qp->srq;
 	sec  = qp->qp_sec;
+	if (sec)
+		ib_security_destroy_qp_begin(sec);
 
 	ret = qp->device->destroy_qp(qp);
 	if (!ret) {
@@ -1292,7 +1294,10 @@ int ib_destroy_qp(struct ib_qp *qp)
 		if (srq)
 			atomic_dec(&srq->usecnt);
 		if (sec)
-			ib_security_destroy_qp(sec);
+			ib_security_destroy_qp_end(sec);
+	} else {
+		if (sec)
+			ib_security_destroy_qp_abort(sec);
 	}
 
 	return ret;
