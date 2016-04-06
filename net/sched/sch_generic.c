@@ -165,6 +165,9 @@ int sch_direct_xmit(struct sk_buff *skb, struct Qdisc *q,
 			skb = dev_hard_start_xmit(skb, dev, txq, &ret);
 
 		HARD_TX_UNLOCK(dev, txq);
+	} else {
+		spin_lock(root_lock);
+		return qdisc_qlen(q);
 	}
 	spin_lock(root_lock);
 
