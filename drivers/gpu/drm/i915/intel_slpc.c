@@ -92,6 +92,11 @@ void intel_slpc_init(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct drm_i915_gem_object *obj;
 
+	/* Initialize the rps frequecny values */
+	mutex_lock(&dev_priv->rps.hw_lock);
+	gen6_init_rps_frequencies(dev);
+	mutex_unlock(&dev_priv->rps.hw_lock);
+
 	/* Allocate shared data structure */
 	obj = dev_priv->guc.slpc.shared_data_obj;
 	if (!obj) {
