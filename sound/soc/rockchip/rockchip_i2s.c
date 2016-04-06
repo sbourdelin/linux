@@ -11,6 +11,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/mfd/syscon.h>
 #include <linux/delay.h>
 #include <linux/of_gpio.h>
 #include <linux/clk.h>
@@ -33,6 +34,8 @@ struct rk_i2s_dev {
 	struct snd_dmaengine_dai_dma_data playback_dma_data;
 
 	struct regmap *regmap;
+	struct regmap *grf;
+	u32 iocfg_reg;
 
 	bool is_master_mode;
 };
@@ -277,6 +280,29 @@ static int rockchip_i2s_hw_params(struct snd_pcm_substream *substream,
 				   I2S_TXCR_VDW_MASK | I2S_TXCR_CSR_MASK,
 				   val);
 
+	if (!IS_ERR(i2s->grf)) {
+		regmap_read(i2s->regmap, I2S_TXCR, &val);
+		val &= I2S_TXCR_CSR_MASK;
+
+		switch (val) {
+		case I2S_CHN_4:
+			val = I2S_IO_4CH_OUT_6CH_IN;
+			break;
+		case I2S_CHN_6:
+			val = I2S_IO_6CH_OUT_4CH_IN;
+			break;
+		case I2S_CHN_8:
+			val = I2S_IO_8CH_OUT_2CH_IN;
+			break;
+		default:
+			val = I2S_IO_2CH_OUT_8CH_IN;
+			break;
+		}
+
+		regmap_write(i2s->grf, i2s->iocfg_reg,
+			     I2S_IO_DIRECTION_MASK << 16 | val);
+	}
+
 	regmap_update_bits(i2s->regmap, I2S_DMACR, I2S_DMACR_TDL_MASK,
 			   I2S_DMACR_TDL(16));
 	regmap_update_bits(i2s->regmap, I2S_DMACR, I2S_DMACR_RDL_MASK,
@@ -478,6 +504,18 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+	i2s->dev = &pdev->dev;
+
+	i2s->grf = syscon_regmap_lookup_by_phandle(node, "rockchip,grf");
+	if (!IS_ERR(i2s->grf)) {
+		ret = of_property_read_u32_index(node, "rockchip,grf",
+						 1, &i2s->iocfg_reg);
+		if (ret) {
+			dev_err(&pdev->dev, "Can't get iocfg_reg offset\n");
+			return ret;
+		}
+	}
+
 	/* try to prepare related clocks */
 	i2s->hclk = devm_clk_get(&pdev->dev, "i2s_hclk");
 	if (IS_ERR(i2s->hclk)) {
@@ -517,7 +555,6 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
 	i2s->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
 	i2s->capture_dma_data.maxburst = 4;
 
-	i2s->dev = &pdev->dev;
 	dev_set_drvdata(&pdev->dev, i2s);
 
 	pm_runtime_enable(&pdev->dev);
