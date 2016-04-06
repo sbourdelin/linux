@@ -581,7 +581,6 @@ void ib_security_cache_change(struct ib_device *device,
 			      u64 subnet_prefix)
 {
 	struct pkey_index_qp_list *pkey;
-
 	list_for_each_entry(pkey,
 			    &device->port_pkey_list[port_num].pkey_list,
 			    pkey_index_list) {
@@ -665,5 +664,4 @@ int ib_security_enforce_mad_agent_pkey_access(struct ib_device *dev,
 	return security_mad_agent_pkey_access(subnet_prefix, pkey, mad_agent);
 }
 EXPORT_SYMBOL(ib_security_enforce_mad_agent_pkey_access);
-
-#endif /* CONFIG_SECURITY_INFINIBAND */
+#endif

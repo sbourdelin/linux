@@ -230,5 +230,6 @@ static inline int ib_security_open_shared_qp(struct ib_qp *qp,
 static inline void ib_security_close_shared_qp(struct ib_qp_security *sec)
 {
 }
-#endif
+
+#endif /* CONFIG_SECURITY_INFINIBAND */
 #endif /* _CORE_PRIV_H */
