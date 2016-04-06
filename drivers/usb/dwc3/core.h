@@ -348,6 +348,11 @@
 #define DWC3_DSTS_LOWSPEED		(2 << 0)
 #define DWC3_DSTS_FULLSPEED1		(3 << 0)
 
+/* Global Debug Queue/FIFO Space Available Register */
+#define DWC3_GDBGFIFOSPACE_NUM(x)	(((x) << 0) & 0x1F)
+#define DWC3_GDBGFIFOSPACE_TYPE(x)	(((x) << 5) & 0xE0)
+#define DWC3_GDBGFIFOSPACE_GET_SPACE(x)	(((x) >> 16) & 0xFFFF)
+
 /* Device Generic Command Register */
 #define DWC3_DGCMD_SET_LMP		0x01
 #define DWC3_DGCMD_SET_PERIODIC_PAR	0x02

@@ -426,6 +426,45 @@ static const struct file_operations dwc3_mode_fops = {
 	.release		= single_release,
 };
 
+static int dwc3_fifo_show(struct seq_file *s, void *unused)
+{
+	struct dwc3		*dwc = s->private;
+	unsigned long		flags;
+	unsigned int		type, index;
+	const char		*name;
+	u32			reg;
+
+	static const char * const fifo_names[] = {
+		"TxFIFO", "RxFIFO", "TxReqQ", "RxReqQ", "RxInfoQ",
+		"DescFetchQ", "EventQ", "ProtocolStatusQ"};
+	spin_lock_irqsave(&dwc->lock, flags);
+	for (type = 0; type < 8; type++) {
+		name = fifo_names[type];
+		for (index = 0; index < 32; index++) {
+			dwc3_writel(dwc->regs, DWC3_GDBGFIFOSPACE,
+				DWC3_GDBGFIFOSPACE_NUM(index) |
+				DWC3_GDBGFIFOSPACE_TYPE(type));
+			reg = dwc3_readl(dwc->regs, DWC3_GDBGFIFOSPACE);
+			seq_printf(s, "%s%02d = %d\n", name, index,
+				DWC3_GDBGFIFOSPACE_GET_SPACE(reg));
+		}
+	}
+	spin_unlock_irqrestore(&dwc->lock, flags);
+	return 0;
+}
+
+static int dwc3_fifo_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, dwc3_fifo_show, inode->i_private);
+}
+
+static const struct file_operations dwc3_fifo_fops = {
+	.open			= dwc3_fifo_open,
+	.read			= seq_read,
+	.llseek			= seq_lseek,
+	.release		= single_release,
+};
+
 static int dwc3_testmode_show(struct seq_file *s, void *unused)
 {
 	struct dwc3		*dwc = s->private;
@@ -639,6 +678,7 @@ void dwc3_debugfs_init(struct dwc3 *dwc)
 	dwc->regset->base = dwc->regs;
 
 	debugfs_create_regset32("regdump", S_IRUGO, root, dwc->regset);
+	debugfs_create_file("fifo", S_IRUGO, root, dwc, &dwc3_fifo_fops);
 
 	if (IS_ENABLED(CONFIG_USB_DWC3_DUAL_ROLE))
 		debugfs_create_file("mode", S_IRUGO | S_IWUSR, root,
