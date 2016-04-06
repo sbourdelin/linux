@@ -746,6 +746,8 @@ int cdc_ncm_change_mtu(struct net_device *net, int new_mtu)
 	if (new_mtu <= 0 || new_mtu > maxmtu)
 		return -EINVAL;
 	net->mtu = new_mtu;
+	cdc_ncm_set_dgram_size(dev, new_mtu);
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(cdc_ncm_change_mtu);
