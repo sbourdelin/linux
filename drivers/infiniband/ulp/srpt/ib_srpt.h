@@ -179,7 +179,6 @@ struct srpt_recv_ioctx {
  * struct srpt_send_ioctx - SRPT send I/O context.
  * @ioctx:       See above.
  * @ch:          Channel pointer.
- * @free_list:   Node in srpt_rdma_ch.free_list.
  * @n_rbuf:      Number of data buffers in the received SRP command.
  * @rbufs:       Pointer to SRP data buffer array.
  * @single_rbuf: SRP data buffer if the command has only a single buffer.
@@ -202,7 +201,6 @@ struct srpt_send_ioctx {
 	struct srp_direct_buf	*rbufs;
 	struct srp_direct_buf	single_rbuf;
 	struct scatterlist	*sg;
-	struct list_head	free_list;
 	spinlock_t		spinlock;
 	enum srpt_command_state	state;
 	struct se_cmd		cmd;
@@ -250,8 +248,7 @@ enum rdma_ch_state {
  * @req_lim:       request limit: maximum number of requests that may be sent
  *                 by the initiator without having received a response.
  * @req_lim_delta: Number of credits not yet sent back to the initiator.
- * @spinlock:      Protects free_list and state.
- * @free_list:     Head of list with free send I/O contexts.
+ * @spinlock:      Protects modifications of @state.
  * @state:         channel state. See also enum rdma_ch_state.
  * @ioctx_ring:    Send ring.
  * @list:          Node for insertion in the srpt_device.rch_list list.
@@ -279,7 +276,6 @@ struct srpt_rdma_ch {
 	atomic_t		req_lim;
 	atomic_t		req_lim_delta;
 	spinlock_t		spinlock;
-	struct list_head	free_list;
 	enum rdma_ch_state	state;
 	struct srpt_send_ioctx	**ioctx_ring;
 	struct list_head	list;
