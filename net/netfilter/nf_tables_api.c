@@ -3800,11 +3800,25 @@ err:
 	return err;
 }
 
+struct nft_nexpr *nft_nexpr_lookup(const struct nft_table *table,
+				   const struct nlattr * const nla_name,
+				   const struct nlattr * const nla_type)
+{
+	struct nft_nexpr *nexpr;
+
+	list_for_each_entry(nexpr, &table->nexprs, list) {
+		if (!nla_strcmp(nla_name, nexpr->name) &&
+		    !nla_strcmp(nla_type, nexpr->expr->ops->type->name))
+			return nexpr;
+	}
+	return ERR_PTR(-ENOENT);
+}
+EXPORT_SYMBOL_GPL(nft_nexpr_lookup);
+
 static struct nft_nexpr *nf_tables_nexpr_lookup(const struct nft_table *table,
 						const struct nlattr * const nla[])
 {
 	struct nlattr *tb[NFTA_EXPR_MAX + 1];
-	struct nft_nexpr *nexpr;
 	int err;
 
 	if (!nla[NFTA_NEXPR_NAME] ||
@@ -3819,12 +3833,8 @@ static struct nft_nexpr *nf_tables_nexpr_lookup(const struct nft_table *table,
 	if (!tb[NFTA_EXPR_NAME])
 		return ERR_PTR(-EINVAL);
 
-	list_for_each_entry(nexpr, &table->nexprs, list) {
-		if (!nla_strcmp(nla[NFTA_NEXPR_NAME], nexpr->name) &&
-		    !nla_strcmp(tb[NFTA_EXPR_NAME], nexpr->expr->ops->type->name))
-			return nexpr;
-	}
-	return ERR_PTR(-ENOENT);
+	return nft_nexpr_lookup(table, nla[NFTA_NEXPR_NAME],
+				tb[NFTA_EXPR_NAME]);
 }
 
 static const struct nla_policy nft_nexpr_policy[NFTA_NEXPR_MAX + 1] = {

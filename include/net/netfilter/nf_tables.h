@@ -669,6 +669,10 @@ struct nft_nexpr {
 	struct nft_expr			*expr;
 };
 
+struct nft_nexpr *nft_nexpr_lookup(const struct nft_table *table,
+				   const struct nlattr * const nla_name,
+				   const struct nlattr * const nla_type);
+
 static inline void *nft_expr_priv(const struct nft_expr *expr)
 {
 	return (void *)expr->data;

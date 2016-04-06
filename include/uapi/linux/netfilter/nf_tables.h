@@ -1031,6 +1031,20 @@ enum nft_fwd_attributes {
 #define NFTA_FWD_MAX	(__NFTA_FWD_MAX - 1)
 
 /**
+ * enum nft_nexpr_ref_attributes - nf_tables named expression reference netlink attributes
+ *
+ * @NFTA_NEXPR_REF_NAME: name of this named expression (NLA_STRING)
+ * @NFTA_NEXPR_REF_TYPE: type of this named expression (NLA_STRING)
+ */
+enum nft_nexpr_ref_attributes {
+	NFTA_NEXPR_REF_UNSPEC,
+	NFTA_NEXPR_REF_NAME,
+	NFTA_NEXPR_REF_TYPE,
+	__NFTA_NEXPR_REF_MAX
+};
+#define NFTA_NEXPR_REF_MAX	(__NFTA_NEXPR_REF_MAX - 1)
+
+/**
  * enum nft_gen_attributes - nf_tables ruleset generation attributes
  *
  * @NFTA_GEN_ID: Ruleset generation ID (NLA_U32)

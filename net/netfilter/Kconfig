@@ -535,6 +535,12 @@ config NFT_NAT
 	  This option adds the "nat" expression that you can use to perform
 	  typical Network Address Translation (NAT) packet transformations.
 
+config NFT_NEXPR
+	tristate "Netfilter nf_tables named expression module"
+	help
+	  This option adds the "named" expression that you can use to
+	  refer an existing named expression.
+
 config NFT_QUEUE
 	depends on NETFILTER_NETLINK_QUEUE
 	tristate "Netfilter nf_tables queue module"
