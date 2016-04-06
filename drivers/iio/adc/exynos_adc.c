@@ -130,7 +130,6 @@
 
 struct exynos_adc {
 	struct exynos_adc_data	*data;
-	struct device		*dev;
 	struct input_dev	*input;
 	void __iomem		*regs;
 	struct regmap		*pmu_map;
@@ -173,11 +172,12 @@ static void exynos_adc_unprepare_clk(struct exynos_adc *info)
 
 static int exynos_adc_prepare_clk(struct exynos_adc *info)
 {
+	struct device *dev = regmap_get_device(info->pmu_map);
 	int ret;
 
 	ret = clk_prepare(info->clk);
 	if (ret) {
-		dev_err(info->dev, "failed preparing adc clock: %d\n", ret);
+		dev_err(dev, "failed preparing adc clock: %d\n", ret);
 		return ret;
 	}
 
@@ -185,7 +185,7 @@ static int exynos_adc_prepare_clk(struct exynos_adc *info)
 		ret = clk_prepare(info->sclk);
 		if (ret) {
 			clk_unprepare(info->clk);
-			dev_err(info->dev,
+			dev_err(dev,
 				"failed preparing sclk_adc clock: %d\n", ret);
 			return ret;
 		}
@@ -203,11 +203,12 @@ static void exynos_adc_disable_clk(struct exynos_adc *info)
 
 static int exynos_adc_enable_clk(struct exynos_adc *info)
 {
+	struct device *dev = regmap_get_device(info->pmu_map);
 	int ret;
 
 	ret = clk_enable(info->clk);
 	if (ret) {
-		dev_err(info->dev, "failed enabling adc clock: %d\n", ret);
+		dev_err(dev, "failed enabling adc clock: %d\n", ret);
 		return ret;
 	}
 
@@ -215,7 +216,7 @@ static int exynos_adc_enable_clk(struct exynos_adc *info)
 		ret = clk_enable(info->sclk);
 		if (ret) {
 			clk_disable(info->clk);
-			dev_err(info->dev,
+			dev_err(dev,
 				"failed enabling sclk_adc clock: %d\n", ret);
 			return ret;
 		}
@@ -610,13 +611,14 @@ static irqreturn_t exynos_adc_isr(int irq, void *dev_id)
 static irqreturn_t exynos_ts_isr(int irq, void *dev_id)
 {
 	struct exynos_adc *info = dev_id;
-	struct iio_dev *dev = dev_get_drvdata(info->dev);
+	struct device *dev = regmap_get_device(info->pmu_map);
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
 	u32 x, y;
 	bool pressed;
 	int ret;
 
 	while (info->input->users) {
-		ret = exynos_read_s3c64xx_ts(dev, &x, &y);
+		ret = exynos_read_s3c64xx_ts(indio_dev, &x, &y);
 		if (ret == -ETIMEDOUT)
 			break;
 
@@ -799,8 +801,6 @@ static int exynos_adc_probe(struct platform_device *pdev)
 		return irq;
 
 	info->tsirq = irq;
-
-	info->dev = &pdev->dev;
 
 	init_completion(&info->completion);
 
