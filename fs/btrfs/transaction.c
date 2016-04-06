@@ -1516,6 +1516,55 @@ static noinline int create_pending_snapshot(struct btrfs_trans_handle *trans,
 		goto fail;
 	}
 
+	/*
+	 * Account qgroups before insert the dir item
+	 * As such dir item insert will modify parent_root, which could be
+	 * src root. If we don't do it now, wrong accounting may be inherited
+	 * to snapshot qgroup.
+	 *
+	 * For reason locking tree_log_mutex, see btrfs_commit_transaction()
+	 * comment
+	 */
+	mutex_lock(&root->fs_info->tree_log_mutex);
+
+	ret = commit_fs_roots(trans, root);
+	if (ret) {
+		mutex_unlock(&root->fs_info->tree_log_mutex);
+		goto fail;
+	}
+
+	btrfs_apply_pending_changes(root->fs_info);
+
+	ret = btrfs_qgroup_prepare_account_extents(trans, root->fs_info);
+	if (ret < 0) {
+		mutex_unlock(&root->fs_info->tree_log_mutex);
+		goto fail;
+	}
+	ret = btrfs_qgroup_account_extents(trans, root->fs_info);
+	if (ret < 0) {
+		mutex_unlock(&root->fs_info->tree_log_mutex);
+		goto fail;
+	}
+	/*
+	 * Now qgroup are all updated, we can inherit it to new qgroups
+	 */
+	ret = btrfs_qgroup_inherit(trans, fs_info,
+				   root->root_key.objectid,
+				   objectid, pending->inherit);
+	if (ret < 0) {
+		mutex_unlock(&root->fs_info->tree_log_mutex);
+		goto fail;
+	}
+	/*
+	 * qgroup_account_extents() must be followed by a
+	 * switch_commit_roots(), or next qgroup_account_extents() will
+	 * be corrupted
+	 */
+	ret = commit_cowonly_roots(trans, root);
+	mutex_unlock(&root->fs_info->tree_log_mutex);
+	if (ret)
+		goto fail;
+
 	ret = btrfs_insert_dir_item(trans, parent_root,
 				    dentry->d_name.name, dentry->d_name.len,
 				    parent_inode, &key,
@@ -1554,23 +1603,6 @@ static noinline int create_pending_snapshot(struct btrfs_trans_handle *trans,
 	}
 
 	ret = btrfs_run_delayed_refs(trans, root, (unsigned long)-1);
-	if (ret) {
-		btrfs_abort_transaction(trans, root, ret);
-		goto fail;
-	}
-
-	/*
-	 * account qgroup counters before qgroup_inherit()
-	 */
-	ret = btrfs_qgroup_prepare_account_extents(trans, fs_info);
-	if (ret)
-		goto fail;
-	ret = btrfs_qgroup_account_extents(trans, fs_info);
-	if (ret)
-		goto fail;
-	ret = btrfs_qgroup_inherit(trans, fs_info,
-				   root->root_key.objectid,
-				   objectid, pending->inherit);
 	if (ret) {
 		btrfs_abort_transaction(trans, root, ret);
 		goto fail;
