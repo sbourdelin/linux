@@ -288,6 +288,7 @@ static ssize_t hugetlb_cgroup_write(struct kernfs_open_file *of,
 
 	switch (MEMFILE_ATTR(of_cft(of)->private)) {
 	case RES_LIMIT:
+		nr_pages &= ~((1 << huge_page_order(&hstates[idx])) - 1);
 		mutex_lock(&hugetlb_limit_mutex);
 		ret = page_counter_limit(&h_cg->hugepage[idx], nr_pages);
 		mutex_unlock(&hugetlb_limit_mutex);
