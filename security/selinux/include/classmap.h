@@ -159,5 +159,7 @@ struct security_class_mapping secclass_map[] = {
 		      NULL } },
 	{ "infiniband_pkey",
 	  { "access", NULL } },
+	{ "infiniband_device",
+	  { "smi", NULL } },
 	{ NULL }
   };

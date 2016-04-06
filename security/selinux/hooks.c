@@ -5996,6 +5996,32 @@ static int selinux_mad_agent_pkey_access(u64 subnet_prefix, u16 pkey_val,
 					mad_agent->m_security);
 }
 
+static int selinux_ibdev_smi(const char *dev_name, u8 port,
+			     struct ib_mad_agent *mad_agent)
+{
+	struct common_audit_data ad;
+	int err;
+	u32 sid = 0;
+	struct ib_security_struct *sec = mad_agent->m_security;
+	struct lsm_ibdev_audit ibdev;
+
+	err = security_ibdev_sid(dev_name, port, &sid);
+
+	if (err)
+		goto out;
+
+	ad.type = LSM_AUDIT_DATA_IBDEV;
+	strncpy(ibdev.dev_name, dev_name, sizeof(ibdev.dev_name));
+	ibdev.port = port;
+	ad.u.ibdev = &ibdev;
+	err = avc_has_perm(sec->sid, sid,
+			   SECCLASS_INFINIBAND_DEVICE,
+			   INFINIBAND_DEVICE__SMI, &ad);
+
+out:
+	return err;
+}
+
 static int selinux_ib_qp_alloc_security(struct ib_qp_security *qp_sec)
 {
 	struct ib_security_struct *sec;
@@ -6227,6 +6253,7 @@ static struct security_hook_list selinux_hooks[] = {
 		      selinux_unregister_ib_flush_callback),
 	LSM_HOOK_INIT(qp_pkey_access, selinux_qp_pkey_access),
 	LSM_HOOK_INIT(mad_agent_pkey_access, selinux_mad_agent_pkey_access),
+	LSM_HOOK_INIT(ibdev_smi, selinux_ibdev_smi),
 	LSM_HOOK_INIT(ib_qp_alloc_security,
 		      selinux_ib_qp_alloc_security),
 	LSM_HOOK_INIT(ib_qp_free_security,

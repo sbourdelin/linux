@@ -21,6 +21,7 @@
 #include <linux/path.h>
 #include <linux/key.h>
 #include <linux/skbuff.h>
+#include <rdma/ib_verbs.h>
 
 struct lsm_network_audit {
 	int netif;
@@ -50,6 +51,11 @@ struct lsm_pkey_audit {
 	u16	pkey;
 };
 
+struct lsm_ibdev_audit {
+	char	dev_name[IB_DEVICE_NAME_MAX];
+	u8	port;
+};
+
 /* Auxiliary data to use in generating the audit record. */
 struct common_audit_data {
 	char type;
@@ -65,6 +71,7 @@ struct common_audit_data {
 #define LSM_AUDIT_DATA_DENTRY	10
 #define LSM_AUDIT_DATA_IOCTL_OP	11
 #define LSM_AUDIT_DATA_PKEY	12
+#define LSM_AUDIT_DATA_IBDEV	13
 	union 	{
 		struct path path;
 		struct dentry *dentry;
@@ -82,6 +89,7 @@ struct common_audit_data {
 		char *kmod_name;
 		struct lsm_ioctlop_audit *op;
 		struct lsm_pkey_audit *pkey;
+		struct lsm_ibdev_audit *ibdev;
 	} u;
 	/* this union contains LSM specific data */
 	union {
