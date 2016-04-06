@@ -39,6 +39,7 @@ struct i915_params {
 	int enable_fbc;
 	int enable_ppgtt;
 	int enable_execlists;
+	int enable_slpc;
 	int enable_psr;
 	unsigned int preliminary_hw_support;
 	int disable_power_well;
