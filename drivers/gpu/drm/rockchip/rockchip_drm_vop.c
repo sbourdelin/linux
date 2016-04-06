@@ -1059,8 +1059,9 @@ static bool vop_win_pending_is_complete(struct vop_win *vop_win)
 	struct vop_plane_state *state = to_vop_plane_state(plane->state);
 	dma_addr_t yrgb_mst;
 
-	if (!state->enable)
-		return VOP_WIN_GET(vop_win->vop, vop_win->data, enable) == 0;
+	if (!state->enable &&
+	    VOP_WIN_GET(vop_win->vop, vop_win->data, enable) == 0)
+		return true;
 
 	yrgb_mst = VOP_WIN_GET_YRGBADDR(vop_win->vop, vop_win->data);
 
