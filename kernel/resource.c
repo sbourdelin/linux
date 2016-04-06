@@ -321,6 +321,8 @@ int request_resource(struct resource *root, struct resource *new)
 	struct resource *conflict;
 
 	conflict = request_resource_conflict(root, new);
+	new->start = 0;
+	new->end = 0;
 	return conflict ? -EBUSY : 0;
 }
 
@@ -864,6 +866,8 @@ int insert_resource(struct resource *parent, struct resource *new)
 	struct resource *conflict;
 
 	conflict = insert_resource_conflict(parent, new);
+	new->start = 0;
+	new->end = 0;
 	return conflict ? -EBUSY : 0;
 }
 EXPORT_SYMBOL_GPL(insert_resource);
