@@ -223,21 +223,15 @@ rt_mutex_enqueue_pi(struct task_struct *task, struct rt_mutex_waiter *waiter)
 	struct rb_node **link = &task->pi_waiters.rb_node;
 	struct rb_node *parent = NULL;
 	struct rt_mutex_waiter *entry;
-	int leftmost = 1;
 
 	while (*link) {
 		parent = *link;
 		entry = rb_entry(parent, struct rt_mutex_waiter, pi_tree_entry);
-		if (rt_mutex_waiter_less(waiter, entry)) {
+		if (rt_mutex_waiter_less(waiter, entry))
 			link = &parent->rb_left;
-		} else {
+		else
 			link = &parent->rb_right;
-			leftmost = 0;
-		}
 	}
-
-	if (leftmost)
-		task->pi_waiters_leftmost = &waiter->pi_tree_entry;
 
 	rb_link_node(&waiter->pi_tree_entry, parent, link);
 	rb_insert_color(&waiter->pi_tree_entry, &task->pi_waiters);
@@ -248,9 +242,6 @@ rt_mutex_dequeue_pi(struct task_struct *task, struct rt_mutex_waiter *waiter)
 {
 	if (RB_EMPTY_NODE(&waiter->pi_tree_entry))
 		return;
-
-	if (task->pi_waiters_leftmost == &waiter->pi_tree_entry)
-		task->pi_waiters_leftmost = rb_next(&waiter->pi_tree_entry);
 
 	rb_erase(&waiter->pi_tree_entry, &task->pi_waiters);
 	RB_CLEAR_NODE(&waiter->pi_tree_entry);

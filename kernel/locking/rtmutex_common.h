@@ -63,7 +63,7 @@ static inline int task_has_pi_waiters(struct task_struct *p)
 static inline struct rt_mutex_waiter *
 task_top_pi_waiter(struct task_struct *p)
 {
-	return rb_entry(p->pi_waiters_leftmost, struct rt_mutex_waiter,
+	return rb_entry(rb_first(&p->pi_waiters), struct rt_mutex_waiter,
 			pi_tree_entry);
 }
 
