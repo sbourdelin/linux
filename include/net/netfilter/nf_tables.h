@@ -653,6 +653,22 @@ struct nft_expr {
 	unsigned char			data[];
 };
 
+/**
+ *	struct nft_nexpr - nf_tables named expression
+ *
+ *	@list: table named expression list node
+ *	@name: name of this expression
+ *	@use: number of references to this named expression
+ *	@expr: pointer to expression object
+ */
+struct nft_nexpr {
+	struct list_head		list;
+	char				name[NFT_NEXPR_MAXNAMELEN];
+	u32				flags;
+	u32				use;
+	struct nft_expr			*expr;
+};
+
 static inline void *nft_expr_priv(const struct nft_expr *expr)
 {
 	return (void *)expr->data;
@@ -835,6 +851,7 @@ unsigned int nft_do_chain(struct nft_pktinfo *pkt, void *priv);
  *	@list: used internally
  *	@chains: chains in the table
  *	@sets: sets in the table
+ *	@nexprs: named expression in the table
  *	@hgenerator: handle generator state
  *	@use: number of chain references to this table
  *	@flags: table flag (see enum nft_table_flags)
@@ -844,6 +861,7 @@ struct nft_table {
 	struct list_head		list;
 	struct list_head		chains;
 	struct list_head		sets;
+	struct list_head		nexprs;
 	u64				hgenerator;
 	u32				use;
 	u16				flags;
@@ -1087,5 +1105,12 @@ struct nft_trans_elem {
 	(((struct nft_trans_elem *)trans->data)->set)
 #define nft_trans_elem(trans)	\
 	(((struct nft_trans_elem *)trans->data)->elem)
+
+struct nft_trans_nexpr {
+	struct nft_nexpr		*nexpr;
+};
+
+#define nft_trans_nexpr(trans)	\
+	(((struct nft_trans_nexpr *)trans->data)->nexpr)
 
 #endif /* _NET_NF_TABLES_H */
