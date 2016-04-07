@@ -3972,18 +3972,27 @@ regulator_register(const struct regulator_desc *regulator_desc,
 
 	dev_set_drvdata(&rdev->dev, rdev);
 
+	if (init_data && init_data->supply_regulator)
+		rdev->supply_name = init_data->supply_regulator;
+	else if (regulator_desc->supply_name)
+		rdev->supply_name = regulator_desc->supply_name;
+
+	/*
+	 * set_machine_constraints() needs the supply to be resolved in order
+	 * to support querying the current voltage in bypass mode. Resolve it
+	 * here to more easily handle deferred probing.
+	 */
+	ret = regulator_resolve_supply(rdev);
+	if (ret < 0)
+		goto scrub;
+
 	/* set regulator constraints */
 	if (init_data)
 		constraints = &init_data->constraints;
 
 	ret = set_machine_constraints(rdev, constraints);
 	if (ret < 0)
-		goto scrub;
-
-	if (init_data && init_data->supply_regulator)
-		rdev->supply_name = init_data->supply_regulator;
-	else if (regulator_desc->supply_name)
-		rdev->supply_name = regulator_desc->supply_name;
+		goto tumble;
 
 	/* add consumers devices */
 	if (init_data) {
@@ -4010,7 +4019,13 @@ regulator_register(const struct regulator_desc *regulator_desc,
 
 unset_supplies:
 	unset_regulator_supplies(rdev);
+tumble:
+	if (rdev->supply) {
+		if (_regulator_is_enabled(rdev))
+			regulator_disable(rdev->supply);
 
+		_regulator_put(rdev->supply);
+	}
 scrub:
 	regulator_ena_gpio_free(rdev);
 	device_unregister(&rdev->dev);
