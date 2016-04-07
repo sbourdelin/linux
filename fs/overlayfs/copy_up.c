@@ -260,7 +260,7 @@ static int ovl_copy_up_locked(struct dentry *workdir, struct dentry *upperdir,
 
 	/* Can't properly set mode on creation because of the umask */
 	stat->mode &= S_IFMT;
-	err = ovl_create_real(wdir, newdentry, stat, link, NULL, true);
+	err = ovl_create_real(wdir, newdentry, stat, link, NULL);
 	stat->mode = mode;
 	if (err)
 		goto out2;

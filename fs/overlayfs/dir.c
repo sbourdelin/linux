@@ -71,7 +71,7 @@ static struct dentry *ovl_whiteout(struct dentry *workdir,
 
 int ovl_create_real(struct inode *dir, struct dentry *newdentry,
 		    struct kstat *stat, const char *link,
-		    struct dentry *hardlink, bool debug)
+		    struct dentry *hardlink)
 {
 	int err;
 
@@ -79,15 +79,15 @@ int ovl_create_real(struct inode *dir, struct dentry *newdentry,
 		return -ESTALE;
 
 	if (hardlink) {
-		err = ovl_do_link(hardlink, dir, newdentry, debug);
+		err = ovl_do_link(hardlink, dir, newdentry);
 	} else {
 		switch (stat->mode & S_IFMT) {
 		case S_IFREG:
-			err = ovl_do_create(dir, newdentry, stat->mode, debug);
+			err = ovl_do_create(dir, newdentry, stat->mode);
 			break;
 
 		case S_IFDIR:
-			err = ovl_do_mkdir(dir, newdentry, stat->mode, debug);
+			err = ovl_do_mkdir(dir, newdentry, stat->mode);
 			break;
 
 		case S_IFCHR:
@@ -95,11 +95,11 @@ int ovl_create_real(struct inode *dir, struct dentry *newdentry,
 		case S_IFIFO:
 		case S_IFSOCK:
 			err = ovl_do_mknod(dir, newdentry,
-					   stat->mode, stat->rdev, debug);
+					   stat->mode, stat->rdev);
 			break;
 
 		case S_IFLNK:
-			err = ovl_do_symlink(dir, newdentry, link, debug);
+			err = ovl_do_symlink(dir, newdentry, link);
 			break;
 
 		default:
@@ -173,7 +173,7 @@ static int ovl_create_upper(struct dentry *dentry, struct inode *inode,
 	err = PTR_ERR(newdentry);
 	if (IS_ERR(newdentry))
 		goto out_unlock;
-	err = ovl_create_real(udir, newdentry, stat, link, hardlink, false);
+	err = ovl_create_real(udir, newdentry, stat, link, hardlink);
 	if (err)
 		goto out_dput;
 
@@ -246,7 +246,7 @@ static struct dentry *ovl_clear_empty(struct dentry *dentry,
 	if (IS_ERR(opaquedir))
 		goto out_unlock;
 
-	err = ovl_create_real(wdir, opaquedir, &stat, NULL, NULL, true);
+	err = ovl_create_real(wdir, opaquedir, &stat, NULL, NULL);
 	if (err)
 		goto out_dput;
 
@@ -343,7 +343,7 @@ static int ovl_create_over_whiteout(struct dentry *dentry, struct inode *inode,
 	if (IS_ERR(upper))
 		goto out_dput;
 
-	err = ovl_create_real(wdir, newdentry, stat, link, hardlink, true);
+	err = ovl_create_real(wdir, newdentry, stat, link, hardlink);
 	if (err)
 		goto out_dput2;
 

@@ -768,7 +768,7 @@ retry:
 			goto retry;
 		}
 
-		err = ovl_create_real(dir, work, &stat, NULL, NULL, true);
+		err = ovl_create_real(dir, work, &stat, NULL, NULL);
 		if (err)
 			goto out_dput;
 	}
