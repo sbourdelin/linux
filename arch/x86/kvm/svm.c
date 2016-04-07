@@ -71,6 +71,8 @@ MODULE_DEVICE_TABLE(x86cpu, svm_cpu_id);
 #define SVM_FEATURE_DECODE_ASSIST  (1 <<  7)
 #define SVM_FEATURE_PAUSE_FILTER   (1 << 10)
 
+#define SVM_AVIC_DOORBELL	0xc001011b
+
 #define NESTED_EXIT_HOST	0	/* Exit handled on host level */
 #define NESTED_EXIT_DONE	1	/* Exit caused nested vmexit  */
 #define NESTED_EXIT_CONTINUE	2	/* Further checks needed      */
@@ -216,6 +218,8 @@ static bool npt_enabled = true;
 static bool npt_enabled;
 #endif
 
+static struct kvm_x86_ops svm_x86_ops;
+
 /* allow nested paging (virtualized MMU) for all guests */
 static int npt = true;
 module_param(npt, int, S_IRUGO);
@@ -288,6 +292,18 @@ static inline void mark_dirty(struct vmcb *vmcb, int bit)
 static inline struct vcpu_svm *to_svm(struct kvm_vcpu *vcpu)
 {
 	return container_of(vcpu, struct vcpu_svm, vcpu);
+}
+
+static inline bool avic_vcpu_is_running(struct kvm_vcpu *vcpu)
+{
+	struct vcpu_svm *svm = to_svm(vcpu);
+	u64 *entry;
+
+	entry = svm->avic_physical_id_cache;
+	if (!entry)
+		return false;
+
+	return (READ_ONCE(*entry) & AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK);
 }
 
 static void recalc_intercepts(struct vcpu_svm *svm)
@@ -963,6 +979,8 @@ static __init int svm_hardware_setup(void)
 
 	if (avic) {
 		printk(KERN_INFO "kvm: AVIC enabled\n");
+	} else {
+		svm_x86_ops.deliver_posted_interrupt = NULL;
 	}
 
 	return 0;
@@ -2883,8 +2901,10 @@ static int clgi_interception(struct vcpu_svm *svm)
 	disable_gif(svm);
 
 	/* After a CLGI no interrupts should come */
-	svm_clear_vintr(svm);
-	svm->vmcb->control.int_ctl &= ~V_IRQ_MASK;
+	if (!svm_vcpu_avic_enabled(svm)) {
+		svm_clear_vintr(svm);
+		svm->vmcb->control.int_ctl &= ~V_IRQ_MASK;
+	}
 
 	mark_dirty(svm->vmcb, VMCB_INTR);
 
@@ -3777,6 +3797,7 @@ static inline void svm_inject_irq(struct vcpu_svm *svm, int irq)
 {
 	struct vmcb_control_area *control;
 
+	/* The following fields are ignored when AVIC is enabled */
 	control = &svm->vmcb->control;
 	control->int_vector = irq;
 	control->int_ctl &= ~V_INTR_PRIO_MASK;
@@ -3854,6 +3875,20 @@ static void svm_sync_pir_to_irr(struct kvm_vcpu *vcpu)
 	return;
 }
 
+static void svm_deliver_avic_intr(struct kvm_vcpu *vcpu, int vec)
+{
+	struct vcpu_svm *svm = to_svm(vcpu);
+
+	kvm_lapic_set_irr(vec, svm->vcpu.arch.apic);
+	smp_mb__after_atomic();
+
+	if (avic_vcpu_is_running(vcpu))
+		wrmsrl(SVM_AVIC_DOORBELL,
+		       __default_cpu_present_to_apicid(vcpu->cpu));
+	else
+		kvm_vcpu_wake_up(vcpu);
+}
+
 static int svm_nmi_allowed(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_svm *svm = to_svm(vcpu);
@@ -3907,6 +3942,9 @@ static int svm_interrupt_allowed(struct kvm_vcpu *vcpu)
 static void enable_irq_window(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_svm *svm = to_svm(vcpu);
+
+	if (svm_vcpu_avic_enabled(svm))
+		return;
 
 	/*
 	 * In case GIF=0 we can't rely on the CPU to tell us when GIF becomes
@@ -4651,6 +4689,7 @@ static struct kvm_x86_ops svm_x86_ops = {
 	.sched_in = svm_sched_in,
 
 	.pmu_ops = &amd_pmu_ops,
+	.deliver_posted_interrupt = svm_deliver_avic_intr,
 };
 
 static int __init svm_init(void)
