@@ -4560,14 +4560,26 @@ static u64 svm_get_mt_mask(struct kvm_vcpu *vcpu, gfn_t gfn, bool is_mmio)
 static void svm_cpuid_update(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_svm *svm = to_svm(vcpu);
+	struct kvm_cpuid_entry2 *entry;
 
 	/* Update nrips enabled cache */
 	svm->nrips_enabled = !!guest_cpuid_has_nrips(&svm->vcpu);
+
+	if (!svm_vcpu_avic_enabled(svm))
+		return;
+
+	entry = kvm_find_cpuid_entry(vcpu, 0x1, 0);
+	if (entry->function == 1)
+		entry->ecx &= ~bit(X86_FEATURE_X2APIC);
 }
 
 static void svm_set_supported_cpuid(u32 func, struct kvm_cpuid_entry2 *entry)
 {
 	switch (func) {
+	case 0x00000001:
+		if (avic)
+			entry->ecx &= ~bit(X86_FEATURE_X2APIC);
+		break;
 	case 0x80000001:
 		if (nested)
 			entry->ecx |= (1 << 2); /* Set SVM bit */
