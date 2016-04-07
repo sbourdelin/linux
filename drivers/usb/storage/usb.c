@@ -594,6 +594,10 @@ static int get_device_info(struct us_data *us, const struct usb_device_id *id,
 		return -ENODEV;
 	}
 
+	/* Flag USB3 devices so we can increase max_sectors to 2048 sectors. */
+	if (dev->speed == USB_SPEED_SUPER)
+		us->fflags |= US_FL_USB3;
+
 	/*
 	 * This flag is only needed when we're in high-speed, so let's
 	 * disable it if we're in full-speed

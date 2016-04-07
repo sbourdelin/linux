@@ -115,12 +115,18 @@ static int slave_configure(struct scsi_device *sdev)
 {
 	struct us_data *us = host_to_us(sdev->host);
 
-	/* Many devices have trouble transferring more than 32KB at a time,
-	 * while others have trouble with more than 64K. At this time we
-	 * are limiting both to 32K (64 sectores).
-	 */
-	if (us->fflags & (US_FL_MAX_SECTORS_64 | US_FL_MAX_SECTORS_MIN)) {
+	if (us->fflags & US_FL_USB3) {
+		/* USB3 devices will be limited to 2048 sectors. This gives us
+		 * better throughput on most devices.
+		 */
+		blk_queue_max_hw_sectors(sdev->request_queue, 2048);
+	} else if (us->fflags & (US_FL_MAX_SECTORS_64 | US_FL_MAX_SECTORS_MIN)) {
 		unsigned int max_sectors = 64;
+
+		/* Many devices have trouble transferring more than 32KB at a time,
+		 * while others have trouble with more than 64K. At this time we
+		 * are limiting both to 32K (64 sectores).
+		 */
 
 		if (us->fflags & US_FL_MAX_SECTORS_MIN)
 			max_sectors = PAGE_CACHE_SIZE >> 9;
