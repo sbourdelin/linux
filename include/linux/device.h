@@ -961,6 +961,13 @@ static inline void pm_suspend_ignore_children(struct device *dev, bool enable)
 	dev->power.ignore_children = enable;
 }
 
+static inline void pm_suspend_inherit_ignore_children(struct device *dev)
+{
+	if (!dev->parent)
+		return;
+	dev->power.ignore_children = dev->parent->power.ignore_children;
+}
+
 static inline void dev_pm_syscore_device(struct device *dev, bool val)
 {
 #ifdef CONFIG_PM_SLEEP
