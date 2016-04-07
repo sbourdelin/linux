@@ -1092,7 +1092,8 @@ static void init_vmcb(struct vcpu_svm *svm)
 	set_cr_intercept(svm, INTERCEPT_CR0_WRITE);
 	set_cr_intercept(svm, INTERCEPT_CR3_WRITE);
 	set_cr_intercept(svm, INTERCEPT_CR4_WRITE);
-	set_cr_intercept(svm, INTERCEPT_CR8_WRITE);
+	if (!svm_vcpu_avic_enabled(svm))
+		set_cr_intercept(svm, INTERCEPT_CR8_WRITE);
 
 	set_dr_intercepts(svm);
 
@@ -4069,7 +4070,8 @@ static void update_cr8_intercept(struct kvm_vcpu *vcpu, int tpr, int irr)
 {
 	struct vcpu_svm *svm = to_svm(vcpu);
 
-	if (is_guest_mode(vcpu) && (vcpu->arch.hflags & HF_VINTR_MASK))
+	if ((is_guest_mode(vcpu) && (vcpu->arch.hflags & HF_VINTR_MASK)) ||
+	     svm_vcpu_avic_enabled(svm))
 		return;
 
 	clr_cr_intercept(svm, INTERCEPT_CR8_WRITE);
@@ -4255,14 +4257,15 @@ static inline void sync_cr8_to_lapic(struct kvm_vcpu *vcpu)
 static inline void sync_lapic_to_cr8(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_svm *svm = to_svm(vcpu);
-	u64 cr8;
+	struct kvm_lapic *apic = vcpu->arch.apic;
 
-	if (is_guest_mode(vcpu) && (vcpu->arch.hflags & HF_VINTR_MASK))
+	if (is_guest_mode(vcpu) && (vcpu->arch.hflags & HF_VINTR_MASK) &&
+	    svm_vcpu_avic_enabled(svm))
 		return;
 
-	cr8 = kvm_get_cr8(vcpu);
 	svm->vmcb->control.int_ctl &= ~V_TPR_MASK;
-	svm->vmcb->control.int_ctl |= cr8 & V_TPR_MASK;
+	svm->vmcb->control.int_ctl |= (kvm_apic_get_reg(apic,
+				       APIC_TASKPRI) >> 4) & V_TPR_MASK;
 }
 
 static void svm_complete_interrupts(struct vcpu_svm *svm)
