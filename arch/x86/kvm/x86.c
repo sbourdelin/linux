@@ -7754,6 +7754,9 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 	kvm_page_track_init(kvm);
 	kvm_mmu_init_vm(kvm);
 
+	if (kvm_x86_ops->vm_init)
+		return kvm_x86_ops->vm_init(kvm);
+
 	return 0;
 }
 
@@ -7780,6 +7783,9 @@ static void kvm_free_vcpus(struct kvm *kvm)
 	}
 	kvm_for_each_vcpu(i, vcpu, kvm)
 		kvm_arch_vcpu_free(vcpu);
+
+	if (kvm_x86_ops->vm_uninit)
+		kvm_x86_ops->vm_uninit(kvm);
 
 	mutex_lock(&kvm->lock);
 	for (i = 0; i < atomic_read(&kvm->online_vcpus); i++)
