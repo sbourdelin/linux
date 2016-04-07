@@ -127,6 +127,11 @@ static void tpm_dev_release(struct device *dev)
 	idr_remove(&dev_nums_idr, chip->dev_num);
 	mutex_unlock(&idr_lock);
 
+	/* Make the driver uncallable. */
+	down_write(&chip->ops_sem);
+	chip->ops = NULL;
+	up_write(&chip->ops_sem);
+
 	kfree(chip);
 }
 
@@ -266,11 +271,6 @@ static void tpm_del_char_device(struct tpm_chip *chip)
 	mutex_lock(&idr_lock);
 	idr_replace(&dev_nums_idr, NULL, chip->dev_num);
 	mutex_unlock(&idr_lock);
-
-	/* Make the driver uncallable. */
-	down_write(&chip->ops_sem);
-	chip->ops = NULL;
-	up_write(&chip->ops_sem);
 }
 
 static int tpm1_chip_register(struct tpm_chip *chip)
