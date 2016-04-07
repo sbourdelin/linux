@@ -72,6 +72,7 @@ struct vfsmount {
 struct file; /* forward dec */
 struct path;
 
+extern struct vfsmount *lookup_mnt(struct path *);
 extern int mnt_want_write(struct vfsmount *mnt);
 extern int mnt_want_write_file(struct file *file);
 extern int mnt_clone_write(struct vfsmount *mnt);

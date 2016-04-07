@@ -332,8 +332,6 @@ static int validate_request(struct autofs_wait_queue **wait,
 					dentry = new;
 			}
 		}
-		if (have_submounts(dentry))
-			valid = 0;
 
 		if (new)
 			dput(new);

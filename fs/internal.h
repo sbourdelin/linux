@@ -58,7 +58,6 @@ extern int vfs_path_lookup(struct dentry *, struct vfsmount *,
 extern void *copy_mount_options(const void __user *);
 extern char *copy_mount_string(const void __user *);
 
-extern struct vfsmount *lookup_mnt(struct path *);
 extern int finish_automount(struct vfsmount *, struct path *);
 
 extern int sb_prepare_remount_readonly(struct super_block *);

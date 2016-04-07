@@ -378,38 +378,28 @@ static struct vfsmount *autofs4_d_automount(struct path *path)
 		goto done;
 	}
 
-	if (!d_mountpoint(dentry)) {
-		/*
-		 * It's possible that user space hasn't removed directories
-		 * after umounting a rootless multi-mount, although it
-		 * should. For v5 have_submounts() is sufficient to handle
-		 * this because the leaves of the directory tree under the
-		 * mount never trigger mounts themselves (they have an autofs
-		 * trigger mount mounted on them). But v4 pseudo direct mounts
-		 * do need the leaves to trigger mounts. In this case we
-		 * have no choice but to use the list_empty() check and
-		 * require user space behave.
-		 */
-		if (sbi->version > 4) {
-			if (have_submounts(dentry)) {
-				spin_unlock(&sbi->fs_lock);
-				goto done;
-			}
-		} else {
-			if (!simple_empty(dentry)) {
-				spin_unlock(&sbi->fs_lock);
-				goto done;
-			}
-		}
-		ino->flags |= AUTOFS_INF_PENDING;
-		spin_unlock(&sbi->fs_lock);
-		status = autofs4_mount_wait(dentry, 0);
-		spin_lock(&sbi->fs_lock);
-		ino->flags &= ~AUTOFS_INF_PENDING;
-		if (status) {
+	if (d_mountpoint(dentry)) {
+		/* Make sure this is a mountpoint in this namespace. */
+		struct vfsmount *mounted = lookup_mnt(path);
+		if (mounted) {
+			mntput(mounted);
 			spin_unlock(&sbi->fs_lock);
-			return ERR_PTR(status);
+			goto done;
 		}
+	}
+
+	if (!simple_empty(dentry)) {
+		spin_unlock(&sbi->fs_lock);
+		goto done;
+	}
+	ino->flags |= AUTOFS_INF_PENDING;
+	spin_unlock(&sbi->fs_lock);
+	status = autofs4_mount_wait(dentry, 0);
+	spin_lock(&sbi->fs_lock);
+	ino->flags &= ~AUTOFS_INF_PENDING;
+	if (status) {
+		spin_unlock(&sbi->fs_lock);
+		return ERR_PTR(status);
 	}
 	spin_unlock(&sbi->fs_lock);
 done:
