@@ -690,6 +690,10 @@ follow_huge_addr(struct mm_struct *mm, unsigned long address, int write)
 	unsigned long mask, flags;
 	struct page *page = ERR_PTR(-EINVAL);
 
+#ifdef CONFIG_ARCH_WANT_GENERAL_HUGETLB
+	return ERR_PTR(-EINVAL);
+#endif
+
 	local_irq_save(flags);
 	ptep = find_linux_pte_or_hugepte(mm->pgd, address, &is_thp, &shift);
 	if (!ptep)
@@ -717,6 +721,7 @@ no_page:
 	return page;
 }
 
+#ifndef CONFIG_ARCH_WANT_GENERAL_HUGETLB
 struct page *
 follow_huge_pmd(struct mm_struct *mm, unsigned long address,
 		pmd_t *pmd, int write)
@@ -732,6 +737,15 @@ follow_huge_pud(struct mm_struct *mm, unsigned long address,
 	BUG();
 	return NULL;
 }
+
+struct page *
+follow_huge_pgd(struct mm_struct *mm, unsigned long address,
+		pgd_t *pgd, int write)
+{
+	BUG();
+	return NULL;
+}
+#endif /* !CONFIG_ARCH_WANT_GENERAL_HUGETLB */
 
 static unsigned long hugepte_addr_end(unsigned long addr, unsigned long end,
 				      unsigned long sz)

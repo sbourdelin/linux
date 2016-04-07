@@ -146,6 +146,16 @@ extern bool __rpte_sub_valid(real_pte_t rpte, unsigned long index);
  * Defined in such a way that we can optimize away code block at build time
  * if CONFIG_HUGETLB_PAGE=n.
  */
+#ifdef CONFIG_ARCH_WANT_GENERAL_HUGETLB
+static inline int pte_huge(pte_t pte)
+{
+	/*
+	 * leaf pte for huge page
+	 */
+	return !!(pte_val(pte) & _PAGE_PTE);
+}
+#endif
+
 static inline int pmd_huge(pmd_t pmd)
 {
 	/*
