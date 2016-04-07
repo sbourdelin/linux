@@ -288,9 +288,6 @@ static u32 log_buf_len = __LOG_BUF_LEN;
 
 /* Control whether printing to console must be synchronous. */
 static bool __read_mostly printk_sync = true;
-module_param_named(synchronous, printk_sync, bool, S_IRUGO);
-MODULE_PARM_DESC(synchronous, "make printing to console synchronous");
-
 /* Printing kthread for async printk */
 static struct task_struct *printk_kthread;
 /* When `true' printing thread has messages to print */
@@ -1785,7 +1782,7 @@ asmlinkage int vprintk_emit(int facility, int level,
 		 * operate in sync mode once panic() occurred.
 		 */
 		if (console_loglevel != CONSOLE_LOGLEVEL_MOTORMOUTH &&
-				printk_kthread) {
+				!printk_sync && printk_kthread) {
 			/* Offload printing to a schedulable context. */
 			printk_kthread_need_flush_console = true;
 			wake_up_process(printk_kthread);
@@ -2757,6 +2754,16 @@ static int __init printk_late_init(void)
 late_initcall(printk_late_init);
 
 #if defined CONFIG_PRINTK
+/*
+ * kernel_param_ops.set is called from two places:
+ * - from parse_args()->printk_sync_set(), when we can't kthread_run(), so
+ *   we just set the param value. The actual initalization happens later,
+ *   from late_initcall().
+ *
+ * - from user space via sysfs knob; we can kthread_run() there (if needed).
+ */
+static bool printk_initcall_done;
+
 static int printk_kthread_func(void *data)
 {
 	while (1) {
@@ -2780,11 +2787,7 @@ static int printk_kthread_func(void *data)
 	return 0;
 }
 
-/*
- * Init async printk via late_initcall, after core/arch/device/etc.
- * initialization.
- */
-static int __init init_printk_kthread(void)
+static int __init_printk_kthread(void)
 {
 	struct task_struct *thread;
 	struct sched_param param = {
@@ -2792,6 +2795,9 @@ static int __init init_printk_kthread(void)
 	};
 
 	if (printk_sync)
+		return 0;
+
+	if (printk_kthread)
 		return 0;
 
 	thread = kthread_run(printk_kthread_func, NULL, "printk");
@@ -2804,6 +2810,43 @@ static int __init init_printk_kthread(void)
 	sched_setscheduler(thread, SCHED_FIFO, &param);
 	printk_kthread = thread;
 	return 0;
+}
+
+static int printk_sync_set(const char *val, const struct kernel_param *kp)
+{
+	static DEFINE_MUTEX(printk_sync_lock);
+	int ret;
+
+	mutex_lock(&printk_sync_lock);
+	ret = param_set_bool(val, kp);
+	if (ret) {
+		mutex_unlock(&printk_sync_lock);
+		return ret;
+	}
+
+	if (printk_initcall_done)
+		ret = __init_printk_kthread();
+	mutex_unlock(&printk_sync_lock);
+	return ret;
+}
+
+static const struct kernel_param_ops param_ops_printk_sync = {
+	.set = printk_sync_set,
+	.get = param_get_bool,
+};
+
+module_param_cb(synchronous, &param_ops_printk_sync, &printk_sync,
+		S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(synchronous, "make printing to console synchronous");
+
+/*
+ * Init async printk via late_initcall, after core/arch/device/etc.
+ * initialization.
+ */
+static __init int init_printk_kthread(void)
+{
+	printk_initcall_done = true;
+	return __init_printk_kthread();
 }
 late_initcall(init_printk_kthread);
 
@@ -2820,7 +2863,7 @@ static void wake_up_klogd_work_func(struct irq_work *irq_work)
 	int pending = __this_cpu_xchg(printk_pending, 0);
 
 	if (pending & PRINTK_PENDING_OUTPUT) {
-		if (printk_kthread) {
+		if (!printk_sync && printk_kthread) {
 			wake_up_process(printk_kthread);
 		} else {
 			/*
