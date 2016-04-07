@@ -428,6 +428,8 @@ struct lock_class_key { };
 #define lockdep_pin_lock(l)				do { (void)(l); } while (0)
 #define lockdep_unpin_lock(l)			do { (void)(l); } while (0)
 
+#define lockdep_is_held(l)			({ (void)(l); (1); })
+
 #endif /* !LOCKDEP */
 
 #ifdef CONFIG_LOCK_STAT
