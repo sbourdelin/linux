@@ -3,6 +3,7 @@
 #
 config DECNET
 	tristate "DECnet Support"
+	depends on BROKEN
 	---help---
 	  The DECnet networking protocol was used in many products made by
 	  Digital (now Compaq).  It provides reliable stream and sequenced
