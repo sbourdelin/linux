@@ -686,10 +686,12 @@ endif
 KBUILD_CFLAGS += $(stackp-flag)
 
 ifdef CONFIG_KCOV
-  ifeq ($(call cc-option, $(CFLAGS_KCOV)),)
-    $(warning Cannot use CONFIG_KCOV: \
+  ifneq ($(CFLAGS_KCOV),)
+    ifeq ($(call cc-option, $(CFLAGS_KCOV)),)
+      $(warning Cannot use CONFIG_KCOV: \
              -fsanitize-coverage=trace-pc is not supported by compiler)
-    CFLAGS_KCOV =
+      CFLAGS_KCOV =
+    endif
   endif
 endif
 
