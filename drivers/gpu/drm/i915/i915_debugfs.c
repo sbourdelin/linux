@@ -3219,12 +3219,26 @@ static int i915_shared_dplls_info(struct seq_file *m, void *unused)
 		seq_printf(m, " crtc_mask: 0x%08x, active: 0x%x, on: %s\n",
 			   pll->config.crtc_mask, pll->active_mask, yesno(pll->on));
 		seq_printf(m, " tracked hardware state:\n");
-		seq_printf(m, " dpll:    0x%08x\n", pll->config.hw_state.dpll);
-		seq_printf(m, " dpll_md: 0x%08x\n",
-			   pll->config.hw_state.dpll_md);
-		seq_printf(m, " fp0:     0x%08x\n", pll->config.hw_state.fp0);
-		seq_printf(m, " fp1:     0x%08x\n", pll->config.hw_state.fp1);
-		seq_printf(m, " wrpll:   0x%08x\n", pll->config.hw_state.wrpll);
+		if (IS_BROXTON(dev)) {
+			seq_printf(m, " ebb0:    0x%08x\n", pll->config.hw_state.ebb0);
+			seq_printf(m, " ebb4:    0x%08x\n", pll->config.hw_state.ebb4);
+			seq_printf(m, " pll0:    0x%08x\n", pll->config.hw_state.pll0);
+			seq_printf(m, " pll1:    0x%08x\n", pll->config.hw_state.pll1);
+			seq_printf(m, " pll2:    0x%08x\n", pll->config.hw_state.pll2);
+			seq_printf(m, " pll3:    0x%08x\n", pll->config.hw_state.pll3);
+			seq_printf(m, " pll6:    0x%08x\n", pll->config.hw_state.pll6);
+			seq_printf(m, " pll8:    0x%08x\n", pll->config.hw_state.pll8);
+			seq_printf(m, " pll9:    0x%08x\n", pll->config.hw_state.pll9);
+			seq_printf(m, " pll10:   0x%08x\n", pll->config.hw_state.pll10);
+			seq_printf(m, " pcsdw12: 0x%08x\n", pll->config.hw_state.pcsdw12);
+		} else {
+			seq_printf(m, " dpll:    0x%08x\n", pll->config.hw_state.dpll);
+			seq_printf(m, " dpll_md: 0x%08x\n",
+				   pll->config.hw_state.dpll_md);
+			seq_printf(m, " fp0:     0x%08x\n", pll->config.hw_state.fp0);
+			seq_printf(m, " fp1:     0x%08x\n", pll->config.hw_state.fp1);
+			seq_printf(m, " wrpll:   0x%08x\n", pll->config.hw_state.wrpll);
+		}
 	}
 	drm_modeset_unlock_all(dev);
 
