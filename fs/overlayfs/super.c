@@ -42,6 +42,8 @@ struct ovl_fs {
 	long lower_namelen;
 	/* pathnames of lower and upper dirs, for show_options */
 	struct ovl_config config;
+	/* creds of process who forced instantiation of super block */
+	const struct cred *creator_cred;
 };
 
 struct ovl_dir_cache;
@@ -263,6 +265,13 @@ bool ovl_is_whiteout(struct dentry *dentry)
 	struct inode *inode = dentry->d_inode;
 
 	return inode && IS_WHITEOUT(inode);
+}
+
+const struct cred *ovl_sb_creator_cred(struct super_block *sb)
+{
+	struct ovl_fs *ofs = sb->s_fs_info;
+
+	return ofs->creator_cred;
 }
 
 static bool ovl_is_opaquedir(struct dentry *dentry)
@@ -572,6 +581,7 @@ static void ovl_put_super(struct super_block *sb)
 	kfree(ufs->config.lowerdir);
 	kfree(ufs->config.upperdir);
 	kfree(ufs->config.workdir);
+	put_cred(ufs->creator_cred);
 	kfree(ufs);
 }
 
@@ -1103,6 +1113,10 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 
 	ovl_copyattr(ovl_dentry_real(root_dentry)->d_inode,
 		     root_dentry->d_inode);
+
+	ufs->creator_cred = prepare_creds();
+	if (!ufs->creator_cred)
+		goto out_free_oe;
 
 	sb->s_magic = OVERLAYFS_SUPER_MAGIC;
 	sb->s_op = &ovl_super_operations;
