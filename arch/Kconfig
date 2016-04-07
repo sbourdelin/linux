@@ -366,6 +366,18 @@ menuconfig GCC_PLUGINS
 	  GCC plugins are loadable modules that provide extra features to the
 	  compiler. They are useful for runtime instrumentation and static analysis.
 
+config GCC_PLUGIN_CYC_COMPLEXITY
+	bool "Compute the cyclomatic complexity of a function"
+	depends on GCC_PLUGINS
+	help
+	  The complexity M of a function's control flow graph is defined as:
+	   M = E - N + 2P
+	  where
+
+	  E = the number of edges
+	  N = the number of nodes
+	  P = the number of connected components (exit nodes).
+
 config HAVE_CC_STACKPROTECTOR
 	bool
 	help
