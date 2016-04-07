@@ -905,7 +905,7 @@ static void update_pfit_vscale_ratio(struct intel_overlay *overlay)
 	/* XXX: This is not the same logic as in the xorg driver, but more in
 	 * line with the intel documentation for the i965
 	 */
-	if (INTEL_INFO(dev)->gen >= 4) {
+	if (INTEL_INFO(dev_priv)->gen >= 4) {
 		/* on i965 use the PGM reg to read out the autoscaler values */
 		ratio = I915_READ(PFIT_PGM_RATIOS) >> PFIT_VERT_SCALE_SHIFT_965;
 	} else {
@@ -1069,7 +1069,7 @@ static int intel_panel_fitter_pipe(struct drm_device *dev)
 	u32  pfit_control;
 
 	/* i830 doesn't have a panel fitter */
-	if (INTEL_INFO(dev)->gen <= 3 && (IS_I830(dev) || !IS_MOBILE(dev)))
+	if (INTEL_INFO(dev_priv)->gen <= 3 && (IS_I830(dev) || !IS_MOBILE(dev)))
 		return -1;
 
 	pfit_control = I915_READ(PFIT_CONTROL);

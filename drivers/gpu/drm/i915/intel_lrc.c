@@ -2142,7 +2142,7 @@ static int logical_render_ring_init(struct drm_device *dev)
 	logical_ring_default_vfuncs(dev, engine);
 
 	/* Override some for render ring. */
-	if (INTEL_INFO(dev)->gen >= 9)
+	if (INTEL_INFO(dev_priv)->gen >= 9)
 		engine->init_hw = gen9_init_render_ring;
 	else
 		engine->init_hw = gen8_init_render_ring;

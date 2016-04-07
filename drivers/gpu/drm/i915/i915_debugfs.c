@@ -612,7 +612,7 @@ static int i915_gem_pageflip_info(struct seq_file *m, void *data)
 				seq_puts(m, "Stall check waiting for page flip ioctl, ");
 			seq_printf(m, "%d prepares\n", atomic_read(&work->pending));
 
-			if (INTEL_INFO(dev)->gen >= 4)
+			if (INTEL_INFO(dev_priv)->gen >= 4)
 				addr = I915_HI_DISPBASE(I915_READ(DSPSURF(crtc->plane)));
 			else
 				addr = I915_READ(DSPADDR(crtc->plane));
@@ -809,7 +809,7 @@ static int i915_interrupt_info(struct seq_file *m, void *data)
 			   I915_READ(GEN8_PCU_IIR));
 		seq_printf(m, "PCU interrupt enable:\t%08x\n",
 			   I915_READ(GEN8_PCU_IER));
-	} else if (INTEL_INFO(dev)->gen >= 8) {
+	} else if (INTEL_INFO(dev_priv)->gen >= 8) {
 		seq_printf(m, "Master Interrupt Control:\t%08x\n",
 			   I915_READ(GEN8_MASTER_IRQ));
 
@@ -935,7 +935,7 @@ static int i915_interrupt_info(struct seq_file *m, void *data)
 			   I915_READ(GTIMR));
 	}
 	for_each_engine(engine, dev_priv) {
-		if (INTEL_INFO(dev)->gen >= 6) {
+		if (INTEL_INFO(dev_priv)->gen >= 6) {
 			seq_printf(m,
 				   "Graphics Interrupt mask (%s):	%08x\n",
 				   engine->name, I915_READ_IMR(engine));
@@ -1172,7 +1172,7 @@ static int i915_frequency_info(struct seq_file *m, void *unused)
 			   "efficient (RPe) frequency: %d MHz\n",
 			   intel_gpu_freq(dev_priv, dev_priv->rps.efficient_freq));
 		mutex_unlock(&dev_priv->rps.hw_lock);
-	} else if (INTEL_INFO(dev)->gen >= 6) {
+	} else if (INTEL_INFO(dev_priv)->gen >= 6) {
 		u32 rp_state_limits;
 		u32 gt_perf_status;
 		u32 rp_state_cap;
@@ -1680,7 +1680,7 @@ static int i915_fbc_fc_get(void *data, u64 *val)
 	struct drm_device *dev = data;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	if (INTEL_INFO(dev)->gen < 7 || !HAS_FBC(dev))
+	if (INTEL_INFO(dev_priv)->gen < 7 || !HAS_FBC(dev))
 		return -ENODEV;
 
 	*val = dev_priv->fbc.false_color;
@@ -1694,7 +1694,7 @@ static int i915_fbc_fc_set(void *data, u64 val)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	u32 reg;
 
-	if (INTEL_INFO(dev)->gen < 7 || !HAS_FBC(dev))
+	if (INTEL_INFO(dev_priv)->gen < 7 || !HAS_FBC(dev))
 		return -ENODEV;
 
 	mutex_lock(&dev_priv->fbc.lock);
@@ -1730,7 +1730,7 @@ static int i915_ips_status(struct seq_file *m, void *unused)
 	seq_printf(m, "Enabled by kernel parameter: %s\n",
 		   yesno(i915.enable_ips));
 
-	if (INTEL_INFO(dev)->gen >= 8) {
+	if (INTEL_INFO(dev_priv)->gen >= 8) {
 		seq_puts(m, "Currently: unknown\n");
 	} else {
 		if (I915_READ(IPS_CTL) & IPS_ENABLE)
@@ -2201,7 +2201,7 @@ static int i915_swizzle_info(struct seq_file *m, void *data)
 			   I915_READ16(C0DRB3));
 		seq_printf(m, "C1DRB3 = 0x%04x\n",
 			   I915_READ16(C1DRB3));
-	} else if (INTEL_INFO(dev)->gen >= 6) {
+	} else if (INTEL_INFO(dev_priv)->gen >= 6) {
 		seq_printf(m, "MAD_DIMM_C0 = 0x%08x\n",
 			   I915_READ(MAD_DIMM_C0));
 		seq_printf(m, "MAD_DIMM_C1 = 0x%08x\n",
@@ -2210,7 +2210,7 @@ static int i915_swizzle_info(struct seq_file *m, void *data)
 			   I915_READ(MAD_DIMM_C2));
 		seq_printf(m, "TILECTL = 0x%08x\n",
 			   I915_READ(TILECTL));
-		if (INTEL_INFO(dev)->gen >= 8)
+		if (INTEL_INFO(dev_priv)->gen >= 8)
 			seq_printf(m, "GAMTARBMODE = 0x%08x\n",
 				   I915_READ(GAMTARBMODE));
 		else
@@ -2276,12 +2276,12 @@ static void gen6_ppgtt_info(struct seq_file *m, struct drm_device *dev)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *engine;
 
-	if (INTEL_INFO(dev)->gen == 6)
+	if (INTEL_INFO(dev_priv)->gen == 6)
 		seq_printf(m, "GFX_MODE: 0x%08x\n", I915_READ(GFX_MODE));
 
 	for_each_engine(engine, dev_priv) {
 		seq_printf(m, "%s\n", engine->name);
-		if (INTEL_INFO(dev)->gen == 7)
+		if (INTEL_INFO(dev_priv)->gen == 7)
 			seq_printf(m, "GFX_MODE: 0x%08x\n",
 				   I915_READ(RING_MODE_GEN7(engine)));
 		seq_printf(m, "PP_DIR_BASE: 0x%08x\n",
@@ -2315,9 +2315,9 @@ static int i915_ppgtt_info(struct seq_file *m, void *data)
 		return ret;
 	intel_runtime_pm_get(dev_priv);
 
-	if (INTEL_INFO(dev)->gen >= 8)
+	if (INTEL_INFO(dev_priv)->gen >= 8)
 		gen8_ppgtt_info(m, dev);
-	else if (INTEL_INFO(dev)->gen >= 6)
+	else if (INTEL_INFO(dev_priv)->gen >= 6)
 		gen6_ppgtt_info(m, dev);
 
 	list_for_each_entry_reverse(file, &dev->filelist, lhead) {
@@ -2669,7 +2669,7 @@ static int i915_energy_uJ(struct seq_file *m, void *data)
 	u64 power;
 	u32 units;
 
-	if (INTEL_INFO(dev)->gen < 6)
+	if (INTEL_INFO(dev_priv)->gen < 6)
 		return -ENODEV;
 
 	intel_runtime_pm_get(dev_priv);
@@ -3137,7 +3137,7 @@ static int i915_semaphore_status(struct seq_file *m, void *unused)
 	struct drm_device *dev = node->minor->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *engine;
-	int num_rings = hweight32(INTEL_INFO(dev)->ring_mask);
+	int num_rings = hweight32(INTEL_INFO(dev_priv)->ring_mask);
 	enum intel_engine_id id;
 	int j, ret;
 
@@ -3282,7 +3282,7 @@ static int i915_ddb_info(struct seq_file *m, void *unused)
 	enum pipe pipe;
 	int plane;
 
-	if (INTEL_INFO(dev)->gen < 9)
+	if (INTEL_INFO(dev_priv)->gen < 9)
 		return 0;
 
 	drm_modeset_lock_all(dev);
@@ -4034,7 +4034,7 @@ static int pipe_crc_set_source(struct drm_device *dev, enum pipe pipe,
 
 	if (IS_GEN2(dev))
 		ret = i8xx_pipe_crc_ctl_reg(&source, &val);
-	else if (INTEL_INFO(dev)->gen < 5)
+	else if (INTEL_INFO(dev_priv)->gen < 5)
 		ret = i9xx_pipe_crc_ctl_reg(dev, pipe, &source, &val);
 	else if (IS_VALLEYVIEW(dev) || IS_CHERRYVIEW(dev))
 		ret = vlv_pipe_crc_ctl_reg(dev, pipe, &source, &val);
@@ -4521,7 +4521,7 @@ static int pri_wm_latency_show(struct seq_file *m, void *data)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	const uint16_t *latencies;
 
-	if (INTEL_INFO(dev)->gen >= 9)
+	if (INTEL_INFO(dev_priv)->gen >= 9)
 		latencies = dev_priv->wm.skl_latency;
 	else
 		latencies = to_i915(dev)->wm.pri_latency;
@@ -4537,7 +4537,7 @@ static int spr_wm_latency_show(struct seq_file *m, void *data)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	const uint16_t *latencies;
 
-	if (INTEL_INFO(dev)->gen >= 9)
+	if (INTEL_INFO(dev_priv)->gen >= 9)
 		latencies = dev_priv->wm.skl_latency;
 	else
 		latencies = to_i915(dev)->wm.spr_latency;
@@ -4553,7 +4553,7 @@ static int cur_wm_latency_show(struct seq_file *m, void *data)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	const uint16_t *latencies;
 
-	if (INTEL_INFO(dev)->gen >= 9)
+	if (INTEL_INFO(dev_priv)->gen >= 9)
 		latencies = dev_priv->wm.skl_latency;
 	else
 		latencies = to_i915(dev)->wm.cur_latency;
@@ -4644,7 +4644,7 @@ static ssize_t pri_wm_latency_write(struct file *file, const char __user *ubuf,
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	uint16_t *latencies;
 
-	if (INTEL_INFO(dev)->gen >= 9)
+	if (INTEL_INFO(dev_priv)->gen >= 9)
 		latencies = dev_priv->wm.skl_latency;
 	else
 		latencies = to_i915(dev)->wm.pri_latency;
@@ -4660,7 +4660,7 @@ static ssize_t spr_wm_latency_write(struct file *file, const char __user *ubuf,
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	uint16_t *latencies;
 
-	if (INTEL_INFO(dev)->gen >= 9)
+	if (INTEL_INFO(dev_priv)->gen >= 9)
 		latencies = dev_priv->wm.skl_latency;
 	else
 		latencies = to_i915(dev)->wm.spr_latency;
@@ -4676,7 +4676,7 @@ static ssize_t cur_wm_latency_write(struct file *file, const char __user *ubuf,
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	uint16_t *latencies;
 
-	if (INTEL_INFO(dev)->gen >= 9)
+	if (INTEL_INFO(dev_priv)->gen >= 9)
 		latencies = dev_priv->wm.skl_latency;
 	else
 		latencies = to_i915(dev)->wm.cur_latency;
@@ -4916,7 +4916,7 @@ i915_max_freq_get(void *data, u64 *val)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	int ret;
 
-	if (INTEL_INFO(dev)->gen < 6)
+	if (INTEL_INFO(dev_priv)->gen < 6)
 		return -ENODEV;
 
 	flush_delayed_work(&dev_priv->rps.delayed_resume_work);
@@ -4939,7 +4939,7 @@ i915_max_freq_set(void *data, u64 val)
 	u32 hw_max, hw_min;
 	int ret;
 
-	if (INTEL_INFO(dev)->gen < 6)
+	if (INTEL_INFO(dev_priv)->gen < 6)
 		return -ENODEV;
 
 	flush_delayed_work(&dev_priv->rps.delayed_resume_work);
@@ -4983,7 +4983,7 @@ i915_min_freq_get(void *data, u64 *val)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	int ret;
 
-	if (INTEL_INFO(dev)->gen < 6)
+	if (INTEL_INFO(dev_priv)->gen < 6)
 		return -ENODEV;
 
 	flush_delayed_work(&dev_priv->rps.delayed_resume_work);
@@ -5006,7 +5006,7 @@ i915_min_freq_set(void *data, u64 val)
 	u32 hw_max, hw_min;
 	int ret;
 
-	if (INTEL_INFO(dev)->gen < 6)
+	if (INTEL_INFO(dev_priv)->gen < 6)
 		return -ENODEV;
 
 	flush_delayed_work(&dev_priv->rps.delayed_resume_work);
@@ -5178,7 +5178,7 @@ static void gen9_sseu_device_status(struct drm_device *dev,
 		stat->slice_total++;
 
 		if (IS_SKYLAKE(dev) || IS_KABYLAKE(dev))
-			ss_cnt = INTEL_INFO(dev)->subslice_per_slice;
+			ss_cnt = INTEL_INFO(dev_priv)->subslice_per_slice;
 
 		for (ss = 0; ss < ss_max; ss++) {
 			unsigned int eu_cnt;
@@ -5214,15 +5214,15 @@ static void broadwell_sseu_device_status(struct drm_device *dev,
 	stat->slice_total = hweight32(slice_info & GEN8_LSLICESTAT_MASK);
 
 	if (stat->slice_total) {
-		stat->subslice_per_slice = INTEL_INFO(dev)->subslice_per_slice;
+		stat->subslice_per_slice = INTEL_INFO(dev_priv)->subslice_per_slice;
 		stat->subslice_total = stat->slice_total *
 				       stat->subslice_per_slice;
-		stat->eu_per_subslice = INTEL_INFO(dev)->eu_per_subslice;
+		stat->eu_per_subslice = INTEL_INFO(dev_priv)->eu_per_subslice;
 		stat->eu_total = stat->eu_per_subslice * stat->subslice_total;
 
 		/* subtract fused off EU(s) from enabled slice(s) */
 		for (s = 0; s < stat->slice_total; s++) {
-			u8 subslice_7eu = INTEL_INFO(dev)->subslice_7eu[s];
+			u8 subslice_7eu = INTEL_INFO(dev_priv)->subslice_7eu[s];
 
 			stat->eu_total -= hweight8(subslice_7eu);
 		}
@@ -5284,7 +5284,7 @@ static int i915_forcewake_open(struct inode *inode, struct file *file)
 	struct drm_device *dev = inode->i_private;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	if (INTEL_INFO(dev)->gen < 6)
+	if (INTEL_INFO(dev_priv)->gen < 6)
 		return 0;
 
 	intel_runtime_pm_get(dev_priv);
@@ -5298,7 +5298,7 @@ static int i915_forcewake_release(struct inode *inode, struct file *file)
 	struct drm_device *dev = inode->i_private;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	if (INTEL_INFO(dev)->gen < 6)
+	if (INTEL_INFO(dev_priv)->gen < 6)
 		return 0;
 
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);

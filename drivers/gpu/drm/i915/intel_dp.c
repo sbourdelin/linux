@@ -1471,7 +1471,7 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 		intel_fixed_panel_mode(intel_connector->panel.fixed_mode,
 				       adjusted_mode);
 
-		if (INTEL_INFO(dev)->gen >= 9) {
+		if (INTEL_INFO(dev_priv)->gen >= 9) {
 			int ret;
 			ret = skl_update_scaler_crtc(pipe_config);
 			if (ret)
@@ -3157,7 +3157,7 @@ intel_dp_voltage_max(struct intel_dp *intel_dp)
 
 	if (IS_BROXTON(dev))
 		return DP_TRAIN_VOLTAGE_SWING_LEVEL_3;
-	else if (INTEL_INFO(dev)->gen >= 9) {
+	else if (INTEL_INFO(dev_priv)->gen >= 9) {
 		if (dev_priv->vbt.edp.low_vswing && port == PORT_A)
 			return DP_TRAIN_VOLTAGE_SWING_LEVEL_3;
 		return DP_TRAIN_VOLTAGE_SWING_LEVEL_2;
@@ -3820,7 +3820,7 @@ intel_dp_get_dpcd(struct intel_dp *intel_dp)
 			DRM_DEBUG_KMS("Detected EDP PSR Panel.\n");
 		}
 
-		if (INTEL_INFO(dev)->gen >= 9 &&
+		if (INTEL_INFO(dev_priv)->gen >= 9 &&
 			(intel_dp->psr_dpcd[0] & DP_PSR2_IS_SUPPORTED)) {
 			uint8_t frame_sync_cap;
 
@@ -5085,7 +5085,7 @@ bool intel_dp_is_edp(struct drm_device *dev, enum port port)
 	 * eDP not supported on g4x. so bail out early just
 	 * for a bit extra safety in case the VBT is bonkers.
 	 */
-	if (INTEL_INFO(dev)->gen < 5)
+	if (INTEL_INFO(dev_priv)->gen < 5)
 		return false;
 
 	if (port == PORT_A)
@@ -5399,7 +5399,7 @@ static void intel_dp_set_drrs_state(struct drm_device *dev, int refresh_rate)
 		return;
 	}
 
-	if (INTEL_INFO(dev)->gen >= 8 && !IS_CHERRYVIEW(dev)) {
+	if (INTEL_INFO(dev_priv)->gen >= 8 && !IS_CHERRYVIEW(dev)) {
 		switch (index) {
 		case DRRS_HIGH_RR:
 			intel_dp_set_m_n(intel_crtc, M1_N1);
@@ -5411,7 +5411,7 @@ static void intel_dp_set_drrs_state(struct drm_device *dev, int refresh_rate)
 		default:
 			DRM_ERROR("Unsupported refreshrate type\n");
 		}
-	} else if (INTEL_INFO(dev)->gen > 6) {
+	} else if (INTEL_INFO(dev_priv)->gen > 6) {
 		i915_reg_t reg = PIPECONF(intel_crtc->config->cpu_transcoder);
 		u32 val;
 
@@ -5688,7 +5688,7 @@ intel_dp_drrs_init(struct intel_connector *intel_connector,
 	INIT_DELAYED_WORK(&dev_priv->drrs.work, intel_edp_drrs_downclock_work);
 	mutex_init(&dev_priv->drrs.mutex);
 
-	if (INTEL_INFO(dev)->gen <= 6) {
+	if (INTEL_INFO(dev_priv)->gen <= 6) {
 		DRM_DEBUG_KMS("DRRS supported for Gen7 and above\n");
 		return NULL;
 	}
@@ -5840,7 +5840,7 @@ intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 	intel_dp->pps_pipe = INVALID_PIPE;
 
 	/* intel_dp vfuncs */
-	if (INTEL_INFO(dev)->gen >= 9)
+	if (INTEL_INFO(dev_priv)->gen >= 9)
 		intel_dp->get_aux_clock_divider = skl_get_aux_clock_divider;
 	else if (IS_HASWELL(dev) || IS_BROADWELL(dev))
 		intel_dp->get_aux_clock_divider = hsw_get_aux_clock_divider;
@@ -5849,7 +5849,7 @@ intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 	else
 		intel_dp->get_aux_clock_divider = g4x_get_aux_clock_divider;
 
-	if (INTEL_INFO(dev)->gen >= 9)
+	if (INTEL_INFO(dev_priv)->gen >= 9)
 		intel_dp->get_aux_send_ctl = skl_get_aux_send_ctl;
 	else
 		intel_dp->get_aux_send_ctl = g4x_get_aux_send_ctl;
@@ -6026,7 +6026,7 @@ intel_dp_init(struct drm_device *dev,
 	} else {
 		intel_encoder->pre_enable = g4x_pre_enable_dp;
 		intel_encoder->enable = g4x_enable_dp;
-		if (INTEL_INFO(dev)->gen >= 5)
+		if (INTEL_INFO(dev_priv)->gen >= 5)
 			intel_encoder->post_disable = ilk_post_disable_dp;
 	}
 

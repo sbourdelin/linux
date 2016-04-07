@@ -2126,14 +2126,14 @@ static void intel_read_wm_latency(struct drm_device *dev, uint16_t wm[8])
 		wm[2] = (sskpd >> 12) & 0xFF;
 		wm[3] = (sskpd >> 20) & 0x1FF;
 		wm[4] = (sskpd >> 32) & 0x1FF;
-	} else if (INTEL_INFO(dev)->gen >= 6) {
+	} else if (INTEL_INFO(dev_priv)->gen >= 6) {
 		uint32_t sskpd = I915_READ(MCH_SSKPD);
 
 		wm[0] = (sskpd >> SSKPD_WM0_SHIFT) & SSKPD_WM_MASK;
 		wm[1] = (sskpd >> SSKPD_WM1_SHIFT) & SSKPD_WM_MASK;
 		wm[2] = (sskpd >> SSKPD_WM2_SHIFT) & SSKPD_WM_MASK;
 		wm[3] = (sskpd >> SSKPD_WM3_SHIFT) & SSKPD_WM_MASK;
-	} else if (INTEL_INFO(dev)->gen >= 5) {
+	} else if (INTEL_INFO(dev_priv)->gen >= 5) {
 		uint32_t mltr = I915_READ(MLTR_ILK);
 
 		/* ILK primary LP0 latency is 700 ns */
@@ -2338,7 +2338,7 @@ static int ilk_compute_pipe_wm(struct intel_crtc_state *cstate)
 	usable_level = max_level;
 
 	/* ILK/SNB: LP2+ watermarks only w/o sprites */
-	if (INTEL_INFO(dev)->gen <= 6 && pipe_wm->sprites_enabled)
+	if (INTEL_INFO(dev_priv)->gen <= 6 && pipe_wm->sprites_enabled)
 		usable_level = 1;
 
 	/* ILK/SNB/IVB: LP1+ watermarks only w/o scaling */
@@ -2481,12 +2481,12 @@ static void ilk_wm_merge(struct drm_device *dev,
 	int last_enabled_level = max_level;
 
 	/* ILK/SNB/IVB: LP1+ watermarks only w/ single pipe */
-	if ((INTEL_INFO(dev)->gen <= 6 || IS_IVYBRIDGE(dev)) &&
+	if ((INTEL_INFO(dev_priv)->gen <= 6 || IS_IVYBRIDGE(dev)) &&
 	    config->num_pipes_active > 1)
 		return;
 
 	/* ILK: FBC WM must be disabled always */
-	merged->fbc_wm_enabled = INTEL_INFO(dev)->gen >= 6;
+	merged->fbc_wm_enabled = INTEL_INFO(dev_priv)->gen >= 6;
 
 	/* merge each WM1+ level */
 	for (level = 1; level <= max_level; level++) {
@@ -2792,7 +2792,7 @@ static void ilk_write_wm_values(struct drm_i915_private *dev_priv,
 	    previous->wm_lp_spr[0] != results->wm_lp_spr[0])
 		I915_WRITE(WM1S_LP_ILK, results->wm_lp_spr[0]);
 
-	if (INTEL_INFO(dev)->gen >= 7) {
+	if (INTEL_INFO(dev_priv)->gen >= 7) {
 		if (dirty & WM_DIRTY_LP(2) && previous->wm_lp_spr[1] != results->wm_lp_spr[1])
 			I915_WRITE(WM2S_LP_IVB, results->wm_lp_spr[1]);
 		if (dirty & WM_DIRTY_LP(3) && previous->wm_lp_spr[2] != results->wm_lp_spr[2])
@@ -3733,7 +3733,7 @@ static void ilk_program_watermarks(struct drm_i915_private *dev_priv)
 	ilk_wm_merge(dev, &config, &max, &lp_wm_1_2);
 
 	/* 5/6 split only in single pipe config on IVB+ */
-	if (INTEL_INFO(dev)->gen >= 7 &&
+	if (INTEL_INFO(dev_priv)->gen >= 7 &&
 	    config.num_pipes_active == 1 && config.sprites_enabled) {
 		ilk_compute_wm_maximums(dev, 1, &config, INTEL_DDB_PART_5_6, &max);
 		ilk_wm_merge(dev, &config, &max, &lp_wm_5_6);
@@ -4102,7 +4102,7 @@ void ilk_wm_get_hw_state(struct drm_device *dev)
 	hw->wm_lp[2] = I915_READ(WM3_LP_ILK);
 
 	hw->wm_lp_spr[0] = I915_READ(WM1S_LP_ILK);
-	if (INTEL_INFO(dev)->gen >= 7) {
+	if (INTEL_INFO(dev_priv)->gen >= 7) {
 		hw->wm_lp_spr[1] = I915_READ(WM2S_LP_IVB);
 		hw->wm_lp_spr[2] = I915_READ(WM3S_LP_IVB);
 	}
@@ -5140,7 +5140,7 @@ static void __gen6_update_ring_freq(struct drm_device *dev)
 			 * No floor required for ring frequency on SKL.
 			 */
 			ring_freq = gpu_freq;
-		} else if (INTEL_INFO(dev)->gen >= 8) {
+		} else if (INTEL_INFO(dev_priv)->gen >= 8) {
 			/* max(2 * GT, DDR). NB: GT is 50MHz units */
 			ring_freq = max(min_ring_freq, gpu_freq);
 		} else if (IS_HASWELL(dev)) {
@@ -5184,12 +5184,11 @@ void gen6_update_ring_freq(struct drm_device *dev)
 
 static int cherryview_rps_max_freq(struct drm_i915_private *dev_priv)
 {
-	struct drm_device *dev = dev_priv->dev;
 	u32 val, rp0;
 
 	val = vlv_punit_read(dev_priv, FB_GFX_FMAX_AT_VMAX_FUSE);
 
-	switch (INTEL_INFO(dev)->eu_total) {
+	switch (INTEL_INFO(dev_priv)->eu_total) {
 	case 8:
 		/* (2 * 4) config */
 		rp0 = (val >> FB_GFX_FMAX_AT_VMAX_2SS4EU_FUSE_SHIFT);
@@ -5791,10 +5790,9 @@ static unsigned long __i915_chipset_val(struct drm_i915_private *dev_priv)
 
 unsigned long i915_chipset_val(struct drm_i915_private *dev_priv)
 {
-	struct drm_device *dev = dev_priv->dev;
 	unsigned long val;
 
-	if (INTEL_INFO(dev)->gen != 5)
+	if (INTEL_INFO(dev_priv)->gen != 5)
 		return 0;
 
 	spin_lock_irq(&mchdev_lock);
@@ -5834,11 +5832,10 @@ static int _pxvid_to_vd(u8 pxvid)
 
 static u32 pvid_to_extvid(struct drm_i915_private *dev_priv, u8 pxvid)
 {
-	struct drm_device *dev = dev_priv->dev;
 	const int vd = _pxvid_to_vd(pxvid);
 	const int vm = vd - 1125;
 
-	if (INTEL_INFO(dev)->is_mobile)
+	if (INTEL_INFO(dev_priv)->is_mobile)
 		return vm > 0 ? vm : 0;
 
 	return vd;
@@ -5879,9 +5876,7 @@ static void __i915_update_gfx_val(struct drm_i915_private *dev_priv)
 
 void i915_update_gfx_val(struct drm_i915_private *dev_priv)
 {
-	struct drm_device *dev = dev_priv->dev;
-
-	if (INTEL_INFO(dev)->gen != 5)
+	if (INTEL_INFO(dev_priv)->gen != 5)
 		return;
 
 	spin_lock_irq(&mchdev_lock);
@@ -5930,10 +5925,9 @@ static unsigned long __i915_gfx_val(struct drm_i915_private *dev_priv)
 
 unsigned long i915_gfx_val(struct drm_i915_private *dev_priv)
 {
-	struct drm_device *dev = dev_priv->dev;
 	unsigned long val;
 
-	if (INTEL_INFO(dev)->gen != 5)
+	if (INTEL_INFO(dev_priv)->gen != 5)
 		return 0;
 
 	spin_lock_irq(&mchdev_lock);
@@ -6246,7 +6240,7 @@ void intel_suspend_gt_powersave(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	if (INTEL_INFO(dev)->gen < 6)
+	if (INTEL_INFO(dev_priv)->gen < 6)
 		return;
 
 	gen6_suspend_rps(dev);
@@ -6261,11 +6255,11 @@ void intel_disable_gt_powersave(struct drm_device *dev)
 
 	if (IS_IRONLAKE_M(dev)) {
 		ironlake_disable_drps(dev);
-	} else if (INTEL_INFO(dev)->gen >= 6) {
+	} else if (INTEL_INFO(dev_priv)->gen >= 6) {
 		intel_suspend_gt_powersave(dev);
 
 		mutex_lock(&dev_priv->rps.hw_lock);
-		if (INTEL_INFO(dev)->gen >= 9)
+		if (INTEL_INFO(dev_priv)->gen >= 9)
 			gen9_disable_rps(dev);
 		else if (IS_CHERRYVIEW(dev))
 			cherryview_disable_rps(dev);
@@ -6294,7 +6288,7 @@ static void intel_gen6_powersave_work(struct work_struct *work)
 		cherryview_enable_rps(dev);
 	} else if (IS_VALLEYVIEW(dev)) {
 		valleyview_enable_rps(dev);
-	} else if (INTEL_INFO(dev)->gen >= 9) {
+	} else if (INTEL_INFO(dev_priv)->gen >= 9) {
 		gen9_enable_rc6(dev);
 		gen9_enable_rps(dev);
 		if (IS_SKYLAKE(dev) || IS_KABYLAKE(dev))
@@ -6335,7 +6329,7 @@ void intel_enable_gt_powersave(struct drm_device *dev)
 		mutex_lock(&dev->struct_mutex);
 		intel_init_emon(dev);
 		mutex_unlock(&dev->struct_mutex);
-	} else if (INTEL_INFO(dev)->gen >= 6) {
+	} else if (INTEL_INFO(dev_priv)->gen >= 6) {
 		/*
 		 * PCU communication is slow and this doesn't need to be
 		 * done at any specific time, so do this out of our fast path
@@ -6358,7 +6352,7 @@ void intel_reset_gt_powersave(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	if (INTEL_INFO(dev)->gen < 6)
+	if (INTEL_INFO(dev_priv)->gen < 6)
 		return;
 
 	gen6_suspend_rps(dev);
@@ -7199,7 +7193,7 @@ void intel_init_pm(struct drm_device *dev)
 		i915_ironlake_get_mem_freq(dev);
 
 	/* For FIFO watermark updates */
-	if (INTEL_INFO(dev)->gen >= 9) {
+	if (INTEL_INFO(dev_priv)->gen >= 9) {
 		skl_setup_wm_latency(dev);
 		dev_priv->display.update_wm = skl_update_wm;
 	} else if (HAS_PCH_SPLIT(dev)) {
@@ -7249,7 +7243,7 @@ void intel_init_pm(struct drm_device *dev)
 		dev_priv->display.update_wm = i9xx_update_wm;
 		dev_priv->display.get_fifo_size = i9xx_get_fifo_size;
 	} else if (IS_GEN2(dev)) {
-		if (INTEL_INFO(dev)->num_pipes == 1) {
+		if (INTEL_INFO(dev_priv)->num_pipes == 1) {
 			dev_priv->display.update_wm = i845_update_wm;
 			dev_priv->display.get_fifo_size = i845_get_fifo_size;
 		} else {

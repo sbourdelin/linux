@@ -458,7 +458,7 @@ void intel_detect_pch(struct drm_device *dev)
 	/* In all current cases, num_pipes is equivalent to the PCH_NOP setting
 	 * (which really amounts to a PCH but no South Display).
 	 */
-	if (INTEL_INFO(dev)->num_pipes == 0) {
+	if (INTEL_INFO(dev_priv)->num_pipes == 0) {
 		dev_priv->pch_type = PCH_NOP;
 		return;
 	}
@@ -949,7 +949,7 @@ int i915_reset(struct drm_device *dev)
 	 * previous concerns that it doesn't respond well to some forms
 	 * of re-init after reset.
 	 */
-	if (INTEL_INFO(dev)->gen > 5)
+	if (INTEL_INFO(dev_priv)->gen > 5)
 		intel_enable_gt_powersave(dev);
 
 	return 0;

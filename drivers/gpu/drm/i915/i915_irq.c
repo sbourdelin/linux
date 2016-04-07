@@ -617,7 +617,7 @@ static void i915_enable_asle_pipestat(struct drm_device *dev)
 	spin_lock_irq(&dev_priv->irq_lock);
 
 	i915_enable_pipestat(dev_priv, PIPE_B, PIPE_LEGACY_BLC_EVENT_STATUS);
-	if (INTEL_INFO(dev)->gen >= 4)
+	if (INTEL_INFO(dev_priv)->gen >= 4)
 		i915_enable_pipestat(dev_priv, PIPE_A,
 				     PIPE_LEGACY_BLC_EVENT_STATUS);
 
@@ -835,7 +835,7 @@ static int i915_get_crtc_scanoutpos(struct drm_device *dev, unsigned int pipe,
 	if (stime)
 		*stime = ktime_get();
 
-	if (IS_GEN2(dev) || IS_G4X(dev) || INTEL_INFO(dev)->gen >= 5) {
+	if (IS_GEN2(dev) || IS_G4X(dev) || INTEL_INFO(dev_priv)->gen >= 5) {
 		/* No obvious pixelcount register. Only query vertical
 		 * scanout position from Display scan line register.
 		 */
@@ -897,7 +897,7 @@ static int i915_get_crtc_scanoutpos(struct drm_device *dev, unsigned int pipe,
 	else
 		position += vtotal - vbl_end;
 
-	if (IS_GEN2(dev) || IS_G4X(dev) || INTEL_INFO(dev)->gen >= 5) {
+	if (IS_GEN2(dev) || IS_G4X(dev) || INTEL_INFO(dev_priv)->gen >= 5) {
 		*vpos = position;
 		*hpos = 0;
 	} else {
@@ -1591,12 +1591,12 @@ static void i9xx_pipe_crc_irq_handler(struct drm_device *dev, enum pipe pipe)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	uint32_t res1, res2;
 
-	if (INTEL_INFO(dev)->gen >= 3)
+	if (INTEL_INFO(dev_priv)->gen >= 3)
 		res1 = I915_READ(PIPE_CRC_RES_RES1_I915(pipe));
 	else
 		res1 = 0;
 
-	if (INTEL_INFO(dev)->gen >= 5 || IS_G4X(dev))
+	if (INTEL_INFO(dev_priv)->gen >= 5 || IS_G4X(dev))
 		res2 = I915_READ(PIPE_CRC_RES_RES2_G4X(pipe));
 	else
 		res2 = 0;
@@ -2215,7 +2215,7 @@ static irqreturn_t ironlake_irq_handler(int irq, void *arg)
 	if (gt_iir) {
 		I915_WRITE(GTIIR, gt_iir);
 		ret = IRQ_HANDLED;
-		if (INTEL_INFO(dev)->gen >= 6)
+		if (INTEL_INFO(dev_priv)->gen >= 6)
 			snb_gt_irq_handler(dev, dev_priv, gt_iir);
 		else
 			ilk_gt_irq_handler(dev, dev_priv, gt_iir);
@@ -2225,13 +2225,13 @@ static irqreturn_t ironlake_irq_handler(int irq, void *arg)
 	if (de_iir) {
 		I915_WRITE(DEIIR, de_iir);
 		ret = IRQ_HANDLED;
-		if (INTEL_INFO(dev)->gen >= 7)
+		if (INTEL_INFO(dev_priv)->gen >= 7)
 			ivb_display_irq_handler(dev, de_iir);
 		else
 			ilk_display_irq_handler(dev, de_iir);
 	}
 
-	if (INTEL_INFO(dev)->gen >= 6) {
+	if (INTEL_INFO(dev_priv)->gen >= 6) {
 		u32 pm_iir = I915_READ(GEN6_PMIIR);
 		if (pm_iir) {
 			I915_WRITE(GEN6_PMIIR, pm_iir);
@@ -2614,7 +2614,7 @@ static void i915_report_and_clear_eir(struct drm_device *dev)
 		pr_err("  INSTPM: 0x%08x\n", I915_READ(INSTPM));
 		for (i = 0; i < ARRAY_SIZE(instdone); i++)
 			pr_err("  INSTDONE_%d: 0x%08x\n", i, instdone[i]);
-		if (INTEL_INFO(dev)->gen < 4) {
+		if (INTEL_INFO(dev_priv)->gen < 4) {
 			u32 ipeir = I915_READ(IPEIR);
 
 			pr_err("  IPEIR: 0x%08x\n", I915_READ(IPEIR));
@@ -2704,7 +2704,7 @@ static int i915_enable_vblank(struct drm_device *dev, unsigned int pipe)
 	unsigned long irqflags;
 
 	spin_lock_irqsave(&dev_priv->irq_lock, irqflags);
-	if (INTEL_INFO(dev)->gen >= 4)
+	if (INTEL_INFO(dev_priv)->gen >= 4)
 		i915_enable_pipestat(dev_priv, pipe,
 				     PIPE_START_VBLANK_INTERRUPT_STATUS);
 	else
@@ -2719,7 +2719,7 @@ static int ironlake_enable_vblank(struct drm_device *dev, unsigned int pipe)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	unsigned long irqflags;
-	uint32_t bit = (INTEL_INFO(dev)->gen >= 7) ? DE_PIPE_VBLANK_IVB(pipe) :
+	uint32_t bit = (INTEL_INFO(dev_priv)->gen >= 7) ? DE_PIPE_VBLANK_IVB(pipe) :
 						     DE_PIPE_VBLANK(pipe);
 
 	spin_lock_irqsave(&dev_priv->irq_lock, irqflags);
@@ -2773,7 +2773,7 @@ static void ironlake_disable_vblank(struct drm_device *dev, unsigned int pipe)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	unsigned long irqflags;
-	uint32_t bit = (INTEL_INFO(dev)->gen >= 7) ? DE_PIPE_VBLANK_IVB(pipe) :
+	uint32_t bit = (INTEL_INFO(dev_priv)->gen >= 7) ? DE_PIPE_VBLANK_IVB(pipe) :
 						     DE_PIPE_VBLANK(pipe);
 
 	spin_lock_irqsave(&dev_priv->irq_lock, irqflags);
@@ -3036,7 +3036,7 @@ ring_stuck(struct intel_engine_cs *engine, u64 acthd)
 		return HANGCHECK_KICK;
 	}
 
-	if (INTEL_INFO(dev)->gen >= 6 && tmp & RING_WAIT_SEMAPHORE) {
+	if (INTEL_INFO(dev_priv)->gen >= 6 && tmp & RING_WAIT_SEMAPHORE) {
 		switch (semaphore_passed(engine)) {
 		default:
 			return HANGCHECK_HUNG;
@@ -3257,7 +3257,7 @@ static void gen5_gt_irq_reset(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
 	GEN5_IRQ_RESET(GT);
-	if (INTEL_INFO(dev)->gen >= 6)
+	if (INTEL_INFO(dev_priv)->gen >= 6)
 		GEN5_IRQ_RESET(GEN6_PM);
 }
 
@@ -3457,12 +3457,12 @@ static void ilk_hpd_irq_setup(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	u32 hotplug_irqs, hotplug, enabled_irqs;
 
-	if (INTEL_INFO(dev)->gen >= 8) {
+	if (INTEL_INFO(dev_priv)->gen >= 8) {
 		hotplug_irqs = GEN8_PORT_DP_A_HOTPLUG;
 		enabled_irqs = intel_hpd_enabled_irqs(dev, hpd_bdw);
 
 		bdw_update_port_irq(dev_priv, hotplug_irqs, enabled_irqs);
-	} else if (INTEL_INFO(dev)->gen >= 7) {
+	} else if (INTEL_INFO(dev_priv)->gen >= 7) {
 		hotplug_irqs = DE_DP_A_HOTPLUG_IVB;
 		enabled_irqs = intel_hpd_enabled_irqs(dev, hpd_ivb);
 
@@ -3564,7 +3564,7 @@ static void gen5_gt_irq_postinstall(struct drm_device *dev)
 
 	GEN5_IRQ_INIT(GT, dev_priv->gt_irq_mask, gt_irqs);
 
-	if (INTEL_INFO(dev)->gen >= 6) {
+	if (INTEL_INFO(dev_priv)->gen >= 6) {
 		/*
 		 * RPS interrupts will get enabled/disabled on demand when RPS
 		 * itself is enabled/disabled.
@@ -3582,7 +3582,7 @@ static int ironlake_irq_postinstall(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	u32 display_mask, extra_mask;
 
-	if (INTEL_INFO(dev)->gen >= 7) {
+	if (INTEL_INFO(dev_priv)->gen >= 7) {
 		display_mask = (DE_MASTER_IRQ_CONTROL | DE_GSE_IVB |
 				DE_PCH_EVENT_IVB | DE_PLANEC_FLIP_DONE_IVB |
 				DE_PLANEB_FLIP_DONE_IVB |

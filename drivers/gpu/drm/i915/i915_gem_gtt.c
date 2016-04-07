@@ -2281,7 +2281,7 @@ void i915_check_and_clear_faults(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *engine;
 
-	if (INTEL_INFO(dev)->gen < 6)
+	if (INTEL_INFO(dev_priv)->gen < 6)
 		return;
 
 	for_each_engine(engine, dev_priv) {
@@ -2322,7 +2322,7 @@ void i915_gem_suspend_gtt_mappings(struct drm_device *dev)
 	/* Don't bother messing with faults pre GEN6 as we have little
 	 * documentation supporting that it's a good idea.
 	 */
-	if (INTEL_INFO(dev)->gen < 6)
+	if (INTEL_INFO(dev_priv)->gen < 6)
 		return;
 
 	i915_check_and_clear_faults(dev);
@@ -3050,7 +3050,7 @@ static int gen8_gmch_probe(struct i915_ggtt *ggtt)
 
 	pci_read_config_word(dev->pdev, SNB_GMCH_CTRL, &snb_gmch_ctl);
 
-	if (INTEL_INFO(dev)->gen >= 9) {
+	if (INTEL_INFO(dev_priv)->gen >= 9) {
 		ggtt->stolen_size = gen9_get_stolen_size(snb_gmch_ctl);
 		ggtt->size = gen8_get_total_gtt_size(snb_gmch_ctl);
 	} else if (IS_CHERRYVIEW(dev)) {
@@ -3166,10 +3166,10 @@ int i915_ggtt_init_hw(struct drm_device *dev)
 	struct i915_ggtt *ggtt = &dev_priv->ggtt;
 	int ret;
 
-	if (INTEL_INFO(dev)->gen <= 5) {
+	if (INTEL_INFO(dev_priv)->gen <= 5) {
 		ggtt->probe = i915_gmch_probe;
 		ggtt->base.cleanup = i915_gmch_remove;
-	} else if (INTEL_INFO(dev)->gen < 8) {
+	} else if (INTEL_INFO(dev_priv)->gen < 8) {
 		ggtt->probe = gen6_gmch_probe;
 		ggtt->base.cleanup = gen6_gmch_remove;
 		if (IS_HASWELL(dev) && dev_priv->ellc_size)
@@ -3178,7 +3178,7 @@ int i915_ggtt_init_hw(struct drm_device *dev)
 			ggtt->base.pte_encode = hsw_pte_encode;
 		else if (IS_VALLEYVIEW(dev))
 			ggtt->base.pte_encode = byt_pte_encode;
-		else if (INTEL_INFO(dev)->gen >= 7)
+		else if (INTEL_INFO(dev_priv)->gen >= 7)
 			ggtt->base.pte_encode = ivb_pte_encode;
 		else
 			ggtt->base.pte_encode = snb_pte_encode;
@@ -3267,7 +3267,7 @@ void i915_gem_restore_gtt_mappings(struct drm_device *dev)
 			i915_gem_clflush_object(obj, obj->pin_display);
 	}
 
-	if (INTEL_INFO(dev)->gen >= 8) {
+	if (INTEL_INFO(dev_priv)->gen >= 8) {
 		if (IS_CHERRYVIEW(dev) || IS_BROXTON(dev))
 			chv_setup_private_ppat(dev_priv);
 		else

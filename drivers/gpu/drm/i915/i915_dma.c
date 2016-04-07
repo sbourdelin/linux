@@ -165,7 +165,7 @@ static int i915_getparam(struct drm_device *dev, void *data,
 		value = 1;
 		break;
 	case I915_PARAM_HAS_EXEC_CONSTANTS:
-		value = INTEL_INFO(dev)->gen >= 4;
+		value = INTEL_INFO(dev_priv)->gen >= 4;
 		break;
 	case I915_PARAM_HAS_RELAXED_DELTA:
 		value = 1;
@@ -213,12 +213,12 @@ static int i915_getparam(struct drm_device *dev, void *data,
 		value = 1;
 		break;
 	case I915_PARAM_SUBSLICE_TOTAL:
-		value = INTEL_INFO(dev)->subslice_total;
+		value = INTEL_INFO(dev_priv)->subslice_total;
 		if (!value)
 			return -ENODEV;
 		break;
 	case I915_PARAM_EU_TOTAL:
-		value = INTEL_INFO(dev)->eu_total;
+		value = INTEL_INFO(dev_priv)->eu_total;
 		if (!value)
 			return -ENODEV;
 		break;
@@ -269,12 +269,12 @@ static int
 intel_alloc_mchbar_resource(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	int reg = INTEL_INFO(dev)->gen >= 4 ? MCHBAR_I965 : MCHBAR_I915;
+	int reg = INTEL_INFO(dev_priv)->gen >= 4 ? MCHBAR_I965 : MCHBAR_I915;
 	u32 temp_lo, temp_hi = 0;
 	u64 mchbar_addr;
 	int ret;
 
-	if (INTEL_INFO(dev)->gen >= 4)
+	if (INTEL_INFO(dev_priv)->gen >= 4)
 		pci_read_config_dword(dev_priv->bridge_dev, reg + 4, &temp_hi);
 	pci_read_config_dword(dev_priv->bridge_dev, reg, &temp_lo);
 	mchbar_addr = ((u64)temp_hi << 32) | temp_lo;
@@ -301,7 +301,7 @@ intel_alloc_mchbar_resource(struct drm_device *dev)
 		return ret;
 	}
 
-	if (INTEL_INFO(dev)->gen >= 4)
+	if (INTEL_INFO(dev_priv)->gen >= 4)
 		pci_write_config_dword(dev_priv->bridge_dev, reg + 4,
 				       upper_32_bits(dev_priv->mch_res.start));
 
@@ -315,7 +315,7 @@ static void
 intel_setup_mchbar(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	int mchbar_reg = INTEL_INFO(dev)->gen >= 4 ? MCHBAR_I965 : MCHBAR_I915;
+	int mchbar_reg = INTEL_INFO(dev_priv)->gen >= 4 ? MCHBAR_I965 : MCHBAR_I915;
 	u32 temp;
 	bool enabled;
 
@@ -355,7 +355,7 @@ static void
 intel_teardown_mchbar(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	int mchbar_reg = INTEL_INFO(dev)->gen >= 4 ? MCHBAR_I965 : MCHBAR_I915;
+	int mchbar_reg = INTEL_INFO(dev_priv)->gen >= 4 ? MCHBAR_I965 : MCHBAR_I915;
 	u32 temp;
 
 	if (dev_priv->mchbar_need_disable) {
@@ -479,7 +479,7 @@ static int i915_load_modeset_init(struct drm_device *dev)
 	/* Always safe in the mode setting case. */
 	/* FIXME: do pre/post-mode set stuff in core KMS code */
 	dev->vblank_disable_allowed = true;
-	if (INTEL_INFO(dev)->num_pipes == 0)
+	if (INTEL_INFO(dev_priv)->num_pipes == 0)
 		return 0;
 
 	ret = intel_fbdev_init(dev);
@@ -853,7 +853,7 @@ static void intel_device_info_runtime_init(struct drm_device *dev)
 		DRM_INFO("Display disabled (module parameter)\n");
 		info->num_pipes = 0;
 	} else if (info->num_pipes > 0 &&
-		   (INTEL_INFO(dev)->gen == 7 || INTEL_INFO(dev)->gen == 8) &&
+		   (INTEL_INFO(dev_priv)->gen == 7 || INTEL_INFO(dev_priv)->gen == 8) &&
 		   HAS_PCH_SPLIT(dev)) {
 		u32 fuse_strap = I915_READ(FUSE_STRAP);
 		u32 sfuse_strap = I915_READ(SFUSE_STRAP);
@@ -877,7 +877,7 @@ static void intel_device_info_runtime_init(struct drm_device *dev)
 			DRM_INFO("PipeC fused off\n");
 			info->num_pipes -= 1;
 		}
-	} else if (info->num_pipes > 0 && INTEL_INFO(dev)->gen == 9) {
+	} else if (info->num_pipes > 0 && INTEL_INFO(dev_priv)->gen == 9) {
 		u32 dfsm = I915_READ(SKL_DFSM);
 		u8 disabled_mask = 0;
 		bool invalid;
@@ -915,7 +915,7 @@ static void intel_device_info_runtime_init(struct drm_device *dev)
 		cherryview_sseu_info_init(dev);
 	else if (IS_BROADWELL(dev))
 		broadwell_sseu_info_init(dev);
-	else if (INTEL_INFO(dev)->gen >= 9)
+	else if (INTEL_INFO(dev_priv)->gen >= 9)
 		gen9_sseu_info_init(dev);
 
 	/* Snooping is broken on BXT A stepping. */
@@ -1091,7 +1091,7 @@ static int i915_mmio_setup(struct drm_device *dev)
 	 * the register BAR remains the same size for all the earlier
 	 * generations up to Ironlake.
 	 */
-	if (INTEL_INFO(dev)->gen < 5)
+	if (INTEL_INFO(dev_priv)->gen < 5)
 		mmio_size = 512 * 1024;
 	else
 		mmio_size = 2 * 1024 * 1024;
@@ -1373,8 +1373,8 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 	 * of the i915_driver_init_/i915_driver_register functions according
 	 * to the role/effect of the given init step.
 	 */
-	if (INTEL_INFO(dev)->num_pipes) {
-		ret = drm_vblank_init(dev, INTEL_INFO(dev)->num_pipes);
+	if (INTEL_INFO(dev_priv)->num_pipes) {
+		ret = drm_vblank_init(dev, INTEL_INFO(dev_priv)->num_pipes);
 		if (ret)
 			goto out_cleanup_hw;
 	}

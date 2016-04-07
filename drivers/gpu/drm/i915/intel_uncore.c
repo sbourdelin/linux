@@ -315,7 +315,7 @@ static void intel_uncore_ellc_detect(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
 	if ((IS_HASWELL(dev) || IS_BROADWELL(dev) ||
-	     INTEL_INFO(dev)->gen >= 9) &&
+	     INTEL_INFO(dev_priv)->gen >= 9) &&
 	    (__raw_i915_read32(dev_priv, HSW_EDRAM_PRESENT) & EDRAM_ENABLED)) {
 		/* The docs do not explain exactly how the calculation can be
 		 * made. It is somewhat guessable, but for now, it's always
@@ -1259,7 +1259,7 @@ void intel_uncore_init(struct drm_device *dev)
 
 	dev_priv->uncore.unclaimed_mmio_check = 1;
 
-	switch (INTEL_INFO(dev)->gen) {
+	switch (INTEL_INFO(dev_priv)->gen) {
 	default:
 	case 9:
 		ASSIGN_WRITE_MMIO_VFUNCS(gen9);
@@ -1343,7 +1343,7 @@ int i915_reg_read_ioctl(struct drm_device *dev,
 
 	for (i = 0; i < ARRAY_SIZE(whitelist); i++, entry++) {
 		if (i915_mmio_reg_offset(entry->offset_ldw) == (reg->offset & -entry->size) &&
-		    (1 << INTEL_INFO(dev)->gen & entry->gen_bitmask))
+		    (1 << INTEL_INFO(dev_priv)->gen & entry->gen_bitmask))
 			break;
 	}
 

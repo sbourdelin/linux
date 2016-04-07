@@ -698,7 +698,7 @@ int intel_fbdev_init(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	int ret;
 
-	if (WARN_ON(INTEL_INFO(dev)->num_pipes == 0))
+	if (WARN_ON(INTEL_INFO(dev_priv)->num_pipes == 0))
 		return -ENODEV;
 
 	ifbdev = kzalloc(sizeof(struct intel_fbdev), GFP_KERNEL);
@@ -711,7 +711,7 @@ int intel_fbdev_init(struct drm_device *dev)
 		ifbdev->preferred_bpp = 32;
 
 	ret = drm_fb_helper_init(dev, &ifbdev->helper,
-				 INTEL_INFO(dev)->num_pipes, 4);
+				 INTEL_INFO(dev_priv)->num_pipes, 4);
 	if (ret) {
 		kfree(ifbdev);
 		return ret;

@@ -179,7 +179,7 @@ static void i9xx_load_csc_matrix(struct drm_crtc_state *crtc_state)
 	I915_WRITE(PIPE_CSC_PREOFF_ME(pipe), 0);
 	I915_WRITE(PIPE_CSC_PREOFF_LO(pipe), 0);
 
-	if (INTEL_INFO(dev)->gen > 6) {
+	if (INTEL_INFO(dev_priv)->gen > 6) {
 		uint16_t postoff = 0;
 
 		if (intel_crtc->config->limited_color_range)
@@ -346,7 +346,7 @@ static void broadwell_load_luts(struct drm_crtc_state *state)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_crtc_state *intel_state = to_intel_crtc_state(state);
 	enum pipe pipe = to_intel_crtc(crtc)->pipe;
-	uint32_t i, lut_size = INTEL_INFO(dev)->color.degamma_lut_size;
+	uint32_t i, lut_size = INTEL_INFO(dev_priv)->color.degamma_lut_size;
 
 	if (crtc_state_is_legacy(state)) {
 		haswell_load_luts(state);
@@ -442,7 +442,7 @@ static void cherryview_load_luts(struct drm_crtc_state *state)
 
 	if (state->degamma_lut) {
 		lut = (struct drm_color_lut *) state->degamma_lut->data;
-		lut_size = INTEL_INFO(dev)->color.degamma_lut_size;
+		lut_size = INTEL_INFO(dev_priv)->color.degamma_lut_size;
 		for (i = 0; i < lut_size; i++) {
 			/* Write LUT in U0.14 format. */
 			word0 =
@@ -457,7 +457,7 @@ static void cherryview_load_luts(struct drm_crtc_state *state)
 
 	if (state->gamma_lut) {
 		lut = (struct drm_color_lut *) state->gamma_lut->data;
-		lut_size = INTEL_INFO(dev)->color.gamma_lut_size;
+		lut_size = INTEL_INFO(dev_priv)->color.gamma_lut_size;
 		for (i = 0; i < lut_size; i++) {
 			/* Write LUT in U0.10 format. */
 			word0 =
@@ -545,9 +545,9 @@ void intel_color_init(struct drm_crtc *crtc)
 	}
 
 	/* Enable color management support when we have degamma & gamma LUTs. */
-	if (INTEL_INFO(dev)->color.degamma_lut_size != 0 &&
-	    INTEL_INFO(dev)->color.gamma_lut_size != 0)
+	if (INTEL_INFO(dev_priv)->color.degamma_lut_size != 0 &&
+	    INTEL_INFO(dev_priv)->color.gamma_lut_size != 0)
 		drm_helper_crtc_enable_color_mgmt(crtc,
-					INTEL_INFO(dev)->color.degamma_lut_size,
-					INTEL_INFO(dev)->color.gamma_lut_size);
+					INTEL_INFO(dev_priv)->color.degamma_lut_size,
+					INTEL_INFO(dev_priv)->color.gamma_lut_size);
 }
