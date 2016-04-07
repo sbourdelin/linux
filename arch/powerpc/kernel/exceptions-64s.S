@@ -786,6 +786,7 @@ kvmppc_skip_Hinterrupt:
 	STD_EXCEPTION_COMMON(0xb00, trap_0b, unknown_exception)
 	STD_EXCEPTION_COMMON(0xd00, single_step, single_step_exception)
 	STD_EXCEPTION_COMMON(0xe00, trap_0e, unknown_exception)
+	STD_EXCEPTION_COMMON(0xe20, h_instr_storage, unknown_exception)
 	STD_EXCEPTION_COMMON(0xe40, emulation_assist, emulation_assist_interrupt)
 	STD_EXCEPTION_COMMON_ASYNC(0xe60, hmi_exception, handle_hmi_exception)
 #ifdef CONFIG_PPC_DOORBELL
@@ -794,6 +795,9 @@ kvmppc_skip_Hinterrupt:
 	STD_EXCEPTION_COMMON_ASYNC(0xe80, h_doorbell, unknown_exception)
 #endif
 	STD_EXCEPTION_COMMON_ASYNC(0xf00, performance_monitor, performance_monitor_exception)
+	STD_EXCEPTION_COMMON(0xf60, facility_unavailable, facility_unavailable_exception)
+	STD_EXCEPTION_COMMON(0xf80, hv_facility_unavailable, facility_unavailable_exception)
+
 	STD_EXCEPTION_COMMON(0x1300, instruction_breakpoint, instruction_breakpoint_exception)
 	STD_EXCEPTION_COMMON(0x1502, denorm, unknown_exception)
 #ifdef CONFIG_ALTIVEC
@@ -801,11 +805,6 @@ kvmppc_skip_Hinterrupt:
 #else
 	STD_EXCEPTION_COMMON(0x1700, altivec_assist, unknown_exception)
 #endif
-#ifdef CONFIG_CBE_RAS
-	STD_EXCEPTION_COMMON(0x1200, cbe_system_error, cbe_system_error_exception)
-	STD_EXCEPTION_COMMON(0x1600, cbe_maintenance, cbe_maintenance_exception)
-	STD_EXCEPTION_COMMON(0x1800, cbe_thermal, cbe_thermal_exception)
-#endif /* CONFIG_CBE_RAS */
 
 	/*
 	 * Relocation-on interrupts: A subset of the interrupts can be delivered
@@ -1029,8 +1028,6 @@ instruction_access_common:
 	li	r5,0x400
 	b	do_hash_page		/* Try to handle as hpte fault */
 
-	STD_EXCEPTION_COMMON(0xe20, h_instr_storage, unknown_exception)
-
 /*
  * Here is the common SLB miss user that is used when going to virtual
  * mode for SLB misses, that is currently not used
@@ -1246,9 +1243,6 @@ END_FTR_SECTION_IFSET(CPU_FTR_VSX)
 	bl	vsx_unavailable_exception
 	b	ret_from_except
 
-	STD_EXCEPTION_COMMON(0xf60, facility_unavailable, facility_unavailable_exception)
-	STD_EXCEPTION_COMMON(0xf80, hv_facility_unavailable, facility_unavailable_exception)
-
 	.align	7
 	.globl	__end_handlers
 __end_handlers:
@@ -1267,6 +1261,12 @@ fwnmi_data_area:
 	 */
 	. = 0x8000
 #endif /* defined(CONFIG_PPC_PSERIES) || defined(CONFIG_PPC_POWERNV) */
+
+#ifdef CONFIG_CBE_RAS
+	STD_EXCEPTION_COMMON(0x1200, cbe_system_error, cbe_system_error_exception)
+	STD_EXCEPTION_COMMON(0x1600, cbe_maintenance, cbe_maintenance_exception)
+	STD_EXCEPTION_COMMON(0x1800, cbe_thermal, cbe_thermal_exception)
+#endif /* CONFIG_CBE_RAS */
 
 	.globl hmi_exception_early
 hmi_exception_early:
