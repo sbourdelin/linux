@@ -232,6 +232,12 @@ struct page *follow_page_mask(struct vm_area_struct *vma,
 	pgd = pgd_offset(mm, address);
 	if (pgd_none(*pgd) || unlikely(pgd_bad(*pgd)))
 		return no_page_table(vma, flags);
+	if (pgd_huge(*pgd) && vma->vm_flags & VM_HUGETLB) {
+		page = follow_huge_pgd(mm, address, pgd, flags);
+		if (page)
+			return page;
+		return no_page_table(vma, flags);
+	}
 
 	pud = pud_offset(pgd, address);
 	if (pud_none(*pud))

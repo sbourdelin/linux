@@ -4249,6 +4249,11 @@ pte_t *huge_pte_alloc(struct mm_struct *mm,
 	pte_t *pte = NULL;
 
 	pgd = pgd_offset(mm, addr);
+	if (sz == PGDIR_SIZE) {
+		pte = (pte_t *)pgd;
+		goto huge_pgd;
+	}
+
 	pud = pud_alloc(mm, pgd, addr);
 	if (pud) {
 		if (sz == PUD_SIZE) {
@@ -4261,6 +4266,8 @@ pte_t *huge_pte_alloc(struct mm_struct *mm,
 				pte = (pte_t *)pmd_alloc(mm, pud, addr);
 		}
 	}
+
+huge_pgd:
 	BUG_ON(pte && !pte_none(*pte) && !pte_huge(*pte));
 
 	return pte;
@@ -4274,6 +4281,8 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
 
 	pgd = pgd_offset(mm, addr);
 	if (pgd_present(*pgd)) {
+		if (pgd_huge(*pgd))
+			return (pte_t *)pgd;
 		pud = pud_offset(pgd, addr);
 		if (pud_present(*pud)) {
 			if (pud_huge(*pud))
@@ -4340,6 +4349,17 @@ follow_huge_pud(struct mm_struct *mm, unsigned long address,
 		return NULL;
 
 	return pte_page(*(pte_t *)pud) + ((address & ~PUD_MASK) >> PAGE_SHIFT);
+}
+
+struct page * __weak
+follow_huge_pgd(struct mm_struct *mm, unsigned long address,
+		pgd_t *pgd, int flags)
+{
+	if (flags & FOLL_GET)
+		return NULL;
+
+	return pte_page(*(pte_t *)pgd) +
+				((address & ~PGDIR_MASK) >> PAGE_SHIFT);
 }
 
 #ifdef CONFIG_MEMORY_FAILURE
