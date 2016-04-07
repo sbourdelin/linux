@@ -2488,6 +2488,7 @@ static int i915_guc_info(struct seq_file *m, void *data)
 	struct i915_guc_client client = {};
 	struct intel_engine_cs *engine;
 	u64 total = 0;
+	int i;
 
 	if (!HAS_GUC_SCHED(dev_priv))
 		return 0;
@@ -2501,6 +2502,13 @@ static int i915_guc_info(struct seq_file *m, void *data)
 		client = *guc.execbuf_client;
 
 	mutex_unlock(&dev->struct_mutex);
+
+	seq_printf(m, "Doorbell map:\n");
+	for (i = 0; i < BITS_TO_LONGS(GUC_MAX_DOORBELLS) - 3; i += 4)
+		seq_printf(m, "\t%016lx %016lx %016lx %016lx\n",
+			guc.doorbell_bitmap[i], guc.doorbell_bitmap[i+1],
+			guc.doorbell_bitmap[i+2], guc.doorbell_bitmap[i+3]);
+	seq_printf(m, "Doorbell next cacheline: 0x%x\n\n", guc.db_cacheline);
 
 	seq_printf(m, "GuC total action count: %llu\n", guc.action_count);
 	seq_printf(m, "GuC action failure count: %u\n", guc.action_fail);
