@@ -10,6 +10,7 @@
 #define __DRM_I2C_ADV7511_H__
 
 #include <linux/hdmi.h>
+#include <drm/drmP.h>
 
 #define ADV7511_REG_CHIP_REVISION		0x00
 #define ADV7511_REG_N0				0x01
@@ -241,6 +242,7 @@ enum adv7511_sync_polarity {
  * @sync_pulse:			Select the sync pulse
  * @vsync_polarity:		vsync input signal configuration
  * @hsync_polarity:		hsync input signal configuration
+ * @enable_audio		True if audio is enabled
  */
 struct adv7511_link_config {
 	unsigned int input_color_depth;
@@ -255,6 +257,8 @@ struct adv7511_link_config {
 	enum adv7511_input_sync_pulse sync_pulse;
 	enum adv7511_sync_polarity vsync_polarity;
 	enum adv7511_sync_polarity hsync_polarity;
+
+	bool enable_audio;
 };
 
 /**
@@ -296,6 +300,10 @@ struct adv7511 {
 	bool powered;
 
 	unsigned int f_tmds;
+	unsigned int f_audio;
+
+	unsigned int audio_source;
+	bool enable_audio;
 
 	unsigned int current_edid_segment;
 	uint8_t edid_buf[256];
@@ -316,5 +324,19 @@ struct adv7511 {
 
 int adv7511_packet_enable(struct adv7511 *adv7511, unsigned int packet);
 int adv7511_packet_disable(struct adv7511 *adv7511, unsigned int packet);
+
+#ifdef CONFIG_DRM_I2C_ADV7511_AUDIO
+int adv7511_audio_init(struct device *dev);
+void adv7511_audio_exit(struct device *dev);
+#else
+int adv7511_audio_init(struct device *dev)
+{
+	return 0;
+}
+void adv7511_audio_exit(struct device *dev)
+{
+
+}
+#endif
 
 #endif /* __DRM_I2C_ADV7511_H__ */

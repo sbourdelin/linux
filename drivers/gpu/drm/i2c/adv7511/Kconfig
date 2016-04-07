@@ -4,3 +4,15 @@ config DRM_I2C_ADV7511
 	help
 	  Support for the Analog Device ADV7511(W) and ADV7513 HDMI encoders.
 
+config DRM_I2C_ADV7511_AUDIO
+	bool "ADV7511 audio"
+	depends on DRM_I2C_ADV7511
+	depends on SND_SOC=y || (SND_SOC && DRM_I2C_ADV7511=m)
+	default y
+	help
+	  This adds support for audio on the ADV7511(W) and ADV7513 HDMI
+	  encoders.
+
+	  By selecting this option the ADV7511 will register a codec interface
+	  into ALSA.
+
