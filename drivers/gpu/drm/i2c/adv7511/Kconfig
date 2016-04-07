@@ -1,0 +1,6 @@
+config DRM_I2C_ADV7511
+	tristate "AV7511 encoder"
+	select REGMAP_I2C
+	help
+	  Support for the Analog Device ADV7511(W) and ADV7513 HDMI encoders.
+
