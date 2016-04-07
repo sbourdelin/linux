@@ -190,67 +190,6 @@ static void guc_init_doorbell(struct intel_guc *guc,
 	kunmap_atomic(base);
 }
 
-static int guc_ring_doorbell(struct i915_guc_client *gc)
-{
-	struct guc_process_desc *desc;
-	union guc_doorbell_qw db_cmp, db_exc, db_ret;
-	union guc_doorbell_qw *db;
-	void *base;
-	int attempt = 2, ret = -EAGAIN;
-
-	base = kmap_atomic(i915_gem_object_get_page(gc->client_obj, 0));
-	desc = base + gc->proc_desc_offset;
-
-	/* Update the tail so it is visible to GuC */
-	desc->tail = gc->wq_tail;
-
-	/* current cookie */
-	db_cmp.db_status = GUC_DOORBELL_ENABLED;
-	db_cmp.cookie = gc->cookie;
-
-	/* cookie to be updated */
-	db_exc.db_status = GUC_DOORBELL_ENABLED;
-	db_exc.cookie = gc->cookie + 1;
-	if (db_exc.cookie == 0)
-		db_exc.cookie = 1;
-
-	/* pointer of current doorbell cacheline */
-	db = base + gc->doorbell_offset;
-
-	while (attempt--) {
-		/* lets ring the doorbell */
-		db_ret.value_qw = atomic64_cmpxchg((atomic64_t *)db,
-			db_cmp.value_qw, db_exc.value_qw);
-
-		/* if the exchange was successfully executed */
-		if (db_ret.value_qw == db_cmp.value_qw) {
-			/* db was successfully rung */
-			gc->cookie = db_exc.cookie;
-			ret = 0;
-			break;
-		}
-
-		/* XXX: doorbell was lost and need to acquire it again */
-		if (db_ret.db_status == GUC_DOORBELL_DISABLED)
-			break;
-
-		DRM_ERROR("Cookie mismatch. Expected %d, returned %d\n",
-			  db_cmp.cookie, db_ret.cookie);
-
-		/* update the cookie to newly read cookie from GuC */
-		db_cmp.cookie = db_ret.cookie;
-		db_exc.cookie = db_ret.cookie + 1;
-		if (db_exc.cookie == 0)
-			db_exc.cookie = 1;
-	}
-
-	/* Finally, update the cached copy of the GuC's WQ head */
-	gc->wq_head = desc->head;
-
-	kunmap_atomic(base);
-	return ret;
-}
-
 static void guc_disable_doorbell(struct intel_guc *guc,
 				 struct i915_guc_client *client)
 {
@@ -471,6 +410,12 @@ static void guc_fini_ctx_desc(struct intel_guc *guc,
 			     sizeof(desc) * client->ctx_index);
 }
 
+/*
+ * Everything above here is concerned with setup & teardown, and is
+ * therefore not part of the somewhat time-critical batch-submission
+ * path of i915_guc_submit() below.
+ */
+
 int i915_guc_wq_check_space(struct i915_guc_client *gc)
 {
 	struct guc_process_desc *desc;
@@ -557,6 +502,67 @@ static int guc_add_workqueue_item(struct i915_guc_client *gc,
 	kunmap_atomic(base);
 
 	return 0;
+}
+
+static int guc_ring_doorbell(struct i915_guc_client *gc)
+{
+	struct guc_process_desc *desc;
+	union guc_doorbell_qw db_cmp, db_exc, db_ret;
+	union guc_doorbell_qw *db;
+	void *base;
+	int attempt = 2, ret = -EAGAIN;
+
+	base = kmap_atomic(i915_gem_object_get_page(gc->client_obj, 0));
+	desc = base + gc->proc_desc_offset;
+
+	/* Update the tail so it is visible to GuC */
+	desc->tail = gc->wq_tail;
+
+	/* current cookie */
+	db_cmp.db_status = GUC_DOORBELL_ENABLED;
+	db_cmp.cookie = gc->cookie;
+
+	/* cookie to be updated */
+	db_exc.db_status = GUC_DOORBELL_ENABLED;
+	db_exc.cookie = gc->cookie + 1;
+	if (db_exc.cookie == 0)
+		db_exc.cookie = 1;
+
+	/* pointer of current doorbell cacheline */
+	db = base + gc->doorbell_offset;
+
+	while (attempt--) {
+		/* lets ring the doorbell */
+		db_ret.value_qw = atomic64_cmpxchg((atomic64_t *)db,
+			db_cmp.value_qw, db_exc.value_qw);
+
+		/* if the exchange was successfully executed */
+		if (db_ret.value_qw == db_cmp.value_qw) {
+			/* db was successfully rung */
+			gc->cookie = db_exc.cookie;
+			ret = 0;
+			break;
+		}
+
+		/* XXX: doorbell was lost and need to acquire it again */
+		if (db_ret.db_status == GUC_DOORBELL_DISABLED)
+			break;
+
+		DRM_ERROR("Cookie mismatch. Expected %d, returned %d\n",
+			  db_cmp.cookie, db_ret.cookie);
+
+		/* update the cookie to newly read cookie from GuC */
+		db_cmp.cookie = db_ret.cookie;
+		db_exc.cookie = db_ret.cookie + 1;
+		if (db_exc.cookie == 0)
+			db_exc.cookie = 1;
+	}
+
+	/* Finally, update the cached copy of the GuC's WQ head */
+	gc->wq_head = desc->head;
+
+	kunmap_atomic(base);
+	return ret;
 }
 
 /**
