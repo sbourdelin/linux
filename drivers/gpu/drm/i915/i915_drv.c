@@ -532,7 +532,7 @@ void intel_detect_pch(struct drm_device *dev)
 
 bool i915_semaphore_is_enabled(struct drm_device *dev)
 {
-	if (INTEL_INFO(dev)->gen < 6)
+	if (INTEL_GEN(dev) < 6)
 		return false;
 
 	if (i915.semaphores >= 0)
@@ -548,7 +548,7 @@ bool i915_semaphore_is_enabled(struct drm_device *dev)
 
 #ifdef CONFIG_INTEL_IOMMU
 	/* Enable semaphores on SNB when IO remapping is off */
-	if (INTEL_INFO(dev)->gen == 6 && intel_iommu_gfx_mapped)
+	if (INTEL_GEN(dev) == 6 && intel_iommu_gfx_mapped)
 		return false;
 #endif
 
@@ -691,7 +691,7 @@ static int i915_drm_suspend_late(struct drm_device *drm_dev, bool hibernation)
 	 * Fujitsu FSC S7110
 	 * Acer Aspire 1830T
 	 */
-	if (!(hibernation && INTEL_INFO(dev_priv)->gen < 6))
+	if (!(hibernation && INTEL_GEN(dev_priv) < 6))
 		pci_set_power_state(drm_dev->pdev, PCI_D3hot);
 
 	dev_priv->suspended_to_idle = suspend_to_idle(dev_priv);
@@ -949,7 +949,7 @@ int i915_reset(struct drm_device *dev)
 	 * previous concerns that it doesn't respond well to some forms
 	 * of re-init after reset.
 	 */
-	if (INTEL_INFO(dev)->gen > 5)
+	if (INTEL_GEN(dev) > 5)
 		intel_enable_gt_powersave(dev);
 
 	return 0;

@@ -631,7 +631,7 @@ void i915_setup_sysfs(struct drm_device *dev)
 	ret = 0;
 	if (IS_VALLEYVIEW(dev) || IS_CHERRYVIEW(dev))
 		ret = sysfs_create_files(&dev->primary->kdev->kobj, vlv_attrs);
-	else if (INTEL_INFO(dev)->gen >= 6)
+	else if (INTEL_GEN(dev) >= 6)
 		ret = sysfs_create_files(&dev->primary->kdev->kobj, gen6_attrs);
 	if (ret)
 		DRM_ERROR("RPS sysfs setup failed\n");

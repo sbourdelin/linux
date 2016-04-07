@@ -109,9 +109,9 @@ static int sanitize_enable_ppgtt(struct drm_device *dev, int enable_ppgtt)
 	bool has_full_ppgtt;
 	bool has_full_48bit_ppgtt;
 
-	has_aliasing_ppgtt = INTEL_INFO(dev)->gen >= 6;
-	has_full_ppgtt = INTEL_INFO(dev)->gen >= 7;
-	has_full_48bit_ppgtt = IS_BROADWELL(dev) || INTEL_INFO(dev)->gen >= 9;
+	has_aliasing_ppgtt = INTEL_GEN(dev) >= 6;
+	has_full_ppgtt = INTEL_GEN(dev) >= 7;
+	has_full_48bit_ppgtt = IS_BROADWELL(dev) || INTEL_GEN(dev) >= 9;
 
 	if (intel_vgpu_active(dev))
 		has_full_ppgtt = false; /* emulation is too hard */
@@ -120,7 +120,7 @@ static int sanitize_enable_ppgtt(struct drm_device *dev, int enable_ppgtt)
 	 * We don't allow disabling PPGTT for gen9+ as it's a requirement for
 	 * execlists, the sole mechanism available to submit work.
 	 */
-	if (INTEL_INFO(dev)->gen < 9 &&
+	if (INTEL_GEN(dev) < 9 &&
 	    (enable_ppgtt == 0 || !has_aliasing_ppgtt))
 		return 0;
 
@@ -135,7 +135,7 @@ static int sanitize_enable_ppgtt(struct drm_device *dev, int enable_ppgtt)
 
 #ifdef CONFIG_INTEL_IOMMU
 	/* Disable ppgtt on SNB if VT-d is on. */
-	if (INTEL_INFO(dev)->gen == 6 && intel_iommu_gfx_mapped) {
+	if (INTEL_GEN(dev) == 6 && intel_iommu_gfx_mapped) {
 		DRM_INFO("Disabling PPGTT because VT-d is on\n");
 		return 0;
 	}
@@ -147,7 +147,7 @@ static int sanitize_enable_ppgtt(struct drm_device *dev, int enable_ppgtt)
 		return 0;
 	}
 
-	if (INTEL_INFO(dev)->gen >= 8 && i915.enable_execlists)
+	if (INTEL_GEN(dev) >= 8 && i915.enable_execlists)
 		return has_full_48bit_ppgtt ? 3 : 2;
 	else
 		return has_aliasing_ppgtt ? 1 : 0;
@@ -426,7 +426,7 @@ static void free_scratch_page(struct drm_device *dev,
 static struct i915_page_table *alloc_pt(struct drm_device *dev)
 {
 	struct i915_page_table *pt;
-	const size_t count = INTEL_INFO(dev)->gen >= 8 ?
+	const size_t count = INTEL_GEN(dev) >= 8 ?
 		GEN8_PTES : GEN6_PTES;
 	int ret = -ENOMEM;
 
@@ -2106,7 +2106,7 @@ static int __hw_ppgtt_init(struct drm_device *dev, struct i915_hw_ppgtt *ppgtt)
 {
 	ppgtt->base.dev = dev;
 
-	if (INTEL_INFO(dev)->gen < 8)
+	if (INTEL_GEN(dev) < 8)
 		return gen6_ppgtt_init(ppgtt);
 	else
 		return gen8_ppgtt_init(ppgtt);
@@ -2172,10 +2172,10 @@ int i915_ppgtt_init_hw(struct drm_device *dev)
 		gen6_ppgtt_enable(dev);
 	else if (IS_GEN7(dev))
 		gen7_ppgtt_enable(dev);
-	else if (INTEL_INFO(dev)->gen >= 8)
+	else if (INTEL_GEN(dev) >= 8)
 		gen8_ppgtt_enable(dev);
 	else
-		MISSING_CASE(INTEL_INFO(dev)->gen);
+		MISSING_CASE(INTEL_GEN(dev));
 
 	return 0;
 }
@@ -2281,7 +2281,7 @@ void i915_check_and_clear_faults(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *engine;
 
-	if (INTEL_INFO(dev)->gen < 6)
+	if (INTEL_GEN(dev) < 6)
 		return;
 
 	for_each_engine(engine, dev_priv) {
@@ -2306,7 +2306,7 @@ void i915_check_and_clear_faults(struct drm_device *dev)
 
 static void i915_ggtt_flush(struct drm_i915_private *dev_priv)
 {
-	if (INTEL_INFO(dev_priv)->gen < 6) {
+	if (INTEL_GEN(dev_priv) < 6) {
 		intel_gtt_chipset_flush();
 	} else {
 		I915_WRITE(GFX_FLSH_CNTL_GEN6, GFX_FLSH_CNTL_EN);
@@ -2322,7 +2322,7 @@ void i915_gem_suspend_gtt_mappings(struct drm_device *dev)
 	/* Don't bother messing with faults pre GEN6 as we have little
 	 * documentation supporting that it's a good idea.
 	 */
-	if (INTEL_INFO(dev)->gen < 6)
+	if (INTEL_GEN(dev) < 6)
 		return;
 
 	i915_check_and_clear_faults(dev);
@@ -3050,7 +3050,7 @@ static int gen8_gmch_probe(struct i915_ggtt *ggtt)
 
 	pci_read_config_word(dev->pdev, SNB_GMCH_CTRL, &snb_gmch_ctl);
 
-	if (INTEL_INFO(dev)->gen >= 9) {
+	if (INTEL_GEN(dev) >= 9) {
 		ggtt->stolen_size = gen9_get_stolen_size(snb_gmch_ctl);
 		ggtt->size = gen8_get_total_gtt_size(snb_gmch_ctl);
 	} else if (IS_CHERRYVIEW(dev)) {
@@ -3166,10 +3166,10 @@ int i915_ggtt_init_hw(struct drm_device *dev)
 	struct i915_ggtt *ggtt = &dev_priv->ggtt;
 	int ret;
 
-	if (INTEL_INFO(dev)->gen <= 5) {
+	if (INTEL_GEN(dev) <= 5) {
 		ggtt->probe = i915_gmch_probe;
 		ggtt->base.cleanup = i915_gmch_remove;
-	} else if (INTEL_INFO(dev)->gen < 8) {
+	} else if (INTEL_GEN(dev) < 8) {
 		ggtt->probe = gen6_gmch_probe;
 		ggtt->base.cleanup = gen6_gmch_remove;
 		if (IS_HASWELL(dev) && dev_priv->ellc_size)
@@ -3178,7 +3178,7 @@ int i915_ggtt_init_hw(struct drm_device *dev)
 			ggtt->base.pte_encode = hsw_pte_encode;
 		else if (IS_VALLEYVIEW(dev))
 			ggtt->base.pte_encode = byt_pte_encode;
-		else if (INTEL_INFO(dev)->gen >= 7)
+		else if (INTEL_GEN(dev) >= 7)
 			ggtt->base.pte_encode = ivb_pte_encode;
 		else
 			ggtt->base.pte_encode = snb_pte_encode;
@@ -3267,7 +3267,7 @@ void i915_gem_restore_gtt_mappings(struct drm_device *dev)
 			i915_gem_clflush_object(obj, obj->pin_display);
 	}
 
-	if (INTEL_INFO(dev)->gen >= 8) {
+	if (INTEL_GEN(dev) >= 8) {
 		if (IS_CHERRYVIEW(dev) || IS_BROXTON(dev))
 			chv_setup_private_ppat(dev_priv);
 		else

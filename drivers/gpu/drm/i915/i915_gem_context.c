@@ -111,7 +111,7 @@ static int get_context_size(struct drm_device *dev)
 	int ret;
 	u32 reg;
 
-	switch (INTEL_INFO(dev)->gen) {
+	switch (INTEL_GEN(dev)) {
 	case 6:
 		reg = I915_READ(CXT_SIZE);
 		ret = GEN6_CXT_TOTAL_SIZE(reg) * 64;
@@ -531,14 +531,14 @@ mi_set_context(struct drm_i915_gem_request *req, u32 hw_flags)
 	}
 
 	/* These flags are for resource streamer on HSW+ */
-	if (IS_HASWELL(engine->dev) || INTEL_INFO(engine->dev)->gen >= 8)
+	if (IS_HASWELL(engine->dev) || INTEL_GEN(engine->dev) >= 8)
 		flags |= (HSW_MI_RS_SAVE_STATE_EN | HSW_MI_RS_RESTORE_STATE_EN);
-	else if (INTEL_INFO(engine->dev)->gen < 8)
+	else if (INTEL_GEN(engine->dev) < 8)
 		flags |= (MI_SAVE_EXT_STATE_EN | MI_RESTORE_EXT_STATE_EN);
 
 
 	len = 4;
-	if (INTEL_INFO(engine->dev)->gen >= 7)
+	if (INTEL_GEN(engine->dev) >= 7)
 		len += 2 + (num_rings ? 4*num_rings + 2 : 0);
 
 	ret = intel_ring_begin(req, len);
@@ -546,7 +546,7 @@ mi_set_context(struct drm_i915_gem_request *req, u32 hw_flags)
 		return ret;
 
 	/* WaProgramMiArbOnOffAroundMiSetContext:ivb,vlv,hsw,bdw,chv */
-	if (INTEL_INFO(engine->dev)->gen >= 7) {
+	if (INTEL_GEN(engine->dev) >= 7) {
 		intel_ring_emit(engine, MI_ARB_ON_OFF | MI_ARB_DISABLE);
 		if (num_rings) {
 			struct intel_engine_cs *signaller;
@@ -576,7 +576,7 @@ mi_set_context(struct drm_i915_gem_request *req, u32 hw_flags)
 	 */
 	intel_ring_emit(engine, MI_NOOP);
 
-	if (INTEL_INFO(engine->dev)->gen >= 7) {
+	if (INTEL_GEN(engine->dev) >= 7) {
 		if (num_rings) {
 			struct intel_engine_cs *signaller;
 
@@ -622,7 +622,7 @@ needs_pd_load_pre(struct intel_engine_cs *engine, struct intel_context *to)
 	if (!to->ppgtt)
 		return false;
 
-	if (INTEL_INFO(engine->dev)->gen < 8)
+	if (INTEL_GEN(engine->dev) < 8)
 		return true;
 
 	if (engine != &dev_priv->engine[RCS])

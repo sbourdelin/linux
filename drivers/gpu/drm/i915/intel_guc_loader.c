@@ -124,7 +124,7 @@ static u32 get_gttype(struct drm_i915_private *dev_priv)
 
 static u32 get_core_family(struct drm_i915_private *dev_priv)
 {
-	switch (INTEL_INFO(dev_priv)->gen) {
+	switch (INTEL_GEN(dev_priv)) {
 	case 9:
 		return GFXCORE_FAMILY_GEN9;
 

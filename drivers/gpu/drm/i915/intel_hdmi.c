@@ -1171,7 +1171,7 @@ static int hdmi_port_clock_limit(struct intel_hdmi *hdmi, bool respect_dvi_limit
 
 	if ((respect_dvi_limit && !hdmi->has_hdmi_sink) || IS_G4X(dev))
 		return 165000;
-	else if (IS_HASWELL(dev) || INTEL_INFO(dev)->gen >= 8)
+	else if (IS_HASWELL(dev) || INTEL_GEN(dev) >= 8)
 		return 300000;
 	else
 		return 225000;

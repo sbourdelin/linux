@@ -253,7 +253,7 @@ int intel_sanitize_enable_execlists(struct drm_device *dev, int enable_execlists
 	if (HAS_LOGICAL_RING_CONTEXTS(dev) && intel_vgpu_active(dev))
 		return 1;
 
-	if (INTEL_INFO(dev)->gen >= 9)
+	if (INTEL_GEN(dev) >= 9)
 		return 1;
 
 	if (enable_execlists == 0)
@@ -1500,9 +1500,9 @@ static int intel_init_workaround_bb(struct intel_engine_cs *engine)
 	WARN_ON(engine->id != RCS);
 
 	/* update this when WA for higher Gen are added */
-	if (INTEL_INFO(engine->dev)->gen > 9) {
+	if (INTEL_GEN(engine->dev) > 9) {
 		DRM_ERROR("WA batch buffer is not initialized for Gen%d\n",
-			  INTEL_INFO(engine->dev)->gen);
+			  INTEL_GEN(engine->dev));
 		return 0;
 	}
 
@@ -1522,7 +1522,7 @@ static int intel_init_workaround_bb(struct intel_engine_cs *engine)
 	batch = kmap_atomic(page);
 	offset = 0;
 
-	if (INTEL_INFO(engine->dev)->gen == 8) {
+	if (INTEL_GEN(engine->dev) == 8) {
 		ret = gen8_init_indirectctx_bb(engine,
 					       &wa_ctx->indirect_ctx,
 					       batch,
@@ -1536,7 +1536,7 @@ static int intel_init_workaround_bb(struct intel_engine_cs *engine)
 					  &offset);
 		if (ret)
 			goto out;
-	} else if (INTEL_INFO(engine->dev)->gen == 9) {
+	} else if (INTEL_GEN(engine->dev) == 9) {
 		ret = gen9_init_indirectctx_bb(engine,
 					       &wa_ctx->indirect_ctx,
 					       batch,
@@ -2142,7 +2142,7 @@ static int logical_render_ring_init(struct drm_device *dev)
 	logical_ring_default_vfuncs(dev, engine);
 
 	/* Override some for render ring. */
-	if (INTEL_INFO(dev)->gen >= 9)
+	if (INTEL_GEN(dev) >= 9)
 		engine->init_hw = gen9_init_render_ring;
 	else
 		engine->init_hw = gen8_init_render_ring;
@@ -2310,7 +2310,7 @@ make_rpcs(struct drm_device *dev)
 	 * No explicit RPCS request is needed to ensure full
 	 * slice/subslice/EU enablement prior to Gen9.
 	*/
-	if (INTEL_INFO(dev)->gen < 9)
+	if (INTEL_GEN(dev) < 9)
 		return 0;
 
 	/*
@@ -2348,9 +2348,9 @@ static u32 intel_lr_indirect_ctx_offset(struct intel_engine_cs *engine)
 {
 	u32 indirect_ctx_offset;
 
-	switch (INTEL_INFO(engine->dev)->gen) {
+	switch (INTEL_GEN(engine->dev)) {
 	default:
-		MISSING_CASE(INTEL_INFO(engine->dev)->gen);
+		MISSING_CASE(INTEL_GEN(engine->dev));
 		/* fall through */
 	case 9:
 		indirect_ctx_offset =
@@ -2556,11 +2556,11 @@ uint32_t intel_lr_context_size(struct intel_engine_cs *engine)
 {
 	int ret = 0;
 
-	WARN_ON(INTEL_INFO(engine->dev)->gen < 8);
+	WARN_ON(INTEL_GEN(engine->dev) < 8);
 
 	switch (engine->id) {
 	case RCS:
-		if (INTEL_INFO(engine->dev)->gen >= 9)
+		if (INTEL_GEN(engine->dev) >= 9)
 			ret = GEN9_LR_CONTEXT_RENDER_SIZE;
 		else
 			ret = GEN8_LR_CONTEXT_RENDER_SIZE;

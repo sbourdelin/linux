@@ -1279,7 +1279,7 @@ int __i915_wait_request(struct drm_i915_gem_request *req,
 		before = ktime_get_raw_ns();
 	}
 
-	if (INTEL_INFO(dev_priv)->gen >= 6)
+	if (INTEL_GEN(dev_priv) >= 6)
 		gen6_rps_boost(dev_priv, rps, req->emitted_jiffies);
 
 	trace_i915_gem_request_wait_begin(req);
@@ -1986,12 +1986,12 @@ i915_gem_get_gtt_size(struct drm_device *dev, uint32_t size, int tiling_mode)
 {
 	uint32_t gtt_size;
 
-	if (INTEL_INFO(dev)->gen >= 4 ||
+	if (INTEL_GEN(dev) >= 4 ||
 	    tiling_mode == I915_TILING_NONE)
 		return size;
 
 	/* Previous chips need a power-of-two fence region when tiling */
-	if (INTEL_INFO(dev)->gen == 3)
+	if (INTEL_GEN(dev) == 3)
 		gtt_size = 1024*1024;
 	else
 		gtt_size = 512*1024;
@@ -2017,7 +2017,7 @@ i915_gem_get_gtt_alignment(struct drm_device *dev, uint32_t size,
 	 * Minimum alignment is 4k (GTT page size), but might be greater
 	 * if a fence register is needed for the object.
 	 */
-	if (INTEL_INFO(dev)->gen >= 4 || (!fenced && IS_G33(dev)) ||
+	if (INTEL_GEN(dev) >= 4 || (!fenced && IS_G33(dev)) ||
 	    tiling_mode == I915_TILING_NONE)
 		return 4096;
 
@@ -4730,7 +4730,7 @@ void i915_gem_init_swizzling(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	if (INTEL_INFO(dev)->gen < 5 ||
+	if (INTEL_GEN(dev) < 5 ||
 	    dev_priv->mm.bit_6_swizzle_x == I915_BIT_6_SWIZZLE_NONE)
 		return;
 
@@ -4832,7 +4832,7 @@ i915_gem_init_hw(struct drm_device *dev)
 	struct intel_engine_cs *engine;
 	int ret, j;
 
-	if (INTEL_INFO(dev)->gen < 6 && !intel_enable_gtt())
+	if (INTEL_GEN(dev) < 6 && !intel_enable_gtt())
 		return -EIO;
 
 	/* Double layer security blanket, see i915_gem_init() */
@@ -4850,7 +4850,7 @@ i915_gem_init_hw(struct drm_device *dev)
 			u32 temp = I915_READ(GEN7_MSG_CTL);
 			temp &= ~(WAIT_FOR_PCH_FLR_ACK | WAIT_FOR_PCH_RESET_ACK);
 			I915_WRITE(GEN7_MSG_CTL, temp);
-		} else if (INTEL_INFO(dev)->gen >= 7) {
+		} else if (INTEL_GEN(dev) >= 7) {
 			u32 temp = I915_READ(HSW_NDE_RSTWRN_OPT);
 			temp &= ~RESET_PCH_HANDSHAKE_ENABLE;
 			I915_WRITE(HSW_NDE_RSTWRN_OPT, temp);
@@ -5034,10 +5034,10 @@ i915_gem_load_init_fences(struct drm_i915_private *dev_priv)
 {
 	struct drm_device *dev = dev_priv->dev;
 
-	if (INTEL_INFO(dev_priv)->gen >= 7 && !IS_VALLEYVIEW(dev_priv) &&
+	if (INTEL_GEN(dev_priv) >= 7 && !IS_VALLEYVIEW(dev_priv) &&
 	    !IS_CHERRYVIEW(dev_priv))
 		dev_priv->num_fence_regs = 32;
-	else if (INTEL_INFO(dev_priv)->gen >= 4 || IS_I945G(dev_priv) ||
+	else if (INTEL_GEN(dev_priv) >= 4 || IS_I945G(dev_priv) ||
 		 IS_I945GM(dev_priv) || IS_G33(dev_priv))
 		dev_priv->num_fence_regs = 16;
 	else

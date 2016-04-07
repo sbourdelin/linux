@@ -49,7 +49,7 @@ static int render_state_init(struct render_state *so, struct drm_device *dev)
 {
 	int ret;
 
-	so->gen = INTEL_INFO(dev)->gen;
+	so->gen = INTEL_GEN(dev);
 	so->rodata = render_state_get_rodata(dev, so->gen);
 	if (so->rodata == NULL)
 		return 0;

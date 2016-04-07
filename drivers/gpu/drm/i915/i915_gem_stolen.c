@@ -56,7 +56,7 @@ int i915_gem_stolen_insert_node_in_range(struct drm_i915_private *dev_priv,
 
 	/* See the comment at the drm_mm_init() call for more about this check.
 	 * WaSkipStolenMemoryFirstPage:bdw,chv (incomplete) */
-	if (INTEL_INFO(dev_priv)->gen == 8 && start < 4096)
+	if (INTEL_GEN(dev_priv) == 8 && start < 4096)
 		start = 4096;
 
 	mutex_lock(&dev_priv->mm.stolen_lock);
@@ -106,7 +106,7 @@ static unsigned long i915_stolen_to_physical(struct drm_device *dev)
 	 *
 	 */
 	base = 0;
-	if (INTEL_INFO(dev)->gen >= 3) {
+	if (INTEL_GEN(dev) >= 3) {
 		/* Read Graphics Base of Stolen Memory directly */
 		pci_read_config_dword(dev->pdev, 0x5c, &base);
 		base &= ~((1<<20) - 1);
@@ -188,7 +188,7 @@ static unsigned long i915_stolen_to_physical(struct drm_device *dev)
 		return 0;
 
 	/* make sure we don't clobber the GTT if it's within stolen memory */
-	if (INTEL_INFO(dev)->gen <= 4 && !IS_G33(dev) && !IS_G4X(dev)) {
+	if (INTEL_GEN(dev) <= 4 && !IS_G33(dev) && !IS_G4X(dev)) {
 		struct {
 			u32 start, end;
 		} stolen[2] = {
@@ -401,7 +401,7 @@ int i915_gem_init_stolen(struct drm_device *dev)
 	mutex_init(&dev_priv->mm.stolen_lock);
 
 #ifdef CONFIG_INTEL_IOMMU
-	if (intel_iommu_gfx_mapped && INTEL_INFO(dev)->gen < 8) {
+	if (intel_iommu_gfx_mapped && INTEL_GEN(dev) < 8) {
 		DRM_INFO("DMAR active, disabling use of stolen memory\n");
 		return 0;
 	}
@@ -416,7 +416,7 @@ int i915_gem_init_stolen(struct drm_device *dev)
 
 	stolen_top = dev_priv->mm.stolen_base + ggtt->stolen_size;
 
-	switch (INTEL_INFO(dev_priv)->gen) {
+	switch (INTEL_GEN(dev_priv)) {
 	case 2:
 	case 3:
 		break;

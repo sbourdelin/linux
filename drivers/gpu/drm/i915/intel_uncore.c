@@ -315,7 +315,7 @@ static void intel_uncore_ellc_detect(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
 	if ((IS_HASWELL(dev) || IS_BROADWELL(dev) ||
-	     INTEL_INFO(dev)->gen >= 9) &&
+	     INTEL_GEN(dev) >= 9) &&
 	    (__raw_i915_read32(dev_priv, HSW_EDRAM_PRESENT) & EDRAM_ENABLED)) {
 		/* The docs do not explain exactly how the calculation can be
 		 * made. It is somewhat guessable, but for now, it's always
@@ -1161,7 +1161,7 @@ static void intel_uncore_fw_domains_init(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	if (INTEL_INFO(dev_priv)->gen <= 5)
+	if (INTEL_GEN(dev_priv) <= 5)
 		return;
 
 	if (IS_GEN9(dev)) {
@@ -1259,7 +1259,7 @@ void intel_uncore_init(struct drm_device *dev)
 
 	dev_priv->uncore.unclaimed_mmio_check = 1;
 
-	switch (INTEL_INFO(dev)->gen) {
+	switch (INTEL_GEN(dev)) {
 	default:
 	case 9:
 		ASSIGN_WRITE_MMIO_VFUNCS(gen9);
@@ -1343,7 +1343,7 @@ int i915_reg_read_ioctl(struct drm_device *dev,
 
 	for (i = 0; i < ARRAY_SIZE(whitelist); i++, entry++) {
 		if (i915_mmio_reg_offset(entry->offset_ldw) == (reg->offset & -entry->size) &&
-		    (1 << INTEL_INFO(dev)->gen & entry->gen_bitmask))
+		    (1 << INTEL_GEN(dev) & entry->gen_bitmask))
 			break;
 	}
 
@@ -1632,9 +1632,9 @@ static int (*intel_get_gpu_reset(struct drm_device *dev))(struct drm_device *,
 	if (!i915.reset)
 		return NULL;
 
-	if (INTEL_INFO(dev)->gen >= 8)
+	if (INTEL_GEN(dev) >= 8)
 		return gen8_reset_engines;
-	else if (INTEL_INFO(dev)->gen >= 6)
+	else if (INTEL_GEN(dev) >= 6)
 		return gen6_reset_engines;
 	else if (IS_GEN5(dev))
 		return ironlake_do_reset;
@@ -1642,7 +1642,7 @@ static int (*intel_get_gpu_reset(struct drm_device *dev))(struct drm_device *,
 		return g4x_do_reset;
 	else if (IS_G33(dev))
 		return g33_do_reset;
-	else if (INTEL_INFO(dev)->gen >= 3)
+	else if (INTEL_GEN(dev) >= 3)
 		return i915_do_reset;
 	else
 		return NULL;

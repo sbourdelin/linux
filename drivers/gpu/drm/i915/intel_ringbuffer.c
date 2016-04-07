@@ -441,10 +441,10 @@ u64 intel_ring_get_active_head(struct intel_engine_cs *engine)
 	struct drm_i915_private *dev_priv = engine->dev->dev_private;
 	u64 acthd;
 
-	if (INTEL_INFO(engine->dev)->gen >= 8)
+	if (INTEL_GEN(engine->dev) >= 8)
 		acthd = I915_READ64_2x32(RING_ACTHD(engine->mmio_base),
 					 RING_ACTHD_UDW(engine->mmio_base));
-	else if (INTEL_INFO(engine->dev)->gen >= 4)
+	else if (INTEL_GEN(engine->dev) >= 4)
 		acthd = I915_READ(RING_ACTHD(engine->mmio_base));
 	else
 		acthd = I915_READ(ACTHD);
@@ -458,7 +458,7 @@ static void ring_setup_phys_status_page(struct intel_engine_cs *engine)
 	u32 addr;
 
 	addr = dev_priv->status_page_dmah->busaddr;
-	if (INTEL_INFO(engine->dev)->gen >= 4)
+	if (INTEL_GEN(engine->dev) >= 4)
 		addr |= (dev_priv->status_page_dmah->busaddr >> 28) & 0xf0;
 	I915_WRITE(HWS_PGA, addr);
 }
@@ -509,7 +509,7 @@ static void intel_ring_setup_status_page(struct intel_engine_cs *engine)
 	 * arises: do we still need this and if so how should we go about
 	 * invalidating the TLB?
 	 */
-	if (INTEL_INFO(dev)->gen >= 6 && INTEL_INFO(dev)->gen < 8) {
+	if (INTEL_GEN(dev) >= 6 && INTEL_GEN(dev) < 8) {
 		i915_reg_t reg = RING_INSTPM(engine->mmio_base);
 
 		/* ring should be idle before issuing a sync flush*/
@@ -655,7 +655,7 @@ intel_fini_pipe_control(struct intel_engine_cs *engine)
 	if (engine->scratch.obj == NULL)
 		return;
 
-	if (INTEL_INFO(dev)->gen >= 5) {
+	if (INTEL_GEN(dev) >= 5) {
 		kunmap(sg_page(engine->scratch.obj->pages->sgl));
 		i915_gem_object_ggtt_unpin(engine->scratch.obj);
 	}
@@ -1215,7 +1215,7 @@ static int init_render_ring(struct intel_engine_cs *engine)
 		return ret;
 
 	/* WaTimedSingleVertexDispatch:cl,bw,ctg,elk,ilk,snb */
-	if (INTEL_INFO(dev)->gen >= 4 && INTEL_INFO(dev)->gen < 7)
+	if (INTEL_GEN(dev) >= 4 && INTEL_GEN(dev) < 7)
 		I915_WRITE(MI_MODE, _MASKED_BIT_ENABLE(VS_TIMER_DISPATCH));
 
 	/* We need to disable the AsyncFlip performance optimisations in order
@@ -1224,12 +1224,12 @@ static int init_render_ring(struct intel_engine_cs *engine)
 	 *
 	 * WaDisableAsyncFlipPerfMode:snb,ivb,hsw,vlv
 	 */
-	if (INTEL_INFO(dev)->gen >= 6 && INTEL_INFO(dev)->gen < 8)
+	if (INTEL_GEN(dev) >= 6 && INTEL_GEN(dev) < 8)
 		I915_WRITE(MI_MODE, _MASKED_BIT_ENABLE(ASYNC_FLIP_PERF_DISABLE));
 
 	/* Required for the hardware to program scanline values for waiting */
 	/* WaEnableFlushTlbInvalidationMode:snb */
-	if (INTEL_INFO(dev)->gen == 6)
+	if (INTEL_GEN(dev) == 6)
 		I915_WRITE(GFX_MODE,
 			   _MASKED_BIT_ENABLE(GFX_TLB_INVALIDATE_EXPLICIT));
 
@@ -1249,7 +1249,7 @@ static int init_render_ring(struct intel_engine_cs *engine)
 			   _MASKED_BIT_DISABLE(CM0_STC_EVICT_DISABLE_LRA_SNB));
 	}
 
-	if (INTEL_INFO(dev)->gen >= 6 && INTEL_INFO(dev)->gen < 8)
+	if (INTEL_GEN(dev) >= 6 && INTEL_GEN(dev) < 8)
 		I915_WRITE(INSTPM, _MASKED_BIT_ENABLE(INSTPM_FORCE_ORDERING));
 
 	if (HAS_L3_DPF(dev))
@@ -2553,7 +2553,7 @@ void intel_ring_init_seqno(struct intel_engine_cs *engine, u32 seqno)
 	struct drm_device *dev = engine->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	if (INTEL_INFO(dev)->gen == 6 || INTEL_INFO(dev)->gen == 7) {
+	if (INTEL_GEN(dev) == 6 || INTEL_GEN(dev) == 7) {
 		I915_WRITE(RING_SYNC_0(engine->mmio_base), 0);
 		I915_WRITE(RING_SYNC_1(engine->mmio_base), 0);
 		if (HAS_VEBOX(dev))
@@ -2609,7 +2609,7 @@ static int gen6_bsd_ring_flush(struct drm_i915_gem_request *req,
 		return ret;
 
 	cmd = MI_FLUSH_DW;
-	if (INTEL_INFO(engine->dev)->gen >= 8)
+	if (INTEL_GEN(engine->dev) >= 8)
 		cmd += 1;
 
 	/* We always require a command barrier so that subsequent
@@ -2631,7 +2631,7 @@ static int gen6_bsd_ring_flush(struct drm_i915_gem_request *req,
 	intel_ring_emit(engine, cmd);
 	intel_ring_emit(engine,
 			I915_GEM_HWS_SCRATCH_ADDR | MI_FLUSH_DW_USE_GTT);
-	if (INTEL_INFO(engine->dev)->gen >= 8) {
+	if (INTEL_GEN(engine->dev) >= 8) {
 		intel_ring_emit(engine, 0); /* upper addr */
 		intel_ring_emit(engine, 0); /* value */
 	} else  {
@@ -2731,7 +2731,7 @@ static int gen6_ring_flush(struct drm_i915_gem_request *req,
 		return ret;
 
 	cmd = MI_FLUSH_DW;
-	if (INTEL_INFO(dev)->gen >= 8)
+	if (INTEL_GEN(dev) >= 8)
 		cmd += 1;
 
 	/* We always require a command barrier so that subsequent
@@ -2752,7 +2752,7 @@ static int gen6_ring_flush(struct drm_i915_gem_request *req,
 	intel_ring_emit(engine, cmd);
 	intel_ring_emit(engine,
 			I915_GEM_HWS_SCRATCH_ADDR | MI_FLUSH_DW_USE_GTT);
-	if (INTEL_INFO(dev)->gen >= 8) {
+	if (INTEL_GEN(dev) >= 8) {
 		intel_ring_emit(engine, 0); /* upper addr */
 		intel_ring_emit(engine, 0); /* value */
 	} else  {
@@ -2776,7 +2776,7 @@ int intel_init_render_ring_buffer(struct drm_device *dev)
 	engine->exec_id = I915_EXEC_RENDER;
 	engine->mmio_base = RENDER_RING_BASE;
 
-	if (INTEL_INFO(dev)->gen >= 8) {
+	if (INTEL_GEN(dev) >= 8) {
 		if (i915_semaphore_is_enabled(dev)) {
 			obj = i915_gem_alloc_object(dev, 4096);
 			if (obj == NULL) {
@@ -2808,11 +2808,11 @@ int intel_init_render_ring_buffer(struct drm_device *dev)
 			engine->semaphore.signal = gen8_rcs_signal;
 			GEN8_RING_SEMAPHORE_INIT(engine);
 		}
-	} else if (INTEL_INFO(dev)->gen >= 6) {
+	} else if (INTEL_GEN(dev) >= 6) {
 		engine->init_context = intel_rcs_ctx_init;
 		engine->add_request = gen6_add_request;
 		engine->flush = gen7_render_ring_flush;
-		if (INTEL_INFO(dev)->gen == 6)
+		if (INTEL_GEN(dev) == 6)
 			engine->flush = gen6_render_ring_flush;
 		engine->irq_get = gen6_ring_get_irq;
 		engine->irq_put = gen6_ring_put_irq;
@@ -2851,7 +2851,7 @@ int intel_init_render_ring_buffer(struct drm_device *dev)
 					GT_RENDER_PIPECTL_NOTIFY_INTERRUPT;
 	} else {
 		engine->add_request = i9xx_add_request;
-		if (INTEL_INFO(dev)->gen < 4)
+		if (INTEL_GEN(dev) < 4)
 			engine->flush = gen2_render_ring_flush;
 		else
 			engine->flush = gen4_render_ring_flush;
@@ -2872,9 +2872,9 @@ int intel_init_render_ring_buffer(struct drm_device *dev)
 		engine->dispatch_execbuffer = hsw_ring_dispatch_execbuffer;
 	else if (IS_GEN8(dev))
 		engine->dispatch_execbuffer = gen8_ring_dispatch_execbuffer;
-	else if (INTEL_INFO(dev)->gen >= 6)
+	else if (INTEL_GEN(dev) >= 6)
 		engine->dispatch_execbuffer = gen6_ring_dispatch_execbuffer;
-	else if (INTEL_INFO(dev)->gen >= 4)
+	else if (INTEL_GEN(dev) >= 4)
 		engine->dispatch_execbuffer = i965_dispatch_execbuffer;
 	else if (IS_I830(dev) || IS_845G(dev))
 		engine->dispatch_execbuffer = i830_dispatch_execbuffer;
@@ -2906,7 +2906,7 @@ int intel_init_render_ring_buffer(struct drm_device *dev)
 	if (ret)
 		return ret;
 
-	if (INTEL_INFO(dev)->gen >= 5) {
+	if (INTEL_GEN(dev) >= 5) {
 		ret = intel_init_pipe_control(engine);
 		if (ret)
 			return ret;
@@ -2925,7 +2925,7 @@ int intel_init_bsd_ring_buffer(struct drm_device *dev)
 	engine->exec_id = I915_EXEC_BSD;
 
 	engine->write_tail = ring_write_tail;
-	if (INTEL_INFO(dev)->gen >= 6) {
+	if (INTEL_GEN(dev) >= 6) {
 		engine->mmio_base = GEN6_BSD_RING_BASE;
 		/* gen6 bsd needs a special wa for tail updates */
 		if (IS_GEN6(dev))
@@ -2934,7 +2934,7 @@ int intel_init_bsd_ring_buffer(struct drm_device *dev)
 		engine->add_request = gen6_add_request;
 		engine->get_seqno = gen6_ring_get_seqno;
 		engine->set_seqno = ring_set_seqno;
-		if (INTEL_INFO(dev)->gen >= 8) {
+		if (INTEL_GEN(dev) >= 8) {
 			engine->irq_enable_mask =
 				GT_RENDER_USER_INTERRUPT << GEN8_VCS1_IRQ_SHIFT;
 			engine->irq_get = gen8_ring_get_irq;
@@ -3038,7 +3038,7 @@ int intel_init_blt_ring_buffer(struct drm_device *dev)
 	engine->add_request = gen6_add_request;
 	engine->get_seqno = gen6_ring_get_seqno;
 	engine->set_seqno = ring_set_seqno;
-	if (INTEL_INFO(dev)->gen >= 8) {
+	if (INTEL_GEN(dev) >= 8) {
 		engine->irq_enable_mask =
 			GT_RENDER_USER_INTERRUPT << GEN8_BCS_IRQ_SHIFT;
 		engine->irq_get = gen8_ring_get_irq;
@@ -3097,7 +3097,7 @@ int intel_init_vebox_ring_buffer(struct drm_device *dev)
 	engine->get_seqno = gen6_ring_get_seqno;
 	engine->set_seqno = ring_set_seqno;
 
-	if (INTEL_INFO(dev)->gen >= 8) {
+	if (INTEL_GEN(dev) >= 8) {
 		engine->irq_enable_mask =
 			GT_RENDER_USER_INTERRUPT << GEN8_VECS_IRQ_SHIFT;
 		engine->irq_get = gen8_ring_get_irq;

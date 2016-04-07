@@ -786,7 +786,7 @@ intel_check_sprite_plane(struct drm_plane *plane,
 	}
 
 	/* setup can_scale, min_scale, max_scale */
-	if (INTEL_INFO(dev)->gen >= 9) {
+	if (INTEL_GEN(dev) >= 9) {
 		/* use scaler when colorkey is not required */
 		if (state->ckey.flags == I915_SET_COLORKEY_NONE) {
 			can_scale = 1;
@@ -902,8 +902,8 @@ intel_check_sprite_plane(struct drm_plane *plane,
 
 		width_bytes = ((src_x * cpp) & 63) + src_w * cpp;
 
-		if (INTEL_INFO(dev)->gen < 9 && (src_w > 2048 || src_h > 2048 ||
-		    width_bytes > 4096 || fb->pitches[0] > 4096)) {
+		if (INTEL_GEN(dev) < 9 && (src_w > 2048 || src_h > 2048 ||
+					   width_bytes > 4096 || fb->pitches[0] > 4096)) {
 			DRM_DEBUG_KMS("Source dimensions exceed hardware limits\n");
 			return -EINVAL;
 		}
@@ -1032,7 +1032,7 @@ intel_plane_init(struct drm_device *dev, enum pipe pipe, int plane)
 	int num_plane_formats;
 	int ret;
 
-	if (INTEL_INFO(dev)->gen < 5)
+	if (INTEL_GEN(dev) < 5)
 		return -ENODEV;
 
 	intel_plane = kzalloc(sizeof(*intel_plane), GFP_KERNEL);
@@ -1048,7 +1048,7 @@ intel_plane_init(struct drm_device *dev, enum pipe pipe, int plane)
 	}
 	intel_plane->base.state = &state->base;
 
-	switch (INTEL_INFO(dev)->gen) {
+	switch (INTEL_GEN(dev)) {
 	case 5:
 	case 6:
 		intel_plane->can_scale = true;
@@ -1099,7 +1099,7 @@ intel_plane_init(struct drm_device *dev, enum pipe pipe, int plane)
 		num_plane_formats = ARRAY_SIZE(skl_plane_formats);
 		break;
 	default:
-		MISSING_CASE(INTEL_INFO(dev)->gen);
+		MISSING_CASE(INTEL_GEN(dev));
 		ret = -ENODEV;
 		goto fail;
 	}

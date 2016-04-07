@@ -290,7 +290,7 @@ relocate_entry_cpu(struct drm_i915_gem_object *obj,
 				reloc->offset >> PAGE_SHIFT));
 	*(uint32_t *)(vaddr + page_offset) = lower_32_bits(delta);
 
-	if (INTEL_INFO(dev)->gen >= 8) {
+	if (INTEL_GEN(dev) >= 8) {
 		page_offset = offset_in_page(page_offset + sizeof(uint32_t));
 
 		if (page_offset == 0) {
@@ -335,7 +335,7 @@ relocate_entry_gtt(struct drm_i915_gem_object *obj,
 					      offset & PAGE_MASK);
 	iowrite32(lower_32_bits(delta), reloc_page + offset_in_page(offset));
 
-	if (INTEL_INFO(dev)->gen >= 8) {
+	if (INTEL_GEN(dev) >= 8) {
 		offset += sizeof(uint32_t);
 
 		if (offset_in_page(offset) == 0) {
@@ -382,7 +382,7 @@ relocate_entry_clflush(struct drm_i915_gem_object *obj,
 				reloc->offset >> PAGE_SHIFT));
 	clflush_write32(vaddr + page_offset, lower_32_bits(delta));
 
-	if (INTEL_INFO(dev)->gen >= 8) {
+	if (INTEL_GEN(dev) >= 8) {
 		page_offset = offset_in_page(page_offset + sizeof(uint32_t));
 
 		if (page_offset == 0) {
@@ -465,7 +465,7 @@ i915_gem_execbuffer_relocate_entry(struct drm_i915_gem_object *obj,
 
 	/* Check that the relocation address is valid... */
 	if (unlikely(reloc->offset >
-		obj->base.size - (INTEL_INFO(dev)->gen >= 8 ? 8 : 4))) {
+		obj->base.size - (INTEL_GEN(dev) >= 8 ? 8 : 4))) {
 		DRM_DEBUG("Relocation beyond object bounds: "
 			  "obj %p target %d offset %d size %d.\n",
 			  obj, reloc->target_handle,
@@ -724,7 +724,7 @@ i915_gem_execbuffer_reserve(struct intel_engine_cs *engine,
 	struct i915_address_space *vm;
 	struct list_head ordered_vmas;
 	struct list_head pinned_vmas;
-	bool has_fenced_gpu_access = INTEL_INFO(engine->dev)->gen < 4;
+	bool has_fenced_gpu_access = INTEL_GEN(engine->dev) < 4;
 	int retry;
 
 	i915_gem_retire_requests_ring(engine);
@@ -1264,19 +1264,19 @@ i915_gem_ringbuffer_submission(struct i915_execbuffer_params *params,
 		}
 
 		if (instp_mode != dev_priv->relative_constants_mode) {
-			if (INTEL_INFO(dev)->gen < 4) {
+			if (INTEL_GEN(dev) < 4) {
 				DRM_DEBUG("no rel constants on pre-gen4\n");
 				return -EINVAL;
 			}
 
-			if (INTEL_INFO(dev)->gen > 5 &&
+			if (INTEL_GEN(dev) > 5 &&
 			    instp_mode == I915_EXEC_CONSTANTS_REL_SURFACE) {
 				DRM_DEBUG("rel surface constants mode invalid on gen5+\n");
 				return -EINVAL;
 			}
 
 			/* The HW changed the meaning on this bit on gen6 */
-			if (INTEL_INFO(dev)->gen >= 6)
+			if (INTEL_GEN(dev) >= 6)
 				instp_mask &= ~I915_EXEC_CONSTANTS_REL_SURFACE;
 		}
 		break;
@@ -1720,7 +1720,7 @@ i915_gem_execbuffer(struct drm_device *dev, void *data,
 		exec2_list[i].relocs_ptr = exec_list[i].relocs_ptr;
 		exec2_list[i].alignment = exec_list[i].alignment;
 		exec2_list[i].offset = exec_list[i].offset;
-		if (INTEL_INFO(dev)->gen < 4)
+		if (INTEL_GEN(dev) < 4)
 			exec2_list[i].flags = EXEC_OBJECT_NEEDS_FENCE;
 		else
 			exec2_list[i].flags = 0;

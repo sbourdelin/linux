@@ -2593,14 +2593,14 @@ struct drm_i915_cmd_table {
  * have their own (e.g. HAS_PCH_SPLIT for ILK+ display, IS_foo for particular
  * chips, etc.).
  */
-#define IS_GEN2(dev)	(INTEL_INFO(dev)->gen == 2)
-#define IS_GEN3(dev)	(INTEL_INFO(dev)->gen == 3)
-#define IS_GEN4(dev)	(INTEL_INFO(dev)->gen == 4)
-#define IS_GEN5(dev)	(INTEL_INFO(dev)->gen == 5)
-#define IS_GEN6(dev)	(INTEL_INFO(dev)->gen == 6)
-#define IS_GEN7(dev)	(INTEL_INFO(dev)->gen == 7)
-#define IS_GEN8(dev)	(INTEL_INFO(dev)->gen == 8)
-#define IS_GEN9(dev)	(INTEL_INFO(dev)->gen == 9)
+#define IS_GEN2(dev)	(INTEL_GEN(dev) == 2)
+#define IS_GEN3(dev)	(INTEL_GEN(dev) == 3)
+#define IS_GEN4(dev)	(INTEL_GEN(dev) == 4)
+#define IS_GEN5(dev)	(INTEL_GEN(dev) == 5)
+#define IS_GEN6(dev)	(INTEL_GEN(dev) == 6)
+#define IS_GEN7(dev)	(INTEL_GEN(dev) == 7)
+#define IS_GEN8(dev)	(INTEL_GEN(dev) == 8)
+#define IS_GEN9(dev)	(INTEL_GEN(dev) == 9)
 
 #define RENDER_RING		(1<<RCS)
 #define BSD_RING		(1<<VCS)
@@ -2619,8 +2619,8 @@ struct drm_i915_cmd_table {
 				 __I915__(dev)->ellc_size)
 #define I915_NEED_GFX_HWS(dev)	(INTEL_INFO(dev)->need_gfx_hws)
 
-#define HAS_HW_CONTEXTS(dev)	(INTEL_INFO(dev)->gen >= 6)
-#define HAS_LOGICAL_RING_CONTEXTS(dev)	(INTEL_INFO(dev)->gen >= 8)
+#define HAS_HW_CONTEXTS(dev)	(INTEL_GEN(dev) >= 6)
+#define HAS_LOGICAL_RING_CONTEXTS(dev)	(INTEL_GEN(dev) >= 8)
 #define USES_PPGTT(dev)		(i915.enable_ppgtt)
 #define USES_FULL_PPGTT(dev)	(i915.enable_ppgtt >= 2)
 #define USES_FULL_48BIT_PPGTT(dev)	(i915.enable_ppgtt == 3)
@@ -2641,8 +2641,8 @@ struct drm_i915_cmd_table {
  * legacy irq no. is shared with another device. The kernel then disables that
  * interrupt source and so prevents the other device from working properly.
  */
-#define HAS_AUX_IRQ(dev) (INTEL_INFO(dev)->gen >= 5)
-#define HAS_GMBUS_IRQ(dev) (INTEL_INFO(dev)->gen >= 5)
+#define HAS_AUX_IRQ(dev) (INTEL_GEN(dev) >= 5)
+#define HAS_GMBUS_IRQ(dev) (INTEL_GEN(dev) >= 5)
 
 /* With the 945 and later, Y tiling got adjusted so that it was 32 128-byte
  * rows, which changed the alignment requirements and fence programming.
@@ -2652,14 +2652,14 @@ struct drm_i915_cmd_table {
 #define SUPPORTS_TV(dev)		(INTEL_INFO(dev)->supports_tv)
 #define I915_HAS_HOTPLUG(dev)		 (INTEL_INFO(dev)->has_hotplug)
 
-#define HAS_FW_BLC(dev) (INTEL_INFO(dev)->gen > 2)
+#define HAS_FW_BLC(dev) (INTEL_GEN(dev) > 2)
 #define HAS_PIPE_CXSR(dev) (INTEL_INFO(dev)->has_pipe_cxsr)
 #define HAS_FBC(dev) (INTEL_INFO(dev)->has_fbc)
 
 #define HAS_IPS(dev)		(IS_HSW_ULT(dev) || IS_BROADWELL(dev))
 
 #define HAS_DP_MST(dev)		(IS_HASWELL(dev) || IS_BROADWELL(dev) || \
-				 INTEL_INFO(dev)->gen >= 9)
+				 INTEL_GEN(dev) >= 9)
 
 #define HAS_DDI(dev)		(INTEL_INFO(dev)->has_ddi)
 #define HAS_FPGA_DBG_UNCLAIMED(dev)	(INTEL_INFO(dev)->has_fpga_dbg)
@@ -2670,8 +2670,8 @@ struct drm_i915_cmd_table {
 				 IS_BROADWELL(dev) || IS_VALLEYVIEW(dev) || \
 				 IS_CHERRYVIEW(dev) || IS_SKYLAKE(dev) || \
 				 IS_KABYLAKE(dev))
-#define HAS_RC6(dev)		(INTEL_INFO(dev)->gen >= 6)
-#define HAS_RC6p(dev)		(INTEL_INFO(dev)->gen == 6 || IS_IVYBRIDGE(dev))
+#define HAS_RC6(dev)		(INTEL_GEN(dev) >= 6)
+#define HAS_RC6p(dev)		(INTEL_GEN(dev) == 6 || IS_IVYBRIDGE(dev))
 
 #define HAS_CSR(dev)	(IS_GEN9(dev))
 
@@ -2679,9 +2679,9 @@ struct drm_i915_cmd_table {
 #define HAS_GUC_SCHED(dev)	(IS_GEN9(dev) && !IS_KABYLAKE(dev))
 
 #define HAS_RESOURCE_STREAMER(dev) (IS_HASWELL(dev) || \
-				    INTEL_INFO(dev)->gen >= 8)
+				    INTEL_GEN(dev) >= 8)
 
-#define HAS_CORE_RING_FREQ(dev)	(INTEL_INFO(dev)->gen >= 6 && \
+#define HAS_CORE_RING_FREQ(dev)	(INTEL_GEN(dev) >= 6 && \
 				 !IS_VALLEYVIEW(dev) && !IS_CHERRYVIEW(dev) && \
 				 !IS_BROXTON(dev))
 
@@ -2707,7 +2707,7 @@ struct drm_i915_cmd_table {
 #define HAS_PCH_NOP(dev) (INTEL_PCH_TYPE(dev) == PCH_NOP)
 #define HAS_PCH_SPLIT(dev) (INTEL_PCH_TYPE(dev) != PCH_NONE)
 
-#define HAS_GMCH_DISPLAY(dev) (INTEL_INFO(dev)->gen < 5 || \
+#define HAS_GMCH_DISPLAY(dev) (INTEL_GEN(dev) < 5 || \
 			       IS_VALLEYVIEW(dev) || IS_CHERRYVIEW(dev))
 
 /* DPF == dynamic parity feature */
@@ -3276,7 +3276,7 @@ int i915_gem_evict_vm(struct i915_address_space *vm, bool do_idle);
 /* belongs in i915_gem_gtt.h */
 static inline void i915_gem_chipset_flush(struct drm_device *dev)
 {
-	if (INTEL_INFO(dev)->gen < 6)
+	if (INTEL_GEN(dev) < 6)
 		intel_gtt_chipset_flush();
 }
 
@@ -3588,7 +3588,7 @@ static inline i915_reg_t i915_vgacntrl_reg(struct drm_device *dev)
 {
 	if (IS_VALLEYVIEW(dev) || IS_CHERRYVIEW(dev))
 		return VLV_VGACNTRL;
-	else if (INTEL_INFO(dev)->gen >= 5)
+	else if (INTEL_GEN(dev) >= 5)
 		return CPU_VGACNTRL;
 	else
 		return VGACNTRL;

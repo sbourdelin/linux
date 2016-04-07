@@ -977,7 +977,7 @@ void intel_ddi_clock_get(struct intel_encoder *encoder,
 {
 	struct drm_device *dev = encoder->base.dev;
 
-	if (INTEL_INFO(dev)->gen <= 8)
+	if (INTEL_GEN(dev) <= 8)
 		hsw_ddi_clock_get(encoder, pipe_config);
 	else if (IS_SKYLAKE(dev) || IS_KABYLAKE(dev))
 		skl_ddi_clock_get(encoder, pipe_config);
@@ -1579,7 +1579,7 @@ void intel_ddi_clk_select(struct intel_encoder *encoder,
 
 		I915_WRITE(DPLL_CTRL2, val);
 
-	} else if (INTEL_INFO(dev_priv)->gen < 9) {
+	} else if (INTEL_GEN(dev_priv) < 9) {
 		WARN_ON(pipe_config->ddi_pll_sel == PORT_CLK_SEL_NONE);
 		I915_WRITE(PORT_CLK_SEL(port), pipe_config->ddi_pll_sel);
 	}
@@ -1611,7 +1611,7 @@ static void intel_ddi_pre_enable(struct intel_encoder *intel_encoder)
 
 		intel_dp_sink_dpms(intel_dp, DRM_MODE_DPMS_ON);
 		intel_dp_start_link_train(intel_dp);
-		if (port != PORT_A || INTEL_INFO(dev_priv)->gen >= 9)
+		if (port != PORT_A || INTEL_GEN(dev_priv) >= 9)
 			intel_dp_stop_link_train(intel_dp);
 	} else if (type == INTEL_OUTPUT_HDMI) {
 		struct intel_hdmi *intel_hdmi = enc_to_intel_hdmi(encoder);
@@ -1657,7 +1657,7 @@ static void intel_ddi_post_disable(struct intel_encoder *intel_encoder)
 	if (IS_SKYLAKE(dev) || IS_KABYLAKE(dev))
 		I915_WRITE(DPLL_CTRL2, (I915_READ(DPLL_CTRL2) |
 					DPLL_CTRL2_DDI_CLK_OFF(port)));
-	else if (INTEL_INFO(dev)->gen < 9)
+	else if (INTEL_GEN(dev) < 9)
 		I915_WRITE(PORT_CLK_SEL(port), PORT_CLK_SEL_NONE);
 }
 
@@ -1685,7 +1685,7 @@ static void intel_enable_ddi(struct intel_encoder *intel_encoder)
 	} else if (type == INTEL_OUTPUT_EDP) {
 		struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
 
-		if (port == PORT_A && INTEL_INFO(dev)->gen < 9)
+		if (port == PORT_A && INTEL_GEN(dev) < 9)
 			intel_dp_stop_link_train(intel_dp);
 
 		intel_edp_backlight_on(intel_dp);

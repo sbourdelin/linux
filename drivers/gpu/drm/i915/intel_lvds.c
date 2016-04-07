@@ -123,7 +123,7 @@ static void intel_lvds_get_config(struct intel_encoder *encoder,
 	pipe_config->base.adjusted_mode.flags |= flags;
 
 	/* gen2/3 store dither state in pfit control, needs to match */
-	if (INTEL_INFO(dev)->gen < 4) {
+	if (INTEL_GEN(dev) < 4) {
 		tmp = I915_READ(PFIT_CONTROL);
 
 		pipe_config->gmch_pfit.control |= tmp & PANEL_8TO6_DITHER_ENABLE;
@@ -186,7 +186,7 @@ static void intel_pre_enable_lvds(struct intel_encoder *encoder)
 	/* Set the dithering flag on LVDS as needed, note that there is no
 	 * special lvds dither control bit on pch-split platforms, dithering is
 	 * only controlled through the PIPECONF reg. */
-	if (INTEL_INFO(dev)->gen == 4) {
+	if (INTEL_GEN(dev) == 4) {
 		/* Bspec wording suggests that LVDS port dithering only exists
 		 * for 18bpp panels. */
 		if (crtc->config->dither && crtc->config->pipe_bpp == 18)
@@ -312,7 +312,7 @@ static bool intel_lvds_compute_config(struct intel_encoder *intel_encoder,
 	unsigned int lvds_bpp;
 
 	/* Should never happen!! */
-	if (INTEL_INFO(dev)->gen < 4 && intel_crtc->pipe == 0) {
+	if (INTEL_GEN(dev) < 4 && intel_crtc->pipe == 0) {
 		DRM_ERROR("Can't support LVDS on pipe A\n");
 		return false;
 	}
@@ -861,7 +861,7 @@ static bool intel_lvds_supported(struct drm_device *dev)
 
 	/* Otherwise LVDS was only attached to mobile products,
 	 * except for the inglorious 830gm */
-	if (INTEL_INFO(dev)->gen <= 4 && IS_MOBILE(dev) && !IS_I830(dev))
+	if (INTEL_GEN(dev) <= 4 && IS_MOBILE(dev) && !IS_I830(dev))
 		return true;
 
 	return false;
@@ -900,7 +900,7 @@ void intel_lvds_init(struct drm_device *dev)
 	if (HAS_PCH_SPLIT(dev)) {
 		I915_WRITE(PCH_PP_CONTROL,
 			   I915_READ(PCH_PP_CONTROL) | PANEL_UNLOCK_REGS);
-	} else if (INTEL_INFO(dev_priv)->gen < 5) {
+	} else if (INTEL_GEN(dev_priv) < 5) {
 		I915_WRITE(PP_CONTROL,
 			   I915_READ(PP_CONTROL) | PANEL_UNLOCK_REGS);
 	}
@@ -937,7 +937,7 @@ void intel_lvds_init(struct drm_device *dev)
 	}
 
 	 /* Set the Panel Power On/Off timings if uninitialized. */
-	if (INTEL_INFO(dev_priv)->gen < 5 &&
+	if (INTEL_GEN(dev_priv) < 5 &&
 	    I915_READ(PP_ON_DELAYS) == 0 && I915_READ(PP_OFF_DELAYS) == 0) {
 		/* Set T2 to 40ms and T5 to 200ms */
 		I915_WRITE(PP_ON_DELAYS, 0x019007d0);

@@ -48,17 +48,17 @@ static inline bool fbc_supported(struct drm_i915_private *dev_priv)
 
 static inline bool fbc_on_pipe_a_only(struct drm_i915_private *dev_priv)
 {
-	return IS_HASWELL(dev_priv) || INTEL_INFO(dev_priv)->gen >= 8;
+	return IS_HASWELL(dev_priv) || INTEL_GEN(dev_priv) >= 8;
 }
 
 static inline bool fbc_on_plane_a_only(struct drm_i915_private *dev_priv)
 {
-	return INTEL_INFO(dev_priv)->gen < 4;
+	return INTEL_GEN(dev_priv) < 4;
 }
 
 static inline bool no_fbc_on_multiple_pipes(struct drm_i915_private *dev_priv)
 {
-	return INTEL_INFO(dev_priv)->gen <= 3;
+	return INTEL_GEN(dev_priv) <= 3;
 }
 
 /*
@@ -104,7 +104,7 @@ static int intel_fbc_calculate_cfb_size(struct drm_i915_private *dev_priv,
 	int lines;
 
 	intel_fbc_get_plane_source_size(cache, NULL, &lines);
-	if (INTEL_INFO(dev_priv)->gen >= 7)
+	if (INTEL_GEN(dev_priv) >= 7)
 		lines = min(lines, 2048);
 
 	/* Hardware needs the full buffer stride, not just the active area. */
@@ -331,7 +331,7 @@ static void gen7_fbc_activate(struct drm_i915_private *dev_priv)
 
 static bool intel_fbc_hw_is_active(struct drm_i915_private *dev_priv)
 {
-	if (INTEL_INFO(dev_priv)->gen >= 5)
+	if (INTEL_GEN(dev_priv) >= 5)
 		return ilk_fbc_is_active(dev_priv);
 	else if (IS_GM45(dev_priv))
 		return g4x_fbc_is_active(dev_priv);
@@ -345,9 +345,9 @@ static void intel_fbc_hw_activate(struct drm_i915_private *dev_priv)
 
 	fbc->active = true;
 
-	if (INTEL_INFO(dev_priv)->gen >= 7)
+	if (INTEL_GEN(dev_priv) >= 7)
 		gen7_fbc_activate(dev_priv);
-	else if (INTEL_INFO(dev_priv)->gen >= 5)
+	else if (INTEL_GEN(dev_priv) >= 5)
 		ilk_fbc_activate(dev_priv);
 	else if (IS_GM45(dev_priv))
 		g4x_fbc_activate(dev_priv);
@@ -361,7 +361,7 @@ static void intel_fbc_hw_deactivate(struct drm_i915_private *dev_priv)
 
 	fbc->active = false;
 
-	if (INTEL_INFO(dev_priv)->gen >= 5)
+	if (INTEL_GEN(dev_priv) >= 5)
 		ilk_fbc_deactivate(dev_priv);
 	else if (IS_GM45(dev_priv))
 		g4x_fbc_deactivate(dev_priv);
@@ -542,7 +542,7 @@ again:
 
 	ret = i915_gem_stolen_insert_node_in_range(dev_priv, node, size >>= 1,
 						   4096, 0, end);
-	if (ret && INTEL_INFO(dev_priv)->gen <= 4) {
+	if (ret && INTEL_GEN(dev_priv) <= 4) {
 		return 0;
 	} else if (ret) {
 		compression_threshold <<= 1;
@@ -575,7 +575,7 @@ static int intel_fbc_alloc_cfb(struct intel_crtc *crtc)
 
 	fbc->threshold = ret;
 
-	if (INTEL_INFO(dev_priv)->gen >= 5)
+	if (INTEL_GEN(dev_priv) >= 5)
 		I915_WRITE(ILK_DPFC_CB_BASE, fbc->compressed_fb.start);
 	else if (IS_GM45(dev_priv)) {
 		I915_WRITE(DPFC_CB_BASE, fbc->compressed_fb.start);
@@ -689,10 +689,10 @@ static bool intel_fbc_hw_tracking_covers_screen(struct intel_crtc *crtc)
 	struct intel_fbc *fbc = &dev_priv->fbc;
 	unsigned int effective_w, effective_h, max_w, max_h;
 
-	if (INTEL_INFO(dev_priv)->gen >= 8 || IS_HASWELL(dev_priv)) {
+	if (INTEL_GEN(dev_priv) >= 8 || IS_HASWELL(dev_priv)) {
 		max_w = 4096;
 		max_h = 4096;
-	} else if (IS_G4X(dev_priv) || INTEL_INFO(dev_priv)->gen >= 5) {
+	} else if (IS_G4X(dev_priv) || INTEL_GEN(dev_priv) >= 5) {
 		max_w = 4096;
 		max_h = 2048;
 	} else {
@@ -740,7 +740,7 @@ static void intel_fbc_update_state_cache(struct intel_crtc *crtc)
 
 	/* FIXME: We lack the proper locking here, so only run this on the
 	 * platforms that need. */
-	if (INTEL_INFO(dev_priv)->gen >= 5 && INTEL_INFO(dev_priv)->gen < 7)
+	if (INTEL_GEN(dev_priv) >= 5 && INTEL_GEN(dev_priv) < 7)
 		cache->fb.ilk_ggtt_offset = i915_gem_obj_ggtt_offset(obj);
 	cache->fb.pixel_format = fb->pixel_format;
 	cache->fb.stride = fb->pitches[0];
@@ -778,7 +778,7 @@ static bool intel_fbc_can_activate(struct intel_crtc *crtc)
 		fbc->no_fbc_reason = "framebuffer not tiled or fenced";
 		return false;
 	}
-	if (INTEL_INFO(dev_priv)->gen <= 4 && !IS_G4X(dev_priv) &&
+	if (INTEL_GEN(dev_priv) <= 4 && !IS_G4X(dev_priv) &&
 	    cache->plane.rotation != BIT(DRM_ROTATE_0)) {
 		fbc->no_fbc_reason = "rotation unsupported";
 		return false;
@@ -1253,7 +1253,7 @@ void intel_fbc_init(struct drm_i915_private *dev_priv)
 	}
 
 	/* This value was pulled out of someone's hat */
-	if (INTEL_INFO(dev_priv)->gen <= 4 && !IS_GM45(dev_priv))
+	if (INTEL_GEN(dev_priv) <= 4 && !IS_GM45(dev_priv))
 		I915_WRITE(FBC_CONTROL, 500 << FBC_CTL_INTERVAL_SHIFT);
 
 	/* We still don't have any sort of hardware state readout for FBC, so

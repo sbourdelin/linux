@@ -259,7 +259,7 @@ static void i915_ring_error_state(struct drm_i915_error_state_buf *m,
 	err_printf(m, "  IPEIR: 0x%08x\n", ring->ipeir);
 	err_printf(m, "  IPEHR: 0x%08x\n", ring->ipehr);
 	err_printf(m, "  INSTDONE: 0x%08x\n", ring->instdone);
-	if (INTEL_INFO(dev)->gen >= 4) {
+	if (INTEL_GEN(dev) >= 4) {
 		err_printf(m, "  BBADDR: 0x%08x %08x\n", (u32)(ring->bbaddr>>32), (u32)ring->bbaddr);
 		err_printf(m, "  BB_STATE: 0x%08x\n", ring->bbstate);
 		err_printf(m, "  INSTPS: 0x%08x\n", ring->instps);
@@ -267,7 +267,7 @@ static void i915_ring_error_state(struct drm_i915_error_state_buf *m,
 	err_printf(m, "  INSTPM: 0x%08x\n", ring->instpm);
 	err_printf(m, "  FADDR: 0x%08x %08x\n", upper_32_bits(ring->faddr),
 		   lower_32_bits(ring->faddr));
-	if (INTEL_INFO(dev)->gen >= 6) {
+	if (INTEL_GEN(dev) >= 6) {
 		err_printf(m, "  RC PSMI: 0x%08x\n", ring->rc_psmi);
 		err_printf(m, "  FAULT_REG: 0x%08x\n", ring->fault_reg);
 		err_printf(m, "  SYNC_0: 0x%08x [last synced 0x%08x]\n",
@@ -285,7 +285,7 @@ static void i915_ring_error_state(struct drm_i915_error_state_buf *m,
 	if (USES_PPGTT(dev)) {
 		err_printf(m, "  GFX_MODE: 0x%08x\n", ring->vm_info.gfx_mode);
 
-		if (INTEL_INFO(dev)->gen >= 8) {
+		if (INTEL_GEN(dev) >= 8) {
 			int i;
 			for (i = 0; i < 4; i++)
 				err_printf(m, "  PDP%d: 0x%016llx\n",
@@ -381,7 +381,7 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 
 	err_printf(m, "EIR: 0x%08x\n", error->eir);
 	err_printf(m, "IER: 0x%08x\n", error->ier);
-	if (INTEL_INFO(dev)->gen >= 8) {
+	if (INTEL_GEN(dev) >= 8) {
 		for (i = 0; i < 4; i++)
 			err_printf(m, "GTIER gt %d: 0x%08x\n", i,
 				   error->gtier[i]);
@@ -400,17 +400,17 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 		err_printf(m, "  INSTDONE_%d: 0x%08x\n", i,
 			   error->extra_instdone[i]);
 
-	if (INTEL_INFO(dev)->gen >= 6) {
+	if (INTEL_GEN(dev) >= 6) {
 		err_printf(m, "ERROR: 0x%08x\n", error->error);
 
-		if (INTEL_INFO(dev)->gen >= 8)
+		if (INTEL_GEN(dev) >= 8)
 			err_printf(m, "FAULT_TLB_DATA: 0x%08x 0x%08x\n",
 				   error->fault_data1, error->fault_data0);
 
 		err_printf(m, "DONE_REG: 0x%08x\n", error->done_reg);
 	}
 
-	if (INTEL_INFO(dev)->gen == 7)
+	if (INTEL_GEN(dev) == 7)
 		err_printf(m, "ERR_INT: 0x%08x\n", error->err_int);
 
 	for (i = 0; i < ARRAY_SIZE(error->ring); i++)
@@ -835,7 +835,7 @@ static void i915_gem_record_fences(struct drm_device *dev,
 	} else if (IS_GEN5(dev) || IS_GEN4(dev)) {
 		for (i = 0; i < dev_priv->num_fence_regs; i++)
 			error->fence[i] = I915_READ64(FENCE_REG_965_LO(i));
-	} else if (INTEL_INFO(dev)->gen >= 6) {
+	} else if (INTEL_GEN(dev) >= 6) {
 		for (i = 0; i < dev_priv->num_fence_regs; i++)
 			error->fence[i] = I915_READ64(FENCE_REG_GEN6_LO(i));
 	}
@@ -899,24 +899,24 @@ static void i915_record_ring_state(struct drm_device *dev,
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	if (INTEL_INFO(dev)->gen >= 6) {
+	if (INTEL_GEN(dev) >= 6) {
 		ering->rc_psmi = I915_READ(RING_PSMI_CTL(engine->mmio_base));
 		ering->fault_reg = I915_READ(RING_FAULT_REG(engine));
-		if (INTEL_INFO(dev)->gen >= 8)
+		if (INTEL_GEN(dev) >= 8)
 			gen8_record_semaphore_state(dev_priv, error, engine,
 						    ering);
 		else
 			gen6_record_semaphore_state(dev_priv, engine, ering);
 	}
 
-	if (INTEL_INFO(dev)->gen >= 4) {
+	if (INTEL_GEN(dev) >= 4) {
 		ering->faddr = I915_READ(RING_DMA_FADD(engine->mmio_base));
 		ering->ipeir = I915_READ(RING_IPEIR(engine->mmio_base));
 		ering->ipehr = I915_READ(RING_IPEHR(engine->mmio_base));
 		ering->instdone = I915_READ(RING_INSTDONE(engine->mmio_base));
 		ering->instps = I915_READ(RING_INSTPS(engine->mmio_base));
 		ering->bbaddr = I915_READ(RING_BBADDR(engine->mmio_base));
-		if (INTEL_INFO(dev)->gen >= 8) {
+		if (INTEL_GEN(dev) >= 8) {
 			ering->faddr |= (u64) I915_READ(RING_DMA_FADD_UDW(engine->mmio_base)) << 32;
 			ering->bbaddr |= (u64) I915_READ(RING_BBADDR_UDW(engine->mmio_base)) << 32;
 		}
@@ -980,7 +980,7 @@ static void i915_record_ring_state(struct drm_device *dev,
 		else if (IS_GEN7(dev))
 			ering->vm_info.pp_dir_base =
 				I915_READ(RING_PP_DIR_BASE(engine));
-		else if (INTEL_INFO(dev)->gen >= 8)
+		else if (INTEL_GEN(dev) >= 8)
 			for (i = 0; i < 4; i++) {
 				ering->vm_info.pdp[i] =
 					I915_READ(GEN8_RING_PDP_UDW(engine, i));
@@ -1253,7 +1253,7 @@ static void i915_capture_reg_state(struct drm_i915_private *dev_priv,
 	if (IS_GEN7(dev))
 		error->err_int = I915_READ(GEN7_ERR_INT);
 
-	if (INTEL_INFO(dev)->gen >= 8) {
+	if (INTEL_GEN(dev) >= 8) {
 		error->fault_data0 = I915_READ(GEN8_FAULT_TLB_DATA0);
 		error->fault_data1 = I915_READ(GEN8_FAULT_TLB_DATA1);
 	}
@@ -1265,10 +1265,10 @@ static void i915_capture_reg_state(struct drm_i915_private *dev_priv,
 	}
 
 	/* 2: Registers which belong to multiple generations */
-	if (INTEL_INFO(dev)->gen >= 7)
+	if (INTEL_GEN(dev) >= 7)
 		error->forcewake = I915_READ_FW(FORCEWAKE_MT);
 
-	if (INTEL_INFO(dev)->gen >= 6) {
+	if (INTEL_GEN(dev) >= 6) {
 		error->derrmr = I915_READ(DERRMR);
 		error->error = I915_READ(ERROR_GEN6);
 		error->done_reg = I915_READ(DONE_REG);
@@ -1284,7 +1284,7 @@ static void i915_capture_reg_state(struct drm_i915_private *dev_priv,
 	if (HAS_HW_CONTEXTS(dev))
 		error->ccid = I915_READ(CCID);
 
-	if (INTEL_INFO(dev)->gen >= 8) {
+	if (INTEL_GEN(dev) >= 8) {
 		error->ier = I915_READ(GEN8_DE_MISC_IER);
 		for (i = 0; i < 4; i++)
 			error->gtier[i] = I915_READ(GEN8_GT_IER(i));
@@ -1315,7 +1315,7 @@ static void i915_error_capture_msg(struct drm_device *dev,
 
 	len = scnprintf(error->error_msg, sizeof(error->error_msg),
 			"GPU HANG: ecode %d:%d:0x%08x",
-			INTEL_INFO(dev)->gen, ring_id, ecode);
+			INTEL_GEN(dev), ring_id, ecode);
 
 	if (ring_id != -1 && error->ring[ring_id].pid != -1)
 		len += scnprintf(error->error_msg + len,
@@ -1458,7 +1458,7 @@ void i915_get_extra_instdone(struct drm_device *dev, uint32_t *instdone)
 	else if (IS_GEN4(dev) || IS_GEN5(dev) || IS_GEN6(dev)) {
 		instdone[0] = I915_READ(RING_INSTDONE(RENDER_RING_BASE));
 		instdone[1] = I915_READ(GEN4_INSTDONE1);
-	} else if (INTEL_INFO(dev)->gen >= 7) {
+	} else if (INTEL_GEN(dev) >= 7) {
 		instdone[0] = I915_READ(RING_INSTDONE(RENDER_RING_BASE));
 		instdone[1] = I915_READ(GEN7_SC_INSTDONE);
 		instdone[2] = I915_READ(GEN7_SAMPLER_INSTDONE);
