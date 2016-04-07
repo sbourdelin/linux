@@ -41,6 +41,23 @@
 #define MAX44000_REG_TRIM_GAIN_GREEN	0x0f
 #define MAX44000_REG_TRIM_GAIN_IR	0x10
 
+/* REG_CFG bits */
+#define MAX44000_CFG_ALSINTE		0x01
+#define MAX44000_CFG_PRXINTE		0x02
+#define MAX44000_CFG_MASK		0x1c
+#define MAX44000_CFG_MODE_SHUTDOWN	0x00
+#define MAX44000_CFG_MODE_ALS_GIR	0x04
+#define MAX44000_CFG_MODE_ALS_G		0x08
+#define MAX44000_CFG_MODE_ALS_IR	0x0c
+#define MAX44000_CFG_MODE_ALS_PRX	0x10
+#define MAX44000_CFG_MODE_PRX		0x14
+#define MAX44000_CFG_TRIM		0x20
+
+/* REG_TX bits */
+#define MAX44000_LED_CURRENT_MASK	0xf
+#define MAX44000_LED_CURRENT_MAX	11
+#define MAX44000_LED_CURRENT_DEFAULT	6
+
 #define MAX44000_ALSDATA_OVERFLOW	0x4000
 
 #define MAX44000_REGMASK_READABLE	0x419fff
@@ -59,6 +76,12 @@ struct max44000_data {
 static const struct iio_chan_spec max44000_channels[] = {
 	{
 		.type = IIO_LIGHT,
+		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),
+		.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE) |
+					    BIT(IIO_CHAN_INFO_INT_TIME),
+	},
+	{
+		.type = IIO_PROXIMITY,
 		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),
 		.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),
 	},
@@ -90,11 +113,23 @@ static inline int max44000_read_alsval(struct max44000_data *data)
 	return regval;
 }
 
+static inline int max44000_write_led_current_raw(struct max44000_data *data, int val)
+{
+	/* Maybe we should clamp the value instead? */
+	if (val < 0 || val > MAX44000_LED_CURRENT_MAX)
+		return -ERANGE;
+	if (val >= 8)
+		val += 4;
+	return regmap_write_bits(data->regmap, MAX44000_REG_CFG_TX,
+				 MAX44000_LED_CURRENT_MASK, val);
+}
+
 static int max44000_read_raw(struct iio_dev *indio_dev,
 			     struct iio_chan_spec const *chan,
 			     int *val, int *val2, long mask)
 {
 	struct max44000_data *data = iio_priv(indio_dev);
+	unsigned int regval;
 	int ret;
 
 	switch (mask) {
@@ -107,6 +142,15 @@ static int max44000_read_raw(struct iio_dev *indio_dev,
 			if (ret < 0)
 				return ret;
 			*val = ret;
+			return IIO_VAL_INT;
+
+		case IIO_PROXIMITY:
+			mutex_lock(&data->lock);
+			ret = regmap_read(data->regmap, MAX44000_REG_PRX_DATA, &regval);
+			mutex_unlock(&data->lock);
+			if (ret < 0)
+				return ret;
+			*val = regval;
 			return IIO_VAL_INT;
 
 		default:
@@ -241,6 +285,23 @@ static int max44000_probe(struct i2c_client *client,
 	ret = max44000_force_write_defaults(data);
 	if (ret < 0) {
 		dev_err(&data->client->dev, "failed to write defaults: %d\n", ret);
+		return ret;
+	}
+
+	/* By default the LED pulse used for the proximity sensor is disabled.
+	 * Set a middle value so that we get some sort of valid data by default.
+	 */
+	ret = max44000_write_led_current_raw(data, MAX44000_LED_CURRENT_DEFAULT);
+	if (ret < 0) {
+		dev_err(&data->client->dev, "failed to write init config: %d\n", ret);
+		return ret;
+	}
+
+	/* By default set in ALS_PRX mode which allows easy reading of both values. */
+	reg = MAX44000_CFG_TRIM | MAX44000_CFG_MODE_ALS_PRX;
+	ret = regmap_write(data->regmap, MAX44000_REG_CFG_MAIN, reg);
+	if (ret < 0) {
+		dev_err(&data->client->dev, "failed to write init config: %d\n", ret);
 		return ret;
 	}
 
