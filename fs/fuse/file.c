@@ -572,11 +572,11 @@ static void fuse_aio_complete(struct fuse_io_priv *io, int err, ssize_t pos)
 		io->bytes = pos;
 
 	left = --io->reqs;
-	if (!left && is_sync)
+	if (!left && (is_sync || io->blocking_aio))
 		complete(io->done);
 	spin_unlock(&io->lock);
 
-	if (!left && !is_sync) {
+	if (!left && !is_sync && !io->blocking_aio) {
 		ssize_t res = fuse_get_res_by_io(io);
 
 		if (res >= 0) {
@@ -2884,17 +2884,17 @@ fuse_direct_IO(struct kiocb *iocb, struct iov_iter *iter, loff_t offset)
 	 */
 	io->async = async_dio;
 	io->iocb = iocb;
+	io->blocking_aio = false;
 
 	/*
-	 * We cannot asynchronously extend the size of a file. We have no method
-	 * to wait on real async I/O requests, so we must submit this request
-	 * synchronously.
+	 * We cannot asynchronously extend the size of a file.
+	 * In such case the aio will behave exactly like sync io.
 	 */
 	if (!is_sync && (offset + count > i_size) &&
 	    iov_iter_rw(iter) == WRITE)
-		io->async = false;
+		io->blocking_aio = true;
 
-	if (io->async && is_sync) {
+	if (io->async && (is_sync | io->blocking_aio)) {
 		/*
 		 * Additional reference to keep io around after
 		 * calling fuse_aio_complete()
@@ -2914,7 +2914,7 @@ fuse_direct_IO(struct kiocb *iocb, struct iov_iter *iter, loff_t offset)
 		fuse_aio_complete(io, ret < 0 ? ret : 0, -1);
 
 		/* we have a non-extending, async request, so return */
-		if (!is_sync)
+		if (!is_sync && !io->blocking_aio)
 			return -EIOCBQUEUED;
 
 		wait_for_completion(&wait);
