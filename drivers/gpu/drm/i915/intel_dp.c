@@ -3806,7 +3806,7 @@ intel_dp_get_dpcd(struct intel_dp *intel_dp)
 	 * downstream port information. So, an early return here saves
 	 * time from performing other operations which are not required.
 	 */
-	if (!intel_dp->sink_count)
+	if (!is_edp(intel_dp) && !intel_dp->sink_count)
 		return false;
 
 	/* Check if the panel supports PSR */
