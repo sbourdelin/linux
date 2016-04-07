@@ -35,13 +35,27 @@
 #define dev_to_drm_minor(d) dev_get_drvdata((d))
 
 #ifdef CONFIG_PM
-static u32 calc_residency(struct drm_device *dev,
-			  i915_reg_t reg)
+static unsigned long calc_overflow_jiffies(struct drm_device *dev)
 {
-	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_i915_private *dev_priv = to_i915(dev);
+	u32 overflow_ms;
+
+	/* How many ticks per millisecond? */
+	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
+		overflow_ms = ~0u / dev_priv->czclk_freq;
+	else if (IS_BROXTON(dev_priv))
+		overflow_ms = ~0u / 1200; /* tick every 833ns */
+	else
+		overflow_ms = ~0u / 780; /* tick every 1.28us */
+
+	return msecs_to_jiffies(overflow_ms);
+}
+
+static unsigned long long calc_residency(struct drm_device *dev, i915_reg_t reg)
+{
+	struct drm_i915_private *dev_priv = to_i915(dev);
 	u64 raw_time; /* 32b value may overflow during fixed point math */
 	u64 units = 128ULL, div = 100000ULL;
-	u32 ret;
 
 	if (!intel_enable_rc6(dev))
 		return 0;
@@ -49,22 +63,22 @@ static u32 calc_residency(struct drm_device *dev,
 	intel_runtime_pm_get(dev_priv);
 
 	/* On VLV and CHV, residency time is in CZ units rather than 1.28us */
-	if (IS_VALLEYVIEW(dev) || IS_CHERRYVIEW(dev)) {
+	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) {
 		units = 1;
 		div = dev_priv->czclk_freq;
 
 		if (I915_READ(VLV_COUNTER_CONTROL) & VLV_COUNT_RANGE_HIGH)
 			units <<= 8;
-	} else if (IS_BROXTON(dev)) {
+	} else if (IS_BROXTON(dev_priv)) {
 		units = 1;
 		div = 1200;		/* 833.33ns */
 	}
 
-	raw_time = I915_READ(reg) * units;
-	ret = DIV_ROUND_UP_ULL(raw_time, div);
+	raw_time = i915_read64emu(dev_priv, reg) * units;
 
 	intel_runtime_pm_put(dev_priv);
-	return ret;
+
+	return DIV_ROUND_UP_ULL(raw_time, div);
 }
 
 static ssize_t
@@ -78,32 +92,32 @@ static ssize_t
 show_rc6_ms(struct device *kdev, struct device_attribute *attr, char *buf)
 {
 	struct drm_minor *dminor = dev_get_drvdata(kdev);
-	u32 rc6_residency = calc_residency(dminor->dev, GEN6_GT_GFX_RC6);
-	return snprintf(buf, PAGE_SIZE, "%u\n", rc6_residency);
+	return snprintf(buf, PAGE_SIZE, "%llu\n",
+			calc_residency(dminor->dev, GEN6_GT_GFX_RC6));
 }
 
 static ssize_t
 show_rc6p_ms(struct device *kdev, struct device_attribute *attr, char *buf)
 {
 	struct drm_minor *dminor = dev_to_drm_minor(kdev);
-	u32 rc6p_residency = calc_residency(dminor->dev, GEN6_GT_GFX_RC6p);
-	return snprintf(buf, PAGE_SIZE, "%u\n", rc6p_residency);
+	return snprintf(buf, PAGE_SIZE, "%llu\n",
+			calc_residency(dminor->dev, GEN6_GT_GFX_RC6p));
 }
 
 static ssize_t
 show_rc6pp_ms(struct device *kdev, struct device_attribute *attr, char *buf)
 {
 	struct drm_minor *dminor = dev_to_drm_minor(kdev);
-	u32 rc6pp_residency = calc_residency(dminor->dev, GEN6_GT_GFX_RC6pp);
-	return snprintf(buf, PAGE_SIZE, "%u\n", rc6pp_residency);
+	return snprintf(buf, PAGE_SIZE, "%llu\n",
+			calc_residency(dminor->dev, GEN6_GT_GFX_RC6pp));
 }
 
 static ssize_t
 show_media_rc6_ms(struct device *kdev, struct device_attribute *attr, char *buf)
 {
 	struct drm_minor *dminor = dev_get_drvdata(kdev);
-	u32 rc6_residency = calc_residency(dminor->dev, VLV_GT_MEDIA_RC6);
-	return snprintf(buf, PAGE_SIZE, "%u\n", rc6_residency);
+	return snprintf(buf, PAGE_SIZE, "%llu\n",
+			calc_residency(dminor->dev, VLV_GT_MEDIA_RC6));
 }
 
 static DEVICE_ATTR(rc6_enable, S_IRUGO, show_rc6_mask, NULL);
@@ -593,22 +607,30 @@ static struct bin_attribute error_state_attr = {
 
 void i915_setup_sysfs(struct drm_device *dev)
 {
+	struct drm_i915_private *dev_priv = to_i915(dev);
 	int ret;
 
 #ifdef CONFIG_PM
 	if (HAS_RC6(dev)) {
+		dev_priv->uncore.reg64_emu_timeout =
+			min(dev_priv->uncore.reg64_emu_timeout,
+			    calc_overflow_jiffies(dev) / 2);
+		calc_residency(dev, GEN6_GT_GFX_RC6);
 		ret = sysfs_merge_group(&dev->primary->kdev->kobj,
 					&rc6_attr_group);
 		if (ret)
 			DRM_ERROR("RC6 residency sysfs setup failed\n");
 	}
 	if (HAS_RC6p(dev)) {
+		calc_residency(dev, GEN6_GT_GFX_RC6p);
+		calc_residency(dev, GEN6_GT_GFX_RC6pp);
 		ret = sysfs_merge_group(&dev->primary->kdev->kobj,
 					&rc6p_attr_group);
 		if (ret)
 			DRM_ERROR("RC6p residency sysfs setup failed\n");
 	}
 	if (IS_VALLEYVIEW(dev) || IS_CHERRYVIEW(dev)) {
+		calc_residency(dev, VLV_GT_MEDIA_RC6);
 		ret = sysfs_merge_group(&dev->primary->kdev->kobj,
 					&media_rc6_attr_group);
 		if (ret)

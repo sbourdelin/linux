@@ -1247,6 +1247,70 @@ static void intel_uncore_fw_domains_init(struct drm_device *dev)
 	WARN_ON(dev_priv->uncore.fw_domains == 0);
 }
 
+struct reg64emu {
+	i915_reg_t reg;
+	u64 last;
+	struct list_head link;
+};
+
+static u64 __read64emu(struct drm_i915_private *dev_priv, struct reg64emu *emu)
+{
+	u64 result;
+
+	result = I915_READ(emu->reg) | (emu->last & 0xffffffff00000000);
+	if (lower_32_bits(result) < lower_32_bits(emu->last))
+		result += 1ull << 32;
+	emu->last = result;
+
+	return result;
+}
+
+u64 i915_read64emu(struct drm_i915_private *dev_priv, i915_reg_t reg)
+{
+	struct reg64emu *emu;
+
+	list_for_each_entry(emu, &dev_priv->uncore.reg64_emu_list, link)
+		if (i915_mmio_reg_offset(emu->reg) == i915_mmio_reg_offset(reg))
+			goto read;
+
+	emu = kmalloc(sizeof(*emu), GFP_KERNEL);
+	if (emu == NULL)
+		return I915_READ(reg);
+
+	emu->reg = reg;
+	emu->last = 0;
+	list_add(&emu->link, &dev_priv->uncore.reg64_emu_list);
+
+	if (!timer_pending(&dev_priv->uncore.reg64_emu_timer))
+		mod_timer(&dev_priv->uncore.reg64_emu_timer,
+			  jiffies + dev_priv->uncore.reg64_emu_timeout);
+
+read:
+	return __read64emu(dev_priv, emu);
+}
+
+static void intel_uncore_reg64_emu_timer(unsigned long arg)
+{
+	struct drm_i915_private *dev_priv = (struct drm_i915_private *)arg;
+	struct reg64emu *emu;
+
+	list_for_each_entry(emu, &dev_priv->uncore.reg64_emu_list, link)
+		__read64emu(dev_priv, emu);
+
+	mod_timer(&dev_priv->uncore.reg64_emu_timer,
+		  jiffies + dev_priv->uncore.reg64_emu_timeout);
+}
+
+static void intel_uncore_init_regemu64(struct drm_i915_private *dev_priv)
+{
+	dev_priv->uncore.reg64_emu_timeout = MAX_JIFFY_OFFSET;
+
+	INIT_LIST_HEAD(&dev_priv->uncore.reg64_emu_list);
+	setup_timer(&dev_priv->uncore.reg64_emu_timer,
+		    intel_uncore_reg64_emu_timer,
+		    (unsigned long)dev_priv);
+}
+
 void intel_uncore_init(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -1306,16 +1370,32 @@ void intel_uncore_init(struct drm_device *dev)
 		ASSIGN_READ_MMIO_VFUNCS(vgpu);
 	}
 
+	intel_uncore_init_regemu64(dev_priv);
+
 	i915_check_and_clear_faults(dev);
 }
 #undef ASSIGN_WRITE_MMIO_VFUNCS
 #undef ASSIGN_READ_MMIO_VFUNCS
+
+static void intel_uncore_fini_reg64emu(struct drm_device *dev)
+{
+	struct drm_i915_private *i915 = to_i915(dev);
+	struct reg64emu *emu, *en;
+
+	list_for_each_entry_safe(emu, en, &i915->uncore.reg64_emu_list, link)
+		kfree(emu);
+
+	INIT_LIST_HEAD(&i915->uncore.reg64_emu_list);
+	del_timer_sync(&i915->uncore.reg64_emu_timer);
+}
 
 void intel_uncore_fini(struct drm_device *dev)
 {
 	/* Paranoia: make sure we have disabled everything before we exit. */
 	intel_uncore_sanitize(dev);
 	intel_uncore_forcewake_reset(dev, false);
+
+	intel_uncore_fini_reg64emu(dev);
 }
 
 #define GEN_RANGE(l, h) GENMASK(h, l)

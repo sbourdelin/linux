@@ -659,6 +659,16 @@ struct intel_uncore {
 
 	struct intel_uncore_funcs funcs;
 
+	/* A few interesting registers track variables over time,
+	 * such as RC6 residencies, in 32bit registers which overflow within
+	 * a matter of seconds (~14s). However, we want to present them as a
+	 * continuous quantity to the user and so we need to keep an overflow
+	 * counter.
+	 */
+	struct list_head reg64_emu_list;
+	struct timer_list reg64_emu_timer;
+	unsigned long reg64_emu_timeout;
+
 	unsigned fifo_count;
 	enum forcewake_domains fw_domains;
 
@@ -3579,6 +3589,8 @@ __raw_write(64, q)
 #define I915_READ_FW(reg__) __raw_i915_read32(dev_priv, (reg__))
 #define I915_WRITE_FW(reg__, val__) __raw_i915_write32(dev_priv, (reg__), (val__))
 #define POSTING_READ_FW(reg__) (void)I915_READ_FW(reg__)
+
+u64 i915_read64emu(struct drm_i915_private *dev_priv, i915_reg_t reg);
 
 /* "Broadcast RGB" property */
 #define INTEL_BROADCAST_RGB_AUTO 0
