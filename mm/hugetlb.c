@@ -4345,21 +4345,70 @@ struct page * __weak
 follow_huge_pud(struct mm_struct *mm, unsigned long address,
 		pud_t *pud, int flags)
 {
-	if (flags & FOLL_GET)
-		return NULL;
-
-	return pte_page(*(pte_t *)pud) + ((address & ~PUD_MASK) >> PAGE_SHIFT);
+	struct page *page = NULL;
+	spinlock_t *ptl;
+retry:
+	ptl = pud_lockptr(mm, pud);
+	spin_lock(ptl);
+	/*
+	 * make sure that the address range covered by this pud is not
+	 * unmapped from other threads.
+	 */
+	if (!pud_huge(*pud))
+		goto out;
+	if (pud_present(*pud)) {
+		page = pud_page(*pud) + ((address & ~PUD_MASK) >> PAGE_SHIFT);
+		if (flags & FOLL_GET)
+			get_page(page);
+	} else {
+		if (is_hugetlb_entry_migration(huge_ptep_get((pte_t *)pud))) {
+			spin_unlock(ptl);
+			__migration_entry_wait(mm, (pte_t *)pud, ptl);
+			goto retry;
+		}
+		/*
+		 * hwpoisoned entry is treated as no_page_table in
+		 * follow_page_mask().
+		 */
+	}
+out:
+	spin_unlock(ptl);
+	return page;
 }
 
 struct page * __weak
 follow_huge_pgd(struct mm_struct *mm, unsigned long address,
 		pgd_t *pgd, int flags)
 {
-	if (flags & FOLL_GET)
-		return NULL;
-
-	return pte_page(*(pte_t *)pgd) +
-				((address & ~PGDIR_MASK) >> PAGE_SHIFT);
+	struct page *page = NULL;
+	spinlock_t *ptl;
+retry:
+	ptl = pgd_lockptr(mm, pgd);
+	spin_lock(ptl);
+	/*
+	 * make sure that the address range covered by this pgd is not
+	 * unmapped from other threads.
+	 */
+	if (!pgd_huge(*pgd))
+		goto out;
+	if (pgd_present(*pgd)) {
+		page = pgd_page(*pgd) + ((address & ~PGDIR_MASK) >> PAGE_SHIFT);
+		if (flags & FOLL_GET)
+			get_page(page);
+	} else {
+		if (is_hugetlb_entry_migration(huge_ptep_get((pte_t *)pgd))) {
+			spin_unlock(ptl);
+			__migration_entry_wait(mm, (pte_t *)pgd, ptl);
+			goto retry;
+		}
+		/*
+		 * hwpoisoned entry is treated as no_page_table in
+		 * follow_page_mask().
+		 */
+	}
+out:
+	spin_unlock(ptl);
+	return page;
 }
 
 #ifdef CONFIG_MEMORY_FAILURE

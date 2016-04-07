@@ -1674,11 +1674,34 @@ static inline void pgtable_page_dtor(struct page *page)
 		NULL: pte_offset_kernel(pmd, address))
 
 #if USE_SPLIT_PMD_PTLOCKS
+static struct page *pgd_to_page(pgd_t *pgd)
+{
+	unsigned long mask = ~(PTRS_PER_PGD * sizeof(pgd_t) - 1);
+
+	return virt_to_page((void *)((unsigned long) pgd & mask));
+}
+
+static struct page *pud_to_page(pud_t *pud)
+{
+	unsigned long mask = ~(PTRS_PER_PUD * sizeof(pud_t) - 1);
+
+	return virt_to_page((void *)((unsigned long) pud & mask));
+}
 
 static struct page *pmd_to_page(pmd_t *pmd)
 {
 	unsigned long mask = ~(PTRS_PER_PMD * sizeof(pmd_t) - 1);
 	return virt_to_page((void *)((unsigned long) pmd & mask));
+}
+
+static inline spinlock_t *pgd_lockptr(struct mm_struct *mm, pgd_t *pgd)
+{
+	return ptlock_ptr(pgd_to_page(pgd));
+}
+
+static inline spinlock_t *pud_lockptr(struct mm_struct *mm, pud_t *pud)
+{
+	return ptlock_ptr(pud_to_page(pud));
 }
 
 static inline spinlock_t *pmd_lockptr(struct mm_struct *mm, pmd_t *pmd)
@@ -1705,6 +1728,16 @@ static inline void pgtable_pmd_page_dtor(struct page *page)
 #define pmd_huge_pte(mm, pmd) (pmd_to_page(pmd)->pmd_huge_pte)
 
 #else
+
+static inline spinlock_t *pgd_lockptr(struct mm_struct *mm, pgd_t *pgd)
+{
+	return &mm->page_table_lock;
+}
+
+static inline spinlock_t *pud_lockptr(struct mm_struct *mm, pud_t *pud)
+{
+	return &mm->page_table_lock;
+}
 
 static inline spinlock_t *pmd_lockptr(struct mm_struct *mm, pmd_t *pmd)
 {
