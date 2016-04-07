@@ -418,6 +418,8 @@ export KBUILD_AFLAGS_MODULE KBUILD_CFLAGS_MODULE KBUILD_LDFLAGS_MODULE
 export KBUILD_AFLAGS_KERNEL KBUILD_CFLAGS_KERNEL
 export KBUILD_ARFLAGS
 
+export PLUGINCC GCC_PLUGINS_CFLAGS GCC_PLUGINS_AFLAGS
+
 # When compiling out-of-tree modules, put MODVERDIR in the module
 # tree rather than in the kernel tree. The kernel tree might
 # even be read-only.
@@ -548,7 +550,7 @@ ifeq ($(KBUILD_EXTMOD),)
 # in parallel
 PHONY += scripts
 scripts: scripts_basic include/config/auto.conf include/config/tristate.conf \
-	 asm-generic
+	 asm-generic gcc-plugins
 	$(Q)$(MAKE) $(build)=$(@)
 
 # Objects we will link into vmlinux / subdirs we need to visit
@@ -622,6 +624,15 @@ endif
 
 # Tell gcc to never replace conditional load with a non-conditional one
 KBUILD_CFLAGS	+= $(call cc-option,--param=allow-store-data-races=0)
+
+PHONY += gcc-plugins
+gcc-plugins: scripts_basic
+ifdef CONFIG_GCC_PLUGINS
+	$(Q)$(MAKE) $(build)=scripts/gcc-plugins
+endif
+	@:
+
+include scripts/Makefile.gcc-plugins
 
 ifdef CONFIG_READABLE_ASM
 # Disable optimizations that make assembler listings hard to read.
@@ -949,6 +960,8 @@ endif
 
 # The actual objects are generated when descending,
 # make sure no implicit rule kicks in
+$(filter-out $(init-y),$(vmlinux-deps)): KBUILD_CFLAGS += $(GCC_PLUGINS_CFLAGS)
+$(filter-out $(init-y),$(vmlinux-deps)): KBUILD_AFLAGS += $(GCC_PLUGINS_AFLAGS)
 $(sort $(vmlinux-deps)): $(vmlinux-dirs) ;
 
 # Handle descending into subdirectories listed in $(vmlinux-dirs)
@@ -1001,10 +1014,13 @@ prepare1: prepare2 $(version_h) include/generated/utsrelease.h \
 
 archprepare: archheaders archscripts prepare1 scripts_basic
 
-prepare0: archprepare FORCE
+prepare0: KBUILD_CFLAGS += $(GCC_PLUGINS_CFLAGS)
+prepare0: KBUILD_AFLAGS += $(GCC_PLUGINS_AFLAGS)
+prepare0: archprepare gcc-plugins FORCE
 	$(Q)$(MAKE) $(build)=.
 
 # All the preparing..
+prepare: KBUILD_CFLAGS := $(filter-out $(GCC_PLUGINS_CFLAGS),$(KBUILD_CFLAGS))
 prepare: prepare0 prepare-objtool
 
 ifdef CONFIG_STACK_VALIDATION
@@ -1137,6 +1153,8 @@ all: modules
 # using awk while concatenating to the final file.
 
 PHONY += modules
+modules: KBUILD_CFLAGS += $(GCC_PLUGINS_CFLAGS)
+modules: KBUILD_AFLAGS += $(GCC_PLUGINS_AFLAGS)
 modules: $(vmlinux-dirs) $(if $(KBUILD_BUILTIN),vmlinux) modules.builtin
 	$(Q)$(AWK) '!x[$$0]++' $(vmlinux-dirs:%=$(objtree)/%/modules.order) > $(objtree)/modules.order
 	@$(kecho) '  Building modules, stage 2.';
@@ -1257,7 +1275,7 @@ distclean: mrproper
 	@find $(srctree) $(RCS_FIND_IGNORE) \
 		\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
-		-o -name '.*.rej' -o -name '*%'  -o -name 'core' \) \
+		-o -name '.*.rej' -o -name '*.so' -o -name '*%' -o -name 'core' \) \
 		-type f -print | xargs rm -f
 
 
@@ -1426,6 +1444,8 @@ PHONY += $(module-dirs) modules
 $(module-dirs): crmodverdir $(objtree)/Module.symvers
 	$(Q)$(MAKE) $(build)=$(patsubst _module_%,%,$@)
 
+modules: KBUILD_CFLAGS += $(GCC_PLUGINS_CFLAGS)
+modules: KBUILD_AFLAGS += $(GCC_PLUGINS_AFLAGS)
 modules: $(module-dirs)
 	@$(kecho) '  Building modules, stage 2.';
 	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.modpost
@@ -1567,10 +1587,14 @@ else
         target-dir = $(if $(KBUILD_EXTMOD),$(dir $<),$(dir $@))
 endif
 
+%.s: KBUILD_CFLAGS += $(GCC_PLUGINS_CFLAGS)
+%.s: KBUILD_AFLAGS += $(GCC_PLUGINS_AFLAGS)
 %.s: %.c prepare scripts FORCE
 	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
 %.i: %.c prepare scripts FORCE
 	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
+%.o: KBUILD_CFLAGS += $(GCC_PLUGINS_CFLAGS)
+%.o: KBUILD_AFLAGS += $(GCC_PLUGINS_AFLAGS)
 %.o: %.c prepare scripts FORCE
 	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
 %.lst: %.c prepare scripts FORCE
@@ -1589,10 +1613,14 @@ endif
 	$(build)=$(build-dir)
 # Make sure the latest headers are built for Documentation
 Documentation/: headers_install
+%/: KBUILD_CFLAGS += $(GCC_PLUGINS_CFLAGS)
+%/: KBUILD_AFLAGS += $(GCC_PLUGINS_AFLAGS)
 %/: prepare scripts FORCE
 	$(cmd_crmodverdir)
 	$(Q)$(MAKE) KBUILD_MODULES=$(if $(CONFIG_MODULES),1) \
 	$(build)=$(build-dir)
+%.ko: KBUILD_CFLAGS += $(GCC_PLUGINS_CFLAGS)
+%.ko: KBUILD_AFLAGS += $(GCC_PLUGINS_AFLAGS)
 %.ko: prepare scripts FORCE
 	$(cmd_crmodverdir)
 	$(Q)$(MAKE) KBUILD_MODULES=$(if $(CONFIG_MODULES),1)   \
