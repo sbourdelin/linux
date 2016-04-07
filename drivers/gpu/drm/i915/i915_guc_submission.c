@@ -981,6 +981,10 @@ int i915_guc_submission_init(struct drm_device *dev)
 	const size_t gemsize = round_up(poolsize, PAGE_SIZE);
 	struct intel_guc *guc = &dev_priv->guc;
 
+	/* Wipe bitmap & delete client in case of reinitialisation */
+	bitmap_clear(guc->doorbell_bitmap, 0, GUC_MAX_DOORBELLS);
+	i915_guc_submission_disable(dev);
+
 	if (!i915.enable_guc_submission)
 		return 0; /* not enabled  */
 
@@ -992,9 +996,7 @@ int i915_guc_submission_init(struct drm_device *dev)
 		return -ENOMEM;
 
 	ida_init(&guc->ctx_ids);
-
 	guc_create_log(guc);
-
 	guc_create_ads(guc);
 
 	return 0;
