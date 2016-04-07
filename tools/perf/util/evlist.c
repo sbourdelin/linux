@@ -680,14 +680,14 @@ static struct perf_evsel *perf_evlist__event2evsel(struct perf_evlist *evlist,
 }
 
 static union perf_event *
-__perf_evlist__mmap_read(struct perf_mmap *md, bool overwrite, u64 head,
-			 u64 old, u64 *prev)
+__perf_evlist__mmap_read(struct perf_mmap *md, bool check_messup,
+			 u64 head, u64 old, u64 *prev)
 {
 	unsigned char *data = md->base + page_size;
 	union perf_event *event = NULL;
 	int diff = head - old;
 
-	if (overwrite) {
+	if (check_messup) {
 		/*
 		 * If we're further behind than half the buffer, there's a chance
 		 * the writer will bite our tail and mess up the samples under us.
@@ -764,6 +764,45 @@ union perf_event *perf_evlist__mmap_read(struct perf_evlist *evlist, int idx)
 
 	return __perf_evlist__mmap_read(md, evlist->overwrite, head,
 					old, &md->prev);
+}
+
+union perf_event *
+perf_evlist__mmap_read_backward(struct perf_evlist *evlist, int idx)
+{
+	struct perf_mmap *md = &evlist->mmap[idx];
+	u64 head, end;
+	u64 start = md->prev;
+
+	/*
+	 * Check if event was unmapped due to a POLLHUP/POLLERR.
+	 */
+	if (!atomic_read(&md->refcnt))
+		return NULL;
+
+	/* NOTE: head is negative in this case */
+	head = perf_mmap__read_head(md);
+
+	if (!head)
+		return NULL;
+
+	end = head + md->mask + 1;
+
+	if ((end - head) > -head)
+		end = 0;
+
+	return __perf_evlist__mmap_read(md, false, end, start, &md->prev);
+}
+
+void perf_evlist__mmap_read_catchup(struct perf_evlist *evlist, int idx)
+{
+	struct perf_mmap *md = &evlist->mmap[idx];
+	u64 head;
+
+	if (!atomic_read(&md->refcnt))
+		return;
+
+	head = perf_mmap__read_head(md);
+	md->prev = head;
 }
 
 static bool perf_mmap__empty(struct perf_mmap *md)
