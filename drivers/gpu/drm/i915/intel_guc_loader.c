@@ -314,15 +314,15 @@ static int guc_ucode_xfer(struct drm_i915_private *dev_priv)
 	/* Enable MIA caching. GuC clock gating is disabled. */
 	I915_WRITE(GUC_SHIM_CONTROL, GUC_SHIM_CONTROL_VALUE);
 
-	/* WaDisableMinuteIaClockGating:skl,bxt */
 	if (IS_SKL_REVID(dev, 0, SKL_REVID_B0) ||
 	    IS_BXT_REVID(dev, 0, BXT_REVID_A1)) {
+		/* WaDisableMinuteIaClockGating:skl,bxt */
 		I915_WRITE(GUC_SHIM_CONTROL, (I915_READ(GUC_SHIM_CONTROL) &
 					      ~GUC_ENABLE_MIA_CLOCK_GATING));
-	}
 
-	/* WaC6DisallowByGfxPause*/
-	I915_WRITE(GEN6_GFXPAUSE, 0x30FFF);
+		/* WaC6DisallowByGfxPause*/
+		I915_WRITE(GEN6_GFXPAUSE, 0x30FFF);
+	}
 
 	if (IS_BROXTON(dev))
 		I915_WRITE(GEN9LP_GT_PM_CONFIG, GT_DOORBELL_ENABLE);
