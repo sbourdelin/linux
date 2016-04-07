@@ -7,6 +7,10 @@ Required properties:
    clocks. The controller expects one clock: the clock used as the sampling
    rate reference clock sample.
  - clock-names : "i2sclk" for the sample rate reference clock.
+
+ Optional properties:
+ - snps,use-dmaengine: If set the driver will use ALSA DMA engine. If set
+   it is required to use the properties 'dmas' and 'dma-names'.
  - dmas: Pairs of phandle and specifier for the DMA channels that are used by
    the core. The core expects one or two dma channels: one for transmit and
    one for receive.
@@ -26,6 +30,7 @@ Example:
 		clocks = <&scpi_i2sclk 0>;
 		clock-names = "i2sclk";
 		#sound-dai-cells = <0>;
+		snps,use-dmaengine;
 		dmas = <&dma0 5>;
 		dma-names = "tx";
 	};
