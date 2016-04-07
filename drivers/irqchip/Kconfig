@@ -16,7 +16,8 @@ config ARM_GIC_MAX_NR
 config ARM_GIC_V2M
 	bool
 	depends on ARM_GIC
-	depends on PCI && PCI_MSI
+	depends on PCI
+	select PCI_MSI
 	select PCI_MSI_IRQ_DOMAIN
 
 config GIC_NON_BANKED
@@ -30,6 +31,8 @@ config ARM_GIC_V3
 
 config ARM_GIC_V3_ITS
 	bool
+	depends on PCI
+	select PCI_MSI
 	select PCI_MSI_IRQ_DOMAIN
 
 config ARM_NVIC
@@ -55,11 +58,13 @@ config ARM_VIC_NR
 config ARMADA_370_XP_IRQ
 	bool
 	select GENERIC_IRQ_CHIP
-	select PCI_MSI_IRQ_DOMAIN if PCI_MSI
+	select PCI_MSI if PCI
+	select PCI_MSI_IRQ_DOMAIN if PCI
 
 config ALPINE_MSI
 	bool
-	depends on PCI && PCI_MSI
+	depends on PCI
+	select PCI_MSI
 	select GENERIC_IRQ_CHIP
 	select PCI_MSI_IRQ_DOMAIN
 
