@@ -553,9 +553,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 		return ret;
 
 	if (run->exit_reason == KVM_EXIT_MMIO) {
-		ret = kvm_handle_mmio_return(vcpu, vcpu->run);
-		if (ret)
-			return ret;
+		if (!run->mmio.is_write) {
+			ret = kvm_writeback_mmio_data(vcpu, run->mmio.data,
+						      run->mmio.len,
+						      run->mmio.phys_addr);
+			if (ret)
+				return ret;
+		}
 	}
 
 	if (vcpu->sigset_active)

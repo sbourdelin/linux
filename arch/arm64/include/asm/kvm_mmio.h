@@ -30,7 +30,8 @@ struct kvm_decode {
 	bool sign_extend;
 };
 
-int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run);
+int kvm_writeback_mmio_data(struct kvm_vcpu *vcpu, void *data, int len,
+			    gpa_t addr);
 int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
 		 phys_addr_t fault_ipa);
 

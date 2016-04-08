@@ -86,37 +86,32 @@ static unsigned long mmio_read_buf(char *buf, unsigned int len)
 }
 
 /**
- * kvm_handle_mmio_return -- Handle MMIO loads after user space emulation
+ * kvm_writeback_mmio_data -- Write back emulation data into the guest's
+ *                            target register after return from userspace.
  * @vcpu: The VCPU pointer
- * @run:  The VCPU run struct containing the mmio data
+ * @data: A pointer to the data to be written back
+ * @len:  The size of the read access
+ * @addr: The original MMIO address (for the tracepoint only)
  *
  * This should only be called after returning from userspace for MMIO load
  * emulation.
  */
-int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
+int kvm_writeback_mmio_data(struct kvm_vcpu *vcpu, void *data_ptr, int len,
+			    gpa_t addr)
 {
 	unsigned long data;
-	unsigned int len;
 	int mask;
 
-	if (!run->mmio.is_write) {
-		len = run->mmio.len;
-		if (len > sizeof(unsigned long))
-			return -EINVAL;
+	data = mmio_read_buf(data_ptr, len);
 
-		data = mmio_read_buf(run->mmio.data, len);
-
-		if (vcpu->arch.mmio_decode.sign_extend &&
-		    len < sizeof(unsigned long)) {
-			mask = 1U << ((len * 8) - 1);
-			data = (data ^ mask) - mask;
-		}
-
-		trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, run->mmio.phys_addr,
-			       data);
-		data = vcpu_data_host_to_guest(vcpu, data, len);
-		vcpu_set_reg(vcpu, vcpu->arch.mmio_decode.rt, data);
+	if (vcpu->arch.mmio_decode.sign_extend && len < sizeof(unsigned long)) {
+		mask = 1U << ((len * 8) - 1);
+		data = (data ^ mask) - mask;
 	}
+
+	trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, addr, data);
+	data = vcpu_data_host_to_guest(vcpu, data, len);
+	vcpu_set_reg(vcpu, vcpu->arch.mmio_decode.rt, data);
 
 	return 0;
 }
@@ -202,22 +197,23 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
 				      data_buf);
 	}
 
+	if (!ret) {
+		/* We handled the access successfully in the kernel. */
+		vcpu->stat.mmio_exit_kernel++;
+		if (!is_write)
+			kvm_writeback_mmio_data(vcpu, data_buf, len, fault_ipa);
+		return 1;
+	}
+
 	/* Now prepare kvm_run for the potential return to userland. */
 	run->mmio.is_write	= is_write;
 	run->mmio.phys_addr	= fault_ipa;
 	run->mmio.len		= len;
+	run->exit_reason	= KVM_EXIT_MMIO;
 	if (is_write)
 		memcpy(run->mmio.data, data_buf, len);
 
-	if (!ret) {
-		/* We handled the access successfully in the kernel. */
-		vcpu->stat.mmio_exit_kernel++;
-		kvm_handle_mmio_return(vcpu, run);
-		return 1;
-	} else {
-		vcpu->stat.mmio_exit_user++;
-	}
+	vcpu->stat.mmio_exit_user++;
 
-	run->exit_reason	= KVM_EXIT_MMIO;
 	return 0;
 }
