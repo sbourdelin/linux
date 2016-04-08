@@ -2651,11 +2651,15 @@ out_enomem:
 	goto out;
 }
 
-static int validate_evlist(struct perf_evlist *evlist)
+static int validate_evlist(struct perf_evlist *evlist, bool *has_bpf_output)
 {
 	struct perf_evsel *evsel;
 
 	evlist__for_each(evlist, evsel) {
+		if (perf_evsel__is_bpf_output(evsel)) {
+			*has_bpf_output = true;
+			continue;
+		}
 		if (evsel->attr.type != PERF_TYPE_TRACEPOINT)
 			return -EINVAL;
 	}
@@ -3243,6 +3247,7 @@ int cmd_trace(int argc, const char **argv, const char *prefix __maybe_unused)
 	const char * const trace_subcommands[] = { "record", NULL };
 	int err;
 	char bf[BUFSIZ];
+	bool has_bpf_output = false;
 
 	signal(SIGSEGV, sighandler_dump_stack);
 	signal(SIGFPE, sighandler_dump_stack);
@@ -3258,12 +3263,12 @@ int cmd_trace(int argc, const char **argv, const char *prefix __maybe_unused)
 	argc = parse_options_subcommand(argc, argv, trace_options, trace_subcommands,
 				 trace_usage, PARSE_OPT_STOP_AT_NON_OPTION);
 
-	if (validate_evlist(trace.evlist)) {
-		pr_err("Only support tracepoint events!\n");
+	if (validate_evlist(trace.evlist, &has_bpf_output)) {
+		pr_err("Only support tracepoint and bpf-output events!\n");
 		return -EINVAL;
 	}
 
-	if (trace.trace_pgfaults) {
+	if (trace.trace_pgfaults || has_bpf_output) {
 		trace.opts.sample_address = true;
 		trace.opts.sample_time = true;
 	}
