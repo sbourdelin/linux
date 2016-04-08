@@ -481,7 +481,8 @@ struct acpi_table_pcct {
 enum acpi_pcct_type {
 	ACPI_PCCT_TYPE_GENERIC_SUBSPACE = 0,
 	ACPI_PCCT_TYPE_HW_REDUCED_SUBSPACE = 1,
-	ACPI_PCCT_TYPE_RESERVED = 2	/* 2 and greater are reserved */
+	ACPI_PCCT_TYPE_HW_REDUCED_SUBSPACE_TYPE2 = 2,
+	ACPI_PCCT_TYPE_RESERVED = 3	/* 3 and greater are reserved */
 };
 
 /*
@@ -503,7 +504,7 @@ struct acpi_pcct_subspace {
 	u16 min_turnaround_time;
 };
 
-/* 1: HW-reduced Communications Subspace (ACPI 5.1) */
+/* 1 or 2: HW-reduced Communications Subspace (ACPI 6.1) */
 
 struct acpi_pcct_hw_reduced {
 	struct acpi_subtable_header header;
@@ -518,6 +519,9 @@ struct acpi_pcct_hw_reduced {
 	u32 latency;
 	u32 max_access_rate;
 	u16 min_turnaround_time;
+	struct acpi_generic_address doorbell_ack_register;
+	u64 ack_preserve_mask;
+	u64 ack_write_mask;
 };
 
 /* Values for doorbell flags above */
