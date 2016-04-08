@@ -11,6 +11,8 @@
 #ifndef _EXT4_EXTENTS_STATUS_H
 #define _EXT4_EXTENTS_STATUS_H
 
+#include <linux/percpu_stats.h>
+
 /*
  * Turn on ES_DEBUG__ to get lots of info about extent status operations.
  */
@@ -67,10 +69,15 @@ struct ext4_es_tree {
 	struct extent_status *cache_es;	/* recently accessed extent */
 };
 
+enum ext4_es_stat_type {
+	es_stats_cache_hits,
+	es_stats_cache_misses,
+	es_stats_cnt,
+};
+
 struct ext4_es_stats {
 	unsigned long es_stats_shrunk;
-	unsigned long es_stats_cache_hits;
-	unsigned long es_stats_cache_misses;
+	struct percpu_stats es_stats;
 	u64 es_stats_scan_time;
 	u64 es_stats_max_scan_time;
 	struct percpu_counter es_stats_all_cnt;
