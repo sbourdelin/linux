@@ -271,6 +271,8 @@ static int mt6397_probe(struct platform_device *pdev)
 	}
 
 	pmic->irq = platform_get_irq(pdev, 0);
+	if (pmic->irq == -EPROBE_DEFER)
+		return -EPROBE_DEFER;
 
 	switch (id & 0xff) {
 	case MT6323_CID_CODE:
