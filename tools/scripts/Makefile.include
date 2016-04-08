@@ -8,6 +8,10 @@ ifeq ($(objtree),)
 	objtree := $(O)
 endif
 endif
+else
+ifneq ($(KBUILD_OUTPUT),)
+	OUTPUT := $(KBUILD_OUTPUT)/$(if $(subdir),$(subdir)/)
+endif
 endif
 
 # check that the output directory actually exists
