@@ -2964,16 +2964,22 @@ retry:
 			config->degamma_lut_property, 0);
 	if (ret)
 		goto fail;
+	drm_object_property_set_value(&crtc->base,
+			config->degamma_lut_property, 0);
 
 	ret = drm_atomic_crtc_set_property(crtc, crtc_state,
 			config->ctm_property, 0);
 	if (ret)
 		goto fail;
+	drm_object_property_set_value(&crtc->base,
+			config->ctm_property, 0);
 
 	ret = drm_atomic_crtc_set_property(crtc, crtc_state,
 			config->gamma_lut_property, blob->base.id);
 	if (ret)
 		goto fail;
+	drm_object_property_set_value(&crtc->base,
+			config->gamma_lut_property, blob->base.id);
 
 	ret = drm_atomic_commit(state);
 	if (ret)
