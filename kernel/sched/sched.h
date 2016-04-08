@@ -715,6 +715,10 @@ static inline int cpu_of(struct rq *rq)
 
 DECLARE_PER_CPU_SHARED_ALIGNED(struct rq, runqueues);
 
+#ifdef CONFIG_SMP
+DECLARE_PER_CPU(cpumask_var_t, sched_pp_shared_mask);
+#endif
+
 #define cpu_rq(cpu)		(&per_cpu(runqueues, (cpu)))
 #define this_rq()		this_cpu_ptr(&runqueues)
 #define task_rq(p)		cpu_rq(task_cpu(p))
@@ -1296,8 +1300,6 @@ extern void sysrq_sched_debug_show(void);
 extern void sched_init_granularity(void);
 extern void update_max_interval(void);
 
-extern void init_sched_dl_class(void);
-extern void init_sched_rt_class(void);
 extern void init_sched_fair_class(void);
 
 extern void resched_curr(struct rq *rq);

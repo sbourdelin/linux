@@ -1273,18 +1273,12 @@ next_node:
 	return NULL;
 }
 
-static DEFINE_PER_CPU(cpumask_var_t, local_cpu_mask_dl);
-
 static int find_later_rq(struct task_struct *task)
 {
 	struct sched_domain *sd;
-	struct cpumask *later_mask = this_cpu_cpumask_var_ptr(local_cpu_mask_dl);
+	struct cpumask *later_mask;
 	int this_cpu = smp_processor_id();
 	int best_cpu, cpu = task_cpu(task);
-
-	/* Make sure the mask is initialized first */
-	if (unlikely(!later_mask))
-		return -1;
 
 	if (task->nr_cpus_allowed == 1)
 		return -1;
@@ -1293,6 +1287,7 @@ static int find_later_rq(struct task_struct *task)
 	 * We have to consider system topology and task affinity
 	 * first, then we can look for a suitable cpu.
 	 */
+	later_mask = this_cpu_cpumask_var_ptr(sched_pp_shared_mask);
 	best_cpu = cpudl_find(&task_rq(task)->rd->cpudl,
 			task, later_mask);
 	if (best_cpu == -1)
@@ -1677,15 +1672,6 @@ static void rq_offline_dl(struct rq *rq)
 
 	cpudl_set(&rq->rd->cpudl, rq->cpu, 0, 0);
 	cpudl_clear_freecpu(&rq->rd->cpudl, rq->cpu);
-}
-
-void __init init_sched_dl_class(void)
-{
-	unsigned int i;
-
-	for_each_possible_cpu(i)
-		zalloc_cpumask_var_node(&per_cpu(local_cpu_mask_dl, i),
-					GFP_KERNEL, cpu_to_node(i));
 }
 
 #endif /* CONFIG_SMP */

@@ -1616,22 +1616,17 @@ static struct task_struct *pick_highest_pushable_task(struct rq *rq, int cpu)
 	return NULL;
 }
 
-static DEFINE_PER_CPU(cpumask_var_t, local_cpu_mask);
-
 static int find_lowest_rq(struct task_struct *task)
 {
 	struct sched_domain *sd;
-	struct cpumask *lowest_mask = this_cpu_cpumask_var_ptr(local_cpu_mask);
+	struct cpumask *lowest_mask;
 	int this_cpu = smp_processor_id();
 	int cpu      = task_cpu(task);
-
-	/* Make sure the mask is initialized first */
-	if (unlikely(!lowest_mask))
-		return -1;
 
 	if (task->nr_cpus_allowed == 1)
 		return -1; /* No other targets possible */
 
+	lowest_mask = this_cpu_cpumask_var_ptr(sched_pp_shared_mask);
 	if (!cpupri_find(&task_rq(task)->rd->cpupri, task, lowest_mask))
 		return -1; /* No targets found */
 
@@ -2167,16 +2162,6 @@ static void switched_from_rt(struct rq *rq, struct task_struct *p)
 		return;
 
 	queue_pull_task(rq);
-}
-
-void __init init_sched_rt_class(void)
-{
-	unsigned int i;
-
-	for_each_possible_cpu(i) {
-		zalloc_cpumask_var_node(&per_cpu(local_cpu_mask, i),
-					GFP_KERNEL, cpu_to_node(i));
-	}
 }
 #endif /* CONFIG_SMP */
 

@@ -93,6 +93,11 @@
 DEFINE_MUTEX(sched_domains_mutex);
 DEFINE_PER_CPU_SHARED_ALIGNED(struct rq, runqueues);
 
+#ifdef CONFIG_SMP
+/* Used by Push/Pull scheduling, and shared by rt and deadline. */
+DEFINE_PER_CPU(cpumask_var_t, sched_pp_shared_mask);
+#endif
+
 static void update_rq_clock_task(struct rq *rq, s64 delta);
 
 void update_rq_clock(struct rq *rq)
@@ -7242,9 +7247,6 @@ void __init sched_init_smp(void)
 		BUG();
 	sched_init_granularity();
 	free_cpumask_var(non_isolated_cpus);
-
-	init_sched_rt_class();
-	init_sched_dl_class();
 }
 #else
 void __init sched_init_smp(void)
@@ -7444,6 +7446,11 @@ void __init sched_init(void)
 		zalloc_cpumask_var(&cpu_isolated_map, GFP_NOWAIT);
 	idle_thread_set_boot_cpu();
 	set_cpu_rq_start_time();
+
+	for_each_possible_cpu(i) {
+		zalloc_cpumask_var_node(&per_cpu(sched_pp_shared_mask, i),
+			GFP_KERNEL, cpu_to_node(i));
+	}
 #endif
 	init_sched_fair_class();
 
