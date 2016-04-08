@@ -6195,7 +6195,7 @@ int si_irq_set(struct radeon_device *rdev)
 	return 0;
 }
 
-static inline void si_irq_ack(struct radeon_device *rdev)
+static void si_irq_ack(struct radeon_device *rdev)
 {
 	u32 tmp;
 
