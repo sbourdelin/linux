@@ -24,6 +24,7 @@
 #include <linux/of_platform.h>
 #include <linux/delay.h>
 #include <linux/pm_runtime.h>
+#include <linux/cpuidle.h>
 
 #include "coresight-priv.h"
 
@@ -514,7 +515,7 @@ static ssize_t enable_sink_show(struct device *dev,
 {
 	struct coresight_device *csdev = to_coresight_device(dev);
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", (unsigned)csdev->activated);
+	return scnprintf(buf, PAGE_SIZE, "%u\n", csdev->activated);
 }
 
 static ssize_t enable_sink_store(struct device *dev,
@@ -544,7 +545,7 @@ static ssize_t enable_source_show(struct device *dev,
 {
 	struct coresight_device *csdev = to_coresight_device(dev);
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", (unsigned)csdev->enable);
+	return scnprintf(buf, PAGE_SIZE, "%u\n", csdev->enable);
 }
 
 static ssize_t enable_source_store(struct device *dev,
@@ -559,6 +560,8 @@ static ssize_t enable_source_store(struct device *dev,
 	if (ret)
 		return ret;
 
+	/* suspend cpuidle */
+	cpuidle_pause();
 	if (val) {
 		ret = coresight_enable(csdev);
 		if (ret)
@@ -566,7 +569,8 @@ static ssize_t enable_source_store(struct device *dev,
 	} else {
 		coresight_disable(csdev);
 	}
-
+	/* resume cpuidle */
+	cpuidle_resume();
 	return size;
 }
 static DEVICE_ATTR_RW(enable_source);
