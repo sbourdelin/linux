@@ -13480,6 +13480,13 @@ static bool needs_vblank_wait(struct intel_crtc_state *crtc_state)
 	return false;
 }
 
+static bool needs_commit_planes_on_crtc(struct drm_crtc_state *crtc_state)
+{
+	return (crtc_state->planes_changed ||
+		crtc_state->color_mgmt_changed ||
+		to_intel_crtc_state(crtc_state)->update_pipe);
+}
+
 /**
  * intel_atomic_commit - commit validated state object
  * @dev: DRM device
@@ -13583,7 +13590,6 @@ static int intel_atomic_commit(struct drm_device *dev,
 		bool modeset = needs_modeset(crtc->state);
 		struct intel_crtc_state *pipe_config =
 			to_intel_crtc_state(crtc->state);
-		bool update_pipe = !modeset && pipe_config->update_pipe;
 
 		if (modeset && crtc->state->active) {
 			update_scanline_offset(to_intel_crtc(crtc));
@@ -13597,8 +13603,8 @@ static int intel_atomic_commit(struct drm_device *dev,
 		    drm_atomic_get_existing_plane_state(state, crtc->primary))
 			intel_fbc_enable(intel_crtc);
 
-		if (crtc->state->active &&
-		    (crtc->state->planes_changed || update_pipe))
+		if (crtc->state->active && !modeset &&
+		    needs_commit_planes_on_crtc(crtc->state))
 			drm_atomic_helper_commit_planes_on_crtc(old_crtc_state);
 
 		if (pipe_config->base.active && needs_vblank_wait(pipe_config))
