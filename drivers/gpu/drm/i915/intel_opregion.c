@@ -1024,3 +1024,16 @@ err_out:
 	memunmap(base);
 	return err;
 }
+
+int
+intel_opregion_get_panel_type(struct drm_device *dev)
+{
+	u32 panel_details;
+	int ret;
+
+	ret = swsci(dev, SWSCI_GBDA_PANEL_DETAILS, 0x0, &panel_details);
+	if (ret)
+		return ret;
+
+	return (panel_details >> 8) & 0xff;
+}
