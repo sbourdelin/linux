@@ -391,9 +391,9 @@ void usbhs_pipe_set_trans_count_if_bulk(struct usbhs_pipe *pipe, int len)
 /*
  *		pipe setup
  */
-static u16 usbhsp_setup_pipecfg(struct usbhs_pipe *pipe,
-				int is_host,
-				int dir_in)
+static u16 *usbhsp_setup_pipecfg(struct usbhs_pipe *pipe,
+				 int is_host,
+				 int dir_in)
 {
 	u16 type = 0;
 	u16 bfre = 0;
@@ -407,9 +407,13 @@ static u16 usbhsp_setup_pipecfg(struct usbhs_pipe *pipe,
 		[USB_ENDPOINT_XFER_INT]  = TYPE_INT,
 		[USB_ENDPOINT_XFER_ISOC] = TYPE_ISO,
 	};
+	u16 *result;
 
 	if (usbhs_pipe_is_dcp(pipe))
-		return -EINVAL;
+		return ERR_PTR(-EINVAL);
+	result = kmalloc(sizeof(u16), GFP_KERNEL);
+	if (!result)
+		return ERR_PTR(-ENOMEM);
 
 	/*
 	 * PIPECFG
@@ -451,14 +455,14 @@ static u16 usbhsp_setup_pipecfg(struct usbhs_pipe *pipe,
 
 	/* EPNUM */
 	epnum = 0; /* see usbhs_pipe_config_update() */
-
-	return	type	|
-		bfre	|
-		dblb	|
-		cntmd	|
-		dir	|
-		shtnak	|
-		epnum;
+	*result = type	 |
+		  bfre	 |
+		  dblb	 |
+		  cntmd	 |
+		  dir	 |
+		  shtnak |
+		  epnum;
+	return result;
 }
 
 static u16 usbhsp_setup_pipebuff(struct usbhs_pipe *pipe)
@@ -683,6 +687,7 @@ struct usbhs_pipe *usbhs_pipe_malloc(struct usbhs_priv *priv,
 	int is_host = usbhs_mod_is_host(priv);
 	int ret;
 	u16 pipecfg, pipebuf;
+	u16 *result;
 
 	pipe = usbhsp_get_pipe(priv, endpoint_type);
 	if (!pipe) {
@@ -702,7 +707,14 @@ struct usbhs_pipe *usbhs_pipe_malloc(struct usbhs_priv *priv,
 		return NULL;
 	}
 
-	pipecfg  = usbhsp_setup_pipecfg(pipe, is_host, dir_in);
+	result = usbhsp_setup_pipecfg(pipe, is_host, dir_in);
+	if (IS_ERR(result)) {
+		dev_err(dev, "can't setup pipe\n");
+		return NULL;
+	}
+	pipecfg = *result;
+	kfree(result);
+
 	pipebuf  = usbhsp_setup_pipebuff(pipe);
 
 	usbhsp_pipe_select(pipe);
