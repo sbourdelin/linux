@@ -131,7 +131,7 @@ void *hcd_buffer_alloc(
 	}
 
 	for (i = 0; i < HCD_BUFFER_POOLS; i++) {
-		if (size <= pool_max[i])
+		if (pool_max[i] && size <= pool_max[i])
 			return dma_pool_alloc(hcd->pool[i], mem_flags, dma);
 	}
 	return dma_alloc_coherent(hcd->self.controller, size, dma, mem_flags);
@@ -158,7 +158,7 @@ void hcd_buffer_free(
 	}
 
 	for (i = 0; i < HCD_BUFFER_POOLS; i++) {
-		if (size <= pool_max[i]) {
+		if (pool_max[i] && size <= pool_max[i]) {
 			dma_pool_free(hcd->pool[i], addr, dma);
 			return;
 		}
