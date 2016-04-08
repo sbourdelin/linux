@@ -5336,7 +5336,7 @@ i915_gem_object_create_from_data(struct drm_device *dev,
 	int ret;
 
 	obj = i915_gem_alloc_object(dev, round_up(size, PAGE_SIZE));
-	if (IS_ERR_OR_NULL(obj))
+	if (!obj)
 		return obj;
 
 	ret = i915_gem_object_set_to_cpu_domain(obj, true);
