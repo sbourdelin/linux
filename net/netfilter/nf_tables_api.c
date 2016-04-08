@@ -4060,8 +4060,8 @@ static int nf_tables_abort(struct net *net, struct sk_buff *skb)
 			break;
 		case NFT_MSG_DELCHAIN:
 			trans->ctx.table->use++;
-			list_add_tail_rcu(&trans->ctx.chain->list,
-					  &trans->ctx.table->chains);
+			list_add_rcu(&trans->ctx.chain->list,
+				     &trans->ctx.table->chains);
 			nft_trans_destroy(trans);
 			break;
 		case NFT_MSG_NEWRULE:
