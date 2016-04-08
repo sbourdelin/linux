@@ -1857,7 +1857,8 @@ static int gen6_alloc_va_range(struct i915_address_space *vm,
 	uint32_t pde, temp;
 	int ret;
 
-	if (WARN_ON(start_in + length_in > ppgtt->base.total))
+	if (WARN_ON(start_in > ppgtt->base.total || length_in >
+		    ppgtt->base.total - start_in))
 		return -ENODEV;
 
 	start = start_save = start_in;
