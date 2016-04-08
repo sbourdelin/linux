@@ -312,7 +312,8 @@ static int mt6397_probe(struct platform_device *pdev)
 
 fail_irq:
 	if (ret) {
-		irq_domain_remove(pmic->irq_domain);
+		if (pmic->irq_domain)
+			irq_domain_remove(pmic->irq_domain);
 		dev_err(&pdev->dev, "failed to add child devices: %d\n", ret);
 	}
 
