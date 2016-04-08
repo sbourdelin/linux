@@ -8,6 +8,7 @@
 #define MBI_MCR_OFFSET		0xD0
 #define MBI_MDR_OFFSET		0xD4
 #define MBI_MCRX_OFFSET		0xD8
+#define MBI_MCRP_OFFSET		0xDC
 
 #define MBI_RD_MASK		0xFEFFFFFF
 #define MBI_WR_MASK		0X01000000
@@ -87,6 +88,32 @@ int iosf_mbi_write(u8 port, u8 opcode, u32 offset, u32 mdr);
  * Return: Nonzero on error
  */
 int iosf_mbi_modify(u8 port, u8 opcode, u32 offset, u32 mdr, u32 mask);
+
+/**
+ * iosf_mbi_read_with_fid() - MailBox Interface read command requiring fid
+ * @fid:	fid bits
+ * @port:	port indicating subunit being accessed
+ * @opcode:	port specific read or write opcode
+ * @offset:	register address offset
+ * @mdr:	register data to be read
+ *
+ * Locking is handled by spinlock - cannot sleep.
+ * Return: Nonzero on error
+ */
+int iosf_mbi_read_with_fid(u32 fid, u8 port, u8 opcode, u32 offset, u32 *mdr);
+
+/**
+ * iosf_mbi_write_with_fid() - MailBox unmasked write command requiring fid
+ * @fid:	fid bits
+ * @port:	port indicating subunit being accessed
+ * @opcode:	port specific read or write opcode
+ * @offset:	register address offset
+ * @mdr:	register data to be written
+ *
+ * Locking is handled by spinlock - cannot sleep.
+ * Return: Nonzero on error
+ */
+int iosf_mbi_write_with_fid(u32 fid, u8 port, u8 opcode, u32 offset, u32 mdr);
 
 #else /* CONFIG_IOSF_MBI is not enabled */
 static inline

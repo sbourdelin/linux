@@ -98,6 +98,24 @@ fail_write:
 	return result;
 }
 
+static int iosf_mbi_pci_write_fid(u32 fid)
+{
+	int result;
+
+	if (!mbi_pdev)
+		return -ENODEV;
+
+	result = pci_write_config_dword(mbi_pdev, MBI_MCRP_OFFSET, fid);
+	if (result < 0)
+		goto fail_fid_write;
+
+	return 0;
+
+fail_fid_write:
+	dev_err(&mbi_pdev->dev, "PCI config access failed with %d\n", result);
+	return result;
+}
+
 int iosf_mbi_read(u8 port, u8 opcode, u32 offset, u32 *mdr)
 {
 	u32 mcr, mcrx;
@@ -182,6 +200,61 @@ int iosf_mbi_modify(u8 port, u8 opcode, u32 offset, u32 mdr, u32 mask)
 	return ret;
 }
 EXPORT_SYMBOL(iosf_mbi_modify);
+
+/*
+ * Some IP blocks require fid to access their registers.
+ * fid value is programmed through MCRP register, see above function
+ * iosf_mbi_pci_write_fid() for details.
+ */
+int iosf_mbi_read_with_fid(u32 fid, u8 port, u8 opcode, u32 offset, u32 *mdr)
+{
+	u32 mcr, mcrx;
+	unsigned long flags;
+	int ret;
+
+	/*Access to the GFX unit is handled by GPU code */
+	if (port == BT_MBI_UNIT_GFX) {
+		WARN_ON(1);
+		return -EPERM;
+	}
+
+	mcr = iosf_mbi_form_mcr(opcode, port, offset & MBI_MASK_LO);
+	mcrx = offset & MBI_MASK_HI;
+
+	spin_lock_irqsave(&iosf_mbi_lock, flags);
+	ret = iosf_mbi_pci_write_fid(fid);
+	if (!ret)
+		ret = iosf_mbi_pci_read_mdr(mcrx, mcr, mdr);
+	spin_unlock_irqrestore(&iosf_mbi_lock, flags);
+
+	return ret;
+}
+EXPORT_SYMBOL(iosf_mbi_read_with_fid);
+
+int iosf_mbi_write_with_fid(u32 fid, u8 port, u8 opcode, u32 offset, u32 mdr)
+{
+	u32 mcr, mcrx;
+	unsigned long flags;
+	int ret;
+
+	/*Access to the GFX unit is handled by GPU code */
+	if (port == BT_MBI_UNIT_GFX) {
+		WARN_ON(1);
+		return -EPERM;
+	}
+
+	mcr = iosf_mbi_form_mcr(opcode, port, offset & MBI_MASK_LO);
+	mcrx = offset & MBI_MASK_HI;
+
+	spin_lock_irqsave(&iosf_mbi_lock, flags);
+	ret = iosf_mbi_pci_write_fid(fid);
+	if (!ret)
+		ret = iosf_mbi_pci_write_mdr(mcrx, mcr, mdr);
+	spin_unlock_irqrestore(&iosf_mbi_lock, flags);
+
+	return ret;
+}
+EXPORT_SYMBOL(iosf_mbi_write_with_fid);
 
 bool iosf_mbi_available(void)
 {
