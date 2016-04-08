@@ -7306,7 +7306,7 @@ int cik_irq_set(struct radeon_device *rdev)
  * etc.) (CIK).  Certain interrupts sources are sw
  * generated and do not require an explicit ack.
  */
-static inline void cik_irq_ack(struct radeon_device *rdev)
+static void cik_irq_ack(struct radeon_device *rdev)
 {
 	u32 tmp;
 
