@@ -18,8 +18,12 @@ Optional properties:
   through pmic_power_en
 - clocks: Any internal or external clocks feeding in to rtc
 - clock-names: Corresponding names of the clocks
+- gpio-controller: Mark as gpio controller when using ext_wakeup
+- #gpio-cells: Should be set to 2
+- ngpios: Number of ext_wakeup sources supported by processor (board)
+- ext-wakeup-gpios: List of ext_wakeup sources to configure
 
-Example:
+Examples:
 
 rtc@1c23000 {
 	compatible = "ti,da830-rtc";
@@ -30,4 +34,16 @@ rtc@1c23000 {
 	system-power-controller;
 	clocks = <&clk_32k_rtc>, <&clk_32768_ck>;
 	clock-names = "ext-clk", "int-clk";
+};
+
+rtc: rtc@44e3e000 {
+	compatible = "ti,am3352-rtc", "ti,da830-rtc";
+	reg = <0x44e3e000 0x1000>;
+	interrupts = <75
+		      76>;
+	system-power-controller;
+	gpio-controller;
+	#gpio-cells = <2>;
+	ngpios = <1>;
+	ext-wakeup-gpios = <&rtc 0 GPIO_ACTIVE_LOW>;
 };

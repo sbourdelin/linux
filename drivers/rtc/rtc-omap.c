@@ -16,6 +16,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/slab.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
 #include <linux/rtc.h>
@@ -23,6 +24,8 @@
 #include <linux/platform_device.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/of_gpio.h>
+#include <linux/gpio/driver.h>
 #include <linux/pm_runtime.h>
 #include <linux/io.h>
 #include <linux/clk.h>
@@ -114,7 +117,11 @@
 #define OMAP_RTC_IRQWAKEEN_ALARM_WAKEEN	BIT(1)
 
 /* OMAP_RTC_PMIC bit fields: */
-#define OMAP_RTC_PMIC_POWER_EN_EN	BIT(16)
+#define OMAP_RTC_PMIC_POWER_EN_EN		BIT(16)
+#define OMAP_RTC_PMIC_EXT_WAKEUP_EN(x)		(BIT(x))
+#define OMAP_RTC_PMIC_EXT_WAKEUP_POL(x)		(BIT(x) << 4)
+#define OMAP_RTC_PMIC_EXT_WAKEUP_EN_MASK	(0x0F)
+#define OMAP_RTC_PMIC_EXT_WAKEUP_POL_MASK	(0x0F << 4)
 
 /* OMAP_RTC_KICKER values */
 #define	KICK0_VALUE			0x83e70b13
@@ -131,6 +138,17 @@ struct omap_rtc_device_type {
 	void (*unlock)(struct omap_rtc *rtc);
 };
 
+struct omap_rtc_gpio_desc {
+	struct gpio_desc *desc;
+	int hwnum;
+	bool active_low;
+};
+
+struct omap_rtc_gpio_descs {
+	unsigned int ndescs;
+	struct omap_rtc_gpio_desc desc[];
+};
+
 struct omap_rtc {
 	struct rtc_device *rtc;
 	void __iomem *base;
@@ -141,6 +159,8 @@ struct omap_rtc {
 	bool is_pmic_controller;
 	bool has_ext_clk;
 	const struct omap_rtc_device_type *type;
+	struct gpio_chip gpio_chip;
+	struct omap_rtc_gpio_descs *descs;
 };
 
 static inline u8 rtc_read(struct omap_rtc *rtc, unsigned int reg)
@@ -181,6 +201,135 @@ static void default_rtc_unlock(struct omap_rtc *rtc)
 
 static void default_rtc_lock(struct omap_rtc *rtc)
 {
+}
+
+static int omap_rtc_gpio_get_direction(struct gpio_chip *chip,
+				unsigned int offset)
+{
+	return 1; /* Always in */
+}
+
+static int omap_rtc_gpio_direction_input(struct gpio_chip *chip,
+					unsigned int offset)
+{
+	return 0;
+}
+
+static int omap_rtc_gpio_get(struct gpio_chip *chip, unsigned int offset)
+{
+	return 0;
+}
+
+static struct gpio_chip template_chip = {
+	.label			= "omap-rtc-gpio",
+	.owner			= THIS_MODULE,
+	.get_direction		= omap_rtc_gpio_get_direction,
+	.direction_input	= omap_rtc_gpio_direction_input,
+	.get			= omap_rtc_gpio_get,
+	.base			= -1,
+	.ngpio			= 4,
+	.can_sleep		= true,
+};
+
+static void omap_rtc_gpio_enable(struct omap_rtc *rtc)
+{
+	struct omap_rtc_gpio_descs *descs = rtc->descs;
+	struct omap_rtc_gpio_desc *desc;
+	u32 val;
+	unsigned int i;
+
+	if (!descs)
+		return;
+
+	val = rtc_readl(rtc, OMAP_RTC_PMIC_REG);
+	val &= ~(OMAP_RTC_PMIC_EXT_WAKEUP_EN_MASK
+		| OMAP_RTC_PMIC_EXT_WAKEUP_POL_MASK);
+
+	for (i = 0; i < descs->ndescs; i++) {
+		desc = &descs->desc[i];
+		val |= OMAP_RTC_PMIC_EXT_WAKEUP_EN(desc->hwnum);
+		if (desc->active_low)
+			val |= OMAP_RTC_PMIC_EXT_WAKEUP_POL(desc->hwnum);
+	}
+
+	rtc_writel(rtc, OMAP_RTC_PMIC_REG, val);
+}
+
+static void omap_rtc_gpio_disable(struct omap_rtc *rtc)
+{
+	u32 val;
+
+	val = rtc_readl(rtc, OMAP_RTC_PMIC_REG);
+	val &= ~(OMAP_RTC_PMIC_EXT_WAKEUP_EN_MASK
+		| OMAP_RTC_PMIC_EXT_WAKEUP_POL_MASK);
+	rtc_writel(rtc, OMAP_RTC_PMIC_REG, val);
+}
+
+static void omap_rtc_gpio_descs_put(struct omap_rtc_gpio_descs *descs)
+{
+	unsigned int i;
+
+	for (i = 0; i < descs->ndescs; i++)
+		gpiochip_free_own_desc(descs->desc[i].desc);
+
+	kfree(descs);
+}
+
+static struct omap_rtc_gpio_descs *omap_rtc_gpio_descs_get(struct device *dev)
+{
+	struct omap_rtc *rtc = dev_get_drvdata(dev);
+	struct device_node *np = dev->of_node;
+	struct gpio_chip *chip = &rtc->gpio_chip;
+	struct of_phandle_args of_args;
+	enum of_gpio_flags of_flags;
+	struct omap_rtc_gpio_descs *descs;
+	struct omap_rtc_gpio_desc *desc;
+	int index;
+	int count;
+	int ret;
+
+	count = of_gpio_named_count(np, "ext-wakeup-gpios");
+	if (count <= 0)
+		return ERR_PTR(-ENOENT);
+
+	descs = kzalloc(sizeof(*descs) + sizeof(descs->desc[0]) * count,
+			GFP_KERNEL);
+	if (!descs)
+		return ERR_PTR(-ENOMEM);
+
+	for (index = 0; index < count; index++) {
+		desc = &descs->desc[index];
+		ret = of_parse_phandle_with_args(np, "ext-wakeup-gpios",
+						"#gpio-cells", index,
+						&of_args);
+		if (ret) {
+			dev_err(dev, "Could not parse ext-wakeup-gpios %d\n",
+				index);
+			omap_rtc_gpio_descs_put(descs);
+			return ERR_PTR(ret);
+		}
+
+		ret = of_gpio_simple_xlate(chip, &of_args, &of_flags);
+		if (ret < 0) {
+			dev_err(dev, "Could not xlate %d\n", index);
+			omap_rtc_gpio_descs_put(descs);
+			return ERR_PTR(ret);
+		}
+		desc->hwnum = ret;
+
+		desc->desc = gpiochip_request_own_desc(chip, ret,
+						"omap-rtc-gpio");
+		if (IS_ERR(desc->desc)) {
+			dev_err(dev, "Could not request gpio %d\n", index);
+			omap_rtc_gpio_descs_put(descs);
+			return ERR_CAST(desc->desc);
+		}
+
+		desc->active_low = (of_flags & OF_GPIO_ACTIVE_LOW);
+		descs->ndescs++;
+	}
+
+	return descs;
 }
 
 /*
@@ -532,6 +681,8 @@ static int omap_rtc_probe(struct platform_device *pdev)
 	u8 reg, mask, new_ctrl;
 	const struct platform_device_id *id_entry;
 	const struct of_device_id *of_id;
+	struct omap_rtc_gpio_descs *descs = NULL;
+	u32 ngpios = 0;
 	int ret;
 
 	rtc = devm_kzalloc(&pdev->dev, sizeof(*rtc), GFP_KERNEL);
@@ -544,6 +695,10 @@ static int omap_rtc_probe(struct platform_device *pdev)
 		rtc->is_pmic_controller = rtc->type->has_pmic_mode &&
 				of_property_read_bool(pdev->dev.of_node,
 						"system-power-controller");
+		ret = of_property_read_u32(pdev->dev.of_node, "ngpios",
+					&ngpios);
+		if (ret)
+			ngpios = 0;
 	} else {
 		id_entry = platform_get_device_id(pdev);
 		rtc->type = (void *)id_entry->driver_data;
@@ -576,6 +731,26 @@ static int omap_rtc_probe(struct platform_device *pdev)
 	/* Enable the clock/module so that we can access the registers */
 	pm_runtime_enable(&pdev->dev);
 	pm_runtime_get_sync(&pdev->dev);
+
+	if (ngpios > 0) {
+		rtc->gpio_chip = template_chip;
+		rtc->gpio_chip.parent = &pdev->dev;
+		rtc->gpio_chip.ngpio = ngpios;
+		ret = devm_gpiochip_add_data(&pdev->dev, &rtc->gpio_chip,
+					rtc);
+		if (ret < 0) {
+			dev_err(&pdev->dev, "Could not register gpiochip, %d\n",
+				ret);
+			return ret;
+		}
+
+		descs = omap_rtc_gpio_descs_get(&pdev->dev);
+		if (IS_ERR(descs)) {
+			dev_err(&pdev->dev, "Could not request gpios\n");
+			return PTR_ERR(descs);
+		}
+		rtc->descs = descs;
+	}
 
 	rtc->type->unlock(rtc);
 
@@ -618,6 +793,8 @@ static int omap_rtc_probe(struct platform_device *pdev)
 	/* force to 24 hour mode */
 	new_ctrl = reg & (OMAP_RTC_CTRL_SPLIT | OMAP_RTC_CTRL_AUTO_COMP);
 	new_ctrl |= OMAP_RTC_CTRL_STOP;
+
+	omap_rtc_gpio_enable(rtc);
 
 	/*
 	 * BOARD-SPECIFIC CUSTOMIZATION CAN GO HERE:
@@ -684,6 +861,8 @@ static int omap_rtc_probe(struct platform_device *pdev)
 	return 0;
 
 err:
+	if (descs)
+		omap_rtc_gpio_descs_put(descs);
 	device_init_wakeup(&pdev->dev, false);
 	rtc->type->lock(rtc);
 	pm_runtime_put_sync(&pdev->dev);
@@ -697,6 +876,9 @@ static int __exit omap_rtc_remove(struct platform_device *pdev)
 	struct omap_rtc *rtc = platform_get_drvdata(pdev);
 	u8 reg;
 
+	if (rtc->descs)
+		omap_rtc_gpio_descs_put(rtc->descs);
+
 	if (pm_power_off == omap_rtc_power_off &&
 			omap_rtc_power_off_rtc == rtc) {
 		pm_power_off = NULL;
@@ -709,6 +891,9 @@ static int __exit omap_rtc_remove(struct platform_device *pdev)
 		clk_disable_unprepare(rtc->clk);
 
 	rtc->type->unlock(rtc);
+
+	omap_rtc_gpio_disable(rtc);
+
 	/* leave rtc running, but disable irqs */
 	rtc_write(rtc, OMAP_RTC_INTERRUPTS_REG, 0);
 
