@@ -1447,7 +1447,7 @@ wq_copy_cleanup_scsi_cmd:
 	}
 }
 
-static inline int fnic_queue_abort_io_req(struct fnic *fnic, int tag,
+static int fnic_queue_abort_io_req(struct fnic *fnic, int tag,
 					  u32 task_req, u8 *fc_lun,
 					  struct fnic_io_req *io_req)
 {
