@@ -379,7 +379,7 @@ static int xhci_pci_suspend(struct usb_hcd *hcd, bool do_wakeup)
 	 * need to have the registers polled during D3, so avoid D3cold.
 	 */
 	if (xhci->quirks & XHCI_COMP_MODE_QUIRK)
-		pdev->no_d3cold = true;
+		pci_enable_d3cold(pdev, false);
 
 	if (xhci->quirks & XHCI_PME_STUCK_QUIRK)
 		xhci_pme_quirk(hcd);

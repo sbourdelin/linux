@@ -744,6 +744,19 @@ static int pci_pm_suspend(struct device *dev)
 	return 0;
 }
 
+/*
+ * Check if given device can go to low power state. Currently we allow
+ * normal PCI devices and PCI bridges if their bridge_d3 is set.
+ */
+static bool pci_can_suspend(struct pci_dev *pdev)
+{
+	if (!pci_has_subordinate(pdev))
+		return true;
+	else if (pdev->bridge_d3)
+		return true;
+	return false;
+}
+
 static int pci_pm_suspend_noirq(struct device *dev)
 {
 	struct pci_dev *pci_dev = to_pci_dev(dev);
@@ -777,7 +790,7 @@ static int pci_pm_suspend_noirq(struct device *dev)
 
 	if (!pci_dev->state_saved) {
 		pci_save_state(pci_dev);
-		if (!pci_has_subordinate(pci_dev))
+		if (pci_can_suspend(pci_dev))
 			pci_prepare_to_sleep(pci_dev);
 	}
 

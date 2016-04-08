@@ -407,6 +407,7 @@ static ssize_t d3cold_allowed_store(struct device *dev,
 
 	pdev->d3cold_allowed = !!val;
 	pm_runtime_resume(dev);
+	pci_bridge_pm_update(pdev, false);
 
 	return count;
 }

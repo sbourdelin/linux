@@ -96,6 +96,8 @@ static void pci_remove_bus_device(struct pci_dev *dev)
 		dev->subordinate = NULL;
 	}
 
+	pci_bridge_pm_update(dev, true);
+
 	pci_destroy_dev(dev);
 }
 

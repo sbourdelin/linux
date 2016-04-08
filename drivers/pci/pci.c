@@ -9,6 +9,7 @@
 
 #include <linux/kernel.h>
 #include <linux/delay.h>
+#include <linux/dmi.h>
 #include <linux/init.h>
 #include <linux/of.h>
 #include <linux/of_pci.h>
@@ -2156,6 +2157,107 @@ void pci_config_pm_runtime_put(struct pci_dev *pdev)
 }
 
 /**
+ * pci_bridge_d3_possible - Is it possible to move the bridge to D3
+ * @bridge: Bridge to check
+ *
+ * This function checks if it is possible to move the bridge to D3.
+ * Currently we only allow D3 for recent enough PCIe ports.
+ */
+static bool pci_bridge_d3_possible(struct pci_dev *bridge)
+{
+	unsigned int year;
+
+	if (!pci_is_pcie(bridge))
+		return false;
+
+	switch (pci_pcie_type(bridge)) {
+	case PCI_EXP_TYPE_ROOT_PORT:
+	case PCI_EXP_TYPE_UPSTREAM:
+	case PCI_EXP_TYPE_DOWNSTREAM:
+		/*
+		 * PCIe ports from 2015 and newer should be capable of
+		 * entering D3.
+		 */
+		if (dmi_get_date(DMI_BIOS_DATE, &year, NULL, NULL) &&
+		    year >= 2015) {
+			return true;
+		}
+		break;
+	}
+
+	return false;
+}
+
+static int pci_dev_check_d3cold(struct pci_dev *pdev, void *data)
+{
+	bool *d3cold_ok = data;
+
+	/*
+	 * The device needs to be allowed to go D3cold and if it is wake
+	 * capable to do so from D3cold.
+	 */
+	if (pdev->no_d3cold || !pdev->d3cold_allowed)
+		*d3cold_ok = false;
+	if (device_may_wakeup(&pdev->dev) && !pci_pme_capable(pdev, PCI_D3cold))
+		*d3cold_ok = false;
+
+	return !*d3cold_ok;
+}
+
+/**
+ * pci_bridge_pm_update - Update PM capabilities of upstream PCI bridge
+ * @dev: PCI device whose configuration changed
+ * @remove: Is the PCI device about to be removed
+ *
+ * When PM configuration of a PCI device is changed this function updates
+ * PM capabilities of the upstream PCI bridge accordingly.
+ */
+void pci_bridge_pm_update(struct pci_dev *pdev, bool remove)
+{
+	struct pci_dev *bridge;
+	bool d3cold_ok = true;
+
+	bridge = pci_upstream_bridge(pdev);
+	if (!bridge || !pci_bridge_d3_possible(bridge))
+		return;
+
+	pci_dev_get(bridge);
+	if (!remove)
+		pci_dev_check_d3cold(pdev, &d3cold_ok);
+
+	if (d3cold_ok) {
+		/*
+		 * We need to go through all children to find out if all of
+		 * them can still go to D3cold.
+		 */
+		pci_walk_bus(bridge->subordinate, pci_dev_check_d3cold,
+			     &d3cold_ok);
+	}
+	bridge->bridge_d3 = d3cold_ok;
+	pci_dev_put(bridge);
+}
+
+/**
+ * pci_enable_d3cold - Enables or disables D3cold from the device
+ * @pdev: PCI device to handle
+ * @enable: Enable or disable D3cold
+ *
+ * This function can be used in drivers to prevent D3cold from the device
+ * they handle. It also updates upstream PCI bridge PM capabilities
+ * accordingly.
+ */
+void pci_enable_d3cold(struct pci_dev *pdev, bool enable)
+{
+	bool no_d3cold = !enable;
+
+	if (pdev->no_d3cold != no_d3cold) {
+		pdev->no_d3cold = !enable;
+		pci_bridge_pm_update(pdev, false);
+	}
+}
+EXPORT_SYMBOL_GPL(pci_enable_d3cold);
+
+/**
  * pci_pm_init - Initialize PM functions of given PCI device
  * @dev: PCI device to handle.
  */
@@ -2189,6 +2291,7 @@ void pci_pm_init(struct pci_dev *dev)
 	dev->pm_cap = pm;
 	dev->d3_delay = PCI_PM_D3_WAIT;
 	dev->d3cold_delay = PCI_PM_D3COLD_WAIT;
+	dev->bridge_d3 = pci_bridge_d3_possible(dev);
 	dev->d3cold_allowed = true;
 
 	dev->d1_support = false;
