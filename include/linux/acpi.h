@@ -190,7 +190,7 @@ static inline int acpi_debugger_notify_command_complete(void)
 }
 #endif
 
-#ifdef CONFIG_ACPI_INITRD_TABLE_OVERRIDE
+#ifdef CONFIG_ACPI_TABLE_UPGRADE
 void early_acpi_table_init(void *data, size_t size);
 #else
 static inline void early_acpi_table_init(void *data, size_t size)
