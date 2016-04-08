@@ -33,7 +33,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/perf_event.h>
 #include <asm/sections.h>
-
+#include<linux/cpuidle.h>
 #include "coresight-etm4x.h"
 
 static int boot_enable;
@@ -111,8 +111,8 @@ static void etm4_enable_hw(void *info)
 
 	writel_relaxed(drvdata->pe_sel, drvdata->base + TRCPROCSELR);
 	writel_relaxed(drvdata->cfg, drvdata->base + TRCCONFIGR);
-	/* nothing specific implemented */
-	writel_relaxed(0x0, drvdata->base + TRCAUXCTLR);
+	/*Force ETM idle acknowleghe when CPU enter WFI*/
+	writel_relaxed(0x2, drvdata->base + TRCAUXCTLR);
 	writel_relaxed(drvdata->eventctrl0, drvdata->base + TRCEVENTCTL0R);
 	writel_relaxed(drvdata->eventctrl1, drvdata->base + TRCEVENTCTL1R);
 	writel_relaxed(drvdata->stall_ctrl, drvdata->base + TRCSTALLCTLR);
@@ -2491,6 +2491,8 @@ static void etm4_init_default_data(struct etmv4_drvdata *drvdata)
 	 *  started state
 	 */
 	drvdata->vinst_ctrl |= BIT(0);
+	/*Not generate EL0-NS trace   */
+	drvdata->vinst_ctrl |= BIT(20);
 	/* set initial state of start-stop logic */
 	if (drvdata->nr_addr_cmp)
 		drvdata->vinst_ctrl |= BIT(9);
@@ -2594,6 +2596,42 @@ out:
 static struct notifier_block etm4_cpu_notifier = {
 	.notifier_call = etm4_cpu_callback,
 };
+#ifdef CONFIG_PM
+static int etmv4_suspend(struct device *dev)
+{
+
+	int ret = 0;
+	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev);
+
+	dev_info(drvdata->dev, "%s: CPU+%d\n", __func__, drvdata->cpu);
+	if (drvdata->enable) {
+		cpuidle_pause();
+		coresight_disable(drvdata->csdev);
+		cpuidle_resume();
+	}
+
+	return ret;
+}
+
+static int etmv4_resume(struct device *dev)
+{
+
+	int ret = 0;
+	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev);
+
+	dev_info(drvdata->dev, "%s: CPU+%d\n", __func__, drvdata->cpu);
+	if (!drvdata->enable && drvdata->boot_enable) {
+		cpuidle_pause();
+		coresight_enable(drvdata->csdev);
+		cpuidle_resume();
+	}
+
+	return ret;
+}
+
+static SIMPLE_DEV_PM_OPS(etm4x_dev_pm_ops, etmv4_suspend, etmv4_resume);
+
+#endif
 
 static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
 {
@@ -2673,7 +2711,9 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
 	dev_info(dev, "%s initialized\n", (char *)id->data);
 
 	if (boot_enable) {
+		cpuidle_pause();
 		coresight_enable(drvdata->csdev);
+		cpuidle_resume();
 		drvdata->boot_enable = true;
 	}
 
@@ -2698,7 +2738,17 @@ static struct amba_id etm4_ids[] = {
 		.mask	= 0x000fffff,
 		.data	= "ETM 4.0",
 	},
-	{ 0, 0},
+	{       /* ETM 4.0 - A72 board */
+		.id = 0x000bb95a,
+		.mask = 0x000fffff,
+		.data = "ETM 4.0",
+	},
+	{       /* ETM 4.0 - Atermis board */
+		.id = 0x000bb959,
+		.mask = 0x000fffff,
+		.data = "ETM 4.0",
+	},
+	{0, 0},
 };
 
 static struct amba_driver etm4x_driver = {
