@@ -3087,9 +3087,11 @@ _base_release_memory_pools(struct MPT3SAS_ADAPTER *ioc)
 	}
 
 	if (ioc->sense) {
-		pci_pool_free(ioc->sense_dma_pool, ioc->sense, ioc->sense_dma);
-		if (ioc->sense_dma_pool)
+		if (ioc->sense_dma_pool) {
+			pci_pool_free(ioc->sense_dma_pool, ioc->sense,
+				      ioc->sense_dma);
 			pci_pool_destroy(ioc->sense_dma_pool);
+		}
 		dexitprintk(ioc, pr_info(MPT3SAS_FMT
 			"sense_pool(0x%p): free\n",
 			ioc->name, ioc->sense));
