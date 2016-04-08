@@ -1333,27 +1333,25 @@ static void pnv_pci_ioda2_set_bypass(struct pnv_ioda_pe *pe, bool enable);
 static void pnv_pci_ioda2_group_release(void *iommu_data)
 {
 	struct iommu_table_group *table_group = iommu_data;
+	struct pnv_ioda_pe *pe = container_of(table_group,
+			struct pnv_ioda_pe, table_group);
+	struct pci_controller *hose = pci_bus_to_host(pe->parent_dev->bus);
+	struct pnv_phb *phb = hose->private_data;
+	struct iommu_table *tbl = pe->table_group.tables[0];
+	int64_t rc;
 
-	table_group->group = NULL;
-}
-
-static void pnv_pci_ioda2_release_dma_pe(struct pci_dev *dev, struct pnv_ioda_pe *pe)
-{
-	struct iommu_table    *tbl;
-	int64_t               rc;
-
-	tbl = pe->table_group.tables[0];
 	rc = pnv_pci_ioda2_unset_window(&pe->table_group, 0);
 	if (rc)
 		pe_warn(pe, "OPAL error %ld release DMA window\n", rc);
 
 	pnv_pci_ioda2_set_bypass(pe, false);
-	if (pe->table_group.group) {
-		iommu_group_put(pe->table_group.group);
-		BUG_ON(pe->table_group.group);
-	}
+
+	BUG_ON(!tbl);
 	pnv_pci_ioda2_table_free_pages(tbl);
-	iommu_free_table(tbl, of_node_full_name(dev->dev.of_node));
+	iommu_free_table(tbl, of_node_full_name(pe->parent_dev->dev.of_node));
+
+	pnv_ioda_deconfigure_pe(phb, pe);
+	pnv_ioda_free_pe(phb, pe->pe_number);
 }
 
 static void pnv_ioda_release_vf_PE(struct pci_dev *pdev)
@@ -1376,16 +1374,13 @@ static void pnv_ioda_release_vf_PE(struct pci_dev *pdev)
 		if (pe->parent_dev != pdev)
 			continue;
 
-		pnv_pci_ioda2_release_dma_pe(pdev, pe);
-
 		/* Remove from list */
 		mutex_lock(&phb->ioda.pe_list_mutex);
 		list_del(&pe->list);
 		mutex_unlock(&phb->ioda.pe_list_mutex);
 
-		pnv_ioda_deconfigure_pe(phb, pe);
-
-		pnv_ioda_free_pe(phb, pe->pe_number);
+		if (pe->table_group.group)
+			iommu_group_put(pe->table_group.group);
 	}
 }
 
