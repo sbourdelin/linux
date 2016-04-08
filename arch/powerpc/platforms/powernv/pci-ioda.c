@@ -1330,6 +1330,13 @@ static long pnv_pci_ioda2_unset_window(struct iommu_table_group *table_group,
 		int num);
 static void pnv_pci_ioda2_set_bypass(struct pnv_ioda_pe *pe, bool enable);
 
+static void pnv_pci_ioda2_group_release(void *iommu_data)
+{
+	struct iommu_table_group *table_group = iommu_data;
+
+	table_group->group = NULL;
+}
+
 static void pnv_pci_ioda2_release_dma_pe(struct pci_dev *dev, struct pnv_ioda_pe *pe)
 {
 	struct iommu_table    *tbl;
@@ -1965,8 +1972,8 @@ static void pnv_pci_ioda_setup_dma_pe(struct pnv_phb *phb,
 		return;
 
 	tbl = pnv_pci_table_alloc(phb->hose->node);
-	iommu_register_group(&pe->table_group, phb->hose->global_number,
-			pe->pe_number);
+	iommu_register_table_group(&pe->table_group, phb->hose->global_number,
+			pe->pe_number, NULL);
 	pnv_pci_link_table_and_group(phb->hose->node, 0, tbl, &pe->table_group);
 
 	/* Grab a 32-bit TCE table */
@@ -2450,8 +2457,8 @@ static void pnv_pci_ioda2_setup_dma_pe(struct pnv_phb *phb,
 	/* TVE #1 is selected by PCI address bit 59 */
 	pe->tce_bypass_base = 1ull << 59;
 
-	iommu_register_group(&pe->table_group, phb->hose->global_number,
-			pe->pe_number);
+	iommu_register_table_group(&pe->table_group, phb->hose->global_number,
+			pe->pe_number, pnv_pci_ioda2_group_release);
 
 	/* The PE will reserve all possible 32-bits space */
 	pe->tce32_seg = 0;

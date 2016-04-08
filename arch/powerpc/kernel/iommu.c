@@ -887,15 +887,9 @@ EXPORT_SYMBOL_GPL(iommu_direction_to_tce_perm);
 /*
  * SPAPR TCE API
  */
-static void group_release(void *iommu_data)
-{
-	struct iommu_table_group *table_group = iommu_data;
-
-	table_group->group = NULL;
-}
-
-void iommu_register_group(struct iommu_table_group *table_group,
-		int pci_domain_number, unsigned long pe_num)
+void iommu_register_table_group(struct iommu_table_group *table_group,
+		int pci_domain_number, unsigned long pe_num,
+		void (*release)(void *iommu_data))
 {
 	struct iommu_group *grp;
 	char *name;
@@ -907,7 +901,7 @@ void iommu_register_group(struct iommu_table_group *table_group,
 		return;
 	}
 	table_group->group = grp;
-	iommu_group_set_iommudata(grp, table_group, group_release);
+	iommu_group_set_iommudata(grp, table_group, release);
 	name = kasprintf(GFP_KERNEL, "domain%d-pe%lx",
 			pci_domain_number, pe_num);
 	if (!name)

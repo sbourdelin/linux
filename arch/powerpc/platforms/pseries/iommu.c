@@ -112,7 +112,7 @@ static void iommu_pseries_free_group(struct iommu_table_group *table_group,
 	}
 	if (table_group->group) {
 		iommu_group_put(table_group->group);
-		BUG_ON(table_group->group);
+		table_group->group = NULL;
 	}
 #endif
 	iommu_free_table(tbl, node_name);
@@ -692,7 +692,8 @@ static void pci_dma_bus_setup_pSeries(struct pci_bus *bus)
 	iommu_table_setparms(pci->phb, dn, tbl);
 	tbl->it_ops = &iommu_table_pseries_ops;
 	iommu_init_table(tbl, pci->phb->node);
-	iommu_register_group(pci->table_group, pci_domain_nr(bus), 0);
+	iommu_register_table_group(pci->table_group, pci_domain_nr(bus), 0,
+			NULL);
 
 	/* Divide the rest (1.75GB) among the children */
 	pci->phb->dma_window_size = 0x80000000ul;
@@ -743,8 +744,8 @@ static void pci_dma_bus_setup_pSeriesLP(struct pci_bus *bus)
 		iommu_table_setparms_lpar(ppci->phb, pdn, tbl, dma_window);
 		tbl->it_ops = &iommu_table_lpar_multi_ops;
 		iommu_init_table(tbl, ppci->phb->node);
-		iommu_register_group(ppci->table_group,
-				pci_domain_nr(bus), 0);
+		iommu_register_table_group(ppci->table_group,
+				pci_domain_nr(bus), 0, NULL);
 		pr_debug("  created table: %p\n", ppci->table_group);
 	}
 }
@@ -772,8 +773,8 @@ static void pci_dma_dev_setup_pSeries(struct pci_dev *dev)
 		iommu_table_setparms(phb, dn, tbl);
 		tbl->it_ops = &iommu_table_pseries_ops;
 		iommu_init_table(tbl, phb->node);
-		iommu_register_group(PCI_DN(dn)->table_group,
-				pci_domain_nr(phb->bus), 0);
+		iommu_register_table_group(PCI_DN(dn)->table_group,
+				pci_domain_nr(phb->bus), 0, NULL);
 		set_iommu_table_base(&dev->dev, tbl);
 		iommu_add_device(&dev->dev);
 		return;
@@ -1197,8 +1198,8 @@ static void pci_dma_dev_setup_pSeriesLP(struct pci_dev *dev)
 		iommu_table_setparms_lpar(pci->phb, pdn, tbl, dma_window);
 		tbl->it_ops = &iommu_table_lpar_multi_ops;
 		iommu_init_table(tbl, pci->phb->node);
-		iommu_register_group(pci->table_group,
-				pci_domain_nr(pci->phb->bus), 0);
+		iommu_register_table_group(pci->table_group,
+				pci_domain_nr(pci->phb->bus), 0, NULL);
 		pr_debug("  created table: %p\n", pci->table_group);
 	} else {
 		pr_debug("  found DMA window, table: %p\n", pci->table_group);
