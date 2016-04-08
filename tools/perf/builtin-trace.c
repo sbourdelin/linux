@@ -3263,6 +3263,16 @@ int cmd_trace(int argc, const char **argv, const char *prefix __maybe_unused)
 	argc = parse_options_subcommand(argc, argv, trace_options, trace_subcommands,
 				 trace_usage, PARSE_OPT_STOP_AT_NON_OPTION);
 
+	err = bpf__setup_stdout(trace.evlist);
+	if (err) {
+		char errbuf[BUFSIZ];
+
+		bpf__strerror_setup_stdout(trace.evlist, err, errbuf, sizeof(errbuf));
+		pr_err("ERROR: Setup BPF stdout failed: %s\n",
+			 errbuf);
+		goto out;
+	}
+
 	if (validate_evlist(trace.evlist, &has_bpf_output)) {
 		pr_err("Only support tracepoint and bpf-output events!\n");
 		return -EINVAL;
