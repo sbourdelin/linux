@@ -2784,7 +2784,7 @@ static inline void netif_tx_schedule_all(struct net_device *dev)
 		netif_schedule_queue(netdev_get_tx_queue(dev, i));
 }
 
-static inline void netif_tx_start_queue(struct netdev_queue *dev_queue)
+static __always_inline void netif_tx_start_queue(struct netdev_queue *dev_queue)
 {
 	clear_bit(__QUEUE_STATE_DRV_XOFF, &dev_queue->state);
 }
@@ -2834,7 +2834,7 @@ static inline void netif_tx_wake_all_queues(struct net_device *dev)
 	}
 }
 
-static inline void netif_tx_stop_queue(struct netdev_queue *dev_queue)
+static __always_inline void netif_tx_stop_queue(struct netdev_queue *dev_queue)
 {
 	set_bit(__QUEUE_STATE_DRV_XOFF, &dev_queue->state);
 }
