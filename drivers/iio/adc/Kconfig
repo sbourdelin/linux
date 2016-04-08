@@ -232,6 +232,13 @@ config IMX7D_ADC
 	  This driver can also be built as a module. If so, the module will be
 	  called imx7d_adc.
 
+config INA3221
+	tristate "Texas Instruments INA3221 Triple Power Monitor"
+	depends on I2C
+	select REGMAP_I2C
+	help
+	  Say yes here to build support for TI INA3221 Triple Power Monitor.
+
 config LP8788_ADC
 	tristate "LP8788 ADC driver"
 	depends on MFD_LP8788

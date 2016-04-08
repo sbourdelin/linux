@@ -1,0 +1,23 @@
+What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_shunt_(raw|scale)
+What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_bus_(raw|scale)
+Date:		April 2016
+KernelVersion:	4.7
+Contact:	Andrew F. Davis <afd@ti.com>
+Description:
+		Shunt and Bus voltage for each channel.
+
+What:		/sys/bus/iio/devices/iio:deviceX/shunt_integration_time[_available]
+What:		/sys/bus/iio/devices/iio:deviceX/bus_integration_time[_available]
+Date:		April 2016
+KernelVersion:	4.7
+Contact:	Andrew F. Davis <afd@ti.com>
+Description:
+		Shunt and Bus integration time for each channel.
+
+What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_shunt_critical_(raw|scale)
+What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_shunt_warning_(raw|scale)
+Date:		April 2016
+KernelVersion:	4.7
+Contact:	Andrew F. Davis <afd@ti.com>
+Description:
+		Shunt voltage critical and warning trigger levels.
