@@ -2308,6 +2308,10 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			lock	 - Configure if Flex-OneNAND boundary should be locked.
 				   Once locked, the boundary cannot be changed.
 				   1 indicates lock status, 0 indicates unlock status.
+	opt_read_hpet=	[X86]
+			0 to disable read_hpet optimization
+			1 to enable read_hpet optimization
+			See arch/x86/kernel/hpet.c.
 
 	mtdset=		[ARM]
 			ARM/S3C2412 JIVE boot control
