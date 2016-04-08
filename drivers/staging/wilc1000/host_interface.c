@@ -3410,6 +3410,14 @@ int wilc_init(struct net_device *dev, struct host_if_drv **hif_drv_handler)
 	init_completion(&hif_drv->comp_get_rssi);
 	init_completion(&hif_drv->comp_inactive_time);
 
+	hif_drv->cfg_values.site_survey_enabled = SITE_SURVEY_OFF;
+	hif_drv->cfg_values.scan_source = DEFAULT_SCAN;
+	hif_drv->cfg_values.active_scan_time = ACTIVE_SCAN_TIME;
+	hif_drv->cfg_values.passive_scan_time = PASSIVE_SCAN_TIME;
+	hif_drv->cfg_values.curr_tx_rate = AUTORATE;
+
+	mutex_init(&hif_drv->cfg_values_lock);
+
 	if (clients_count == 0)	{
 		result = wilc_mq_create(&hif_msg_q);
 
@@ -3435,19 +3443,9 @@ int wilc_init(struct net_device *dev, struct host_if_drv **hif_drv_handler)
 	setup_timer(&hif_drv->connect_timer, TimerCB_Connect, 0);
 	setup_timer(&hif_drv->remain_on_ch_timer, ListenTimerCB, 0);
 
-	mutex_init(&hif_drv->cfg_values_lock);
-	mutex_lock(&hif_drv->cfg_values_lock);
-
 	hif_drv->hif_state = HOST_IF_IDLE;
-	hif_drv->cfg_values.site_survey_enabled = SITE_SURVEY_OFF;
-	hif_drv->cfg_values.scan_source = DEFAULT_SCAN;
-	hif_drv->cfg_values.active_scan_time = ACTIVE_SCAN_TIME;
-	hif_drv->cfg_values.passive_scan_time = PASSIVE_SCAN_TIME;
-	hif_drv->cfg_values.curr_tx_rate = AUTORATE;
 
 	hif_drv->p2p_timeout = 0;
-
-	mutex_unlock(&hif_drv->cfg_values_lock);
 
 	clients_count++;
 
