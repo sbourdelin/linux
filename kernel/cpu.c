@@ -36,6 +36,7 @@
  * @target:	The target state
  * @thread:	Pointer to the hotplug thread
  * @should_run:	Thread should execute
+ * @rollback:	Perform a rollback
  * @cb_stat:	The state for a single callback (install/uninstall)
  * @cb:		Single callback function (install/uninstall)
  * @result:	Result of the operation
@@ -47,6 +48,7 @@ struct cpuhp_cpu_state {
 #ifdef CONFIG_SMP
 	struct task_struct	*thread;
 	bool			should_run;
+	bool			rollback;
 	enum cpuhp_state	cb_state;
 	int			(*cb)(unsigned int cpu);
 	int			result;
@@ -477,6 +479,11 @@ static void cpuhp_thread_fun(unsigned int cpu)
 		} else {
 			ret = cpuhp_invoke_callback(cpu, st->cb_state, st->cb);
 		}
+	} else if (st->rollback) {
+		BUG_ON(st->state < CPUHP_AP_ONLINE_IDLE);
+
+		undo_cpu_down(cpu, st, cpuhp_ap_states);
+		st->rollback = false;
 	} else {
 		/* Cannot happen .... */
 		BUG_ON(st->state < CPUHP_AP_ONLINE_IDLE);
@@ -724,6 +731,8 @@ static int takedown_cpu(unsigned int cpu)
 		/* CPU didn't die: tell everyone.  Can't complain. */
 		cpu_notify_nofail(CPU_DOWN_FAILED, cpu);
 		irq_unlock_sparse();
+		kthread_unpark(per_cpu_ptr(&cpuhp_state, cpu)->thread);
+		/* smpboot threads are up via CPUHP_AP_SMPBOOT_THREADS */
 		return err;
 	}
 	BUG_ON(cpu_online(cpu));
@@ -832,6 +841,12 @@ static int __ref _cpu_down(unsigned int cpu, int tasks_frozen,
 	 * to do the further cleanups.
 	 */
 	ret = cpuhp_down_callbacks(cpu, st, cpuhp_bp_states, target);
+	if (ret && st->state > CPUHP_TEARDOWN_CPU && st->state < prev_state) {
+
+		st->target = prev_state;
+		st->rollback = true;
+		cpuhp_kick_ap_work(cpu);
+	}
 
 	hasdied = prev_state != st->state && st->state == CPUHP_OFFLINE;
 out:
@@ -1249,6 +1264,7 @@ static struct cpuhp_step cpuhp_ap_states[] = {
 		.name			= "notify:online",
 		.startup		= notify_online,
 		.teardown		= notify_down_prepare,
+		.skip_onerr		= true,
 	},
 #endif
 	/*
