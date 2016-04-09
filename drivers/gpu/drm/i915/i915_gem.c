@@ -1964,11 +1964,21 @@ out:
 void
 i915_gem_release_mmap(struct drm_i915_gem_object *obj)
 {
+	/* Serialisation between user GTT access and our code depends upon
+	 * revoking the CPU's PTE whilst the mutex is held. The next user
+	 * pagefault then has to wait until we release the mutex.
+	 */
+	lockdep_assert_held(&obj->base.dev->struct_mutex);
+
 	if (!obj->fault_mappable)
 		return;
 
 	drm_vma_node_unmap(&obj->base.vma_node,
 			   obj->base.dev->anon_inode->i_mapping);
+
+	/* Ensure that the CPU's PTE are revoked before we return */
+	wmb();
+
 	obj->fault_mappable = false;
 }
 
@@ -3295,9 +3305,6 @@ static void i915_gem_object_finish_gtt(struct drm_i915_gem_object *obj)
 
 	if ((obj->base.read_domains & I915_GEM_DOMAIN_GTT) == 0)
 		return;
-
-	/* Wait for any direct GTT access to complete */
-	mb();
 
 	old_read_domains = obj->base.read_domains;
 	old_write_domain = obj->base.write_domain;
