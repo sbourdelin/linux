@@ -499,6 +499,11 @@ static void iscsit_aborted_task(struct iscsi_conn *conn, struct iscsi_cmd *cmd)
 	__iscsit_free_cmd(cmd, scsi_cmd, true);
 }
 
+static void *iscsit_alloc_pdu(struct iscsi_conn *conn, struct iscsi_cmd *cmd)
+{
+	return cmd->pdu;
+}
+
 static enum target_prot_op iscsit_get_sup_prot_ops(struct iscsi_conn *conn)
 {
 	return TARGET_PROT_NORMAL;
@@ -519,6 +524,7 @@ static struct iscsit_transport iscsi_target_transport = {
 	.iscsit_queue_data_in	= iscsit_queue_rsp,
 	.iscsit_queue_status	= iscsit_queue_rsp,
 	.iscsit_aborted_task	= iscsit_aborted_task,
+	.iscsit_alloc_pdu	= iscsit_alloc_pdu,
 	.iscsit_get_sup_prot_ops = iscsit_get_sup_prot_ops,
 };
 
@@ -2537,7 +2543,10 @@ static int iscsit_send_conn_drop_async_message(
 	cmd->tx_size = ISCSI_HDR_LEN;
 	cmd->iscsi_opcode = ISCSI_OP_ASYNC_EVENT;
 
-	hdr			= (struct iscsi_async *) cmd->pdu;
+	hdr = conn->conn_transport->iscsit_alloc_pdu(conn, cmd);
+	if (unlikely(!hdr))
+		return -ENOMEM;
+
 	hdr->opcode		= ISCSI_OP_ASYNC_EVENT;
 	hdr->flags		= ISCSI_FLAG_CMD_FINAL;
 	cmd->init_task_tag	= RESERVED_ITT;
@@ -2630,7 +2639,7 @@ iscsit_build_datain_pdu(struct iscsi_cmd *cmd, struct iscsi_conn *conn,
 
 static int iscsit_send_datain(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 {
-	struct iscsi_data_rsp *hdr = (struct iscsi_data_rsp *)&cmd->pdu[0];
+	struct iscsi_data_rsp *hdr;
 	struct iscsi_datain datain;
 	struct iscsi_datain_req *dr;
 	struct kvec *iov;
@@ -2674,6 +2683,10 @@ static int iscsit_send_datain(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 			   DATAIN_COMPLETE_WITHIN_COMMAND_RECOVERY)
 			set_statsn = true;
 	}
+
+	hdr = conn->conn_transport->iscsit_alloc_pdu(conn, cmd);
+	if (unlikely(!hdr))
+		return -ENOMEM;
 
 	iscsit_build_datain_pdu(cmd, conn, &datain, hdr, set_statsn);
 
@@ -2843,13 +2856,20 @@ EXPORT_SYMBOL(iscsit_build_logout_rsp);
 static int
 iscsit_send_logout(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 {
+	struct iscsi_logout_rsp *hdr;
 	struct kvec *iov;
 	int niov = 0, tx_size, rc;
 
-	rc = iscsit_build_logout_rsp(cmd, conn,
-			(struct iscsi_logout_rsp *)&cmd->pdu[0]);
-	if (rc < 0)
+	hdr = conn->conn_transport->iscsit_alloc_pdu(conn, cmd);
+	if (unlikely(!hdr))
+		return -ENOMEM;
+
+	rc = iscsit_build_logout_rsp(cmd, conn, hdr);
+	if (rc < 0) {
+		if (conn->conn_transport->iscsit_free_pdu)
+			conn->conn_transport->iscsit_free_pdu(conn, cmd);
 		return rc;
+	}
 
 	tx_size = ISCSI_HDR_LEN;
 	iov = &cmd->iov_misc[0];
@@ -2909,8 +2929,12 @@ static int iscsit_send_unsolicited_nopin(
 	struct iscsi_conn *conn,
 	int want_response)
 {
-	struct iscsi_nopin *hdr = (struct iscsi_nopin *)&cmd->pdu[0];
+	struct iscsi_nopin *hdr;
 	int tx_size = ISCSI_HDR_LEN, ret;
+
+	hdr = conn->conn_transport->iscsit_alloc_pdu(conn, cmd);
+	if (unlikely(!hdr))
+		return -ENOMEM;
 
 	iscsit_build_nopin_rsp(cmd, conn, hdr, false);
 
@@ -2950,10 +2974,14 @@ static int iscsit_send_unsolicited_nopin(
 static int
 iscsit_send_nopin(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 {
-	struct iscsi_nopin *hdr = (struct iscsi_nopin *)&cmd->pdu[0];
+	struct iscsi_nopin *hdr;
 	struct kvec *iov;
 	u32 padding = 0;
 	int niov = 0, tx_size;
+
+	hdr = conn->conn_transport->iscsit_alloc_pdu(conn, cmd);
+	if (unlikely(!hdr))
+		return -ENOMEM;
 
 	iscsit_build_nopin_rsp(cmd, conn, hdr, true);
 
@@ -3028,7 +3056,10 @@ static int iscsit_send_r2t(
 	if (!r2t)
 		return -1;
 
-	hdr			= (struct iscsi_r2t_rsp *) cmd->pdu;
+	hdr = conn->conn_transport->iscsit_alloc_pdu(conn, cmd);
+	if (unlikely(!hdr))
+		return -ENOMEM;
+
 	memset(hdr, 0, ISCSI_HDR_LEN);
 	hdr->opcode		= ISCSI_OP_R2T;
 	hdr->flags		|= ISCSI_FLAG_CMD_FINAL;
@@ -3203,11 +3234,15 @@ EXPORT_SYMBOL(iscsit_build_rsp_pdu);
 
 static int iscsit_send_response(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 {
-	struct iscsi_scsi_rsp *hdr = (struct iscsi_scsi_rsp *)&cmd->pdu[0];
+	struct iscsi_scsi_rsp *hdr;
 	struct kvec *iov;
 	u32 padding = 0, tx_size = 0;
 	int iov_count = 0;
 	bool inc_stat_sn = (cmd->i_state == ISTATE_SEND_STATUS);
+
+	hdr = conn->conn_transport->iscsit_alloc_pdu(conn, cmd);
+	if (unlikely(!hdr))
+		return -ENOMEM;
 
 	iscsit_build_rsp_pdu(cmd, conn, inc_stat_sn, hdr);
 
@@ -3322,8 +3357,12 @@ EXPORT_SYMBOL(iscsit_build_task_mgt_rsp);
 static int
 iscsit_send_task_mgt_rsp(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 {
-	struct iscsi_tm_rsp *hdr = (struct iscsi_tm_rsp *)&cmd->pdu[0];
+	struct iscsi_tm_rsp *hdr;
 	u32 tx_size = 0;
+
+	hdr = conn->conn_transport->iscsit_alloc_pdu(conn, cmd);
+	if (unlikely(!hdr))
+		return -ENOMEM;
 
 	iscsit_build_task_mgt_rsp(cmd, conn, hdr);
 
@@ -3582,14 +3621,21 @@ static int iscsit_send_text_rsp(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
-	struct iscsi_text_rsp *hdr = (struct iscsi_text_rsp *)cmd->pdu;
+	struct iscsi_text_rsp *hdr;
 	struct kvec *iov;
 	u32 tx_size = 0;
 	int text_length, iov_count = 0, rc;
 
+	hdr = conn->conn_transport->iscsit_alloc_pdu(conn, cmd);
+	if (unlikely(!hdr))
+		return -ENOMEM;
+
 	rc = iscsit_build_text_rsp(cmd, conn, hdr, ISCSI_TCP);
-	if (rc < 0)
+	if (rc < 0) {
+		if (conn->conn_transport->iscsit_free_pdu)
+			conn->conn_transport->iscsit_free_pdu(conn, cmd);
 		return rc;
+	}
 
 	text_length = rc;
 	iov = &cmd->iov_misc[0];
@@ -3653,9 +3699,13 @@ static int iscsit_send_reject(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
-	struct iscsi_reject *hdr = (struct iscsi_reject *)&cmd->pdu[0];
+	struct iscsi_reject *hdr;
 	struct kvec *iov;
 	u32 iov_count = 0, tx_size;
+
+	hdr = conn->conn_transport->iscsit_alloc_pdu(conn, cmd);
+	if (unlikely(!hdr))
+		return -ENOMEM;
 
 	iscsit_build_reject(cmd, conn, hdr);
 
