@@ -56,6 +56,7 @@ static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
 
 	pcie->base = bdev->io_addr;
 	pcie->base_addr = bdev->addr;
+	pcie->hook_abort_handler = true;
 
 	res_mem.start = bdev->addr_s[0];
 	res_mem.end = bdev->addr_s[0] + SZ_128M - 1;
