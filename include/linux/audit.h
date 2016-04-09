@@ -313,7 +313,7 @@ void audit_core_dumps(long signr);
 
 static inline void audit_seccomp(unsigned long syscall, long signr, int code)
 {
-	if (!audit_enabled)
+	if (!audit_enabled || !test_thread_flag(TIF_SYSCALL_AUDIT))
 		return;
 
 	/* Force a record to be reported if a signal was delivered. */
