@@ -2389,7 +2389,13 @@ static void snd_usb_mixer_interrupt_v2(struct usb_mixer_interface *mixer,
 			continue;
 
 		info = (struct usb_mixer_elem_info *)list;
-		if (info->control != control)
+
+		/*
+		 * Allow any value of 'control' in case there is only one
+		 * mixer element with the given unit ID.
+		 */
+		if (info->control != control &&
+		    (list != mixer->id_elems[unitid] || list->next_id_elem))
 			continue;
 
 		switch (attribute) {
