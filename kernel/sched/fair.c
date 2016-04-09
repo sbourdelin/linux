@@ -4969,11 +4969,34 @@ find_idlest_cpu(struct sched_group *group, struct task_struct *p, int this_cpu)
 }
 
 /*
+ * helper for select_idle_sibling to decide if it should look for idle
+ * threads
+ */
+static int bounce_to_target(struct task_struct *p, int cpu)
+{
+	s64 delta;
+
+	/*
+	 * as the run queue gets bigger, its more and more likely that
+	 * balance will have distributed things for us, and less likely
+	 * that scanning all our CPUs for an idle one will find one.
+	 * So, if nr_running > 1, just call this CPU good enough
+	 */
+	if (cpu_rq(cpu)->cfs.nr_running > 1)
+		return 1;
+
+	/* taken from task_hot() */
+	delta = rq_clock_task(task_rq(p)) - p->se.exec_start;
+	return delta < (s64)sysctl_sched_migration_cost;
+}
+
+/*
  * Try and locate an idle CPU in the sched_domain.
  */
 static int select_idle_sibling(struct task_struct *p, int target)
 {
 	struct sched_domain *sd;
+	struct sched_domain *package_sd;
 	struct sched_group *sg;
 	int i = task_cpu(p);
 
@@ -4989,7 +5012,8 @@ static int select_idle_sibling(struct task_struct *p, int target)
 	/*
 	 * Otherwise, iterate the domains and find an elegible idle cpu.
 	 */
-	sd = rcu_dereference(per_cpu(sd_llc, target));
+	package_sd = rcu_dereference(per_cpu(sd_llc, target));
+	sd = package_sd;
 	for_each_lower_domain(sd) {
 		sg = sd->groups;
 		do {
@@ -4998,7 +5022,12 @@ static int select_idle_sibling(struct task_struct *p, int target)
 				goto next;
 
 			for_each_cpu(i, sched_group_cpus(sg)) {
-				if (i == target || !idle_cpu(i))
+				/*
+				 * we tested target for idle up above,
+				 * but don't skip it here because it might
+				 * have raced to idle while we were scanning
+				 */
+				if (!idle_cpu(i))
 					goto next;
 			}
 
@@ -5008,6 +5037,24 @@ static int select_idle_sibling(struct task_struct *p, int target)
 next:
 			sg = sg->next;
 		} while (sg != sd->groups);
+	}
+
+	/*
+	 * we're here because we didn't find an idle core, or an idle sibling
+	 * in the target core.  For message bouncing workloads, we want to
+	 * just stick with the target suggestion from the caller, but
+	 * otherwise we'd rather have an idle CPU from anywhere else in
+	 * the package.
+	 */
+	if (package_sd && !bounce_to_target(p, target)) {
+		for_each_cpu_and(i, sched_domain_span(package_sd),
+				 tsk_cpus_allowed(p)) {
+			if (idle_cpu(i)) {
+				target = i;
+				break;
+			}
+
+		}
 	}
 done:
 	return target;
