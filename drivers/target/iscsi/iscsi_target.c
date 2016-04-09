@@ -3546,7 +3546,8 @@ static int iscsit_send_text_rsp(
 	if (unlikely(!hdr))
 		return -ENOMEM;
 
-	text_length = iscsit_build_text_rsp(cmd, conn, hdr, ISCSI_TCP);
+	text_length = iscsit_build_text_rsp(cmd, conn, hdr,
+					    conn->network_transport);
 	if (text_length < 0) {
 		if (conn->conn_transport->iscsit_free_pdu)
 			conn->conn_transport->iscsit_free_pdu(conn, cmd);
