@@ -72,6 +72,7 @@ struct iproc_pcie {
 	struct phy *phy;
 	int (*map_irq)(const struct pci_dev *, u8, u8);
 	bool need_ob_cfg;
+	bool hook_abort_handler;
 	struct iproc_pcie_ob ob;
 	struct iproc_msi *msi;
 };

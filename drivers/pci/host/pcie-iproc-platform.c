@@ -100,6 +100,8 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
 		pcie->need_ob_cfg = true;
 	}
 
+	pcie->hook_abort_handler = of_property_read_bool(np, "brcm,pcie-hook-abort-handler");
+
 	/* PHY use is optional */
 	pcie->phy = devm_phy_get(&pdev->dev, "pcie-phy");
 	if (IS_ERR(pcie->phy)) {

@@ -22,6 +22,12 @@ Optional properties:
 
 - brcm,pcie-ob: Some iProc SoCs do not have the outbound address mapping done
 by the ASIC after power on reset. In this case, SW needs to configure it
+- brcm,pcie-hook-abort-handler: During PCI bus probing (device enumeration)
+  there can be errors that are expected and harmless. Unfortunately some bridges
+  can't be configured to ignore them and they forward them to the ARM core
+  triggering die().
+  This property should be set in such case, it will make driver add its own
+  handler ignoring such errors.
 
 If the brcm,pcie-ob property is present, the following properties become
 effective:

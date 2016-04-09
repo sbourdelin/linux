@@ -433,6 +433,17 @@ static int iproc_pcie_map_ranges(struct iproc_pcie *pcie,
 	return 0;
 }
 
+#ifdef CONFIG_ARM
+static int iproc_pcie_abort_handler(unsigned long addr, unsigned int fsr,
+				    struct pt_regs *regs)
+{
+	if (fsr == 0x1406)
+		return 0;
+
+	return 1;
+}
+#endif
+
 static int iproc_pcie_msi_enable(struct iproc_pcie *pcie)
 {
 	struct device_node *msi_node;
@@ -496,6 +507,12 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
 			goto err_power_off_phy;
 		}
 	}
+
+#ifdef CONFIG_ARM
+	if (pcie->hook_abort_handler)
+		hook_fault_code(16 + 6, iproc_pcie_abort_handler, SIGBUS,
+				BUS_OBJERR, "imprecise external abort");
+#endif
 
 #ifdef CONFIG_ARM
 	pcie->sysdata.private_data = pcie;
