@@ -39,9 +39,6 @@
 /* third irq byte base 0x94 + below */
 /* fourth irq byte normally 0xee */
 
-/* second interrupt byte */
-#define CH341_MULT_STAT 0x04 /* multiple status since last interrupt event */
-
 /* status returned in third interrupt answer byte, inverted in data
    from irq */
 #define CH341_BIT_CTS 0x01
@@ -81,6 +78,10 @@
 #define CH341_LCR_CS6          0x01
 #define CH341_LCR_CS5          0x00
 
+/* General status from register 0x07 and second interrupt byte */
+#define CH341_STATUS_TXBUSY    0x01
+#define CH341_STATUS_MULTI     0x04
+
 static const struct usb_device_id id_table[] = {
 	{ USB_DEVICE(0x4348, 0x5523) },
 	{ USB_DEVICE(0x1a86, 0x7523) },
@@ -94,6 +95,7 @@ struct ch341_private {
 	unsigned baud_rate; /* set baud rate */
 	u8 line_control; /* set line control value RTS/DTR */
 	u8 line_status; /* active status of modem control inputs */
+	u8 uart_status; /* generic UART status bits */
 };
 
 static void ch341_set_termios(struct tty_struct *tty,
@@ -184,7 +186,8 @@ static int ch341_get_status(struct usb_device *dev, struct ch341_private *priv)
 	if (r == 2) {
 		r = 0;
 		spin_lock_irqsave(&priv->lock, flags);
-		priv->line_status = (~(*buffer)) & CH341_BITS_MODEM_STAT;
+		priv->line_status = (~buffer[0]) & CH341_BITS_MODEM_STAT;
+		priv->uart_status = buffer[1];
 		spin_unlock_irqrestore(&priv->lock, flags);
 	} else {
 		r = -EPROTO;
@@ -193,6 +196,18 @@ static int ch341_get_status(struct usb_device *dev, struct ch341_private *priv)
 out:
 	kfree(buffer);
 	return r;
+}
+
+static bool ch341_tx_empty(struct usb_serial_port *port)
+{
+	int r;
+	struct ch341_private *priv = usb_get_serial_port_data(port);
+
+	r = ch341_get_status(port->serial->dev, priv);
+	if (r < 0)
+		return true;
+
+	return !(priv->uart_status & CH341_STATUS_TXBUSY);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -493,7 +508,7 @@ static void ch341_update_line_status(struct usb_serial_port *port,
 	priv->line_status = status;
 	spin_unlock_irqrestore(&priv->lock, flags);
 
-	if (data[1] & CH341_MULT_STAT)
+	if (data[1] & CH341_STATUS_MULTI)
 		dev_dbg(&port->dev, "Multiple status change\n");
 
 	if (!delta)
@@ -599,6 +614,7 @@ static struct usb_serial_driver ch341_device = {
 	.carrier_raised	   = ch341_carrier_raised,
 	.close             = ch341_close,
 	.set_termios       = ch341_set_termios,
+	.tx_empty          = ch341_tx_empty,
 	.break_ctl         = ch341_break_ctl,
 	.tiocmget          = ch341_tiocmget,
 	.tiocmset          = ch341_tiocmset,
