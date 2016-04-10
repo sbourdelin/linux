@@ -133,7 +133,7 @@ static int ch341_control_in(struct usb_device *dev,
 }
 
 static int ch341_init_set_baudrate(struct usb_device *dev,
-			      struct ch341_private *priv, unsigned ctrl)
+				   struct ch341_private *priv, unsigned ctrl)
 {
 	short a;
 	int r;
@@ -187,10 +187,12 @@ static int ch341_get_status(struct usb_device *dev, struct ch341_private *priv)
 		spin_lock_irqsave(&priv->lock, flags);
 		priv->line_status = (~(*buffer)) & CH341_BITS_MODEM_STAT;
 		spin_unlock_irqrestore(&priv->lock, flags);
-	} else
+	} else {
 		r = -EPROTO;
+	}
 
-out:	kfree(buffer);
+out:
+	kfree(buffer);
 	return r;
 }
 
@@ -241,7 +243,8 @@ static int ch341_configure(struct usb_device *dev, struct ch341_private *priv)
 	/* expect 0x9f 0xee */
 	r = ch341_get_status(dev, priv);
 
-out:	kfree(buffer);
+out:
+	kfree(buffer);
 	return r;
 }
 
@@ -265,7 +268,8 @@ static int ch341_port_probe(struct usb_serial_port *port)
 	usb_set_serial_port_data(port, priv);
 	return 0;
 
-error:	kfree(priv);
+error:
+	kfree(priv);
 	return r;
 }
 
@@ -479,7 +483,7 @@ static int ch341_tiocmset(struct tty_struct *tty,
 }
 
 static void ch341_update_line_status(struct usb_serial_port *port,
-					unsigned char *data, size_t len)
+				     unsigned char *data, size_t len)
 {
 	struct ch341_private *priv = usb_get_serial_port_data(port);
 	struct tty_struct *tty;
@@ -600,7 +604,7 @@ static struct usb_serial_driver ch341_device = {
 	.id_table          = id_table,
 	.num_ports         = 1,
 	.open              = ch341_open,
-	.dtr_rts	   = ch341_dtr_rts,
+	.dtr_rts           = ch341_dtr_rts,
 	.carrier_raised	   = ch341_carrier_raised,
 	.close             = ch341_close,
 	.set_termios       = ch341_set_termios,
