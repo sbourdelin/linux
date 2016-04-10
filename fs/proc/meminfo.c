@@ -33,7 +33,7 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 	int lru;
 
 /*
- * display in kilobytes.
+ * display in kibibytes.
  */
 #define K(x) ((x) << (PAGE_SHIFT - 10))
 	si_meminfo(&i);
@@ -54,61 +54,61 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 	 * Tagged format, for easy grepping and expansion.
 	 */
 	seq_printf(m,
-		"MemTotal:       %8lu kB\n"
-		"MemFree:        %8lu kB\n"
-		"MemAvailable:   %8lu kB\n"
-		"Buffers:        %8lu kB\n"
-		"Cached:         %8lu kB\n"
-		"SwapCached:     %8lu kB\n"
-		"Active:         %8lu kB\n"
-		"Inactive:       %8lu kB\n"
-		"Active(anon):   %8lu kB\n"
-		"Inactive(anon): %8lu kB\n"
-		"Active(file):   %8lu kB\n"
-		"Inactive(file): %8lu kB\n"
-		"Unevictable:    %8lu kB\n"
-		"Mlocked:        %8lu kB\n"
+		"MemTotal:       %8lu KiB\n"
+		"MemFree:        %8lu KiB\n"
+		"MemAvailable:   %8lu KiB\n"
+		"Buffers:        %8lu KiB\n"
+		"Cached:         %8lu KiB\n"
+		"SwapCached:     %8lu KiB\n"
+		"Active:         %8lu KiB\n"
+		"Inactive:       %8lu KiB\n"
+		"Active(anon):   %8lu KiB\n"
+		"Inactive(anon): %8lu KiB\n"
+		"Active(file):   %8lu KiB\n"
+		"Inactive(file): %8lu KiB\n"
+		"Unevictable:    %8lu KiB\n"
+		"Mlocked:        %8lu KiB\n"
 #ifdef CONFIG_HIGHMEM
-		"HighTotal:      %8lu kB\n"
-		"HighFree:       %8lu kB\n"
-		"LowTotal:       %8lu kB\n"
-		"LowFree:        %8lu kB\n"
+		"HighTotal:      %8lu KiB\n"
+		"HighFree:       %8lu KiB\n"
+		"LowTotal:       %8lu KiB\n"
+		"LowFree:        %8lu KiB\n"
 #endif
 #ifndef CONFIG_MMU
-		"MmapCopy:       %8lu kB\n"
+		"MmapCopy:       %8lu KiB\n"
 #endif
-		"SwapTotal:      %8lu kB\n"
-		"SwapFree:       %8lu kB\n"
-		"Dirty:          %8lu kB\n"
-		"Writeback:      %8lu kB\n"
-		"AnonPages:      %8lu kB\n"
-		"Mapped:         %8lu kB\n"
-		"Shmem:          %8lu kB\n"
-		"Slab:           %8lu kB\n"
-		"SReclaimable:   %8lu kB\n"
-		"SUnreclaim:     %8lu kB\n"
-		"KernelStack:    %8lu kB\n"
-		"PageTables:     %8lu kB\n"
+		"SwapTotal:      %8lu KiB\n"
+		"SwapFree:       %8lu KiB\n"
+		"Dirty:          %8lu KiB\n"
+		"Writeback:      %8lu KiB\n"
+		"AnonPages:      %8lu KiB\n"
+		"Mapped:         %8lu KiB\n"
+		"Shmem:          %8lu KiB\n"
+		"Slab:           %8lu KiB\n"
+		"SReclaimable:   %8lu KiB\n"
+		"SUnreclaim:     %8lu KiB\n"
+		"KernelStack:    %8lu KiB\n"
+		"PageTables:     %8lu KiB\n"
 #ifdef CONFIG_QUICKLIST
-		"Quicklists:     %8lu kB\n"
+		"Quicklists:     %8lu KiB\n"
 #endif
-		"NFS_Unstable:   %8lu kB\n"
-		"Bounce:         %8lu kB\n"
-		"WritebackTmp:   %8lu kB\n"
-		"CommitLimit:    %8lu kB\n"
-		"Committed_AS:   %8lu kB\n"
-		"VmallocTotal:   %8lu kB\n"
-		"VmallocUsed:    %8lu kB\n"
-		"VmallocChunk:   %8lu kB\n"
+		"NFS_Unstable:   %8lu KiB\n"
+		"Bounce:         %8lu KiB\n"
+		"WritebackTmp:   %8lu KiB\n"
+		"CommitLimit:    %8lu KiB\n"
+		"Committed_AS:   %8lu KiB\n"
+		"VmallocTotal:   %8lu KiB\n"
+		"VmallocUsed:    %8lu KiB\n"
+		"VmallocChunk:   %8lu KiB\n"
 #ifdef CONFIG_MEMORY_FAILURE
-		"HardwareCorrupted: %5lu kB\n"
+		"HardwareCorrupted: %5lu KiB\n"
 #endif
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-		"AnonHugePages:  %8lu kB\n"
+		"AnonHugePages:  %8lu KiB\n"
 #endif
 #ifdef CONFIG_CMA
-		"CmaTotal:       %8lu kB\n"
-		"CmaFree:        %8lu kB\n"
+		"CmaTotal:       %8lu KiB\n"
+		"CmaFree:        %8lu KiB\n"
 #endif
 		,
 		K(i.totalram),
