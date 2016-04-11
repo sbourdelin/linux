@@ -7,17 +7,6 @@
 #include <linux/kernel.h>
 #include <linux/pci.h>
 
-/* Register offsets */
-#if IS_ENABLED(CONFIG_I2C_THUNDERX)
-	#define SW_TWSI			0x1000
-	#define TWSI_INT		0x1010
-	#define SW_TWSI_EXT		0x1018
-#else
-	#define SW_TWSI			0x00
-	#define TWSI_INT		0x10
-	#define SW_TWSI_EXT		0x18
-#endif
-
 /* Controller command patterns */
 #define SW_TWSI_V		BIT_ULL(63)	/* Valid bit */
 #define SW_TWSI_EIA		BIT_ULL(61)	/* Extended internal address */
@@ -95,9 +84,21 @@
 #define TWSI_INT_SDA		BIT_ULL(10)
 #define TWSI_INT_SCL		BIT_ULL(11)
 
+/* Register offsets */
+struct octeon_i2c_reg_offset {
+	unsigned int sw_twsi;
+	unsigned int twsi_int;
+	unsigned int sw_twsi_ext;
+};
+
+#define SW_TWSI(x)	(x->roff.sw_twsi)
+#define TWSI_INT(x)	(x->roff.twsi_int)
+#define SW_TWSI_EXT(x)	(x->roff.sw_twsi_ext)
+
 struct octeon_i2c {
 	wait_queue_head_t queue;
 	struct i2c_adapter adap;
+	struct octeon_i2c_reg_offset roff;
 	struct clk *clk;
 	int irq;
 	int hlc_irq;		/* For cn7890 only */
@@ -138,9 +139,9 @@ static inline void octeon_i2c_reg_write(struct octeon_i2c *i2c, u64 eop_reg, u8 
 {
 	u64 tmp;
 
-	__raw_writeq(SW_TWSI_V | eop_reg | data, i2c->twsi_base + SW_TWSI);
+	__raw_writeq(SW_TWSI_V | eop_reg | data, i2c->twsi_base + SW_TWSI(i2c));
 	do {
-		tmp = __raw_readq(i2c->twsi_base + SW_TWSI);
+		tmp = __raw_readq(i2c->twsi_base + SW_TWSI(i2c));
 	} while ((tmp & SW_TWSI_V) != 0);
 }
 
@@ -162,9 +163,9 @@ static u8 inline octeon_i2c_reg_read(struct octeon_i2c *i2c, u64 eop_reg)
 {
 	u64 tmp;
 
-	__raw_writeq(SW_TWSI_V | eop_reg | SW_TWSI_R, i2c->twsi_base + SW_TWSI);
+	__raw_writeq(SW_TWSI_V | eop_reg | SW_TWSI_R, i2c->twsi_base + SW_TWSI(i2c));
 	do {
-		tmp = __raw_readq(i2c->twsi_base + SW_TWSI);
+		tmp = __raw_readq(i2c->twsi_base + SW_TWSI(i2c));
 	} while ((tmp & SW_TWSI_V) != 0);
 
 	return tmp & 0xFF;
@@ -185,7 +186,7 @@ static u8 inline octeon_i2c_reg_read(struct octeon_i2c *i2c, u64 eop_reg)
  */
 static inline u64 octeon_i2c_read_int(struct octeon_i2c *i2c)
 {
-	return __raw_readq(i2c->twsi_base + TWSI_INT);
+	return __raw_readq(i2c->twsi_base + TWSI_INT(i2c));
 }
 
 /**
@@ -195,7 +196,7 @@ static inline u64 octeon_i2c_read_int(struct octeon_i2c *i2c)
  */
 static inline void octeon_i2c_write_int(struct octeon_i2c *i2c, u64 data)
 {
-	writeqflush(data, i2c->twsi_base + TWSI_INT);
+	writeqflush(data, i2c->twsi_base + TWSI_INT(i2c));
 }
 
 static inline int octeon_i2c_test_iflg(struct octeon_i2c *i2c)
