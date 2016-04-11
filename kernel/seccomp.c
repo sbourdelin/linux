@@ -25,6 +25,10 @@
 #include <asm/syscall.h>
 #endif
 
+#ifdef CONFIG_AUDIT
+int audit_log_seccomp __read_mostly = 0;
+#endif
+
 #ifdef CONFIG_SECCOMP_FILTER
 #include <linux/filter.h>
 #include <linux/pid.h>
