@@ -255,6 +255,7 @@ struct hc_driver {
 #define	HCD_USB31	0x0050		/* USB 3.1 */
 #define	HCD_MASK	0x0070
 #define	HCD_BH		0x0100		/* URB complete in BH context */
+#define HCD_NO_ONESHOT	0x0200		/* Don't need to set IRQF_ONESHOT */
 
 	/* called to init HCD and root hub */
 	int	(*reset) (struct usb_hcd *hcd);
