@@ -411,7 +411,7 @@ static void dup_variable_bug(efi_char16_t *str16, efi_guid_t *vendor_guid,
 	 */
 	efivar_wq_enabled = false;
 
-	str8 = kzalloc(len8, GFP_KERNEL);
+	str8 = kzalloc(len8, GFP_ATOMIC);
 	if (!str8)
 		return;
 
