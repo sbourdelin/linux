@@ -2683,6 +2683,7 @@ irqreturn_t xhci_threaded_irq(struct usb_hcd *hcd)
 {
 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
 	u32 status;
+	u32 cmd;
 	u64 temp_64;
 	union xhci_trb *event_ring_deq;
 	dma_addr_t deq;
@@ -2747,6 +2748,11 @@ irqreturn_t xhci_threaded_irq(struct usb_hcd *hcd)
 	temp_64 |= ERST_EHB;
 	xhci_write_64(xhci, temp_64, &xhci->ir_set->erst_dequeue);
 
+	/* unmask interrupt */
+	cmd = readl(&xhci->op_regs->command);
+	cmd |= CMD_EIE;
+	writel(cmd, &xhci->op_regs->command);
+
 	spin_unlock_irqrestore(&xhci->lock, flags);
 
 	return IRQ_HANDLED;
@@ -2761,6 +2767,7 @@ irqreturn_t xhci_irq(struct usb_hcd *hcd)
 {
 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
 	u32 status;
+	u32 cmd;
 
 	/* Check if the xHC generated the interrupt, or the irq is shared */
 	status = readl(&xhci->op_regs->status);
@@ -2776,13 +2783,11 @@ irqreturn_t xhci_irq(struct usb_hcd *hcd)
 		return IRQ_HANDLED;
 	}
 
-	/*
-	 * Clear the op reg interrupt status first,
-	 * so we can receive interrupts from other MSI-X interrupters.
-	 * Write 1 to clear the interrupt status.
-	 */
-	status |= STS_EINT;
-	writel(status, &xhci->op_regs->status);
+	/* mask interrupt */
+	cmd = readl(&xhci->op_regs->command);
+	cmd &= ~CMD_EIE;
+	writel(cmd, &xhci->op_regs->command);
+
 	/* FIXME when MSI-X is supported and there are multiple vectors */
 	/* Clear the MSI-X event interrupt status */
 
