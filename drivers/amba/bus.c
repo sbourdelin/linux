@@ -86,15 +86,21 @@ static int amba_read_periphid(struct amba_device *adev)
 
 	iounmap(tmp);
 
+	if (r < 0)
+		return r;
+
 	return adev->periphid ? 0 : -ENODEV;
 }
 
 static const struct amba_id *
 amba_lookup(const struct amba_id *table, struct amba_device *dev)
 {
-	int ret = 0;
+	int ret;
 
-	if (amba_read_periphid(dev))
+	ret = amba_read_periphid(dev);
+	if (ret < 0)
+		return ERR_PTR(ret);
+	if (ret)
 		return NULL;
 
 	while (table->mask) {
@@ -111,12 +117,17 @@ static int amba_match(struct device *dev, struct device_driver *drv)
 {
 	struct amba_device *pcdev = to_amba_device(dev);
 	struct amba_driver *pcdrv = to_amba_driver(drv);
+	const struct amba_id *id;
 
 	/* When driver_override is set, only bind to the matching driver */
 	if (pcdev->driver_override)
 		return !strcmp(pcdev->driver_override, drv->name);
 
-	return amba_lookup(pcdrv->id_table, pcdev) != NULL;
+	id = amba_lookup(pcdrv->id_table, pcdev);
+	if (IS_ERR(id))
+		return PTR_ERR(id);
+
+	return id != NULL;
 }
 
 static int amba_uevent(struct device *dev, struct kobj_uevent_env *env)
