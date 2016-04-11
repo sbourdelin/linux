@@ -114,7 +114,7 @@ static inline void sg_set_page(struct scatterlist *sg, struct page *page,
 {
 	sg_assign_page(sg, page);
 	sg->offset = offset;
-	sg->length = len;
+	sg_dma_len(sg) = len;
 }
 
 static inline struct page *sg_page(struct scatterlist *sg)
