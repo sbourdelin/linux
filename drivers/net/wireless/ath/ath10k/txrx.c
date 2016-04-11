@@ -190,6 +190,9 @@ void ath10k_peer_map_event(struct ath10k_htt *htt,
 	struct ath10k *ar = htt->ar;
 	struct ath10k_peer *peer;
 
+	if (ev->peer_id >= ATH10K_MAX_NUM_PEER_IDS)
+		return;
+
 	spin_lock_bh(&ar->data_lock);
 	peer = ath10k_peer_find(ar, ev->vdev_id, ev->addr);
 	if (!peer) {
@@ -217,6 +220,9 @@ void ath10k_peer_unmap_event(struct ath10k_htt *htt,
 {
 	struct ath10k *ar = htt->ar;
 	struct ath10k_peer *peer;
+
+	if (ev->peer_id >= ATH10K_MAX_NUM_PEER_IDS)
+		return;
 
 	spin_lock_bh(&ar->data_lock);
 	peer = ath10k_peer_find_by_id(ar, ev->peer_id);
