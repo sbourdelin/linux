@@ -55,6 +55,7 @@ struct i915_params {
 	bool fastboot;
 	bool prefault_disable;
 	bool load_detect_test;
+	bool force_reset_modeset_test;
 	bool reset;
 	bool disable_display;
 	bool enable_guc_submission;

@@ -3160,6 +3160,7 @@ __intel_display_resume(struct drm_device *dev,
 
 void intel_prepare_reset(struct drm_device *dev)
 {
+	bool requires_display_reset = true;
 	struct drm_atomic_state *state;
 	struct drm_modeset_acquire_ctx *pctx;
 	int ret;
@@ -3169,8 +3170,12 @@ void intel_prepare_reset(struct drm_device *dev)
 		return;
 
 	/* reset doesn't touch the display */
-	if (INTEL_INFO(dev)->gen >= 5 || IS_G4X(dev))
-		return;
+	if (INTEL_INFO(dev)->gen >= 5 || IS_G4X(dev)) {
+		if (!i915.force_reset_modeset_test)
+			return;
+
+		requires_display_reset = false;
+	}
 
 	drm_modeset_lock_all(dev);
 	pctx = dev->mode_config.acquire_ctx;
@@ -3199,12 +3204,15 @@ void intel_prepare_reset(struct drm_device *dev)
 
 err:
 	drm_atomic_state_free(state);
+	if (!requires_display_reset)
+		drm_modeset_unlock_all(dev);
 }
 
 void intel_finish_reset(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct drm_atomic_state *state = dev_priv->modeset_restore_state;
+	bool hpd_init;
 	int ret;
 
 	/*
@@ -3220,22 +3228,27 @@ void intel_finish_reset(struct drm_device *dev)
 
 	/* reset doesn't touch the display */
 	if (INTEL_INFO(dev)->gen >= 5 || IS_G4X(dev)) {
-		/*
-		 * Flips in the rings have been nuked by the reset,
-		 * so update the base address of all primary
-		 * planes to the the last fb to make sure we're
-		 * showing the correct fb after a reset.
-		 *
-		 * FIXME: Atomic will make this obsolete since we won't schedule
-		 * CS-based flips (which might get lost in gpu resets) any more.
-		 */
-		intel_update_primary_planes(dev);
-		return;
+		hpd_init = false;
+
+		if (!state) {
+			/*
+			 * Flips in the rings have been nuked by the reset,
+			 * so update the base address of all primary
+			 * planes to the the last fb to make sure we're
+			 * showing the correct fb after a reset.
+			 *
+			 * FIXME: Atomic will make this obsolete since we won't schedule
+			 * CS-based flips (which might get lost in gpu resets) any more.
+			 */
+			intel_update_primary_planes(dev);
+			return;
+		}
 	} else {
 		/*
 		 * The display has been reset as well,
 		 * so need a full re-initialization.
 		 */
+		hpd_init = true;
 		intel_runtime_pm_disable_interrupts(dev_priv);
 		intel_runtime_pm_enable_interrupts(dev_priv);
 
@@ -3255,7 +3268,8 @@ void intel_finish_reset(struct drm_device *dev)
 	if (ret)
 		DRM_ERROR("Restoring old state failed with %i\n", ret);
 
-	intel_hpd_init(dev_priv);
+	if (hpd_init)
+		intel_hpd_init(dev_priv);
 
 	drm_modeset_unlock_all(dev);
 }
