@@ -57,6 +57,219 @@ DEFINE_MUTEX(hci_cb_list_lock);
 /* HCI ID Numbering */
 static DEFINE_IDA(hci_index_ida);
 
+struct hci_conn *hci_conn_hash_lookup_handle(struct hci_dev *hdev,
+						__u16 handle)
+{
+	struct hci_conn_hash *h = &hdev->conn_hash;
+	struct hci_conn  *c;
+
+	rcu_read_lock();
+
+	list_for_each_entry_rcu(c, &h->list, list) {
+		if (c->handle == handle) {
+			rcu_read_unlock();
+			return c;
+		}
+	}
+	rcu_read_unlock();
+
+	return NULL;
+}
+
+struct hci_conn *hci_conn_hash_lookup_ba(struct hci_dev *hdev,
+						__u8 type, bdaddr_t *ba)
+{
+	struct hci_conn_hash *h = &hdev->conn_hash;
+	struct hci_conn  *c;
+
+	rcu_read_lock();
+
+	list_for_each_entry_rcu(c, &h->list, list) {
+		if (c->type == type && !bacmp(&c->dst, ba)) {
+			rcu_read_unlock();
+			return c;
+		}
+	}
+
+	rcu_read_unlock();
+
+	return NULL;
+}
+EXPORT_SYMBOL(hci_conn_hash_lookup_ba);
+
+struct hci_conn *hci_conn_hash_lookup_le(struct hci_dev *hdev,
+						bdaddr_t *ba,
+						__u8 ba_type)
+{
+	struct hci_conn_hash *h = &hdev->conn_hash;
+	struct hci_conn  *c;
+
+	rcu_read_lock();
+
+	list_for_each_entry_rcu(c, &h->list, list) {
+		if (c->type != LE_LINK)
+		       continue;
+
+		if (ba_type == c->dst_type && !bacmp(&c->dst, ba)) {
+			rcu_read_unlock();
+			return c;
+		}
+	}
+
+	rcu_read_unlock();
+
+	return NULL;
+}
+EXPORT_SYMBOL(hci_conn_hash_lookup_le);
+
+struct hci_conn *hci_conn_hash_lookup_state(struct hci_dev *hdev,
+						__u8 type, __u16 state)
+{
+	struct hci_conn_hash *h = &hdev->conn_hash;
+	struct hci_conn  *c;
+
+	rcu_read_lock();
+
+	list_for_each_entry_rcu(c, &h->list, list) {
+		if (c->type == type && c->state == state) {
+			rcu_read_unlock();
+			return c;
+		}
+	}
+
+	rcu_read_unlock();
+
+	return NULL;
+}
+
+struct hci_conn *hci_lookup_le_connect(struct hci_dev *hdev)
+{
+	struct hci_conn_hash *h = &hdev->conn_hash;
+	struct hci_conn  *c;
+
+	rcu_read_lock();
+
+	list_for_each_entry_rcu(c, &h->list, list) {
+		if (c->type == LE_LINK && c->state == BT_CONNECT &&
+		    !test_bit(HCI_CONN_SCANNING, &c->flags)) {
+			rcu_read_unlock();
+			return c;
+		}
+	}
+
+	rcu_read_unlock();
+
+	return NULL;
+}
+
+void hci_conn_drop(struct hci_conn *conn)
+{
+	BT_DBG("hcon %p orig refcnt %d", conn, atomic_read(&conn->refcnt));
+
+	if (atomic_dec_and_test(&conn->refcnt)) {
+		unsigned long timeo;
+
+		switch (conn->type) {
+		case ACL_LINK:
+		case LE_LINK:
+			cancel_delayed_work(&conn->idle_work);
+			if (conn->state == BT_CONNECTED) {
+				timeo = conn->disc_timeout;
+				if (!conn->out)
+					timeo *= 2;
+			} else {
+				timeo = 0;
+			}
+			break;
+
+		case AMP_LINK:
+			timeo = conn->disc_timeout;
+			break;
+
+		default:
+			timeo = 0;
+			break;
+		}
+
+		cancel_delayed_work(&conn->disc_work);
+		queue_delayed_work(conn->hdev->workqueue,
+				   &conn->disc_work, timeo);
+	}
+}
+
+void hci_connect_cfm(struct hci_conn *conn, __u8 status)
+{
+	struct hci_cb *cb;
+
+	mutex_lock(&hci_cb_list_lock);
+	list_for_each_entry(cb, &hci_cb_list, list) {
+		if (cb->connect_cfm)
+			cb->connect_cfm(conn, status);
+	}
+	mutex_unlock(&hci_cb_list_lock);
+
+	if (conn->connect_cfm_cb)
+		conn->connect_cfm_cb(conn, status);
+}
+
+void hci_disconn_cfm(struct hci_conn *conn, __u8 reason)
+{
+	struct hci_cb *cb;
+
+	mutex_lock(&hci_cb_list_lock);
+	list_for_each_entry(cb, &hci_cb_list, list) {
+		if (cb->disconn_cfm)
+			cb->disconn_cfm(conn, reason);
+	}
+	mutex_unlock(&hci_cb_list_lock);
+
+	if (conn->disconn_cfm_cb)
+		conn->disconn_cfm_cb(conn, reason);
+}
+
+void hci_auth_cfm(struct hci_conn *conn, __u8 status)
+{
+	struct hci_cb *cb;
+	__u8 encrypt;
+
+	if (test_bit(HCI_CONN_ENCRYPT_PEND, &conn->flags))
+		return;
+
+	encrypt = test_bit(HCI_CONN_ENCRYPT, &conn->flags) ? 0x01 : 0x00;
+
+	mutex_lock(&hci_cb_list_lock);
+	list_for_each_entry(cb, &hci_cb_list, list) {
+		if (cb->security_cfm)
+			cb->security_cfm(conn, status, encrypt);
+	}
+	mutex_unlock(&hci_cb_list_lock);
+
+	if (conn->security_cfm_cb)
+		conn->security_cfm_cb(conn, status);
+}
+
+void hci_encrypt_cfm(struct hci_conn *conn, __u8 status,
+						__u8 encrypt)
+{
+	struct hci_cb *cb;
+
+	if (conn->sec_level == BT_SECURITY_SDP)
+		conn->sec_level = BT_SECURITY_LOW;
+
+	if (conn->pending_sec_level > conn->sec_level)
+		conn->sec_level = conn->pending_sec_level;
+
+	mutex_lock(&hci_cb_list_lock);
+	list_for_each_entry(cb, &hci_cb_list, list) {
+		if (cb->security_cfm)
+			cb->security_cfm(conn, status, encrypt);
+	}
+	mutex_unlock(&hci_cb_list_lock);
+
+	if (conn->security_cfm_cb)
+		conn->security_cfm_cb(conn, status);
+}
+
 /* ---- HCI debugfs entries ---- */
 
 static ssize_t dut_mode_read(struct file *file, char __user *user_buf,
