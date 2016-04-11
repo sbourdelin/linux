@@ -240,7 +240,7 @@ static int xhci_setup_msi(struct xhci_hcd *xhci)
 	}
 
 	ret = request_threaded_irq(pdev->irq, xhci_msi_irq, xhci_msi_threaded_irq,
-				IRQF_ONESHOT, "xhci_hcd", xhci_to_hcd(xhci));
+				0, "xhci_hcd", xhci_to_hcd(xhci));
 	if (ret) {
 		xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 				"disable MSI interrupt");
@@ -314,7 +314,7 @@ static int xhci_setup_msix(struct xhci_hcd *xhci)
 	for (i = 0; i < xhci->msix_count; i++) {
 		ret = request_threaded_irq(xhci->msix_entries[i].vector,
 				xhci_msi_irq, xhci_msi_threaded_irq,
-				IRQF_ONESHOT, "xhci_hcd", xhci_to_hcd(xhci));
+				0, "xhci_hcd", xhci_to_hcd(xhci));
 		if (ret)
 			goto disable_msix;
 	}
@@ -409,7 +409,7 @@ static int xhci_try_enable_msi(struct usb_hcd *hcd)
 
 	/* fall back to legacy interrupt*/
 	ret = request_threaded_irq(pdev->irq, usb_hcd_irq, usb_hcd_threaded_irq,
-			IRQF_SHARED | IRQF_ONESHOT, hcd->irq_descr, hcd);
+			IRQF_SHARED, hcd->irq_descr, hcd);
 	if (ret) {
 		xhci_err(xhci, "request interrupt %d failed\n",
 				pdev->irq);
@@ -4990,7 +4990,8 @@ static const struct hc_driver xhci_hc_driver = {
 	 */
 	.irq =			xhci_irq,
 	.threaded_irq =		xhci_threaded_irq,
-	.flags =		HCD_MEMORY | HCD_USB3 | HCD_SHARED,
+	.flags =		HCD_MEMORY | HCD_USB3 | HCD_SHARED |
+				HCD_NO_ONESHOT,
 
 	/*
 	 * basic lifecycle operations
