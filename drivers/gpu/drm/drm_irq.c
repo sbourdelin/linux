@@ -303,6 +303,37 @@ static void drm_update_vblank_count(struct drm_device *dev, unsigned int pipe,
 	store_vblank(dev, pipe, diff, &t_vblank, cur_vblank);
 }
 
+/**
+ * drm_accurate_vblank_count_and_time - retrieve the master vblank counter
+ * @crtc: which counter to retrieve
+ * @tv_ret: last time counter was updated
+ *
+ * This function is similar to @drm_update_vblank_count_and_time but
+ * this function interpolates to handle a race with vblank irq's, and
+ * is only useful for crtc's that have no hw vblank counter.
+ */
+
+u32 drm_accurate_vblank_count_and_time(struct drm_crtc *crtc,
+				       struct timeval *tv_ret)
+{
+	struct drm_device *dev = crtc->dev;
+	u32 vblank, pipe = drm_crtc_index(crtc);
+	unsigned long flags;
+
+	WARN(dev->max_vblank_count, "This function is only useful when a hw counter is unavailable.");
+
+	spin_lock_irqsave(&dev->vblank_time_lock, flags);
+	drm_update_vblank_count(dev, pipe, 0);
+
+	vblank = dev->vblank[pipe].count;
+	*tv_ret = vblanktimestamp(dev, pipe, vblank);
+
+	spin_unlock_irqrestore(&dev->vblank_time_lock, flags);
+
+	return vblank;
+}
+EXPORT_SYMBOL(drm_accurate_vblank_count_and_time);
+
 /*
  * Disable vblank irq's on crtc, make sure that last vblank count
  * of hardware and corresponding consistent software vblank counter
