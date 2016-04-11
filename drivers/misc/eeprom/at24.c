@@ -59,13 +59,8 @@ struct at24_data {
 	int use_smbus;
 	int use_smbus_write;
 
-	/*
-	 * Lock protects against activities from other Linux tasks,
-	 * but not from changes by other I2C masters.
-	 */
-	struct mutex lock;
-
 	u8 *writebuf;
+	struct mutex wrbuf_lock;
 	unsigned write_max;
 	unsigned num_addresses;
 
@@ -260,12 +255,6 @@ static ssize_t at24_read(struct at24_data *at24,
 	if (unlikely(!count))
 		return count;
 
-	/*
-	 * Read data from chip, protecting against concurrent updates
-	 * from this host, but not from other I2C masters.
-	 */
-	mutex_lock(&at24->lock);
-
 	while (count) {
 		ssize_t	status;
 
@@ -280,8 +269,6 @@ static ssize_t at24_read(struct at24_data *at24,
 		count -= status;
 		retval += status;
 	}
-
-	mutex_unlock(&at24->lock);
 
 	return retval;
 }
@@ -322,6 +309,8 @@ static ssize_t at24_eeprom_write(struct at24_data *at24, const char *buf,
 		msg.addr = client->addr;
 		msg.flags = 0;
 
+		mutex_lock(&at24->wrbuf_lock);
+
 		/* msg.buf is u8 and casts will mask the values */
 		msg.buf = at24->writebuf;
 		if (at24->chip.flags & AT24_FLAG_ADDR16)
@@ -356,6 +345,7 @@ static ssize_t at24_eeprom_write(struct at24_data *at24, const char *buf,
 				status = count;
 		} else {
 			status = i2c_transfer(client->adapter, &msg, 1);
+			mutex_unlock(&at24->wrbuf_lock);
 			if (status == 1)
 				status = count;
 		}
@@ -380,12 +370,6 @@ static ssize_t at24_write(struct at24_data *at24, const char *buf, loff_t off,
 	if (unlikely(!count))
 		return count;
 
-	/*
-	 * Write data to chip, protecting against concurrent updates
-	 * from this host, but not from other I2C masters.
-	 */
-	mutex_lock(&at24->lock);
-
 	while (count) {
 		ssize_t	status;
 
@@ -400,8 +384,6 @@ static ssize_t at24_write(struct at24_data *at24, const char *buf, loff_t off,
 		count -= status;
 		retval += status;
 	}
-
-	mutex_unlock(&at24->lock);
 
 	return retval;
 }
@@ -566,7 +548,7 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	if (!at24)
 		return -ENOMEM;
 
-	mutex_init(&at24->lock);
+	mutex_init(&at24->wrbuf_lock);
 	at24->use_smbus = use_smbus;
 	at24->use_smbus_write = use_smbus_write;
 	at24->chip = chip;
