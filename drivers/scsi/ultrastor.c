@@ -670,12 +670,12 @@ static const char *ultrastor_info(struct Scsi_Host * shpnt)
       sprintf(buf, "UltraStor 24F SCSI @ Slot %u IRQ%u",
 	      config.slot, config.interrupt);
     else if (config.subversion)
-      sprintf(buf, "UltraStor 34F SCSI @ Port %03X BIOS %05X IRQ%u",
-	      config.port_address, (int)config.bios_segment,
+      sprintf(buf, "UltraStor 34F SCSI @ Port %03X BIOS %pK IRQ%u",
+	      config.port_address, config.bios_segment,
 	      config.interrupt);
     else
-      sprintf(buf, "UltraStor 14F SCSI @ Port %03X BIOS %05X IRQ%u DMA%u",
-	      config.port_address, (int)config.bios_segment,
+      sprintf(buf, "UltraStor 14F SCSI @ Port %03X BIOS %pK IRQ%u DMA%u",
+	      config.port_address, config.bios_segment,
 	      config.interrupt, config.dma_channel);
     return buf;
 }
