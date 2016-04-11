@@ -1560,6 +1560,7 @@ static int i2c_register_adapter(struct i2c_adapter *adap)
 
 	pm_runtime_no_callbacks(&adap->dev);
 	pm_runtime_enable(&adap->dev);
+	pm_suspend_ignore_children(&adap->dev, true);
 
 #ifdef CONFIG_I2C_COMPAT
 	res = class_compat_create_link(i2c_adapter_compat_class, &adap->dev,
