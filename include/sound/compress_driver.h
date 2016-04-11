@@ -78,6 +78,7 @@ struct snd_compr_stream {
 	struct snd_compr_ops *ops;
 	struct snd_compr_runtime *runtime;
 	struct snd_compr *device;
+	struct delayed_work error_work;
 	enum snd_compr_direction direction;
 	bool metadata_set;
 	bool next_track;
@@ -186,5 +187,8 @@ static inline void snd_compr_drain_notify(struct snd_compr_stream *stream)
 	stream->runtime->state = SNDRV_PCM_STATE_SETUP;
 	wake_up(&stream->runtime->sleep);
 }
+
+int snd_compr_stop_error(struct snd_compr_stream *stream,
+			 snd_pcm_state_t state);
 
 #endif
