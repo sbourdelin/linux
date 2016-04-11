@@ -2979,6 +2979,14 @@ retry:
 	if (ret)
 		goto fail;
 
+	drm_object_property_set_value(&crtc->base,
+			config->degamma_lut_property, 0);
+	drm_object_property_set_value(&crtc->base,
+			config->ctm_property, 0);
+	drm_object_property_set_value(&crtc->base,
+			config->gamma_lut_property,
+			crtc->state->gamma_lut->base.id);
+
 	/* Driver takes ownership of state on successful commit. */
 
 	drm_property_unreference_blob(blob);
