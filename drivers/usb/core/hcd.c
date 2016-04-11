@@ -2425,16 +2425,11 @@ EXPORT_SYMBOL_GPL(usb_bus_start_enum);
 irqreturn_t usb_hcd_irq (int irq, void *__hcd)
 {
 	struct usb_hcd		*hcd = __hcd;
-	irqreturn_t		rc;
 
 	if (unlikely(HCD_DEAD(hcd) || !HCD_HW_ACCESSIBLE(hcd)))
-		rc = IRQ_NONE;
-	else if (hcd->driver->irq(hcd) == IRQ_NONE)
-		rc = IRQ_NONE;
-	else
-		rc = IRQ_HANDLED;
+		return IRQ_NONE;
 
-	return rc;
+	return hcd->driver->irq(hcd);
 }
 EXPORT_SYMBOL_GPL(usb_hcd_irq);
 
