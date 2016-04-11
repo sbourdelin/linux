@@ -47,6 +47,15 @@
 #define XUSB_DMA_LENGTH_OFFSET		0x0210	/* DMA Length Register */
 #define XUSB_DMA_STATUS_OFFSET		0x0214	/* DMA Status Register */
 
+/* DMA source Address Reg for LSB */
+#define XUSB_DMA_DSAR_ADDR_OFFSET_LSB   0x0308
+/* DMA source Address Reg for MSB */
+#define XUSB_DMA_DSAR_ADDR_OFFSET_MSB   0x030C
+/* DMA destination Addr Reg LSB */
+#define XUSB_DMA_DDAR_ADDR_OFFSET_LSB   0x0310
+/* DMA destination Addr Reg MSB */
+#define XUSB_DMA_DDAR_ADDR_OFFSET_MSB   0x0314
+
 /* Endpoint Configuration Space offsets */
 #define XUSB_EP_CFGSTATUS_OFFSET	0x00	/* Endpoint Config Status  */
 #define XUSB_EP_BUF0COUNT_OFFSET	0x08	/* Buffer 0 Count */
@@ -176,6 +185,7 @@ struct xusb_ep {
  * @addr: the usb device base address
  * @lock: instance of spinlock
  * @dma_enabled: flag indicating whether the dma is included in the system
+ * @dma_addrwidth:Indicate the DMA address width.
  * @read_fn: function pointer to read device registers
  * @write_fn: function pointer to write to device registers
  */
@@ -193,7 +203,7 @@ struct xusb_udc {
 	void __iomem *addr;
 	spinlock_t lock;
 	bool dma_enabled;
-
+	u32 dma_addrwidth;
 	unsigned int (*read_fn)(void __iomem *);
 	void (*write_fn)(void __iomem *, u32, u32);
 };
@@ -213,6 +223,19 @@ static const struct usb_endpoint_descriptor config_bulk_out_desc = {
 	.bmAttributes		= USB_ENDPOINT_XFER_BULK,
 	.wMaxPacketSize		= cpu_to_le16(EP0_MAX_PACKET),
 };
+
+/**
+ * xudc_write64 - write 64bit value to device registers
+ * @addr: base addr of device registers
+ * @offset: register offset
+ * @val: data to be written
+ **/
+static void xudc_write64(void __iomem *addr, u32 offset, u64 val)
+{
+#if defined(CONFIG_PHYS_ADDR_T_64BIT)
+	writeq(val, addr + offset);
+#endif
+}
 
 /**
  * xudc_write32 - little endian write to device registers
@@ -330,8 +353,13 @@ static int xudc_start_dma(struct xusb_ep *ep, dma_addr_t src,
 	 * destination registers and then set the length
 	 * into the DMA length register.
 	 */
-	udc->write_fn(udc->addr, XUSB_DMA_DSAR_ADDR_OFFSET, src);
-	udc->write_fn(udc->addr, XUSB_DMA_DDAR_ADDR_OFFSET, dst);
+	if (udc->dma_addrwidth > 32) {
+		xudc_write64(udc->addr, XUSB_DMA_DSAR_ADDR_OFFSET_LSB, src);
+		xudc_write64(udc->addr, XUSB_DMA_DDAR_ADDR_OFFSET_LSB, dst);
+	} else {
+		udc->write_fn(udc->addr, XUSB_DMA_DSAR_ADDR_OFFSET, src);
+		udc->write_fn(udc->addr, XUSB_DMA_DDAR_ADDR_OFFSET, dst);
+	}
 	udc->write_fn(udc->addr, XUSB_DMA_LENGTH_OFFSET, length);
 
 	/*
@@ -2096,6 +2124,10 @@ static int xudc_probe(struct platform_device *pdev)
 	}
 
 	udc->dma_enabled = of_property_read_bool(np, "xlnx,has-builtin-dma");
+
+	ret = of_property_read_u32(np, "xlnx,addrwidth", &udc->dma_addrwidth);
+	if (ret < 0)
+		dev_warn(&pdev->dev, "missing xlnx,addrwidth property\n");
 
 	/* Setup gadget structure */
 	udc->gadget.ops = &xusb_udc_ops;
