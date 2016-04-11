@@ -3285,6 +3285,55 @@ static void gen5_gt_irq_reset(struct drm_device *dev)
 		GEN5_IRQ_RESET(GEN6_PM);
 }
 
+static void vlv_display_irq_reset(struct drm_i915_private *dev_priv)
+{
+	enum pipe pipe;
+
+	i915_hotplug_interrupt_update_locked(dev_priv, 0xffffffff, 0);
+	I915_WRITE(PORT_HOTPLUG_STAT, I915_READ(PORT_HOTPLUG_STAT));
+
+	for_each_pipe(dev_priv, pipe)
+		I915_WRITE(PIPESTAT(pipe), 0xffff);
+
+	GEN5_IRQ_RESET(VLV_);
+
+	dev_priv->irq_mask = ~0;
+}
+
+static void vlv_display_irq_postinstall(struct drm_i915_private *dev_priv)
+{
+	u32 pipestat_mask;
+	u32 iir_mask;
+	enum pipe pipe;
+
+	pipestat_mask = PIPESTAT_INT_STATUS_MASK |
+			PIPE_FIFO_UNDERRUN_STATUS;
+
+	for_each_pipe(dev_priv, pipe)
+		I915_WRITE(PIPESTAT(pipe), pipestat_mask);
+	POSTING_READ(PIPESTAT(PIPE_A));
+
+	pipestat_mask = PLANE_FLIP_DONE_INT_STATUS_VLV |
+			PIPE_CRC_DONE_INTERRUPT_STATUS;
+
+	i915_enable_pipestat(dev_priv, PIPE_A, PIPE_GMBUS_INTERRUPT_STATUS);
+	for_each_pipe(dev_priv, pipe)
+		i915_enable_pipestat(dev_priv, pipe, pipestat_mask);
+
+	iir_mask = I915_DISPLAY_PORT_INTERRUPT |
+		   I915_DISPLAY_PIPE_A_EVENT_INTERRUPT |
+		   I915_DISPLAY_PIPE_B_EVENT_INTERRUPT;
+	if (IS_CHERRYVIEW(dev_priv))
+		iir_mask |= I915_DISPLAY_PIPE_C_EVENT_INTERRUPT;
+	dev_priv->irq_mask &= ~iir_mask;
+
+	I915_WRITE(VLV_IIR, iir_mask);
+	I915_WRITE(VLV_IIR, iir_mask);
+	I915_WRITE(VLV_IER, ~dev_priv->irq_mask);
+	I915_WRITE(VLV_IMR, dev_priv->irq_mask);
+	POSTING_READ(VLV_IMR);
+}
+
 /* drm_dma.h hooks
 */
 static void ironlake_irq_reset(struct drm_device *dev)
@@ -3300,21 +3349,6 @@ static void ironlake_irq_reset(struct drm_device *dev)
 	gen5_gt_irq_reset(dev);
 
 	ibx_irq_reset(dev);
-}
-
-static void vlv_display_irq_reset(struct drm_i915_private *dev_priv)
-{
-	enum pipe pipe;
-
-	i915_hotplug_interrupt_update_locked(dev_priv, 0xffffffff, 0);
-	I915_WRITE(PORT_HOTPLUG_STAT, I915_READ(PORT_HOTPLUG_STAT));
-
-	for_each_pipe(dev_priv, pipe)
-		I915_WRITE(PIPESTAT(pipe), 0xffff);
-
-	GEN5_IRQ_RESET(VLV_);
-
-	dev_priv->irq_mask = ~0;
 }
 
 static void valleyview_irq_preinstall(struct drm_device *dev)
@@ -3651,40 +3685,6 @@ static int ironlake_irq_postinstall(struct drm_device *dev)
 	}
 
 	return 0;
-}
-
-static void vlv_display_irq_postinstall(struct drm_i915_private *dev_priv)
-{
-	u32 pipestat_mask;
-	u32 iir_mask;
-	enum pipe pipe;
-
-	pipestat_mask = PIPESTAT_INT_STATUS_MASK |
-			PIPE_FIFO_UNDERRUN_STATUS;
-
-	for_each_pipe(dev_priv, pipe)
-		I915_WRITE(PIPESTAT(pipe), pipestat_mask);
-	POSTING_READ(PIPESTAT(PIPE_A));
-
-	pipestat_mask = PLANE_FLIP_DONE_INT_STATUS_VLV |
-			PIPE_CRC_DONE_INTERRUPT_STATUS;
-
-	i915_enable_pipestat(dev_priv, PIPE_A, PIPE_GMBUS_INTERRUPT_STATUS);
-	for_each_pipe(dev_priv, pipe)
-		      i915_enable_pipestat(dev_priv, pipe, pipestat_mask);
-
-	iir_mask = I915_DISPLAY_PORT_INTERRUPT |
-		   I915_DISPLAY_PIPE_A_EVENT_INTERRUPT |
-		   I915_DISPLAY_PIPE_B_EVENT_INTERRUPT;
-	if (IS_CHERRYVIEW(dev_priv))
-		iir_mask |= I915_DISPLAY_PIPE_C_EVENT_INTERRUPT;
-	dev_priv->irq_mask &= ~iir_mask;
-
-	I915_WRITE(VLV_IIR, iir_mask);
-	I915_WRITE(VLV_IIR, iir_mask);
-	I915_WRITE(VLV_IER, ~dev_priv->irq_mask);
-	I915_WRITE(VLV_IMR, dev_priv->irq_mask);
-	POSTING_READ(VLV_IMR);
 }
 
 void valleyview_enable_display_irqs(struct drm_i915_private *dev_priv)
