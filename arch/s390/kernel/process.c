@@ -101,7 +101,7 @@ int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
 	 */
 	fpu_regs_size = MACHINE_HAS_VX ? sizeof(__vector128) * __NUM_VXRS
 				       : sizeof(freg_t) * __NUM_FPRS;
-	dst->thread.fpu.regs = kzalloc(fpu_regs_size, GFP_KERNEL|__GFP_REPEAT);
+	dst->thread.fpu.regs = kzalloc(fpu_regs_size, GFP_KERNEL);
 	if (!dst->thread.fpu.regs)
 		return -ENOMEM;
 
