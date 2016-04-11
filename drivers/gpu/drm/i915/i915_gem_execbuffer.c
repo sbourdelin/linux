@@ -93,6 +93,7 @@ static int
 eb_lookup_vmas(struct eb_vmas *eb,
 	       struct drm_i915_gem_exec_object2 *exec,
 	       const struct drm_i915_gem_execbuffer2 *args,
+	       struct i915_address_space *vm0,
 	       struct i915_address_space *vm,
 	       struct drm_file *file)
 {
@@ -143,7 +144,7 @@ eb_lookup_vmas(struct eb_vmas *eb,
 		 * from the (obj, vm) we don't run the risk of creating
 		 * duplicated vmas for the same vm.
 		 */
-		vma = i915_gem_obj_lookup_or_create_vma(obj, vm);
+		vma = i915_gem_obj_lookup_or_create_vma(obj, i ? vm : vm0);
 		if (IS_ERR(vma)) {
 			DRM_DEBUG("Failed to lookup VMA\n");
 			ret = PTR_ERR(vma);
@@ -831,14 +832,15 @@ i915_gem_execbuffer_relocate_slow(struct drm_device *dev,
 				  struct intel_context *ctx)
 {
 	struct drm_i915_gem_relocation_entry *reloc;
-	struct i915_address_space *vm;
+	struct i915_address_space *vm0, *vm;
 	struct i915_vma *vma;
 	bool need_relocs;
 	int *reloc_offset;
 	int i, total, ret;
 	unsigned count = args->buffer_count;
 
-	vm = list_first_entry(&eb->vmas, struct i915_vma, exec_list)->vm;
+	vm0 = list_first_entry(&eb->vmas, struct i915_vma, exec_list)->vm;
+	vm = list_last_entry(&eb->vmas, struct i915_vma, exec_list)->vm;
 
 	/* We may process another execbuffer during the unlock... */
 	while (!list_empty(&eb->vmas)) {
@@ -909,7 +911,7 @@ i915_gem_execbuffer_relocate_slow(struct drm_device *dev,
 
 	/* reacquire the objects */
 	eb_reset(eb);
-	ret = eb_lookup_vmas(eb, exec, args, vm, file);
+	ret = eb_lookup_vmas(eb, exec, args, vm0, vm, file);
 	if (ret)
 		goto err;
 
@@ -1440,7 +1442,7 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 	struct drm_i915_gem_exec_object2 shadow_exec_entry;
 	struct intel_engine_cs *engine;
 	struct intel_context *ctx;
-	struct i915_address_space *vm;
+	struct i915_address_space *vm0, *vm;
 	struct i915_execbuffer_params params_master; /* XXX: will be removed later */
 	struct i915_execbuffer_params *params = &params_master;
 	const u32 ctx_id = i915_execbuffer2_get_context_id(*args);
@@ -1508,6 +1510,12 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 	else
 		vm = &ggtt->base;
 
+	/* Secure batches must live in GGTT */
+	if (dispatch_flags & I915_DISPATCH_SECURE)
+		vm0 = &dev_priv->ggtt.base;
+	else
+		vm0 = vm;
+
 	memset(&params_master, 0x00, sizeof(params_master));
 
 	eb = eb_create(args);
@@ -1519,7 +1527,7 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 	}
 
 	/* Look up object handles */
-	ret = eb_lookup_vmas(eb, exec, args, vm, file);
+	ret = eb_lookup_vmas(eb, exec, args, vm0, vm, file);
 	if (ret)
 		goto err;
 
