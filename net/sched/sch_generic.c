@@ -47,10 +47,13 @@ EXPORT_SYMBOL(default_qdisc_ops);
 
 static inline int dev_requeue_skb(struct sk_buff *skb, struct Qdisc *q)
 {
-	q->gso_skb = skb;
-	q->qstats.requeues++;
-	q->q.qlen++;	/* it's still part of the queue */
-	__netif_schedule(q);
+	if (skb) {
+		q->gso_skb = skb;
+		q->qstats.requeues++;
+		q->q.qlen++;	/* it's still part of the queue */
+	}
+	if (qdisc_qlen(q))
+		__netif_schedule(q);
 
 	return 0;
 }
