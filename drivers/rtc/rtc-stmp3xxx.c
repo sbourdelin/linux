@@ -105,20 +105,22 @@ static struct stmp3xxx_wdt_pdata wdt_pdata = {
 	.wdt_set_timeout = stmp3xxx_wdt_set_timeout,
 };
 
-static void stmp3xxx_wdt_register(struct platform_device *rtc_pdev)
+static int stmp3xxx_wdt_register(struct platform_device *rtc_pdev)
 {
 	struct platform_device *wdt_pdev =
 		platform_device_alloc("stmp3xxx_rtc_wdt", rtc_pdev->id);
 
-	if (wdt_pdev) {
-		wdt_pdev->dev.parent = &rtc_pdev->dev;
-		wdt_pdev->dev.platform_data = &wdt_pdata;
-		platform_device_add(wdt_pdev);
-	}
+	if (!wdt_pdev)
+		return -ENOMEM;
+
+	wdt_pdev->dev.parent = &rtc_pdev->dev;
+	wdt_pdev->dev.platform_data = &wdt_pdata;
+	return platform_device_add(wdt_pdev);
 }
 #else
-static void stmp3xxx_wdt_register(struct platform_device *rtc_pdev)
+static int stmp3xxx_wdt_register(struct platform_device *rtc_pdev)
 {
+	return 0;
 }
 #endif /* CONFIG_STMP3XXX_RTC_WATCHDOG */
 
@@ -357,8 +359,7 @@ static int stmp3xxx_rtc_probe(struct platform_device *pdev)
 		return err;
 	}
 
-	stmp3xxx_wdt_register(pdev);
-	return 0;
+	return stmp3xxx_wdt_register(pdev);
 }
 
 #ifdef CONFIG_PM_SLEEP
