@@ -2677,14 +2677,21 @@ static int usb_hcd_request_irqs(struct usb_hcd *hcd,
 		 * leaving IRQF_ONESHOT in place, but soon enough we plan on
 		 * removing that after all HCDs are fixed.
 		 */
-		if (hcd->driver->threaded_irq)
+		if (hcd->driver->threaded_irq) {
+			if (!(hcd->driver->flags & HCD_NO_ONESHOT))
+				irqflags |= IRQF_ONESHOT;
+			else
+				WARN_ONCE(irqflags & IRQF_ONESHOT,
+						"HCD_NO_ONESHOT set, why IRQF_ONESHOT?\n");
+
 			retval = request_threaded_irq(irqnum, usb_hcd_irq,
-					usb_hcd_threaded_irq,
-					irqflags | IRQF_ONESHOT, hcd->irq_descr,
-					hcd);
-		else
+					usb_hcd_threaded_irq, irqflags,
+					hcd->irq_descr, hcd);
+		} else {
 			retval = request_irq(irqnum, usb_hcd_irq, irqflags,
 					hcd->irq_descr, hcd);
+		}
+
 		if (retval != 0) {
 			dev_err(hcd->self.controller,
 					"request interrupt %d failed\n",
