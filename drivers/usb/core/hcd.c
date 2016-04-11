@@ -2420,7 +2420,8 @@ EXPORT_SYMBOL_GPL(usb_bus_start_enum);
  * If the controller isn't HALTed, calls the driver's irq handler.
  * Checks whether the controller is now dead.
  *
- * Return: %IRQ_HANDLED if the IRQ was handled. %IRQ_NONE otherwise.
+ * Return: %IRQ_HANDLED if the IRQ was handled or %IRQ_WAKE_THREAD if we need to
+ * wake our threaded handler. %IRQ_NONE otherwise.
  */
 irqreturn_t usb_hcd_irq (int irq, void *__hcd)
 {
@@ -2432,6 +2433,29 @@ irqreturn_t usb_hcd_irq (int irq, void *__hcd)
 	return hcd->driver->irq(hcd);
 }
 EXPORT_SYMBOL_GPL(usb_hcd_irq);
+
+/**
+ * usb_hcd_threaded_irq - hook threaded IRQs to HCD framework (bus glue)
+ * @irq the IRQ for which a thread is being woken
+ * @__hcd: pointer to the HCD whose IRQ is being signaled
+ * If the controller isn't HALTed, calls the driver's irq handler.
+ * Checks whether the controller is now dead.
+ *
+ * Return: %IRQ_HANDLED if the IRQ was handled. %IRQ_NONE otherwise.
+ */
+irqreturn_t usb_hcd_threaded_irq (int irq, void *__hcd)
+{
+	struct usb_hcd		*hcd = __hcd;
+
+	if (unlikely(HCD_DEAD(hcd) || !HCD_HW_ACCESSIBLE(hcd)))
+		return IRQ_NONE;
+
+	if (hcd->driver->threaded_irq)
+		return hcd->driver->threaded_irq(hcd);
+
+	return IRQ_NONE;
+}
+EXPORT_SYMBOL_GPL(usb_hcd_threaded_irq);
 
 /*-------------------------------------------------------------------------*/
 
@@ -2646,8 +2670,21 @@ static int usb_hcd_request_irqs(struct usb_hcd *hcd,
 
 		snprintf(hcd->irq_descr, sizeof(hcd->irq_descr), "%s:usb%d",
 				hcd->driver->description, hcd->self.busnum);
-		retval = request_irq(irqnum, &usb_hcd_irq, irqflags,
-				hcd->irq_descr, hcd);
+
+		/*
+		 * NOTICE: we're assuming here that if an HCD implements
+		 * threaded_irq, it's because it wants to use it. For now, we're
+		 * leaving IRQF_ONESHOT in place, but soon enough we plan on
+		 * removing that after all HCDs are fixed.
+		 */
+		if (hcd->driver->threaded_irq)
+			retval = request_threaded_irq(irqnum, usb_hcd_irq,
+					usb_hcd_threaded_irq,
+					irqflags | IRQF_ONESHOT, hcd->irq_descr,
+					hcd);
+		else
+			retval = request_irq(irqnum, usb_hcd_irq, irqflags,
+					hcd->irq_descr, hcd);
 		if (retval != 0) {
 			dev_err(hcd->self.controller,
 					"request interrupt %d failed\n",

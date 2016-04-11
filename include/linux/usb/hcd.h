@@ -242,6 +242,7 @@ struct hc_driver {
 
 	/* irq handler */
 	irqreturn_t	(*irq) (struct usb_hcd *hcd);
+	irqreturn_t	(*threaded_irq) (struct usb_hcd *hcd);
 
 	int	flags;
 #define	HCD_MEMORY	0x0001		/* HC regs use memory (else I/O) */
@@ -479,6 +480,7 @@ void hcd_buffer_free(struct usb_bus *bus, size_t size,
 
 /* generic bus glue, needed for host controllers that don't use PCI */
 extern irqreturn_t usb_hcd_irq(int irq, void *__hcd);
+extern irqreturn_t usb_hcd_threaded_irq(int irq, void *__hcd);
 
 extern void usb_hc_died(struct usb_hcd *hcd);
 extern void usb_hcd_poll_rh_status(struct usb_hcd *hcd);
