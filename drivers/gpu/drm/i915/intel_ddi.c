@@ -1999,6 +1999,7 @@ void intel_ddi_get_config(struct intel_encoder *encoder,
 	switch (temp & TRANS_DDI_MODE_SELECT_MASK) {
 	case TRANS_DDI_MODE_SELECT_HDMI:
 		pipe_config->has_hdmi_sink = true;
+		pipe_config->lane_count = 4;
 		intel_hdmi = enc_to_intel_hdmi(&encoder->base);
 
 		if (intel_hdmi->infoframe_enabled(&encoder->base, pipe_config))
