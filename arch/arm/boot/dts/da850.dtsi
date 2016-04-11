@@ -148,7 +148,24 @@
 					0xc 0x88888888 0xffffffff
 				>;
 			};
-
+			mcbsp0_pins: pinmux_mcbsp0_pins {
+				pinctrl-single,bits = <
+					/* PINMUX2:
+					* CLKS0, DX0, DR0, FSX0
+					* FSR0, CLKX0, CLKR0
+					*/
+					0x8 0x02222220 0xfffffff0
+				>;
+			};
+			mcbsp1_pins: pinmux_mcbsp1_pins {
+				pinctrl-single,bits = <
+					/* PINMUX1:
+					* CLKS1, DX1, DR1, FSX1,
+					* FSR1, CLKX1, CLKR1
+					*/
+					0x4 0x22222220 0xfffffff0
+				>;
+			};
 		};
 		edma0: edma@01c00000 {
 			compatible = "ti,edma3-tpcc";
@@ -335,6 +352,32 @@
 				<&edma0 0 1>;
 			dma-names = "tx", "rx";
 		};
+
+		mcbsp0: mcbsp@1d10000 {
+			compatible = "ti,da850-mcbsp";
+			reg =	<0x00110000 0x1000>,
+				<0x00310000 0x1000>;
+			reg-names = "mpu", "dat";
+			interrupts = <97 98>;
+			interrupts-names = "rx", "tx";
+			dmas = <&edma0 3 1
+				&edma0 2 1>;
+			dma-names = "tx", "rx";
+			status = "disabled";
+		};
+		mcbsp1: mcbsp@1d11000 {
+			compatible = "ti,da850-mcbsp";
+			reg =	<0x00111000 0x1000>,
+				<0x00311000 0x1000>;
+			reg-names = "mpu", "dat";
+			interrupts = <99 100>;
+			interrupts-names = "rx", "tx";
+			dmas = <&edma0 5 1
+				&edma0 4 1>;
+			dma-names = "tx", "rx";
+			status = "disabled";
+		};
+
 	};
 	nand_cs3@62000000 {
 		compatible = "ti,davinci-nand";
