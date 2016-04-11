@@ -59,6 +59,10 @@ struct at24_data {
 	int use_smbus;
 	int use_smbus_write;
 
+	ssize_t (*read_func)(struct at24_data *, char *, loff_t, size_t);
+	ssize_t (*write_func)(struct at24_data *,
+			      const char *, loff_t, size_t);
+
 	u8 *writebuf;
 	struct mutex wrbuf_lock;
 	unsigned write_max;
@@ -458,7 +462,7 @@ static int at24_regmap_read(void *context, const void *reg, size_t reg_size,
 	off_t offset = *(u32 *)reg;
 	int err;
 
-	err = at24_read(at24, val, offset, val_size);
+	err = at24->read_func(at24, val, offset, val_size);
 	if (err)
 		return err;
 	return 0;
@@ -476,7 +480,7 @@ static int at24_regmap_write(void *context, const void *data, size_t count)
 	buf = (const char *)data + sizeof(offset);
 	len = count - sizeof(offset);
 
-	err = at24_write(at24, buf, offset, len);
+	err = at24->write_func(at24, buf, offset, len);
 	if (err)
 		return err;
 	return 0;
@@ -610,6 +614,9 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	at24->use_smbus_write = use_smbus_write;
 	at24->chip = chip;
 	at24->num_addresses = num_addresses;
+
+	at24->read_func = at24_read;
+	at24->write_func = at24_write;
 
 	writable = !(chip.flags & AT24_FLAG_READONLY);
 	if (writable) {
