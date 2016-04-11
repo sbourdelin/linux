@@ -21,6 +21,7 @@ show up in /proc/sys/kernel:
 - acct
 - acpi_video_flags
 - auto_msgmni
+- audit_log_seccomp
 - bootloader_type	     [ X86 only ]
 - bootloader_version	     [ X86 only ]
 - callhome		     [ S390 only ]
@@ -126,6 +127,14 @@ upon memory add/remove or upon ipc namespace creation/removal.
 Echoing "1" into this file enabled msgmni automatic recomputing.
 Echoing "0" turned it off. auto_msgmni default value was 1.
 
+==============================================================
+
+audit_log_seccomp
+
+When this variable is set to 1 every SECCOMP_KILL/SECCOMP_RET_ERRNO
+results in an audit log. This is generally a bad idea because
+it leads to a audit message every time Chrome opens a new tab.
+Defaults to 0.
 
 ==============================================================
 

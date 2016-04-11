@@ -65,6 +65,7 @@
 #include <linux/sched/sysctl.h>
 #include <linux/kexec.h>
 #include <linux/bpf.h>
+#include <linux/audit.h>
 
 #include <asm/uaccess.h>
 #include <asm/processor.h>
@@ -516,6 +517,16 @@ static struct ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
 	},
+#endif
+#ifdef CONFIG_AUDIT
+	{
+		.procname	= "audit-log-seccomp",
+		.data		= &audit_log_seccomp,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+
 #endif
 	{
 		.procname	= "print-fatal-signals",

@@ -311,9 +311,11 @@ static inline void audit_inode_child(struct inode *parent,
 }
 void audit_core_dumps(long signr);
 
+extern int audit_log_seccomp;
+
 static inline void audit_seccomp(unsigned long syscall, long signr, int code)
 {
-	if (!audit_enabled)
+	if (!audit_enabled || !audit_log_seccomp)
 		return;
 
 	/* Force a record to be reported if a signal was delivered. */
