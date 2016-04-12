@@ -58,6 +58,15 @@
 
 		i2c@9845000 {
 			status = "okay";
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			eeprom@50 {
+				compatible = "at,24c256";
+				pagesize = <64>;
+				reg = <0x50>;
+			};
 		};
 
 		i2c@9540000 {
