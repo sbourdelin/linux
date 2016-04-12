@@ -24,6 +24,7 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include <sound/dmaengine_pcm.h>
+#include "designware.h"
 
 /* common register for all channel */
 #define IER		0x000
@@ -84,31 +85,6 @@
 #define MAX_CHANNEL_NUM		8
 #define MIN_CHANNEL_NUM		2
 
-union dw_i2s_snd_dma_data {
-	struct i2s_dma_data pd;
-	struct snd_dmaengine_dai_dma_data dt;
-};
-
-struct dw_i2s_dev {
-	void __iomem *i2s_base;
-	struct clk *clk;
-	int active;
-	unsigned int capability;
-	unsigned int quirks;
-	unsigned int i2s_reg_comp1;
-	unsigned int i2s_reg_comp2;
-	struct device *dev;
-	u32 ccr;
-	u32 xfer_resolution;
-	u32 fifo_th;
-
-	/* data related to DMA transfers b/w i2s and DMAC */
-	union dw_i2s_snd_dma_data play_dma_data;
-	union dw_i2s_snd_dma_data capture_dma_data;
-	struct i2s_clk_config_data config;
-	int (*i2s_clk_cfg)(struct i2s_clk_config_data *config);
-};
-
 static inline void i2s_write_reg(void __iomem *io_base, int reg, u32 val)
 {
 	writel(val, io_base + reg);
@@ -143,6 +119,54 @@ static inline void i2s_clear_irqs(struct dw_i2s_dev *dev, u32 stream)
 		for (i = 0; i < 4; i++)
 			i2s_read_reg(dev->i2s_base, ROR(i));
 	}
+}
+
+static irqreturn_t dw_i2s_irq_handler(int irq, void *dev_id)
+{
+	struct dw_i2s_dev *dev = dev_id;
+	u32 isr[4], sleft[dev->fifo_th], sright[dev->fifo_th];
+	int i, j, xfer_bytes = dev->config.data_width / 8;
+	int dir = dev->binfo.stream->stream;
+
+	for (i = 0; i < 4; i++)
+		isr[i] = i2s_read_reg(dev->i2s_base, ISR(i));
+
+	i2s_clear_irqs(dev, SNDRV_PCM_STREAM_PLAYBACK);
+	i2s_clear_irqs(dev, SNDRV_PCM_STREAM_CAPTURE);
+
+	if (dev->use_dmaengine)
+		return IRQ_HANDLED;
+
+	for (i = 0; i < 4; i++) {
+		/* Copy only to/from first two channels
+		 * TODO: Remaining channels
+		 */
+		if ((isr[i] & 0x10) && (i == 0) &&
+				(dir == SNDRV_PCM_STREAM_PLAYBACK)) {
+			/* TXFEM - TX FIFO is empty */
+			dw_pcm_transfer(sleft, sright, xfer_bytes, dev->fifo_th,
+					&dev->binfo);
+			for (j = 0; j < dev->fifo_th; j++) {
+				i2s_write_reg(dev->i2s_base, LRBR_LTHR(i),
+						sleft[j]);
+				i2s_write_reg(dev->i2s_base, RRBR_RTHR(i),
+						sright[j]);
+			}
+		} else if ((isr[i] & 0x01) && (i == 0) &&
+				(dir == SNDRV_PCM_STREAM_CAPTURE)) {
+			/* RXDAM - RX FIFO is full */
+			for (j = 0; j < dev->fifo_th; j++) {
+				sleft[j] = i2s_read_reg(dev->i2s_base,
+						LRBR_LTHR(i));
+				sright[j] = i2s_read_reg(dev->i2s_base,
+						RRBR_RTHR(i));
+			}
+			dw_pcm_transfer(sleft, sright, xfer_bytes, dev->fifo_th,
+					&dev->binfo);
+		}
+	}
+
+	return IRQ_HANDLED;
 }
 
 static void i2s_start(struct dw_i2s_dev *dev,
@@ -626,7 +650,7 @@ static int dw_i2s_probe(struct platform_device *pdev)
 	const struct i2s_platform_data *pdata = pdev->dev.platform_data;
 	struct dw_i2s_dev *dev;
 	struct resource *res;
-	int ret;
+	int ret, irq_number;
 	struct snd_soc_dai_driver *dw_i2s_dai;
 	const char *clk_id;
 
@@ -649,6 +673,19 @@ static int dw_i2s_probe(struct platform_device *pdev)
 	if (IS_ERR(dev->i2s_base))
 		return PTR_ERR(dev->i2s_base);
 
+	irq_number = platform_get_irq(pdev, 0);
+	if (irq_number <= 0) {
+		dev_err(&pdev->dev, "get_irq fail\n");
+		return -EINVAL;
+	}
+
+	ret = devm_request_irq(&pdev->dev, irq_number, dw_i2s_irq_handler,
+			IRQF_SHARED, "dw_i2s_irq_handler", dev);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "request_irq fail\n");
+		return ret;
+	}
+
 	dev->dev = &pdev->dev;
 
 	dev->i2s_reg_comp1 = I2S_COMP_PARAM_1;
@@ -657,6 +694,7 @@ static int dw_i2s_probe(struct platform_device *pdev)
 		dev->capability = pdata->cap;
 		clk_id = NULL;
 		dev->quirks = pdata->quirks;
+		dev->use_dmaengine = false;
 		if (dev->quirks & DW_I2S_QUIRK_COMP_REG_OFFSET) {
 			dev->i2s_reg_comp1 = pdata->i2s_reg_comp1;
 			dev->i2s_reg_comp2 = pdata->i2s_reg_comp2;
@@ -664,6 +702,8 @@ static int dw_i2s_probe(struct platform_device *pdev)
 		ret = dw_configure_dai_by_pd(dev, dw_i2s_dai, res, pdata);
 	} else {
 		clk_id = "i2sclk";
+		dev->use_dmaengine = of_property_read_bool(pdev->dev.of_node,
+				"dmas");
 		ret = dw_configure_dai_by_dt(dev, dw_i2s_dai, res);
 	}
 	if (ret < 0)
@@ -695,7 +735,7 @@ static int dw_i2s_probe(struct platform_device *pdev)
 		goto err_clk_disable;
 	}
 
-	if (!pdata) {
+	if (dev->use_dmaengine) {
 		ret = devm_snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
 		if (ret) {
 			dev_err(&pdev->dev,
