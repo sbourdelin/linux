@@ -330,7 +330,7 @@ struct etmv4_drvdata {
 	u32				ccctlr;
 	bool				trcbb;
 	u32				bb_ctrl;
-	bool				q_support;
+	u32				q_support;
 	u32				vinst_ctrl;
 	u32				viiectlr;
 	u32				vissctlr;
