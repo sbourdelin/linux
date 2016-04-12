@@ -72,6 +72,10 @@
 			status = "okay";
 		};
 
+		vqmmc_reg: voltage-regulator {
+			status = "okay";
+		};
+
 		/* SSC11 to HDMI */
 		hdmiddc: i2c@9541000 {
 			status = "okay";
