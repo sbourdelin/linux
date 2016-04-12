@@ -106,7 +106,7 @@ err_get_value:
 static void flush_timer(unsigned long arg)
 {
 	struct gpio_rc_dev *gpio_dev = (struct gpio_rc_dev *)arg;
-	DEFINE_IR_RAW_EVENT(ev);
+	struct ir_raw_event ev = {};
 
 	ev.timeout = true;
 	ev.duration = gpio_dev->rcdev->timeout;

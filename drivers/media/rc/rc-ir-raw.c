@@ -107,7 +107,7 @@ int ir_raw_event_store_edge(struct rc_dev *dev, enum raw_event_type type)
 {
 	ktime_t			now;
 	s64			delta; /* ns */
-	DEFINE_IR_RAW_EVENT(ev);
+	struct ir_raw_event	ev = {};
 	int			rc = 0;
 	int			delay;
 
@@ -200,7 +200,7 @@ void ir_raw_event_set_idle(struct rc_dev *dev, bool idle)
 	if (idle) {
 		dev->raw->this_ev.timeout = true;
 		ir_raw_event_store(dev, &dev->raw->this_ev);
-		init_ir_raw_event(&dev->raw->this_ev);
+		dev->raw->this_ev = (struct ir_raw_event) {};
 	}
 
 	if (dev->s_idle)

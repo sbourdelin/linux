@@ -341,7 +341,7 @@ static void redrat3_rx_timeout(unsigned long data)
 
 static void redrat3_process_ir_data(struct redrat3_dev *rr3)
 {
-	DEFINE_IR_RAW_EVENT(rawir);
+	struct ir_raw_event rawir = {};
 	struct device *dev;
 	unsigned i, trailer = 0;
 	unsigned sig_size, single_len, offset, val;
