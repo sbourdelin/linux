@@ -105,6 +105,7 @@ static int pending_scrq(struct ibmvnic_adapter *,
 			struct ibmvnic_sub_crq_queue *);
 static union sub_crq *ibmvnic_next_scrq(struct ibmvnic_adapter *,
 					struct ibmvnic_sub_crq_queue *);
+static int ibmvnic_tx_work(void *data);
 static int ibmvnic_poll(struct napi_struct *napi, int data);
 static void send_map_query(struct ibmvnic_adapter *adapter);
 static void send_request_map(struct ibmvnic_adapter *, dma_addr_t, __be32, u8);
@@ -437,6 +438,17 @@ static int ibmvnic_open(struct net_device *netdev)
 
 		tx_pool->consumer_index = 0;
 		tx_pool->producer_index = 0;
+
+		init_waitqueue_head(&tx_pool->ibmvnic_tx_comp_q);
+		tx_pool->work_thread =
+			kthread_run(ibmvnic_tx_work, adapter->tx_scrq[i],
+				    "%s_%s_%d",
+				    IBMVNIC_NAME, adapter->netdev->name, i);
+		if (IS_ERR(tx_pool->work_thread)) {
+			dev_err(dev, "Couldn't create kernel thread: %ld\n",
+				PTR_ERR(tx_pool->work_thread));
+			goto thread_failed;
+		}
 	}
 	adapter->bounce_buffer_size =
 	    (netdev->mtu + ETH_HLEN - 1) / PAGE_SIZE + 1;
@@ -477,6 +489,9 @@ bounce_map_failed:
 bounce_alloc_failed:
 	i = tx_subcrqs - 1;
 	kfree(adapter->tx_pool[i].free_map);
+thread_failed:
+	for (j = 0; j < i; j++)
+		kthread_stop(adapter->tx_pool[j].work_thread);
 tx_fm_alloc_failed:
 	free_long_term_buff(adapter, &adapter->tx_pool[i].long_term_buff);
 tx_ltb_alloc_failed:
@@ -731,6 +746,16 @@ static int ibmvnic_xmit(struct sk_buff *skb, struct net_device *netdev)
 	}
 
 	index = tx_pool->free_map[tx_pool->consumer_index];
+	/* tx queue full */
+	if ((index + 1) % adapter->max_tx_entries_per_subcrq ==
+	    tx_pool->free_map[tx_pool->producer_index]) {
+		netif_tx_stop_queue(netdev_get_tx_queue(netdev, queue_num));
+		tx_send_failed++;
+		tx_dropped++;
+		ret = NETDEV_TX_BUSY;
+		goto out;
+	}
+
 	offset = index * adapter->req_mtu;
 	dst = tx_pool->long_term_buff.buff + offset;
 	memset(dst, 0, adapter->req_mtu);
@@ -1314,6 +1339,7 @@ static int ibmvnic_complete_tx(struct ibmvnic_adapter *adapter,
 {
 	struct device *dev = &adapter->vdev->dev;
 	struct ibmvnic_tx_buff *txbuff;
+	struct netdev_queue *txq;
 	union sub_crq *next;
 	int index;
 	int i, j;
@@ -1361,6 +1387,10 @@ restart_loop:
 		next->tx_comp.first = 0;
 	}
 
+	txq = netdev_get_tx_queue(adapter->netdev, scrq->pool_index);
+	if (netif_tx_queue_stopped(txq))
+		netif_tx_wake_queue(txq);
+
 	enable_scrq_irq(adapter, scrq);
 
 	if (pending_scrq(adapter, scrq)) {
@@ -1371,13 +1401,35 @@ restart_loop:
 	return 0;
 }
 
+static int ibmvnic_tx_work(void *data)
+{
+	int rc;
+	struct ibmvnic_sub_crq_queue *scrq = data;
+	struct ibmvnic_adapter *adapter = scrq->adapter;
+
+	while (1) {
+		rc = wait_event_interruptible(adapter->
+					      tx_pool[scrq->pool_index].
+					      ibmvnic_tx_comp_q,
+					      pending_scrq(adapter, scrq));
+		BUG_ON(rc);
+
+		if (kthread_should_stop())
+			break;
+
+		disable_scrq_irq(adapter, scrq);
+
+		ibmvnic_complete_tx(adapter, scrq);
+	}
+	return 0;
+}
+
 static irqreturn_t ibmvnic_interrupt_tx(int irq, void *instance)
 {
 	struct ibmvnic_sub_crq_queue *scrq = instance;
 	struct ibmvnic_adapter *adapter = scrq->adapter;
 
-	disable_scrq_irq(adapter, scrq);
-	ibmvnic_complete_tx(adapter, scrq);
+	wake_up(&adapter->tx_pool[scrq->pool_index].ibmvnic_tx_comp_q);
 
 	return IRQ_HANDLED;
 }
