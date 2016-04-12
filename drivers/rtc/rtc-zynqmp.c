@@ -57,6 +57,7 @@ struct xlnx_rtc_dev {
 	int			alarm_irq;
 	int			sec_irq;
 	int			calibval;
+	int			time_updated;
 };
 
 static int xlnx_rtc_set_time(struct device *dev, struct rtc_time *tm)
@@ -64,6 +65,12 @@ static int xlnx_rtc_set_time(struct device *dev, struct rtc_time *tm)
 	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
 	unsigned long new_time;
 
+	/*
+	 * The value written will be updated after 1 sec into the
+	 * seconds read register, so we need to program time +1 sec
+	 * to get the correct time on read.
+	 */
+	tm->tm_sec += 1;
 	new_time = rtc_tm_to_time64(tm);
 
 	if (new_time > RTC_SEC_MAX_VAL)
@@ -78,6 +85,17 @@ static int xlnx_rtc_set_time(struct device *dev, struct rtc_time *tm)
 
 	writel(new_time, xrtcdev->reg_base + RTC_SET_TM_WR);
 
+	/*
+	 * Clear the rtc interrupt status register after setting the
+	 * time. During a read_time function, the code should read the
+	 * RTC_INT_STATUS register and if bit 0 is still 0, it means
+	 * that one second has not elapsed yet since RTC was set and
+	 * the current time should be read from SET_TIME_READ register;
+	 * otherwise, CURRENT_TIME register is read to report the time
+	 */
+	writel(RTC_INT_SEC | RTC_INT_ALRM, xrtcdev->reg_base + RTC_INT_STS);
+	xrtcdev->time_updated = 0;
+
 	return 0;
 }
 
@@ -85,7 +103,17 @@ static int xlnx_rtc_read_time(struct device *dev, struct rtc_time *tm)
 {
 	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
 
-	rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_CUR_TM), tm);
+	if (xrtcdev->time_updated == 0) {
+		/*
+		 * Time written in SET_TIME_WRITE has not yet updated into
+		 * the seconds read register, so read the time from the
+		 * SET_TIME_WRITE instead of CURRENT_TIME register.
+		 */
+		rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_SET_TM_RD), tm);
+		tm->tm_sec -= 1;
+	} else {
+		rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_CUR_TM), tm);
+	}
 
 	return rtc_valid_tm(tm);
 }
@@ -133,6 +161,9 @@ static void xlnx_init_rtc(struct xlnx_rtc_dev *xrtcdev)
 {
 	u32 rtc_ctrl;
 
+	/* Enable RTC SEC interrupts */
+	writel(RTC_INT_SEC, xrtcdev->reg_base + RTC_INT_EN);
+
 	/* Enable RTC switch to battery when VCC_PSAUX is not available */
 	rtc_ctrl = readl(xrtcdev->reg_base + RTC_CTRL);
 	rtc_ctrl |= RTC_BATT_EN;
@@ -169,8 +200,13 @@ static irqreturn_t xlnx_rtc_interrupt(int irq, void *id)
 	/* Clear interrupt */
 	writel(status, xrtcdev->reg_base + RTC_INT_STS);
 
-	if (status & RTC_INT_SEC)
+	if (status & RTC_INT_SEC) {
+		if (xrtcdev->time_updated == 0) {
+			/* RTC updated the seconds read register */
+			xrtcdev->time_updated = 1;
+		}
 		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_UF);
+	}
 	if (status & RTC_INT_ALRM)
 		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_AF);
 
