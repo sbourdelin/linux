@@ -71,7 +71,45 @@ static ssize_t
 show_rc6_mask(struct device *kdev, struct device_attribute *attr, char *buf)
 {
 	struct drm_minor *dminor = dev_to_drm_minor(kdev);
-	return snprintf(buf, PAGE_SIZE, "%x\n", intel_enable_rc6(dminor->dev));
+	struct drm_device *dev = dminor->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	int enable_rc6;
+
+	enable_rc6 = sanitize_rc6_option(dev, intel_enable_rc6(dminor->dev));
+	return snprintf(buf, PAGE_SIZE, "%x\n",
+				(dev_priv->rps.enabled && enable_rc6));
+}
+
+static ssize_t
+toggle_rc6(struct device *kdev, struct device_attribute *attr,
+	const char *buf, size_t count)
+{
+	struct drm_minor *dminor = dev_to_drm_minor(kdev);
+	struct drm_device *dev = dminor->dev;
+	u32 val;
+	ssize_t ret;
+	bool sysfs_set = true;
+
+	ret = kstrtou32(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	switch (val) {
+	case 0:
+		ret = intel_disable_rc_powersave(dev, sysfs_set);
+		if (ret)
+			return ret;
+		break;
+	case 1:
+		ret = intel_enable_gt_powersave(dev, sysfs_set);
+		if (ret)
+			return ret;
+		break;
+	default:
+		return -EINVAL;
+
+	}
+	return count;
 }
 
 static ssize_t
@@ -228,7 +266,7 @@ toggle_psr(struct device *kdev, struct device_attribute *attr,
 
 static DEVICE_ATTR(fbc_enable, S_IRUGO | S_IWUSR, show_fbc, toggle_fbc);
 static DEVICE_ATTR(psr_enable, S_IRUGO | S_IWUSR, show_psr, toggle_psr);
-static DEVICE_ATTR(rc6_enable, S_IRUGO, show_rc6_mask, NULL);
+static DEVICE_ATTR(rc6_enable, S_IRUGO | S_IWUSR, show_rc6_mask, toggle_rc6);
 static DEVICE_ATTR(rc6_residency_ms, S_IRUGO, show_rc6_ms, NULL);
 static DEVICE_ATTR(rc6p_residency_ms, S_IRUGO, show_rc6p_ms, NULL);
 static DEVICE_ATTR(rc6pp_residency_ms, S_IRUGO, show_rc6pp_ms, NULL);

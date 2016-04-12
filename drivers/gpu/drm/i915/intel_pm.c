@@ -4587,12 +4587,26 @@ void intel_set_rps(struct drm_device *dev, u8 val)
 		gen6_set_rps(dev, val);
 }
 
+static void gen9_disable_rc(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	I915_WRITE(GEN6_RC_CONTROL, 0);
+}
+
 static void gen9_disable_rps(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
 	I915_WRITE(GEN6_RC_CONTROL, 0);
 	I915_WRITE(GEN9_PG_ENABLE, 0);
+}
+
+static void gen6_disable_rc(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	I915_WRITE(GEN6_RC_CONTROL, 0);
 }
 
 static void gen6_disable_rps(struct drm_device *dev)
@@ -6255,7 +6269,33 @@ void intel_suspend_gt_powersave(struct drm_device *dev)
 	gen6_rps_idle(dev_priv);
 }
 
-void intel_disable_gt_powersave(struct drm_device *dev)
+int intel_disable_rc_powersave(struct drm_device *dev, bool sysfs_set)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	if (IS_IRONLAKE_M(dev)) {
+		ironlake_disable_drps(dev);
+	} else if (INTEL_INFO(dev)->gen >= 6) {
+		intel_suspend_gt_powersave(dev);
+
+		mutex_lock(&dev_priv->rps.hw_lock);
+		if (INTEL_INFO(dev)->gen >= 9)
+			gen9_disable_rc(dev);
+		else if (IS_CHERRYVIEW(dev))
+			cherryview_disable_rps(dev);
+		else if (IS_VALLEYVIEW(dev))
+			valleyview_disable_rps(dev);
+		else
+			gen6_disable_rc(dev);
+
+		dev_priv->rps.enabled = false;
+		dev_priv->rps.sysfs_set = sysfs_set;
+		mutex_unlock(&dev_priv->rps.hw_lock);
+	}
+	return 0;
+}
+
+int intel_disable_gt_powersave(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
@@ -6277,6 +6317,7 @@ void intel_disable_gt_powersave(struct drm_device *dev)
 		dev_priv->rps.enabled = false;
 		mutex_unlock(&dev_priv->rps.hw_lock);
 	}
+	return 0;
 }
 
 static void intel_gen6_powersave_work(struct work_struct *work)
@@ -6322,13 +6363,14 @@ static void intel_gen6_powersave_work(struct work_struct *work)
 	intel_runtime_pm_put(dev_priv);
 }
 
-void intel_enable_gt_powersave(struct drm_device *dev)
+int intel_enable_gt_powersave(struct drm_device *dev, bool sysfs_set)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
+	int ret = 0;
 
 	/* Powersaving is controlled by the host when inside a VM */
 	if (intel_vgpu_active(dev))
-		return;
+		return -ENOTTY;
 
 	if (IS_IRONLAKE_M(dev)) {
 		ironlake_enable_drps(dev);
@@ -6352,6 +6394,11 @@ void intel_enable_gt_powersave(struct drm_device *dev)
 					   round_jiffies_up_relative(HZ)))
 			intel_runtime_pm_get_noresume(dev_priv);
 	}
+
+	mutex_lock(&dev_priv->rps.hw_lock);
+	dev_priv->rps.sysfs_set = sysfs_set;
+	mutex_unlock(&dev_priv->rps.hw_lock);
+	return ret;
 }
 
 void intel_reset_gt_powersave(struct drm_device *dev)

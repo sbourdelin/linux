@@ -950,7 +950,7 @@ int i915_reset(struct drm_device *dev)
 	 * of re-init after reset.
 	 */
 	if (INTEL_INFO(dev)->gen > 5)
-		intel_enable_gt_powersave(dev);
+		intel_enable_gt_powersave(dev, false);
 
 	return 0;
 }
@@ -1600,7 +1600,8 @@ static int intel_runtime_resume(struct device *device)
 	if (!IS_VALLEYVIEW(dev_priv) && !IS_CHERRYVIEW(dev_priv))
 		intel_hpd_init(dev_priv);
 
-	intel_enable_gt_powersave(dev);
+	if (dev_priv->rps.sysfs_set != true)
+		intel_enable_gt_powersave(dev, dev_priv->rps.sysfs_set);
 
 	enable_rpm_wakeref_asserts(dev_priv);
 

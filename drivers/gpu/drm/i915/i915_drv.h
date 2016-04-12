@@ -1158,6 +1158,7 @@ struct intel_gen6_power_mgmt {
 	 * talking to hw - so only take it when talking to hw!
 	 */
 	struct mutex hw_lock;
+	bool sysfs_set;
 };
 
 /* defined intel_pm.c */
