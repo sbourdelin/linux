@@ -1338,15 +1338,112 @@ static int tvp5150_init(struct i2c_client *c)
 	return 0;
 }
 
+#ifdef CONFIG_MEDIA_CONTROLLER
+static int tvp5150_parse_connector_node(struct tvp5150 *decoder,
+					struct device_node *port)
+{
+	struct v4l2_of_endpoint endpoint;
+	struct media_entity *input;
+	struct device_node *ep, *rp;
+	unsigned int input_type;
+	const char *name;
+	int ret;
+
+	/* tvp5150 connector ports can have only one endpoint. */
+	ep = of_get_next_child(port, NULL);
+	if (!ep) {
+		v4l2_err(&decoder->sd, "Endpoint not found for connector %s\n",
+			 port->full_name);
+		return -EINVAL;
+	}
+
+	ret = v4l2_of_parse_endpoint(ep, &endpoint);
+	if (ret) {
+		v4l2_err(&decoder->sd, "Connector %s parse endpoint failed %d\n",
+			 port->full_name, ret);
+		goto err_ep;
+	}
+
+	input_type = endpoint.base.port;
+
+	if (input_type >= TVP5150_INPUT_NUM) {
+		v4l2_err(&decoder->sd,
+			 "Connector %s port address %u is not a valid one\n",
+			 port->full_name, input_type);
+		ret = -EINVAL;
+		goto err_ep;
+	}
+
+	input = &decoder->input_ent[input_type];
+
+	/* Each input connector can only be defined once */
+	if (input->name) {
+		v4l2_err(&decoder->sd,
+			 "Connector %s with same type already exists\n",
+			 input->name);
+		ret = -EINVAL;
+		goto err_ep;
+	}
+
+	rp = of_graph_get_remote_port_parent(ep);
+	if (!rp) {
+		v4l2_err(&decoder->sd, "Port %s remote parent not found\n",
+			 ep->full_name);
+		ret = -EINVAL;
+		goto err_ep;
+	}
+
+	switch (input_type) {
+	case TVP5150_COMPOSITE0:
+	case TVP5150_COMPOSITE1:
+		if (!of_device_is_compatible(rp, "composite-video-connector")) {
+			v4l2_err(&decoder->sd, "Wrong compatible for port %s\n",
+				 rp->full_name);
+			ret = -EINVAL;
+			goto err_rp;
+		}
+
+		input->function = MEDIA_ENT_F_CONN_COMPOSITE;
+		break;
+	case TVP5150_SVIDEO:
+		if (!of_device_is_compatible(rp, "svideo-connector")) {
+			v4l2_err(&decoder->sd, "Wrong compatible for port %s\n",
+				 rp->full_name);
+			ret = -EINVAL;
+			goto err_rp;
+		}
+
+		input->function = MEDIA_ENT_F_CONN_SVIDEO;
+		break;
+	}
+
+	input->flags = MEDIA_ENT_FL_CONNECTOR;
+
+	ret = of_property_read_string(rp, "label", &name);
+	if (ret < 0) {
+		v4l2_err(&decoder->sd,
+			 "Missing label property in port %s\n",
+			 rp->full_name);
+		goto err_rp;
+	}
+
+	input->name = name;
+
+err_rp:
+	of_node_put(rp);
+err_ep:
+	of_node_put(ep);
+	return ret;
+
+}
+#endif
+
 static int tvp5150_parse_dt(struct tvp5150 *decoder, struct device_node *np)
 {
 	struct v4l2_of_endpoint bus_cfg;
 	struct device_node *ep;
 #ifdef CONFIG_MEDIA_CONTROLLER
 	struct device_node *connectors, *child;
-	struct media_entity *input;
-	const char *name;
-	u32 input_type;
 #endif
 	unsigned int flags;
 	int ret = 0;
@@ -1377,52 +1474,22 @@ static int tvp5150_parse_dt(struct tvp5150 *decoder, struct device_node *np)
 	if (!connectors)
 		goto err;
 
+	if (of_get_child_count(connectors) > TVP5150_INPUT_NUM) {
+		v4l2_err(&decoder->sd,
+			 "Maximum number of connectors is %d\n",
+			 TVP5150_INPUT_NUM);
+		ret = -EINVAL;
+		goto err_connector;
+	}
+
 	for_each_available_child_of_node(connectors, child) {
-		ret = of_property_read_u32(child, "input", &input_type);
+		ret = tvp5150_parse_connector_node(decoder, child);
 		if (ret) {
 			v4l2_err(&decoder->sd,
-				 "missing type property in node %s\n",
-				 child->name);
+				 "Connector %s parse failed\n", child->name);
+			of_node_put(child);
 			goto err_connector;
 		}
-
-		if (input_type >= TVP5150_INPUT_NUM) {
-			ret = -EINVAL;
-			goto err_connector;
-		}
-
-		input = &decoder->input_ent[input_type];
-
-		/* Each input connector can only be defined once */
-		if (input->name) {
-			v4l2_err(&decoder->sd,
-				 "input %s with same type already exists\n",
-				 input->name);
-			ret = -EINVAL;
-			goto err_connector;
-		}
-
-		switch (input_type) {
-		case TVP5150_COMPOSITE0:
-		case TVP5150_COMPOSITE1:
-			input->function = MEDIA_ENT_F_CONN_COMPOSITE;
-			break;
-		case TVP5150_SVIDEO:
-			input->function = MEDIA_ENT_F_CONN_SVIDEO;
-			break;
-		}
-
-		input->flags = MEDIA_ENT_FL_CONNECTOR;
-
-		ret = of_property_read_string(child, "label", &name);
-		if (ret < 0) {
-			v4l2_err(&decoder->sd,
-				 "missing label property in node %s\n",
-				 child->name);
-			goto err_connector;
-		}
-
-		input->name = name;
 	}
 
 err_connector:
