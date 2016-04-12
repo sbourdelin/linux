@@ -1650,6 +1650,10 @@ struct blk_dax_ctl {
 	pfn_t pfn;
 };
 
+#define BDEV_RES_GET		0
+#define BDEV_RES_MOD		(1 << 0)
+#define BDEV_RES_PROVISION	(1 << 1)
+
 struct block_device_operations {
 	int (*open) (struct block_device *, fmode_t);
 	void (*release) (struct gendisk *, fmode_t);
@@ -1667,6 +1671,8 @@ struct block_device_operations {
 	int (*getgeo)(struct block_device *, struct hd_geometry *);
 	/* this callback is with swap_lock and sometimes page table lock held */
 	void (*swap_slot_free_notify) (struct block_device *, unsigned long);
+	int (*reserve_space) (struct block_device *, int, sector_t, sector_t,
+			      sector_t *);
 	struct module *owner;
 	const struct pr_ops *pr_ops;
 };
