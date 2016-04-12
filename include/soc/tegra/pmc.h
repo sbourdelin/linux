@@ -133,6 +133,7 @@ int tegra_powergate_sequence_power_up(unsigned int id, struct clk *clk,
 
 int tegra_io_rail_power_on(unsigned int id);
 int tegra_io_rail_power_off(unsigned int id);
+int tegra_io_rail_power_get_status(unsigned int id);
 #else
 static inline int tegra_powergate_is_powered(unsigned int id)
 {
@@ -169,6 +170,11 @@ static inline int tegra_io_rail_power_on(unsigned int id)
 static inline int tegra_io_rail_power_off(unsigned int id)
 {
 	return -ENOSYS;
+}
+
+static inline int tegra_io_rail_power_get_status(unsigned int id)
+{
+	return -ENOTSUP;
 }
 #endif /* CONFIG_ARCH_TEGRA */
 

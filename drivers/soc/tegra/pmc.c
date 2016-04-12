@@ -613,6 +613,22 @@ error:
 }
 EXPORT_SYMBOL(tegra_io_rail_power_off);
 
+int tegra_io_rail_power_get_status(unsigned int id)
+{
+	unsigned long status, value;
+	unsigned int mask;
+
+	if ((id > 63) || (id == 30) || (id == 31))
+		return -EINVAL;
+
+	status = (id < 32) ? IO_DPD_STATUS : IO_DPD2_STATUS;
+	mask = BIT(id % 32);
+	value = tegra_pmc_readl(status);
+
+	return !!(value & mask);
+}
+EXPORT_SYMBOL(tegra_io_rail_power_get_status);
+
 #ifdef CONFIG_PM_SLEEP
 enum tegra_suspend_mode tegra_pmc_get_suspend_mode(void)
 {
