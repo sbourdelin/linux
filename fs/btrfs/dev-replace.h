@@ -44,4 +44,5 @@ static inline void btrfs_dev_replace_stats_inc(atomic64_t *stat_value)
 {
 	atomic64_inc(stat_value);
 }
+int btrfs_auto_replace_start(struct btrfs_root *root, u64 src_devid);
 #endif
