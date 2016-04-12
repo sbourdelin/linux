@@ -415,6 +415,15 @@ static inline u8 drm_eld_get_conn_type(const uint8_t *eld)
 	return eld[DRM_ELD_SAD_COUNT_CONN_TYPE] & DRM_ELD_CONN_TYPE_MASK;
 }
 
+/**
+ * drm_eld_get_spk_alloc - Get ELD speaker allocation
+ * @eld: pointer to an eld memory structure
+ */
+static inline const u8 drm_eld_get_spk_alloc(const uint8_t *eld)
+{
+	return eld[DRM_ELD_SPEAKER];
+}
+
 struct edid *drm_do_get_edid(struct drm_connector *connector,
 	int (*get_edid_block)(void *data, u8 *buf, unsigned int block,
 			      size_t len),
