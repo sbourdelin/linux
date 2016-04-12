@@ -92,6 +92,13 @@ struct intel_ring_hangcheck {
 	enum intel_ring_hangcheck_action action;
 	int deadlock;
 	u32 instdone[I915_NUM_INSTDONE_REG];
+
+	/*
+	 * Last recorded ring head index.
+	 * This is only ever a ring index where as active
+	 * head may be a graphics address in a ring buffer
+	 */
+	u32 last_head;
 };
 
 struct intel_ringbuffer {
@@ -215,6 +222,8 @@ struct  intel_engine_cs {
 	/* engine reset supporting functions */
 	int (*save)(struct intel_engine_cs *engine,
 		    struct intel_engine_cs_state *state);
+	int (*start)(struct intel_engine_cs *engine,
+		     struct intel_engine_cs_state *state);
 
 	/* GEN8 signal/wait table - never trust comments!
 	 *	  signal to	signal to    signal to   signal to      signal to

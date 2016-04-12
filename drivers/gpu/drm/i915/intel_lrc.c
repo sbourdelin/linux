@@ -505,6 +505,30 @@ static void execlists_context_unqueue(struct intel_engine_cs *engine,
 	execlists_submit_requests(req0, req1, tdr_resubmission);
 }
 
+/**
+ * intel_execlists_resubmit()
+ * @engine: engine to do resubmission for
+ *
+ * In execlists mode, engine reset postprocess mainly includes resubmission of
+ * context after reset, for this we bypass the execlist queue. This is
+ * necessary since at the point of TDR hang recovery the hardware will be hung
+ * and resubmitting a fixed context (the context that the TDR has identified
+ * as hung and fixed up in order to move past the blocking batch buffer) to a
+ * hung execlist queue will lock up the TDR.  Instead, opt for direct ELSP
+ * submission without depending on the rest of the driver.
+ */
+static void intel_execlists_resubmit(struct intel_engine_cs *engine)
+{
+	unsigned long flags;
+
+	if (WARN_ON(list_empty(&engine->execlist_queue)))
+		return;
+
+	spin_lock_irqsave(&engine->execlist_lock, flags);
+	execlists_context_unqueue(engine, true);
+	spin_unlock_irqrestore(&engine->execlist_lock, flags);
+}
+
 static unsigned int
 execlists_check_remove_request(struct intel_engine_cs *engine, u32 request_id)
 {
@@ -1265,6 +1289,75 @@ static int gen8_engine_state_save(struct intel_engine_cs *engine,
 	state->req = intel_execlist_get_current_request(engine);
 	if (!state->req)
 		return -EINVAL;
+
+	return 0;
+}
+
+/**
+ * gen8_engine_start() - restore saved state and start engine
+ * @engine: engine to be started
+ * @state: state to be restored
+ *
+ * Returns:
+ *	0 if ok, otherwise propagates error codes.
+ */
+static int gen8_engine_start(struct intel_engine_cs *engine,
+			     struct intel_engine_cs_state *state)
+{
+	u32 head;
+	u32 head_addr, tail_addr;
+	u32 *reg_state;
+	struct intel_ringbuffer *ringbuf;
+	struct intel_context *ctx;
+	struct drm_i915_private *dev_priv = engine->dev->dev_private;
+
+	ctx = state->req->ctx;
+	ringbuf = ctx->engine[engine->id].ringbuf;
+	reg_state = ctx->engine[engine->id].lrc_reg_state;
+
+	head = state->head;
+	head_addr = head & HEAD_ADDR;
+
+	if (head == engine->hangcheck.last_head) {
+		/*
+		 * The engine has not advanced since the last time it hung,
+		 * force it to advance to the next QWORD. In most cases the
+		 * engine head pointer will automatically advance to the
+		 * next instruction as soon as it has read the current
+		 * instruction, without waiting for it to complete. This
+		 * seems to be the default behaviour, however an MBOX wait
+		 * inserted directly to the VCS/BCS engines does not behave
+		 * in the same way, instead the head pointer will still be
+		 * pointing at the MBOX instruction until it completes.
+		 */
+		head_addr = roundup(head_addr, 8);
+		engine->hangcheck.last_head = head;
+	} else if (head_addr & 0x7) {
+		/* Ensure head pointer is pointing to a QWORD boundary */
+		head_addr = ALIGN(head_addr, 8);
+	}
+
+	tail_addr = reg_state[CTX_RING_TAIL+1] & TAIL_ADDR;
+
+	if (head_addr > tail_addr)
+		head_addr = tail_addr;
+	else if (head_addr >= ringbuf->size)
+		head_addr = 0;
+
+	head &= ~HEAD_ADDR;
+	head |= (head_addr & HEAD_ADDR);
+
+	/* Restore head */
+	reg_state[CTX_RING_HEAD+1] = head;
+	I915_WRITE_HEAD(engine, head);
+
+	/* set head */
+	ringbuf->head = head;
+	ringbuf->last_retired_head = -1;
+	intel_ring_update_space(ringbuf);
+
+	if (state->req)
+		intel_execlists_resubmit(engine);
 
 	return 0;
 }
@@ -2175,6 +2268,7 @@ logical_ring_default_vfuncs(struct drm_device *dev,
 
 	/* engine reset supporting functions */
 	engine->save = gen8_engine_state_save;
+	engine->start = gen8_engine_start;
 
 	if (IS_BXT_REVID(dev, 0, BXT_REVID_A1)) {
 		engine->irq_seqno_barrier = bxt_a_seqno_barrier;
