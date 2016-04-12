@@ -358,7 +358,8 @@ u32 intel_execlists_ctx_id(struct intel_context *ctx,
 }
 
 static void execlists_elsp_write(struct drm_i915_gem_request *rq0,
-				 struct drm_i915_gem_request *rq1)
+				 struct drm_i915_gem_request *rq1,
+				 bool tdr_resubmission)
 {
 
 	struct intel_engine_cs *engine = rq0->engine;
@@ -368,13 +369,15 @@ static void execlists_elsp_write(struct drm_i915_gem_request *rq0,
 
 	if (rq1) {
 		desc[1] = intel_lr_context_descriptor(rq1->ctx, rq1->engine);
-		rq1->elsp_submitted++;
+		if (!tdr_resubmission)
+			rq1->elsp_submitted++;
 	} else {
 		desc[1] = 0;
 	}
 
 	desc[0] = intel_lr_context_descriptor(rq0->ctx, rq0->engine);
-	rq0->elsp_submitted++;
+	if (!tdr_resubmission)
+		rq0->elsp_submitted++;
 
 	/* You must always write both descriptors in the order below. */
 	I915_WRITE_FW(RING_ELSP(engine), upper_32_bits(desc[1]));
@@ -415,7 +418,8 @@ static void execlists_update_context(struct drm_i915_gem_request *rq)
 }
 
 static void execlists_submit_requests(struct drm_i915_gem_request *rq0,
-				      struct drm_i915_gem_request *rq1)
+				      struct drm_i915_gem_request *rq1,
+				      bool tdr_resubmission)
 {
 	struct drm_i915_private *dev_priv = rq0->i915;
 
@@ -427,13 +431,14 @@ static void execlists_submit_requests(struct drm_i915_gem_request *rq0,
 	spin_lock_irq(&dev_priv->uncore.lock);
 	intel_uncore_forcewake_get__locked(dev_priv, FORCEWAKE_ALL);
 
-	execlists_elsp_write(rq0, rq1);
+	execlists_elsp_write(rq0, rq1, tdr_resubmission);
 
 	intel_uncore_forcewake_put__locked(dev_priv, FORCEWAKE_ALL);
 	spin_unlock_irq(&dev_priv->uncore.lock);
 }
 
-static void execlists_context_unqueue(struct intel_engine_cs *engine)
+static void execlists_context_unqueue(struct intel_engine_cs *engine,
+				      bool tdr_resubmission)
 {
 	struct drm_i915_gem_request *req0 = NULL, *req1 = NULL;
 	struct drm_i915_gem_request *cursor, *tmp;
@@ -451,6 +456,19 @@ static void execlists_context_unqueue(struct intel_engine_cs *engine)
 				 execlist_link) {
 		if (!req0) {
 			req0 = cursor;
+
+			/*
+			 * Only submit head request if this is a resubmission
+			 * following engine reset. The intention is to restore
+			 * the original submission state from the situation
+			 * when the hang originally happened. Once the request
+			 * that caused the hang is resubmitted we can continue
+			 * normally by submitting two request at a time.
+			 */
+			if (tdr_resubmission) {
+				req1 = NULL;
+				break;
+			}
 		} else if (req0->ctx == cursor->ctx) {
 			/* Same ctx: ignore first request, as second request
 			 * will update tail past first request's workload */
@@ -484,7 +502,7 @@ static void execlists_context_unqueue(struct intel_engine_cs *engine)
 		req0->tail &= ringbuf->size - 1;
 	}
 
-	execlists_submit_requests(req0, req1);
+	execlists_submit_requests(req0, req1, tdr_resubmission);
 }
 
 static unsigned int
@@ -599,7 +617,7 @@ static void intel_lrc_irq_handler(unsigned long data)
 	if (submit_contexts) {
 		if (!engine->disable_lite_restore_wa ||
 		    (csb[i][0] & GEN8_CTX_STATUS_ACTIVE_IDLE))
-			execlists_context_unqueue(engine);
+			execlists_context_unqueue(engine, false);
 	}
 
 	spin_unlock(&engine->execlist_lock);
@@ -642,7 +660,7 @@ static void execlists_context_queue(struct drm_i915_gem_request *request)
 
 	list_add_tail(&request->execlist_link, &engine->execlist_queue);
 	if (num_elements == 0)
-		execlists_context_unqueue(engine);
+		execlists_context_unqueue(engine, false);
 
 	spin_unlock_bh(&engine->execlist_lock);
 }
