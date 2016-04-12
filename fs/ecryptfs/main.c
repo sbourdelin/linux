@@ -24,6 +24,7 @@
  * 02111-1307, USA.
  */
 
+#include <linux/cred.h>
 #include <linux/dcache.h>
 #include <linux/file.h>
 #include <linux/module.h>
@@ -95,6 +96,56 @@ void __ecryptfs_printk(const char *fmt, ...)
 }
 
 /**
+ * Credentials for opening lower files.
+ */
+static const struct cred *kernel_cred;
+
+/**
+ * ecryptfs_privileged_open
+ * @lower_file: Result of dentry_open by root on lower dentry
+ * @lower_dentry: Lower dentry for file to open
+ * @lower_mnt: Lower vfsmount for file to open
+ *
+ * This function gets a r/w file opened againt the lower dentry.
+ *
+ * Returns zero on success; non-zero otherwise
+ */
+static int ecryptfs_privileged_open(struct file **lower_file,
+				    struct dentry *lower_dentry,
+				    struct vfsmount *lower_mnt)
+{
+	struct path path;
+	int flags = O_LARGEFILE;
+	int rc = 0;
+	const struct cred *old_cred;
+
+	path.dentry = lower_dentry;
+	path.mnt = lower_mnt;
+	flags |= IS_RDONLY(d_inode(lower_dentry)) ? O_RDONLY : O_RDWR;
+
+	/*
+	 * Use kernel service credentials to open the lower file, as the current
+	 * task may not have write privileges.  Uses kernel creds instead of
+	 * normal creds with CAP_DAC_OVERRIDE because because some LSMs like
+	 * SELinux associate the file with extra state from the current
+	 * credentials. When this happens, access to the lower file can
+	 * be affected by which task was the first to open it.
+	 */
+	old_cred = override_creds(kernel_cred);
+
+	/* Corresponding dput() and mntput() are done when the
+	 * lower file is fput() when all eCryptfs files for the inode are
+	 * released. */
+	(*lower_file) = dentry_open(&path, flags, kernel_cred);
+
+	revert_creds(old_cred);
+
+	if (IS_ERR(*lower_file))
+		rc = PTR_ERR(*lower_file);
+	return rc;
+}
+
+/**
  * ecryptfs_init_lower_file
  * @ecryptfs_dentry: Fully initialized eCryptfs dentry object, with
  *                   the lower dentry and the lower mount set
@@ -118,12 +169,10 @@ void __ecryptfs_printk(const char *fmt, ...)
 static int ecryptfs_init_lower_file(struct dentry *dentry,
 				    struct file **lower_file)
 {
-	const struct cred *cred = current_cred();
 	struct path *path = ecryptfs_dentry_to_lower_path(dentry);
 	int rc;
 
-	rc = ecryptfs_privileged_open(lower_file, path->dentry, path->mnt,
-				      cred);
+	rc = ecryptfs_privileged_open(lower_file, path->dentry, path->mnt);
 	if (rc) {
 		printk(KERN_ERR "Error opening lower file "
 		       "for lower_dentry [0x%p] and lower_mnt [0x%p]; "
@@ -829,29 +878,30 @@ static int __init ecryptfs_init(void)
 				(unsigned long)PAGE_SIZE);
 		goto out;
 	}
+	kernel_cred = prepare_kernel_cred(NULL);
+	if (kernel_cred == NULL) {
+		rc = -ENOMEM;
+		ecryptfs_printk(KERN_ERR,
+				"Failed to prepare kernel credentials\n");
+		goto out;
+	}
 	rc = ecryptfs_init_kmem_caches();
 	if (rc) {
 		printk(KERN_ERR
 		       "Failed to allocate one or more kmem_cache objects\n");
-		goto out;
+		goto out_put_cred;
 	}
 	rc = do_sysfs_registration();
 	if (rc) {
 		printk(KERN_ERR "sysfs registration failed\n");
 		goto out_free_kmem_caches;
 	}
-	rc = ecryptfs_init_kthread();
-	if (rc) {
-		printk(KERN_ERR "%s: kthread initialization failed; "
-		       "rc = [%d]\n", __func__, rc);
-		goto out_do_sysfs_unregistration;
-	}
 	rc = ecryptfs_init_messaging();
 	if (rc) {
 		printk(KERN_ERR "Failure occurred while attempting to "
 				"initialize the communications channel to "
 				"ecryptfsd\n");
-		goto out_destroy_kthread;
+		goto out_do_sysfs_unregistration;
 	}
 	rc = ecryptfs_init_crypto();
 	if (rc) {
@@ -873,12 +923,12 @@ out_destroy_crypto:
 	ecryptfs_destroy_crypto();
 out_release_messaging:
 	ecryptfs_release_messaging();
-out_destroy_kthread:
-	ecryptfs_destroy_kthread();
 out_do_sysfs_unregistration:
 	do_sysfs_unregistration();
 out_free_kmem_caches:
 	ecryptfs_free_kmem_caches();
+out_put_cred:
+	put_cred(kernel_cred);
 out:
 	return rc;
 }
@@ -892,10 +942,10 @@ static void __exit ecryptfs_exit(void)
 		printk(KERN_ERR "Failure whilst attempting to destroy crypto; "
 		       "rc = [%d]\n", rc);
 	ecryptfs_release_messaging();
-	ecryptfs_destroy_kthread();
 	do_sysfs_unregistration();
 	unregister_filesystem(&ecryptfs_fs_type);
 	ecryptfs_free_kmem_caches();
+	put_cred(kernel_cred);
 }
 
 MODULE_AUTHOR("Michael A. Halcrow <mhalcrow@us.ibm.com>");

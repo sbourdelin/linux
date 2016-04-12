@@ -695,10 +695,6 @@ int ecryptfs_find_daemon_by_euid(struct ecryptfs_daemon **daemon);
 #endif
 int ecryptfs_init_kthread(void);
 void ecryptfs_destroy_kthread(void);
-int ecryptfs_privileged_open(struct file **lower_file,
-			     struct dentry *lower_dentry,
-			     struct vfsmount *lower_mnt,
-			     const struct cred *cred);
 int ecryptfs_get_lower_file(struct dentry *dentry, struct inode *inode);
 void ecryptfs_put_lower_file(struct inode *inode);
 int
