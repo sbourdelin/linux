@@ -76,6 +76,10 @@ struct btrfs_device {
 	int can_discard;
 	int is_tgtdev_for_dev_replace;
 
+	/* for barrier_all_devices() check */
+	int err_send;
+	int err_wait;
+
 #ifdef __BTRFS_NEED_DEVICE_DATA_ORDERED
 	seqcount_t data_seqcount;
 #endif
