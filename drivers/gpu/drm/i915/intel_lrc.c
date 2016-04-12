@@ -229,8 +229,9 @@ enum {
 
 static int intel_lr_context_pin(struct intel_context *ctx,
 				struct intel_engine_cs *engine);
-static void lrc_setup_hardware_status_page(struct intel_engine_cs *engine,
-					   struct drm_i915_gem_object *default_ctx_obj);
+static int
+lrc_setup_hws(struct intel_engine_cs *engine,
+	      struct drm_i915_gem_object *default_ctx_obj);
 
 
 /**
@@ -1093,8 +1094,8 @@ static int intel_lr_context_do_pin(struct intel_context *ctx,
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct drm_i915_gem_object *ctx_obj = ctx->engine[engine->id].state;
 	struct intel_ringbuffer *ringbuf = ctx->engine[engine->id].ringbuf;
-	struct page *lrc_state_page;
-	uint32_t *lrc_reg_state;
+	void *obj_addr;
+	u32 *lrc_reg_state;
 	int ret;
 
 	WARN_ON(!mutex_is_locked(&engine->dev->struct_mutex));
@@ -1104,19 +1105,20 @@ static int intel_lr_context_do_pin(struct intel_context *ctx,
 	if (ret)
 		return ret;
 
-	lrc_state_page = i915_gem_object_get_dirty_page(ctx_obj, LRC_STATE_PN);
-	if (WARN_ON(!lrc_state_page)) {
-		ret = -ENODEV;
+	obj_addr = i915_gem_object_pin_map(ctx_obj);
+	if (IS_ERR(obj_addr)) {
+		ret = PTR_ERR(obj_addr);
 		goto unpin_ctx_obj;
 	}
 
+	lrc_reg_state = obj_addr + LRC_STATE_PN * PAGE_SIZE;
+
 	ret = intel_pin_and_map_ringbuffer_obj(engine->dev, ringbuf);
 	if (ret)
-		goto unpin_ctx_obj;
+		goto unpin_map;
 
 	ctx->engine[engine->id].lrc_vma = i915_gem_obj_to_ggtt(ctx_obj);
 	intel_lr_context_descriptor_update(ctx, engine);
-	lrc_reg_state = kmap(lrc_state_page);
 	lrc_reg_state[CTX_RING_BUFFER_START+1] = ringbuf->vma->node.start;
 	ctx->engine[engine->id].lrc_reg_state = lrc_reg_state;
 	ctx_obj->dirty = true;
@@ -1127,6 +1129,8 @@ static int intel_lr_context_do_pin(struct intel_context *ctx,
 
 	return ret;
 
+unpin_map:
+	i915_gem_object_unpin_map(ctx_obj);
 unpin_ctx_obj:
 	i915_gem_object_ggtt_unpin(ctx_obj);
 
@@ -1159,7 +1163,7 @@ void intel_lr_context_unpin(struct intel_context *ctx,
 
 	WARN_ON(!mutex_is_locked(&ctx->i915->dev->struct_mutex));
 	if (--ctx->engine[engine->id].pin_count == 0) {
-		kunmap(kmap_to_page(ctx->engine[engine->id].lrc_reg_state));
+		i915_gem_object_unpin_map(ctx_obj);
 		intel_unpin_ringbuffer_obj(ctx->engine[engine->id].ringbuf);
 		i915_gem_object_ggtt_unpin(ctx_obj);
 		ctx->engine[engine->id].lrc_vma = NULL;
@@ -1584,9 +1588,12 @@ static int gen8_init_common_ring(struct intel_engine_cs *engine)
 	struct drm_device *dev = engine->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	unsigned int next_context_status_buffer_hw;
+	int ret;
 
-	lrc_setup_hardware_status_page(engine,
-				       dev_priv->kernel_context->engine[engine->id].state);
+	ret = lrc_setup_hws(engine,
+			    dev_priv->kernel_context->engine[engine->id].state);
+	if (ret)
+		return ret;
 
 	I915_WRITE_IMR(engine,
 		       ~(engine->irq_enable_mask | engine->irq_keep_mask));
@@ -2048,7 +2055,7 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *engine)
 	i915_gem_batch_pool_fini(&engine->batch_pool);
 
 	if (engine->status_page.obj) {
-		kunmap(sg_page(engine->status_page.obj->pages->sgl));
+		i915_gem_object_unpin_map(engine->status_page.obj);
 		engine->status_page.obj = NULL;
 	}
 
@@ -2378,15 +2385,16 @@ static u32 intel_lr_indirect_ctx_offset(struct intel_engine_cs *engine)
 }
 
 static int
-populate_lr_context(struct intel_context *ctx, struct drm_i915_gem_object *ctx_obj,
+populate_lr_context(struct intel_context *ctx,
+		    struct drm_i915_gem_object *ctx_obj,
 		    struct intel_engine_cs *engine,
 		    struct intel_ringbuffer *ringbuf)
 {
 	struct drm_device *dev = engine->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct i915_hw_ppgtt *ppgtt = ctx->ppgtt;
-	struct page *page;
-	uint32_t *reg_state;
+	void *obj_addr;
+	u32 *reg_state;
 	int ret;
 
 	if (!ppgtt)
@@ -2398,18 +2406,17 @@ populate_lr_context(struct intel_context *ctx, struct drm_i915_gem_object *ctx_o
 		return ret;
 	}
 
-	ret = i915_gem_object_get_pages(ctx_obj);
-	if (ret) {
-		DRM_DEBUG_DRIVER("Could not get object pages\n");
+	obj_addr = i915_gem_object_pin_map(ctx_obj);
+	if (IS_ERR(obj_addr)) {
+		ret = PTR_ERR(obj_addr);
+		DRM_DEBUG_DRIVER("Could not map object pages! (%d)\n", ret);
 		return ret;
 	}
-
-	i915_gem_object_pin_pages(ctx_obj);
+	ctx_obj->dirty = true;
 
 	/* The second page of the context object contains some fields which must
 	 * be set up prior to the first execution. */
-	page = i915_gem_object_get_dirty_page(ctx_obj, LRC_STATE_PN);
-	reg_state = kmap_atomic(page);
+	reg_state = obj_addr + LRC_STATE_PN * PAGE_SIZE;
 
 	/* A context is actually a big batch buffer with several MI_LOAD_REGISTER_IMM
 	 * commands followed by (reg, value) pairs. The values we are setting here are
@@ -2514,8 +2521,7 @@ populate_lr_context(struct intel_context *ctx, struct drm_i915_gem_object *ctx_o
 			       make_rpcs(dev));
 	}
 
-	kunmap_atomic(reg_state);
-	i915_gem_object_unpin_pages(ctx_obj);
+	i915_gem_object_unpin_map(ctx_obj);
 
 	return 0;
 }
@@ -2588,22 +2594,27 @@ uint32_t intel_lr_context_size(struct intel_engine_cs *engine)
 	return ret;
 }
 
-static void lrc_setup_hardware_status_page(struct intel_engine_cs *engine,
-					   struct drm_i915_gem_object *default_ctx_obj)
+static int
+lrc_setup_hws(struct intel_engine_cs *engine,
+	      struct drm_i915_gem_object *def_ctx_obj)
 {
 	struct drm_i915_private *dev_priv = engine->dev->dev_private;
-	struct page *page;
+	void *hws;
 
 	/* The HWSP is part of the default context object in LRC mode. */
-	engine->status_page.gfx_addr = i915_gem_obj_ggtt_offset(default_ctx_obj)
-			+ LRC_PPHWSP_PN * PAGE_SIZE;
-	page = i915_gem_object_get_page(default_ctx_obj, LRC_PPHWSP_PN);
-	engine->status_page.page_addr = kmap(page);
-	engine->status_page.obj = default_ctx_obj;
+	engine->status_page.gfx_addr = i915_gem_obj_ggtt_offset(def_ctx_obj) +
+				       LRC_PPHWSP_PN * PAGE_SIZE;
+	hws = i915_gem_object_pin_map(def_ctx_obj);
+	if (IS_ERR(hws))
+		return PTR_ERR(hws);
+	engine->status_page.page_addr = hws + LRC_PPHWSP_PN * PAGE_SIZE;
+	engine->status_page.obj = def_ctx_obj;
 
 	I915_WRITE(RING_HWS_PGA(engine->mmio_base),
-			(u32)engine->status_page.gfx_addr);
+		   (u32)engine->status_page.gfx_addr);
 	POSTING_READ(RING_HWS_PGA(engine->mmio_base));
+
+	return 0;
 }
 
 /**
@@ -2688,10 +2699,9 @@ error_deref_obj:
 	return ret;
 }
 
-void intel_lr_context_reset(struct drm_device *dev,
-			struct intel_context *ctx)
+void intel_lr_context_reset(struct drm_i915_private *dev_priv,
+			    struct intel_context *ctx)
 {
-	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *engine;
 
 	for_each_engine(engine, dev_priv) {
@@ -2699,23 +2709,23 @@ void intel_lr_context_reset(struct drm_device *dev,
 				ctx->engine[engine->id].state;
 		struct intel_ringbuffer *ringbuf =
 				ctx->engine[engine->id].ringbuf;
+		void *obj_addr;
 		uint32_t *reg_state;
-		struct page *page;
 
 		if (!ctx_obj)
 			continue;
 
-		if (i915_gem_object_get_pages(ctx_obj)) {
-			WARN(1, "Failed get_pages for context obj\n");
+		obj_addr = i915_gem_object_pin_map(ctx_obj);
+		if (WARN_ON(IS_ERR(obj_addr)))
 			continue;
-		}
-		page = i915_gem_object_get_dirty_page(ctx_obj, LRC_STATE_PN);
-		reg_state = kmap_atomic(page);
+
+		reg_state = obj_addr + LRC_STATE_PN * PAGE_SIZE;
+		ctx_obj->dirty = true;
 
 		reg_state[CTX_RING_HEAD+1] = 0;
 		reg_state[CTX_RING_TAIL+1] = 0;
 
-		kunmap_atomic(reg_state);
+		i915_gem_object_unpin_map(ctx_obj);
 
 		ringbuf->head = 0;
 		ringbuf->tail = 0;
