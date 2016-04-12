@@ -568,6 +568,9 @@ void brcmf_txfinalize(struct brcmf_if *ifp, struct sk_buff *txp, bool success)
 	struct ethhdr *eh;
 	u16 type;
 
+	if (!ifp)
+		goto free;
+
 	eh = (struct ethhdr *)(txp->data);
 	type = ntohs(eh->h_proto);
 
@@ -580,6 +583,7 @@ void brcmf_txfinalize(struct brcmf_if *ifp, struct sk_buff *txp, bool success)
 	if (!success)
 		ifp->stats.tx_errors++;
 
+free:
 	brcmu_pkt_buf_free_skb(txp);
 }
 

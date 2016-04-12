@@ -1899,8 +1899,10 @@ int brcmf_fws_process_skb(struct brcmf_if *ifp, struct sk_buff *skb)
 
 	if (fws->avoid_queueing) {
 		rc = brcmf_proto_txdata(drvr, ifp->ifidx, 0, skb);
-		if (rc < 0)
+		if (rc < 0) {
+			(void)brcmf_proto_hdrpull(drvr, false, skb, &ifp);
 			brcmf_txfinalize(ifp, skb, false);
+		}
 		return rc;
 	}
 
