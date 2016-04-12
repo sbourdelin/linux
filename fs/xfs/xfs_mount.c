@@ -1150,11 +1150,12 @@ int
 xfs_mod_fdblocks(
 	struct xfs_mount	*mp,
 	int64_t			delta,
-	bool			rsvd)
+	uint32_t		flags)
 {
 	int64_t			lcounter;
 	long long		res_used;
 	s32			batch;
+	bool			rsvd = (flags & XFS_FDBLOCKS_RSVD);
 
 	if (delta > 0) {
 		/*

@@ -172,8 +172,11 @@ xfs_trans_reserve(
 	uint			blocks,
 	uint			rtextents)
 {
-	int		error = 0;
-	bool		rsvd = (tp->t_flags & XFS_TRANS_RESERVE) != 0;
+	int			error = 0;
+	int			flags = 0;
+
+	if (tp->t_flags & XFS_TRANS_RESERVE)
+		flags |= XFS_FDBLOCKS_RSVD;
 
 	/* Mark this thread as being in a transaction */
 	current_set_flags_nested(&tp->t_pflags, PF_FSTRANS);
@@ -184,7 +187,8 @@ xfs_trans_reserve(
 	 * fail if the count would go below zero.
 	 */
 	if (blocks > 0) {
-		error = xfs_mod_fdblocks(tp->t_mountp, -((int64_t)blocks), rsvd);
+		error = xfs_mod_fdblocks(tp->t_mountp, -((int64_t)blocks),
+					 flags);
 		if (error != 0) {
 			current_restore_flags_nested(&tp->t_pflags, PF_FSTRANS);
 			return -ENOSPC;
@@ -259,7 +263,7 @@ undo_log:
 
 undo_blocks:
 	if (blocks > 0) {
-		xfs_mod_fdblocks(tp->t_mountp, -((int64_t)blocks), rsvd);
+		xfs_mod_fdblocks(tp->t_mountp, -((int64_t)blocks), flags);
 		tp->t_blk_res = 0;
 	}
 
@@ -543,12 +547,15 @@ xfs_trans_unreserve_and_mod_sb(
 	struct xfs_trans	*tp)
 {
 	struct xfs_mount	*mp = tp->t_mountp;
-	bool			rsvd = (tp->t_flags & XFS_TRANS_RESERVE) != 0;
 	int64_t			blkdelta = 0;
 	int64_t			rtxdelta = 0;
 	int64_t			idelta = 0;
 	int64_t			ifreedelta = 0;
 	int			error;
+	int			flags = 0;
+
+	if (tp->t_flags & XFS_TRANS_RESERVE)
+		flags |= XFS_FDBLOCKS_RSVD;
 
 	/* calculate deltas */
 	if (tp->t_blk_res > 0)
@@ -572,7 +579,7 @@ xfs_trans_unreserve_and_mod_sb(
 
 	/* apply the per-cpu counters */
 	if (blkdelta) {
-		error = xfs_mod_fdblocks(mp, blkdelta, rsvd);
+		error = xfs_mod_fdblocks(mp, blkdelta, flags);
 		if (error)
 			goto out;
 	}
@@ -680,7 +687,7 @@ out_undo_icount:
 		xfs_mod_icount(mp, -idelta);
 out_undo_fdblocks:
 	if (blkdelta)
-		xfs_mod_fdblocks(mp, -blkdelta, rsvd);
+		xfs_mod_fdblocks(mp, -blkdelta, flags);
 out:
 	ASSERT(error == 0);
 	return;

@@ -2186,7 +2186,7 @@ xfs_bmap_add_extent_delay_real(
 			(bma->cur ? bma->cur->bc_private.b.allocated : 0));
 		if (diff > 0) {
 			error = xfs_mod_fdblocks(bma->ip->i_mount,
-						 -((int64_t)diff), false);
+						 -((int64_t)diff), 0);
 			ASSERT(!error);
 			if (error)
 				goto done;
@@ -2238,7 +2238,7 @@ xfs_bmap_add_extent_delay_real(
 		ASSERT(temp <= da_old);
 		if (temp < da_old)
 			xfs_mod_fdblocks(bma->ip->i_mount,
-					(int64_t)(da_old - temp), false);
+					(int64_t)(da_old - temp), 0);
 	}
 
 	/* clear out the allocated field, done with it now in any case. */
@@ -2916,8 +2916,7 @@ xfs_bmap_add_extent_hole_delay(
 	}
 	if (oldlen != newlen) {
 		ASSERT(oldlen > newlen);
-		xfs_mod_fdblocks(ip->i_mount, (int64_t)(oldlen - newlen),
-				 false);
+		xfs_mod_fdblocks(ip->i_mount, (int64_t)(oldlen - newlen), 0);
 		/*
 		 * Nothing to do for disk quota accounting here.
 		 */
@@ -4149,13 +4148,13 @@ xfs_bmapi_reserve_delalloc(
 	if (rt) {
 		error = xfs_mod_frextents(mp, -((int64_t)extsz));
 	} else {
-		error = xfs_mod_fdblocks(mp, -((int64_t)alen), false);
+		error = xfs_mod_fdblocks(mp, -((int64_t)alen), 0);
 	}
 
 	if (error)
 		goto out_unreserve_quota;
 
-	error = xfs_mod_fdblocks(mp, -((int64_t)indlen), false);
+	error = xfs_mod_fdblocks(mp, -((int64_t)indlen), 0);
 	if (error)
 		goto out_unreserve_blocks;
 
@@ -4184,7 +4183,7 @@ out_unreserve_blocks:
 	if (rt)
 		xfs_mod_frextents(mp, extsz);
 	else
-		xfs_mod_fdblocks(mp, alen, false);
+		xfs_mod_fdblocks(mp, alen, 0);
 out_unreserve_quota:
 	if (XFS_IS_QUOTA_ON(mp))
 		xfs_trans_unreserve_quota_nblks(NULL, ip, (long)alen, 0, rt ?
@@ -5093,7 +5092,7 @@ xfs_bmap_del_extent(
 	 */
 	ASSERT(da_old >= da_new);
 	if (da_old > da_new)
-		xfs_mod_fdblocks(mp, (int64_t)(da_old - da_new), false);
+		xfs_mod_fdblocks(mp, (int64_t)(da_old - da_new), 0);
 done:
 	*logflagsp = flags;
 	return error;
@@ -5413,7 +5412,7 @@ xfs_bunmapi(
 			goto error0;
 
 		if (!isrt && wasdel)
-			xfs_mod_fdblocks(mp, (int64_t)del.br_blockcount, false);
+			xfs_mod_fdblocks(mp, (int64_t)del.br_blockcount, 0);
 
 		bno = del.br_startoff - 1;
 nodelete:
