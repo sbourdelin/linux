@@ -1188,6 +1188,87 @@ void intel_lr_context_unpin(struct intel_context *ctx,
 	}
 }
 
+/**
+ * intel_execlist_get_current_request() - returns request currently processed
+ * by the given engine
+ *
+ * @engine: Engine currently running context to be returned.
+ *
+ * Returns:
+ *  req - if a valid req is found in the execlist queue and HW also agrees.
+ *        caller has to dereference at the end of its lifecycle.
+ *  NULL - otherwise
+ */
+static struct drm_i915_gem_request *
+intel_execlist_get_current_request(struct intel_engine_cs *engine)
+{
+	struct drm_i915_private *dev_priv;
+	struct drm_i915_gem_request *req;
+	unsigned long flags;
+
+	dev_priv = engine->dev->dev_private;
+
+	spin_lock_irqsave(&engine->execlist_lock, flags);
+
+	req = list_first_entry_or_null(&engine->execlist_queue,
+				       struct drm_i915_gem_request,
+				       execlist_link);
+	/*
+	 * Only acknowledge the request in the execlist queue if it's actually
+	 * been submitted to hardware, otherwise there's the risk of
+	 * inconsistency between the (unsubmitted) request and the idle
+	 * hardware state.
+	 */
+	if (req && req->ctx && req->elsp_submitted) {
+		u32 execlist_status;
+		u32 hw_context;
+		u32 hw_active;
+		u32 sw_context;
+
+		hw_context = I915_READ(RING_EXECLIST_STATUS_CTX_ID(engine));
+		execlist_status = I915_READ(RING_EXECLIST_STATUS_LO(engine));
+		hw_active = ((execlist_status & EXECLIST_STATUS_ELEMENT0_ACTIVE) ||
+			     (execlist_status & EXECLIST_STATUS_ELEMENT1_ACTIVE));
+
+		sw_context = intel_execlists_ctx_id(req->ctx, engine);
+
+		/* If both HW and driver agrees then we found it */
+		if (hw_active && hw_context == sw_context)
+			i915_gem_request_reference(req);
+	} else {
+		req = NULL;
+		WARN(1, "No active request for %s\n", engine->name);
+	}
+
+	spin_unlock_irqrestore(&engine->execlist_lock, flags);
+
+	return req;
+}
+
+/**
+ * gen8_engine_state_save() - save minimum engine state
+ * @engine: engine whose state is to be saved
+ * @state: location where the state is saved
+ *
+ * captured engine state includes head, tail, active request. After reset,
+ * engine is restarted with this state.
+ *
+ * Returns:
+ *	0 if ok, otherwise propagates error codes.
+ */
+static int gen8_engine_state_save(struct intel_engine_cs *engine,
+				  struct intel_engine_cs_state *state)
+{
+	struct drm_i915_private *dev_priv = engine->dev->dev_private;
+
+	state->head = I915_READ_HEAD(engine);
+	state->req = intel_execlist_get_current_request(engine);
+	if (!state->req)
+		return -EINVAL;
+
+	return 0;
+}
+
 static int intel_logical_ring_workarounds_emit(struct drm_i915_gem_request *req)
 {
 	int ret, i;
@@ -2091,6 +2172,10 @@ logical_ring_default_vfuncs(struct drm_device *dev,
 	engine->emit_bb_start = gen8_emit_bb_start;
 	engine->get_seqno = gen8_get_seqno;
 	engine->set_seqno = gen8_set_seqno;
+
+	/* engine reset supporting functions */
+	engine->save = gen8_engine_state_save;
+
 	if (IS_BXT_REVID(dev, 0, BXT_REVID_A1)) {
 		engine->irq_seqno_barrier = bxt_a_seqno_barrier;
 		engine->set_seqno = bxt_a_set_seqno;

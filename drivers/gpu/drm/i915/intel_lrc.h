@@ -29,7 +29,10 @@
 /* Execlists regs */
 #define RING_ELSP(ring)				_MMIO((ring)->mmio_base + 0x230)
 #define RING_EXECLIST_STATUS_LO(ring)		_MMIO((ring)->mmio_base + 0x234)
+#define   EXECLIST_STATUS_ELEMENT0_ACTIVE       (1 << 14)
+#define   EXECLIST_STATUS_ELEMENT1_ACTIVE       (1 << 15)
 #define RING_EXECLIST_STATUS_HI(ring)		_MMIO((ring)->mmio_base + 0x234 + 4)
+#define RING_EXECLIST_STATUS_CTX_ID(ring)	RING_EXECLIST_STATUS_HI(ring)
 #define RING_CONTEXT_CONTROL(ring)		_MMIO((ring)->mmio_base + 0x244)
 #define	  CTX_CTRL_INHIBIT_SYN_CTX_SWITCH	(1 << 3)
 #define	  CTX_CTRL_ENGINE_CTX_RESTORE_INHIBIT	(1 << 0)

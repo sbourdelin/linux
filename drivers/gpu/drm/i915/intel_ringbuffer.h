@@ -144,6 +144,12 @@ struct  i915_ctx_workarounds {
 	struct drm_i915_gem_object *obj;
 };
 
+struct intel_engine_cs_state {
+	u32 head;
+	u32 tail;
+	struct drm_i915_gem_request *req;
+};
+
 struct  intel_engine_cs {
 	const char	*name;
 	enum intel_engine_id {
@@ -205,6 +211,10 @@ struct  intel_engine_cs {
 #define I915_DISPATCH_PINNED 0x2
 #define I915_DISPATCH_RS     0x4
 	void		(*cleanup)(struct intel_engine_cs *ring);
+
+	/* engine reset supporting functions */
+	int (*save)(struct intel_engine_cs *engine,
+		    struct intel_engine_cs_state *state);
 
 	/* GEN8 signal/wait table - never trust comments!
 	 *	  signal to	signal to    signal to   signal to      signal to
