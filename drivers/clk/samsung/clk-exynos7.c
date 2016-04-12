@@ -8,6 +8,7 @@
  *
 */
 
+#include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/of.h>
 
@@ -205,7 +206,11 @@ static struct samsung_cmu_info topc_cmu_info __initdata = {
 
 static void __init exynos7_clk_topc_init(struct device_node *np)
 {
+	struct clk *clk;
+
 	samsung_cmu_register_one(np, &topc_cmu_info);
+	clk = __clk_lookup("aclk_ccore_133");
+	clk_prepare_enable(clk);
 }
 
 CLK_OF_DECLARE(exynos7_clk_topc, "samsung,exynos7-clock-topc",
@@ -573,7 +578,11 @@ static struct samsung_cmu_info top1_cmu_info __initdata = {
 
 static void __init exynos7_clk_top1_init(struct device_node *np)
 {
+	struct clk *clk;
+
 	samsung_cmu_register_one(np, &top1_cmu_info);
+	clk = __clk_lookup("aclk_fsys0_200");
+	clk_prepare_enable(clk);
 }
 
 CLK_OF_DECLARE(exynos7_clk_top1, "samsung,exynos7-clock-top1",
