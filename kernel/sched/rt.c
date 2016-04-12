@@ -8,6 +8,11 @@
 #include <linux/slab.h>
 #include <linux/irq_work.h>
 
+#ifdef CONFIG_RTC_CYCLIC
+#include "cyclic.h"
+extern int rt_overrun_task_admitted1(struct rq *rq, struct task_struct *p);
+#endif
+
 int sched_rr_timeslice = RR_TIMESLICE;
 
 static int do_sched_rt_period_timer(struct rt_bandwidth *rt_b, int overrun);
@@ -1321,8 +1326,18 @@ enqueue_task_rt(struct rq *rq, struct task_struct *p, int flags)
 
 	if (flags & ENQUEUE_WAKEUP)
 		rt_se->timeout = 0;
+#ifdef CONFIG_RTC_CYCLIC
+	/* if admitted and the current slot then head, otherwise tail */
+	if (rt_overrun_task_admitted1(rq, p)) {
+		if (rt_overrun_task_active(p)) {
+			flags |= ENQUEUE_HEAD;
+		}
+	}
 
 	enqueue_rt_entity(rt_se, flags);
+#else
+	enqueue_rt_entity(rt_se, flags & ENQUEUE_HEAD);
+#endif
 
 	if (!task_current(rq, p) && p->nr_cpus_allowed > 1)
 		enqueue_pushable_task(rq, p);
@@ -1366,6 +1381,18 @@ static void requeue_task_rt(struct rq *rq, struct task_struct *p, int head)
 		requeue_rt_entity(rt_rq, rt_se, head);
 	}
 }
+
+#ifdef CONFIG_RTC_CYCLIC
+void dequeue_task_rt2(struct rq *rq, struct task_struct *p, int flags)
+{
+	dequeue_task_rt(rq, p, flags);
+}
+
+void requeue_task_rt2(struct rq *rq, struct task_struct *p, int head)
+{
+	requeue_task_rt(rq, p, head);
+}
+#endif
 
 static void yield_task_rt(struct rq *rq)
 {
@@ -2177,6 +2204,10 @@ void __init init_sched_rt_class(void)
 		zalloc_cpumask_var_node(&per_cpu(local_cpu_mask, i),
 					GFP_KERNEL, cpu_to_node(i));
 	}
+
+#ifdef CONFIG_RTC_CYCLIC
+	init_rt_overrun();
+#endif
 }
 #endif /* CONFIG_SMP */
 
@@ -2322,6 +2353,13 @@ static unsigned int get_rr_interval_rt(struct rq *rq, struct task_struct *task)
 		return 0;
 }
 
+#ifdef CONFIG_RTC_CYCLIC
+static void task_dead_rt(struct task_struct *p)
+{
+	rt_overrun_entry_delete(p);
+}
+#endif
+
 const struct sched_class rt_sched_class = {
 	.next			= &fair_sched_class,
 	.enqueue_task		= enqueue_task_rt,
@@ -2344,6 +2382,9 @@ const struct sched_class rt_sched_class = {
 #endif
 
 	.set_curr_task          = set_curr_task_rt,
+#ifdef CONFIG_RTC_CYCLIC
+	.task_dead              = task_dead_rt,
+#endif
 	.task_tick		= task_tick_rt,
 
 	.get_rr_interval	= get_rr_interval_rt,
