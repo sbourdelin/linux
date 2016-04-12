@@ -23,6 +23,17 @@ config PINCTRL_TEGRA210
 	bool
 	select PINCTRL_TEGRA
 
+config PINCTRL_TEGRA210_IO_PAD
+	bool "Tegra210 IO pad Control Driver"
+	depends on ARCH_TEGRA
+	select PINCONF
+	select PINMUX
+	help
+	  NVIDIA Tegra210 SoC has IO pads which supports mult-voltage level
+	  of interfacing. The voltage of IO pads are SW configurable based
+	  on IO rail of that pads. This driver provides the interface to
+	  change IO pad voltage and power state via pincontrol interface.
+
 config PINCTRL_TEGRA_XUSB
 	def_bool y if ARCH_TEGRA
 	select GENERIC_PHY
