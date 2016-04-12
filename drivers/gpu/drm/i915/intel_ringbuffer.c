@@ -2352,6 +2352,7 @@ static void __wrap_ring_buffer(struct intel_ringbuffer *ringbuf)
 int intel_engine_idle(struct intel_engine_cs *engine)
 {
 	struct drm_i915_gem_request *req;
+	u32 flags;
 
 	/* Wait upon the last request to be completed */
 	if (list_empty(&engine->request_list))
@@ -2361,10 +2362,13 @@ int intel_engine_idle(struct intel_engine_cs *engine)
 			 struct drm_i915_gem_request,
 			 list);
 
+	flags = to_i915(engine->dev)->mm.interruptible ? WAIT_INTERRUPTIBLE : 0;
+	flags |= WAIT_LOCKED;
+
 	/* Make sure we do not trigger any retires */
 	return __i915_wait_request(req,
 				   atomic_read(&to_i915(engine->dev)->gpu_error.reset_counter),
-				   to_i915(engine->dev)->mm.interruptible,
+				   flags,
 				   NULL, NULL);
 }
 

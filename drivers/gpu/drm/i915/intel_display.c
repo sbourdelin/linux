@@ -11360,7 +11360,7 @@ static void intel_mmio_flip_work_func(struct work_struct *work)
 	if (mmio_flip->req) {
 		WARN_ON(__i915_wait_request(mmio_flip->req,
 					    mmio_flip->crtc->reset_counter,
-					    false, NULL,
+					    0, NULL,
 					    &mmio_flip->i915->rps.mmioflips));
 		i915_gem_request_unreference__unlocked(mmio_flip->req);
 	}
@@ -13428,7 +13428,7 @@ static int intel_atomic_prepare_commit(struct drm_device *dev,
 				continue;
 
 			ret = __i915_wait_request(intel_plane_state->wait_req,
-						  reset_counter, true,
+						  reset_counter, WAIT_INTERRUPTIBLE,
 						  NULL, NULL);
 
 			/* Swallow -EIO errors to allow updates during hw lockup. */
