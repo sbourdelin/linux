@@ -354,6 +354,9 @@ extern int	xfs_mod_icount(struct xfs_mount *mp, int64_t delta);
 extern int	xfs_mod_ifree(struct xfs_mount *mp, int64_t delta);
 
 #define	XFS_FDBLOCKS_RSVD	(1 << 0)
+#define XFS_BLK_RES		(1 << 1)
+extern int	__xfs_mod_fdblocks(struct xfs_mount *mp, int64_t delta,
+				   uint32_t flags);
 extern int	xfs_mod_fdblocks(struct xfs_mount *mp, int64_t delta,
 				 uint32_t flags);
 extern int	xfs_mod_frextents(struct xfs_mount *mp, int64_t delta);

@@ -35,6 +35,7 @@
 #include "xfs_trans.h"
 #include "xfs_buf_item.h"
 #include "xfs_log.h"
+#include "xfs_thin.h"
 
 struct workqueue_struct *xfs_alloc_wq;
 
@@ -652,6 +653,30 @@ xfs_alloc_ag_vextent(
 				 XFS_TRANS_SB_RES_FDBLOCKS :
 				 XFS_TRANS_SB_FDBLOCKS,
 				 -((long)(args->len)));
+
+		if (args->mp->m_thin_reserve) {
+			sector_t	res;
+			xfs_fsblock_t	fsbno = XFS_AGB_TO_FSB(args->mp,
+							       args->agno,
+							       args->agbno);
+			if (args->wasdel)
+				res = xfs_fsb_res(args->mp, args->len, false);
+			else
+				res = args->tp->t_blk_thin_res;
+			error = xfs_thin_provision(args->mp, fsbno, args->len,
+						   &res);
+			WARN_ON(error);
+
+			if (args->wasdel) {
+				if (res)
+					error = xfs_thin_unreserve(args->mp, res);
+				WARN_ON(error);
+			} else if (args->tp) {
+				args->tp->t_blk_thin_res = res;
+			}
+
+			error = 0;
+		}
 	}
 
 	XFS_STATS_INC(args->mp, xs_allocx);

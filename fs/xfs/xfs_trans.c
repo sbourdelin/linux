@@ -31,6 +31,7 @@
 #include "xfs_log.h"
 #include "xfs_trace.h"
 #include "xfs_error.h"
+#include "xfs_thin.h"
 
 kmem_zone_t	*xfs_trans_zone;
 kmem_zone_t	*xfs_log_item_desc_zone;
@@ -174,6 +175,7 @@ xfs_trans_reserve(
 {
 	int			error = 0;
 	int			flags = 0;
+	struct xfs_mount	*mp = tp->t_mountp;
 
 	if (tp->t_flags & XFS_TRANS_RESERVE)
 		flags |= XFS_FDBLOCKS_RSVD;
@@ -187,13 +189,14 @@ xfs_trans_reserve(
 	 * fail if the count would go below zero.
 	 */
 	if (blocks > 0) {
-		error = xfs_mod_fdblocks(tp->t_mountp, -((int64_t)blocks),
-					 flags);
+		error = xfs_mod_fdblocks(mp, -((int64_t)blocks), flags);
 		if (error != 0) {
 			current_restore_flags_nested(&tp->t_pflags, PF_FSTRANS);
 			return -ENOSPC;
 		}
 		tp->t_blk_res += blocks;
+		if (mp->m_thin_res)
+			tp->t_blk_thin_res += xfs_fsb_res(mp, blocks, false);
 	}
 
 	/*
@@ -265,6 +268,8 @@ undo_blocks:
 	if (blocks > 0) {
 		xfs_mod_fdblocks(tp->t_mountp, -((int64_t)blocks), flags);
 		tp->t_blk_res = 0;
+		if (tp->t_blk_thin_res)
+			tp->t_blk_thin_res = 0;
 	}
 
 	current_restore_flags_nested(&tp->t_pflags, PF_FSTRANS);
@@ -551,6 +556,7 @@ xfs_trans_unreserve_and_mod_sb(
 	int64_t			rtxdelta = 0;
 	int64_t			idelta = 0;
 	int64_t			ifreedelta = 0;
+	int64_t			resdelta = 0;
 	int			error;
 	int			flags = 0;
 
@@ -558,8 +564,41 @@ xfs_trans_unreserve_and_mod_sb(
 		flags |= XFS_FDBLOCKS_RSVD;
 
 	/* calculate deltas */
-	if (tp->t_blk_res > 0)
-		blkdelta = tp->t_blk_res;
+	if (tp->t_blk_res > 0) {
+		/*
+		 * The transaction may have some number of unused fs blocks and
+		 * unused bdev reservation. It might also have non-reserved free
+		 * blocks (i.e., freed extents) that need to make it back into
+		 * the fs general pool. We need to distinguish between these
+		 * cases when unwinding the unused resources.
+		 *
+		 * We do this as follows:
+		 *
+		 * - resdelta - For every unused fs block and bdev reservation
+		 *   combination, account one fs+bdev reserved block that can be
+		 *   returned to the fs. These are blocks that can go directly
+		 *   back into the XFS reserve pool, if necessary, because they
+		 *   are already reserved. If the reserve pool is full, they are
+		 *   unreserved and returned to the general pool.
+		 * - blkdelta - Freed filesystem blocks without any bdev
+		 *   reservation. These can get into the XFS reserve pool as
+		 *   well, but they are reserved from the bdev first. If
+		 *   reservation fails, they are returned to the general pool.
+		 * - t_blk_thin_res - Unused bdev reservation from the
+		 *   transaction. Extra bdev reservation remains when newly
+		 *   allocated fs blocks might have already been provisioned in
+		 *   the bdev (due to larger bdev blocks). This reservation is
+		 *   returned directly to the bdev.
+		 */
+		blkdelta = tp->t_blk_res - tp->t_blk_res_used;
+		while (blkdelta && tp->t_blk_thin_res) {
+			tp->t_blk_thin_res -= xfs_fsb_res(mp, 1, false);
+			blkdelta--;
+			resdelta++;
+		}
+		blkdelta = tp->t_blk_res - resdelta;
+	}
+
 	if ((tp->t_fdblocks_delta != 0) &&
 	    (xfs_sb_version_haslazysbcount(&mp->m_sb) ||
 	     (tp->t_flags & XFS_TRANS_SB_DIRTY)))
@@ -578,10 +617,33 @@ xfs_trans_unreserve_and_mod_sb(
 	}
 
 	/* apply the per-cpu counters */
-	if (blkdelta) {
-		error = xfs_mod_fdblocks(mp, blkdelta, flags);
+	if (resdelta) {
+		error = __xfs_mod_fdblocks(mp, resdelta, flags | XFS_BLK_RES);
 		if (error)
 			goto out;
+	}
+	/*
+	 * Return any bdev reservation that hasn't been returned in the form of
+	 * reserved blocks above. Do this before returning unreserved blocks to
+	 * improve the chance that bdev reservation is available if the XFS
+	 * reserve pool must be replenished.
+	 *
+	 * XXX: This logic is kind of wonky now that the bdev res. is tracked
+	 * separately. If we have a bunch of freed blocks, can't we just return
+	 * however many we have reservation for as 'reserved blocks?' Also need
+	 * to fix up the code above to kill the while loop.
+	 */
+	if (tp->t_blk_thin_res) {
+		error = xfs_thin_unreserve(mp, tp->t_blk_thin_res);
+		if (error)
+			goto out_undo_resblocks;
+		tp->t_blk_thin_res = 0;
+	}
+
+	if (blkdelta) {
+		error = __xfs_mod_fdblocks(mp, blkdelta, flags);
+		if (error)
+			goto out_undo_resblocks;
 	}
 
 	if (idelta) {
@@ -688,6 +750,9 @@ out_undo_icount:
 out_undo_fdblocks:
 	if (blkdelta)
 		xfs_mod_fdblocks(mp, -blkdelta, flags);
+out_undo_resblocks:
+	if (resdelta)
+		xfs_mod_fdblocks(mp, -resdelta, flags);
 out:
 	ASSERT(error == 0);
 	return;
