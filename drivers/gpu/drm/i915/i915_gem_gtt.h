@@ -560,6 +560,8 @@ size_t
 i915_ggtt_view_size(struct drm_i915_gem_object *obj,
 		    const struct i915_ggtt_view *view);
 
+struct drm_i915_private;
+
 /**
  * i915_vma_iomap - calls ioremap_wc to map the GGTT VMA via the aperture
  * @dev_priv: i915 private pointer
