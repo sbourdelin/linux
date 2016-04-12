@@ -201,6 +201,9 @@ struct rtc_device *rtc_device_register(const char *name, struct device *dev,
 	rtc->irq_freq = 1;
 	rtc->max_user_freq = 64;
 	rtc->dev.parent = dev;
+#ifdef CONFIG_RTC_CYCLIC
+	INIT_LIST_HEAD(&rtc->rt_overrun_tasks); //struct list_head
+#endif
 	rtc->dev.class = rtc_class;
 	rtc->dev.groups = rtc_get_dev_attribute_groups();
 	rtc->dev.release = rtc_device_release;

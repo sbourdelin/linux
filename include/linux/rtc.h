@@ -114,6 +114,9 @@ struct rtc_timer {
 struct rtc_device {
 	struct device dev;
 	struct module *owner;
+#ifdef CONFIG_RTC_CYCLIC
+	struct list_head rt_overrun_tasks;
+#endif
 
 	int id;
 	char name[RTC_DEVICE_NAME_SIZE];
