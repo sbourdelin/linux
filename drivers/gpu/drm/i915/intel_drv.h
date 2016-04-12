@@ -1244,8 +1244,8 @@ bool bxt_find_best_dpll(struct intel_crtc_state *crtc_state, int target_clock,
 int chv_calc_dpll_params(int refclk, intel_clock_t *pll_clock);
 
 bool intel_crtc_active(struct drm_crtc *crtc);
-void hsw_enable_ips(struct intel_crtc *crtc);
-void hsw_disable_ips(struct intel_crtc *crtc);
+int hsw_enable_ips(struct intel_crtc *crtc, bool sysfs_set);
+int hsw_disable_ips(struct intel_crtc *crtc, bool sysfs_set);
 enum intel_display_power_domain
 intel_display_port_power_domain(struct intel_encoder *intel_encoder);
 enum intel_display_power_domain

@@ -4400,13 +4400,14 @@ static void ironlake_pfit_enable(struct intel_crtc *crtc)
 	}
 }
 
-void hsw_enable_ips(struct intel_crtc *crtc)
+int hsw_enable_ips(struct intel_crtc *crtc, bool sysfs_set)
 {
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
+	int ret = 0;
 
 	if (!crtc->config->ips_enabled)
-		return;
+		return -EINVAL;
 
 	/*
 	 * We can only enable IPS after we enable a plane and wait for a vblank
@@ -4431,18 +4432,28 @@ void hsw_enable_ips(struct intel_crtc *crtc)
 		 * and don't wait for vblanks until the end of crtc_enable, then
 		 * the HW state readout code will complain that the expected
 		 * IPS_CTL value is not the one we read. */
-		if (wait_for(I915_READ_NOTRACE(IPS_CTL) & IPS_ENABLE, 50))
+		if (wait_for(I915_READ_NOTRACE(IPS_CTL) & IPS_ENABLE, 50)){
 			DRM_ERROR("Timed out waiting for IPS enable\n");
+			ret = -ETIMEDOUT;
+		}
 	}
+
+	mutex_lock(&dev_priv->hsw_ips.lock);
+	dev_priv->hsw_ips.enable = 1;
+	dev_priv->hsw_ips.sysfs_set = sysfs_set;
+	mutex_unlock(&dev_priv->hsw_ips.lock);
+
+	return ret;
 }
 
-void hsw_disable_ips(struct intel_crtc *crtc)
+int hsw_disable_ips(struct intel_crtc *crtc, bool sysfs_set)
 {
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
+	int ret = 0;
 
 	if (!crtc->config->ips_enabled)
-		return;
+		return -EINVAL;
 
 	assert_plane_enabled(dev_priv, crtc->plane);
 	if (IS_BROADWELL(dev)) {
@@ -4450,15 +4461,23 @@ void hsw_disable_ips(struct intel_crtc *crtc)
 		WARN_ON(sandybridge_pcode_write(dev_priv, DISPLAY_IPS_CONTROL, 0));
 		mutex_unlock(&dev_priv->rps.hw_lock);
 		/* wait for pcode to finish disabling IPS, which may take up to 42ms */
-		if (wait_for((I915_READ(IPS_CTL) & IPS_ENABLE) == 0, 42))
+		if (wait_for((I915_READ(IPS_CTL) & IPS_ENABLE) == 0, 42)){
 			DRM_ERROR("Timed out waiting for IPS disable\n");
+			ret = -ETIMEDOUT;
+		}
 	} else {
 		I915_WRITE(IPS_CTL, 0);
 		POSTING_READ(IPS_CTL);
 	}
 
+	mutex_lock(&dev_priv->hsw_ips.lock);
+	dev_priv->hsw_ips.enable = 0;
+	dev_priv->hsw_ips.sysfs_set = sysfs_set;
+	mutex_unlock(&dev_priv->hsw_ips.lock);
+
 	/* We need to wait for a vblank before we can disable the plane. */
 	intel_wait_for_vblank(dev, crtc->pipe);
+	return ret;
 }
 
 static void intel_crtc_dpms_overlay_disable(struct intel_crtc *intel_crtc)
@@ -4503,7 +4522,8 @@ intel_post_enable_primary(struct drm_crtc *crtc)
 	 * when going from primary only to sprite only and vice
 	 * versa.
 	 */
-	hsw_enable_ips(intel_crtc);
+	if (dev_priv->hsw_ips.sysfs_set != true)
+		hsw_enable_ips(intel_crtc, dev_priv->hsw_ips.sysfs_set);
 
 	/*
 	 * Gen2 reports pipe underruns whenever all planes are disabled.
@@ -4544,7 +4564,8 @@ intel_pre_disable_primary(struct drm_crtc *crtc)
 	 * when going from primary only to sprite only and vice
 	 * versa.
 	 */
-	hsw_disable_ips(intel_crtc);
+	if (dev_priv->hsw_ips.sysfs_set != true)
+		hsw_disable_ips(intel_crtc, dev_priv->hsw_ips.sysfs_set);
 }
 
 /* FIXME get rid of this and use pre_plane_update */

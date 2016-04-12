@@ -325,8 +325,10 @@ static void haswell_load_luts(struct drm_crtc_state *crtc_state)
 	 */
 	if (IS_HASWELL(dev) && intel_crtc->config->ips_enabled &&
 	    (intel_crtc_state->gamma_mode == GAMMA_MODE_MODE_SPLIT)) {
-		hsw_disable_ips(intel_crtc);
-		reenable_ips = true;
+		if (dev_priv->hsw_ips.sysfs_set != true){
+			hsw_disable_ips(intel_crtc, dev_priv->hsw_ips.sysfs_set);
+			reenable_ips = true;
+		}
 	}
 
 	intel_crtc_state->gamma_mode = GAMMA_MODE_MODE_8BIT;
@@ -334,8 +336,10 @@ static void haswell_load_luts(struct drm_crtc_state *crtc_state)
 
 	i9xx_load_luts(crtc_state);
 
-	if (reenable_ips)
-		hsw_enable_ips(intel_crtc);
+	if (reenable_ips){
+		if (dev_priv->hsw_ips.sysfs_set != true)
+			hsw_enable_ips(intel_crtc, dev_priv->hsw_ips.sysfs_set);
+	}
 }
 
 /* Loads the palette/gamma unit for the CRTC on Broadwell+. */

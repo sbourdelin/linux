@@ -3906,6 +3906,7 @@ static int intel_dp_sink_crc_stop(struct intel_dp *intel_dp)
 {
 	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
 	struct drm_device *dev = dig_port->base.base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_crtc *intel_crtc = to_intel_crtc(dig_port->base.base.crtc);
 	u8 buf;
 	int ret = 0;
@@ -3942,7 +3943,8 @@ static int intel_dp_sink_crc_stop(struct intel_dp *intel_dp)
 	}
 
  out:
-	hsw_enable_ips(intel_crtc);
+	if (dev_priv->hsw_ips.sysfs_set != true)
+		hsw_enable_ips(intel_crtc, dev_priv->hsw_ips.sysfs_set);
 	return ret;
 }
 
@@ -3950,6 +3952,7 @@ static int intel_dp_sink_crc_start(struct intel_dp *intel_dp)
 {
 	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
 	struct drm_device *dev = dig_port->base.base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_crtc *intel_crtc = to_intel_crtc(dig_port->base.base.crtc);
 	u8 buf;
 	int ret;
@@ -3969,11 +3972,13 @@ static int intel_dp_sink_crc_start(struct intel_dp *intel_dp)
 			return ret;
 	}
 
-	hsw_disable_ips(intel_crtc);
+	if (dev_priv->hsw_ips.sysfs_set != true)
+		hsw_disable_ips(intel_crtc, dev_priv->hsw_ips.sysfs_set);
 
 	if (drm_dp_dpcd_writeb(&intel_dp->aux, DP_TEST_SINK,
 			       buf | DP_TEST_SINK_START) < 0) {
-		hsw_enable_ips(intel_crtc);
+		if (dev_priv->hsw_ips.sysfs_set != true)
+			hsw_enable_ips(intel_crtc, dev_priv->hsw_ips.sysfs_set);
 		return -EIO;
 	}
 

@@ -4022,6 +4022,7 @@ static int pipe_crc_set_source(struct drm_device *dev, enum pipe pipe,
 	enum intel_display_power_domain power_domain;
 	u32 val = 0; /* shut up gcc */
 	int ret;
+	bool sysfs_set = false;
 
 	if (pipe_crc->source == source)
 		return 0;
@@ -4071,7 +4072,7 @@ static int pipe_crc_set_source(struct drm_device *dev, enum pipe pipe,
 		 * user space can't make reliable use of the CRCs, so let's just
 		 * completely disable it.
 		 */
-		hsw_disable_ips(crtc);
+		hsw_disable_ips(crtc, sysfs_set);
 
 		spin_lock_irq(&pipe_crc->lock);
 		kfree(pipe_crc->entries);
@@ -4116,7 +4117,7 @@ static int pipe_crc_set_source(struct drm_device *dev, enum pipe pipe,
 		else if (IS_HASWELL(dev) && pipe == PIPE_A)
 			hsw_trans_edp_pipe_A_crc_wa(dev, false);
 
-		hsw_enable_ips(crtc);
+		hsw_enable_ips(crtc, sysfs_set);
 	}
 
 	ret = 0;

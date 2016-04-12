@@ -265,6 +265,64 @@ toggle_psr(struct device *kdev, struct device_attribute *attr,
 }
 
 static ssize_t
+show_ips(struct device *kdev, struct device_attribute *attr, char *buf)
+{
+	struct drm_minor *dminor = dev_to_drm_minor(kdev);
+	struct drm_device *dev = dminor->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	ssize_t ret;
+
+	mutex_lock(&dev_priv->hsw_ips.lock);
+	ret = snprintf(buf, PAGE_SIZE, "%s\n", dev_priv->hsw_ips.enable ?
+			"enabled":"disabled");
+	mutex_unlock(&dev_priv->hsw_ips.lock);
+	return ret;
+}
+
+static ssize_t
+toggle_ips(struct device *kdev, struct device_attribute *attr,
+	const char *buf, size_t count)
+{
+	struct drm_minor *dminor = dev_to_drm_minor(kdev);
+	struct drm_device *dev = dminor->dev;
+	struct intel_connector *connector;
+	struct intel_encoder *encoder;
+	struct intel_crtc *crtc = NULL;
+	bool sysfs_set = true;
+	u32 val;
+	ssize_t ret;
+
+	ret = kstrtou32(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	for_each_intel_connector(dev, connector) {
+		if (!connector->base.encoder)
+			continue;
+		encoder = to_intel_encoder(connector->base.encoder);
+		crtc = to_intel_crtc(encoder->base.crtc);
+	}
+	if (!crtc)
+		return -ENODEV;
+
+	switch (val) {
+		case 0:
+			ret = hsw_disable_ips(crtc, sysfs_set);
+			if (ret)
+				return ret;
+			break;
+		case 1:
+			ret = hsw_enable_ips(crtc, sysfs_set);
+			if (ret)
+				return ret;
+			break;
+		default:
+			return -EINVAL;
+	}
+	return count;
+}
+
+static ssize_t
 show_drrs(struct device *kdev, struct device_attribute *attr, char *buf)
 {
 	struct drm_minor *dminor = dev_to_drm_minor(kdev);
@@ -329,6 +387,7 @@ toggle_drrs(struct device *kdev, struct device_attribute *attr,
 	return count;
 }
 
+static DEVICE_ATTR(ips_enable, S_IRUGO | S_IWUSR, show_ips, toggle_ips);
 static DEVICE_ATTR(drrs_enable, S_IRUGO | S_IWUSR, show_drrs, toggle_drrs);
 static DEVICE_ATTR(fbc_enable, S_IRUGO | S_IWUSR, show_fbc, toggle_fbc);
 static DEVICE_ATTR(psr_enable, S_IRUGO | S_IWUSR, show_psr, toggle_psr);
@@ -346,6 +405,16 @@ static struct attribute *fbc_attrs[] = {
 static struct attribute_group fbc_attr_group = {
 	.name = power_group_name,
 	.attrs = fbc_attrs
+};
+
+static struct attribute *ips_attrs[] = {
+	&dev_attr_ips_enable.attr,
+	NULL
+};
+
+static struct attribute_group ips_attr_group = {
+	.name = power_group_name,
+	.attrs = ips_attrs
 };
 
 static struct attribute *psr_attrs[] = {
@@ -859,6 +928,14 @@ void i915_setup_sysfs(struct drm_device *dev)
 		if (ret)
 			DRM_ERROR("FBC sysfs setup failed\n");
 	}
+
+	if (HAS_IPS(dev)) {
+		ret = sysfs_merge_group(&dev->primary->kdev->kobj,
+					&ips_attr_group);
+		if (ret)
+			DRM_ERROR("IPS sysfs setup failed\n");
+	}
+
 	if (HAS_PSR(dev)) {
 		ret = sysfs_merge_group(&dev->primary->kdev->kobj,
 					&psr_attr_group);
@@ -931,6 +1008,7 @@ void i915_teardown_sysfs(struct drm_device *dev)
 #ifdef CONFIG_PM
 	sysfs_unmerge_group(&dev->primary->kdev->kobj, &drrs_attr_group);
 	sysfs_unmerge_group(&dev->primary->kdev->kobj, &fbc_attr_group);
+	sysfs_unmerge_group(&dev->primary->kdev->kobj, &ips_attr_group);
 	sysfs_unmerge_group(&dev->primary->kdev->kobj, &psr_attr_group);
 	sysfs_unmerge_group(&dev->primary->kdev->kobj, &rc6_attr_group);
 	sysfs_unmerge_group(&dev->primary->kdev->kobj, &rc6p_attr_group);

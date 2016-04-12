@@ -967,6 +967,12 @@ struct i915_drrs {
 	bool sysfs_set;
 };
 
+struct i915_ips {
+	struct mutex lock;
+	int enable;
+	bool sysfs_set;
+};
+
 struct i915_psr {
 	struct mutex lock;
 	bool sink_support;
@@ -1887,6 +1893,8 @@ struct drm_i915_private {
 	struct intel_ilk_power_mgmt ips;
 
 	struct i915_power_domains power_domains;
+
+	struct i915_ips hsw_ips;
 
 	struct i915_psr psr;
 
