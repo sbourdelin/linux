@@ -762,7 +762,23 @@ static int hpet_cpuhp_notify(struct notifier_block *n,
  */
 static cycle_t read_hpet(struct clocksource *cs)
 {
-	return (cycle_t)hpet_readl(HPET_COUNTER);
+	unsigned int ret;
+	static bool checked;
+	ret = hpet_readl(HPET_COUNTER);
+
+	if (unlikely(ret == 0xffffffff && !checked)) {
+		int i;
+		for (i = 0; i < 20; i++) {
+			ret = hpet_readl(HPET_COUNTER);
+			if (ret != 0xffffffff)
+				break;
+		}
+		if (i == 20) {
+			WARN_ONCE(true, "HPET counter value is abnormal\n");
+			checked = true;
+		}
+	}
+	return (cycle_t)ret;
 }
 
 static struct clocksource clocksource_hpet = {
