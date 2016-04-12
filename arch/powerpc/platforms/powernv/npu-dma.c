@@ -12,6 +12,7 @@
 #include <linux/export.h>
 #include <linux/pci.h>
 #include <linux/memblock.h>
+#include <linux/iommu.h>
 
 #include <asm/iommu.h>
 #include <asm/pnv-pci.h>
@@ -261,4 +262,129 @@ void pnv_npu_try_dma_set_bypass(struct pci_dev *gpdev, bool bypass)
 			pnv_npu_dma_set_32(npe);
 		}
 	}
+}
+
+long pnv_npu_set_window(struct pnv_ioda_pe *npe, int num,
+		struct iommu_table *tbl)
+{
+	struct pnv_phb *phb = npe->phb;
+	int64_t rc;
+	const unsigned long size = tbl->it_indirect_levels ?
+		tbl->it_level_size : tbl->it_size;
+	const __u64 start_addr = tbl->it_offset << tbl->it_page_shift;
+	const __u64 win_size = tbl->it_size << tbl->it_page_shift;
+
+	pe_info(npe, "Setting up window#%d %llx..%llx pg=%lx\n", num,
+			start_addr, start_addr + win_size - 1,
+			IOMMU_PAGE_SIZE(tbl));
+
+	/* Ignore @num as there is just one window per NPU */
+	rc = opal_pci_map_pe_dma_window(phb->opal_id,
+			npe->pe_number,
+			npe->pe_number,
+			tbl->it_indirect_levels + 1,
+			__pa(tbl->it_base),
+			size << 3,
+			IOMMU_PAGE_SIZE(tbl));
+	if (rc) {
+		pe_err(npe, "Failed to configure TCE table, err %lld\n", rc);
+		return rc;
+	}
+
+	pnv_pci_link_table_and_group(phb->hose->node, num,
+			tbl, &npe->table_group);
+	pnv_pci_ioda2_tce_invalidate_entire(npe->phb, false);
+
+	return rc;
+}
+
+long pnv_npu_unset_window(struct pnv_ioda_pe *npe, int num)
+{
+	struct pnv_phb *phb = npe->phb;
+	long ret;
+
+	pe_info(npe, "Removing DMA window #%d\n", num);
+
+	/* Ignore @num as there is just one window per NPU */
+	ret = opal_pci_map_pe_dma_window(phb->opal_id, npe->pe_number,
+			npe->pe_number,
+			0/* levels */, 0/* table address */,
+			0/* table size */, 0/* page size */);
+	if (ret)
+		pe_warn(npe, "Unmapping failed, ret = %ld\n", ret);
+	else
+		pnv_pci_ioda2_tce_invalidate_entire(npe->phb, false);
+
+	pnv_pci_unlink_table_and_group(npe->table_group.tables[num],
+			&npe->table_group);
+
+	return ret;
+}
+
+/* Switch ownership from platform code to external user (e.g. VFIO) */
+void pnv_npu_take_ownership(struct pnv_ioda_pe *npe)
+{
+	struct pnv_phb *phb = npe->phb;
+	int64_t ret;
+
+	if (npe->table_group.tables[0]) {
+		/* Disable 32bit window */
+		pnv_pci_unlink_table_and_group(npe->table_group.tables[0],
+				&npe->table_group);
+		npe->table_group.tables[0] = NULL;
+		ret = opal_pci_map_pe_dma_window(phb->opal_id, npe->pe_number,
+				npe->pe_number,
+				0/* levels */, 0/* table address */,
+				0/* table size */, 0/* page size */);
+	} else {
+		/* Disable bypass */
+		ret = opal_pci_map_pe_dma_window_real(phb->opal_id,
+				npe->pe_number, npe->pe_number,
+				0 /* bypass base */, 0);
+	}
+
+	if (ret != OPAL_SUCCESS)
+		pe_err(npe, "Failed to remove DMA window");
+	else
+		pnv_pci_ioda2_tce_invalidate_entire(npe->phb, false);
+}
+
+/* Switch ownership from external user (e.g. VFIO) back to core */
+void pnv_npu_release_ownership(struct pnv_ioda_pe *npe)
+{
+	struct pnv_phb *phb = npe->phb;
+	int64_t ret;
+
+	/* Disable a window (not bypass) as external users do not use bypass */
+	ret = opal_pci_map_pe_dma_window(phb->opal_id, npe->pe_number,
+			npe->pe_number,
+			0/* levels */, 0/* table address */,
+			0/* table size */, 0/* page size */);
+	if (ret != OPAL_SUCCESS)
+		pe_err(npe, "Failed to remove DMA window");
+	else
+		pnv_pci_ioda2_tce_invalidate_entire(npe->phb, false);
+}
+
+struct pnv_ioda_pe *pnv_pci_npu_setup_iommu(struct pnv_ioda_pe *npe)
+{
+	struct pnv_phb *phb = npe->phb;
+	struct pci_bus *pbus = phb->hose->bus;
+	struct pci_dev *npdev, *gpdev = NULL, *gptmp;
+	struct pnv_ioda_pe *gpe = get_gpu_pci_dev_and_pe(npe, &gpdev);
+
+	if (!gpe || !gpdev)
+		return NULL;
+
+	list_for_each_entry(npdev, &pbus->devices, bus_list) {
+		gptmp = pnv_pci_get_gpu_dev(npdev);
+
+		if (gptmp != gpdev)
+			continue;
+
+		pe_info(gpe, "Attached NPU %s\n", dev_name(&npdev->dev));
+		iommu_group_add_device(gpe->table_group.group, &npdev->dev);
+	}
+
+	return gpe;
 }
