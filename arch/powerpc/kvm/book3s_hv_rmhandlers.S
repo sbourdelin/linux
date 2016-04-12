@@ -183,6 +183,10 @@ END_FTR_SECTION_IFSET(CPU_FTR_ARCH_207S)
 kvmppc_primary_no_guest:
 	/* We handle this much like a ceded vcpu */
 	/* put the HDEC into the DEC, since HDEC interrupts don't wake us */
+
+	/* XXX: ISA v3 only says the HDEC is at least as large as the DEC, but
+	 *      this code assumes we can fit HDEC in DEC. This is probably
+	 *      not an issue in practice, but... */
 	mfspr	r3, SPRN_HDEC
 	mtspr	SPRN_DEC, r3
 	/*
@@ -249,9 +253,9 @@ kvm_novcpu_wakeup:
 	bge	kvm_novcpu_exit
 
 	/* See if our timeslice has expired (HDEC is negative) */
-	mfspr	r0, SPRN_HDEC
+	GET_HDEC(r0);
 	li	r12, BOOK3S_INTERRUPT_HV_DECREMENTER
-	cmpwi	r0, 0
+	cmpdi	r0, 0
 	blt	kvm_novcpu_exit
 
 	/* Got an IPI but other vcpus aren't yet exiting, must be a latecomer */
@@ -340,8 +344,9 @@ kvm_secondary_got_guest:
 	lbz	r4, HSTATE_PTID(r13)
 	cmpwi	r4, 0
 	bne	63f
-	lis	r6, 0x7fff
-	ori	r6, r6, 0xffff
+
+	LOAD_REG_ADDR(r6, decrementer_max);
+	ld	r6,0(r6);
 	mtspr	SPRN_HDEC, r6
 	/* and set per-LPAR registers, if doing dynamic micro-threading */
 	ld	r6, HSTATE_SPLIT_MODE(r13)
@@ -897,7 +902,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_ARCH_207S)
 	mftb	r7
 	subf	r3,r7,r8
 	mtspr	SPRN_DEC,r3
-	stw	r3,VCPU_DEC(r4)
+	std	r3,VCPU_DEC(r4)
 
 	ld	r5, VCPU_SPRG0(r4)
 	ld	r6, VCPU_SPRG1(r4)
@@ -953,8 +958,8 @@ END_FTR_SECTION_IFCLR(CPU_FTR_ARCH_207S)
 	isync
 
 	/* Check if HDEC expires soon */
-	mfspr	r3, SPRN_HDEC
-	cmpwi	r3, 512		/* 1 microsecond */
+	GET_HDEC(r3)
+	cmpdi	r3, 512		/* 1 microsecond */
 	blt	hdec_soon
 
 	ld	r6, VCPU_CTR(r4)
@@ -990,8 +995,9 @@ deliver_guest_interrupt:
 	beq	5f
 	li	r0, BOOK3S_INTERRUPT_EXTERNAL
 	bne	cr1, 12f
-	mfspr	r0, SPRN_DEC
-	cmpwi	r0, 0
+
+	GET_DEC(r0)
+	cmpdi	r0, 0
 	li	r0, BOOK3S_INTERRUPT_DECREMENTER
 	bge	5f
 
@@ -1206,8 +1212,8 @@ END_FTR_SECTION_IFSET(CPU_FTR_HAS_PPR)
 	/* See if this is a leftover HDEC interrupt */
 	cmpwi	r12,BOOK3S_INTERRUPT_HV_DECREMENTER
 	bne	2f
-	mfspr	r3,SPRN_HDEC
-	cmpwi	r3,0
+	GET_HDEC(r3);
+	cmpdi	r3,0
 	mr	r4,r9
 	bge	fast_guest_return
 2:
@@ -1326,9 +1332,8 @@ mc_cont:
 	mtspr	SPRN_SPURR,r4
 
 	/* Save DEC */
-	mfspr	r5,SPRN_DEC
+	GET_DEC(r5);
 	mftb	r6
-	extsw	r5,r5
 	add	r5,r5,r6
 	/* r5 is a guest timebase value here, convert to host TB */
 	ld	r3,HSTATE_KVM_VCORE(r13)
@@ -2250,15 +2255,14 @@ _GLOBAL(kvmppc_h_cede)		/* r3 = vcpu pointer, r11 = msr, r13 = paca */
 	 * no later than the end of our timeslice (HDEC interrupts
 	 * don't wake us from nap).
 	 */
-	mfspr	r3, SPRN_DEC
-	mfspr	r4, SPRN_HDEC
+	GET_DEC(r3);
+	GET_HDEC(r4);
 	mftb	r5
-	cmpw	r3, r4
+	cmpd	r3, r4
 	ble	67f
 	mtspr	SPRN_DEC, r4
 67:
 	/* save expiry time of guest decrementer */
-	extsw	r3, r3
 	add	r3, r3, r5
 	ld	r4, HSTATE_KVM_VCPU(r13)
 	ld	r5, HSTATE_KVM_VCORE(r13)

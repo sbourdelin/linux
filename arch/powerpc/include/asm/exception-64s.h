@@ -545,4 +545,26 @@ END_FTR_SECTION_IFSET(CPU_FTR_CAN_NAP)
 #define FINISH_NAP
 #endif
 
+/* these ensure that we always get a 64bit value from the
+ * decrementer register. */
+
+#define IS_LD_ENABLED(reg)                 \
+	mfspr  reg,SPRN_LPCR;              \
+	andis. reg,reg,(LPCR_LD >> 16);
+
+#define GET_DEC(reg)                       \
+	IS_LD_ENABLED(reg);                \
+	mfspr reg, SPRN_DEC;               \
+	bne 99f;                           \
+	extsw reg, reg;                    \
+99:
+
+/* For CPUs that support it the Hypervisor LD is
+ * always enabled, so this needs to be feature gated */
+#define GET_HDEC(reg) \
+	mfspr reg, SPRN_HDEC;           \
+BEGIN_FTR_SECTION                       \
+	extsw reg, reg;                 \
+END_FTR_SECTION_IFCLR(CPU_FTR_ARCH_300)
+
 #endif	/* _ASM_POWERPC_EXCEPTION_H */

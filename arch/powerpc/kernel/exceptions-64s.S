@@ -631,7 +631,14 @@ masked_##_H##interrupt:					\
 	stb	r11,PACAIRQHAPPENED(r13);		\
 	cmpwi	r10,PACA_IRQ_DEC;			\
 	bne	1f;					\
-	lis	r10,0x7fff;				\
+	mfspr	r10,SPRN_LPCR;				\
+	andis.	r10,r10,(LPCR_LD >> 16);		\
+	beq	3f;					\
+	LOAD_REG_ADDR(r10, decrementer_max);		\
+	ld r10,0(r10);					\
+	mtspr	SPRN_DEC,r10;				\
+	b	2f;					\
+3:	lis	r10,0x7fff;				\
 	ori	r10,r10,0xffff;				\
 	mtspr	SPRN_DEC,r10;				\
 	b	2f;					\
