@@ -148,6 +148,11 @@ typedef struct xfs_mount {
 	 */
 	__uint32_t		m_generation;
 
+	bool			m_thin_reserve;
+	struct mutex		m_thin_res_lock;
+	uint32_t		m_thin_sectpb;
+	sector_t		m_thin_res;
+
 #ifdef DEBUG
 	/*
 	 * DEBUG mode instrumentation to test and/or trigger delayed allocation
