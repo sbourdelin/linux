@@ -311,12 +311,13 @@ loop:
  * when the transaction commits
  */
 static int record_root_in_trans(struct btrfs_trans_handle *trans,
-			       struct btrfs_root *root)
+			       struct btrfs_root *root,
+			       int force)
 {
-	if (test_bit(BTRFS_ROOT_REF_COWS, &root->state) &&
-	    root->last_trans < trans->transid) {
+	if ((test_bit(BTRFS_ROOT_REF_COWS, &root->state) &&
+	    root->last_trans < trans->transid) || force) {
 		WARN_ON(root == root->fs_info->extent_root);
-		WARN_ON(root->commit_root != root->node);
+		WARN_ON(root->commit_root != root->node && !force);
 
 		/*
 		 * see below for IN_TRANS_SETUP usage rules
@@ -331,7 +332,7 @@ static int record_root_in_trans(struct btrfs_trans_handle *trans,
 		smp_wmb();
 
 		spin_lock(&root->fs_info->fs_roots_radix_lock);
-		if (root->last_trans == trans->transid) {
+		if (root->last_trans == trans->transid && !force) {
 			spin_unlock(&root->fs_info->fs_roots_radix_lock);
 			return 0;
 		}
@@ -402,7 +403,7 @@ int btrfs_record_root_in_trans(struct btrfs_trans_handle *trans,
 		return 0;
 
 	mutex_lock(&root->fs_info->reloc_mutex);
-	record_root_in_trans(trans, root);
+	record_root_in_trans(trans, root, 0);
 	mutex_unlock(&root->fs_info->reloc_mutex);
 
 	return 0;
@@ -1383,7 +1384,7 @@ static noinline int create_pending_snapshot(struct btrfs_trans_handle *trans,
 	dentry = pending->dentry;
 	parent_inode = pending->dir;
 	parent_root = BTRFS_I(parent_inode)->root;
-	record_root_in_trans(trans, parent_root);
+	record_root_in_trans(trans, parent_root, 0);
 
 	cur_time = current_fs_time(parent_inode->i_sb);
 
@@ -1420,7 +1421,7 @@ static noinline int create_pending_snapshot(struct btrfs_trans_handle *trans,
 		goto fail;
 	}
 
-	record_root_in_trans(trans, root);
+	record_root_in_trans(trans, root, 0);
 	btrfs_set_root_last_snapshot(&root->root_item, trans->transid);
 	memcpy(new_root_item, &root->root_item, sizeof(*new_root_item));
 	btrfs_check_and_init_root_item(new_root_item);
@@ -1516,6 +1517,62 @@ static noinline int create_pending_snapshot(struct btrfs_trans_handle *trans,
 		goto fail;
 	}
 
+	/*
+	 * Account qgroups before insert the dir item
+	 * As such dir item insert will modify parent_root, which could be
+	 * src root. If we don't do it now, wrong accounting may be inherited
+	 * to snapshot qgroup.
+	 *
+	 * For reason locking tree_log_mutex, see btrfs_commit_transaction()
+	 * comment
+	 */
+	mutex_lock(&root->fs_info->tree_log_mutex);
+
+	ret = commit_fs_roots(trans, root);
+	if (ret) {
+		mutex_unlock(&root->fs_info->tree_log_mutex);
+		goto fail;
+	}
+
+	ret = btrfs_qgroup_prepare_account_extents(trans, root->fs_info);
+	if (ret < 0) {
+		mutex_unlock(&root->fs_info->tree_log_mutex);
+		goto fail;
+	}
+	ret = btrfs_qgroup_account_extents(trans, root->fs_info);
+	if (ret < 0) {
+		mutex_unlock(&root->fs_info->tree_log_mutex);
+		goto fail;
+	}
+	/*
+	 * Now qgroup are all updated, we can inherit it to new qgroups
+	 */
+	ret = btrfs_qgroup_inherit(trans, fs_info,
+				   root->root_key.objectid,
+				   objectid, pending->inherit);
+	if (ret < 0) {
+		mutex_unlock(&root->fs_info->tree_log_mutex);
+		goto fail;
+	}
+	/*
+	 * qgroup_account_extents() must be followed by a
+	 * switch_commit_roots(), or next qgroup_account_extents() will
+	 * be corrupted
+	 */
+	ret = commit_cowonly_roots(trans, root);
+	if (ret) {
+		mutex_unlock(&root->fs_info->tree_log_mutex);
+		goto fail;
+	}
+	/*
+	 * Just like in btrfs_commit_transaction(), we need to
+	 * switch_commit_roots().
+	 * However this time we don't need to do a full one,
+	 * excluding tree root and chunk root should be OK.
+	 */
+	switch_commit_roots(trans->transaction, root->fs_info);
+	mutex_unlock(&root->fs_info->tree_log_mutex);
+
 	ret = btrfs_insert_dir_item(trans, parent_root,
 				    dentry->d_name.name, dentry->d_name.len,
 				    parent_inode, &key,
@@ -1526,6 +1583,12 @@ static noinline int create_pending_snapshot(struct btrfs_trans_handle *trans,
 		btrfs_abort_transaction(trans, root, ret);
 		goto fail;
 	}
+
+	/*
+	 * Force parent root to be updated, as we recorded it before its
+	 * last_trans == cur_transid
+	 */
+	record_root_in_trans(trans, parent_root, 1);
 
 	btrfs_i_size_write(parent_inode, parent_inode->i_size +
 					 dentry->d_name.len * 2);
@@ -1554,23 +1617,6 @@ static noinline int create_pending_snapshot(struct btrfs_trans_handle *trans,
 	}
 
 	ret = btrfs_run_delayed_refs(trans, root, (unsigned long)-1);
-	if (ret) {
-		btrfs_abort_transaction(trans, root, ret);
-		goto fail;
-	}
-
-	/*
-	 * account qgroup counters before qgroup_inherit()
-	 */
-	ret = btrfs_qgroup_prepare_account_extents(trans, fs_info);
-	if (ret)
-		goto fail;
-	ret = btrfs_qgroup_account_extents(trans, fs_info);
-	if (ret)
-		goto fail;
-	ret = btrfs_qgroup_inherit(trans, fs_info,
-				   root->root_key.objectid,
-				   objectid, pending->inherit);
 	if (ret) {
 		btrfs_abort_transaction(trans, root, ret);
 		goto fail;
