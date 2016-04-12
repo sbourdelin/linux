@@ -73,6 +73,10 @@
 
 #define PMC_SCRATCH41			0x140
 
+/* Power detect for IO rail voltage */
+#define PMC_PWR_DET			0x48
+#define PMC_PWR_DET_VAL			0xe4
+
 #define PMC_SENSOR_CTRL			0x1b0
 #define PMC_SENSOR_CTRL_SCRATCH_WRITE	BIT(2)
 #define PMC_SENSOR_CTRL_ENABLE_RST	BIT(1)
@@ -102,6 +106,8 @@
 
 #define GPU_RG_CNTRL			0x2d4
 
+static DEFINE_SPINLOCK(tegra_pmc_access_lock);
+
 struct tegra_pmc_soc {
 	unsigned int num_powergates;
 	const char *const *powergates;
@@ -110,6 +116,7 @@ struct tegra_pmc_soc {
 
 	bool has_tsense_reset;
 	bool has_gpu_clamps;
+	bool has_io_rail_voltage_config;
 };
 
 /**
@@ -160,9 +167,29 @@ struct tegra_pmc {
 	struct mutex powergates_lock;
 };
 
+struct tegra_io_rail_voltage_bit_info {
+	int io_rail_id;
+	int bit_position;
+};
+
 static struct tegra_pmc *pmc = &(struct tegra_pmc) {
 	.base = NULL,
 	.suspend_mode = TEGRA_SUSPEND_NONE,
+};
+
+#define TEGRA_IO_RAIL_VOLTAGE(_io_rail, _pos)		\
+{							\
+	.io_rail_id = TEGRA_IO_RAIL_##_io_rail,		\
+	.bit_position = _pos,				\
+}
+
+static struct tegra_io_rail_voltage_bit_info tegra210_io_rail_voltage_info[] = {
+	TEGRA_IO_RAIL_VOLTAGE(SDMMC1, 12),
+	TEGRA_IO_RAIL_VOLTAGE(SDMMC3, 13),
+	TEGRA_IO_RAIL_VOLTAGE(AUDIO_HV, 18),
+	TEGRA_IO_RAIL_VOLTAGE(DMIC, 20),
+	TEGRA_IO_RAIL_VOLTAGE(GPIO, 21),
+	TEGRA_IO_RAIL_VOLTAGE(SPI_HV, 23),
 };
 
 static u32 tegra_pmc_readl(unsigned long offset)
@@ -173,6 +200,16 @@ static u32 tegra_pmc_readl(unsigned long offset)
 static void tegra_pmc_writel(u32 value, unsigned long offset)
 {
 	writel(value, pmc->base + offset);
+}
+
+static void _tegra_pmc_register_update(unsigned long addr, unsigned long mask,
+				       unsigned long val)
+{
+	u32 pmc_reg;
+
+	pmc_reg = tegra_pmc_readl(addr);
+	pmc_reg = (pmc_reg & ~mask) | (val & mask);
+	tegra_pmc_writel(pmc_reg, addr);
 }
 
 static inline bool tegra_powergate_state(int id)
@@ -409,6 +446,63 @@ int tegra_pmc_cpu_remove_clamping(unsigned int cpuid)
 	return tegra_powergate_remove_clamping(id);
 }
 #endif /* CONFIG_SMP */
+
+static int tegra_io_rail_voltage_get_bit_pos(int io_rail_id)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(tegra210_io_rail_voltage_info); ++i) {
+		if (tegra210_io_rail_voltage_info[i].io_rail_id == io_rail_id)
+			return tegra210_io_rail_voltage_info[i].bit_position;
+	}
+
+	return -EINVAL;
+}
+
+int tegra_io_rail_voltage_set(int io_rail, int val)
+{
+	unsigned long flags;
+	unsigned long bval, mask;
+	int bpos;
+
+	if (!pmc->soc->has_io_rail_voltage_config)
+		return -ENODEV;
+
+	bpos = tegra_io_rail_voltage_get_bit_pos(io_rail);
+	if (bpos < 0)
+		return bpos;
+
+	mask = BIT(bpos);
+	bval = (val) ? mask : 0;
+
+	spin_lock_irqsave(&tegra_pmc_access_lock, flags);
+	_tegra_pmc_register_update(PMC_PWR_DET, mask, mask);
+	_tegra_pmc_register_update(PMC_PWR_DET_VAL, mask, bval);
+	spin_unlock_irqrestore(&tegra_pmc_access_lock, flags);
+
+	usleep_range(5, 10);
+
+	return 0;
+}
+EXPORT_SYMBOL(tegra_io_rail_voltage_set);
+
+int tegra_io_rail_voltage_get(int io_rail)
+{
+	u32 rval;
+	int bpos;
+
+	if (!pmc->soc->has_io_rail_voltage_config)
+		return -ENODEV;
+
+	bpos = tegra_io_rail_voltage_get_bit_pos(io_rail);
+	if (bpos < 0)
+		return bpos;
+
+	rval = tegra_pmc_readl(PMC_PWR_DET_VAL);
+
+	return !!(rval & BIT(bpos));
+}
+EXPORT_SYMBOL(tegra_io_rail_voltage_get);
 
 static int tegra_pmc_restart_notify(struct notifier_block *this,
 				    unsigned long action, void *data)
@@ -1102,6 +1196,7 @@ static const struct tegra_pmc_soc tegra210_pmc_soc = {
 	.cpu_powergates = tegra210_cpu_powergates,
 	.has_tsense_reset = true,
 	.has_gpu_clamps = true,
+	.has_io_rail_voltage_config = true,
 };
 
 static const struct of_device_id tegra_pmc_match[] = {

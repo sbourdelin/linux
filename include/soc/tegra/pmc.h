@@ -134,6 +134,27 @@ int tegra_powergate_sequence_power_up(unsigned int id, struct clk *clk,
 int tegra_io_rail_power_on(unsigned int id);
 int tegra_io_rail_power_off(unsigned int id);
 int tegra_io_rail_power_get_status(unsigned int id);
+
+/*
+ * tegra_io_rail_voltage_set: Set IO rail voltage.
+ * @io_rail: Tegra IO rail ID as defined in macro TEGRA_IO_RAIL_*
+ * @val: Voltage need to be set. The values are:
+ *		0 for 1.8V,
+ *		1 for 3.3V.
+ *
+ * Returns 0 if success otherwise error number.
+ */
+int tegra_io_rail_voltage_set(int io_rail, int val);
+
+/*
+ * tegra_io_rail_voltage_get: Get IO rail voltage.
+ * @io_rail: Tegra IO rail ID as defined in macro TEGRA_IO_RAIL_*
+ *
+ * Returns negative error number if it fails due to invalid io pad id.
+ * Otherwise 0 for 1.8V, 1 for 3.3V.
+ */
+int tegra_io_rail_voltage_get(int io_rail);
+
 #else
 static inline int tegra_powergate_is_powered(unsigned int id)
 {
@@ -176,6 +197,17 @@ static inline int tegra_io_rail_power_get_status(unsigned int id)
 {
 	return -ENOTSUP;
 }
+
+static inline int tegra_io_rail_voltage_set(int io_rail, int val)
+{
+	return -ENOTSUP;
+}
+
+static inline int tegra_io_rail_voltage_get(int io_rail)
+{
+	return -ENOTSUP;
+}
+
 #endif /* CONFIG_ARCH_TEGRA */
 
 #endif /* __SOC_TEGRA_PMC_H__ */
