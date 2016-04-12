@@ -73,6 +73,11 @@ config RTC_DEBUG
 	  Say yes here to enable debugging support in the RTC framework
 	  and individual RTC drivers.
 
+config RTC_CYCLIC
+	bool "RTC cyclic executive scheduler support"
+	help
+	  Frame/Cyclic executive scheduler support through the RTC interface
+
 comment "RTC interfaces"
 
 config RTC_INTF_SYSFS
