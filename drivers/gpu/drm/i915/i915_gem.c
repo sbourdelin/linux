@@ -80,12 +80,29 @@ static void i915_gem_info_remove_obj(struct drm_i915_private *dev_priv,
 	spin_unlock(&dev_priv->mm.object_stat_lock);
 }
 
+static bool i915_engine_reset_pending(struct i915_gpu_error *error,
+				     struct intel_engine_cs *engine)
+{
+	int i;
+
+	if (engine)
+		return i915_engine_reset_in_progress(error, engine->id);
+
+	for (i = 0; i < I915_NUM_ENGINES; ++i) {
+		if (i915_engine_reset_in_progress(error, i))
+			return true;
+	}
+
+	return false;
+}
+
 static int
 i915_gem_wait_for_error(struct i915_gpu_error *error)
 {
 	int ret;
 
 #define EXIT_COND (!i915_reset_in_progress(error) || \
+		   !i915_engine_reset_pending(error, NULL) ||	\
 		   i915_terminally_wedged(error))
 	if (EXIT_COND)
 		return 0;
@@ -1112,9 +1129,11 @@ put_rpm:
 
 int
 i915_gem_check_wedge(struct i915_gpu_error *error,
+		     struct intel_engine_cs *engine,
 		     bool interruptible)
 {
-	if (i915_reset_in_progress(error)) {
+	if (i915_reset_in_progress(error) ||
+	    i915_engine_reset_pending(error, engine)) {
 		/* Non-interruptible callers can't handle -EAGAIN, hence return
 		 * -EIO unconditionally for these. */
 		if (!interruptible)
@@ -1296,16 +1315,22 @@ int __i915_wait_request(struct drm_i915_gem_request *req,
 
 	for (;;) {
 		struct timer_list timer;
+		int reset_in_progress;
 
 		prepare_to_wait(&engine->irq_queue, &wait, state);
 
 		/* We need to check whether any gpu reset happened in between
 		 * the caller grabbing the seqno and now ... */
-		if (reset_counter != atomic_read(&dev_priv->gpu_error.reset_counter)) {
+		reset_in_progress = i915_gem_check_wedge(&dev_priv->gpu_error,
+							 NULL,
+							 interruptible);
+		if (reset_counter != atomic_read(&dev_priv->gpu_error.reset_counter) ||
+		    reset_in_progress) {
 			/* ... but upgrade the -EAGAIN to an -EIO if the gpu
 			 * is truely gone. */
-			ret = i915_gem_check_wedge(&dev_priv->gpu_error, interruptible);
-			if (ret == 0)
+			if (reset_in_progress)
+				ret = reset_in_progress;
+			else
 				ret = -EAGAIN;
 			break;
 		}
@@ -1471,7 +1496,7 @@ i915_wait_request(struct drm_i915_gem_request *req)
 
 	BUG_ON(!mutex_is_locked(&dev->struct_mutex));
 
-	ret = i915_gem_check_wedge(&dev_priv->gpu_error, interruptible);
+	ret = i915_gem_check_wedge(&dev_priv->gpu_error, NULL, interruptible);
 	if (ret)
 		return ret;
 
@@ -1561,7 +1586,7 @@ i915_gem_object_wait_rendering__nonblocking(struct drm_i915_gem_object *obj,
 	if (!obj->active)
 		return 0;
 
-	ret = i915_gem_check_wedge(&dev_priv->gpu_error, true);
+	ret = i915_gem_check_wedge(&dev_priv->gpu_error, NULL, true);
 	if (ret)
 		return ret;
 
@@ -4189,7 +4214,7 @@ i915_gem_ring_throttle(struct drm_device *dev, struct drm_file *file)
 	if (ret)
 		return ret;
 
-	ret = i915_gem_check_wedge(&dev_priv->gpu_error, false);
+	ret = i915_gem_check_wedge(&dev_priv->gpu_error, NULL, false);
 	if (ret)
 		return ret;
 

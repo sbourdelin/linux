@@ -3081,6 +3081,7 @@ i915_gem_find_active_request(struct intel_engine_cs *engine);
 bool i915_gem_retire_requests(struct drm_device *dev);
 void i915_gem_retire_requests_ring(struct intel_engine_cs *engine);
 int __must_check i915_gem_check_wedge(struct i915_gpu_error *error,
+				      struct intel_engine_cs *engine,
 				      bool interruptible);
 
 static inline bool i915_reset_in_progress(struct i915_gpu_error *error)
