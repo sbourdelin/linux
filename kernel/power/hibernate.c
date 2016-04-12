@@ -35,8 +35,13 @@
 
 
 static int nocompress;
+#ifndef CONFIG_RANDOMIZE_BASE_ON
 static int noresume;
 static int nohibernate;
+#else
+static int noresume = 1;
+static int nohibernate = 1;
+#endif
 static int resume_wait;
 static unsigned int resume_delay;
 static char resume_file[256] = CONFIG_PM_STD_PARTITION;
@@ -1154,11 +1159,6 @@ static int __init nohibernate_setup(char *str)
 	return 1;
 }
 
-static int __init kaslr_nohibernate_setup(char *str)
-{
-	return nohibernate_setup(str);
-}
-
 static int __init page_poison_nohibernate_setup(char *str)
 {
 #ifdef CONFIG_PAGE_POISONING_ZERO
@@ -1175,6 +1175,26 @@ static int __init page_poison_nohibernate_setup(char *str)
 	return 1;
 }
 
+/*
+ * Hibernation on x86 currently conflicts with kASLR, so only change
+ * hibernation boot defaults when seeing kaslr arguments on x86.
+ */
+#if defined(CONFIG_X86) && defined(CONFIG_RANDOMIZE_BASE)
+static int __init kaslr_nohibernate_setup(char *str)
+{
+	return nohibernate_setup(str);
+}
+
+static int __init nokaslr_hibernate_setup(char *str)
+{
+	noresume = 0;
+	nohibernate = 0;
+	return 1;
+}
+__setup("kaslr", kaslr_nohibernate_setup);
+__setup("nokaslr", nokaslr_hibernate_setup);
+#endif
+
 __setup("noresume", noresume_setup);
 __setup("resume_offset=", resume_offset_setup);
 __setup("resume=", resume_setup);
@@ -1182,5 +1202,4 @@ __setup("hibernate=", hibernate_setup);
 __setup("resumewait", resumewait_setup);
 __setup("resumedelay=", resumedelay_setup);
 __setup("nohibernate", nohibernate_setup);
-__setup("kaslr", kaslr_nohibernate_setup);
 __setup("page_poison=", page_poison_nohibernate_setup);

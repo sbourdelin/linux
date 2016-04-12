@@ -1932,7 +1932,7 @@ config RELOCATABLE
 	  (CONFIG_PHYSICAL_START) is used as the minimum location.
 
 config RANDOMIZE_BASE
-	bool "Randomize the address of the kernel image"
+	bool "Randomize the address of the kernel image (kASLR)"
 	depends on RELOCATABLE
 	default n
 	---help---
@@ -1954,6 +1954,20 @@ config RANDOMIZE_BASE
 	   9 bits of entropy and 32-bit uses 8 bits.
 
 	   If unsure, say N.
+
+config RANDOMIZE_BASE_ON
+	bool "Prefer kASLR over Hibernation"
+	depends on RANDOMIZE_BASE
+	depends on HIBERNATION
+	default n
+	---help---
+	  Currently Hibernation and kASLR are not compatible at runtime
+	  on x86. To enable kASLR by default (and disable Hibernation),
+	  enable this option. To enable Hibernation by default (and
+	  disable kASLR), disable this option. Regardless of this
+	  setting, the availability of kASLR (and therefore Hibernation)
+	  can be chosen at boot time with the "kaslr" or "nokaslr"
+	  kernel argument.
 
 config RANDOMIZE_BASE_MAX_OFFSET
 	hex "Maximum kASLR offset allowed" if EXPERT
