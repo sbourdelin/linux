@@ -1446,8 +1446,8 @@ void intel_backlight_unregister(struct drm_device *dev);
 
 
 /* intel_psr.c */
-void intel_psr_enable(struct intel_dp *intel_dp);
-void intel_psr_disable(struct intel_dp *intel_dp);
+int intel_psr_enable(struct intel_dp *intel_dp, bool sysfs_set);
+int intel_psr_disable(struct intel_dp *intel_dp, bool sysfs_set);
 void intel_psr_invalidate(struct drm_device *dev,
 			  unsigned frontbuffer_bits);
 void intel_psr_flush(struct drm_device *dev,

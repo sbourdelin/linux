@@ -976,6 +976,7 @@ struct i915_psr {
 	bool psr2_support;
 	bool aux_frame_sync;
 	bool link_standby;
+	bool sysfs_set;
 };
 
 enum intel_pch {

@@ -1689,7 +1689,8 @@ static void intel_enable_ddi(struct intel_encoder *intel_encoder)
 			intel_dp_stop_link_train(intel_dp);
 
 		intel_edp_backlight_on(intel_dp);
-		intel_psr_enable(intel_dp);
+		if (dev_priv->psr.sysfs_set != true)
+			intel_psr_enable(intel_dp, dev_priv->psr.sysfs_set);
 		intel_edp_drrs_enable(intel_dp);
 	}
 
@@ -1717,7 +1718,8 @@ static void intel_disable_ddi(struct intel_encoder *intel_encoder)
 		struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
 
 		intel_edp_drrs_disable(intel_dp);
-		intel_psr_disable(intel_dp);
+		if (dev_priv->psr.sysfs_set != true)
+			intel_psr_disable(intel_dp, dev_priv->psr.sysfs_set);
 		intel_edp_backlight_off(intel_dp);
 	}
 }

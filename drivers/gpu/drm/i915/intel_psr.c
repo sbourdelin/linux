@@ -378,34 +378,43 @@ static void intel_psr_activate(struct intel_dp *intel_dp)
 /**
  * intel_psr_enable - Enable PSR
  * @intel_dp: Intel DP
+ * @sysfs_set: Identifies if this feature is set from sysfs
  *
  * This function can only be called after the pipe is fully trained and enabled.
+ *
+ * Returns:
+ * 0 on success and -errno otherwise.
  */
-void intel_psr_enable(struct intel_dp *intel_dp)
+int intel_psr_enable(struct intel_dp *intel_dp, bool sysfs_set)
 {
 	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
 	struct drm_device *dev = intel_dig_port->base.base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_crtc *crtc = to_intel_crtc(intel_dig_port->base.base.crtc);
+	int ret = 0;
+
 
 	if (!HAS_PSR(dev)) {
 		DRM_DEBUG_KMS("PSR not supported on this platform\n");
-		return;
+		return -EINVAL;
 	}
 
 	if (!is_edp_psr(intel_dp)) {
 		DRM_DEBUG_KMS("PSR not supported by this panel\n");
-		return;
+		return -EINVAL;
 	}
 
 	mutex_lock(&dev_priv->psr.lock);
 	if (dev_priv->psr.enabled) {
 		DRM_DEBUG_KMS("PSR already in use\n");
+		ret = -EALREADY;
 		goto unlock;
 	}
 
-	if (!intel_psr_match_conditions(intel_dp))
+	if (!intel_psr_match_conditions(intel_dp)) {
+		ret = -ENOTTY;
 		goto unlock;
+	}
 
 	dev_priv->psr.busy_frontbuffer_bits = 0;
 
@@ -464,8 +473,12 @@ void intel_psr_enable(struct intel_dp *intel_dp)
 				      msecs_to_jiffies(intel_dp->panel_power_cycle_delay * 5));
 
 	dev_priv->psr.enabled = intel_dp;
+	if (sysfs_set)
+		dev_priv->psr.sysfs_set = sysfs_set;
+
 unlock:
 	mutex_unlock(&dev_priv->psr.lock);
+	return ret;
 }
 
 static void vlv_psr_disable(struct intel_dp *intel_dp)
@@ -520,10 +533,11 @@ static void hsw_psr_disable(struct intel_dp *intel_dp)
 /**
  * intel_psr_disable - Disable PSR
  * @intel_dp: Intel DP
+ * @sysfs_set: Identifies if this feature is set from sysfs
  *
  * This function needs to be called before disabling pipe.
  */
-void intel_psr_disable(struct intel_dp *intel_dp)
+int intel_psr_disable(struct intel_dp *intel_dp, bool sysfs_set)
 {
 	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
 	struct drm_device *dev = intel_dig_port->base.base.dev;
@@ -532,7 +546,7 @@ void intel_psr_disable(struct intel_dp *intel_dp)
 	mutex_lock(&dev_priv->psr.lock);
 	if (!dev_priv->psr.enabled) {
 		mutex_unlock(&dev_priv->psr.lock);
-		return;
+		return -EALREADY;
 	}
 
 	/* Disable PSR on Source */
@@ -545,9 +559,13 @@ void intel_psr_disable(struct intel_dp *intel_dp)
 	drm_dp_dpcd_writeb(&intel_dp->aux, DP_PSR_EN_CFG, 0);
 
 	dev_priv->psr.enabled = NULL;
+	if (sysfs_set)
+		dev_priv->psr.sysfs_set = sysfs_set;
+
 	mutex_unlock(&dev_priv->psr.lock);
 
 	cancel_delayed_work_sync(&dev_priv->psr.work);
+	return 0;
 }
 
 static void intel_psr_work(struct work_struct *work)
@@ -781,8 +799,10 @@ void intel_psr_init(struct drm_device *dev)
 
 	/* Per platform default */
 	if (i915.enable_psr == -1) {
-		if (IS_HASWELL(dev) || IS_BROADWELL(dev))
-			i915.enable_psr = 1;
+		if (IS_HASWELL(dev) || IS_BROADWELL(dev)) {
+			if (dev_priv->psr.sysfs_set != true)
+				i915.enable_psr = 1;
+		}
 		else
 			i915.enable_psr = 0;
 	}
