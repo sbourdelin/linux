@@ -329,8 +329,12 @@ static int
 brcmf_proto_bcdc_txdata(struct brcmf_pub *drvr, int ifidx, u8 offset,
 			struct sk_buff *pktbuf)
 {
+	int res;
 	brcmf_proto_bcdc_hdrpush(drvr, ifidx, offset, pktbuf);
-	return brcmf_bus_txdata(drvr->bus_if, pktbuf);
+	res = brcmf_bus_txdata(drvr->bus_if, pktbuf);
+	if (res < 0)
+		brcmf_proto_bcdc_hdrpull(drvr, false, &ifidx, pktbuf);
+	return res;
 }
 
 static void

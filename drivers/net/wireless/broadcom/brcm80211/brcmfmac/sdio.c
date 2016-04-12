@@ -2720,7 +2720,7 @@ static int brcmf_sdio_bus_txdata(struct device *dev, struct sk_buff *pkt)
 	*(u16 *)(pkt->cb) = 0;
 	if (!brcmf_sdio_prec_enq(&bus->txq, pkt, prec)) {
 		skb_pull(pkt, bus->tx_hdrlen);
-		brcmf_err("out of bus->txq !!!\n");
+		brcmf_dbg(INFO, "out of bus->txq !!!\n");
 		ret = -ENOSR;
 	} else {
 		ret = 0;
