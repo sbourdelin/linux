@@ -203,6 +203,15 @@
 				};
 			};
 
+			i2c12 {
+				pinctrl_i2c12_default: i2c12-default {
+					st,pins {
+						sda = <&pio3 6 ALT2 BIDIR>;
+						scl = <&pio3 7 ALT2 BIDIR>;
+					};
+				};
+			};
+
 			keyscan {
 				pinctrl_keyscan: keyscan {
 					st,pins {
