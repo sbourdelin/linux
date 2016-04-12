@@ -2853,8 +2853,8 @@ i915_gem_find_active_request(struct intel_engine_cs *engine)
 	return NULL;
 }
 
-static void i915_gem_reset_engine_status(struct drm_i915_private *dev_priv,
-				       struct intel_engine_cs *engine)
+void i915_gem_reset_engine_status(struct drm_i915_private *dev_priv,
+				  struct intel_engine_cs *engine)
 {
 	struct drm_i915_gem_request *request;
 	bool ring_hung;

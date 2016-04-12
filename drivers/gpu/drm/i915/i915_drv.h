@@ -2751,6 +2751,8 @@ extern long i915_compat_ioctl(struct file *filp, unsigned int cmd,
 			      unsigned long arg);
 #endif
 extern int intel_gpu_reset(struct drm_device *dev, u32 engine_mask);
+extern int intel_request_for_reset(struct intel_engine_cs *engine);
+extern int intel_clear_reset_request(struct intel_engine_cs *engine);
 extern bool intel_has_gpu_reset(struct drm_device *dev);
 extern bool intel_has_engine_reset_support(struct intel_engine_cs *engine);
 extern int i915_reset(struct drm_device *dev);
@@ -3123,6 +3125,8 @@ static inline bool i915_stop_ring_allow_warn(struct drm_i915_private *dev_priv)
 }
 
 void i915_gem_reset(struct drm_device *dev);
+void i915_gem_reset_engine_status(struct drm_i915_private *dev_priv,
+				  struct intel_engine_cs *ring);
 bool i915_gem_clflush_object(struct drm_i915_gem_object *obj, bool force);
 int __must_check i915_gem_init(struct drm_device *dev);
 int i915_gem_init_engines(struct drm_device *dev);

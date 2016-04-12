@@ -970,10 +970,60 @@ int i915_reset(struct drm_device *dev)
  */
 int i915_reset_engine(struct intel_engine_cs *engine)
 {
+	struct drm_device *dev = engine->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_engine_cs_state state;
 	int ret;
 
-	/* FIXME: replace me with engine reset sequence */
-	ret = -ENODEV;
+	WARN_ON(!mutex_is_locked(&dev->struct_mutex));
+
+	i915_gem_reset_engine_status(dev_priv, engine);
+
+	/*Take wake lock to prevent power saving mode */
+	intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
+
+	ret = intel_request_for_reset(engine);
+	if (ret) {
+		DRM_ERROR("Failed to disable %s\n", engine->name);
+		goto out;
+	}
+
+	ret = engine->save(engine, &state);
+	if (ret)
+		goto enable_engine;
+
+	ret = intel_gpu_reset(dev, intel_engine_flag(engine));
+	if (ret) {
+		DRM_ERROR("Failed to reset %s, ret=%d\n", engine->name, ret);
+		goto enable_engine;
+	}
+
+	ret = engine->init_hw(engine);
+	if (ret)
+		goto out;
+
+	/*
+	 * Restart the engine after reset.
+	 * Engine state is first restored and the context is resubmitted.
+	 */
+	engine->start(engine, &state);
+
+enable_engine:
+	/*
+	 * we only need to enable engine if we cannot either save engine state
+	 * or reset fails. If the reset is successful, engine gets enabled
+	 * automatically so we can skip this step.
+	 */
+	if (ret)
+		intel_clear_reset_request(engine);
+
+out:
+	if (state.req)
+		i915_gem_request_unreference(state.req);
+
+	/* Wake up anything waiting on this engine's queue */
+	wake_up_all(&engine->irq_queue);
+	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
 
 	return ret;
 }
