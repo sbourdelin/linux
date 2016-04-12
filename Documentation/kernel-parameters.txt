@@ -3983,6 +3983,19 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			<port#>,<js1>,<js2>,<js3>,<js4>,<js5>,<js6>,<js7>
 			See also Documentation/input/joystick-parport.txt
 
+	ucsi.usb_data_role=
+			[USB] On dual role capable systems, select the preferred
+			USB Data Role for the USB Type-C ports - host or device.
+
+			After connection to an other dual role capable system,
+			if the partner gets the preferred role, UCSI driver
+			executes data role swap as defined in USB Type-C
+			specification.
+
+			On desktop systems host role is often preferred, and on
+			mobile systems device role is usually preferred as the
+			default data role.
+
 	udbg-immortal	[PPC] When debugging early kernel crashes that
 			happen after console_init() and before a proper 
 			console driver takes over, this boot options might
