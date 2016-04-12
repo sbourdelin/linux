@@ -492,7 +492,7 @@ int __init pci_xen_initial_domain(void)
 	__acpi_register_gsi = acpi_register_gsi_xen;
 	__acpi_unregister_gsi = NULL;
 	/* Pre-allocate legacy irqs */
-	for (irq = 0; irq < nr_legacy_irqs(); irq++) {
+	for (irq = 0; irq < NR_IRQS_LEGACY; irq++) {
 		int trigger, polarity;
 
 		if (acpi_get_override_irq(irq, &trigger, &polarity) == -1)
