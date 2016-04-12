@@ -678,7 +678,7 @@ int dwc3_debugfs_init(struct dwc3 *dwc)
 
 err1:
 	debugfs_remove_recursive(root);
-
+	kfree(dwc->regset);
 err0:
 	return ret;
 }
@@ -686,5 +686,5 @@ err0:
 void dwc3_debugfs_exit(struct dwc3 *dwc)
 {
 	debugfs_remove_recursive(dwc->root);
-	dwc->root = NULL;
+	kfree(dwc->regset);
 }
