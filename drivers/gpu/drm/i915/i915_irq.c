@@ -2474,16 +2474,19 @@ static void i915_error_wake_up(struct drm_i915_private *dev_priv,
 }
 
 /**
- * i915_reset_and_wakeup - do process context error handling work
- * @dev: drm device
+ * i915_error_work_func - do process context error handling work
+ * @work: work item containing error struct, passed by the error handler
  *
  * Fire an error uevent so userspace can see that a hang or error
  * was detected.
  */
-static void i915_reset_and_wakeup(struct drm_device *dev)
+static void i915_error_work_func(struct work_struct *work)
 {
-	struct drm_i915_private *dev_priv = to_i915(dev);
-	struct i915_gpu_error *error = &dev_priv->gpu_error;
+	struct i915_gpu_error *error = container_of(work, struct i915_gpu_error,
+	                                            work);
+	struct drm_i915_private *dev_priv =
+	        container_of(error, struct drm_i915_private, gpu_error);
+	struct drm_device *dev = dev_priv->dev;
 	char *error_event[] = { I915_ERROR_UEVENT "=1", NULL };
 	char *reset_event[] = { I915_RESET_UEVENT "=1", NULL };
 	char *reset_done_event[] = { I915_ERROR_UEVENT "=0", NULL };
@@ -2693,7 +2696,19 @@ void i915_handle_error(struct drm_device *dev, u32 engine_mask,
 		i915_error_wake_up(dev_priv, false);
 	}
 
-	i915_reset_and_wakeup(dev);
+	/*
+	 * Our reset work can grab modeset locks (since it needs to reset the
+	 * state of outstanding pageflips). Hence it must not be run on our own
+	 * dev-priv->wq work queue for otherwise the flush_work in the pageflip
+	 * code will deadlock.
+	 * If error_work is already in the work queue then it will not be added
+	 * again. It hasn't yet executed so it will see the reset flags when
+	 * it is scheduled. If it isn't in the queue or it is currently
+	 * executing then this call will add it to the queue again so that
+	 * even if it misses the reset flags during the current call it is
+	 * guaranteed to see them on the next call.
+	 */
+	schedule_work(&dev_priv->gpu_error.work);
 }
 
 /* Called from drm generic code, passed 'crtc' which
@@ -4591,7 +4606,7 @@ void intel_irq_init(struct drm_i915_private *dev_priv)
 	struct drm_device *dev = dev_priv->dev;
 
 	intel_hpd_init_work(dev_priv);
-
+	INIT_WORK(&dev_priv->gpu_error.work, i915_error_work_func);
 	INIT_WORK(&dev_priv->rps.work, gen6_pm_rps_work);
 	INIT_WORK(&dev_priv->l3_parity.error_work, ivybridge_parity_work);
 
