@@ -2448,6 +2448,8 @@ void *i915_gem_object_pin_map(struct drm_i915_gem_object *obj)
 		}
 	}
 
+	/* Presume the caller is going to write into the map */
+	obj->dirty = true;
 	return obj->mapping;
 }
 
