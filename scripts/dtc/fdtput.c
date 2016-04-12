@@ -75,8 +75,9 @@ static int encode_value(struct display_info *disp, char **arg, int arg_count,
 	char *ptr;		/* pointer to current value position */
 	int len;		/* length of this cell/string/byte */
 	int ival;
-	int upto;	/* the number of bytes we have written to buf */
+	int upto;		/* the number of bytes we have written to buf */
 	char fmt[3];
+	void *save_ptr = NULL;	/* save pointer to realloc */
 
 	upto = 0;
 
@@ -96,12 +97,15 @@ static int encode_value(struct display_info *disp, char **arg, int arg_count,
 		/* enlarge our value buffer by a suitable margin if needed */
 		if (upto + len > value_size) {
 			value_size = (upto + len) + 500;
-			value = realloc(value, value_size);
-			if (!value) {
+			void *save_ptr = realloc(value, value_size);
+
+			if (!save_ptr) {
+				free(value);
 				fprintf(stderr, "Out of mmory: cannot alloc "
 					"%d bytes\n", value_size);
 				return -1;
 			}
+			value = save_ptr;
 		}
 
 		ptr = value + upto;
