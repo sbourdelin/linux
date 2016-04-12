@@ -34,6 +34,7 @@ struct i915_params {
 	int lvds_channel_mode;
 	int panel_use_ssc;
 	int vbt_sdvo_panel_type;
+	int reset;
 	int enable_rc6;
 	int enable_dc;
 	int enable_fbc;
@@ -55,7 +56,6 @@ struct i915_params {
 	bool fastboot;
 	bool prefault_disable;
 	bool load_detect_test;
-	bool reset;
 	bool disable_display;
 	bool enable_guc_submission;
 	bool verbose_state_checks;
