@@ -490,6 +490,7 @@ struct drm_i915_error_state {
 		int hangcheck_score;
 		enum intel_ring_hangcheck_action hangcheck_action;
 		int num_requests;
+		u32 reset_count;
 
 		/* our own tracking of ring head and tail */
 		u32 cpu_ring_head;

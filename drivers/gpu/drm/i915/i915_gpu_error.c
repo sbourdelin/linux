@@ -303,6 +303,7 @@ static void i915_ring_error_state(struct drm_i915_error_state_buf *m,
 	err_printf(m, "  hangcheck: %s [%d]\n",
 		   hangcheck_action_to_str(ring->hangcheck_action),
 		   ring->hangcheck_score);
+	err_printf(m, "  engine reset count: %u\n", ring->reset_count);
 }
 
 void i915_error_printf(struct drm_i915_error_state_buf *e, const char *f, ...)
@@ -970,6 +971,8 @@ static void i915_record_ring_state(struct drm_device *dev,
 
 	ering->hangcheck_score = engine->hangcheck.score;
 	ering->hangcheck_action = engine->hangcheck.action;
+	ering->reset_count = i915_engine_reset_count(&dev_priv->gpu_error,
+						     engine);
 
 	if (USES_PPGTT(dev)) {
 		int i;
