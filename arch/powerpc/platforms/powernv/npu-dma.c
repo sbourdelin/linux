@@ -136,63 +136,22 @@ static struct pnv_ioda_pe *get_gpu_pci_dev_and_pe(struct pnv_ioda_pe *npe,
 	struct pnv_ioda_pe *pe;
 	struct pci_dn *pdn;
 
-	if (npe->flags & PNV_IODA_PE_PEER) {
-		pe = npe->peers[0];
-		pdev = pe->pdev;
-	} else {
-		pdev = pnv_pci_get_gpu_dev(npe->pdev);
-		if (!pdev)
-			return NULL;
+	pdev = pnv_pci_get_gpu_dev(npe->pdev);
+	if (!pdev)
+		return NULL;
 
-		pdn = pci_get_pdn(pdev);
-		if (WARN_ON(!pdn || pdn->pe_number == IODA_INVALID_PE))
-			return NULL;
+	pdn = pci_get_pdn(pdev);
+	if (WARN_ON(!pdn || pdn->pe_number == IODA_INVALID_PE))
+		return NULL;
 
-		hose = pci_bus_to_host(pdev->bus);
-		phb = hose->private_data;
-		pe = &phb->ioda.pe_array[pdn->pe_number];
-	}
+	hose = pci_bus_to_host(pdev->bus);
+	phb = hose->private_data;
+	pe = &phb->ioda.pe_array[pdn->pe_number];
 
 	if (gpdev)
 		*gpdev = pdev;
 
 	return pe;
-}
-
-void pnv_npu_init_dma_pe(struct pnv_ioda_pe *npe)
-{
-	struct pnv_ioda_pe *gpe;
-	struct pci_dev *gpdev;
-	int i, avail = -1;
-
-	if (!npe->pdev || !(npe->flags & PNV_IODA_PE_DEV))
-		return;
-
-	gpe = get_gpu_pci_dev_and_pe(npe, &gpdev);
-	if (!gpe)
-		return;
-
-	for (i = 0; i < PNV_IODA_MAX_PEER_PES; i++) {
-		/* Nothing to do if the PE is already connected. */
-		if (gpe->peers[i] == npe)
-			return;
-
-		if (!gpe->peers[i])
-			avail = i;
-	}
-
-	if (WARN_ON(avail < 0))
-		return;
-
-	gpe->peers[avail] = npe;
-	gpe->flags |= PNV_IODA_PE_PEER;
-
-	/*
-	 * We assume that the NPU devices only have a single peer PE
-	 * (the GPU PCIe device PE).
-	 */
-	npe->peers[0] = gpe;
-	npe->flags |= PNV_IODA_PE_PEER;
 }
 
 /*
@@ -225,6 +184,13 @@ static void pnv_npu_dma_set_32(struct pnv_ioda_pe *npe)
 	if (rc != OPAL_SUCCESS)
 		pr_warn("%s: Error %lld setting DMA window on PHB#%d-PE#%d\n",
 			__func__, rc, phb->hose->global_number, npe->pe_number);
+	else
+		pnv_pci_ioda2_tce_invalidate_entire(phb, false);
+
+	/* Add the table to the list so its TCE cache will get invalidated */
+	npe->table_group.tables[0] = tbl;
+	pnv_pci_link_table_and_group(phb->hose->node, 0,
+			tbl, &npe->table_group);
 
 	/*
 	 * We don't initialise npu_pe->tce32_table as we always use
@@ -245,10 +211,10 @@ static int pnv_npu_dma_set_bypass(struct pnv_ioda_pe *npe)
 	int64_t rc = 0;
 	phys_addr_t top = memblock_end_of_DRAM();
 
-	if (phb->type != PNV_PHB_NPU || !npe->pdev)
-		return -EINVAL;
-
 	/* Enable the bypass window */
+	pnv_pci_unlink_table_and_group(npe->table_group.tables[0],
+			&npe->table_group);
+	npe->table_group.tables[0] = NULL;
 
 	top = roundup_pow_of_two(top);
 	dev_info(&npe->pdev->dev, "Enabling bypass for PE %d\n",
@@ -256,6 +222,9 @@ static int pnv_npu_dma_set_bypass(struct pnv_ioda_pe *npe)
 	rc = opal_pci_map_pe_dma_window_real(phb->opal_id,
 			npe->pe_number, npe->pe_number,
 			0 /* bypass base */, top);
+
+	if (rc == OPAL_SUCCESS)
+		pnv_pci_ioda2_tce_invalidate_entire(phb, false);
 
 	return rc;
 }
