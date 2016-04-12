@@ -623,6 +623,7 @@ iscsi_iser_session_create(struct iscsi_endpoint *ep,
 	shost->max_id = 0;
 	shost->max_channel = 0;
 	shost->max_cmd_len = 16;
+	shost->max_segment_size = SIZE_4K;
 
 	/*
 	 * older userspace tools (before 2.0-870) did not pass us
