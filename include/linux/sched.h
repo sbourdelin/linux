@@ -1307,6 +1307,21 @@ struct sched_rt_entity {
 	/* rq "owned" by this entity/group: */
 	struct rt_rq		*my_q;
 #endif
+#ifdef CONFIG_RTC_CYCLIC
+	struct {
+		struct rb_node node; /* admittance structure */
+		struct list_head task_list;
+		unsigned long count; /* overrun count per slot */
+		int type, color, yield;
+		u64 slots;
+
+		/* debug */
+		unsigned long last_task_state;
+
+		/* instrumentation  */
+		unsigned int machine_state, last_machine_state;
+	} rt_overrun;
+#endif
 };
 
 struct sched_dl_entity {
