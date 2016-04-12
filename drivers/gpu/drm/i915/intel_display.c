@@ -6254,7 +6254,8 @@ static void intel_crtc_disable_noatomic(struct drm_crtc *crtc)
 	for_each_encoder_on_crtc(crtc->dev, crtc, encoder)
 		encoder->base.crtc = NULL;
 
-	intel_fbc_disable(intel_crtc);
+	if (dev_priv->fbc.sysfs_set != true)
+		intel_fbc_disable(intel_crtc, dev_priv->fbc.sysfs_set);
 	intel_update_watermarks(crtc);
 	intel_disable_shared_dpll(intel_crtc);
 
@@ -13590,7 +13591,10 @@ static int intel_atomic_commit(struct drm_device *dev,
 			intel_crtc_disable_planes(crtc, old_crtc_state->plane_mask);
 			dev_priv->display.crtc_disable(crtc);
 			intel_crtc->active = false;
-			intel_fbc_disable(intel_crtc);
+
+			if (dev_priv->fbc.sysfs_set != true)
+				intel_fbc_disable(intel_crtc,
+						dev_priv->fbc.sysfs_set);
 			intel_disable_shared_dpll(intel_crtc);
 
 			/*
@@ -13636,8 +13640,11 @@ static int intel_atomic_commit(struct drm_device *dev,
 			intel_pre_plane_update(to_intel_crtc_state(old_crtc_state));
 
 		if (crtc->state->active &&
-		    drm_atomic_get_existing_plane_state(state, crtc->primary))
-			intel_fbc_enable(intel_crtc);
+		    drm_atomic_get_existing_plane_state(state, crtc->primary)) {
+			if (dev_priv->fbc.sysfs_set != true)
+				intel_fbc_enable(intel_crtc,
+						dev_priv->fbc.sysfs_set);
+		}
 
 		if (crtc->state->active &&
 		    (crtc->state->planes_changed || update_pipe))

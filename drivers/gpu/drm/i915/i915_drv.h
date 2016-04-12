@@ -936,6 +936,7 @@ struct intel_fbc {
 	} work;
 
 	const char *no_fbc_reason;
+	bool sysfs_set;
 };
 
 /**

@@ -1083,19 +1083,24 @@ out:
 /**
  * intel_fbc_enable: tries to enable FBC on the CRTC
  * @crtc: the CRTC
+ * @sysfs_set: Identifies if this featudre is set from sysfs.
  *
  * This function checks if the given CRTC was chosen for FBC, then enables it if
  * possible. Notice that it doesn't activate FBC. It is valid to call
  * intel_fbc_enable multiple times for the same pipe without an
  * intel_fbc_disable in the middle, as long as it is deactivated.
+ *
+ * Returns:
+ * 0 on success and -errno otherwise
  */
-void intel_fbc_enable(struct intel_crtc *crtc)
+int intel_fbc_enable(struct intel_crtc *crtc, bool sysfs_set)
 {
 	struct drm_i915_private *dev_priv = crtc->base.dev->dev_private;
 	struct intel_fbc *fbc = &dev_priv->fbc;
+	int ret = 0;
 
 	if (!fbc_supported(dev_priv))
-		return;
+		return -EINVAL;
 
 	mutex_lock(&fbc->lock);
 
@@ -1105,11 +1110,14 @@ void intel_fbc_enable(struct intel_crtc *crtc)
 			WARN_ON(!crtc->config->enable_fbc);
 			WARN_ON(fbc->active);
 		}
+		ret = -EALREADY;
 		goto out;
 	}
 
-	if (!crtc->config->enable_fbc)
+	if (!crtc->config->enable_fbc) {
+		ret = -EINVAL;
 		goto out;
+	}
 
 	WARN_ON(fbc->active);
 	WARN_ON(fbc->crtc != NULL);
@@ -1117,6 +1125,7 @@ void intel_fbc_enable(struct intel_crtc *crtc)
 	intel_fbc_update_state_cache(crtc);
 	if (intel_fbc_alloc_cfb(crtc)) {
 		fbc->no_fbc_reason = "not enough stolen memory";
+		ret = -EINVAL;
 		goto out;
 	}
 
@@ -1125,8 +1134,11 @@ void intel_fbc_enable(struct intel_crtc *crtc)
 
 	fbc->enabled = true;
 	fbc->crtc = crtc;
+	if (sysfs_set)
+		dev_priv->fbc.sysfs_set = sysfs_set;
 out:
 	mutex_unlock(&fbc->lock);
+	return ret;
 }
 
 /**
@@ -1157,26 +1169,33 @@ static void __intel_fbc_disable(struct drm_i915_private *dev_priv)
 /**
  * intel_fbc_disable - disable FBC if it's associated with crtc
  * @crtc: the CRTC
+ * @sysfs_set: Identifies if this featudre is set from sysfs.
  *
  * This function disables FBC if it's associated with the provided CRTC.
+ *
+ * Returns:
+ * 0 on success and -errno otherwise
  */
-void intel_fbc_disable(struct intel_crtc *crtc)
+int intel_fbc_disable(struct intel_crtc *crtc, bool sysfs_set)
 {
 	struct drm_i915_private *dev_priv = crtc->base.dev->dev_private;
 	struct intel_fbc *fbc = &dev_priv->fbc;
 
 	if (!fbc_supported(dev_priv))
-		return;
+		return -EINVAL;
 
 	mutex_lock(&fbc->lock);
 	if (fbc->crtc == crtc) {
 		WARN_ON(!fbc->enabled);
 		WARN_ON(fbc->active);
 		__intel_fbc_disable(dev_priv);
+		if (sysfs_set)
+			dev_priv->fbc.sysfs_set = sysfs_set;
 	}
 	mutex_unlock(&fbc->lock);
 
 	cancel_work_sync(&fbc->work.work);
+	return 0;
 }
 
 /**
