@@ -2614,6 +2614,10 @@ struct drm_i915_cmd_table {
 #define VEBOX_RING		(1<<VECS)
 #define BSD2_RING		(1<<VCS2)
 #define ALL_ENGINES		(~0)
+#define I915_ENGINE_RESET_MASK	((1 << I915_EXEC_RENDER) | \
+				 (1 << I915_EXEC_BSD) | \
+				 (1 << I915_EXEC_BLT) | \
+				 (1 << I915_EXEC_VEBOX))
 
 #define HAS_BSD(dev)		(INTEL_INFO(dev)->ring_mask & BSD_RING)
 #define HAS_BSD2(dev)		(INTEL_INFO(dev)->ring_mask & BSD2_RING)

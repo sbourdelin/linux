@@ -45,7 +45,7 @@ struct i915_params i915 __read_mostly = {
 	.fastboot = 0,
 	.prefault_disable = 0,
 	.load_detect_test = 0,
-	.reset = 1,
+	.reset = I915_ENGINE_RESET_MASK,
 	.invert_brightness = 0,
 	.disable_display = 0,
 	.enable_cmd_parser = 1,
@@ -109,7 +109,7 @@ MODULE_PARM_DESC(vbt_sdvo_panel_type,
 	"(-2=ignore, -1=auto [default], index in VBT BIOS table)");
 
 module_param_named_unsafe(reset, i915.reset, int, 0600);
-MODULE_PARM_DESC(reset, "Attempt GPU resets (0=disabled, 1=full gpu reset [default], 2=engine reset)");
+MODULE_PARM_DESC(reset, "Attempt GPU resets (0=disabled, 1=full gpu reset, 2=engine reset [default])");
 
 module_param_named_unsafe(enable_hangcheck, i915.enable_hangcheck, bool, 0644);
 MODULE_PARM_DESC(enable_hangcheck,
