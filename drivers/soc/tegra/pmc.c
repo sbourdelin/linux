@@ -32,6 +32,7 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/platform_device.h>
+#include <linux/of_platform.h>
 #include <linux/reboot.h>
 #include <linux/reset.h>
 #include <linux/seq_file.h>
@@ -1001,6 +1002,11 @@ static int tegra_pmc_probe(struct platform_device *pdev)
 	iounmap(pmc->base);
 	pmc->base = base;
 	mutex_unlock(&pmc->powergates_lock);
+
+	err = of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+	if (err < 0)
+		dev_err(&pdev->dev,
+			"Failed to register PMC Sub module driver: %d\n", err);
 
 	return 0;
 }
