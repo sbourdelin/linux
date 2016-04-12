@@ -327,6 +327,19 @@
 			status = "disabled";
 		};
 
+		i2c@9542000 {
+			compatible = "st,comms-ssc4-i2c";
+			reg = <0x9542000 0x110>;
+			interrupts = <GIC_SPI 137 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&clk_sysin>;
+			clock-names = "ssc";
+			clock-frequency = <400000>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_i2c12_default>;
+
+			status = "disabled";
+		};
+
 		usb2_picophy0: phy1 {
 			compatible = "st,stih407-usb2-phy";
 			#phy-cells = <0>;
