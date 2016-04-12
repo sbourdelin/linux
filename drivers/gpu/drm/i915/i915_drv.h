@@ -1370,6 +1370,12 @@ struct i915_gpu_error {
 #define I915_RESET_IN_PROGRESS_FLAG	1
 #define I915_WEDGED			(1 << 31)
 
+	/* indicates request to reset engine */
+#define I915_ENGINE_RESET_IN_PROGRESS	(1<<0)
+
+	/* extending the idea of reset_counter to engine reset */
+	atomic_t engine_reset_counter[I915_NUM_ENGINES];
+
 	/**
 	 * Waitqueue to signal when the reset has completed. Used by clients
 	 * that wait for dev_priv->mm.wedged to settle.
@@ -3086,6 +3092,19 @@ static inline bool i915_terminally_wedged(struct i915_gpu_error *error)
 static inline u32 i915_reset_count(struct i915_gpu_error *error)
 {
 	return ((atomic_read(&error->reset_counter) & ~I915_WEDGED) + 1) / 2;
+}
+
+static inline bool i915_engine_reset_in_progress(struct i915_gpu_error *error,
+						 u32 engine_id)
+{
+	return unlikely(atomic_read(&error->engine_reset_counter[engine_id])
+			& I915_ENGINE_RESET_IN_PROGRESS);
+}
+
+static inline u32 i915_engine_reset_count(struct i915_gpu_error *error,
+					  struct intel_engine_cs *engine)
+{
+	return (atomic_read(&error->engine_reset_counter[engine->id]) + 1) / 2;
 }
 
 static inline bool i915_stop_ring_allow_ban(struct drm_i915_private *dev_priv)
