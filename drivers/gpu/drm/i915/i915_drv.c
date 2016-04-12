@@ -955,6 +955,29 @@ int i915_reset(struct drm_device *dev)
 	return 0;
 }
 
+/**
+ * i915_reset_engine - reset GPU engine to recover from a hang
+ * @engine: engine to reset
+ *
+ * Reset a specific GPU engine. Useful if a hang is detected.
+ * Returns zero on successful reset or otherwise an error code.
+ *
+ * Procedure is fairly simple:
+ *  - force engine to idle
+ *  - save current state which includes head and current request
+ *  - reset engine
+ *  - restore saved state and resubmit context
+ */
+int i915_reset_engine(struct intel_engine_cs *engine)
+{
+	int ret;
+
+	/* FIXME: replace me with engine reset sequence */
+	ret = -ENODEV;
+
+	return ret;
+}
+
 static int i915_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	struct intel_device_info *intel_info =

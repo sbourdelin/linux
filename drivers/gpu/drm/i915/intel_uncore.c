@@ -1673,6 +1673,18 @@ bool intel_has_gpu_reset(struct drm_device *dev)
 	return intel_get_gpu_reset(dev) != NULL;
 }
 
+bool intel_has_engine_reset_support(struct intel_engine_cs *engine)
+{
+	u32 reset_param;
+	struct drm_device *dev = engine->dev;
+
+	reset_param = i915.reset & ((1 << (I915_NUM_ENGINES + 1)) - 1);
+
+	return (INTEL_INFO(dev)->gen >=8 &&
+		!(reset_param & 0x01) &&
+		(reset_param & (1 << engine->exec_id)));
+}
+
 int intel_guc_reset(struct drm_i915_private *dev_priv)
 {
 	int ret;

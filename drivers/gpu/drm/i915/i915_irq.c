@@ -2473,6 +2473,89 @@ static void i915_error_wake_up(struct drm_i915_private *dev_priv,
 		wake_up_all(&dev_priv->gpu_error.reset_queue);
 }
 
+static int i915_reset_engines(struct drm_i915_private *dev_priv)
+{
+	struct intel_engine_cs *engine;
+
+	for_each_engine(engine, dev_priv) {
+		int ret;
+		struct i915_gpu_error *error = &dev_priv->gpu_error;
+
+		if (!i915_engine_reset_in_progress(error, engine->id))
+			continue;
+
+		ret = i915_reset_engine(engine);
+		if (ret) {
+			struct intel_engine_cs *e;
+
+			DRM_ERROR("Reset of %s failed! ret=%d",
+				  engine->name, ret);
+
+			/*
+			 * when engine reset fails we switch to full gpu reset
+			 * which clears everything; In the case where multiple
+			 * engines are hung we would've already scheduled work
+			 * items and when they attempt to do engine reset they
+			 * won't find any active request (full gpu reset
+			 * would've cleared it). To make the work items exit
+			 * safely, clear engine reset pending mask.
+			 */
+			for_each_engine(e, dev_priv) {
+				if (i915_engine_reset_in_progress(error, e->id))
+					atomic_and(~I915_ENGINE_RESET_IN_PROGRESS,
+						   &error->engine_reset_counter[e->id]);
+			}
+
+			return ret;
+		}
+
+		atomic_inc(&error->engine_reset_counter[engine->id]);
+	}
+
+	return 0;
+}
+
+static int i915_reset_full(struct drm_i915_private *dev_priv)
+{
+	struct i915_gpu_error *error = &dev_priv->gpu_error;
+	struct drm_device *dev = dev_priv->dev;
+	int ret;
+
+	/* ensure device is awake */
+	assert_rpm_wakelock_held(dev_priv);
+
+	intel_prepare_reset(dev);
+
+	/*
+	 * All state reset _must_ be completed before we update the
+	 * reset counter, for otherwise waiters might miss the reset
+	 * pending state and not properly drop locks, resulting in
+	 * deadlocks with the reset work.
+	 */
+	ret = i915_reset(dev);
+
+	intel_finish_reset(dev);
+
+	if (ret == 0) {
+		/*
+		 * After all the gem state is reset, increment the reset
+		 * counter and wake up everyone waiting for the reset to
+		 * complete.
+		 *
+		 * Since unlock operations are a one-sided barrier only,
+		 * we need to insert a barrier here to order any seqno
+		 * updates before
+		 * the counter increment.
+		 */
+		smp_mb__before_atomic();
+		atomic_inc(&error->reset_counter);
+	} else {
+		atomic_or(I915_WEDGED, &error->reset_counter);
+	}
+
+	return ret;
+}
+
 /**
  * i915_error_work_func - do process context error handling work
  * @work: work item containing error struct, passed by the error handler
@@ -2495,6 +2578,39 @@ static void i915_error_work_func(struct work_struct *work)
 	kobject_uevent_env(&dev->primary->kdev->kobj, KOBJ_CHANGE, error_event);
 
 	/*
+	 * This event needs to be sent before performing gpu reset. When
+	 * engine resets are supported we iterate through all engines and
+	 * reset hung engines individually. To keep the event dispatch
+	 * mechanism consistent with full gpu reset, this is only sent once
+	 * even when multiple engines are hung. It is also safe to move this
+	 * here because when we are in this function, we will definitely
+	 * perform gpu reset.
+	 */
+	kobject_uevent_env(&dev->primary->kdev->kobj, KOBJ_CHANGE, reset_event);
+
+	/*
+	 * In most cases it's guaranteed that we get here with an RPM
+	 * reference held, for example because there is a pending GPU
+	 * request that won't finish until the reset is done. This
+	 * isn't the case at least when we get here by doing a
+	 * simulated reset via debugs, so get an RPM reference.
+	 */
+	intel_runtime_pm_get(dev_priv);
+
+	mutex_lock(&dev->struct_mutex);
+
+	if (!i915_reset_in_progress(error)) {
+		ret = i915_reset_engines(dev_priv);
+		if (ret) {
+			/* attempt full gpu reset to recover */
+			atomic_or(I915_RESET_IN_PROGRESS_FLAG,
+				  &dev_priv->gpu_error.reset_counter);
+		}
+	}
+
+	mutex_unlock(&dev->struct_mutex);
+
+	/*
 	 * Note that there's only one work item which does gpu resets, so we
 	 * need not worry about concurrent gpu resets potentially incrementing
 	 * error->reset_counter twice. We only need to take care of another
@@ -2506,58 +2622,21 @@ static void i915_error_work_func(struct work_struct *work)
 	 */
 	if (i915_reset_in_progress(error) && !i915_terminally_wedged(error)) {
 		DRM_DEBUG_DRIVER("resetting chip\n");
-		kobject_uevent_env(&dev->primary->kdev->kobj, KOBJ_CHANGE,
-				   reset_event);
 
-		/*
-		 * In most cases it's guaranteed that we get here with an RPM
-		 * reference held, for example because there is a pending GPU
-		 * request that won't finish until the reset is done. This
-		 * isn't the case at least when we get here by doing a
-		 * simulated reset via debugs, so get an RPM reference.
-		 */
-		intel_runtime_pm_get(dev_priv);
-
-		intel_prepare_reset(dev);
-
-		/*
-		 * All state reset _must_ be completed before we update the
-		 * reset counter, for otherwise waiters might miss the reset
-		 * pending state and not properly drop locks, resulting in
-		 * deadlocks with the reset work.
-		 */
-		ret = i915_reset(dev);
-
-		intel_finish_reset(dev);
-
-		intel_runtime_pm_put(dev_priv);
-
-		if (ret == 0) {
-			/*
-			 * After all the gem state is reset, increment the reset
-			 * counter and wake up everyone waiting for the reset to
-			 * complete.
-			 *
-			 * Since unlock operations are a one-sided barrier only,
-			 * we need to insert a barrier here to order any seqno
-			 * updates before
-			 * the counter increment.
-			 */
-			smp_mb__before_atomic();
-			atomic_inc(&dev_priv->gpu_error.reset_counter);
-
-			kobject_uevent_env(&dev->primary->kdev->kobj,
-					   KOBJ_CHANGE, reset_done_event);
-		} else {
-			atomic_or(I915_WEDGED, &error->reset_counter);
-		}
-
-		/*
-		 * Note: The wake_up also serves as a memory barrier so that
-		 * waiters see the update value of the reset counter atomic_t.
-		 */
-		i915_error_wake_up(dev_priv, true);
+		ret = i915_reset_full(dev_priv);
 	}
+
+	/*
+	 * Note: The wake_up also serves as a memory barrier so that
+	 * waiters see the update value of the reset counter atomic_t.
+	 */
+	if (!i915_terminally_wedged(error)) {
+		i915_error_wake_up(dev_priv, true);
+		kobject_uevent_env(&dev->primary->kdev->kobj,
+				   KOBJ_CHANGE, reset_done_event);
+	}
+
+	intel_runtime_pm_put(dev_priv);
 }
 
 static void i915_report_and_clear_eir(struct drm_device *dev)
@@ -2656,6 +2735,8 @@ static void i915_report_and_clear_eir(struct drm_device *dev)
  * i915_handle_error - handle a gpu error
  * @dev: drm device
  * @engine_mask: mask representing engines that are hung
+ * @fmt: formatted hang msg that gets logged in captured error state
+ *
  * Do some basic checking of register state at error time and
  * dump it to the syslog.  Also call i915_capture_error_state() to make
  * sure we get a record and make it available in debugfs.  Fire a uevent
@@ -2668,6 +2749,8 @@ void i915_handle_error(struct drm_device *dev, u32 engine_mask,
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	va_list args;
 	char error_msg[80];
+	bool use_engine_reset;
+	struct intel_engine_cs *engine;
 
 	va_start(args, fmt);
 	vscnprintf(error_msg, sizeof(error_msg), fmt, args);
@@ -2676,25 +2759,47 @@ void i915_handle_error(struct drm_device *dev, u32 engine_mask,
 	i915_capture_error_state(dev, engine_mask, error_msg);
 	i915_report_and_clear_eir(dev);
 
+	use_engine_reset = false;
 	if (engine_mask) {
-		atomic_or(I915_RESET_IN_PROGRESS_FLAG,
-				&dev_priv->gpu_error.reset_counter);
+		u32 engines_allowed = 0;
 
-		/*
-		 * Wakeup waiting processes so that the reset function
-		 * i915_reset_and_wakeup doesn't deadlock trying to grab
-		 * various locks. By bumping the reset counter first, the woken
-		 * processes will see a reset in progress and back off,
-		 * releasing their locks and then wait for the reset completion.
-		 * We must do this for _all_ gpu waiters that might hold locks
-		 * that the reset work needs to acquire.
-		 *
-		 * Note: The wake_up serves as the required memory barrier to
-		 * ensure that the waiters see the updated value of the reset
-		 * counter atomic_t.
-		 */
-		i915_error_wake_up(dev_priv, false);
+		for_each_engine_masked(engine, dev_priv, engine_mask) {
+			if (intel_has_engine_reset_support(engine))
+				engines_allowed |= intel_engine_flag(engine);
+		}
+
+		use_engine_reset = (engines_allowed == engine_mask);
 	}
+
+	if (use_engine_reset) {
+		struct i915_gpu_error *error = &dev_priv->gpu_error;
+
+		for_each_engine_masked(engine, dev_priv, engine_mask) {
+			if (i915_engine_reset_in_progress(error, engine->id))
+				continue;
+
+			atomic_or(I915_ENGINE_RESET_IN_PROGRESS,
+				  &error->engine_reset_counter[engine->id]);
+		}
+	} else {
+		atomic_or(I915_RESET_IN_PROGRESS_FLAG,
+			  &dev_priv->gpu_error.reset_counter);
+	}
+
+	/*
+	 * Wakeup waiting processes so that the reset function
+	 * i915_reset_and_wakeup doesn't deadlock trying to grab
+	 * various locks. By bumping the reset counter first, the woken
+	 * processes will see a reset in progress and back off,
+	 * releasing their locks and then wait for the reset completion.
+	 * We must do this for _all_ gpu waiters that might hold locks
+	 * that the reset work needs to acquire.
+	 *
+	 * Note: The wake_up serves as the required memory barrier to
+	 * ensure that the waiters see the updated value of the reset
+	 * counter atomic_t.
+	 */
+	i915_error_wake_up(dev_priv, false);
 
 	/*
 	 * Our reset work can grab modeset locks (since it needs to reset the
