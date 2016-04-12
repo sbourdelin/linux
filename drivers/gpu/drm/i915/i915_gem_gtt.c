@@ -3626,3 +3626,41 @@ i915_ggtt_view_size(struct drm_i915_gem_object *obj,
 		return obj->base.size;
 	}
 }
+
+void *i915_vma_iomap(struct drm_i915_private *dev_priv,
+		     struct i915_vma *vma)
+{
+	struct drm_i915_gem_object *obj = vma->obj;
+	struct i915_ggtt *ggtt = &dev_priv->ggtt;
+
+	if (WARN_ON(!obj->map_and_fenceable))
+		return ERR_PTR(-ENODEV);
+
+	BUG_ON(!vma->is_ggtt);
+	BUG_ON(vma->ggtt_view.type != I915_GGTT_VIEW_NORMAL);
+	BUG_ON((vma->bound & GLOBAL_BIND) == 0);
+
+	if (vma->iomap == NULL) {
+		void *ptr;
+
+		ptr = ioremap_wc(ggtt->mappable_base + vma->node.start,
+				 obj->base.size);
+		if (ptr == NULL) {
+			int ret;
+
+			/* Too many areas already allocated? */
+			ret = i915_gem_evict_vm(vma->vm, true);
+			if (ret)
+				return ERR_PTR(ret);
+
+			ptr = ioremap_wc(ggtt->mappable_base + vma->node.start,
+					 obj->base.size);
+			if (ptr == NULL)
+				return ERR_PTR(-ENOMEM);
+		}
+
+		vma->iomap = ptr;
+	}
+
+	return vma->iomap;
+}

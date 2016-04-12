@@ -175,6 +175,7 @@ struct i915_vma {
 	struct drm_mm_node node;
 	struct drm_i915_gem_object *obj;
 	struct i915_address_space *vm;
+	void *iomap;
 
 	/** Flags and address space this VMA is bound to */
 #define GLOBAL_BIND	(1<<0)
@@ -558,5 +559,42 @@ i915_ggtt_view_equal(const struct i915_ggtt_view *a,
 size_t
 i915_ggtt_view_size(struct drm_i915_gem_object *obj,
 		    const struct i915_ggtt_view *view);
+
+/**
+ * i915_vma_iomap - calls ioremap_wc to map the GGTT VMA via the aperture
+ * @dev_priv: i915 private pointer
+ * @vma: VMA to iomap
+ *
+ * The passed in VMA has to be pinned in the global GTT mappable region. Or in
+ * other words callers are responsible for managing the VMA pinned lifetime and
+ * ensuring it covers the use of the returned mapping.
+ *
+ * Callers must hold the struct_mutex.
+ *
+ * Returns a valid iomapped pointer or ERR_PTR.
+ */
+void *i915_vma_iomap(struct drm_i915_private *dev_priv,
+		     struct i915_vma *vma);
+
+/**
+ * i915_vma_iounmap - unmaps the mapping returned from i915_vma_iomap
+ * @dev_priv: i915 private pointer
+ * @vma: VMA to unmap
+ *
+ * Unmaps the previously iomapped VMA using iounmap.
+ *
+ * Users of i915_vma_iomap should not manually unmap by calling this function
+ * if they want to take advantage of the mapping getting cached in the VMA.
+ *
+ * Callers must hold the struct_mutex.
+ */
+static inline void i915_vma_iounmap(struct i915_vma *vma)
+{
+	if (vma->iomap == NULL)
+		return;
+
+	iounmap(vma->iomap);
+	vma->iomap = NULL;
+}
 
 #endif

@@ -251,12 +251,10 @@ static int intelfb_create(struct drm_fb_helper *helper,
 	info->fix.smem_start = dev->mode_config.fb_base + i915_gem_obj_ggtt_offset(obj);
 	info->fix.smem_len = size;
 
-	info->screen_base =
-		ioremap_wc(ggtt->mappable_base + i915_gem_obj_ggtt_offset(obj),
-			   size);
-	if (!info->screen_base) {
+	info->screen_base = i915_vma_iomap(dev_priv, i915_gem_obj_to_ggtt(obj));
+	if (IS_ERR(info->screen_base)) {
 		DRM_ERROR("Failed to remap framebuffer into virtual memory\n");
-		ret = -ENOSPC;
+		ret = PTR_ERR(info->screen_base);
 		goto out_destroy_fbi;
 	}
 	info->screen_size = size;
