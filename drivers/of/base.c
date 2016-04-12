@@ -518,8 +518,8 @@ EXPORT_SYMBOL(of_machine_is_compatible);
  *
  *  @device: Node to check for availability, with locks already held
  *
- *  Returns true if the status property is absent or set to "okay" or "ok",
- *  false otherwise
+ *  Returns true if the status property is absent or set to "okay", "ok",
+ *  or "fail-hw-incomplete", false otherwise
  */
 static bool __of_device_is_available(const struct device_node *device)
 {
@@ -534,7 +534,8 @@ static bool __of_device_is_available(const struct device_node *device)
 		return true;
 
 	if (statlen > 0) {
-		if (!strcmp(status, "okay") || !strcmp(status, "ok"))
+		if (!strcmp(status, "okay") || !strcmp(status, "ok") ||
+		    !strcmp(status, "fail-hw-incomplete"))
 			return true;
 	}
 
@@ -561,6 +562,54 @@ bool of_device_is_available(const struct device_node *device)
 
 }
 EXPORT_SYMBOL(of_device_is_available);
+
+/**
+ *  __of_device_is_incomplete - check if a device is incomplete
+ *
+ *  @device: Node to check for partial failure with locks already held
+ *
+ *  Returns true if the status is "fail-hw-incomplete", false otherwise.
+ */
+static bool __of_device_is_incomplete(const struct device_node *device)
+{
+	const char *status;
+	int statlen;
+
+	if (!device)
+		return false;
+
+	status = __of_get_property(device, "status", &statlen);
+	if (status == NULL)
+		return false;
+
+	if (statlen > 0) {
+		if (!strcmp(status, "fail-hw-incomplete"))
+			return true;
+	}
+
+	return false;
+}
+
+/**
+ *  of_device_is_incomplete - check if a device is incomplete
+ *
+ *  @device: Node to check for partial failure
+ *
+ *  Returns true if the status property is set to "fail-hw-incomplete",
+ *  false otherwise. Fore more information, see fail-sss in ePAPR 1.1
+ *  "Table 2-4 Values for status property".
+ */
+bool of_device_is_incomplete(const struct device_node *device)
+{
+	unsigned long flags;
+	bool res;
+
+	raw_spin_lock_irqsave(&devtree_lock, flags);
+	res = __of_device_is_incomplete(device);
+	raw_spin_unlock_irqrestore(&devtree_lock, flags);
+	return res;
+}
+EXPORT_SYMBOL(of_device_is_incomplete);
 
 /**
  *  of_device_is_big_endian - check if a device has BE registers
