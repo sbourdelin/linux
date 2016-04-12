@@ -706,14 +706,20 @@ retry:
 			inode_dio_end(inode);
 			goto locked;
 		}
+		/*
+		 * Need to pass in DIO_SKIP_DIO_COUNT to prevent
+		 * duplicated inode_dio_begin/inode_dio_end sequence.
+		 */
 		if (IS_DAX(inode))
 			ret = dax_do_io(iocb, inode, iter, offset,
-					ext4_dio_get_block, NULL, 0);
+					ext4_dio_get_block, NULL,
+					DIO_SKIP_DIO_COUNT);
 		else
 			ret = __blockdev_direct_IO(iocb, inode,
 						   inode->i_sb->s_bdev, iter,
 						   offset, ext4_dio_get_block,
-						   NULL, NULL, 0);
+						   NULL, NULL,
+						   DIO_SKIP_DIO_COUNT);
 		inode_dio_end(inode);
 	} else {
 locked:
