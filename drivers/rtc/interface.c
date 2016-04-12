@@ -17,6 +17,10 @@
 #include <linux/log2.h>
 #include <linux/workqueue.h>
 
+#ifdef CONFIG_RTC_CYCLIC
+#include "../kernel/sched/cyclic.h"
+#endif
+
 static int rtc_timer_enqueue(struct rtc_device *rtc, struct rtc_timer *timer);
 static void rtc_timer_remove(struct rtc_device *rtc, struct rtc_timer *timer);
 
@@ -488,6 +492,9 @@ EXPORT_SYMBOL_GPL(rtc_update_irq_enable);
 void rtc_handle_legacy_irq(struct rtc_device *rtc, int num, int mode)
 {
 	unsigned long flags;
+#ifdef CONFIG_RTC_CYCLIC
+	int handled = 0;
+#endif
 
 	/* mark one irq of the appropriate mode */
 	spin_lock_irqsave(&rtc->irq_lock, flags);
@@ -500,7 +507,23 @@ void rtc_handle_legacy_irq(struct rtc_device *rtc, int num, int mode)
 		rtc->irq_task->func(rtc->irq_task->private_data);
 	spin_unlock_irqrestore(&rtc->irq_task_lock, flags);
 
+#ifdef CONFIG_RTC_CYCLIC
+	/* wake up slot_curr if overrun task */
+	if (RTC_PF) {
+		if (rt_overrun_rq_admitted()) {
+			/* advance the cursor, overrun report */
+			rt_overrun_timer_handler(rtc);
+			handled = 1;
+		}
+	}
+
+	if (!handled) {
+		wake_up_interruptible(&rtc->irq_queue);
+	}
+#else
 	wake_up_interruptible(&rtc->irq_queue);
+#endif
+
 	kill_fasync(&rtc->async_queue, SIGIO, POLL_IN);
 }
 
