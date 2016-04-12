@@ -2108,8 +2108,9 @@ int intel_pin_and_map_ringbuffer_obj(struct drm_device *dev,
 			goto err_unpin;
 
 		ringbuf->virtual_start = i915_gem_object_pin_map(obj);
-		if (ringbuf->virtual_start == NULL) {
-			ret = -ENOMEM;
+		if (IS_ERR(ringbuf->virtual_start)) {
+			ret = PTR_ERR(ringbuf->virtual_start);
+			ringbuf->virtual_start = NULL;
 			goto err_unpin;
 		}
 	} else {
