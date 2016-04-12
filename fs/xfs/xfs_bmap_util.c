@@ -40,6 +40,7 @@
 #include "xfs_trace.h"
 #include "xfs_icache.h"
 #include "xfs_log.h"
+#include "xfs_thin.h"
 
 /* Kernel only BMAP related definitions and functions */
 
@@ -1035,9 +1036,11 @@ xfs_alloc_file_space(
 		}
 
 		/*
-		 * Allocate and setup the transaction.
+		 * Allocate and setup the transaction. The noblkres flags tells
+		 * the reservation infrastructure to skip bdev reservation.
 		 */
 		tp = xfs_trans_alloc(mp, XFS_TRANS_DIOSTRAT);
+		tp->t_flags |= XFS_TRANS_NOBLKRES;
 		error = xfs_trans_reserve(tp, &M_RES(mp)->tr_write,
 					  resblks, resrtextents);
 		/*
@@ -1051,6 +1054,30 @@ xfs_alloc_file_space(
 			xfs_trans_cancel(tp);
 			break;
 		}
+
+		/*
+		 * We disabled the transaction bdev reservation because the
+		 * trans infrastructure uses a worst case reservation. Since we
+		 * call xfs_bmapi_write() one mapping at a time, we can assume
+		 * the allocated blocks will be contiguous and thus can use a
+		 * more optimal reservation value. Acquire the reservation here
+		 * and attach it to the transaction.
+		 *
+		 * XXX: Need to take apart data and metadata block parts of res
+		 * (see XFS_DIOSTRAT_SPACE_RES()). The latter still needs
+		 * worst-case.
+		 */
+		if (mp->m_thin_res) {
+			sector_t	res = xfs_fsb_res(mp, resblks, true);
+
+			error = xfs_thin_reserve(mp, res);
+			if (error) {
+				xfs_trans_cancel(tp);
+				break;
+			}
+			tp->t_blk_thin_res = res;
+		}
+
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		error = xfs_trans_reserve_quota_nblks(tp, ip, qblocks,
 						      0, quota_flag);
