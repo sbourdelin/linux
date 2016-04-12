@@ -183,6 +183,8 @@ int	xfs_log_calc_minimum_size(struct xfs_mount *);
 #define XFS_TRANS_RESERVE	0x20    /* OK to use reserved data blocks */
 #define XFS_TRANS_FREEZE_PROT	0x40	/* Transaction has elevated writer
 					   count in superblock */
+#define XFS_TRANS_NOBLKRES	0x100	/* do not attempt blkdev reservation */
+
 /*
  * Field values for xfs_trans_mod_sb.
  */

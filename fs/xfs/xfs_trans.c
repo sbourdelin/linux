@@ -174,11 +174,13 @@ xfs_trans_reserve(
 	uint			rtextents)
 {
 	int			error = 0;
-	int			flags = 0;
+	int			flags = XFS_BLK_RES;
 	struct xfs_mount	*mp = tp->t_mountp;
 
 	if (tp->t_flags & XFS_TRANS_RESERVE)
 		flags |= XFS_FDBLOCKS_RSVD;
+	if (tp->t_flags & XFS_TRANS_NOBLKRES)
+		flags &= ~XFS_BLK_RES;
 
 	/* Mark this thread as being in a transaction */
 	current_set_flags_nested(&tp->t_pflags, PF_FSTRANS);
@@ -189,13 +191,13 @@ xfs_trans_reserve(
 	 * fail if the count would go below zero.
 	 */
 	if (blocks > 0) {
-		error = xfs_mod_fdblocks(mp, -((int64_t)blocks), flags);
+		error = __xfs_mod_fdblocks(mp, -((int64_t)blocks), flags);
 		if (error != 0) {
 			current_restore_flags_nested(&tp->t_pflags, PF_FSTRANS);
 			return -ENOSPC;
 		}
 		tp->t_blk_res += blocks;
-		if (mp->m_thin_res)
+		if (mp->m_thin_res && (flags & XFS_BLK_RES))
 			tp->t_blk_thin_res += xfs_fsb_res(mp, blocks, false);
 	}
 
@@ -266,7 +268,7 @@ undo_log:
 
 undo_blocks:
 	if (blocks > 0) {
-		xfs_mod_fdblocks(tp->t_mountp, -((int64_t)blocks), flags);
+		__xfs_mod_fdblocks(tp->t_mountp, -((int64_t)blocks), flags);
 		tp->t_blk_res = 0;
 		if (tp->t_blk_thin_res)
 			tp->t_blk_thin_res = 0;
