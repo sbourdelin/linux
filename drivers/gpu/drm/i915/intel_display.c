@@ -10508,6 +10508,7 @@ found:
 	}
 
 	ret = intel_modeset_setup_plane_state(state, crtc, mode, fb, 0, 0);
+
 	if (ret)
 		goto fail;
 
@@ -15827,6 +15828,10 @@ static void intel_modeset_readout_hw_state(struct drm_device *dev)
 
 		memset(&crtc->base.mode, 0, sizeof(crtc->base.mode));
 		if (crtc->base.state->active) {
+			if (crtc->config->has_audio)
+				intel_display_power_get(dev_priv,
+							POWER_DOMAIN_AUDIO);
+
 			intel_mode_from_pipe_config(&crtc->base.mode, crtc->config);
 			intel_mode_from_pipe_config(&crtc->base.state->adjusted_mode, crtc->config);
 			WARN_ON(drm_atomic_set_mode_for_crtc(crtc->base.state, &crtc->base.mode));
