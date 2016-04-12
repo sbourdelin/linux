@@ -40,6 +40,7 @@
 #include "xfs_trace.h"
 #include "xfs_log.h"
 #include "xfs_filestream.h"
+#include "xfs_thin.h"
 
 /*
  * File system operations
@@ -676,6 +677,7 @@ xfs_reserve_blocks(
 	__uint64_t		request;
 	__int64_t		free;
 	int			error = 0;
+	sector_t		res = 0;
 
 	/* If inval is null, report current values and return */
 	if (inval == (__uint64_t *)NULL) {
@@ -743,6 +745,28 @@ xfs_reserve_blocks(
 			fdblks_delta = delta;
 
 		/*
+		 * Reserve pool blocks must carry a block device reservation (if
+		 * enabled). The block device could be much closer to ENOSPC
+		 * than the fs (i.e., a thin or snap device), so try to reserve
+		 * the bdev space first.
+		 */
+		spin_unlock(&mp->m_sb_lock);
+		if (mp->m_thin_reserve) {
+			while (fdblks_delta) {
+				res = xfs_fsb_res(mp, fdblks_delta, false);
+				error = xfs_thin_reserve(mp, res);
+				if (error != -ENOSPC)
+					break;
+
+				fdblks_delta >>= 1;
+			}
+			if (!fdblks_delta || error) {
+				spin_lock(&mp->m_sb_lock);
+				break;
+			}
+		}
+
+		/*
 		 * We'll either succeed in getting space from the free block
 		 * count or we'll get an ENOSPC. If we get a ENOSPC, it means
 		 * things changed while we were calculating fdblks_delta and so
@@ -752,8 +776,9 @@ xfs_reserve_blocks(
 		 * Don't set the reserved flag here - we don't want to reserve
 		 * the extra reserve blocks from the reserve.....
 		 */
-		spin_unlock(&mp->m_sb_lock);
-		error = xfs_mod_fdblocks(mp, -fdblks_delta, 0);
+		error = __xfs_mod_fdblocks(mp, -fdblks_delta, 0);
+		if (error && mp->m_thin_reserve)
+			xfs_thin_unreserve(mp, res);
 		spin_lock(&mp->m_sb_lock);
 	}
 
