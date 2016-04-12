@@ -264,6 +264,72 @@ toggle_psr(struct device *kdev, struct device_attribute *attr,
 	return count;
 }
 
+static ssize_t
+show_drrs(struct device *kdev, struct device_attribute *attr, char *buf)
+{
+	struct drm_minor *dminor = dev_to_drm_minor(kdev);
+	struct drm_device *dev = dminor->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	ssize_t ret;
+
+	mutex_lock(&dev_priv->drrs.mutex);
+	ret = snprintf(buf, PAGE_SIZE, "%s\n", dev_priv->drrs.dp ?
+			"enabled":"disabled");
+	mutex_unlock(&dev_priv->drrs.mutex);
+	return ret;
+}
+
+static ssize_t
+toggle_drrs(struct device *kdev, struct device_attribute *attr,
+	const char *buf, size_t count)
+{
+	struct drm_minor *dminor = dev_to_drm_minor(kdev);
+	struct drm_device *dev = dminor->dev;
+	struct intel_connector *connector;
+	struct intel_encoder *encoder;
+	struct intel_crtc *crtc = NULL;
+	struct intel_dp *intel_dp = NULL;
+	u32 val;
+	ssize_t ret;
+	bool sysfs_set = true;
+
+	ret = kstrtou32(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	for_each_intel_connector(dev, connector) {
+		if (!connector->base.encoder)
+			continue;
+
+		encoder = to_intel_encoder(connector->base.encoder);
+		crtc = to_intel_crtc(encoder->base.crtc);
+		intel_dp = enc_to_intel_dp(&encoder->base);
+	}
+	if (!crtc)
+		return -ENODEV;
+
+	switch (val) {
+	case 0:
+		ret = intel_edp_drrs_disable(intel_dp, sysfs_set);
+		if (ret)
+			return ret;
+		break;
+	case 1:
+		if (encoder->type == INTEL_OUTPUT_EDP) {
+			ret = intel_edp_drrs_enable(intel_dp, sysfs_set);
+			if (ret)
+				return ret;
+		}
+		break;
+	default:
+		return -EINVAL;
+
+	}
+
+	return count;
+}
+
+static DEVICE_ATTR(drrs_enable, S_IRUGO | S_IWUSR, show_drrs, toggle_drrs);
 static DEVICE_ATTR(fbc_enable, S_IRUGO | S_IWUSR, show_fbc, toggle_fbc);
 static DEVICE_ATTR(psr_enable, S_IRUGO | S_IWUSR, show_psr, toggle_psr);
 static DEVICE_ATTR(rc6_enable, S_IRUGO | S_IWUSR, show_rc6_mask, toggle_rc6);
@@ -323,6 +389,17 @@ static struct attribute_group media_rc6_attr_group = {
 	.name = power_group_name,
 	.attrs =  media_rc6_attrs
 };
+
+static struct attribute *drrs_attrs[] = {
+	&dev_attr_drrs_enable.attr,
+	NULL
+};
+
+static struct attribute_group drrs_attr_group = {
+	.name = power_group_name,
+	.attrs = drrs_attrs
+};
+
 #endif
 
 static int l3_access_valid(struct drm_device *dev, loff_t offset)
@@ -788,6 +865,14 @@ void i915_setup_sysfs(struct drm_device *dev)
 		if (ret)
 			DRM_ERROR("PSR sysfs setup failed\n");
 	}
+
+	if (HAS_PSR(dev)) {
+		ret = sysfs_merge_group(&dev->primary->kdev->kobj,
+					&drrs_attr_group);
+		if (ret)
+			DRM_ERROR("DRRS sysfs setup failed\n");
+	}
+
 	if (HAS_RC6(dev)) {
 		ret = sysfs_merge_group(&dev->primary->kdev->kobj,
 					&rc6_attr_group);
@@ -844,6 +929,7 @@ void i915_teardown_sysfs(struct drm_device *dev)
 	device_remove_bin_file(dev->primary->kdev,  &dpf_attrs_1);
 	device_remove_bin_file(dev->primary->kdev,  &dpf_attrs);
 #ifdef CONFIG_PM
+	sysfs_unmerge_group(&dev->primary->kdev->kobj, &drrs_attr_group);
 	sysfs_unmerge_group(&dev->primary->kdev->kobj, &fbc_attr_group);
 	sysfs_unmerge_group(&dev->primary->kdev->kobj, &psr_attr_group);
 	sysfs_unmerge_group(&dev->primary->kdev->kobj, &rc6_attr_group);

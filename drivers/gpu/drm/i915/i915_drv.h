@@ -964,6 +964,7 @@ struct i915_drrs {
 	unsigned busy_frontbuffer_bits;
 	enum drrs_refresh_rate_type refresh_rate_type;
 	enum drrs_support_type type;
+	bool sysfs_set;
 };
 
 struct i915_psr {

@@ -1691,7 +1691,9 @@ static void intel_enable_ddi(struct intel_encoder *intel_encoder)
 		intel_edp_backlight_on(intel_dp);
 		if (dev_priv->psr.sysfs_set != true)
 			intel_psr_enable(intel_dp, dev_priv->psr.sysfs_set);
-		intel_edp_drrs_enable(intel_dp);
+		if (dev_priv->drrs.sysfs_set != true)
+			intel_edp_drrs_enable(intel_dp,
+						dev_priv->drrs.sysfs_set);
 	}
 
 	if (intel_crtc->config->has_audio) {
@@ -1717,7 +1719,10 @@ static void intel_disable_ddi(struct intel_encoder *intel_encoder)
 	if (type == INTEL_OUTPUT_EDP) {
 		struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
 
-		intel_edp_drrs_disable(intel_dp);
+		if (dev_priv->drrs.sysfs_set != true)
+			intel_edp_drrs_disable(intel_dp,
+						dev_priv->drrs.sysfs_set);
+
 		if (dev_priv->psr.sysfs_set != true)
 			intel_psr_disable(intel_dp, dev_priv->psr.sysfs_set);
 		intel_edp_backlight_off(intel_dp);

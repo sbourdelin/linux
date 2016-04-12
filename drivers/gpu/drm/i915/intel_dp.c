@@ -5413,42 +5413,53 @@ static void intel_dp_set_drrs_state(struct drm_device *dev, int refresh_rate)
 /**
  * intel_edp_drrs_enable - init drrs struct if supported
  * @intel_dp: DP struct
+ * @sysfs_set: Identifies if this featudre is set from sysfs.
  *
  * Initializes frontbuffer_bits and drrs.dp
+ *
+ * Returns:
+ * 0 on success and -errno otherwise.
  */
-void intel_edp_drrs_enable(struct intel_dp *intel_dp)
+int intel_edp_drrs_enable(struct intel_dp *intel_dp, bool sysfs_set)
 {
 	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
 	struct drm_crtc *crtc = dig_port->base.base.crtc;
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+	int ret = 0;
 
 	if (!intel_crtc->config->has_drrs) {
 		DRM_DEBUG_KMS("Panel doesn't support DRRS\n");
-		return;
+		return -EINVAL;
 	}
 
 	mutex_lock(&dev_priv->drrs.mutex);
 	if (WARN_ON(dev_priv->drrs.dp)) {
 		DRM_ERROR("DRRS already enabled\n");
+		ret = -EALREADY;
 		goto unlock;
 	}
 
 	dev_priv->drrs.busy_frontbuffer_bits = 0;
 
 	dev_priv->drrs.dp = intel_dp;
-
+	if (sysfs_set)
+		dev_priv->drrs.sysfs_set = sysfs_set;
 unlock:
 	mutex_unlock(&dev_priv->drrs.mutex);
+	return ret;
 }
 
 /**
  * intel_edp_drrs_disable - Disable DRRS
  * @intel_dp: DP struct
+ * @sysfs_set: Identifies if this featudre is set from sysfs.
  *
+ * Returns:
+ * 0 on success and -errno otherwise.
  */
-void intel_edp_drrs_disable(struct intel_dp *intel_dp)
+int intel_edp_drrs_disable(struct intel_dp *intel_dp, bool sysfs_set)
 {
 	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -5457,12 +5468,12 @@ void intel_edp_drrs_disable(struct intel_dp *intel_dp)
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 
 	if (!intel_crtc->config->has_drrs)
-		return;
+		return -EINVAL;
 
 	mutex_lock(&dev_priv->drrs.mutex);
 	if (!dev_priv->drrs.dp) {
 		mutex_unlock(&dev_priv->drrs.mutex);
-		return;
+		return -EALREADY;
 	}
 
 	if (dev_priv->drrs.refresh_rate_type == DRRS_LOW_RR)
@@ -5471,9 +5482,12 @@ void intel_edp_drrs_disable(struct intel_dp *intel_dp)
 			fixed_mode->vrefresh);
 
 	dev_priv->drrs.dp = NULL;
+	if (sysfs_set)
+		dev_priv->drrs.sysfs_set = sysfs_set;
 	mutex_unlock(&dev_priv->drrs.mutex);
 
 	cancel_delayed_work_sync(&dev_priv->drrs.work);
+	return 0;
 }
 
 static void intel_edp_drrs_downclock_work(struct work_struct *work)
