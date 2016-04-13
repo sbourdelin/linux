@@ -1643,10 +1643,26 @@ COMPAT_SYSCALL_DEFINE2(getrusage, int, who, struct compat_rusage __user *, ru)
 }
 #endif
 
-SYSCALL_DEFINE1(umask, int, mask)
+static int do_umask(int mask, int flags)
 {
+	if (flags & ~UMASK_GET_MASK)
+		return -EINVAL;
+
+	if (flags & UMASK_GET_MASK)
+		return current_umask();
+
 	mask = xchg(&current->fs->umask, mask & S_IRWXUGO);
 	return mask;
+}
+
+SYSCALL_DEFINE1(umask, int, mask)
+{
+	return do_umask(mask, 0);
+}
+
+SYSCALL_DEFINE2(umask2, int, mask, int, flags)
+{
+	return do_umask(mask, flags);
 }
 
 static int prctl_set_mm_exe_file(struct mm_struct *mm, unsigned int fd)

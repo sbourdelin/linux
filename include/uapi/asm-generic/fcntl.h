@@ -217,4 +217,6 @@ struct flock64 {
 };
 #endif
 
+#define UMASK_GET_MASK 1	/* umask2 should only return current umask */
+
 #endif /* _ASM_GENERIC_FCNTL_H */
