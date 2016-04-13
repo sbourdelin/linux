@@ -439,10 +439,9 @@ xfs_submit_ioend(
 
 	ioend->io_bio->bi_private = ioend;
 	ioend->io_bio->bi_end_io = xfs_end_bio;
+	ioend->io_bio->bi_op = REQ_OP_WRITE;
 	if (wbc->sync_mode)
 		ioend->io_bio->bi_rw = WRITE_SYNC;
-	else
-		ioend->io_bio->bi_rw = WRITE;
 	/*
 	 * If we are failing the IO now, just mark the ioend with an
 	 * error and finish it. This will run IO completion immediately
