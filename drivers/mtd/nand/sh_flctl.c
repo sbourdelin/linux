@@ -1005,6 +1005,7 @@ static int flctl_chip_init_tail(struct mtd_info *mtd)
 		flctl->flcmncr_base |= _4ECCEN;
 	} else {
 		chip->ecc.mode = NAND_ECC_SOFT;
+		chip->ecc.algo = NAND_ECC_HAMMING;
 	}
 
 	return 0;
