@@ -116,15 +116,6 @@ static int block_is_full(struct rrpc *rrpc, struct rrpc_block *rblk)
 	return (rblk->next_page == rrpc->dev->sec_per_blk);
 }
 
-/* Calculate relative addr for the given block, considering instantiated LUNs */
-static u64 block_to_rel_addr(struct rrpc *rrpc, struct rrpc_block *rblk)
-{
-	struct nvm_block *blk = rblk->parent;
-	int lun_blk = blk->id % (rrpc->dev->blks_per_lun * rrpc->nr_luns);
-
-	return lun_blk * rrpc->dev->sec_per_blk;
-}
-
 /* Calculate global addr for the given block */
 static u64 block_to_addr(struct rrpc *rrpc, struct rrpc_block *rblk)
 {
@@ -997,16 +988,19 @@ static void rrpc_map_free(struct rrpc *rrpc)
 static int rrpc_l2p_update(u64 slba, u32 nlb, __le64 *entries, void *private)
 {
 	struct rrpc *rrpc = (struct rrpc *)private;
-	struct nvm_dev *dev = rrpc->dev;
-	struct rrpc_addr *addr = rrpc->trans_map + slba;
-	struct rrpc_rev_addr *raddr = rrpc->rev_trans_map;
-	u64 elba = slba + nlb;
-	u64 i;
+	struct rrpc_addr *addr;
+	struct rrpc_rev_addr *raddr;
+	u64 i, elba = slba + nlb - 1;
 
-	if (unlikely(elba > dev->total_secs)) {
+	if (unlikely(slba < rrpc->soffset ||
+			elba > rrpc->soffset + rrpc->nr_sects - 1)) {
 		pr_err("nvm: L2P data from device is out of bounds!\n");
 		return -EINVAL;
 	}
+
+	slba -= rrpc->soffset;
+	addr = rrpc->trans_map + slba;
+	raddr = rrpc->rev_trans_map;
 
 	for (i = 0; i < nlb; i++) {
 		u64 pba = le64_to_cpu(entries[i]);
@@ -1014,7 +1008,9 @@ static int rrpc_l2p_update(u64 slba, u32 nlb, __le64 *entries, void *private)
 		/* LNVM treats address-spaces as silos, LBA and PBA are
 		 * equally large and zero-indexed.
 		 */
-		if (unlikely(pba >= dev->total_secs && pba != U64_MAX)) {
+		if (unlikely((pba < rrpc->poffset ||
+			pba > rrpc->poffset + rrpc->nr_sects - 1) &&
+					(pba != U64_MAX && pba != 0))) {
 			pr_err("nvm: L2P data entry is out of bounds!\n");
 			return -EINVAL;
 		}
@@ -1289,19 +1285,20 @@ static void rrpc_block_map_update(struct rrpc *rrpc, struct rrpc_block *rblk)
 	struct nvm_dev *dev = rrpc->dev;
 	int offset;
 	struct rrpc_addr *laddr;
-	u64 bpaddr, paddr, pladdr;
+	u64 paddr, rpaddr, pladdr;
 
-	bpaddr = block_to_rel_addr(rrpc, rblk);
+	paddr = block_to_addr(rrpc, rblk);
+	rpaddr = paddr - rrpc->poffset;
+
 	for (offset = 0; offset < dev->sec_per_blk; offset++) {
-		paddr = bpaddr + offset;
 
-		pladdr = rrpc->rev_trans_map[paddr].addr;
+		pladdr = rrpc->rev_trans_map[rpaddr + offset].addr;
 		if (pladdr == ADDR_EMPTY)
 			continue;
 
 		laddr = &rrpc->trans_map[pladdr];
 
-		if (paddr == laddr->addr) {
+		if (paddr + offset == laddr->addr) {
 			laddr->rblk = rblk;
 		} else {
 			set_bit(offset, rblk->invalid_pages);
