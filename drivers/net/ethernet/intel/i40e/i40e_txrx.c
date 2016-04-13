@@ -235,8 +235,14 @@ static int i40e_add_del_fdir_udpv4(struct i40e_vsi *vsi,
 				 "Filter deleted for PCTYPE %d loc = %d\n",
 				 fd_data->pctype, fd_data->fd_id);
 	}
-	if (err)
+	if (err) {
 		kfree(raw_packet);
+	} else {
+		if (add)
+			pf->fd_udp4_filter_cnt++;
+		else
+			pf->fd_udp4_filter_cnt--;
+	}
 
 	return err ? -EOPNOTSUPP : 0;
 }
@@ -315,8 +321,14 @@ static int i40e_add_del_fdir_tcpv4(struct i40e_vsi *vsi,
 				 fd_data->pctype, fd_data->fd_id);
 	}
 
-	if (err)
+	if (err) {
 		kfree(raw_packet);
+	} else {
+		if (add)
+			pf->fd_tcp4_filter_cnt++;
+		else
+			pf->fd_tcp4_filter_cnt--;
+	}
 
 	return err ? -EOPNOTSUPP : 0;
 }
@@ -393,8 +405,14 @@ static int i40e_add_del_fdir_ipv4(struct i40e_vsi *vsi,
 		}
 	}
 
-	if (err)
+	if (err) {
 		kfree(raw_packet);
+	} else {
+		if (add)
+			pf->fd_ip4_filter_cnt++;
+		else
+			pf->fd_ip4_filter_cnt--;
+	}
 
 	return err ? -EOPNOTSUPP : 0;
 }
