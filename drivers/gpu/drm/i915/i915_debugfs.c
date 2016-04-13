@@ -574,10 +574,10 @@ static int i915_gem_pageflip_info(struct seq_file *m, void *data)
 	for_each_intel_crtc(dev, crtc) {
 		const char pipe = pipe_name(crtc->pipe);
 		const char plane = plane_name(crtc->plane);
-		struct intel_unpin_work *work;
+		struct intel_flip_work *work;
 
 		spin_lock_irq(&dev->event_lock);
-		work = crtc->unpin_work;
+		work = crtc->flip_work;
 		if (work == NULL) {
 			seq_printf(m, "No flip due on pipe %c (plane %c)\n",
 				   pipe, plane);
