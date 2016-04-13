@@ -186,9 +186,10 @@ static int intelfb_create(struct drm_fb_helper *helper,
 	struct i915_ggtt *ggtt = &dev_priv->ggtt;
 	struct fb_info *info;
 	struct drm_framebuffer *fb;
+	struct i915_vma *vma;
 	struct drm_i915_gem_object *obj;
-	int size, ret;
 	bool prealloc = false;
+	int ret;
 
 	if (intel_fb &&
 	    (sizes->fb_width > intel_fb->base.width ||
@@ -214,7 +215,6 @@ static int intelfb_create(struct drm_fb_helper *helper,
 	}
 
 	obj = intel_fb->obj;
-	size = obj->base.size;
 
 	mutex_lock(&dev->struct_mutex);
 
@@ -244,22 +244,22 @@ static int intelfb_create(struct drm_fb_helper *helper,
 	info->flags = FBINFO_DEFAULT | FBINFO_CAN_FORCE_OUTPUT;
 	info->fbops = &intelfb_ops;
 
+	vma = i915_gem_obj_to_ggtt(obj);
+
 	/* setup aperture base/size for vesafb takeover */
 	info->apertures->ranges[0].base = dev->mode_config.fb_base;
 	info->apertures->ranges[0].size = ggtt->mappable_end;
 
-	info->fix.smem_start = dev->mode_config.fb_base + i915_gem_obj_ggtt_offset(obj);
-	info->fix.smem_len = size;
+	info->fix.smem_start = dev->mode_config.fb_base + vma->node.start;
+	info->fix.smem_len = vma->node.size;
 
-	info->screen_base =
-		ioremap_wc(ggtt->mappable_base + i915_gem_obj_ggtt_offset(obj),
-			   size);
-	if (!info->screen_base) {
+	info->screen_base = i915_vma_iomap(vma);
+	if (IS_ERR(info->screen_base)) {
 		DRM_ERROR("Failed to remap framebuffer into virtual memory\n");
-		ret = -ENOSPC;
+		ret = PTR_ERR(info->screen_base);
 		goto out_destroy_fbi;
 	}
-	info->screen_size = size;
+	info->screen_size = vma->node.size;
 
 	/* This driver doesn't need a VT switch to restore the mode on resume */
 	info->skip_vt_switch = true;
