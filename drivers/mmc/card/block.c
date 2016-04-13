@@ -43,6 +43,7 @@
 #include <linux/mmc/sd.h>
 
 #include <asm/uaccess.h>
+#include <linux/mmc/ffu.h>
 
 #include "queue.h"
 
