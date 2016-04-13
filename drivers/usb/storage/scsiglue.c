@@ -127,6 +127,11 @@ static int slave_configure(struct scsi_device *sdev)
 		if (queue_max_hw_sectors(sdev->request_queue) > max_sectors)
 			blk_queue_max_hw_sectors(sdev->request_queue,
 					      max_sectors);
+	} else if (us->pusb_dev->speed >= USB_SPEED_SUPER) {
+		/* USB3 devices will be limited to 2048 sectors. This gives us
+		 * better throughput on most devices.
+		 */
+		blk_queue_max_hw_sectors(sdev->request_queue, 2048);
 	} else if (sdev->type == TYPE_TAPE) {
 		/* Tapes need much higher max_sector limits, so just
 		 * raise it to the maximum possible (4 GB / 512) and
