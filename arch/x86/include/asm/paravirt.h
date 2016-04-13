@@ -676,9 +676,9 @@ static __always_inline void pv_queued_spin_unlock(struct qspinlock *lock)
 	PVOP_VCALLEE1(pv_lock_ops.queued_spin_unlock, lock);
 }
 
-static __always_inline void pv_wait(u8 *ptr, u8 val)
+static __always_inline void pv_wait(u8 *ptr, u8 val, int lockcpu)
 {
-	PVOP_VCALL2(pv_lock_ops.wait, ptr, val);
+	PVOP_VCALL3(pv_lock_ops.wait, ptr, val, lockcpu);
 }
 
 static __always_inline void pv_kick(int cpu)
