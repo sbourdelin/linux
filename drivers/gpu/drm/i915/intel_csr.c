@@ -246,6 +246,9 @@ void intel_csr_load_program(struct drm_i915_private *dev_priv)
 	u32 *payload = dev_priv->csr.dmc_payload;
 	uint32_t i, fw_size;
 
+	if (i915.disable_firmware_loading & (1<<1))
+		return;
+
 	if (!IS_GEN9(dev_priv)) {
 		DRM_ERROR("No CSR support available for this platform\n");
 		return;
@@ -433,6 +436,11 @@ void intel_csr_ucode_init(struct drm_i915_private *dev_priv)
 
 	INIT_WORK(&dev_priv->csr.work, csr_load_work_fn);
 
+	if (i915.disable_firmware_loading & (1<<1)) {
+		DRM_INFO("CSR support disabled by module parameter\n");
+		return;
+	}
+
 	if (!HAS_CSR(dev_priv))
 		return;
 
@@ -465,6 +473,9 @@ void intel_csr_ucode_init(struct drm_i915_private *dev_priv)
  */
 void intel_csr_ucode_fini(struct drm_i915_private *dev_priv)
 {
+	if (i915.disable_firmware_loading & (1<<1))
+		return;
+
 	if (!HAS_CSR(dev_priv))
 		return;
 

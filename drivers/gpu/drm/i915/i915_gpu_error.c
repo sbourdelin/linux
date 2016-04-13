@@ -369,6 +369,9 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 		   dev->pdev->subsystem_vendor,
 		   dev->pdev->subsystem_device);
 	err_printf(m, "IOMMU enabled?: %d\n", error->iommu);
+	err_printf(m, "Firmwares disabled: %s%s\n",
+		   i915.disable_firmware_loading & (1<<0) ? "GuC " : "",
+		   i915.disable_firmware_loading & (1<<1) ? "DMC " : "");
 
 	if (HAS_CSR(dev)) {
 		struct intel_csr *csr = &dev_priv->csr;

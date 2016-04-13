@@ -2419,6 +2419,9 @@ static int i915_guc_load_status_info(struct seq_file *m, void *data)
 	struct intel_guc_fw *guc_fw = &dev_priv->guc.guc_fw;
 	u32 tmp, i;
 
+	if (i915.disable_firmware_loading & (1<<0))
+		return 0;
+
 	if (!HAS_GUC_UCODE(dev_priv))
 		return 0;
 
@@ -2492,6 +2495,11 @@ static int i915_guc_info(struct seq_file *m, void *data)
 	struct i915_guc_client client = {};
 	struct intel_engine_cs *engine;
 	u64 total = 0;
+
+	if (i915.disable_firmware_loading & (1<<0)) {
+		seq_printf(m, "GuC disabled by module parameter.\n");
+		return 0;
+	}
 
 	if (!HAS_GUC_SCHED(dev_priv))
 		return 0;
@@ -2757,6 +2765,11 @@ static int i915_dmc_info(struct seq_file *m, void *unused)
 	struct drm_device *dev = node->minor->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_csr *csr;
+
+	if (i915.disable_firmware_loading & (1<<1)) {
+		seq_puts(m, "disabled by module parameter\n");
+		return 0;
+	}
 
 	if (!HAS_CSR(dev)) {
 		seq_puts(m, "not supported\n");

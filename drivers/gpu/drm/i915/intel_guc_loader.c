@@ -389,6 +389,9 @@ int intel_guc_ucode_load(struct drm_device *dev)
 	struct intel_guc_fw *guc_fw = &dev_priv->guc.guc_fw;
 	int retries, err = 0;
 
+	if (i915.disable_firmware_loading & (1<<0))
+		return 0;
+
 	if (!i915.enable_guc_submission)
 		return 0;
 
@@ -631,6 +634,11 @@ void intel_guc_ucode_init(struct drm_device *dev)
 	struct intel_guc_fw *guc_fw = &dev_priv->guc.guc_fw;
 	const char *fw_path;
 
+	if (i915.disable_firmware_loading & (1<<0)) {
+		DRM_INFO("GuC support disabled by module parameter\n");
+		return;
+	}
+
 	if (!HAS_GUC_SCHED(dev))
 		i915.enable_guc_submission = false;
 
@@ -676,6 +684,9 @@ void intel_guc_ucode_fini(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_guc_fw *guc_fw = &dev_priv->guc.guc_fw;
+
+	if (i915.disable_firmware_loading & (1<<0))
+		return;
 
 	mutex_lock(&dev->struct_mutex);
 	direct_interrupts_to_host(dev_priv);
