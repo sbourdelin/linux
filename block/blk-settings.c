@@ -837,16 +837,13 @@ EXPORT_SYMBOL_GPL(blk_queue_flush_queueable);
 void blk_queue_write_cache(struct request_queue *q, bool wc, bool fua)
 {
 	spin_lock_irq(q->queue_lock);
-	if (wc) {
+	if (wc)
 		queue_flag_set(QUEUE_FLAG_WC, q);
-		q->flush_flags = REQ_FLUSH;
-	} else
+	else
 		queue_flag_clear(QUEUE_FLAG_WC, q);
-	if (fua) {
-		if (wc)
-			q->flush_flags |= REQ_FUA;
+	if (fua)
 		queue_flag_set(QUEUE_FLAG_FUA, q);
-	} else
+	else
 		queue_flag_clear(QUEUE_FLAG_FUA, q);
 	spin_unlock_irq(q->queue_lock);
 }
