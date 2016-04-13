@@ -1,0 +1,65 @@
+Qualcomm EMAC Gigabit Ethernet Controller
+
+Required properties:
+- compatible : Should be "qcom,emac".
+- reg : Offset and length of the register regions for the device
+- reg-names : Register region names referenced in 'reg' above.
+	Required register resource entries are:
+	"base"   : EMAC controller base register block.
+	"csr"    : EMAC wrapper register block.
+	Optional register resource entries are:
+	"ptp"    : EMAC PTP (1588) register block.
+		   Required if 'qcom,emac-tstamp-en' is present.
+	"sgmii"  : EMAC SGMII PHY register block.
+- interrupts : Interrupt numbers used by this controller
+- interrupt-names : Interrupt resource names referenced in 'interrupts' above.
+	Required interrupt resource entries are:
+	"emac_core0"   : EMAC core0 interrupt.
+	"sgmii_irq"   : EMAC SGMII interrupt.
+- phy-addr            : Specifies phy address on MDIO bus.
+			Required if the optional property "qcom,no-external-phy"
+			is not specified.
+
+Optional properties:
+- qcom,emac-tstamp-en       : Enables the PTP (1588) timestamping feature.
+			      Include this only if PTP (1588) timestamping
+			      feature is needed. If included, "ptp" register
+			      base should be specified.
+- mac-address               : The 6-byte MAC address. If present, it is the
+			      default MAC address.
+- qcom,no-external-phy      : Indicates there is no external PHY connected to
+			      EMAC. Include this only if the EMAC is directly
+			      connected to the peer end without EPHY.
+Example:
+	emac0: qcom,emac@feb20000 {
+		compatible = "qcom,fsm9900-emac";
+		reg-names = "base", "csr", "ptp", "sgmii";
+		reg =   <0xfeb20000 0x10000>,
+			<0xfeb36000 0x1000>,
+			<0xfeb3c000 0x4000>,
+			<0xfeb38000 0x400>;
+		#address-cells = <0>;
+		interrupt-parent = <&emac0>;
+		#interrupt-cells = <1>;
+		interrupts = <0 1>;
+		interrupt-map-mask = <0xffffffff>;
+		interrupt-map = <0 &intc 0 76 0
+				 1 &intc 0 80 0>;
+		interrupt-names = "emac_core0", "sgmii_irq";
+		qcom,emac-tstamp-en;
+		phy-addr = <0>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&mdio_pins_a>;
+	};
+
+	tlmm: pinctrl@fd510000 {
+		compatible = "qcom,fsm9900-pinctrl";
+
+		mdio_pins_a: mdio {
+			state {
+				pins = "gpio123", "gpio124";
+				function = "mdio";
+			};
+		};
+	};
