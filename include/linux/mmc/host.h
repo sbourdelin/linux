@@ -411,10 +411,13 @@ void mmc_request_done(struct mmc_host *, struct mmc_request *);
 
 static inline void mmc_signal_sdio_irq(struct mmc_host *host)
 {
-	host->ops->enable_sdio_irq(host, 0);
-	host->sdio_irq_pending = true;
-	if (host->sdio_irq_thread)
+	if (!(host->caps2 & MMC_CAP2_SDIO_IRQ_NOTHREAD)) {
+		host->ops->enable_sdio_irq(host, 0);
+		host->sdio_irq_pending = true;
 		wake_up_process(host->sdio_irq_thread);
+	} else if (host->caps & MMC_CAP_SDIO_IRQ) {
+		host->ops->enable_sdio_irq(host, 1);
+	}
 }
 
 void sdio_run_irqs(struct mmc_host *host);
