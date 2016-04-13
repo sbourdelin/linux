@@ -5914,11 +5914,6 @@ void drm_mode_config_cleanup(struct drm_device *dev)
 		drm_property_destroy(dev, property);
 	}
 
-	list_for_each_entry_safe(blob, bt, &dev->mode_config.property_blob_list,
-				 head_global) {
-		drm_property_unreference_blob(blob);
-	}
-
 	/*
 	 * Single-threaded teardown context, so it's not required to grab the
 	 * fb_lock to protect against concurrent fb_list access. Contrary, it
@@ -5939,6 +5934,11 @@ void drm_mode_config_cleanup(struct drm_device *dev)
 
 	list_for_each_entry_safe(crtc, ct, &dev->mode_config.crtc_list, head) {
 		crtc->funcs->destroy(crtc);
+	}
+
+	list_for_each_entry_safe(blob, bt, &dev->mode_config.property_blob_list,
+				head_global) {
+		drm_property_unreference_blob(blob);
 	}
 
 	ida_destroy(&dev->mode_config.connector_ida);
