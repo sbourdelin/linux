@@ -659,6 +659,7 @@ asmlinkage long sys_prlimit64(pid_t pid, unsigned int resource,
 				struct rlimit64 __user *old_rlim);
 asmlinkage long sys_getrusage(int who, struct rusage __user *ru);
 asmlinkage long sys_umask(int mask);
+asmlinkage long sys_getumask(void);
 
 asmlinkage long sys_msgget(key_t key, int msgflg);
 asmlinkage long sys_msgsnd(int msqid, struct msgbuf __user *msgp,
