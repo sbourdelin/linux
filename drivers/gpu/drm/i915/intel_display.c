@@ -3101,7 +3101,6 @@ static void intel_complete_page_flips(struct drm_device *dev)
 		struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 		enum plane plane = intel_crtc->plane;
 
-		intel_prepare_page_flip(dev, plane);
 		intel_finish_page_flip_plane(dev, plane);
 	}
 }
@@ -10851,53 +10850,6 @@ static void intel_unpin_work_fn(struct work_struct *__work)
 	kfree(work);
 }
 
-static void do_intel_finish_page_flip(struct drm_device *dev,
-				      struct drm_crtc *crtc)
-{
-	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
-	struct intel_unpin_work *work;
-	unsigned long flags;
-
-	/* Ignore early vblank irqs */
-	if (intel_crtc == NULL)
-		return;
-
-	/*
-	 * This is called both by irq handlers and the reset code (to complete
-	 * lost pageflips) so needs the full irqsave spinlocks.
-	 */
-	spin_lock_irqsave(&dev->event_lock, flags);
-	work = intel_crtc->unpin_work;
-
-	/* Ensure we don't miss a work->pending update ... */
-	smp_rmb();
-
-	if (work == NULL || atomic_read(&work->pending) < INTEL_FLIP_COMPLETE) {
-		spin_unlock_irqrestore(&dev->event_lock, flags);
-		return;
-	}
-
-	page_flip_completed(intel_crtc);
-
-	spin_unlock_irqrestore(&dev->event_lock, flags);
-}
-
-void intel_finish_page_flip(struct drm_device *dev, int pipe)
-{
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	struct drm_crtc *crtc = dev_priv->pipe_to_crtc_mapping[pipe];
-
-	do_intel_finish_page_flip(dev, crtc);
-}
-
-void intel_finish_page_flip_plane(struct drm_device *dev, int plane)
-{
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	struct drm_crtc *crtc = dev_priv->plane_to_crtc_mapping[plane];
-
-	do_intel_finish_page_flip(dev, crtc);
-}
-
 /* Is 'a' after or equal to 'b'? */
 static bool g4x_flip_count_after_eq(u32 a, u32 b)
 {
@@ -10950,26 +10902,50 @@ static bool page_flip_finished(struct intel_crtc *crtc)
 				    crtc->unpin_work->flip_count);
 }
 
-void intel_prepare_page_flip(struct drm_device *dev, int plane)
+static void do_intel_finish_page_flip(struct drm_device *dev,
+				      struct drm_crtc *crtc)
 {
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	struct intel_crtc *intel_crtc =
-		to_intel_crtc(dev_priv->plane_to_crtc_mapping[plane]);
+	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+	struct intel_unpin_work *work;
 	unsigned long flags;
 
+	/* Ignore early vblank irqs */
+	if (intel_crtc == NULL)
+		return;
 
 	/*
 	 * This is called both by irq handlers and the reset code (to complete
 	 * lost pageflips) so needs the full irqsave spinlocks.
-	 *
-	 * NB: An MMIO update of the plane base pointer will also
-	 * generate a page-flip completion irq, i.e. every modeset
-	 * is also accompanied by a spurious intel_prepare_page_flip().
 	 */
 	spin_lock_irqsave(&dev->event_lock, flags);
-	if (intel_crtc->unpin_work && page_flip_finished(intel_crtc))
-		atomic_inc_not_zero(&intel_crtc->unpin_work->pending);
+	work = intel_crtc->unpin_work;
+
+	if (work == NULL ||
+	    atomic_read(&work->pending) == INTEL_FLIP_INACTIVE ||
+	   !page_flip_finished(intel_crtc)) {
+		spin_unlock_irqrestore(&dev->event_lock, flags);
+		return;
+	}
+
+	page_flip_completed(intel_crtc);
+
 	spin_unlock_irqrestore(&dev->event_lock, flags);
+}
+
+void intel_finish_page_flip(struct drm_device *dev, int pipe)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_crtc *crtc = dev_priv->pipe_to_crtc_mapping[pipe];
+
+	do_intel_finish_page_flip(dev, crtc);
+}
+
+void intel_finish_page_flip_plane(struct drm_device *dev, int plane)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_crtc *crtc = dev_priv->plane_to_crtc_mapping[plane];
+
+	do_intel_finish_page_flip(dev, crtc);
 }
 
 static inline void intel_mark_page_flip_active(struct intel_unpin_work *work)
@@ -11421,8 +11397,8 @@ static bool __intel_pageflip_stall_check(struct drm_device *dev,
 	u32 pending;
 
 	pending = atomic_read(&work->pending);
-	if (pending != INTEL_FLIP_PENDING)
-		return pending == INTEL_FLIP_COMPLETE;
+	if (pending == INTEL_FLIP_INACTIVE)
+		return false;
 
 	if (work->flip_ready_vblank == 0) {
 		if (work->flip_queued_req &&

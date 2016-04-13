@@ -946,7 +946,6 @@ struct intel_unpin_work {
 	atomic_t pending;
 #define INTEL_FLIP_INACTIVE	0
 #define INTEL_FLIP_PENDING	1
-#define INTEL_FLIP_COMPLETE	2
 	u32 flip_count;
 	u32 gtt_offset;
 	struct drm_i915_gem_request *flip_queued_req;
@@ -1159,7 +1158,6 @@ struct drm_framebuffer *
 __intel_framebuffer_create(struct drm_device *dev,
 			   struct drm_mode_fb_cmd2 *mode_cmd,
 			   struct drm_i915_gem_object *obj);
-void intel_prepare_page_flip(struct drm_device *dev, int plane);
 void intel_finish_page_flip(struct drm_device *dev, int pipe);
 void intel_finish_page_flip_plane(struct drm_device *dev, int plane);
 void intel_check_page_flip(struct drm_device *dev, int pipe);

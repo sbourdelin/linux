@@ -1707,10 +1707,8 @@ static void valleyview_pipestat_irq_handler(struct drm_device *dev, u32 iir)
 		    intel_pipe_handle_vblank(dev, pipe))
 			intel_check_page_flip(dev, pipe);
 
-		if (pipe_stats[pipe] & PLANE_FLIP_DONE_INT_STATUS_VLV) {
-			intel_prepare_page_flip(dev, pipe);
+		if (pipe_stats[pipe] & PLANE_FLIP_DONE_INT_STATUS_VLV)
 			intel_finish_page_flip(dev, pipe);
-		}
 
 		if (pipe_stats[pipe] & PIPE_CRC_DONE_INTERRUPT_STATUS)
 			i9xx_pipe_crc_irq_handler(dev, pipe);
@@ -2109,10 +2107,8 @@ static void ilk_display_irq_handler(struct drm_device *dev, u32 de_iir)
 			i9xx_pipe_crc_irq_handler(dev, pipe);
 
 		/* plane/pipes map 1:1 on ilk+ */
-		if (de_iir & DE_PLANE_FLIP_DONE(pipe)) {
-			intel_prepare_page_flip(dev, pipe);
+		if (de_iir & DE_PLANE_FLIP_DONE(pipe))
 			intel_finish_page_flip_plane(dev, pipe);
-		}
 	}
 
 	/* check event from PCH */
@@ -2156,10 +2152,8 @@ static void ivb_display_irq_handler(struct drm_device *dev, u32 de_iir)
 			intel_check_page_flip(dev, pipe);
 
 		/* plane/pipes map 1:1 on ilk+ */
-		if (de_iir & DE_PLANE_FLIP_DONE_IVB(pipe)) {
-			intel_prepare_page_flip(dev, pipe);
+		if (de_iir & DE_PLANE_FLIP_DONE_IVB(pipe))
 			intel_finish_page_flip_plane(dev, pipe);
-		}
 	}
 
 	/* check event from PCH */
@@ -2363,10 +2357,8 @@ gen8_de_irq_handler(struct drm_i915_private *dev_priv, u32 master_ctl)
 		else
 			flip_done &= GEN8_PIPE_PRIMARY_FLIP_DONE;
 
-		if (flip_done) {
-			intel_prepare_page_flip(dev, pipe);
+		if (flip_done)
 			intel_finish_page_flip_plane(dev, pipe);
-		}
 
 		if (iir & GEN8_PIPE_CDCLK_CRC_DONE)
 			hsw_pipe_crc_irq_handler(dev, pipe);
@@ -3962,7 +3954,6 @@ static bool i8xx_handle_vblank(struct drm_device *dev,
 	if (I915_READ16(ISR) & flip_pending)
 		goto check_page_flip;
 
-	intel_prepare_page_flip(dev, plane);
 	intel_finish_page_flip(dev, pipe);
 	return true;
 
@@ -4153,7 +4144,6 @@ static bool i915_handle_vblank(struct drm_device *dev,
 	if (I915_READ(ISR) & flip_pending)
 		goto check_page_flip;
 
-	intel_prepare_page_flip(dev, plane);
 	intel_finish_page_flip(dev, pipe);
 	return true;
 

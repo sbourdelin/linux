@@ -589,9 +589,6 @@ static int i915_gem_pageflip_info(struct seq_file *m, void *data)
 			if (pending == INTEL_FLIP_INACTIVE) {
 				seq_printf(m, "Flip ioctl preparing on pipe %c (plane %c)\n",
 					   pipe, plane);
-			} else if (pending >= INTEL_FLIP_COMPLETE) {
-				seq_printf(m, "Flip queued on pipe %c (plane %c)\n",
-					   pipe, plane);
 			} else {
 				seq_printf(m, "Flip pending (waiting for vsync) on pipe %c (plane %c)\n",
 					   pipe, plane);
