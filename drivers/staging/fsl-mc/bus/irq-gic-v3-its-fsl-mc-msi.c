@@ -22,9 +22,6 @@
 
 static struct irq_chip its_msi_irq_chip = {
 	.name = "fsl-mc-bus-msi",
-	.irq_mask = irq_chip_mask_parent,
-	.irq_unmask = irq_chip_unmask_parent,
-	.irq_eoi = irq_chip_eoi_parent,
 };
 
 static int its_fsl_mc_msi_prepare(struct irq_domain *msi_domain,
