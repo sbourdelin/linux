@@ -1066,6 +1066,9 @@ extern int __must_check device_reprobe(struct device *dev);
 
 extern bool device_is_bound(struct device *dev);
 
+extern int deferred_probe_register_notifier(struct notifier_block *nb);
+extern int deferred_probe_unregister_notifier(struct notifier_block *nb);
+
 /*
  * Easy functions for dynamically creating devices on the fly
  */
