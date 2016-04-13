@@ -79,6 +79,8 @@ struct flash_info {
 					 * Use dedicated 4byte address op codes
 					 * to support memory size above 128Mib.
 					 */
+
+	const struct spi_nor_basic_flash_parameter *params;
 };
 
 #define JEDEC_MFR(info)	((info)->id[0])
@@ -140,24 +142,6 @@ static int read_cr(struct spi_nor *nor)
 	}
 
 	return val;
-}
-
-/*
- * Dummy Cycle calculation for different type of read.
- * It can be used to support more commands with
- * different dummy cycle requirements.
- */
-static inline int spi_nor_read_dummy_cycles(struct spi_nor *nor)
-{
-	switch (nor->flash_read) {
-	case SPI_NOR_FAST:
-	case SPI_NOR_DUAL:
-	case SPI_NOR_QUAD:
-		return 8;
-	case SPI_NOR_NORMAL:
-		return 0;
-	}
-	return 0;
 }
 
 /*
@@ -1073,13 +1057,19 @@ static const struct flash_info spi_nor_ids[] = {
 	{ },
 };
 
-static const struct flash_info *spi_nor_read_id(struct spi_nor *nor)
+static const struct flash_info *
+spi_nor_read_id(struct spi_nor *nor,
+		const struct spi_nor_basic_flash_parameter *params,
+		u32 id_modes)
 {
 	int			tmp;
 	u8			id[SPI_NOR_MAX_ID_LEN];
 	const struct flash_info	*info;
 
-	tmp = nor->read_reg(nor, SPINOR_OP_RDID, id, SPI_NOR_MAX_ID_LEN);
+	if (params && params->read_id)
+		tmp = params->read_id(nor, id, sizeof(id), id_modes);
+	else
+		tmp = nor->read_reg(nor, SPINOR_OP_RDID, id, sizeof(id));
 	if (tmp < 0) {
 		dev_dbg(nor->dev, "error %d reading JEDEC ID\n", tmp);
 		return ERR_PTR(tmp);
@@ -1329,8 +1319,159 @@ static int spi_nor_check(struct spi_nor *nor)
 	return 0;
 }
 
-int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
+static int spi_nor_midx2proto(int midx, enum spi_nor_protocol *proto)
 {
+	switch (midx) {
+	case SNOR_MIDX_SLOW:
+	case SNOR_MIDX_1_1_1:
+		*proto = SNOR_PROTO_1_1_1;
+		break;
+
+	case SNOR_MIDX_1_1_2:
+		*proto = SNOR_PROTO_1_1_2;
+		break;
+
+	case SNOR_MIDX_1_2_2:
+		*proto = SNOR_PROTO_1_2_2;
+		break;
+
+	case SNOR_MIDX_2_2_2:
+		*proto = SNOR_PROTO_2_2_2;
+		break;
+
+	case SNOR_MIDX_1_1_4:
+		*proto = SNOR_PROTO_1_1_4;
+		break;
+
+	case SNOR_MIDX_1_4_4:
+		*proto = SNOR_PROTO_1_4_4;
+		break;
+
+	case SNOR_MIDX_4_4_4:
+		*proto = SNOR_PROTO_4_4_4;
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int spi_nor_setup(struct spi_nor *nor, const struct flash_info *info,
+			 const struct spi_nor_basic_flash_parameter *params,
+			 const struct spi_nor_modes *modes)
+{
+	bool enable_quad_io, enable_4_4_4, enable_2_2_2;
+	u32 rd_modes, wr_modes, cmd_modes, mask;
+	const struct spi_nor_erase_type *erase_type;
+	const struct spi_nor_read *read;
+	int rd_midx, wr_midx, err = 0;
+
+	/* 2-2-2 or 4-4-4 modes must be supported by BOTH read and write */
+	mask = (SNOR_MODE_2_2_2 | SNOR_MODE_4_4_4);
+	cmd_modes = (modes->rd_modes & modes->wr_modes) & mask;
+	rd_modes = (modes->rd_modes & ~mask) | cmd_modes;
+	wr_modes = (modes->wr_modes & ~mask) | cmd_modes;
+
+	/* Setup read operation. */
+	rd_midx = fls(params->rd_modes & rd_modes) - 1;
+	if (spi_nor_midx2proto(rd_midx, &nor->read_proto)) {
+		dev_err(nor->dev, "invalid (fast) read\n");
+		return -EINVAL;
+	}
+	read = &params->reads[rd_midx];
+	nor->read_opcode = read->opcode;
+	nor->read_dummy = read->num_mode_clocks + read->num_wait_states;
+
+	/* Set page program op code and protocol. */
+	wr_midx = fls(params->wr_modes & wr_modes) - 1;
+	if (spi_nor_midx2proto(wr_midx, &nor->write_proto)) {
+		dev_err(nor->dev, "invalid page program\n");
+		return -EINVAL;
+	}
+	nor->program_opcode = params->page_programs[wr_midx];
+
+	/* Set sector erase op code and size. */
+	erase_type = &params->erase_types[0];
+#ifdef CONFIG_MTD_SPI_NOR_USE_4K_SECTORS
+	for (i = 1; i < SNOR_MAX_ERASE_TYPES; ++i)
+		if (params->erase_types[i].size == 0x0c)
+			erase_type = &params->erase_types[i];
+#endif
+	nor->erase_opcode = erase_type->opcode;
+	nor->mtd.erasesize = (1 << erase_type->size);
+
+
+	enable_quad_io = (SNOR_PROTO_DATA_FROM_PROTO(nor->read_proto) == 4 ||
+			  SNOR_PROTO_DATA_FROM_PROTO(nor->write_proto) == 4);
+	enable_4_4_4 = (nor->read_proto == SNOR_PROTO_4_4_4);
+	enable_2_2_2 = (nor->read_proto == SNOR_PROTO_2_2_2);
+
+	/* Enable Quad I/O if needed. */
+	if ((enable_quad_io || enable_4_4_4) &&
+	    params->enable_quad_io &&
+	    nor->reg_proto != SNOR_PROTO_4_4_4) {
+		err = params->enable_quad_io(nor, true);
+		if (err) {
+			dev_err(nor->dev,
+				"failed to enable the Quad I/O mode\n");
+			return err;
+		}
+	}
+
+	/* Enter/Leave 2-2-2 or 4-4-4 if needed. */
+	if (enable_2_2_2 && params->enable_2_2_2 &&
+	    nor->reg_proto != SNOR_PROTO_2_2_2)
+		err = params->enable_2_2_2(nor, true);
+	else if (enable_4_4_4 && params->enable_4_4_4 &&
+		 nor->reg_proto != SNOR_PROTO_4_4_4)
+		err = params->enable_4_4_4(nor, true);
+	else if (!enable_2_2_2 && params->enable_2_2_2 &&
+		 nor->reg_proto == SNOR_PROTO_2_2_2)
+		err = params->enable_2_2_2(nor, false);
+	else if (!enable_4_4_4 && params->enable_4_4_4 &&
+		 nor->reg_proto == SNOR_PROTO_4_4_4)
+		err = params->enable_4_4_4(nor, false);
+	if (err)
+		return err;
+
+	/*
+	 * Fix erase protocol if needed, read and write protocols should
+	 * already be valid.
+	 */
+	switch (nor->reg_proto) {
+	case SNOR_PROTO_4_4_4:
+		nor->erase_proto = SNOR_PROTO_4_4_4;
+		break;
+
+	case SNOR_PROTO_2_2_2:
+		nor->erase_proto = SNOR_PROTO_2_2_2;
+		break;
+
+	default:
+		nor->erase_proto = SNOR_PROTO_1_1_1;
+		break;
+	}
+
+	dev_dbg(nor->dev,
+		"(Fast) Read:  opcode=%02Xh, protocol=%03x, mode=%u, wait=%u\n",
+		nor->read_opcode, nor->read_proto,
+		read->num_mode_clocks, read->num_wait_states);
+	dev_dbg(nor->dev,
+		"Page Program: opcode=%02Xh, protocol=%03x\n",
+		nor->program_opcode, nor->write_proto);
+	dev_dbg(nor->dev,
+		"Sector Erase: opcode=%02Xh, protocol=%03x, sector size=%zu\n",
+		nor->erase_opcode, nor->erase_proto, nor->mtd.erasesize);
+
+	return 0;
+}
+
+int spi_nor_scan(struct spi_nor *nor, const char *name,
+		 struct spi_nor_modes *modes)
+{
+	const struct spi_nor_basic_flash_parameter *params = NULL;
 	const struct flash_info *info = NULL;
 	struct device *dev = nor->dev;
 	struct mtd_info *mtd = &nor->mtd;
@@ -1342,11 +1483,17 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 	if (ret)
 		return ret;
 
+	/* Reset SPI protocol for all commands */
+	nor->erase_proto = SNOR_PROTO_1_1_1;
+	nor->read_proto = SNOR_PROTO_1_1_1;
+	nor->write_proto = SNOR_PROTO_1_1_1;
+	nor->reg_proto = SNOR_PROTO_1_1_1;
+
 	if (name)
 		info = spi_nor_match_id(name);
 	/* Try to auto-detect if chip name wasn't specified or not found */
 	if (!info)
-		info = spi_nor_read_id(nor);
+		info = spi_nor_read_id(nor, NULL, 0);
 	if (IS_ERR_OR_NULL(info))
 		return -ENOENT;
 
@@ -1357,7 +1504,7 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 	if (name && info->id_len) {
 		const struct flash_info *jinfo;
 
-		jinfo = spi_nor_read_id(nor);
+		jinfo = spi_nor_read_id(nor, info->params, modes->id_modes);
 		if (IS_ERR(jinfo)) {
 			return PTR_ERR(jinfo);
 		} else if (jinfo->id_len != info->id_len ||
@@ -1374,6 +1521,7 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 			info = jinfo;
 		}
 	}
+	params = info->params;
 
 	mutex_init(&nor->lock);
 
@@ -1451,50 +1599,41 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 	if (np) {
 		/* If we were instantiated by DT, use it */
 		if (of_property_read_bool(np, "m25p,fast-read"))
-			nor->flash_read = SPI_NOR_FAST;
+			modes->rd_modes |= SNOR_MODE_1_1_1;
 		else
-			nor->flash_read = SPI_NOR_NORMAL;
+			modes->rd_modes &= ~SNOR_MODE_1_1_1;
 	} else {
 		/* If we weren't instantiated by DT, default to fast-read */
-		nor->flash_read = SPI_NOR_FAST;
+		modes->rd_modes |= SNOR_MODE_1_1_1;
 	}
 
 	/* Some devices cannot do fast-read, no matter what DT tells us */
 	if (info->flags & SPI_NOR_NO_FR)
-		nor->flash_read = SPI_NOR_NORMAL;
-
-	/* Quad/Dual-read mode takes precedence over fast/normal */
-	if (mode == SPI_NOR_QUAD && info->flags & SPI_NOR_QUAD_READ) {
-		ret = set_quad_mode(nor, info);
-		if (ret) {
-			dev_err(dev, "quad mode not supported\n");
-			return ret;
-		}
-		nor->flash_read = SPI_NOR_QUAD;
-	} else if (mode == SPI_NOR_DUAL && info->flags & SPI_NOR_DUAL_READ) {
-		nor->flash_read = SPI_NOR_DUAL;
-	}
-
-	/* Default commands */
-	switch (nor->flash_read) {
-	case SPI_NOR_QUAD:
-		nor->read_opcode = SPINOR_OP_READ_1_1_4;
-		break;
-	case SPI_NOR_DUAL:
-		nor->read_opcode = SPINOR_OP_READ_1_1_2;
-		break;
-	case SPI_NOR_FAST:
-		nor->read_opcode = SPINOR_OP_READ_FAST;
-		break;
-	case SPI_NOR_NORMAL:
-		nor->read_opcode = SPINOR_OP_READ;
-		break;
-	default:
-		dev_err(dev, "No Read opcode defined\n");
-		return -EINVAL;
-	}
+		modes->rd_modes &= ~SNOR_MODE_1_1_1;
 
 	nor->program_opcode = SPINOR_OP_PP;
+
+	/*
+	 * Configure the SPI memory:
+	 * - select op codes for (Fast) Read, Page Program and Sector Erase.
+	 * - set the number of dummy cycles (mode cycles + wait states).
+	 * - set the SPI protocols for register and memory accesses.
+	 * - set the Quad Enable bit if needed (required by SPI x-y-4 protos).
+	 * - enter/leave the 4-4-4 or 2-2-2 modes if needed.
+	 */
+	if (params) {
+		ret = spi_nor_setup(nor, info, params, modes);
+		if (ret)
+			return ret;
+	} else {
+		if (modes->rd_modes & SNOR_MODE_1_1_1) {
+			nor->read_opcode = SPINOR_OP_READ_FAST;
+			nor->read_dummy = 8;
+		} else {
+			nor->read_opcode = SPINOR_OP_READ;
+			nor->read_dummy = 0;
+		}
+	}
 
 	if (info->addr_width)
 		nor->addr_width = info->addr_width;
@@ -1515,8 +1654,6 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 			nor->addr_width);
 		return -EINVAL;
 	}
-
-	nor->read_dummy = spi_nor_read_dummy_cycles(nor);
 
 	dev_info(dev, "%s (%lld Kbytes)\n", info->name,
 			(long long)mtd->size >> 10);
