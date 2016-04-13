@@ -939,16 +939,12 @@ struct intel_flip_work {
 	atomic_t pending;
 #define INTEL_FLIP_INACTIVE	0
 #define INTEL_FLIP_PENDING	1
-	u32 flip_count;
-	u32 gtt_offset;
-	struct drm_i915_gem_request *flip_queued_req;
 	u32 flip_queued_vblank;
-	u32 flip_ready_vblank;
 
 	unsigned put_power_domains;
 	unsigned num_planes;
 
-	bool can_async_unpin, flip_prepared;
+	bool can_async_unpin;
 	unsigned fb_bits;
 
 	struct intel_crtc_state *old_crtc_state, *new_crtc_state;
