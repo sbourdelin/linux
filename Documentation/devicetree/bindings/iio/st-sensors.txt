@@ -38,6 +38,7 @@ Accelerometers:
 - st,lsm303agr-accel
 - st,lis2dh12-accel
 - st,h3lis331dl-accel
+- st,lsm9ds0-accel
 
 Gyroscopes:
 - st,l3g4200d-gyro
@@ -47,6 +48,7 @@ Gyroscopes:
 - st,l3gd20-gyro
 - st,l3g4is-gyro
 - st,lsm330-gyro
+- st,lsm9ds0-gyro
 
 Magnetometers:
 - st,lsm303agr-magn
@@ -54,6 +56,7 @@ Magnetometers:
 - st,lsm303dlhc-magn
 - st,lsm303dlm-magn
 - st,lis3mdl-magn
+- st,lsm9ds0-magn
 
 Pressure sensors:
 - st,lps001wp-press

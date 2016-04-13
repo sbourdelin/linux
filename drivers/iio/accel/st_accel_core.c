@@ -211,6 +211,50 @@
 #define ST_ACCEL_6_IHL_IRQ_MASK			0x80
 #define ST_ACCEL_6_MULTIREAD_BIT		true
 
+/* CUSTOM VALUES FOR SENSOR 7 */
+#define ST_ACCEL_7_WAI_EXP			0x49
+#define ST_ACCEL_7_ODR_ADDR			0x20
+#define ST_ACCEL_7_ODR_MASK			0xf0
+#define ST_ACCEL_7_ODR_AVL_3HZ_VAL		0x01
+#define ST_ACCEL_7_ODR_AVL_6HZ_VAL		0x02
+#define ST_ACCEL_7_ODR_AVL_12HZ_VAL		0x03
+#define ST_ACCEL_7_ODR_AVL_25HZ_VAL		0x04
+#define ST_ACCEL_7_ODR_AVL_50HZ_VAL		0x05
+#define ST_ACCEL_7_ODR_AVL_100HZ_VAL		0x06
+#define ST_ACCEL_7_ODR_AVL_200HZ_VAL		0x07
+#define ST_ACCEL_7_ODR_AVL_400HZ_VAL		0x08
+#define ST_ACCEL_7_ODR_AVL_800HZ_VAL		0x09
+#define ST_ACCEL_7_ODR_AVL_1600HZ_VAL		0x0a
+#define ST_ACCEL_7_FS_ADDR			0x21
+#define ST_ACCEL_7_FS_MASK			0x38
+#define ST_ACCEL_7_FS_AVL_2_VAL			0x00
+#define ST_ACCEL_7_FS_AVL_4_VAL			0x01
+#define ST_ACCEL_7_FS_AVL_6_VAL			0x02
+#define ST_ACCEL_7_FS_AVL_8_VAL			0x03
+#define ST_ACCEL_7_FS_AVL_16_VAL		0x04
+#define ST_ACCEL_7_FS_AVL_2_GAIN		IIO_G_TO_M_S_2(61)
+#define ST_ACCEL_7_FS_AVL_4_GAIN		IIO_G_TO_M_S_2(122)
+#define ST_ACCEL_7_FS_AVL_6_GAIN		IIO_G_TO_M_S_2(183)
+#define ST_ACCEL_7_FS_AVL_8_GAIN		IIO_G_TO_M_S_2(244)
+#define ST_ACCEL_7_FS_AVL_16_GAIN		IIO_G_TO_M_S_2(732)
+#define ST_ACCEL_7_BDU_ADDR			0x20
+#define ST_ACCEL_7_BDU_MASK			0x08
+#define ST_ACCEL_7_DRDY_IRQ_ADDR		0x22
+#define ST_ACCEL_7_DRDY_IRQ_INT1_MASK		0x04
+/* INT2 is actually at another address. Not supported by driver */
+/*
+#define ST_ACCEL_7_DRDY_IRQ_INT2_ADDR		0x23
+#define ST_ACCEL_7_DRDY_IRQ_INT2_MASK		0x08
+ */
+/* Common to magnetometer so not supported */
+/*
+#define ST_ACCEL_7_IHL_IRQ_ADDR			0x12
+#define ST_ACCEL_7_IHL_IRQ_MASK			0x80
+ */
+#define ST_ACCEL_7_IG1_EN_ADDR			0x22
+#define ST_ACCEL_7_IG1_EN_MASK			0x20
+#define ST_ACCEL_7_MULTIREAD_BIT		true
+
 static const struct iio_chan_spec st_accel_8bit_channels[] = {
 	ST_SENSORS_LSM_CHANNELS(IIO_ACCEL,
 			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE),
@@ -647,6 +691,84 @@ static const struct st_sensor_settings st_accel_sensors_settings[] = {
 			.mask_ihl = ST_ACCEL_6_IHL_IRQ_MASK,
 		},
 		.multi_read_bit = ST_ACCEL_6_MULTIREAD_BIT,
+		.bootime = 2,
+	},
+	{
+		.wai = ST_ACCEL_7_WAI_EXP,
+		.wai_addr = ST_SENSORS_DEFAULT_WAI_ADDRESS,
+		.sensors_supported = {
+			[0] = LSM9DS0_ACCEL_DEV_NAME,
+		},
+		.ch = (struct iio_chan_spec *)st_accel_16bit_channels,
+		.odr = {
+			.addr = ST_ACCEL_7_ODR_ADDR,
+			.mask = ST_ACCEL_7_ODR_MASK,
+			.odr_avl = {
+				{ 3, ST_ACCEL_7_ODR_AVL_3HZ_VAL },
+				{ 6, ST_ACCEL_7_ODR_AVL_6HZ_VAL, },
+				{ 12, ST_ACCEL_7_ODR_AVL_12HZ_VAL, },
+				{ 25, ST_ACCEL_7_ODR_AVL_25HZ_VAL, },
+				{ 50, ST_ACCEL_7_ODR_AVL_50HZ_VAL, },
+				{ 100, ST_ACCEL_7_ODR_AVL_100HZ_VAL, },
+				{ 200, ST_ACCEL_7_ODR_AVL_200HZ_VAL, },
+				{ 400, ST_ACCEL_7_ODR_AVL_400HZ_VAL, },
+				{ 800, ST_ACCEL_7_ODR_AVL_800HZ_VAL, },
+				{ 1600, ST_ACCEL_7_ODR_AVL_1600HZ_VAL, },
+			},
+		},
+		.pw = {
+			.addr = ST_ACCEL_7_ODR_ADDR,
+			.mask = ST_ACCEL_7_ODR_MASK,
+			.value_off = ST_SENSORS_DEFAULT_POWER_OFF_VALUE,
+		},
+		.enable_axis = {
+			.addr = ST_SENSORS_DEFAULT_AXIS_ADDR,
+			.mask = ST_SENSORS_DEFAULT_AXIS_MASK,
+		},
+		.fs = {
+			.addr = ST_ACCEL_7_FS_ADDR,
+			.mask = ST_ACCEL_7_FS_MASK,
+			.fs_avl = {
+				[0] = {
+					.num = ST_ACCEL_FS_AVL_2G,
+					.value = ST_ACCEL_7_FS_AVL_2_VAL,
+					.gain = ST_ACCEL_7_FS_AVL_2_GAIN,
+				},
+				[1] = {
+					.num = ST_ACCEL_FS_AVL_4G,
+					.value = ST_ACCEL_7_FS_AVL_4_VAL,
+					.gain = ST_ACCEL_7_FS_AVL_4_GAIN,
+				},
+				[2] = {
+					.num = ST_ACCEL_FS_AVL_6G,
+					.value = ST_ACCEL_7_FS_AVL_6_VAL,
+					.gain = ST_ACCEL_7_FS_AVL_6_GAIN,
+				},
+				[3] = {
+					.num = ST_ACCEL_FS_AVL_8G,
+					.value = ST_ACCEL_7_FS_AVL_8_VAL,
+					.gain = ST_ACCEL_7_FS_AVL_8_GAIN,
+				},
+				[4] = {
+					.num = ST_ACCEL_FS_AVL_16G,
+					.value = ST_ACCEL_7_FS_AVL_16_VAL,
+					.gain = ST_ACCEL_7_FS_AVL_16_GAIN,
+				},
+			},
+		},
+		.bdu = {
+			.addr = ST_ACCEL_7_BDU_ADDR,
+			.mask = ST_ACCEL_7_BDU_MASK,
+		},
+		.drdy_irq = {
+			.addr = ST_ACCEL_7_DRDY_IRQ_ADDR,
+			.mask_int1 = ST_ACCEL_7_DRDY_IRQ_INT1_MASK,
+			.ig1 = {
+				.en_addr = ST_ACCEL_7_IG1_EN_ADDR,
+				.en_mask = ST_ACCEL_7_IG1_EN_MASK,
+			},
+		},
+		.multi_read_bit = ST_ACCEL_7_MULTIREAD_BIT,
 		.bootime = 2,
 	},
 };
