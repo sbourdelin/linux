@@ -101,6 +101,7 @@
 #define SR_QUAD_EN_MX		BIT(6)	/* Macronix Quad I/O */
 
 /* Enhanced Volatile Configuration Register bits */
+#define EVCR_DUAL_EN_MICRON	BIT(6)	/* Micron Dual I/O */
 #define EVCR_QUAD_EN_MICRON	BIT(7)	/* Micron Quad I/O */
 
 /* Flag Status Register bits */
