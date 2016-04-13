@@ -4,6 +4,7 @@ TARGETS += cpu-hotplug
 TARGETS += efivarfs
 TARGETS += exec
 TARGETS += firmware
+TARGETS += fs
 TARGETS += ftrace
 TARGETS += futex
 TARGETS += ipc
