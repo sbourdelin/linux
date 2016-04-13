@@ -319,8 +319,17 @@ static void intel_uncore_ellc_detect(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	if ((IS_HASWELL(dev) || IS_BROADWELL(dev) ||
-	     INTEL_INFO(dev)->gen >= 9) &&
+	if (INTEL_INFO(dev)->gen >= 9 && HAS_LLC(dev)) {
+		u32 edramcap = __raw_i915_read32(dev_priv, HSW_EDRAM_PRESENT);
+		if (edramcap & EDRAM_ENABLED) {
+			int sets = (edramcap >> 8) & 0x3;
+			int ways = (edramcap >> 5) & 0x7;
+			int banks = (edramcap >> 1) & 0xf;
+
+			ways = (ways + 1) * 4;
+			dev_priv->ellc_size = sets * ways * banks;
+		}
+	} else if ((IS_HASWELL(dev) || IS_BROADWELL(dev)) &&
 	    (__raw_i915_read32(dev_priv, HSW_EDRAM_PRESENT) & EDRAM_ENABLED)) {
 		/* The docs do not explain exactly how the calculation can be
 		 * made. It is somewhat guessable, but for now, it's always
@@ -328,8 +337,9 @@ static void intel_uncore_ellc_detect(struct drm_device *dev)
 		 * NB: We can't write IDICR yet because we do not have gt funcs
 		 * set up */
 		dev_priv->ellc_size = 128;
-		DRM_INFO("Found %zuMB of eLLC\n", dev_priv->ellc_size);
 	}
+
+	DRM_INFO("Found %zuMB of eLLC\n", dev_priv->ellc_size);
 }
 
 static bool
