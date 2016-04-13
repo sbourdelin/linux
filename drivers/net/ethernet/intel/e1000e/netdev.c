@@ -3580,7 +3580,6 @@ static int e1000e_config_hwtstamp(struct e1000_adapter *adapter,
 	bool is_l4 = false;
 	bool is_l2 = false;
 	u32 regval;
-	s32 ret_val;
 
 	if (!(adapter->flags & FLAG_HAS_HW_TIMESTAMP))
 		return -EINVAL;
@@ -3718,16 +3717,6 @@ static int e1000e_config_hwtstamp(struct e1000_adapter *adapter,
 	/* Clear TSYNCRXCTL_VALID & TSYNCTXCTL_VALID bit */
 	er32(RXSTMPH);
 	er32(TXSTMPH);
-
-	/* Get and set the System Time Register SYSTIM base frequency */
-	ret_val = e1000e_get_base_timinca(adapter, &regval);
-	if (ret_val)
-		return ret_val;
-	ew32(TIMINCA, regval);
-
-	/* reset the ns time counter */
-	timecounter_init(&adapter->tc, &adapter->cc,
-			 ktime_to_ns(ktime_get_real()));
 
 	return 0;
 }
@@ -6966,6 +6955,8 @@ static int e1000_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	u16 eeprom_data = 0;
 	u16 eeprom_apme_mask = E1000_EEPROM_APME;
 	s32 rval = 0;
+	u32 regval;
+	s32 ret_val;
 
 	if (ei->flags2 & FLAG2_DISABLE_ASPM_L0S)
 		aspm_disable_flag = PCIE_LINK_STATE_L0S;
@@ -7255,6 +7246,16 @@ static int e1000_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	/* carrier off reporting is important to ethtool even BEFORE open */
 	netif_carrier_off(netdev);
+
+	/* Get and set the System Time Register SYSTIM base frequency */
+	ret_val = e1000e_get_base_timinca(adapter, &regval);
+	if (rval)
+		goto err_register;
+	ew32(TIMINCA, regval);
+
+	/* reset the ns time counter */
+	timecounter_init(&adapter->tc, &adapter->cc,
+			 ktime_to_ns(ktime_get_real()));
 
 	/* init PTP hardware clock */
 	e1000e_ptp_init(adapter);
