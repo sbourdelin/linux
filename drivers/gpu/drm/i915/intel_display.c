@@ -11341,8 +11341,6 @@ static void intel_do_mmio_flip(struct intel_mmio_flip *mmio_flip)
 	if (work == NULL)
 		return;
 
-	intel_mark_page_flip_active(work);
-
 	intel_pipe_update_start(crtc);
 
 	if (INTEL_INFO(mmio_flip->i915)->gen >= 9)
@@ -11352,6 +11350,8 @@ static void intel_do_mmio_flip(struct intel_mmio_flip *mmio_flip)
 		ilk_do_mmio_flip(crtc, work);
 
 	intel_pipe_update_end(crtc);
+
+	intel_mark_page_flip_active(work);
 }
 
 static void intel_mmio_flip_work_func(struct work_struct *work)
@@ -11418,15 +11418,11 @@ static bool __intel_pageflip_stall_check(struct drm_device *dev,
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 	struct intel_unpin_work *work = intel_crtc->unpin_work;
 	u32 addr;
+	u32 pending;
 
-	if (atomic_read(&work->pending) >= INTEL_FLIP_COMPLETE)
-		return true;
-
-	if (atomic_read(&work->pending) < INTEL_FLIP_PENDING)
-		return false;
-
-	if (!work->enable_stall_check)
-		return false;
+	pending = atomic_read(&work->pending);
+	if (pending != INTEL_FLIP_PENDING)
+		return pending == INTEL_FLIP_COMPLETE;
 
 	if (work->flip_ready_vblank == 0) {
 		if (work->flip_queued_req &&
@@ -11602,6 +11598,11 @@ static int intel_crtc_page_flip(struct drm_crtc *crtc,
 	 */
 	if (!mmio_flip) {
 		ret = i915_gem_object_sync(obj, engine, &request);
+		if (!ret && !request) {
+			request = i915_gem_request_alloc(engine, NULL);
+			ret = PTR_ERR_OR_ZERO(request);
+		}
+
 		if (ret)
 			goto cleanup_pending;
 	}
@@ -11613,6 +11614,7 @@ static int intel_crtc_page_flip(struct drm_crtc *crtc,
 	work->gtt_offset = intel_plane_obj_offset(to_intel_plane(primary),
 						  obj, 0);
 	work->gtt_offset += intel_crtc->dspaddr_offset;
+	work->flip_queued_vblank = drm_crtc_vblank_count(crtc);
 
 	if (mmio_flip) {
 		ret = intel_queue_mmio_flip(dev, crtc, obj);
@@ -11622,14 +11624,6 @@ static int intel_crtc_page_flip(struct drm_crtc *crtc,
 		i915_gem_request_assign(&work->flip_queued_req,
 					obj->last_write_req);
 	} else {
-		if (!request) {
-			request = i915_gem_request_alloc(engine, NULL);
-			if (IS_ERR(request)) {
-				ret = PTR_ERR(request);
-				goto cleanup_unpin;
-			}
-		}
-
 		ret = dev_priv->display.queue_flip(dev, crtc, fb, obj, request,
 						   page_flip_flags);
 		if (ret)
@@ -11642,7 +11636,6 @@ static int intel_crtc_page_flip(struct drm_crtc *crtc,
 		i915_add_request_no_flush(request);
 
 	work->flip_queued_vblank = drm_crtc_vblank_count(crtc);
-	work->enable_stall_check = true;
 
 	i915_gem_track_fb(intel_fb_obj(work->old_fb), obj,
 			  to_intel_plane(primary)->frontbuffer_bit);
