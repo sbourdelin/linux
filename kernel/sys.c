@@ -1649,6 +1649,11 @@ SYSCALL_DEFINE1(umask, int, mask)
 	return mask;
 }
 
+SYSCALL_DEFINE0(getumask)
+{
+	return current_umask();
+}
+
 static int prctl_set_mm_exe_file(struct mm_struct *mm, unsigned int fd)
 {
 	struct fd exe;
