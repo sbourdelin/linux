@@ -26,6 +26,7 @@
 #include <linux/sched.h>
 #include <linux/ptrace.h>
 #include <uapi/linux/audit.h>
+#include <linux/tty.h>
 
 #define AUDIT_INO_UNSET ((unsigned long)-1)
 #define AUDIT_DEV_UNSET ((dev_t)-1)
@@ -343,6 +344,19 @@ static inline unsigned int audit_get_sessionid(struct task_struct *tsk)
 	return tsk->sessionid;
 }
 
+static inline char *audit_get_tty(struct task_struct *tsk)
+{
+	char *tty;
+
+	spin_lock_irq(&tsk->sighand->siglock);
+	if (tsk->signal && tsk->signal->tty && tsk->signal->tty->name)
+		tty = tsk->signal->tty->name;
+	else
+		tty = "(none)";
+	spin_unlock_irq(&tsk->sighand->siglock);
+	return tty;
+}
+
 extern void __audit_ipc_obj(struct kern_ipc_perm *ipcp);
 extern void __audit_ipc_set_perm(unsigned long qbytes, uid_t uid, gid_t gid, umode_t mode);
 extern void __audit_bprm(struct linux_binprm *bprm);
@@ -499,6 +513,10 @@ static inline kuid_t audit_get_loginuid(struct task_struct *tsk)
 static inline unsigned int audit_get_sessionid(struct task_struct *tsk)
 {
 	return -1;
+}
+static inline char *audit_get_tty(struct task_struct *tsk)
+{
+	return "(invalid)";
 }
 static inline void audit_ipc_obj(struct kern_ipc_perm *ipcp)
 { }

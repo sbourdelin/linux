@@ -1993,8 +1993,9 @@ static void audit_log_set_loginuid(kuid_t koldloginuid, kuid_t kloginuid,
 		return;
 	audit_log_format(ab, "pid=%d uid=%u", task_pid_nr(current), uid);
 	audit_log_task_context(ab);
-	audit_log_format(ab, " old-auid=%u auid=%u old-ses=%u ses=%u res=%d",
-			 oldloginuid, loginuid, oldsessionid, sessionid, !rc);
+	audit_log_format(ab, " old-auid=%u auid=%u tty=%s old-ses=%u ses=%u res=%d",
+			 oldloginuid, loginuid, audit_get_tty(current),
+			 oldsessionid, sessionid, !rc);
 	audit_log_end(ab);
 }
 
