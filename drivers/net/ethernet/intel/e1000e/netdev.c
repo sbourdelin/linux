@@ -6956,7 +6956,6 @@ static int e1000_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	u16 eeprom_apme_mask = E1000_EEPROM_APME;
 	s32 rval = 0;
 	u32 regval;
-	s32 ret_val;
 
 	if (ei->flags2 & FLAG2_DISABLE_ASPM_L0S)
 		aspm_disable_flag = PCIE_LINK_STATE_L0S;
@@ -7248,7 +7247,7 @@ static int e1000_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	netif_carrier_off(netdev);
 
 	/* Get and set the System Time Register SYSTIM base frequency */
-	ret_val = e1000e_get_base_timinca(adapter, &regval);
+	rval = e1000e_get_base_timinca(adapter, &regval);
 	if (rval)
 		goto err_register;
 	ew32(TIMINCA, regval);
