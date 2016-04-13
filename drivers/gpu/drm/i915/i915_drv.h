@@ -3005,6 +3005,32 @@ static inline void i915_gem_object_unpin_pages(struct drm_i915_gem_object *obj)
 }
 
 /**
+ * i915_gem_object_map_range - map some or all of a GEM object into kernel space
+ * @obj: the GEM object to be mapped
+ * @first: offset in pages of the start of the range to be mapped
+ * @npages: length in pages of the range to be mapped. For convenience, a
+ *          length of zero is taken to mean "the remainder of the object"
+ *
+ * Map a given range of a GEM object into kernel virtual space.  The caller must
+ * make sure the associated pages are gathered and pinned before calling this
+ * function, and is responsible for unmapping the returned address when it is no
+ * longer required, by calling i915_gem_addr_unmap().
+ *
+ * Returns the address at which the object has been mapped, or NULL on failure.
+ */
+void *__must_check i915_gem_object_map_range(const struct drm_i915_gem_object *obj,
+					     unsigned long first,
+					     unsigned long npages);
+
+static inline void i915_gem_addr_unmap(void *mapped_addr)
+{
+	if (is_vmalloc_addr(mapped_addr))
+		vunmap(mapped_addr);
+	else
+		kunmap(kmap_to_page(mapped_addr));
+}
+
+/**
  * i915_gem_object_pin_map - return a contiguous mapping of the entire object
  * @obj - the object to map into kernel address space
  *

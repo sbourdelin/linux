@@ -927,40 +927,16 @@ find_reg_in_tables(const struct drm_i915_reg_table *tables,
 	return NULL;
 }
 
-static u32 *vmap_batch(struct drm_i915_gem_object *obj,
+static u32 *map_batch(struct drm_i915_gem_object *obj,
 		       unsigned start, unsigned len)
 {
-	int i;
-	void *addr = NULL;
-	struct sg_page_iter sg_iter;
-	int first_page = start >> PAGE_SHIFT;
-	int last_page = (len + start + 4095) >> PAGE_SHIFT;
-	int npages = last_page - first_page;
-	struct page **pages;
+	unsigned long first, npages;
 
-	pages = drm_malloc_ab(npages, sizeof(*pages));
-	if (pages == NULL) {
-		DRM_DEBUG_DRIVER("Failed to get space for pages\n");
-		goto finish;
-	}
+	/* Convert [start, len) to pages */
+	first = start >> PAGE_SHIFT;
+	npages = DIV_ROUND_UP(start + len, PAGE_SIZE) - first;
 
-	i = 0;
-	for_each_sg_page(obj->pages->sgl, &sg_iter, obj->pages->nents, first_page) {
-		pages[i++] = sg_page_iter_page(&sg_iter);
-		if (i == npages)
-			break;
-	}
-
-	addr = vmap(pages, i, 0, PAGE_KERNEL);
-	if (addr == NULL) {
-		DRM_DEBUG_DRIVER("Failed to vmap pages\n");
-		goto finish;
-	}
-
-finish:
-	if (pages)
-		drm_free_large(pages);
-	return (u32*)addr;
+	return i915_gem_object_map_range(obj, first, npages);
 }
 
 /* Returns a vmap'd pointer to dest_obj, which the caller must unmap */
@@ -987,7 +963,7 @@ static u32 *copy_batch(struct drm_i915_gem_object *dest_obj,
 		return ERR_PTR(ret);
 	}
 
-	src_base = vmap_batch(src_obj, batch_start_offset, batch_len);
+	src_base = map_batch(src_obj, batch_start_offset, batch_len);
 	if (!src_base) {
 		DRM_DEBUG_DRIVER("CMD: Failed to vmap batch\n");
 		ret = -ENOMEM;
@@ -1000,7 +976,7 @@ static u32 *copy_batch(struct drm_i915_gem_object *dest_obj,
 		goto unmap_src;
 	}
 
-	dst = vmap_batch(dest_obj, 0, batch_len);
+	dst = map_batch(dest_obj, 0, batch_len);
 	if (!dst) {
 		DRM_DEBUG_DRIVER("CMD: Failed to vmap shadow batch\n");
 		ret = -ENOMEM;
@@ -1014,7 +990,7 @@ static u32 *copy_batch(struct drm_i915_gem_object *dest_obj,
 	memcpy(dst, src, batch_len);
 
 unmap_src:
-	vunmap(src_base);
+	i915_gem_addr_unmap(src_base);
 unpin_src:
 	i915_gem_object_unpin_pages(src_obj);
 
@@ -1262,7 +1238,7 @@ int i915_parse_cmds(struct intel_engine_cs *engine,
 		ret = -EINVAL;
 	}
 
-	vunmap(batch_base);
+	i915_gem_addr_unmap(batch_base);
 
 	return ret;
 }

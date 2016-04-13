@@ -2233,10 +2233,7 @@ i915_gem_object_put_pages(struct drm_i915_gem_object *obj)
 	list_del(&obj->global_list);
 
 	if (obj->mapping) {
-		if (is_vmalloc_addr(obj->mapping))
-			vunmap(obj->mapping);
-		else
-			kunmap(kmap_to_page(obj->mapping));
+		i915_gem_addr_unmap(obj->mapping);
 		obj->mapping = NULL;
 	}
 
@@ -2408,6 +2405,55 @@ i915_gem_object_get_pages(struct drm_i915_gem_object *obj)
 	return 0;
 }
 
+void *i915_gem_object_map_range(const struct drm_i915_gem_object *obj,
+				unsigned long first,
+				unsigned long npages)
+{
+	unsigned long max_pages = obj->base.size >> PAGE_SHIFT;
+	struct scatterlist *sg = obj->pages->sgl;
+	struct sg_page_iter sg_iter;
+	struct page **pages;
+	unsigned long i = 0;
+	void *addr = NULL;
+
+	/* Minimal range check */
+	if (first + npages > max_pages) {
+		DRM_DEBUG_DRIVER("Invalid page range\n");
+		return NULL;
+	}
+
+	/* npages==0 is shorthand for "the rest of the object" */
+	if (npages == 0)
+		npages = max_pages - first;
+
+	/* A single page can always be kmapped */
+	if (npages == 1)
+		return kmap(sg_page(sg));
+
+	pages = drm_malloc_gfp(npages, sizeof(*pages), GFP_TEMPORARY);
+	if (pages == NULL) {
+		DRM_DEBUG_DRIVER("Failed to get space for pages\n");
+		return NULL;
+	}
+
+	for_each_sg_page(sg, &sg_iter, max_pages, first) {
+		pages[i] = sg_page_iter_page(&sg_iter);
+		if (++i == npages) {
+			addr = vmap(pages, npages, 0, PAGE_KERNEL);
+			break;
+		}
+	}
+
+	/* We should have got here via the 'break' above */
+	WARN_ON(i != npages);
+	if (addr == NULL)
+		DRM_DEBUG_DRIVER("Failed to vmap pages\n");
+
+	drm_free_large(pages);
+
+	return addr;
+}
+
 void *i915_gem_object_pin_map(struct drm_i915_gem_object *obj)
 {
 	int ret;
@@ -2421,27 +2467,7 @@ void *i915_gem_object_pin_map(struct drm_i915_gem_object *obj)
 	i915_gem_object_pin_pages(obj);
 
 	if (obj->mapping == NULL) {
-		struct page **pages;
-
-		pages = NULL;
-		if (obj->base.size == PAGE_SIZE)
-			obj->mapping = kmap(sg_page(obj->pages->sgl));
-		else
-			pages = drm_malloc_gfp(obj->base.size >> PAGE_SHIFT,
-					       sizeof(*pages),
-					       GFP_TEMPORARY);
-		if (pages != NULL) {
-			struct sg_page_iter sg_iter;
-			int n;
-
-			n = 0;
-			for_each_sg_page(obj->pages->sgl, &sg_iter,
-					 obj->pages->nents, 0)
-				pages[n++] = sg_page_iter_page(&sg_iter);
-
-			obj->mapping = vmap(pages, n, 0, PAGE_KERNEL);
-			drm_free_large(pages);
-		}
+		obj->mapping = i915_gem_object_map_range(obj, 0, 0);
 		if (obj->mapping == NULL) {
 			i915_gem_object_unpin_pages(obj);
 			return ERR_PTR(-ENOMEM);
