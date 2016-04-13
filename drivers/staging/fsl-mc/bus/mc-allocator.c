@@ -487,7 +487,8 @@ int fsl_mc_populate_irq_pool(struct fsl_mc_bus *mc_bus,
 		    irq_count > FSL_MC_IRQ_POOL_MAX_TOTAL_IRQS))
 		return -EINVAL;
 
-	error = fsl_mc_msi_domain_alloc_irqs(&mc_bus_dev->dev, irq_count);
+	error = platform_msi_domain_alloc_irqs(&mc_bus_dev->dev, irq_count,
+					       fsl_mc_msi_write_msg);
 	if (error < 0)
 		return error;
 
@@ -514,7 +515,7 @@ int fsl_mc_populate_irq_pool(struct fsl_mc_bus *mc_bus,
 	}
 
 	for_each_msi_entry(msi_desc, &mc_bus_dev->dev) {
-		mc_dev_irq = &irq_resources[msi_desc->fsl_mc.msi_index];
+		mc_dev_irq = &irq_resources[msi_desc->platform.msi_index];
 		mc_dev_irq->msi_desc = msi_desc;
 		mc_dev_irq->resource.id = msi_desc->irq;
 	}
@@ -525,7 +526,7 @@ int fsl_mc_populate_irq_pool(struct fsl_mc_bus *mc_bus,
 	return 0;
 
 cleanup_msi_irqs:
-	fsl_mc_msi_domain_free_irqs(&mc_bus_dev->dev);
+	platform_msi_domain_free_irqs(&mc_bus_dev->dev);
 	return error;
 }
 EXPORT_SYMBOL_GPL(fsl_mc_populate_irq_pool);
@@ -553,7 +554,7 @@ void fsl_mc_cleanup_irq_pool(struct fsl_mc_bus *mc_bus)
 	res_pool->max_count = 0;
 	res_pool->free_count = 0;
 	mc_bus->irq_resources = NULL;
-	fsl_mc_msi_domain_free_irqs(&mc_bus_dev->dev);
+	platform_msi_domain_free_irqs(&mc_bus_dev->dev);
 }
 EXPORT_SYMBOL_GPL(fsl_mc_cleanup_irq_pool);
 

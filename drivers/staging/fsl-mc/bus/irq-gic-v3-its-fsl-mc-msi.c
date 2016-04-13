@@ -25,7 +25,6 @@ static struct irq_chip its_msi_irq_chip = {
 	.irq_mask = irq_chip_mask_parent,
 	.irq_unmask = irq_chip_unmask_parent,
 	.irq_eoi = irq_chip_eoi_parent,
-	.irq_set_affinity = msi_domain_set_affinity
 };
 
 static int its_fsl_mc_msi_prepare(struct irq_domain *msi_domain,
@@ -86,7 +85,7 @@ int __init its_fsl_mc_msi_init(void)
 			continue;
 		}
 
-		mc_msi_domain = fsl_mc_msi_create_irq_domain(
+		mc_msi_domain = platform_msi_create_irq_domain(
 						 of_node_to_fwnode(np),
 						 &its_fsl_mc_msi_domain_info,
 						 parent);
@@ -113,7 +112,7 @@ void its_fsl_mc_msi_cleanup(void)
 	     np = of_find_matching_node(np, its_device_id)) {
 		struct irq_domain *mc_msi_domain = irq_find_matching_host(
 							np,
-							DOMAIN_BUS_FSL_MC_MSI);
+							DOMAIN_BUS_PLATFORM_MSI);
 
 		if (!of_property_read_bool(np, "msi-controller"))
 			continue;

@@ -41,6 +41,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
+#include <linux/msi.h>
 
 /**
  * Bit masks for a MC I/O object (struct fsl_mc_io) flags
@@ -107,6 +108,8 @@ int fsl_mc_io_set_dpmcp(struct fsl_mc_io *mc_io,
 			struct fsl_mc_device *dpmcp_dev);
 
 void fsl_mc_io_unset_dpmcp(struct fsl_mc_io *mc_io);
+void fsl_mc_msi_write_msg(struct msi_desc *msi_desc,
+			  struct msi_msg *msg);
 
 int mc_send_command(struct fsl_mc_io *mc_io, struct mc_command *cmd);
 
