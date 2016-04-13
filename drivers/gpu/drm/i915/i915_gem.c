@@ -3393,6 +3393,8 @@ static int __i915_vma_unbind(struct i915_vma *vma, bool wait)
 		ret = i915_gem_object_put_fence(obj);
 		if (ret)
 			return ret;
+
+		i915_vma_iounmap(vma);
 	}
 
 	trace_i915_vma_unbind(vma);

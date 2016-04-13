@@ -3626,3 +3626,28 @@ i915_ggtt_view_size(struct drm_i915_gem_object *obj,
 		return obj->base.size;
 	}
 }
+
+void *i915_vma_iomap(struct i915_vma *vma)
+{
+	if (WARN_ON(!vma->obj->map_and_fenceable))
+		return ERR_PTR(-ENODEV);
+
+	BUG_ON(!vma->is_ggtt);
+	BUG_ON((vma->bound & GLOBAL_BIND) == 0);
+
+	if (vma->iomap == NULL) {
+		struct i915_ggtt *ggtt =
+			container_of(vma->vm, struct i915_ggtt, base);
+		void *ptr;
+
+		ptr = io_mapping_map_wc(ggtt->mappable,
+					vma->node.start,
+					vma->node.size);
+		if (ptr == NULL)
+			return ERR_PTR(-ENOMEM);
+
+		vma->iomap = ptr;
+	}
+
+	return vma->iomap;
+}
