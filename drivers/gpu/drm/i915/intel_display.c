@@ -3204,17 +3204,12 @@ static bool intel_crtc_has_pending_flip(struct drm_crtc *crtc)
 	struct drm_device *dev = crtc->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
-	bool pending;
 
 	if (i915_reset_in_progress(&dev_priv->gpu_error) ||
 	    intel_crtc->reset_counter != atomic_read(&dev_priv->gpu_error.reset_counter))
 		return false;
 
-	spin_lock_irq(&dev->event_lock);
-	pending = to_intel_crtc(crtc)->flip_work != NULL;
-	spin_unlock_irq(&dev->event_lock);
-
-	return pending;
+	return !list_empty_careful(&to_intel_crtc(crtc)->flip_work);
 }
 
 static void intel_update_pipe_config(struct intel_crtc *crtc,
@@ -3790,7 +3785,7 @@ bool intel_has_pending_fb_unpin(struct drm_device *dev)
 		if (atomic_read(&crtc->unpin_work_count) == 0)
 			continue;
 
-		if (crtc->flip_work)
+		if (!list_empty_careful(&crtc->flip_work))
 			intel_wait_for_vblank(dev, crtc->pipe);
 
 		return true;
@@ -3799,14 +3794,11 @@ bool intel_has_pending_fb_unpin(struct drm_device *dev)
 	return false;
 }
 
-static void page_flip_completed(struct intel_crtc *intel_crtc)
+static void page_flip_completed(struct intel_crtc *intel_crtc, struct intel_flip_work *work)
 {
 	struct drm_i915_private *dev_priv = to_i915(intel_crtc->base.dev);
-	struct intel_flip_work *work = intel_crtc->flip_work;
 
-	/* ensure that the flip work is consistent wrt ->pending. */
-	smp_rmb();
-	intel_crtc->flip_work = NULL;
+	list_del_init(&work->head);
 
 	if (work->event)
 		drm_send_vblank_event(intel_crtc->base.dev,
@@ -3843,10 +3835,11 @@ static int intel_crtc_wait_for_pending_flips(struct drm_crtc *crtc)
 		struct intel_flip_work *work;
 
 		spin_lock_irq(&dev->event_lock);
-		work = intel_crtc->flip_work;
+		work = list_first_entry_or_null(&intel_crtc->flip_work,
+						struct intel_flip_work, head);
 		if (work && !is_mmio_work(work)) {
 			WARN_ONCE(1, "Removing stuck page flip\n");
-			page_flip_completed(intel_crtc);
+			page_flip_completed(intel_crtc, work);
 		}
 		spin_unlock_irq(&dev->event_lock);
 	}
@@ -6237,7 +6230,7 @@ static void intel_crtc_disable_noatomic(struct drm_crtc *crtc)
 		return;
 
 	if (to_intel_plane_state(crtc->primary->state)->visible) {
-		WARN_ON(intel_crtc->flip_work);
+		WARN_ON(list_empty(&intel_crtc->flip_work));
 
 		intel_pre_disable_primary_noatomic(crtc);
 
@@ -10815,17 +10808,24 @@ static void intel_crtc_destroy(struct drm_crtc *crtc)
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 	struct drm_device *dev = crtc->dev;
 	struct intel_flip_work *work;
+	struct list_head head;
+
+	INIT_LIST_HEAD(&head);
 
 	spin_lock_irq(&dev->event_lock);
-	work = intel_crtc->flip_work;
-	intel_crtc->flip_work = NULL;
-	spin_unlock_irq(&dev->event_lock);
+	while (!list_empty(&intel_crtc->flip_work)) {
+		work = list_first_entry(&intel_crtc->flip_work,
+					struct intel_flip_work, head);
+		list_del_init(&work->head);
+		spin_unlock_irq(&dev->event_lock);
 
-	if (work) {
 		cancel_work_sync(&work->mmio_work);
 		cancel_work_sync(&work->unpin_work);
 		kfree(work);
+
+		spin_lock_irq(&dev->event_lock);
 	}
+	spin_unlock_irq(&dev->event_lock);
 
 	drm_crtc_cleanup(crtc);
 
@@ -10867,7 +10867,8 @@ static bool g4x_flip_count_after_eq(u32 a, u32 b)
 	return !((a - b) & 0x80000000);
 }
 
-static bool page_flip_finished(struct intel_crtc *crtc)
+static bool page_flip_finished(struct intel_crtc *crtc,
+			       struct intel_flip_work *work)
 {
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -10908,9 +10909,9 @@ static bool page_flip_finished(struct intel_crtc *crtc)
 	 * anyway, we don't really care.
 	 */
 	return (I915_READ(DSPSURFLIVE(crtc->plane)) & ~0xfff) ==
-		crtc->flip_work->gtt_offset &&
+		work->gtt_offset &&
 		g4x_flip_count_after_eq(I915_READ(PIPE_FLIPCOUNT_G4X(crtc->pipe)),
-				    crtc->flip_work->flip_count);
+					work->flip_count);
 }
 
 static void do_intel_finish_page_flip(struct drm_device *dev,
@@ -10929,16 +10930,18 @@ static void do_intel_finish_page_flip(struct drm_device *dev,
 	 * lost pageflips) so needs the full irqsave spinlocks.
 	 */
 	spin_lock_irqsave(&dev->event_lock, flags);
-	work = intel_crtc->flip_work;
+	work = list_first_entry_or_null(&intel_crtc->flip_work,
+					struct intel_flip_work,
+					head);
 
 	if (work == NULL ||
 	    atomic_read(&work->pending) == INTEL_FLIP_INACTIVE ||
-	    !page_flip_finished(intel_crtc)) {
+	    !page_flip_finished(intel_crtc, work)) {
 		spin_unlock_irqrestore(&dev->event_lock, flags);
 		return;
 	}
 
-	page_flip_completed(intel_crtc);
+	page_flip_completed(intel_crtc, work);
 
 	spin_unlock_irqrestore(&dev->event_lock, flags);
 }
@@ -10973,7 +10976,7 @@ static int intel_gen2_queue_flip(struct drm_device *dev,
 				 struct drm_framebuffer *fb,
 				 struct drm_i915_gem_object *obj,
 				 struct drm_i915_gem_request *req,
-				 uint32_t flags)
+				 uint64_t gtt_offset)
 {
 	struct intel_engine_cs *engine = req->engine;
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
@@ -10996,7 +10999,7 @@ static int intel_gen2_queue_flip(struct drm_device *dev,
 	intel_ring_emit(engine, MI_DISPLAY_FLIP |
 			MI_DISPLAY_FLIP_PLANE(intel_crtc->plane));
 	intel_ring_emit(engine, fb->pitches[0]);
-	intel_ring_emit(engine, intel_crtc->flip_work->gtt_offset);
+	intel_ring_emit(engine, gtt_offset);
 	intel_ring_emit(engine, 0); /* aux display base address, unused */
 
 	return 0;
@@ -11007,7 +11010,7 @@ static int intel_gen3_queue_flip(struct drm_device *dev,
 				 struct drm_framebuffer *fb,
 				 struct drm_i915_gem_object *obj,
 				 struct drm_i915_gem_request *req,
-				 uint32_t flags)
+				 uint64_t gtt_offset)
 {
 	struct intel_engine_cs *engine = req->engine;
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
@@ -11027,7 +11030,7 @@ static int intel_gen3_queue_flip(struct drm_device *dev,
 	intel_ring_emit(engine, MI_DISPLAY_FLIP_I915 |
 			MI_DISPLAY_FLIP_PLANE(intel_crtc->plane));
 	intel_ring_emit(engine, fb->pitches[0]);
-	intel_ring_emit(engine, intel_crtc->flip_work->gtt_offset);
+	intel_ring_emit(engine, gtt_offset);
 	intel_ring_emit(engine, MI_NOOP);
 
 	return 0;
@@ -11038,7 +11041,7 @@ static int intel_gen4_queue_flip(struct drm_device *dev,
 				 struct drm_framebuffer *fb,
 				 struct drm_i915_gem_object *obj,
 				 struct drm_i915_gem_request *req,
-				 uint32_t flags)
+				 uint64_t gtt_offset)
 {
 	struct intel_engine_cs *engine = req->engine;
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -11057,8 +11060,7 @@ static int intel_gen4_queue_flip(struct drm_device *dev,
 	intel_ring_emit(engine, MI_DISPLAY_FLIP |
 			MI_DISPLAY_FLIP_PLANE(intel_crtc->plane));
 	intel_ring_emit(engine, fb->pitches[0]);
-	intel_ring_emit(engine, intel_crtc->flip_work->gtt_offset |
-			obj->tiling_mode);
+	intel_ring_emit(engine, gtt_offset | obj->tiling_mode);
 
 	/* XXX Enabling the panel-fitter across page-flip is so far
 	 * untested on non-native modes, so ignore it for now.
@@ -11076,7 +11078,7 @@ static int intel_gen6_queue_flip(struct drm_device *dev,
 				 struct drm_framebuffer *fb,
 				 struct drm_i915_gem_object *obj,
 				 struct drm_i915_gem_request *req,
-				 uint32_t flags)
+				 uint64_t gtt_offset)
 {
 	struct intel_engine_cs *engine = req->engine;
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -11091,7 +11093,7 @@ static int intel_gen6_queue_flip(struct drm_device *dev,
 	intel_ring_emit(engine, MI_DISPLAY_FLIP |
 			MI_DISPLAY_FLIP_PLANE(intel_crtc->plane));
 	intel_ring_emit(engine, fb->pitches[0] | obj->tiling_mode);
-	intel_ring_emit(engine, intel_crtc->flip_work->gtt_offset);
+	intel_ring_emit(engine, gtt_offset);
 
 	/* Contrary to the suggestions in the documentation,
 	 * "Enable Panel Fitter" does not seem to be required when page
@@ -11111,7 +11113,7 @@ static int intel_gen7_queue_flip(struct drm_device *dev,
 				 struct drm_framebuffer *fb,
 				 struct drm_i915_gem_object *obj,
 				 struct drm_i915_gem_request *req,
-				 uint32_t flags)
+				 uint64_t gtt_offset)
 {
 	struct intel_engine_cs *engine = req->engine;
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
@@ -11194,7 +11196,7 @@ static int intel_gen7_queue_flip(struct drm_device *dev,
 
 	intel_ring_emit(engine, MI_DISPLAY_FLIP_I915 | plane_bit);
 	intel_ring_emit(engine, (fb->pitches[0] | obj->tiling_mode));
-	intel_ring_emit(engine, intel_crtc->flip_work->gtt_offset);
+	intel_ring_emit(engine, gtt_offset);
 	intel_ring_emit(engine, (MI_NOOP));
 
 	return 0;
@@ -11262,17 +11264,17 @@ static int intel_default_queue_flip(struct drm_device *dev,
 				    struct drm_framebuffer *fb,
 				    struct drm_i915_gem_object *obj,
 				    struct drm_i915_gem_request *req,
-				    uint32_t flags)
+				    uint64_t gtt_offset)
 {
 	return -ENODEV;
 }
 
 static bool __intel_pageflip_stall_check(struct drm_device *dev,
-					 struct drm_crtc *crtc)
+					 struct drm_crtc *crtc,
+					 struct intel_flip_work *work)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
-	struct intel_flip_work *work = intel_crtc->flip_work;
 	u32 addr;
 	u32 pending;
 
@@ -11327,12 +11329,14 @@ void intel_check_page_flip(struct drm_device *dev, int pipe)
 		return;
 
 	spin_lock(&dev->event_lock);
-	work = intel_crtc->flip_work;
-	if (work != NULL && __intel_pageflip_stall_check(dev, crtc)) {
+	work = list_first_entry_or_null(&intel_crtc->flip_work,
+					struct intel_flip_work, head);
+
+	if (work != NULL && __intel_pageflip_stall_check(dev, crtc, work)) {
 		WARN_ONCE(!is_mmio_work(work),
 			  "Kicking stuck page flip: queued at %d, now %d\n",
 			 work->flip_queued_vblank, drm_vblank_count(dev, pipe));
-		page_flip_completed(intel_crtc);
+		page_flip_completed(intel_crtc, work);
 		work = NULL;
 	}
 	if (work != NULL && !is_mmio_work(work) &&
@@ -11398,13 +11402,18 @@ static int intel_crtc_page_flip(struct drm_crtc *crtc,
 
 	/* We borrow the event spin lock for protecting flip_work */
 	spin_lock_irq(&dev->event_lock);
-	if (intel_crtc->flip_work) {
+	if (!list_empty(&intel_crtc->flip_work)) {
+		struct intel_flip_work *old_work;
+
+		old_work = list_first_entry(&intel_crtc->flip_work,
+					    struct intel_flip_work, head);
+
 		/* Before declaring the flip queue wedged, check if
 		 * the hardware completed the operation behind our backs.
 		 */
-		if (__intel_pageflip_stall_check(dev, crtc)) {
+		if (__intel_pageflip_stall_check(dev, crtc, old_work)) {
 			DRM_DEBUG_DRIVER("flip queue: previous flip completed, continuing\n");
-			page_flip_completed(intel_crtc);
+			page_flip_completed(intel_crtc, old_work);
 		} else {
 			DRM_DEBUG_DRIVER("flip queue: crtc already busy\n");
 			spin_unlock_irq(&dev->event_lock);
@@ -11414,7 +11423,7 @@ static int intel_crtc_page_flip(struct drm_crtc *crtc,
 			return -EBUSY;
 		}
 	}
-	intel_crtc->flip_work = work;
+	list_add_tail(&work->head, &intel_crtc->flip_work);
 	spin_unlock_irq(&dev->event_lock);
 
 	if (atomic_read(&intel_crtc->unpin_work_count) >= 2)
@@ -11492,7 +11501,7 @@ static int intel_crtc_page_flip(struct drm_crtc *crtc,
 	} else {
 		i915_gem_request_assign(&work->flip_queued_req, request);
 		ret = dev_priv->display.queue_flip(dev, crtc, fb, obj, request,
-						   page_flip_flags);
+						   work->gtt_offset);
 		if (ret)
 			goto cleanup_unpin;
 
@@ -11528,7 +11537,7 @@ cleanup:
 	drm_framebuffer_unreference(work->old_fb);
 
 	spin_lock_irq(&dev->event_lock);
-	intel_crtc->flip_work = NULL;
+	list_del(&work->head);
 	spin_unlock_irq(&dev->event_lock);
 
 	drm_crtc_vblank_put(crtc);
@@ -14145,6 +14154,8 @@ static void intel_crtc_init(struct drm_device *dev, int pipe)
 	intel_crtc->config = crtc_state;
 	intel_crtc->base.state = &crtc_state->base;
 	crtc_state->base.crtc = &intel_crtc->base;
+
+	INIT_LIST_HEAD(&intel_crtc->flip_work);
 
 	/* initialize shared scalers */
 	if (INTEL_INFO(dev)->gen >= 9) {
