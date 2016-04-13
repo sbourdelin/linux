@@ -595,6 +595,7 @@ int nf_ct_frag6_gather(struct net *net, struct sk_buff *skb, u32 user)
 		pr_debug("Can't find and can't create new queue\n");
 		return -ENOMEM;
 	}
+	skb_orphan(skb);
 
 	spin_lock_bh(&fq->q.lock);
 
