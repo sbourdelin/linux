@@ -45,6 +45,7 @@
 #include <linux/platform_device.h>
 #include <linux/phy/phy.h>
 #include <linux/platform_data/s3c-hsotg.h>
+#include <linux/reset.h>
 
 #include <linux/usb/of.h>
 
@@ -337,6 +338,17 @@ static int dwc2_lowlevel_hw_init(struct dwc2_hsotg *hsotg)
 {
 	int i, ret;
 
+	hsotg->reset = devm_reset_control_get(hsotg->dev, "dwc2");
+	if (IS_ERR(hsotg->reset)) {
+		if (PTR_ERR(hsotg->reset) == -EPROBE_DEFER)
+			return -EPROBE_DEFER;
+		dev_dbg(hsotg->dev, "Could not get reset control.\n");
+		hsotg->reset = NULL;
+	}
+
+	if(hsotg->reset)
+		reset_control_deassert(hsotg->reset);
+
 	/* Set default UTMI width */
 	hsotg->phyif = GUSBCFG_PHYIF16;
 
@@ -433,6 +445,9 @@ static int dwc2_driver_remove(struct platform_device *dev)
 
 	if (hsotg->ll_hw_enabled)
 		dwc2_lowlevel_hw_disable(hsotg);
+
+	if (hsotg->reset)
+		reset_control_assert(hsotg->reset);
 
 	return 0;
 }
