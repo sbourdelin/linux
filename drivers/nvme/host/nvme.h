@@ -175,7 +175,7 @@ static inline u64 nvme_block_nr(struct nvme_ns *ns, sector_t sector)
 
 static inline unsigned nvme_map_len(struct request *rq)
 {
-	if (rq->cmd_flags & REQ_DISCARD)
+	if (rq->op == REQ_OP_DISCARD)
 		return sizeof(struct nvme_dsm_range);
 	else
 		return blk_rq_bytes(rq);
