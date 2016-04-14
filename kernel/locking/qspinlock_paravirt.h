@@ -51,6 +51,7 @@ struct pv_node {
 	struct mcs_spinlock	__res[3];
 
 	int			cpu;
+	int			prev_cpu;	/* Previous node cpu */
 	u8			state;
 };
 
@@ -156,8 +157,7 @@ static __always_inline int trylock_clear_pending(struct qspinlock *lock)
  * 256 (64-bit) or 512 (32-bit) to fully utilize a 4k page.
  *
  * Since we should not be holding locks from NMI context (very rare indeed) the
- * max load factor is 0.75, which is around the point where open addressing
- * breaks down.
+ * max load factor is 0.75.
  *
  */
 struct pv_hash_entry {
@@ -251,6 +251,31 @@ static struct pv_node *pv_unhash(struct qspinlock *lock)
 }
 
 /*
+ * Look up the given lock in the hash table
+ * Return the pv_node if found, NULL otherwise
+ */
+static struct pv_node *pv_lookup_hash(struct qspinlock *lock)
+{
+	unsigned long offset, hash = hash_ptr(lock, pv_lock_hash_bits);
+	struct pv_hash_entry *he;
+
+	for_each_hash_entry(he, offset, hash) {
+		struct qspinlock *l = READ_ONCE(he->lock);
+
+		if (l == lock)
+			return READ_ONCE(he->node);
+		/*
+		 * Presence of an empty slot signal the end of search. We
+		 * may miss the entry, but that will limit the amount of
+		 * time doing the search when the desired entry isn't there.
+		 */
+		else if (!l)
+			break;
+	}
+	return NULL;
+}
+
+/*
  * Return true if when it is time to check the previous node which is not
  * in a running state.
  */
@@ -275,6 +300,7 @@ static void pv_init_node(struct mcs_spinlock *node)
 
 	pn->cpu = smp_processor_id();
 	pn->state = vcpu_running;
+	pn->prev_cpu = -1;
 }
 
 /*
@@ -282,13 +308,16 @@ static void pv_init_node(struct mcs_spinlock *node)
  * pv_kick_node() is used to set _Q_SLOW_VAL and fill in hash table on its
  * behalf.
  */
-static void pv_wait_node(struct mcs_spinlock *node, struct mcs_spinlock *prev)
+static void pv_wait_node(struct qspinlock *lock, struct mcs_spinlock *node,
+			 struct mcs_spinlock *prev)
 {
 	struct pv_node *pn = (struct pv_node *)node;
 	struct pv_node *pp = (struct pv_node *)prev;
 	int waitcnt = 0;
 	int loop;
 	bool wait_early;
+
+	pn->prev_cpu = pp->cpu;	/* Save previous node vCPU */
 
 	/* waitcnt processing will be compiled out if !QUEUED_LOCK_STAT */
 	for (;; waitcnt++) {
@@ -314,10 +343,21 @@ static void pv_wait_node(struct mcs_spinlock *node, struct mcs_spinlock *prev)
 		smp_store_mb(pn->state, vcpu_halted);
 
 		if (!READ_ONCE(node->locked)) {
+			struct pv_node *hn;
+
 			qstat_inc(qstat_pv_wait_node, true);
 			qstat_inc(qstat_pv_wait_again, waitcnt);
 			qstat_inc(qstat_pv_wait_early, wait_early);
-			pv_wait(&pn->state, vcpu_halted);
+
+			/*
+			 * We try to locate the queue head pv_node by looking
+			 * up the hash table. If it is not found, use the
+			 * CPU in the previous node instead.
+			 */
+			hn = pv_lookup_hash(lock);
+			if (!hn)
+				hn = pn;
+			pv_wait(&pn->state, vcpu_halted, hn->prev_cpu);
 		}
 
 		/*
@@ -453,7 +493,15 @@ pv_wait_head_or_lock(struct qspinlock *lock, struct mcs_spinlock *node)
 		WRITE_ONCE(pn->state, vcpu_halted);
 		qstat_inc(qstat_pv_wait_head, true);
 		qstat_inc(qstat_pv_wait_again, waitcnt);
-		pv_wait(&l->locked, _Q_SLOW_VAL);
+
+		/*
+		 * Pass in the previous node vCPU nmber which is likely to be
+		 * the lock holder vCPU. This additional information may help
+		 * the hypervisor to give more resource to that vCPU so that
+		 * it can release the lock faster. With lock stealing,
+		 * however, that vCPU may not be the actual lock holder.
+		 */
+		pv_wait(&l->locked, _Q_SLOW_VAL, pn->prev_cpu);
 
 		/*
 		 * The unlocker should have freed the lock before kicking the
