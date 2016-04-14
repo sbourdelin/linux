@@ -97,7 +97,7 @@ static irqreturn_t arizona_irq_thread(int irq, void *data)
 {
 	struct arizona *arizona = data;
 	bool poll;
-	unsigned int val;
+	unsigned int val, nest_irq;
 	int ret;
 
 	ret = pm_runtime_get_sync(arizona->dev);
@@ -109,8 +109,23 @@ static irqreturn_t arizona_irq_thread(int irq, void *data)
 	do {
 		poll = false;
 
-		if (arizona->aod_irq_chip)
-			handle_nested_irq(irq_find_mapping(arizona->virq, 0));
+		if (arizona->aod_irq_chip) {
+			/*
+			 * Check the AOD status register to determine whether
+			 * the nested IRQ handler should be called.
+			 */
+			ret = regmap_read(arizona->regmap,
+					  ARIZONA_AOD_IRQ1,
+					  &val);
+			if (ret == 0 && val != 0) {
+				nest_irq = irq_find_mapping(arizona->virq, 0);
+				handle_nested_irq(nest_irq);
+			} else if (ret != 0) {
+				dev_err(arizona->dev,
+					"Failed to read AOD IRQ1 %d\n",
+					ret);
+			}
+		}
 
 		/*
 		 * Check if one of the main interrupts is asserted and only
