@@ -15,27 +15,6 @@
 #include <linux/rtmutex.h>
 
 /*
- * This is the control structure for tasks blocked on a rt_mutex,
- * which is allocated on the kernel stack on of the blocked task.
- *
- * @tree_entry:		pi node to enqueue into the mutex waiters tree
- * @pi_tree_entry:	pi node to enqueue into the mutex owner waiters tree
- * @task:		task reference to the blocked task
- */
-struct rt_mutex_waiter {
-	struct rb_node          tree_entry;
-	struct rb_node          pi_tree_entry;
-	struct task_struct	*task;
-	struct rt_mutex		*lock;
-#ifdef CONFIG_DEBUG_RT_MUTEXES
-	unsigned long		ip;
-	struct pid		*deadlock_task_pid;
-	struct rt_mutex		*deadlock_lock;
-#endif
-	int prio;
-};
-
-/*
  * Various helpers to access the waiters-tree:
  */
 static inline int rt_mutex_has_waiters(struct rt_mutex *lock)
