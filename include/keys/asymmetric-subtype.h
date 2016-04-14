@@ -17,6 +17,8 @@
 #include <linux/seq_file.h>
 #include <keys/asymmetric-type.h>
 
+struct kernel_pkey_query;
+struct kernel_pkey_params;
 struct public_key_signature;
 
 /*
@@ -33,6 +35,17 @@ struct asymmetric_key_subtype {
 
 	/* Destroy a key of this subtype */
 	void (*destroy)(void *payload_crypto, void *payload_auth);
+
+	int (*query)(const struct key *key, struct kernel_pkey_query *info);
+
+	int (*encrypt_blob)(struct kernel_pkey_params *params,
+			    const void *data, void *enc);
+
+	int (*decrypt_blob)(struct kernel_pkey_params *params,
+			    const void *enc, void *data);
+
+	int (*create_signature)(struct kernel_pkey_params *params,
+				const void *data, void *enc);
 
 	/* Verify the signature on a key of this subtype (optional) */
 	int (*verify_signature)(const struct key *key,

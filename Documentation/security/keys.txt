@@ -854,6 +854,111 @@ The keyctl syscall functions are:
      supported, error ENOKEY if the key could not be found, or error
      EACCES if the key is not readable by the caller.
 
+
+ (*) Query an asymmetric key.
+
+	long keyctl(KEYCTL_PKEY_QUERY, key_serial_t key,
+		    struct keyctl_pkey_query *info);
+
+     Get information about an asymmetric key.  The information is returned in
+     the keyctl_pkey_query struct:
+
+	__u32	supported_ops;
+
+     A bit mask of flags indicating which ops are supported.  This is
+     constructed from a bitwise-OR of:
+
+	KEYCTL_SUPPORTS_{ENCRYPT,DECRYPT,SIGN,VERIFY}
+
+	__u32	key_size;
+
+     The size in bits of the key.
+
+	__u16	max_data_size;
+	__u16	max_sig_size;
+	__u16	max_enc_size;
+	__u16	max_dec_size;
+
+     The maximum sizes in bytes of a blob of data to be signed, a signature
+     blob, a blob to be encrypted and a blob to be decypted.
+
+     If successful, 0 is returned.  If the key is not an asymmetric key,
+     EOPNOTSUPP is returned.
+
+
+ (*) Encrypt, decrypt, sign or verify a blob using an asymmetric key.
+
+	long keyctl(KEYCTL_PKEY_ENCRYPT,
+		    const struct keyctl_pkey_params *params,
+		    const char *info,
+		    const void *data,
+		    void *enc);
+
+	long keyctl(KEYCTL_PKEY_DECRYPT,
+		    const struct keyctl_pkey_params *params,
+		    const char *info,
+		    const void *enc,
+		    void *data);
+
+	long keyctl(KEYCTL_PKEY_SIGN,
+		    const struct keyctl_pkey_params *params,
+		    const char *info,
+		    const void *data,
+		    void *enc);
+
+	long keyctl(KEYCTL_PKEY_VERIFY,
+		    const struct keyctl_pkey_params *params,
+		    const char *info,
+		    const void *data,
+		    const void *enc);
+
+     Use an asymmetric key to perform a public-key cryptographic operation a
+     blob of data.  For encryption and verification, the asymmetric key may
+     only need the public parts to be available, but for decryption and signing
+     the private parts are required also.
+
+     The parameter block pointed to by params contains a number of integer
+     values:
+
+	__s32		key_id;
+	__s32		password_id;
+	__u32		data_len;
+	__u32		enc_len;
+
+     key_id is the ID of the asymmetric key to be used.  data_len indicates the
+     length of the data or buffer pointed to by data whilst enc_len indicates
+     the length of the data or buffer pointed to by enc.
+
+     If the key must be unlocked with a password before it can be used,
+     password_id should point to a logon-type key that holds this.
+
+     info is a string of key=value pairs that supply supplementary
+     information.  These include:
+
+	enc=<encoding>	The encoding of the encrypted/signature blob.  This can
+			be "pkcs1" for RSASSA-PKCS1-v1.5 or RSAES-PKCS1-v1.5;
+			"pss" for "RSASSA-PSS"; "oaep" for "RSAES-OAEP".  If
+			omitted or is "raw", the raw output of the encryption
+			function is specified.
+
+        hash=<algo>	If the data buffer contains the output of a hash
+			function and the encoding includes some indication of
+			which hash function was used, the hash function can be
+			specified with this, eg. "hash=sha256".
+
+     For encryption, data points to the data blob to be encrypted whilst enc
+     points to a buffer to hold the encrypted output.  Decryption is the mirror
+     image of this - and note that the arguments are reversed.
+
+     For signing and verifying, data holds the blob to be signed in both cases
+     (this is typically the output of a digest function).  When signing, enc
+     points to a buffer into which the signature will be written, whereas with
+     verification, enc points to the signature to be verified.
+
+     If successful, encrypt, decrypt and sign all return the amount of data
+     written into the output buffer.  Verification returns 0 on success.
+
+
 ===============
 KERNEL SERVICES
 ===============

@@ -1691,6 +1691,27 @@ SYSCALL_DEFINE5(keyctl, int, option, unsigned long, arg2, unsigned long, arg3,
 					 (char __user *) arg3,
 					 (size_t) arg4);
 
+	case KEYCTL_PKEY_QUERY:
+		return keyctl_pkey_query((key_serial_t)arg2,
+					 (struct keyctl_pkey_query *)arg3);
+
+	case KEYCTL_PKEY_ENCRYPT:
+	case KEYCTL_PKEY_DECRYPT:
+	case KEYCTL_PKEY_SIGN:
+		return keyctl_pkey_e_d_s(
+			option,
+			(const struct keyctl_pkey_params __user *)arg2,
+			(const char __user *)arg3,
+			(const void __user *)arg4,
+			(void __user *)arg5);
+
+	case KEYCTL_PKEY_VERIFY:
+		return keyctl_pkey_verify(
+			(const struct keyctl_pkey_params __user *)arg2,
+			(const char __user *)arg3,
+			(const void __user *)arg4,
+			(const void __user *)arg5);
+
 	default:
 		return -EOPNOTSUPP;
 	}
