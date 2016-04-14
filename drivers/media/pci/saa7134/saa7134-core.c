@@ -1046,7 +1046,7 @@ static int saa7134_initdev(struct pci_dev *pci_dev,
 	dev->media_dev = kzalloc(sizeof(*dev->media_dev), GFP_KERNEL);
 	if (!dev->media_dev) {
 		err = -ENOMEM;
-		goto fail0;
+		goto media_dev_alloc_fail;
 	}
 	media_device_pci_init(dev->media_dev, pci_dev, dev->name);
 	dev->v4l2_dev.mdev = dev->media_dev;
@@ -1309,6 +1309,7 @@ static int saa7134_initdev(struct pci_dev *pci_dev,
  fail0:
 #ifdef CONFIG_MEDIA_CONTROLLER
 	kfree(dev->media_dev);
+ media_dev_alloc_fail:
 #endif
 	kfree(dev);
 	return err;
