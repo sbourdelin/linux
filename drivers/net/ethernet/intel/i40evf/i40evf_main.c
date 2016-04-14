@@ -34,7 +34,7 @@ char i40evf_driver_name[] = "i40evf";
 static const char i40evf_driver_string[] =
 	"Intel(R) 40-10 Gigabit Virtual Function Network Driver";
 
-#define DRV_KERN "-k"
+#define DRV_VF_VERSION_DESC "-k"
 
 #define DRV_VERSION_MAJOR 1
 #define DRV_VERSION_MINOR 5
@@ -42,7 +42,7 @@ static const char i40evf_driver_string[] =
 #define DRV_VERSION __stringify(DRV_VERSION_MAJOR) "." \
 	     __stringify(DRV_VERSION_MINOR) "." \
 	     __stringify(DRV_VERSION_BUILD) \
-	     DRV_KERN
+			DRV_VF_VERSION_DESC
 const char i40evf_driver_version[] = DRV_VERSION;
 static const char i40evf_copyright[] =
 	"Copyright (c) 2013 - 2015 Intel Corporation.";
