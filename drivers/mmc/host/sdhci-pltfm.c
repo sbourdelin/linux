@@ -152,6 +152,11 @@ struct sdhci_host *sdhci_pltfm_init(struct platform_device *pdev,
 	}
 
 	host->irq = platform_get_irq(pdev, 0);
+	if (host->irq < 0) {
+		dev_err(&pdev->dev, "failed to get IRQ number");
+		ret = host->irq;
+		goto err_request;
+	}
 
 	if (!request_mem_region(iomem->start, resource_size(iomem),
 		mmc_hostname(host->mmc))) {
