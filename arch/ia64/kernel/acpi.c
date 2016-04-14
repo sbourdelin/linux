@@ -811,6 +811,7 @@ int acpi_map_cpu2node(acpi_handle handle, int cpu, int physid)
 #endif
 	return 0;
 }
+EXPORT_SYMBOL(acpi_map_cpu2node);
 
 int additional_cpus __initdata = -1;
 

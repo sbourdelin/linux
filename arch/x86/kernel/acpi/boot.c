@@ -696,7 +696,7 @@ static void __init acpi_set_irq_model_ioapic(void)
 #ifdef CONFIG_ACPI_HOTPLUG_CPU
 #include <acpi/processor.h>
 
-void acpi_map_cpu2node(acpi_handle handle, int cpu, int physid)
+int acpi_map_cpu2node(acpi_handle handle, int cpu, int physid)
 {
 #ifdef CONFIG_ACPI_NUMA
 	int nid;
@@ -707,7 +707,9 @@ void acpi_map_cpu2node(acpi_handle handle, int cpu, int physid)
 		numa_set_node(cpu, nid);
 	}
 #endif
+	return 0;
 }
+EXPORT_SYMBOL(acpi_map_cpu2node);
 
 int acpi_map_cpu(acpi_handle handle, phys_cpuid_t physid, int *pcpu)
 {

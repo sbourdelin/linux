@@ -262,7 +262,7 @@ int acpi_get_cpuid(acpi_handle handle, int type, u32 acpi_id)
 EXPORT_SYMBOL_GPL(acpi_get_cpuid);
 
 #ifdef CONFIG_ACPI_HOTPLUG_CPU
-static bool map_processor(acpi_handle handle, int *phys_id, int *cpuid)
+static bool map_processor(acpi_handle handle, phys_cpuid_t *phys_id, int *cpuid)
 {
 	int type;
 	u32 acpi_id;
@@ -307,13 +307,13 @@ static acpi_status __init
 set_processor_node_mapping(acpi_handle handle, u32 lvl, void *context,
 			   void **rv)
 {
-	u32 apic_id;
+	phys_cpuid_t phys_id;
 	int cpu_id;
 
-	if (!map_processor(handle, &apic_id, &cpu_id))
+	if (!map_processor(handle, &phys_id, &cpu_id))
 		return AE_ERROR;
 
-	acpi_map_cpu2node(handle, cpu_id, apic_id);
+	acpi_map_cpu2node(handle, cpu_id, phys_id);
 	return AE_OK;
 }
 
