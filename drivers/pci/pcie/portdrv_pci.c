@@ -17,6 +17,8 @@
 #include <linux/aer.h>
 #include <linux/dmi.h>
 #include <linux/pci-aspm.h>
+#include <linux/pci-acpi.h>
+#include <linux/acpi.h>
 
 #include "portdrv.h"
 #include "aer/aerdrv.h"
@@ -58,6 +60,10 @@ __setup("pcie_ports=", pcie_port_setup);
 
 /* global data */
 
+struct pcie_port_data {
+	bool runtime_pm_enabled;
+};
+
 /**
  * pcie_clear_root_pme_status - Clear root port PME interrupt status.
  * @dev: PCIe root port or event collector.
@@ -93,6 +99,78 @@ static int pcie_port_resume_noirq(struct device *dev)
 	return 0;
 }
 
+static int pcie_port_runtime_suspend(struct device *dev)
+{
+	return to_pci_dev(dev)->bridge_d3 ? 0 : -EBUSY;
+}
+
+static int pcie_port_runtime_resume(struct device *dev)
+{
+	return 0;
+}
+
+static int pcie_port_runtime_idle(struct device *dev)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	/*
+	 * Rely the PCI core has set bridge_d3 whenever it thinks the port
+	 * should be good to go to D3. Everything else, including moving
+	 * the port to D3, is handled by the PCI core.
+	 */
+	if (pdev->bridge_d3) {
+		pm_schedule_suspend(dev, 10);
+		return 0;
+	}
+	return -EBUSY;
+}
+
+#ifdef CONFIG_ACPI
+static bool pcie_port_uses_acpi_hotplug(struct pci_dev *pdev)
+{
+	const struct acpi_pci_root *root;
+	acpi_handle handle;
+
+	if (!pdev->is_hotplug_bridge)
+		return false;
+
+	handle = acpi_find_root_bridge_handle(pdev);
+	if (!handle)
+		return false;
+
+	root = acpi_pci_find_root(handle);
+	if (!root)
+		return false;
+
+	return !(root->osc_control_set & OSC_PCI_EXPRESS_NATIVE_HP_CONTROL);
+}
+#else
+static inline bool pcie_port_uses_acpi_hotplug(struct pci_dev *pdev)
+{
+	return false;
+}
+#endif
+
+static bool pcie_port_runtime_pm_possible(struct pci_dev *pdev)
+{
+	/*
+	 * Only enable runtime PM if the PCI core agrees that this port can
+	 * even go to D3.
+	 */
+	if (!pdev->bridge_d3)
+		return false;
+
+	/*
+	 * Prevent runtime PM if the port is using ACPI based hotplug.
+	 * Otherwise the BIOS hotplug SMI code might not be able to
+	 * enumerate devices behind this port properly (the port is powered
+	 * down preventing all config space accesses to the subordinate
+	 * devices). Native hotplug is expected to work with runtime PM
+	 * enabled.
+	 */
+	return !pcie_port_uses_acpi_hotplug(pdev);
+}
+
 static const struct dev_pm_ops pcie_portdrv_pm_ops = {
 	.suspend	= pcie_port_device_suspend,
 	.resume		= pcie_port_device_resume,
@@ -101,11 +179,19 @@ static const struct dev_pm_ops pcie_portdrv_pm_ops = {
 	.poweroff	= pcie_port_device_suspend,
 	.restore	= pcie_port_device_resume,
 	.resume_noirq	= pcie_port_resume_noirq,
+	.runtime_suspend = pcie_port_runtime_suspend,
+	.runtime_resume	= pcie_port_runtime_resume,
+	.runtime_idle	= pcie_port_runtime_idle,
 };
 
 #define PCIE_PORTDRV_PM_OPS	(&pcie_portdrv_pm_ops)
 
 #else /* !PM */
+
+static inline bool pcie_port_runtime_pm_possible(struct pci_dev *pdev)
+{
+	return false;
+}
 
 #define PCIE_PORTDRV_PM_OPS	NULL
 #endif /* !PM */
@@ -121,6 +207,7 @@ static const struct dev_pm_ops pcie_portdrv_pm_ops = {
 static int pcie_portdrv_probe(struct pci_dev *dev,
 					const struct pci_device_id *id)
 {
+	struct pcie_port_data *pdata;
 	int status;
 
 	if (!pci_is_pcie(dev) ||
@@ -134,11 +221,31 @@ static int pcie_portdrv_probe(struct pci_dev *dev,
 		return status;
 
 	pci_save_state(dev);
+
+	pdata = devm_kzalloc(&dev->dev, sizeof(*pdata), GFP_KERNEL);
+	if (!pdata)
+		return -ENOMEM;
+
+	pci_set_drvdata(dev, pdata);
+	if (pcie_port_runtime_pm_possible(dev)) {
+		pm_runtime_put_noidle(&dev->dev);
+		pm_runtime_allow(&dev->dev);
+
+		pdata->runtime_pm_enabled = true;
+	}
+
 	return 0;
 }
 
 static void pcie_portdrv_remove(struct pci_dev *dev)
 {
+	const struct pcie_port_data *pdata = pci_get_drvdata(dev);
+
+	if (pdata->runtime_pm_enabled) {
+		pm_runtime_forbid(&dev->dev);
+		pm_runtime_get_noresume(&dev->dev);
+	}
+
 	pcie_port_device_remove(dev);
 }
 
