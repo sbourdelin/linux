@@ -612,29 +612,36 @@ static noinline int check_leaf(struct btrfs_root *root,
 	return 0;
 }
 
-static int btree_readpage_end_io_hook(struct btrfs_io_bio *io_bio,
-				      u64 phy_offset, struct page *page,
-				      u64 start, u64 end, int mirror)
+int verify_extent_buffer_read(struct btrfs_io_bio *io_bio,
+			struct page *page,
+			u64 start, u64 end, int mirror)
 {
+	struct address_space *mapping = (io_bio->bio).bi_io_vec->bv_page->mapping;
+	struct extent_buffer_head *ebh;
+	struct extent_buffer *eb;
+	struct btrfs_root *root = BTRFS_I(mapping->host)->root;
+	struct btrfs_fs_info *fs_info = root->fs_info;
 	u64 found_start;
 	int found_level;
-	struct extent_buffer *eb;
-	struct btrfs_root *root = BTRFS_I(page->mapping->host)->root;
-	struct btrfs_fs_info *fs_info = root->fs_info;
-	int ret = 0;
 	int reads_done;
-
-	if (!page->private)
-		goto out;
+	int ret = 0;
 
 	eb = (struct extent_buffer *)page->private;
+	do {
+		if ((eb->start <= start) && (eb->start + eb->len - 1 > start))
+			break;
+	} while ((eb = eb->eb_next) != NULL);
+
+	ASSERT(eb);
+
+	ebh = eb_head(eb);
 
 	/* the pending IO might have been the only thing that kept this buffer
 	 * in memory.  Make sure we have a ref for all this other checks
 	 */
 	extent_buffer_get(eb);
 
-	reads_done = atomic_dec_and_test(&eb_head(eb)->io_bvecs);
+	reads_done = atomic_dec_and_test(&ebh->io_bvecs);
 	if (!reads_done)
 		goto err;
 
@@ -690,30 +697,13 @@ err:
 		btree_readahead_hook(fs_info, eb, eb->start, ret);
 
 	if (ret) {
-		/*
-		 * our io error hook is going to dec the io pages
-		 * again, we have to make sure it has something
-		 * to decrement
-		 */
 		atomic_inc(&eb_head(eb)->io_bvecs);
 		clear_extent_buffer_uptodate(eb);
 	}
+
 	free_extent_buffer(eb);
-out:
+
 	return ret;
-}
-
-static int btree_io_failed_hook(struct page *page, int failed_mirror)
-{
-	struct extent_buffer *eb;
-
-	eb = (struct extent_buffer *)page->private;
-	set_bit(EXTENT_BUFFER_READ_ERR, &eb->ebflags);
-	eb->read_mirror = failed_mirror;
-	atomic_dec(&eb_head(eb)->io_bvecs);
-	if (test_and_clear_bit(EXTENT_BUFFER_READAHEAD, &eb->ebflags))
-		btree_readahead_hook(eb_head(eb)->fs_info, eb, eb->start, -EIO);
-	return -EIO;	/* we fixed nothing */
 }
 
 static void end_workqueue_bio(struct bio *bio)
@@ -4505,8 +4495,6 @@ static int btrfs_cleanup_transaction(struct btrfs_root *root)
 }
 
 static const struct extent_io_ops btree_extent_io_ops = {
-	.readpage_end_io_hook = btree_readpage_end_io_hook,
-	.readpage_io_failed_hook = btree_io_failed_hook,
 	.submit_bio_hook = btree_submit_bio_hook,
 	/* note we're sharing with inode.c for the merge bio hook */
 	.merge_bio_hook = btrfs_merge_bio_hook,
