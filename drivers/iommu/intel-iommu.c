@@ -442,10 +442,11 @@ struct dmar_rmrr_unit {
 
 struct dmar_atsr_unit {
 	struct list_head list;		/* list of ATSR units */
-	struct acpi_dmar_header *hdr;	/* ACPI header */
 	struct dmar_dev_scope *devices;	/* target devices */
 	int devices_cnt;		/* target device count */
 	u8 include_all:1;		/* include all ports */
+	struct acpi_dmar_atsr atsr[0];	/* Root Port ATS Capability
+					   Reporting Structure */
 };
 
 static LIST_HEAD(dmar_atsr_units);
@@ -4089,7 +4090,7 @@ static struct dmar_atsr_unit *dmar_find_atsr(struct acpi_dmar_atsr *atsr)
 	struct acpi_dmar_atsr *tmp;
 
 	list_for_each_entry_rcu(atsru, &dmar_atsr_units, list) {
-		tmp = (struct acpi_dmar_atsr *)atsru->hdr;
+		tmp = atsru->atsr;
 		if (atsr->segment != tmp->segment)
 			continue;
 		if (atsr->header.length != tmp->header.length)
@@ -4109,7 +4110,7 @@ int dmar_parse_one_atsr(struct acpi_dmar_header *hdr, void *arg)
 	if (system_state != SYSTEM_BOOTING && !intel_iommu_enabled)
 		return 0;
 
-	atsr = container_of(hdr, struct acpi_dmar_atsr, header);
+	atsr = (struct acpi_dmar_atsr *)hdr;
 	atsru = dmar_find_atsr(atsr);
 	if (atsru)
 		return 0;
@@ -4123,8 +4124,7 @@ int dmar_parse_one_atsr(struct acpi_dmar_header *hdr, void *arg)
 	 * copy the memory content because the memory buffer will be freed
 	 * on return.
 	 */
-	atsru->hdr = (void *)(atsru + 1);
-	memcpy(atsru->hdr, hdr, hdr->length);
+	memcpy(atsru->atsr, hdr, hdr->length);
 	atsru->include_all = atsr->flags & 0x1;
 	if (!atsru->include_all) {
 		atsru->devices = dmar_alloc_dev_scope((void *)(atsr + 1),
@@ -4152,7 +4152,7 @@ int dmar_release_one_atsr(struct acpi_dmar_header *hdr, void *arg)
 	struct acpi_dmar_atsr *atsr;
 	struct dmar_atsr_unit *atsru;
 
-	atsr = container_of(hdr, struct acpi_dmar_atsr, header);
+	atsr = (struct acpi_dmar_atsr *)hdr;
 	atsru = dmar_find_atsr(atsr);
 	if (atsru) {
 		list_del_rcu(&atsru->list);
@@ -4170,7 +4170,7 @@ int dmar_check_one_atsr(struct acpi_dmar_header *hdr, void *arg)
 	struct acpi_dmar_atsr *atsr;
 	struct dmar_atsr_unit *atsru;
 
-	atsr = container_of(hdr, struct acpi_dmar_atsr, header);
+	atsr = (struct acpi_dmar_atsr *)hdr;
 	atsru = dmar_find_atsr(atsr);
 	if (!atsru)
 		return 0;
@@ -4328,7 +4328,7 @@ int dmar_find_matched_atsr_unit(struct pci_dev *dev)
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(atsru, &dmar_atsr_units, list) {
-		atsr = container_of(atsru->hdr, struct acpi_dmar_atsr, header);
+		atsr = atsru->atsr;
 		if (atsr->segment != pci_domain_nr(dev->bus))
 			continue;
 
@@ -4377,7 +4377,7 @@ int dmar_iommu_notify_scope_dev(struct dmar_pci_notify_info *info)
 		if (atsru->include_all)
 			continue;
 
-		atsr = container_of(atsru->hdr, struct acpi_dmar_atsr, header);
+		atsr = atsru->atsr;
 		if (info->event == BUS_NOTIFY_ADD_DEVICE) {
 			ret = dmar_insert_dev_scope(info, (void *)(atsr + 1),
 					(void *)atsr + atsr->header.length,

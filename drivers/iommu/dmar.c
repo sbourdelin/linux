@@ -292,8 +292,7 @@ static int dmar_pci_bus_add_dev(struct dmar_pci_notify_info *info)
 		if (dmaru->include_all)
 			continue;
 
-		drhd = container_of(dmaru->hdr,
-				    struct acpi_dmar_hardware_unit, header);
+		drhd = dmaru->drhd;
 		ret = dmar_insert_dev_scope(info, (void *)(drhd + 1),
 				((void *)drhd) + drhd->header.length,
 				dmaru->segment,
@@ -391,8 +390,7 @@ static int dmar_parse_one_drhd(struct acpi_dmar_header *header, void *arg)
 	 * If header is allocated from slab by ACPI _DSM method, we need to
 	 * copy the content because the memory buffer will be freed on return.
 	 */
-	dmaru->hdr = (void *)(dmaru + 1);
-	memcpy(dmaru->hdr, header, header->length);
+	memcpy(dmaru->drhd, drhd, drhd->header.length);
 	dmaru->reg_base_addr = drhd->address;
 	dmaru->segment = drhd->segment;
 	dmaru->include_all = drhd->flags & 0x1; /* BIT0: INCLUDE_ALL */
@@ -530,8 +528,7 @@ static int __init dmar_table_detect(void)
 
 	/* if we could find DMAR table, then there are DMAR devices */
 	status = acpi_get_table_with_size(ACPI_SIG_DMAR, 0,
-				(struct acpi_table_header **)&dmar_tbl,
-				&dmar_tbl_size);
+				&dmar_tbl, &dmar_tbl_size);
 
 	if (ACPI_SUCCESS(status) && !dmar_tbl) {
 		pr_warn("Unable to map DMAR\n");
@@ -664,9 +661,7 @@ dmar_find_matched_drhd_unit(struct pci_dev *dev)
 
 	rcu_read_lock();
 	for_each_drhd_unit(dmaru) {
-		drhd = container_of(dmaru->hdr,
-				    struct acpi_dmar_hardware_unit,
-				    header);
+		drhd = dmaru->drhd;
 
 		if (dmaru->include_all &&
 		    drhd->segment == pci_domain_nr(dev->bus))
@@ -694,9 +689,7 @@ static void __init dmar_acpi_insert_dev_scope(u8 device_number,
 	struct acpi_dmar_pci_path *path;
 
 	for_each_drhd_unit(dmaru) {
-		drhd = container_of(dmaru->hdr,
-				    struct acpi_dmar_hardware_unit,
-				    header);
+		drhd = dmaru->drhd;
 
 		for (scope = (void *)(drhd + 1);
 		     (unsigned long)scope < ((unsigned long)drhd) + drhd->header.length;
