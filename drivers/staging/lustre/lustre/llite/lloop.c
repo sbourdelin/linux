@@ -302,19 +302,20 @@ static unsigned int loop_get_bio(struct lloop_device *lo, struct bio **req)
 	}
 
 	/* TODO: need to split the bio, too bad. */
-	LASSERT(first->bi_vcnt <= LLOOP_MAX_SEGMENTS);
+	LASSERT(bio_pages(first) <= LLOOP_MAX_SEGMENTS);
 
 	rw = first->bi_rw;
 	bio = &lo->lo_bio;
 	while (*bio && (*bio)->bi_rw == rw) {
+		unsigned curr_cnt = bio_pages(*bio);
 		CDEBUG(D_INFO, "bio sector %llu size %u count %u vcnt%u\n",
 		       (unsigned long long)(*bio)->bi_iter.bi_sector,
 		       (*bio)->bi_iter.bi_size,
-		       page_count, (*bio)->bi_vcnt);
-		if (page_count + (*bio)->bi_vcnt > LLOOP_MAX_SEGMENTS)
+		       page_count, curr_cnt);
+		if (page_count + curr_cnt > LLOOP_MAX_SEGMENTS)
 			break;
 
-		page_count += (*bio)->bi_vcnt;
+		page_count += curr_cnt;
 		count++;
 		bio = &(*bio)->bi_next;
 	}
