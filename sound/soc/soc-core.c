@@ -34,6 +34,7 @@
 #include <linux/ctype.h>
 #include <linux/slab.h>
 #include <linux/of.h>
+#include <linux/of_graph.h>
 #include <sound/core.h>
 #include <sound/jack.h>
 #include <sound/pcm.h>
@@ -3838,6 +3839,47 @@ static int snd_soc_get_dai_name(struct of_phandle_args *args,
 	mutex_unlock(&client_mutex);
 	return ret;
 }
+
+int of_parse_snd_soc_connection_with_args(const struct device_node *np,
+					  struct of_phandle_args *out_args)
+{
+	int ret;
+
+	ret = of_parse_phandle_with_args(np, "sound-dai",
+					 "#sound-dai-cells", 0, out_args);
+	if (ret) {
+		struct device_node *p_node = NULL;
+		struct device_node *ep_node = NULL;
+		struct of_endpoint ep;
+
+		/* try graph base parse */
+		p_node = of_graph_get_remote_port_parent(np);
+		if (!p_node)
+			return -EINVAL;
+
+		ep_node = of_graph_get_remote_port(np);
+		if (!p_node) {
+			ret = -EINVAL;
+			goto graph_err_parent;
+		}
+
+		ret = of_graph_parse_endpoint(ep_node, &ep);
+		if (ret < 0)
+			goto graph_err_endpoint;
+
+		out_args->np		= p_node;
+		out_args->args_count	= (1 != of_graph_get_endpoint_count(p_node));
+		out_args->args[0]	= ep.port;
+
+graph_err_endpoint:
+		of_node_put(ep_node);
+graph_err_parent:
+		of_node_put(p_node);
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(of_parse_snd_soc_connection_with_args);
 
 int snd_soc_of_get_dai_name(struct device_node *of_node,
 			    const char **dai_name)
