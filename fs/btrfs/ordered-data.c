@@ -190,11 +190,26 @@ static int __btrfs_add_ordered_extent(struct inode *inode, u64 file_offset,
 	struct btrfs_ordered_inode_tree *tree;
 	struct rb_node *node;
 	struct btrfs_ordered_extent *entry;
+	u64 nr_longs;
+	u64 nr_blks;
 
 	tree = &BTRFS_I(inode)->ordered_tree;
 	entry = kmem_cache_zalloc(btrfs_ordered_extent_cache, GFP_NOFS);
 	if (!entry)
 		return -ENOMEM;
+
+	nr_blks = BTRFS_BYTES_TO_BLKS(root->fs_info, len);
+	nr_longs = BITS_TO_LONGS(nr_blks);
+	if (nr_longs == 1) {
+		entry->blocks_done = &entry->blocks_bitmap;
+	} else {
+		entry->blocks_done = kzalloc(nr_longs * sizeof(unsigned long),
+					GFP_NOFS);
+		if (!entry->blocks_done) {
+			kmem_cache_free(btrfs_ordered_extent_cache, entry);
+			return -ENOMEM;
+		}
+	}
 
 	entry->file_offset = file_offset;
 	entry->start = start;
@@ -577,6 +592,10 @@ void btrfs_put_ordered_extent(struct btrfs_ordered_extent *entry)
 			list_del(&sum->list);
 			kfree(sum);
 		}
+
+		if (entry->blocks_done != &entry->blocks_bitmap)
+			kfree(entry->blocks_done);
+
 		kmem_cache_free(btrfs_ordered_extent_cache, entry);
 	}
 }
