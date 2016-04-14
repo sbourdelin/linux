@@ -2856,10 +2856,8 @@ static int i40e_configure_rx_ring(struct i40e_ring *ring)
 	memset(&rx_ctx, 0, sizeof(rx_ctx));
 
 	ring->rx_buf_len = vsi->rx_buf_len;
-	ring->rx_hdr_len = vsi->rx_hdr_len;
 
 	rx_ctx.dbuff = ring->rx_buf_len >> I40E_RXQ_CTX_DBUFF_SHIFT;
-	rx_ctx.hbuff = ring->rx_hdr_len >> I40E_RXQ_CTX_HBUFF_SHIFT;
 
 	rx_ctx.base = (ring->dma / 128);
 	rx_ctx.qlen = ring->count;
@@ -2872,18 +2870,9 @@ static int i40e_configure_rx_ring(struct i40e_ring *ring)
 	}
 
 	rx_ctx.dtype = vsi->dtype;
-	if (vsi->dtype) {
-		set_ring_ps_enabled(ring);
-		rx_ctx.hsplit_0 = I40E_RX_SPLIT_L2      |
-				  I40E_RX_SPLIT_IP      |
-				  I40E_RX_SPLIT_TCP_UDP |
-				  I40E_RX_SPLIT_SCTP;
-	} else {
-		rx_ctx.hsplit_0 = 0;
-	}
+	rx_ctx.hsplit_0 = 0;
 
-	rx_ctx.rxmax = min_t(u16, vsi->max_frame,
-				  (chain_len * ring->rx_buf_len));
+	rx_ctx.rxmax = min_t(u16, vsi->max_frame, chain_len * ring->rx_buf_len);
 	if (hw->revision_id == 0)
 		rx_ctx.lrxqthresh = 0;
 	else
@@ -2920,12 +2909,7 @@ static int i40e_configure_rx_ring(struct i40e_ring *ring)
 	ring->tail = hw->hw_addr + I40E_QRX_TAIL(pf_q);
 	writel(0, ring->tail);
 
-	if (ring_is_ps_enabled(ring)) {
-		i40e_alloc_rx_headers(ring);
-		i40e_alloc_rx_buffers_ps(ring, I40E_DESC_UNUSED(ring));
-	} else {
-		i40e_alloc_rx_buffers_1buf(ring, I40E_DESC_UNUSED(ring));
-	}
+	i40e_alloc_rx_buffers(ring, I40E_DESC_UNUSED(ring));
 
 	return 0;
 }
@@ -2964,31 +2948,13 @@ static int i40e_vsi_configure_rx(struct i40e_vsi *vsi)
 	else
 		vsi->max_frame = I40E_RXBUFFER_2048;
 
-	/* figure out correct receive buffer length */
-	switch (vsi->back->flags & (I40E_FLAG_RX_1BUF_ENABLED |
-				    I40E_FLAG_RX_PS_ENABLED)) {
-	case I40E_FLAG_RX_1BUF_ENABLED:
-		vsi->rx_hdr_len = 0;
-		vsi->rx_buf_len = vsi->max_frame;
-		vsi->dtype = I40E_RX_DTYPE_NO_SPLIT;
-		break;
-	case I40E_FLAG_RX_PS_ENABLED:
-		vsi->rx_hdr_len = I40E_RX_HDR_SIZE;
-		vsi->rx_buf_len = I40E_RXBUFFER_2048;
-		vsi->dtype = I40E_RX_DTYPE_HEADER_SPLIT;
-		break;
-	default:
-		vsi->rx_hdr_len = I40E_RX_HDR_SIZE;
-		vsi->rx_buf_len = I40E_RXBUFFER_2048;
-		vsi->dtype = I40E_RX_DTYPE_SPLIT_ALWAYS;
-		break;
-	}
+	vsi->rx_buf_len = I40E_RXBUFFER_2048;
+	vsi->dtype = I40E_RX_DTYPE_NO_SPLIT;
 
 #ifdef I40E_FCOE
 	/* setup rx buffer for FCoE */
 	if ((vsi->type == I40E_VSI_FCOE) &&
 	    (vsi->back->flags & I40E_FLAG_FCOE_ENABLED)) {
-		vsi->rx_hdr_len = 0;
 		vsi->rx_buf_len = I40E_RXBUFFER_3072;
 		vsi->max_frame = I40E_RXBUFFER_3072;
 		vsi->dtype = I40E_RX_DTYPE_NO_SPLIT;
@@ -2996,8 +2962,6 @@ static int i40e_vsi_configure_rx(struct i40e_vsi *vsi)
 
 #endif /* I40E_FCOE */
 	/* round up for the chip's needs */
-	vsi->rx_hdr_len = ALIGN(vsi->rx_hdr_len,
-				BIT_ULL(I40E_RXQ_CTX_HBUFF_SHIFT));
 	vsi->rx_buf_len = ALIGN(vsi->rx_buf_len,
 				BIT_ULL(I40E_RXQ_CTX_DBUFF_SHIFT));
 
@@ -8461,11 +8425,6 @@ static int i40e_sw_init(struct i40e_pf *pf)
 		    I40E_FLAG_MSI_ENABLED     |
 		    I40E_FLAG_MSIX_ENABLED;
 
-	if (iommu_present(&pci_bus_type))
-		pf->flags |= I40E_FLAG_RX_PS_ENABLED;
-	else
-		pf->flags |= I40E_FLAG_RX_1BUF_ENABLED;
-
 	/* Set default ITR */
 	pf->rx_itr_default = I40E_ITR_DYNAMIC | I40E_ITR_RX_DEF;
 	pf->tx_itr_default = I40E_ITR_DYNAMIC | I40E_ITR_TX_DEF;
@@ -10691,11 +10650,9 @@ static void i40e_print_features(struct i40e_pf *pf)
 #ifdef CONFIG_PCI_IOV
 	i += snprintf(&buf[i], REMAIN(i), " VFs: %d", pf->num_req_vfs);
 #endif
-	i += snprintf(&buf[i], REMAIN(i), " VSIs: %d QP: %d RX: %s",
+	i += snprintf(&buf[i], REMAIN(i), " VSIs: %d QP: %d",
 		      pf->hw.func_caps.num_vsis,
-		      pf->vsi[pf->lan_vsi]->num_queue_pairs,
-		      pf->flags & I40E_FLAG_RX_PS_ENABLED ? "PS" : "1BUF");
-
+		      pf->vsi[pf->lan_vsi]->num_queue_pairs);
 	if (pf->flags & I40E_FLAG_RSS_ENABLED)
 		i += snprintf(&buf[i], REMAIN(i), " RSS");
 	if (pf->flags & I40E_FLAG_FD_ATR_ENABLED)

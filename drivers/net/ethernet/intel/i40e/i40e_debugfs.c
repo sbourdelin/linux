@@ -268,13 +268,13 @@ static void i40e_dbg_dump_vsi_seid(struct i40e_pf *pf, int seid)
 			 rx_ring->queue_index,
 			 rx_ring->reg_idx);
 		dev_info(&pf->pdev->dev,
-			 "    rx_rings[%i]: rx_hdr_len = %d, rx_buf_len = %d, dtype = %d\n",
-			 i, rx_ring->rx_hdr_len,
+			 "    rx_rings[%i]: rx_buf_len = %d, dtype = %d\n",
+			 i,
 			 rx_ring->rx_buf_len,
 			 rx_ring->dtype);
 		dev_info(&pf->pdev->dev,
-			 "    rx_rings[%i]: hsplit = %d, next_to_use = %d, next_to_clean = %d, ring_active = %i\n",
-			 i, ring_is_ps_enabled(rx_ring),
+			 "    rx_rings[%i]: next_to_use = %d, next_to_clean = %d, ring_active = %i\n",
+			 i,
 			 rx_ring->next_to_use,
 			 rx_ring->next_to_clean,
 			 rx_ring->ring_active);
@@ -365,8 +365,8 @@ static void i40e_dbg_dump_vsi_seid(struct i40e_pf *pf, int seid)
 		 "    work_limit = %d\n",
 		 vsi->work_limit);
 	dev_info(&pf->pdev->dev,
-		 "    max_frame = %d, rx_hdr_len = %d, rx_buf_len = %d dtype = %d\n",
-		 vsi->max_frame, vsi->rx_hdr_len, vsi->rx_buf_len, vsi->dtype);
+		 "    max_frame = %d, rx_buf_len = %d dtype = %d\n",
+		 vsi->max_frame, vsi->rx_buf_len, vsi->dtype);
 	dev_info(&pf->pdev->dev,
 		 "    num_q_vectors = %i, base_vector = %i\n",
 		 vsi->num_q_vectors, vsi->base_vector);
