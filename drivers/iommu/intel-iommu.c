@@ -4071,7 +4071,7 @@ int __init dmar_parse_one_rmrr(struct acpi_dmar_header *header, void *arg)
 	rmrr = (struct acpi_dmar_reserved_memory *)header;
 	rmrru->base_address = rmrr->base_address;
 	rmrru->end_address = rmrr->end_address;
-	rmrru->devices = dmar_alloc_dev_scope((void *)(rmrr + 1),
+	rmrru->devices = dmar_alloc_dev_scope((void *)(rmrr->dev_scope),
 				((void *)rmrr) + rmrr->header.length,
 				&rmrru->devices_cnt);
 	if (rmrru->devices_cnt && rmrru->devices == NULL) {
@@ -4127,7 +4127,7 @@ int dmar_parse_one_atsr(struct acpi_dmar_header *hdr, void *arg)
 	memcpy(atsru->atsr, hdr, hdr->length);
 	atsru->include_all = atsr->flags & 0x1;
 	if (!atsru->include_all) {
-		atsru->devices = dmar_alloc_dev_scope((void *)(atsr + 1),
+		atsru->devices = dmar_alloc_dev_scope((void *)(atsr->dev_scope),
 				(void *)atsr + atsr->header.length,
 				&atsru->devices_cnt);
 		if (atsru->devices_cnt && atsru->devices == NULL) {
@@ -4361,7 +4361,7 @@ int dmar_iommu_notify_scope_dev(struct dmar_pci_notify_info *info)
 		rmrr = container_of(rmrru->hdr,
 				    struct acpi_dmar_reserved_memory, header);
 		if (info->event == BUS_NOTIFY_ADD_DEVICE) {
-			ret = dmar_insert_dev_scope(info, (void *)(rmrr + 1),
+			ret = dmar_insert_dev_scope(info, (void *)(rmrr->dev_scope),
 				((void *)rmrr) + rmrr->header.length,
 				rmrr->segment, rmrru->devices,
 				rmrru->devices_cnt);
@@ -4379,7 +4379,7 @@ int dmar_iommu_notify_scope_dev(struct dmar_pci_notify_info *info)
 
 		atsr = atsru->atsr;
 		if (info->event == BUS_NOTIFY_ADD_DEVICE) {
-			ret = dmar_insert_dev_scope(info, (void *)(atsr + 1),
+			ret = dmar_insert_dev_scope(info, (void *)(atsr->dev_scope),
 					(void *)atsr + atsr->header.length,
 					atsr->segment, atsru->devices,
 					atsru->devices_cnt);
