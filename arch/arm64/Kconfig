@@ -521,6 +521,7 @@ config CPU_BIG_ENDIAN
 
 config SCHED_MC
 	bool "Multi-core scheduler support"
+	depends on SMP
 	help
 	  Multi-core scheduler support improves the CPU scheduler's decision
 	  making when dealing with multi-core CPU chips at a cost of slightly
@@ -528,6 +529,7 @@ config SCHED_MC
 
 config SCHED_SMT
 	bool "SMT scheduler support"
+	depends on SMP
 	help
 	  Improves the CPU scheduler's decision making when dealing with
 	  MultiThreading at a cost of slightly increased overhead in some
