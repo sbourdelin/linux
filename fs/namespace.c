@@ -1562,6 +1562,7 @@ void __detach_mounts(struct dentry *dentry)
 		goto out_unlock;
 
 	lock_mount_hash();
+	event++;
 	while (!hlist_empty(&mp->m_list)) {
 		mnt = hlist_entry(mp->m_list.first, struct mount, mnt_mp_list);
 		if (mnt->mnt.mnt_flags & MNT_UMOUNT) {
@@ -1576,7 +1577,7 @@ out_unlock:
 	namespace_unlock();
 }
 
-/* 
+/*
  * Is the caller allowed to modify his namespace?
  */
 static inline bool may_mount(void)
@@ -1765,6 +1766,7 @@ void drop_collected_mounts(struct vfsmount *mnt)
 {
 	namespace_lock();
 	lock_mount_hash();
+	event++;
 	umount_tree(real_mount(mnt), UMOUNT_SYNC);
 	unlock_mount_hash();
 	namespace_unlock();
