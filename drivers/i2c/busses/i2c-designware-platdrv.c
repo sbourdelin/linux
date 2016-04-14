@@ -33,6 +33,7 @@
 #include <linux/err.h>
 #include <linux/interrupt.h>
 #include <linux/of.h>
+#include <linux/of_gpio.h>
 #include <linux/platform_device.h>
 #include <linux/pm.h>
 #include <linux/pm_runtime.h>
@@ -148,6 +149,49 @@ static int i2c_dw_plat_prepare_clk(struct dw_i2c_dev *i_dev, bool prepare)
 	return 0;
 }
 
+static void i2c_dw_plat_prepare_recovery(struct i2c_adapter *adap)
+{
+	struct dw_i2c_dev *dev = i2c_get_adapdata(adap);
+
+	pinctrl_select_state(dev->pinctrl, dev->pinctrl_pins_gpio);
+}
+
+static void i2c_dw_plat_unprepare_recovery(struct i2c_adapter *adap)
+{
+	struct dw_i2c_dev *dev = i2c_get_adapdata(adap);
+
+	pinctrl_select_state(dev->pinctrl, dev->pinctrl_pins_default);
+}
+
+static void i2c_dw_plat_init_recovery_info(struct dw_i2c_dev *dev,
+					   struct platform_device *pdev)
+{
+	struct i2c_bus_recovery_info *rinfo = &dev->rinfo;
+
+	dev->pinctrl_pins_default = pinctrl_lookup_state(dev->pinctrl,
+			PINCTRL_STATE_DEFAULT);
+	dev->pinctrl_pins_gpio = pinctrl_lookup_state(dev->pinctrl,
+			"gpio");
+	rinfo->sda_gpio = of_get_named_gpio(pdev->dev.of_node, "sda-gpios", 0);
+	rinfo->scl_gpio = of_get_named_gpio(pdev->dev.of_node, "scl-gpios", 0);
+
+	if (!gpio_is_valid(rinfo->sda_gpio) ||
+	    !gpio_is_valid(rinfo->scl_gpio) ||
+	    IS_ERR(dev->pinctrl_pins_default) ||
+	    IS_ERR(dev->pinctrl_pins_gpio)) {
+		dev_dbg(&pdev->dev, "recovery information incomplete\n");
+		return;
+	}
+
+	dev_dbg(&pdev->dev, "using scl-gpio %d and sda-gpio %d for recovery\n",
+		rinfo->sda_gpio, rinfo->scl_gpio);
+
+	rinfo->prepare_recovery = i2c_dw_plat_prepare_recovery;
+	rinfo->unprepare_recovery = i2c_dw_plat_unprepare_recovery;
+	rinfo->recover_bus = i2c_generic_gpio_recovery;
+	dev->adapter.bus_recovery_info = rinfo;
+}
+
 static int dw_i2c_plat_probe(struct platform_device *pdev)
 {
 	struct dw_i2c_platform_data *pdata = dev_get_platdata(&pdev->dev);
@@ -164,6 +208,12 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 	dev = devm_kzalloc(&pdev->dev, sizeof(struct dw_i2c_dev), GFP_KERNEL);
 	if (!dev)
 		return -ENOMEM;
+
+	dev->pinctrl = devm_pinctrl_get(&pdev->dev);
+	if (IS_ERR(dev->pinctrl))
+		return PTR_ERR(dev->pinctrl);
+
+	i2c_dw_plat_init_recovery_info(dev, pdev);
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	dev->base = devm_ioremap_resource(&pdev->dev, mem);

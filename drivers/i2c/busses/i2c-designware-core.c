@@ -399,7 +399,10 @@ static int i2c_dw_wait_bus_not_busy(struct dw_i2c_dev *dev)
 	while (dw_readl(dev, DW_IC_STATUS) & DW_IC_STATUS_ACTIVITY) {
 		if (timeout <= 0) {
 			dev_warn(dev->dev, "timeout waiting for bus ready\n");
-			return -ETIMEDOUT;
+			i2c_recover_bus(&dev->adapter);
+			if (dw_readl(dev, DW_IC_STATUS)
+					& DW_IC_STATUS_ACTIVITY)
+				return -ETIMEDOUT;
 		}
 		timeout--;
 		usleep_range(1000, 1100);
@@ -665,6 +668,7 @@ i2c_dw_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	/* wait for tx to complete */
 	if (!wait_for_completion_timeout(&dev->cmd_complete, HZ)) {
 		dev_err(dev->dev, "controller timed out\n");
+		i2c_recover_bus(&dev->adapter);
 		/* i2c_dw_init implicitly disables the adapter */
 		i2c_dw_init(dev);
 		ret = -ETIMEDOUT;

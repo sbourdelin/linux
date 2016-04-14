@@ -104,6 +104,10 @@ struct dw_i2c_dev {
 	u16			fs_lcnt;
 	int			(*acquire_lock)(struct dw_i2c_dev *dev);
 	void			(*release_lock)(struct dw_i2c_dev *dev);
+	struct i2c_bus_recovery_info rinfo;
+	struct pinctrl		*pinctrl;
+	struct pinctrl_state	*pinctrl_pins_default;
+	struct pinctrl_state	*pinctrl_pins_gpio;
 	bool			pm_runtime_disabled;
 };
 

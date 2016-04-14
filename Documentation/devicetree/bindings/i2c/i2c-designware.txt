@@ -20,6 +20,13 @@ Optional properties :
  - i2c-sda-falling-time-ns : should contain the SDA falling time in nanoseconds.
    This value which is by default 300ns is used to compute the tHIGH period.
 
+ - scl-gpios: specify the gpio related to SCL pin
+
+ - sda-gpios: specify the gpio related to SDA pin
+
+ - pinctrl: add extra pinctrl to configure i2c pins to gpio function for i2c
+   bus recovery, call it "gpio" state
+
 Example :
 
 	i2c@f0000 {
@@ -42,4 +49,9 @@ Example :
 		i2c-sda-hold-time-ns = <300>;
 		i2c-sda-falling-time-ns = <300>;
 		i2c-scl-falling-time-ns = <300>;
+		pinctrl-names = "default", "gpio";
+		pinctrl-0 = <&pinctrl_i2c1_default>;
+		pinctrl-1 = <&pinctrl_i2c1_gpio>;
+		scl-gpios = <&porta 26 GPIO_ACTIVE_HIGH>;
+		sda-gpios = <&porta 27 GPIO_ACTIVE_HIGH>;
 	};
