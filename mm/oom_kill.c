@@ -762,13 +762,28 @@ void oom_kill_process(struct oom_control *oc, struct task_struct *p,
 	task_unlock(victim);
 
 	/*
-	 * Kill all user processes sharing victim->mm in other thread groups, if
-	 * any.  They don't get access to memory reserves, though, to avoid
-	 * depletion of all memory.  This prevents mm->mmap_sem livelock when an
-	 * oom killed thread cannot exit because it requires the semaphore and
-	 * its contended by another thread trying to allocate memory itself.
-	 * That thread will now get access to memory reserves since it has a
-	 * pending fatal signal.
+	 * Kill all user processes sharing victim->mm in other thread groups,
+	 * if any. This reduces possibility of hitting mm->mmap_sem livelock
+	 * when an OOM victim thread cannot exit because it requires the
+	 * mm->mmap_sem for read at exit_mm() while another thread is trying
+	 * to allocate memory with that mm->mmap_sem held for write.
+	 *
+	 * Any thread except the victim thread itself which is killed by
+	 * this heuristic does not get access to memory reserves as of now,
+	 * but it will get access to memory reserves by calling out_of_memory()
+	 * or mem_cgroup_out_of_memory() since it has a pending fatal signal.
+	 *
+	 * Note that this heuristic is not perfect because it is possible that
+	 * a thread which shares victim->mm and is doing memory allocation with
+	 * victim->mm->mmap_sem held for write is marked as OOM_SCORE_ADJ_MIN.
+	 * Also, it is possible that a thread which shares victim->mm and is
+	 * doing memory allocation with victim->mm->mmap_sem held for write
+	 * (possibly the victim thread itself which got TIF_MEMDIE) is blocked
+	 * at unkillable locks from direct reclaim paths because nothing
+	 * prevents TIF_MEMDIE threads which already started direct reclaim
+	 * paths from being blocked at unkillable locks. In such cases, the
+	 * OOM reaper will be unable to reap victim->mm and we will need to
+	 * select a different OOM victim.
 	 */
 	rcu_read_lock();
 	for_each_process(p) {
