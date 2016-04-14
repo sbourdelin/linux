@@ -70,6 +70,7 @@ properties should also be placed in the codec node if needed.
 Required CPU/CODEC subnodes properties:
 
 - sound-dai				: phandle and port of CPU/CODEC
+- remote-endpoint			: graph endpoint of CPU/CODEC
 
 Optional CPU/CODEC subnodes properties:
 
@@ -160,5 +161,23 @@ sound {
 		codec {
 			sound-dai = <&spdif_codec>;
 		};
+	};
+};
+
+Example 3 - sound-dai and remote-endpoint
+
+rsnd_ak4613: sound {
+	compatible = "simple-audio-card";
+
+	simple-audio-card,name = "R-Sound";
+	simple-audio-card,format = "left_j";
+	simple-audio-card,bitclock-master = <&sndcpu>;
+	simple-audio-card,frame-master = <&sndcpu>;
+
+	sndcpu: simple-audio-card,cpu {
+		sound-dai = <&rcar_sound 1>;
+	};
+	sndcodec: simple-audio-card,codec {
+		remote-endpoint = <&du_out_hdmi0>;
 	};
 };

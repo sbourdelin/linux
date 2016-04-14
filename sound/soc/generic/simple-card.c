@@ -14,6 +14,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_gpio.h>
+#include <linux/of_graph.h>
 #include <linux/platform_device.h>
 #include <linux/string.h>
 #include <sound/jack.h>
@@ -224,11 +225,13 @@ asoc_simple_card_sub_parse_of(struct device_node *np,
 	int ret;
 
 	/*
-	 * Get node via "sound-dai = <&phandle port>"
+	 * Get node via
+	 *	sound-dai = <&phandle port>
+	 * or
+	 *	remote-endpoint = <&phandle>
 	 * it will be used as xxx_of_node on soc_bind_dai_link()
 	 */
-	ret = of_parse_phandle_with_args(np, "sound-dai",
-					 "#sound-dai-cells", 0, &args);
+	ret = of_parse_snd_soc_connection_with_args(np, &args);
 	if (ret)
 		return ret;
 
