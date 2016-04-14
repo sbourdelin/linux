@@ -41,11 +41,17 @@
 #include <asm/ppc-pci.h>
 #include <asm/eeh.h>
 
+/* hose_spinlock protects accesses to the the phb_bitmap. */
 static DEFINE_SPINLOCK(hose_spinlock);
 LIST_HEAD(hose_list);
 
-/* XXX kill that some day ... */
-static int global_phb_number;		/* Global phb counter */
+/* For dynamic PHB numbering on get_phb_number(): max number of PHBs. */
+#define	MAX_PHBS	8192
+
+/* For dynamic PHB numbering: used/free PHBs tracking bitmap.
+ * Accesses to this bitmap should be protected by hose_spinlock.
+ */
+static DECLARE_BITMAP(phb_bitmap, MAX_PHBS);
 
 /* ISA Memory physical address */
 resource_size_t isa_mem_base;
@@ -64,6 +70,55 @@ struct dma_map_ops *get_pci_dma_ops(void)
 }
 EXPORT_SYMBOL(get_pci_dma_ops);
 
+/* get_phb_number() function should run under locking
+ * protection, specifically hose_spinlock.
+ */
+static int get_phb_number(struct device_node *dn)
+{
+	const __be64 *prop64;
+	const __be32 *regs;
+	int phb_id = 0;
+
+	/* Try fixed PHB numbering first, by checking archs and reading
+	 * the respective device-tree properties. Firstly, try PowerNV by
+	 * reading "ibm,opal-phbid", only present in OPAL environment.
+	 */
+	prop64 = of_get_property(dn, "ibm,opal-phbid", NULL);
+	if (prop64) {
+		phb_id = (int)(be64_to_cpup(prop64) & 0xFFFF);
+
+	} else if (machine_is(pseries)) {
+		regs = of_get_property(dn, "reg", NULL);
+		if (regs)
+			phb_id = (int)(be32_to_cpu(regs[1]) & 0xFFFF);
+	} else {
+		goto dynamic_phb_numbering;
+	}
+
+	/* If we have a huge PHB number obtained from device-tree, no need
+	 * to worry with the bitmap. Otherwise, we need to be sure we're
+	 * not trying to use the same PHB number twice.
+	 */
+	if (phb_id < MAX_PHBS) {
+		if (test_bit(phb_id, phb_bitmap))
+			goto dynamic_phb_numbering;
+		set_bit(phb_id, phb_bitmap);
+	}
+
+	return phb_id;
+
+	/* If not pSeries nor PowerNV, or if fixed PHB numbering tried to add
+	 * the same PHB number twice, then fallback to dynamic PHB numbering.
+	 */
+dynamic_phb_numbering:
+
+	phb_id = find_first_zero_bit(phb_bitmap, MAX_PHBS);
+	BUG_ON(phb_id >= MAX_PHBS); /* Reached maximum number of PHBs. */
+	set_bit(phb_id, phb_bitmap);
+
+	return phb_id;
+}
+
 struct pci_controller *pcibios_alloc_controller(struct device_node *dev)
 {
 	struct pci_controller *phb;
@@ -72,7 +127,7 @@ struct pci_controller *pcibios_alloc_controller(struct device_node *dev)
 	if (phb == NULL)
 		return NULL;
 	spin_lock(&hose_spinlock);
-	phb->global_number = global_phb_number++;
+	phb->global_number = get_phb_number(dev);
 	list_add_tail(&phb->list_node, &hose_list);
 	spin_unlock(&hose_spinlock);
 	phb->dn = dev;
@@ -94,6 +149,11 @@ EXPORT_SYMBOL_GPL(pcibios_alloc_controller);
 void pcibios_free_controller(struct pci_controller *phb)
 {
 	spin_lock(&hose_spinlock);
+
+	/* Clear bit of phb_bitmap to allow reuse of this PHB number. */
+	if (phb->global_number < MAX_PHBS)
+		clear_bit(phb->global_number, phb_bitmap);
+
 	list_del(&phb->list_node);
 	spin_unlock(&hose_spinlock);
 
