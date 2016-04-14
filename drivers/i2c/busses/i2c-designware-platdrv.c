@@ -268,6 +268,8 @@ rpm_disable:
 		pm_runtime_put_noidle(&pdev->dev);
 	}
 
+	i2c_dw_plat_prepare_clk(dev, false);
+
 	return r;
 }
 
