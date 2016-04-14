@@ -27,7 +27,7 @@ static struct lock_class_key dlock_list_key;
 /*
  * Initialize the per-cpu list head
  */
-int init_dlock_list_head(struct dlock_list_head **pdlock_head)
+int init_dlock_list_head(struct dlock_list_head __percpu **pdlock_head)
 {
 	struct dlock_list_head *dlock_head;
 	int cpu;
@@ -53,7 +53,8 @@ int init_dlock_list_head(struct dlock_list_head **pdlock_head)
  * function is called. However, deletion may be done by a different CPU.
  * So we still need to use a lock to protect the content of the list.
  */
-void dlock_list_add(struct dlock_list_node *node, struct dlock_list_head *head)
+void dlock_list_add(struct dlock_list_node *node,
+		    struct dlock_list_head __percpu *head)
 {
 	struct dlock_list_head *myhead;
 
