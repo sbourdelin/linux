@@ -513,7 +513,8 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 	struct alua_port_group *tmp_pg;
 	int len, k, off, valid_states = 0, bufflen = ALUA_RTPG_SIZE;
 	unsigned char *desc, *buff;
-	unsigned err, retval;
+	unsigned int err = 0;
+	unsigned int retval;
 	unsigned int tpg_desc_tbl_off;
 	unsigned char orig_transition_tmo;
 	unsigned long flags;
