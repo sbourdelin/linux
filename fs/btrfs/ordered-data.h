@@ -139,6 +139,10 @@ struct btrfs_ordered_extent {
 	struct completion completion;
 	struct btrfs_work flush_work;
 	struct list_head work_list;
+
+	/* bitmap to track the blocks that have been written to disk */
+	unsigned long *blocks_done;
+	unsigned long blocks_bitmap;
 };
 
 /*
