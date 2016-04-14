@@ -151,7 +151,7 @@ static int
 generic_match(struct auth_cred *acred, struct rpc_cred *cred, int flags)
 {
 	struct generic_cred *gcred = container_of(cred, struct generic_cred, gc_base);
-	int i;
+	int i, gnum;
 
 	if (acred->machine_cred)
 		return machine_cred_match(acred, gcred, flags);
@@ -166,9 +166,12 @@ generic_match(struct auth_cred *acred, struct rpc_cred *cred, int flags)
 		goto out_match;
 
 	/* Slow path... */
-	if (gcred->acred.group_info->ngroups != acred->group_info->ngroups)
+	i = acred->group_info ? acred->group_info->ngroups : 0;
+	gnum = gcred->acred.group_info ? gcred->acred.group_info->ngroups : 0;
+
+	if (gnum != i)
 		goto out_nomatch;
-	for (i = 0; i < gcred->acred.group_info->ngroups; i++) {
+	for (i = 0; i < gnum; i++) {
 		if (!gid_eq(GROUP_AT(gcred->acred.group_info, i),
 				GROUP_AT(acred->group_info, i)))
 			goto out_nomatch;
