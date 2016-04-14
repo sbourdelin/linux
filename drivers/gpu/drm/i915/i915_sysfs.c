@@ -121,6 +121,20 @@ show_psr(struct device *kdev, struct device_attribute *attr, char *buf)
 	return ret;
 }
 
+static ssize_t
+show_fbc(struct device *kdev, struct device_attribute *attr, char *buf)
+{
+	struct drm_minor *dminor = dev_to_drm_minor(kdev);
+	struct drm_device *dev = dminor->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	ssize_t ret;
+
+	mutex_lock(&dev_priv->fbc.lock);
+	ret = snprintf(buf, PAGE_SIZE, "%s\n", dev_priv->fbc.enabled ?
+			"enabled":"disabled");
+	mutex_unlock(&dev_priv->fbc.lock);
+	return ret;
+}
 
 static DEVICE_ATTR(rc6_enable, S_IRUGO, show_rc6_mask, NULL);
 static DEVICE_ATTR(rc6_residency_ms, S_IRUGO, show_rc6_ms, NULL);
@@ -128,6 +142,7 @@ static DEVICE_ATTR(rc6p_residency_ms, S_IRUGO, show_rc6p_ms, NULL);
 static DEVICE_ATTR(rc6pp_residency_ms, S_IRUGO, show_rc6pp_ms, NULL);
 static DEVICE_ATTR(media_rc6_residency_ms, S_IRUGO, show_media_rc6_ms, NULL);
 static DEVICE_ATTR(psr_enable, S_IRUGO, show_psr, NULL);
+static DEVICE_ATTR(fbc_enable, S_IRUGO, show_fbc, NULL);
 
 static struct attribute *rc6_attrs[] = {
 	&dev_attr_rc6_enable.attr,
@@ -169,6 +184,16 @@ static struct attribute *psr_attrs[] = {
 static struct attribute_group psr_attr_group = {
 	.name = power_group_name,
 	.attrs = psr_attrs
+};
+
+static struct attribute *fbc_attrs[] = {
+	&dev_attr_fbc_enable.attr,
+	NULL
+};
+
+static struct attribute_group fbc_attr_group = {
+	.name = power_group_name,
+	.attrs = fbc_attrs
 };
 
 #endif
@@ -648,6 +673,12 @@ void i915_setup_sysfs(struct drm_device *dev)
 		if (ret)
 			DRM_ERROR("PSR sysfs setup failed\n");
 	}
+	if (HAS_FBC(dev)) {
+		ret = sysfs_merge_group(&dev->primary->kdev->kobj,
+					&fbc_attr_group);
+		if (ret)
+			DRM_ERROR("FBC sysfs setup failed\n");
+	}
 #endif
 	if (HAS_L3_DPF(dev)) {
 		ret = device_create_bin_file(dev->primary->kdev, &dpf_attrs);
@@ -689,5 +720,6 @@ void i915_teardown_sysfs(struct drm_device *dev)
 	sysfs_unmerge_group(&dev->primary->kdev->kobj, &rc6_attr_group);
 	sysfs_unmerge_group(&dev->primary->kdev->kobj, &rc6p_attr_group);
 	sysfs_unmerge_group(&dev->primary->kdev->kobj, &psr_attr_group);
+	sysfs_unmerge_group(&dev->primary->kdev->kobj, &fbc_attr_group);
 #endif
 }
