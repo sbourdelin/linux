@@ -406,6 +406,7 @@ static ssize_t d3cold_allowed_store(struct device *dev,
 		return -EINVAL;
 
 	pdev->d3cold_allowed = !!val;
+	pci_bridge_d3_device_changed(pdev);
 	pm_runtime_resume(dev);
 
 	return count;
