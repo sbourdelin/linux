@@ -340,6 +340,18 @@ static void atp8xx_fixup(struct pci_dev *pdev)
 	}
 }
 
+static int is_fast(struct pci_dev *pdev)
+{
+	int ret = 0;
+	void __iomem *addr;
+
+	addr = pci_iomap(pdev, 4, 1);
+	if (ioread8(addr) & 0x10)
+		ret = 1;
+	pci_iounmap(pdev, addr);
+
+	return ret;
+}
 /**
  *	artop_init_one - Register ARTOP ATA PCI device with kernel services
  *	@pdev: PCI device to register
@@ -398,10 +410,8 @@ static int artop_init_one (struct pci_dev *pdev, const struct pci_device_id *id)
 	else if (id->driver_data == 1)	/* 6260 */
 		ppi[0] = &info_626x;
 	else if (id->driver_data == 2)	{ /* 6280 or 6280 + fast */
-		unsigned long io = pci_resource_start(pdev, 4);
-
 		ppi[0] = &info_628x;
-		if (inb(io) & 0x10)
+		if (is_fast(pdev))
 			ppi[0] = &info_628x_fast;
 	}
 
