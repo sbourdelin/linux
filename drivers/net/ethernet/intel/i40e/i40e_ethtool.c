@@ -2422,7 +2422,11 @@ static bool i40e_match_fdir_input_set(struct i40e_fdir_filter *rule,
 	if ((rule->dst_ip[0] != input->dst_ip[0]) ||
 	    (rule->src_ip[0] != input->src_ip[0]) ||
 	    (rule->dst_port != input->dst_port) ||
-	    (rule->src_port != input->src_port))
+	    (rule->src_port != input->src_port) ||
+	    (rule->flow_type != input->flow_type) ||
+	    (rule->ip4_proto != input->ip4_proto) ||
+	    (rule->sctp_v_tag != input->sctp_v_tag) ||
+	    (rule->q_index != input->q_index))
 		return false;
 	return true;
 }
