@@ -2348,8 +2348,8 @@ static void gen8_set_pte(void __iomem *addr, gen8_pte_t pte)
 #ifdef writeq
 	writeq(pte, addr);
 #else
-	iowrite32((u32)pte, addr);
-	iowrite32(pte >> 32, addr + 4);
+	writel((u32)pte, addr);
+	writel(pte >> 32, addr + 4);
 #endif
 }
 
@@ -2450,7 +2450,7 @@ static void gen6_ggtt_insert_entries(struct i915_address_space *vm,
 
 	for_each_sg_page(st->sgl, &sg_iter, st->nents, 0) {
 		addr = sg_page_iter_dma_address(&sg_iter);
-		iowrite32(vm->pte_encode(addr, level, true, flags), &gtt_entries[i]);
+		writel(vm->pte_encode(addr, level, true, flags), &gtt_entries[i]);
 		i++;
 	}
 
@@ -2533,7 +2533,7 @@ static void gen6_ggtt_clear_range(struct i915_address_space *vm,
 				     I915_CACHE_LLC, use_scratch, 0);
 
 	for (i = 0; i < num_entries; i++)
-		iowrite32(scratch_pte, &gtt_base[i]);
+		writel(scratch_pte, &gtt_base[i]);
 	readl(gtt_base);
 
 	assert_rpm_atomic_end(dev_priv, rpm_atomic_seq);
