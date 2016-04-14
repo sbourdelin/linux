@@ -477,7 +477,7 @@ static int lo_rw_aio(struct loop_device *lo, struct loop_cmd *cmd,
 		     loff_t pos, bool rw)
 {
 	struct iov_iter iter;
-	struct bio_vec *bvec;
+	const struct bio_vec *bvec;
 	struct bio *bio = cmd->rq->bio;
 	struct file *file = lo->lo_backing_file;
 	int ret;
@@ -485,7 +485,8 @@ static int lo_rw_aio(struct loop_device *lo, struct loop_cmd *cmd,
 	/* nomerge for loop request queue */
 	WARN_ON(cmd->rq->bio != cmd->rq->biotail);
 
-	bvec = __bvec_iter_bvec(bio->bi_io_vec, bio->bi_iter);
+	/* passed to iterate_bvec() */
+	bvec = bio_get_base_vec(bio);
 	iov_iter_bvec(&iter, ITER_BVEC | rw, bvec,
 		      bio_segments(bio), blk_rq_bytes(cmd->rq));
 
