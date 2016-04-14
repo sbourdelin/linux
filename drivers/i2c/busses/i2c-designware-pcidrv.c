@@ -248,14 +248,17 @@ static int i2c_dw_pci_probe(struct pci_dev *pdev,
 	ACPI_COMPANION_SET(&adap->dev, ACPI_COMPANION(&pdev->dev));
 	adap->nr = controller->bus_num;
 
-	r = i2c_dw_probe(dev);
-	if (r)
-		return r;
-
 	pm_runtime_set_autosuspend_delay(&pdev->dev, 1000);
 	pm_runtime_use_autosuspend(&pdev->dev);
-	pm_runtime_put_autosuspend(&pdev->dev);
 	pm_runtime_allow(&pdev->dev);
+
+	r = i2c_dw_probe(dev);
+	if (r) {
+		pm_runtime_forbid(&pdev->dev);
+		return r;
+	}
+
+	pm_runtime_put_autosuspend(&pdev->dev);
 
 	return 0;
 }
