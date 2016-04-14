@@ -1298,7 +1298,8 @@ try_next_bio:
 static void pkt_start_write(struct pktcdvd_device *pd, struct packet_data *pkt)
 {
 	int f;
-	struct bio_vec *bvec = pkt->w_bio->bi_io_vec;
+	/* need to fix this usage after multipage bvecs */
+	struct bio_vec *bvec = bio_get_base_vec(pkt->w_bio);
 
 	bio_reset(pkt->w_bio);
 	pkt->w_bio->bi_iter.bi_sector = pkt->sector;
