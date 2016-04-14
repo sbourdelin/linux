@@ -49,6 +49,7 @@
 #include <linux/if.h>
 #include <linux/if_vlan.h>
 #include <linux/prefetch.h>
+#include <asm/mshyperv.h>
 
 #include "ixgbevf.h"
 
@@ -62,10 +63,14 @@ static char ixgbevf_copyright[] =
 	"Copyright (c) 2009 - 2015 Intel Corporation.";
 
 static const struct ixgbevf_info *ixgbevf_info_tbl[] = {
-	[board_82599_vf] = &ixgbevf_82599_vf_info,
-	[board_X540_vf]  = &ixgbevf_X540_vf_info,
-	[board_X550_vf]  = &ixgbevf_X550_vf_info,
-	[board_X550EM_x_vf] = &ixgbevf_X550EM_x_vf_info,
+	[board_82599_vf]	= &ixgbevf_82599_vf_info,
+	[board_82599_vf_hv]	= &ixgbevf_82599_vf_hv_info,
+	[board_X540_vf]		= &ixgbevf_X540_vf_info,
+	[board_X540_vf_hv]	= &ixgbevf_X540_vf_hv_info,
+	[board_X550_vf]		= &ixgbevf_X550_vf_info,
+	[board_X550_vf_hv]	= &ixgbevf_X550_vf_hv_info,
+	[board_X550EM_x_vf]	= &ixgbevf_X550EM_x_vf_info,
+	[board_X550EM_x_vf_hv]	= &ixgbevf_X550EM_x_vf_hv_info,
 };
 
 /* ixgbevf_pci_tbl - PCI Device ID Table
@@ -78,9 +83,13 @@ static const struct ixgbevf_info *ixgbevf_info_tbl[] = {
  */
 static const struct pci_device_id ixgbevf_pci_tbl[] = {
 	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82599_VF), board_82599_vf },
+	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82599_VF_HV), board_82599_vf_hv },
 	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_X540_VF), board_X540_vf },
+	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_X540_VF_HV), board_X540_vf_hv },
 	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_X550_VF), board_X550_vf },
+	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_X550_VF_HV), board_X550_vf_hv },
 	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_X550EM_X_VF), board_X550EM_x_vf },
+	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_X550EM_X_VF_HV), board_X550EM_x_vf_hv},
 	/* required last entry */
 	{0, }
 };
@@ -1809,12 +1818,13 @@ static int ixgbevf_vlan_rx_add_vid(struct net_device *netdev,
 {
 	struct ixgbevf_adapter *adapter = netdev_priv(netdev);
 	struct ixgbe_hw *hw = &adapter->hw;
-	int err;
+	int err = 0;
 
 	spin_lock_bh(&adapter->mbx_lock);
 
 	/* add VID to filter table */
-	err = hw->mac.ops.set_vfta(hw, vid, 0, true);
+	if (hw->mac.ops.set_vfta)
+		err = hw->mac.ops.set_vfta(hw, vid, 0, true);
 
 	spin_unlock_bh(&adapter->mbx_lock);
 
@@ -1835,12 +1845,13 @@ static int ixgbevf_vlan_rx_kill_vid(struct net_device *netdev,
 {
 	struct ixgbevf_adapter *adapter = netdev_priv(netdev);
 	struct ixgbe_hw *hw = &adapter->hw;
-	int err;
+	int err = 0;
 
 	spin_lock_bh(&adapter->mbx_lock);
 
 	/* remove VID from filter table */
-	err = hw->mac.ops.set_vfta(hw, vid, 0, false);
+	if (hw->mac.ops.set_vfta)
+		err = hw->mac.ops.set_vfta(hw, vid, 0, false);
 
 	spin_unlock_bh(&adapter->mbx_lock);
 
@@ -1873,14 +1884,16 @@ static int ixgbevf_write_uc_addr_list(struct net_device *netdev)
 		struct netdev_hw_addr *ha;
 
 		netdev_for_each_uc_addr(ha, netdev) {
-			hw->mac.ops.set_uc_addr(hw, ++count, ha->addr);
+			if (hw->mac.ops.set_uc_addr)
+				hw->mac.ops.set_uc_addr(hw, ++count, ha->addr);
 			udelay(200);
 		}
 	} else {
 		/* If the list is empty then send message to PF driver to
 		 * clear all MAC VLANs on this VF.
 		 */
-		hw->mac.ops.set_uc_addr(hw, 0, NULL);
+		if (hw->mac.ops.set_uc_addr)
+			hw->mac.ops.set_uc_addr(hw, 0, NULL);
 	}
 
 	return count;
@@ -1908,10 +1921,13 @@ static void ixgbevf_set_rx_mode(struct net_device *netdev)
 
 	spin_lock_bh(&adapter->mbx_lock);
 
-	hw->mac.ops.update_xcast_mode(hw, netdev, xcast_mode);
+	if (hw->mac.ops.update_mc_addr_list)
+		if (hw->mac.ops.update_xcast_mode)
+			hw->mac.ops.update_xcast_mode(hw, netdev, xcast_mode);
 
 	/* reprogram multicast list */
-	hw->mac.ops.update_mc_addr_list(hw, netdev);
+	if (hw->mac.ops.update_mc_addr_list)
+		hw->mac.ops.update_mc_addr_list(hw, netdev);
 
 	ixgbevf_write_uc_addr_list(netdev);
 
@@ -2074,10 +2090,13 @@ static void ixgbevf_up_complete(struct ixgbevf_adapter *adapter)
 
 	spin_lock_bh(&adapter->mbx_lock);
 
-	if (is_valid_ether_addr(hw->mac.addr))
-		hw->mac.ops.set_rar(hw, 0, hw->mac.addr, 0);
-	else
-		hw->mac.ops.set_rar(hw, 0, hw->mac.perm_addr, 0);
+	if (is_valid_ether_addr(hw->mac.addr)) {
+		if (hw->mac.ops.set_rar)
+			hw->mac.ops.set_rar(hw, 0, hw->mac.addr, 0);
+	} else {
+		if (hw->mac.ops.set_rar)
+			hw->mac.ops.set_rar(hw, 0, hw->mac.perm_addr, 0);
+	}
 
 	spin_unlock_bh(&adapter->mbx_lock);
 
@@ -3672,14 +3691,15 @@ static int ixgbevf_set_mac(struct net_device *netdev, void *p)
 	struct ixgbevf_adapter *adapter = netdev_priv(netdev);
 	struct ixgbe_hw *hw = &adapter->hw;
 	struct sockaddr *addr = p;
-	int err;
+	int err = 0;
 
 	if (!is_valid_ether_addr(addr->sa_data))
 		return -EADDRNOTAVAIL;
 
 	spin_lock_bh(&adapter->mbx_lock);
 
-	err = hw->mac.ops.set_rar(hw, 0, addr->sa_data, 0);
+	if (hw->mac.ops.set_rar)
+		err = hw->mac.ops.set_rar(hw, 0, addr->sa_data, 0);
 
 	spin_unlock_bh(&adapter->mbx_lock);
 
