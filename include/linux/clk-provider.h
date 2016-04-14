@@ -370,6 +370,8 @@ struct clk_div_table {
  * CLK_DIVIDER_MAX_AT_ZERO - For dividers which are like CLK_DIVIDER_ONE_BASED
  *	except when the value read from the register is zero, the divisor is
  *	2^width of the field.
+ * CLK_DIVIDER_WORD_REG - The driver use 16-bit access function for register.
+ *	Usally 32-bit access.
  */
 struct clk_divider {
 	struct clk_hw	hw;
@@ -390,6 +392,7 @@ struct clk_divider {
 #define CLK_DIVIDER_ROUND_CLOSEST	BIT(4)
 #define CLK_DIVIDER_READ_ONLY		BIT(5)
 #define CLK_DIVIDER_MAX_AT_ZERO		BIT(6)
+#define CLK_DIVIDER_WORD_REG		BIT(7)
 
 extern const struct clk_ops clk_divider_ops;
 extern const struct clk_ops clk_divider_ro_ops;
@@ -797,6 +800,16 @@ static inline void clk_writel(u32 val, u32 __iomem *reg)
 }
 
 #endif	/* platform dependent I/O accessors */
+
+static inline u32 clk_readw(u32 __iomem *reg)
+{
+	return readw(reg);
+}
+
+static inline void clk_writew(u32 val, u32 __iomem *reg)
+{
+	writew(val, reg);
+}
 
 #ifdef CONFIG_DEBUG_FS
 struct dentry *clk_debugfs_add_file(struct clk_hw *hw, char *name, umode_t mode,

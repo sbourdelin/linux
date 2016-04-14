@@ -141,7 +141,10 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
 	struct clk_divider *divider = to_clk_divider(hw);
 	unsigned int val;
 
-	val = clk_readl(divider->reg) >> divider->shift;
+	if (divider->flags & CLK_DIVIDER_WORD_REG)
+		val = clk_readw(divider->reg) >> divider->shift;
+	else
+		val = clk_readl(divider->reg) >> divider->shift;
 	val &= div_mask(divider->width);
 
 	return divider_recalc_rate(hw, parent_rate, val, divider->table,
@@ -403,7 +406,10 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
 		val &= ~(div_mask(divider->width) << divider->shift);
 	}
 	val |= value << divider->shift;
-	clk_writel(val, divider->reg);
+	if (divider->flags & CLK_DIVIDER_WORD_REG)
+		clk_writew(val, divider->reg);
+	else
+		clk_writel(val, divider->reg);
 
 	if (divider->lock)
 		spin_unlock_irqrestore(divider->lock, flags);
