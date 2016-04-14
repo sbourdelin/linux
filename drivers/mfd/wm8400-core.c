@@ -43,7 +43,7 @@ static bool wm8400_volatile(struct device *dev, unsigned int reg)
  *
  * @return  Read value
  */
-u16 wm8400_reg_read(struct wm8400 *wm8400, u8 reg)
+int wm8400_reg_read(struct wm8400 *wm8400, u8 reg)
 {
 	unsigned int val;
 	int ret;
