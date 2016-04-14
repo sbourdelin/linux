@@ -221,7 +221,12 @@ static void bio_dp_init(struct dpages *dp, struct bio *bio)
 {
 	dp->get_page = bio_get_page;
 	dp->next_page = bio_next_page;
-	dp->context_ptr = __bvec_iter_bvec(bio->bi_io_vec, bio->bi_iter);
+
+	/*
+	 * need to fix both bio_get_page() and bio_next_page()
+	 * before multipage bvecs
+	 */
+	dp->context_ptr = bio_get_base_vec(bio);
 	dp->context_u = bio->bi_iter.bi_bvec_done;
 }
 
