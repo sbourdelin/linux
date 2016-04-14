@@ -210,6 +210,9 @@ static int insert_inline_extent(struct btrfs_trans_handle *trans,
 		page = find_get_page(inode->i_mapping,
 				     start >> PAGE_SHIFT);
 		btrfs_set_file_extent_compression(leaf, ei, 0);
+		clear_page_blks_state(page, 1 << BLK_STATE_DIRTY, start,
+                                round_up(start + size - 1, root->sectorsize)
+				- 1);
 		kaddr = kmap_atomic(page);
 		offset = start & (PAGE_SIZE - 1);
 		write_extent_buffer(leaf, kaddr + offset, ptr, size);
@@ -2023,6 +2026,11 @@ again:
 	 }
 
 	btrfs_set_extent_delalloc(inode, page_start, page_end, &cached_state);
+
+	set_page_blks_state(page,
+			1 << BLK_STATE_DIRTY | 1 << BLK_STATE_UPTODATE,
+			page_start, page_end);
+
 	ClearPageChecked(page);
 	set_page_dirty(page);
 out:
@@ -3025,26 +3033,48 @@ static int btrfs_writepage_end_io_hook(struct page *page, u64 start, u64 end,
 	struct btrfs_ordered_extent *ordered_extent = NULL;
 	struct btrfs_workqueue *wq;
 	btrfs_work_func_t func;
+	u64 ordered_start, ordered_end;
+	int done;
 
 	trace_btrfs_writepage_end_io_hook(page, start, end, uptodate);
 
 	ClearPagePrivate2(page);
-	if (!btrfs_dec_test_ordered_pending(inode, &ordered_extent, start,
-					    end - start + 1, uptodate))
-		return 0;
+loop:
+	ordered_extent = btrfs_lookup_ordered_range(inode, start,
+						end - start + 1);
+	if (!ordered_extent)
+		goto out;
 
-	if (btrfs_is_free_space_inode(inode)) {
-		wq = root->fs_info->endio_freespace_worker;
-		func = btrfs_freespace_write_helper;
-	} else {
-		wq = root->fs_info->endio_write_workers;
-		func = btrfs_endio_write_helper;
+	ordered_start = max_t(u64, start, ordered_extent->file_offset);
+	ordered_end = min_t(u64, end,
+			ordered_extent->file_offset + ordered_extent->len - 1);
+
+	done = btrfs_dec_test_ordered_pending(inode, &ordered_extent,
+					ordered_start,
+					ordered_end - ordered_start + 1,
+					uptodate);
+	if (done) {
+		if (btrfs_is_free_space_inode(inode)) {
+			wq = root->fs_info->endio_freespace_worker;
+			func = btrfs_freespace_write_helper;
+		} else {
+			wq = root->fs_info->endio_write_workers;
+			func = btrfs_endio_write_helper;
+		}
+
+		btrfs_init_work(&ordered_extent->work, func,
+				finish_ordered_fn, NULL, NULL);
+		btrfs_queue_work(wq, &ordered_extent->work);
 	}
 
-	btrfs_init_work(&ordered_extent->work, func, finish_ordered_fn, NULL,
-			NULL);
-	btrfs_queue_work(wq, &ordered_extent->work);
+	btrfs_put_ordered_extent(ordered_extent);
 
+	start = ordered_end + 1;
+
+	if (start < end)
+		goto loop;
+
+out:
 	return 0;
 }
 
@@ -4704,6 +4734,9 @@ again:
 				     &cached_state, GFP_NOFS);
 		goto out_unlock;
 	}
+
+	set_page_blks_state(page, 1 << BLK_STATE_DIRTY | 1 << BLK_STATE_UPTODATE,
+			block_start, block_end);
 
 	if (offset != blocksize) {
 		if (!len)
@@ -8820,6 +8853,9 @@ again:
 	 *    This means the reserved space should be freed here.
 	 */
 	btrfs_qgroup_free_data(inode, page_start, PAGE_SIZE);
+
+	clear_page_blks_state(page, 1 << BLK_STATE_DIRTY, page_start, page_end);
+
 	if (!inode_evicting) {
 		clear_extent_bit(tree, page_start, page_end,
 				 EXTENT_LOCKED | EXTENT_DIRTY |
@@ -8963,6 +8999,10 @@ again:
 		ret = VM_FAULT_SIGBUS;
 		goto out_unlock;
 	}
+
+	set_page_blks_state(page, 1 << BLK_STATE_DIRTY | 1 << BLK_STATE_UPTODATE,
+			page_start, end);
+
 	ret = 0;
 
 	/* page is wholly or partially inside EOF */
