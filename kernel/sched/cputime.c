@@ -785,14 +785,10 @@ void arch_vtime_task_switch(struct task_struct *prev)
 
 void vtime_init_idle(struct task_struct *t, int cpu)
 {
-	unsigned long flags;
-
-	local_irq_save(flags);
 	write_seqcount_begin(&t->vtime_seqcount);
 	t->vtime_snap_whence = VTIME_SYS;
 	t->vtime_snap = jiffies;
 	write_seqcount_end(&t->vtime_seqcount);
-	local_irq_restore(flags);
 }
 
 cputime_t task_gtime(struct task_struct *t)
