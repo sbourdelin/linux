@@ -162,7 +162,8 @@ extern struct task_group root_task_group;
 #ifdef CONFIG_RT_MUTEXES
 # define INIT_RT_MUTEXES(tsk)						\
 	.pi_waiters = RB_ROOT,						\
-	.pi_waiters_leftmost = NULL,
+	.pi_waiters_leftmost = NULL,					\
+	.pi_waiters_leftmost_copy = NULL,
 #else
 # define INIT_RT_MUTEXES(tsk)
 #endif

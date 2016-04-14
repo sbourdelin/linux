@@ -26,4 +26,6 @@ static inline bool dl_time_before(u64 a, u64 b)
 	return (s64)(a - b) < 0;
 }
 
+extern void rt_mutex_update_copy(struct task_struct *p);
+
 #endif /* _SCHED_DEADLINE_H */

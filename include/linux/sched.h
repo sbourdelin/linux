@@ -1621,7 +1621,10 @@ struct task_struct {
 #ifdef CONFIG_RT_MUTEXES
 	/* PI waiters blocked on a rt_mutex held by this task */
 	struct rb_root pi_waiters;
+	/* Updated under pi_lock and rtmutex lock */
 	struct rb_node *pi_waiters_leftmost;
+	/* Updated under pi_lock, rq_lock, and rtmutex lock */
+	struct rb_node *pi_waiters_leftmost_copy;
 	/* Deadlock detection and priority inheritance handling */
 	struct rt_mutex_waiter *pi_blocked_on;
 #endif
