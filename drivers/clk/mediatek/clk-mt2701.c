@@ -908,6 +908,8 @@ static void __init mtk_pericfg_init(struct device_node *node)
 }
 CLK_OF_DECLARE(mtk_pericfg, "mediatek,mt2701-pericfg", mtk_pericfg_init);
 
+#ifdef CONFIG_COMMON_CLK_MT2701_MMSYS
+
 static const struct mtk_gate_regs disp0_cg_regs __initconst = {
 	.set_ofs = 0x0104,
 	.clr_ofs = 0x0108,
@@ -991,6 +993,10 @@ static void __init mtk_mmsys_init(struct device_node *node)
 			__func__, r);
 }
 
+#endif /* CONFIG_COMMON_CLK_MT2701_MMSYS */
+
+#ifdef CONFIG_COMMON_CLK_MT2701_IMGSYS
+
 static const struct mtk_gate_regs img_cg_regs __initconst = {
 	.set_ofs = 0x0004,
 	.clr_ofs = 0x0008,
@@ -1030,6 +1036,10 @@ static void __init mtk_imgsys_init(struct device_node *node)
 		pr_err("%s(): could not register clock provider: %d\n",
 			__func__, r);
 }
+
+#endif /* CONFIG_COMMON_CLK_MT2701_IMGSYS */
+
+#ifdef CONFIG_COMMON_CLK_MT2701_VDECSYS
 
 static const struct mtk_gate_regs vdec0_cg_regs __initconst = {
 	.set_ofs = 0x0000,
@@ -1082,6 +1092,10 @@ static void __init mtk_vdecsys_init(struct device_node *node)
 			__func__, r);
 }
 
+#endif /* CONFIG_COMMON_CLK_MT2701_VDECSYS */
+
+#ifdef CONFIG_COMMON_CLK_MT2701_HIFSYS
+
 static const struct mtk_gate_regs hif_cg_regs __initconst = {
 	.sta_ofs = 0x0008,
 };
@@ -1120,6 +1134,10 @@ static void __init mtk_hifsys_init(struct device_node *node)
 
 	mtk_register_reset_controller(node, 1, 0x34);
 }
+
+#endif /* CONFIG_COMMON_CLK_MT2701_HIFSYS */
+
+#ifdef CONFIG_COMMON_CLK_MT2701_ETHSYS
 
 static const struct mtk_gate_regs eth_cg_regs __initconst = {
 	.sta_ofs = 0x0030,
@@ -1160,6 +1178,10 @@ static void __init mtk_ethsys_init(struct device_node *node)
 		pr_err("%s(): could not register clock provider: %d\n",
 			__func__, r);
 }
+
+#endif /* CONFIG_COMMON_CLK_MT2701_ETHSYS */
+
+#ifdef CONFIG_COMMON_CLK_MT2701_BDPSYS
 
 static const struct mtk_gate_regs bdp0_cg_regs __initconst = {
 	.set_ofs = 0x0104,
@@ -1259,6 +1281,8 @@ static void __init mtk_bdpsys_init(struct device_node *node)
 			__func__, r);
 }
 
+#endif /* CONFIG_COMMON_CLK_MT2701_BDPSYS */
+
 #define MT8590_PLL_FMAX		(2000 * MHZ)
 #define CON0_MT8590_RST_BAR	BIT(27)
 
@@ -1333,24 +1357,36 @@ CLK_OF_DECLARE(mtk_apmixedsys, "mediatek,mt2701-apmixedsys",
 
 static const struct of_device_id of_clk_match_tbl[] = {
 	{
+#ifdef CONFIG_COMMON_CLK_MT2701_MMSYS
 		.compatible = "mediatek,mt2701-mmsys",
 		.data = mtk_mmsys_init,
 	}, {
+#endif
+#ifdef CONFIG_COMMON_CLK_MT2701_IMGSYS
 		.compatible = "mediatek,mt2701-imgsys",
 		.data = mtk_imgsys_init,
 	}, {
+#endif
+#ifdef CONFIG_COMMON_CLK_MT2701_VDECSYS
 		.compatible = "mediatek,mt2701-vdecsys",
 		.data = mtk_vdecsys_init,
 	}, {
+#endif
+#ifdef CONFIG_COMMON_CLK_MT2701_HIFSYS
 		.compatible = "mediatek,mt2701-hifsys",
 		.data = mtk_hifsys_init,
 	}, {
+#endif
+#ifdef CONFIG_COMMON_CLK_MT2701_ETHSYS
 		.compatible = "mediatek,mt2701-ethsys",
 		.data = mtk_ethsys_init,
 	}, {
+#endif
+#ifdef CONFIG_COMMON_CLK_MT2701_BDPSYS
 		.compatible = "mediatek,mt2701-bdpsys",
 		.data = mtk_bdpsys_init,
 	}, {
+#endif
 		/* sentinel */
 	}
 };
