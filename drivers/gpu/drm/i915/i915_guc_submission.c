@@ -179,15 +179,11 @@ static void guc_init_doorbell(struct intel_guc *guc,
 			      struct i915_guc_client *client)
 {
 	struct guc_doorbell_info *doorbell;
-	void *base;
 
-	base = kmap_atomic(i915_gem_object_get_page(client->client_obj, 0));
-	doorbell = base + client->doorbell_offset;
+	doorbell = client->client_base + client->doorbell_offset;
 
-	doorbell->db_status = 1;
+	doorbell->db_status = GUC_DOORBELL_ENABLED;
 	doorbell->cookie = 0;
-
-	kunmap_atomic(base);
 }
 
 static int guc_ring_doorbell(struct i915_guc_client *gc)
@@ -256,16 +252,12 @@ static void guc_disable_doorbell(struct intel_guc *guc,
 {
 	struct drm_i915_private *dev_priv = guc_to_i915(guc);
 	struct guc_doorbell_info *doorbell;
-	void *base;
 	i915_reg_t drbreg = GEN8_DRBREGL(client->doorbell_id);
 	int value;
 
-	base = kmap_atomic(i915_gem_object_get_page(client->client_obj, 0));
-	doorbell = base + client->doorbell_offset;
+	doorbell = client->client_base + client->doorbell_offset;
 
-	doorbell->db_status = 0;
-
-	kunmap_atomic(base);
+	doorbell->db_status = GUC_DOORBELL_DISABLED;
 
 	I915_WRITE(drbreg, I915_READ(drbreg) & ~GEN8_DRB_VALID);
 
@@ -341,10 +333,8 @@ static void guc_init_proc_desc(struct intel_guc *guc,
 			       struct i915_guc_client *client)
 {
 	struct guc_process_desc *desc;
-	void *base;
 
-	base = kmap_atomic(i915_gem_object_get_page(client->client_obj, 0));
-	desc = base + client->proc_desc_offset;
+	desc = client->client_base + client->proc_desc_offset;
 
 	memset(desc, 0, sizeof(*desc));
 
@@ -361,8 +351,6 @@ static void guc_init_proc_desc(struct intel_guc *guc,
 	desc->wq_size_bytes = client->wq_size;
 	desc->wq_status = WQ_STATUS_ACTIVE;
 	desc->priority = client->priority;
-
-	kunmap_atomic(base);
 }
 
 /*
@@ -607,6 +595,7 @@ int i915_guc_submit(struct i915_guc_client *client,
  * This is a wrapper to create a gem obj. In order to use it inside GuC, the
  * object needs to be pinned lifetime. Also we must pin it to gtt space other
  * than [0, GUC_WOPCM_TOP) because this range is reserved inside GuC.
+ * The object is also pinned & mapped into kernel address space.
  *
  * Return:	A drm_i915_gem_object if successful, otherwise NULL.
  */
@@ -620,13 +609,14 @@ static struct drm_i915_gem_object *gem_allocate_guc_obj(struct drm_device *dev,
 	if (!obj)
 		return NULL;
 
-	if (i915_gem_object_get_pages(obj)) {
+	if (i915_gem_object_pin_map(obj) == NULL) {
 		drm_gem_object_unreference(&obj->base);
 		return NULL;
 	}
 
 	if (i915_gem_obj_ggtt_pin(obj, PAGE_SIZE,
 			PIN_OFFSET_BIAS | GUC_WOPCM_TOP)) {
+		i915_gem_object_unpin_map(obj);
 		drm_gem_object_unreference(&obj->base);
 		return NULL;
 	}
@@ -648,6 +638,8 @@ static void gem_release_guc_obj(struct drm_i915_gem_object *obj)
 
 	if (i915_gem_obj_is_pinned(obj))
 		i915_gem_object_ggtt_unpin(obj);
+
+	i915_gem_object_unpin_map(obj);
 
 	drm_gem_object_unreference(&obj->base);
 }
@@ -729,6 +721,8 @@ static struct i915_guc_client *guc_client_alloc(struct drm_device *dev,
 		goto err;
 
 	client->client_obj = obj;
+	client->client_base = obj->mapping;
+	WARN_ON(!client->client_base);
 	client->wq_offset = GUC_DB_SIZE;
 	client->wq_size = GUC_WQ_SIZE;
 
@@ -841,7 +835,6 @@ static void guc_create_ads(struct intel_guc *guc)
 	struct guc_policies *policies;
 	struct guc_mmio_reg_state *reg_state;
 	struct intel_engine_cs *engine;
-	struct page *page;
 	u32 size;
 
 	/* The ads obj includes the struct itself and buffers passed to GuC */
@@ -857,9 +850,7 @@ static void guc_create_ads(struct intel_guc *guc)
 
 		guc->ads_obj = obj;
 	}
-
-	page = i915_gem_object_get_page(obj, 0);
-	ads = kmap(page);
+	ads = obj->mapping;
 
 	/*
 	 * The GuC requires a "Golden Context" when it reinitialises
@@ -897,8 +888,6 @@ static void guc_create_ads(struct intel_guc *guc)
 
 	ads->reg_state_buffer = ads->reg_state_addr +
 			sizeof(struct guc_mmio_reg_state);
-
-	kunmap(page);
 }
 
 /*
