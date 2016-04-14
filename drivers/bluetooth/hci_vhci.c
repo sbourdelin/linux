@@ -50,6 +50,7 @@ struct vhci_data {
 	wait_queue_head_t read_wait;
 	struct sk_buff_head readq;
 
+	struct mutex open_mutex;
 	struct delayed_work open_timeout;
 };
 
@@ -87,7 +88,7 @@ static int vhci_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
 	return 0;
 }
 
-static int vhci_create_device(struct vhci_data *data, __u8 opcode)
+static int __vhci_create_device(struct vhci_data *data, __u8 opcode)
 {
 	struct hci_dev *hdev;
 	struct sk_buff *skb;
@@ -151,6 +152,19 @@ static int vhci_create_device(struct vhci_data *data, __u8 opcode)
 	return 0;
 }
 
+static int vhci_create_device(struct vhci_data *data, __u8 opcode)
+{
+	int err;
+
+	mutex_lock(&data->open_mutex);
+	if (data->hdev)
+		err = -EBADFD;
+	else
+		err = __vhci_create_device(data, opcode);
+	mutex_unlock(&data->open_mutex);
+	return err;
+}
+
 static inline ssize_t vhci_get_user(struct vhci_data *data,
 				    struct iov_iter *from)
 {
@@ -190,11 +204,6 @@ static inline ssize_t vhci_get_user(struct vhci_data *data,
 
 	case HCI_VENDOR_PKT:
 		cancel_delayed_work_sync(&data->open_timeout);
-
-		if (data->hdev) {
-			kfree_skb(skb);
-			return -EBADFD;
-		}
 
 		opcode = *((__u8 *) skb->data);
 		skb_pull(skb, 1);
@@ -320,6 +329,7 @@ static int vhci_open(struct inode *inode, struct file *file)
 	skb_queue_head_init(&data->readq);
 	init_waitqueue_head(&data->read_wait);
 
+	mutex_init(&data->open_mutex);
 	INIT_DELAYED_WORK(&data->open_timeout, vhci_open_timeout);
 
 	file->private_data = data;
