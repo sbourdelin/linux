@@ -407,8 +407,9 @@ ff_layout_alloc_lseg(struct pnfs_layout_hdr *lh,
 		struct nfs4_ff_layout_mirror *mirror;
 		struct nfs4_deviceid devid;
 		struct nfs4_deviceid_node *idnode;
-		u32 ds_count;
-		u32 fh_count;
+		struct auth_cred acred = {0};
+		struct rpc_cred	*cred;
+		u32 ds_count, fh_count, id;
 		int j;
 
 		rc = -EIO;
@@ -484,24 +485,39 @@ ff_layout_alloc_lseg(struct pnfs_layout_hdr *lh,
 		fls->mirror_array[i]->fh_versions_cnt = fh_count;
 
 		/* user */
-		rc = decode_name(&stream, &fls->mirror_array[i]->uid);
+		rc = decode_name(&stream, &id);
 		if (rc)
 			goto out_err_free;
 
+		acred.uid = make_kuid(&init_user_ns, id);
+
 		/* group */
-		rc = decode_name(&stream, &fls->mirror_array[i]->gid);
+		rc = decode_name(&stream, &id);
 		if (rc)
 			goto out_err_free;
+
+		acred.gid = make_kgid(&init_user_ns, id);
+
+		/* find the cred for it */
+		cred = rpc_lookup_generic_cred(&acred, 0, gfp_flags);
+		if (IS_ERR(cred)) {
+			rc = PTR_ERR(cred);
+			goto out_err_free;
+		}
+
+		rcu_assign_pointer(fls->mirror_array[i]->cred, cred);
 
 		mirror = ff_layout_add_mirror(lh, fls->mirror_array[i]);
 		if (mirror != fls->mirror_array[i]) {
+			/* swap cred ptrs so free_mirror will clean up old */
+			fls->mirror_array[i]->cred = xchg(&mirror->cred, cred);
 			ff_layout_free_mirror(fls->mirror_array[i]);
 			fls->mirror_array[i] = mirror;
 		}
 
-		dprintk("%s: uid %d gid %d\n", __func__,
-			fls->mirror_array[i]->uid,
-			fls->mirror_array[i]->gid);
+		dprintk("%s: uid %u gid %u\n", __func__,
+			from_kuid(&init_user_ns, acred.uid),
+			from_kgid(&init_user_ns, acred.gid));
 	}
 
 	p = xdr_inline_decode(&stream, 4);
