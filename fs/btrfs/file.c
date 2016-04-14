@@ -2432,11 +2432,11 @@ static int btrfs_punch_hole(struct inode *inode, loff_t offset, loff_t len)
 		goto out_only_mutex;
 	}
 
-	start_index = lockstart >> PAGE_CACHE_SHIFT;
-	end_index = lockend >> PAGE_CACHE_SHIFT;
+	start_index = lockstart >> PAGE_SHIFT;
+	end_index = lockend >> PAGE_SHIFT;
 
-	same_page = lockstart >> PAGE_CACHE_SHIFT
-		== lockend >> PAGE_CACHE_SHIFT;
+	same_page = lockstart >> PAGE_SHIFT
+		== lockend >> PAGE_SHIFT;
 
 	while (1) {
 		struct btrfs_ordered_extent *ordered;
@@ -2446,7 +2446,7 @@ static int btrfs_punch_hole(struct inode *inode, loff_t offset, loff_t len)
 
 		truncate_pagecache_range(inode, lockstart, lockend);
 
-		if (lockstart & (PAGE_CACHE_SIZE - 1)) {
+		if (lockstart & (PAGE_SIZE - 1)) {
 			start_page = find_or_create_page(mapping, start_index,
 							GFP_NOFS);
 			if (!start_page) {
@@ -2455,13 +2455,13 @@ static int btrfs_punch_hole(struct inode *inode, loff_t offset, loff_t len)
 			}
 		}
 
-		if (!same_page && ((lockend + 1) & (PAGE_CACHE_SIZE - 1))) {
+		if (!same_page && ((lockend + 1) & (PAGE_SIZE - 1))) {
 			end_page = find_or_create_page(mapping, end_index,
 						GFP_NOFS);
 			if (!end_page) {
 				if (start_page) {
 					unlock_page(start_page);
-					page_cache_release(start_page);
+					put_page(start_page);
 				}
 				mutex_unlock(&inode->i_mutex);
 				return -ENOMEM;
@@ -2478,9 +2478,9 @@ static int btrfs_punch_hole(struct inode *inode, loff_t offset, loff_t len)
 		 * and nobody raced in and read a page in this range, if we did
 		 * we need to try again.
 		 */
-		nr_pages = round_up(lockend, PAGE_CACHE_SIZE)
-			- round_down(lockstart, PAGE_CACHE_SIZE);
-		nr_pages >>= PAGE_CACHE_SHIFT;
+		nr_pages = round_up(lockend, PAGE_SIZE)
+			- round_down(lockstart, PAGE_SIZE);
+		nr_pages >>= PAGE_SHIFT;
 
 		if ((!ordered ||
 		    (ordered->file_offset + ordered->len <= lockstart ||
@@ -2488,22 +2488,22 @@ static int btrfs_punch_hole(struct inode *inode, loff_t offset, loff_t len)
 		     (!(start_page && PagePrivate(start_page) &&
 			test_page_blks_state(start_page, 1 << BLK_STATE_UPTODATE,
 			 lockstart,
-			 min(lockstart + PAGE_CACHE_SIZE - 1, lockend), 0)) &&
+			 min(lockstart + PAGE_SIZE - 1, lockend), 0)) &&
 		      !(end_page && PagePrivate(end_page) &&
 			test_page_blks_state(end_page, 1 << BLK_STATE_UPTODATE,
 			 page_offset(end_page), lockend, 0)) &&
 		      !(nr_pages > 2 && btrfs_page_exists_in_range(inode,
-					 round_up(lockstart, PAGE_CACHE_SIZE),
-					 round_down(lockend, PAGE_CACHE_SIZE) - 1)))) {
+					 round_up(lockstart, PAGE_SIZE),
+					 round_down(lockend, PAGE_SIZE) - 1)))) {
 			if (ordered)
 				btrfs_put_ordered_extent(ordered);
 			if (end_page) {
 				unlock_page(end_page);
-				page_cache_release(end_page);
+				put_page(end_page);
 			}
 			if (start_page) {
 				unlock_page(start_page);
-				page_cache_release(start_page);
+				put_page(start_page);
 			}
 			break;
 		}
@@ -2513,11 +2513,11 @@ static int btrfs_punch_hole(struct inode *inode, loff_t offset, loff_t len)
 				     lockend, &cached_state, GFP_NOFS);
 		if (end_page) {
 			unlock_page(end_page);
-			page_cache_release(end_page);
+			put_page(end_page);
 		}
 		if (start_page) {
 			unlock_page(start_page);
-			page_cache_release(start_page);
+			put_page(start_page);
 		}
 		ret = btrfs_wait_ordered_range(inode, lockstart,
 					       lockend - lockstart + 1);
