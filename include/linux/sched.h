@@ -1309,6 +1309,11 @@ struct sched_rt_entity {
 #endif
 };
 
+static inline int dl_policy(int policy)
+{
+	return policy == SCHED_DEADLINE;
+}
+
 struct sched_dl_entity {
 	struct rb_node	rb_node;
 
