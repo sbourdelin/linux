@@ -84,7 +84,7 @@ static inline void intel_logical_ring_advance(struct intel_ringbuffer *ringbuf)
 static inline void intel_logical_ring_emit(struct intel_ringbuffer *ringbuf,
 					   u32 data)
 {
-	iowrite32(data, ringbuf->virtual_start + ringbuf->tail);
+	writel(data, ringbuf->virtual_start + ringbuf->tail);
 	ringbuf->tail += 4;
 }
 static inline void intel_logical_ring_emit_reg(struct intel_ringbuffer *ringbuf,

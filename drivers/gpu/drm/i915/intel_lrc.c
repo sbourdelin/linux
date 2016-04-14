@@ -822,7 +822,7 @@ static void __wrap_ring_buffer(struct intel_ringbuffer *ringbuf)
 	virt = ringbuf->virtual_start + ringbuf->tail;
 	rem /= 4;
 	while (rem--)
-		iowrite32(MI_NOOP, virt++);
+		writel(MI_NOOP, virt++);
 
 	ringbuf->tail = 0;
 	intel_ring_update_space(ringbuf);
