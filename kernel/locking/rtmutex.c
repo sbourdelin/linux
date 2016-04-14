@@ -280,6 +280,15 @@ struct task_struct *rt_mutex_get_top_task(struct task_struct *task)
 				struct rt_mutex_waiter, pi_tree_entry)->task;
 }
 
+struct rt_mutex_waiter *rt_mutex_get_top_waiter(struct task_struct *task)
+{
+	if (!task->pi_waiters_leftmost_copy)
+		return NULL;
+
+	return rb_entry(task->pi_waiters_leftmost_copy,
+				struct rt_mutex_waiter, pi_tree_entry);
+}
+
 /*
  * Called by sched_setscheduler() to get the priority which will be
  * effective after the change.
@@ -299,7 +308,17 @@ int rt_mutex_get_effective_prio(struct task_struct *task, int newprio)
  */
 void rt_mutex_update_copy(struct task_struct *p)
 {
+	struct rt_mutex_waiter *top_waiter;
+
+	/* We must always update it, even if NULL */
 	p->pi_waiters_leftmost_copy = p->pi_waiters_leftmost;
+
+	if (!task_has_pi_waiters(p))
+		return;
+
+	top_waiter = task_top_pi_waiter(p);
+	top_waiter->dl_runtime_copy = top_waiter->dl_runtime;
+	top_waiter->dl_period_copy = top_waiter->dl_period;
 }
 
 /*
@@ -632,6 +651,8 @@ static int rt_mutex_adjust_prio_chain(struct task_struct *task,
 	/* [7] Requeue the waiter in the lock waiter tree. */
 	rt_mutex_dequeue(lock, waiter);
 	waiter->prio = task->prio;
+	waiter->dl_runtime = dl_policy(task->policy) ? task->dl.dl_runtime : 0;
+	waiter->dl_period = dl_policy(task->policy) ? task->dl.dl_period : 0;
 	rt_mutex_enqueue(lock, waiter);
 
 	/* [8] Release the task */
@@ -902,6 +923,8 @@ static int task_blocks_on_rt_mutex(struct rt_mutex *lock,
 	waiter->task = task;
 	waiter->lock = lock;
 	waiter->prio = task->prio;
+	waiter->dl_runtime = dl_policy(task->policy) ? task->dl.dl_runtime : 0;
+	waiter->dl_period = dl_policy(task->policy) ? task->dl.dl_period : 0;
 
 	/* Get the top priority waiter on the lock */
 	if (rt_mutex_has_waiters(lock))

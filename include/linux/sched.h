@@ -1323,8 +1323,8 @@ struct sched_dl_entity {
 	 * the next sched_setattr().
 	 */
 	u64 dl_runtime;		/* maximum runtime for each instance	*/
-	u64 dl_deadline;	/* relative deadline of each instance	*/
 	u64 dl_period;		/* separation of two instances (period) */
+	u64 dl_deadline;	/* relative deadline of each instance	*/
 	u64 dl_bw;		/* dl_runtime / dl_deadline		*/
 
 	/*

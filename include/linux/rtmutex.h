@@ -58,6 +58,13 @@ struct rt_mutex_waiter {
 	struct rt_mutex		*deadlock_lock;
 #endif
 	int prio;
+	/* Updated under waiter's pi_lock and rt_mutex lock */
+	u64 dl_runtime, dl_period;
+	/*
+	 * Copied directly from above.
+	 * Updated under owner's pi_lock, rq lock, and rt_mutex lock.
+	 */
+	u64 dl_runtime_copy, dl_period_copy;
 };
 
 struct hrtimer_sleeper;

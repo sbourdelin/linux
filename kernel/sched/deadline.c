@@ -932,8 +932,9 @@ static void dequeue_dl_entity(struct sched_dl_entity *dl_se)
 
 static void enqueue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 {
-	struct task_struct *pi_task = rt_mutex_get_top_task(p);
+	struct rt_mutex_waiter *top_waiter = rt_mutex_get_top_waiter(p);
 	struct sched_dl_entity *pi_se = &p->dl;
+	struct sched_dl_entity_fake pi_se_fake;
 
 	/*
 	 * Use the scheduling parameters of the top pi-waiter
@@ -941,8 +942,11 @@ static void enqueue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 	 * smaller than our one... OTW we keep our runtime and
 	 * deadline.
 	 */
-	if (pi_task && p->dl.dl_boosted && dl_prio(pi_task->normal_prio)) {
-		pi_se = &pi_task->dl;
+	if (top_waiter && p->dl.dl_boosted && top_waiter->dl_runtime_copy) {
+		BUG_ON(top_waiter->dl_period_copy == 0);
+		pi_se_fake.dl_runtime = top_waiter->dl_runtime_copy;
+		pi_se_fake.dl_period = top_waiter->dl_period_copy;
+		pi_se = (struct sched_dl_entity *)&pi_se_fake;
 	} else if (!dl_prio(p->normal_prio)) {
 		/*
 		 * Special case in which we have a !SCHED_DEADLINE task
