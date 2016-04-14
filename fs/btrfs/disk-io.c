@@ -504,28 +504,30 @@ static int btree_read_extent_buffer_pages(struct btrfs_root *root,
 
 static int csum_dirty_buffer(struct btrfs_fs_info *fs_info, struct page *page)
 {
-	u64 start = page_offset(page);
-	u64 found_start;
 	struct extent_buffer *eb;
+	u64 found_start;
+	int ret;
 
 	eb = (struct extent_buffer *)page->private;
 	if (page != eb_head(eb)->pages[0])
 		return 0;
 
-	found_start = btrfs_header_bytenr(eb);
-	/*
-	 * Please do not consolidate these warnings into a single if.
-	 * It is useful to know what went wrong.
-	 */
-	if (WARN_ON(found_start != start))
-		return -EUCLEAN;
-	if (WARN_ON(!PageUptodate(page)))
-		return -EUCLEAN;
+	do {
+		if (!test_bit(EXTENT_BUFFER_WRITEBACK, &eb->ebflags))
+			continue;
+		if (WARN_ON(!test_bit(EXTENT_BUFFER_UPTODATE, &eb->ebflags)))
+			continue;
+		found_start = btrfs_header_bytenr(eb);
+		if (WARN_ON(found_start != eb->start))
+			return 0;
+		ASSERT(memcmp_extent_buffer(eb, fs_info->fsid,
+				btrfs_header_fsid(), BTRFS_FSID_SIZE) == 0);
+		ret = csum_tree_block(fs_info, eb, 0);
+		if (ret)
+			return ret;
+	} while ((eb = eb->eb_next) != NULL);
 
-	ASSERT(memcmp_extent_buffer(eb, fs_info->fsid,
-			btrfs_header_fsid(), BTRFS_FSID_SIZE) == 0);
-
-	return csum_tree_block(fs_info, eb, 0);
+	return 0;
 }
 
 static int check_tree_block_fsid(struct btrfs_fs_info *fs_info,
