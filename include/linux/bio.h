@@ -310,6 +310,27 @@ static inline void bio_clear_flag(struct bio *bio, unsigned int bit)
 	bio->bi_flags &= ~(1U << bit);
 }
 
+static inline struct bio_vec *bio_get_base_vec(struct bio *bio)
+{
+	return __bvec_iter_bvec(bio->bi_io_vec, bio->bi_iter);
+}
+
+/* This helper should be used for setting bvec table on a new bio */
+static inline void bio_set_vec_table(struct bio *bio, struct bio_vec *table,
+			      unsigned max_vecs)
+{
+	bio->bi_io_vec = table;
+	bio->bi_max_vecs = max_vecs;
+}
+
+/* For singlepage bvecs, one segment includes one page */
+static inline unsigned bio_pages(struct bio *bio)
+{
+	if (!bio_flagged(bio, BIO_CLONED))
+		return bio->bi_vcnt;
+	return bio_segments(bio);
+}
+
 static inline void bio_get_first_bvec(struct bio *bio, struct bio_vec *bv)
 {
 	*bv = bio_iovec(bio);
