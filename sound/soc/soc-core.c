@@ -3887,8 +3887,7 @@ int snd_soc_of_get_dai_name(struct device_node *of_node,
 	struct of_phandle_args args;
 	int ret;
 
-	ret = of_parse_phandle_with_args(of_node, "sound-dai",
-					 "#sound-dai-cells", 0, &args);
+	ret = of_parse_snd_soc_connection_with_args(of_node, &args);
 	if (ret)
 		return ret;
 
