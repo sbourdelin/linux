@@ -36,12 +36,15 @@ int __read_mostly sysctl_hung_task_check_count = PID_MAX_LIMIT;
  * Zero means infinite timeout - no checking done:
  */
 unsigned long __read_mostly sysctl_hung_task_timeout_secs = CONFIG_DEFAULT_HUNG_TASK_TIMEOUT;
+unsigned long hung_task_last_checked;
 
 int __read_mostly sysctl_hung_task_warnings = 10;
 
 static int __read_mostly did_panic;
 
-static struct task_struct *watchdog_task;
+static struct kthread_worker *watchdog_worker;
+static void watchdog_check_func(struct kthread_work *dummy);
+static DEFINE_DELAYED_KTHREAD_WORK(watchdog_check_work, watchdog_check_func);
 
 /*
  * Should we panic (and reboot, if panic_timeout= is set) when a
@@ -72,7 +75,7 @@ static struct notifier_block panic_block = {
 	.notifier_call = hung_task_panic,
 };
 
-static void check_hung_task(struct task_struct *t, unsigned long timeout)
+static void check_hung_task(struct task_struct *t, unsigned long lapsed)
 {
 	unsigned long switch_count = t->nvcsw + t->nivcsw;
 
@@ -109,7 +112,7 @@ static void check_hung_task(struct task_struct *t, unsigned long timeout)
 	 * complain:
 	 */
 	pr_err("INFO: task %s:%d blocked for more than %ld seconds.\n",
-		t->comm, t->pid, timeout);
+		t->comm, t->pid, lapsed);
 	pr_err("      %s %s %.*s\n",
 		print_tainted(), init_utsname()->release,
 		(int)strcspn(init_utsname()->version, " "),
@@ -155,7 +158,7 @@ static bool rcu_lock_break(struct task_struct *g, struct task_struct *t)
  * a really long time (120 seconds). If that happens, print out
  * a warning.
  */
-static void check_hung_uninterruptible_tasks(unsigned long timeout)
+static void check_hung_uninterruptible_tasks(unsigned long lapsed)
 {
 	int max_count = sysctl_hung_task_check_count;
 	int batch_count = HUNG_TASK_BATCHING;
@@ -179,18 +182,10 @@ static void check_hung_uninterruptible_tasks(unsigned long timeout)
 		}
 		/* use "==" to skip the TASK_KILLABLE tasks waiting on NFS */
 		if (t->state == TASK_UNINTERRUPTIBLE)
-			check_hung_task(t, timeout);
+			check_hung_task(t, lapsed);
 	}
  unlock:
 	rcu_read_unlock();
-}
-
-static long hung_timeout_jiffies(unsigned long last_checked,
-				 unsigned long timeout)
-{
-	/* timeout of 0 will disable the watchdog */
-	return timeout ? last_checked - jiffies + timeout * HZ :
-		MAX_SCHEDULE_TIMEOUT;
 }
 
 /*
@@ -201,13 +196,26 @@ int proc_dohung_task_timeout_secs(struct ctl_table *table, int write,
 				  size_t *lenp, loff_t *ppos)
 {
 	int ret;
+	long remaining;
 
 	ret = proc_doulongvec_minmax(table, write, buffer, lenp, ppos);
 
-	if (ret || !write)
+	if (ret || !write || !watchdog_worker)
 		goto out;
 
-	wake_up_process(watchdog_task);
+	/* Disable watchdog when there is a zero timeout */
+	if (!sysctl_hung_task_timeout_secs) {
+		cancel_delayed_kthread_work_sync(&watchdog_check_work);
+		goto out;
+	}
+
+	/* Reschedule the check according to the updated timeout */
+	remaining = sysctl_hung_task_timeout_secs * HZ -
+		    (jiffies - hung_task_last_checked);
+	if (remaining < 0)
+		remaining = 0;
+	mod_delayed_kthread_work(watchdog_worker, &watchdog_check_work,
+				 remaining);
 
  out:
 	return ret;
@@ -221,36 +229,45 @@ void reset_hung_task_detector(void)
 }
 EXPORT_SYMBOL_GPL(reset_hung_task_detector);
 
+static void schedule_next_watchdog_check(void)
+{
+	unsigned long timeout = READ_ONCE(sysctl_hung_task_timeout_secs);
+
+	hung_task_last_checked = jiffies;
+	if (timeout)
+		queue_delayed_kthread_work(watchdog_worker,
+					   &watchdog_check_work,
+					   timeout * HZ);
+}
+
 /*
  * kthread which checks for tasks stuck in D state
  */
-static int watchdog(void *dummy)
+static void watchdog_check_func(struct kthread_work *dummy)
 {
-	unsigned long hung_last_checked = jiffies;
+	unsigned long lapsed = (jiffies - hung_task_last_checked) / HZ;
 
-	set_user_nice(current, 0);
+	if (!atomic_xchg(&reset_hung_task, 0))
+		check_hung_uninterruptible_tasks(lapsed);
 
-	for ( ; ; ) {
-		unsigned long timeout = sysctl_hung_task_timeout_secs;
-		long t = hung_timeout_jiffies(hung_last_checked, timeout);
-
-		if (t <= 0) {
-			if (!atomic_xchg(&reset_hung_task, 0))
-				check_hung_uninterruptible_tasks(timeout);
-			hung_last_checked = jiffies;
-			continue;
-		}
-		schedule_timeout_interruptible(t);
-	}
-
-	return 0;
+	schedule_next_watchdog_check();
 }
 
 static int __init hung_task_init(void)
 {
-	atomic_notifier_chain_register(&panic_notifier_list, &panic_block);
-	watchdog_task = kthread_run(watchdog, NULL, "khungtaskd");
+	struct kthread_worker *worker;
 
+	atomic_notifier_chain_register(&panic_notifier_list, &panic_block);
+	worker = create_kthread_worker(0, "khungtaskd");
+	if (IS_ERR(worker)) {
+		pr_warn("Failed to create khungtaskd\n");
+		goto out;
+	}
+	watchdog_worker = worker;
+	set_user_nice(worker->task, 0);
+	schedule_next_watchdog_check();
+
+ out:
 	return 0;
 }
 subsys_initcall(hung_task_init);
