@@ -313,7 +313,6 @@ static int linux_wlan_txq_task(void *vp)
 	vif = netdev_priv(dev);
 	wl = vif->wilc;
 
-	up(&wl->txq_thread_started);
 	while (1) {
 		down(&wl->txq_event);
 
