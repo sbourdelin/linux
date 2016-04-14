@@ -48,3 +48,24 @@ config SND_SOC_MT8173_RT5650_RT5676
 	  with the RT5650 and RT5676 codecs.
 	  Select Y if you have such device.
 	  If unsure select "N".
+
+config SND_SOC_MT2701
+	bool "SND_SOC_MT2701"
+	depends on SND_SOC_MEDIATEK
+	select SND_SOC_CS42XX8_I2C
+	help
+	  This adds ASoC driver for Mediatek MT2701 boards
+	  with the CS42448 codecs.
+	  Select Y if you have such device.
+	  If unsure select "N".
+
+config SND_SOC_MT2701_CS42448
+	bool "SND_SOC_MT2701_CS42448"
+	depends on SND_SOC_MT2701
+	select SND_SOC_CS42XX8_I2C
+	help
+	  This adds ASoC driver for Mediatek MT2701 boards
+	  with the CS42448 codecs.
+	  Select Y if you have such device.
+	  If unsure select "N".
+
