@@ -246,6 +246,7 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 	if (dev->pm_runtime_disabled) {
 		pm_runtime_forbid(&pdev->dev);
 	} else {
+		pm_runtime_get_noresume(&pdev->dev);
 		pm_runtime_set_autosuspend_delay(&pdev->dev, 1000);
 		pm_runtime_use_autosuspend(&pdev->dev);
 		pm_runtime_set_active(&pdev->dev);
@@ -253,8 +254,19 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 	}
 
 	r = i2c_dw_probe(dev);
-	if (r && !dev->pm_runtime_disabled)
+	if (r)
+		goto rpm_disable;
+
+	if (!dev->pm_runtime_disabled)
+		pm_runtime_put_autosuspend(&pdev->dev);
+
+	return 0;
+
+rpm_disable:
+	if (!dev->pm_runtime_disabled) {
 		pm_runtime_disable(&pdev->dev);
+		pm_runtime_put_noidle(&pdev->dev);
+	}
 
 	return r;
 }
