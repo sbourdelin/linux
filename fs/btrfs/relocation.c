@@ -3103,14 +3103,19 @@ static int relocate_file_extent_cluster(struct inode *inode,
 {
 	u64 page_start;
 	u64 page_end;
+	u64 block_start;
+	u64 block_end;
 	u64 offset = BTRFS_I(inode)->index_cnt;
+	u64 blocksize = BTRFS_I(inode)->root->sectorsize;
 	unsigned long index;
 	unsigned long last_index;
 	struct page *page;
 	struct file_ra_state *ra;
 	gfp_t mask = btrfs_alloc_write_mask(inode->i_mapping);
+	int nr_blocks;
 	int nr = 0;
 	int ret = 0;
+	int i;
 
 	if (!cluster->nr)
 		return 0;
@@ -3130,13 +3135,13 @@ static int relocate_file_extent_cluster(struct inode *inode,
 	if (ret)
 		goto out;
 
+	page_start = cluster->start - offset;
+	page_end = min_t(u64, page_start + PAGE_SIZE - 1,
+			cluster->end - offset);
+
 	index = (cluster->start - offset) >> PAGE_SHIFT;
 	last_index = (cluster->end - offset) >> PAGE_SHIFT;
 	while (index <= last_index) {
-		ret = btrfs_delalloc_reserve_metadata(inode, PAGE_SIZE);
-		if (ret)
-			goto out;
-
 		page = find_lock_page(inode->i_mapping, index);
 		if (!page) {
 			page_cache_sync_readahead(inode->i_mapping,
@@ -3145,8 +3150,6 @@ static int relocate_file_extent_cluster(struct inode *inode,
 			page = find_or_create_page(inode->i_mapping, index,
 						   mask);
 			if (!page) {
-				btrfs_delalloc_release_metadata(inode,
-							PAGE_SIZE);
 				ret = -ENOMEM;
 				goto out;
 			}
@@ -3164,42 +3167,62 @@ static int relocate_file_extent_cluster(struct inode *inode,
 			if (!PageUptodate(page)) {
 				unlock_page(page);
 				put_page(page);
-				btrfs_delalloc_release_metadata(inode,
-							PAGE_SIZE);
 				ret = -EIO;
 				goto out;
 			}
 		}
 
-		page_start = page_offset(page);
-		page_end = page_start + PAGE_SIZE - 1;
+		nr_blocks = (page_end + 1 - page_start) >> inode->i_blkbits;
+		i = 0;
 
-		lock_extent(&BTRFS_I(inode)->io_tree, page_start, page_end);
+		while (i < nr_blocks) {
+			ret = btrfs_delalloc_reserve_metadata(inode, blocksize);
+			if (ret) {
+				if (i)
+					set_page_dirty(page);
+				unlock_page(page);
+				put_page(page);
+				goto out;
+			}
 
-		set_page_extent_mapped(page);
+			block_start = page_start + (i << inode->i_blkbits);
+			block_end = block_start + blocksize - 1;
 
-		if (nr < cluster->nr &&
-		    page_start + offset == cluster->boundary[nr]) {
-			set_extent_bits(&BTRFS_I(inode)->io_tree,
-					page_start, page_end,
-					EXTENT_BOUNDARY, GFP_NOFS);
-			nr++;
+			lock_extent(&BTRFS_I(inode)->io_tree, block_start,
+				block_end);
+
+			set_page_extent_mapped(page);
+
+			if (nr < cluster->nr &&
+				block_start + offset == cluster->boundary[nr]) {
+				set_extent_bits(&BTRFS_I(inode)->io_tree,
+						block_start, block_end,
+						EXTENT_BOUNDARY, GFP_NOFS);
+				nr++;
+			}
+
+			btrfs_set_extent_delalloc(inode, block_start,
+						block_end, NULL);
+			set_page_blks_state(page,
+					1 << BLK_STATE_DIRTY | 1 << BLK_STATE_UPTODATE,
+					block_start, block_end);
+
+			unlock_extent(&BTRFS_I(inode)->io_tree,
+				block_start, block_end);
+			i++;
 		}
 
-		btrfs_set_extent_delalloc(inode, page_start, page_end, NULL);
-		set_page_blks_state(page,
-				1 << BLK_STATE_DIRTY | 1 << BLK_STATE_UPTODATE,
-				page_start, page_end);
 		set_page_dirty(page);
-
-		unlock_extent(&BTRFS_I(inode)->io_tree,
-			      page_start, page_end);
 		unlock_page(page);
 		put_page(page);
 
 		index++;
 		balance_dirty_pages_ratelimited(inode->i_mapping);
 		btrfs_throttle(BTRFS_I(inode)->root);
+
+		page_start += PAGE_SIZE;
+		page_end = min_t(u64, page_start + PAGE_SIZE - 1,
+				cluster->end - offset);
 	}
 	WARN_ON(nr != cluster->nr);
 out:
