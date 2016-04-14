@@ -1587,6 +1587,7 @@ struct task_struct {
 
 	unsigned long sas_ss_sp;
 	size_t sas_ss_size;
+	unsigned sas_ss_flags;
 
 	struct callback_head *task_works;
 
@@ -2571,6 +2572,13 @@ static inline int sas_ss_flags(unsigned long sp)
 		return SS_DISABLE;
 
 	return on_sig_stack(sp) ? SS_ONSTACK : 0;
+}
+
+static inline void sas_ss_reset(struct task_struct *p)
+{
+	p->sas_ss_sp = 0;
+	p->sas_ss_size = 0;
+	p->sas_ss_flags = SS_DISABLE;
 }
 
 static inline unsigned long sigsp(unsigned long sp, struct ksignal *ksig)
