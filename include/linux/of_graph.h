@@ -91,4 +91,15 @@ static inline struct device_node *of_graph_get_remote_port(
 
 #endif /* CONFIG_OF */
 
+static inline int of_graph_get_endpoint_count(const struct device_node *np)
+{
+	struct device_node *child;
+	int num = 0;
+
+	for_each_endpoint_of_node(np, child)
+		num++;
+
+	return num;
+}
+
 #endif /* __LINUX_OF_GRAPH_H */
