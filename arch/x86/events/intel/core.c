@@ -1860,7 +1860,7 @@ static int intel_pmu_handle_irq(struct pt_regs *regs)
 
 	loops = 0;
 again:
-	intel_pmu_lbr_read();
+	intel_pmu_lbr_read(regs);
 	intel_pmu_ack_status(status);
 	if (++loops > 100) {
 		static bool warned = false;

@@ -136,7 +136,9 @@ enum {
 	 X86_BR_IRQ		|\
 	 X86_BR_INT)
 
-static void intel_pmu_lbr_filter(struct cpu_hw_events *cpuc);
+
+static void
+intel_pmu_lbr_filter(struct pt_regs *regs, struct cpu_hw_events *cpuc);
 
 /*
  * We only support LBR implementations that have FREEZE_LBRS_ON_PMI
@@ -500,7 +502,7 @@ static void intel_pmu_lbr_read_64(struct cpu_hw_events *cpuc)
 	cpuc->lbr_stack.nr = out;
 }
 
-void intel_pmu_lbr_read(void)
+void intel_pmu_lbr_read(struct pt_regs *regs)
 {
 	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
 
@@ -512,7 +514,7 @@ void intel_pmu_lbr_read(void)
 	else
 		intel_pmu_lbr_read_64(cpuc);
 
-	intel_pmu_lbr_filter(cpuc);
+	intel_pmu_lbr_filter(regs, cpuc);
 }
 
 /*
@@ -658,7 +660,8 @@ int intel_pmu_setup_lbr_filter(struct perf_event *event)
  * decoded (e.g., text page not present), then X86_BR_NONE is
  * returned.
  */
-static int branch_type(unsigned long from, unsigned long to, int abort)
+static int branch_type(unsigned long from, unsigned long to, int abort,
+		struct pt_regs *regs)
 {
 	struct insn insn;
 	void *addr;
@@ -724,7 +727,7 @@ static int branch_type(unsigned long from, unsigned long to, int abort)
 	 * on 64-bit systems running 32-bit apps
 	 */
 #ifdef CONFIG_X86_64
-	is64 = kernel_ip((unsigned long)addr) || !test_thread_flag(TIF_IA32);
+	is64 = kernel_ip((unsigned long)addr) || user_64bit_mode(regs);
 #endif
 	insn_init(&insn, addr, bytes_read, is64);
 	insn_get_opcode(&insn);
@@ -830,7 +833,7 @@ static int branch_type(unsigned long from, unsigned long to, int abort)
  * in PERF_SAMPLE_BRANCH_STACK sample may vary.
  */
 static void
-intel_pmu_lbr_filter(struct cpu_hw_events *cpuc)
+intel_pmu_lbr_filter(struct pt_regs *regs, struct cpu_hw_events *cpuc)
 {
 	u64 from, to;
 	int br_sel = cpuc->br_sel;
@@ -846,7 +849,7 @@ intel_pmu_lbr_filter(struct cpu_hw_events *cpuc)
 		from = cpuc->lbr_entries[i].from;
 		to = cpuc->lbr_entries[i].to;
 
-		type = branch_type(from, to, cpuc->lbr_entries[i].abort);
+		type = branch_type(from, to, cpuc->lbr_entries[i].abort, regs);
 		if (type != X86_BR_NONE && (br_sel & X86_BR_ANYTX)) {
 			if (cpuc->lbr_entries[i].in_tx)
 				type |= X86_BR_IN_TX;

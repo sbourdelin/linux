@@ -899,7 +899,7 @@ void intel_pmu_lbr_enable_all(bool pmi);
 
 void intel_pmu_lbr_disable_all(void);
 
-void intel_pmu_lbr_read(void);
+void intel_pmu_lbr_read(struct pt_regs *regs);
 
 void intel_pmu_lbr_init_core(void);
 
