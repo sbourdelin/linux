@@ -87,6 +87,10 @@
 #include "../workqueue_internal.h"
 #include "../smpboot.h"
 
+#ifdef CONFIG_RTC_CYCLIC
+#include "cyclic.h"
+#endif
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
 
@@ -2074,6 +2078,10 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 	memset(&p->se.statistics, 0, sizeof(p->se.statistics));
 #endif
 
+#ifdef CONFIG_RTC_CYCLIC
+	RB_CLEAR_NODE(&p->rt.rt_overrun.node);
+#endif
+
 	RB_CLEAR_NODE(&p->dl.rb_node);
 	init_dl_task_timer(&p->dl);
 	__dl_clear_params(p);
@@ -3880,6 +3888,11 @@ recheck:
 		  */
 		if (dl_policy(policy))
 			return -EPERM;
+
+#ifdef CONFIG_RTC_CYCLIC
+		if (rt_overrun_policy(p, policy))
+			return -EPERM;
+#endif
 
 		/*
 		 * Treat SCHED_IDLE as nice 20. Only allow a switch to
