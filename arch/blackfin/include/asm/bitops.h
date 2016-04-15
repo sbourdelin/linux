@@ -9,20 +9,115 @@
 
 #include <linux/compiler.h>
 
-#include <asm-generic/bitops/__ffs.h>
-#include <asm-generic/bitops/ffz.h>
-#include <asm-generic/bitops/fls.h>
-#include <asm-generic/bitops/__fls.h>
-#include <asm-generic/bitops/fls64.h>
-#include <asm-generic/bitops/find.h>
-
 #ifndef _LINUX_BITOPS_H
 #error only <linux/bitops.h> can be included directly
 #endif
 
-#include <asm-generic/bitops/sched.h>
-#include <asm-generic/bitops/ffs.h>
+/*
+ * hweightN: returns the hamming weight (i.e. the number
+ * of bits set) of a N-bit word
+ */
+
+static inline unsigned int __arch_hweight32(unsigned int w)
+{
+	unsigned int res;
+
+	__asm__ ("%0.l = ONES %1;"
+		"%0 = %0.l (Z);"
+		: "=d" (res) : "d" (w));
+	return res;
+}
+
+static inline unsigned int __arch_hweight64(__u64 w)
+{
+	return __arch_hweight32((unsigned int)(w >> 32)) +
+	       __arch_hweight32((unsigned int)w);
+}
+
+static inline unsigned int __arch_hweight16(unsigned int w)
+{
+	return __arch_hweight32(w & 0xffff);
+}
+
+static inline unsigned int __arch_hweight8(unsigned int w)
+{
+	return __arch_hweight32(w & 0xff);
+}
+
 #include <asm-generic/bitops/const_hweight.h>
+
+/**
+ * ffz - find the first zero bit in a long word
+ * @x: The long word to find the bit in
+ *
+ * Returns the bit-number (0..31) of the first (least significant) zero bit.
+ * Undefined if no zero exists, so code should check against ~0UL first...
+ */
+static inline unsigned long ffz(unsigned long x)
+{
+	return hweight32(x & (~x - 1));
+}
+
+/**
+ * ffs - find first bit set
+ * @x: the word to search
+ *
+ * This is defined the same way as
+ * the libc and compiler builtin ffs routines, therefore
+ * differs in spirit from the above ffz (man ffs).
+ */
+static inline int ffs(int x)
+{
+	if (!x)
+		return 0;
+	return hweight32(x ^ (x - 1));
+}
+
+/**
+ * __ffs - find first bit in word.
+ * @x: The word to search
+ *
+ * Undefined if no bit exists, so code should check against 0 first.
+ */
+static inline unsigned long __ffs(unsigned long x)
+{
+	return hweight32(~x & (x - 1));
+}
+
+/*
+ * Find the last (most significant) bit set.  Returns 0 for x==0 and
+ * bits are numbered from 1..32 (e.g., fls(9) == 4).
+ */
+static inline int fls(int x)
+{
+	if (!x)
+		return 0;
+	x |= x >> 1;
+	x |= x >> 2;
+	x |= x >> 4;
+	x |= x >> 8;
+	x |= x >> 16;
+	return hweight32(x);
+}
+
+/*
+ * Find the last (most significant) bit set.  Undefined for x==0.
+ * Bits are numbered from 0..31 (e.g., __fls(9) == 3).
+ */
+static inline unsigned long __fls(unsigned long x)
+{
+	x |= x >> 1;
+	x |= x >> 2;
+	x |= x >> 4;
+	x |= x >> 8;
+	x |= x >> 16;
+	return hweight32(x) - 1;
+}
+
+#include <asm-generic/bitops/fls64.h>
+#include <asm-generic/bitops/find.h>
+
+#include <asm-generic/bitops/sched.h>
 #include <asm-generic/bitops/lock.h>
 
 #include <asm-generic/bitops/ext2-atomic.h>
@@ -105,36 +200,5 @@ static inline int test_and_change_bit(int nr, volatile unsigned long *addr)
 
 /* Needs to be after test_bit and friends */
 #include <asm-generic/bitops/le.h>
-
-/*
- * hweightN: returns the hamming weight (i.e. the number
- * of bits set) of a N-bit word
- */
-
-static inline unsigned int __arch_hweight32(unsigned int w)
-{
-	unsigned int res;
-
-	__asm__ ("%0.l = ONES %1;"
-		"%0 = %0.l (Z);"
-		: "=d" (res) : "d" (w));
-	return res;
-}
-
-static inline unsigned int __arch_hweight64(__u64 w)
-{
-	return __arch_hweight32((unsigned int)(w >> 32)) +
-	       __arch_hweight32((unsigned int)w);
-}
-
-static inline unsigned int __arch_hweight16(unsigned int w)
-{
-	return __arch_hweight32(w & 0xffff);
-}
-
-static inline unsigned int __arch_hweight8(unsigned int w)
-{
-	return __arch_hweight32(w & 0xff);
-}
 
 #endif				/* _BLACKFIN_BITOPS_H */
