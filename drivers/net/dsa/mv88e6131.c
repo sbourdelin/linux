@@ -18,10 +18,10 @@
 #include "mv88e6xxx.h"
 
 static const struct mv88e6xxx_info mv88e6131_table[] = {
-	{ MV88E6XXX_INFO(6095, 0x095, "Marvell 88E6095/88E6095F") },
-	{ MV88E6XXX_INFO(6097, 0x04a, "Marvell 88E6085") },
-	{ MV88E6XXX_INFO(6185, 0x106, "Marvell 88E6131") },
-	{ MV88E6XXX_INFO(6185, 0x1a7, "Marvell 88E6185") },
+	{ MV88E6XXX_INFO(6095, 0x095, 11, "Marvell 88E6095/88E6095F") },
+	{ MV88E6XXX_INFO(6097, 0x04a, 10, "Marvell 88E6085") },
+	{ MV88E6XXX_INFO(6185, 0x106, 8,  "Marvell 88E6131") },
+	{ MV88E6XXX_INFO(6185, 0x1a7, 10, "Marvell 88E6185") },
 };
 
 static char *mv88e6131_drv_probe(struct device *dsa_dev,
@@ -90,7 +90,6 @@ static int mv88e6131_setup_global(struct dsa_switch *ds)
 
 static int mv88e6131_setup(struct dsa_switch *ds)
 {
-	struct mv88e6xxx_priv_state *ps = ds_to_priv(ds);
 	int ret;
 
 	ret = mv88e6xxx_setup_common(ds);
@@ -98,21 +97,6 @@ static int mv88e6131_setup(struct dsa_switch *ds)
 		return ret;
 
 	mv88e6xxx_ppu_state_init(ds);
-
-	switch (ps->id) {
-	case PORT_SWITCH_ID_6085:
-	case PORT_SWITCH_ID_6185:
-		ps->num_ports = 10;
-		break;
-	case PORT_SWITCH_ID_6095:
-		ps->num_ports = 11;
-		break;
-	case PORT_SWITCH_ID_6131:
-		ps->num_ports = 8;
-		break;
-	default:
-		return -ENODEV;
-	}
 
 	ret = mv88e6xxx_switch_reset(ds, false);
 	if (ret < 0)
@@ -129,7 +113,7 @@ static int mv88e6131_port_to_phy_addr(struct dsa_switch *ds, int port)
 {
 	struct mv88e6xxx_priv_state *ps = ds_to_priv(ds);
 
-	if (port >= 0 && port < ps->num_ports)
+	if (port >= 0 && port < ps->info->num_ports)
 		return port;
 
 	return -EINVAL;

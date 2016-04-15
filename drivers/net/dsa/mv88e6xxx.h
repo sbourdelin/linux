@@ -369,12 +369,14 @@ enum mv88e6xxx_family {
 struct mv88e6xxx_info {
 	enum mv88e6xxx_family family;
 	u16 prod_num;
+	unsigned int num_ports;
 	const char *name;
 };
 
-#define MV88E6XXX_INFO(_family, _prod_num, _name) \
+#define MV88E6XXX_INFO(_family, _prod_num, _num_ports, _name) \
 	.family = MV88E6XXX_FAMILY_##_family, \
 	.prod_num = _prod_num, \
+	.num_ports = _num_ports, \
 	.name = _name, \
 
 struct mv88e6xxx_atu_entry {
@@ -447,8 +449,6 @@ struct mv88e6xxx_priv_state {
 	struct mutex eeprom_mutex;
 
 	int		id; /* switch product id */
-	int		num_ports;	/* number of switch ports */
-
 	struct mv88e6xxx_priv_port	ports[DSA_MAX_PORTS];
 
 	DECLARE_BITMAP(port_state_update_mask, DSA_MAX_PORTS);
