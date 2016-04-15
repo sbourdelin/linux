@@ -1428,9 +1428,9 @@ static void of_i2c_register_devices(struct i2c_adapter *adap)
 	dev_dbg(&adap->dev, "of_i2c: walking child nodes\n");
 
 	for_each_available_child_of_node(adap->dev.of_node, node) {
-		if (of_node_test_and_set_flag(node, OF_POPULATED))
-			continue;
-		of_i2c_register_device(adap, node);
+		if (!of_node_test_and_set_flag(node, OF_POPULATED))
+			of_i2c_register_device(adap, node);
+		of_node_put(node);
 	}
 }
 
