@@ -620,7 +620,41 @@ EXPORT_SYMBOL_GPL(__trace_bputs);
 
 #ifdef CONFIG_TRACER_SNAPSHOT
 /**
- * trace_snapshot - take a snapshot of the current buffer.
+ * trace_snapshot - take a snapshot of a buffer.
+ * @tr:    Which tracing buffer (instance) to take a snapshot of
+ */
+void __tracing_snapshot(struct trace_array *tr)
+{
+	struct tracer *tracer = tr->current_trace;
+	unsigned long flags;
+
+	if (in_nmi()) {
+		internal_trace_puts("*** SNAPSHOT CALLED FROM NMI CONTEXT ***\n");
+		internal_trace_puts("*** snapshot is being ignored        ***\n");
+		return;
+	}
+
+	if (!tr->allocated_snapshot) {
+		internal_trace_puts("*** SNAPSHOT NOT ALLOCATED ***\n");
+		internal_trace_puts("*** stopping trace here!   ***\n");
+		tracer_tracing_off(tr);
+		return;
+	}
+
+	/* Note, snapshot can not be used when the tracer uses it */
+	if (tracer->use_max_tr) {
+		internal_trace_puts("*** LATENCY TRACER ACTIVE ***\n");
+		internal_trace_puts("*** Can not use snapshot (sorry) ***\n");
+		return;
+	}
+
+	local_irq_save(flags);
+	update_max_tr(tr, current, smp_processor_id());
+	local_irq_restore(flags);
+}
+
+/**
+ * trace_snapshot - take a snapshot of the top level buffer.
  *
  * This causes a swap between the snapshot buffer and the current live
  * tracing buffer. You can use this to take snapshots of the live
@@ -635,33 +669,7 @@ EXPORT_SYMBOL_GPL(__trace_bputs);
  */
 void tracing_snapshot(void)
 {
-	struct trace_array *tr = &global_trace;
-	struct tracer *tracer = tr->current_trace;
-	unsigned long flags;
-
-	if (in_nmi()) {
-		internal_trace_puts("*** SNAPSHOT CALLED FROM NMI CONTEXT ***\n");
-		internal_trace_puts("*** snapshot is being ignored        ***\n");
-		return;
-	}
-
-	if (!tr->allocated_snapshot) {
-		internal_trace_puts("*** SNAPSHOT NOT ALLOCATED ***\n");
-		internal_trace_puts("*** stopping trace here!   ***\n");
-		tracing_off();
-		return;
-	}
-
-	/* Note, snapshot can not be used when the tracer uses it */
-	if (tracer->use_max_tr) {
-		internal_trace_puts("*** LATENCY TRACER ACTIVE ***\n");
-		internal_trace_puts("*** Can not use snapshot (sorry) ***\n");
-		return;
-	}
-
-	local_irq_save(flags);
-	update_max_tr(tr, current, smp_processor_id());
-	local_irq_restore(flags);
+	__tracing_snapshot(&global_trace);
 }
 EXPORT_SYMBOL_GPL(tracing_snapshot);
 

@@ -717,6 +717,7 @@ enum print_line_t print_trace_line(struct trace_iterator *iter);
 extern char trace_find_mark(unsigned long long duration);
 
 void __trace_dump_stack(int skip, struct trace_array *tr);
+void __tracing_snapshot(struct trace_array *tr);
 int tracer_tracing_is_on(struct trace_array *tr);
 void tracer_tracing_on(struct trace_array *tr);
 void tracer_tracing_off(struct trace_array *tr);

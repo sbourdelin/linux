@@ -901,7 +901,7 @@ static void
 snapshot_trigger(struct event_trigger_data *data, void *rec,
 		 struct trace_event_file *file)
 {
-	tracing_snapshot();
+	__tracing_snapshot(file->tr);
 }
 
 static void
@@ -914,7 +914,7 @@ snapshot_count_trigger(struct event_trigger_data *data, void *rec,
 	if (data->count != -1)
 		(data->count)--;
 
-	snapshot_trigger(data, rec);
+	snapshot_trigger(data, rec, file);
 }
 
 static int
