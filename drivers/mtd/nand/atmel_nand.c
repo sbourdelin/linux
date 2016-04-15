@@ -1212,6 +1212,7 @@ static int atmel_pmecc_nand_init_params(struct platform_device *pdev,
 		dev_warn(host->dev,
 			"Can't get I/O resource regs for PMECC controller, rolling back on software ECC\n");
 		nand_chip->ecc.mode = NAND_ECC_SOFT;
+		nand_chip->ecc.algo = NAND_ECC_HAMMING;
 		return 0;
 	}
 
@@ -1295,6 +1296,7 @@ static int atmel_pmecc_nand_init_params(struct platform_device *pdev,
 		/* page size not handled by HW ECC */
 		/* switching back to soft ECC */
 		nand_chip->ecc.mode = NAND_ECC_SOFT;
+		nand_chip->ecc.algo = NAND_ECC_HAMMING;
 		return 0;
 	}
 
@@ -1613,6 +1615,7 @@ static int atmel_of_init_port(struct atmel_nand_host *host,
 	 * even if the nand-ecc-mode property is not defined.
 	 */
 	host->nand_chip.ecc.mode = NAND_ECC_SOFT;
+	host->nand_chip.ecc.algo = NAND_ECC_HAMMING;
 
 	return 0;
 }
@@ -1629,6 +1632,7 @@ static int atmel_hw_nand_init_params(struct platform_device *pdev,
 		dev_err(host->dev,
 			"Can't get I/O resource regs, use software ECC\n");
 		nand_chip->ecc.mode = NAND_ECC_SOFT;
+		nand_chip->ecc.algo = NAND_ECC_HAMMING;
 		return 0;
 	}
 
@@ -1661,6 +1665,7 @@ static int atmel_hw_nand_init_params(struct platform_device *pdev,
 		/* page size not handled by HW ECC */
 		/* switching back to soft ECC */
 		nand_chip->ecc.mode = NAND_ECC_SOFT;
+		nand_chip->ecc.algo = NAND_ECC_HAMMING;
 		return 0;
 	}
 
@@ -2159,6 +2164,7 @@ static int atmel_nand_probe(struct platform_device *pdev)
 		memcpy(&host->board, dev_get_platdata(&pdev->dev),
 		       sizeof(struct atmel_nand_data));
 		nand_chip->ecc.mode = host->board.ecc_mode;
+		nand_chip->ecc.algo = host->board.ecc_algo;
 
 		/* 16-bit bus width */
 		if (host->board.bus_width_16)
