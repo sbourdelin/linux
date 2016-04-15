@@ -4153,7 +4153,7 @@ int nand_scan_tail(struct mtd_info *mtd)
 	/*
 	 * If no default placement scheme is given, select an appropriate one.
 	 */
-	if (!mtd->ooblayout && (ecc->mode != NAND_ECC_SOFT_BCH)) {
+	if (!mtd->ooblayout && ecc->algo != NAND_ECC_BCH) {
 		switch (mtd->oobsize) {
 		case 8:
 		case 16:
@@ -4247,51 +4247,59 @@ int nand_scan_tail(struct mtd_info *mtd)
 		ecc->algo = NAND_ECC_HAMMING;
 
 	case NAND_ECC_SOFT:
-		ecc->calculate = nand_calculate_ecc;
-		ecc->correct = nand_correct_data;
-		ecc->read_page = nand_read_page_swecc;
-		ecc->read_subpage = nand_read_subpage;
-		ecc->write_page = nand_write_page_swecc;
-		ecc->read_page_raw = nand_read_page_raw;
-		ecc->write_page_raw = nand_write_page_raw;
-		ecc->read_oob = nand_read_oob_std;
-		ecc->write_oob = nand_write_oob_std;
-		if (!ecc->size)
-			ecc->size = 256;
-		ecc->bytes = 3;
-		ecc->strength = 1;
-		break;
-
 	case NAND_ECC_SOFT_BCH:
-		if (!mtd_nand_has_bch()) {
-			WARN(1, "CONFIG_MTD_NAND_ECC_BCH not enabled\n");
-			ret = -EINVAL;
-			goto err_free;
-		}
-		ecc->calculate = nand_bch_calculate_ecc;
-		ecc->correct = nand_bch_correct_data;
-		ecc->read_page = nand_read_page_swecc;
-		ecc->read_subpage = nand_read_subpage;
-		ecc->write_page = nand_write_page_swecc;
-		ecc->read_page_raw = nand_read_page_raw;
-		ecc->write_page_raw = nand_write_page_raw;
-		ecc->read_oob = nand_read_oob_std;
-		ecc->write_oob = nand_write_oob_std;
-		/*
-		 * Board driver should supply ecc.size and ecc.strength values
-		 * to select how many bits are correctable. Otherwise, default
-		 * to 4 bits for large page devices.
-		 */
-		if (!ecc->size && (mtd->oobsize >= 64)) {
-			ecc->size = 512;
-			ecc->strength = 4;
-		}
+		switch (ecc->algo) {
+		case NAND_ECC_HAMMING:
+			ecc->calculate = nand_calculate_ecc;
+			ecc->correct = nand_correct_data;
+			ecc->read_page = nand_read_page_swecc;
+			ecc->read_subpage = nand_read_subpage;
+			ecc->write_page = nand_write_page_swecc;
+			ecc->read_page_raw = nand_read_page_raw;
+			ecc->write_page_raw = nand_write_page_raw;
+			ecc->read_oob = nand_read_oob_std;
+			ecc->write_oob = nand_write_oob_std;
+			if (!ecc->size)
+				ecc->size = 256;
+			ecc->bytes = 3;
+			ecc->strength = 1;
+			break;
+		case NAND_ECC_BCH:
+			if (!mtd_nand_has_bch()) {
+				WARN(1, "CONFIG_MTD_NAND_ECC_BCH not enabled\n");
+				ret = -EINVAL;
+				goto err_free;
+			}
+			ecc->calculate = nand_bch_calculate_ecc;
+			ecc->correct = nand_bch_correct_data;
+			ecc->read_page = nand_read_page_swecc;
+			ecc->read_subpage = nand_read_subpage;
+			ecc->write_page = nand_write_page_swecc;
+			ecc->read_page_raw = nand_read_page_raw;
+			ecc->write_page_raw = nand_write_page_raw;
+			ecc->read_oob = nand_read_oob_std;
+			ecc->write_oob = nand_write_oob_std;
+			/*
+			* Board driver should supply ecc.size and ecc.strength
+			* values to select how many bits are correctable.
+			* Otherwise, default to 4 bits for large page devices.
+			*/
+			if (!ecc->size && (mtd->oobsize >= 64)) {
+				ecc->size = 512;
+				ecc->strength = 4;
+			}
 
-		/* See nand_bch_init() for details. */
-		ecc->bytes = 0;
-		ecc->priv = nand_bch_init(mtd);
-		if (!ecc->priv) {
-			WARN(1, "BCH ECC initialization failed!\n");
+			/* See nand_bch_init() for details. */
+			ecc->bytes = 0;
+			ecc->priv = nand_bch_init(mtd);
+			if (!ecc->priv) {
+				WARN(1, "BCH ECC initialization failed!\n");
+				ret = -EINVAL;
+				goto err_free;
+			}
+			break;
+		default:
+			WARN(1, "Unsupported ECC algorithm!\n");
 			ret = -EINVAL;
 			goto err_free;
 		}
@@ -4470,7 +4478,7 @@ void nand_release(struct mtd_info *mtd)
 {
 	struct nand_chip *chip = mtd_to_nand(mtd);
 
-	if (chip->ecc.mode == NAND_ECC_SOFT_BCH)
+	if (chip->ecc.algo == NAND_ECC_BCH)
 		nand_bch_free((struct nand_bch_control *)chip->ecc.priv);
 
 	mtd_device_unregister(mtd);
