@@ -162,7 +162,7 @@ struct hw_bank {
  * @irq: IRQ number
  * @roles: array of supported roles for this controller
  * @role: current role
- * @is_otg: if the device is otg-capable
+ * @is_otg: if the device is otg-capable (the register OTGSC can be accessed)
  * @fsm: otg finite state machine
  * @otg_fsm_hrtimer: hrtimer for otg fsm timers
  * @hr_timeouts: time out list for active otg fsm timers
@@ -200,6 +200,8 @@ struct hw_bank {
  * @wakeup_int: if wakeup interrupt occur
  * @rev: The revision number for controller
  * @dp_always_pullup: keep dp always pullup at device mode
+ * @fake_otgsc: record id/vbus status when these two values are not from
+ * registers
  */
 struct ci_hdrc {
 	struct device			*dev;
@@ -250,6 +252,7 @@ struct ci_hdrc {
 	bool				wakeup_int;
 	enum ci_revision		rev;
 	bool				dp_always_pullup;
+	u32				fake_otgsc;
 };
 
 static inline struct ci_role_driver *ci_role(struct ci_hdrc *ci)

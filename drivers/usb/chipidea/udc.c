@@ -1956,10 +1956,9 @@ void ci_hdrc_gadget_destroy(struct ci_hdrc *ci)
 
 static int udc_id_switch_for_device(struct ci_hdrc *ci)
 {
-	if (ci->is_otg)
-		/* Clear and enable BSV irq */
-		hw_write_otgsc(ci, OTGSC_BSVIS | OTGSC_BSVIE,
-					OTGSC_BSVIS | OTGSC_BSVIE);
+	/* Clear and enable BSV irq */
+	ci_write_otgsc(ci, OTGSC_BSVIS | OTGSC_BSVIE,
+				OTGSC_BSVIS | OTGSC_BSVIE);
 
 	return 0;
 }
@@ -1970,8 +1969,7 @@ static void udc_id_switch_for_host(struct ci_hdrc *ci)
 	 * host doesn't care B_SESSION_VALID event
 	 * so clear and disbale BSV irq
 	 */
-	if (ci->is_otg)
-		hw_write_otgsc(ci, OTGSC_BSVIE | OTGSC_BSVIS, OTGSC_BSVIS);
+	ci_write_otgsc(ci, OTGSC_BSVIE | OTGSC_BSVIS, OTGSC_BSVIS);
 }
 
 /**

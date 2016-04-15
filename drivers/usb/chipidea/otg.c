@@ -25,53 +25,76 @@
 #include "otg_fsm.h"
 
 /**
- * hw_read_otgsc returns otgsc register bits value.
+ * hw_read_otgsc returns otgsc register bits value, for OTG FSM only.
  * @mask: bitfield mask
  */
 u32 hw_read_otgsc(struct ci_hdrc *ci, u32 mask)
 {
-	struct ci_hdrc_cable *cable;
-	u32 val = hw_read(ci, OP_OTGSC, mask);
-
-	/*
-	 * If using extcon framework for VBUS and/or ID signal
-	 * detection overwrite OTGSC register value
-	 */
-	cable = &ci->platdata->vbus_extcon;
-	if (!IS_ERR(cable->edev)) {
-		if (cable->changed)
-			val |= OTGSC_BSVIS;
-		else
-			val &= ~OTGSC_BSVIS;
-
-		cable->changed = false;
-
-		if (cable->state)
-			val |= OTGSC_BSV;
-		else
-			val &= ~OTGSC_BSV;
-	}
-
-	cable = &ci->platdata->id_extcon;
-	if (!IS_ERR(cable->edev)) {
-		if (cable->changed)
-			val |= OTGSC_IDIS;
-		else
-			val &= ~OTGSC_IDIS;
-
-		cable->changed = false;
-
-		if (cable->state)
-			val |= OTGSC_ID;
-		else
-			val &= ~OTGSC_ID;
-	}
-
-	return val;
+	return hw_read(ci, OP_OTGSC, mask);
 }
 
 /**
- * hw_write_otgsc updates target bits of OTGSC register.
+ * ci_read_otgsc returns otgsc bits value.
+ * The value may from:
+ *	- register OTGSC
+ *	- extcon status
+ *
+ * @ci: the controller struct
+ * @mask: bitfield mask
+ */
+u32 ci_read_otgsc(struct ci_hdrc *ci, u32 mask)
+{
+	struct ci_hdrc_cable *cable_vbus;
+	struct ci_hdrc_cable *cable_id;
+	u32 val = ci->fake_otgsc;
+
+	cable_vbus = &ci->platdata->vbus_extcon;
+	cable_id = &ci->platdata->vbus_extcon;
+	if (!IS_ERR(cable_vbus->edev) || !IS_ERR(cable_id->edev)) {
+		if (!IS_ERR(cable_vbus->edev)) {
+			if (cable_vbus->changed)
+				val |= OTGSC_BSVIS;
+			else
+				val &= ~OTGSC_BSVIS;
+
+			cable_vbus->changed = false;
+
+			if (cable_vbus->state)
+				val |= OTGSC_BSV;
+			else
+				val &= ~OTGSC_BSV;
+		}
+
+		if (!IS_ERR(cable_id->edev)) {
+			if (cable_id->changed)
+				val |= OTGSC_IDIS;
+			else
+				val &= ~OTGSC_IDIS;
+
+			cable_id->changed = false;
+
+			if (cable_id->state)
+				val |= OTGSC_ID;
+			else
+				val &= ~OTGSC_ID;
+		}
+		return val;
+	} else if (ci->is_otg) { /* read otgsc from register */
+		return hw_read_otgsc(ci, mask);
+	} else if (mask == OTGSC_ID) {
+		/*
+		 * Can't decide role from external pin, but the controller
+		 * is dual role, we take the default role as gadget,
+		 * and the user can switch it through debugfs.
+		 */
+		return OTGSC_ID;
+	} else {
+		return 0;
+	}
+}
+
+/**
+ * hw_write_otgsc updates target bits of OTGSC register, for OTG FSM only
  * @mask: bitfield mask
  * @data: to be written
  */
@@ -81,12 +104,23 @@ void hw_write_otgsc(struct ci_hdrc *ci, u32 mask, u32 data)
 }
 
 /**
+ * ci_write_otgsc: only update register for OTG controller
+ * @mask: bitfield mask
+ * @data: to be written
+ */
+void ci_write_otgsc(struct ci_hdrc *ci, u32 mask, u32 data)
+{
+	if (ci->is_otg)
+		hw_write_otgsc(ci, mask, data);
+}
+
+/**
  * ci_otg_role - pick role based on ID pin state
  * @ci: the controller
  */
 enum ci_role ci_otg_role(struct ci_hdrc *ci)
 {
-	enum ci_role role = hw_read_otgsc(ci, OTGSC_ID)
+	enum ci_role role = ci_read_otgsc(ci, OTGSC_ID)
 		? CI_ROLE_GADGET
 		: CI_ROLE_HOST;
 
@@ -100,7 +134,7 @@ void ci_handle_vbus_change(struct ci_hdrc *ci)
 		return;
 	}
 
-	if (hw_read_otgsc(ci, OTGSC_BSV))
+	if (ci_read_otgsc(ci, OTGSC_BSV))
 		usb_gadget_vbus_connect(&ci->gadget);
 	else
 		usb_gadget_vbus_disconnect(&ci->gadget);
@@ -183,7 +217,7 @@ void ci_hdrc_otg_destroy(struct ci_hdrc *ci)
 		destroy_workqueue(ci->wq);
 	}
 	/* Disable all OTG irq and clear status */
-	hw_write_otgsc(ci, OTGSC_INT_EN_BITS | OTGSC_INT_STATUS_BITS,
+	ci_write_otgsc(ci, OTGSC_INT_EN_BITS | OTGSC_INT_STATUS_BITS,
 						OTGSC_INT_STATUS_BITS);
 	if (ci_otg_is_fsm_mode(ci))
 		ci_hdrc_otg_fsm_remove(ci);

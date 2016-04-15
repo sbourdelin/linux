@@ -367,10 +367,8 @@ static int ci_registers_show(struct seq_file *s, void *unused)
 	tmp_reg = hw_read(ci, OP_PORTSC, ~0);
 	seq_printf(s, "PORTSC reg: %08x\n", tmp_reg);
 
-	if (ci->is_otg) {
-		tmp_reg = hw_read_otgsc(ci, ~0);
-		seq_printf(s, "OTGSC reg: %08x\n", tmp_reg);
-	}
+	tmp_reg = ci_read_otgsc(ci, ~0);
+	seq_printf(s, "OTGSC(may be fake one) reg : %08x\n", tmp_reg);
 
 	return 0;
 }

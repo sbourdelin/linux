@@ -561,23 +561,21 @@ static irqreturn_t ci_irq(int irq, void *data)
 		return IRQ_HANDLED;
 	}
 
-	if (ci->is_otg) {
-		otgsc = hw_read_otgsc(ci, ~0);
-		if (ci_otg_is_fsm_mode(ci)) {
-			ret = ci_otg_fsm_irq(ci);
-			if (ret == IRQ_HANDLED)
-				return ret;
-		}
+	otgsc = ci_read_otgsc(ci, ~0);
+	if (ci_otg_is_fsm_mode(ci)) {
+		ret = ci_otg_fsm_irq(ci);
+		if (ret == IRQ_HANDLED)
+			return ret;
 	}
 
 	/*
 	 * Handle id change interrupt, it indicates device/host function
 	 * switch.
 	 */
-	if (ci->is_otg && (otgsc & OTGSC_IDIE) && (otgsc & OTGSC_IDIS)) {
+	if ((otgsc & OTGSC_IDIE) && (otgsc & OTGSC_IDIS)) {
 		ci->id_event = true;
 		/* Clear ID change irq status */
-		hw_write_otgsc(ci, OTGSC_IDIS, OTGSC_IDIS);
+		ci_write_otgsc(ci, OTGSC_IDIS, OTGSC_IDIS);
 		ci_otg_queue_work(ci);
 		return IRQ_HANDLED;
 	}
@@ -586,10 +584,10 @@ static irqreturn_t ci_irq(int irq, void *data)
 	 * Handle vbus change interrupt, it indicates device connection
 	 * and disconnection events.
 	 */
-	if (ci->is_otg && (otgsc & OTGSC_BSVIE) && (otgsc & OTGSC_BSVIS)) {
+	if ((otgsc & OTGSC_BSVIE) && (otgsc & OTGSC_BSVIS)) {
 		ci->b_sess_valid_event = true;
 		/* Clear BSV irq */
-		hw_write_otgsc(ci, OTGSC_BSVIS, OTGSC_BSVIS);
+		ci_write_otgsc(ci, OTGSC_BSVIS, OTGSC_BSVIS);
 		ci_otg_queue_work(ci);
 		return IRQ_HANDLED;
 	}
@@ -883,12 +881,12 @@ static void ci_get_otg_capable(struct ci_hdrc *ci)
 		ci->is_otg = (hw_read(ci, CAP_DCCPARAMS,
 				DCCPARAMS_DC | DCCPARAMS_HC)
 					== (DCCPARAMS_DC | DCCPARAMS_HC));
-	if (ci->is_otg) {
-		dev_dbg(ci->dev, "It is OTG capable controller\n");
-		/* Disable and clear all OTG irq */
-		hw_write_otgsc(ci, OTGSC_INT_EN_BITS | OTGSC_INT_STATUS_BITS,
-							OTGSC_INT_STATUS_BITS);
-	}
+	/* Disable and clear all OTG irq */
+	ci_write_otgsc(ci, OTGSC_INT_EN_BITS | OTGSC_INT_STATUS_BITS,
+			OTGSC_INT_STATUS_BITS);
+
+	dev_dbg(ci->dev, "It is %sOTG capable controller\n",
+		ci->is_otg ? "" : "non-");
 }
 
 static int ci_hdrc_probe(struct platform_device *pdev)
@@ -997,18 +995,9 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 	}
 
 	if (ci->roles[CI_ROLE_HOST] && ci->roles[CI_ROLE_GADGET]) {
-		if (ci->is_otg) {
 			ci->role = ci_otg_role(ci);
 			/* Enable ID change irq */
-			hw_write_otgsc(ci, OTGSC_IDIE, OTGSC_IDIE);
-		} else {
-			/*
-			 * If the controller is not OTG capable, but support
-			 * role switch, the defalt role is gadget, and the
-			 * user can switch it through debugfs.
-			 */
-			ci->role = CI_ROLE_GADGET;
-		}
+			ci_write_otgsc(ci, OTGSC_IDIE, OTGSC_IDIE);
 	} else {
 		ci->role = ci->roles[CI_ROLE_HOST]
 			? CI_ROLE_HOST

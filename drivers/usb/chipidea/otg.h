@@ -12,7 +12,9 @@
 #define __DRIVERS_USB_CHIPIDEA_OTG_H
 
 u32 hw_read_otgsc(struct ci_hdrc *ci, u32 mask);
+u32 ci_read_otgsc(struct ci_hdrc *ci, u32 mask);
 void hw_write_otgsc(struct ci_hdrc *ci, u32 mask, u32 data);
+void ci_write_otgsc(struct ci_hdrc *ci, u32 mask, u32 data);
 int ci_hdrc_otg_init(struct ci_hdrc *ci);
 void ci_hdrc_otg_destroy(struct ci_hdrc *ci);
 enum ci_role ci_otg_role(struct ci_hdrc *ci);
