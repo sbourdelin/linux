@@ -788,12 +788,6 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
 	val |= 0x00010100;
 	dw_pcie_writel_rc(pp, val, PCI_PRIMARY_BUS);
 
-	/* setup memory base, memory limit */
-	membase = ((u32)pp->mem_base & 0xfff00000) >> 16;
-	memlimit = (pp->mem_size + (u32)pp->mem_base) & 0xfff00000;
-	val = memlimit | membase;
-	dw_pcie_writel_rc(pp, val, PCI_MEMORY_BASE);
-
 	/* setup command register */
 	dw_pcie_readl_rc(pp, PCI_COMMAND, &val);
 	val &= 0xffff0000;
