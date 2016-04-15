@@ -370,13 +370,15 @@ struct mv88e6xxx_info {
 	enum mv88e6xxx_family family;
 	u16 prod_num;
 	unsigned int num_ports;
+	unsigned int num_databases;
 	const char *name;
 };
 
-#define MV88E6XXX_INFO(_family, _prod_num, _num_ports, _name) \
+#define MV88E6XXX_INFO(_family, _prod_num, _num_ports, _num_db, _name) \
 	.family = MV88E6XXX_FAMILY_##_family, \
 	.prod_num = _prod_num, \
 	.num_ports = _num_ports, \
+	.num_databases = _num_db, \
 	.name = _name, \
 
 struct mv88e6xxx_atu_entry {

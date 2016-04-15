@@ -18,9 +18,9 @@
 #include "mv88e6xxx.h"
 
 static const struct mv88e6xxx_info mv88e6123_table[] = {
-	{ MV88E6XXX_INFO(6165, 0x121, 3, "Marvell 88E6123") },
-	{ MV88E6XXX_INFO(6165, 0x161, 6, "Marvell 88E6161") },
-	{ MV88E6XXX_INFO(6165, 0x165, 6, "Marvell 88E6165") },
+	{ MV88E6XXX_INFO(6165, 0x121, 3, 4096, "Marvell 88E6123") },
+	{ MV88E6XXX_INFO(6165, 0x161, 6, 4096, "Marvell 88E6161") },
+	{ MV88E6XXX_INFO(6165, 0x165, 6, 4096, "Marvell 88E6165") },
 };
 
 static char *mv88e6123_drv_probe(struct device *dsa_dev,
