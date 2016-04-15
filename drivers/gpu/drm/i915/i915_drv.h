@@ -2290,6 +2290,9 @@ struct drm_i915_gem_request {
 	struct intel_context *ctx;
 	struct intel_ringbuffer *ringbuf;
 
+	/** Context preceding this one on the same engine. Can be NULL. */
+	struct intel_context *prev_ctx;
+
 	/** Batch buffer related to this request if any (used for
 	    error state dump only) */
 	struct drm_i915_gem_object *batch_obj;
@@ -2325,7 +2328,6 @@ struct drm_i915_gem_request {
 
 	/** Execlists no. of times this request has been sent to the ELSP */
 	int elsp_submitted;
-
 };
 
 struct drm_i915_gem_request * __must_check
