@@ -813,8 +813,8 @@ config MFD_RC5T583
 	  Additional drivers must be enabled in order to use the
 	  different functionality of the device.
 
-config MFD_RK808
-	tristate "Rockchip RK808 Power Management chip"
+config MFD_RK8XX
+	tristate "Rockchip RK8XX Power Management chip"
 	depends on I2C && OF
 	select MFD_CORE
 	select REGMAP_I2C

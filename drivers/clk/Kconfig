@@ -50,7 +50,7 @@ config COMMON_CLK_MAX77802
 
 config COMMON_CLK_RK808
 	tristate "Clock driver for RK808"
-	depends on MFD_RK808
+	depends on MFD_RK8XX
 	---help---
 	  This driver supports RK808 crystal oscillator clock. These
 	  multi-function devices have two fixed-rate oscillators,
