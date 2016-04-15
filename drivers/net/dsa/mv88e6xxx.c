@@ -3027,7 +3027,6 @@ found:
 	ps->bus = bus;
 	ps->sw_addr = sw_addr;
 	ps->info = info;
-	ps->id = id & 0xfff0;
 	ps->rev = id & 0xf;
 
 	dev_info(&ps->bus->dev, "found switch %s, revision %u\n",
