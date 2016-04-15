@@ -2663,11 +2663,15 @@ int mv88e6xxx_setup_ports(struct dsa_switch *ds)
 int mv88e6xxx_setup_common(struct dsa_switch *ds)
 {
 	struct mv88e6xxx_priv_state *ps = ds_to_priv(ds);
+	int id;
 
 	ps->ds = ds;
 	mutex_init(&ps->smi_mutex);
 
-	ps->id = REG_READ(REG_PORT(0), PORT_SWITCH_ID) & 0xfff0;
+	id = REG_READ(REG_PORT(0), PORT_SWITCH_ID);
+
+	ps->id = id & 0xfff0;
+	ps->rev = id & 0xf;
 
 	INIT_WORK(&ps->bridge_work, mv88e6xxx_bridge_work);
 
@@ -3083,19 +3087,8 @@ static char *mv88e6xxx_lookup_name(struct mii_bus *bus, int sw_addr,
 
 	/* Look up the exact switch ID */
 	for (i = 0; i < num; ++i)
-		if (table[i].id == ret)
+		if (table[i].id == (ret & 0xfff0))
 			return table[i].name;
-
-	/* Look up only the product number */
-	for (i = 0; i < num; ++i) {
-		if (table[i].id == (ret & PORT_SWITCH_ID_PROD_NUM_MASK)) {
-			dev_warn(&bus->dev,
-				 "unknown revision %d, using base switch 0x%x\n",
-				 ret & PORT_SWITCH_ID_REV_MASK,
-				 ret & PORT_SWITCH_ID_PROD_NUM_MASK);
-			return table[i].name;
-		}
-	}
 
 	return NULL;
 }
