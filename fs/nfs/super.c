@@ -2281,7 +2281,7 @@ EXPORT_SYMBOL_GPL(nfs_remount);
 /*
  * Initialise the common bits of the superblock
  */
-inline void nfs_initialise_sb(struct super_block *sb)
+static void nfs_initialise_sb(struct super_block *sb)
 {
 	struct nfs_server *server = NFS_SB(sb);
 
