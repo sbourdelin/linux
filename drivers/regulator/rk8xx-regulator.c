@@ -1,5 +1,5 @@
 /*
- * Regulator driver for Rockchip RK808
+ * Regulator driver for Rockchip's RK8XX PMIC family
  *
  * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
  *
@@ -523,7 +523,7 @@ static struct of_regulator_match rk808_reg_matches[] = {
 	[RK808_ID_SWITCH2]	= { .name = "SWITCH_REG2" },
 };
 
-static int rk808_regulator_dt_parse_pdata(struct device *dev,
+static int rk8xx_regulator_dt_parse_pdata(struct device *dev,
 				   struct device *client_dev,
 				   struct regmap *map,
 				   struct rk808_regulator_data *pdata)
@@ -566,12 +566,12 @@ dt_parse_end:
 	return ret;
 }
 
-static int rk808_regulator_probe(struct platform_device *pdev)
+static int rk8xx_regulator_probe(struct platform_device *pdev)
 {
-	struct rk808 *rk808 = dev_get_drvdata(pdev->dev.parent);
-	struct i2c_client *client = rk808->i2c;
+	struct rk808 *rk8xx = dev_get_drvdata(pdev->dev.parent);
+	struct i2c_client *client = rk8xx->i2c;
 	struct regulator_config config = {};
-	struct regulator_dev *rk808_rdev;
+	struct regulator_dev *rk8xx_rdev;
 	struct rk808_regulator_data *pdata;
 	int ret, i;
 
@@ -579,8 +579,8 @@ static int rk808_regulator_probe(struct platform_device *pdev)
 	if (!pdata)
 		return -ENOMEM;
 
-	ret = rk808_regulator_dt_parse_pdata(&pdev->dev, &client->dev,
-					     rk808->regmap, pdata);
+	ret = rk8xx_regulator_dt_parse_pdata(&pdev->dev, &client->dev,
+					     rk8xx->regmap, pdata);
 	if (ret < 0)
 		return ret;
 
@@ -594,34 +594,34 @@ static int rk808_regulator_probe(struct platform_device *pdev)
 
 		config.dev = &client->dev;
 		config.driver_data = pdata;
-		config.regmap = rk808->regmap;
+		config.regmap = rk8xx->regmap;
 		config.of_node = rk808_reg_matches[i].of_node;
 		config.init_data = rk808_reg_matches[i].init_data;
 
-		rk808_rdev = devm_regulator_register(&pdev->dev,
+		rk8xx_rdev = devm_regulator_register(&pdev->dev,
 						     &rk808_reg[i], &config);
-		if (IS_ERR(rk808_rdev)) {
+		if (IS_ERR(rk8xx_rdev)) {
 			dev_err(&client->dev,
 				"failed to register %d regulator\n", i);
-			return PTR_ERR(rk808_rdev);
+			return PTR_ERR(rk8xx_rdev);
 		}
 	}
 
 	return 0;
 }
 
-static struct platform_driver rk808_regulator_driver = {
-	.probe = rk808_regulator_probe,
+static struct platform_driver rk8xx_regulator_driver = {
+	.probe = rk8xx_regulator_probe,
 	.driver = {
-		.name = "rk808-regulator",
+		.name = "rk8xx-regulator",
 		.owner = THIS_MODULE,
 	},
 };
 
-module_platform_driver(rk808_regulator_driver);
+module_platform_driver(rk8xx_regulator_driver);
 
-MODULE_DESCRIPTION("regulator driver for the rk808 series PMICs");
+MODULE_DESCRIPTION("regulator driver for the rk8xx series PMICs");
 MODULE_AUTHOR("Chris Zhong<zyw@rock-chips.com>");
 MODULE_AUTHOR("Zhang Qing<zhangqing@rock-chips.com>");
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:rk808-regulator");
+MODULE_ALIAS("platform:rk8xx-regulator");

@@ -609,8 +609,8 @@ config REGULATOR_RC5T583
 	  through regulator interface. The device supports multiple DCDC/LDO
 	  outputs which can be controlled by i2c communication.
 
-config REGULATOR_RK808
-	tristate "Rockchip RK808 Power regulators"
+config REGULATOR_RK8XX
+	tristate "Rockchip RK8XX Power regulators"
 	depends on MFD_RK8XX
 	help
 	  Select this option to enable the power regulator of ROCKCHIP
