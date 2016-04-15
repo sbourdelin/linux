@@ -1230,7 +1230,8 @@ extern int register_event_command(struct event_command *cmd);
  */
 struct event_trigger_ops {
 	void			(*func)(struct event_trigger_data *data,
-					void *rec);
+					void *rec,
+					struct trace_event_file *file);
 	int			(*init)(struct event_trigger_ops *ops,
 					struct event_trigger_data *data);
 	void			(*free)(struct event_trigger_ops *ops,
