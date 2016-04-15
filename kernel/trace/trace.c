@@ -1900,14 +1900,15 @@ void __trace_stack(struct trace_array *tr, unsigned long flags, int skip,
 }
 
 /**
- * trace_dump_stack - record a stack back trace in the trace buffer
+ * __trace_dump_stack - record a stack back trace in the given trace buffer
  * @skip: Number of functions to skip (helper handlers)
+ * @tr:   Which trace buffer (instance) to write to
  */
-void trace_dump_stack(int skip)
+void __trace_dump_stack(int skip, struct trace_array *tr)
 {
 	unsigned long flags;
 
-	if (tracing_disabled || tracing_selftest_running)
+	if (tracing_disabled || tr->buffer_disabled || tracing_selftest_running)
 		return;
 
 	local_save_flags(flags);
@@ -1917,8 +1918,20 @@ void trace_dump_stack(int skip)
 	 * this function.
 	 */
 	skip += 3;
-	__ftrace_trace_stack(global_trace.trace_buffer.buffer,
+	__ftrace_trace_stack(tr->trace_buffer.buffer,
 			     flags, skip, preempt_count(), NULL);
+}
+
+/**
+ * trace_dump_stack - record a stack back trace in the top-level trace buffer
+ * @skip: Number of functions to skip (helper handlers)
+ */
+void trace_dump_stack(int skip)
+{
+	/* This wrapper function deepens the stack one level */
+	skip += 1;
+
+	__trace_dump_stack(skip, &global_trace);
 }
 
 static DEFINE_PER_CPU(int, user_stack_count);
