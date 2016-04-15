@@ -996,7 +996,7 @@ static void
 stacktrace_trigger(struct event_trigger_data *data, void *rec,
 		   struct trace_event_file *file)
 {
-	trace_dump_stack(STACK_SKIP);
+	__trace_dump_stack(STACK_SKIP, file->tr);
 }
 
 static void
