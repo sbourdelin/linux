@@ -2002,6 +2002,7 @@ static int lbmRead(struct jfs_log * log, int pn, struct lbuf ** bpp)
 
 	bio->bi_end_io = lbmIODone;
 	bio->bi_private = bp;
+	bio->bi_op = REQ_OP_READ;
 	bio->bi_rw = READ_SYNC;
 	/*check if journaling to disk has been disabled*/
 	if (log->no_integrity) {
@@ -2146,6 +2147,7 @@ static void lbmStartIO(struct lbuf * bp)
 
 	bio->bi_end_io = lbmIODone;
 	bio->bi_private = bp;
+	bio->bi_op = REQ_OP_WRITE;
 	bio->bi_rw = WRITE_SYNC;
 
 	/* check if journaling to disk has been disabled */
