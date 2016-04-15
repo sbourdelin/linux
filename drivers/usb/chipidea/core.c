@@ -871,7 +871,7 @@ static inline void ci_role_destroy(struct ci_hdrc *ci)
 {
 	ci_hdrc_gadget_destroy(ci);
 	ci_hdrc_host_destroy(ci);
-	if (ci->is_otg)
+	if (!ci->dp_always_pullup && ci->roles[CI_ROLE_GADGET])
 		ci_hdrc_otg_destroy(ci);
 }
 
@@ -920,6 +920,8 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 		CI_HDRC_IMX28_WRITE_FIX);
 	ci->supports_runtime_pm = !!(ci->platdata->flags &
 		CI_HDRC_SUPPORTS_RUNTIME_PM);
+	ci->dp_always_pullup = !!(ci->platdata->flags &
+		CI_HDRC_DP_ALWAYS_PULLUP);
 
 	ret = hw_device_init(ci, base);
 	if (ret < 0) {
@@ -986,7 +988,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 		goto deinit_phy;
 	}
 
-	if (ci->is_otg && ci->roles[CI_ROLE_GADGET]) {
+	if (!ci->dp_always_pullup && ci->roles[CI_ROLE_GADGET]) {
 		ret = ci_hdrc_otg_init(ci);
 		if (ret) {
 			dev_err(dev, "init otg fails, ret = %d\n", ret);
