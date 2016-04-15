@@ -938,6 +938,7 @@ static void vlv_init_display_clock_gating(struct drm_i915_private *dev_priv)
 
 static void vlv_display_power_well_init(struct drm_i915_private *dev_priv)
 {
+	struct drm_encoder *encoder, *vga_encoder = NULL;
 	enum pipe pipe;
 
 	/*
@@ -972,6 +973,17 @@ static void vlv_display_power_well_init(struct drm_i915_private *dev_priv)
 		return;
 
 	intel_hpd_init(dev_priv);
+
+	/* Re-enable the ADPA, if we have one */
+	drm_for_each_encoder(encoder, dev_priv->dev) {
+		if (encoder->encoder_type == DRM_MODE_ENCODER_DAC) {
+			vga_encoder = encoder;
+			break;
+		}
+	}
+
+	if (vga_encoder && vga_encoder->funcs->reset)
+		vga_encoder->funcs->reset(vga_encoder);
 
 	i915_redisable_vga_power_on(dev_priv->dev);
 }
