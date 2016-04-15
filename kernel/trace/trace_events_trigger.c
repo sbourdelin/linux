@@ -768,17 +768,17 @@ static void
 traceon_trigger(struct event_trigger_data *data, void *rec,
 		struct trace_event_file *file)
 {
-	if (tracing_is_on())
+	if (tracer_tracing_is_on(file->tr))
 		return;
 
-	tracing_on();
+	tracer_tracing_on(file->tr);
 }
 
 static void
 traceon_count_trigger(struct event_trigger_data *data, void *rec,
 		      struct trace_event_file *file)
 {
-	if (tracing_is_on())
+	if (tracer_tracing_is_on(file->tr))
 		return;
 
 	if (!data->count)
@@ -787,24 +787,24 @@ traceon_count_trigger(struct event_trigger_data *data, void *rec,
 	if (data->count != -1)
 		(data->count)--;
 
-	tracing_on();
+	tracer_tracing_on(file->tr);
 }
 
 static void
 traceoff_trigger(struct event_trigger_data *data, void *rec,
 		 struct trace_event_file *file)
 {
-	if (!tracing_is_on())
+	if (!tracer_tracing_is_on(file->tr))
 		return;
 
-	tracing_off();
+	tracer_tracing_off(file->tr);
 }
 
 static void
 traceoff_count_trigger(struct event_trigger_data *data, void *rec,
 		       struct trace_event_file *file)
 {
-	if (!tracing_is_on())
+	if (!tracer_tracing_is_on(file->tr))
 		return;
 
 	if (!data->count)
@@ -813,7 +813,7 @@ traceoff_count_trigger(struct event_trigger_data *data, void *rec,
 	if (data->count != -1)
 		(data->count)--;
 
-	tracing_off();
+	tracer_tracing_off(file->tr);
 }
 
 static int
