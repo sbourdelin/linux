@@ -2595,8 +2595,6 @@ int mv88e6xxx_setup_common(struct dsa_switch *ds)
 	ps->ds = ds;
 	mutex_init(&ps->smi_mutex);
 
-	ps->id = REG_READ(REG_PORT(0), PORT_SWITCH_ID) & 0xfff0;
-
 	INIT_WORK(&ps->bridge_work, mv88e6xxx_bridge_work);
 
 	return 0;
@@ -3029,7 +3027,6 @@ found:
 	ps->bus = bus;
 	ps->sw_addr = sw_addr;
 	ps->info = info;
-	ps->id = id & 0xfff0;
 
 	dev_info(&ps->bus->dev, "found switch %s, revision %u\n",
 		 ps->info->name, id & 0xf);
