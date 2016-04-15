@@ -1297,8 +1297,12 @@ static int wake_futex_pi(u32 __user *uaddr, u32 uval, struct futex_q *this,
 
 	if (cmpxchg_futex_value_locked(&curval, uaddr, uval, newval))
 		ret = -EFAULT;
-	else if (curval != uval)
-		ret = -EINVAL;
+	else if (curval != uval) {
+		if ((FUTEX_TID_MASK & curval) == uval)
+			ret = -EAGAIN;
+		else
+			ret = -EINVAL;
+	}
 	if (ret) {
 		raw_spin_unlock_irq(&pi_state->pi_mutex.wait_lock);
 		return ret;
@@ -2623,6 +2627,12 @@ retry:
 		if (ret == -EFAULT)
 			goto pi_faulted;
 		/*
+		 * Between get_user() and obtaining the hb->lock the uval
+		 * gained a flag. Retry with the new value.
+		 */
+		if (ret == -EAGAIN)
+			goto pi_faulted;
+		/*
 		 * wake_futex_pi has detected invalid state. Tell user
 		 * space.
 		 */
@@ -2654,6 +2664,8 @@ pi_faulted:
 	spin_unlock(&hb->lock);
 	put_futex_key(&key);
 
+	if (ret == -EAGAIN)
+		goto retry;
 	ret = fault_in_user_writeable(uaddr);
 	if (!ret)
 		goto retry;
