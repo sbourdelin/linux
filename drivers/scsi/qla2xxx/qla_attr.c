@@ -2003,9 +2003,14 @@ static void
 qla2x00_get_host_fabric_name(struct Scsi_Host *shost)
 {
 	scsi_qla_host_t *vha = shost_priv(shost);
+	/*
+	 * This can trigger gcc 4.9/5.3 bug.
+	 * See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=70646
 	uint8_t node_name[WWN_SIZE] = { 0xFF, 0xFF, 0xFF, 0xFF, \
 		0xFF, 0xFF, 0xFF, 0xFF};
 	u64 fabric_name = wwn_to_u64(node_name);
+	 */
+	u64 fabric_name = (u64)(s64)-1; /* the same as above */
 
 	if (vha->device_flags & SWITCH_FOUND)
 		fabric_name = wwn_to_u64(vha->fabric_node_name);
