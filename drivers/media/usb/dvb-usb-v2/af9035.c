@@ -24,6 +24,10 @@
 /* Max transfer size done by I2C transfer functions */
 #define MAX_XFER_SIZE  64
 
+static int dvb_usb_af9035_no_read = -1;
+module_param_named(no_read, dvb_usb_af9035_no_read, int, 0644);
+MODULE_PARM_DESC(no_read, "Emulate I2C reads for devices that do not support them.");
+
 DVB_DEFINE_MOD_OPT_ADAPTER_NR(adapter_nr);
 
 static u16 af9035_checksum(const u8 *buf, size_t len)
@@ -348,6 +352,9 @@ static int af9035_i2c_master_xfer(struct i2c_adapter *adap,
 
 			ret = af9035_rd_regs(d, reg, &msg[1].buf[0],
 					msg[1].len);
+		} else if (state->no_read) {
+			memset(msg[1].buf, 0, msg[1].len);
+			ret = 0;
 		} else {
 			/* I2C write + read */
 			u8 buf[MAX_XFER_SIZE];
@@ -421,6 +428,9 @@ static int af9035_i2c_master_xfer(struct i2c_adapter *adap,
 		if (msg[0].len > 40) {
 			/* TODO: correct limits > 40 */
 			ret = -EOPNOTSUPP;
+		} else if (state->no_read) {
+			memset(msg[0].buf, 0, msg[0].len);
+			ret = 0;
 		} else {
 			/* I2C read */
 			u8 buf[5];
@@ -960,6 +970,23 @@ skip_eeprom:
 			state->af9033_config[i].clock = clock_lut_it9135[tmp];
 		else
 			state->af9033_config[i].clock = clock_lut_af9035[tmp];
+	}
+
+	/* Some MXL5007T devices cannot properly handle tuner I2C read ops. */
+	if (dvb_usb_af9035_no_read != -1) { /* Override with module param */
+		state->no_read = dvb_usb_af9035_no_read == 0 ? false : true;
+	} else {
+		switch (le16_to_cpu(d->udev->descriptor.idProduct)) {
+		case USB_PID_AVERMEDIA_A867:
+		case USB_PID_AVERMEDIA_TWINSTAR:
+			dev_info(&d->udev->dev,
+				"%s: Device may have issues with I2C read operations. Enabling fix.\n",
+				KBUILD_MODNAME);
+			state->no_read = true;
+			break;
+		default:
+			state->no_read = false;
+		}
 	}
 
 	return 0;
