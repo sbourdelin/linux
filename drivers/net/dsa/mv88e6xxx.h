@@ -354,10 +354,14 @@
 
 #define MV88E6XXX_N_FID		4096
 
-struct mv88e6xxx_switch_id {
-	u16 id;
-	char *name;
+struct mv88e6xxx_info {
+	u16 prod_num;
+	const char *name;
 };
+
+#define MV88E6XXX_INFO(_prod_num, _name) \
+	.prod_num = _prod_num, \
+	.name = _name, \
 
 struct mv88e6xxx_atu_entry {
 	u16	fid;
@@ -384,6 +388,7 @@ struct mv88e6xxx_priv_port {
 };
 
 struct mv88e6xxx_priv_state {
+	const struct mv88e6xxx_info *info;
 	int rev;
 
 	/* The dsa_switch this private structure is related to */
@@ -453,8 +458,7 @@ struct mv88e6xxx_hw_stat {
 int mv88e6xxx_switch_reset(struct dsa_switch *ds, bool ppu_active);
 char *mv88e6xxx_drv_probe(struct device *dsa_dev, struct device *host_dev,
 			  int sw_addr, void **priv,
-			  const struct mv88e6xxx_switch_id *table,
-			  unsigned int num);
+			  const struct mv88e6xxx_info *table, unsigned int num);
 
 int mv88e6xxx_setup_ports(struct dsa_switch *ds);
 int mv88e6xxx_setup_common(struct dsa_switch *ds);
