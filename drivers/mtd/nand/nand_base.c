@@ -4247,7 +4247,6 @@ int nand_scan_tail(struct mtd_info *mtd)
 		ecc->algo = NAND_ECC_HAMMING;
 
 	case NAND_ECC_SOFT:
-	case NAND_ECC_SOFT_BCH:
 		switch (ecc->algo) {
 		case NAND_ECC_HAMMING:
 			ecc->calculate = nand_calculate_ecc;
@@ -4385,7 +4384,6 @@ int nand_scan_tail(struct mtd_info *mtd)
 	/* Large page NAND with SOFT_ECC should support subpage reads */
 	switch (ecc->mode) {
 	case NAND_ECC_SOFT:
-	case NAND_ECC_SOFT_BCH:
 		if (chip->page_shift > 9)
 			chip->options |= NAND_SUBPAGE_READ;
 		break;
