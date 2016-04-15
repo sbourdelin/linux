@@ -1354,7 +1354,8 @@ gen8_dispatch_bsd_ring(struct drm_i915_private *dev_priv, struct drm_file *file)
 static struct drm_i915_gem_object *
 eb_get_batch(struct eb_vmas *eb)
 {
-	struct i915_vma *vma = list_entry(eb->vmas.prev, typeof(*vma), exec_list);
+	/* The batch is always the LAST item in the VMA list */
+	struct i915_vma *vma = list_last_entry(&eb->vmas, typeof(*vma), exec_list);
 
 	/*
 	 * SNA is doing fancy tricks with compressing batch buffers, which leads
