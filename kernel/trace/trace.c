@@ -529,11 +529,13 @@ EXPORT_SYMBOL_GPL(tracing_on);
 
 /**
  * __trace_puts - write a constant string into the trace buffer.
+ * @tr:    Which buffer (instance) to write to
  * @ip:	   The address of the caller
  * @str:   The constant string to write
  * @size:  The size of the string.
  */
-int __trace_puts(unsigned long ip, const char *str, int size)
+int __trace_puts_tr(struct trace_array *tr, unsigned long ip,
+		    const char *str, int size)
 {
 	struct ring_buffer_event *event;
 	struct ring_buffer *buffer;
@@ -553,7 +555,7 @@ int __trace_puts(unsigned long ip, const char *str, int size)
 	alloc = sizeof(*entry) + size + 2; /* possible \n added */
 
 	local_save_flags(irq_flags);
-	buffer = global_trace.trace_buffer.buffer;
+	buffer = tr->trace_buffer.buffer;
 	event = trace_buffer_lock_reserve(buffer, TRACE_PRINT, alloc, 
 					  irq_flags, pc);
 	if (!event)
@@ -572,9 +574,20 @@ int __trace_puts(unsigned long ip, const char *str, int size)
 		entry->buf[size] = '\0';
 
 	__buffer_unlock_commit(buffer, event);
-	ftrace_trace_stack(&global_trace, buffer, irq_flags, 4, pc, NULL);
+	ftrace_trace_stack(tr, buffer, irq_flags, 4, pc, NULL);
 
 	return size;
+}
+
+/**
+ * __trace_puts - write a constant string into the top level trace buffer.
+ * @ip:	   The address of the caller
+ * @str:   The constant string to write
+ * @size:  The size of the string.
+ */
+int __trace_puts(unsigned long ip, const char *str, int size)
+{
+	return __trace_puts_tr(&global_trace, ip, str, size);
 }
 EXPORT_SYMBOL_GPL(__trace_puts);
 
@@ -629,22 +642,22 @@ void __tracing_snapshot(struct trace_array *tr)
 	unsigned long flags;
 
 	if (in_nmi()) {
-		internal_trace_puts("*** SNAPSHOT CALLED FROM NMI CONTEXT ***\n");
-		internal_trace_puts("*** snapshot is being ignored        ***\n");
+		internal_trace_puts(tr, "*** SNAPSHOT CALLED FROM NMI CONTEXT ***\n");
+		internal_trace_puts(tr, "*** snapshot is being ignored        ***\n");
 		return;
 	}
 
 	if (!tr->allocated_snapshot) {
-		internal_trace_puts("*** SNAPSHOT NOT ALLOCATED ***\n");
-		internal_trace_puts("*** stopping trace here!   ***\n");
+		internal_trace_puts(tr, "*** SNAPSHOT NOT ALLOCATED ***\n");
+		internal_trace_puts(tr, "*** stopping trace here!   ***\n");
 		tracer_tracing_off(tr);
 		return;
 	}
 
 	/* Note, snapshot can not be used when the tracer uses it */
 	if (tracer->use_max_tr) {
-		internal_trace_puts("*** LATENCY TRACER ACTIVE ***\n");
-		internal_trace_puts("*** Can not use snapshot (sorry) ***\n");
+		internal_trace_puts(tr, "*** LATENCY TRACER ACTIVE ***\n");
+		internal_trace_puts(tr, "*** Can not use snapshot (sorry) ***\n");
 		return;
 	}
 

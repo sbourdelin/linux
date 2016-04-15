@@ -1404,6 +1404,8 @@ void trace_printk_start_comm(void);
 int trace_keep_overwrite(struct tracer *tracer, u32 mask, int set);
 int set_tracer_flag(struct trace_array *tr, unsigned int mask, int enabled);
 
+int __trace_puts_tr(struct trace_array *tr, unsigned long ip,
+		    const char *str, int size);
 /*
  * Normal trace_printk() and friends allocates special buffers
  * to do the manipulation, as well as saves the print formats
@@ -1413,7 +1415,8 @@ int set_tracer_flag(struct trace_array *tr, unsigned int mask, int enabled);
  * about performance). The internal_trace_puts() is for such
  * a purpose.
  */
-#define internal_trace_puts(str) __trace_puts(_THIS_IP_, str, strlen(str))
+#define internal_trace_puts(tr, str)	\
+	__trace_puts_tr(tr, _THIS_IP_, str, strlen(str))
 
 #undef FTRACE_ENTRY
 #define FTRACE_ENTRY(call, struct_name, id, tstruct, print, filter)	\
