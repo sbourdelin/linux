@@ -55,8 +55,11 @@ torture_param(int, shutdown_secs, 0, "Shutdown time (j), <= zero to disable.");
 torture_param(int, stat_interval, 60,
 	     "Number of seconds between stats printk()s");
 torture_param(int, stutter, 5, "Number of jiffies to run/halt test, 0=disable");
-torture_param(bool, verbose, true,
-	     "Enable verbose debugging printk()s");
+
+static bool verbose = true;
+module_param(verbose, bool, 0644);
+MODULE_PARM_DESC(verbose,
+		 "Enable verbose debugging printk()s");
 
 static char *torture_type = "spin_lock";
 module_param(torture_type, charp, 0444);
@@ -693,7 +696,7 @@ static void lock_torture_stats_print(void)
 	}
 
 	__torture_print_stats(buf, cxt.lwsa, true);
-	pr_alert("%s", buf);
+	VERBOSE_STRING(buf);
 	kfree(buf);
 
 	if (cxt.cur_ops->readlock) {
@@ -705,7 +708,7 @@ static void lock_torture_stats_print(void)
 		}
 
 		__torture_print_stats(buf, cxt.lrsa, false);
-		pr_alert("%s", buf);
+		VERBOSE_STRING(buf);
 		kfree(buf);
 	}
 }
