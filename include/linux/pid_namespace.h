@@ -9,6 +9,7 @@
 #include <linux/nsproxy.h>
 #include <linux/kref.h>
 #include <linux/ns_common.h>
+#include <linux/path.h>
 
 struct pidmap {
        atomic_t nr_free;
@@ -45,6 +46,8 @@ struct pid_namespace {
 	int hide_pid;
 	int reboot;	/* group exit code if this pidns was rebooted */
 	struct ns_common ns;
+	spinlock_t root_for_dump_lock;
+	struct path root_for_dump;
 };
 
 extern struct pid_namespace init_pid_ns;

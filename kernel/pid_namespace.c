@@ -123,6 +123,8 @@ static struct pid_namespace *create_pid_namespace(struct user_namespace *user_ns
 	for (i = 1; i < PIDMAP_ENTRIES; i++)
 		atomic_set(&ns->pidmap[i].nr_free, BITS_PER_PAGE);
 
+	spin_lock_init(&ns->root_for_dump_lock);
+
 	return ns;
 
 out_free_map:
@@ -147,6 +149,10 @@ static void destroy_pid_namespace(struct pid_namespace *ns)
 	for (i = 0; i < PIDMAP_ENTRIES; i++)
 		kfree(ns->pidmap[i].page);
 	put_user_ns(ns->user_ns);
+
+	if (ns->root_for_dump.mnt)
+		path_put(&ns->root_for_dump);
+
 	call_rcu(&ns->rcu, delayed_free_pidns);
 }
 
