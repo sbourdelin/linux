@@ -22,6 +22,7 @@ void __init reserve_real_mode(void)
 	base = __va(mem);
 	memblock_reserve(mem, size);
 	real_mode_header = (struct real_mode_header *) base;
+	/* Don't disclose memory trampoline with KASLR memory enabled */
 	printk(KERN_DEBUG "Base memory trampoline at [%p] %llx size %zu\n",
 	       base, (unsigned long long)mem, size);
 }
@@ -84,7 +85,11 @@ void __init setup_real_mode(void)
 	*trampoline_cr4_features = __read_cr4();
 
 	trampoline_pgd = (u64 *) __va(real_mode_header->trampoline_pgd);
+#ifdef CONFIG_RANDOMIZE_MEMORY
+	trampoline_pgd[0] = trampoline_pgd_entry.pgd;
+#else
 	trampoline_pgd[0] = init_level4_pgt[pgd_index(__PAGE_OFFSET)].pgd;
+#endif
 	trampoline_pgd[511] = init_level4_pgt[511].pgd;
 #endif
 }

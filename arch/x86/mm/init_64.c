@@ -633,6 +633,9 @@ kernel_physical_mapping_init(unsigned long start,
 		pgd_changed = true;
 	}
 
+	if (addr == PAGE_OFFSET)
+		kaslr_trampoline_init(page_size_mask);
+
 	if (pgd_changed)
 		sync_global_pgds(addr, end - 1, 0);
 
