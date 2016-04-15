@@ -108,7 +108,7 @@ static int vdso_mremap(const struct vm_special_mapping *sm,
 	if (image->size != new_size)
 		return -EINVAL;
 
-	if (is_ia32_task()) {
+	if (in_ia32_syscall()) {
 		struct pt_regs *regs = current_pt_regs();
 		unsigned long vdso_land = image->sym_int80_landing_pad;
 		unsigned long old_land_addr = vdso_land +
