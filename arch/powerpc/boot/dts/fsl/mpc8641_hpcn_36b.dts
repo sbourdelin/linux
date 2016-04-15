@@ -346,6 +346,7 @@
 			>;
 		pcie@0 {
 			reg = <0 0 0 0 0>;
+			#interrupt-cells = <1>;
 			#size-cells = <2>;
 			#address-cells = <3>;
 			device_type = "pci";
