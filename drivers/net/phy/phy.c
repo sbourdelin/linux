@@ -787,6 +787,9 @@ void phy_start(struct phy_device *phydev)
 		break;
 	case PHY_READY:
 		phydev->state = PHY_UP;
+		cancel_delayed_work_sync(&phydev->state_queue);
+		queue_delayed_work(system_power_efficient_wq,
+				   &phydev->state_queue, 0);
 		break;
 	case PHY_HALTED:
 		/* make sure interrupts are re-enabled for the PHY */
