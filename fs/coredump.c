@@ -590,6 +590,8 @@ void do_coredump(const siginfo_t *siginfo)
 		int dump_count;
 		char **helper_argv;
 		struct subprocess_info *sub_info;
+		struct pid_namespace *pid_ns;
+		struct path root_fs;
 
 		if (ispipe < 0) {
 			printk(KERN_WARNING "format_corename failed\n");
@@ -636,15 +638,29 @@ void do_coredump(const siginfo_t *siginfo)
 			goto fail_dropcount;
 		}
 
+		pid_ns = task_active_pid_ns(current);
+		spin_lock(&pid_ns->root_for_dump_lock);
+		while (pid_ns != &init_pid_ns) {
+			if (pid_ns->root_for_dump.mnt)
+				break;
+			spin_unlock(&pid_ns->root_for_dump_lock);
+			pid_ns = pid_ns->parent,
+			spin_lock(&pid_ns->root_for_dump_lock);
+		}
+		root_fs = pid_ns->root_for_dump;
+		path_get(&root_fs);
+		spin_unlock(&pid_ns->root_for_dump_lock);
+
 		retval = -ENOMEM;
 		sub_info = call_usermodehelper_setup(helper_argv[0],
 						helper_argv, NULL, GFP_KERNEL,
 						umh_pipe_setup, NULL, &cprm,
-						NULL);
+						&root_fs);
 		if (sub_info)
 			retval = call_usermodehelper_exec(sub_info,
 							  UMH_WAIT_EXEC);
 
+		path_put(&root_fs);
 		argv_free(helper_argv);
 		if (retval) {
 			printk(KERN_INFO "Core dump to |%s pipe failed\n",
