@@ -706,9 +706,16 @@ retry:
 			inode_dio_end(inode);
 			goto locked;
 		}
+		/*
+		 * Need to pass in DIO_SKIP_DIO_COUNT to dax_do_io() to prevent
+		 * duplicated inode_dio_begin/inode_dio_end pair. The flag
+		 * isn't used in __blockdev_direct_IO() as the inode_dio_end()
+		 * call can be deferred for AIO.
+		 */
 		if (IS_DAX(inode))
 			ret = dax_do_io(iocb, inode, iter, offset,
-					ext4_dio_get_block, NULL, 0);
+					ext4_dio_get_block, NULL,
+					DIO_SKIP_DIO_COUNT);
 		else
 			ret = __blockdev_direct_IO(iocb, inode,
 						   inode->i_sb->s_bdev, iter,
