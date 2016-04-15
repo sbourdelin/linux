@@ -257,13 +257,6 @@ static int i915_get_bridge_dev(struct drm_device *dev)
 	return 0;
 }
 
-#define MCHBAR_I915 0x44
-#define MCHBAR_I965 0x48
-#define MCHBAR_SIZE (4*4096)
-
-#define DEVEN_REG 0x54
-#define   DEVEN_MCHBAR_EN (1 << 28)
-
 /* Allocate space for the MCH regs if needed, return nonzero on error */
 static int
 intel_alloc_mchbar_resource(struct drm_device *dev)
@@ -325,7 +318,7 @@ intel_setup_mchbar(struct drm_device *dev)
 	dev_priv->mchbar_need_disable = false;
 
 	if (IS_I915G(dev) || IS_I915GM(dev)) {
-		pci_read_config_dword(dev_priv->bridge_dev, DEVEN_REG, &temp);
+		pci_read_config_dword(dev_priv->bridge_dev, DEVEN, &temp);
 		enabled = !!(temp & DEVEN_MCHBAR_EN);
 	} else {
 		pci_read_config_dword(dev_priv->bridge_dev, mchbar_reg, &temp);
@@ -343,7 +336,7 @@ intel_setup_mchbar(struct drm_device *dev)
 
 	/* Space is allocated or reserved, so enable it. */
 	if (IS_I915G(dev) || IS_I915GM(dev)) {
-		pci_write_config_dword(dev_priv->bridge_dev, DEVEN_REG,
+		pci_write_config_dword(dev_priv->bridge_dev, DEVEN,
 				       temp | DEVEN_MCHBAR_EN);
 	} else {
 		pci_read_config_dword(dev_priv->bridge_dev, mchbar_reg, &temp);
@@ -360,9 +353,9 @@ intel_teardown_mchbar(struct drm_device *dev)
 
 	if (dev_priv->mchbar_need_disable) {
 		if (IS_I915G(dev) || IS_I915GM(dev)) {
-			pci_read_config_dword(dev_priv->bridge_dev, DEVEN_REG, &temp);
+			pci_read_config_dword(dev_priv->bridge_dev, DEVEN, &temp);
 			temp &= ~DEVEN_MCHBAR_EN;
-			pci_write_config_dword(dev_priv->bridge_dev, DEVEN_REG, temp);
+			pci_write_config_dword(dev_priv->bridge_dev, DEVEN, temp);
 		} else {
 			pci_read_config_dword(dev_priv->bridge_dev, mchbar_reg, &temp);
 			temp &= ~1;
