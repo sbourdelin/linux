@@ -56,6 +56,7 @@ struct file;
 struct subprocess_info {
 	struct work_struct work;
 	struct completion *complete;
+	struct path *root_override;
 	char *path;
 	char **argv;
 	char **envp;
@@ -72,7 +73,8 @@ call_usermodehelper(char *path, char **argv, char **envp, int wait);
 extern struct subprocess_info *
 call_usermodehelper_setup(char *path, char **argv, char **envp, gfp_t gfp_mask,
 			  int (*init)(struct subprocess_info *info, struct cred *new),
-			  void (*cleanup)(struct subprocess_info *), void *data);
+			  void (*cleanup)(struct subprocess_info *), void *data,
+			  struct path *root_override);
 
 extern int
 call_usermodehelper_exec(struct subprocess_info *info, int wait);

@@ -79,7 +79,7 @@ static int call_usermodehelper_keys(char *path, char **argv, char **envp,
 
 	info = call_usermodehelper_setup(path, argv, envp, GFP_KERNEL,
 					  umh_keys_init, umh_keys_cleanup,
-					  session_keyring);
+					  session_keyring, NULL);
 	if (!info)
 		return -ENOMEM;
 

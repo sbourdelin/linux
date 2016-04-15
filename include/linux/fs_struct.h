@@ -19,7 +19,8 @@ extern struct kmem_cache *fs_cachep;
 extern void exit_fs(struct task_struct *);
 extern void set_fs_root(struct fs_struct *, const struct path *);
 extern void set_fs_pwd(struct fs_struct *, const struct path *);
-extern struct fs_struct *copy_fs_struct(struct fs_struct *);
+extern struct fs_struct *copy_fs_struct(struct fs_struct *,
+					struct path *root_override);
 extern void free_fs_struct(struct fs_struct *);
 extern int unshare_fs_struct(void);
 
