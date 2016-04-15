@@ -1817,6 +1817,11 @@ enum nl80211_commands {
  * @NL80211_ATTR_STA_SUPPORT_P2P_PS: whether P2P PS mechanism supported
  *	or not. u8, one of the values of &enum nl80211_sta_p2p_ps_status
  *
+ * @NL80211_ATTR_IFTYPE_EXT_CAPA: Nested attribute of the following attributes:
+ *	%NL80211_ATTR_IFTYPE, %NL80211_ATTR_EXT_CAPA,
+ *	%NL80211_ATTR_EXT_CAPA_MASK, to specify the extended capabilities per
+ *	interface type.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2196,6 +2201,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_BSS_SELECT,
 
 	NL80211_ATTR_STA_SUPPORT_P2P_PS,
+
+	NL80211_ATTR_IFTYPE_EXT_CAPA,
 
 	/* add attributes here, update the policy in nl80211.c */
 

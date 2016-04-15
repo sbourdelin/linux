@@ -1761,6 +1761,39 @@ static int nl80211_send_wiphy(struct cfg80211_registered_device *rdev,
 			nla_nest_end(msg, nested);
 		}
 
+		state->split_start++;
+		break;
+	case 13:
+		if (rdev->wiphy.num_iftype_ext_capab &&
+		    rdev->wiphy.iftype_ext_capab) {
+			struct nlattr *nested_ext_capab, *nested;
+
+			nested = nla_nest_start(msg,
+						NL80211_ATTR_IFTYPE_EXT_CAPA);
+			if (!nested)
+				goto nla_put_failure;
+
+			for (i = 0; i < rdev->wiphy.num_iftype_ext_capab; i++) {
+				struct wiphy_iftype_ext_capab *capab;
+
+				capab = &rdev->wiphy.iftype_ext_capab[i];
+				nested_ext_capab = nla_nest_start(msg, i);
+				if (!nested_ext_capab ||
+				    nla_put_u32(msg, NL80211_ATTR_IFTYPE,
+						capab->iftype) ||
+				    nla_put(msg, NL80211_ATTR_EXT_CAPA,
+					    capab->ext_capab_len,
+					    capab->ext_capab) ||
+				    nla_put(msg, NL80211_ATTR_EXT_CAPA_MASK,
+					    capab->ext_capab_len,
+					    capab->ext_capab_mask))
+					goto nla_put_failure;
+
+				nla_nest_end(msg, nested_ext_capab);
+			}
+			nla_nest_end(msg, nested);
+		}
+
 		/* done */
 		state->split_start = 0;
 		break;
