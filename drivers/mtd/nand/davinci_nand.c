@@ -738,6 +738,14 @@ static int nand_davinci_probe(struct platform_device *pdev)
 	}
 	info->chip.ecc.mode = ecc_mode;
 
+	/*
+	 * When using software ECC this driver support hamming only. Force
+	 * ecc.algo to NAND_ECC_HAMMING to avoid adding an extra ->ecc_algo
+	 * field to davinci_nand_pdata.
+	 */
+	if (ecc_mode == NAND_ECC_SOFT)
+		info->chip.ecc.algo = NAND_ECC_HAMMING;
+
 	info->clk = devm_clk_get(&pdev->dev, "aemif");
 	if (IS_ERR(info->clk)) {
 		ret = PTR_ERR(info->clk);
