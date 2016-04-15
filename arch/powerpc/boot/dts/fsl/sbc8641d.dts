@@ -167,6 +167,7 @@
 	pci1: pcie@f8009000 {
 		compatible = "fsl,mpc8641-pcie";
 		device_type = "pci";
+		#interrupt-cells = <1>;
 		#size-cells = <2>;
 		#address-cells = <3>;
 		reg = <0xf8009000 0x1000>;
