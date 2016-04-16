@@ -5,7 +5,7 @@ config CARL9170
 	select FW_LOADER
 	select CRC32
 	help
-	  This is another driver for the Atheros "otus" 802.11n USB devices.
+	  This is the mainline driver for the Atheros "otus" 802.11n USB devices.
 
 	  This driver provides more features than the original,
 	  but it needs a special firmware (carl9170-1.fw) to do that.
