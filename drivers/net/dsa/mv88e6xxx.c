@@ -3066,24 +3066,24 @@ int mv88e6xxx_get_temp_alarm(struct dsa_switch *ds, bool *alarm)
 }
 #endif /* CONFIG_NET_DSA_HWMON */
 
-static char *mv88e6xxx_lookup_name(unsigned int id,
-				   const struct mv88e6xxx_switch_id *table,
-				   unsigned int num)
+static const struct mv88e6xxx_info *
+mv88e6xxx_lookup_info(unsigned int prod_num, const struct mv88e6xxx_info *table,
+		      unsigned int num)
 {
 	int i;
 
 	for (i = 0; i < num; ++i)
-		if (table[i].id == (id & 0xfff0))
-			return table[i].name;
+		if (table[i].prod_num == prod_num)
+			return &table[i];
 
 	return NULL;
 }
 
 char *mv88e6xxx_drv_probe(struct device *dsa_dev, struct device *host_dev,
 			  int sw_addr, void **priv,
-			  const struct mv88e6xxx_switch_id *table,
-			  unsigned int num)
+			  const struct mv88e6xxx_info *table, unsigned int num)
 {
+	const struct mv88e6xxx_info *info;
 	struct mv88e6xxx_priv_state *ps;
 	struct mii_bus *bus;
 	int id, prod_num, rev;
@@ -3100,9 +3100,11 @@ char *mv88e6xxx_drv_probe(struct device *dsa_dev, struct device *host_dev,
 	prod_num = (id & 0xfff0) >> 4;
 	rev = id & 0x000f;
 
-	name = mv88e6xxx_lookup_name(id, table, num);
-	if (!name)
+	info = mv88e6xxx_lookup_info(prod_num, table, num);
+	if (!info)
 		return NULL;
+
+	name = (char *) info->name;
 
 	ps = devm_kzalloc(dsa_dev, sizeof(*ps), GFP_KERNEL);
 	if (!ps)
@@ -3110,6 +3112,7 @@ char *mv88e6xxx_drv_probe(struct device *dsa_dev, struct device *host_dev,
 
 	ps->bus = bus;
 	ps->sw_addr = sw_addr;
+	ps->info = info;
 	ps->id = id & 0xfff0;
 
 	*priv = ps;
