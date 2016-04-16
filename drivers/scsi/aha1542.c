@@ -996,25 +996,31 @@ static int aha1542_pnp_probe(struct pnp_dev *pdev, const struct pnp_device_id *i
 {
 	int indx;
 	struct Scsi_Host *sh;
+	int ret;
 
-	for (indx = 0; indx < ARRAY_SIZE(io); indx++) {
-		if (io[indx])
-			continue;
+	for (indx = 0; indx < ARRAY_SIZE(io); indx++)
+		if (!io[indx])
+			break;
 
-		if (pnp_activate_dev(pdev) < 0)
-			continue;
+	if (indx == ARRAY_SIZE(io))
+		return -ENXIO;
 
-		io[indx] = pnp_port_start(pdev, 0);
+	ret = pnp_activate_dev(pdev);
+	if (ret < 0)
+		return ret;
 
-		/* The card can be queried for its DMA, we have
-		   the DMA set up that is enough */
+	io[indx] = pnp_port_start(pdev, 0);
 
-		dev_info(&pdev->dev, "ISAPnP found an AHA1535 at I/O 0x%03X", io[indx]);
-	}
+	/* The card can be queried for its DMA, we have
+	   the DMA set up that is enough */
+
+	dev_info(&pdev->dev, "ISAPnP found an AHA1535 at I/O 0x%03X", io[indx]);
 
 	sh = aha1542_hw_init(&driver_template, &pdev->dev, indx);
-	if (!sh)
+	if (!sh) {
+		pnp_disable_dev(pdev);
 		return -ENODEV;
+	}
 
 	pnp_set_drvdata(pdev, sh);
 	return 0;
