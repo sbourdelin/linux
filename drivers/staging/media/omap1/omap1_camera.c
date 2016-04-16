@@ -1579,6 +1579,7 @@ static int omap1_cam_probe(struct platform_device *pdev)
 	if (IS_ERR(clk))
 		return PTR_ERR(clk);
 
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	pcdev = devm_kzalloc(&pdev->dev, sizeof(*pcdev) + resource_size(res),
 			     GFP_KERNEL);
 	if (!pcdev)
@@ -1614,7 +1615,6 @@ static int omap1_cam_probe(struct platform_device *pdev)
 	INIT_LIST_HEAD(&pcdev->capture);
 	spin_lock_init(&pcdev->lock);
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(base))
 		return PTR_ERR(base);
