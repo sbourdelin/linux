@@ -45,10 +45,12 @@ static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
 					     unsigned long parent_rate)
 {
 	u8 n = 1, k = 0, p = 0, m = 0;
+	u8 par_index = 0;
 	u32 reg;
 	unsigned long rate;
 	struct clk_factors *factors = to_clk_factors(hw);
 	const struct clk_factors_config *config = factors->config;
+	const struct clk_factors_prediv *prediv = factors->prediv_config;
 
 	/* Fetch the register value */
 	reg = readl(factors->reg);
@@ -63,24 +65,16 @@ static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
 	if (config->pwidth != SUNXI_FACTORS_NOT_APPLICABLE)
 		p = FACTOR_GET(config->pshift, config->pwidth, reg);
 
-	if (factors->recalc) {
-		struct factors_request factors_req = {
-			.parent_rate = parent_rate,
-			.n = n,
-			.k = k,
-			.m = m,
-			.p = p,
-		};
-
+	if (prediv) {
 		/* get mux details from mux clk structure */
 		if (factors->mux)
-			factors_req.parent_index =
-				(reg >> factors->mux->shift) &
-				factors->mux->mask;
+			par_index = (reg >> factors->mux->shift) &
+					factors->mux->mask;
 
-		factors->recalc(&factors_req);
-
-		return factors_req.rate;
+		if (prediv[par_index].width != SUNXI_FACTORS_NOT_APPLICABLE) {
+			m = FACTOR_GET(prediv[par_index].shift,
+				prediv[par_index].width, reg);
+		}
 	}
 
 	/* Calculate the rate */
@@ -102,8 +96,12 @@ static int clk_factors_determine_rate(struct clk_hw *hw,
 	for (i = 0; i < num_parents; i++) {
 		struct factors_request factors_req = {
 			.rate = req->rate,
-			.parent_index = i,
 		};
+
+		if (factors->prediv_config)
+			factors_req.prediv_width =
+						factors->prediv_config[i].width;
+
 		parent = clk_hw_get_parent_by_index(hw, i);
 		if (!parent)
 			continue;
@@ -211,6 +209,7 @@ struct clk *sunxi_factors_register(struct device_node *node,
 	/* set up factors properties */
 	factors->reg = reg;
 	factors->config = data->table;
+	factors->prediv_config = data->prediv_table;
 	factors->get_factors = data->getter;
 	factors->recalc = data->recalc;
 	factors->lock = lock;
