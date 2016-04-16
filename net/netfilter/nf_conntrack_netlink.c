@@ -336,6 +336,7 @@ nla_put_failure:
 #endif
 
 #ifdef CONFIG_NF_CONNTRACK_LABELS
+#ifdef CONFIG_NF_CONNTRACK_EVENTS
 static int ctnetlink_label_size(const struct nf_conn *ct)
 {
 	struct nf_conn_labels *labels = nf_ct_labels_find(ct);
@@ -344,6 +345,7 @@ static int ctnetlink_label_size(const struct nf_conn *ct)
 		return 0;
 	return nla_total_size(labels->words * sizeof(long));
 }
+#endif
 
 static int
 ctnetlink_dump_labels(struct sk_buff *skb, const struct nf_conn *ct)
@@ -526,6 +528,7 @@ nla_put_failure:
 	return -1;
 }
 
+#if defined(CONFIG_NF_CONNTRACK_EVENTS) || defined(CONFIG_NETFILTER_NETLINK_GLUE_CT)
 static size_t ctnetlink_proto_size(const struct nf_conn *ct)
 {
 	struct nf_conntrack_l3proto *l3proto;
@@ -543,16 +546,6 @@ static size_t ctnetlink_proto_size(const struct nf_conn *ct)
 	return len;
 }
 
-static size_t ctnetlink_acct_size(const struct nf_conn *ct)
-{
-	if (!nf_ct_ext_exist(ct, NF_CT_EXT_ACCT))
-		return 0;
-	return 2 * nla_total_size(0) /* CTA_COUNTERS_ORIG|REPL */
-	       + 2 * nla_total_size(sizeof(uint64_t)) /* CTA_COUNTERS_PACKETS */
-	       + 2 * nla_total_size(sizeof(uint64_t)) /* CTA_COUNTERS_BYTES */
-	       ;
-}
-
 static int ctnetlink_secctx_size(const struct nf_conn *ct)
 {
 #ifdef CONFIG_NF_CONNTRACK_SECMARK
@@ -568,6 +561,18 @@ static int ctnetlink_secctx_size(const struct nf_conn *ct)
 	return 0;
 #endif
 }
+#endif
+
+#ifdef CONFIG_NF_CONNTRACK_EVENTS
+static size_t ctnetlink_acct_size(const struct nf_conn *ct)
+{
+	if (!nf_ct_ext_exist(ct, NF_CT_EXT_ACCT))
+		return 0;
+	return 2 * nla_total_size(0) /* CTA_COUNTERS_ORIG|REPL */
+	       + 2 * nla_total_size(sizeof(uint64_t)) /* CTA_COUNTERS_PACKETS */
+	       + 2 * nla_total_size(sizeof(uint64_t)) /* CTA_COUNTERS_BYTES */
+	       ;
+}
 
 static size_t ctnetlink_timestamp_size(const struct nf_conn *ct)
 {
@@ -580,7 +585,6 @@ static size_t ctnetlink_timestamp_size(const struct nf_conn *ct)
 #endif
 }
 
-#ifdef CONFIG_NF_CONNTRACK_EVENTS
 static size_t ctnetlink_nlmsg_size(const struct nf_conn *ct)
 {
 	return NLMSG_ALIGN(sizeof(struct nfgenmsg))
