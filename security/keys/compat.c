@@ -136,6 +136,17 @@ COMPAT_SYSCALL_DEFINE5(keyctl, u32, option,
 		return keyctl_dh_compute(compat_ptr(arg2), compat_ptr(arg3),
 					 arg4);
 
+	case KEYCTL_PKEY_ENCRYPT:
+	case KEYCTL_PKEY_DECRYPT:
+	case KEYCTL_PKEY_SIGN:
+		return keyctl_pkey_e_d_s(option,
+					 compat_ptr(arg2), compat_ptr(arg3),
+					 compat_ptr(arg4), compat_ptr(arg5));
+
+	case KEYCTL_PKEY_VERIFY:
+		return keyctl_pkey_verify(compat_ptr(arg2), compat_ptr(arg3),
+					  compat_ptr(arg4), compat_ptr(arg5));
+
 	default:
 		return -EOPNOTSUPP;
 	}
