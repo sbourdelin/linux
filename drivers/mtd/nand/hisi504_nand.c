@@ -768,6 +768,7 @@ static int hisi_nfc_probe(struct platform_device *pdev)
 	chip->chip_delay	= HINFC504_CHIP_DELAY;
 
 	chip->ecc.mode = of_get_nand_ecc_mode(np);
+	chip->ecc.algo = of_get_nand_ecc_algo(np);
 
 	buswidth = of_get_nand_bus_width(np);
 	if (buswidth == 16)
