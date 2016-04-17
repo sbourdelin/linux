@@ -46,6 +46,7 @@
 #include <linux/seccomp.h>
 #include <linux/if_vlan.h>
 #include <linux/bpf.h>
+#include <linux/perf_event.h>
 #include <net/sch_generic.h>
 #include <net/cls_cgroup.h>
 #include <net/dst_metadata.h>
@@ -1584,6 +1585,33 @@ static const struct bpf_func_proto bpf_csum_diff_proto = {
 	.arg5_type	= ARG_ANYTHING,
 };
 
+u64 __weak bpf_perf_event_output(u64 r1, u64 r2, u64 flags, u64 r4, u64 size)
+{
+	return -EACCES;
+}
+
+static DEFINE_PER_CPU(struct pt_regs, bpf_pt_regs);
+
+static u64 bpf_skb_event_output(u64 r1, u64 r2, u64 flags, u64 r4, u64 size)
+{
+	struct pt_regs *regs = this_cpu_ptr(&bpf_pt_regs);
+
+	perf_fetch_caller_regs(regs);
+
+	return bpf_perf_event_output((long)regs, r2, flags, r4, size);
+}
+
+static const struct bpf_func_proto bpf_skb_event_output_proto = {
+	.func		= bpf_skb_event_output,
+	.gpl_only	= true,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_CTX,
+	.arg2_type	= ARG_CONST_MAP_PTR,
+	.arg3_type	= ARG_ANYTHING,
+	.arg4_type	= ARG_PTR_TO_STACK,
+	.arg5_type	= ARG_CONST_STACK_SIZE,
+};
+
 static u64 bpf_clone_redirect(u64 r1, u64 ifindex, u64 flags, u64 r4, u64 r5)
 {
 	struct sk_buff *skb = (struct sk_buff *) (long) r1, *skb2;
@@ -2039,6 +2067,8 @@ tc_cls_act_func_proto(enum bpf_func_id func_id)
 		return &bpf_redirect_proto;
 	case BPF_FUNC_get_route_realm:
 		return &bpf_get_route_realm_proto;
+	case BPF_FUNC_perf_event_output:
+		return &bpf_skb_event_output_proto;
 	default:
 		return sk_filter_func_proto(func_id);
 	}
