@@ -638,7 +638,7 @@ void tegra_pmc_enter_suspend_mode(enum tegra_suspend_mode mode)
 		break;
 
 	case TEGRA_SUSPEND_LP2:
-		rate = clk_get_rate(pmc->clk);
+		rate = tegra_pmc_get_pclk_rate();
 		break;
 
 	default:
