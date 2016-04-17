@@ -325,7 +325,7 @@ static void ion_buffer_remove_from_handle(struct ion_buffer *buffer)
 	 */
 	mutex_lock(&buffer->lock);
 	buffer->handle_count--;
-	BUG_ON(buffer->handle_count < 0);
+	WARN_ON(buffer->handle_count < 0);
 	if (!buffer->handle_count) {
 		struct task_struct *task;
 
@@ -556,7 +556,10 @@ static void ion_free_nolock(struct ion_client *client,
 {
 	bool valid_handle;
 
-	BUG_ON(client != handle->client);
+	if (client != handle->client) {
+		WARN(1, "%s: client != handle->client.\n", __func__);
+		return;
+	}
 
 	valid_handle = ion_handle_validate(client, handle);
 
@@ -569,7 +572,10 @@ static void ion_free_nolock(struct ion_client *client,
 
 void ion_free(struct ion_client *client, struct ion_handle *handle)
 {
-	BUG_ON(client != handle->client);
+	if (client != handle->client) {
+		WARN(1, "%s: client != handle->client.\n", __func__);
+		return;
+	}
 
 	mutex_lock(&client->lock);
 	ion_free_nolock(client, handle);
