@@ -671,7 +671,7 @@ static int exynos5_i2c_xfer(struct i2c_adapter *adap,
 		return -EIO;
 	}
 
-	ret = clk_prepare_enable(i2c->clk);
+	ret = clk_enable(i2c->clk);
 	if (ret)
 		return ret;
 
@@ -697,7 +697,7 @@ static int exynos5_i2c_xfer(struct i2c_adapter *adap,
 	}
 
  out:
-	clk_disable_unprepare(i2c->clk);
+	clk_disable(i2c->clk);
 	return ret;
 }
 
@@ -803,6 +803,10 @@ static int exynos5_i2c_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, i2c);
 
+	clk_disable(i2c->clk);
+
+	return 0;
+
  err_clk:
 	clk_disable_unprepare(i2c->clk);
 	return ret;
@@ -814,6 +818,8 @@ static int exynos5_i2c_remove(struct platform_device *pdev)
 
 	i2c_del_adapter(&i2c->adap);
 
+	clk_unprepare(i2c->clk);
+
 	return 0;
 }
 
@@ -824,6 +830,8 @@ static int exynos5_i2c_suspend_noirq(struct device *dev)
 	struct exynos5_i2c *i2c = platform_get_drvdata(pdev);
 
 	i2c->suspended = 1;
+
+	clk_unprepare(i2c->clk);
 
 	return 0;
 }
@@ -845,7 +853,7 @@ static int exynos5_i2c_resume_noirq(struct device *dev)
 	}
 
 	exynos5_i2c_init(i2c);
-	clk_disable_unprepare(i2c->clk);
+	clk_disable(i2c->clk);
 	i2c->suspended = 0;
 
 	return 0;
