@@ -7,7 +7,7 @@ include ../lib.mk
 TARGETS_C_BOTHBITS := single_step_syscall sysret_ss_attrs syscall_nt ptrace_syscall \
 			check_initial_reg_state sigreturn ldt_gdt iopl
 TARGETS_C_32BIT_ONLY := entry_from_vm86 syscall_arg_fault test_syscall_vdso unwind_vdso \
-			test_FCMOV test_FCOMI test_FISTTP \
+			test_FCMOV test_FCOMI test_FISTTP test_mremap_vdso \
 			vdso_restorer
 
 TARGETS_C_32BIT_ALL := $(TARGETS_C_BOTHBITS) $(TARGETS_C_32BIT_ONLY)
