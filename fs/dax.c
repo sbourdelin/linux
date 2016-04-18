@@ -509,7 +509,7 @@ static void wake_mapping_entry_waiter(struct address_space *mapping,
 	}
 }
 
-static void unlock_mapping_entry(struct address_space *mapping, pgoff_t index)
+void dax_unlock_mapping_entry(struct address_space *mapping, pgoff_t index)
 {
 	void *ret, **slot;
 
@@ -532,7 +532,7 @@ static void put_locked_mapping_entry(struct address_space *mapping,
 		unlock_page(entry);
 		put_page(entry);
 	} else {
-		unlock_mapping_entry(mapping, index);
+		dax_unlock_mapping_entry(mapping, index);
 	}
 }
 
@@ -912,12 +912,10 @@ int __dax_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 			goto unlock_entry;
 		if (!radix_tree_exceptional_entry(entry)) {
 			vmf->page = entry;
-		} else {
-			unlock_mapping_entry(mapping, vmf->pgoff);
-			i_mmap_lock_read(mapping);
-			vmf->page = NULL;
+			return VM_FAULT_LOCKED;
 		}
-		return VM_FAULT_LOCKED;
+		vmf->entry = entry;
+		return VM_FAULT_DAX_LOCKED;
 	}
 
 	if (!buffer_mapped(&bh)) {

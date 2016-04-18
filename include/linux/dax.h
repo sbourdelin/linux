@@ -20,11 +20,18 @@ int dax_delete_mapping_entry(struct address_space *mapping, pgoff_t index);
 
 #ifdef CONFIG_FS_DAX
 struct page *read_dax_sector(struct block_device *bdev, sector_t n);
+void dax_unlock_mapping_entry(struct address_space *mapping, pgoff_t index);
 #else
 static inline struct page *read_dax_sector(struct block_device *bdev,
 		sector_t n)
 {
 	return ERR_PTR(-ENXIO);
+}
+/* Shouldn't ever be called when dax is disabled. */
+static inline void dax_unlock_mapping_entry(struct address_space *mapping,
+					    pgoff_t index)
+{
+	BUG();
 }
 #endif
 
