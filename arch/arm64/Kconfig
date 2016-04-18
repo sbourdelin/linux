@@ -98,6 +98,7 @@ config ARM64
 	select SYSCTL_EXCEPTION_TRACE
 	select HAVE_CONTEXT_TRACKING
 	select HAVE_ARM_SMCCC
+	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
 	help
 	  ARM 64-bit (AArch64) Linux support.
 
@@ -577,9 +578,6 @@ config SYS_SUPPORTS_HUGETLBFS
 
 config ARCH_WANT_HUGE_PMD_SHARE
 	def_bool y if ARM64_4K_PAGES || (ARM64_16K_PAGES && !ARM64_VA_BITS_36)
-
-config HAVE_ARCH_TRANSPARENT_HUGEPAGE
-	def_bool y
 
 config ARCH_HAS_CACHE_LINE_SIZE
 	def_bool y
