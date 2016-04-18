@@ -665,6 +665,16 @@ config ZONE_DEVICE
 
 	  If FS_DAX is enabled, then say Y.
 
+config FAULT_AROUND_BYTES
+	int
+	range 4096 65536
+	default 65536
+	help
+	  The number of bytes to be mapped around the fault. The default
+	  value of 64 kilobytes effectively disables faultaround on
+	  architectures with page size >= 64k, considering the fact that
+	  the feature is less relevant when page size is bigger than 4k.
+
 config FRAME_VECTOR
 	bool
 
