@@ -436,3 +436,20 @@ void snd_soc_jack_free_gpios(struct snd_soc_jack *jack, int count,
 }
 EXPORT_SYMBOL_GPL(snd_soc_jack_free_gpios);
 #endif	/* CONFIG_GPIOLIB */
+
+/**
+ * snd_soc_jack_codec_detect - Call and init jack detection if the codec support it
+ *
+ * @codec: ASoC codec
+ * @jack:  ASoC jack
+ *
+ * Call and initialize the codec jack detection if the codec supports it and fills
+ * the detect_jack function in the struct snd_soc_codec_driver.
+ */
+void snd_soc_jack_codec_detect(struct snd_soc_codec *codec,
+				struct snd_soc_jack *jack)
+{
+	if (codec && codec->driver && codec->driver->detect_jack)
+		codec->driver->detect_jack(codec, jack);
+}
+EXPORT_SYMBOL_GPL(snd_soc_jack_codec_detect);
