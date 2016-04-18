@@ -246,7 +246,6 @@ static struct regulator_ops s2mps11_ldo_ops = {
 	.disable		= regulator_disable_regmap,
 	.get_voltage_sel	= regulator_get_voltage_sel_regmap,
 	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
-	.set_voltage_time_sel	= regulator_set_voltage_time_sel,
 };
 
 static struct regulator_ops s2mps11_buck_ops = {
@@ -606,7 +605,6 @@ static struct regulator_ops s2mps14_reg_ops = {
 	.disable		= regulator_disable_regmap,
 	.get_voltage_sel	= regulator_get_voltage_sel_regmap,
 	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
-	.set_voltage_time_sel	= regulator_set_voltage_time_sel,
 	.set_suspend_disable	= s2mps14_regulator_set_suspend_disable,
 };
 
