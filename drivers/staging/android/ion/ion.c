@@ -209,7 +209,7 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 	buffer->size = len;
 
 	table = heap->ops->map_dma(heap, buffer);
-	if (WARN_ONCE(table == NULL,
+	if (WARN_ONCE(!table,
 		      "heap->ops->map_dma should return ERR_PTR on error"))
 		table = ERR_PTR(-EINVAL);
 	if (IS_ERR(table)) {
@@ -522,7 +522,7 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 	}
 	up_read(&dev->lock);
 
-	if (buffer == NULL)
+	if (!buffer)
 		return ERR_PTR(-ENODEV);
 
 	if (IS_ERR(buffer))
@@ -612,7 +612,7 @@ static void *ion_buffer_kmap_get(struct ion_buffer *buffer)
 		return buffer->vaddr;
 	}
 	vaddr = buffer->heap->ops->map_kernel(buffer->heap, buffer);
-	if (WARN_ONCE(vaddr == NULL,
+	if (WARN_ONCE(!vaddr,
 		      "heap->ops->map_kernel should return ERR_PTR on error"))
 		return ERR_PTR(-EINVAL);
 	if (IS_ERR(vaddr))
