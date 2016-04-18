@@ -19,6 +19,10 @@
 #define CXL_SLOT_RESET_EVENT		2
 #define CXL_RESUME_EVENT		3
 
+#define CXL_KTHREAD 			"cxl_kthread"
+
+void stop_state_thread(struct cxl_afu *afu);
+
 static void pci_error_handlers(struct cxl_afu *afu,
 				int bus_error_event,
 				pci_channel_state_t state)
@@ -177,6 +181,9 @@ static int afu_read_error_state(struct cxl_afu *afu, int *state_out)
 {
 	u64 state;
 	int rc = 0;
+
+	if (!afu)
+		return -EIO;
 
 	rc = cxl_h_read_error_state(afu->guest->handle, &state);
 	if (!rc) {
@@ -645,6 +652,8 @@ static void guest_release_afu(struct device *dev)
 
 	idr_destroy(&afu->contexts_idr);
 
+	stop_state_thread(afu);
+
 	kfree(afu->guest);
 	kfree(afu);
 }
@@ -818,7 +827,6 @@ static int afu_update_state(struct cxl_afu *afu)
 	switch (cur_state) {
 	case H_STATE_NORMAL:
 		afu->guest->previous_state = cur_state;
-		rc = 1;
 		break;
 
 	case H_STATE_DISABLE:
@@ -834,7 +842,6 @@ static int afu_update_state(struct cxl_afu *afu)
 			pci_error_handlers(afu, CXL_SLOT_RESET_EVENT,
 					pci_channel_io_normal);
 			pci_error_handlers(afu, CXL_RESUME_EVENT, 0);
-			rc = 1;
 		}
 		afu->guest->previous_state = 0;
 		break;
@@ -859,39 +866,61 @@ static int afu_update_state(struct cxl_afu *afu)
 	return rc;
 }
 
-static int afu_do_recovery(struct cxl_afu *afu)
+static int handle_state_thread(void *data)
 {
-	int rc;
+	struct cxl_afu *afu;
+	int rc = 0;
 
-	/* many threads can arrive here, in case of detach_all for example.
-	 * Only one needs to drive the recovery
-	 */
-	if (mutex_trylock(&afu->guest->recovery_lock)) {
-		rc = afu_update_state(afu);
-		mutex_unlock(&afu->guest->recovery_lock);
-		return rc;
+	pr_devel("in %s\n", __func__);
+
+	afu = (struct cxl_afu*)data;
+	do {
+		set_current_state(TASK_INTERRUPTIBLE);
+
+		if (afu) {
+			afu_update_state(afu);
+			if (afu->guest->previous_state == H_STATE_PERM_UNAVAILABLE)
+				goto out;
+		} else
+			return -ENODEV;
+		schedule_timeout(msecs_to_jiffies(3000));
+	} while(!kthread_should_stop());
+
+out:
+	afu->guest->kthread_tsk = NULL;
+	return rc;
+}
+
+void start_state_thread(struct cxl_afu *afu)
+{
+	if (afu->guest->kthread_tsk)
+		return;
+
+	/* start kernel thread to handle the state of the afu */
+	afu->guest->kthread_tsk = kthread_run(&handle_state_thread,
+				  (void *)afu, CXL_KTHREAD);
+	if (IS_ERR(afu->guest->kthread_tsk)) {
+		pr_devel("cannot start state kthread\n");
+		afu->guest->kthread_tsk = NULL;
 	}
-	return 0;
+}
+
+void stop_state_thread(struct cxl_afu *afu)
+{
+	if (afu->guest->kthread_tsk)
+		kthread_stop(afu->guest->kthread_tsk);
 }
 
 static bool guest_link_ok(struct cxl *cxl, struct cxl_afu *afu)
 {
 	int state;
 
-	if (afu) {
-		if (afu_read_error_state(afu, &state) ||
-			state != H_STATE_NORMAL) {
-			if (afu_do_recovery(afu) > 0) {
-				/* check again in case we've just fixed it */
-				if (!afu_read_error_state(afu, &state) &&
-					state == H_STATE_NORMAL)
-					return true;
-			}
-			return false;
-		}
+	if (afu && (!afu_read_error_state(afu, &state))) {
+		if (state == H_STATE_NORMAL)
+			return true;
 	}
 
-	return true;
+	return false;
 }
 
 static int afu_properties_look_ok(struct cxl_afu *afu)
@@ -928,8 +957,6 @@ int cxl_guest_init_afu(struct cxl *adapter, int slice, struct device_node *afu_n
 		kfree(afu);
 		return -ENOMEM;
 	}
-
-	mutex_init(&afu->guest->recovery_lock);
 
 	if ((rc = dev_set_name(&afu->dev, "afu%i.%i",
 					  adapter->adapter_num,
@@ -985,6 +1012,8 @@ int cxl_guest_init_afu(struct cxl *adapter, int slice, struct device_node *afu_n
 	adapter->afu[afu->slice] = afu;
 
 	afu->enabled = true;
+
+	start_state_thread(afu);
 
 	if ((rc = cxl_pci_vphb_add(afu)))
 		dev_info(&afu->dev, "Can't register vPHB\n");

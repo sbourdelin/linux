@@ -19,6 +19,7 @@
 #include <linux/io.h>
 #include <linux/pci.h>
 #include <linux/fs.h>
+#include <linux/kthread.h>
 #include <asm/cputable.h>
 #include <asm/mmu.h>
 #include <asm/reg.h>
@@ -379,7 +380,7 @@ struct cxl_afu_guest {
 	phys_addr_t p2n_phys;
 	u64 p2n_size;
 	int max_ints;
-	struct mutex recovery_lock;
+	struct task_struct *kthread_tsk;
 	int previous_state;
 };
 
