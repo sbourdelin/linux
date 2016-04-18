@@ -568,7 +568,7 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
 	}
 
 	ret = vfio_add_group_dev(dev, &vfio_platform_ops, vdev);
-	if (ret) {
+	if (ret < 0) {
 		iommu_group_put(group);
 		return ret;
 	}

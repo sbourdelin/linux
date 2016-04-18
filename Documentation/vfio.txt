@@ -259,7 +259,9 @@ extern void *vfio_del_group_dev(struct device *dev);
 
 vfio_add_group_dev() indicates to the core to begin tracking the
 specified iommu_group and register the specified dev as owned by
-a VFIO bus driver.  The driver provides an ops structure for callbacks
+a VFIO bus driver.  A negative return value indicates failure.
+A positive return value indicates that an unsafe noiommu mode
+is in use.  The driver provides an ops structure for callbacks
 similar to a file operations structure:
 
 struct vfio_device_ops {

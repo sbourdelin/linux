@@ -756,6 +756,7 @@ int vfio_add_group_dev(struct device *dev,
 	struct iommu_group *iommu_group;
 	struct vfio_group *group;
 	struct vfio_device *device;
+	int noiommu;
 
 	iommu_group = iommu_group_get(dev);
 	if (!iommu_group)
@@ -791,6 +792,8 @@ int vfio_add_group_dev(struct device *dev,
 		return PTR_ERR(device);
 	}
 
+	noiommu = group->noiommu;
+
 	/*
 	 * Drop all but the vfio_device reference.  The vfio_device holds
 	 * a reference to the vfio_group, which holds a reference to the
@@ -798,7 +801,7 @@ int vfio_add_group_dev(struct device *dev,
 	 */
 	vfio_group_put(group);
 
-	return 0;
+	return noiommu;
 }
 EXPORT_SYMBOL_GPL(vfio_add_group_dev);
 

@@ -1119,7 +1119,7 @@ static int vfio_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	spin_lock_init(&vdev->irqlock);
 
 	ret = vfio_add_group_dev(&pdev->dev, &vfio_pci_ops, vdev);
-	if (ret) {
+	if (ret < 0) {
 		vfio_iommu_group_put(group, &pdev->dev);
 		kfree(vdev);
 		return ret;
