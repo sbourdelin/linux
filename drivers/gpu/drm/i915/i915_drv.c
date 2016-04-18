@@ -803,7 +803,7 @@ static int i915_drm_resume(struct drm_device *dev)
 static int i915_drm_resume_early(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	int ret = 0;
+	int ret;
 
 	/*
 	 * We have a resume ordering issue with the snd-hda driver also
@@ -814,6 +814,13 @@ static int i915_drm_resume_early(struct drm_device *dev)
 	 * FIXME: This should be solved with a special hdmi sink device or
 	 * similar so that power domains can be employed.
 	 */
+
+	ret = pci_set_power_state(dev->pdev, PCI_D0);
+	if (ret) {
+		DRM_ERROR("failed to set PCI D0 power state (%d)\n", ret);
+		goto out;
+	}
+
 	if (pci_enable_device(dev->pdev)) {
 		ret = -EIO;
 		goto out;
