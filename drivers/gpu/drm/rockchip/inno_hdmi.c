@@ -500,9 +500,6 @@ static void inno_hdmi_encoder_enable(struct drm_encoder *encoder)
 {
 	struct inno_hdmi *hdmi = to_inno_hdmi(encoder);
 
-	rockchip_drm_crtc_mode_config(encoder->crtc, DRM_MODE_CONNECTOR_HDMIA,
-				      ROCKCHIP_OUT_MODE_P888);
-
 	inno_hdmi_set_pwr_mode(hdmi, NORMAL);
 }
 
@@ -517,6 +514,8 @@ static bool inno_hdmi_encoder_mode_fixup(struct drm_encoder *encoder,
 					 const struct drm_display_mode *mode,
 					 struct drm_display_mode *adj_mode)
 {
+	adj_mode->private_flags = ROCKCHIP_DSP_MODE(HDMIA, P888);
+
 	return true;
 }
 
