@@ -436,3 +436,11 @@ void snd_soc_jack_free_gpios(struct snd_soc_jack *jack, int count,
 }
 EXPORT_SYMBOL_GPL(snd_soc_jack_free_gpios);
 #endif	/* CONFIG_GPIOLIB */
+
+void snd_soc_jack_codec_detect(struct snd_soc_codec *codec,
+				struct snd_soc_jack *jack)
+{
+	if (codec && codec->driver && codec->driver->detect_jack)
+		codec->driver->detect_jack(codec, jack);
+}
+EXPORT_SYMBOL_GPL(snd_soc_jack_codec_detect);

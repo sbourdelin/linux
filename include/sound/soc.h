@@ -547,6 +547,10 @@ static inline void snd_soc_jack_free_gpios(struct snd_soc_jack *jack, int count,
 }
 #endif
 
+/* init jack detect via codec */
+void snd_soc_jack_codec_detect(struct snd_soc_codec *codec,
+				struct snd_soc_jack *jack);
+
 /* codec register bit access */
 int snd_soc_update_bits(struct snd_soc_codec *codec, unsigned int reg,
 				unsigned int mask, unsigned int value);
@@ -920,6 +924,8 @@ struct snd_soc_codec_driver {
 			     enum snd_soc_dapm_type, int);
 
 	bool ignore_pmdown_time;  /* Doesn't benefit from pmdown delay */
+
+	void (*detect_jack)(struct snd_soc_codec *codec, struct snd_soc_jack *jack);
 };
 
 /* SoC platform interface */
