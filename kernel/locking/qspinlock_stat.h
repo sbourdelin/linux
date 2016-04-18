@@ -225,12 +225,18 @@ static int __init init_qspinlock_stat(void)
 	 * performance.
 	 */
 	for (i = 0; i < qstat_num; i++)
-		debugfs_create_file(qstat_names[i], 0400, d_qstat,
-				   (void *)(long)i, &fops_qstat);
+		if (!debugfs_create_file(qstat_names[i], 0400, d_qstat,
+					 (void *)(long)i, &fops_qstat))
+			goto fail;
 
-	debugfs_create_file(qstat_names[qstat_reset_cnts], 0200, d_qstat,
-			   (void *)(long)qstat_reset_cnts, &fops_qstat);
+	if (!debugfs_create_file(qstat_names[qstat_reset_cnts], 0200, d_qstat,
+				 (void *)(long)qstat_reset_cnts, &fops_qstat))
+		goto fail;
+
 	return 0;
+fail:
+	debugfs_remove_recursive(d_qstat);
+	return 1;
 }
 fs_initcall(init_qspinlock_stat);
 
