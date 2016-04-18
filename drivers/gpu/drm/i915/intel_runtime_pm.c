@@ -1786,7 +1786,8 @@ static struct i915_power_well vlv_power_wells[] = {
 		.domains = VLV_DPIO_TX_B_LANES_01_POWER_DOMAINS |
 			   VLV_DPIO_TX_B_LANES_23_POWER_DOMAINS |
 			   VLV_DPIO_TX_C_LANES_01_POWER_DOMAINS |
-			   VLV_DPIO_TX_C_LANES_23_POWER_DOMAINS,
+			   VLV_DPIO_TX_C_LANES_23_POWER_DOMAINS |
+			   VLV_DPIO_CMN_BC_POWER_DOMAINS,
 		.ops = &vlv_dpio_power_well_ops,
 		.data = PUNIT_POWER_WELL_DPIO_TX_B_LANES_01,
 	},
@@ -1795,7 +1796,8 @@ static struct i915_power_well vlv_power_wells[] = {
 		.domains = VLV_DPIO_TX_B_LANES_01_POWER_DOMAINS |
 			   VLV_DPIO_TX_B_LANES_23_POWER_DOMAINS |
 			   VLV_DPIO_TX_C_LANES_01_POWER_DOMAINS |
-			   VLV_DPIO_TX_C_LANES_23_POWER_DOMAINS,
+			   VLV_DPIO_TX_C_LANES_23_POWER_DOMAINS |
+			   VLV_DPIO_CMN_BC_POWER_DOMAINS,
 		.ops = &vlv_dpio_power_well_ops,
 		.data = PUNIT_POWER_WELL_DPIO_TX_B_LANES_23,
 	},
@@ -1804,7 +1806,8 @@ static struct i915_power_well vlv_power_wells[] = {
 		.domains = VLV_DPIO_TX_B_LANES_01_POWER_DOMAINS |
 			   VLV_DPIO_TX_B_LANES_23_POWER_DOMAINS |
 			   VLV_DPIO_TX_C_LANES_01_POWER_DOMAINS |
-			   VLV_DPIO_TX_C_LANES_23_POWER_DOMAINS,
+			   VLV_DPIO_TX_C_LANES_23_POWER_DOMAINS |
+			   VLV_DPIO_CMN_BC_POWER_DOMAINS,
 		.ops = &vlv_dpio_power_well_ops,
 		.data = PUNIT_POWER_WELL_DPIO_TX_C_LANES_01,
 	},
@@ -1813,7 +1816,8 @@ static struct i915_power_well vlv_power_wells[] = {
 		.domains = VLV_DPIO_TX_B_LANES_01_POWER_DOMAINS |
 			   VLV_DPIO_TX_B_LANES_23_POWER_DOMAINS |
 			   VLV_DPIO_TX_C_LANES_01_POWER_DOMAINS |
-			   VLV_DPIO_TX_C_LANES_23_POWER_DOMAINS,
+			   VLV_DPIO_TX_C_LANES_23_POWER_DOMAINS |
+			   VLV_DPIO_CMN_BC_POWER_DOMAINS,
 		.ops = &vlv_dpio_power_well_ops,
 		.data = PUNIT_POWER_WELL_DPIO_TX_C_LANES_23,
 	},
