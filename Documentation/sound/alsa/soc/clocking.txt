@@ -47,5 +47,111 @@ rate, number of channels and word size) to save on power.
 It is also desirable to use the codec (if possible) to drive (or master) the
 audio clocks as it usually gives more accurate sample rates than the CPU.
 
+The below diagrams all have BCLK as the first signal, LRC as the second signal
+and DATA as the third. Below that is an indication about which DATA bits belong
+in what channel.
+
+A "..." marking as DATA indicates that there may be more bits that are not
+shown. Also, all DATA bits marked X may or may not be present. DAI
+transmitters must add them should LRC not match the word size exactly and DAI
+receivers must be prepared to ignore them. DAI transmitters must insert
+zeros for I2S, Left and Right Justified modes, and preferably not drive DATA
+for the DSP modes for these extra X bits.
 
 
+I2S
+ .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-.
+-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-
+---.                               .-------------------------------.
+   '-------------------------------'                               '-----
+---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.-
+   |   |MSB|   |...|   |LSB| X |...| X |MSB|   |...|   |LSB| X |...| X |
+---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'-
+       | Left channel                  | Right channel                 |
+
+
+Left Justified (aka MSB)
+ .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-.
+-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-
+   .-------------------------------.                               .-----
+---'                               '-------------------------------'
+---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.-
+   |MSB|   |...|   |LSB| X |...| X |MSB|   |...|   |LSB| X |...| X |   |
+---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'-
+   | Left channel                  | Right channel                 |
+
+
+Right Justified (aka LSB)
+ .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-.
+-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-
+   .-------------------------------.                               .-----
+---'                               '-------------------------------'
+---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.-
+   | X |...| X |MSB|   |...|   |LSB| X |...| X |MSB|   |...|   |LSB|   |
+---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'-
+   | Left channel                  | Right channel                 |
+
+
+DSP mode A
+ .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-.
+-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-
+      -.                                                          -.
+       '-                                                          '-
+---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.-
+   |   |MSB|   |...|   |LSB|MSB|   |...|   |LSB| X |   |...|   | X |   |
+---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'-
+       | Left channel      | Right channel     |                   |
+
+LRC examples for DSP mode A
+   .---.                                                       .---.
+---'   '-------------------------------------------------------'   '-----
+     .-.                                                         .-.
+-----' '---------------------------------------------------------' '-----
+-------. .---------------------------------------------------------. .---
+       '-'                                                         '-'
+
+
+DSP mode B
+ .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-.
+-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-
+   .-                                                          .-
+  -'                                                          -'
+---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.-
+   |MSB|   |...|   |LSB|MSB|   |...|   |LSB| X |   |...|   | X |   |   |
+---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'-
+   | Left channel      | Right channel     |                   |
+
+LRC examples for DSP mode B
+   .---.                                                       .---.
+---'   '-------------------------------------------------------'   '-----
+-. .---------------------------------------------------------. .---------
+ '-'                                                         '-'
+
+
+The above diagrams show normal BCLK and LRC clocking where DAI transmitters
+change DATA on the falling edge of BCLK and DAI receivers read DATA on the
+rising edge. For inverted BCLK it is naturally the other way around. Inverted
+LRC is just that. Note that DSP mode A is compatible with DSP mode B with
+inverted LRC, and vice versa.
+
+
+Left Justified, inverted BCLK
+-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-
+ '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-'
+   .-------------------------------.                               .-----
+---'                               '-------------------------------'
+---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.-
+   |MSB|   |...|   |LSB| X |...| X |MSB|   |...|   |LSB| X |...| X |   |
+---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'-
+   | Left channel                  | Right channel                 |
+
+
+Left Justified, inverted LRC
+ .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-. .-.
+-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-' '-
+---.                               .-------------------------------.
+   '-------------------------------'                               '-----
+---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.---.-
+   |MSB|   |...|   |LSB| X |...| X |MSB|   |...|   |LSB| X |...| X |   |
+---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'---'-
+   | Left channel                  | Right channel                 |
