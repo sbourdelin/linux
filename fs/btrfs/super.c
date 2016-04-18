@@ -69,6 +69,11 @@ static struct file_system_type btrfs_fs_type;
 
 static int btrfs_remount(struct super_block *sb, int *flags, char *data);
 
+struct file_system_type *btrfs_get_fs_type()
+{
+	return &btrfs_fs_type;
+}
+
 const char *btrfs_decode_error(int errno)
 {
 	char *errstr = "unknown";
