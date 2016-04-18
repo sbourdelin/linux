@@ -816,6 +816,31 @@ int mipi_dsi_dcs_get_display_mode(struct mipi_dsi_device *dsi, u8 *mode)
 EXPORT_SYMBOL(mipi_dsi_dcs_get_display_mode);
 
 /**
+ * mipi_dsi_dcs_get_diagnostic_result() - query the display module's diagnostic
+ *    result
+ * @dsi: DSI peripheral device
+ * @mode: return location for the display self diagnostic result
+ *
+ * Return: 0 on success or a negative error code on failure.
+ */
+int mipi_dsi_dcs_get_diagnostic_result(struct mipi_dsi_device *dsi, u8 *mode)
+{
+	ssize_t err;
+
+	err = mipi_dsi_dcs_read(dsi, MIPI_DCS_GET_DIAGNOSTIC_RESULT, mode,
+				sizeof(*mode));
+	if (err <= 0) {
+		if (err == 0)
+			err = -ENODATA;
+
+		return err;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(mipi_dsi_dcs_get_diagnostic_result);
+
+/**
  * mipi_dsi_dcs_get_pixel_format() - gets the pixel format for the RGB image
  *    data used by the interface
  * @dsi: DSI peripheral device
