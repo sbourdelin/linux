@@ -1664,7 +1664,8 @@
 				compatible = "ti,davinci_mdio";
 				#address-cells = <1>;
 				#size-cells = <0>;
-				ti,hwmods = "davinci_mdio";
+				clocks = <&dpll_gmac_ck>;
+				clock-names = "fck";
 				bus_freq = <1000000>;
 				reg = <0x48485000 0x100>;
 			};
