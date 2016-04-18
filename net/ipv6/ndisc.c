@@ -185,24 +185,25 @@ static struct nd_opt_hdr *ndisc_next_option(struct nd_opt_hdr *cur,
 	return cur <= end && cur->nd_opt_type == type ? cur : NULL;
 }
 
-static inline int ndisc_is_useropt(struct nd_opt_hdr *opt)
+static inline int ip6_ndisc_is_useropt(struct nd_opt_hdr *opt)
 {
-	return opt->nd_opt_type == ND_OPT_RDNSS ||
-		opt->nd_opt_type == ND_OPT_DNSSL;
+	return __ip6_ndisc_is_useropt(opt);
 }
 
-static struct nd_opt_hdr *ndisc_next_useropt(struct nd_opt_hdr *cur,
+static struct nd_opt_hdr *ndisc_next_useropt(const struct net_device *dev,
+					     struct nd_opt_hdr *cur,
 					     struct nd_opt_hdr *end)
 {
 	if (!cur || !end || cur >= end)
 		return NULL;
 	do {
 		cur = ((void *)cur) + (cur->nd_opt_len << 3);
-	} while (cur < end && !ndisc_is_useropt(cur));
-	return cur <= end && ndisc_is_useropt(cur) ? cur : NULL;
+	} while (cur < end && !ndisc_is_useropt(dev, cur));
+	return cur <= end && ndisc_is_useropt(dev, cur) ? cur : NULL;
 }
 
-struct ndisc_options *ndisc_parse_options(u8 *opt, int opt_len,
+struct ndisc_options *ndisc_parse_options(const struct net_device *dev,
+					  u8 *opt, int opt_len,
 					  struct ndisc_options *ndopts)
 {
 	struct nd_opt_hdr *nd_opt = (struct nd_opt_hdr *)opt;
@@ -243,7 +244,7 @@ struct ndisc_options *ndisc_parse_options(u8 *opt, int opt_len,
 			break;
 #endif
 		default:
-			if (ndisc_is_useropt(nd_opt)) {
+			if (ndisc_is_useropt(dev, nd_opt)) {
 				ndopts->nd_useropts_end = nd_opt;
 				if (!ndopts->nd_useropts)
 					ndopts->nd_useropts = nd_opt;
@@ -479,9 +480,11 @@ static void ndisc_send_skb(struct sk_buff *skb,
 	rcu_read_unlock();
 }
 
-void ndisc_send_na(struct net_device *dev, const struct in6_addr *daddr,
-		   const struct in6_addr *solicited_addr,
-		   bool router, bool solicited, bool override, bool inc_opt)
+static void ip6_ndisc_send_na(struct net_device *dev,
+			      const struct in6_addr *daddr,
+			      const struct in6_addr *solicited_addr,
+			      bool router, bool solicited, bool override,
+			      bool inc_opt)
 {
 	struct sk_buff *skb;
 	struct in6_addr tmpaddr;
@@ -555,8 +558,10 @@ static void ndisc_send_unsol_na(struct net_device *dev)
 	in6_dev_put(idev);
 }
 
-void ndisc_send_ns(struct net_device *dev, const struct in6_addr *solicit,
-		   const struct in6_addr *daddr, const struct in6_addr *saddr)
+static void ip6_ndisc_send_ns(struct net_device *dev,
+			      const struct in6_addr *solicit,
+			      const struct in6_addr *daddr,
+			      const struct in6_addr *saddr)
 {
 	struct sk_buff *skb;
 	struct in6_addr addr_buf;
@@ -702,7 +707,7 @@ static int pndisc_is_router(const void *pkey,
 	return ret;
 }
 
-static void ndisc_recv_ns(struct sk_buff *skb)
+static void ip6_ndisc_recv_ns(struct sk_buff *skb)
 {
 	struct nd_msg *msg = (struct nd_msg *)skb_transport_header(skb);
 	const struct in6_addr *saddr = &ipv6_hdr(skb)->saddr;
@@ -738,7 +743,7 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 		return;
 	}
 
-	if (!ndisc_parse_options(msg->opt, ndoptlen, &ndopts)) {
+	if (!ndisc_parse_options(dev, msg->opt, ndoptlen, &ndopts)) {
 		ND_PRINTK(2, warn, "NS: invalid ND options\n");
 		return;
 	}
@@ -874,7 +879,7 @@ out:
 		in6_dev_put(idev);
 }
 
-static void ndisc_recv_na(struct sk_buff *skb)
+static void ip6_ndisc_recv_na(struct sk_buff *skb)
 {
 	struct nd_msg *msg = (struct nd_msg *)skb_transport_header(skb);
 	struct in6_addr *saddr = &ipv6_hdr(skb)->saddr;
@@ -912,7 +917,7 @@ static void ndisc_recv_na(struct sk_buff *skb)
 	    idev->cnf.drop_unsolicited_na)
 		return;
 
-	if (!ndisc_parse_options(msg->opt, ndoptlen, &ndopts)) {
+	if (!ndisc_parse_options(dev, msg->opt, ndoptlen, &ndopts)) {
 		ND_PRINTK(2, warn, "NS: invalid ND option\n");
 		return;
 	}
@@ -1019,7 +1024,7 @@ static void ndisc_recv_rs(struct sk_buff *skb)
 		goto out;
 
 	/* Parse ND options */
-	if (!ndisc_parse_options(rs_msg->opt, ndoptlen, &ndopts)) {
+	if (!ndisc_parse_options(skb->dev, rs_msg->opt, ndoptlen, &ndopts)) {
 		ND_PRINTK(2, notice, "NS: invalid ND option, ignored\n");
 		goto out;
 	}
@@ -1137,7 +1142,7 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 		return;
 	}
 
-	if (!ndisc_parse_options(opt, optlen, &ndopts)) {
+	if (!ndisc_parse_options(skb->dev, opt, optlen, &ndopts)) {
 		ND_PRINTK(2, warn, "RA: invalid ND options\n");
 		return;
 	}
@@ -1424,7 +1429,8 @@ skip_routeinfo:
 		struct nd_opt_hdr *p;
 		for (p = ndopts.nd_useropts;
 		     p;
-		     p = ndisc_next_useropt(p, ndopts.nd_useropts_end)) {
+		     p = ndisc_next_useropt(skb->dev, p,
+					    ndopts.nd_useropts_end)) {
 			ndisc_ra_useropt(skb, p);
 		}
 	}
@@ -1462,7 +1468,7 @@ static void ndisc_redirect_rcv(struct sk_buff *skb)
 		return;
 	}
 
-	if (!ndisc_parse_options(msg->opt, ndoptlen, &ndopts))
+	if (!ndisc_parse_options(skb->dev, msg->opt, ndoptlen, &ndopts))
 		return;
 
 	if (!ndopts.nd_opts_rh) {
@@ -1782,6 +1788,29 @@ int ndisc_ifinfo_sysctl_change(struct ctl_table *ctl, int write, void __user *bu
 
 
 #endif
+
+static const struct ndisc_ops ip6_ndisc_ops = {
+	.is_useropt = ip6_ndisc_is_useropt,
+	.send_na = ip6_ndisc_send_na,
+	.recv_na = ip6_ndisc_recv_na,
+	.send_ns = ip6_ndisc_send_ns,
+	.recv_ns = ip6_ndisc_recv_ns,
+};
+
+void ip6_register_ndisc_ops(struct net_device *dev)
+{
+	switch (dev->type) {
+	default:
+		if (dev->ndisc_ops) {
+			ND_PRINTK(2, warn,
+				  "%s: ndisc_ops already defined for interface type=%d\n",
+				  __func__, dev->type);
+		} else {
+			dev->ndisc_ops = &ip6_ndisc_ops;
+		}
+		break;
+	}
+}
 
 static int __net_init ndisc_net_init(struct net *net)
 {
