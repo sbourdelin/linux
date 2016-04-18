@@ -1767,6 +1767,8 @@ static struct snd_soc_codec_driver soc_codec_dev_da7219 = {
 	.num_dapm_widgets	= ARRAY_SIZE(da7219_dapm_widgets),
 	.dapm_routes		= da7219_audio_map,
 	.num_dapm_routes	= ARRAY_SIZE(da7219_audio_map),
+
+	.detect_jack		= da7219_aad_jack_det,
 };
 
 
