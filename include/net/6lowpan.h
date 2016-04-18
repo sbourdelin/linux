@@ -98,6 +98,9 @@ static inline bool lowpan_is_iphc(u8 dispatch)
 #define LOWPAN_PRIV_SIZE(llpriv_size)	\
 	(sizeof(struct lowpan_dev) + llpriv_size)
 
+#define LOWPAN_NEIGH_PRIV_SIZE(llneigh_priv_size)	\
+	(sizeof(struct lowpan_neigh) + llneigh_priv_size)
+
 enum lowpan_lltypes {
 	LOWPAN_LLTYPE_BTLE,
 	LOWPAN_LLTYPE_IEEE802154,
@@ -140,6 +143,27 @@ struct lowpan_dev {
 	/* must be last */
 	u8 priv[0] __aligned(sizeof(void *));
 };
+
+struct lowpan_neigh {
+	/* 6LoWPAN neigh private data */
+	/* must be last */
+	u8 priv[0] __aligned(sizeof(void *));
+};
+
+struct lowpan_802154_neigh {
+	__le16 short_addr;
+};
+
+static inline struct lowpan_neigh *lowpan_neigh(void *neigh_priv)
+{
+	return neigh_priv;
+}
+
+static inline
+struct lowpan_802154_neigh *lowpan_802154_neigh(void *neigh_priv)
+{
+	return (struct lowpan_802154_neigh *)lowpan_neigh(neigh_priv)->priv;
+}
 
 static inline
 struct lowpan_dev *lowpan_dev(const struct net_device *dev)

@@ -833,6 +833,8 @@ static int setup_netdev(struct l2cap_chan *chan, struct lowpan_btle_dev **dev)
 	list_add_rcu(&(*dev)->list, &bt_6lowpan_devices);
 	spin_unlock(&devices_lock);
 
+	netdev->neigh_priv_len = LOWPAN_NEIGH_PRIV_SIZE(0);
+
 	err = lowpan_register_netdev(netdev, LOWPAN_LLTYPE_BTLE);
 	if (err < 0) {
 		BT_INFO("register_netdev failed %d", err);
