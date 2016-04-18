@@ -22,6 +22,23 @@ Optional properties:
 					  headphones are attached.
 - simple-audio-card,mic-det-gpio	: Reference to GPIO that signals when
 					  a microphone is attached.
+- simple-audio-card,codec-jack		: A list of the codec supports jack detection.
+					  The jack types which are supported refer to include/sound/jack.h.
+					  All of the jack types:
+						"JACK_HEADPHONE",
+						"JACK_MICROPHONE",
+						"JACK_HEADSET",
+						"JACK_LINEOUT",
+						"JACK_MECHANICAL",
+						"JACK_VIDEOOUT",
+						"JACK_AVOUT",
+						"JACK_LINEIN",
+						"JACK_BTN_0",
+						"JACK_BTN_1",
+						"JACK_BTN_2",
+						"JACK_BTN_3",
+						"JACK_BTN_4",
+						"JACK_BTN_5".
 
 Optional subnodes:
 
