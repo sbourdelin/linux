@@ -18,6 +18,15 @@
 #include <linux/sched.h>
 #include "rtc-core.h"
 
+#ifdef CONFIG_RTC_CYCLIC
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
+
+#include <../kernel/sched/sched.h>
+#include <../kernel/sched/cyclic.h>
+//#include <../kernel/sched/cyclic_rt.h>
+#endif
+
 static dev_t rtc_devt;
 
 #define RTC_DEV_MAX 16 /* 16 RTCs should be enough for everyone... */
@@ -28,6 +37,10 @@ static int rtc_dev_open(struct inode *inode, struct file *file)
 	struct rtc_device *rtc = container_of(inode->i_cdev,
 					struct rtc_device, char_dev);
 	const struct rtc_class_ops *ops = rtc->ops;
+
+#ifdef CONFIG_RTC_CYCLIC
+	reset_rt_overrun();
+#endif
 
 	if (test_and_set_bit_lock(RTC_DEV_BUSY, &rtc->flags))
 		return -EBUSY;
@@ -153,13 +166,26 @@ rtc_dev_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct rtc_device *rtc = file->private_data;
 
+#ifdef CONFIG_RTC_CYCLIC
+	DEFINE_WAIT_FUNC(wait, single_default_wake_function);
+#else
 	DECLARE_WAITQUEUE(wait, current);
+#endif
 	unsigned long data;
+#ifdef CONFIG_RTC_CYCLIC
+	unsigned long flags;
+	int wake = 0, block = 0;
+#endif
 	ssize_t ret;
 
 	if (count != sizeof(unsigned int) && count < sizeof(unsigned long))
 		return -EINVAL;
 
+#ifdef CONFIG_RTC_CYCLIC
+	if (rt_overrun_task_yield(current))
+		goto yield;
+printk("%s: 0 color = %d \n", __func__, current->rt.rt_overrun.color);
+#endif
 	add_wait_queue(&rtc->irq_queue, &wait);
 	do {
 		__set_current_state(TASK_INTERRUPTIBLE);
@@ -169,23 +195,65 @@ rtc_dev_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 		rtc->irq_data = 0;
 		spin_unlock_irq(&rtc->irq_lock);
 
+#ifdef CONFIG_RTC_CYCLIC
+if (block) {
+	block = 0;
+	if (wake) {
+		printk("%s: wake \n", __func__);
+		wake = 0;
+	} else {
+		printk("%s: ~wake \n", __func__);
+	}
+}
+#endif
 		if (data != 0) {
+#ifdef CONFIG_RTC_CYCLIC
+			/* overrun reporting */
+			raw_spin_lock_irqsave(&rt_overrun_lock, flags);
+			if (_on_rt_overrun_admitted(current)) {
+				/* pass back to userspace */
+				data = rt_task_count(current);
+				rt_task_count(current) = 0;
+			}
+			raw_spin_unlock_irqrestore(&rt_overrun_lock, flags);
+			ret = 0;
+printk("%s: 1 color = %d \n", __func__, current->rt.rt_overrun.color);
+			break;
+		}
+#else
 			ret = 0;
 			break;
 		}
+#endif
 		if (file->f_flags & O_NONBLOCK) {
 			ret = -EAGAIN;
+#ifdef CONFIG_RTC_CYCLIC
+printk("%s: 2 color = %d \n", __func__, current->rt.rt_overrun.color);
+#endif
 			break;
 		}
 		if (signal_pending(current)) {
+#ifdef CONFIG_RTC_CYCLIC
+printk("%s: 3 color = %d \n", __func__, current->rt.rt_overrun.color);
+#endif
 			ret = -ERESTARTSYS;
 			break;
 		}
+#ifdef CONFIG_RTC_CYCLIC
+		block = 1;
+#endif
 		schedule();
+#ifdef CONFIG_RTC_CYCLIC
+		/* debugging */
+		wake = 1;
+#endif
 	} while (1);
 	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&rtc->irq_queue, &wait);
 
+#ifdef CONFIG_RTC_CYCLIC
+ret:
+#endif
 	if (ret == 0) {
 		/* Check for any data updates */
 		if (rtc->ops->read_callback)
@@ -201,6 +269,29 @@ rtc_dev_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 				sizeof(unsigned long);
 	}
 	return ret;
+
+#ifdef CONFIG_RTC_CYCLIC
+yield:
+
+	spin_lock_irq(&rtc->irq_lock);
+	data = rtc->irq_data;
+	rtc->irq_data = 0;
+	spin_unlock_irq(&rtc->irq_lock);
+
+	raw_spin_lock_irqsave(&rt_overrun_lock, flags);
+	if (_on_rt_overrun_admitted(current)) {
+		/* pass back to userspace */
+		data = rt_task_count(current);
+		rt_task_count(current) = 0;
+	}
+	else {
+	}
+
+	raw_spin_unlock_irqrestore(&rt_overrun_lock, flags);
+	ret = 0;
+
+	goto ret;
+#endif
 }
 
 static unsigned int rtc_dev_poll(struct file *file, poll_table *wait)
@@ -215,6 +306,56 @@ static unsigned int rtc_dev_poll(struct file *file, poll_table *wait)
 	return (data != 0) ? (POLLIN | POLLRDNORM) : 0;
 }
 
+#ifdef CONFIG_RTC_CYCLIC
+extern asmlinkage __visible void __sched notrace preempt_schedule(void);
+
+/* yield behavior * /
+int rt_overrun_task_yield_block(struct task_struct *p)
+{
+	struct rq *rq = task_rq(p);
+	unsigned int block = 1;
+
+	if (test_case)
+	else
+		return 1;
+
+	if (rt_overrun_task_is_best_effort(p)) {
+		// assert that it should be on the rq
+		// move to the end, let pick_next_task_rt() deal with the next runnable task
+		requeue_task_rt2(rq, p, false);
+
+		//clear_overrun_log();
+
+		if (_cond_resched()) {
+			// we reschedule here
+		}
+
+		block = 0;
+	}
+
+	return block;
+} */
+
+int test_admit(u64 slots)
+{
+	/* Only allow the current task to be admitted for now
+	 * and allow for /proc to show the slot pattern
+	 * in a global fashion */
+	return rt_overrun_task_admit(current, slots);
+}
+
+int test_yield(u64 slots)
+{
+	rt_task_yield(current) = slots;
+	return 0;
+}
+
+void test_replenish(void)
+{
+	rt_overrun_task_replenish(current);
+}
+#endif
+
 static long rtc_dev_ioctl(struct file *file,
 		unsigned int cmd, unsigned long arg)
 {
@@ -223,6 +364,9 @@ static long rtc_dev_ioctl(struct file *file,
 	const struct rtc_class_ops *ops = rtc->ops;
 	struct rtc_time tm;
 	struct rtc_wkalrm alarm;
+#ifdef CONFIG_RTC_CYCLIC
+	u64 slots;
+#endif
 	void __user *uarg = (void __user *) arg;
 
 	err = mutex_lock_interruptible(&rtc->ops_lock);
@@ -250,6 +394,12 @@ static long rtc_dev_ioctl(struct file *file,
 				!capable(CAP_SYS_RESOURCE))
 			err = -EACCES;
 		break;
+#ifdef CONFIG_RTC_CYCLIC
+	case RTC_OV_REPLEN:
+		test_replenish();
+		err = -EACCES;
+		break;
+#endif
 	}
 
 	if (err)
@@ -380,7 +530,21 @@ static long rtc_dev_ioctl(struct file *file,
 	case RTC_IRQP_READ:
 		err = put_user(rtc->irq_freq, (unsigned long __user *)uarg);
 		break;
+#ifdef CONFIG_RTC_CYCLIC
+	case RTC_OV_YIELD:
+		mutex_unlock(&rtc->ops_lock);
+		if (copy_from_user(&slots, uarg, sizeof(u64)))
+			return -EFAULT;
 
+		return test_yield(slots);
+
+	case RTC_OV_ADMIT:
+		mutex_unlock(&rtc->ops_lock);
+		if (copy_from_user(&slots, uarg, sizeof(u64)))
+			return -EFAULT;
+
+		return test_admit(slots);
+#endif
 	case RTC_WKALM_SET:
 		mutex_unlock(&rtc->ops_lock);
 		if (copy_from_user(&alarm, uarg, sizeof(alarm)))
@@ -424,6 +588,9 @@ static int rtc_dev_release(struct inode *inode, struct file *file)
 {
 	struct rtc_device *rtc = file->private_data;
 
+#ifdef CONFIG_RTC_CYCLIC
+	rt_overrun_entries_delete_all(rtc);
+#endif
 	/* We shut down the repeating IRQs that userspace enabled,
 	 * since nothing is listening to them.
 	 *  - Update (UIE) ... currently only managed through ioctls
