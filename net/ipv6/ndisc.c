@@ -73,15 +73,6 @@
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv6.h>
 
-/* Set to 3 to get tracing... */
-#define ND_DEBUG 1
-
-#define ND_PRINTK(val, level, fmt, ...)				\
-do {								\
-	if (val <= ND_DEBUG)					\
-		net_##level##_ratelimited(fmt, ##__VA_ARGS__);	\
-} while (0)
-
 static u32 ndisc_hash(const void *pkey,
 		      const struct net_device *dev,
 		      __u32 *hash_rnd);
@@ -150,8 +141,8 @@ struct neigh_table nd_tbl = {
 };
 EXPORT_SYMBOL_GPL(nd_tbl);
 
-static void ndisc_fill_addr_option(struct sk_buff *skb, int type, void *data,
-				   int data_len)
+void ndisc_fill_addr_option(struct sk_buff *skb, int type, void *data,
+			    int data_len)
 {
 	int pad   = ndisc_addr_option_pad(skb->dev->type);
 	int space = ndisc_opt_addr_space(skb->dev, data_len);
@@ -171,6 +162,7 @@ static void ndisc_fill_addr_option(struct sk_buff *skb, int type, void *data,
 	if (space > 0)
 		memset(opt, 0, space);
 }
+EXPORT_SYMBOL(ndisc_fill_addr_option);
 
 static struct nd_opt_hdr *ndisc_next_option(struct nd_opt_hdr *cur,
 					    struct nd_opt_hdr *end)
@@ -378,8 +370,7 @@ static void pndisc_destructor(struct pneigh_entry *n)
 	ipv6_dev_mc_dec(dev, &maddr);
 }
 
-static struct sk_buff *ndisc_alloc_skb(struct net_device *dev,
-				       int len)
+struct sk_buff *ndisc_alloc_skb(struct net_device *dev, int len)
 {
 	int hlen = LL_RESERVED_SPACE(dev);
 	int tlen = dev->needed_tailroom;
@@ -406,6 +397,7 @@ static struct sk_buff *ndisc_alloc_skb(struct net_device *dev,
 
 	return skb;
 }
+EXPORT_SYMBOL(ndisc_alloc_skb);
 
 static void ip6_nd_hdr(struct sk_buff *skb,
 		       const struct in6_addr *saddr,
@@ -428,9 +420,8 @@ static void ip6_nd_hdr(struct sk_buff *skb,
 	hdr->daddr = *daddr;
 }
 
-static void ndisc_send_skb(struct sk_buff *skb,
-			   const struct in6_addr *daddr,
-			   const struct in6_addr *saddr)
+void ndisc_send_skb(struct sk_buff *skb, const struct in6_addr *daddr,
+		    const struct in6_addr *saddr)
 {
 	struct dst_entry *dst = skb_dst(skb);
 	struct net *net = dev_net(skb->dev);
@@ -479,6 +470,7 @@ static void ndisc_send_skb(struct sk_buff *skb,
 
 	rcu_read_unlock();
 }
+EXPORT_SYMBOL(ndisc_send_skb);
 
 static void ip6_ndisc_send_na(struct net_device *dev,
 			      const struct in6_addr *daddr,
@@ -692,8 +684,7 @@ static void ndisc_solicit(struct neighbour *neigh, struct sk_buff *skb)
 	}
 }
 
-static int pndisc_is_router(const void *pkey,
-			    struct net_device *dev)
+int pndisc_is_router(const void *pkey, struct net_device *dev)
 {
 	struct pneigh_entry *n;
 	int ret = -1;
@@ -706,6 +697,7 @@ static int pndisc_is_router(const void *pkey,
 
 	return ret;
 }
+EXPORT_SYMBOL(pndisc_is_router);
 
 static void ip6_ndisc_recv_ns(struct sk_buff *skb)
 {
