@@ -157,7 +157,8 @@ __init_LPCR:
 
 __init_FSCR:
 	mfspr	r3,SPRN_FSCR
-	ori	r3,r3,FSCR_TAR|FSCR_DSCR|FSCR_EBB
+	ori	r3,r3,FSCR_LM|FSCR_TAR|FSCR_DSCR|FSCR_EBB
+	xori	r3,r3,FSCR_LM
 	mtspr	SPRN_FSCR,r3
 	blr
 
