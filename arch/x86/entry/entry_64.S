@@ -190,12 +190,10 @@ entry_SYSCALL_64_fastpath:
 	 */
 	TRACE_IRQS_ON
 	ENABLE_INTERRUPTS(CLBR_NONE)
-#if __SYSCALL_MASK == ~0
-	cmpq	$__NR_syscall_max, %rax
-#else
-	andl	$__SYSCALL_MASK, %eax
-	cmpl	$__NR_syscall_max, %eax
+#if __SYSCALL_MASK != ~0
+	andq	$__SYSCALL_MASK, %rax
 #endif
+	cmpq	$__NR_syscall_max, %rax
 	ja	1f				/* return -ENOSYS (already in pt_regs->ax) */
 	movq	%r10, %rcx
 
