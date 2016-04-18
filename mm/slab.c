@@ -116,6 +116,7 @@
 #include	<linux/kmemcheck.h>
 #include	<linux/memory.h>
 #include	<linux/prefetch.h>
+#include	<linux/log2.h>
 
 #include	<net/sock.h>
 
@@ -1200,6 +1201,62 @@ static void __init set_up_node(struct kmem_cache *cachep, int index)
 	}
 }
 
+#ifdef CONFIG_FREELIST_RANDOM
+/*
+ * Master lists are pre-computed random lists
+ * Lists of different sizes are used to optimize performance on SLABS with
+ * different object counts.
+ */
+static freelist_idx_t master_list_2[2];
+static freelist_idx_t master_list_4[4];
+static freelist_idx_t master_list_8[8];
+static freelist_idx_t master_list_16[16];
+static freelist_idx_t master_list_32[32];
+static freelist_idx_t master_list_64[64];
+static freelist_idx_t master_list_128[128];
+static freelist_idx_t master_list_256[256];
+const static struct m_list {
+	size_t count;
+	freelist_idx_t *list;
+} master_lists[] = {
+	{ ARRAY_SIZE(master_list_2), master_list_2 },
+	{ ARRAY_SIZE(master_list_4), master_list_4 },
+	{ ARRAY_SIZE(master_list_8), master_list_8 },
+	{ ARRAY_SIZE(master_list_16), master_list_16 },
+	{ ARRAY_SIZE(master_list_32), master_list_32 },
+	{ ARRAY_SIZE(master_list_64), master_list_64 },
+	{ ARRAY_SIZE(master_list_128), master_list_128 },
+	{ ARRAY_SIZE(master_list_256), master_list_256 },
+};
+
+/* Pre-compute the Freelist master lists at boot */
+static void __init freelist_random_init(void)
+{
+	unsigned int seed;
+	size_t z, i, rand;
+	struct rnd_state slab_rand;
+
+	get_random_bytes_arch(&seed, sizeof(seed));
+	prandom_seed_state(&slab_rand, seed);
+
+	for (z = 0; z < ARRAY_SIZE(master_lists); z++) {
+		for (i = 0; i < master_lists[z].count; i++)
+			master_lists[z].list[i] = i;
+
+		/* Fisher-Yates shuffle */
+		for (i = master_lists[z].count - 1; i > 0; i--) {
+			rand = prandom_u32_state(&slab_rand);
+			rand %= (i + 1);
+			swap(master_lists[z].list[i],
+				master_lists[z].list[rand]);
+		}
+	}
+}
+#else
+static inline void __init freelist_random_init(void) { }
+#endif /* CONFIG_FREELIST_RANDOM */
+
+
 /*
  * Initialisation.  Called after the page allocator have been initialised and
  * before smp_init().
@@ -1225,6 +1282,8 @@ void __init kmem_cache_init(void)
 	 */
 	if (!slab_max_order_set && totalram_pages > (32 << 20) >> PAGE_SHIFT)
 		slab_max_order = SLAB_MAX_ORDER_HI;
+
+	freelist_random_init();
 
 	/* Bootstrap is tricky, because several objects are allocated
 	 * from caches that do not exist yet:
@@ -2412,6 +2471,107 @@ static void cache_init_objs_debug(struct kmem_cache *cachep, struct page *page)
 #endif
 }
 
+#ifdef CONFIG_FREELIST_RANDOM
+/* Identify if the target freelist matches the pre-computed list */
+enum master_type {
+	match,
+	less,
+	more
+};
+
+/* Hold information during a freelist initialization */
+struct freelist_init_state {
+	unsigned int padding;
+	unsigned int pos;
+	unsigned int count;
+	struct m_list master_list;
+	unsigned int master_count;
+	enum master_type type;
+};
+
+/* Select the right pre-computed master list and initialize state */
+static void freelist_state_initialize(struct freelist_init_state *state,
+				      unsigned int count)
+{
+	unsigned int idx;
+	const unsigned int last_idx = ARRAY_SIZE(master_lists) - 1;
+
+	memset(state, 0, sizeof(*state));
+	state->count = count;
+	state->pos = 0;
+	/* count is always >= 2 */
+	idx = ilog2(count) - 1;
+	if (idx >= last_idx)
+		idx = last_idx;
+	else if (roundup_pow_of_two(idx + 1) != count)
+		idx++;
+	state->master_list = master_lists[idx];
+	if (state->master_list.count == state->count)
+		state->type = match;
+	else if (state->master_list.count > state->count)
+		state->type = more;
+	else
+		state->type = less;
+}
+
+/* Get the next entry on the master list depending on the target list size */
+static freelist_idx_t get_next_entry(struct freelist_init_state *state)
+{
+	if (state->type == less && state->pos == state->master_list.count) {
+		state->padding += state->pos;
+		state->pos = 0;
+	}
+	BUG_ON(state->pos >= state->master_list.count);
+	return state->master_list.list[state->pos++];
+}
+
+static freelist_idx_t next_random_slot(struct freelist_init_state *state)
+{
+	freelist_idx_t cur, entry;
+
+	entry = get_next_entry(state);
+
+	if (state->type != match) {
+		while ((entry + state->padding) >= state->count)
+			entry = get_next_entry(state);
+		cur = entry + state->padding;
+		BUG_ON(cur >= state->count);
+	} else {
+		cur = entry;
+	}
+
+	return cur;
+}
+
+/* Shuffle the freelist initialization state based on pre-computed lists */
+static void shuffle_freelist(struct kmem_cache *cachep, struct page *page,
+			     unsigned int count)
+{
+	unsigned int i;
+	struct freelist_init_state state;
+
+	if (count < 2) {
+		for (i = 0; i < count; i++)
+			set_free_obj(page, i, i);
+		return;
+	}
+
+	/* Last chunk is used already in this case */
+	if (OBJFREELIST_SLAB(cachep))
+		count--;
+
+	freelist_state_initialize(&state, count);
+	for (i = 0; i < count; i++)
+		set_free_obj(page, i, next_random_slot(&state));
+
+	if (OBJFREELIST_SLAB(cachep))
+		set_free_obj(page, i, i);
+}
+#else
+static inline void shuffle_freelist(struct kmem_cache *cachep,
+				    struct page *page, unsigned int count) { }
+#endif /* CONFIG_FREELIST_RANDOM */
+
 static void cache_init_objs(struct kmem_cache *cachep,
 			    struct page *page)
 {
@@ -2434,8 +2594,12 @@ static void cache_init_objs(struct kmem_cache *cachep,
 			kasan_poison_object_data(cachep, objp);
 		}
 
-		set_free_obj(page, i, i);
+		/* If enabled, initialization is done in shuffle_freelist */
+		if (!config_enabled(CONFIG_FREELIST_RANDOM))
+			set_free_obj(page, i, i);
 	}
+
+	shuffle_freelist(cachep, page, cachep->num);
 }
 
 static void kmem_flagcheck(struct kmem_cache *cachep, gfp_t flags)
