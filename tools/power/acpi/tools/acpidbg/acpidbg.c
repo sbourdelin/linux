@@ -430,7 +430,7 @@ int main(int argc, char **argv)
 	acpi_aml_loop(fd);
 
 exit:
-	if (fd < 0)
+	if (fd >= 0)
 		close(fd);
 	if (acpi_aml_batch_cmd)
 		free(acpi_aml_batch_cmd);
