@@ -1,0 +1,468 @@
+[in progress]
+
+"Work Conserving"
+
+When a task is active and calls read(), it will block/yield depending on
+is requested from the cyclic scheduler. A RT_OV_YIELD call to ioctl()
+specifies the behavior for the calling thread.
+
+In the case where read() is called before the time slice is over, it will
+allow other tasks to run with the leftover time.
+
+"Overrun Reporting/Apps"
+
+Calls to read() will return the overrun count and zero the counter. This
+can be used to adjust the execution time of the thread so that it can run
+within that slot so that thread can meet some deadline constraint.
+
+[no decision has been made to return a more meaningful set of numbers as
+you can just get time stamps and do the math in userspace but it could
+be changed to do so]
+
+The behavior of the read() depends on whether it has been admitted or not
+via an ioctl() using RTC_OV_ADMIT. If it is then it will return the overrun
+count. If this is not admitted then it returns value corresponding to the
+default read() behavior for rtc.
+
+See the sample test sources for details.
+
+Using a video game as an example, having a rendering engine overrunning its
+slot driving by a vertical retrace interrupt can cause visual skipping and
+hurt interactivity. Adapting the computation from the read() result can
+allow for the frame buffer swap at the frame interrupt. If read() reports
+and it can simplify calculations and adapt to fit within that slot.
+It would then allow the program to respond to events (touches, buttons)
+minimizing the possibility of perceived pauses.
+
+The slot allocation scheme for the video game must have some inherit
+definition of interactivity. That determines appropriate slot allocation
+amognst a mixture of soft/hard real-time. A general policy must be created
+for the system, and all programs, to meet a real-time criteria.
+
+"Admittance"
+
+Admittance of a task is done through a ioctl() call using RTC_OV_ADMIT.
+This passes 64 bit wide bitmap that maps onto a entries in the slot map.
+
+(slot map of two threads)
+execution direction ->
+
+1000 1000 1000 1000...
+0100 0100 0100 0100...
+
+(bit pattern of two threads)
+0001 0001 0001 0001...
+0010 0010 0010 0010...
+
+(hex)
+0x1111
+0x2222
+
+The slot map is an array of 64 entries of threads. An index is increment
+through determine what the next active thread-slot will be. The end of the
+index set in /proc/rt_overrun_proc
+
+"Slot/slice activation"
+
+Move the task to the front of the SCHED_FIFO list when active, the tail when
+inactive.
+
+"RTC Infrastructure and Interrupt Routing"
+
+The cyclic scheduler is driven by the update interrupt in the RTC
+infrastructure but can be rerouted to any periodic interrupt source.
+
+One of those applications could be when interrupts from a display refresh
+happen or some interval where an external controller such as a drum pad,
+touch event or whatever.
+
+"Embedded Environments"
+
+This is single run queue only and targeting embedded scenarios where not all
+cores are guaranteed to be available. Older Qualcomm MSM kernels have a very
+aggressive cpu hotplug as a means of fully powering off cores. The only
+guaranteed CPU to run is CPU 0.
+
+"Project History"
+
+This was originally created when I was at HP/Palm to solve issues related
+to touch event handling and lag working with the real-time media subsystem.
+The typical workaround used to prevent skipping is to use large buffers to
+prevent data underruns. The programs running at SCHED_FIFO which can
+starve the system from handling external events in a timely manner like
+buttons or touch events. The lack of a globally defined policy of how to
+use real-time resources can causes long pauses between handling touch
+events and other kinds of implicit deadline misses.
+
+By choosing some kind of slot execution pattern, it was hoped that it that
+can be controlled globally across the system so that some basic interactive
+guarantees can be met. Whether the tasks be some combination of soft or
+hard real-time, a mechanism like this can help guide how SCHED_FIFO tasks
+are run versus letting SCHED_FIFO tasks run wildly.
+
+"Future work"
+
+Possible integration with the deadline scheduler. Power management
+awareness, CPU clock governor. Turning off the scheduler tick when there
+are no runnable tasks, other things...
+
+"Power management"
+
+Governor awareness...
+
+[more]
+
+----------------------------
+
+/*
+ *	Based on the:
+ *
+ *      Real Time Clock Driver Test/Example Program
+ *      by Copyright (C) 1996, Paul Gortmaker.
+ * 
+ *	Simplification and multi-threading support for interrupt event testing
+ *	by Bill Huey at <bill.huey@gmail.com>
+ *
+ *      Released under the GNU General Public License, version 2,
+ *      included herein by reference.
+ */
+
+#include <stdio.h>
+#include <linux/rtc.h>
+#include <sys/ioctl.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <pthread.h>
+#include <linux/types.h>
+#include <sys/mman.h>
+#include <sched.h>
+#include <errno.h>
+
+/*
+ * This expects the new RTC class driver framework, working with
+ * clocks that will often not be clones of what the PC-AT had.
+ * Use the command line to specify another RTC if you need one.
+ */
+static const char default_rtc[] = "/dev/rtc0";
+
+#define RTC_OV_ADMIT	_IOW('p', 0x15, unsigned long)
+#define RTC_OV_REPLEN	_IOW('p', 0x16, unsigned long)
+#define RTC_OV_YIELD	_IOW('p', 0x17, unsigned long)
+
+//#if 0
+#define THREADS	(3)
+#define handle_error_en(en, msg) \
+               do { errno = en; perror(msg); exit(EXIT_FAILURE); } while (0)
+
+#define OBJ (THREADS + 1)
+
+//#define LARGE (1000 * 1000)
+
+pthread_mutex_t mutex[OBJ];
+pthread_cond_t condvar[OBJ];
+
+pthread_mutex_t start_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t start_condvar = PTHREAD_COND_INITIALIZER;
+int start[OBJ];
+
+pthread_t threads[OBJ];
+volatile int die = 0;
+int fd;
+
+#define ioctl_enotty_err(a, b, c, label, ret)			\
+	retval = ioctl(fd, a, ret);				\
+	if (retval == -1) {					\
+		if (errno == ENOTTY) {				\
+			fprintf(stderr, b);			\
+			goto label;				\
+		}						\
+		perror(c);					\
+		exit(errno);					\
+	}
+
+#define ioctl_err(a, b, c)					\
+	retval = ioctl(fd, a, c);				\
+	if (retval == -1) {					\
+		perror(b);					\
+		exit(errno);					\
+	}
+
+#define read_err(a) 						\
+	retval = read(fd, &data, sizeof(unsigned long));	\
+	if (retval == -1) {					\
+		perror("read");					\
+		exit(errno);					\
+	}
+
+void init_pthreads(void)
+{
+	int i;
+
+	for (i = 0; i < OBJ; ++i) {
+		start[i] = 1;
+		pthread_mutex_init(&mutex[i], NULL);
+		pthread_cond_init(&condvar[i], NULL);
+	}
+}
+
+/* Just loop and exit */
+void *thread(void *threadid)
+{
+	long tid = (unsigned long)threadid;
+	pthread_t self = pthread_self();
+	unsigned int i,j;
+	pid_t pid;
+	struct sched_param param;
+	int retval;
+	__aligned_u64 slots = 0;
+	unsigned long data;
+
+	fprintf(stderr, "\tthread id = %ld\n", tid);
+	param.sched_priority = sched_get_priority_min(SCHED_RR);
+	if (sched_setscheduler( 0, SCHED_RR, &param) == -1)
+		perror("sched_setscheduler failed\n");
+
+	pid = getpid();
+
+	if (start) {
+		start[tid] = 0;
+		pthread_mutex_lock(&start_mutex);
+		pthread_cond_signal(&start_condvar);
+		pthread_mutex_unlock(&start_mutex);
+	}
+
+	/* admit the task before doing yields */
+//	fprintf(stderr, "\n");
+	for (i = 0; i < 64; ++i) {
+		if (((tid + i) % THREADS) == 0) {
+//			fprintf(stderr, "%d\n", i);
+			slots |= ((long long unsigned) 1 << i);
+		}
+	}
+
+	fprintf(stderr, "slots = 0x%016llx\n", slots);
+	ioctl_err(RTC_OV_ADMIT, "RTC_OV_ADMIT ioctl", &slots);
+
+//	slots = 1; /* set yield instead of block */
+//	ioctl_err(RTC_OV_YIELD, "RTC_OV_YIELD ioctl", &slots);
+
+	while (!die)
+		;
+
+	read_err();
+	fprintf(stderr, "tid %ld, 0x%04lx\n", tid, data);
+
+#if 0
+	ioctl_enotty_err(RTC_IRQP_SET,
+		"\n...Periodic IRQ rate is fixed\n",
+		"RTC_IRQP_SET ioctl",
+		done, (unsigned long ) slots);
+
+	ioctl_err(RTC_PIE_ON, "RTC_PIE_ON ioctl", 0);
+
+	while (!die)
+		;
+
+	ioctl_err(RTC_PIE_OFF, "RTC_PIE_OFF ioctl", 0);
+#endif
+	/* body */
+
+	fprintf(stderr, "\tthread exited running SCHED_RR = %ld\n", tid);
+	pthread_exit(NULL);
+}
+
+void thread_spawn(int val)
+{
+	int result, retval;
+	long tid;
+	int i;
+	pthread_attr_t threads_attr[OBJ];
+	cpu_set_t cpuset;
+
+	struct sched_param schedparam;
+
+	schedparam.sched_priority = 3;
+
+	init_pthreads();
+
+	tid = 0;
+	while(tid < THREADS) {
+		fprintf(stderr, "\ncreated thread %ld\n", tid);
+		pthread_attr_init(&threads_attr[tid]);
+		pthread_attr_setinheritsched(&threads_attr[tid], PTHREAD_EXPLICIT_SCHED);
+		pthread_attr_setschedpolicy(&threads_attr[tid], SCHED_RR);
+		pthread_attr_setschedparam(&threads_attr[tid], &schedparam);
+		pthread_attr_destroy(&threads_attr[tid]);
+
+		pthread_mutex_lock(&start_mutex);
+		result = pthread_create(&threads[tid], &threads_attr[tid], thread, (void *)tid);
+		pthread_cond_wait(&start_condvar, &start_mutex);
+		pthread_mutex_unlock(&start_mutex);
+
+		if (result != 0)
+			handle_error_en(result, "pthread_create");
+		++tid;
+	}
+
+	ioctl_err(RTC_PIE_ON, "RTC_PIE_ON ioctl", 0);
+
+	sleep(3);
+	
+//	10/val; // deliberate divide by zero
+
+	sleep(1);
+	die = 1;
+
+	for (i = 0; i < THREADS; i++)
+		pthread_join(threads[i], NULL);
+
+	ioctl_err(RTC_PIE_OFF, "RTC_PIE_OFF ioctl", 0);
+
+	fprintf(stderr, "pthread done\n");
+}
+//#endif
+
+int main(int argc, char **argv)
+{
+	int	i,j,k,
+		blocking,
+		delay,
+		retval, irqcount = 0;
+	unsigned long data;
+	__aligned_u64 slots;
+	struct rtc_time rtc_tm;
+	const char *rtc = default_rtc;
+	struct timeval start, end, diff;
+
+	struct sched_param param;
+	pid_t pid = getpid();
+
+	/* testing thread should be SCHED_FIFO or RR */
+	param.sched_priority = sched_get_priority_min(SCHED_RR);
+
+	if (sched_setscheduler(pid, SCHED_RR, &param) == -1)
+
+		perror("sched_setscheduler failed\n");
+
+	switch (argc) {
+	case 2:
+		rtc = argv[1];
+		/* FALLTHROUGH */
+	case 1:
+		break;
+	default:
+		fprintf(stderr, "usage:  rtctest [rtcdev]\n");
+		return 1;
+	}
+
+	fd = open(rtc, O_RDONLY);
+	if (fd ==  -1) {
+		perror(rtc);
+		exit(errno);
+	}
+
+	fprintf(stderr, "\n\t\t\tRTC Driver Test Example.\n\n");
+
+	/* Admit this task, enable tick tracking and set the slots */
+//	slots = 0xFFFFffffFFFFffff;
+	slots = 0x3333333333333333;
+	ioctl_err(RTC_OV_ADMIT, "RTC_OV_ADMIT ioctl", &slots);
+
+#if 0
+#endif
+test_PIE:
+	/* Read periodic IRQ rate */
+	ioctl_enotty_err(RTC_IRQP_READ,
+		"\nNo periodic IRQ support\n",
+		"RTC_IRQP_READ ioctl",
+		done, &slots);
+
+	fprintf(stderr, "\nPeriodic IRQ rate is %ldHz.\n", (unsigned long) slots);
+
+	fprintf(stderr, "Counting 20 interrupts at:");
+	fflush(stderr);
+
+	/* The frequencies 128Hz, 256Hz, ... 8192Hz are only allowed for root. */
+	for (slots=2; slots<=64; slots*=2) {
+		/* not all RTCs can change their periodic IRQ rate */
+		ioctl_enotty_err(RTC_IRQP_SET,
+			"\n...Periodic IRQ rate is fixed\n",
+			"RTC_IRQP_SET ioctl",
+			done, (unsigned long ) slots);
+
+		fprintf(stderr, "\n%ldHz:\t", (unsigned long ) slots);
+		fflush(stderr);
+
+		/* Enable periodic interrupts */
+		ioctl_err(RTC_PIE_ON, "RTC_PIE_ON ioctl", 0);
+
+//		blocking = 0; delay = 0;
+		blocking = 0; delay = 1;
+//		blocking = 1; delay = 0;
+//		blocking = 1; delay = 1;
+		for (i=1; i<6; i++) {
+
+#define LARGE 5000
+#define LARGE2 50000
+#define work() 									\
+										\
+			/* This blocks */					\
+			if (blocking) {						\
+				if (delay)					\
+					fprintf(stderr, " ignoring delay ");	\
+										\
+				gettimeofday(&start, NULL);			\
+				fprintf(stderr, " ");				\
+				read_err()					\
+			} else {						\
+				/* delay for testing yield only	*/		\
+				if (delay) {					\
+					fprintf(stderr, ".");			\
+					for(j = LARGE; j > 0; --j)		\
+						for(k = LARGE2; k > 0; --k)	\
+							;			\
+				} else						\
+					fprintf(stderr, "`");			\
+										\
+				/* really a yield */				\
+				read_err()					\
+				/* fake diff values on a yield  */		\
+				gettimeofday(&start, NULL);			\
+			}							\
+										\
+			gettimeofday(&end, NULL);				\
+										\
+			timersub(&end, &start, &diff);				\
+			if (!blocking && (diff.tv_sec > 0 ||			\
+			    diff.tv_usec > ((1000000L / slots) * 1.10))) {	\
+				fprintf(stderr,					\
+					"\nPIE delta error: %ld.%06ld should be close to 0.%06ld\n", \
+				       diff.tv_sec, diff.tv_usec,		\
+				       (1000000L / (unsigned long) slots));	\
+				fflush(stdout);					\
+				exit(-1);					\
+			}							\
+										\
+			fprintf(stderr, "%d 0x%04lx,", i, data);		\
+			fflush(stderr);						\
+			irqcount++;					
+
+			work()
+		}
+		/* Disable periodic interrupts */
+		ioctl_err(RTC_PIE_OFF, "RTC_PIE_OFF ioctl", 0);
+	}
+
+done:
+	fprintf(stderr, "\n\n\t\t\t *** Test complete ***\n");
+
+	thread_spawn(0);
+
+	close(fd);
+
+	return 0;
+}
