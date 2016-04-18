@@ -23,6 +23,7 @@
 #include <linux/module.h>
 #include <linux/pagemap.h>
 #include <linux/platform_device.h>
+#include <linux/regulator/consumer.h>
 #include <linux/scatterlist.h>
 #include <linux/string.h>
 #include <linux/time.h>
@@ -1147,12 +1148,43 @@ static void usdhi6_enable_sdio_irq(struct mmc_host *mmc, int enable)
 	}
 }
 
+static int usdhi6_sig_volt_switch(struct mmc_host *mmc, struct mmc_ios *ios)
+{
+	int ret;
+
+	if (IS_ERR(mmc->supply.vqmmc))
+		return 0;
+
+	switch (ios->signal_voltage) {
+	case MMC_SIGNAL_VOLTAGE_330:
+		ret = regulator_set_voltage(mmc->supply.vqmmc,
+					    2700000, 3600000);
+		break;
+	case MMC_SIGNAL_VOLTAGE_180:
+		ret = regulator_set_voltage(mmc->supply.vqmmc,
+					    1700000, 1950000);
+		break;
+	case MMC_SIGNAL_VOLTAGE_120:
+		ret = regulator_set_voltage(mmc->supply.vqmmc,
+					    1100000, 1300000);
+		break;
+	default:
+		return 0;
+	}
+
+	if (ret < 0)
+		dev_warn(mmc_dev(mmc), "Voltage switch failed: %d\n", ret);
+
+	return ret;
+}
+
 static struct mmc_host_ops usdhi6_ops = {
 	.request	= usdhi6_request,
 	.set_ios	= usdhi6_set_ios,
 	.get_cd		= usdhi6_get_cd,
 	.get_ro		= usdhi6_get_ro,
 	.enable_sdio_irq = usdhi6_enable_sdio_irq,
+	.start_signal_voltage_switch = usdhi6_sig_volt_switch,
 };
 
 /*			State machine handlers				*/
