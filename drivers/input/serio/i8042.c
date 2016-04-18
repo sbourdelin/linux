@@ -132,6 +132,7 @@ struct i8042_port {
 
 static struct i8042_port i8042_ports[I8042_NUM_PORTS];
 
+static bool i8042_present;
 static unsigned char i8042_initial_ctr;
 static unsigned char i8042_ctr;
 static bool i8042_mux_present;
@@ -163,6 +164,9 @@ int i8042_install_filter(bool (*filter)(unsigned char data, unsigned char str,
 	unsigned long flags;
 	int ret = 0;
 
+	if (!i8042_present)
+		return ret;
+
 	spin_lock_irqsave(&i8042_lock, flags);
 
 	if (i8042_platform_filter) {
@@ -183,6 +187,9 @@ int i8042_remove_filter(bool (*filter)(unsigned char data, unsigned char str,
 {
 	unsigned long flags;
 	int ret = 0;
+
+	if (!i8042_present)
+		return ret;
 
 	spin_lock_irqsave(&i8042_lock, flags);
 
@@ -311,7 +318,10 @@ static int __i8042_command(unsigned char *param, int command)
 int i8042_command(unsigned char *param, int command)
 {
 	unsigned long flags;
-	int retval;
+	int retval = 0;
+
+	if (!i8042_present)
+		return retval;
 
 	spin_lock_irqsave(&i8042_lock, flags);
 	retval = __i8042_command(param, command);
@@ -1380,6 +1390,9 @@ bool i8042_check_port_owner(const struct serio *port)
 {
 	int i;
 
+	if (!i8042_present)
+		return false;
+
 	for (i = 0; i < I8042_NUM_PORTS; i++)
 		if (i8042_ports[i].serio == port)
 			return true;
@@ -1569,13 +1582,17 @@ static int __init i8042_init(void)
 
 	dbg_init();
 
+	i8042_present = false;
+
 	err = i8042_platform_init();
 	if (err)
 		return err;
 
 	err = i8042_controller_check();
-	if (err)
-		goto err_platform_exit;
+	if (err) {
+		pr_info("Staying resident in case of module dependencies\n");
+		goto out;
+	}
 
 	pdev = platform_create_bundle(&i8042_driver, i8042_probe, NULL, 0, NULL, 0);
 	if (IS_ERR(pdev)) {
@@ -1585,7 +1602,9 @@ static int __init i8042_init(void)
 
 	bus_register_notifier(&serio_bus, &i8042_kbd_bind_notifier_block);
 	panic_blink = i8042_panic_blink;
+	i8042_present = true;
 
+out:
 	return 0;
 
  err_platform_exit:
@@ -1595,12 +1614,20 @@ static int __init i8042_init(void)
 
 static void __exit i8042_exit(void)
 {
-	platform_device_unregister(i8042_platform_device);
-	platform_driver_unregister(&i8042_driver);
+	if (i8042_present) {
+		platform_device_unregister(i8042_platform_device);
+		platform_driver_unregister(&i8042_driver);
+	}
+
 	i8042_platform_exit();
 
-	bus_unregister_notifier(&serio_bus, &i8042_kbd_bind_notifier_block);
-	panic_blink = NULL;
+	if (i8042_present) {
+		bus_unregister_notifier(&serio_bus,
+					&i8042_kbd_bind_notifier_block);
+		panic_blink = NULL;
+	}
+
+	i8042_present = false;
 }
 
 module_init(i8042_init);
