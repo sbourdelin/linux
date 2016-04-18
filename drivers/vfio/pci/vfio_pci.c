@@ -1125,6 +1125,17 @@ static int vfio_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		return ret;
 	}
 
+	if (pdev->vendor == PCI_VENDOR_ID_REDHAT_QUMRANET &&
+	    ((ret = vfio_pci_virtio_quirk(vdev, ret)))) {
+		dev_warn(&vdev->pdev->dev,
+			 "Failed to setup Virtio for VFIO\n");
+		vfio_del_group_dev(&pdev->dev);
+		vfio_iommu_group_put(group, &pdev->dev);
+		kfree(vdev);
+		return ret;
+	}
+
+
 	if (vfio_pci_is_vga(pdev)) {
 		vga_client_register(pdev, vdev, NULL, vfio_pci_set_vga_decode);
 		vga_set_legacy_decoding(pdev,
