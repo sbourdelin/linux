@@ -331,20 +331,6 @@ static struct omap_hwmod dra7xx_gmac_hwmod = {
 };
 
 /*
- * 'mdio' class
- */
-static struct omap_hwmod_class dra7xx_mdio_hwmod_class = {
-	.name		= "davinci_mdio",
-};
-
-static struct omap_hwmod dra7xx_mdio_hwmod = {
-	.name		= "davinci_mdio",
-	.class		= &dra7xx_mdio_hwmod_class,
-	.clkdm_name	= "gmac_clkdm",
-	.main_clk	= "dpll_gmac_ck",
-};
-
-/*
  * 'dcan' class
  *
  */
@@ -2607,12 +2593,6 @@ static struct omap_hwmod_ocp_if dra7xx_l4_per2__cpgmac0 = {
 	.user		= OCP_USER_MPU,
 };
 
-static struct omap_hwmod_ocp_if dra7xx_gmac__mdio = {
-	.master		= &dra7xx_gmac_hwmod,
-	.slave		= &dra7xx_mdio_hwmod,
-	.user		= OCP_USER_MPU,
-};
-
 /* l4_wkup -> dcan1 */
 static struct omap_hwmod_ocp_if dra7xx_l4_wkup__dcan1 = {
 	.master		= &dra7xx_l4_wkup_hwmod,
@@ -3486,7 +3466,6 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
 	&dra7xx_l4_per2__cpgmac0,
 	&dra7xx_l4_per2__mcasp3,
 	&dra7xx_l3_main_1__mcasp3,
-	&dra7xx_gmac__mdio,
 	&dra7xx_l4_cfg__dma_system,
 	&dra7xx_l3_main_1__tpcc,
 	&dra7xx_l3_main_1__tptc0,
