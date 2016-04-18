@@ -1792,6 +1792,9 @@ static const struct ndisc_ops ip6_ndisc_ops = {
 void ip6_register_ndisc_ops(struct net_device *dev)
 {
 	switch (dev->type) {
+	case ARPHRD_6LOWPAN:
+		/* will be assigned while lowpan interface register */
+		break;
 	default:
 		if (dev->ndisc_ops) {
 			ND_PRINTK(2, warn,
