@@ -903,6 +903,26 @@ int vt_ioctl(struct tty_struct *tty,
 		break;
 	}
 
+	/*
+	 * flush the specified VT's scollback buffer
+	 */
+	case VT_FLUSH_SCROLLBACK: {
+		if (!perm)
+			return -EPERM;
+		if (arg == 0 || arg > MAX_NR_CONSOLES)
+			ret = -ENXIO;
+		else {
+			struct vc_data *data = vc_cons[arg-1].d;
+
+			if (!data)
+				ret = -ENXIO;
+			else
+				ret = data->vc_sw->con_flush_scrollback(data);
+		}
+
+		break;
+	}
+
 	case PIO_FONT: {
 		if (!perm)
 			return -EPERM;

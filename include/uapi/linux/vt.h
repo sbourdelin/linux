@@ -83,5 +83,6 @@ struct vt_setactivate {
 };
 
 #define VT_SETACTIVATE	0x560F	/* Activate and set the mode of a console */
+#define VT_FLUSH_SCROLLBACK	0x5610	/* Flush the scrollback buffer */
 
 #endif /* _UAPI_LINUX_VT_H */

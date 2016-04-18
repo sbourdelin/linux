@@ -379,11 +379,33 @@ static int vgacon_scrolldelta(struct vc_data *c, int lines)
 
 	return 1;
 }
+
+/* flush the scrollback buffer of a console */
+static int vgacon_flush_scrollback(struct vc_data *c)
+{
+	size_t size = CONFIG_VGACON_SOFT_SCROLLBACK_SIZE * 1024;
+	struct vgacon_scrollback_info *vgacon_scrollback_prev;
+
+	vgacon_scrollback_prev = vgacon_scrollback_cur;
+	vgacon_scrollback_cur = &vgacon_scrollbacks[c->vc_num];
+
+	if (vgacon_scrollback_cur != NULL)
+		vgacon_scrollback_reset(size);
+
+	vgacon_scrollback_cur = vgacon_scrollback_prev;
+
+	return 0;
+}
 #else
 #define vgacon_scrollback_startup(...) do { } while (0)
 #define vgacon_scrollback_init(...)    do { } while (0)
 #define vgacon_scrollback_update(...)  do { } while (0)
 #define vgacon_switch_scrollback(...)  do { } while (0)
+
+static int vgacon_flush_scrollback(struct vc_data *c)
+{
+	return 0;
+}
 
 static void vgacon_restore_screen(struct vc_data *c)
 {
@@ -1492,6 +1514,7 @@ const struct consw vga_con = {
 	.con_resize = vgacon_resize,
 	.con_set_palette = vgacon_set_palette,
 	.con_scrolldelta = vgacon_scrolldelta,
+	.con_flush_scrollback = vgacon_flush_scrollback,
 	.con_set_origin = vgacon_set_origin,
 	.con_save_screen = vgacon_save_screen,
 	.con_build_attr = vgacon_build_attr,

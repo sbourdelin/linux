@@ -73,5 +73,6 @@ const struct consw dummy_con = {
     .con_font_copy =	DUMMY,
     .con_set_palette =	DUMMY,
     .con_scrolldelta =	DUMMY,
+    .con_flush_scrollback = DUMMY,
 };
 EXPORT_SYMBOL_GPL(dummy_con);

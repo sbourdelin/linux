@@ -1442,6 +1442,7 @@ static const struct consw sisusb_dummy_con = {
 	.con_font_copy =	SISUSBCONDUMMY,
 	.con_set_palette =	SISUSBCONDUMMY,
 	.con_scrolldelta =	SISUSBCONDUMMY,
+	.con_flush_scrollback = SISUSBCONDUMMY,
 };
 
 int

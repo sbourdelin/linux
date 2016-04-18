@@ -738,6 +738,7 @@ const struct consw newport_con = {
 	.con_scrolldelta  = newport_scrolldelta,
 	.con_set_origin	  = DUMMY,
 	.con_save_screen  = DUMMY
+	.con_flush_scrollback = DUMMY,
 };
 
 static int newport_probe(struct gio_device *dev,

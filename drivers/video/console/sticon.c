@@ -345,6 +345,12 @@ static void sticon_save_screen(struct vc_data *conp)
 {
 }
 
+static int sticon_flush_scrollback(struct vc_data *c)
+{
+	return 0;
+}
+
+
 static const struct consw sti_con = {
 	.owner			= THIS_MODULE,
 	.con_startup		= sticon_startup,
@@ -360,6 +366,7 @@ static const struct consw sti_con = {
 	.con_blank		= sticon_blank,
 	.con_set_palette	= sticon_set_palette,
 	.con_scrolldelta	= sticon_scrolldelta,
+	.con_flush_scrollback	= sticon_flush_scrollback,
 	.con_set_origin		= sticon_set_origin,
 	.con_save_screen	= sticon_save_screen, 
 	.con_build_attr		= sticon_build_attr,
