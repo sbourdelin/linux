@@ -19,9 +19,13 @@ Optional SoC Specific Properties:
   "IRQ Status Read" erratum.
 - en2-rf-quirk: Specify that the trf7970a being used has the "EN2 RF"
   erratum.
+<<<<<<< HEAD
 - t5t-rmb-extra-byte-quirk: Specify that the trf7970a has the erratum
   where an extra byte is returned by Read Multiple Block commands issued
   to Type 5 tags.
+=======
+- vdd_io_1v8: Set to specify that the trf7970a io voltage should be set to 1.8V
+>>>>>>> e7ea4dd... NFC: trf7970a: Add device tree option of 1.8 Volt IO voltage
 - crystal_27mhz: Set to specify that the input frequency to the trf7970a is 27.12MHz
 
 Example (for ARM-based BeagleBone with TRF7970A on SPI1):
@@ -45,7 +49,11 @@ Example (for ARM-based BeagleBone with TRF7970A on SPI1):
 		autosuspend-delay = <30000>;
 		irq-status-read-quirk;
 		en2-rf-quirk;
+<<<<<<< HEAD
 		t5t-rmb-extra-byte-quirk;
+=======
+		vdd_io_1v8;
+>>>>>>> e7ea4dd... NFC: trf7970a: Add device tree option of 1.8 Volt IO voltage
 		crystal_27mhz;
 		status = "okay";
 	};

@@ -441,6 +441,7 @@ struct trf7970a {
 	u8				iso_ctrl_tech;
 	u8				modulator_sys_clk_ctrl;
 	u8				special_fcn_reg1;
+	u8				io_ctrl;
 	unsigned int			guard_time;
 	int				technology;
 	int				framing;
@@ -1061,6 +1062,11 @@ static int trf7970a_init(struct trf7970a *trf)
 		goto err_out;
 
 	ret = trf7970a_cmd(trf, TRF7970A_CMD_IDLE);
+	if (ret)
+		goto err_out;
+
+	ret = trf7970a_write(trf, TRF7970A_REG_IO_CTRL,
+			trf->io_ctrl|TRF7970A_REG_IO_CTRL_VRS(0x1));
 	if (ret)
 		goto err_out;
 
@@ -1768,7 +1774,7 @@ static int _trf7970a_tg_listen(struct nfc_digital_dev *ddev, u16 timeout,
 		goto out_err;
 
 	ret = trf7970a_write(trf, TRF7970A_REG_IO_CTRL,
-			TRF7970A_REG_IO_CTRL_VRS(0x1));
+			trf->io_ctrl|TRF7970A_REG_IO_CTRL_VRS(0x1));
 	if (ret)
 		goto out_err;
 
@@ -2074,6 +2080,9 @@ static int trf7970a_probe(struct spi_device *spi)
 		dev_err(trf->dev, "Can't request SS GPIO: %d\n", ret);
 		return ret;
 	}
+
+	if (of_property_read_bool(np, "vdd_io_1v8"))
+		trf->io_ctrl = TRF7970A_REG_IO_CTRL_IO_LOW;
 
 	if (of_property_read_bool(np, "crystal_27MHz"))
 		trf->modulator_sys_clk_ctrl = TRF7970A_MODULATOR_27MHZ;
