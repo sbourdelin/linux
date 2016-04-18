@@ -823,9 +823,12 @@ static void macvlan_uninit(struct net_device *dev)
 	free_percpu(vlan->pcpu_stats);
 
 	macvlan_flush_sources(port, vlan);
-	port->count -= 1;
-	if (!port->count)
-		macvlan_port_destroy(port->dev);
+
+	if (!(vlan->priv_flags & MACVLAN_PRIV_FLAG_REGISTERING)) {
+		port->count -= 1;
+		if (!port->count)
+			macvlan_port_destroy(port->dev);
+	}
 }
 
 static struct rtnl_link_stats64 *macvlan_dev_get_stats64(struct net_device *dev,
@@ -1313,7 +1316,9 @@ int macvlan_common_newlink(struct net *src_net, struct net_device *dev,
 	}
 
 	port->count += 1;
+	vlan->priv_flags |= MACVLAN_PRIV_FLAG_REGISTERING;
 	err = register_netdevice(dev);
+	vlan->priv_flags &= ~MACVLAN_PRIV_FLAG_REGISTERING;
 	if (err < 0)
 		goto destroy_port;
 

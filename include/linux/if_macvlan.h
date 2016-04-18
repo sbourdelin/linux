@@ -48,6 +48,7 @@ struct macvlan_dev {
 	netdev_features_t	set_features;
 	enum macvlan_mode	mode;
 	u16			flags;
+	u16			priv_flags;
 	/* This array tracks active taps. */
 	struct macvtap_queue	__rcu *taps[MAX_MACVTAP_QUEUES];
 	/* This list tracks all taps (both enabled and disabled) */
@@ -62,6 +63,8 @@ struct macvlan_dev {
 #endif
 	unsigned int		macaddr_count;
 };
+
+#define MACVLAN_PRIV_FLAG_REGISTERING	1
 
 static inline void macvlan_count_rx(const struct macvlan_dev *vlan,
 				    unsigned int len, bool success,
