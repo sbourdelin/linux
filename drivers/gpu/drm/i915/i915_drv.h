@@ -3025,6 +3025,18 @@ static inline void i915_gem_object_unpin_pages(struct drm_i915_gem_object *obj)
 void *__must_check i915_gem_object_pin_map(struct drm_i915_gem_object *obj);
 
 /**
+ * i915_object_mapped_address - address at which a GEM object is mapped
+ * @obj - the object (presumably already mapped into kernel address space)
+ *
+ * Returns the address at which an object has been mapped by a call to
+ * i915_gem_object_pin_map() above, or NULL if not currently mapped and pinned
+ */
+static inline void *i915_object_mapped_address(struct drm_i915_gem_object *obj)
+{
+       return obj->pages_pin_count == 0 ? NULL : obj->mapping;
+}
+
+/**
  * i915_gem_object_unpin_map - releases an earlier mapping
  * @obj - the object to unmap
  *
