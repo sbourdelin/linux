@@ -480,5 +480,34 @@ void intel_csr_ucode_fini(struct drm_i915_private *dev_priv)
 
 	flush_work(&dev_priv->csr.work);
 
+	/* Drop the reference held in case DMC isn't loaded. */
+	if (!dev_priv->csr.dmc_payload)
+		intel_display_power_put(dev_priv, POWER_DOMAIN_INIT);
+
 	kfree(dev_priv->csr.dmc_payload);
+}
+
+void intel_csr_ucode_suspend(struct drm_i915_private *dev_priv)
+{
+	if (!HAS_CSR(dev_priv))
+		return;
+
+	flush_work(&dev_priv->csr.work);
+
+	/* Drop the reference held in case DMC isn't loaded. */
+	if (!dev_priv->csr.dmc_payload)
+		intel_display_power_put(dev_priv, POWER_DOMAIN_INIT);
+}
+
+void intel_csr_ucode_resume(struct drm_i915_private *dev_priv)
+{
+	if (!HAS_CSR(dev_priv))
+		return;
+
+	/*
+	 * Reacquire the reference to keep RPM disabled in case DMC isn't
+	 * loaded.
+	 */
+	if (!dev_priv->csr.dmc_payload)
+		intel_display_power_get(dev_priv, POWER_DOMAIN_INIT);
 }
