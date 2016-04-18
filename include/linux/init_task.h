@@ -183,6 +183,23 @@ extern struct task_group root_task_group;
 # define INIT_KASAN(tsk)
 #endif
 
+#ifdef CONFIG_RTC_CYCLIC
+# define INIT_RT_OVERRUN(tsk)						\
+		.rt_overrun	= {					\
+			.count = 0,					\
+			.task_list = LIST_HEAD_INIT(tsk.rt.rt_overrun.task_list), \
+			.type = 0,					\
+			.color = 0,					\
+			.slots = 0,					\
+			.yield = 0,					\
+			.machine_state = 0,				\
+			.last_machine_state = 0,			\
+			.last_task_state = 0,				\
+		}
+#else
+# define INIT_RT_OVERRUN(tsk)
+#endif
+
 /*
  *  INIT_TASK is used to set up the first task table, touch at
  * your own risk!. Base=0, limit=0x1fffff (=2MB)
@@ -210,6 +227,7 @@ extern struct task_group root_task_group;
 	.rt		= {						\
 		.run_list	= LIST_HEAD_INIT(tsk.rt.run_list),	\
 		.time_slice	= RR_TIMESLICE,				\
+		INIT_RT_OVERRUN(tsk)					\
 	},								\
 	.tasks		= LIST_HEAD_INIT(tsk.tasks),			\
 	INIT_PUSHABLE_TASKS(tsk)					\
