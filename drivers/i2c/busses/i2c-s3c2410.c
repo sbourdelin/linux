@@ -1196,7 +1196,12 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
 
 	/* initialise the i2c controller */
 
-	clk_prepare_enable(i2c->clk);
+	ret = clk_prepare_enable(i2c->clk);
+	if (ret) {
+		dev_err(&pdev->dev, "I2C clock enable failed (%d)\n", ret);
+		return ret;
+	}
+
 	ret = s3c24xx_i2c_init(i2c);
 	clk_disable(i2c->clk);
 	if (ret != 0) {
