@@ -410,7 +410,7 @@ static int stmpe_gpio_probe(struct platform_device *pdev)
 	struct stmpe *stmpe = dev_get_drvdata(pdev->dev.parent);
 	struct device_node *np = pdev->dev.of_node;
 	struct stmpe_gpio *stmpe_gpio;
-	int ret;
+	int ret, i;
 	int irq = 0;
 
 	irq = platform_get_irq(pdev, 0);
@@ -474,6 +474,10 @@ static int stmpe_gpio_probe(struct platform_device *pdev)
 					     irq,
 					     NULL);
 	}
+
+	/* To minimize power consumption, configure unused GPIOs as outputs */
+	for (i = 0; i < stmpe_gpio->chip.ngpio; i++)
+		stmpe_gpio_direction_output(&stmpe_gpio->chip, i, 0);
 
 	platform_set_drvdata(pdev, stmpe_gpio);
 
