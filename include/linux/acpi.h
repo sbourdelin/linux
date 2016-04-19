@@ -190,13 +190,7 @@ static inline int acpi_debugger_notify_command_complete(void)
 }
 #endif
 
-#ifdef CONFIG_ACPI_INITRD_TABLE_OVERRIDE
-void acpi_initrd_override(void *data, size_t size);
-#else
-static inline void acpi_initrd_override(void *data, size_t size)
-{
-}
-#endif
+void acpi_table_initrd_init(void *data, size_t size);
 
 #define BAD_MADT_ENTRY(entry, end) (					    \
 		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \

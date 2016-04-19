@@ -62,3 +62,29 @@ AML Output:    minnowmax.aml - 165 bytes, 6 named objects, 1 executable opcodes
 
 The resulting AML code can then be loaded by the kernel using one of the methods
 below.
+
+== Loading ACPI SSDTs from initrd ==
+
+This option allows loading of user defined SSDTs from initrd and it is useful
+when the system does not support EFI or when there is not enough EFI storage.
+
+It works in a similar way with initrd based ACPI tables overrides: SSDT aml code
+must be placed in the first, uncompressed, initrd under the
+"kernel/firmware/acpi" path. Multiple files can be used and this will translate
+in loading multiple tables. Only SSDT and OEM tables are allowed.
+
+Here is an example:
+
+# Add the raw ACPI tables to an uncompressed cpio archive.
+# They must be put into a /kernel/firmware/acpi directory inside the
+# cpio archive.
+# The uncompressed cpio archive must be the first.
+# Other, typically compressed cpio archives, must be
+# concatenated on top of the uncompressed one.
+mkdir -p kernel/firmware/acpi
+cp ssdt.aml kernel/firmware/acpi
+
+# Create the uncompressed cpio archive and concatenate the original initrd
+# on top:
+find kernel | cpio -H newc --create > /boot/instrumented_initrd
+cat /boot/initrd >>/boot/instrumented_initrd

@@ -602,15 +602,24 @@ acpi_os_predefined_override(const struct acpi_predefined_names *init_val,
 	return AE_OK;
 }
 
-static void acpi_table_taint(struct acpi_table_header *table)
+static void acpi_table_taint(struct acpi_table_header *table, bool override)
 {
-	pr_warn(PREFIX
-		"Override [%4.4s-%8.8s], this is unsafe: tainting kernel\n",
-		table->signature, table->oem_table_id);
-	add_taint(TAINT_OVERRIDDEN_ACPI_TABLE, LOCKDEP_NOW_UNRELIABLE);
+	enum lockdep_ok lockdep_ok;
+	unsigned int taint;
+
+	if (override) {
+		pr_warn(PREFIX "Override [%4.4s-%8.8s], this is unsafe: tainting kernel\n",
+			table->signature, table->oem_table_id);
+		lockdep_ok = false;
+		taint = TAINT_OVERRIDDEN_ACPI_TABLE;
+	} else {
+		lockdep_ok = true;
+		taint = TAINT_OVERLAY_ACPI_TABLE;
+	}
+
+	add_taint(taint, lockdep_ok);
 }
 
-#ifdef CONFIG_ACPI_INITRD_TABLE_OVERRIDE
 #include <linux/earlycpio.h>
 #include <linux/memblock.h>
 
@@ -642,13 +651,13 @@ static const char * const table_sigs[] = {
 
 #define ACPI_HEADER_SIZE sizeof(struct acpi_table_header)
 
-#define ACPI_OVERRIDE_TABLES 64
-static struct cpio_data __initdata acpi_initrd_files[ACPI_OVERRIDE_TABLES];
-static DECLARE_BITMAP(acpi_initrd_installed, ACPI_OVERRIDE_TABLES);
+#define ACPI_INITRD_TABLES 64
+static struct cpio_data acpi_initrd_files[ACPI_INITRD_TABLES] __initdata;
+static DECLARE_BITMAP(acpi_initrd_installed, ACPI_INITRD_TABLES);
 
 #define MAP_CHUNK_SIZE   (NR_FIX_BTMAPS << PAGE_SHIFT)
 
-void __init acpi_initrd_override(void *data, size_t size)
+void __init acpi_table_initrd_init(void *data, size_t size)
 {
 	int sig, no, table_nr = 0, total_offset = 0;
 	long offset = 0;
@@ -659,7 +668,7 @@ void __init acpi_initrd_override(void *data, size_t size)
 	if (data == NULL || size == 0)
 		return;
 
-	for (no = 0; no < ACPI_OVERRIDE_TABLES; no++) {
+	for (no = 0; no < ACPI_INITRD_TABLES; no++) {
 		file = find_cpio_data(cpio_path, data, size, &offset);
 		if (!file.data)
 			break;
@@ -668,8 +677,8 @@ void __init acpi_initrd_override(void *data, size_t size)
 		size -= offset;
 
 		if (file.size < sizeof(struct acpi_table_header)) {
-			pr_err("ACPI OVERRIDE: Table smaller than ACPI header [%s%s]\n",
-				cpio_path, file.name);
+			pr_err(PREFIX "initrd: Table smaller than ACPI header [%s%s]\n",
+			       cpio_path, file.name);
 			continue;
 		}
 
@@ -680,18 +689,18 @@ void __init acpi_initrd_override(void *data, size_t size)
 				break;
 
 		if (!table_sigs[sig]) {
-			pr_err("ACPI OVERRIDE: Unknown signature [%s%s]\n",
-				cpio_path, file.name);
+			pr_err(PREFIX "initrd: Unknown signature [%s%s]\n",
+			       cpio_path, file.name);
 			continue;
 		}
 		if (file.size != table->length) {
-			pr_err("ACPI OVERRIDE: File length does not match table length [%s%s]\n",
-				cpio_path, file.name);
+			pr_err(PREFIX "initrd: File length does not match table length [%s%s]\n",
+			       cpio_path, file.name);
 			continue;
 		}
 		if (acpi_table_checksum(file.data, table->length)) {
-			pr_err("ACPI OVERRIDE: Bad table checksum [%s%s]\n",
-				cpio_path, file.name);
+			pr_err(PREFIX "initrd: Bad table checksum [%s%s]\n",
+			       cpio_path, file.name);
 			continue;
 		}
 
@@ -756,6 +765,7 @@ void __init acpi_initrd_override(void *data, size_t size)
 	}
 }
 
+#ifdef CONFIG_ACPI_INITRD_TABLE_OVERRIDE
 acpi_status
 acpi_os_physical_table_override(struct acpi_table_header *existing_table,
 				acpi_physical_address *address, u32 *length)
@@ -792,7 +802,7 @@ acpi_os_physical_table_override(struct acpi_table_header *existing_table,
 
 		*length = table_length;
 		*address = acpi_tables_addr + table_offset;
-		acpi_table_taint(existing_table);
+		acpi_table_taint(existing_table, true);
 		acpi_os_unmap_memory(table, ACPI_HEADER_SIZE);
 		set_bit(table_index, acpi_initrd_installed);
 		break;
@@ -803,6 +813,17 @@ next_table:
 	}
 	return AE_OK;
 }
+#else
+acpi_status
+acpi_os_physical_table_override(struct acpi_table_header *existing_table,
+				acpi_physical_address *address,
+				u32 *table_length)
+{
+	*table_length = 0;
+	*address = 0;
+	return AE_OK;
+}
+#endif /* CONFIG_ACPI_INITRD_TABLE_OVERRIDE */
 
 void __init acpi_initrd_initialize_tables(void)
 {
@@ -833,7 +854,7 @@ void __init acpi_initrd_initialize_tables(void)
 			goto next_table;
 		}
 
-		acpi_table_taint(table);
+		acpi_table_taint(table, false);
 		acpi_os_unmap_memory(table, ACPI_HEADER_SIZE);
 		acpi_install_table(acpi_tables_addr + table_offset, TRUE);
 		set_bit(table_index, acpi_initrd_installed);
@@ -842,21 +863,6 @@ next_table:
 		table_index++;
 	}
 }
-#else
-acpi_status
-acpi_os_physical_table_override(struct acpi_table_header *existing_table,
-				acpi_physical_address *address,
-				u32 *table_length)
-{
-	*table_length = 0;
-	*address = 0;
-	return AE_OK;
-}
-
-void __init acpi_initrd_initialize_tables(void)
-{
-}
-#endif /* CONFIG_ACPI_INITRD_TABLE_OVERRIDE */
 
 acpi_status
 acpi_os_table_override(struct acpi_table_header *existing_table,
@@ -872,7 +878,7 @@ acpi_os_table_override(struct acpi_table_header *existing_table,
 		*new_table = (struct acpi_table_header *)AmlCode;
 #endif
 	if (*new_table != NULL)
-		acpi_table_taint(existing_table);
+		acpi_table_taint(existing_table, true);
 	return AE_OK;
 }
 
