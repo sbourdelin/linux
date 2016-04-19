@@ -518,6 +518,14 @@ int acpi_match_device_ids(struct acpi_device *device,
 int acpi_create_dir(struct acpi_device *);
 void acpi_remove_dir(struct acpi_device *);
 
+enum acpi_reconfig_event  {
+	ACPI_RECONFIG_DEVICE_ADD = 0,
+	ACPI_RECONFIG_DEVICE_REMOVE,
+};
+
+int acpi_reconfig_notifier_register(struct notifier_block *nb);
+int acpi_reconfig_notifier_unregister(struct notifier_block *nb);
+
 static inline bool acpi_device_enumerated(struct acpi_device *adev)
 {
 	return adev && adev->flags.initialized && adev->flags.visited;
@@ -642,6 +650,16 @@ static inline bool acpi_device_can_poweroff(struct acpi_device *adev)
 
 static inline int register_acpi_bus_type(void *bus) { return 0; }
 static inline int unregister_acpi_bus_type(void *bus) { return 0; }
+
+static inline int acpi_reconfig_notifier_register(struct notifier_block *nb)
+{
+	return -EINVAL;
+}
+
+static inline int acpi_reconfig_notifier_unregister(struct notifier_block *nb)
+{
+	return -EINVAL;
+}
 
 #endif				/* CONFIG_ACPI */
 
