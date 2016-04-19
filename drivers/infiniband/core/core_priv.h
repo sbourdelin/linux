@@ -137,4 +137,7 @@ static inline bool rdma_is_upper_dev_rcu(struct net_device *dev,
 	return _upper == upper;
 }
 
+int ib_get_cached_subnet_prefix(struct ib_device *device,
+				u8                port_num,
+				u64              *sn_pfx);
 #endif /* _CORE_PRIV_H */
