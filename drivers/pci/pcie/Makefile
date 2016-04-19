@@ -14,3 +14,6 @@ obj-$(CONFIG_PCIEPORTBUS)	+= pcieportdrv.o
 obj-$(CONFIG_PCIEAER)		+= aer/
 
 obj-$(CONFIG_PCIE_PME) += pme.o
+
+# Precision Time Measurement support
+obj-$(CONFIG_PCIE_PTM) += pcie_ptm.o
