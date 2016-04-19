@@ -47,6 +47,7 @@
 int sysctl_panic_on_oom;
 int sysctl_oom_kill_allocating_task;
 int sysctl_oom_dump_tasks = 1;
+unsigned long sysctl_oom_victim_wait_timeout = (LONG_MAX / HZ);
 
 DEFINE_MUTEX(oom_lock);
 
@@ -147,6 +148,12 @@ static bool oom_unkillable_task(struct task_struct *p,
 
 	/* p may not have freeable memory in nodemask */
 	if (!has_intersects_mems_allowed(p, nodemask))
+		return true;
+
+	/* Already OOM-killed p might get stuck at unkillable wait */
+	if (p->signal->oom_start &&
+	    time_after(jiffies, p->signal->oom_start
+		       + sysctl_oom_victim_wait_timeout * HZ))
 		return true;
 
 	return false;
@@ -589,6 +596,17 @@ void mark_oom_victim(struct task_struct *tsk)
 	/* OOM killer might race with memcg OOM */
 	if (test_and_set_tsk_thread_flag(tsk, TIF_MEMDIE))
 		return;
+	/*
+	 * The task might get stuck at unkillable wait with mmap_sem held for
+	 * write. In that case, even the OOM reaper will not help.
+	 */
+	if (!tsk->signal->oom_start) {
+		unsigned long oom_start = jiffies;
+
+		if (!oom_start)
+			oom_start--;
+		tsk->signal->oom_start = oom_start;
+	}
 	/*
 	 * Make sure that the task is woken up from uninterruptible sleep
 	 * if it is frozen because OOM killer wouldn't be able to free
