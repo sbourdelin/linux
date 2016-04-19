@@ -80,7 +80,6 @@ struct tegra_gpio_soc_config {
 	u32 upper_offset;
 };
 
-static struct device *dev;
 static struct irq_domain *irq_domain;
 static void __iomem *regs;
 static u32 tegra_gpio_bank_count;
@@ -240,7 +239,8 @@ static int tegra_gpio_irq_set_type(struct irq_data *d, unsigned int type)
 
 	ret = gpiochip_lock_as_irq(&tegra_gpio_chip, gpio);
 	if (ret) {
-		dev_err(dev, "unable to lock Tegra GPIO %d as IRQ\n", gpio);
+		dev_err(tegra_gpio_chip.parent,
+			"unable to lock Tegra GPIO %d as IRQ\n", gpio);
 		return ret;
 	}
 
@@ -465,8 +465,6 @@ static int tegra_gpio_probe(struct platform_device *pdev)
 	int i;
 	int j;
 
-	dev = &pdev->dev;
-
 	config = of_device_get_match_data(&pdev->dev);
 	if (!config) {
 		dev_err(&pdev->dev, "Error: No device match found\n");
@@ -488,6 +486,8 @@ static int tegra_gpio_probe(struct platform_device *pdev)
 	}
 
 	tegra_gpio_chip.ngpio = tegra_gpio_bank_count * 32;
+	tegra_gpio_chip.parent = &pdev->dev;
+
 
 	tegra_gpio_banks = devm_kzalloc(&pdev->dev,
 			tegra_gpio_bank_count * sizeof(*tegra_gpio_banks),
