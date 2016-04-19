@@ -19,6 +19,7 @@
 
 /* Temparory solution for building, will be removed later */
 #include <linux/pci.h>
+#include <linux/dma-reserved-iommu.h>
 
 struct msi_desc *alloc_msi_entry(struct device *dev)
 {
@@ -64,8 +65,12 @@ static int msi_compose(struct irq_data *irq_data,
 
 	if (erase)
 		memset(msg, 0, sizeof(*msg));
-	else
+	else {
 		ret = irq_chip_compose_msi_msg(irq_data, msg);
+		if (ret)
+			return ret;
+		iommu_msi_mapping_translate_msg(irq_data, msg);
+	}
 
 	return ret;
 }
