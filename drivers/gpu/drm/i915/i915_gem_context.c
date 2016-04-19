@@ -90,6 +90,8 @@
 #include "i915_drv.h"
 #include "i915_trace.h"
 
+#define ALL_L3_SLICES(dev) (1 << NUM_L3_SLICES(dev)) - 1
+
 /* This is a HW constraint. The value below is the largest known requirement
  * I've seen in a spec to date, and that was a workaround for a non-shipping
  * part. It should be safe to decrease this, but it's more future proof as is.
@@ -249,7 +251,7 @@ __create_hw_context(struct drm_device *dev,
 	/* NB: Mark all slices as needing a remap so that when the context first
 	 * loads it will restore whatever remap state already exists. If there
 	 * is no remap info, it will be a NOP. */
-	ctx->remap_slice = (1 << NUM_L3_SLICES(dev)) - 1;
+	ctx->remap_slice = ALL_L3_SLICES(dev_priv);
 
 	ctx->hang_stats.ban_period_seconds = DRM_I915_CTX_BAN_PERIOD;
 
@@ -336,7 +338,6 @@ static void i915_gem_context_unpin(struct intel_context *ctx,
 void i915_gem_context_reset(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	int i;
 
 	if (i915.enable_execlists) {
 		struct intel_context *ctx;
@@ -345,17 +346,7 @@ void i915_gem_context_reset(struct drm_device *dev)
 			intel_lr_context_reset(dev_priv, ctx);
 	}
 
-	for (i = 0; i < I915_NUM_ENGINES; i++) {
-		struct intel_engine_cs *engine = &dev_priv->engine[i];
-
-		if (engine->last_context) {
-			i915_gem_context_unpin(engine->last_context, engine);
-			engine->last_context = NULL;
-		}
-	}
-
-	/* Force the GPU state to be reinitialised on enabling */
-	dev_priv->kernel_context->legacy_hw_ctx.initialized = false;
+	i915_gem_context_lost(dev_priv);
 }
 
 int i915_gem_context_init(struct drm_device *dev)
@@ -403,11 +394,30 @@ int i915_gem_context_init(struct drm_device *dev)
 	return 0;
 }
 
+void i915_gem_context_lost(struct drm_i915_private *dev_priv)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(dev_priv->engine); i++) {
+		struct intel_engine_cs *engine = &dev_priv->engine[i];
+
+		if (engine->last_context) {
+			i915_gem_context_unpin(engine->last_context, engine);
+			engine->last_context = NULL;
+		}
+	}
+
+	/* Force the GPU state to be reinitialised on enabling */
+	dev_priv->kernel_context->legacy_hw_ctx.initialized = false;
+	dev_priv->kernel_context->remap_slice = ALL_L3_SLICES(dev_priv);
+}
+
 void i915_gem_context_fini(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_context *dctx = dev_priv->kernel_context;
-	int i;
+
+	i915_gem_context_lost(dev_priv);
 
 	if (dctx->legacy_hw_ctx.rcs_state) {
 		/* The only known way to stop the gpu from accessing the hw context is
@@ -424,15 +434,6 @@ void i915_gem_context_fini(struct drm_device *dev)
 		WARN_ON(!dev_priv->engine[RCS].last_context);
 
 		i915_gem_object_ggtt_unpin(dctx->legacy_hw_ctx.rcs_state);
-	}
-
-	for (i = I915_NUM_ENGINES; --i >= 0;) {
-		struct intel_engine_cs *engine = &dev_priv->engine[i];
-
-		if (engine->last_context) {
-			i915_gem_context_unpin(engine->last_context, engine);
-			engine->last_context = NULL;
-		}
 	}
 
 	i915_gem_context_unreference(dctx);
