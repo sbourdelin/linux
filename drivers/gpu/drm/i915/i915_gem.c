@@ -3346,6 +3346,15 @@ static void i915_gem_object_finish_gtt(struct drm_i915_gem_object *obj)
 					    old_write_domain);
 }
 
+static void __i915_vma_iounmap(struct i915_vma *vma)
+{
+	if (vma->iomap == NULL)
+		return;
+
+	io_mapping_unmap(vma->iomap);
+	vma->iomap = NULL;
+}
+
 static int __i915_vma_unbind(struct i915_vma *vma, bool wait)
 {
 	struct drm_i915_gem_object *obj = vma->obj;
@@ -3378,6 +3387,8 @@ static int __i915_vma_unbind(struct i915_vma *vma, bool wait)
 		ret = i915_gem_object_put_fence(obj);
 		if (ret)
 			return ret;
+
+		__i915_vma_iounmap(vma);
 	}
 
 	trace_i915_vma_unbind(vma);
