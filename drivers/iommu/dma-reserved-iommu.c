@@ -135,6 +135,22 @@ unlock:
 }
 EXPORT_SYMBOL_GPL(iommu_alloc_reserved_iova_domain);
 
+/* called with domain's reserved_lock held */
+static void reserved_binding_release(struct kref *kref)
+{
+	struct iommu_reserved_binding *b =
+		container_of(kref, struct iommu_reserved_binding, kref);
+	struct iommu_domain *d = b->domain;
+	struct reserved_iova_domain *rid =
+		(struct reserved_iova_domain *)d->reserved_iova_cookie;
+	unsigned long order;
+
+	order = iova_shift(rid->iovad);
+	free_iova(rid->iovad, b->iova >> order);
+	unlink_reserved_binding(d, b);
+	kfree(b);
+}
+
 void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
 {
 	struct reserved_iova_domain *rid;
@@ -160,3 +176,137 @@ unlock:
 	}
 }
 EXPORT_SYMBOL_GPL(iommu_free_reserved_iova_domain);
+
+int iommu_get_reserved_iova(struct iommu_domain *domain,
+			      phys_addr_t addr, size_t size, int prot,
+			      dma_addr_t *iova)
+{
+	unsigned long base_pfn, end_pfn, nb_iommu_pages, order, flags;
+	struct iommu_reserved_binding *b, *newb;
+	size_t iommu_page_size, binding_size;
+	phys_addr_t aligned_base, offset;
+	struct reserved_iova_domain *rid;
+	struct iova_domain *iovad;
+	struct iova *p_iova;
+	int ret = -EINVAL;
+
+	newb = kzalloc(sizeof(*newb), GFP_KERNEL);
+	if (!newb)
+		return -ENOMEM;
+
+	spin_lock_irqsave(&domain->reserved_lock, flags);
+
+	rid = (struct reserved_iova_domain *)domain->reserved_iova_cookie;
+	if (!rid)
+		goto free_newb;
+
+	if ((prot & IOMMU_READ & !(rid->prot & IOMMU_READ)) ||
+	    (prot & IOMMU_WRITE & !(rid->prot & IOMMU_WRITE)))
+		goto free_newb;
+
+	iovad = rid->iovad;
+	order = iova_shift(iovad);
+	base_pfn = addr >> order;
+	end_pfn = (addr + size - 1) >> order;
+	aligned_base = base_pfn << order;
+	offset = addr - aligned_base;
+	nb_iommu_pages = end_pfn - base_pfn + 1;
+	iommu_page_size = 1 << order;
+	binding_size = nb_iommu_pages * iommu_page_size;
+
+	b = find_reserved_binding(domain, aligned_base, binding_size);
+	if (b) {
+		*iova = b->iova + offset + aligned_base - b->addr;
+		kref_get(&b->kref);
+		ret = 0;
+		goto free_newb;
+	}
+
+	p_iova = alloc_iova(iovad, nb_iommu_pages,
+			    iovad->dma_32bit_pfn, true);
+	if (!p_iova) {
+		ret = -ENOMEM;
+		goto free_newb;
+	}
+
+	*iova = iova_dma_addr(iovad, p_iova);
+
+	/* unlock to call iommu_map which is not guaranteed to be atomic */
+	spin_unlock_irqrestore(&domain->reserved_lock, flags);
+
+	ret = iommu_map(domain, *iova, aligned_base, binding_size, prot);
+
+	spin_lock_irqsave(&domain->reserved_lock, flags);
+
+	rid = (struct reserved_iova_domain *) domain->reserved_iova_cookie;
+	if (!rid || (rid->iovad != iovad)) {
+		/* reserved iova domain was destroyed in our back */
+		ret = -EBUSY;
+		goto free_newb; /* iova already released */
+	}
+
+	/* no change in iova reserved domain but iommu_map failed */
+	if (ret)
+		goto free_iova;
+
+	/* everything is fine, add in the new node in the rb tree */
+	kref_init(&newb->kref);
+	newb->domain = domain;
+	newb->addr = aligned_base;
+	newb->iova = *iova;
+	newb->size = binding_size;
+
+	link_reserved_binding(domain, newb);
+
+	*iova += offset;
+	goto unlock;
+
+free_iova:
+	free_iova(rid->iovad, p_iova->pfn_lo);
+free_newb:
+	kfree(newb);
+unlock:
+	spin_unlock_irqrestore(&domain->reserved_lock, flags);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(iommu_get_reserved_iova);
+
+void iommu_put_reserved_iova(struct iommu_domain *domain, phys_addr_t addr)
+{
+	phys_addr_t aligned_addr, page_size, mask;
+	struct iommu_reserved_binding *b;
+	struct reserved_iova_domain *rid;
+	unsigned long order, flags;
+	struct iommu_domain *d;
+	dma_addr_t iova;
+	size_t size;
+	int ret = 0;
+
+	spin_lock_irqsave(&domain->reserved_lock, flags);
+
+	rid = (struct reserved_iova_domain *)domain->reserved_iova_cookie;
+	if (!rid)
+		goto unlock;
+
+	order = iova_shift(rid->iovad);
+	page_size = (uint64_t)1 << order;
+	mask = page_size - 1;
+	aligned_addr = addr & ~mask;
+
+	b = find_reserved_binding(domain, aligned_addr, page_size);
+	if (!b)
+		goto unlock;
+
+	iova = b->iova;
+	size = b->size;
+	d = b->domain;
+
+	ret = kref_put(&b->kref, reserved_binding_release);
+
+unlock:
+	spin_unlock_irqrestore(&domain->reserved_lock, flags);
+	if (ret)
+		iommu_unmap(d, iova, size);
+}
+EXPORT_SYMBOL_GPL(iommu_put_reserved_iova);
+

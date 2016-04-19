@@ -42,6 +42,34 @@ int iommu_alloc_reserved_iova_domain(struct iommu_domain *domain,
  */
 void iommu_free_reserved_iova_domain(struct iommu_domain *domain);
 
+/**
+ * iommu_get_reserved_iova: allocate a contiguous set of iova pages and
+ * map them to the physical range defined by @addr and @size.
+ *
+ * @domain: iommu domain handle
+ * @addr: physical address to bind
+ * @size: size of the binding
+ * @prot: mapping protection attribute
+ * @iova: returned iova
+ *
+ * Mapped physical pfns are within [@addr >> order, (@addr + size -1) >> order]
+ * where order corresponds to the reserved iova domain order.
+ * This mapping is tracked and reference counted with the minimal granularity
+ * of @size.
+ */
+int iommu_get_reserved_iova(struct iommu_domain *domain,
+			    phys_addr_t addr, size_t size, int prot,
+			    dma_addr_t *iova);
+
+/**
+ * iommu_put_reserved_iova: decrement a ref count of the reserved mapping
+ *
+ * @domain: iommu domain handle
+ * @addr: physical address whose binding ref count is decremented
+ *
+ * if the binding ref count is null, destroy the reserved mapping
+ */
+void iommu_put_reserved_iova(struct iommu_domain *domain, phys_addr_t addr);
 #else
 
 static inline int
@@ -54,6 +82,16 @@ iommu_alloc_reserved_iova_domain(struct iommu_domain *domain,
 
 static inline void
 iommu_free_reserved_iova_domain(struct iommu_domain *domain) {}
+
+static inline int iommu_get_reserved_iova(struct iommu_domain *domain,
+					  phys_addr_t addr, size_t size,
+					  int prot, dma_addr_t *iova)
+{
+	return -ENOENT;
+}
+
+static inline void iommu_put_reserved_iova(struct iommu_domain *domain,
+					   phys_addr_t addr) {}
 
 #endif	/* CONFIG_IOMMU_DMA_RESERVED */
 #endif	/* __DMA_RESERVED_IOMMU_H */
