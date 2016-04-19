@@ -63,6 +63,7 @@
 #include <linux/sched/rt.h>
 #include <linux/page_owner.h>
 #include <linux/kthread.h>
+#include <linux/fs.h>
 
 #include <asm/sections.h>
 #include <asm/tlbflush.h>
@@ -4028,6 +4029,51 @@ void show_free_areas(unsigned int filter)
 
 	show_swap_cache_info();
 }
+
+static void mark_free_pages_bitmap(struct zone *zone,
+		unsigned long *bitmap, unsigned long len)
+{
+	unsigned long pfn, flags, i, limit;
+	unsigned int order, t;
+	struct list_head *curr;
+
+	if (zone_is_empty(zone))
+		return;
+
+	spin_lock_irqsave(&zone->lock, flags);
+
+	limit = min(len, max_pfn);
+	for_each_migratetype_order(order, t) {
+		list_for_each(curr, &zone->free_area[order].free_list[t]) {
+			pfn = page_to_pfn(list_entry(curr, struct page, lru));
+			for (i = 0; i < (1UL << order); i++) {
+				if ((pfn + i) < limit)
+					set_bit_le(pfn + i, bitmap);
+				else
+					break;
+			}
+		}
+	}
+
+	spin_unlock_irqrestore(&zone->lock, flags);
+}
+
+unsigned long get_max_pfn(void)
+{
+	return max_pfn;
+}
+EXPORT_SYMBOL(get_max_pfn);
+
+void get_free_pages(unsigned long *bitmap, unsigned long len, int drop)
+{
+	struct zone *zone;
+
+	drop_cache(drop);
+
+	for_each_populated_zone(zone)
+		mark_free_pages_bitmap(zone, bitmap, len);
+}
+EXPORT_SYMBOL(get_free_pages);
 
 static void zoneref_set_zone(struct zone *zone, struct zoneref *zoneref)
 {
