@@ -17,6 +17,7 @@
 
 #include <linux/iommu.h>
 #include <linux/iova.h>
+#include <linux/msi.h>
 
 struct reserved_iova_domain {
 	struct iova_domain *iovad;
@@ -332,3 +333,21 @@ unlock:
 }
 EXPORT_SYMBOL_GPL(iommu_put_reserved_iova);
 
+struct iommu_domain *iommu_msi_mapping_desc_to_domain(struct msi_desc *desc)
+{
+	struct device *dev;
+	struct iommu_domain *d;
+
+	dev = msi_desc_to_dev(desc);
+
+	d = iommu_get_domain_for_dev(dev);
+
+	if (!d || (d->type == IOMMU_DOMAIN_DMA))
+		return NULL;
+
+	if (iommu_domain_get_attr(d, DOMAIN_ATTR_MSI_MAPPING, NULL))
+		return NULL;
+
+	return d;
+}
+EXPORT_SYMBOL_GPL(iommu_msi_mapping_desc_to_domain);

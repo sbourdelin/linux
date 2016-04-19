@@ -19,6 +19,7 @@
 #include <linux/kernel.h>
 
 struct iommu_domain;
+struct msi_desc;
 
 #ifdef CONFIG_IOMMU_DMA_RESERVED
 
@@ -70,6 +71,17 @@ int iommu_get_reserved_iova(struct iommu_domain *domain,
  * if the binding ref count is null, destroy the reserved mapping
  */
 void iommu_put_reserved_iova(struct iommu_domain *domain, phys_addr_t addr);
+
+/**
+ * iommu_msi_mapping_desc_to_domain: in case the MSI originates from a device
+ * upstream to an IOMMU and this IOMMU translates the MSI transaction,
+ * this function returns the iommu domain the MSI doorbell address must be
+ * mapped in. Else it returns NULL.
+ *
+ * @desc: msi desc handle
+ */
+struct iommu_domain *iommu_msi_mapping_desc_to_domain(struct msi_desc *desc);
+
 #else
 
 static inline int
@@ -92,6 +104,12 @@ static inline int iommu_get_reserved_iova(struct iommu_domain *domain,
 
 static inline void iommu_put_reserved_iova(struct iommu_domain *domain,
 					   phys_addr_t addr) {}
+
+static inline struct iommu_domain *
+iommu_msi_mapping_desc_to_domain(struct msi_desc *desc)
+{
+	return NULL;
+}
 
 #endif	/* CONFIG_IOMMU_DMA_RESERVED */
 #endif	/* __DMA_RESERVED_IOMMU_H */
