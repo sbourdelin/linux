@@ -440,27 +440,6 @@ void i915_gem_context_fini(struct drm_device *dev)
 	dev_priv->kernel_context = NULL;
 }
 
-int i915_gem_context_enable(struct drm_i915_gem_request *req)
-{
-	struct intel_engine_cs *engine = req->engine;
-	int ret;
-
-	if (i915.enable_execlists) {
-		if (engine->init_context == NULL)
-			return 0;
-
-		ret = engine->init_context(req);
-	} else
-		ret = i915_switch_context(req);
-
-	if (ret) {
-		DRM_ERROR("ring init context: %d\n", ret);
-		return ret;
-	}
-
-	return 0;
-}
-
 static int context_idr_cleanup(int id, void *p, void *data)
 {
 	struct intel_context *ctx = p;
@@ -659,7 +638,7 @@ static bool
 needs_pd_load_pre(struct intel_engine_cs *engine, struct intel_context *to)
 {
 	if (!to->ppgtt)
-		return false;
+		return engine->last_context == NULL;
 
 	if (engine->last_context == to &&
 	    !(intel_engine_flag(engine) & to->ppgtt->pd_dirty_rings))
@@ -693,6 +672,7 @@ static int do_rcs_switch(struct drm_i915_gem_request *req)
 {
 	struct intel_context *to = req->ctx;
 	struct intel_engine_cs *engine = req->engine;
+	struct i915_hw_ppgtt *ppgtt = to->ppgtt ?: req->i915->mm.aliasing_ppgtt;
 	struct intel_context *from;
 	u32 hw_flags;
 	int ret, i;
@@ -734,7 +714,7 @@ static int do_rcs_switch(struct drm_i915_gem_request *req)
 		 * Register Immediate commands in Ring Buffer before submitting
 		 * a context."*/
 		trace_switch_mm(engine, to);
-		ret = to->ppgtt->switch_mm(to->ppgtt, req);
+		ret = ppgtt->switch_mm(ppgtt, req);
 		if (ret)
 			goto unpin_out;
 	}
@@ -745,8 +725,7 @@ static int do_rcs_switch(struct drm_i915_gem_request *req)
 		 * space. This means we must enforce that a page table load
 		 * occur when this occurs. */
 		hw_flags = MI_RESTORE_INHIBIT;
-	else if (to->ppgtt &&
-		 intel_engine_flag(engine) & to->ppgtt->pd_dirty_rings)
+	else if (ppgtt && intel_engine_flag(engine) & ppgtt->pd_dirty_rings)
 		hw_flags = MI_FORCE_RESTORE;
 	else
 		hw_flags = 0;
@@ -791,7 +770,7 @@ static int do_rcs_switch(struct drm_i915_gem_request *req)
 	 */
 	if (needs_pd_load_post(to, hw_flags)) {
 		trace_switch_mm(engine, to);
-		ret = to->ppgtt->switch_mm(to->ppgtt, req);
+		ret = ppgtt->switch_mm(ppgtt, req);
 		/* The hardware context switch is emitted, but we haven't
 		 * actually changed the state - so it's probably safe to bail
 		 * here. Still, let the user know something dangerous has
@@ -801,8 +780,8 @@ static int do_rcs_switch(struct drm_i915_gem_request *req)
 			return ret;
 	}
 
-	if (to->ppgtt)
-		to->ppgtt->pd_dirty_rings &= ~intel_engine_flag(engine);
+	if (ppgtt)
+		ppgtt->pd_dirty_rings &= ~intel_engine_flag(engine);
 
 	for (i = 0; i < MAX_L3_SLICES; i++) {
 		if (!(to->remap_slice & (1<<i)))
@@ -857,15 +836,17 @@ int i915_switch_context(struct drm_i915_gem_request *req)
 		struct intel_context *to = req->ctx;
 
 		if (needs_pd_load_pre(engine, to)) {
+			struct i915_hw_ppgtt *ppgtt;
 			int ret;
 
+			ppgtt = to->ppgtt ?: req->i915->mm.aliasing_ppgtt;
+
 			trace_switch_mm(engine, to);
-			ret = to->ppgtt->switch_mm(to->ppgtt, req);
+			ret = ppgtt->switch_mm(ppgtt, req);
 			if (ret)
 				return ret;
 
-			/* Doing a PD load always reloads the page dirs */
-			to->ppgtt->pd_dirty_rings &= ~intel_engine_flag(engine);
+			ppgtt->pd_dirty_rings &= ~intel_engine_flag(engine);
 		}
 
 		if (to != engine->last_context) {
