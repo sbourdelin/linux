@@ -22,7 +22,7 @@ static u64 notrace read_sched_clock(void)
 static void __init tango_clocksource_init(struct device_node *np)
 {
 	struct clk *clk;
-	int xtal_freq, ret;
+	int xtal_freq, err;
 
 	xtal_in_cnt = of_iomap(np, 0);
 	if (xtal_in_cnt == NULL) {
@@ -40,9 +40,9 @@ static void __init tango_clocksource_init(struct device_node *np)
 	delay_timer.freq = xtal_freq;
 	delay_timer.read_current_timer = read_xtal_counter;
 
-	ret = clocksource_mmio_init(xtal_in_cnt, "tango-xtal", xtal_freq, 350,
+	err = clocksource_mmio_init(xtal_in_cnt, "tango-xtal", xtal_freq, 350,
 				    32, clocksource_mmio_readl_up);
-	if (!ret) {
+	if (err) {
 		pr_err("%s: registration failed\n", np->full_name);
 		return;
 	}
