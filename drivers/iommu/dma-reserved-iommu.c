@@ -18,6 +18,14 @@
 #include <linux/iommu.h>
 #include <linux/iova.h>
 #include <linux/msi.h>
+#include <linux/irq.h>
+
+#ifdef CONFIG_PHYS_ADDR_T_64BIT
+#define msg_to_phys_addr(msg) \
+	(((phys_addr_t)((msg)->address_hi) << 32) | (msg)->address_lo)
+#else
+#define msg_to_phys_addr(msg)	((msg)->address_lo)
+#endif
 
 struct reserved_iova_domain {
 	struct iova_domain *iovad;
@@ -351,3 +359,64 @@ struct iommu_domain *iommu_msi_mapping_desc_to_domain(struct msi_desc *desc)
 	return d;
 }
 EXPORT_SYMBOL_GPL(iommu_msi_mapping_desc_to_domain);
+
+static dma_addr_t iommu_find_reserved_iova(struct iommu_domain *domain,
+				    phys_addr_t addr, size_t size)
+{
+	unsigned long  base_pfn, end_pfn, nb_iommu_pages, order, flags;
+	size_t iommu_page_size, binding_size;
+	struct iommu_reserved_binding *b;
+	phys_addr_t aligned_base, offset;
+	dma_addr_t iova = DMA_ERROR_CODE;
+	struct iova_domain *iovad;
+
+	spin_lock_irqsave(&domain->reserved_lock, flags);
+
+	iovad = (struct iova_domain *)domain->reserved_iova_cookie;
+
+	if (!iovad)
+		goto unlock;
+
+	order = iova_shift(iovad);
+	base_pfn = addr >> order;
+	end_pfn = (addr + size - 1) >> order;
+	aligned_base = base_pfn << order;
+	offset = addr - aligned_base;
+	nb_iommu_pages = end_pfn - base_pfn + 1;
+	iommu_page_size = 1 << order;
+	binding_size = nb_iommu_pages * iommu_page_size;
+
+	b = find_reserved_binding(domain, aligned_base, binding_size);
+	if (b && (b->addr <= aligned_base) &&
+		(aligned_base + binding_size <=  b->addr + b->size))
+		iova = b->iova + offset + aligned_base - b->addr;
+unlock:
+	spin_unlock_irqrestore(&domain->reserved_lock, flags);
+	return iova;
+}
+
+int iommu_msi_mapping_translate_msg(struct irq_data *data, struct msi_msg *msg)
+{
+	struct iommu_domain *d;
+	struct msi_desc *desc;
+	dma_addr_t iova;
+
+	desc = irq_data_get_msi_desc(data);
+	if (!desc)
+		return -EINVAL;
+
+	d = iommu_msi_mapping_desc_to_domain(desc);
+	if (!d)
+		return 0;
+
+	iova = iommu_find_reserved_iova(d, msg_to_phys_addr(msg),
+					sizeof(phys_addr_t));
+
+	if (iova == DMA_ERROR_CODE)
+		return -EINVAL;
+
+	msg->address_lo = lower_32_bits(iova);
+	msg->address_hi = upper_32_bits(iova);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(iommu_msi_mapping_translate_msg);
