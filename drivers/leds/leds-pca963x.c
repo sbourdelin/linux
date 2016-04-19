@@ -99,7 +99,7 @@ struct pca963x_led;
 
 struct pca963x {
 	struct pca963x_chipdef *chipdef;
-	struct mutex mutex;
+	struct mutex mutex; /* protect i2c access to/from the pca963x chip */
 	struct i2c_client *client;
 	struct pca963x_led *leds;
 };
@@ -156,22 +156,22 @@ static void pca963x_blink(struct pca963x_led *pca963x)
 	u8 ledout_addr = pca963x->chip->chipdef->ledout_base +
 		(pca963x->led_num / 4);
 	u8 ledout;
-	u8 mode2 = i2c_smbus_read_byte_data(pca963x->chip->client,
-							PCA963X_MODE2);
+	u8 mode2;
 	int shift = 2 * (pca963x->led_num % 4);
 	u8 mask = 0x3 << shift;
 
+	mutex_lock(&pca963x->chip->mutex);
 	i2c_smbus_write_byte_data(pca963x->chip->client,
 			pca963x->chip->chipdef->grppwm,	pca963x->gdc);
 
 	i2c_smbus_write_byte_data(pca963x->chip->client,
 			pca963x->chip->chipdef->grpfreq, pca963x->gfrq);
 
+	mode2 = i2c_smbus_read_byte_data(pca963x->chip->client, PCA963X_MODE2);
 	if (!(mode2 & PCA963X_MODE2_DMBLNK))
 		i2c_smbus_write_byte_data(pca963x->chip->client, PCA963X_MODE2,
 			mode2 | PCA963X_MODE2_DMBLNK);
 
-	mutex_lock(&pca963x->chip->mutex);
 	ledout = i2c_smbus_read_byte_data(pca963x->chip->client, ledout_addr);
 	if ((ledout & mask) != (PCA963X_LED_GRP_PWM << shift))
 		i2c_smbus_write_byte_data(pca963x->chip->client, ledout_addr,
