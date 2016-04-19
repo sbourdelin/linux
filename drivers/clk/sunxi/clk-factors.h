@@ -18,10 +18,16 @@ struct clk_factors_config {
 	u8 n_start;
 };
 
+struct clk_factors_prediv {
+	u8 parent_index;
+	u8 shift;
+	u8 width;
+};
+
 struct factors_request {
 	unsigned long rate;
 	unsigned long parent_rate;
-	u8 parent_index;
+	u8 prediv_width;
 	u8 n;
 	u8 k;
 	u8 m;
@@ -33,6 +39,7 @@ struct factors_data {
 	int mux;
 	int muxmask;
 	const struct clk_factors_config *table;
+	const struct clk_factors_prediv *prediv_table;
 	void (*getter)(struct factors_request *req);
 	void (*recalc)(struct factors_request *req);
 	const char *name;
@@ -42,6 +49,7 @@ struct clk_factors {
 	struct clk_hw hw;
 	void __iomem *reg;
 	const struct clk_factors_config *config;
+	const struct clk_factors_prediv *prediv_config;
 	void (*get_factors)(struct factors_request *req);
 	void (*recalc)(struct factors_request *req);
 	spinlock_t *lock;
