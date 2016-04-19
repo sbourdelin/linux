@@ -324,8 +324,6 @@ static void __init pmac_pic_probe_oldstyle(void)
 
 		/* We might have a second cascaded heathrow */
 
-		/* Compensate for of_node_put() in of_find_node_by_name() */
-		of_node_get(master);
 		slave = of_find_node_by_name(master, "mac-io");
 
 		/* Check ordering of master & slave */

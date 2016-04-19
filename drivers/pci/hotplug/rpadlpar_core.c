@@ -63,12 +63,12 @@ static struct device_node *find_vio_slot_node(char *drc_name)
 static struct device_node *find_php_slot_pci_node(char *drc_name,
 						  char *drc_type)
 {
-	struct device_node *np = NULL;
+	struct device_node *np;
 	char *name;
 	char *type;
 	int rc;
 
-	while ((np = of_find_node_by_name(np, "pci"))) {
+	for_each_node_by_name(np, "pci") {
 		rc = rpaphp_get_drc_props(np, NULL, &name, &type, NULL);
 		if (rc == 0)
 			if (!strcmp(drc_name, name) && !strcmp(drc_type, type))

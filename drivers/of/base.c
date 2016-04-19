@@ -826,7 +826,7 @@ EXPORT_SYMBOL(of_find_node_opts_by_path);
  *	@from:	The node to start searching from or NULL, the node
  *		you pass will not be searched, only the next one
  *		will; typically, you pass what the previous call
- *		returned. of_node_put() will be called on it
+ *		returned.
  *	@name:	The name string to match against
  *
  *	Returns a node pointer with refcount incremented, use
@@ -843,7 +843,6 @@ struct device_node *of_find_node_by_name(struct device_node *from,
 		if (np->name && (of_node_cmp(np->name, name) == 0)
 		    && of_node_get(np))
 			break;
-	of_node_put(from);
 	raw_spin_unlock_irqrestore(&devtree_lock, flags);
 	return np;
 }

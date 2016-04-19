@@ -880,9 +880,15 @@ static inline int of_property_read_s32(const struct device_node *np,
 		s;						\
 		s = of_prop_next_string(prop, s))
 
-#define for_each_node_by_name(dn, name) \
-	for (dn = of_find_node_by_name(NULL, name); dn; \
-	     dn = of_find_node_by_name(dn, name))
+#define for_each_node_by_name(dn, name)			\
+	for (dn = of_find_node_by_name(NULL, name);	\
+	     dn;					\
+	     {						\
+		struct device_node *_pdn = dn;		\
+		dn = of_find_node_by_name(_pdn, name);	\
+		of_put_node(_pdn);			\
+	     }						\
+	)
 #define for_each_node_by_type(dn, type) \
 	for (dn = of_find_node_by_type(NULL, type); dn; \
 	     dn = of_find_node_by_type(dn, type))
