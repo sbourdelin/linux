@@ -22,6 +22,7 @@
 
 #include <linux/delay.h>
 #include <linux/dma-iommu.h>
+#include <linux/dma-reserved-iommu.h>
 #include <linux/err.h>
 #include <linux/interrupt.h>
 #include <linux/iommu.h>
@@ -1444,6 +1445,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
 	struct arm_smmu_device *smmu = smmu_domain->smmu;
 
 	iommu_put_dma_cookie(domain);
+	iommu_free_reserved_iova_domain(domain);
 	free_io_pgtable_ops(smmu_domain->pgtbl_ops);
 
 	/* Free the CD and ASID, if we allocated them */
