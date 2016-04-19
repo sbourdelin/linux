@@ -24,6 +24,7 @@
 #include <linux/reboot.h>
 #include <linux/slab.h>
 #include <linux/suspend.h>
+#include <linux/acpi.h>
 
 #include <uapi/linux/psci.h>
 
@@ -32,6 +33,7 @@
 #include <asm/system_misc.h>
 #include <asm/smp_plat.h>
 #include <asm/suspend.h>
+#include <acpi/processor.h>
 
 /*
  * While a 64-bit OS can make calls with SMC32 calling conventions, for some
@@ -316,8 +318,54 @@ free_mem:
 	return ret;
 }
 
+static int __maybe_unused psci_acpi_cpu_init_idle(unsigned int cpu)
+{
+	int i, count;
+	u32 *psci_states;
+	struct acpi_processor *pr;
+	struct acpi_processor_lpi *lpi;
+
+	pr = per_cpu(processors, cpu);
+	if (unlikely(!pr || !pr->flags.has_lpi))
+		return -EINVAL;
+
+	/*
+	 * If the PSCI cpu_suspend function hook has not been initialized
+	 * idle states must not be enabled, so bail out
+	 */
+	if (!psci_ops.cpu_suspend)
+		return -EOPNOTSUPP;
+
+	count = pr->power.count - 1;
+	if (!count)
+		return -ENODEV;
+
+	psci_states = kcalloc(count, sizeof(*psci_states), GFP_KERNEL);
+	if (!psci_states)
+		return -ENOMEM;
+
+	for (i = 0; i < count; i++) {
+		u32 state;
+
+		lpi = &pr->power.lpi_states[i + 1];
+		state = lpi->address & 0xFFFFFFFF;
+		if (!psci_power_state_is_valid(state)) {
+			pr_warn("Invalid PSCI power state %#x\n", state);
+			kfree(psci_states);
+			return -EINVAL;
+		}
+		psci_states[i] = state;
+	}
+	/* Idle states parsed correctly, initialize per-cpu pointer */
+	per_cpu(psci_power_state, cpu) = psci_states;
+	return 0;
+}
+
 int psci_cpu_init_idle(unsigned int cpu)
 {
+	if (!acpi_disabled)
+		return psci_acpi_cpu_init_idle(cpu);
+
 	return psci_dt_cpu_init_idle(cpu);
 }
 

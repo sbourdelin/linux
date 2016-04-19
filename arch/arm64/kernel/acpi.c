@@ -18,6 +18,7 @@
 #include <linux/acpi.h>
 #include <linux/bootmem.h>
 #include <linux/cpumask.h>
+#include <linux/cpu_pm.h>
 #include <linux/init.h>
 #include <linux/irq.h>
 #include <linux/irqdomain.h>
@@ -25,9 +26,11 @@
 #include <linux/of_fdt.h>
 #include <linux/smp.h>
 
+#include <asm/cpuidle.h>
 #include <asm/cputype.h>
 #include <asm/cpu_ops.h>
 #include <asm/smp_plat.h>
+#include <acpi/processor.h>
 
 #ifdef CONFIG_ACPI_APEI
 # include <linux/efi.h>
@@ -209,6 +212,37 @@ void __init acpi_boot_table_init(void)
 		if (!param_acpi_force)
 			disable_acpi();
 	}
+}
+
+int acpi_processor_ffh_lpi_probe(unsigned int cpu)
+{
+	return arm_cpuidle_init(cpu);
+}
+
+struct acpi_processor_lpi *lpi;
+int acpi_processor_ffh_lpi_enter(struct acpi_processor_lpi *lpi, int idx)
+{
+	int ret;
+
+	if (!idx) {
+		cpu_do_idle();
+		return idx;
+	}
+
+	/* TODO cpu_pm_{enter,exit} can be done in generic code ? */
+	ret = cpu_pm_enter();
+	if (!ret) {
+		/*
+		 * Pass idle state index to cpu_suspend which in turn will
+		 * call the CPU ops suspend protocol with idle index as a
+		 * parameter.
+		 */
+		ret = arm_cpuidle_suspend(idx);
+
+		cpu_pm_exit();
+	}
+
+	return ret ? -1 : idx;
 }
 
 #ifdef CONFIG_ACPI_APEI
