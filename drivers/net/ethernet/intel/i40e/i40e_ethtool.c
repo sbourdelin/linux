@@ -2500,6 +2500,7 @@ static int i40e_handle_input_set(struct i40e_vsi *vsi,
 {
 	bool inset_mask_change = false;
 	struct i40e_pf *pf;
+	u16 filter_cnt;
 	u64 val;
 	u8 idx;
 
@@ -2510,9 +2511,11 @@ static int i40e_handle_input_set(struct i40e_vsi *vsi,
 	switch (fsp->flow_type & FLOW_TYPE_MASK) {
 	case TCP_V4_FLOW:
 		idx = I40E_FILTER_PCTYPE_NONF_IPV4_TCP;
+		filter_cnt = pf->fd_tcp4_filter_cnt;
 		break;
 	case UDP_V4_FLOW:
 		idx = I40E_FILTER_PCTYPE_NONF_IPV4_UDP;
+		filter_cnt = pf->fd_udp4_filter_cnt;
 		break;
 	default:
 		/* for all other flow types */
@@ -2578,8 +2581,10 @@ static int i40e_handle_input_set(struct i40e_vsi *vsi,
 			netif_err(pf, drv, vsi->netdev, "Change of input set is not supported when MFP mode is enabled\n");
 			return -EOPNOTSUPP;
 		}
-		if (pf->fdir_pf_active_filters) {
-			netif_err(pf, drv, vsi->netdev, "Change of input set is not supported when there are existing filters. Please delete them and re-try\n");
+
+		if (filter_cnt) {
+			netif_err(pf, drv, vsi->netdev, "Change of input set is not supported when there are existing filter(%u) for specified flow-type: %u. Please delete them and re-try\n",
+				  filter_cnt, fsp->flow_type & FLOW_TYPE_MASK);
 			return -EOPNOTSUPP;
 		}
 
