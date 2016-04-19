@@ -284,6 +284,7 @@ static const struct tnt tnts[] = {
 	{ TAINT_UNSIGNED_MODULE,	'E', ' ' },
 	{ TAINT_SOFTLOCKUP,		'L', ' ' },
 	{ TAINT_LIVEPATCH,		'K', ' ' },
+	{ TAINT_OVERLAY_ACPI_TABLE,	'N', ' ' },
 };
 
 /**
@@ -305,6 +306,7 @@ static const struct tnt tnts[] = {
  *  'E' - Unsigned module has been loaded.
  *  'L' - A soft lockup has previously occurred.
  *  'K' - Kernel has been live patched.
+ *  'N' - ACPI SSDT overlays have been loaded.
  *
  *	The string is overwritten by the next call to print_tainted().
  */
