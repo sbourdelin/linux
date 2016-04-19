@@ -796,12 +796,12 @@ fc_remote_port_chkready(struct fc_rport *rport)
 	return result;
 }
 
-static inline u64 wwn_to_u64(u8 *wwn)
+static __always_inline u64 wwn_to_u64(u8 *wwn)
 {
 	return get_unaligned_be64(wwn);
 }
 
-static inline void u64_to_wwn(u64 inm, u8 *wwn)
+static __always_inline void u64_to_wwn(u64 inm, u8 *wwn)
 {
 	put_unaligned_be64(inm, wwn);
 }
