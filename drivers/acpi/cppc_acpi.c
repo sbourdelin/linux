@@ -40,6 +40,9 @@
 #include <linux/cpufreq.h>
 #include <linux/delay.h>
 #include <linux/ktime.h>
+#include <linux/dmi.h>
+
+#include <asm/unaligned.h>
 
 #include <acpi/cppc_acpi.h>
 /*
@@ -709,6 +712,47 @@ static int cpc_write(struct cpc_reg *reg, u64 val)
 	return ret_val;
 }
 
+static u64 cppc_dmi_khz;
+
+static void cppc_find_dmi_mhz(const struct dmi_header *dm, void *private)
+{
+	u16 *mhz = (u16 *)private;
+	const u8 *dmi_data = (const u8 *)dm;
+
+	if (dm->type == DMI_ENTRY_PROCESSOR && dm->length >= 48)
+		*mhz = (u16)get_unaligned((const u16 *)(dmi_data + 0x14));
+}
+
+
+static u64 cppc_get_dmi_khz(void)
+{
+	u16 mhz;
+
+	dmi_walk(cppc_find_dmi_mhz, &mhz);
+
+	/*
+	 * Real stupid fallback value, just in case there is no
+	 * actual value set.
+	 */
+	mhz = mhz ? mhz : 1;
+
+	return (1000 * mhz);
+}
+
+static u64 cppc_unitless_to_khz(u64 min, u64 max, u64 val)
+{
+	/*
+	 * The incoming val should be min <= val <= max.  Our
+	 * job is to convert that to KHz so it can be properly
+	 * reported to user space via cpufreq_policy.
+	 */
+
+	if (!cppc_dmi_khz)
+		cppc_dmi_khz = cppc_get_dmi_khz();
+
+	return ((val - min) * cppc_dmi_khz) / (max - min);
+}
+
 /**
  * cppc_get_perf_caps - Get a CPUs performance capabilities.
  * @cpunum: CPU from which to get capabilities info.
@@ -748,17 +792,24 @@ int cppc_get_perf_caps(int cpunum, struct cppc_perf_caps *perf_caps)
 		}
 	}
 
+	/*
+	 * Since these values in perf_caps will be used in setting
+	 * up the cpufreq policy, they must always be stored in units
+	 * of KHz.  If they are not, user space tools will become very
+	 * confused since they assume these are in KHz when reading
+	 * sysfs.
+	 */
 	cpc_read(&highest_reg->cpc_entry.reg, &high);
-	perf_caps->highest_perf = high;
-
 	cpc_read(&lowest_reg->cpc_entry.reg, &low);
-	perf_caps->lowest_perf = low;
+
+	perf_caps->highest_perf = cppc_unitless_to_khz(low, high, high);
+	perf_caps->lowest_perf = cppc_unitless_to_khz(low, high, low);
 
 	cpc_read(&ref_perf->cpc_entry.reg, &ref);
-	perf_caps->reference_perf = ref;
+	perf_caps->reference_perf = cppc_unitless_to_khz(low, high, ref);
 
 	cpc_read(&nom_perf->cpc_entry.reg, &nom);
-	perf_caps->nominal_perf = nom;
+	perf_caps->nominal_perf = cppc_unitless_to_khz(low, high, nom);
 
 	if (!ref)
 		perf_caps->reference_perf = perf_caps->nominal_perf;
