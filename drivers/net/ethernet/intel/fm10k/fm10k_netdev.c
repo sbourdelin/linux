@@ -1443,15 +1443,21 @@ struct net_device *fm10k_alloc_netdev(const struct fm10k_info *info)
 
 	/* Only the PF can support VXLAN and NVGRE tunnel offloads */
 	if (info->mac == fm10k_mac_pf) {
-		dev->hw_enc_features = NETIF_F_IP_CSUM |
+		dev->hw_enc_features = NETIF_F_SG |
+				       NETIF_F_IP_CSUM |
+				       NETIF_F_IPV6_CSUM |
 				       NETIF_F_TSO |
 				       NETIF_F_TSO6 |
 				       NETIF_F_TSO_ECN |
 				       NETIF_F_GSO_UDP_TUNNEL |
-				       NETIF_F_IPV6_CSUM |
-				       NETIF_F_SG;
+				       NETIF_F_GSO_UDP_TUNNEL_CSUM |
+				       NETIF_F_GSO_PARTIAL;
 
-		dev->features |= NETIF_F_GSO_UDP_TUNNEL;
+		dev->features |= NETIF_F_GSO_UDP_TUNNEL |
+				 NETIF_F_GSO_UDP_TUNNEL_CSUM |
+				 NETIF_F_GSO_PARTIAL;
+
+		dev->gso_partial_features = NETIF_F_GSO_UDP_TUNNEL_CSUM;
 	}
 
 	/* all features defined to this point should be changeable */
