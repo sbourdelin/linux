@@ -24,6 +24,7 @@
 #include <linux/of.h>
 #include <linux/types.h>
 #include <linux/scatterlist.h>
+#include <linux/spinlock.h>
 #include <trace/events/iommu.h>
 
 #define IOMMU_READ	(1 << 0)
@@ -82,6 +83,11 @@ struct iommu_domain {
 	void *handler_token;
 	struct iommu_domain_geometry geometry;
 	void *iova_cookie;
+	void *reserved_iova_cookie;
+	/* rb tree indexed by PA, for reserved bindings only */
+	struct rb_root reserved_binding_list;
+	/* protects reserved cookie and rbtree manipulation */
+	spinlock_t reserved_lock;
 };
 
 enum iommu_cap {
