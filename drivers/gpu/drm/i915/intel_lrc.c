@@ -590,7 +590,6 @@ static void execlists_context_queue(struct drm_i915_gem_request *request)
 	struct drm_i915_gem_request *cursor;
 	int num_elements = 0;
 
-	intel_lr_context_pin(request->ctx, request->engine);
 	i915_gem_request_reference(request);
 
 	spin_lock_bh(&engine->execlist_lock);
@@ -1017,9 +1016,6 @@ void intel_execlists_retire_requests(struct intel_engine_cs *engine)
 	spin_unlock_bh(&engine->execlist_lock);
 
 	list_for_each_entry_safe(req, tmp, &retired_list, execlist_link) {
-		if (req->previous_context)
-			intel_lr_context_unpin(req->previous_context, engine);
-
 		list_del(&req->execlist_link);
 		i915_gem_request_unreference(req);
 	}
