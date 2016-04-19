@@ -1437,6 +1437,7 @@ struct ib_qp {
 	void		       *qp_context;
 	u32			qp_num;
 	enum ib_qp_type		qp_type;
+	struct ib_qp_security  *qp_sec;
 };
 
 struct ib_mr {
