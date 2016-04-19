@@ -36,6 +36,7 @@
 /* FULLSCALE */
 #define ST_MAGN_FS_AVL_1300MG			1300
 #define ST_MAGN_FS_AVL_1900MG			1900
+#define ST_MAGN_FS_AVL_2000MG			2000
 #define ST_MAGN_FS_AVL_2500MG			2500
 #define ST_MAGN_FS_AVL_4000MG			4000
 #define ST_MAGN_FS_AVL_4700MG			4700
@@ -183,6 +184,50 @@
 #define ST_MAGN_3_OUT_Y_L_ADDR			0x6a
 #define ST_MAGN_3_OUT_Z_L_ADDR			0x6c
 
+/* CUSTOM VALUES FOR SENSOR 4 */
+#define ST_MAGN_4_WAI_EXP			0x49
+#define ST_MAGN_4_ODR_ADDR			0x24
+#define ST_MAGN_4_ODR_MASK			0x1c
+#define ST_MAGN_4_ODR_AVL_3HZ_VAL		0x00
+#define ST_MAGN_4_ODR_AVL_6HZ_VAL		0x01
+#define ST_MAGN_4_ODR_AVL_12HZ_VAL		0x02
+#define ST_MAGN_4_ODR_AVL_25HZ_VAL		0x03
+#define ST_MAGN_4_ODR_AVL_50HZ_VAL		0x04
+#define ST_MAGN_4_ODR_AVL_100HZ_VAL		0x05
+#define ST_MAGN_4_PW_ADDR			0x26
+#define ST_MAGN_4_PW_MASK			0x03
+#define ST_MAGN_4_PW_ON				0x00
+#define ST_MAGN_4_PW_OFF			0x03
+#define ST_MAGN_4_FS_ADDR			0x25
+#define ST_MAGN_4_FS_MASK			0x60
+#define ST_MAGN_4_FS_AVL_2000_VAL		0x00
+#define ST_MAGN_4_FS_AVL_4000_VAL		0x01
+#define ST_MAGN_4_FS_AVL_8000_VAL		0x02
+#define ST_MAGN_4_FS_AVL_12000_VAL		0x03
+#define ST_MAGN_4_FS_AVL_2000_GAIN		73
+#define ST_MAGN_4_FS_AVL_4000_GAIN		146
+#define ST_MAGN_4_FS_AVL_8000_GAIN		292
+#define ST_MAGN_4_FS_AVL_12000_GAIN		438
+/* Shared with accelerometer */
+#define ST_MAGN_4_BDU_ADDR			0x20
+#define ST_MAGN_4_BDU_MASK			0x08
+#define ST_MAGN_4_DRDY_IRQ_ADDR			0x22
+#define ST_MAGN_4_DRDY_INT_MASK			0x02
+/* INT2 is actually at another address. Not supported by driver */
+/*
+#define ST_MAGN_4_DRDY_IRQ_INT2_ADDR		0x23
+#define ST_MAGN_4_DRDY_IRQ_INT2_MASK		0x04
+ */
+/* Common to accelerometer so not supported */
+/*
+#define ST_MAGN_4_IHL_IRQ_ADDR			0x12
+#define ST_MAGN_4_IHL_IRQ_MASK			0x80
+ */
+#define ST_MAGN_4_MULTIREAD_BIT			true
+#define ST_MAGN_4_OUT_X_L_ADDR			0x08
+#define ST_MAGN_4_OUT_Y_L_ADDR			0x0a
+#define ST_MAGN_4_OUT_Z_L_ADDR			0x0c
+
 static const struct iio_chan_spec st_magn_16bit_channels[] = {
 	ST_SENSORS_LSM_CHANNELS(IIO_MAGN,
 			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE),
@@ -228,6 +273,22 @@ static const struct iio_chan_spec st_magn_3_16bit_channels[] = {
 			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE),
 			ST_SENSORS_SCAN_Z, 1, IIO_MOD_Z, 's', IIO_LE, 16, 16,
 			ST_MAGN_3_OUT_Z_L_ADDR),
+	IIO_CHAN_SOFT_TIMESTAMP(3)
+};
+
+static const struct iio_chan_spec st_magn_4_16bit_channels[] = {
+	ST_SENSORS_LSM_CHANNELS(IIO_MAGN,
+			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE),
+			ST_SENSORS_SCAN_X, 1, IIO_MOD_X, 's', IIO_LE, 16, 16,
+			ST_MAGN_4_OUT_X_L_ADDR),
+	ST_SENSORS_LSM_CHANNELS(IIO_MAGN,
+			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE),
+			ST_SENSORS_SCAN_Y, 1, IIO_MOD_Y, 's', IIO_LE, 16, 16,
+			ST_MAGN_4_OUT_Y_L_ADDR),
+	ST_SENSORS_LSM_CHANNELS(IIO_MAGN,
+			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE),
+			ST_SENSORS_SCAN_Z, 1, IIO_MOD_Z, 's', IIO_LE, 16, 16,
+			ST_MAGN_4_OUT_Z_L_ADDR),
 	IIO_CHAN_SOFT_TIMESTAMP(3)
 };
 
@@ -486,6 +547,68 @@ static const struct st_sensor_settings st_magn_sensors_settings[] = {
 			.mask_ihl = ST_MAGN_3_IHL_IRQ_MASK,
 		},
 		.multi_read_bit = ST_MAGN_3_MULTIREAD_BIT,
+		.bootime = 2,
+	},
+	{
+		.wai = ST_MAGN_4_WAI_EXP,
+		.wai_addr = ST_SENSORS_DEFAULT_WAI_ADDRESS,
+		.sensors_supported = {
+			[0] = LSM9DS0_MAGN_DEV_NAME,
+		},
+		.ch = (struct iio_chan_spec *)st_magn_4_16bit_channels,
+		.odr = {
+			.addr = ST_MAGN_4_ODR_ADDR,
+			.mask = ST_MAGN_4_ODR_MASK,
+			.odr_avl = {
+				{ 3, ST_MAGN_4_ODR_AVL_3HZ_VAL, },
+				{ 6, ST_MAGN_4_ODR_AVL_6HZ_VAL, },
+				{ 12, ST_MAGN_4_ODR_AVL_12HZ_VAL, },
+				{ 25, ST_MAGN_4_ODR_AVL_25HZ_VAL, },
+				{ 50, ST_MAGN_4_ODR_AVL_50HZ_VAL, },
+				{ 100, ST_MAGN_4_ODR_AVL_100HZ_VAL, },
+			},
+		},
+		.pw = {
+			.addr = ST_MAGN_4_PW_ADDR,
+			.mask = ST_MAGN_4_PW_MASK,
+			.value_on = ST_MAGN_4_PW_ON,
+			.value_off = ST_MAGN_4_PW_OFF,
+		},
+		.fs = {
+			.addr = ST_MAGN_4_FS_ADDR,
+			.mask = ST_MAGN_4_FS_MASK,
+			.fs_avl = {
+				[0] = {
+					.num = ST_MAGN_FS_AVL_2000MG,
+					.value = ST_MAGN_4_FS_AVL_2000_VAL,
+					.gain = ST_MAGN_4_FS_AVL_2000_GAIN,
+				},
+				[1] = {
+					.num = ST_MAGN_FS_AVL_4000MG,
+					.value = ST_MAGN_4_FS_AVL_4000_VAL,
+					.gain = ST_MAGN_4_FS_AVL_4000_GAIN,
+				},
+				[2] = {
+					.num = ST_MAGN_FS_AVL_8000MG,
+					.value = ST_MAGN_4_FS_AVL_8000_VAL,
+					.gain = ST_MAGN_4_FS_AVL_8000_GAIN,
+				},
+				[3] = {
+					.num = ST_MAGN_FS_AVL_12000MG,
+					.value = ST_MAGN_4_FS_AVL_12000_VAL,
+					.gain = ST_MAGN_4_FS_AVL_12000_GAIN,
+				},
+			},
+		},
+		.bdu = {
+			.addr = ST_MAGN_4_BDU_ADDR,
+			.mask = ST_MAGN_4_BDU_MASK,
+		},
+		.drdy_irq = {
+			.addr = ST_MAGN_4_DRDY_IRQ_ADDR,
+			.mask_int1 = ST_MAGN_4_DRDY_INT_MASK,
+		},
+		.multi_read_bit = ST_MAGN_4_MULTIREAD_BIT,
 		.bootime = 2,
 	},
 };
