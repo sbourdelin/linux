@@ -788,12 +788,14 @@ intel_logical_ring_advance_and_submit(struct drm_i915_gem_request *request)
 	if (intel_engine_stopped(engine))
 		return 0;
 
-	if (engine->last_context != request->ctx) {
-		if (engine->last_context)
-			intel_lr_context_unpin(engine->last_context, engine);
-		intel_lr_context_pin(request->ctx, engine);
-		engine->last_context = request->ctx;
-	}
+	/* We keep the previous context alive until we retire the following
+	 * request. This ensures that any the context object is still pinned
+	 * for any residual writes the HW makes into it on the context switch
+	 * into the next object following the breadcrumb. Otherwise, we may
+	 * retire the context too early.
+	 */
+	request->previous_context = engine->last_context;
+	engine->last_context = request->ctx;
 
 	if (dev_priv->guc.execbuf_client)
 		i915_guc_submit(dev_priv->guc.execbuf_client, request);
@@ -1015,7 +1017,8 @@ void intel_execlists_retire_requests(struct intel_engine_cs *engine)
 	spin_unlock_bh(&engine->execlist_lock);
 
 	list_for_each_entry_safe(req, tmp, &retired_list, execlist_link) {
-		intel_lr_context_unpin(req->ctx, engine);
+		if (req->previous_context)
+			intel_lr_context_unpin(req->previous_context, engine);
 
 		list_del(&req->execlist_link);
 		i915_gem_request_unreference(req);
