@@ -1342,6 +1342,9 @@ static int pci_create_capabilities_sysfs(struct pci_dev *dev)
 	/* Active State Power Management */
 	pcie_aspm_create_sysfs_dev_files(dev);
 
+	/* Precision Time Measurement */
+	pcie_ptm_create_sysfs_dev_files(dev);
+
 	if (!pci_probe_reset_function(dev)) {
 		retval = device_create_file(&dev->dev, &reset_attr);
 		if (retval)
@@ -1351,6 +1354,7 @@ static int pci_create_capabilities_sysfs(struct pci_dev *dev)
 	return 0;
 
 error:
+	pcie_ptm_remove_sysfs_dev_files(dev);
 	pcie_aspm_remove_sysfs_dev_files(dev);
 	if (dev->vpd && dev->vpd->attr) {
 		sysfs_remove_bin_file(&dev->dev.kobj, dev->vpd->attr);
@@ -1436,6 +1440,9 @@ static void pci_remove_capabilities_sysfs(struct pci_dev *dev)
 	}
 
 	pcie_aspm_remove_sysfs_dev_files(dev);
+
+	pcie_ptm_remove_sysfs_dev_files(dev);
+
 	if (dev->reset_fn) {
 		device_remove_file(&dev->dev, &reset_attr);
 		dev->reset_fn = 0;

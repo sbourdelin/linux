@@ -320,6 +320,26 @@ static inline resource_size_t pci_resource_alignment(struct pci_dev *dev,
 
 void pci_enable_acs(struct pci_dev *dev);
 
+#ifdef CONFIG_PCIE_PTM
+int pci_enable_ptm(struct pci_dev *dev);
+int pcie_ptm_create_sysfs_dev_files(struct pci_dev *dev);
+void pcie_ptm_remove_sysfs_dev_files(struct pci_dev *dev);
+void pci_disable_ptm(struct pci_dev *dev);
+void pci_ptm_init(struct pci_dev *dev);
+#else
+static inline int pci_enable_ptm(struct pci_dev *dev)
+{
+	return -ENXIO;
+}
+static inline int pcie_ptm_create_sysfs_dev_files(struct pci_dev *dev)
+{
+	return -ENXIO;
+}
+static inline void pcie_ptm_remove_sysfs_dev_files(struct pci_dev *dev) {}
+static inline void pci_disable_ptm(struct pci_dev *dev) {}
+static inline void pci_ptm_init(struct pci_dev *dev) {}
+#endif
+
 struct pci_dev_reset_methods {
 	u16 vendor;
 	u16 device;
