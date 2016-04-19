@@ -157,14 +157,36 @@ void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
 	unsigned long flags;
 	int ret = 0;
 
-	spin_lock_irqsave(&domain->reserved_lock, flags);
+	while (1) {
+		struct iommu_reserved_binding *b;
+		struct rb_node *node;
+		dma_addr_t iova;
+		size_t size;
 
-	rid = (struct reserved_iova_domain *)domain->reserved_iova_cookie;
-	if (!rid) {
-		ret = -EINVAL;
-		goto unlock;
+		spin_lock_irqsave(&domain->reserved_lock, flags);
+
+		rid = (struct reserved_iova_domain *)
+				domain->reserved_iova_cookie;
+		if (!rid) {
+			ret = -EINVAL;
+			goto unlock;
+		}
+
+		node = rb_first(&domain->reserved_binding_list);
+		if (!node)
+			break;
+		b = rb_entry(node, struct iommu_reserved_binding, node);
+
+		iova = b->iova;
+		size = b->size;
+
+		while (!kref_put(&b->kref, reserved_binding_release))
+			;
+		spin_unlock_irqrestore(&domain->reserved_lock, flags);
+		iommu_unmap(domain, iova, size);
 	}
 
+	domain->reserved_binding_list = RB_ROOT;
 	domain->reserved_iova_cookie = NULL;
 unlock:
 	spin_unlock_irqrestore(&domain->reserved_lock, flags);
