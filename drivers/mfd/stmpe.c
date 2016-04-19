@@ -532,6 +532,51 @@ static struct stmpe_variant_info stmpe610 = {
 };
 
 /*
+ * STMPE1600
+ */
+
+static const u8 stmpe1600_regs[] = {
+	[STMPE_IDX_CHIP_ID]	= STMPE1600_REG_CHIP_ID,
+	[STMPE_IDX_SYS_CTRL]	= STMPE1600_REG_SYS_CTRL,
+	[STMPE_IDX_ICR_LSB]	= STMPE1600_REG_SYS_CTRL,
+	[STMPE_IDX_GPMR_LSB]	= STMPE1600_REG_GPMR,
+	[STMPE_IDX_GPSR_LSB]	= STMPE1600_REG_GPSR,
+	[STMPE_IDX_GPDR_LSB]	= STMPE1600_REG_GPDR,
+	[STMPE_IDX_IEGPIOR_LSB]	= STMPE1600_REG_IEGPIOR,
+	[STMPE_IDX_ISGPIOR_LSB]	= STMPE1600_REG_ISGPIOR,
+};
+
+static struct stmpe_variant_block stmpe1600_blocks[] = {
+	{
+		.cell	= &stmpe_gpio_cell,
+		.irq	= 0,
+		.block	= STMPE_BLOCK_GPIO,
+	},
+};
+
+static int stmpe1600_enable(struct stmpe *stmpe, unsigned int blocks,
+			   bool enable)
+{
+	if (blocks & STMPE_BLOCK_GPIO)
+		return 0;
+	else
+		return -EINVAL;
+}
+
+static struct stmpe_variant_info stmpe1600 = {
+	.name		= "stmpe1600",
+	.id_val		= STMPE1600_ID,
+	.id_mask	= 0xffff,
+	.num_gpios	= 16,
+	.af_bits	= 0,
+	.regs		= stmpe1600_regs,
+	.blocks		= stmpe1600_blocks,
+	.num_blocks	= ARRAY_SIZE(stmpe1600_blocks),
+	.num_irqs	= STMPE1600_NR_INTERNAL_IRQS,
+	.enable		= stmpe1600_enable,
+};
+
+/*
  * STMPE1601
  */
 
@@ -888,6 +933,7 @@ static struct stmpe_variant_info *stmpe_variant_info[STMPE_NBR_PARTS] = {
 	[STMPE610]	= &stmpe610,
 	[STMPE801]	= &stmpe801,
 	[STMPE811]	= &stmpe811,
+	[STMPE1600]	= &stmpe1600,
 	[STMPE1601]	= &stmpe1601,
 	[STMPE1801]	= &stmpe1801,
 	[STMPE2401]	= &stmpe2401,
@@ -914,7 +960,8 @@ static irqreturn_t stmpe_irq(int irq, void *data)
 	int ret;
 	int i;
 
-	if (variant->id_val == STMPE801_ID) {
+	if (variant->id_val == STMPE801_ID ||
+	    variant->id_val == STMPE1600_ID) {
 		int base = irq_create_mapping(stmpe->domain, 0);
 
 		handle_nested_irq(base);
@@ -1088,13 +1135,13 @@ static int stmpe_chip_init(struct stmpe *stmpe)
 		return ret;
 
 	if (stmpe->irq >= 0) {
-		if (id == STMPE801_ID)
-			icr = STMPE801_REG_SYS_CTRL_INT_EN;
+		if (id == STMPE801_ID || id == STMPE1600_ID)
+			icr = STMPE_SYS_CTRL_INT_EN;
 		else
 			icr = STMPE_ICR_LSB_GIM;
 
-		/* STMPE801 doesn't support Edge interrupts */
-		if (id != STMPE801_ID) {
+		/* STMPE801 and STMPE1600 don't support Edge interrupts */
+		if (id != STMPE801_ID && id != STMPE1600_ID) {
 			if (irq_trigger == IRQF_TRIGGER_FALLING ||
 					irq_trigger == IRQF_TRIGGER_RISING)
 				icr |= STMPE_ICR_LSB_EDGE;
@@ -1102,8 +1149,8 @@ static int stmpe_chip_init(struct stmpe *stmpe)
 
 		if (irq_trigger == IRQF_TRIGGER_RISING ||
 				irq_trigger == IRQF_TRIGGER_HIGH) {
-			if (id == STMPE801_ID)
-				icr |= STMPE801_REG_SYS_CTRL_INT_HI;
+			if (id == STMPE801_ID || id == STMPE1600_ID)
+				icr |= STMPE_SYS_CTRL_INT_HI;
 			else
 				icr |= STMPE_ICR_LSB_HIGH;
 		}

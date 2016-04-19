@@ -105,6 +105,8 @@ int stmpe_remove(struct stmpe *stmpe);
 #define STMPE_ICR_LSB_GIM	(1 << 0)
 
 #define STMPE_SYS_CTRL_RESET	(1 << 7)
+#define STMPE_SYS_CTRL_INT_EN	(1 << 2)
+#define STMPE_SYS_CTRL_INT_HI	(1 << 0)
 
 /*
  * STMPE801
@@ -120,10 +122,6 @@ int stmpe_remove(struct stmpe *stmpe);
 #define STMPE801_REG_GPIO_MP_STA	0x10
 #define STMPE801_REG_GPIO_SET_PIN	0x11
 #define STMPE801_REG_GPIO_DIR		0x12
-
-#define STMPE801_REG_SYS_CTRL_RESET	(1 << 7)
-#define STMPE801_REG_SYS_CTRL_INT_EN	(1 << 2)
-#define STMPE801_REG_SYS_CTRL_INT_HI	(1 << 0)
 
 /*
  * STMPE811
@@ -164,6 +162,21 @@ int stmpe_remove(struct stmpe *stmpe);
 #define STMPE811_SYS_CTRL2_TSC_OFF	(1 << 1)
 #define STMPE811_SYS_CTRL2_GPIO_OFF	(1 << 2)
 #define STMPE811_SYS_CTRL2_TS_OFF	(1 << 3)
+
+/*
+ * STMPE1600
+ */
+#define STMPE1600_ID			0x0016
+#define STMPE1600_NR_INTERNAL_IRQS	16
+
+#define STMPE1600_REG_CHIP_ID		0x00
+#define STMPE1600_REG_SYS_CTRL		0x03
+#define STMPE1600_REG_IEGPIOR		0x08
+#define STMPE1600_REG_ISGPIOR		0x0A
+#define STMPE1600_REG_GPMR		0x10
+#define STMPE1600_REG_GPSR		0x12
+#define STMPE1600_REG_GPDR		0x14
+#define STMPE1600_REG_GPPIR		0x16
 
 /*
  * STMPE1601
