@@ -1,0 +1,19 @@
+Texas Instruments INA3221 Triple I2C Current/Voltage Monitor
+
+Required properties:
+ - compatible		: Should be "ti,ina3221".
+ - reg			: I2C address of the device.
+
+Optional properties:
+ - shunt-resistors	: Shunt resistor values in micro-Ohms for each channel.
+
+Example:
+
+&i2c {
+	hw_monitor@40 {
+		compatible = "ti,ina3221";
+		reg = <0x40>;
+
+		shunt-resistors = <1000>, <2000>, <500>;
+	};
+};
