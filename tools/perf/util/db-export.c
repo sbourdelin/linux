@@ -330,7 +330,7 @@ int db_export__sample(struct db_export *dbe, union perf_event *event,
 		goto out_put;
 
 	dbe->call_path_last_seen_db_id = 0;
-	if(dbe->crp) {
+	if(dbe->crp && dbe->export_callchains) {
 		thread_stack__process_callchain(thread, comm, evsel,
 						al->machine, sample,
 						PERF_MAX_STACK_DEPTH, dbe->crp);

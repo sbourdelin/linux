@@ -1008,8 +1008,10 @@ error:
 static void set_table_handlers(struct tables *tables)
 {
 	const char *perf_db_export_mode = "perf_db_export_mode";
+	const char *perf_db_export_callchains = "perf_db_export_callchains";
 	const char *perf_db_export_calls = "perf_db_export_calls";
-	PyObject *db_export_mode, *db_export_calls;
+	PyObject *db_export_mode, *db_export_callchains, *db_export_calls;
+	bool export_callchains = false;
 	bool export_calls = false;
 	int ret;
 
@@ -1028,6 +1030,16 @@ static void set_table_handlers(struct tables *tables)
 		return;
 
 	tables->dbe.crp = NULL;
+
+	db_export_callchains = PyDict_GetItemString(main_dict,
+						    perf_db_export_callchains);
+	if (db_export_callchains) {
+		ret = PyObject_IsTrue(db_export_callchains);
+		if (ret == -1)
+			handler_call_die(perf_db_export_callchains);
+		export_callchains = !!ret;
+	}
+
 	db_export_calls = PyDict_GetItemString(main_dict, perf_db_export_calls);
 	if (db_export_calls) {
 		ret = PyObject_IsTrue(db_export_calls);
@@ -1043,9 +1055,17 @@ static void set_table_handlers(struct tables *tables)
 						   &tables->dbe);
 		if (!tables->dbe.crp)
 			Py_FatalError("failed to create calls processor");
+	} else if (export_callchains) {
+		tables->dbe.crp =
+			call_return_processor__new(python_process_call_path,
+						   NULL,
+						   &tables->dbe);
+		if (!tables->dbe.crp)
+			Py_FatalError("failed to create calls processor");
 	}
 
 	tables->db_export_mode = true;
+	tables->dbe.export_callchains = export_callchains;
 	/*
 	 * Reserve per symbol space for symbol->db_id via symbol__priv()
 	 */

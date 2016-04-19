@@ -77,6 +77,7 @@ struct db_export {
 	u64 call_path_last_seen_db_id; /* last db_id seen(exported or not) */
 	u64 call_return_last_db_id;
 	struct list_head deferred;
+	bool export_callchains;
 };
 
 int db_export__init(struct db_export *dbe);
