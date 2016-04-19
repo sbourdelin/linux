@@ -36,6 +36,7 @@
 #include <linux/uaccess.h>
 #include <linux/vfio.h>
 #include <linux/workqueue.h>
+#include <linux/dma-reserved-iommu.h>
 
 #define DRIVER_VERSION  "0.2"
 #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
@@ -445,9 +446,20 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
 	vfio_lock_acct(-unlocked);
 }
 
+static void vfio_destroy_reserved(struct vfio_iommu *iommu)
+{
+	struct vfio_domain *d;
+
+	list_for_each_entry(d, &iommu->domain_list, next)
+		iommu_free_reserved_iova_domain(d->domain);
+}
+
 static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
 {
-	vfio_unmap_unpin(iommu, dma);
+	if (likely(dma->type == VFIO_IOVA_USER))
+		vfio_unmap_unpin(iommu, dma);
+	else
+		vfio_destroy_reserved(iommu);
 	vfio_unlink_dma(iommu, dma);
 	kfree(dma);
 }
@@ -726,6 +738,9 @@ static int vfio_iommu_replay(struct vfio_iommu *iommu,
 
 		dma = rb_entry(n, struct vfio_dma, node);
 		iova = dma->iova;
+
+		if (dma->type == VFIO_IOVA_RESERVED)
+			continue;
 
 		while (iova < dma->iova + dma->size) {
 			phys_addr_t phys = iommu_iova_to_phys(d->domain, iova);
