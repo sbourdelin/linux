@@ -101,12 +101,6 @@ int mlx4_en_create_tx_ring(struct mlx4_en_priv *priv,
 		goto err_bounce;
 	}
 
-	err = mlx4_en_map_buffer(&ring->wqres.buf);
-	if (err) {
-		en_err(priv, "Failed to map TX buffer\n");
-		goto err_hwq_res;
-	}
-
 	ring->buf = ring->wqres.buf.direct.buf;
 
 	en_dbg(DRV, priv, "Allocated TX ring (addr:%p) - buf:%p size:%d buf_size:%d dma:%llx\n",
@@ -155,8 +149,6 @@ int mlx4_en_create_tx_ring(struct mlx4_en_priv *priv,
 err_reserve:
 	mlx4_qp_release_range(mdev->dev, ring->qpn, 1);
 err_map:
-	mlx4_en_unmap_buffer(&ring->wqres.buf);
-err_hwq_res:
 	mlx4_free_hwq_res(mdev->dev, &ring->wqres, ring->buf_size);
 err_bounce:
 	kfree(ring->bounce_buf);
@@ -182,7 +174,6 @@ void mlx4_en_destroy_tx_ring(struct mlx4_en_priv *priv,
 	mlx4_qp_remove(mdev->dev, &ring->qp);
 	mlx4_qp_free(mdev->dev, &ring->qp);
 	mlx4_qp_release_range(priv->mdev->dev, ring->qpn, 1);
-	mlx4_en_unmap_buffer(&ring->wqres.buf);
 	mlx4_free_hwq_res(mdev->dev, &ring->wqres, ring->buf_size);
 	kfree(ring->bounce_buf);
 	ring->bounce_buf = NULL;

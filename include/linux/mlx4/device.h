@@ -618,8 +618,6 @@ struct mlx4_buf_list {
 
 struct mlx4_buf {
 	struct mlx4_buf_list	direct;
-	struct mlx4_buf_list   *page_list;
-	int			nbufs;
 	int			npages;
 	int			page_shift;
 };
@@ -1051,11 +1049,7 @@ int mlx4_buf_alloc(struct mlx4_dev *dev, int size, int max_direct,
 void mlx4_buf_free(struct mlx4_dev *dev, int size, struct mlx4_buf *buf);
 static inline void *mlx4_buf_offset(struct mlx4_buf *buf, int offset)
 {
-	if (BITS_PER_LONG == 64 || buf->nbufs == 1)
-		return buf->direct.buf + offset;
-	else
-		return buf->page_list[offset >> PAGE_SHIFT].buf +
-			(offset & (PAGE_SIZE - 1));
+	return buf->direct.buf + offset;
 }
 
 int mlx4_pd_alloc(struct mlx4_dev *dev, u32 *pdn);
