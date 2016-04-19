@@ -3786,8 +3786,8 @@ unsigned int snd_soc_of_parse_daifmt(struct device_node *np,
 }
 EXPORT_SYMBOL_GPL(snd_soc_of_parse_daifmt);
 
-static int snd_soc_get_dai_name(struct of_phandle_args *args,
-				const char **dai_name)
+int snd_soc_get_dai_name(struct of_phandle_args *args,
+			 const char **dai_name)
 {
 	struct snd_soc_component *pos;
 	struct device_node *component_of_node;
@@ -3838,6 +3838,7 @@ static int snd_soc_get_dai_name(struct of_phandle_args *args,
 	mutex_unlock(&client_mutex);
 	return ret;
 }
+EXPORT_SYMBOL_GPL(snd_soc_get_dai_name);
 
 int snd_soc_of_get_dai_name(struct device_node *of_node,
 			    const char **dai_name)
