@@ -1593,7 +1593,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	/*
 	 * Enable HPI feature (if supported)
 	 */
-	if (card->ext_csd.hpi) {
+	if (card->ext_csd.hpi && !(host->caps & MMC_CAP_BROKEN_HPI)) {
 		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 				EXT_CSD_HPI_MGMT, 1,
 				card->ext_csd.generic_cmd6_time);
