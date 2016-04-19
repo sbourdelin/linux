@@ -26,6 +26,7 @@ struct comm;
 struct ip_callchain;
 struct symbol;
 struct dso;
+struct machine;
 struct call_return_processor;
 struct comm;
 struct perf_sample;
@@ -83,6 +84,8 @@ struct call_return {
  */
 struct call_path {
 	struct call_path *parent;
+	struct machine *machine;
+	struct dso *dso;
 	struct symbol *sym;
 	u64 ip;
 	u64 db_id;
@@ -100,9 +103,18 @@ int thread_stack__flush(struct thread *thread);
 void thread_stack__free(struct thread *thread);
 
 struct call_return_processor *
-call_return_processor__new(int (*process)(struct call_return *cr, void *data),
+call_return_processor__new(int (*process_call_path)(struct call_path *cp,
+						    void *data),
+			   int (*process_call_return)(struct call_return *cr,
+						      void *data),
 			   void *data);
 void call_return_processor__free(struct call_return_processor *crp);
+
+int thread_stack__process_callchain(struct thread *thread, struct comm *comm,
+				    struct perf_evsel *evsel,
+				    struct machine *machine,
+				    struct perf_sample *sample, int max_stack,
+				    struct call_return_processor *crp);
 int thread_stack__process(struct thread *thread, struct comm *comm,
 			  struct perf_sample *sample,
 			  struct addr_location *from_al,

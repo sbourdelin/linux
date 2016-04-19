@@ -22,6 +22,7 @@
 #include "debug.h"
 #include "symbol.h"
 #include "comm.h"
+#include "callchain.h"
 #include "thread-stack.h"
 
 #define CALL_PATH_BLOCK_SHIFT 8
@@ -56,7 +57,8 @@ struct call_path_root {
  */
 struct call_return_processor {
 	struct call_path_root *cpr;
-	int (*process)(struct call_return *cr, void *data);
+	int (*process_call_path)(struct call_path *cp, void *data);
+	int (*process_call_return)(struct call_return *cr, void *data);
 	void *data;
 };
 
@@ -216,7 +218,7 @@ static int thread_stack__call_return(struct thread *thread,
 	if (no_return)
 		cr.flags |= CALL_RETURN_NO_RETURN;
 
-	return crp->process(&cr, crp->data);
+	return crp->process_call_return(&cr, crp->data);
 }
 
 static int __thread_stack__flush(struct thread *thread, struct thread_stack *ts)
@@ -336,9 +338,12 @@ void thread_stack__sample(struct thread *thread, struct ip_callchain *chain,
 }
 
 static void call_path__init(struct call_path *cp, struct call_path *parent,
+			    struct machine *machine, struct dso *dso,
 			    struct symbol *sym, u64 ip, bool in_kernel)
 {
 	cp->parent = parent;
+	cp->machine = machine;
+	cp->dso = dso;
 	cp->sym = sym;
 	cp->ip = sym ? 0 : ip;
 	cp->db_id = 0;
@@ -354,7 +359,7 @@ static struct call_path_root *call_path_root__new(void)
 	cpr = zalloc(sizeof(struct call_path_root));
 	if (!cpr)
 		return NULL;
-	call_path__init(&cpr->call_path, NULL, NULL, 0, false);
+	call_path__init(&cpr->call_path, NULL, NULL, NULL, NULL, 0, false);
 	INIT_LIST_HEAD(&cpr->blocks);
 	return cpr;
 }
@@ -372,8 +377,9 @@ static void call_path_root__free(struct call_path_root *cpr)
 
 static struct call_path *call_path__new(struct call_path_root *cpr,
 					struct call_path *parent,
-					struct symbol *sym, u64 ip,
-					bool in_kernel)
+					struct machine *machine,
+					struct dso *dso, struct symbol *sym,
+					u64 ip, bool in_kernel)
 {
 	struct call_path_block *cpb;
 	struct call_path *cp;
@@ -393,14 +399,16 @@ static struct call_path *call_path__new(struct call_path_root *cpr,
 	n = cpr->next++ & CALL_PATH_BLOCK_MASK;
 	cp = &cpb->cp[n];
 
-	call_path__init(cp, parent, sym, ip, in_kernel);
+	call_path__init(cp, parent, machine, dso, sym, ip, in_kernel);
 
 	return cp;
 }
 
 static struct call_path *call_path__findnew(struct call_path_root *cpr,
 					    struct call_path *parent,
-					    struct symbol *sym, u64 ip, u64 ks)
+					    struct machine *machine,
+					    struct dso *dso, struct symbol *sym,
+					    u64 ip, u64 ks)
 {
 	struct rb_node **p;
 	struct rb_node *node_parent = NULL;
@@ -411,23 +419,28 @@ static struct call_path *call_path__findnew(struct call_path_root *cpr,
 		ip = 0;
 
 	if (!parent)
-		return call_path__new(cpr, parent, sym, ip, in_kernel);
+		return call_path__new(cpr, parent, machine, dso, sym, ip,
+				      in_kernel);
 
 	p = &parent->children.rb_node;
 	while (*p != NULL) {
 		node_parent = *p;
 		cp = rb_entry(node_parent, struct call_path, rb_node);
 
-		if (cp->sym == sym && cp->ip == ip)
+		if (cp->sym == sym && cp->ip == ip && cp->dso == dso)
 			return cp;
 
-		if (sym < cp->sym || (sym == cp->sym && ip < cp->ip))
+		if (sym < cp->sym || (sym == cp->sym && ip < cp->ip) ||
+				(sym == cp->sym && ip == cp->ip
+				 && dso < cp->dso) ||
+				(sym == cp->sym && ip == cp->ip
+				 && dso == cp->dso && machine < cp->machine))
 			p = &(*p)->rb_left;
 		else
 			p = &(*p)->rb_right;
 	}
 
-	cp = call_path__new(cpr, parent, sym, ip, in_kernel);
+	cp = call_path__new(cpr, parent, machine, dso, sym, ip, in_kernel);
 	if (!cp)
 		return NULL;
 
@@ -438,7 +451,10 @@ static struct call_path *call_path__findnew(struct call_path_root *cpr,
 }
 
 struct call_return_processor *
-call_return_processor__new(int (*process)(struct call_return *cr, void *data),
+call_return_processor__new(int (*process_call_path)(struct call_path *cp,
+						    void *data),
+			   int (*process_call_return)(struct call_return *cr,
+						      void *data),
 			   void *data)
 {
 	struct call_return_processor *crp;
@@ -449,7 +465,8 @@ call_return_processor__new(int (*process)(struct call_return *cr, void *data),
 	crp->cpr = call_path_root__new();
 	if (!crp->cpr)
 		goto out_free;
-	crp->process = process;
+	crp->process_call_path = process_call_path;
+	crp->process_call_return = process_call_return;
 	crp->data = data;
 	return crp;
 
@@ -492,7 +509,7 @@ static int thread_stack__push_cp(struct thread_stack *ts, u64 ret_addr,
 
 static int thread_stack__pop_cp(struct thread *thread, struct thread_stack *ts,
 				u64 ret_addr, u64 timestamp, u64 ref,
-				struct symbol *sym)
+				struct dso *dso, struct symbol *sym)
 {
 	int err;
 
@@ -502,7 +519,7 @@ static int thread_stack__pop_cp(struct thread *thread, struct thread_stack *ts,
 	if (ts->cnt == 1) {
 		struct thread_stack_entry *tse = &ts->stack[0];
 
-		if (tse->cp->sym == sym)
+		if (tse->cp->dso == dso && tse->cp->sym == sym)
 			return thread_stack__call_return(thread, ts, --ts->cnt,
 							 timestamp, ref, false);
 	}
@@ -540,20 +557,28 @@ static int thread_stack__bottom(struct thread *thread, struct thread_stack *ts,
 {
 	struct call_path_root *cpr = ts->crp->cpr;
 	struct call_path *cp;
+	struct machine *machine;
+	struct dso *dso = NULL;
 	struct symbol *sym;
 	u64 ip;
 
 	if (sample->ip) {
 		ip = sample->ip;
 		sym = from_al->sym;
+		if (from_al->map)
+			dso = from_al->map->dso;
+		machine = from_al->machine;
 	} else if (sample->addr) {
 		ip = sample->addr;
 		sym = to_al->sym;
+		if (to_al->map)
+			dso = to_al->map->dso;
+		machine = to_al->machine;
 	} else {
 		return 0;
 	}
 
-	cp = call_path__findnew(cpr, &cpr->call_path, sym, ip,
+	cp = call_path__findnew(cpr, &cpr->call_path, machine, dso, sym, ip,
 				ts->kernel_start);
 	if (!cp)
 		return -ENOMEM;
@@ -586,6 +611,7 @@ static int thread_stack__no_call_return(struct thread *thread,
 		/* If the stack is empty, push the userspace address */
 		if (!ts->cnt) {
 			cp = call_path__findnew(cpr, &cpr->call_path,
+						to_al->machine, to_al->map->dso,
 						to_al->sym, sample->addr,
 						ts->kernel_start);
 			if (!cp)
@@ -610,7 +636,8 @@ static int thread_stack__no_call_return(struct thread *thread,
 		parent = &cpr->call_path;
 
 	/* This 'return' had no 'call', so push and pop top of stack */
-	cp = call_path__findnew(cpr, parent, from_al->sym, sample->ip,
+	cp = call_path__findnew(cpr, parent, from_al->machine,
+				from_al->map->dso, from_al->sym, sample->ip,
 				ts->kernel_start);
 	if (!cp)
 		return -ENOMEM;
@@ -621,7 +648,7 @@ static int thread_stack__no_call_return(struct thread *thread,
 		return err;
 
 	return thread_stack__pop_cp(thread, ts, sample->addr, sample->time, ref,
-				    to_al->sym);
+				    to_al->map->dso, to_al->sym);
 }
 
 static int thread_stack__trace_begin(struct thread *thread,
@@ -636,7 +663,7 @@ static int thread_stack__trace_begin(struct thread *thread,
 
 	/* Pop trace end */
 	tse = &ts->stack[ts->cnt - 1];
-	if (tse->cp->sym == NULL && tse->cp->ip == 0) {
+	if (tse->cp->dso == NULL && tse->cp->sym == NULL && tse->cp->ip == 0) {
 		err = thread_stack__call_return(thread, ts, --ts->cnt,
 						timestamp, ref, false);
 		if (err)
@@ -657,7 +684,7 @@ static int thread_stack__trace_end(struct thread_stack *ts,
 	if (!ts->cnt || (ts->cnt == 1 && ts->stack[0].ref == ref))
 		return 0;
 
-	cp = call_path__findnew(cpr, ts->stack[ts->cnt - 1].cp, NULL, 0,
+	cp = call_path__findnew(cpr, ts->stack[ts->cnt - 1].cp, NULL, NULL, NULL, 0,
 				ts->kernel_start);
 	if (!cp)
 		return -ENOMEM;
@@ -668,14 +695,11 @@ static int thread_stack__trace_end(struct thread_stack *ts,
 				     false);
 }
 
-int thread_stack__process(struct thread *thread, struct comm *comm,
-			  struct perf_sample *sample,
-			  struct addr_location *from_al,
-			  struct addr_location *to_al, u64 ref,
-			  struct call_return_processor *crp)
+static int __thread_stack__process_init(struct thread *thread,
+					struct comm *comm,
+					struct call_return_processor *crp)
 {
 	struct thread_stack *ts = thread->ts;
-	int err = 0;
 
 	if (ts) {
 		if (!ts->crp) {
@@ -694,6 +718,80 @@ int thread_stack__process(struct thread *thread, struct comm *comm,
 		ts = thread->ts;
 		ts->comm = comm;
 	}
+	return 0;
+}
+
+int thread_stack__process_callchain(struct thread *thread, struct comm *comm,
+				    struct perf_evsel *evsel,
+				    struct machine *machine,
+				    struct perf_sample *sample, int max_stack,
+				    struct call_return_processor *crp)
+{
+	struct call_path *current = &crp->cpr->call_path;
+	struct thread_stack *ts = NULL;
+	enum chain_order saved_order = callchain_param.order;
+	int err = 0;
+
+	if (!symbol_conf.use_callchain || !sample->callchain)
+		return err;
+
+	err = __thread_stack__process_init(thread, comm, crp);
+	if(err)
+		return err;
+
+	ts = thread->ts;
+
+
+	callchain_param.order = ORDER_CALLER;
+        err = thread__resolve_callchain(thread, &callchain_cursor, evsel,
+                                        sample, NULL, NULL, max_stack);
+	if (err) {
+		callchain_param.order = saved_order;
+		return err;
+	}
+	callchain_cursor_commit(&callchain_cursor);
+
+	while (1) {
+		struct callchain_cursor_node *node;
+		struct dso *dso = NULL;
+		node = callchain_cursor_current(&callchain_cursor);
+		if (!node)
+			break;
+		if (node->map)
+			dso = node->map->dso;
+
+		current = call_path__findnew(ts->crp->cpr, current, machine,
+					     dso, node->sym, node->ip,
+					     ts->kernel_start);
+
+		callchain_cursor_advance(&callchain_cursor);
+	}
+	callchain_param.order = saved_order;
+
+	if (current == &crp->cpr->call_path) {
+		/* Bail because the callchain was empty. */
+		return 1;
+	}
+
+	err = ts->crp->process_call_path(current,ts->crp->data);
+	return err;
+}
+
+int thread_stack__process(struct thread *thread, struct comm *comm,
+			  struct perf_sample *sample,
+			  struct addr_location *from_al,
+			  struct addr_location *to_al, u64 ref,
+			  struct call_return_processor *crp)
+{
+	struct thread_stack *ts = NULL;
+
+	int err = 0;
+
+	err = __thread_stack__process_init(thread, comm, crp);
+	if(err)
+		return err;
+
+	ts = thread->ts;
 
 	/* Flush stack on exec */
 	if (ts->comm != comm && thread->pid_ == thread->tid) {
@@ -717,7 +815,11 @@ int thread_stack__process(struct thread *thread, struct comm *comm,
 	if (sample->flags & PERF_IP_FLAG_CALL) {
 		struct call_path_root *cpr = ts->crp->cpr;
 		struct call_path *cp;
+		struct dso *dso = NULL;
 		u64 ret_addr;
+
+		if(to_al->map)
+			dso = to_al->map->dso;
 
 		if (!sample->ip || !sample->addr)
 			return 0;
@@ -727,6 +829,7 @@ int thread_stack__process(struct thread *thread, struct comm *comm,
 			return 0; /* Zero-length calls are excluded */
 
 		cp = call_path__findnew(cpr, ts->stack[ts->cnt - 1].cp,
+					to_al->machine, dso,
 					to_al->sym, sample->addr,
 					ts->kernel_start);
 		if (!cp)
@@ -734,11 +837,16 @@ int thread_stack__process(struct thread *thread, struct comm *comm,
 		err = thread_stack__push_cp(ts, ret_addr, sample->time, ref,
 					    cp, false);
 	} else if (sample->flags & PERF_IP_FLAG_RETURN) {
+		struct dso *dso = NULL;
+		if(from_al->map)
+			dso = from_al->map->dso;
+
 		if (!sample->ip || !sample->addr)
 			return 0;
 
 		err = thread_stack__pop_cp(thread, ts, sample->addr,
-					   sample->time, ref, from_al->sym);
+					   sample->time, ref, dso,
+					   from_al->sym);
 		if (err) {
 			if (err < 0)
 				return err;

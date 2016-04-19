@@ -681,7 +681,7 @@ static int python_export_sample(struct db_export *dbe,
 	struct tables *tables = container_of(dbe, struct tables, dbe);
 	PyObject *t;
 
-	t = tuple_new(21);
+	t = tuple_new(22);
 
 	tuple_set_u64(t, 0, es->db_id);
 	tuple_set_u64(t, 1, es->evsel->db_id);
@@ -704,6 +704,8 @@ static int python_export_sample(struct db_export *dbe,
 	tuple_set_u64(t, 18, es->sample->data_src);
 	tuple_set_s32(t, 19, es->sample->flags & PERF_BRANCH_MASK);
 	tuple_set_s32(t, 20, !!(es->sample->flags & PERF_IP_FLAG_IN_TX));
+	tuple_set_s32(t, 21, es->call_path_db_id);
+
 
 	call_object(tables->sample_handler, t, "sample_table");
 
@@ -716,17 +718,19 @@ static int python_export_call_path(struct db_export *dbe, struct call_path *cp)
 {
 	struct tables *tables = container_of(dbe, struct tables, dbe);
 	PyObject *t;
-	u64 parent_db_id, sym_db_id;
+	u64 parent_db_id, sym_db_id, dso_db_id;
 
 	parent_db_id = cp->parent ? cp->parent->db_id : 0;
 	sym_db_id = cp->sym ? *(u64 *)symbol__priv(cp->sym) : 0;
+	dso_db_id = cp->dso ? cp->dso->db_id : 0;
 
-	t = tuple_new(4);
+	t = tuple_new(5);
 
 	tuple_set_u64(t, 0, cp->db_id);
 	tuple_set_u64(t, 1, parent_db_id);
 	tuple_set_u64(t, 2, sym_db_id);
 	tuple_set_u64(t, 3, cp->ip);
+	tuple_set_u64(t, 4, dso_db_id);
 
 	call_object(tables->call_path_handler, t, "call_path_table");
 
@@ -761,6 +765,13 @@ static int python_export_call_return(struct db_export *dbe,
 	Py_DECREF(t);
 
 	return 0;
+}
+
+static int python_process_call_path(struct call_path *cp, void *data)
+{
+	struct db_export *dbe = data;
+
+	return db_export__call_path(dbe, cp);
 }
 
 static int python_process_call_return(struct call_return *cr, void *data)
@@ -1027,7 +1038,8 @@ static void set_table_handlers(struct tables *tables)
 
 	if (export_calls) {
 		tables->dbe.crp =
-			call_return_processor__new(python_process_call_return,
+			call_return_processor__new(python_process_call_path,
+						   python_process_call_return,
 						   &tables->dbe);
 		if (!tables->dbe.crp)
 			Py_FatalError("failed to create calls processor");

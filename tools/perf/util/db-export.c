@@ -329,6 +329,13 @@ int db_export__sample(struct db_export *dbe, union perf_event *event,
 	if (err)
 		goto out_put;
 
+	dbe->call_path_last_seen_db_id = 0;
+	if(dbe->crp) {
+		thread_stack__process_callchain(thread, comm, evsel,
+						al->machine, sample,
+						PERF_MAX_STACK_DEPTH, dbe->crp);
+	}
+
 	if ((evsel->attr.sample_type & PERF_SAMPLE_ADDR) &&
 	    sample_addr_correlates_sym(&evsel->attr)) {
 		struct addr_location addr_al;
@@ -346,6 +353,7 @@ int db_export__sample(struct db_export *dbe, union perf_event *event,
 				goto out_put;
 		}
 	}
+	es.call_path_db_id = dbe->call_path_last_seen_db_id;
 
 	if (dbe->export_sample)
 		err = dbe->export_sample(dbe, &es);
@@ -397,9 +405,10 @@ int db_export__branch_types(struct db_export *dbe)
 int db_export__call_path(struct db_export *dbe, struct call_path *cp)
 {
 	int err;
-
-	if (cp->db_id)
+	if (cp->db_id) {
+		dbe->call_path_last_seen_db_id = cp->db_id;
 		return 0;
+	}
 
 	if (cp->parent) {
 		err = db_export__call_path(dbe, cp->parent);
@@ -409,8 +418,14 @@ int db_export__call_path(struct db_export *dbe, struct call_path *cp)
 
 	cp->db_id = ++dbe->call_path_last_db_id;
 
-	if (dbe->export_call_path)
+	if (dbe->export_call_path) {
+		if (cp->dso)
+			db_export__dso(dbe, cp->dso, cp->machine);
+		if (cp->sym && cp->dso)
+			db_export__symbol(dbe, cp->sym, cp->dso);
+		dbe->call_path_last_seen_db_id = cp->db_id;
 		return dbe->export_call_path(dbe, cp);
+	}
 
 	return 0;
 }

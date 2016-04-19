@@ -43,6 +43,7 @@ struct export_sample {
 	u64			addr_dso_db_id;
 	u64			addr_sym_db_id;
 	u64			addr_offset; /* addr offset from symbol start */
+	u64			call_path_db_id;
 };
 
 struct db_export {
@@ -73,6 +74,7 @@ struct db_export {
 	u64 symbol_last_db_id;
 	u64 sample_last_db_id;
 	u64 call_path_last_db_id;
+	u64 call_path_last_seen_db_id; /* last db_id seen(exported or not) */
 	u64 call_return_last_db_id;
 	struct list_head deferred;
 };
