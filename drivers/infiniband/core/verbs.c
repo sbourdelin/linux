@@ -44,6 +44,7 @@
 #include <linux/in.h>
 #include <linux/in6.h>
 #include <net/addrconf.h>
+#include <linux/security.h>
 
 #include <rdma/ib_verbs.h>
 #include <rdma/ib_cache.h>
@@ -681,10 +682,18 @@ static struct ib_qp *__ib_open_qp(struct ib_qp *real_qp,
 {
 	struct ib_qp *qp;
 	unsigned long flags;
+	int err;
 
 	qp = kzalloc(sizeof *qp, GFP_KERNEL);
 	if (!qp)
 		return ERR_PTR(-ENOMEM);
+
+	qp->real_qp = real_qp;
+	err = ib_open_shared_qp_security(qp, real_qp->device);
+	if (err) {
+		kfree(qp);
+		return ERR_PTR(err);
+	}
 
 	qp->real_qp = real_qp;
 	atomic_inc(&real_qp->usecnt);
@@ -728,11 +737,16 @@ struct ib_qp *ib_create_qp(struct ib_pd *pd,
 {
 	struct ib_qp *qp, *real_qp;
 	struct ib_device *device;
+	int err;
 
 	device = pd ? pd->device : qp_init_attr->xrcd->device;
 	qp = device->create_qp(pd, qp_init_attr, NULL);
 
 	if (!IS_ERR(qp)) {
+		err = ib_create_qp_security(qp, device);
+		if (err)
+			goto destroy_qp;
+
 		qp->device     = device;
 		qp->real_qp    = qp;
 		qp->uobject    = NULL;
@@ -780,6 +794,10 @@ struct ib_qp *ib_create_qp(struct ib_pd *pd,
 	}
 
 	return qp;
+
+destroy_qp:
+	ib_destroy_qp(qp);
+	return ERR_PTR(err);
 }
 EXPORT_SYMBOL(ib_create_qp);
 
@@ -1180,7 +1198,7 @@ int ib_modify_qp(struct ib_qp *qp,
 	if (ret)
 		return ret;
 
-	return qp->device->modify_qp(qp->real_qp, qp_attr, qp_attr_mask, NULL);
+	return ib_security_modify_qp(qp->real_qp, qp_attr, qp_attr_mask, NULL);
 }
 EXPORT_SYMBOL(ib_modify_qp);
 
@@ -1209,6 +1227,7 @@ int ib_close_qp(struct ib_qp *qp)
 	spin_unlock_irqrestore(&real_qp->device->event_handler_lock, flags);
 
 	atomic_dec(&real_qp->usecnt);
+	ib_close_shared_qp_security(qp->qp_sec);
 	kfree(qp);
 
 	return 0;
@@ -1248,6 +1267,7 @@ int ib_destroy_qp(struct ib_qp *qp)
 	struct ib_pd *pd;
 	struct ib_cq *scq, *rcq;
 	struct ib_srq *srq;
+	struct ib_qp_security *sec;
 	int ret;
 
 	if (atomic_read(&qp->usecnt))
@@ -1260,6 +1280,9 @@ int ib_destroy_qp(struct ib_qp *qp)
 	scq  = qp->send_cq;
 	rcq  = qp->recv_cq;
 	srq  = qp->srq;
+	sec  = qp->qp_sec;
+	if (sec)
+		ib_destroy_qp_security_begin(sec);
 
 	ret = qp->device->destroy_qp(qp);
 	if (!ret) {
@@ -1271,6 +1294,11 @@ int ib_destroy_qp(struct ib_qp *qp)
 			atomic_dec(&rcq->usecnt);
 		if (srq)
 			atomic_dec(&srq->usecnt);
+		if (sec)
+			ib_destroy_qp_security_end(sec);
+	} else {
+		if (sec)
+			ib_destroy_qp_security_abort(sec);
 	}
 
 	return ret;
