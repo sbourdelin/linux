@@ -235,7 +235,7 @@ static int write_buildid(const char *name, size_t name_len, u8 *build_id,
 	if (err < 0)
 		return err;
 
-	return write_padded(fd, name, name_len + 1, len);
+	return write_padded(fd, name, name_len, len);
 }
 
 static int machine__write_buildid_table(struct machine *machine, int fd)
