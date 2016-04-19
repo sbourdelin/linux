@@ -120,19 +120,29 @@ ENTRY(__inval_cache_range)
  *	- end     - virtual end address of region
  */
 __dma_inv_range:
-	dcache_line_size x2, x3
-	sub	x3, x2, #1
-	tst	x1, x3				// end cache line aligned?
-	bic	x1, x1, x3
-	b.eq	1f
-	dc	civac, x1			// clean & invalidate D / U line
-1:	tst	x0, x3				// start cache line aligned?
-	bic	x0, x0, x3
+	dcache_line_size x2, x3			// get Dminline in x2
+	sub	x3, x2, #1			// Dminline mask in x3
+	bic	x0, x0, x3			// align start down to line size
+
+	cache_cwg_size x4, x3			// get CWG
+	sub	x3, x4, #1			// CWG mask in x3
+
+	tst	x1, x3				// end CWG aligned?
 	b.eq	2f
-	dc	civac, x0			// clean & invalidate D / U line
-	b	3f
-2:	dc	ivac, x0			// invalidate D / U line
-3:	add	x0, x0, x2
+	bic	x5, x1, x3
+0:	dc	civac, x5			// clean & invalidate D / U line
+	add	x5, x5, x2
+	tst	x5, x3
+	b.ne	0b
+	b	2f
+
+1:	dc	civac, x0			// clean & invalidate D / U line
+	add	x0, x0, x2
+2:	tst	x0, x3				// start CWG aligned?
+	b.ne	1b
+
+	dc	ivac, x0			// invalidate D / U line
+	add	x0, x0, x2
 	cmp	x0, x1
 	b.lo	2b
 	dsb	sy

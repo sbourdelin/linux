@@ -54,6 +54,19 @@
 	.endm
 
 /*
+ * cache_cwg_size - get the maximum cache line size from the CTR register
+ */
+	.macro	cache_cwg_size, reg, tmp
+	mrs	\tmp, ctr_el0			// read CTR
+	ubfm	\tmp, \tmp, #24, #27		// CTR_EL0.CWG [27:24]
+	mov	\reg, #9			// use architectural default of
+	cmp	\tmp, xzr			// 2 KB (2^9 words) if CWG is
+	csel	\tmp, \tmp, \reg, ne		// not provided
+	mov	\reg, #4			// bytes per word
+	lsl	\reg, \reg, \tmp		// actual cache line size
+	.endm
+
+/*
  * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
  */
 	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
