@@ -1398,22 +1398,39 @@ intel_hdmi_detect(struct drm_connector *connector, bool force)
 	struct intel_hdmi *intel_hdmi = intel_attached_hdmi(connector);
 	struct drm_i915_private *dev_priv = to_i915(connector->dev);
 	bool live_status = false;
-	unsigned int try;
 
 	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n",
 		      connector->base.id, connector->name);
 
 	intel_display_power_get(dev_priv, POWER_DOMAIN_GMBUS);
 
-	for (try = 0; !live_status && try < 9; try++) {
-		if (try)
-			msleep(10);
-		live_status = intel_digital_port_connected(dev_priv,
+	/*
+	* Live status check for HDMI detection is not very
+	* reliable on older platforms. So insist the live
+	* status check for EDID read from VLV onwards.
+	*/
+	if (INTEL_INFO(dev_priv)->gen >= 7 && !IS_IVYBRIDGE(dev_priv)) {
+		unsigned int try;
+
+		for (try = 0; !live_status && try < 9; try++) {
+			if (try)
+				msleep(10);
+			live_status = intel_digital_port_connected(dev_priv,
 				hdmi_to_dig_port(intel_hdmi));
+		}
 	}
 
-	if (!live_status)
-		DRM_DEBUG_KMS("Live status not up!");
+	if (!live_status) {
+		/*
+		* TODO: Replace this with some magic code.
+		* Even after giving enough delay, live status is not up.
+		* Lets read EDID and decide if HDMI is available. We
+		* have to do this not to break old platforms, but ideally
+		* should read EDID only when live_status reg allows us.
+		*/
+		DRM_DEBUG_KMS("Live status down, making it up\n");
+		live_status = true;
+	}
 
 	intel_hdmi_unset_edid(connector);
 
