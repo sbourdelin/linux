@@ -64,6 +64,12 @@ struct dma_map_ops {
 	int (*mapping_error)(struct device *dev, dma_addr_t dma_addr);
 	int (*dma_supported)(struct device *dev, u64 mask);
 	int (*set_dma_mask)(struct device *dev, u64 mask);
+	void *(*remap)(struct device *dev, void *cpu_addr, dma_addr_t handle,
+			size_t size, unsigned long offset,
+			struct dma_attrs *attrs);
+	void (*unremap)(struct device *dev, void *cpu_addr,
+			size_t size, unsigned long offset,
+			struct dma_attrs *attrs);
 #ifdef ARCH_HAS_DMA_GET_REQUIRED_MASK
 	u64 (*get_required_mask)(struct device *dev);
 #endif
@@ -466,6 +472,35 @@ static inline int dma_set_mask(struct device *dev, u64 mask)
 	return 0;
 }
 #endif
+
+static inline void *dma_remap(struct device *dev, void *cpu_addr,
+		dma_addr_t dma_handle, size_t size, unsigned long offset,
+		struct dma_attrs *attrs)
+{
+	const struct dma_map_ops *ops = get_dma_ops(dev);
+
+	if (!ops)
+		return NULL;
+	if (!ops->remap)
+		return NULL;
+
+	return ops->remap(dev, cpu_addr, dma_handle, size, offset, attrs);
+}
+
+
+static inline void dma_unremap(struct device *dev, void *remapped_addr,
+				size_t size, unsigned long offset,
+				struct dma_attrs *attrs)
+{
+	const struct dma_map_ops *ops = get_dma_ops(dev);
+
+	if (!ops)
+		return;
+	if (!ops->unremap)
+		return;
+
+	return ops->unremap(dev, remapped_addr, size, offset, attrs);
+}
 
 static inline u64 dma_get_mask(struct device *dev)
 {

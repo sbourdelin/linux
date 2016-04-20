@@ -345,6 +345,43 @@ static int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
 	return ret;
 }
 
+static void *arm64_dma_remap(struct device *dev, void *cpu_addr,
+			     dma_addr_t handle, size_t size,
+			     unsigned long offset, struct dma_attrs *attrs)
+{
+	struct page *page = phys_to_page(dma_to_phys(dev, handle) + offset);
+	bool coherent = is_device_dma_coherent(dev);
+	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
+	void *ptr;
+
+	if (dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs)) {
+		offset &= ~PAGE_MASK;
+		size = PAGE_ALIGN(size + offset);
+
+		ptr = dma_common_contiguous_remap(page, size, VM_USERMAP, prot,
+						  NULL);
+	} else {
+		ptr = cpu_addr;
+	}
+	if (!ptr)
+		return NULL;
+
+	return ptr + offset;
+}
+
+static void arm64_dma_unremap(struct device *dev, void *cpu_addr,
+			      size_t size, unsigned long offset,
+			      struct dma_attrs *attrs)
+{
+	if (!dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs))
+		return;
+
+	offset &= ~PAGE_MASK;
+	cpu_addr -= offset;
+
+	vunmap(cpu_addr);
+}
+
 static struct dma_map_ops swiotlb_dma_ops = {
 	.alloc = __dma_alloc,
 	.free = __dma_free,
@@ -360,6 +397,8 @@ static struct dma_map_ops swiotlb_dma_ops = {
 	.sync_sg_for_device = __swiotlb_sync_sg_for_device,
 	.dma_supported = swiotlb_dma_supported,
 	.mapping_error = swiotlb_dma_mapping_error,
+	.remap = arm64_dma_remap,
+	.unremap = arm64_dma_unremap,
 };
 
 static int __init atomic_pool_init(void)
