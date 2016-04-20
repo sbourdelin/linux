@@ -31,6 +31,7 @@
 #include <linux/err.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/clk.h>
 #ifdef CONFIG_PPC
 #include <asm/machdep.h>
 #endif
@@ -71,6 +72,7 @@ void sdhci_get_of_property(struct platform_device *pdev)
 	struct device_node *np = pdev->dev.of_node;
 	struct sdhci_host *host = platform_get_drvdata(pdev);
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct clk *sdhci_clk;
 	u32 bus_width;
 
 	if (of_get_property(np, "sdhci,auto-cmd12", NULL))
@@ -99,7 +101,11 @@ void sdhci_get_of_property(struct platform_device *pdev)
 	    of_device_is_compatible(np, "fsl,mpc8536-esdhc"))
 		host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
 
-	of_property_read_u32(np, "clock-frequency", &pltfm_host->clock);
+	sdhci_clk = of_clk_get(np, 0);
+	if (!IS_ERR(sdhci_clk))
+		pltfm_host->clock = clk_get_rate(sdhci_clk);
+	else
+		of_property_read_u32(np, "clock-frequency", &pltfm_host->clock);
 
 	if (of_find_property(np, "keep-power-in-suspend", NULL))
 		host->mmc->pm_caps |= MMC_PM_KEEP_POWER;
