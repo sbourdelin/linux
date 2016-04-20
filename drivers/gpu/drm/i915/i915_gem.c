@@ -165,6 +165,7 @@ i915_gem_get_aperture_ioctl(struct drm_device *dev, void *data,
 
 	args->aper_size = ggtt->base.total;
 	args->aper_available_size = args->aper_size - pinned;
+	args->map_total_size = ggtt->mappable_end;;
 
 	return 0;
 }

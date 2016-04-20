@@ -1007,6 +1007,11 @@ struct drm_i915_gem_get_aperture {
 	 * bytes
 	 */
 	__u64 aper_available_size;
+
+	/**
+	 * Total space in the mappable region of the aperture, in bytes
+	 */
+	__u64 map_total_size;
 };
 
 struct drm_i915_get_pipe_from_crtc_id {
