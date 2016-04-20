@@ -34,6 +34,8 @@ int lowpan_register_netdevice(struct net_device *dev,
 	for (i = 0; i < LOWPAN_IPHC_CTX_TABLE_SIZE; i++)
 		lowpan_dev(dev)->ctx.table[i].id = i;
 
+	lowpan_register_ndisc_ops(dev);
+
 	ret = register_netdevice(dev);
 	if (ret < 0)
 		return ret;

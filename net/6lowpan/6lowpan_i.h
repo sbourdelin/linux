@@ -12,6 +12,8 @@ static inline bool lowpan_is_ll(const struct net_device *dev,
 	return lowpan_dev(dev)->lltype == lltype;
 }
 
+void lowpan_register_ndisc_ops(struct net_device *dev);
+
 #ifdef CONFIG_6LOWPAN_DEBUGFS
 int lowpan_dev_debugfs_init(struct net_device *dev);
 void lowpan_dev_debugfs_exit(struct net_device *dev);
