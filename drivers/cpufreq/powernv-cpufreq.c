@@ -64,7 +64,9 @@ enum throttle_reason_type {
 	OCC_MAX_REASON
 };
 
-static struct chip {
+static LIST_HEAD(powernv_chip_list);
+
+struct chip {
 	unsigned int id;
 	bool throttled;
 	bool restore;
@@ -74,9 +76,9 @@ static struct chip {
 	int throttle_turbo;
 	int throttle_sub_turbo;
 	int reason[OCC_MAX_REASON];
-} *chips;
+	struct list_head list;
+};
 
-static int nr_chips;
 static DEFINE_PER_CPU(struct chip *, chip_info);
 
 /*
@@ -528,12 +530,22 @@ out:
 	put_online_cpus();
 }
 
+static inline struct chip *find_chip(unsigned int id)
+{
+	struct chip *chip;
+
+	list_for_each_entry(chip, &powernv_chip_list, list)
+		if (chip->id == id)
+			return chip;
+	return NULL;
+}
+
 static int powernv_cpufreq_occ_msg(struct notifier_block *nb,
 				   unsigned long msg_type, void *_msg)
 {
 	struct opal_msg *msg = _msg;
 	struct opal_occ_msg omsg;
-	int i;
+	struct chip *chip;
 
 	if (msg_type != OPAL_MSG_OCC)
 		return 0;
@@ -569,28 +581,27 @@ static int powernv_cpufreq_occ_msg(struct notifier_block *nb,
 			throttled = false;
 			pr_info("OCC Active, CPU frequency is no longer throttled\n");
 
-			for (i = 0; i < nr_chips; i++) {
-				chips[i].restore = true;
-				schedule_work(&chips[i].throttle);
+			list_for_each_entry(chip, &powernv_chip_list, list) {
+				chip->restore = true;
+				schedule_work(&chip->throttle);
 			}
 
 			return 0;
 		}
 
-		for (i = 0; i < nr_chips; i++)
-			if (chips[i].id == omsg.chip)
-				break;
-
+		chip = find_chip(omsg.chip);
+		if (!chip)
+			return -EINVAL;
 		if (omsg.throttle_status >= 0 &&
 		    omsg.throttle_status <= OCC_MAX_THROTTLE_STATUS) {
-			chips[i].throttle_reason = omsg.throttle_status;
-			chips[i].reason[omsg.throttle_status]++;
+			chip->throttle_reason = omsg.throttle_status;
+			chip->reason[omsg.throttle_status]++;
 		}
 
 		if (!omsg.throttle_status)
-			chips[i].restore = true;
+			chip->restore = true;
 
-		schedule_work(&chips[i].throttle);
+		schedule_work(&chip->throttle);
 	}
 	return 0;
 }
@@ -622,37 +633,42 @@ static struct cpufreq_driver powernv_cpufreq_driver = {
 
 static int init_chip_info(void)
 {
-	unsigned int chip[256];
-	unsigned int cpu, i;
+	unsigned int cpu;
 	unsigned int prev_chip_id = UINT_MAX;
+	struct chip *chip = NULL;
 
 	for_each_possible_cpu(cpu) {
 		unsigned int id = cpu_to_chip_id(cpu);
 
 		if (prev_chip_id != id) {
 			prev_chip_id = id;
-			chip[nr_chips++] = id;
+			chip = find_chip(id);
 		}
+		if (!chip) {
+			chip = kzalloc(sizeof(struct chip), GFP_KERNEL);
+			if (!chip)
+				goto out;
+			chip->id = id;
+			INIT_WORK(&chip->throttle, powernv_cpufreq_work_fn);
+			INIT_LIST_HEAD(&chip->list);
+			list_add(&chip->list, &powernv_chip_list);
+		}
+		cpumask_set_cpu(cpu, &chip->mask);
+		per_cpu(chip_info, cpu) = chip;
 	}
-
-	chips = kcalloc(nr_chips, sizeof(struct chip), GFP_KERNEL);
-	if (!chips)
-		return -ENOMEM;
-
-	for (i = 0; i < nr_chips; i++) {
-		chips[i].id = chip[i];
-		cpumask_copy(&chips[i].mask, cpumask_of_node(chip[i]));
-		INIT_WORK(&chips[i].throttle, powernv_cpufreq_work_fn);
-		for_each_cpu(cpu, &chips[i].mask)
-			per_cpu(chip_info, cpu) =  &chips[i];
-	}
-
 	return 0;
+out:
+	list_for_each_entry(chip, &powernv_chip_list, list)
+		kfree(chip);
+	return -ENOMEM;
 }
 
 static inline void clean_chip_info(void)
 {
-	kfree(chips);
+	struct chip *chip;
+
+	list_for_each_entry(chip, &powernv_chip_list, list)
+		kfree(chip);
 }
 
 static inline void unregister_all_notifiers(void)
