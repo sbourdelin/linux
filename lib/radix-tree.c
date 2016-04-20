@@ -188,9 +188,10 @@ static inline int any_tag_set(struct radix_tree_node *node, unsigned int tag)
  * Returns next bit offset, or size if nothing found.
  */
 static __always_inline unsigned long
-radix_tree_find_next_bit(const unsigned long *addr,
+radix_tree_find_next_bit(struct radix_tree_node *node, unsigned int tag,
 			 unsigned long size, unsigned long offset)
 {
+	const unsigned long *addr = node->tags[tag];
 	if (!__builtin_constant_p(size))
 		return find_next_bit(addr, size, offset);
 
@@ -1142,8 +1143,7 @@ void **radix_tree_next_chunk(struct radix_tree_root *root,
 				return NULL;
 
 			if (flags & RADIX_TREE_ITER_TAGGED)
-				offset = radix_tree_find_next_bit(
-						node->tags[tag],
+				offset = radix_tree_find_next_bit(node, tag,
 						RADIX_TREE_MAP_SIZE,
 						offset + 1);
 			else
