@@ -610,7 +610,7 @@ static int i915_gem_aperture_info(struct seq_file *m, void *data)
 	struct list_head map_list;
 	const uint64_t map_limit = ggtt->mappable_end;
 	uint64_t map_space, map_largest, fence_space, fence_largest;
-	uint64_t last, size;
+	uint64_t last, size, stolen_free, stolen_largest;
 	int ret;
 
 	INIT_LIST_HEAD(&map_list);
@@ -623,6 +623,10 @@ static int i915_gem_aperture_info(struct seq_file *m, void *data)
 		return ret;
 
 	mutex_lock(&dev->struct_mutex);
+
+	i915_gem_stolen_size_info(dev_priv, &stolen_free,
+				  &stolen_largest);
+
 	list_for_each_entry(vma, &ggtt->base.active_list, vm_link)
 		if (vma->pin_count &&
 			(vma->node.start + vma->node.size) <= map_limit)
@@ -682,6 +686,12 @@ skip_first:
 		   fence_space);
 	seq_printf(m, "Single largest fence available: %llu bytes\n",
 		   fence_largest);
+	seq_printf(m, "Total size of the stolen region: %llu bytes\n",
+		   arg.stolen_total_size);
+	seq_printf(m, "Available size of the stolen region: %llu bytes\n",
+		   stolen_free);
+	seq_printf(m, "Single largest area in the stolen region: %llu bytes\n",
+		   stolen_largest);
 
 	return 0;
 }

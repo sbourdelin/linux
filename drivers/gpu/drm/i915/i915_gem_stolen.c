@@ -914,3 +914,44 @@ int i915_gem_stolen_freeze(struct drm_i915_private *i915)
 
 	return ret;
 }
+
+
+void i915_gem_stolen_size_info(struct drm_i915_private *dev_priv,
+			       uint64_t *stolen_free,
+			       uint64_t *stolen_largest)
+{
+	struct drm_mm *mm = &dev_priv->mm.stolen;
+	struct drm_mm_node *head_node = &mm->head_node;
+	struct drm_mm_node *entry;
+	uint64_t hole_size, hole_start, hole_end, largest_hole = 0;
+	uint64_t total_free = 0;
+
+	if (dev_priv->mm.volatile_stolen) {
+		*stolen_free = 0;
+		*stolen_largest = 0;
+		return;
+	}
+
+	if (head_node->hole_follows) {
+		hole_start = drm_mm_hole_node_start(head_node);
+		hole_end = drm_mm_hole_node_end(head_node);
+		hole_size = hole_end - hole_start;
+		total_free += hole_size;
+		if (largest_hole < hole_size)
+			largest_hole = hole_size;
+	}
+
+	drm_mm_for_each_node(entry, mm) {
+		if (entry->hole_follows) {
+			hole_start = drm_mm_hole_node_start(entry);
+			hole_end = drm_mm_hole_node_end(entry);
+			hole_size = hole_end - hole_start;
+			total_free += hole_size;
+			if (largest_hole < hole_size)
+				largest_hole = hole_size;
+		}
+	}
+
+	*stolen_free = total_free;
+	*stolen_largest = largest_hole;
+}
