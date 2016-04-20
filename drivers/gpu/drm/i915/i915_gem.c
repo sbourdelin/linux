@@ -392,19 +392,18 @@ i915_gem_alloc_object_stolen(struct drm_device *dev, size_t size)
 
 	mutex_lock(&dev->struct_mutex);
 	obj = i915_gem_object_create_stolen(dev, size);
-	if (!obj) {
-		mutex_unlock(&dev->struct_mutex);
-		return NULL;
-	}
+	if (IS_ERR(obj))
+		goto out;
 
 	/* Always clear fresh buffers before handing to userspace */
 	ret = i915_gem_object_clear(obj);
 	if (ret) {
 		drm_gem_object_unreference(&obj->base);
-		mutex_unlock(&dev->struct_mutex);
-		return NULL;
+		obj = ERR_PTR(ret);
+		goto out;
 	}
 
+out:
 	mutex_unlock(&dev->struct_mutex);
 	return obj;
 }
@@ -439,8 +438,8 @@ i915_gem_create(struct drm_file *file,
 		return -EINVAL;
 	}
 
-	if (obj == NULL)
-		return -ENOMEM;
+	if (IS_ERR(obj))
+		return PTR_ERR(obj);
 
 	ret = drm_gem_handle_create(file, &obj->base, &handle);
 	/* drop reference from allocate - handle holds it now */
@@ -4586,14 +4585,16 @@ struct drm_i915_gem_object *i915_gem_alloc_object(struct drm_device *dev,
 	struct drm_i915_gem_object *obj;
 	struct address_space *mapping;
 	gfp_t mask;
+	int ret;
 
 	obj = i915_gem_object_alloc(dev);
 	if (obj == NULL)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
-	if (drm_gem_object_init(dev, &obj->base, size) != 0) {
+	ret = drm_gem_object_init(dev, &obj->base, size);
+	if (ret) {
 		i915_gem_object_free(obj);
-		return NULL;
+		return ERR_PTR(ret);
 	}
 
 	mask = GFP_HIGHUSER | __GFP_RECLAIMABLE;
