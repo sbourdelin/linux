@@ -114,6 +114,33 @@ static unsigned int radix_tree_descend(struct radix_tree_node *parent,
 	return offset;
 }
 
+static unsigned int radix_tree_next_present(struct radix_tree_node **nodep,
+				struct radix_tree_node **childp,
+				unsigned long *indexp, unsigned long max)
+{
+	struct radix_tree_node *node = *nodep;
+	struct radix_tree_node *child = *childp;
+	unsigned long offset, index = *indexp;
+
+	do {
+		offset = (index >> node->shift) + 1;
+		index = offset << node->shift;
+		if (!index || index > max)
+			break;
+		offset &= RADIX_TREE_MAP_MASK;
+		while (offset == 0) {
+			offset = (node->offset + 1) & RADIX_TREE_MAP_MASK;
+			node = node->parent;
+		}
+		child = node->slots[offset];
+	} while (!child || is_sibling_entry(node, child));
+
+	*nodep = node;
+	*childp = child;
+	*indexp = index;
+	return offset;
+}
+
 static inline gfp_t root_gfp_mask(struct radix_tree_root *root)
 {
 	return root->gfp_mask & __GFP_BITS_MASK;
@@ -1229,10 +1256,11 @@ unsigned long radix_tree_range_tag_if_tagged(struct radix_tree_root *root,
 		unsigned long nr_to_tag,
 		unsigned int iftag, unsigned int settag)
 {
-	struct radix_tree_node *node, *child;
+	struct radix_tree_node *node = NULL, *child;
 	unsigned long maxindex;
 	unsigned long tagged = 0;
 	unsigned long index = *first_indexp;
+	unsigned int offset = 0;
 
 	radix_tree_load_root(root, &child, &maxindex);
 	last_index = min(last_index, maxindex);
@@ -1245,48 +1273,30 @@ unsigned long radix_tree_range_tag_if_tagged(struct radix_tree_root *root,
 		return 0;
 	}
 	if (!radix_tree_is_internal_node(child)) {
-		*first_indexp = last_index + 1;
+		*first_indexp = 1;
 		root_tag_set(root, settag);
 		return 1;
 	}
 
-	node = entry_to_node(child);
-
-	for (;;) {
-		unsigned offset = radix_tree_descend(node, &child, index);
-		if (!child)
-			goto next;
-		if (!tag_get(node, iftag, offset))
-			goto next;
-		/* Sibling slots never have tags set on them */
-		if (radix_tree_is_internal_node(child)) {
+	do {
+		while (radix_tree_is_internal_node(child)) {
 			node = entry_to_node(child);
-			continue;
+			offset = radix_tree_descend(node, &child, index);
+			if (!child || !tag_get(node, iftag, offset))
+				goto next;
 		}
 
 		tagged++;
 		node_tag_set(root, node, settag, offset);
  next:
-		/* Go to next entry in node */
-		index = ((index >> node->shift) + 1) << node->shift;
+		offset = radix_tree_next_present(&node, &child, &index,
+								last_index);
 		/* Overflow can happen when last_index is ~0UL... */
-		if (index > last_index || !index)
+		if ((index - 1) >= last_index)
 			break;
-		offset = (index >> node->shift) & RADIX_TREE_MAP_MASK;
-		while (offset == 0) {
-			/*
-			 * We've fully scanned this node. Go up. Because
-			 * last_index is guaranteed to be in the tree, what
-			 * we do below cannot wander astray.
-			 */
-			node = node->parent;
-			offset = (index >> node->shift) & RADIX_TREE_MAP_MASK;
-		}
-		if (is_sibling_entry(node, node->slots[offset]))
+		if (!tag_get(node, iftag, offset))
 			goto next;
-		if (tagged >= nr_to_tag)
-			break;
-	}
+	} while (tagged < nr_to_tag);
 
 	*first_indexp = index;
 
