@@ -55,6 +55,8 @@ struct workqueue_struct;
 struct iov_iter;
 struct fscrypt_info;
 struct fscrypt_operations;
+struct device;
+struct dma_attrs;
 
 extern void __init inode_init(void);
 extern void __init inode_init_early(void);
@@ -2599,11 +2601,21 @@ enum kernel_read_file_id {
 	READING_MAX_ID
 };
 
+struct file_dma {
+	struct device *dev;
+	void *cpu_addr;
+	dma_addr_t dma_addr;
+	unsigned long offset;
+	size_t size;
+	struct dma_attrs *attrs;
+};
+
 extern int kernel_read(struct file *, loff_t, char *, unsigned long);
 extern int kernel_read_file(struct file *, void **, loff_t *, loff_t,
 			    enum kernel_read_file_id);
 extern int kernel_read_file_from_path(char *, void **, loff_t *, loff_t,
-				      enum kernel_read_file_id);
+				      enum kernel_read_file_id,
+				      struct file_dma *dma);
 extern int kernel_read_file_from_fd(int, void **, loff_t *, loff_t,
 				    enum kernel_read_file_id);
 extern ssize_t kernel_write(struct file *, const char *, size_t, loff_t);

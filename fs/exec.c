@@ -57,6 +57,7 @@
 #include <linux/oom.h>
 #include <linux/compat.h>
 #include <linux/vmalloc.h>
+#include <linux/dma-mapping.h>
 
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
@@ -836,12 +837,15 @@ int kernel_read(struct file *file, loff_t offset,
 
 EXPORT_SYMBOL(kernel_read);
 
-int kernel_read_file(struct file *file, void **buf, loff_t *size,
-		     loff_t max_size, enum kernel_read_file_id id)
+static int _kernel_read_file(struct file *file, void **buf, loff_t *size,
+			     loff_t max_size, enum kernel_read_file_id id,
+			     struct file_dma *dma)
 {
-	loff_t i_size, pos;
+	loff_t i_size, r_size = 0, pos, remaining;
 	ssize_t bytes = 0;
 	int ret;
+	unsigned long dma_pos = 0;
+	char *dbuf;
 
 	if (!S_ISREG(file_inode(file)->i_mode) || max_size < 0)
 		return -EINVAL;
@@ -856,33 +860,73 @@ int kernel_read_file(struct file *file, void **buf, loff_t *size,
 	if (i_size <= 0)
 		return -EINVAL;
 
-	*buf = vmalloc(i_size);
-	if (!*buf)
-		return -ENOMEM;
+	if (dma) {
+#ifdef CONFIG_HAS_DMA
+		if (i_size + dma->offset > dma->size)
+			return -EINVAL;
 
-	pos = 0;
-	while (pos < i_size) {
-		bytes = kernel_read(file, pos, (char *)(*buf) + pos,
-				    i_size - pos);
-		if (bytes < 0) {
-			ret = bytes;
-			goto out;
+		dma_pos = dma->offset;
+		pos = 0;
+		remaining = i_size;
+
+		while (remaining > 0) {
+			r_size = min_t(int, remaining, PAGE_SIZE);
+
+			dbuf = dma_remap(dma->dev, dma->cpu_addr, dma->dma_addr,
+					r_size, dma_pos, dma->attrs);
+			if (!dbuf)
+				return -ENOMEM;
+
+			ret = kernel_read(file, pos, dbuf, r_size);
+			if (ret != r_size) {
+				if (ret > 0)
+					ret = -EIO;
+				goto fail_dma;
+			}
+
+			dma_unremap(dma->dev, dbuf, r_size, dma_pos, dma->attrs);
+			dma_pos += r_size;
+			pos += r_size;
+			remaining -= r_size;
+		}
+#else
+		return -EINVAL;
+#endif
+	} else {
+
+		*buf = vmalloc(i_size);
+		if (!*buf)
+			return -ENOMEM;
+
+		pos = 0;
+		while (pos < i_size) {
+			bytes = kernel_read(file, pos, (char *)(*buf) + pos,
+					    i_size - pos);
+			if (bytes < 0) {
+				ret = bytes;
+				goto out;
+			}
+
+			if (bytes == 0)
+				break;
+			pos += bytes;
 		}
 
-		if (bytes == 0)
-			break;
-		pos += bytes;
-	}
-
-	if (pos != i_size) {
-		ret = -EIO;
-		goto out;
+		if (pos != i_size) {
+			ret = -EIO;
+			goto out;
+		}
 	}
 
 	ret = security_kernel_post_read_file(file, *buf, i_size, id);
 	if (!ret)
 		*size = pos;
 
+#ifdef CONFIG_HAS_DMA
+fail_dma:
+	dma_unremap(dma->dev, buf, r_size, dma_pos, dma->attrs);
+	return ret;
+#endif
 out:
 	if (ret < 0) {
 		vfree(*buf);
@@ -890,10 +934,17 @@ out:
 	}
 	return ret;
 }
+
+int kernel_read_file(struct file *file, void **buf, loff_t *size,
+		     loff_t max_size, enum kernel_read_file_id id)
+{
+	return _kernel_read_file(file, buf, size, max_size, id, NULL);
+}
 EXPORT_SYMBOL_GPL(kernel_read_file);
 
 int kernel_read_file_from_path(char *path, void **buf, loff_t *size,
-			       loff_t max_size, enum kernel_read_file_id id)
+			       loff_t max_size, enum kernel_read_file_id id,
+			       struct file_dma *dma)
 {
 	struct file *file;
 	int ret;
@@ -905,7 +956,7 @@ int kernel_read_file_from_path(char *path, void **buf, loff_t *size,
 	if (IS_ERR(file))
 		return PTR_ERR(file);
 
-	ret = kernel_read_file(file, buf, size, max_size, id);
+	ret = _kernel_read_file(file, buf, size, max_size, id, dma);
 	fput(file);
 	return ret;
 }
