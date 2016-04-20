@@ -53,6 +53,15 @@ enum {
 
 #include <net/neighbour.h>
 
+/* Set to 3 to get tracing... */
+#define ND_DEBUG 1
+
+#define ND_PRINTK(val, level, fmt, ...)				\
+do {								\
+	if (val <= ND_DEBUG)					\
+		net_##level##_ratelimited(fmt, ##__VA_ARGS__);	\
+} while (0)
+
 struct ctl_table;
 struct inet6_dev;
 struct net_device;
@@ -266,6 +275,13 @@ int ndisc_late_init(void);
 
 void ndisc_late_cleanup(void);
 void ndisc_cleanup(void);
+
+void ndisc_fill_addr_option(struct sk_buff *skb, int type, void *data,
+			    int data_len);
+struct sk_buff *ndisc_alloc_skb(struct net_device *dev, int len);
+void ndisc_send_skb(struct sk_buff *skb, const struct in6_addr *daddr,
+		    const struct in6_addr *saddr);
+int pndisc_is_router(const void *pkey, struct net_device *dev);
 
 int ndisc_rcv(struct sk_buff *skb);
 
