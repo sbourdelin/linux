@@ -31,6 +31,7 @@
 #include "sdhci.h"
 #include "sdhci-pci.h"
 #include "sdhci-pci-o2micro.h"
+#include "sdhci-pci-dwc.h"
 
 /*****************************************************************************\
  *                                                                           *
@@ -70,6 +71,11 @@ static int ricoh_mmc_resume(struct sdhci_pci_chip *chip)
 	msleep(500);
 	return 0;
 }
+/* Synopsys SDHCI compliant Controller */
+static const struct sdhci_pci_fixes sdhci_snps = {
+	.probe_slot	= sdhci_pci_probe_slot_snps,
+	.quirks2	= SDHCI_QUIRK2_PRESET_VALUE_BROKEN,
+};
 
 static const struct sdhci_pci_fixes sdhci_ricoh = {
 	.probe		= ricoh_probe,
@@ -793,6 +799,14 @@ static const struct sdhci_pci_fixes sdhci_amd = {
 };
 
 static const struct pci_device_id pci_ids[] = {
+	{
+		.vendor		= PCI_VENDOR_ID_SYNOPSYS,
+		.device		= 0xc201, /* Device ID of sdhci-dwc on Haps51 */
+		.subvendor	= PCI_ANY_ID,
+		.subdevice	= PCI_ANY_ID,
+		.driver_data	= (kernel_ulong_t)&sdhci_snps,
+	},
+
 	{
 		.vendor		= PCI_VENDOR_ID_RICOH,
 		.device		= PCI_DEVICE_ID_RICOH_R5C822,
