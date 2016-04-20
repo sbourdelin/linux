@@ -998,6 +998,13 @@ static int gen9_init_workarounds(struct intel_engine_cs *engine)
 	I915_WRITE(GEN8_L3SQCREG4, (I915_READ(GEN8_L3SQCREG4) |
 				    GEN8_LQSC_FLUSH_COHERENT_LINES));
 
+	/* WaDisableSbeCacheDispatchPortSharing:skl,bxt */
+	if (IS_BXT_REVID(dev, 0, BXT_REVID_B0) ||
+	    IS_SKL_REVID(dev, 0, SKL_REVID_F0))
+		WA_SET_BIT_MASKED(
+			GEN7_HALF_SLICE_CHICKEN1,
+			GEN7_SBE_SS_CACHE_DISPATCH_PORT_SHARING_DISABLE);
+
 	/* WaEnablePreemptionGranularityControlByUMD:skl,bxt */
 	ret= wa_ring_whitelist_reg(engine, GEN8_CS_CHICKEN1);
 	if (ret)
@@ -1120,12 +1127,6 @@ static int skl_init_workarounds(struct intel_engine_cs *engine)
 				  HDC_FENCE_DEST_SLM_DISABLE |
 				  HDC_BARRIER_PERFORMANCE_DISABLE);
 
-	/* WaDisableSbeCacheDispatchPortSharing:skl */
-	if (IS_SKL_REVID(dev, 0, SKL_REVID_F0))
-		WA_SET_BIT_MASKED(
-			GEN7_HALF_SLICE_CHICKEN1,
-			GEN7_SBE_SS_CACHE_DISPATCH_PORT_SHARING_DISABLE);
-
 	/* WaDisableLSQCROPERFforOCL:skl */
 	ret = wa_ring_whitelist_reg(engine, GEN8_L3SQCREG4);
 	if (ret)
@@ -1158,13 +1159,6 @@ static int bxt_init_workarounds(struct intel_engine_cs *engine)
 	/* WaDisableThreadStallDopClockGating:bxt */
 	WA_SET_BIT_MASKED(GEN8_ROW_CHICKEN,
 			  STALL_DOP_GATING_DISABLE);
-
-	/* WaDisableSbeCacheDispatchPortSharing:bxt */
-	if (IS_BXT_REVID(dev, 0, BXT_REVID_B0)) {
-		WA_SET_BIT_MASKED(
-			GEN7_HALF_SLICE_CHICKEN1,
-			GEN7_SBE_SS_CACHE_DISPATCH_PORT_SHARING_DISABLE);
-	}
 
 	/* WaDisableObjectLevelPreemptionForTrifanOrPolygon:bxt */
 	/* WaDisableObjectLevelPreemptionForInstancedDraw:bxt */
