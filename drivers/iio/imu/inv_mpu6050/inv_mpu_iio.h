@@ -42,6 +42,13 @@
  *  @int_pin_cfg;	Controls interrupt pin configuration.
  *  @accl_offset:	Controls the accelerometer calibration offset.
  *  @gyro_offset:	Controls the gyroscope calibration offset.
+ *  @mst_status:	secondary I2C master interrupt source status
+ *  @slv4_addr:		I2C slave address for slave 4 transaction
+ *  @slv4_reg:		I2C register used with slave 4 transaction
+ *  @slv4_di:		I2C data in register for slave 4 transaction
+ *  @slv4_ctrl:		I2C slave 4 control register
+ *  @slv4_do:		I2C data out register for slave 4 transaction
+
  */
 struct inv_mpu6050_reg_map {
 	u8 sample_rate_div;
@@ -61,6 +68,15 @@ struct inv_mpu6050_reg_map {
 	u8 int_pin_cfg;
 	u8 accl_offset;
 	u8 gyro_offset;
+	u8 mst_status;
+
+	/* slave 4 registers */
+	u8 slv4_addr;
+	u8 slv4_reg;
+	u8 slv4_di; /* data in */
+	u8 slv4_ctrl;
+	u8 slv4_do; /* data out */
+
 };
 
 /*device enum */
@@ -134,6 +150,10 @@ struct inv_mpu6050_state {
 	DECLARE_KFIFO(timestamps, long long, TIMESTAMP_FIFO_SIZE);
 	struct regmap *map;
 	int irq;
+
+	/* I2C adapter for talking to aux sensors in "master" mode */
+	struct i2c_adapter aux_master_adapter;
+	struct completion slv4_done;
 };
 
 /*register and associated bit definition*/
@@ -149,9 +169,30 @@ struct inv_mpu6050_state {
 #define INV_MPU6050_BIT_ACCEL_OUT           0x08
 #define INV_MPU6050_BITS_GYRO_OUT           0x70
 
+#define INV_MPU6050_REG_I2C_SLV4_ADDR       0x31
+#define INV_MPU6050_BIT_I2C_SLV4_R          0x80
+#define INV_MPU6050_BIT_I2C_SLV4_W          0x00
+
+#define INV_MPU6050_REG_I2C_SLV4_REG        0x32
+#define INV_MPU6050_REG_I2C_SLV4_DO         0x33
+#define INV_MPU6050_REG_I2C_SLV4_CTRL       0x34
+
+#define INV_MPU6050_BIT_SLV4_EN             0x80
+#define INV_MPU6050_BIT_SLV4_INT_EN         0x40
+#define INV_MPU6050_BIT_SLV4_DIS            0x20
+
+#define INV_MPU6050_REG_I2C_SLV4_DI         0x35
+
+#define INV_MPU6050_REG_I2C_MST_STATUS      0x36
+#define INV_MPU6050_BIT_I2C_SLV4_DONE       0x40
+
 #define INV_MPU6050_REG_INT_ENABLE          0x38
 #define INV_MPU6050_BIT_DATA_RDY_EN         0x01
 #define INV_MPU6050_BIT_DMP_INT_EN          0x02
+#define INV_MPU6050_BIT_MST_INT_EN          0x08
+
+#define INV_MPU6050_REG_INT_STATUS          0x3A
+#define INV_MPU6050_BIT_MST_INT             0x08
 
 #define INV_MPU6050_REG_RAW_ACCEL           0x3B
 #define INV_MPU6050_REG_TEMPERATURE         0x41

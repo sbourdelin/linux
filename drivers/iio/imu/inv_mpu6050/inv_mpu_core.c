@@ -25,6 +25,8 @@
 #include <linux/iio/iio.h>
 #include <linux/i2c-mux.h>
 #include <linux/acpi.h>
+#include <linux/completion.h>
+
 #include "inv_mpu_iio.h"
 
 /*
@@ -57,6 +59,12 @@ static const struct inv_mpu6050_reg_map reg_set_6500 = {
 	.int_pin_cfg		= INV_MPU6050_REG_INT_PIN_CFG,
 	.accl_offset		= INV_MPU6500_REG_ACCEL_OFFSET,
 	.gyro_offset		= INV_MPU6050_REG_GYRO_OFFSET,
+	.slv4_addr		= INV_MPU6050_REG_I2C_SLV4_ADDR,
+	.slv4_reg		= INV_MPU6050_REG_I2C_SLV4_REG,
+	.slv4_do		= INV_MPU6050_REG_I2C_SLV4_DO,
+	.slv4_ctrl		= INV_MPU6050_REG_I2C_SLV4_CTRL,
+	.slv4_di		= INV_MPU6050_REG_I2C_SLV4_DI,
+	.mst_status		= INV_MPU6050_REG_I2C_MST_STATUS,
 };
 
 static const struct inv_mpu6050_reg_map reg_set_6050 = {
@@ -77,6 +85,12 @@ static const struct inv_mpu6050_reg_map reg_set_6050 = {
 	.int_pin_cfg		= INV_MPU6050_REG_INT_PIN_CFG,
 	.accl_offset		= INV_MPU6050_REG_ACCEL_OFFSET,
 	.gyro_offset		= INV_MPU6050_REG_GYRO_OFFSET,
+	.slv4_addr		= INV_MPU6050_REG_I2C_SLV4_ADDR,
+	.slv4_reg		= INV_MPU6050_REG_I2C_SLV4_REG,
+	.slv4_do		= INV_MPU6050_REG_I2C_SLV4_DO,
+	.slv4_ctrl		= INV_MPU6050_REG_I2C_SLV4_CTRL,
+	.slv4_di		= INV_MPU6050_REG_I2C_SLV4_DI,
+	.mst_status		= INV_MPU6050_REG_I2C_MST_STATUS,
 };
 
 static const struct inv_mpu6050_chip_config chip_config_6050 = {
@@ -761,6 +775,109 @@ static int inv_check_and_setup_chip(struct inv_mpu6050_state *st)
 	return 0;
 }
 
+static irqreturn_t inv_mpu_datardy_irq_handler(int irq, void *private)
+{
+	struct inv_mpu6050_state *st = (struct inv_mpu6050_state *)private;
+
+	/* IRQs can come before triggers are initialized. */
+	if (st->trig)
+		iio_trigger_poll(st->trig);
+
+	return IRQ_WAKE_THREAD;
+}
+
+static irqreturn_t inv_mpu_datardy_thread_handler(int irq, void *private)
+{
+	struct inv_mpu6050_state *st = (struct inv_mpu6050_state *)private;
+	int ret, val;
+
+	ret = regmap_read(st->map, st->reg->mst_status, &val);
+	if (ret < 0)
+		return ret;
+
+	if (val & INV_MPU6050_BIT_I2C_SLV4_DONE)
+		complete(&st->slv4_done);
+
+	return IRQ_HANDLED;
+}
+
+static u32 inv_mpu_i2c_functionality(struct i2c_adapter *adap)
+{
+	return I2C_FUNC_SMBUS_BYTE | I2C_FUNC_SMBUS_BYTE_DATA;
+}
+
+static int
+inv_mpu_i2c_smbus_xfer(struct i2c_adapter *adap, u16 addr,
+		       unsigned short flags, char read_write, u8 command,
+		       int size, union i2c_smbus_data *data)
+{
+	struct inv_mpu6050_state *st = i2c_get_adapdata(adap);
+
+	unsigned long time_left;
+	int ret, val;
+	u8 ctrl;
+
+	ret = inv_mpu6050_set_power_itg(st, true);
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_update_bits(st->map, st->reg->user_ctrl,
+				 INV_MPU6050_BIT_I2C_MST_EN,
+				 INV_MPU6050_BIT_I2C_MST_EN);
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_update_bits(st->map, st->reg->int_enable,
+				 INV_MPU6050_BIT_MST_INT_EN,
+				 INV_MPU6050_BIT_MST_INT_EN);
+	if (ret < 0)
+		return ret;
+
+	if (read_write == I2C_SMBUS_WRITE)
+		addr |= INV_MPU6050_BIT_I2C_SLV4_W;
+	else
+		addr |= INV_MPU6050_BIT_I2C_SLV4_R;
+
+	ret = regmap_write(st->map, st->reg->slv4_addr, addr);
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_write(st->map, st->reg->slv4_reg, command);
+	if (ret < 0)
+		return ret;
+
+	if (read_write == I2C_SMBUS_WRITE) {
+		ret = regmap_write(st->map, st->reg->slv4_do, data->byte);
+		if (ret < 0)
+			return ret;
+	}
+
+	ctrl = INV_MPU6050_BIT_SLV4_EN | INV_MPU6050_BIT_SLV4_INT_EN;
+	ret = regmap_write(st->map, st->reg->slv4_ctrl, ctrl);
+	if (ret < 0)
+		return ret;
+	if (read_write == I2C_SMBUS_READ) {
+		time_left = wait_for_completion_timeout(&st->slv4_done, HZ);
+		if (!time_left)
+			return -ETIMEDOUT;
+
+		ret = regmap_read(st->map, st->reg->slv4_di, &val);
+		if (ret < 0)
+			return ret;
+		data->byte = val;
+	}
+
+	ret = inv_mpu6050_set_power_itg(st, false);
+	if (ret < 0)
+		return ret;
+	return 0;
+}
+
+static const struct i2c_algorithm inv_mpu_i2c_algo = {
+	.smbus_xfer	=	inv_mpu_i2c_smbus_xfer,
+	.functionality	=	inv_mpu_i2c_functionality,
+};
+
 int inv_mpu_core_probe(struct regmap *regmap, int irq, const char *name,
 		int (*inv_mpu_bus_setup)(struct iio_dev *), int chip_type)
 {
@@ -817,10 +934,39 @@ int inv_mpu_core_probe(struct regmap *regmap, int irq, const char *name,
 		dev_err(dev, "configure buffer fail %d\n", result);
 		return result;
 	}
+
 	result = inv_mpu6050_probe_trigger(indio_dev);
 	if (result) {
 		dev_err(dev, "trigger probe fail %d\n", result);
 		goto out_unreg_ring;
+	}
+
+	/* Request interrupt for trigger and i2c master adapter */
+	result = devm_request_threaded_irq(&indio_dev->dev, st->irq,
+					   &inv_mpu_datardy_irq_handler,
+					   &inv_mpu_datardy_thread_handler,
+					   IRQF_TRIGGER_RISING, "inv_mpu",
+					   st);
+	if (result) {
+		dev_err(dev, "request irq fail %d\n", result);
+		goto out_remove_trigger;
+	}
+
+	/* Setup i2c adapter for aux devices. */
+	init_completion(&st->slv4_done);
+	st->aux_master_adapter.owner = THIS_MODULE;
+	st->aux_master_adapter.algo = &inv_mpu_i2c_algo;
+	st->aux_master_adapter.dev.parent = dev;
+	snprintf(st->aux_master_adapter.name, sizeof(st->aux_master_adapter.name),
+			"aux-master-%s", indio_dev->name);
+	st->aux_master_adapter.dev.of_node = of_get_child_by_name(
+			dev->of_node, "i2c-aux-master");
+	i2c_set_adapdata(&st->aux_master_adapter, st);
+	/* This will also probe aux devices so transfers must work now */
+	result = i2c_add_adapter(&st->aux_master_adapter);
+	if (result < 0) {
+		dev_err(dev, "i2x aux master register fail %d\n", result);
+		goto out_remove_trigger;
 	}
 
 	INIT_KFIFO(st->timestamps);
@@ -828,11 +974,13 @@ int inv_mpu_core_probe(struct regmap *regmap, int irq, const char *name,
 	result = iio_device_register(indio_dev);
 	if (result) {
 		dev_err(dev, "IIO register fail %d\n", result);
-		goto out_remove_trigger;
+		goto out_del_adapter;
 	}
 
 	return 0;
 
+out_del_adapter:
+	i2c_del_adapter(&st->aux_master_adapter);
 out_remove_trigger:
 	inv_mpu6050_remove_trigger(st);
 out_unreg_ring:
@@ -844,10 +992,12 @@ EXPORT_SYMBOL_GPL(inv_mpu_core_probe);
 int inv_mpu_core_remove(struct device  *dev)
 {
 	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct inv_mpu6050_state *st = iio_priv(indio_dev);
 
 	iio_device_unregister(indio_dev);
 	inv_mpu6050_remove_trigger(iio_priv(indio_dev));
 	iio_triggered_buffer_cleanup(indio_dev);
+	i2c_del_adapter(&st->aux_master_adapter);
 
 	return 0;
 }

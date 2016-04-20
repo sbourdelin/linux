@@ -1,12 +1,23 @@
 InvenSense MPU-6050 Six-Axis (Gyro + Accelerometer) MEMS MotionTracking Device
 
-http://www.invensense.com/mems/gyro/mpu6050.html
-
 Required properties:
- - compatible : should be "invensense,mpu6050"
- - reg : the I2C address of the sensor
+ - compatible : should be "invensense,mpuXXXX"
+ - reg : the I2C or SPI address of the sensor
  - interrupt-parent : should be the phandle for the interrupt controller
  - interrupts : interrupt mapping for GPIO IRQ
+
+Valid compatible strings:
+ - mpu6000
+ - mpu6050
+ - mpu6500
+ - mpu9150
+
+It is possible to attach auxiliary sensors to the MPU and have them be handled
+by linux. Those auxiliary sensors are describes as an i2c bus.
+
+Devices connected in "bypass" mode must be listed behind i2c@0 with the address 0
+
+Devices connected in "master" mode must be listed behind i2c-aux-master.
 
 Example:
 	mpu6050@68 {
@@ -14,4 +25,44 @@ Example:
 		reg = <0x68>;
 		interrupt-parent = <&gpio1>;
 		interrupts = <18 1>;
+	};
+
+Example describing mpu9150 (which includes an ak9875 on chip):
+	mpu9150@68 {
+		compatible = "invensense,mpu9150";
+		reg = <0x68>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <18 1>;
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+		i2c@0 {
+			reg = <0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			ak8975@0c {
+				compatible = "ak,ak8975";
+				reg = <0x0c>;
+			};
+		};
+	};
+
+Example describing a mpu6500 via SPI with an hmc5883l on auxiliary i2c:
+	mpu6500@0 {
+		compatible = "inv,mpu6500";
+		reg = <0x0>;
+		spi-max-frequency = <1000000>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <31 1>;
+
+		i2c-aux-master {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			hmc5883l@1e {
+				compatible = "honeywell,hmc5883l";
+				reg = <0x1e>;
+			};
+		};
 	};
