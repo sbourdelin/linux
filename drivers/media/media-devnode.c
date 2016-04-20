@@ -155,7 +155,7 @@ static long media_compat_ioctl(struct file *filp, unsigned int cmd,
 static int media_open(struct inode *inode, struct file *filp)
 {
 	struct media_devnode *mdev;
-	int ret;
+	int ret = 0;
 
 	/* Check if the media device is available. This needs to be done with
 	 * the media_devnode_lock held to prevent an open/unregister race:
@@ -173,7 +173,6 @@ static int media_open(struct inode *inode, struct file *filp)
 	}
 	/* and increase the device refcount */
 	get_device(&mdev->dev);
-	mutex_unlock(&media_devnode_lock);
 
 	filp->private_data = mdev;
 
@@ -182,11 +181,12 @@ static int media_open(struct inode *inode, struct file *filp)
 		if (ret) {
 			put_device(&mdev->dev);
 			filp->private_data = NULL;
-			return ret;
+			goto done;
 		}
 	}
-
-	return 0;
+done:
+	mutex_unlock(&media_devnode_lock);
+	return ret;
 }
 
 /* Override for the release function */
