@@ -3287,6 +3287,29 @@ static int wp_huge_pmd(struct mm_struct *mm, struct vm_area_struct *vma,
 	return VM_FAULT_FALLBACK;
 }
 
+static void huge_pmd_set_accessed(struct mm_struct *mm,
+				  struct vm_area_struct *vma,
+				  unsigned long address,
+				  pmd_t *pmd, pmd_t orig_pmd,
+				  int dirty)
+{
+	spinlock_t *ptl;
+	pmd_t entry;
+	unsigned long haddr;
+
+	ptl = pmd_lock(mm, pmd);
+	if (unlikely(!pmd_same(*pmd, orig_pmd)))
+		goto unlock;
+
+	entry = pmd_mkyoung(orig_pmd);
+	haddr = address & HPAGE_PMD_MASK;
+	if (pmdp_set_access_flags(vma, haddr, pmd, entry, dirty))
+		update_mmu_cache_pmd(vma, address, pmd);
+
+unlock:
+	spin_unlock(ptl);
+}
+
 /*
  * These routines also need to handle stuff like marking pages dirty
  * and/or accessed for architectures that don't do it in hardware (most
