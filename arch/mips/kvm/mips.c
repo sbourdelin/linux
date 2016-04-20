@@ -248,9 +248,14 @@ struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm, unsigned int id)
 	int err, size, offset;
 	void *gebase;
 	int i;
+	struct kvm_vcpu *vcpu;
 
-	struct kvm_vcpu *vcpu = kzalloc(sizeof(struct kvm_vcpu), GFP_KERNEL);
+	if (id >= KVM_MAX_VCPUS) {
+		err = -EINVAL;
+		goto out;
+	}
 
+	vcpu = kzalloc(sizeof(struct kvm_vcpu), GFP_KERNEL);
 	if (!vcpu) {
 		err = -ENOMEM;
 		goto out;
