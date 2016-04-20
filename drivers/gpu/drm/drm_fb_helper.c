@@ -40,6 +40,7 @@
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
+#include <drm/drm_rect.h>
 
 static bool drm_fbdev_emulation = true;
 module_param_named(fbdev_emulation, drm_fbdev_emulation, bool, 0600);
@@ -47,6 +48,9 @@ MODULE_PARM_DESC(fbdev_emulation,
 		 "Enable legacy fbdev emulation [default=true]");
 
 static LIST_HEAD(kernel_fb_helper_list);
+
+static void drm_fb_helper_defer_dirty(struct fb_info *info, u32 x, u32 y,
+				      u32 width, u32 height);
 
 /**
  * DOC: fbdev helpers
@@ -84,6 +88,13 @@ static LIST_HEAD(kernel_fb_helper_list);
  * and set up an initial configuration using the detected hardware, drivers
  * should call drm_fb_helper_single_add_all_connectors() followed by
  * drm_fb_helper_initial_config().
+ *
+ * If CONFIG_FB_DEFERRED_IO is enabled and (struct fb_info).fbdefio is set,
+ * the drm_fb_helper_{cfb,sys}_{write,fillrect,copyarea,imageblit} functions
+ * will accumulate changes and schedule (struct fb_info).deferred_work to run.
+ * This is the same worker used by the mmap deferred io code path.
+ * drm_fb_helper_deferred_io() will call
+ * (struct drm_framebuffer_funcs)->dirty().
  */
 
 /**
@@ -401,10 +412,13 @@ backoff:
 static int restore_fbdev_mode(struct drm_fb_helper *fb_helper)
 {
 	struct drm_device *dev = fb_helper->dev;
+	struct fb_info *info = fb_helper->fbdev;
 	struct drm_plane *plane;
 	int i;
 
 	drm_warn_on_modeset_not_all_locked(dev);
+
+	drm_fb_helper_defer_dirty(info, 0, 0, info->var.xres, info->var.yres);
 
 	if (fb_helper->atomic)
 		return restore_fbdev_mode_atomic(fb_helper);
@@ -650,6 +664,9 @@ void drm_fb_helper_prepare(struct drm_device *dev, struct drm_fb_helper *helper,
 			   const struct drm_fb_helper_funcs *funcs)
 {
 	INIT_LIST_HEAD(&helper->kernel_fb_list);
+#ifdef CONFIG_FB_DEFERRED_IO
+	spin_lock_init(&helper->dirty_lock);
+#endif
 	helper->funcs = funcs;
 	helper->dev = dev;
 }
@@ -834,6 +851,87 @@ void drm_fb_helper_unlink_fbi(struct drm_fb_helper *fb_helper)
 }
 EXPORT_SYMBOL(drm_fb_helper_unlink_fbi);
 
+#ifdef CONFIG_FB_DEFERRED_IO
+/**
+ * drm_fb_helper_deferred_io() - (struct fb_deferred_io *)->deferred_io callback
+ *                               function
+ *
+ * This function always runs in process context (struct delayed_work) and calls
+ * the (struct drm_framebuffer_funcs)->dirty function with the collected
+ * damage. There's no need to worry about the possibility that the fb_sys_*()
+ * functions could be running in atomic context. They only schedule the
+ * delayed worker which then calls this deferred_io callback.
+ */
+void drm_fb_helper_deferred_io(struct fb_info *info,
+			       struct list_head *pagelist)
+{
+	struct drm_fb_helper *helper = info->par;
+	unsigned long start, end, min, max;
+	struct drm_clip_rect clip;
+	unsigned long flags;
+	struct page *page;
+
+	if (!helper->fb->funcs->dirty)
+		return;
+
+	spin_lock_irqsave(&helper->dirty_lock, flags);
+	clip = helper->dirty_clip;
+	drm_clip_rect_reset(&helper->dirty_clip);
+	spin_unlock_irqrestore(&helper->dirty_lock, flags);
+
+	min = ULONG_MAX;
+	max = 0;
+	list_for_each_entry(page, pagelist, lru) {
+		start = page->index << PAGE_SHIFT;
+		end = start + PAGE_SIZE - 1;
+		min = min(min, start);
+		max = max(max, end);
+	}
+
+	if (min < max) {
+		struct drm_clip_rect mmap_clip;
+
+		mmap_clip.x1 = 0;
+		mmap_clip.x2 = info->var.xres;
+		mmap_clip.y1 = min / info->fix.line_length;
+		mmap_clip.y2 = min_t(u32, max / info->fix.line_length,
+				     info->var.yres);
+		drm_clip_rect_merge(&clip, &mmap_clip, 1, 0, 0, 0);
+	}
+
+	if (!drm_clip_rect_is_empty(&clip))
+		helper->fb->funcs->dirty(helper->fb, NULL, 0, 0, &clip, 1);
+}
+EXPORT_SYMBOL(drm_fb_helper_deferred_io);
+
+static void drm_fb_helper_defer_dirty(struct fb_info *info, u32 x, u32 y,
+				      u32 width, u32 height)
+{
+	struct drm_fb_helper *helper = info->par;
+	struct drm_clip_rect clip;
+	unsigned long flags;
+
+	if (!info->fbdefio)
+		return;
+
+	clip.x1 = x;
+	clip.x2 = x + width;
+	clip.y1 = y;
+	clip.y2 = y + height;
+
+	spin_lock_irqsave(&helper->dirty_lock, flags);
+	drm_clip_rect_merge(&helper->dirty_clip, &clip, 1, 0, 0, 0);
+	spin_unlock_irqrestore(&helper->dirty_lock, flags);
+
+	schedule_delayed_work(&info->deferred_work, info->fbdefio->delay);
+}
+#else
+static void drm_fb_helper_defer_dirty(struct fb_info *info, u32 x, u32 y,
+				      u32 width, u32 height)
+{
+}
+#endif
+
 /**
  * drm_fb_helper_sys_read - wrapper around fb_sys_read
  * @info: fb_info struct pointer
@@ -862,7 +960,14 @@ EXPORT_SYMBOL(drm_fb_helper_sys_read);
 ssize_t drm_fb_helper_sys_write(struct fb_info *info, const char __user *buf,
 				size_t count, loff_t *ppos)
 {
-	return fb_sys_write(info, buf, count, ppos);
+	ssize_t ret;
+
+	ret = fb_sys_write(info, buf, count, ppos);
+	if (ret > 0)
+		drm_fb_helper_defer_dirty(info, 0, 0,
+					  info->var.xres, info->var.yres);
+
+	return ret;
 }
 EXPORT_SYMBOL(drm_fb_helper_sys_write);
 
@@ -877,6 +982,8 @@ void drm_fb_helper_sys_fillrect(struct fb_info *info,
 				const struct fb_fillrect *rect)
 {
 	sys_fillrect(info, rect);
+	drm_fb_helper_defer_dirty(info, rect->dx, rect->dy,
+				  rect->width, rect->height);
 }
 EXPORT_SYMBOL(drm_fb_helper_sys_fillrect);
 
@@ -891,6 +998,8 @@ void drm_fb_helper_sys_copyarea(struct fb_info *info,
 				const struct fb_copyarea *area)
 {
 	sys_copyarea(info, area);
+	drm_fb_helper_defer_dirty(info, area->dx, area->dy,
+				  area->width, area->height);
 }
 EXPORT_SYMBOL(drm_fb_helper_sys_copyarea);
 
@@ -905,6 +1014,8 @@ void drm_fb_helper_sys_imageblit(struct fb_info *info,
 				 const struct fb_image *image)
 {
 	sys_imageblit(info, image);
+	drm_fb_helper_defer_dirty(info, image->dx, image->dy,
+				  image->width, image->height);
 }
 EXPORT_SYMBOL(drm_fb_helper_sys_imageblit);
 
@@ -919,6 +1030,8 @@ void drm_fb_helper_cfb_fillrect(struct fb_info *info,
 				const struct fb_fillrect *rect)
 {
 	cfb_fillrect(info, rect);
+	drm_fb_helper_defer_dirty(info, rect->dx, rect->dy,
+				  rect->width, rect->height);
 }
 EXPORT_SYMBOL(drm_fb_helper_cfb_fillrect);
 
@@ -933,6 +1046,8 @@ void drm_fb_helper_cfb_copyarea(struct fb_info *info,
 				const struct fb_copyarea *area)
 {
 	cfb_copyarea(info, area);
+	drm_fb_helper_defer_dirty(info, area->dx, area->dy,
+				  area->width, area->height);
 }
 EXPORT_SYMBOL(drm_fb_helper_cfb_copyarea);
 
@@ -947,6 +1062,8 @@ void drm_fb_helper_cfb_imageblit(struct fb_info *info,
 				 const struct fb_image *image)
 {
 	cfb_imageblit(info, image);
+	drm_fb_helper_defer_dirty(info, image->dx, image->dy,
+				  image->width, image->height);
 }
 EXPORT_SYMBOL(drm_fb_helper_cfb_imageblit);
 
