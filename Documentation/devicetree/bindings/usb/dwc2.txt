@@ -27,6 +27,9 @@ Refer to phy/phy-bindings.txt for generic phy consumer properties
 - g-rx-fifo-size: size of rx fifo size in gadget mode.
 - g-np-tx-fifo-size: size of non-periodic tx fifo size in gadget mode.
 - g-tx-fifo-size: size of periodic tx fifo per endpoint (except ep0) in gadget mode.
+- resets: list of phandle and reset specifier pairs. The should be one entry for
+  softreset line of the USB IP.
+- reset-names: Should be "dwc2".
 
 Example:
 
