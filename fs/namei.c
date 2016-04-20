@@ -1415,21 +1415,28 @@ static void follow_mount(struct path *path)
 	}
 }
 
+static int path_parent_directory(struct path *path)
+{
+	struct dentry *old = path->dentry;
+	/* rare case of legitimate dget_parent()... */
+	path->dentry = dget_parent(path->dentry);
+	dput(old);
+	if (unlikely(!path_connected(path)))
+		return -ENOENT;
+	return 0;
+}
+
 static int follow_dotdot(struct nameidata *nd)
 {
 	while(1) {
-		struct dentry *old = nd->path.dentry;
-
 		if (nd->path.dentry == nd->root.dentry &&
 		    nd->path.mnt == nd->root.mnt) {
 			break;
 		}
 		if (nd->path.dentry != nd->path.mnt->mnt_root) {
-			/* rare case of legitimate dget_parent()... */
-			nd->path.dentry = dget_parent(nd->path.dentry);
-			dput(old);
-			if (unlikely(!path_connected(&nd->path)))
-				return -ENOENT;
+			int ret = path_parent_directory(&nd->path);
+			if (ret)
+				return ret;
 			break;
 		}
 		if (!follow_up(&nd->path))
@@ -2375,6 +2382,43 @@ struct dentry *lookup_one_len_unlocked(const char *name,
 	return ret;
 }
 EXPORT_SYMBOL(lookup_one_len_unlocked);
+
+#ifdef CONFIG_UNIX98_PTYS
+int path_pts(struct path *path)
+{
+	/* Find "pts" in the same directory as the input path */
+	struct dentry *child, *parent;
+	struct qstr this;
+	int ret;
+
+	ret = path_parent_directory(path);
+	if (ret)
+		return ret;
+
+	parent = path->dentry;
+	if (!d_can_lookup(parent))
+		return -ENOENT;
+
+	this.name = "pts";
+	this.len = 3;
+	this.hash = full_name_hash(this.name, this.len);
+	if (parent->d_flags & DCACHE_OP_HASH) {
+		int err = parent->d_op->d_hash(parent, &this);
+		if (err < 0)
+			return err;
+	}
+	inode_lock(parent->d_inode);
+	child = d_lookup(parent, &this);
+	inode_unlock(parent->d_inode);
+	if (!child)
+		return -ENOENT;
+
+	path->dentry = child;
+	dput(parent);
+	follow_mount(path);
+	return 0;
+}
+#endif
 
 int user_path_at_empty(int dfd, const char __user *name, unsigned flags,
 		 struct path *path, int *empty)
