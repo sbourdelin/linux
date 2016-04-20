@@ -3388,6 +3388,7 @@ S:	Maintained
 F:	include/linux/mfd/fm33256b.h
 F:	drivers/mfd/fm33256b.c
 F:	drivers/misc/eeprom/fm33256b-fram.c
+F:	drivers/rtc/rtc-fm33256b.c
 
 CYTTSP TOUCHSCREEN DRIVER
 M:	Ferruh Yigit <fery@cypress.com>
