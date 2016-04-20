@@ -672,9 +672,10 @@ static int execlists_move_to_gpu(struct drm_i915_gem_request *req,
 
 int intel_logical_ring_alloc_request_extras(struct drm_i915_gem_request *request)
 {
-	int ret = 0;
+	struct intel_engine_cs *engine = request->engine;
+	int ret;
 
-	request->ringbuf = request->ctx->engine[request->engine->id].ringbuf;
+	request->ringbuf = request->ctx->engine[engine->id].ringbuf;
 
 	if (i915.enable_guc_submission) {
 		/*
@@ -689,7 +690,20 @@ int intel_logical_ring_alloc_request_extras(struct drm_i915_gem_request *request
 			return ret;
 	}
 
-	return intel_lr_context_pin(request->ctx, request->engine);
+	ret = intel_lr_context_pin(request->ctx, engine);
+	if (ret)
+		return ret;
+
+	if (!request->ctx->engine[engine->id].initialised) {
+		ret = engine->init_context(request);
+		if (ret) {
+			intel_lr_context_unpin(request->ctx, engine);
+			return ret;
+		}
+		request->ctx->engine[engine->id].initialised = true;
+	}
+
+	return 0;
 }
 
 static int logical_ring_wait_for_space(struct drm_i915_gem_request *req,
@@ -2634,25 +2648,8 @@ int intel_lr_context_deferred_alloc(struct intel_context *ctx,
 
 	ctx->engine[engine->id].ringbuf = ringbuf;
 	ctx->engine[engine->id].state = ctx_obj;
+	ctx->engine[engine->id].initialised = engine->init_context == NULL;
 
-	if (ctx != ctx->i915->kernel_context && engine->init_context) {
-		struct drm_i915_gem_request *req;
-
-		req = i915_gem_request_alloc(engine, ctx);
-		if (IS_ERR(req)) {
-			ret = PTR_ERR(req);
-			DRM_ERROR("ring create req: %d\n", ret);
-			goto error_ringbuf;
-		}
-
-		ret = engine->init_context(req);
-		i915_add_request_no_flush(req);
-		if (ret) {
-			DRM_ERROR("ring init context: %d\n",
-				ret);
-			goto error_ringbuf;
-		}
-	}
 	return 0;
 
 error_ringbuf:
