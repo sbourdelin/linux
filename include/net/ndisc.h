@@ -110,7 +110,8 @@ struct ndisc_options {
 
 #define NDISC_OPT_SPACE(len) (((len)+2+7)&~7)
 
-struct ndisc_options *ndisc_parse_options(u8 *opt, int opt_len,
+struct ndisc_options *ndisc_parse_options(const struct net_device *dev,
+					  u8 *opt, int opt_len,
 					  struct ndisc_options *ndopts);
 
 /*
@@ -173,6 +174,93 @@ static inline struct neighbour *__ipv6_neigh_lookup(struct net_device *dev, cons
 	return n;
 }
 
+static inline int __ip6_ndisc_is_useropt(struct nd_opt_hdr *opt)
+{
+	return opt->nd_opt_type == ND_OPT_RDNSS ||
+		opt->nd_opt_type == ND_OPT_DNSSL;
+}
+
+#if IS_ENABLED(CONFIG_IPV6)
+struct ndisc_ops {
+	int	(*is_useropt)(struct nd_opt_hdr *opt);
+	void	(*send_na)(struct net_device *dev,
+			   const struct in6_addr *daddr,
+			   const struct in6_addr *solicited_addr,
+			   bool router, bool solicited,
+			   bool override, bool inc_opt);
+	void	(*recv_na)(struct sk_buff *skb);
+	void	(*send_ns)(struct net_device *dev,
+			   const struct in6_addr *solicit,
+			   const struct in6_addr *daddr,
+			   const struct in6_addr *saddr);
+	void	(*recv_ns)(struct sk_buff *skb);
+};
+
+static inline int ndisc_is_useropt(const struct net_device *dev,
+				   struct nd_opt_hdr *opt)
+{
+	if (likely(dev->ndisc_ops->is_useropt))
+		return dev->ndisc_ops->is_useropt(opt);
+	else
+		return 0;
+}
+
+static inline void ndisc_send_na(struct net_device *dev,
+				 const struct in6_addr *daddr,
+				 const struct in6_addr *solicited_addr,
+				 bool router, bool solicited, bool override,
+				 bool inc_opt)
+{
+	if (likely(dev->ndisc_ops->send_na))
+		dev->ndisc_ops->send_na(dev, daddr, solicited_addr, router,
+					solicited, override, inc_opt);
+}
+
+static inline void ndisc_recv_na(struct sk_buff *skb)
+{
+	if (likely(skb->dev->ndisc_ops->recv_na))
+		skb->dev->ndisc_ops->recv_na(skb);
+}
+
+static inline void ndisc_send_ns(struct net_device *dev,
+				 const struct in6_addr *solicit,
+				 const struct in6_addr *daddr,
+				 const struct in6_addr *saddr)
+{
+	if (likely(dev->ndisc_ops->send_ns))
+		dev->ndisc_ops->send_ns(dev, solicit, daddr, saddr);
+}
+
+static inline void ndisc_recv_ns(struct sk_buff *skb)
+{
+	if (likely(skb->dev->ndisc_ops->recv_ns))
+		skb->dev->ndisc_ops->recv_ns(skb);
+}
+#else
+static inline int ndisc_is_useropt(const struct net_device *dev,
+				   struct nd_opt_hdr *opt)
+{
+	return 0;
+}
+
+static inline void ndisc_send_na(struct net_device *dev,
+				 const struct in6_addr *daddr,
+				 const struct in6_addr *solicited_addr,
+				 bool router, bool solicited, bool override,
+				 bool inc_opt) { }
+
+static inline void ndisc_recv_na(struct sk_buff *skb) { }
+
+static inline void ndisc_send_ns(struct net_device *dev,
+				 const struct in6_addr *solicit,
+				 const struct in6_addr *daddr,
+				 const struct in6_addr *saddr) { }
+
+static inline void ndisc_recv_ns(struct sk_buff *skb) { }
+#endif
+
+void ip6_register_ndisc_ops(struct net_device *dev);
+
 int ndisc_init(void);
 int ndisc_late_init(void);
 
@@ -181,14 +269,8 @@ void ndisc_cleanup(void);
 
 int ndisc_rcv(struct sk_buff *skb);
 
-void ndisc_send_ns(struct net_device *dev, const struct in6_addr *solicit,
-		   const struct in6_addr *daddr, const struct in6_addr *saddr);
-
 void ndisc_send_rs(struct net_device *dev,
 		   const struct in6_addr *saddr, const struct in6_addr *daddr);
-void ndisc_send_na(struct net_device *dev, const struct in6_addr *daddr,
-		   const struct in6_addr *solicited_addr,
-		   bool router, bool solicited, bool override, bool inc_opt);
 
 void ndisc_send_redirect(struct sk_buff *skb, const struct in6_addr *target);
 

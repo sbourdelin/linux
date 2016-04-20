@@ -3266,6 +3266,7 @@ static int addrconf_notify(struct notifier_block *this, unsigned long event,
 			idev = ipv6_add_dev(dev);
 			if (IS_ERR(idev))
 				return notifier_from_errno(PTR_ERR(idev));
+			ip6_register_ndisc_ops(dev);
 		}
 		break;
 

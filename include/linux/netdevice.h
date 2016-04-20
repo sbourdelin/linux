@@ -1677,6 +1677,9 @@ struct net_device {
 #ifdef CONFIG_NET_L3_MASTER_DEV
 	const struct l3mdev_ops	*l3mdev_ops;
 #endif
+#if IS_ENABLED(CONFIG_IPV6)
+	const struct ndisc_ops *ndisc_ops;
+#endif
 
 	const struct header_ops *header_ops;
 
