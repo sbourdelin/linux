@@ -150,11 +150,11 @@ struct neigh_table nd_tbl = {
 };
 EXPORT_SYMBOL_GPL(nd_tbl);
 
-static void ndisc_fill_addr_option(struct sk_buff *skb, int type, void *data)
+static void ndisc_fill_addr_option(struct sk_buff *skb, int type, void *data,
+				   int data_len)
 {
 	int pad   = ndisc_addr_option_pad(skb->dev->type);
-	int data_len = skb->dev->addr_len;
-	int space = ndisc_opt_addr_space(skb->dev, skb->dev->addr_len);
+	int space = ndisc_opt_addr_space(skb->dev, data_len);
 	u8 *opt = skb_put(skb, space);
 
 	opt[0] = type;
@@ -528,7 +528,7 @@ void ndisc_send_na(struct net_device *dev, const struct in6_addr *daddr,
 
 	if (inc_opt)
 		ndisc_fill_addr_option(skb, ND_OPT_TARGET_LL_ADDR,
-				       dev->dev_addr);
+				       dev->dev_addr, dev->addr_len);
 
 
 	ndisc_send_skb(skb, daddr, src_addr);
@@ -590,7 +590,7 @@ void ndisc_send_ns(struct net_device *dev, const struct in6_addr *solicit,
 
 	if (inc_opt)
 		ndisc_fill_addr_option(skb, ND_OPT_SOURCE_LL_ADDR,
-				       dev->dev_addr);
+				       dev->dev_addr, dev->addr_len);
 
 	ndisc_send_skb(skb, daddr, saddr);
 }
@@ -641,7 +641,7 @@ void ndisc_send_rs(struct net_device *dev, const struct in6_addr *saddr,
 
 	if (send_sllao)
 		ndisc_fill_addr_option(skb, ND_OPT_SOURCE_LL_ADDR,
-				       dev->dev_addr);
+				       dev->dev_addr, dev->addr_len);
 
 	ndisc_send_skb(skb, daddr, saddr);
 }
@@ -1597,7 +1597,8 @@ void ndisc_send_redirect(struct sk_buff *skb, const struct in6_addr *target)
 	 */
 
 	if (ha)
-		ndisc_fill_addr_option(buff, ND_OPT_TARGET_LL_ADDR, ha);
+		ndisc_fill_addr_option(buff, ND_OPT_TARGET_LL_ADDR, ha,
+				       dev->addr_len);
 
 	/*
 	 *	build redirect option and copy skb over to the new packet.
