@@ -859,6 +859,7 @@ struct intel_dp {
 	void (*prepare_link_retrain)(struct intel_dp *intel_dp);
 
 	bool train_set_valid;
+	uint32_t signal_levels, target_signal_levels;
 
 	/* Displayport compliance testing */
 	unsigned long compliance_test_type;

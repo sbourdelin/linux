@@ -3622,6 +3622,7 @@ intel_dp_set_signal_levels(struct intel_dp *intel_dp)
 			DP_TRAIN_PRE_EMPHASIS_SHIFT);
 
 	intel_dp->DP = (intel_dp->DP & ~mask) | signal_levels;
+	intel_dp->signal_levels = signal_levels;
 
 	I915_WRITE(intel_dp->output_reg, intel_dp->DP);
 	POSTING_READ(intel_dp->output_reg);

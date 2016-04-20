@@ -149,6 +149,8 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp)
 	loop_tries = 0;
 	for (;;) {
 		uint8_t link_status[DP_LINK_STATUS_SIZE];
+		DRM_DEBUG_KMS("signal levels (target/current): %.8x/%.8x\n",
+			      intel_dp->target_signal_levels, intel_dp->signal_levels);
 
 		drm_dp_link_train_clock_recovery_delay(intel_dp->dpcd);
 		if (!intel_dp_get_link_status(intel_dp, link_status)) {
@@ -156,7 +158,8 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp)
 			break;
 		}
 
-		if (drm_dp_clock_recovery_ok(link_status, intel_dp->lane_count)) {
+		if (drm_dp_clock_recovery_ok(link_status, intel_dp->lane_count) &&
+			intel_dp->signal_levels >= intel_dp->target_signal_levels) {
 			DRM_DEBUG_KMS("clock recovery OK\n");
 			break;
 		}
@@ -324,6 +327,8 @@ intel_dp_link_training_channel_equalization(struct intel_dp *intel_dp)
 
 	if (channel_eq) {
 		intel_dp->train_set_valid = true;
+		intel_dp->target_signal_levels = max(intel_dp->signal_levels,
+						     intel_dp->target_signal_levels);
 		DRM_DEBUG_KMS("Channel EQ done. DP Training successful\n");
 	}
 }
