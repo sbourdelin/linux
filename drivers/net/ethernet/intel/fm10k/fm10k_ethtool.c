@@ -243,9 +243,10 @@ static void fm10k_add_ethtool_stats(u64 **data, void *pointer,
 	unsigned int i;
 	char *p;
 
-	/* simply skip forward if we were not given a valid pointer */
 	if (!pointer) {
-		*data += size;
+		/* memory is not zero allocated so we have to clear it */
+		for (i = 0; i < size; i++)
+			*((*data)++) = 0;
 		return;
 	}
 
