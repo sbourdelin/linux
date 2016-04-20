@@ -926,9 +926,10 @@ static int gen9_init_workarounds(struct intel_engine_cs *engine)
 	I915_WRITE(BDW_SCRATCH1, I915_READ(BDW_SCRATCH1) |
 		   GEN9_LBS_SLA_RETRY_TIMER_DECREMENT_ENABLE);
 
-	/* WaDisableKillLogic:bxt,skl */
-	I915_WRITE(GAM_ECOCHK, I915_READ(GAM_ECOCHK) |
-		   ECOCHK_DIS_TLB);
+	if (!IS_KABYLAKE(dev))
+		/* WaDisableKillLogic:bxt,skl */
+		I915_WRITE(GAM_ECOCHK, I915_READ(GAM_ECOCHK) |
+			   ECOCHK_DIS_TLB);
 
 	/* WaClearFlowControlGpgpuContextSave:skl,bxt,kbl */
 	/* WaDisablePartialInstShootdown:skl,bxt,kbl */
