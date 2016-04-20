@@ -4913,34 +4913,6 @@ i915_gem_init_hw(struct drm_device *dev)
 	if (ret)
 		goto out;
 
-	/* Now it is safe to go back round and do everything else: */
-	for_each_engine(engine, dev_priv) {
-		struct drm_i915_gem_request *req;
-
-		req = i915_gem_request_alloc(engine, NULL);
-		if (IS_ERR(req)) {
-			ret = PTR_ERR(req);
-			break;
-		}
-
-		ret = i915_ppgtt_init_ring(req);
-		if (ret)
-			goto err_request;
-
-		ret = i915_gem_context_enable(req);
-		if (ret)
-			goto err_request;
-
-err_request:
-		i915_add_request_no_flush(req);
-		if (ret) {
-			DRM_ERROR("Failed to enable %s, error=%d\n",
-				  engine->name, ret);
-			i915_gem_cleanup_engines(dev);
-			break;
-		}
-	}
-
 out:
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
 	return ret;
