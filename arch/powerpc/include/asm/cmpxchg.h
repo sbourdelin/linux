@@ -7,12 +7,57 @@
 #include <asm/asm-compat.h>
 #include <linux/bug.h>
 
+#ifdef __BIG_ENDIAN
+#define BITOFF_CAL(size, off)	((sizeof(u32) - size - off) * BITS_PER_BYTE)
+#else
+#define BITOFF_CAL(size, off)	(off * BITS_PER_BYTE)
+#endif
+
+#define __XCHG_GEN(cmp, type, sfx, skip, v)				\
+static __always_inline unsigned long					\
+__cmpxchg_u32##sfx(v unsigned int *p, unsigned long old,		\
+			 unsigned long new);				\
+static __always_inline u32						\
+__##cmp##xchg_##type##sfx(v void *ptr, u32 old, u32 new)		\
+{									\
+	int size = sizeof (type);					\
+	int off = (unsigned long)ptr % sizeof(u32);			\
+	volatile u32 *p = ptr - off;					\
+	int bitoff = BITOFF_CAL(size, off);				\
+	u32 bitmask = ((0x1 << size * BITS_PER_BYTE) - 1) << bitoff;	\
+	u32 oldv, newv, tmp;						\
+	u32 ret;							\
+	oldv = READ_ONCE(*p);						\
+	do {								\
+		ret = (oldv & bitmask) >> bitoff;			\
+		if (skip && ret != old)					\
+			break;						\
+		newv = (oldv & ~bitmask) | (new << bitoff);		\
+		tmp = oldv;						\
+		oldv = __cmpxchg_u32##sfx((v u32*)p, oldv, newv);	\
+	} while (tmp != oldv);						\
+	return ret;							\
+}
+
 /*
  * Atomic exchange
  *
  * Changes the memory location '*p' to be val and returns
  * the previous value stored there.
  */
+
+#define XCHG_GEN(type, sfx, v)						\
+		__XCHG_GEN(_, type, sfx, 0, v)				\
+static __always_inline u32 __xchg_##type##sfx(v void *p, u32 n)		\
+{									\
+	return ___xchg_##type##sfx(p, 0, n);				\
+}
+
+XCHG_GEN(u8, _local, volatile);
+XCHG_GEN(u8, _relaxed, );
+XCHG_GEN(u16, _local, volatile);
+XCHG_GEN(u16, _relaxed, );
+#undef XCHG_GEN
 
 static __always_inline unsigned long
 __xchg_u32_local(volatile void *p, unsigned long val)
@@ -88,6 +133,10 @@ static __always_inline unsigned long
 __xchg_local(volatile void *ptr, unsigned long x, unsigned int size)
 {
 	switch (size) {
+	case 1:
+		return __xchg_u8_local(ptr, x);
+	case 2:
+		return __xchg_u16_local(ptr, x);
 	case 4:
 		return __xchg_u32_local(ptr, x);
 #ifdef CONFIG_PPC64
@@ -103,6 +152,10 @@ static __always_inline unsigned long
 __xchg_relaxed(void *ptr, unsigned long x, unsigned int size)
 {
 	switch (size) {
+	case 1:
+		return __xchg_u8_relaxed(ptr, x);
+	case 2:
+		return __xchg_u16_relaxed(ptr, x);
 	case 4:
 		return __xchg_u32_relaxed(ptr, x);
 #ifdef CONFIG_PPC64
@@ -130,6 +183,20 @@ __xchg_relaxed(void *ptr, unsigned long x, unsigned int size)
  * Compare and exchange - if *p == old, set it to new,
  * and return the old value of *p.
  */
+
+#define CMPXCHG_GEN(type, sfx, v)				\
+	__XCHG_GEN(cmp, type, sfx, 1, v)
+
+CMPXCHG_GEN(u8, , volatile);
+CMPXCHG_GEN(u8, _local,	volatile);
+CMPXCHG_GEN(u8, _relaxed, );
+CMPXCHG_GEN(u8, _acquire, );
+CMPXCHG_GEN(u16, , volatile);
+CMPXCHG_GEN(u16, _local, volatile);
+CMPXCHG_GEN(u16, _relaxed, );
+CMPXCHG_GEN(u16, _acquire, );
+#undef CMPXCHG_GEN
+#undef __XCHG_GEN
 
 static __always_inline unsigned long
 __cmpxchg_u32(volatile unsigned int *p, unsigned long old, unsigned long new)
@@ -316,6 +383,10 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new,
 	  unsigned int size)
 {
 	switch (size) {
+	case 1:
+		return __cmpxchg_u8(ptr, old, new);
+	case 2:
+		return __cmpxchg_u16(ptr, old, new);
 	case 4:
 		return __cmpxchg_u32(ptr, old, new);
 #ifdef CONFIG_PPC64
@@ -332,6 +403,10 @@ __cmpxchg_local(volatile void *ptr, unsigned long old, unsigned long new,
 	  unsigned int size)
 {
 	switch (size) {
+	case 1:
+		return __cmpxchg_u8_local(ptr, old, new);
+	case 2:
+		return __cmpxchg_u16_local(ptr, old, new);
 	case 4:
 		return __cmpxchg_u32_local(ptr, old, new);
 #ifdef CONFIG_PPC64
@@ -348,6 +423,10 @@ __cmpxchg_relaxed(void *ptr, unsigned long old, unsigned long new,
 		  unsigned int size)
 {
 	switch (size) {
+	case 1:
+		return __cmpxchg_u8_relaxed(ptr, old, new);
+	case 2:
+		return __cmpxchg_u16_relaxed(ptr, old, new);
 	case 4:
 		return __cmpxchg_u32_relaxed(ptr, old, new);
 #ifdef CONFIG_PPC64
@@ -364,6 +443,10 @@ __cmpxchg_acquire(void *ptr, unsigned long old, unsigned long new,
 		  unsigned int size)
 {
 	switch (size) {
+	case 1:
+		return __cmpxchg_u8_acquire(ptr, old, new);
+	case 2:
+		return __cmpxchg_u16_acquire(ptr, old, new);
 	case 4:
 		return __cmpxchg_u32_acquire(ptr, old, new);
 #ifdef CONFIG_PPC64
