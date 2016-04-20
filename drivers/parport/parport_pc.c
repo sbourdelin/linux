@@ -2301,6 +2301,7 @@ EXPORT_SYMBOL(parport_pc_unregister_port);
 
 #ifdef CONFIG_PCI
 
+#ifdef CONFIG_PARPORT_PC_SUPERIO
 /* ITE support maintained by Rich Liu <richliu@poorman.org> */
 static int sio_ite_8872_probe(struct pci_dev *pdev, int autoirq, int autodma,
 			      const struct parport_pc_via_data *via)
@@ -2611,6 +2612,9 @@ static struct parport_pc_superio {
 	{ sio_via_probe, &via_8231_data, },
 	{ sio_ite_8872_probe, NULL, },
 };
+#else
+#define last_sio 0
+#endif /* CONFIG_PARPORT_PC_SUPERIO */
 
 enum parport_pc_pci_cards {
 	siig_1p_10x = last_sio,
@@ -2711,11 +2715,13 @@ static struct parport_pc_pci {
 };
 
 static const struct pci_device_id parport_pc_pci_tbl[] = {
+#ifdef CONFIG_PARPORT_PC_SUPERIO
 	/* Super-IO onboard chips */
 	{ 0x1106, 0x0686, PCI_ANY_ID, PCI_ANY_ID, 0, 0, sio_via_686a },
 	{ 0x1106, 0x8231, PCI_ANY_ID, PCI_ANY_ID, 0, 0, sio_via_8231 },
 	{ PCI_VENDOR_ID_ITE, PCI_DEVICE_ID_ITE_8872,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, sio_ite_8872 },
+#endif
 
 	/* PCI cards */
 	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1P_10x,
@@ -2900,7 +2906,11 @@ static struct pci_driver parport_pc_pci_driver = {
 	.probe		= parport_pc_pci_probe,
 	.remove		= parport_pc_pci_remove,
 };
+#else
+static struct pci_driver parport_pc_pci_driver;
+#endif /* CONFIG_PCI */
 
+#if defined(CONFIG_PCI) && defined(CONFIG_PARPORT_PC_SUPERIO)
 static int __init parport_pc_init_superio(int autoirq, int autodma)
 {
 	const struct pci_device_id *id;
@@ -2922,12 +2932,11 @@ static int __init parport_pc_init_superio(int autoirq, int autodma)
 	return ret; /* number of devices found */
 }
 #else
-static struct pci_driver parport_pc_pci_driver;
 static int __init parport_pc_init_superio(int autoirq, int autodma)
 {
 	return 0;
 }
-#endif /* CONFIG_PCI */
+#endif
 
 #ifdef CONFIG_PNP
 
@@ -3125,7 +3134,7 @@ static int __init parport_parse_dma(const char *dmastr, int *val)
 				     PARPORT_DMA_NONE, PARPORT_DMA_NOFIFO);
 }
 
-#ifdef CONFIG_PCI
+#if defined(CONFIG_PCI) && defined(CONFIG_PARPORT_PC_SUPERIO)
 static int __init parport_init_mode_setup(char *str)
 {
 	printk(KERN_DEBUG
@@ -3162,7 +3171,7 @@ module_param_array(dma, charp, NULL, 0);
 MODULE_PARM_DESC(verbose_probing, "Log chit-chat during initialisation");
 module_param(verbose_probing, int, 0644);
 #endif
-#ifdef CONFIG_PCI
+#if defined(CONFIG_PCI) && defined(CONFIG_PARPORT_PC_SUPERIO)
 static char *init_mode;
 MODULE_PARM_DESC(init_mode,
 	"Initialise mode for VIA VT8231 port (spp, ps2, epp, ecp or ecpepp)");
@@ -3174,7 +3183,7 @@ static int __init parse_parport_params(void)
 	unsigned int i;
 	int val;
 
-#ifdef CONFIG_PCI
+#if defined(CONFIG_PCI) && defined(CONFIG_PARPORT_PC_SUPERIO)
 	if (init_mode)
 		parport_init_mode_setup(init_mode);
 #endif
@@ -3292,7 +3301,7 @@ __setup("parport=", parport_setup);
  *
  * parport_init_mode=[spp|ps2|epp|ecp|ecpepp]
  */
-#ifdef CONFIG_PCI
+#if defined(CONFIG_PCI) && defined(CONFIG_PARPORT_PC_SUPERIO)
 __setup("parport_init_mode=", parport_init_mode_setup);
 #endif
 #endif
