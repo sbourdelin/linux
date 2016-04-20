@@ -48,6 +48,7 @@ MODULE_PARM_DESC(nohwcrypt, "Disable hardware encryption.");
 
 static bool rt2800usb_hwcrypt_disabled(struct rt2x00_dev *rt2x00dev)
 {
+	ieee80211_hw_set(rt2x00dev->hw, MFP_CAPABLE);
 	return modparam_nohwcrypt;
 }
 
