@@ -24,6 +24,8 @@
 #ifndef DRM_RECT_H
 #define DRM_RECT_H
 
+#include <uapi/drm/drm.h>
+
 /**
  * DOC: rect utils
  *
@@ -170,5 +172,72 @@ void drm_rect_rotate(struct drm_rect *r,
 void drm_rect_rotate_inv(struct drm_rect *r,
 			 int width, int height,
 			 unsigned int rotation);
+
+/**
+ * drm_clip_rect_width - determine the clip rectangle width
+ * @r: clip rectangle whose width is returned
+ *
+ * RETURNS:
+ * The width of the clip rectangle.
+ */
+static inline int drm_clip_rect_width(const struct drm_clip_rect *r)
+{
+	return r->x2 - r->x1;
+}
+
+/**
+ * drm_clip_rect_height - determine the clip rectangle height
+ * @r: clip rectangle whose height is returned
+ *
+ * RETURNS:
+ * The height of the clip rectangle.
+ */
+static inline int drm_clip_rect_height(const struct drm_clip_rect *r)
+{
+	return r->y2 - r->y1;
+}
+
+/**
+ * drm_clip_rect_visible - determine if the the clip rectangle is visible
+ * @r: clip rectangle whose visibility is returned
+ *
+ * RETURNS:
+ * %true if the clip rectangle is visible, %false otherwise.
+ */
+static inline bool drm_clip_rect_visible(const struct drm_clip_rect *r)
+{
+	return drm_clip_rect_width(r) > 0 && drm_clip_rect_height(r) > 0;
+}
+
+/**
+ * drm_clip_rect_reset - Reset clip rectangle
+ * @clip: clip rectangle
+ *
+ * Sets clip rectangle to {0,0,0,0}.
+ */
+static inline void drm_clip_rect_reset(struct drm_clip_rect *clip)
+{
+	clip->x1 = 0;
+	clip->x2 = 0;
+	clip->y1 = 0;
+	clip->y2 = 0;
+}
+
+/**
+ * drm_clip_rect_is_empty - Is clip rectangle empty?
+ * @clip: clip rectangle
+ *
+ * Returns true if clip rectangle is {0,0,0,0}.
+ */
+static inline bool drm_clip_rect_is_empty(struct drm_clip_rect *clip)
+{
+	return (!clip->x1 && !clip->x2 && !clip->y1 && !clip->y2);
+}
+
+bool drm_clip_rect_intersect(struct drm_clip_rect *r1,
+			     const struct drm_clip_rect *r2);
+void drm_clip_rect_merge(struct drm_clip_rect *dst,
+			 struct drm_clip_rect *src, unsigned num_clips,
+			 unsigned flags, u32 width, u32 height);
 
 #endif
