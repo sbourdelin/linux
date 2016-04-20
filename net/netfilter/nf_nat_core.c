@@ -505,6 +505,7 @@ unsigned int nf_nat_packet(struct nf_conn *ct,
 		if (!l3proto->manip_pkt(skb, 0, l4proto, &target, mtype))
 			return NF_DROP;
 	}
+	skb_clear_hash(skb);
 	return NF_ACCEPT;
 }
 EXPORT_SYMBOL_GPL(nf_nat_packet);
