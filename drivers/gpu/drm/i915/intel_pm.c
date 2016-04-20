@@ -76,6 +76,10 @@ static void bxt_init_clock_gating(struct drm_device *dev)
 	if (IS_BXT_REVID(dev_priv, BXT_REVID_B0, REVID_FOREVER))
 		I915_WRITE(GEN9_CLKGATE_DIS_0, I915_READ(GEN9_CLKGATE_DIS_0) |
 			   PWM1_GATING_DIS | PWM2_GATING_DIS);
+
+	/* WaProgramL3SqcReg1DefaultForPerf:bxt */
+	if (IS_BXT_REVID(dev, BXT_REVID_B0, REVID_FOREVER))
+		I915_WRITE(GEN8_L3SQCREG1, BXT_WA_L3SQCREG1_DEFAULT);
 }
 
 static void i915_pineview_get_mem_freq(struct drm_device *dev)
