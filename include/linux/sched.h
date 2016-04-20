@@ -786,6 +786,8 @@ struct signal_struct {
 	short oom_score_adj;		/* OOM kill score adjustment */
 	short oom_score_adj_min;	/* OOM kill score adjustment min value.
 					 * Only settable by CAP_SYS_RESOURCE. */
+	/* If not 0, timestamp of getting TIF_MEMDIE for the first time. */
+	unsigned long oom_start;
 
 	struct mutex cred_guard_mutex;	/* guard against foreign influences on
 					 * credential calculations

@@ -47,6 +47,8 @@
 int sysctl_panic_on_oom;
 int sysctl_oom_kill_allocating_task;
 int sysctl_oom_dump_tasks = 1;
+unsigned long sysctl_oom_victim_skip_secs = (LONG_MAX / HZ);
+unsigned long sysctl_oom_victim_panic_secs = (LONG_MAX / HZ);
 
 DEFINE_MUTEX(oom_lock);
 
@@ -132,6 +134,34 @@ static inline bool is_sysrq_oom(struct oom_control *oc)
 	return oc->order == -1;
 }
 
+static bool is_killable_memdie_task(struct task_struct *p)
+{
+	const unsigned long oom_start = p->signal->oom_start;
+	struct task_struct *t;
+	bool memdie_pending = false;
+
+	if (!oom_start)
+		return false;
+	rcu_read_lock();
+	for_each_thread(p, t) {
+		if (!test_tsk_thread_flag(t, TIF_MEMDIE))
+			continue;
+		memdie_pending = true;
+		break;
+	}
+	rcu_read_unlock();
+	if (!memdie_pending)
+		return false;
+	if (time_after(jiffies, oom_start +
+		       sysctl_oom_victim_panic_secs * HZ)) {
+		sched_show_task(p);
+		panic("Out of memory and %u (%s) can not die...\n",
+		      p->pid, p->comm);
+	}
+	return time_after(jiffies, oom_start +
+			  sysctl_oom_victim_skip_secs * HZ);
+}
+
 /* return true if the task is not adequate as candidate victim task. */
 static bool oom_unkillable_task(struct task_struct *p,
 		struct mem_cgroup *memcg, const nodemask_t *nodemask)
@@ -149,7 +179,8 @@ static bool oom_unkillable_task(struct task_struct *p,
 	if (!has_intersects_mems_allowed(p, nodemask))
 		return true;
 
-	return false;
+	/* Already OOM-killed p might get stuck at unkillable wait */
+	return is_killable_memdie_task(p);
 }
 
 /**
@@ -589,6 +620,22 @@ void mark_oom_victim(struct task_struct *tsk)
 	/* OOM killer might race with memcg OOM */
 	if (test_and_set_tsk_thread_flag(tsk, TIF_MEMDIE))
 		return;
+	/*
+	 * The task might get stuck at unkillable wait with mmap_sem held for
+	 * write. In that case, even the OOM reaper will not help. Therefore,
+	 * record timestamp of setting TIF_MEMDIE for the first time of this
+	 * thread group, and check the timestamp at oom_unkillable_task().
+	 * If we record timestamp of setting TIF_MEMDIE for the first time of
+	 * this task, find_lock_task_mm() will select this task forever and
+	 * the OOM killer will wait for this thread group forever.
+	 */
+	if (!tsk->signal->oom_start) {
+		unsigned long oom_start = jiffies;
+
+		if (!oom_start)
+			oom_start = 1;
+		tsk->signal->oom_start = oom_start;
+	}
 	/*
 	 * Make sure that the task is woken up from uninterruptible sleep
 	 * if it is frozen because OOM killer wouldn't be able to free

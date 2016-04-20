@@ -146,6 +146,9 @@ static const int cap_last_cap = CAP_LAST_CAP;
 static unsigned long hung_task_timeout_max = (LONG_MAX/HZ);
 #endif
 
+static unsigned long oom_victim_wait_timeout_min = 1;
+static unsigned long oom_victim_wait_timeout_max = (LONG_MAX / HZ);
+
 #ifdef CONFIG_INOTIFY_USER
 #include <linux/inotify.h>
 #endif
@@ -1219,6 +1222,24 @@ static struct ctl_table vm_table[] = {
 		.maxlen		= sizeof(sysctl_oom_dump_tasks),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "oom_victim_skip_secs",
+		.data		= &sysctl_oom_victim_skip_secs,
+		.maxlen		= sizeof(sysctl_oom_victim_skip_secs),
+		.mode		= 0644,
+		.proc_handler	= proc_doulongvec_minmax,
+		.extra1         = &oom_victim_wait_timeout_min,
+		.extra2         = &oom_victim_wait_timeout_max,
+	},
+	{
+		.procname	= "oom_victim_panic_secs",
+		.data		= &sysctl_oom_victim_panic_secs,
+		.maxlen		= sizeof(sysctl_oom_victim_panic_secs),
+		.mode		= 0644,
+		.proc_handler	= proc_doulongvec_minmax,
+		.extra1         = &oom_victim_wait_timeout_min,
+		.extra2         = &oom_victim_wait_timeout_max,
 	},
 	{
 		.procname	= "overcommit_ratio",
