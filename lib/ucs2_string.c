@@ -85,29 +85,34 @@ ucs2_as_utf8(u8 *dest, const ucs2_char_t *src, unsigned long maxlength)
 	unsigned long j = 0;
 	unsigned long limit = ucs2_strnlen(src, maxlength);
 
-	for (i = 0; maxlength && i < limit; i++) {
+	if (maxlength == 0)
+		return 0;
+
+	for (i = 0; i < limit; i++) {
 		u16 c = src[i];
 
 		if (c >= 0x800) {
-			if (maxlength < 3)
+			if (maxlength <= 3)
 				break;
 			maxlength -= 3;
 			dest[j++] = 0xe0 | (c & 0xf000) >> 12;
 			dest[j++] = 0x80 | (c & 0x0fc0) >> 6;
 			dest[j++] = 0x80 | (c & 0x003f);
 		} else if (c >= 0x80) {
-			if (maxlength < 2)
+			if (maxlength <= 2)
 				break;
 			maxlength -= 2;
 			dest[j++] = 0xc0 | (c & 0x7c0) >> 6;
 			dest[j++] = 0x80 | (c & 0x03f);
 		} else {
+			if (maxlength <= 1)
+				break;
 			maxlength -= 1;
 			dest[j++] = c & 0x7f;
 		}
 	}
-	if (maxlength)
-		dest[j] = '\0';
+	dest[j] = '\0';
+
 	return j;
 }
 EXPORT_SYMBOL(ucs2_as_utf8);
