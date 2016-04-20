@@ -263,7 +263,6 @@ static void fc_rport_work(struct work_struct *work)
 		ids = rdata->ids;
 		rdata->event = RPORT_EV_NONE;
 		rdata->major_retries = 0;
-		kref_get(&rdata->kref);
 		mutex_unlock(&rdata->rp_mutex);
 
 		if (!rport)
@@ -297,7 +296,6 @@ static void fc_rport_work(struct work_struct *work)
 			FC_RPORT_DBG(rdata, "lld callback ev %d\n", event);
 			rdata->lld_event_callback(lport, rdata, event);
 		}
-		kref_put(&rdata->kref, lport->tt.rport_destroy);
 		break;
 
 	case RPORT_EV_FAILED:
@@ -377,6 +375,7 @@ static void fc_rport_work(struct work_struct *work)
 		mutex_unlock(&rdata->rp_mutex);
 		break;
 	}
+	kref_put(&rdata->kref, lport->tt.rport_destroy);
 }
 
 /**
@@ -438,8 +437,15 @@ static void fc_rport_enter_delete(struct fc_rport_priv *rdata,
 
 	fc_rport_state_enter(rdata, RPORT_ST_DELETE);
 
-	if (rdata->event == RPORT_EV_NONE)
-		queue_work(rport_event_queue, &rdata->event_work);
+	if (rdata->event == RPORT_EV_NONE) {
+		if (!kref_get_unless_zero(&rdata->kref)) {
+			FC_RPORT_DBG(rdata, "port already deleted\n");
+			return;
+		}
+		if (!queue_work(rport_event_queue, &rdata->event_work))
+			kref_put(&rdata->kref,
+				 rdata->local_port->tt.rport_destroy);
+	}
 	rdata->event = event;
 }
 
@@ -487,8 +493,15 @@ static void fc_rport_enter_ready(struct fc_rport_priv *rdata)
 
 	FC_RPORT_DBG(rdata, "Port is Ready\n");
 
-	if (rdata->event == RPORT_EV_NONE)
-		queue_work(rport_event_queue, &rdata->event_work);
+	if (rdata->event == RPORT_EV_NONE) {
+		if (!kref_get_unless_zero(&rdata->kref)) {
+			FC_RPORT_DBG(rdata, "port already deleted\n");
+			return;
+		}
+		if (!queue_work(rport_event_queue, &rdata->event_work))
+			kref_put(&rdata->kref,
+				 rdata->local_port->tt.rport_destroy);
+	}
 	rdata->event = RPORT_EV_READY;
 }
 
