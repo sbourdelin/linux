@@ -1472,16 +1472,11 @@ EXPORT_SYMBOL(radix_tree_gang_lookup_tag_slot);
 #if defined(CONFIG_SHMEM) && defined(CONFIG_SWAP)
 #include <linux/sched.h> /* for cond_resched() */
 
-struct locate_info {
-	unsigned long found_index;
-	bool stop;
-};
-
 /*
  * This linear search is at present only useful to shmem_unuse_inode().
  */
 static unsigned long __locate(struct radix_tree_node *slot, void *item,
-			      unsigned long index, struct locate_info *info)
+			      unsigned long index, unsigned long *found_index)
 {
 	unsigned long base, i;
 
@@ -1498,9 +1493,8 @@ static unsigned long __locate(struct radix_tree_node *slot, void *item,
 				goto out;
 			if (!radix_tree_is_internal_node(node)) {
 				if (node == item) {
-					info->found_index = index;
-					info->stop = true;
-					goto out;
+					*found_index = index;
+					return 0;
 				}
 				continue;
 			}
@@ -1512,9 +1506,7 @@ static unsigned long __locate(struct radix_tree_node *slot, void *item,
 		}
 	} while (i < RADIX_TREE_MAP_SIZE);
 
-out:
-	if ((index == 0) && (i == RADIX_TREE_MAP_SIZE))
-		info->stop = true;
+ out:
 	return index;
 }
 
@@ -1532,10 +1524,7 @@ unsigned long radix_tree_locate_item(struct radix_tree_root *root, void *item)
 	struct radix_tree_node *node;
 	unsigned long max_index;
 	unsigned long cur_index = 0;
-	struct locate_info info = {
-		.found_index = -1,
-		.stop = false,
-	};
+	unsigned long found_index = -1;
 
 	do {
 		rcu_read_lock();
@@ -1543,24 +1532,25 @@ unsigned long radix_tree_locate_item(struct radix_tree_root *root, void *item)
 		if (!radix_tree_is_internal_node(node)) {
 			rcu_read_unlock();
 			if (node == item)
-				info.found_index = 0;
+				found_index = 0;
 			break;
 		}
 
 		node = entry_to_node(node);
-
 		max_index = node_maxindex(node);
 		if (cur_index > max_index) {
 			rcu_read_unlock();
 			break;
 		}
 
-		cur_index = __locate(node, item, cur_index, &info);
+		cur_index = __locate(node, item, cur_index, &found_index);
 		rcu_read_unlock();
+		if (found_index != -1)
+			break;
 		cond_resched();
-	} while (!info.stop && cur_index <= max_index);
+	} while (cur_index != 0);
 
-	return info.found_index;
+	return found_index;
 }
 #else
 unsigned long radix_tree_locate_item(struct radix_tree_root *root, void *item)
