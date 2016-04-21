@@ -169,19 +169,22 @@ _GLOBAL(power7_idle)
 _GLOBAL(power7_nap)
 	mr	r4,r3
 	li	r3,PNV_THREAD_NAP
-	b	power7_powersave_common
+	LOAD_REG_ADDR(r5, power7_enter_nap_mode)
+	b	power_powersave_common
 	/* No return */
 
 _GLOBAL(power7_sleep)
 	li	r3,PNV_THREAD_SLEEP
 	li	r4,1
-	b	power7_powersave_common
+	LOAD_REG_ADDR(r5, power7_enter_nap_mode)
+	b	power_powersave_common
 	/* No return */
 
 _GLOBAL(power7_winkle)
-	li	r3,3
+	li	r3,PNV_THREAD_WINKLE
 	li	r4,1
-	b	power7_powersave_common
+	LOAD_REG_ADDR(r5, power7_enter_nap_mode)
+	b	power_powersave_common
 	/* No return */
 
 _GLOBAL(power7_wakeup_tb_loss)

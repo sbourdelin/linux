@@ -21,8 +21,10 @@
  * To check IRQ_HAPPENED in r4
  * 	0 - don't check
  * 	1 - check
+ *
+ * Address to 'rfid' to in r5
  */
-_GLOBAL(power7_powersave_common)
+_GLOBAL(power_powersave_common)
 	/* Use r3 to pass state nap/sleep/winkle */
 	/* NAP is a state loss, we create a regs frame on the
 	 * stack, fill it up with the state we care about and
@@ -79,13 +81,12 @@ _GLOBAL(power7_powersave_common)
 	 * because as soon as we do that, another thread can switch
 	 * the MMU context to the guest.
 	 */
-	LOAD_REG_IMMEDIATE(r5, MSR_IDLE)
+	LOAD_REG_IMMEDIATE(r7, MSR_IDLE)
 	li	r6, MSR_RI
 	andc	r6, r9, r6
-	LOAD_REG_ADDR(r7, power7_enter_nap_mode)
 	mtmsrd	r6, 1		/* clear RI before setting SRR0/1 */
-	mtspr	SPRN_SRR0, r7
-	mtspr	SPRN_SRR1, r5
+	mtspr	SPRN_SRR0, r5
+	mtspr	SPRN_SRR1, r7
 	rfid
 	/* No return */
 
