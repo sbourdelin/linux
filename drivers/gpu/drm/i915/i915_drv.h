@@ -2104,6 +2104,9 @@ struct drm_i915_gem_object {
 	/** List of VMAs backed by this object */
 	struct list_head vma_list;
 
+	/** Aggregate pin count of all VMAs backed by this object. */
+	unsigned int vma_pin_count;
+
 	/** Stolen memory for this object, instead of being backed by shmem. */
 	struct drm_mm_node *stolen;
 	struct list_head global_list;
@@ -3236,7 +3239,11 @@ i915_gem_obj_to_ggtt(struct drm_i915_gem_object *obj)
 {
 	return i915_gem_obj_to_ggtt_view(obj, &i915_ggtt_view_normal);
 }
-bool i915_gem_obj_is_pinned(struct drm_i915_gem_object *obj);
+
+static inline bool i915_gem_obj_is_pinned(struct drm_i915_gem_object *obj)
+{
+	return obj->vma_pin_count > 0;
+}
 
 /* Some GGTT VM helpers */
 static inline struct i915_hw_ppgtt *

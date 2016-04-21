@@ -4314,6 +4314,8 @@ i915_gem_object_do_pin(struct drm_i915_gem_object *obj,
 	}
 
 	vma->pin_count++;
+	obj->vma_pin_count++;
+
 	return 0;
 }
 
@@ -4354,6 +4356,7 @@ i915_gem_object_ggtt_unpin_view(struct drm_i915_gem_object *obj,
 	WARN_ON(!i915_gem_obj_ggtt_bound_view(obj, view));
 
 	--vma->pin_count;
+	--obj->vma_pin_count;
 }
 
 int
@@ -4586,6 +4589,8 @@ void i915_gem_free_object(struct drm_gem_object *gem_obj)
 	list_for_each_entry_safe(vma, next, &obj->vma_list, obj_link) {
 		int ret;
 
+		GEM_BUG_ON(obj->vma_pin_count < vma->pin_count);
+		obj->vma_pin_count -= vma->pin_count;
 		vma->pin_count = 0;
 		ret = i915_vma_unbind(vma);
 		if (WARN_ON(ret == -ERESTARTSYS)) {
@@ -5327,16 +5332,6 @@ unsigned long i915_gem_obj_size(struct drm_i915_gem_object *o,
 			return vma->node.size;
 	}
 	return 0;
-}
-
-bool i915_gem_obj_is_pinned(struct drm_i915_gem_object *obj)
-{
-	struct i915_vma *vma;
-	list_for_each_entry(vma, &obj->vma_list, obj_link)
-		if (vma->pin_count > 0)
-			return true;
-
-	return false;
 }
 
 /* Like i915_gem_object_get_page(), but mark the returned page dirty */

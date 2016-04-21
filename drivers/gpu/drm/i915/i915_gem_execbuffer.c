@@ -218,8 +218,10 @@ i915_gem_execbuffer_unreserve_vma(struct i915_vma *vma)
 	if (entry->flags & __EXEC_OBJECT_HAS_FENCE)
 		i915_gem_object_unpin_fence(obj);
 
-	if (entry->flags & __EXEC_OBJECT_HAS_PIN)
+	if (entry->flags & __EXEC_OBJECT_HAS_PIN) {
 		vma->pin_count--;
+		obj->vma_pin_count--;
+	}
 
 	entry->flags &= ~(__EXEC_OBJECT_HAS_FENCE | __EXEC_OBJECT_HAS_PIN);
 }
