@@ -168,7 +168,7 @@ static inline void do_adj_guesttime(u64 hosttime)
 	s64 host_tns;
 	struct timespec host_ts;
 
-	host_tns = (hosttime - WLTIMEDELTA) * 100;
+	host_tns = (hosttime - WLTIMEDELTA) * HV_NSEC_PER_TICK;
 	host_ts = ns_to_timespec(host_tns);
 
 	do_settimeofday(&host_ts);

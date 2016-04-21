@@ -18,6 +18,9 @@
 #define HYPERV_CPUID_MIN			0x40000005
 #define HYPERV_CPUID_MAX			0x4000ffff
 
+/* time unit in Hyper-V clocks and timers */
+#define HV_NSEC_PER_TICK			100
+
 /*
  * Feature identification. EAX indicates which features are available
  * to the partition based upon the current partition privileges.

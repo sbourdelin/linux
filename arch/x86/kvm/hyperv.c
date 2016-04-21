@@ -386,7 +386,8 @@ static void synic_init(struct kvm_vcpu_hv_synic *synic)
 
 static u64 get_time_ref_counter(struct kvm *kvm)
 {
-	return div_u64(get_kernel_ns() + kvm->arch.kvmclock_offset, 100);
+	return div_u64(get_kernel_ns() + kvm->arch.kvmclock_offset,
+		       HV_NSEC_PER_TICK);
 }
 
 static void stimer_mark_pending(struct kvm_vcpu_hv_stimer *stimer,
@@ -460,7 +461,8 @@ static int stimer_start(struct kvm_vcpu_hv_stimer *stimer)
 
 		hrtimer_start(&stimer->timer,
 			      ktime_add_ns(ktime_now,
-					   100 * (stimer->exp_time - time_now)),
+					   HV_NSEC_PER_TICK *
+					   (stimer->exp_time - time_now)),
 			      HRTIMER_MODE_ABS);
 		return 0;
 	}
@@ -481,7 +483,9 @@ static int stimer_start(struct kvm_vcpu_hv_stimer *stimer)
 					   time_now, stimer->count);
 
 	hrtimer_start(&stimer->timer,
-		      ktime_add_ns(ktime_now, 100 * (stimer->count - time_now)),
+		      ktime_add_ns(ktime_now,
+				   HV_NSEC_PER_TICK *
+				   (stimer->count - time_now)),
 		      HRTIMER_MODE_ABS);
 	return 0;
 }
@@ -836,7 +840,7 @@ static u64 current_task_runtime_100ns(void)
 	cputime_t utime, stime;
 
 	task_cputime_adjusted(current, &utime, &stime);
-	return div_u64(cputime_to_nsecs(utime + stime), 100);
+	return div_u64(cputime_to_nsecs(utime + stime), HV_NSEC_PER_TICK);
 }
 
 static int kvm_hv_set_msr(struct kvm_vcpu *vcpu, u32 msr, u64 data, bool host)

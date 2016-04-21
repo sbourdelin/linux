@@ -255,7 +255,8 @@ int hv_init(void)
 		tsc_msr.guest_physical_address = vmalloc_to_pfn(va_tsc);
 
 		wrmsrl(HV_X64_MSR_REFERENCE_TSC, tsc_msr.as_uint64);
-		clocksource_register_hz(&hyperv_cs_tsc, NSEC_PER_SEC/100);
+		clocksource_register_hz(&hyperv_cs_tsc,
+					NSEC_PER_SEC / HV_NSEC_PER_TICK);
 	}
 #endif
 	return 0;
