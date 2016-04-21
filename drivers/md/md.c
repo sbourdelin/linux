@@ -7784,6 +7784,7 @@ void md_do_sync(struct md_thread *thread)
 	char *desc, *action = NULL;
 	struct blk_plug plug;
 	bool cluster_resync_finished = false;
+	int ret;
 
 	/* just incase thread restarts... */
 	if (test_bit(MD_RECOVERY_DONE, &mddev->recovery))
@@ -7791,6 +7792,19 @@ void md_do_sync(struct md_thread *thread)
 	if (mddev->ro) {/* never try to sync a read-only array */
 		set_bit(MD_RECOVERY_INTR, &mddev->recovery);
 		return;
+	}
+
+	if (mddev_is_clustered(mddev)) {
+		ret = md_cluster_ops->resync_start(mddev);
+		if (ret)
+			goto skip;
+
+		if (!(test_bit(MD_RECOVERY_SYNC, &mddev->recovery) ||
+			test_bit(MD_RECOVERY_RESHAPE, &mddev->recovery) ||
+			test_bit(MD_RECOVERY_RECOVER, &mddev->recovery))
+		     && ((unsigned long long)mddev->curr_resync_completed
+			 < (unsigned long long)mddev->resync_max_sectors))
+			goto skip;
 	}
 
 	if (test_bit(MD_RECOVERY_SYNC, &mddev->recovery)) {
@@ -8223,14 +8237,6 @@ static void md_start_sync(struct work_struct *ws)
 {
 	struct mddev *mddev = container_of(ws, struct mddev, del_work);
 	int ret = 0;
-
-	if (mddev_is_clustered(mddev)) {
-		ret = md_cluster_ops->resync_start(mddev);
-		if (ret) {
-			mddev->sync_thread = NULL;
-			goto out;
-		}
-	}
 
 	mddev->sync_thread = md_register_thread(md_do_sync,
 						mddev,
