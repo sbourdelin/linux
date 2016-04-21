@@ -526,4 +526,9 @@ static inline void mmc_retune_recheck(struct mmc_host *host)
 		host->retune_now = 1;
 }
 
+static inline bool mmc_retune_enabled(struct mmc_host *host)
+{
+	return host->can_retune;
+}
+
 #endif /* LINUX_MMC_HOST_H */

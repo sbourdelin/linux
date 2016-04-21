@@ -182,6 +182,9 @@ extern int mmc_set_blockcount(struct mmc_card *card, unsigned int blockcount,
 extern int mmc_hw_reset(struct mmc_host *host);
 extern int mmc_can_reset(struct mmc_card *card);
 
+extern int mmc_exit_tuning_mode(struct mmc_card *card);
+extern int mmc_reenter_tuning_mode(struct mmc_card *card, u8 mode);
+
 extern void mmc_set_data_timeout(struct mmc_data *, const struct mmc_card *);
 extern unsigned int mmc_align_data_size(struct mmc_card *, unsigned int);
 

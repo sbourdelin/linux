@@ -733,6 +733,36 @@ static const struct block_device_operations mmc_bdops = {
 #endif
 };
 
+static int mmc_blk_pre_rpmb(struct mmc_card *card, struct mmc_blk_data *md)
+{
+	int ret;
+
+	if (md->part_type != EXT_CSD_PART_CONFIG_ACC_RPMB)
+		return 0;
+
+	ret = mmc_exit_tuning_mode(card);
+	if (ret < 0)
+		return ret;
+
+	card->post_rpmb_mode = ret;
+
+	return 0;
+}
+
+static void mmc_blk_post_rpmb(struct mmc_card *card,
+			      struct mmc_blk_data *main_md)
+{
+	int ret;
+
+	if (main_md->part_curr != EXT_CSD_PART_CONFIG_ACC_RPMB)
+		return;
+
+	ret = mmc_reenter_tuning_mode(card, card->post_rpmb_mode);
+	if (ret)
+		pr_err("%s: Post RPMB, failed to reenter mode %u, error %d\n",
+		       mmc_hostname(card->host), card->post_rpmb_mode, ret);
+}
+
 static inline int mmc_blk_part_switch(struct mmc_card *card,
 				      struct mmc_blk_data *md)
 {
@@ -745,6 +775,10 @@ static inline int mmc_blk_part_switch(struct mmc_card *card,
 	if (mmc_card_mmc(card)) {
 		u8 part_config = card->ext_csd.part_config;
 
+		ret = mmc_blk_pre_rpmb(card, md);
+		if (ret)
+			return ret;
+
 		part_config &= ~EXT_CSD_PART_CONFIG_ACC_MASK;
 		part_config |= md->part_type;
 
@@ -755,6 +789,8 @@ static inline int mmc_blk_part_switch(struct mmc_card *card,
 			return ret;
 
 		card->ext_csd.part_config = part_config;
+
+		mmc_blk_post_rpmb(card, main_md);
 	}
 
 	main_md->part_curr = md->part_type;

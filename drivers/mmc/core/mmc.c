@@ -1408,6 +1408,75 @@ static int mmc_hs200_tuning(struct mmc_card *card)
 	return mmc_execute_tuning(card);
 }
 
+static int mmc_hs_to_hs200(struct mmc_card *card)
+{
+	int err;
+
+	err = __mmc_hs_to_hs200(card);
+	if (err)
+		return err;
+
+	err = mmc_hs200_tuning(card);
+	if (err)
+		return err;
+
+	return 0;
+}
+
+int mmc_exit_tuning_mode(struct mmc_card *card)
+{
+	struct mmc_host *host = card->host;
+	int err;
+
+	if (!mmc_retune_enabled(host))
+		return 0;
+
+	switch (host->ios.timing) {
+	case MMC_TIMING_MMC_HS200:
+		/*
+		 * Shouldn't need re-tuning because the frequency first gets
+		 * reduced to the High Speed frequency.
+		 */
+		mmc_retune_disable(host);
+		err = mmc_hs200_to_hs(card);
+		if (err < 0)
+			return err;
+		return MMC_TIMING_MMC_HS200;
+	case MMC_TIMING_MMC_HS400:
+		/*
+		 * Must disable re-tuning to stop it interfering with the mode
+		 * switch, which is OK because we are following the same
+		 * sequence that re-tuning follows anyway.
+		 */
+		mmc_retune_disable(host);
+		err = mmc_hs400_to_hs(card);
+		if (err < 0)
+			return err;
+		return MMC_TIMING_MMC_HS400;
+	default:
+		return 0;
+	}
+}
+EXPORT_SYMBOL(mmc_exit_tuning_mode);
+
+int mmc_reenter_tuning_mode(struct mmc_card *card, u8 mode)
+{
+	int err;
+
+	switch (mode) {
+	case MMC_TIMING_MMC_HS200:
+		return mmc_hs_to_hs200(card);
+	case MMC_TIMING_MMC_HS400:
+		err = mmc_hs_to_hs200(card);
+		if (err)
+			return err;
+		return mmc_hs200_to_hs400(card);
+	default:
+		return 0;
+	}
+}
+EXPORT_SYMBOL(mmc_reenter_tuning_mode);
+
 /*
  * Handle the detection and initialisation of a card.
  *
