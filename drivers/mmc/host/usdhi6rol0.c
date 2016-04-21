@@ -21,6 +21,7 @@
 #include <linux/mmc/sd.h>
 #include <linux/mmc/sdio.h>
 #include <linux/module.h>
+#include <linux/of.h>
 #include <linux/pagemap.h>
 #include <linux/platform_device.h>
 #include <linux/scatterlist.h>
@@ -1147,12 +1148,22 @@ static void usdhi6_enable_sdio_irq(struct mmc_host *mmc, int enable)
 	}
 }
 
+static int usdhi6_sig_volt_switch(struct mmc_host *mmc, struct mmc_ios *ios)
+{
+	int ret;
+
+	ret = mmc_regulator_set_vqmmc(mmc, ios);
+
+	return ret;
+}
+
 static struct mmc_host_ops usdhi6_ops = {
 	.request	= usdhi6_request,
 	.set_ios	= usdhi6_set_ios,
 	.get_cd		= usdhi6_get_cd,
 	.get_ro		= usdhi6_get_ro,
 	.enable_sdio_irq = usdhi6_enable_sdio_irq,
+	.start_signal_voltage_switch = usdhi6_sig_volt_switch,
 };
 
 /*			State machine handlers				*/
@@ -1785,7 +1796,17 @@ static int usdhi6_probe(struct platform_device *pdev)
 
 	mmc->ops = &usdhi6_ops;
 	mmc->caps |= MMC_CAP_SD_HIGHSPEED | MMC_CAP_MMC_HIGHSPEED |
-		MMC_CAP_UHS_SDR50 | MMC_CAP_UHS_DDR50 | MMC_CAP_SDIO_IRQ;
+		     MMC_CAP_SDIO_IRQ;
+
+	/*
+	 * A vqmmc regulator with a 1.8V mode is mandatory to support
+	 * UHS modes.
+	 */
+	if (!of_property_read_bool(dev->of_node, "no-1-8-v") &&
+	    !IS_ERR(mmc->supply.vqmmc)) {
+		mmc->caps |= MMC_CAP_UHS_DDR50 | MMC_CAP_UHS_SDR50;
+	}
+
 	/* Set .max_segs to some random number. Feel free to adjust. */
 	mmc->max_segs = 32;
 	mmc->max_blk_size = 512;
