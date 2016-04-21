@@ -60,10 +60,11 @@ static unsigned int tw686x_fields_map(v4l2_std_id std, unsigned int fps)
 		0, 1, 1, 1, 2,  2,  3,  3,  4,  4,  5,  5,  6,  6, 7, 7,
 		   8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 0, 0
 	};
+	unsigned int max_fps = (std & V4L2_STD_525_60) ? 30 : 25;
+	unsigned int i;
 
-	unsigned int i =
-		(std & V4L2_STD_625_50) ? std_625_50[fps] : std_525_60[fps];
-
+	fps = fps > max_fps ? max_fps : fps;
+	i = (std & V4L2_STD_525_60) ? std_625_50[fps] : std_525_60[fps];
 	return map[i];
 }
 
