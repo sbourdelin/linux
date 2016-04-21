@@ -175,9 +175,9 @@ int lp8788_irq_init(struct lp8788 *lp, int irq)
 	lp->irqdm = irqd->domain;
 	mutex_init(&irqd->irq_lock);
 
-	ret = request_threaded_irq(irq, NULL, lp8788_irq_handler,
-				IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
-				"lp8788-irq", irqd);
+	ret = devm_request_threaded_irq(lp->dev, irq, NULL, lp8788_irq_handler,
+					IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+					"lp8788-irq", irqd);
 	if (ret) {
 		dev_err(lp->dev, "failed to create a thread for IRQ_N\n");
 		return ret;
@@ -186,10 +186,4 @@ int lp8788_irq_init(struct lp8788 *lp, int irq)
 	lp->irq = irq;
 
 	return 0;
-}
-
-void lp8788_irq_exit(struct lp8788 *lp)
-{
-	if (lp->irq)
-		free_irq(lp->irq, lp->irqdm);
 }

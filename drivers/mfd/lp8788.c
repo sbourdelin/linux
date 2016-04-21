@@ -203,15 +203,6 @@ static int lp8788_probe(struct i2c_client *cl, const struct i2c_device_id *id)
 			       ARRAY_SIZE(lp8788_devs), NULL, 0, NULL);
 }
 
-static int lp8788_remove(struct i2c_client *cl)
-{
-	struct lp8788 *lp = i2c_get_clientdata(cl);
-
-	mfd_remove_devices(lp->dev);
-	lp8788_irq_exit(lp);
-	return 0;
-}
-
 static const struct i2c_device_id lp8788_ids[] = {
 	{"lp8788", 0},
 	{ }
@@ -223,7 +214,6 @@ static struct i2c_driver lp8788_driver = {
 		.name = "lp8788",
 	},
 	.probe = lp8788_probe,
-	.remove = lp8788_remove,
 	.id_table = lp8788_ids,
 };
 
