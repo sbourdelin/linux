@@ -199,11 +199,10 @@ Type: vm ioctl
 Parameters: vcpu id (apic id on x86)
 Returns: vcpu fd on success, -1 on error
 
-This API adds a vcpu to a virtual machine.  The vcpu id is a small integer
-in the range [0, max_vcpus).
+This API adds a vcpu to a virtual machine.  The vcpu id is a positive integer.
 
-The recommended max_vcpus value can be retrieved using the KVM_CAP_NR_VCPUS of
-the KVM_CHECK_EXTENSION ioctl() at run-time.
+The recommended maximum number of vcpus (max_vcpus) can be retrieved using the
+KVM_CAP_NR_VCPUS of the KVM_CHECK_EXTENSION ioctl() at run-time.
 The maximum possible value for max_vcpus can be retrieved using the
 KVM_CAP_MAX_VCPUS of the KVM_CHECK_EXTENSION ioctl() at run-time.
 
