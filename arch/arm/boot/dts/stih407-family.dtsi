@@ -745,5 +745,14 @@
 				      "fdma_low",
 				      "fdma_ic";
 		};
+
+		sti_sasg_codec: sti-sasg-codec {
+			compatible = "st,stih407-sas-codec";
+			#sound-dai-cells = <1>;
+			status = "okay";
+			st,syscfg = <&syscfg_core>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_spdif_out >;
+		};
 	};
 };
