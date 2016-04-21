@@ -4645,11 +4645,21 @@ struct i915_vma *i915_gem_obj_to_vma(struct drm_i915_gem_object *obj,
 				     struct i915_address_space *vm)
 {
 	struct i915_vma *vma;
+
+	BUILD_BUG_ON(I915_GGTT_VIEW_NORMAL != 0);
+
 	list_for_each_entry(vma, &obj->vma_list, obj_link) {
-		if (vma->ggtt_view.type == I915_GGTT_VIEW_NORMAL &&
-		    vma->vm == vm)
+		/*
+		 * Below is just a branching avoiding way of saying:
+		 * vma_ggtt_view.type == I915_GGTT_VIEW_NORMAL && vma->vm == vm,
+		 * which relies on the fact I915_GGTT_VIEW_NORMAL has to be
+		 * zero.
+		 */
+		if (!((unsigned long)vma->ggtt_view.type |
+		    ((unsigned long)vma->vm ^ (unsigned long)vm)))
 			return vma;
 	}
+
 	return NULL;
 }
 
