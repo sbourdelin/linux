@@ -96,11 +96,35 @@ _GLOBAL(power_powersave_common)
  * back to reset vector.
  */
 _GLOBAL(power7_restore_hyp_resource)
+	GET_PACA(r13)
+BEGIN_FTR_SECTION_NESTED(888)
 	/*
+	 * POWER ISA 3. Use PSSCR to determine if we
+	 * are waking up from deep idle state
+	 */
+	LOAD_REG_ADDRBASE(r5,pnv_first_deep_stop_state)
+	ld	r4,ADDROFF(pnv_first_deep_stop_state)(r5)
+
+	mfspr	r5,SPRN_PSSCR
+	/*
+	 * 0-4 bits correspond to Power-Saving Level Status
+	 * which indicates the idle state we are waking up from
+	 */
+	rldicl  r5,r5,4,60
+	cmpd	r5,r4
+	bge	power_stop_wakeup_hyp_loss
+	/*
+	 * Waking up without hypervisor state loss. Return to
+	 * reset vector
+	 */
+	blr
+
+END_FTR_SECTION_NESTED(CPU_FTR_STOP_INST,CPU_FTR_STOP_INST,888)
+	/*
+	 * POWER ISA 2.07 or less.
 	 * Check if last bit of HSPGR0 is set. This indicates whether we are
 	 * waking up from winkle.
 	 */
-	GET_PACA(r13)
 	clrldi	r5,r13,63
 	clrrdi	r13,r13,1
 	cmpwi	cr4,r5,1
