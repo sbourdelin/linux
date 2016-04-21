@@ -1494,9 +1494,11 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 		      max_lane_count, common_rates[max_clock],
 		      adjusted_mode->crtc_clock);
 
-	/* Walk through all bpp values. Luckily they're all nicely spaced with 2
-	 * bpc in between. */
-	bpp = pipe_config->pipe_bpp;
+	if (intel_dp->compliance_test_data == INTEL_DP_RESOLUTION_FAILSAFE)
+		bpp = 18;
+	else
+		bpp = pipe_config->pipe_bpp;
+
 	if (is_edp(intel_dp)) {
 
 		/* Get bpp from vbt only for panels that dont have bpp in edid */
@@ -1518,6 +1520,10 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 		min_clock = max_clock;
 	}
 
+	/*
+	 * Walk through all bpp values. Luckily they're all nicely spaced with
+	 * 2bpc in between.
+	 */
 	for (; bpp >= 6*3; bpp -= 2*3) {
 		mode_rate = intel_dp_link_required(adjusted_mode->crtc_clock,
 						   bpp);
@@ -4680,6 +4686,8 @@ intel_dp_detect(struct drm_connector *connector, bool force)
 
 	intel_dp->detect_done = false;
 
+	if (intel_dp->compliance_test_data == INTEL_DP_RESOLUTION_FAILSAFE)
+		return connector_status_connected;
 	if (intel_connector->detect_edid)
 		return connector_status_connected;
 	else
@@ -4715,7 +4723,17 @@ intel_dp_force(struct drm_connector *connector)
 static int intel_dp_get_modes(struct drm_connector *connector)
 {
 	struct intel_connector *intel_connector = to_intel_connector(connector);
+	struct intel_dp *intel_dp = intel_attached_dp(connector);
 	struct edid *edid;
+
+	if (intel_dp->compliance_test_data == INTEL_DP_RESOLUTION_FAILSAFE) {
+		int count;
+
+		count = drm_add_modes_noedid(connector, 640, 480);
+		drm_set_preferred_mode(connector, 640, 480);
+		DRM_ERROR("Using fail mode since edid is corrupt\n");
+		return count;
+	}
 
 	edid = intel_connector->detect_edid;
 	if (edid) {
