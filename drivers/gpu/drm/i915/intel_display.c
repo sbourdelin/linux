@@ -14570,7 +14570,22 @@ static void intel_setup_outputs(struct drm_device *dev)
 		    intel_dp_is_edp(dev, PORT_C))
 			intel_dp_init(dev, VLV_DP_C, PORT_C);
 
-		if (IS_CHERRYVIEW(dev)) {
+		if (IS_VALLEYVIEW(dev)) {
+			struct intel_connector *connector;
+
+			/*
+			 * On vlv, turning off all of the power domains results
+			 * in a loss of hpd, enable polling on all of the
+			 * connectors so that drm polls them when this happens
+			 */
+			drm_modeset_lock(&dev->mode_config.connection_mutex,
+					 NULL);
+			for_each_intel_connector(dev, connector) {
+				connector->polled = DRM_CONNECTOR_POLL_CONNECT |
+					DRM_CONNECTOR_POLL_DISCONNECT;
+			}
+			drm_modeset_unlock(&dev->mode_config.connection_mutex);
+		} else if (IS_CHERRYVIEW(dev)) {
 			/* eDP not supported on port D, so don't check VBT */
 			if (I915_READ(CHV_HDMID) & SDVO_DETECTED)
 				intel_hdmi_init(dev, CHV_HDMID, PORT_D);
