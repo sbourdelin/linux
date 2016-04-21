@@ -1361,6 +1361,7 @@ static const struct intel_uncore_init_fun knl_uncore_init __initconst = {
 };
 
 static const struct intel_uncore_init_fun skl_uncore_init __initconst = {
+	.cpu_init = skl_uncore_cpu_init,
 	.pci_init = skl_uncore_pci_init,
 };
 
@@ -1384,7 +1385,8 @@ static const struct x86_cpu_id intel_uncore_match[] __initconst = {
 	X86_UNCORE_MODEL_MATCH(79, bdx_uncore_init),	/* BDX-EP */
 	X86_UNCORE_MODEL_MATCH(86, bdx_uncore_init),	/* BDX-DE */
 	X86_UNCORE_MODEL_MATCH(87, knl_uncore_init),	/* Knights Landing */
-	X86_UNCORE_MODEL_MATCH(94, skl_uncore_init),	/* SkyLake */
+	X86_UNCORE_MODEL_MATCH(78, skl_uncore_init),	/* SkyLake Mobile */
+	X86_UNCORE_MODEL_MATCH(94, skl_uncore_init),	/* SkyLake Desktop */
 	{},
 };
 
