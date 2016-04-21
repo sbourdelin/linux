@@ -213,9 +213,9 @@ struct i915_vma {
 	 * and the framebuffer code. When switching/pageflipping, the
 	 * framebuffer code has at most two buffers pinned per crtc.
 	 *
-	 * In the worst case this is 1 + 1 + 1 + 2*2 = 7. That would fit into 3
-	 * bits with absolutely no headroom. So use 4 bits. */
-	unsigned int pin_count:4;
+	 * In the worst case this is 1 + 1 + 1 + 2*2 = 7.
+	 */
+	unsigned int pin_count;
 #define DRM_I915_GEM_OBJECT_MAX_PIN_COUNT 0xf
 };
 
