@@ -4173,9 +4173,14 @@ static void intel_dp_handle_test_request(struct intel_dp *intel_dp,
 	}
 
 update_status:
+	/* Clear interrupt first */
+	drm_dp_dpcd_writeb(&intel_dp->aux,
+			   DP_DEVICE_SERVICE_IRQ_VECTOR,
+			   DP_AUTOMATED_TEST_REQUEST);
 	status = drm_dp_dpcd_write(&intel_dp->aux,
 				   DP_TEST_RESPONSE,
 				   &response, 1);
+
 	if (status <= 0)
 		DRM_DEBUG_KMS("Could not write test response to sink\n");
 }
@@ -4312,15 +4317,22 @@ intel_dp_short_pulse(struct intel_dp *intel_dp)
 	/* Try to read the source of the interrupt */
 	if (intel_dp->dpcd[DP_DPCD_REV] >= 0x11 &&
 	    intel_dp_get_sink_irq(intel_dp, &sink_irq_vector)) {
-		/* Clear interrupt source */
-		drm_dp_dpcd_writeb(&intel_dp->aux,
-				   DP_DEVICE_SERVICE_IRQ_VECTOR,
-				   sink_irq_vector);
-
-		if (sink_irq_vector & DP_AUTOMATED_TEST_REQUEST)
+		if (sink_irq_vector & DP_AUTOMATED_TEST_REQUEST) {
 			intel_dp_handle_test_request(intel_dp, true);
+			sink_irq_vector &= ~DP_AUTOMATED_TEST_REQUEST;
+		}
+
 		if (sink_irq_vector & (DP_CP_IRQ | DP_SINK_SPECIFIC_IRQ))
 			DRM_DEBUG_DRIVER("CP or sink specific irq unhandled\n");
+
+		/* Clear interrupt source */
+		if (sink_irq_vector) {
+			DRM_DEBUG_KMS("ATR requests not handled for %x\n",
+				      sink_irq_vector);
+			drm_dp_dpcd_writeb(&intel_dp->aux,
+					   DP_DEVICE_SERVICE_IRQ_VECTOR,
+					   sink_irq_vector);
+		}
 	}
 
 	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
