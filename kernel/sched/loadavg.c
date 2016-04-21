@@ -216,10 +216,9 @@ void calc_load_exit_idle(void)
 static long calc_load_fold_idle(void)
 {
 	int idx = calc_load_read_idx();
-	long delta = 0;
+	long delta;
 
-	if (atomic_long_read(&calc_load_idle[idx]))
-		delta = atomic_long_xchg(&calc_load_idle[idx], 0);
+	delta = atomic_long_xchg(&calc_load_idle[idx], 0);
 
 	return delta;
 }
