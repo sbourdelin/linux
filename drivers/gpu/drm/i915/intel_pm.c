@@ -4804,6 +4804,16 @@ static void gen9_enable_rps(struct drm_device *dev)
 
 	/* WaGsvDisableTurbo: Workaround to disable turbo on BXT A* */
 	if (IS_BXT_REVID(dev, 0, BXT_REVID_A1)) {
+		/*
+		 * BIOS could leave the Hw Turbo enabled, so need to explicitly
+		 * clear out the Control register just to avoid inconsitency
+		 * with debugfs interface, which will show  Turbo as enabled
+		 * only and that is not expected by the User after adding the
+		 * WaGsvDisableTurbo. Apart from this there is no problem even
+		 * if the Turbo is left enabled in the Control register, as the
+		 * Up/Down interrupts would remain masked.
+		 */
+		I915_WRITE(GEN6_RP_CONTROL, 0);
 		intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
 		return;
 	}
