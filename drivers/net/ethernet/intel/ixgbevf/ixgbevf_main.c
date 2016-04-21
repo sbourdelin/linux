@@ -1557,6 +1557,7 @@ static inline void ixgbevf_irq_enable(struct ixgbevf_adapter *adapter)
 static void ixgbevf_configure_tx_ring(struct ixgbevf_adapter *adapter,
 				      struct ixgbevf_ring *ring)
 {
+	u32 regval;
 	struct ixgbe_hw *hw = &adapter->hw;
 	u64 tdba = ring->dma;
 	int wait_loop = 10;
@@ -1577,8 +1578,10 @@ static void ixgbevf_configure_tx_ring(struct ixgbevf_adapter *adapter,
 	IXGBE_WRITE_REG(hw, IXGBE_VFTDWBAL(reg_idx), 0);
 
 	/* enable relaxed ordering */
+	regval = IXGBE_READ_REG(hw, IXGBE_VFDCA_TXCTRL(reg_idx));
+
 	IXGBE_WRITE_REG(hw, IXGBE_VFDCA_TXCTRL(reg_idx),
-			(IXGBE_DCA_TXCTRL_DESC_RRO_EN |
+			(regval | IXGBE_DCA_TXCTRL_DESC_RRO_EN |
 			 IXGBE_DCA_TXCTRL_DATA_RRO_EN));
 
 	/* reset head and tail pointers */
@@ -1746,6 +1749,7 @@ static void ixgbevf_setup_vfmrqc(struct ixgbevf_adapter *adapter)
 static void ixgbevf_configure_rx_ring(struct ixgbevf_adapter *adapter,
 				      struct ixgbevf_ring *ring)
 {
+	u32 regval;
 	struct ixgbe_hw *hw = &adapter->hw;
 	u64 rdba = ring->dma;
 	u32 rxdctl;
@@ -1761,8 +1765,9 @@ static void ixgbevf_configure_rx_ring(struct ixgbevf_adapter *adapter,
 			ring->count * sizeof(union ixgbe_adv_rx_desc));
 
 	/* enable relaxed ordering */
+	regval = IXGBE_READ_REG(hw, IXGBE_VFDCA_RXCTRL(reg_idx));
 	IXGBE_WRITE_REG(hw, IXGBE_VFDCA_RXCTRL(reg_idx),
-			IXGBE_DCA_RXCTRL_DESC_RRO_EN);
+			regval | IXGBE_DCA_RXCTRL_DESC_RRO_EN);
 
 	/* reset head and tail pointers */
 	IXGBE_WRITE_REG(hw, IXGBE_VFRDH(reg_idx), 0);
