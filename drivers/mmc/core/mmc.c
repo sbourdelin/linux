@@ -1162,7 +1162,7 @@ int mmc_hs200_to_hs400(struct mmc_card *card)
 	return mmc_select_hs400(card);
 }
 
-int mmc_hs400_to_hs200(struct mmc_card *card)
+static int mmc_hs400_to_hs(struct mmc_card *card)
 {
 	struct mmc_host *host = card->host;
 	bool send_status = true;
@@ -1208,6 +1208,24 @@ int mmc_hs400_to_hs200(struct mmc_card *card)
 			goto out_err;
 	}
 
+	return 0;
+
+out_err:
+	pr_err("%s: %s failed, error %d\n", mmc_hostname(card->host),
+	       __func__, err);
+	return err;
+}
+
+static int __mmc_hs_to_hs200(struct mmc_card *card)
+{
+	struct mmc_host *host = card->host;
+	bool send_status = true;
+	int err;
+	u8 val;
+
+	if (host->caps & MMC_CAP_WAIT_WHILE_BUSY)
+		send_status = false;
+
 	/* Switch HS to HS200 */
 	val = EXT_CSD_TIMING_HS200 |
 	      card->drive_strength << EXT_CSD_DRV_STR_SHIFT;
@@ -1226,6 +1244,26 @@ int mmc_hs400_to_hs200(struct mmc_card *card)
 	}
 
 	mmc_set_bus_speed(card);
+
+	return 0;
+
+out_err:
+	pr_err("%s: %s failed, error %d\n", mmc_hostname(card->host),
+	       __func__, err);
+	return err;
+}
+
+int mmc_hs400_to_hs200(struct mmc_card *card)
+{
+	int err;
+
+	err = mmc_hs400_to_hs(card);
+	if (err)
+		goto out_err;
+
+	err = __mmc_hs_to_hs200(card);
+	if (err)
+		goto out_err;
 
 	return 0;
 
