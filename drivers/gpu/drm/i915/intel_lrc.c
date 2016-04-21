@@ -314,14 +314,12 @@ static void
 intel_lr_context_descriptor_update(struct intel_context *ctx,
 				   struct intel_engine_cs *engine)
 {
-	uint64_t lrca, desc;
+	u64 desc;
 
-	lrca = ctx->engine[engine->id].lrc_vma->node.start +
-	       LRC_PPHWSP_PN * PAGE_SIZE;
-
-	desc = engine->ctx_desc_template;			   /* bits  0-11 */
-	desc |= lrca;					   /* bits 12-31 */
-	desc |= (lrca >> PAGE_SHIFT) << GEN8_CTX_ID_SHIFT; /* bits 32-51 */
+	desc = engine->ctx_desc_template; /* bits  0-11 */
+	desc |= ctx->engine[engine->id].lrc_vma->node.start +
+	       LRC_PPHWSP_PN * PAGE_SIZE; /* bits 12-31 */
+	desc |= (u64)ctx->hw_id << GEN8_CTX_ID_SHIFT; /* bits 32-51 */
 
 	ctx->engine[engine->id].lrc_desc = desc;
 }
@@ -330,28 +328,6 @@ uint64_t intel_lr_context_descriptor(struct intel_context *ctx,
 				     struct intel_engine_cs *engine)
 {
 	return ctx->engine[engine->id].lrc_desc;
-}
-
-/**
- * intel_execlists_ctx_id() - get the Execlists Context ID
- * @ctx: Context to get the ID for
- * @ring: Engine to get the ID for
- *
- * Do not confuse with ctx->id! Unfortunately we have a name overload
- * here: the old context ID we pass to userspace as a handler so that
- * they can refer to a context, and the new context ID we pass to the
- * ELSP so that the GPU can inform us of the context status via
- * interrupts.
- *
- * The context ID is a portion of the context descriptor, so we can
- * just extract the required part from the cached descriptor.
- *
- * Return: 20-bits globally unique context ID.
- */
-u32 intel_execlists_ctx_id(struct intel_context *ctx,
-			   struct intel_engine_cs *engine)
-{
-	return intel_lr_context_descriptor(ctx, engine) >> GEN8_CTX_ID_SHIFT;
 }
 
 static void execlists_elsp_write(struct drm_i915_gem_request *rq0,
@@ -499,7 +475,7 @@ execlists_check_remove_request(struct intel_engine_cs *engine, u32 request_id)
 	if (!head_req)
 		return 0;
 
-	if (unlikely(intel_execlists_ctx_id(head_req->ctx, engine) != request_id))
+	if (unlikely(head_req->ctx->hw_id != request_id))
 		return 0;
 
 	WARN(head_req->elsp_submitted == 0, "Never submitted head request\n");
