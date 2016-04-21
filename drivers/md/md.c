@@ -2293,12 +2293,18 @@ repeat:
 	if (mddev_is_clustered(mddev)) {
 		if (test_and_clear_bit(MD_CHANGE_DEVS, &mddev->flags))
 			force_change = 1;
+		if (test_and_clear_bit(MD_CHANGE_CLEAN, &mddev->flags))
+			nospares = 1;
 		ret = md_cluster_ops->metadata_update_start(mddev);
 		/* Has someone else has updated the sb */
 		if (!does_sb_need_changing(mddev)) {
 			if (ret == 0)
 				md_cluster_ops->metadata_update_cancel(mddev);
-			clear_bit(MD_CHANGE_PENDING, &mddev->flags);
+			spin_lock(&mddev->write_lock);
+			if (!test_bit(MD_CHANGE_DEVS, &mddev->flags) &&
+			    !test_bit(MD_CHANGE_CLEAN, &mddev->flags))
+				clear_bit(MD_CHANGE_PENDING, &mddev->flags);
+			spin_unlock(&mddev->lock);
 			return;
 		}
 	}
@@ -2434,7 +2440,8 @@ repeat:
 
 	spin_lock(&mddev->lock);
 	if (mddev->in_sync != sync_req ||
-	    test_bit(MD_CHANGE_DEVS, &mddev->flags)) {
+	    test_bit(MD_CHANGE_DEVS, &mddev->flags) ||
+	    test_bit(MD_CHANGE_CLEAN, &mddev->flags)) {
 		/* have to write it out again */
 		spin_unlock(&mddev->lock);
 		goto repeat;
@@ -8145,18 +8152,20 @@ void md_do_sync(struct md_thread *thread)
 		}
 	}
  skip:
-	set_bit(MD_CHANGE_DEVS, &mddev->flags);
-
 	if (mddev_is_clustered(mddev) &&
 	    ret == 0) {
 		/* set CHANGE_PENDING here since maybe another
 		 * update is needed, so other nodes are informed */
+		spin_lock(&mddev->lock);
+		set_bit(MD_CHANGE_DEVS, &mddev->flags);
 		set_bit(MD_CHANGE_PENDING, &mddev->flags);
+		spin_unlock(&mddev->lock);
 		md_wakeup_thread(mddev->thread);
 		wait_event(mddev->sb_wait,
 			   !test_bit(MD_CHANGE_PENDING, &mddev->flags));
 		md_cluster_ops->resync_finish(mddev);
-	}
+	} else
+		set_bit(MD_CHANGE_DEVS, &mddev->flags);
 
 	spin_lock(&mddev->lock);
 	if (!test_bit(MD_RECOVERY_INTR, &mddev->recovery)) {
@@ -8549,6 +8558,7 @@ EXPORT_SYMBOL(md_finish_reshape);
 int rdev_set_badblocks(struct md_rdev *rdev, sector_t s, int sectors,
 		       int is_new)
 {
+	struct mddev *mddev = rdev->mddev;
 	int rv;
 	if (is_new)
 		s += rdev->new_data_offset;
@@ -8558,8 +8568,10 @@ int rdev_set_badblocks(struct md_rdev *rdev, sector_t s, int sectors,
 	if (rv == 0) {
 		/* Make sure they get written out promptly */
 		sysfs_notify_dirent_safe(rdev->sysfs_state);
+		spin_lock(&mddev->lock);
 		set_bit(MD_CHANGE_CLEAN, &rdev->mddev->flags);
 		set_bit(MD_CHANGE_PENDING, &rdev->mddev->flags);
+		spin_unlock(&mddev->lock);
 		md_wakeup_thread(rdev->mddev->thread);
 		return 1;
 	} else
