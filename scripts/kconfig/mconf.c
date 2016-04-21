@@ -642,6 +642,75 @@ conf_childs:
 	indent -= doint;
 }
 
+static int less(struct menu *a, struct menu *b)
+{
+	const char *s1 = _(menu_get_prompt(a));
+	const char *s2 = _(menu_get_prompt(b));
+
+	if (!s1)
+		return 1;
+
+	if (!s2)
+		return 0;
+
+	return strcmp(s1, s2) < 0;
+}
+
+static struct menu *merge(struct menu *a, struct menu *b)
+{
+	struct menu head;
+	struct menu *c = &head;
+
+	while (a && b) {
+		if (less(a, b)) {
+			c->next = a;
+			c = a;
+			a = a->next;
+		} else {
+			c->next = b;
+			c = b;
+			b = b->next;
+		}
+	}
+
+	c->next = a ? a : b;
+
+	return head.next;
+}
+
+static struct menu *mergesort(struct menu *c)
+{
+	struct menu *a;
+	struct menu *b;
+
+	if (!c)
+		return c;
+
+	if (c->list)
+		c->list =  mergesort(c->list);
+
+	if (!c->next)
+		return c;
+
+	a = c;
+	b = c->next;
+
+	while (b && b->next) {
+		c = c->next;
+		b = b->next->next;
+	}
+
+	b = c->next;
+	c->next = NULL;
+
+	return merge(mergesort(a), mergesort(b));
+}
+
+static struct menu *sort_conf(void)
+{
+	return mergesort(&rootmenu);
+}
+
 static void conf(struct menu *menu, struct menu *active_menu)
 {
 	struct menu *submenu;
@@ -668,6 +737,7 @@ static void conf(struct menu *menu, struct menu *active_menu)
 		res = dialog_menu(prompt ? _(prompt) : _("Main Menu"),
 				  _(menu_instructions),
 				  active_menu, &s_scroll);
+
 		if (res == 1 || res == KEY_ESC || res == -ERRDISPLAYTOOSMALL)
 			break;
 		if (item_count() != 0) {
@@ -720,6 +790,9 @@ static void conf(struct menu *menu, struct menu *active_menu)
 			conf_load();
 			break;
 		case 5:
+			sort_conf();
+			break;
+		case 6:
 			if (item_is_tag('t')) {
 				if (sym_set_tristate_value(sym, yes))
 					break;
@@ -727,24 +800,24 @@ static void conf(struct menu *menu, struct menu *active_menu)
 					show_textbox(NULL, setmod_text, 6, 74);
 			}
 			break;
-		case 6:
+		case 7:
 			if (item_is_tag('t'))
 				sym_set_tristate_value(sym, no);
 			break;
-		case 7:
+		case 8:
 			if (item_is_tag('t'))
 				sym_set_tristate_value(sym, mod);
 			break;
-		case 8:
+		case 9:
 			if (item_is_tag('t'))
 				sym_toggle_tristate_value(sym);
 			else if (item_is_tag('m'))
 				conf(submenu, NULL);
 			break;
-		case 9:
+		case 10:
 			search_conf();
 			break;
-		case 10:
+		case 11:
 			show_all_options = !show_all_options;
 			break;
 		}

@@ -162,6 +162,7 @@ static void print_buttons(WINDOW * win, int height, int width, int selected)
 	print_button(win, gettext(" Help "), y, x + 24, selected == 2);
 	print_button(win, gettext(" Save "), y, x + 36, selected == 3);
 	print_button(win, gettext(" Load "), y, x + 48, selected == 4);
+	print_button(win, gettext(" Sort "), y, x + 60, selected == 5);
 
 	wmove(win, y, x + 1 + 12 * selected);
 	wrefresh(win);
@@ -375,7 +376,7 @@ do_resize:
 		case TAB:
 		case KEY_RIGHT:
 			button = ((key == KEY_LEFT ? --button : ++button) < 0)
-			    ? 4 : (button > 4 ? 0 : button);
+			    ? 5 : (button > 5 ? 0 : button);
 
 			print_buttons(dialog, height, width, button);
 			wrefresh(menu);
@@ -390,6 +391,7 @@ do_resize:
 		case '?':
 		case 'z':
 		case '\n':
+		case '.':
 			/* save scroll info */
 			*s_scroll = scroll;
 			delwin(menu);
@@ -400,19 +402,21 @@ do_resize:
 			case 'h':
 			case '?':
 				return 2;
+			case '.':
+				return 5;
 			case 's':
 			case 'y':
-				return 5;
-			case 'n':
 				return 6;
-			case 'm':
+			case 'n':
 				return 7;
-			case ' ':
+			case 'm':
 				return 8;
-			case '/':
+			case ' ':
 				return 9;
-			case 'z':
+			case '/':
 				return 10;
+			case 'z':
+				return 11;
 			case '\n':
 				return button;
 			}
