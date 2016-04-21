@@ -1053,20 +1053,13 @@ static int mmc_switch_status(struct mmc_card *card)
 	return mmc_switch_status_error(card->host, status);
 }
 
-static int mmc_select_hs400(struct mmc_card *card)
+static int mmc_hs200_to_hs(struct mmc_card *card)
 {
 	struct mmc_host *host = card->host;
 	bool send_status = true;
 	unsigned int max_dtr;
-	int err = 0;
+	int err;
 	u8 val;
-
-	/*
-	 * HS400 mode requires 8-bit bus width
-	 */
-	if (!(card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS400 &&
-	      host->ios.bus_width == MMC_BUS_WIDTH_8))
-		return 0;
 
 	if (host->caps & MMC_CAP_WAIT_WHILE_BUSY)
 		send_status = false;
@@ -1081,11 +1074,8 @@ static int mmc_select_hs400(struct mmc_card *card)
 			   EXT_CSD_HS_TIMING, val,
 			   card->ext_csd.generic_cmd6_time,
 			   true, send_status, true);
-	if (err) {
-		pr_err("%s: switch to high-speed from hs200 failed, err:%d\n",
-			mmc_hostname(host), err);
-		return err;
-	}
+	if (err)
+		goto out_err;
 
 	/* Set host controller to HS timing */
 	mmc_set_timing(card->host, MMC_TIMING_MMC_HS);
@@ -1095,6 +1085,35 @@ static int mmc_select_hs400(struct mmc_card *card)
 		if (err)
 			goto out_err;
 	}
+
+	return 0;
+
+out_err:
+	pr_err("%s: switch to high-speed from hs200 failed, error %d\n",
+	       mmc_hostname(host), err);
+	return err;
+}
+
+static int mmc_select_hs400(struct mmc_card *card)
+{
+	struct mmc_host *host = card->host;
+	bool send_status = true;
+	int err = 0;
+	u8 val;
+
+	/*
+	 * HS400 mode requires 8-bit bus width
+	 */
+	if (!(card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS400 &&
+	      host->ios.bus_width == MMC_BUS_WIDTH_8))
+		return 0;
+
+	if (host->caps & MMC_CAP_WAIT_WHILE_BUSY)
+		send_status = false;
+
+	err = mmc_hs200_to_hs(card);
+	if (err)
+		goto out_err;
 
 	/* Switch card to DDR */
 	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
