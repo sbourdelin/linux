@@ -30,6 +30,7 @@
 #include <linux/highmem.h>
 #include <asm/apicdef.h>
 #include <trace/events/kvm.h>
+#include <asm/pvclock.h>
 
 #include "trace.h"
 
@@ -797,23 +798,11 @@ static int kvm_hv_set_msr_pw(struct kvm_vcpu *vcpu, u32 msr, u64 data,
 		mark_page_dirty(kvm, gfn);
 		break;
 	}
-	case HV_X64_MSR_REFERENCE_TSC: {
-		u64 gfn;
-		HV_REFERENCE_TSC_PAGE tsc_ref;
-
-		memset(&tsc_ref, 0, sizeof(tsc_ref));
+	case HV_X64_MSR_REFERENCE_TSC:
 		hv->hv_tsc_page = data;
-		if (!(data & HV_X64_MSR_TSC_REFERENCE_ENABLE))
-			break;
-		gfn = data >> HV_X64_MSR_TSC_REFERENCE_ADDRESS_SHIFT;
-		if (kvm_write_guest(
-				kvm,
-				gfn << HV_X64_MSR_TSC_REFERENCE_ADDRESS_SHIFT,
-				&tsc_ref, sizeof(tsc_ref)))
-			return 1;
-		mark_page_dirty(kvm, gfn);
+		if (hv->hv_tsc_page & HV_X64_MSR_TSC_REFERENCE_ENABLE)
+			kvm_make_request(KVM_REQ_MASTERCLOCK_UPDATE, vcpu);
 		break;
-	}
 	case HV_X64_MSR_CRASH_P0 ... HV_X64_MSR_CRASH_P4:
 		return kvm_hv_msr_set_crash_data(vcpu,
 						 msr - HV_X64_MSR_CRASH_P0,
@@ -1142,4 +1131,108 @@ set_result:
 	ret = res | (((u64)rep_done & 0xfff) << 32);
 	kvm_hv_hypercall_set_result(vcpu, ret);
 	return 1;
+}
+
+bool kvm_hv_tscpage_need_update(struct kvm_vcpu *v)
+{
+	return v == kvm_get_vcpu(v->kvm, 0) &&
+		(v->kvm->arch.hyperv.hv_tsc_page &
+		 HV_X64_MSR_TSC_REFERENCE_ENABLE);
+}
+
+static int pvclock_to_tscpage(struct pvclock_vcpu_time_info *hv_clock,
+			       HV_REFERENCE_TSC_PAGE *tsc_ref)
+{
+#ifdef CONFIG_X86_64
+	/*
+	 * kvm_clock:
+	 * nsec = ((((rdtsc - tsc_timestamp) << tsc_shift) *
+	 *          tsc_to_system_mul) >> 32) + system_time
+	 *
+	 * hyperv ref tsc page:
+	 * nsec / 100 = ((rdtsc * tsc_scale) >> 64) + tsc_offset
+	 *
+	 * this gives:
+	 *
+	 * tsc_scale = (tsc_to_system_mul << (tsc_shift + 32)) / 100
+	 *
+	 * tsc_offset = (system_time -
+	 *               pvclock_scale_delta(tsc_timestamp, tsc_to_system_mul
+	 *                                   tsc_shift)) / 100
+	 *
+	 * Note that although tsc_to_system_mul is 32 bit, we may need 128 bit
+	 * division to calculate tsc_scale
+	 */
+	u64 tsc_scale_hi, tsc_scale_lo;
+	s64 tsc_offset;
+
+	/* impossible by definition of tsc_shift but we'd better check */
+	if (hv_clock->tsc_shift >= 32 || hv_clock->tsc_shift <= -32)
+		return -ERANGE;
+
+	tsc_scale_lo = hv_clock->tsc_to_system_mul;
+	tsc_scale_hi = tsc_scale_lo >> (32 - hv_clock->tsc_shift);
+	/* check if division will overflow */
+	if (tsc_scale_hi >= HV_NSEC_PER_TICK)
+		return -ERANGE;
+	tsc_scale_lo <<= (32 + hv_clock->tsc_shift);
+
+	__asm__ ("divq %[divisor]"
+		 : "+a"(tsc_scale_lo), "+d"(tsc_scale_hi)
+		 : [divisor]"rm"((u64)HV_NSEC_PER_TICK));
+	tsc_ref->tsc_scale = tsc_scale_lo;
+
+	tsc_offset = hv_clock->system_time;
+	tsc_offset -= pvclock_scale_delta(hv_clock->tsc_timestamp,
+					  hv_clock->tsc_to_system_mul,
+					  hv_clock->tsc_shift);
+	tsc_ref->tsc_offset = div_s64(tsc_offset, HV_NSEC_PER_TICK);
+
+	return 0;
+#else
+	return -ERANGE;
+#endif
+}
+
+void kvm_hv_tscpage_update(struct kvm_vcpu *v, bool use_master_clock)
+{
+	struct kvm *kvm = v->kvm;
+	struct kvm_hv *hv = &kvm->arch.hyperv;
+	HV_REFERENCE_TSC_PAGE tsc_ref;
+	u32 tsc_seq;
+	gpa_t gpa;
+	u64 gfn;
+
+	gfn = hv->hv_tsc_page >> HV_X64_MSR_TSC_REFERENCE_ADDRESS_SHIFT;
+	gpa = gfn_to_gpa(gfn);
+
+	if (kvm_read_guest(kvm, gpa, &tsc_ref, sizeof(tsc_ref)))
+		return;
+
+	/*
+	 * mark tsc page invalid either for the duration of contents update or
+	 * for good if it can't be used
+	 */
+	tsc_seq = tsc_ref.tsc_sequence;
+	tsc_ref.tsc_sequence = 0;
+
+	BUILD_BUG_ON(offsetof(HV_REFERENCE_TSC_PAGE, tsc_sequence) != 0);
+	kvm_write_guest(kvm, gpa, &tsc_ref, sizeof(tsc_ref.tsc_sequence));
+	smp_wmb();
+
+	if (!use_master_clock)
+		return;
+
+	if (pvclock_to_tscpage(&v->arch.hv_clock, &tsc_ref))
+		return;
+
+	kvm_write_guest(kvm, gpa, &tsc_ref, sizeof(tsc_ref));
+	smp_wmb();
+
+	tsc_ref.tsc_sequence = tsc_seq + 1;
+	if (tsc_ref.tsc_sequence == 0xffffffff || tsc_ref.tsc_sequence == 0)
+		tsc_ref.tsc_sequence = 1;
+	trace_kvm_hv_tscpage_update(&tsc_ref);
+
+	kvm_write_guest(kvm, gpa, &tsc_ref, sizeof(tsc_ref.tsc_sequence));
 }

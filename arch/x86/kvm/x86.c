@@ -1833,7 +1833,7 @@ static int kvm_guest_time_update(struct kvm_vcpu *v)
 
 	local_irq_restore(flags);
 
-	if (!vcpu->pv_time_enabled)
+	if (!vcpu->pv_time_enabled && !kvm_hv_tscpage_need_update(v))
 		return 0;
 
 	if (kvm_has_tsc_control)
@@ -1851,7 +1851,10 @@ static int kvm_guest_time_update(struct kvm_vcpu *v)
 	vcpu->hv_clock.system_time = kernel_ns + v->kvm->arch.kvmclock_offset;
 	vcpu->last_guest_tsc = tsc_timestamp;
 
-	kvm_pvclock_update(v, use_master_clock);
+	if (vcpu->pv_time_enabled)
+		kvm_pvclock_update(v, use_master_clock);
+	if (kvm_hv_tscpage_need_update(v))
+		kvm_hv_tscpage_update(v, use_master_clock);
 	return 0;
 }
 

@@ -1292,6 +1292,31 @@ TRACE_EVENT(kvm_hv_stimer_cleanup,
 		  __entry->vcpu_id, __entry->timer_index)
 );
 
+/*
+ * Tracepoint for kvm_hv_tscpage_update.
+ */
+TRACE_EVENT(kvm_hv_tscpage_update,
+	TP_PROTO(HV_REFERENCE_TSC_PAGE *tsc_ref),
+	TP_ARGS(tsc_ref),
+
+	TP_STRUCT__entry(
+		__field(u32, tsc_sequence)
+		__field(u64, tsc_scale)
+		__field(s64, tsc_offset)
+	),
+
+	TP_fast_assign(
+		__entry->tsc_sequence = tsc_ref->tsc_sequence;
+		__entry->tsc_scale = tsc_ref->tsc_scale;
+		__entry->tsc_offset = tsc_ref->tsc_offset;
+	),
+
+	TP_printk("tsc_ref_page { sequence %u, scale 0x%llx, offset %lld }",
+		  __entry->tsc_sequence,
+		  __entry->tsc_scale,
+		  __entry->tsc_offset)
+);
+
 #endif /* _TRACE_KVM_H */
 
 #undef TRACE_INCLUDE_PATH
