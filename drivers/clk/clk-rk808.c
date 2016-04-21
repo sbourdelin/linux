@@ -25,7 +25,7 @@
 #define RK808_NR_OUTPUT 2
 
 struct rk808_clkout {
-	struct rk808 *rk808;
+	struct rk8xx *rk8xx;
 	struct clk_onecell_data clk_data;
 	struct clk_hw		clkout1_hw;
 	struct clk_hw		clkout2_hw;
@@ -42,9 +42,9 @@ static int rk808_clkout2_enable(struct clk_hw *hw, bool enable)
 	struct rk808_clkout *rk808_clkout = container_of(hw,
 							 struct rk808_clkout,
 							 clkout2_hw);
-	struct rk808 *rk808 = rk808_clkout->rk808;
+	struct rk8xx *rk8xx = rk808_clkout->rk8xx;
 
-	return regmap_update_bits(rk808->regmap, RK808_CLK32OUT_REG,
+	return regmap_update_bits(rk8xx->regmap, RK808_CLK32OUT_REG,
 				  CLK32KOUT2_EN, enable ? CLK32KOUT2_EN : 0);
 }
 
@@ -63,10 +63,10 @@ static int rk808_clkout2_is_prepared(struct clk_hw *hw)
 	struct rk808_clkout *rk808_clkout = container_of(hw,
 							 struct rk808_clkout,
 							 clkout2_hw);
-	struct rk808 *rk808 = rk808_clkout->rk808;
+	struct rk8xx *rk8xx = rk808_clkout->rk8xx;
 	uint32_t val;
 
-	int ret = regmap_read(rk808->regmap, RK808_CLK32OUT_REG, &val);
+	int ret = regmap_read(rk8xx->regmap, RK808_CLK32OUT_REG, &val);
 
 	if (ret < 0)
 		return ret;
@@ -87,8 +87,8 @@ static const struct clk_ops rk808_clkout2_ops = {
 
 static int rk808_clkout_probe(struct platform_device *pdev)
 {
-	struct rk808 *rk808 = dev_get_drvdata(pdev->dev.parent);
-	struct i2c_client *client = rk808->i2c;
+	struct rk8xx *rk8xx = dev_get_drvdata(pdev->dev.parent);
+	struct i2c_client *client = rk8xx->i2c;
 	struct device_node *node = client->dev.of_node;
 	struct clk_init_data init = {};
 	struct clk **clk_table;
@@ -99,7 +99,7 @@ static int rk808_clkout_probe(struct platform_device *pdev)
 	if (!rk808_clkout)
 		return -ENOMEM;
 
-	rk808_clkout->rk808 = rk808;
+	rk808_clkout->rk8xx = rk8xx;
 
 	clk_table = devm_kcalloc(&client->dev, RK808_NR_OUTPUT,
 				 sizeof(struct clk *), GFP_KERNEL);
@@ -144,8 +144,8 @@ static int rk808_clkout_probe(struct platform_device *pdev)
 
 static int rk808_clkout_remove(struct platform_device *pdev)
 {
-	struct rk808 *rk808 = dev_get_drvdata(pdev->dev.parent);
-	struct i2c_client *client = rk808->i2c;
+	struct rk8xx *rk8xx = dev_get_drvdata(pdev->dev.parent);
+	struct i2c_client *client = rk8xx->i2c;
 	struct device_node *node = client->dev.of_node;
 
 	of_clk_del_provider(node);

@@ -191,7 +191,7 @@ enum {
 	BOOST_ILMIN_250MA,
 };
 
-struct rk808 {
+struct rk8xx {
 	struct i2c_client *i2c;
 	struct regmap_irq_chip_data *irq_data;
 	struct regmap *regmap;

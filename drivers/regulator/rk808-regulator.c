@@ -568,8 +568,8 @@ dt_parse_end:
 
 static int rk808_regulator_probe(struct platform_device *pdev)
 {
-	struct rk808 *rk808 = dev_get_drvdata(pdev->dev.parent);
-	struct i2c_client *client = rk808->i2c;
+	struct rk8xx *rk8xx = dev_get_drvdata(pdev->dev.parent);
+	struct i2c_client *client = rk8xx->i2c;
 	struct regulator_config config = {};
 	struct regulator_dev *rk808_rdev;
 	struct rk808_regulator_data *pdata;
@@ -580,7 +580,7 @@ static int rk808_regulator_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	ret = rk808_regulator_dt_parse_pdata(&pdev->dev, &client->dev,
-					     rk808->regmap, pdata);
+					     rk8xx->regmap, pdata);
 	if (ret < 0)
 		return ret;
 
@@ -594,7 +594,7 @@ static int rk808_regulator_probe(struct platform_device *pdev)
 
 		config.dev = &client->dev;
 		config.driver_data = pdata;
-		config.regmap = rk808->regmap;
+		config.regmap = rk8xx->regmap;
 		config.of_node = rk808_reg_matches[i].of_node;
 		config.init_data = rk808_reg_matches[i].init_data;
 
