@@ -1291,20 +1291,20 @@ static int i915_frequency_info(struct seq_file *m, void *unused)
 		seq_printf(m, "RPDECLIMIT: 0x%08x\n", rpdeclimit);
 		seq_printf(m, "RPNSWREQ: %dMHz\n", reqf);
 		seq_printf(m, "CAGF: %dMHz\n", cagf);
-		seq_printf(m, "RP CUR UP EI: %dus\n", rpupei &
+		seq_printf(m, "RP CUR UP EI: %d\n", rpupei &
 			   GEN6_CURICONT_MASK);
-		seq_printf(m, "RP CUR UP: %dus\n", rpcurup &
+		seq_printf(m, "RP CUR UP: %d\n", rpcurup &
 			   GEN6_CURBSYTAVG_MASK);
-		seq_printf(m, "RP PREV UP: %dus\n", rpprevup &
+		seq_printf(m, "RP PREV UP: %d\n", rpprevup &
 			   GEN6_CURBSYTAVG_MASK);
 		seq_printf(m, "Up threshold: %d%%\n",
 			   dev_priv->rps.up_threshold);
 
-		seq_printf(m, "RP CUR DOWN EI: %dus\n", rpdownei &
+		seq_printf(m, "RP CUR DOWN EI: %d\n", rpdownei &
 			   GEN6_CURIAVG_MASK);
-		seq_printf(m, "RP CUR DOWN: %dus\n", rpcurdown &
+		seq_printf(m, "RP CUR DOWN: %d\n", rpcurdown &
 			   GEN6_CURBSYTAVG_MASK);
-		seq_printf(m, "RP PREV DOWN: %dus\n", rpprevdown &
+		seq_printf(m, "RP PREV DOWN: %d\n", rpprevdown &
 			   GEN6_CURBSYTAVG_MASK);
 		seq_printf(m, "Down threshold: %d%%\n",
 			   dev_priv->rps.down_threshold);
