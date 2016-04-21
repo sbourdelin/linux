@@ -20,6 +20,27 @@
 #include <linux/spinlock.h>
 #include <asm/efi.h>
 
+
+#ifndef efi_call_virt
+#define efi_call_virt(f, args...)					\
+({									\
+	efi_status_t __s;						\
+	arch_efi_call_virt_setup();					\
+	__s = arch_efi_call_virt(f, args);				\
+	arch_efi_call_virt_teardown();					\
+	__s;								\
+})
+#endif
+
+#ifndef __efi_call_virt
+#define __efi_call_virt(f, args...)					\
+({									\
+	arch_efi_call_virt_setup();					\
+	arch_efi_call_virt(f, args);					\
+	arch_efi_call_virt_teardown();					\
+})
+#endif
+
 /*
  * According to section 7.1 of the UEFI spec, Runtime Services are not fully
  * reentrant, and there are particular combinations of calls that need to be
