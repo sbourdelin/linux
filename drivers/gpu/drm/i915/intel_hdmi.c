@@ -1412,8 +1412,10 @@ intel_hdmi_detect(struct drm_connector *connector, bool force)
 				hdmi_to_dig_port(intel_hdmi));
 	}
 
-	if (!live_status)
-		DRM_DEBUG_KMS("Live status not up!");
+	if (!live_status) {
+		DRM_DEBUG_KMS("Warning: live status not up, faking it\n");
+		live_status = true;
+	}
 
 	intel_hdmi_unset_edid(connector);
 
