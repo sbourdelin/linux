@@ -227,6 +227,8 @@ enum {
 #define GEN8_CTX_RCS_INDIRECT_CTX_OFFSET_DEFAULT	0x17
 #define GEN9_CTX_RCS_INDIRECT_CTX_OFFSET_DEFAULT	0x26
 
+static int execlists_context_deferred_alloc(struct intel_context *ctx,
+					    struct intel_engine_cs *engine);
 static int intel_lr_context_pin(struct intel_context *ctx,
 				struct intel_engine_cs *engine);
 
@@ -675,8 +677,6 @@ int intel_logical_ring_alloc_request_extras(struct drm_i915_gem_request *request
 	struct intel_engine_cs *engine = request->engine;
 	int ret;
 
-	request->ringbuf = request->ctx->engine[engine->id].ringbuf;
-
 	if (i915.enable_guc_submission) {
 		/*
 		 * Check that the GuC has space for the request before
@@ -689,6 +689,14 @@ int intel_logical_ring_alloc_request_extras(struct drm_i915_gem_request *request
 		if (ret)
 			return ret;
 	}
+
+	if (request->ctx->engine[engine->id].state == NULL) {
+		ret = execlists_context_deferred_alloc(request->ctx, engine);
+		if (ret)
+			return ret;
+	}
+
+	request->ringbuf = request->ctx->engine[engine->id].ringbuf;
 
 	ret = intel_lr_context_pin(request->ctx, engine);
 	if (ret)
@@ -2134,7 +2142,7 @@ logical_ring_init(struct drm_device *dev, struct intel_engine_cs *engine)
 	if (ret)
 		goto error;
 
-	ret = intel_lr_context_deferred_alloc(dctx, engine);
+	ret = execlists_context_deferred_alloc(dctx, engine);
 	if (ret)
 		goto error;
 
@@ -2608,9 +2616,9 @@ uint32_t intel_lr_context_size(struct intel_engine_cs *engine)
 }
 
 /**
- * intel_lr_context_deferred_alloc() - create the LRC specific bits of a context
+ * execlists_context_deferred_alloc() - create the LRC specific bits of a context
  * @ctx: LR context to create.
- * @ring: engine to be used with the context.
+ * @engine: engine to be used with the context.
  *
  * This function can be called more than once, with different engines, if we plan
  * to use the context with them. The context backing objects and the ringbuffers
@@ -2620,9 +2628,8 @@ uint32_t intel_lr_context_size(struct intel_engine_cs *engine)
  *
  * Return: non-zero on error.
  */
-
-int intel_lr_context_deferred_alloc(struct intel_context *ctx,
-				    struct intel_engine_cs *engine)
+static int execlists_context_deferred_alloc(struct intel_context *ctx,
+					    struct intel_engine_cs *engine)
 {
 	struct drm_device *dev = engine->dev;
 	struct drm_i915_gem_object *ctx_obj;
