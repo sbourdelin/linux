@@ -4859,7 +4859,6 @@ static void mem_cgroup_move_charge(struct mm_struct *mm)
 		.mm = mm,
 	};
 
-	lru_add_drain_all();
 	/*
 	 * Signal lock_page_memcg() to take the memcg's move_lock
 	 * while we're moving its pages to another memcg. Then wait
