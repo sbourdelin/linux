@@ -21,6 +21,7 @@
 #include <linux/bitops.h>
 #include <linux/count_zeros.h>
 #include "mpi-internal.h"
+#include <asm/unaligned.h>
 
 #define MAX_EXTERN_MPI_BITS 16384
 
@@ -405,10 +406,13 @@ int mpi_write_to_sgl(MPI a, struct scatterlist *sgl, unsigned *nbytes,
 				p -= sizeof(alimb);
 				continue;
 			} else {
-				mpi_limb_t *limb1 = (void *)p - sizeof(alimb);
-				mpi_limb_t *limb2 = (void *)p - sizeof(alimb)
-							+ lzeros;
-				*limb1 = *limb2;
+				mpi_limb_t tmp;
+
+				tmp = get_unaligned_be32((void *)p -
+							 sizeof(alimb) +
+							 lzeros);
+				put_unaligned_be32(tmp,
+						   (void *)p - sizeof(alimb));
 				p -= lzeros;
 				y = lzeros;
 			}
