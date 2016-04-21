@@ -290,9 +290,9 @@ static int arizona_ldo1_probe(struct platform_device *pdev)
 	config.ena_gpio = arizona->pdata.ldoena;
 
 	if (arizona->pdata.ldo1)
-		config.init_data = arizona->pdata.ldo1;
-	else
-		config.init_data = &ldo1->init_data;
+		ldo1->init_data = *arizona->pdata.ldo1;
+
+	config.init_data = &ldo1->init_data;
 
 	/*
 	 * LDO1 can only be used to supply DCVDD so if it has no
@@ -300,6 +300,13 @@ static int arizona_ldo1_probe(struct platform_device *pdev)
 	 */
 	if (config.init_data->num_consumer_supplies == 0)
 		arizona->external_dcvdd = true;
+
+	if (!arizona->external_dcvdd && (config.ena_gpio == 0) &&
+	    !config.ena_gpio_initialized) {
+		dev_warn(arizona->dev,
+			 "No LDOENA: regulator will be always-on\n");
+		ldo1->init_data.constraints.always_on = true;
+	}
 
 	ldo1->regulator = devm_regulator_register(&pdev->dev, desc, &config);
 
