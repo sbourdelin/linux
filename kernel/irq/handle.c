@@ -175,6 +175,7 @@ irqreturn_t handle_irq_event_percpu(struct irq_desc *desc)
 	}
 
 	add_interrupt_randomness(irq, flags);
+	lrng_irq_process();
 
 	if (!noirqdebug)
 		note_interrupt(desc, retval);
