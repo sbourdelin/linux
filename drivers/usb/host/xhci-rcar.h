@@ -24,7 +24,11 @@ static inline void xhci_rcar_start(struct usb_hcd *hcd)
 
 static inline int xhci_rcar_init_quirk(struct usb_hcd *hcd)
 {
-	return 0;
+	/*
+	 * To avoid wait and timeout in xhci_reset() if CONFIG_XHCI_RCAR is
+	 * disabled, this function fails.
+	 */
+	return -ENODEV;
 }
 #endif
 #endif /* _XHCI_RCAR_H */
