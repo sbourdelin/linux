@@ -16,23 +16,45 @@
 
 #include <linux/bug.h>
 #include <linux/efi.h>
+#include <linux/irqflags.h>
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
+#include <linux/stringify.h>
 #include <asm/efi.h>
+
+static void efi_call_virt_check_flags(unsigned long flags, const char *call)
+{
+	unsigned long cur_flags;
+
+	local_save_flags(cur_flags);
+	if (!WARN_ON_ONCE(cur_flags != flags))
+		return;
+
+	add_taint(TAINT_FIRMWARE_WORKAROUND, LOCKDEP_NOW_UNRELIABLE);
+	pr_err_ratelimited(FW_BUG "IRQ flags corrupted (0x%08lx=>0x%08lx) by EFI %s\n",
+			   flags, cur_flags, call);
+	local_irq_restore(flags);
+}
 
 #define efi_call_virt(f, args...)					\
 ({									\
 	efi_status_t __s;						\
+	unsigned long flags;						\
 	arch_efi_call_virt_setup();					\
+	local_save_flags(flags);					\
 	__s = arch_efi_call_virt(f, args);				\
+	efi_call_virt_check_flags(flags, __stringify(f));		\
 	arch_efi_call_virt_teardown();					\
 	__s;								\
 })
 
 #define __efi_call_virt(f, args...)					\
 ({									\
+	unsigned long flags;						\
 	arch_efi_call_virt_setup();					\
+	local_save_flags(flags);					\
 	arch_efi_call_virt(f, args);					\
+	efi_call_virt_check_flags(flags, __stringify(f));		\
 	arch_efi_call_virt_teardown();					\
 })
 
