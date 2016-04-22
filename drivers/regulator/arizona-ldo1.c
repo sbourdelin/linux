@@ -161,16 +161,12 @@ static const struct regulator_init_data arizona_ldo1_dvfs = {
 	.constraints = {
 		.min_uV = 1200000,
 		.max_uV = 1800000,
-		.valid_ops_mask = REGULATOR_CHANGE_STATUS |
-				  REGULATOR_CHANGE_VOLTAGE,
+		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
 	},
 	.num_consumer_supplies = 1,
 };
 
 static const struct regulator_init_data arizona_ldo1_default = {
-	.constraints = {
-		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
-	},
 	.num_consumer_supplies = 1,
 };
 
@@ -178,8 +174,7 @@ static const struct regulator_init_data arizona_ldo1_wm5110 = {
 	.constraints = {
 		.min_uV = 1175000,
 		.max_uV = 1200000,
-		.valid_ops_mask = REGULATOR_CHANGE_STATUS |
-				  REGULATOR_CHANGE_VOLTAGE,
+		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
 	},
 	.num_consumer_supplies = 1,
 };
@@ -290,9 +285,9 @@ static int arizona_ldo1_probe(struct platform_device *pdev)
 	config.ena_gpio = arizona->pdata.ldoena;
 
 	if (arizona->pdata.ldo1)
-		config.init_data = arizona->pdata.ldo1;
-	else
-		config.init_data = &ldo1->init_data;
+		ldo1->init_data = *arizona->pdata.ldo1;
+
+	config.init_data = &ldo1->init_data;
 
 	/*
 	 * LDO1 can only be used to supply DCVDD so if it has no
@@ -300,6 +295,15 @@ static int arizona_ldo1_probe(struct platform_device *pdev)
 	 */
 	if (config.init_data->num_consumer_supplies == 0)
 		arizona->external_dcvdd = true;
+
+	if (!arizona->external_dcvdd &&
+	    (config.ena_gpio || config.ena_gpio_initialized) &&
+	    gpio_is_valid(config.ena_gpio))
+		ldo1->init_data.constraints.valid_ops_mask |=
+			REGULATOR_CHANGE_STATUS;
+	else
+		dev_warn(arizona->dev,
+			 "No LDOENA: regulator will be always-on\n");
 
 	ldo1->regulator = devm_regulator_register(&pdev->dev, desc, &config);
 
