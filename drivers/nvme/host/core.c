@@ -30,6 +30,7 @@
 #include <asm/unaligned.h>
 
 #include "nvme.h"
+#include "opal.h"
 
 #define NVME_MINORS		(1U << MINORBITS)
 
@@ -622,6 +623,10 @@ static int nvme_ioctl(struct block_device *bdev, fmode_t mode,
 	case SG_IO:
 		return nvme_sg_io(ns, (void __user *)arg);
 #endif
+	case NVME_IOCTL_SAVE_OPAL_KEY:
+		return nvme_opal_register(ns, (void __user *)arg);
+	case NVME_IOCTL_UNLOCK_OPAL:
+		return nvme_opal_unlock(ns);
 	default:
 		return -ENOTTY;
 	}
@@ -780,6 +785,7 @@ static int nvme_revalidate_disk(struct gendisk *disk)
 	if (ns->ctrl->oncs & NVME_CTRL_ONCS_DSM)
 		nvme_config_discard(ns);
 	blk_mq_unfreeze_queue(disk->queue);
+	nvme_opal_unlock(ns);
 
 	kfree(id);
 	return 0;
@@ -1704,6 +1710,8 @@ int __init nvme_core_init(void)
 		goto unregister_chrdev;
 	}
 
+	nvme_opal_init();
+
 	return 0;
 
  unregister_chrdev:
@@ -1715,6 +1723,7 @@ int __init nvme_core_init(void)
 
 void nvme_core_exit(void)
 {
+	nvme_opal_exit();
 	unregister_blkdev(nvme_major, "nvme");
 	class_destroy(nvme_class);
 	__unregister_chrdev(nvme_char_major, 0, NVME_MINORS, "nvme");
