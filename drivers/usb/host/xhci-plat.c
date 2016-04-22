@@ -190,6 +190,10 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	 * clock does not exists.
 	 */
 	clk = devm_clk_get(&pdev->dev, NULL);
+	if (IS_ERR(clk) && PTR_ERR(clk) == -EPROBE_DEFER) {
+		ret = -EPROBE_DEFER;
+		goto put_hcd;
+	}
 	if (!IS_ERR(clk)) {
 		ret = clk_prepare_enable(clk);
 		if (ret)
