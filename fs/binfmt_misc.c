@@ -716,7 +716,7 @@ out:
 
 	if (err) {
 		kfree(e);
-		return -EINVAL;
+		return err;
 	}
 	return count;
 }
