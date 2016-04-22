@@ -138,7 +138,7 @@ __LL_SC_PREFIX(atomic64_##op##_return##name(long i, atomic64_t *v))	\
 									\
 	return result;							\
 }									\
-__LL_SC_EXPORT(atomic64_##op##_return##name);
+__LL_SC_EXPORT(atomic64_fetch_##op####name);
 
 #define ATOMIC64_OPS(...)						\
 	ATOMIC64_OP(__VA_ARGS__)					\
