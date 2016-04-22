@@ -17,7 +17,11 @@
 
 #include <linux/types.h>
 #include <linux/compiler.h>
-#include <linux/if.h>
+#ifdef __KERNEL__
+#	include <linux/if.h>
+#else
+#	include <net/if.h>
+#endif
 #include <linux/netfilter_ipv4.h>
 
 #include <linux/netfilter/x_tables.h>
