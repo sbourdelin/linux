@@ -632,6 +632,18 @@ enum iscsi_host_param {
 	ISCSI_HOST_PARAM_IPADDRESS,
 	ISCSI_HOST_PARAM_PORT_STATE,
 	ISCSI_HOST_PARAM_PORT_SPEED,
+	ISCSI_HOST_PARAM_LOGIN_ACCEPT_RSPS,
+	ISCSI_HOST_PARAM_LOGIN_OTHER_FAILS,
+	ISCSI_HOST_PARAM_LOGIN_AUTHENTICATION_FAILS,
+	ISCSI_HOST_PARAM_LOGIN_AUTHORIZATION_FAILS,
+	ISCSI_HOST_PARAM_LOGIN_NEGOTIATION_FAILS,
+	ISCSI_HOST_PARAM_LOGIN_REDIRECT_RSPS,
+	ISCSI_HOST_PARAM_LOGOUT_NORMAL_RSPS,
+	ISCSI_HOST_PARAM_LOGOUT_OTHER_RSPS,
+	ISCSI_HOST_PARAM_DIGEST_ERR,
+	ISCSI_HOST_PARAM_TIMEOUT_ERR,
+	ISCSI_HOST_PARAM_FORMAT_ERR,
+	ISCSI_HOST_PARAM_SESSION_FAILS,
 	ISCSI_HOST_PARAM_MAX,
 };
 
@@ -819,6 +831,18 @@ struct iscsi_stats {
 	/* errors */
 	uint32_t digest_err;
 	uint32_t timeout_err;
+	uint32_t format_err;
+	uint32_t session_fails;
+
+	/* login/logout stats */
+	uint32_t login_accept_rsps;
+	uint32_t login_other_fails;
+	uint32_t login_authentication_fails;
+	uint32_t login_authorization_fails;
+	uint32_t login_negotiation_fails;
+	uint32_t login_redirect_rsps;
+	uint32_t logout_normal_rsps;
+	uint32_t logout_other_rsps;
 
 	/*
 	 * iSCSI Custom Statistics support, i.e. Transport could

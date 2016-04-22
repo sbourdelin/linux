@@ -4253,6 +4253,21 @@ iscsi_host_attr(ipaddress, ISCSI_HOST_PARAM_IPADDRESS);
 iscsi_host_attr(initiatorname, ISCSI_HOST_PARAM_INITIATOR_NAME);
 iscsi_host_attr(port_state, ISCSI_HOST_PARAM_PORT_STATE);
 iscsi_host_attr(port_speed, ISCSI_HOST_PARAM_PORT_SPEED);
+iscsi_host_attr(login_accept_rsps, ISCSI_HOST_PARAM_LOGIN_ACCEPT_RSPS);
+iscsi_host_attr(login_other_fails, ISCSI_HOST_PARAM_LOGIN_OTHER_FAILS);
+iscsi_host_attr(login_authentication_fails,
+		ISCSI_HOST_PARAM_LOGIN_AUTHENTICATION_FAILS);
+iscsi_host_attr(login_authorization_fails,
+		ISCSI_HOST_PARAM_LOGIN_AUTHORIZATION_FAILS);
+iscsi_host_attr(login_negotiation_fails,
+		ISCSI_HOST_PARAM_LOGIN_NEGOTIATION_FAILS);
+iscsi_host_attr(login_redirect_rsps, ISCSI_HOST_PARAM_LOGIN_REDIRECT_RSPS);
+iscsi_host_attr(logout_normal_rsps, ISCSI_HOST_PARAM_LOGOUT_NORMAL_RSPS);
+iscsi_host_attr(logout_other_rsps, ISCSI_HOST_PARAM_LOGOUT_OTHER_RSPS);
+iscsi_host_attr(digest_err, ISCSI_HOST_PARAM_DIGEST_ERR);
+iscsi_host_attr(timeout_err, ISCSI_HOST_PARAM_TIMEOUT_ERR);
+iscsi_host_attr(format_err, ISCSI_HOST_PARAM_FORMAT_ERR);
+iscsi_host_attr(session_fails, ISCSI_HOST_PARAM_SESSION_FAILS);
 
 static struct attribute *iscsi_host_attrs[] = {
 	&dev_attr_host_netdev.attr,
@@ -4261,6 +4276,18 @@ static struct attribute *iscsi_host_attrs[] = {
 	&dev_attr_host_initiatorname.attr,
 	&dev_attr_host_port_state.attr,
 	&dev_attr_host_port_speed.attr,
+	&dev_attr_host_login_accept_rsps.attr,
+	&dev_attr_host_login_other_fails.attr,
+	&dev_attr_host_login_authentication_fails.attr,
+	&dev_attr_host_login_authorization_fails.attr,
+	&dev_attr_host_login_negotiation_fails.attr,
+	&dev_attr_host_login_redirect_rsps.attr,
+	&dev_attr_host_logout_normal_rsps.attr,
+	&dev_attr_host_logout_other_rsps.attr,
+	&dev_attr_host_digest_err.attr,
+	&dev_attr_host_timeout_err.attr,
+	&dev_attr_host_format_err.attr,
+	&dev_attr_host_session_fails.attr,
 	NULL,
 };
 
@@ -4284,6 +4311,30 @@ static umode_t iscsi_host_attr_is_visible(struct kobject *kobj,
 		param = ISCSI_HOST_PARAM_PORT_STATE;
 	else if (attr == &dev_attr_host_port_speed.attr)
 		param = ISCSI_HOST_PARAM_PORT_SPEED;
+	else if (attr == &dev_attr_host_login_accept_rsps.attr)
+		param = ISCSI_HOST_PARAM_LOGIN_ACCEPT_RSPS;
+	else if (attr == &dev_attr_host_login_other_fails.attr)
+		param = ISCSI_HOST_PARAM_LOGIN_OTHER_FAILS;
+	else if (attr == &dev_attr_host_login_authentication_fails.attr)
+		param = ISCSI_HOST_PARAM_LOGIN_AUTHENTICATION_FAILS;
+	else if (attr == &dev_attr_host_login_authorization_fails.attr)
+		param = ISCSI_HOST_PARAM_LOGIN_AUTHORIZATION_FAILS;
+	else if (attr == &dev_attr_host_login_negotiation_fails.attr)
+		param = ISCSI_HOST_PARAM_LOGIN_NEGOTIATION_FAILS;
+	else if (attr == &dev_attr_host_login_redirect_rsps.attr)
+		param = ISCSI_HOST_PARAM_LOGIN_REDIRECT_RSPS;
+	else if (attr == &dev_attr_host_logout_normal_rsps.attr)
+		param = ISCSI_HOST_PARAM_LOGOUT_NORMAL_RSPS;
+	else if (attr == &dev_attr_host_logout_other_rsps.attr)
+		param = ISCSI_HOST_PARAM_LOGOUT_OTHER_RSPS;
+	else if (attr == &dev_attr_host_digest_err.attr)
+		param = ISCSI_HOST_PARAM_DIGEST_ERR;
+	else if (attr == &dev_attr_host_timeout_err.attr)
+		param = ISCSI_HOST_PARAM_TIMEOUT_ERR;
+	else if (attr == &dev_attr_host_format_err.attr)
+		param = ISCSI_HOST_PARAM_FORMAT_ERR;
+	else if (attr == &dev_attr_host_session_fails.attr)
+		param = ISCSI_HOST_PARAM_SESSION_FAILS;
 	else {
 		WARN_ONCE(1, "Invalid host attr");
 		return 0;
