@@ -437,6 +437,8 @@ void i915_gem_context_fini(struct drm_device *dev)
 
 	i915_gem_context_unreference(dctx);
 	dev_priv->kernel_context = NULL;
+
+	WARN_ON(!list_empty(&dev_priv->context_list));
 }
 
 int i915_gem_context_enable(struct drm_i915_gem_request *req)
