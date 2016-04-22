@@ -48,6 +48,9 @@
 /** Number of page pointers embedded in fuse_req */
 #define FUSE_REQ_INLINE_PAGES 1
 
+/** Maximum length of a read from a directory */
+#define FUSE_DIR_READ_MAX 4096
+
 /** List of active connections */
 extern struct list_head fuse_conn_list;
 
@@ -658,6 +661,9 @@ struct fuse_conn {
 
 	/** List of device instances belonging to this connection */
 	struct list_head devices;
+
+	/** Is dir_read not implemented by fs? */
+	unsigned no_dir_read:1;
 };
 
 static inline struct fuse_conn *get_fuse_conn_super(struct super_block *sb)
