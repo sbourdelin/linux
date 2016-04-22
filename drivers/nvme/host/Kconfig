@@ -24,3 +24,10 @@ config BLK_DEV_NVME_SCSI
 	  to say N here, unless you run a distro that abuses the SCSI
 	  emulation to provide stable device names for mount by id, like
 	  some OpenSuSE and SLES versions.
+
+config BLK_DEV_NVME_OPAL
+	bool "Opal encryption resume support"
+	depends on BLK_DEV_NVME
+	---help---
+	  Self encrypting devices that support the Opal specification need this
+	  option enabled to support resume from S3 and S0ix states.
