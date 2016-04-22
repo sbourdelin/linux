@@ -410,6 +410,7 @@
 #define IS_ISP1x160(ha)        (ha->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP10160 || \
 				ha->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP12160)
 
+#define QLA1280_QUEUE_DEPTH 32
 
 static int qla1280_probe_one(struct pci_dev *, const struct pci_device_id *);
 static void qla1280_remove_one(struct pci_dev *);
@@ -2080,7 +2081,7 @@ qla1280_set_defaults(struct scsi_qla_host *ha)
 		nv->bus[bus].config_2.req_ack_active_negation = 1;
 		nv->bus[bus].config_2.data_line_active_negation = 1;
 		nv->bus[bus].selection_timeout = 250;
-		nv->bus[bus].max_queue_depth = 32;
+		nv->bus[bus].max_queue_depth = QLA1280_QUEUE_DEPTH;
 
 		if (IS_ISP1040(ha)) {
 			nv->bus[bus].bus_reset_delay = 3;
@@ -4214,7 +4215,7 @@ static struct scsi_host_template qla1280_driver_template = {
 	.eh_bus_reset_handler	= qla1280_eh_bus_reset,
 	.eh_host_reset_handler	= qla1280_eh_adapter_reset,
 	.bios_param		= qla1280_biosparam,
-	.can_queue		= 0xfffff,
+	.can_queue		= QLA1280_QUEUE_DEPTH,
 	.this_id		= -1,
 	.sg_tablesize		= SG_ALL,
 	.use_clustering		= ENABLE_CLUSTERING,
