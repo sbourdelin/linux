@@ -4622,12 +4622,26 @@ F:	drivers/net/ethernet/freescale/fec_ptp.c
 F:	drivers/net/ethernet/freescale/fec.h
 F:	Documentation/devicetree/bindings/net/fsl-fec.txt
 
-FREESCALE QUICC ENGINE LIBRARY
+FREESCALE SOC SPECIFIC DRIVER
+M:	Scott Wood <oss@buserror.net>
 L:	linuxppc-dev@lists.ozlabs.org
-S:	Orphan
+S:	Maintained
+F:	drivers/soc/fsl/
+F:	include/linux/fsl/
+
+FREESCALE QUICC ENGINE LIBRARY
+M:	Qiang Zhao <qiang.zhao@nxp.com>
+L:	linuxppc-dev@lists.ozlabs.org
+S:	Maintained
 F:	drivers/soc/fsl/qe/
 F:	include/soc/fsl/*qe*.h
 F:	include/soc/fsl/*ucc*.h
+
+FREESCALE GUTS DRIVER
+M:	Yangbo Lu <yangbo.lu@nxp.com>
+L:	linuxppc-dev@lists.ozlabs.org
+S:	Maintained
+F:	drivers/soc/fsl/guts.c
 
 FREESCALE USB PERIPHERAL DRIVERS
 M:	Li Yang <leoli@freescale.com>
