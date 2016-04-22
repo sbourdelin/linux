@@ -163,22 +163,6 @@ static bool eeh_dev_removed(struct eeh_dev *edev)
 	return false;
 }
 
-static void *eeh_dev_save_state(void *data, void *userdata)
-{
-	struct eeh_dev *edev = data;
-	struct pci_dev *pdev;
-
-	if (!edev)
-		return NULL;
-
-	pdev = eeh_dev_to_pci_dev(edev);
-	if (!pdev)
-		return NULL;
-
-	pci_save_state(pdev);
-	return NULL;
-}
-
 /**
  * eeh_report_error - Report pci error to each device driver
  * @data: eeh device
@@ -301,22 +285,6 @@ static void *eeh_report_reset(void *data, void *userdata)
 	     rc == PCI_ERS_RESULT_NEED_RESET) *res = rc;
 
 	eeh_pcid_put(dev);
-	return NULL;
-}
-
-static void *eeh_dev_restore_state(void *data, void *userdata)
-{
-	struct eeh_dev *edev = data;
-	struct pci_dev *pdev;
-
-	if (!edev)
-		return NULL;
-
-	pdev = eeh_dev_to_pci_dev(edev);
-	if (!pdev)
-		return NULL;
-
-	pci_restore_state(pdev);
 	return NULL;
 }
 
@@ -561,9 +529,6 @@ int eeh_pe_reset_and_recover(struct eeh_pe *pe)
 	/* Put the PE into recovery mode */
 	eeh_pe_state_mark(pe, EEH_PE_RECOVERING);
 
-	/* Save states */
-	eeh_pe_dev_traverse(pe, eeh_dev_save_state, NULL);
-
 	/* Issue reset */
 	ret = eeh_reset_pe(pe);
 	if (ret) {
@@ -578,8 +543,8 @@ int eeh_pe_reset_and_recover(struct eeh_pe *pe)
 		return ret;
 	}
 
-	/* Restore device state */
-	eeh_pe_dev_traverse(pe, eeh_dev_restore_state, NULL);
+	/* Restore device's config space */
+	eeh_pe_restore_bars(pe);
 
 	/* Clear recovery mode */
 	eeh_pe_state_clear(pe, EEH_PE_RECOVERING);
