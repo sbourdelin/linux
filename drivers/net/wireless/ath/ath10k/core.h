@@ -859,6 +859,7 @@ struct ath10k {
 	 * avoid reporting garbage data.
 	 */
 	bool ch_info_can_report_survey;
+	struct completion bss_survey_done;
 
 	struct dfs_pattern_detector *dfs_detector;
 
