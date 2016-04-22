@@ -1280,6 +1280,23 @@ static void unset_regulator_supplies(struct regulator_dev *rdev)
 }
 
 #ifdef CONFIG_DEBUG_FS
+static ssize_t always_on_read_file(struct file *file, char __user *user_buf,
+				   size_t count, loff_t *ppos)
+{
+	const struct regulator *regulator = file->private_data;
+	char *buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	ssize_t ret;
+
+	if (!buf)
+		return -ENOMEM;
+
+	ret = snprintf(buf, PAGE_SIZE, "always_on: %u\n", regulator->always_on);
+	ret = simple_read_from_buffer(user_buf, count, ppos, buf, ret);
+	kfree(buf);
+
+	return ret;
+}
+
 static ssize_t constraint_flags_read_file(struct file *file,
 					  char __user *user_buf,
 					  size_t count, loff_t *ppos)
@@ -1317,8 +1334,15 @@ static ssize_t constraint_flags_read_file(struct file *file,
 
 	return ret;
 }
-
 #endif
+
+static const struct file_operations always_on_fops = {
+#ifdef CONFIG_DEBUG_FS
+	.open = simple_open,
+	.read = always_on_read_file,
+	.llseek = default_llseek,
+#endif
+};
 
 static const struct file_operations constraint_flags_fops = {
 #ifdef CONFIG_DEBUG_FS
@@ -1383,6 +1407,8 @@ static struct regulator *create_regulator(struct regulator_dev *rdev,
 				   &regulator->min_uV);
 		debugfs_create_u32("max_uV", 0444, regulator->debugfs,
 				   &regulator->max_uV);
+		debugfs_create_file("always_on", 0444, regulator->debugfs,
+				    regulator, &always_on_fops);
 		debugfs_create_file("constraint_flags", 0444,
 				    regulator->debugfs, regulator,
 				    &constraint_flags_fops);
