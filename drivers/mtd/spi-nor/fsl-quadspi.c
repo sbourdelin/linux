@@ -41,6 +41,8 @@
 #define QUADSPI_QUIRK_TKT253890		(1 << 2)
 /* Controller cannot wake up from wait mode, TKT245618 */
 #define QUADSPI_QUIRK_TKT245618         (1 << 3)
+/*Errata A-009282: disable the AHB buffer prefetch */
+#define QUADSPI_QUIRK_ADASZ_8BYTE_LIMIT (1 << 4)
 /* QSPI_AMBA_BASE is internally added by SOC design */
 #define QUADSPI_AMBA_BASE_INTERNAL	(0x10000)
 
@@ -270,7 +272,7 @@ static struct fsl_qspi_devtype_data ls1021a_data = {
 	.rxfifo = 128,
 	.txfifo = 64,
 	.ahb_buf_size = 1024,
-	.driver_data = 0,
+	.driver_data = QUADSPI_QUIRK_ADASZ_8BYTE_LIMIT,
 };
 
 static struct fsl_qspi_devtype_data ls2080a_data = {
@@ -278,7 +280,8 @@ static struct fsl_qspi_devtype_data ls2080a_data = {
 	.rxfifo = 128,
 	.txfifo = 64,
 	.ahb_buf_size = 1024,
-	.driver_data = QUADSPI_AMBA_BASE_INTERNAL,
+	.driver_data = QUADSPI_AMBA_BASE_INTERNAL
+		       | QUADSPI_QUIRK_ADASZ_8BYTE_LIMIT,
 };
 
 #define FSL_QSPI_MAX_CHIP	4
@@ -326,6 +329,11 @@ static inline int needs_wakeup_wait_mode(struct fsl_qspi *q)
 static inline int has_added_amba_base_internal(struct fsl_qspi *q)
 {
 	return q->devtype_data->driver_data & QUADSPI_AMBA_BASE_INTERNAL;
+}
+
+static inline int needs_disable_ahb_prefetch(struct fsl_qspi *q)
+{
+	return q->devtype_data->driver_data & QUADSPI_QUIRK_ADASZ_8BYTE_LIMIT;
 }
 
 /*
@@ -757,14 +765,21 @@ static void fsl_qspi_init_abh_read(struct fsl_qspi *q)
 	qspi_writel(q, QUADSPI_BUFXCR_INVALID_MSTRID, base + QUADSPI_BUF0CR);
 	qspi_writel(q, QUADSPI_BUFXCR_INVALID_MSTRID, base + QUADSPI_BUF1CR);
 	qspi_writel(q, QUADSPI_BUFXCR_INVALID_MSTRID, base + QUADSPI_BUF2CR);
-	/*
-	 * Set ADATSZ with the maximum AHB buffer size to improve the
-	 * read performance.
-	 */
-	qspi_writel(q, QUADSPI_BUF3CR_ALLMST_MASK |
-			((q->devtype_data->ahb_buf_size / 8)
-			<< QUADSPI_BUF3CR_ADATSZ_SHIFT),
+
+	if (needs_disable_ahb_prefetch(q)) {
+		qspi_writel(q, QUADSPI_BUF3CR_ALLMST_MASK |
+			(1 << QUADSPI_BUF3CR_ADATSZ_SHIFT),
 			base + QUADSPI_BUF3CR);
+	} else {
+		/*
+		 * Set ADATSZ with the maximum AHB buffer size to improve the
+		 * read performance.
+		*/
+		qspi_writel(q, QUADSPI_BUF3CR_ALLMST_MASK |
+				((q->devtype_data->ahb_buf_size / 8)
+				<< QUADSPI_BUF3CR_ADATSZ_SHIFT),
+				base + QUADSPI_BUF3CR);
+	}
 
 	/* We only use the buffer3 */
 	qspi_writel(q, 0, base + QUADSPI_BUF0IND);
