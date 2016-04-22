@@ -373,6 +373,7 @@ struct iscsi_host {
 
 	struct workqueue_struct	*workq;
 	char			workq_name[20];
+	struct iscsi_stats	ihost_stats;
 };
 
 /*
@@ -466,6 +467,10 @@ extern void __iscsi_put_task(struct iscsi_task *task);
 extern void __iscsi_get_task(struct iscsi_task *task);
 extern void iscsi_complete_scsi_task(struct iscsi_task *task,
 				     uint32_t exp_cmdsn, uint32_t max_cmdsn);
+extern void iscsi_update_login_stats(struct Scsi_Host *shost,
+				     struct iscsi_login_rsp *rsp_hdr);
+extern void iscsi_update_logout_stats(struct Scsi_Host *shost,
+				      struct iscsi_logout_rsp *rsp_hdr);
 
 /*
  * generic helpers
