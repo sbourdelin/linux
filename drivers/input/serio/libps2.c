@@ -17,7 +17,7 @@
 #include <linux/interrupt.h>
 #include <linux/input.h>
 #include <linux/serio.h>
-#include <linux/i8042.h>
+#include <linux/libi8042.h>
 #include <linux/libps2.h>
 
 #define DRIVER_DESC	"PS/2 driver library"

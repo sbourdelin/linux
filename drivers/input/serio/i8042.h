@@ -54,13 +54,6 @@
 #define I8042_BUFFER_SIZE	16
 
 /*
- * Number of AUX ports on controllers supporting active multiplexing
- * specification
- */
-
-#define I8042_NUM_MUX_PORTS	4
-
-/*
  * Debug.
  */
 

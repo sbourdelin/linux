@@ -107,30 +107,9 @@ static char i8042_aux_firmware_id[128];
  */
 static DEFINE_SPINLOCK(i8042_lock);
 
-/*
- * Writers to AUX and KBD ports as well as users issuing i8042_command
- * directly should acquire i8042_mutex (by means of calling
- * i8042_lock_chip() and i8042_unlock_ship() helpers) to ensure that
- * they do not disturb each other (unfortunately in many i8042
- * implementations write to one of the ports will immediately abort
- * command that is being processed by another port).
- */
-static DEFINE_MUTEX(i8042_mutex);
-
-struct i8042_port {
-	struct serio *serio;
-	int irq;
-	bool exists;
-	bool driver_bound;
-	signed char mux;
-};
-
 #define I8042_KBD_PORT_NO	0
 #define I8042_AUX_PORT_NO	1
 #define I8042_MUX_PORT_NO	2
-#define I8042_NUM_PORTS		(I8042_NUM_MUX_PORTS + 2)
-
-static struct i8042_port i8042_ports[I8042_NUM_PORTS];
 
 static unsigned char i8042_initial_ctr;
 static unsigned char i8042_ctr;
@@ -144,18 +123,6 @@ static struct notifier_block i8042_kbd_bind_notifier_block;
 static irqreturn_t i8042_interrupt(int irq, void *dev_id);
 static bool (*i8042_platform_filter)(unsigned char data, unsigned char str,
 				     struct serio *serio);
-
-void i8042_lock_chip(void)
-{
-	mutex_lock(&i8042_mutex);
-}
-EXPORT_SYMBOL(i8042_lock_chip);
-
-void i8042_unlock_chip(void)
-{
-	mutex_unlock(&i8042_mutex);
-}
-EXPORT_SYMBOL(i8042_unlock_chip);
 
 int i8042_install_filter(bool (*filter)(unsigned char data, unsigned char str,
 					struct serio *serio))
@@ -1372,21 +1339,6 @@ static void i8042_unregister_ports(void)
 		}
 	}
 }
-
-/*
- * Checks whether port belongs to i8042 controller.
- */
-bool i8042_check_port_owner(const struct serio *port)
-{
-	int i;
-
-	for (i = 0; i < I8042_NUM_PORTS; i++)
-		if (i8042_ports[i].serio == port)
-			return true;
-
-	return false;
-}
-EXPORT_SYMBOL(i8042_check_port_owner);
 
 static void i8042_free_irqs(void)
 {
