@@ -161,10 +161,10 @@ static void regulator_unlock_supply(struct regulator_dev *rdev)
 	struct regulator *supply;
 
 	while (1) {
-		mutex_unlock(&rdev->mutex);
 		supply = rdev->supply;
+		mutex_unlock(&rdev->mutex);
 
-		if (!rdev->supply)
+		if (!supply)
 			return;
 
 		rdev = supply->rdev;
