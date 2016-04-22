@@ -221,7 +221,7 @@ static int tmp006_probe(struct i2c_client *client,
 	data->client = client;
 
 	indio_dev->dev.parent = &client->dev;
-	indio_dev->name = dev_name(&client->dev);
+	indio_dev->name = id->name;
 	indio_dev->modes = INDIO_DIRECT_MODE;
 	indio_dev->info = &tmp006_info;
 
