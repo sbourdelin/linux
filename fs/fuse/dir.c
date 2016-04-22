@@ -1870,6 +1870,55 @@ static int fuse_removexattr(struct dentry *entry, const char *name)
 	return err;
 }
 
+static ssize_t fuse_dir_read(struct file *file, char __user *buf, size_t size,
+		loff_t *ppos)
+{
+	struct inode *inode = file_inode(file);
+	struct fuse_conn *fc = get_fuse_conn(inode);
+	struct fuse_dir_read_in inarg;
+	ssize_t ret;
+	struct fuse_file *ff = file->private_data;
+	char *kbuf;
+	FUSE_ARGS(args);
+
+	if (fc->no_dir_read || fc->minor < 25)
+		return -EISDIR;
+
+	if (size > FUSE_DIR_READ_MAX)
+		size = FUSE_DIR_READ_MAX;
+	kbuf = kmalloc(size, GFP_KERNEL);
+	if (!kbuf)
+		return -ENOMEM;
+
+	memset(&inarg, 0, sizeof(inarg));
+	inarg.size = size;
+	inarg.off = *ppos;
+	inarg.fh = ff->fh;
+	args.in.h.opcode = FUSE_DIR_READ;
+	args.in.h.nodeid = get_node_id(inode);
+	args.in.numargs = 1;
+	args.in.args[0].size = sizeof(inarg);
+	args.in.args[0].value = &inarg;
+	args.out.numargs = 1;
+	args.out.argvar = 1;
+	args.out.args[0].size = size;
+	args.out.args[0].value = kbuf;
+	ret = fuse_simple_request(fc, &args);
+	if (ret == -ENOSYS) {
+		fc->no_dir_read = 1;
+		ret = -EISDIR;
+	}
+	if (ret > 0) {
+		if (copy_to_user(buf, kbuf, ret))
+			ret = -EFAULT;
+		else
+			*ppos += ret;
+	}
+	fuse_invalidate_atime(inode);
+	kfree(kbuf);
+	return ret;
+}
+
 static const struct inode_operations fuse_dir_inode_operations = {
 	.lookup		= fuse_lookup,
 	.mkdir		= fuse_mkdir,
@@ -1892,7 +1941,7 @@ static const struct inode_operations fuse_dir_inode_operations = {
 
 static const struct file_operations fuse_dir_operations = {
 	.llseek		= generic_file_llseek,
-	.read		= generic_read_dir,
+	.read		= fuse_dir_read,
 	.iterate	= fuse_readdir,
 	.open		= fuse_dir_open,
 	.release	= fuse_dir_release,
