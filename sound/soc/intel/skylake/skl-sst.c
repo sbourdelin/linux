@@ -25,6 +25,7 @@
 #include "../common/sst-dsp-priv.h"
 #include "../common/sst-ipc.h"
 #include "skl-sst-ipc.h"
+#include "skl-dsp-parse.h"
 
 #define SKL_BASEFW_TIMEOUT	300
 #define SKL_INIT_TIMEOUT	1000
@@ -70,7 +71,7 @@ static int skl_transfer_firmware(struct sst_dsp *ctx,
 
 static int skl_load_base_firmware(struct sst_dsp *ctx)
 {
-	int ret = 0, i;
+	int ret = 0, i, err;
 	struct skl_sst *skl = ctx->thread_context;
 	u32 reg;
 
@@ -83,6 +84,14 @@ static int skl_load_base_firmware(struct sst_dsp *ctx)
 			dev_err(ctx->dev, "Request firmware failed %d\n", ret);
 			skl_dsp_disable_core(ctx);
 			return -EIO;
+		}
+
+		err = snd_skl_parse_fw_bin(ctx);
+		if (err < 0) {
+			dev_err(ctx->dev,
+					"Firmware parsing err: %d\n", ret);
+			release_firmware(ctx->fw);
+			return err;
 		}
 	}
 

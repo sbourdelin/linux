@@ -28,6 +28,7 @@
 #include "skl-tplg-interface.h"
 #include "../common/sst-dsp.h"
 #include "../common/sst-dsp-priv.h"
+#include "skl-dsp-parse.h"
 
 #define SKL_CH_FIXUP_MASK		(1 << 0)
 #define SKL_RATE_FIXUP_MASK		(1 << 1)
@@ -1565,6 +1566,10 @@ static int skl_tplg_widget_load(struct snd_soc_component *cmpnt,
 
 	w->priv = mconfig;
 	memcpy(&mconfig->guid, &dfw_config->uuid, 16);
+
+	ret = snd_skl_get_module_info(skl->skl_sst, mconfig->guid, dfw_config);
+	if (ret < 0)
+		return ret;
 
 	mconfig->id.module_id = dfw_config->module_id;
 	mconfig->id.instance_id = dfw_config->instance_id;
