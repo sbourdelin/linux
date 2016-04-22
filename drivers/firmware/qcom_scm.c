@@ -166,6 +166,11 @@ bool qcom_scm_is_available(void)
 }
 EXPORT_SYMBOL(qcom_scm_is_available);
 
+static void qcom_scm_init(void)
+{
+	__qcom_scm_init();
+}
+
 static int qcom_scm_probe(struct platform_device *pdev)
 {
 	struct qcom_scm *scm;
@@ -207,6 +212,8 @@ static int qcom_scm_probe(struct platform_device *pdev)
 
 	__scm = scm;
 	__scm->dev = &pdev->dev;
+
+	qcom_scm_init();
 
 	return 0;
 }
