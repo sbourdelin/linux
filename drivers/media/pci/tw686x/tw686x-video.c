@@ -61,8 +61,19 @@ static unsigned int tw686x_fields_map(v4l2_std_id std, unsigned int fps)
 		   8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 0, 0
 	};
 
-	unsigned int i =
-		(std & V4L2_STD_625_50) ? std_625_50[fps] : std_525_60[fps];
+	unsigned int i;
+
+	if (std & V4L2_STD_625_50) {
+		if (unlikely(i > ARRAY_SIZE(std_625_50)))
+			i = 14;		/* 25 fps */
+		else
+			i = std_625_50[fps];
+	} else {
+		if (unlikely(i > ARRAY_SIZE(std_525_60)))
+			i = 0;		/* 30 fps */
+		else
+			i = std_525_60[fps];
+	}
 
 	return map[i];
 }
