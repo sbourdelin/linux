@@ -579,7 +579,6 @@ static void hns_roce_free_eq(struct hns_roce_dev *hr_dev,
 	kfree(eq->buf_list);
 }
 
-
 void hns_roce_int_mask_en(struct hns_roce_dev *hr_dev)
 {
 	void __iomem *reg_caepceirqmsk;
