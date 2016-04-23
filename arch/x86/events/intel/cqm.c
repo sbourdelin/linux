@@ -1479,7 +1479,8 @@ static int intel_cqm_event_init(struct perf_event *event)
 	    event->attr.exclude_idle   ||
 	    event->attr.exclude_host   ||
 	    event->attr.exclude_guest  ||
-	    event->attr.sample_period) /* no sampling */
+	    event->attr.sample_period  || /* no sampling */
+	    !(event->attach_state & PERF_ATTACH_TASK))
 		return -EINVAL;
 
 	INIT_LIST_HEAD(&event->hw.cqm_group_entry);
