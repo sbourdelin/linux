@@ -104,6 +104,12 @@ int hns_roce_engine_reset(struct hns_roce_dev *hr_dev, u32 val)
 {
 	return hr_dev->hw->reset(hr_dev, val);
 }
+
+void hns_roce_profile_init(struct hns_roce_dev *hr_dev)
+{
+	hr_dev->hw->hw_profile(hr_dev);
+}
+
 /**
 * hns_roce_probe - RoCE driver entrance
 * @pdev: pointer to platform device
@@ -149,6 +155,8 @@ static int hns_roce_probe(struct platform_device *pdev)
 		goto error_failed_get_cfg;
 	}
 
+	hns_roce_profile_init(hr_dev);
+
 error_failed_get_cfg:
 	ib_dealloc_device(&hr_dev->ib_dev);
 	return ret;
@@ -166,6 +174,7 @@ static int hns_roce_remove(struct platform_device *pdev)
 	ret = hns_roce_engine_reset(hr_dev, 0);
 	if (ret)
 		return ret;
+
 	ib_dealloc_device(&hr_dev->ib_dev);
 
 	return ret;
