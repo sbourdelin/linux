@@ -43,9 +43,26 @@ config VGACON_SOFT_SCROLLBACK_SIZE
        range 1 1024
        default "64"
        help
-         Enter the amount of System RAM to allocate for the scrollback
-	 buffer.  Each 64KB will give you approximately 16 80x25
-	 screenfuls of scrollback buffer
+	  Enter the amount of System RAM to allocate for scrollback
+	  buffers of VGA consoles. Each 64KB will give you approximately
+	  16 80x25 screenfuls of scrollback buffer.
+
+config VGACON_SOFT_SCROLLBACK_FOR_EACH_CONSOLE
+	bool "Persistent Scrollback History for each console"
+	depends on VGACON_SOFT_SCROLLBACK
+	default n
+	help
+	  Say Y here if for each VGA console a scrollback buffer should
+	  be allocated. The scrollback history will persist when switching
+	  between consoles. If you say N here, scrollback is only supported
+	  for the active VGA console and scrollback history will be flushed
+	  when switching between consoles.
+
+	  This breaks legacy versions of tools like clear_console which
+	  might cause security issues.
+	  Use the escape sequence \e[3J instead if this feature is activated.
+
+	  If you use a RAM-constrained system, say N here.
 
 config MDA_CONSOLE
 	depends on !M68K && !PARISC && ISA
