@@ -55,6 +55,7 @@ static LIST_HEAD(regulator_map_list);
 static LIST_HEAD(regulator_ena_gpio_list);
 static LIST_HEAD(regulator_supply_alias_list);
 static bool has_full_constraints;
+static bool regulator_has_booted;
 
 static struct dentry *debugfs_root;
 
@@ -139,7 +140,15 @@ static bool regulator_ops_is_valid(struct regulator_dev *rdev, int ops)
 		return false;
 	}
 
-	if (rdev->constraints->valid_ops_mask & ops)
+	/*
+	 * Ignore regulator boot-protection, after later_initcall.
+	 */
+	if (!regulator_has_booted && rdev->constraints->boot_protection) {
+		if (rdev->constraints->boot_valid_ops_mask & ops)
+			return true;
+		else
+			rdev_info(rdev, "rejected operation 0x%02x\n", ops);
+	} else if (rdev->constraints->valid_ops_mask & ops)
 		return true;
 
 	return false;
@@ -866,7 +875,7 @@ static void print_constraints(struct regulator_dev *rdev)
 	rdev_dbg(rdev, "%s\n", buf);
 
 	if ((constraints->min_uV != constraints->max_uV) &&
-	    !regulator_ops_is_valid(rdev, REGULATOR_CHANGE_VOLTAGE))
+	    !(constraints->valid_ops_mask & REGULATOR_CHANGE_VOLTAGE))
 		rdev_warn(rdev,
 			  "Voltage range but no REGULATOR_CHANGE_VOLTAGE\n");
 }
@@ -1368,7 +1377,8 @@ static struct regulator *create_regulator(struct regulator_dev *rdev,
 	 * it is then we don't need to do nearly so much work for
 	 * enable/disable calls.
 	 */
-	if (!regulator_ops_is_valid(rdev, REGULATOR_CHANGE_STATUS) &&
+	if (rdev->constraints &&
+	    !(rdev->constraints->valid_ops_mask & REGULATOR_CHANGE_STATUS) &&
 	    _regulator_is_enabled(rdev))
 		regulator->always_on = true;
 
@@ -4435,6 +4445,12 @@ static int __init regulator_late_cleanup(struct device *dev, void *data)
 	struct regulation_constraints *c = rdev->constraints;
 	int enabled, ret;
 
+	/*
+	 * The kernel boot is finished, let's unset boot_protection
+	 * Need a lock?
+	 */
+	c->boot_protection = 0;
+
 	if (c && c->always_on)
 		return 0;
 
@@ -4487,6 +4503,8 @@ static int __init regulator_init_complete(void)
 	 */
 	if (of_have_populated_dt())
 		has_full_constraints = true;
+
+	regulator_has_booted = true;
 
 	/* If we have a full configuration then disable any regulators
 	 * we have permission to change the status for and which are

@@ -78,6 +78,35 @@ static void of_get_regulation_constraints(struct device_node *np,
 	if (of_property_read_bool(np, "regulator-allow-set-load"))
 		constraints->valid_ops_mask |= REGULATOR_CHANGE_DRMS;
 
+	constraints->boot_protection = of_property_read_bool(np,
+			"regulator-boot-protection");
+
+	if (constraints->boot_protection) {
+		if (of_property_read_bool(np, "boot-allow-set-voltage"))
+			constraints->boot_valid_ops_mask |=
+				REGULATOR_CHANGE_VOLTAGE;
+		if (of_property_read_bool(np, "boot-allow-set-current"))
+			constraints->boot_valid_ops_mask |=
+				REGULATOR_CHANGE_CURRENT;
+		if (of_property_read_bool(np, "boot-allow-set-mode"))
+			constraints->boot_valid_ops_mask |=
+				REGULATOR_CHANGE_MODE;
+		if (of_property_read_bool(np, "boot-allow-set-status"))
+			constraints->boot_valid_ops_mask |=
+				REGULATOR_CHANGE_STATUS;
+		if (of_property_read_bool(np, "boot-allow-set-load"))
+			constraints->boot_valid_ops_mask |=
+				REGULATOR_CHANGE_DRMS;
+		if (of_property_read_bool(np, "boot-allow-bypass"))
+			constraints->boot_valid_ops_mask |=
+				REGULATOR_CHANGE_BYPASS;
+
+		/*
+		 * boot_valid_ops_mask is a subset of valid_ops_mask
+		 */
+		constraints->boot_valid_ops_mask &= constraints->valid_ops_mask;
+	}
+
 	ret = of_property_read_u32(np, "regulator-ramp-delay", &pval);
 	if (!ret) {
 		if (pval)

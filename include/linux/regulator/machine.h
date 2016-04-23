@@ -135,6 +135,7 @@ struct regulation_constraints {
 
 	/* valid operations for regulator on this machine */
 	unsigned int valid_ops_mask;
+	unsigned int boot_valid_ops_mask;
 
 	/* regulator input voltage - only if supply is another regulator */
 	int input_uV;
@@ -156,6 +157,7 @@ struct regulation_constraints {
 	/* constraint flags */
 	unsigned always_on:1;	/* regulator never off when system is on */
 	unsigned boot_on:1;	/* bootloader/firmware enabled regulator */
+	unsigned boot_protection:1;
 	unsigned apply_uV:1;	/* apply uV constraint if min == max */
 	unsigned ramp_disable:1; /* disable ramp delay */
 	unsigned soft_start:1;	/* ramp voltage slowly */
