@@ -484,8 +484,18 @@ static inline void mbm_set_rccount(
 {
 	u64 tmpval;
 
-	tmpval = local64_read(&event->hw.rc_count) + atomic64_read(&rr->value);
+	tmpval = local64_read(&event->hw.rc_count) + atomic64_read(&rr->value) -
+		 local64_read(&event->hw.st_count);
+
 	local64_set(&event->hw.rc_count, tmpval);
+
+	/*
+	 * The st_count(start count) is meant to store the starting bytes
+	 * for an event which is reusing an RMID which already
+	 * had bytes measured.Once we start using the rc_count
+	 * to keep the history bytes, reset the start bytes.
+	 */
+	local64_set(&event->hw.st_count, 0UL);
 	local64_set(&event->count, tmpval);
 }
 
@@ -1025,6 +1035,58 @@ static void init_mbm_sample(u32 rmid, u32 evt_type)
 	on_each_cpu_mask(&cqm_cpumask, __intel_mbm_event_init, &rr, 1);
 }
 
+static inline bool first_event_ingroup(struct perf_event *group,
+				    struct perf_event *event)
+{
+	struct list_head *head = &group->hw.cqm_group_entry;
+	u32 evt_type = event->attr.config;
+
+	if (evt_type == group->attr.config)
+		return false;
+	list_for_each_entry(event, head, hw.cqm_group_entry) {
+		if (evt_type == event->attr.config)
+			return false;
+	}
+
+	return true;
+}
+
+/*
+ * mbm_setup_event - Does mbm specific count initialization
+ * when multiple events share RMID.
+ *
+ * If this is the first mbm event using the RMID, then initialize
+ * the total_bytes in the RMID and prev_count.
+ * else only initialize the start count of the event which is the current
+ * count of the RMID.
+ * In other words if the RMID has say counted 100MB till now because
+ * other event was already using it, we start
+ * from zero for our new event. Because after 1s if user checks the count,
+ * we need to report for the 1s duration and not the entire duration the
+ * RMID was being counted.
+*/
+static inline void mbm_setup_event(u32 rmid, struct perf_event *group,
+					  struct perf_event *event)
+{
+	u32 evt_type = event->attr.config;
+	struct rmid_read rr;
+
+	if (first_event_ingroup(group, event)) {
+		init_mbm_sample(rmid, evt_type);
+	} else {
+		rr = __init_rr(rmid, evt_type, 0);
+		cqm_mask_call(&rr);
+		local64_set(&event->hw.st_count, atomic64_read(&rr.value));
+	}
+}
+
+static inline void mbm_setup_event_init(struct perf_event *event)
+{
+	event->hw.is_group_event = false;
+	local64_set(&event->hw.rc_count, 0UL);
+	local64_set(&event->hw.st_count, 0UL);
+}
+
 /*
  * Find a group and setup RMID.
  *
@@ -1037,7 +1099,7 @@ static void intel_cqm_setup_event(struct perf_event *event,
 	bool conflict = false;
 	u32 rmid;
 
-	event->hw.is_group_event = false;
+	mbm_setup_event_init(event);
 	list_for_each_entry(iter, &cache_groups, hw.cqm_groups_entry) {
 		rmid = iter->hw.cqm_rmid;
 
@@ -1046,7 +1108,7 @@ static void intel_cqm_setup_event(struct perf_event *event,
 			event->hw.cqm_rmid = rmid;
 			*group = iter;
 			if (is_mbm_event(event->attr.config) && __rmid_valid(rmid))
-				init_mbm_sample(rmid, event->attr.config);
+				mbm_setup_event(rmid, iter, event);
 			return;
 		}
 
@@ -1273,7 +1335,8 @@ static u64 intel_cqm_event_count(struct perf_event *event)
 	if (event->hw.cqm_rmid == rr.rmid) {
 		if (is_mbm_event(event->attr.config)) {
 			tmpval = atomic64_read(&rr.value) +
-				local64_read(&event->hw.rc_count);
+				local64_read(&event->hw.rc_count) -
+				local64_read(&event->hw.st_count);
 
 			local64_set(&event->count, tmpval);
 		} else {
