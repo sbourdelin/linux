@@ -102,7 +102,7 @@ static u32 tsi148_LM_irqhandler(struct tsi148_driver *bridge, u32 stat)
 	for (i = 0; i < 4; i++) {
 		if (stat & TSI148_LCSR_INTS_LMS[i]) {
 			/* We only enable interrupts if the callback is set */
-			bridge->lm_callback[i](i);
+			bridge->lm_callback[i](bridge->lm_cookie[i]);
 			serviced |= TSI148_LCSR_INTC_LMC[i];
 		}
 	}
@@ -2051,7 +2051,7 @@ static int tsi148_lm_get(struct vme_lm_resource *lm,
  * Callback will be passed the monitor triggered.
  */
 static int tsi148_lm_attach(struct vme_lm_resource *lm, int monitor,
-	void (*callback)(int))
+	void (*callback)(void *), void *cookie)
 {
 	u32 lm_ctl, tmp;
 	struct vme_bridge *tsi148_bridge;
@@ -2081,6 +2081,7 @@ static int tsi148_lm_attach(struct vme_lm_resource *lm, int monitor,
 
 	/* Attach callback */
 	bridge->lm_callback[monitor] = callback;
+	bridge->lm_cookie[monitor] = cookie;
 
 	/* Enable Location Monitor interrupt */
 	tmp = ioread32be(bridge->base + TSI148_LCSR_INTEN);
