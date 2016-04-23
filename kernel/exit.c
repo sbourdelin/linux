@@ -679,6 +679,14 @@ void do_exit(long code)
 	validate_creds_for_do_exit(tsk);
 
 	/*
+	 * It is possible to get here with interrupt disabled when fault
+	 * happens in kernel thread. Enable interrupt to make threadgroup
+	 * happy.
+	 */
+	if (irqs_disabled())
+		local_irq_enable();
+
+	/*
 	 * We're taking recursive faults here in do_exit. Safest is to just
 	 * leave this task alone and wait for reboot.
 	 */
