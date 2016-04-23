@@ -21,6 +21,431 @@
 #include "hns_roce_device.h"
 #include "hns_roce_hw_v1.h"
 
+void hns_roce_set_db_event_mode(struct hns_roce_dev *hr_dev, int sdb_mode,
+				int odb_mode)
+{
+	u32 val;
+
+	val = roce_readl(hr_dev->reg_base + ROCEE_GLB_CFG_REG);
+	roce_set_bit(val, ROCEE_GLB_CFG_ROCEE_DB_SQ_MODE_S, sdb_mode);
+	roce_set_bit(val, ROCEE_GLB_CFG_ROCEE_DB_OTH_MODE_S, odb_mode);
+	roce_writel(val, hr_dev->reg_base + ROCEE_GLB_CFG_REG);
+}
+
+void hns_roce_set_db_ext_mode(struct hns_roce_dev *hr_dev,
+			      u32 sdb_mode, u32 odb_mode)
+{
+	u32 val;
+
+	/* Configure SDB/ODB extend mode */
+	val = roce_readl(hr_dev->reg_base + ROCEE_GLB_CFG_REG);
+	roce_set_bit(val, ROCEE_GLB_CFG_SQ_EXT_DB_MODE_S, sdb_mode);
+	roce_set_bit(val, ROCEE_GLB_CFG_OTH_EXT_DB_MODE_S, odb_mode);
+	roce_writel(val, hr_dev->reg_base + ROCEE_GLB_CFG_REG);
+}
+
+void hns_roce_set_sdb(struct hns_roce_dev *hr_dev, u32 sdb_alept, u32 sdb_alful)
+{
+	struct hns_roce_v1_priv *priv;
+	struct hns_roce_db_table *db;
+	u32 val;
+
+	priv = (struct hns_roce_v1_priv *)hr_dev->hw->priv;
+	db = &priv->db_table;
+
+	db->sdb_almept = sdb_alept;
+	db->sdb_almful = sdb_alful;
+
+	/* Configure SDB */
+	val = roce_readl(hr_dev->reg_base + ROCEE_DB_SQ_WL_REG);
+	roce_set_field(val, ROCEE_DB_SQ_WL_ROCEE_DB_SQ_WL_M,
+		       ROCEE_DB_SQ_WL_ROCEE_DB_SQ_WL_S, db->sdb_almful);
+	roce_set_field(val, ROCEE_DB_SQ_WL_ROCEE_DB_SQ_WL_EMPTY_M,
+		       ROCEE_DB_SQ_WL_ROCEE_DB_SQ_WL_EMPTY_S, db->sdb_almept);
+	roce_writel(val, hr_dev->reg_base + ROCEE_DB_SQ_WL_REG);
+}
+
+void hns_roce_set_odb(struct hns_roce_dev *hr_dev, u32 odb_alept, u32 odb_alful)
+{
+	struct hns_roce_v1_priv *priv;
+	struct hns_roce_db_table *db;
+	u32 val;
+
+	priv = (struct hns_roce_v1_priv *)hr_dev->hw->priv;
+	db = &priv->db_table;
+
+	db->odb_almept = odb_alept;
+	db->odb_almful = odb_alful;
+
+	/* Configure ODB */
+	val = roce_readl(hr_dev->reg_base + ROCEE_DB_OTHERS_WL_REG);
+	roce_set_field(val, ROCEE_DB_OTHERS_WL_ROCEE_DB_OTH_WL_M,
+		       ROCEE_DB_OTHERS_WL_ROCEE_DB_OTH_WL_S, db->odb_almful);
+	roce_set_field(val, ROCEE_DB_OTHERS_WL_ROCEE_DB_OTH_WL_EMPTY_M,
+		       ROCEE_DB_OTHERS_WL_ROCEE_DB_OTH_WL_EMPTY_S,
+		       db->odb_almept);
+	roce_writel(val, hr_dev->reg_base + ROCEE_DB_OTHERS_WL_REG);
+}
+
+void hns_roce_set_sdb_ext(struct hns_roce_dev *hr_dev, u32 ext_sdb_alept,
+			  u32 ext_sdb_alful)
+{
+	struct device *dev = &hr_dev->pdev->dev;
+	struct hns_roce_v1_priv *priv;
+	struct hns_roce_db_table *db;
+	dma_addr_t sdb_dma_addr;
+	u32 val;
+
+	priv = (struct hns_roce_v1_priv *)hr_dev->hw->priv;
+	db = &priv->db_table;
+
+	db->ext_db->esdb_almept = ext_sdb_alept;
+	db->ext_db->esdb_alful = ext_sdb_alful;
+
+	/* Configure extend SDB threshold */
+	roce_writel(db->ext_db->esdb_almept,
+		    hr_dev->reg_base + ROCEE_EXT_DB_SQ_WL_EMPTY_REG);
+	roce_writel(db->ext_db->esdb_alful,
+		    hr_dev->reg_base + ROCEE_EXT_DB_SQ_WL_REG);
+
+	/* Configure extend SDB base addr */
+	sdb_dma_addr = db->ext_db->sdb_buf_list->map;
+	roce_writel((u32)(sdb_dma_addr >> ADDR_SHIFT_12),
+		     hr_dev->reg_base + ROCEE_EXT_DB_SQ_REG);
+
+	/* Configure extend SDB depth */
+	val = roce_readl(hr_dev->reg_base + ROCEE_EXT_DB_SQ_H_REG);
+	roce_set_field(val, ROCEE_EXT_DB_SQ_H_EXT_DB_SQ_SHIFT_M,
+		       ROCEE_EXT_DB_SQ_H_EXT_DB_SQ_SHIFT_S,
+		       db->ext_db->esdb_dep);
+	roce_set_field(val, ROCEE_EXT_DB_SQ_H_EXT_DB_SQ_BA_H_M,
+		       ROCEE_EXT_DB_SQ_H_EXT_DB_SQ_BA_H_S,
+		       sdb_dma_addr >> ADDR_SHIFT_44);
+	roce_writel(val, hr_dev->reg_base + ROCEE_EXT_DB_SQ_H_REG);
+
+	dev_dbg(dev, "ext SDB depth: 0x%x\n", db->ext_db->esdb_dep);
+	dev_dbg(dev, "ext SDB threshold: epmty: 0x%x, ful: 0x%x\n",
+		db->ext_db->esdb_almept, db->ext_db->esdb_alful);
+}
+
+void hns_roce_set_odb_ext(struct hns_roce_dev *hr_dev, u32 ext_odb_alept,
+			  u32 ext_odb_alful)
+{
+	struct device *dev = &hr_dev->pdev->dev;
+	struct hns_roce_v1_priv *priv;
+	struct hns_roce_db_table *db;
+	dma_addr_t odb_dma_addr;
+	u32 val;
+
+	priv = (struct hns_roce_v1_priv *)hr_dev->hw->priv;
+	db = &priv->db_table;
+
+	db->ext_db->eodb_almept = ext_odb_alept;
+	db->ext_db->eodb_alful = ext_odb_alful;
+
+	/* Configure extend ODB threshold */
+	roce_writel(db->ext_db->eodb_almept,
+		    hr_dev->reg_base + ROCEE_EXT_DB_OTHERS_WL_EMPTY_REG);
+	roce_writel(db->ext_db->eodb_alful,
+		    hr_dev->reg_base + ROCEE_EXT_DB_OTHERS_WL_REG);
+
+	/* Configure extend ODB base addr */
+	odb_dma_addr = db->ext_db->odb_buf_list->map;
+	roce_writel((u32)(odb_dma_addr >> ADDR_SHIFT_12),
+		     hr_dev->reg_base + ROCEE_EXT_DB_OTH_REG);
+
+	/* Configure extend ODB depth */
+	val = roce_readl(hr_dev->reg_base + ROCEE_EXT_DB_OTH_H_REG);
+	roce_set_field(val, ROCEE_EXT_DB_OTH_H_EXT_DB_OTH_SHIFT_M,
+		       ROCEE_EXT_DB_OTH_H_EXT_DB_OTH_SHIFT_S,
+		       db->ext_db->eodb_dep);
+	roce_set_field(val, ROCEE_EXT_DB_SQ_H_EXT_DB_OTH_BA_H_M,
+		       ROCEE_EXT_DB_SQ_H_EXT_DB_OTH_BA_H_S,
+		       db->ext_db->eodb_dep);
+	roce_writel(val, hr_dev->reg_base + ROCEE_EXT_DB_OTH_H_REG);
+
+	dev_dbg(dev, "ext ODB depth: 0x%x\n", db->ext_db->eodb_dep);
+	dev_dbg(dev, "ext ODB threshold: empty: 0x%x, ful: 0x%x\n",
+		db->ext_db->eodb_almept, db->ext_db->eodb_alful);
+}
+
+int hns_roce_db_ext_init(struct hns_roce_dev *hr_dev, u32 sdb_ext_mod,
+			 u32 odb_ext_mod)
+{
+	struct device *dev = &hr_dev->pdev->dev;
+	struct hns_roce_v1_priv *priv;
+	struct hns_roce_db_table *db;
+	dma_addr_t sdb_dma_addr;
+	dma_addr_t odb_dma_addr;
+	int ret = 0;
+
+	priv = (struct hns_roce_v1_priv *)hr_dev->hw->priv;
+	db = &priv->db_table;
+
+	db->ext_db = kmalloc(sizeof(*db->ext_db), GFP_KERNEL);
+	if (!db->ext_db) {
+		ret = -ENOMEM;
+		dev_err(dev, "extend db buf alloc fail\n");
+		return ret;
+	}
+
+	if (sdb_ext_mod) {
+		db->ext_db->sdb_buf_list = kmalloc(
+				sizeof(*db->ext_db->sdb_buf_list), GFP_KERNEL);
+		if (!db->ext_db->sdb_buf_list) {
+			ret = -ENOMEM;
+			dev_err(dev, "sdb buf alloc failed\n");
+			goto ext_sdb_buf_fail_out;
+		}
+
+		db->ext_db->sdb_buf_list->buf = dma_alloc_coherent(dev,
+						     HNS_ROCE_V1_EXT_SDB_SIZE,
+						     &sdb_dma_addr, GFP_KERNEL);
+		if (!db->ext_db->sdb_buf_list->buf) {
+			ret = -ENOMEM;
+			dev_err(dev, "Send queue db buf alloc fail\n");
+			goto alloc_sq_db_buf_fail;
+		}
+		db->ext_db->sdb_buf_list->map = sdb_dma_addr;
+
+		db->ext_db->esdb_dep = ilog2(HNS_ROCE_V1_EXT_SDB_DEPTH);
+		hns_roce_set_sdb_ext(hr_dev, HNS_ROCE_V1_EXT_SDB_ALEPT,
+				     HNS_ROCE_V1_EXT_SDB_ALFUL);
+	} else
+		hns_roce_set_sdb(hr_dev, HNS_ROCE_V1_SDB_ALEPT,
+				 HNS_ROCE_V1_SDB_ALFUL);
+
+	if (odb_ext_mod) {
+		db->ext_db->odb_buf_list = kmalloc(
+				sizeof(*db->ext_db->odb_buf_list), GFP_KERNEL);
+		if (!db->ext_db->odb_buf_list) {
+			ret = -ENOMEM;
+			dev_err(dev, "odb buf alloc failed\n");
+			goto ext_odb_buf_fail_out;
+		}
+
+		db->ext_db->odb_buf_list->buf = dma_alloc_coherent(dev,
+						     HNS_ROCE_V1_EXT_ODB_SIZE,
+						     &odb_dma_addr, GFP_KERNEL);
+		if (!db->ext_db->odb_buf_list->buf) {
+			ret = -ENOMEM;
+			dev_err(dev, "Other queue db buf alloc fail\n");
+			goto alloc_otr_db_buf_fail;
+		}
+		db->ext_db->odb_buf_list->map = odb_dma_addr;
+
+		db->ext_db->eodb_dep = ilog2(HNS_ROCE_V1_EXT_ODB_DEPTH);
+		hns_roce_set_odb_ext(hr_dev, HNS_ROCE_V1_EXT_ODB_ALEPT,
+				     HNS_ROCE_V1_EXT_ODB_ALFUL);
+	} else
+		hns_roce_set_odb(hr_dev, HNS_ROCE_V1_ODB_ALEPT,
+				 HNS_ROCE_V1_ODB_ALFUL);
+
+	hns_roce_set_db_ext_mode(hr_dev, sdb_ext_mod, odb_ext_mod);
+
+	return 0;
+
+alloc_otr_db_buf_fail:
+	kfree(db->ext_db->odb_buf_list);
+
+ext_odb_buf_fail_out:
+	if (sdb_ext_mod) {
+		dma_free_coherent(dev, HNS_ROCE_V1_EXT_SDB_SIZE,
+				  db->ext_db->sdb_buf_list->buf,
+				  db->ext_db->sdb_buf_list->map);
+	}
+
+alloc_sq_db_buf_fail:
+	if (sdb_ext_mod)
+		kfree(db->ext_db->sdb_buf_list);
+
+ext_sdb_buf_fail_out:
+	kfree(db->ext_db);
+	return ret;
+}
+
+int hns_roce_db_init(struct hns_roce_dev *hr_dev)
+{
+	struct device *dev = &hr_dev->pdev->dev;
+	struct hns_roce_v1_priv *priv;
+	struct hns_roce_db_table *db;
+	u32 sdb_ext_mod;
+	u32 odb_ext_mod;
+	u32 sdb_evt_mod;
+	u32 odb_evt_mod;
+	int ret = 0;
+
+	priv = (struct hns_roce_v1_priv *)hr_dev->hw->priv;
+	db = &priv->db_table;
+
+	memset(db, 0, sizeof(*db));
+
+	/* Default DB mode */
+	sdb_ext_mod = HNS_ROCE_SDB_EXTEND_MODE;
+	odb_ext_mod = HNS_ROCE_ODB_EXTEND_MODE;
+	sdb_evt_mod = HNS_ROCE_SDB_NORMAL_MODE;
+	odb_evt_mod = HNS_ROCE_ODB_POLL_MODE;
+
+	db->sdb_ext_mod = sdb_ext_mod;
+	db->odb_ext_mod = odb_ext_mod;
+
+	/* Init extend DB */
+	ret = hns_roce_db_ext_init(hr_dev, sdb_ext_mod, odb_ext_mod);
+	if (ret) {
+		dev_err(dev, "Failed in extend DB configuration.\n");
+		return ret;
+	}
+
+	hns_roce_set_db_event_mode(hr_dev, sdb_evt_mod, odb_evt_mod);
+
+	return 0;
+}
+
+void hns_roce_db_free(struct hns_roce_dev *hr_dev)
+{
+	struct device *dev = &hr_dev->pdev->dev;
+	struct hns_roce_v1_priv *priv;
+	struct hns_roce_db_table *db;
+
+	priv = (struct hns_roce_v1_priv *)hr_dev->hw->priv;
+	db = &priv->db_table;
+
+	if (db->sdb_ext_mod) {
+		dma_free_coherent(dev, HNS_ROCE_V1_EXT_SDB_SIZE,
+				  db->ext_db->sdb_buf_list->buf,
+				  db->ext_db->sdb_buf_list->map);
+		kfree(db->ext_db->sdb_buf_list);
+	}
+
+	if (db->odb_ext_mod) {
+		dma_free_coherent(dev, HNS_ROCE_V1_EXT_ODB_SIZE,
+				  db->ext_db->odb_buf_list->buf,
+				  db->ext_db->odb_buf_list->map);
+		kfree(db->ext_db->odb_buf_list);
+	}
+
+	kfree(db->ext_db);
+}
+
+int hns_roce_raq_init(struct hns_roce_dev *hr_dev)
+{
+	int ret;
+	int raq_shift = 0;
+	dma_addr_t addr;
+	u32 val;
+	struct hns_roce_v1_priv *priv;
+	struct hns_roce_raq_table *raq;
+	struct device *dev = &hr_dev->pdev->dev;
+
+	priv = (struct hns_roce_v1_priv *)hr_dev->hw->priv;
+	raq = &priv->raq_table;
+
+	raq->e_raq_addr = hr_dev->reg_base + ROCEE_EXT_RAQ_REG;
+	raq->e_raq_wl_addr = hr_dev->reg_base + ROCEE_RAQ_WL_REG;
+	raq->e_raq_shift_addr = hr_dev->reg_base + ROCEE_EXT_RAQ_H_REG;
+
+	raq->e_raq_buf = kzalloc(sizeof(*(raq->e_raq_buf)), GFP_KERNEL);
+	if (!raq->e_raq_buf) {
+		ret = -ENOMEM;
+		dev_err(dev, "Failed to alloc raq buf, Aborting.\n");
+		return ret;
+	}
+
+	raq->e_raq_buf->buf = dma_alloc_coherent(dev, HNS_ROCE_V1_RAQ_SIZE,
+						 &addr, GFP_KERNEL);
+	if (!raq->e_raq_buf->buf) {
+		ret = -ENOMEM;
+		dev_err(dev, "Failed to dma_alloc ext raq buf.\n");
+		goto _err_dma_alloc_raq;
+	}
+	raq->e_raq_buf->map = addr;
+
+	/* Configure raq extended address. 48bit 4K align*/
+	roce_writel(raq->e_raq_buf->map >> ADDR_SHIFT_12, raq->e_raq_addr);
+
+	/* Configure raq_shift */
+	raq_shift = ilog2(HNS_ROCE_V1_RAQ_SIZE / HNS_ROCE_V1_RAQ_ENTRY);
+	val = roce_readl(raq->e_raq_shift_addr);
+	roce_set_field(val, ROCEE_EXT_RAQ_H_EXT_RAQ_SHIFT_M,
+		       ROCEE_EXT_RAQ_H_EXT_RAQ_SHIFT_S,
+		       raq_shift);
+	roce_set_field(val, ROCEE_EXT_RAQ_H_EXT_RAQ_BA_H_M,
+		       ROCEE_EXT_RAQ_H_EXT_RAQ_BA_H_S,
+		       raq->e_raq_buf->map >> ADDR_SHIFT_44);
+	roce_writel(val, raq->e_raq_shift_addr);
+	dev_dbg(dev, "Configure raq_shift 0x%x.\n", val);
+
+	/* Configure raq threshold */
+	val = roce_readl(raq->e_raq_wl_addr);
+	roce_set_field(val, ROCEE_RAQ_WL_ROCEE_RAQ_WL_M,
+		       ROCEE_RAQ_WL_ROCEE_RAQ_WL_S,
+		       HNS_ROCE_V1_EXT_RAQ_WF);
+	roce_writel(val, raq->e_raq_wl_addr);
+	dev_dbg(dev, "Configure raq_wl 0x%x.\n", val);
+
+	/* Enable extend raq */
+	val = roce_readl(hr_dev->reg_base + ROCEE_WRMS_POL_TIME_INTERVAL_REG);
+	roce_set_field(val,
+		       ROCEE_WRMS_POL_TIME_INTERVAL_WRMS_POL_TIME_INTERVAL_M,
+		       ROCEE_WRMS_POL_TIME_INTERVAL_WRMS_POL_TIME_INTERVAL_S,
+		       POL_TIME_INTERVAL_VAL);
+	roce_set_bit(val, ROCEE_WRMS_POL_TIME_INTERVAL_WRMS_EXT_RAQ_MODE, 1);
+	roce_set_field(val,
+		       ROCEE_WRMS_POL_TIME_INTERVAL_WRMS_RAQ_TIMEOUT_CHK_CFG_M,
+		       ROCEE_WRMS_POL_TIME_INTERVAL_WRMS_RAQ_TIMEOUT_CHK_CFG_S,
+		       2);
+	roce_set_bit(val,
+		     ROCEE_WRMS_POL_TIME_INTERVAL_WRMS_RAQ_TIMEOUT_CHK_EN_S, 1);
+	roce_writel(val, hr_dev->reg_base + ROCEE_WRMS_POL_TIME_INTERVAL_REG);
+	dev_dbg(dev, "Configure WrmsPolTimeInterval 0x%x.\n", val);
+
+	/* Enable raq drop */
+	val = roce_readl(hr_dev->reg_base + ROCEE_GLB_CFG_REG);
+	roce_set_bit(val, ROCEE_GLB_CFG_TRP_RAQ_DROP_EN_S, 1);
+	roce_writel(val, hr_dev->reg_base + ROCEE_GLB_CFG_REG);
+	dev_dbg(dev, "Configure GlbCfg = 0x%x.\n", val);
+
+	return 0;
+
+_err_dma_alloc_raq:
+	kfree(raq->e_raq_buf);
+	return ret;
+}
+
+void hns_roce_raq_free(struct hns_roce_dev *hr_dev)
+{
+	struct device *dev = &hr_dev->pdev->dev;
+	struct hns_roce_v1_priv *priv;
+	struct hns_roce_raq_table *raq;
+
+	priv = (struct hns_roce_v1_priv *)hr_dev->hw->priv;
+	raq = &priv->raq_table;
+
+	dma_free_coherent(dev, HNS_ROCE_V1_RAQ_SIZE, raq->e_raq_buf->buf,
+			  raq->e_raq_buf->map);
+	kfree(raq->e_raq_buf);
+}
+
+void hns_roce_port_enable(struct hns_roce_dev  *hr_dev, int enable_flag)
+{
+	u32 val;
+
+	if (enable_flag) {
+		val = roce_readl(hr_dev->reg_base + ROCEE_GLB_CFG_REG);
+		 /* Open all ports */
+		roce_set_field(val, ROCEE_GLB_CFG_ROCEE_PORT_ST_M,
+			       ROCEE_GLB_CFG_ROCEE_PORT_ST_S,
+			       ALL_PORT_VAL_OPEN);
+		roce_writel(val, hr_dev->reg_base + ROCEE_GLB_CFG_REG);
+	} else {
+		val = roce_readl(hr_dev->reg_base + ROCEE_GLB_CFG_REG);
+		/* Close all ports */
+		roce_set_field(val, ROCEE_GLB_CFG_ROCEE_PORT_ST_M,
+			       ROCEE_GLB_CFG_ROCEE_PORT_ST_S, 0x0);
+		roce_writel(val, hr_dev->reg_base + ROCEE_GLB_CFG_REG);
+	}
+}
+
 /**
  * hns_roce_v1_reset - reset roce
  * @hr_dev: roce device struct pointer
@@ -126,7 +551,59 @@ void hns_roce_v1_profile(struct hns_roce_dev *hr_dev)
 	caps->max_mtu = IB_MTU_2048;
 }
 
+int hns_roce_v1_init(struct hns_roce_dev *hr_dev)
+{
+	int ret;
+	u32 val;
+	struct device *dev = &hr_dev->pdev->dev;
+
+	/* DMAE user config */
+	val = roce_readl(hr_dev->reg_base + ROCEE_DMAE_USER_CFG1_REG);
+	roce_set_field(val, ROCEE_DMAE_USER_CFG1_ROCEE_CACHE_TB_CFG_M,
+		       ROCEE_DMAE_USER_CFG1_ROCEE_CACHE_TB_CFG_S, 0xf);
+	roce_set_field(val, ROCEE_DMAE_USER_CFG1_ROCEE_STREAM_ID_TB_CFG_M,
+		       ROCEE_DMAE_USER_CFG1_ROCEE_STREAM_ID_TB_CFG_S,
+		       1 << PAGES_SHIFT_16);
+	roce_writel(val, hr_dev->reg_base + ROCEE_DMAE_USER_CFG1_REG);
+
+	val = roce_readl(hr_dev->reg_base + ROCEE_DMAE_USER_CFG2_REG);
+	roce_set_field(val, ROCEE_DMAE_USER_CFG2_ROCEE_CACHE_PKT_CFG_M,
+		       ROCEE_DMAE_USER_CFG2_ROCEE_CACHE_PKT_CFG_S, 0xf);
+	roce_set_field(val, ROCEE_DMAE_USER_CFG2_ROCEE_STREAM_ID_PKT_CFG_M,
+		       ROCEE_DMAE_USER_CFG2_ROCEE_STREAM_ID_PKT_CFG_S,
+		       1 << PAGES_SHIFT_16);
+
+	ret = hns_roce_db_init(hr_dev);
+	if (ret) {
+		dev_err(dev, "doorbell init failed!\n");
+		return ret;
+	}
+
+	ret = hns_roce_raq_init(hr_dev);
+	if (ret) {
+		dev_err(dev, "raq init failed!\n");
+		goto _error_failed_raq_init;
+	}
+
+	hns_roce_port_enable(hr_dev, HNS_ROCE_PORT_UP);
+
+	return 0;
+
+_error_failed_raq_init:
+	hns_roce_db_free(hr_dev);
+	return ret;
+}
+
+void hns_roce_v1_uninit(struct hns_roce_dev *hr_dev)
+{
+	hns_roce_port_enable(hr_dev, HNS_ROCE_PORT_DOWN);
+	hns_roce_raq_free(hr_dev);
+	hns_roce_db_free(hr_dev);
+}
+
 struct hns_roce_hw hns_roce_hw_v1 = {
 	.reset = hns_roce_v1_reset,
 	.hw_profile = hns_roce_v1_profile,
+	.hw_init = hns_roce_v1_init,
+	.hw_uninit = hns_roce_v1_uninit,
 };
