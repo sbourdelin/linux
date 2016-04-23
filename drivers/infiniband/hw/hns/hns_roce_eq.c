@@ -589,8 +589,7 @@ void hns_roce_int_mask_en(struct hns_roce_dev *hr_dev)
 	int masken = 0;
 
 	/* AEQ INT */
-	reg_caepaemsk = (void *)((char *)hr_dev->reg_base +
-				  ROCEE_CAEP_AE_MASK_REG);
+	reg_caepaemsk = (void *)(hr_dev->reg_base + ROCEE_CAEP_AE_MASK_REG);
 	aemask_val = roce_readl(reg_caepaemsk);
 	roce_set_bit(aemask_val, ROCEE_CAEP_AE_MASK_CAEP_AEQ_ALM_OVF_MASK_S,
 		     masken);
