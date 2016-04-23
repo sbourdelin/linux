@@ -1659,6 +1659,8 @@ int nf_conntrack_init_start(void)
 	for (i = 0; i < CONNTRACK_LOCKS; i++)
 		spin_lock_init(&nf_conntrack_locks[i]);
 
+	spin_lock_init(&nf_conntrack_locks_all_lock);
+
 	if (!nf_conntrack_htable_size) {
 		/* Idea from tcp.c: use 1/16384 of memory.
 		 * On i386: 32MB machine has 512 buckets.
