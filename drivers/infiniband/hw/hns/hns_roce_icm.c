@@ -274,7 +274,7 @@ int hns_roce_unmap_icm(struct hns_roce_dev *hr_dev,
 {
 	struct device *dev = &hr_dev->pdev->dev;
 	unsigned long end = 0;
-	unsigned long flag;
+	unsigned long flags;
 	void __iomem *bt_cmd;
 	uint32_t bt_cmd_val[2];
 	u32 bt_cmd_h_val = 0;
