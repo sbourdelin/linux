@@ -39,6 +39,7 @@
 #include <rdma/ib_umem.h>
 #include <rdma/ib_user_verbs.h>
 #include <rdma/ib_verbs.h>
+#include "hns_roce_common.h"
 #include "hns_roce_device.h"
 
 int hns_roce_get_cfg(struct hns_roce_dev *hr_dev)
@@ -157,8 +158,20 @@ static int hns_roce_probe(struct platform_device *pdev)
 
 	hns_roce_profile_init(hr_dev);
 
+	ret = hns_roce_cmd_init(hr_dev);
+	if (ret) {
+		dev_err(dev, "cmd init failed!\n");
+		goto error_failed_cmd_init;
+	}
+
+error_failed_cmd_init:
+	ret = hns_roce_engine_reset(hr_dev, 0);
+	if (ret)
+		dev_err(&hr_dev->pdev->dev, "roce_engine reset fail\n");
+
 error_failed_get_cfg:
 	ib_dealloc_device(&hr_dev->ib_dev);
+
 	return ret;
 }
 
@@ -170,6 +183,8 @@ static int hns_roce_remove(struct platform_device *pdev)
 {
 	struct hns_roce_dev *hr_dev = platform_get_drvdata(pdev);
 	int ret = 0;
+
+	hns_roce_cmd_cleanup(hr_dev);
 
 	ret = hns_roce_engine_reset(hr_dev, 0);
 	if (ret)

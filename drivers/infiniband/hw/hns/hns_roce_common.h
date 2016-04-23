@@ -22,4 +22,6 @@
 
 #define ROCEE_ACK_DELAY_REG			0x14
 
+#define ROCEE_MB1_REG				0x210
+
 #endif /* _HNS_ROCE_COMMON_H */
