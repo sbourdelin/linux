@@ -479,6 +479,16 @@ static void cqm_mask_call(struct rmid_read *rr)
 		on_each_cpu_mask(&cqm_cpumask, __intel_cqm_event_count, rr, 1);
 }
 
+static inline void mbm_set_rccount(
+			  struct perf_event *event, struct rmid_read *rr)
+{
+	u64 tmpval;
+
+	tmpval = local64_read(&event->hw.rc_count) + atomic64_read(&rr->value);
+	local64_set(&event->hw.rc_count, tmpval);
+	local64_set(&event->count, tmpval);
+}
+
 /*
  * Exchange the RMID of a group of events.
  */
@@ -493,12 +503,19 @@ static u32 intel_cqm_xchg_rmid(struct perf_event *group, u32 rmid)
 
 	/*
 	 * If our RMID is being deallocated, perform a read now.
+	 * For mbm, we need to store the bytes that were counted till now
+	 * separately.
 	 */
 	if (__rmid_valid(old_rmid) && !__rmid_valid(rmid)) {
 
 		rr = __init_rr(old_rmid, group->attr.config, 0);
 		cqm_mask_call(&rr);
-		local64_set(&group->count, atomic64_read(&rr.value));
+
+		if (is_mbm_event(group->attr.config))
+			mbm_set_rccount(group, &rr);
+		else
+			local64_set(&group->count, atomic64_read(&rr.value));
+
 		list_for_each_entry(event, head, hw.cqm_group_entry) {
 			if (event->hw.is_group_event) {
 
@@ -506,6 +523,9 @@ static u32 intel_cqm_xchg_rmid(struct perf_event *group, u32 rmid)
 				rr = __init_rr(old_rmid, evttype, 0);
 
 				cqm_mask_call(&rr);
+				if (is_mbm_event(event->attr.config))
+					mbm_set_rccount(event, &rr);
+				else
 					local64_set(&event->count,
 						    atomic64_read(&rr.value));
 			}
@@ -1194,6 +1214,7 @@ static u64 intel_cqm_event_count(struct perf_event *event)
 {
 	unsigned long flags;
 	struct rmid_read rr = __init_rr(-1, event->attr.config, 0);
+	u64 tmpval;
 
 	/*
 	 * We only need to worry about task events. System-wide events
@@ -1235,6 +1256,11 @@ static u64 intel_cqm_event_count(struct perf_event *event)
 	 * busying performing the IPI calls. It's therefore necessary to
 	 * check @event's RMID afterwards, and if it has changed,
 	 * discard the result of the read.
+	 *
+	 * For MBM events, we are reading the total bytes and not
+	 * a snapshot. Hence if the RMID was recycled for the duration
+	 * we will be adding the rc_count which keeps the historical count
+	 * of old RMIDs that were used.
 	 */
 	rr.rmid = ACCESS_ONCE(event->hw.cqm_rmid);
 
@@ -1244,8 +1270,16 @@ static u64 intel_cqm_event_count(struct perf_event *event)
 	cqm_mask_call(&rr);
 
 	raw_spin_lock_irqsave(&cache_lock, flags);
-	if (event->hw.cqm_rmid == rr.rmid)
-		local64_set(&event->count, atomic64_read(&rr.value));
+	if (event->hw.cqm_rmid == rr.rmid) {
+		if (is_mbm_event(event->attr.config)) {
+			tmpval = atomic64_read(&rr.value) +
+				local64_read(&event->hw.rc_count);
+
+			local64_set(&event->count, tmpval);
+		} else {
+			local64_set(&event->count, atomic64_read(&rr.value));
+		}
+	}
 	raw_spin_unlock_irqrestore(&cache_lock, flags);
 out:
 	return __perf_event_count(event);
