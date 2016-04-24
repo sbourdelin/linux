@@ -27,6 +27,7 @@ my $emacs = 0;
 my $terse = 0;
 my $showfile = 0;
 my $file = 0;
+my $git = 0;
 my $check = 0;
 my $check_orig = 0;
 my $summary = 1;
@@ -68,6 +69,12 @@ Options:
   --emacs                    emacs compile window format
   --terse                    one line per report
   --showfile                 emit diffed file position, not input file position
+  -g, --git                  tread FILE as git commits expression. You can
+                             specify the git commit hash ID expressions, then
+                             these commits from your git repository will be
+                             checked. For example, when -g applied, [FILE]
+			     'HEAD-3' means we need check commits 'HEAD',
+                             'HEAD~1' and HEAD~2'.
   -f, --file                 treat FILE as regular source file
   --subjective, --strict     enable more subjective tests
   --types TYPE(,TYPE2...)    show only these comma separated message types
@@ -141,6 +148,7 @@ GetOptions(
 	'terse!'	=> \$terse,
 	'showfile!'	=> \$showfile,
 	'f|file!'	=> \$file,
+	'g|git!'	=> \$git,
 	'subjective!'	=> \$check,
 	'strict!'	=> \$check,
 	'ignore=s'	=> \@ignore,
@@ -752,10 +760,40 @@ my @fixed_inserted = ();
 my @fixed_deleted = ();
 my $fixlinenr = -1;
 
+# If input is git commits, extract all commits from the commit expressions.
+# For example, HEAD-3 means we need check 'HEAD, HEAD~1, HEAD~2'.
+if ($git) {
+	my @commits = ();
+	for my $commit_expr (@ARGV) {
+		if ($commit_expr =~ m/-/) {
+			my @tmp = split(/-/, $commit_expr);
+			die "$P: incorrect git commits expression".
+				"$commit_expr$!\n" if @tmp != 2;
+			for (my $i = 0; $i < $tmp[1]; $i++) {
+				my $sha = `git log -1 $tmp[0]~$i --pretty=format:'%H'`;
+				unshift(@commits, $sha);
+			}
+		} elsif ($commit_expr =~ m/\.\./) {
+			my $lines = `git log --pretty=format:'%H' $commit_expr`;
+			my $line;
+			foreach $line (split(/\n/, $lines)) {
+				unshift(@commits, $line);
+			}
+		} else {
+			unshift(@commits, $commit_expr);
+		}
+	}
+	die "$P: no git commits after extraction!\n" if @commits == 0;
+	@ARGV = @commits
+}
+
 my $vname;
 for my $filename (@ARGV) {
 	my $FILE;
-	if ($file) {
+	if ($git) {
+		open($FILE, '-|', "git format-patch --stdout -1 $filename") ||
+			die "$P: $filename: git format-patch failed - $!\n";
+	} elsif ($file) {
 		open($FILE, '-|', "diff -u /dev/null $filename") ||
 			die "$P: $filename: diff failed - $!\n";
 	} elsif ($filename eq '-') {
@@ -766,6 +804,8 @@ for my $filename (@ARGV) {
 	}
 	if ($filename eq '-') {
 		$vname = 'Your patch';
+	} elsif ($git) {
+		$vname = "Commit ". `git log -1 $filename --pretty=format:'%h("%s")'`;
 	} else {
 		$vname = $filename;
 	}
