@@ -372,7 +372,12 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
 			return -EACCES;
 		if (ext4_encryption_info(inode) == NULL)
 			return -ENOKEY;
+		if (filp->f_flags & O_DIRECT)
+			return -EINVAL;
 	}
+	if ((ext4_should_journal_data(inode) || ext4_has_inline_data(inode)) &&
+	    (filp->f_flags & O_DIRECT))
+		return -EINVAL;
 
 	dir = dget_parent(file_dentry(filp));
 	if (ext4_encrypted_inode(d_inode(dir)) &&
