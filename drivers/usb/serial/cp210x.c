@@ -696,6 +696,7 @@ static void cp210x_get_termios_port(struct usb_serial_port *port,
 	unsigned int cflag;
 	u8 modem_ctl[16];
 	u32 baud;
+	u16 old_bits;
 	u16 bits;
 
 	cp210x_read_u32_reg(port, CP210X_GET_BAUDRATE, &baud);
@@ -706,6 +707,7 @@ static void cp210x_get_termios_port(struct usb_serial_port *port,
 	cflag = *cflagp;
 
 	cp210x_get_line_ctl(port, &bits);
+	old_bits = bits;
 	cflag &= ~CSIZE;
 	switch (bits & BITS_DATA_MASK) {
 	case BITS_DATA_5:
@@ -729,14 +731,12 @@ static void cp210x_get_termios_port(struct usb_serial_port *port,
 		cflag |= CS8;
 		bits &= ~BITS_DATA_MASK;
 		bits |= BITS_DATA_8;
-		cp210x_write_u16_reg(port, CP210X_SET_LINE_CTL, bits);
 		break;
 	default:
 		dev_dbg(dev, "%s - Unknown number of data bits, using 8\n", __func__);
 		cflag |= CS8;
 		bits &= ~BITS_DATA_MASK;
 		bits |= BITS_DATA_8;
-		cp210x_write_u16_reg(port, CP210X_SET_LINE_CTL, bits);
 		break;
 	}
 
@@ -767,7 +767,6 @@ static void cp210x_get_termios_port(struct usb_serial_port *port,
 		dev_dbg(dev, "%s - Unknown parity mode, disabling parity\n", __func__);
 		cflag &= ~PARENB;
 		bits &= ~BITS_PARITY_MASK;
-		cp210x_write_u16_reg(port, CP210X_SET_LINE_CTL, bits);
 		break;
 	}
 
@@ -779,7 +778,6 @@ static void cp210x_get_termios_port(struct usb_serial_port *port,
 	case BITS_STOP_1_5:
 		dev_dbg(dev, "%s - stop bits = 1.5 (not supported, using 1 stop bit)\n", __func__);
 		bits &= ~BITS_STOP_MASK;
-		cp210x_write_u16_reg(port, CP210X_SET_LINE_CTL, bits);
 		break;
 	case BITS_STOP_2:
 		dev_dbg(dev, "%s - stop bits = 2\n", __func__);
@@ -788,9 +786,11 @@ static void cp210x_get_termios_port(struct usb_serial_port *port,
 	default:
 		dev_dbg(dev, "%s - Unknown number of stop bits, using 1 stop bit\n", __func__);
 		bits &= ~BITS_STOP_MASK;
-		cp210x_write_u16_reg(port, CP210X_SET_LINE_CTL, bits);
 		break;
 	}
+
+	if (bits != old_bits)
+		cp210x_write_u16_reg(port, CP210X_SET_LINE_CTL, bits);
 
 	cp210x_read_reg_block(port, CP210X_GET_FLOW, modem_ctl,
 			sizeof(modem_ctl));
