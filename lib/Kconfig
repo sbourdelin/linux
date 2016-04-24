@@ -528,13 +528,13 @@ config SG_SPLIT
 	help
 	 Provides a helper to split scatterlists into chunks, each chunk being
 	 a scatterlist. This should be selected by a driver or an API which
-	 whishes to split a scatterlist amongst multiple DMA channels.
+	 wishes to split a scatterlist amongst multiple DMA channels.
 
 config SG_POOL
-	def_bool n
+	def_tristate n
 	help
 	 Provides a helper to allocate chained scatterlists. This should be
-	 selected by a driver or an API which whishes to allocate chained
+	 selected by a driver or an API which wishes to allocate chained
 	 scatterlist.
 
 #
