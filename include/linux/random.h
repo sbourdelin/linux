@@ -17,10 +17,17 @@ struct random_ready_callback {
 	struct module *owner;
 };
 
-extern void add_device_randomness(const void *, unsigned int);
 extern void add_input_randomness(unsigned int type, unsigned int code,
 				 unsigned int value);
+#ifdef CONFIG_CRYPTO_LRNG
+#define add_device_randomness(buf, nbytes) do {} while (0)
+#define add_interrupt_randomness(irq, irq_flags) do {} while (0)
+extern void lrng_irq_process(void);
+#else	/* CONFIG_CRYPTO_LRNG */
+extern void add_device_randomness(const void *, unsigned int);
 extern void add_interrupt_randomness(int irq, int irq_flags);
+#define lrng_irq_process()
+#endif	/* CONFIG_CRYPTO_LRNG */
 
 extern void get_random_bytes(void *buf, int nbytes);
 extern int add_random_ready_callback(struct random_ready_callback *rdy);
