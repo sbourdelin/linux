@@ -1476,6 +1476,51 @@ static int std_irq_setup(struct smi_info *info)
 	return rv;
 }
 
+static void region_cleanup(struct smi_info *info, int num, bool is_memio)
+{
+	unsigned long addr = info->io.addr_data;
+	int idx;
+
+	for (idx = 0; idx < num; idx++) {
+		if (is_memio)
+			release_mem_region(addr + idx * info->io.regspacing,
+					   info->io.regsize);
+		else
+			release_region(addr + idx * info->io.regspacing,
+				       info->io.regsize);
+	}
+}
+
+static int region_setup(struct smi_info *info, bool is_memio)
+{
+	unsigned long addr = info->io.addr_data;
+	struct resource *res;
+	int idx, offset;
+
+	/*
+	 * Some BIOSes reserve disjoint I/O regions in their ACPI
+	 * tables.  This causes problems when trying to register the
+	 * entire I/O region.  Therefore we must register each I/O
+	 * region separately.
+	 */
+	for (idx = 0; idx < info->io_size; idx++) {
+		offset = idx * info->io.regspacing;
+		if (is_memio)
+			res = request_mem_region(addr + offset,
+						 info->io.regsize, DEVICE_NAME);
+		else
+			res = request_region(addr + offset,
+					     info->io.regsize, DEVICE_NAME);
+
+		if (res == NULL) {
+			/* Undo allocations */
+			region_cleanup(info, idx, is_memio);
+			return -EIO;
+		}
+	}
+	return 0;
+}
+
 static unsigned char port_inb(const struct si_sm_io *io, unsigned int offset)
 {
 	unsigned int addr = io->addr_data;
@@ -1523,14 +1568,8 @@ static void port_outl(const struct si_sm_io *io, unsigned int offset,
 
 static void port_cleanup(struct smi_info *info)
 {
-	unsigned int addr = info->io.addr_data;
-	int          idx;
-
-	if (addr) {
-		for (idx = 0; idx < info->io_size; idx++)
-			release_region(addr + idx * info->io.regspacing,
-				       info->io.regsize);
-	}
+	if (info->io.addr_data)
+		region_cleanup(info, info->io_size, false);
 }
 
 static int port_setup(struct smi_info *info)
@@ -1640,23 +1679,17 @@ static void mem_outq(const struct si_sm_io *io, unsigned int offset,
 
 static void mem_cleanup(struct smi_info *info)
 {
-	unsigned long addr = info->io.addr_data;
-	int           mapsize;
-
 	if (info->io.addr) {
 		iounmap(info->io.addr);
 
-		mapsize = ((info->io_size * info->io.regspacing)
-			   - (info->io.regspacing - info->io.regsize));
-
-		release_mem_region(addr, mapsize);
+		region_cleanup(info, info->io_size, true);
 	}
 }
 
 static int mem_setup(struct smi_info *info)
 {
 	unsigned long addr = info->io.addr_data;
-	int           mapsize;
+	int           mapsize, err;
 
 	if (!addr)
 		return -ENODEV;
@@ -1692,6 +1725,10 @@ static int mem_setup(struct smi_info *info)
 		return -EINVAL;
 	}
 
+	err = region_setup(info, true);
+	if (err)
+		return err;
+
 	/*
 	 * Calculate the total amount of memory to claim.  This is an
 	 * unusual looking calculation, but it avoids claiming any
@@ -1702,12 +1739,9 @@ static int mem_setup(struct smi_info *info)
 	mapsize = ((info->io_size * info->io.regspacing)
 		   - (info->io.regspacing - info->io.regsize));
 
-	if (request_mem_region(addr, mapsize, DEVICE_NAME) == NULL)
-		return -EIO;
-
 	info->io.addr = ioremap(addr, mapsize);
 	if (info->io.addr == NULL) {
-		release_mem_region(addr, mapsize);
+		region_cleanup(info, info->io_size, true);
 		return -EIO;
 	}
 	return 0;
