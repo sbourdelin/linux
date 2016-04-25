@@ -1266,12 +1266,14 @@ static void mlx5e_build_icosq_param(struct mlx5e_priv *priv,
 	param->icosq = true;
 }
 
-static void mlx5e_build_channel_param(struct mlx5e_priv *priv,
-				      struct mlx5e_channel_param *cparam)
+static struct mlx5e_channel_param *mlx5e_build_channel_param(struct mlx5e_priv *priv)
 {
+	struct mlx5e_channel_param *cparam;
 	u8 icosq_log_wq_sz = MLX5E_PARAMS_MINIMUM_LOG_SQ_SIZE;
 
-	memset(cparam, 0, sizeof(*cparam));
+	cparam = kzalloc(sizeof(struct mlx5e_channel_param), GFP_KERNEL);
+	if (!cparam)
+		return NULL;
 
 	mlx5e_build_rq_param(priv, &cparam->rq);
 	mlx5e_build_sq_param(priv, &cparam->sq);
@@ -1279,11 +1281,13 @@ static void mlx5e_build_channel_param(struct mlx5e_priv *priv,
 	mlx5e_build_rx_cq_param(priv, &cparam->rx_cq);
 	mlx5e_build_tx_cq_param(priv, &cparam->tx_cq);
 	mlx5e_build_ico_cq_param(priv, &cparam->icosq_cq, icosq_log_wq_sz);
+
+	return cparam;
 }
 
 static int mlx5e_open_channels(struct mlx5e_priv *priv)
 {
-	struct mlx5e_channel_param cparam;
+	struct mlx5e_channel_param *cparam;
 	int nch = priv->params.num_channels;
 	int err = -ENOMEM;
 	int i;
@@ -1298,9 +1302,12 @@ static int mlx5e_open_channels(struct mlx5e_priv *priv)
 	if (!priv->channel || !priv->txq_to_sq_map)
 		goto err_free_txq_to_sq_map;
 
-	mlx5e_build_channel_param(priv, &cparam);
+	cparam = mlx5e_build_channel_param(priv);
+	if (!cparam)
+		goto err_free_txq_to_sq_map;
+
 	for (i = 0; i < nch; i++) {
-		err = mlx5e_open_channel(priv, i, &cparam, &priv->channel[i]);
+		err = mlx5e_open_channel(priv, i, cparam, &priv->channel[i]);
 		if (err)
 			goto err_close_channels;
 	}
@@ -1311,11 +1318,13 @@ static int mlx5e_open_channels(struct mlx5e_priv *priv)
 			goto err_close_channels;
 	}
 
+	kfree(cparam);
 	return 0;
 
 err_close_channels:
 	for (i--; i >= 0; i--)
 		mlx5e_close_channel(priv->channel[i]);
+	kfree(cparam);
 
 err_free_txq_to_sq_map:
 	kfree(priv->txq_to_sq_map);
