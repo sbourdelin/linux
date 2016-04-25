@@ -3111,6 +3111,12 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			Format: <bool>  (1/Y/y=enable, 0/N/n=disable)
 			default: disabled
 
+	printk.disable_kmsg_write
+			Disable writing to /dev/kmsg. This prevents user space
+			tools from writing into the kernel printk buffers.
+			When set, opening /dev/kmsg for write mode will return
+			-EPERM.
+
 	printk.time=	Show timing data prefixed to each printk message line
 			Format: <bool>  (1/Y/y=enable, 0/N/n=disable)
 

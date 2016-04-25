@@ -85,6 +85,15 @@ static struct lockdep_map console_lock_dep_map = {
 };
 #endif
 
+static bool __read_mostly devkmsg_disabled;
+static int __init disable_devkmsg(char *str)
+{
+	devkmsg_disabled = true;
+	return 0;
+}
+__setup("printk.disable_kmsg_write", disable_devkmsg);
+
+
 /*
  * Number of registered extended console drivers.
  *
@@ -798,6 +807,10 @@ static int devkmsg_open(struct inode *inode, struct file *file)
 {
 	struct devkmsg_user *user;
 	int err;
+
+	/* When devkmsg_disabled is set, fail all write access */
+	if (devkmsg_disabled && (file->f_flags & O_ACCMODE))
+		return -EPERM;
 
 	/* write-only does not need any file context */
 	if ((file->f_flags & O_ACCMODE) == O_WRONLY)
