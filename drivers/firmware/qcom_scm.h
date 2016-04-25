@@ -36,6 +36,10 @@ extern int __qcom_scm_is_call_available(u32 svc_id, u32 cmd_id);
 extern int __qcom_scm_hdcp_req(struct qcom_scm_hdcp_req *req, u32 req_cnt,
 		u32 *resp);
 
+extern void *qcom_scm_alloc_buffer(size_t size, dma_addr_t *dma_addr,
+				    gfp_t gfp);
+extern void qcom_scm_free_buffer(size_t size, void *virt_addr,
+				 dma_addr_t dma_addr);
 /* common error codes */
 #define QCOM_SCM_ENOMEM		-5
 #define QCOM_SCM_EOPNOTSUPP	-4

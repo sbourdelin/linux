@@ -20,6 +20,7 @@
 #include <linux/of.h>
 #include <linux/of_platform.h>
 #include <linux/clk.h>
+#include <linux/dma-mapping.h>
 
 #include "qcom_scm.h"
 
@@ -157,6 +158,21 @@ bool qcom_scm_is_available(void)
 	return !!__scm;
 }
 EXPORT_SYMBOL(qcom_scm_is_available);
+
+void *qcom_scm_alloc_buffer(size_t size, dma_addr_t *dma_addr,
+				      gfp_t gfp)
+{
+	if (__scm)
+		return dma_alloc_writecombine(__scm->dev, size, dma_addr, gfp);
+	else
+		return ERR_PTR(-ENODEV);
+}
+
+void qcom_scm_free_buffer(size_t size, void *cpu_addr,
+				 dma_addr_t dma_addr)
+{
+	dma_free_writecombine(__scm->dev, size, cpu_addr, dma_addr);
+}
 
 static int qcom_scm_probe(struct platform_device *pdev)
 {
