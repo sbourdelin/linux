@@ -864,45 +864,6 @@ static void octeon_i2c_stop(struct octeon_i2c *i2c)
 }
 
 /**
- * octeon_i2c_write - send data to the bus via low-level controller
- * @i2c: The struct octeon_i2c
- * @target: Target address
- * @data: Pointer to the data to be sent
- * @length: Length of the data
- *
- * The address is sent over the bus, then the data.
- *
- * Returns 0 on success, otherwise a negative errno.
- */
-static int octeon_i2c_write(struct octeon_i2c *i2c, int target,
-			    const u8 *data, int length)
-{
-	int i, result;
-
-	octeon_i2c_data_write(i2c, target << 1);
-	octeon_i2c_ctl_write(i2c, TWSI_CTL_ENAB);
-
-	result = octeon_i2c_wait(i2c);
-	if (result)
-		return result;
-
-	for (i = 0; i < length; i++) {
-		result = octeon_i2c_check_status(i2c, false);
-		if (result)
-			return result;
-
-		octeon_i2c_data_write(i2c, data[i]);
-		octeon_i2c_ctl_write(i2c, TWSI_CTL_ENAB);
-
-		result = octeon_i2c_wait(i2c);
-		if (result)
-			return result;
-	}
-
-	return 0;
-}
-
-/**
  * octeon_i2c_read - receive data from the bus via low-level controller
  * @i2c: The struct octeon_i2c
  * @target: Target address
@@ -963,6 +924,45 @@ static int octeon_i2c_read(struct octeon_i2c *i2c, int target,
 			return result;
 	}
 	*rlength = length;
+	return 0;
+}
+
+/**
+ * octeon_i2c_write - send data to the bus via low-level controller
+ * @i2c: The struct octeon_i2c
+ * @target: Target address
+ * @data: Pointer to the data to be sent
+ * @length: Length of the data
+ *
+ * The address is sent over the bus, then the data.
+ *
+ * Returns 0 on success, otherwise a negative errno.
+ */
+static int octeon_i2c_write(struct octeon_i2c *i2c, int target,
+			    const u8 *data, int length)
+{
+	int i, result;
+
+	octeon_i2c_data_write(i2c, target << 1);
+	octeon_i2c_ctl_write(i2c, TWSI_CTL_ENAB);
+
+	result = octeon_i2c_wait(i2c);
+	if (result)
+		return result;
+
+	for (i = 0; i < length; i++) {
+		result = octeon_i2c_check_status(i2c, false);
+		if (result)
+			return result;
+
+		octeon_i2c_data_write(i2c, data[i]);
+		octeon_i2c_ctl_write(i2c, TWSI_CTL_ENAB);
+
+		result = octeon_i2c_wait(i2c);
+		if (result)
+			return result;
+	}
+
 	return 0;
 }
 
