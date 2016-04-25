@@ -1621,11 +1621,11 @@ static void do_thread_regset_writeback(struct task_struct *task,
 }
 
 #ifndef PR_REG_SIZE
-#define PR_REG_SIZE(S) sizeof(S)
+#define PR_REG_SIZE(S, R) sizeof(S)
 #endif
 
 #ifndef PRSTATUS_SIZE
-#define PRSTATUS_SIZE(S) sizeof(S)
+#define PRSTATUS_SIZE(S, R) sizeof(S)
 #endif
 
 #ifndef PR_REG_PTR
@@ -1633,12 +1633,13 @@ static void do_thread_regset_writeback(struct task_struct *task,
 #endif
 
 #ifndef SET_PR_FPVALID
-#define SET_PR_FPVALID(S, V) ((S)->pr_fpvalid = (V))
+#define SET_PR_FPVALID(S, V, R) ((S)->pr_fpvalid = (V))
 #endif
 
 static int fill_thread_core_info(struct elf_thread_core_info *t,
 				 const struct user_regset_view *view,
-				 long signr, size_t *total)
+				 long signr, size_t *total,
+				 struct pt_regs *regs __maybe_unused)
 {
 	unsigned int i;
 
@@ -1650,11 +1651,11 @@ static int fill_thread_core_info(struct elf_thread_core_info *t,
 	 */
 	fill_prstatus(&t->prstatus, t->task, signr);
 	(void) view->regsets[0].get(t->task, &view->regsets[0],
-				    0, PR_REG_SIZE(t->prstatus.pr_reg),
+				    0, PR_REG_SIZE(t->prstatus.pr_reg, regs),
 				    PR_REG_PTR(&t->prstatus), NULL);
 
 	fill_note(&t->notes[0], "CORE", NT_PRSTATUS,
-		  PRSTATUS_SIZE(t->prstatus), &t->prstatus);
+		  PRSTATUS_SIZE(t->prstatus, regs), &t->prstatus);
 	*total += notesize(&t->notes[0]);
 
 	do_thread_regset_writeback(t->task, &view->regsets[0]);
@@ -1684,7 +1685,7 @@ static int fill_thread_core_info(struct elf_thread_core_info *t,
 						  regset->core_note_type,
 						  size, data);
 				else {
-					SET_PR_FPVALID(&t->prstatus, 1);
+					SET_PR_FPVALID(&t->prstatus, 1, regs);
 					fill_note(&t->notes[i], "CORE",
 						  NT_PRFPREG, size, data);
 				}
@@ -1770,7 +1771,8 @@ static int fill_note_info(struct elfhdr *elf, int phdrs,
 	 * Now fill in each thread's information.
 	 */
 	for (t = info->thread; t != NULL; t = t->next)
-		if (!fill_thread_core_info(t, view, siginfo->si_signo, &info->size))
+		if (!fill_thread_core_info(t, view, siginfo->si_signo,
+					&info->size, regs))
 			return 0;
 
 	/*
