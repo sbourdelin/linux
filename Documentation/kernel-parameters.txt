@@ -921,6 +921,12 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			Disable Dynamic DMA Window support. Use this if
 			to workaround buggy firmware.
 
+	disable_devkmsg_write
+			Disable writing to /dev/kmsg. This prevents user space
+			tools from writing into the kernel printk buffers.
+			When set, opening /dev/kmsg for write mode will return
+			-EPERM.
+
 	disable_ipv6=	[IPV6]
 			See Documentation/networking/ipv6.txt.
 
