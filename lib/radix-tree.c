@@ -22,6 +22,8 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <linux/bitmap.h>
+#include <linux/bitops.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -33,7 +35,6 @@
 #include <linux/notifier.h>
 #include <linux/cpu.h>
 #include <linux/string.h>
-#include <linux/bitops.h>
 #include <linux/rcupdate.h>
 #include <linux/preempt.h>		/* in_interrupt() */
 
@@ -201,6 +202,11 @@ static inline int any_tag_set(struct radix_tree_node *node, unsigned int tag)
 			return 1;
 	}
 	return 0;
+}
+
+static inline void all_tag_set(struct radix_tree_node *node, unsigned int tag)
+{
+	bitmap_fill(node->tags[tag], RADIX_TREE_MAP_SIZE);
 }
 
 /**
