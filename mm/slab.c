@@ -116,6 +116,7 @@
 #include	<linux/kmemcheck.h>
 #include	<linux/memory.h>
 #include	<linux/prefetch.h>
+#include	<linux/log2.h>
 
 #include	<net/sock.h>
 
@@ -1200,6 +1201,100 @@ static void __init set_up_node(struct kmem_cache *cachep, int index)
 	}
 }
 
+#ifdef CONFIG_FREELIST_RANDOM
+static void freelist_randomize(struct rnd_state *state, freelist_idx_t *list,
+			size_t count)
+{
+	size_t i;
+	unsigned int rand;
+
+	for (i = 0; i < count; i++)
+		list[i] = i;
+
+	/* Fisher-Yates shuffle */
+	for (i = count - 1; i > 0; i--) {
+		rand = prandom_u32_state(state);
+		rand %= (i + 1);
+		swap(list[i], list[rand]);
+	}
+}
+
+/* Create a random sequence per cache */
+static void cache_random_seq_create(struct kmem_cache *cachep)
+{
+	unsigned int seed, count = cachep->num;
+	struct rnd_state state;
+
+	if (count < 2)
+		return;
+
+	cachep->random_seq = kcalloc(count, sizeof(freelist_idx_t), GFP_KERNEL);
+	BUG_ON(cachep->random_seq == NULL);
+
+	/* Get best entropy at this stage */
+	get_random_bytes_arch(&seed, sizeof(seed));
+	prandom_seed_state(&state, seed);
+
+	freelist_randomize(&state, cachep->random_seq, count);
+}
+
+/* Destroy the per-cache random freelist sequence */
+static void cache_random_seq_destroy(struct kmem_cache *cachep)
+{
+	kfree(cachep->random_seq);
+	cachep->random_seq = NULL;
+}
+
+/*
+ * Global static list are used when pre-computed cache list are not yet
+ * available. Lists of different sizes are created to optimize performance on
+ * SLABS with different object counts.
+ */
+static freelist_idx_t freelist_random_seq_2[2];
+static freelist_idx_t freelist_random_seq_4[4];
+static freelist_idx_t freelist_random_seq_8[8];
+static freelist_idx_t freelist_random_seq_16[16];
+static freelist_idx_t freelist_random_seq_32[32];
+static freelist_idx_t freelist_random_seq_64[64];
+static freelist_idx_t freelist_random_seq_128[128];
+static freelist_idx_t freelist_random_seq_256[256];
+const static struct m_list {
+	size_t count;
+	freelist_idx_t *list;
+} freelist_random_seqs[] = {
+	{ ARRAY_SIZE(freelist_random_seq_2), freelist_random_seq_2 },
+	{ ARRAY_SIZE(freelist_random_seq_4), freelist_random_seq_4 },
+	{ ARRAY_SIZE(freelist_random_seq_8), freelist_random_seq_8 },
+	{ ARRAY_SIZE(freelist_random_seq_16), freelist_random_seq_16 },
+	{ ARRAY_SIZE(freelist_random_seq_32), freelist_random_seq_32 },
+	{ ARRAY_SIZE(freelist_random_seq_64), freelist_random_seq_64 },
+	{ ARRAY_SIZE(freelist_random_seq_128), freelist_random_seq_128 },
+	{ ARRAY_SIZE(freelist_random_seq_256), freelist_random_seq_256 },
+};
+
+/* Pre-compute the global pre-computed lists early at boot */
+static void __init freelist_random_init(void)
+{
+	unsigned int seed;
+	size_t i;
+	struct rnd_state state;
+
+	/* Get best entropy available at this stage */
+	get_random_bytes_arch(&seed, sizeof(seed));
+	prandom_seed_state(&state, seed);
+
+	for (i = 0; i < ARRAY_SIZE(freelist_random_seqs); i++) {
+		freelist_randomize(&state, freelist_random_seqs[i].list,
+				freelist_random_seqs[i].count);
+	}
+}
+#else
+static inline void __init freelist_random_init(void) { }
+static inline void cache_random_seq_create(struct kmem_cache *cachep) { }
+static inline void cache_random_seq_destroy(struct kmem_cache *cachep) { }
+#endif /* CONFIG_FREELIST_RANDOM */
+
+
 /*
  * Initialisation.  Called after the page allocator have been initialised and
  * before smp_init().
@@ -1225,6 +1320,8 @@ void __init kmem_cache_init(void)
 	 */
 	if (!slab_max_order_set && totalram_pages > (32 << 20) >> PAGE_SHIFT)
 		slab_max_order = SLAB_MAX_ORDER_HI;
+
+	freelist_random_init();
 
 	/* Bootstrap is tricky, because several objects are allocated
 	 * from caches that do not exist yet:
@@ -2306,6 +2403,8 @@ void __kmem_cache_release(struct kmem_cache *cachep)
 	int i;
 	struct kmem_cache_node *n;
 
+	cache_random_seq_destroy(cachep);
+
 	free_percpu(cachep->cpu_cache);
 
 	/* NUMA: free the node structures */
@@ -2412,15 +2511,122 @@ static void cache_init_objs_debug(struct kmem_cache *cachep, struct page *page)
 #endif
 }
 
+#ifdef CONFIG_FREELIST_RANDOM
+/* Hold information during a freelist initialization */
+struct freelist_init_state {
+	unsigned int padding;
+	unsigned int pos;
+	unsigned int count;
+	unsigned int rand;
+	struct m_list freelist_random_seq;
+};
+
+/* Select the right pre-computed list and initialize state */
+static void freelist_state_initialize(struct freelist_init_state *state,
+				struct kmem_cache *cachep,
+				unsigned int count)
+{
+	unsigned int idx;
+	const unsigned int last_idx = ARRAY_SIZE(freelist_random_seqs) - 1;
+
+	memset(state, 0, sizeof(*state));
+	state->count = count;
+	state->pos = 0;
+
+	/* Use best entropy available to define a random shift */
+	get_random_bytes_arch(&state->rand, sizeof(state->rand));
+
+	if (cachep->random_seq) {
+		state->freelist_random_seq.list = cachep->random_seq;
+		state->freelist_random_seq.count = count;
+	} else {
+		/* count is always >= 2 */
+		idx = ilog2(count) - 1;
+		if (idx >= last_idx)
+			idx = last_idx;
+		else if (roundup_pow_of_two(idx + 1) != count)
+			idx++;
+		state->freelist_random_seq = freelist_random_seqs[idx];
+	}
+}
+
+/* Get the next entry on the list depending on the target list size */
+static freelist_idx_t get_next_entry(struct freelist_init_state *state)
+{
+	freelist_idx_t ret;
+
+	if (state->pos == state->freelist_random_seq.count) {
+		state->padding += state->pos;
+		state->pos = 0;
+	}
+
+	/* Randomize the entry using the random shift */
+	ret = state->freelist_random_seq.list[state->pos++];
+	ret = (ret + state->rand) % state->freelist_random_seq.count;
+	return ret;
+}
+
+static freelist_idx_t next_random_slot(struct freelist_init_state *state)
+{
+	freelist_idx_t entry;
+
+	do {
+		entry = get_next_entry(state);
+	} while ((entry + state->padding) >= state->count);
+
+	return entry + state->padding;
+}
+
+/*
+ * Shuffle the freelist initialization state based on pre-computed lists.
+ * return true if the list was successfully shuffled, false otherwise.
+ */
+static bool shuffle_freelist(struct kmem_cache *cachep, struct page *page)
+{
+	unsigned int objfreelist, i, count = cachep->num;
+	struct freelist_init_state state;
+
+	if (count < 2)
+		return false;
+
+	objfreelist = 0;
+	freelist_state_initialize(&state, cachep, count);
+
+	/* Take the first random entry as the objfreelist */
+	if (OBJFREELIST_SLAB(cachep)) {
+		objfreelist = next_random_slot(&state);
+		page->freelist = index_to_obj(cachep, page, objfreelist) +
+						obj_offset(cachep);
+		count--;
+	}
+	for (i = 0; i < count; i++)
+		set_free_obj(page, i, next_random_slot(&state));
+
+	if (OBJFREELIST_SLAB(cachep))
+		set_free_obj(page, i, objfreelist);
+	return true;
+}
+#else
+static inline bool shuffle_freelist(struct kmem_cache *cachep,
+				struct page *page)
+{
+	return false;
+}
+#endif /* CONFIG_FREELIST_RANDOM */
+
 static void cache_init_objs(struct kmem_cache *cachep,
 			    struct page *page)
 {
 	int i;
 	void *objp;
+	bool shuffled;
 
 	cache_init_objs_debug(cachep, page);
 
-	if (OBJFREELIST_SLAB(cachep)) {
+	/* Try to randomize the freelist if enabled */
+	shuffled = shuffle_freelist(cachep, page);
+
+	if (!shuffled && OBJFREELIST_SLAB(cachep)) {
 		page->freelist = index_to_obj(cachep, page, cachep->num - 1) +
 						obj_offset(cachep);
 	}
@@ -2434,7 +2640,8 @@ static void cache_init_objs(struct kmem_cache *cachep,
 			kasan_poison_object_data(cachep, objp);
 		}
 
-		set_free_obj(page, i, i);
+		if (!shuffled)
+			set_free_obj(page, i, i);
 	}
 }
 
@@ -3803,6 +4010,8 @@ static int enable_cpucache(struct kmem_cache *cachep, gfp_t gfp)
 	int limit = 0;
 	int shared = 0;
 	int batchcount = 0;
+
+	cache_random_seq_create(cachep);
 
 	if (!is_root_cache(cachep)) {
 		struct kmem_cache *root = memcg_root_cache(cachep);
