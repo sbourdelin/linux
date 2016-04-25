@@ -770,7 +770,7 @@ struct clk_onecell_data {
 
 struct clk_hw_onecell_data {
 	size_t num;
-	struct clk_hw *hws[];
+	struct clk_hw *hws[0];
 };
 
 extern struct of_device_id __clk_of_table;
