@@ -2,6 +2,8 @@
 #error "Please don't include <linux/compiler-gcc.h> directly, include <linux/compiler.h> instead."
 #endif
 
+#include <linux/bug.h>
+
 /*
  * Common definitions for all gcc versions go here.
  */
