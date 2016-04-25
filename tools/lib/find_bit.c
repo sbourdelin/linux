@@ -66,6 +66,14 @@ unsigned long find_next_bit(const unsigned long *addr, unsigned long size,
 }
 #endif
 
+#ifndef find_next_zero_bit
+unsigned long find_next_zero_bit(const unsigned long *addr, unsigned long size,
+				unsigned long offset)
+{
+	return _find_next_bit(addr, size, offset, ~0UL);
+}
+#endif
+
 #ifndef find_first_bit
 /*
  * Find the first set bit in a memory region.
