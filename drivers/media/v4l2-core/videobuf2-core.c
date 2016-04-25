@@ -2297,6 +2297,10 @@ unsigned int vb2_core_poll(struct vb2_queue *q, struct file *file,
 	if (!vb2_is_streaming(q) || q->error)
 		return POLLERR;
 
+	if (q->quirk_poll_must_check_waiting_for_buffers &&
+	    q->waiting_for_buffers && (req_events & (POLLIN | POLLRDNORM)))
+		return POLLERR;
+
 	/*
 	 * For output streams you can call write() as long as there are fewer
 	 * buffers queued than there are buffers available.
