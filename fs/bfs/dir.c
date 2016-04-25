@@ -252,7 +252,7 @@ static int bfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	old_dir->i_ctime = old_dir->i_mtime = CURRENT_TIME_SEC;
 	mark_inode_dirty(old_dir);
 	if (new_inode) {
-		new_inode->i_ctime = CURRENT_TIME_SEC;
+		new_inode->i_ctime = new_inode->i_mtime = CURRENT_TIME_SEC;
 		inode_dec_link_count(new_inode);
 	}
 	mark_buffer_dirty_inode(old_bh, old_dir);
