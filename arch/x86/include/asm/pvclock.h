@@ -80,19 +80,12 @@ static __always_inline
 unsigned __pvclock_read_cycles(const struct pvclock_vcpu_time_info *src,
 			       cycle_t *cycles, u8 *flags)
 {
-	unsigned version;
-	cycle_t ret, offset;
-	u8 ret_flags;
-
-	version = src->version;
+	cycle_t offset;
 
 	offset = pvclock_get_nsec_offset(src);
-	ret = src->system_time + offset;
-	ret_flags = src->flags;
-
-	*cycles = ret;
-	*flags = ret_flags;
-	return version;
+	*cycles = src->system_time + offset;
+	*flags = src->flags;
+	return src->version;
 }
 
 struct pvclock_vsyscall_time_info {
