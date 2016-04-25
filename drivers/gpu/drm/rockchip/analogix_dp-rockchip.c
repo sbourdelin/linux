@@ -36,11 +36,17 @@
 
 #define to_dp(nm)	container_of(nm, struct rockchip_dp_device, nm)
 
+enum rockchip_dp_chip_type {
+	RK3288_DP,
+	RK3399_EDP,
+};
+
 struct rockchip_dp_chip_data {
 	u32	lcdsel_grf_reg;
 	u32	lcdsel_big;
 	u32	lcdsel_lit;
 	u32	lcdsel_mask;
+	u32	chip_type;
 };
 
 struct rockchip_dp_device {
@@ -115,8 +121,30 @@ static void rockchip_dp_drm_encoder_mode_set(struct drm_encoder *encoder,
 static void rockchip_dp_drm_encoder_enable(struct drm_encoder *encoder)
 {
 	struct rockchip_dp_device *dp = to_dp(encoder);
+	int out_mode;
 	int ret;
 	u32 val;
+
+	ret = drm_of_encoder_active_endpoint_id(dp->dev->of_node, encoder);
+	if (ret < 0)
+		return;
+
+	switch (dp->data->chip_type) {
+	case RK3399_EDP:
+		/*
+		 * For RK3399, VOP Lit must code the out mode to RGB888,
+		 * VOP Big must code the out mode to RGB10.
+		 */
+		if (ret)
+			out_mode = ROCKCHIP_OUT_MODE_P888;
+		else
+			out_mode = ROCKCHIP_OUT_MODE_AAAA;
+		break;
+
+	default:
+		out_mode = ROCKCHIP_OUT_MODE_AAAA;
+		break;
+	}
 
 	/*
 	 * FIXME(Yakir): driver should configure the CRTC output video
@@ -132,16 +160,11 @@ static void rockchip_dp_drm_encoder_enable(struct drm_encoder *encoder)
 	 * RGB666 input video mode, then screen would works prefect.
 	 */
 	ret = rockchip_drm_crtc_mode_config(encoder->crtc,
-					    DRM_MODE_CONNECTOR_eDP,
-					    ROCKCHIP_OUT_MODE_AAAA);
+					    DRM_MODE_CONNECTOR_eDP, out_mode);
 	if (ret < 0) {
 		dev_err(dp->dev, "Could not set crtc mode config (%d)\n", ret);
 		return;
 	}
-
-	ret = drm_of_encoder_active_endpoint_id(dp->dev->of_node, encoder);
-	if (ret < 0)
-		return;
 
 	if (ret)
 		val = dp->data->lcdsel_lit | dp->data->lcdsel_mask;
@@ -369,15 +392,25 @@ static const struct dev_pm_ops rockchip_dp_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(rockchip_dp_suspend, rockchip_dp_resume)
 };
 
+static const struct rockchip_dp_chip_data rk3399_edp = {
+	.lcdsel_grf_reg = 0x6250,
+	.lcdsel_big = 0,
+	.lcdsel_lit = BIT(5),
+	.lcdsel_mask = BIT(21),
+	.chip_type = RK3399_EDP,
+};
+
 static const struct rockchip_dp_chip_data rk3288_dp = {
 	.lcdsel_grf_reg = 0x025c,
 	.lcdsel_big = 0,
 	.lcdsel_lit = BIT(5),
 	.lcdsel_mask = BIT(21),
+	.chip_type = RK3288_DP,
 };
 
 static const struct of_device_id rockchip_dp_dt_ids[] = {
 	{.compatible = "rockchip,rk3288-dp", .data = &rk3288_dp },
+	{.compatible = "rockchip,rk3399-edp", .data = &rk3399_edp },
 	{}
 };
 MODULE_DEVICE_TABLE(of, rockchip_dp_dt_ids);
