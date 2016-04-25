@@ -28,6 +28,7 @@
 #include <linux/poll.h>
 #include <linux/ioctl.h>
 #include <linux/wait.h>
+#include <asm/ioctls.h>
 #include <asm/uaccess.h>
 #include "dmxdev.h"
 
@@ -55,6 +56,22 @@ static int dvb_dmxdev_buffer_write(struct dvb_ringbuffer *buf,
 	}
 
 	return dvb_ringbuffer_write(buf, src, len);
+}
+
+static int dvb_dmxdev_get_buffer_avail(struct dvb_ringbuffer *src,
+				       u32 *len)
+{
+	if (!src->data) {
+		*len = 0;
+		return 0;
+	}
+
+	if (src->error)
+		return src->error;
+
+	*len = dvb_ringbuffer_avail(src);
+
+	return 0;
 }
 
 static ssize_t dvb_dmxdev_buffer_read(struct dvb_ringbuffer *src,
@@ -965,6 +982,16 @@ static int dvb_demux_do_ioctl(struct file *file,
 		return -ERESTARTSYS;
 
 	switch (cmd) {
+	case FIONREAD:
+		if (mutex_lock_interruptible(&dmxdevfilter->mutex)) {
+			mutex_unlock(&dmxdev->mutex);
+			return -ERESTARTSYS;
+		}
+		ret = dvb_dmxdev_get_buffer_avail(&dmxdevfilter->buffer, parg);
+		mutex_unlock(&dmxdevfilter->mutex);
+
+		break;
+
 	case DMX_START:
 		if (mutex_lock_interruptible(&dmxdevfilter->mutex)) {
 			mutex_unlock(&dmxdev->mutex);
@@ -1160,6 +1187,10 @@ static int dvb_dvr_do_ioctl(struct file *file,
 		return -ERESTARTSYS;
 
 	switch (cmd) {
+	case FIONREAD:
+		ret = dvb_dmxdev_get_buffer_avail(&dmxdev->dvr_buffer, parg);
+		break;
+
 	case DMX_SET_BUFFER_SIZE:
 		ret = dvb_dvr_set_buffer_size(dmxdev, arg);
 		break;
