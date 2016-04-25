@@ -4419,12 +4419,6 @@ static int skd_cons_disk(struct skd_device *skdev)
 	/* set sysfs ptimal_io_size to 8K */
 	blk_queue_io_opt(q, 8192);
 
-	/* DISCARD Flag initialization. */
-	q->limits.discard_granularity = 8192;
-	q->limits.discard_alignment = 0;
-	blk_queue_max_discard_sectors(q, UINT_MAX >> 9);
-	q->limits.discard_zeroes_data = 1;
-	queue_flag_set_unlocked(QUEUE_FLAG_DISCARD, q);
 	queue_flag_set_unlocked(QUEUE_FLAG_NONROT, q);
 	queue_flag_clear_unlocked(QUEUE_FLAG_ADD_RANDOM, q);
 
