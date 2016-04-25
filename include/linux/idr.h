@@ -136,7 +136,8 @@ static inline void *idr_find(struct idr *idr, int id)
 	for (id = 0; ((entry) = idr_get_next(idp, &(id))) != NULL; ++id)
 
 /**
- * idr_for_each_entry - continue iteration over an idr's elements of a given type
+ * idr_for_each_entry_continue - continue iteration over an idr's elements of
+ * a given type
  * @idp:     idr handle
  * @entry:   the type * to use as cursor
  * @id:      id entry's key
