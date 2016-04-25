@@ -166,4 +166,6 @@ int e_snprintf(char *str, size_t size, const char *format, ...)
 int copy_to_probe_trace_arg(struct probe_trace_arg *tvar,
 			    struct perf_probe_arg *pvar);
 
+char *find_module_name(const char *module);
+
 #endif /*_PROBE_EVENT_H */

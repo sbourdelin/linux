@@ -265,6 +265,65 @@ static bool kprobe_warn_out_range(const char *symbol, unsigned long address)
 	return true;
 }
 
+/*
+ * NOTE:
+ * '.gnu.linkonce.this_module' section of kernel module elf directly
+ * maps to 'struct module' from linux/module.h. This section contains
+ * actual module name which will be used by kernel after loading it.
+ * But, we cannot use 'struct module' here since linux/module.h is not
+ * exposed to user-space. Offset of 'name' has remained same from long
+ * time, so hardcoding it here.
+ */
+#ifdef __LP64__
+#define MOD_NAME_OFFSET 24
+#else
+#define MOD_NAME_OFFSET 12
+#endif
+
+/*
+ * @module can be module name of module file path. In case of path,
+ * inspect elf and find out what is actual module name.
+ * Caller has to free mod_name after using it.
+ */
+char *find_module_name(const char *module)
+{
+	int fd;
+	Elf *elf;
+	GElf_Ehdr ehdr;
+	GElf_Shdr shdr;
+	Elf_Data *data;
+	Elf_Scn *sec;
+	char *mod_name = NULL;
+
+	fd = open(module, O_RDONLY);
+	if (fd < 0)
+		return NULL;
+
+	elf = elf_begin(fd, PERF_ELF_C_READ_MMAP, NULL);
+	if (elf == NULL)
+		goto elf_err;
+
+	if (gelf_getehdr(elf, &ehdr) == NULL)
+		goto ret_err;
+
+	sec = elf_section_by_name(elf, &ehdr, &shdr,
+			".gnu.linkonce.this_module", NULL);
+	if (!sec)
+		goto ret_err;
+
+	data = elf_getdata(sec, NULL);
+	if (!data || !data->d_buf)
+		goto ret_err;
+
+	mod_name = strdup((char *)data->d_buf + MOD_NAME_OFFSET);
+
+ret_err:
+	elf_end(elf);
+elf_err:
+	close(fd);
+	return mod_name;
+}
+
 #ifdef HAVE_DWARF_SUPPORT
 
 static int kernel_get_module_dso(const char *module, struct dso **pdso)
@@ -583,32 +642,23 @@ static int add_module_to_probe_trace_events(struct probe_trace_event *tevs,
 					    int ntevs, const char *module)
 {
 	int i, ret = 0;
-	char *tmp;
+	char *mod_name;
 
 	if (!module)
 		return 0;
 
-	tmp = strrchr(module, '/');
-	if (tmp) {
-		/* This is a module path -- get the module name */
-		module = strdup(tmp + 1);
-		if (!module)
-			return -ENOMEM;
-		tmp = strchr(module, '.');
-		if (tmp)
-			*tmp = '\0';
-		tmp = (char *)module;	/* For free() */
-	}
+	mod_name = find_module_name(module);
 
 	for (i = 0; i < ntevs; i++) {
-		tevs[i].point.module = strdup(module);
+		tevs[i].point.module =
+			strdup(mod_name ? mod_name : module);
 		if (!tevs[i].point.module) {
 			ret = -ENOMEM;
 			break;
 		}
 	}
 
-	free(tmp);
+	free(mod_name);
 	return ret;
 }
 
