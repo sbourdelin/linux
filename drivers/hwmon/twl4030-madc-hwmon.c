@@ -25,6 +25,7 @@
  */
 #include <linux/init.h>
 #include <linux/module.h>
+//FIXME this is used for clamp_val
 #include <linux/kernel.h>
 #include <linux/i2c/twl.h>
 #include <linux/device.h>
