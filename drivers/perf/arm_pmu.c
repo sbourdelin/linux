@@ -603,7 +603,11 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
 
 	irq = platform_get_irq(pmu_device, 0);
 	if (irq >= 0 && irq_is_percpu(irq)) {
-		on_each_cpu(cpu_pmu_disable_percpu_irq, &irq, 1);
+		struct cpumask ppi_cpumask;
+
+		irq_get_percpu_devid_partition(irq, &ppi_cpumask);
+		on_each_cpu_mask(&ppi_cpumask, cpu_pmu_disable_percpu_irq,
+				 &irq, 1);
 		free_percpu_irq(irq, &hw_events->percpu_pmu);
 	} else {
 		for (i = 0; i < irqs; ++i) {
@@ -638,6 +642,8 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
 
 	irq = platform_get_irq(pmu_device, 0);
 	if (irq >= 0 && irq_is_percpu(irq)) {
+		struct cpumask ppi_cpumask;
+
 		err = request_percpu_irq(irq, handler, "arm-pmu",
 					 &hw_events->percpu_pmu);
 		if (err) {
@@ -645,7 +651,10 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
 				irq);
 			return err;
 		}
-		on_each_cpu(cpu_pmu_enable_percpu_irq, &irq, 1);
+
+		irq_get_percpu_devid_partition(irq, &ppi_cpumask);
+		on_each_cpu_mask(&ppi_cpumask, cpu_pmu_enable_percpu_irq,
+				 &irq, 1);
 	} else {
 		for (i = 0; i < irqs; ++i) {
 			int cpu = i;
