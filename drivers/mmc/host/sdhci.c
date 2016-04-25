@@ -2635,18 +2635,28 @@ static irqreturn_t sdhci_thread_irq(int irq, void *dev_id)
 \*****************************************************************************/
 
 #ifdef CONFIG_PM
+/*
+ * To enable wakeup events, the corresponding events have to be enabled in
+ * the Interrupt Status Enable register too. See 'Table 1-6: Wakeup Signal
+ * Table' in the SD Host Controller Standard Specification.
+ */
 void sdhci_enable_irq_wakeups(struct sdhci_host *host)
 {
-	u8 val;
-	u8 mask = SDHCI_WAKE_ON_INSERT | SDHCI_WAKE_ON_REMOVE
-			| SDHCI_WAKE_ON_INT;
+	u8 wakeup_val;
+	u8 wakeup_mask = SDHCI_WAKE_ON_INSERT | SDHCI_WAKE_ON_REMOVE |
+			 SDHCI_WAKE_ON_INT;
+	u32 irq_val = SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE |
+		      SDHCI_INT_CARD_INT;
 
-	val = sdhci_readb(host, SDHCI_WAKE_UP_CONTROL);
-	val |= mask ;
+	wakeup_val = sdhci_readb(host, SDHCI_WAKE_UP_CONTROL);
+	wakeup_val |= wakeup_mask;
 	/* Avoid fake wake up */
-	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
-		val &= ~(SDHCI_WAKE_ON_INSERT | SDHCI_WAKE_ON_REMOVE);
-	sdhci_writeb(host, val, SDHCI_WAKE_UP_CONTROL);
+	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION) {
+		wakeup_val &= ~(SDHCI_WAKE_ON_INSERT | SDHCI_WAKE_ON_REMOVE);
+		irq_val &= ~(SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE);
+	}
+	sdhci_writeb(host, wakeup_val, SDHCI_WAKE_UP_CONTROL);
+	sdhci_writel(host, irq_val, SDHCI_INT_ENABLE);
 }
 EXPORT_SYMBOL_GPL(sdhci_enable_irq_wakeups);
 
