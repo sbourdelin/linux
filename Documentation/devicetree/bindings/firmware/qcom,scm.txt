@@ -1,0 +1,28 @@
+QCOM Secure Channel Manager (SCM)
+
+Qualcomm processors include an interface to communicate to the secure firmware.
+This interface allows for clients to request different types of actions.  These
+can include CPU power up/down, HDCP requests, loading of firmware, and other
+assorted actions.
+
+Required properties:
+- compatible: must contain one of the following:
+ * "qcom,scm-apq8064" for APQ8064
+ * "qcom,scm-apq8084" for APQ8084
+ * "qcom,scm-msm8916" for MSM8916
+ * "qcom,scm-msm8974" for MSM8974
+- clocks: One to three clocks may be required based on compatible.
+ * Only core clock required for "qcom,scm-apq8064"
+ * Core, iface, and bus clocks required for all other compatibles.
+- clock-names: Must contain "core" for the core clock, "iface" for the interface
+  clock and "bus" for the bus clock per the requirements of the compatible.
+
+Example for MSM8916:
+
+	firmware {
+		scm {
+			compatible = "qcom,scm-msm8916";
+			clocks = <&gcc GCC_CRYPTO_CLK> , <&gcc GCC_CRYPTO_AXI_CLK>, <&gcc GCC_CRYPTO_AHB_CLK>;
+			clock-names = "core", "bus", "iface";
+		};
+	};
