@@ -7,6 +7,9 @@
 #define SLAB_PANIC 2
 #define SLAB_RECLAIM_ACCOUNT    0x00020000UL            /* Objects are reclaimable */
 
+#define kmalloc(size, mask)	malloc(size)
+#define kfree(x)	free(x)
+
 struct kmem_cache {
 	int size;
 	void (*ctor)(void *);

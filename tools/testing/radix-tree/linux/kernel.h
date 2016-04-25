@@ -8,6 +8,7 @@
 #include <limits.h>
 
 #include "../../include/linux/compiler.h"
+#include "../../include/linux/err.h"
 #include "../../../include/linux/kconfig.h"
 
 #define RADIX_TREE_MAP_SHIFT	3
@@ -53,5 +54,8 @@ static inline int in_interrupt(void)
 #define __round_mask(x, y) ((__typeof__(x))((y)-1))
 #define round_up(x, y) ((((x)-1) | __round_mask(x, y))+1)
 #define round_down(x, y) ((x) & ~__round_mask(x, y))
+
+/* Not thread-safe if we want to try multithreaded tests which use this ... */
+#define xchg(ptr, x)	({ __typeof__(*ptr) __y = *ptr; *ptr = x; __y; })
 
 #endif /* _KERNEL_H */
