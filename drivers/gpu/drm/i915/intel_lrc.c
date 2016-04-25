@@ -708,9 +708,7 @@ int intel_logical_ring_alloc_request_extras(struct drm_i915_gem_request *request
 		 * going any further, as the i915_add_request() call
 		 * later on mustn't fail ...
 		 */
-		struct intel_guc *guc = &request->i915->guc;
-
-		ret = i915_guc_wq_check_space(guc->execbuf_client);
+		ret = i915_guc_wq_check_space(request);
 		if (ret)
 			return ret;
 	}
