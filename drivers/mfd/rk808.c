@@ -152,15 +152,15 @@ static struct i2c_client *rk808_i2c_client;
 static void rk808_device_shutdown(void)
 {
 	int ret;
-	struct rk808 *rk808 = i2c_get_clientdata(rk808_i2c_client);
+	struct rk8xx *rk8xx = i2c_get_clientdata(rk808_i2c_client);
 
-	if (!rk808) {
+	if (!rk8xx) {
 		dev_warn(&rk808_i2c_client->dev,
 			 "have no rk808, so do nothing here\n");
 		return;
 	}
 
-	ret = regmap_update_bits(rk808->regmap,
+	ret = regmap_update_bits(rk8xx->regmap,
 				 RK808_DEVCTRL_REG,
 				 DEV_OFF_RST, DEV_OFF_RST);
 	if (ret)
@@ -171,7 +171,7 @@ static int rk808_probe(struct i2c_client *client,
 		       const struct i2c_device_id *id)
 {
 	struct device_node *np = client->dev.of_node;
-	struct rk808 *rk808;
+	struct rk8xx *rk8xx;
 	int pm_off = 0;
 	int ret;
 	int i;
@@ -181,18 +181,18 @@ static int rk808_probe(struct i2c_client *client,
 		return -EINVAL;
 	}
 
-	rk808 = devm_kzalloc(&client->dev, sizeof(*rk808), GFP_KERNEL);
-	if (!rk808)
+	rk8xx = devm_kzalloc(&client->dev, sizeof(*rk8xx), GFP_KERNEL);
+	if (!rk8xx)
 		return -ENOMEM;
 
-	rk808->regmap = devm_regmap_init_i2c(client, &rk808_regmap_config);
-	if (IS_ERR(rk808->regmap)) {
+	rk8xx->regmap = devm_regmap_init_i2c(client, &rk808_regmap_config);
+	if (IS_ERR(rk8xx->regmap)) {
 		dev_err(&client->dev, "regmap initialization failed\n");
-		return PTR_ERR(rk808->regmap);
+		return PTR_ERR(rk8xx->regmap);
 	}
 
 	for (i = 0; i < ARRAY_SIZE(pre_init_reg); i++) {
-		ret = regmap_update_bits(rk808->regmap, pre_init_reg[i].addr,
+		ret = regmap_update_bits(rk8xx->regmap, pre_init_reg[i].addr,
 					 pre_init_reg[i].mask,
 					 pre_init_reg[i].value);
 		if (ret) {
@@ -202,20 +202,20 @@ static int rk808_probe(struct i2c_client *client,
 		}
 	}
 
-	ret = regmap_add_irq_chip(rk808->regmap, client->irq,
+	ret = regmap_add_irq_chip(rk8xx->regmap, client->irq,
 				  IRQF_ONESHOT, -1,
-				  &rk808_irq_chip, &rk808->irq_data);
+				  &rk808_irq_chip, &rk8xx->irq_data);
 	if (ret) {
 		dev_err(&client->dev, "Failed to add irq_chip %d\n", ret);
 		return ret;
 	}
 
-	rk808->i2c = client;
-	i2c_set_clientdata(client, rk808);
+	rk8xx->i2c = client;
+	i2c_set_clientdata(client, rk8xx);
 
 	ret = mfd_add_devices(&client->dev, -1,
 			      rk808s, ARRAY_SIZE(rk808s),
-			      NULL, 0, regmap_irq_get_domain(rk808->irq_data));
+			      NULL, 0, regmap_irq_get_domain(rk8xx->irq_data));
 	if (ret) {
 		dev_err(&client->dev, "failed to add MFD devices %d\n", ret);
 		goto err_irq;
@@ -231,15 +231,15 @@ static int rk808_probe(struct i2c_client *client,
 	return 0;
 
 err_irq:
-	regmap_del_irq_chip(client->irq, rk808->irq_data);
+	regmap_del_irq_chip(client->irq, rk8xx->irq_data);
 	return ret;
 }
 
 static int rk808_remove(struct i2c_client *client)
 {
-	struct rk808 *rk808 = i2c_get_clientdata(client);
+	struct rk8xx *rk8xx = i2c_get_clientdata(client);
 
-	regmap_del_irq_chip(client->irq, rk808->irq_data);
+	regmap_del_irq_chip(client->irq, rk8xx->irq_data);
 	mfd_remove_devices(&client->dev);
 	pm_power_off = NULL;
 
