@@ -1120,6 +1120,9 @@ intel_plane_init(struct drm_device *dev, enum pipe pipe, int plane)
 
 	intel_create_rotation_property(dev, intel_plane);
 
+	if (INTEL_INFO(dev)->gen == 9)
+		intel_create_scaler_props(dev, intel_plane);
+
 	drm_plane_helper_add(&intel_plane->base, &intel_plane_helper_funcs);
 
 	return 0;

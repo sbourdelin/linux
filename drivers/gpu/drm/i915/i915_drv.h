@@ -1902,6 +1902,13 @@ struct drm_i915_private {
 	struct drm_property *broadcast_rgb_property;
 	struct drm_property *force_audio_property;
 
+	/* scaler properties */
+	struct drm_property *prop_max_downscale_ratio;
+	struct drm_property *prop_max_nv12_downscale_ratio;
+	struct drm_property *prop_min_src_size;
+	struct drm_property *prop_max_src_size;
+	struct drm_property *prop_min_dst_size;
+
 	/* hda/i915 audio component */
 	struct i915_audio_component *audio_component;
 	bool audio_component_registered;

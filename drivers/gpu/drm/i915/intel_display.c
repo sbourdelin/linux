@@ -14095,6 +14095,9 @@ static struct drm_plane *intel_primary_plane_create(struct drm_device *dev,
 	if (INTEL_INFO(dev)->gen >= 4)
 		intel_create_rotation_property(dev, primary);
 
+	if (INTEL_INFO(dev)->gen == 9)
+		intel_create_scaler_props(dev, primary);
+
 	drm_plane_helper_add(&primary->base, &intel_plane_helper_funcs);
 
 	return &primary->base;
@@ -14122,6 +14125,73 @@ void intel_create_rotation_property(struct drm_device *dev, struct intel_plane *
 		drm_object_attach_property(&plane->base.base,
 				dev->mode_config.rotation_property,
 				plane->base.state->rotation);
+}
+
+void
+intel_create_scaler_props(struct drm_device *dev, struct intel_plane *plane)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	if (!dev_priv->prop_max_downscale_ratio) {
+		dev_priv->prop_max_downscale_ratio =
+			drm_property_create_object(dev, DRM_MODE_PROP_ATOMIC,
+						   "scaling_max_down_ratio",
+						   DRM_MODE_OBJECT_PLANE);
+	}
+	if (!dev_priv->prop_max_nv12_downscale_ratio) {
+		dev_priv->prop_max_nv12_downscale_ratio =
+			drm_property_create_object(dev, DRM_MODE_PROP_ATOMIC,
+						   "nv12_scaling_max_down_ratio",
+						   DRM_MODE_OBJECT_PLANE);
+	}
+	if (!dev_priv->prop_min_src_size) {
+		dev_priv->prop_min_src_size = drm_property_create_object(dev,
+			 DRM_MODE_PROP_ATOMIC, "min_src_size",
+			 DRM_MODE_OBJECT_PLANE);
+	}
+	if (!dev_priv->prop_max_src_size) {
+		dev_priv->prop_max_src_size = drm_property_create_object(dev,
+			 DRM_MODE_PROP_ATOMIC, "max_src_size",
+			 DRM_MODE_OBJECT_PLANE);
+	}
+	if (!dev_priv->prop_min_dst_size) {
+		dev_priv->prop_min_dst_size = drm_property_create_object(dev,
+			 DRM_MODE_PROP_ATOMIC, "min_dst_size",
+			 DRM_MODE_OBJECT_PLANE);
+	}
+
+	plane->max_down_ratio = DRM_PLANE_HELPER_NO_SCALING;
+	plane->nv12_max_down_ratio = DRM_PLANE_HELPER_NO_SCALING;
+	plane->min_src_size = 0;
+	plane->max_src_size = 0;
+	plane->min_dst_size = 0;
+
+	if (INTEL_INFO(dev)->gen == 9) {
+		plane->min_src_size = ((SKL_MIN_SRC_W << 16) | SKL_MIN_SRC_H);
+		plane->max_src_size = ((SKL_MAX_SRC_W << 16) | SKL_MAX_SRC_H);
+		plane->min_dst_size = ((SKL_MIN_DST_W << 16) | SKL_MIN_DST_H);
+	}
+
+	if (dev_priv->prop_max_downscale_ratio)
+		drm_object_attach_property(&plane->base.base,
+					   dev_priv->prop_max_downscale_ratio,
+					   plane->max_down_ratio);
+	if (dev_priv->prop_max_nv12_downscale_ratio)
+		drm_object_attach_property(&plane->base.base,
+			dev_priv->prop_max_nv12_downscale_ratio,
+			plane->nv12_max_down_ratio);
+	if (dev_priv->prop_min_src_size)
+		drm_object_attach_property(&plane->base.base,
+			dev_priv->prop_min_src_size,
+			plane->min_src_size);
+	if (dev_priv->prop_max_src_size)
+		drm_object_attach_property(&plane->base.base,
+			dev_priv->prop_max_src_size,
+			plane->max_src_size);
+	if (dev_priv->prop_min_dst_size)
+		drm_object_attach_property(&plane->base.base,
+			dev_priv->prop_min_dst_size,
+			plane->min_dst_size);
 }
 
 static int

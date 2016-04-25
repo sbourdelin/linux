@@ -228,8 +228,53 @@ intel_plane_atomic_get_property(struct drm_plane *plane,
 				struct drm_property *property,
 				uint64_t *val)
 {
-	DRM_DEBUG_KMS("Unknown plane property '%s'\n", property->name);
-	return -EINVAL;
+	struct drm_i915_private *dev_priv = state->plane->dev->dev_private;
+	struct intel_plane_state *intel_state = to_intel_plane_state(state);
+	struct intel_plane *intel_plane = to_intel_plane(plane);
+	enum plane plane_id = intel_plane->plane;
+	enum pipe pipe = intel_plane->pipe;
+	struct drm_crtc *crtc  = dev_priv->pipe_to_crtc_mapping[pipe];
+	int cdclk = dev_priv->cdclk_freq;
+	int crtc_clock = crtc->hwmode.crtc_clock;
+
+	/*
+	 * scaling ratio is calculated as following.
+	 * required scaling = (src*0x10000)/dst.
+	 * We store the values in packed BCD format, to stop precision loss
+	 * We keep MSB 16bit for Integer and 16bit for fraction
+	 * i.e 6.75 is represented as 0110.0111010100000000
+	 */
+	if (INTEL_INFO(state->plane->dev)->gen == 9) {
+		if (cdclk && crtc_clock) {
+			intel_plane->max_down_ratio =
+				min(((SKL_MAX_DOWNSCALE_RATIO << 16) - 1),
+				    (1 << 8) * ((cdclk << 8) / crtc_clock));
+
+			/* For primary plane &  1st sprite plane plane id :0 */
+			if ((pipe != PIPE_C) && (plane_id == 0)) {
+				intel_plane->nv12_max_down_ratio =
+					min((SKL_MAX_NV12_DOWNSCALE_RATIO <<
+					     16) - 1,
+					    (1 << 8) * ((cdclk << 8) /
+							crtc_clock));
+			}
+		}
+	}
+
+	if (property == dev_priv->prop_max_downscale_ratio) {
+		*val = intel_plane->max_down_ratio;
+	} else if (property == dev_priv->prop_max_nv12_downscale_ratio) {
+		*val = intel_plane->nv12_max_down_ratio;
+	} else if (property == dev_priv->prop_min_src_size) {
+		*val = intel_plane->min_src_size;
+	} else if (property == dev_priv->prop_max_src_size) {
+		*val = intel_plane->max_src_size;
+	} else if (property == dev_priv->prop_min_dst_size) {
+		*val = intel_plane->min_dst_size;
+	} else {
+		DRM_DEBUG_KMS("Unknown plane property '%s'\n", property->name);
+		return -EINVAL;
+	}
 }
 
 /**

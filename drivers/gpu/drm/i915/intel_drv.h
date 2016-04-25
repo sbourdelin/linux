@@ -351,6 +351,8 @@ struct intel_initial_plane_config {
 #define SKL_MAX_DST_W 4096
 #define SKL_MIN_DST_H 8
 #define SKL_MAX_DST_H 4096
+#define SKL_MAX_DOWNSCALE_RATIO		3
+#define SKL_MAX_NV12_DOWNSCALE_RATIO	2
 
 struct intel_scaler {
 	int in_use;
@@ -697,6 +699,10 @@ struct intel_plane {
 	bool can_scale;
 	int max_downscale;
 	uint32_t frontbuffer_bit;
+
+	/*scaling props*/
+	u32 min_src_size, max_src_size, min_dst_size, max_dst_size;
+	u32 max_down_ratio, nv12_max_down_ratio;
 
 	/* Since we need to change the watermarks before/after
 	 * enabling/disabling the planes, we need to store the parameters here
@@ -1195,6 +1201,9 @@ intel_rotation_90_or_270(unsigned int rotation)
 
 void intel_create_rotation_property(struct drm_device *dev,
 					struct intel_plane *plane);
+
+void
+intel_create_scaler_props(struct drm_device *dev, struct intel_plane *plane);
 
 void assert_pch_transcoder_disabled(struct drm_i915_private *dev_priv,
 				    enum pipe pipe);
