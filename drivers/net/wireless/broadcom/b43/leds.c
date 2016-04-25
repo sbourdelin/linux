@@ -224,31 +224,9 @@ static void b43_led_get_sprominfo(struct b43_wldev *dev,
 
 	if (sprom[led_index] == 0xFF) {
 		/* There is no LED information in the SPROM
-		 * for this LED. Hardcode it here. */
+		 * for this LED. Keep it disabled. */
 		*activelow = false;
-		switch (led_index) {
-		case 0:
-			*behaviour = B43_LED_ACTIVITY;
-			*activelow = true;
-			if (dev->dev->board_vendor == PCI_VENDOR_ID_COMPAQ)
-				*behaviour = B43_LED_RADIO_ALL;
-			break;
-		case 1:
-			*behaviour = B43_LED_RADIO_B;
-			if (dev->dev->board_vendor == PCI_VENDOR_ID_ASUSTEK)
-				*behaviour = B43_LED_ASSOC;
-			break;
-		case 2:
-			*behaviour = B43_LED_RADIO_A;
-			break;
-		case 3:
-			*behaviour = B43_LED_OFF;
-			break;
-		default:
-			*behaviour = B43_LED_OFF;
-			B43_WARN_ON(1);
-			return;
-		}
+		*behaviour = B43_LED_OFF;
 	} else {
 		*behaviour = sprom[led_index] & B43_LED_BEHAVIOUR;
 		*activelow = !!(sprom[led_index] & B43_LED_ACTIVELOW);
