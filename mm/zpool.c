@@ -23,6 +23,7 @@ struct zpool {
 	const struct zpool_ops *ops;
 
 	struct list_head list;
+	struct work_struct work;
 };
 
 static LIST_HEAD(drivers_head);
@@ -197,6 +198,15 @@ struct zpool *zpool_create_pool(const char *type, const char *name, gfp_t gfp,
 	return zpool;
 }
 
+static void zpool_destroy_pool_work(struct work_struct *work)
+{
+	struct zpool *zpool = container_of(work, struct zpool, work);
+
+	zpool->driver->destroy(zpool->pool);
+	zpool_put_driver(zpool->driver);
+	kfree(zpool);
+}
+
 /**
  * zpool_destroy_pool() - Destroy a zpool
  * @pool	The zpool to destroy.
@@ -204,7 +214,8 @@ struct zpool *zpool_create_pool(const char *type, const char *name, gfp_t gfp,
  * Implementations must guarantee this to be thread-safe,
  * however only when destroying different pools.  The same
  * pool should only be destroyed once, and should not be used
- * after it is destroyed.
+ * after it is destroyed.  This defers calling the implementation
+ * to a workqueue, so the implementation may sleep.
  *
  * This destroys an existing zpool.  The zpool should not be in use.
  */
@@ -215,9 +226,8 @@ void zpool_destroy_pool(struct zpool *zpool)
 	spin_lock(&pools_lock);
 	list_del(&zpool->list);
 	spin_unlock(&pools_lock);
-	zpool->driver->destroy(zpool->pool);
-	zpool_put_driver(zpool->driver);
-	kfree(zpool);
+	INIT_WORK(&zpool->work, zpool_destroy_pool_work);
+	schedule_work(&zpool->work);
 }
 
 /**
