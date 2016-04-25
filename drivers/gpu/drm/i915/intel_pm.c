@@ -76,6 +76,16 @@ static void bxt_init_clock_gating(struct drm_device *dev)
 	if (IS_BXT_REVID(dev_priv, BXT_REVID_B0, REVID_FOREVER))
 		I915_WRITE(GEN9_CLKGATE_DIS_0, I915_READ(GEN9_CLKGATE_DIS_0) |
 			   PWM1_GATING_DIS | PWM2_GATING_DIS);
+
+	/*
+	 * Note that for dynamic reprogramming we'd need to do a stalling flush
+	 * operation, but we can do away with that here, since the GPU is idle
+	 * at this point.
+	 */
+	if (IS_BXT_REVID(dev_priv, BXT_REVID_A1, REVID_FOREVER))
+		I915_WRITE(GEN8_L3SQCREG1,
+			   L3_GENERAL_PRIO_CREDITS(62) |
+			   L3_HIGH_PRIO_CREDITS(2));
 }
 
 static void i915_pineview_get_mem_freq(struct drm_device *dev)
