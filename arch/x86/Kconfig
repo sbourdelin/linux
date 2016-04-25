@@ -2003,6 +2003,21 @@ config PHYSICAL_ALIGN
 
 	  Don't change this unless you know what you are doing.
 
+config RANDOMIZE_MEMORY
+	bool "Randomize the kernel memory sections"
+	depends on X86_64
+	depends on RANDOMIZE_BASE
+	default n
+	---help---
+	   Randomizes the virtual address of memory sections (physical memory
+	   mapping, vmalloc & vmemmap). This security feature mitigates exploits
+	   relying on predictable memory locations.
+
+	   Base and padding between memory section is randomized. Their order is
+	   not. Entropy is generated in the same way as RANDOMIZE_BASE.
+
+	   If unsure, say N.
+
 config HOTPLUG_CPU
 	bool "Support for hot-pluggable CPUs"
 	depends on SMP
