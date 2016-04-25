@@ -3345,7 +3345,7 @@ megasas_internal_reset_defer_cmds(struct megasas_instance *instance)
 			if (!list_empty(&cmd->list)) {
 				dev_notice(&instance->pdev->dev, "ERROR while"
 					" moving this cmd:%p, %d %p, it was"
-					"discovered on some list?\n",
+					" discovered on some list?\n",
 					cmd, cmd->sync_cmd, cmd->scmd);
 
 				list_del_init(&cmd->list);
