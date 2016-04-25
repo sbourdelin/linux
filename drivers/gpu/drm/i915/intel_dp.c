@@ -4159,7 +4159,7 @@ static void intel_dp_handle_test_request(struct intel_dp *intel_dp,
 	case DP_TEST_LINK_TRAINING:
 		DRM_DEBUG_KMS("LINK_TRAINING test requested\n");
 		intel_dp->compliance_test_type = DP_TEST_LINK_TRAINING;
-		response = intel_dp_autotest_link_training(intel_dp);
+		intel_dp_autotest_link_training(intel_dp);
 		break;
 	case DP_TEST_LINK_VIDEO_PATTERN:
 		DRM_DEBUG_KMS("TEST_PATTERN test requested\n");
@@ -4182,9 +4182,11 @@ static void intel_dp_handle_test_request(struct intel_dp *intel_dp,
 	}
 
 update_status:
-	status = intel_dp_write_test_reply(intel_dp, response);
-	if (status <= 0)
-		DRM_DEBUG_KMS("Could not write test response to sink\n");
+	if (intel_dp->compliance_test_type != DP_TEST_LINK_TRAINING) {
+		status = intel_dp_write_test_reply(intel_dp, response);
+		if (status <= 0)
+			DRM_DEBUG_KMS("Could not write test response to sink\n");
+	}
 }
 
 static int

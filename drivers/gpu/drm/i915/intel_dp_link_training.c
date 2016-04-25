@@ -120,6 +120,9 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp)
 	intel_dp_compute_rate(intel_dp, intel_dp->link_rate,
 			      &link_bw, &rate_select);
 
+	if (intel_dp->compliance_test_type == DP_TEST_LINK_TRAINING)
+		intel_dp_write_test_reply(intel_dp, DP_TEST_ACK);
+
 	/* Write the link configuration data */
 	link_config[0] = link_bw;
 	link_config[1] = intel_dp->lane_count;
