@@ -4128,6 +4128,15 @@ static uint8_t intel_dp_autotest_phy_pattern(struct intel_dp *intel_dp)
 	return test_result;
 }
 
+int intel_dp_write_test_reply(struct intel_dp *intel_dp, uint8_t reply)
+{
+	/* Clear interrupt first */
+	drm_dp_dpcd_writeb(&intel_dp->aux, DP_DEVICE_SERVICE_IRQ_VECTOR,
+			   DP_AUTOMATED_TEST_REQUEST);
+
+	return drm_dp_dpcd_write(&intel_dp->aux, DP_TEST_RESPONSE, &reply, 1);
+}
+
 static void intel_dp_handle_test_request(struct intel_dp *intel_dp,
 					 bool short_pulse)
 {
@@ -4173,14 +4182,7 @@ static void intel_dp_handle_test_request(struct intel_dp *intel_dp,
 	}
 
 update_status:
-	/* Clear interrupt first */
-	drm_dp_dpcd_writeb(&intel_dp->aux,
-			   DP_DEVICE_SERVICE_IRQ_VECTOR,
-			   DP_AUTOMATED_TEST_REQUEST);
-	status = drm_dp_dpcd_write(&intel_dp->aux,
-				   DP_TEST_RESPONSE,
-				   &response, 1);
-
+	status = intel_dp_write_test_reply(intel_dp, response);
 	if (status <= 0)
 		DRM_DEBUG_KMS("Could not write test response to sink\n");
 }
