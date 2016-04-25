@@ -120,12 +120,9 @@ static int xilly_map_single_pci(struct xilly_endpoint *ep,
 
 	*ret_dma_handle = addr;
 
-	rc = devm_add_action(ep->dev, xilly_pci_unmap, this);
-	if (rc) {
-		pci_unmap_single(ep->pdev, addr, size, pci_direction);
-		kfree(this);
+	rc = devm_add_action_or_reset(ep->dev, xilly_pci_unmap, this);
+	if (rc)
 		return rc;
-	}
 
 	return 0;
 }

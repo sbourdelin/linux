@@ -101,13 +101,10 @@ static int xilly_map_single_of(struct xilly_endpoint *ep,
 
 	*ret_dma_handle = addr;
 
-	rc = devm_add_action(ep->dev, xilly_of_unmap, this);
+	rc = devm_add_action_or_reset(ep->dev, xilly_of_unmap, this);
 
-	if (rc) {
-		dma_unmap_single(ep->dev, addr, size, direction);
-		kfree(this);
+	if (rc)
 		return rc;
-	}
 
 	return 0;
 }
