@@ -40,7 +40,10 @@ extern void *qcom_scm_alloc_buffer(size_t size, dma_addr_t *dma_addr,
 				    gfp_t gfp);
 extern void qcom_scm_free_buffer(size_t size, void *virt_addr,
 				 dma_addr_t dma_addr);
+extern void __qcom_scm_init(void);
+
 /* common error codes */
+#define QCOM_SCM_V2_EBUSY	-12
 #define QCOM_SCM_ENOMEM		-5
 #define QCOM_SCM_EOPNOTSUPP	-4
 #define QCOM_SCM_EINVAL_ADDR	-3
@@ -60,6 +63,8 @@ static inline int qcom_scm_remap_error(int err)
 		return -EOPNOTSUPP;
 	case QCOM_SCM_ENOMEM:
 		return -ENOMEM;
+	case QCOM_SCM_V2_EBUSY:
+		return -EBUSY;
 	}
 	return -EINVAL;
 }
