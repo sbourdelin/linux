@@ -29,6 +29,7 @@ void item_kill_tree(struct radix_tree_root *root);
 
 void tag_check(void);
 void multiorder_checks(void);
+void idr_checks(void);
 
 struct item *
 item_tag_set(struct radix_tree_root *root, unsigned long index, int tag);

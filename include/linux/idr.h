@@ -12,47 +12,22 @@
 #ifndef __IDR_H__
 #define __IDR_H__
 
-#include <linux/types.h>
-#include <linux/bitops.h>
-#include <linux/init.h>
-#include <linux/rcupdate.h>
-
-/*
- * Using 6 bits at each layer allows us to allocate 7 layers out of each page.
- * 8 bits only gave us 3 layers out of every pair of pages, which is less
- * efficient except for trees with a largest element between 192-255 inclusive.
- */
-#define IDR_BITS 6
-#define IDR_SIZE (1 << IDR_BITS)
-#define IDR_MASK ((1 << IDR_BITS)-1)
-
-struct idr_layer {
-	int			prefix;	/* the ID prefix of this idr_layer */
-	int			layer;	/* distance from leaf */
-	struct idr_layer __rcu	*ary[1<<IDR_BITS];
-	int			count;	/* When zero, we can release it */
-	union {
-		/* A zero bit means "space here" */
-		DECLARE_BITMAP(bitmap, IDR_SIZE);
-		struct rcu_head		rcu_head;
-	};
-};
+#include <linux/radix-tree.h>
+#include <linux/gfp.h>
 
 struct idr {
-	struct idr_layer __rcu	*hint;	/* the last layer allocated from */
-	struct idr_layer __rcu	*top;
-	int			layers;	/* only valid w/o concurrent changes */
-	int			cur;	/* current pos for cyclic allocation */
-	spinlock_t		lock;
-	int			id_free_cnt;
-	struct idr_layer	*id_free;
+	struct radix_tree_root	idr_rt;
+	int			idr_curr;
 };
 
-#define IDR_INIT(name)							\
+/* Set the IDR flag and the IDR_FREE tag */
+#define IDR_RT_MARKER		((__force gfp_t)(3 << __GFP_BITS_SHIFT))
+
+#define IDR_INIT							\
 {									\
-	.lock			= __SPIN_LOCK_UNLOCKED(name.lock),	\
+	.idr_rt = RADIX_TREE_INIT(IDR_RT_MARKER)			\
 }
-#define DEFINE_IDR(name)	struct idr name = IDR_INIT(name)
+#define DEFINE_IDR(name)	struct idr name = IDR_INIT
 
 /**
  * DOC: idr sync
@@ -75,7 +50,6 @@ struct idr {
  * This is what we export.
  */
 
-void *idr_find_slowpath(struct idr *idp, int id);
 void idr_preload(gfp_t gfp_mask);
 int idr_alloc(struct idr *idp, void *ptr, int start, int end, gfp_t gfp_mask);
 int idr_alloc_cyclic(struct idr *idr, void *ptr, int start, int end, gfp_t gfp_mask);
@@ -83,10 +57,23 @@ int idr_for_each(struct idr *idp,
 		 int (*fn)(int id, void *p, void *data), void *data);
 void *idr_get_next(struct idr *idp, int *nextid);
 void *idr_replace(struct idr *idp, void *ptr, int id);
-void idr_remove(struct idr *idp, int id);
 void idr_destroy(struct idr *idp);
-void idr_init(struct idr *idp);
-bool idr_is_empty(struct idr *idp);
+
+static inline void idr_remove(struct idr *idp, int id)
+{
+	radix_tree_delete(&idp->idr_rt, id);
+}
+
+static inline void idr_init(struct idr *idp)
+{
+	memset(idp, 0, sizeof(*idp));
+	idp->idr_rt.gfp_mask = IDR_RT_MARKER;
+}
+
+static inline bool idr_is_empty(struct idr *idp)
+{
+	return radix_tree_empty(&idp->idr_rt);
+}
 
 /**
  * idr_preload_end - end preload section started with idr_preload()
@@ -101,7 +88,7 @@ static inline void idr_preload_end(void)
 
 /**
  * idr_find - return pointer for given id
- * @idr: idr handle
+ * @idp: idr handle
  * @id: lookup key
  *
  * Return the pointer given the id it has been registered with.  A %NULL
@@ -111,14 +98,9 @@ static inline void idr_preload_end(void)
  * This function can be called under rcu_read_lock(), given that the leaf
  * pointers lifetimes are correctly managed.
  */
-static inline void *idr_find(struct idr *idr, int id)
+static inline void *idr_find(struct idr *idp, int id)
 {
-	struct idr_layer *hint = rcu_dereference_raw(idr->hint);
-
-	if (hint && (id & ~IDR_MASK) == hint->prefix)
-		return rcu_dereference_raw(hint->ary[id & IDR_MASK]);
-
-	return idr_find_slowpath(idr, id);
+	return radix_tree_lookup(&idp->idr_rt, id);
 }
 
 /**
@@ -135,7 +117,7 @@ static inline void *idr_find(struct idr *idr, int id)
 	for (id = 0; ((entry) = idr_get_next(idp, &(id))) != NULL; ++id)
 
 /**
- * idr_for_each_entry - continue iteration over an idr's elements of a given type
+ * idr_for_each_entry_continue - continue iteration over an idr's elements of a given type
  * @idp:     idr handle
  * @entry:   the type * to use as cursor
  * @id:      id entry's key
@@ -165,22 +147,27 @@ struct ida_bitmap {
 };
 
 struct ida {
-	struct idr		idr;
+	struct radix_tree_root	ida_rt;
 	struct ida_bitmap	*free_bitmap;
 };
 
-#define IDA_INIT(name)		{ .idr = IDR_INIT((name).idr), .free_bitmap = NULL, }
-#define DEFINE_IDA(name)	struct ida name = IDA_INIT(name)
+#define IDA_INIT		{ .ida_rt = RADIX_TREE_INIT(IDR_RT_MARKER), }
+#define DEFINE_IDA(name)	struct ida name = IDA_INIT
 
 int ida_pre_get(struct ida *ida, gfp_t gfp_mask);
 int ida_get_new_above(struct ida *ida, int starting_id, int *p_id);
 void ida_remove(struct ida *ida, int id);
 void ida_destroy(struct ida *ida);
-void ida_init(struct ida *ida);
 
 int ida_simple_get(struct ida *ida, unsigned int start, unsigned int end,
 		   gfp_t gfp_mask);
 void ida_simple_remove(struct ida *ida, unsigned int id);
+
+static inline void ida_init(struct ida *ida)
+{
+	memset(ida, 0, sizeof(*ida));
+	ida->ida_rt.gfp_mask = IDR_RT_MARKER;
+}
 
 /**
  * ida_get_new - allocate new ID
@@ -196,9 +183,6 @@ static inline int ida_get_new(struct ida *ida, int *p_id)
 
 static inline bool ida_is_empty(struct ida *ida)
 {
-	return idr_is_empty(&ida->idr);
+	return radix_tree_empty(&ida->ida_rt);
 }
-
-void __init idr_init_cache(void);
-
 #endif /* __IDR_H__ */

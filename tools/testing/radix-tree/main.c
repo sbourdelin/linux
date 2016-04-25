@@ -293,6 +293,8 @@ static void single_thread_tests(bool long_run)
 	printf("after add_and_check: %d allocated\n", nr_allocated);
 	dynamic_height_check();
 	printf("after dynamic_height_check: %d allocated\n", nr_allocated);
+	idr_checks();
+	printf("after idr_checks: %d allocated\n", nr_allocated);
 	big_gang_check(long_run);
 	printf("after big_gang_check: %d allocated\n", nr_allocated);
 	for (i = 0; i < (long_run ? 2000 : 3); i++) {

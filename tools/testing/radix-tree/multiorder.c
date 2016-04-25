@@ -281,8 +281,8 @@ void multiorder_tagged_iteration(void)
 		}
 	}
 
-	radix_tree_range_tag_if_tagged(&tree, &first, ~0UL,
-					MT_NUM_ENTRIES, 1, 2);
+	assert(radix_tree_range_tag_if_tagged(&tree, &first, ~0UL,
+				TAG_ENTRIES, 1, 2) == TAG_ENTRIES);
 
 	for (j = 0; j < 256; j++) {
 		int mask, k;
@@ -306,8 +306,8 @@ void multiorder_tagged_iteration(void)
 	}
 
 	first = 1;
-	radix_tree_range_tag_if_tagged(&tree, &first, ~0UL,
-					MT_NUM_ENTRIES, 1, 0);
+	assert(radix_tree_range_tag_if_tagged(&tree, &first, ~0UL,
+				MT_NUM_ENTRIES * 2, 1, 0) == TAG_ENTRIES);
 	i = 0;
 	radix_tree_for_each_tagged(slot, &tree, &iter, 0, 0) {
 		assert(iter.index == tag_index[i]);
