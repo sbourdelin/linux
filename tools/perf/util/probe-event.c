@@ -2516,6 +2516,7 @@ static int find_probe_trace_events_from_map(struct perf_probe_event *pev,
 	struct probe_trace_point *tp;
 	int num_matched_functions;
 	int ret, i, j, skipped = 0;
+	char *mod_name;
 
 	map = get_target_map(pev->target, pev->uprobes);
 	if (!map) {
@@ -2600,9 +2601,19 @@ static int find_probe_trace_events_from_map(struct perf_probe_event *pev,
 		tp->realname = strdup_or_goto(sym->name, nomem_out);
 
 		tp->retprobe = pp->retprobe;
-		if (pev->target)
-			tev->point.module = strdup_or_goto(pev->target,
-							   nomem_out);
+		if (pev->target) {
+			if (pev->uprobes) {
+				tev->point.module = strdup_or_goto(pev->target,
+								   nomem_out);
+			} else {
+				mod_name = find_module_name(pev->target);
+				tev->point.module =
+					strdup(mod_name ? mod_name : pev->target);
+				free(mod_name);
+				if (!tev->point.module)
+					goto nomem_out;
+			}
+		}
 		tev->uprobes = pev->uprobes;
 		tev->nargs = pev->nargs;
 		if (tev->nargs) {
