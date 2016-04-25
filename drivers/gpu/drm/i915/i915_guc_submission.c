@@ -453,32 +453,29 @@ static void guc_fini_ctx_desc(struct intel_guc *guc,
 
 int i915_guc_wq_check_space(struct drm_i915_gem_request *request)
 {
-	const size_t size = sizeof(struct guc_wq_item);
+	const size_t wqi_size = sizeof(struct guc_wq_item);
 	struct i915_guc_client *gc = request->i915->guc.execbuf_client;
 	struct guc_process_desc *desc;
-	int ret = -ETIMEDOUT, timeout_counter = 200;
 
 	if (!gc)
 		return 0;
 
 	desc = gc->client_base + gc->proc_desc_offset;
 
-	while (timeout_counter-- > 0) {
-		if (CIRC_SPACE(gc->wq_tail, desc->head, gc->wq_size) >= size) {
-			ret = 0;
-			break;
-		}
+	if (CIRC_SPACE(gc->wq_tail, desc->head, gc->wq_size) >= wqi_size)
+		return 0;
 
-		if (timeout_counter)
-			usleep_range(1000, 2000);
-	};
+	/* A one-in-a-million chance? */
+	WARN(gc->no_wq_space % 0x100000 == 0, "GuC WQ full!");
+	gc->no_wq_space += 1;
 
-	return ret;
+	return -EAGAIN;
 }
 
 static int guc_add_workqueue_item(struct i915_guc_client *gc,
 				  struct drm_i915_gem_request *rq)
 {
+	const size_t wqi_size = sizeof(struct guc_wq_item);
 	struct guc_process_desc *desc;
 	struct guc_wq_item *wqi;
 	void *base;
@@ -489,11 +486,6 @@ static int guc_add_workqueue_item(struct i915_guc_client *gc,
 	if (WARN_ON(space < sizeof(struct guc_wq_item)))
 		return -ENOSPC; /* shouldn't happen */
 
-	/* postincrement WQ tail for next time */
-	wq_off = gc->wq_tail;
-	gc->wq_tail += sizeof(struct guc_wq_item);
-	gc->wq_tail &= gc->wq_size - 1;
-
 	/* For now workqueue item is 4 DWs; workqueue buffer is 2 pages. So we
 	 * should not have the case where structure wqi is across page, neither
 	 * wrapped to the beginning. This simplifies the implementation below.
@@ -501,8 +493,13 @@ static int guc_add_workqueue_item(struct i915_guc_client *gc,
 	 * XXX: if not the case, we need save data to a temp wqi and copy it to
 	 * workqueue buffer dw by dw.
 	 */
-	WARN_ON(sizeof(struct guc_wq_item) != 16);
-	WARN_ON(wq_off & 3);
+	BUILD_BUG_ON(wqi_size != 16);
+
+	/* postincrement WQ tail for next time */
+	wq_off = gc->wq_tail;
+	WARN_ON(wq_off & (wqi_size - 1));
+	gc->wq_tail += wqi_size;
+	gc->wq_tail &= gc->wq_size - 1;
 
 	/* wq starts from the page after doorbell / process_desc */
 	base = kmap_atomic(i915_gem_object_get_page(gc->client_obj,
@@ -510,8 +507,8 @@ static int guc_add_workqueue_item(struct i915_guc_client *gc,
 	wq_off &= PAGE_SIZE - 1;
 	wqi = (struct guc_wq_item *)((char *)base + wq_off);
 
-	/* len does not include the header */
-	wq_len = sizeof(struct guc_wq_item) / sizeof(u32) - 1;
+	/* len is in DWords, and does not include the one-word header */
+	wq_len = wqi_size/sizeof(u32) - 1;
 	wqi->header = WQ_TYPE_INORDER |
 			(wq_len << WQ_LEN_SHIFT) |
 			(rq->engine->guc_id << WQ_TARGET_SHIFT) |
