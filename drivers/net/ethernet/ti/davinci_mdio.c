@@ -343,6 +343,7 @@ static int davinci_mdio_probe(struct platform_device *pdev)
 		if (davinci_mdio_probe_dt(&data->pdata, pdev))
 			data->pdata = default_pdata;
 		snprintf(data->bus->id, MII_BUS_ID_SIZE, "%s", pdev->name);
+		data->bus->dev.of_node = dev->of_node;
 	} else {
 		data->pdata = pdata ? (*pdata) : default_pdata;
 		snprintf(data->bus->id, MII_BUS_ID_SIZE, "%s-%x",
