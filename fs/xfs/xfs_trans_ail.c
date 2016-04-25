@@ -495,6 +495,7 @@ xfsaild(
 {
 	struct xfs_ail	*ailp = data;
 	long		tout = 0;	/* milliseconds */
+	struct xfs_log_item *lip;
 
 	current->flags |= PF_MEMALLOC;
 	set_freezable();
@@ -508,7 +509,8 @@ xfsaild(
 		spin_lock(&ailp->xa_lock);
 
 		/*
-		 * Idle if the AIL is empty and we are not racing with a target
+		 * Idle if the AIL is empty or pushed up to the requested
+		 * target LSN and we are not racing with a target
 		 * update. We check the AIL after we set the task to a sleep
 		 * state to guarantee that we either catch an xa_target update
 		 * or that a wake_up resets the state to TASK_RUNNING.
@@ -517,7 +519,8 @@ xfsaild(
 		 * The barrier matches the xa_target update in xfs_ail_push().
 		 */
 		smp_rmb();
-		if (!xfs_ail_min(ailp) &&
+		lip = xfs_ail_min(ailp);
+		if ((!lip || XFS_LSN_CMP(lip->li_lsn, ailp->xa_target) >= 0) &&
 		    ailp->xa_target == ailp->xa_target_prev) {
 			spin_unlock(&ailp->xa_lock);
 			freezable_schedule();
