@@ -140,7 +140,6 @@ enum zone_stat_item {
 	NR_SHMEM_HUGEPAGES,	/* transparent shmem huge pages */
 	NR_SHMEM_PMDMAPPED,	/* shmem huge pages currently mapped hugely */
 	NR_SHMEM_FREEHOLES,	/* unused memory of high-order allocations */
-	NR_FREE_CMA_PAGES,
 	NR_VM_ZONE_STAT_ITEMS };
 
 /*
