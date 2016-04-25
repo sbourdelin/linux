@@ -526,10 +526,10 @@ phys_pud_init(pud_t *pud_page, unsigned long addr, unsigned long end,
 {
 	unsigned long pages = 0, next;
 	unsigned long last_map_addr = end;
-	int i = pud_index(addr);
+	int i = pud_index((unsigned long)__va(addr));
 
 	for (; i < PTRS_PER_PUD; i++, addr = next) {
-		pud_t *pud = pud_page + pud_index(addr);
+		pud_t *pud = pud_page + pud_index((unsigned long)__va(addr));
 		pmd_t *pmd;
 		pgprot_t prot = PAGE_KERNEL;
 
