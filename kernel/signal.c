@@ -3044,6 +3044,10 @@ void kernel_sigaction(int sig, __sighandler_t action)
 }
 EXPORT_SYMBOL(kernel_sigaction);
 
+void __weak sigaction_compat_abi(struct k_sigaction *act)
+{
+}
+
 int do_sigaction(int sig, struct k_sigaction *act, struct k_sigaction *oact)
 {
 	struct task_struct *p = current, *t;
@@ -3054,6 +3058,7 @@ int do_sigaction(int sig, struct k_sigaction *act, struct k_sigaction *oact)
 		return -EINVAL;
 
 	k = &p->sighand->action[sig-1];
+	sigaction_compat_abi(act);
 
 	spin_lock_irq(&p->sighand->siglock);
 	if (oact)

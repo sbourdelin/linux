@@ -70,6 +70,8 @@ typedef unsigned long sigset_t;
  * SA_RESETHAND clears the handler when the signal is delivered.
  * SA_NOCLDWAIT flag on SIGCHLD to inhibit zombies.
  * SA_NODEFER prevents the current signal from being masked in the handler.
+ * SA_IA32_ABI/SA_X32_ABI indicates ABI for a signal frame,
+ *   if neither is set, the kernel will set them according to a syscall ABI
  *
  * SA_ONESHOT and SA_NOMASK are the historical Linux names for the Single
  * Unix names RESETHAND and NODEFER respectively.
@@ -85,7 +87,9 @@ typedef unsigned long sigset_t;
 #define SA_NOMASK	SA_NODEFER
 #define SA_ONESHOT	SA_RESETHAND
 
-#define SA_RESTORER	0x04000000
+#define SA_RESTORER	0x04000000u
+#define SA_IA32_ABI	0x02000000u
+#define SA_X32_ABI	0x01000000u
 
 #define MINSIGSTKSZ	2048
 #define SIGSTKSZ	8192
