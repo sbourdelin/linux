@@ -11,6 +11,7 @@
 #include <asm/uaccess.h>
 #include <asm/desc.h>
 #include <asm/ftrace.h>
+#include <asm/mem_encrypt.h>
 
 #ifdef CONFIG_FUNCTION_TRACER
 /* mcount and __fentry__ are defined in assembly */
@@ -78,4 +79,9 @@ EXPORT_SYMBOL(native_load_gs_index);
 #ifdef CONFIG_PREEMPT
 EXPORT_SYMBOL(___preempt_schedule);
 EXPORT_SYMBOL(___preempt_schedule_notrace);
+#endif
+
+#ifdef CONFIG_AMD_MEM_ENCRYPT
+EXPORT_SYMBOL_GPL(sme_me_mask);
+EXPORT_SYMBOL_GPL(sme_get_me_loss);
 #endif
