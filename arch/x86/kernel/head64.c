@@ -47,12 +47,12 @@ static void __init reset_early_page_tables(void)
 }
 
 /* Create a new PMD entry */
-int __init early_make_pgtable(unsigned long address)
+static int __init __early_make_pgtable(unsigned long address, pmdval_t pmd)
 {
 	unsigned long physaddr = address - __PAGE_OFFSET;
 	pgdval_t pgd, *pgd_p;
 	pudval_t pud, *pud_p;
-	pmdval_t pmd, *pmd_p;
+	pmdval_t *pmd_p;
 
 	/* Invalid address or early pgt is done ?  */
 	if (physaddr >= MAXMEM || read_cr3() != __sme_pa_nodebug(early_level4_pgt))
@@ -94,10 +94,90 @@ again:
 		memset(pmd_p, 0, sizeof(*pmd_p) * PTRS_PER_PMD);
 		*pud_p = (pudval_t)pmd_p - __START_KERNEL_map + phys_base + _KERNPG_TABLE;
 	}
-	pmd = (physaddr & PMD_MASK) + early_pmd_flags;
 	pmd_p[pmd_index(address)] = pmd;
 
 	return 0;
+}
+
+int __init early_make_pgtable(unsigned long address)
+{
+	unsigned long physaddr = address - __PAGE_OFFSET;
+	pmdval_t pmd;
+
+	pmd = (physaddr & PMD_MASK) + early_pmd_flags;
+
+	return __early_make_pgtable(address, pmd);
+}
+
+static void __init create_unencrypted_mapping(void *address, unsigned long size)
+{
+	unsigned long physaddr = (unsigned long)address - __PAGE_OFFSET;
+	pmdval_t pmd_flags, pmd;
+
+	if (!sme_me_mask)
+		return;
+
+	/* Clear the encryption mask from the early_pmd_flags */
+	pmd_flags = early_pmd_flags & ~sme_me_mask;
+
+	do {
+		pmd = (physaddr & PMD_MASK) + pmd_flags;
+		__early_make_pgtable((unsigned long)address, pmd);
+
+		address += PMD_SIZE;
+		physaddr += PMD_SIZE;
+		size = (size < PMD_SIZE) ? 0 : size - PMD_SIZE;
+	} while (size);
+}
+
+static void __init __clear_mapping(unsigned long address)
+{
+	unsigned long physaddr = address - __PAGE_OFFSET;
+	pgdval_t pgd, *pgd_p;
+	pudval_t pud, *pud_p;
+	pmdval_t *pmd_p;
+
+	/* Invalid address or early pgt is done ?  */
+	if (physaddr >= MAXMEM ||
+	    read_cr3() != __sme_pa_nodebug(early_level4_pgt))
+		return;
+
+	pgd_p = &early_level4_pgt[pgd_index(address)].pgd;
+	pgd = *pgd_p;
+
+	if (!pgd)
+		return;
+
+	/*
+	 * The use of __START_KERNEL_map rather than __PAGE_OFFSET here matches
+	 * __early_make_pgtable where the entry was created.
+	 */
+	pud_p = (pudval_t *)((pgd & PTE_PFN_MASK) + __START_KERNEL_map - phys_base);
+	pud_p += pud_index(address);
+	pud = *pud_p;
+
+	if (!pud)
+		return;
+
+	pmd_p = (pmdval_t *)((pud & PTE_PFN_MASK) + __START_KERNEL_map - phys_base);
+	pmd_p[pmd_index(address)] = 0;
+}
+
+static void __init clear_mapping(void *address, unsigned long size)
+{
+	do {
+		__clear_mapping((unsigned long)address);
+
+		address += PMD_SIZE;
+		size = (size < PMD_SIZE) ? 0 : size - PMD_SIZE;
+	} while (size);
+}
+
+static void __init sme_memcpy(void *dst, void *src, unsigned long size)
+{
+	create_unencrypted_mapping(src, size);
+	memcpy(dst, src, size);
+	clear_mapping(src, size);
 }
 
 /* Don't add a printk in there. printk relies on the PDA which is not initialized 
@@ -122,12 +202,12 @@ static void __init copy_bootdata(char *real_mode_data)
 	char * command_line;
 	unsigned long cmd_line_ptr;
 
-	memcpy(&boot_params, real_mode_data, sizeof boot_params);
+	sme_memcpy(&boot_params, real_mode_data, sizeof boot_params);
 	sanitize_boot_params(&boot_params);
 	cmd_line_ptr = get_cmd_line_ptr();
 	if (cmd_line_ptr) {
 		command_line = __va(cmd_line_ptr);
-		memcpy(boot_command_line, command_line, COMMAND_LINE_SIZE);
+		sme_memcpy(boot_command_line, command_line, COMMAND_LINE_SIZE);
 	}
 }
 

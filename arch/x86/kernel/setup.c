@@ -113,6 +113,7 @@
 #include <asm/prom.h>
 #include <asm/microcode.h>
 #include <asm/mmu_context.h>
+#include <asm/mem_encrypt.h>
 
 /*
  * max_low_pfn_mapped: highest direct mapped pfn under 4GB
@@ -374,6 +375,13 @@ static void __init reserve_initrd(void)
 	if (!boot_params.hdr.type_of_loader ||
 	    !ramdisk_image || !ramdisk_size)
 		return;		/* No initrd provided by bootloader */
+
+	/*
+	 * This memory is marked encrypted by the kernel but the ramdisk
+	 * was loaded in the clear by the bootloader, so make sure that
+	 * the ramdisk image is encrypted.
+	 */
+	sme_early_mem_enc(ramdisk_image, ramdisk_end - ramdisk_image);
 
 	initrd_start = 0;
 
