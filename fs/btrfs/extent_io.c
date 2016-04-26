@@ -4569,11 +4569,10 @@ int extent_invalidatepage(struct extent_io_tree *tree,
  * to drop the page.
  */
 static int try_release_extent_state(struct extent_map_tree *map,
-				    struct extent_io_tree *tree,
-				    struct page *page, gfp_t mask)
+				struct extent_io_tree *tree,
+				struct page *page, u64 start, u64 end,
+				gfp_t mask)
 {
-	u64 start = page_offset(page);
-	u64 end = start + PAGE_SIZE - 1;
 	int ret = 1;
 
 	if (test_range_bit(tree, start, end,
@@ -4607,12 +4606,12 @@ static int try_release_extent_state(struct extent_map_tree *map,
  * map records are removed
  */
 int try_release_extent_mapping(struct extent_map_tree *map,
-			       struct extent_io_tree *tree, struct page *page,
-			       gfp_t mask)
+			struct extent_io_tree *tree, struct page *page,
+			u64 start, u64 end, gfp_t mask)
 {
 	struct extent_map *em;
-	u64 start = page_offset(page);
-	u64 end = start + PAGE_SIZE - 1;
+	u64 orig_start = start;
+	u64 orig_end = end;
 
 	if (gfpflags_allow_blocking(mask) &&
 	    page->mapping->host->i_size > SZ_16M) {
@@ -4646,7 +4645,9 @@ int try_release_extent_mapping(struct extent_map_tree *map,
 			free_extent_map(em);
 		}
 	}
-	return try_release_extent_state(map, tree, page, mask);
+	return try_release_extent_state(map, tree, page,
+					orig_start, orig_end,
+					mask);
 }
 
 /*
