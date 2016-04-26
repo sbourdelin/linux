@@ -295,6 +295,7 @@ static int xhci_plat_remove(struct platform_device *dev)
 #ifdef CONFIG_PM_SLEEP
 static int xhci_plat_suspend(struct device *dev)
 {
+	int ret;
 	struct usb_hcd	*hcd = dev_get_drvdata(dev);
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
 
@@ -306,13 +307,24 @@ static int xhci_plat_suspend(struct device *dev)
 	 * reconsider this when xhci_plat_suspend enlarges its scope, e.g.,
 	 * also applies to runtime suspend.
 	 */
-	return xhci_suspend(xhci, device_may_wakeup(dev));
+	ret = xhci_suspend(xhci, device_may_wakeup(dev));
+	if (ret)
+		return ret;
+
+	clk_disable_unprepare(xhci->clk);
+
+	return ret;
 }
 
 static int xhci_plat_resume(struct device *dev)
 {
+	int ret;
 	struct usb_hcd	*hcd = dev_get_drvdata(dev);
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+
+	ret = clk_prepare_enable(xhci->clk);
+	if (ret)
+		return ret;
 
 	return xhci_resume(xhci, 0);
 }
