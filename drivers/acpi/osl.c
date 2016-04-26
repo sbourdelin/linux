@@ -136,6 +136,9 @@ static struct acpi_osi_config {
 	unsigned int	linux_enable:1;
 	unsigned int	linux_dmi:1;
 	unsigned int	linux_cmdline:1;
+	unsigned int	darwin_enable:1;
+	unsigned int	darwin_dmi:1;
+	unsigned int	darwin_cmdline:1;
 } osi_config;
 
 static u32 acpi_osi_handler(acpi_string interface, u32 supported)
@@ -148,13 +151,11 @@ static u32 acpi_osi_handler(acpi_string interface, u32 supported)
 			osi_config.linux_dmi ? " via DMI" : "");
 	}
 	if (!strcmp("Darwin", interface)) {
-		/*
-		 * Apple firmware will behave poorly if it receives positive
-		 * answers to "Darwin" and any other OS. Respond positively
-		 * to Darwin and then disable all other vendor strings.
-		 */
-		acpi_update_interfaces(ACPI_DISABLE_ALL_VENDOR_STRINGS);
-		supported = ACPI_UINT32_MAX;
+		pr_notice_once(
+			"BIOS _OSI(Darwin) query %s%s\n",
+			osi_config.darwin_enable ? "honored" : "ignored",
+			osi_config.darwin_cmdline ? " via cmdline" :
+			osi_config.darwin_dmi ? " via DMI" : "");
 	}
 
 	return supported;
@@ -1486,6 +1487,9 @@ void __init acpi_osi_setup(char *str)
 				osi->enable = false;
 			}
 			return;
+		} else if (*str == '!') {
+			osi_config.default_disabling = 0;
+			return;
 		}
 		enable = false;
 	}
@@ -1501,6 +1505,33 @@ void __init acpi_osi_setup(char *str)
 			break;
 		}
 	}
+}
+
+static void __init __acpi_osi_setup_darwin(bool enable)
+{
+	osi_config.darwin_enable = !!enable;
+	if (enable) {
+		acpi_osi_setup("!");
+		acpi_osi_setup("Darwin");
+	} else {
+		acpi_osi_setup("!!");
+		acpi_osi_setup("!Darwin");
+	}
+}
+
+static void __init acpi_osi_setup_darwin(bool enable)
+{
+	osi_config.darwin_cmdline = 1;
+	/* Override acpi_blacklisted() */
+	osi_config.darwin_dmi = 0;
+	__acpi_osi_setup_darwin(enable);
+}
+
+void __init acpi_dmi_osi_darwin(bool enable, const struct dmi_system_id *d)
+{
+	pr_notice("DMI detected to setup _OSI(\"Darwin\"): %s\n", d->ident);
+	osi_config.darwin_dmi = 1;
+	__acpi_osi_setup_darwin(enable);
 }
 
 static void __init __acpi_osi_setup_linux(bool enable)
@@ -1576,6 +1607,10 @@ static int __init osi_setup(char *str)
 		acpi_osi_setup_linux(true);
 	else if (str && !strcmp("!Linux", str))
 		acpi_osi_setup_linux(false);
+	else if (str && !strcmp("Darwin", str))
+		acpi_osi_setup_darwin(true);
+	else if (str && !strcmp("!Darwin", str))
+		acpi_osi_setup_darwin(false);
 	else
 		acpi_osi_setup(str);
 
