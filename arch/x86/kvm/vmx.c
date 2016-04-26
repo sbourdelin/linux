@@ -6351,7 +6351,7 @@ static __init int hardware_setup(void)
 		kvm_mmu_set_mask_ptes(0ull,
 			(enable_ept_ad_bits) ? VMX_EPT_ACCESS_BIT : 0ull,
 			(enable_ept_ad_bits) ? VMX_EPT_DIRTY_BIT : 0ull,
-			0ull, VMX_EPT_EXECUTABLE_MASK);
+			0ull, VMX_EPT_EXECUTABLE_MASK, 0ull);
 		ept_set_mmio_spte_mask();
 		kvm_enable_tdp();
 	} else
