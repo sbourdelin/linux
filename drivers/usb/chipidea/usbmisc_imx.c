@@ -74,12 +74,29 @@
 #define VF610_OVER_CUR_DIS		BIT(7)
 
 #define MX7D_USBNC_USB_CTRL2		0x4
+#define MX7D_USBNC_USB_CTRL2_OPMODE_OVERRIDE_EN		BIT(8)
+#define MX7D_USBNC_USB_CTRL2_OPMODE_OVERRIDE_MASK	(BIT(7) | BIT(6))
+#define MX7D_USBNC_USB_CTRL2_OPMODE(v)			(v << 6)
+#define MX7D_USBNC_USB_CTRL2_OPMODE_NON_DRIVING	MX7D_USBNC_USB_CTRL2_OPMODE(1)
+
 #define MX7D_USB_VBUS_WAKEUP_SOURCE_MASK	0x3
 #define MX7D_USB_VBUS_WAKEUP_SOURCE(v)		(v << 0)
 #define MX7D_USB_VBUS_WAKEUP_SOURCE_VBUS	MX7D_USB_VBUS_WAKEUP_SOURCE(0)
 #define MX7D_USB_VBUS_WAKEUP_SOURCE_AVALID	MX7D_USB_VBUS_WAKEUP_SOURCE(1)
 #define MX7D_USB_VBUS_WAKEUP_SOURCE_BVALID	MX7D_USB_VBUS_WAKEUP_SOURCE(2)
 #define MX7D_USB_VBUS_WAKEUP_SOURCE_SESS_END	MX7D_USB_VBUS_WAKEUP_SOURCE(3)
+
+#define MX7D_USB_OTG_PHY_CFG2_CHRG_DCDENB	BIT(3)
+#define MX7D_USB_OTG_PHY_CFG2_CHRG_VDATSRCENB0	BIT(2)
+#define MX7D_USB_OTG_PHY_CFG2_CHRG_VDATDETENB0	BIT(1)
+#define MX7D_USB_OTG_PHY_CFG2_CHRG_CHRGSEL	BIT(0)
+#define MX7D_USB_OTG_PHY_CFG2		0x34
+
+#define MX7D_USB_OTG_PHY_STATUS		0x3c
+#define MX7D_USB_OTG_PHY_STATUS_CHRGDET		BIT(29)
+#define MX7D_USB_OTG_PHY_STATUS_VBUS_VLD	BIT(3)
+#define MX7D_USB_OTG_PHY_STATUS_LINE_STATE1	BIT(1)
+#define MX7D_USB_OTG_PHY_STATUS_LINE_STATE0	BIT(0)
 
 struct usbmisc_ops {
 	/* It's called once when probe a usb device */
@@ -385,6 +402,144 @@ static int usbmisc_imx7d_init(struct imx_usbmisc_data *data)
 	return 0;
 }
 
+static void imx7d_disable_charger_detector(struct imx_usbmisc_data *data)
+{
+	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
+	unsigned long flags;
+	u32 val;
+
+	spin_lock_irqsave(&usbmisc->lock, flags);
+	val = readl(usbmisc->base + MX7D_USB_OTG_PHY_CFG2);
+	val &= ~(MX7D_USB_OTG_PHY_CFG2_CHRG_DCDENB |
+			MX7D_USB_OTG_PHY_CFG2_CHRG_VDATSRCENB0 |
+			MX7D_USB_OTG_PHY_CFG2_CHRG_VDATDETENB0 |
+			MX7D_USB_OTG_PHY_CFG2_CHRG_CHRGSEL);
+	writel(val, usbmisc->base + MX7D_USB_OTG_PHY_CFG2);
+
+	/* Set OPMODE to be 2'b00 and disable its override */
+	val = readl(usbmisc->base + MX7D_USBNC_USB_CTRL2);
+	val &= ~MX7D_USBNC_USB_CTRL2_OPMODE_OVERRIDE_MASK;
+	writel(val, usbmisc->base + MX7D_USBNC_USB_CTRL2);
+
+	val = readl(usbmisc->base + MX7D_USBNC_USB_CTRL2);
+	writel(val & ~MX7D_USBNC_USB_CTRL2_OPMODE_OVERRIDE_EN,
+			usbmisc->base + MX7D_USBNC_USB_CTRL2);
+	spin_unlock_irqrestore(&usbmisc->lock, flags);
+}
+
+static int imx7d_charger_data_contact_detect(struct imx_usbmisc_data *data)
+{
+	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
+	int i, data_pin_contact_count = 0;
+	unsigned long flags;
+	u32 val;
+
+	spin_lock_irqsave(&usbmisc->lock, flags);
+
+	/* check if vbus is valid */
+	val = readl(usbmisc->base + MX7D_USB_OTG_PHY_STATUS);
+	if (!(val & MX7D_USB_OTG_PHY_STATUS_VBUS_VLD)) {
+		dev_err(data->dev, "vbus is error\n");
+		spin_unlock_irqrestore(&usbmisc->lock, flags);
+		return -EINVAL;
+	}
+
+	/*
+	 * - Do not check whether a charger is connected to the USB port
+	 * - Check whether the USB plug has been in contact with each other
+	 */
+	val = readl(usbmisc->base + MX7D_USB_OTG_PHY_CFG2);
+	writel(val | MX7D_USB_OTG_PHY_CFG2_CHRG_DCDENB,
+			usbmisc->base + MX7D_USB_OTG_PHY_CFG2);
+
+	spin_unlock_irqrestore(&usbmisc->lock, flags);
+
+	/* Check if plug is connected */
+	for (i = 0; i < 100; i = i + 1) {
+		val = readl(usbmisc->base + MX7D_USB_OTG_PHY_STATUS);
+		if (!(val & MX7D_USB_OTG_PHY_STATUS_LINE_STATE0)) {
+			if (data_pin_contact_count++ > 5)
+				/* Data pin makes contact */
+				break;
+			else
+				usleep_range(5000, 10000);
+		} else {
+			data_pin_contact_count = 0;
+			usleep_range(5000, 6000);
+		}
+	}
+
+	if (i == 100) {
+		dev_err(data->dev,
+			"VBUS is coming from a dedicated power supply.\n");
+		imx7d_disable_charger_detector(data);
+		return -ENXIO;
+	}
+
+	return 0;
+}
+
+static enum usb_charger_type usbmisc_imx7d_charger_detect(
+				struct imx_usbmisc_data *data)
+{
+	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
+	enum usb_charger_type ret = UNKNOWN_TYPE;
+	unsigned long flags;
+	u32 val;
+
+	if (imx7d_charger_data_contact_detect(data))
+		return ret;
+
+	spin_lock_irqsave(&usbmisc->lock, flags);
+	/* Set OPMODE to be non-driving mode */
+	val = readl(usbmisc->base + MX7D_USBNC_USB_CTRL2);
+	val &= ~MX7D_USBNC_USB_CTRL2_OPMODE_OVERRIDE_MASK;
+	val |= MX7D_USBNC_USB_CTRL2_OPMODE_NON_DRIVING;
+	writel(val, usbmisc->base + MX7D_USBNC_USB_CTRL2);
+
+	val = readl(usbmisc->base + MX7D_USBNC_USB_CTRL2);
+	writel(val | MX7D_USBNC_USB_CTRL2_OPMODE_OVERRIDE_EN,
+			usbmisc->base + MX7D_USBNC_USB_CTRL2);
+
+	/* Do not check data contact */
+	val = readl(usbmisc->base + MX7D_USB_OTG_PHY_CFG2);
+	writel(val | MX7D_USB_OTG_PHY_CFG2_CHRG_VDATSRCENB0 |
+			MX7D_USB_OTG_PHY_CFG2_CHRG_VDATDETENB0,
+			usbmisc->base + MX7D_USB_OTG_PHY_CFG2);
+	spin_unlock_irqrestore(&usbmisc->lock, flags);
+
+	usleep_range(1000, 2000);
+
+	/* Check if it is a charger */
+	val = readl(usbmisc->base + MX7D_USB_OTG_PHY_STATUS);
+	if (!(val & MX7D_USB_OTG_PHY_STATUS_CHRGDET)) {
+		dev_dbg(data->dev, "It is a stardard downstream port\n");
+		ret = SDP_TYPE;
+	}
+
+	imx7d_disable_charger_detector(data);
+
+	return ret;
+}
+
+static enum usb_charger_type usbmisc_imx7d_charger_secondary_detect(
+					struct imx_usbmisc_data *data)
+{
+	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
+	enum usb_charger_type ret = UNKNOWN_TYPE;
+	int val;
+
+	msleep(80);
+
+	val = readl(usbmisc->base + MX7D_USB_OTG_PHY_STATUS);
+	if (val & MX7D_USB_OTG_PHY_STATUS_LINE_STATE1)
+		ret = DCP_TYPE;
+	else
+		ret = CDP_TYPE;
+
+	return ret;
+}
+
 static const struct usbmisc_ops imx25_usbmisc_ops = {
 	.init = usbmisc_imx25_init,
 	.post = usbmisc_imx25_post,
@@ -415,6 +570,8 @@ static const struct usbmisc_ops imx6sx_usbmisc_ops = {
 static const struct usbmisc_ops imx7d_usbmisc_ops = {
 	.init = usbmisc_imx7d_init,
 	.set_wakeup = usbmisc_imx7d_set_wakeup,
+	.charger_detect = usbmisc_imx7d_charger_detect,
+	.charger_secondary_detect = usbmisc_imx7d_charger_secondary_detect,
 };
 
 int imx_usbmisc_init(struct imx_usbmisc_data *data)
@@ -524,6 +681,10 @@ static const struct of_device_id usbmisc_imx_dt_ids[] = {
 	{
 		.compatible = "fsl,imx6ul-usbmisc",
 		.data = &imx6sx_usbmisc_ops,
+	},
+	{
+		.compatible = "fsl,imx7d-usbmisc",
+		.data = &imx7d_usbmisc_ops,
 	},
 	{ /* sentinel */ }
 };
