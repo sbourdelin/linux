@@ -367,7 +367,12 @@ static ssize_t btrfs_label_show(struct kobject *kobj,
 {
 	struct btrfs_fs_info *fs_info = to_fs_info(kobj);
 	char *label = fs_info->super_copy->label;
-	return snprintf(buf, PAGE_SIZE, label[0] ? "%s\n" : "%s", label);
+
+	spin_lock(&fs_info->super_lock);
+	snprintf(buf, PAGE_SIZE, label[0] ? "%s\n" : "%s", label);
+	spin_unlock(&fs_info->super_lock);
+
+	return buf;
 }
 
 static ssize_t btrfs_label_store(struct kobject *kobj,
