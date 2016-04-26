@@ -156,6 +156,15 @@ struct dma_ops_domain {
 	struct aperture_range *aperture[APERTURE_MAX_RANGES];
 };
 
+/*
+ * Support for memory encryption. If memory encryption is supported, then an
+ * override to this function will be provided.
+ */
+unsigned long __weak amd_iommu_get_me_mask(void)
+{
+	return 0;
+}
+
 /****************************************************************************
  *
  * Helper functions
@@ -2612,6 +2621,7 @@ static dma_addr_t __map_single(struct device *dev,
 	if (address == DMA_ERROR_CODE)
 		goto out;
 
+	paddr |= amd_iommu_get_me_mask();
 	start = address;
 	for (i = 0; i < pages; ++i) {
 		ret = dma_ops_domain_map(dma_dom, start, paddr, dir);

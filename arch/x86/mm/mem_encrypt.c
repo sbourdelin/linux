@@ -179,6 +179,11 @@ void __init mem_encrypt_init(void)
 	swiotlb_clear_encryption();
 }
 
+unsigned long amd_iommu_get_me_mask(void)
+{
+	return sme_me_mask;
+}
+
 unsigned long swiotlb_get_me_mask(void)
 {
 	return sme_me_mask;

@@ -39,6 +39,8 @@ void __init sme_early_init(void);
 /* Architecture __weak replacement functions */
 void __init mem_encrypt_init(void);
 
+unsigned long amd_iommu_get_me_mask(void);
+
 unsigned long swiotlb_get_me_mask(void);
 void swiotlb_set_mem_dec(void *vaddr, unsigned long size);
 
