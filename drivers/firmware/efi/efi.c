@@ -76,6 +76,16 @@ static int __init parse_efi_cmdline(char *str)
 }
 early_param("efi", parse_efi_cmdline);
 
+/*
+ * If memory encryption is supported, then an override to this function
+ * will be provided.
+ */
+void __weak __init *efi_me_early_memremap(resource_size_t phys_addr,
+					  unsigned long size)
+{
+	return early_memremap(phys_addr, size);
+}
+
 struct kobject *efi_kobj;
 
 /*
@@ -289,9 +299,9 @@ int __init efi_mem_desc_lookup(u64 phys_addr, efi_memory_desc_t *out_md)
 		 * So just always get our own virtual map on the CPU.
 		 *
 		 */
-		md = early_memremap(p, sizeof (*md));
+		md = efi_me_early_memremap(p, sizeof (*md));
 		if (!md) {
-			pr_err_once("early_memremap(%pa, %zu) failed.\n",
+			pr_err_once("efi_me_early_memremap(%pa, %zu) failed.\n",
 				    &p, sizeof (*md));
 			return -ENOMEM;
 		}
@@ -431,8 +441,8 @@ int __init efi_config_init(efi_config_table_type_t *arch_tables)
 	/*
 	 * Let's see what config tables the firmware passed to us.
 	 */
-	config_tables = early_memremap(efi.systab->tables,
-				       efi.systab->nr_tables * sz);
+	config_tables = efi_me_early_memremap(efi.systab->tables,
+					      efi.systab->nr_tables * sz);
 	if (config_tables == NULL) {
 		pr_err("Could not map Configuration table!\n");
 		return -ENOMEM;

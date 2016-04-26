@@ -53,6 +53,7 @@
 #include <asm/x86_init.h>
 #include <asm/rtc.h>
 #include <asm/uv/uv.h>
+#include <asm/mem_encrypt.h>
 
 #define EFI_DEBUG
 
@@ -261,12 +262,12 @@ static int __init efi_systab_init(void *phys)
 		u64 tmp = 0;
 
 		if (efi_setup) {
-			data = early_memremap(efi_setup, sizeof(*data));
+			data = sme_early_memremap(efi_setup, sizeof(*data));
 			if (!data)
 				return -ENOMEM;
 		}
-		systab64 = early_memremap((unsigned long)phys,
-					 sizeof(*systab64));
+		systab64 = sme_early_memremap((unsigned long)phys,
+					      sizeof(*systab64));
 		if (systab64 == NULL) {
 			pr_err("Couldn't map the system table!\n");
 			if (data)
@@ -314,8 +315,8 @@ static int __init efi_systab_init(void *phys)
 	} else {
 		efi_system_table_32_t *systab32;
 
-		systab32 = early_memremap((unsigned long)phys,
-					 sizeof(*systab32));
+		systab32 = sme_early_memremap((unsigned long)phys,
+					      sizeof(*systab32));
 		if (systab32 == NULL) {
 			pr_err("Couldn't map the system table!\n");
 			return -ENOMEM;
@@ -361,8 +362,8 @@ static int __init efi_runtime_init32(void)
 {
 	efi_runtime_services_32_t *runtime;
 
-	runtime = early_memremap((unsigned long)efi.systab->runtime,
-			sizeof(efi_runtime_services_32_t));
+	runtime = sme_early_memremap((unsigned long)efi.systab->runtime,
+				     sizeof(efi_runtime_services_32_t));
 	if (!runtime) {
 		pr_err("Could not map the runtime service table!\n");
 		return -ENOMEM;
@@ -385,8 +386,8 @@ static int __init efi_runtime_init64(void)
 {
 	efi_runtime_services_64_t *runtime;
 
-	runtime = early_memremap((unsigned long)efi.systab->runtime,
-			sizeof(efi_runtime_services_64_t));
+	runtime = sme_early_memremap((unsigned long)efi.systab->runtime,
+				     sizeof(efi_runtime_services_64_t));
 	if (!runtime) {
 		pr_err("Could not map the runtime service table!\n");
 		return -ENOMEM;
@@ -444,8 +445,8 @@ static int __init efi_memmap_init(void)
 		return 0;
 
 	/* Map the EFI memory map */
-	memmap.map = early_memremap((unsigned long)memmap.phys_map,
-				   memmap.nr_map * memmap.desc_size);
+	memmap.map = sme_early_memremap((unsigned long)memmap.phys_map,
+					memmap.nr_map * memmap.desc_size);
 	if (memmap.map == NULL) {
 		pr_err("Could not map the memory map!\n");
 		return -ENOMEM;
@@ -490,7 +491,7 @@ void __init efi_init(void)
 	/*
 	 * Show what we know for posterity
 	 */
-	c16 = tmp = early_memremap(efi.systab->fw_vendor, 2);
+	c16 = tmp = sme_early_memremap(efi.systab->fw_vendor, 2);
 	if (c16) {
 		for (i = 0; i < sizeof(vendor) - 1 && *c16; ++i)
 			vendor[i] = *c16++;
@@ -690,6 +691,7 @@ static void *realloc_pages(void *old_memmap, int old_shift)
 	ret = (void *)__get_free_pages(GFP_KERNEL, old_shift + 1);
 	if (!ret)
 		goto out;
+	sme_set_mem_dec(ret, PAGE_SIZE << (old_shift + 1));
 
 	/*
 	 * A first-time allocation doesn't have anything to copy.

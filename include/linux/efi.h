@@ -957,6 +957,9 @@ extern void __init efi_fake_memmap(void);
 static inline void efi_fake_memmap(void) { }
 #endif
 
+extern void __weak __init *efi_me_early_memremap(resource_size_t phys_addr,
+						 unsigned long size);
+
 /* Iterate through an efi_memory_map */
 #define for_each_efi_memory_desc(m, md)					   \
 	for ((md) = (m)->map;						   \

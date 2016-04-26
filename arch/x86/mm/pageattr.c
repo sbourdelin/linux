@@ -1731,6 +1731,81 @@ int set_memory_4k(unsigned long addr, int numpages)
 					__pgprot(0), 1, 0, NULL);
 }
 
+static int __set_memory_enc_dec(struct cpa_data *cpa)
+{
+	unsigned long addr;
+	int numpages;
+	int ret;
+
+	if (*cpa->vaddr & ~PAGE_MASK) {
+		*cpa->vaddr &= PAGE_MASK;
+
+		/* People should not be passing in unaligned addresses */
+		WARN_ON_ONCE(1);
+	}
+
+	addr = *cpa->vaddr;
+	numpages = cpa->numpages;
+
+	/* Must avoid aliasing mappings in the highmem code */
+	kmap_flush_unused();
+	vm_unmap_aliases();
+
+	ret = __change_page_attr_set_clr(cpa, 1);
+
+	/* Check whether we really changed something */
+	if (!(cpa->flags & CPA_FLUSHTLB))
+		goto out;
+
+	/*
+	 * On success we use CLFLUSH, when the CPU supports it to
+	 * avoid the WBINVD.
+	 */
+	if (!ret && static_cpu_has(X86_FEATURE_CLFLUSH))
+		cpa_flush_range(addr, numpages, 1);
+	else
+		cpa_flush_all(1);
+
+out:
+	return ret;
+}
+
+int set_memory_enc(unsigned long addr, int numpages)
+{
+	struct cpa_data cpa;
+
+	if (!sme_me_mask)
+		return 0;
+
+	memset(&cpa, 0, sizeof(cpa));
+	cpa.vaddr = &addr;
+	cpa.numpages = numpages;
+	cpa.mask_set = __pgprot(_PAGE_ENC);
+	cpa.mask_clr = __pgprot(0);
+	cpa.pgd = init_mm.pgd;
+
+	return __set_memory_enc_dec(&cpa);
+}
+EXPORT_SYMBOL(set_memory_enc);
+
+int set_memory_dec(unsigned long addr, int numpages)
+{
+	struct cpa_data cpa;
+
+	if (!sme_me_mask)
+		return 0;
+
+	memset(&cpa, 0, sizeof(cpa));
+	cpa.vaddr = &addr;
+	cpa.numpages = numpages;
+	cpa.mask_set = __pgprot(0);
+	cpa.mask_clr = __pgprot(_PAGE_ENC);
+	cpa.pgd = init_mm.pgd;
+
+	return __set_memory_enc_dec(&cpa);
+}
+EXPORT_SYMBOL(set_memory_dec);
+
 int set_pages_uc(struct page *page, int numpages)
 {
 	unsigned long addr = (unsigned long)page_address(page);

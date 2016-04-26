@@ -13,6 +13,7 @@
 #include <linux/dmi.h>
 #include <asm/efi.h>
 #include <asm/uv/uv.h>
+#include <asm/mem_encrypt.h>
 
 #define EFI_MIN_RESERVE 5120
 
@@ -265,6 +266,13 @@ void __init efi_free_boot_services(void)
 		if (md->attribute & EFI_MEMORY_RUNTIME)
 			continue;
 
+		/*
+		 * Change the mapping to encrypted memory before freeing.
+		 * This insures any future allocations of this mapped area
+		 * are used encrypted.
+		 */
+		sme_set_mem_enc(__va(start), size);
+
 		free_bootmem_late(start, size);
 	}
 
@@ -292,7 +300,7 @@ int __init efi_reuse_config(u64 tables, int nr_tables)
 	if (!efi_enabled(EFI_64BIT))
 		return 0;
 
-	data = early_memremap(efi_setup, sizeof(*data));
+	data = sme_early_memremap(efi_setup, sizeof(*data));
 	if (!data) {
 		ret = -ENOMEM;
 		goto out;
@@ -303,7 +311,7 @@ int __init efi_reuse_config(u64 tables, int nr_tables)
 
 	sz = sizeof(efi_config_table_64_t);
 
-	p = tablep = early_memremap(tables, nr_tables * sz);
+	p = tablep = sme_early_memremap(tables, nr_tables * sz);
 	if (!p) {
 		pr_err("Could not map Configuration table!\n");
 		ret = -ENOMEM;

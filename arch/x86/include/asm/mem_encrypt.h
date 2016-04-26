@@ -23,12 +23,22 @@ extern unsigned long sme_me_mask;
 
 u8 sme_get_me_loss(void);
 
+int sme_set_mem_enc(void *vaddr, unsigned long size);
+int sme_set_mem_dec(void *vaddr, unsigned long size);
+
 void __init sme_early_mem_enc(resource_size_t paddr,
 			      unsigned long size);
 void __init sme_early_mem_dec(resource_size_t paddr,
 			      unsigned long size);
 
+void __init *sme_early_memremap(resource_size_t paddr,
+				unsigned long size);
+
 void __init sme_early_init(void);
+
+/* Architecture __weak replacement functions */
+void __init *efi_me_early_memremap(resource_size_t paddr,
+				   unsigned long size);
 
 #define __sme_pa(x)		(__pa((x)) | sme_me_mask)
 #define __sme_pa_nodebug(x)	(__pa_nodebug((x)) | sme_me_mask)
@@ -40,6 +50,16 @@ void __init sme_early_init(void);
 #define sme_me_mask		0UL
 
 static inline u8 sme_get_me_loss(void)
+{
+	return 0;
+}
+
+static inline int sme_set_mem_enc(void *vaddr, unsigned long size)
+{
+	return 0;
+}
+
+static inline int sme_set_mem_dec(void *vaddr, unsigned long size)
 {
 	return 0;
 }
@@ -62,6 +82,8 @@ static inline void __init sme_early_init(void)
 #define __sme_pa_nodebug	__pa_nodebug
 
 #define __sme_va		__va
+
+#define sme_early_memremap	early_memremap
 
 #endif	/* CONFIG_AMD_MEM_ENCRYPT */
 

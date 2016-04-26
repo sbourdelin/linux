@@ -424,7 +424,7 @@ static void __init parse_setup_data(void)
 	while (pa_data) {
 		u32 data_len, data_type;
 
-		data = early_memremap(pa_data, sizeof(*data));
+		data = sme_early_memremap(pa_data, sizeof(*data));
 		data_len = data->len + sizeof(struct setup_data);
 		data_type = data->type;
 		pa_next = data->next;
@@ -457,7 +457,7 @@ static void __init e820_reserve_setup_data(void)
 		return;
 
 	while (pa_data) {
-		data = early_memremap(pa_data, sizeof(*data));
+		data = sme_early_memremap(pa_data, sizeof(*data));
 		e820_update_range(pa_data, sizeof(*data)+data->len,
 			 E820_RAM, E820_RESERVED_KERN);
 		pa_data = data->next;
@@ -477,7 +477,7 @@ static void __init memblock_x86_reserve_range_setup_data(void)
 
 	pa_data = boot_params.hdr.setup_data;
 	while (pa_data) {
-		data = early_memremap(pa_data, sizeof(*data));
+		data = sme_early_memremap(pa_data, sizeof(*data));
 		memblock_reserve(pa_data, sizeof(*data) + data->len);
 		pa_data = data->next;
 		early_memunmap(data, sizeof(*data));

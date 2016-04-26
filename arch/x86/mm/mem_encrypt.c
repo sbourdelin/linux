@@ -14,11 +14,54 @@
 #include <linux/mm.h>
 
 #include <asm/mem_encrypt.h>
+#include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 #include <asm/fixmap.h>
 
 /* Buffer used for early in-place encryption by BSP, no locking needed */
 static char me_early_buffer[PAGE_SIZE] __aligned(PAGE_SIZE);
+
+int sme_set_mem_enc(void *vaddr, unsigned long size)
+{
+	unsigned long addr, numpages;
+
+	if (!sme_me_mask)
+		return 0;
+
+	addr = (unsigned long)vaddr & PAGE_MASK;
+	numpages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+
+	/*
+	 * The set_memory_xxx functions take an integer for numpages, make
+	 * sure it doesn't exceed that.
+	 */
+	if (numpages > INT_MAX)
+		return -EINVAL;
+
+	return set_memory_enc(addr, numpages);
+}
+EXPORT_SYMBOL_GPL(sme_set_mem_enc);
+
+int sme_set_mem_dec(void *vaddr, unsigned long size)
+{
+	unsigned long addr, numpages;
+
+	if (!sme_me_mask)
+		return 0;
+
+	addr = (unsigned long)vaddr & PAGE_MASK;
+	numpages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+
+	/*
+	 * The set_memory_xxx functions take an integer for numpages, make
+	 * sure it doesn't exceed that.
+	 */
+	if (numpages > INT_MAX)
+		return -EINVAL;
+
+	return set_memory_dec(addr, numpages);
+}
+EXPORT_SYMBOL_GPL(sme_set_mem_dec);
 
 void __init sme_early_mem_enc(resource_size_t paddr, unsigned long size)
 {
@@ -104,6 +147,12 @@ void __init sme_early_mem_dec(resource_size_t paddr, unsigned long size)
 	}
 }
 
+void __init *sme_early_memremap(resource_size_t paddr,
+				unsigned long size)
+{
+	return early_memremap_dec(paddr, size);
+}
+
 void __init sme_early_init(void)
 {
 	unsigned int i;
@@ -116,4 +165,11 @@ void __init sme_early_init(void)
 	/* Update the protection map with memory encryption mask */
 	for (i = 0; i < ARRAY_SIZE(protection_map); i++)
 		protection_map[i] = __pgprot(pgprot_val(protection_map[i]) | sme_me_mask);
+}
+
+/* Architecture __weak replacement functions */
+void __init *efi_me_early_memremap(resource_size_t paddr,
+				   unsigned long size)
+{
+	return sme_early_memremap(paddr, size);
 }
