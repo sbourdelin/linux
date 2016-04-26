@@ -32,6 +32,11 @@ struct probe_cache {
 	struct list_head list;
 };
 
+int probe_cache_entry__get_event(struct probe_cache_entry *entry,
+				 struct probe_trace_event **tevs);
+#define for_each_probe_cache_entry(entry, pcache) \
+	list_for_each_entry(entry, &pcache->list, list)
+
 struct probe_cache *probe_cache__new(const char *target);
 int probe_cache__add_entry(struct probe_cache *pcache,
 			   struct perf_probe_event *pev,
