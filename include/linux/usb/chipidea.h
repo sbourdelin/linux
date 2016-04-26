@@ -55,10 +55,28 @@ struct ci_hdrc_platform_data {
 #define CI_HDRC_OVERRIDE_AHB_BURST	BIT(9)
 #define CI_HDRC_OVERRIDE_TX_BURST	BIT(10)
 #define CI_HDRC_OVERRIDE_RX_BURST	BIT(11)
+#define CI_HDRC_PULL_DP_FOR_CHARGER	BIT(12)
 	enum usb_dr_mode	dr_mode;
 #define CI_HDRC_CONTROLLER_RESET_EVENT		0
 #define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
 	void	(*notify_event) (struct ci_hdrc *ci, unsigned event);
+	/*
+	 * charger detection whole process, or first stage if have to
+	 * split it to be 2 stages, secondary stage will be handled by
+	 * usb_charger_secondary_detect.
+	 */
+	enum usb_charger_type (*usb_charger_detect)(struct ci_hdrc *ci);
+	/*
+	 * Set this flag if pull up and down DP line is required
+	 * before and after secondary detection.
+	 */
+	bool	pull_dp_for_charger;
+	/*
+	 * usb charger secondary detection phrase if need split it
+	 * out of usb_charger_detection.
+	 */
+	enum usb_charger_type (*usb_charger_secondary_detect)
+					(struct ci_hdrc *ci);
 	struct regulator	*reg_vbus;
 	struct usb_otg_caps	ci_otg_caps;
 	bool			tpl_support;

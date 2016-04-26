@@ -1510,6 +1510,37 @@ static const struct usb_ep_ops usb_ep_ops = {
 /******************************************************************************
  * GADGET block
  *****************************************************************************/
+static enum usb_charger_type ci_usb_charger_detect(struct usb_charger *charger)
+{
+	struct ci_hdrc *ci;
+	enum usb_charger_type ret = UNKNOWN_TYPE;
+
+	if (!charger || !charger->gadget)
+		return ret;
+
+	ci = container_of(charger->gadget, struct ci_hdrc, gadget);
+	if (ci->vbus_active) {
+		if (ci->platdata->usb_charger_detect) {
+			ret = ci->platdata->usb_charger_detect(ci);
+			if (ret != UNKNOWN_TYPE)
+				return ret;
+		}
+
+		if (ci->platdata->pull_dp_for_charger) {
+			hw_device_reset(ci);
+			hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
+		}
+
+		if (ci->platdata->usb_charger_secondary_detect)
+			ret = ci->platdata->usb_charger_secondary_detect(ci);
+
+		if (ci->platdata->pull_dp_for_charger)
+			hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
+	}
+
+	return ret;
+}
+
 static int ci_udc_vbus_session(struct usb_gadget *_gadget, int is_active)
 {
 	struct ci_hdrc *ci = container_of(_gadget, struct ci_hdrc, gadget);
@@ -1521,6 +1552,9 @@ static int ci_udc_vbus_session(struct usb_gadget *_gadget, int is_active)
 	if (ci->driver)
 		gadget_ready = 1;
 	spin_unlock_irqrestore(&ci->lock, flags);
+
+	if (_gadget->charger && _gadget->charger->charger_detect && is_active)
+		usb_charger_detect_type(_gadget->charger);
 
 	if (gadget_ready) {
 		if (is_active) {
@@ -1922,6 +1956,9 @@ static int udc_start(struct ci_hdrc *ci)
 	if (retval)
 		goto destroy_eps;
 
+	if (ci->gadget.charger && ci->platdata->usb_charger_detect)
+		ci->gadget.charger->charger_detect = ci_usb_charger_detect;
+
 	pm_runtime_no_callbacks(&ci->gadget.dev);
 	pm_runtime_enable(&ci->gadget.dev);
 
@@ -1945,6 +1982,9 @@ void ci_hdrc_gadget_destroy(struct ci_hdrc *ci)
 {
 	if (!ci->roles[CI_ROLE_GADGET])
 		return;
+
+	if (ci->gadget.charger)
+		ci->gadget.charger->charger_detect = NULL;
 
 	usb_del_gadget_udc(&ci->gadget);
 
