@@ -23,5 +23,8 @@ struct imx_usbmisc_data {
 int imx_usbmisc_init(struct imx_usbmisc_data *);
 int imx_usbmisc_init_post(struct imx_usbmisc_data *);
 int imx_usbmisc_set_wakeup(struct imx_usbmisc_data *, bool);
+enum usb_charger_type imx_usbmisc_charger_detect(struct imx_usbmisc_data *data);
+enum usb_charger_type imx_usbmisc_charger_secondary_detect(
+						struct imx_usbmisc_data *data);
 
 #endif /* __DRIVER_USB_CHIPIDEA_CI_HDRC_IMX_H */

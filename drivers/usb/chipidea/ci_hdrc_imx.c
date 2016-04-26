@@ -244,6 +244,39 @@ static void imx_disable_unprepare_clks(struct device *dev)
 	}
 }
 
+static enum usb_charger_type imx_usb_charger_detect(struct ci_hdrc *ci)
+{
+	struct device *dev = ci->dev->parent;
+	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
+	struct imx_usbmisc_data *mdata = data->usbmisc_data;
+	int ret = UNKNOWN_TYPE;
+
+	if (!mdata || !ci->gadget.charger)
+		return ret;
+
+	if (ci->vbus_active)
+		ret = imx_usbmisc_charger_detect(mdata);
+
+	return ret;
+}
+
+static enum usb_charger_type
+	imx_usb_charger_secondary_detect(struct ci_hdrc *ci)
+{
+	struct device *dev = ci->dev->parent;
+	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
+	struct imx_usbmisc_data *mdata = data->usbmisc_data;
+	int ret = UNKNOWN_TYPE;
+
+	if (!mdata || !ci->gadget.charger)
+		return ret;
+
+	if (ci->vbus_active)
+		ret = imx_usbmisc_charger_secondary_detect(mdata);
+
+	return ret;
+}
+
 static int ci_hdrc_imx_probe(struct platform_device *pdev)
 {
 	struct ci_hdrc_imx_data *data;
@@ -254,6 +287,7 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
 	int ret;
 	const struct of_device_id *of_id;
 	const struct ci_hdrc_imx_platform_flag *imx_platform_flag;
+	struct device_node *np = pdev->dev.of_node;
 
 	of_id = of_match_device(ci_hdrc_imx_dt_ids, &pdev->dev);
 	if (!of_id)
@@ -291,6 +325,16 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
 	pdata.flags |= imx_platform_flag->flags;
 	if (pdata.flags & CI_HDRC_SUPPORTS_RUNTIME_PM)
 		data->supports_runtime_pm = true;
+
+	if (of_find_property(np, "usb-charger-detection", NULL) &&
+							data->usbmisc_data) {
+		pdata.usb_charger_detect = imx_usb_charger_detect;
+		if (imx_platform_flag->flags & CI_HDRC_PULL_DP_FOR_CHARGER) {
+			pdata.pull_dp_for_charger = true;
+			pdata.usb_charger_secondary_detect =
+					imx_usb_charger_secondary_detect;
+		}
+	}
 
 	ret = imx_usbmisc_init(data->usbmisc_data);
 	if (ret) {

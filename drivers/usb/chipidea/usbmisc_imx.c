@@ -14,6 +14,7 @@
 #include <linux/err.h>
 #include <linux/io.h>
 #include <linux/delay.h>
+#include <linux/usb/charger.h>
 
 #include "ci_hdrc_imx.h"
 
@@ -87,6 +88,9 @@ struct usbmisc_ops {
 	int (*post)(struct imx_usbmisc_data *data);
 	/* It's called when we need to enable/disable usb wakeup */
 	int (*set_wakeup)(struct imx_usbmisc_data *data, bool enabled);
+	enum usb_charger_type (*charger_detect)(struct imx_usbmisc_data *data);
+	enum usb_charger_type (*charger_secondary_detect)
+				(struct imx_usbmisc_data *data);
 };
 
 struct imx_usbmisc {
@@ -454,6 +458,35 @@ int imx_usbmisc_set_wakeup(struct imx_usbmisc_data *data, bool enabled)
 	return usbmisc->ops->set_wakeup(data, enabled);
 }
 EXPORT_SYMBOL_GPL(imx_usbmisc_set_wakeup);
+
+enum usb_charger_type imx_usbmisc_charger_detect(struct imx_usbmisc_data *data)
+{
+	struct imx_usbmisc *usbmisc;
+
+	if (!data)
+		return -EINVAL;
+
+	usbmisc = dev_get_drvdata(data->dev);
+	if (!usbmisc->ops->charger_detect)
+		return -EINVAL;
+	return usbmisc->ops->charger_detect(data);
+}
+EXPORT_SYMBOL_GPL(imx_usbmisc_charger_detect);
+
+enum usb_charger_type imx_usbmisc_charger_secondary_detect(
+				struct imx_usbmisc_data *data)
+{
+	struct imx_usbmisc *usbmisc;
+
+	if (!data)
+		return -EINVAL;
+
+	usbmisc = dev_get_drvdata(data->dev);
+	if (!usbmisc->ops->charger_secondary_detect)
+		return -EINVAL;
+	return usbmisc->ops->charger_secondary_detect(data);
+}
+EXPORT_SYMBOL_GPL(imx_usbmisc_charger_secondary_detect);
 
 static const struct of_device_id usbmisc_imx_dt_ids[] = {
 	{
