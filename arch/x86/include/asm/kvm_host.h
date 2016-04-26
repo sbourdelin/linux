@@ -71,6 +71,7 @@
 #define KVM_REQ_HV_RESET          28
 #define KVM_REQ_HV_EXIT           29
 #define KVM_REQ_HV_STIMER         30
+#define KVM_REQ_EXIT_DIRTY_LOG_FULL 31
 
 #define CR0_RESERVED_BITS                                               \
 	(~(unsigned long)(X86_CR0_PE | X86_CR0_MP | X86_CR0_EM | X86_CR0_TS \

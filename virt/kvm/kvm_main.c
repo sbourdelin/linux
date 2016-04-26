@@ -2006,6 +2006,25 @@ static void mark_page_dirty_in_slot(struct kvm_memory_slot *memslot,
 	}
 }
 
+static void check_dirty_trigger(struct kvm *kvm, struct kvm_vcpu *vcpu,
+				int count)
+{
+	if (count > kvm->mt.dirty_trigger) {
+		/*
+		* Request vcpu exits, but if interrupts are disabled, we have
+		* to defer the requests because smp_call_xxx may deadlock when
+		* called that way.
+		*/
+		if (vcpu && irqs_disabled()) {
+			vcpu->need_exit = 1;
+		} else {
+			WARN_ON(irqs_disabled());
+			kvm_make_all_cpus_request(kvm,
+			KVM_REQ_EXIT_DIRTY_LOG_FULL);
+		}
+	}
+}
+
 /*
  * We have some new dirty pages for our sublist waiter.  Enough to merit
  * waking it up?
@@ -2079,6 +2098,7 @@ static void mt_mark_page_dirty(struct kvm *kvm, struct kvm_memory_slot *slot,
 		if ((gfnlist->dirty_index % DIRTY_GFN_ADD_GRANULARITY) == 0) {
 			spin_lock(&kvm->mt.lock);
 			kvm->mt.tot_pages += DIRTY_GFN_ADD_GRANULARITY;
+			check_dirty_trigger(kvm, vcpu, kvm->mt.tot_pages);
 			mt_sw_add_pages(kvm);
 			spin_unlock(&kvm->mt.lock);
 		}
@@ -2432,6 +2452,8 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
 	vcpu = kvm_arch_vcpu_create(kvm, id);
 	if (IS_ERR(vcpu))
 		return PTR_ERR(vcpu);
+
+	vcpu->need_exit = false;
 
 	preempt_notifier_init(&vcpu->preempt_notifier, &kvm_preempt_ops);
 
@@ -3627,7 +3649,17 @@ static int kvm_vm_ioctl_mt_sublist_fetch(struct kvm *kvm,
 
 static int kvm_vm_ioctl_mt_dirty_trigger(struct kvm *kvm, int dirty_trigger)
 {
-	return -EINVAL;
+	if (!kvm->mt.gfn_list.dirty_gfns)
+		return -EINVAL;
+
+	if (kvm->mt.gfn_list.max_dirty < dirty_trigger)
+		return -EINVAL;
+
+	kvm->mt.dirty_trigger = dirty_trigger;
+
+	check_dirty_trigger(kvm, NULL, kvm->mt.tot_pages);
+
+	return 0;
 }
 
 static long kvm_vm_ioctl(struct file *filp,

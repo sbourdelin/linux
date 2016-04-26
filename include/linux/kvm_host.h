@@ -257,6 +257,7 @@ struct kvm_vcpu {
 	} spin_loop;
 #endif
 	bool preempted;
+	bool need_exit;
 	struct kvm_vcpu_arch arch;
 };
 

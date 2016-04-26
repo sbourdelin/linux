@@ -6489,6 +6489,11 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 			r = 1;
 			goto out;
 		}
+		if (kvm_check_request(KVM_REQ_EXIT_DIRTY_LOG_FULL, vcpu)) {
+			vcpu->run->exit_reason = KVM_EXIT_DIRTY_LOG_FULL;
+			r = 0;
+			goto out;
+		}
 		if (kvm_check_request(KVM_REQ_STEAL_UPDATE, vcpu))
 			record_steal_time(vcpu);
 		if (kvm_check_request(KVM_REQ_SMI, vcpu))
@@ -6686,6 +6691,12 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	preempt_enable();
 
 	vcpu->srcu_idx = srcu_read_lock(&vcpu->kvm->srcu);
+
+	if (vcpu->need_exit) {
+		vcpu->need_exit = false;
+		kvm_make_all_cpus_request(vcpu->kvm,
+			KVM_REQ_EXIT_DIRTY_LOG_FULL);
+	}
 
 	/*
 	 * Profile KVM exit RIPs:
