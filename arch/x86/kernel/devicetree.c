@@ -22,6 +22,7 @@
 #include <asm/pci_x86.h>
 #include <asm/setup.h>
 #include <asm/i8259.h>
+#include <asm/mem_encrypt.h>
 
 __initdata u64 initial_dtb;
 char __initdata cmd_line[COMMAND_LINE_SIZE];
@@ -276,11 +277,12 @@ static void __init x86_flattree_get_config(void)
 
 	map_len = max(PAGE_SIZE - (initial_dtb & ~PAGE_MASK), (u64)128);
 
-	initial_boot_params = dt = early_memremap(initial_dtb, map_len);
+	initial_boot_params = dt = sme_early_memremap(initial_dtb, map_len);
 	size = of_get_flat_dt_size();
 	if (map_len < size) {
 		early_memunmap(dt, map_len);
-		initial_boot_params = dt = early_memremap(initial_dtb, size);
+		initial_boot_params = dt = sme_early_memremap(initial_dtb,
+							      size);
 		map_len = size;
 	}
 
