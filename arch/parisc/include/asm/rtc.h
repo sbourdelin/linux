@@ -12,25 +12,14 @@
 
 #ifdef __KERNEL__
 
-#include <linux/rtc.h>
+#define get_rtc_time parisc_get_rtc_time
+#define set_rtc_time parisc_set_rtc_time
+#include <asm-generic/rtc.h>
 
 #include <asm/pdc.h>
 
 #define SECS_PER_HOUR   (60 * 60)
 #define SECS_PER_DAY    (SECS_PER_HOUR * 24)
-
-
-#define RTC_PIE 0x40		/* periodic interrupt enable */
-#define RTC_AIE 0x20		/* alarm interrupt enable */
-#define RTC_UIE 0x10		/* update-finished interrupt enable */
-
-#define RTC_BATT_BAD 0x100	/* battery bad */
-
-/* some dummy definitions */
-#define RTC_SQWE 0x08		/* enable square-wave output */
-#define RTC_DM_BINARY 0x04	/* all time/date values are BCD if clear */
-#define RTC_24H 0x02		/* 24 hour mode - else hours bit 7 means pm */
-#define RTC_DST_EN 0x01	        /* auto switch DST - works f. USA only */
 
 # define __isleap(year) \
   ((year) % 4 == 0 && ((year) % 100 != 0 || (year) % 400 == 0))
@@ -44,7 +33,7 @@ static const unsigned short int __mon_yday[2][13] =
 	{ 0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366 }
 };
 
-static inline unsigned int get_rtc_time(struct rtc_time *wtime)
+static inline unsigned int parisc_get_rtc_time(struct rtc_time *wtime)
 {
 	struct pdc_tod tod_data;
 	long int days, rem, y;
@@ -96,7 +85,7 @@ static inline unsigned int get_rtc_time(struct rtc_time *wtime)
 	return RTC_24H;
 }
 
-static int set_rtc_time(struct rtc_time *wtime)
+static int parisc_set_rtc_time(struct rtc_time *wtime)
 {
 	u_int32_t secs;
 
@@ -108,23 +97,6 @@ static int set_rtc_time(struct rtc_time *wtime)
 	else
 		return 0;
 
-}
-
-static inline unsigned int get_rtc_ss(void)
-{
-	struct rtc_time h;
-
-	get_rtc_time(&h);
-	return h.tm_sec;
-}
-
-static inline int get_rtc_pll(struct rtc_pll_info *pll)
-{
-	return -EINVAL;
-}
-static inline int set_rtc_pll(struct rtc_pll_info *pll)
-{
-	return -EINVAL;
 }
 
 #endif /* __KERNEL__ */
