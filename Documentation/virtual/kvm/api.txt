@@ -3120,6 +3120,176 @@ struct kvm_reinject_control {
 pit_reinject = 0 (!reinject mode) is recommended, unless running an old
 operating system that uses the PIT for timing (e.g. Linux 2.4.x).
 
+4.99 KVM_INIT_MT
+
+Capability: basic
+Architectures: x86
+Type: vm ioctl
+Parameters: struct mt_setup (in)
+Returns: 0 on success, -1 on error
+
+/* for KVM_INIT_MT */
+struct mt_setup {
+#define KVM_MT_VERSION                  1
+struct mt_setup {
+        __u32 version;
+
+        /* which operation to perform? */
+#define KVM_MT_OP_INIT           1
+#define KVM_MT_OP_CLEANUP        2
+        __u32 op;
+
+        /*
+         * Features.
+         * 1. Avoid logging duplicate entries
+         */
+#define KVM_MT_OPTION_NO_DUPS           (1 << 2)
+
+        __u32 flags;
+
+        /* max number of dirty pages per checkpoint cycle */
+        __u32 max_dirty;
+};
+
+This instructs the memory tracking (MT) subsystem to initialize or
+cleanup memory tracking data structures. Userspace specifies the
+memory tracking version to make sure it and KVM are on the same
+page. For initialization, userspace specifies the maxinum number
+of dirty pages that is allowed per checkpoint cycle. It can tell
+KVM to avoid logging duplicate pages via 'flags', and KVM would
+create bitmap to track dirty pages.
+
+Called once during initialization.
+
+4.100 KVM_ENABLE_MT
+
+Capability: basic
+Architectures: x86
+Type: vm ioctl
+Parameters: struct mt_enable (in)
+Returns: 0 on success, -1 on error
+
+/* for KVM_ENABLE_MT */
+struct mt_enable {
+       __u32 flags;            /* 1 -> on, 0 -> off */
+};
+
+This instructs the MT subsystem to start/stop logging dirty
+VM pages. On hosts that support fault based memory tracking, KVM
+write-protects all VM pages to start dirty logging. On hosts that
+support PML, KVM clears the dirty bits for all VM pages to start
+dirty logging, and sets the dirty bits to stop dirty logging.
+
+Called once when entering/exiting live migration/checkpoint mode.
+
+4.101 KVM_PREPARE_MT_CP
+
+Capability: basic
+Architectures: x86
+Type: vm ioctl
+Parameters: struct mt_prepare_cp (in)
+Returns: 0 on success, -1 on error
+
+/* for KVM_PREPARE_MT_CP */
+struct mt_prepare_cp {
+        __s64   cpid;
+};
+
+This instructs the MT subsystem that a new checkpoint cycle is
+about to start and provides the cycle ID. The MT subsystem resets
+all the relevant variables, assuming all dirty pages have been
+fetched.
+
+Called once per checkpoint cycle.
+
+4.102 KVM_MT_SUBLIST_FETCH
+
+Capability: basic
+Architectures: x86
+Type: vm ioctl
+Parameters: struct mt_sublist_fetch_info (in/out)
+Returns: 0 on success, -1 on error
+
+/* for KVM_MT_SUBLIST_FETCH */
+struct mt_gfn_list {
+        __s32   count;
+        __u32   max_dirty;
+        __u64   *gfnlist;
+};
+
+struct mt_sublist_fetch_info {
+        struct mt_gfn_list  gfn_info;
+
+        /*
+         * flags bit defs:
+         */
+
+        /* caller sleeps until dirty count is reached */
+#define MT_FETCH_WAIT           (1 << 0)
+        /* dirty tracking is re-armed for each page in returned list */
+#define MT_FETCH_REARM          (1 << 1)
+
+        __u32 flags;
+};
+
+This fetches a subset of the current dirty pages. Userspace thread
+specifies the maximum number of dirty pages it wants to fetch via
+(struct mt_gfn_list).count. It also tells the MT subsystem if it is
+going to wait until the specified maxinum number is reached. Userspace
+thread can instruct the MT subsystem to re-arm the dirty trap for
+each page that is fetched. The dirty pages are returned to userspace
+in (struct mt_gfn_list).gfnlist, and (struct mt_gfn_list).count
+indicates the number of dirty pages that are returned.
+
+Called multiple times by multiple threads per checkpoint cycle.
+
+4.103 KVM_REARM_DIRTY_PAGES
+
+Capability: basic
+Architectures: x86
+Type: vm ioctl
+Parameters:
+Returns: 0 on success, -1 on error
+
+This instructs the MT subsystem to rearm the dirty traps for all
+the pages that were dirtied during the last checkpoint cycle.
+
+Called once per checkpoint cycle. The call is not necessary if dirty
+traps are rearmed when dirty pages are being fetched.
+
+4.104 KVM_MT_VM_QUIESCED
+
+Capability: basic
+Architectures: x86
+Type: vm ioctl
+Parameters:
+Returns: 0 on success, -1 on error
+
+This instructs the MT subsystem that the VM has been quiesced and no
+more pages will be dirtied this checkpoint cycle. The MT subsystem
+will wake up userspace threads that are waiting for new dirty pages
+to fetch, if any.
+
+Called once per checkpoint cycle.
+
+4.105 KVM_MT_DIRTY_TRIGGER
+
+Capability: basic
+Architectures: x86
+Type: vm ioctl
+Parameters: struct mt_dirty_trigger (in)
+Returns: 0 on success, -1 on error
+
+/* for KVM_MT_DIRTY_TRIGGER */
+struct mt_dirty_trigger {
+        /* force vcpus to exit when trigger is reached */
+        __u32 dirty_trigger;
+};
+
+This sets the VM exit trigger point based on dirty page count.
+
+Called once when entering live migration/checkpoint mode.
+
 5. The kvm_run structure
 ------------------------
 
