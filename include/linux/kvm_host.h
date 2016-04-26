@@ -358,6 +358,54 @@ struct kvm_memslots {
 	int used_slots;
 };
 
+struct gfn_list {
+	int max_dirty;
+	__u64 *dirty_gfns; /* slot / offset */
+	int dirty_index;
+	int fetch_index;
+	int reset_index;
+	int overflow;
+	spinlock_t lock;
+	struct mutex mtx;
+};
+
+struct vcpu_mt {
+	struct gfn_list gfn_list;
+};
+
+struct sublist_waiter {
+	wait_queue_head_t       wq;
+	spinlock_t              lock;
+	int goal;
+};
+
+#define MAX_DIRTY_PAGE_BATCH   (4096/sizeof(int))
+
+struct kvm_mt {
+	long            cp_id;
+	int             active;
+	int             mode;
+	spinlock_t      lock;
+	u64             max_gfn;
+	int             quiesced;
+	int             allow_blocking;
+	void            *bmap;
+	long            bmapsz;
+	int             dirty_trigger;
+
+	struct gfn_list gfn_list;
+
+	int             tot_pages;
+	int             fetch_count;
+
+	struct mutex    sublist_mtx;
+	struct sublist_waiter sw;
+	int             sw_busy;
+	spinlock_t      sw_lock;
+
+	__u64           *gfn_buf;
+};
+
 struct kvm {
 	spinlock_t mmu_lock;
 	struct mutex slots_lock;
@@ -407,6 +455,11 @@ struct kvm {
 #endif
 	long tlbs_dirty;
 	struct list_head devices;
+
+
+	struct kvm_mt mt;
+
+	struct vcpu_mt vcpu_mt[KVM_MAX_VCPUS];
 };
 
 #define kvm_err(fmt, ...) \

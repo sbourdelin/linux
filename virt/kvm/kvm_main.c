@@ -220,10 +220,48 @@ void kvm_reload_remote_mmus(struct kvm *kvm)
 	kvm_make_all_cpus_request(kvm, KVM_REQ_MMU_RELOAD);
 }
 
+static void init_gfn_list(struct gfn_list *gfnlist)
+{
+	gfnlist->dirty_gfns = NULL;
+	gfnlist->dirty_index = 0;
+	gfnlist->fetch_index = 0;
+	gfnlist->reset_index = 0;
+	gfnlist->overflow = 0;
+}
+
+static void clear_gfn_list(struct gfn_list *gfnlist)
+{
+	init_gfn_list(gfnlist);
+	gfnlist->max_dirty = 0;
+}
+
+static void clear_kvm_mt(struct kvm *kvm)
+{
+	clear_gfn_list(&kvm->mt.gfn_list);
+	kvm->mt.active = 0;
+	kvm->mt.mode = 0;
+	kvm->mt.tot_pages  = kvm->mt.fetch_count = 0;
+}
+
+static void clear_vcpu_mt(struct kvm_vcpu *vcpu)
+{
+	struct gfn_list *gfnlist = &vcpu->kvm->vcpu_mt[vcpu->vcpu_id].gfn_list;
+
+	clear_gfn_list(gfnlist);
+}
+
+static void init_vcpu_mt(struct kvm_vcpu *vcpu)
+{
+	struct gfn_list *gfnlist = &vcpu->kvm->vcpu_mt[vcpu->vcpu_id].gfn_list;
+
+	init_gfn_list(gfnlist);
+}
+
 int kvm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm *kvm, unsigned id)
 {
 	struct page *page;
 	int r;
+	struct gfn_list *gfnlist;
 
 	mutex_init(&vcpu->mutex);
 	vcpu->cpu = -1;
@@ -235,6 +273,11 @@ int kvm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm *kvm, unsigned id)
 
 	vcpu->pre_pcpu = -1;
 	INIT_LIST_HEAD(&vcpu->blocked_vcpu_list);
+
+	gfnlist = &vcpu->kvm->vcpu_mt[vcpu->vcpu_id].gfn_list;
+	clear_vcpu_mt(vcpu);
+	spin_lock_init(&gfnlist->lock);
+	mutex_init(&gfnlist->mtx);
 
 	page = alloc_page(GFP_KERNEL | __GFP_ZERO);
 	if (!page) {
@@ -602,6 +645,16 @@ static struct kvm *kvm_create_vm(unsigned long type)
 
 	preempt_notifier_inc();
 
+	clear_kvm_mt(kvm);
+	spin_lock_init(&kvm->mt.lock);
+	spin_lock_init(&kvm->mt.sw_lock);
+	spin_lock_init(&kvm->mt.gfn_list.lock);
+	mutex_init(&kvm->mt.gfn_list.mtx);
+	init_waitqueue_head(&kvm->mt.sw.wq);
+	spin_lock_init(&kvm->mt.sw.lock);
+	kvm->mt.sw.goal = 0;
+	mutex_init(&kvm->mt.sublist_mtx);
+
 	return kvm;
 
 out_err:
@@ -642,11 +695,14 @@ static void kvm_destroy_devices(struct kvm *kvm)
 	}
 }
 
+static int kvm_cleanup_mt(struct kvm *kvm, int force);
+
 static void kvm_destroy_vm(struct kvm *kvm)
 {
 	int i;
 	struct mm_struct *mm = kvm->mm;
 
+	kvm_cleanup_mt(kvm, 1);
 	kvm_arch_sync_events(kvm);
 	spin_lock(&kvm_lock);
 	list_del(&kvm->vm_list);
@@ -2752,9 +2808,206 @@ static long kvm_vm_ioctl_check_extension_generic(struct kvm *kvm, long arg)
 	return kvm_vm_ioctl_check_extension(kvm, arg);
 }
 
+static u64 kvm_get_max_gfn(struct kvm *kvm)
+{
+	int num_gfn = -1;
+	struct kvm_memslots *slots = kvm_memslots(kvm);
+	struct kvm_memory_slot *memslot;
+	int gfn;
+
+	kvm_for_each_memslot(memslot, slots) {
+		gfn = memslot->base_gfn + memslot->npages;
+		if (gfn > num_gfn)
+			num_gfn = gfn;
+	}
+	return num_gfn - 1;
+}
+
+#define DIRTY_GFN_ADD_GRANULARITY      (256)
+
+/*
+ * Return a the smallest multiple of DIRTY_GFN_ADD_GRANULARITY that is >= goal.
+ */
+static int mt_calc_max_dirty(int goal)
+{
+	int val = DIRTY_GFN_ADD_GRANULARITY;
+
+	while (val < goal)
+		val += DIRTY_GFN_ADD_GRANULARITY;
+	return val;
+}
+
+static int __kvm_init_mt(struct kvm *kvm, struct mt_setup *mts)
+{
+	struct kvm_vcpu *vcpu;
+	int i, alloc_fail = 0;
+	struct gfn_list *gfnlist = &kvm->mt.gfn_list;
+	int max_dirty;
+
+	if (gfnlist->dirty_gfns) {
+		pr_warn("KVM: vm %d, MT already initialized\n",
+			current->pid);
+		return -EBUSY;
+	}
+
+	/*
+	 * Internally, max_dirty must be a multiple of DIRTY_GFN_ADD_GRANULARITY
+	 */
+	max_dirty = mt_calc_max_dirty(mts->max_dirty);
+
+	/* probably need to make gfn lists for each vcpu to avoid locking */
+	gfnlist->dirty_gfns = vmalloc(max_dirty *
+					sizeof(*(gfnlist->dirty_gfns)));
+	if (!gfnlist->dirty_gfns)
+		return -ENOMEM;
+
+	if (mts->flags & KVM_MT_OPTION_NO_DUPS) {
+		long bmapsz = sizeof(long) *
+			((kvm->mt.max_gfn + BITS_PER_LONG)/BITS_PER_LONG);
+		kvm->mt.bmap = vmalloc(bmapsz);
+		if (!kvm->mt.bmap) {
+			vfree(gfnlist->dirty_gfns);
+			gfnlist->dirty_gfns = NULL;
+			return -ENOMEM;
+		}
+		kvm->mt.bmapsz = bmapsz;
+		memset(kvm->mt.bmap, 0, bmapsz);
+		pr_info("KVM: vm %d, using bmap, size %ld\n",
+			current->pid, bmapsz);
+	}
+
+	gfnlist->max_dirty = max_dirty;
+	gfnlist->dirty_index = 0;
+
+	kvm->mt.active = 0;
+	kvm->mt.tot_pages = 0;
+	kvm->mt.fetch_count = 0;
+	kvm->mt.quiesced = 0;
+	kvm->mt.allow_blocking = 1;
+	kvm->mt.sw_busy = 0;
+	kvm->mt.gfn_buf = vmalloc(max_dirty * sizeof(*(kvm->mt.gfn_buf)));
+	if (!kvm->mt.gfn_buf) {
+		vfree(gfnlist->dirty_gfns);
+		gfnlist->dirty_gfns = NULL;
+		if (kvm->mt.bmap) {
+			vfree(kvm->mt.bmap);
+			kvm->mt.bmap = NULL;
+		}
+		return -ENOMEM;
+	}
+
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		init_vcpu_mt(vcpu);
+		gfnlist = &vcpu->kvm->vcpu_mt[vcpu->vcpu_id].gfn_list;
+		gfnlist->dirty_gfns =
+			vmalloc(max_dirty *
+				sizeof(*(gfnlist->dirty_gfns)));
+		if (!gfnlist->dirty_gfns) {
+			pr_warn("KVM: vm %d, MT init, alloc fail, vcpu %d\n",
+				current->pid, i);
+			alloc_fail = 1;
+			break;
+		}
+		gfnlist->max_dirty = max_dirty;
+	}
+
+	if (alloc_fail) {
+		/* cleanup and bail out */
+		kvm_for_each_vcpu(i, vcpu, kvm) {
+			gfnlist = &vcpu->kvm->vcpu_mt[vcpu->vcpu_id].gfn_list;
+			if (gfnlist->dirty_gfns)
+				vfree(gfnlist->dirty_gfns);
+			clear_vcpu_mt(vcpu);
+		}
+
+		vfree(kvm->mt.gfn_list.dirty_gfns);
+		kvm->mt.gfn_list.dirty_gfns = NULL;
+		kvm->mt.bmap = NULL;
+		vfree(kvm->mt.gfn_buf);
+		kvm->mt.gfn_buf = NULL;
+		clear_kvm_mt(kvm);
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+static int kvm_init_mt(struct kvm *kvm, struct mt_setup *mts)
+{
+	int rc = 0;
+
+	if (mts->version != KVM_MT_VERSION) {
+		pr_warn(
+			"KVM: vm %d, MT version error, kvm %d, qemu %d\n",
+			current->pid, KVM_MT_VERSION, mts->version);
+		rc = -EINVAL;
+		goto init_mt_done;
+	}
+
+	if (mts->max_dirty == 0) {
+		pr_warn("KVM: vm %d, MT max_dirty is zero?\n",
+			current->pid);
+		rc = -EINVAL;
+		goto init_mt_done;
+	}
+
+	kvm->mt.max_gfn = kvm_get_max_gfn(kvm);
+
+	rc = __kvm_init_mt(kvm, mts);
+
+init_mt_done:
+	return rc;
+}
+
+static int kvm_cleanup_mt(struct kvm *kvm, int force)
+{
+	int rc = 0;
+	int i;
+	struct kvm_vcpu *vcpu;
+
+	if (!force && kvm->mt.active) {
+		pr_warn("KVM: vm %d, MT still active!\n",
+			current->pid);
+		rc = -EBUSY;
+		goto cleanup_mt_done;
+	}
+
+	if (kvm->mt.gfn_list.dirty_gfns)
+		vfree(kvm->mt.gfn_list.dirty_gfns);
+
+	clear_kvm_mt(kvm);
+
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		int id = vcpu->vcpu_id;
+		struct gfn_list *gfnlist = &vcpu->kvm->vcpu_mt[id].gfn_list;
+
+		if (gfnlist->dirty_gfns)
+			vfree(gfnlist->dirty_gfns);
+		clear_vcpu_mt(vcpu);
+	}
+
+	if (kvm->mt.bmap)
+		vfree(kvm->mt.bmap);
+	kvm->mt.bmap = NULL;
+	if (kvm->mt.gfn_buf)
+		vfree(kvm->mt.gfn_buf);
+	kvm->mt.gfn_buf = NULL;
+
+	kvm->mt.active = 0;
+
+cleanup_mt_done:
+
+	return rc;
+}
+
 static int kvm_vm_ioctl_mt_init(struct kvm *kvm, struct mt_setup *mts)
 {
-	return -EINVAL;
+	if (mts->op == KVM_MT_OP_INIT)
+		return kvm_init_mt(kvm, mts);
+	else if (mts->op == KVM_MT_OP_CLEANUP)
+		return kvm_cleanup_mt(kvm, 0);
+	else
+		return -EINVAL;
 }
 
 static int kvm_vm_ioctl_mt_enable(struct kvm *kvm, struct mt_enable *mte)
