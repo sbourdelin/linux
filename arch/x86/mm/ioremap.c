@@ -420,6 +420,34 @@ void unxlate_dev_mem_ptr(phys_addr_t phys, void *addr)
 	iounmap((void __iomem *)((unsigned long)addr & PAGE_MASK));
 }
 
+/* Remap memory with encryption */
+void __init *early_memremap_enc(resource_size_t phys_addr,
+				unsigned long size)
+{
+	return early_memremap_prot(phys_addr, size, __PAGE_KERNEL_ENC);
+}
+
+/* Remap memory with encryption and write-protected */
+void __init *early_memremap_enc_wp(resource_size_t phys_addr,
+				   unsigned long size)
+{
+	return early_memremap_prot(phys_addr, size, __PAGE_KERNEL_ENC_WP);
+}
+
+/* Remap memory without encryption */
+void __init *early_memremap_dec(resource_size_t phys_addr,
+				unsigned long size)
+{
+	return early_memremap_prot(phys_addr, size, __PAGE_KERNEL_DEC);
+}
+
+/* Remap memory without encryption and write-protected */
+void __init *early_memremap_dec_wp(resource_size_t phys_addr,
+				   unsigned long size)
+{
+	return early_memremap_prot(phys_addr, size, __PAGE_KERNEL_DEC_WP);
+}
+
 static pte_t bm_pte[PAGE_SIZE/sizeof(pte_t)] __page_aligned_bss;
 
 static inline pmd_t * __init early_ioremap_pmd(unsigned long addr)
