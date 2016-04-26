@@ -342,7 +342,7 @@ static void kvm_mmu_notifier_invalidate_page(struct mmu_notifier *mn,
 	 * is going to be freed.
 	 */
 	idx = srcu_read_lock(&kvm->srcu);
-	spin_lock(&kvm->mmu_lock);
+	write_lock(&kvm->mmu_lock);
 
 	kvm->mmu_notifier_seq++;
 	need_tlb_flush = kvm_unmap_hva(kvm, address) | kvm->tlbs_dirty;
@@ -350,7 +350,7 @@ static void kvm_mmu_notifier_invalidate_page(struct mmu_notifier *mn,
 	if (need_tlb_flush)
 		kvm_flush_remote_tlbs(kvm);
 
-	spin_unlock(&kvm->mmu_lock);
+	write_unlock(&kvm->mmu_lock);
 
 	kvm_arch_mmu_notifier_invalidate_page(kvm, address);
 
@@ -366,10 +366,10 @@ static void kvm_mmu_notifier_change_pte(struct mmu_notifier *mn,
 	int idx;
 
 	idx = srcu_read_lock(&kvm->srcu);
-	spin_lock(&kvm->mmu_lock);
+	write_lock(&kvm->mmu_lock);
 	kvm->mmu_notifier_seq++;
 	kvm_set_spte_hva(kvm, address, pte);
-	spin_unlock(&kvm->mmu_lock);
+	write_unlock(&kvm->mmu_lock);
 	srcu_read_unlock(&kvm->srcu, idx);
 }
 
@@ -382,7 +382,7 @@ static void kvm_mmu_notifier_invalidate_range_start(struct mmu_notifier *mn,
 	int need_tlb_flush = 0, idx;
 
 	idx = srcu_read_lock(&kvm->srcu);
-	spin_lock(&kvm->mmu_lock);
+	write_lock(&kvm->mmu_lock);
 	/*
 	 * The count increase must become visible at unlock time as no
 	 * spte can be established without taking the mmu_lock and
@@ -395,7 +395,7 @@ static void kvm_mmu_notifier_invalidate_range_start(struct mmu_notifier *mn,
 	if (need_tlb_flush)
 		kvm_flush_remote_tlbs(kvm);
 
-	spin_unlock(&kvm->mmu_lock);
+	write_unlock(&kvm->mmu_lock);
 	srcu_read_unlock(&kvm->srcu, idx);
 }
 
@@ -406,7 +406,7 @@ static void kvm_mmu_notifier_invalidate_range_end(struct mmu_notifier *mn,
 {
 	struct kvm *kvm = mmu_notifier_to_kvm(mn);
 
-	spin_lock(&kvm->mmu_lock);
+	write_lock(&kvm->mmu_lock);
 	/*
 	 * This sequence increase will notify the kvm page fault that
 	 * the page that is going to be mapped in the spte could have
@@ -420,7 +420,7 @@ static void kvm_mmu_notifier_invalidate_range_end(struct mmu_notifier *mn,
 	 * in conjunction with the smp_rmb in mmu_notifier_retry().
 	 */
 	kvm->mmu_notifier_count--;
-	spin_unlock(&kvm->mmu_lock);
+	write_unlock(&kvm->mmu_lock);
 
 	BUG_ON(kvm->mmu_notifier_count < 0);
 }
@@ -434,13 +434,13 @@ static int kvm_mmu_notifier_clear_flush_young(struct mmu_notifier *mn,
 	int young, idx;
 
 	idx = srcu_read_lock(&kvm->srcu);
-	spin_lock(&kvm->mmu_lock);
+	write_lock(&kvm->mmu_lock);
 
 	young = kvm_age_hva(kvm, start, end);
 	if (young)
 		kvm_flush_remote_tlbs(kvm);
 
-	spin_unlock(&kvm->mmu_lock);
+	write_unlock(&kvm->mmu_lock);
 	srcu_read_unlock(&kvm->srcu, idx);
 
 	return young;
@@ -455,7 +455,7 @@ static int kvm_mmu_notifier_clear_young(struct mmu_notifier *mn,
 	int young, idx;
 
 	idx = srcu_read_lock(&kvm->srcu);
-	spin_lock(&kvm->mmu_lock);
+	write_lock(&kvm->mmu_lock);
 	/*
 	 * Even though we do not flush TLB, this will still adversely
 	 * affect performance on pre-Haswell Intel EPT, where there is
@@ -470,7 +470,7 @@ static int kvm_mmu_notifier_clear_young(struct mmu_notifier *mn,
 	 * more sophisticated heuristic later.
 	 */
 	young = kvm_age_hva(kvm, start, end);
-	spin_unlock(&kvm->mmu_lock);
+	write_unlock(&kvm->mmu_lock);
 	srcu_read_unlock(&kvm->srcu, idx);
 
 	return young;
@@ -484,9 +484,9 @@ static int kvm_mmu_notifier_test_young(struct mmu_notifier *mn,
 	int young, idx;
 
 	idx = srcu_read_lock(&kvm->srcu);
-	spin_lock(&kvm->mmu_lock);
+	write_lock(&kvm->mmu_lock);
 	young = kvm_test_age_hva(kvm, address);
-	spin_unlock(&kvm->mmu_lock);
+	write_unlock(&kvm->mmu_lock);
 	srcu_read_unlock(&kvm->srcu, idx);
 
 	return young;
@@ -593,7 +593,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
 	if (!kvm)
 		return ERR_PTR(-ENOMEM);
 
-	spin_lock_init(&kvm->mmu_lock);
+	rwlock_init(&kvm->mmu_lock);
 	atomic_inc(&current->mm->mm_count);
 	kvm->mm = current->mm;
 	kvm_eventfd_init(kvm);
@@ -1165,7 +1165,7 @@ int kvm_get_dirty_log_protect(struct kvm *kvm,
 	dirty_bitmap_buffer = dirty_bitmap + n / sizeof(long);
 	memset(dirty_bitmap_buffer, 0, n);
 
-	spin_lock(&kvm->mmu_lock);
+	write_lock(&kvm->mmu_lock);
 	*is_dirty = false;
 	for (i = 0; i < n / sizeof(long); i++) {
 		unsigned long mask;
@@ -1186,7 +1186,7 @@ int kvm_get_dirty_log_protect(struct kvm *kvm,
 		}
 	}
 
-	spin_unlock(&kvm->mmu_lock);
+	write_unlock(&kvm->mmu_lock);
 
 	r = -EFAULT;
 	if (copy_to_user(log->dirty_bitmap, dirty_bitmap_buffer, n))
@@ -3257,7 +3257,7 @@ static int mt_reset_all_gfns(struct kvm *kvm)
 	if (!kvm->mt.quiesced)
 		return -EINVAL;
 
-	spin_lock(&kvm->mmu_lock);
+	write_lock(&kvm->mmu_lock);
 
 	kvm_for_each_vcpu(i, vcpu, kvm) {
 		gfnlist = &vcpu->kvm->vcpu_mt[vcpu->vcpu_id].gfn_list;
@@ -3295,7 +3295,7 @@ global_gfn_loop:
 	if (count)
 		goto global_gfn_loop;
 
-	spin_unlock(&kvm->mmu_lock);
+	write_unlock(&kvm->mmu_lock);
 
 
 	if (cleared)
@@ -3412,7 +3412,7 @@ static int mt_sublist_req_nowait(struct kvm *kvm,
 		 * below, but must take mmu_lock _before_ gfnlist lock.
 		 */
 		if (reset)
-			spin_lock(&kvm->mmu_lock);
+			write_lock(&kvm->mmu_lock);
 
 		if (need_locks)
 			spin_lock(&gfnlist->lock);
@@ -3440,7 +3440,7 @@ static int mt_sublist_req_nowait(struct kvm *kvm,
 		if (need_locks)
 			spin_unlock(&gfnlist->lock);
 		if (reset)
-			spin_unlock(&kvm->mmu_lock);
+			write_unlock(&kvm->mmu_lock);
 		mutex_unlock(&gfnlist->mtx);
 
 		if (len != avail) {
@@ -3489,7 +3489,7 @@ static int mt_sublist_req_nowait(struct kvm *kvm,
 		 * below, but must take mmu_lock _before_ gfnlist lock.
 		 */
 		if (reset)
-			spin_lock(&kvm->mmu_lock);
+			write_lock(&kvm->mmu_lock);
 
 		if (need_locks)
 			spin_lock(&gfnlist->lock);
@@ -3517,7 +3517,7 @@ static int mt_sublist_req_nowait(struct kvm *kvm,
 		if (need_locks)
 			spin_unlock(&gfnlist->lock);
 		if (reset)
-			spin_unlock(&kvm->mmu_lock);
+			write_unlock(&kvm->mmu_lock);
 		mutex_unlock(&gfnlist->mtx);
 
 		if (len != avail) {

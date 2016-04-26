@@ -408,7 +408,7 @@ struct kvm_mt {
 };
 
 struct kvm {
-	spinlock_t mmu_lock;
+	rwlock_t mmu_lock;
 	struct mutex slots_lock;
 	struct mm_struct *mm; /* userspace tied to this vm */
 	struct kvm_memslots *memslots[KVM_ADDRESS_SPACE_NUM];
