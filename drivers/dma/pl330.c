@@ -2393,29 +2393,6 @@ static inline void _init_desc(struct dma_pl330_desc *desc)
 	INIT_LIST_HEAD(&desc->node);
 }
 
-/* Returns the number of descriptors added to the DMAC pool */
-static int add_desc(struct pl330_dmac *pl330, gfp_t flg, int count)
-{
-	struct dma_pl330_desc *desc;
-	unsigned long flags;
-	int i;
-
-	desc = kcalloc(count, sizeof(*desc), flg);
-	if (!desc)
-		return 0;
-
-	spin_lock_irqsave(&pl330->pool_lock, flags);
-
-	for (i = 0; i < count; i++) {
-		_init_desc(&desc[i]);
-		list_add_tail(&desc[i].node, &pl330->desc_pool);
-	}
-
-	spin_unlock_irqrestore(&pl330->pool_lock, flags);
-
-	return count;
-}
-
 static struct dma_pl330_desc *pluck_desc(struct pl330_dmac *pl330)
 {
 	struct dma_pl330_desc *desc = NULL;
@@ -2428,9 +2405,6 @@ static struct dma_pl330_desc *pluck_desc(struct pl330_dmac *pl330)
 				struct dma_pl330_desc, node);
 
 		list_del_init(&desc->node);
-
-		desc->status = PREP;
-		desc->txd.callback = NULL;
 	}
 
 	spin_unlock_irqrestore(&pl330->pool_lock, flags);
@@ -2449,19 +2423,18 @@ static struct dma_pl330_desc *pl330_get_desc(struct dma_pl330_chan *pch)
 
 	/* If the DMAC pool is empty, alloc new */
 	if (!desc) {
-		if (!add_desc(pl330, GFP_ATOMIC, 1))
-			return NULL;
-
-		/* Try again */
-		desc = pluck_desc(pl330);
+		desc = kzalloc(sizeof(*desc), GFP_ATOMIC);
 		if (!desc) {
 			dev_err(pch->dmac->ddma.dev,
 				"%s:%d ALERT!\n", __func__, __LINE__);
 			return NULL;
 		}
+		_init_desc(desc);
 	}
 
 	/* Initialize the descriptor */
+	desc->status = PREP;
+	desc->txd.callback = NULL;
 	desc->pchan = pch;
 	desc->txd.cookie = 0;
 	async_tx_ack(&desc->txd);
@@ -2814,6 +2787,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
 	struct pl330_config *pcfg;
 	struct pl330_dmac *pl330;
 	struct dma_pl330_chan *pch, *_p;
+	struct dma_pl330_desc *desc;
 	struct dma_device *pd;
 	struct resource *res;
 	int i, ret, irq;
@@ -2874,8 +2848,15 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
 	spin_lock_init(&pl330->pool_lock);
 
 	/* Create a descriptor pool of default size */
-	if (!add_desc(pl330, GFP_KERNEL, NR_DEFAULT_DESC))
+	desc = kcalloc(NR_DEFAULT_DESC, sizeof(*desc), GFP_KERNEL);
+	if (desc) {
+		for (i = 0; i < NR_DEFAULT_DESC; i++) {
+			_init_desc(&desc[i]);
+			list_add_tail(&desc[i].node, &pl330->desc_pool);
+		}
+	} else {
 		dev_warn(&adev->dev, "unable to allocate desc\n");
+	}
 
 	INIT_LIST_HEAD(&pd->channels);
 
