@@ -1344,11 +1344,11 @@ struct mt_enable {
 #define MT_OFFSET_MASK		(0x0000ffffffffffffUL)
 
 #define MT_MAKE_SLOT_OFFSET(slot, offset)			\
-	do {							\
+	({							\
 		__u64 slot_off = offset & MT_OFFSET_MASK;	\
 		slot_off |= ((__u64)slot << 48);		\
 		slot_off;					\
-	} while (0)
+	})
 
 #define MT_OFFSET_FROM_SLOT_OFFSET(slot_off)		\
 	(slot_off & MT_OFFSET_MASK)

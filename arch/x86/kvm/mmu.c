@@ -1443,6 +1443,58 @@ restart:
 	return 0;
 }
 
+static struct kvm_memory_slot *kvm_memslot_from_id(struct kvm *kvm, int slot_id)
+{
+	int i;
+	struct kvm_memory_slot *memslot;
+	struct kvm_memslots *slots;
+
+	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
+		slots = __kvm_memslots(kvm, i);
+		kvm_for_each_memslot(memslot, slots) {
+			if (memslot->id == slot_id)
+				return memslot;
+		}
+	}
+	return NULL;
+}
+
+gfn_t kvm_mt_slot_offset_to_gfn(struct kvm *kvm, u64 slot_offset)
+{
+	struct kvm_memory_slot *slot;
+	int slot_id;
+	gfn_t offset;
+
+	slot_id = MT_SLOT_FROM_SLOT_OFFSET(slot_offset);
+	slot = kvm_memslot_from_id(kvm, slot_id);
+	if (slot == NULL) {
+		pr_warn("KVM: bad slot_id %d\n", slot_id);
+		return kvm->mt.max_gfn+1;
+	}
+	offset  = MT_OFFSET_FROM_SLOT_OFFSET(slot_offset);
+	return offset + slot->base_gfn;
+}
+
+int kvm_mt_mmu_reset_gfn(struct kvm *kvm, u64 slot_offset)
+{
+	struct kvm_memory_slot *slot;
+	int slot_id;
+	gfn_t offset, gfn;
+
+	slot_id = MT_SLOT_FROM_SLOT_OFFSET(slot_offset);
+	slot = kvm_memslot_from_id(kvm, slot_id);
+	offset  = MT_OFFSET_FROM_SLOT_OFFSET(slot_offset);
+	gfn = offset + slot->base_gfn;
+
+	if (gfn > kvm->mt.max_gfn) {
+		pr_warn("KVM: bad gfn %lx\n", (long)gfn);
+		return 0;
+	}
+
+	kvm_arch_mmu_enable_log_dirty_pt_masked(kvm, slot, offset, 1);
+	return 1;
+}
+
 struct slot_rmap_walk_iterator {
 	/* input fields. */
 	struct kvm_memory_slot *slot;
@@ -4760,6 +4812,47 @@ void kvm_mmu_slot_remove_write_access(struct kvm *kvm,
 	 */
 	if (flush)
 		kvm_flush_remote_tlbs(kvm);
+}
+
+void kvm_mmu_mt_enable_log_dirty(struct kvm *kvm)
+{
+	int i;
+	struct kvm_memslots *slots;
+	struct kvm_memory_slot *memslot;
+
+	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
+		slots = __kvm_memslots(kvm, i);
+
+		kvm_for_each_memslot(memslot, slots) {
+			if (memslot->id < KVM_USER_MEM_SLOTS) {
+				if (kvm_x86_ops->slot_enable_log_dirty)
+					kvm_x86_ops->slot_enable_log_dirty(kvm,
+						memslot);
+				else
+					kvm_mmu_slot_remove_write_access(kvm,
+						memslot);
+			}
+		}
+	}
+}
+
+void kvm_mmu_mt_disable_log_dirty(struct kvm *kvm)
+{
+	int i;
+	struct kvm_memslots *slots;
+	struct kvm_memory_slot *memslot;
+
+	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
+		slots = __kvm_memslots(kvm, i);
+
+		kvm_for_each_memslot(memslot, slots) {
+			if (memslot->id < KVM_USER_MEM_SLOTS) {
+				if (kvm_x86_ops->slot_disable_log_dirty)
+					kvm_x86_ops->slot_disable_log_dirty(kvm,
+						memslot);
+			}
+		}
+	}
 }
 
 static bool kvm_mmu_zap_collapsible_spte(struct kvm *kvm,

@@ -1795,8 +1795,12 @@ int kvm_vcpu_read_guest_atomic(struct kvm_vcpu *vcpu, gpa_t gpa,
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_read_guest_atomic);
 
-static int __kvm_write_guest_page(struct kvm_memory_slot *memslot, gfn_t gfn,
-			          const void *data, int offset, int len)
+static void mt_mark_page_dirty(struct kvm *kvm, struct kvm_memory_slot *slot,
+	gfn_t gfn, struct kvm_vcpu *vcpu);
+
+static int __kvm_write_guest_page(struct kvm *kvm,
+				struct kvm_memory_slot *memslot, gfn_t gfn,
+				const void *data, int offset, int len)
 {
 	int r;
 	unsigned long addr;
@@ -1808,6 +1812,8 @@ static int __kvm_write_guest_page(struct kvm_memory_slot *memslot, gfn_t gfn,
 	if (r)
 		return -EFAULT;
 	mark_page_dirty_in_slot(memslot, gfn);
+	if (memslot && (memslot->id >= 0 && memslot->id < KVM_USER_MEM_SLOTS))
+		mt_mark_page_dirty(kvm, memslot, gfn, NULL);
 	return 0;
 }
 
@@ -1816,7 +1822,7 @@ int kvm_write_guest_page(struct kvm *kvm, gfn_t gfn,
 {
 	struct kvm_memory_slot *slot = gfn_to_memslot(kvm, gfn);
 
-	return __kvm_write_guest_page(slot, gfn, data, offset, len);
+	return __kvm_write_guest_page(kvm, slot, gfn, data, offset, len);
 }
 EXPORT_SYMBOL_GPL(kvm_write_guest_page);
 
@@ -1825,7 +1831,7 @@ int kvm_vcpu_write_guest_page(struct kvm_vcpu *vcpu, gfn_t gfn,
 {
 	struct kvm_memory_slot *slot = kvm_vcpu_gfn_to_memslot(vcpu, gfn);
 
-	return __kvm_write_guest_page(slot, gfn, data, offset, len);
+	return __kvm_write_guest_page(vcpu->kvm, slot, gfn, data, offset, len);
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_write_guest_page);
 
@@ -1929,6 +1935,10 @@ int kvm_write_guest_cached(struct kvm *kvm, struct gfn_to_hva_cache *ghc,
 	if (r)
 		return -EFAULT;
 	mark_page_dirty_in_slot(ghc->memslot, ghc->gpa >> PAGE_SHIFT);
+	if (ghc->memslot && (ghc->memslot->id >= 0 &&
+		ghc->memslot->id < KVM_USER_MEM_SLOTS))
+		mt_mark_page_dirty(kvm, ghc->memslot, ghc->gpa >> PAGE_SHIFT,
+			NULL);
 
 	return 0;
 }
@@ -1996,11 +2006,95 @@ static void mark_page_dirty_in_slot(struct kvm_memory_slot *memslot,
 	}
 }
 
+/*
+ * We have some new dirty pages for our sublist waiter.  Enough to merit
+ * waking it up?
+ */
+static void mt_sw_add_pages(struct kvm *kvm)
+{
+	int avail = kvm->mt.tot_pages - kvm->mt.fetch_count;
+	struct sublist_waiter *swp = &kvm->mt.sw;
+
+	spin_lock(&kvm->mt.sw_lock);
+
+	if (swp->goal && (avail >= swp->goal)) {
+		kvm->mt.fetch_count += avail;
+		swp->goal = 0;
+		wake_up(&swp->wq);
+	}
+
+	spin_unlock(&kvm->mt.sw_lock);
+}
+
+#define DIRTY_GFN_ADD_GRANULARITY      (256)
+
+static void mt_mark_page_dirty(struct kvm *kvm, struct kvm_memory_slot *slot,
+	gfn_t gfn, struct kvm_vcpu *vcpu)
+{
+	int use_kvm;            /* add to global list? */
+	struct gfn_list *gfnlist;
+	int slot_id = slot->id;
+	__u64 offset = gfn - slot->base_gfn;
+	__u64 slot_offset;
+
+	/*
+	 * Try to add dirty page to vcpu list.  If vcpu is NULL or
+	 * vcpu list is full, then try to add to kvm master list.
+	 */
+
+	if (!kvm->mt.active)
+		return;
+
+	if (slot->id >= KVM_USER_MEM_SLOTS)
+		return;
+
+	if (gfn > kvm->mt.max_gfn)
+		return;
+
+	/* if we're avoiding duplicates, is this one already marked? */
+	if (kvm->mt.bmap && test_and_set_bit(gfn, kvm->mt.bmap))
+		return;
+
+	slot_offset = MT_MAKE_SLOT_OFFSET(slot_id, offset);
+
+	use_kvm = (vcpu == NULL);
+
+	if (vcpu) {
+		gfnlist = &vcpu->kvm->vcpu_mt[vcpu->vcpu_id].gfn_list;
+		if (gfnlist->dirty_index == gfnlist->max_dirty) {
+			use_kvm = 1;
+			gfnlist->overflow = 1;
+			/* Fall back to master gfn list.*/
+			gfnlist = &kvm->mt.gfn_list;
+		}
+	} else {
+		gfnlist = &kvm->mt.gfn_list;
+	}
+
+	spin_lock(&gfnlist->lock);
+	if (gfnlist->dirty_index >= gfnlist->max_dirty) {
+		gfnlist->overflow = 1;
+	} else {
+		gfnlist->dirty_gfns[gfnlist->dirty_index++] = slot_offset;
+		if ((gfnlist->dirty_index % DIRTY_GFN_ADD_GRANULARITY) == 0) {
+			spin_lock(&kvm->mt.lock);
+			kvm->mt.tot_pages += DIRTY_GFN_ADD_GRANULARITY;
+			mt_sw_add_pages(kvm);
+			spin_unlock(&kvm->mt.lock);
+		}
+	}
+	spin_unlock(&gfnlist->lock);
+}
+
 void mark_page_dirty(struct kvm *kvm, gfn_t gfn)
 {
 	struct kvm_memory_slot *memslot;
 
 	memslot = gfn_to_memslot(kvm, gfn);
+	if (memslot) {
+		if (memslot->id >= 0 && memslot->id < KVM_USER_MEM_SLOTS)
+			mt_mark_page_dirty(kvm, memslot, gfn, NULL);
+	}
 	mark_page_dirty_in_slot(memslot, gfn);
 }
 EXPORT_SYMBOL_GPL(mark_page_dirty);
@@ -2010,6 +2104,10 @@ void kvm_vcpu_mark_page_dirty(struct kvm_vcpu *vcpu, gfn_t gfn)
 	struct kvm_memory_slot *memslot;
 
 	memslot = kvm_vcpu_gfn_to_memslot(vcpu, gfn);
+	if (memslot) {
+		if (memslot->id >= 0 && memslot->id < KVM_USER_MEM_SLOTS)
+			mt_mark_page_dirty(vcpu->kvm, memslot, gfn, vcpu);
+	}
 	mark_page_dirty_in_slot(memslot, gfn);
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_mark_page_dirty);
@@ -2823,8 +2921,6 @@ static u64 kvm_get_max_gfn(struct kvm *kvm)
 	return num_gfn - 1;
 }
 
-#define DIRTY_GFN_ADD_GRANULARITY      (256)
-
 /*
  * Return a the smallest multiple of DIRTY_GFN_ADD_GRANULARITY that is >= goal.
  */
@@ -3010,31 +3106,523 @@ static int kvm_vm_ioctl_mt_init(struct kvm *kvm, struct mt_setup *mts)
 		return -EINVAL;
 }
 
+static int kvm_enable_mt(struct kvm *kvm)
+{
+	int rc = 0;
+
+	if (kvm->mt.active) {
+		pr_warn("KVM: vm %d, MT already active\n",
+			current->pid);
+		rc = -EINVAL;
+		goto enable_mt_done;
+	}
+
+	kvm_mmu_mt_enable_log_dirty(kvm);
+	if (kvm->mt.bmap)
+		memset(kvm->mt.bmap, 0, kvm->mt.bmapsz);
+
+	kvm->mt.active = 1;
+
+enable_mt_done:
+
+	return rc;
+}
+
+static int kvm_disable_mt(struct kvm *kvm)
+{
+	int rc = 0;
+
+	if (!kvm->mt.active) {
+		pr_warn("KVM: vm %d, MT already disabled\n",
+			current->pid);
+		rc = -EINVAL;
+		goto disable_mt_done;
+	}
+
+	kvm_mmu_mt_disable_log_dirty(kvm);
+	kvm->mt.active = 0;
+
+disable_mt_done:
+
+	return rc;
+}
+
 static int kvm_vm_ioctl_mt_enable(struct kvm *kvm, struct mt_enable *mte)
 {
-	return -EINVAL;
+	if ((mte->flags & 0x1) == 1)
+		return kvm_enable_mt(kvm);
+	else if ((mte->flags & 0x1) == 0)
+		return kvm_disable_mt(kvm);
+	else
+		return -EINVAL;
 }
 
 static int kvm_vm_ioctl_mt_prepare_cp(struct kvm *kvm,
 				      struct mt_prepare_cp *mtpcp)
 {
-	return -EINVAL;
+	int i;
+	struct kvm_vcpu *vcpu;
+	struct gfn_list *gfnlist;
+
+	if (!kvm->mt.active)
+		return -EINVAL;
+
+	kvm->mt.cp_id = mtpcp->cpid;
+
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		gfnlist = &vcpu->kvm->vcpu_mt[vcpu->vcpu_id].gfn_list;
+		spin_lock(&gfnlist->lock);
+		gfnlist->fetch_index = 0;
+		gfnlist->reset_index = 0;
+		gfnlist->dirty_index = 0;
+		gfnlist->overflow = 0;
+		spin_unlock(&gfnlist->lock);
+	}
+
+	gfnlist = &kvm->mt.gfn_list;
+	spin_lock(&gfnlist->lock);
+	gfnlist->fetch_index = 0;
+	gfnlist->reset_index = 0;
+	gfnlist->dirty_index = 0;
+	gfnlist->overflow = 0;
+	spin_unlock(&gfnlist->lock);
+
+	kvm->mt.quiesced = 0;
+	kvm->mt.allow_blocking = 1;
+	kvm->mt.tot_pages  = kvm->mt.fetch_count = 0;
+
+	return 0;
+}
+
+static bool mt_reset_gfn(struct kvm *kvm, u64 slot_offset)
+{
+	gfn_t gfn;
+
+	gfn = kvm_mt_slot_offset_to_gfn(kvm, slot_offset);
+	if (gfn > kvm->mt.max_gfn)
+		return 0;
+
+	if (kvm->mt.bmap) {
+		if (kvm->mt.quiesced) {
+			/*
+			 * Goal is to reset entire bmap, but don't need
+			 * atomics if we are quiesced
+			 */
+			int offset32 = gfn/32;
+			int *p = (int *)(kvm->mt.bmap) + offset32;
+			*p = 0;
+		} else {
+			clear_bit(gfn, kvm->mt.bmap);
+		}
+	}
+
+	return kvm_mt_mmu_reset_gfn(kvm, slot_offset);
+}
+
+#define GFN_RESET_BATCH        (64)
+
+static int mt_reset_all_gfns(struct kvm *kvm)
+{
+	int i, j;
+	struct kvm_vcpu *vcpu;
+	struct gfn_list *gfnlist;
+	bool cleared = false;
+	int reset_start, count, avail;
+
+	if (!kvm->mt.active)
+		return -EINVAL;
+
+	if (!kvm->mt.quiesced)
+		return -EINVAL;
+
+	spin_lock(&kvm->mmu_lock);
+
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		gfnlist = &vcpu->kvm->vcpu_mt[vcpu->vcpu_id].gfn_list;
+
+vcpu_gfn_loop:
+
+		spin_lock(&gfnlist->lock);
+		reset_start = gfnlist->reset_index;
+		avail = gfnlist->dirty_index - gfnlist->reset_index;
+		count = avail > GFN_RESET_BATCH ? GFN_RESET_BATCH : avail;
+		gfnlist->reset_index += count;
+		spin_unlock(&gfnlist->lock);
+
+		for (j = reset_start; j < reset_start + count; j++)
+			cleared |= mt_reset_gfn(kvm, gfnlist->dirty_gfns[j]);
+
+		if (count)
+			goto vcpu_gfn_loop;
+	}
+
+	gfnlist = &kvm->mt.gfn_list;
+
+global_gfn_loop:
+
+	spin_lock(&gfnlist->lock);
+	reset_start = gfnlist->reset_index;
+	avail = gfnlist->dirty_index - gfnlist->reset_index;
+	count = avail > GFN_RESET_BATCH ? GFN_RESET_BATCH : avail;
+	gfnlist->reset_index += count;
+	spin_unlock(&gfnlist->lock);
+
+	for (j = reset_start; j < reset_start + count; j++)
+		cleared |= mt_reset_gfn(kvm, gfnlist->dirty_gfns[j]);
+
+	if (count)
+		goto global_gfn_loop;
+
+	spin_unlock(&kvm->mmu_lock);
+
+
+	if (cleared)
+		kvm_flush_remote_tlbs(kvm);
+
+	return 0;
 }
 
 static int kvm_vm_ioctl_mt_rearm_gfns(struct kvm *kvm)
 {
-	return -EINVAL;
+	return mt_reset_all_gfns(kvm);
+}
+
+static int mt_unblock_sw(struct kvm *kvm)
+{
+	struct sublist_waiter *swp;
+
+	if (!kvm->mt.active)
+		return -EINVAL;
+
+	spin_lock(&kvm->mt.sw_lock);
+
+	kvm->mt.allow_blocking = 0;
+
+	/* Make sure allow_blocking is clear before the wake up */
+	mb();
+
+	swp = &kvm->mt.sw;
+	wake_up(&swp->wq);
+
+	spin_unlock(&kvm->mt.sw_lock);
+
+	return 0;
 }
 
 static int kvm_vm_ioctl_mt_quiesced(struct kvm *kvm)
 {
-	return -EINVAL;
+	if (!kvm->mt.active)
+		return -EINVAL;
+
+	kvm->mt.quiesced = 1;
+
+	/* wake up the sublist waiter */
+	mt_unblock_sw(kvm);
+
+	if (kvm->mt.gfn_list.overflow)
+		return -ENOMEM;
+
+	return 0;
+}
+
+static int mt_sublist_req_nowait(struct kvm *kvm,
+				struct mt_sublist_fetch_info *msfi, int offset)
+{
+	int i, j, avail, goal = msfi->gfn_info.count;
+	struct kvm_vcpu *vcpu;
+	__u64 *gfndst, *gfnsrc;
+	int rc = 0;
+	__u64 slot_offset;
+	int index;
+
+	/* Clearing dirty/write bits requires tlb flush before exit */
+	int cleared = 0;
+
+	/* Don't need to lock gfn lists if we're in VM blackout */
+	int need_locks = !kvm->mt.quiesced;
+
+	/* Consolidate flags */
+	int reset = msfi->flags & MT_FETCH_REARM;
+	int bmap = kvm->mt.bmap != NULL;
+
+	if (goal == 0)
+		return 0;
+
+	gfndst = &msfi->gfn_info.gfnlist[offset];
+	msfi->gfn_info.count = offset;
+
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		int len, rem;
+		int vcpu_id;
+		struct gfn_list *gfnlist;
+
+		vcpu_id = vcpu->vcpu_id;
+		gfnlist = &vcpu->kvm->vcpu_mt[vcpu_id].gfn_list;
+
+		mutex_lock(&gfnlist->mtx);
+		if (need_locks)
+			spin_lock(&gfnlist->lock);
+
+		avail = gfnlist->dirty_index - gfnlist->fetch_index;
+		if (!avail) {
+			if (need_locks)
+				spin_unlock(&gfnlist->lock);
+				mutex_unlock(&gfnlist->mtx);
+			continue;
+		}
+		avail = avail > goal ? goal : avail;
+		for (j = 0; j < avail; j++) {
+			index = gfnlist->fetch_index+j;
+			slot_offset = gfnlist->dirty_gfns[index];
+			kvm->mt.gfn_buf[j] = kvm_mt_slot_offset_to_gfn(kvm,
+						slot_offset);
+		}
+		gfnsrc = &kvm->mt.gfn_buf[0];
+
+		if (need_locks)
+			spin_unlock(&gfnlist->lock);
+
+		rem = copy_to_user(gfndst, gfnsrc,
+				avail*sizeof(*gfndst)) / sizeof(*gfndst);
+
+		/*
+		 * Need mmu_lock if we're going to do kvm_mt_mmu_reset_gfn
+		 * below, but must take mmu_lock _before_ gfnlist lock.
+		 */
+		if (reset)
+			spin_lock(&kvm->mmu_lock);
+
+		if (need_locks)
+			spin_lock(&gfnlist->lock);
+
+		len = avail - rem;
+		msfi->gfn_info.count += len;
+		gfndst += len;
+		if (reset) {
+			__u64 gfn;
+
+			for (j = 0; j < len; j++) {
+				index = gfnlist->fetch_index+j;
+				slot_offset = gfnlist->dirty_gfns[index];
+				gfn = kvm_mt_slot_offset_to_gfn(kvm,
+					slot_offset);
+				cleared +=
+					kvm_mt_mmu_reset_gfn(kvm, slot_offset);
+				if (bmap)
+					clear_bit(gfn, kvm->mt.bmap);
+			}
+			gfnlist->reset_index += len;
+		}
+		gfnlist->fetch_index += len;
+
+		if (need_locks)
+			spin_unlock(&gfnlist->lock);
+		if (reset)
+			spin_unlock(&kvm->mmu_lock);
+		mutex_unlock(&gfnlist->mtx);
+
+		if (len != avail) {
+			rc = -EFAULT;
+			goto copy_done_err;
+		}
+
+		goal -= avail;
+		if (goal == 0)
+			break;
+	}
+
+	/* If we still need more gfns, consult the master list */
+	if (goal) {
+		int len, rem;
+		struct gfn_list *gfnlist = &kvm->mt.gfn_list;
+
+		mutex_lock(&gfnlist->mtx);
+		if (need_locks)
+			spin_lock(&gfnlist->lock);
+
+		avail = gfnlist->dirty_index - gfnlist->fetch_index;
+		if (!avail) {
+			if (need_locks)
+				spin_unlock(&gfnlist->lock);
+			mutex_unlock(&gfnlist->mtx);
+			goto copy_done_no_err;
+		}
+		avail = avail > goal ? goal : avail;
+		for (j = 0; j < avail; j++) {
+			index = gfnlist->fetch_index+j;
+			slot_offset = gfnlist->dirty_gfns[index];
+			kvm->mt.gfn_buf[j] = kvm_mt_slot_offset_to_gfn(kvm,
+						slot_offset);
+		}
+		gfnsrc = &kvm->mt.gfn_buf[0];
+
+		if (need_locks)
+			spin_unlock(&gfnlist->lock);
+
+		rem = copy_to_user(gfndst, gfnsrc,
+				avail*sizeof(*gfndst)) / sizeof(*gfndst);
+
+		/*
+		 * Need mmu_lock if we're going to do kvm_mt_mmu_reset_gfn
+		 * below, but must take mmu_lock _before_ gfnlist lock.
+		 */
+		if (reset)
+			spin_lock(&kvm->mmu_lock);
+
+		if (need_locks)
+			spin_lock(&gfnlist->lock);
+
+		len = avail - rem;
+		msfi->gfn_info.count += len;
+		gfnlist->fetch_index += len;
+		if (reset) {
+			__u64 slot_offset;
+			__u64 gfn;
+
+			for (j = 0; j < len; j++) {
+				index = gfnlist->fetch_index+j;
+				slot_offset = gfnlist->dirty_gfns[index];
+				gfn = kvm_mt_slot_offset_to_gfn(kvm,
+					slot_offset);
+				cleared +=
+					kvm_mt_mmu_reset_gfn(kvm, slot_offset);
+				if (bmap)
+					clear_bit(gfn, kvm->mt.bmap);
+			}
+			gfnlist->reset_index += len;
+		}
+
+		if (need_locks)
+			spin_unlock(&gfnlist->lock);
+		if (reset)
+			spin_unlock(&kvm->mmu_lock);
+		mutex_unlock(&gfnlist->mtx);
+
+		if (len != avail) {
+			rc = -EFAULT;
+			goto copy_done_err;
+		}
+
+		goal -= avail;
+	}
+
+copy_done_no_err:
+
+copy_done_err:
+
+	if (cleared)
+		kvm_flush_remote_tlbs(kvm);
+
+	return rc;
+}
+
+static int mt_sublist_req_wait(struct kvm *kvm,
+				struct mt_sublist_fetch_info *msfi)
+{
+	struct sublist_waiter *swp;
+	int goal = msfi->gfn_info.count;
+	int offset;
+	int rc;
+
+	if (msfi->gfn_info.count == 0)
+		return 0;
+
+	spin_lock(&kvm->mt.sw_lock);
+	if (!kvm->mt.allow_blocking) {
+		spin_unlock(&kvm->mt.sw_lock);
+		return -EINVAL;
+	}
+	spin_unlock(&kvm->mt.sw_lock);
+
+	rc = mt_sublist_req_nowait(kvm, msfi, 0);
+	if (rc || (msfi->gfn_info.count == goal))
+		return rc;
+
+	offset = msfi->gfn_info.count;
+
+	spin_lock(&kvm->mt.sw_lock);
+
+	if (kvm->mt.sw_busy) {
+		spin_unlock(&kvm->mt.sw_lock);
+		return -EBUSY;
+	}
+	kvm->mt.sw_busy = 1;
+
+	swp = &kvm->mt.sw;
+	swp->goal = goal;
+
+	spin_unlock(&kvm->mt.sw_lock);
+
+	rc = wait_event_interruptible(swp->wq,
+			!kvm->mt.allow_blocking || !swp->goal);
+
+	spin_lock(&kvm->mt.sw_lock);
+
+	kvm->mt.sw_busy = 0;
+
+	spin_unlock(&kvm->mt.sw_lock);
+
+	if (rc)
+		return rc;
+
+	msfi->gfn_info.count = goal - offset;
+
+	return mt_sublist_req_nowait(kvm, msfi, offset);
+}
+
+static int mt_get_dirty_count(struct kvm *kvm,
+				struct mt_sublist_fetch_info *msfi)
+{
+	int i, avail = 0;
+	struct kvm_vcpu *vcpu;
+	struct gfn_list *gfnlist;
+
+	/* Don't need to lock gfn lists if we're in VM blackout */
+	int need_locks = !kvm->mt.quiesced;
+
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		gfnlist = &vcpu->kvm->vcpu_mt[vcpu->vcpu_id].gfn_list;
+
+		mutex_lock(&gfnlist->mtx);
+		if (need_locks)
+			spin_lock(&gfnlist->lock);
+		avail += gfnlist->dirty_index - gfnlist->fetch_index;
+		if (need_locks)
+			spin_unlock(&gfnlist->lock);
+		mutex_unlock(&gfnlist->mtx);
+	}
+
+	gfnlist = &kvm->mt.gfn_list;
+
+	mutex_lock(&gfnlist->mtx);
+	if (need_locks)
+		spin_lock(&gfnlist->lock);
+	avail += gfnlist->dirty_index - gfnlist->fetch_index;
+	if (need_locks)
+		spin_unlock(&gfnlist->lock);
+	mutex_unlock(&gfnlist->mtx);
+
+	msfi->gfn_info.count = avail;
+
+	return 0;
 }
 
 static int kvm_vm_ioctl_mt_sublist_fetch(struct kvm *kvm,
 					 struct mt_sublist_fetch_info *mtsfi)
 {
-	return -EINVAL;
+	if (!kvm->mt.active)
+		return -EINVAL;
+
+	if (mtsfi->gfn_info.gfnlist == NULL)
+		return mt_get_dirty_count(kvm, mtsfi);
+
+	if (mtsfi->gfn_info.count == 0)
+		return 0;
+
+	if (!(mtsfi->flags & MT_FETCH_WAIT))
+		return mt_sublist_req_nowait(kvm, mtsfi, 0);
+
+	return mt_sublist_req_wait(kvm, mtsfi);
 }
 
 static int kvm_vm_ioctl_mt_dirty_trigger(struct kvm *kvm, int dirty_trigger)
