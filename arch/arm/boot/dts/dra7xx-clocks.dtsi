@@ -95,7 +95,7 @@
 	secure_32k_clk_src_ck: secure_32k_clk_src_ck {
 		#clock-cells = <0>;
 		compatible = "fixed-clock";
-		clock-frequency = <32768>;
+		clock-frequency = <34600>; /* approximate frequency */
 	};
 
 	virt_12000000_ck: virt_12000000_ck {
