@@ -499,6 +499,7 @@ static int get_text_start_address(const char *exec, unsigned long *address)
 	ret = 0;
 out:
 	elf_end(elf);
+	close(fd);
 	return ret;
 }
 
