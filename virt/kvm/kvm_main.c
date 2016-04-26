@@ -2752,6 +2752,43 @@ static long kvm_vm_ioctl_check_extension_generic(struct kvm *kvm, long arg)
 	return kvm_vm_ioctl_check_extension(kvm, arg);
 }
 
+static int kvm_vm_ioctl_mt_init(struct kvm *kvm, struct mt_setup *mts)
+{
+	return -EINVAL;
+}
+
+static int kvm_vm_ioctl_mt_enable(struct kvm *kvm, struct mt_enable *mte)
+{
+	return -EINVAL;
+}
+
+static int kvm_vm_ioctl_mt_prepare_cp(struct kvm *kvm,
+				      struct mt_prepare_cp *mtpcp)
+{
+	return -EINVAL;
+}
+
+static int kvm_vm_ioctl_mt_rearm_gfns(struct kvm *kvm)
+{
+	return -EINVAL;
+}
+
+static int kvm_vm_ioctl_mt_quiesced(struct kvm *kvm)
+{
+	return -EINVAL;
+}
+
+static int kvm_vm_ioctl_mt_sublist_fetch(struct kvm *kvm,
+					 struct mt_sublist_fetch_info *mtsfi)
+{
+	return -EINVAL;
+}
+
+static int kvm_vm_ioctl_mt_dirty_trigger(struct kvm *kvm, int dirty_trigger)
+{
+	return -EINVAL;
+}
+
 static long kvm_vm_ioctl(struct file *filp,
 			   unsigned int ioctl, unsigned long arg)
 {
@@ -2909,6 +2946,65 @@ out_free_irq_routing:
 	case KVM_CHECK_EXTENSION:
 		r = kvm_vm_ioctl_check_extension_generic(kvm, arg);
 		break;
+	case KVM_INIT_MT: {
+		struct mt_setup mts;
+
+		r = -EFAULT;
+		if (copy_from_user(&mts, (void __user *)arg, sizeof(mts)))
+			goto out;
+		r = kvm_vm_ioctl_mt_init(kvm, &mts);
+		break;
+	}
+	case KVM_ENABLE_MT: {
+		struct mt_enable mte;
+
+		r = -EFAULT;
+		if (copy_from_user(&mte, (void __user *)arg, sizeof(mte)))
+			goto out;
+		r = kvm_vm_ioctl_mt_enable(kvm, &mte);
+		break;
+	}
+	case KVM_PREPARE_MT_CP: {
+		struct mt_prepare_cp mtpcp;
+
+		r = -EFAULT;
+		if (copy_from_user(&mtpcp, (void __user *)arg, sizeof(mtpcp)))
+			goto out;
+		r = kvm_vm_ioctl_mt_prepare_cp(kvm, &mtpcp);
+		break;
+	}
+	case KVM_REARM_DIRTY_PAGES: {
+		r = kvm_vm_ioctl_mt_rearm_gfns(kvm);
+		break;
+	}
+	case KVM_MT_VM_QUIESCED: {
+		r = kvm_vm_ioctl_mt_quiesced(kvm);
+		break;
+	}
+	case KVM_MT_SUBLIST_FETCH: {
+		struct mt_sublist_fetch_info mtsfi;
+
+		r = -EFAULT;
+		if (copy_from_user(&mtsfi, (void __user *)arg, sizeof(mtsfi)))
+			goto out;
+		r = kvm_vm_ioctl_mt_sublist_fetch(kvm, &mtsfi);
+		if (r)
+			goto out;
+		r = -EFAULT;
+		if (copy_to_user((void __user *)arg, &mtsfi, sizeof(mtsfi)))
+			goto out;
+		r = 0;
+		break;
+	}
+	case KVM_MT_DIRTY_TRIGGER: {
+		struct mt_dirty_trigger mtdt;
+
+		r = -EFAULT;
+		if (copy_from_user(&mtdt, (void __user *)arg, sizeof(mtdt)))
+			goto out;
+		r = kvm_vm_ioctl_mt_dirty_trigger(kvm, mtdt.dirty_trigger);
+		break;
+	}
 	default:
 		r = kvm_arch_vm_ioctl(filp, ioctl, arg);
 	}

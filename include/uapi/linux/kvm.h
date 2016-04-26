@@ -1312,4 +1312,98 @@ struct kvm_assigned_msix_entry {
 	__u16 padding[3];
 };
 
+#define KVM_MT_VERSION			1
+struct mt_setup {
+	__u32 version;
+
+	/* which operation to perform? */
+#define KVM_MT_OP_INIT           1
+#define KVM_MT_OP_CLEANUP        2
+	__u32 op;
+
+	/*
+	 * flags bit defs:
+	 */
+
+	/*
+	 * Features.
+	 * 1. Avoid logging duplicate entries
+	 */
+#define KVM_MT_OPTION_NO_DUPS		(1 << 2)
+
+	__u32 flags;
+
+	/* max number of dirty pages per checkpoint cycle */
+	__u32 max_dirty;
+};
+
+struct mt_enable {
+	__u32 flags;		/* 1 -> on, 0 -> off */
+};
+
+#define MT_OFFSET_MASK		(0x0000ffffffffffffUL)
+
+#define MT_MAKE_SLOT_OFFSET(slot, offset)			\
+	do {							\
+		__u64 slot_off = offset & MT_OFFSET_MASK;	\
+		slot_off |= ((__u64)slot << 48);		\
+		slot_off;					\
+	} while (0)
+
+#define MT_OFFSET_FROM_SLOT_OFFSET(slot_off)		\
+	(slot_off & MT_OFFSET_MASK)
+
+#define MT_SLOT_FROM_SLOT_OFFSET(slot_off)		\
+	(slot_off >> 48)
+
+struct mt_gfn_list {
+	__s32	count;
+	__u32	max_dirty;
+	__u64	*gfnlist;
+};
+
+struct mt_prepare_cp {
+	__s64	cpid;
+};
+
+struct mt_sublist_fetch_info {
+	struct mt_gfn_list  gfn_info;
+
+	/*
+	 * flags bit defs:
+	 */
+
+	/* caller sleeps until dirty count is reached */
+#define MT_FETCH_WAIT		(1 << 0)
+	/* dirty tracking is re-armed for each page in returned list */
+#define MT_FETCH_REARM		(1 << 1)
+
+	__u32 flags;
+};
+
+struct mt_dirty_trigger {
+	/* force vcpus to exit when trigger is reached */
+	__u32 dirty_trigger;
+};
+
+/* Initialize/Cleanup MT data structures, allocate/free list buffers, etc. */
+#define KVM_INIT_MT		 _IOW(KVMIO, 0xf0, struct mt_setup)
+/* Active/Deactivate Memory Tracking */
+#define KVM_ENABLE_MT		 _IOW(KVMIO, 0xf1, struct mt_enable)
+/* notify MT subsystem that VM is about to be unpaused */
+#define KVM_PREPARE_MT_CP	 _IOW(KVMIO, 0xf2, struct mt_prepare_cp)
+/* Rearm dirty traps for specified pages */
+#define KVM_REARM_DIRTY_PAGES	 _IO(KVMIO, 0xf3)
+/* notify MT subsystem no more pages will be dirtied this cycle */
+#define KVM_MT_VM_QUIESCED	  _IO(KVMIO, 0xf4)
+/*
+ * Return specified number of dirty pages.  May return fewer than requested.
+ * Optionally, caller can request to sleep until desired number is reached.
+ * The KVM_MT_VM_QUIESCED call above will wake this sleeper even if the
+ * number of dirty pages is not yet the requested amount.
+ */
+#define KVM_MT_SUBLIST_FETCH	_IOWR(KVMIO, 0xf5, struct mt_sublist_fetch_info)
+/* Set VM exit trigger point based on dirty page count */
+#define KVM_MT_DIRTY_TRIGGER	 _IOW(KVMIO, 0xf6, struct mt_dirty_trigger)
+
 #endif /* __LINUX_KVM_H */
