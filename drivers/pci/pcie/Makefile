@@ -12,5 +12,6 @@ obj-$(CONFIG_PCIEPORTBUS)	+= pcieportdrv.o
 
 # Build PCI Express AER if needed
 obj-$(CONFIG_PCIEAER)		+= aer/
+obj-$(CONFIG_PCIEDPC)		+= dpc/
 
 obj-$(CONFIG_PCIE_PME) += pme.o

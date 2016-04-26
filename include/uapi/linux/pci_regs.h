@@ -670,7 +670,8 @@
 #define PCI_EXT_CAP_ID_SECPCI	0x19	/* Secondary PCIe Capability */
 #define PCI_EXT_CAP_ID_PMUX	0x1A	/* Protocol Multiplexing */
 #define PCI_EXT_CAP_ID_PASID	0x1B	/* Process Address Space ID */
-#define PCI_EXT_CAP_ID_MAX	PCI_EXT_CAP_ID_PASID
+#define PCI_EXT_CAP_ID_DPC	0x1D	/* Downstream Port Containment */
+#define PCI_EXT_CAP_ID_MAX	PCI_EXT_CAP_ID_DPC
 
 #define PCI_EXT_CAP_DSN_SIZEOF	12
 #define PCI_EXT_CAP_MCAST_ENDPOINT_SIZEOF 40
@@ -945,5 +946,29 @@
 #define PCI_TPH_CAP_ST_MASK	0x07FF0000	/* st table mask */
 #define PCI_TPH_CAP_ST_SHIFT	16	/* st table shift */
 #define PCI_TPH_BASE_SIZEOF	12	/* size with no st table */
+
+/* Downstream Port Containment */
+#define PCI_EXP_DPC_CAP			4	/* DPC Capability */
+#define  PCI_EXP_DPC_CAP_RP_EXT		0x20	/* Root Port Extensions for DPC */
+#define  PCI_EXP_DPC_CAP_POISONED_TLP	0x40	/* Poisoned TLP Egress Blocking Supported */
+#define  PCI_EXP_DPC_CAP_SW_TRIGGER	0x80	/* Software Triggering Supported */
+#define  PCI_EXP_DPC_CAP_DL_ACTIVE	0x1000	/* ERR_COR signal on DL_Active supported */
+
+#define PCI_EXP_DPC_CTL			6	/* DPC control */
+#define  PCI_EXP_DPC_CTL_DISABLE 	0x00	/* Disable trigger */
+#define  PCI_EXP_DPC_CTL_EN_FATAL 	0x01	/* Enable trigger on ERR_FATAL message */
+#define  PCI_EXP_DPC_CTL_EN_NONFATAL 	0x02	/* Enable trigger on ERR_NONFATAL message */
+#define  PCI_EXP_DPC_CTL_UR 		0x04	/* Unsupported Request Completion Status */
+#define  PCI_EXP_DPC_CTL_INT_EN 	0x08	/* DPC Interrupt Enable */
+#define  PCI_EXP_DPC_CTL_ERR_COR_EN 	0x10	/* Enable ERRO_COR Message on DPC triggered */
+#define  PCI_EXP_DPC_CTL_POSIONED_TLP	0x20	/* Enabled Poisoned TLP Egress Blocking */
+#define  PCI_EXP_DPC_CTL_SW_T_EN	0x40	/* Trigger DPC Status */
+#define  PCI_EXP_DPC_CTL_DL_A_ERR_COR	0x80	/* Signal ER_COR on DL_Active */
+
+#define PCI_EXP_DPC_STATUS		8	/* DPC Status */
+#define  PCI_EXP_DPC_STATUS_TRIGGER	0x01	/* Trigger Status */
+#define  PCI_EXP_DPC_STATUS_INTERRUPT	0x08	/* Interrupt Status */
+
+#define PCI_EXP_DPC_SOURCE_ID		0x0A
 
 #endif /* LINUX_PCI_REGS_H */

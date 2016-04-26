@@ -23,6 +23,7 @@ config HOTPLUG_PCI_PCIE
 	  When in doubt, say N.
 
 source "drivers/pci/pcie/aer/Kconfig"
+source "drivers/pci/pcie/dpc/Kconfig"
 
 #
 # PCI Express ASPM
