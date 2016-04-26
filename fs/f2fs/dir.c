@@ -149,9 +149,9 @@ struct f2fs_dir_entry *find_target_dentry(struct fscrypt_name *fname,
 
 		/* remain bug on condition */
 		if (unlikely(!de->name_len))
-			d->max = -1;
-
-		bit_pos += GET_DENTRY_SLOTS(le16_to_cpu(de->name_len));
+			bit_pos++;
+		else
+			bit_pos += GET_DENTRY_SLOTS(le16_to_cpu(de->name_len));
 	}
 
 	de = NULL;
