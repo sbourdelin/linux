@@ -346,11 +346,11 @@ unsigned long get_taint(void)
  * @lockdep_ok: whether lock debugging is still OK.
  *
  * If something bad has gone wrong, you'll want @lockdebug_ok = false, but for
- * some notewortht-but-not-corrupting cases, it can be set to true.
+ * some noteworthy-but-not-corrupting cases, it can be set to true.
  */
 void add_taint(unsigned flag, enum lockdep_ok lockdep_ok)
 {
-	if (lockdep_ok == LOCKDEP_NOW_UNRELIABLE && __debug_locks_off())
+	if (lockdep_ok == LOCKDEP_NOW_UNRELIABLE && !debug_locks)
 		pr_warn("Disabling lock debugging due to kernel taint\n");
 
 	set_bit(flag, &tainted_mask);
