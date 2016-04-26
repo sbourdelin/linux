@@ -1326,9 +1326,8 @@ static int wake_futex_pi(u32 __user *uaddr, u32 uval, struct futex_q *this,
 	 * scheduled away before the wake up can take place.
 	 */
 	spin_unlock(&hb->lock);
-	wake_up_q(&wake_q);
-	if (deboost)
-		rt_mutex_adjust_prio(current);
+
+	rt_mutex_postunlock(&wake_q, deboost);
 
 	return 0;
 }

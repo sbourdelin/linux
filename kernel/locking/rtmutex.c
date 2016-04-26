@@ -1390,12 +1390,32 @@ rt_mutex_fastunlock(struct rt_mutex *lock,
 	} else {
 		bool deboost = slowfn(lock, &wake_q);
 
-		wake_up_q(&wake_q);
-
-		/* Undo pi boosting if necessary: */
-		if (deboost)
-			rt_mutex_adjust_prio(current);
+		rt_mutex_postunlock(&wake_q, deboost);
 	}
+}
+
+
+/*
+ * Undo pi boosting (if necessary) and wake top waiter.
+ */
+void rt_mutex_postunlock(struct wake_q_head *wake_q, bool deboost)
+{
+	/*
+	 * We should deboost before waking the top waiter task such that
+	 * we don't run two tasks with the 'same' priority. This however
+	 * can lead to prio-inversion if we would get preempted after
+	 * the deboost but before waking our high-prio task, hence the
+	 * preempt_disable.
+	 */
+	if (deboost) {
+		preempt_disable();
+		rt_mutex_adjust_prio(current);
+	}
+
+	wake_up_q(wake_q);
+
+	if (deboost)
+		preempt_enable();
 }
 
 /**
