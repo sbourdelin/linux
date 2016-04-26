@@ -602,7 +602,7 @@ choice
 	config VF_USE_ARM_GLOBAL_TIMER
 		bool "Use ARM Global Timer"
 		depends on ARCH_MULTI_V7
-		select ARM_GLOBAL_TIMER
+		select HAVE_ARM_GLOBAL_TIMER
 		select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
 		help
 		  Use the ARM Global Timer as clocksource

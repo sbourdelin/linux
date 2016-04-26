@@ -14,7 +14,7 @@ config ARCH_ROCKCHIP
 	select DW_APB_TIMER_OF
 	select REGULATOR if PM
 	select ROCKCHIP_TIMER
-	select ARM_GLOBAL_TIMER
+	select HAVE_ARM_GLOBAL_TIMER
 	select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
 	help
 	  Support for Rockchip's Cortex-A9 Single-to-Quad-Core-SoCs

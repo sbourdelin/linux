@@ -207,9 +207,14 @@ config ARM_ARCH_TIMER_EVTSTREAM
 	  This must be disabled for hardware validation purposes to detect any
 	  hardware anomalies of missing events.
 
-config ARM_GLOBAL_TIMER
+config HAVE_ARM_GLOBAL_TIMER
 	bool
+
+config ARM_GLOBAL_TIMER
+	bool "Support for ARM global timer unit"
 	select CLKSRC_OF if OF
+	default y
+	depends on HAVE_ARM_GLOBAL_TIMER
 	help
 	  This options enables support for the ARM global timer unit
 
