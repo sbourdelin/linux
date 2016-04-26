@@ -313,6 +313,7 @@ static int xhci_plat_suspend(struct device *dev)
 	if (ret)
 		return ret;
 
+	usb_phy_shutdown(xhci->shared_hcd->usb_phy);
 	clk_disable_unprepare(xhci->clk);
 
 	return ret;
@@ -325,6 +326,10 @@ static int xhci_plat_resume(struct device *dev)
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
 
 	ret = clk_prepare_enable(xhci->clk);
+	if (ret)
+		return ret;
+
+	ret = usb_phy_init(xhci->shared_hcd->usb_phy);
 	if (ret)
 		return ret;
 
