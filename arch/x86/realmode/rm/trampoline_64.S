@@ -30,6 +30,7 @@
 #include <asm/msr.h>
 #include <asm/segment.h>
 #include <asm/processor-flags.h>
+#include <asm/realmode.h>
 #include "realmode.h"
 
 	.text
@@ -109,6 +110,18 @@ ENTRY(startup_32)
 	movl	$(X86_CR0_PG | X86_CR0_WP | X86_CR0_PE), %eax
 	movl	%eax, %cr0
 
+	# Check for and enable memory encryption support
+	movl	pa_tr_flags, %eax
+	bt	$TH_FLAGS_MEM_ENCRYPT_BIT, pa_tr_flags
+	jnc	.Ldone
+	movl	$MSR_K8_SYSCFG, %ecx
+	rdmsr
+	bt	$MSR_K8_SYSCFG_MEM_ENCRYPT_BIT, %eax
+	jc	.Ldone
+	bts	$MSR_K8_SYSCFG_MEM_ENCRYPT_BIT, %eax
+	wrmsr
+.Ldone:
+
 	/*
 	 * At this point we're in long mode but in 32bit compatibility mode
 	 * with EFER.LME = 1, CS.L = 0, CS.D = 1 (and in turn
@@ -147,6 +160,7 @@ GLOBAL(trampoline_header)
 	tr_start:		.space	8
 	GLOBAL(tr_efer)		.space	8
 	GLOBAL(tr_cr4)		.space	4
+	GLOBAL(tr_flags)	.space	4
 END(trampoline_header)
 
 #include "trampoline_common.S"
