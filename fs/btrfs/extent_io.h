@@ -35,6 +35,7 @@
 #define EXTENT_BUFFER_HEAD_TREE_REF 0
 #define EXTENT_BUFFER_HEAD_DUMMY 1
 #define EXTENT_BUFFER_HEAD_IN_TREE 2
+#define EXTENT_BUFFER_HEAD_WRITEBACK 3
 
 /* these are bit numbers for test/set bit on extent buffer */
 #define EXTENT_BUFFER_UPTODATE 0
