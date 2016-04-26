@@ -199,6 +199,7 @@ void print_usage(void)
 		"  -e         Disable wait for event (new data)\n"
 		"  -g         Use trigger-less mode\n"
 		"  -l <n>     Set buffer length to n samples\n"
+		"  -m <n>     Set watermark to n samples\n"
 		"  -n <name>  Set device name (mandatory)\n"
 		"  -t <name>  Set trigger name\n"
 		"  -w <n>     Set delay between reads in us (event-less mode)\n");
@@ -225,11 +226,12 @@ int main(int argc, char **argv)
 	int scan_size;
 	int noevents = 0;
 	int notrigger = 0;
+	int watermark = 0;
 	char *dummy;
 
 	struct iio_channel_info *channels;
 
-	while ((c = getopt(argc, argv, "c:egl:n:t:w:")) != -1) {
+	while ((c = getopt(argc, argv, "c:egl:n:t:w:m:")) != -1) {
 		switch (c) {
 		case 'c':
 			errno = 0;
@@ -250,6 +252,12 @@ int main(int argc, char **argv)
 			if (errno)
 				return -errno;
 
+			break;
+		case 'm':
+			errno = 0;
+			watermark = strtoul(optarg, &dummy, 10);
+			if (errno)
+				return -errno;
 			break;
 		case 'n':
 			device_name = optarg;
@@ -370,6 +378,15 @@ int main(int argc, char **argv)
 	ret = write_sysfs_int("length", buf_dir_name, buf_len);
 	if (ret < 0)
 		goto error_free_buf_dir_name;
+
+	if (watermark) {
+		ret = write_sysfs_int("watermark", buf_dir_name,
+				       watermark);
+		if (ret < 0) {
+			fprintf(stderr, "Failed to write watermark\n");
+			goto error_free_buf_dir_name;
+		}
+	}
 
 	/* Enable the buffer */
 	ret = write_sysfs_int("enable", buf_dir_name, 1);
