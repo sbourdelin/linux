@@ -18,6 +18,7 @@
 #include <linux/of.h>
 #include <linux/phy/phy.h>
 #include <linux/platform_device.h>
+#include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <linux/usb/phy.h>
 #include <linux/usb/xhci_pdriver.h>
@@ -178,6 +179,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	struct clk              *clk;
 	struct usb_phy		*usb_phy;
 	struct phy		*phy;
+	struct regulator	*vbus;
 	int			ret;
 	int			irq;
 
@@ -249,13 +251,30 @@ static int xhci_plat_probe(struct platform_device *pdev)
 
 	device_wakeup_enable(hcd->self.controller);
 
+	vbus = devm_regulator_get(&pdev->dev, "vbus");
+	if (PTR_ERR(vbus) == -ENODEV) {
+		vbus = NULL;
+	} else if (IS_ERR(vbus)) {
+		ret = PTR_ERR(vbus);
+		goto disable_clk;
+	} else if (vbus) {
+		ret = regulator_enable(vbus);
+		if (ret) {
+			dev_err(&pdev->dev,
+				"failed to enable usb vbus regulator: %d\n",
+				ret);
+			goto disable_clk;
+		}
+	}
+
 	xhci->clk = clk;
+	xhci->vbus = vbus;
 	xhci->main_hcd = hcd;
 	xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
 			dev_name(&pdev->dev), hcd);
 	if (!xhci->shared_hcd) {
 		ret = -ENOMEM;
-		goto disable_clk;
+		goto disable_vbus;
 	}
 
 	if ((node && of_property_read_bool(node, "usb3-lpm-capable")) ||
@@ -323,6 +342,10 @@ disable_usb2_phy:
 put_usb3_hcd:
 	usb_put_hcd(xhci->shared_hcd);
 
+disable_vbus:
+	if (vbus)
+		regulator_disable(vbus);
+
 disable_clk:
 	clk_disable_unprepare(clk);
 
@@ -337,6 +360,7 @@ static int xhci_plat_remove(struct platform_device *dev)
 	struct usb_hcd	*hcd = platform_get_drvdata(dev);
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
 	struct clk *clk = xhci->clk;
+	struct regulator *vbus = xhci->vbus;
 
 	usb_remove_hcd(xhci->shared_hcd);
 	xhci_plat_phy_exit(xhci->shared_hcd);
@@ -347,6 +371,9 @@ static int xhci_plat_remove(struct platform_device *dev)
 	clk_disable_unprepare(clk);
 	usb_put_hcd(hcd);
 
+	if (vbus)
+		regulator_disable(vbus);
+
 	return 0;
 }
 
@@ -356,6 +383,7 @@ static int xhci_plat_suspend(struct device *dev)
 	int ret;
 	struct usb_hcd	*hcd = dev_get_drvdata(dev);
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+	struct regulator *vbus = xhci->vbus;
 
 	/*
 	 * xhci_suspend() needs `do_wakeup` to know whether host is allowed
@@ -373,6 +401,9 @@ static int xhci_plat_suspend(struct device *dev)
 	xhci_plat_phy_exit(hcd);
 	clk_disable_unprepare(xhci->clk);
 
+	if (vbus)
+		ret = regulator_disable(vbus);
+
 	return ret;
 }
 
@@ -381,10 +412,17 @@ static int xhci_plat_resume(struct device *dev)
 	int ret;
 	struct usb_hcd	*hcd = dev_get_drvdata(dev);
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+	struct regulator *vbus = xhci->vbus;
 
 	ret = clk_prepare_enable(xhci->clk);
 	if (ret)
 		return ret;
+
+	if (vbus) {
+		ret = regulator_enable(vbus);
+		if (ret)
+			return ret;
+	}
 
 	ret = xhci_plat_phy_init(hcd);
 	if (ret)
