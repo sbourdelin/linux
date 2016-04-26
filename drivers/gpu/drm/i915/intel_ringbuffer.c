@@ -1593,6 +1593,13 @@ gen6_seqno_barrier(struct intel_engine_cs *engine)
 	POSTING_READ_FW(RING_ACTHD(engine->mmio_base));
 }
 
+static void
+hsw_seqno_barrier(struct intel_engine_cs *engine)
+{
+	gen6_seqno_barrier(engine);
+	intel_flush_status_page(engine, I915_GEM_HWS_INDEX);
+}
+
 static u32
 ring_get_seqno(struct intel_engine_cs *engine)
 {
@@ -2936,9 +2943,13 @@ int intel_init_bsd_ring_buffer(struct drm_device *dev)
 			engine->write_tail = gen6_bsd_ring_write_tail;
 		engine->flush = gen6_bsd_ring_flush;
 		engine->add_request = gen6_add_request;
-		engine->irq_seqno_barrier = gen6_seqno_barrier;
+
 		engine->get_seqno = ring_get_seqno;
 		engine->set_seqno = ring_set_seqno;
+		engine->irq_seqno_barrier = gen6_seqno_barrier;
+		if (IS_HASWELL(dev))
+			engine->irq_seqno_barrier = hsw_seqno_barrier;
+
 		if (INTEL_INFO(dev)->gen >= 8) {
 			engine->irq_enable_mask =
 				GT_RENDER_USER_INTERRUPT << GEN8_VCS1_IRQ_SHIFT;
@@ -3010,13 +3021,18 @@ int intel_init_bsd2_ring_buffer(struct drm_device *dev)
 	engine->mmio_base = GEN8_BSD2_RING_BASE;
 	engine->flush = gen6_bsd_ring_flush;
 	engine->add_request = gen6_add_request;
-	engine->irq_seqno_barrier = gen6_seqno_barrier;
-	engine->get_seqno = ring_get_seqno;
-	engine->set_seqno = ring_set_seqno;
+
 	engine->irq_enable_mask =
 			GT_RENDER_USER_INTERRUPT << GEN8_VCS2_IRQ_SHIFT;
 	engine->irq_get = gen8_ring_get_irq;
 	engine->irq_put = gen8_ring_put_irq;
+	engine->irq_seqno_barrier = gen6_seqno_barrier;
+	if (IS_HASWELL(dev))
+		engine->irq_seqno_barrier = hsw_seqno_barrier;
+
+	engine->get_seqno = ring_get_seqno;
+	engine->set_seqno = ring_set_seqno;
+
 	engine->dispatch_execbuffer =
 			gen8_ring_dispatch_execbuffer;
 	if (i915_semaphore_is_enabled(dev)) {
@@ -3042,9 +3058,14 @@ int intel_init_blt_ring_buffer(struct drm_device *dev)
 	engine->write_tail = ring_write_tail;
 	engine->flush = gen6_ring_flush;
 	engine->add_request = gen6_add_request;
+
 	engine->irq_seqno_barrier = gen6_seqno_barrier;
+	if (IS_HASWELL(dev))
+		engine->irq_seqno_barrier = hsw_seqno_barrier;
+
 	engine->get_seqno = ring_get_seqno;
 	engine->set_seqno = ring_set_seqno;
+
 	if (INTEL_INFO(dev)->gen >= 8) {
 		engine->irq_enable_mask =
 			GT_RENDER_USER_INTERRUPT << GEN8_BCS_IRQ_SHIFT;
@@ -3101,7 +3122,11 @@ int intel_init_vebox_ring_buffer(struct drm_device *dev)
 	engine->write_tail = ring_write_tail;
 	engine->flush = gen6_ring_flush;
 	engine->add_request = gen6_add_request;
+
 	engine->irq_seqno_barrier = gen6_seqno_barrier;
+	if (IS_HASWELL(dev))
+		engine->irq_seqno_barrier = hsw_seqno_barrier;
+
 	engine->get_seqno = ring_get_seqno;
 	engine->set_seqno = ring_set_seqno;
 
