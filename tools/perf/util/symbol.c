@@ -1687,11 +1687,16 @@ static char *dso__find_kallsyms(struct dso *dso, struct map *map)
 
 	scnprintf(path, sizeof(path), "%s/[kernel.kallsyms]/%s/kallsyms",
 		  buildid_dir, sbuild_id);
-
+	/* Try old style kallsyms cache */
 	if (access(path, F_OK)) {
-		pr_err("No kallsyms or vmlinux with build-id %s was found\n",
-		       sbuild_id);
-		return NULL;
+		scnprintf(path, sizeof(path), "%s/[kernel.kallsyms]/%s",
+			  buildid_dir, sbuild_id);
+
+		if (access(path, F_OK)) {
+			pr_err("No kallsyms or vmlinux with build-id %s was found\n",
+			       sbuild_id);
+			return NULL;
+		}
 	}
 
 	return strdup(path);

@@ -155,6 +155,12 @@ static char *build_id_cache__linkname(const char *sbuild_id, char *bf,
 	return bf;
 }
 
+static bool __is_regular_file(const char *pathname)
+{
+	struct stat sb;
+	return stat(pathname, &sb) == 0 && S_ISREG(sb.st_mode);
+}
+
 static const char *build_id_cache__basename(bool is_kallsyms, bool is_vdso)
 {
 	return is_kallsyms ? "kallsyms" : (is_vdso ? "vdso" : "elf");
@@ -177,7 +183,11 @@ char *dso__build_id_filename(const struct dso *dso, char *bf, size_t size)
 	if (!linkname)
 		return NULL;
 
-	ret = asnprintf(&bf, size, "%s/%s", linkname,
+	/* Check if old style build_id cache */
+	if (__is_regular_file(linkname))
+		ret = asnprintf(&bf, size, "%s", linkname);
+	else
+		ret = asnprintf(&bf, size, "%s/%s", linkname,
 			 build_id_cache__basename(is_kallsyms, is_vdso));
 	if (ret < 0 || (!alloc && size < (unsigned int)ret))
 		bf = NULL;
@@ -444,6 +454,11 @@ int build_id_cache__add_s(const char *sbuild_id, const char *name,
 						     is_vdso, sbuild_id);
 	if (!dir_name)
 		goto out_free;
+
+	/* Remove old style build-id cache */
+	if (__is_regular_file(dir_name))
+		if (unlink(dir_name))
+			goto out_free;
 
 	if (mkdir_p(dir_name, 0755))
 		goto out_free;
