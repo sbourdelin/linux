@@ -52,11 +52,64 @@
 #define PAGE_SET_PRIVATE2	(1 << 4)
 #define PAGE_SET_ERROR		(1 << 5)
 
+enum blk_state {
+	BLK_STATE_UPTODATE,
+	BLK_STATE_DIRTY,
+	BLK_STATE_IO,
+	BLK_NR_STATE,
+};
+
 /*
- * page->private values.  Every page that is controlled by the extent
- * map has page->private set to one.
- */
-#define EXTENT_PAGE_PRIVATE 1
+  The maximum number of blocks per page (i.e. 32) occurs when using 2k
+  as the block size and having 64k as the page size.
+*/
+#define BLK_STATE_NR_LONGS DIV_ROUND_UP(BLK_NR_STATE * 32, BITS_PER_LONG)
+
+/*
+  btrfs_page_private->io_lock plays the same role as BH_Uptodate_Lock
+  (see end_buffer_async_read()) i.e. without the io_lock we may end up
+  in the following situation,
+
+  NOTE: Assume 64k page size and 4k block size. Also assume that the first 12
+  blocks of the page are contiguous while the next 4 blocks are contiguous. When
+  reading the page we end up submitting two "logical address space" bios. So
+  end_bio_extent_readpage function is invoked twice, once for each bio.
+
+  |-------------------------+-------------------------+-------------|
+  | Task A                  | Task B                  | Task C      |
+  |-------------------------+-------------------------+-------------|
+  | end_bio_extent_readpage |                         |             |
+  | process block 0         |                         |             |
+  | - clear BLK_STATE_IO    |                         |             |
+  | - page_read_complete    |                         |             |
+  | process block 1         |                         |             |
+  |                         |                         |             |
+  |                         |                         |             |
+  |                         | end_bio_extent_readpage |             |
+  |                         | process block 0         |             |
+  |                         | - clear BLK_STATE_IO    |             |
+  |                         | - page_read_complete    |             |
+  |                         | process block 1         |             |
+  |                         |                         |             |
+  | process block 11        | process block 3         |             |
+  | - clear BLK_STATE_IO    | - clear BLK_STATE_IO    |             |
+  | - page_read_complete    | - page_read_complete    |             |
+  |   - returns true        |   - returns true        |             |
+  |   - unlock_page()       |                         |             |
+  |                         |                         | lock_page() |
+  |                         |   - unlock_page()       |             |
+  |-------------------------+-------------------------+-------------|
+
+  We end up incorrectly unlocking the page twice and "Task C" ends up
+  working on an unlocked page. So private->io_lock makes sure that
+  only one of the tasks gets "true" as the return value when
+  page_io_complete() is invoked. As an optimization the patch gets the
+  io_lock only when the last block of the bio_vec is being processed.
+*/
+struct btrfs_page_private {
+	spinlock_t io_lock;
+	unsigned long bstate[BLK_STATE_NR_LONGS];
+};
 
 struct extent_state;
 struct btrfs_root;
@@ -342,8 +395,14 @@ int extent_readpages(struct extent_io_tree *tree,
 		     get_extent_t get_extent);
 int extent_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 		__u64 start, __u64 len, get_extent_t *get_extent);
-void set_page_extent_mapped(struct page *page);
-
+int set_page_extent_mapped(struct page *page);
+int clear_page_extent_mapped(struct page *page);
+int set_page_blks_state(struct page *page, unsigned long blk_states,
+ 			u64 start, u64 end);
+int clear_page_blks_state(struct page *page, unsigned long blk_states,
+ 			u64 start, u64 end);
+int test_page_blks_state(struct page *page, enum blk_state blk_state,
+			u64 start, u64 end, int check_all);
 struct extent_buffer *alloc_extent_buffer(struct btrfs_fs_info *fs_info,
 					  u64 start);
 struct extent_buffer *__alloc_dummy_extent_buffer(struct btrfs_fs_info *fs_info,
