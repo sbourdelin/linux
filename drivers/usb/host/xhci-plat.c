@@ -11,19 +11,19 @@
  * version 2 as published by the Free Software Foundation.
  */
 
+#include <linux/acpi.h>
 #include <linux/clk.h>
 #include <linux/dma-mapping.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
-#include <linux/usb/phy.h>
 #include <linux/slab.h>
+#include <linux/usb/phy.h>
 #include <linux/usb/xhci_pdriver.h>
-#include <linux/acpi.h>
 
 #include "xhci.h"
-#include "xhci-plat.h"
 #include "xhci-mvebu.h"
+#include "xhci-plat.h"
 #include "xhci-rcar.h"
 
 static struct hc_driver __read_mostly xhci_plat_hc_driver;
