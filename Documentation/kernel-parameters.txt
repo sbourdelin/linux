@@ -2202,6 +2202,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			memory contents and reserves bad memory
 			regions that are detected.
 
+	mem_encrypt=on	[X86_64] Enable memory encryption on processors
+			that support this feature.
+
 	meye.*=		[HW] Set MotionEye Camera parameters
 			See Documentation/video4linux/meye.txt.
 
