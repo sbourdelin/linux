@@ -3187,6 +3187,9 @@ static int relocate_file_extent_cluster(struct inode *inode,
 		}
 
 		btrfs_set_extent_delalloc(inode, page_start, page_end, NULL);
+		set_page_blks_state(page,
+				1 << BLK_STATE_DIRTY | 1 << BLK_STATE_UPTODATE,
+				page_start, page_end);
 		set_page_dirty(page);
 
 		unlock_extent(&BTRFS_I(inode)->io_tree,

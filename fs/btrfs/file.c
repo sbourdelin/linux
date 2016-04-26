@@ -495,6 +495,9 @@ int btrfs_dirty_pages(struct btrfs_root *root, struct inode *inode,
 	u64 num_bytes;
 	u64 start_pos;
 	u64 end_of_last_block;
+	u64 start;
+	u64 end;
+	u64 page_end;
 	u64 end_pos = pos + write_bytes;
 	loff_t isize = i_size_read(inode);
 
@@ -507,11 +510,24 @@ int btrfs_dirty_pages(struct btrfs_root *root, struct inode *inode,
 	if (err)
 		return err;
 
+	start = start_pos;
+
 	for (i = 0; i < num_pages; i++) {
 		struct page *p = pages[i];
 		SetPageUptodate(p);
 		ClearPageChecked(p);
+
+		end = page_end = page_offset(p) + PAGE_SIZE - 1;
+
+		if (i == num_pages - 1)
+			end = min_t(u64, page_end, end_of_last_block);
+
+		set_page_blks_state(p,
+				1 << BLK_STATE_DIRTY | 1 << BLK_STATE_UPTODATE,
+				start, end);
 		set_page_dirty(p);
+
+		start = page_end + 1;
 	}
 
 	/*
