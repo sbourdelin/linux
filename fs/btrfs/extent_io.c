@@ -14,6 +14,7 @@
 #include "extent_io.h"
 #include "extent_map.h"
 #include "ctree.h"
+#include "disk-io.h"
 #include "btrfs_inode.h"
 #include "volumes.h"
 #include "check-integrity.h"
@@ -2173,7 +2174,7 @@ int repair_eb_io_failure(struct btrfs_root *root, struct extent_buffer *eb,
 		struct page *p = eb_head(eb)->pages[i];
 
 		ret = repair_io_failure(root->fs_info->btree_inode, start,
-					PAGE_SIZE, start, p,
+					eb->len, start, p,
 					start - page_offset(p), mirror_num);
 		if (ret)
 			break;
@@ -3721,6 +3722,80 @@ lock_extent_buffer_for_io(struct extent_buffer *eb,
 	}
 
 	return ret;
+}
+
+static void end_bio_extent_buffer_readpage(struct bio *bio)
+{
+	struct address_space *mapping = bio->bi_io_vec->bv_page->mapping;
+	struct extent_io_tree *tree = &BTRFS_I(mapping->host)->io_tree;
+	struct btrfs_io_bio *io_bio = btrfs_io_bio(bio);
+	struct extent_buffer *eb;
+	struct btrfs_root *root;
+	struct bio_vec *bvec;
+	struct page *page;
+	int uptodate = !bio->bi_error;
+	u64 start;
+	u64 end;
+	int mirror;
+	int ret;
+	int i;
+
+	bio_for_each_segment_all(bvec, bio, i) {
+		page = bvec->bv_page;
+		root = BTRFS_I(page->mapping->host)->root;
+
+		start = page_offset(page) + bvec->bv_offset;
+		end = start + bvec->bv_len - 1;
+
+		if (!page->private) {
+			unlock_page(page);
+			clear_extent_bit(tree, start, end,
+					EXTENT_LOCKED, 1, 0, NULL,
+					GFP_ATOMIC);
+			continue;
+		}
+
+		eb = (struct extent_buffer *)page->private;
+
+		do {
+			/*
+			  read_extent_buffer_pages() does not start
+			  I/O on PG_uptodate pages. Hence the bio may
+			  map only part of the extent buffer.
+			 */
+			if ((eb->start <= start) && (eb->start + eb->len - 1 > start))
+				break;
+		} while ((eb = eb->eb_next) != NULL);
+
+		BUG_ON(!eb);
+
+		mirror = io_bio->mirror_num;
+
+		if (uptodate) {
+			ret = verify_extent_buffer_read(io_bio, page, start,
+							end, mirror);
+			if (ret)
+				uptodate = 0;
+		}
+
+		if (!uptodate) {
+			set_bit(EXTENT_BUFFER_READ_ERR, &eb->ebflags);
+			eb->read_mirror = mirror;
+			atomic_dec(&eb_head(eb)->io_bvecs);
+			if (test_and_clear_bit(EXTENT_BUFFER_READAHEAD,
+						&eb->ebflags))
+				btree_readahead_hook(root->fs_info, eb, eb->start,
+						-EIO);
+			ClearPageUptodate(page);
+			SetPageError(page);
+		}
+
+		unlock_page(page);
+		clear_extent_bit(tree, start, end,
+				EXTENT_LOCKED, 1, 0, NULL, GFP_ATOMIC);
+	}
+
+	bio_put(bio);
 }
 
 static void end_extent_buffer_writeback(struct extent_buffer *eb)
@@ -5418,6 +5493,9 @@ int read_extent_buffer_pages(struct extent_io_tree *tree,
 			     struct extent_buffer *eb, u64 start, int wait,
 			     get_extent_t *get_extent, int mirror_num)
 {
+	struct inode *inode = tree->mapping->host;
+	struct btrfs_fs_info *fs_info = BTRFS_I(inode)->root->fs_info;
+	struct extent_state *cached_state = NULL;
 	unsigned long i;
 	unsigned long start_i;
 	struct page *page;
@@ -5445,10 +5523,17 @@ int read_extent_buffer_pages(struct extent_io_tree *tree,
 	for (i = start_i; i < num_pages; i++) {
 		page = eb_head(eb)->pages[i];
 		if (wait == WAIT_NONE) {
-			if (!trylock_page(page))
+			if (!trylock_page(page)) {
 				goto unlock_exit;
+			} else {
+				if (PageWriteback(page)) {
+					unlock_page(page);
+					goto unlock_exit;
+				}
+			}
 		} else {
 			lock_page(page);
+			wait_on_page_writeback(page);
 		}
 		locked_pages++;
 		if (!PageUptodate(page)) {
@@ -5469,10 +5554,32 @@ int read_extent_buffer_pages(struct extent_io_tree *tree,
 		page = eb_head(eb)->pages[i];
 		if (!PageUptodate(page)) {
 			ClearPageError(page);
-			err = __extent_read_full_page(tree, page,
-						      get_extent, &bio,
-						      mirror_num, &bio_flags,
-						      READ | REQ_META);
+			if (eb->len < PAGE_SIZE) {
+				lock_extent_bits(tree, eb->start, eb->start + eb->len - 1,
+							&cached_state);
+				err = submit_extent_page(READ | REQ_META, tree,
+							NULL, page,
+							eb->start >> 9, eb->len,
+							eb->start - page_offset(page),
+							fs_info->fs_devices->latest_bdev,
+							&bio, -1,
+							end_bio_extent_buffer_readpage,
+							mirror_num, bio_flags,
+							bio_flags, false);
+			} else {
+				lock_extent_bits(tree, page_offset(page),
+						page_offset(page) + PAGE_SIZE - 1,
+						&cached_state);
+				err = submit_extent_page(READ | REQ_META, tree,
+							NULL, page,
+							page_offset(page) >> 9,
+							PAGE_SIZE, 0,
+							fs_info->fs_devices->latest_bdev,
+							&bio, -1,
+							end_bio_extent_buffer_readpage,
+							mirror_num, bio_flags,
+							bio_flags, false);
+			}
 			if (err)
 				ret = err;
 		} else {
@@ -5493,9 +5600,10 @@ int read_extent_buffer_pages(struct extent_io_tree *tree,
 	for (i = start_i; i < num_pages; i++) {
 		page = eb_head(eb)->pages[i];
 		wait_on_page_locked(page);
-		if (!PageUptodate(page))
-			ret = -EIO;
 	}
+
+	if (!extent_buffer_uptodate(eb))
+		ret = -EIO;
 
 	return ret;
 
