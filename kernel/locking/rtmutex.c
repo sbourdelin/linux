@@ -256,6 +256,16 @@ rt_mutex_dequeue_pi(struct task_struct *task, struct rt_mutex_waiter *waiter)
 	RB_CLEAR_NODE(&waiter->pi_tree_entry);
 }
 
+void rt_mutex_update_top_task(struct task_struct *p)
+{
+	if (!task_has_pi_waiters(p)) {
+		p->pi_top_task = NULL;
+		return;
+	}
+
+	p->pi_top_task = task_top_pi_waiter(p)->task;
+}
+
 /*
  * Calculate task priority from the waiter tree priority
  *
@@ -273,10 +283,7 @@ int rt_mutex_getprio(struct task_struct *task)
 
 struct task_struct *rt_mutex_get_top_task(struct task_struct *task)
 {
-	if (likely(!task_has_pi_waiters(task)))
-		return NULL;
-
-	return task_top_pi_waiter(task)->task;
+	return task->pi_top_task;
 }
 
 /*
@@ -285,12 +292,12 @@ struct task_struct *rt_mutex_get_top_task(struct task_struct *task)
  */
 int rt_mutex_get_effective_prio(struct task_struct *task, int newprio)
 {
-	if (!task_has_pi_waiters(task))
+	struct task_struct *top_task = rt_mutex_get_top_task(task);
+
+	if (!top_task)
 		return newprio;
 
-	if (task_top_pi_waiter(task)->task->prio <= newprio)
-		return task_top_pi_waiter(task)->task->prio;
-	return newprio;
+	return min(top_task->prio, newprio);
 }
 
 /*
@@ -304,24 +311,6 @@ static void __rt_mutex_adjust_prio(struct task_struct *task)
 
 	if (task->prio != prio || dl_prio(prio))
 		rt_mutex_setprio(task, prio);
-}
-
-/*
- * Adjust task priority (undo boosting). Called from the exit path of
- * rt_mutex_slowunlock() and rt_mutex_slowlock().
- *
- * (Note: We do this outside of the protection of lock->wait_lock to
- * allow the lock to be taken while or before we readjust the priority
- * of task. We do not use the spin_xx_mutex() variants here as we are
- * outside of the debug path.)
- */
-void rt_mutex_adjust_prio(struct task_struct *task)
-{
-	unsigned long flags;
-
-	raw_spin_lock_irqsave(&task->pi_lock, flags);
-	__rt_mutex_adjust_prio(task);
-	raw_spin_unlock_irqrestore(&task->pi_lock, flags);
 }
 
 /*
@@ -987,6 +976,7 @@ static void mark_wakeup_next_waiter(struct wake_q_head *wake_q,
 	 * lock->wait_lock.
 	 */
 	rt_mutex_dequeue_pi(current, waiter);
+	__rt_mutex_adjust_prio(current);
 
 	/*
 	 * As we are waking up the top waiter, and the waiter stays
@@ -1325,6 +1315,16 @@ static bool __sched rt_mutex_slowunlock(struct rt_mutex *lock,
 	 */
 	mark_wakeup_next_waiter(wake_q, lock);
 
+	/*
+	 * We should deboost before waking the top waiter task such that
+	 * we don't run two tasks with the 'same' priority. This however
+	 * can lead to prio-inversion if we would get preempted after
+	 * the deboost but before waking our high-prio task, hence the
+	 * preempt_disable before unlock. Pairs with preempt_enable() in
+	 * rt_mutex_postunlock();
+	 */
+	preempt_disable();
+
 	raw_spin_unlock_irqrestore(&lock->wait_lock, flags);
 
 	/* check PI boosting */
@@ -1400,20 +1400,9 @@ rt_mutex_fastunlock(struct rt_mutex *lock,
  */
 void rt_mutex_postunlock(struct wake_q_head *wake_q, bool deboost)
 {
-	/*
-	 * We should deboost before waking the top waiter task such that
-	 * we don't run two tasks with the 'same' priority. This however
-	 * can lead to prio-inversion if we would get preempted after
-	 * the deboost but before waking our high-prio task, hence the
-	 * preempt_disable.
-	 */
-	if (deboost) {
-		preempt_disable();
-		rt_mutex_adjust_prio(current);
-	}
-
 	wake_up_q(wake_q);
 
+	/* Pairs with preempt_disable() in rt_mutex_slowunlock() */
 	if (deboost)
 		preempt_enable();
 }
