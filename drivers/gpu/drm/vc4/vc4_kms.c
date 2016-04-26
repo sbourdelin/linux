@@ -107,10 +107,26 @@ static int vc4_atomic_commit(struct drm_device *dev,
 			     bool async)
 {
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
-	int ret;
-	int i;
 	uint64_t wait_seqno = 0;
 	struct vc4_commit *c;
+	struct drm_crtc_state *crtc_state;
+	struct drm_crtc *crtc;
+	unsigned long flags;
+	int i, ret;
+
+	if (async) {
+		for_each_crtc_in_state(state, crtc, crtc_state, i) {
+
+			spin_lock_irqsave(&dev->event_lock, flags);
+
+			if (crtc->state->event || 
+				vc4_crtc_has_pending_event(crtc)) {
+				spin_unlock_irqrestore(&dev->event_lock, flags);
+				return -EBUSY;
+			}
+			spin_unlock_irqrestore(&dev->event_lock, flags);
+		}
+	}
 
 	c = commit_init(state);
 	if (!c)

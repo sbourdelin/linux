@@ -802,3 +802,9 @@ struct platform_driver vc4_crtc_driver = {
 		.of_match_table = vc4_crtc_dt_match,
 	},
 };
+
+bool vc4_crtc_has_pending_event(struct drm_crtc *crtc)
+{
+	assert_spin_locked(&crtc->dev->event_lock);
+	return to_vc4_crtc(crtc)->event;
+}
