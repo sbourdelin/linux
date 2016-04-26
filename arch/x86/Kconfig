@@ -598,6 +598,20 @@ config IOSF_MBI_DEBUG
 
 	  If you don't require the option or are in doubt, say N.
 
+config X86_INTEL_NON_ACPI
+	bool "Enable support non-ACPI Intel platforms"
+	select PINCTRL
+	---help---
+	  Select this option to enables MMIO BAR access over the P2SB for
+	  non-ACPI Intel SoC platforms. This driver uses the P2SB hide/unhide
+	  mechanism cooperatively to pass the PCI BAR address to the platform
+	  driver, currently GPIO on the following SoC products.
+	   - Apollo Lake
+
+config P2SB
+	tristate
+	depends on PCI
+
 config X86_RDC321X
 	bool "RDC R-321x SoC"
 	depends on X86_32
