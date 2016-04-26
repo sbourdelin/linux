@@ -70,6 +70,7 @@ static int render_state_init(struct render_state *so, struct drm_device *dev)
 
 free_gem:
 	drm_gem_object_unreference(&so->obj->base);
+	so->obj = NULL;
 	return ret;
 }
 
