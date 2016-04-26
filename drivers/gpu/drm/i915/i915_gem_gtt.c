@@ -866,31 +866,31 @@ static void gen8_free_page_tables(struct drm_device *dev,
 static int gen8_init_scratch(struct i915_address_space *vm)
 {
 	struct drm_device *dev = vm->dev;
+	int ret;
 
 	vm->scratch_page = alloc_scratch_page(dev);
-	if (IS_ERR(vm->scratch_page))
-		return PTR_ERR(vm->scratch_page);
+	if (IS_ERR(vm->scratch_page)) {
+		ret = PTR_ERR(vm->scratch_page);
+		goto fail_scratch;
+	}
 
 	vm->scratch_pt = alloc_pt(dev);
 	if (IS_ERR(vm->scratch_pt)) {
-		free_scratch_page(dev, vm->scratch_page);
-		return PTR_ERR(vm->scratch_pt);
+		ret = PTR_ERR(vm->scratch_pt);
+		goto fail_pt;
 	}
 
 	vm->scratch_pd = alloc_pd(dev);
 	if (IS_ERR(vm->scratch_pd)) {
-		free_pt(dev, vm->scratch_pt);
-		free_scratch_page(dev, vm->scratch_page);
-		return PTR_ERR(vm->scratch_pd);
+		ret = PTR_ERR(vm->scratch_pd);
+		goto fail_pd;
 	}
 
 	if (USES_FULL_48BIT_PPGTT(dev)) {
 		vm->scratch_pdp = alloc_pdp(dev);
 		if (IS_ERR(vm->scratch_pdp)) {
-			free_pd(dev, vm->scratch_pd);
-			free_pt(dev, vm->scratch_pt);
-			free_scratch_page(dev, vm->scratch_page);
-			return PTR_ERR(vm->scratch_pdp);
+			ret = PTR_ERR(vm->scratch_pdp);
+			goto fail_pdp;
 		}
 	}
 
@@ -900,6 +900,20 @@ static int gen8_init_scratch(struct i915_address_space *vm)
 		gen8_initialize_pdp(vm, vm->scratch_pdp);
 
 	return 0;
+
+fail_pdp:
+	vm->scratch_pdp = NULL;
+	free_pd(dev, vm->scratch_pd);
+fail_pd:
+	vm->scratch_pd = NULL;
+	free_pt(dev, vm->scratch_pt);
+fail_pt:
+	vm->scratch_pt = NULL;
+	free_scratch_page(dev, vm->scratch_page);
+fail_scratch:
+	vm->scratch_page = NULL;
+
+	return ret;
 }
 
 static int gen8_ppgtt_notify_vgt(struct i915_hw_ppgtt *ppgtt, bool create)
