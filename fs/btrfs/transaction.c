@@ -1352,6 +1352,7 @@ static noinline int create_pending_snapshot(struct btrfs_trans_handle *trans,
 	pending->error = btrfs_find_free_objectid(tree_root, &objectid);
 	if (pending->error)
 		goto no_free_objectid;
+	pending->objectid = objectid;
 
 	/*
 	 * Make qgroup to skip current new snapshot's qgroupid, as it is
@@ -1558,24 +1559,6 @@ static noinline int create_pending_snapshot(struct btrfs_trans_handle *trans,
 		btrfs_abort_transaction(trans, root, ret);
 		goto fail;
 	}
-
-	/*
-	 * account qgroup counters before qgroup_inherit()
-	 */
-	ret = btrfs_qgroup_prepare_account_extents(trans, fs_info);
-	if (ret)
-		goto fail;
-	ret = btrfs_qgroup_account_extents(trans, fs_info);
-	if (ret)
-		goto fail;
-	ret = btrfs_qgroup_inherit(trans, fs_info,
-				   root->root_key.objectid,
-				   objectid, pending->inherit);
-	if (ret) {
-		btrfs_abort_transaction(trans, root, ret);
-		goto fail;
-	}
-
 fail:
 	pending->error = ret;
 dir_item_existed:
@@ -1598,15 +1581,35 @@ no_free_objectid:
 static noinline int create_pending_snapshots(struct btrfs_trans_handle *trans,
 					     struct btrfs_fs_info *fs_info)
 {
+	struct btrfs_pending_snapshot *pending;
+	struct list_head *head = &trans->transaction->pending_snapshots;
+	int ret = 0;
+
+	list_for_each_entry(pending, head, list) {
+		ret = create_pending_snapshot(trans, fs_info, pending);
+		if (ret)
+			break;
+	}
+	return ret;
+}
+
+static noinline int inherit_pending_snapshots(struct btrfs_trans_handle *trans,
+					      struct btrfs_fs_info *fs_info)
+{
 	struct btrfs_pending_snapshot *pending, *next;
 	struct list_head *head = &trans->transaction->pending_snapshots;
 	int ret = 0;
 
 	list_for_each_entry_safe(pending, next, head, list) {
+		struct btrfs_root *root = pending->root;
 		list_del(&pending->list);
-		ret = create_pending_snapshot(trans, fs_info, pending);
-		if (ret)
+		ret = btrfs_qgroup_inherit(trans, fs_info,
+					   root->root_key.objectid,
+					   pending->objectid, pending->inherit);
+		if (ret) {
+			btrfs_abort_transaction(trans, root, ret);
 			break;
+		}
 	}
 	return ret;
 }
@@ -2082,6 +2085,14 @@ int btrfs_commit_transaction(struct btrfs_trans_handle *trans,
 		mutex_unlock(&root->fs_info->reloc_mutex);
 		goto scrub_continue;
 	}
+
+	/* Inherit the qgroup information for the snapshots. */
+	ret = inherit_pending_snapshots(trans, root->fs_info);
+	if (ret) {
+		mutex_unlock(&root->fs_info->reloc_mutex);
+		goto scrub_continue;
+	}
+
 
 	ret = commit_cowonly_roots(trans, root);
 	if (ret) {

@@ -144,6 +144,7 @@ struct btrfs_pending_snapshot {
 	/* block reservation for the operation */
 	struct btrfs_block_rsv block_rsv;
 	u64 qgroup_reserved;
+	u64 objectid;
 	/* extra metadata reseration for relocation */
 	int error;
 	bool readonly;
