@@ -12,6 +12,8 @@
 
 #include <linux/init.h>
 #include <linux/mm.h>
+#include <linux/dma-mapping.h>
+#include <linux/swiotlb.h>
 
 #include <asm/mem_encrypt.h>
 #include <asm/cacheflush.h>
@@ -168,6 +170,25 @@ void __init sme_early_init(void)
 }
 
 /* Architecture __weak replacement functions */
+void __init mem_encrypt_init(void)
+{
+	if (!sme_me_mask)
+		return;
+
+	/* Make SWIOTLB use an unencrypted DMA area */
+	swiotlb_clear_encryption();
+}
+
+unsigned long swiotlb_get_me_mask(void)
+{
+	return sme_me_mask;
+}
+
+void swiotlb_set_mem_dec(void *vaddr, unsigned long size)
+{
+	sme_set_mem_dec(vaddr, size);
+}
+
 void __init *efi_me_early_memremap(resource_size_t paddr,
 				   unsigned long size)
 {

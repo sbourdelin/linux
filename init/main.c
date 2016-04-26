@@ -458,6 +458,10 @@ void __init __weak thread_info_cache_init(void)
 }
 #endif
 
+void __init __weak mem_encrypt_init(void)
+{
+}
+
 /*
  * Set up kernel memory allocators
  */
@@ -596,6 +600,8 @@ asmlinkage __visible void __init start_kernel(void)
 	 * too:
 	 */
 	locking_selftest();
+
+	mem_encrypt_init();
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start && !initrd_below_start_ok &&

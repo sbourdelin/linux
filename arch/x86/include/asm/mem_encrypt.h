@@ -37,6 +37,11 @@ void __init *sme_early_memremap(resource_size_t paddr,
 void __init sme_early_init(void);
 
 /* Architecture __weak replacement functions */
+void __init mem_encrypt_init(void);
+
+unsigned long swiotlb_get_me_mask(void);
+void swiotlb_set_mem_dec(void *vaddr, unsigned long size);
+
 void __init *efi_me_early_memremap(resource_size_t paddr,
 				   unsigned long size);
 
