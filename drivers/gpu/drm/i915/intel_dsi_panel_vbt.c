@@ -29,6 +29,7 @@
 #include <drm/drm_edid.h>
 #include <drm/i915_drm.h>
 #include <drm/drm_panel.h>
+#include <linux/gpio/consumer.h>
 #include <linux/slab.h>
 #include <video/mipi_display.h>
 #include <asm/intel-mid.h>
@@ -300,6 +301,31 @@ static void chv_exec_gpio(struct drm_i915_private *dev_priv,
 	mutex_unlock(&dev_priv->sb_lock);
 }
 
+static void bxt_exec_gpio(struct drm_i915_private *dev_priv,
+			  u8 gpio_source, u8 gpio_index, bool value)
+{
+	/* XXX: this table is a quick ugly hack. */
+	static struct gpio_desc *bxt_gpio_table[U8_MAX + 1];
+	struct gpio_desc *gpio_desc = bxt_gpio_table[gpio_index];
+
+	if (!gpio_desc) {
+		gpio_desc = devm_gpiod_get_index(dev_priv->dev->dev,
+						 NULL, gpio_index,
+						 value ? GPIOD_OUT_LOW :
+						 GPIOD_OUT_HIGH);
+
+		if (IS_ERR_OR_NULL(gpio_desc)) {
+			DRM_ERROR("GPIO index %u request failed (%ld)\n",
+				  gpio_index, PTR_ERR(gpio_desc));
+			return;
+		}
+
+		bxt_gpio_table[gpio_index] = gpio_desc;
+	}
+
+	gpiod_set_value(gpio_desc, value);
+}
+
 static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
 {
 	struct drm_device *dev = intel_dsi->base.base.dev;
@@ -326,7 +352,7 @@ static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
 	else if (IS_CHERRYVIEW(dev_priv))
 		chv_exec_gpio(dev_priv, gpio_source, gpio_index, value);
 	else
-		DRM_DEBUG_KMS("GPIO element not supported on this platform\n");
+		bxt_exec_gpio(dev_priv, gpio_source, gpio_index, value);
 
 	return data;
 }
