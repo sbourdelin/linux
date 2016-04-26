@@ -567,13 +567,16 @@ static struct
 i915_page_directory_pointer *alloc_pdp(struct drm_device *dev)
 {
 	struct i915_page_directory_pointer *pdp;
-	int ret = -ENOMEM;
+	int ret = -EINVAL;
 
-	WARN_ON(!USES_FULL_48BIT_PPGTT(dev));
+	if (WARN_ON(!USES_FULL_48BIT_PPGTT(dev)))
+		goto fail;
 
 	pdp = kzalloc(sizeof(*pdp), GFP_KERNEL);
-	if (!pdp)
-		return ERR_PTR(-ENOMEM);
+	if (!pdp) {
+		ret = -ENOMEM;
+		goto fail;
+	}
 
 	ret = __pdp_init(dev, pdp);
 	if (ret)
@@ -589,7 +592,7 @@ fail_page_m:
 	__pdp_fini(pdp);
 fail_bitmap:
 	kfree(pdp);
-
+fail:
 	return ERR_PTR(ret);
 }
 
