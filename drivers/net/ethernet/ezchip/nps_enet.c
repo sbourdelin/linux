@@ -199,6 +199,18 @@ static int nps_enet_poll(struct napi_struct *napi, int budget)
 
 		nps_enet_reg_set(priv, NPS_ENET_REG_BUF_INT_ENABLE,
 				 buf_int_enable_value);
+
+		/* in case we will get a tx interrupt while interrupts
+		 * are masked, we will lose it since the tx is edge interrupt.
+		 * specifically, while executing the code section above,
+		 * between nps_enet_tx_handler and the interrupts enable, all
+		 * tx requests will be stuck until we will get an rx interrupt.
+		 * the two code lines below will solve this situation by
+		 * re-adding ourselves to the poll list.
+		 */
+
+		if (nps_enet_is_tx_pending(priv))
+			napi_reschedule(napi);
 	}
 
 	return work_done;
