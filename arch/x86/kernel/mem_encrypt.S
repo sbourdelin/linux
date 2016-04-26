@@ -14,6 +14,14 @@
 
 	.text
 	.code64
+ENTRY(sme_enable)
+	ret
+ENDPROC(sme_enable)
+
+ENTRY(sme_encrypt_kernel)
+	ret
+ENDPROC(sme_encrypt_kernel)
+
 ENTRY(sme_get_me_loss)
 	xor	%rax, %rax
 	mov	sme_me_loss(%rip), %al

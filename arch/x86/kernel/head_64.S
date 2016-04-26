@@ -86,6 +86,13 @@ startup_64:
 	jnz	bad_address
 
 	/*
+	 * Enable memory encryption (if available). Add the memory encryption
+	 * mask to %rbp to include it in the the page table fixup.
+	 */
+	call	sme_enable
+	addq	sme_me_mask(%rip), %rbp
+
+	/*
 	 * Fixup the physical addresses in the page table
 	 */
 	addq	%rbp, early_level4_pgt + (L4_START_KERNEL*8)(%rip)
@@ -107,7 +114,8 @@ startup_64:
 	movq	%rdi, %rax
 	shrq	$PGDIR_SHIFT, %rax
 
-	leaq	(4096 + _KERNPG_TABLE)(%rbx), %rdx
+	leaq	(4096 + __KERNPG_TABLE)(%rbx), %rdx
+	addq	sme_me_mask(%rip), %rdx		/* Apply mem encryption mask */
 	movq	%rdx, 0(%rbx,%rax,8)
 	movq	%rdx, 8(%rbx,%rax,8)
 
@@ -124,6 +132,7 @@ startup_64:
 	movq	%rdi, %rax
 	shrq	$PMD_SHIFT, %rdi
 	addq	$(__PAGE_KERNEL_LARGE_EXEC & ~_PAGE_GLOBAL), %rax
+	addq	sme_me_mask(%rip), %rax		/* Apply mem encryption mask */
 	leaq	(_end - 1)(%rip), %rcx
 	shrq	$PMD_SHIFT, %rcx
 	subq	%rdi, %rcx
@@ -154,8 +163,18 @@ startup_64:
 	cmp	%r8, %rdi
 	jne	1b
 
-	/* Fixup phys_base */
+	/*
+	 * Fixup phys_base, remove the memory encryption mask from %rbp
+	 * to obtain the true physical address.
+	 */
+	subq	sme_me_mask(%rip), %rbp
 	addq	%rbp, phys_base(%rip)
+
+	/*
+	 * The page tables have been updated with the memory encryption mask,
+	 * so encrypt the kernel if memory encryption is active
+	 */
+	call	sme_encrypt_kernel
 
 	movq	$(early_level4_pgt - __START_KERNEL_map), %rax
 	jmp 1f
@@ -179,6 +198,9 @@ ENTRY(secondary_startup_64)
 
 	movq	$(init_level4_pgt - __START_KERNEL_map), %rax
 1:
+
+	/* Add the memory encryption mask to RAX */
+	addq	sme_me_mask(%rip), %rax
 
 	/* Enable PAE mode and PGE */
 	movl	$(X86_CR4_PAE | X86_CR4_PGE), %ecx
@@ -449,7 +471,7 @@ GLOBAL(name)
 	__INITDATA
 NEXT_PAGE(early_level4_pgt)
 	.fill	511,8,0
-	.quad	level3_kernel_pgt - __START_KERNEL_map + _PAGE_TABLE
+	.quad	level3_kernel_pgt - __START_KERNEL_map + __PAGE_TABLE
 
 NEXT_PAGE(early_dynamic_pgts)
 	.fill	512*EARLY_DYNAMIC_PAGE_TABLES,8,0
@@ -461,15 +483,15 @@ NEXT_PAGE(init_level4_pgt)
 	.fill	512,8,0
 #else
 NEXT_PAGE(init_level4_pgt)
-	.quad   level3_ident_pgt - __START_KERNEL_map + _KERNPG_TABLE
+	.quad   level3_ident_pgt - __START_KERNEL_map + __KERNPG_TABLE
 	.org    init_level4_pgt + L4_PAGE_OFFSET*8, 0
-	.quad   level3_ident_pgt - __START_KERNEL_map + _KERNPG_TABLE
+	.quad   level3_ident_pgt - __START_KERNEL_map + __KERNPG_TABLE
 	.org    init_level4_pgt + L4_START_KERNEL*8, 0
 	/* (2^48-(2*1024*1024*1024))/(2^39) = 511 */
-	.quad   level3_kernel_pgt - __START_KERNEL_map + _PAGE_TABLE
+	.quad   level3_kernel_pgt - __START_KERNEL_map + __PAGE_TABLE
 
 NEXT_PAGE(level3_ident_pgt)
-	.quad	level2_ident_pgt - __START_KERNEL_map + _KERNPG_TABLE
+	.quad	level2_ident_pgt - __START_KERNEL_map + __KERNPG_TABLE
 	.fill	511, 8, 0
 NEXT_PAGE(level2_ident_pgt)
 	/* Since I easily can, map the first 1G.
@@ -481,8 +503,8 @@ NEXT_PAGE(level2_ident_pgt)
 NEXT_PAGE(level3_kernel_pgt)
 	.fill	L3_START_KERNEL,8,0
 	/* (2^48-(2*1024*1024*1024)-((2^39)*511))/(2^30) = 510 */
-	.quad	level2_kernel_pgt - __START_KERNEL_map + _KERNPG_TABLE
-	.quad	level2_fixmap_pgt - __START_KERNEL_map + _PAGE_TABLE
+	.quad	level2_kernel_pgt - __START_KERNEL_map + __KERNPG_TABLE
+	.quad	level2_fixmap_pgt - __START_KERNEL_map + __PAGE_TABLE
 
 NEXT_PAGE(level2_kernel_pgt)
 	/*
@@ -500,7 +522,7 @@ NEXT_PAGE(level2_kernel_pgt)
 
 NEXT_PAGE(level2_fixmap_pgt)
 	.fill	506,8,0
-	.quad	level1_fixmap_pgt - __START_KERNEL_map + _PAGE_TABLE
+	.quad	level1_fixmap_pgt - __START_KERNEL_map + __PAGE_TABLE
 	/* 8MB reserved for vsyscalls + a 2MB hole = 4 + 1 entries */
 	.fill	5,8,0
 
