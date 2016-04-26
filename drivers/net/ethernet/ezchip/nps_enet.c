@@ -24,6 +24,14 @@
 
 #define DRV_NAME			"nps_mgt_enet"
 
+static inline bool nps_enet_is_tx_pending(struct nps_enet_priv *priv)
+{
+	u32 tx_ctrl_value = nps_enet_reg_get(priv, NPS_ENET_REG_TX_CTL);
+	u32 tx_ctrl_ct = (tx_ctrl_value & TX_CTL_CT_MASK) >> TX_CTL_CT_SHIFT;
+
+	return (!tx_ctrl_ct && priv->tx_packet_sent);
+}
+
 static void nps_enet_clean_rx_fifo(struct net_device *ndev, u32 frame_len)
 {
 	struct nps_enet_priv *priv = netdev_priv(ndev);
@@ -140,12 +148,11 @@ static void nps_enet_tx_handler(struct net_device *ndev)
 {
 	struct nps_enet_priv *priv = netdev_priv(ndev);
 	u32 tx_ctrl_value = nps_enet_reg_get(priv, NPS_ENET_REG_TX_CTL);
-	u32 tx_ctrl_ct = (tx_ctrl_value & TX_CTL_CT_MASK) >> TX_CTL_CT_SHIFT;
 	u32 tx_ctrl_et = (tx_ctrl_value & TX_CTL_ET_MASK) >> TX_CTL_ET_SHIFT;
 	u32 tx_ctrl_nt = (tx_ctrl_value & TX_CTL_NT_MASK) >> TX_CTL_NT_SHIFT;
 
 	/* Check if we got TX */
-	if (!priv->tx_packet_sent || tx_ctrl_ct)
+	if (!nps_enet_is_tx_pending(priv))
 		return;
 
 	/* Ack Tx ctrl register */
@@ -213,11 +220,9 @@ static irqreturn_t nps_enet_irq_handler(s32 irq, void *dev_instance)
 	struct net_device *ndev = dev_instance;
 	struct nps_enet_priv *priv = netdev_priv(ndev);
 	u32 rx_ctrl_value = nps_enet_reg_get(priv, NPS_ENET_REG_RX_CTL);
-	u32 tx_ctrl_value = nps_enet_reg_get(priv, NPS_ENET_REG_TX_CTL);
-	u32 tx_ctrl_ct = (tx_ctrl_value & TX_CTL_CT_MASK) >> TX_CTL_CT_SHIFT;
 	u32 rx_ctrl_cr = (rx_ctrl_value & RX_CTL_CR_MASK) >> RX_CTL_CR_SHIFT;
 
-	if ((!tx_ctrl_ct && priv->tx_packet_sent) || rx_ctrl_cr)
+	if (nps_enet_is_tx_pending(priv) || rx_ctrl_cr)
 		if (likely(napi_schedule_prep(&priv->napi))) {
 			nps_enet_reg_set(priv, NPS_ENET_REG_BUF_INT_ENABLE, 0);
 			__napi_schedule(&priv->napi);
