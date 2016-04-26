@@ -17,6 +17,16 @@
  *
  * Author: Anton Blanchard <anton@au.ibm.com>
  */
+
+/*
+ * Sparse (as at v0.5.0) gets very, very confused by this file.
+ * Just disable it.
+ */
+#ifdef __CHECKER__
+#undef __CHECKER__
+#warning "Sparse checking disabled for this file"
+#endif
+
 #include <altivec.h>
 
 #include <linux/preempt.h>
