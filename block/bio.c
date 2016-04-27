@@ -68,6 +68,8 @@ static DEFINE_MUTEX(bio_slab_lock);
 static struct bio_slab *bio_slabs;
 static unsigned int bio_slab_nr, bio_slab_max;
 
+static DEFINE_PER_CPU(struct bio_list *, bio_end_list) = { NULL };
+
 static struct kmem_cache *bio_find_or_create_slab(unsigned int extra_size)
 {
 	unsigned int sz = sizeof(struct bio) + extra_size;
@@ -1737,6 +1739,58 @@ static inline bool bio_remaining_done(struct bio *bio)
 	return false;
 }
 
+static void __bio_endio(struct bio *bio)
+{
+	if (bio->bi_end_io)
+		bio->bi_end_io(bio);
+}
+
+/* disable local irq when manipulating the percpu bio_list */
+static void unwind_bio_endio(struct bio *bio)
+{
+	struct bio_list *bl;
+	unsigned long flags;
+
+	/*
+	 * We can't optimize if bi_endio() is scheduled to run from
+	 * process context because there isn't easy way to get a
+	 * per-task bio list head or allocate a per-task variable.
+	 */
+	if (!in_interrupt()) {
+		/*
+		 * It has to be a top calling when it is run from
+		 * process context.
+		 */
+		WARN_ON(this_cpu_read(bio_end_list));
+		__bio_endio(bio);
+		return;
+	}
+
+	local_irq_save(flags);
+	bl = __this_cpu_read(bio_end_list);
+	if (!bl) {
+		struct bio_list bl_in_stack;
+
+		bl = &bl_in_stack;
+		bio_list_init(bl);
+		__this_cpu_write(bio_end_list, bl);
+	} else {
+		bio_list_add(bl, bio);
+		goto out;
+	}
+
+	while (bio) {
+		local_irq_restore(flags);
+		__bio_endio(bio);
+		local_irq_save(flags);
+
+		bio = bio_list_pop(bl);
+	}
+	__this_cpu_write(bio_end_list, NULL);
+ out:
+	local_irq_restore(flags);
+}
+
 /**
  * bio_endio - end I/O on a bio
  * @bio:	bio
@@ -1765,8 +1819,7 @@ again:
 		goto again;
 	}
 
-	if (bio->bi_end_io)
-		bio->bi_end_io(bio);
+	unwind_bio_endio(bio);
 }
 EXPORT_SYMBOL(bio_endio);
 
