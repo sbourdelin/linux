@@ -136,7 +136,7 @@ static void au0828_unregister_media_device(struct au0828_dev *dev)
 
 #ifdef CONFIG_MEDIA_CONTROLLER
 	if (dev->media_dev &&
-		media_devnode_is_registered(&dev->media_dev->devnode)) {
+		media_devnode_is_registered(dev->media_dev->devnode)) {
 		/* clear enable_source, disable_source */
 		dev->media_dev->source_priv = NULL;
 		dev->media_dev->enable_source = NULL;
@@ -468,7 +468,7 @@ static int au0828_media_device_register(struct au0828_dev *dev,
 	if (!dev->media_dev)
 		return 0;
 
-	if (!media_devnode_is_registered(&dev->media_dev->devnode)) {
+	if (!media_devnode_is_registered(dev->media_dev->devnode)) {
 
 		/* register media device */
 		ret = media_device_register(dev->media_dev);

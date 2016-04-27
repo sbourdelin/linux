@@ -70,7 +70,9 @@ struct media_file_operations {
  * @fops:	pointer to struct &media_file_operations with media device ops
  * @dev:	struct device pointer for the media controller device
  * @cdev:	struct cdev pointer character device
+ * @kobj:	struct kobject
  * @parent:	parent device
+ * @media_dev:	media device
  * @minor:	device node minor number
  * @flags:	flags, combination of the MEDIA_FLAG_* constants
  * @release:	release callback called at the end of media_devnode_release()
@@ -87,7 +89,9 @@ struct media_devnode {
 	/* sysfs */
 	struct device dev;		/* media device */
 	struct cdev cdev;		/* character device */
+	struct kobject kobj;		/* set as cdev parent kobj */
 	struct device *parent;		/* device parent */
+	struct media_device *media_dev; /* media device for the devnode */
 
 	/* device info */
 	int minor;
@@ -149,7 +153,9 @@ static inline struct media_devnode *media_devnode_data(struct file *filp)
  */
 static inline int media_devnode_is_registered(struct media_devnode *mdev)
 {
-	return test_bit(MEDIA_FLAG_REGISTERED, &mdev->flags);
+	if (mdev)
+		return test_bit(MEDIA_FLAG_REGISTERED, &mdev->flags);
+	return false;
 }
 
 #endif /* _MEDIA_DEVNODE_H */

@@ -171,6 +171,9 @@ static int media_open(struct inode *inode, struct file *filp)
 		mutex_unlock(&media_devnode_lock);
 		return -ENXIO;
 	}
+
+	kobject_get(&mdev->kobj);
+
 	/* and increase the device refcount */
 	get_device(&mdev->dev);
 	mutex_unlock(&media_devnode_lock);
@@ -181,6 +184,7 @@ static int media_open(struct inode *inode, struct file *filp)
 		ret = mdev->fops->open(filp);
 		if (ret) {
 			put_device(&mdev->dev);
+			kobject_put(&mdev->kobj);
 			filp->private_data = NULL;
 			return ret;
 		}
@@ -200,6 +204,7 @@ static int media_release(struct inode *inode, struct file *filp)
 	/* decrease the refcount unconditionally since the release()
 	   return value is ignored. */
 	put_device(&mdev->dev);
+	kobject_put(&mdev->kobj);
 	filp->private_data = NULL;
 	return 0;
 }
@@ -216,6 +221,19 @@ static const struct file_operations media_devnode_fops = {
 	.release = media_release,
 	.poll = media_poll,
 	.llseek = no_llseek,
+};
+
+static void media_devnode_free(struct kobject *kobj)
+{
+	struct media_devnode *devnode =
+			container_of(kobj, struct media_devnode, kobj);
+
+	kfree(devnode);
+	pr_info("%s: Media Devnode Deallocated\n", __func__);
+}
+
+static struct kobj_type media_devnode_ktype = {
+	.release = media_devnode_free,
 };
 
 int __must_check media_devnode_register(struct media_devnode *mdev,
@@ -238,9 +256,12 @@ int __must_check media_devnode_register(struct media_devnode *mdev,
 
 	mdev->minor = minor;
 
+	kobject_init(&mdev->kobj, &media_devnode_ktype);
+
 	/* Part 2: Initialize and register the character device */
 	cdev_init(&mdev->cdev, &media_devnode_fops);
 	mdev->cdev.owner = owner;
+	mdev->cdev.kobj.parent = &mdev->kobj;
 
 	ret = cdev_add(&mdev->cdev, MKDEV(MAJOR(media_dev_t), mdev->minor), 1);
 	if (ret < 0) {
@@ -269,6 +290,7 @@ int __must_check media_devnode_register(struct media_devnode *mdev,
 error:
 	cdev_del(&mdev->cdev);
 	clear_bit(mdev->minor, media_devnode_nums);
+	kobject_put(&mdev->kobj);
 	return ret;
 }
 
@@ -282,6 +304,7 @@ void media_devnode_unregister(struct media_devnode *mdev)
 	clear_bit(MEDIA_FLAG_REGISTERED, &mdev->flags);
 	mutex_unlock(&media_devnode_lock);
 	device_unregister(&mdev->dev);
+	kobject_put(&mdev->kobj);
 }
 
 /*
