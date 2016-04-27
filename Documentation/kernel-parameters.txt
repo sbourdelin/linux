@@ -1542,7 +1542,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 
 	ima_policy=	[IMA]
 			The builtin measurement policy to load during IMA
-			setup.  Specyfing "tcb" as the value, measures all
+			setup.  Specifying "tcb" as the value, measures all
 			programs exec'd, files mmap'd for exec, and all files
 			opened with the read mode bit set by either the
 			effective uid (euid=0) or uid=0.
@@ -3984,7 +3984,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			See also Documentation/input/joystick-parport.txt
 
 	udbg-immortal	[PPC] When debugging early kernel crashes that
-			happen after console_init() and before a proper 
+			happen after console_init() and before a proper
 			console driver takes over, this boot options might
 			help "seeing" what's going on.
 

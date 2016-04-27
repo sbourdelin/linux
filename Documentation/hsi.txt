@@ -49,7 +49,7 @@ use an arbitrary number of channels.
 ~~~~~~~~~~~~~~~~~~
 
 Each port automatically registers a generic client driver called hsi_char,
-which provides a charecter device for userspace representing the HSI port.
+which provides a character device for userspace representing the HSI port.
 It can be used to communicate via HSI from userspace. Userspace may
 configure the hsi_char device using the following ioctl commands:
 
