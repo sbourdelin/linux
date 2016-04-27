@@ -50,28 +50,18 @@ static unsigned int tw686x_fields_map(v4l2_std_id std, unsigned int fps)
 		0x01041041, 0x01104411, 0x01111111, 0x04444445, 0x04511445,
 		0x05145145, 0x05151515, 0x05515455, 0x05551555, 0x05555555
 	};
+	unsigned int i, max_fps;
 
-	static const unsigned int std_625_50[26] = {
-		0, 1, 1, 2,  3,  3,  4,  4,  5,  5,  6,  7,  7,
-		   8, 8, 9, 10, 10, 11, 11, 12, 13, 13, 14, 14, 0
-	};
+	if (std & V4L2_STD_525_60)
+		max_fps = 30;
+	else
+		max_fps = 25;
 
-	static const unsigned int std_525_60[31] = {
-		0, 1, 1, 1, 2,  2,  3,  3,  4,  4,  5,  5,  6,  6, 7, 7,
-		   8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 0, 0
-	};
-
-	unsigned int i;
-
-	if (std & V4L2_STD_525_60) {
-		if (fps >= ARRAY_SIZE(std_525_60))
-			fps = 30;
-		i = std_525_60[fps];
-	} else {
-		if (fps >= ARRAY_SIZE(std_625_50))
-			fps = 25;
-		i = std_625_50[fps];
-	}
+	i = DIV_ROUND_CLOSEST(15 * fps, max_fps);
+	if (!i)
+		i = 1;	/* Min possible fps */
+	else if (i > 14)
+		i = 0;	/* fps = max_fps */
 
 	return map[i];
 }
