@@ -990,7 +990,8 @@ out:
 	return ret;
 }
 
-static bool free_pages_prepare(struct page *page, unsigned int order)
+static __always_inline bool free_pages_prepare(struct page *page, unsigned int order,
+						bool check_free)
 {
 	int bad = 0;
 
@@ -1022,7 +1023,8 @@ static bool free_pages_prepare(struct page *page, unsigned int order)
 	}
 	if (PageAnonHead(page))
 		page->mapping = NULL;
-	bad += free_pages_check(page);
+	if (check_free)
+		bad += free_pages_check(page);
 	if (bad)
 		return false;
 
@@ -1046,7 +1048,7 @@ static bool free_pages_prepare(struct page *page, unsigned int order)
 #ifdef CONFIG_DEBUG_VM
 static inline bool free_pcp_prepare(struct page *page)
 {
-	return free_pages_prepare(page, 0);
+	return free_pages_prepare(page, 0, true);
 }
 
 static inline bool bulkfree_pcp_prepare(struct page *page)
@@ -1056,30 +1058,7 @@ static inline bool bulkfree_pcp_prepare(struct page *page)
 #else
 static bool free_pcp_prepare(struct page *page)
 {
-	VM_BUG_ON_PAGE(PageTail(page), page);
-
-	trace_mm_page_free(page, 0);
-	kmemcheck_free_shadow(page, 0);
-	kasan_poison_free_pages(page, 0);
-
-	if (PageAnonHead(page))
-		page->mapping = NULL;
-
-	reset_page_owner(page, 0);
-
-	if (!PageHighMem(page)) {
-		debug_check_no_locks_freed(page_address(page),
-					   PAGE_SIZE);
-		debug_check_no_obj_freed(page_address(page),
-					   PAGE_SIZE);
-	}
-	arch_free_page(page, 0);
-	kernel_poison_pages(page, 0, 0);
-	kernel_map_pages(page, 0, 0);
-
-	page_cpupid_reset_last(page);
-	page->flags &= ~PAGE_FLAGS_CHECK_AT_PREP;
-	return true;
+	return free_pages_prepare(page, 0, false);
 }
 
 static bool bulkfree_pcp_prepare(struct page *page)
@@ -1257,7 +1236,7 @@ static void __free_pages_ok(struct page *page, unsigned int order)
 	int migratetype;
 	unsigned long pfn = page_to_pfn(page);
 
-	if (!free_pages_prepare(page, order))
+	if (!free_pages_prepare(page, order, true))
 		return;
 
 	migratetype = get_pfnblock_migratetype(page, pfn);
