@@ -1590,7 +1590,10 @@ gen6_seqno_barrier(struct intel_engine_cs *engine)
 	 * interrupt (with the same net latency).
 	 */
 	struct drm_i915_private *dev_priv = engine->dev->dev_private;
+
+	spin_lock_irq(&dev_priv->uncore.lock);
 	POSTING_READ_FW(RING_ACTHD(engine->mmio_base));
+	spin_unlock_irq(&dev_priv->uncore.lock);
 }
 
 static u32
