@@ -125,6 +125,7 @@ static const u64 amd_perfmon_event_map[] =
   [PERF_COUNT_HW_BRANCH_MISSES]			= 0x00c3,
   [PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= 0x00d0, /* "Decoder empty" event */
   [PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= 0x00d1, /* "Dispatch stalls" event */
+  [PERF_COUNT_HW_REF_CPU_CYCLES]		=      0,
 };
 
 static u64 amd_pmu_event_map(int hw_event)
