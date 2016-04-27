@@ -3844,6 +3844,7 @@ retry_cpuset:
 	 */
 	if (unlikely(!page && read_mems_allowed_retry(cpuset_mems_cookie))) {
 		alloc_mask = gfp_mask;
+		ac.nodemask = &cpuset_current_mems_allowed;
 		goto retry_cpuset;
 	}
 
