@@ -809,6 +809,16 @@ struct iommu_group *pci_device_group(struct device *dev)
 	return group;
 }
 
+static void pci_check_msi_remapping(struct pci_dev *pdev,
+					const struct iommu_ops *ops)
+{
+	struct pci_bus *bus = pdev->bus;
+
+	if (ops->capable(IOMMU_CAP_INTR_REMAP) &&
+		!(bus->bus_flags & PCI_BUS_FLAGS_MSI_REMAP))
+		bus->bus_flags |= PCI_BUS_FLAGS_MSI_REMAP;
+}
+
 /**
  * iommu_group_get_for_dev - Find or create the IOMMU group for a device
  * @dev: target device
@@ -867,6 +877,9 @@ static int add_iommu_group(struct device *dev, void *data)
 	const struct iommu_ops *ops = cb->ops;
 	int ret;
 
+	if (dev_is_pci(dev) && ops->capable)
+		pci_check_msi_remapping(to_pci_dev(dev), ops);
+
 	if (!ops->add_device)
 		return 0;
 
@@ -909,6 +922,8 @@ static int iommu_bus_notifier(struct notifier_block *nb,
 	 * result in ADD/DEL notifiers to group->notifier
 	 */
 	if (action == BUS_NOTIFY_ADD_DEVICE) {
+		if (dev_is_pci(dev) && ops->capable)
+			pci_check_msi_remapping(to_pci_dev(dev), ops);
 		if (ops->add_device)
 			return ops->add_device(dev);
 	} else if (action == BUS_NOTIFY_REMOVED_DEVICE) {
