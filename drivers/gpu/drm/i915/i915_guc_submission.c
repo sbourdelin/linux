@@ -451,10 +451,11 @@ static void guc_fini_ctx_desc(struct intel_guc *guc,
 			     sizeof(desc) * client->ctx_index);
 }
 
-int i915_guc_wq_check_space(struct i915_guc_client *gc)
+int i915_guc_wq_check_space(struct drm_i915_gem_request *request)
 {
+	const size_t size = sizeof(struct guc_wq_item);
+	struct i915_guc_client *gc = request->i915->guc.execbuf_client;
 	struct guc_process_desc *desc;
-	u32 size = sizeof(struct guc_wq_item);
 	int ret = -ETIMEDOUT, timeout_counter = 200;
 
 	if (!gc)
@@ -537,11 +538,11 @@ static int guc_add_workqueue_item(struct i915_guc_client *gc,
  *
  * Return:	0 if succeed
  */
-int i915_guc_submit(struct i915_guc_client *client,
-		    struct drm_i915_gem_request *rq)
+int i915_guc_submit(struct drm_i915_gem_request *rq)
 {
-	struct intel_guc *guc = client->guc;
 	unsigned int engine_id = rq->engine->guc_id;
+	struct intel_guc *guc = &rq->i915->guc;
+	struct i915_guc_client *client = guc->execbuf_client;
 	int q_ret, b_ret;
 
 	q_ret = guc_add_workqueue_item(client, rq);
