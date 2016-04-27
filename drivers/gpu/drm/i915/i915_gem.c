@@ -2754,6 +2754,7 @@ __i915_gem_request_alloc(struct intel_engine_cs *engine,
 	if (ret)
 		goto err;
 
+	INIT_LIST_HEAD(&req->list);
 	kref_init(&req->ref);
 	req->i915 = dev_priv;
 	req->engine = engine;
