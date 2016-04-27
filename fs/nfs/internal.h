@@ -545,6 +545,8 @@ extern int nfs40_walk_client_list(struct nfs_client *clp,
 extern int nfs41_walk_client_list(struct nfs_client *clp,
 				struct nfs_client **result,
 				struct rpc_cred *cred);
+extern int nfs4_detect_session_trunking(struct nfs_client *clp,
+				struct nfs41_exchange_id_res *res);
 
 static inline struct inode *nfs_igrab_and_active(struct inode *inode)
 {
