@@ -7,4 +7,13 @@ config SND_DESIGNWARE_I2S
 	 Synopsys desigwnware I2S device. The device supports upto
 	 maximum of 8 channels each for play and record.
 
+config SND_DESIGNWARE_PCM
+	tristate "Synopsys I2S PCM Driver"
+	help
+	 Say Y or M if you want to add support for ALSA ASoC platform driver
+	 using I2S.
+
+	 Select this option if you want to be able to create a sound interface
+	 using the I2S device driver as CPU driver. Instead of using ALSA
+	 DMA engine by selecting this driver a custom PCM driver will be used.
 
