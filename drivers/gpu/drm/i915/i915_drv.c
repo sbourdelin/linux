@@ -1645,8 +1645,8 @@ static const struct dev_pm_ops i915_pm_ops = {
 	 * PMSG_RESUME]
 	 */
 	.suspend = i915_pm_suspend,
-	.suspend_late = i915_pm_suspend_late,
-	.resume_early = i915_pm_resume_early,
+	.suspend_noirq = i915_pm_suspend_late,
+	.resume_noirq = i915_pm_resume_early,
 	.resume = i915_pm_resume,
 
 	/*
@@ -1665,12 +1665,12 @@ static const struct dev_pm_ops i915_pm_ops = {
 	 *                            hibernation image [PMSG_RESTORE]
 	 */
 	.freeze = i915_pm_suspend,
-	.freeze_late = i915_pm_suspend_late,
-	.thaw_early = i915_pm_resume_early,
+	.freeze_noirq = i915_pm_suspend_late,
+	.thaw_noirq = i915_pm_resume_early,
 	.thaw = i915_pm_resume,
 	.poweroff = i915_pm_suspend,
-	.poweroff_late = i915_pm_poweroff_late,
-	.restore_early = i915_pm_resume_early,
+	.poweroff_noirq = i915_pm_poweroff_late,
+	.restore_noirq = i915_pm_resume_early,
 	.restore = i915_pm_resume,
 
 	/* S0ix (via runtime suspend) event handlers */
