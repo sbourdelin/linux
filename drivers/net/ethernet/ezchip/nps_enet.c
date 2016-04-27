@@ -389,6 +389,13 @@ static void nps_enet_send_frame(struct net_device *ndev,
 
 	/* Indicate SW is done */
 	priv->tx_packet_sent = true;
+
+	/* before the frame is sent we have to make
+	 * sure that priv->tx_packet_sent will be valid
+	 * for the CPU'S that handles the ISR and NAPI poll
+	 */
+	smp_wmb();
+
 	tx_ctrl_value |= NPS_ENET_ENABLE << TX_CTL_CT_SHIFT;
 	/* Send Frame */
 	nps_enet_reg_set(priv, NPS_ENET_REG_TX_CTL, tx_ctrl_value);
