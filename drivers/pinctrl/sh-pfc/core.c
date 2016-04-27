@@ -600,9 +600,9 @@ static int sh_pfc_probe(struct platform_device *pdev)
 
 static int sh_pfc_remove(struct platform_device *pdev)
 {
+#ifdef CONFIG_PINCTRL_SH_PFC_GPIO
 	struct sh_pfc *pfc = platform_get_drvdata(pdev);
 
-#ifdef CONFIG_PINCTRL_SH_PFC_GPIO
 	sh_pfc_unregister_gpiochip(pfc);
 #endif
 
