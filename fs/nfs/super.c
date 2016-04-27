@@ -605,8 +605,32 @@ static void nfs_show_nfsv4_options(struct seq_file *m, struct nfs_server *nfss,
 				    int showdefaults)
 {
 	struct nfs_client *clp = nfss->nfs_client;
+	struct rpc_clnt *clnt = clp->cl_rpcclient;
+	struct rpc_xprt_switch *xps;
+	struct rpc_xprt *pos;
+	unsigned int nxprts;
 
 	seq_printf(m, ",clientaddr=%s", clp->cl_ipaddr);
+	rcu_read_lock();
+	xps = xprt_switch_get(rcu_dereference(clnt->cl_xpi.xpi_xpswitch));
+	pos = xprt_iter_xprt(&clnt->cl_xpi);
+	if (xps == NULL || pos == NULL)
+		return;
+	nxprts = xps->xps_nxprts;
+	list_for_each_entry_rcu(pos, &xps->xps_xprt_list, xprt_switch) {
+		if (nxprts == 0)
+			break;
+		if (pos->address_strings[RPC_DISPLAY_ADDR] == NULL)
+			break;
+		/* Do not display mount xprt as a multiaddr */
+		if (pos == rcu_access_pointer(clp->cl_rpcclient->cl_xprt))
+			continue;
+		seq_printf(m, ",multiaddr=%s",
+			pos->address_strings[RPC_DISPLAY_ADDR]);
+		nxprts--;
+	}
+	rcu_read_unlock();
+	xprt_switch_put(xps);
 }
 #else
 static void nfs_show_nfsv4_options(struct seq_file *m, struct nfs_server *nfss,
