@@ -1,0 +1,13 @@
+#
+# PCI Express Device DPC Configuration
+#
+
+config PCIEDPC
+	boolean "PCI-e Downstream Port Containment support"
+	depends on PCIEPORTBUS
+	default n
+	help
+	  This enables PCI-Express Downstream Port Containment (DPC)
+	  driver support. DPC events from the Root and Downstream ports
+	  will be handled by DPC driver.
+
