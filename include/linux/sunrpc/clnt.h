@@ -150,7 +150,7 @@ int		rpc_switch_client_transport(struct rpc_clnt *,
 
 void		rpc_shutdown_client(struct rpc_clnt *);
 void		rpc_release_client(struct rpc_clnt *);
-void		rpc_task_release_client(struct rpc_task *);
+void		rpc_task_release_client(struct rpc_task *, int);
 
 int		rpcb_create_local(struct net *);
 void		rpcb_put_local(struct net *);
