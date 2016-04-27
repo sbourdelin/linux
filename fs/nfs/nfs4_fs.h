@@ -214,6 +214,10 @@ struct nfs4_mig_recovery_ops {
 	int (*fsid_present)(struct inode *, struct rpc_cred *);
 };
 
+struct nfs4_add_xprt_data {
+	struct nfs_client	*clp;
+	struct rpc_cred		*cred;
+};
 extern const struct dentry_operations nfs4_dentry_operations;
 
 /* dir.c */

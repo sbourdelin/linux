@@ -107,6 +107,7 @@ enum {
 	Opt_nfsvers,
 	Opt_sec, Opt_proto, Opt_mountproto, Opt_mounthost,
 	Opt_addr, Opt_mountaddr, Opt_clientaddr,
+	Opt_multiaddr,
 	Opt_lookupcache,
 	Opt_fscache_uniq,
 	Opt_local_lock,
@@ -178,6 +179,7 @@ static const match_table_t nfs_mount_option_tokens = {
 	{ Opt_clientaddr, "clientaddr=%s" },
 	{ Opt_mounthost, "mounthost=%s" },
 	{ Opt_mountaddr, "mountaddr=%s" },
+	{ Opt_multiaddr, "multiaddr=%s" },
 
 	{ Opt_lookupcache, "lookupcache=%s" },
 	{ Opt_fscache_uniq, "fsc=%s" },
@@ -921,6 +923,12 @@ static struct nfs_parsed_mount_data *nfs_alloc_parsed_mount_data(void)
 
 	data = kzalloc(sizeof(*data), GFP_KERNEL);
 	if (data) {
+		data->multiaddrs = kzalloc(sizeof(*data->multiaddrs) *
+				NFS_MAX_MULTIADDR, GFP_KERNEL);
+		if (!data->multiaddrs) {
+			kfree(data);
+			return NULL;
+		}
 		data->acregmin		= NFS_DEF_ACREGMIN;
 		data->acregmax		= NFS_DEF_ACREGMAX;
 		data->acdirmin		= NFS_DEF_ACDIRMIN;
@@ -939,12 +947,20 @@ static struct nfs_parsed_mount_data *nfs_alloc_parsed_mount_data(void)
 
 static void nfs_free_parsed_mount_data(struct nfs_parsed_mount_data *data)
 {
+	struct multi_addr *multip = data->multiaddrs;
+	int i;
+
 	if (data) {
 		kfree(data->client_address);
 		kfree(data->mount_server.hostname);
 		kfree(data->nfs_server.export_path);
 		kfree(data->nfs_server.hostname);
 		kfree(data->fscache_uniq);
+		for (i = 0; i < data->num_multi; i++) {
+			kfree(multip->hostname);
+			multip++;
+		}
+		kfree(data->multiaddrs);
 		security_free_mnt_opts(&data->lsm_opts);
 		kfree(data);
 	}
@@ -1200,6 +1216,7 @@ static int nfs_parse_mount_options(char *raw,
 	int rc, sloppy = 0, invalid_option = 0;
 	unsigned short protofamily = AF_UNSPEC;
 	unsigned short mountfamily = AF_UNSPEC;
+	struct multi_addr *multip = mnt->multiaddrs;
 
 	if (!raw) {
 		dfprintk(MOUNT, "NFS: mount options string was NULL.\n");
@@ -1589,6 +1606,25 @@ static int nfs_parse_mount_options(char *raw,
 				return 0;
 			};
 			break;
+		case Opt_multiaddr:
+			if (mnt->num_multi == NFS_MAX_MULTIADDR)
+				goto out_too_many_multiaddrs;
+
+			if (nfs_get_option_str(args, &multip->hostname))
+				goto out_nomem;
+
+			multip->addrlen = rpc_pton(mnt->net, multip->hostname,
+						strlen(multip->hostname),
+						(struct sockaddr *)
+						&multip->addr,
+						sizeof(multip->addr));
+
+			dfprintk(MOUNT, "NFS:   Added multiaddr %s\n",
+				multip->hostname);
+			mnt->num_multi++;
+			multip++;
+
+			break;
 
 		/*
 		 * Special options
@@ -1640,6 +1676,10 @@ static int nfs_parse_mount_options(char *raw,
 
 	return 1;
 
+out_too_many_multiaddrs:
+	printk(KERN_INFO "NFS: %d is too many multiple hostnames.\n",
+		mnt->num_multi);
+	return 0;
 out_mountproto_mismatch:
 	printk(KERN_INFO "NFS: mount server address does not match mountproto= "
 			 "option\n");

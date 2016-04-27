@@ -75,6 +75,20 @@ struct nfs_client_initdata {
 	struct net *net;
 };
 
+/**
+ * NFS_MAXHOSTNAME of 255 limits the number of multiple hostnames on the
+ * mount stanza. 16 is a reasonable maximum number
+ */
+#define NFS_MAX_MULTIADDR       16
+
+
+/* hold multiple hostname info */
+struct multi_addr {
+	struct sockaddr_storage	addr;
+	size_t			addrlen;
+	char			*hostname;
+};
+
 /*
  * In-kernel mount arguments
  */
@@ -112,6 +126,9 @@ struct nfs_parsed_mount_data {
 		int			port;
 		unsigned short		protocol;
 	} nfs_server;
+
+	unsigned int		num_multi;
+	struct multi_addr	*multiaddrs;
 
 	struct security_mnt_opts lsm_opts;
 	struct net		*net;
