@@ -155,6 +155,7 @@ __rwsem_do_wake(struct rw_semaphore *sem, enum rwsem_wake_type wake_type)
 			/* Last active locker left. Retry waking readers. */
 			goto try_reader_grant;
 		}
+		rwsem_reader_owned(sem);
 	}
 
 	/* Grant an infinite number of read locks to the readers at the front
@@ -306,16 +307,11 @@ static inline bool rwsem_can_spin_on_owner(struct rw_semaphore *sem)
 
 	rcu_read_lock();
 	owner = READ_ONCE(sem->owner);
-	if (!owner) {
-		long count = READ_ONCE(sem->count);
+	if (!rwsem_is_writer_owned(owner)) {
 		/*
-		 * If sem->owner is not set, yet we have just recently entered the
-		 * slowpath with the lock being active, then there is a possibility
-		 * reader(s) may have the lock. To be safe, bail spinning in these
-		 * situations.
+		 * Don't spin if the rwsem is readers owned.
 		 */
-		if (count & RWSEM_ACTIVE_MASK)
-			ret = false;
+		ret = (owner != RWSEM_READER_OWNED);
 		goto done;
 	}
 
@@ -328,8 +324,6 @@ done:
 static noinline
 bool rwsem_spin_on_owner(struct rw_semaphore *sem, struct task_struct *owner)
 {
-	long count;
-
 	rcu_read_lock();
 	while (sem->owner == owner) {
 		/*
@@ -350,16 +344,11 @@ bool rwsem_spin_on_owner(struct rw_semaphore *sem, struct task_struct *owner)
 	}
 	rcu_read_unlock();
 
-	if (READ_ONCE(sem->owner))
-		return true; /* new owner, continue spinning */
-
 	/*
-	 * When the owner is not set, the lock could be free or
-	 * held by readers. Check the counter to verify the
-	 * state.
+	 * If there is a new owner or the owner is not set, we continue
+	 * spinning.
 	 */
-	count = READ_ONCE(sem->count);
-	return (count == 0 || count == RWSEM_WAITING_BIAS);
+	return READ_ONCE(sem->owner) != RWSEM_READER_OWNED;
 }
 
 static bool rwsem_optimistic_spin(struct rw_semaphore *sem)
@@ -378,7 +367,8 @@ static bool rwsem_optimistic_spin(struct rw_semaphore *sem)
 
 	while (true) {
 		owner = READ_ONCE(sem->owner);
-		if (owner && !rwsem_spin_on_owner(sem, owner))
+		if (rwsem_is_writer_owned(owner) &&
+		   !rwsem_spin_on_owner(sem, owner))
 			break;
 
 		/* wait_lock will be acquired if write_lock is obtained */
@@ -391,9 +381,11 @@ static bool rwsem_optimistic_spin(struct rw_semaphore *sem)
 		 * When there's no owner, we might have preempted between the
 		 * owner acquiring the lock and setting the owner field. If
 		 * we're an RT task that will live-lock because we won't let
-		 * the owner complete.
+		 * the owner complete. We also quit if the lock is owned by
+		 * readers.
 		 */
-		if (!owner && (need_resched() || rt_task(current)))
+		if ((owner == RWSEM_READER_OWNED) ||
+		   (!owner && (need_resched() || rt_task(current))))
 			break;
 
 		/*
