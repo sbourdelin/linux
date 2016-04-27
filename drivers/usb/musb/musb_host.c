@@ -1863,14 +1863,12 @@ void musb_host_rx(struct musb *musb, u8 epnum)
 
 		/* stall; record URB status */
 		status = -EPIPE;
+	} else if (rx_csr & (MUSB_RXCSR_DATAERROR | MUSB_RXCSR_H_ERROR)) {
 
-	} else if (rx_csr & MUSB_RXCSR_H_ERROR) {
-		dev_dbg(musb->controller, "end %d RX proto error\n", epnum);
-
-		status = -EPROTO;
-		musb_writeb(epio, MUSB_RXINTERVAL, 0);
-
-	} else if (rx_csr & MUSB_RXCSR_DATAERROR) {
+		if (rx_csr & MUSB_RXCSR_H_ERROR) {
+			status = -EPROTO;
+			musb_writeb(epio, MUSB_RXINTERVAL, 0);
+		}
 
 		if (USB_ENDPOINT_XFER_ISOC != qh->type) {
 			dev_dbg(musb->controller, "RX end %d NAK timeout\n", epnum);
