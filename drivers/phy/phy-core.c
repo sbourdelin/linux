@@ -36,12 +36,14 @@ static void devm_phy_release(struct device *dev, void *res)
 	phy_put(phy);
 }
 
+#ifdef CONFIG_OF
 static void devm_phy_provider_release(struct device *dev, void *res)
 {
 	struct phy_provider *phy_provider = *(struct phy_provider **)res;
 
 	of_phy_provider_unregister(phy_provider);
 }
+#endif
 
 static void devm_phy_consume(struct device *dev, void *res)
 {
@@ -132,6 +134,7 @@ static struct phy *phy_find(struct device *dev, const char *con_id)
 	return pl ? pl->phy : ERR_PTR(-ENODEV);
 }
 
+#ifdef CONFIG_OF
 static struct phy_provider *of_phy_provider_lookup(struct device_node *node)
 {
 	struct phy_provider *phy_provider;
@@ -154,6 +157,7 @@ static struct phy_provider *of_phy_provider_lookup(struct device_node *node)
 
 	return ERR_PTR(-EPROBE_DEFER);
 }
+#endif
 
 int phy_pm_runtime_get(struct phy *phy)
 {
@@ -348,6 +352,7 @@ int phy_power_off(struct phy *phy)
 }
 EXPORT_SYMBOL_GPL(phy_power_off);
 
+#ifdef CONFIG_OF
 /**
  * _of_phy_get() - lookup and obtain a reference to a phy by phandle
  * @np: device_node for which to get the phy
@@ -425,6 +430,7 @@ struct phy *of_phy_get(struct device_node *np, const char *con_id)
 	return phy;
 }
 EXPORT_SYMBOL_GPL(of_phy_get);
+#endif
 
 /**
  * phy_put() - release the PHY
@@ -462,6 +468,7 @@ void devm_phy_put(struct device *dev, struct phy *phy)
 }
 EXPORT_SYMBOL_GPL(devm_phy_put);
 
+#ifdef CONFIG_OF
 /**
  * of_phy_simple_xlate() - returns the phy instance from phy provider
  * @dev: the PHY provider device
@@ -492,6 +499,7 @@ struct phy *of_phy_simple_xlate(struct device *dev, struct of_phandle_args
 	return ERR_PTR(-ENODEV);
 }
 EXPORT_SYMBOL_GPL(of_phy_simple_xlate);
+#endif
 
 /**
  * phy_get() - lookup and obtain a reference to a phy.
@@ -505,21 +513,21 @@ EXPORT_SYMBOL_GPL(of_phy_simple_xlate);
  */
 struct phy *phy_get(struct device *dev, const char *string)
 {
-	int index = 0;
 	struct phy *phy;
 
 	if (string == NULL) {
 		dev_WARN(dev, "missing string\n");
 		return ERR_PTR(-EINVAL);
 	}
-
+#ifdef CONFIG_OF
 	if (dev->of_node) {
+		int index;
 		index = of_property_match_string(dev->of_node, "phy-names",
 			string);
 		phy = _of_phy_get(dev->of_node, index);
-	} else {
+	} else
+#endif
 		phy = phy_find(dev, string);
-	}
 	if (IS_ERR(phy))
 		return phy;
 
@@ -607,6 +615,7 @@ struct phy *devm_phy_optional_get(struct device *dev, const char *string)
 }
 EXPORT_SYMBOL_GPL(devm_phy_optional_get);
 
+#ifdef CONFIG_OF
 /**
  * devm_of_phy_get() - lookup and obtain a reference to a phy.
  * @dev: device that requests this phy
@@ -678,6 +687,7 @@ struct phy *devm_of_phy_get_by_index(struct device *dev, struct device_node *np,
 	return phy;
 }
 EXPORT_SYMBOL_GPL(devm_of_phy_get_by_index);
+#endif
 
 /**
  * phy_create() - create a new phy
@@ -814,6 +824,7 @@ void devm_phy_destroy(struct device *dev, struct phy *phy)
 }
 EXPORT_SYMBOL_GPL(devm_phy_destroy);
 
+#ifdef CONFIG_OF
 /**
  * __of_phy_provider_register() - create/register phy provider with the framework
  * @dev: struct device of the phy provider
@@ -924,6 +935,7 @@ void devm_of_phy_provider_unregister(struct device *dev,
 	dev_WARN_ONCE(dev, r, "couldn't find PHY provider device resource\n");
 }
 EXPORT_SYMBOL_GPL(devm_of_phy_provider_unregister);
+#endif
 
 /**
  * phy_release() - release the phy
