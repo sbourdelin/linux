@@ -191,9 +191,15 @@ __add_wait_queue_tail_exclusive(wait_queue_head_t *q, wait_queue_t *wait)
 }
 
 static inline void
-__remove_wait_queue(wait_queue_head_t *head, wait_queue_t *old)
+__remove_wait_queue_entry(wait_queue_t *old)
 {
 	list_del(&old->task_list);
+}
+
+static inline void
+__remove_wait_queue(wait_queue_head_t *head, wait_queue_t *old)
+{
+	__remove_wait_queue_entry(old);
 }
 
 typedef int wait_bit_action_f(struct wait_bit_key *, int mode);
