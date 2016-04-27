@@ -7207,6 +7207,43 @@ int nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
 	return _nfs4_proc_exchange_id(clp, cred, SP4_NONE, NULL);
 }
 
+/**
+ * nfs4_test_session_trunk_and_add_xprt - Test for session trunking with a
+ * synchronous exchange_id call, and add a new transport to the rpc_clnt
+ *
+ * @clnt: struct rpc_clnt to get new transport
+ * @xps:  the rpc_xprt_switch to hold the new transport
+ * @xprt: the rpc_xprt to test
+ * @data: call data for _nfs4_proc_exchange_id.
+ *
+ */
+int nfs4_test_session_trunk_and_add_xprt(struct rpc_clnt *clnt,
+					struct rpc_xprt_switch *xps,
+					struct rpc_xprt *xprt,
+					void *data)
+{
+	struct nfs4_add_xprt_data *xdata = (struct nfs4_add_xprt_data *)data;
+	u32 sp4_how;
+	int status;
+
+	sp4_how = (xdata->clp->cl_sp4_flags == 0 ? SP4_NONE : SP4_MACH_CRED);
+
+	/* Ensure these stick around for the rpc call */
+	xps = xprt_switch_get(xps);
+	xprt = xprt_get(xprt);
+
+	/* Sync call */
+	status = _nfs4_proc_exchange_id(xdata->clp, xdata->cred, sp4_how, xprt);
+
+	xprt_put(xprt);
+	xprt_switch_put(xps);
+
+	if (status)
+		pr_info("NFS: mulitaddr %s establishment failed. status %d\n",
+			xprt->address_strings[RPC_DISPLAY_ADDR], status);
+	return status;
+}
+
 static int _nfs4_proc_destroy_clientid(struct nfs_client *clp,
 		struct rpc_cred *cred)
 {

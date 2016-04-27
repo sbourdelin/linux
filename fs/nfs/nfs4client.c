@@ -1041,6 +1041,43 @@ out:
 	return error;
 }
 
+/**
+ * Add rpc_xprts to an existing RPC client
+ */
+void nfs4_try_multiaddr(struct nfs_parsed_mount_data *mnt,
+			struct nfs_client *clp)
+{
+	struct multi_addr *multip = mnt->multiaddrs;
+	struct nfs4_add_xprt_data xprtdata = {
+		.clp = clp,
+	};
+	int i;
+
+	dprintk("NFS:   Try adding %u multi addrs\n", mnt->num_multi);
+
+	if (mnt->num_multi == 0)
+		return;
+
+	xprtdata.cred = nfs4_get_clid_cred(clp);
+
+	for (i = 0; i < mnt->num_multi; i++) {
+		struct xprt_create xprt_args = {
+			.ident = XPRT_TRANSPORT_TCP,
+			.net = mnt->net,
+			.dstaddr = (struct sockaddr *)&multip->addr,
+			.addrlen = multip->addrlen,
+			.servername = multip->hostname,
+		};
+		/* Add this address as an alias */
+		rpc_clnt_add_xprt(clp->cl_rpcclient, &xprt_args,
+				  nfs4_test_session_trunk_and_add_xprt,
+				  &xprtdata);
+		multip++;
+	}
+	if (xprtdata.cred)
+		put_rpccred(xprtdata.cred);
+}
+
 /*
  * Create a version 4 volume record
  */
@@ -1097,6 +1134,8 @@ static int nfs4_init_server(struct nfs_server *server,
 	error = nfs_init_server_rpcclient(server, &timeparms,
 					  data->selected_flavor);
 
+	if (!error)
+		nfs4_try_multiaddr(data, server->nfs_client);
 error:
 	/* Done */
 	dprintk("<-- nfs4_init_server() = %d\n", error);

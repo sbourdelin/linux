@@ -218,6 +218,11 @@ struct nfs4_add_xprt_data {
 	struct nfs_client	*clp;
 	struct rpc_cred		*cred;
 };
+extern int nfs4_test_session_trunk_and_add_xprt(struct rpc_clnt *clnt,
+						struct rpc_xprt_switch *xps,
+						struct rpc_xprt *xprt,
+						void *data);
+
 extern const struct dentry_operations nfs4_dentry_operations;
 
 /* dir.c */
