@@ -73,10 +73,10 @@ struct i915_guc_client {
 
 	/* GuC submission statistics & status */
 	uint64_t submissions[GUC_MAX_ENGINES_NUM];
-	uint32_t q_fail;
-	uint32_t b_fail;
-	int retcode;
-	int spare;			/* pad to 32 DWords		*/
+	uint32_t no_wq_space;		/* Space pre-check failed	*/
+	uint32_t q_fail;		/* Failed to queue (MBZ)	*/
+	uint32_t b_fail;		/* Doorbell failure (MBZ)	*/
+	int retcode;			/* Result of last guc_submit()	*/
 };
 
 enum intel_guc_fw_status {
