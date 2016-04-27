@@ -74,7 +74,7 @@ struct i915_guc_client {
 	/* GuC submission statistics & status */
 	uint64_t submissions[GUC_MAX_ENGINES_NUM];
 	uint32_t no_wq_space;		/* Space pre-check failed	*/
-	uint32_t q_fail;		/* Failed to queue (MBZ)	*/
+	uint32_t q_fail;		/* No longer used		*/
 	uint32_t b_fail;		/* Doorbell failure (MBZ)	*/
 	int retcode;			/* Result of last guc_submit()	*/
 };
