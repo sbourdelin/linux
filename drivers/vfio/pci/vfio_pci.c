@@ -110,13 +110,47 @@ static inline bool vfio_pci_is_vga(struct pci_dev *pdev)
 	return (pdev->class >> 8) == PCI_CLASS_DISPLAY_VGA;
 }
 
+static bool vfio_pci_bar_mmap_supported(struct vfio_pci_device *vdev, int index)
+{
+	struct resource *res = vdev->pdev->resource + index;
+	struct vfio_pci_shadow_resource *shadow_res;
+
+	if (IS_ENABLED(CONFIG_VFIO_PCI_MMAP) && res->flags & IORESOURCE_MEM &&
+		resource_size(res) > 0) {
+		if (resource_size(res) >= PAGE_SIZE)
+			return true;
+
+		if (!(res->start & ~PAGE_MASK)) {
+			/*
+			 * Add shadow resource for sub-page bar whose mmio
+			 * page is exclusive in case that hot-add device's
+			 * bar is assigned into the mem hole.
+			 */
+			shadow_res = kzalloc(sizeof(*shadow_res), GFP_KERNEL);
+			shadow_res->resource.start = res->end + 1;
+			shadow_res->resource.end = res->start + PAGE_SIZE - 1;
+			shadow_res->resource.flags = res->flags;
+			if (request_resource(res->parent,
+					&shadow_res->resource)) {
+				kfree(shadow_res);
+				return false;
+			}
+			shadow_res->index = index;
+			list_add(&shadow_res->res_next,
+					&vdev->shadow_resources_list);
+			return true;
+		}
+	}
+	return false;
+}
+
 static void vfio_pci_try_bus_reset(struct vfio_pci_device *vdev);
 static void vfio_pci_disable(struct vfio_pci_device *vdev);
 
 static int vfio_pci_enable(struct vfio_pci_device *vdev)
 {
 	struct pci_dev *pdev = vdev->pdev;
-	int ret;
+	int ret, bar;
 	u16 cmd;
 	u8 msix_pos;
 
@@ -183,12 +217,17 @@ static int vfio_pci_enable(struct vfio_pci_device *vdev)
 		}
 	}
 
+	for (bar = PCI_STD_RESOURCES; bar <= PCI_STD_RESOURCE_END; bar++) {
+		vdev->bar_mmap_supported[bar] =
+				vfio_pci_bar_mmap_supported(vdev, bar);
+	}
 	return 0;
 }
 
 static void vfio_pci_disable(struct vfio_pci_device *vdev)
 {
 	struct pci_dev *pdev = vdev->pdev;
+	struct vfio_pci_shadow_resource *shadow_res, *tmp;
 	int i, bar;
 
 	/* Stop the device from further DMA */
@@ -215,6 +254,13 @@ static void vfio_pci_disable(struct vfio_pci_device *vdev)
 		pci_iounmap(pdev, vdev->barmap[bar]);
 		pci_release_selected_regions(pdev, 1 << bar);
 		vdev->barmap[bar] = NULL;
+	}
+
+	list_for_each_entry_safe(shadow_res, tmp,
+				 &vdev->shadow_resources_list, res_next) {
+		list_del(&shadow_res->res_next);
+		release_resource(&shadow_res->resource);
+		kfree(shadow_res);
 	}
 
 	vdev->needs_reset = true;
@@ -588,9 +634,7 @@ static long vfio_pci_ioctl(void *device_data,
 
 			info.flags = VFIO_REGION_INFO_FLAG_READ |
 				     VFIO_REGION_INFO_FLAG_WRITE;
-			if (IS_ENABLED(CONFIG_VFIO_PCI_MMAP) &&
-			    pci_resource_flags(pdev, info.index) &
-			    IORESOURCE_MEM && info.size >= PAGE_SIZE) {
+			if (vdev->bar_mmap_supported[info.index]) {
 				info.flags |= VFIO_REGION_INFO_FLAG_MMAP;
 				if (info.index == vdev->msix_bar) {
 					ret = msix_sparse_mmap_cap(vdev, &caps);
@@ -1014,16 +1058,16 @@ static int vfio_pci_mmap(void *device_data, struct vm_area_struct *vma)
 		return -EINVAL;
 	if (index >= VFIO_PCI_ROM_REGION_INDEX)
 		return -EINVAL;
-	if (!(pci_resource_flags(pdev, index) & IORESOURCE_MEM))
+	if (!vdev->bar_mmap_supported[index])
 		return -EINVAL;
 
-	phys_len = pci_resource_len(pdev, index);
+	phys_len = PAGE_ALIGN(pci_resource_len(pdev, index));
 	req_len = vma->vm_end - vma->vm_start;
 	pgoff = vma->vm_pgoff &
 		((1U << (VFIO_PCI_OFFSET_SHIFT - PAGE_SHIFT)) - 1);
 	req_start = pgoff << PAGE_SHIFT;
 
-	if (phys_len < PAGE_SIZE || req_start + req_len > phys_len)
+	if (req_start + req_len > phys_len)
 		return -EINVAL;
 
 	if (index == vdev->msix_bar) {
