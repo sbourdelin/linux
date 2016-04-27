@@ -558,7 +558,15 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
 		break;
 
 	case SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM:
-		/* I2S format, CODEC supplies BCLK and LRC clocks. */
+		/*
+		 * I2S format, CODEC supplies BCLK and LRC clocks.
+		 * NOTE! This is not really I2S, as the SSC does not allow
+		 * for any extra empty BCLK cycles after the left channel
+		 * word. I.e. the SSC is only looking at the falling edge
+		 * of LRCLK and ignores the rising edge.
+		 * In reality, this is DSP mode A with inverted LRCLK.
+		 * Use DSP mode A instead, if your codec supports it.
+		 */
 		rcmr =	  SSC_BF(RCMR_PERIOD, 0)
 			| SSC_BF(RCMR_STTDLY, START_DELAY)
 			| SSC_BF(RCMR_START, SSC_START_FALLING_RF)
