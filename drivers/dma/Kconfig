@@ -527,6 +527,12 @@ config ZX_DMA
 	help
 	  Support the DMA engine for ZTE ZX296702 platform devices.
 
+config XILINX_ZYNQMP_DMA
+	tristate "Xilinx ZynqMP DMA Engine"
+	depends on (ARCH_ZYNQ || MICROBLAZE || ARM64)
+	select DMA_ENGINE
+	help
+	  Enable support for Xilinx ZynqMP DMA controller.
 
 # driver files
 source "drivers/dma/bestcomm/Kconfig"
