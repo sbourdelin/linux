@@ -350,15 +350,10 @@ static void dio_bio_end_io(struct bio *bio)
  */
 void dio_end_io(struct bio *bio, int error)
 {
-	struct dio *dio = bio->bi_private;
-
 	if (!bio->bi_error)
 		bio->bi_error = error;
 
-	if (dio->is_async)
-		dio_bio_end_aio(bio);
-	else
-		dio_bio_end_io(bio);
+	bio_endio(bio);
 }
 EXPORT_SYMBOL_GPL(dio_end_io);
 
