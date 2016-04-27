@@ -1517,6 +1517,15 @@ static int dwc3_gadget_run_stop(struct dwc3 *dwc, int is_on, int suspend)
 	return 0;
 }
 
+static void dwc3_disconnect_gadget(struct dwc3 *dwc)
+{
+	if (dwc->gadget_driver && dwc->gadget_driver->disconnect) {
+		spin_unlock(&dwc->lock);
+		dwc->gadget_driver->disconnect(&dwc->gadget);
+		spin_lock(&dwc->lock);
+	}
+}
+
 static int dwc3_gadget_pullup(struct usb_gadget *g, int is_on)
 {
 	struct dwc3		*dwc = gadget_to_dwc(g);
@@ -1526,6 +1535,21 @@ static int dwc3_gadget_pullup(struct usb_gadget *g, int is_on)
 	is_on = !!is_on;
 
 	spin_lock_irqsave(&dwc->lock, flags);
+	/**
+	 * WORKAROUND: The dwc3 controller can't generate a disconnect
+	 * event after it is stopped. Thus gadget dissconnect callback
+	 * is not invoked when do soft dissconnect. Call dissconnect
+	 * here to workaround this issue.
+	 * Note, most time we still see disconnect be called that because
+	 * it is invoked by dwc3_gadget_reset_interrupt(). But if we
+	 * disconnect cable once pullup disabled quickly, issue can be
+	 * observed.
+	 */
+	if (!is_on && (dwc->gadget.speed != USB_SPEED_UNKNOWN)) {
+		dev_dbg(dwc->dev, "fake dissconnect event on pullup off\n");
+		dwc3_disconnect_gadget(dwc);
+		dwc->gadget.speed = USB_SPEED_UNKNOWN;
+	}
 	ret = dwc3_gadget_run_stop(dwc, is_on, false);
 	spin_unlock_irqrestore(&dwc->lock, flags);
 
@@ -2091,15 +2115,6 @@ static void dwc3_endpoint_interrupt(struct dwc3 *dwc,
 	case DWC3_DEPEVT_EPCMDCMPLT:
 		dwc3_trace(trace_dwc3_gadget, "Endpoint Command Complete");
 		break;
-	}
-}
-
-static void dwc3_disconnect_gadget(struct dwc3 *dwc)
-{
-	if (dwc->gadget_driver && dwc->gadget_driver->disconnect) {
-		spin_unlock(&dwc->lock);
-		dwc->gadget_driver->disconnect(&dwc->gadget);
-		spin_lock(&dwc->lock);
 	}
 }
 
