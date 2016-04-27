@@ -253,6 +253,14 @@ static int soc_pcm_params_symmetry(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	unsigned int rate, channels, sample_bits, symmetry, i;
 
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		if (!cpu_dai->capture_active)
+			return 0;
+	} else if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
+		if (!cpu_dai->playback_active)
+			return 0;
+	}
+
 	rate = params_rate(params);
 	channels = params_channels(params);
 	sample_bits = snd_pcm_format_physical_width(params_format(params));
