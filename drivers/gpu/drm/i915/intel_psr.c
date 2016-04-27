@@ -788,14 +788,11 @@ void intel_psr_init(struct drm_device *dev)
 	}
 
 	/* Set link_standby x link_off defaults */
-	if (IS_HASWELL(dev) || IS_BROADWELL(dev))
-		/* HSW and BDW require workarounds that we don't implement. */
-		dev_priv->psr.link_standby = false;
 	else if (IS_VALLEYVIEW(dev) || IS_CHERRYVIEW(dev))
 		/* On VLV and CHV only standby mode is supported. */
 		dev_priv->psr.link_standby = true;
 	else
-		/* For new platforms let's respect VBT back again */
+		/* For other platforms let's respect VBT back again */
 		dev_priv->psr.link_standby = dev_priv->vbt.psr.full_link;
 
 	/* Override link_standby x link_off defaults */
