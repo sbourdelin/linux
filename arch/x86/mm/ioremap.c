@@ -138,14 +138,16 @@ static void __iomem *__ioremap_caller(resource_size_t phys_addr,
 	}
 
 	if (pcm != new_pcm) {
-		if (!is_new_memtype_allowed(phys_addr, size, pcm, new_pcm)) {
-			printk(KERN_ERR
-		"ioremap error for 0x%llx-0x%llx, requested 0x%x, got 0x%x\n",
+		retval = is_new_memtype_allowed(phys_addr, size, pcm, new_pcm);
+		pr_err(
+		    "ioremap %s for 0x%llx-0x%llx, requested 0x%x, got 0x%x\n",
+				retval ? "warning" : "error",
 				(unsigned long long)phys_addr,
 				(unsigned long long)(phys_addr + size),
 				pcm, new_pcm);
+		if (!retval)
 			goto err_free_memtype;
-		}
+
 		pcm = new_pcm;
 	}
 
