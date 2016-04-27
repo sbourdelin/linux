@@ -224,6 +224,8 @@ static int i2c_inb(struct i2c_adapter *i2c_adap)
 			indata |= 0x01;
 		setscl(adap, 0);
 		udelay(i == 7 ? adap->udelay / 2 : adap->udelay);
+		if (adap->set_sdahi)
+			sdahi(adap);
 	}
 	/* assert: scl is low */
 	return indata;
