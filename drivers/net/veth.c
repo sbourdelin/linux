@@ -472,7 +472,6 @@ err_register_dev:
 	/* nothing to do */
 err_configure_peer:
 	unregister_netdevice(peer);
-	return err;
 
 err_register_peer:
 	free_netdev(peer);
