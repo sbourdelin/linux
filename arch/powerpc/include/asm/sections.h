@@ -62,7 +62,7 @@ static inline int overlaps_kvm_tmp(unsigned long start, unsigned long end)
 #endif
 }
 
-#if !defined(_CALL_ELF) || _CALL_ELF != 2
+#ifndef PPC_ELF_ABI_v2
 #undef dereference_function_descriptor
 static inline void *dereference_function_descriptor(void *ptr)
 {

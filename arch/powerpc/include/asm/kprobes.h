@@ -41,7 +41,7 @@ typedef ppc_opcode_t kprobe_opcode_t;
 #define MAX_INSN_SIZE 1
 
 #ifdef CONFIG_PPC64
-#if defined(_CALL_ELF) && _CALL_ELF == 2
+#ifdef PPC_ELF_ABI_v2
 /* PPC64 ABIv2 needs local entry point */
 #define kprobe_lookup_name(name, addr)					\
 {									\
@@ -92,7 +92,7 @@ typedef ppc_opcode_t kprobe_opcode_t;
 		addr = (kprobe_opcode_t *)kallsyms_lookup_name(name);	\
 	}								\
 }
-#endif /* defined(_CALL_ELF) && _CALL_ELF == 2 */
+#endif /* PPC_ELF_ABI_v2 */
 #endif /* CONFIG_PPC64 */
 
 #define flush_insn_slot(p)	do { } while (0)

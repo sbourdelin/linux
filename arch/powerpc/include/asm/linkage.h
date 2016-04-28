@@ -2,7 +2,7 @@
 #define _ASM_POWERPC_LINKAGE_H
 
 #ifdef CONFIG_PPC64
-#if !defined(_CALL_ELF) || _CALL_ELF != 2
+#ifndef PPC_ELF_ABI_v2
 #define cond_syscall(x) \
 	asm ("\t.weak " #x "\n\t.set " #x ", sys_ni_syscall\n"		\
 	     "\t.weak ." #x "\n\t.set ." #x ", .sys_ni_syscall\n")

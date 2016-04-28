@@ -15,6 +15,10 @@
 
 #include <uapi/asm/types.h>
 
+#if defined(_CALL_ELF) && _CALL_ELF == 2
+#define PPC_ELF_ABI_v2
+#endif
+
 #ifndef __ASSEMBLY__
 
 typedef __vector128 vector128;
