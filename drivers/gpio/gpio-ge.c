@@ -18,13 +18,12 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/io.h>
-#include <linux/slab.h>
-#include <linux/of_device.h>
-#include <linux/of_gpio.h>
-#include <linux/of_address.h>
 #include <linux/module.h>
+#include <linux/err.h>
+#include <linux/ioport.h>
 #include <linux/gpio/driver.h>
+#include <linux/platform_device.h>
+#include "gpio-mmio-compat.h"
 
 #define GEF_GPIO_DIRECT		0x00
 #define GEF_GPIO_IN		0x04
@@ -36,79 +35,37 @@
 #define GEF_GPIO_OVERRUN	0x1C
 #define GEF_GPIO_MODE		0x20
 
-static const struct of_device_id gef_gpio_ids[] = {
-	{
-		.compatible	= "gef,sbc610-gpio",
-		.data		= (void *)19,
-	}, {
-		.compatible	= "gef,sbc310-gpio",
-		.data		= (void *)6,
-	}, {
-		.compatible	= "ge,imp3a-gpio",
-		.data		= (void *)16,
-	},
-	{ }
-};
-MODULE_DEVICE_TABLE(of, gef_gpio_ids);
-
-static int __init gef_gpio_probe(struct platform_device *pdev)
+int ge_parse_dt(struct platform_device *pdev,
+	       struct bgpio_pdata *pdata,
+	       unsigned long *flags)
 {
-	const struct of_device_id *of_id =
-		of_match_device(gef_gpio_ids, &pdev->dev);
-	struct gpio_chip *gc;
-	void __iomem *regs;
-	int ret;
+	struct device_node *np = pdev->dev.of_node;
 
-	gc = devm_kzalloc(&pdev->dev, sizeof(*gc), GFP_KERNEL);
-	if (!gc)
-		return -ENOMEM;
+	struct resource *res;
+	struct resource nres[] = {
+		DEFINE_RES_MEM_NAMED(0, 1, "dat"),
+		DEFINE_RES_MEM_NAMED(0, 1, "set"),
+		DEFINE_RES_MEM_NAMED(0, 1, "dirin"),
+	};
 
-	regs = of_iomap(pdev->dev.of_node, 0);
-	if (!regs)
-		return -ENOMEM;
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res || resource_size(res) != 0x24)
+		return -EINVAL;
 
-	ret = bgpio_init(gc, &pdev->dev, 4, regs + GEF_GPIO_IN,
-			 regs + GEF_GPIO_OUT, NULL, NULL,
-			 regs + GEF_GPIO_DIRECT, BGPIOF_BIG_ENDIAN_BYTE_ORDER);
-	if (ret) {
-		dev_err(&pdev->dev, "bgpio_init failed\n");
-		goto err0;
-	}
+	set_resource_address(&nres[0], res->start + GEF_GPIO_IN, 0x4);
+	set_resource_address(&nres[1], res->start + GEF_GPIO_OUT, 0x4);
+	set_resource_address(&nres[2], res->start + GEF_GPIO_DIRECT, 0x4);
+	*flags |= BGPIOF_BIG_ENDIAN_BYTE_ORDER;
 
-	/* Setup pointers to chip functions */
-	gc->label = devm_kstrdup(&pdev->dev, pdev->dev.of_node->full_name,
-				     GFP_KERNEL);
-	if (!gc->label) {
-		ret = -ENOMEM;
-		goto err0;
-	}
+	if (of_device_is_compatible(np, "ge,imp3a-gpio"))
+		pdata->ngpio = 16;
+	else if (of_device_is_compatible(np, "gef,sbc310-gpio"))
+		pdata->ngpio = 6;
+	else if (of_device_is_compatible(np, "gef,sbc610-gpio"))
+		pdata->ngpio = 19;
 
-	gc->base = -1;
-	gc->ngpio = (u16)(uintptr_t)of_id->data;
-	gc->of_gpio_n_cells = 2;
-	gc->of_node = pdev->dev.of_node;
-
-	/* This function adds a memory mapped GPIO chip */
-	ret = devm_gpiochip_add_data(&pdev->dev, gc, NULL);
-	if (ret)
-		goto err0;
-
-	return 0;
-err0:
-	iounmap(regs);
-	pr_err("%s: GPIO chip registration failed\n",
-			pdev->dev.of_node->full_name);
-	return ret;
-};
-
-static struct platform_driver gef_gpio_driver = {
-	.driver = {
-		.name		= "gef-gpio",
-		.of_match_table	= gef_gpio_ids,
-	},
-};
-module_platform_driver_probe(gef_gpio_driver, gef_gpio_probe);
+	return platform_device_add_resources(pdev, nres, ARRAY_SIZE(nres));
+}
 
 MODULE_DESCRIPTION("GE I/O FPGA GPIO driver");
 MODULE_AUTHOR("Martyn Welch <martyn.welch@ge.com");
-MODULE_LICENSE("GPL");

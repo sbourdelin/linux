@@ -186,18 +186,6 @@ config GPIO_ETRAXFS
 	help
 	  Say yes here to support the GPIO controller on Axis ETRAX FS SoCs.
 
-config GPIO_GE_FPGA
-	bool "GE FPGA based GPIO"
-	depends on GE_FPGA
-	select GPIO_GENERIC
-	help
-	  Support for common GPIO functionality provided on some GE Single Board
-	  Computers.
-
-	  This driver provides basic support (configure as input or output, read
-	  and write pin state) for GPIO implemented in a number of GE single
-	  board computers.
-
 config GPIO_GENERIC_PLATFORM
 	tristate "Generic memory-mapped GPIO controller support (MMIO platform device)"
 	select GPIO_GENERIC
@@ -211,6 +199,18 @@ config GPIO_CLPS711X
 	select GPIO_GENERIC
 	help
 	  Say yes here to support GPIO on CLPS711X SoCs.
+
+config GPIO_GE_FPGA
+	bool "GE FPGA based GPIO"
+	depends on GE_FPGA || COMPILE_TEST
+	select GPIO_GENERIC
+	help
+	  Support for common GPIO functionality provided on some GE Single Board
+	  Computers.
+
+	  This driver provides basic support (configure as input or output, read
+	  and write pin state) for GPIO implemented in a number of GE single
+	  board computers.
 
 endif
 
