@@ -156,6 +156,20 @@ static const struct reg_default nau8825_reg_defaults[] = {
 	{ NAU8825_REG_CHARGE_PUMP, 0x0 },
 };
 
+/* Biquad filter coefficients for A1, A2, B0, B1, and B3 */
+static const struct reg_default nau8825_adc_biq_reg[] = {
+	{ NAU8825_REG_BIQ_COF1, 0x009B },
+	{ NAU8825_REG_BIQ_COF2, 0x0006 },
+	{ NAU8825_REG_BIQ_COF3, 0xff66 },
+	{ NAU8825_REG_BIQ_COF4, 0x0000 },
+	{ NAU8825_REG_BIQ_COF5, 0xffb3 },
+	{ NAU8825_REG_BIQ_COF6, 0x0000 },
+	{ NAU8825_REG_BIQ_COF7, 0x009A },
+	{ NAU8825_REG_BIQ_COF8, 0x0006 },
+	{ NAU8825_REG_BIQ_COF9, 0xffb3 },
+	{ NAU8825_REG_BIQ_COF10, 0x8000 },
+};
+
 static bool nau8825_readable_reg(struct device *dev, unsigned int reg)
 {
 	switch (reg) {
@@ -217,10 +231,44 @@ static bool nau8825_volatile_reg(struct device *dev, unsigned int reg)
 	case NAU8825_REG_SARDOUT_RAM_STATUS:
 	case NAU8825_REG_CHARGE_PUMP_INPUT_READ:
 	case NAU8825_REG_GENERAL_STATUS:
+	case NAU8825_REG_BIQ_CTRL ... NAU8825_REG_BIQ_COF10:
 		return true;
 	default:
 		return false;
 	}
+}
+
+static void nau8825_adc_biq_apply(struct nau8825 *nau8825)
+{
+	int i;
+
+	/* Enable the BIQ parameter write/updated. The control is valid only
+	 * when change from 0 to 1. The driver applies the BIQ function into
+	 * the ADC path only.
+	 */
+	regmap_update_bits(nau8825->regmap, NAU8825_REG_BIQ_CTRL,
+		NAU8825_BIQ_WRT_EN | NAU8825_BIQ_PATH_MASK,
+		NAU8825_BIQ_PATH_ADC);
+	for (i = 0; i < ARRAY_SIZE(nau8825_adc_biq_reg); i++)
+		regmap_write(nau8825->regmap, nau8825_adc_biq_reg[i].reg,
+				nau8825_adc_biq_reg[i].def);
+	regmap_update_bits(nau8825->regmap, NAU8825_REG_BIQ_CTRL,
+		NAU8825_BIQ_WRT_EN, NAU8825_BIQ_WRT_EN);
+}
+
+static void nau8825_adc_biq_cancel(struct nau8825 *nau8825)
+{
+	int i;
+
+	/* Disable the BIQ parameter write/updated. The control is valid only
+	 * when change from 0 to 1.
+	 */
+	regmap_update_bits(nau8825->regmap, NAU8825_REG_BIQ_CTRL,
+		NAU8825_BIQ_WRT_EN, 0);
+	for (i = 0; i < ARRAY_SIZE(nau8825_adc_biq_reg); i++)
+		regmap_write(nau8825->regmap, nau8825_adc_biq_reg[i].reg, 0);
+	regmap_update_bits(nau8825->regmap, NAU8825_REG_BIQ_CTRL,
+		NAU8825_BIQ_WRT_EN, NAU8825_BIQ_WRT_EN);
 }
 
 static int nau8825_adc_event(struct snd_soc_dapm_widget *w,
@@ -660,6 +708,9 @@ static void nau8825_eject_jack(struct nau8825 *nau8825)
 	struct snd_soc_dapm_context *dapm = nau8825->dapm;
 	struct regmap *regmap = nau8825->regmap;
 
+	/* Cancel biquad filter in ADC path */
+	nau8825_adc_biq_cancel(nau8825);
+
 	snd_soc_dapm_disable_pin(dapm, "SAR");
 	snd_soc_dapm_disable_pin(dapm, "MICBIAS");
 	/* Detach 2kOhm Resistors from MICBIAS to MICGND1/2 */
@@ -748,6 +799,14 @@ static int nau8825_jack_insert(struct nau8825 *nau8825)
 		snd_soc_dapm_force_enable_pin(dapm, "SAR");
 		snd_soc_dapm_sync(dapm);
 		break;
+	}
+
+	if (type & SND_JACK_MICROPHONE) {
+		/* Apply biquad filter into ADC path. It helps to avoid the DC
+		 * offset in recoding signal. The function will keep asleep
+		 * without clock and work up automatically when clock provided.
+		 */
+		nau8825_adc_biq_apply(nau8825);
 	}
 
 	/* Leaving HPOL/R grounded after jack insert by default. They will be
