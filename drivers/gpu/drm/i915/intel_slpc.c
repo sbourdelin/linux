@@ -73,6 +73,24 @@ static void host2guc_slpc_shutdown(struct drm_device *dev)
 	host2guc_slpc(dev_priv, data, 4);
 }
 
+static void host2guc_slpc_display_mode_change(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	u32 data[3 + SLPC_MAX_NUM_OF_PIPES];
+	int i;
+	struct intel_slpc_display_mode_event_params *display_mode_params;
+
+	display_mode_params = &dev_priv->guc.slpc.display_mode_params;
+	data[0] = HOST2GUC_ACTION_SLPC_REQUEST;
+	data[1] = SLPC_EVENT(SLPC_EVENT_DISPLAY_MODE_CHANGE,
+					SLPC_MAX_NUM_OF_PIPES + 1);
+	data[2] = display_mode_params->global_data;
+	for(i = 0; i < SLPC_MAX_NUM_OF_PIPES; ++i)
+		data[3+i] = display_mode_params->per_pipe_info[i].data;
+
+	host2guc_slpc(dev_priv, data, 3 + SLPC_MAX_NUM_OF_PIPES);
+}
+
 static u8 slpc_get_platform_sku(struct drm_i915_gem_object *obj)
 {
 	struct drm_device *dev = obj->base.dev;
@@ -181,8 +199,10 @@ void intel_slpc_disable(struct drm_device *dev)
 
 void intel_slpc_enable(struct drm_device *dev)
 {
-	if (intel_slpc_active(dev))
+	if (intel_slpc_active(dev)) {
 		host2guc_slpc_reset(dev);
+		intel_slpc_update_display_mode_info(dev);
+	}
 }
 
 void intel_slpc_reset(struct drm_device *dev)
@@ -191,4 +211,156 @@ void intel_slpc_reset(struct drm_device *dev)
 		host2guc_slpc_shutdown(dev);
 		host2guc_slpc_reset(dev);
 	}
+}
+
+void intel_slpc_update_display_mode_info(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_crtc *intel_crtc;
+	struct intel_display_pipe_info *per_pipe_info;
+	struct intel_slpc_display_mode_event_params *cur_params, old_params;
+	bool notify = false;
+
+	if (!intel_slpc_active(dev))
+		return;
+
+	/* Copy display mode parameters for comparison */
+	cur_params = &dev_priv->guc.slpc.display_mode_params;
+	old_params.global_data  = cur_params->global_data;
+	cur_params->global_data = 0;
+
+	intel_runtime_pm_get(dev_priv);
+	drm_modeset_lock_all(dev);
+
+	for_each_intel_crtc(dev, intel_crtc) {
+		per_pipe_info = &cur_params->per_pipe_info[intel_crtc->pipe];
+		old_params.per_pipe_info[intel_crtc->pipe].data =
+							per_pipe_info->data;
+		per_pipe_info->data = 0;
+
+		if (intel_crtc->active) {
+			struct drm_display_mode *mode = &intel_crtc->base.mode;
+
+			if (mode->clock == 0 || mode->htotal == 0 ||
+			    mode->vtotal == 0) {
+				DRM_DEBUG_DRIVER(
+					"Display Mode Info not sent to SLPC\n");
+				drm_modeset_unlock_all(dev);
+				intel_runtime_pm_put(dev_priv);
+				return;
+			}
+			/* FIXME: Update is_widi based on encoder */
+			per_pipe_info->is_widi = 0;
+			per_pipe_info->refresh_rate =
+						(mode->clock * 1000) /
+						(mode->htotal * mode->vtotal);
+			per_pipe_info->vsync_ft_usec =
+					(mode->htotal * mode->vtotal * 1000) /
+						mode->clock;
+			cur_params->active_pipes_bitmask |=
+							(1 << intel_crtc->pipe);
+			cur_params->vbi_sync_on_pipes |=
+							(1 << intel_crtc->pipe);
+		} else {
+			cur_params->active_pipes_bitmask &=
+						~(1 << intel_crtc->pipe);
+			cur_params->vbi_sync_on_pipes &=
+						~(1 << intel_crtc->pipe);
+		}
+
+		if (old_params.per_pipe_info[intel_crtc->pipe].data !=
+							per_pipe_info->data)
+			notify = true;
+	}
+
+	drm_modeset_unlock_all(dev);
+
+	cur_params->num_active_pipes =
+				hweight32(cur_params->active_pipes_bitmask);
+
+	/*
+	 * Compare old display mode with current mode.
+	 * Notify SLPC if it is changed.
+	*/
+	if (cur_params->global_data != old_params.global_data)
+		notify = true;
+
+	if (notify)
+		host2guc_slpc_display_mode_change(dev);
+
+	intel_runtime_pm_put(dev_priv);
+}
+
+void intel_slpc_update_atomic_commit_info(struct drm_device *dev,
+					  struct drm_atomic_state *state)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_crtc *crtc;
+	struct drm_crtc_state *crtc_state;
+	struct intel_display_pipe_info *per_pipe_info;
+	struct intel_slpc_display_mode_event_params *cur_params, old_params;
+	bool notify = false;
+	int i;
+
+	if (!intel_slpc_active(dev))
+		return;
+
+	/* Copy display mode parameters for comparison */
+	cur_params = &dev_priv->guc.slpc.display_mode_params;
+	old_params.global_data  = cur_params->global_data;
+
+	for_each_crtc_in_state(state, crtc, crtc_state, i) {
+		struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+
+		per_pipe_info = &cur_params->per_pipe_info[intel_crtc->pipe];
+		old_params.per_pipe_info[intel_crtc->pipe].data =
+							per_pipe_info->data;
+
+		per_pipe_info->data = 0;
+		cur_params->active_pipes_bitmask &=
+						~(1 << intel_crtc->pipe);
+		cur_params->vbi_sync_on_pipes &=
+						~(1 << intel_crtc->pipe);
+
+		if (crtc_state->active) {
+			struct drm_display_mode *mode = &crtc->mode;
+
+			if (mode->clock == 0 || mode->htotal == 0 ||
+			    mode->vtotal == 0) {
+				DRM_DEBUG_DRIVER(
+					"Display Mode Info not sent to SLPC\n");
+				return;
+			}
+
+			/* FIXME: Update is_widi based on encoder */
+			per_pipe_info->is_widi = 0;
+			per_pipe_info->refresh_rate =
+						(mode->clock * 1000) /
+						(mode->htotal * mode->vtotal);
+			per_pipe_info->vsync_ft_usec =
+					(mode->htotal * mode->vtotal * 1000) /
+						mode->clock;
+			cur_params->active_pipes_bitmask |=
+							(1 << intel_crtc->pipe);
+			cur_params->vbi_sync_on_pipes |=
+							(1 << intel_crtc->pipe);
+		}
+
+		if (old_params.per_pipe_info[intel_crtc->pipe].data !=
+							per_pipe_info->data)
+			notify = true;
+	}
+
+	cur_params->num_active_pipes =
+				hweight32(cur_params->active_pipes_bitmask);
+
+	/*
+	 * Compare old display mode with current mode.
+	 * Notify SLPC if it is changed.
+	*/
+	if (cur_params->global_data != old_params.global_data)
+		notify = true;
+
+	if (notify)
+		host2guc_slpc_display_mode_change(dev);
 }

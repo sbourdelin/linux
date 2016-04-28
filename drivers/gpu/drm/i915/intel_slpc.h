@@ -150,5 +150,8 @@ void intel_slpc_suspend(struct drm_device *dev);
 void intel_slpc_disable(struct drm_device *dev);
 void intel_slpc_enable(struct drm_device *dev);
 void intel_slpc_reset(struct drm_device *dev);
+void intel_slpc_update_display_mode_info(struct drm_device *dev);
+void intel_slpc_update_atomic_commit_info(struct drm_device *dev,
+					  struct drm_atomic_state *state);
 
 #endif

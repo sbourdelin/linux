@@ -13715,6 +13715,8 @@ static int intel_atomic_commit(struct drm_device *dev,
 	drm_atomic_helper_cleanup_planes(dev, state);
 	mutex_unlock(&dev->struct_mutex);
 
+	intel_slpc_update_atomic_commit_info(dev, state);
+
 	drm_atomic_state_free(state);
 
 	/* As one of the primary mmio accessors, KMS has a high likelihood
