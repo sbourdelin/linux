@@ -134,6 +134,8 @@ enum slpc_power_source {
 };
 
 #define SLPC_POWER_PLAN_SOURCE(plan, source) ((plan) | ((source) << 6))
+#define SLPC_POWER_PLAN(plan_source) ((plan_source) & 0x3F)
+#define SLPC_POWER_SOURCE(plan_source) ((plan_source) >> 6)
 
 struct slpc_platform_info {
 	u8 platform_sku;
@@ -211,4 +213,5 @@ void intel_slpc_set_param(struct drm_device *dev, enum slpc_param_id id,
 			  u32 value);
 void intel_slpc_get_param(struct drm_device *dev, enum slpc_param_id id,
 			  int *overriding, u32 *value);
+void intel_slpc_query_task_state(struct drm_device *dev);
 #endif

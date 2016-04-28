@@ -118,6 +118,23 @@ static void host2guc_slpc_unset_param(struct drm_device *dev,
 	host2guc_slpc(dev_priv, data, 3);
 }
 
+static void host2guc_slpc_query_task_state(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_i915_gem_object *obj = dev_priv->guc.slpc.shared_data_obj;
+	u32 data[4];
+	u64 shared_data_gtt_offset = i915_gem_obj_ggtt_offset(obj);
+
+	data[0] = HOST2GUC_ACTION_SLPC_REQUEST;
+	data[1] = SLPC_EVENT(SLPC_EVENT_QUERY_TASK_STATE, 2);
+	data[2] = lower_32_bits(shared_data_gtt_offset);
+	data[3] = upper_32_bits(shared_data_gtt_offset);
+
+	WARN_ON(0 != data[3]);
+
+	host2guc_slpc(dev_priv, data, 4);
+}
+
 static u8 slpc_get_platform_sku(struct drm_i915_gem_object *obj)
 {
 	struct drm_device *dev = obj->base.dev;
@@ -490,4 +507,10 @@ void intel_slpc_get_param(struct drm_device *dev, enum slpc_param_id id,
 
 		kunmap_atomic(data);
 	}
+}
+
+void intel_slpc_query_task_state(struct drm_device *dev)
+{
+	if (intel_slpc_active(dev))
+		host2guc_slpc_query_task_state(dev);
 }
