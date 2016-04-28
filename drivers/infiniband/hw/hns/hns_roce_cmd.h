@@ -13,7 +13,59 @@
 #include <linux/dma-mapping.h>
 
 enum {
-	HNS_ROCE_MAILBOX_SIZE		=  4096
+	/* QP/EE commands */
+	HNS_ROCE_CMD_RST2INIT_QP	= 0x19,
+	HNS_ROCE_CMD_INIT2RTR_QP	= 0x1a,
+	HNS_ROCE_CMD_RTR2RTS_QP		= 0x1b,
+	HNS_ROCE_CMD_RTS2RTS_QP		= 0x1c,
+	HNS_ROCE_CMD_2ERR_QP		= 0x1e,
+	HNS_ROCE_CMD_RTS2SQD_QP		= 0x1f,
+	HNS_ROCE_CMD_SQD2SQD_QP		= 0x38,
+	HNS_ROCE_CMD_SQD2RTS_QP		= 0x20,
+	HNS_ROCE_CMD_2RST_QP		= 0x21,
+	HNS_ROCE_CMD_QUERY_QP		= 0x22,
 };
+
+enum {
+	HNS_ROCE_CMD_TIME_CLASS_A	= 10000,
+	HNS_ROCE_CMD_TIME_CLASS_C	= 10000,
+};
+
+enum {
+	HNS_ROCE_MAILBOX_SIZE		=  4096,
+};
+
+struct hns_roce_cmd_mailbox {
+	void		       *buf;
+	dma_addr_t		dma;
+};
+
+int __hns_roce_cmd(struct hns_roce_dev *hr_dev, u64 in_param, u64 *out_param,
+		   unsigned long in_modifier, u8 op_modifier, u16 op,
+		   unsigned long timeout);
+
+/* Invoke a command with no output parameter */
+static inline int hns_roce_cmd(struct hns_roce_dev *hr_dev, u64 in_param,
+			       unsigned long in_modifier, u8 op_modifier,
+			       u16 op, unsigned long timeout)
+{
+	return __hns_roce_cmd(hr_dev, in_param, NULL, in_modifier,
+			      op_modifier, op, timeout);
+}
+
+/* Invoke a command with an output mailbox */
+static inline int hns_roce_cmd_box(struct hns_roce_dev *hr_dev, u64 in_param,
+				   u64 out_param, unsigned long in_modifier,
+				   u8 op_modifier, u16 op,
+				   unsigned long timeout)
+{
+	return __hns_roce_cmd(hr_dev, in_param, &out_param, in_modifier,
+			      op_modifier, op, timeout);
+}
+
+struct hns_roce_cmd_mailbox
+	*hns_roce_alloc_cmd_mailbox(struct hns_roce_dev *hr_dev);
+void hns_roce_free_cmd_mailbox(struct hns_roce_dev *hr_dev,
+			       struct hns_roce_cmd_mailbox *mailbox);
 
 #endif /* _HNS_ROCE_CMD_H */

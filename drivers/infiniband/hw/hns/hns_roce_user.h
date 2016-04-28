@@ -10,6 +10,12 @@
 #ifndef _HNS_ROCE_USER_H
 #define _HNS_ROCE_USER_H
 
+struct hns_roce_ib_create_qp {
+	__u64	buf_addr;
+	__u8    log_sq_bb_count;
+	__u8    log_sq_stride;
+};
+
 struct hns_roce_ib_alloc_ucontext_resp {
 	__u32	qp_tab_size;
 };
