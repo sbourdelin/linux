@@ -146,10 +146,14 @@ extern int intel_guc_suspend(struct drm_device *dev);
 extern int intel_guc_resume(struct drm_device *dev);
 
 /* i915_guc_submission.c */
+int host2guc_action(struct intel_guc *guc, u32 *data, u32 len);
 int i915_guc_submission_init(struct drm_device *dev);
 int i915_guc_submission_enable(struct drm_device *dev);
 int i915_guc_submit(struct i915_guc_client *client,
 		    struct drm_i915_gem_request *rq);
+struct drm_i915_gem_object *gem_allocate_guc_obj(struct drm_device *dev,
+							u32 size);
+void gem_release_guc_obj(struct drm_i915_gem_object *obj);
 void i915_guc_submission_disable(struct drm_device *dev);
 void i915_guc_submission_fini(struct drm_device *dev);
 int i915_guc_wq_check_space(struct i915_guc_client *client);

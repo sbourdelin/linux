@@ -75,7 +75,7 @@ static inline bool host2guc_action_response(struct drm_i915_private *dev_priv,
 	return GUC2HOST_IS_RESPONSE(val);
 }
 
-static int host2guc_action(struct intel_guc *guc, u32 *data, u32 len)
+int host2guc_action(struct intel_guc *guc, u32 *data, u32 len)
 {
 	struct drm_i915_private *dev_priv = guc_to_i915(guc);
 	u32 status;
@@ -581,7 +581,7 @@ int i915_guc_submit(struct i915_guc_client *client,
  *
  * Return:	A drm_i915_gem_object if successful, otherwise NULL.
  */
-static struct drm_i915_gem_object *gem_allocate_guc_obj(struct drm_device *dev,
+struct drm_i915_gem_object *gem_allocate_guc_obj(struct drm_device *dev,
 							u32 size)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -612,7 +612,7 @@ static struct drm_i915_gem_object *gem_allocate_guc_obj(struct drm_device *dev,
  * gem_release_guc_obj() - Release gem object allocated for GuC usage
  * @obj:	gem obj to be released
  */
-static void gem_release_guc_obj(struct drm_i915_gem_object *obj)
+void gem_release_guc_obj(struct drm_i915_gem_object *obj)
 {
 	if (!obj)
 		return;
