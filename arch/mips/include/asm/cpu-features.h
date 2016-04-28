@@ -288,6 +288,9 @@
 #ifndef cpu_has_clo_clz
 #define cpu_has_clo_clz	cpu_has_mips_r
 #endif
+#if !cpu_has_clo_clz
+#define CONFIG_CPU_NO_EFFICIENT_FFS 1
+#endif
 
 /*
  * MIPS32 R2, MIPS64 R2, Loongson 3A and Octeon have WSBH.
