@@ -35,6 +35,8 @@
 #define ADDR_SHIFT_32				32
 #define ADDR_SHIFT_44				44
 
+#define PAGES_SHIFT_16				16
+
 enum hns_roce_event {
 	HNS_ROCE_EVENT_TYPE_PATH_MIG                  = 0x01,
 	HNS_ROCE_EVENT_TYPE_PATH_MIG_FAILED           = 0x02,
@@ -90,6 +92,9 @@ enum {
 enum {
 	HNS_ROCE_CMD_SUCCESS			= 1,
 };
+
+#define HNS_ROCE_PORT_DOWN		0
+#define HNS_ROCE_PORT_UP		1
 
 struct hns_roce_uar {
 	u64		pfn;
@@ -174,6 +179,13 @@ struct hns_roce_cq_table {
 	spinlock_t			lock;
 	struct radix_tree_root		tree;
 	struct hns_roce_icm_table	table;
+};
+
+struct hns_roce_raq_table {
+	void __iomem			*e_raq_addr;
+	void __iomem			*e_raq_wl_addr;
+	void __iomem			*e_raq_shift_addr;
+	struct hns_roce_buf_list	*e_raq_buf;
 };
 
 struct hns_roce_cmd_context {
@@ -297,6 +309,9 @@ struct hns_roce_caps {
 struct hns_roce_hw {
 	int (*reset)(struct hns_roce_dev *hr_dev, u32 val);
 	void (*hw_profile)(struct hns_roce_dev *hr_dev);
+	int (*hw_init)(struct hns_roce_dev *hr_dev);
+	void (*hw_uninit)(struct hns_roce_dev *hr_dev);
+	void	*priv;
 };
 
 struct hns_roce_dev {
