@@ -153,5 +153,6 @@ void intel_slpc_reset(struct drm_device *dev);
 void intel_slpc_update_display_mode_info(struct drm_device *dev);
 void intel_slpc_update_atomic_commit_info(struct drm_device *dev,
 					  struct drm_atomic_state *state);
+void intel_slpc_update_display_rr_info(struct drm_device *dev, u32 refresh_rate);
 
 #endif

@@ -364,3 +364,26 @@ void intel_slpc_update_atomic_commit_info(struct drm_device *dev,
 	if (notify)
 		host2guc_slpc_display_mode_change(dev);
 }
+
+void intel_slpc_update_display_rr_info(struct drm_device *dev, u32 refresh_rate)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_crtc *crtc;
+	struct intel_display_pipe_info *per_pipe_info;
+	struct intel_slpc_display_mode_event_params *display_params;
+
+	if (!intel_slpc_active(dev))
+		return;
+
+	if (!refresh_rate)
+		return;
+
+	display_params = &dev_priv->guc.slpc.display_mode_params;
+	crtc = dp_to_dig_port(dev_priv->drrs.dp)->base.base.crtc;
+
+	per_pipe_info = &display_params->per_pipe_info[to_intel_crtc(crtc)->pipe];
+	per_pipe_info->refresh_rate = refresh_rate;
+	per_pipe_info->vsync_ft_usec = 1000000 / refresh_rate;
+
+	host2guc_slpc_display_mode_change(dev);
+}

@@ -5409,6 +5409,8 @@ static void intel_dp_set_drrs_state(struct drm_device *dev, int refresh_rate)
 	dev_priv->drrs.refresh_rate_type = index;
 
 	DRM_DEBUG_KMS("eDP Refresh Rate set to : %dHz\n", refresh_rate);
+
+	intel_slpc_update_display_rr_info(dev, refresh_rate);
 }
 
 /**
