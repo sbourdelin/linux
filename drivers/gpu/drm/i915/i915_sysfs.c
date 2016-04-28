@@ -393,6 +393,15 @@ static ssize_t gt_max_freq_mhz_store(struct device *kdev,
 
 	dev_priv->rps.max_freq_softlimit = val;
 
+	if (intel_slpc_active(dev)) {
+		intel_slpc_set_param(dev,
+				     SLPC_PARAM_GLOBAL_MAX_GT_UNSLICE_FREQ_MHZ,
+				     (u32) intel_gpu_freq(dev_priv, val));
+		intel_slpc_set_param(dev,
+				     SLPC_PARAM_GLOBAL_MAX_GT_SLICE_FREQ_MHZ,
+				     (u32) intel_gpu_freq(dev_priv, val));
+	}
+
 	val = clamp_t(int, dev_priv->rps.cur_freq,
 		      dev_priv->rps.min_freq_softlimit,
 		      dev_priv->rps.max_freq_softlimit);
@@ -456,6 +465,15 @@ static ssize_t gt_min_freq_mhz_store(struct device *kdev,
 	}
 
 	dev_priv->rps.min_freq_softlimit = val;
+
+	if (intel_slpc_active(dev)) {
+		intel_slpc_set_param(dev,
+				     SLPC_PARAM_GLOBAL_MIN_GT_UNSLICE_FREQ_MHZ,
+				     (u32) intel_gpu_freq(dev_priv, val));
+		intel_slpc_set_param(dev,
+				     SLPC_PARAM_GLOBAL_MIN_GT_SLICE_FREQ_MHZ,
+				     (u32) intel_gpu_freq(dev_priv, val));
+	}
 
 	val = clamp_t(int, dev_priv->rps.cur_freq,
 		      dev_priv->rps.min_freq_softlimit,
