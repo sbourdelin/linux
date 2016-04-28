@@ -1,0 +1,5 @@
+config VIDEO_GSXXXX
+	tristate "Gennum Serializers video"
+	depends on SPI
+	---help---
+	  Enable the GSXXXX driver which serializes video streams.
