@@ -12130,6 +12130,7 @@ static void intel_dump_pipe_config(struct intel_crtc *crtc,
 				   const char *context)
 {
 	struct drm_device *dev = crtc->base.dev;
+	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct drm_plane *plane;
 	struct intel_plane *intel_plane;
 	struct intel_plane_state *state;
@@ -12138,8 +12139,8 @@ static void intel_dump_pipe_config(struct intel_crtc *crtc,
 	DRM_DEBUG_KMS("[CRTC:%d]%s config %p for pipe %c\n", crtc->base.base.id,
 		      context, pipe_config, pipe_name(crtc->pipe));
 
-	DRM_DEBUG_KMS("cpu_transcoder: %s\n", transcoder_name(pipe_config->cpu_transcoder));
-	DRM_DEBUG_KMS("pipe bpp: %i, dithering: %i\n",
+	DRM_DEBUG_KMS("cpu_transcoder: %s; pipe bpp: %i, dithering: %i\n",
+		      transcoder_name(pipe_config->cpu_transcoder),
 		      pipe_config->pipe_bpp, pipe_config->dither);
 	DRM_DEBUG_KMS("fdi/pch: %i, lanes: %i, gmch_m: %u, gmch_n: %u, link_m: %u, link_n: %u, tu: %u\n",
 		      pipe_config->has_pch_encoder,
@@ -12172,13 +12173,14 @@ static void intel_dump_pipe_config(struct intel_crtc *crtc,
 	DRM_DEBUG_KMS("adjusted mode:\n");
 	drm_mode_debug_printmodeline(&pipe_config->base.adjusted_mode);
 	intel_dump_crtc_timings(&pipe_config->base.adjusted_mode);
-	DRM_DEBUG_KMS("port clock: %d\n", pipe_config->port_clock);
-	DRM_DEBUG_KMS("pipe src size: %dx%d\n",
+	DRM_DEBUG_KMS("port clock: %d; pipe src size: %dx%d\n",
+		      pipe_config->port_clock,
 		      pipe_config->pipe_src_w, pipe_config->pipe_src_h);
-	DRM_DEBUG_KMS("num_scalers: %d, scaler_users: 0x%x, scaler_id: %d\n",
-		      crtc->num_scalers,
-		      pipe_config->scaler_state.scaler_users,
-		      pipe_config->scaler_state.scaler_id);
+	if (INTEL_GEN(dev_priv) >= 9)
+		DRM_DEBUG_KMS("num_scalers: %d, scaler_users: 0x%x, scaler_id: %d\n",
+			      crtc->num_scalers,
+			      pipe_config->scaler_state.scaler_users,
+			      pipe_config->scaler_state.scaler_id);
 	DRM_DEBUG_KMS("gmch pfit: control: 0x%08x, ratios: 0x%08x, lvds border: 0x%08x\n",
 		      pipe_config->gmch_pfit.control,
 		      pipe_config->gmch_pfit.pgm_ratios,
@@ -12187,8 +12189,8 @@ static void intel_dump_pipe_config(struct intel_crtc *crtc,
 		      pipe_config->pch_pfit.pos,
 		      pipe_config->pch_pfit.size,
 		      pipe_config->pch_pfit.enabled ? "enabled" : "disabled");
-	DRM_DEBUG_KMS("ips: %i\n", pipe_config->ips_enabled);
-	DRM_DEBUG_KMS("double wide: %i\n", pipe_config->double_wide);
+	DRM_DEBUG_KMS("ips: %i; double wide: %i\n",
+		      pipe_config->ips_enabled, pipe_config->double_wide);
 
 	if (IS_BROXTON(dev)) {
 		DRM_DEBUG_KMS("ddi_pll_sel: %u; dpll_hw_state: ebb0: 0x%x, ebb4: 0x%x,"
@@ -12227,38 +12229,37 @@ static void intel_dump_pipe_config(struct intel_crtc *crtc,
 			      pipe_config->dpll_hw_state.fp1);
 	}
 
-	DRM_DEBUG_KMS("planes on this crtc\n");
+	DRM_DEBUG_KMS("Planes on this crtc:\n");
 	list_for_each_entry(plane, &dev->mode_config.plane_list, head) {
 		intel_plane = to_intel_plane(plane);
 		if (intel_plane->pipe != crtc->pipe)
 			continue;
 
+		DRM_DEBUG_KMS("  %s plane:%d (%u.%u) idx: %d\n",
+			plane->type == DRM_PLANE_TYPE_CURSOR ?
+			"cursor" : "standard",
+			plane->base.id, intel_plane->pipe,
+			(crtc->base.primary == plane) ?
+			0 : intel_plane->plane + 1,
+			drm_plane_index(plane));
+
 		state = to_intel_plane_state(plane->state);
 		fb = state->base.fb;
-		if (!fb) {
-			DRM_DEBUG_KMS("%s PLANE:%d plane: %u.%u idx: %d "
-				"disabled, scaler_id = %d\n",
-				plane->type == DRM_PLANE_TYPE_CURSOR ? "CURSOR" : "STANDARD",
-				plane->base.id, intel_plane->pipe,
-				(crtc->base.primary == plane) ? 0 : intel_plane->plane + 1,
-				drm_plane_index(plane), state->scaler_id);
-			continue;
-		}
 
-		DRM_DEBUG_KMS("%s PLANE:%d plane: %u.%u idx: %d enabled",
-			plane->type == DRM_PLANE_TYPE_CURSOR ? "CURSOR" : "STANDARD",
-			plane->base.id, intel_plane->pipe,
-			crtc->base.primary == plane ? 0 : intel_plane->plane + 1,
-			drm_plane_index(plane));
-		DRM_DEBUG_KMS("\tFB:%d, fb = %ux%u format = 0x%x",
-			fb->base.id, fb->width, fb->height, fb->pixel_format);
-		DRM_DEBUG_KMS("\tscaler:%d src (%u, %u) %ux%u dst (%u, %u) %ux%u\n",
-			state->scaler_id,
-			state->src.x1 >> 16, state->src.y1 >> 16,
-			drm_rect_width(&state->src) >> 16,
-			drm_rect_height(&state->src) >> 16,
-			state->dst.x1, state->dst.y1,
-			drm_rect_width(&state->dst), drm_rect_height(&state->dst));
+		if (fb)
+			DRM_DEBUG_KMS("\tfb:%d, %ux%u, format = 0x%x",
+				      fb->base.id, fb->width, fb->height,
+				      fb->pixel_format);
+
+		if (fb && INTEL_GEN(dev_priv) >= 9)
+			DRM_DEBUG_KMS("\tscaler:%d src (%u, %u) %ux%u dst (%u, %u) %ux%u\n",
+				      state->scaler_id,
+				      state->src.x1 >> 16, state->src.y1 >> 16,
+				      drm_rect_width(&state->src) >> 16,
+				      drm_rect_height(&state->src) >> 16,
+				      state->dst.x1, state->dst.y1,
+				      drm_rect_width(&state->dst),
+				      drm_rect_height(&state->dst));
 	}
 }
 
