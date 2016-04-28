@@ -1098,17 +1098,17 @@ static int intel_lr_context_do_pin(struct intel_context *ctx,
 		goto unpin_ctx_obj;
 	}
 
-	lrc_reg_state = vaddr + LRC_STATE_PN * PAGE_SIZE;
-
 	ret = intel_pin_and_map_ringbuffer_obj(engine->dev, ringbuf);
 	if (ret)
 		goto unpin_map;
 
-	ctx->engine[engine->id].lrc_vma = i915_gem_obj_to_ggtt(ctx_obj);
-	intel_lr_context_descriptor_update(ctx, engine);
+	i915_gem_object_mark_dirty(ctx_obj);
+
+	lrc_reg_state = vaddr + LRC_STATE_PN * PAGE_SIZE;
 	lrc_reg_state[CTX_RING_BUFFER_START+1] = ringbuf->vma->node.start;
 	ctx->engine[engine->id].lrc_reg_state = lrc_reg_state;
-	ctx_obj->dirty = true;
+	ctx->engine[engine->id].lrc_vma = i915_gem_obj_to_ggtt(ctx_obj);
+	intel_lr_context_descriptor_update(ctx, engine);
 
 	/* Invalidate GuC TLB. */
 	if (i915.enable_guc_submission)

@@ -2141,6 +2141,7 @@ int intel_pin_and_map_ringbuffer_obj(struct drm_device *dev,
 
 	ringbuf->virtual_start = addr;
 	ringbuf->vma = i915_gem_obj_to_ggtt(obj);
+	i915_gem_object_mark_dirty(obj);
 	return 0;
 
 err_unpin:
