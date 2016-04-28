@@ -1103,7 +1103,7 @@ void hfi1_rc_send_complete(struct rvt_qp *qp, struct hfi1_ib_header *hdr)
 	struct hfi1_other_headers *ohdr;
 	struct rvt_swqe *wqe;
 	struct ib_wc wc;
-	unsigned i;
+	unsigned int i;
 	u32 opcode;
 	u32 psn;
 
@@ -1196,7 +1196,7 @@ static struct rvt_swqe *do_rc_completion(struct rvt_qp *qp,
 					 struct hfi1_ibport *ibp)
 {
 	struct ib_wc wc;
-	unsigned i;
+	unsigned int i;
 
 	/*
 	 * Don't decrement refcount and don't generate a
@@ -1970,9 +1970,9 @@ void hfi1_rc_error(struct rvt_qp *qp, enum ib_wc_status err)
 	}
 }
 
-static inline void update_ack_queue(struct rvt_qp *qp, unsigned n)
+static inline void update_ack_queue(struct rvt_qp *qp, unsigned int n)
 {
-	unsigned next;
+	unsigned int next;
 
 	next = n + 1;
 	if (next > HFI1_MAX_RDMA_ATOMIC)

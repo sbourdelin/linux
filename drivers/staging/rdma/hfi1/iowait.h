@@ -100,7 +100,7 @@ struct iowait {
 		struct sdma_engine *sde,
 		struct iowait *wait,
 		struct sdma_txreq *tx,
-		unsigned seq);
+		unsigned int seq);
 	void (*wakeup)(struct iowait *wait, int reason);
 	void (*sdma_drained)(struct iowait *wait);
 	struct work_struct iowork;
@@ -136,7 +136,7 @@ static inline void iowait_init(
 		struct sdma_engine *sde,
 		struct iowait *wait,
 		struct sdma_txreq *tx,
-		unsigned seq),
+		unsigned int seq),
 	void (*wakeup)(struct iowait *wait, int reason),
 	void (*sdma_drained)(struct iowait *wait))
 {

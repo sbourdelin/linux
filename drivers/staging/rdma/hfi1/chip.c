@@ -1252,9 +1252,9 @@ CNTR_ELEM(#name, \
 
 u64 read_csr(const struct hfi1_devdata *dd, u32 offset)
 {
-	if (dd->flags & HFI1_PRESENT) {
+	if (dd->flags & HFI1_PRESENT)
 		return readq((void __iomem *)dd->kregbase + offset);
-	}
+
 	return -1;
 }
 
@@ -12672,7 +12672,7 @@ static int set_up_context_variables(struct hfi1_devdata *dd)
 	int num_kernel_contexts;
 	int total_contexts;
 	int ret;
-	unsigned ngroups;
+	unsigned int ngroups;
 
 	/*
 	 * Kernel contexts: (to be fixed later):
@@ -13491,7 +13491,7 @@ static void init_qpmap_table(struct hfi1_devdata *dd,
 static void init_qos(struct hfi1_devdata *dd, u32 first_ctxt)
 {
 	u8 max_by_vl = 0;
-	unsigned qpns_per_vl, ctxt, i, qpn, n = 1, m;
+	unsigned int qpns_per_vl, ctxt, i, qpn, n = 1, m;
 	u64 *rsmmap;
 	u64 reg;
 	u8  rxcontext = is_ax(dd) ? 0 : 0xff;  /* 0 is default if a0 ver. */
@@ -13501,7 +13501,7 @@ static void init_qos(struct hfi1_devdata *dd, u32 first_ctxt)
 	    num_vls == 1 ||
 	    krcvqsset <= 1)
 		goto bail;
-	for (i = 0; i < min_t(unsigned, num_vls, krcvqsset); i++)
+	for (i = 0; i < min_t(unsigned int, num_vls, krcvqsset); i++)
 		if (krcvqs[i] > max_by_vl)
 			max_by_vl = krcvqs[i];
 	if (max_by_vl > 32)
@@ -13521,11 +13521,11 @@ static void init_qos(struct hfi1_devdata *dd, u32 first_ctxt)
 	memset(rsmmap, rxcontext, NUM_MAP_REGS * sizeof(u64));
 	/* init the local copy of the table */
 	for (i = 0, ctxt = first_ctxt; i < num_vls; i++) {
-		unsigned tctxt;
+		unsigned int tctxt;
 
 		for (qpn = 0, tctxt = ctxt;
 		     krcvqs[i] && qpn < qpns_per_vl; qpn++) {
-			unsigned idx, regoff, regidx;
+			unsigned int idx, regoff, regidx;
 
 			/* generate index <= 128 */
 			idx = (qpn << n) ^ i;
@@ -13673,10 +13673,10 @@ static void init_txe(struct hfi1_devdata *dd)
 		write_csr(dd, SEND_CM_TIMER_CTRL, HFI1_CREDIT_RETURN_RATE);
 }
 
-int hfi1_set_ctxt_jkey(struct hfi1_devdata *dd, unsigned ctxt, u16 jkey)
+int hfi1_set_ctxt_jkey(struct hfi1_devdata *dd, unsigned int ctxt, u16 jkey)
 {
 	struct hfi1_ctxtdata *rcd = dd->rcd[ctxt];
-	unsigned sctxt;
+	unsigned int sctxt;
 	int ret = 0;
 	u64 reg;
 
@@ -13710,10 +13710,10 @@ done:
 	return ret;
 }
 
-int hfi1_clear_ctxt_jkey(struct hfi1_devdata *dd, unsigned ctxt)
+int hfi1_clear_ctxt_jkey(struct hfi1_devdata *dd, unsigned int ctxt)
 {
 	struct hfi1_ctxtdata *rcd = dd->rcd[ctxt];
-	unsigned sctxt;
+	unsigned int sctxt;
 	int ret = 0;
 	u64 reg;
 
@@ -13739,10 +13739,10 @@ done:
 	return ret;
 }
 
-int hfi1_set_ctxt_pkey(struct hfi1_devdata *dd, unsigned ctxt, u16 pkey)
+int hfi1_set_ctxt_pkey(struct hfi1_devdata *dd, unsigned int ctxt, u16 pkey)
 {
 	struct hfi1_ctxtdata *rcd;
-	unsigned sctxt;
+	unsigned int sctxt;
 	int ret = 0;
 	u64 reg;
 
@@ -13767,10 +13767,10 @@ done:
 	return ret;
 }
 
-int hfi1_clear_ctxt_pkey(struct hfi1_devdata *dd, unsigned ctxt)
+int hfi1_clear_ctxt_pkey(struct hfi1_devdata *dd, unsigned int ctxt)
 {
 	struct hfi1_ctxtdata *rcd;
-	unsigned sctxt;
+	unsigned int sctxt;
 	int ret = 0;
 	u64 reg;
 

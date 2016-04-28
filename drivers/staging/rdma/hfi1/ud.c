@@ -466,10 +466,10 @@ bail_no_tx:
 int hfi1_lookup_pkey_idx(struct hfi1_ibport *ibp, u16 pkey)
 {
 	struct hfi1_pportdata *ppd = ppd_from_ibp(ibp);
-	unsigned i;
+	unsigned int i;
 
 	if (pkey == FULL_MGMT_P_KEY || pkey == LIM_MGMT_P_KEY) {
-		unsigned lim_idx = -1;
+		unsigned int lim_idx = -1;
 
 		for (i = 0; i < ARRAY_SIZE(ppd->pkeys); ++i) {
 			/* here we look for an exact match */
@@ -884,7 +884,7 @@ void hfi1_ud_rcv(struct hfi1_packet *packet)
 				mgmt_pkey_idx = 0;
 			}
 		}
-		wc.pkey_index = (unsigned)mgmt_pkey_idx;
+		wc.pkey_index = (unsigned int)mgmt_pkey_idx;
 	} else {
 		wc.pkey_index = 0;
 	}

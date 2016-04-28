@@ -162,7 +162,7 @@ MODULE_PARM_DESC(sdma_comp_size, "Size of User SDMA completion ring. Default: 12
  */
 #define MAX_DEFER_RETRY_COUNT 1
 
-static unsigned initial_pkt_count = 8;
+static unsigned int initial_pkt_count = 8;
 
 #define SDMA_IOWAIT_TIMEOUT 1000 /* in milliseconds */
 
@@ -170,7 +170,7 @@ struct user_sdma_iovec {
 	struct list_head list;
 	struct iovec iov;
 	/* number of pages in this vector */
-	unsigned npages;
+	unsigned int npages;
 	/* array of pinned pages for this vector */
 	struct page **pages;
 	/*
@@ -186,7 +186,7 @@ struct sdma_mmu_node {
 	struct hfi1_user_sdma_pkt_q *pq;
 	atomic_t refcount;
 	struct page **pages;
-	unsigned npages;
+	unsigned int npages;
 };
 
 struct user_sdma_request {
@@ -225,11 +225,11 @@ struct user_sdma_request {
 	 * We copy the iovs for this request (based on
 	 * info.iovcnt). These are only the data vectors
 	 */
-	unsigned data_iovs;
+	unsigned int data_iovs;
 	/* total length of the data in the request */
 	u32 data_len;
 	/* progress index moving along the iovs array */
-	unsigned iov_idx;
+	unsigned int iov_idx;
 	struct user_sdma_iovec iovs[MAX_VECTORS_PER_REQ];
 	/* number of elements copied to the tids array */
 	u16 n_tids;
@@ -259,7 +259,7 @@ struct user_sdma_txreq {
 	struct list_head list;
 	struct user_sdma_request *req;
 	u16 flags;
-	unsigned busycount;
+	unsigned int busycount;
 	u64 seqnum;
 };
 
@@ -271,14 +271,14 @@ struct user_sdma_txreq {
 	hfi1_cdbg(SDMA, "[%u:%u:%u] " fmt, (pq)->dd->unit, (pq)->ctxt, \
 		 (pq)->subctxt, ##__VA_ARGS__)
 
-static int user_sdma_send_pkts(struct user_sdma_request *, unsigned);
+static int user_sdma_send_pkts(struct user_sdma_request *, unsigned int);
 static int num_user_pages(const struct iovec *);
 static void user_sdma_txreq_cb(struct sdma_txreq *, int);
 static inline void pq_update(struct hfi1_user_sdma_pkt_q *);
 static void user_sdma_free_request(struct user_sdma_request *, bool);
 static int pin_vector_pages(struct user_sdma_request *,
 			    struct user_sdma_iovec *);
-static void unpin_vector_pages(struct mm_struct *, struct page **, unsigned);
+static void unpin_vector_pages(struct mm_struct *, struct page **, unsigned int);
 static int check_header_template(struct user_sdma_request *,
 				 struct hfi1_pkt_header *, u32, u32);
 static int set_txreq_header(struct user_sdma_request *,
@@ -295,7 +295,7 @@ static int defer_packet_queue(
 	struct sdma_engine *,
 	struct iowait *,
 	struct sdma_txreq *,
-	unsigned seq);
+	unsigned int seq);
 static void activate_packet_queue(struct iowait *, int);
 static bool sdma_rb_filter(struct mmu_rb_node *, unsigned long, unsigned long);
 static int sdma_rb_insert(struct rb_root *, struct mmu_rb_node *);
@@ -313,7 +313,7 @@ static int defer_packet_queue(
 	struct sdma_engine *sde,
 	struct iowait *wait,
 	struct sdma_txreq *txreq,
-	unsigned seq)
+	unsigned int seq)
 {
 	struct hfi1_user_sdma_pkt_q *pq =
 		container_of(wait, struct hfi1_user_sdma_pkt_q, busy);
@@ -359,7 +359,7 @@ int hfi1_user_sdma_alloc_queues(struct hfi1_ctxtdata *uctxt, struct file *fp)
 {
 	struct hfi1_filedata *fd;
 	int ret = 0;
-	unsigned memsize;
+	unsigned int memsize;
 	char buf[64];
 	struct hfi1_devdata *dd;
 	struct hfi1_user_sdma_comp_q *cq;
@@ -791,10 +791,10 @@ static inline u32 get_lrh_len(struct hfi1_pkt_header hdr, u32 len)
 	return ((sizeof(hdr) - sizeof(hdr.pbc)) + 4 + len);
 }
 
-static int user_sdma_send_pkts(struct user_sdma_request *req, unsigned maxpkts)
+static int user_sdma_send_pkts(struct user_sdma_request *req, unsigned int maxpkts)
 {
 	int ret = 0;
-	unsigned npkts = 0;
+	unsigned int npkts = 0;
 	struct user_sdma_txreq *tx = NULL;
 	struct hfi1_user_sdma_pkt_q *pq = NULL;
 	struct user_sdma_iovec *iovec = NULL;
@@ -939,7 +939,7 @@ static int user_sdma_send_pkts(struct user_sdma_request *req, unsigned maxpkts)
 		while (queued < datalen &&
 		       (req->sent + data_sent) < req->data_len) {
 			unsigned long base, offset;
-			unsigned pageidx, len;
+			unsigned int pageidx, len;
 
 			base = (unsigned long)iovec->iov.iov_base;
 			offset = offset_in_page(base + iovec->offset +
@@ -1147,7 +1147,7 @@ bail:
 }
 
 static void unpin_vector_pages(struct mm_struct *mm, struct page **pages,
-			       unsigned npages)
+			       unsigned int npages)
 {
 	hfi1_release_user_pages(mm, pages, npages, 0);
 	kfree(pages);

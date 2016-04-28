@@ -72,7 +72,7 @@ bool hfi1_can_pin_pages(struct hfi1_devdata *dd, u32 nlocked, u32 npages)
 {
 	unsigned long ulimit = rlimit(RLIMIT_MEMLOCK), pinned, cache_limit,
 		size = (cache_size * (1UL << 20)); /* convert to bytes */
-	unsigned usr_ctxts = dd->num_rcv_contexts - dd->first_user_ctxt;
+	unsigned int usr_ctxts = dd->num_rcv_contexts - dd->first_user_ctxt;
 	bool can_lock = capable(CAP_IPC_LOCK);
 
 	/*

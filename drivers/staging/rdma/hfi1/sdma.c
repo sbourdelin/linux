@@ -234,7 +234,7 @@ static void sdma_put(struct sdma_state *);
 static void sdma_set_state(struct sdma_engine *, enum sdma_states);
 static void sdma_start_hw_clean_up(struct sdma_engine *);
 static void sdma_sw_clean_up_task(unsigned long);
-static void sdma_sendctrl(struct sdma_engine *, unsigned);
+static void sdma_sendctrl(struct sdma_engine *, unsigned int);
 static void init_sdma_regs(struct sdma_engine *, u32, uint);
 static void sdma_process_event(
 	struct sdma_engine *sde,
@@ -244,7 +244,7 @@ static void __sdma_process_event(
 	enum sdma_events event);
 static void dump_sdma_state(struct sdma_engine *sde);
 static void sdma_make_progress(struct sdma_engine *sde, u64 status);
-static void sdma_desc_avail(struct sdma_engine *sde, unsigned avail);
+static void sdma_desc_avail(struct sdma_engine *sde, unsigned int avail);
 static void sdma_flush_descq(struct sdma_engine *sde);
 
 /**
@@ -346,7 +346,7 @@ void sdma_wait(struct hfi1_devdata *dd)
 	}
 }
 
-static inline void sdma_set_desc_cnt(struct sdma_engine *sde, unsigned cnt)
+static inline void sdma_set_desc_cnt(struct sdma_engine *sde, unsigned int cnt)
 {
 	u64 reg;
 
@@ -472,7 +472,7 @@ static void sdma_err_halt_wait(struct work_struct *work)
 static void sdma_err_progress_check_schedule(struct sdma_engine *sde)
 {
 	if (!is_bx(sde->dd) && HFI1_CAP_IS_KSET(SDMA_AHG)) {
-		unsigned index;
+		unsigned int index;
 		struct hfi1_devdata *dd = sde->dd;
 
 		for (index = 0; index < dd->num_sdma; index++) {
@@ -491,7 +491,7 @@ static void sdma_err_progress_check_schedule(struct sdma_engine *sde)
 
 static void sdma_err_progress_check(unsigned long data)
 {
-	unsigned index;
+	unsigned int index;
 	struct sdma_engine *sde = (struct sdma_engine *)data;
 
 	dd_dev_err(sde->dd, "SDE progress check event\n");
@@ -657,7 +657,7 @@ static void sdma_set_state(struct sdma_engine *sde,
 {
 	struct sdma_state *ss = &sde->state;
 	const struct sdma_set_state_action *action = sdma_action_table;
-	unsigned op = 0;
+	unsigned int op = 0;
 
 	trace_hfi1_sdma_state(
 		sde,
@@ -989,7 +989,7 @@ static void sdma_clean(struct hfi1_devdata *dd, size_t num_engines)
  */
 int sdma_init(struct hfi1_devdata *dd, u8 port)
 {
-	unsigned this_idx;
+	unsigned int this_idx;
 	struct sdma_engine *sde;
 	u16 descq_cnt;
 	void *curr_head;
@@ -1213,7 +1213,7 @@ void sdma_all_idle(struct hfi1_devdata *dd)
  */
 void sdma_start(struct hfi1_devdata *dd)
 {
-	unsigned i;
+	unsigned int i;
 	struct sdma_engine *sde;
 
 	/* kick off the engines state processing */
@@ -1229,7 +1229,7 @@ void sdma_start(struct hfi1_devdata *dd)
  */
 void sdma_exit(struct hfi1_devdata *dd)
 {
-	unsigned this_idx;
+	unsigned int this_idx;
 	struct sdma_engine *sde;
 
 	for (this_idx = 0; dd->per_sdma && this_idx < dd->num_sdma;
@@ -1388,11 +1388,11 @@ retry:
  *
  * This is called with head_lock held.
  */
-static void sdma_desc_avail(struct sdma_engine *sde, unsigned avail)
+static void sdma_desc_avail(struct sdma_engine *sde, unsigned int avail)
 {
 	struct iowait *wait, *nw;
 	struct iowait *waits[SDMA_WAIT_BATCH_SIZE];
-	unsigned i, n = 0, seq;
+	unsigned int i, n = 0, seq;
 	struct sdma_txreq *stx;
 	struct hfi1_ibdev *dev = &sde->dd->verbs_dev;
 
@@ -1557,7 +1557,7 @@ void sdma_engine_error(struct sdma_engine *sde, u64 status)
 	spin_unlock_irqrestore(&sde->tail_lock, flags);
 }
 
-static void sdma_sendctrl(struct sdma_engine *sde, unsigned op)
+static void sdma_sendctrl(struct sdma_engine *sde, unsigned int op)
 {
 	u64 set_senddmactrl = 0;
 	u64 clr_senddmactrl = 0;
@@ -1736,7 +1736,7 @@ static void init_sdma_regs(
 void sdma_dumpstate(struct sdma_engine *sde)
 {
 	u64 csr;
-	unsigned i;
+	unsigned int i;
 
 	sdma_dumpstate_helper(SD(CTRL));
 	sdma_dumpstate_helper(SD(STATUS));
@@ -1999,7 +1999,7 @@ static int sdma_check_progress(
 		return -EAGAIN;
 	/* pulse the head_lock */
 	if (wait && wait->sleep) {
-		unsigned seq;
+		unsigned int seq;
 
 		seq = raw_seqcount_begin(
 			(const seqcount_t *)&sde->head_lock.seqcount);
