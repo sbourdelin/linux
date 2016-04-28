@@ -1171,6 +1171,13 @@ static void autoconfig(struct uart_8250_port *up)
 	if (!port->iobase && !port->mapbase && !port->membase)
 		return;
 
+	/* Hypervisors always export working 16550A devices. */
+	if (cpu_has_hypervisor) {
+		up->port.type = PORT_16550A;
+		up->capabilities |= UART_CAP_FIFO;
+		return;
+	}
+
 	DEBUG_AUTOCONF("ttyS%d: autoconf (0x%04lx, 0x%p): ",
 		       serial_index(port), port->iobase, port->membase);
 
