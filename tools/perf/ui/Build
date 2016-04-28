@@ -5,7 +5,7 @@ libperf-y += util.o
 libperf-y += hist.o
 libperf-y += stdio/hist.o
 
-CFLAGS_setup.o += -DLIBDIR="BUILD_STR($(LIBDIR))"
+CFLAGS_setup.o += -DLIBDIR="BUILD_STR($(libdir))"
 
 libperf-$(CONFIG_SLANG) += browser.o
 libperf-$(CONFIG_SLANG) += browsers/
