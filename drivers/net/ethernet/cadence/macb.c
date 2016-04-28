@@ -424,7 +424,7 @@ static int macb_mii_init(struct macb *bp)
 {
 	struct macb_platform_data *pdata;
 	struct device_node *np;
-	int err = -ENXIO, i;
+	int err = -ENXIO;
 
 	/* Enable management port */
 	macb_writel(bp, NCR, MACB_BIT(MPE));
@@ -450,23 +450,6 @@ static int macb_mii_init(struct macb *bp)
 	if (np) {
 		/* try dt phy registration */
 		err = of_mdiobus_register(bp->mii_bus, np);
-
-		/* fallback to standard phy registration if no phy were
-		   found during dt phy registration */
-		if (!err && !phy_find_first(bp->mii_bus)) {
-			for (i = 0; i < PHY_MAX_ADDR; i++) {
-				struct phy_device *phydev;
-
-				phydev = mdiobus_scan(bp->mii_bus, i);
-				if (IS_ERR(phydev)) {
-					err = PTR_ERR(phydev);
-					break;
-				}
-			}
-
-			if (err)
-				goto err_out_unregister_bus;
-		}
 	} else {
 		if (pdata)
 			bp->mii_bus->phy_mask = pdata->phy_mask;
