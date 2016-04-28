@@ -136,6 +136,8 @@ struct intel_guc {
 
 	uint64_t submissions[GUC_MAX_ENGINES_NUM];
 	uint32_t last_seqno[GUC_MAX_ENGINES_NUM];
+
+	struct intel_slpc slpc;
 };
 
 static inline int intel_slpc_enabled(void)

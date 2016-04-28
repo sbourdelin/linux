@@ -24,6 +24,81 @@
 #ifndef _INTEL_SLPC_H_
 #define _INTEL_SLPC_H_
 
+#define SLPC_MAJOR_VER 2
+#define SLPC_MINOR_VER 4
+#define SLPC_VERSION ((2015 << 16) | (SLPC_MAJOR_VER << 8) | (SLPC_MINOR_VER))
+
+enum slpc_global_state {
+	SLPC_GLOBAL_STATE_NOT_RUNNING = 0,
+	SLPC_GLOBAL_STATE_INITIALIZING = 1,
+	SLPC_GLOBAL_STATE_RESETTING = 2,
+	SLPC_GLOBAL_STATE_RUNNING = 3,
+	SLPC_GLOBAL_STATE_SHUTTING_DOWN = 4,
+	SLPC_GLOBAL_STATE_ERROR = 5
+};
+
+enum slpc_host_os {
+	SLPC_HOST_OS_UNDEFINED = 0,
+	SLPC_HOST_OS_WINDOWS_8 = 1,
+};
+
+enum slpc_platform_sku {
+	SLPC_PLATFORM_SKU_UNDEFINED = 0,
+	SLPC_PLATFORM_SKU_ULX = 1,
+	SLPC_PLATFORM_SKU_ULT = 2,
+	SLPC_PLATFORM_SKU_T = 3,
+	SLPC_PLATFORM_SKU_MOBL = 4,
+	SLPC_PLATFORM_SKU_DT = 5,
+	SLPC_PLATFORM_SKU_UNKNOWN = 6,
+};
+
+enum slpc_power_plan {
+	SLPC_POWER_PLAN_UNDEFINED = 0,
+	SLPC_POWER_PLAN_BATTERY_SAVER = 1,
+	SLPC_POWER_PLAN_BALANCED = 2,
+	SLPC_POWER_PLAN_PERFORMANCE = 3,
+	SLPC_POWER_PLAN_UNKNOWN = 4,
+};
+
+enum slpc_power_source {
+	SLPC_POWER_SOURCE_UNDEFINED = 0,
+	SLPC_POWER_SOURCE_AC = 1,
+	SLPC_POWER_SOURCE_DC = 2,
+	SLPC_POWER_SOURCE_UNKNOWN = 3,
+};
+
+#define SLPC_POWER_PLAN_SOURCE(plan, source) ((plan) | ((source) << 6))
+
+struct slpc_platform_info {
+	u8 platform_sku;
+	u8 slice_count;
+	u8 host_os;
+	u8 power_plan_source;
+	u8 P0_freq;
+	u8 P1_freq;
+	u8 Pe_freq;
+	u8 Pn_freq;
+	u32 package_rapl_limit_high;
+	u32 package_rapl_limit_low;
+} __packed;
+
+#define SLPC_MAX_OVERRIDE_PARAMETERS 192
+#define SLPC_OVERRIDE_BITFIELD_SIZE ((SLPC_MAX_OVERRIDE_PARAMETERS + 31) / 32)
+
+struct slpc_shared_data {
+	u32 slpc_version;
+	u32 shared_data_size;
+	u32 global_state;
+	struct slpc_platform_info platform_info;
+	u32 task_state_data;
+	u32 override_parameters_set_bits[SLPC_OVERRIDE_BITFIELD_SIZE];
+	u32 override_parameters_values[SLPC_MAX_OVERRIDE_PARAMETERS];
+} __packed;
+
+struct intel_slpc {
+	struct drm_i915_gem_object *shared_data_obj;
+};
+
 /* intel_slpc.c */
 void intel_slpc_init(struct drm_device *dev);
 void intel_slpc_cleanup(struct drm_device *dev);
