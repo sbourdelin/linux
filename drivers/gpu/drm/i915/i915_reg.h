@@ -6953,6 +6953,7 @@ enum skl_disp_power_wells {
 #define   GEN6_FREQUENCY(x)			((x)<<25)
 #define   HSW_FREQUENCY(x)			((x)<<24)
 #define   GEN9_FREQUENCY(x)			((x)<<23)
+#define   GEN9_GET_FREQUENCY(x)			((x)>>23)
 #define   GEN6_OFFSET(x)			((x)<<19)
 #define   GEN6_AGGRESSIVE_TURBO			(0<<15)
 #define GEN6_RC_VIDEO_FREQ			_MMIO(0xA00C)

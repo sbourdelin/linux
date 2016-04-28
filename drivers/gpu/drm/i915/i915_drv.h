@@ -3736,4 +3736,9 @@ static inline void i915_trace_irq_get(struct intel_engine_cs *engine,
 		i915_gem_request_assign(&engine->trace_irq_req, req);
 }
 
+static inline u8 gen9_read_requested_freq(struct drm_i915_private *dev_priv)
+{
+	return (u8) GEN9_GET_FREQUENCY(I915_READ(GEN6_RPNSWREQ));
+}
+
 #endif

@@ -1165,6 +1165,9 @@ static int i915_frequency_info(struct seq_file *m, void *unused)
 
 	flush_delayed_work(&dev_priv->rps.delayed_resume_work);
 
+	if (intel_slpc_active(dev))
+		dev_priv->rps.cur_freq = gen9_read_requested_freq(dev_priv);
+
 	if (IS_GEN5(dev)) {
 		u16 rgvswctl = I915_READ16(MEMSWCTL);
 		u16 rgvstat = I915_READ16(MEMSTAT_ILK);
@@ -2393,6 +2396,9 @@ static int i915_rps_boost_info(struct seq_file *m, void *data)
 	struct drm_device *dev = node->minor->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct drm_file *file;
+
+	if (intel_slpc_active(dev))
+		dev_priv->rps.cur_freq = gen9_read_requested_freq(dev_priv);
 
 	seq_printf(m, "RPS enabled? %d\n", dev_priv->rps.enabled);
 	seq_printf(m, "GPU busy? %d\n", dev_priv->mm.busy);
