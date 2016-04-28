@@ -33,6 +33,10 @@ struct hns_roce_caps {
 	u8			num_ports;
 };
 
+struct hns_roce_hw {
+	int (*reset)(struct hns_roce_dev *hr_dev, u32 val);
+};
+
 struct hns_roce_dev {
 	struct ib_device	ib_dev;
 	struct platform_device  *pdev;
@@ -44,6 +48,9 @@ struct hns_roce_dev {
 
 	int			cmd_mod;
 	int			loop_idc;
+	struct hns_roce_hw	*hw;
 };
+
+extern struct hns_roce_hw hns_roce_hw_v1;
 
 #endif /* _HNS_ROCE_DEVICE_H */
