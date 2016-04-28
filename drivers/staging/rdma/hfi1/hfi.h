@@ -223,7 +223,7 @@ struct hfi1_ctxtdata {
 	 * protocol use, on each TID
 	 */
 	/* instead of calculating it */
-	unsigned ctxt;
+	unsigned int ctxt;
 	/* non-zero if ctxt is being shared. */
 	u16 subctxt_cnt;
 	/* non-zero if ctxt is being shared. */
@@ -300,7 +300,7 @@ struct hfi1_ctxtdata {
 	/* interrupt handling */
 	u64 imask;	/* clear interrupt mask */
 	int ireg;	/* clear interrupt register */
-	unsigned numa_id; /* numa node of this context */
+	unsigned int numa_id; /* numa node of this context */
 	/* verbs stats per CTX */
 	struct hfi1_opcode_stats_perctx *opstats;
 	/*
@@ -1185,7 +1185,7 @@ struct mmu_rb_node;
 /* Private data for file operations */
 struct hfi1_filedata {
 	struct hfi1_ctxtdata *uctxt;
-	unsigned subctxt;
+	unsigned int subctxt;
 	struct hfi1_user_sdma_comp_q *cq;
 	struct hfi1_user_sdma_pkt_q *pq;
 	/* for cpu affinity; -1 if none */
@@ -1350,7 +1350,7 @@ static inline void pause_for_credit_return(struct hfi1_devdata *dd)
  */
 static inline u8 sc_to_vlt(struct hfi1_devdata *dd, u8 sc5)
 {
-	unsigned seq;
+	unsigned int seq;
 	u8 rval;
 
 	if (sc5 >= OPA_MAX_SCS)
@@ -1559,7 +1559,7 @@ static inline struct hfi1_ibdev *dev_from_rdi(struct rvt_dev_info *rdi)
 static inline struct hfi1_ibport *to_iport(struct ib_device *ibdev, u8 port)
 {
 	struct hfi1_devdata *dd = dd_from_ibdev(ibdev);
-	unsigned pidx = port - 1; /* IB number port from 1, hdw from 0 */
+	unsigned int pidx = port - 1; /* IB number port from 1, hdw from 0 */
 
 	WARN_ON(pidx >= dd->num_pports);
 	return &dd->pport[pidx].ibport_data;
@@ -1568,7 +1568,7 @@ static inline struct hfi1_ibport *to_iport(struct ib_device *ibdev, u8 port)
 /*
  * Return the indexed PKEY from the port PKEY table.
  */
-static inline u16 hfi1_get_pkey(struct hfi1_ibport *ibp, unsigned index)
+static inline u16 hfi1_get_pkey(struct hfi1_ibport *ibp, unsigned int index)
 {
 	struct hfi1_pportdata *ppd = ppd_from_ibp(ibp);
 	u16 ret;
@@ -1746,7 +1746,7 @@ extern unsigned int hfi1_max_mtu;
 extern unsigned int hfi1_cu;
 extern unsigned int user_credit_return_threshold;
 extern int num_user_contexts;
-extern unsigned n_krcvqs;
+extern unsigned int n_krcvqs;
 extern uint krcvqs[];
 extern int krcvqsset;
 extern uint kdeth_qp;

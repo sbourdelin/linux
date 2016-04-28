@@ -147,12 +147,12 @@ TRACE_EVENT(hfi1_receive_interrupt,
 );
 
 TRACE_EVENT(hfi1_exp_tid_reg,
-	    TP_PROTO(unsigned ctxt, u16 subctxt, u32 rarr,
+	    TP_PROTO(unsigned int ctxt, u16 subctxt, u32 rarr,
 		     u32 npages, unsigned long va, unsigned long pa,
 		     dma_addr_t dma),
 	    TP_ARGS(ctxt, subctxt, rarr, npages, va, pa, dma),
 	    TP_STRUCT__entry(
-		    __field(unsigned, ctxt)
+		    __field(unsigned int, ctxt)
 		    __field(u16, subctxt)
 		    __field(u32, rarr)
 		    __field(u32, npages)
@@ -181,11 +181,11 @@ TRACE_EVENT(hfi1_exp_tid_reg,
 	);
 
 TRACE_EVENT(hfi1_exp_tid_unreg,
-	    TP_PROTO(unsigned ctxt, u16 subctxt, u32 rarr, u32 npages,
+	    TP_PROTO(unsigned int ctxt, u16 subctxt, u32 rarr, u32 npages,
 		     unsigned long va, unsigned long pa, dma_addr_t dma),
 	    TP_ARGS(ctxt, subctxt, rarr, npages, va, pa, dma),
 	    TP_STRUCT__entry(
-		    __field(unsigned, ctxt)
+		    __field(unsigned int, ctxt)
 		    __field(u16, subctxt)
 		    __field(u32, rarr)
 		    __field(u32, npages)
@@ -214,11 +214,11 @@ TRACE_EVENT(hfi1_exp_tid_unreg,
 	);
 
 TRACE_EVENT(hfi1_exp_tid_inval,
-	    TP_PROTO(unsigned ctxt, u16 subctxt, unsigned long va, u32 rarr,
+	    TP_PROTO(unsigned int ctxt, u16 subctxt, unsigned long va, u32 rarr,
 		     u32 npages, dma_addr_t dma),
 	    TP_ARGS(ctxt, subctxt, va, rarr, npages, dma),
 	    TP_STRUCT__entry(
-		    __field(unsigned, ctxt)
+		    __field(unsigned int, ctxt)
 		    __field(u16, subctxt)
 		    __field(unsigned long, va)
 		    __field(u32, rarr)
@@ -244,11 +244,11 @@ TRACE_EVENT(hfi1_exp_tid_inval,
 	);
 
 TRACE_EVENT(hfi1_mmu_invalidate,
-	    TP_PROTO(unsigned ctxt, u16 subctxt, const char *type,
+	    TP_PROTO(unsigned int ctxt, u16 subctxt, const char *type,
 		     unsigned long start, unsigned long end),
 	    TP_ARGS(ctxt, subctxt, type, start, end),
 	    TP_STRUCT__entry(
-		    __field(unsigned, ctxt)
+		    __field(unsigned int, ctxt)
 		    __field(u16, subctxt)
 		    __string(type, type)
 		    __field(unsigned long, start)
@@ -615,7 +615,7 @@ TRACE_EVENT(hfi1_uctxtdata,
 	    TP_PROTO(struct hfi1_devdata *dd, struct hfi1_ctxtdata *uctxt),
 	    TP_ARGS(dd, uctxt),
 	    TP_STRUCT__entry(DD_DEV_ENTRY(dd)
-			     __field(unsigned, ctxt)
+			     __field(unsigned int, ctxt)
 			     __field(u32, credits)
 			     __field(u64, hw_free)
 			     __field(u64, piobase)
@@ -651,12 +651,12 @@ TRACE_EVENT(hfi1_uctxtdata,
 #define CINFO_FMT \
 	"egrtids:%u, egr_size:%u, hdrq_cnt:%u, hdrq_size:%u, sdma_ring_size:%u"
 TRACE_EVENT(hfi1_ctxt_info,
-	    TP_PROTO(struct hfi1_devdata *dd, unsigned ctxt, unsigned subctxt,
+	    TP_PROTO(struct hfi1_devdata *dd, unsigned int ctxt, unsigned int subctxt,
 		     struct hfi1_ctxt_info cinfo),
 	    TP_ARGS(dd, ctxt, subctxt, cinfo),
 	    TP_STRUCT__entry(DD_DEV_ENTRY(dd)
-			     __field(unsigned, ctxt)
-			     __field(unsigned, subctxt)
+			     __field(unsigned int, ctxt)
+			     __field(unsigned int, subctxt)
 			     __field(u16, egrtids)
 			     __field(u16, rcvhdrq_cnt)
 			     __field(u16, rcvhdrq_size)

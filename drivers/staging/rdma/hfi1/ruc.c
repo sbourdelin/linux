@@ -239,7 +239,7 @@ bail:
 	return ret;
 }
 
-static __be64 get_sguid(struct hfi1_ibport *ibp, unsigned index)
+static __be64 get_sguid(struct hfi1_ibport *ibp, unsigned int index)
 {
 	if (!index) {
 		struct hfi1_pportdata *ppd = ppd_from_ibp(ibp);
@@ -927,7 +927,7 @@ void hfi1_send_complete(struct rvt_qp *qp, struct rvt_swqe *wqe,
 			enum ib_wc_status status)
 {
 	u32 old_last, last;
-	unsigned i;
+	unsigned int i;
 
 	if (!(ib_rvt_state_ops[qp->state] & RVT_PROCESS_OR_FLUSH_SEND))
 		return;

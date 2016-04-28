@@ -399,7 +399,7 @@ int init_sc_pools_and_sizes(struct hfi1_devdata *dd)
 	used_blocks = 0;
 	for (i = 0; i < SC_MAX; i++) {
 		if (dd->sc_sizes[i].size < 0) {
-			unsigned pool = wildcard_to_pool(dd->sc_sizes[i].size);
+			unsigned int pool = wildcard_to_pool(dd->sc_sizes[i].size);
 
 			WARN_ON_ONCE(pool >= NUM_SC_POOLS);
 			dd->sc_sizes[i].size = mem_pool_info[pool].size;
@@ -1529,7 +1529,7 @@ static void sc_piobufavail(struct send_context *sc)
 	struct rvt_qp *qp;
 	struct hfi1_qp_priv *priv;
 	unsigned long flags;
-	unsigned i, n = 0;
+	unsigned int i, n = 0;
 
 	if (dd->send_contexts[sc->sw_index].type != SC_KERNEL)
 		return;

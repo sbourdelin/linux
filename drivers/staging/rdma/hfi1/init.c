@@ -93,9 +93,9 @@ module_param_array(krcvqs, uint, &krcvqsset, S_IRUGO);
 MODULE_PARM_DESC(krcvqs, "Array of the number of non-control kernel receive queues by VL");
 
 /* computed based on above array */
-unsigned n_krcvqs;
+unsigned int n_krcvqs;
 
-static unsigned hfi1_rcvarr_split = 25;
+static unsigned int hfi1_rcvarr_split = 25;
 module_param_named(rcvarr_split, hfi1_rcvarr_split, uint, S_IRUGO);
 MODULE_PARM_DESC(rcvarr_split, "Percent of context's RcvArray entries used for Eager buffers");
 
@@ -126,7 +126,7 @@ unsigned long *hfi1_cpulist;
  */
 int hfi1_create_ctxts(struct hfi1_devdata *dd)
 {
-	unsigned i;
+	unsigned int i;
 	int ret;
 
 	/* Control context has to be always 0 */
@@ -208,7 +208,7 @@ struct hfi1_ctxtdata *hfi1_create_ctxtdata(struct hfi1_pportdata *ppd, u32 ctxt,
 {
 	struct hfi1_devdata *dd = ppd->dd;
 	struct hfi1_ctxtdata *rcd;
-	unsigned kctxt_ngroups = 0;
+	unsigned int kctxt_ngroups = 0;
 	u32 base;
 
 	if (dd->rcv_entries.nctxt_extra >
@@ -658,7 +658,7 @@ wq_error:
 int hfi1_init(struct hfi1_devdata *dd, int reinit)
 {
 	int ret = 0, pidx, lastfail = 0;
-	unsigned i, len;
+	unsigned int i, len;
 	struct hfi1_ctxtdata *rcd;
 	struct hfi1_pportdata *ppd;
 
@@ -859,7 +859,7 @@ static void stop_timers(struct hfi1_devdata *dd)
 static void shutdown_device(struct hfi1_devdata *dd)
 {
 	struct hfi1_pportdata *ppd;
-	unsigned pidx;
+	unsigned int pidx;
 	int i;
 
 	for (pidx = 0; pidx < dd->num_pports; ++pidx) {
@@ -935,7 +935,7 @@ static void shutdown_device(struct hfi1_devdata *dd)
  */
 void hfi1_free_ctxtdata(struct hfi1_devdata *dd, struct hfi1_ctxtdata *rcd)
 {
-	unsigned e;
+	unsigned int e;
 
 	if (!rcd)
 		return;
@@ -1546,7 +1546,7 @@ static void remove_one(struct pci_dev *pdev)
  */
 int hfi1_create_rcvhdrq(struct hfi1_devdata *dd, struct hfi1_ctxtdata *rcd)
 {
-	unsigned amt;
+	unsigned int amt;
 	u64 reg;
 
 	if (!rcd->rcvhdrq) {

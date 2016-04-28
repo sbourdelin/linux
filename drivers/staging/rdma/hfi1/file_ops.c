@@ -85,15 +85,15 @@ static int get_base_info(struct file *, void __user *, __u32);
 static int setup_ctxt(struct file *);
 static int setup_subctxt(struct hfi1_ctxtdata *);
 static int get_user_context(struct file *, struct hfi1_user_info *,
-			    int, unsigned);
+			    int, unsigned int);
 static int find_shared_ctxt(struct file *, const struct hfi1_user_info *);
 static int allocate_ctxt(struct file *, struct hfi1_devdata *,
 			 struct hfi1_user_info *);
 static unsigned int poll_urgent(struct file *, struct poll_table_struct *);
 static unsigned int poll_next(struct file *, struct poll_table_struct *);
 static int user_event_ack(struct hfi1_ctxtdata *, int, unsigned long);
-static int set_ctxt_pkey(struct hfi1_ctxtdata *, unsigned, u16);
-static int manage_rcvq(struct hfi1_ctxtdata *, unsigned, int);
+static int set_ctxt_pkey(struct hfi1_ctxtdata *, unsigned int, u16);
+static int manage_rcvq(struct hfi1_ctxtdata *, unsigned int, int);
 static int vma_fault(struct vm_area_struct *, struct vm_fault *);
 
 static const struct file_operations hfi1_file_ops = {
@@ -713,7 +713,7 @@ static int vma_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 static unsigned int hfi1_poll(struct file *fp, struct poll_table_struct *pt)
 {
 	struct hfi1_ctxtdata *uctxt;
-	unsigned pollflag;
+	unsigned int pollflag;
 
 	uctxt = ((struct hfi1_filedata *)fp->private_data)->uctxt;
 	if (!uctxt)
@@ -829,7 +829,7 @@ static u64 kvirt_to_phys(void *addr)
 static int assign_ctxt(struct file *fp, struct hfi1_user_info *uinfo)
 {
 	int i_minor, ret = 0;
-	unsigned swmajor, swminor, alg = HFI1_ALG_ACROSS;
+	unsigned int swmajor, swminor, alg = HFI1_ALG_ACROSS;
 
 	swmajor = uinfo->userversion >> 16;
 	if (swmajor != HFI1_USER_SWMAJOR) {
@@ -878,7 +878,7 @@ static int usable_device(struct hfi1_devdata *dd)
 }
 
 static int get_user_context(struct file *fp, struct hfi1_user_info *uinfo,
-			    int devno, unsigned alg)
+			    int devno, unsigned int alg)
 {
 	struct hfi1_devdata *dd = NULL;
 	int ret = 0, devmax, npresent, nup, dev;
@@ -902,7 +902,7 @@ static int get_user_context(struct file *fp, struct hfi1_user_info *uinfo,
 		struct hfi1_devdata *pdd;
 
 		if (alg == HFI1_ALG_ACROSS) {
-			unsigned free = 0U;
+			unsigned iny free = 0U;
 
 			for (dev = 0; dev < devmax; dev++) {
 				pdd = hfi1_lookup(dev);
@@ -988,7 +988,7 @@ static int allocate_ctxt(struct file *fp, struct hfi1_devdata *dd,
 {
 	struct hfi1_filedata *fd = fp->private_data;
 	struct hfi1_ctxtdata *uctxt;
-	unsigned ctxt;
+	unsigned int ctxt;
 	int ret, numa;
 
 	if (dd->flags & HFI1_FROZEN) {
@@ -1076,7 +1076,7 @@ static int allocate_ctxt(struct file *fp, struct hfi1_devdata *dd,
 static int init_subctxts(struct hfi1_ctxtdata *uctxt,
 			 const struct hfi1_user_info *uinfo)
 {
-	unsigned num_subctxts;
+	unsigned int num_subctxts;
 
 	num_subctxts = uinfo->subctxt_cnt;
 	if (num_subctxts > HFI1_MAX_SHARED_CTXTS)
@@ -1094,7 +1094,7 @@ static int init_subctxts(struct hfi1_ctxtdata *uctxt,
 static int setup_subctxt(struct hfi1_ctxtdata *uctxt)
 {
 	int ret = 0;
-	unsigned num_subctxts = uctxt->subctxt_cnt;
+	unsigned int num_subctxts = uctxt->subctxt_cnt;
 
 	uctxt->subctxt_uregbase = vmalloc_user(PAGE_SIZE);
 	if (!uctxt->subctxt_uregbase) {
@@ -1299,7 +1299,7 @@ static int get_base_info(struct file *fp, void __user *ubase, __u32 len)
 	struct hfi1_ctxtdata *uctxt = fd->uctxt;
 	struct hfi1_devdata *dd = uctxt->dd;
 	ssize_t sz;
-	unsigned offset;
+	unsigned int offset;
 	int ret = 0;
 
 	trace_hfi1_uctxtdata(uctxt->dd, uctxt);
@@ -1375,7 +1375,7 @@ static unsigned int poll_urgent(struct file *fp,
 	struct hfi1_filedata *fd = fp->private_data;
 	struct hfi1_ctxtdata *uctxt = fd->uctxt;
 	struct hfi1_devdata *dd = uctxt->dd;
-	unsigned pollflag;
+	unsigned int pollflag;
 
 	poll_wait(fp, &uctxt->wait, pt);
 
@@ -1398,7 +1398,7 @@ static unsigned int poll_next(struct file *fp,
 	struct hfi1_filedata *fd = fp->private_data;
 	struct hfi1_ctxtdata *uctxt = fd->uctxt;
 	struct hfi1_devdata *dd = uctxt->dd;
-	unsigned pollflag;
+	unsigned int pollflag;
 
 	poll_wait(fp, &uctxt->wait, pt);
 
@@ -1424,7 +1424,7 @@ int hfi1_set_uevent_bits(struct hfi1_pportdata *ppd, const int evtbit)
 {
 	struct hfi1_ctxtdata *uctxt;
 	struct hfi1_devdata *dd = ppd->dd;
-	unsigned ctxt;
+	unsigned int ctxt;
 	int ret = 0;
 	unsigned long flags;
 
@@ -1466,7 +1466,7 @@ done:
  * overflow conditions.  start_stop==1 re-enables, to be used to
  * re-init the software copy of the head register
  */
-static int manage_rcvq(struct hfi1_ctxtdata *uctxt, unsigned subctxt,
+static int manage_rcvq(struct hfi1_ctxtdata *uctxt, unsigned int subctxt,
 		       int start_stop)
 {
 	struct hfi1_devdata *dd = uctxt->dd;
@@ -1522,7 +1522,7 @@ static int user_event_ack(struct hfi1_ctxtdata *uctxt, int subctxt,
 	return 0;
 }
 
-static int set_ctxt_pkey(struct hfi1_ctxtdata *uctxt, unsigned subctxt,
+static int set_ctxt_pkey(struct hfi1_ctxtdata *uctxt, unsigned int subctxt,
 			 u16 pkey)
 {
 	int ret = -ENOENT, i, intable = 0;

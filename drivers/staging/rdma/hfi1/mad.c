@@ -78,7 +78,7 @@ static inline void clear_opa_smp_data(struct opa_smp *smp)
 	memset(data, 0, size);
 }
 
-static void send_trap(struct hfi1_ibport *ibp, void *data, unsigned len)
+static void send_trap(struct hfi1_ibport *ibp, void *data, unsigned int len)
 {
 	struct ib_mad_send_buf *send_buf;
 	struct ib_mad_agent *agent;
@@ -321,7 +321,7 @@ static int __subn_get_opa_nodeinfo(struct opa_smp *smp, u32 am, u8 *data,
 {
 	struct opa_node_info *ni;
 	struct hfi1_devdata *dd = dd_from_ibdev(ibdev);
-	unsigned pidx = port - 1; /* IB number port from 1, hw from 0 */
+	unsigned int pidx = port - 1; /* IB number port from 1, hw from 0 */
 
 	ni = (struct opa_node_info *)data;
 
@@ -359,7 +359,7 @@ static int subn_get_nodeinfo(struct ib_smp *smp, struct ib_device *ibdev,
 {
 	struct ib_node_info *nip = (struct ib_node_info *)&smp->data;
 	struct hfi1_devdata *dd = dd_from_ibdev(ibdev);
-	unsigned pidx = port - 1; /* IB number port from 1, hw from 0 */
+	unsigned int pidx = port - 1; /* IB number port from 1, hw from 0 */
 
 	/* GUID 0 is illegal */
 	if (smp->attr_mod || pidx >= dd->num_pports ||
@@ -743,7 +743,7 @@ static int __subn_get_opa_pkeytable(struct opa_smp *smp, u32 am, u8 *data,
 	u16 *q;
 	int i;
 	u16 n_blocks_avail;
-	unsigned npkeys = hfi1_get_npkeys(dd);
+	unsigned int npkeys = hfi1_get_npkeys(dd);
 	size_t size;
 
 	if (n_blocks_req == 0) {
@@ -1421,7 +1421,7 @@ static int __subn_set_opa_pkeytable(struct opa_smp *smp, u32 am, u8 *data,
 	__be16 *q = (__be16 *)data;
 	int i;
 	u16 n_blocks_avail;
-	unsigned npkeys = hfi1_get_npkeys(dd);
+	unsigned int npkeys = hfi1_get_npkeys(dd);
 
 	if (n_blocks_sent == 0) {
 		pr_warn("OPA Get PKey AM Invalid : P = %d; B = 0x%x; N = 0x%x\n",
@@ -1506,7 +1506,7 @@ static int __subn_get_opa_sl_to_sc(struct opa_smp *smp, u32 am, u8 *data,
 	struct hfi1_ibport *ibp = to_iport(ibdev, port);
 	u8 *p = data;
 	size_t size = ARRAY_SIZE(ibp->sl_to_sc); /* == 32 */
-	unsigned i;
+	unsigned int i;
 
 	if (am) {
 		smp->status |= IB_SMP_INVALID_FIELD;
@@ -1556,7 +1556,7 @@ static int __subn_get_opa_sc_to_sl(struct opa_smp *smp, u32 am, u8 *data,
 	struct hfi1_ibport *ibp = to_iport(ibdev, port);
 	u8 *p = data;
 	size_t size = ARRAY_SIZE(ibp->sc_to_sl); /* == 32 */
-	unsigned i;
+	unsigned int i;
 
 	if (am) {
 		smp->status |= IB_SMP_INVALID_FIELD;

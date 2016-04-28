@@ -1376,7 +1376,7 @@ static int modify_device(struct ib_device *device,
 			 struct ib_device_modify *device_modify)
 {
 	struct hfi1_devdata *dd = dd_from_ibdev(device);
-	unsigned i;
+	unsigned int i;
 	int ret;
 
 	if (device_modify_mask & ~(IB_DEVICE_MODIFY_SYS_IMAGE_GUID |
@@ -1510,7 +1510,7 @@ struct ib_ah *hfi1_create_qp0_ah(struct hfi1_ibport *ibp, u16 dlid)
  * hfi1_get_npkeys - return the size of the PKEY table for context 0
  * @dd: the hfi1_ib device
  */
-unsigned hfi1_get_npkeys(struct hfi1_devdata *dd)
+unsigned int hfi1_get_npkeys(struct hfi1_devdata *dd)
 {
 	return ARRAY_SIZE(dd->pport[0].pkeys);
 }
@@ -1553,7 +1553,7 @@ int hfi1_register_ib_device(struct hfi1_devdata *dd)
 	struct hfi1_ibdev *dev = &dd->verbs_dev;
 	struct ib_device *ibdev = &dev->rdi.ibdev;
 	struct hfi1_pportdata *ppd = dd->pport;
-	unsigned i;
+	unsigned int i;
 	int ret;
 	size_t lcpysz = IB_DEVICE_NAME_MAX;
 

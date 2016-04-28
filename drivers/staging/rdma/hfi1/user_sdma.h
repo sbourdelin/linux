@@ -55,8 +55,8 @@ extern uint extended_psn;
 
 struct hfi1_user_sdma_pkt_q {
 	struct list_head list;
-	unsigned ctxt;
-	unsigned subctxt;
+	unsigned int ctxt;
+	unsigned int subctxt;
 	u16 n_max_reqs;
 	atomic_t n_reqs;
 	u16 reqidx;
@@ -64,7 +64,7 @@ struct hfi1_user_sdma_pkt_q {
 	struct kmem_cache *txreq_cache;
 	struct user_sdma_request *reqs;
 	struct iowait busy;
-	unsigned state;
+	unsigned int state;
 	wait_queue_head_t wait;
 	unsigned long unpinned;
 	struct rb_root sdma_rb_root;

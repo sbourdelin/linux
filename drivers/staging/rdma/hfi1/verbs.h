@@ -467,7 +467,7 @@ void hfi1_unregister_ib_device(struct hfi1_devdata *);
 
 void hfi1_ib_rcv(struct hfi1_packet *packet);
 
-unsigned hfi1_get_npkeys(struct hfi1_devdata *);
+unsigned int hfi1_get_npkeys(struct hfi1_devdata *);
 
 int hfi1_verbs_send_dma(struct rvt_qp *qp, struct hfi1_pkt_state *ps,
 			u64 pbc);

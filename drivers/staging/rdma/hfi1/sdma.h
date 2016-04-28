@@ -196,11 +196,11 @@ struct sdma_state {
 	struct kref          kref;
 	struct completion    comp;
 	enum sdma_states current_state;
-	unsigned             current_op;
-	unsigned             go_s99_running;
+	unsigned int		current_op;
+	unsigned int		go_s99_running;
 	/* debugging/development */
 	enum sdma_states previous_state;
-	unsigned             previous_op;
+	unsigned int		previous_op;
 	enum sdma_events last_event;
 };
 
@@ -335,7 +335,7 @@ struct sdma_engine {
 	/* private: */
 	struct hw_sdma_desc *descq;
 	/* private: */
-	unsigned descq_full_count;
+	unsigned int descq_full_count;
 	struct sdma_txreq **tx_ring;
 	/* private: */
 	dma_addr_t            descq_phys;
@@ -892,7 +892,7 @@ static inline u32 sdma_build_ahg_descriptor(
  * re-submission is detected by checking whether the descriptor
  * queue has enough descriptor for the txreq.
  */
-static inline unsigned sdma_progress(struct sdma_engine *sde, unsigned seq,
+static inline unsigned int sdma_progress(struct sdma_engine *sde, unsigned int seq,
 				     struct sdma_txreq *tx)
 {
 	if (read_seqretry(&sde->head_lock, seq)) {

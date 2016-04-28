@@ -1339,10 +1339,10 @@ u32 hfi1_read_portcntrs(struct hfi1_pportdata *ppd, char **namep, u64 **cntrp);
 u8 hfi1_ibphys_portstate(struct hfi1_pportdata *ppd);
 int hfi1_get_ib_cfg(struct hfi1_pportdata *ppd, int which);
 int hfi1_set_ib_cfg(struct hfi1_pportdata *ppd, int which, u32 val);
-int hfi1_set_ctxt_jkey(struct hfi1_devdata *dd, unsigned ctxt, u16 jkey);
-int hfi1_clear_ctxt_jkey(struct hfi1_devdata *dd, unsigned ctxt);
-int hfi1_set_ctxt_pkey(struct hfi1_devdata *dd, unsigned ctxt, u16 pkey);
-int hfi1_clear_ctxt_pkey(struct hfi1_devdata *dd, unsigned ctxt);
+int hfi1_set_ctxt_jkey(struct hfi1_devdata *dd, unsigned int ctxt, u16 jkey);
+int hfi1_clear_ctxt_jkey(struct hfi1_devdata *dd, unsigned int ctxt);
+int hfi1_set_ctxt_pkey(struct hfi1_devdata *dd, unsigned int ctxt, u16 pkey);
+int hfi1_clear_ctxt_pkey(struct hfi1_devdata *dd, unsigned int ctxt);
 void hfi1_read_link_quality(struct hfi1_devdata *dd, u8 *link_quality);
 
 /*

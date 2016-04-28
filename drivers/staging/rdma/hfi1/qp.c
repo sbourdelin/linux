@@ -68,13 +68,13 @@ static int iowait_sleep(
 	struct sdma_engine *sde,
 	struct iowait *wait,
 	struct sdma_txreq *stx,
-	unsigned seq);
+	unsigned int seq);
 static void iowait_wakeup(struct iowait *wait, int reason);
 static void iowait_sdma_drained(struct iowait *wait);
 static void qp_pio_drain(struct rvt_qp *qp);
 
-static inline unsigned mk_qpn(struct rvt_qpn_table *qpt,
-			      struct rvt_qpn_map *map, unsigned off)
+static inline unsigned int mk_qpn(struct rvt_qpn_table *qpt,
+			      struct rvt_qpn_map *map, unsigned int off)
 {
 	return (map - qpt->map) * RVT_BITS_PER_PAGE + off;
 }
@@ -450,7 +450,7 @@ static int iowait_sleep(
 	struct sdma_engine *sde,
 	struct iowait *wait,
 	struct sdma_txreq *stx,
-	unsigned seq)
+	unsigned int seq)
 {
 	struct verbs_txreq *tx = container_of(stx, struct verbs_txreq, txreq);
 	struct rvt_qp *qp;
@@ -760,7 +760,7 @@ void qp_priv_free(struct rvt_dev_info *rdi, struct rvt_qp *qp)
 	kfree(priv);
 }
 
-unsigned free_all_qps(struct rvt_dev_info *rdi)
+unsigned int free_all_qps(struct rvt_dev_info *rdi)
 {
 	struct hfi1_ibdev *verbs_dev = container_of(rdi,
 						    struct hfi1_ibdev,
@@ -769,7 +769,7 @@ unsigned free_all_qps(struct rvt_dev_info *rdi)
 					       struct hfi1_devdata,
 					       verbs_dev);
 	int n;
-	unsigned qp_inuse = 0;
+	unsigned int qp_inuse = 0;
 
 	for (n = 0; n < dd->num_pports; n++) {
 		struct hfi1_ibport *ibp = &dd->pport[n].ibport_data;
