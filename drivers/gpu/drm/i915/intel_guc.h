@@ -137,6 +137,12 @@ struct intel_guc {
 	uint32_t last_seqno[GUC_MAX_ENGINES_NUM];
 };
 
+static inline int intel_slpc_enabled(void)
+{
+	WARN_ON(i915.enable_slpc < 0);
+	return i915.enable_slpc;
+}
+
 /* intel_guc_loader.c */
 extern void intel_guc_ucode_init(struct drm_device *dev);
 extern int intel_guc_ucode_load(struct drm_device *dev);

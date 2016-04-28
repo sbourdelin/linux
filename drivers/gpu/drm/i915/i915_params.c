@@ -36,6 +36,7 @@ struct i915_params i915 __read_mostly = {
 	.enable_dc = -1,
 	.enable_fbc = -1,
 	.enable_execlists = -1,
+	.enable_slpc = 0,
 	.enable_hangcheck = true,
 	.enable_ppgtt = -1,
 	.enable_psr = -1,
@@ -126,6 +127,11 @@ module_param_named_unsafe(enable_execlists, i915.enable_execlists, int, 0400);
 MODULE_PARM_DESC(enable_execlists,
 	"Override execlists usage. "
 	"(-1=auto [default], 0=disabled, 1=enabled)");
+
+module_param_named_unsafe(enable_slpc, i915.enable_slpc, int, 0400);
+MODULE_PARM_DESC(enable_slpc,
+	"Override single-loop-power-controller (slpc) usage. "
+	"(-1=auto, 0=disabled [default], 1=enabled)");
 
 module_param_named_unsafe(enable_psr, i915.enable_psr, int, 0600);
 MODULE_PARM_DESC(enable_psr, "Enable PSR "
