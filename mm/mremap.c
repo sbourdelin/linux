@@ -293,8 +293,14 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 		old_addr = new_addr;
 		new_addr = err;
 	} else {
-		arch_remap(mm, old_addr, old_addr + old_len,
-			   new_addr, new_addr + new_len);
+#ifdef CONFIG_ARCH_WANT_VDSO_MAP
+		/*
+		 * mremap() doesn't allow moving multiple vmas so we can limit the
+		 * check to old_addr == vdso.
+		 */
+		if (old_addr == mm->context.vdso)
+			mm->context.vdso = new_addr;
+#endif  /* CONFIG_ARCH_WANT_VDSO_MAP */
 	}
 
 	/* Conceal VM_ACCOUNT so old reservation is not undone */
