@@ -17,7 +17,7 @@
 
 #ifndef __ASSEMBLY__
 
-/* Offsets relative to thread->vdso_base */
+/* Offsets relative to mm->context.vdso */
 extern unsigned long vdso64_rt_sigtramp;
 extern unsigned long vdso32_sigtramp;
 extern unsigned long vdso32_rt_sigtramp;

@@ -525,7 +525,7 @@ typedef struct {
 #else
 	u16 sllp;		/* SLB page size encoding */
 #endif
-	unsigned long vdso_base;
+	unsigned long vdso;
 #ifdef CONFIG_PPC_SUBPAGE_PROT
 	struct subpage_prot_table spt;
 #endif /* CONFIG_PPC_SUBPAGE_PROT */

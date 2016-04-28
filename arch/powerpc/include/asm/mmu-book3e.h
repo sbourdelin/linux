@@ -228,7 +228,7 @@ extern unsigned int tlbcam_index;
 typedef struct {
 	unsigned int	id;
 	unsigned int	active;
-	unsigned long	vdso_base;
+	unsigned long	vdso;
 #ifdef CONFIG_PPC_MM_SLICES
 	u64 low_slices_psize;   /* SLB page size encodings */
 	u64 high_slices_psize;  /* 4 bits per slice for now */

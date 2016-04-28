@@ -107,7 +107,7 @@ extern unsigned int tlb_44x_index;
 typedef struct {
 	unsigned int	id;
 	unsigned int	active;
-	unsigned long	vdso_base;
+	unsigned long	vdso;
 } mm_context_t;
 
 #endif /* !__ASSEMBLY__ */

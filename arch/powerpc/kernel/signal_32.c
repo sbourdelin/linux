@@ -1000,9 +1000,9 @@ int handle_rt_signal32(struct ksignal *ksig, sigset_t *oldset,
 	/* Save user registers on the stack */
 	frame = &rt_sf->uc.uc_mcontext;
 	addr = frame;
-	if (vdso32_rt_sigtramp && current->mm->context.vdso_base) {
+	if (vdso32_rt_sigtramp && current->mm->context.vdso) {
 		sigret = 0;
-		tramp = current->mm->context.vdso_base + vdso32_rt_sigtramp;
+		tramp = current->mm->context.vdso + vdso32_rt_sigtramp;
 	} else {
 		sigret = __NR_rt_sigreturn;
 		tramp = (unsigned long) frame->tramp;
@@ -1425,9 +1425,9 @@ int handle_signal32(struct ksignal *ksig, sigset_t *oldset, struct pt_regs *regs
 	    || __put_user(ksig->sig, &sc->signal))
 		goto badframe;
 
-	if (vdso32_sigtramp && current->mm->context.vdso_base) {
+	if (vdso32_sigtramp && current->mm->context.vdso) {
 		sigret = 0;
-		tramp = current->mm->context.vdso_base + vdso32_sigtramp;
+		tramp = current->mm->context.vdso + vdso32_sigtramp;
 	} else {
 		sigret = __NR_sigreturn;
 		tramp = (unsigned long) frame->mctx.tramp;
