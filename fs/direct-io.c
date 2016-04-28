@@ -352,6 +352,9 @@ void dio_end_io(struct bio *bio, int error)
 {
 	struct dio *dio = bio->bi_private;
 
+	if (!bio->bi_error)
+		bio->bi_error = error;
+
 	if (dio->is_async)
 		dio_bio_end_aio(bio);
 	else
