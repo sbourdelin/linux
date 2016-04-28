@@ -30,6 +30,18 @@ int ge_parse_dt(struct platform_device *pdev,
 #define GPIO_GE_FPGA_COMPATIBLE
 #endif /* CONFIG_CONFIG_GPIO_GE_FPGA */
 
+#if IS_ENABLED(CONFIG_GPIO_MOXART)
+int moxart_parse_dt(struct platform_device *pdev,
+		    struct bgpio_pdata *pdata,
+		    unsigned long *flags);
+
+#define GPIO_MOXART_COMPATIBLE				\
+	ADD("moxa,moxart-gpio", moxart_parse_dt),
+
+#else
+#define GPIO_MOXART_COMPATIBLE
+#endif /* CONFIG_GPIO_MOXART */
+
 #undef ADD
 
 static inline void set_resource_address(struct resource *res,
