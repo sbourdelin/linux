@@ -259,6 +259,13 @@ static void omap_musb_set_mailbox(struct omap2430_glue *glue)
 	struct musb_hdrc_platform_data *pdata = dev_get_platdata(dev);
 	struct omap_musb_board_data *data = pdata->board_data;
 	struct usb_otg *otg = musb->xceiv->otg;
+	bool cable_connected;
+
+	cable_connected = ((glue->status & MUSB_ID_GROUND) ||
+			   (glue->status & MUSB_VBUS_VALID));
+
+	if (cable_connected)
+		pm_runtime_get_sync(dev);
 
 	switch (glue->status) {
 	case MUSB_ID_GROUND:
@@ -268,7 +275,6 @@ static void omap_musb_set_mailbox(struct omap2430_glue *glue)
 		musb->xceiv->otg->state = OTG_STATE_A_IDLE;
 		musb->xceiv->last_event = USB_EVENT_ID;
 		if (musb->gadget_driver) {
-			pm_runtime_get_sync(dev);
 			omap_control_usb_set_mode(glue->control_otghs,
 				USB_MODE_HOST);
 			omap2430_musb_set_vbus(musb, 1);
@@ -281,8 +287,6 @@ static void omap_musb_set_mailbox(struct omap2430_glue *glue)
 		otg->default_a = false;
 		musb->xceiv->otg->state = OTG_STATE_B_IDLE;
 		musb->xceiv->last_event = USB_EVENT_VBUS;
-		if (musb->gadget_driver)
-			pm_runtime_get_sync(dev);
 		omap_control_usb_set_mode(glue->control_otghs, USB_MODE_DEVICE);
 		break;
 
@@ -291,11 +295,8 @@ static void omap_musb_set_mailbox(struct omap2430_glue *glue)
 		dev_dbg(dev, "VBUS Disconnect\n");
 
 		musb->xceiv->last_event = USB_EVENT_NONE;
-		if (musb->gadget_driver) {
+		if (musb->gadget_driver)
 			omap2430_musb_set_vbus(musb, 0);
-			pm_runtime_mark_last_busy(dev);
-			pm_runtime_put_autosuspend(dev);
-		}
 
 		if (data->interface_type == MUSB_INTERFACE_UTMI)
 			otg_set_vbus(musb->xceiv->otg, 0);
@@ -305,6 +306,11 @@ static void omap_musb_set_mailbox(struct omap2430_glue *glue)
 		break;
 	default:
 		dev_dbg(dev, "ID float\n");
+	}
+
+	if (!cable_connected) {
+		pm_runtime_mark_last_busy(dev);
+		pm_runtime_put_autosuspend(dev);
 	}
 
 	atomic_notifier_call_chain(&musb->xceiv->notifier,
