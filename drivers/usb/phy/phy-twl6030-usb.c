@@ -97,6 +97,9 @@ struct twl6030_usb {
 
 	struct regulator		*usb3v3;
 
+	/* used to check initial cable status after probe */
+	struct delayed_work	get_status_work;
+
 	/* used to set vbus, in atomic path */
 	struct work_struct	set_vbus_work;
 
@@ -274,6 +277,15 @@ static irqreturn_t twl6030_usbotg_irq(int irq, void *_twl)
 	return IRQ_HANDLED;
 }
 
+static void twl6030_status_work(struct work_struct *work)
+{
+	struct twl6030_usb *twl = container_of(work, struct twl6030_usb,
+					       get_status_work.work);
+
+	twl6030_usb_irq(twl->irq2, twl);
+	twl6030_usbotg_irq(twl->irq1, twl);
+}
+
 static int twl6030_enable_irq(struct twl6030_usb *twl)
 {
 	twl6030_writeb(twl, TWL_MODULE_USB, 0x1, USB_ID_INT_EN_HI_SET);
@@ -284,8 +296,6 @@ static int twl6030_enable_irq(struct twl6030_usb *twl)
 				REG_INT_MSK_LINE_C);
 	twl6030_interrupt_unmask(TWL6030_CHARGER_CTRL_INT_MASK,
 				REG_INT_MSK_STS_C);
-	twl6030_usb_irq(twl->irq2, twl);
-	twl6030_usbotg_irq(twl->irq1, twl);
 
 	return 0;
 }
@@ -371,6 +381,7 @@ static int twl6030_usb_probe(struct platform_device *pdev)
 		dev_warn(&pdev->dev, "could not create sysfs file\n");
 
 	INIT_WORK(&twl->set_vbus_work, otg_set_vbus_work);
+	INIT_DELAYED_WORK(&twl->get_status_work, twl6030_status_work);
 
 	status = request_threaded_irq(twl->irq1, NULL, twl6030_usbotg_irq,
 			IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING | IRQF_ONESHOT,
@@ -395,6 +406,7 @@ static int twl6030_usb_probe(struct platform_device *pdev)
 
 	twl->asleep = 0;
 	twl6030_enable_irq(twl);
+	schedule_delayed_work(&twl->get_status_work, HZ);
 	dev_info(&pdev->dev, "Initialized TWL6030 USB module\n");
 
 	return 0;
@@ -404,6 +416,7 @@ static int twl6030_usb_remove(struct platform_device *pdev)
 {
 	struct twl6030_usb *twl = platform_get_drvdata(pdev);
 
+	cancel_delayed_work(&twl->get_status_work);
 	twl6030_interrupt_mask(TWL6030_USBOTG_INT_MASK,
 		REG_INT_MSK_LINE_C);
 	twl6030_interrupt_mask(TWL6030_USBOTG_INT_MASK,
