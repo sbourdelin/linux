@@ -611,6 +611,7 @@ static const struct of_device_id bgpio_of_match[] = {
 	GPIO_CLPS711X_COMPATIBLE
 	GPIO_GE_FPGA_COMPATIBLE
 	GPIO_MOXART_COMPATIBLE
+	GPIO_TS4800_COMPATIBLE
 
 	{ }
 };

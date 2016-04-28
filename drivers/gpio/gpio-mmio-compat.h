@@ -42,6 +42,17 @@ int moxart_parse_dt(struct platform_device *pdev,
 #define GPIO_MOXART_COMPATIBLE
 #endif /* CONFIG_GPIO_MOXART */
 
+#if IS_ENABLED(CONFIG_GPIO_TS4800)
+int technologic_ts4800_parse_dt(struct platform_device *pdev,
+				struct bgpio_pdata *pdata,
+				unsigned long *flags);
+
+#define GPIO_TS4800_COMPATIBLE				\
+	ADD("technologic,ts4800-gpio", technologic_ts4800_parse_dt),
+#else
+#define GPIO_TS4800_COMPATIBLE
+#endif /* CONFIG_GPIO_TS4800 */
+
 #undef ADD
 
 static inline void set_resource_address(struct resource *res,

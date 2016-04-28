@@ -17,6 +17,7 @@ gpio-generic-$(CONFIG_GPIO_GENERIC)	+= gpio-mmio.o
 gpio-generic-$(CONFIG_GPIO_CLPS711X)	+= gpio-clps711x.o
 gpio-generic-$(CONFIG_GPIO_GE_FPGA)	+= gpio-ge.o
 gpio-generic-$(CONFIG_GPIO_MOXART)	+= gpio-moxart.o
+gpio-generic-$(CONFIG_GPIO_TS4800)	+= gpio-ts4800.o
 
 obj-$(CONFIG_GPIO_104_DIO_48E)	+= gpio-104-dio-48e.o
 obj-$(CONFIG_GPIO_104_IDIO_16)	+= gpio-104-idio-16.o
@@ -107,7 +108,6 @@ obj-$(CONFIG_GPIO_TPS65218)	+= gpio-tps65218.o
 obj-$(CONFIG_GPIO_TPS6586X)	+= gpio-tps6586x.o
 obj-$(CONFIG_GPIO_TPS65910)	+= gpio-tps65910.o
 obj-$(CONFIG_GPIO_TPS65912)	+= gpio-tps65912.o
-obj-$(CONFIG_GPIO_TS4800)	+= gpio-ts4800.o
 obj-$(CONFIG_GPIO_TS5500)	+= gpio-ts5500.o
 obj-$(CONFIG_GPIO_TWL4030)	+= gpio-twl4030.o
 obj-$(CONFIG_GPIO_TWL6040)	+= gpio-twl6040.o
