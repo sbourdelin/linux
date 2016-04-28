@@ -9,83 +9,55 @@
  * (at your option) any later version.
  */
 
-#include <linux/err.h>
+#include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/err.h>
+#include <linux/ioport.h>
 #include <linux/gpio/driver.h>
 #include <linux/platform_device.h>
+#include "gpio-mmio-compat.h"
 
-static int clps711x_gpio_probe(struct platform_device *pdev)
+int cirrus_clps711x_parse_dt(struct platform_device *pdev,
+			     struct bgpio_pdata *pdata,
+			     unsigned long *flags)
 {
 	struct device_node *np = pdev->dev.of_node;
-	void __iomem *dat, *dir;
-	struct gpio_chip *gc;
+	int id = np ? of_alias_get_id(np, "gpio") : pdev->id;
 	struct resource *res;
-	int err, id = np ? of_alias_get_id(np, "gpio") : pdev->id;
+	struct resource nres[] = {
+		DEFINE_RES_MEM_NAMED(0, 1, "dat"),
+		DEFINE_RES_MEM_NAMED(0, 1, "dirout"),
+	};
 
 	if ((id < 0) || (id > 4))
 		return -ENODEV;
 
-	gc = devm_kzalloc(&pdev->dev, sizeof(*gc), GFP_KERNEL);
-	if (!gc)
-		return -ENOMEM;
+	if (id == 4) {
+		/* PORTE is 3 lines only */
+		pdata->ngpio = 3;
+	}
+
+	pdata->base = id * 8;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	dat = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(dat))
-		return PTR_ERR(dat);
+	if (!res || resource_size(res) != 0x1)
+		return -EINVAL;
+	set_resource_address(&nres[0], res->start, 0x1);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-	dir = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(dir))
-		return PTR_ERR(dir);
+	if (!res || resource_size(res) != 0x1)
+		return -EINVAL;
+	set_resource_address(&nres[1], res->start, 0x1);
 
-	switch (id) {
-	case 3:
+	if (id == 3) {
 		/* PORTD is inverted logic for direction register */
-		err = bgpio_init(gc, &pdev->dev, 1, dat, NULL, NULL,
-				 NULL, dir, 0);
-		break;
-	default:
-		err = bgpio_init(gc, &pdev->dev, 1, dat, NULL, NULL,
-				 dir, NULL, 0);
-		break;
+		nres[1].name = "dirin";
 	}
 
-	if (err)
-		return err;
-
-	switch (id) {
-	case 4:
-		/* PORTE is 3 lines only */
-		gc->ngpio = 3;
-		break;
-	default:
-		break;
-	}
-
-	gc->base = id * 8;
-	gc->owner = THIS_MODULE;
-	platform_set_drvdata(pdev, gc);
-
-	return devm_gpiochip_add_data(&pdev->dev, gc, NULL);
+	return platform_device_add_resources(pdev, nres, ARRAY_SIZE(nres));
 }
 
-static const struct of_device_id __maybe_unused clps711x_gpio_ids[] = {
-	{ .compatible = "cirrus,clps711x-gpio" },
-	{ }
-};
-MODULE_DEVICE_TABLE(of, clps711x_gpio_ids);
-
-static struct platform_driver clps711x_gpio_driver = {
-	.driver	= {
-		.name		= "clps711x-gpio",
-		.of_match_table	= of_match_ptr(clps711x_gpio_ids),
-	},
-	.probe	= clps711x_gpio_probe,
-};
-module_platform_driver(clps711x_gpio_driver);
-
-MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Alexander Shiyan <shc_work@mail.ru>");
 MODULE_DESCRIPTION("CLPS711X GPIO driver");
 MODULE_ALIAS("platform:clps711x-gpio");
+MODULE_ALIAS("clps711x-gpio");

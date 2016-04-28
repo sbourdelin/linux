@@ -608,6 +608,7 @@ static int bgpio_basic_mmio_parse_dt(struct platform_device *pdev,
 
 static const struct of_device_id bgpio_of_match[] = {
 	ADD("linux,gpio-mmio", bgpio_basic_mmio_parse_dt),
+	GPIO_CLPS711X_COMPATIBLE
 
 	{ }
 };
