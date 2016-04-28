@@ -4738,7 +4738,7 @@ int intel_enable_rc6(const struct drm_device *dev)
 	return i915.enable_rc6;
 }
 
-static void gen6_init_rps_frequencies(struct drm_device *dev)
+void gen6_init_rps_frequencies(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	uint32_t rp_state_cap;
