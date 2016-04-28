@@ -288,7 +288,7 @@ int crash_shutdown_unregister(crash_shutdown_t handler)
 		rc = 1;
 	} else {
 		/* Shift handles down */
-		for (; crash_shutdown_handles[i]; i++)
+		for (; crash_shutdown_handles[i] && i < CRASH_HANDLER_MAX; i++)
 			crash_shutdown_handles[i] =
 				crash_shutdown_handles[i+1];
 		rc = 0;
