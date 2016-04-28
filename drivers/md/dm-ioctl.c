@@ -1715,16 +1715,13 @@ static int copy_params(struct dm_ioctl __user *user, struct dm_ioctl *param_kern
 	 */
 	dmi = NULL;
 	if (param_kernel->data_size <= KMALLOC_MAX_SIZE) {
-		dmi = kmalloc(param_kernel->data_size, GFP_NOIO | __GFP_NORETRY | __GFP_NOMEMALLOC | __GFP_NOWARN);
+		dmi = kmalloc(param_kernel->data_size, GFP_KERNEL | __GFP_NORETRY | __GFP_NOWARN);
 		if (dmi)
 			*param_flags |= DM_PARAMS_KMALLOC;
 	}
 
 	if (!dmi) {
-		unsigned noio_flag;
-		noio_flag = memalloc_noio_save();
-		dmi = __vmalloc(param_kernel->data_size, GFP_NOIO | __GFP_HIGH | __GFP_HIGHMEM, PAGE_KERNEL);
-		memalloc_noio_restore(noio_flag);
+		dmi = __vmalloc(param_kernel->data_size, GFP_KERNEL | __GFP_HIGH | __GFP_HIGHMEM, PAGE_KERNEL);
 		if (dmi)
 			*param_flags |= DM_PARAMS_VMALLOC;
 	}
@@ -1801,6 +1798,7 @@ static int ctl_ioctl(uint command, struct dm_ioctl __user *user)
 	ioctl_fn fn = NULL;
 	size_t input_param_size;
 	struct dm_ioctl param_kernel;
+	unsigned noio_flag;
 
 	/* only root can play with this */
 	if (!capable(CAP_SYS_ADMIN))
@@ -1832,9 +1830,12 @@ static int ctl_ioctl(uint command, struct dm_ioctl __user *user)
 	}
 
 	/*
-	 * Copy the parameters into kernel space.
+	 * Copy the parameters into kernel space. Make sure that no IO is triggered
+	 * from the allocation paths because this might be called during the suspend.
 	 */
+	noio_flag = memalloc_noio_save();
 	r = copy_params(user, &param_kernel, ioctl_flags, &param, &param_flags);
+	memalloc_noio_restore(noio_flag);
 
 	if (r)
 		return r;
