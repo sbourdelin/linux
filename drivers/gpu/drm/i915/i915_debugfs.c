@@ -1154,6 +1154,253 @@ DEFINE_SIMPLE_ATTRIBUTE(i915_next_seqno_fops,
 			i915_next_seqno_get, i915_next_seqno_set,
 			"0x%llx\n");
 
+static int slpc_enable_disable_get(struct drm_device *dev, u64 *val,
+				   enum slpc_param_id enable_id,
+				   enum slpc_param_id disable_id)
+{
+	int override_enable, override_disable;
+	u32 value_enable, value_disable;
+	int ret = 0;
+
+	if (!intel_slpc_active(dev)) {
+		ret = -ENODEV;
+	} else if (val) {
+		intel_slpc_get_param(dev, enable_id, &override_enable,
+				     &value_enable);
+		intel_slpc_get_param(dev, disable_id, &override_disable,
+				     &value_disable);
+
+		/* set the output value:
+		* 0: default
+		* 1: enabled
+		* 2: disabled
+		* 3: unknown (should not happen)
+		*/
+		if (override_disable && (1 == value_disable))
+			*val = SLPC_PARAM_TASK_DISABLED;
+		else if (override_enable && (1 == value_enable))
+			*val = SLPC_PARAM_TASK_ENABLED;
+		else if (!override_enable && !override_disable)
+			*val = SLPC_PARAM_TASK_DEFAULT;
+		else
+			*val = SLPC_PARAM_TASK_UNKNOWN;
+
+	} else {
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+
+static int slpc_enable_disable_set(struct drm_device *dev, u64 val,
+				   enum slpc_param_id enable_id,
+				   enum slpc_param_id disable_id)
+{
+	int ret = 0;
+
+	if (!intel_slpc_active(dev)) {
+		ret = -ENODEV;
+	} else if (SLPC_PARAM_TASK_DEFAULT == val) {
+		/* set default */
+		intel_slpc_unset_param(dev, enable_id);
+		intel_slpc_unset_param(dev, disable_id);
+	} else if (SLPC_PARAM_TASK_ENABLED == val) {
+		/* set enable */
+		intel_slpc_set_param(dev, enable_id, 1);
+		intel_slpc_unset_param(dev, disable_id);
+	} else if (SLPC_PARAM_TASK_DISABLED == val) {
+		/* set disable */
+		intel_slpc_set_param(dev, disable_id, 1);
+		intel_slpc_unset_param(dev, enable_id);
+	} else {
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+
+static void slpc_param_show(struct seq_file *m, enum slpc_param_id enable_id,
+			    enum slpc_param_id disable_id)
+{
+	struct drm_device *dev = m->private;
+	const char *status;
+	u64 val;
+	int ret;
+
+	ret = slpc_enable_disable_get(dev, &val, enable_id, disable_id);
+
+	if (ret) {
+		seq_printf(m, "error %d\n", ret);
+	} else {
+		switch (val) {
+		case SLPC_PARAM_TASK_DEFAULT:
+			status = "default\n";
+			break;
+
+		case SLPC_PARAM_TASK_ENABLED:
+			status = "enabled\n";
+			break;
+
+		case SLPC_PARAM_TASK_DISABLED:
+			status = "disabled\n";
+			break;
+
+		default:
+			status = "unknown\n";
+			break;
+		}
+
+		seq_puts(m, status);
+	}
+}
+
+static int slpc_param_write(struct seq_file *m, const char __user *ubuf,
+			    size_t len, enum slpc_param_id enable_id,
+			    enum slpc_param_id disable_id)
+{
+	struct drm_device *dev = m->private;
+	u64 val;
+	int ret = 0;
+	char buf[10];
+
+	if (len >= sizeof(buf))
+		ret = -EINVAL;
+	else if (copy_from_user(buf, ubuf, len))
+		ret = -EFAULT;
+	else
+		buf[len] = '\0';
+
+	if (!ret) {
+		if (!strncmp(buf, "default", 7))
+			val = SLPC_PARAM_TASK_DEFAULT;
+		else if (!strncmp(buf, "enabled", 7))
+			val = SLPC_PARAM_TASK_ENABLED;
+		else if (!strncmp(buf, "disabled", 8))
+			val = SLPC_PARAM_TASK_DISABLED;
+		else
+			ret = -EINVAL;
+	}
+
+	if (!ret)
+		ret = slpc_enable_disable_set(dev, val, enable_id, disable_id);
+
+	return ret;
+}
+
+static int slpc_gtperf_show(struct seq_file *m, void *data)
+{
+	slpc_param_show(m, SLPC_PARAM_TASK_ENABLE_GTPERF,
+			SLPC_PARAM_TASK_DISABLE_GTPERF);
+
+	return 0;
+}
+
+static int slpc_gtperf_open(struct inode *inode, struct file *file)
+{
+	struct drm_connector *dev = inode->i_private;
+
+	return single_open(file, slpc_gtperf_show, dev);
+}
+
+static ssize_t slpc_gtperf_write(struct file *file, const char __user *ubuf,
+			      size_t len, loff_t *offp)
+{
+	struct seq_file *m = file->private_data;
+	int ret = 0;
+
+	ret = slpc_param_write(m, ubuf, len, SLPC_PARAM_TASK_ENABLE_GTPERF,
+			       SLPC_PARAM_TASK_DISABLE_GTPERF);
+	if (ret)
+		return (size_t) ret;
+
+	return len;
+}
+
+static const struct file_operations i915_slpc_gtperf_fops = {
+	.owner	 = THIS_MODULE,
+	.open	 = slpc_gtperf_open,
+	.release = single_release,
+	.read	 = seq_read,
+	.write	 = slpc_gtperf_write,
+	.llseek	 = seq_lseek
+};
+
+static int slpc_balancer_show(struct seq_file *m, void *data)
+{
+	slpc_param_show(m, SLPC_PARAM_TASK_ENABLE_BALANCER,
+			SLPC_PARAM_TASK_DISABLE_BALANCER);
+
+	return 0;
+}
+
+static int slpc_balancer_open(struct inode *inode, struct file *file)
+{
+	struct drm_connector *dev = inode->i_private;
+
+	return single_open(file, slpc_balancer_show, dev);
+}
+
+static ssize_t slpc_balancer_write(struct file *file, const char __user *ubuf,
+			      size_t len, loff_t *offp)
+{
+	struct seq_file *m = file->private_data;
+	int ret = 0;
+
+	ret = slpc_param_write(m, ubuf, len, SLPC_PARAM_TASK_ENABLE_BALANCER,
+			       SLPC_PARAM_TASK_DISABLE_BALANCER);
+	if (ret)
+		return (size_t) ret;
+
+	return len;
+}
+
+static const struct file_operations i915_slpc_balancer_fops = {
+	.owner	 = THIS_MODULE,
+	.open	 = slpc_balancer_open,
+	.release = single_release,
+	.read	 = seq_read,
+	.write	 = slpc_balancer_write,
+	.llseek	 = seq_lseek
+};
+
+static int slpc_dcc_show(struct seq_file *m, void *data)
+{
+	slpc_param_show(m, SLPC_PARAM_TASK_ENABLE_DCC,
+			SLPC_PARAM_TASK_DISABLE_DCC);
+
+	return 0;
+}
+
+static int slpc_dcc_open(struct inode *inode, struct file *file)
+{
+	struct drm_connector *dev = inode->i_private;
+
+	return single_open(file, slpc_dcc_show, dev);
+}
+
+static ssize_t slpc_dcc_write(struct file *file, const char __user *ubuf,
+			      size_t len, loff_t *offp)
+{
+	struct seq_file *m = file->private_data;
+	int ret = 0;
+
+	ret = slpc_param_write(m, ubuf, len, SLPC_PARAM_TASK_ENABLE_DCC,
+			       SLPC_PARAM_TASK_DISABLE_DCC);
+	if (ret)
+		return (size_t) ret;
+
+	return len;
+}
+
+static const struct file_operations i915_slpc_dcc_fops = {
+	.owner	 = THIS_MODULE,
+	.open	 = slpc_dcc_open,
+	.release = single_release,
+	.read	 = seq_read,
+	.write	 = slpc_dcc_write,
+	.llseek	 = seq_lseek
+};
+
 static int i915_frequency_info(struct seq_file *m, void *unused)
 {
 	struct drm_info_node *node = m->private;
@@ -5466,6 +5713,9 @@ static const struct i915_debugfs_files {
 	const struct file_operations *fops;
 } i915_debugfs_files[] = {
 	{"i915_wedged", &i915_wedged_fops},
+	{"i915_slpc_gtperf", &i915_slpc_gtperf_fops},
+	{"i915_slpc_balancer", &i915_slpc_balancer_fops},
+	{"i915_slpc_dcc", &i915_slpc_dcc_fops},
 	{"i915_max_freq", &i915_max_freq_fops},
 	{"i915_min_freq", &i915_min_freq_fops},
 	{"i915_cache_sharing", &i915_cache_sharing_fops},
