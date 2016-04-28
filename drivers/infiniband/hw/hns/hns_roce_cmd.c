@@ -22,6 +22,14 @@
 
 #define CMD_MAX_NUM		32
 
+static int hns_roce_status_to_errno(u8 orig_status)
+{
+	if (orig_status == HNS_ROCE_CMD_SUCCESS)
+		return 0;
+	else
+		return -EIO;
+}
+
 int hns_roce_cmd_init(struct hns_roce_dev *hr_dev)
 {
 	struct device *dev = &hr_dev->pdev->dev;
@@ -93,4 +101,18 @@ void hns_roce_cmd_use_polling(struct hns_roce_dev *hr_dev)
 
 	kfree(hr_cmd->context);
 	up(&hr_cmd->poll_sem);
+}
+
+void hns_roce_cmd_event(struct hns_roce_dev *hr_dev, u16 token, u8 status,
+			u64 out_param)
+{
+	struct hns_roce_cmd_context
+		*context = &hr_dev->cmd.context[token & hr_dev->cmd.token_mask];
+
+	if (token != context->token)
+		return;
+
+	context->result = hns_roce_status_to_errno(status);
+	context->out_param = out_param;
+	complete(&context->done);
 }
