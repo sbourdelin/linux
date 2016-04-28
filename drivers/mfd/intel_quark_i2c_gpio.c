@@ -251,9 +251,13 @@ static int intel_quark_mfd_probe(struct pci_dev *pdev,
 	quark_mfd->dev = &pdev->dev;
 	dev_set_drvdata(&pdev->dev, quark_mfd);
 
+	pci_set_master(pdev);
+
 	ret = intel_quark_register_i2c_clk(&pdev->dev);
 	if (ret)
 		return ret;
+
+	pci_enable_msi(pdev);
 
 	ret = intel_quark_i2c_setup(pdev, &intel_quark_mfd_cells[1]);
 	if (ret)
