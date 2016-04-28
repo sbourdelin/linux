@@ -549,35 +549,24 @@ static void rdma_read_complete(struct svc_rqst *rqstp,
 	rqstp->rq_arg.buflen = head->arg.buflen;
 }
 
-/* By convention, backchannel calls arrive via rdma_msg type
- * messages, and never populate the chunk lists. This makes
- * the RPC/RDMA header small and fixed in size, so it is
- * straightforward to check the RPC header's direction field.
+/* Currently, this implementation does not support chunks in the
+ * backward direction. Thus only RDMA_MSG bc replies are accepted.
  */
 static bool
-svc_rdma_is_backchannel_reply(struct svc_xprt *xprt, struct rpcrdma_msg *rmsgp)
+svc_rdma_is_backchannel_reply(struct svc_xprt *xprt, struct rpcrdma_msg *rmsgp,
+			      struct xdr_buf *rq_arg)
 {
-	__be32 *p = (__be32 *)rmsgp;
+	__be32 *p = (__be32 *)rq_arg->head[0].iov_base;
 
+	/* Is there a backchannel transport associated with xprt? */
 	if (!xprt->xpt_bc_xprt)
 		return false;
-
+	/* Is there an RPC message in the inline buffer? */
 	if (rmsgp->rm_type != rdma_msg)
 		return false;
-	if (rmsgp->rm_body.rm_chunks[0] != xdr_zero)
+	/* Is that message a Call or a Reply? */
+	if (p[1] != cpu_to_be32(RPC_REPLY))
 		return false;
-	if (rmsgp->rm_body.rm_chunks[1] != xdr_zero)
-		return false;
-	if (rmsgp->rm_body.rm_chunks[2] != xdr_zero)
-		return false;
-
-	/* sanity */
-	if (p[7] != rmsgp->rm_xid)
-		return false;
-	/* call direction */
-	if (p[8] == cpu_to_be32(RPC_CALL))
-		return false;
-
 	return true;
 }
 
@@ -643,7 +632,7 @@ int svc_rdma_recvfrom(struct svc_rqst *rqstp)
 		goto out_drop;
 	rqstp->rq_xprt_hlen = ret;
 
-	if (svc_rdma_is_backchannel_reply(xprt, rmsgp)) {
+	if (svc_rdma_is_backchannel_reply(xprt, rmsgp, &rqstp->rq_arg)) {
 		ret = svc_rdma_handle_bc_reply(xprt->xpt_bc_xprt, rmsgp,
 					       &rqstp->rq_arg);
 		svc_rdma_put_context(ctxt, 0);
