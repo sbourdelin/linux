@@ -18,7 +18,7 @@
 
 typedef struct {
 	atomic64_t	id;
-	void		*vdso;
+	unsigned long	vdso;
 } mm_context_t;
 
 /*

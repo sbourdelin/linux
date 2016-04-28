@@ -96,7 +96,7 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
 	void *ret;
 
 	down_write(&mm->mmap_sem);
-	current->mm->context.vdso = (void *)addr;
+	current->mm->context.vdso = addr;
 
 	/* Map vectors page at the high address. */
 	ret = _install_special_mapping(mm, addr, PAGE_SIZE,
@@ -176,7 +176,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
 		goto up_fail;
 
 	vdso_base += PAGE_SIZE;
-	mm->context.vdso = (void *)vdso_base;
+	mm->context.vdso = vdso_base;
 	ret = _install_special_mapping(mm, vdso_base, vdso_text_len,
 				       VM_READ|VM_EXEC|
 				       VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
@@ -189,7 +189,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
 	return 0;
 
 up_fail:
-	mm->context.vdso = NULL;
+	mm->context.vdso = 0;
 	up_write(&mm->mmap_sem);
 	return PTR_ERR(ret);
 }
