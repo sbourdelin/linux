@@ -1586,6 +1586,10 @@ void chv_phy_powergate_lanes(struct intel_encoder *encoder,
 bool chv_phy_powergate_ch(struct drm_i915_private *dev_priv, enum dpio_phy phy,
 			  enum dpio_channel ch, bool override);
 
+static inline int intel_slpc_active(struct drm_device *dev)
+{
+	return 0;
+}
 
 /* intel_pm.c */
 void intel_init_clock_gating(struct drm_device *dev);

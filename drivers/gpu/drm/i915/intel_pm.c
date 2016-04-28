@@ -6227,7 +6227,9 @@ void intel_init_gt_powersave(struct drm_device *dev)
 		intel_runtime_pm_get(dev_priv);
 	}
 
-	if (IS_CHERRYVIEW(dev))
+	if (intel_slpc_enabled())
+		intel_slpc_init(dev);
+	else if (IS_CHERRYVIEW(dev))
 		cherryview_init_gt_powersave(dev);
 	else if (IS_VALLEYVIEW(dev))
 		valleyview_init_gt_powersave(dev);
@@ -6237,7 +6239,9 @@ void intel_cleanup_gt_powersave(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	if (IS_CHERRYVIEW(dev))
+	if (intel_slpc_active(dev))
+		intel_slpc_cleanup(dev);
+	else if (IS_CHERRYVIEW(dev))
 		return;
 	else if (IS_VALLEYVIEW(dev))
 		valleyview_cleanup_gt_powersave(dev);
@@ -6270,17 +6274,24 @@ void intel_suspend_gt_powersave(struct drm_device *dev)
 	if (INTEL_INFO(dev)->gen < 6)
 		return;
 
-	gen6_suspend_rps(dev);
+	if (intel_slpc_active(dev)) {
+		intel_slpc_suspend(dev);
+	} else {
+		gen6_suspend_rps(dev);
 
-	/* Force GPU to min freq during suspend */
-	gen6_rps_idle(dev_priv);
+		/* Force GPU to min freq during suspend */
+		gen6_rps_idle(dev_priv);
+	}
 }
 
 void intel_disable_gt_powersave(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	if (IS_IRONLAKE_M(dev)) {
+	if (intel_slpc_active(dev)) {
+		intel_slpc_disable(dev);
+		gen9_disable_rc6(dev);
+	} else if (IS_IRONLAKE_M(dev)) {
 		ironlake_disable_drps(dev);
 	} else if (INTEL_INFO(dev)->gen >= 6) {
 		intel_suspend_gt_powersave(dev);
@@ -6288,7 +6299,6 @@ void intel_disable_gt_powersave(struct drm_device *dev)
 		mutex_lock(&dev_priv->rps.hw_lock);
 		if (INTEL_INFO(dev)->gen >= 9) {
 			gen9_disable_rc6(dev);
-			gen9_disable_rps(dev);
 		} else if (IS_CHERRYVIEW(dev))
 			cherryview_disable_rps(dev);
 		else if (IS_VALLEYVIEW(dev))
@@ -6352,7 +6362,10 @@ void intel_enable_gt_powersave(struct drm_device *dev)
 	if (intel_vgpu_active(dev))
 		return;
 
-	if (IS_IRONLAKE_M(dev)) {
+	if (intel_slpc_active(dev)) {
+		gen9_enable_rc6(dev);
+		intel_slpc_enable(dev);
+	} else if (IS_IRONLAKE_M(dev)) {
 		ironlake_enable_drps(dev);
 		mutex_lock(&dev->struct_mutex);
 		intel_init_emon(dev);
@@ -6383,8 +6396,12 @@ void intel_reset_gt_powersave(struct drm_device *dev)
 	if (INTEL_INFO(dev)->gen < 6)
 		return;
 
-	gen6_suspend_rps(dev);
-	dev_priv->rps.enabled = false;
+	if (intel_slpc_active(dev)) {
+		intel_slpc_reset(dev);
+	} else {
+		gen6_suspend_rps(dev);
+		dev_priv->rps.enabled = false;
+	}
 }
 
 static void ibx_init_clock_gating(struct drm_device *dev)
