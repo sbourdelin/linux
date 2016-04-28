@@ -383,9 +383,10 @@ struct address_space *page_mapping(struct page *page)
 /* Slow path of page_mapcount() for compound pages */
 int __page_mapcount(struct page *page)
 {
-	int ret;
+	int ret = 0, i;
 
-	ret = atomic_read(&page->_mapcount) + 1;
+	for (i = 0; i < HPAGE_PMD_NR; i++)
+		ret = max(ret, atomic_read(&page->_mapcount) + 1);
 	page = compound_head(page);
 	ret += atomic_read(compound_mapcount_ptr(page)) + 1;
 	if (PageDoubleMap(page))
