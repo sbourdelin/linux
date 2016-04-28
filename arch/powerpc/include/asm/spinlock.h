@@ -52,6 +52,24 @@
 #define SYNC_IO
 #endif
 
+#if defined(CONFIG_PPC_SPLPAR)
+/* We only yield to the hypervisor if we are in shared processor mode */
+#define SHARED_PROCESSOR (lppaca_shared_proc(local_paca->lppaca_ptr))
+extern void __spin_yield(arch_spinlock_t *lock);
+extern void __spin_yield_cpu(int cpu);
+extern void __spin_wake_cpu(int cpu);
+extern void __rw_yield(arch_rwlock_t *lock);
+#else /* SPLPAR */
+#define __spin_yield(x)	barrier()
+#define __spin_yield_cpu(x) barrier()
+#define __spin_wake_cpu(x) barrier()
+#define __rw_yield(x)	barrier()
+#define SHARED_PROCESSOR	0
+#endif
+
+#ifdef CONFIG_QUEUED_SPINLOCKS
+#include <asm/qspinlock.h>
+#else
 static __always_inline int arch_spin_value_unlocked(arch_spinlock_t lock)
 {
 	return lock.slock == 0;
@@ -106,18 +124,6 @@ static inline int arch_spin_trylock(arch_spinlock_t *lock)
  * held.  Conveniently, we have a word in the paca that holds this
  * value.
  */
-
-#if defined(CONFIG_PPC_SPLPAR)
-/* We only yield to the hypervisor if we are in shared processor mode */
-#define SHARED_PROCESSOR (lppaca_shared_proc(local_paca->lppaca_ptr))
-extern void __spin_yield(arch_spinlock_t *lock);
-extern void __rw_yield(arch_rwlock_t *lock);
-#else /* SPLPAR */
-#define __spin_yield(x)	barrier()
-#define __rw_yield(x)	barrier()
-#define SHARED_PROCESSOR	0
-#endif
-
 static inline void arch_spin_lock(arch_spinlock_t *lock)
 {
 	CLEAR_IO_SYNC;
@@ -169,6 +175,7 @@ extern void arch_spin_unlock_wait(arch_spinlock_t *lock);
 	do { while (arch_spin_is_locked(lock)) cpu_relax(); } while (0)
 #endif
 
+#endif /* !CONFIG_QUEUED_SPINLOCKS */
 /*
  * Read-write spinlocks, allowing multiple readers
  * but only one writer.
