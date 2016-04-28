@@ -3004,6 +3004,17 @@ static inline void i915_gem_object_pin_pages(struct drm_i915_gem_object *obj)
 	obj->pages_pin_count++;
 }
 
+/*
+ * Flag the object content as having changed since the last call to
+ * i915_gem_object_pin_pages() above, so that the new content is not
+ * lost after the next call to i915_gem_object_unpin_pages() below
+ */
+static inline void i915_gem_object_mark_dirty(struct drm_i915_gem_object *obj)
+{
+	WARN_ON(obj->pages_pin_count == 0);
+	obj->dirty = true;
+}
+
 static inline void i915_gem_object_unpin_pages(struct drm_i915_gem_object *obj)
 {
 	BUG_ON(obj->pages_pin_count == 0);

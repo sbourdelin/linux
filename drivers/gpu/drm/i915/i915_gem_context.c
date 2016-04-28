@@ -747,7 +747,7 @@ static int do_rcs_switch(struct drm_i915_gem_request *req)
 		 * able to defer doing this until we know the object would be
 		 * swapped, but there is no way to do that yet.
 		 */
-		from->legacy_hw_ctx.rcs_state->dirty = 1;
+		i915_gem_object_mark_dirty(from->legacy_hw_ctx.rcs_state);
 
 		/* obj is kept alive until the next request by its active ref */
 		i915_gem_object_ggtt_unpin(from->legacy_hw_ctx.rcs_state);

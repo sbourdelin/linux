@@ -2451,7 +2451,7 @@ populate_lr_context(struct intel_context *ctx,
 		DRM_DEBUG_DRIVER("Could not map object pages! (%d)\n", ret);
 		return ret;
 	}
-	ctx_obj->dirty = true;
+	i915_gem_object_mark_dirty(ctx_obj);
 
 	/* The second page of the context object contains some fields which must
 	 * be set up prior to the first execution. */
@@ -2735,9 +2735,9 @@ void intel_lr_context_reset(struct drm_i915_private *dev_priv,
 		if (WARN_ON(IS_ERR(vaddr)))
 			continue;
 
-		reg_state = vaddr + LRC_STATE_PN * PAGE_SIZE;
-		ctx_obj->dirty = true;
+		i915_gem_object_mark_dirty(ctx_obj);
 
+		reg_state = vaddr + LRC_STATE_PN * PAGE_SIZE;
 		reg_state[CTX_RING_HEAD+1] = 0;
 		reg_state[CTX_RING_TAIL+1] = 0;
 

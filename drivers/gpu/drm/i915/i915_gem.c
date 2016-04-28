@@ -931,9 +931,9 @@ i915_gem_shmem_pwrite(struct drm_device *dev,
 	intel_fb_obj_invalidate(obj, ORIGIN_CPU);
 
 	i915_gem_object_pin_pages(obj);
+	i915_gem_object_mark_dirty(obj);
 
 	offset = args->offset;
-	obj->dirty = 1;
 
 	for_each_sg_page(obj->pages->sgl, &sg_iter, obj->pages->nents,
 			 offset >> PAGE_SHIFT) {
@@ -3794,7 +3794,7 @@ i915_gem_object_set_to_gtt_domain(struct drm_i915_gem_object *obj, bool write)
 	if (write) {
 		obj->base.read_domains = I915_GEM_DOMAIN_GTT;
 		obj->base.write_domain = I915_GEM_DOMAIN_GTT;
-		obj->dirty = 1;
+		i915_gem_object_mark_dirty(obj);
 	}
 
 	trace_i915_gem_object_change_domain(obj,
@@ -5379,7 +5379,7 @@ i915_gem_object_create_from_data(struct drm_device *dev,
 	i915_gem_object_pin_pages(obj);
 	sg = obj->pages;
 	bytes = sg_copy_from_buffer(sg->sgl, sg->nents, (void *)data, size);
-	obj->dirty = 1;		/* Backing store is now out of date */
+	i915_gem_object_mark_dirty(obj); /* Backing store is out of date */
 	i915_gem_object_unpin_pages(obj);
 
 	if (WARN_ON(bytes != size)) {
