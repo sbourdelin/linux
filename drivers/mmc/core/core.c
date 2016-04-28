@@ -2453,6 +2453,12 @@ int mmc_hw_reset(struct mmc_host *host)
 		return -EOPNOTSUPP;
 	}
 
+	/*
+	 * In the case of recovery, we can't expect flushing the cache to work
+	 * always, but we have a go and ignore errors.
+	 */
+	mmc_flush_cache(host->card);
+
 	ret = host->bus_ops->reset(host);
 	mmc_bus_put(host);
 
