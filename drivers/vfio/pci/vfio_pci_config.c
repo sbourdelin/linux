@@ -1140,7 +1140,7 @@ static int vfio_cap_len(struct vfio_pci_device *vdev, u8 cap, u8 pos)
 	case PCI_CAP_ID_EXP:
 		/* Test for extended capabilities */
 		pci_read_config_dword(pdev, PCI_CFG_SPACE_SIZE, &dword);
-		vdev->extended_caps = (dword != 0);
+		vdev->extended_caps = (dword != 0) && (dword != 0xffffffff);
 
 		/* length based on version */
 		if ((pcie_caps_reg(pdev) & PCI_EXP_FLAGS_VERS) == 1)
