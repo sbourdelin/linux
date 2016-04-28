@@ -109,8 +109,38 @@ struct slpc_shared_data {
 	u32 override_parameters_values[SLPC_MAX_OVERRIDE_PARAMETERS];
 } __packed;
 
+#define SLPC_MAX_NUM_OF_PIPES 4
+
+struct intel_display_pipe_info {
+	union {
+		u32 data;
+		struct {
+			u32 is_widi:1;
+			u32 refresh_rate:7;
+			u32 vsync_ft_usec:24;
+		};
+	};
+} __packed;
+
+struct intel_slpc_display_mode_event_params {
+	struct {
+		struct intel_display_pipe_info
+					per_pipe_info[SLPC_MAX_NUM_OF_PIPES];
+		union {
+			u32 global_data;
+			struct {
+				u32 active_pipes_bitmask:SLPC_MAX_NUM_OF_PIPES;
+				u32 fullscreen_pipes:SLPC_MAX_NUM_OF_PIPES;
+				u32 vbi_sync_on_pipes:SLPC_MAX_NUM_OF_PIPES;
+				u32 num_active_pipes:2;
+			};
+		};
+	};
+} __packed;
+
 struct intel_slpc {
 	struct drm_i915_gem_object *shared_data_obj;
+	struct intel_slpc_display_mode_event_params display_mode_params;
 };
 
 /* intel_slpc.c */
