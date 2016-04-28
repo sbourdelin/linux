@@ -116,6 +116,18 @@ static void direct_interrupts_to_guc(struct drm_i915_private *dev_priv)
 	I915_WRITE(GUC_WD_VECS_IER, ~irqs);
 }
 
+static void slpc_version_check(struct drm_device *dev,
+			       struct intel_guc_fw *guc_fw)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_device_info *info;
+
+	if (IS_SKYLAKE(dev) && (guc_fw->guc_fw_major_found != 6)) {
+		info = (struct intel_device_info *) &dev_priv->info;
+		info->has_slpc = 0;
+	}
+}
+
 static u32 get_gttype(struct drm_i915_private *dev_priv)
 {
 	/* XXX: GT type based on PCI device ID? field seems unused by fw */
@@ -666,6 +678,8 @@ void intel_guc_ucode_init(struct drm_device *dev)
 	DRM_DEBUG_DRIVER("GuC firmware pending, path %s\n", fw_path);
 	guc_fw_fetch(dev, guc_fw);
 	/* status must now be FAIL or SUCCESS */
+
+	slpc_version_check(dev, guc_fw);
 }
 
 /**
