@@ -12,6 +12,7 @@
 #ifndef _NF_CONNTRACK_CORE_H
 #define _NF_CONNTRACK_CORE_H
 
+#include <linux/hash.h>
 #include <linux/netfilter.h>
 #include <net/netfilter/nf_conntrack_l3proto.h>
 #include <net/netfilter/nf_conntrack_l4proto.h>
@@ -85,5 +86,14 @@ extern spinlock_t nf_conntrack_locks[CONNTRACK_LOCKS];
 void nf_conntrack_lock(spinlock_t *lock);
 
 extern spinlock_t nf_conntrack_expect_lock;
+
+static inline u32 nf_conntrack_netns_hash(const struct net *net)
+{
+#ifdef CONFIG_NET_NS
+	return hash_ptr(net, 32);
+#else
+	return 0;
+#endif
+}
 
 #endif /* _NF_CONNTRACK_CORE_H */
