@@ -488,6 +488,7 @@ struct vfio_iommu_type1_info {
 	__u32	argsz;
 	__u32	flags;
 #define VFIO_IOMMU_INFO_PGSIZES (1 << 0)	/* supported page sizes info */
+#define VFIO_IOMMU_INFO_REQUIRE_MSI_MAP (1 << 1)/* MSI must be mapped */
 	__u64	iova_pgsizes;		/* Bitmap of supported page sizes */
 };
 
@@ -503,6 +504,9 @@ struct vfio_iommu_type1_info {
  * IOVA region that will be used on some platforms to map the host MSI frames.
  * In that specific case, vaddr is ignored. Once registered, an MSI reserved
  * IOVA region stays until the container is closed.
+ * The requirement for provisioning such reserved IOVA range can be checked by
+ * calling VFIO_IOMMU_GET_INFO and testing the VFIO_IOMMU_INFO_REQUIRE_MSI_MAP
+ * flag.
  */
 struct vfio_iommu_type1_dma_map {
 	__u32	argsz;

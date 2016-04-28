@@ -310,6 +310,29 @@ static int vaddr_get_pfn(unsigned long vaddr, int prot, unsigned long *pfn)
 }
 
 /*
+ * vfio_domains_require_msi_mapping: return whether MSI doorbells must be
+ * iommu mapped
+ *
+ * returns true if msi mapping is requested
+ */
+static bool vfio_domains_require_msi_mapping(struct vfio_iommu *iommu)
+{
+	struct iommu_domain_msi_geometry msi_geometry;
+	struct vfio_domain *d;
+	bool flag;
+
+	mutex_lock(&iommu->lock);
+	/* All domains have same require_msi_map property, pick first */
+	d = list_first_entry(&iommu->domain_list, struct vfio_domain, next);
+	iommu_domain_get_attr(d->domain, DOMAIN_ATTR_MSI_GEOMETRY,
+			      &msi_geometry);
+	flag = msi_geometry.programmable;
+
+	mutex_unlock(&iommu->lock);
+
+	return flag;
+}
+/*
  * Attempt to pin pages.  We really don't want to track all the pfns and
  * the iommu can only map chunks of consecutive pfns anyway, so get the
  * first page and all consecutive pages with the same locking.
@@ -1165,6 +1188,9 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
 			return -EINVAL;
 
 		info.flags = VFIO_IOMMU_INFO_PGSIZES;
+
+		if (vfio_domains_require_msi_mapping(iommu))
+			info.flags |= VFIO_IOMMU_INFO_REQUIRE_MSI_MAP;
 
 		info.iova_pgsizes = vfio_pgsize_bitmap(iommu);
 
