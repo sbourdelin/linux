@@ -109,7 +109,7 @@ static const struct sst_res_info byt_rvp_res_info = {
 	.mbox_size = 0x1000,
 	.acpi_lpe_res_index = 0,
 	.acpi_ddr_index = 2,
-	.acpi_ipc_irq_index = 5,
+	.acpi_ipc_irq_index = 0,
 };
 
 static struct sst_platform_info byt_rvp_platform_data = {
@@ -326,6 +326,8 @@ static struct sst_acpi_mach sst_acpi_bytcr[] = {
 	{"10EC5642", "bytcr_rt5640", "intel/fw_sst_0f28.bin", "bytcr_rt5640", NULL,
 						&byt_rvp_platform_data },
 	{"INTCCFFD", "bytcr_rt5640", "intel/fw_sst_0f28.bin", "bytcr_rt5640", NULL,
+						&byt_rvp_platform_data },
+	{"10EC5648", "bytcr_rt5645", "intel/fw_sst_0f28_ssp0.bin", "bytcr_rt5645", NULL,
 						&byt_rvp_platform_data },
 	{"10EC5651", "bytcr_rt5651", "intel/fw_sst_0f28.bin", "bytcr_rt5651", NULL,
 						&byt_rvp_platform_data },
