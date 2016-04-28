@@ -319,9 +319,6 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 	if (!host)
 		return NULL;
 
-	/* scanning will be enabled when we're ready */
-	host->rescan_disable = 1;
-
 again:
 	if (!ida_pre_get(&mmc_host_ida, GFP_KERNEL)) {
 		kfree(host);
