@@ -8,7 +8,8 @@
 
 /* This global variable contains all the supported driver and its corresponding
    function API. Please set the function pointer to NULL whenever the function
-   is not supported. */
+   is not supported.
+*/
 static dvi_ctrl_device_t g_dcftSupportedDviController[] = {
 #ifdef DVI_CTRL_SII164
 	{
@@ -28,7 +29,6 @@ static dvi_ctrl_device_t g_dcftSupportedDviController[] = {
 #endif
 };
 
-
 int dviInit(
 	unsigned char edgeSelect,
 	unsigned char busSelect,
@@ -45,7 +45,7 @@ int dviInit(
 	dvi_ctrl_device_t *pCurrentDviCtrl;
 
 	pCurrentDviCtrl = g_dcftSupportedDviController;
-	if (pCurrentDviCtrl->pfnInit != NULL) {
+	if (pCurrentDviCtrl->pfnInit) {
 		return pCurrentDviCtrl->pfnInit(edgeSelect, busSelect, dualEdgeClkSelect, hsyncEnable,
 						vsyncEnable, deskewEnable, deskewSetting, continuousSyncEnable,
 						pllFilterEnable, pllFilterValue);
@@ -54,5 +54,4 @@ int dviInit(
 }
 
 #endif
-
 
