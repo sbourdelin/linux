@@ -154,7 +154,9 @@ restart:
 
 		set_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
 		len = tty->ops->write(tty, skb->data, skb->len);
-		hdev->stat.byte_tx += len;
+
+		if (hdev)
+			hdev->stat.byte_tx += len;
 
 		skb_pull(skb, len);
 		if (skb->len) {
@@ -349,7 +351,7 @@ void hci_uart_set_baudrate(struct hci_uart *hu, unsigned int speed)
 	/* tty_set_termios() return not checked as it is always 0 */
 	tty_set_termios(tty, &ktermios);
 
-	BT_DBG("%s: New tty speeds: %d/%d", hu->hdev->name,
+	BT_DBG("%s: New tty speeds: %d/%d", hu->hdev ? hu->hdev->name : "",
 	       tty->termios.c_ispeed, tty->termios.c_ospeed);
 }
 
