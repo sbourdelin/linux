@@ -724,7 +724,7 @@ static int efm32_uart_probe(struct platform_device *pdev)
 	}
 
 	ret = platform_get_irq(pdev, 0);
-	if (ret < 0) {
+	if (ret <= 0) {
 		dev_dbg(&pdev->dev, "failed to get rx irq\n");
 		goto err_get_rxirq;
 	}
@@ -732,7 +732,7 @@ static int efm32_uart_probe(struct platform_device *pdev)
 	efm_port->port.irq = ret;
 
 	ret = platform_get_irq(pdev, 1);
-	if (ret < 0)
+	if (ret <= 0)
 		ret = efm_port->port.irq + 1;
 
 	efm_port->txirq = ret;

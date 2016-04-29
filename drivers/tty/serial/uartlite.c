@@ -693,7 +693,7 @@ static int ulite_probe(struct platform_device *pdev)
 		return -ENODEV;
 
 	irq = platform_get_irq(pdev, 0);
-	if (irq < 0)
+	if (irq <= 0)
 		return -ENXIO;
 
 	return ulite_assign(&pdev->dev, id, res->start, irq);
