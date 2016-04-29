@@ -695,6 +695,29 @@ struct vfio_iommu_spapr_tce_remove {
  */
 #define VFIO_DEVICE_CCW_HOT_RESET	_IO(VFIO_TYPE, VFIO_BASE + 21)
 
+/**
+ * VFIO_DEVICE_CCW_CMD_REQUEST - _IOWR(VFIO_TYPE, VFIO_BASE + 22,
+ *                                     struct vfio_ccw_cmd)
+ *
+ * Issue a user-space ccw program for translation and performing channel I/O
+ * operations.
+ */
+struct vfio_ccw_cmd {
+	__u32 argsz;
+	__u8 cssid;
+	__u8 ssid;
+	__u16 devno;
+#define ORB_AREA_SIZE 12
+	__u8 orb_area[ORB_AREA_SIZE];
+#define SCSW_AREA_SIZE 12
+	__u8 scsw_area[SCSW_AREA_SIZE];
+#define IRB_AREA_SIZE 96
+	__u8 irb_area[IRB_AREA_SIZE];
+	__u32 ccwchain_nr;
+	__u64 ccwchain_buf;
+} __attribute__((packed));
+#define VFIO_DEVICE_CCW_CMD_REQUEST	_IO(VFIO_TYPE, VFIO_BASE + 22)
+
 /* ***************************************************************** */
 
 #endif /* _UAPIVFIO_H */
