@@ -267,6 +267,8 @@
 #include <asm/irq_regs.h>
 #include <asm/io.h>
 
+#ifndef CONFIG_CRYPTO_LRNG
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/random.h>
 
@@ -1620,6 +1622,7 @@ SYSCALL_DEFINE3(getrandom, char __user *, buf, size_t, count,
 	}
 	return urandom_read(NULL, buf, count, NULL);
 }
+#endif	/* CONFIG_CRYPTO_LRNG */
 
 /***************************************************************
  * Random UUID interface
@@ -1647,6 +1650,7 @@ EXPORT_SYMBOL(generate_random_uuid);
  *
  ********************************************************************/
 
+#ifndef CONFIG_CRYPTO_LRNG
 #ifdef CONFIG_SYSCTL
 
 #include <linux/sysctl.h>
@@ -1784,6 +1788,8 @@ struct ctl_table random_table[] = {
 };
 #endif 	/* CONFIG_SYSCTL */
 
+#endif	/* CONFIG_CRYPTO_LRNG */
+
 static u32 random_int_secret[MD5_MESSAGE_BYTES / 4] ____cacheline_aligned;
 
 int random_int_secret_init(void)
@@ -1859,6 +1865,7 @@ randomize_range(unsigned long start, unsigned long end, unsigned long len)
 	return PAGE_ALIGN(get_random_int() % range + start);
 }
 
+#ifndef CONFIG_CRYPTO_LRNG
 /* Interface for in-kernel drivers of true hardware RNGs.
  * Those devices may produce endless random bits and will be throttled
  * when our pool is full.
@@ -1878,3 +1885,4 @@ void add_hwgenerator_randomness(const char *buffer, size_t count,
 	credit_entropy_bits(poolp, entropy);
 }
 EXPORT_SYMBOL_GPL(add_hwgenerator_randomness);
+#endif	/* CONFIG_CRYPTO_LRNG */
