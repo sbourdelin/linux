@@ -1563,6 +1563,11 @@ xfs_fs_fill_super(
 			xfs_alert(mp,
 		"Filesystem block size invalid for DAX Turning DAX off.");
 			mp->m_flags &= ~XFS_MOUNT_DAX;
+		} else if (sb->s_bdev->bd_part->start_sect % (PAGE_SIZE / 512)
+		   || sb->s_bdev->bd_part->nr_sects % (PAGE_SIZE / 512)) {
+			xfs_alert(mp,
+		"Partition alignment invalid for DAX Turning DAX off.");
+			mp->m_flags &= ~XFS_MOUNT_DAX;
 		} else if (!sb->s_bdev->bd_disk->fops->direct_access) {
 			xfs_alert(mp,
 		"Block device does not support DAX Turning DAX off.");
