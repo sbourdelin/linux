@@ -1,0 +1,7 @@
+config VFIO_CCW
+	tristate "VFIO support for CCW devices"
+	depends on VFIO_NOIOMMU && CCW
+	help
+	  VFIO support for CCW bus driver. Note that this is just
+	  the base driver; you'll also need a userspace program
+	  to provide a device configuration and channel programs.

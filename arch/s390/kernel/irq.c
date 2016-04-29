@@ -88,6 +88,7 @@ static const struct irq_class irqclass_sub_desc[] = {
 	{.irq = IRQIO_VAI,  .name = "VAI", .desc = "[I/O] Virtual I/O Devices AI"},
 	{.irq = NMI_NMI,    .name = "NMI", .desc = "[NMI] Machine Check"},
 	{.irq = CPU_RST,    .name = "RST", .desc = "[CPU] CPU Restart"},
+	{.irq = IRQIO_VFC,  .name = "VFC", .desc = "[I/O] VFIO CCW Devices"},
 };
 
 void __init init_IRQ(void)
