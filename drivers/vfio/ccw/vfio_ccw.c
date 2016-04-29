@@ -22,10 +22,12 @@
  * struct vfio_ccw_device
  * @cdev: ccw device
  * @going_away: if an offline procedure was already ongoing
+ * @hot_reset: if hot-reset is ongoing
  */
 struct vfio_ccw_device {
 	struct ccw_device	*cdev;
 	bool			going_away;
+	bool			hot_reset;
 };
 
 enum vfio_ccw_device_type {
@@ -58,6 +60,7 @@ static void vfio_ccw_release(void *device_data)
 static long vfio_ccw_ioctl(void *device_data, unsigned int cmd,
 			   unsigned long arg)
 {
+	struct vfio_ccw_device *vcdev = device_data;
 	unsigned long minsz;
 
 	if (cmd == VFIO_DEVICE_GET_INFO) {
@@ -76,6 +79,34 @@ static long vfio_ccw_ioctl(void *device_data, unsigned int cmd,
 		info.num_irqs = 0;
 
 		return copy_to_user((void __user *)arg, &info, minsz);
+
+	} else if (cmd == VFIO_DEVICE_CCW_HOT_RESET) {
+		unsigned long flags;
+		int ret;
+
+		spin_lock_irqsave(get_ccwdev_lock(vcdev->cdev), flags);
+		if (!vcdev->cdev->online) {
+			spin_unlock_irqrestore(get_ccwdev_lock(vcdev->cdev),
+					       flags);
+			return -EINVAL;
+		}
+
+		if (vcdev->hot_reset) {
+			spin_unlock_irqrestore(get_ccwdev_lock(vcdev->cdev),
+					       flags);
+			return -EBUSY;
+		}
+		vcdev->hot_reset = true;
+		spin_unlock_irqrestore(get_ccwdev_lock(vcdev->cdev), flags);
+
+		ret = ccw_device_set_offline(vcdev->cdev);
+		if (!ret)
+			ret = ccw_device_set_online(vcdev->cdev);
+
+		spin_lock_irqsave(get_ccwdev_lock(vcdev->cdev), flags);
+		vcdev->hot_reset = false;
+		spin_unlock_irqrestore(get_ccwdev_lock(vcdev->cdev), flags);
+		return ret;
 	}
 
 	return -ENOTTY;
@@ -108,7 +139,7 @@ static int vfio_ccw_set_offline(struct ccw_device *cdev)
 
 	vdev = vfio_device_data(device);
 	vfio_device_put(device);
-	if (!vdev || vdev->going_away)
+	if (!vdev || vdev->hot_reset || vdev->going_away)
 		return 0;
 
 	vdev->going_away = true;
@@ -128,9 +159,26 @@ void vfio_ccw_remove(struct ccw_device *cdev)
 
 static int vfio_ccw_set_online(struct ccw_device *cdev)
 {
+	struct vfio_device *device = vfio_device_get_from_dev(&cdev->dev);
 	struct vfio_ccw_device *vdev;
 	int ret;
 
+	if (!device)
+		goto create_device;
+
+	vdev = vfio_device_data(device);
+	vfio_device_put(device);
+	if (!vdev)
+		goto create_device;
+
+	/*
+	 * During hot reset, we just want to disable/enable the
+	 * subchannel and need not setup anything again.
+	 */
+	if (vdev->hot_reset)
+		return 0;
+
+create_device:
 	vdev = kzalloc(sizeof(*vdev), GFP_KERNEL);
 	if (!vdev)
 		return -ENOMEM;

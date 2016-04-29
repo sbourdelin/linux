@@ -687,6 +687,14 @@ struct vfio_iommu_spapr_tce_remove {
 };
 #define VFIO_IOMMU_SPAPR_TCE_REMOVE	_IO(VFIO_TYPE, VFIO_BASE + 20)
 
+/**
+ * VFIO_DEVICE_CCW_HOT_RESET - _IOW(VFIO_TYPE, VFIO_BASE + 21)
+ *
+ * Hot reset the channel I/O device. All state of the subchannel will be
+ * cleared.
+ */
+#define VFIO_DEVICE_CCW_HOT_RESET	_IO(VFIO_TYPE, VFIO_BASE + 21)
+
 /* ***************************************************************** */
 
 #endif /* _UAPIVFIO_H */
