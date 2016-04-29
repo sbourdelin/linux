@@ -295,6 +295,40 @@ struct drm_mode_get_connector {
  */
 #define DRM_MODE_PROP_ATOMIC        0x80000000
 
+/* Color for the KMS API, ARGB (msb -> lsb) 16bits per component. */
+#define DRM_MODE_COLOR(a, r, b, g)	\
+	(((__u64)(a) << 48) | ((__u64)(r) << 32) | \
+	 ((__u64)(g) << 16) | (__u64)(b))
+
+/* Extract full precision, 8 bits, 10 bits and 12 bits components. */
+#define DRM_MODE_COLOR_ALPHA(color)	(((color) >> 48) & 0xffff)
+#define DRM_MODE_COLOR_RED(color)	(((color) >> 32) & 0xffff)
+#define DRM_MODE_COLOR_BLUE(color)	(((color) >> 16) & 0xffff)
+#define DRM_MODE_COLOR_GREEN(color)	((color) & 0xffff)
+#define DRM_MODE_COLOR_ALPHA_8(color)	(((color) >> (48 + 8)) & 0xff)
+#define DRM_MODE_COLOR_RED_8(color)	(((color) >> (32 + 8)) & 0xff)
+#define DRM_MODE_COLOR_BLUE_8(color)	(((color) >> (16 + 8)) & 0xff)
+#define DRM_MODE_COLOR_GREEN_8(color)	(((color) >>  8) & 0xff)
+#define DRM_MODE_COLOR_ALPHA_10(color)	(((color) >> (48 + 6)) & 0x3ff)
+#define DRM_MODE_COLOR_RED_10(color)	(((color) >> (32 + 6)) & 0x3ff)
+#define DRM_MODE_COLOR_BLUE_10(color)	(((color) >> (16 + 6)) & 0x3ff)
+#define DRM_MODE_COLOR_GREEN_10(color)	(((color) >>  6) & 0x3ff)
+#define DRM_MODE_COLOR_ALPHA_12(color)	(((color) >> (48 + 4)) & 0xfff)
+#define DRM_MODE_COLOR_RED_12(color)	(((color) >> (32 + 4)) & 0xfff)
+#define DRM_MODE_COLOR_BLUE_12(color)	(((color) >> (16 + 4)) & 0xfff)
+#define DRM_MODE_COLOR_GREEN_12(color)	(((color) >>  4) & 0xfff)
+
+/* Handy macros to convert a DRM_MODE_COLOR() into common precisions */
+#define DRM_MODE_COLOR_TO_ARGB_8888(color)	 \
+	((DRM_MODE_COLOR_ALPHA_8(color) << 24) | \
+	 (DRM_MODE_COLOR_RED_8(color)   << 16) | \
+	 (DRM_MODE_COLOR_GREEN_8(color) << 8)  | \
+	 DRM_MODE_COLOR_BLUE_8(color))
+#define DRM_MODE_COLOR_TO_RGB_101010(color)	  \
+	 ((DRM_MODE_COLOR_RED_10(color)  << 20) | \
+	 (DRM_MODE_COLOR_GREEN_10(color) << 10) | \
+	 DRM_MODE_COLOR_BLUE_10(color))
+
 struct drm_mode_property_enum {
 	__u64 value;
 	char name[DRM_PROP_NAME_LEN];
