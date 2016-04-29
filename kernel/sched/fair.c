@@ -6801,8 +6801,12 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
 		update_sg_lb_stats(env, sg, load_idx, local_group, sgs,
 						&overload);
 
+		/* Update sd_lb_stats */
+		sds->total_load += sgs->group_load;
+		sds->total_capacity += sgs->group_capacity;
+
 		if (local_group)
-			goto next_group;
+			continue;
 
 		/*
 		 * In case the child domain prefers tasks go to siblings
@@ -6826,13 +6830,7 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
 			sds->busiest_stat = *sgs;
 		}
 
-next_group:
-		/* Now, start updating sd_lb_stats */
-		sds->total_load += sgs->group_load;
-		sds->total_capacity += sgs->group_capacity;
-
-		sg = sg->next;
-	} while (sg != env->sd->groups);
+	} while (sg = sg->next, sg != env->sd->groups);
 
 	if (env->sd->flags & SD_NUMA)
 		env->fbq_type = fbq_classify_group(&sds->busiest_stat);
