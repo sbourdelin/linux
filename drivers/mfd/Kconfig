@@ -16,7 +16,7 @@ config MFD_CS5535
 	depends on PCI && (X86_32 || (X86 && COMPILE_TEST))
 	---help---
 	  This is the core driver for CS5535/CS5536 MFD functions.  This is
-          necessary for using the board's GPIO and MFGPT functionality.
+	  necessary for using the board's GPIO and MFGPT functionality.
 
 config MFD_ACT8945A
 	tristate "Active-semi ACT8945A"
@@ -318,6 +318,23 @@ config MFD_HI6421_PMIC
 	  individul components like voltage regulators under corresponding
 	  menus in order to enable them.
 	  We communicate with the Hi6421 via memory-mapped I/O.
+
+config MFD_MXS_LRADC
+	tristate "Freescale i.MX23/i.MX28 LRADC"
+	depends on ARCH_MXS || COMPILE_TEST
+	select MFD_CORE
+	select STMP_DEVICE
+	help
+	  Say yes here to build support for the low-resolution
+	  analog-to-digital converter (LRADC) found on the i.MX23 and i.MX28
+	  processors. This driver provides common support for accessing the
+	  device, additional drivers must be enabled in order to use the
+	  functionality of the device:
+		mxs-lradc-adc for ADC readings
+		mxs-lradc-ts  for touchscreen support
+
+	  This driver can also be built as a module. If so, the module will be
+	  called mxs-lradc.
 
 config HTC_EGPIO
 	bool "HTC EGPIO support"
@@ -650,7 +667,7 @@ config EZX_PCAP
 	  needed for MMC, TouchScreen, Sound, USB, etc..
 
 config MFD_VIPERBOARD
-        tristate "Nano River Technologies Viperboard"
+	tristate "Nano River Technologies Viperboard"
 	select MFD_CORE
 	depends on USB
 	default n
@@ -898,11 +915,11 @@ config MFD_SMSC
        select MFD_CORE
        select REGMAP_I2C
        help
-        If you say yes here you get support for the
-        ece1099 chips from SMSC.
+	If you say yes here you get support for the
+	ece1099 chips from SMSC.
 
-        To compile this driver as a module, choose M here: the
-        module will be called smsc.
+	To compile this driver as a module, choose M here: the
+	module will be called smsc.
 
 config ABX500_CORE
 	bool "ST-Ericsson ABX500 Mixed Signal Circuit register functions"
@@ -956,8 +973,8 @@ config AB8500_DEBUG
        depends on AB8500_GPADC && DEBUG_FS
        default y if DEBUG_FS
        help
-         Select this option if you want debug information using the debug
-         filesystem, debugfs.
+	 Select this option if you want debug information using the debug
+	 filesystem, debugfs.
 
 config AB8500_GPADC
 	bool "ST-Ericsson AB8500 GPADC driver"
