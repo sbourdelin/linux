@@ -58,6 +58,26 @@ static void vfio_ccw_release(void *device_data)
 static long vfio_ccw_ioctl(void *device_data, unsigned int cmd,
 			   unsigned long arg)
 {
+	unsigned long minsz;
+
+	if (cmd == VFIO_DEVICE_GET_INFO) {
+		struct vfio_device_info info;
+
+		minsz = offsetofend(struct vfio_device_info, num_irqs);
+
+		if (copy_from_user(&info, (void __user *)arg, minsz))
+			return -EFAULT;
+
+		if (info.argsz < minsz)
+			return -EINVAL;
+
+		info.flags = VFIO_DEVICE_FLAGS_CCW;
+		info.num_regions = 0;
+		info.num_irqs = 0;
+
+		return copy_to_user((void __user *)arg, &info, minsz);
+	}
+
 	return -ENOTTY;
 }
 
