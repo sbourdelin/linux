@@ -1298,15 +1298,9 @@ int do_huge_pmd_wp_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	VM_BUG_ON_PAGE(!PageCompound(page) || !PageHead(page), page);
 	/*
 	 * We can only reuse the page if nobody else maps the huge page or it's
-	 * part. We can do it by checking page_mapcount() on each sub-page, but
-	 * it's expensive.
-	 * The cheaper way is to check page_count() to be equal 1: every
-	 * mapcount takes page reference reference, so this way we can
-	 * guarantee, that the PMD is the only mapping.
-	 * This can give false negative if somebody pinned the page, but that's
-	 * fine.
+	 * part.
 	 */
-	if (page_mapcount(page) == 1 && page_count(page) == 1) {
+	if (page_trans_huge_mapcount(page) == 1) {
 		pmd_t entry;
 		entry = pmd_mkyoung(orig_pmd);
 		entry = maybe_pmd_mkwrite(pmd_mkdirty(entry), vma);
@@ -3221,6 +3215,40 @@ int total_mapcount(struct page *page)
 		ret += atomic_read(&page[i]._mapcount) + 1;
 	if (PageDoubleMap(page))
 		ret -= HPAGE_PMD_NR;
+	return ret;
+}
+
+/*
+ * This calculates accurately how many mappings a transparent hugepage
+ * has (unlike page_mapcount() which isn't fully accurate). This full
+ * accuracy is primarily needed to know if copy-on-write faults can
+ * takeover the page and change the mapping to read-write instead of
+ * copying them. This is different from total_mapcount() too: we must
+ * not count all mappings on the subpages individually, but instead we
+ * must check the highest mapcount any one of the subpages has.
+ *
+ * It would be entirely safe and even more correct to replace
+ * page_mapcount() with page_trans_huge_mapcount(), however we only
+ * use page_trans_huge_mapcount() in the copy-on-write faults where we
+ * need full accuracy to avoid breaking page pinning.
+ */
+int page_trans_huge_mapcount(struct page *page)
+{
+	int i, ret;
+
+	VM_BUG_ON_PAGE(PageTail(page), page);
+
+	if (likely(!PageCompound(page)))
+		return atomic_read(&page->_mapcount) + 1;
+
+	ret = 0;
+	if (likely(!PageHuge(page))) {
+		for (i = 0; i < HPAGE_PMD_NR; i++)
+			ret = max(ret, atomic_read(&page[i]._mapcount) + 1);
+		if (PageDoubleMap(page))
+			ret -= 1;
+	}
+	ret += compound_mapcount(page);
 	return ret;
 }
 
