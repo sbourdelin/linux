@@ -1,2 +1,2 @@
-# 8173 Machine support
+obj-$(CONFIG_SND_SOC_MT2701) += mt2701/
 obj-$(CONFIG_SND_SOC_MT8173) += mt8173/
