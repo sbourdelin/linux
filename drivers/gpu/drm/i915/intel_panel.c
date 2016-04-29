@@ -371,7 +371,8 @@ out:
 
 	pipe_config->gmch_pfit.control = pfit_control;
 	pipe_config->gmch_pfit.pgm_ratios = pfit_pgm_ratios;
-	pipe_config->gmch_pfit.lvds_border_bits = border;
+	if (INTEL_INFO(dev)->gen < 5)
+		pipe_config->gmch_pfit.lvds_border_bits = border;
 }
 
 enum drm_connector_status
