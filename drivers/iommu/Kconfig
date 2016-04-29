@@ -331,11 +331,11 @@ config ARM_SMMU_V3
 	  the ARM SMMUv3 architecture.
 
 config S390_IOMMU
-	def_bool y if S390 && PCI
-	depends on S390 && PCI
+	def_bool y
+	depends on S390 && (PCI || CCW)
 	select IOMMU_API
 	help
-	  Support for the IOMMU API for s390 PCI devices.
+	  Support for the IOMMU API for s390 PCI and CCW devices.
 
 config MTK_IOMMU
 	bool "MTK IOMMU Support"
