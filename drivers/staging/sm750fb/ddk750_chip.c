@@ -19,15 +19,16 @@ logical_chip_type_t getChipType(void)
 	physicalID = devId750; /* either 0x718 or 0x750 */
 	physicalRev = revId750;
 
-	if (physicalID == 0x718)
+	if (physicalID == 0x718) {
 		chip = SM718;
-	else if (physicalID == 0x750) {
+	} else if (physicalID == 0x750) {
 		chip = SM750;
 		/* SM750 and SM750LE are different in their revision ID only. */
 		if (physicalRev == SM750LE_REVISION_ID)
 			chip = SM750LE;
-	} else
+	} else {
 		chip = SM_UNKNOWN;
+	}
 
 	return chip;
 }
