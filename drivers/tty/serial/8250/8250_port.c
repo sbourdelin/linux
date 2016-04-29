@@ -53,6 +53,10 @@
 #define DEBUG_AUTOCONF(fmt...)	do { } while (0)
 #endif
 
+static bool really_16550a;
+module_param(really_16550a, bool, 0644);
+MODULE_PARM_DESC(really_16550a, "Don't probe, assume 16550A");
+
 #define BOTH_EMPTY	(UART_LSR_TEMT | UART_LSR_THRE)
 
 /*
@@ -1170,6 +1174,12 @@ static void autoconfig(struct uart_8250_port *up)
 
 	if (!port->iobase && !port->mapbase && !port->membase)
 		return;
+
+	if (really_16550a) {
+		up->port.type = PORT_16550A;
+		up->capabilities |= UART_CAP_FIFO;
+		return;
+	}
 
 	DEBUG_AUTOCONF("ttyS%d: autoconf (0x%04lx, 0x%p): ",
 		       serial_index(port), port->iobase, port->membase);
