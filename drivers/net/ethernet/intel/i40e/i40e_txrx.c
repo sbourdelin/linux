@@ -412,7 +412,7 @@ int i40e_add_del_fdir(struct i40e_vsi *vsi,
 	struct i40e_pf *pf = vsi->back;
 	int ret;
 
-	switch (input->flow_type & ~FLOW_EXT) {
+	switch (input->flow_type & FLOW_TYPE_MASK) {
 	case TCP_V4_FLOW:
 		ret = i40e_add_del_fdir_tcpv4(vsi, input, add);
 		break;

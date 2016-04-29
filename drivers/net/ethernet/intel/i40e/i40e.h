@@ -240,6 +240,12 @@ struct i40e_fdir_filter {
 	u32 fd_id;
 };
 
+#ifndef FLOW_TYPE_MASK
+#define FLOW_TYPE_MASK  0xFF
+#else
+#error FLOW_TYPE_MASK already defined elsewhere
+#endif
+
 #define I40E_ETH_P_LLDP			0x88cc
 
 #define I40E_DCB_PRIO_TYPE_STRICT	0
