@@ -1288,6 +1288,13 @@ search_again:
 	spin_unlock(&tree->lock);
 	if (gfpflags_allow_blocking(mask))
 		cond_resched();
+	/*
+	 * If we used the preallocated state, try again here out of the
+	 * locked section so we can avoid GFP_ATOMIC. No error checking
+	 * as we might not need it in the end.
+	 */
+	if (!prealloc)
+		prealloc = alloc_extent_state(mask);
 	first_iteration = false;
 	goto again;
 
