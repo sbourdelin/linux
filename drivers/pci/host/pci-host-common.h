@@ -38,7 +38,6 @@ struct gen_pci_cfg_windows {
 struct gen_pci {
 	struct pci_host_bridge			host;
 	struct gen_pci_cfg_windows		cfg;
-	struct list_head			resources;
 };
 
 int pci_host_common_probe(struct platform_device *pdev,

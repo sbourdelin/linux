@@ -26,7 +26,7 @@
 
 static void gen_pci_release_of_pci_ranges(struct gen_pci *pci)
 {
-	pci_free_resource_list(&pci->resources);
+	pci_free_resource_list(&pci->host.windows);
 }
 
 static int gen_pci_parse_request_of_pci_ranges(struct gen_pci *pci)
@@ -37,12 +37,12 @@ static int gen_pci_parse_request_of_pci_ranges(struct gen_pci *pci)
 	resource_size_t iobase;
 	struct resource_entry *win;
 
-	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pci->resources,
+	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pci->host.windows,
 					       &iobase);
 	if (err)
 		return err;
 
-	resource_list_for_each_entry(win, &pci->resources) {
+	resource_list_for_each_entry(win, &pci->host.windows) {
 		struct resource *parent, *res = win->res;
 
 		switch (resource_type(res)) {
@@ -130,6 +130,14 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
 	return 0;
 }
 
+static void gen_pci_release(struct device *dev)
+{
+	struct gen_pci *pci = container_of(dev, struct gen_pci, host.dev);
+
+	gen_pci_release_of_pci_ranges(pci);
+	kfree(pci);
+}
+
 int pci_host_common_probe(struct platform_device *pdev,
 			  struct gen_pci *pci)
 {
@@ -137,7 +145,7 @@ int pci_host_common_probe(struct platform_device *pdev,
 	const char *type;
 	struct device *dev = &pdev->dev;
 	struct device_node *np = dev->of_node;
-	struct pci_bus *bus, *child;
+	struct pci_bus *child;
 
 	type = of_get_property(np, "device_type", NULL);
 	if (!type || strcmp(type, "pci")) {
@@ -148,8 +156,8 @@ int pci_host_common_probe(struct platform_device *pdev,
 	of_pci_check_probe_only();
 
 	pci->host.dev.parent = dev;
+	pci->host.dev.release = gen_pci_release;
 	INIT_LIST_HEAD(&pci->host.windows);
-	INIT_LIST_HEAD(&pci->resources);
 
 	/* Parse our PCI ranges and request their resources */
 	err = gen_pci_parse_request_of_pci_ranges(pci);
@@ -168,24 +176,26 @@ int pci_host_common_probe(struct platform_device *pdev,
 		pci_add_flags(PCI_REASSIGN_ALL_RSRC | PCI_REASSIGN_ALL_BUS);
 
 
-	bus = pci_scan_root_bus(dev, pci->cfg.bus_range->start,
-				&pci->cfg.ops->ops, pci, &pci->resources);
-	if (!bus) {
-		dev_err(dev, "Scanning rootbus failed");
-		return -ENODEV;
+	pci->host.ops = &pci->cfg.ops->ops;
+	pci->host.sysdata = pci;
+	pci->host.busnr = pci->cfg.bus_range->start;
+	err = pci_register_host(&pci->host);
+	if (!err) {
+		dev_err(dev, "registering host failed");
+		return err;
 	}
 
 	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
 
 	if (!pci_has_flag(PCI_PROBE_ONLY)) {
-		pci_bus_size_bridges(bus);
-		pci_bus_assign_resources(bus);
+		pci_bus_size_bridges(pci->host.bus);
+		pci_bus_assign_resources(pci->host.bus);
 
-		list_for_each_entry(child, &bus->children, node)
+		list_for_each_entry(child, &pci->host.bus->children, node)
 			pcie_bus_configure_settings(child);
 	}
 
-	pci_bus_add_devices(bus);
+	pci_bus_add_devices(pci->host.bus);
 	return 0;
 }
 
