@@ -463,7 +463,7 @@ int pnv_pci_cfg_write(struct pci_dn *pdn,
 	u32 bdfn = (pdn->busno << 8) | pdn->devfn;
 
 	cfg_dbg("%s: bus: %x devfn: %x +%x/%x -> %08x\n",
-		pdn->busno, pdn->devfn, where, size, val);
+		__func__, pdn->busno, pdn->devfn, where, size, val);
 	switch (size) {
 	case 1:
 		opal_pci_config_write_byte(phb->opal_id, bdfn, where, val);
