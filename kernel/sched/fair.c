@@ -6915,7 +6915,7 @@ static inline
 void fix_small_imbalance(struct lb_env *env, struct sd_lb_stats *sds)
 {
 	unsigned long tmp, capa_now = 0, capa_move = 0;
-	unsigned int imbn = 2;
+	unsigned int imbn = 1;
 	unsigned long scaled_busy_load_per_task;
 	struct sg_lb_stats *local, *busiest;
 
@@ -6925,13 +6925,13 @@ void fix_small_imbalance(struct lb_env *env, struct sd_lb_stats *sds)
 	if (!local->sum_nr_running)
 		local->load_per_task = cpu_avg_load_per_task(env->dst_cpu);
 	else if (busiest->load_per_task > local->load_per_task)
-		imbn = 1;
+		imbn = 0;
 
 	scaled_busy_load_per_task =
 		(busiest->load_per_task * SCHED_CAPACITY_SCALE) /
 		busiest->group_capacity;
 
-	if (busiest->avg_load + scaled_busy_load_per_task >=
+	if (busiest->avg_load >=
 	    local->avg_load + (scaled_busy_load_per_task * imbn)) {
 		env->imbalance = busiest->load_per_task;
 		return;
