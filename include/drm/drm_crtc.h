@@ -97,6 +97,10 @@ enum drm_blend_factor {
 	DRM_BLEND_FACTOR_ONE,
 	DRM_BLEND_FACTOR_SRC_ALPHA,
 	DRM_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+	DRM_BLEND_FACTOR_CONSTANT_ALPHA,
+	DRM_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA,
+	DRM_BLEND_FACTOR_CONSTANT_ALPHA_TIMES_SRC_ALPHA,
+	DRM_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA_TIMES_SRC_ALPHA,
 };
 
 #define DRM_BLEND_FUNC(src_factor, dst_factor)		\
@@ -105,6 +109,7 @@ enum drm_blend_factor {
 #define DRM_BLEND_FUNC_DST_FACTOR(val)	((val) & 0xffff)
 
 struct drm_blend_mode {
+	uint64_t color;
 	uint64_t func;
 };
 
@@ -2146,6 +2151,7 @@ struct drm_mode_config {
 	struct drm_property *prop_active;
 	struct drm_property *prop_mode_id;
 	struct drm_property *prop_blend_func;
+	struct drm_property *prop_blend_color;
 
 	/* DVI-I properties */
 	struct drm_property *dvi_i_subconnector_property;

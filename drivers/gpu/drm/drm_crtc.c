@@ -1610,6 +1610,11 @@ static int drm_mode_create_standard_properties(struct drm_device *dev)
 		return -ENOMEM;
 	dev->mode_config.prop_blend_func = prop;
 
+	prop = drm_property_create_range(dev, 0, "blend_color", 0, U64_MAX);
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.prop_blend_color = prop;
+
 	return 0;
 }
 
