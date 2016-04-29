@@ -4898,17 +4898,17 @@ static long effective_load(struct task_group *tg, int cpu, long wl, long wg)
 	for_each_sched_entity(se) {
 		long w, W;
 
-		tg = se->my_q->tg;
+		tg = group_cfs_rq(se)->tg;
 
 		/*
 		 * W = @wg + \Sum rw_j
 		 */
-		W = wg + calc_tg_weight(tg, se->my_q);
+		W = wg + calc_tg_weight(tg, group_cfs_rq(se));
 
 		/*
 		 * w = rw_i + @wl
 		 */
-		w = cfs_rq_load_avg(se->my_q) + wl;
+		w = cfs_rq_load_avg(group_cfs_rq(se)) + wl;
 
 		/*
 		 * wl = S * s'_i; see (2)
@@ -8528,7 +8528,7 @@ void init_tg_cfs_entry(struct task_group *tg, struct cfs_rq *cfs_rq,
 		se->cfs_rq = &rq->cfs;
 		se->depth = 0;
 	} else {
-		se->cfs_rq = parent->my_q;
+		se->cfs_rq = group_cfs_rq(parent);
 		se->depth = parent->depth + 1;
 	}
 
