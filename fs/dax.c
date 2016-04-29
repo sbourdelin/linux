@@ -253,8 +253,12 @@ static ssize_t dax_io(struct inode *inode, struct iov_iter *iter,
  * If @flags has DIO_LOCKING set, we assume that the i_mutex is held by the
  * caller for writes.  For reads, we take and release the i_mutex ourselves.
  * If DIO_LOCKING is not set, the filesystem takes care of its own locking.
- * As with do_blockdev_direct_IO(), we increment i_dio_count while the I/O
- * is in progress.
+ *
+ * The do_blockdev_direct_IO() function increment i_dio_count while the I/O
+ * is in progress. However, the dax_do_io() always does synchronous I/O. The
+ * locking done by the caller or within dax_do_io() for read (DIO_LOCKING)
+ * should be enough to protect against concurrent truncation. We don't really
+ * need to touch i_dio_count here.
  */
 ssize_t dax_do_io(struct kiocb *iocb, struct inode *inode,
 		  struct iov_iter *iter, loff_t pos, get_block_t get_block,
@@ -277,10 +281,6 @@ ssize_t dax_do_io(struct kiocb *iocb, struct inode *inode,
 		}
 	}
 
-	/* Protects against truncate */
-	if (!(flags & DIO_SKIP_DIO_COUNT))
-		inode_dio_begin(inode);
-
 	retval = dax_io(inode, iter, pos, end, get_block, &bh);
 
 	if ((flags & DIO_LOCKING) && iov_iter_rw(iter) == READ)
@@ -294,8 +294,6 @@ ssize_t dax_do_io(struct kiocb *iocb, struct inode *inode,
 			retval = err;
 	}
 
-	if (!(flags & DIO_SKIP_DIO_COUNT))
-		inode_dio_end(inode);
  out:
 	return retval;
 }
