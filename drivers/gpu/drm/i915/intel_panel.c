@@ -363,6 +363,7 @@ out:
 	if ((pfit_control & PFIT_ENABLE) == 0) {
 		pfit_control = 0;
 		pfit_pgm_ratios = 0;
+		border = 0;
 	}
 
 	/* Make sure pre-965 set dither correctly for 18bpp panels. */
