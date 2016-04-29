@@ -7016,9 +7016,11 @@ static inline void calculate_imbalance(struct lb_env *env, struct sd_lb_stats *s
 	    local->group_type   == group_overloaded) {
 		load_above_capacity = busiest->sum_nr_running *
 					SCHED_LOAD_SCALE;
-		if (load_above_capacity > busiest->group_capacity)
+		if (load_above_capacity > busiest->group_capacity) {
 			load_above_capacity -= busiest->group_capacity;
-		else
+			load_above_capacity *= SCHED_LOAD_SCALE;
+			load_above_capacity /= busiest->group_capacity;
+		} else
 			load_above_capacity = ~0UL;
 	}
 
