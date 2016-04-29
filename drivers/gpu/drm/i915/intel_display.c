@@ -3015,6 +3015,8 @@ static void skylake_update_primary_plane(struct drm_plane *plane,
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc_state->base.crtc);
 	struct drm_framebuffer *fb = plane_state->base.fb;
 	struct drm_i915_gem_object *obj = intel_fb_obj(fb);
+	const struct drm_intel_sprite_colorkey *key =
+			&to_intel_plane_state(plane->state)->ckey;
 	int pipe = intel_crtc->pipe;
 	u32 plane_ctl, stride_div, stride;
 	u32 tile_height, plane_offset, plane_size;
@@ -3046,6 +3048,15 @@ static void skylake_update_primary_plane(struct drm_plane *plane,
 	surf_addr = intel_plane_obj_offset(to_intel_plane(plane), obj, 0);
 
 	WARN_ON(drm_rect_width(&plane_state->src) == 0);
+
+	I915_WRITE(PLANE_KEYMAX(pipe, 0), (DRM_MODE_COLOR_ALPHA_8
+			(plane_state->base.blend_mode.color)
+				<< PLANE_KEY_MAX_ALPHA_SHIFT) |
+			(key->max_value & PLANE_KEYMAX_ALPHA_MASK));
+	I915_WRITE(PLANE_KEYMSK(pipe, 0),
+			(plane_state->use_plane_alpha
+				<< PLANE_KEY_MASK_ALPHA_EN) |
+			(key->channel_mask & GENMASK(0, 26)));
 
 	if (intel_rotation_90_or_270(rotation)) {
 		int cpp = drm_format_plane_cpp(fb->pixel_format, 0);
@@ -3129,6 +3140,7 @@ static int intel_plane_state_check_blend(struct drm_plane_state *plane_state)
 	case DRM_BLEND_FUNC(AUTO, AUTO):
 		if (has_per_pixel_blending)
 			state->per_pixel_alpha = PRE_MULTIPLIED_ALPHA;
+		state->use_plane_alpha = false;
 		break;
 	/* fbs without an alpha channel, or dropping the alpha channel */
 	case DRM_BLEND_FUNC(ONE, ZERO):
@@ -3141,6 +3153,7 @@ static int intel_plane_state_check_blend(struct drm_plane_state *plane_state)
 			state->per_pixel_alpha = DROP_ALPHA;
 		else
 			state->per_pixel_alpha = PRE_MULTIPLIED_ALPHA;
+		state->use_plane_alpha = false;
 		break;
 	/* non pre-multiplied alpha */
 	case DRM_BLEND_FUNC(SRC_ALPHA, ONE_MINUS_SRC_ALPHA):
@@ -3148,6 +3161,34 @@ static int intel_plane_state_check_blend(struct drm_plane_state *plane_state)
 			state->per_pixel_alpha = DROP_ALPHA;
 		else
 			state->per_pixel_alpha = NON_PRE_MULTIPLIED_ALPHA;
+		state->use_plane_alpha = false;
+		break;
+	/* plane alpha */
+	case DRM_BLEND_FUNC(CONSTANT_ALPHA, ONE_MINUS_CONSTANT_ALPHA):
+		state->use_plane_alpha = true;
+		break;
+	/* plane alpha, pre-multiplied fb */
+	case DRM_BLEND_FUNC(CONSTANT_ALPHA,
+			    ONE_MINUS_CONSTANT_ALPHA_TIMES_SRC_ALPHA):
+		if (!has_per_pixel_blending)
+			state->per_pixel_alpha = DROP_ALPHA;
+		else
+			state->per_pixel_alpha = PRE_MULTIPLIED_ALPHA;
+		/*TBD bspec check*/
+		state->use_plane_alpha = true;
+		break;
+	/* plane alpha, non pre-multiplied fb */
+	case DRM_BLEND_FUNC(CONSTANT_ALPHA_TIMES_SRC_ALPHA,
+			    ONE_MINUS_CONSTANT_ALPHA_TIMES_SRC_ALPHA):
+		if (!has_per_pixel_blending)
+			state->per_pixel_alpha = DROP_ALPHA;
+		else
+			state->per_pixel_alpha = NON_PRE_MULTIPLIED_ALPHA;
+		state->use_plane_alpha = true;
+		break;
+	/* drop plane alpha */
+	case DRM_BLEND_FUNC(ZERO, ONE):
+		state->use_plane_alpha = false;
 		break;
 	default:
 		return -EINVAL;
@@ -14189,6 +14230,12 @@ void intel_plane_add_blend_properties(struct intel_plane *plane)
 	if (prop)
 		drm_object_attach_property(&plane->base.base, prop,
 					   DRM_BLEND_FUNC(AUTO, AUTO));
+
+	prop = dev->mode_config.prop_blend_color;
+	if (prop)
+		drm_object_attach_property(&plane->base.base, prop,
+					   DRM_MODE_COLOR(0xffff, 0xffff,
+							  0xffff, 0xffff));
 }
 
 static int

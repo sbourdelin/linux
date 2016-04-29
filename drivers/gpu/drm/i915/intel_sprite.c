@@ -226,10 +226,15 @@ skl_update_plane(struct drm_plane *drm_plane,
 	crtc_w--;
 	crtc_h--;
 
+	I915_WRITE(PLANE_KEYMAX(pipe, plane),
+		   (DRM_MODE_COLOR_ALPHA_8(plane_state->base.blend_mode.color)
+			<< 24) | (key->max_value & 0x00ffffff));
+	I915_WRITE(PLANE_KEYMSK(pipe, plane),
+		   (plane_state->use_plane_alpha << 31) |
+		   (key->channel_mask & GENMASK(0, 26)));
+
 	if (key->flags) {
 		I915_WRITE(PLANE_KEYVAL(pipe, plane), key->min_value);
-		I915_WRITE(PLANE_KEYMAX(pipe, plane), key->max_value);
-		I915_WRITE(PLANE_KEYMSK(pipe, plane), key->channel_mask);
 	}
 
 	if (key->flags & I915_SET_COLORKEY_DESTINATION)

@@ -341,6 +341,9 @@ struct intel_plane_state {
 	/* per pixel alpha channel state */
 	enum per_pixel_alpha_state per_pixel_alpha;
 
+	/* use per-plane alpha */
+	bool use_plane_alpha;
+
 	/* async flip related structures */
 	struct drm_i915_gem_request *wait_req;
 };
