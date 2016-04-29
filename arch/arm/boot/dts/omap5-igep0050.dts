@@ -20,7 +20,7 @@
 };
 
 &hdmi {
-	vdda-supply = <&ldo7_reg>;
+	vdda-supply = <&ldo4_reg>;
 };
 
 &i2c4 {
