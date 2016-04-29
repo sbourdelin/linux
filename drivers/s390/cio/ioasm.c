@@ -7,9 +7,9 @@
 #include <asm/chpid.h>
 #include <asm/schid.h>
 #include <asm/crw.h>
+#include <asm/orb.h>
 
 #include "ioasm.h"
-#include "orb.h"
 #include "cio.h"
 
 int stsch(struct subchannel_id schid, struct schib *addr)

@@ -7,10 +7,10 @@
 
 #include <linux/kernel.h>
 #include <asm/crw.h>
+#include <asm/orb.h>
 #include <uapi/asm/chpid.h>
 #include <uapi/asm/schid.h>
 #include "cio.h"
-#include "orb.h"
 
 #undef TRACE_SYSTEM
 #define TRACE_SYSTEM s390

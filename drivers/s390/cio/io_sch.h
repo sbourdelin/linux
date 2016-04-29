@@ -5,8 +5,8 @@
 #include <asm/schid.h>
 #include <asm/ccwdev.h>
 #include <asm/irq.h>
+#include <asm/orb.h>
 #include "css.h"
-#include "orb.h"
 
 struct io_subchannel_private {
 	union orb orb;		/* operation request block */

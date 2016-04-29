@@ -21,12 +21,12 @@
 #include <asm/cio.h>
 #include <asm/scsw.h>
 #include <asm/eadm.h>
+#include <asm/orb.h>
 
 #include "eadm_sch.h"
 #include "ioasm.h"
 #include "cio.h"
 #include "css.h"
-#include "orb.h"
 
 MODULE_DESCRIPTION("driver for s390 eadm subchannels");
 MODULE_LICENSE("GPL");

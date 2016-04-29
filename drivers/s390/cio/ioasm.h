@@ -4,7 +4,7 @@
 #include <asm/chpid.h>
 #include <asm/schid.h>
 #include <asm/crw.h>
-#include "orb.h"
+#include <asm/orb.h>
 #include "cio.h"
 #include "trace.h"
 
