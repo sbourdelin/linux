@@ -303,6 +303,12 @@ struct intel_atomic_state {
 	bool skip_intermediate_wm;
 };
 
+enum per_pixel_alpha_state {
+	DROP_ALPHA = 0,
+	PRE_MULTIPLIED_ALPHA,
+	NON_PRE_MULTIPLIED_ALPHA,
+};
+
 struct intel_plane_state {
 	struct drm_plane_state base;
 	struct drm_rect src;
@@ -331,6 +337,9 @@ struct intel_plane_state {
 	int scaler_id;
 
 	struct drm_intel_sprite_colorkey ckey;
+
+	/* per pixel alpha channel state */
+	enum per_pixel_alpha_state per_pixel_alpha;
 
 	/* async flip related structures */
 	struct drm_i915_gem_request *wait_req;
@@ -1190,6 +1199,7 @@ intel_rotation_90_or_270(unsigned int rotation)
 
 void intel_create_rotation_property(struct drm_device *dev,
 					struct intel_plane *plane);
+void intel_plane_add_blend_properties(struct intel_plane *plane);
 
 void assert_pch_transcoder_disabled(struct drm_i915_private *dev_priv,
 				    enum pipe pipe);
@@ -1260,7 +1270,9 @@ u32 intel_plane_obj_offset(struct intel_plane *intel_plane,
 			   struct drm_i915_gem_object *obj,
 			   unsigned int plane);
 
-u32 skl_plane_ctl_format(uint32_t pixel_format);
+u32 skl_plane_ctl_format(uint32_t pixel_format,
+				enum per_pixel_alpha_state alpha);
+
 u32 skl_plane_ctl_tiling(uint64_t fb_modifier);
 u32 skl_plane_ctl_rotation(unsigned int rotation);
 

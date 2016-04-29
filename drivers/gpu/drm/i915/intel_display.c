@@ -2904,8 +2904,29 @@ static void skl_detach_scalers(struct intel_crtc *intel_crtc)
 	}
 }
 
-u32 skl_plane_ctl_format(uint32_t pixel_format)
+u32 skl_plane_ctl_format(uint32_t pixel_format,
+			enum per_pixel_alpha_state alpha)
 {
+	u32 plane_ctl_alpha = 0;
+
+	if (pixel_format == DRM_FORMAT_ABGR8888 ||
+		pixel_format == DRM_FORMAT_ARGB8888) {
+
+		switch (alpha) {
+		case DROP_ALPHA:
+			plane_ctl_alpha = PLANE_CTL_ALPHA_DISABLE;
+			break;
+		case PRE_MULTIPLIED_ALPHA:
+			plane_ctl_alpha = PLANE_CTL_ALPHA_SW_PREMULTIPLY;
+			break;
+		case NON_PRE_MULTIPLIED_ALPHA:
+			plane_ctl_alpha = PLANE_CTL_ALPHA_HW_PREMULTIPLY;
+			break;
+		default:
+			MISSING_CASE(alpha);
+		}
+	}
+
 	switch (pixel_format) {
 	case DRM_FORMAT_C8:
 		return PLANE_CTL_FORMAT_INDEXED;
@@ -2921,11 +2942,11 @@ u32 skl_plane_ctl_format(uint32_t pixel_format)
 	 * DRM_FORMAT) for user-space to configure that.
 	 */
 	case DRM_FORMAT_ABGR8888:
-		return PLANE_CTL_FORMAT_XRGB_8888 | PLANE_CTL_ORDER_RGBX |
-			PLANE_CTL_ALPHA_SW_PREMULTIPLY;
+		return ((PLANE_CTL_FORMAT_XRGB_8888 | (PLANE_CTL_ORDER_RGBX
+				& (~PLANE_CTL_ALPHA_MASK))) | plane_ctl_alpha);
 	case DRM_FORMAT_ARGB8888:
-		return PLANE_CTL_FORMAT_XRGB_8888 |
-			PLANE_CTL_ALPHA_SW_PREMULTIPLY;
+		return ((PLANE_CTL_FORMAT_XRGB_8888 & ~PLANE_CTL_ALPHA_MASK)
+						| plane_ctl_alpha);
 	case DRM_FORMAT_XRGB2101010:
 		return PLANE_CTL_FORMAT_XRGB_2101010;
 	case DRM_FORMAT_XBGR2101010:
@@ -3014,7 +3035,8 @@ static void skylake_update_primary_plane(struct drm_plane *plane,
 		    PLANE_CTL_PIPE_GAMMA_ENABLE |
 		    PLANE_CTL_PIPE_CSC_ENABLE;
 
-	plane_ctl |= skl_plane_ctl_format(fb->pixel_format);
+	plane_ctl |= skl_plane_ctl_format(fb->pixel_format,
+					plane_state->per_pixel_alpha);
 	plane_ctl |= skl_plane_ctl_tiling(fb->modifier[0]);
 	plane_ctl |= PLANE_CTL_PLANE_GAMMA_DISABLE;
 	plane_ctl |= skl_plane_ctl_rotation(rotation);
@@ -3068,6 +3090,69 @@ static void skylake_update_primary_plane(struct drm_plane *plane,
 	I915_WRITE(PLANE_SURF(pipe, 0), surf_addr);
 
 	POSTING_READ(PLANE_SURF(pipe, 0));
+}
+
+static int intel_plane_state_check_blend(struct drm_plane_state *plane_state)
+{
+	struct drm_device *dev = plane_state->state->dev;
+	struct intel_plane_state *state = to_intel_plane_state(plane_state);
+	const struct drm_framebuffer *fb = plane_state->fb;
+	const struct drm_blend_mode *mode = &state->base.blend_mode;
+	bool has_per_pixel_blending;
+
+	/*
+	 * We don't install the properties pre-SKL, so this is SKL+ specific
+	 * code for now.
+	 */
+	if (INTEL_INFO(dev)->gen < 9)
+		return 0;
+
+	if (!fb)
+		return 0;
+
+	has_per_pixel_blending = fb->pixel_format == DRM_FORMAT_ABGR8888 ||
+				fb->pixel_format == DRM_FORMAT_RGBA8888 ||
+				fb->pixel_format == DRM_FORMAT_ARGB8888 ||
+				fb->pixel_format == DRM_FORMAT_BGRA8888;
+
+	/* drop alpha for all fbs without an alpha channel */
+	if (!has_per_pixel_blending)
+		state->per_pixel_alpha = DROP_ALPHA;
+
+	switch (mode->func) {
+	/*
+	 * The 'AUTO' behaviour is the default and keeps compatibility with
+	 * kernels before the introduction of the blend_func property:
+	 *   - pre-multiplied alpha if the fb has an alpha channel
+	 *   - usual DRM_BLEND_FUNC(ONE, ZERO) otherwise
+	 */
+	case DRM_BLEND_FUNC(AUTO, AUTO):
+		if (has_per_pixel_blending)
+			state->per_pixel_alpha = PRE_MULTIPLIED_ALPHA;
+		break;
+	/* fbs without an alpha channel, or dropping the alpha channel */
+	case DRM_BLEND_FUNC(ONE, ZERO):
+		if (has_per_pixel_blending)
+			state->per_pixel_alpha = DROP_ALPHA;
+		break;
+	/* pre-multiplied alpha */
+	case DRM_BLEND_FUNC(ONE, ONE_MINUS_SRC_ALPHA):
+		if (!has_per_pixel_blending)
+			state->per_pixel_alpha = DROP_ALPHA;
+		else
+			state->per_pixel_alpha = PRE_MULTIPLIED_ALPHA;
+		break;
+	/* non pre-multiplied alpha */
+	case DRM_BLEND_FUNC(SRC_ALPHA, ONE_MINUS_SRC_ALPHA):
+		if (!has_per_pixel_blending)
+			state->per_pixel_alpha = DROP_ALPHA;
+		else
+			state->per_pixel_alpha = NON_PRE_MULTIPLIED_ALPHA;
+		break;
+	default:
+		return -EINVAL;
+	}
+	return 0;
 }
 
 static void skylake_disable_primary_plane(struct drm_plane *primary,
@@ -11850,6 +11935,10 @@ int intel_plane_atomic_calc_changes(struct drm_crtc_state *crtc_state,
 	    !needs_scaling(old_plane_state))
 		pipe_config->disable_lp_wm = true;
 
+	ret = intel_plane_state_check_blend(plane_state);
+	if (ret)
+		return ret;
+
 	return 0;
 }
 
@@ -14056,6 +14145,9 @@ static struct drm_plane *intel_primary_plane_create(struct drm_device *dev,
 	if (INTEL_INFO(dev)->gen >= 4)
 		intel_create_rotation_property(dev, primary);
 
+	if (INTEL_INFO(dev)->gen == 9)
+		intel_plane_add_blend_properties(primary);
+
 	drm_plane_helper_add(&primary->base, &intel_plane_helper_funcs);
 
 	return &primary->base;
@@ -14083,6 +14175,20 @@ void intel_create_rotation_property(struct drm_device *dev, struct intel_plane *
 		drm_object_attach_property(&plane->base.base,
 				dev->mode_config.rotation_property,
 				plane->base.state->rotation);
+}
+
+void intel_plane_add_blend_properties(struct intel_plane *plane)
+{
+	struct drm_device *dev = plane->base.dev;
+	struct drm_property *prop;
+
+	if (INTEL_INFO(dev)->gen < 9)
+		return;
+
+	prop = dev->mode_config.prop_blend_func;
+	if (prop)
+		drm_object_attach_property(&plane->base.base, prop,
+					   DRM_BLEND_FUNC(AUTO, AUTO));
 }
 
 static int
@@ -14126,6 +14232,9 @@ intel_check_cursor_plane(struct drm_plane *plane,
 		DRM_DEBUG_KMS("cursor cannot be tiled\n");
 		return -EINVAL;
 	}
+
+	if (INTEL_INFO(plane->dev)->gen == 9)
+		intel_plane_add_blend_properties(to_intel_plane(plane));
 
 	/*
 	 * There's something wrong with the cursor on CHV pipe C.
