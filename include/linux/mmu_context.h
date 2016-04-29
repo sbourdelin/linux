@@ -1,8 +1,6 @@
 #ifndef _LINUX_MMU_CONTEXT_H
 #define _LINUX_MMU_CONTEXT_H
 
-#include <asm/mmu_context.h>
-
 struct mm_struct;
 
 void use_mm(struct mm_struct *mm);
