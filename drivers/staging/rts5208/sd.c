@@ -56,21 +56,21 @@ static u16 REG_SD_DCMPS1_CTL;
 
 static inline void sd_set_err_code(struct rtsx_chip *chip, u8 err_code)
 {
-	struct sd_info *sd_card = &(chip->sd_card);
+	struct sd_info *sd_card = &chip->sd_card;
 
 	sd_card->err_code |= err_code;
 }
 
 static inline void sd_clr_err_code(struct rtsx_chip *chip)
 {
-	struct sd_info *sd_card = &(chip->sd_card);
+	struct sd_info *sd_card = &chip->sd_card;
 
 	sd_card->err_code = 0;
 }
 
 static inline int sd_check_err_code(struct rtsx_chip *chip, u8 err_code)
 {
-	struct sd_info *sd_card = &(chip->sd_card);
+	struct sd_info *sd_card = &chip->sd_card;
 
 	return sd_card->err_code & err_code;
 }
