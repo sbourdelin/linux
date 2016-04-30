@@ -4048,6 +4048,82 @@ static uint8_t intel_dp_autotest_link_training(struct intel_dp *intel_dp)
 static uint8_t intel_dp_autotest_video_pattern(struct intel_dp *intel_dp)
 {
 	uint8_t test_result = DP_TEST_NAK;
+	uint8_t test_pattern;
+	uint16_t  h_width, v_height, test_misc;
+	int status = 0;
+
+	/* Automation support for Video Pattern Tests has a dependency
+	 * on Link training Automation support (CTS Test 4.3.1.11)
+	 * Hence it returns a TEST NAK until the Link Training automation
+	 * support is added to the kernel
+	 */
+	return test_result;
+
+	/* Read the TEST_PATTERN (DP CTS 3.1.5) */
+	status = drm_dp_dpcd_read(&intel_dp->aux, DP_TEST_PATTERN,
+				  &test_pattern, 1);
+	if (status <= 0) {
+		DRM_DEBUG_KMS("Could not read test pattern from"
+			      "refernce sink\n");
+		return 0;
+	}
+	if (test_pattern != DP_COLOR_RAMP)
+		return test_result;
+	intel_dp->test_data.video_pattern = test_pattern;
+
+	status = drm_dp_dpcd_read(&intel_dp->aux, DP_TEST_H_WIDTH,
+				  &h_width, 2);
+	if (status <= 0) {
+		DRM_DEBUG_KMS("Could not read H Width from"
+			      "refernce sink\n");
+		return 0;
+	}
+	intel_dp->test_data.hdisplay = (h_width & DP_TEST_MSB_MASK) >> 8 |
+					(h_width << 8);
+
+	status = drm_dp_dpcd_read(&intel_dp->aux, DP_TEST_V_HEIGHT,
+				  &v_height, 2);
+	if (status <= 0) {
+		DRM_DEBUG_KMS("Could not read V Height from"
+			      "refernce sink\n");
+		return 0;
+	}
+	intel_dp->test_data.vdisplay = (v_height & DP_TEST_MSB_MASK) >> 8 |
+					(v_height << 8);
+
+	status = drm_dp_dpcd_read(&intel_dp->aux, DP_TEST_MISC,
+				  &test_misc, 1);
+	if (status <= 0) {
+		DRM_DEBUG_KMS("Could not read TEST MISC from"
+			      "refernce sink\n");
+		return 0;
+	}
+	if (((test_misc & DP_TEST_COLOR_FORMAT_MASK) >> 1) !=
+	    DP_VIDEO_PATTERN_RGB_FORMAT)
+		return test_result;
+	if (((test_misc & DP_TEST_DYNAMIC_RANGE_MASK) >> 3) !=
+	    DP_VIDEO_PATTERN_VESA)
+		return test_result;
+	switch ((test_misc & DP_TEST_BIT_DEPTH_MASK) >> 5) {
+	case 0:
+		intel_dp->compliance_force_bpc = 6;
+		intel_dp->test_data.bpc = 6;
+		break;
+	case 1:
+		intel_dp->compliance_force_bpc = 8;
+		intel_dp->test_data.bpc = 8;
+		break;
+	default:
+		return test_result;
+	}
+	/* Set test active flag here so userspace doesn't interrupt things */
+	intel_dp->compliance_test_active = 1;
+
+	test_result = DP_TEST_ACK;
+	DRM_DEBUG_KMS("Hdisplay = %lu\n Vdisplay = %lu\n BPC = %u\n ",
+		      intel_dp->test_data.hdisplay,
+		      intel_dp->test_data.vdisplay,
+		      intel_dp->test_data.bpc);
 	return test_result;
 }
 

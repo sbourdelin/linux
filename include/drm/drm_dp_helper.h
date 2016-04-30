@@ -412,7 +412,19 @@
 
 #define DP_TEST_LANE_COUNT		    0x220
 
-#define DP_TEST_PATTERN			    0x221
+#define DP_TEST_PATTERN				0x221
+#define DP_COLOR_RAMP				(1 << 0)
+#define DP_TEST_H_WIDTH				0x22E
+#define DP_TEST_V_HEIGHT			0x230
+#define DP_TEST_MISC				0x232
+#define DP_TEST_MSB_MASK			0xFF00
+#define DP_VIDEO_PATTERN_RGB_FORMAT		0
+#define DP_TEST_COLOR_FORMAT_MASK		0x6
+#define DP_TEST_DYNAMIC_RANGE_MASK		(1 << 3)
+#define DP_VIDEO_PATTERN_VESA			0
+#define DP_TEST_BIT_DEPTH_MASK			0x00E0
+#define DP_TEST_BIT_DEPTH_6			0
+#define DP_TEST_BIT_DEPTH_8			1
 
 #define DP_TEST_CRC_R_CR		    0x240
 #define DP_TEST_CRC_G_Y			    0x242

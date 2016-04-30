@@ -4452,7 +4452,19 @@ static int i915_displayport_test_data_show(struct seq_file *m, void *data)
 		if (connector->status == connector_status_connected &&
 		    connector->encoder != NULL) {
 			intel_dp = enc_to_intel_dp(connector->encoder);
-			seq_printf(m, "%lx", intel_dp->compliance_test_data);
+			if (intel_dp->compliance_test_type ==
+			    DP_TEST_LINK_EDID_READ)
+				seq_printf(m, "%lx",
+					   intel_dp->compliance_test_data);
+			else if (intel_dp->compliance_test_type ==
+				 DP_TEST_LINK_VIDEO_PATTERN) {
+				seq_printf(m, "hdisplay: %lu\n",
+					   intel_dp->test_data.hdisplay);
+				seq_printf(m, "vdisplay: %lu\n",
+					   intel_dp->test_data.vdisplay);
+				seq_printf(m, "bpc: %u\n",
+					   intel_dp->test_data.bpc);
+			}
 		} else
 			seq_puts(m, "0");
 	}

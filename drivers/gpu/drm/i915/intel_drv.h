@@ -794,6 +794,12 @@ enum link_m_n_set {
 	M2_N2
 };
 
+struct compliance_test_data {
+	uint8_t video_pattern;
+	uint16_t hdisplay, vdisplay;
+	uint8_t bpc;
+};
+
 struct intel_dp {
 	i915_reg_t output_reg;
 	i915_reg_t aux_ch_ctl_reg;
@@ -865,6 +871,9 @@ struct intel_dp {
 	unsigned long compliance_test_data;
 	bool compliance_test_active;
 	unsigned long compliance_force_bpc; /* 0 for default or bpc to use */
+	struct compliance_test_data test_data;   /* a structure to hold all dp
+						  * compliance test data
+						  */
 };
 
 struct intel_digital_port {
