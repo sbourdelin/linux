@@ -386,26 +386,17 @@ static int solo_querycap(struct file *file, void  *priv,
 static int solo_enum_ext_input(struct solo_dev *solo_dev,
 			       struct v4l2_input *input)
 {
-	static const char * const dispnames_1[] = { "4UP" };
-	static const char * const dispnames_2[] = { "4UP-1", "4UP-2" };
-	static const char * const dispnames_5[] = {
-		"4UP-1", "4UP-2", "4UP-3", "4UP-4", "16UP"
-	};
-	const char * const *dispnames;
+	int ext = input->index - solo_dev->nr_chans;
+	unsigned int nup, first;
 
-	if (input->index >= (solo_dev->nr_chans + solo_dev->nr_ext))
+	if (ext >= solo_dev->nr_ext)
 		return -EINVAL;
 
-	if (solo_dev->nr_ext == 5)
-		dispnames = dispnames_5;
-	else if (solo_dev->nr_ext == 2)
-		dispnames = dispnames_2;
-	else
-		dispnames = dispnames_1;
-
-	snprintf(input->name, sizeof(input->name), "Multi %s",
-		 dispnames[input->index - solo_dev->nr_chans]);
-
+	nup   = (ext == 4) ? 16 : 4;
+	first = (ext & 3) << 2;
+	snprintf(input->name, sizeof(input->name),
+		 "Multi %d-up (cameras %d-%d)",
+		 nup, first + 1, first + nup);
 	return 0;
 }
 
