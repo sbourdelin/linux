@@ -992,24 +992,21 @@ static void cp210x_set_termios(struct tty_struct *tty,
 		dev_dbg(dev, "%s - read ulControlHandshake=%08x ulFlowReplace=%08x\n",
 			__func__, ControlHandshake, FlowReplace);
 
+		ControlHandshake &= ~SERIAL_DSR_HANDSHAKE;
+		ControlHandshake &= ~SERIAL_DCD_HANDSHAKE;
+		ControlHandshake &= ~SERIAL_DSR_SENSITIVITY;
+		ControlHandshake &= ~SERIAL_DTR_MASK;
+		ControlHandshake |= SERIAL_DTR_ACTIVE;
 		if (cflag & CRTSCTS) {
-			ControlHandshake &= ~(SERIAL_DTR_MASK |
-				SERIAL_CTS_HANDSHAKE | SERIAL_DSR_HANDSHAKE |
-				SERIAL_DCD_HANDSHAKE | SERIAL_DSR_SENSITIVITY);
-			ControlHandshake |= SERIAL_DTR_ACTIVE;
 			ControlHandshake |= SERIAL_CTS_HANDSHAKE;
-			/* FIXME why clear bits unrelated to flow control */
-			/* FIXME why clear _XOFF_CONTINUE which is never set */
-			FlowReplace &= ~0xffffffff;
+
+			FlowReplace &= ~SERIAL_RTS_MASK;
 			FlowReplace |= SERIAL_RTS_FLOW_CTL;
 			dev_dbg(dev, "%s - flow control = CRTSCTS\n", __func__);
 		} else {
-			ControlHandshake &= ~(SERIAL_DTR_MASK |
-				SERIAL_CTS_HANDSHAKE | SERIAL_DSR_HANDSHAKE |
-				SERIAL_DCD_HANDSHAKE | SERIAL_DSR_SENSITIVITY);
-			ControlHandshake |= SERIAL_DTR_ACTIVE;
-			/* FIXME - why clear bits unrelated to flow control */
-			FlowReplace &= ~0xff;
+			ControlHandshake &= ~SERIAL_CTS_HANDSHAKE;
+
+			FlowReplace &= ~SERIAL_RTS_MASK;
 			FlowReplace |= SERIAL_RTS_ACTIVE;
 			dev_dbg(dev, "%s - flow control = NONE\n", __func__);
 		}
