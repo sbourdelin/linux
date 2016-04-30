@@ -12104,11 +12104,39 @@ compute_baseline_pipe_bpp(struct intel_crtc *crtc,
 
 	/* Clamp display bpp to EDID value */
 	for_each_connector_in_state(state, connector, connector_state, i) {
+		int type = 0;
+
+		if (connector_state->best_encoder) {
+			struct intel_encoder *ienc;
+
+			ienc = to_intel_encoder(connector_state->best_encoder);
+			type = ienc->type;
+		}
+
 		if (connector_state->crtc != &crtc->base)
 			continue;
 
-		connected_sink_compute_bpp(to_intel_connector(connector),
-					   pipe_config);
+		/* For DP compliance we need to ensure that we can override
+		 * the computed bpp for the pipe.
+		 */
+		if (type == INTEL_OUTPUT_DISPLAYPORT) {
+			struct intel_dp *intel_dp =
+				enc_to_intel_dp(connector_state->best_encoder);
+
+			if (intel_dp &&
+			    (intel_dp->compliance_force_bpc != 0)) {
+				pipe_config->pipe_bpp =
+					intel_dp->compliance_force_bpc*3;
+				DRM_DEBUG_KMS("JMB Setting pipe_bpp to %d\n",
+					      pipe_config->pipe_bpp);
+			} else {
+				connected_sink_compute_bpp(to_intel_connector(connector),
+						   pipe_config);
+			}
+		} else {
+			connected_sink_compute_bpp(to_intel_connector(connector),
+						   pipe_config);
+		}
 	}
 
 	return bpp;

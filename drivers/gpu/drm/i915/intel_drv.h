@@ -864,6 +864,7 @@ struct intel_dp {
 	unsigned long compliance_test_type;
 	unsigned long compliance_test_data;
 	bool compliance_test_active;
+	unsigned long compliance_force_bpc; /* 0 for default or bpc to use */
 };
 
 struct intel_digital_port {
