@@ -12,18 +12,23 @@ void *perf_gtk_handle;
 static int setup_gtk_browser(void)
 {
 	int (*perf_ui_init)(void);
+	char buf[PATH_MAX];
 
 	if (perf_gtk_handle)
 		return 0;
 
-	perf_gtk_handle = dlopen(PERF_GTK_DSO, RTLD_LAZY);
+	scnprintf(buf, sizeof(buf), "%s/%s", LIBDIR, PERF_GTK_DSO);
+	perf_gtk_handle = dlopen(buf, RTLD_LAZY);
+
 	if (perf_gtk_handle == NULL) {
-		char buf[PATH_MAX];
-		scnprintf(buf, sizeof(buf), "%s/%s", LIBDIR, PERF_GTK_DSO);
-		perf_gtk_handle = dlopen(buf, RTLD_LAZY);
+		printf("%s\n", dlerror());
+		perf_gtk_handle = dlopen(PERF_GTK_DSO, RTLD_LAZY);
 	}
-	if (perf_gtk_handle == NULL)
+
+	if (perf_gtk_handle == NULL) {
+		printf("%s\n", dlerror());
 		return -1;
+	}
 
 	perf_ui_init = dlsym(perf_gtk_handle, "perf_gtk__init");
 	if (perf_ui_init == NULL)
