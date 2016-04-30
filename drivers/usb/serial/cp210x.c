@@ -327,6 +327,40 @@ struct cp210x_comm_status {
  */
 #define PURGE_ALL		0x000f
 
+/* CP210X_GET_FLOW/CP210X_SET_FLOW read/write these 0x10 bytes */
+struct cp210x_flow_ctl {
+	__le32	ulControlHandshake;
+	__le32	ulFlowReplace;
+	__le32	ulXonLimit;
+	__le32	ulXoffLimit;
+} __packed;
+
+/* cp210x_flow_ctl::ulControlHandshake */
+#define SERIAL_DTR_MASK		0x00000003
+#define SERIAL_CTS_HANDSHAKE	0x00000008
+#define SERIAL_DSR_HANDSHAKE	0x00000010
+#define SERIAL_DCD_HANDSHAKE	0x00000020
+#define SERIAL_DSR_SENSITIVITY	0x00000040
+
+/* values for cp210x_flow_ctl::ulControlHandshake::SERIAL_DTR_MASK */
+#define SERIAL_DTR_INACTIVE	0x00000000
+#define SERIAL_DTR_ACTIVE	0x00000001
+#define SERIAL_DTR_FLOW_CTL	0x00000002
+
+/* cp210x_flow_ctl::ulFlowReplace */
+#define SERIAL_AUTO_TRANSMIT	0x00000001
+#define SERIAL_AUTO_RECEIVE	0x00000002
+#define SERIAL_ERROR_CHAR	0x00000004
+#define SERIAL_NULL_STRIPPING	0x00000008
+#define SERIAL_BREAK_CHAR	0x00000010
+#define SERIAL_RTS_MASK		0x000000c0
+#define SERIAL_XOFF_CONTINUE	0x80000000
+
+/* values for cp210x_flow_ctl::ulFlowReplace::SERIAL_RTS_MASK */
+#define SERIAL_RTS_INACTIVE	0x00000000
+#define SERIAL_RTS_ACTIVE	0x00000040
+#define SERIAL_RTS_FLOW_CTL	0x00000080
+
 /*
  * Reads a variable-sized block of CP210X_ registers, identified by req.
  * Returns data into buf in native USB byte order.
@@ -694,7 +728,7 @@ static void cp210x_get_termios_port(struct usb_serial_port *port,
 {
 	struct device *dev = &port->dev;
 	unsigned int cflag;
-	u8 modem_ctl[16];
+	struct cp210x_flow_ctl flow_ctl;
 	u32 baud;
 	u16 bits;
 
@@ -792,9 +826,9 @@ static void cp210x_get_termios_port(struct usb_serial_port *port,
 		break;
 	}
 
-	cp210x_read_reg_block(port, CP210X_GET_FLOW, modem_ctl,
-			sizeof(modem_ctl));
-	if (modem_ctl[0] & 0x08) {
+	cp210x_read_reg_block(port, CP210X_GET_FLOW, &flow_ctl,
+			sizeof(flow_ctl));
+	if (le32_to_cpu(flow_ctl.ulControlHandshake) & SERIAL_CTS_HANDSHAKE) {
 		dev_dbg(dev, "%s - flow control = CRTSCTS\n", __func__);
 		cflag |= CRTSCTS;
 	} else {
@@ -863,7 +897,6 @@ static void cp210x_set_termios(struct tty_struct *tty,
 	struct device *dev = &port->dev;
 	unsigned int cflag, old_cflag;
 	u16 bits;
-	u8 modem_ctl[16];
 
 	cflag = tty->termios.c_cflag;
 	old_cflag = old_termios->c_cflag;
@@ -948,33 +981,45 @@ static void cp210x_set_termios(struct tty_struct *tty,
 
 	if ((cflag & CRTSCTS) != (old_cflag & CRTSCTS)) {
 
-		/* Only bytes 0, 4 and 7 out of first 8 have functional bits */
+		struct cp210x_flow_ctl flow_ctl;
+		u32 ControlHandshake;
+		u32 FlowReplace;
 
-		cp210x_read_reg_block(port, CP210X_GET_FLOW, modem_ctl,
-				sizeof(modem_ctl));
-		dev_dbg(dev, "%s - read modem controls = %02x .. .. .. %02x .. .. %02x\n",
-			__func__, modem_ctl[0], modem_ctl[4], modem_ctl[7]);
+		cp210x_read_reg_block(port, CP210X_GET_FLOW, &flow_ctl,
+				sizeof(flow_ctl));
+		ControlHandshake = le32_to_cpu(flow_ctl.ulControlHandshake);
+		FlowReplace      = le32_to_cpu(flow_ctl.ulFlowReplace);
+		dev_dbg(dev, "%s - read ulControlHandshake=%08x ulFlowReplace=%08x\n",
+			__func__, ControlHandshake, FlowReplace);
 
 		if (cflag & CRTSCTS) {
-			modem_ctl[0] &= ~0x7B;
-			modem_ctl[0] |= 0x09;
-			modem_ctl[4] = 0x80;
-			/* FIXME - why clear reserved bits just read? */
-			modem_ctl[5] = 0;
-			modem_ctl[6] = 0;
-			modem_ctl[7] = 0;
+			ControlHandshake &= ~(SERIAL_DTR_MASK |
+				SERIAL_CTS_HANDSHAKE | SERIAL_DSR_HANDSHAKE |
+				SERIAL_DCD_HANDSHAKE | SERIAL_DSR_SENSITIVITY);
+			ControlHandshake |= SERIAL_DTR_ACTIVE;
+			ControlHandshake |= SERIAL_CTS_HANDSHAKE;
+			/* FIXME why clear bits unrelated to flow control */
+			/* FIXME why clear _XOFF_CONTINUE which is never set */
+			FlowReplace &= ~0xffffffff;
+			FlowReplace |= SERIAL_RTS_FLOW_CTL;
 			dev_dbg(dev, "%s - flow control = CRTSCTS\n", __func__);
 		} else {
-			modem_ctl[0] &= ~0x7B;
-			modem_ctl[0] |= 0x01;
-			modem_ctl[4] = 0x40;
+			ControlHandshake &= ~(SERIAL_DTR_MASK |
+				SERIAL_CTS_HANDSHAKE | SERIAL_DSR_HANDSHAKE |
+				SERIAL_DCD_HANDSHAKE | SERIAL_DSR_SENSITIVITY);
+			ControlHandshake |= SERIAL_DTR_ACTIVE;
+			/* FIXME - why clear bits unrelated to flow control */
+			FlowReplace &= ~0xff;
+			FlowReplace |= SERIAL_RTS_ACTIVE;
 			dev_dbg(dev, "%s - flow control = NONE\n", __func__);
 		}
 
-		dev_dbg(dev, "%s - write modem controls = %02x .. .. .. %02x .. .. %02x\n",
-			__func__, modem_ctl[0], modem_ctl[4], modem_ctl[7]);
-		cp210x_write_reg_block(port, CP210X_SET_FLOW, modem_ctl,
-				sizeof(modem_ctl));
+		dev_dbg(dev, "%s - write ulControlHandshake=%08x ulFlowReplace=%08x\n",
+			__func__, ControlHandshake, FlowReplace);
+		flow_ctl.ulControlHandshake = cpu_to_le32(ControlHandshake);
+		flow_ctl.ulFlowReplace      = cpu_to_le32(FlowReplace);
+		cp210x_write_reg_block(port, CP210X_SET_FLOW, &flow_ctl,
+				sizeof(flow_ctl));
 	}
 
 }
