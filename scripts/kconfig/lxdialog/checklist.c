@@ -46,7 +46,14 @@ static void print_item(WINDOW * win, int choice, int selected)
 	wattrset(win, selected ? dlg.check_selected.atr
 		 : dlg.check.atr);
 	if (!item_is_tag(':'))
-		wprintw(win, "(%c)", item_is_tag('X') ? 'X' : ' ');
+		if (item_is_tag('z'))
+			/*
+			 * inactive items visible because of
+			 * show_all_options.
+			 */
+			wprintw(win, "- -");
+		else
+			wprintw(win, "(%c)", item_is_tag('X') ? 'X' : ' ');
 
 	wattrset(win, selected ? dlg.tag_selected.atr : dlg.tag.atr);
 	mvwaddch(win, choice, item_x, list_item[0]);
@@ -296,10 +303,18 @@ do_resize:
 			item_foreach()
 				item_set_selected(0);
 			item_set(scroll + choice);
-			item_set_selected(1);
-			delwin(list);
-			delwin(dialog);
-			return button;
+			if (!item_is_tag('z') || button == 1) {
+				/*
+				  Return if selected item isn't an
+				  item only visible because of
+				  show_all options or if help was selected.
+				 */
+				item_set_selected(1);
+				delwin(list);
+				delwin(dialog);
+				return button;
+			}
+			continue;
 		case TAB:
 		case KEY_LEFT:
 		case KEY_RIGHT:
@@ -316,6 +331,12 @@ do_resize:
 		case KEY_ESC:
 			key = on_key_esc(dialog);
 			break;
+		case 'z':
+		case 'Z':
+			button = 2; /* toggle show_all_options */
+			delwin(list);
+			delwin(dialog);
+			return button;
 		case KEY_RESIZE:
 			delwin(list);
 			delwin(dialog);

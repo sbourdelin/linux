@@ -811,11 +811,13 @@ static void conf_choice(struct menu *menu)
 
 		current_menu = menu;
 		for (child = menu->list; child; child = child->next) {
-			if (!menu_is_visible(child))
+			if (!menu_is_visible(child) && !show_all_options)
 				continue;
-			if (child->sym)
+			if (child->sym) {
 				item_make("%s", _(menu_get_prompt(child)));
-			else {
+				if (!menu_is_visible(child))
+					item_set_tag('z');
+			} else {
 				item_make("*** %s ***", _(menu_get_prompt(child)));
 				item_set_tag(':');
 			}
@@ -849,6 +851,9 @@ static void conf_choice(struct menu *menu)
 				active = child->sym;
 			} else
 				show_help(menu);
+			break;
+		case 2:
+			show_all_options = !show_all_options;
 			break;
 		case KEY_ESC:
 			return;
