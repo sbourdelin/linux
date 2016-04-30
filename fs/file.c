@@ -543,7 +543,7 @@ repeat:
 	/* Sanity check */
 	if (rcu_access_pointer(fdt->fd[fd]) != NULL) {
 		printk(KERN_WARNING "alloc_fd: slot %d not NULL!\n", fd);
-		rcu_assign_pointer(fdt->fd[fd], NULL);
+		RCU_INIT_POINTER(fdt->fd[fd], NULL);
 	}
 #endif
 
@@ -644,7 +644,7 @@ int __close_fd(struct files_struct *files, unsigned fd)
 	file = fdt->fd[fd];
 	if (!file)
 		goto out_unlock;
-	rcu_assign_pointer(fdt->fd[fd], NULL);
+	RCU_INIT_POINTER(fdt->fd[fd], NULL);
 	__clear_close_on_exec(fd, fdt);
 	__put_unused_fd(files, fd);
 	spin_unlock(&files->file_lock);
@@ -679,7 +679,7 @@ void do_close_on_exec(struct files_struct *files)
 			file = fdt->fd[fd];
 			if (!file)
 				continue;
-			rcu_assign_pointer(fdt->fd[fd], NULL);
+			RCU_INIT_POINTER(fdt->fd[fd], NULL);
 			__put_unused_fd(files, fd);
 			spin_unlock(&files->file_lock);
 			filp_close(file, files);
