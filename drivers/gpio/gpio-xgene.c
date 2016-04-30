@@ -17,6 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <linux/acpi.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -218,10 +219,18 @@ static const struct of_device_id xgene_gpio_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, xgene_gpio_of_match);
 
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id xgene_gpio_acpi_match[] = {
+	{ "APMC0D14", 0 },
+	{ },
+};
+#endif
+
 static struct platform_driver xgene_gpio_driver = {
 	.driver = {
 		.name = "xgene-gpio",
 		.of_match_table = xgene_gpio_of_match,
+		.acpi_match_table = ACPI_PTR(xgene_gpio_acpi_match),
 		.pm     = XGENE_GPIO_PM_OPS,
 	},
 	.probe = xgene_gpio_probe,
