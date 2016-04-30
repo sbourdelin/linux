@@ -2741,6 +2741,8 @@ static short rtl8192_init(struct net_device *dev)
 {
 
 	struct r8192_priv *priv = ieee80211_priv(dev);
+	int err;
+
 	memset(&(priv->stats), 0, sizeof(struct Stats));
 	memset(priv->txqueue_to_outpipemap, 0, 9);
 #ifdef PIPE12
@@ -2761,7 +2763,9 @@ static short rtl8192_init(struct net_device *dev)
 	rtl8192_init_priv_lock(priv);
 	rtl8192_init_priv_task(dev);
 	rtl8192_get_eeprom_size(dev);
-	rtl8192_read_eeprom_info(dev);
+	err = rtl8192_read_eeprom_info(dev);
+	if (err)
+		return err;
 	rtl8192_get_channel_map(dev);
 	init_hal_dm(dev);
 	setup_timer(&priv->watch_dog_timer, watch_dog_timer_callback,
