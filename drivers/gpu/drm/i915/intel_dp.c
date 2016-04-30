@@ -4041,7 +4041,7 @@ intel_dp_get_sink_irq_esi(struct intel_dp *intel_dp, u8 *sink_irq_vector)
 
 static uint8_t intel_dp_autotest_link_training(struct intel_dp *intel_dp)
 {
-	uint8_t test_result = DP_TEST_ACK;
+	uint8_t test_result = DP_TEST_NAK;
 	return test_result;
 }
 
