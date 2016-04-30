@@ -607,9 +607,12 @@ static int get_more_blocks(struct dio *dio, struct dio_submit *sdio,
 	int ret;
 	sector_t fs_startblk;	/* Into file, in filesystem-sized blocks */
 	sector_t fs_endblk;	/* Into file, in filesystem-sized blocks */
+	sector_t block_in_file = sdio->block_in_file;
 	unsigned long fs_count;	/* Number of filesystem-sized blocks */
 	int create;
-	unsigned int i_blkbits = sdio->blkbits + sdio->blkfactor;
+	unsigned int blkbits = sdio->blkbits;
+	unsigned int blkfactor = sdio->blkfactor;
+	unsigned int i_blkbits = blkbits + blkfactor;
 
 	/*
 	 * If there was a memory error and we've overwritten all the
@@ -617,10 +620,9 @@ static int get_more_blocks(struct dio *dio, struct dio_submit *sdio,
 	 */
 	ret = dio->page_errors;
 	if (ret == 0) {
-		BUG_ON(sdio->block_in_file >= sdio->final_block_in_request);
-		fs_startblk = sdio->block_in_file >> sdio->blkfactor;
-		fs_endblk = (sdio->final_block_in_request - 1) >>
-					sdio->blkfactor;
+		BUG_ON(block_in_file >= sdio->final_block_in_request);
+		fs_startblk = block_in_file >> blkfactor;
+		fs_endblk = (sdio->final_block_in_request - 1) >> blkfactor;
 		fs_count = fs_endblk - fs_startblk + 1;
 
 		map_bh->b_state = 0;
@@ -638,11 +640,9 @@ static int get_more_blocks(struct dio *dio, struct dio_submit *sdio,
 		 * buffer head.
 		 */
 		create = dio->rw & WRITE;
-		if (dio->flags & DIO_SKIP_HOLES) {
-			if (sdio->block_in_file < (i_size_read(dio->inode) >>
-							sdio->blkbits))
-				create = 0;
-		}
+		if ((dio->flags & DIO_SKIP_HOLES) &&
+		    ((block_in_file << blkbits) < i_size_read(dio->inode)))
+			create = 0;
 
 		ret = (*sdio->get_block)(dio->inode, fs_startblk,
 						map_bh, create);
