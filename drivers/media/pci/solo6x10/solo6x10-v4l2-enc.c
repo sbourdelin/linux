@@ -33,7 +33,7 @@
 #include "solo6x10-jpeg.h"
 
 #define MIN_VID_BUFFERS		2
-#define FRAME_BUF_SIZE		(196 * 1024)
+#define FRAME_BUF_SIZE		(200 * 1024)
 #define MP4_QS			16
 #define DMA_ALIGN		4096
 
@@ -323,8 +323,11 @@ static int solo_send_desc(struct solo_enc_dev *solo_enc, int skip,
 	int i;
 	int ret;
 
-	if (WARN_ON_ONCE(size > FRAME_BUF_SIZE))
+	if (WARN_ON_ONCE(size > FRAME_BUF_SIZE)) {
+		dev_warn(&solo_dev->pdev->dev,
+			 "oversized frame (%d bytes)\n", size);
 		return -EINVAL;
+	}
 
 	solo_enc->desc_count = 1;
 
