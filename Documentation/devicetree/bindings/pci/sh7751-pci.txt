@@ -1,0 +1,51 @@
+* Renesas SH7751 PCI host interfaces
+
+Required properties:
+  - compatible: "renesas,sh7751-pci" is required.
+    And board specific compatible if fixup required.
+
+  - reg: base address and length of the pcie controller registers.
+  - #address-cells: set to <2>
+  - #size-cells: set to <1>
+  - bus-range: PCI bus numbers covered
+  - device_type: set to "pci"
+  - ranges: ranges for the PCI memory and I/O regions.
+  - interrupt-map-mask and interrupt-map: standard PCI properties
+  	to define the mapping of the PCIe interface to interrupt
+	numbers.
+
+Example:
+	pci: pci-controller@fe200000 {
+		compatible = "renesas,sh7751-pci", "iodata,landisk";
+		device_type = "pci";
+		bus-range = <0 0>;
+		#address-cells = <2>;
+		#size-cells = <1>;
+		ranges = <0x02000000 0x00000000 0xfd000000 0xfd000000 0x00000000 0x01000000>,
+		         <0x01000000 0x00000000 0xfe240000 0x00000000 0x00000000 0x00040000>;
+		reg = <0xfe200000 0x0400>,
+		      <0x0c000000 0x04000000>,
+		      <0xff800000 0x0030>;
+		#interrupt-cells = <1>;
+		interrupt-map-mask = <0x1800 0 7>;
+		interrupt-map = <0x0000 0 1 &cpldintc evt2irq(0x2a0) 0
+		                 0x0000 0 2 &cpldintc evt2irq(0x2c0) 0
+		                 0x0000 0 3 &cpldintc evt2irq(0x2e0) 0
+		                 0x0000 0 4 &cpldintc evt2irq(0x300) 0
+
+		                 0x0800 0 1 &cpldintc evt2irq(0x2c0) 0
+		                 0x0800 0 2 &cpldintc evt2irq(0x2e0) 0
+		                 0x0800 0 3 &cpldintc evt2irq(0x300) 0
+		                 0x0800 0 4 &cpldintc evt2irq(0x2a0) 0
+
+		                 0x1000 0 1 &cpldintc evt2irq(0x2e0) 0
+		                 0x1000 0 2 &cpldintc evt2irq(0x300) 0
+		                 0x1000 0 3 &cpldintc evt2irq(0x2a0) 0
+		                 0x1000 0 4 &cpldintc evt2irq(0x2c0) 0
+
+		                 0x1800 0 1 &cpldintc evt2irq(0x300) 0
+		                 0x1800 0 2 &cpldintc evt2irq(0x2a0) 0
+		                 0x1800 0 3 &cpldintc evt2irq(0x2c0) 0
+		                 0x1800 0 4 &cpldintc evt2irq(0x2e0) 0>;
+	};
+};
