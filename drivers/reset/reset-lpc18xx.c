@@ -199,7 +199,7 @@ static int lpc18xx_rgu_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, rc);
 
-	ret = reset_controller_register(&rc->rcdev);
+	ret = devm_reset_controller_register(&pdev->dev, &rc->rcdev);
 	if (ret) {
 		dev_err(&pdev->dev, "unable to register device\n");
 		goto dis_clks;
@@ -228,8 +228,6 @@ static int lpc18xx_rgu_remove(struct platform_device *pdev)
 	ret = unregister_restart_handler(&lpc18xx_rgu_restart_nb);
 	if (ret)
 		dev_warn(&pdev->dev, "failed to unregister restart handler\n");
-
-	reset_controller_unregister(&rc->rcdev);
 
 	clk_disable_unprepare(rc->clk_delay);
 	clk_disable_unprepare(rc->clk_reg);
