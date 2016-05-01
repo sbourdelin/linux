@@ -3551,6 +3551,14 @@ static int cgroup_kn_set_ugid(struct kernfs_node *kn)
 	return kernfs_setattr(kn, &iattr);
 }
 
+static int cgroup_kn_set_mode(struct kernfs_node *kn, umode_t mode)
+{
+	struct iattr iattr = { .ia_valid = ATTR_MODE,
+			       .ia_mode = mode, };
+
+	return kernfs_setattr(kn, &iattr);
+}
+
 static int cgroup_add_file(struct cgroup_subsys_state *css, struct cgroup *cgrp,
 			   struct cftype *cft)
 {
@@ -6225,8 +6233,12 @@ struct cgroup_namespace *copy_cgroup_ns(unsigned long flags,
 					struct user_namespace *user_ns,
 					struct cgroup_namespace *old_ns)
 {
+	struct cgroup_subsys *ss;
 	struct cgroup_namespace *new_ns;
 	struct css_set *cset;
+	int ssid, err;
+	umode_t mode[CGROUP_SUBSYS_COUNT];
+	u16 updated_mask = 0;
 
 	BUG_ON(!old_ns);
 
@@ -6241,11 +6253,54 @@ struct cgroup_namespace *copy_cgroup_ns(unsigned long flags,
 
 	mutex_lock(&cgroup_mutex);
 	spin_lock_bh(&css_set_lock);
-
 	cset = task_css_set(current);
 	get_css_set(cset);
-
 	spin_unlock_bh(&css_set_lock);
+
+	/*
+	 * When creating a new cgroup namespace, we change the permissions of
+	 * the cgroup's directory to be a+w. This is necessary in order to
+	 * allow new cgroup namespaces to manage their own subtrees. This does
+	 * not allow for an escape from cgroup policy for three reasons:
+	 *
+	 * 1. cgroups are hierarchical, so any subtree must (at the very least)
+	 *    obey the original cgroup's restrictions.
+	 *
+	 * 2. The unix permission model for directories does not allow a user
+	 *    with write access to a directory to directly modify the dentries.
+	 *    While a user can unlink such files in a normal directory, in
+	 *    cgroupfs this is not allowed.
+	 *
+	 * 3. cgroup core doesn't allow tasks to be migrated by users that have
+	 *    write access to two subtrees unless they also have write access to
+	 *    the common ancestor of the two subtrees. Thus you cannot use a
+	 *    complicit process in less restrictive cgroup to overcome your own
+	 *    cgroup restriction.
+	 *
+	 * Therefore, we can safely change the mode of the cgroup without any
+	 * ill effects. We don't do this on cgroupns_install(), because the
+	 * owner of the cgroup may have decided to disallow modifications to
+	 * the hierarchy (which can be done by creating a nested cgroup
+	 * namespace in a cgroup you now own).
+	 */
+	rcu_read_lock();
+	for_each_subsys(ss, ssid) {
+		struct kernfs_node *kn = cset->subsys[ssid]->cgroup->kn;
+
+		kernfs_get(kn);
+		kernfs_break_active_protection(kn);
+		mode[ssid] = kn->mode;
+		err = cgroup_kn_set_mode(kn, mode[ssid] |
+					     (S_IROTH | S_IWOTH | S_IXOTH));
+		kernfs_unbreak_active_protection(kn);
+		kernfs_put(kn);
+		if (err)
+			goto err_unset_mode;
+
+		updated_mask |= 1 << ssid;
+	}
+	rcu_read_unlock();
+
 	mutex_unlock(&cgroup_mutex);
 
 	new_ns = alloc_cgroup_ns();
@@ -6258,6 +6313,18 @@ struct cgroup_namespace *copy_cgroup_ns(unsigned long flags,
 	new_ns->root_cset = cset;
 
 	return new_ns;
+
+err_unset_mode:
+	/* Clean up the mode changes. */
+	do_each_subsys_mask(ss, ssid, updated_mask) {
+		struct kernfs_node *kn = cset->subsys[ssid]->cgroup->kn;
+
+		kernfs_break_active_protection(kn);
+		cgroup_kn_set_mode(kn, mode[ssid]);
+		kernfs_unbreak_active_protection(kn);
+	} while_each_subsys_mask();
+
+	return ERR_PTR(err);
 }
 
 static inline struct cgroup_namespace *to_cg_ns(struct ns_common *ns)
