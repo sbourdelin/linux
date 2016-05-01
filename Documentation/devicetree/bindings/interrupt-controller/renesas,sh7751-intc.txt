@@ -1,0 +1,25 @@
+DT bindings for the SH7751 interrupt controller
+
+Required properties:
+
+  - compatible: has to be "renesas,sh7751-intc".
+
+  - reg: Base address and length of interrupt controller register
+         and extend register.
+
+  - interrupt-controller: Identifies the node as an interrupt controller.
+
+  - #interrupt-cells: has to be <2>: an interrupt index and flags, as defined
+    in interrupts.txt in this directory.
+
+Example
+-------
+
+ 	shintc: interrupt-controller@ffd00000 {
+		compatible = "renesas,sh7751-intc";
+		#interrupt-cells = <2>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		interrupt-controller;
+		reg = <0xffd00000 14>, <0xfe080000 128>;
+	};
