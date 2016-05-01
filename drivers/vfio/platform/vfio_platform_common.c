@@ -13,6 +13,7 @@
  */
 
 #include <linux/device.h>
+#include <linux/acpi.h>
 #include <linux/iommu.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
@@ -41,7 +42,7 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
 		if (!strcmp(iter->compat, compat) &&
 			try_module_get(iter->owner)) {
 			*module = iter->owner;
-			reset_fn = iter->reset;
+			reset_fn = iter->of_reset;
 			break;
 		}
 	}
@@ -49,20 +50,111 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
 	return reset_fn;
 }
 
-static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
+
+#ifdef CONFIG_ACPI
+int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
+			     struct device *dev)
 {
-	vdev->reset = vfio_platform_lookup_reset(vdev->compat,
-						&vdev->reset_module);
-	if (!vdev->reset) {
-		request_module("vfio-reset:%s", vdev->compat);
-		vdev->reset = vfio_platform_lookup_reset(vdev->compat,
-							 &vdev->reset_module);
+	struct acpi_device *adev = ACPI_COMPANION(dev);
+
+	if (acpi_disabled)
+		return -ENODEV;
+
+	if (!adev)
+		return -ENODEV;
+
+	vdev->acpihid = acpi_device_hid(adev);
+	if (!vdev->acpihid) {
+		pr_err("VFIO: cannot find ACPI HID for %s\n",
+		       vdev->name);
+		return -ENODEV;
 	}
+	return 0;
+}
+
+static int vfio_platform_acpi_call_reset(struct vfio_platform_device *vdev)
+{
+	struct device *dev = vdev->device;
+	acpi_handle handle = ACPI_HANDLE(dev);
+	acpi_status acpi_ret;
+	unsigned long long val;
+
+	acpi_ret = acpi_evaluate_integer(handle, "_RST", NULL, &val);
+	if (ACPI_FAILURE(acpi_ret))
+		return -EINVAL;
+
+	return 0;
+}
+
+static int vfio_platform_acpi_has_reset(struct vfio_platform_device *vdev)
+{
+	struct device *dev = vdev->device;
+	acpi_handle handle = ACPI_HANDLE(dev);
+
+	if (acpi_has_method(handle, "_RST"))
+		return 0;
+
+	return -EINVAL;
+}
+#else
+int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
+			     struct device *dev)
+{
+	return -EINVAL;
+}
+
+static int vfio_platform_acpi_call_reset(struct vfio_platform_device *vdev)
+{
+	return -EINVAL;
+}
+
+static int vfio_platform_acpi_has_reset(struct vfio_platform_device *vdev)
+{
+	return -EINVAL;
+}
+#endif
+
+static int vfio_platform_has_reset(struct vfio_platform_device *vdev)
+{
+	if (vdev->acpihid)
+		return vfio_platform_acpi_has_reset(vdev);
+
+	if (vdev->of_reset)
+		return 0;
+
+	return -EINVAL;
+}
+
+static int vfio_platform_get_reset(struct vfio_platform_device *vdev)
+{
+	int rc;
+
+	if (vdev->acpihid)
+		return vfio_platform_acpi_has_reset(vdev);
+
+	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
+						    &vdev->reset_module);
+	if (vdev->of_reset)
+		return 0;
+
+	rc = request_module("vfio-reset:%s", vdev->compat);
+	if (rc)
+		return rc;
+
+	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
+						    &vdev->reset_module);
+	if (vdev->of_reset)
+		return 0;
+
+	return -EINVAL;
 }
 
 static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
 {
-	if (vdev->reset)
+	if (vdev->acpihid)
+		return;
+
+	if (vdev->of_reset)
 		module_put(vdev->reset_module);
 }
 
@@ -134,6 +226,20 @@ static void vfio_platform_regions_cleanup(struct vfio_platform_device *vdev)
 	kfree(vdev->regions);
 }
 
+static int vfio_platform_call_reset(struct vfio_platform_device *vdev)
+{
+	if (vdev->of_reset) {
+		dev_info(vdev->device, "reset\n");
+		vdev->of_reset(vdev);
+		return 0;
+	} else if (vdev->acpihid) {
+		return vfio_platform_acpi_call_reset(vdev);
+	}
+
+	dev_warn(vdev->device, "no reset function found!\n");
+	return -EINVAL;
+}
+
 static void vfio_platform_release(void *device_data)
 {
 	struct vfio_platform_device *vdev = device_data;
@@ -141,12 +247,7 @@ static void vfio_platform_release(void *device_data)
 	mutex_lock(&driver_lock);
 
 	if (!(--vdev->refcnt)) {
-		if (vdev->reset) {
-			dev_info(vdev->device, "reset\n");
-			vdev->reset(vdev);
-		} else {
-			dev_warn(vdev->device, "no reset function found!\n");
-		}
+		vfio_platform_call_reset(vdev);
 		vfio_platform_regions_cleanup(vdev);
 		vfio_platform_irq_cleanup(vdev);
 	}
@@ -175,12 +276,9 @@ static int vfio_platform_open(void *device_data)
 		if (ret)
 			goto err_irq;
 
-		if (vdev->reset) {
-			dev_info(vdev->device, "reset\n");
-			vdev->reset(vdev);
-		} else {
-			dev_warn(vdev->device, "no reset function found!\n");
-		}
+		ret = vfio_platform_call_reset(vdev);
+		if (ret)
+			goto err_irq;
 	}
 
 	vdev->refcnt++;
@@ -213,7 +311,7 @@ static long vfio_platform_ioctl(void *device_data,
 		if (info.argsz < minsz)
 			return -EINVAL;
 
-		if (vdev->reset)
+		if (!vfio_platform_has_reset(vdev))
 			vdev->flags |= VFIO_DEVICE_FLAGS_RESET;
 		info.flags = vdev->flags;
 		info.num_regions = vdev->num_regions;
@@ -312,10 +410,7 @@ static long vfio_platform_ioctl(void *device_data,
 		return ret;
 
 	} else if (cmd == VFIO_DEVICE_RESET) {
-		if (vdev->reset)
-			return vdev->reset(vdev);
-		else
-			return -EINVAL;
+		return vfio_platform_call_reset(vdev);
 	}
 
 	return -ENOTTY;
@@ -544,6 +639,21 @@ static const struct vfio_device_ops vfio_platform_ops = {
 	.mmap		= vfio_platform_mmap,
 };
 
+int vfio_platform_of_probe(struct vfio_platform_device *vdev,
+			   struct device *dev)
+{
+	int ret;
+
+	ret = device_property_read_string(dev, "compatible",
+					  &vdev->compat);
+	if (ret) {
+		pr_err("VFIO: cannot retrieve compat for %s\n",
+			vdev->name);
+		return ret;
+	}
+	return 0;
+}
+
 int vfio_platform_probe_common(struct vfio_platform_device *vdev,
 			       struct device *dev)
 {
@@ -553,14 +663,14 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
 	if (!vdev)
 		return -EINVAL;
 
-	ret = device_property_read_string(dev, "compatible", &vdev->compat);
-	if (ret) {
-		pr_err("VFIO: cannot retrieve compat for %s\n", vdev->name);
-		return -EINVAL;
-	}
+	ret = vfio_platform_acpi_probe(vdev, dev);
+	if (ret)
+		ret = vfio_platform_of_probe(vdev, dev);
+
+	if (ret)
+		return ret;
 
 	vdev->device = dev;
-
 	group = iommu_group_get(dev);
 	if (!group) {
 		pr_err("VFIO: No IOMMU group for device %s\n", vdev->name);
@@ -611,7 +721,7 @@ void vfio_platform_unregister_reset(const char *compat,
 
 	mutex_lock(&driver_lock);
 	list_for_each_entry_safe(iter, temp, &reset_list, link) {
-		if (!strcmp(iter->compat, compat) && (iter->reset == fn)) {
+		if (!strcmp(iter->compat, compat) && (iter->of_reset == fn)) {
 			list_del(&iter->link);
 			break;
 		}
