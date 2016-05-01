@@ -130,6 +130,9 @@ head-y	:= arch/sh/kernel/head_$(BITS).o
 core-y				+= arch/sh/kernel/ arch/sh/mm/ arch/sh/boards/
 core-$(CONFIG_SH_FPU_EMU)	+= arch/sh/math-emu/
 
+core-$(CONFIG_USE_BUILTIN_DTB)	+= arch/sh/boot/dts/
+
+ifneq ($(CONFIG_SH_DEVICE_TREE),y)
 # Mach groups
 machdir-$(CONFIG_SOLUTION_ENGINE)		+= mach-se
 machdir-$(CONFIG_SH_HP6XX)			+= mach-hp6xx
@@ -150,6 +153,7 @@ machdir-$(CONFIG_SH_LANDISK)			+= mach-landisk
 machdir-$(CONFIG_SH_LBOX_RE2)			+= mach-lboxre2
 machdir-$(CONFIG_SH_CAYMAN)			+= mach-cayman
 machdir-$(CONFIG_SH_RSK)			+= mach-rsk
+endif
 
 ifneq ($(machdir-y),)
 core-y	+= $(addprefix arch/sh/boards/, \
@@ -221,6 +225,13 @@ archprepare:
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
 	$(Q)$(MAKE) $(clean)=arch/sh/kernel/vsyscall
+
+%.dtb %.dtb.S %.dtb.o: | scripts
+	$(Q)$(MAKE) $(build)=arch/sh/boot/dts arch/sh/boot/dts/$@
+
+PHONY += dtbs
+dtbs: scripts
+	$(Q)$(MAKE) $(build)=arch/sh/boot/dts
 
 define archhelp
 	@echo '  zImage 	           - Compressed kernel image'
