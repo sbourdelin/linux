@@ -163,6 +163,10 @@
 				regulator-always-on;
 			};
 		};
+		ac_power_supply: ac_power_supply {
+			status = "okay";
+			compatible = "x-powers,axp202-ac-power-supply";
+		};
 	};
 };
 
