@@ -60,7 +60,7 @@ nouveau_fence_signal(struct nouveau_fence *fence)
 
 	fence_signal_locked(&fence->base);
 	list_del(&fence->head);
-	rcu_assign_pointer(fence->channel, NULL);
+	RCU_INIT_POINTER(fence->channel, NULL);
 
 	if (test_bit(FENCE_FLAG_USER_BITS, &fence->base.flags)) {
 		struct nouveau_fence_chan *fctx = nouveau_fctx(fence);
