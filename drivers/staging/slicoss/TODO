@@ -11,8 +11,6 @@ TODO:
 	   - without CONFIG_X86_64 confusion
 	   - do 64 bit correctly
 	   - don't depend on order of union
-	- get rid of ASSERT(), use BUG() instead but only where necessary
-	  looks like most aren't really useful
 	- no new SIOCDEVPRIVATE ioctl allowed
 	- don't use module_param for configuring interrupt mitigation
 	  use ethtool instead

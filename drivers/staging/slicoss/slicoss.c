@@ -55,13 +55,9 @@
  */
 
 #define KLUDGE_FOR_4GB_BOUNDARY         1
-#define DEBUG_MICROCODE                 1
-#define DBG                             1
 #define SLIC_INTERRUPT_PROCESS_LIMIT	1
 #define SLIC_OFFLOAD_IP_CHECKSUM	1
-#define STATS_TIMER_INTERVAL		2
 #define PING_TIMER_INTERVAL		1
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/kernel.h>
 #include <linux/string.h>
@@ -102,17 +98,12 @@ static char *slic_banner = "Alacritech SLIC Technology(tm) Server and Storage Ac
 static char *slic_proc_version = "2.0.351  2006/07/14 12:26:00";
 
 static struct base_driver slic_global = { {}, 0, 0, 0, 1, NULL, NULL };
-#define DEFAULT_INTAGG_DELAY 100
 static unsigned int rcv_count;
 
 #define DRV_NAME          "slicoss"
-#define DRV_VERSION       "2.0.1"
 #define DRV_AUTHOR        "Alacritech, Inc. Engineering"
 #define DRV_DESCRIPTION   "Alacritech SLIC Techonology(tm) "\
 		"Non-Accelerated Driver"
-#define DRV_COPYRIGHT     "Copyright  2000-2006 Alacritech, Inc. "\
-		"All rights reserved."
-#define PFX		   DRV_NAME " "
 
 MODULE_AUTHOR(DRV_AUTHOR);
 MODULE_DESCRIPTION(DRV_DESCRIPTION);
@@ -1340,7 +1331,7 @@ static void slic_cmdq_addcmdpage(struct adapter *adapter, u32 *page)
 		pslic_handle->next = NULL;
 
 		cmd->pslic_handle = pslic_handle;
-		cmd->cmd64.hosthandle = pslic_handle->token.handle_token;
+		cmd->cmd64.hosthandle = pslic_handle->token.handle.whole;
 		cmd->busy = false;
 		cmd->paddrl = phys_addrl;
 		cmd->paddrh = phys_addrh;
@@ -1998,9 +1989,6 @@ static void slic_rcv_handle_error(struct adapter *adapter,
 	}
 }
 
-#define TCP_OFFLOAD_FRAME_PUSHFLAG  0x10000000
-#define M_FAST_PATH                 0x0040
-
 static void slic_rcv_handler(struct adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
@@ -2065,10 +2053,10 @@ static void slic_xmit_complete(struct adapter *adapter)
 		/*
 		 * Get the complete host command buffer
 		 */
-		slic_handle_word.handle_token = rspbuf->hosthandle;
+		slic_handle_word.handle.whole = rspbuf->hosthandle;
 		hcmd =
-			adapter->slic_handles[slic_handle_word.handle_index].
-									address;
+			adapter->slic_handles[
+				slic_handle_word.handle.parts.index].address;
 /*      hcmd = (struct slic_hostcmd *) rspbuf->hosthandle; */
 		if (hcmd->type == SLIC_CMD_DUMB) {
 			if (hcmd->skb)
@@ -2933,7 +2921,7 @@ static void slic_init_adapter(struct net_device *netdev,
 	for (index = 1, pslic_handle = &adapter->slic_handles[1];
 	     index < SLIC_CMDQ_MAXCMDS; index++, pslic_handle++) {
 
-		pslic_handle->token.handle_index = index;
+		pslic_handle->token.handle.parts.index = index;
 		pslic_handle->type = SLIC_HANDLE_FREE;
 		pslic_handle->next = adapter->pfree_slic_handles;
 		adapter->pfree_slic_handles = pslic_handle;
