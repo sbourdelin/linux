@@ -59,7 +59,7 @@ ENTRY(empty_zero_page)
  */
 ENTRY(_stext)
 	!			Initialize Status Register
-	mov.l	1f, r0		! MD=1, RB=0, BL=0, IMASK=0xF
+	mov.l	1f, r0		! MD=1, RB=0, BL=1, IMASK=0xF
 	ldc	r0, sr
 	!			Initialize global interrupt mask
 #ifdef CONFIG_CPU_HAS_SR_RB
