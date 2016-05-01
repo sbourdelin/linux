@@ -26,10 +26,35 @@ DEFINE_RAW_SPINLOCK(pci_config_lock);
  * PCIC fixups
  */
 
+#define PCIMCR_MRSET 0x40000000
+#define PCIMCR_RFSH  0x00000004
+
+static void __init landisk_fixup(void __iomem *pci_reg_base, void __iomem *bcr)
+{
+	unsigned long bcr1, mcr;
+
+	bcr1 = __raw_readl(bcr + SH7751_BCR1);
+	bcr1 |= 0x00080000;	/* Enable Bit 19 BREQEN, set PCIC to slave */
+	pcic_writel(bcr1, SH4_PCIBCR1);
+
+	mcr = __raw_readl(bcr + SH7751_MCR);
+	mcr &= (~PCIMCR_MRSET) & (~PCIMCR_RFSH);
+	pcic_writel(mcr, SH4_PCIMCR);
+
+	pcic_writel(0x0c000000, SH7751_PCICONF5);
+	pcic_writel(0xd0000000, SH7751_PCICONF6);
+	pcic_writel(0x0c000000, SH4_PCILAR0);
+	pcic_writel(0x00000000, SH4_PCILAR1);
+}
+
 static __initconst const struct fixups {
 	char *compatible;
 	void (*fixup)(void __iomem *, void __iomem *);
 } fixup_list[] = {
+	{
+		.compatible = "iodata,landisk",
+		.fixup = landisk_fixup,
+	},
 };
 
 static __init void pcic_fixups(struct device_node *np,

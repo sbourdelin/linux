@@ -1,0 +1,28 @@
+DT bindings for the I/O DATA HDL-U interrupt controler
+
+Required properties:
+
+  - compatible: has to be "iodata,landisk-intc".
+
+  - reg: Base address and length of interrupt controller register.
+
+  - interrupt-controller: Identifies the node as an interrupt controller.
+
+  - #interrupt-cells: has to be <2>: an interrupt index and flags, as defined
+    in interrupts.txt in this directory.
+
+  - interrupt-map: Interrupt mapping on parent controler.
+
+Example
+-------
+
+	cpldintc: cpld@b0000000 {
+		compatible = "iodata,landisk-intc";
+		#interrupt-cells = <2>;
+		interrupt-controller;
+		reg = <0xb0000000 8>;
+		interrupt-map=<0 &shintc 0 0>, <1 &shintc 1 0>,
+		              <2 &shintc 2 0>, <3 &shintc 3 0>,
+		              <4 &shintc 4 0>, <5 &shintc 5 0>,
+		              <6 &shintc 6 0>, <7 &shintc 7 0>;
+	};
