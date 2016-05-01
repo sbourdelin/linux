@@ -112,29 +112,25 @@ static int noopi(void)
 	return 0;
 }
 
-static void __init sh_of_mem_reserve(void)
+static void __init sh_of_mem_init(void)
 {
 	early_init_fdt_reserve_self();
 	early_init_fdt_scan_reserved_mem();
 }
 
-static void __init sh_of_time_init(void)
-{
-	pr_info("SH generic board support: scanning for clocksource devices\n");
-	clocksource_probe();
-}
-
 static void __init sh_of_setup(char **cmdline_p)
 {
-	unflatten_device_tree();
-
-	board_time_init = sh_of_time_init;
+	struct device_node *cpu;
+	int freq;
 
 	sh_mv.mv_name = of_flat_dt_get_machine_name();
 	if (!sh_mv.mv_name)
 		sh_mv.mv_name = "Unknown SH model";
 
 	sh_of_smp_probe();
+	cpu = of_find_node_by_name(NULL, "cpu");
+	if (!of_property_read_u32(cpu, "clock-frequency", &freq))
+		preset_lpj = freq / 500;
 }
 
 static int sh_of_irq_demux(int irq)
@@ -167,8 +163,7 @@ static struct sh_machine_vector __initmv sh_of_generic_mv = {
 	.mv_init_irq	= sh_of_init_irq,
 	.mv_clk_init	= sh_of_clk_init,
 	.mv_mode_pins	= noopi,
-	.mv_mem_init	= noop,
-	.mv_mem_reserve	= sh_of_mem_reserve,
+	.mv_mem_init	= sh_of_mem_init,
 };
 
 struct sh_clk_ops;
@@ -194,3 +189,7 @@ static int __init sh_of_device_init(void)
 	return 0;
 }
 arch_initcall_sync(sh_of_device_init);
+
+void intc_finalize(void)
+{
+}
