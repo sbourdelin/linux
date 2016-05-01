@@ -1,0 +1,26 @@
+Renesas SH7750/51 PLL clock
+
+This device is Clock multiplyer
+
+Required Properties:
+
+  - compatible: Must be "renesas,sh7750-pll-clock"
+
+  - clocks: Reference to the parent clocks
+
+  - #clock-cells: Must be 0
+
+  - renesas,mult: PLL1 multiply rate
+
+  - reg: Two rate selector (FRQCR / WDT) register address
+
+Example
+-------
+
+        pllclk: pllclk {
+                compatible = "renesas,sh7750-pll-clock";
+                clocks = <&oclk>;
+                #clock-cells = <0>;
+		renesas,mult = <12>;
+                reg = <0xffc00000 2>, <0xffc00008 4>;
+        };

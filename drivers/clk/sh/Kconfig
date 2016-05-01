@@ -1,0 +1,5 @@
+config COMMON_CLK_SH7750
+	bool "Clcok driver for SH7750/SH7751"
+	depends on CPU_SUBTYPE_SH7750 || CPU_SUBTYPE_SH7750S || \
+	           CPU_SUBTYPE_SH7750R || \
+	           CPU_SUBTYPE_SH7751 || CPU_SUBTYPE_SH7751R
