@@ -690,11 +690,9 @@ static u32 rtl8188eu_hal_init(struct adapter *Adapter)
 
 	#define HAL_INIT_PROFILE_TAG(stage) do {} while (0)
 
-
 	HAL_INIT_PROFILE_TAG(HAL_INIT_STAGES_BEGIN);
 
 	if (Adapter->pwrctrlpriv.bkeepfwalive) {
-
 		if (haldata->odmpriv.RFCalibrateInfo.bIQKInitialized) {
 			rtl88eu_phy_iq_calibrate(Adapter, true);
 		} else {
@@ -908,7 +906,6 @@ HAL_INIT_PROFILE_TAG(HAL_INIT_STAGES_END);
 	DBG_88E("%s in %dms\n", __func__,
 		jiffies_to_msecs(jiffies - init_start_time));
 
-
 	return status;
 }
 
@@ -971,6 +968,7 @@ static void CardDisableRTL8188EU(struct adapter *Adapter)
 	haldata->bMacPwrCtrlOn = false;
 	Adapter->bFWReady = false;
 }
+
 static void rtl8192cu_hw_power_down(struct adapter *adapt)
 {
 	/*  2010/-8/09 MH For power down module, we need to enable register block contrl reg at 0x1c. */
@@ -983,7 +981,6 @@ static void rtl8192cu_hw_power_down(struct adapter *adapt)
 
 static u32 rtl8188eu_hal_deinit(struct adapter *Adapter)
 {
-
 	DBG_88E("==> %s\n", __func__);
 
 	usb_write32(Adapter, REG_HIMR_88E, IMR_DISABLED_88E);
@@ -1119,7 +1116,6 @@ readAdapterInfo_8188EU(
 	Hal_ReadAntennaDiversity88E(adapt, eeprom->efuse_eeprom_data, eeprom->bautoload_fail_flag);
 	Hal_EfuseParseBoardType88E(adapt, eeprom->efuse_eeprom_data, eeprom->bautoload_fail_flag);
 	Hal_ReadThermalMeter_88E(adapt, eeprom->efuse_eeprom_data, eeprom->bautoload_fail_flag);
-
 }
 
 static void _ReadPROMContent(
@@ -1858,7 +1854,6 @@ static void GetHwReg8188EU(struct adapter *Adapter, u8 variable, u8 *val)
 	default:
 		break;
 	}
-
 }
 
 /*  */
