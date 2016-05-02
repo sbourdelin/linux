@@ -95,7 +95,7 @@
 	secure_32k_clk_src_ck: secure_32k_clk_src_ck {
 		#clock-cells = <0>;
 		compatible = "fixed-clock";
-		clock-frequency = <32768>;
+		clock-frequency = <34600>; /* approximate frequency */
 	};
 
 	sys_clk32_crystal_ck: sys_clk32_crystal_ck {
