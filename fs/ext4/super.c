@@ -3416,14 +3416,30 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	}
 
 	if (sbi->s_mount_opt & EXT4_MOUNT_DAX) {
+		struct blk_dax_ctl dax = {
+			.sector = 0,
+			.size = PAGE_SIZE,
+		};
 		if (blocksize != PAGE_SIZE) {
 			ext4_msg(sb, KERN_ERR,
 					"error: unsupported blocksize for dax");
 			goto failed_mount;
 		}
-		if (!sb->s_bdev->bd_disk->fops->direct_access) {
-			ext4_msg(sb, KERN_ERR,
+		err = bdev_direct_access(sb->s_bdev, &dax);
+		if (err < 0) {
+			switch (err) {
+			case -EOPNOTSUPP:
+				ext4_msg(sb, KERN_ERR,
 					"error: device does not support dax");
+				break;
+			case -EINVAL:
+				ext4_msg(sb, KERN_ERR,
+					"error: unaligned partition for dax");
+				break;
+			default:
+				ext4_msg(sb, KERN_ERR,
+					"error: dax access failed (%d)", err);
+			}
 			goto failed_mount;
 		}
 	}
