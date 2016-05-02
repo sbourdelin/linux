@@ -32,13 +32,15 @@ static inline void *kasan_mem_to_shadow(const void *addr)
 /* Enable reporting bugs after kasan_disable_current() */
 static inline void kasan_enable_current(void)
 {
-	current->kasan_depth++;
+	if (current->kasan_depth + 1)
+		current->kasan_depth++;
 }
 
 /* Disable reporting bugs for current task */
 static inline void kasan_disable_current(void)
 {
-	current->kasan_depth--;
+	if (current->kasan_depth)
+		current->kasan_depth--;
 }
 
 void kasan_unpoison_shadow(const void *address, size_t size);
@@ -113,8 +115,6 @@ static inline void kasan_krealloc(const void *object, size_t new_size,
 
 static inline void kasan_slab_alloc(struct kmem_cache *s, void *object,
 				   gfp_t flags) {}
-/* kasan_slab_free() returns true if the object has been put into quarantine.
- */
 static inline bool kasan_slab_free(struct kmem_cache *s, void *object)
 {
 	return false;
