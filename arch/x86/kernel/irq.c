@@ -387,13 +387,12 @@ int check_irq_vectors_for_cpu_disable(void)
 		 * this the down'd cpu is the last cpu in the irq's
 		 * affinity mask, or
 		 *
-		 * 2) the resulting affinity mask is no longer a
-		 * subset of the online cpus but the affinity mask is
+		 * 2) the resulting affinity mask no longer has
+		 * common bits with online cpus mask but the affinity mask is
 		 * not zero; that is the down'd cpu is the last online
 		 * cpu in a user set affinity mask.
 		 */
-		if (cpumask_empty(&affinity_new) ||
-		    !cpumask_subset(&affinity_new, &online_new))
+		if (cpumask_any_and(&affinity_new, &online_new) >= nr_cpu_ids)
 			this_count++;
 	}
 
