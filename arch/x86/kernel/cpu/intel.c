@@ -25,6 +25,62 @@
 #include <asm/apic.h>
 #endif
 
+/*
+ * Just in case our CPU detection goes bad, allow a way to
+ * override the disabling of MPX.
+ */
+static int forcempx;
+static int __init forcempx_setup(char *__unused)
+{
+	forcempx = 1;
+	return 1;
+}
+__setup("intel-skd-046-workaround=disable", forcempx_setup);
+
+/*
+ * x86_model values come from: SDM Vol 3. Chapter 35
+ */
+static int is_mpx_affected_microarch(struct cpuinfo_x86 *c)
+{
+	/* Only family 6 is affected */
+	if (c->x86 != 0x6)
+		return 0;
+
+	/* We know these Atom models are unaffected, for sure */
+	switch (c->x86_model) {
+	case 0x5F: /* "Future Intel Atom ... Goldmont */
+	case 0x5C: /* "Future Intel Atom ... Goldmont */
+	     return 0;
+	}
+	/*
+	 * We will get here on future unknown processors and all
+	 * Core/Xeons.  They might be unaffected Atoms or
+	 * affected Core/Xeons. Be conservative and assume
+	 * processor is affected.
+	 *
+	 * Once the complete list of Core/Xeon models is known
+	 * it can be added here, and the Atom list removed.
+	 */
+	return 1;
+}
+
+void check_mpx_erratum(struct cpuinfo_x86 *c)
+{
+	if (forcempx)
+		return;
+	/*
+	 * Turn off MPX feature on affected CPUs where SMEP is not
+	 * available or disabled.
+	 *
+	 * Works around Intel Erratum: "SKD046 Branch Instructions
+	 * May Initialize MPX Bound Registers Incorrectly."
+	 */
+	if (is_mpx_affected_microarch(c) &&
+	    cpu_has(c, X86_FEATURE_MPX) &&
+	    !cpu_has(c, X86_FEATURE_SMEP))
+		setup_clear_cpu_cap(X86_FEATURE_MPX);
+}
+
 static void early_init_intel(struct cpuinfo_x86 *c)
 {
 	u64 misc_enable;
@@ -173,6 +229,8 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 		if (edx & (1U << 28))
 			c->x86_coreid_bits = get_count_order((ebx >> 16) & 0xff);
 	}
+
+	check_mpx_erratum(c);
 }
 
 #ifdef CONFIG_X86_32
