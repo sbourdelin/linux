@@ -746,6 +746,17 @@ struct crng_state primary_crng = {
 };
 static DECLARE_WAIT_QUEUE_HEAD(crng_init_wait);
 
+#ifdef CONFIG_NUMA
+/*
+ * Hack to deal with crazy userspace progams when they are all trying
+ * to access /dev/urandom in parallel.  The programs are almost
+ * certainly doing something terribly wrong, but we'll work around
+ * their brain damage.
+ */
+static struct crng_state **crng_node_pool __read_mostly;
+#endif
+
+
 static void _initialize_crng(struct crng_state *crng)
 {
 	int		i;
@@ -761,11 +772,13 @@ static void _initialize_crng(struct crng_state *crng)
 	crng->init_time = jiffies - CRNG_RESEED_INTERVAL;
 }
 
+#ifdef CONFIG_NUMA
 static void initialize_crng(struct crng_state *crng)
 {
 	_initialize_crng(crng);
 	spin_lock_init(&crng->lock);
 }
+#endif
 
 static int crng_fast_load(__u32 pool[4])
 {
@@ -822,19 +835,23 @@ out:
 	return ret;
 }
 
+static inline void maybe_reseed_primary_crng(void)
+{
+	if (crng_init > 2 &&
+	    time_after(jiffies, primary_crng.init_time + CRNG_RESEED_INTERVAL))
+		crng_reseed(&input_pool);
+}
+
 static inline void crng_wait_ready(void)
 {
 	wait_event_interruptible(crng_init_wait, crng_ready());
 }
 
-static void extract_crng(__u8 out[CHACHA20_BLOCK_SIZE])
+static void _extract_crng(struct crng_state *crng,
+			  __u8 out[CHACHA20_BLOCK_SIZE])
 {
 	unsigned long v, flags;
-	struct crng_state *crng = &primary_crng;
 
-	if (crng_init > 2 &&
-	    time_after(jiffies, crng->init_time + CRNG_RESEED_INTERVAL))
-		crng_reseed(&input_pool);
 	spin_lock_irqsave(&crng->lock, flags);
 	if (arch_get_random_long(&v))
 		crng->state[14] ^= v;
@@ -842,6 +859,30 @@ static void extract_crng(__u8 out[CHACHA20_BLOCK_SIZE])
 	if (crng->state[12] == 0)
 		crng->state[13]++;
 	spin_unlock_irqrestore(&crng->lock, flags);
+}
+
+static void extract_crng(__u8 out[CHACHA20_BLOCK_SIZE])
+{
+#ifndef CONFIG_NUMA
+	maybe_reseed_primary_crng();
+	_extract_crng(&primary_crng, out);
+#else
+	int node_id = numa_node_id();
+	struct crng_state *crng = crng_node_pool[node_id];
+
+	if (time_after(jiffies, crng->init_time + CRNG_RESEED_INTERVAL)) {
+		unsigned long flags;
+
+		maybe_reseed_primary_crng();
+		_extract_crng(&primary_crng, out);
+		spin_lock_irqsave(&crng->lock, flags);
+		memcpy(&crng->state[4], out, CHACHA20_KEY_SIZE);
+		crng->state[15] = numa_node_id();
+		crng->init_time = jiffies;
+		spin_unlock_irqrestore(&crng->lock, flags);
+	}
+	_extract_crng(crng, out);
+#endif
 }
 
 static ssize_t extract_crng_user(void __user *buf, size_t nbytes)
@@ -1548,6 +1589,22 @@ static void init_std_data(struct entropy_store *r)
  */
 static int rand_initialize(void)
 {
+#ifdef CONFIG_NUMA
+	int i;
+	int num_nodes = num_possible_nodes();
+	struct crng_state *crng;
+
+	crng_node_pool = kmalloc(num_nodes * sizeof(void *),
+				 GFP_KERNEL|__GFP_NOFAIL);
+
+	for (i=0; i < num_nodes; i++) {
+		crng = kmalloc(sizeof(struct crng_state),
+			       GFP_KERNEL | __GFP_NOFAIL);
+		initialize_crng(crng);
+		crng_node_pool[i] = crng;
+
+	}
+#endif
 	init_std_data(&input_pool);
 	init_std_data(&blocking_pool);
 	_initialize_crng(&primary_crng);
