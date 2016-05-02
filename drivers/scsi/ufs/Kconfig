@@ -91,3 +91,12 @@ config SCSI_UFS_DWC
 config SCSI_UFS_DWC_TC
 	bool
 	select SCSI_UFS_DWC
+
+config SCSI_UFS_DWC_TC_PLATFORM
+	tristate "DesignWare platform support using a G210 Test Chip"
+	depends on SCSI_UFSHCD_PLATFORM
+	select SCSI_UFS_DWC_TC
+	---help---
+	  Synopsys Test Chip is a PHY for prototyping purposes.
+
+	  If unsure, say N."
