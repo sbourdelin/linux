@@ -2784,7 +2784,7 @@ static int cgroup_procs_write_permission(struct task_struct *task,
 	int ret = 0;
 
 	/*
-	 * even if we're attaching all tasks in the thread group, we only
+	 * Even if we're attaching all tasks in the thread group, we only
 	 * need to check permissions on one of them.
 	 */
 	if (!uid_eq(cred->euid, GLOBAL_ROOT_UID) &&
@@ -2792,14 +2792,21 @@ static int cgroup_procs_write_permission(struct task_struct *task,
 	    !uid_eq(cred->euid, tcred->suid))
 		ret = -EACCES;
 
-	if (!ret && cgroup_on_dfl(dst_cgrp)) {
+	if (!ret) {
 		struct super_block *sb = of->file->f_path.dentry->d_sb;
 		struct cgroup *cgrp;
 		struct inode *inode;
 
 		spin_lock_bh(&css_set_lock);
-		cgrp = task_cgroup_from_root(task, &cgrp_dfl_root);
+		cgrp = task_cgroup_from_root(task, dst_cgrp->root);
 		spin_unlock_bh(&css_set_lock);
+
+		/*
+		 * We don't do any cgroup.proc permission checks if the user is trying
+		 * to mode the process to subtree of the current cgroup it is in.
+		 */
+		if (cgroup_is_descendant(dst_cgrp, cgrp))
+			goto out_put_cred;
 
 		while (!cgroup_is_descendant(dst_cgrp, cgrp))
 			cgrp = cgroup_parent(cgrp);
@@ -2812,6 +2819,7 @@ static int cgroup_procs_write_permission(struct task_struct *task,
 		}
 	}
 
+out_put_cred:
 	put_cred(tcred);
 	return ret;
 }
@@ -4824,6 +4832,7 @@ static struct cftype cgroup_dfl_base_files[] = {
 static struct cftype cgroup_legacy_base_files[] = {
 	{
 		.name = "cgroup.procs",
+		.file_offset = offsetof(struct cgroup, procs_file),
 		.seq_start = cgroup_pidlist_start,
 		.seq_next = cgroup_pidlist_next,
 		.seq_stop = cgroup_pidlist_stop,
