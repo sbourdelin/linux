@@ -3143,27 +3143,83 @@ static void intel_update_primary_planes(struct drm_device *dev)
 	}
 }
 
+static int
+__intel_display_resume(struct drm_device *dev,
+		       struct drm_atomic_state *state)
+{
+	struct drm_crtc_state *crtc_state;
+	struct drm_crtc *crtc;
+	int i;
+
+	intel_modeset_setup_hw_state(dev);
+	i915_redisable_vga(dev);
+
+	if (!state)
+		return 0;
+
+	for_each_crtc_in_state(state, crtc, crtc_state, i) {
+		/*
+		 * Force recalculation even if we restore
+		 * current state. With fast modeset this may not result
+		 * in a modeset when the state is compatible.
+		 */
+		crtc_state->mode_changed = true;
+	}
+
+	return drm_atomic_commit(state);
+}
+
 void intel_prepare_reset(struct drm_device *dev)
 {
-	/* no reset support for gen2 */
-	if (IS_GEN2(dev))
-		return;
+	struct drm_atomic_state *state;
+	struct drm_modeset_acquire_ctx *pctx;
+	struct drm_i915_private *dev_priv = to_i915(dev);
+	int ret;
 
-	/* reset doesn't touch the display */
-	if (INTEL_INFO(dev)->gen >= 5 || IS_G4X(dev))
+	/* no reset support for gen2 */
+	if (IS_GEN2(dev_priv))
 		return;
 
 	drm_modeset_lock_all(dev);
+
+	/* reset doesn't touch the display, but flips might get nuked anyway, */
+	if (INTEL_INFO(dev_priv)->gen >= 5 || IS_G4X(dev_priv))
+		return;
+
+	pctx = dev->mode_config.acquire_ctx;
+
 	/*
 	 * Disabling the crtcs gracefully seems nicer. Also the
 	 * g33 docs say we should at least disable all the planes.
 	 */
-	intel_display_suspend(dev);
+
+	state = drm_atomic_helper_duplicate_state(dev, pctx);
+	if (IS_ERR(state)) {
+		ret = PTR_ERR(state);
+		state = NULL;
+		DRM_ERROR("Duplicating state failed with %i\n", ret);
+		goto err;
+	}
+
+	ret = drm_atomic_helper_disable_all(dev, pctx);
+	if (ret) {
+		DRM_ERROR("Suspending crtc's failed with %i\n", ret);
+		goto err;
+	}
+
+	dev_priv->modeset_restore_state = state;
+	state->acquire_ctx = pctx;
+	return;
+
+err:
+	drm_atomic_state_free(state);
 }
 
 void intel_finish_reset(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct drm_atomic_state *state = dev_priv->modeset_restore_state;
+	int ret;
 
 	/*
 	 * Flips in the rings will be nuked by the reset,
@@ -3175,6 +3231,8 @@ void intel_finish_reset(struct drm_device *dev)
 	/* no reset support for gen2 */
 	if (IS_GEN2(dev))
 		return;
+
+	dev_priv->modeset_restore_state = NULL;
 
 	/* reset doesn't touch the display */
 	if (INTEL_INFO(dev)->gen >= 5 || IS_G4X(dev)) {
@@ -3188,26 +3246,27 @@ void intel_finish_reset(struct drm_device *dev)
 		 * CS-based flips (which might get lost in gpu resets) any more.
 		 */
 		intel_update_primary_planes(dev);
-		return;
+	} else {
+		/*
+		 * The display has been reset as well,
+		 * so need a full re-initialization.
+		 */
+		intel_runtime_pm_disable_interrupts(dev_priv);
+		intel_runtime_pm_enable_interrupts(dev_priv);
+
+		intel_modeset_init_hw(dev);
+
+		spin_lock_irq(&dev_priv->irq_lock);
+		if (dev_priv->display.hpd_irq_setup)
+			dev_priv->display.hpd_irq_setup(dev);
+		spin_unlock_irq(&dev_priv->irq_lock);
+
+		ret = __intel_display_resume(dev, state);
+		if (ret)
+			DRM_ERROR("Restoring old state failed with %i\n", ret);
+
+		intel_hpd_init(dev_priv);
 	}
-
-	/*
-	 * The display has been reset as well,
-	 * so need a full re-initialization.
-	 */
-	intel_runtime_pm_disable_interrupts(dev_priv);
-	intel_runtime_pm_enable_interrupts(dev_priv);
-
-	intel_modeset_init_hw(dev);
-
-	spin_lock_irq(&dev_priv->irq_lock);
-	if (dev_priv->display.hpd_irq_setup)
-		dev_priv->display.hpd_irq_setup(dev);
-	spin_unlock_irq(&dev_priv->irq_lock);
-
-	intel_display_resume(dev);
-
-	intel_hpd_init(dev_priv);
 
 	drm_modeset_unlock_all(dev);
 }
@@ -15957,9 +16016,10 @@ void intel_display_resume(struct drm_device *dev)
 	struct drm_atomic_state *state = dev_priv->modeset_restore_state;
 	struct drm_modeset_acquire_ctx ctx;
 	int ret;
-	bool setup = false;
 
 	dev_priv->modeset_restore_state = NULL;
+	if (state)
+		state->acquire_ctx = &ctx;
 
 	/*
 	 * This is a cludge because with real atomic modeset mode_config.mutex
@@ -15970,39 +16030,16 @@ void intel_display_resume(struct drm_device *dev)
 	mutex_lock(&dev->mode_config.mutex);
 	drm_modeset_acquire_init(&ctx, 0);
 
-retry:
-	ret = drm_modeset_lock_all_ctx(dev, &ctx);
+	while (1) {
+		ret = drm_modeset_lock_all_ctx(dev, &ctx);
+		if (ret != -EDEADLK)
+			break;
 
-	if (ret == 0 && !setup) {
-		setup = true;
-
-		intel_modeset_setup_hw_state(dev);
-		i915_redisable_vga(dev);
-	}
-
-	if (ret == 0 && state) {
-		struct drm_crtc_state *crtc_state;
-		struct drm_crtc *crtc;
-		int i;
-
-		state->acquire_ctx = &ctx;
-
-		for_each_crtc_in_state(state, crtc, crtc_state, i) {
-			/*
-			 * Force recalculation even if we restore
-			 * current state. With fast modeset this may not result
-			 * in a modeset when the state is compatible.
-			 */
-			crtc_state->mode_changed = true;
-		}
-
-		ret = drm_atomic_commit(state);
-	}
-
-	if (ret == -EDEADLK) {
 		drm_modeset_backoff(&ctx);
-		goto retry;
 	}
+
+	ret = __intel_display_resume(dev, state);
+	WARN_ON(ret == -EDEADLK);
 
 	drm_modeset_drop_locks(&ctx);
 	drm_modeset_acquire_fini(&ctx);
