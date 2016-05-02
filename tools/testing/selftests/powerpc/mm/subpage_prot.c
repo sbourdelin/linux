@@ -207,14 +207,16 @@ int test_file(void)
 
 int main(int argc, char *argv[])
 {
-	test_harness(test_anon, "subpage_prot_anon");
+	int rc;
+
+	rc = test_harness(test_anon, "subpage_prot_anon");
+	if (rc)
+		return rc;
 
 	if (argc > 1)
 		file_name = argv[1];
 	else
 		file_name = "tempfile";
 
-	test_harness(test_file, "subpage_prot_file");
-
-	return 0;
+	return test_harness(test_file, "subpage_prot_file");
 }
