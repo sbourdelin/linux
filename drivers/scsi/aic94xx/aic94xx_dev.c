@@ -73,7 +73,7 @@ out:
 
 static void asd_free_ddb(struct asd_ha_struct *asd_ha, int ddb)
 {
-	if (!ddb || ddb >= 0xFFFF)
+	if (ddb <= 0 || ddb >= 0xFFFF)
 		return;
 	asd_ddbsite_write_byte(asd_ha, ddb, DDB_TYPE, DDB_TYPE_UNUSED);
 	CLEAR_DDB(ddb, asd_ha);
