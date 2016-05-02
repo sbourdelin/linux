@@ -1557,15 +1557,30 @@ xfs_fs_fill_super(
 		sb->s_flags |= MS_I_VERSION;
 
 	if (mp->m_flags & XFS_MOUNT_DAX) {
+		struct blk_dax_ctl dax = {
+			.sector = 0,
+			.size = PAGE_SIZE,
+		};
 		xfs_warn(mp,
-	"DAX enabled. Warning: EXPERIMENTAL, use at your own risk");
+		"DAX enabled. Warning: EXPERIMENTAL, use at your own risk");
 		if (sb->s_blocksize != PAGE_SIZE) {
 			xfs_alert(mp,
 		"Filesystem block size invalid for DAX Turning DAX off.");
 			mp->m_flags &= ~XFS_MOUNT_DAX;
-		} else if (!sb->s_bdev->bd_disk->fops->direct_access) {
-			xfs_alert(mp,
-		"Block device does not support DAX Turning DAX off.");
+		} else if ((error = bdev_direct_access(sb->s_bdev, &dax)) < 0) {
+			switch (error) {
+			case -EOPNOTSUPP:
+				xfs_alert(mp,
+			"Block device does not support DAX Turning DAX off.");
+				break;
+			case -EINVAL:
+				xfs_alert(mp,
+			"Partition alignment invalid for DAX Turning DAX off.");
+				break;
+			default:
+				xfs_alert(mp,
+			"DAX access failed (%d) DAX Turning DAX off.", error);
+			}
 			mp->m_flags &= ~XFS_MOUNT_DAX;
 		}
 	}
