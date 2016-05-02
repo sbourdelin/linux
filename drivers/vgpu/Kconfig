@@ -1,0 +1,21 @@
+
+menuconfig VGPU
+    tristate "VGPU driver framework"
+    depends on VFIO
+    select VGPU_VFIO
+    help
+        VGPU provides a framework to virtualize GPU without SR-IOV cap
+        See Documentation/vgpu.txt for more details.
+
+        If you don't know what do here, say N.
+
+config VGPU
+    tristate
+    depends on VFIO
+    default n
+
+config VGPU_VFIO
+    tristate
+    depends on VGPU
+    default n
+
