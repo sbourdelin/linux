@@ -4120,6 +4120,20 @@ static int btrfs_check_super_valid(struct btrfs_fs_info *fs_info,
 	 * Hint to catch really bogus numbers, bitflips or so, more exact checks are
 	 * done later
 	 */
+	if (btrfs_super_total_bytes(sb) == 0) {
+		printk(KERN_ERR "BTRFS: total bytes is zero\n");
+		ret = -EINVAL;
+	}
+	if (btrfs_super_bytes_used(sb) < 6 * btrfs_super_nodesize(sb)) {
+		printk(KERN_ERR "BTRFS: bytes_used is too small %llu\n",
+		       btrfs_super_bytes_used(sb));
+		ret = -EINVAL;
+	}
+	if (btrfs_super_stripesize(sb) != 4096) {
+		printk(KERN_ERR "BTRFS: invalid stripesize %u\n",
+		       btrfs_super_stripesize(sb));
+		ret = -EINVAL;
+	}
 	if (btrfs_super_num_devices(sb) > (1UL << 31))
 		printk(KERN_WARNING "BTRFS: suspicious number of devices: %llu\n",
 				btrfs_super_num_devices(sb));
