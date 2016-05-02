@@ -2186,7 +2186,7 @@
 		reg = <0x0558>;
 	};
 
-	sys_32k_ck: sys_32k_ck {
+	sys_32k_ck: sys_32k_ck@6c4 {
 		#clock-cells = <0>;
 		compatible = "ti,mux-clock";
 		clocks = <&sys_clk32_crystal_ck>, <&sys_clk32_pseudo_ck>, <&sys_clk32_pseudo_ck>, <&sys_clk32_pseudo_ck>;
