@@ -243,7 +243,7 @@ struct ib_class_port_info {
 	u8			base_version;
 	u8			class_version;
 	__be16			capability_mask;
-	u8			reserved[3];
+	__be32			capability_mask2;
 	u8			resp_time_value;
 	u8			redirect_gid[16];
 	__be32			redirect_tcslfl;
