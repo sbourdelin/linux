@@ -99,7 +99,7 @@ static inline const void *kasan_shadow_to_mem(const void *shadow_addr)
 
 static inline bool kasan_report_enabled(void)
 {
-	return !current->kasan_depth;
+	return !!current->kasan_depth;
 }
 
 void kasan_report(unsigned long addr, size_t size,
