@@ -1329,15 +1329,26 @@ void hash_preload(struct mm_struct *mm, unsigned long ea,
 	unsigned long vsid;
 	pgd_t *pgdir;
 	pte_t *ptep;
+	int psize;
 	unsigned long flags;
 	int rc, ssize, update_flags = 0;
 
 	BUG_ON(REGION_ID(ea) != USER_REGION_ID);
 
 #ifdef CONFIG_PPC_MM_SLICES
-	/* We only prefault standard pages for now */
-	if (unlikely(get_slice_psize(mm, ea) != mm->context.user_psize))
+	psize = get_slice_psize(mm, ea);
+	/*
+	 * We only prefault standard pages
+	 */
+	if (psize != mm->context.user_psize)
 		return;
+#ifdef CONFIG_PPC_64K_PAGES
+	/*
+	 * Don't prefault is subpage protection is enabled for that ea
+	 */
+	if ((psize == MMU_PAGE_4K) && subpage_protection(mm, ea))
+		return;
+#endif
 #endif
 
 	DBG_LOW("hash_preload(mm=%p, mm->pgdir=%p, ea=%016lx, access=%lx,"
