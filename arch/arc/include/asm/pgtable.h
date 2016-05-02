@@ -278,11 +278,9 @@ static inline void pmd_set(pmd_t *pmdp, pte_t *ptep)
 #define pmd_present(x)			(pmd_val(x))
 #define pmd_clear(xp)			do { pmd_val(*(xp)) = 0; } while (0)
 
-#define pte_page(pte)	\
-	(mem_map + virt_to_pfn(pte_val(pte) - CONFIG_LINUX_LINK_BASE))
-
 #define mk_pte(page, prot)	pfn_pte(page_to_pfn(page), prot)
 #define pte_pfn(pte)		virt_to_pfn(pte_val(pte))
+#define pte_page(pte)		pfn_to_page(pte_pfn(pte))
 #define pfn_pte(pfn, prot)	(__pte(((pte_t)(pfn) << PAGE_SHIFT) | \
 				 pgprot_val(prot)))
 #define __pte_index(addr)	(virt_to_pfn(addr) & (PTRS_PER_PTE - 1))
