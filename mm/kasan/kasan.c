@@ -511,23 +511,28 @@ void kasan_poison_slab_free(struct kmem_cache *cache, void *object)
 bool kasan_slab_free(struct kmem_cache *cache, void *object)
 {
 #ifdef CONFIG_SLAB
+	struct kasan_alloc_meta *alloc_info;
+	struct kasan_free_meta *free_info;
+
 	/* RCU slabs could be legally used after free within the RCU period */
 	if (unlikely(cache->flags & SLAB_DESTROY_BY_RCU))
 		return false;
 
-	if (likely(cache->flags & SLAB_KASAN)) {
-		struct kasan_alloc_meta *alloc_info =
-			get_alloc_info(cache, object);
-		struct kasan_free_meta *free_info =
-			get_free_info(cache, object);
+	if (unlikely(!(cache->flags & SLAB_KASAN)))
+		return false;
 
-		switch (alloc_info->state) {
-		case KASAN_STATE_ALLOC:
-			alloc_info->state = KASAN_STATE_QUARANTINE;
-			quarantine_put(free_info, cache);
-			set_track(&free_info->track, GFP_NOWAIT);
-			kasan_poison_slab_free(cache, object);
-			return true;
+	alloc_info = get_alloc_info(cache, object);
+
+	if (cmpxchg(&alloc_info->state, KASAN_STATE_ALLOC,
+				KASAN_STATE_QUARANTINE) == KASAN_STATE_ALLOC) {
+		free_info = get_free_info(cache, object);
+		quarantine_put(free_info, cache);
+		set_track(&free_info->track, GFP_NOWAIT);
+		kasan_poison_slab_free(cache, object);
+		return true;
+	}
+
+	switch (alloc_info->state) {
 		case KASAN_STATE_QUARANTINE:
 		case KASAN_STATE_FREE:
 			pr_err("Double free");
@@ -535,7 +540,6 @@ bool kasan_slab_free(struct kmem_cache *cache, void *object)
 			break;
 		default:
 			break;
-		}
 	}
 	return false;
 #else
