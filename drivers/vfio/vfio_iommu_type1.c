@@ -36,6 +36,7 @@
 #include <linux/uaccess.h>
 #include <linux/vfio.h>
 #include <linux/workqueue.h>
+#include <linux/vgpu.h>
 
 #define DRIVER_VERSION  "0.2"
 #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
@@ -67,6 +68,11 @@ struct vfio_domain {
 	struct list_head	group_list;
 	int			prot;		/* IOMMU_CACHE */
 	bool			fgsp;		/* Fine-grained super pages */
+	bool			vfio_iommu_api_only;	/* Domain for device which
+							   is without physical IOMMU */
+	struct mm_struct	*vmm_mm;	/* VMM's mm */
+	struct rb_root		pfn_list;	/* Host pfn list for requested gfns */
+	struct mutex		lock;		/* mutex for pfn_list */
 };
 
 struct vfio_dma {
@@ -82,6 +88,19 @@ struct vfio_group {
 	struct list_head	next;
 };
 
+/*
+ * Guest RAM pinning working set or DMA target
+ */
+struct vfio_vgpu_pfn {
+	struct rb_node		node;
+	unsigned long		vmm_va;		/* VMM virtual addr */
+	dma_addr_t		iova;		/* IOVA */
+	unsigned long		npage;		/* number of pages */
+	unsigned long		pfn;		/* Host pfn */
+	int			prot;
+	atomic_t		ref_count;
+	struct list_head	next;
+};
 /*
  * This code handles mapping and unmapping of user data buffers
  * into DMA'ble space using the IOMMU
@@ -128,6 +147,53 @@ static void vfio_link_dma(struct vfio_iommu *iommu, struct vfio_dma *new)
 static void vfio_unlink_dma(struct vfio_iommu *iommu, struct vfio_dma *old)
 {
 	rb_erase(&old->node, &iommu->dma_list);
+}
+
+/*
+ * Helper Functions for host pfn list
+ */
+
+static struct vfio_vgpu_pfn *vfio_find_vgpu_pfn(struct vfio_domain *domain,
+						unsigned long pfn)
+{
+	struct rb_node *node = domain->pfn_list.rb_node;
+
+	while (node) {
+		struct vfio_vgpu_pfn *vgpu_pfn = rb_entry(node, struct vfio_vgpu_pfn, node);
+
+		if (pfn <= vgpu_pfn->pfn)
+			node = node->rb_left;
+		else if (pfn >= vgpu_pfn->pfn)
+			node = node->rb_right;
+		else
+			return vgpu_pfn;
+	}
+
+	return NULL;
+}
+
+static void vfio_link_vgpu_pfn(struct vfio_domain *domain, struct vfio_vgpu_pfn *new)
+{
+	struct rb_node **link = &domain->pfn_list.rb_node, *parent = NULL;
+	struct vfio_vgpu_pfn *vgpu_pfn;
+
+	while (*link) {
+		parent = *link;
+		vgpu_pfn = rb_entry(parent, struct vfio_vgpu_pfn, node);
+
+		if (new->pfn <= vgpu_pfn->pfn)
+			link = &(*link)->rb_left;
+		else
+			link = &(*link)->rb_right;
+	}
+
+	rb_link_node(&new->node, parent, link);
+	rb_insert_color(&new->node, &domain->pfn_list);
+}
+
+static void vfio_unlink_vgpu_pfn(struct vfio_domain *domain, struct vfio_vgpu_pfn *old)
+{
+	rb_erase(&old->node, &domain->pfn_list);
 }
 
 struct vwork {
@@ -228,20 +294,22 @@ static int put_pfn(unsigned long pfn, int prot)
 	return 0;
 }
 
-static int vaddr_get_pfn(unsigned long vaddr, int prot, unsigned long *pfn)
+static int vaddr_get_pfn(struct mm_struct *mm, unsigned long vaddr,
+			 int prot, unsigned long *pfn)
 {
 	struct page *page[1];
 	struct vm_area_struct *vma;
 	int ret = -EFAULT;
 
-	if (get_user_pages_fast(vaddr, 1, !!(prot & IOMMU_WRITE), page) == 1) {
+	if (get_user_pages_remote(NULL, mm, vaddr, 1, !!(prot & IOMMU_WRITE),
+				    0, page, NULL) == 1) {
 		*pfn = page_to_pfn(page[0]);
 		return 0;
 	}
 
-	down_read(&current->mm->mmap_sem);
+	down_read(&mm->mmap_sem);
 
-	vma = find_vma_intersection(current->mm, vaddr, vaddr + 1);
+	vma = find_vma_intersection(mm, vaddr, vaddr + 1);
 
 	if (vma && vma->vm_flags & VM_PFNMAP) {
 		*pfn = ((vaddr - vma->vm_start) >> PAGE_SHIFT) + vma->vm_pgoff;
@@ -249,9 +317,34 @@ static int vaddr_get_pfn(unsigned long vaddr, int prot, unsigned long *pfn)
 			ret = 0;
 	}
 
-	up_read(&current->mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 
 	return ret;
+}
+
+/*
+ * Get first domain with iommu and without iommu from iommu's domain_list for
+ * lookups
+ * @iommu [in]: iommu structure
+ * @domain [out]: domain with iommu
+ * @domain_vgpu [out] : domain without iommu for vGPU
+ */
+static void get_first_domains(struct vfio_iommu *iommu, struct vfio_domain **domain,
+			      struct vfio_domain **domain_vgpu)
+{
+	struct vfio_domain *d;
+
+	if (!domain || !domain_vgpu)
+		return;
+
+	list_for_each_entry(d, &iommu->domain_list, next) {
+		if (d->vfio_iommu_api_only && !*domain_vgpu)
+			*domain_vgpu = d;
+		else if (!*domain)
+			*domain = d;
+		if (*domain_vgpu && *domain)
+			break;
+	}
 }
 
 /*
@@ -259,18 +352,28 @@ static int vaddr_get_pfn(unsigned long vaddr, int prot, unsigned long *pfn)
  * the iommu can only map chunks of consecutive pfns anyway, so get the
  * first page and all consecutive pages with the same locking.
  */
-static long vfio_pin_pages(unsigned long vaddr, long npage,
-			   int prot, unsigned long *pfn_base)
+static long vfio_pin_pages_internal(void *domain_data, unsigned long vaddr, long npage,
+		             int prot, unsigned long *pfn_base)
 {
+	struct vfio_domain *domain = domain_data;
 	unsigned long limit = rlimit(RLIMIT_MEMLOCK) >> PAGE_SHIFT;
 	bool lock_cap = capable(CAP_IPC_LOCK);
 	long ret, i;
 	bool rsvd;
+	struct mm_struct *mm;
 
-	if (!current->mm)
+	if (!domain)
 		return -ENODEV;
 
-	ret = vaddr_get_pfn(vaddr, prot, pfn_base);
+	if (domain->vfio_iommu_api_only)
+		mm = domain->vmm_mm;
+	else
+		mm = current->mm;
+
+	if (!mm)
+		return -ENODEV;
+
+	ret = vaddr_get_pfn(mm, vaddr, prot, pfn_base);
 	if (ret)
 		return ret;
 
@@ -293,7 +396,7 @@ static long vfio_pin_pages(unsigned long vaddr, long npage,
 	for (i = 1, vaddr += PAGE_SIZE; i < npage; i++, vaddr += PAGE_SIZE) {
 		unsigned long pfn = 0;
 
-		ret = vaddr_get_pfn(vaddr, prot, &pfn);
+		ret = vaddr_get_pfn(mm, vaddr, prot, &pfn);
 		if (ret)
 			break;
 
@@ -318,25 +421,183 @@ static long vfio_pin_pages(unsigned long vaddr, long npage,
 	return i;
 }
 
-static long vfio_unpin_pages(unsigned long pfn, long npage,
-			     int prot, bool do_accounting)
+static long vfio_unpin_pages_internal(void *domain_data, unsigned long pfn, long npage,
+				      int prot, bool do_accounting)
 {
+	struct vfio_domain *domain = domain_data;
 	unsigned long unlocked = 0;
 	long i;
+
+	if (!domain)
+		return -ENODEV;
 
 	for (i = 0; i < npage; i++)
 		unlocked += put_pfn(pfn++, prot);
 
 	if (do_accounting)
 		vfio_lock_acct(-unlocked);
+	return unlocked;
+}
+
+/*
+ * Pin a set of guest PFNs and return their associated host PFNs for vGPU.
+ * @vaddr [in]: array of guest PFNs
+ * @npage [in]: count of array elements
+ * @prot [in] : protection flags
+ * @pfn_base[out] : array of host PFNs
+ */
+int vfio_pin_pages(void *iommu_data, dma_addr_t *vaddr, long npage,
+		   int prot, dma_addr_t *pfn_base)
+{
+	struct vfio_iommu *iommu = iommu_data;
+	struct vfio_domain *domain = NULL, *domain_vgpu = NULL;
+	int i = 0, ret = 0;
+	long retpage;
+	dma_addr_t remote_vaddr = 0;
+	dma_addr_t *pfn = pfn_base;
+	struct vfio_dma *dma;
+
+	if (!iommu || !pfn_base)
+		return -EINVAL;
+
+	if (list_empty(&iommu->domain_list)) {
+		ret = -EINVAL;
+		goto pin_done;
+	}
+
+	get_first_domains(iommu, &domain, &domain_vgpu);
+
+	// Return error if vGPU domain doesn't exist
+	if (!domain_vgpu) {
+		ret = -EINVAL;
+		goto pin_done;
+	}
+
+	for (i = 0; i < npage; i++) {
+		struct vfio_vgpu_pfn *p;
+		struct vfio_vgpu_pfn *lpfn;
+		unsigned long tpfn;
+		dma_addr_t iova;
+
+		mutex_lock(&iommu->lock);
+
+		iova = vaddr[i] << PAGE_SHIFT;
+
+		dma = vfio_find_dma(iommu, iova, 0 /*  size */);
+		if (!dma) {
+			mutex_unlock(&iommu->lock);
+			ret = -EINVAL;
+			goto pin_done;
+		}
+
+		remote_vaddr = dma->vaddr + iova - dma->iova;
+
+		retpage = vfio_pin_pages_internal(domain_vgpu, remote_vaddr,
+						  (long)1, prot, &tpfn);
+		mutex_unlock(&iommu->lock);
+		if (retpage <= 0) {
+			WARN_ON(!retpage);
+			ret = (int)retpage;
+			goto pin_done;
+		}
+
+		pfn[i] = tpfn;
+
+		mutex_lock(&domain_vgpu->lock);
+
+		// search if pfn exist
+		if ((p = vfio_find_vgpu_pfn(domain_vgpu, tpfn))) {
+			atomic_inc(&p->ref_count);
+			mutex_unlock(&domain_vgpu->lock);
+			continue;
+		}
+
+		// add to pfn_list
+		lpfn = kzalloc(sizeof(*lpfn), GFP_KERNEL);
+		if (!lpfn) {
+			ret = -ENOMEM;
+			mutex_unlock(&domain_vgpu->lock);
+			goto pin_done;
+		}
+		lpfn->vmm_va = remote_vaddr;
+		lpfn->iova = iova;
+		lpfn->pfn = pfn[i];
+		lpfn->npage = 1;
+		lpfn->prot = prot;
+		atomic_inc(&lpfn->ref_count);
+		vfio_link_vgpu_pfn(domain_vgpu, lpfn);
+		mutex_unlock(&domain_vgpu->lock);
+	}
+
+	ret = i;
+
+pin_done:
+	return ret;
+}
+EXPORT_SYMBOL(vfio_pin_pages);
+
+static int vfio_vgpu_unpin_pfn(struct vfio_domain *domain, struct vfio_vgpu_pfn *vpfn)
+{
+	int ret;
+
+	ret = vfio_unpin_pages_internal(domain, vpfn->pfn, vpfn->npage, vpfn->prot, true);
+
+	if (atomic_dec_and_test(&vpfn->ref_count)) {
+		// remove from pfn_list
+		vfio_unlink_vgpu_pfn(domain, vpfn);
+		kfree(vpfn);
+	}
+
+	return ret;
+}
+
+/*
+ * Unpin set of host PFNs for vGPU.
+ * @pfn	[in] : array of host PFNs to be unpinned.
+ * @npage [in] :count of elements in array, that is number of pages.
+ * @prot [in] : protection flags
+ */
+int vfio_unpin_pages(void *iommu_data, dma_addr_t *pfn, long npage,
+		     int prot)
+{
+	struct vfio_iommu *iommu = iommu_data;
+	struct vfio_domain *domain = NULL, *domain_vgpu = NULL;
+	long unlocked = 0;
+	int i;
+	if (!iommu || !pfn)
+		return -EINVAL;
+
+	if (list_empty(&iommu->domain_list))
+		return -EINVAL;
+
+	get_first_domains(iommu, &domain, &domain_vgpu);
+
+	// Return error if vGPU domain doesn't exist
+	if (!domain_vgpu)
+		return -EINVAL;
+
+	mutex_lock(&domain_vgpu->lock);
+
+	for (i = 0; i < npage; i++) {
+		struct vfio_vgpu_pfn *p;
+
+		// verify if pfn exist in pfn_list
+		if (!(p = vfio_find_vgpu_pfn(domain_vgpu, *(pfn + i)))) {
+			continue;
+		}
+
+		unlocked += vfio_vgpu_unpin_pfn(domain_vgpu, p);
+	}
+	mutex_unlock(&domain_vgpu->lock);
 
 	return unlocked;
 }
+EXPORT_SYMBOL(vfio_unpin_pages);
 
 static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
 {
 	dma_addr_t iova = dma->iova, end = dma->iova + dma->size;
-	struct vfio_domain *domain, *d;
+	struct vfio_domain *domain = NULL, *d, *domain_vgpu = NULL;
 	long unlocked = 0;
 
 	if (!dma->size)
@@ -348,12 +609,18 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
 	 * pfns to unpin.  The rest need to be unmapped in advance so we have
 	 * no iommu translations remaining when the pages are unpinned.
 	 */
-	domain = d = list_first_entry(&iommu->domain_list,
-				      struct vfio_domain, next);
 
+	get_first_domains(iommu, &domain, &domain_vgpu);
+
+	if (!domain)
+		return;
+
+	d = domain;
 	list_for_each_entry_continue(d, &iommu->domain_list, next) {
-		iommu_unmap(d->domain, dma->iova, dma->size);
-		cond_resched();
+		if (!d->vfio_iommu_api_only) {
+			iommu_unmap(d->domain, dma->iova, dma->size);
+			cond_resched();
+		}
 	}
 
 	while (iova < end) {
@@ -382,7 +649,7 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
 		if (WARN_ON(!unmapped))
 			break;
 
-		unlocked += vfio_unpin_pages(phys >> PAGE_SHIFT,
+		unlocked += vfio_unpin_pages_internal(domain, phys >> PAGE_SHIFT,
 					     unmapped >> PAGE_SHIFT,
 					     dma->prot, false);
 		iova += unmapped;
@@ -406,8 +673,10 @@ static unsigned long vfio_pgsize_bitmap(struct vfio_iommu *iommu)
 	unsigned long bitmap = ULONG_MAX;
 
 	mutex_lock(&iommu->lock);
-	list_for_each_entry(domain, &iommu->domain_list, next)
-		bitmap &= domain->domain->ops->pgsize_bitmap;
+	list_for_each_entry(domain, &iommu->domain_list, next) {
+		if (!domain->vfio_iommu_api_only)
+			bitmap &= domain->domain->ops->pgsize_bitmap;
+	}
 	mutex_unlock(&iommu->lock);
 
 	/*
@@ -517,6 +786,9 @@ static int map_try_harder(struct vfio_domain *domain, dma_addr_t iova,
 	long i;
 	int ret;
 
+	if (domain->vfio_iommu_api_only)
+		return -EINVAL;
+
 	for (i = 0; i < npage; i++, pfn++, iova += PAGE_SIZE) {
 		ret = iommu_map(domain->domain, iova,
 				(phys_addr_t)pfn << PAGE_SHIFT,
@@ -538,6 +810,9 @@ static int vfio_iommu_map(struct vfio_iommu *iommu, dma_addr_t iova,
 	int ret;
 
 	list_for_each_entry(d, &iommu->domain_list, next) {
+		if (d->vfio_iommu_api_only)
+			continue;
+
 		ret = iommu_map(d->domain, iova, (phys_addr_t)pfn << PAGE_SHIFT,
 				npage << PAGE_SHIFT, prot | d->prot);
 		if (ret) {
@@ -552,8 +827,11 @@ static int vfio_iommu_map(struct vfio_iommu *iommu, dma_addr_t iova,
 	return 0;
 
 unwind:
-	list_for_each_entry_continue_reverse(d, &iommu->domain_list, next)
+	list_for_each_entry_continue_reverse(d, &iommu->domain_list, next) {
+		if (d->vfio_iommu_api_only)
+			continue;
 		iommu_unmap(d->domain, iova, npage << PAGE_SHIFT);
+	}
 
 	return ret;
 }
@@ -569,6 +847,8 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
 	uint64_t mask;
 	struct vfio_dma *dma;
 	unsigned long pfn;
+	struct vfio_domain *domain = NULL;
+	int domain_with_iommu_present = 0;
 
 	/* Verify that none of our __u64 fields overflow */
 	if (map->size != size || map->vaddr != vaddr || map->iova != iova)
@@ -611,9 +891,22 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
 	/* Insert zero-sized and grow as we map chunks of it */
 	vfio_link_dma(iommu, dma);
 
+	list_for_each_entry(domain, &iommu->domain_list, next) {
+		if (!domain->vfio_iommu_api_only) {
+			domain_with_iommu_present = 1;
+			break;
+		}
+	}
+
+	// Skip pin and map only if domain without IOMMU is present
+	if (!domain_with_iommu_present) {
+		dma->size = size;
+		goto map_done;
+	}
+
 	while (size) {
 		/* Pin a contiguous chunk of memory */
-		npage = vfio_pin_pages(vaddr + dma->size,
+		npage = vfio_pin_pages_internal(domain, vaddr + dma->size,
 				       size >> PAGE_SHIFT, prot, &pfn);
 		if (npage <= 0) {
 			WARN_ON(!npage);
@@ -623,8 +916,8 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
 
 		/* Map it! */
 		ret = vfio_iommu_map(iommu, iova + dma->size, pfn, npage, prot);
-		if (ret) {
-			vfio_unpin_pages(pfn, npage, prot, true);
+		if (ret){
+			vfio_unpin_pages_internal(domain, pfn, npage, prot, true);
 			break;
 		}
 
@@ -635,6 +928,7 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
 	if (ret)
 		vfio_remove_dma(iommu, dma);
 
+map_done:
 	mutex_unlock(&iommu->lock);
 	return ret;
 }
@@ -654,12 +948,15 @@ static int vfio_bus_type(struct device *dev, void *data)
 static int vfio_iommu_replay(struct vfio_iommu *iommu,
 			     struct vfio_domain *domain)
 {
-	struct vfio_domain *d;
+	struct vfio_domain *d = NULL, *d_vgpu = NULL;
 	struct rb_node *n;
 	int ret;
 
+	if (domain->vfio_iommu_api_only)
+		return -EINVAL;
+
 	/* Arbitrarily pick the first domain in the list for lookups */
-	d = list_first_entry(&iommu->domain_list, struct vfio_domain, next);
+	get_first_domains(iommu, &d, &d_vgpu);
 	n = rb_first(&iommu->dma_list);
 
 	/* If there's not a domain, there better not be any mappings */
@@ -716,6 +1013,9 @@ static void vfio_test_domain_fgsp(struct vfio_domain *domain)
 	struct page *pages;
 	int ret, order = get_order(PAGE_SIZE * 2);
 
+	if (domain->vfio_iommu_api_only)
+		return;
+
 	pages = alloc_pages(GFP_KERNEL | __GFP_ZERO, order);
 	if (!pages)
 		return;
@@ -768,6 +1068,23 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
 	ret = iommu_group_for_each_dev(iommu_group, &bus, vfio_bus_type);
 	if (ret)
 		goto out_free;
+
+	if (!iommu_present(bus) && (bus == &vgpu_bus_type)) {
+		struct vgpu_device *vgpu_dev = NULL;
+
+		vgpu_dev = get_vgpu_device_from_group(iommu_group);
+		if (!vgpu_dev)
+			goto out_free;
+
+		vgpu_dev->iommu_data = iommu;
+		domain->vfio_iommu_api_only = true;
+		domain->vmm_mm = current->mm;
+		INIT_LIST_HEAD(&domain->group_list);
+		list_add(&group->next, &domain->group_list);
+		domain->pfn_list = RB_ROOT;
+		mutex_init(&domain->lock);
+		goto out_success;
+	}
 
 	domain->domain = iommu_domain_alloc(bus);
 	if (!domain->domain) {
@@ -834,6 +1151,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
 	if (ret)
 		goto out_detach;
 
+out_success:
 	list_add(&domain->next, &iommu->domain_list);
 
 	mutex_unlock(&iommu->lock);
@@ -854,9 +1172,34 @@ out_free:
 static void vfio_iommu_unmap_unpin_all(struct vfio_iommu *iommu)
 {
 	struct rb_node *node;
+	struct vfio_domain *domain = NULL, *domain_vgpu = NULL;
+
+	get_first_domains(iommu, &domain, &domain_vgpu);
+
+	if (domain_vgpu) {
+		int unlocked;
+		mutex_lock(&domain_vgpu->lock);
+		while ((node = rb_first(&domain_vgpu->pfn_list))) {
+			unlocked = vfio_vgpu_unpin_pfn(domain_vgpu,
+					rb_entry(node, struct vfio_vgpu_pfn, node));
+		}
+		mutex_unlock(&domain_vgpu->lock);
+	}
 
 	while ((node = rb_first(&iommu->dma_list)))
 		vfio_remove_dma(iommu, rb_entry(node, struct vfio_dma, node));
+}
+
+static bool list_is_singular_iommu_domain(struct vfio_iommu *iommu)
+{
+	struct vfio_domain *domain;
+	int domain_iommu = 0;
+
+	list_for_each_entry(domain, &iommu->domain_list, next) {
+		if (!domain->vfio_iommu_api_only)
+			domain_iommu++;
+	}
+	return (domain_iommu == 1);
 }
 
 static void vfio_iommu_type1_detach_group(void *iommu_data,
@@ -872,19 +1215,28 @@ static void vfio_iommu_type1_detach_group(void *iommu_data,
 		list_for_each_entry(group, &domain->group_list, next) {
 			if (group->iommu_group != iommu_group)
 				continue;
+			if (!domain->vfio_iommu_api_only)
+				iommu_detach_group(domain->domain, iommu_group);
+			else {
+				struct vgpu_device *vgpu_dev = NULL;
 
-			iommu_detach_group(domain->domain, iommu_group);
+				vgpu_dev = get_vgpu_device_from_group(iommu_group);
+				if (vgpu_dev)
+					vgpu_dev->iommu_data = NULL;
+
+			}
 			list_del(&group->next);
 			kfree(group);
 			/*
 			 * Group ownership provides privilege, if the group
 			 * list is empty, the domain goes away.  If it's the
-			 * last domain, then all the mappings go away too.
+			 * last domain with iommu, then all the mappings go away too.
 			 */
 			if (list_empty(&domain->group_list)) {
-				if (list_is_singular(&iommu->domain_list))
+				if (list_is_singular_iommu_domain(iommu))
 					vfio_iommu_unmap_unpin_all(iommu);
-				iommu_domain_free(domain->domain);
+				if (!domain->vfio_iommu_api_only)
+					iommu_domain_free(domain->domain);
 				list_del(&domain->next);
 				kfree(domain);
 			}
@@ -936,11 +1288,22 @@ static void vfio_iommu_type1_release(void *iommu_data)
 				 &iommu->domain_list, next) {
 		list_for_each_entry_safe(group, group_tmp,
 					 &domain->group_list, next) {
-			iommu_detach_group(domain->domain, group->iommu_group);
+			if (!domain->vfio_iommu_api_only)
+				iommu_detach_group(domain->domain, group->iommu_group);
+			else {
+				struct vgpu_device *vgpu_dev = NULL;
+
+				vgpu_dev = get_vgpu_device_from_group(group->iommu_group);
+				if (vgpu_dev)
+					vgpu_dev->iommu_data = NULL;
+
+			}
+
 			list_del(&group->next);
 			kfree(group);
 		}
-		iommu_domain_free(domain->domain);
+		if (!domain->vfio_iommu_api_only)
+			iommu_domain_free(domain->domain);
 		list_del(&domain->next);
 		kfree(domain);
 	}

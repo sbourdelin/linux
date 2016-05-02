@@ -36,6 +36,7 @@ struct vgpu_device {
 	struct device		dev;
 	struct gpu_device	*gpu_dev;
 	struct iommu_group	*group;
+	void			*iommu_data;
 #define DEVICE_NAME_LEN		(64)
 	char			dev_name[DEVICE_NAME_LEN];
 	uuid_le			uuid;
@@ -209,8 +210,7 @@ extern void vgpu_unregister_driver(struct vgpu_driver *drv);
 
 extern int vgpu_map_virtual_bar(uint64_t virt_bar_addr, uint64_t phys_bar_addr,
 				uint32_t len, uint32_t flags);
-extern int vgpu_dma_do_translate(dma_addr_t * gfn_buffer, uint32_t count);
 
-struct vgpu_device *get_vgpu_device_from_group(struct iommu_group *group);
+extern struct vgpu_device *get_vgpu_device_from_group(struct iommu_group *group);
 
 #endif /* VGPU_H */
