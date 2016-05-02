@@ -76,6 +76,10 @@
 
 #define PMC_SCRATCH41			0x140
 
+/* Power detect for pad voltage */
+#define PMC_PWR_DET			0x48
+#define PMC_PWR_DET_VAL			0xe4
+
 #define PMC_SENSOR_CTRL			0x1b0
 #define PMC_SENSOR_CTRL_SCRATCH_WRITE	BIT(2)
 #define PMC_SENSOR_CTRL_ENABLE_RST	BIT(1)
@@ -115,12 +119,19 @@ struct tegra_powergate {
 	unsigned int num_resets;
 };
 
+struct tegra_io_pads_control {
+	int pad_id;
+	int dpd_bit_pos;
+	int pwr_val_pos;
+};
+
 struct tegra_pmc_soc {
 	unsigned int num_powergates;
 	const char *const *powergates;
 	unsigned int num_cpu_powergates;
 	const u8 *cpu_powergates;
-
+	const struct tegra_io_pads_control *io_pads_control;
+	unsigned int num_io_pads;
 	bool has_tsense_reset;
 	bool has_gpu_clamps;
 };
@@ -194,6 +205,14 @@ static u32 tegra_pmc_readl(unsigned long offset)
 static void tegra_pmc_writel(u32 value, unsigned long offset)
 {
 	writel(value, pmc->base + offset);
+}
+
+static void tegra_pmc_read_modify_write(unsigned long offset, u32 mask, u32 val)
+{
+	u32 pmc_reg = tegra_pmc_readl(offset);
+
+	pmc_reg = (pmc_reg & ~mask) | (val & mask);
+	tegra_pmc_writel(pmc_reg, offset);
 }
 
 static inline bool tegra_powergate_state(int id)
@@ -970,6 +989,165 @@ error:
 }
 EXPORT_SYMBOL(tegra_io_rail_power_off);
 
+#define TEGRA_IO_PADS_CONTROL(_pad, _dpd, _pwr)		\
+{							\
+	.pad_id = (TEGRA_IO_PAD_##_pad),		\
+	.dpd_bit_pos = (_dpd),				\
+	.pwr_val_pos = (_pwr),				\
+}
+
+struct tegra_io_pads_control tegra210_io_pads_control[] = {
+	TEGRA_IO_PADS_CONTROL(CSIA, 0, -1),
+	TEGRA_IO_PADS_CONTROL(CSIB, 1, -1),
+	TEGRA_IO_PADS_CONTROL(DSI, 2, -1),
+	TEGRA_IO_PADS_CONTROL(MIPI_BIAS, 3, -1),
+	TEGRA_IO_PADS_CONTROL(PEX_BIAS, 4, -1),
+	TEGRA_IO_PADS_CONTROL(PEX_CLK1, 5, -1),
+	TEGRA_IO_PADS_CONTROL(PEX_CLK2, 6, -1),
+	TEGRA_IO_PADS_CONTROL(USB0, 9, -1),
+	TEGRA_IO_PADS_CONTROL(USB1, 10, -1),
+	TEGRA_IO_PADS_CONTROL(USB2, 11, -1),
+	TEGRA_IO_PADS_CONTROL(USB_BIAS, 12, -1),
+	TEGRA_IO_PADS_CONTROL(UART, 14, -1),
+	TEGRA_IO_PADS_CONTROL(AUDIO, 17, -1),
+	TEGRA_IO_PADS_CONTROL(USB3, 18, -1),
+	TEGRA_IO_PADS_CONTROL(HSIC, 19, -1),
+	TEGRA_IO_PADS_CONTROL(DBG, 25, -1),
+	TEGRA_IO_PADS_CONTROL(DEBUG_NONAO, 26, -1),
+	TEGRA_IO_PADS_CONTROL(GPIO, 27, 21),
+	TEGRA_IO_PADS_CONTROL(HDMI, 28, -1),
+	TEGRA_IO_PADS_CONTROL(SDMMC1, 33, 12),
+	TEGRA_IO_PADS_CONTROL(SDMMC3, 34, 13),
+	TEGRA_IO_PADS_CONTROL(EMMC, 35, -1),
+	TEGRA_IO_PADS_CONTROL(CAM, 36, -1),
+	TEGRA_IO_PADS_CONTROL(EMMC2, 37, -1),
+	TEGRA_IO_PADS_CONTROL(DSIB, 39, -1),
+	TEGRA_IO_PADS_CONTROL(DSIC, 40, -1),
+	TEGRA_IO_PADS_CONTROL(DSID, 41, -1),
+	TEGRA_IO_PADS_CONTROL(CSIC, 42, -1),
+	TEGRA_IO_PADS_CONTROL(CSID, 43, -1),
+	TEGRA_IO_PADS_CONTROL(CSIE, 44, -1),
+	TEGRA_IO_PADS_CONTROL(CSIF, 45, -1),
+	TEGRA_IO_PADS_CONTROL(SPI, 46, -1),
+	TEGRA_IO_PADS_CONTROL(SPI_HV, 47, 23),
+	TEGRA_IO_PADS_CONTROL(DMIC, 50, -1),
+	TEGRA_IO_PADS_CONTROL(DP, 51, -1),
+	TEGRA_IO_PADS_CONTROL(LVDS, 57, -1),
+	TEGRA_IO_PADS_CONTROL(AUDIO_HV, 61, 18),
+};
+
+static int tegra_io_pads_to_dpd(const struct tegra_pmc_soc *soc, int pad_id)
+{
+	int i;
+
+	if (!soc || !soc->num_io_pads)
+		return -EINVAL;
+
+	for (i = 0; i < soc->num_io_pads; ++i) {
+		if (soc->io_pads_control[i].pad_id == pad_id)
+			return soc->io_pads_control[i].dpd_bit_pos;
+	}
+
+	return -EINVAL;
+}
+
+static int tegra_io_pads_to_power_val(const struct tegra_pmc_soc *soc,
+				      int pad_id)
+{
+	int i;
+
+	if (!soc || !soc->num_io_pads)
+		return -EINVAL;
+
+	for (i = 0; i < soc->num_io_pads; ++i) {
+		if (soc->io_pads_control[i].pad_id == pad_id)
+			return soc->io_pads_control[i].pwr_val_pos;
+	}
+
+	return -EINVAL;
+}
+
+int tegra_io_pads_power_enable(int io_pad_id)
+{
+	int dpd_bit;
+
+	dpd_bit = tegra_io_pads_to_dpd(pmc->soc, io_pad_id);
+	if (dpd_bit < 0)
+		return dpd_bit;
+
+	return tegra_io_rail_power_on(dpd_bit);
+}
+EXPORT_SYMBOL(tegra_io_pads_power_enable);
+
+int tegra_io_pads_power_disable(int io_pad_id)
+{
+	int dpd_bit;
+
+	dpd_bit = tegra_io_pads_to_dpd(pmc->soc, io_pad_id);
+	if (dpd_bit < 0)
+		return dpd_bit;
+
+	return tegra_io_rail_power_off(dpd_bit);
+}
+EXPORT_SYMBOL(tegra_io_pads_power_disable);
+
+int tegra_io_pads_power_is_enabled(int io_pad_id)
+{
+	unsigned long status_reg;
+	u32 status;
+	int dpd_bit;
+
+	dpd_bit = tegra_io_pads_to_dpd(pmc->soc, io_pad_id);
+	if (dpd_bit < 0)
+		return dpd_bit;
+
+	status_reg = (dpd_bit < 32) ? IO_DPD_STATUS : IO_DPD2_STATUS;
+	status = tegra_pmc_readl(status_reg);
+
+	return !!(status & BIT(dpd_bit % 32));
+}
+EXPORT_SYMBOL(tegra_io_pads_power_is_enabled);
+
+int tegra_io_pads_configure_voltage(int io_pad_id, int io_volt_uv)
+{
+	int pwr_bit;
+	u32 bval;
+
+	if ((io_volt_uv != 3300000) && (io_volt_uv != 1800000))
+		return -EINVAL;
+
+	pwr_bit = tegra_io_pads_to_power_val(pmc->soc, io_pad_id);
+	if (pwr_bit < 0)
+		return pwr_bit;
+
+	bval = (io_volt_uv == 3300000) ? BIT(pwr_bit) : 0;
+
+	mutex_lock(&pmc->powergates_lock);
+	tegra_pmc_read_modify_write(PMC_PWR_DET, BIT(pwr_bit), BIT(pwr_bit));
+	tegra_pmc_read_modify_write(PMC_PWR_DET_VAL, BIT(pwr_bit), bval);
+	mutex_unlock(&pmc->powergates_lock);
+
+	usleep_range(100, 250);
+
+	return 0;
+}
+EXPORT_SYMBOL(tegra_io_pads_configure_voltage);
+
+int tegra_io_pads_get_configured_voltage(int io_pad_id)
+{
+	int pwr_bit;
+	u32 pwr_det_val;
+
+	pwr_bit = tegra_io_pads_to_power_val(pmc->soc, io_pad_id);
+	if (pwr_bit < 0)
+		return pwr_bit;
+
+	pwr_det_val = tegra_pmc_readl(PMC_PWR_DET_VAL);
+
+	return (pwr_det_val & BIT(pwr_bit)) ? 3300000 : 1800000;
+}
+EXPORT_SYMBOL(tegra_io_pads_get_configured_voltage);
+
 #ifdef CONFIG_PM_SLEEP
 enum tegra_suspend_mode tegra_pmc_get_suspend_mode(void)
 {
@@ -1443,6 +1621,8 @@ static const struct tegra_pmc_soc tegra210_pmc_soc = {
 	.powergates = tegra210_powergates,
 	.num_cpu_powergates = ARRAY_SIZE(tegra210_cpu_powergates),
 	.cpu_powergates = tegra210_cpu_powergates,
+	.io_pads_control = tegra210_io_pads_control,
+	.num_io_pads = ARRAY_SIZE(tegra210_io_pads_control),
 	.has_tsense_reset = true,
 	.has_gpu_clamps = true,
 };
