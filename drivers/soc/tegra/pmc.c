@@ -132,6 +132,8 @@ struct tegra_pmc_soc {
 	const u8 *cpu_powergates;
 	const struct tegra_io_pads_control *io_pads_control;
 	unsigned int num_io_pads;
+	const char **sub_devs_name;
+	unsigned int num_sub_devs;
 	bool has_tsense_reset;
 	bool has_gpu_clamps;
 };
@@ -158,6 +160,8 @@ struct tegra_pmc_soc {
  * @lp0_vec_size: size of the LP0 warm boot code
  * @powergates_available: Bitmap of available power gates
  * @powergates_lock: mutex for power gate register access
+ * @pdevs: Platform device for PMC child devices.
+ * @num_pdevs: Number of platform devices.
  */
 struct tegra_pmc {
 	struct device *dev;
@@ -184,6 +188,9 @@ struct tegra_pmc {
 	DECLARE_BITMAP(powergates_available, TEGRA_POWERGATE_MAX);
 
 	struct mutex powergates_lock;
+
+	struct platform_device **pdevs;
+	unsigned int num_pdevs;
 };
 
 static struct tegra_pmc *pmc = &(struct tegra_pmc) {
@@ -1379,6 +1386,43 @@ out:
 	of_node_put(np);
 }
 
+static int  tegra_pmc_init_sub_devs(struct tegra_pmc *pmc)
+{
+	int ret, i;
+
+	if (!pmc->soc->num_sub_devs)
+		return 0;
+
+	pmc->pdevs = devm_kzalloc(pmc->dev, sizeof(**pmc->pdevs), GFP_KERNEL);
+	if (!pmc->pdevs)
+		return -ENOMEM;
+
+	for (i = 0; i < pmc->soc->num_sub_devs; ++i) {
+		pmc->pdevs[i] = platform_device_register_data(pmc->dev,
+						pmc->soc->sub_devs_name[i],
+						0, NULL, 0);
+		if (IS_ERR(pmc->pdevs[i])) {
+			ret = PTR_ERR(pmc->pdevs[i]);
+			dev_err(pmc->dev,
+				"Failed to register platform device for %s: %d\n",
+				pmc->soc->sub_devs_name[i], ret);
+			goto pdev_cleanups;
+		}
+		pmc->num_pdevs++;
+	}
+
+	return 0;
+
+pdev_cleanups:
+	for (i = pmc->num_pdevs; i > 0; i--) {
+		platform_device_unregister(pmc->pdevs[i - 1]);
+		pmc->pdevs[i - 1] = NULL;
+	}
+	pmc->num_pdevs = 0;
+
+	return ret;
+}
+
 static int tegra_pmc_probe(struct platform_device *pdev)
 {
 	void __iomem *base;
@@ -1407,6 +1451,10 @@ static int tegra_pmc_probe(struct platform_device *pdev)
 	tegra_pmc_init(pmc);
 
 	tegra_pmc_init_tsense_reset(pmc);
+
+	err = tegra_pmc_init_sub_devs(pmc);
+	if (err < 0)
+		dev_warn(pmc->dev, "Failed to register sub devices: %d\n", err);
 
 	if (IS_ENABLED(CONFIG_DEBUG_FS)) {
 		err = tegra_powergate_debugfs_init();
@@ -1616,6 +1664,10 @@ static const u8 tegra210_cpu_powergates[] = {
 	TEGRA_POWERGATE_CPU3,
 };
 
+static const char *tegra210_sub_devs_name[] = {
+	"pinctrl-tegra210-io-pad",
+};
+
 static const struct tegra_pmc_soc tegra210_pmc_soc = {
 	.num_powergates = ARRAY_SIZE(tegra210_powergates),
 	.powergates = tegra210_powergates,
@@ -1623,6 +1675,8 @@ static const struct tegra_pmc_soc tegra210_pmc_soc = {
 	.cpu_powergates = tegra210_cpu_powergates,
 	.io_pads_control = tegra210_io_pads_control,
 	.num_io_pads = ARRAY_SIZE(tegra210_io_pads_control),
+	.sub_devs_name = tegra210_sub_devs_name,
+	.num_sub_devs = ARRAY_SIZE(tegra210_sub_devs_name),
 	.has_tsense_reset = true,
 	.has_gpu_clamps = true,
 };
