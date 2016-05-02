@@ -3418,13 +3418,25 @@ static int __btrfs_balance(struct btrfs_fs_info *fs_info)
 		ret = btrfs_shrink_device(device, old_size - size_to_free);
 		if (ret == -ENOSPC)
 			break;
-		BUG_ON(ret);
+		if (ret) {
+			/* btrfs_shrink_device never returns ret > 0 */
+			WARN_ON_ONCE(ret > 0);
+			goto error;
+		}
 
 		trans = btrfs_start_transaction(dev_root, 0);
-		BUG_ON(IS_ERR(trans));
+		if (IS_ERR(trans)) {
+			ret = PTR_ERR(trans);
+			goto error;
+		}
 
 		ret = btrfs_grow_device(trans, device, old_size);
-		BUG_ON(ret);
+		if (ret) {
+			btrfs_end_transaction(trans, dev_root);
+			/* btrfs_grow_device never returns ret > 0 */
+			WARN_ON_ONCE(ret > 0);
+			goto error;
+		}
 
 		btrfs_end_transaction(trans, dev_root);
 	}
