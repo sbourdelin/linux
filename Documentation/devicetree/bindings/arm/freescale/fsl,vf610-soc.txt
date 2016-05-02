@@ -1,0 +1,35 @@
+Vybrid System-on-Chip
+---------------------
+
+Required properties:
+
+- #address-cells: must be 1
+- #size-cells: must be 1
+- compatible: "fsl,vf610-soc-bus", "simple-bus"
+- interrupt-parent: phandle to the MSCM interrupt router node
+- ranges
+- fsl,rom-revision: phandle to the on-chip ROM node and address of rom
+  revision register
+- fsl,cpu-count: phandle to the MSCM CPU configuration node and address of
+  CPU count register
+- fsl,l2-size: phandle to the MSCM CPU configuration node and address of
+  L2 cache size register
+- nvmem-cells: phandles to two OCOTP child nodes ocotp_cfg0 and ocotp_cfg1
+- nvmem-cell-names: should contain string names "cfg0" and "cfg1"
+
+Example:
+
+	soc {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "fsl,vf610-soc-bus", "simple-bus";
+		interrupt-parent = <&mscm_ir>;
+		ranges;
+		fsl,rom-revision = <&ocrom 0x80>;
+		fsl,cpu-count = <&mscm_cpucfg 0x2C>;
+		fsl,l2-size = <&mscm_cpucfg 0x14>;
+		nvmem-cells = <&ocotp_cfg0>, <&ocotp_cfg1>;
+		nvmem-cell-names = "cfg0", "cfg1";
+
+		...
+	};
