@@ -85,7 +85,7 @@ err_g_ip_clk:
 void s5p_mfc_final_pm(struct s5p_mfc_dev *dev)
 {
 	if (dev->variant->version != MFC_VERSION_V6 &&
-	    pm->clock) {
+	    !IS_ERR_OR_NULL(pm->clock)) {
 		clk_disable_unprepare(pm->clock);
 		clk_put(pm->clock);
 	}
