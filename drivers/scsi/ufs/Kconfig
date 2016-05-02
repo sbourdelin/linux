@@ -87,3 +87,7 @@ config SCSI_UFS_QCOM
 
 config SCSI_UFS_DWC
 	bool
+
+config SCSI_UFS_DWC_TC
+	bool
+	select SCSI_UFS_DWC
