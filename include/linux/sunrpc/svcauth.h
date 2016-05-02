@@ -165,7 +165,8 @@ extern int svcauth_unix_set_client(struct svc_rqst *rqstp);
 extern int unix_gid_cache_create(struct net *net);
 extern void unix_gid_cache_destroy(struct net *net);
 
-static inline unsigned long hash_str(char *name, int bits)
+/* TODO: Update to <asm/word-at-a-time.h> when CONFIG_DCACHE_WORD_ACCESS */
+static inline u32 hash_str(const char *name, int bits)
 {
 	unsigned long hash = 0;
 	unsigned long l = 0;
@@ -176,14 +177,13 @@ static inline unsigned long hash_str(char *name, int bits)
 			c = (char)len; len = -1;
 		}
 		l = (l << 8) | c;
-		len++;
-		if ((len & (BITS_PER_LONG/8-1))==0)
-			hash = hash_long(hash^l, BITS_PER_LONG);
+		if (++len % sizeof(hash) == 0)
+			hash = __hash_long(hash^l);
 	} while (len);
 	return hash >> (BITS_PER_LONG - bits);
 }
 
-static inline unsigned long hash_mem(char *buf, int length, int bits)
+static inline u32 hash_mem(const char *buf, int length, int bits)
 {
 	unsigned long hash = 0;
 	unsigned long l = 0;
@@ -195,9 +195,8 @@ static inline unsigned long hash_mem(char *buf, int length, int bits)
 		} else
 			c = *buf++;
 		l = (l << 8) | c;
-		len++;
-		if ((len & (BITS_PER_LONG/8-1))==0)
-			hash = hash_long(hash^l, BITS_PER_LONG);
+		if (++len % sizeof(hash) == 0)
+			hash = __hash_long(hash^l);
 	} while (len);
 	return hash >> (BITS_PER_LONG - bits);
 }

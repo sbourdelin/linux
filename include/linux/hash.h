@@ -24,15 +24,17 @@
 
 #if BITS_PER_LONG == 32
 #define GOLDEN_RATIO_PRIME GOLDEN_RATIO_PRIME_32
+#define __hash_long(val) __hash_32(val)
 #define hash_long(val, bits) hash_32(val, bits)
 #elif BITS_PER_LONG == 64
+#define __hash_long(val) __hash_64(val)
 #define hash_long(val, bits) hash_64(val, bits)
 #define GOLDEN_RATIO_PRIME GOLDEN_RATIO_PRIME_64
 #else
 #error Wordsize not 32 or 64
 #endif
 
-static __always_inline u64 hash_64(u64 val, unsigned int bits)
+static __always_inline u64 __hash_64(u64 val)
 {
 	u64 hash = val;
 
@@ -55,20 +57,28 @@ static __always_inline u64 hash_64(u64 val, unsigned int bits)
 	hash += n;
 #endif
 
-	/* High bits are more random, so use them. */
-	return hash >> (64 - bits);
+	return hash;
 }
 
-static inline u32 hash_32(u32 val, unsigned int bits)
+static __always_inline u64 hash_64(u64 val, unsigned bits)
+{
+	/* High bits are more random, so use them. */
+	return __hash_64(val) >> (64 - bits);
+}
+
+static inline u32 __hash_32(u32 val)
 {
 	/* On some cpus multiply is faster, on others gcc will do shifts */
-	u32 hash = val * GOLDEN_RATIO_PRIME_32;
-
-	/* High bits are more random, so use them. */
-	return hash >> (32 - bits);
+	return val * GOLDEN_RATIO_PRIME_32;
 }
 
-static inline unsigned long hash_ptr(const void *ptr, unsigned int bits)
+static inline u32 hash_32(u32 val, unsigned bits)
+{
+	/* High bits are more random, so use them. */
+	return __hash_32(val) >> (32 - bits);
+}
+
+static inline u32 hash_ptr(const void *ptr, unsigned bits)
 {
 	return hash_long((unsigned long)ptr, bits);
 }
