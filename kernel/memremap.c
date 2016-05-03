@@ -207,7 +207,7 @@ static void pgmap_radix_release(struct resource *res)
 	mutex_unlock(&pgmap_lock);
 }
 
-static unsigned long pfn_first(struct page_map *page_map)
+unsigned long pfn_first(struct page_map *page_map)
 {
 	struct dev_pagemap *pgmap = &page_map->pgmap;
 	const struct resource *res = &page_map->res;
@@ -220,7 +220,7 @@ static unsigned long pfn_first(struct page_map *page_map)
 	return pfn;
 }
 
-static unsigned long pfn_end(struct page_map *page_map)
+unsigned long pfn_end(struct page_map *page_map)
 {
 	const struct resource *res = &page_map->res;
 
@@ -260,6 +260,17 @@ struct dev_pagemap *find_dev_pagemap(resource_size_t phys)
 
 	page_map = radix_tree_lookup(&pgmap_radix, phys >> PA_SECTION_SHIFT);
 	return page_map ? &page_map->pgmap : NULL;
+}
+
+struct page_map *find_pagemap(resource_size_t phys)
+{
+	struct page_map *page_map;
+
+	rcu_read_lock();
+	page_map = radix_tree_lookup(&pgmap_radix, phys >> PA_SECTION_SHIFT);
+	rcu_read_unlock();
+
+	return page_map;
 }
 
 /**

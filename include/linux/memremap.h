@@ -28,10 +28,28 @@ void vmem_altmap_free(struct vmem_altmap *altmap, unsigned long nr_pfns);
 
 #if defined(CONFIG_SPARSEMEM_VMEMMAP) && defined(CONFIG_ZONE_DEVICE)
 struct vmem_altmap *to_vmem_altmap(unsigned long memmap_start);
+struct page_map *find_pagemap(resource_size_t phys);
+unsigned long pfn_first(struct page_map *pgmap);
+unsigned long pfn_end(struct page_map *pgmap);
 #else
 static inline struct vmem_altmap *to_vmem_altmap(unsigned long memmap_start)
 {
 	return NULL;
+}
+
+static inline struct page_map *find_pagemap(resource_size_t phys)
+{
+	return NULL;
+}
+
+unsigned long pfn_first(struct page_map *pgmap)
+{
+	return 0;
+}
+
+unsigned long pfn_end(struct page_map *pgmap)
+{
+	return 0;
 }
 #endif
 
