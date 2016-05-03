@@ -15962,6 +15962,17 @@ void intel_display_resume(struct drm_device *dev)
 	dev_priv->modeset_restore_state = NULL;
 
 	/*
+	 * With MST, the number of connectors can change between suspend and
+	 * resume, which means that the state we want to restore might now be
+	 * impossible to use since it'll be pointing to non-existant
+	 * connectors.
+	 */
+	if (state->num_connector != dev->mode_config.num_connector) {
+		drm_atomic_state_free(state);
+		state = NULL;
+	}
+
+	/*
 	 * This is a cludge because with real atomic modeset mode_config.mutex
 	 * won't be taken. Unfortunately some probed state like
 	 * audio_codec_enable is still protected by mode_config.mutex, so lock
