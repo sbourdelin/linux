@@ -290,9 +290,15 @@ is_ds_client(struct nfs_client *clp)
 	return clp->cl_exchange_flags & EXCHGID4_FLAG_USE_PNFS_DS;
 }
 
+/*
+ * Function responsible for determining if an rpc_message should use the
+ * machine cred under SP4_MACH_CRED and if so switching the credential and
+ * authflavor (using the nfs_client's rpc_clnt which will be krb5i/p).
+ * Should be called before rpc_call_sync/rpc_call_async.
+ */
 static inline bool
-_nfs4_state_protect(struct nfs_client *clp, unsigned long sp4_mode,
-		    struct rpc_clnt **clntp, struct rpc_message *msg)
+nfs4_state_protect(struct nfs_client *clp, unsigned long sp4_mode,
+		   struct rpc_clnt **clntp, struct rpc_message *msg)
 {
 	struct rpc_cred *newcred = NULL;
 	rpc_authflavor_t flavor;
@@ -317,19 +323,6 @@ _nfs4_state_protect(struct nfs_client *clp, unsigned long sp4_mode,
 }
 
 /*
- * Function responsible for determining if an rpc_message should use the
- * machine cred under SP4_MACH_CRED and if so switching the credential and
- * authflavor (using the nfs_client's rpc_clnt which will be krb5i/p).
- * Should be called before rpc_call_sync/rpc_call_async.
- */
-static inline void
-nfs4_state_protect(struct nfs_client *clp, unsigned long sp4_mode,
-		   struct rpc_clnt **clntp, struct rpc_message *msg)
-{
-	_nfs4_state_protect(clp, sp4_mode, clntp, msg);
-}
-
-/*
  * Special wrapper to nfs4_state_protect for write.
  * If WRITE can use machine cred but COMMIT cannot, make sure all writes
  * that use machine cred use NFS_FILE_SYNC.
@@ -338,7 +331,7 @@ static inline void
 nfs4_state_protect_write(struct nfs_client *clp, struct rpc_clnt **clntp,
 			 struct rpc_message *msg, struct nfs_pgio_header *hdr)
 {
-	if (_nfs4_state_protect(clp, NFS_SP4_MACH_CRED_WRITE, clntp, msg) &&
+	if (nfs4_state_protect(clp, NFS_SP4_MACH_CRED_WRITE, clntp, msg) &&
 	    !test_bit(NFS_SP4_MACH_CRED_COMMIT, &clp->cl_sp4_flags))
 		hdr->args.stable = NFS_FILE_SYNC;
 }
