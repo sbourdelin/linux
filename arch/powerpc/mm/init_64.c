@@ -282,6 +282,17 @@ int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node)
 }
 
 #ifdef CONFIG_MEMORY_HOTPLUG
+void dump_vmemmap(void)
+{
+	struct vmemmap_backing *vmem_back = vmemmap_list;
+
+	for (; vmem_back; vmem_back = vmem_back->list) {
+		printk("RMEM: vmemmap backing (%lx %lx)\n",
+			vmem_back->virt_addr, vmem_back->phys);
+	}
+}
+EXPORT_SYMBOL(dump_vmemmap);
+
 static unsigned long vmemmap_list_free(unsigned long start)
 {
 	struct vmemmap_backing *vmem_back, *vmem_back_prev;
@@ -413,5 +424,4 @@ struct page *realmode_pfn_to_page(unsigned long pfn)
 	return page;
 }
 EXPORT_SYMBOL_GPL(realmode_pfn_to_page);
-
 #endif /* CONFIG_SPARSEMEM_VMEMMAP/CONFIG_FLATMEM */
