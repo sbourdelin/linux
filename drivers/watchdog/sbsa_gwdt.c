@@ -35,17 +35,23 @@
  *
  * SBSA GWDT:
  * if action is 1 (the two stages mode):
- * |--------WOR-------WS0--------WOR-------WS1
+ * |--------WCV-------WS0--------WCV-------WS1
  * |----timeout-----(panic)----timeout-----reset
  *
  * if action is 0 (the single stage mode):
- * |------WOR-----WS0(ignored)-----WOR------WS1
+ * |------WCV-----WS0(ignored)-----WOR------WS1
  * |--------------timeout-------------------reset
  *
- * Note: Since this watchdog timer has two stages, and each stage is determined
- * by WOR, in the single stage mode, the timeout is (WOR * 2); in the two
- * stages mode, the timeout is WOR. The maximum timeout in the two stages mode
- * is half of that in the single stage mode.
+ * Note: This watchdog timer has two stages. If action is 0, first stage is
+ * determined by directly programming WCV and second by WOR. When first
+ * timeout is reached, WS0 is triggered and WCV is reloaded with value in
+ * WOR. WS0 interrupt will be ignored, then the second watch period starts;
+ * when second timeout is reached, then WS1 is triggered, system resets. WCV
+ * and WOR are programmed in such a way that total time corresponding to
+ * WCV+WOR becomes equivalent to user programmed "timeout".
+ * If action is 1, then we expect to call panic() at user programmed
+ * "timeout". Therefore, we program both first and second stage using WCV
+ * only.
  *
  */
 
@@ -95,7 +101,17 @@ struct sbsa_gwdt {
 	void __iomem		*control_base;
 };
 
-#define DEFAULT_TIMEOUT		10 /* seconds */
+/*
+ * Max Timeout Can be in days, but 255 seconds seems reasonable for all use
+ * cases
+ */
+#define MAX_TIMEOUT		255
+
+/* Default timeout is 40 seconds, which is the 1st + 2nd watch periods when
+ * action is 0. When action is 1 then both 1st and 2nd watch periods will
+ * be of 40 seconds.
+ */
+#define DEFAULT_TIMEOUT		40 /* seconds */
 
 static unsigned int timeout;
 module_param(timeout, uint, 0);
@@ -127,20 +143,21 @@ static int sbsa_gwdt_set_timeout(struct watchdog_device *wdd,
 				 unsigned int timeout)
 {
 	struct sbsa_gwdt *gwdt = watchdog_get_drvdata(wdd);
+	u64 timeout_1, timeout_2;
 
 	wdd->timeout = timeout;
 
 	if (action)
-		writel(gwdt->clk * timeout,
-		       gwdt->control_base + SBSA_GWDT_WOR);
+		timeout_1 = (u64)gwdt->clk * timeout;
 	else
-		/*
-		 * In the single stage mode, The first signal (WS0) is ignored,
-		 * the timeout is (WOR * 2), so the WOR should be configured
-		 * to half value of timeout.
-		 */
-		writel(gwdt->clk / 2 * timeout,
-		       gwdt->control_base + SBSA_GWDT_WOR);
+		timeout_1 = (u64)gwdt->clk * (timeout - wdd->min_timeout);
+
+	/* when action=1, timeout_2 will be overwritten in ISR */
+	timeout_2 = (u64)gwdt->clk * wdd->min_timeout;
+
+	writel(timeout_2, gwdt->control_base + SBSA_GWDT_WOR);
+	writeq(timeout_1 + arch_counter_get_cntvct(),
+		gwdt->control_base + SBSA_GWDT_WCV);
 
 	return 0;
 }
@@ -172,12 +189,17 @@ static int sbsa_gwdt_keepalive(struct watchdog_device *wdd)
 	struct sbsa_gwdt *gwdt = watchdog_get_drvdata(wdd);
 
 	/*
-	 * Writing WRR for an explicit watchdog refresh.
-	 * You can write anyting (like 0).
+	 * play safe: program WOR with max value so that we have sufficient
+	 * time to overwrite them after explicit refresh
 	 */
+	writel(U32_MAX, gwdt->control_base + SBSA_GWDT_WOR);
+	/*
+	* Writing WRR for an explicit watchdog refresh.
+	* You can write anyting (like 0).
+	*/
 	writel(0, gwdt->refresh_base + SBSA_GWDT_WRR);
 
-	return 0;
+	return sbsa_gwdt_set_timeout(wdd, wdd->timeout);;
 }
 
 static unsigned int sbsa_gwdt_status(struct watchdog_device *wdd)
@@ -193,10 +215,15 @@ static int sbsa_gwdt_start(struct watchdog_device *wdd)
 {
 	struct sbsa_gwdt *gwdt = watchdog_get_drvdata(wdd);
 
+	/*
+	 * play safe: program WOR with max value so that we have sufficient
+	 * time to overwrite them after explicit refresh
+	 */
+	writel(U32_MAX, gwdt->control_base + SBSA_GWDT_WOR);
 	/* writing WCS will cause an explicit watchdog refresh */
 	writel(SBSA_GWDT_WCS_EN, gwdt->control_base + SBSA_GWDT_WCS);
 
-	return 0;
+	return sbsa_gwdt_set_timeout(wdd, wdd->timeout);;
 }
 
 static int sbsa_gwdt_stop(struct watchdog_device *wdd)
@@ -211,6 +238,20 @@ static int sbsa_gwdt_stop(struct watchdog_device *wdd)
 
 static irqreturn_t sbsa_gwdt_interrupt(int irq, void *dev_id)
 {
+	struct sbsa_gwdt *gwdt = (struct sbsa_gwdt *)dev_id;
+	struct watchdog_device *wdd = &gwdt->wdd;
+	u64 timeout_2 = (u64)gwdt->clk * wdd->timeout;
+
+	/*
+	 * Since we can not trust system at this moment, therefore re-write
+	 * WCV only if wdd->timeout <= MAX_TIMEOUT to avoid a corner
+	 * scenario when we might have corrupted wdd->timeout values at
+	 * this point.
+	 */
+	if (wdd->timeout <= MAX_TIMEOUT)
+		writeq(timeout_2 + arch_counter_get_cntvct(),
+			gwdt->control_base + SBSA_GWDT_WCV);
+
 	panic(WATCHDOG_NAME " timeout");
 
 	return IRQ_HANDLED;
@@ -273,7 +314,7 @@ static int sbsa_gwdt_probe(struct platform_device *pdev)
 	wdd->info = &sbsa_gwdt_info;
 	wdd->ops = &sbsa_gwdt_ops;
 	wdd->min_timeout = 1;
-	wdd->max_timeout = U32_MAX / gwdt->clk;
+	wdd->max_timeout = MAX_TIMEOUT;
 	wdd->timeout = DEFAULT_TIMEOUT;
 	watchdog_set_drvdata(wdd, gwdt);
 	watchdog_set_nowayout(wdd, nowayout);
