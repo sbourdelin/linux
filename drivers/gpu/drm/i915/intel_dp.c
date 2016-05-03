@@ -206,6 +206,13 @@ intel_dp_mode_valid(struct drm_connector *connector,
 	int max_rate, mode_rate, max_lanes, max_link_clock;
 	int max_dotclk = to_i915(connector->dev)->max_dotclk_freq;
 
+	/* DP to VGA dongle may define max pixel rate in DPCD */
+	if (intel_dp->dfp.present &&
+	    intel_dp->dfp.detailed_cap_info &&
+	    (intel_dp->dfp.type & DP_DS_PORT_TYPE_VGA) &&
+	    (intel_dp->dfp.dot_clk > 0))
+		max_dotclk = min(max_dotclk, intel_dp->dfp.dot_clk);
+
 	if (is_edp(intel_dp) && fixed_mode) {
 		if (mode->hdisplay > fixed_mode->hdisplay)
 			return MODE_PANEL;
@@ -4978,6 +4985,28 @@ static const struct drm_encoder_funcs intel_dp_enc_funcs = {
 	.destroy = intel_dp_encoder_destroy,
 };
 
+static void intel_dp_get_dfp(struct intel_dp *intel_dp)
+{
+	uint8_t dfp_info[4];
+
+	intel_dp->dfp.detailed_cap_info = intel_dp->dpcd[DP_DOWNSTREAMPORT_PRESENT] & DP_DETAILED_CAP_INFO_AVAILABLE;
+
+	if (drm_dp_dpcd_read(&intel_dp->aux, DP_DOWNSTREAM_PORT_0, dfp_info, 4) < 0) {
+		intel_dp->dfp.present = false;
+		intel_dp->dfp.detailed_cap_info = false;
+		return; /* aux transfer failed */
+	}
+
+	intel_dp->dfp.type = dfp_info[0] & DP_DS_PORT_TYPE_MASK;
+
+	if (intel_dp->dfp.detailed_cap_info) {
+		if (intel_dp->dfp.type & DP_DS_PORT_TYPE_VGA) {
+			intel_dp->dfp.dot_clk = dfp_info[1] * 8 * 1000;
+			DRM_DEBUG_KMS("max pixel rate for VGA is %d kHz\n", intel_dp->dfp.dot_clk);
+		}
+	}
+}
+
 enum irqreturn
 intel_dp_hpd_pulse(struct intel_digital_port *intel_dig_port, bool long_hpd)
 {
@@ -5010,6 +5039,11 @@ intel_dp_hpd_pulse(struct intel_digital_port *intel_dig_port, bool long_hpd)
 
 	power_domain = intel_display_port_aux_power_domain(intel_encoder);
 	intel_display_power_get(dev_priv, power_domain);
+
+	intel_dp->dfp.present = intel_dp->dpcd[DP_DOWNSTREAMPORT_PRESENT] & 0x1;
+
+	if (intel_dp->dfp.present)
+		intel_dp_get_dfp(intel_dp);
 
 	if (long_hpd) {
 		/* indicate that we need to restart link training */

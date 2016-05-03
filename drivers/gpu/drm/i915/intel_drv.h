@@ -794,6 +794,13 @@ enum link_m_n_set {
 	M2_N2
 };
 
+struct intel_dp_dfp {
+	bool present;
+	int type;
+	bool detailed_cap_info;
+	int dot_clk; /* pixel rate for VGA dongles */
+};
+
 struct intel_dp {
 	i915_reg_t output_reg;
 	i915_reg_t aux_ch_ctl_reg;
@@ -859,6 +866,8 @@ struct intel_dp {
 	void (*prepare_link_retrain)(struct intel_dp *intel_dp);
 
 	bool train_set_valid;
+
+	struct intel_dp_dfp dfp;
 
 	/* Displayport compliance testing */
 	unsigned long compliance_test_type;
