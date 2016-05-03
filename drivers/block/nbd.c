@@ -57,12 +57,12 @@ struct nbd_device {
 	int blksize;
 	loff_t bytesize;
 	int xmit_timeout;
-	bool timedout;
+	atomic_t timedout;
 	bool disconnect; /* a disconnect has been requested by user */
 
 	struct timer_list timeout_timer;
 	/* protects initialization and shutdown of the socket */
-	spinlock_t sock_lock;
+	struct mutex sock_lock;
 	struct task_struct *task_recv;
 	struct task_struct *task_send;
 
@@ -172,10 +172,9 @@ static void nbd_end_request(struct nbd_device *nbd, struct request *req)
  */
 static void sock_shutdown(struct nbd_device *nbd)
 {
-	spin_lock_irq(&nbd->sock_lock);
-
+	mutex_lock(&nbd->sock_lock);
 	if (!nbd->sock) {
-		spin_unlock_irq(&nbd->sock_lock);
+		mutex_unlock(&nbd->sock_lock);
 		return;
 	}
 
@@ -183,27 +182,19 @@ static void sock_shutdown(struct nbd_device *nbd)
 	kernel_sock_shutdown(nbd->sock, SHUT_RDWR);
 	sockfd_put(nbd->sock);
 	nbd->sock = NULL;
-	spin_unlock_irq(&nbd->sock_lock);
-
+	mutex_unlock(&nbd->sock_lock);
 	del_timer(&nbd->timeout_timer);
 }
 
 static void nbd_xmit_timeout(unsigned long arg)
 {
 	struct nbd_device *nbd = (struct nbd_device *)arg;
-	unsigned long flags;
 
 	if (list_empty(&nbd->queue_head))
 		return;
 
-	spin_lock_irqsave(&nbd->sock_lock, flags);
-
-	nbd->timedout = true;
-
-	if (nbd->sock)
-		kernel_sock_shutdown(nbd->sock, SHUT_RDWR);
-
-	spin_unlock_irqrestore(&nbd->sock_lock, flags);
+	atomic_inc(&nbd->timedout);
+	wake_up(&nbd->waiting_wq);
 
 	dev_err(nbd_to_dev(nbd), "Connection timed out, shutting down connection\n");
 }
@@ -579,7 +570,27 @@ static int nbd_thread_send(void *data)
 		/* wait for something to do */
 		wait_event_interruptible(nbd->waiting_wq,
 					 kthread_should_stop() ||
-					 !list_empty(&nbd->waiting_queue));
+					 !list_empty(&nbd->waiting_queue) ||
+					 atomic_read(&nbd->timedout));
+
+		if (atomic_read(&nbd->timedout)) {
+			mutex_lock(&nbd->sock_lock);
+			if (nbd->sock) {
+				struct request sreq;
+
+				blk_rq_init(NULL, &sreq);
+				sreq.cmd_type = REQ_TYPE_DRV_PRIV;
+				mutex_lock(&nbd->tx_lock);
+				nbd->disconnect = true;
+				nbd_send_req(nbd, &sreq);
+				mutex_unlock(&nbd->tx_lock);
+				dev_err(disk_to_dev(nbd->disk),
+					"Device Timeout occured.Shutting down"
+					" socket.");
+			}
+			mutex_unlock(&nbd->sock_lock);
+			sock_shutdown(nbd);
+		}
 
 		/* extract request */
 		if (list_empty(&nbd->waiting_queue))
@@ -592,7 +603,11 @@ static int nbd_thread_send(void *data)
 		spin_unlock_irq(&nbd->queue_lock);
 
 		/* handle request */
-		nbd_handle_req(nbd, req);
+		if (atomic_read(&nbd->timedout)) {
+			req->errors++;
+			nbd_end_request(nbd, req);
+		} else
+			nbd_handle_req(nbd, req);
 	}
 
 	nbd->task_send = NULL;
@@ -647,7 +662,7 @@ static int nbd_set_socket(struct nbd_device *nbd, struct socket *sock)
 {
 	int ret = 0;
 
-	spin_lock_irq(&nbd->sock_lock);
+	mutex_lock(&nbd->sock_lock);
 
 	if (nbd->sock) {
 		ret = -EBUSY;
@@ -657,7 +672,7 @@ static int nbd_set_socket(struct nbd_device *nbd, struct socket *sock)
 	nbd->sock = sock;
 
 out:
-	spin_unlock_irq(&nbd->sock_lock);
+	mutex_unlock(&nbd->sock_lock);
 
 	return ret;
 }
@@ -666,7 +681,7 @@ out:
 static void nbd_reset(struct nbd_device *nbd)
 {
 	nbd->disconnect = false;
-	nbd->timedout = false;
+	atomic_set(&nbd->timedout, 0);
 	nbd->blksize = 1024;
 	nbd->bytesize = 0;
 	set_capacity(nbd->disk, 0);
@@ -803,17 +818,15 @@ static int __nbd_ioctl(struct block_device *bdev, struct nbd_device *nbd,
 		error = nbd_thread_recv(nbd, bdev);
 		nbd_dev_dbg_close(nbd);
 		kthread_stop(thread);
-
-		mutex_lock(&nbd->tx_lock);
-
 		sock_shutdown(nbd);
+		mutex_lock(&nbd->tx_lock);
 		nbd_clear_que(nbd);
 		kill_bdev(bdev);
 		nbd_bdev_reset(bdev);
 
 		if (nbd->disconnect) /* user requested, ignore socket errors */
 			error = 0;
-		if (nbd->timedout)
+		if (atomic_read(&nbd->timedout))
 			error = -ETIMEDOUT;
 
 		nbd_reset(nbd);
@@ -1075,7 +1088,7 @@ static int __init nbd_init(void)
 		nbd_dev[i].magic = NBD_MAGIC;
 		INIT_LIST_HEAD(&nbd_dev[i].waiting_queue);
 		spin_lock_init(&nbd_dev[i].queue_lock);
-		spin_lock_init(&nbd_dev[i].sock_lock);
+		mutex_init(&nbd_dev[i].sock_lock);
 		INIT_LIST_HEAD(&nbd_dev[i].queue_head);
 		mutex_init(&nbd_dev[i].tx_lock);
 		init_timer(&nbd_dev[i].timeout_timer);
