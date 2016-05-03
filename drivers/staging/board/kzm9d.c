@@ -9,7 +9,7 @@ static struct resource usbs1_res[] __initdata = {
 	DEFINE_RES_IRQ(159),
 };
 
-static void __init kzm9d_init(void)
+static void kzm9d_setup(void)
 {
 	board_staging_gic_setup_xlate("arm,pl390", 32);
 
@@ -22,4 +22,13 @@ static void __init kzm9d_init(void)
 	}
 }
 
-board_staging("renesas,kzm9d", kzm9d_init);
+static int __init kzm9d_init(void)
+{
+	const char *compat = "renesas,kzm9d";
+
+	if (of_machine_is_compatible(compat))
+		kzm9d_setup();
+	return 0;
+}
+
+device_initcall(kzm9d_init);
