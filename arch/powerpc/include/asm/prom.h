@@ -165,5 +165,20 @@ struct of_drconf_cell {
  */
 extern unsigned char ibm_architecture_vec[];
 
+#define SYSRAM_END	0x400000000
+#define DEVRAM_START	0xb00000000
+#define NR_RESERVE	500
+
+enum resmem_elements {
+	MEM_BASE = 0,
+	MEM_SIZE = 1,
+	MEM_NODE = 2,
+	MEM_MAX = 3
+};
+
+struct resmem {
+	u64     mem[NR_RESERVE][MEM_MAX];
+	u64     nr;
+};
 #endif /* __KERNEL__ */
 #endif /* _POWERPC_PROM_H */

@@ -436,6 +436,8 @@ static int __init early_init_dt_scan_chosen_ppc(unsigned long node,
 }
 
 #ifdef CONFIG_PPC_PSERIES
+struct resmem rmem;
+EXPORT_SYMBOL(rmem);
 /*
  * Interpret the ibm,dynamic-memory property in the
  * /ibm,dynamic-reconfiguration-memory node.
@@ -469,6 +471,7 @@ static int __init early_init_dt_scan_drconf_memory(unsigned long node)
 	if (usm != NULL)
 		is_kexec_kdump = 1;
 
+	memset(&rmem, 0, sizeof(struct resmem));
 	for (; n != 0; --n) {
 		base = dt_mem_next_cell(dt_root_addr_cells, &dm);
 		flags = of_read_number(&dm[3], 1);
@@ -506,6 +509,14 @@ static int __init early_init_dt_scan_drconf_memory(unsigned long node)
 				if ((base + size) > 0x80000000ul)
 					size = 0x80000000ul - base;
 			}
+			if (base > DEVRAM_START) {
+				rmem.mem[rmem.nr][MEM_BASE] = base;
+				rmem.mem[rmem.nr][MEM_SIZE] = size;
+				rmem.nr++;
+				continue;
+			}
+			if (base > SYSRAM_END)
+				continue;
 			memblock_add(base, size);
 		} while (--rngs);
 	}
