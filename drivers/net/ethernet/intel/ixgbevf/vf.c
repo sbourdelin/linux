@@ -974,11 +974,13 @@ static const struct ixgbe_mac_operations ixgbevf_hv_mac_ops = {
 	.stop_adapter		= ixgbevf_stop_hw_vf,
 	.setup_link		= ixgbevf_setup_mac_link_vf,
 	.check_link		= ixgbevf_hv_check_mac_link_vf,
+	.negotiate_api_version	= ixgbevf_hv_negotiate_api_version_vf,
 	.set_rar		= ixgbevf_hv_set_rar_vf,
 	.update_mc_addr_list	= ixgbevf_hv_update_mc_addr_list_vf,
 	.update_xcast_mode	= ixgbevf_hv_update_xcast_mode,
 	.set_uc_addr		= ixgbevf_hv_set_uc_addr_vf,
 	.set_vfta		= ixgbevf_hv_set_vfta_vf,
+	.set_rlpml		= ixgbevf_hv_set_rlpml_vf,
 };
 
 const struct ixgbevf_info ixgbevf_82599_vf_info = {
