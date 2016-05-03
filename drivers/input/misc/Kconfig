@@ -82,6 +82,17 @@ config INPUT_ARIZONA_HAPTICS
 	  To compile this driver as a module, choose M here: the
 	  module will be called arizona-haptics.
 
+config INPUT_ATMEGAXX_CAPTOUCH
+	tristate "Atmel AtmegaXX Capacitive Touch"
+	depends on OF || COMPILE_TEST
+	help
+	  Say Y here if an Atmel Capacitive Touch device is connected to
+	  an I2C bus. One should find "atmel,atmegaxx_captouch" node in
+	  the board specific DTS.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called atmegaxx_captouch.
+
 config INPUT_BMA150
 	tristate "BMA150/SMB380 acceleration sensor support"
 	depends on I2C
