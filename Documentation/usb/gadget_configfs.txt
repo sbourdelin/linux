@@ -205,11 +205,13 @@ In order to enable the gadget it must be bound to a UDC (USB Device Controller).
 
 $ echo <udc name> > UDC
 
-where <udc name> is one of those found in /sys/class/udc/*
+where <udc name> is one of those found in /sys/class/udc/* or "any" if you
+doesn't care about which controller to bind.
 e.g.:
 
 $ echo s3c-hsotg > UDC
-
+or
+$ echo any > UDC
 
 6. Disabling the gadget
 -----------------------
