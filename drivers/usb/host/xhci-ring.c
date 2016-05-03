@@ -95,7 +95,7 @@ static bool last_trb_on_last_seg(struct xhci_hcd *xhci, struct xhci_ring *ring,
 		struct xhci_segment *seg, union xhci_trb *trb)
 {
 	if (ring == xhci->event_ring)
-		return (trb == &seg->trbs[TRBS_PER_SEGMENT]) &&
+		return (trb == &seg->trbs[TRBS_PER_SEGMENT - 1]) &&
 			(seg->next == xhci->event_ring->first_seg);
 	else
 		return le32_to_cpu(trb->link.control) & LINK_TOGGLE;
@@ -109,7 +109,7 @@ static int last_trb(struct xhci_hcd *xhci, struct xhci_ring *ring,
 		struct xhci_segment *seg, union xhci_trb *trb)
 {
 	if (ring == xhci->event_ring)
-		return trb == &seg->trbs[TRBS_PER_SEGMENT];
+		return trb == &seg->trbs[TRBS_PER_SEGMENT - 1];
 	else
 		return TRB_TYPE_LINK_LE32(trb->link.control);
 }
