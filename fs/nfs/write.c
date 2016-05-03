@@ -1323,10 +1323,7 @@ static void nfs_initiate_write(struct nfs_pgio_header *hdr,
 	int priority = flush_task_priority(how);
 
 	task_setup_data->priority = priority;
-	rpc_ops->write_setup(hdr, msg);
-
-	nfs4_state_protect_write(NFS_SERVER(hdr->inode)->nfs_client,
-				 &task_setup_data->rpc_client, msg, hdr);
+	rpc_ops->write_setup(&task_setup_data->rpc_client, hdr, msg);
 }
 
 /* If a nfs_flush_* function fails, it should remove reqs from @head and
@@ -1609,12 +1606,9 @@ int nfs_initiate_commit(struct rpc_clnt *clnt, struct nfs_commit_data *data,
 		.priority = priority,
 	};
 	/* Set up the initial task struct.  */
-	nfs_ops->commit_setup(data, &msg);
+	nfs_ops->commit_setup(&task_setup_data.rpc_client, data, &msg);
 
 	dprintk("NFS: initiated commit call\n");
-
-	nfs4_state_protect(NFS_SERVER(data->inode)->nfs_client,
-		NFS_SP4_MACH_CRED_COMMIT, &task_setup_data.rpc_client, &msg);
 
 	task = rpc_run_task(&task_setup_data);
 	if (IS_ERR(task))

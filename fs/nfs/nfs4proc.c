@@ -4448,7 +4448,8 @@ bool nfs4_write_need_cache_consistency_data(struct nfs_pgio_header *hdr)
 	return nfs4_have_delegation(hdr->inode, FMODE_READ) == 0;
 }
 
-static void nfs4_proc_write_setup(struct nfs_pgio_header *hdr,
+static void nfs4_proc_write_setup(struct rpc_clnt **clnt,
+				  struct nfs_pgio_header *hdr,
 				  struct rpc_message *msg)
 {
 	struct nfs_server *server = NFS_SERVER(hdr->inode);
@@ -4466,6 +4467,8 @@ static void nfs4_proc_write_setup(struct nfs_pgio_header *hdr,
 
 	msg->rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_WRITE];
 	nfs4_init_sequence(&hdr->args.seq_args, &hdr->res.seq_res, 1);
+	nfs4_state_protect_write(NFS_SERVER(hdr->inode)->nfs_client,
+				 clnt, msg, hdr);
 }
 
 static void nfs4_proc_commit_rpc_prepare(struct rpc_task *task, struct nfs_commit_data *data)
@@ -4496,7 +4499,9 @@ static int nfs4_commit_done(struct rpc_task *task, struct nfs_commit_data *data)
 	return data->commit_done_cb(task, data);
 }
 
-static void nfs4_proc_commit_setup(struct nfs_commit_data *data, struct rpc_message *msg)
+static void nfs4_proc_commit_setup(struct rpc_clnt **clnt,
+				   struct nfs_commit_data *data,
+				   struct rpc_message *msg)
 {
 	struct nfs_server *server = NFS_SERVER(data->inode);
 
@@ -4505,6 +4510,8 @@ static void nfs4_proc_commit_setup(struct nfs_commit_data *data, struct rpc_mess
 	data->res.server = server;
 	msg->rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_COMMIT];
 	nfs4_init_sequence(&data->args.seq_args, &data->res.seq_res, 1);
+	nfs4_state_protect(NFS_SERVER(data->inode)->nfs_client,
+		NFS_SP4_MACH_CRED_COMMIT, clnt, msg);
 }
 
 struct nfs4_renewdata {
