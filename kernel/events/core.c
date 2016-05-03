@@ -375,6 +375,14 @@ static void update_perf_cpu_limits(void)
 {
 	u64 tmp = perf_sample_period_ns;
 
+	/*
+	 * Don't update the perf_sample_allowed_ns,
+	 * if the dynamic interrupt throttle mechanism is disabled.
+	 */
+	if (sysctl_perf_cpu_time_max_percent == 100 ||
+	    sysctl_perf_cpu_time_max_percent == 0)
+		return;
+
 	tmp *= sysctl_perf_cpu_time_max_percent;
 	tmp = div_u64(tmp, 100);
 	if (!tmp)
