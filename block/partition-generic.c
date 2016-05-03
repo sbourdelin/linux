@@ -361,6 +361,10 @@ struct hd_struct *add_partition(struct gendisk *disk, int partno,
 			goto out_del;
 	}
 
+	err = -ENOMEM;
+	if (hd_ref_init(p))
+		goto out_free_info;
+
 	/* everything is up and running, commence */
 	rcu_assign_pointer(ptbl->part[partno], p);
 
@@ -368,8 +372,7 @@ struct hd_struct *add_partition(struct gendisk *disk, int partno,
 	if (!dev_get_uevent_suppress(ddev))
 		kobject_uevent(&pdev->kobj, KOBJ_ADD);
 
-	if (!hd_ref_init(p))
-		return p;
+	return p;
 
 out_free_info:
 	free_part_info(p);
