@@ -37,6 +37,10 @@ MODULE_AUTHOR("Gabriel L. Somlo <somlo@cmu.edu>");
 MODULE_DESCRIPTION("QEMU fw_cfg sysfs support");
 MODULE_LICENSE("GPL");
 
+static int modparam_list_all;
+module_param_named(list_all, modparam_list_all, int, 0444);
+MODULE_PARM_DESC(list_all, "List all fw-cfg items under by_name sysfs folder.");
+
 /* selector key values for "well-known" fw_cfg entries */
 #define FW_CFG_SIGNATURE  0x00
 #define FW_CFG_ID         0x01
@@ -453,6 +457,10 @@ static int fw_cfg_register_file(const struct fw_cfg_file *f)
 {
 	int err;
 	struct fw_cfg_sysfs_entry *entry;
+
+	/* skip listing item if name does not begin with "opt/" */
+	if (!modparam_list_all && strncmp(f->name, "opt/", 4))
+		return 0;
 
 	/* allocate new entry */
 	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
