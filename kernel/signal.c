@@ -1688,6 +1688,7 @@ static void do_notify_parent_cldstop(struct task_struct *tsk,
 		parent = tsk->real_parent;
 	}
 
+	memset(&info, 0, sizeof(info));
 	info.si_signo = SIGCHLD;
 	info.si_errno = 0;
 	/*
