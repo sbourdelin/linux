@@ -616,6 +616,47 @@ static inline void nf_ct_acct_update(struct nf_conn *ct,
 	}
 }
 
+static void nf_ct_acct_merge(struct nf_conn *ct, enum ip_conntrack_info ctinfo,
+			     const struct nf_conn *old_ct)
+{
+	struct nf_conn_acct *acct;
+
+	acct = nf_conn_acct_find(old_ct);
+	if (acct) {
+		struct nf_conn_counter *counter = acct->counter;
+		enum ip_conntrack_info ctinfo;
+		unsigned int bytes;
+
+		/* u32 should be fine since we must have seen one packet. */
+		bytes = atomic64_read(&counter[CTINFO2DIR(ctinfo)].bytes);
+		nf_ct_acct_update(ct, ctinfo, bytes);
+	}
+}
+
+/* Resolve race on insertion if this protocol allows this. */
+static int nf_ct_resolve_clash(struct net *net, struct sk_buff *skb,
+			       const struct nf_conn *old_ct,
+			       enum ip_conntrack_info ctinfo,
+			       struct nf_conntrack_tuple_hash *h)
+{
+	struct nf_conn *ct = nf_ct_tuplehash_to_ctrack(h);
+	struct nf_conntrack_l4proto *l4proto;
+
+	l4proto = __nf_ct_l4proto_find(nf_ct_l3num(ct), nf_ct_protonum(ct));
+	if (l4proto->allow_clash &&
+	    !nf_ct_is_dying(ct) &&
+	    atomic_inc_not_zero(&ct->ct_general.use)) {
+		/* Don't modify skb->nfctinfo, we're at POSTROUTING so this
+		 * packet is already leaving our framework, it is too late.
+		 */
+		skb->nfct = &ct->ct_general;
+		nf_ct_acct_merge(ct, ctinfo, old_ct);
+		return NF_ACCEPT;
+	}
+	NF_CT_STAT_INC(net, drop);
+	return NF_DROP;
+}
+
 /* Confirm a connection given skb; places it in hash table */
 int
 __nf_conntrack_confirm(struct sk_buff *skb)
@@ -630,6 +671,7 @@ __nf_conntrack_confirm(struct sk_buff *skb)
 	enum ip_conntrack_info ctinfo;
 	struct net *net;
 	unsigned int sequence;
+	int ret;
 
 	ct = nf_ct_get(skb, &ctinfo);
 	net = nf_ct_net(ct);
@@ -726,11 +768,12 @@ __nf_conntrack_confirm(struct sk_buff *skb)
 	return NF_ACCEPT;
 
 out:
+	ret = nf_ct_resolve_clash(net, skb, ct, ctinfo, h);
 	nf_ct_add_to_dying_list(ct);
 	nf_conntrack_double_unlock(hash, reply_hash);
 	NF_CT_STAT_INC(net, insert_failed);
 	local_bh_enable();
-	return NF_DROP;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(__nf_conntrack_confirm);
 
