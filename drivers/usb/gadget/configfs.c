@@ -230,16 +230,18 @@ static ssize_t gadget_dev_desc_bcdUSB_store(struct config_item *item,
 
 static ssize_t gadget_dev_desc_UDC_show(struct config_item *item, char *page)
 {
-	char *udc_name = to_gadget_info(item)->composite.gadget_driver.udc_name;
+	struct gadget_info *gi = to_gadget_info(item);
+	char *udc_name = gi->composite.gadget_driver.udc_name;
 
-	return sprintf(page, "%s\n", udc_name ?: "");
+	return sprintf(page, "%s\n", udc_name ?:
+			(gi->cdev.gadget ? "any" : ""));
 }
 
 static int unregister_gadget(struct gadget_info *gi)
 {
 	int ret;
 
-	if (!gi->composite.gadget_driver.udc_name)
+	if (!gi->cdev.gadget)
 		return -ENODEV;
 
 	ret = usb_gadget_unregister_driver(&gi->composite.gadget_driver);
@@ -270,9 +272,13 @@ static ssize_t gadget_dev_desc_UDC_store(struct config_item *item,
 		if (ret)
 			goto err;
 	} else {
-		if (gi->composite.gadget_driver.udc_name) {
+		if (gi->cdev.gadget) {
 			ret = -EBUSY;
 			goto err;
+		}
+		if (!strcmp(name, "any")) {
+			kfree(name);
+			name = NULL;
 		}
 		gi->composite.gadget_driver.udc_name = name;
 		ret = usb_gadget_probe_driver(&gi->composite.gadget_driver);
@@ -428,9 +434,9 @@ static int config_usb_cfg_unlink(
 	 * remove the function.
 	 */
 	mutex_lock(&gi->lock);
-	if (gi->composite.gadget_driver.udc_name)
+	if (gi->cdev.gadget)
 		unregister_gadget(gi);
-	WARN_ON(gi->composite.gadget_driver.udc_name);
+	WARN_ON(gi->cdev.gadget);
 
 	list_for_each_entry(f, &cfg->func_list, list) {
 		if (f->fi == fi) {
@@ -873,10 +879,10 @@ static int os_desc_unlink(struct config_item *os_desc_ci,
 	struct usb_composite_dev *cdev = &gi->cdev;
 
 	mutex_lock(&gi->lock);
-	if (gi->composite.gadget_driver.udc_name)
+	if (gi->cdev.gadget)
 		unregister_gadget(gi);
 	cdev->os_desc_config = NULL;
-	WARN_ON(gi->composite.gadget_driver.udc_name);
+	WARN_ON(gi->cdev.gadget);
 	mutex_unlock(&gi->lock);
 	return 0;
 }
