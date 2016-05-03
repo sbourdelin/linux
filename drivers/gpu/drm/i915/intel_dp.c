@@ -5003,6 +5003,9 @@ static void intel_dp_get_dfp(struct intel_dp *intel_dp)
 		if (intel_dp->dfp.type & DP_DS_PORT_TYPE_VGA) {
 			intel_dp->dfp.dot_clk = dfp_info[1] * 8 * 1000;
 			DRM_DEBUG_KMS("max pixel rate for VGA is %d kHz\n", intel_dp->dfp.dot_clk);
+		} else if (!(intel_dp->dfp.type & DP_DS_PORT_TYPE_WIRELESS)) {
+			intel_dp->dfp.tmds_clk = DIV_ROUND_CLOSEST(dfp_info[1] * 25 * 1000, 10);
+			DRM_DEBUG_KMS("max TMDS clock is %d kHz\n", intel_dp->dfp.tmds_clk);
 		}
 	}
 }

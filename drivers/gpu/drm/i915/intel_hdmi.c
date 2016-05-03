@@ -1168,13 +1168,14 @@ static void pch_post_disable_hdmi(struct intel_encoder *encoder)
 static int hdmi_port_clock_limit(struct intel_hdmi *hdmi, bool respect_dvi_limit)
 {
 	struct drm_device *dev = intel_hdmi_to_dev(hdmi);
+	int tmds_clock = hdmi_to_dig_port(hdmi)->dp.dfp.tmds_clk;
 
 	if ((respect_dvi_limit && !hdmi->has_hdmi_sink) || IS_G4X(dev))
-		return 165000;
+		return (tmds_clock > 0 ? min(165000, tmds_clock) : 165000);
 	else if (IS_HASWELL(dev) || INTEL_INFO(dev)->gen >= 8)
-		return 300000;
+		return (tmds_clock > 0 ? min(300000, tmds_clock) : 300000);
 	else
-		return 225000;
+		return (tmds_clock > 0 ? min(225000, tmds_clock) : 225000);
 }
 
 static enum drm_mode_status

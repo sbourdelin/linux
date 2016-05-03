@@ -799,6 +799,7 @@ struct intel_dp_dfp {
 	int type;
 	bool detailed_cap_info;
 	int dot_clk; /* pixel rate for VGA dongles */
+	int tmds_clk;
 };
 
 struct intel_dp {
