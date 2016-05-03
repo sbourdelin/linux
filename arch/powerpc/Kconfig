@@ -1086,6 +1086,10 @@ endif
 config	ARCH_RANDOM
 	def_bool n
 
+config ZONE_DEVICE
+	bool
+	default y if PPC_BOOK3S_64
+
 source "net/Kconfig"
 
 source "drivers/Kconfig"
