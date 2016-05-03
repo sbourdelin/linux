@@ -2894,12 +2894,32 @@ static int prepare_transfer(struct xhci_hcd *xhci,
 	struct xhci_td	*td;
 	struct xhci_ring *ep_ring;
 	struct xhci_ep_ctx *ep_ctx = xhci_get_ep_ctx(xhci, xdev->out_ctx, ep_index);
+	unsigned int avg_trb_len;
+	unsigned int tx_info;
 
 	ep_ring = xhci_stream_id_to_ring(xdev, ep_index, stream_id);
 	if (!ep_ring) {
 		xhci_dbg(xhci, "Can't prepare ring for bad stream ID %u\n",
 				stream_id);
 		return -EINVAL;
+	}
+
+	/*
+	 * Here we update avg_trb_len so that, over time, we get a better
+	 * representation of what the actual average length for this endpoint's
+	 * TRBs are going to be.
+	 */
+	if (urb->transfer_buffer_length > 0) {
+		tx_info = le32_to_cpu(ep_ctx->tx_info);
+
+		avg_trb_len = EP_AVG_TRB_LENGTH(tx_info);
+		avg_trb_len += urb->transfer_buffer_length;
+		avg_trb_len /= 2;
+
+		tx_info &= ~EP_AVG_TRB_LENGTH_MASK;
+		tx_info |= EP_AVG_TRB_LENGTH(avg_trb_len);
+
+		ep_ctx->tx_info = cpu_to_le32(tx_info);
 	}
 
 	ret = prepare_ring(xhci, ep_ring,

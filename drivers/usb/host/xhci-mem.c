@@ -1451,18 +1451,34 @@ int xhci_endpoint_init(struct xhci_hcd *xhci,
 	virt_dev->eps[ep_index].skip = false;
 	ep_ring = virt_dev->eps[ep_index].new_ring;
 
-	/*
-	 * Get values to fill the endpoint context, mostly from ep descriptor.
-	 * The average TRB buffer lengt for bulk endpoints is unclear as we
-	 * have no clue on scatter gather list entry size. For Isoc and Int,
-	 * set it to max available. See xHCI 1.1 spec 4.14.1.1 for details.
-	 */
+	/* Get values to fill the endpoint context, mostly from ep descriptor. */
 	max_esit_payload = xhci_get_max_esit_payload(udev, ep);
 	interval = xhci_get_endpoint_interval(udev, ep);
 	mult = xhci_get_endpoint_mult(udev, ep);
 	max_packet = GET_MAX_PACKET(usb_endpoint_maxp(&ep->desc));
 	max_burst = xhci_get_endpoint_max_burst(udev, ep);
-	avg_trb_len = max_esit_payload;
+
+	/*
+	 * We are using a running avg for our endpoint's avg_trb_len. The reason
+	 * is that we have no clue about average transfer sizes for any
+	 * endpoints because the HCD does not know which USB Class is running on
+	 * the other end.
+	 *
+	 * See xHCI 1.1 spec 4.14.1.1 for details about initial avg_trb_len
+	 * setting.
+	 */
+	switch (usb_endpoint_type(&ep->desc)) {
+	case USB_ENDPOINT_XFER_CONTROL:
+		avg_trb_len = 8;
+		break;
+	case USB_ENDPOINT_XFER_INT:
+		avg_trb_len = 1024;
+		break;
+	case USB_ENDPOINT_XFER_ISOC:
+	case USB_ENDPOINT_XFER_BULK:
+		avg_trb_len = 3072;
+		break;
+	}
 
 	/* FIXME dig Mult and streams info out of ep companion desc */
 
@@ -1472,9 +1488,7 @@ int xhci_endpoint_init(struct xhci_hcd *xhci,
 	/* Some devices get this wrong */
 	if (usb_endpoint_xfer_bulk(&ep->desc) && udev->speed == USB_SPEED_HIGH)
 		max_packet = 512;
-	/* xHCI 1.0 and 1.1 indicates that ctrl ep avg TRB Length should be 8 */
-	if (usb_endpoint_xfer_control(&ep->desc) && xhci->hci_version >= 0x100)
-		avg_trb_len = 8;
+
 	/* xhci 1.1 with LEC support doesn't use mult field, use RsvdZ */
 	if ((xhci->hci_version > 0x100) && HCC2_LEC(xhci->hcc_params2))
 		mult = 0;
