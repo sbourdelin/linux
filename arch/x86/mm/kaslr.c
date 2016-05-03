@@ -68,15 +68,25 @@ void __init kernel_randomize_memory(void)
 {
 	size_t i;
 	unsigned long addr = memory_rand_start;
-	unsigned long padding, rand, mem_tb;
+	unsigned long padding, rand, mem_tb, page_offset_padding;
 	struct rnd_state rnd_st;
 	unsigned long remain_padding = memory_rand_end - memory_rand_start;
 
 	if (!kaslr_enabled())
 		return;
 
+	/*
+	 * Update Physical memory mapping to available and
+	 * add padding if needed (especially for memory hotplug support).
+	 */
+	page_offset_padding = CONFIG_RANDOMIZE_MEMORY_PHYSICAL_PADDING;
+
+#ifdef CONFIG_MEMORY_HOTPLUG
+	page_offset_padding = max(1UL, page_offset_padding);
+#endif
+
 	BUG_ON(kaslr_regions[0].base != &page_offset_base);
-	mem_tb = ((max_pfn << PAGE_SHIFT) >> TB_SHIFT);
+	mem_tb = ((max_pfn << PAGE_SHIFT) >> TB_SHIFT) + page_offset_padding;
 
 	if (mem_tb < kaslr_regions[0].size_tb)
 		kaslr_regions[0].size_tb = mem_tb;
