@@ -280,6 +280,14 @@ pnfs_generic_commit_pagelist(struct inode *inode, struct list_head *mds_pages,
 	list_for_each_entry_safe(data, tmp, &list, pages) {
 		list_del_init(&data->pages);
 		if (data->ds_commit_index < 0) {
+			/* another commit raced with us */
+			if (list_empty(mds_pages)) {
+				if (atomic_dec_and_test(&cinfo->mds->rpcs_out))
+					wake_up_atomic_t(&cinfo->mds->rpcs_out);
+				nfs_commitdata_release(data);
+				continue;
+			}
+
 			nfs_init_commit(data, mds_pages, NULL, cinfo);
 			nfs_initiate_commit(NFS_CLIENT(inode), data,
 					    NFS_PROTO(data->inode),
@@ -288,6 +296,15 @@ pnfs_generic_commit_pagelist(struct inode *inode, struct list_head *mds_pages,
 			LIST_HEAD(pages);
 
 			pnfs_fetch_commit_bucket_list(&pages, data, cinfo);
+
+			/* another commit raced with us */
+			if (list_empty(&pages)) {
+				if (atomic_dec_and_test(&cinfo->mds->rpcs_out))
+					wake_up_atomic_t(&cinfo->mds->rpcs_out);
+				nfs_commitdata_release(data);
+				continue;
+			}
+
 			nfs_init_commit(data, &pages, data->lseg, cinfo);
 			initiate_commit(data, how);
 		}
