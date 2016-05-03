@@ -1594,6 +1594,7 @@ bool do_notify_parent(struct task_struct *tsk, int sig)
 			sig = SIGCHLD;
 	}
 
+	memset(&info, 0, sizeof(info));
 	info.si_signo = sig;
 	info.si_errno = 0;
 	/*
