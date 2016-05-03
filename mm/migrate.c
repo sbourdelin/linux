@@ -1760,7 +1760,13 @@ int migrate_misplaced_transhuge_page(struct mm_struct *mm,
 	int page_lru = page_is_file_cache(page);
 	unsigned long mmun_start = address & HPAGE_PMD_MASK;
 	unsigned long mmun_end = mmun_start + HPAGE_PMD_SIZE;
-	pmd_t orig_entry;
+
+	/*
+	 * What we do here is only valid if pmd_protnone(entry) is true and thp
+	 * page is map in only once, which numamigrate_isolate_page() checks.
+	 */
+	if (!pmd_protnone(entry))
+		goto out_unlock;
 
 	/*
 	 * Rate-limit the amount of data that is being migrated to a node.
@@ -1803,7 +1809,6 @@ int migrate_misplaced_transhuge_page(struct mm_struct *mm,
 	mmu_notifier_invalidate_range_start(mm, mmun_start, mmun_end);
 	ptl = pmd_lock(mm, pmd);
 	if (unlikely(!pmd_same(*pmd, entry) || page_count(page) != 2)) {
-fail_putback:
 		spin_unlock(ptl);
 		mmu_notifier_invalidate_range_end(mm, mmun_start, mmun_end);
 
@@ -1825,17 +1830,21 @@ fail_putback:
 		goto out_unlock;
 	}
 
-	orig_entry = *pmd;
+	/*
+	 * We are holding the lock so no one can set a new pmd and original pmd
+	 * is PROT_NONE thus no one can get_user_pages or get_user_pages_fast
+	 * (GUP or GUP_fast) from this point on we can not fail.
+	 */
 	entry = mk_pmd(new_page, vma->vm_page_prot);
 	entry = pmd_mkhuge(entry);
 	entry = maybe_pmd_mkwrite(pmd_mkdirty(entry), vma);
 
 	/*
 	 * Clear the old entry under pagetable lock and establish the new PTE.
-	 * Any parallel GUP will either observe the old page blocking on the
-	 * page lock, block on the page table lock or observe the new page.
-	 * The SetPageUptodate on the new page and page_add_new_anon_rmap
-	 * guarantee the copy is visible before the pagetable update.
+	 * Any parallel GUP can only observe the new page as old page only had
+	 * one mapping with PROT_NONE (GUP/GUP_fast fails if pmd_protnone() is
+	 * true). However a concurrent GUP might see the new page as soon as
+	 * we set the pmd to the new entry.
 	 */
 	flush_cache_range(vma, mmun_start, mmun_end);
 	page_add_anon_rmap(new_page, vma, mmun_start, true);
@@ -1843,14 +1852,13 @@ fail_putback:
 	set_pmd_at(mm, mmun_start, pmd, entry);
 	update_mmu_cache_pmd(vma, address, &entry);
 
-	if (page_count(page) != 2) {
-		set_pmd_at(mm, mmun_start, pmd, orig_entry);
-		flush_pmd_tlb_range(vma, mmun_start, mmun_end);
-		mmu_notifier_invalidate_range(mm, mmun_start, mmun_end);
-		update_mmu_cache_pmd(vma, address, &entry);
-		page_remove_rmap(new_page, true);
-		goto fail_putback;
-	}
+	/* As said above no one can get reference on the old page nor through
+	 * get_user_pages or get_user_pages_fast (GUP/GUP_fast) or through
+	 * any other means. To get reference on huge page you need to hold
+	 * pmd_lock and we are already holding that lock here and the page
+	 * is only mapped once.
+	 */
+	BUG_ON(page_count(page) != 2);
 
 	mlock_migrate_page(new_page, page);
 	page_remove_rmap(page, true);
