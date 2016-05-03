@@ -1,0 +1,19 @@
+EXTCON FOR GPIO
+
+Required Properties:
+ - compatible : Should be "extcon-gpio";
+
+Optional Properties:
+ - extcon-gpio,name: Name of extcon device.
+ - gpio: gpio number.
+ - extcon-gpio,irq-flags: IRQ flags for GPIO.
+ - extcon-gpio,debounce: Debounce time in ms.
+ - extcon-gpio,connection-state-low: boolean, Connection state with
+                gpio state. True if gpio low means connected.
+
+extcon-gpio {
+	compatible = "extcon-gpio";
+        extcon-gpio,name = "VBUS";
+	gpio = <&gpio 20 0>;
+	extcon-gpio,cable-names = <EXTCON_USB EXTCON_NONE>;
+};
