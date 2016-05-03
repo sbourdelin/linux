@@ -163,6 +163,7 @@ static struct notifier_block acpi_cpu_notifier = {
 static int acpi_pss_perf_init(struct acpi_processor *pr,
 		struct acpi_device *device)
 {
+	char cdev_name[THERMAL_NAME_LENGTH];
 	int result = 0;
 
 	acpi_processor_ppc_has_changed(pr, 0);
@@ -172,7 +173,8 @@ static int acpi_pss_perf_init(struct acpi_processor *pr,
 	if (pr->flags.throttling)
 		pr->flags.limit = 1;
 
-	pr->cdev = thermal_cooling_device_register("Processor", device,
+	snprintf(cdev_name, sizeof(cdev_name), "Processor.%d", pr->id);
+	pr->cdev = thermal_cooling_device_register(cdev_name, device,
 						   &processor_cooling_ops);
 	if (IS_ERR(pr->cdev)) {
 		result = PTR_ERR(pr->cdev);
