@@ -38,22 +38,25 @@ TRACE_EVENT(kvm_userspace_exit,
 );
 
 TRACE_EVENT(kvm_vcpu_wakeup,
-	    TP_PROTO(__u64 ns, bool waited),
-	    TP_ARGS(ns, waited),
+	    TP_PROTO(__u64 ns, bool waited, bool tuned),
+	    TP_ARGS(ns, waited, tuned),
 
 	TP_STRUCT__entry(
 		__field(	__u64,		ns		)
 		__field(	bool,		waited		)
+		__field(	bool,		tuned		)
 	),
 
 	TP_fast_assign(
 		__entry->ns		= ns;
 		__entry->waited		= waited;
+		__entry->tuned		= tuned;
 	),
 
-	TP_printk("%s time %lld ns",
+	TP_printk("%s time %lld ns, polling %s",
 		  __entry->waited ? "wait" : "poll",
-		  __entry->ns)
+		  __entry->ns,
+		  __entry->tuned ? "changed" : "unchanged")
 );
 
 #if defined(CONFIG_HAVE_KVM_IRQFD)
