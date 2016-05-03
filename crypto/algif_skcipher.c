@@ -489,7 +489,7 @@ static int skcipher_all_sg_nents(struct skcipher_ctx *ctx)
 		sg = sgl->sg;
 
 		while (!sg->length)
-			sg++;
+			sg = sg_next(sg);
 
 		nents += sg_nents(sg);
 	}
@@ -553,7 +553,7 @@ static int skcipher_recvmsg_async(struct socket *sock, struct msghdr *msg,
 		sg = sgl->sg;
 
 		while (!sg->length)
-			sg++;
+			sg = sg_next(sg);
 
 		used = min_t(unsigned long, ctx->used,
 			     iov_iter_count(&msg->msg_iter));
@@ -676,7 +676,7 @@ static int skcipher_recvmsg_sync(struct socket *sock, struct msghdr *msg,
 		sg = sgl->sg;
 
 		while (!sg->length)
-			sg++;
+			sg = sg_next(sg);
 
 		skcipher_request_set_crypt(&ctx->req, sg, ctx->rsgl.sg, used,
 					   ctx->iv);
