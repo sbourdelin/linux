@@ -227,6 +227,7 @@ GENL_struct(DRBD_NLA_STATE_INFO, 8, state_info,
 	__u32_field(21,                      0, ap_bio_cnt)
 	__u32_field(22,                      0, ap_pending_cnt)
 	__u32_field(23,                      0, rs_pending_cnt)
+	__unspec_field(24,                   0, pad)
 )
 
 GENL_struct(DRBD_NLA_START_OV_PARMS, 9, start_ov_parms,

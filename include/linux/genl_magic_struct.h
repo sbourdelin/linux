@@ -61,11 +61,15 @@ extern void CONCAT_(GENL_MAGIC_FAMILY, _genl_unregister)(void);
  */
 
 /* MAGIC helpers							{{{2 */
+#define nla_magic_put_flag(skb, attr, val) nla_put_flag(skb, attr)
 
 /* possible field types */
 #define __flg_field(attr_nr, attr_flag, name) \
 	__field(attr_nr, attr_flag, name, NLA_U8, char, \
 			nla_get_u8, nla_put_u8, false)
+#define __unspec_field(attr_nr, attr_flag, name)	\
+	__field(attr_nr, attr_flag, name, NLA_UNSPEC, unsigned char, \
+			nla_get_flag, nla_magic_put_flag, false)
 #define __u8_field(attr_nr, attr_flag, name)	\
 	__field(attr_nr, attr_flag, name, NLA_U8, unsigned char, \
 			nla_get_u8, nla_put_u8, false)
