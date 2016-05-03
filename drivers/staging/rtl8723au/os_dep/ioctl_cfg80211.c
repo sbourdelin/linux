@@ -2926,6 +2926,7 @@ static int cfg80211_rtw_dump_station(struct wiphy *wiphy,
 
 	/* TODO: dump scanned queue */
 
+	memset(mac, 0, ETH_ALEN);
 	return -ENOENT;
 }
 
