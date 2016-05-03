@@ -36,6 +36,8 @@
  */
 struct gpio_extcon_pdata {
 	unsigned int extcon_id;
+	unsigned int *extcon_cable_names;
+	int extcon_cable_cnt;
 	unsigned gpio;
 	bool gpio_active_low;
 	unsigned long debounce;
