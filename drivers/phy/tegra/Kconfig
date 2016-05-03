@@ -1,6 +1,6 @@
 config PHY_TEGRA_XUSB
 	tristate "NVIDIA Tegra XUSB pad controller driver"
-	depends on ARCH_TEGRA
+	depends on PINCTRL_TEGRA && PINCTRL_TEGRA_XUSB
 	help
 	  Choose this option if you have an NVIDIA Tegra SoC.
 
