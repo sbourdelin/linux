@@ -107,7 +107,7 @@ GENL_struct(DRBD_NLA_DISK_CONF, 3, disk_conf,
 	__s32_field(3, DRBD_F_REQUIRED | DRBD_F_INVARIANT,	meta_dev_idx)
 
 	/* use the resize command to try and change the disk_size */
-	__u64_field(4, DRBD_GENLA_F_MANDATORY | DRBD_F_INVARIANT,	disk_size)
+	__u64_field(4, DRBD_GENLA_F_MANDATORY | DRBD_F_INVARIANT,	disk_size, 24)
 	/* we could change the max_bio_bvecs,
 	 * but it won't propagate through the stack */
 	__u32_field(5, DRBD_GENLA_F_MANDATORY | DRBD_F_INVARIANT,	max_bio_bvecs)
@@ -132,6 +132,7 @@ GENL_struct(DRBD_NLA_DISK_CONF, 3, disk_conf,
 	__u32_field_def(21,	0 /* OPTIONAL */,       read_balancing, DRBD_READ_BALANCING_DEF)
 	/* 9: __u32_field_def(22,	DRBD_GENLA_F_MANDATORY,	unplug_watermark, DRBD_UNPLUG_WATERMARK_DEF) */
 	__flg_field_def(23,     0 /* OPTIONAL */,	al_updates, DRBD_AL_UPDATES_DEF)
+	__unspec_field(24,	0		,	disk_conf_pad)
 )
 
 GENL_struct(DRBD_NLA_RESOURCE_OPTS, 4, res_opts,
@@ -182,11 +183,12 @@ GENL_struct(DRBD_NLA_SET_ROLE_PARMS, 6, set_role_parms,
 )
 
 GENL_struct(DRBD_NLA_RESIZE_PARMS, 7, resize_parms,
-	__u64_field(1, DRBD_GENLA_F_MANDATORY,	resize_size)
+	__u64_field(1, DRBD_GENLA_F_MANDATORY,	resize_size, 6)
 	__flg_field(2, DRBD_GENLA_F_MANDATORY,	resize_force)
 	__flg_field(3, DRBD_GENLA_F_MANDATORY,	no_resync)
 	__u32_field_def(4, 0 /* OPTIONAL */, al_stripes, DRBD_AL_STRIPES_DEF)
 	__u32_field_def(5, 0 /* OPTIONAL */, al_stripe_size, DRBD_AL_STRIPE_SIZE_DEF)
+	__unspec_field(6, 0, resize_parms_pad)
 )
 
 GENL_struct(DRBD_NLA_STATE_INFO, 8, state_info,
@@ -194,8 +196,8 @@ GENL_struct(DRBD_NLA_STATE_INFO, 8, state_info,
 	 * if this is an event triggered broadcast. */
 	__u32_field(1, DRBD_GENLA_F_MANDATORY,	sib_reason)
 	__u32_field(2, DRBD_F_REQUIRED,	current_state)
-	__u64_field(3, DRBD_GENLA_F_MANDATORY,	capacity)
-	__u64_field(4, DRBD_GENLA_F_MANDATORY,	ed_uuid)
+	__u64_field(3, DRBD_GENLA_F_MANDATORY,	capacity, 24)
+	__u64_field(4, DRBD_GENLA_F_MANDATORY,	ed_uuid, 24)
 
 	/* These are for broadcast from after state change work.
 	 * prev_state and new_state are from the moment the state change took
@@ -208,30 +210,32 @@ GENL_struct(DRBD_NLA_STATE_INFO, 8, state_info,
 	/* if we have a local disk: */
 	__bin_field(7, DRBD_GENLA_F_MANDATORY,	uuids, (UI_SIZE*sizeof(__u64)))
 	__u32_field(8, DRBD_GENLA_F_MANDATORY,	disk_flags)
-	__u64_field(9, DRBD_GENLA_F_MANDATORY,	bits_total)
-	__u64_field(10, DRBD_GENLA_F_MANDATORY,	bits_oos)
+	__u64_field(9, DRBD_GENLA_F_MANDATORY,	bits_total, 24)
+	__u64_field(10, DRBD_GENLA_F_MANDATORY,	bits_oos, 24)
 	/* and in case resync or online verify is active */
-	__u64_field(11, DRBD_GENLA_F_MANDATORY,	bits_rs_total)
-	__u64_field(12, DRBD_GENLA_F_MANDATORY,	bits_rs_failed)
+	__u64_field(11, DRBD_GENLA_F_MANDATORY,	bits_rs_total, 24)
+	__u64_field(12, DRBD_GENLA_F_MANDATORY,	bits_rs_failed, 24)
 
 	/* for pre and post notifications of helper execution */
 	__str_field(13, DRBD_GENLA_F_MANDATORY,	helper, 32)
 	__u32_field(14, DRBD_GENLA_F_MANDATORY,	helper_exit_code)
 
-	__u64_field(15,                      0, send_cnt)
-	__u64_field(16,                      0, recv_cnt)
-	__u64_field(17,                      0, read_cnt)
-	__u64_field(18,                      0, writ_cnt)
-	__u64_field(19,                      0, al_writ_cnt)
-	__u64_field(20,                      0, bm_writ_cnt)
+	__u64_field(15,                      0, send_cnt, 24)
+	__u64_field(16,                      0, recv_cnt, 24)
+	__u64_field(17,                      0, read_cnt, 24)
+	__u64_field(18,                      0, writ_cnt, 24)
+	__u64_field(19,                      0, al_writ_cnt, 24)
+	__u64_field(20,                      0, bm_writ_cnt, 24)
 	__u32_field(21,                      0, ap_bio_cnt)
 	__u32_field(22,                      0, ap_pending_cnt)
 	__u32_field(23,                      0, rs_pending_cnt)
+	__unspec_field(24,                   0, state_info_pad)
 )
 
 GENL_struct(DRBD_NLA_START_OV_PARMS, 9, start_ov_parms,
-	__u64_field(1, DRBD_GENLA_F_MANDATORY,	ov_start_sector)
-	__u64_field(2, DRBD_GENLA_F_MANDATORY,	ov_stop_sector)
+	__u64_field(1, DRBD_GENLA_F_MANDATORY,	ov_start_sector, 3)
+	__u64_field(2, DRBD_GENLA_F_MANDATORY,	ov_stop_sector, 3)
+	__unspec_field(3, 0, ov_pad)
 )
 
 GENL_struct(DRBD_NLA_NEW_C_UUID_PARMS, 10, new_c_uuid_parms,
@@ -280,20 +284,21 @@ GENL_struct(DRBD_NLA_RESOURCE_STATISTICS, 19, resource_statistics,
 )
 
 GENL_struct(DRBD_NLA_DEVICE_STATISTICS, 20, device_statistics,
-	__u64_field(1, 0, dev_size)  /* (sectors) */
-	__u64_field(2, 0, dev_read)  /* (sectors) */
-	__u64_field(3, 0, dev_write)  /* (sectors) */
-	__u64_field(4, 0, dev_al_writes)  /* activity log writes (count) */
-	__u64_field(5, 0, dev_bm_writes)  /*  bitmap writes  (count) */
+	__u64_field(1, 0, dev_size, 15)  /* (sectors) */
+	__u64_field(2, 0, dev_read, 15)  /* (sectors) */
+	__u64_field(3, 0, dev_write, 15)  /* (sectors) */
+	__u64_field(4, 0, dev_al_writes, 15)  /* activity log writes (count) */
+	__u64_field(5, 0, dev_bm_writes, 15)  /*  bitmap writes  (count) */
 	__u32_field(6, 0, dev_upper_pending)  /* application requests in progress */
 	__u32_field(7, 0, dev_lower_pending)  /* backing device requests in progress */
 	__flg_field(8, 0, dev_upper_blocked)
 	__flg_field(9, 0, dev_lower_blocked)
 	__flg_field(10, 0, dev_al_suspended)  /* activity log suspended */
-	__u64_field(11, 0, dev_exposed_data_uuid)
-	__u64_field(12, 0, dev_current_uuid)
+	__u64_field(11, 0, dev_exposed_data_uuid, 15)
+	__u64_field(12, 0, dev_current_uuid, 15)
 	__u32_field(13, 0, dev_disk_flags)
 	__bin_field(14, 0, history_uuids, HISTORY_UUIDS * sizeof(__u64))
+	__unspec_field(15, 0, dev_pad)
 )
 
 GENL_struct(DRBD_NLA_CONNECTION_STATISTICS, 21, connection_statistics,
@@ -301,14 +306,15 @@ GENL_struct(DRBD_NLA_CONNECTION_STATISTICS, 21, connection_statistics,
 )
 
 GENL_struct(DRBD_NLA_PEER_DEVICE_STATISTICS, 22, peer_device_statistics,
-	__u64_field(1, 0, peer_dev_received)  /* sectors */
-	__u64_field(2, 0, peer_dev_sent)  /* sectors */
+	__u64_field(1, 0, peer_dev_received, 10)  /* sectors */
+	__u64_field(2, 0, peer_dev_sent, 10)  /* sectors */
 	__u32_field(3, 0, peer_dev_pending)  /* number of requests */
 	__u32_field(4, 0, peer_dev_unacked)  /* number of requests */
-	__u64_field(5, 0, peer_dev_out_of_sync)  /* sectors */
-	__u64_field(6, 0, peer_dev_resync_failed)  /* sectors */
-	__u64_field(7, 0, peer_dev_bitmap_uuid)
+	__u64_field(5, 0, peer_dev_out_of_sync, 10)  /* sectors */
+	__u64_field(6, 0, peer_dev_resync_failed, 10)  /* sectors */
+	__u64_field(7, 0, peer_dev_bitmap_uuid, 10)
 	__u32_field(9, 0, peer_dev_flags)
+	__unspec_field(10, 0, peer_dev_pad)
 )
 
 GENL_struct(DRBD_NLA_NOTIFICATION_HEADER, 23, drbd_notification_header,

@@ -66,6 +66,9 @@ extern void CONCAT_(GENL_MAGIC_FAMILY, _genl_unregister)(void);
 #define __flg_field(attr_nr, attr_flag, name) \
 	__field(attr_nr, attr_flag, name, NLA_U8, char, \
 			nla_get_u8, nla_put_u8, false)
+#define __unspec_field(attr_nr, attr_flag, name)	\
+	__field2(attr_nr, attr_flag, name, NLA_UNSPEC, unsigned char, \
+			nla_get_flag, nla_put_flag, false)
 #define __u8_field(attr_nr, attr_flag, name)	\
 	__field(attr_nr, attr_flag, name, NLA_U8, unsigned char, \
 			nla_get_u8, nla_put_u8, false)
@@ -78,9 +81,9 @@ extern void CONCAT_(GENL_MAGIC_FAMILY, _genl_unregister)(void);
 #define __s32_field(attr_nr, attr_flag, name)	\
 	__field(attr_nr, attr_flag, name, NLA_U32, __s32, \
 			nla_get_u32, nla_put_u32, true)
-#define __u64_field(attr_nr, attr_flag, name)	\
-	__field(attr_nr, attr_flag, name, NLA_U64, __u64, \
-			nla_get_u64, nla_put_u64, false)
+#define __u64_field(attr_nr, attr_flag, name, padattr)	\
+	__field4(attr_nr, attr_flag, name, NLA_U64, __u64, \
+			nla_get_u64, nla_put_u64_64bit, false, padattr)
 #define __str_field(attr_nr, attr_flag, name, maxlen) \
 	__array(attr_nr, attr_flag, name, NLA_NUL_STRING, char, maxlen, \
 			nla_strlcpy, nla_put, false)
@@ -156,6 +159,15 @@ enum {								\
 		__get, __put, __is_signed)			\
 	T_ ## name = (__u16)(attr_nr | ((attr_flag) & DRBD_GENLA_F_MANDATORY)),
 
+#undef __field2
+#define __field2 __field
+
+#undef __field4
+#define __field4(attr_nr, attr_flag, name, nla_type, _type, __get,	\
+		 __put, __is_signed, padattr)				\
+	__field(attr_nr, attr_flag, name, nla_type, _type, __get,       \
+		__put, __is_signed)
+
 #undef __array
 #define __array(attr_nr, attr_flag, name, nla_type, type,	\
 		maxlen, __get, __put, __is_signed)		\
@@ -222,6 +234,15 @@ static inline void ct_assert_unique_ ## s_name ## _attributes(void)	\
 		__is_signed)						\
 	case attr_nr:
 
+#undef __field2
+#define __field2 __field
+
+#undef __field4
+#define __field4(attr_nr, attr_flag, name, nla_type, _type, __get,	\
+		 __put, __is_signed, padattr)				\
+	__field(attr_nr, attr_flag, name, nla_type, _type, __get,       \
+		__put, __is_signed)
+
 #undef __array
 #define __array(attr_nr, attr_flag, name, nla_type, type, maxlen,	\
 		__get, __put, __is_signed)				\
@@ -246,6 +267,15 @@ struct s_name { s_fields };
 		__is_signed)						\
 	type name;
 
+#undef __field2
+#define __field2 __field
+
+#undef __field4
+#define __field4(attr_nr, attr_flag, name, nla_type, _type, __get,	\
+		 __put, __is_signed, padattr)				\
+	__field(attr_nr, attr_flag, name, nla_type, _type, __get,       \
+		__put, __is_signed)
+
 #undef __array
 #define __array(attr_nr, attr_flag, name, nla_type, type, maxlen,	\
 		__get, __put, __is_signed)				\
@@ -264,6 +294,15 @@ enum {									\
 #define __field(attr_nr, attr_flag, name, nla_type, type, __get, __put,	\
 		is_signed)						\
 	F_ ## name ## _IS_SIGNED = is_signed,
+
+#undef __field2
+#define __field2 __field
+
+#undef __field4
+#define __field4(attr_nr, attr_flag, name, nla_type, _type, __get,	\
+		 __put, __is_signed, padattr)				\
+	__field(attr_nr, attr_flag, name, nla_type, _type, __get,       \
+		__put, __is_signed)
 
 #undef __array
 #define __array(attr_nr, attr_flag, name, nla_type, type, maxlen,	\

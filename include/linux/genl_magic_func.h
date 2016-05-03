@@ -35,6 +35,15 @@ static struct nla_policy s_name ## _nl_policy[] __read_mostly =		\
 		 __put, __is_signed)					\
 	[attr_nr] = { .type = nla_type },
 
+#undef __field2
+#define __field2 __field
+
+#undef __field4
+#define __field4(attr_nr, attr_flag, name, nla_type, _type, __get,	\
+		 __put, __is_signed, padattr)				\
+	__field(attr_nr, attr_flag, name, nla_type, _type, __get,       \
+		__put, __is_signed)
+
 #undef __array
 #define __array(attr_nr, attr_flag, name, nla_type, _type, maxlen,	\
 		__get, __put, __is_signed)				\
@@ -199,6 +208,15 @@ static int s_name ## _from_attrs_for_change(struct s_name *s,		\
 				s->name = __get(nla);			\
 			DPRINT_FIELD("<<", nla_type, name, s, nla))
 
+#undef __field2
+#define __field2 __field
+
+#undef __field4
+#define __field4(attr_nr, attr_flag, name, nla_type, _type, __get,	\
+		 __put, __is_signed, padattr)				\
+	__field(attr_nr, attr_flag, name, nla_type, _type, __get,       \
+		__put, __is_signed)
+
 /* validate_nla() already checked nla_len <= maxlen appropriately. */
 #undef __array
 #define __array(attr_nr, attr_flag, name, nla_type, type, maxlen,	\
@@ -362,6 +380,24 @@ static inline int s_name ## _to_unpriv_skb(struct sk_buff *skb,		\
 			goto nla_put_failure;				\
 	}
 
+#undef __field2
+#define __field2(attr_nr, attr_flag, name, nla_type, type, __get, __put,\
+		 __is_signed)						\
+	if (!exclude_sensitive || !((attr_flag) & DRBD_F_SENSITIVE)) {	\
+		DPRINT_FIELD(">>", nla_type, name, s, NULL);		\
+		if (__put(skb, attr_nr))				\
+			goto nla_put_failure;				\
+	}
+
+#undef __field4
+#define __field4(attr_nr, attr_flag, name, nla_type, type, __get, __put,\
+		 __is_signed, padattr)					\
+	if (!exclude_sensitive || !((attr_flag) & DRBD_F_SENSITIVE)) {	\
+		DPRINT_FIELD(">>", nla_type, name, s, NULL);		\
+		if (__put(skb, attr_nr, s->name, padattr))		\
+			goto nla_put_failure;				\
+	}
+
 #undef __array
 #define __array(attr_nr, attr_flag, name, nla_type, type, maxlen,	\
 		__get, __put, __is_signed)				\
@@ -381,6 +417,11 @@ static inline int s_name ## _to_unpriv_skb(struct sk_buff *skb,		\
 #undef __field
 #define __field(attr_nr, attr_flag, name, nla_type, type, __get, __put,	\
 		__is_signed)
+#undef __field2
+#define __field2 __field
+#undef __field4
+#define __field4(attr_nr, attr_flag, name, nla_type, type, __get, __put,\
+		__is_signed, padattr)
 #undef __array
 #define __array(attr_nr, attr_flag, name, nla_type, type, maxlen,	\
 		__get, __put, __is_signed)
