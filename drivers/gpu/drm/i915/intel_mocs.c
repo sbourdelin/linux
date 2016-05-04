@@ -24,17 +24,6 @@
 #include "intel_lrc.h"
 #include "intel_ringbuffer.h"
 
-/* structures required */
-struct drm_i915_mocs_entry {
-	u32 control_value;
-	u16 l3cc_value;
-};
-
-struct drm_i915_mocs_table {
-	u32 size;
-	const struct drm_i915_mocs_entry *table;
-};
-
 /* Defines for the tables (XXX_MOCS_0 - XXX_MOCS_63) */
 #define LE_CACHEABILITY(value)	((value) << 0)
 #define LE_TGT_CACHE(value)	((value) << 2)
@@ -138,8 +127,8 @@ static const struct drm_i915_mocs_entry broxton_mocs_table[] = {
  *
  * Return: true if there are applicable MOCS settings for the device.
  */
-static bool get_mocs_settings(struct drm_i915_private *dev_priv,
-			      struct drm_i915_mocs_table *table)
+bool get_mocs_settings(struct drm_i915_private *dev_priv,
+		       struct drm_i915_mocs_table *table)
 {
 	bool result = false;
 

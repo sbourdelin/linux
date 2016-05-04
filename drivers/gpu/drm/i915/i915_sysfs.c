@@ -31,6 +31,7 @@
 #include <linux/sysfs.h>
 #include "intel_drv.h"
 #include "i915_drv.h"
+#include "intel_mocs.h"
 
 #define dev_to_drm_minor(d) dev_get_drvdata((d))
 
@@ -591,6 +592,32 @@ static struct bin_attribute error_state_attr = {
 	.write = error_state_write,
 };
 
+static ssize_t mocs_state_show_attr(struct device *kdev,
+				    struct device_attribute *attr,
+				    char *buf)
+{
+	struct drm_minor *minor = dev_to_drm_minor(kdev);
+	struct drm_device *dev = minor->dev;
+	struct drm_i915_mocs_table table;
+	ssize_t ret = 0;
+	u32 count;
+
+	if (!get_mocs_settings(dev->dev_private, &table))
+		return 0;
+
+	for (count = 0; count < table.size; count++) {
+		ret += snprintf(buf + ret,
+				PAGE_SIZE - ret,
+				"0x%08x 0x%04x\n",
+				table.table[count].control_value,
+				table.table[count].l3cc_value);
+	}
+
+	return ret;
+}
+
+static DEVICE_ATTR(mocs_state, S_IRUGO, mocs_state_show_attr, NULL);
+
 void i915_setup_sysfs(struct drm_device *dev)
 {
 	int ret;
@@ -640,6 +667,10 @@ void i915_setup_sysfs(struct drm_device *dev)
 				    &error_state_attr);
 	if (ret)
 		DRM_ERROR("error_state sysfs setup failed\n");
+
+	ret = device_create_file(dev->primary->kdev, &dev_attr_mocs_state);
+	if (ret)
+		DRM_ERROR("mocs_state failed to create: %d\n", ret);
 }
 
 void i915_teardown_sysfs(struct drm_device *dev)
@@ -655,4 +686,5 @@ void i915_teardown_sysfs(struct drm_device *dev)
 	sysfs_unmerge_group(&dev->primary->kdev->kobj, &rc6_attr_group);
 	sysfs_unmerge_group(&dev->primary->kdev->kobj, &rc6p_attr_group);
 #endif
+	device_remove_file(dev->primary->kdev, &dev_attr_mocs_state);
 }
