@@ -58,6 +58,7 @@ int thermal_register_governor(struct thermal_governor *);
 void thermal_unregister_governor(struct thermal_governor *);
 void thermal_zone_device_passive_update(struct thermal_zone_device *, int);
 int thermal_zone_device_set_policy(struct thermal_zone_device *, char *);
+int thermal_build_list_of_policies(char *buf);
 
 #ifdef CONFIG_THERMAL_GOV_STEP_WISE
 int thermal_gov_step_wise_register(void);
