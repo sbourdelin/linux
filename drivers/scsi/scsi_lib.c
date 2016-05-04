@@ -3082,6 +3082,20 @@ int scsi_vpd_lun_id(struct scsi_device *sdev, char *id, size_t id_len)
 			goto next_desig;
 
 		switch (d[1] & 0xf) {
+		case 0x1:
+			/* T10 vendor ID */
+			if (cur_id_size > d[3])
+				break;
+			/* Prefer EUI-64 or NAA IEEE Registered Extended */
+			if ((cur_id_type == 0x2 || cur_id_type == 0x3) &&
+			    cur_id_size == d[3])
+				break;
+			cur_id_size = d[3];
+			cur_id_str = d + 4;
+			cur_id_type = d[1] & 0xf;
+			id_size = snprintf(id, id_len, "%*phN", cur_id_size,
+					   cur_id_str);
+			break;
 		case 0x2:
 			/* EUI-64 */
 			if (cur_id_size > d[3])
