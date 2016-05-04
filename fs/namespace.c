@@ -1652,6 +1652,22 @@ SYSCALL_DEFINE1(oldumount, char __user *, name)
 
 #endif
 
+/* Returns true if the VFS should shift inode's UID */
+static bool vfs_mount_shift_i_uid(struct mnt_namespace *ns,
+				  const struct inode *inode)
+{
+	return (ns->flags & CLONE_MNTNS_SHIFT_UIDGID) &&
+		(inode->i_sb->s_iflags & SB_I_VFS_SHIFT_UIDS);
+}
+
+/* Returns true if the VFS should shift inode's GID */
+static bool vfs_mount_shift_i_gid(struct mnt_namespace *ns,
+				  const struct inode *inode)
+{
+	return (ns->flags & CLONE_MNTNS_SHIFT_UIDGID) &&
+		(inode->i_sb->s_iflags & SB_I_VFS_SHIFT_GIDS);
+}
+
 static bool is_mnt_ns_file(struct dentry *dentry)
 {
 	/* Is this a proxy for a mount namespace? */
@@ -1662,6 +1678,52 @@ static bool is_mnt_ns_file(struct dentry *dentry)
 struct mnt_namespace *to_mnt_ns(struct ns_common *ns)
 {
 	return container_of(ns, struct mnt_namespace, ns);
+}
+
+/*
+ * Returns the virtual UID view of the inode's uid
+ * If UID shifts are enabled on the mount namespace and the filesystem,
+ * the VFS will return the shifted UID according to the rules of the
+ * user namespace of the containing mount namespace. If no shift is
+ * performed, inode->i_uid is returned.
+ */
+kuid_t vfs_shift_i_uid_to_virtual(const struct inode *inode)
+{
+	kuid_t i_uid = inode->i_uid;
+	struct mnt_namespace *ns = current->nsproxy->mnt_ns;
+
+	/* Nothing to do */
+	if (!vfs_mount_shift_i_uid(ns, inode))
+		return i_uid;
+
+	/* If there is no mapping construct one in the current mountns */
+	if (!kuid_has_mapping(ns->user_ns, i_uid))
+		return make_kuid(ns->user_ns, i_uid.val);
+
+	return i_uid;
+}
+
+/*
+ * Returns the virtual GID view of the inode's gid
+ * If GID shifts are enabled on the mount namespace and the filesystem,
+ * the VFS will return the shifted GID according to the rules of the
+ * user namespace of the containing mount namespace. If no shift is
+ * performed, inode->i_gid is returned.
+ */
+kgid_t vfs_shift_i_gid_to_virtual(const struct inode *inode)
+{
+	kgid_t i_gid = inode->i_gid;
+	struct mnt_namespace *ns = current->nsproxy->mnt_ns;
+
+	/* Nothing to do */
+	if (!vfs_mount_shift_i_gid(ns, inode))
+		return i_gid;
+
+	/* If there is no mapping construct one in the current mountns */
+	if (!kgid_has_mapping(ns->user_ns, i_gid))
+		return make_kgid(ns->user_ns, i_gid.val);
+
+	return i_gid;
 }
 
 static bool mnt_ns_loop(struct dentry *dentry)

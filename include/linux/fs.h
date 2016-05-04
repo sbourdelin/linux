@@ -1328,6 +1328,8 @@ struct mm_struct;
 /* sb->s_iflags */
 #define SB_I_CGROUPWB	0x00000001	/* cgroup-aware writeback enabled */
 #define SB_I_NOEXEC	0x00000002	/* Ignore executables on this fs */
+#define SB_I_VFS_SHIFT_UIDS	0X00000004	/* FS allows VFS to do UID shifts */
+#define SB_I_VFS_SHIFT_GIDS	0X00000008	/* FS allows VFS to do GID shifts */
 
 /* Possible states of 'frozen' field */
 enum {
@@ -1593,6 +1595,15 @@ extern int vfs_whiteout(struct inode *, struct dentry *);
  */
 extern void inode_init_owner(struct inode *inode, const struct inode *dir,
 			umode_t mode);
+
+/*
+ * VFS helpers to shift inodes's uid/gid and passed values to either virtual
+ * or on-disk view. The shift is done according to rules of the user namespace
+ * of the containing mount namespace.
+ */
+extern kuid_t vfs_shift_i_uid_to_virtual(const struct inode *inode);
+extern kgid_t vfs_shift_i_gid_to_virtual(const struct inode *inode);
+
 /*
  * VFS FS_IOC_FIEMAP helper definitions.
  */

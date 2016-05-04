@@ -24,8 +24,8 @@ void generic_fillattr(struct inode *inode, struct kstat *stat)
 	stat->ino = inode->i_ino;
 	stat->mode = inode->i_mode;
 	stat->nlink = inode->i_nlink;
-	stat->uid = inode->i_uid;
-	stat->gid = inode->i_gid;
+	stat->uid = vfs_shift_i_uid_to_virtual(inode);
+	stat->gid = vfs_shift_i_gid_to_virtual(inode);
 	stat->rdev = inode->i_rdev;
 	stat->size = i_size_read(inode);
 	stat->atime = inode->i_atime;
