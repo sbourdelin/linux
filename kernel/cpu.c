@@ -317,8 +317,8 @@ static int notify_prepare(unsigned int cpu)
 	ret = __cpu_notify(CPU_UP_PREPARE, cpu, -1, &nr_calls);
 	if (ret) {
 		nr_calls--;
-		printk(KERN_WARNING "%s: attempt to bring up CPU %u failed\n",
-				__func__, cpu);
+		pr_warn("%s: attempt to bring up CPU %u failed\n",
+			__func__, cpu);
 		__cpu_notify(CPU_UP_CANCELED, cpu, nr_calls, NULL);
 	}
 	return ret;
@@ -353,6 +353,8 @@ static int bringup_cpu(unsigned int cpu)
 	ret = __cpu_up(cpu, idle);
 	if (ret) {
 		cpu_notify(CPU_UP_CANCELED, cpu);
+		pr_warn("%s: attempt to bring up CPU %u failed\n",
+			__func__, cpu);
 		return ret;
 	}
 	ret = bringup_wait_for_ap(cpu);
@@ -662,7 +664,7 @@ static int notify_down_prepare(unsigned int cpu)
 		nr_calls--;
 		__cpu_notify(CPU_DOWN_FAILED, cpu, nr_calls, NULL);
 		pr_warn("%s: attempt to take down CPU %u failed\n",
-				__func__, cpu);
+			__func__, cpu);
 	}
 	return err;
 }
@@ -737,6 +739,8 @@ static int takedown_cpu(unsigned int cpu)
 		irq_unlock_sparse();
 		/* Unpark the hotplug thread so we can rollback there */
 		kthread_unpark(per_cpu_ptr(&cpuhp_state, cpu)->thread);
+		pr_warn("%s: attempt to take down CPU %u failed\n",
+			__func__, cpu);
 		return err;
 	}
 	BUG_ON(cpu_online(cpu));
