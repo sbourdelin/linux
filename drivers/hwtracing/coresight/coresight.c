@@ -393,6 +393,7 @@ out:
 struct list_head *coresight_build_path(struct coresight_device *csdev)
 {
 	struct list_head *path;
+	int rc;
 
 	path = kzalloc(sizeof(struct list_head), GFP_KERNEL);
 	if (!path)
@@ -400,9 +401,10 @@ struct list_head *coresight_build_path(struct coresight_device *csdev)
 
 	INIT_LIST_HEAD(path);
 
-	if (_coresight_build_path(csdev, path)) {
+	rc = _coresight_build_path(csdev, path);
+	if (rc) {
 		kfree(path);
-		path = NULL;
+		return ERR_PTR(rc);
 	}
 
 	return path;
@@ -448,8 +450,9 @@ int coresight_enable(struct coresight_device *csdev)
 		goto out;
 
 	path = coresight_build_path(csdev);
-	if (!path) {
+	if (IS_ERR(path)) {
 		pr_err("building path(s) failed\n");
+		ret = PTR_ERR(path);
 		goto out;
 	}
 
