@@ -207,8 +207,8 @@ static long afu_ioctl_start_work(struct cxl_context *ctx,
 
 	trace_cxl_attach(ctx, work.work_element_descriptor, work.num_interrupts, amr);
 
-	if ((rc = cxl_ops->attach_process(ctx, false, work.work_element_descriptor,
-							amr))) {
+	if ((rc = cxl_ops->attach_process(ctx, false, false,
+					  work.work_element_descriptor, amr))) {
 		afu_release_irqs(ctx, ctx);
 		goto out;
 	}

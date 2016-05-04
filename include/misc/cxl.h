@@ -111,6 +111,14 @@ void cxl_unmap_afu_irq(struct cxl_context *cxl, int num, void *cookie);
  */
 int cxl_start_context(struct cxl_context *ctx, u64 wed,
 		      struct task_struct *task);
+
+/*
+ * Variant of cxl_start_context that allows the context to operate with
+ * translation disabled. Note that this only makes sense for kernel contexts
+ * under bare metal, and will not work with virtualisation.
+ */
+int cxl_start_context2(struct cxl_context *ctx, u64 wed,
+		      struct task_struct *task, bool real_mode);
 /*
  * Stop a context and remove it from the PSL
  */
