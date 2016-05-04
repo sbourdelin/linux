@@ -24,6 +24,7 @@
 #include <linux/of_pci.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
+#include <linux/iommu.h>
 
 /*
 * MSI_TYPER:
@@ -64,6 +65,7 @@ struct v2m_data {
 	u32 nr_spis;		/* The number of SPIs for MSIs */
 	unsigned long *bm;	/* MSI vector bitmap */
 	u32 flags;		/* v2m flags for specific implementation */
+	struct irq_chip_msi_doorbell_info doorbell_info;
 };
 
 static void gicv2m_mask_msi_irq(struct irq_data *d)
@@ -105,6 +107,14 @@ static void gicv2m_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
 		msg->data -= v2m->spi_start;
 }
 
+static struct irq_chip_msi_doorbell_info *
+gicv2m_msi_doorbell_info(struct irq_data *data)
+{
+	struct v2m_data *v2m = irq_data_get_irq_chip_data(data);
+
+	return &v2m->doorbell_info;
+}
+
 static struct irq_chip gicv2m_irq_chip = {
 	.name			= "GICv2m",
 	.irq_mask		= irq_chip_mask_parent,
@@ -112,6 +122,7 @@ static struct irq_chip gicv2m_irq_chip = {
 	.irq_eoi		= irq_chip_eoi_parent,
 	.irq_set_affinity	= irq_chip_set_affinity_parent,
 	.irq_compose_msi_msg	= gicv2m_compose_msi_msg,
+	.msi_doorbell_info	= gicv2m_msi_doorbell_info,
 };
 
 static int gicv2m_irq_gic_domain_alloc(struct irq_domain *domain,
@@ -310,6 +321,11 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
 	v2m->fwnode = fwnode;
 
 	memcpy(&v2m->res, res, sizeof(struct resource));
+
+	v2m->doorbell_info.global_doorbell = v2m->res.start;
+	v2m->doorbell_info.doorbell_is_percpu = false;
+	v2m->doorbell_info.size = sizeof(u32);
+	v2m->doorbell_info.prot = IOMMU_WRITE | IOMMU_MMIO;
 
 	v2m->base = ioremap(v2m->res.start, resource_size(&v2m->res));
 	if (!v2m->base) {
