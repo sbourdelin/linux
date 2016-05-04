@@ -289,8 +289,10 @@ static int check_acl(struct inode *inode, int mask)
 static int acl_permission_check(struct inode *inode, int mask)
 {
 	unsigned int mode = inode->i_mode;
+	kuid_t i_uid = vfs_shift_i_uid_to_virtual(inode);
+	kgid_t i_gid = vfs_shift_i_gid_to_virtual(inode);
 
-	if (likely(uid_eq(current_fsuid(), inode->i_uid)))
+	if (likely(uid_eq(current_fsuid(), i_uid)))
 		mode >>= 6;
 	else {
 		if (IS_POSIXACL(inode) && (mode & S_IRWXG)) {
@@ -299,7 +301,7 @@ static int acl_permission_check(struct inode *inode, int mask)
 				return error;
 		}
 
-		if (in_group_p(inode->i_gid))
+		if (in_group_p(i_gid))
 			mode >>= 3;
 	}
 

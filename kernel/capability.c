@@ -441,9 +441,19 @@ EXPORT_SYMBOL(file_ns_capable);
  */
 bool capable_wrt_inode_uidgid(const struct inode *inode, int cap)
 {
+	kuid_t i_uid;
+	kgid_t i_gid;
 	struct user_namespace *ns = current_user_ns();
 
-	return ns_capable(ns, cap) && kuid_has_mapping(ns, inode->i_uid) &&
-		kgid_has_mapping(ns, inode->i_gid);
+	/*
+	 * Check if inode's UID/GID are mean to be shifted into the current
+	 * mount namespace, if so we use the result to check if the shifted
+	 * UID/GID have a mapping in current's user namespace.
+	 */
+	i_uid = vfs_shift_i_uid_to_virtual(inode);
+	i_gid = vfs_shift_i_gid_to_virtual(inode);
+
+	return ns_capable(ns, cap) && kuid_has_mapping(ns, i_uid) &&
+		kgid_has_mapping(ns, i_gid);
 }
 EXPORT_SYMBOL(capable_wrt_inode_uidgid);

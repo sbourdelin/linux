@@ -1962,12 +1962,13 @@ EXPORT_SYMBOL(inode_init_owner);
 bool inode_owner_or_capable(const struct inode *inode)
 {
 	struct user_namespace *ns;
+	kuid_t i_uid = vfs_shift_i_uid_to_virtual(inode);
 
-	if (uid_eq(current_fsuid(), inode->i_uid))
+	if (uid_eq(current_fsuid(), i_uid))
 		return true;
 
 	ns = current_user_ns();
-	if (ns_capable(ns, CAP_FOWNER) && kuid_has_mapping(ns, inode->i_uid))
+	if (ns_capable(ns, CAP_FOWNER) && kuid_has_mapping(ns, i_uid))
 		return true;
 	return false;
 }
