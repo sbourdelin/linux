@@ -402,7 +402,7 @@ enum dma_residue_granularity {
  * 	type of direction, the dma controller should fill (1 << <TYPE>) and same
  * 	should be checked by controller as well
  * @max_burst: max burst capability per-transfer
- * @cmd_pause: true, if pause and thereby resume is supported
+ * @cmd_suspend: true, if pause and thereby resume is supported
  * @cmd_terminate: true, if terminate cmd is supported
  * @residue_granularity: granularity of the reported transfer residue
  * @descriptor_reuse: if a descriptor can be reused by client and
@@ -413,7 +413,7 @@ struct dma_slave_caps {
 	u32 dst_addr_widths;
 	u32 directions;
 	u32 max_burst;
-	bool cmd_pause;
+	bool cmd_suspend;
 	bool cmd_terminate;
 	enum dma_residue_granularity residue_granularity;
 	bool descriptor_reuse;
