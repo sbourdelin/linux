@@ -1418,7 +1418,19 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
 					 ret, uhs & v18 ? "1.8" : "3.3");
 			return -EAGAIN;
 		}
+	} else {
+		/*
+		 * If there isn't vqmmc, it should fail to switch voltage.
+		 * Then it needs to maintain the previous status.
+		 * If ios->signal_voltage is 3.3v, it means that previous
+		 * voltages was 1.8v.
+		 */
+		if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330)
+			uhs |= v18;
+		else
+			uhs &= ~v18;
 	}
+
 	mci_writel(host, UHS_REG, uhs);
 
 	return 0;
