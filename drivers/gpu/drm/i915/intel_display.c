@@ -13697,6 +13697,11 @@ static int intel_atomic_commit(struct drm_device *dev,
 
 		if (dev_priv->display.optimize_watermarks)
 			dev_priv->display.optimize_watermarks(intel_cstate);
+
+		if (crtc->state->color_mgmt_changed) {
+			intel_color_set_csc(crtc->state);
+			intel_color_load_luts(crtc->state);
+		}
 	}
 
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
