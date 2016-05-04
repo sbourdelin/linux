@@ -202,7 +202,6 @@ with the payload of the inbound message).
      a pointer to a previously-registered rpmsg_driver struct.
      Returns 0 on success, and an appropriate error value on failure.
 
-
 3. Typical usage
 
 The following is a simple rpmsg driver, that sends an "hello!" message
@@ -254,18 +253,7 @@ static struct rpmsg_driver rpmsg_sample_client = {
 	.callback	= rpmsg_sample_cb,
 	.remove		= rpmsg_sample_remove,
 };
-
-static int __init init(void)
-{
-	return register_rpmsg_driver(&rpmsg_sample_client);
-}
-module_init(init);
-
-static void __exit fini(void)
-{
-	unregister_rpmsg_driver(&rpmsg_sample_client);
-}
-module_exit(fini);
+module_rpmsg_driver(rpmsg_sample_client);
 
 Note: a similar sample which can be built and loaded can be found
 in samples/rpmsg/.
