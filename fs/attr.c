@@ -47,26 +47,38 @@ int inode_change_ok(const struct inode *inode, struct iattr *attr)
 		return 0;
 
 	/* Make sure a caller can chown. */
-	if ((ia_valid & ATTR_UID) &&
-	    (!uid_eq(current_fsuid(), inode->i_uid) ||
-	     !uid_eq(attr->ia_uid, inode->i_uid)) &&
-	    !capable_wrt_inode_uidgid(inode, CAP_CHOWN))
-		return -EPERM;
+	if (ia_valid & ATTR_UID) {
+		/* Shift to virtual if necessary */
+		kuid_t i_uid = vfs_shift_i_uid_to_virtual(inode);
+
+		if ((!uid_eq(current_fsuid(), i_uid) ||
+		     !uid_eq(attr->ia_uid, inode->i_uid)) &&
+		    !capable_wrt_inode_uidgid(inode, CAP_CHOWN))
+			return -EPERM;
+	}
 
 	/* Make sure caller can chgrp. */
-	if ((ia_valid & ATTR_GID) &&
-	    (!uid_eq(current_fsuid(), inode->i_uid) ||
-	    (!in_group_p(attr->ia_gid) && !gid_eq(attr->ia_gid, inode->i_gid))) &&
-	    !capable_wrt_inode_uidgid(inode, CAP_CHOWN))
+	if (ia_valid & ATTR_GID) {
+		/* Shift to virtual if ncessary */
+		kuid_t i_uid = vfs_shift_i_uid_to_virtual(inode);
+		/* Shift it back to virtual if necessary */
+		kgid_t ia_gid = vfs_kgid_disk_to_virtual(inode, attr->ia_gid);
+
+		if ((!uid_eq(current_fsuid(), i_uid) ||
+		     (!in_group_p(ia_gid) &&
+		      !gid_eq(attr->ia_gid, inode->i_gid))) &&
+		    !capable_wrt_inode_uidgid(inode, CAP_CHOWN))
 		return -EPERM;
+	}
 
 	/* Make sure a caller can chmod. */
 	if (ia_valid & ATTR_MODE) {
 		if (!inode_owner_or_capable(inode))
 			return -EPERM;
 		/* Also check the setgid bit! */
-		if (!in_group_p((ia_valid & ATTR_GID) ? attr->ia_gid :
-				inode->i_gid) &&
+		if (!in_group_p((ia_valid & ATTR_GID) ?
+				vfs_kgid_disk_to_virtual(inode, attr->ia_gid) :
+				vfs_shift_i_gid_to_virtual(inode)) &&
 		    !capable_wrt_inode_uidgid(inode, CAP_FSETID))
 			attr->ia_mode &= ~S_ISGID;
 	}
@@ -208,6 +220,16 @@ int notify_change(struct dentry * dentry, struct iattr * attr, struct inode **de
 		if (is_sxid(amode))
 			inode->i_flags &= ~S_NOSEC;
 	}
+
+	/*
+	 * Shift if necessary the UID and GID that are mean to be written
+	 * into inodes's uid/gid to on-disk view. Do that as early as
+	 * possible.
+	 */
+	if ((ia_valid & ATTR_UID))
+		attr->ia_uid = vfs_shift_kuid_to_disk(inode, attr->ia_uid);
+	if ((ia_valid & ATTR_GID))
+		attr->ia_gid = vfs_shift_kgid_to_disk(inode, attr->ia_gid);
 
 	now = current_fs_time(inode->i_sb);
 

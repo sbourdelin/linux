@@ -1941,13 +1941,13 @@ EXPORT_SYMBOL(init_special_inode);
 void inode_init_owner(struct inode *inode, const struct inode *dir,
 			umode_t mode)
 {
-	inode->i_uid = current_fsuid();
+	inode->i_uid = vfs_shift_kuid_to_disk(inode, current_fsuid());
 	if (dir && dir->i_mode & S_ISGID) {
 		inode->i_gid = dir->i_gid;
 		if (S_ISDIR(mode))
 			mode |= S_ISGID;
 	} else
-		inode->i_gid = current_fsgid();
+		inode->i_gid = vfs_shift_kgid_to_disk(inode, current_fsgid());
 	inode->i_mode = mode;
 }
 EXPORT_SYMBOL(inode_init_owner);
