@@ -618,14 +618,12 @@ static int proc_pid_limits(struct seq_file *m, struct pid_namespace *ns,
 			   struct pid *pid, struct task_struct *task)
 {
 	unsigned int i;
-	unsigned long flags;
 
 	struct rlimit rlim[RLIM_NLIMITS];
 
-	if (!lock_task_sighand(task, &flags))
-		return 0;
+	task_lock(task->group_leader);
 	memcpy(rlim, task->signal->rlim, sizeof(struct rlimit) * RLIM_NLIMITS);
-	unlock_task_sighand(task, &flags);
+	task_unlock(task->group_leader);
 
 	/*
 	 * print the file header

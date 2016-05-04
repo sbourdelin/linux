@@ -1361,7 +1361,9 @@ int do_prlimit(struct task_struct *tsk, unsigned int resource,
 		struct rlimit *new_rlim, struct rlimit *old_rlim)
 {
 	struct rlimit *rlim;
+	unsigned long flags;
 	int retval = 0;
+	int sighand_locked = 0;
 
 	if (resource >= RLIM_NLIMITS)
 		return -EINVAL;
@@ -1373,15 +1375,17 @@ int do_prlimit(struct task_struct *tsk, unsigned int resource,
 			return -EPERM;
 	}
 
-	/* protect tsk->signal and tsk->sighand from disappearing */
-	read_lock(&tasklist_lock);
-	if (!tsk->sighand) {
-		retval = -ESRCH;
-		goto out;
+	task_lock(tsk->group_leader);
+	if (new_rlim && resource == RLIMIT_CPU &&
+			new_rlim->rlim_cur != RLIM_INFINITY) {
+		if (!lock_task_sighand(tsk, &flags)) {
+			retval = -ESRCH;
+			goto out;
+		}
+		sighand_locked = 1;
 	}
 
 	rlim = tsk->signal->rlim + resource;
-	task_lock(tsk->group_leader);
 	if (new_rlim) {
 		/* Keep the capable check against init_user_ns until
 		   cgroups can contain all limits */
@@ -1407,7 +1411,6 @@ int do_prlimit(struct task_struct *tsk, unsigned int resource,
 		if (new_rlim)
 			*rlim = *new_rlim;
 	}
-	task_unlock(tsk->group_leader);
 
 	/*
 	 * RLIMIT_CPU handling.   Note that the kernel fails to return an error
@@ -1418,8 +1421,11 @@ int do_prlimit(struct task_struct *tsk, unsigned int resource,
 	 if (!retval && new_rlim && resource == RLIMIT_CPU &&
 			 new_rlim->rlim_cur != RLIM_INFINITY)
 		update_rlimit_cpu(tsk, new_rlim->rlim_cur);
+
+	if (sighand_locked)
+		unlock_task_sighand(tsk, &flags);
 out:
-	read_unlock(&tasklist_lock);
+	task_unlock(tsk->group_leader);
 	return retval;
 }
 

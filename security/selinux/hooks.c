@@ -2492,8 +2492,10 @@ static void selinux_bprm_committing_creds(struct linux_binprm *bprm)
 			initrlim = init_task.signal->rlim + i;
 			rlim->rlim_cur = min(rlim->rlim_max, initrlim->rlim_cur);
 		}
-		task_unlock(current);
+		spin_lock_irq(&current->sighand->siglock);
 		update_rlimit_cpu(current, rlimit(RLIMIT_CPU));
+		spin_unlock_irq(&current->sighand->siglock);
+		task_unlock(current);
 	}
 }
 
