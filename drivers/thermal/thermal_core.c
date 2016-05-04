@@ -580,8 +580,15 @@ void thermal_zone_device_passive_update(struct thermal_zone_device *tz,
 	thermal_zone_device_update(tz);
 }
 
-/* Device management */
-
+/*
+ * Device management section: cooling devices, zones devices, and binding
+ *
+ * Set of functions provided by the thermal core for:
+ * - cooling devices lifecycle: registration, unregistration,
+ *   				binding, and unbinding.
+ * - thermal zone devices lifecycle: registration, unregistration,
+ *   				     binding, and unbinding.
+ */
 static int get_idr(struct idr *idr, struct mutex *lock, int *id)
 {
 	int ret;
