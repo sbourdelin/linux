@@ -94,6 +94,7 @@
 };
 
 &mmc2 {
+	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&sd1_pins>;
 	vmmc-supply = <&vmmcsd_fixed>;
