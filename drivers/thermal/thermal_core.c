@@ -699,6 +699,28 @@ void thermal_zone_device_passive_update(struct thermal_zone_device *tz,
 	thermal_zone_device_update(tz);
 }
 
+int thermal_zone_device_set_policy(struct thermal_zone_device *tz,
+				   char *policy)
+{
+	struct thermal_governor *gov;
+	int ret = -EINVAL;
+
+	mutex_lock(&thermal_governor_lock);
+	mutex_lock(&tz->lock);
+
+	gov = __find_governor(strim(policy));
+	if (!gov)
+		goto exit;
+
+	ret = thermal_set_governor(tz, gov);
+
+exit:
+	mutex_unlock(&tz->lock);
+	mutex_unlock(&thermal_governor_lock);
+
+	return ret;
+}
+
 /* sys I/F for thermal zone */
 
 #define to_thermal_zone(_dev) \
@@ -927,27 +949,16 @@ static ssize_t
 policy_store(struct device *dev, struct device_attribute *attr,
 		    const char *buf, size_t count)
 {
-	int ret = -EINVAL;
 	struct thermal_zone_device *tz = to_thermal_zone(dev);
-	struct thermal_governor *gov;
 	char name[THERMAL_NAME_LENGTH];
+	int ret;
 
 	snprintf(name, sizeof(name), "%s", buf);
 
-	mutex_lock(&thermal_governor_lock);
-	mutex_lock(&tz->lock);
-
-	gov = __find_governor(strim(name));
-	if (!gov)
-		goto exit;
-
-	ret = thermal_set_governor(tz, gov);
+	ret = thermal_zone_device_set_policy(tz, name);
 	if (!ret)
 		ret = count;
 
-exit:
-	mutex_unlock(&tz->lock);
-	mutex_unlock(&thermal_governor_lock);
 	return ret;
 }
 
