@@ -87,6 +87,7 @@ struct rk3x_i2c_calced_timings {
 
 enum rk3x_i2c_state {
 	STATE_IDLE,
+	STATE_SETUP,
 	STATE_START,
 	STATE_READ,
 	STATE_WRITE,
@@ -174,6 +175,7 @@ static void rk3x_i2c_start(struct rk3x_i2c *i2c)
 {
 	u32 val;
 
+	i2c->state = STATE_START;
 	i2c_writel(i2c, REG_INT_START, REG_IEN);
 
 	/* enable adapter with correct mode, send START condition */
@@ -451,6 +453,7 @@ static irqreturn_t rk3x_i2c_irq(int irqno, void *dev_id)
 		rk3x_i2c_handle_stop(i2c, ipd);
 		break;
 	case STATE_IDLE:
+	case STATE_SETUP:
 		break;
 	}
 
@@ -781,7 +784,7 @@ static int rk3x_i2c_setup(struct rk3x_i2c *i2c, struct i2c_msg *msgs, int num)
 
 	i2c->addr = msgs[0].addr;
 	i2c->busy = true;
-	i2c->state = STATE_START;
+	i2c->state = STATE_SETUP;
 	i2c->processed = 0;
 	i2c->error = 0;
 
