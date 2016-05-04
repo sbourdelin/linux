@@ -844,7 +844,8 @@ static void tegra_powergate_init(struct tegra_pmc *pmc)
 static int tegra_io_rail_prepare(unsigned int id, unsigned long *request,
 				 unsigned long *status, unsigned int *bit)
 {
-	unsigned long rate, value;
+	unsigned long rate;
+	u32 value;
 
 	*bit = id % 32;
 
@@ -868,17 +869,18 @@ static int tegra_io_rail_prepare(unsigned int id, unsigned long *request,
 	tegra_pmc_writel(DPD_SAMPLE_ENABLE, DPD_SAMPLE);
 
 	/* must be at least 200 ns, in APB (PCLK) clock cycles */
-	value = DIV_ROUND_UP(1000000000, rate);
-	value = DIV_ROUND_UP(200, value);
+	rate = DIV_ROUND_UP(1000000000, rate);
+	rate = DIV_ROUND_UP(200, rate);
+	value = (u32)rate;
 	tegra_pmc_writel(value, SEL_DPD_TIM);
 
 	return 0;
 }
 
-static int tegra_io_rail_poll(unsigned long offset, unsigned long mask,
-			      unsigned long val, unsigned long timeout)
+static int tegra_io_rail_poll(unsigned long offset, u32 mask,
+			      u32 val, unsigned long timeout)
 {
-	unsigned long value;
+	u32 value;
 
 	timeout = jiffies + msecs_to_jiffies(timeout);
 
@@ -900,8 +902,9 @@ static void tegra_io_rail_unprepare(void)
 
 int tegra_io_rail_power_on(unsigned int id)
 {
-	unsigned long request, status, value;
-	unsigned int bit, mask;
+	unsigned long request, status;
+	unsigned int bit;
+	u32 value, mask;
 	int err;
 
 	mutex_lock(&pmc->powergates_lock);
@@ -935,8 +938,9 @@ EXPORT_SYMBOL(tegra_io_rail_power_on);
 
 int tegra_io_rail_power_off(unsigned int id)
 {
-	unsigned long request, status, value;
-	unsigned int bit, mask;
+	unsigned long request, status;
+	unsigned int bit;
+	u32 value, mask;
 	int err;
 
 	mutex_lock(&pmc->powergates_lock);
