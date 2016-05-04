@@ -1194,6 +1194,7 @@ enum {
 	Opt_dioread_nolock, Opt_dioread_lock,
 	Opt_discard, Opt_nodiscard, Opt_init_itable, Opt_noinit_itable,
 	Opt_max_dir_size_kb, Opt_nojournal_checksum,
+	Opt_vfs_shift_uids, Opt_vfs_shift_gids,
 };
 
 static const match_table_t tokens = {
@@ -1279,6 +1280,8 @@ static const match_table_t tokens = {
 	{Opt_removed, "reservation"},	/* mount option from ext2/3 */
 	{Opt_removed, "noreservation"}, /* mount option from ext2/3 */
 	{Opt_removed, "journal=%u"},	/* mount option from ext2/3 */
+	{Opt_vfs_shift_uids, "vfs_shift_uids"},
+	{Opt_vfs_shift_gids, "vfs_shift_gids"},
 	{Opt_err, NULL},
 };
 
@@ -1521,7 +1524,14 @@ static int handle_mount_opt(struct super_block *sb, char *opt, int token,
 	case Opt_nolazytime:
 		sb->s_flags &= ~MS_LAZYTIME;
 		return 1;
+	case Opt_vfs_shift_uids:
+		sb->s_iflags |= SB_I_VFS_SHIFT_UIDS;
+		return 1;
+	case Opt_vfs_shift_gids:
+		sb->s_iflags |= SB_I_VFS_SHIFT_GIDS;
+		return 1;
 	}
+
 
 	for (m = ext4_mount_opts; m->token != Opt_err; m++)
 		if (token == m->token)
@@ -1920,6 +1930,10 @@ static int _ext4_show_options(struct seq_file *seq, struct super_block *sb,
 		SEQ_OPTS_PRINT("max_dir_size_kb=%u", sbi->s_max_dir_size_kb);
 	if (test_opt(sb, DATA_ERR_ABORT))
 		SEQ_OPTS_PUTS("data_err=abort");
+	if (sb->s_iflags & SB_I_VFS_SHIFT_UIDS)
+		SEQ_OPTS_PUTS("vfs_shift_uids");
+	if (sb->s_iflags & SB_I_VFS_SHIFT_GIDS)
+		SEQ_OPTS_PUTS("vfs_shift_gids");
 
 	ext4_show_quota_options(seq, sb);
 	return 0;
