@@ -121,10 +121,9 @@ END_FTR_SECTION_IFSET(CPU_FTR_ARCH_207S)
 	 * Put whatever is in the decrementer into the
 	 * hypervisor decrementer.
 	 */
-	mfspr	r8,SPRN_DEC
+	GET_DEC(r8)
 	mftb	r7
 	mtspr	SPRN_HDEC,r8
-	extsw	r8,r8
 	add	r8,r8,r7
 	std	r8,HSTATE_DECEXP(r13)
 

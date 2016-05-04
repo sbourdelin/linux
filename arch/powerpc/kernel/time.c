@@ -506,7 +506,7 @@ static void __timer_interrupt(void)
 	} else {
 		now = *next_tb - now;
 		if (now <= decrementer_max)
-			set_dec((int)now);
+			set_dec(now);
 		/* We may have raced with new irq work */
 		if (test_irq_work_pending())
 			set_dec(1);

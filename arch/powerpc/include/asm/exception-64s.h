@@ -545,4 +545,33 @@ END_FTR_SECTION_IFSET(CPU_FTR_CAN_NAP)
 #define FINISH_NAP
 #endif
 
+/*
+ * On ISAv3 processors the DEC register can be extended from 32 bits to 64 by
+ * setting the LD flag the LPCR. The decrementer value is a signed quantity so
+ * sign exension is required when operating in 32 bit mode. The GET_DEC() and
+ * GET_HDEC() handle this sign extension and yield a 64 bit result independent
+ * of the LD mode.
+ *
+ * NB: It's possible run with LD mode disabled on ISAv3 so GET_DEC() does not
+ *     use a CPU_FEATURE section. A feature section is used for GET_HDEC because
+ *     it has no mode bit. It is always 64 bits for ISAv3 processors.
+ */
+
+#define IS_LD_ENABLED(reg)                 \
+	mfspr  reg,SPRN_LPCR;              \
+	andis. reg,reg,(LPCR_LD >> 16);
+
+#define GET_DEC(reg)                       \
+	IS_LD_ENABLED(reg);                \
+	mfspr reg, SPRN_DEC;               \
+	bne 99f;                           \
+	extsw reg, reg;                    \
+99:
+
+#define GET_HDEC(reg) \
+	mfspr reg, SPRN_HDEC;           \
+BEGIN_FTR_SECTION                       \
+	extsw reg, reg;                 \
+END_FTR_SECTION_IFCLR(CPU_FTR_ARCH_300)
+
 #endif	/* _ASM_POWERPC_EXCEPTION_H */
