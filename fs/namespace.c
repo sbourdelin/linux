@@ -1726,6 +1726,99 @@ kgid_t vfs_shift_i_gid_to_virtual(const struct inode *inode)
 	return i_gid;
 }
 
+/*
+ * Returns the on-disk UID view of the passed kuid that is supposed to be
+ * used to update the inode's uid.
+ * If UID shifts are enabled on the mount namespace and the filesystem,
+ * the VFS will return the on-disk view of the passed kuid. If no shift is
+ * performed, kuid is returned without any change.
+ */
+kuid_t vfs_shift_kuid_to_disk(const struct inode *inode, kuid_t kuid)
+{
+	uid_t uid;
+	struct mnt_namespace *ns;
+
+	if (!current->mm)
+		return kuid;
+
+	ns = current->nsproxy->mnt_ns;
+
+	/* Nothing to do */
+	if (!vfs_mount_shift_i_uid(ns, inode))
+		return kuid;
+
+	/*
+	 * If kuid has a mapping in the mountns get its uid_t otherwise get it
+	 * from init_user_ns
+	 */
+	if (kuid_has_mapping(ns->user_ns, kuid))
+		uid = from_kuid(ns->user_ns, kuid);
+	else
+		uid = from_kuid(&init_user_ns, kuid);
+
+	if (uid == (uid_t) -1)
+		return kuid;
+
+	/* Get the final kuid that will be used for on-disk writes */
+	return make_kuid(&init_user_ns, uid);
+}
+
+/*
+ * Returns the on-disk GID view of the passed kgid that is supposed to be
+ * used to update the inode's gid.
+ * If GID shifts are enabled on the mount namespace and the filesystem,
+ * the VFS will return the on-disk view of the passed kgid. If no shift is
+ * performed, kgid is returned without any change.
+ */
+kgid_t vfs_shift_kgid_to_disk(const struct inode *inode, kgid_t kgid)
+{
+	gid_t gid;
+	struct mnt_namespace *ns;
+
+	if (!current->mm)
+		return kgid;
+
+	ns = current->nsproxy->mnt_ns;
+
+	/* Nothing to do ? */
+	if (!vfs_mount_shift_i_gid(ns, inode))
+		return kgid;
+
+	/*
+	 * If kgid has a mapping in the mountns get its gid_t otherwise get it
+	 * from init_user_ns
+	 */
+	if (kgid_has_mapping(ns->user_ns, kgid))
+		gid = from_kgid(ns->user_ns, kgid);
+	else
+		gid = from_kgid(&init_user_ns, kgid);
+
+	if (gid == (gid_t) -1)
+		return kgid;
+
+	/* Get the final kgid that will be used for on-disk writes */
+	return make_kgid(&init_user_ns, gid);
+}
+
+/*
+ * Converts the passed kgid from on-disk view into the virtual one and returns it.
+ * It takes two arguments, the inode where the related kgid is supposed to be
+ * used, and the kgid.
+ */
+kgid_t vfs_kgid_disk_to_virtual(const struct inode *inode, kgid_t kgid)
+{
+	struct mnt_namespace *ns = current->nsproxy->mnt_ns;
+
+	/* shift kgid if necessary */
+	if (!vfs_mount_shift_i_gid(ns, inode))
+		return kgid;
+
+	if (!kgid_has_mapping(ns->user_ns, kgid))
+		return make_kgid(ns->user_ns, kgid.val);
+
+	return kgid;
+}
+
 static bool mnt_ns_loop(struct dentry *dentry)
 {
 	/* Could bind mounting the mount namespace inode cause a

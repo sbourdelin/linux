@@ -1603,6 +1603,9 @@ extern void inode_init_owner(struct inode *inode, const struct inode *dir,
  */
 extern kuid_t vfs_shift_i_uid_to_virtual(const struct inode *inode);
 extern kgid_t vfs_shift_i_gid_to_virtual(const struct inode *inode);
+extern kgid_t vfs_kgid_disk_to_virtual(const struct inode *inode, kgid_t kgid);
+extern kuid_t vfs_shift_kuid_to_disk(const struct inode *inode, kuid_t kuid);
+extern kgid_t vfs_shift_kgid_to_disk(const struct inode *inode, kgid_t kgid);
 
 /*
  * VFS FS_IOC_FIEMAP helper definitions.
