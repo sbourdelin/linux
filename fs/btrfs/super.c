@@ -304,7 +304,8 @@ enum {
 	Opt_commit_interval, Opt_barrier, Opt_nodefrag, Opt_nodiscard,
 	Opt_noenospc_debug, Opt_noflushoncommit, Opt_acl, Opt_datacow,
 	Opt_datasum, Opt_treelog, Opt_noinode_cache, Opt_usebackuproot,
-	Opt_nologreplay, Opt_norecovery,
+	Opt_nologreplay, Opt_norecovery, Opt_vfs_shift_uids,
+	Opt_vfs_shift_gids,
 #ifdef CONFIG_BTRFS_DEBUG
 	Opt_fragment_data, Opt_fragment_metadata, Opt_fragment_all,
 #endif
@@ -364,6 +365,8 @@ static const match_table_t tokens = {
 	{Opt_rescan_uuid_tree, "rescan_uuid_tree"},
 	{Opt_fatal_errors, "fatal_errors=%s"},
 	{Opt_commit_interval, "commit=%d"},
+	{Opt_vfs_shift_uids, "vfs_shift_uids"},
+	{Opt_vfs_shift_gids, "vfs_shift_gids"},
 #ifdef CONFIG_BTRFS_DEBUG
 	{Opt_fragment_data, "fragment=data"},
 	{Opt_fragment_metadata, "fragment=metadata"},
@@ -785,6 +788,12 @@ int btrfs_parse_options(struct btrfs_root *root, char *options,
 				    BTRFS_DEFAULT_COMMIT_INTERVAL);
 				info->commit_interval = BTRFS_DEFAULT_COMMIT_INTERVAL;
 			}
+			break;
+		case Opt_vfs_shift_uids:
+			root->fs_info->sb->s_iflags |= SB_I_VFS_SHIFT_UIDS;
+			break;
+		case Opt_vfs_shift_gids:
+			root->fs_info->sb->s_iflags |= SB_I_VFS_SHIFT_GIDS;
 			break;
 #ifdef CONFIG_BTRFS_DEBUG
 		case Opt_fragment_all:
@@ -1279,6 +1288,10 @@ static int btrfs_show_options(struct seq_file *seq, struct dentry *dentry)
 	if (btrfs_test_opt(root, FRAGMENT_METADATA))
 		seq_puts(seq, ",fragment=metadata");
 #endif
+	if (root->fs_info->sb->s_iflags & SB_I_VFS_SHIFT_UIDS)
+		seq_puts(seq, ",vfs_shift_uids");
+	if (root->fs_info->sb->s_iflags & SB_I_VFS_SHIFT_GIDS)
+		seq_puts(seq, ",vfs_shift_gids");
 	seq_printf(seq, ",subvolid=%llu",
 		  BTRFS_I(d_inode(dentry))->root->root_key.objectid);
 	seq_puts(seq, ",subvol=");
