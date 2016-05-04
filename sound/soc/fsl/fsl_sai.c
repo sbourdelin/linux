@@ -21,6 +21,8 @@
 #include <sound/core.h>
 #include <sound/dmaengine_pcm.h>
 #include <sound/pcm_params.h>
+#include <linux/mfd/syscon.h>
+#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
 
 #include "fsl_sai.h"
 #include "imx-pcm.h"
@@ -785,11 +787,14 @@ static const struct regmap_config fsl_sai_regmap_config = {
 static int fsl_sai_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
+	struct device_node *gpr_np = of_parse_phandle(np, "gpr", 0);
 	struct fsl_sai *sai;
+	struct regmap *gpr;
 	struct resource *res;
 	void __iomem *base;
 	char tmp[8];
 	int irq, ret, i;
+	u32 index;
 
 	sai = devm_kzalloc(&pdev->dev, sizeof(*sai), GFP_KERNEL);
 	if (!sai)
@@ -875,6 +880,38 @@ static int fsl_sai_probe(struct platform_device *pdev)
 		fsl_sai_dai.symmetric_rates = 0;
 		fsl_sai_dai.symmetric_channels = 0;
 		fsl_sai_dai.symmetric_samplebits = 0;
+	}
+
+	if (of_find_property(np, "fsl,sai-enable-mclk", NULL)) {
+		ret = of_property_read_u32(np, "sai-index", &index);
+		if (ret) {
+			dev_err(&pdev->dev, "could not read sai-index\n");
+			return ret;
+		}
+
+		gpr = syscon_node_to_regmap(gpr_np);
+		if (IS_ERR(gpr)) {
+			dev_err(&pdev->dev, "could not find gpr node\n");
+			return PTR_ERR(gpr);
+		}
+
+		switch (index) {
+		case 1:
+			regmap_update_bits(gpr, IOMUXC_GPR1,
+					   IMX6UL_GPR1_SAI1_MCLK_DIR,
+					   IMX6UL_GPR1_SAI1_MCLK_DIR);
+			break;
+		case 2:
+			regmap_update_bits(gpr, IOMUXC_GPR1,
+					   IMX6UL_GPR1_SAI2_MCLK_DIR,
+					   IMX6UL_GPR1_SAI2_MCLK_DIR);
+			break;
+		case 3:
+			regmap_update_bits(gpr, IOMUXC_GPR1,
+					   IMX6UL_GPR1_SAI3_MCLK_DIR,
+					   IMX6UL_GPR1_SAI3_MCLK_DIR);
+			break;
+		}
 	}
 
 	sai->dma_params_rx.addr = res->start + FSL_SAI_RDR;
