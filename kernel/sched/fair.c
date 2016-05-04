@@ -2575,8 +2575,85 @@ static void update_cfs_shares(struct cfs_rq *cfs_rq)
 
 	reweight_entity(cfs_rq_of(se), se, shares);
 }
+
+/*
+ * Save how much utilization has just been added/removed on cfs rq so we can
+ * propagate it across the whole tg tree
+ */
+static void set_tg_cfs_util(struct cfs_rq *cfs_rq, int delta)
+{
+	if (!cfs_rq->tg)
+		return;
+
+	cfs_rq->diff_util_avg += delta;
+}
+
+/*
+ * Look at pending utilization change in the cfs rq and reflect it in the
+ * sched_entity that represents the cfs rq at parent level
+ */
+static int update_tg_se_util(struct sched_entity *se)
+{
+	struct cfs_rq *cfs_rq;
+	long update_util_avg;
+	long old_util_avg;
+
+	if (entity_is_task(se))
+		return 0;
+
+	cfs_rq = se->my_q;
+
+	update_util_avg = cfs_rq->diff_util_avg;
+
+	if (!update_util_avg)
+		return 0;
+
+	cfs_rq->diff_util_avg = 0;
+
+	old_util_avg = se->avg.util_avg;
+	se->avg.util_avg = max_t(long, se->avg.util_avg + update_util_avg, 0);
+	se->avg.util_sum = se->avg.util_avg * LOAD_AVG_MAX;
+
+	return se->avg.util_avg - old_util_avg;
+}
+
+
+/* Take into account the change of the utilization of a child task group */
+static void update_tg_cfs_util(struct sched_entity *se)
+{
+	int delta;
+	struct cfs_rq *cfs_rq;
+
+	if (!se)
+		return;
+
+	delta = update_tg_se_util(se);
+	if (!delta)
+		return;
+
+	cfs_rq = cfs_rq_of(se);
+
+	cfs_rq->avg.util_avg =  max_t(long, cfs_rq->avg.util_avg + delta, 0);
+	cfs_rq->avg.util_sum = cfs_rq->avg.util_avg * LOAD_AVG_MAX;
+
+	set_tg_cfs_util(cfs_rq, delta);
+}
+
 #else /* CONFIG_FAIR_GROUP_SCHED */
 static inline void update_cfs_shares(struct cfs_rq *cfs_rq)
+{
+}
+
+static inline void set_tg_cfs_util(struct cfs_rq *cfs_rq, int delta)
+{
+}
+
+static inline int update_tg_se_util(struct sched_entity *se)
+{
+	return 0
+}
+
+static inline void update_tg_cfs_util(struct sched_entity *se)
 {
 }
 #endif /* CONFIG_FAIR_GROUP_SCHED */
@@ -2922,6 +2999,7 @@ update_cfs_rq_load_avg(u64 now, struct cfs_rq *cfs_rq, bool update_freq)
 		sa->util_avg = max_t(long, sa->util_avg - r, 0);
 		sa->util_sum = max_t(s32, sa->util_sum - r * LOAD_AVG_MAX, 0);
 		removed_util = 1;
+		set_tg_cfs_util(cfs_rq, -r);
 	}
 
 	decayed = __update_load_avg(now, cpu_of(rq_of(cfs_rq)), sa,
@@ -2978,11 +3056,14 @@ static void attach_entity_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *s
 	}
 
 skip_aging:
+	update_tg_se_util(se);
 	se->avg.last_update_time = cfs_rq->avg.last_update_time;
 	cfs_rq->avg.load_avg += se->avg.load_avg;
 	cfs_rq->avg.load_sum += se->avg.load_sum;
 	cfs_rq->avg.util_avg += se->avg.util_avg;
 	cfs_rq->avg.util_sum += se->avg.util_sum;
+
+	set_tg_cfs_util(cfs_rq, se->avg.util_avg);
 
 	cfs_rq_util_change(cfs_rq);
 }
@@ -2992,11 +3073,12 @@ static void detach_entity_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *s
 	__update_load_avg(cfs_rq->avg.last_update_time, cpu_of(rq_of(cfs_rq)),
 			  &se->avg, se->on_rq * scale_load_down(se->load.weight),
 			  cfs_rq->curr == se, NULL);
-
 	cfs_rq->avg.load_avg = max_t(long, cfs_rq->avg.load_avg - se->avg.load_avg, 0);
 	cfs_rq->avg.load_sum = max_t(s64,  cfs_rq->avg.load_sum - se->avg.load_sum, 0);
 	cfs_rq->avg.util_avg = max_t(long, cfs_rq->avg.util_avg - se->avg.util_avg, 0);
 	cfs_rq->avg.util_sum = max_t(s32,  cfs_rq->avg.util_sum - se->avg.util_sum, 0);
+
+	set_tg_cfs_util(cfs_rq, -se->avg.util_avg);
 
 	cfs_rq_util_change(cfs_rq);
 }
@@ -3271,6 +3353,7 @@ enqueue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 	enqueue_entity_load_avg(cfs_rq, se);
 	account_entity_enqueue(cfs_rq, se);
 	update_cfs_shares(cfs_rq);
+	update_tg_cfs_util(se);
 
 	if (flags & ENQUEUE_WAKEUP) {
 		place_entity(cfs_rq, se, 0);
@@ -3372,6 +3455,8 @@ dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 
 	update_min_vruntime(cfs_rq);
 	update_cfs_shares(cfs_rq);
+	update_tg_cfs_util(se);
+
 }
 
 /*
@@ -3549,6 +3634,7 @@ entity_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr, int queued)
 	 */
 	update_load_avg(curr, 1);
 	update_cfs_shares(cfs_rq);
+	update_tg_cfs_util(curr);
 
 #ifdef CONFIG_SCHED_HRTICK
 	/*
@@ -4422,6 +4508,7 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 
 		update_load_avg(se, 1);
 		update_cfs_shares(cfs_rq);
+		update_tg_cfs_util(se);
 	}
 
 	if (!se)
@@ -4482,6 +4569,7 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 
 		update_load_avg(se, 1);
 		update_cfs_shares(cfs_rq);
+		update_tg_cfs_util(se);
 	}
 
 	if (!se)
@@ -6260,6 +6348,8 @@ static void update_blocked_averages(int cpu)
 
 		if (update_cfs_rq_load_avg(cfs_rq_clock_task(cfs_rq), cfs_rq, true))
 			update_tg_load_avg(cfs_rq, 0);
+		/* Propagate pending util changes to the parent */
+		update_tg_cfs_util(cfs_rq->tg->se[cpu_of(rq)]);
 	}
 	raw_spin_unlock_irqrestore(&rq->lock, flags);
 }
@@ -8426,6 +8516,9 @@ void init_cfs_rq(struct cfs_rq *cfs_rq)
 #ifdef CONFIG_SMP
 	atomic_long_set(&cfs_rq->removed_load_avg, 0);
 	atomic_long_set(&cfs_rq->removed_util_avg, 0);
+#endif
+#ifdef CONFIG_FAIR_GROUP_SCHED
+	cfs_rq->diff_util_avg = 0;
 #endif
 }
 
