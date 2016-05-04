@@ -6,6 +6,7 @@
 
 struct mnt_namespace {
 	atomic_t		count;
+	int			flags;
 	struct ns_common	ns;
 	struct mount *	root;
 	struct list_head	list;

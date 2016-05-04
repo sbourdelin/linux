@@ -1264,6 +1264,10 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	if ((clone_flags & (CLONE_NEWNS|CLONE_FS)) == (CLONE_NEWNS|CLONE_FS))
 		return ERR_PTR(-EINVAL);
 
+	if ((clone_flags & CLONE_MNTNS_SHIFT_UIDGID) &&
+	    !(clone_flags & CLONE_NEWNS))
+		return ERR_PTR(-EINVAL);
+
 	if ((clone_flags & (CLONE_NEWUSER|CLONE_FS)) == (CLONE_NEWUSER|CLONE_FS))
 		return ERR_PTR(-EINVAL);
 

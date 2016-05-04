@@ -2774,6 +2774,7 @@ static struct mnt_namespace *alloc_mnt_ns(struct user_namespace *user_ns)
 	INIT_LIST_HEAD(&new_ns->list);
 	init_waitqueue_head(&new_ns->poll);
 	new_ns->event = 0;
+	new_ns->flags = 0;
 	new_ns->user_ns = get_user_ns(user_ns);
 	return new_ns;
 }
@@ -2800,6 +2801,25 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
 	new_ns = alloc_mnt_ns(user_ns);
 	if (IS_ERR(new_ns))
 		return new_ns;
+
+	if (flags & CLONE_MNTNS_SHIFT_UIDGID) {
+		/*
+		 * If parent has the CLONE_MNTNS_SHIFT_UIDGID flag set
+		 * or current is capable in init_user_ns, then we set the
+		 * CLONE_MNTNS_SHIFT_UIDGID flag and allow mounts inside
+		 * this namespace to shift their UID and GID.
+		 *
+		 * We check the init_user_ns here since we always start from
+		 * that user namespace and mounts are by default available to all
+		 * users. In this regard, only CAP_SYS_ADMIN in init_user_ns is
+		 * allowed to start and propagate the CLONE_MNTNS_SHIFT_UIDGID
+		 * flag to new mount namespaces.
+		 */
+		if ((ns->flags & CLONE_MNTNS_SHIFT_UIDGID) || capable(CAP_SYS_ADMIN))
+			new_ns->flags |= CLONE_MNTNS_SHIFT_UIDGID;
+		else
+			return ERR_PTR(-EPERM);
+	}
 
 	namespace_lock();
 	/* First pass: copy the tree topology */
