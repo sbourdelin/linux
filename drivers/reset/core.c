@@ -251,7 +251,7 @@ EXPORT_SYMBOL_GPL(reset_control_get);
 
 void reset_control_put(struct reset_control *rstc)
 {
-	if (IS_ERR(rstc))
+	if (IS_ERR_OR_NULL(rstc))
 		return;
 
 	module_put(rstc->rcdev->owner);
