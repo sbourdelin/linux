@@ -53,6 +53,7 @@ static struct opp_device *_find_opp_dev(const struct device *dev,
 	return NULL;
 }
 
+#ifdef CONFIG_OF
 static struct opp_table *_managed_opp(const struct device_node *np)
 {
 	struct opp_table *opp_table;
@@ -72,6 +73,7 @@ static struct opp_table *_managed_opp(const struct device_node *np)
 
 	return NULL;
 }
+#endif
 
 /**
  * _find_opp_table() - find opp_table struct using device pointer
@@ -1115,6 +1117,7 @@ unlock:
 	return ret;
 }
 
+#ifdef CONFIG_OF
 /* TODO: Support multiple regulators */
 static int opp_parse_supplies(struct dev_pm_opp *opp, struct device *dev,
 			      struct opp_table *opp_table)
@@ -1191,6 +1194,7 @@ static int opp_parse_supplies(struct dev_pm_opp *opp, struct device *dev,
 
 	return 0;
 }
+#endif
 
 /**
  * dev_pm_opp_set_supported_hw() - Set supported platforms
@@ -1520,6 +1524,7 @@ unlock:
 }
 EXPORT_SYMBOL_GPL(dev_pm_opp_put_regulator);
 
+#ifdef CONFIG_OF
 static bool _opp_is_supported(struct device *dev, struct opp_table *opp_table,
 			      struct device_node *np)
 {
@@ -1657,6 +1662,7 @@ unlock:
 	mutex_unlock(&opp_table_lock);
 	return ret;
 }
+#endif
 
 /**
  * dev_pm_opp_add()  - Add an OPP table from a table definitions
