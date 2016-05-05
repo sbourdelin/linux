@@ -2912,8 +2912,22 @@ int mv88e6xxx_setup_ports(struct dsa_switch *ds)
 
 static int _mv88e6xxx_setup_global(struct mv88e6xxx_priv_state *ps)
 {
+	u16 reg;
 	int err;
 	int i;
+
+	/* Enable the PHY Polling Unit if present, discard packets with
+	 * excessive collisions, set the maximum frame size to 1632, and mask
+	 * all interrupt sources.
+	 */
+	reg = GLOBAL_CONTROL_DISCARD_EXCESS | GLOBAL_CONTROL_MAX_FRAME_1632;
+	if (mv88e6xxx_has(ps, MV88E6XXX_FLAG_PPU) ||
+	    mv88e6xxx_has(ps, MV88E6XXX_FLAG_PPU_ACTIVE))
+		reg |= GLOBAL_CONTROL_PPU_ENABLE;
+
+	err = _mv88e6xxx_reg_write(ps, REG_GLOBAL, GLOBAL_CONTROL, reg);
+	if (err)
+		return err;
 
 	/* Set the default address aging time to 5 minutes, and
 	 * enable address learn messages to be sent to all message
