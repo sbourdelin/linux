@@ -24,21 +24,24 @@ static const struct mv88e6xxx_info mv88e6123_table[] = {
 		.name = "Marvell 88E6123",
 		.num_databases = 4096,
 		.num_ports = 3,
-		.flags = MV88E6XXX_FLAG_TEMP,
+		.flags = MV88E6XXX_FLAG_SWITCH_MAC |
+			MV88E6XXX_FLAG_TEMP,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6161,
 		.family = MV88E6XXX_FAMILY_6165,
 		.name = "Marvell 88E6161",
 		.num_databases = 4096,
 		.num_ports = 6,
-		.flags = MV88E6XXX_FLAG_TEMP,
+		.flags = MV88E6XXX_FLAG_SWITCH_MAC |
+			MV88E6XXX_FLAG_TEMP,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6165,
 		.family = MV88E6XXX_FAMILY_6165,
 		.name = "Marvell 88E6165",
 		.num_databases = 4096,
 		.num_ports = 6,
-		.flags = MV88E6XXX_FLAG_TEMP,
+		.flags = MV88E6XXX_FLAG_SWITCH_MAC |
+			MV88E6XXX_FLAG_TEMP,
 	}
 };
 
@@ -114,7 +117,7 @@ struct dsa_switch_driver mv88e6123_switch_driver = {
 	.tag_protocol		= DSA_TAG_PROTO_EDSA,
 	.probe			= mv88e6123_drv_probe,
 	.setup			= mv88e6123_setup,
-	.set_addr		= mv88e6xxx_set_addr_indirect,
+	.set_addr		= mv88e6xxx_set_addr,
 	.phy_read		= mv88e6xxx_phy_read,
 	.phy_write		= mv88e6xxx_phy_write,
 	.get_strings		= mv88e6xxx_get_strings,

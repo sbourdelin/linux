@@ -25,6 +25,7 @@ static const struct mv88e6xxx_info mv88e6171_table[] = {
 		.num_databases = 4096,
 		.num_ports = 7,
 		.flags = MV88E6XXX_FLAG_SMI_PHY |
+			MV88E6XXX_FLAG_SWITCH_MAC |
 			MV88E6XXX_FLAG_TEMP,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6175,
@@ -33,6 +34,7 @@ static const struct mv88e6xxx_info mv88e6171_table[] = {
 		.num_databases = 4096,
 		.num_ports = 7,
 		.flags = MV88E6XXX_FLAG_SMI_PHY |
+			MV88E6XXX_FLAG_SWITCH_MAC |
 			MV88E6XXX_FLAG_TEMP,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6350,
@@ -41,6 +43,7 @@ static const struct mv88e6xxx_info mv88e6171_table[] = {
 		.num_databases = 4096,
 		.num_ports = 7,
 		.flags = MV88E6XXX_FLAG_SMI_PHY |
+			MV88E6XXX_FLAG_SWITCH_MAC |
 			MV88E6XXX_FLAG_TEMP,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6351,
@@ -49,6 +52,7 @@ static const struct mv88e6xxx_info mv88e6171_table[] = {
 		.num_databases = 4096,
 		.num_ports = 7,
 		.flags = MV88E6XXX_FLAG_SMI_PHY |
+			MV88E6XXX_FLAG_SWITCH_MAC |
 			MV88E6XXX_FLAG_TEMP,
 	}
 };
@@ -127,7 +131,7 @@ struct dsa_switch_driver mv88e6171_switch_driver = {
 	.tag_protocol		= DSA_TAG_PROTO_EDSA,
 	.probe			= mv88e6171_drv_probe,
 	.setup			= mv88e6171_setup,
-	.set_addr		= mv88e6xxx_set_addr_indirect,
+	.set_addr		= mv88e6xxx_set_addr,
 	.phy_read		= mv88e6xxx_phy_read,
 	.phy_write		= mv88e6xxx_phy_write,
 	.get_strings		= mv88e6xxx_get_strings,

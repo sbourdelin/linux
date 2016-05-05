@@ -173,58 +173,6 @@ int mv88e6xxx_reg_write(struct mv88e6xxx_priv_state *ps, int addr,
 	return ret;
 }
 
-int mv88e6xxx_set_addr_direct(struct dsa_switch *ds, u8 *addr)
-{
-	struct mv88e6xxx_priv_state *ps = ds_to_priv(ds);
-	int err;
-
-	err = mv88e6xxx_reg_write(ps, REG_GLOBAL, GLOBAL_MAC_01,
-				  (addr[0] << 8) | addr[1]);
-	if (err)
-		return err;
-
-	err = mv88e6xxx_reg_write(ps, REG_GLOBAL, GLOBAL_MAC_23,
-				  (addr[2] << 8) | addr[3]);
-	if (err)
-		return err;
-
-	return mv88e6xxx_reg_write(ps, REG_GLOBAL, GLOBAL_MAC_45,
-				   (addr[4] << 8) | addr[5]);
-}
-
-int mv88e6xxx_set_addr_indirect(struct dsa_switch *ds, u8 *addr)
-{
-	struct mv88e6xxx_priv_state *ps = ds_to_priv(ds);
-	int ret;
-	int i;
-
-	for (i = 0; i < 6; i++) {
-		int j;
-
-		/* Write the MAC address byte. */
-		ret = mv88e6xxx_reg_write(ps, REG_GLOBAL2, GLOBAL2_SWITCH_MAC,
-					  GLOBAL2_SWITCH_MAC_BUSY |
-					  (i << 8) | addr[i]);
-		if (ret)
-			return ret;
-
-		/* Wait for the write to complete. */
-		for (j = 0; j < 16; j++) {
-			ret = mv88e6xxx_reg_read(ps, REG_GLOBAL2,
-						 GLOBAL2_SWITCH_MAC);
-			if (ret < 0)
-				return ret;
-
-			if ((ret & GLOBAL2_SWITCH_MAC_BUSY) == 0)
-				break;
-		}
-		if (j == 16)
-			return -ETIMEDOUT;
-	}
-
-	return 0;
-}
-
 static int _mv88e6xxx_phy_read(struct mv88e6xxx_priv_state *ps, int addr,
 			       int regnum)
 {
@@ -1129,6 +1077,69 @@ out:
 	mutex_unlock(&ps->smi_mutex);
 
 	return ret;
+}
+
+static int _mv88e6xxx_set_addr_direct(struct mv88e6xxx_priv_state *ps, u8 *addr)
+{
+	int err;
+
+	err = _mv88e6xxx_reg_write(ps, REG_GLOBAL, GLOBAL_MAC_01,
+				   (addr[0] << 8) | addr[1]);
+	if (err)
+		return err;
+
+	err = _mv88e6xxx_reg_write(ps, REG_GLOBAL, GLOBAL_MAC_23,
+				   (addr[2] << 8) | addr[3]);
+	if (err)
+		return err;
+
+	return _mv88e6xxx_reg_write(ps, REG_GLOBAL, GLOBAL_MAC_45,
+				    (addr[4] << 8) | addr[5]);
+}
+
+static int _mv88e6xxx_switch_mac_wait(struct mv88e6xxx_priv_state *ps)
+{
+	return _mv88e6xxx_wait(ps, REG_GLOBAL2, GLOBAL2_SWITCH_MAC,
+			       GLOBAL2_SWITCH_MAC_BUSY);
+}
+
+static int _mv88e6xxx_set_addr_indirect(struct mv88e6xxx_priv_state *ps,
+					u8 *addr)
+{
+	int i, err;
+
+	for (i = 0; i < 6; i++) {
+		/* Write the MAC address byte. */
+		err = _mv88e6xxx_reg_write(ps, REG_GLOBAL2, GLOBAL2_SWITCH_MAC,
+					   GLOBAL2_SWITCH_MAC_BUSY |
+					   (i << 8) | addr[i]);
+		if (err)
+			break;
+
+		/* Wait for the write to complete. */
+		err = _mv88e6xxx_switch_mac_wait(ps);
+		if (err)
+			break;
+	}
+
+	return err;
+}
+
+int mv88e6xxx_set_addr(struct dsa_switch *ds, u8 *addr)
+{
+	struct mv88e6xxx_priv_state *ps = ds_to_priv(ds);
+	int err;
+
+	mutex_lock(&ps->smi_mutex);
+
+	if (mv88e6xxx_has(ps, MV88E6XXX_FLAG_SWITCH_MAC))
+		err = _mv88e6xxx_set_addr_indirect(ps, addr);
+	else
+		err = _mv88e6xxx_set_addr_direct(ps, addr);
+
+	mutex_unlock(&ps->smi_mutex);
+
+	return err;
 }
 
 static int _mv88e6xxx_atu_cmd(struct mv88e6xxx_priv_state *ps, u16 fid, u16 cmd)
