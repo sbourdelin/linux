@@ -32,6 +32,7 @@
 static int setfl(int fd, struct file * filp, unsigned long arg)
 {
 	struct inode * inode = file_inode(filp);
+	unsigned int flags;
 	int error = 0;
 
 	/*
@@ -59,7 +60,7 @@ static int setfl(int fd, struct file * filp, unsigned long arg)
 	}
 
 	if (filp->f_op->check_flags)
-		error = filp->f_op->check_flags(arg);
+		error = filp->f_op->check_flags(arg, filp, 0);
 	if (error)
 		return error;
 
@@ -75,7 +76,14 @@ static int setfl(int fd, struct file * filp, unsigned long arg)
 	}
 	spin_lock(&filp->f_lock);
 	filp->f_flags = (arg & SETFL_MASK) | (filp->f_flags & ~SETFL_MASK);
+	flags = filp->f_flags;
 	spin_unlock(&filp->f_lock);
+
+	/*
+	 * Pass the flags to VFS for setting.
+	 */
+	if (filp->f_op->check_flags)
+		error = filp->f_op->check_flags(flags, filp, 1);
 
  out:
 	return error;
