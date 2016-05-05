@@ -812,6 +812,7 @@ static int collect_cpu_info(int cpu_num, struct cpu_signature *csig)
 		/* get processor flags from MSR 0x17 */
 		rdmsr(MSR_IA32_PLATFORM_ID, val[0], val[1]);
 		csig->pf = 1 << ((val[1] >> 18) & 7);
+		cpu_data(cpu_num).platform_id = (val[1] >> 18) & 7;
 	}
 
 	csig->rev = c->microcode;
