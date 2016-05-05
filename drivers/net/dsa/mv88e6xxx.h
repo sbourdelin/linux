@@ -351,6 +351,10 @@ enum mv88e6xxx_family {
 };
 
 enum mv88e6xxx_cap {
+	/* Energy Efficient Ethernet.
+	 */
+	MV88E6XXX_CAP_EEE,
+
 	/* EEPROM Command and Data registers.
 	 * See GLOBAL2_EEPROM_OP and GLOBAL2_EEPROM_DATA.
 	 */
@@ -382,6 +386,7 @@ enum mv88e6xxx_cap {
 };
 
 /* Bitmask of capabilities */
+#define MV88E6XXX_FLAG_EEE		BIT(MV88E6XXX_CAP_EEE)
 #define MV88E6XXX_FLAG_EEPROM		BIT(MV88E6XXX_CAP_EEPROM)
 #define MV88E6XXX_FLAG_PPU		BIT(MV88E6XXX_CAP_PPU)
 #define MV88E6XXX_FLAG_SMI_PHY		BIT(MV88E6XXX_CAP_SMI_PHY)
