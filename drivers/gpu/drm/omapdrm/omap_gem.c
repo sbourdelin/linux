@@ -557,22 +557,19 @@ int omap_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 
 	/* if a shmem backed object, make sure we have pages attached now */
 	ret = get_pages(obj, &pages);
-	if (ret)
-		goto fail;
+	if (!ret) {
+		/* where should we do corresponding put_pages().. we are mapping
+		 * the original page, rather than thru a GART, so we can't rely
+		 * on eviction to trigger this.  But munmap() or all mappings should
+		 * probably trigger put_pages()?
+		 */
 
-	/* where should we do corresponding put_pages().. we are mapping
-	 * the original page, rather than thru a GART, so we can't rely
-	 * on eviction to trigger this.  But munmap() or all mappings should
-	 * probably trigger put_pages()?
-	 */
+		if (omap_obj->flags & OMAP_BO_TILED)
+			ret = fault_2d(obj, vma, vmf);
+		else
+			ret = fault_1d(obj, vma, vmf);
+	}
 
-	if (omap_obj->flags & OMAP_BO_TILED)
-		ret = fault_2d(obj, vma, vmf);
-	else
-		ret = fault_1d(obj, vma, vmf);
-
-
-fail:
 	mutex_unlock(&dev->struct_mutex);
 	switch (ret) {
 	case 0:
