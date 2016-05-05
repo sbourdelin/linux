@@ -351,6 +351,11 @@ enum mv88e6xxx_family {
 };
 
 enum mv88e6xxx_cap {
+	/* EEPROM Command and Data registers.
+	 * See GLOBAL2_EEPROM_OP and GLOBAL2_EEPROM_DATA.
+	 */
+	MV88E6XXX_CAP_EEPROM,
+
 	/* PHY Polling Unit.
 	 * See GLOBAL_CONTROL_PPU_ENABLE and GLOBAL_STATUS_PPU_POLLING.
 	 */
@@ -364,6 +369,7 @@ enum mv88e6xxx_cap {
 };
 
 /* Bitmask of capabilities */
+#define MV88E6XXX_FLAG_EEPROM		BIT(MV88E6XXX_CAP_EEPROM)
 #define MV88E6XXX_FLAG_PPU		BIT(MV88E6XXX_CAP_PPU)
 #define MV88E6XXX_FLAG_SMI_PHY		BIT(MV88E6XXX_CAP_SMI_PHY)
 
@@ -501,8 +507,10 @@ int mv88e6xxx_get_temp(struct dsa_switch *ds, int *temp);
 int mv88e6xxx_get_temp_limit(struct dsa_switch *ds, int *temp);
 int mv88e6xxx_set_temp_limit(struct dsa_switch *ds, int temp);
 int mv88e6xxx_get_temp_alarm(struct dsa_switch *ds, bool *alarm);
-int mv88e6xxx_eeprom_load_wait(struct dsa_switch *ds);
-int mv88e6xxx_eeprom_busy_wait(struct dsa_switch *ds);
+int mv88e6xxx_get_eeprom(struct dsa_switch *ds, struct ethtool_eeprom *eeprom,
+			 u8 *data);
+int mv88e6xxx_set_eeprom(struct dsa_switch *ds, struct ethtool_eeprom *eeprom,
+			 u8 *data);
 int mv88e6xxx_phy_read_indirect(struct dsa_switch *ds, int addr, int regnum);
 int mv88e6xxx_phy_write_indirect(struct dsa_switch *ds, int addr, int regnum,
 				 u16 val);

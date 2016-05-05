@@ -786,38 +786,255 @@ static int _mv88e6xxx_wait(struct mv88e6xxx_priv_state *ps, int reg, int offset,
 	return -ETIMEDOUT;
 }
 
-static int mv88e6xxx_wait(struct mv88e6xxx_priv_state *ps, int reg,
-			  int offset, u16 mask)
-{
-	int ret;
-
-	mutex_lock(&ps->smi_mutex);
-	ret = _mv88e6xxx_wait(ps, reg, offset, mask);
-	mutex_unlock(&ps->smi_mutex);
-
-	return ret;
-}
-
 static int _mv88e6xxx_phy_wait(struct mv88e6xxx_priv_state *ps)
 {
 	return _mv88e6xxx_wait(ps, REG_GLOBAL2, GLOBAL2_SMI_OP,
 			       GLOBAL2_SMI_OP_BUSY);
 }
 
-int mv88e6xxx_eeprom_load_wait(struct dsa_switch *ds)
+static int _mv88e6xxx_eeprom_load_wait(struct mv88e6xxx_priv_state *ps)
 {
-	struct mv88e6xxx_priv_state *ps = ds_to_priv(ds);
-
-	return mv88e6xxx_wait(ps, REG_GLOBAL2, GLOBAL2_EEPROM_OP,
-			      GLOBAL2_EEPROM_OP_LOAD);
+	return _mv88e6xxx_wait(ps, REG_GLOBAL2, GLOBAL2_EEPROM_OP,
+			       GLOBAL2_EEPROM_OP_LOAD);
 }
 
-int mv88e6xxx_eeprom_busy_wait(struct dsa_switch *ds)
+static int _mv88e6xxx_eeprom_busy_wait(struct mv88e6xxx_priv_state *ps)
+{
+	return _mv88e6xxx_wait(ps, REG_GLOBAL2, GLOBAL2_EEPROM_OP,
+			       GLOBAL2_EEPROM_OP_BUSY);
+}
+
+static int _mv88e6xxx_read_eeprom_word(struct mv88e6xxx_priv_state *ps,
+				       int addr)
+{
+	int ret;
+
+	mutex_lock(&ps->eeprom_mutex);
+
+	ret = _mv88e6xxx_reg_write(ps, REG_GLOBAL2, GLOBAL2_EEPROM_OP,
+				  GLOBAL2_EEPROM_OP_READ |
+				  (addr & GLOBAL2_EEPROM_OP_ADDR_MASK));
+	if (ret)
+		goto unlock;
+
+	ret = _mv88e6xxx_eeprom_busy_wait(ps);
+	if (ret)
+		goto unlock;
+
+	ret = _mv88e6xxx_reg_read(ps, REG_GLOBAL2, GLOBAL2_EEPROM_DATA);
+unlock:
+	mutex_unlock(&ps->eeprom_mutex);
+
+	return ret;
+}
+
+static int _mv88e6xxx_get_eeprom(struct mv88e6xxx_priv_state *ps,
+				 struct ethtool_eeprom *eeprom, u8 *data)
+{
+	int offset;
+	int len;
+	int ret;
+
+	if (!mv88e6xxx_has(ps, MV88E6XXX_FLAG_EEPROM))
+		return -EOPNOTSUPP;
+
+	offset = eeprom->offset;
+	len = eeprom->len;
+	eeprom->len = 0;
+
+	eeprom->magic = 0xc3ec4951;
+
+	ret = _mv88e6xxx_eeprom_load_wait(ps);
+	if (ret < 0)
+		return ret;
+
+	if (offset & 1) {
+		int word;
+
+		word = _mv88e6xxx_read_eeprom_word(ps, offset >> 1);
+		if (word < 0)
+			return word;
+
+		*data++ = (word >> 8) & 0xff;
+
+		offset++;
+		len--;
+		eeprom->len++;
+	}
+
+	while (len >= 2) {
+		int word;
+
+		word = _mv88e6xxx_read_eeprom_word(ps, offset >> 1);
+		if (word < 0)
+			return word;
+
+		*data++ = word & 0xff;
+		*data++ = (word >> 8) & 0xff;
+
+		offset += 2;
+		len -= 2;
+		eeprom->len += 2;
+	}
+
+	if (len) {
+		int word;
+
+		word = _mv88e6xxx_read_eeprom_word(ps, offset >> 1);
+		if (word < 0)
+			return word;
+
+		*data++ = word & 0xff;
+
+		offset++;
+		len--;
+		eeprom->len++;
+	}
+
+	return 0;
+}
+
+int mv88e6xxx_get_eeprom(struct dsa_switch *ds, struct ethtool_eeprom *eeprom,
+			 u8 *data)
 {
 	struct mv88e6xxx_priv_state *ps = ds_to_priv(ds);
+	int err;
 
-	return mv88e6xxx_wait(ps, REG_GLOBAL2, GLOBAL2_EEPROM_OP,
-			      GLOBAL2_EEPROM_OP_BUSY);
+	mutex_lock(&ps->smi_mutex);
+	err = _mv88e6xxx_get_eeprom(ps, eeprom, data);
+	mutex_unlock(&ps->smi_mutex);
+
+	return err;
+}
+
+static int _mv88e6xxx_eeprom_is_readonly(struct mv88e6xxx_priv_state *ps)
+{
+	int ret;
+
+	ret = _mv88e6xxx_reg_read(ps, REG_GLOBAL2, GLOBAL2_EEPROM_OP);
+	if (ret < 0)
+		return ret;
+
+	if (!(ret & GLOBAL2_EEPROM_OP_WRITE_EN))
+		return -EROFS;
+
+	return 0;
+}
+
+static int _mv88e6xxx_write_eeprom_word(struct mv88e6xxx_priv_state *ps,
+					int addr, u16 data)
+{
+	int err;
+
+	mutex_lock(&ps->eeprom_mutex);
+
+	err = _mv88e6xxx_reg_write(ps, REG_GLOBAL2, GLOBAL2_EEPROM_DATA, data);
+	if (err)
+		goto unlock;
+
+	err = _mv88e6xxx_reg_write(ps, REG_GLOBAL2, GLOBAL2_EEPROM_OP,
+				   GLOBAL2_EEPROM_OP_WRITE |
+				   (addr & GLOBAL2_EEPROM_OP_ADDR_MASK));
+	if (err)
+		goto unlock;
+
+	err = _mv88e6xxx_eeprom_busy_wait(ps);
+unlock:
+	mutex_unlock(&ps->eeprom_mutex);
+
+	return err;
+}
+
+static int _mv88e6xxx_set_eeprom(struct mv88e6xxx_priv_state *ps,
+				 struct ethtool_eeprom *eeprom, u8 *data)
+{
+	int offset;
+	int ret;
+	int len;
+
+	if (!mv88e6xxx_has(ps, MV88E6XXX_FLAG_EEPROM))
+		return -EOPNOTSUPP;
+
+	if (eeprom->magic != 0xc3ec4951)
+		return -EINVAL;
+
+	ret = _mv88e6xxx_eeprom_is_readonly(ps);
+	if (ret)
+		return ret;
+
+	offset = eeprom->offset;
+	len = eeprom->len;
+	eeprom->len = 0;
+
+	ret = _mv88e6xxx_eeprom_load_wait(ps);
+	if (ret < 0)
+		return ret;
+
+	if (offset & 1) {
+		int word;
+
+		word = _mv88e6xxx_read_eeprom_word(ps, offset >> 1);
+		if (word < 0)
+			return word;
+
+		word = (*data++ << 8) | (word & 0xff);
+
+		ret = _mv88e6xxx_write_eeprom_word(ps, offset >> 1, word);
+		if (ret < 0)
+			return ret;
+
+		offset++;
+		len--;
+		eeprom->len++;
+	}
+
+	while (len >= 2) {
+		int word;
+
+		word = *data++;
+		word |= *data++ << 8;
+
+		ret = _mv88e6xxx_write_eeprom_word(ps, offset >> 1, word);
+		if (ret < 0)
+			return ret;
+
+		offset += 2;
+		len -= 2;
+		eeprom->len += 2;
+	}
+
+	if (len) {
+		int word;
+
+		word = _mv88e6xxx_read_eeprom_word(ps, offset >> 1);
+		if (word < 0)
+			return word;
+
+		word = (word & 0xff00) | *data++;
+
+		ret = _mv88e6xxx_write_eeprom_word(ps, offset >> 1, word);
+		if (ret < 0)
+			return ret;
+
+		offset++;
+		len--;
+		eeprom->len++;
+	}
+
+	return 0;
+}
+
+int mv88e6xxx_set_eeprom(struct dsa_switch *ds, struct ethtool_eeprom *eeprom,
+			 u8 *data)
+{
+	struct mv88e6xxx_priv_state *ps = ds_to_priv(ds);
+	int err;
+
+	mutex_lock(&ps->smi_mutex);
+	err = _mv88e6xxx_set_eeprom(ps, eeprom, data);
+	mutex_unlock(&ps->smi_mutex);
+
+	return err;
 }
 
 static int _mv88e6xxx_atu_wait(struct mv88e6xxx_priv_state *ps)
@@ -2576,6 +2793,9 @@ int mv88e6xxx_setup_common(struct mv88e6xxx_priv_state *ps)
 	mutex_init(&ps->smi_mutex);
 
 	INIT_WORK(&ps->bridge_work, mv88e6xxx_bridge_work);
+
+	if (mv88e6xxx_has(ps, MV88E6XXX_FLAG_EEPROM))
+		mutex_init(&ps->eeprom_mutex);
 
 	if (mv88e6xxx_has(ps, MV88E6XXX_FLAG_PPU))
 		mv88e6xxx_ppu_state_init(ps);
