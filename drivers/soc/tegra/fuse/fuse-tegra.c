@@ -104,10 +104,8 @@ static const struct of_device_id tegra_fuse_match[] = {
 #ifdef CONFIG_ARCH_TEGRA_210_SOC
 	{ .compatible = "nvidia,tegra210-efuse", .data = &tegra210_fuse_soc },
 #endif
-#ifdef CONFIG_ARCH_TEGRA_132_SOC
+#if defined CONFIG_ARCH_TEGRA_124_SOC || defined CONFIG_ARCH_TEGRA_132_SOC
 	{ .compatible = "nvidia,tegra132-efuse", .data = &tegra124_fuse_soc },
-#endif
-#ifdef CONFIG_ARCH_TEGRA_124_SOC
 	{ .compatible = "nvidia,tegra124-efuse", .data = &tegra124_fuse_soc },
 #endif
 #ifdef CONFIG_ARCH_TEGRA_114_SOC
