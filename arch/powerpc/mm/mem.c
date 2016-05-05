@@ -239,8 +239,14 @@ static int __init mark_nonram_nosave(void)
 
 static bool zone_limits_final;
 
+/*
+ * The memory zones past TOP_ZONE are managed by the generic
+ * mm subsystem which expects the max PFN for these zones
+ * to be set to zero.
+ */
 static unsigned long max_zone_pfns[MAX_NR_ZONES] = {
-	[0 ... MAX_NR_ZONES - 1] = ~0UL
+	[0        ... TOP_ZONE     - 1] = ~0UL,
+	[TOP_ZONE ... MAX_NR_ZONES - 1] = 0
 };
 
 /*
