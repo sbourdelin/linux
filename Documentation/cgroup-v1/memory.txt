@@ -281,11 +281,9 @@ different than user memory, since it can't be swapped out, which makes it
 possible to DoS the system by consuming too much of this precious resource.
 
 Kernel memory won't be accounted at all until limit on a group is set. This
-allows for existing setups to continue working without disruption.  The limit
-cannot be set if the cgroup have children, or if there are already tasks in the
-cgroup. Attempting to set the limit under those conditions will return -EBUSY.
-When use_hierarchy == 1 and a group is accounted, its children will
-automatically be accounted regardless of their limit value.
+allows for existing setups to continue working without disruption. When
+use_hierarchy == 1 and a group is accounted, its children will automatically
+be accounted regardless of their limit value.
 
 After a group is first limited, it will be kept being accounted until it
 is removed. The memory limitation itself, can of course be removed by writing
