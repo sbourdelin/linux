@@ -361,9 +361,7 @@ store_mem_state(struct device *dev,
 err:
 	unlock_device_hotplug();
 
-	if (ret)
-		return ret;
-	return count;
+	return ret < 0 ? ret : count;
 }
 
 /*
