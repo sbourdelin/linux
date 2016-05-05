@@ -307,11 +307,11 @@ static int drm_minor_register(struct drm_device *dev, unsigned int type)
 	if (!minor)
 		return 0;
 
-	ret = drm_debugfs_init(minor, minor->index, drm_debugfs_root);
-	if (ret) {
+	ret = -ENOENT;
+	if (drm_debugfs_root)
+		ret = drm_debugfs_init(minor, minor->index, drm_debugfs_root);
+	if (ret)
 		DRM_ERROR("DRM: Failed to initialize /sys/kernel/debug/dri.\n");
-		return ret;
-	}
 
 	ret = device_add(minor->kdev);
 	if (ret)
@@ -904,17 +904,13 @@ static int __init drm_core_init(void)
 	}
 
 	drm_debugfs_root = debugfs_create_dir("dri", NULL);
-	if (!drm_debugfs_root) {
+	if (!drm_debugfs_root)
 		DRM_ERROR("Cannot create /sys/kernel/debug/dri\n");
-		ret = -1;
-		goto err_p3;
-	}
 
 	DRM_INFO("Initialized %s %d.%d.%d %s\n",
 		 CORE_NAME, CORE_MAJOR, CORE_MINOR, CORE_PATCHLEVEL, CORE_DATE);
 	return 0;
-err_p3:
-	drm_sysfs_destroy();
+
 err_p2:
 	unregister_chrdev(DRM_MAJOR, "drm");
 
@@ -925,7 +921,8 @@ err_p1:
 
 static void __exit drm_core_exit(void)
 {
-	debugfs_remove(drm_debugfs_root);
+	if (drm_debugfs_root)
+		debugfs_remove(drm_debugfs_root);
 	drm_sysfs_destroy();
 
 	unregister_chrdev(DRM_MAJOR, "drm");

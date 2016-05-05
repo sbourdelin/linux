@@ -160,10 +160,8 @@ int drm_debugfs_init(struct drm_minor *minor, int minor_id,
 	ret = drm_debugfs_create_files(drm_debugfs_list, DRM_DEBUGFS_ENTRIES,
 				       minor->debugfs_root, minor);
 	if (ret) {
-		debugfs_remove(minor->debugfs_root);
-		minor->debugfs_root = NULL;
 		DRM_ERROR("Failed to create core drm debugfs files\n");
-		return ret;
+		goto err_root;
 	}
 
 	if (dev->driver->debugfs_init) {
@@ -171,10 +169,17 @@ int drm_debugfs_init(struct drm_minor *minor, int minor_id,
 		if (ret) {
 			DRM_ERROR("DRM: Driver failed to initialize "
 				  "/sys/kernel/debug/dri.\n");
-			return ret;
+			goto err_core;
 		}
 	}
 	return 0;
+
+err_core:
+	drm_debugfs_remove_files(drm_debugfs_list, DRM_DEBUGFS_ENTRIES, minor);
+err_root:
+	debugfs_remove(minor->debugfs_root);
+	minor->debugfs_root = NULL;
+	return ret;
 }
 
 
