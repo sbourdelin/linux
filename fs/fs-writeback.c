@@ -189,6 +189,35 @@ out_unlock:
 	spin_unlock_bh(&wb->work_lock);
 }
 
+/*
+ * Check whether the request to writeback some pages can be merged with some
+ * other request which is already pending. If yes, merge it and return true.
+ * If no, return false.
+ */
+static bool wb_merge_request(struct bdi_writeback *wb, long nr_pages,
+			     struct super_block *sb, bool range_cyclic,
+			     enum wb_reason reason)
+{
+	struct wb_writeback_work *work;
+	bool merged = false;
+
+	spin_lock_bh(&wb->work_lock);
+	list_for_each_entry(work, &wb->work_list, list) {
+		if (work->reason == reason &&
+		    work->range_cyclic == range_cyclic &&
+		    work->auto_free == 1 && work->sb == sb &&
+		    work->for_sync == 0) {
+			work->nr_pages += nr_pages;
+			merged = true;
+			trace_writeback_merged(wb, work);
+			break;
+		}
+	}
+	spin_unlock_bh(&wb->work_lock);
+
+	return merged;
+}
+
 /**
  * wb_wait_for_completion - wait for completion of bdi_writeback_works
  * @bdi: bdi work items were issued to
@@ -925,6 +954,14 @@ void wb_start_writeback(struct bdi_writeback *wb, long nr_pages,
 	struct wb_writeback_work *work;
 
 	if (!wb_has_dirty_io(wb))
+		return;
+
+	/*
+	 * Can we merge current request with another pending one - saves us
+	 * atomic allocation which can be significant e.g. when MM is under
+	 * pressure and calls wake_up_flusher_threads() a lot.
+	 */
+	if (wb_merge_request(wb, nr_pages, NULL, range_cyclic, reason))
 		return;
 
 	/*

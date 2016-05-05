@@ -252,6 +252,7 @@ DEFINE_WRITEBACK_WORK_EVENT(writeback_exec);
 DEFINE_WRITEBACK_WORK_EVENT(writeback_start);
 DEFINE_WRITEBACK_WORK_EVENT(writeback_written);
 DEFINE_WRITEBACK_WORK_EVENT(writeback_wait);
+DEFINE_WRITEBACK_WORK_EVENT(writeback_merged);
 
 TRACE_EVENT(writeback_pages_written,
 	TP_PROTO(long pages_written),
