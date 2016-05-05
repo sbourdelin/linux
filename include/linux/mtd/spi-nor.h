@@ -77,6 +77,10 @@
 /* Used for Micron flashes only. */
 #define SPINOR_OP_RD_EVCR      0x65    /* Read EVCR register */
 #define SPINOR_OP_WD_EVCR      0x61    /* Write EVCR register */
+#define SPINOR_OP_RD_OTP       0x4b    /* Read OTP location */
+#define SPINOR_OP_WR_OTP       0x42    /* Write OTP location */
+
+
 
 /* Status Register bits. */
 #define SR_WIP			BIT(0)	/* Write in progress */
@@ -113,6 +117,9 @@ enum spi_nor_ops {
 	SPI_NOR_OPS_ERASE,
 	SPI_NOR_OPS_LOCK,
 	SPI_NOR_OPS_UNLOCK,
+	SPI_NOR_OPS_OTP_WRITE,
+	SPI_NOR_OPS_OTP_READ,
+	SPI_NOR_OPS_OTP_LOCK,
 };
 
 enum spi_nor_option_flags {
@@ -130,6 +137,7 @@ enum spi_nor_option_flags {
  * @erase_opcode:	the opcode for erasing a sector
  * @read_opcode:	the read opcode
  * @read_dummy:		the dummy needed by the read operation
+ * @read_otp_dummy:	the dummy needed by the read otp operation
  * @program_opcode:	the program opcode
  * @flash_read:		the mode of the read
  * @sst_write_second:	used by the SST write operation
@@ -161,6 +169,7 @@ struct spi_nor {
 	u8			erase_opcode;
 	u8			read_opcode;
 	u8			read_dummy;
+	u8			read_otp_dummy;
 	u8			program_opcode;
 	enum read_mode		flash_read;
 	bool			sst_write_second;
@@ -177,6 +186,12 @@ struct spi_nor {
 	void (*write)(struct spi_nor *nor, loff_t to,
 			size_t len, size_t *retlen, const u_char *write_buf);
 	int (*erase)(struct spi_nor *nor, loff_t offs);
+
+	int (*read_otp)(struct spi_nor *nor, loff_t from, size_t len,
+		       size_t *retlen, u_char *read_buf);
+	int (*write_otp)(struct spi_nor *nor, loff_t to, size_t len,
+			size_t *retlen, const u_char *write_buf);
+	int (*lock_otp)(struct spi_nor *nor);
 
 	int (*flash_lock)(struct spi_nor *nor, loff_t ofs, uint64_t len);
 	int (*flash_unlock)(struct spi_nor *nor, loff_t ofs, uint64_t len);

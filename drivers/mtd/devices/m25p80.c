@@ -149,6 +149,90 @@ static int m25p80_read(struct spi_nor *nor, loff_t from, size_t len,
 	spi_sync(spi, &m);
 
 	*retlen = m.actual_length - m25p_cmdsz(nor) - dummy;
+
+	return 0;
+}
+
+static int m25p80_read_otp(struct spi_nor *nor, loff_t from, size_t len,
+			   size_t *retlen, u_char *read_buf)
+{
+	struct m25p *flash = nor->priv;
+	struct spi_device *spi = flash->spi;
+	struct spi_transfer t[2];
+	struct spi_message m;
+	unsigned int dummy = nor->read_otp_dummy;
+
+	if (from > 65)
+		return -EINVAL;
+
+	if ((from + len) > 65)
+		len = 65 - from;
+
+	/* convert the dummy cycles to the number of bytes */
+	dummy /= 8;
+
+	spi_message_init(&m);
+	memset(t, 0, sizeof(t));
+
+	flash->command[0] = SPINOR_OP_RD_OTP;
+	m25p_addr2cmd(nor, from, flash->command);
+
+	t[0].tx_buf = flash->command;
+	t[0].len = m25p_cmdsz(nor) + dummy;
+	spi_message_add_tail(&t[0], &m);
+
+	t[1].rx_buf = read_buf;
+	t[1].rx_nbits = m25p80_rx_nbits(nor);
+	t[1].len = len;
+	spi_message_add_tail(&t[1], &m);
+
+	spi_sync(spi, &m);
+
+	*retlen = m.actual_length - m25p_cmdsz(nor) - dummy;
+
+	return 0;
+}
+
+static int m25p80_write_otp(struct spi_nor *nor, loff_t to, size_t len,
+			    size_t *retlen, const u_char *write_buf)
+{
+	struct m25p *flash = nor->priv;
+	struct spi_device *spi = flash->spi;
+	struct spi_transfer t[2];
+	struct spi_message m;
+	int cmd_sz = m25p_cmdsz(nor);
+
+	/* TODO: Ghetto hack ... */
+	if (to > 64)
+		return -EINVAL;
+
+	if ((to + len) > 64)
+		len = 64 - to;
+
+	/* TODO: Deal with locking */
+
+	spi_message_init(&m);
+
+	flash->command[0] = SPINOR_OP_WR_OTP;
+	m25p_addr2cmd(nor, to, flash->command);
+
+	t[0].tx_buf = flash->command;
+	t[0].len = cmd_sz;
+	spi_message_add_tail(&t[0], &m);
+
+	t[1].tx_buf = write_buf;
+	t[1].len = len;
+	spi_message_add_tail(&t[1], &m);
+
+	spi_sync(spi, &m);
+
+	*retlen += m.actual_length - cmd_sz;
+
+	return 0;
+}
+
+static int m25p80_lock_otp(struct spi_nor *nor)
+{
 	return 0;
 }
 
@@ -179,6 +263,9 @@ static int m25p_probe(struct spi_device *spi)
 	nor->write = m25p80_write;
 	nor->write_reg = m25p80_write_reg;
 	nor->read_reg = m25p80_read_reg;
+	nor->read_otp = m25p80_read_otp;
+	nor->write_otp = m25p80_write_otp;
+	nor->lock_otp = m25p80_lock_otp;
 
 	nor->dev = &spi->dev;
 	spi_nor_set_flash_node(nor, spi->dev.of_node);

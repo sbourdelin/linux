@@ -157,6 +157,22 @@ static inline int spi_nor_read_dummy_cycles(struct spi_nor *nor)
 }
 
 /*
+ * Dummy cycle calculation for different types of otp reads.
+ */
+static inline int spi_nor_otp_read_dummy_cycles(struct spi_nor *nor)
+{
+	switch (nor->flash_read) {
+	case SPI_NOR_QUAD:
+		return 10;
+	case SPI_NOR_FAST:
+	case SPI_NOR_DUAL:
+	case SPI_NOR_NORMAL:
+		return 8;
+	}
+	return 0;
+}
+
+/*
  * Write status register 1 byte
  * Returns negative if error occurred.
  */
@@ -680,6 +696,66 @@ static int stm_unlock(struct spi_nor *nor, loff_t ofs, uint64_t len)
 	if (ret)
 		return ret;
 	return spi_nor_wait_till_ready(nor);
+}
+
+static int spi_nor_get_user_prot_info(struct mtd_info *mtd, size_t len,
+				      size_t *retlen, struct otp_info *info)
+{
+	struct spi_nor *nor = mtd_to_spi_nor(mtd);
+
+	info->start = 0;
+	info->length = 64;
+	info->locked = 0;
+
+	*retlen = sizeof(*info);
+
+	return 0;
+}
+
+static int spi_nor_read_user_prot_reg(struct mtd_info *mtd, loff_t from,
+				      size_t len, size_t *retlen,
+				      u_char *read_buf)
+{
+	struct spi_nor *nor = mtd_to_spi_nor(mtd);
+	int ret;
+
+	dev_dbg(nor->dev, "from 0x%08x, len %zd\n", (u32)from, len);
+
+	ret = spi_nor_lock_and_prep(nor, SPI_NOR_OPS_OTP_READ);
+	if (ret)
+		return ret;
+
+	ret = nor->read_otp(nor, from, len, retlen, read_buf);
+
+	spi_nor_unlock_and_unprep(nor, SPI_NOR_OPS_OTP_READ);
+
+	return ret;
+}
+
+static int spi_nor_write_user_prot_reg(struct mtd_info *mtd, loff_t to,
+				       size_t len, size_t *retlen,
+				       u_char *write_buf)
+{
+	struct spi_nor *nor = mtd_to_spi_nor(mtd);
+	int ret;
+
+	dev_dbg(nor->dev, "to 0x%08x, len %zd\n", (u32)to, len);
+
+	ret = spi_nor_lock_and_prep(nor, SPI_NOR_OPS_OTP_WRITE);
+	if (ret)
+		return ret;
+
+	write_enable(nor);
+
+	ret = nor->write_otp(nor, to, len, retlen, write_buf);
+
+	ret = spi_nor_wait_till_ready(nor);
+
+	write_disable(nor);
+
+	spi_nor_unlock_and_unprep(nor, SPI_NOR_OPS_OTP_WRITE);
+
+	return ret;
 }
 
 /*
@@ -1327,6 +1403,9 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 		nor->flash_lock = stm_lock;
 		nor->flash_unlock = stm_unlock;
 		nor->flash_is_locked = stm_is_locked;
+		mtd->_read_user_prot_reg = spi_nor_read_user_prot_reg;
+		mtd->_write_user_prot_reg = spi_nor_write_user_prot_reg;
+		mtd->_get_user_prot_info = spi_nor_get_user_prot_info;
 	}
 
 	if (nor->flash_lock && nor->flash_unlock && nor->flash_is_locked) {
@@ -1454,6 +1533,7 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 	}
 
 	nor->read_dummy = spi_nor_read_dummy_cycles(nor);
+	nor->read_otp_dummy = spi_nor_otp_read_dummy_cycles(nor);
 
 	dev_info(dev, "%s (%lld Kbytes)\n", info->name,
 			(long long)mtd->size >> 10);
