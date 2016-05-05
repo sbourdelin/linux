@@ -7125,7 +7125,7 @@ F:	include/uapi/linux/uvcvideo.h
 
 MEDIATEK ETHERNET DRIVER
 M:	Felix Fietkau <nbd@openwrt.org>
-M:	John Crispin <blogic@openwrt.org>
+M:	John Crispin <john@phrozen.org>
 L:	netdev@vger.kernel.org
 S:	Maintained
 F:	drivers/net/ethernet/mediatek/
