@@ -24,24 +24,28 @@ static const struct mv88e6xxx_info mv88e6131_table[] = {
 		.name = "Marvell 88E6095/88E6095F",
 		.num_databases = 256,
 		.num_ports = 11,
+		.flags = MV88E6XXX_FLAG_PPU,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6085,
 		.family = MV88E6XXX_FAMILY_6097,
 		.name = "Marvell 88E6085",
 		.num_databases = 4096,
 		.num_ports = 10,
+		.flags = MV88E6XXX_FLAG_PPU,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6131,
 		.family = MV88E6XXX_FAMILY_6185,
 		.name = "Marvell 88E6131",
 		.num_databases = 256,
 		.num_ports = 8,
+		.flags = MV88E6XXX_FLAG_PPU,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6185,
 		.family = MV88E6XXX_FAMILY_6185,
 		.name = "Marvell 88E6185",
 		.num_databases = 256,
 		.num_ports = 10,
+		.flags = MV88E6XXX_FLAG_PPU,
 	}
 };
 
@@ -128,8 +132,6 @@ static int mv88e6131_setup(struct dsa_switch *ds)
 	if (ret < 0)
 		return ret;
 
-	mv88e6xxx_ppu_state_init(ps);
-
 	ret = mv88e6xxx_switch_reset(ps, false);
 	if (ret < 0)
 		return ret;
@@ -141,46 +143,13 @@ static int mv88e6131_setup(struct dsa_switch *ds)
 	return mv88e6xxx_setup_ports(ds);
 }
 
-static int mv88e6131_port_to_phy_addr(struct dsa_switch *ds, int port)
-{
-	struct mv88e6xxx_priv_state *ps = ds_to_priv(ds);
-
-	if (port >= 0 && port < ps->info->num_ports)
-		return port;
-
-	return -EINVAL;
-}
-
-static int
-mv88e6131_phy_read(struct dsa_switch *ds, int port, int regnum)
-{
-	int addr = mv88e6131_port_to_phy_addr(ds, port);
-
-	if (addr < 0)
-		return addr;
-
-	return mv88e6xxx_phy_read_ppu(ds, addr, regnum);
-}
-
-static int
-mv88e6131_phy_write(struct dsa_switch *ds,
-			      int port, int regnum, u16 val)
-{
-	int addr = mv88e6131_port_to_phy_addr(ds, port);
-
-	if (addr < 0)
-		return addr;
-
-	return mv88e6xxx_phy_write_ppu(ds, addr, regnum, val);
-}
-
 struct dsa_switch_driver mv88e6131_switch_driver = {
 	.tag_protocol		= DSA_TAG_PROTO_DSA,
 	.probe			= mv88e6131_drv_probe,
 	.setup			= mv88e6131_setup,
 	.set_addr		= mv88e6xxx_set_addr_direct,
-	.phy_read		= mv88e6131_phy_read,
-	.phy_write		= mv88e6131_phy_write,
+	.phy_read		= mv88e6xxx_phy_read,
+	.phy_write		= mv88e6xxx_phy_write,
 	.get_strings		= mv88e6xxx_get_strings,
 	.get_ethtool_stats	= mv88e6xxx_get_ethtool_stats,
 	.get_sset_count		= mv88e6xxx_get_sset_count,

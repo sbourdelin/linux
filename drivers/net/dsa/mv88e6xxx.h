@@ -350,12 +350,23 @@ enum mv88e6xxx_family {
 	MV88E6XXX_FAMILY_6352,	/* 6172 6176 6240 6352 */
 };
 
+enum mv88e6xxx_cap {
+	/* PHY Polling Unit.
+	 * See GLOBAL_CONTROL_PPU_ENABLE and GLOBAL_STATUS_PPU_POLLING.
+	 */
+	MV88E6XXX_CAP_PPU,
+};
+
+/* Bitmask of capabilities */
+#define MV88E6XXX_FLAG_PPU		BIT(MV88E6XXX_CAP_PPU)
+
 struct mv88e6xxx_info {
 	enum mv88e6xxx_family family;
 	u16 prod_num;
 	const char *name;
 	unsigned int num_databases;
 	unsigned int num_ports;
+	unsigned long flags;
 };
 
 struct mv88e6xxx_atu_entry {
@@ -403,15 +414,13 @@ struct mv88e6xxx_priv_state {
 	struct mii_bus *bus;
 	int sw_addr;
 
-#ifdef CONFIG_NET_DSA_MV88E6XXX_NEED_PPU
 	/* Handles automatic disabling and re-enabling of the PHY
 	 * polling unit.
 	 */
 	struct mutex		ppu_mutex;
-	int			ppu_disabled;
+	bool			ppu_disabled;
 	struct work_struct	ppu_work;
 	struct timer_list	ppu_timer;
-#endif
 
 	/* This mutex serialises access to the statistics unit.
 	 * Hold this mutex over snapshot + dump sequences.
@@ -449,6 +458,12 @@ struct mv88e6xxx_hw_stat {
 	enum stat_type type;
 };
 
+static inline bool mv88e6xxx_has(struct mv88e6xxx_priv_state *ps,
+				 unsigned long flags)
+{
+	return (ps->info->flags & flags) == flags;
+}
+
 int mv88e6xxx_switch_reset(struct mv88e6xxx_priv_state *ps, bool ppu_active);
 const char *mv88e6xxx_drv_probe(struct device *dsa_dev, struct device *host_dev,
 				int sw_addr, void **priv,
@@ -468,10 +483,6 @@ int mv88e6xxx_phy_write(struct dsa_switch *ds, int port, int regnum, u16 val);
 int mv88e6xxx_phy_read_indirect(struct dsa_switch *ds, int port, int regnum);
 int mv88e6xxx_phy_write_indirect(struct dsa_switch *ds, int port, int regnum,
 				 u16 val);
-void mv88e6xxx_ppu_state_init(struct mv88e6xxx_priv_state *ps);
-int mv88e6xxx_phy_read_ppu(struct dsa_switch *ds, int addr, int regnum);
-int mv88e6xxx_phy_write_ppu(struct dsa_switch *ds, int addr,
-			    int regnum, u16 val);
 void mv88e6xxx_get_strings(struct dsa_switch *ds, int port, uint8_t *data);
 void mv88e6xxx_get_ethtool_stats(struct dsa_switch *ds, int port,
 				 uint64_t *data);
