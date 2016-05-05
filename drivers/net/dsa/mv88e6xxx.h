@@ -394,6 +394,11 @@ enum mv88e6xxx_cap {
 	 * the output (or egress) ports to which it is allowed to send frames.
 	 */
 	MV88E6XXX_CAP_VLANTABLE,
+
+	/* VLAN Table Unit.
+	 * The VTU is used to program 802.1Q VLANs. See GLOBAL_VTU_OP.
+	 */
+	MV88E6XXX_CAP_VTU,
 };
 
 /* Bitmask of capabilities */
@@ -406,6 +411,7 @@ enum mv88e6xxx_cap {
 #define MV88E6XXX_FLAG_TEMP		BIT(MV88E6XXX_CAP_TEMP)
 #define MV88E6XXX_FLAG_TEMP_LIMIT	BIT(MV88E6XXX_CAP_TEMP_LIMIT)
 #define MV88E6XXX_FLAG_VLANTABLE	BIT(MV88E6XXX_CAP_VLANTABLE)
+#define MV88E6XXX_FLAG_VTU		BIT(MV88E6XXX_CAP_VTU)
 
 struct mv88e6xxx_info {
 	enum mv88e6xxx_family family;

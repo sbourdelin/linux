@@ -25,7 +25,8 @@ static const struct mv88e6xxx_info mv88e6131_table[] = {
 		.num_databases = 256,
 		.num_ports = 11,
 		.flags = MV88E6XXX_FLAG_PPU |
-			MV88E6XXX_FLAG_VLANTABLE,
+			MV88E6XXX_FLAG_VLANTABLE |
+			MV88E6XXX_FLAG_VTU,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6085,
 		.family = MV88E6XXX_FAMILY_6097,
@@ -33,7 +34,8 @@ static const struct mv88e6xxx_info mv88e6131_table[] = {
 		.num_databases = 4096,
 		.num_ports = 10,
 		.flags = MV88E6XXX_FLAG_PPU |
-			MV88E6XXX_FLAG_VLANTABLE,
+			MV88E6XXX_FLAG_VLANTABLE |
+			MV88E6XXX_FLAG_VTU,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6131,
 		.family = MV88E6XXX_FAMILY_6185,
@@ -41,7 +43,8 @@ static const struct mv88e6xxx_info mv88e6131_table[] = {
 		.num_databases = 256,
 		.num_ports = 8,
 		.flags = MV88E6XXX_FLAG_PPU |
-			MV88E6XXX_FLAG_VLANTABLE,
+			MV88E6XXX_FLAG_VLANTABLE |
+			MV88E6XXX_FLAG_VTU,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6185,
 		.family = MV88E6XXX_FAMILY_6185,
@@ -49,7 +52,8 @@ static const struct mv88e6xxx_info mv88e6131_table[] = {
 		.num_databases = 256,
 		.num_ports = 10,
 		.flags = MV88E6XXX_FLAG_PPU |
-			MV88E6XXX_FLAG_VLANTABLE,
+			MV88E6XXX_FLAG_VLANTABLE |
+			MV88E6XXX_FLAG_VTU,
 	}
 };
 
