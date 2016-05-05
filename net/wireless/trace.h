@@ -1420,6 +1420,26 @@ TRACE_EVENT(rdev_set_tx_power,
 		  WIPHY_PR_ARG, WDEV_PR_ARG,__entry->type, __entry->mbm)
 );
 
+DEFINE_EVENT(wiphy_only_evt, rdev_get_tx_power_mode,
+	TP_PROTO(struct wiphy *wiphy),
+	TP_ARGS(wiphy)
+);
+
+TRACE_EVENT(rdev_set_tx_power_mode,
+	TP_PROTO(struct wiphy *wiphy, enum nl80211_tx_power_mode mode),
+	TP_ARGS(wiphy, mode),
+	TP_STRUCT__entry(
+		WIPHY_ENTRY
+		__field(enum nl80211_tx_power_mode, mode)
+	),
+	TP_fast_assign(
+		WIPHY_ASSIGN;
+		__entry->mode = mode;
+	),
+	TP_printk(WIPHY_PR_FMT ", mode: %d",
+		  WIPHY_PR_ARG, __entry->mode)
+);
+
 TRACE_EVENT(rdev_return_int_int,
 	TP_PROTO(struct wiphy *wiphy, int func_ret, int func_fill),
 	TP_ARGS(wiphy, func_ret, func_fill),

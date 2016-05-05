@@ -402,6 +402,7 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 	[NL80211_ATTR_SCHED_SCAN_DELAY] = { .type = NLA_U32 },
 	[NL80211_ATTR_REG_INDOOR] = { .type = NLA_FLAG },
 	[NL80211_ATTR_PBSS] = { .type = NLA_FLAG },
+	[NL80211_ATTR_WIPHY_TX_POWER_MODE] = { .type = NLA_U32 },
 };
 
 /* policy for the key attributes */
@@ -2214,6 +2215,21 @@ static int nl80211_set_wiphy(struct sk_buff *skb, struct genl_info *info)
 		}
 
 		result = rdev_set_tx_power(rdev, txp_wdev, type, mbm);
+		if (result)
+			return result;
+	}
+
+	if (info->attrs[NL80211_ATTR_WIPHY_TX_POWER_MODE]) {
+		enum nl80211_tx_power_mode mode;
+		int idx = 0;
+
+		if (!rdev->ops->set_tx_power_mode)
+			return -EOPNOTSUPP;
+
+		idx = NL80211_ATTR_WIPHY_TX_POWER_MODE;
+		mode = nla_get_u32(info->attrs[idx]);
+
+		result = rdev_set_tx_power_mode(rdev, mode);
 		if (result)
 			return result;
 	}

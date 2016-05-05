@@ -1796,6 +1796,9 @@ enum nl80211_commands {
  *	connecting to a PCP, and in %NL80211_CMD_START_AP to start
  *	a PCP instead of AP. Relevant for DMG networks only.
  *
+ * @NL80211_ATTR_WIPHY_TX_POWER_MODE: Transmit power mode. See
+ *      &enum nl80211_tx_power_mode for possible values.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2171,6 +2174,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_SCHED_SCAN_PLANS,
 
 	NL80211_ATTR_PBSS,
+
+	NL80211_ATTR_WIPHY_TX_POWER_MODE,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -3700,6 +3705,22 @@ enum nl80211_tx_power_setting {
 	NL80211_TX_POWER_AUTOMATIC,
 	NL80211_TX_POWER_LIMITED,
 	NL80211_TX_POWER_FIXED,
+};
+
+/**
+ * enum nl80211_tx_power_mode - TX power mode setting
+ * @NL80211_TX_POWER_LOW: general low TX power mode
+ * @NL80211_TX_POWER_MEDIUM: general medium TX power mode
+ * @NL80211_TX_POWER_HIGH: general high TX power mode
+ * @NL80211_TX_POWER_CLAMSHELL: clamshell mode TX power mode
+ * @NL80211_TX_POWER_TABLET: tablet mode TX power mode
+ */
+enum nl80211_tx_power_mode {
+	NL80211_TX_POWER_LOW,
+	NL80211_TX_POWER_MEDIUM,
+	NL80211_TX_POWER_HIGH,
+	NL80211_TX_POWER_CLAMSHELL,
+	NL80211_TX_POWER_TABLET,
 };
 
 /**

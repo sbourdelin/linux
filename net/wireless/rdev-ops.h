@@ -552,6 +552,28 @@ static inline int rdev_get_tx_power(struct cfg80211_registered_device *rdev,
 	return ret;
 }
 
+static inline int
+rdev_set_tx_power_mode(struct cfg80211_registered_device *rdev,
+		       enum nl80211_tx_power_mode mode)
+{
+	int ret;
+	trace_rdev_set_tx_power_mode(&rdev->wiphy, mode);
+	ret = rdev->ops->set_tx_power_mode(&rdev->wiphy, mode);
+	trace_rdev_return_int(&rdev->wiphy, ret);
+	return ret;
+}
+
+static inline int
+rdev_get_tx_power_mode(struct cfg80211_registered_device *rdev,
+		       enum nl80211_tx_power_mode *mode)
+{
+	int ret;
+	trace_rdev_get_tx_power_mode(&rdev->wiphy);
+	ret = rdev->ops->get_tx_power_mode(&rdev->wiphy, mode);
+	trace_rdev_return_int_int(&rdev->wiphy, ret, *mode);
+	return ret;
+}
+
 static inline int rdev_set_wds_peer(struct cfg80211_registered_device *rdev,
 				    struct net_device *dev, const u8 *addr)
 {
