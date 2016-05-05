@@ -15,6 +15,7 @@
 #include <linux/platform_device.h>
 #include <linux/i2c.h>
 #include <linux/of_device.h>
+#include <linux/acpi.h>
 #include <linux/property.h>
 #include <linux/pm_wakeirq.h>
 #include <linux/slab.h>
@@ -26,7 +27,6 @@
 
 #include "da7219.h"
 #include "da7219-aad.h"
-
 
 /*
  * Detection control
@@ -383,7 +383,7 @@ static irqreturn_t da7219_aad_irq_thread(int irq, void *data)
 }
 
 /*
- * DT to pdata conversion
+ * DT/ACPI to pdata conversion
  */
 
 static enum da7219_aad_micbias_pulse_lvl
@@ -539,6 +539,26 @@ static enum da7219_aad_adc_1bit_rpt
 	}
 }
 
+#ifdef CONFIG_ACPI
+static inline bool da7219_aad_of_acpi_node_matched(struct fwnode_handle *child,
+						   const char *name)
+{
+	struct acpi_data_node *acpi_node = to_acpi_data_node(child);
+
+	if (strcmp(acpi_node->name, name) == 0)
+		return true;
+	else
+		return false;
+}
+#else
+static inline bool da7219_aad_of_acpi_node_matched(struct fwnode_handle *child,
+						   const char *name)
+{
+	return false;
+}
+
+#endif /* CONFIG_ACPI */
+
 static struct fwnode_handle *da7219_aad_of_named_fwhandle(struct device *dev,
 							  const char *name)
 {
@@ -550,6 +570,9 @@ static struct fwnode_handle *da7219_aad_of_named_fwhandle(struct device *dev,
 		if (is_of_node(child)) {
 			of_node = to_of_node(child);
 			if (of_node_cmp(of_node->name, name) == 0)
+				return child;
+		} else if (is_acpi_data_node(child)) {
+			if (da7219_aad_of_acpi_node_matched(child, name))
 				return child;
 		}
 	}
@@ -787,8 +810,9 @@ int da7219_aad_init(struct snd_soc_codec *codec)
 	da7219->aad = da7219_aad;
 	da7219_aad->codec = codec;
 
-	/* Handle any DT/platform data */
-	if ((codec->dev->of_node) && (da7219->pdata))
+	/* Handle any DT/ACPI/platform data */
+	if (((codec->dev->of_node) || is_acpi_node(codec->dev->fwnode)) &&
+	    (da7219->pdata))
 		da7219->pdata->aad_pdata = da7219_aad_of_to_pdata(codec);
 
 	da7219_aad_handle_pdata(codec);

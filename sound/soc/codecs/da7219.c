@@ -14,6 +14,7 @@
 #include <linux/clk.h>
 #include <linux/i2c.h>
 #include <linux/of_device.h>
+#include <linux/acpi.h>
 #include <linux/property.h>
 #include <linux/regmap.h>
 #include <linux/slab.h>
@@ -1418,7 +1419,7 @@ static struct snd_soc_dai_driver da7219_dai = {
 
 
 /*
- * DT
+ * DT/ACPI
  */
 
 static const struct of_device_id da7219_of_match[] = {
@@ -1656,8 +1657,8 @@ static int da7219_probe(struct snd_soc_codec *codec)
 		break;
 	}
 
-	/* Handle DT/Platform data */
-	if (codec->dev->of_node)
+	/* Handle DT/ACPI/Platform data */
+	if (codec->dev->of_node || is_acpi_node(codec->dev->fwnode))
 		da7219->pdata = da7219_of_to_pdata(codec);
 	else
 		da7219->pdata = dev_get_platdata(codec->dev);
