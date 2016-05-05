@@ -228,8 +228,8 @@ objectify = $(foreach o,$(1),$(if $(filter /%,$(o)),$(o),$(obj)/$(o)))
 ifneq ($(KBUILD_NOCMDDEP),1)
 # Check if both arguments has same arguments. Result is empty string if equal.
 # User may override this check using make KBUILD_NOCMDDEP=1
-arg-check = $(strip $(filter-out $(cmd_$(1)), $(cmd_$@)) \
-                    $(filter-out $(cmd_$@),   $(cmd_$(1))) )
+arg-check = $(filter-out $(quote)$(strip $(cmd_$1))$(quote), \
+                         $(quote)$(strip $(cmd_$@))$(quote))
 else
 arg-check = $(if $(strip $(cmd_$@)),,1)
 endif
