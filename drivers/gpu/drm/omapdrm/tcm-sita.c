@@ -237,7 +237,7 @@ struct tcm *sita_init(u16 width, u16 height)
 
 	tcm = kzalloc(sizeof(*tcm) + map_size, GFP_KERNEL);
 	if (!tcm)
-		goto error;
+		return NULL;
 
 	/* Updating the pointers to SiTA implementation APIs */
 	tcm->height = height;
@@ -254,8 +254,4 @@ struct tcm *sita_init(u16 width, u16 height)
 	tcm->map_size = width*height;
 
 	return tcm;
-
-error:
-	kfree(tcm);
-	return NULL;
 }
