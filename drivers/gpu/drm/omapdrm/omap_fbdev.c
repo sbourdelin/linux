@@ -61,11 +61,8 @@ static int omap_fbdev_pan_display(struct fb_var_screeninfo *var,
 	struct drm_fb_helper *helper = get_fb(fbi);
 	struct omap_fbdev *fbdev = to_omap_fbdev(helper);
 
-	if (!helper)
-		goto fallback;
-
-	if (!fbdev->ywrap_enabled)
-		goto fallback;
+	if (!(helper || fbdev->ywrap_enabled))
+		return drm_fb_helper_pan_display(var, fbi);
 
 	if (drm_can_sleep()) {
 		pan_worker(&fbdev->work);
@@ -75,9 +72,6 @@ static int omap_fbdev_pan_display(struct fb_var_screeninfo *var,
 	}
 
 	return 0;
-
-fallback:
-	return drm_fb_helper_pan_display(var, fbi);
 }
 
 static struct fb_ops omap_fb_ops = {
