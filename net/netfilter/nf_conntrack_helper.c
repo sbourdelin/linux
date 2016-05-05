@@ -449,10 +449,10 @@ void nf_conntrack_helper_unregister(struct nf_conntrack_helper *me)
 	 */
 	synchronize_rcu();
 
-	rtnl_lock();
+	mutex_lock(&net_mutex);
 	for_each_net(net)
 		__nf_conntrack_helper_unregister(me, net);
-	rtnl_unlock();
+	mutex_unlock(&net_mutex);
 }
 EXPORT_SYMBOL_GPL(nf_conntrack_helper_unregister);
 
