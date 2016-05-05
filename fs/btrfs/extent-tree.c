@@ -9520,39 +9520,20 @@ out:
 	return ret;
 }
 
-static int find_first_block_group(struct btrfs_root *root,
-		struct btrfs_path *path, struct btrfs_key *key)
+int find_block_group(struct btrfs_root *root,
+				   struct btrfs_path *path,
+				   struct extent_map *chunk_em)
 {
 	int ret = 0;
-	struct btrfs_key found_key;
-	struct extent_buffer *leaf;
-	int slot;
+	struct btrfs_key key;
 
-	ret = btrfs_search_slot(NULL, root, key, path, 0, 0);
-	if (ret < 0)
-		goto out;
+	key.objectid = chunk_em->start;
+	key.offset = chunk_em->len;
+	key.type = BTRFS_BLOCK_GROUP_ITEM_KEY;
 
-	while (1) {
-		slot = path->slots[0];
-		leaf = path->nodes[0];
-		if (slot >= btrfs_header_nritems(leaf)) {
-			ret = btrfs_next_leaf(root, path);
-			if (ret == 0)
-				continue;
-			if (ret < 0)
-				goto out;
-			break;
-		}
-		btrfs_item_key_to_cpu(leaf, &found_key, slot);
-
-		if (found_key.objectid >= key->objectid &&
-		    found_key.type == BTRFS_BLOCK_GROUP_ITEM_KEY) {
-			ret = 0;
-			goto out;
-		}
-		path->slots[0]++;
-	}
-out:
+	ret = btrfs_search_slot(NULL, root, &key, path, 0, 0);
+	if (ret > 0)
+		ret = -ENOENT;
 	return ret;
 }
 
@@ -9771,16 +9752,14 @@ int btrfs_read_block_groups(struct btrfs_root *root)
 	struct btrfs_block_group_cache *cache;
 	struct btrfs_fs_info *info = root->fs_info;
 	struct btrfs_space_info *space_info;
-	struct btrfs_key key;
+	struct btrfs_mapping_tree *map_tree = &root->fs_info->mapping_tree;
+	struct extent_map *chunk_em;
 	struct btrfs_key found_key;
 	struct extent_buffer *leaf;
 	int need_clear = 0;
 	u64 cache_gen;
 
 	root = info->extent_root;
-	key.objectid = 0;
-	key.offset = 0;
-	key.type = BTRFS_BLOCK_GROUP_ITEM_KEY;
 	path = btrfs_alloc_path();
 	if (!path)
 		return -ENOMEM;
@@ -9793,10 +9772,16 @@ int btrfs_read_block_groups(struct btrfs_root *root)
 	if (btrfs_test_opt(root, CLEAR_CACHE))
 		need_clear = 1;
 
+	/* Here we don't lock the map tree, as we are the only reader */
+	chunk_em = first_extent_mapping(&map_tree->map_tree);
+	/* Not really possible */
+	if (!chunk_em) {
+		ret = -ENOENT;
+		goto error;
+	}
+
 	while (1) {
-		ret = find_first_block_group(root, path, &key);
-		if (ret > 0)
-			break;
+		ret = find_block_group(root, path, chunk_em);
 		if (ret != 0)
 			goto error;
 
@@ -9830,7 +9815,6 @@ int btrfs_read_block_groups(struct btrfs_root *root)
 				   sizeof(cache->item));
 		cache->flags = btrfs_block_group_flags(&cache->item);
 
-		key.objectid = found_key.objectid + found_key.offset;
 		btrfs_release_path(path);
 
 		/*
@@ -9911,6 +9895,9 @@ int btrfs_read_block_groups(struct btrfs_root *root)
 			}
 			spin_unlock(&info->unused_bgs_lock);
 		}
+		chunk_em = next_extent_mapping(chunk_em);
+		if (!chunk_em)
+			break;
 	}
 
 	list_for_each_entry_rcu(space_info, &root->fs_info->space_info, list) {
