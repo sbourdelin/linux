@@ -2001,12 +2001,12 @@ static int btusb_setup_intel_new(struct hci_dev *hdev)
 		return -EINVAL;
 	}
 
-	/* At the moment only the hardware variant iBT 3.0 (LnP/SfP) is
+	/* At the moment only the hardware variant iBT 3.0 (LnP/SfP/WsP) is
 	 * supported by this firmware loading method. This check has been
 	 * put in place to ensure correct forward compatibility options
 	 * when newer hardware variants come along.
 	 */
-	if (ver.hw_variant != 0x0b) {
+	if ((ver.hw_variant != 0x0b) && (ver.hw_variant != 0x0c)) {
 		BT_ERR("%s: Unsupported Intel hardware variant (%u)",
 		       hdev->name, ver.hw_variant);
 		return -EINVAL;
