@@ -426,10 +426,11 @@ static unsigned long find_random_virt_addr(unsigned long minimum,
 	return random_addr * CONFIG_PHYSICAL_ALIGN + minimum;
 }
 
-unsigned char *choose_random_location(unsigned char *input_ptr,
-				      unsigned long input_size,
-				      unsigned char *output_ptr,
-				      unsigned long output_size)
+void choose_random_location(unsigned char *input_ptr,
+				unsigned long input_size,
+				unsigned char **output_ptr,
+				unsigned long output_size,
+				unsigned char **virt_addr)
 {
 	/*
 	 * The caller of choose_random_location() uses unsigned char * for
@@ -439,19 +440,21 @@ unsigned char *choose_random_location(unsigned char *input_ptr,
 	 * more casts into extract_kernel, do them here and at return.
 	 */
 	unsigned long input = (unsigned long)input_ptr;
-	unsigned long output = (unsigned long)output_ptr;
-	unsigned long choice = output;
+	unsigned long output = (unsigned long)*output_ptr;
 	unsigned long random_addr;
+
+	/* By default, keep output position unchanged. */
+	*virt_addr = *output_ptr;
 
 #ifdef CONFIG_HIBERNATION
 	if (!cmdline_find_option_bool("kaslr")) {
 		warn("KASLR disabled: 'kaslr' not on cmdline (hibernation selected).");
-		goto out;
+		return;
 	}
 #else
 	if (cmdline_find_option_bool("nokaslr")) {
 		warn("KASLR disabled: 'nokaslr' on cmdline.");
-		goto out;
+		return;
 	}
 #endif
 
@@ -464,17 +467,18 @@ unsigned char *choose_random_location(unsigned char *input_ptr,
 	random_addr = find_random_phys_addr(output, output_size);
 	if (!random_addr) {
 		warn("KASLR disabled: could not find suitable E820 region!");
-		goto out;
+	} else {
+		/* Update the new physical address location. */
+		if (output != random_addr) {
+			fill_pagetable(random_addr, output_size);
+			switch_pagetable();
+			*output_ptr = (unsigned char *)random_addr;
+		}
 	}
 
-	/* Always enforce the minimum. */
-	if (random_addr < choice)
-		goto out;
-
-	choice = random_addr;
-
-	fill_pagetable(choice, output_size);
-	switch_pagetable();
-out:
-	return (unsigned char *)choice;
+	/* Pick random virtual address starting from LOAD_PHYSICAL_ADDR. */
+	if (IS_ENABLED(CONFIG_X86_64))
+		random_addr = find_random_virt_addr(LOAD_PHYSICAL_ADDR,
+						 output_size);
+	*virt_addr = (unsigned char *)random_addr;
 }

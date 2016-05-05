@@ -67,20 +67,22 @@ int cmdline_find_option_bool(const char *option);
 
 #if CONFIG_RANDOMIZE_BASE
 /* kaslr.c */
-unsigned char *choose_random_location(unsigned char *input_ptr,
-				      unsigned long input_size,
-				      unsigned char *output_ptr,
-				      unsigned long output_size);
+void choose_random_location(unsigned char *input_ptr,
+			    unsigned long input_size,
+			    unsigned char **output_ptr,
+			    unsigned long output_size,
+			    unsigned char **virt_addr);
 /* cpuflags.c */
 bool has_cpuflag(int flag);
 #else
-static inline
-unsigned char *choose_random_location(unsigned char *input_ptr,
-				      unsigned long input_size,
-				      unsigned char *output_ptr,
-				      unsigned long output_size)
+static inline void choose_random_location(unsigned char *input_ptr,
+					  unsigned long input_size,
+					  unsigned char **output_ptr,
+					  unsigned long output_size,
+					  unsigned char **virt_addr)
 {
-	return output_ptr;
+	/* No change from existing output location. */
+	*virt_addr = *output_ptr;
 }
 #endif
 
