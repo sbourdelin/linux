@@ -374,6 +374,7 @@ enum mv88e6xxx_cap {
 	 * See GLOBAL_CONTROL_PPU_ENABLE and GLOBAL_STATUS_PPU_POLLING.
 	 */
 	MV88E6XXX_CAP_PPU,
+	MV88E6XXX_CAP_PPU_ACTIVE,
 
 	/* SMI PHY Command and Data registers.
 	 * This requires an indirect access to PHY registers through
@@ -412,6 +413,7 @@ enum mv88e6xxx_cap {
 #define MV88E6XXX_FLAG_EEPROM		BIT(MV88E6XXX_CAP_EEPROM)
 #define MV88E6XXX_FLAG_PORTSTATE	BIT(MV88E6XXX_CAP_PORTSTATE)
 #define MV88E6XXX_FLAG_PPU		BIT(MV88E6XXX_CAP_PPU)
+#define MV88E6XXX_FLAG_PPU_ACTIVE	BIT(MV88E6XXX_CAP_PPU_ACTIVE)
 #define MV88E6XXX_FLAG_SMI_PHY		BIT(MV88E6XXX_CAP_SMI_PHY)
 #define MV88E6XXX_FLAG_SWITCH_MAC	BIT(MV88E6XXX_CAP_SWITCH_MAC_WOL_WOF)
 #define MV88E6XXX_FLAG_TEMP		BIT(MV88E6XXX_CAP_TEMP)
@@ -523,7 +525,6 @@ static inline bool mv88e6xxx_has(struct mv88e6xxx_priv_state *ps,
 	return (ps->info->flags & flags) == flags;
 }
 
-int mv88e6xxx_switch_reset(struct mv88e6xxx_priv_state *ps, bool ppu_active);
 const char *mv88e6xxx_drv_probe(struct device *dsa_dev, struct device *host_dev,
 				int sw_addr, void **priv,
 				const struct mv88e6xxx_info *table,

@@ -26,6 +26,7 @@ static const struct mv88e6xxx_info mv88e6171_table[] = {
 		.num_ports = 7,
 		.flags = MV88E6XXX_FLAG_ATU |
 			MV88E6XXX_FLAG_PORTSTATE |
+			MV88E6XXX_FLAG_PPU_ACTIVE |
 			MV88E6XXX_FLAG_SMI_PHY |
 			MV88E6XXX_FLAG_SWITCH_MAC |
 			MV88E6XXX_FLAG_TEMP |
@@ -39,6 +40,7 @@ static const struct mv88e6xxx_info mv88e6171_table[] = {
 		.num_ports = 7,
 		.flags = MV88E6XXX_FLAG_ATU |
 			MV88E6XXX_FLAG_PORTSTATE |
+			MV88E6XXX_FLAG_PPU_ACTIVE |
 			MV88E6XXX_FLAG_SMI_PHY |
 			MV88E6XXX_FLAG_SWITCH_MAC |
 			MV88E6XXX_FLAG_TEMP |
@@ -52,6 +54,7 @@ static const struct mv88e6xxx_info mv88e6171_table[] = {
 		.num_ports = 7,
 		.flags = MV88E6XXX_FLAG_ATU |
 			MV88E6XXX_FLAG_PORTSTATE |
+			MV88E6XXX_FLAG_PPU_ACTIVE |
 			MV88E6XXX_FLAG_SMI_PHY |
 			MV88E6XXX_FLAG_SWITCH_MAC |
 			MV88E6XXX_FLAG_TEMP |
@@ -65,6 +68,7 @@ static const struct mv88e6xxx_info mv88e6171_table[] = {
 		.num_ports = 7,
 		.flags = MV88E6XXX_FLAG_ATU |
 			MV88E6XXX_FLAG_PORTSTATE |
+			MV88E6XXX_FLAG_PPU_ACTIVE |
 			MV88E6XXX_FLAG_SMI_PHY |
 			MV88E6XXX_FLAG_SWITCH_MAC |
 			MV88E6XXX_FLAG_TEMP |
@@ -129,10 +133,6 @@ static int mv88e6171_setup(struct dsa_switch *ds)
 	ps->ds = ds;
 
 	ret = mv88e6xxx_setup_common(ps);
-	if (ret < 0)
-		return ret;
-
-	ret = mv88e6xxx_switch_reset(ps, true);
 	if (ret < 0)
 		return ret;
 
