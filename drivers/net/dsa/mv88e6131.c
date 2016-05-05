@@ -25,6 +25,7 @@ static const struct mv88e6xxx_info mv88e6131_table[] = {
 		.num_databases = 256,
 		.num_ports = 11,
 		.flags = MV88E6XXX_FLAG_ATU |
+			MV88E6XXX_FLAG_CORE_TAG_TYPE |
 			MV88E6XXX_FLAG_PPU |
 			MV88E6XXX_FLAG_VLANTABLE |
 			MV88E6XXX_FLAG_VTU,
@@ -35,6 +36,7 @@ static const struct mv88e6xxx_info mv88e6131_table[] = {
 		.num_databases = 4096,
 		.num_ports = 10,
 		.flags = MV88E6XXX_FLAG_ATU |
+			MV88E6XXX_FLAG_CORE_TAG_TYPE |
 			MV88E6XXX_FLAG_PPU |
 			MV88E6XXX_FLAG_VLANTABLE |
 			MV88E6XXX_FLAG_VTU,
@@ -45,6 +47,7 @@ static const struct mv88e6xxx_info mv88e6131_table[] = {
 		.num_databases = 256,
 		.num_ports = 8,
 		.flags = MV88E6XXX_FLAG_ATU |
+			MV88E6XXX_FLAG_CORE_TAG_TYPE |
 			MV88E6XXX_FLAG_PPU |
 			MV88E6XXX_FLAG_VLANTABLE |
 			MV88E6XXX_FLAG_VTU,
@@ -55,6 +58,7 @@ static const struct mv88e6xxx_info mv88e6131_table[] = {
 		.num_databases = 256,
 		.num_ports = 10,
 		.flags = MV88E6XXX_FLAG_ATU |
+			MV88E6XXX_FLAG_CORE_TAG_TYPE |
 			MV88E6XXX_FLAG_PPU |
 			MV88E6XXX_FLAG_VLANTABLE |
 			MV88E6XXX_FLAG_VTU,
@@ -76,11 +80,6 @@ static int mv88e6131_setup_global(struct dsa_switch *ds)
 	u32 upstream_port = dsa_upstream_port(ds);
 	int ret;
 	u32 reg;
-
-	/* Set the VLAN ethertype to 0x8100. */
-	ret = mv88e6xxx_reg_write(ps, REG_GLOBAL, GLOBAL_CORE_TAG_TYPE, 0x8100);
-	if (ret)
-		return ret;
 
 	/* Disable ARP mirroring, and configure the upstream port as
 	 * the port to which ingress and egress monitor frames are to
