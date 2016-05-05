@@ -351,6 +351,11 @@ enum mv88e6xxx_family {
 };
 
 enum mv88e6xxx_cap {
+	/* Address Translation Unit.
+	 * The ATU is used to lookup and learn MAC addresses. See GLOBAL_ATU_OP.
+	 */
+	MV88E6XXX_CAP_ATU,
+
 	/* Energy Efficient Ethernet.
 	 */
 	MV88E6XXX_CAP_EEE,
@@ -402,6 +407,7 @@ enum mv88e6xxx_cap {
 };
 
 /* Bitmask of capabilities */
+#define MV88E6XXX_FLAG_ATU		BIT(MV88E6XXX_CAP_ATU)
 #define MV88E6XXX_FLAG_EEE		BIT(MV88E6XXX_CAP_EEE)
 #define MV88E6XXX_FLAG_EEPROM		BIT(MV88E6XXX_CAP_EEPROM)
 #define MV88E6XXX_FLAG_PORTSTATE	BIT(MV88E6XXX_CAP_PORTSTATE)

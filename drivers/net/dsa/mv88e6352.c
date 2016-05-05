@@ -29,7 +29,8 @@ static const struct mv88e6xxx_info mv88e6352_table[] = {
 		.name = "Marvell 88E6320",
 		.num_databases = 4096,
 		.num_ports = 7,
-		.flags = MV88E6XXX_FLAG_EEE |
+		.flags = MV88E6XXX_FLAG_ATU |
+			MV88E6XXX_FLAG_EEE |
 			MV88E6XXX_FLAG_EEPROM |
 			MV88E6XXX_FLAG_PORTSTATE |
 			MV88E6XXX_FLAG_SMI_PHY |
@@ -44,7 +45,8 @@ static const struct mv88e6xxx_info mv88e6352_table[] = {
 		.name = "Marvell 88E6321",
 		.num_databases = 4096,
 		.num_ports = 7,
-		.flags = MV88E6XXX_FLAG_EEE |
+		.flags = MV88E6XXX_FLAG_ATU |
+			MV88E6XXX_FLAG_EEE |
 			MV88E6XXX_FLAG_EEPROM |
 			MV88E6XXX_FLAG_PORTSTATE |
 			MV88E6XXX_FLAG_SMI_PHY |
@@ -59,7 +61,8 @@ static const struct mv88e6xxx_info mv88e6352_table[] = {
 		.name = "Marvell 88E6172",
 		.num_databases = 4096,
 		.num_ports = 7,
-		.flags = MV88E6XXX_FLAG_EEE |
+		.flags = MV88E6XXX_FLAG_ATU |
+			MV88E6XXX_FLAG_EEE |
 			MV88E6XXX_FLAG_EEPROM |
 			MV88E6XXX_FLAG_PORTSTATE |
 			MV88E6XXX_FLAG_SMI_PHY |
@@ -74,7 +77,8 @@ static const struct mv88e6xxx_info mv88e6352_table[] = {
 		.name = "Marvell 88E6176",
 		.num_databases = 4096,
 		.num_ports = 7,
-		.flags = MV88E6XXX_FLAG_EEE |
+		.flags = MV88E6XXX_FLAG_ATU |
+			MV88E6XXX_FLAG_EEE |
 			MV88E6XXX_FLAG_EEPROM |
 			MV88E6XXX_FLAG_PORTSTATE |
 			MV88E6XXX_FLAG_SMI_PHY |
@@ -89,7 +93,8 @@ static const struct mv88e6xxx_info mv88e6352_table[] = {
 		.name = "Marvell 88E6240",
 		.num_databases = 4096,
 		.num_ports = 7,
-		.flags = MV88E6XXX_FLAG_EEE |
+		.flags = MV88E6XXX_FLAG_ATU |
+			MV88E6XXX_FLAG_EEE |
 			MV88E6XXX_FLAG_EEPROM |
 			MV88E6XXX_FLAG_PORTSTATE |
 			MV88E6XXX_FLAG_SMI_PHY |
@@ -104,7 +109,8 @@ static const struct mv88e6xxx_info mv88e6352_table[] = {
 		.name = "Marvell 88E6352",
 		.num_databases = 4096,
 		.num_ports = 7,
-		.flags = MV88E6XXX_FLAG_EEE |
+		.flags = MV88E6XXX_FLAG_ATU |
+			MV88E6XXX_FLAG_EEE |
 			MV88E6XXX_FLAG_EEPROM |
 			MV88E6XXX_FLAG_PORTSTATE |
 			MV88E6XXX_FLAG_SMI_PHY |
