@@ -293,7 +293,7 @@ struct drm_connector *omap_connector_init(struct drm_device *dev,
 
 	omap_connector = kzalloc(sizeof(struct omap_connector), GFP_KERNEL);
 	if (!omap_connector)
-		goto fail;
+		return NULL;
 
 	omap_connector->dssdev = dssdev;
 	omap_connector->encoder = encoder;
@@ -318,10 +318,4 @@ struct drm_connector *omap_connector_init(struct drm_device *dev,
 	drm_connector_register(connector);
 
 	return connector;
-
-fail:
-	if (connector)
-		omap_connector_destroy(connector);
-
-	return NULL;
 }
