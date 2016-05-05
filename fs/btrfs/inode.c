@@ -9456,6 +9456,8 @@ static int btrfs_rename_exchange(struct inode *old_dir,
 		/* force full log commit if subvolume involved. */
 		btrfs_set_log_full_commit(root->fs_info, trans);
 	} else {
+		btrfs_pin_log_trans(root);
+		root_log_pinned = true;
 		ret = btrfs_insert_inode_ref(trans, dest,
 					     new_dentry->d_name.name,
 					     new_dentry->d_name.len,
@@ -9463,8 +9465,6 @@ static int btrfs_rename_exchange(struct inode *old_dir,
 					     btrfs_ino(new_dir), old_idx);
 		if (ret)
 			goto out_fail;
-		btrfs_pin_log_trans(root);
-		root_log_pinned = true;
 	}
 
 	/* And now for the dest. */
@@ -9472,6 +9472,8 @@ static int btrfs_rename_exchange(struct inode *old_dir,
 		/* force full log commit if subvolume involved. */
 		btrfs_set_log_full_commit(dest->fs_info, trans);
 	} else {
+		btrfs_pin_log_trans(dest);
+		dest_log_pinned = true;
 		ret = btrfs_insert_inode_ref(trans, root,
 					     old_dentry->d_name.name,
 					     old_dentry->d_name.len,
@@ -9479,8 +9481,6 @@ static int btrfs_rename_exchange(struct inode *old_dir,
 					     btrfs_ino(old_dir), new_idx);
 		if (ret)
 			goto out_fail;
-		btrfs_pin_log_trans(dest);
-		dest_log_pinned = true;
 	}
 
 	/* Update inode version and ctime/mtime. */
