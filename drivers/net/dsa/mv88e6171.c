@@ -24,36 +24,44 @@ static const struct mv88e6xxx_info mv88e6171_table[] = {
 		.name = "Marvell 88E6171",
 		.num_databases = 4096,
 		.num_ports = 7,
-		.flags = MV88E6XXX_FLAG_SMI_PHY |
+		.flags = MV88E6XXX_FLAG_PORTSTATE |
+			MV88E6XXX_FLAG_SMI_PHY |
 			MV88E6XXX_FLAG_SWITCH_MAC |
-			MV88E6XXX_FLAG_TEMP,
+			MV88E6XXX_FLAG_TEMP |
+			MV88E6XXX_FLAG_VLANTABLE,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6175,
 		.family = MV88E6XXX_FAMILY_6351,
 		.name = "Marvell 88E6175",
 		.num_databases = 4096,
 		.num_ports = 7,
-		.flags = MV88E6XXX_FLAG_SMI_PHY |
+		.flags = MV88E6XXX_FLAG_PORTSTATE |
+			MV88E6XXX_FLAG_SMI_PHY |
 			MV88E6XXX_FLAG_SWITCH_MAC |
-			MV88E6XXX_FLAG_TEMP,
+			MV88E6XXX_FLAG_TEMP |
+			MV88E6XXX_FLAG_VLANTABLE,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6350,
 		.family = MV88E6XXX_FAMILY_6351,
 		.name = "Marvell 88E6350",
 		.num_databases = 4096,
 		.num_ports = 7,
-		.flags = MV88E6XXX_FLAG_SMI_PHY |
+		.flags = MV88E6XXX_FLAG_PORTSTATE |
+			MV88E6XXX_FLAG_SMI_PHY |
 			MV88E6XXX_FLAG_SWITCH_MAC |
-			MV88E6XXX_FLAG_TEMP,
+			MV88E6XXX_FLAG_TEMP |
+			MV88E6XXX_FLAG_VLANTABLE,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6351,
 		.family = MV88E6XXX_FAMILY_6351,
 		.name = "Marvell 88E6351",
 		.num_databases = 4096,
 		.num_ports = 7,
-		.flags = MV88E6XXX_FLAG_SMI_PHY |
+		.flags = MV88E6XXX_FLAG_PORTSTATE |
+			MV88E6XXX_FLAG_SMI_PHY |
 			MV88E6XXX_FLAG_SWITCH_MAC |
-			MV88E6XXX_FLAG_TEMP,
+			MV88E6XXX_FLAG_TEMP |
+			MV88E6XXX_FLAG_VLANTABLE,
 	}
 };
 
