@@ -262,8 +262,8 @@ void delete_partition(struct gendisk *disk, int partno)
 	if (!part)
 		return;
 
-	rcu_assign_pointer(ptbl->part[partno], NULL);
-	rcu_assign_pointer(ptbl->last_lookup, NULL);
+	RCU_INIT_POINTER(ptbl->part[partno], NULL);
+	RCU_INIT_POINTER(ptbl->last_lookup, NULL);
 	kobject_put(part->holder_dir);
 	device_del(part_to_dev(part));
 
