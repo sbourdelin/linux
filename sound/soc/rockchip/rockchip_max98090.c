@@ -36,7 +36,7 @@
 static struct snd_soc_jack headset_jack;
 static struct snd_soc_jack_pin headset_jack_pins[] = {
 	{
-		.pin = "Headset Jack",
+		.pin = "Headphone",
 		.mask = SND_JACK_HEADPHONE | SND_JACK_MICROPHONE |
 			SND_JACK_BTN_0 | SND_JACK_BTN_1 |
 			SND_JACK_BTN_2 | SND_JACK_BTN_3,
