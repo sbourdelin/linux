@@ -355,10 +355,17 @@ enum mv88e6xxx_cap {
 	 * See GLOBAL_CONTROL_PPU_ENABLE and GLOBAL_STATUS_PPU_POLLING.
 	 */
 	MV88E6XXX_CAP_PPU,
+
+	/* SMI PHY Command and Data registers.
+	 * This requires an indirect access to PHY registers through
+	 * GLOBAL2_SMI_OP, otherwise direct access to PHY registers is done.
+	 */
+	MV88E6XXX_CAP_SMI_PHY,
 };
 
 /* Bitmask of capabilities */
 #define MV88E6XXX_FLAG_PPU		BIT(MV88E6XXX_CAP_PPU)
+#define MV88E6XXX_FLAG_SMI_PHY		BIT(MV88E6XXX_CAP_SMI_PHY)
 
 struct mv88e6xxx_info {
 	enum mv88e6xxx_family family;
@@ -480,9 +487,6 @@ int mv88e6xxx_set_addr_direct(struct dsa_switch *ds, u8 *addr);
 int mv88e6xxx_set_addr_indirect(struct dsa_switch *ds, u8 *addr);
 int mv88e6xxx_phy_read(struct dsa_switch *ds, int port, int regnum);
 int mv88e6xxx_phy_write(struct dsa_switch *ds, int port, int regnum, u16 val);
-int mv88e6xxx_phy_read_indirect(struct dsa_switch *ds, int port, int regnum);
-int mv88e6xxx_phy_write_indirect(struct dsa_switch *ds, int port, int regnum,
-				 u16 val);
 void mv88e6xxx_get_strings(struct dsa_switch *ds, int port, uint8_t *data);
 void mv88e6xxx_get_ethtool_stats(struct dsa_switch *ds, int port,
 				 uint64_t *data);
