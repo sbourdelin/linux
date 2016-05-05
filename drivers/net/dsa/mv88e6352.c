@@ -30,7 +30,9 @@ static const struct mv88e6xxx_info mv88e6352_table[] = {
 		.num_databases = 4096,
 		.num_ports = 7,
 		.flags = MV88E6XXX_FLAG_EEPROM |
-			MV88E6XXX_FLAG_SMI_PHY,
+			MV88E6XXX_FLAG_SMI_PHY |
+			MV88E6XXX_FLAG_TEMP |
+			MV88E6XXX_FLAG_TEMP_LIMIT,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6321,
 		.family = MV88E6XXX_FAMILY_6320,
@@ -38,7 +40,9 @@ static const struct mv88e6xxx_info mv88e6352_table[] = {
 		.num_databases = 4096,
 		.num_ports = 7,
 		.flags = MV88E6XXX_FLAG_EEPROM |
-			MV88E6XXX_FLAG_SMI_PHY,
+			MV88E6XXX_FLAG_SMI_PHY |
+			MV88E6XXX_FLAG_TEMP |
+			MV88E6XXX_FLAG_TEMP_LIMIT,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6172,
 		.family = MV88E6XXX_FAMILY_6352,
@@ -46,7 +50,9 @@ static const struct mv88e6xxx_info mv88e6352_table[] = {
 		.num_databases = 4096,
 		.num_ports = 7,
 		.flags = MV88E6XXX_FLAG_EEPROM |
-			MV88E6XXX_FLAG_SMI_PHY,
+			MV88E6XXX_FLAG_SMI_PHY |
+			MV88E6XXX_FLAG_TEMP |
+			MV88E6XXX_FLAG_TEMP_LIMIT,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6176,
 		.family = MV88E6XXX_FAMILY_6352,
@@ -54,7 +60,9 @@ static const struct mv88e6xxx_info mv88e6352_table[] = {
 		.num_databases = 4096,
 		.num_ports = 7,
 		.flags = MV88E6XXX_FLAG_EEPROM |
-			MV88E6XXX_FLAG_SMI_PHY,
+			MV88E6XXX_FLAG_SMI_PHY |
+			MV88E6XXX_FLAG_TEMP |
+			MV88E6XXX_FLAG_TEMP_LIMIT,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6240,
 		.family = MV88E6XXX_FAMILY_6352,
@@ -62,7 +70,9 @@ static const struct mv88e6xxx_info mv88e6352_table[] = {
 		.num_databases = 4096,
 		.num_ports = 7,
 		.flags = MV88E6XXX_FLAG_EEPROM |
-			MV88E6XXX_FLAG_SMI_PHY,
+			MV88E6XXX_FLAG_SMI_PHY |
+			MV88E6XXX_FLAG_TEMP |
+			MV88E6XXX_FLAG_TEMP_LIMIT,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6352,
 		.family = MV88E6XXX_FAMILY_6352,
@@ -70,7 +80,9 @@ static const struct mv88e6xxx_info mv88e6352_table[] = {
 		.num_databases = 4096,
 		.num_ports = 7,
 		.flags = MV88E6XXX_FLAG_EEPROM |
-			MV88E6XXX_FLAG_SMI_PHY,
+			MV88E6XXX_FLAG_SMI_PHY |
+			MV88E6XXX_FLAG_TEMP |
+			MV88E6XXX_FLAG_TEMP_LIMIT,
 	}
 };
 

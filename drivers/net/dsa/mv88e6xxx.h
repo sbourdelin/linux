@@ -366,12 +366,20 @@ enum mv88e6xxx_cap {
 	 * GLOBAL2_SMI_OP, otherwise direct access to PHY registers is done.
 	 */
 	MV88E6XXX_CAP_SMI_PHY,
+
+	/* Internal temperature sensor.
+	 * Available from any enabled port's PHY register 26, page 6.
+	 */
+	MV88E6XXX_CAP_TEMP,
+	MV88E6XXX_CAP_TEMP_LIMIT,
 };
 
 /* Bitmask of capabilities */
 #define MV88E6XXX_FLAG_EEPROM		BIT(MV88E6XXX_CAP_EEPROM)
 #define MV88E6XXX_FLAG_PPU		BIT(MV88E6XXX_CAP_PPU)
 #define MV88E6XXX_FLAG_SMI_PHY		BIT(MV88E6XXX_CAP_SMI_PHY)
+#define MV88E6XXX_FLAG_TEMP		BIT(MV88E6XXX_CAP_TEMP)
+#define MV88E6XXX_FLAG_TEMP_LIMIT	BIT(MV88E6XXX_CAP_TEMP_LIMIT)
 
 struct mv88e6xxx_info {
 	enum mv88e6xxx_family family;

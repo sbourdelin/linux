@@ -24,18 +24,21 @@ static const struct mv88e6xxx_info mv88e6123_table[] = {
 		.name = "Marvell 88E6123",
 		.num_databases = 4096,
 		.num_ports = 3,
+		.flags = MV88E6XXX_FLAG_TEMP,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6161,
 		.family = MV88E6XXX_FAMILY_6165,
 		.name = "Marvell 88E6161",
 		.num_databases = 4096,
 		.num_ports = 6,
+		.flags = MV88E6XXX_FLAG_TEMP,
 	}, {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6165,
 		.family = MV88E6XXX_FAMILY_6165,
 		.name = "Marvell 88E6165",
 		.num_databases = 4096,
 		.num_ports = 6,
+		.flags = MV88E6XXX_FLAG_TEMP,
 	}
 };
 
@@ -120,6 +123,9 @@ struct dsa_switch_driver mv88e6123_switch_driver = {
 	.adjust_link		= mv88e6xxx_adjust_link,
 #ifdef CONFIG_NET_DSA_HWMON
 	.get_temp		= mv88e6xxx_get_temp,
+	.get_temp_limit		= mv88e6xxx_get_temp_limit,
+	.set_temp_limit		= mv88e6xxx_set_temp_limit,
+	.get_temp_alarm		= mv88e6xxx_get_temp_alarm,
 #endif
 	.get_eeprom		= mv88e6xxx_get_eeprom,
 	.set_eeprom		= mv88e6xxx_set_eeprom,

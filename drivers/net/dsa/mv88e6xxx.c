@@ -3125,15 +3125,12 @@ mv88e6xxx_phy_write(struct dsa_switch *ds, int port, int regnum, u16 val)
 
 #ifdef CONFIG_NET_DSA_HWMON
 
-static int mv88e61xx_get_temp(struct dsa_switch *ds, int *temp)
+static int _mv88e61xx_get_temp(struct mv88e6xxx_priv_state *ps, int *temp)
 {
-	struct mv88e6xxx_priv_state *ps = ds_to_priv(ds);
 	int ret;
 	int val;
 
 	*temp = 0;
-
-	mutex_lock(&ps->smi_mutex);
 
 	ret = _mv88e6xxx_phy_write(ps, 0x0, 0x16, 0x6);
 	if (ret < 0)
@@ -3166,19 +3163,18 @@ static int mv88e61xx_get_temp(struct dsa_switch *ds, int *temp)
 
 error:
 	_mv88e6xxx_phy_write(ps, 0x0, 0x16, 0x0);
-	mutex_unlock(&ps->smi_mutex);
+
 	return ret;
 }
 
-static int mv88e63xx_get_temp(struct dsa_switch *ds, int *temp)
+static int _mv88e63xx_get_temp(struct mv88e6xxx_priv_state *ps, int *temp)
 {
-	struct mv88e6xxx_priv_state *ps = ds_to_priv(ds);
 	int phy = mv88e6xxx_6320_family(ps) ? 3 : 0;
 	int ret;
 
 	*temp = 0;
 
-	ret = mv88e6xxx_phy_page_read(ds, phy, 6, 27);
+	ret = _mv88e6xxx_phy_page_read(ps, phy, 6, 27);
 	if (ret < 0)
 		return ret;
 
@@ -3190,11 +3186,21 @@ static int mv88e63xx_get_temp(struct dsa_switch *ds, int *temp)
 int mv88e6xxx_get_temp(struct dsa_switch *ds, int *temp)
 {
 	struct mv88e6xxx_priv_state *ps = ds_to_priv(ds);
+	int err;
+
+	if (!mv88e6xxx_has(ps, MV88E6XXX_FLAG_TEMP))
+		return -EOPNOTSUPP;
+
+	mutex_lock(&ps->smi_mutex);
 
 	if (mv88e6xxx_6320_family(ps) || mv88e6xxx_6352_family(ps))
-		return mv88e63xx_get_temp(ds, temp);
+		err = _mv88e63xx_get_temp(ps, temp);
+	else
+		err = _mv88e61xx_get_temp(ps, temp);
 
-	return mv88e61xx_get_temp(ds, temp);
+	mutex_unlock(&ps->smi_mutex);
+
+	return err;
 }
 
 int mv88e6xxx_get_temp_limit(struct dsa_switch *ds, int *temp)
@@ -3203,7 +3209,7 @@ int mv88e6xxx_get_temp_limit(struct dsa_switch *ds, int *temp)
 	int phy = mv88e6xxx_6320_family(ps) ? 3 : 0;
 	int ret;
 
-	if (!mv88e6xxx_6320_family(ps) && !mv88e6xxx_6352_family(ps))
+	if (!mv88e6xxx_has(ps, MV88E6XXX_FLAG_TEMP_LIMIT))
 		return -EOPNOTSUPP;
 
 	*temp = 0;
@@ -3223,7 +3229,7 @@ int mv88e6xxx_set_temp_limit(struct dsa_switch *ds, int temp)
 	int phy = mv88e6xxx_6320_family(ps) ? 3 : 0;
 	int ret;
 
-	if (!mv88e6xxx_6320_family(ps) && !mv88e6xxx_6352_family(ps))
+	if (!mv88e6xxx_has(ps, MV88E6XXX_FLAG_TEMP_LIMIT))
 		return -EOPNOTSUPP;
 
 	ret = mv88e6xxx_phy_page_read(ds, phy, 6, 26);
@@ -3240,7 +3246,7 @@ int mv88e6xxx_get_temp_alarm(struct dsa_switch *ds, bool *alarm)
 	int phy = mv88e6xxx_6320_family(ps) ? 3 : 0;
 	int ret;
 
-	if (!mv88e6xxx_6320_family(ps) && !mv88e6xxx_6352_family(ps))
+	if (!mv88e6xxx_has(ps, MV88E6XXX_FLAG_TEMP_LIMIT))
 		return -EOPNOTSUPP;
 
 	*alarm = false;
