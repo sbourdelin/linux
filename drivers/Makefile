@@ -44,6 +44,7 @@ obj-$(CONFIG_REGULATOR)		+= regulator/
 
 # reset controllers early, since gpu drivers might rely on them to initialize
 obj-$(CONFIG_RESET_CONTROLLER)	+= reset/
+obj-y				+= clk/
 
 # tty/ comes before char/ so that the VT console is the boot-time
 # default.
@@ -141,8 +142,6 @@ obj-$(CONFIG_VHOST_RING)	+= vhost/
 obj-$(CONFIG_VLYNQ)		+= vlynq/
 obj-$(CONFIG_STAGING)		+= staging/
 obj-y				+= platform/
-#common clk code
-obj-y				+= clk/
 
 obj-$(CONFIG_MAILBOX)		+= mailbox/
 obj-$(CONFIG_HWSPINLOCK)	+= hwspinlock/
