@@ -456,22 +456,18 @@ static int __of_device_is_compatible(const struct device_node *device,
 				break;
 			}
 		}
-		if (!score)
-			return 0;
 	}
 
 	/* Matching type is better than matching name */
 	if (type && type[0]) {
-		if (!device->type || of_node_cmp(type, device->type))
-			return 0;
-		score += 2;
+		if (device->type && !of_node_cmp(type, device->type))
+			score += 2;
 	}
 
 	/* Matching name is a bit better than not */
 	if (name && name[0]) {
-		if (!device->name || of_node_cmp(name, device->name))
-			return 0;
-		score++;
+		if (device->name && !of_node_cmp(name, device->name))
+			score++;
 	}
 
 	return score;
