@@ -16,6 +16,7 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/module.h>
+#include <linux/kthread.h>
 
 static noinline void __init kmalloc_oob_right(void)
 {
@@ -389,6 +390,83 @@ static noinline void __init ksize_unpoisons_memory(void)
 	kfree(ptr);
 }
 
+#ifdef CONFIG_SLAB
+#ifdef CONFIG_SMP
+static DECLARE_COMPLETION(starting_gun);
+static DECLARE_COMPLETION(finish_line);
+
+static int try_free(void *p)
+{
+	wait_for_completion(&starting_gun);
+	kfree(p);
+	complete(&finish_line);
+	return 0;
+}
+
+/*
+ * allocs an object; then all cpus concurrently attempt to free the
+ * same object.
+ */
+static noinline void __init kasan_double_free(void)
+{
+	char *p;
+	int cpu;
+	struct task_struct **tasks;
+	size_t size = (KMALLOC_MAX_CACHE_SIZE/4 + 1);
+
+	/*
+	 * max slab size instrumented by KASAN is KMALLOC_MAX_CACHE_SIZE/2.
+	 * Do not increase size beyond this: slab corruption from double-free
+	 * may ensue.
+	 */
+	pr_info("concurrent double-free test\n");
+	init_completion(&starting_gun);
+	init_completion(&finish_line);
+	tasks = kzalloc((sizeof(tasks) * nr_cpu_ids), GFP_KERNEL);
+	if (!tasks) {
+		pr_err("Allocation failed\n");
+		return;
+	}
+	p = kmalloc(size, GFP_KERNEL);
+	if (!p) {
+		pr_err("Allocation failed\n");
+		return;
+	}
+
+	for_each_online_cpu(cpu) {
+		tasks[cpu] = kthread_create(try_free, (void *)p, "try_free%d",
+				cpu);
+		if (IS_ERR(tasks[cpu])) {
+			WARN(1, "kthread_create failed.\n");
+			return;
+		}
+		kthread_bind(tasks[cpu], cpu);
+		wake_up_process(tasks[cpu]);
+	}
+
+	complete_all(&starting_gun);
+	for_each_online_cpu(cpu)
+		wait_for_completion(&finish_line);
+	kfree(tasks);
+}
+#else
+static noinline void __init kasan_double_free(void)
+{
+	char *p;
+	size_t size = 2049;
+
+	pr_info("double-free test\n");
+	p = kmalloc(size, GFP_KERNEL);
+	if (!p) {
+		pr_err("Allocation failed\n");
+		return;
+	}
+	kfree(p);
+	kfree(p);
+}
+#endif
+#endif
+
 static int __init kmalloc_tests_init(void)
 {
 	kmalloc_oob_right();
@@ -414,6 +492,7 @@ static int __init kmalloc_tests_init(void)
 	kasan_global_oob();
 #ifdef CONFIG_SLAB
 	kasan_quarantine_cache();
+	kasan_double_free();
 #endif
 	ksize_unpoisons_memory();
 	return -EAGAIN;
