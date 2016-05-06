@@ -1231,7 +1231,7 @@ static int init_render_ring(struct intel_engine_cs *engine)
 
 	/* Required for the hardware to program scanline values for waiting */
 	/* WaEnableFlushTlbInvalidationMode:snb */
-	if (INTEL_INFO(dev)->gen == 6)
+	if (IS_GEN6(dev_priv))
 		I915_WRITE(GFX_MODE,
 			   _MASKED_BIT_ENABLE(GFX_TLB_INVALIDATE_EXPLICIT));
 
@@ -2539,7 +2539,7 @@ void intel_ring_init_seqno(struct intel_engine_cs *engine, u32 seqno)
 	 * the semaphore value, then when the seqno moves backwards all
 	 * future waits will complete instantly (causing rendering corruption).
 	 */
-	if (INTEL_INFO(dev_priv)->gen == 6 || INTEL_INFO(dev_priv)->gen == 7) {
+	if (IS_GEN6(dev_priv) || IS_GEN7(dev_priv)) {
 		I915_WRITE(RING_SYNC_0(engine->mmio_base), 0);
 		I915_WRITE(RING_SYNC_1(engine->mmio_base), 0);
 		if (HAS_VEBOX(dev_priv))
@@ -2811,7 +2811,7 @@ int intel_init_render_ring_buffer(struct drm_device *dev)
 		engine->init_context = intel_rcs_ctx_init;
 		engine->add_request = gen6_add_request;
 		engine->flush = gen7_render_ring_flush;
-		if (INTEL_INFO(dev)->gen == 6)
+		if (IS_GEN6(dev_priv))
 			engine->flush = gen6_render_ring_flush;
 		engine->irq_get = gen6_ring_get_irq;
 		engine->irq_put = gen6_ring_put_irq;
