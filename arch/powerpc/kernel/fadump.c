@@ -225,6 +225,10 @@ static inline unsigned long fadump_calculate_reserve_size(void)
 	/* round it down in multiples of 256 */
 	size = size & ~0x0FFFFFFFUL;
 
+	/* Set an upper limit on the memory to be reserved */
+	if (size > MAX_BOOT_MEM)
+		size = MAX_BOOT_MEM;
+
 	/* Truncate to memory_limit. We don't want to over reserve the memory.*/
 	if (memory_limit && size > memory_limit)
 		size = memory_limit;

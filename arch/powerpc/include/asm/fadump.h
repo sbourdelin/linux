@@ -43,6 +43,12 @@
 #define MIN_BOOT_MEM	(((RMA_END < (0x1UL << 28)) ? (0x1UL << 28) : RMA_END) \
 			+ (0x1UL << 26))
 
+/*
+ * Maximum memory needed for fadump to boot up successfully. Use this as
+ * an upper limit for fadump so we don't endup reserving excess memory.
+ */
+#define MAX_BOOT_MEM	(0x1UL << 32)
+
 #define memblock_num_regions(memblock_type)	(memblock.memblock_type.cnt)
 
 #ifndef ELF_CORE_EFLAGS
