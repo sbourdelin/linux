@@ -1,0 +1,22 @@
+* SiS I2C Multiple Touch Controller
+
+Required properties:
+- compatible: must be "sis,9200_ts"
+- reg: i2c slave address
+- interrupt-parent: the phandle for the interrupt controller
+- interrupts: touch controller interrupt
+- irq-gpio: the gpio pin used as irq pin
+- reset-gpio: the gpio pin used to reset the controller 
+
+Example:
+
+	sis9255@5c  {
+                compatible = "sis,9200_ts";
+                reg = <0x5c>;
+                pinctrl-names = "default";
+                pinctrl-0 = <&pinctrl_sis>;
+                interrupt-parent = <&gpio3>;
+                interrupts = <19 2>;
+                irq-gpio = <&gpio3 19 0>;
+                reset-gpio = <&gpio2 30 0>;
+	};
