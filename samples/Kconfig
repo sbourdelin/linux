@@ -57,7 +57,8 @@ config SAMPLE_KDB
 
 config SAMPLE_RPMSG_CLIENT
 	tristate "Build rpmsg client sample -- loadable modules only"
-	depends on RPMSG && m
+	select RPMSG
+	depends on m
 	help
 	  Build an rpmsg client sample driver, which demonstrates how
 	  to communicate with an AMP-configured remote processor over
