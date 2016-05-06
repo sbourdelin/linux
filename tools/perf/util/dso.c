@@ -21,6 +21,7 @@ char dso__symtab_origin(const struct dso *dso)
 		[DSO_BINARY_TYPE__OPENEMBEDDED_DEBUGINFO]	= 'o',
 		[DSO_BINARY_TYPE__BUILDID_DEBUGINFO]		= 'b',
 		[DSO_BINARY_TYPE__SYSTEM_PATH_DSO]		= 'd',
+		[DSO_BINARY_TYPE__SYSTEM_PATH_DSO_CUSTOM]	= 'r',
 		[DSO_BINARY_TYPE__SYSTEM_PATH_KMODULE]		= 'K',
 		[DSO_BINARY_TYPE__SYSTEM_PATH_KMODULE_COMP]	= 'm',
 		[DSO_BINARY_TYPE__GUEST_KALLSYMS]		= 'g',
@@ -113,6 +114,11 @@ int dso__read_binary_type_filename(const struct dso *dso,
 			 build_id_hex, build_id_hex + 2);
 		break;
 
+	case DSO_BINARY_TYPE__SYSTEM_PATH_DSO_CUSTOM:
+	{
+		snprintf(filename, size, "%s", symbol_conf.vdso_name);
+		break;
+	}
 	case DSO_BINARY_TYPE__VMLINUX:
 	case DSO_BINARY_TYPE__GUEST_VMLINUX:
 	case DSO_BINARY_TYPE__SYSTEM_PATH_DSO:
@@ -487,6 +493,7 @@ static void try_to_open_dso(struct dso *dso, struct machine *machine)
 	enum dso_binary_type binary_type_data[] = {
 		DSO_BINARY_TYPE__BUILD_ID_CACHE,
 		DSO_BINARY_TYPE__SYSTEM_PATH_DSO,
+		DSO_BINARY_TYPE__SYSTEM_PATH_DSO_CUSTOM,
 		DSO_BINARY_TYPE__NOT_FOUND,
 	};
 	int i = 0;

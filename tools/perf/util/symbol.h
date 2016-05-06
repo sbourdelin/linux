@@ -115,6 +115,7 @@ struct symbol_conf {
 			report_hierarchy;
 	const char	*vmlinux_name,
 			*kallsyms_name,
+			*vdso_name,
 			*source_prefix,
 			*field_sep;
 	const char	*default_guest_vmlinux_name,

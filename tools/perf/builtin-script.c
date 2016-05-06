@@ -2008,6 +2008,8 @@ int cmd_script(int argc, const char **argv, const char *prefix __maybe_unused)
 		   "file", "vmlinux pathname"),
 	OPT_STRING(0, "kallsyms", &symbol_conf.kallsyms_name,
 		   "file", "kallsyms pathname"),
+	OPT_STRING(0, "vdso", &symbol_conf.vdso_name,
+		   "file", "vdso pathname"),
 	OPT_BOOLEAN('G', "hide-call-graph", &no_callchain,
 		    "When printing symbols do not display call chain"),
 	OPT_STRING(0, "symfs", &symbol_conf.symfs, "directory",
