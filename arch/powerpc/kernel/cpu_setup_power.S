@@ -49,7 +49,6 @@ _GLOBAL(__restore_cpu_power7)
 
 _GLOBAL(__setup_cpu_power8)
 	mflr	r11
-	bl	__init_FSCR
 	bl	__init_PMU
 	bl	__init_hvmode_206
 	mtlr	r11
@@ -67,7 +66,6 @@ _GLOBAL(__setup_cpu_power8)
 
 _GLOBAL(__restore_cpu_power8)
 	mflr	r11
-	bl	__init_FSCR
 	bl	__init_PMU
 	mfmsr	r3
 	rldicl.	r0,r3,4,63
@@ -86,7 +84,6 @@ _GLOBAL(__restore_cpu_power8)
 
 _GLOBAL(__setup_cpu_power9)
 	mflr	r11
-	bl	__init_FSCR
 	bl	__init_hvmode_206
 	mtlr	r11
 	beqlr
@@ -102,7 +99,6 @@ _GLOBAL(__setup_cpu_power9)
 
 _GLOBAL(__restore_cpu_power9)
 	mflr	r11
-	bl	__init_FSCR
 	mfmsr	r3
 	rldicl.	r0,r3,4,63
 	mtlr	r11
@@ -153,12 +149,6 @@ __init_LPCR:
 	rldimi	r3,r5, LPCR_VRMASD_SH, 64-LPCR_VRMASD_SH-5
 	mtspr	SPRN_LPCR,r3
 	isync
-	blr
-
-__init_FSCR:
-	mfspr	r3,SPRN_FSCR
-	ori	r3,r3,FSCR_TAR|FSCR_DSCR|FSCR_EBB
-	mtspr	SPRN_FSCR,r3
 	blr
 
 __init_HFSCR:

@@ -1023,18 +1023,11 @@ static inline void restore_sprs(struct thread_struct *old_thread,
 #ifdef CONFIG_PPC_BOOK3S_64
 	if (cpu_has_feature(CPU_FTR_DSCR)) {
 		u64 dscr = get_paca()->dscr_default;
-		u64 fscr = old_thread->fscr & ~FSCR_DSCR;
-
-		if (new_thread->dscr_inherit) {
+		if (new_thread->dscr_inherit)
 			dscr = new_thread->dscr;
-			fscr |= FSCR_DSCR;
-		}
 
 		if (old_thread->dscr != dscr)
 			mtspr(SPRN_DSCR, dscr);
-
-		if (old_thread->fscr != fscr)
-			mtspr(SPRN_FSCR, fscr);
 	}
 
 	if (cpu_has_feature(CPU_FTR_ARCH_207S)) {
@@ -1044,6 +1037,9 @@ static inline void restore_sprs(struct thread_struct *old_thread,
 			mtspr(SPRN_EBBHR, new_thread->ebbhr);
 		if (old_thread->ebbrr != new_thread->ebbrr)
 			mtspr(SPRN_EBBRR, new_thread->ebbrr);
+
+		if (old_thread->fscr != new_thread->fscr)
+			mtspr(SPRN_FSCR, new_thread->fscr);
 
 		if (old_thread->tar != new_thread->tar)
 			mtspr(SPRN_TAR, new_thread->tar);
@@ -1391,6 +1387,15 @@ static void setup_ksp_vsid(struct task_struct *p, unsigned long sp)
 #endif
 }
 
+#ifdef CONFIG_PPC64
+void init_fscr(struct task_struct *tsk)
+{
+	tsk->thread.fscr = FSCR_TAR|FSCR_EBB;
+	if (current->thread.dscr_inherit)
+		tsk->thread.fscr |= FSCR_DSCR;
+}
+#endif
+
 /*
  * Copy a thread..
  */
@@ -1484,6 +1489,7 @@ int copy_thread(unsigned long clone_flags, unsigned long usp,
 		p->thread.dscr_inherit = current->thread.dscr_inherit;
 		p->thread.dscr = mfspr(SPRN_DSCR);
 	}
+	init_fscr(p);
 	if (cpu_has_feature(CPU_FTR_HAS_PPR))
 		p->thread.ppr = INIT_PPR;
 #endif
@@ -1574,6 +1580,7 @@ void start_thread(struct pt_regs *regs, unsigned long start, unsigned long sp)
 		regs->gpr[2] = 0;
 		regs->msr = MSR_USER32;
 	}
+	init_fscr(current);
 #endif
 #ifdef CONFIG_VSX
 	current->thread.used_vsr = 0;
