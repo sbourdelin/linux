@@ -479,6 +479,14 @@ static void cqm_mask_call(struct rmid_read *rr)
 		on_each_cpu_mask(&cqm_cpumask, __intel_cqm_event_count, rr, 1);
 }
 
+static void update_mbm_count(u64 val, struct perf_event *event)
+{
+	u64 diff = val - local64_read(&event->hw.cqm_prev_count);
+
+	local64_add(diff, &event->count);
+	local64_set(&event->hw.cqm_prev_count, val);
+}
+
 /*
  * Exchange the RMID of a group of events.
  */
@@ -1005,6 +1013,52 @@ static void init_mbm_sample(u32 rmid, u32 evt_type)
 	on_each_cpu_mask(&cqm_cpumask, __intel_mbm_event_init, &rr, 1);
 }
 
+static inline bool first_event_ingroup(struct perf_event *group,
+				    struct perf_event *event)
+{
+	struct list_head *head = &group->hw.cqm_group_entry;
+	u32 evt_type = event->attr.config;
+
+	if (evt_type == group->attr.config)
+		return false;
+	list_for_each_entry(event, head, hw.cqm_group_entry) {
+		if (evt_type == event->attr.config)
+			return false;
+	}
+
+	return true;
+}
+
+/*
+ * mbm_setup_event - Does mbm specific count initialization
+ * when multiple events share RMID.
+ *
+ * If this is the first mbm event then the event prev_count is 0 bytes,
+ * else the current bytes of the RMID is the prev_count.
+*/
+static inline void mbm_setup_event(u32 rmid, struct perf_event *group,
+					  struct perf_event *event)
+{
+	u32 evt_type = event->attr.config;
+	struct rmid_read rr;
+	u64 val;
+
+	if (first_event_ingroup(group, event)) {
+		init_mbm_sample(rmid, evt_type);
+	} else {
+		rr = __init_rr(rmid, evt_type, 0);
+		cqm_mask_call(&rr);
+		val = atomic64_read(&rr.value);
+		local64_set(&event->hw.cqm_prev_count, val);
+	}
+}
+
+static inline void mbm_setup_event_init(struct perf_event *event)
+{
+	event->hw.is_group_event = false;
+	local64_set(&event->hw.cqm_prev_count, 0UL);
+}
+
 /*
  * Find a group and setup RMID.
  *
@@ -1017,7 +1071,7 @@ static void intel_cqm_setup_event(struct perf_event *event,
 	bool conflict = false;
 	u32 rmid;
 
-	event->hw.is_group_event = false;
+	mbm_setup_event_init(event);
 	list_for_each_entry(iter, &cache_groups, hw.cqm_groups_entry) {
 		rmid = iter->hw.cqm_rmid;
 
@@ -1026,7 +1080,7 @@ static void intel_cqm_setup_event(struct perf_event *event,
 			event->hw.cqm_rmid = rmid;
 			*group = iter;
 			if (is_mbm_event(event->attr.config) && __rmid_valid(rmid))
-				init_mbm_sample(rmid, event->attr.config);
+				mbm_setup_event(rmid, iter, event);
 			return;
 		}
 
@@ -1244,8 +1298,12 @@ static u64 intel_cqm_event_count(struct perf_event *event)
 	cqm_mask_call(&rr);
 
 	raw_spin_lock_irqsave(&cache_lock, flags);
-	if (event->hw.cqm_rmid == rr.rmid)
-		local64_set(&event->count, atomic64_read(&rr.value));
+	if (event->hw.cqm_rmid == rr.rmid) {
+		if (is_mbm_event(event->attr.config))
+			update_mbm_count(atomic64_read(&rr.value), event);
+		else
+			local64_set(&event->count, atomic64_read(&rr.value));
+	}
 	raw_spin_unlock_irqrestore(&cache_lock, flags);
 out:
 	return __perf_event_count(event);

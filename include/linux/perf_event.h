@@ -122,6 +122,7 @@ struct hw_perf_event {
 			int			cqm_state;
 			u32			cqm_rmid;
 			int			is_group_event;
+			local64_t		cqm_prev_count;
 			struct list_head	cqm_events_entry;
 			struct list_head	cqm_groups_entry;
 			struct list_head	cqm_group_entry;
