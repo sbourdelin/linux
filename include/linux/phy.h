@@ -830,6 +830,52 @@ int phy_ethtool_set_wol(struct phy_device *phydev, struct ethtool_wolinfo *wol);
 void phy_ethtool_get_wol(struct phy_device *phydev,
 			 struct ethtool_wolinfo *wol);
 
+/**
+ * ethtool_phy_get_link_ksettings() - Helper macro for get_link_ksettings
+ * @name: name of the driver
+ * @private: name of the private structure in the net device
+ * @phy: name of the phydev variable in the private structure
+ *
+ * Helper macro for the callback get_link_ksettings which
+ * simply call phy_ethtool_ksettings_get.
+ */
+#define ethtool_phy_get_link_ksettings(name, private, phy)		\
+	static int							\
+	name##_get_link_ksettings(struct net_device *ndev,		\
+				  struct ethtool_link_ksettings *cmd)	\
+	{								\
+		struct private *priv = netdev_priv(ndev);		\
+		struct phy_device *phydev = priv->phy;			\
+									\
+		if (!phydev)						\
+			return -ENODEV;					\
+									\
+		return phy_ethtool_ksettings_get(phydev, cmd);		\
+	}
+
+/**
+ * ethtool_phy_set_link_ksettings() - Helper macro for set_link_ksettings
+ * @name: name of the driver
+ * @private: name of the private structure in the net device
+ * @phy: name of the phydev variable in the private structure
+ *
+ * Helper macro for the callback set_link_ksettings which
+ * simply call phy_ethtool_ksettings_set.
+ */
+#define ethtool_phy_set_link_ksettings(name, private, phy)		\
+	static int							\
+	name##_set_link_ksettings(struct net_device *ndev,		\
+				  const struct ethtool_link_ksettings *cmd) \
+	{								\
+		struct private *priv = netdev_priv(ndev);		\
+		struct phy_device *phydev = priv->phy;			\
+									\
+		if (!phydev)						\
+			return -ENODEV;					\
+									\
+		return phy_ethtool_ksettings_set(phydev, cmd);		\
+	}
+
 int __init mdio_bus_init(void);
 void mdio_bus_exit(void);
 
