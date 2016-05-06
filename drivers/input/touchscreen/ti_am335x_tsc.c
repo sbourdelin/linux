@@ -27,6 +27,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/sort.h>
+#include <linux/pm_wakeirq.h>
 
 #include <linux/mfd/ti_am335x_tscadc.h>
 
@@ -430,6 +431,12 @@ static int titsc_probe(struct platform_device *pdev)
 	if (err) {
 		dev_err(&pdev->dev, "failed to allocate irq.\n");
 		goto err_free_mem;
+	}
+
+	if (device_may_wakeup(tscadc_dev->dev)) {
+		err = dev_pm_set_wake_irq(tscadc_dev->dev, ts_dev->irq);
+		if (err)
+			dev_err(&pdev->dev, "irq wake enable failed.\n");
 	}
 
 	titsc_writel(ts_dev, REG_IRQENABLE, IRQENB_FIFO0THRES);
