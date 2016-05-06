@@ -73,7 +73,8 @@ FEATURE_TESTS_EXTRA :=			\
 	libbabeltrace			\
 	liberty				\
 	liberty-z			\
-	libunwind-debug-frame
+	libunwind-debug-frame-arm	\
+	libunwind-debug-frame-aarch64
 
 FEATURE_TESTS ?= $(FEATURE_TESTS_BASIC)
 
