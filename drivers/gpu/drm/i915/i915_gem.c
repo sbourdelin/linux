@@ -1623,10 +1623,26 @@ i915_gem_set_domain_ioctl(struct drm_device *dev, void *data,
 	if (ret)
 		goto unref;
 
+	/* Flush and acquire obj->pages so that we are coherent through
+	 * direct access in memory with previous cached writes through
+	 * shmemfs and that our cache domain tracking remains valid.
+	 * For example, if the obj->filp was moved to swap without us
+	 * being notified and releasing the pages, we would mistakenly
+	 * continue to assume that the obj remained out of the CPU cached
+	 * domain.
+	 */
+	ret = i915_gem_object_get_pages(obj);
+	if (ret)
+		goto unref;
+
+	i915_gem_object_pin_pages(obj);
+
 	if (read_domains & I915_GEM_DOMAIN_GTT)
 		ret = i915_gem_object_set_to_gtt_domain(obj, write_domain != 0);
 	else
 		ret = i915_gem_object_set_to_cpu_domain(obj, write_domain != 0);
+
+	i915_gem_object_unpin_pages(obj);
 
 	if (write_domain != 0)
 		intel_fb_obj_invalidate(obj,
@@ -3759,18 +3775,6 @@ i915_gem_object_set_to_gtt_domain(struct drm_i915_gem_object *obj, bool write)
 		return 0;
 
 	ret = i915_gem_object_wait_rendering(obj, !write);
-	if (ret)
-		return ret;
-
-	/* Flush and acquire obj->pages so that we are coherent through
-	 * direct access in memory with previous cached writes through
-	 * shmemfs and that our cache domain tracking remains valid.
-	 * For example, if the obj->filp was moved to swap without us
-	 * being notified and releasing the pages, we would mistakenly
-	 * continue to assume that the obj remained out of the CPU cached
-	 * domain.
-	 */
-	ret = i915_gem_object_get_pages(obj);
 	if (ret)
 		return ret;
 
