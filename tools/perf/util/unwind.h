@@ -24,6 +24,28 @@ int libunwind__arch_reg_id(int regnum);
 int unwind__prepare_access(struct thread *thread);
 void unwind__flush_access(struct thread *thread);
 void unwind__finish_access(struct thread *thread);
+int register_unwind_libunwind_ops(struct unwind_libunwind_ops *ops,
+				  struct thread *thread);
+int register_null_unwind_libunwind_ops(struct thread *thread);
+
+#ifndef HAVE_LIBUNWIND_LOCAL_SUPPORT
+static inline int
+register_local_unwind_libunwind_ops(struct thread *thread) {
+	return register_null_unwind_libunwind_ops(thread);
+}
+#else
+int register_local_unwind_libunwind_ops(struct thread *thread);
+#endif
+
+#define unwind__get_entries(cb, arg,					\
+			    thread,					\
+			    data, max_stack)				\
+	thread->unwind_libunwind_ops->get_entries(cb,			\
+						  arg,			\
+						  thread,		\
+						  data,			\
+						  max_stack)
+
 #else
 static inline int unwind__prepare_access(struct thread *thread __maybe_unused)
 {

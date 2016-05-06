@@ -43,9 +43,6 @@ struct thread *thread__new(pid_t pid, pid_t tid)
 		thread->cpu = -1;
 		INIT_LIST_HEAD(&thread->comm_list);
 
-		if (unwind__prepare_access(thread) < 0)
-			goto err_thread;
-
 		comm_str = malloc(32);
 		if (!comm_str)
 			goto err_thread;
@@ -59,6 +56,9 @@ struct thread *thread__new(pid_t pid, pid_t tid)
 		list_add(&comm->list, &thread->comm_list);
 		atomic_set(&thread->refcnt, 1);
 		RB_CLEAR_NODE(&thread->rb_node);
+#ifdef HAVE_LIBUNWIND_SUPPORT
+		register_null_unwind_libunwind_ops(thread);
+#endif
 	}
 
 	return thread;
@@ -84,7 +84,9 @@ void thread__delete(struct thread *thread)
 		list_del(&comm->list);
 		comm__free(comm);
 	}
-	unwind__finish_access(thread);
+#ifdef HAVE_LIBUNWIND_SUPPORT
+	thread->unwind_libunwind_ops->finish_access(thread);
+#endif
 
 	free(thread);
 }
@@ -146,8 +148,10 @@ int __thread__set_comm(struct thread *thread, const char *str, u64 timestamp,
 			return -ENOMEM;
 		list_add(&new->list, &thread->comm_list);
 
+#ifdef HAVE_LIBUNWIND_SUPPORT
 		if (exec)
-			unwind__flush_access(thread);
+			thread->unwind_libunwind_ops->flush_access(thread);
+#endif
 	}
 
 	thread->comm_set = true;
@@ -227,14 +231,27 @@ void thread__insert_map(struct thread *thread, struct map *map)
 		   || !strcmp(arch, "x86")
 		   || !strcmp(arch, "i686")) {
 		pr_debug("Thread map is X86, 64bit is %d\n", is_64_bit);
-		if (!is_64_bit)
+		if (!is_64_bit) {
 #ifdef HAVE_LIBUNWIND_X86_SUPPORT
 			pr_err("target platform=%s is not implemented!\n",
 			       arch);
 #else
 			pr_err("target platform=%s is not supported!\n", arch);
 #endif
+			goto err;
+		}
+	} else {
+		register_local_unwind_libunwind_ops(thread);
 	}
+
+	if (thread->unwind_libunwind_ops->prepare_access(thread) < 0)
+		return;
+
+	return;
+
+err: __maybe_unused
+	register_null_unwind_libunwind_ops(thread);
+	return;
 #endif
 }
 
