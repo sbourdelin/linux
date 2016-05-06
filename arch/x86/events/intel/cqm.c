@@ -487,6 +487,14 @@ static void update_mbm_count(u64 val, struct perf_event *event)
 	local64_set(&event->hw.cqm_prev_count, val);
 }
 
+static inline void
+mbm_init_rccount(u32 rmid, struct perf_event *event, bool mbm_bytes_init)
+{
+	if (!mbm_bytes_init)
+		init_mbm_sample(rmid, event->attr.config);
+	local64_set(&event->hw.cqm_prev_count, 0UL);
+}
+
 /*
  * Exchange the RMID of a group of events.
  */
@@ -495,18 +503,26 @@ static u32 intel_cqm_xchg_rmid(struct perf_event *group, u32 rmid)
 	struct perf_event *event;
 	struct list_head *head = &group->hw.cqm_group_entry;
 	u32 old_rmid = group->hw.cqm_rmid, evttype;
+	bool mbm_bytes_init = false;
 	struct rmid_read rr;
+	u64 val;
 
 	lockdep_assert_held(&cache_mutex);
 
 	/*
 	 * If our RMID is being deallocated, perform a read now.
+	 * For mbm, we need to store the bytes that were counted till now
 	 */
 	if (__rmid_valid(old_rmid) && !__rmid_valid(rmid)) {
 
 		rr = __init_rr(old_rmid, group->attr.config, 0);
 		cqm_mask_call(&rr);
-		local64_set(&group->count, atomic64_read(&rr.value));
+
+		if (is_mbm_event(group->attr.config))
+			update_mbm_count(atomic64_read(&rr.value), group);
+		else
+			local64_set(&group->count, atomic64_read(&rr.value));
+
 		list_for_each_entry(event, head, hw.cqm_group_entry) {
 			if (event->hw.is_group_event) {
 
@@ -514,8 +530,12 @@ static u32 intel_cqm_xchg_rmid(struct perf_event *group, u32 rmid)
 				rr = __init_rr(old_rmid, evttype, 0);
 
 				cqm_mask_call(&rr);
-				local64_set(&event->count,
-					    atomic64_read(&rr.value));
+				val = atomic64_read(&rr.value);
+				if (is_mbm_event(event->attr.config))
+					update_mbm_count(val, event);
+				else
+					local64_set(&event->count,
+						    atomic64_read(&rr.value));
 			}
 		}
 	}
@@ -535,12 +555,17 @@ static u32 intel_cqm_xchg_rmid(struct perf_event *group, u32 rmid)
 	 */
 	if (__rmid_valid(rmid)) {
 		event = group;
-		if (is_mbm_event(event->attr.config))
-			init_mbm_sample(rmid, event->attr.config);
+
+		if (is_mbm_event(event->attr.config)) {
+			mbm_init_rccount(rmid, event, mbm_bytes_init);
+			mbm_bytes_init = true;
+		}
 
 		list_for_each_entry(event, head, hw.cqm_group_entry) {
-			if (is_mbm_event(event->attr.config))
-				init_mbm_sample(rmid, event->attr.config);
+			if (is_mbm_event(event->attr.config)) {
+				mbm_init_rccount(rmid, event, mbm_bytes_init);
+				mbm_bytes_init = true;
+			}
 		}
 	}
 
