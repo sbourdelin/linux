@@ -2058,29 +2058,8 @@ static void fec_enet_mii_remove(struct fec_enet_private *fep)
 	}
 }
 
-static int fec_enet_get_link_ksettings(struct net_device *ndev,
-				       struct ethtool_link_ksettings *cmd)
-{
-	struct fec_enet_private *fep = netdev_priv(ndev);
-	struct phy_device *phydev = fep->phy_dev;
-
-	if (!phydev)
-		return -ENODEV;
-
-	return phy_ethtool_ksettings_get(phydev, cmd);
-}
-
-static int fec_enet_set_link_ksettings(struct net_device *ndev,
-				       const struct ethtool_link_ksettings *cmd)
-{
-	struct fec_enet_private *fep = netdev_priv(ndev);
-	struct phy_device *phydev = fep->phy_dev;
-
-	if (!phydev)
-		return -ENODEV;
-
-	return phy_ethtool_ksettings_set(phydev, cmd);
-}
+ethtool_phy_get_link_ksettings(fec_enet, fec_enet_private, phy_dev);
+ethtool_phy_set_link_ksettings(fec_enet, fec_enet_private, phy_dev);
 
 static void fec_enet_get_drvinfo(struct net_device *ndev,
 				 struct ethtool_drvinfo *info)
