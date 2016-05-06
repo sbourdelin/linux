@@ -1,0 +1,17 @@
+AXP20x AC power supply
+
+Required Properties:
+-compatible: "x-powers,axp202-ac-power-supply"
+
+This node is a subnode of the axp20x PMIC.
+
+Example:
+
+axp209: pmic@34 {
+
+	ac-power-supply: ac-power-supply {
+		compatible = "x-powers,axp202-ac-power-supply";
+	};
+
+	...
+};
