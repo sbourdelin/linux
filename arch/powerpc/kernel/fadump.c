@@ -193,6 +193,121 @@ static unsigned long init_fadump_mem_struct(struct fadump_mem_struct *fdm,
 	return addr;
 }
 
+#define FADUMP_MEM_CMDLINE_PREFIX		"fadump_reserve_mem="
+
+static __init char *get_last_fadump_reserve_mem(void)
+{
+	char *p = boot_command_line, *fadump_cmdline = NULL;
+
+	/* find fadump_reserve_mem and use the last one if there are more */
+	p = strstr(p, FADUMP_MEM_CMDLINE_PREFIX);
+	while (p) {
+		fadump_cmdline = p;
+		p = strstr(p+1, FADUMP_MEM_CMDLINE_PREFIX);
+	}
+
+	return fadump_cmdline;
+}
+
+#define parse_fadump_print(fmt, arg...) \
+	printk(KERN_INFO "fadump_reserve_mem: "	fmt, ##arg)
+
+/*
+ * This function parses command line for fadump_reserve_mem=
+ *
+ * Supports the below two syntaxes:
+ *    1. fadump_reserve_mem=size
+ *    2. fadump_reserve_mem=ramsize-range:size[,...]
+ *
+ * Sets fw_dump.reserve_bootvar with the memory size
+ * provided, 0 otherwise
+ *
+ * The function returns -EINVAL on failure, 0 otherwise.
+ */
+static int __init parse_fadump_reserve_mem(void)
+{
+	char *cur, *tmp;
+	char *first_colon, *first_space;
+	char *fadump_cmdline;
+	unsigned long long system_ram;
+
+	fw_dump.reserve_bootvar = 0;
+	fadump_cmdline = get_last_fadump_reserve_mem();
+
+	/* when no fadump_reserve_mem= cmdline option is provided */
+	if (!fadump_cmdline)
+		return 0;
+
+	first_colon = strchr(fadump_cmdline, ':');
+	first_space = strchr(fadump_cmdline, ' ');
+	cur = fadump_cmdline + strlen(FADUMP_MEM_CMDLINE_PREFIX);
+
+	/* for fadump_reserve_mem=size cmdline syntax */
+	if (!first_colon || (first_space && (first_colon > first_space))) {
+		fw_dump.reserve_bootvar = memparse(cur, &cur);
+		return 0;
+	}
+
+	/* for fadump_reserve_mem=ramsize-range:size[,...] cmdline syntax */
+	system_ram = memblock_phys_mem_size();
+	/* for each entry of the comma-separated list */
+	do {
+		unsigned long long start, end = ULLONG_MAX, size;
+
+		/* get the start of the range */
+		start = memparse(cur, &tmp);
+		if (cur == tmp) {
+			parse_fadump_print("Memory value expected\n");
+			return -EINVAL;
+		}
+		cur = tmp;
+		if (*cur != '-') {
+			parse_fadump_print("'-' expected\n");
+			return -EINVAL;
+		}
+		cur++;
+
+		/* if no ':' is here, than we read the end */
+		if (*cur != ':') {
+			end = memparse(cur, &tmp);
+			if (cur == tmp) {
+				parse_fadump_print("Memory value expected\n");
+				return -EINVAL;
+			}
+			cur = tmp;
+			if (end <= start) {
+				parse_fadump_print("end <= start\n");
+				return -EINVAL;
+			}
+		}
+
+		if (*cur != ':') {
+			parse_fadump_print("':' expected\n");
+			return -EINVAL;
+		}
+		cur++;
+
+		size = memparse(cur, &tmp);
+		if (cur == tmp) {
+			parse_fadump_print("Memory value expected\n");
+			return -EINVAL;
+		}
+		cur = tmp;
+		if (size >= system_ram) {
+			parse_fadump_print("invalid size\n");
+			return -EINVAL;
+		}
+
+		/* match ? */
+		if (system_ram >= start && system_ram < end) {
+			fw_dump.reserve_bootvar = size;
+			break;
+		}
+	} while (*cur++ == ',');
+
+	return 0;
+}
+
 /**
  * fadump_calculate_reserve_size(): reserve variable boot area 5% of System RAM
  *
@@ -211,6 +326,9 @@ static unsigned long init_fadump_mem_struct(struct fadump_mem_struct *fdm,
 static inline unsigned long fadump_calculate_reserve_size(void)
 {
 	unsigned long size;
+
+	/* sets fw_dump.reserve_bootvar */
+	parse_fadump_reserve_mem();
 
 	/*
 	 * Check if the size is specified through fadump_reserve_mem= cmdline
@@ -351,15 +469,6 @@ static int __init early_fadump_param(char *p)
 	return 0;
 }
 early_param("fadump", early_fadump_param);
-
-/* Look for fadump_reserve_mem= cmdline option */
-static int __init early_fadump_reserve_mem(char *p)
-{
-	if (p)
-		fw_dump.reserve_bootvar = memparse(p, &p);
-	return 0;
-}
-early_param("fadump_reserve_mem", early_fadump_reserve_mem);
 
 static void register_fw_dump(struct fadump_mem_struct *fdm)
 {
