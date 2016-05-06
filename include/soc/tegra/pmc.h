@@ -76,37 +76,70 @@ int tegra_pmc_cpu_remove_clamping(unsigned int cpuid);
 
 #define TEGRA_POWERGATE_3D0	TEGRA_POWERGATE_3D
 
-#define TEGRA_IO_RAIL_CSIA	0
-#define TEGRA_IO_RAIL_CSIB	1
-#define TEGRA_IO_RAIL_DSI	2
-#define TEGRA_IO_RAIL_MIPI_BIAS	3
-#define TEGRA_IO_RAIL_PEX_BIAS	4
-#define TEGRA_IO_RAIL_PEX_CLK1	5
-#define TEGRA_IO_RAIL_PEX_CLK2	6
-#define TEGRA_IO_RAIL_USB0	9
-#define TEGRA_IO_RAIL_USB1	10
-#define TEGRA_IO_RAIL_USB2	11
-#define TEGRA_IO_RAIL_USB_BIAS	12
-#define TEGRA_IO_RAIL_NAND	13
-#define TEGRA_IO_RAIL_UART	14
-#define TEGRA_IO_RAIL_BB	15
-#define TEGRA_IO_RAIL_AUDIO	17
-#define TEGRA_IO_RAIL_HSIC	19
-#define TEGRA_IO_RAIL_COMP	22
-#define TEGRA_IO_RAIL_HDMI	28
-#define TEGRA_IO_RAIL_PEX_CNTRL	32
-#define TEGRA_IO_RAIL_SDMMC1	33
-#define TEGRA_IO_RAIL_SDMMC3	34
-#define TEGRA_IO_RAIL_SDMMC4	35
-#define TEGRA_IO_RAIL_CAM	36
-#define TEGRA_IO_RAIL_RES	37
-#define TEGRA_IO_RAIL_HV	38
-#define TEGRA_IO_RAIL_DSIB	39
-#define TEGRA_IO_RAIL_DSIC	40
-#define TEGRA_IO_RAIL_DSID	41
-#define TEGRA_IO_RAIL_CSIE	44
-#define TEGRA_IO_RAIL_LVDS	57
-#define TEGRA_IO_RAIL_SYS_DDC	58
+/* TEGRA_IO_PAD: The IO pins of Tegra SoCs are grouped for common control
+ * of IO interface like setting voltage signal levels, power state of the
+ * interface. The group is generally referred as io-pads. The power and
+ * voltage control of IO pins are available at io-pads level.
+ * The following macros make the super list all IO pads found on Tegra SoC
+ * generations.
+ */
+enum tegra_io_pads {
+	TEGRA_IO_PAD_AUDIO,
+	TEGRA_IO_PAD_AUDIO_HV,
+	TEGRA_IO_PAD_BB,
+	TEGRA_IO_PAD_CAM,
+	TEGRA_IO_PAD_COMP,
+	TEGRA_IO_PAD_CSIA,
+	TEGRA_IO_PAD_CSIB,
+	TEGRA_IO_PAD_CSIC,
+	TEGRA_IO_PAD_CSID,
+	TEGRA_IO_PAD_CSIE,
+	TEGRA_IO_PAD_CSIF,
+	TEGRA_IO_PAD_DBG,
+	TEGRA_IO_PAD_DEBUG_NONAO,
+	TEGRA_IO_PAD_DMIC,
+	TEGRA_IO_PAD_DP,
+	TEGRA_IO_PAD_DSI,
+	TEGRA_IO_PAD_DSIB,
+	TEGRA_IO_PAD_DSIC,
+	TEGRA_IO_PAD_DSID,
+	TEGRA_IO_PAD_EMMC,
+	TEGRA_IO_PAD_EMMC2,
+	TEGRA_IO_PAD_GPIO,
+	TEGRA_IO_PAD_HDMI,
+	TEGRA_IO_PAD_HSIC,
+	TEGRA_IO_PAD_HV,
+	TEGRA_IO_PAD_LVDS,
+	TEGRA_IO_PAD_MIPI_BIAS,
+	TEGRA_IO_PAD_NAND,
+	TEGRA_IO_PAD_PEX_BIAS,
+	TEGRA_IO_PAD_PEX_CLK1,
+	TEGRA_IO_PAD_PEX_CLK2,
+	TEGRA_IO_PAD_PEX_CNTRL,
+	TEGRA_IO_PAD_SDMMC1,
+	TEGRA_IO_PAD_SDMMC3,
+	TEGRA_IO_PAD_SDMMC4,
+	TEGRA_IO_PAD_SPI,
+	TEGRA_IO_PAD_SPI_HV,
+	TEGRA_IO_PAD_SYS_DDC,
+	TEGRA_IO_PAD_UART,
+	TEGRA_IO_PAD_USB0,
+	TEGRA_IO_PAD_USB1,
+	TEGRA_IO_PAD_USB2,
+	TEGRA_IO_PAD_USB3,
+	TEGRA_IO_PAD_USB_BIAS,
+
+	/* Last entry */
+	TEGRA_IO_PAD_MAX,
+};
+
+/* tegra_io_pads_source_voltage: The voltage level of IO rails which source
+ *				 the IO pads.
+ */
+enum tegra_io_pads_source_voltage {
+	TEGRA_IO_PADS_SOURCE_VOLTAGE_1800000UV,
+	TEGRA_IO_PADS_SOURCE_VOLTAGE_3300000UV,
+};
 
 #ifdef CONFIG_ARCH_TEGRA
 int tegra_powergate_is_powered(unsigned int id);
@@ -118,8 +151,16 @@ int tegra_powergate_remove_clamping(unsigned int id);
 int tegra_powergate_sequence_power_up(unsigned int id, struct clk *clk,
 				      struct reset_control *rst);
 
-int tegra_io_rail_power_on(unsigned int id);
-int tegra_io_rail_power_off(unsigned int id);
+/* Power enable/disable of the IO pads */
+int tegra_io_pads_power_enable(enum tegra_io_pads id);
+int tegra_io_pads_power_disable(enum tegra_io_pads id);
+int tegra_io_pads_power_is_enabled(enum tegra_io_pads id);
+
+/* Set/get Tegra IO pads voltage config registers */
+int tegra_io_pads_set_voltage_config(enum tegra_io_pads id,
+				     enum tegra_io_pads_source_voltage rail_uv);
+int tegra_io_pads_get_voltage_config(enum tegra_io_pads id);
+
 #else
 static inline int tegra_powergate_is_powered(unsigned int id)
 {
@@ -148,14 +189,31 @@ static inline int tegra_powergate_sequence_power_up(unsigned int id,
 	return -ENOSYS;
 }
 
-static inline int tegra_io_rail_power_on(unsigned int id)
+static inline int tegra_io_pads_power_enable(enum tegra_io_pads id)
 {
-	return -ENOSYS;
+	return -ENOTSUPP;
 }
 
-static inline int tegra_io_rail_power_off(unsigned int id)
+static inline int tegra_io_pads_power_disable(enum tegra_io_pads id)
 {
-	return -ENOSYS;
+	return -ENOTSUPP;
+}
+
+static inline int tegra_io_pads_power_is_enabled(enum tegra_io_pads id)
+{
+	return -ENOTSUPP;
+}
+
+static inline int tegra_io_pads_set_voltage_config(
+			enum tegra_io_pads id,
+			enum tegra_io_pads_source_voltage rail_uv)
+{
+	return -ENOTSUPP;
+}
+
+static inline int tegra_io_pads_get_voltage_config(enum tegra_io_pads id)
+{
+	return -ENOTSUPP;
 }
 #endif /* CONFIG_ARCH_TEGRA */
 
