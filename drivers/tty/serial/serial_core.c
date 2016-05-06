@@ -189,9 +189,10 @@ static int uart_port_startup(struct tty_struct *tty, struct uart_state *state,
 	if (!state->xmit.buf) {
 		/* This is protected by the per port mutex */
 		page = get_zeroed_page(GFP_KERNEL);
-		if (!page)
+		if (!page) {
+			uart_change_pm(state, UART_PM_STATE_OFF);
 			return -ENOMEM;
-
+		}
 		state->xmit.buf = (unsigned char *) page;
 		uart_circ_clear(&state->xmit);
 	}
