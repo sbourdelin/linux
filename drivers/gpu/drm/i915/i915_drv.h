@@ -2504,6 +2504,7 @@ struct drm_i915_cmd_table {
 })
 #define INTEL_INFO(p) 	(&__I915__(p)->info)
 #define INTEL_GEN(p)	(INTEL_INFO(p)->gen)
+#define INTEL_GEN_RANGE(p, s, e) (INTEL_INFO(p)->gen_mask & GENMASK((e) - 1, (s) - 1))
 #define INTEL_DEVID(p)	(INTEL_INFO(p)->device_id)
 #define INTEL_REVID(p)	(__I915__(p)->dev->pdev->revision)
 
