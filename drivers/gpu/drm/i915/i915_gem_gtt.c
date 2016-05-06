@@ -135,7 +135,7 @@ static int sanitize_enable_ppgtt(struct drm_device *dev, int enable_ppgtt)
 
 #ifdef CONFIG_INTEL_IOMMU
 	/* Disable ppgtt on SNB if VT-d is on. */
-	if (INTEL_INFO(dev)->gen == 6 && intel_iommu_gfx_mapped) {
+	if (IS_GEN6(dev) && intel_iommu_gfx_mapped) {
 		DRM_INFO("Disabling PPGTT because VT-d is on\n");
 		return 0;
 	}

@@ -1532,7 +1532,7 @@ static int intel_init_workaround_bb(struct intel_engine_cs *engine)
 	batch = kmap_atomic(page);
 	offset = 0;
 
-	if (INTEL_INFO(engine->dev)->gen == 8) {
+	if (IS_GEN8(engine->dev)) {
 		ret = gen8_init_indirectctx_bb(engine,
 					       &wa_ctx->indirect_ctx,
 					       batch,
@@ -1546,7 +1546,7 @@ static int intel_init_workaround_bb(struct intel_engine_cs *engine)
 					  &offset);
 		if (ret)
 			goto out;
-	} else if (INTEL_INFO(engine->dev)->gen == 9) {
+	} else if (IS_GEN9(engine->dev)) {
 		ret = gen9_init_indirectctx_bb(engine,
 					       &wa_ctx->indirect_ctx,
 					       batch,

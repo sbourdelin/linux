@@ -552,7 +552,7 @@ bool i915_semaphore_is_enabled(struct drm_device *dev)
 
 #ifdef CONFIG_INTEL_IOMMU
 	/* Enable semaphores on SNB when IO remapping is off */
-	if (INTEL_INFO(dev)->gen == 6 && intel_iommu_gfx_mapped)
+	if (IS_GEN6(dev) && intel_iommu_gfx_mapped)
 		return false;
 #endif
 
