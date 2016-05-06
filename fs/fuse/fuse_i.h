@@ -617,6 +617,9 @@ struct fuse_conn {
 	/** Is lseek not implemented by fs? */
 	unsigned no_lseek:1;
 
+	/** Is setfl implemented by fs? */
+	unsigned no_setfl:1;
+
 	/** The number of requests waiting for completion */
 	atomic_t num_waiting;
 

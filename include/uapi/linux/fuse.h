@@ -105,6 +105,9 @@
  *
  *  7.24
  *  - add FUSE_LSEEK for SEEK_HOLE and SEEK_DATA support
+ *
+ *  7.25
+ *  - add FUSE_SETFL
  */
 
 #ifndef _LINUX_FUSE_H
@@ -362,6 +365,7 @@ enum fuse_opcode {
 	FUSE_READDIRPLUS   = 44,
 	FUSE_RENAME2       = 45,
 	FUSE_LSEEK         = 46,
+	FUSE_SETFL         = 47,
 
 	/* CUSE specific operations */
 	CUSE_INIT          = 4096,
@@ -771,6 +775,12 @@ struct fuse_lseek_in {
 
 struct fuse_lseek_out {
 	uint64_t	offset;
+};
+
+struct fuse_setfl_in {
+	uint64_t	fh;
+	uint32_t	flags;
+	uint32_t	setting;
 };
 
 #endif /* _LINUX_FUSE_H */

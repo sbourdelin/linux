@@ -3009,6 +3009,47 @@ out:
 	return err;
 }
 
+static int fuse_do_setfl(unsigned int flags, struct file *file)
+{
+	struct inode *inode = file_inode(file);
+	struct fuse_conn *fc = get_fuse_conn(inode);
+	struct fuse_file *ff = file->private_data;
+	struct fuse_setfl_in inarg;
+	FUSE_ARGS(args);
+	int err;
+
+	if (is_bad_inode(inode))
+		return -EIO;
+
+	if (fc->no_setfl)
+		return 0;
+
+	inarg.fh = ff->fh;
+	inarg.flags = flags;
+	inarg.setting = 1;
+	args.in.h.opcode = FUSE_SETFL;
+	args.in.h.nodeid = get_node_id(inode);
+	args.in.numargs = 1;
+	args.in.args[0].size = sizeof(inarg);
+	args.in.args[0].value = &inarg;
+	err = fuse_simple_request(fc, &args);
+	if (err == -ENOSYS) {
+		fc->no_setfl = 1;
+		err = 0;
+	}
+
+	return err;
+}
+
+static int fuse_file_check_flags(unsigned int flags, struct file *file,
+				 int setting)
+{
+	if (!setting)
+		return 0;
+
+	return fuse_do_setfl(flags, file);
+}
+
 static const struct file_operations fuse_file_operations = {
 	.llseek		= fuse_file_llseek,
 	.read_iter	= fuse_file_read_iter,
@@ -3025,6 +3066,7 @@ static const struct file_operations fuse_file_operations = {
 	.compat_ioctl	= fuse_file_compat_ioctl,
 	.poll		= fuse_file_poll,
 	.fallocate	= fuse_file_fallocate,
+	.check_flags	= fuse_file_check_flags,
 };
 
 static const struct file_operations fuse_direct_io_file_operations = {
@@ -3043,6 +3085,7 @@ static const struct file_operations fuse_direct_io_file_operations = {
 	.poll		= fuse_file_poll,
 	.fallocate	= fuse_file_fallocate,
 	/* no splice_read */
+	.check_flags	= fuse_file_check_flags,
 };
 
 static const struct address_space_operations fuse_file_aops  = {
