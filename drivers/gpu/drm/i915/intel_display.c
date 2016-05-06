@@ -3110,16 +3110,16 @@ intel_pipe_set_base_atomic(struct drm_crtc *crtc, struct drm_framebuffer *fb,
 	return -ENODEV;
 }
 
-static void intel_complete_page_flips(struct drm_device *dev)
+static void intel_complete_page_flips(struct drm_i915_private *dev_priv)
 {
 	struct drm_crtc *crtc;
 
-	for_each_crtc(dev, crtc) {
+	for_each_crtc(dev_priv->dev, crtc) {
 		struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 		enum plane plane = intel_crtc->plane;
 
-		intel_prepare_page_flip(dev, plane);
-		intel_finish_page_flip_plane(dev, plane);
+		intel_prepare_page_flip(dev_priv, plane);
+		intel_finish_page_flip_plane(dev_priv, plane);
 	}
 }
 
@@ -3170,7 +3170,7 @@ void intel_finish_reset(struct drm_device *dev)
 	 * so complete all pending flips so that user space
 	 * will get its events and not get stuck.
 	 */
-	intel_complete_page_flips(dev);
+	intel_complete_page_flips(dev_priv);
 
 	/* no reset support for gen2 */
 	if (IS_GEN2(dev))
@@ -3202,7 +3202,7 @@ void intel_finish_reset(struct drm_device *dev)
 
 	spin_lock_irq(&dev_priv->irq_lock);
 	if (dev_priv->display.hpd_irq_setup)
-		dev_priv->display.hpd_irq_setup(dev);
+		dev_priv->display.hpd_irq_setup(dev_priv);
 	spin_unlock_irq(&dev_priv->irq_lock);
 
 	intel_display_resume(dev);
@@ -10883,9 +10883,10 @@ static void intel_unpin_work_fn(struct work_struct *__work)
 	kfree(work);
 }
 
-static void do_intel_finish_page_flip(struct drm_device *dev,
+static void do_intel_finish_page_flip(struct drm_i915_private *dev_priv,
 				      struct drm_crtc *crtc)
 {
+	struct drm_device *dev = dev_priv->dev;
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 	struct intel_unpin_work *work;
 	unsigned long flags;
@@ -10914,20 +10915,18 @@ static void do_intel_finish_page_flip(struct drm_device *dev,
 	spin_unlock_irqrestore(&dev->event_lock, flags);
 }
 
-void intel_finish_page_flip(struct drm_device *dev, int pipe)
+void intel_finish_page_flip(struct drm_i915_private *dev_priv, int pipe)
 {
-	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct drm_crtc *crtc = dev_priv->pipe_to_crtc_mapping[pipe];
 
-	do_intel_finish_page_flip(dev, crtc);
+	do_intel_finish_page_flip(dev_priv, crtc);
 }
 
-void intel_finish_page_flip_plane(struct drm_device *dev, int plane)
+void intel_finish_page_flip_plane(struct drm_i915_private *dev_priv, int plane)
 {
-	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct drm_crtc *crtc = dev_priv->plane_to_crtc_mapping[plane];
 
-	do_intel_finish_page_flip(dev, crtc);
+	do_intel_finish_page_flip(dev_priv, crtc);
 }
 
 /* Is 'a' after or equal to 'b'? */
@@ -10983,9 +10982,9 @@ static bool page_flip_finished(struct intel_crtc *crtc)
 				    crtc->unpin_work->flip_count);
 }
 
-void intel_prepare_page_flip(struct drm_device *dev, int plane)
+void intel_prepare_page_flip(struct drm_i915_private *dev_priv, int plane)
 {
-	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_device *dev = dev_priv->dev;
 	struct intel_crtc *intel_crtc =
 		to_intel_crtc(dev_priv->plane_to_crtc_mapping[plane]);
 	unsigned long flags;
@@ -11485,9 +11484,9 @@ static bool __intel_pageflip_stall_check(struct drm_device *dev,
 	return addr == work->gtt_offset;
 }
 
-void intel_check_page_flip(struct drm_device *dev, int pipe)
+void intel_check_page_flip(struct drm_i915_private *dev_priv, int pipe)
 {
-	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_device *dev = dev_priv->dev;
 	struct drm_crtc *crtc = dev_priv->pipe_to_crtc_mapping[pipe];
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 	struct intel_unpin_work *work;
