@@ -24,8 +24,7 @@ enum {
 #define RDMA_NL_GET_TYPE(client, op) ((client << 10) + op)
 
 enum {
-	RDMA_NL_RDMA_CM_ID_STATS = 0,
-	RDMA_NL_RDMA_CM_NUM_OPS
+	RDMA_NL_RDMA_CM_ID_STATS
 };
 
 enum {
@@ -137,9 +136,8 @@ enum {
  *   SET_TIMEOUT - The local service requests the client to set the timeout.
  */
 enum {
-	RDMA_NL_LS_OP_RESOLVE = 0,
-	RDMA_NL_LS_OP_SET_TIMEOUT,
-	RDMA_NL_LS_NUM_OPS
+	RDMA_NL_LS_OP_RESOLVE,
+	RDMA_NL_LS_OP_SET_TIMEOUT
 };
 
 /* Local service netlink message flags */
