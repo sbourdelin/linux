@@ -1800,6 +1800,11 @@ struct bio *bio_split(struct bio *bio, int sectors,
 
 	bio_advance(bio, split->bi_iter.bi_size);
 
+#ifdef CONFIG_BLK_CGROUP
+	if (bio->bi_css)
+		bio_associate_blkcg(split, bio->bi_css);
+#endif
+
 	return split;
 }
 EXPORT_SYMBOL(bio_split);
