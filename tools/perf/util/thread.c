@@ -233,12 +233,12 @@ void thread__insert_map(struct thread *thread, struct map *map)
 		pr_debug("Thread map is X86, 64bit is %d\n", is_64_bit);
 		if (!is_64_bit) {
 #ifdef HAVE_LIBUNWIND_X86_SUPPORT
-			pr_err("target platform=%s is not implemented!\n",
-			       arch);
+			register_unwind_libunwind_ops(
+				&_Ux86_unwind_libunwind_ops, thread);
 #else
-			pr_err("target platform=%s is not supported!\n", arch);
-#endif
+			register_null_unwind_libunwind_ops(thread);
 			goto err;
+#endif
 		}
 	} else {
 		register_local_unwind_libunwind_ops(thread);
@@ -250,7 +250,7 @@ void thread__insert_map(struct thread *thread, struct map *map)
 	return;
 
 err: __maybe_unused
-	register_null_unwind_libunwind_ops(thread);
+	pr_err("target platform=%s not support!\n", arch);
 	return;
 #endif
 }
