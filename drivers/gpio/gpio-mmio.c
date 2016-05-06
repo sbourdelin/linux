@@ -610,10 +610,200 @@ static int bgpio_basic_mmio_parse_dt(struct platform_device *pdev,
 	return 0;
 }
 
+static int clps711x_parse_dt(struct platform_device *pdev,
+			     struct bgpio_pdata *pdata,
+			     unsigned long *flags)
+{
+	struct device_node *np = pdev->dev.of_node;
+	struct resource *res;
+	const char *dir_reg_name;
+	int id = np ? of_alias_get_id(np, "gpio") : pdev->id;
+
+	if ((id < 0) || (id > 4))
+		return -ENODEV;
+
+	/* PORTE is 3 lines only */
+	pdata->ngpio = (id == 4) ? 3 : /* determined by register width */ 0;
+
+	/* PORTD is inverted logic for direction register */
+	dir_reg_name = (id == 3) ? "dirin" : "dirout",
+
+	pdata->base = id * 8;
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res)
+		return -EINVAL;
+	if (!res->name || strcmp("dat", res->name))
+		res->name = devm_kstrdup(&pdev->dev, "dat", GFP_KERNEL);
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	if (!res)
+		return -EINVAL;
+	if (!res->name || strcmp(dir_reg_name, res->name))
+		res->name = devm_kstrdup(&pdev->dev, dir_reg_name, GFP_KERNEL);
+
+	return 0;
+}
+
+static int ge_dt_cb(struct platform_device *pdev,
+		    struct bgpio_pdata *pdata,
+		    unsigned long *flags)
+{
+	struct device_node *np = pdev->dev.of_node;
+
+	pdata->label = devm_kstrdup(&pdev->dev, np->full_name, GFP_KERNEL);
+	if (!pdata->label)
+		return -ENOMEM;
+
+	return 0;
+}
+
+static int moxart_dt_cb(struct platform_device *pdev,
+			struct bgpio_pdata *pdata,
+			unsigned long *flags)
+{
+	pdata->base = 0;
+	pdata->label = "moxart-gpio";
+	return 0;
+}
+
+
+static int ts4800_dt_cb(struct platform_device *pdev,
+			struct bgpio_pdata *pdata,
+			unsigned long *flags)
+{
+	int err;
+
+	err = of_property_read_u32(pdev->dev.of_node, "ngpios", &pdata->ngpio);
+	if (err == -EINVAL) {
+		pdata->ngpio = 16;
+		err = 0;
+	}
+	return err;
+}
+
+struct compat_gpio_device_data {
+	unsigned int expected_resource_size;
+	unsigned int ngpio;
+	resource_size_t register_width;
+	unsigned long flags;
+	int (*call_back)(struct platform_device *pdev,
+			 struct bgpio_pdata *pdata,
+			 unsigned long *flags);
+	struct resource_replacement {
+		resource_size_t start_offset;
+		const char *name;
+	} resources[5];
+};
+
+#define ADD_COMPAT_REGISTER(_name, _offset)	\
+	{ .name = (_name), .start_offset = (_offset) }
+
+#define ADD_COMPAT_GPIO(_comp, _sz, _ngpio, _width, _cb, _f, _res...)	\
+	{ .compatible = (_comp),					\
+	  .data = &(struct compat_gpio_device_data) {			\
+		.expected_resource_size = (_sz),			\
+		.ngpio = (_ngpio),					\
+		.register_width = (_width),				\
+		.flags = (_f),						\
+		.call_back = (_cb),					\
+		.resources = { _res },					\
+	}								\
+}
+
+#define ADD_COMPAT_GE_GPIO(_name, _ngpio)				\
+	ADD_COMPAT_GPIO(_name, 0x24, _ngpio, 0x4, ge_dt_cb,		\
+		 BGPIOF_BIG_ENDIAN_BYTE_ORDER,				\
+		 ADD_COMPAT_REGISTER("dat", 0x04),			\
+		 ADD_COMPAT_REGISTER("set", 0x08),			\
+		 ADD_COMPAT_REGISTER("dirin", 0x00))			\
+
+static const struct of_device_id compat_gpio_devices[] = {
+	ADD_COMPAT_GE_GPIO("ge,imp3a-gpio", 16),
+	ADD_COMPAT_GE_GPIO("gef,sbc310-gpio", 6),
+	ADD_COMPAT_GE_GPIO("gef,sbc610-gpio", 19),
+	ADD_COMPAT_GPIO("moxa,moxart-gpio", 0xc, 0, 0x4, moxart_dt_cb,
+		 BGPIOF_READ_OUTPUT_REG_SET,
+		 ADD_COMPAT_REGISTER("dat", 0x04),
+		 ADD_COMPAT_REGISTER("set", 0x00),
+		 ADD_COMPAT_REGISTER("dirout", 0x08)),
+	ADD_COMPAT_GPIO("technologic,ts4800-gpio", 0x6, 16, 0x2, ts4800_dt_cb,
+		 0, ADD_COMPAT_REGISTER("dat", 0x00),
+		 ADD_COMPAT_REGISTER("set", 0x02),
+		 ADD_COMPAT_REGISTER("dirout", 0x04)),
+};
+
+#undef ADD_COMPAT_GE_GPIO
+#undef ADD_COMPAT_GPIO
+#undef ADD_COMPAT_REGISTER
+
+static int compat_parse_dt(struct platform_device *pdev,
+			   struct bgpio_pdata *pdata,
+			   unsigned long *flags)
+{
+	const struct device_node *node = pdev->dev.of_node;
+	const struct compat_gpio_device_data *entry;
+	const struct of_device_id *of_id;
+	struct resource *res;
+	int err;
+
+	of_id = of_match_node(compat_gpio_devices, node);
+	if (!of_id)
+		return -ENODEV;
+
+	entry = of_id->data;
+	if (!entry || !entry->resources[0].name)
+		return -EINVAL;
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res)
+		return -EINVAL;
+
+	if (!res->name || strcmp(entry->resources[0].name, res->name)) {
+		struct resource nres[ARRAY_SIZE(entry->resources)];
+		int i;
+
+		if (resource_size(res) != entry->expected_resource_size)
+			return -EINVAL;
+
+		for (i = 0; i < ARRAY_SIZE(entry->resources); i++) {
+			if (!entry->resources[i].name)
+				continue;
+
+			nres[i].name = devm_kstrdup(&pdev->dev,
+				entry->resources[i].name, GFP_KERNEL);
+			nres[i].start = res->start +
+				entry->resources[i].start_offset;
+			nres[i].end = nres[i].start +
+				entry->register_width - 1;
+			nres[i].flags = IORESOURCE_MEM;
+		}
+
+		err = platform_device_add_resources(pdev, nres, i);
+		if (err)
+			return err;
+	}
+
+	pdata->base = -1;
+	pdata->ngpio = entry->ngpio;
+	*flags = entry->flags;
+
+	if (entry->call_back)
+		err = entry->call_back(pdev, pdata, flags);
+
+	return err;
+}
+
 #define ADD_GPIO_OF(_name, _func) { .compatible = _name, .data = _func }
 
 static const struct of_device_id bgpio_of_match[] = {
 	ADD_GPIO_OF("wd,mbl-gpio", bgpio_basic_mmio_parse_dt),
+	ADD_GPIO_OF("cirrus,clps711x-gpio", clps711x_parse_dt),
+	ADD_GPIO_OF("ge,imp3a-gpio", compat_parse_dt),
+	ADD_GPIO_OF("gef,sbc310-gpio", compat_parse_dt),
+	ADD_GPIO_OF("gef,sbc610-gpio", compat_parse_dt),
+	ADD_GPIO_OF("moxa,moxart-gpio", compat_parse_dt),
+	ADD_GPIO_OF("technologic,ts4800-gpio", compat_parse_dt),
 	{ }
 };
 #undef ADD_GPIO_OF
