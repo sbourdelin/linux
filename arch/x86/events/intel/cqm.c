@@ -14,6 +14,14 @@
 #define MSR_IA32_QM_EVTSEL	0x0c8d
 
 #define MBM_CNTR_WIDTH		24
+
+#define __init_rr(old_rmid, config, val)	\
+((struct rmid_read) {				\
+	.rmid = old_rmid,			\
+	.evt_type = config,			\
+	.value = ATOMIC64_INIT(val),		\
+})
+
 /*
  * Guaranteed time in ms as per SDM where MBM counters will not overflow.
  */
@@ -478,7 +486,8 @@ static u32 intel_cqm_xchg_rmid(struct perf_event *group, u32 rmid)
 {
 	struct perf_event *event;
 	struct list_head *head = &group->hw.cqm_group_entry;
-	u32 old_rmid = group->hw.cqm_rmid;
+	u32 old_rmid = group->hw.cqm_rmid, evttype;
+	struct rmid_read rr;
 
 	lockdep_assert_held(&cache_mutex);
 
@@ -486,14 +495,21 @@ static u32 intel_cqm_xchg_rmid(struct perf_event *group, u32 rmid)
 	 * If our RMID is being deallocated, perform a read now.
 	 */
 	if (__rmid_valid(old_rmid) && !__rmid_valid(rmid)) {
-		struct rmid_read rr = {
-			.rmid = old_rmid,
-			.evt_type = group->attr.config,
-			.value = ATOMIC64_INIT(0),
-		};
 
+		rr = __init_rr(old_rmid, group->attr.config, 0);
 		cqm_mask_call(&rr);
 		local64_set(&group->count, atomic64_read(&rr.value));
+		list_for_each_entry(event, head, hw.cqm_group_entry) {
+			if (event->hw.is_group_event) {
+
+				evttype = event->attr.config;
+				rr = __init_rr(old_rmid, evttype, 0);
+
+				cqm_mask_call(&rr);
+				local64_set(&event->count,
+					    atomic64_read(&rr.value));
+			}
+		}
 	}
 
 	raw_spin_lock_irq(&cache_lock);
@@ -983,11 +999,7 @@ static void __intel_mbm_event_init(void *info)
 
 static void init_mbm_sample(u32 rmid, u32 evt_type)
 {
-	struct rmid_read rr = {
-		.rmid = rmid,
-		.evt_type = evt_type,
-		.value = ATOMIC64_INIT(0),
-	};
+	struct rmid_read rr = __init_rr(rmid, evt_type, 0);
 
 	/* on each socket, init sample */
 	on_each_cpu_mask(&cqm_cpumask, __intel_mbm_event_init, &rr, 1);
@@ -1181,10 +1193,7 @@ static void mbm_hrtimer_init(void)
 static u64 intel_cqm_event_count(struct perf_event *event)
 {
 	unsigned long flags;
-	struct rmid_read rr = {
-		.evt_type = event->attr.config,
-		.value = ATOMIC64_INIT(0),
-	};
+	struct rmid_read rr = __init_rr(-1, event->attr.config, 0);
 
 	/*
 	 * We only need to worry about task events. System-wide events
