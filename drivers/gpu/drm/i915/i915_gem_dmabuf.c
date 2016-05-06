@@ -182,7 +182,15 @@ static int i915_gem_begin_cpu_access(struct dma_buf *dma_buf, enum dma_data_dire
 	if (ret)
 		return ret;
 
+	ret = i915_gem_object_get_pages(obj);
+	if (ret)
+		goto err_unlock;
+
+	i915_gem_object_pin_pages(obj);
 	ret = i915_gem_object_set_to_cpu_domain(obj, write);
+	i915_gem_object_unpin_pages(obj);
+
+err_unlock:
 	mutex_unlock(&dev->struct_mutex);
 	return ret;
 }
