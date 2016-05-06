@@ -636,6 +636,22 @@ bool __weak elf__needs_adjust_symbols(GElf_Ehdr ehdr)
 	return ehdr.e_type == ET_EXEC || ehdr.e_type == ET_REL;
 }
 
+int elf_is_64_bit(char *name)
+{
+	Elf *elf;
+	int fd;
+
+	fd = open(name, O_RDONLY);
+	if (fd < 0)
+		return -1;
+
+	elf = elf_begin(fd, PERF_ELF_C_READ_MMAP, NULL);
+	if (elf == NULL)
+		return -1;
+
+	return (gelf_getclass(elf) == ELFCLASS64);
+}
+
 int symsrc__init(struct symsrc *ss, struct dso *dso, const char *name,
 		 enum dso_binary_type type)
 {

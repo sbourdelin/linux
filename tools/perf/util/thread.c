@@ -203,8 +203,39 @@ size_t thread__fprintf(struct thread *thread, FILE *fp)
 
 void thread__insert_map(struct thread *thread, struct map *map)
 {
+	char * __maybe_unused arch;
+	int __maybe_unused is_64_bit;
+
 	map_groups__fixup_overlappings(thread->mg, map, stderr);
 	map_groups__insert(thread->mg, map);
+
+#ifdef HAVE_LIBUNWIND_SUPPORT
+	if (!thread->mg->machine->env)
+		return;
+
+	is_64_bit = dso_is_64_bit(map->dso, map);
+	if (is_64_bit < 0)
+		return;
+
+	if (thread->addr_space)
+		pr_debug("Thread map already set, 64bit is %d, dso=%s\n",
+			 is_64_bit, map->dso->name);
+
+	arch = thread->mg->machine->env->arch;
+
+	if (!strcmp(arch, "x86_64")
+		   || !strcmp(arch, "x86")
+		   || !strcmp(arch, "i686")) {
+		pr_debug("Thread map is X86, 64bit is %d\n", is_64_bit);
+		if (!is_64_bit)
+#ifdef HAVE_LIBUNWIND_X86_SUPPORT
+			pr_err("target platform=%s is not implemented!\n",
+			       arch);
+#else
+			pr_err("target platform=%s is not supported!\n", arch);
+#endif
+	}
+#endif
 }
 
 static int thread__clone_map_groups(struct thread *thread,

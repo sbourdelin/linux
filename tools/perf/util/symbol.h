@@ -322,6 +322,8 @@ int setup_list(struct strlist **list, const char *list_str,
 	       const char *list_name);
 int setup_intlist(struct intlist **list, const char *list_str,
 		  const char *list_name);
+int elf_is_64_bit(char *name);
+int dso_is_64_bit(struct dso *dso, struct map *map);
 
 #ifdef HAVE_LIBELF_SUPPORT
 bool elf__needs_adjust_symbols(GElf_Ehdr ehdr);
