@@ -240,6 +240,18 @@ void thread__insert_map(struct thread *thread, struct map *map)
 			goto err;
 #endif
 		}
+	} else if (!strcmp(arch, "aarch64") || !strncmp(arch, "arm", 3)) {
+		pr_debug("Thread map is ARM, 64bit is %d, dso=%s\n",
+			 is_64_bit, map->dso->name);
+		if (is_64_bit) {
+#ifdef HAVE_LIBUNWIND_AARCH64_SUPPORT
+			register_unwind_libunwind_ops(
+				&_Uaarch64_unwind_libunwind_ops, thread);
+#else
+			register_null_unwind_libunwind_ops(thread);
+			goto err;
+#endif
+		}
 	} else {
 		register_local_unwind_libunwind_ops(thread);
 	}

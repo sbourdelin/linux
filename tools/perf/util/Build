@@ -104,9 +104,13 @@ libperf-$(CONFIG_LIBDW_DWARF_UNWIND) += unwind-libdw.o
 libperf-$(CONFIG_LOCAL_LIBUNWIND)    += unwind-libunwind.o
 libperf-$(CONFIG_LIBUNWIND)          += unwind-libunwind_common.o
 libperf-$(CONFIG_LIBUNWIND_X86)      += unwind-libunwind_x86_32.o
+libperf-$(CONFIG_LIBUNWIND_AARCH64)  += unwind-libunwind_arm64.o
 
 $(OUTPUT)util/unwind-libunwind_x86_32.o: util/unwind-libunwind.c arch/x86/util/unwind-libunwind.c
 	$(QUIET_CC)$(CC) $(CFLAGS) -DARCH_UNWIND_LIBUNWIND -Iarch/x86/include/libunwind -c -o $@ util/unwind-libunwind.c
+
+$(OUTPUT)util/unwind-libunwind_arm64.o: util/unwind-libunwind.c arch/arm64/util/unwind-libunwind.c
+	$(QUIET_CC)$(CC) $(CFLAGS) -DARCH_UNWIND_LIBUNWIND -Iarch/arm64/include/libunwind -c -o $@ util/unwind-libunwind.c
 
 libperf-$(CONFIG_LIBBABELTRACE) += data-convert-bt.o
 

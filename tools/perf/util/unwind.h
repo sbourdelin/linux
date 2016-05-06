@@ -59,6 +59,9 @@ static inline void unwind__finish_access(struct thread *thread __maybe_unused) {
 #ifdef HAVE_LIBUNWIND_X86_SUPPORT
 extern struct unwind_libunwind_ops _Ux86_unwind_libunwind_ops;
 #endif
+#ifdef HAVE_LIBUNWIND_AARCH64_SUPPORT
+extern struct unwind_libunwind_ops _Uaarch64_unwind_libunwind_ops;
+#endif
 
 #else
 static inline int
