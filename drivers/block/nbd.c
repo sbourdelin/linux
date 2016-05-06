@@ -1134,7 +1134,7 @@ static void __exit nbd_cleanup(void)
 	}
 	unregister_blkdev(NBD_MAJOR, "nbd");
 	kfree(nbd_dev);
-	printk(KERN_INFO "nbd: unregistered device at major %d\n", NBD_MAJOR);
+	pr_info("nbd: unregistered device at major %d\n", NBD_MAJOR);
 }
 
 module_init(nbd_init);
