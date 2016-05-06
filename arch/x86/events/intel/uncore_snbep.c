@@ -1902,6 +1902,7 @@ static int knl_cha_hw_config(struct intel_uncore_box *box,
 		reg1->reg = HSWEP_C0_MSR_PMON_BOX_FILTER0 +
 			    KNL_CHA_MSR_OFFSET * box->pmu->pmu_idx;
 		reg1->config = event->attr.config1 & knl_cha_filter_mask(idx);
+		reg1->config |= 0x23ull << 32;
 		reg1->idx = idx;
 	}
 	return 0;
