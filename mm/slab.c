@@ -2651,6 +2651,7 @@ static void cache_init_objs(struct kmem_cache *cachep,
 			cachep->ctor(objp);
 			kasan_poison_object_data(cachep, objp);
 		}
+		kasan_init_object(cachep, index_to_obj(cachep, page, i));
 
 		if (!shuffled)
 			set_free_obj(page, i, i);

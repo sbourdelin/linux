@@ -34,6 +34,7 @@
 #include <linux/string.h>
 #include <linux/types.h>
 #include <linux/vmalloc.h>
+#include <linux/atomic.h>
 
 #include "kasan.h"
 #include "../slab.h"
@@ -419,13 +420,6 @@ void kasan_poison_object_data(struct kmem_cache *cache, void *object)
 	kasan_poison_shadow(object,
 			round_up(cache->object_size, KASAN_SHADOW_SCALE_SIZE),
 			KASAN_KMALLOC_REDZONE);
-#ifdef CONFIG_SLAB
-	if (cache->flags & SLAB_KASAN) {
-		struct kasan_alloc_meta *alloc_info =
-			get_alloc_info(cache, object);
-		alloc_info->state = KASAN_STATE_INIT;
-	}
-#endif
 }
 
 #ifdef CONFIG_SLAB
@@ -470,6 +464,18 @@ static inline depot_stack_handle_t save_stack(gfp_t flags)
 	return depot_save_stack(&trace, flags);
 }
 
+void kasan_init_object(struct kmem_cache *cache, void *object)
+{
+	struct kasan_alloc_meta *alloc_info;
+
+	if (cache->flags & SLAB_KASAN) {
+		kasan_unpoison_object_data(cache, object);
+		alloc_info = get_alloc_info(cache, object);
+		__memset(alloc_info, 0, sizeof(*alloc_info));
+		kasan_poison_object_data(cache, object);
+	}
+}
+
 static inline void set_track(struct kasan_track *track, gfp_t flags)
 {
 	track->pid = current->pid;
@@ -488,6 +494,39 @@ struct kasan_free_meta *get_free_info(struct kmem_cache *cache,
 {
 	BUILD_BUG_ON(sizeof(struct kasan_free_meta) > 32);
 	return (void *)object + cache->kasan_info.free_meta_offset;
+}
+
+/* acquire per-object lock for access to KASAN metadata. */
+void kasan_meta_lock(struct kasan_alloc_meta *alloc_info)
+{
+	union kasan_alloc_data old, new;
+
+	preempt_disable();
+	for (;;) {
+		old.packed = READ_ONCE(alloc_info->data);
+		if (unlikely(old.lock)) {
+			cpu_relax();
+			continue;
+		}
+		new.packed = old.packed;
+		new.lock = 1;
+		if (likely(cmpxchg(&alloc_info->data, old.packed, new.packed)
+					== old.packed))
+			break;
+	}
+}
+
+/* release lock after a kasan_meta_lock(). */
+void kasan_meta_unlock(struct kasan_alloc_meta *alloc_info)
+{
+	union kasan_alloc_data alloc_data;
+
+	alloc_data.packed = READ_ONCE(alloc_info->data);
+	alloc_data.lock = 0;
+	if (unlikely(xchg(&alloc_info->data, alloc_data.packed) !=
+				(alloc_data.packed | 0x1U)))
+		WARN_ONCE(1, "%s: lock not held!\n", __func__);
+	preempt_enable();
 }
 #endif
 
@@ -511,32 +550,41 @@ void kasan_poison_slab_free(struct kmem_cache *cache, void *object)
 bool kasan_slab_free(struct kmem_cache *cache, void *object)
 {
 #ifdef CONFIG_SLAB
+	struct kasan_alloc_meta *alloc_info;
+	struct kasan_free_meta *free_info;
+	union kasan_alloc_data alloc_data;
+
 	/* RCU slabs could be legally used after free within the RCU period */
 	if (unlikely(cache->flags & SLAB_DESTROY_BY_RCU))
 		return false;
 
-	if (likely(cache->flags & SLAB_KASAN)) {
-		struct kasan_alloc_meta *alloc_info =
-			get_alloc_info(cache, object);
-		struct kasan_free_meta *free_info =
-			get_free_info(cache, object);
+	if (unlikely(!(cache->flags & SLAB_KASAN)))
+		return false;
 
-		switch (alloc_info->state) {
-		case KASAN_STATE_ALLOC:
-			alloc_info->state = KASAN_STATE_QUARANTINE;
-			quarantine_put(free_info, cache);
-			set_track(&free_info->track, GFP_NOWAIT);
-			kasan_poison_slab_free(cache, object);
-			return true;
-		case KASAN_STATE_QUARANTINE:
-		case KASAN_STATE_FREE:
-			pr_err("Double free");
-			dump_stack();
-			break;
-		default:
-			break;
-		}
+	alloc_info = get_alloc_info(cache, object);
+	kasan_meta_lock(alloc_info);
+	alloc_data.packed = alloc_info->data;
+	if (alloc_data.state == KASAN_STATE_ALLOC) {
+		free_info = get_free_info(cache, object);
+		quarantine_put(free_info, cache);
+		set_track(&free_info->track, GFP_NOWAIT);
+		kasan_poison_slab_free(cache, object);
+		alloc_data.state = KASAN_STATE_QUARANTINE;
+		alloc_info->data = alloc_data.packed;
+		kasan_meta_unlock(alloc_info);
+		return true;
 	}
+	switch (alloc_data.state) {
+	case KASAN_STATE_QUARANTINE:
+	case KASAN_STATE_FREE:
+		kasan_report((unsigned long)object, 0, false,
+				(unsigned long)__builtin_return_address(1));
+		kasan_meta_unlock(alloc_info);
+		return true;
+	default:
+		break;
+	}
+	kasan_meta_unlock(alloc_info);
 	return false;
 #else
 	kasan_poison_slab_free(cache, object);
@@ -568,12 +616,20 @@ void kasan_kmalloc(struct kmem_cache *cache, const void *object, size_t size,
 		KASAN_KMALLOC_REDZONE);
 #ifdef CONFIG_SLAB
 	if (cache->flags & SLAB_KASAN) {
+		union kasan_alloc_data alloc_data;
 		struct kasan_alloc_meta *alloc_info =
 			get_alloc_info(cache, object);
+		unsigned long flags;
 
-		alloc_info->state = KASAN_STATE_ALLOC;
-		alloc_info->alloc_size = size;
+		local_irq_save(flags);
+		kasan_meta_lock(alloc_info);
+		alloc_data.packed = alloc_info->data;
+		alloc_data.state = KASAN_STATE_ALLOC;
+		alloc_data.size_delta = cache->object_size - size;
+		alloc_info->data = alloc_data.packed;
 		set_track(&alloc_info->track, flags);
+		kasan_meta_unlock(alloc_info);
+		local_irq_restore(flags);
 	}
 #endif
 }

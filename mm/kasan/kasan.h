@@ -73,10 +73,19 @@ struct kasan_track {
 	depot_stack_handle_t stack;
 };
 
+union kasan_alloc_data {
+	struct {
+		u32 lock : 1;
+		u32 state : 2;		/* enum kasan_state */
+		u32 size_delta : 24;	/* object_size - alloc size */
+		u32 unused : 5;
+	};
+	u32 packed;
+};
+
 struct kasan_alloc_meta {
 	struct kasan_track track;
-	u32 state : 2;	/* enum kasan_state */
-	u32 alloc_size : 30;
+	u32 data;	/* encoded as union kasan_alloc_data */
 	u32 reserved;
 };
 
@@ -112,4 +121,6 @@ void quarantine_put(struct kasan_free_meta *info, struct kmem_cache *cache);
 void quarantine_reduce(void);
 void quarantine_remove_cache(struct kmem_cache *cache);
 
+void kasan_meta_lock(struct kasan_alloc_meta *alloc_info);
+void kasan_meta_unlock(struct kasan_alloc_meta *alloc_info);
 #endif

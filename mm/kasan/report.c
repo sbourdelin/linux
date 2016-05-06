@@ -53,6 +53,17 @@ static void print_error_description(struct kasan_access_info *info)
 	const char *bug_type = "unknown-crash";
 	u8 *shadow_addr;
 
+#ifdef CONFIG_SLAB
+	if (!info->access_size) {
+		pr_err("BUG: KASAN: double-free attempt in %pS on object at addr %p\n",
+				(void *)info->ip, info->access_addr);
+		pr_err("Double free by task %s/%d\n",
+				current->comm, task_pid_nr(current));
+		info->first_bad_addr = info->access_addr;
+		return;
+	}
+#endif
+
 	info->first_bad_addr = find_first_bad_addr(info->access_addr,
 						info->access_size);
 
@@ -131,29 +142,34 @@ static void print_track(struct kasan_track *track)
 }
 
 static void object_err(struct kmem_cache *cache, struct page *page,
-			void *object, char *unused_reason)
+		void *object, char *unused_reason,
+		struct kasan_access_info *info)
 {
 	struct kasan_alloc_meta *alloc_info = get_alloc_info(cache, object);
 	struct kasan_free_meta *free_info;
+	union kasan_alloc_data alloc_data;
 
 	dump_stack();
 	pr_err("Object at %p, in cache %s\n", object, cache->name);
 	if (!(cache->flags & SLAB_KASAN))
 		return;
-	switch (alloc_info->state) {
+	if (info->access_size)
+		kasan_meta_lock(alloc_info);
+	alloc_data.packed = alloc_info->data;
+	switch (alloc_data.state) {
 	case KASAN_STATE_INIT:
 		pr_err("Object not allocated yet\n");
 		break;
 	case KASAN_STATE_ALLOC:
 		pr_err("Object allocated with size %u bytes.\n",
-		       alloc_info->alloc_size);
+				(cache->object_size - alloc_data.size_delta));
 		pr_err("Allocation:\n");
 		print_track(&alloc_info->track);
 		break;
 	case KASAN_STATE_FREE:
 	case KASAN_STATE_QUARANTINE:
 		pr_err("Object freed, allocated with size %u bytes\n",
-		       alloc_info->alloc_size);
+				(cache->object_size - alloc_data.size_delta));
 		free_info = get_free_info(cache, object);
 		pr_err("Allocation:\n");
 		print_track(&alloc_info->track);
@@ -161,6 +177,8 @@ static void object_err(struct kmem_cache *cache, struct page *page,
 		print_track(&free_info->track);
 		break;
 	}
+	if (info->access_size)
+		kasan_meta_unlock(alloc_info);
 }
 #endif
 
@@ -177,8 +195,13 @@ static void print_address_description(struct kasan_access_info *info)
 			struct kmem_cache *cache = page->slab_cache;
 			object = nearest_obj(cache, page,
 						(void *)info->access_addr);
+#ifdef CONFIG_SLAB
+			object_err(cache, page, object,
+					"kasan: bad access detected", info);
+#else
 			object_err(cache, page, object,
 					"kasan: bad access detected");
+#endif
 			return;
 		}
 		dump_page(page, "kasan: bad access detected");

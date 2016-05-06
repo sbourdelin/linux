@@ -144,10 +144,15 @@ static void qlink_free(void **qlink, struct kmem_cache *cache)
 {
 	void *object = qlink_to_object(qlink, cache);
 	struct kasan_alloc_meta *alloc_info = get_alloc_info(cache, object);
+	union kasan_alloc_data alloc_data;
 	unsigned long flags;
 
 	local_irq_save(flags);
-	alloc_info->state = KASAN_STATE_FREE;
+	kasan_meta_lock(alloc_info);
+	alloc_data.packed = alloc_info->data;
+	alloc_data.state = KASAN_STATE_FREE;
+	alloc_info->data = alloc_data.packed;
+	kasan_meta_unlock(alloc_info);
 	___cache_free(cache, object, _THIS_IP_);
 	local_irq_restore(flags);
 }
