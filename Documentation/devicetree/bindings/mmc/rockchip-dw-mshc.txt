@@ -30,6 +30,9 @@ Optional Properties:
   probing, low speeds or in case where all phases work at tuning time.
   If not specified 0 deg will be used.
 
+* rockchip,default-drv-phase: The default phase to set ciu_drv at probing
+  for host to write data to devices. If not specified 180 deg will be used.
+
 Example:
 
 	rkdwmmc0@12200000 {
