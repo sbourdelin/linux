@@ -627,7 +627,7 @@ static void nbd_request_handler(struct request_queue *q)
 		__releases(q->queue_lock) __acquires(q->queue_lock)
 {
 	struct request *req;
-	
+
 	while ((req = blk_fetch_request(q)) != NULL) {
 		struct nbd_device *nbd;
 
