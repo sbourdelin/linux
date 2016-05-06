@@ -1573,9 +1573,13 @@ int dw_dma_probe(struct dw_dma_chip *chip)
 			dwc->block_size = pdata->block_size;
 
 			/* Check if channel supports multi block transfer */
-			channel_writel(dwc, LLP, DWC_LLP_LOC(0xffffffff));
-			dwc->nollp = DWC_LLP_LOC(channel_readl(dwc, LLP)) == 0;
-			channel_writel(dwc, LLP, 0);
+			if (pdata->is_nollp) {
+				dwc->nollp = pdata->is_nollp;
+			} else {
+				channel_writel(dwc, LLP, DWC_LLP_LOC(0xffffffff));
+				dwc->nollp = DWC_LLP_LOC(channel_readl(dwc, LLP)) == 0;
+				channel_writel(dwc, LLP, 0);
+			}
 		}
 	}
 
