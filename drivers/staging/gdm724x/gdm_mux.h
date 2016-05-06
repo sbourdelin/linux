@@ -27,8 +27,8 @@
 
 #define START_FLAG 0xA512485A
 #define MUX_HEADER_SIZE 14
-#define MUX_TX_MAX_SIZE (1024*10)
-#define MUX_RX_MAX_SIZE (1024*30)
+#define MUX_TX_MAX_SIZE (1024 * 10)
+#define MUX_RX_MAX_SIZE (1024 * 30)
 #define AT_PKT_TYPE 0xF011
 #define DM_PKT_TYPE 0xF010
 
@@ -70,9 +70,9 @@ struct rx_cxt {
 	struct list_head to_host_list;
 	struct list_head rx_submit_list;
 	struct list_head rx_free_list;
-	spinlock_t to_host_lock;
-	spinlock_t submit_list_lock;
-	spinlock_t free_list_lock;
+	spinlock_t to_host_lock;         /* spinlock for host handling */
+	spinlock_t submit_list_lock;     /* spinlock for submit list handling */
+	spinlock_t free_list_lock;       /* spinlock for free list handling */
 };
 
 struct mux_dev {
@@ -88,7 +88,7 @@ struct mux_dev {
 		     int tty_index,
 		     struct tty_dev *tty_dev,
 		     int complete);
-	spinlock_t write_lock;
+	spinlock_t write_lock;          /* spinlock for write handling */
 	struct tty_dev *tty_dev;
 };
 
