@@ -24,6 +24,7 @@ struct dw_mci_rockchip_priv_data {
 	struct clk		*drv_clk;
 	struct clk		*sample_clk;
 	int			default_sample_phase;
+	int			default_drv_phase;
 };
 
 static void dw_mci_rk3288_set_ios(struct dw_mci *host, struct mmc_ios *ios)
@@ -66,6 +67,9 @@ static void dw_mci_rk3288_set_ios(struct dw_mci *host, struct mmc_ios *ios)
 	/* Make sure we use phases which we can enumerate with */
 	if (!IS_ERR(priv->sample_clk))
 		clk_set_phase(priv->sample_clk, priv->default_sample_phase);
+
+	if (!IS_ERR(priv->drv_clk))
+		clk_set_phase(priv->drv_clk, priv->default_drv_phase);
 }
 
 #define NUM_PHASES			360
@@ -202,6 +206,10 @@ static int dw_mci_rk3288_parse_dt(struct dw_mci *host)
 	if (of_property_read_u32(np, "rockchip,default-sample-phase",
 					&priv->default_sample_phase))
 		priv->default_sample_phase = 0;
+
+	if (of_property_read_u32(np, "rockchip,default-drv-phase",
+					&priv->default_drv_phase))
+		priv->default_drv_phase = 180;
 
 	priv->drv_clk = devm_clk_get(host->dev, "ciu-drive");
 	if (IS_ERR(priv->drv_clk))
