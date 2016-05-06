@@ -470,6 +470,28 @@ static int __init early_fadump_param(char *p)
 }
 early_param("fadump", early_fadump_param);
 
+/* Look for fadump_nr_cpus= cmdline option. */
+static int __init early_fadump_nrcpus(char *p)
+{
+	int nr_cpus;
+
+	/*
+	 * fadump_nr_cpus parameter is only applicable on a
+	 * fadump active kernel. This is to reduce memory
+	 * needed to boot a fadump active kernel.
+	 * So, check if we are booting after crash.
+	 */
+	if (!is_fadump_active())
+		return 0;
+
+	get_option(&p, &nr_cpus);
+	if (nr_cpus > 0 && nr_cpus < nr_cpu_ids)
+		nr_cpu_ids = nr_cpus;
+
+	return 0;
+}
+early_param("fadump_nr_cpus", early_fadump_nrcpus);
+
 static void register_fw_dump(struct fadump_mem_struct *fdm)
 {
 	int rc;
