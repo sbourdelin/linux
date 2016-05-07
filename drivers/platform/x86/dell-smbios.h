@@ -41,6 +41,7 @@ struct calling_interface_buffer *dell_smbios_get_buffer(void);
 void dell_smbios_clear_buffer(void);
 void dell_smbios_release_buffer(void);
 void dell_smbios_send_request(int class, int select);
+void dell_smbios_prepare_v2_call(u8 *input, size_t length);
 
 struct calling_interface_token *dell_smbios_find_token(int tokenid);
 #endif
