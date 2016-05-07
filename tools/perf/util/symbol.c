@@ -299,7 +299,9 @@ static struct symbol *symbols__find(struct rb_root *symbols, u64 ip)
 	while (n) {
 		struct symbol *s = rb_entry(n, struct symbol, rb_node);
 
-		if (ip < s->start)
+		if (ip == s->start && s->start == s->end)
+			return s;
+		else if (ip < s->start)
 			n = n->rb_left;
 		else if (ip >= s->end)
 			n = n->rb_right;
