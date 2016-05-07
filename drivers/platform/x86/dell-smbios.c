@@ -92,6 +92,34 @@ void dell_smbios_send_request(int class, int select)
 }
 EXPORT_SYMBOL_GPL(dell_smbios_send_request);
 
+/* More complex requests are served by sending
+ * a pointer to a pre-allocated buffer
+ * Bytes 0:3 are the size of the return value
+ * Bytes 4:length are the returned value
+ *
+ * This helper function prepares it properly
+ * with the size length to be provided
+ *
+ * caller still needs to pre-allocate and clear
+ * the input buffer
+ */
+void dell_smbios_prepare_v2_call(u8 *input, size_t length)
+{
+	u32 i;
+	u32 *data = (u32 *) input;
+
+	data[0] = length - 4;
+	for (i = 4; i < length; i += 4) {
+		if (length - i > 4) {
+			input[i]   = 'D';
+			input[i+1] = 'S';
+			input[i+2] = 'C';
+			input[i+3] = 'I';
+		}
+	}
+}
+EXPORT_SYMBOL_GPL(dell_smbios_prepare_v2_call);
+
 struct calling_interface_token *dell_smbios_find_token(int tokenid)
 {
 	int i;
