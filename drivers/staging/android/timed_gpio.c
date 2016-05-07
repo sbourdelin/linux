@@ -26,17 +26,17 @@
 #include "timed_gpio.h"
 
 struct timed_gpio_data {
-	struct timed_output_dev dev;
-	struct hrtimer timer;
-	spinlock_t lock;
-	unsigned gpio;
-	int max_timeout;
-	u8 active_low;
+	struct timed_output_dev	dev;
+	struct hrtimer		timer;
+	spinlock_t		lock;
+	unsigned int		gpio;
+	int			max_timeout;
+	u8			active_low;
 };
 
 static enum hrtimer_restart gpio_timer_func(struct hrtimer *timer)
 {
-	struct timed_gpio_data *data =
+	struct timed_gpio_data	*data =
 		container_of(timer, struct timed_gpio_data, timer);
 
 	gpio_direction_output(data->gpio, data->active_low ? 1 : 0);
@@ -45,8 +45,8 @@ static enum hrtimer_restart gpio_timer_func(struct hrtimer *timer)
 
 static int gpio_get_time(struct timed_output_dev *dev)
 {
-	struct timed_gpio_data *data;
-	ktime_t t;
+	struct timed_gpio_data	*data;
+	ktime_t			t;
 
 	data = container_of(dev, struct timed_gpio_data, dev);
 
@@ -60,9 +60,9 @@ static int gpio_get_time(struct timed_output_dev *dev)
 
 static void gpio_enable(struct timed_output_dev *dev, int value)
 {
-	struct timed_gpio_data *data =
+	struct timed_gpio_data	*data =
 		container_of(dev, struct timed_gpio_data, dev);
-	unsigned long flags;
+	unsigned long		flags;
 
 	spin_lock_irqsave(&data->lock, flags);
 
@@ -84,10 +84,10 @@ static void gpio_enable(struct timed_output_dev *dev, int value)
 
 static int timed_gpio_probe(struct platform_device *pdev)
 {
-	struct timed_gpio_platform_data *pdata = pdev->dev.platform_data;
-	struct timed_gpio *cur_gpio;
-	struct timed_gpio_data *gpio_data, *gpio_dat;
-	int i, ret;
+	struct timed_gpio_platform_data	*pdata = pdev->dev.platform_data;
+	struct timed_gpio		*cur_gpio;
+	struct timed_gpio_data		*gpio_data, *gpio_dat;
+	int				i, ret;
 
 	if (!pdata)
 		return -EBUSY;
@@ -139,9 +139,9 @@ err_out:
 
 static int timed_gpio_remove(struct platform_device *pdev)
 {
-	struct timed_gpio_platform_data *pdata = pdev->dev.platform_data;
-	struct timed_gpio_data *gpio_data = platform_get_drvdata(pdev);
-	int i;
+	struct timed_gpio_platform_data	*pdata = pdev->dev.platform_data;
+	struct timed_gpio_data		*gpio_data = platform_get_drvdata(pdev);
+	int				i;
 
 	for (i = 0; i < pdata->num_gpios; i++) {
 		timed_output_dev_unregister(&gpio_data[i].dev);

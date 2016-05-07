@@ -25,14 +25,14 @@
 
 #include "timed_output.h"
 
-static struct class *timed_output_class;
-static atomic_t device_count;
+static struct class	*timed_output_class;
+static atomic_t		device_count;
 
 static ssize_t enable_show(struct device *dev, struct device_attribute *attr,
 			   char *buf)
 {
-	struct timed_output_dev *tdev = dev_get_drvdata(dev);
-	int remaining = tdev->get_time(tdev);
+	struct timed_output_dev	*tdev = dev_get_drvdata(dev);
+	int			remaining = tdev->get_time(tdev);
 
 	return sprintf(buf, "%d\n", remaining);
 }
@@ -40,9 +40,9 @@ static ssize_t enable_show(struct device *dev, struct device_attribute *attr,
 static ssize_t enable_store(struct device *dev, struct device_attribute *attr,
 			    const char *buf, size_t size)
 {
-	struct timed_output_dev *tdev = dev_get_drvdata(dev);
-	int value;
-	int rc;
+	struct timed_output_dev	*tdev = dev_get_drvdata(dev);
+	int			value;
+	int			rc;
 
 	rc = kstrtoint(buf, 0, &value);
 	if (rc != 0)
@@ -75,7 +75,7 @@ static int create_timed_output_class(void)
 
 int timed_output_dev_register(struct timed_output_dev *tdev)
 {
-	int ret;
+	int	ret;
 
 	if (!tdev || !tdev->name || !tdev->enable || !tdev->get_time)
 		return -EINVAL;
