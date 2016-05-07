@@ -41,6 +41,8 @@ struct sch_gpio {
 	unsigned short resume_base;
 };
 
+#define to_sch_gpio(gc)	container_of(gc, struct sch_gpio, chip)
+
 static unsigned sch_gpio_offset(struct sch_gpio *sch, unsigned gpio,
 				unsigned reg)
 {
@@ -63,7 +65,7 @@ static unsigned sch_gpio_bit(struct sch_gpio *sch, unsigned gpio)
 
 static int sch_gpio_reg_get(struct gpio_chip *gc, unsigned gpio, unsigned reg)
 {
-	struct sch_gpio *sch = gpiochip_get_data(gc);
+	struct sch_gpio *sch = to_sch_gpio(gc);
 	unsigned short offset, bit;
 	u8 reg_val;
 
@@ -78,7 +80,7 @@ static int sch_gpio_reg_get(struct gpio_chip *gc, unsigned gpio, unsigned reg)
 static void sch_gpio_reg_set(struct gpio_chip *gc, unsigned gpio, unsigned reg,
 			     int val)
 {
-	struct sch_gpio *sch = gpiochip_get_data(gc);
+	struct sch_gpio *sch = to_sch_gpio(gc);
 	unsigned short offset, bit;
 	u8 reg_val;
 
@@ -95,7 +97,7 @@ static void sch_gpio_reg_set(struct gpio_chip *gc, unsigned gpio, unsigned reg,
 
 static int sch_gpio_direction_in(struct gpio_chip *gc, unsigned gpio_num)
 {
-	struct sch_gpio *sch = gpiochip_get_data(gc);
+	struct sch_gpio *sch = to_sch_gpio(gc);
 
 	spin_lock(&sch->lock);
 	sch_gpio_reg_set(gc, gpio_num, GIO, 1);
@@ -110,7 +112,7 @@ static int sch_gpio_get(struct gpio_chip *gc, unsigned gpio_num)
 
 static void sch_gpio_set(struct gpio_chip *gc, unsigned gpio_num, int val)
 {
-	struct sch_gpio *sch = gpiochip_get_data(gc);
+	struct sch_gpio *sch = to_sch_gpio(gc);
 
 	spin_lock(&sch->lock);
 	sch_gpio_reg_set(gc, gpio_num, GLV, val);
@@ -120,7 +122,7 @@ static void sch_gpio_set(struct gpio_chip *gc, unsigned gpio_num, int val)
 static int sch_gpio_direction_out(struct gpio_chip *gc, unsigned gpio_num,
 				  int val)
 {
-	struct sch_gpio *sch = gpiochip_get_data(gc);
+	struct sch_gpio *sch = to_sch_gpio(gc);
 
 	spin_lock(&sch->lock);
 	sch_gpio_reg_set(gc, gpio_num, GIO, 0);
