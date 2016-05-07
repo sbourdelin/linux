@@ -526,4 +526,23 @@ config XPOWER_PMIC_OPREGION
 
 endif
 
+config DPTF_POWER
+	tristate "DPTF Platform Power Participant"
+	depends on X86 && !ACPI_BATTERY
+	select ACPI_BATTERY_COMMON
+	select POWER_SUPPLY
+	default y
+	help
+	  This driver adds support for Dynamic Platform and Thermal Framework
+	  (DPTF) Platform Power Participant device support.
+	  This participant is responsible for exposing platform telemetry such
+	  as platform Power, battery Information such as state of Charge,
+	  estimated maximum sustainable power (PMax), SMART battery spec
+	  information.
+	  Since this driver will also register a battery device, this driver
+	  will exit if ACPI_BATTERY is defined.
+
+	  To compile this driver as a module, choose M here:
+	  the module will be called dptf_power.
+
 endif	# ACPI

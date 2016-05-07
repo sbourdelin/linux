@@ -75,6 +75,7 @@ obj-$(CONFIG_ACPI)		+= acpi_memhotplug.o
 obj-$(CONFIG_ACPI_HOTPLUG_IOAPIC) += ioapic.o
 obj-$(CONFIG_ACPI_BATTERY_COMMON) += battery_common.o
 obj-$(CONFIG_ACPI_BATTERY)	+= battery.o
+obj-$(CONFIG_DPTF_POWER)	+= dptf_power.o
 obj-$(CONFIG_ACPI_SBS)		+= sbshc.o
 obj-$(CONFIG_ACPI_SBS)		+= sbs.o
 obj-$(CONFIG_ACPI_HED)		+= hed.o
