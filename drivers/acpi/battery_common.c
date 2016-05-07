@@ -426,6 +426,11 @@ static int acpi_battery_get_status(struct acpi_battery *battery)
 		return -ENODEV;
 	}
 
+	if (!strcmp(acpi_device_hid(battery->device), "INT3407")) {
+		if (battery->device->status.present)
+			battery->device->status.battery_present = 1;
+	}
+
 	return 0;
 }
 
