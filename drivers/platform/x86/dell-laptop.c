@@ -87,6 +87,7 @@ static struct rfkill *wifi_rfkill;
 static struct rfkill *bluetooth_rfkill;
 static struct rfkill *wwan_rfkill;
 static bool force_rfkill;
+static char *auxiliary_mac_address;
 
 module_param(force_rfkill, bool, 0444);
 MODULE_PARM_DESC(force_rfkill, "enable rfkill on non whitelisted models");
@@ -273,6 +274,59 @@ static const struct dmi_system_id dell_quirks[] __initconst = {
 	{ }
 };
 
+/* get_aux_mac
+ * returns the auxiliary mac address
+ * for assigning to a Type-C ethernet device
+ * such as that found in the Dell TB15 dock
+ */
+static int get_aux_mac(void)
+{
+	struct calling_interface_buffer *buffer;
+	int ret;
+	unsigned char *address =
+		(unsigned char *) __get_free_page(GFP_KERNEL | GFP_DMA32);
+
+	buffer = dell_smbios_get_buffer();
+
+	/* prepare a 17 byte buffer */
+	dell_smbios_prepare_v2_call(address, 17);
+	buffer->input[0] = virt_to_phys(address);
+	dell_smbios_send_request(11, 6);
+	ret = buffer->output[0];
+
+	if (ret != 0) {
+		auxiliary_mac_address = NULL;
+		goto auxout;
+	}
+	dell_smbios_clear_buffer();
+
+	/* address will be stored in byte 4-> */
+	auxiliary_mac_address = kmalloc(13, GFP_KERNEL);
+	memcpy(auxiliary_mac_address, &address[4], 13);
+
+ auxout:
+	free_page((unsigned long)address);
+	dell_smbios_release_buffer();
+	return dell_smbios_error(ret);
+
+}
+
+static ssize_t auxiliary_mac_show(struct device *dev,
+				  struct device_attribute *attr, char *page)
+{
+	return sprintf(page, "%s\n", auxiliary_mac_address);
+}
+
+static DEVICE_ATTR_RO(auxiliary_mac);
+static struct attribute *dell_attributes[] = {
+	&dev_attr_auxiliary_mac.attr,
+	NULL
+};
+static const struct attribute_group dell_attr_group = {
+.attrs = dell_attributes,
+};
+
+
 /*
  * Derived from information in smbios-wireless-ctl:
  *
@@ -392,7 +446,6 @@ static const struct dmi_system_id dell_quirks[] __initconst = {
  *     cbArg1, byte0 = 0x13
  *     cbRes1 Standard return codes (0, -1, -2)
  */
-
 static int dell_rfkill_set(void *data, bool blocked)
 {
 	struct calling_interface_buffer *buffer;
@@ -2003,6 +2056,12 @@ static int __init dell_init(void)
 		goto fail_rfkill;
 	}
 
+	ret = get_aux_mac();
+	if (!ret) {
+		sysfs_create_group(&platform_device->dev.kobj,
+				   &dell_attr_group);
+	}
+
 	if (quirks && quirks->touchpad_led)
 		touchpad_led_init(&platform_device->dev);
 
@@ -2064,6 +2123,11 @@ fail_platform_driver:
 
 static void __exit dell_exit(void)
 {
+	if (auxiliary_mac_address)
+		sysfs_remove_group(&platform_device->dev.kobj,
+				  &dell_attr_group);
+
+	kfree(auxiliary_mac_address);
 	debugfs_remove_recursive(dell_laptop_dir);
 	if (quirks && quirks->touchpad_led)
 		touchpad_led_exit();
