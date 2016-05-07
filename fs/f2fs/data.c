@@ -278,6 +278,16 @@ alloc_new:
 	trace_f2fs_submit_page_mbio(fio->page, fio);
 }
 
+void __set_data_blkaddr(struct dnode_of_data *dn)
+{
+	struct f2fs_node *rn = F2FS_NODE(dn->node_page);
+	__le32 *addr_array;
+
+	/* Get physical address of data block */
+	addr_array = blkaddr_in_node(rn);
+	addr_array[dn->ofs_in_node] = cpu_to_le32(dn->data_blkaddr);
+}
+
 /*
  * Lock ordering for the change of data block address:
  * ->data_page
@@ -286,19 +296,10 @@ alloc_new:
  */
 void set_data_blkaddr(struct dnode_of_data *dn)
 {
-	struct f2fs_node *rn;
-	__le32 *addr_array;
-	struct page *node_page = dn->node_page;
-	unsigned int ofs_in_node = dn->ofs_in_node;
+	f2fs_wait_on_page_writeback(dn->node_page, NODE, true);
 
-	f2fs_wait_on_page_writeback(node_page, NODE, true);
-
-	rn = F2FS_NODE(node_page);
-
-	/* Get physical address of data block */
-	addr_array = blkaddr_in_node(rn);
-	addr_array[ofs_in_node] = cpu_to_le32(dn->data_blkaddr);
-	if (set_page_dirty(node_page))
+	__set_data_blkaddr(dn);
+	if (set_page_dirty(dn->node_page))
 		dn->node_changed = true;
 }
 
@@ -318,7 +319,7 @@ int reserve_new_block(struct dnode_of_data *dn)
 	if (unlikely(!inc_valid_block_count(sbi, dn->inode, 1)))
 		return -ENOSPC;
 
-	trace_f2fs_reserve_new_block(dn->inode, dn->nid, dn->ofs_in_node);
+	trace_f2fs_reserve_new_block(dn->inode, dn->nid, dn->ofs_in_node, 1);
 
 	dn->data_blkaddr = NEW_ADDR;
 	set_data_blkaddr(dn);
@@ -340,6 +341,66 @@ int f2fs_reserve_block(struct dnode_of_data *dn, pgoff_t index)
 		err = reserve_new_block(dn);
 	if (err || need_put)
 		f2fs_put_dnode(dn);
+	return err;
+}
+
+int f2fs_reserve_blocks(struct dnode_of_data *dn, pgoff_t *start, pgoff_t end)
+{
+	struct f2fs_sb_info *sbi = F2FS_I_SB(dn->inode);
+	pgoff_t end_offset, index = *start;
+	unsigned int max_blocks, count = 0, i, ofs_in_node;
+	int err;
+
+	err = get_dnode_of_data(dn, index, ALLOC_NODE);
+	if (err)
+		return err;
+
+	if (unlikely(is_inode_flag_set(F2FS_I(dn->inode), FI_NO_ALLOC))) {
+		err = -EPERM;
+		goto out;
+	}
+
+	end_offset = ADDRS_PER_PAGE(dn->node_page, dn->inode);
+	max_blocks = min(end_offset - dn->ofs_in_node, end - index + 1);
+	ofs_in_node = dn->ofs_in_node;
+
+	for (i = 0; i < max_blocks; i++, ofs_in_node++) {
+		if (datablock_addr(dn->node_page, ofs_in_node) == NULL_ADDR)
+			count++;
+	}
+
+	if (!count)
+		goto out_update;
+
+	if (unlikely(!inc_valid_block_count(sbi, dn->inode, count))) {
+		err = -ENOSPC;
+		goto out;
+	}
+
+	trace_f2fs_reserve_new_block(dn->inode, dn->nid,
+						dn->ofs_in_node, count);
+
+	f2fs_wait_on_page_writeback(dn->node_page, NODE, true);
+
+	for (i = 0; i < max_blocks; i++, dn->ofs_in_node++) {
+		dn->data_blkaddr =
+			datablock_addr(dn->node_page, dn->ofs_in_node);
+
+		if (dn->data_blkaddr == NULL_ADDR) {
+			dn->data_blkaddr = NEW_ADDR;
+			__set_data_blkaddr(dn);
+		}
+	}
+
+	if (set_page_dirty(dn->node_page))
+		dn->node_changed = true;
+
+	mark_inode_dirty(dn->inode);
+	sync_inode_page(dn);
+out_update:
+	*start = index + max_blocks - 1;
+out:
+	f2fs_put_dnode(dn);
 	return err;
 }
 

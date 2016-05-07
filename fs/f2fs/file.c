@@ -1188,7 +1188,8 @@ static int expand_inode_data(struct inode *inode, loff_t offset,
 			goto noalloc;
 
 		set_new_dnode(&dn, inode, NULL, NULL, 0);
-		ret = f2fs_reserve_block(&dn, index);
+		ret = f2fs_reserve_blocks(&dn, &index,
+					off_end ? pg_end : pg_end - 1);
 		if (ret)
 			break;
 noalloc:
@@ -1200,7 +1201,7 @@ noalloc:
 			new_size = ((loff_t)index << PAGE_SHIFT) +
 								off_end;
 		else
-			new_size += PAGE_SIZE;
+			new_size = (loff_t)index << PAGE_SHIFT;
 	}
 
 	if (!(mode & FALLOC_FL_KEEP_SIZE) &&
