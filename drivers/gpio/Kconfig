@@ -154,7 +154,7 @@ config GPIO_BRCMSTB
 config GPIO_CLPS711X
 	tristate "CLPS711X GPIO support"
 	depends on ARCH_CLPS711X || COMPILE_TEST
-	select GPIO_GENERIC
+	select GPIO_GENERIC_PLATFORM
 	help
 	  Say yes here to support GPIO on CLPS711X SoCs.
 
@@ -196,7 +196,7 @@ config GPIO_ETRAXFS
 config GPIO_GE_FPGA
 	bool "GE FPGA based GPIO"
 	depends on GE_FPGA
-	select GPIO_GENERIC
+	select GPIO_GENERIC_PLATFORM
 	help
 	  Support for common GPIO functionality provided on some GE Single Board
 	  Computers.
@@ -209,6 +209,14 @@ config GPIO_GENERIC_PLATFORM
 	tristate "Generic memory-mapped GPIO controller support (MMIO platform device)"
 	select GPIO_GENERIC
 	help
+	  Select this to support many generic memory-mapped GPIO controllers.
+
+	  This driver also includes support for the following GPIOs:
+	    CLPS711X SoCs
+	    MOXA ART SoC
+	    TS-4800 FPGA DIO blocks and compatibles.
+	    GPIOs found on some GE Single Board Computers.
+
 	  Say yes here to support basic platform_device memory-mapped GPIO controllers.
 
 config GPIO_GRGPIO
@@ -288,7 +296,7 @@ config GPIO_MM_LANTIQ
 config GPIO_MOXART
 	bool "MOXART GPIO support"
 	depends on ARCH_MOXART || COMPILE_TEST
-	select GPIO_GENERIC
+	select GPIO_GENERIC_PLATFORM
 	help
 	  Select this option to enable GPIO driver for
 	  MOXA ART SoC devices.
@@ -409,7 +417,7 @@ config GPIO_TS4800
 	tristate "TS-4800 DIO blocks and compatibles"
 	depends on OF_GPIO
 	depends on SOC_IMX51 || COMPILE_TEST
-	select GPIO_GENERIC
+	select GPIO_GENERIC_PLATFORM
 	help
 	  This driver support TS-4800 FPGA GPIO controllers.
 
