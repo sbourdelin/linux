@@ -157,6 +157,11 @@ void ethtool_convert_legacy_u32_to_link_mode(unsigned long *dst,
 bool ethtool_convert_link_mode_to_legacy_u32(u32 *legacy_u32,
 				     const unsigned long *src);
 
+int ethtool_op_get_link_ksettings(struct net_device *ndev,
+				  struct ethtool_link_ksettings *cmd);
+int ethtool_op_set_link_ksettings(struct net_device *ndev,
+				  const struct ethtool_link_ksettings *cmd);
+
 /**
  * struct ethtool_ops - optional netdev operations
  * @get_settings: DEPRECATED, use %get_link_ksettings/%set_link_ksettings
