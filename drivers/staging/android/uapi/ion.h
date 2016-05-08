@@ -91,11 +91,11 @@ enum ion_heap_type {
  * Provided by userspace as an argument to the ioctl
  */
 struct ion_allocation_data {
-	size_t len;
-	size_t align;
-	unsigned int heap_id_mask;
-	unsigned int flags;
-	ion_user_handle_t handle;
+	size_t			len;
+	size_t			align;
+	unsigned int		heap_id_mask;
+	unsigned int		flags;
+	ion_user_handle_t	handle;
 };
 
 /**
@@ -109,8 +109,8 @@ struct ion_allocation_data {
  * provides the file descriptor and the kernel returns the handle.
  */
 struct ion_fd_data {
-	ion_user_handle_t handle;
-	int fd;
+	ion_user_handle_t	handle;
+	int			fd;
 };
 
 /**
@@ -118,7 +118,7 @@ struct ion_fd_data {
  * @handle:	a handle
  */
 struct ion_handle_data {
-	ion_user_handle_t handle;
+	ion_user_handle_t	handle;
 };
 
 /**
@@ -130,8 +130,8 @@ struct ion_handle_data {
  * This works just like the regular cmd and arg fields of an ioctl.
  */
 struct ion_custom_data {
-	unsigned int cmd;
-	unsigned long arg;
+	unsigned int	cmd;
+	unsigned long	arg;
 };
 
 #define ION_IOC_MAGIC		'I'

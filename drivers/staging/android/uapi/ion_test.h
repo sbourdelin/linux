@@ -28,11 +28,11 @@
  * @write:	1 to write, 0 to read
  */
 struct ion_test_rw_data {
-	__u64 ptr;
-	__u64 offset;
-	__u64 size;
-	int write;
-	int __padding;
+	__u64	ptr;
+	__u64	offset;
+	__u64	size;
+	int	write;
+	int	__padding;
 };
 
 #define ION_IOC_MAGIC		'I'
