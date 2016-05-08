@@ -711,8 +711,8 @@ static int dprc_probe(struct fsl_mc_device *mc_dev)
 	}
 
 	if (mc_bus->dprc_attr.version.major < DPRC_MIN_VER_MAJOR ||
-	   (mc_bus->dprc_attr.version.major == DPRC_MIN_VER_MAJOR &&
-	    mc_bus->dprc_attr.version.minor < DPRC_MIN_VER_MINOR)) {
+	    (mc_bus->dprc_attr.version.major == DPRC_MIN_VER_MAJOR &&
+	     mc_bus->dprc_attr.version.minor < DPRC_MIN_VER_MINOR)) {
 		dev_err(&mc_dev->dev,
 			"ERROR: DPRC version %d.%d not supported\n",
 			mc_bus->dprc_attr.version.major,
