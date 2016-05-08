@@ -664,7 +664,6 @@ net2272_request_dma(struct net2272 *dev, unsigned ep, u32 buf,
 		/* Setup PLX 9054 DMA mode */
 		writel((1 << LOCAL_BUS_WIDTH) |
 			(1 << TA_READY_INPUT_ENABLE) |
-			(0 << LOCAL_BURST_ENABLE) |
 			(1 << DONE_INTERRUPT_ENABLE) |
 			(1 << LOCAL_ADDRESSING_MODE) |
 			(1 << DEMAND_MODE) |
@@ -688,7 +687,6 @@ net2272_request_dma(struct net2272 *dev, unsigned ep, u32 buf,
 #endif
 
 	net2272_write(dev, DMAREQ,
-		(0 << DMA_BUFFER_VALID) |
 		(1 << DMA_REQUEST_ENABLE) |
 		(1 << DMA_CONTROL_DACK) |
 		(dev->dma_eot_polarity << EOT_POLARITY) |
@@ -779,8 +777,6 @@ net2272_kick_dma(struct net2272_ep *ep, struct net2272_request *req)
 
 			/* deassert dreq */
 			net2272_write(ep->dev, DMAREQ,
-				(0 << DMA_BUFFER_VALID) |
-				(0 << DMA_REQUEST_ENABLE) |
 				(1 << DMA_CONTROL_DACK) |
 				(ep->dev->dma_eot_polarity << EOT_POLARITY) |
 				(ep->dev->dma_dack_polarity << DACK_POLARITY) |
@@ -1363,8 +1359,6 @@ net2272_usb_reset(struct net2272 *dev)
 	net2272_write(dev, IRQSTAT1, ~(1 << SUSPEND_REQUEST_INTERRUPT));
 
 	net2272_write(dev, DMAREQ,
-		(0 << DMA_BUFFER_VALID) |
-		(0 << DMA_REQUEST_ENABLE) |
 		(1 << DMA_CONTROL_DACK) |
 		(dev->dma_eot_polarity << EOT_POLARITY) |
 		(dev->dma_dack_polarity << DACK_POLARITY) |
@@ -1542,9 +1536,7 @@ net2272_handle_dma(struct net2272_ep *ep)
 
 	/* Ensure DREQ is de-asserted */
 	net2272_write(ep->dev, DMAREQ,
-		(0 << DMA_BUFFER_VALID)
-	      | (0 << DMA_REQUEST_ENABLE)
-	      | (1 << DMA_CONTROL_DACK)
+		(1 << DMA_CONTROL_DACK)
 	      | (ep->dev->dma_eot_polarity << EOT_POLARITY)
 	      | (ep->dev->dma_dack_polarity << DACK_POLARITY)
 	      | (ep->dev->dma_dreq_polarity << DREQ_POLARITY)
@@ -2087,7 +2079,7 @@ static irqreturn_t net2272_irq(int irq, void *_dev)
 			dev->rdk1.plx9054_base_addr + INTCSR);
 	}
 	if ((intcsr & DMA_CHANNEL_0_TEST) == DMA_CHANNEL_0_TEST) {
-		writeb((1 << CHANNEL_CLEAR_INTERRUPT | (0 << CHANNEL_ENABLE)),
+		writeb(1 << CHANNEL_CLEAR_INTERRUPT,
 				dev->rdk1.plx9054_base_addr + DMACSR0);
 
 		dmareq = net2272_read(dev, DMAREQ);
@@ -2369,7 +2361,7 @@ net2272_rdk1_probe(struct pci_dev *pdev, struct net2272 *dev)
 			(1 << LOCAL_INTERRUPT_INPUT_ENABLE),
 			dev->rdk1.plx9054_base_addr + INTCSR);
 
-	writeb((1 << CHANNEL_CLEAR_INTERRUPT | (0 << CHANNEL_ENABLE)),
+	writeb(1 << CHANNEL_CLEAR_INTERRUPT,
 			dev->rdk1.plx9054_base_addr + DMACSR0);
 
 	/* reset */
@@ -2377,7 +2369,6 @@ net2272_rdk1_probe(struct pci_dev *pdev, struct net2272 *dev)
 		(1 << DMA_CTL_DACK) |
 		(1 << DMA_TIMEOUT_ENABLE) |
 		(1 << USER) |
-		(0 << MPX_MODE) |
 		(1 << BUSWIDTH) |
 		(1 << NET2272_RESET),
 		dev->base_addr + EPLD_IO_CONTROL_REGISTER);
