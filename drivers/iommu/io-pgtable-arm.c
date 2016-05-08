@@ -255,7 +255,7 @@ static void __arm_lpae_set_pte(arm_lpae_iopte *ptep, arm_lpae_iopte pte,
 	*ptep = pte;
 
 	if (!selftest_running)
-		dma_sync_single_for_device(cfg->iommu_dev,
+		__dma_sync_single_for_device(cfg->iommu_dev,
 					   __arm_lpae_dma_addr(ptep),
 					   sizeof(pte), DMA_TO_DEVICE);
 }
