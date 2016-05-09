@@ -197,7 +197,6 @@ __rwsem_do_wake(struct rw_semaphore *sem, enum rwsem_wake_type wake_type)
 		smp_mb();
 		waiter->task = NULL;
 		wake_up_process(tsk);
-		put_task_struct(tsk);
 	} while (--loop);
 
 	sem->wait_list.next = next;
@@ -220,7 +219,6 @@ struct rw_semaphore __sched *rwsem_down_read_failed(struct rw_semaphore *sem)
 	/* set up my own style of waitqueue */
 	waiter.task = tsk;
 	waiter.type = RWSEM_WAITING_FOR_READ;
-	get_task_struct(tsk);
 
 	raw_spin_lock_irq(&sem->wait_lock);
 	if (list_empty(&sem->wait_list))
