@@ -13673,7 +13673,9 @@ static int intel_atomic_commit(struct drm_device *dev,
 			intel_fbc_enable(intel_crtc);
 
 		if (crtc->state->active &&
-		    (crtc->state->planes_changed || update_pipe))
+		    (crtc->state->planes_changed ||
+		     crtc->state->color_mgmt_changed ||
+		     update_pipe))
 			drm_atomic_helper_commit_planes_on_crtc(old_crtc_state);
 
 		if (pipe_config->base.active && needs_vblank_wait(pipe_config))
