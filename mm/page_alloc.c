@@ -6842,6 +6842,7 @@ bool has_unmovable_pages(struct zone *zone, struct page *page, int count,
 		return false;
 
 	pfn = page_to_pfn(page);
+	pfn = pfn & ~(pageblock_nr_pages - 1);
 	for (found = 0, iter = 0; iter < pageblock_nr_pages; iter++) {
 		unsigned long check = pfn + iter;
 
