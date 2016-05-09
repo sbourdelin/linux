@@ -2389,6 +2389,43 @@ i915_gem_object_get_pages(struct drm_i915_gem_object *obj)
 	return 0;
 }
 
+/* The 'mapping' part of i915_gem_object_pin_map() below */
+static void *i915_gem_object_map(const struct drm_i915_gem_object *obj)
+{
+	unsigned long n_pages = obj->base.size >> PAGE_SHIFT;
+	struct sg_table *sgt = obj->pages;
+	struct sg_page_iter sg_iter;
+	struct page **pages;
+	unsigned long i = 0;
+	void *addr = NULL;
+
+	/* A single page can always be kmapped */
+	if (n_pages == 1)
+		return kmap(sg_page(sgt->sgl));
+
+	pages = drm_malloc_gfp(n_pages, sizeof(*pages), GFP_TEMPORARY);
+	if (pages == NULL) {
+		DRM_DEBUG_DRIVER("Failed to get space for %lu pointers\n",
+				 n_pages);
+		return NULL;
+	}
+
+	for_each_sgt_page_range(&sg_iter, sgt, 0, n_pages)
+		pages[i++] = sg_page_iter_page(&sg_iter);
+
+	/* Check that we have the expected number of pages */
+	GEM_BUG_ON(i != n_pages);
+
+	addr = vmap(pages, n_pages, 0, PAGE_KERNEL);
+	if (addr == NULL)
+		DRM_DEBUG_DRIVER("Failed to vmap %lu pages\n", n_pages);
+
+	drm_free_large(pages);
+
+	return addr;
+}
+
+/* get, pin, and map the pages of the object into kernel space */
 void *i915_gem_object_pin_map(struct drm_i915_gem_object *obj)
 {
 	int ret;
@@ -2402,27 +2439,7 @@ void *i915_gem_object_pin_map(struct drm_i915_gem_object *obj)
 	i915_gem_object_pin_pages(obj);
 
 	if (obj->mapping == NULL) {
-		struct page **pages;
-
-		pages = NULL;
-		if (obj->base.size == PAGE_SIZE)
-			obj->mapping = kmap(sg_page(obj->pages->sgl));
-		else
-			pages = drm_malloc_gfp(obj->base.size >> PAGE_SHIFT,
-					       sizeof(*pages),
-					       GFP_TEMPORARY);
-		if (pages != NULL) {
-			struct sg_page_iter sg_iter;
-			int n;
-
-			n = 0;
-			for_each_sg_page(obj->pages->sgl, &sg_iter,
-					 obj->pages->nents, 0)
-				pages[n++] = sg_page_iter_page(&sg_iter);
-
-			obj->mapping = vmap(pages, n, 0, PAGE_KERNEL);
-			drm_free_large(pages);
-		}
+		obj->mapping = i915_gem_object_map(obj);
 		if (obj->mapping == NULL) {
 			i915_gem_object_unpin_pages(obj);
 			return ERR_PTR(-ENOMEM);
