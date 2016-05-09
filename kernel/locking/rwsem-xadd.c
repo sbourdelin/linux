@@ -126,7 +126,6 @@ __rwsem_mark_wake(struct rw_semaphore *sem,
 		  enum rwsem_wake_type wake_type, struct wake_q_head *wake_q)
 {
 	struct rwsem_waiter *waiter;
-	struct task_struct *tsk;
 	struct list_head *next;
 	long oldcount, woken, loop, adjustment;
 
@@ -190,24 +189,18 @@ __rwsem_mark_wake(struct rw_semaphore *sem,
 	next = sem->wait_list.next;
 	loop = woken;
 	do {
+		struct task_struct *tsk;
+
 		waiter = list_entry(next, struct rwsem_waiter, list);
 		next = waiter->list.next;
-		tsk = waiter->task;
-		/*
-		 * Make sure we do not wakeup the next reader before
-		 * setting the nil condition to grant the next reader;
-		 * otherwise we could miss the wakeup on the other
-		 * side and end up sleeping again. See the pairing
-		 * in rwsem_down_read_failed().
-		 */
-		smp_mb();
-		waiter->task = NULL;
+
+		tsk = xchg_relaxed(&waiter->task, NULL);
 		wake_q_add(wake_q, tsk);
 	} while (--loop);
 
 	sem->wait_list.next = next;
 	next->prev = &sem->wait_list;
- out:
+out:
 	return sem;
 }
 
