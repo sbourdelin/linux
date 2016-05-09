@@ -117,12 +117,11 @@ static void sugov_update_commit(struct sugov_cpu *sg_cpu, int cpu, u64 time,
 	struct sugov_policy *sg_policy = sg_cpu->sg_policy;
 	struct cpufreq_policy *policy = sg_policy->policy;
 
-	sg_policy->last_freq_update_time = time;
-
 	if (sg_policy->next_freq == next_freq) {
 		trace_cpu_frequency(policy->cur, cpu);
 		return;
 	}
+	sg_policy->last_freq_update_time = time;
 	sg_policy->next_freq = next_freq;
 
 	if (sugov_queue_remote_callback(sg_policy, cpu))
