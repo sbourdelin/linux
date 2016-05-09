@@ -60,6 +60,26 @@ static struct notifier_block tts_notifier = {
 	.priority	= 0,
 };
 
+static int pts_notify_reboot(struct notifier_block *this,
+			unsigned long code, void *x)
+{
+	acpi_status status;
+
+	status = acpi_execute_simple_method(NULL, "\\_PTS", ACPI_STATE_S5);
+	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
+		/* It won't break anything. */
+		printk(KERN_NOTICE "Failure in evaluating _PTS object\n");
+	}
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block pts_notifier = {
+	.notifier_call	= pts_notify_reboot,
+	.next		= NULL,
+	.priority	= 0,
+};
+
 static int acpi_sleep_prepare(u32 acpi_state)
 {
 #ifdef CONFIG_ACPI_SLEEP
@@ -903,5 +923,12 @@ int __init acpi_sleep_init(void)
 	 * object can also be evaluated when the system enters S5.
 	 */
 	register_reboot_notifier(&tts_notifier);
+
+	/*
+	 * According to section 7.5 of acpi 6.0 spec, _PTS should run after
+	 * _TTS when the system enters S5.
+	 */
+	register_reboot_notifier(&pts_notifier);
+
 	return 0;
 }
