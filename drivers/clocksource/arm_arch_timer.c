@@ -366,7 +366,7 @@ static int arch_timer_setup(struct clock_event_device *clk)
 {
 	__arch_timer_setup(ARCH_CP15_TIMER, clk);
 
-	enable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi], 0);
+	enable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi], IRQF_TRIGGER_HIGH);
 
 	if (arch_timer_has_nonsecure_ppi())
 		enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], 0);
