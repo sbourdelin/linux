@@ -3368,11 +3368,13 @@ struct update_util_data {
 	void (*func)(struct update_util_data *data,
 		     u64 time, unsigned long util, unsigned long max);
 	int cpu;
+	cpumask_var_t *policy_cpus;
 };
 
 void cpufreq_add_update_util_hook(int cpu, struct update_util_data *data,
 			void (*func)(struct update_util_data *data, u64 time,
-				     unsigned long util, unsigned long max));
+				     unsigned long util, unsigned long max),
+				  cpumask_var_t *policy_cpus);
 void cpufreq_remove_update_util_hook(int cpu);
 #endif /* CONFIG_CPU_FREQ */
 

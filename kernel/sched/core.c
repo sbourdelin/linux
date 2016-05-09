@@ -484,6 +484,8 @@ void resched_curr(struct rq *rq)
 
 	lockdep_assert_held(&rq->lock);
 
+	cpufreq_set_skip_cb(rq);
+
 	if (test_tsk_need_resched(curr))
 		return;
 
@@ -959,6 +961,8 @@ void check_preempt_curr(struct rq *rq, struct task_struct *p, int flags)
 	 */
 	if (task_on_rq_queued(rq->curr) && test_tsk_need_resched(rq->curr))
 		rq_clock_skip_update(rq, true);
+
+	cpufreq_update_remote(rq);
 }
 
 #ifdef CONFIG_SMP

@@ -711,6 +711,10 @@ struct rq {
 	/* Must be inspected within a rcu lock section */
 	struct cpuidle_state *idle_state;
 #endif
+
+#if defined(CONFIG_SMP) && defined(CONFIG_CPU_FREQ)
+	bool cpufreq_skip_cb;
+#endif
 };
 
 static inline int cpu_of(struct rq *rq)
@@ -1759,26 +1763,6 @@ static inline u64 irq_time_read(int cpu)
 DECLARE_PER_CPU(struct update_util_data *, cpufreq_update_util_data);
 
 /**
- * cpufreq_update_util - Take a note about CPU utilization changes.
- * @time: Current time.
- * @util: Current utilization.
- * @max: Utilization ceiling.
- *
- * This function is called by the scheduler on every invocation of
- * update_load_avg() on the CPU whose utilization is being updated.
- *
- * It can only be called from RCU-sched read-side critical sections.
- */
-static inline void cpufreq_update_util(u64 time, unsigned long util, unsigned long max)
-{
-       struct update_util_data *data;
-
-       data = rcu_dereference_sched(*this_cpu_ptr(&cpufreq_update_util_data));
-       if (data)
-               data->func(data, time, util, max);
-}
-
-/**
  * cpufreq_trigger_update - Trigger CPU performance state evaluation if needed.
  * @time: Current time.
  *
@@ -1796,12 +1780,90 @@ static inline void cpufreq_update_util(u64 time, unsigned long util, unsigned lo
  */
 static inline void cpufreq_trigger_update(u64 time)
 {
-	cpufreq_update_util(time, ULONG_MAX, 0);
+	struct update_util_data *data;
+
+	data = rcu_dereference_sched(*this_cpu_ptr(&cpufreq_update_util_data));
+	if (data)
+		data->func(data, time, ULONG_MAX, 0);
 }
+
 #else
-static inline void cpufreq_update_util(u64 time, unsigned long util, unsigned long max) {}
 static inline void cpufreq_trigger_update(u64 time) {}
 #endif /* CONFIG_CPU_FREQ */
+
+#if defined(CONFIG_CPU_FREQ) && defined(CONFIG_SMP)
+/**
+ * cpufreq_update_util - Take a note about CPU utilization changes.
+ * @rq: Runqueue of CPU to be updated.
+ *
+ * This function is called during scheduler events which cause a CPU's root
+ * cfs_rq utilization to be updated.
+*
+ * It can only be called from RCU-sched read-side critical sections.
+ */
+static inline void cpufreq_update_util(struct rq *rq)
+{
+	struct update_util_data *data;
+	unsigned long max;
+
+	data = rcu_dereference_sched(*this_cpu_ptr(&cpufreq_update_util_data));
+	if (!data)
+		return;
+
+	if (!data->policy_cpus && cpu_of(rq) != smp_processor_id())
+		return;
+
+	if (data->policy_cpus &&
+	    !cpumask_test_cpu(smp_processor_id(), *data->policy_cpus))
+		return;
+
+	max = rq->cpu_capacity_orig;
+	data->func(data, rq_clock(rq), min(rq->cfs.avg.util_avg, max), max);
+}
+
+/**
+ * cpufreq_update_remote - Process callbacks to CPUs in remote policies.
+ * @rq: Target runqueue.
+ *
+ * Remote cpufreq callbacks must be processed after preemption has been decided
+ * so that unnecessary IPIs may be avoided. Cpufreq callbacks to CPUs within the
+ * local policy are handled earlier.
+ */
+static inline void cpufreq_update_remote(struct rq *rq)
+{
+	struct update_util_data *data;
+	unsigned long max;
+	int cpu = smp_processor_id();
+	int target = cpu_of(rq);
+
+	if (rq->cpufreq_skip_cb) {
+		rq->cpufreq_skip_cb = false;
+		return;
+	}
+
+	if (target == cpu)
+		return;
+
+	data = rcu_dereference_sched(per_cpu(cpufreq_update_util_data, target));
+	if (!data || !data->policy_cpus)
+		return;
+
+	if (cpumask_test_cpu(cpu, *data->policy_cpus))
+		return;
+
+	max = rq->cpu_capacity_orig;
+	data->func(data, rq_clock(rq), min(rq->cfs.avg.util_avg, max), max);
+}
+
+static inline void cpufreq_set_skip_cb(struct rq *rq)
+{
+	rq->cpufreq_skip_cb = true;
+}
+#else
+static inline void cpufreq_update_util(struct rq *rq) {}
+static inline void cpufreq_update_remote(struct rq *rq) {}
+static inline void cpufreq_set_skip_cb(struct rq *rq) {}
+#endif /* CONFIG_SMP && CONFIG_CPU_FREQ */
 
 #ifdef arch_scale_freq_capacity
 #ifndef arch_scale_freq_invariant

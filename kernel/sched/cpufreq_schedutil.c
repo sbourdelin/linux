@@ -477,10 +477,12 @@ static int sugov_start(struct cpufreq_policy *policy)
 			sg_cpu->max = 0;
 			sg_cpu->last_update = 0;
 			cpufreq_add_update_util_hook(cpu, &sg_cpu->update_util,
-						     sugov_update_shared);
+						     sugov_update_shared,
+						     &policy->cpus);
 		} else {
 			cpufreq_add_update_util_hook(cpu, &sg_cpu->update_util,
-						     sugov_update_single);
+						     sugov_update_single,
+						     &policy->cpus);
 		}
 	}
 	return 0;

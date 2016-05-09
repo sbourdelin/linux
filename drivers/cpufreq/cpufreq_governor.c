@@ -322,7 +322,7 @@ static void gov_set_update_util(struct policy_dbs_info *policy_dbs,
 		struct cpu_dbs_info *cdbs = &per_cpu(cpu_dbs, cpu);
 
 		cpufreq_add_update_util_hook(cpu, &cdbs->update_util,
-					     dbs_update_util_handler);
+					     dbs_update_util_handler, NULL);
 	}
 }
 
