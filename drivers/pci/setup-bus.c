@@ -515,8 +515,10 @@ static void pbus_assign_resources_sorted(const struct pci_bus *bus,
 	struct pci_dev *dev;
 	LIST_HEAD(head);
 
-	list_for_each_entry(dev, &bus->devices, bus_list)
-		__dev_sort_resources(dev, &head);
+	list_for_each_entry(dev, &bus->devices, bus_list) {
+		if (!dev->non_compliant_bars)
+			__dev_sort_resources(dev, &head);
+	}
 
 	__assign_resources_sorted(&head, realloc_head, fail_head);
 }
