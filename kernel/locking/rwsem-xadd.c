@@ -494,7 +494,7 @@ __rwsem_down_write_failed_common(struct rw_semaphore *sem, int state)
 			}
 			schedule();
 			set_current_state(state);
-		} while ((count = sem->count) & RWSEM_ACTIVE_MASK);
+		} while ((count = READ_ONCE(sem->count)) & RWSEM_ACTIVE_MASK);
 
 		raw_spin_lock_irq(&sem->wait_lock);
 	}
