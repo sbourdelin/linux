@@ -752,7 +752,7 @@ i915_gem_object_do_bit_17_swizzle(struct drm_i915_gem_object *obj)
 		return;
 
 	i = 0;
-	for_each_sg_page(obj->pages->sgl, &sg_iter, obj->pages->nents, 0) {
+	for_each_sgt_page(&sg_iter, obj->pages) {
 		struct page *page = sg_page_iter_page(&sg_iter);
 		char new_bit_17 = page_to_phys(page) >> 17;
 		if ((new_bit_17 & 0x1) !=
@@ -790,7 +790,8 @@ i915_gem_object_save_bit_17_swizzle(struct drm_i915_gem_object *obj)
 	}
 
 	i = 0;
-	for_each_sg_page(obj->pages->sgl, &sg_iter, obj->pages->nents, 0) {
+
+	for_each_sgt_page(&sg_iter, obj->pages) {
 		if (page_to_phys(sg_page_iter_page(&sg_iter)) & (1 << 17))
 			__set_bit(i, obj->bit_17);
 		else

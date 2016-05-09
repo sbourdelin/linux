@@ -305,6 +305,7 @@ struct sg_page_iter {
 						 * next step */
 };
 
+bool __sgt_page_iter_next(struct sg_page_iter *piter);
 bool __sg_page_iter_next(struct sg_page_iter *piter);
 void __sg_page_iter_start(struct sg_page_iter *piter,
 			  struct scatterlist *sglist, unsigned int nents,
@@ -338,6 +339,26 @@ static inline dma_addr_t sg_page_iter_dma_address(struct sg_page_iter *piter)
 #define for_each_sg_page(sglist, piter, nents, pgoffset)		   \
 	for (__sg_page_iter_start((piter), (sglist), (nents), (pgoffset)); \
 	     __sg_page_iter_next(piter);)
+
+/**
+ * for_each_sgt_page - iterate over the pages of the given sg_table
+ * @piter:	page iterator to hold current page, sg, sg_pgoffset
+ * @sgt:	sg_table to iterate over
+ */
+#define for_each_sgt_page(piter, sgt)					\
+	for (__sg_page_iter_start((piter), (sgt)->sgl, (~0u), (0)); \
+	     __sgt_page_iter_next(piter);)
+
+/**
+ * for_each_sgt_page_range - iterate over some pages of the given sg_table
+ * @piter:	page iterator to hold current page, sg, sg_pgoffset
+ * @sgt:	sg_table to iterate over
+ * @first:	starting page offset
+ * @max:	maxiumum number of pages to iterate over
+ */
+#define for_each_sgt_page_range(piter, sgt, first, max)			\
+	for (__sg_page_iter_start((piter), (sgt)->sgl, (max), (first)); \
+	     __sgt_page_iter_next(piter);)
 
 /*
  * Mapping sg iterator

@@ -469,6 +469,32 @@ bool __sg_page_iter_next(struct sg_page_iter *piter)
 }
 EXPORT_SYMBOL(__sg_page_iter_next);
 
+/*
+ * Note: we use the same iterator structure as __sg_page_iter_next()
+ * above, but interpret the 'nents' member differently. Here it is
+ * an upper bound on the number of iterations to be performed, not
+ * the number of internal list elements to be traversed.
+ */
+bool __sgt_page_iter_next(struct sg_page_iter *piter)
+{
+	if (!piter->__nents || !piter->sg)
+		return false;
+
+	piter->sg_pgoffset += piter->__pg_advance;
+	piter->__pg_advance = 1;
+
+	while (piter->sg_pgoffset >= sg_page_count(piter->sg)) {
+		piter->sg_pgoffset -= sg_page_count(piter->sg);
+		piter->sg = sg_next(piter->sg);
+		if (!piter->sg)
+			return false;
+	}
+
+	--piter->__nents;
+	return true;
+}
+EXPORT_SYMBOL(__sgt_page_iter_next);
+
 /**
  * sg_miter_start - start mapping iteration over a sg list
  * @miter: sg mapping iter to be started

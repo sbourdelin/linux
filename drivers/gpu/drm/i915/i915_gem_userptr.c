@@ -716,7 +716,7 @@ i915_gem_userptr_put_pages(struct drm_i915_gem_object *obj)
 
 	i915_gem_gtt_finish_object(obj);
 
-	for_each_sg_page(obj->pages->sgl, &sg_iter, obj->pages->nents, 0) {
+	for_each_sgt_page(&sg_iter, obj->pages) {
 		struct page *page = sg_page_iter_page(&sg_iter);
 
 		if (obj->dirty)

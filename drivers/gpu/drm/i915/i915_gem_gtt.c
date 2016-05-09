@@ -1828,7 +1828,7 @@ static void gen6_ppgtt_insert_entries(struct i915_address_space *vm,
 	struct sg_page_iter sg_iter;
 
 	pt_vaddr = NULL;
-	for_each_sg_page(pages->sgl, &sg_iter, pages->nents, 0) {
+	for_each_sgt_page(&sg_iter, pages) {
 		if (pt_vaddr == NULL)
 			pt_vaddr = kmap_px(ppgtt->pd.page_table[act_pt]);
 
@@ -2369,7 +2369,7 @@ static void gen8_ggtt_insert_entries(struct i915_address_space *vm,
 
 	rpm_atomic_seq = assert_rpm_atomic_begin(dev_priv);
 
-	for_each_sg_page(st->sgl, &sg_iter, st->nents, 0) {
+	for_each_sgt_page(&sg_iter, st) {
 		addr = sg_dma_address(sg_iter.sg) +
 			(sg_iter.sg_pgoffset << PAGE_SHIFT);
 		gen8_set_pte(&gtt_entries[i],
@@ -2447,7 +2447,7 @@ static void gen6_ggtt_insert_entries(struct i915_address_space *vm,
 
 	rpm_atomic_seq = assert_rpm_atomic_begin(dev_priv);
 
-	for_each_sg_page(st->sgl, &sg_iter, st->nents, 0) {
+	for_each_sgt_page(&sg_iter, st) {
 		addr = sg_page_iter_dma_address(&sg_iter);
 		iowrite32(vm->pte_encode(addr, level, true, flags), &gtt_entries[i]);
 		i++;
@@ -3390,6 +3390,7 @@ static struct sg_table *
 intel_rotate_fb_obj_pages(struct intel_rotation_info *rot_info,
 			  struct drm_i915_gem_object *obj)
 {
+	unsigned int n_pages = obj->base.size / PAGE_SIZE;
 	unsigned int size_pages = rot_info->plane[0].width * rot_info->plane[0].height;
 	unsigned int size_pages_uv;
 	struct sg_page_iter sg_iter;
@@ -3401,7 +3402,7 @@ intel_rotate_fb_obj_pages(struct intel_rotation_info *rot_info,
 	int ret = -ENOMEM;
 
 	/* Allocate a temporary list of source pages for random access. */
-	page_addr_list = drm_malloc_gfp(obj->base.size / PAGE_SIZE,
+	page_addr_list = drm_malloc_gfp(n_pages,
 					sizeof(dma_addr_t),
 					GFP_TEMPORARY);
 	if (!page_addr_list)
@@ -3424,11 +3425,10 @@ intel_rotate_fb_obj_pages(struct intel_rotation_info *rot_info,
 
 	/* Populate source page list from the object. */
 	i = 0;
-	for_each_sg_page(obj->pages->sgl, &sg_iter, obj->pages->nents, 0) {
-		page_addr_list[i] = sg_page_iter_dma_address(&sg_iter);
-		i++;
-	}
+	for_each_sgt_page_range(&sg_iter, obj->pages, 0, n_pages)
+		page_addr_list[i++] = sg_page_iter_dma_address(&sg_iter);
 
+	WARN_ON(i != n_pages);
 	st->nents = 0;
 	sg = st->sgl;
 
@@ -3494,9 +3494,7 @@ intel_partial_pages(const struct i915_ggtt_view *view,
 
 	sg = st->sgl;
 	st->nents = 0;
-	for_each_sg_page(obj->pages->sgl, &obj_sg_iter, obj->pages->nents,
-		view->params.partial.offset)
-	{
+	for_each_sgt_page_range(&obj_sg_iter, obj->pages, view->params.partial.offset, ~0u) {
 		if (st->nents >= view->params.partial.size)
 			break;
 

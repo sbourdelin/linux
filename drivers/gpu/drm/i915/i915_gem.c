@@ -611,8 +611,7 @@ i915_gem_shmem_pread(struct drm_device *dev,
 
 	offset = args->offset;
 
-	for_each_sg_page(obj->pages->sgl, &sg_iter, obj->pages->nents,
-			 offset >> PAGE_SHIFT) {
+	for_each_sgt_page_range(&sg_iter, obj->pages, offset >> PAGE_SHIFT, ~0u) {
 		struct page *page = sg_page_iter_page(&sg_iter);
 
 		if (remain <= 0)
@@ -935,8 +934,7 @@ i915_gem_shmem_pwrite(struct drm_device *dev,
 	offset = args->offset;
 	obj->dirty = 1;
 
-	for_each_sg_page(obj->pages->sgl, &sg_iter, obj->pages->nents,
-			 offset >> PAGE_SHIFT) {
+	for_each_sgt_page_range(&sg_iter, obj->pages, offset >> PAGE_SHIFT, ~0u) {
 		struct page *page = sg_page_iter_page(&sg_iter);
 		int partial_cacheline_write;
 
@@ -2180,7 +2178,7 @@ i915_gem_object_put_pages_gtt(struct drm_i915_gem_object *obj)
 	if (obj->madv == I915_MADV_DONTNEED)
 		obj->dirty = 0;
 
-	for_each_sg_page(obj->pages->sgl, &sg_iter, obj->pages->nents, 0) {
+	for_each_sgt_page(&sg_iter, obj->pages) {
 		struct page *page = sg_page_iter_page(&sg_iter);
 
 		if (obj->dirty)
@@ -2336,7 +2334,7 @@ i915_gem_object_get_pages_gtt(struct drm_i915_gem_object *obj)
 
 err_pages:
 	sg_mark_end(sg);
-	for_each_sg_page(st->sgl, &sg_iter, st->nents, 0)
+	for_each_sgt_page(&sg_iter, st)
 		put_page(sg_page_iter_page(&sg_iter));
 	sg_free_table(st);
 	kfree(st);

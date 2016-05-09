@@ -945,11 +945,11 @@ static u32 *vmap_batch(struct drm_i915_gem_object *obj,
 	}
 
 	i = 0;
-	for_each_sg_page(obj->pages->sgl, &sg_iter, obj->pages->nents, first_page) {
+	for_each_sgt_page_range(&sg_iter, obj->pages, first_page, npages)
 		pages[i++] = sg_page_iter_page(&sg_iter);
-		if (i == npages)
-			break;
-	}
+
+	if (WARN_ON(i != npages))
+		goto finish;
 
 	addr = vmap(pages, i, 0, PAGE_KERNEL);
 	if (addr == NULL) {
