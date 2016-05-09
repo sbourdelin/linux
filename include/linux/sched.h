@@ -3367,6 +3367,7 @@ static inline unsigned long rlimit_max(unsigned int limit)
 struct update_util_data {
 	void (*func)(struct update_util_data *data,
 		     u64 time, unsigned long util, unsigned long max);
+	int cpu;
 };
 
 void cpufreq_add_update_util_hook(int cpu, struct update_util_data *data,
