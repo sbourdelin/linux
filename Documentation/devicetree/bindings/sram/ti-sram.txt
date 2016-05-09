@@ -1,0 +1,47 @@
+TI SRAM Node:
+-------------
+
+Many TI SoC's rely on SRAM for running low-level PM code as part of the
+suspend or cpuidle path. Because of this, regions in sram must be mapped
+as "memory-exec" or "memory-exec-nocache" in order for the region to be
+executable.
+
+Optional sub-node
+-----------------
+Some TI SoCs have secure variants that require a certain portion of
+the SRAM to be reserved for use by secure software. This can be
+marked in the parent SRAM node with a subnode as described in
+Documentation/devicetree/bindings/sram/sram.txt. This node can be
+added in two ways:
+
+- From board dts files for secure platforms to avoid adding it
+  for all SoC variants with a fixed size defined.
+- As a dummy node in the .dtsi sram node with any size that will be
+  modified by a bootloader to the correct size needed.
+
+Sub-node properties:
+- compatible : should be "ti,secure-sram"
+
+The rest of the properties should follow the generic mmio-sram discription
+found in Documentation/devicetree/bindings/sram/sram.txt
+
+Example:
+	/* In parent SoC .dtsi */
+	ocmcram: ocmcram@40200000 {
+		compatible = "mmio-sram";
+		reg = <0x40200000 0x10000>; /* 64k */
+		memory-exec-nocache;
+		ranges = <0x0 0x40200000 0x10000>;
+
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+	};
+
+	/* In board .dts where secure silicon is present */
+	&ocmcram {
+		sram-hs@0 {
+			compatible = "ti,secure-ram";
+			reg = <0x0 0xC000>;
+		};
+	};
