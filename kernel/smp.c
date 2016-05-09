@@ -17,6 +17,21 @@
 
 #include "smpboot.h"
 
+static DEFINE_PER_CPU(unsigned int, ipi_call_func_sequence);
+static DEFINE_PER_CPU(unsigned int, ipi_call_func_last_sequence[4]);
+
+void show_ipi_sequence(void)
+{
+	int cpu;
+	for_each_online_cpu(cpu) {
+		printk(KERN_ERR "IPI(%d): last_requested=%u,%u last_responded=%u,%u\n",
+		       cpu, per_cpu_ptr(ipi_call_func_last_sequence, cpu)[0],
+		       per_cpu_ptr(ipi_call_func_last_sequence, cpu)[2],
+		       per_cpu_ptr(ipi_call_func_last_sequence, cpu)[1],
+		       per_cpu_ptr(ipi_call_func_last_sequence, cpu)[3]);
+	}
+}
+
 enum {
 	CSD_FLAG_LOCK		= 0x01,
 	CSD_FLAG_SYNCHRONOUS	= 0x02,
@@ -218,7 +233,9 @@ static void flush_smp_call_function_queue(bool warn_cpu_offline)
 	WARN_ON(!irqs_disabled());
 
 	head = this_cpu_ptr(&call_single_queue);
+	this_cpu_write(ipi_call_func_last_sequence[1], this_cpu_inc_return(ipi_call_func_sequence));
 	entry = llist_del_all(head);
+	this_cpu_write(ipi_call_func_last_sequence[3], this_cpu_inc_return(ipi_call_func_sequence));
 	entry = llist_reverse_order(entry);
 
 	/* There shouldn't be any pending callbacks on an offline CPU. */
@@ -452,7 +469,9 @@ void smp_call_function_many(const struct cpumask *mask,
 			csd->flags |= CSD_FLAG_SYNCHRONOUS;
 		csd->func = func;
 		csd->info = info;
+		this_cpu_write(ipi_call_func_last_sequence[0], this_cpu_inc_return(ipi_call_func_sequence));
 		llist_add(&csd->llist, &per_cpu(call_single_queue, cpu));
+		this_cpu_write(ipi_call_func_last_sequence[2], this_cpu_inc_return(ipi_call_func_sequence));
 	}
 
 	/* Send a message to all CPUs in the map */

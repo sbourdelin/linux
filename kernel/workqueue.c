@@ -4404,6 +4404,8 @@ void show_workqueue_state(void)
 	struct worker_pool *pool;
 	unsigned long flags;
 	int pi;
+	extern void show_ipi_sequence(void);
+	show_ipi_sequence();
 
 	rcu_read_lock_sched();
 

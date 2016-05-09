@@ -237,6 +237,8 @@ static DECLARE_WORK(sysrq_showallcpus, sysrq_showregs_othercpus);
 
 static void sysrq_handle_showallcpus(int key)
 {
+	extern void show_ipi_sequence(void);
+	show_ipi_sequence();
 	/*
 	 * Fall back to the workqueue based printing if the
 	 * backtrace printing did not succeed or the
