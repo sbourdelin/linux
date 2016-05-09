@@ -33,12 +33,14 @@ struct calling_interface_structure {
 } __packed;
 
 static struct calling_interface_buffer *buffer;
+static unsigned char *extended_buffer;
 static DEFINE_MUTEX(buffer_mutex);
 
 static int da_command_address;
 static int da_command_code;
 static int da_num_tokens;
 static struct calling_interface_token *da_tokens;
+static const char extended_key[4] = {'D', 'S', 'C', 'I'};
 
 int dell_smbios_error(int value)
 {
@@ -91,6 +93,38 @@ void dell_smbios_send_request(int class, int select)
 	dcdbas_smi_request(&command);
 }
 EXPORT_SYMBOL_GPL(dell_smbios_send_request);
+
+/* More complex requests are served by sending
+ * a pointer to a pre-allocated buffer
+ * Bytes 0:3 are the size of the return value
+ * Bytes 4:length are the returned value
+ *
+ * The return value is the data of the extended buffer request
+ * The value of length will be updated to the length of the actual
+ * buffer content
+ *
+ */
+unsigned char *dell_smbios_send_extended_request(int class, int select,
+						 size_t *length)
+{
+	u32 i;
+	u32 *buffer_length = (u32 *)extended_buffer;
+
+	if (*length < 5 || *length - 4 > PAGE_SIZE)
+		return NULL;
+
+	*buffer_length = *length - 4;
+	for (i = 4; i < *length; i += 4)
+		if (*length - i > 4)
+			memcpy(&extended_buffer[i], &extended_key, 4);
+
+	*length = buffer_length[0];
+	buffer->input[0] = virt_to_phys(extended_buffer);
+	dell_smbios_send_request(class, select);
+
+	return &extended_buffer[4];
+}
+EXPORT_SYMBOL_GPL(dell_smbios_send_extended_request);
 
 struct calling_interface_token *dell_smbios_find_token(int tokenid)
 {
@@ -170,8 +204,16 @@ static int __init dell_smbios_init(void)
 		goto fail_buffer;
 	}
 
+	extended_buffer = (void *)__get_free_page(GFP_KERNEL | GFP_DMA32);
+	if (!extended_buffer) {
+		ret = -ENOMEM;
+		goto fail_extended_buffer;
+	}
+
 	return 0;
 
+fail_extended_buffer:
+	kfree(buffer);
 fail_buffer:
 	kfree(da_tokens);
 	return ret;
@@ -181,6 +223,7 @@ static void __exit dell_smbios_exit(void)
 {
 	kfree(da_tokens);
 	free_page((unsigned long)buffer);
+	free_page((unsigned long)extended_buffer);
 }
 
 subsys_initcall(dell_smbios_init);
