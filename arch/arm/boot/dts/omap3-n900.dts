@@ -1013,3 +1013,10 @@
 &ssi_port2 {
 	status = "disabled";
 };
+
+&ocmcram {
+	sram-hs@0 {
+		compatible = "ti,secure-ram";
+		reg = <0x0 0xC000>;
+	};
+};
