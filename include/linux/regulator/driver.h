@@ -394,6 +394,9 @@ struct regulator_dev {
 	u32 open_count;
 	u32 bypass_count;
 
+	/* save mode during boot protection */
+	unsigned int boot_mode;
+
 	/* lists we belong to */
 	struct list_head list; /* list of all regulators */
 

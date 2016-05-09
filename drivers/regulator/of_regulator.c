@@ -78,6 +78,9 @@ static void of_get_regulation_constraints(struct device_node *np,
 	if (of_property_read_bool(np, "regulator-allow-set-load"))
 		constraints->valid_ops_mask |= REGULATOR_CHANGE_DRMS;
 
+	constraints->boot_protection = of_property_read_bool(np,
+			"regulator-boot-protection");
+
 	ret = of_property_read_u32(np, "regulator-ramp-delay", &pval);
 	if (!ret) {
 		if (pval)
