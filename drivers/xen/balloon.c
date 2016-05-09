@@ -151,8 +151,6 @@ static DECLARE_WAIT_QUEUE_HEAD(balloon_wq);
 static void balloon_process(struct work_struct *work);
 static DECLARE_DELAYED_WORK(balloon_worker, balloon_process);
 
-static void release_memory_resource(struct resource *resource);
-
 /* When ballooning out (allocating memory to return to Xen) we don't really
    want the kernel to try too hard since that can trigger the oom killer. */
 #define GFP_BALLOON \
@@ -248,6 +246,8 @@ static enum bp_state update_schedule(enum bp_state state)
 }
 
 #ifdef CONFIG_XEN_BALLOON_MEMORY_HOTPLUG
+static void release_memory_resource(struct resource *resource);
+
 static struct resource *additional_memory_resource(phys_addr_t size)
 {
 	struct resource *res;
