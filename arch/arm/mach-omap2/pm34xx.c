@@ -502,22 +502,6 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
 }
 
-/*
- * Push functions to SRAM
- *
- * The minimum set of functions is pushed to SRAM for execution:
- * - omap3_do_wfi for erratum i581 WA,
- * - save_secure_ram_context for security extensions.
- */
-void omap_push_sram_idle(void)
-{
-	omap3_do_wfi_sram = omap_sram_push(omap3_do_wfi, omap3_do_wfi_sz);
-
-	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
-		_omap_save_secure_sram = omap_sram_push(save_secure_ram_context,
-				save_secure_ram_context_sz);
-}
-
 static void __init pm_errata_configure(void)
 {
 	if (cpu_is_omap3630()) {
