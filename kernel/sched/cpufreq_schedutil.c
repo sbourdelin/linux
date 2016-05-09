@@ -153,14 +153,26 @@ static void sugov_update_commit(struct sugov_cpu *sg_cpu, int cpu, u64 time,
  * next_freq = C * curr_freq * util_raw / max
  *
  * Take C = 1.25 for the frequency tipping point at (util / max) = 0.8.
+ *
+ * The lowest target-supported frequency which is equal or greater than the raw
+ * next_freq (as calculated above) is returned, or the CPU's max_freq if such
+ * a target-supported frequency does not exist.
  */
 static unsigned int get_next_freq(struct cpufreq_policy *policy,
 				  unsigned long util, unsigned long max)
 {
+	struct cpufreq_frequency_table *entry;
 	unsigned int freq = arch_scale_freq_invariant() ?
 				policy->cpuinfo.max_freq : policy->cur;
+	unsigned int target_freq = UINT_MAX;
 
-	return (freq + (freq >> 2)) * util / max;
+	freq = (freq + (freq >> 2)) * util / max;
+
+	cpufreq_for_each_valid_entry(entry, policy->freq_table)
+		if (entry->frequency >= freq && entry->frequency < target_freq)
+			target_freq = entry->frequency;
+
+	return target_freq != UINT_MAX ? target_freq : policy->cpuinfo.max_freq;
 }
 
 static void sugov_update_single(struct update_util_data *hook, u64 time,
