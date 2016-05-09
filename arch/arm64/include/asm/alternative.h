@@ -94,6 +94,8 @@ void apply_alternatives(void *start, size_t length);
  *
  * The code that follows this macro will be assembled and linked as
  * normal. There are no restrictions on this code.
+ * If you use the enable parameter, see the comments below for _else
+ * and _endif.
  */
 .macro alternative_if_not cap, enable = 1
 	.if \enable
@@ -117,23 +119,33 @@ void apply_alternatives(void *start, size_t length);
  * 2. Not contain a branch target that is used outside of the
  *    alternative sequence it is defined in (branches into an
  *    alternative sequence are not fixed up).
+ *
+ * If you used the optional enable parameter in the opening
+ * alternative_if_not macro above, please protect the whole _else
+ * branch with an .if directive:
+ *	alternative_if_not CAP_SOMETHING, condition
+ *		orig_insn
+ *	.if condition
+ *	alternative_else
+ *		repl_insn
+ *	alternative_endif
+ *	.endif
  */
-.macro alternative_else, enable = 1
-	.if \enable
+.macro alternative_else
 662:	.pushsection .altinstr_replacement, "ax"
 663:
-	.endif
 .endm
 
 /*
  * Complete an alternative code sequence.
+ *
+ * Please mind the comment at alternative_else above if you used the
+ * optional enable parameter with the opening alternative_if_not macro.
  */
-.macro alternative_endif, enable = 1
-	.if \enable
+.macro alternative_endif
 664:	.popsection
 	.org	. - (664b-663b) + (662b-661b)
 	.org	. - (662b-661b) + (664b-663b)
-	.endif
 .endm
 
 #define _ALTERNATIVE_CFG(insn1, insn2, cap, cfg, ...)	\
