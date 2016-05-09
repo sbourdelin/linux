@@ -78,7 +78,14 @@
 	add	\size, \kaddr, \size
 	sub	\tmp2, \tmp1, #1
 	bic	\kaddr, \kaddr, \tmp2
-9998:	dc	\op, \kaddr
+9998:
+	alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE, (\op == cvau || \op == cvac)
+	dc	\op, \kaddr
+	.if	(\op == cvau || \op == cvac)
+	alternative_else
+	dc	civac, \kaddr
+	alternative_endif
+	.endif
 	add	\kaddr, \kaddr, \tmp1
 	cmp	\kaddr, \size
 	b.lo	9998b
