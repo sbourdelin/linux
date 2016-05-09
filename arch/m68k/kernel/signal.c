@@ -595,6 +595,7 @@ static int mangle_kernel_stack(struct pt_regs *regs, int formatvec,
 			       void __user *fp)
 {
 	int fsize = frame_extra_sizes(formatvec >> 12);
+	printk("avoid broken signal handler...\n");
 	if (fsize < 0) {
 		/*
 		 * user process trying to return with weird frame format
