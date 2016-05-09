@@ -42,10 +42,6 @@
 #include <linux/vgaarb.h>
 #include <linux/export.h>
 
-/* Access macro for slots in vblank timestamp ringbuffer. */
-#define vblanktimestamp(dev, pipe, count) \
-	((dev)->vblank[pipe].time[(count) % DRM_VBLANKTIME_RBSIZE])
-
 /* Retry timestamp calculation up to 3 times to satisfy
  * drm_timestamp_precision before giving up.
  */
@@ -82,29 +78,13 @@ static void store_vblank(struct drm_device *dev, unsigned int pipe,
 			 struct timeval *t_vblank, u32 last)
 {
 	struct drm_vblank_crtc *vblank = &dev->vblank[pipe];
-	u32 tslot;
 
-	assert_spin_locked(&dev->vblank_time_lock);
+	assert_spin_locked(&dev->vblank_seqlock.lock);
 
 	vblank->last = last;
 
-	/* All writers hold the spinlock, but readers are serialized by
-	 * the latching of vblank->count below.
-	 */
-	tslot = vblank->count + vblank_count_inc;
-	vblanktimestamp(dev, pipe, tslot) = *t_vblank;
-
-	/*
-	 * vblank timestamp updates are protected on the write side with
-	 * vblank_time_lock, but on the read side done locklessly using a
-	 * sequence-lock on the vblank counter. Ensure correct ordering using
-	 * memory barrriers. We need the barrier both before and also after the
-	 * counter update to synchronize with the next timestamp write.
-	 * The read-side barriers for this are in drm_vblank_count_and_time.
-	 */
-	smp_wmb();
+	vblank->time = *t_vblank;
 	vblank->count += vblank_count_inc;
-	smp_wmb();
 }
 
 /**
@@ -127,7 +107,7 @@ static void drm_reset_vblank_timestamp(struct drm_device *dev, unsigned int pipe
 	struct timeval t_vblank;
 	int count = DRM_TIMESTAMP_MAXRETRIES;
 
-	spin_lock(&dev->vblank_time_lock);
+	write_seqlock(&dev->vblank_seqlock);
 
 	/*
 	 * sample the current counter to avoid random jumps
@@ -152,7 +132,7 @@ static void drm_reset_vblank_timestamp(struct drm_device *dev, unsigned int pipe
 	 */
 	store_vblank(dev, pipe, 1, &t_vblank, cur_vblank);
 
-	spin_unlock(&dev->vblank_time_lock);
+	write_sequnlock(&dev->vblank_seqlock);
 }
 
 /**
@@ -205,7 +185,7 @@ static void drm_update_vblank_count(struct drm_device *dev, unsigned int pipe,
 		const struct timeval *t_old;
 		u64 diff_ns;
 
-		t_old = &vblanktimestamp(dev, pipe, vblank->count);
+		t_old = &vblank->time;
 		diff_ns = timeval_to_ns(&t_vblank) - timeval_to_ns(t_old);
 
 		/*
@@ -236,49 +216,6 @@ static void drm_update_vblank_count(struct drm_device *dev, unsigned int pipe,
 	if (diff > 1 && (vblank->inmodeset & 0x2)) {
 		DRM_DEBUG_VBL("clamping vblank bump to 1 on crtc %u: diffr=%u"
 			      " due to pre-modeset.\n", pipe, diff);
-		diff = 1;
-	}
-
-	/*
-	 * FIMXE: Need to replace this hack with proper seqlocks.
-	 *
-	 * Restrict the bump of the software vblank counter to a safe maximum
-	 * value of +1 whenever there is the possibility that concurrent readers
-	 * of vblank timestamps could be active at the moment, as the current
-	 * implementation of the timestamp caching and updating is not safe
-	 * against concurrent readers for calls to store_vblank() with a bump
-	 * of anything but +1. A bump != 1 would very likely return corrupted
-	 * timestamps to userspace, because the same slot in the cache could
-	 * be concurrently written by store_vblank() and read by one of those
-	 * readers without the read-retry logic detecting the collision.
-	 *
-	 * Concurrent readers can exist when we are called from the
-	 * drm_vblank_off() or drm_vblank_on() functions and other non-vblank-
-	 * irq callers. However, all those calls to us are happening with the
-	 * vbl_lock locked to prevent drm_vblank_get(), so the vblank refcount
-	 * can't increase while we are executing. Therefore a zero refcount at
-	 * this point is safe for arbitrary counter bumps if we are called
-	 * outside vblank irq, a non-zero count is not 100% safe. Unfortunately
-	 * we must also accept a refcount of 1, as whenever we are called from
-	 * drm_vblank_get() -> drm_vblank_enable() the refcount will be 1 and
-	 * we must let that one pass through in order to not lose vblank counts
-	 * during vblank irq off - which would completely defeat the whole
-	 * point of this routine.
-	 *
-	 * Whenever we are called from vblank irq, we have to assume concurrent
-	 * readers exist or can show up any time during our execution, even if
-	 * the refcount is currently zero, as vblank irqs are usually only
-	 * enabled due to the presence of readers, and because when we are called
-	 * from vblank irq we can't hold the vbl_lock to protect us from sudden
-	 * bumps in vblank refcount. Therefore also restrict bumps to +1 when
-	 * called from vblank irq.
-	 */
-	if ((diff > 1) && (atomic_read(&vblank->refcount) > 1 ||
-	    (flags & DRM_CALLED_FROM_VBLIRQ))) {
-		DRM_DEBUG_VBL("clamping vblank bump to 1 on crtc %u: diffr=%u "
-			      "refcount %u, vblirq %u\n", pipe, diff,
-			      atomic_read(&vblank->refcount),
-			      (flags & DRM_CALLED_FROM_VBLIRQ) != 0);
 		diff = 1;
 	}
 
@@ -318,7 +255,7 @@ static void vblank_disable_and_save(struct drm_device *dev, unsigned int pipe)
 	 * so no updates of timestamps or count can happen after we've
 	 * disabled. Needed to prevent races in case of delayed irq's.
 	 */
-	spin_lock_irqsave(&dev->vblank_time_lock, irqflags);
+	write_seqlock_irqsave(&dev->vblank_seqlock, irqflags);
 
 	/*
 	 * Only disable vblank interrupts if they're enabled. This avoids
@@ -338,7 +275,7 @@ static void vblank_disable_and_save(struct drm_device *dev, unsigned int pipe)
 	 */
 	drm_update_vblank_count(dev, pipe, 0);
 
-	spin_unlock_irqrestore(&dev->vblank_time_lock, irqflags);
+	write_sequnlock_irqrestore(&dev->vblank_seqlock, irqflags);
 }
 
 static void vblank_disable_fn(unsigned long arg)
@@ -404,7 +341,7 @@ int drm_vblank_init(struct drm_device *dev, unsigned int num_crtcs)
 	unsigned int i;
 
 	spin_lock_init(&dev->vbl_lock);
-	spin_lock_init(&dev->vblank_time_lock);
+	seqlock_init(&dev->vblank_seqlock);
 
 	dev->num_crtcs = num_crtcs;
 
@@ -991,25 +928,19 @@ u32 drm_vblank_count_and_time(struct drm_device *dev, unsigned int pipe,
 			      struct timeval *vblanktime)
 {
 	struct drm_vblank_crtc *vblank = &dev->vblank[pipe];
-	int count = DRM_TIMESTAMP_MAXRETRIES;
-	u32 cur_vblank;
+	u32 vblank_count;
+	unsigned int seq;
 
 	if (WARN_ON(pipe >= dev->num_crtcs))
 		return 0;
 
-	/*
-	 * Vblank timestamps are read lockless. To ensure consistency the vblank
-	 * counter is rechecked and ordering is ensured using memory barriers.
-	 * This works like a seqlock. The write-side barriers are in store_vblank.
-	 */
 	do {
-		cur_vblank = vblank->count;
-		smp_rmb();
-		*vblanktime = vblanktimestamp(dev, pipe, cur_vblank);
-		smp_rmb();
-	} while (cur_vblank != vblank->count && --count > 0);
+		seq = read_seqbegin(&dev->vblank_seqlock);
+		vblank_count = vblank->count;
+		*vblanktime = vblank->time;
+	} while (read_seqretry(&dev->vblank_seqlock, seq));
 
-	return cur_vblank;
+	return vblank_count;
 }
 EXPORT_SYMBOL(drm_vblank_count_and_time);
 
@@ -1160,11 +1091,11 @@ static int drm_vblank_enable(struct drm_device *dev, unsigned int pipe)
 
 	assert_spin_locked(&dev->vbl_lock);
 
-	spin_lock(&dev->vblank_time_lock);
+	write_seqlock(&dev->vblank_seqlock);
 
 	if (!vblank->enabled) {
 		/*
-		 * Enable vblank irqs under vblank_time_lock protection.
+		 * Enable vblank irqs under vblank_seqlock protection.
 		 * All vblank count & timestamp updates are held off
 		 * until we are done reinitializing master counter and
 		 * timestamps. Filtercode in drm_handle_vblank() will
@@ -1180,7 +1111,7 @@ static int drm_vblank_enable(struct drm_device *dev, unsigned int pipe)
 		}
 	}
 
-	spin_unlock(&dev->vblank_time_lock);
+	write_sequnlock(&dev->vblank_seqlock);
 
 	return ret;
 }
@@ -1880,18 +1811,18 @@ bool drm_handle_vblank(struct drm_device *dev, unsigned int pipe)
 	 * vblank enable/disable, as this would cause inconsistent
 	 * or corrupted timestamps and vblank counts.
 	 */
-	spin_lock(&dev->vblank_time_lock);
+	write_seqlock(&dev->vblank_seqlock);
 
 	/* Vblank irq handling disabled. Nothing to do. */
 	if (!vblank->enabled) {
-		spin_unlock(&dev->vblank_time_lock);
+		write_sequnlock(&dev->vblank_seqlock);
 		spin_unlock_irqrestore(&dev->event_lock, irqflags);
 		return false;
 	}
 
 	drm_update_vblank_count(dev, pipe, DRM_CALLED_FROM_VBLIRQ);
 
-	spin_unlock(&dev->vblank_time_lock);
+	write_sequnlock(&dev->vblank_seqlock);
 
 	wake_up(&vblank->queue);
 	drm_handle_vblank_events(dev, pipe);
