@@ -76,27 +76,61 @@ static bool sugov_should_update_freq(struct sugov_policy *sg_policy, u64 time)
 	return delta_ns >= sg_policy->freq_update_delay_ns;
 }
 
-static void sugov_update_commit(struct sugov_policy *sg_policy, u64 time,
+static void sugov_fast_switch(struct sugov_policy *sg_policy, int cpu,
+			      unsigned int next_freq)
+{
+	struct cpufreq_policy *policy = sg_policy->policy;
+
+	next_freq = cpufreq_driver_fast_switch(policy, next_freq);
+	if (next_freq == CPUFREQ_ENTRY_INVALID)
+		return;
+
+	policy->cur = next_freq;
+	trace_cpu_frequency(next_freq, cpu);
+}
+
+#ifdef CONFIG_SMP
+static inline bool sugov_queue_remote_callback(struct sugov_policy *sg_policy,
+					 int cpu)
+{
+	struct cpufreq_policy *policy = sg_policy->policy;
+
+	if (!cpumask_test_cpu(smp_processor_id(), policy->cpus)) {
+		sg_policy->work_in_progress = true;
+		irq_work_queue_on(&sg_policy->irq_work, cpu);
+		return true;
+	}
+
+	return false;
+}
+#else
+static inline bool sugov_queue_remote_callback(struct sugov_policy *sg_policy,
+					 int cpu)
+{
+	return false;
+}
+#endif
+
+static void sugov_update_commit(struct sugov_cpu *sg_cpu, int cpu, u64 time,
 				unsigned int next_freq)
 {
+	struct sugov_policy *sg_policy = sg_cpu->sg_policy;
 	struct cpufreq_policy *policy = sg_policy->policy;
 
 	sg_policy->last_freq_update_time = time;
 
-	if (policy->fast_switch_enabled) {
-		if (sg_policy->next_freq == next_freq) {
-			trace_cpu_frequency(policy->cur, smp_processor_id());
-			return;
-		}
-		sg_policy->next_freq = next_freq;
-		next_freq = cpufreq_driver_fast_switch(policy, next_freq);
-		if (next_freq == CPUFREQ_ENTRY_INVALID)
-			return;
+	if (sg_policy->next_freq == next_freq) {
+		trace_cpu_frequency(policy->cur, cpu);
+		return;
+	}
+	sg_policy->next_freq = next_freq;
 
-		policy->cur = next_freq;
-		trace_cpu_frequency(next_freq, smp_processor_id());
-	} else if (sg_policy->next_freq != next_freq) {
-		sg_policy->next_freq = next_freq;
+	if (sugov_queue_remote_callback(sg_policy, cpu))
+		return;
+
+	if (policy->fast_switch_enabled) {
+		sugov_fast_switch(sg_policy, cpu, next_freq);
+	} else {
 		sg_policy->work_in_progress = true;
 		irq_work_queue(&sg_policy->irq_work);
 	}
@@ -142,12 +176,13 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 
 	next_f = util == ULONG_MAX ? policy->cpuinfo.max_freq :
 			get_next_freq(policy, util, max);
-	sugov_update_commit(sg_policy, time, next_f);
+	sugov_update_commit(sg_cpu, hook->cpu, time, next_f);
 }
 
-static unsigned int sugov_next_freq_shared(struct sugov_policy *sg_policy,
+static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu,
 					   unsigned long util, unsigned long max)
 {
+	struct sugov_policy *sg_policy = sg_cpu->sg_policy;
 	struct cpufreq_policy *policy = sg_policy->policy;
 	unsigned int max_f = policy->cpuinfo.max_freq;
 	u64 last_freq_update_time = sg_policy->last_freq_update_time;
@@ -161,10 +196,10 @@ static unsigned int sugov_next_freq_shared(struct sugov_policy *sg_policy,
 		unsigned long j_util, j_max;
 		s64 delta_ns;
 
-		if (j == smp_processor_id())
+		j_sg_cpu = &per_cpu(sugov_cpu, j);
+		if (j_sg_cpu == sg_cpu)
 			continue;
 
-		j_sg_cpu = &per_cpu(sugov_cpu, j);
 		/*
 		 * If the CPU utilization was last updated before the previous
 		 * frequency update and the time elapsed between the last update
@@ -204,8 +239,8 @@ static void sugov_update_shared(struct update_util_data *hook, u64 time,
 	sg_cpu->last_update = time;
 
 	if (sugov_should_update_freq(sg_policy, time)) {
-		next_f = sugov_next_freq_shared(sg_policy, util, max);
-		sugov_update_commit(sg_policy, time, next_f);
+		next_f = sugov_next_freq_shared(sg_cpu, util, max);
+		sugov_update_commit(sg_cpu, hook->cpu, time, next_f);
 	}
 
 	raw_spin_unlock(&sg_policy->update_lock);
@@ -226,9 +261,18 @@ static void sugov_work(struct work_struct *work)
 static void sugov_irq_work(struct irq_work *irq_work)
 {
 	struct sugov_policy *sg_policy;
+	struct cpufreq_policy *policy;
 
 	sg_policy = container_of(irq_work, struct sugov_policy, irq_work);
-	schedule_work_on(smp_processor_id(), &sg_policy->work);
+	policy = sg_policy->policy;
+
+	if (policy->fast_switch_enabled) {
+		sugov_fast_switch(sg_policy, smp_processor_id(),
+				  sg_policy->next_freq);
+		sg_policy->work_in_progress = false;
+	} else {
+		schedule_work_on(smp_processor_id(), &sg_policy->work);
+	}
 }
 
 /************************** sysfs interface ************************/
