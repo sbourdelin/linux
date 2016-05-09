@@ -90,7 +90,7 @@
 #define SCTLR_EL1_CP15BEN	(0x1 << 5)
 #define SCTLR_EL1_SED		(0x1 << 8)
 #define SCTLR_EL1_SPAN		(0x1 << 23)
-
+#define SCTLR_EL1_UCI		(0x1 << 26)
 
 /* id_aa64isar0 */
 #define ID_AA64ISAR0_RDM_SHIFT		28
