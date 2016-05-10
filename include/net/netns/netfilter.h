@@ -15,5 +15,10 @@ struct netns_nf {
 	struct ctl_table_header *nf_log_dir_header;
 #endif
 	struct list_head hooks[NFPROTO_NUMPROTO][NF_MAX_HOOKS];
+
+	/* needed so nf core knows that we might need to drop
+	 * queued packets on hook unregister
+	 */
+	bool nfqueue_inited;
 };
 #endif

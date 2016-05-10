@@ -104,7 +104,7 @@ void nf_queue_nf_hook_drop(struct net *net, struct nf_hook_ops *ops)
 
 	rcu_read_lock();
 	qh = rcu_dereference(queue_handler);
-	if (qh)
+	if (qh && net->nf.nfqueue_inited)
 		qh->nf_hook_drop(net, ops);
 	rcu_read_unlock();
 }

@@ -1377,6 +1377,7 @@ static int __net_init nfnl_queue_net_init(struct net *net)
 			 net->nf.proc_netfilter, &nfqnl_file_ops))
 		return -ENOMEM;
 #endif
+	net->nf.nfqueue_inited = true;
 	return 0;
 }
 
