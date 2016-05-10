@@ -540,6 +540,59 @@ static void pending_bios_fn(struct btrfs_work *work)
 	run_scheduled_bios(device);
 }
 
+int btrfs_get_spare_device(char **path)
+{
+	int ret = 1;
+	struct btrfs_fs_devices *fs_devices;
+	struct btrfs_device *device;
+	struct list_head *fs_uuids = btrfs_get_fs_uuids();
+
+	mutex_lock(&uuid_mutex);
+	list_for_each_entry(fs_devices, fs_uuids, list) {
+		if (!fs_devices->spare)
+			continue;
+
+		/* as of now there is only one device in the spare fs_devices */
+		device = list_entry(fs_devices->devices.next,
+					struct btrfs_device, dev_list);
+
+		if (!device || !device->name)
+			continue;
+
+		fs_devices->spare = 0;
+		/*
+		 * Its under uuid_mutex and there is one spare per fsid
+		 * so rcu lock is actually not required
+		 */
+		*path = kstrdup(device->name->str, GFP_KERNEL);
+		if (*path)
+			ret = 0;
+		else
+			ret = -ENOMEM;
+		break;
+	}
+
+	if (!ret) {
+		btrfs_sysfs_remove_fsid(fs_devices);
+		list_del(&fs_devices->list);
+		free_fs_devices(fs_devices);
+	}
+	mutex_unlock(&uuid_mutex);
+
+	return ret;
+}
+
+void btrfs_put_spare_device(char *path)
+{
+	struct file_system_type *btrfs_fs_type;
+	struct btrfs_fs_devices *fs_devices;
+
+	btrfs_fs_type = btrfs_get_fs_type();
+
+	if (btrfs_scan_one_device(path, FMODE_READ,
+				    btrfs_fs_type, &fs_devices))
+		printk(KERN_INFO "failed to return spare device\n");
+}
 
 void btrfs_free_stale_device(struct btrfs_device *cur_dev)
 {

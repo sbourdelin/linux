@@ -428,6 +428,8 @@ int btrfs_init_new_device(struct btrfs_root *root, char *path);
 int btrfs_init_dev_replace_tgtdev(struct btrfs_root *root, char *device_path,
 				  struct btrfs_device *srcdev,
 				  struct btrfs_device **device_out);
+int btrfs_get_spare_device(char **path);
+void btrfs_put_spare_device(char *path);
 int btrfs_balance(struct btrfs_balance_control *bctl,
 		  struct btrfs_ioctl_balance_args *bargs);
 int btrfs_resume_balance_async(struct btrfs_fs_info *fs_info);
