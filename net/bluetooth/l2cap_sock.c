@@ -1307,6 +1307,15 @@ static void l2cap_sock_teardown_cb(struct l2cap_chan *chan, int err)
 
 	BT_DBG("chan %p state %s", chan, state_to_string(chan->state));
 
+	parent = bt_sk(sk)->parent;
+
+	/* The parent sock must be locked if its state is mutated by
+	 * bt_accept_unlink. It must be locked before sk to maintain the same
+	 * locking order as bt_accept_dequeue.
+	 */
+	if (parent)
+		lock_sock_nested(parent, L2CAP_NESTING_PARENT);
+
 	/* This callback can be called both for server (BT_LISTEN)
 	 * sockets as well as "normal" ones. To avoid lockdep warnings
 	 * with child socket locking (through l2cap_sock_cleanup_listen)
@@ -1316,7 +1325,11 @@ static void l2cap_sock_teardown_cb(struct l2cap_chan *chan, int err)
 	 */
 	lock_sock_nested(sk, atomic_read(&chan->nesting));
 
-	parent = bt_sk(sk)->parent;
+	/* bt_accept_unlink could have been called before locking parent. */
+	if (parent && !bt_sk(sk)->parent) {
+		release_sock(parent);
+		parent = NULL;
+	}
 
 	sock_set_flag(sk, SOCK_ZAPPED);
 
@@ -1348,6 +1361,9 @@ static void l2cap_sock_teardown_cb(struct l2cap_chan *chan, int err)
 	}
 
 	release_sock(sk);
+
+	if (parent)
+		release_sock(parent);
 }
 
 static void l2cap_sock_state_change_cb(struct l2cap_chan *chan, int state,
