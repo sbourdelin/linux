@@ -94,7 +94,7 @@ extern int kvmppc_emulate_instruction(struct kvm_run *run,
 extern int kvmppc_emulate_loadstore(struct kvm_vcpu *vcpu);
 extern int kvmppc_emulate_mmio(struct kvm_run *run, struct kvm_vcpu *vcpu);
 extern void kvmppc_emulate_dec(struct kvm_vcpu *vcpu);
-extern u32 kvmppc_get_dec(struct kvm_vcpu *vcpu, u64 tb);
+extern u64 kvmppc_get_dec(struct kvm_vcpu *vcpu, u64 tb);
 extern void kvmppc_decrementer_func(struct kvm_vcpu *vcpu);
 extern int kvmppc_sanity_check(struct kvm_vcpu *vcpu);
 extern int kvmppc_subarch_vcpu_init(struct kvm_vcpu *vcpu);
