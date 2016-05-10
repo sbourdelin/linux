@@ -22,6 +22,9 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <linux/list.h>
+#ifdef ARCH_UNWIND_LIBUNWIND
+#include "libunwind-arch.h"
+#endif
 #include <libunwind.h>
 #include <libunwind-ptrace.h>
 #include "callchain.h"
@@ -33,6 +36,22 @@
 #include "util.h"
 #include "debug.h"
 #include "asm/bug.h"
+
+#ifndef ARCH_UNWIND_LIBUNWIND
+  #define LIBUNWIND__ARCH_REG_ID libunwind__arch_reg_id
+  #define LOCAL_UNWIND_LIBUNWIND
+  #undef UNWT_OBJ
+  #define UNWT_OBJ(x) _##x
+#else
+  #undef NO_LIBUNWIND_DEBUG_FRAME
+  #if defined(LIBUNWIND_ARM) && !defined(NO_LIBUNWIND_DEBUG_FRAME_ARM)
+  #elif defined(LIBUNWIND_AARCH64) &&                    \
+	  defined(NO_LIBUNWIND_DEBUG_FRAME_ARM_AARCH64)
+  #else
+    #define NO_LIBUNWIND_DEBUG_FRAME
+  #endif
+#endif
+
 
 extern int
 UNW_OBJ(dwarf_search_unwind_table) (unw_addr_space_t as,
@@ -579,7 +598,7 @@ static unw_accessors_t accessors = {
 	.get_proc_name		= get_proc_name,
 };
 
-int unwind__prepare_access(struct thread *thread)
+static int UNWT_OBJ(_unwind__prepare_access)(struct thread *thread)
 {
 	if (callchain_param.record_mode != CALLCHAIN_DWARF)
 		return 0;
@@ -594,7 +613,7 @@ int unwind__prepare_access(struct thread *thread)
 	return 0;
 }
 
-void unwind__flush_access(struct thread *thread)
+static void UNWT_OBJ(_unwind__flush_access)(struct thread *thread)
 {
 	if (callchain_param.record_mode != CALLCHAIN_DWARF)
 		return;
@@ -602,7 +621,7 @@ void unwind__flush_access(struct thread *thread)
 	unw_flush_cache(thread->addr_space, 0, 0);
 }
 
-void unwind__finish_access(struct thread *thread)
+static void UNWT_OBJ(_unwind__finish_access)(struct thread *thread)
 {
 	if (callchain_param.record_mode != CALLCHAIN_DWARF)
 		return;
@@ -662,9 +681,10 @@ static int get_entries(struct unwind_info *ui, unwind_entry_cb_t cb,
 	return ret;
 }
 
-int unwind__get_entries(unwind_entry_cb_t cb, void *arg,
-			struct thread *thread,
-			struct perf_sample *data, int max_stack)
+static int UNWT_OBJ(_unwind__get_entries)(unwind_entry_cb_t cb, void *arg,
+					 struct thread *thread,
+					 struct perf_sample *data,
+					 int max_stack)
 {
 	struct unwind_info ui = {
 		.sample       = data,
@@ -681,34 +701,17 @@ int unwind__get_entries(unwind_entry_cb_t cb, void *arg,
 	return get_entries(&ui, cb, arg, max_stack);
 }
 
-void unwind__get_arch(struct thread *thread, struct map *map)
+struct unwind_libunwind_ops
+UNWT_OBJ(unwind_libunwind_ops) = {
+	.prepare_access = UNWT_OBJ(_unwind__prepare_access),
+	.flush_access   = UNWT_OBJ(_unwind__flush_access),
+	.finish_access  = UNWT_OBJ(_unwind__finish_access),
+	.get_entries    = UNWT_OBJ(_unwind__get_entries),
+};
+
+#ifdef LOCAL_UNWIND_LIBUNWIND
+void register_local_unwind_libunwind_ops(struct thread *thread)
 {
-	char *arch;
-	int is_64_bit;
-
-	if (!thread->mg->machine->env)
-		return;
-
-	is_64_bit = dso_is_64_bit(map->dso, map);
-	if (is_64_bit < 0)
-		return;
-
-	if (thread->addr_space)
-		pr_debug("Thread map already set, 64bit is %d, dso=%s\n",
-			 is_64_bit, map->dso->name);
-
-	arch = thread->mg->machine->env->arch;
-
-	if (!strcmp(arch, "x86_64")
-		   || !strcmp(arch, "x86")
-		   || !strcmp(arch, "i686")) {
-		pr_debug("Thread map is X86, 64bit is %d\n", is_64_bit);
-		if (!is_64_bit)
-#ifdef HAVE_LIBUNWIND_X86_SUPPORT
-			pr_err("target platform=%s is not implemented!\n",
-			       arch);
-#else
-			pr_err("target platform=%s is not supported!\n", arch);
-#endif
-	}
+	thread->unwind_libunwind_ops = &UNWT_OBJ(unwind_libunwind_ops);
 }
+#endif

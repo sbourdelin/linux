@@ -15,6 +15,17 @@
 
 struct thread_stack;
 
+struct unwind_entry;
+typedef int (*unwind_entry_cb_t)(struct unwind_entry *entry, void *arg);
+struct unwind_libunwind_ops {
+	int (*prepare_access)(struct thread *thread);
+	void (*flush_access)(struct thread *thread);
+	void (*finish_access)(struct thread *thread);
+	int (*get_entries)(unwind_entry_cb_t cb, void *arg,
+			   struct thread *thread,
+			   struct perf_sample *data, int max_stack);
+};
+
 struct thread {
 	union {
 		struct rb_node	 rb_node;
@@ -36,7 +47,8 @@ struct thread {
 	void			*priv;
 	struct thread_stack	*ts;
 #ifdef HAVE_LIBUNWIND_SUPPORT
-	unw_addr_space_t	addr_space;
+	unw_addr_space_t		addr_space;
+	struct unwind_libunwind_ops	*unwind_libunwind_ops;
 #endif
 };
 
