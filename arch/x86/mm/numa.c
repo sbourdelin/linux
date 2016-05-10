@@ -746,10 +746,14 @@ void __init init_cpu_to_node(void)
 		if (node == NUMA_NO_NODE)
 			continue;
 
+		printk(KERN_INFO "debug init_cpu_to_node debug stay on 1");
 		if (!node_online(node))
+			printk(KERN_INFO "debug init_cpu_to_node debug stay on 2");
 			init_memory_less_node(node);
+			printk(KERN_INFO "debug init_cpu_to_node debug stay on 3");
 
 		numa_set_node(cpu, node);
+		printk(KERN_INFO "debug init_cpu_to_node debug stay on 4");
 	}
 }
 

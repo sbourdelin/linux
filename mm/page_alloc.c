@@ -3223,18 +3223,25 @@ retry_cpuset:
 	/* First allocation attempt */
 	alloc_mask = gfp_mask|__GFP_HARDWALL;
 	page = get_page_from_freelist(alloc_mask, order, alloc_flags, &ac);
+
+	printk(KERN_INFO "debug __alloc_pages_nodemask debug stay on 1");
 	if (unlikely(!page)) {
 		/*
 		 * Runtime PM, block IO and its error handling path
 		 * can deadlock because I/O on the device might not
 		 * complete.
 		 */
+
+		printk(KERN_INFO "debug __alloc_pages_nodemask debug stay on 2");
 		alloc_mask = memalloc_noio_flags(gfp_mask);
 		ac.spread_dirty_pages = false;
 
+		printk(KERN_INFO "debug __alloc_pages_nodemask debug stay on 3");
 		page = __alloc_pages_slowpath(alloc_mask, order, &ac);
+		printk(KERN_INFO "debug __alloc_pages_nodemask debug stay on 4");
 	}
 
+	printk(KERN_INFO "debug __alloc_pages_nodemask debug stay on 5");
 	if (kmemcheck_enabled && page)
 		kmemcheck_pagealloc_alloc(page, order, gfp_mask);
 
