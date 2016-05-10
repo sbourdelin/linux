@@ -7126,8 +7126,12 @@ int btrfs_check_degradable(struct btrfs_fs_info *fs_info, unsigned flags)
 			btrfs_get_num_tolerated_disk_barrier_failures(
 					map->type);
 		for (i = 0; i < map->num_stripes; i++) {
-			if (map->stripes[i].dev->missing)
+			if (map->stripes[i].dev->missing ||
+			    map->stripes[i].dev->err_wait ||
+			    map->stripes[i].dev->err_send)
 				missing++;
+			map->stripes[i].dev->err_wait = 0;
+			map->stripes[i].dev->err_send = 0;
 		}
 		if (missing > max_tolerated) {
 			ret = -EIO;
