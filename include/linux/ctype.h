@@ -11,9 +11,20 @@
 #define _D	0x04	/* digit */
 #define _C	0x08	/* cntrl */
 #define _P	0x10	/* punct */
-#define _S	0x20	/* white space (space/lf/tab) */
+#define _S	0x20	/* space
+			   0x09 - Horizontal Tab (HT)
+			   0x0A - Line Feed (LF)
+			   0x0B - Vertical Tab (VT)
+			   0x0C - Form Feed (FF)
+			   0x0D - Carriage Return (CR)
+			   0x20 - Space (SP)
+			   0xA0 - Non-Breakable Space (NBSP)
+			*/
 #define _X	0x40	/* hex digit */
-#define _SP	0x80	/* hard space (0x20) */
+#define _SP	0x80	/* hard space
+			   0x20 - Space (SP)
+			   0xA0 - Non-Breakable Space (NBSP)
+			 */
 
 extern const unsigned char _ctype[];
 
