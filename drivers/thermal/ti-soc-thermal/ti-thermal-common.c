@@ -278,6 +278,20 @@ static int ti_thermal_get_trend(struct thermal_zone_device *thermal,
 	return 0;
 }
 
+static int __ti_thermal_set_emul_temp(void *p, int temp)
+{
+	struct ti_thermal_data *data = p;
+	struct thermal_zone_device *tz;
+
+	tz = data->ti_thermal;
+
+	mutex_lock(&tz->lock);
+	tz->emul_temperature = temp;
+	mutex_unlock(&tz->lock);
+
+	return 0;
+}
+
 /* Get critical temperature callback functions for thermal zone */
 static int ti_thermal_get_crit_temp(struct thermal_zone_device *thermal,
 				    int *temp)
@@ -289,6 +303,7 @@ static int ti_thermal_get_crit_temp(struct thermal_zone_device *thermal,
 static const struct thermal_zone_of_device_ops ti_of_thermal_ops = {
 	.get_temp = __ti_thermal_get_temp,
 	.get_trend = __ti_thermal_get_trend,
+	.set_emul_temp = __ti_thermal_set_emul_temp,
 };
 
 static struct thermal_zone_device_ops ti_thermal_ops = {
