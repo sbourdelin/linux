@@ -66,13 +66,26 @@ struct btrfs_device {
 	struct btrfs_pending_bios pending_sync_bios;
 
 	struct block_device *bdev;
+	struct block_device *closing_bdev;
 
 	/* the mode sent to blkdev_get */
 	fmode_t mode;
 
 	int writeable;
 	int in_fs_metadata;
+	/* missing: device wasn't found at the time of mount */
 	int missing;
+	/* failed: device confirmed to have experienced critical io failure */
+	int failed;
+	/*
+	 * offline: system or user or block layer transport has removed
+	 * offlined the device which was once present and without going
+	 * through unmount. Implies an intriem communication break down
+	 * and not necessarily a candidate for the device replace. And
+	 * device might be online after user intervention or after
+	 * block transport layer error recovery.
+	 */
+	int offline;
 	int can_discard;
 	int is_tgtdev_for_dev_replace;
 
@@ -534,5 +547,6 @@ struct list_head *btrfs_get_fs_uuids(void);
 void btrfs_set_fs_info_ptr(struct btrfs_fs_info *fs_info);
 void btrfs_reset_fs_info_ptr(struct btrfs_fs_info *fs_info);
 int btrfs_check_degradable(struct btrfs_fs_info *fs_info, unsigned flags);
+void btrfs_device_enforce_state(struct btrfs_device *dev, char *why);
 
 #endif
