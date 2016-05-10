@@ -680,3 +680,35 @@ int unwind__get_entries(unwind_entry_cb_t cb, void *arg,
 
 	return get_entries(&ui, cb, arg, max_stack);
 }
+
+void unwind__get_arch(struct thread *thread, struct map *map)
+{
+	char *arch;
+	int is_64_bit;
+
+	if (!thread->mg->machine->env)
+		return;
+
+	is_64_bit = dso_is_64_bit(map->dso, map);
+	if (is_64_bit < 0)
+		return;
+
+	if (thread->addr_space)
+		pr_debug("Thread map already set, 64bit is %d, dso=%s\n",
+			 is_64_bit, map->dso->name);
+
+	arch = thread->mg->machine->env->arch;
+
+	if (!strcmp(arch, "x86_64")
+		   || !strcmp(arch, "x86")
+		   || !strcmp(arch, "i686")) {
+		pr_debug("Thread map is X86, 64bit is %d\n", is_64_bit);
+		if (!is_64_bit)
+#ifdef HAVE_LIBUNWIND_X86_SUPPORT
+			pr_err("target platform=%s is not implemented!\n",
+			       arch);
+#else
+			pr_err("target platform=%s is not supported!\n", arch);
+#endif
+	}
+}
