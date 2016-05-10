@@ -257,7 +257,7 @@ void account_idle_time(cputime_t cputime)
 		cpustat[CPUTIME_IDLE] += (__force u64) cputime;
 }
 
-static __always_inline bool steal_account_process_tick(void)
+static __always_inline unsigned long steal_account_process_tick(void)
 {
 #ifdef CONFIG_PARAVIRT
 	if (static_key_false(&paravirt_steal_enabled)) {
@@ -279,7 +279,7 @@ static __always_inline bool steal_account_process_tick(void)
 		return steal_jiffies;
 	}
 #endif
-	return false;
+	return 0;
 }
 
 /*
@@ -691,8 +691,11 @@ static cputime_t get_vtime_delta(struct task_struct *tsk)
 
 static void __vtime_account_system(struct task_struct *tsk)
 {
+	unsigned long steal_time = steal_account_process_tick();
 	cputime_t delta_cpu = get_vtime_delta(tsk);
 
+	delta_cpu = steal_time ? (delta_cpu -
+		jiffies_to_cputime(steal_time)) : delta_cpu;
 	account_system_time(tsk, irq_count(), delta_cpu, cputime_to_scaled(delta_cpu));
 }
 
@@ -723,7 +726,11 @@ void vtime_account_user(struct task_struct *tsk)
 	write_seqcount_begin(&tsk->vtime_seqcount);
 	tsk->vtime_snap_whence = VTIME_SYS;
 	if (vtime_delta(tsk)) {
+		unsigned long steal_time = steal_account_process_tick();
 		delta_cpu = get_vtime_delta(tsk);
+
+		delta_cpu = steal_time ? (delta_cpu -
+			jiffies_to_cputime(steal_time)) : delta_cpu;
 		account_user_time(tsk, delta_cpu, cputime_to_scaled(delta_cpu));
 	}
 	write_seqcount_end(&tsk->vtime_seqcount);
