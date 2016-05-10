@@ -6,7 +6,8 @@
 #include <asm/machdep.h>
 #include <asm/mman.h>
 
-void radix__flush_hugetlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
+static inline unsigned long get_base_page_size(struct vm_area_struct *vma,
+					       unsigned long vmaddr)
 {
 	unsigned long ap, shift;
 	struct hstate *hstate = hstate_file(vma->vm_file);
@@ -18,25 +19,25 @@ void radix__flush_hugetlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
 		ap = mmu_get_ap(MMU_PAGE_1G);
 	else {
 		WARN(1, "Wrong huge page shift\n");
-		return ;
+		return 0;
 	}
+#ifdef CONFIG_DEBUG_VM
+	/* Double check this assumption */
+	WARN_ON(ap != 0 && ap != 0x5);
+#endif
+	return ap;
+}
+
+void radix__flush_hugetlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
+{
+	unsigned long ap = get_base_page_size(vma, vmaddr);
 	radix___flush_tlb_page(vma->vm_mm, vmaddr, ap, 0);
 }
 
-void radix__local_flush_hugetlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
+void radix__local_flush_hugetlb_page(struct vm_area_struct *vma,
+				     unsigned long vmaddr)
 {
-	unsigned long ap, shift;
-	struct hstate *hstate = hstate_file(vma->vm_file);
-
-	shift = huge_page_shift(hstate);
-	if (shift == mmu_psize_defs[MMU_PAGE_2M].shift)
-		ap = mmu_get_ap(MMU_PAGE_2M);
-	else if (shift == mmu_psize_defs[MMU_PAGE_1G].shift)
-		ap = mmu_get_ap(MMU_PAGE_1G);
-	else {
-		WARN(1, "Wrong huge page shift\n");
-		return ;
-	}
+	unsigned long ap = get_base_page_size(vma, vmaddr);
 	radix___local_flush_tlb_page(vma->vm_mm, vmaddr, ap, 0);
 }
 
