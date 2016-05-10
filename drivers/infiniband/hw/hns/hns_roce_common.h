@@ -10,6 +10,10 @@
 #ifndef _HNS_ROCE_COMMON_H
 #define _HNS_ROCE_COMMON_H
 
+#ifndef assert
+#define assert(cond)
+#endif
+
 #define roce_writel(value, addr)     writel((value), (addr))
 #define roce_readl(addr)            readl((addr))
 #define roce_raw_write(value, addr) \
