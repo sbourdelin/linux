@@ -73,6 +73,27 @@ static void dw_mci_rk3288_set_ios(struct dw_mci *host, struct mmc_ios *ios)
 	/* Make sure we use phases which we can enumerate with */
 	if (!IS_ERR(priv->sample_clk))
 		clk_set_phase(priv->sample_clk, priv->default_sample_phase);
+
+	/*
+	 * Set the drive phase to 180 degrees.  This helps us achieve proper
+	 * hold times.
+	 *
+	 * Note that this is _not_ a value that is tuned and is also _not_ a
+	 * value that will vary from board to board.  It is a value that
+	 * _could_ vary between different SoC models (could be different on
+	 * rk3066 vs. rk3288 for instance).  It is also a value that _could_
+	 * need to be adjusted based on our clock frequency and speed mode
+	 * since different speed modes have different hold time requirements
+	 * and hold time requirements are in "ns" (a phase offset adds a
+	 * different "ns" delay for different input clocks).
+	 *
+	 * Despite these theoretical needs, it has been observed that 180
+	 * degrees gives us good signaling across all tested SoCs and all
+	 * tested speed modes.  If when we find someone that needs 90 degrees
+	 * here we can add a table based on speed mode / SoC compatible ID.
+	 */
+	if (!IS_ERR(priv->drv_clk))
+		clk_set_phase(priv->drv_clk, 180);
 }
 
 #define NUM_PHASES			360
