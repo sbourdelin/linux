@@ -1876,6 +1876,39 @@ sleep:
 	return 0;
 }
 
+static int btrfs_recuperate(struct btrfs_root *root)
+{
+	int ret;
+	u64 failed_devid = 0;
+	struct btrfs_device *device;
+	struct btrfs_fs_devices *fs_devices;
+
+	fs_devices = root->fs_info->fs_devices;
+
+	/* fixme: does it need device_list_mutex */
+	mutex_lock(&fs_devices->device_list_mutex);
+	rcu_read_lock();
+	list_for_each_entry_rcu(device,
+			&fs_devices->devices, dev_list) {
+		if (device->failed) {
+			failed_devid = device->devid;
+			break;
+		}
+	}
+	rcu_read_unlock();
+	mutex_unlock(&fs_devices->device_list_mutex);
+
+	/*
+	 * We are using the replace code which should be interrupt-able
+	 * during unmount, and as of now there is no user land stop
+	 * request that we support and this will run until its complete
+	 */
+	if (failed_devid && !root->fs_info->no_auto_replace)
+		ret = btrfs_auto_replace_start(root, failed_devid);
+
+	return ret;
+}
+
 /*
  * returns:
  * < 0 : Check didn't run, std error
@@ -1950,6 +1983,8 @@ static int health_kthread(void *arg)
 
 		/* Check devices health */
 		btrfs_update_devices_health(root);
+
+		btrfs_recuperate(root);
 
 		mutex_unlock(&root->fs_info->health_mutex);
 
