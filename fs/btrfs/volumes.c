@@ -619,6 +619,10 @@ static noinline int device_list_add(const char *path,
 		if (IS_ERR(fs_devices))
 			return PTR_ERR(fs_devices);
 
+		if (btrfs_super_incompat_flags(disk_super) &
+				BTRFS_FEATURE_INCOMPAT_SPARE_DEV)
+			fs_devices->spare = 1;
+
 		list_add(&fs_devices->list, &fs_uuids);
 
 		device = NULL;
