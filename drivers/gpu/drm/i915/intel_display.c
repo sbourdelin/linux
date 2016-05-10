@@ -13702,6 +13702,13 @@ static int intel_atomic_commit(struct drm_device *dev,
 			dev_priv->display.optimize_watermarks(intel_cstate);
 	}
 
+	/*
+	 * We've now finished at least one atomic commit following hw readout,
+	 * so any platforms that needed to do extra sanitization of watermarks
+	 * should have done it by now.
+	 */
+	dev_priv->wm.distrust_bios_wm = false;
+
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
 		intel_post_plane_update(to_intel_crtc_state(old_crtc_state));
 

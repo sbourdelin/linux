@@ -4021,10 +4021,23 @@ void skl_wm_get_hw_state(struct drm_device *dev)
 	struct skl_ddb_allocation *ddb = &dev_priv->wm.skl_hw.ddb;
 	struct drm_crtc *crtc;
 	struct intel_crtc *intel_crtc;
+	bool any_on = false;
 
 	skl_ddb_get_hw_state(dev_priv, ddb);
-	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head)
+	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		skl_pipe_wm_get_hw_state(crtc);
+
+		if (crtc->state->active)
+			any_on = true;
+	}
+
+	if (any_on) {
+		/* Fully recompute DDB on first atomic commit */
+		dev_priv->wm.distrust_bios_wm = true;
+	} else {
+		/* Easy/common case; just sanitize DDB now if everything off */
+		memset(ddb, 0, sizeof(*ddb));
+	}
 
 	/* Calculate plane data rates */
 	for_each_intel_crtc(dev, intel_crtc) {
