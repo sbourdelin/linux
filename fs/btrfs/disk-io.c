@@ -2885,6 +2885,16 @@ int open_ctree(struct super_block *sb,
 		goto fail_tree_roots;
 	}
 
+	ret = btrfs_check_degradable(fs_info, fs_info->sb->s_flags);
+	if (ret < 0) {
+		btrfs_err(fs_info, "degraded writable mount failed %d", ret);
+		goto fail_tree_roots;
+	} else if (ret > 0 && !btrfs_test_opt(chunk_root, DEGRADED)) {
+		btrfs_warn(fs_info,
+			"Some device missing, but still degraded mountable, please mount with -o degraded option");
+		ret = -EACCES;
+		goto fail_tree_roots;
+	}
 	/*
 	 * keep the device that is marked to be the target device for the
 	 * dev_replace procedure
@@ -2988,14 +2998,6 @@ retry_root_backup:
 	}
 	fs_info->num_tolerated_disk_barrier_failures =
 		btrfs_calc_num_tolerated_disk_barrier_failures(fs_info);
-	if (fs_info->fs_devices->missing_devices >
-	     fs_info->num_tolerated_disk_barrier_failures &&
-	    !(sb->s_flags & MS_RDONLY)) {
-		pr_warn("BTRFS: missing devices(%llu) exceeds the limit(%d), writeable mount is not allowed\n",
-			fs_info->fs_devices->missing_devices,
-			fs_info->num_tolerated_disk_barrier_failures);
-		goto fail_sysfs;
-	}
 
 	fs_info->cleaner_kthread = kthread_run(cleaner_kthread, tree_root,
 					       "btrfs-cleaner");
