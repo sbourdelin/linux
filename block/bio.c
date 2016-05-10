@@ -611,6 +611,8 @@ struct bio *bio_clone_fast(struct bio *bio, gfp_t gfp_mask, struct bio_set *bs)
 		}
 	}
 
+	bio_clone_blkcg_association(b, bio);
+
 	return b;
 }
 EXPORT_SYMBOL(bio_clone_fast);
@@ -683,6 +685,8 @@ integrity_clone:
 			return NULL;
 		}
 	}
+
+	bio_clone_blkcg_association(bio, bio_src);
 
 	return bio;
 }
@@ -1800,6 +1804,8 @@ struct bio *bio_split(struct bio *bio, int sectors,
 
 	bio_advance(bio, split->bi_iter.bi_size);
 
+	bio_clone_blkcg_association(split, bio);
+
 	return split;
 }
 EXPORT_SYMBOL(bio_split);
@@ -2003,6 +2009,17 @@ void bio_disassociate_task(struct bio *bio)
 		css_put(bio->bi_css);
 		bio->bi_css = NULL;
 	}
+}
+
+/**
+ * bio_clone_blkcg_association - clone blkcg association from src to dst bio
+ * @dst: destination bio
+ * @src: source bio
+ */
+void bio_clone_blkcg_association(struct bio *dst, struct bio *src)
+{
+	if (src->bi_css)
+		WARN_ON(bio_associate_blkcg(dst, src->bi_css));
 }
 
 #endif /* CONFIG_BLK_CGROUP */
