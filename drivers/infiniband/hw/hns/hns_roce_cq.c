@@ -52,3 +52,28 @@ void hns_roce_cq_event(struct hns_roce_dev *hr_dev, u32 cqn, int event_type)
 	if (atomic_dec_and_test(&cq->refcount))
 		complete(&cq->free);
 }
+
+int hns_roce_init_cq_table(struct hns_roce_dev *hr_dev)
+{
+	struct hns_roce_cq_table *cq_table = &hr_dev->cq_table;
+	struct device *dev = &hr_dev->pdev->dev;
+	int ret;
+
+	spin_lock_init(&cq_table->lock);
+	INIT_RADIX_TREE(&cq_table->tree, GFP_ATOMIC);
+
+	ret = hns_roce_bitmap_init(&cq_table->bitmap, hr_dev->caps.num_cqs,
+				   hr_dev->caps.num_cqs - 1,
+				   hr_dev->caps.reserved_cqs, 0);
+	if (ret) {
+		dev_err(dev, "init_cq_table.Failed to bitmap_init.\n");
+		return ret;
+	}
+
+	return 0;
+}
+
+void hns_roce_cleanup_cq_table(struct hns_roce_dev *hr_dev)
+{
+	hns_roce_bitmap_cleanup(&hr_dev->cq_table.bitmap);
+}
