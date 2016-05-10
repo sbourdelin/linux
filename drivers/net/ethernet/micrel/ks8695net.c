@@ -1456,8 +1456,7 @@ ks8695_probe(struct platform_device *pdev)
 	ndev->dev_addr[5] = maclow & 0xFF;
 
 	if (!is_valid_ether_addr(ndev->dev_addr))
-		dev_warn(ksp->dev, "%s: Invalid ethernet MAC address. Please "
-			 "set using ifconfig\n", ndev->name);
+		dev_warn(ksp->dev, "Invalid ethernet MAC address. Please set using ifconfig\n");
 
 	/* In order to be efficient memory-wise, we allocate both
 	 * rings in one go.

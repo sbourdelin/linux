@@ -358,8 +358,7 @@ static int netx_eth_enable(struct net_device *ndev)
 	xc_start(priv->xc);
 
 	if (!is_valid_ether_addr(ndev->dev_addr))
-		printk("%s: Invalid ethernet MAC address.  Please "
-		       "set using ifconfig\n", ndev->name);
+		printk("Invalid ethernet MAC address. Please set using ifconfig\n");
 
 	for (i=2; i<=18; i++)
 		pfifo_push(EMPTY_PTR_FIFO(priv->id),

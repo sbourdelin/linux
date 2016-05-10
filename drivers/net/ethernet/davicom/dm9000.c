@@ -1686,8 +1686,7 @@ dm9000_probe(struct platform_device *pdev)
 	}
 
 	if (!is_valid_ether_addr(ndev->dev_addr)) {
-		dev_warn(db->dev, "%s: Invalid ethernet MAC address. Please "
-			 "set using ifconfig\n", ndev->name);
+		dev_warn(db->dev, "Invalid ethernet MAC address. Please set using ifconfig\n");
 
 		eth_hw_addr_random(ndev);
 		mac_src = "random";
