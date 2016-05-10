@@ -1347,6 +1347,55 @@ static bool dso__is_compatible_symtab_type(struct dso *dso, bool kmod,
 	}
 }
 
+int dso_is_64_bit(struct dso *dso, struct map *map)
+{
+	char *name;
+	u_int i;
+	bool kmod;
+	char *root_dir = (char *) "";
+	struct machine *machine;
+
+	if (map->groups && map->groups->machine)
+		machine = map->groups->machine;
+	else
+		machine = NULL;
+
+	if (machine)
+		root_dir = machine->root_dir;
+
+	name = malloc(PATH_MAX);
+	if (!name)
+		return -1;
+
+	kmod = dso->symtab_type == DSO_BINARY_TYPE__SYSTEM_PATH_KMODULE ||
+		dso->symtab_type == DSO_BINARY_TYPE__SYSTEM_PATH_KMODULE_COMP ||
+		dso->symtab_type == DSO_BINARY_TYPE__GUEST_KMODULE ||
+		dso->symtab_type == DSO_BINARY_TYPE__GUEST_KMODULE_COMP;
+
+	/*
+	 * Iterate over candidate debug images.
+	 * Keep track of "interesting" ones (those which have a symtab, dynsym,
+	 * and/or opd section) for processing.
+	 */
+	for (i = 0; i < DSO_BINARY_TYPE__SYMTAB_CNT; i++) {
+		enum dso_binary_type symtab_type = binary_type_symtab[i];
+
+		if (!dso__is_compatible_symtab_type(dso, kmod, symtab_type))
+			continue;
+
+		if (dso__read_binary_type_filename(dso, symtab_type,
+						   root_dir, name, PATH_MAX))
+			continue;
+
+		if (!is_regular_file(name))
+			continue;
+
+		return elf_is_64_bit(name);
+	}
+
+	return -1;
+}
+
 int dso__load(struct dso *dso, struct map *map, symbol_filter_t filter)
 {
 	char *name;
