@@ -128,7 +128,7 @@ ebt_stp_mt(const struct sk_buff *skb, struct xt_action_param *par)
 	const u8 header[6] = {0x42, 0x42, 0x03, 0x00, 0x00, 0x00};
 
 	sp = skb_header_pointer(skb, 0, sizeof(_stph), &_stph);
-	if (sp == NULL)
+	if (!sp)
 		return false;
 
 	/* The stp code only considers these */
@@ -146,7 +146,7 @@ ebt_stp_mt(const struct sk_buff *skb, struct xt_action_param *par)
 
 		st = skb_header_pointer(skb, sizeof(_stph),
 					sizeof(_stpc), &_stpc);
-		if (st == NULL)
+		if (!st)
 			return false;
 		return ebt_filter_config(info, st);
 	}
