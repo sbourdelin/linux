@@ -937,3 +937,46 @@ void btrfs_bio_counter_inc_blocked(struct btrfs_fs_info *fs_info)
 				     &fs_info->fs_state));
 	}
 }
+
+int btrfs_auto_replace_start(struct btrfs_root *root, u64 src_devid)
+{
+	int ret;
+	char *tgt_path;
+	struct btrfs_fs_info *fs_info = root->fs_info;
+
+	if (!src_devid)
+		return -EINVAL;
+
+	if (fs_info->sb->s_flags & MS_RDONLY)
+		return -EROFS;
+
+	btrfs_dev_replace_lock(&fs_info->dev_replace, 0);
+	if (btrfs_dev_replace_is_ongoing(&fs_info->dev_replace)) {
+		btrfs_dev_replace_unlock(&fs_info->dev_replace, 0);
+		return -EBUSY;
+	}
+	btrfs_dev_replace_unlock(&fs_info->dev_replace, 0);
+
+	if (btrfs_get_spare_device(&tgt_path)) {
+		btrfs_info_rl(root->fs_info,
+			"No spare device found/configured in the kernel");
+		return -EINVAL;
+	}
+
+	if (atomic_xchg(
+		&root->fs_info->mutually_exclusive_operation_running, 1)) {
+		ret = BTRFS_ERROR_DEV_EXCL_RUN_IN_PROGRESS;
+	} else {
+		ret = btrfs_dev_replace_start(root, tgt_path, src_devid, NULL,
+		BTRFS_IOCTL_DEV_REPLACE_CONT_READING_FROM_SRCDEV_MODE_ALWAYS);
+		atomic_set(
+			&root->fs_info->mutually_exclusive_operation_running, 0);
+	}
+
+	if (ret)
+		btrfs_put_spare_device(tgt_path);
+
+	kfree(tgt_path);
+
+	return ret;
+}
