@@ -1023,6 +1023,14 @@ static int i915_driver_init_early(struct drm_i915_private *dev_priv,
 	memcpy(device_info, info, sizeof(dev_priv->info));
 	device_info->device_id = dev->pdev->device;
 
+	/* For unknown revisions mask stays at zero which is correct. */
+	if (IS_SKYLAKE(dev_priv) && dev->pdev->revision <
+	    sizeof(device_info->skl_rev_mask) * BITS_PER_BYTE)
+		device_info->skl_rev_mask = BIT(dev->pdev->revision);
+	else if (IS_BROXTON(dev_priv) && dev->pdev->revision <
+	         sizeof(device_info->bxt_rev_mask) * BITS_PER_BYTE)
+		device_info->bxt_rev_mask = BIT(dev->pdev->revision);
+
 	spin_lock_init(&dev_priv->irq_lock);
 	spin_lock_init(&dev_priv->gpu_error.lock);
 	mutex_init(&dev_priv->backlight_lock);

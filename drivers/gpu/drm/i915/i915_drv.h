@@ -757,6 +757,8 @@ struct intel_csr {
 struct intel_device_info {
 	u32 display_mmio_offset;
 	u16 device_id;
+	u8 skl_rev_mask;
+	u8 bxt_rev_mask;
 	u8 num_pipes:3;
 	u8 num_sprites[I915_MAX_PIPES];
 	u8 gen;
@@ -2505,14 +2507,23 @@ struct drm_i915_cmd_table {
 #define INTEL_DEVID(p)	(INTEL_INFO(p)->device_id)
 #define INTEL_REVID(p)	(__I915__(p)->dev->pdev->revision)
 
-#define REVID_FOREVER		0xff
+#define REVID_FOREVER		0
+
 /*
  * Return true if revision is in range [since,until] inclusive.
  *
  * Use 0 for open-ended since, and REVID_FOREVER for open-ended until.
  */
-#define IS_REVID(p, since, until) \
-	(INTEL_REVID(p) >= (since) && INTEL_REVID(p) <= (until))
+#define IS_REVID(p, mask, since, until) ({\
+	unsigned int __s = (since), __e = (until); \
+	BUILD_BUG_ON(!__builtin_constant_p(since)); \
+	BUILD_BUG_ON(!__builtin_constant_p(until)); \
+	BUILD_BUG_ON(since >= sizeof(INTEL_INFO(p)->mask) * BITS_PER_BYTE); \
+	BUILD_BUG_ON(until >= sizeof(INTEL_INFO(p)->mask) * BITS_PER_BYTE); \
+	if ((__e) == REVID_FOREVER) \
+		__e = BITS_PER_LONG - 1; \
+	!!(INTEL_INFO(p)->mask & GENMASK((__e), (__s))); \
+})
 
 #define IS_I830(dev)		(INTEL_DEVID(dev) == 0x3577)
 #define IS_845G(dev)		(INTEL_DEVID(dev) == 0x2562)
@@ -2591,14 +2602,14 @@ struct drm_i915_cmd_table {
 #define SKL_REVID_E0		0x4
 #define SKL_REVID_F0		0x5
 
-#define IS_SKL_REVID(p, since, until) (IS_SKYLAKE(p) && IS_REVID(p, since, until))
+#define IS_SKL_REVID(p, since, until) IS_REVID(p, skl_rev_mask, since, until)
 
 #define BXT_REVID_A0		0x0
 #define BXT_REVID_A1		0x1
 #define BXT_REVID_B0		0x3
 #define BXT_REVID_C0		0x9
 
-#define IS_BXT_REVID(p, since, until) (IS_BROXTON(p) && IS_REVID(p, since, until))
+#define IS_BXT_REVID(p, since, until) IS_REVID(p, bxt_rev_mask, since, until)
 
 /*
  * The genX designation typically refers to the render engine, so render
