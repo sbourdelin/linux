@@ -2594,6 +2594,7 @@ extern int do_pipe_flags(int *, int);
 
 enum kernel_read_file_id {
 	READING_FIRMWARE = 1,
+	READING_FIRMWARE_INTO_BUF,
 	READING_MODULE,
 	READING_KEXEC_IMAGE,
 	READING_KEXEC_INITRAMFS,

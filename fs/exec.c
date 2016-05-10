@@ -836,8 +836,8 @@ int kernel_read(struct file *file, loff_t offset,
 
 EXPORT_SYMBOL(kernel_read);
 
-int kernel_read_file(struct file *file, void **buf, loff_t *size,
-		     loff_t max_size, enum kernel_read_file_id id)
+static int _kernel_read_file(struct file *file, void **buf, loff_t *size,
+			     loff_t max_size, enum kernel_read_file_id id)
 {
 	loff_t i_size, pos;
 	ssize_t bytes = 0;
@@ -856,7 +856,8 @@ int kernel_read_file(struct file *file, void **buf, loff_t *size,
 	if (i_size <= 0)
 		return -EINVAL;
 
-	*buf = vmalloc(i_size);
+	if (id != READING_FIRMWARE_INTO_BUF)
+		*buf = vmalloc(i_size);
 	if (!*buf)
 		return -ENOMEM;
 
@@ -885,10 +886,18 @@ int kernel_read_file(struct file *file, void **buf, loff_t *size,
 
 out:
 	if (ret < 0) {
-		vfree(*buf);
-		*buf = NULL;
+		if (id != READING_FIRMWARE_INTO_BUF) {
+			vfree(*buf);
+			*buf = NULL;
+		}
 	}
 	return ret;
+}
+
+int kernel_read_file(struct file *file, void **buf, loff_t *size,
+		     loff_t max_size, enum kernel_read_file_id id)
+{
+	return _kernel_read_file(file, buf, size, max_size, id);
 }
 EXPORT_SYMBOL_GPL(kernel_read_file);
 
@@ -905,7 +914,7 @@ int kernel_read_file_from_path(char *path, void **buf, loff_t *size,
 	if (IS_ERR(file))
 		return PTR_ERR(file);
 
-	ret = kernel_read_file(file, buf, size, max_size, id);
+	ret = _kernel_read_file(file, buf, size, max_size, id);
 	fput(file);
 	return ret;
 }
