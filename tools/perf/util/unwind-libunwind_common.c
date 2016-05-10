@@ -82,10 +82,11 @@ void unwind__get_arch(struct thread *thread, struct map *map)
 		pr_debug("unwind: thread map is X86, 64bit is %d\n", is_64_bit);
 		if (!is_64_bit) {
 #ifdef HAVE_LIBUNWIND_X86_SUPPORT
-			pr_err("unwind: target platform=%s is not implemented\n",
-			       arch);
-#endif
+			register_unwind_libunwind_ops(
+				&_Ux86_unwind_libunwind_ops, thread);
+#else
 			register_null_unwind_libunwind_ops(thread);
+#endif
 		} else
 			use_local_unwind = 1;
 	} else {
