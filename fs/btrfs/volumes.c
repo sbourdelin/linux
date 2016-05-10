@@ -1914,9 +1914,6 @@ int btrfs_rm_device(struct btrfs_root *root, char *device_path, u64 devid)
 		free_fs_devices(cur_devices);
 	}
 
-	root->fs_info->num_tolerated_disk_barrier_failures =
-		btrfs_calc_num_tolerated_disk_barrier_failures(root->fs_info);
-
 	/*
 	 * at this point, the device is zero sized.  We want to
 	 * remove it from the devices list and zero out the old super
@@ -2430,8 +2427,6 @@ int btrfs_init_new_device(struct btrfs_root *root, char *device_path)
 				"sysfs: failed to create fsid for sprout");
 	}
 
-	root->fs_info->num_tolerated_disk_barrier_failures =
-		btrfs_calc_num_tolerated_disk_barrier_failures(root->fs_info);
 	ret = btrfs_commit_transaction(trans, root);
 
 	if (seeding_dev) {
@@ -3787,13 +3782,6 @@ int btrfs_balance(struct btrfs_balance_control *bctl,
 			bctl->meta.target, bctl->data.target);
 	}
 
-	if (bctl->sys.flags & BTRFS_BALANCE_ARGS_CONVERT) {
-		fs_info->num_tolerated_disk_barrier_failures = min(
-			btrfs_calc_num_tolerated_disk_barrier_failures(fs_info),
-			btrfs_get_num_tolerated_disk_barrier_failures(
-				bctl->sys.target));
-	}
-
 	ret = insert_balance_item(fs_info->tree_root, bctl);
 	if (ret && ret != -EEXIST)
 		goto out;
@@ -3815,11 +3803,6 @@ int btrfs_balance(struct btrfs_balance_control *bctl,
 
 	mutex_lock(&fs_info->balance_mutex);
 	atomic_dec(&fs_info->balance_running);
-
-	if (bctl->sys.flags & BTRFS_BALANCE_ARGS_CONVERT) {
-		fs_info->num_tolerated_disk_barrier_failures =
-			btrfs_calc_num_tolerated_disk_barrier_failures(fs_info);
-	}
 
 	if (bargs) {
 		memset(bargs, 0, sizeof(*bargs));
