@@ -1315,6 +1315,7 @@ static bool dso__is_compatible_symtab_type(struct dso *dso, bool kmod,
 	case DSO_BINARY_TYPE__UBUNTU_DEBUGINFO:
 	case DSO_BINARY_TYPE__BUILDID_DEBUGINFO:
 	case DSO_BINARY_TYPE__OPENEMBEDDED_DEBUGINFO:
+	case DSO_BINARY_TYPE__VDSO:
 		return !kmod && dso->kernel == DSO_TYPE_USER;
 
 	case DSO_BINARY_TYPE__KALLSYMS:
