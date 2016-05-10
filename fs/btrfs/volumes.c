@@ -7086,3 +7086,70 @@ static void btrfs_close_one_device(struct btrfs_device *device)
 
 	call_rcu(&device->rcu, free_device);
 }
+
+/*
+ * Check if all chunks in the fs is OK for degraded mount
+ * Caller itself should do extra check if DEGRADED mount option is given
+ * for >0 return value.
+ *
+ * Return 0 if all chunks are OK.
+ * Return >0 if all chunks are degradable but not all OK.
+ * Return <0 if any chunk is not degradable or other bug.
+ */
+int btrfs_check_degradable(struct btrfs_fs_info *fs_info, unsigned flags)
+{
+	struct btrfs_mapping_tree *map_tree = &fs_info->mapping_tree;
+	struct extent_map *em;
+	u64 next_start = 0;
+	int ret = 0;
+
+	if (flags & MS_RDONLY)
+		return 0;
+
+	read_lock(&map_tree->map_tree.lock);
+	em = lookup_extent_mapping(&map_tree->map_tree, 0, (u64)(-1));
+	read_unlock(&map_tree->map_tree.lock);
+	/* No any chunk? Should be a huge bug */
+	if (!em) {
+		ret = -ENOENT;
+		goto out;
+	}
+
+	while (em) {
+		struct map_lookup *map;
+		int missing = 0;
+		int max_tolerated;
+		int i;
+
+		map = (struct map_lookup *) em->bdev;
+		max_tolerated =
+			btrfs_get_num_tolerated_disk_barrier_failures(
+					map->type);
+		for (i = 0; i < map->num_stripes; i++) {
+			if (map->stripes[i].dev->missing)
+				missing++;
+		}
+		if (missing > max_tolerated) {
+			ret = -EIO;
+			btrfs_warn(fs_info,
+				   "missing devices(%d) exceeds the limit(%d), writeable mount is not allowed",
+				   missing, max_tolerated);
+			goto out;
+		} else if (missing)
+			ret = 1;
+		next_start = extent_map_end(em);
+
+		/*
+		 * Alwasy search range [next_start, (u64)-1) to find the next
+		 * chunk map
+		 */
+		free_extent_map(em);
+		read_lock(&map_tree->map_tree.lock);
+		em = lookup_extent_mapping(&map_tree->map_tree, next_start,
+					   (u64)(-1) - next_start);
+		read_unlock(&map_tree->map_tree.lock);
+	}
+out:
+	free_extent_map(em);
+	return ret;
+}
