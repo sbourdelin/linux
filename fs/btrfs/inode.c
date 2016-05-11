@@ -9258,7 +9258,10 @@ void btrfs_destroy_inode(struct inode *inode)
 	WARN_ON(BTRFS_I(inode)->outstanding_extents);
 	WARN_ON(BTRFS_I(inode)->reserved_extents);
 	WARN_ON(BTRFS_I(inode)->delalloc_bytes);
-	WARN_ON(BTRFS_I(inode)->csum_bytes);
+#ifdef CONFIG_BTRFS_ASSERT
+	if (BTRFS_I(inode)->csum_bytes)
+		btrfs_info(root->fs_info, "btrfs_destroy_inode: leftover csum_bytes");
+#endif
 	WARN_ON(BTRFS_I(inode)->defrag_bytes);
 
 	/*
