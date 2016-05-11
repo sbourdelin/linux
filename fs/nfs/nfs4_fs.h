@@ -59,6 +59,8 @@ struct nfs4_minor_version_ops {
 			struct nfs4_lock_state *);
 	struct nfs_seqid *
 		(*alloc_seqid)(struct nfs_seqid_counter *, gfp_t);
+	int	(*session_trunk)(struct rpc_clnt *, struct rpc_xprt_switch *,
+			struct rpc_xprt *, void *);
 	const struct rpc_call_ops *call_sync_ops;
 	const struct nfs4_state_recovery_ops *reboot_recovery_ops;
 	const struct nfs4_state_recovery_ops *nograce_recovery_ops;
@@ -212,6 +214,11 @@ struct nfs4_mig_recovery_ops {
 	int (*get_locations)(struct inode *, struct nfs4_fs_locations *,
 		struct page *, struct rpc_cred *);
 	int (*fsid_present)(struct inode *, struct rpc_cred *);
+};
+
+struct nfs4_add_xprt_data {
+	struct nfs_client	*clp;
+	struct rpc_cred		*cred;
 };
 
 extern const struct dentry_operations nfs4_dentry_operations;
