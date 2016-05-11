@@ -626,6 +626,13 @@ static inline int ffs(int word)
 #include <asm/arch_hweight.h>
 #include <asm-generic/bitops/const_hweight.h>
 
+#ifdef ARCH_HAS_USABLE_BUILTIN_POPCOUNT
+#include <asm-generic/bitops/popc-parity.h>
+#else
+#include <asm-generic/bitops/arch_parity.h>
+#endif
+#include <asm-generic/bitops/const_parity.h>
+
 #include <asm-generic/bitops/le.h>
 #include <asm-generic/bitops/ext2-atomic.h>
 

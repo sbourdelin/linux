@@ -85,6 +85,8 @@ static inline unsigned long __arch_hweight64(__u64 w)
 #include <asm-generic/bitops/builtin-__fls.h>
 #include <asm-generic/bitops/builtin-ffs.h>
 #include <asm-generic/bitops/const_hweight.h>
+#include <asm-generic/bitops/popc-parity.h>
+#include <asm-generic/bitops/const_parity.h>
 #include <asm-generic/bitops/lock.h>
 #include <asm-generic/bitops/find.h>
 #include <asm-generic/bitops/sched.h>
