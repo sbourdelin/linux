@@ -269,8 +269,19 @@ unsigned int __arch_hweight16(unsigned int w);
 unsigned int __arch_hweight32(unsigned int w);
 unsigned long __arch_hweight64(__u64 w);
 #include <asm-generic/bitops/const_hweight.h>
+static inline unsigned int __arch_parity4(unsigned int w)
+{
+	w &= 0xf;
+	return ((PARITY_MAGIC) >> w) & 1;
+}
+unsigned int __arch_parity8(unsigned int w);
+unsigned int __arch_parity16(unsigned int w);
+unsigned int __arch_parity32(unsigned int w);
+unsigned int __arch_parity64(__u64 w);
+#include <asm-generic/bitops/const_parity.h>
 #else
 #include <asm-generic/bitops/hweight.h>
+#include <asm-generic/bitops/parity.h>
 #endif
 
 #include <asm-generic/bitops/find.h>

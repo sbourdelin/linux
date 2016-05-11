@@ -32,4 +32,9 @@ EXPORT_SYMBOL(__arch_hweight8);
 EXPORT_SYMBOL(__arch_hweight16);
 EXPORT_SYMBOL(__arch_hweight32);
 EXPORT_SYMBOL(__arch_hweight64);
+
+EXPORT_SYMBOL(__arch_parity8);
+EXPORT_SYMBOL(__arch_parity16);
+EXPORT_SYMBOL(__arch_parity32);
+EXPORT_SYMBOL(__arch_parity64);
 #endif
