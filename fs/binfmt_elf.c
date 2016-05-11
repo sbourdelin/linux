@@ -526,7 +526,7 @@ static unsigned long load_elf_interp(struct elfhdr *interp_elf_ex,
 	int load_addr_set = 0;
 	unsigned long last_bss = 0, elf_bss = 0;
 	unsigned long error = ~0UL;
-	unsigned long total_size;
+	unsigned long total_size, size;
 	int i;
 
 	/* First of all, some simple consistency checks */
@@ -626,11 +626,15 @@ static unsigned long load_elf_interp(struct elfhdr *interp_elf_ex,
 
 		/* What we have mapped so far */
 		elf_bss = ELF_PAGESTART(elf_bss + ELF_MIN_ALIGN - 1);
+		last_bss = ELF_PAGESTART(last_bss + ELF_MIN_ALIGN - 1);
 
 		/* Map the last of the bss segment */
-		error = vm_brk(elf_bss, last_bss - elf_bss);
-		if (BAD_ADDR(error))
-			goto out;
+		size = last_bss - elf_bss;
+		if (size) {
+			error = vm_brk(elf_bss, size);
+			if (BAD_ADDR(error))
+				goto out;
+		}
 	}
 
 	error = load_addr;
