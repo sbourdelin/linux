@@ -1005,7 +1005,7 @@ static void nbd_dbg_close(void)
 #endif
 
 /*
- * And here should be modules and kernel interface 
+ * And here should be modules and kernel interface
  *  (Just smiley confuses emacs :-)
  */
 
