@@ -84,6 +84,9 @@ struct efi_scratch {
 #define arch_efi_call_virt(f, args...)					\
 	efi_call((void *)efi.systab->runtime->f, args)			\
 
+#define uv_efi_call_virt(f, args...)					\
+	efi_call((void *)f, args)			\
+
 #define arch_efi_call_virt_teardown()					\
 ({									\
 	if (efi_scratch.use_pgd) {					\
