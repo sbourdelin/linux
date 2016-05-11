@@ -182,24 +182,10 @@ static int read_raw_oob(struct mtd_info *mtd, loff_t offs, uint8_t *buf)
 	return 0;
 }
 
-/* Parity calculator on a word of n bit size */
-static int get_parity(int number, int size)
-{
- 	int k;
-	int parity;
-
-	parity = 1;
-	for (k = 0; k < size; k++) {
-		parity += (number >> k);
-		parity &= 1;
-	}
-	return parity;
-}
-
 /* Read and validate the logical block address field stored in the OOB */
 static int get_logical_address(uint8_t *oob_buf)
 {
-	int block_address, parity;
+	int block_address;
 	int offset[2] = {6, 11}; /* offset of the 2 address fields within OOB */
 	int j;
 	int ok = 0;
@@ -215,18 +201,17 @@ static int get_logical_address(uint8_t *oob_buf)
 
 		/* Check for the signature bits in the address field (MSBits) */
 		if ((block_address & ~0x7FF) == 0x1000) {
-			parity = block_address & 0x01;
 			block_address &= 0x7FF;
-			block_address >>= 1;
 
-			if (get_parity(block_address, 10) != parity) {
-				pr_debug("SSFDC_RO: logical address field%d"
-					"parity error(0x%04X)\n", j+1,
-					block_address);
-			} else {
-				ok = 1;
+			ok = parity16(block_address);
+			if (ok) {
+				block_address >>= 1;
 				break;
 			}
+
+			pr_debug("SSFDC_RO: logical address field%d"
+				"parity error(0x%04X)\n", j+1,
+				block_address);
 		}
 	}
 
