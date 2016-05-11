@@ -457,15 +457,6 @@ static u16 INFTL_makefreeblock(struct INFTLrecord *inftl, unsigned pendingblock)
 	return INFTL_foldchain(inftl, LongestChain, pendingblock);
 }
 
-static int nrbits(unsigned int val, int bitcount)
-{
-	int i, total = 0;
-
-	for (i = 0; (i < bitcount); i++)
-		total += (((0x1 << i) & val) ? 1 : 0);
-	return total;
-}
-
 /*
  * INFTL_findwriteunit: Return the unit number into which we can write
  *                      for this block. Make it available if it isn't already.
@@ -593,10 +584,10 @@ hitused:
 		if (prev_block < inftl->nb_blocks)
 			prev_block -= inftl->firstEUN;
 
-		parity = (nrbits(thisVUC, 16) & 0x1) ? 0x1 : 0;
-		parity |= (nrbits(prev_block, 16) & 0x1) ? 0x2 : 0;
-		parity |= (nrbits(anac, 8) & 0x1) ? 0x4 : 0;
-		parity |= (nrbits(nacs, 8) & 0x1) ? 0x8 : 0;
+		parity  = parity16(thisVUC);
+		parity |= parity16(prev_block) << 1;
+		parity |= parity8(anac) << 2;
+		parity |= parity8(nacs) << 3;
 
 		oob.u.a.virtualUnitNo = cpu_to_le16(thisVUC);
 		oob.u.a.prevUnitNo = cpu_to_le16(prev_block);
