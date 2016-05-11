@@ -136,7 +136,7 @@ static int sm_get_lba(uint8_t *lba)
 		return -2;
 
 	/* check parity - endianness doesn't matter */
-	if (hweight16(*(uint16_t *)lba) & 1)
+	if (parity16(*(uint16_t *)lba))
 		return -2;
 
 	return (lba[1] >> 1) | ((lba[0] & 0x07) << 7);
@@ -183,8 +183,7 @@ static void sm_write_lba(struct sm_oob *oob, uint16_t lba)
 	tmp[0] = 0x10 | ((lba >> 7) & 0x07);
 	tmp[1] = (lba << 1) & 0xFF;
 
-	if (hweight16(*(uint16_t *)tmp) & 0x01)
-		tmp[1] |= 1;
+	tmp[1] |= parity16(*(uint16_t *)tmp);
 
 	oob->lba_copy1[0] = oob->lba_copy2[0] = tmp[0];
 	oob->lba_copy1[1] = oob->lba_copy2[1] = tmp[1];
