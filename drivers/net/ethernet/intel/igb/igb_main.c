@@ -7527,6 +7527,8 @@ static int __igb_shutdown(struct pci_dev *pdev, bool *enable_wake,
 	if (netif_running(netdev))
 		__igb_close(netdev, true);
 
+	igb_ptp_stop(adapter);
+
 	igb_clear_interrupt_scheme(adapter);
 
 #ifdef CONFIG_PM
@@ -7636,6 +7638,8 @@ static int igb_resume(struct device *dev)
 		dev_err(&pdev->dev, "Unable to allocate memory for queues\n");
 		return -ENOMEM;
 	}
+
+	igb_ptp_init(adapter);
 
 	igb_reset(adapter);
 
