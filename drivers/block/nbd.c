@@ -59,6 +59,7 @@ struct nbd_device {
 	int xmit_timeout;
 	atomic_t timedout;
 	bool disconnect; /* a disconnect has been requested by user */
+	u32 users;
 
 	struct timer_list timeout_timer;
 	/* protects initialization and shutdown of the socket */
@@ -69,6 +70,7 @@ struct nbd_device {
 #if IS_ENABLED(CONFIG_DEBUG_FS)
 	struct dentry *dbg_dir;
 #endif
+	unsigned long bflags;	/* word size bit flags for use. */
 };
 
 #if IS_ENABLED(CONFIG_DEBUG_FS)
@@ -822,6 +824,15 @@ static int __nbd_ioctl(struct block_device *bdev, struct nbd_device *nbd,
 		sock_shutdown(nbd);
 		mutex_lock(&nbd->tx_lock);
 		nbd_clear_que(nbd);
+		/*
+		 * Wait for any users currently using
+		 * this block device.
+		 */
+		mutex_unlock(&nbd->tx_lock);
+		pr_info("Waiting for users to release device %s ...\n",
+						bdev->bd_disk->disk_name);
+		wait_on_bit(&nbd->bflags, NBD_BFLAG_INUSE_BIT, TASK_INTERRUPTIBLE);
+		mutex_lock(&nbd->tx_lock);
 		kill_bdev(bdev);
 		nbd_bdev_reset(bdev);
 
@@ -870,10 +881,39 @@ static int nbd_ioctl(struct block_device *bdev, fmode_t mode,
 	return error;
 }
 
+static int nbd_open(struct block_device *bdev, fmode_t mode)
+{
+	struct nbd_device *nbd_dev = bdev->bd_disk->private_data;
+	nbd_dev->users++;
+	pr_debug("Opening nbd_dev %s. Active users = %u\n",
+			bdev->bd_disk->disk_name, nbd_dev->users);
+	if (nbd_dev->users > 1)
+	{
+		set_bit(NBD_BFLAG_INUSE_BIT, &nbd_dev->bflags);
+	}
+	return 0;
+}
+
+static void nbd_release(struct gendisk *disk, fmode_t mode)
+{
+	struct nbd_device *nbd_dev = disk->private_data;
+	nbd_dev->users--;
+	pr_debug("Closing nbd_dev %s. Active users = %u\n",
+			disk->disk_name, nbd_dev->users);
+	if (nbd_dev->users == 1)
+	{
+		clear_bit(NBD_BFLAG_INUSE_BIT, &nbd_dev->bflags);
+		smp_mb();
+		wake_up_bit(&nbd_dev->bflags, NBD_BFLAG_INUSE_BIT);
+	}
+}
+
 static const struct block_device_operations nbd_fops = {
 	.owner =	THIS_MODULE,
 	.ioctl =	nbd_ioctl,
 	.compat_ioctl =	nbd_ioctl,
+	.open = 	nbd_open,
+	.release = 	nbd_release
 };
 
 #if IS_ENABLED(CONFIG_DEBUG_FS)

@@ -44,6 +44,7 @@ enum {
 /* there is a gap here to match userspace */
 #define NBD_FLAG_SEND_TRIM    (1 << 5) /* send trim/discard */
 
+#define NBD_BFLAG_INUSE_BIT	(1) /* bit number for bflags */
 /* userspace doesn't need the nbd_device structure */
 
 /* These are sent over the network in the request/reply magic fields */
