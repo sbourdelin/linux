@@ -81,3 +81,13 @@ endchoice
 config PCIE_PME
 	def_bool y
 	depends on PCIEPORTBUS && PM
+
+config PCIE_PTM
+	bool "Enable Precision Time Measurement support"
+	default y
+	depends on PCIEPORTBUS
+	help
+	  Say Y here if you have PCI Express devices that are capable of
+	  Precision Time Measurement (PTM). This is only useful if you
+	  have devices that support PTM and that your PCI Express controller
+	  is PTM capable, but it is safe to enable even if you don't.
