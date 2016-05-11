@@ -2117,7 +2117,6 @@ static int gr_remove(struct platform_device *pdev)
 
 	gr_dfs_delete(dev);
 	dma_pool_destroy(dev->desc_pool);
-	platform_set_drvdata(pdev, NULL);
 
 	gr_free_request(&dev->epi[0].ep, &dev->ep0reqi->req);
 	gr_free_request(&dev->epo[0].ep, &dev->ep0reqo->req);
