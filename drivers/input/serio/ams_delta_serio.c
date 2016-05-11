@@ -48,13 +48,9 @@ static int check_data(int data)
 				data);
 		return SERIO_FRAME;
 	}
-	/* calculate the parity */
-	for (i = 1; i < 10; i++) {
-		if (data & (1 << i))
-			parity++;
-	}
 	/* it should be odd */
-	if (!(parity & 0x01)) {
+	parity = parity16(data & 0x3fe);
+	if (!parity) {
 		dev_warn(&ams_delta_serio->dev,
 				"paritiy check failed, data=0x%X parity=0x%X\n",
 				data, parity);
