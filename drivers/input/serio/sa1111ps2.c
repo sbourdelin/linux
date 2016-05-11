@@ -74,7 +74,7 @@ static irqreturn_t ps2_rxint(int irq, void *dev_id)
 
 		scancode = sa1111_readl(ps2if->base + PS2DATA) & 0xff;
 
-		if (hweight8(scancode) & 1)
+		if (parity8(scancode))
 			flag ^= SERIO_PARITY;
 
 		serio_interrupt(ps2if->io, scancode, flag);
