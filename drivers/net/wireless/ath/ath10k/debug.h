@@ -38,6 +38,7 @@ enum ath10k_debug_mask {
 	ATH10K_DBG_WMI_PRINT	= 0x00002000,
 	ATH10K_DBG_PCI_PS	= 0x00004000,
 	ATH10K_DBG_AHB		= 0x00008000,
+	ATH10K_DBG_FW		= 0x80000000,
 	ATH10K_DBG_ANY		= 0xffffffff,
 };
 
@@ -192,4 +193,8 @@ static inline void ath10k_dbg_dump(struct ath10k *ar,
 {
 }
 #endif /* CONFIG_ATH10K_DEBUG */
+
+void ath10k_dbg_print_fw_dbg_buffer(struct ath10k *ar, __le32 *buffer,
+				    int len, const char* lvl);
+
 #endif /* _DEBUG_H_ */
