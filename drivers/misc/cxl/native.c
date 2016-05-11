@@ -738,20 +738,25 @@ static int native_get_irq_info(struct cxl_afu *afu, struct cxl_irq_info *info)
 static irqreturn_t native_handle_psl_slice_error(struct cxl_context *ctx,
 						u64 dsisr, u64 errstat)
 {
-	u64 fir1, fir2, fir_slice, serr, afu_debug;
+	u64 fir1, fir2, fir_slice, serr, afu_debug, afu_error;
 
 	fir1 = cxl_p1_read(ctx->afu->adapter, CXL_PSL_FIR1);
 	fir2 = cxl_p1_read(ctx->afu->adapter, CXL_PSL_FIR2);
 	fir_slice = cxl_p1n_read(ctx->afu, CXL_PSL_FIR_SLICE_An);
 	serr = cxl_p1n_read(ctx->afu, CXL_PSL_SERR_An);
 	afu_debug = cxl_p1n_read(ctx->afu, CXL_AFU_DEBUG_An);
+	afu_error = cxl_p2n_read(ctx->afu, CXL_AFU_ERR_An);
 
+	dev_crit(&ctx->afu->dev,
+		 "PSL Slice error received. Check AFU for root cause\n");
 	dev_crit(&ctx->afu->dev, "PSL ERROR STATUS: 0x%016llx\n", errstat);
 	dev_crit(&ctx->afu->dev, "PSL_FIR1: 0x%016llx\n", fir1);
 	dev_crit(&ctx->afu->dev, "PSL_FIR2: 0x%016llx\n", fir2);
-	dev_crit(&ctx->afu->dev, "PSL_SERR_An: 0x%016llx\n", serr);
+	cxl_afu_decode_psl_serr(ctx->afu, serr);
 	dev_crit(&ctx->afu->dev, "PSL_FIR_SLICE_An: 0x%016llx\n", fir_slice);
-	dev_crit(&ctx->afu->dev, "CXL_PSL_AFU_DEBUG_An: 0x%016llx\n", afu_debug);
+	dev_crit(&ctx->afu->dev, "PSL_AFU_DEBUG_An: 0x%016llx\n", afu_debug);
+	dev_crit(&ctx->afu->dev, "AFU_ERR_An: 0x%016llx\n", afu_error);
+	dev_crit(&ctx->afu->dev, "PSL_DSISR_An: 0x%016llx\n", dsisr);
 
 	dev_crit(&ctx->afu->dev, "STOPPING CXL TRACE\n");
 	cxl_stop_trace(ctx->afu->adapter);
@@ -830,18 +835,22 @@ void native_irq_wait(struct cxl_context *ctx)
 static irqreturn_t native_slice_irq_err(int irq, void *data)
 {
 	struct cxl_afu *afu = data;
-	u64 fir_slice, errstat, serr, afu_debug;
-
-	WARN(irq, "CXL SLICE ERROR interrupt %i\n", irq);
+	u64 fir_slice, errstat, serr, afu_debug, afu_error, dsisr;
 
 	serr = cxl_p1n_read(afu, CXL_PSL_SERR_An);
 	fir_slice = cxl_p1n_read(afu, CXL_PSL_FIR_SLICE_An);
 	errstat = cxl_p2n_read(afu, CXL_PSL_ErrStat_An);
 	afu_debug = cxl_p1n_read(afu, CXL_AFU_DEBUG_An);
-	dev_crit(&afu->dev, "PSL_SERR_An: 0x%016llx\n", serr);
+	afu_error = cxl_p2n_read(afu, CXL_AFU_ERR_An);
+	dsisr = cxl_p2n_read(afu, CXL_PSL_DSISR_An);
+	dev_crit(&afu->dev,
+		 "PSL Slice error received. Check AFU for root cause\n");
+	cxl_afu_decode_psl_serr(afu, serr);
 	dev_crit(&afu->dev, "PSL_FIR_SLICE_An: 0x%016llx\n", fir_slice);
-	dev_crit(&afu->dev, "CXL_PSL_ErrStat_An: 0x%016llx\n", errstat);
-	dev_crit(&afu->dev, "CXL_PSL_AFU_DEBUG_An: 0x%016llx\n", afu_debug);
+	dev_crit(&afu->dev, "PSL_ErrStat_An: 0x%016llx\n", errstat);
+	dev_crit(&afu->dev, "PSL_AFU_DEBUG_An: 0x%016llx\n", afu_debug);
+	dev_crit(&afu->dev, "AFU_ERR_An: 0x%016llx\n", afu_error);
+	dev_crit(&afu->dev, "PSL_DSISR_An: 0x%016llx\n", dsisr);
 
 	cxl_p1n_write(afu, CXL_PSL_SERR_An, serr);
 
