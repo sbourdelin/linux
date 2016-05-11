@@ -7482,6 +7482,10 @@ static const struct ieee80211_iface_limit ath10k_10x_ct_if_limits[] = {
 	.max	= 7,
 	.types	= BIT(NL80211_IFTYPE_AP)
 	},
+	{
+	.max	= 1,
+	.types	= BIT(NL80211_IFTYPE_ADHOC)
+	},
 };
 
 static const struct ieee80211_iface_combination ath10k_if_comb[] = {
@@ -7862,6 +7866,7 @@ int ath10k_mac_register(struct ath10k *ar)
 			ar->hw->wiphy->iface_combinations = ath10k_10x_ct_if_comb;
 			ar->hw->wiphy->n_iface_combinations =
 				ARRAY_SIZE(ath10k_10x_ct_if_comb);
+			ar->hw->wiphy->interface_modes |= BIT(NL80211_IFTYPE_ADHOC);
 		} else {
 			ar->hw->wiphy->iface_combinations = ath10k_10x_if_comb;
 			ar->hw->wiphy->n_iface_combinations =
