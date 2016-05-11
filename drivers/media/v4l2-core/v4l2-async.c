@@ -121,13 +121,19 @@ static int v4l2_async_test_notify(struct v4l2_async_notifier *notifier,
 
 	ret = v4l2_subdev_call(sd, core, registered_async);
 	if (ret < 0 && ret != -ENOIOCTLCMD) {
+		v4l2_device_unregister_subdev(sd);
 		if (notifier->unbind)
 			notifier->unbind(notifier, sd, asd);
 		return ret;
 	}
 
-	if (list_empty(&notifier->waiting) && notifier->complete)
-		return notifier->complete(notifier);
+	if (list_empty(&notifier->waiting) && notifier->complete) {
+		ret = notifier->complete(notifier);
+		if (ret < 0) {
+			v4l2_device_unregister_subdev(sd);
+			return ret;
+		}
+	}
 
 	return 0;
 }
