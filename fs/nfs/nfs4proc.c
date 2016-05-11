@@ -2724,6 +2724,12 @@ static int nfs4_do_setattr(struct inode *inode, struct rpc_cred *cred,
 		.inode = inode,
 	};
 	int err;
+	/*
+	 * a shortcut: it there are no attributes to be updated, do not send setattr at all
+	 */
+	if (sattr->ia_valid == ATTR_OPEN)
+		return 0;
+
 	do {
 		err = _nfs4_do_setattr(inode, cred, fattr, sattr, state, ilabel, olabel);
 		switch (err) {
