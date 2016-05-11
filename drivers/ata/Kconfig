@@ -322,7 +322,7 @@ config SATA_DWC
 
 config SATA_DWC_OLD_DMA
 	bool "Support old device trees"
-	depends on SATA_DWC
+	depends on SATA_DWC && DMADEVICES
 	select DW_DMAC_CORE
 	default y if 460EX
 	help
