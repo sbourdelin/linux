@@ -7,6 +7,26 @@ Required properties:
   The definition for each of these nodes is defined using the standard binding
   for regulators at Documentation/devicetree/bindings/regulator/regulator.txt.
 
+The mt6397 buck supports two different operating modes: Fast and Normal
+Mode. Some regulators support the modes to be changed by the consumers during
+normal operation.
+
+The regulators that support the standard "regulator-allow-change-mode" property,
+changing their mode during normal operation are:
+  buck_vpca15, buck_vpca7, buck_vsramca15, buck_vsramca7, buck_vcore, buck_vgpu,
+  buck_vdrm, buck_vio18
+
+The possible values for "regulator-supported-modes" are:
+	0: PWM mode, mapping to regulator fast mode, allow the
+	converter to remain in the PWM mode regardless of the load current, so
+	that the noise spectrum of the converter can be minimized for certain
+	highly-noise-sensitive handset applications.
+	1: Auto mode, mapping to regulator normal mode, mode switch by current
+	loading. At light load currents, the converter automatically enters
+	PFM mode to save power and improve light load efficiency. At heavy
+	load currents, the converter automatically enters PWM mode to minimiz
+	the noise spectrum of the converter.
+
 The valid names for regulators are::
 BUCK:
   buck_vpca15, buck_vpca7, buck_vsramca15, buck_vsramca7, buck_vcore, buck_vgpu,
@@ -30,6 +50,8 @@ Example:
 				regulator-max-microvolt = <1350000>;
 				regulator-ramp-delay = <12500>;
 				regulator-enable-ramp-delay = <200>;
+				regulator-allow-change-mode;
+				regulator-supported-modes = <0 1>;
 			};
 
 			mt6397_vpca7_reg: buck_vpca7 {
