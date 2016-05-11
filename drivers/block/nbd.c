@@ -587,8 +587,7 @@ static int nbd_thread_send(void *data)
 				nbd_send_req(nbd, &sreq);
 				mutex_unlock(&nbd->tx_lock);
 				dev_err(disk_to_dev(nbd->disk),
-					"Device Timeout occured.Shutting down"
-					" socket.");
+				"Device Timeout occured.Shutting down socket.");
 			}
 			mutex_unlock(&nbd->sock_lock);
 			sock_shutdown(nbd);
