@@ -61,4 +61,9 @@ static __always_inline unsigned long __arch_hweight64(__u64 w)
 }
 #endif /* CONFIG_X86_32 */
 
+#undef POPCNT32
+#undef POPCNT64
+#undef REG_IN
+#undef REG_OUT
+
 #endif
