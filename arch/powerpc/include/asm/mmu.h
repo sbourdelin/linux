@@ -91,11 +91,7 @@
 /*
  * Radix page table available
  */
-#ifdef CONFIG_PPC_RADIX_MMU
 #define MMU_FTR_RADIX                  ASM_CONST(0x80000000)
-#else
-#define MMU_FTR_RADIX                  ASM_CONST(0)
-#endif
 
 /* MMU feature bit sets for various CPUs */
 #define MMU_FTRS_DEFAULT_HPTE_ARCH_V2	\
@@ -128,7 +124,11 @@ enum {
 		MMU_FTR_USE_TLBRSRV | MMU_FTR_USE_PAIRED_MAS |
 		MMU_FTR_NO_SLBIE_B | MMU_FTR_16M_PAGE | MMU_FTR_TLBIEL |
 		MMU_FTR_LOCKLESS_TLBIE | MMU_FTR_CI_LARGE_PAGE |
-		MMU_FTR_1T_SEGMENT | MMU_FTR_RADIX,
+		MMU_FTR_1T_SEGMENT |
+#ifdef CONFIG_PPC_RADIX_MMU
+		MMU_FTR_RADIX |
+#endif
+		0
 };
 
 static inline int mmu_has_feature(unsigned long feature)
