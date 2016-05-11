@@ -30,6 +30,11 @@ extern unsigned int __sw_hweight32(unsigned int w);
 extern unsigned long __sw_hweight64(__u64 w);
 
 /*
+ * a miniature 16-bit parity-table of 4-bits number
+ */
+#define	PARITY_MAGIC	0x6996
+
+/*
  * Include this here because some architectures need generic_ffs/fls in
  * scope
  */
@@ -78,6 +83,11 @@ static inline int get_count_order(unsigned int count)
 static __always_inline unsigned long hweight_long(unsigned long w)
 {
 	return sizeof(w) == 4 ? hweight32(w) : hweight64(w);
+}
+
+static __always_inline unsigned int parity_long(unsigned long w)
+{
+	return sizeof(w) == 4 ? parity32(w) : parity64(w);
 }
 
 /**
