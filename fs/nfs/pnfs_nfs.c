@@ -654,13 +654,43 @@ static int _nfs4_pnfs_v4_ds_connect(struct nfs_server *mds_srv,
 		dprintk("%s: DS %s: trying address %s\n",
 			__func__, ds->ds_remotestr, da->da_remotestr);
 
-		clp = nfs4_set_ds_client(mds_srv->nfs_client,
-					(struct sockaddr *)&da->da_addr,
-					da->da_addrlen, IPPROTO_TCP,
-					timeo, retrans, minor_version,
-					au_flavor);
-		if (!IS_ERR(clp))
-			break;
+		if (!IS_ERR(clp) && clp->cl_mvops->session_trunk) {
+			struct xprt_create xprt_args = {
+				.ident = XPRT_TRANSPORT_TCP,
+				.net = clp->cl_net,
+				.dstaddr = (struct sockaddr *)&da->da_addr,
+				.addrlen = da->da_addrlen,
+				.servername = clp->cl_hostname,
+			};
+			struct nfs4_add_xprt_data xprtdata = {
+				.clp = clp,
+			};
+			xprtdata.cred = nfs4_get_clid_cred(clp);
+
+			/**
+			 * Test this address for session trunking and
+			 * add as an alias
+			 */
+			rpc_clnt_add_xprt(clp->cl_rpcclient, &xprt_args,
+					  clp->cl_mvops->session_trunk,
+					  &xprtdata);
+		} else {
+			clp = nfs4_set_ds_client(mds_srv->nfs_client,
+						(struct sockaddr *)&da->da_addr,
+						da->da_addrlen, IPPROTO_TCP,
+						timeo, retrans, minor_version,
+						au_flavor);
+			if (IS_ERR(clp))
+				continue;
+
+			status = nfs4_init_ds_session(clp,
+					mds_srv->nfs_client->cl_lease_time);
+			if (status) {
+				nfs_put_client(clp);
+				clp = ERR_PTR(-EIO);
+				continue;
+			}
+		}
 	}
 
 	if (IS_ERR(clp)) {
@@ -668,18 +698,11 @@ static int _nfs4_pnfs_v4_ds_connect(struct nfs_server *mds_srv,
 		goto out;
 	}
 
-	status = nfs4_init_ds_session(clp, mds_srv->nfs_client->cl_lease_time);
-	if (status)
-		goto out_put;
-
 	smp_wmb();
 	ds->ds_clp = clp;
 	dprintk("%s [new] addr: %s\n", __func__, ds->ds_remotestr);
 out:
 	return status;
-out_put:
-	nfs_put_client(clp);
-	goto out;
 }
 
 /*
