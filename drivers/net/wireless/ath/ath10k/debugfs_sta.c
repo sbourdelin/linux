@@ -18,7 +18,27 @@
 #include "wmi-ops.h"
 #include "debug.h"
 
-void ath10k_sta_update_rx_duration(struct ath10k *ar, struct list_head *head)
+static void ath10k_sta_update_extd_stats_rx_duration(struct ath10k *ar,
+						     struct list_head *head)
+{
+	struct ieee80211_sta *sta;
+	struct ath10k_fw_extd_stats_peer *peer;
+	struct ath10k_sta *arsta;
+
+	rcu_read_lock();
+	list_for_each_entry(peer, head, list) {
+		sta = ieee80211_find_sta_by_ifaddr(ar->hw, peer->peer_macaddr,
+						   NULL);
+		if (!sta)
+			continue;
+		arsta = (struct ath10k_sta *)sta->drv_priv;
+		arsta->rx_duration += (u64)peer->rx_duration;
+	}
+	rcu_read_unlock();
+}
+
+static void ath10k_sta_update_stats_rx_duration(struct ath10k *ar,
+						struct list_head *head)
 {	struct ieee80211_sta *sta;
 	struct ath10k_fw_stats_peer *peer;
 	struct ath10k_sta *arsta;
@@ -33,6 +53,18 @@ void ath10k_sta_update_rx_duration(struct ath10k *ar, struct list_head *head)
 		arsta->rx_duration += (u64)peer->rx_duration;
 	}
 	rcu_read_unlock();
+}
+
+void ath10k_sta_update_rx_duration(struct ath10k *ar,
+				   struct ath10k_fw_stats *stats)
+{
+	struct ath10k_fw_file *fw_file = &ar->normal_mode_fw.fw_file;
+
+	if (fw_file->wmi_op_version < ATH10K_FW_WMI_OP_VERSION_10_4)
+		ath10k_sta_update_stats_rx_duration(ar, &stats->peers);
+	else
+		ath10k_sta_update_extd_stats_rx_duration(ar,
+							 &stats->peers_extd);
 }
 
 static ssize_t ath10k_dbg_sta_read_aggr_mode(struct file *file,
