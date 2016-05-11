@@ -65,6 +65,7 @@
 #include <linux/sched/sysctl.h>
 #include <linux/kexec.h>
 #include <linux/bpf.h>
+#include <linux/fs_struct.h>
 
 #include <asm/uaccess.h>
 #include <asm/processor.h>
@@ -2344,10 +2345,31 @@ static int proc_dointvec_minmax_coredump(struct ctl_table *table, int write,
 static int proc_dostring_coredump(struct ctl_table *table, int write,
 		  void __user *buffer, size_t *lenp, loff_t *ppos)
 {
-	int error = proc_dostring(table, write, buffer, lenp, ppos);
-	if (!error)
-		validate_coredump_safety();
-	return error;
+	struct pid_namespace *pid_ns;
+	int error;
+
+	error = proc_dostring(table, write, buffer, lenp, ppos);
+	if (error)
+		return error;
+
+	pid_ns = task_active_pid_ns(current);
+	if (WARN_ON(!pid_ns))
+		return -EINVAL;
+
+	spin_lock(&pid_ns->root_for_dump_lock);
+
+	if (pid_ns->root_for_dump.mnt)
+		path_put(&pid_ns->root_for_dump);
+
+	spin_lock(&current->fs->lock);
+	pid_ns->root_for_dump = current->fs->root;
+	path_get(&pid_ns->root_for_dump);
+	spin_unlock(&current->fs->lock);
+
+	spin_unlock(&pid_ns->root_for_dump_lock);
+
+	validate_coredump_safety();
+	return 0;
 }
 #endif
 

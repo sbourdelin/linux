@@ -83,6 +83,7 @@ struct pid_namespace init_pid_ns = {
 #ifdef CONFIG_PID_NS
 	.ns.ops = &pidns_operations,
 #endif
+	.root_for_dump_lock = __SPIN_LOCK_UNLOCKED(init_pid_ns.root_for_dump_lock),
 };
 EXPORT_SYMBOL_GPL(init_pid_ns);
 
