@@ -264,27 +264,6 @@ asmlinkage void sb1_cache_error(void)
 #endif
 }
 
-
-/* Parity lookup table. */
-static const uint8_t parity[256] = {
-	0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-	1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-	1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-	0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-	1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-	0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-	0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-	1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-	1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-	0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-	0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-	1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-	0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-	1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-	1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-	0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0
-};
-
 /* Masks to select bits for Hamming parity, mask_72_64[i] for bit[i] */
 static const uint64_t mask_72_64[8] = {
 	0x0738C808099264FFULL,
@@ -298,34 +277,28 @@ static const uint64_t mask_72_64[8] = {
 };
 
 /* Calculate the parity on a range of bits */
-static char range_parity(uint64_t dword, int max, int min)
+static inline char range_parity(uint64_t dword, int max, int min)
 {
-	char parity = 0;
-	int i;
-	dword >>= min;
-	for (i=max-min; i>=0; i--) {
-		if (dword & 0x1)
-			parity = !parity;
-		dword >>= 1;
+	int n = max - min + 1;
+	if (__builtin_constant_p(n)) {
+		if (n <= 8)
+			return parity8((unsigned int)(dword >> min) & ((1U << n) - 1));
+		if (n <= 16)
+			return parity16((unsigned int)(dword >> min) & ((1U << n) - 1));
+		if (n <= 32)
+			return parity32((unsigned int)(dword >> min) & ((1U << n) - 1));
 	}
-	return parity;
+	return parity64((dword >> min) & ((1ULL << n) - 1));
 }
 
 /* Calculate the 4-bit even byte-parity for an instruction */
-static unsigned char inst_parity(uint32_t word)
+static inline unsigned char inst_parity(uint32_t word)
 {
-	int i, j;
-	char parity = 0;
-	for (j=0; j<4; j++) {
-		char byte_parity = 0;
-		for (i=0; i<8; i++) {
-			if (word & 0x80000000)
-				byte_parity = !byte_parity;
-			word <<= 1;
-		}
-		parity <<= 1;
-		parity |= byte_parity;
-	}
+	char parity;
+	parity  = parity8(word >> 24) << 3;
+	parity |= parity8(word >> 16) << 2;
+	parity |= parity8(word >> 8) << 1;
+	parity |= parity8(word);
 	return parity;
 }
 
@@ -436,7 +409,6 @@ static uint32_t extract_ic(unsigned short addr, int data)
 static uint8_t dc_ecc(uint64_t dword)
 {
 	uint64_t t;
-	uint32_t w;
 	uint8_t	 p;
 	int	 i;
 
@@ -445,12 +417,7 @@ static uint8_t dc_ecc(uint64_t dword)
 	{
 		p <<= 1;
 		t = dword & mask_72_64[i];
-		w = (uint32_t)(t >> 32);
-		p ^= (parity[w>>24] ^ parity[(w>>16) & 0xFF]
-		      ^ parity[(w>>8) & 0xFF] ^ parity[w & 0xFF]);
-		w = (uint32_t)(t & 0xFFFFFFFF);
-		p ^= (parity[w>>24] ^ parity[(w>>16) & 0xFF]
-		      ^ parity[(w>>8) & 0xFF] ^ parity[w & 0xFF]);
+		p |= parity64(t);
 	}
 	return p;
 }
