@@ -246,6 +246,18 @@
 				     "sata2";
 	};
 
+	cru: cru@1800c184 {
+		compatible = "syscon";
+		reg = <0x1800c184 0x4>;
+	};
+
+	reboot@1800c184 {
+		compatible ="syscon-reboot";
+		regmap = <&cru>;
+		offset = <0>;
+		mask = <0x39>;
+	};
+
 	nand: nand@18028000 {
 		compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1", "brcm,brcmnand";
 		reg = <0x18028000 0x600>, <0x1811a408 0x600>, <0x18028f00 0x20>;
