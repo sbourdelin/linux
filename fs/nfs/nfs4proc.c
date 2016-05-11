@@ -7024,7 +7024,7 @@ static int nfs4_sp4_select_mode(struct nfs_client *clp,
  * Wrapper for EXCHANGE_ID operation.
  */
 static int _nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred,
-	u32 sp4_how)
+	u32 sp4_how, struct rpc_xprt *xprt)
 {
 	nfs4_verifier verifier;
 	struct nfs41_exchange_id_args args = {
@@ -7049,6 +7049,18 @@ static int _nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred,
 		.rpc_resp = &res,
 		.rpc_cred = cred,
 	};
+	struct rpc_task_setup task_setup_data = {
+		.rpc_client = clp->cl_rpcclient,
+		.rpc_xprt = xprt,
+		.callback_ops = &nfs4_proc_default_ops,
+		.rpc_message = &msg,
+		.flags = RPC_TASK_TIMEOUT,
+	};
+	struct rpc_task *task;
+
+	/* Do not run exchange_id against the established mount connection */
+	if (xprt && xprt == rcu_access_pointer(clp->cl_rpcclient->cl_xprt))
+		return 1;
 
 	nfs4_init_boot_verifier(clp, &verifier);
 
@@ -7096,11 +7108,17 @@ static int _nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred,
 		goto out_impl_id;
 	}
 
-	status = rpc_call_sync(clp->cl_rpcclient, &msg, RPC_TASK_TIMEOUT);
+	task = rpc_run_task(&task_setup_data);
+	if (!IS_ERR(task)) {
+		status = task->tk_status;
+		rpc_put_task(task);
+	} else
+		status = PTR_ERR(task);
 	trace_nfs4_exchange_id(clp, status);
 	if (status == 0)
 		status = nfs4_check_cl_exchange_flags(res.flags);
-
+	if (xprt)
+		goto session_trunk;
 	if (status == 0)
 		status = nfs4_sp4_select_mode(clp, &res.state_protect);
 
@@ -7138,7 +7156,6 @@ static int _nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred,
 			res.server_scope = NULL;
 		}
 	}
-
 out_impl_id:
 	kfree(res.impl_id);
 out_server_scope:
@@ -7154,6 +7171,11 @@ out:
 			clp->cl_implid->date.nseconds);
 	dprintk("NFS reply exchange_id: %d\n", status);
 	return status;
+
+session_trunk:
+	if (status == 0)
+		status = nfs4_detect_session_trunking(clp, &res);
+	goto out_impl_id;
 }
 
 /*
@@ -7176,13 +7198,13 @@ int nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
 	/* try SP4_MACH_CRED if krb5i/p	*/
 	if (authflavor == RPC_AUTH_GSS_KRB5I ||
 	    authflavor == RPC_AUTH_GSS_KRB5P) {
-		status = _nfs4_proc_exchange_id(clp, cred, SP4_MACH_CRED);
+		status = _nfs4_proc_exchange_id(clp, cred, SP4_MACH_CRED, NULL);
 		if (!status)
 			return 0;
 	}
 
 	/* try SP4_NONE */
-	return _nfs4_proc_exchange_id(clp, cred, SP4_NONE);
+	return _nfs4_proc_exchange_id(clp, cred, SP4_NONE, NULL);
 }
 
 static int _nfs4_proc_destroy_clientid(struct nfs_client *clp,
