@@ -77,7 +77,7 @@ static irqreturn_t pcips2_interrupt(int irq, void *devid)
 
 		flag = (status & PS2_STAT_PARITY) ? 0 : SERIO_PARITY;
 
-		if (hweight8(scancode) & 1)
+		if (parity8(scancode))
 			flag ^= SERIO_PARITY;
 
 		serio_interrupt(ps2if->io, scancode, flag);
