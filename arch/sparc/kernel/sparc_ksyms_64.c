@@ -45,6 +45,12 @@ EXPORT_SYMBOL(__arch_hweight16);
 EXPORT_SYMBOL(__arch_hweight32);
 EXPORT_SYMBOL(__arch_hweight64);
 
+/* from parity.S */
+EXPORT_SYMBOL(__arch_parity8);
+EXPORT_SYMBOL(__arch_parity16);
+EXPORT_SYMBOL(__arch_parity32);
+EXPORT_SYMBOL(__arch_parity64);
+
 /* from ffs_ffz.S */
 EXPORT_SYMBOL(ffs);
 EXPORT_SYMBOL(__ffs);

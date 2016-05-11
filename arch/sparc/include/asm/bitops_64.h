@@ -47,6 +47,24 @@ unsigned int __arch_hweight16(unsigned int w);
 unsigned int __arch_hweight8(unsigned int w);
 
 #include <asm-generic/bitops/const_hweight.h>
+
+/*
+ * parityN: returns the parity of a N-bit word,
+ * i.e. the number of 1-bits in w modulo 2.
+ */
+
+static inline unsigned int __arch_parity4(unsigned int w)
+{
+	w &= 0xf;
+	return ((PARITY_MAGIC) >> w) & 1;
+}
+unsigned int __arch_parity8(unsigned int w);
+unsigned int __arch_parity16(unsigned int w);
+unsigned int __arch_parity32(unsigned int w);
+unsigned int __arch_parity64(__u64 w);
+
+#include <asm-generic/bitops/const_parity.h>
+
 #include <asm-generic/bitops/lock.h>
 #endif /* __KERNEL__ */
 
