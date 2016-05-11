@@ -12939,11 +12939,7 @@ static int tg3_test_nvram(struct tg3 *tp)
 
 		err = -EIO;
 		for (i = 0; i < NVRAM_SELFBOOT_DATA_SIZE; i++) {
-			u8 hw8 = hweight8(data[i]);
-
-			if ((hw8 & 0x1) && parity[i])
-				goto out;
-			else if (!(hw8 & 0x1) && !parity[i])
+			if (parity8(data[i]) == !!parity[i])
 				goto out;
 		}
 		err = 0;
