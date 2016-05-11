@@ -421,11 +421,38 @@ static inline unsigned int __arch_hweight8(unsigned int w)
 {
 	return __arch_hweight64(w & 0xff);
 }
+
+static inline unsigned int __arch_parity64(unsigned long w)
+{
+	return (unsigned int)__kernel_ctpop(w) & 1;
+}
+
+static inline unsigned int __arch_parity32(unsigned int w)
+{
+	return __arch_parity64(w);
+}
+
+static inline unsigned int __arch_parity16(unsigned int w)
+{
+	return __arch_parity64(w & 0xffff);
+}
+
+static inline unsigned int __arch_parity8(unsigned int w)
+{
+	return __arch_parity64(w & 0xff);
+}
+
+static inline unsigned int __arch_parity4(unsigned int w)
+{
+	return __arch_parity64(w & 0xf);
+}
 #else
 #include <asm-generic/bitops/arch_hweight.h>
+#include <asm-generic/bitops/arch_parity.h>
 #endif
 
 #include <asm-generic/bitops/const_hweight.h>
+#include <asm-generic/bitops/const_parity.h>
 
 #endif /* __KERNEL__ */
 
