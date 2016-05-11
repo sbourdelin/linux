@@ -298,6 +298,7 @@ static inline int ffs(unsigned long word)
 #include <asm-generic/bitops/fls64.h>
 #include <asm-generic/bitops/sched.h>
 #include <asm-generic/bitops/hweight.h>
+#include <asm-generic/bitops/parity.h>
 #include <asm-generic/bitops/lock.h>
 
 extern unsigned long find_next_zero_bit_le(const void *addr,
