@@ -640,6 +640,36 @@ static void ffs_epfile_io_complete(struct usb_ep *_ep, struct usb_request *req)
 	}
 }
 
+static size_t ffs_copy_to_user(const void *buf, size_t bytes,
+				struct ffs_io_data *io_data)
+{
+	size_t count = iov_iter_count(&io_data->data);
+	int ret;
+
+	/**
+	 * Since the buffer size for req is rounded up to maxpacketsize,
+	 * then we may end up with more data then user space has space for.
+	 * We can keep the excess data for next i/o, or report an error.
+	 * But we cannot silently drop data, because USB layer should ensure
+	 * the data integrality it has transferred.
+	 *
+	 * Here, we simply report an error to userspace to let userspace
+	 * proccess. Actually, userspace applications should negotiate with
+	 * each other for how many bytes host send.
+	 */
+	if (bytes > count) {
+		pr_err("ffs read size %zu bigger than requested size %zu\n",
+			bytes, count);
+		return -EOVERFLOW;
+	}
+
+	ret = copy_to_iter(buf, bytes, &io_data->data);
+	if (ret != bytes)
+		return -EFAULT;
+
+	return ret;
+}
+
 static void ffs_user_copy_worker(struct work_struct *work)
 {
 	struct ffs_io_data *io_data = container_of(work, struct ffs_io_data,
@@ -650,9 +680,7 @@ static void ffs_user_copy_worker(struct work_struct *work)
 
 	if (io_data->read && ret > 0) {
 		use_mm(io_data->mm);
-		ret = copy_to_iter(io_data->buf, ret, &io_data->data);
-		if (iov_iter_count(&io_data->data))
-			ret = -EFAULT;
+		ret = ffs_copy_to_user(io_data->buf, ret, io_data);
 		unuse_mm(io_data->mm);
 	}
 
@@ -803,18 +831,10 @@ static ssize_t ffs_epfile_io(struct file *file, struct ffs_io_data *io_data)
 			interrupted = ep->status < 0;
 		}
 
-		/*
-		 * XXX We may end up silently droping data here.  Since data_len
-		 * (i.e. req->length) may be bigger than len (after being
-		 * rounded up to maxpacketsize), we may end up with more data
-		 * then user space has space for.
-		 */
 		ret = interrupted ? -EINTR : ep->status;
-		if (io_data->read && ret > 0) {
-			ret = copy_to_iter(data, ret, &io_data->data);
-			if (!ret)
-				ret = -EFAULT;
-		}
+		if (io_data->read && ret > 0)
+			ret = ffs_copy_to_user(data, ret, io_data);
+
 		goto error_mutex;
 	} else if (!(req = usb_ep_alloc_request(ep->ep, GFP_KERNEL))) {
 		ret = -ENOMEM;
