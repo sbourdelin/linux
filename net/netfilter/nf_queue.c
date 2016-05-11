@@ -102,6 +102,13 @@ void nf_queue_nf_hook_drop(struct net *net, struct nf_hook_ops *ops)
 {
 	const struct nf_queue_handler *qh;
 
+	/* netns wasn't initialized, error unwind in progress.
+	 * Its possible that the nfq netns init function was not even
+	 * called, in which case nfq pernetns data is in undefined state.
+	 */
+	if (!net->list.next)
+		return;
+
 	rcu_read_lock();
 	qh = rcu_dereference(queue_handler);
 	if (qh)
