@@ -528,6 +528,8 @@ extern int nfs40_walk_client_list(struct nfs_client *clp,
 extern int nfs41_walk_client_list(struct nfs_client *clp,
 				struct nfs_client **result,
 				struct rpc_cred *cred);
+extern void nfs4_get_pseudofs_replicas(struct nfs_server *server,
+				struct nfs_fh *mntfh);
 
 static inline struct inode *nfs_igrab_and_active(struct inode *inode)
 {
