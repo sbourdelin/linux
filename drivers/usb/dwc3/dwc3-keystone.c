@@ -164,7 +164,6 @@ static int kdwc3_remove(struct platform_device *pdev)
 	kdwc3_disable_irqs(kdwc);
 	device_for_each_child(&pdev->dev, NULL, kdwc3_remove_core);
 	clk_disable_unprepare(kdwc->clk);
-	platform_set_drvdata(pdev, NULL);
 
 	return 0;
 }
