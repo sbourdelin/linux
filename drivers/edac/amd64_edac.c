@@ -1430,7 +1430,7 @@ static u8 f1x_determine_channel(struct amd64_pvt *pvt, u64 sys_addr,
 
 		if (intlv_addr & 0x2) {
 			u8 shift = intlv_addr & 0x1 ? 9 : 6;
-			u32 temp = hweight_long((u32) ((sys_addr >> 16) & 0x1F)) % 2;
+			u8 temp = parity8((sys_addr >> 16) & 0x1F);
 
 			return ((sys_addr >> shift) & 1) ^ temp;
 		}
