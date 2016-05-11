@@ -122,8 +122,6 @@ sci_phy_link_layer_initialization(struct isci_phy *iphy,
 	int phy_idx = iphy->phy_index;
 	struct sci_phy_cap phy_cap;
 	u32 phy_configuration;
-	u32 parity_check = 0;
-	u32 parity_count = 0;
 	u32 llctl, link_rate;
 	u32 clksm_value = 0;
 	u32 sp_timeouts = 0;
@@ -225,18 +223,7 @@ sci_phy_link_layer_initialization(struct isci_phy *iphy,
 	/* The SAS specification indicates that the phy_capabilities that
 	 * are transmitted shall have an even parity.  Calculate the parity.
 	 */
-	parity_check = phy_cap.all;
-	while (parity_check != 0) {
-		if (parity_check & 0x1)
-			parity_count++;
-		parity_check >>= 1;
-	}
-
-	/* If parity indicates there are an odd number of bits set, then
-	 * set the parity bit to 1 in the phy capabilities.
-	 */
-	if ((parity_count % 2) != 0)
-		phy_cap.parity = 1;
+	phy_cap.parity = parity32(phy_cap.all);
 
 	writel(phy_cap.all, &llr->phy_capabilities);
 
