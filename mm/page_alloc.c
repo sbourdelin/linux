@@ -3225,7 +3225,8 @@ retry:
 		goto got_pg;
 
 	/* Checks for THP-specific high-order allocations */
-	if (is_thp_gfp_mask(gfp_mask)) {
+	if (IS_ENABLED(CONFIG_COMPACTION) &&
+		is_thp_gfp_mask(gfp_mask)) {
 		/*
 		 * If compaction is deferred for high-order allocations, it is
 		 * because sync compaction recently failed. If this is the case
