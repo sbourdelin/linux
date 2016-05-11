@@ -175,14 +175,9 @@ static const u8 vivid_cc_sequence2[30] = {
 	0x14, 0x2f,	/* End of Caption */
 };
 
-static u8 calc_parity(u8 val)
+static inline u8 calc_parity(u8 val)
 {
-	unsigned i;
-	unsigned tot = 0;
-
-	for (i = 0; i < 7; i++)
-		tot += (val & (1 << i)) ? 1 : 0;
-	return val | ((tot & 1) ? 0 : 0x80);
+	return (!parity8(val) << 7) | val;
 }
 
 static void vivid_vbi_gen_set_time_of_day(u8 *packet)
