@@ -51,7 +51,7 @@ static int ebc_c384_wdt_start(struct watchdog_device *wdev)
 
 	/* resolution is in minutes for timeouts greater than 255 seconds */
 	if (t > 255)
-		t = DIV_ROUND_UP(t, 60);
+		t /= 60;
 
 	outb(t, PET_ADDR);
 
