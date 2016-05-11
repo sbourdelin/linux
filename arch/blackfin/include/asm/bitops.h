@@ -23,6 +23,7 @@
 #include <asm-generic/bitops/sched.h>
 #include <asm-generic/bitops/ffs.h>
 #include <asm-generic/bitops/const_hweight.h>
+#include <asm-generic/bitops/const_parity.h>
 #include <asm-generic/bitops/lock.h>
 
 #include <asm-generic/bitops/ext2-atomic.h>
@@ -135,6 +136,36 @@ static inline unsigned int __arch_hweight16(unsigned int w)
 static inline unsigned int __arch_hweight8(unsigned int w)
 {
 	return __arch_hweight32(w & 0xff);
+}
+
+/*
+ * parityN: returns the parity of a N-bit word,
+ * i.e. the number of 1-bits in w modulo 2.
+ */
+
+static inline unsigned int __arch_parity32(unsigned int w)
+{
+	return __arch_hweight32(w) & 1;
+}
+
+static inline unsigned int __arch_parity64(__u64 w)
+{
+	return __arch_parity32((unsigned int)(w >> 32) ^ (unsigned int)w);
+}
+
+static inline unsigned int __arch_parity16(unsigned int w)
+{
+	return __arch_parity32(w & 0xffff);
+}
+
+static inline unsigned int __arch_parity8(unsigned int w)
+{
+	return __arch_parity32(w & 0xff);
+}
+
+static inline unsigned int __arch_parity4(unsigned int w)
+{
+	return __arch_parity32(w & 0xf);
 }
 
 #endif				/* _BLACKFIN_BITOPS_H */
