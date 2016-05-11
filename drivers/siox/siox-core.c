@@ -13,6 +13,9 @@
 
 #include "siox.h"
 
+#define CREATE_TRACE_POINTS
+#include <trace/events/siox.h>
+
 struct workqueue_struct *wqueue;
 static bool siox_is_registered;
 
@@ -33,6 +36,7 @@ static void __siox_poll(struct siox_master *smaster)
 {
 	struct siox_device *sdevice;
 	size_t i = 0;
+	unsigned int devno = smaster->num_devices;
 	u8 prevstatus = smaster->status;
 
 	if (++smaster->status > 0x0d)
@@ -44,16 +48,21 @@ static void __siox_poll(struct siox_master *smaster)
 		struct siox_driver *sdriver =
 			sdevice->dev.driver ? to_siox_driver(sdevice->dev.driver) : NULL;
 
+		devno--;
+
 		if (sdriver)
 			sdriver->set_data(sdevice, smaster->status,
 					  &smaster->buf[i + 1]);
 
 		smaster->buf[i] = smaster->status;
 
+		trace_siox_set_data(smaster, sdevice, devno, i);
+
 		i += sdevice->inbytes;
 	}
 
 	BUG_ON(i != smaster->setbuf_len);
+	BUG_ON(devno);
 
 	smaster->pushpull(smaster, smaster->setbuf_len, smaster->buf,
 			  smaster->getbuf_len,
@@ -91,9 +100,12 @@ static void __siox_poll(struct siox_master *smaster)
 		 * counter. Should the bus stop to poll in these cases?
 		 */
 
+		trace_siox_get_data(smaster, sdevice, devno, i);
+
 		if (sdriver)
 			sdriver->get_data(sdevice, &smaster->buf[i]);
 
+		devno++;
 		i += sdevice->outbytes;
 	}
 
