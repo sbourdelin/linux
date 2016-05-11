@@ -343,21 +343,25 @@ void disable_buildid_cache(void)
 static char *build_id_cache__dirname_from_path(const char *name,
 					       bool is_kallsyms, bool is_vdso)
 {
-	char *realname = (char *)name, *filename;
+	const char *realname = name;
+	char *filename;
 	bool slash = is_kallsyms || is_vdso;
 
 	if (!slash) {
 		realname = realpath(name, NULL);
 		if (!realname)
 			return NULL;
-	}
+	} else if (is_vdso)
+		realname = DSO__NAME_VDSO;
+	else
+		realname = "[kernel.kallsyms]";
 
 	if (asprintf(&filename, "%s%s%s", buildid_dir, slash ? "/" : "",
-		     is_vdso ? DSO__NAME_VDSO : realname) < 0)
+		     realname) < 0)
 		filename = NULL;
 
 	if (!slash)
-		free(realname);
+		free((char *)realname);
 
 	return filename;
 }
