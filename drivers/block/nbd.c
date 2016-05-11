@@ -1049,6 +1049,7 @@ static int __init nbd_init(void)
 
 	for (i = 0; i < nbds_max; i++) {
 		struct gendisk *disk = alloc_disk(1 << part_shift);
+
 		if (!disk)
 			goto out;
 		nbd_dev[i].disk = disk;
