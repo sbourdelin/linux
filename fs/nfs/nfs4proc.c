@@ -6784,12 +6784,12 @@ nfs41_same_server_scope(struct nfs41_server_scope *a,
 }
 
 static void
-nfs4_bind_one_conn_to_session_done(struct rpc_task *task, void *calldata)
+nfs4_proc_default_done(struct rpc_task *task, void *calldata)
 {
 }
 
-static const struct rpc_call_ops nfs4_bind_one_conn_to_session_ops = {
-	.rpc_call_done =  &nfs4_bind_one_conn_to_session_done,
+static const struct rpc_call_ops nfs4_proc_default_ops = {
+	.rpc_call_done =  &nfs4_proc_default_done,
 };
 
 /*
@@ -6820,7 +6820,7 @@ int nfs4_proc_bind_one_conn_to_session(struct rpc_clnt *clnt,
 	struct rpc_task_setup task_setup_data = {
 		.rpc_client = clnt,
 		.rpc_xprt = xprt,
-		.callback_ops = &nfs4_bind_one_conn_to_session_ops,
+		.callback_ops = &nfs4_proc_default_ops,
 		.rpc_message = &msg,
 		.flags = RPC_TASK_TIMEOUT,
 	};
