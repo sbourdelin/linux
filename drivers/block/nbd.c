@@ -617,8 +617,8 @@ static int nbd_thread_send(void *data)
 }
 
 /*
- * We always wait for result of write, for now. It would be nice to make it optional
- * in future
+ * We always wait for result of write, for now. It would be nice to make it
+ * optional in future
  * if ((rq_data_dir(req) == WRITE) && (nbd->flags & NBD_WRITE_NOCHK))
  *   { printk( "Warning: Ignoring result!\n"); nbd_end_request( req ); }
  */
