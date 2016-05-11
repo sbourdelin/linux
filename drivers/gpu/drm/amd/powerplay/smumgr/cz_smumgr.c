@@ -636,10 +636,11 @@ static int cz_smu_populate_firmware_entries(struct pp_smumgr *smumgr)
 	int ret;
 	enum cgs_ucode_id ucode_id;
 	struct cgs_firmware_info info = {0};
+	int n = ARRAY_SIZE(firmware_list);
 
 	cz_smu->driver_buffer_length = 0;
 
-	for (i = 0; i < sizeof(firmware_list)/sizeof(*firmware_list); i++) {
+	for (i = 0; i < n; i++) {
 
 		firmware_type = cz_translate_firmware_enum_to_arg(smumgr,
 					firmware_list[i]);
