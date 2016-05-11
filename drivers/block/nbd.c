@@ -1018,7 +1018,7 @@ static int __init nbd_init(void)
 	BUILD_BUG_ON(sizeof(struct nbd_request) != 28);
 
 	if (max_part < 0) {
-		printk(KERN_ERR "nbd: max_part must be >= 0\n");
+		pr_err("nbd: max_part must be >= 0\n");
 		return -EINVAL;
 	}
 
