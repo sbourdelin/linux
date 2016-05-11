@@ -2742,18 +2742,12 @@ static int niu_set_alt_mac_rdc_table(struct niu *np, int idx,
 
 static u64 vlan_entry_set_parity(u64 reg_val)
 {
-	u64 port01_mask;
-	u64 port23_mask;
-
-	port01_mask = 0x00ff;
-	port23_mask = 0xff00;
-
-	if (hweight64(reg_val & port01_mask) & 1)
+	if (parity8(reg_val))
 		reg_val |= ENET_VLAN_TBL_PARITY0;
 	else
 		reg_val &= ~ENET_VLAN_TBL_PARITY0;
 
-	if (hweight64(reg_val & port23_mask) & 1)
+	if (parity8((unsigned int)reg_val >> 8))
 		reg_val |= ENET_VLAN_TBL_PARITY1;
 	else
 		reg_val &= ~ENET_VLAN_TBL_PARITY1;
