@@ -106,6 +106,13 @@ struct hash_pte;
 extern struct hash_pte *Hash, *Hash_end;
 extern unsigned long Hash_size, Hash_mask;
 
+#define PHYS_IMMR_BASE (mfspr(SPRN_IMMR) & 0xfff80000)
+#ifdef CONFIG_PPC_8xx
+#define VIRT_IMMR_BASE (__fix_to_virt(FIX_IMMR_BASE))
+#else
+#define VIRT_IMMR_BASE PHYS_IMMR_BASE
+#endif
+
 #endif /* CONFIG_PPC32 */
 
 extern unsigned long ioremap_bot;
