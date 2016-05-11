@@ -257,6 +257,7 @@ static inline int sock_send_bvec(struct nbd_device *nbd, struct bio_vec *bvec,
 {
 	int result;
 	void *kaddr = kmap(bvec->bv_page);
+
 	result = sock_xmit(nbd, 1, kaddr + bvec->bv_offset,
 			   bvec->bv_len, flags);
 	kunmap(bvec->bv_page);
