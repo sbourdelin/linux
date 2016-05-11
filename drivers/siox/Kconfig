@@ -1,2 +1,9 @@
 menuconfig SIOX
 	tristate "Eckelmann SIOX Support"
+
+if SIOX
+
+config SIOX_BUS_GPIO
+	tristate "SIOX GPIO bus driver"
+
+endif
