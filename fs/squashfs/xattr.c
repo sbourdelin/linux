@@ -67,7 +67,7 @@ ssize_t squashfs_listxattr(struct dentry *d, char *buffer,
 
 		name_size = le16_to_cpu(entry.size);
 		handler = squashfs_xattr_handler(le16_to_cpu(entry.type));
-		if (handler && (!handler->list || handler->list(d))) {
+		if (handler && (!handler->list || handler->list(handler, d))) {
 			const char *prefix = handler->prefix ?: handler->name;
 			size_t prefix_size = strlen(prefix);
 

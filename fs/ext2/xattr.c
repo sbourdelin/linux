@@ -290,7 +290,7 @@ bad_block:	ext2_error(inode->i_sb, "ext2_xattr_list",
 		const struct xattr_handler *handler =
 			ext2_xattr_handler(entry->e_name_index);
 
-		if (handler && (!handler->list || handler->list(dentry))) {
+		if (handler && (!handler->list || handler->list(handler, dentry))) {
 			const char *prefix = handler->prefix ?: handler->name;
 			size_t prefix_len = strlen(prefix);
 			size_t size = prefix_len + entry->e_name_len + 1;

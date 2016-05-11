@@ -787,7 +787,7 @@ static int listxattr_filler(struct dir_context *ctx, const char *name,
 		handler = find_xattr_handler_prefix(b->dentry->d_sb->s_xattr,
 						    name);
 		if (!handler /* Unsupported xattr name */ ||
-		    (handler->list && !handler->list(b->dentry)))
+		    (handler->list && !handler->list(handler, b->dentry)))
 			return 0;
 		size = namelen + 1;
 		if (b->buf) {

@@ -28,7 +28,7 @@ struct xattr_handler {
 	const char *name;
 	const char *prefix;
 	int flags;      /* fs private flags */
-	bool (*list)(struct dentry *dentry);
+	bool (*list)(const struct xattr_handler *, struct dentry *dentry);
 	int (*get)(const struct xattr_handler *, struct dentry *dentry,
 		   struct inode *inode, const char *name, void *buffer,
 		   size_t size);

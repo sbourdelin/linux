@@ -412,7 +412,7 @@ ssize_t f2fs_listxattr(struct dentry *dentry, char *buffer, size_t buffer_size)
 		size_t prefix_len;
 		size_t size;
 
-		if (!handler || (handler->list && !handler->list(dentry)))
+		if (!handler || (handler->list && !handler->list(handler, dentry)))
 			continue;
 
 		prefix = handler->prefix ?: handler->name;
