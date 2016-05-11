@@ -22,6 +22,7 @@
 #include <linux/err.h>
 #include <linux/platform_device.h>
 #include <linux/of_device.h>
+#include <linux/regmap.h>
 #include <linux/regulator/of_regulator.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
@@ -224,7 +225,7 @@ static int tps65218_pmic_get_current_limit(struct regulator_dev *dev)
 	unsigned int index;
 	struct tps65218 *tps = rdev_get_drvdata(dev);
 
-	retval = tps65218_reg_read(tps, dev->desc->csel_reg, &index);
+	retval = regmap_read(tps->regmap, dev->desc->csel_reg, &index);
 	if (retval < 0)
 		return retval;
 
