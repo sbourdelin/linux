@@ -1080,7 +1080,7 @@ static int __init nbd_init(void)
 		goto out;
 	}
 
-	printk(KERN_INFO "nbd: registered device at major %d\n", NBD_MAJOR);
+	pr_info("nbd: registered device at major %d\n", NBD_MAJOR);
 
 	nbd_dbg_init();
 
