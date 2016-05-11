@@ -107,7 +107,8 @@ void exit_fs(struct task_struct *tsk)
 	}
 }
 
-struct fs_struct *copy_fs_struct(struct fs_struct *old)
+struct fs_struct *copy_fs_struct(struct fs_struct *old,
+				 struct path *root_override)
 {
 	struct fs_struct *fs = kmem_cache_alloc(fs_cachep, GFP_KERNEL);
 	/* We don't need to lock fs - think why ;-) */
@@ -117,13 +118,19 @@ struct fs_struct *copy_fs_struct(struct fs_struct *old)
 		spin_lock_init(&fs->lock);
 		seqcount_init(&fs->seq);
 		fs->umask = old->umask;
-
-		spin_lock(&old->lock);
-		fs->root = old->root;
-		path_get(&fs->root);
-		fs->pwd = old->pwd;
-		path_get(&fs->pwd);
-		spin_unlock(&old->lock);
+		if (root_override) {
+			fs->root = *root_override;
+			path_get(&fs->root);
+			fs->pwd = *root_override;
+			path_get(&fs->pwd);
+		} else {
+			spin_lock(&old->lock);
+			fs->root = old->root;
+			path_get(&fs->root);
+			fs->pwd = old->pwd;
+			path_get(&fs->pwd);
+			spin_unlock(&old->lock);
+		}
 	}
 	return fs;
 }
@@ -131,7 +138,7 @@ struct fs_struct *copy_fs_struct(struct fs_struct *old)
 int unshare_fs_struct(void)
 {
 	struct fs_struct *fs = current->fs;
-	struct fs_struct *new_fs = copy_fs_struct(fs);
+	struct fs_struct *new_fs = copy_fs_struct(fs, NULL);
 	int kill;
 
 	if (!new_fs)
