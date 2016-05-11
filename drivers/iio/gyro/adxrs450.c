@@ -109,7 +109,7 @@ static int adxrs450_spi_read_reg_16(struct iio_dev *indio_dev,
 	mutex_lock(&st->buf_lock);
 	tx = ADXRS450_READ_DATA | (reg_address << 17);
 
-	if (!(hweight32(tx) & 1))
+	if (!parity32(tx))
 		tx |= ADXRS450_P;
 
 	st->tx = cpu_to_be32(tx);
@@ -145,7 +145,7 @@ static int adxrs450_spi_write_reg_16(struct iio_dev *indio_dev,
 	mutex_lock(&st->buf_lock);
 	tx = ADXRS450_WRITE_DATA | (reg_address << 17) | (val << 1);
 
-	if (!(hweight32(tx) & 1))
+	if (!parity32(tx))
 		tx |= ADXRS450_P;
 
 	st->tx = cpu_to_be32(tx);
