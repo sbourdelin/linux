@@ -42,7 +42,7 @@
 
 struct nbd_device {
 	u32 flags;
-	struct socket * sock;	/* If == NULL, device is not ready, yet	*/
+	struct socket *sock;	/* If == NULL, device is not ready, yet	*/
 	int magic;
 
 	spinlock_t queue_lock;
