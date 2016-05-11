@@ -363,6 +363,27 @@ unsigned mtd_mmap_capabilities(struct mtd_info *mtd)
 EXPORT_SYMBOL_GPL(mtd_mmap_capabilities);
 #endif
 
+static int mtd_of_node_match(struct device *dev, const void *data)
+{
+	return dev->of_node == data;
+}
+
+struct mtd_info *of_mtd_info_get(struct device_node *node)
+{
+	struct mtd_info *mtd;
+	struct device *d;
+	int ret = -ENODEV;
+
+	d = class_find_device(&mtd_class, NULL, node, mtd_of_node_match);
+	if (!d)
+		return ERR_PTR(-ENODEV);
+
+	mtd = container_of(d, struct mtd_info, dev);
+
+	return mtd;
+}
+EXPORT_SYMBOL_GPL(of_mtd_info_get);
+
 static int mtd_reboot_notifier(struct notifier_block *n, unsigned long state,
 			       void *cmd)
 {
