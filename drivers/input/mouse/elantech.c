@@ -693,9 +693,9 @@ static int elantech_packet_check_v1(struct psmouse *psmouse)
 
 	p3 = (packet[0] & 0x04) >> 2;
 
-	return etd->parity[packet[1]] == p1 &&
-	       etd->parity[packet[2]] == p2 &&
-	       etd->parity[packet[3]] == p3;
+	return parity8(packet[1]) != p1 &&
+	       parity8(packet[2]) != p2 &&
+	       parity8(packet[3]) != p3;
 }
 
 static int elantech_debounce_check_v2(struct psmouse *psmouse)
@@ -1634,10 +1634,6 @@ int elantech_init(struct psmouse *psmouse)
 		return -ENOMEM;
 
 	psmouse_reset(psmouse);
-
-	etd->parity[0] = 1;
-	for (i = 1; i < 256; i++)
-		etd->parity[i] = etd->parity[i & (i - 1)] ^ 1;
 
 	/*
 	 * Do the version query again so we can store the result

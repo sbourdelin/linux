@@ -141,7 +141,6 @@ struct elantech_data {
 	unsigned int y_max;
 	unsigned int width;
 	struct finger_pos mt[ETP_MAX_FINGERS];
-	unsigned char parity[256];
 	int (*send_cmd)(struct psmouse *psmouse, unsigned char c, unsigned char *param);
 	void (*original_set_rate)(struct psmouse *psmouse, unsigned int rate);
 };
