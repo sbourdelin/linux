@@ -89,6 +89,18 @@
 	status = "okay";
 };
 
+&emmc_phy {
+	status = "okay";
+};
+
+&sdhci {
+	bus-width = <8>;
+	mmc-hs400-1_8v;
+	non-removable;
+	mmc-hs400-enhanced-strobe;
+	status = "okay";
+};
+
 &uart2 {
 	status = "okay";
 };
