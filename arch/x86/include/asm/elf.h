@@ -271,8 +271,8 @@ extern int force_personality32;
  * An executable for which elf_read_implies_exec() returns TRUE will
  * have the READ_IMPLIES_EXEC personality flag set automatically.
  */
-#define elf_read_implies_exec(ex, executable_stack)	\
-	(executable_stack != EXSTACK_DISABLE_X)
+#define elf_read_implies_exec(ex, executable_stack) \
+	(mmap_is_ia32() ? (executable_stack != EXSTACK_DISABLE_X) : 0)
 
 struct task_struct;
 
