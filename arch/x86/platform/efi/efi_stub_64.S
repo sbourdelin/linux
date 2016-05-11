@@ -43,7 +43,7 @@ ENTRY(efi_call)
 	FRAME_BEGIN
 	SAVE_XMM
 	mov (%rsp), %rax
-	mov 8(%rax), %rax
+	mov 16(%rax), %rax
 	subq $48, %rsp
 	mov %r9, 32(%rsp)
 	mov %rax, 40(%rsp)
