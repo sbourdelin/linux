@@ -12,6 +12,7 @@
 #include <linux/blk-cgroup.h>
 #include "blk.h"
 
+#define DEFAULT_HISTORY (0xAA) /* 0/1 bits are equal */
 /* Max dispatch from a group in 1 round */
 static int throtl_grp_quantum = 8;
 
@@ -171,6 +172,7 @@ struct throtl_data
 
 	unsigned long low_upgrade_time;
 	unsigned long low_downgrade_time;
+	unsigned char low_history;
 	unsigned int low_upgrade_interval;
 	unsigned int low_downgrade_interval;
 };
@@ -1571,9 +1573,39 @@ static unsigned long tg_last_low_overflow_time(struct throtl_grp *tg)
 	return ret;
 }
 
-static bool throtl_upgrade_check_one(struct throtl_grp *tg)
+static void throtl_calculate_low_interval(struct throtl_data *td)
+{
+	unsigned long history = td->low_history;
+	unsigned int ubits = bitmap_weight(&history,
+		sizeof(td->low_history) * 8);
+	unsigned int dbits = sizeof(td->low_history) * 8 - ubits;
+
+	ubits = max(1U, ubits);
+	dbits = max(1U, dbits);
+
+	if (ubits >= dbits) {
+		td->low_upgrade_interval = ubits / dbits * cg_check_time;
+		td->low_downgrade_interval = cg_check_time;
+	} else {
+		td->low_upgrade_interval = cg_check_time;
+		td->low_downgrade_interval = dbits / ubits * cg_check_time;
+	}
+}
+
+static bool throtl_upgrade_check_one(struct throtl_grp *tg, bool *idle)
 {
 	struct throtl_service_queue *sq = &tg->service_queue;
+
+	if (!tg->bps[READ][LIMIT_LOW] && !tg->bps[WRITE][LIMIT_LOW] &&
+	    !tg->iops[READ][LIMIT_LOW] && !tg->iops[WRITE][LIMIT_LOW])
+		return true;
+
+	/* if cgroup is below low limit for a long time, consider it idle */
+	if (time_after(jiffies,
+	    tg_last_low_overflow_time(tg) + tg->td->low_upgrade_interval)) {
+		*idle = true;
+		return true;
+	}
 
 	if (tg->bps[READ][LIMIT_LOW] != 0 && !sq->nr_queued[READ])
 		return false;
@@ -1586,15 +1618,15 @@ static bool throtl_upgrade_check_one(struct throtl_grp *tg)
 	return true;
 }
 
-static bool throtl_upgrade_check_hierarchy(struct throtl_grp *tg)
+static bool throtl_upgrade_check_hierarchy(struct throtl_grp *tg, bool *idle)
 {
-	if (throtl_upgrade_check_one(tg))
+	if (throtl_upgrade_check_one(tg, idle))
 		return true;
 	while (true) {
 		if (!tg || (cgroup_subsys_on_dfl(io_cgrp_subsys) &&
 				!tg_to_blkg(tg)->parent))
 			return false;
-		if (throtl_upgrade_check_one(tg))
+		if (throtl_upgrade_check_one(tg, idle))
 			return true;
 		tg = sq_to_tg(tg->service_queue.parent_sq);
 	}
@@ -1606,6 +1638,7 @@ static bool throtl_can_upgrade(struct throtl_data *td,
 {
 	struct cgroup_subsys_state *pos_css;
 	struct blkcg_gq *blkg;
+	bool idle = false;
 
 	if (td->limit_index != LIMIT_LOW)
 		return false;
@@ -1621,8 +1654,14 @@ static bool throtl_can_upgrade(struct throtl_data *td,
 			continue;
 		if (!list_empty(&tg_to_blkg(tg)->blkcg->css.children))
 			continue;
-		if (!throtl_upgrade_check_hierarchy(tg))
+		if (!throtl_upgrade_check_hierarchy(tg, &idle))
 			return false;
+	}
+	if (td->limit_index == LIMIT_LOW) {
+		td->low_history <<= 1;
+		if (!idle)
+			td->low_history |= 1;
+		throtl_calculate_low_interval(td);
 	}
 	return true;
 }
@@ -1645,6 +1684,21 @@ static void throtl_upgrade_state(struct throtl_data *td)
 	throtl_select_dispatch(&td->service_queue);
 	throtl_schedule_next_dispatch(&td->service_queue, false);
 	queue_work(kthrotld_workqueue, &td->dispatch_work);
+}
+
+static void throtl_upgrade_check(struct throtl_grp *tg)
+{
+	if (tg->td->limit_index != LIMIT_LOW)
+		return;
+
+	if (!(tg->bps[READ][LIMIT_LOW] || tg->bps[WRITE][LIMIT_LOW] ||
+	      tg->iops[READ][LIMIT_LOW] || tg->iops[WRITE][LIMIT_LOW]) ||
+	    !time_after(jiffies,
+	     tg_last_low_overflow_time(tg) + tg->td->low_upgrade_interval))
+		return;
+
+	if (throtl_can_upgrade(tg->td, NULL))
+		throtl_upgrade_state(tg->td);
 }
 
 static void throtl_downgrade_state(struct throtl_data *td, int new)
@@ -1772,6 +1826,7 @@ again:
 		if (tg->last_low_overflow_time[rw] == 0)
 			tg->last_low_overflow_time[rw] = jiffies;
 		throtl_downgrade_check(tg);
+		throtl_upgrade_check(tg);
 		/* throtl is FIFO - if bios are already queued, should queue */
 		if (sq->nr_queued[rw])
 			break;
@@ -1936,8 +1991,8 @@ int blk_throtl_init(struct request_queue *q)
 	td->limit_index = LIMIT_MAX;
 	td->low_upgrade_time = jiffies;
 	td->low_downgrade_time = jiffies;
-	td->low_upgrade_interval = cg_check_time;
-	td->low_downgrade_interval = cg_check_time;
+	td->low_history = DEFAULT_HISTORY;
+	throtl_calculate_low_interval(td);
 	/* activate policy */
 	ret = blkcg_activate_policy(q, &blkcg_policy_throtl);
 	if (ret)
