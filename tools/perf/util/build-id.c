@@ -354,7 +354,7 @@ static char *build_id_cache__dirname_from_path(const char *name,
 	} else if (is_vdso)
 		realname = DSO__NAME_VDSO;
 	else
-		realname = "[kernel.kallsyms]";
+		realname = DSO__NAME_KALLSYMS;
 
 	if (asprintf(&filename, "%s%s%s", buildid_dir, slash ? "/" : "",
 		     realname) < 0)
