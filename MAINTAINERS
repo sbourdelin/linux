@@ -2742,15 +2742,24 @@ S:	Maintained
 F:	drivers/iio/light/cm*
 F:	Documentation/devicetree/bindings/i2c/trivial-devices.txt
 
+CAVIUM I2C DRIVER
+M:	Jan Glauber <jglauber@cavium.com>
+M:	David Daney <david.daney@cavium.com>
+W:	http://www.cavium.com
+S:	Supported
+F:	drivers/i2c/busses/i2c-cavium*
+F:	drivers/i2c/busses/i2c-octeon*
+F:	drivers/i2c/busses/i2c-thunderx*
+
 CAVIUM LIQUIDIO NETWORK DRIVER
-M:     Derek Chickles <derek.chickles@caviumnetworks.com>
-M:     Satanand Burla <satananda.burla@caviumnetworks.com>
-M:     Felix Manlunas <felix.manlunas@caviumnetworks.com>
-M:     Raghu Vatsavayi <raghu.vatsavayi@caviumnetworks.com>
-L:     netdev@vger.kernel.org
-W:     http://www.cavium.com
-S:     Supported
-F:     drivers/net/ethernet/cavium/liquidio/
+M:	Derek Chickles <derek.chickles@caviumnetworks.com>
+M:	Satanand Burla <satananda.burla@caviumnetworks.com>
+M:	Felix Manlunas <felix.manlunas@caviumnetworks.com>
+M:	Raghu Vatsavayi <raghu.vatsavayi@caviumnetworks.com>
+L:	netdev@vger.kernel.org
+W:	http://www.cavium.com
+S:	Supported
+F:	drivers/net/ethernet/cavium/liquidio/
 
 CC2520 IEEE-802.15.4 RADIO DRIVER
 M:	Varka Bhadram <varkabhadram@gmail.com>
