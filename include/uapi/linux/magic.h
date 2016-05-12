@@ -79,4 +79,6 @@
 #define NSFS_MAGIC		0x6e736673
 #define BPF_FS_MAGIC		0xcafe4a11
 
+#define SHIFTFS_MAGIC		0x6a656a62
+
 #endif /* __LINUX_MAGIC_H__ */
