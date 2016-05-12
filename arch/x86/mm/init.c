@@ -17,6 +17,7 @@
 #include <asm/proto.h>
 #include <asm/dma.h>		/* for MAX_DMA_PFN */
 #include <asm/microcode.h>
+#include <asm/kaslr.h>
 
 /*
  * We need to define the tracepoints somewhere, and tlb.c
@@ -589,6 +590,12 @@ void __init init_mem_mapping(void)
 
 	/* the ISA range is always mapped regardless of memory holes */
 	init_memory_mapping(0, ISA_END_ADDRESS);
+
+	/* Default trampoline pgd value */
+	trampoline_pgd_entry = init_level4_pgt[pgd_index(__PAGE_OFFSET)];
+
+	/* Init the trampoline page table if needed for KASLR memory */
+	kaslr_trampoline_init();
 
 	/*
 	 * If the allocation is in bottom-up direction, we setup direct mapping

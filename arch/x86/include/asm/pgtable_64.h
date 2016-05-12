@@ -21,6 +21,7 @@ extern pmd_t level2_fixmap_pgt[512];
 extern pmd_t level2_ident_pgt[512];
 extern pte_t level1_fixmap_pgt[512];
 extern pgd_t init_level4_pgt[];
+extern pgd_t trampoline_pgd_entry;
 
 #define swapper_pg_dir init_level4_pgt
 
