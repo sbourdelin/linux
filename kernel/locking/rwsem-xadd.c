@@ -202,7 +202,8 @@ __rwsem_do_wake(struct rw_semaphore *sem, enum rwsem_wake_type wake_type)
 		 */
 		smp_mb();
 		waiter->task = NULL;
-		wake_up_process(tsk);
+		if (tsk != current)
+			wake_up_process(tsk);
 		put_task_struct(tsk);
 	} while (--loop);
 
