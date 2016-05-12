@@ -270,20 +270,20 @@ struct ti_firmware_header {
 #define TI_EXTRA_VID_PID_COUNT	5
 
 struct ti_port {
-	u8			tp_msr;
-	u8			tp_shadow_mcr;
-	u8			tp_uart_mode;	/* 232 or 485 modes */
-	unsigned int		tp_uart_base_addr;
-	spinlock_t		tp_lock; /* Protects tp_msr */
-	struct mutex            tp_mutex; /* Protects tp_shadow_mcr */
+	u8 msr;
+	u8 mcr;
+	u8 uart_mode;	/* 232 or 485 modes */
+	unsigned int uart_base_addr;
+	spinlock_t spinlock; /* Protects msr */
+	struct mutex mutex; /* Protects mcr */
 };
 
 struct ti_device {
-	struct mutex		td_open_close_lock;
-	int			td_open_port_count;
-	int			td_is_3410;
-	bool			td_rs485_only;
-	int			td_urb_error;
+	struct mutex open_close_lock;
+	int open_port_count;
+	bool is_3410;
+	bool rs485_only;
+	int model;
 };
 
 static int ti_startup(struct usb_serial *serial);
@@ -564,14 +564,14 @@ static int ti_startup(struct usb_serial *serial)
 	if (!tdev)
 		return -ENOMEM;
 
-	mutex_init(&tdev->td_open_close_lock);
+	mutex_init(&tdev->open_close_lock);
 	usb_set_serial_data(serial, tdev);
 
 	/* determine device type */
 	if (serial->type == &ti_1port_device)
-		tdev->td_is_3410 = 1;
+		tdev->is_3410 = true;
 	dev_dbg(&dev->dev, "%s - device type is: %s\n", __func__,
-		tdev->td_is_3410 ? "3410" : "5052");
+		tdev->is_3410 ? "3410" : "5052");
 
 	vid = le16_to_cpu(dev->descriptor.idVendor);
 	pid = le16_to_cpu(dev->descriptor.idProduct);
@@ -579,7 +579,7 @@ static int ti_startup(struct usb_serial *serial)
 		switch (pid) {
 		case MXU1_1130_PRODUCT_ID:
 		case MXU1_1131_PRODUCT_ID:
-			tdev->td_rs485_only = true;
+			tdev->rs485_only = true;
 			break;
 		}
 	}
@@ -595,7 +595,7 @@ static int ti_startup(struct usb_serial *serial)
 			goto free_tdev;
 
 		/* 3410 must be reset, 5052 resets itself */
-		if (tdev->td_is_3410) {
+		if (tdev->is_3410) {
 			msleep_interruptible(100);
 			usb_reset_device(dev);
 		}
@@ -636,20 +636,20 @@ static int ti_port_probe(struct usb_serial_port *port)
 	if (!tport)
 		return -ENOMEM;
 
-	spin_lock_init(&tport->tp_lock);
-	mutex_init(&tport->tp_mutex);
+	spin_lock_init(&tport->spinlock);
+	mutex_init(&tport->mutex);
 
 	if (port == port->serial->port[0])
-		tport->tp_uart_base_addr = TI_UART1_BASE_ADDR;
+		tport->uart_base_addr = TI_UART1_BASE_ADDR;
 	else
-		tport->tp_uart_base_addr = TI_UART2_BASE_ADDR;
+		tport->uart_base_addr = TI_UART2_BASE_ADDR;
 
 	tdev = usb_get_serial_data(port->serial);
 
-	if (tdev->td_rs485_only)
-		tport->tp_uart_mode = TI_UART_485_RECEIVER_DISABLED;
+	if (tdev->rs485_only)
+		tport->uart_mode = TI_UART_485_RECEIVER_DISABLED;
 	else
-		tport->tp_uart_mode = TI_UART_232;
+		tport->uart_mode = TI_UART_232;
 
 	usb_set_serial_port_data(port, tport);
 
@@ -685,15 +685,15 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 			 (TI_TRANSFER_TIMEOUT << 2));
 
 	/* only one open on any port on a device at a time */
-	if (mutex_lock_interruptible(&tdev->td_open_close_lock))
+	if (mutex_lock_interruptible(&tdev->open_close_lock))
 		return -ERESTARTSYS;
 
 	port_number = port->port_number;
 
-	tport->tp_msr = 0;
+	tport->msr = 0;
 
 	/* start interrupt urb the first time a port is opened on this device */
-	if (tdev->td_open_port_count == 0) {
+	if (tdev->open_port_count == 0) {
 		dev_dbg(&port->dev, "%s - start interrupt in urb\n", __func__);
 		urb = serial->port[0]->interrupt_in_urb;
 		if (!urb) {
@@ -769,15 +769,15 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 	if (status)
 		goto unlink_int_urb;
 
-	++tdev->td_open_port_count;
+	++tdev->open_port_count;
 
 	goto release_lock;
 
 unlink_int_urb:
-	if (tdev->td_open_port_count == 0)
+	if (tdev->open_port_count == 0)
 		usb_kill_urb(serial->port[0]->interrupt_in_urb);
 release_lock:
-	mutex_unlock(&tdev->td_open_close_lock);
+	mutex_unlock(&tdev->open_close_lock);
 	return status;
 }
 
@@ -802,15 +802,15 @@ static void ti_close(struct usb_serial_port *port)
 	}
 
 	/* if mutex_lock is interrupted, continue anyway */
-	do_unlock = !mutex_lock_interruptible(&tdev->td_open_close_lock);
-	tdev->td_open_port_count--;
-	if (tdev->td_open_port_count <= 0) {
+	do_unlock = !mutex_lock_interruptible(&tdev->open_close_lock);
+	tdev->open_port_count--;
+	if (tdev->open_port_count <= 0) {
 		/* last port is closed, shut down interrupt urb */
 		usb_kill_urb(port->serial->port[0]->interrupt_in_urb);
-		tdev->td_open_port_count = 0;
+		tdev->open_port_count = 0;
 	}
 	if (do_unlock)
-		mutex_unlock(&tdev->td_open_close_lock);
+		mutex_unlock(&tdev->open_close_lock);
 }
 
 static bool ti_tx_empty(struct usb_serial_port *port)
@@ -842,7 +842,7 @@ static int ti_get_serial_info(struct usb_serial_port *port,
 
 	memset(&ret_serial, 0, sizeof(ret_serial));
 
-	if (tdev->td_is_3410)
+	if (tdev->is_3410)
 		baud_base = TI_3410_BAUD_BASE;
 	else
 		baud_base = TI_5052_BAUD_BASE;
@@ -934,7 +934,7 @@ static void ti_set_termios(struct tty_struct *tty,
 	/* these flags must be set */
 	config->wFlags |= TI_UART_ENABLE_MS_INTS;
 	config->wFlags |= TI_UART_ENABLE_AUTO_START_DMA;
-	config->bUartMode = tport->tp_uart_mode;
+	config->bUartMode = tport->uart_mode;
 
 	switch (C_CSIZE(tty)) {
 	case CS5:
@@ -994,7 +994,7 @@ static void ti_set_termios(struct tty_struct *tty,
 	baud = tty_get_baud_rate(tty);
 	if (!baud)
 		baud = 9600;
-	if (tdev->td_is_3410)
+	if (tdev->is_3410)
 		config->wBaudRate = (TI_3410_BAUD_BASE + baud / 2) / baud;
 	else
 		config->wBaudRate = (TI_5052_BAUD_BASE + baud / 2) / baud;
@@ -1020,8 +1020,8 @@ static void ti_set_termios(struct tty_struct *tty,
 			port_number, status);
 	}
 
-	mutex_lock(&tport->tp_mutex);
-	mcr = tport->tp_shadow_mcr;
+	mutex_lock(&tport->mutex);
+	mcr = tport->mcr;
 
 	if (C_BAUD(tty) == B0)
 		mcr &= ~(TI_MCR_DTR | TI_MCR_RTS);
@@ -1034,9 +1034,9 @@ static void ti_set_termios(struct tty_struct *tty,
 			"cannot set modem control on port %d: %d\n",
 			port_number, status);
 	} else {
-		tport->tp_shadow_mcr = mcr;
+		tport->mcr = mcr;
 	}
-	mutex_unlock(&tport->tp_mutex);
+	mutex_unlock(&tport->mutex);
 
 	kfree(config);
 }
@@ -1051,14 +1051,14 @@ static int ti_tiocmget(struct tty_struct *tty)
 	unsigned int mcr;
 	unsigned long flags;
 
-	mutex_lock(&tport->tp_mutex);
-	spin_lock_irqsave(&tport->tp_lock, flags);
+	mutex_lock(&tport->mutex);
+	spin_lock_irqsave(&tport->spinlock, flags);
 
-	msr = tport->tp_msr;
-	mcr = tport->tp_shadow_mcr;
+	msr = tport->msr;
+	mcr = tport->mcr;
 
-	spin_unlock_irqrestore(&tport->tp_lock, flags);
-	mutex_unlock(&tport->tp_mutex);
+	spin_unlock_irqrestore(&tport->spinlock, flags);
+	mutex_unlock(&tport->mutex);
 
 	result = ((mcr & TI_MCR_DTR) ? TIOCM_DTR : 0)
 		| ((mcr & TI_MCR_RTS) ? TIOCM_RTS : 0)
@@ -1082,8 +1082,8 @@ static int ti_tiocmset(struct tty_struct *tty,
 	int err;
 	unsigned int mcr;
 
-	mutex_lock(&tport->tp_mutex);
-	mcr = tport->tp_shadow_mcr;
+	mutex_lock(&tport->mutex);
+	mcr = tport->mcr;
 
 	if (set & TIOCM_RTS)
 		mcr |= TI_MCR_RTS;
@@ -1101,9 +1101,9 @@ static int ti_tiocmset(struct tty_struct *tty,
 
 	err = ti_set_mcr(port, mcr);
 	if (!err)
-		tport->tp_shadow_mcr = mcr;
+		tport->mcr = mcr;
 
-	mutex_unlock(&tport->tp_mutex);
+	mutex_unlock(&tport->mutex);
 
 	return err;
 }
@@ -1116,7 +1116,7 @@ static void ti_break(struct tty_struct *tty, int break_state)
 	int status;
 
 	status = ti_write_byte(port,
-		tport->tp_uart_base_addr + TI_UART_OFFSET_LCR,
+		tport->uart_base_addr + TI_UART_OFFSET_LCR,
 		TI_LCR_BREAK, break_state == -1 ? TI_LCR_BREAK : 0);
 	if (status)
 		dev_dbg(&port->dev, "failed to set break: %d\n", status);
@@ -1201,7 +1201,7 @@ static int ti_set_mcr(struct usb_serial_port *port, unsigned int mcr)
 	int status;
 
 	status = ti_write_byte(port,
-			       tport->tp_uart_base_addr + TI_UART_OFFSET_MCR,
+			       tport->uart_base_addr + TI_UART_OFFSET_MCR,
 			       TI_MCR_RTS | TI_MCR_DTR | TI_MCR_LOOP, mcr);
 	return status;
 }
@@ -1244,9 +1244,9 @@ static void ti_handle_new_msr(struct usb_serial_port *port, u8 msr)
 
 	dev_dbg(&port->dev, "%s - msr 0x%02X\n", __func__, msr);
 
-	spin_lock_irqsave(&tport->tp_lock, flags);
-	tport->tp_msr = msr & TI_MSR_MASK;
-	spin_unlock_irqrestore(&tport->tp_lock, flags);
+	spin_lock_irqsave(&tport->spinlock, flags);
+	tport->msr = msr & TI_MSR_MASK;
+	spin_unlock_irqrestore(&tport->spinlock, flags);
 
 	if (msr & TI_MSR_DELTA_MASK) {
 		icount = &port->icount;
@@ -1365,7 +1365,7 @@ static int ti_download_firmware(struct usb_serial *serial)
 		}
 
 		if (buf[0] == '\0') {
-			if (tdev->td_is_3410)
+			if (tdev->is_3410)
 				strcpy(buf, "ti_3410.fw");
 			else
 				strcpy(buf, "ti_5052.fw");
