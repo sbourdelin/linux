@@ -742,7 +742,7 @@ static int netvsc_set_channels(struct net_device *net,
 		goto out;
 
  do_set:
-	nvdev->start_remove = true;
+	net_device_ctx->start_remove = true;
 	rndis_filter_device_remove(dev);
 
 	nvdev->num_chn = channels->combined_count;
@@ -786,6 +786,7 @@ static int netvsc_set_channels(struct net_device *net,
 
  out:
 	netvsc_open(net);
+	net_device_ctx->start_remove = false;
 
 	return ret;
 
@@ -876,7 +877,7 @@ static int netvsc_change_mtu(struct net_device *ndev, int mtu)
 
 	num_chn = nvdev->num_chn;
 
-	nvdev->start_remove = true;
+	ndevctx->start_remove = true;
 	rndis_filter_device_remove(hdev);
 
 	ndev->mtu = mtu;
@@ -892,6 +893,7 @@ static int netvsc_change_mtu(struct net_device *ndev, int mtu)
 
 out:
 	netvsc_open(ndev);
+	ndevctx->start_remove = false;
 
 	return ret;
 }
@@ -1138,6 +1140,9 @@ static int netvsc_probe(struct hv_device *dev,
 	}
 
 	hv_set_drvdata(dev, net);
+
+	net_device_ctx->start_remove = false;
+
 	INIT_DELAYED_WORK(&net_device_ctx->dwork, netvsc_link_change);
 	INIT_WORK(&net_device_ctx->work, do_set_multicast);
 
@@ -1198,9 +1203,10 @@ static int netvsc_remove(struct hv_device *dev)
 		return 0;
 	}
 
-	net_device->start_remove = true;
 
 	ndev_ctx = netdev_priv(net);
+	ndev_ctx->start_remove = true;
+
 	cancel_delayed_work_sync(&ndev_ctx->dwork);
 	cancel_work_sync(&ndev_ctx->work);
 
