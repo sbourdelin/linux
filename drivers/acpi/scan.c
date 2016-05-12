@@ -46,6 +46,12 @@ DEFINE_MUTEX(acpi_device_lock);
 LIST_HEAD(acpi_wakeup_device_list);
 static DEFINE_MUTEX(acpi_hp_context_lock);
 
+static const struct acpi_device_id i2c_whitelisted_id_list[] = {
+	{"MSHW0028", 0},	/* Surface (Pro) 3 buttons */
+	{"MSHW0040", 0},	/* Surface Pro 4 buttons */
+	{"", 0},
+};
+
 struct acpi_dep_data {
 	struct list_head node;
 	acpi_handle master;
@@ -1676,13 +1682,21 @@ static void acpi_default_enumeration(struct acpi_device *device)
 	bool is_spi_i2c_slave = false;
 
 	/*
-	 * Do not enemerate SPI/I2C slaves as they will be enuerated by their
+	 * Do not enemerate SPI/I2C slaves as they will be enumerated by their
 	 * respective parents.
 	 */
 	INIT_LIST_HEAD(&resource_list);
 	acpi_dev_get_resources(device, &resource_list, acpi_check_spi_i2c_slave,
 			       &is_spi_i2c_slave);
 	acpi_dev_free_resource_list(&resource_list);
+
+	/*
+	 * these devices are declared as I2C but should actually be
+	 * enumerated as platform devices.
+	 */
+	if (!acpi_match_device_ids(device, i2c_whitelisted_id_list))
+		is_spi_i2c_slave = false;
+
 	if (!is_spi_i2c_slave)
 		acpi_create_platform_device(device);
 }
