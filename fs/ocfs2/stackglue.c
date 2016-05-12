@@ -640,8 +640,7 @@ static void ocfs2_sysfs_exit(void)
 static int ocfs2_sysfs_init(void)
 {
 	int ret;
-
-	ocfs2_kset = kset_create_and_add("ocfs2", NULL, fs_kobj);
+	ocfs2_kset = kset_create_and_add("ocfs2_stack", NULL, fs_kobj);
 	if (!ocfs2_kset)
 		return -ENOMEM;
 
