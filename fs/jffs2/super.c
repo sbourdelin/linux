@@ -353,6 +353,7 @@ static struct file_system_type jffs2_fs_type = {
 	.name =		"jffs2",
 	.mount =	jffs2_mount,
 	.kill_sb =	jffs2_kill_sb,
+	.fs_fags =	FS_REQUIRES_DEV 
 };
 MODULE_ALIAS_FS("jffs2");
 
