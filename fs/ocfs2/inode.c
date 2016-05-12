@@ -54,6 +54,7 @@
 #include "refcounttree.h"
 #include "ocfs2_trace.h"
 #include "filecheck.h"
+#include "sysfs.h"
 
 #include "buffer_head_io.h"
 
@@ -1412,6 +1413,9 @@ int ocfs2_validate_inode_block(struct super_block *sb,
 		rc = ocfs2_error(sb, "Invalid dinode #%llu: signature = %.*s\n",
 				 (unsigned long long)bh->b_blocknr, 7,
 				 di->i_signature);
+		ocfs2_report_error(OCFS2_SB(sb), (unsigned long long)bh->b_blocknr,
+				(unsigned long long)bh->b_blocknr,
+				rc);
 		goto bail;
 	}
 
@@ -1419,6 +1423,9 @@ int ocfs2_validate_inode_block(struct super_block *sb,
 		rc = ocfs2_error(sb, "Invalid dinode #%llu: i_blkno is %llu\n",
 				 (unsigned long long)bh->b_blocknr,
 				 (unsigned long long)le64_to_cpu(di->i_blkno));
+		ocfs2_report_error(OCFS2_SB(sb), (unsigned long long)bh->b_blocknr,
+				(unsigned long long)bh->b_blocknr,
+				rc);
 		goto bail;
 	}
 
@@ -1426,6 +1433,9 @@ int ocfs2_validate_inode_block(struct super_block *sb,
 		rc = ocfs2_error(sb,
 				 "Invalid dinode #%llu: OCFS2_VALID_FL not set\n",
 				 (unsigned long long)bh->b_blocknr);
+		ocfs2_report_error(OCFS2_SB(sb), (unsigned long long)bh->b_blocknr,
+				(unsigned long long)bh->b_blocknr,
+				rc);
 		goto bail;
 	}
 
@@ -1435,6 +1445,9 @@ int ocfs2_validate_inode_block(struct super_block *sb,
 				 "Invalid dinode #%llu: fs_generation is %u\n",
 				 (unsigned long long)bh->b_blocknr,
 				 le32_to_cpu(di->i_fs_generation));
+		ocfs2_report_error(OCFS2_SB(sb), (unsigned long long)bh->b_blocknr,
+				(unsigned long long)bh->b_blocknr,
+				rc);
 		goto bail;
 	}
 

@@ -103,5 +103,20 @@ struct kobj_type ocfs2_sb_ktype = {
 	.release	= super_block_release,
 };
 
-
+void ocfs2_report_error(struct ocfs2_super *osb, unsigned long long ino,
+			unsigned long long blkno, int errno)
+{
+	char event_name[] = "EVENT=FS_ERROR";
+	char device[16];
+	char inode_number[16];
+	char error_number[16];
+	char block_number[16];
+	char *envp[] = {event_name, inode_number, error_number, block_number,
+		NULL};
+	snprintf(device, 16, "DEVICE=%s", osb->sb->s_id);
+	snprintf(error_number, 16, "ERROR=%d", errno);
+	snprintf(inode_number, 16, "INODE=%llu", ino);
+	snprintf(block_number, 16, "BLOCK=%llu", blkno);
+	sb_report_event(osb->sb, envp);
+}
 
