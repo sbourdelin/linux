@@ -313,11 +313,6 @@ static int ti_set_serial_info(struct tty_struct *tty, struct ti_port *tport,
 	struct serial_struct __user *new_arg);
 static void ti_handle_new_msr(struct ti_port *tport, u8 msr);
 
-static int ti_command_out_sync(struct ti_device *tdev, __u8 command,
-	__u16 moduleid, __u16 value, __u8 *data, int size);
-static int ti_command_in_sync(struct ti_device *tdev, __u8 command,
-	__u16 moduleid, __u16 value, __u8 *data, int size);
-
 static int ti_write_byte(struct usb_serial_port *port, struct ti_device *tdev,
 			 unsigned long addr, u8 mask, u8 byte);
 
@@ -462,6 +457,71 @@ MODULE_DEVICE_TABLE(usb, ti_id_table_combined);
 
 module_usb_serial_driver(serial_drivers, ti_id_table_combined);
 
+static int ti_send_ctrl_data_urb(struct usb_serial *serial, u8 request,
+				 u16 value, u16 index, void *data, size_t size)
+{
+	int status;
+
+	status = usb_control_msg(serial->dev,
+				 usb_sndctrlpipe(serial->dev, 0),
+				 request,
+				 (USB_TYPE_VENDOR | USB_RECIP_DEVICE |
+				  USB_DIR_OUT), value, index,
+				 data, size,
+				 USB_CTRL_SET_TIMEOUT);
+	if (status < 0) {
+		dev_err(&serial->interface->dev,
+			"%s - usb_control_msg failed: %d\n",
+			__func__, status);
+		return status;
+	}
+
+	if (status != size) {
+		dev_err(&serial->interface->dev,
+			"%s - short write (%d / %zd)\n",
+			__func__, status, size);
+		return -EIO;
+	}
+
+	return 0;
+}
+
+static int ti_send_ctrl_urb(struct usb_serial *serial,
+			    u8 request, u16 value, u16 index)
+{
+	return ti_send_ctrl_data_urb(serial, request, value, index,
+				     NULL, 0);
+}
+
+static int ti_recv_ctrl_data_urb(struct usb_serial *serial, u8 request,
+				 u16 value, u16 index, void *data, size_t size)
+{
+	int status;
+
+	status = usb_control_msg(serial->dev,
+				 usb_rcvctrlpipe(serial->dev, 0),
+				 request,
+				 (USB_TYPE_VENDOR | USB_RECIP_DEVICE |
+				  USB_DIR_IN), value, index,
+				 data, size,
+				 USB_CTRL_SET_TIMEOUT);
+	if (status < 0) {
+		dev_err(&serial->interface->dev,
+			"%s - usb_control_msg failed: %d\n",
+			__func__, status);
+		return status;
+	}
+
+	if (status != size) {
+		dev_err(&serial->interface->dev,
+			"%s - short read (%d / %zd)\n",
+			__func__, status, size);
+		return -EIO;
+	}
+
+	return 0;
+}
+
 static int ti_startup(struct usb_serial *serial)
 {
 	struct ti_device *tdev;
@@ -589,6 +649,7 @@ static int ti_port_remove(struct usb_serial_port *port)
 static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 {
 	struct ti_port *tport = usb_get_serial_port_data(port);
+	struct usb_serial *serial = port->serial;
 	struct ti_device *tdev;
 	struct usb_device *dev;
 	struct urb *urb;
@@ -632,31 +693,32 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 	if (tty)
 		ti_set_termios(tty, port, &tty->termios);
 
-	status = ti_command_out_sync(tdev, TI_OPEN_PORT,
-		(__u8)(TI_UART1_PORT + port_number), open_settings, NULL, 0);
+	status = ti_send_ctrl_urb(serial, TI_OPEN_PORT, open_settings,
+				  TI_UART1_PORT + port_number);
 	if (status) {
 		dev_err(&port->dev, "%s - cannot send open command, %d\n",
 			__func__, status);
 		goto unlink_int_urb;
 	}
 
-	status = ti_command_out_sync(tdev, TI_START_PORT,
-		(__u8)(TI_UART1_PORT + port_number), 0, NULL, 0);
+	status = ti_send_ctrl_urb(serial, TI_START_PORT, 0,
+				  TI_UART1_PORT + port_number);
 	if (status) {
 		dev_err(&port->dev, "%s - cannot send start command, %d\n",
 							__func__, status);
 		goto unlink_int_urb;
 	}
 
-	status = ti_command_out_sync(tdev, TI_PURGE_PORT,
-		(__u8)(TI_UART1_PORT + port_number), TI_PURGE_INPUT, NULL, 0);
+	status = ti_send_ctrl_urb(serial, TI_PURGE_PORT, TI_PURGE_INPUT,
+				  TI_UART1_PORT + port_number);
 	if (status) {
 		dev_err(&port->dev, "%s - cannot clear input buffers, %d\n",
 							__func__, status);
 		goto unlink_int_urb;
 	}
-	status = ti_command_out_sync(tdev, TI_PURGE_PORT,
-		(__u8)(TI_UART1_PORT + port_number), TI_PURGE_OUTPUT, NULL, 0);
+
+	status = ti_send_ctrl_urb(serial, TI_PURGE_PORT, TI_PURGE_OUTPUT,
+				  TI_UART1_PORT + port_number);
 	if (status) {
 		dev_err(&port->dev, "%s - cannot clear output buffers, %d\n",
 							__func__, status);
@@ -671,16 +733,16 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 	if (tty)
 		ti_set_termios(tty, port, &tty->termios);
 
-	status = ti_command_out_sync(tdev, TI_OPEN_PORT,
-		(__u8)(TI_UART1_PORT + port_number), open_settings, NULL, 0);
+	status = ti_send_ctrl_urb(serial, TI_OPEN_PORT, open_settings,
+				  TI_UART1_PORT + port_number);
 	if (status) {
 		dev_err(&port->dev, "%s - cannot send open command (2), %d\n",
 							__func__, status);
 		goto unlink_int_urb;
 	}
 
-	status = ti_command_out_sync(tdev, TI_START_PORT,
-		(__u8)(TI_UART1_PORT + port_number), 0, NULL, 0);
+	status = ti_send_ctrl_urb(serial, TI_START_PORT, 0,
+				  TI_UART1_PORT + port_number);
 	if (status) {
 		dev_err(&port->dev, "%s - cannot send start command (2), %d\n",
 							__func__, status);
@@ -735,8 +797,8 @@ static void ti_close(struct usb_serial_port *port)
 
 	port_number = port->port_number;
 
-	status = ti_command_out_sync(tdev, TI_CLOSE_PORT,
-		     (__u8)(TI_UART1_PORT + port_number), 0, NULL, 0);
+	status = ti_send_ctrl_urb(port->serial, TI_CLOSE_PORT, 0,
+				  TI_UART1_PORT + port_number);
 	if (status)
 		dev_err(&port->dev,
 			"%s - cannot send close port command, %d\n"
@@ -894,9 +956,9 @@ static void ti_set_termios(struct tty_struct *tty,
 	cpu_to_be16s(&config->wBaudRate);
 	cpu_to_be16s(&config->wFlags);
 
-	status = ti_command_out_sync(tport->tp_tdev, TI_SET_CONFIG,
-		(__u8)(TI_UART1_PORT + port_number), 0, (__u8 *)config,
-		sizeof(*config));
+	status = ti_send_ctrl_data_urb(port->serial, TI_SET_CONFIG, 0,
+				       TI_UART1_PORT + port_number, config,
+				       sizeof(*config));
 	if (status)
 		dev_err(&port->dev, "%s - cannot set config on port %d, %d\n",
 					__func__, port_number, status);
@@ -1090,7 +1152,6 @@ static int ti_set_mcr(struct ti_port *tport, unsigned int mcr)
 static int ti_get_lsr(struct ti_port *tport, u8 *lsr)
 {
 	int size, status;
-	struct ti_device *tdev = tport->tp_tdev;
 	struct usb_serial_port *port = tport->tp_port;
 	int port_number = port->port_number;
 	struct ti_port_status *data;
@@ -1100,8 +1161,8 @@ static int ti_get_lsr(struct ti_port *tport, u8 *lsr)
 	if (!data)
 		return -ENOMEM;
 
-	status = ti_command_in_sync(tdev, TI_GET_PORT_STATUS,
-		(__u8)(TI_UART1_PORT+port_number), 0, (__u8 *)data, size);
+	status = ti_recv_ctrl_data_urb(port->serial, TI_GET_PORT_STATUS, 0,
+				       TI_UART1_PORT + port_number, data, size);
 	if (status) {
 		dev_err(&port->dev,
 			"%s - get port status command failed, %d\n",
@@ -1208,46 +1269,6 @@ static void ti_handle_new_msr(struct ti_port *tport, u8 msr)
 	tty_kref_put(tty);
 }
 
-static int ti_command_out_sync(struct ti_device *tdev, __u8 command,
-	__u16 moduleid, __u16 value, __u8 *data, int size)
-{
-	int status;
-
-	status = usb_control_msg(tdev->td_serial->dev,
-		usb_sndctrlpipe(tdev->td_serial->dev, 0), command,
-		(USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_OUT),
-		value, moduleid, data, size, 1000);
-
-	if (status == size)
-		status = 0;
-
-	if (status > 0)
-		status = -ECOMM;
-
-	return status;
-}
-
-
-static int ti_command_in_sync(struct ti_device *tdev, __u8 command,
-	__u16 moduleid, __u16 value, __u8 *data, int size)
-{
-	int status;
-
-	status = usb_control_msg(tdev->td_serial->dev,
-		usb_rcvctrlpipe(tdev->td_serial->dev, 0), command,
-		(USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_IN),
-		value, moduleid, data, size, 1000);
-
-	if (status == size)
-		status = 0;
-
-	if (status > 0)
-		status = -ECOMM;
-
-	return status;
-}
-
-
 static int ti_write_byte(struct usb_serial_port *port,
 			 struct ti_device *tdev, unsigned long addr,
 			 u8 mask, u8 byte)
@@ -1272,9 +1293,8 @@ static int ti_write_byte(struct usb_serial_port *port,
 	data->bData[0] = mask;
 	data->bData[1] = byte;
 
-	status = ti_command_out_sync(tdev, TI_WRITE_DATA, TI_RAM_PORT, 0,
-		(__u8 *)data, size);
-
+	status = ti_send_ctrl_data_urb(port->serial, TI_WRITE_DATA, 0,
+				       TI_RAM_PORT, data, size);
 	if (status < 0)
 		dev_err(&port->dev, "%s - failed, %d\n", __func__, status);
 
