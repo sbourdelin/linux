@@ -638,9 +638,6 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 			 TI_PIPE_TIMEOUT_ENABLE |
 			 (TI_TRANSFER_TIMEOUT << 2));
 
-	if (tport == NULL)
-		return -ENODEV;
-
 	dev = port->serial->dev;
 	tdev = tport->tp_tdev;
 
@@ -769,8 +766,6 @@ static void ti_close(struct usb_serial_port *port)
 
 	tdev = usb_get_serial_data(port->serial);
 	tport = usb_get_serial_port_data(port);
-	if (tdev == NULL || tport == NULL)
-		return;
 
 	tport->tp_is_open = 0;
 
@@ -812,7 +807,7 @@ static int ti_write(struct tty_struct *tty, struct usb_serial_port *port,
 		return 0;
 	}
 
-	if (tport == NULL || !tport->tp_is_open)
+	if (!tport->tp_is_open)
 		return -ENODEV;
 
 	count = kfifo_in_locked(&port->write_fifo, data, count,
@@ -830,9 +825,6 @@ static int ti_write_room(struct tty_struct *tty)
 	int room = 0;
 	unsigned long flags;
 
-	if (tport == NULL)
-		return 0;
-
 	spin_lock_irqsave(&tport->tp_lock, flags);
 	room = kfifo_avail(&port->write_fifo);
 	spin_unlock_irqrestore(&tport->tp_lock, flags);
@@ -847,9 +839,6 @@ static int ti_chars_in_buffer(struct tty_struct *tty)
 	struct ti_port *tport = usb_get_serial_port_data(port);
 	int chars = 0;
 	unsigned long flags;
-
-	if (tport == NULL)
-		return 0;
 
 	spin_lock_irqsave(&tport->tp_lock, flags);
 	chars = kfifo_len(&port->write_fifo);
@@ -876,9 +865,6 @@ static void ti_throttle(struct tty_struct *tty)
 	struct usb_serial_port *port = tty->driver_data;
 	struct ti_port *tport = usb_get_serial_port_data(port);
 
-	if (tport == NULL)
-		return;
-
 	if (I_IXOFF(tty) || C_CRTSCTS(tty))
 		ti_stop_read(tport, tty);
 
@@ -890,9 +876,6 @@ static void ti_unthrottle(struct tty_struct *tty)
 	struct usb_serial_port *port = tty->driver_data;
 	struct ti_port *tport = usb_get_serial_port_data(port);
 	int status;
-
-	if (tport == NULL)
-		return;
 
 	if (I_IXOFF(tty) || C_CRTSCTS(tty)) {
 		status = ti_restart_read(tport, tty);
@@ -907,9 +890,6 @@ static int ti_ioctl(struct tty_struct *tty,
 {
 	struct usb_serial_port *port = tty->driver_data;
 	struct ti_port *tport = usb_get_serial_port_data(port);
-
-	if (tport == NULL)
-		return -ENODEV;
 
 	switch (cmd) {
 	case TIOCGSERIAL:
@@ -946,9 +926,6 @@ static void ti_set_termios(struct tty_struct *tty,
 			old_termios->c_cflag,
 			old_termios->c_iflag);
 	}
-
-	if (tport == NULL)
-		return;
 
 	config = kzalloc(sizeof(*config), GFP_KERNEL);
 	if (!config)
@@ -1070,9 +1047,6 @@ static int ti_tiocmget(struct tty_struct *tty)
 	unsigned int mcr;
 	unsigned long flags;
 
-	if (tport == NULL)
-		return -ENODEV;
-
 	spin_lock_irqsave(&tport->tp_lock, flags);
 	msr = tport->tp_msr;
 	mcr = tport->tp_shadow_mcr;
@@ -1099,9 +1073,6 @@ static int ti_tiocmset(struct tty_struct *tty,
 	struct ti_port *tport = usb_get_serial_port_data(port);
 	unsigned int mcr;
 	unsigned long flags;
-
-	if (tport == NULL)
-		return -ENODEV;
 
 	spin_lock_irqsave(&tport->tp_lock, flags);
 	mcr = tport->tp_shadow_mcr;
@@ -1130,9 +1101,6 @@ static void ti_break(struct tty_struct *tty, int break_state)
 	struct usb_serial_port *port = tty->driver_data;
 	struct ti_port *tport = usb_get_serial_port_data(port);
 	int status;
-
-	if (tport == NULL)
-		return;
 
 	status = ti_write_byte(port, tport->tp_tdev,
 		tport->tp_uart_base_addr + TI_UART_OFFSET_LCR,
