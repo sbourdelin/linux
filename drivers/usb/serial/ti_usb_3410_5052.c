@@ -807,24 +807,16 @@ static void ti_close(struct usb_serial_port *port)
 {
 	struct ti_device *tdev;
 	struct ti_port *tport;
-	int port_number;
 	int status;
 	int do_unlock;
-	unsigned long flags;
 
 	tdev = usb_get_serial_data(port->serial);
 	tport = usb_get_serial_port_data(port);
 
-	usb_kill_urb(port->read_urb);
-	usb_kill_urb(port->write_urb);
-	spin_lock_irqsave(&tport->tp_lock, flags);
-	kfifo_reset_out(&port->write_fifo);
-	spin_unlock_irqrestore(&tport->tp_lock, flags);
-
-	port_number = port->port_number;
+	usb_serial_generic_close(port);
 
 	status = ti_send_ctrl_urb(port->serial, TI_CLOSE_PORT, 0,
-				  TI_UART1_PORT + port_number);
+				  TI_UART1_PORT + port->port_number);
 	if (status)
 		dev_err(&port->dev,
 			"%s - cannot send close port command, %d\n"
