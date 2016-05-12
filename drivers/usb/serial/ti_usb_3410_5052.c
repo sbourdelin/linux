@@ -674,7 +674,6 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 	struct ti_port *tport = usb_get_serial_port_data(port);
 	struct usb_serial *serial = port->serial;
 	struct ti_device *tdev;
-	struct usb_device *dev;
 	struct urb *urb;
 	int port_number;
 	int status;
@@ -684,7 +683,6 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 			 TI_PIPE_TIMEOUT_ENABLE |
 			 (TI_TRANSFER_TIMEOUT << 2));
 
-	dev = port->serial->dev;
 	tdev = tport->tp_tdev;
 
 	/* only one open on any port on a device at a time */
@@ -748,8 +746,8 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 
 	/* reset the data toggle on the bulk endpoints to work around bug in
 	 * host controllers where things get out of sync some times */
-	usb_clear_halt(dev, port->write_urb->pipe);
-	usb_clear_halt(dev, port->read_urb->pipe);
+	usb_clear_halt(serial->dev, port->write_urb->pipe);
+	usb_clear_halt(serial->dev, port->read_urb->pipe);
 
 	if (tty)
 		ti_set_termios(tty, port, &tty->termios);
@@ -770,20 +768,9 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 		goto unlink_int_urb;
 	}
 
-	/* start read urb */
-	urb = port->read_urb;
-	if (!urb) {
-		dev_err(&port->dev, "%s - no read urb\n", __func__);
-		status = -EINVAL;
+	status = usb_serial_generic_open(tty, port);
+	if (status)
 		goto unlink_int_urb;
-	}
-	urb->context = tport;
-	status = usb_submit_urb(urb, GFP_KERNEL);
-	if (status) {
-		dev_err(&port->dev, "%s - submit read urb failed, %d\n",
-							__func__, status);
-		goto unlink_int_urb;
-	}
 
 	++tdev->td_open_port_count;
 
