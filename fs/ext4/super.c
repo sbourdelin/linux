@@ -5356,6 +5356,7 @@ static struct file_system_type ext4_fs_type = {
 	.mount		= ext4_mount,
 	.kill_sb	= kill_block_super,
 	.fs_flags	= FS_REQUIRES_DEV,
+	.sb_ktype	= &ext4_sb_ktype,
 };
 MODULE_ALIAS_FS("ext4");
 
@@ -5388,10 +5389,6 @@ static int __init ext4_init_fs(void)
 	if (err)
 		goto out4;
 
-	err = ext4_init_sysfs();
-	if (err)
-		goto out3;
-
 	err = ext4_init_mballoc();
 	if (err)
 		goto out2;
@@ -5402,18 +5399,23 @@ static int __init ext4_init_fs(void)
 	register_as_ext2();
 	err = register_filesystem(&ext4_fs_type);
 	if (err)
+		goto out0;
+
+	err = ext4_init_sysfs(ext4_fs_type.kset);
+	if (err)
 		goto out;
+
 
 	return 0;
 out:
+	unregister_filesystem(&ext4_fs_type);
+out0:
 	unregister_as_ext2();
 	unregister_as_ext3();
 	destroy_inodecache();
 out1:
 	ext4_exit_mballoc();
 out2:
-	ext4_exit_sysfs();
-out3:
 	ext4_exit_system_zone();
 out4:
 	ext4_exit_pageio();

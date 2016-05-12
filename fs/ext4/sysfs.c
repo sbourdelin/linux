@@ -329,18 +329,10 @@ static const struct sysfs_ops ext4_attr_ops = {
 	.store	= ext4_attr_store,
 };
 
-static struct kobj_type ext4_sb_ktype = {
+struct kobj_type ext4_sb_ktype = {
 	.default_attrs	= ext4_attrs,
 	.sysfs_ops	= &ext4_attr_ops,
 	.release	= ext4_sb_release,
-};
-
-static struct kobj_type ext4_ktype = {
-	.sysfs_ops	= &ext4_attr_ops,
-};
-
-static struct kset ext4_kset = {
-	.kobj   = {.ktype = &ext4_ktype},
 };
 
 static struct kobj_type ext4_feat_ktype = {
@@ -348,9 +340,7 @@ static struct kobj_type ext4_feat_ktype = {
 	.sysfs_ops	= &ext4_attr_ops,
 };
 
-static struct kobject ext4_feat = {
-	.kset	= &ext4_kset,
-};
+static struct kobject ext4_feat;
 
 #define PROC_FILE_SHOW_DEFN(name) \
 static int name##_open(struct inode *inode, struct file *file) \
@@ -386,14 +376,6 @@ int ext4_register_sysfs(struct super_block *sb)
 {
 	struct ext4_sb_info *sbi = EXT4_SB(sb);
 	struct ext4_proc_files *p;
-	int err;
-
-	sbi->s_kobj.kset = &ext4_kset;
-	init_completion(&sbi->s_kobj_unregister);
-	err = kobject_init_and_add(&sbi->s_kobj, &ext4_sb_ktype, NULL,
-				   "%s", sb->s_id);
-	if (err)
-		return err;
 
 	if (ext4_proc_root)
 		sbi->s_proc = proc_mkdir(sb->s_id, ext4_proc_root);
@@ -419,29 +401,22 @@ void ext4_unregister_sysfs(struct super_block *sb)
 	kobject_del(&sbi->s_kobj);
 }
 
-int __init ext4_init_sysfs(void)
+int __init ext4_init_sysfs(struct kset *kset)
 {
 	int ret;
 
-	kobject_set_name(&ext4_kset.kobj, "ext4");
-	ext4_kset.kobj.parent = fs_kobj;
-	ret = kset_register(&ext4_kset);
-	if (ret)
-		return ret;
-
+	ext4_feat.kset = kset;
 	ret = kobject_init_and_add(&ext4_feat, &ext4_feat_ktype,
 				   NULL, "features");
 	if (ret)
-		kset_unregister(&ext4_kset);
-	else
-		ext4_proc_root = proc_mkdir(proc_dirname, NULL);
-	return ret;
+		return ret;
+	ext4_proc_root = proc_mkdir(proc_dirname, NULL);
+	return 0;
 }
 
 void ext4_exit_sysfs(void)
 {
 	kobject_put(&ext4_feat);
-	kset_unregister(&ext4_kset);
 	remove_proc_entry(proc_dirname, NULL);
 	ext4_proc_root = NULL;
 }
