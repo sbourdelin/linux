@@ -1238,7 +1238,6 @@ static int ti_set_serial_info(struct tty_struct *tty, struct ti_port *tport,
 static void ti_handle_new_msr(struct ti_port *tport, u8 msr)
 {
 	struct async_icount *icount;
-	struct tty_struct *tty;
 	unsigned long flags;
 
 	dev_dbg(&tport->tp_port->dev, "%s - msr 0x%02X\n", __func__, msr);
@@ -1259,14 +1258,6 @@ static void ti_handle_new_msr(struct ti_port *tport, u8 msr)
 	}
 
 	tport->tp_msr = msr & TI_MSR_MASK;
-
-	/* handle CTS flow control */
-	tty = tty_port_tty_get(&tport->tp_port->port);
-	if (tty && C_CRTSCTS(tty)) {
-		if (msr & TI_MSR_CTS)
-			tty_wakeup(tty);
-	}
-	tty_kref_put(tty);
 }
 
 static int ti_write_byte(struct usb_serial_port *port,
