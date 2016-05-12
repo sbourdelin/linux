@@ -90,6 +90,18 @@ void unwind__get_arch(struct thread *thread, struct map *map)
 #endif
 		} else
 			use_local_unwind = 1;
+	} else if (!strcmp(arch, "aarch64") || !strncmp(arch, "arm", 3)) {
+		pr_debug("Thread map is ARM, 64bit is %d, dso=%s\n",
+			 dso_type == DSO__TYPE_64BIT, map->dso->name);
+		if (dso_type == DSO__TYPE_64BIT) {
+#ifdef HAVE_LIBUNWIND_AARCH64_SUPPORT
+			register_unwind_libunwind_ops(
+				&_Uaarch64_unwind_libunwind_ops, thread);
+#else
+			register_null_unwind_libunwind_ops(thread);
+#endif
+		} else
+			use_local_unwind = 1;
 	} else {
 		use_local_unwind = 1;
 	}
