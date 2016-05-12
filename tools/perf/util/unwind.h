@@ -24,6 +24,7 @@ int libunwind__arch_reg_id(int regnum);
 int unwind__prepare_access(struct thread *thread);
 void unwind__flush_access(struct thread *thread);
 void unwind__finish_access(struct thread *thread);
+void unwind__get_arch(struct thread *thread, struct map *map);
 #else
 static inline int unwind__prepare_access(struct thread *thread __maybe_unused)
 {
@@ -32,6 +33,8 @@ static inline int unwind__prepare_access(struct thread *thread __maybe_unused)
 
 static inline void unwind__flush_access(struct thread *thread __maybe_unused) {}
 static inline void unwind__finish_access(struct thread *thread __maybe_unused) {}
+static inline void unwind__get_arch(struct thread *thread __maybe_unused,
+				    struct map *map __maybe_unused) {}
 #endif
 #else
 static inline int
@@ -51,5 +54,7 @@ static inline int unwind__prepare_access(struct thread *thread __maybe_unused)
 
 static inline void unwind__flush_access(struct thread *thread __maybe_unused) {}
 static inline void unwind__finish_access(struct thread *thread __maybe_unused) {}
+static inline void unwind__get_arch(struct thread *thread __maybe_unused,
+				    struct map *map __maybe_unused) {}
 #endif /* HAVE_DWARF_UNWIND_SUPPORT */
 #endif /* __UNWIND_H */
