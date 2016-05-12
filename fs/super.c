@@ -153,6 +153,12 @@ static void destroy_super_rcu(struct rcu_head *head)
 	schedule_work(&s->destroy_work);
 }
 
+int sb_report_event(struct super_block *sb, char *envp[])
+{
+	return kobject_uevent_env(&sb->s_kobj, KOBJ_CHANGE, envp);
+}
+EXPORT_SYMBOL(sb_report_event);
+
 /**
  *	destroy_super	-	frees a superblock
  *	@s: superblock to free

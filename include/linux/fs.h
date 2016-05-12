@@ -2071,6 +2071,7 @@ extern int vfs_ustat(dev_t, struct kstatfs *);
 extern int freeze_super(struct super_block *super);
 extern int thaw_super(struct super_block *super);
 extern bool our_mnt(struct vfsmount *mnt);
+extern int sb_report_event(struct super_block *sb, char *envp[]);
 
 extern int current_umask(void);
 
