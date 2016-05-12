@@ -259,10 +259,12 @@ struct ti_firmware_header {
 #define TI_DRIVER_AUTHOR	"Al Borchers <alborchers@steinerpoint.com>"
 #define TI_DRIVER_DESC		"TI USB 3410/5052 Serial Driver"
 
+#define TI_3410_BAUD_BASE       923077
+#define TI_5052_BAUD_BASE       461538
+
 #define TI_FIRMWARE_BUF_SIZE	16284
-
 #define TI_TRANSFER_TIMEOUT	2
-
+#define TI_DOWNLOAD_TIMEOUT	1000
 #define TI_DEFAULT_CLOSING_WAIT	4000		/* in .01 secs */
 
 #define TI_EXTRA_VID_PID_COUNT	5
@@ -875,9 +877,9 @@ static void ti_set_termios(struct tty_struct *tty,
 	if (!baud)
 		baud = 9600;
 	if (tport->tp_tdev->td_is_3410)
-		config->wBaudRate = (__u16)((923077 + baud/2) / baud);
+		config->wBaudRate = (TI_3410_BAUD_BASE + baud / 2) / baud;
 	else
-		config->wBaudRate = (__u16)((461538 + baud/2) / baud);
+		config->wBaudRate = (TI_5052_BAUD_BASE + baud / 2) / baud;
 
 	/* FIXME: Should calculate resulting baud here and report it back */
 	if ((C_BAUD(tty)) != B0)
@@ -1123,6 +1125,7 @@ static int ti_get_serial_info(struct ti_port *tport,
 	struct usb_serial_port *port = tport->tp_port;
 	struct serial_struct ret_serial;
 	unsigned cwait;
+	int baud_base;
 
 	if (!ret_arg)
 		return -EFAULT;
@@ -1133,11 +1136,16 @@ static int ti_get_serial_info(struct ti_port *tport,
 
 	memset(&ret_serial, 0, sizeof(ret_serial));
 
+	if (tport->tp_tdev->td_is_3410)
+		baud_base = TI_3410_BAUD_BASE;
+	else
+		baud_base = TI_5052_BAUD_BASE;
+
 	ret_serial.type = PORT_16550A;
 	ret_serial.line = port->minor;
 	ret_serial.port = port->port_number;
 	ret_serial.xmit_fifo_size = kfifo_size(&port->write_fifo);
-	ret_serial.baud_base = tport->tp_tdev->td_is_3410 ? 921600 : 460800;
+	ret_serial.baud_base = baud_base;
 	ret_serial.closing_wait = cwait;
 
 	if (copy_to_user(ret_arg, &ret_serial, sizeof(*ret_arg)))
@@ -1296,8 +1304,8 @@ static int ti_do_download(struct usb_device *dev, int pipe,
 	dev_dbg(&dev->dev, "%s - downloading firmware\n", __func__);
 	for (pos = 0; pos < size; pos += done) {
 		len = min(size - pos, TI_DOWNLOAD_MAX_PACKET_SIZE);
-		status = usb_bulk_msg(dev, pipe, buffer + pos, len,
-								&done, 1000);
+		status = usb_bulk_msg(dev, pipe, buffer + pos, len, &done,
+				      TI_DOWNLOAD_TIMEOUT);
 		if (status)
 			break;
 	}
