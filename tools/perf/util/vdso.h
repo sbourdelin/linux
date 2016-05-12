@@ -4,10 +4,15 @@
 #include <linux/types.h>
 #include <string.h>
 #include <stdbool.h>
+#include "util.h"
 
 #define VDSO__MAP_NAME "[vdso]"
 
-#define DSO__NAME_VDSO    "[vdso]"
+#if BITS_PER_LONG == 64
+#define DSO__NAME_VDSO    "[vdso64]"
+#else
+#define DSO__NAME_VDSO    "[vdso32]"
+#endif
 #define DSO__NAME_VDSO32  "[vdso32]"
 #define DSO__NAME_VDSOX32 "[vdsox32]"
 
