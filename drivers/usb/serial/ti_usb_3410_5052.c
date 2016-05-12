@@ -274,7 +274,8 @@ struct ti_port {
 	u8			tp_shadow_mcr;
 	u8			tp_uart_mode;	/* 232 or 485 modes */
 	unsigned int		tp_uart_base_addr;
-	spinlock_t		tp_lock;
+	spinlock_t		tp_lock; /* Protects tp_msr */
+	struct mutex            tp_mutex; /* Protects tp_shadow_mcr */
 };
 
 struct ti_device {
@@ -636,6 +637,8 @@ static int ti_port_probe(struct usb_serial_port *port)
 		return -ENOMEM;
 
 	spin_lock_init(&tport->tp_lock);
+	mutex_init(&tport->tp_mutex);
+
 	if (port == port->serial->port[0])
 		tport->tp_uart_base_addr = TI_UART1_BASE_ADDR;
 	else
@@ -1017,9 +1020,9 @@ static void ti_set_termios(struct tty_struct *tty,
 			port_number, status);
 	}
 
-	/* SET_CONFIG asserts RTS and DTR, reset them correctly */
+	mutex_lock(&tport->tp_mutex);
 	mcr = tport->tp_shadow_mcr;
-	/* if baud rate is B0, clear RTS and DTR */
+
 	if (C_BAUD(tty) == B0)
 		mcr &= ~(TI_MCR_DTR | TI_MCR_RTS);
 	else if (old_termios && (old_termios->c_cflag & CBAUD) == B0)
@@ -1030,7 +1033,10 @@ static void ti_set_termios(struct tty_struct *tty,
 		dev_err(&port->dev,
 			"cannot set modem control on port %d: %d\n",
 			port_number, status);
+	} else {
+		tport->tp_shadow_mcr = mcr;
 	}
+	mutex_unlock(&tport->tp_mutex);
 
 	kfree(config);
 }
@@ -1045,10 +1051,14 @@ static int ti_tiocmget(struct tty_struct *tty)
 	unsigned int mcr;
 	unsigned long flags;
 
+	mutex_lock(&tport->tp_mutex);
 	spin_lock_irqsave(&tport->tp_lock, flags);
+
 	msr = tport->tp_msr;
 	mcr = tport->tp_shadow_mcr;
+
 	spin_unlock_irqrestore(&tport->tp_lock, flags);
+	mutex_unlock(&tport->tp_mutex);
 
 	result = ((mcr & TI_MCR_DTR) ? TIOCM_DTR : 0)
 		| ((mcr & TI_MCR_RTS) ? TIOCM_RTS : 0)
@@ -1069,10 +1079,10 @@ static int ti_tiocmset(struct tty_struct *tty,
 {
 	struct usb_serial_port *port = tty->driver_data;
 	struct ti_port *tport = usb_get_serial_port_data(port);
+	int err;
 	unsigned int mcr;
-	unsigned long flags;
 
-	spin_lock_irqsave(&tport->tp_lock, flags);
+	mutex_lock(&tport->tp_mutex);
 	mcr = tport->tp_shadow_mcr;
 
 	if (set & TIOCM_RTS)
@@ -1088,9 +1098,14 @@ static int ti_tiocmset(struct tty_struct *tty,
 		mcr &= ~TI_MCR_DTR;
 	if (clear & TIOCM_LOOP)
 		mcr &= ~TI_MCR_LOOP;
-	spin_unlock_irqrestore(&tport->tp_lock, flags);
 
-	return ti_set_mcr(port, mcr);
+	err = ti_set_mcr(port, mcr);
+	if (!err)
+		tport->tp_shadow_mcr = mcr;
+
+	mutex_unlock(&tport->tp_mutex);
+
+	return err;
 }
 
 
@@ -1183,18 +1198,11 @@ exit:
 static int ti_set_mcr(struct usb_serial_port *port, unsigned int mcr)
 {
 	struct ti_port *tport = usb_get_serial_port_data(port);
-	unsigned long flags;
 	int status;
 
 	status = ti_write_byte(port,
 			       tport->tp_uart_base_addr + TI_UART_OFFSET_MCR,
 			       TI_MCR_RTS | TI_MCR_DTR | TI_MCR_LOOP, mcr);
-
-	spin_lock_irqsave(&tport->tp_lock, flags);
-	if (!status)
-		tport->tp_shadow_mcr = mcr;
-	spin_unlock_irqrestore(&tport->tp_lock, flags);
-
 	return status;
 }
 
