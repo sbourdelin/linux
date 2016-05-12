@@ -1245,6 +1245,10 @@ void __pci_bus_size_bridges(struct pci_bus *bus, struct list_head *realloc_head)
 	if (pci_is_root_bus(bus))
 		return;
 
+	/* bridge device available? */
+	if (!bus->self)
+		return;
+
 	switch (bus->self->class >> 8) {
 	case PCI_CLASS_BRIDGE_CARDBUS:
 		/* don't size cardbuses yet. */
