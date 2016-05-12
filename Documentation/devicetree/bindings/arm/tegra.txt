@@ -31,8 +31,12 @@ board-specific compatible values:
   nvidia,ventana
   nvidia,whistler
   toradex,apalis_t30
+  toradex,apalis_tk1
   toradex,apalis_t30-eval
+  toradex,apalis_tk1-eval
   toradex,colibri_t20-512
+  toradex,colibri_t30
+  toradex,colibri_t30-eval-v3
   toradex,iris
 
 Trusted Foundations
