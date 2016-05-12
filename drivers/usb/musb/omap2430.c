@@ -122,16 +122,6 @@ static void omap2430_musb_set_vbus(struct musb *musb, int is_on)
 		musb_readb(musb->mregs, MUSB_DEVCTL));
 }
 
-static int omap2430_musb_set_mode(struct musb *musb, u8 musb_mode)
-{
-	u8	devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
-
-	devctl |= MUSB_DEVCTL_SESSION;
-	musb_writeb(musb->mregs, MUSB_DEVCTL, devctl);
-
-	return 0;
-}
-
 static inline void omap2430_low_level_exit(struct musb *musb)
 {
 	u32 l;
@@ -428,6 +418,9 @@ static void omap2430_musb_enable(struct musb *musb)
 
 	case MUSB_VBUS_VALID:
 		omap_control_usb_set_mode(glue->control_otghs, USB_MODE_DEVICE);
+		devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
+		devctl |= MUSB_DEVCTL_SESSION;
+		musb_writeb(musb->mregs, MUSB_DEVCTL, devctl);
 		break;
 
 	default:
@@ -472,7 +465,6 @@ static const struct musb_platform_ops omap2430_ops = {
 	.init		= omap2430_musb_init,
 	.exit		= omap2430_musb_exit,
 
-	.set_mode	= omap2430_musb_set_mode,
 	.set_vbus	= omap2430_musb_set_vbus,
 
 	.enable		= omap2430_musb_enable,
