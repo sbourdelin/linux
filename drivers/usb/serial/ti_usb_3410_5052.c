@@ -311,7 +311,7 @@ static int ti_get_serial_info(struct ti_port *tport,
 	struct serial_struct __user *ret_arg);
 static int ti_set_serial_info(struct tty_struct *tty, struct ti_port *tport,
 	struct serial_struct __user *new_arg);
-static void ti_handle_new_msr(struct ti_port *tport, u8 msr);
+static void ti_handle_new_msr(struct usb_serial_port *port, u8 msr);
 static int ti_download_firmware(struct ti_device *tdev);
 
 static const struct usb_device_id ti_id_table_3410[] = {
@@ -711,7 +711,6 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 			status = -EINVAL;
 			goto release_lock;
 		}
-		urb->context = tdev;
 		status = usb_submit_urb(urb, GFP_KERNEL);
 		if (status) {
 			dev_err(&port->dev, "%s - submit interrupt urb failed, %d\n", __func__, status);
@@ -1081,17 +1080,12 @@ static void ti_break(struct tty_struct *tty, int break_state)
 
 static void ti_interrupt_callback(struct urb *urb)
 {
-	struct ti_device *tdev = urb->context;
-	struct usb_serial_port *port;
-	struct usb_serial *serial = tdev->td_serial;
-	struct ti_port *tport;
-	struct device *dev = &urb->dev->dev;
+	struct usb_serial_port *port = urb->context;
 	unsigned char *data = urb->transfer_buffer;
 	int length = urb->actual_length;
 	int port_number;
 	int function;
 	int status = urb->status;
-	int retval;
 	u8 msr;
 
 	switch (status) {
@@ -1100,63 +1094,61 @@ static void ti_interrupt_callback(struct urb *urb)
 	case -ECONNRESET:
 	case -ENOENT:
 	case -ESHUTDOWN:
-		dev_dbg(dev, "%s - urb shutting down, %d\n", __func__, status);
+		dev_dbg(&port->dev, "%s - urb shutting down, %d\n",
+			__func__, status);
 		return;
 	default:
-		dev_err(dev, "%s - nonzero urb status, %d\n", __func__, status);
+		dev_err(&port->dev, "%s - nonzero urb status, %d\n",
+			__func__, status);
 		goto exit;
 	}
 
 	if (length != 2) {
-		dev_dbg(dev, "%s - bad packet size, %d\n", __func__, length);
+		dev_dbg(&port->dev, "%s - bad packet size, %d\n",
+			__func__, length);
 		goto exit;
 	}
 
 	if (data[0] == TI_CODE_HARDWARE_ERROR) {
-		dev_err(dev, "%s - hardware error, %d\n", __func__, data[1]);
+		dev_err(&port->dev, "%s - hardware error, %d\n",
+			__func__, data[1]);
 		goto exit;
 	}
 
 	port_number = ti_get_port_from_code(data[0]);
 	function = ti_get_func_from_code(data[0]);
 
-	dev_dbg(dev, "%s - port_number %d, function %d, data 0x%02X\n",
+	dev_dbg(&port->dev, "%s - port_number %d, function %d, data 0x%02X\n",
 		__func__, port_number, function, data[1]);
 
-	if (port_number >= serial->num_ports) {
-		dev_err(dev, "%s - bad port number, %d\n",
+	if (port_number >= port->serial->num_ports) {
+		dev_err(&port->dev, "%s - bad port number, %d\n",
 						__func__, port_number);
 		goto exit;
 	}
 
-	port = serial->port[port_number];
-
-	tport = usb_get_serial_port_data(port);
-	if (!tport)
-		goto exit;
-
 	switch (function) {
 	case TI_CODE_DATA_ERROR:
-		dev_err(dev, "%s - DATA ERROR, port %d, data 0x%02X\n",
+		dev_err(&port->dev, "%s - DATA ERROR, port %d, data 0x%02X\n",
 			__func__, port_number, data[1]);
 		break;
 
 	case TI_CODE_MODEM_STATUS:
 		msr = data[1];
-		ti_handle_new_msr(tport, msr);
+		ti_handle_new_msr(port, msr);
 		break;
 
 	default:
-		dev_err(dev, "%s - unknown interrupt code, 0x%02X\n",
+		dev_err(&port->dev, "%s - unknown interrupt code, 0x%02X\n",
 							__func__, data[1]);
 		break;
 	}
 
 exit:
-	retval = usb_submit_urb(urb, GFP_ATOMIC);
-	if (retval)
-		dev_err(dev, "%s - resubmit interrupt urb failed, %d\n",
-			__func__, retval);
+	status = usb_submit_urb(urb, GFP_ATOMIC);
+	if (status)
+		dev_err(&port->dev, "%s - resubmit interrupt urb failed, %d\n",
+			__func__, status);
 }
 
 static int ti_set_mcr(struct ti_port *tport, unsigned int mcr)
@@ -1263,12 +1255,13 @@ static int ti_set_serial_info(struct tty_struct *tty, struct ti_port *tport,
 }
 
 
-static void ti_handle_new_msr(struct ti_port *tport, u8 msr)
+static void ti_handle_new_msr(struct usb_serial_port *port, u8 msr)
 {
+	struct ti_port *tport = usb_get_serial_port_data(port);
 	struct async_icount *icount;
 	unsigned long flags;
 
-	dev_dbg(&tport->tp_port->dev, "%s - msr 0x%02X\n", __func__, msr);
+	dev_dbg(&port->dev, "%s - msr 0x%02X\n", __func__, msr);
 
 	if (msr & TI_MSR_DELTA_MASK) {
 		spin_lock_irqsave(&tport->tp_lock, flags);
@@ -1281,7 +1274,7 @@ static void ti_handle_new_msr(struct ti_port *tport, u8 msr)
 			icount->dcd++;
 		if (msr & TI_MSR_DELTA_RI)
 			icount->rng++;
-		wake_up_interruptible(&tport->tp_port->port.delta_msr_wait);
+		wake_up_interruptible(&port->port.delta_msr_wait);
 		spin_unlock_irqrestore(&tport->tp_lock, flags);
 	}
 
