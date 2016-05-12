@@ -81,6 +81,11 @@ int register_filesystem(struct file_system_type * fs)
 	else
 		*p = fs;
 	write_unlock(&file_systems_lock);
+	/* Filesystems to set sb_ktype only if they want
+	 * core to create the sysfs entries
+	 */
+	if (fs->sb_ktype)
+		fs->kset = kset_create_and_add(fs->name, NULL, fs_kobj);
 	return res;
 }
 
@@ -109,6 +114,8 @@ int unregister_filesystem(struct file_system_type * fs)
 			*tmp = fs->next;
 			fs->next = NULL;
 			write_unlock(&file_systems_lock);
+			if (fs->kset)
+				kset_unregister(fs->kset);
 			synchronize_rcu();
 			return 0;
 		}

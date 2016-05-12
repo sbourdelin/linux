@@ -35,6 +35,7 @@
 
 #include <asm/byteorder.h>
 #include <uapi/linux/fs.h>
+#include <linux/kobject.h>
 
 struct backing_dev_info;
 struct bdi_writeback;
@@ -42,7 +43,6 @@ struct export_operations;
 struct hd_geometry;
 struct iovec;
 struct kiocb;
-struct kobject;
 struct pipe_inode_info;
 struct poll_table_struct;
 struct kstatfs;
@@ -1996,6 +1996,8 @@ struct file_system_type {
 	struct lock_class_key i_lock_key;
 	struct lock_class_key i_mutex_key;
 	struct lock_class_key i_mutex_dir_key;
+	struct kobj_type *sb_ktype; /* how to handle super block's kobjects */
+	struct kset *kset; /* For /sys/fs/<type> */
 };
 
 #define MODULE_ALIAS_FS(NAME) MODULE_ALIAS("fs-" NAME)
