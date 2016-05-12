@@ -12,10 +12,6 @@
 #include "misc.h"
 #include "error.h"
 
-#include <asm/msr.h>
-#include <asm/archrandom.h>
-#include <asm/e820.h>
-
 #include <generated/compile.h>
 #include <linux/module.h>
 #include <linux/uts.h>
@@ -25,26 +21,6 @@
 /* Simplified build-specific string for starting entropy. */
 static const char build_str[] = UTS_RELEASE " (" LINUX_COMPILE_BY "@"
 		LINUX_COMPILE_HOST ") (" LINUX_COMPILER ") " UTS_VERSION;
-
-#define I8254_PORT_CONTROL	0x43
-#define I8254_PORT_COUNTER0	0x40
-#define I8254_CMD_READBACK	0xC0
-#define I8254_SELECT_COUNTER0	0x02
-#define I8254_STATUS_NOTREADY	0x40
-static inline u16 i8254(void)
-{
-	u16 status, timer;
-
-	do {
-		outb(I8254_PORT_CONTROL,
-		     I8254_CMD_READBACK | I8254_SELECT_COUNTER0);
-		status = inb(I8254_PORT_COUNTER0);
-		timer  = inb(I8254_PORT_COUNTER0);
-		timer |= inb(I8254_PORT_COUNTER0) << 8;
-	} while (status & I8254_STATUS_NOTREADY);
-
-	return timer;
-}
 
 static unsigned long rotate_xor(unsigned long hash, const void *area,
 				size_t size)
@@ -62,7 +38,7 @@ static unsigned long rotate_xor(unsigned long hash, const void *area,
 }
 
 /* Attempt to create a simple but unpredictable starting entropy. */
-static unsigned long get_random_boot(void)
+static unsigned long get_boot_seed(void)
 {
 	unsigned long hash = 0;
 
@@ -70,51 +46,6 @@ static unsigned long get_random_boot(void)
 	hash = rotate_xor(hash, boot_params, sizeof(*boot_params));
 
 	return hash;
-}
-
-static unsigned long get_random_long(const char *purpose)
-{
-#ifdef CONFIG_X86_64
-	const unsigned long mix_const = 0x5d6008cbf3848dd3UL;
-#else
-	const unsigned long mix_const = 0x3f39e593UL;
-#endif
-	unsigned long raw, random = get_random_boot();
-	bool use_i8254 = true;
-
-	debug_putstr(purpose);
-	debug_putstr(" KASLR using");
-
-	if (has_cpuflag(X86_FEATURE_RDRAND)) {
-		debug_putstr(" RDRAND");
-		if (rdrand_long(&raw)) {
-			random ^= raw;
-			use_i8254 = false;
-		}
-	}
-
-	if (has_cpuflag(X86_FEATURE_TSC)) {
-		debug_putstr(" RDTSC");
-		raw = rdtsc();
-
-		random ^= raw;
-		use_i8254 = false;
-	}
-
-	if (use_i8254) {
-		debug_putstr(" i8254");
-		random ^= i8254();
-	}
-
-	/* Circular multiply for better bit diffusion */
-	asm("mul %3"
-	    : "=a" (random), "=d" (raw)
-	    : "a" (random), "rm" (mix_const));
-	random += raw;
-
-	debug_putstr("...\n");
-
-	return random;
 }
 
 struct mem_vector {
@@ -131,7 +62,6 @@ enum mem_avoid_index {
 };
 
 static struct mem_vector mem_avoid[MEM_AVOID_MAX];
-
 static bool mem_contains(struct mem_vector *region, struct mem_vector *item)
 {
 	/* Item at least partially before region. */
@@ -360,13 +290,16 @@ static void slots_append(unsigned long addr)
 	slots[slot_max++] = addr;
 }
 
+#define KASLR_COMPRESSED_BOOT
+#include "../../lib/kaslr.c"
+
 static unsigned long slots_fetch_random(void)
 {
 	/* Handle case of no slots stored. */
 	if (slot_max == 0)
 		return 0;
 
-	return slots[get_random_long("Physical") % slot_max];
+	return slots[kaslr_get_random_long("Physical") % slot_max];
 }
 
 static void process_e820_entry(struct e820entry *entry,
