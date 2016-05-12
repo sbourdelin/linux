@@ -218,16 +218,7 @@ static __inline__ unsigned long __ffs(unsigned long x)
 	return __ilog2(x & -x);
 }
 
-/*
- * ffs: find first bit set. This is defined the same way as
- * the libc and compiler builtin ffs routines, therefore
- * differs in spirit from the above ffz (man ffs).
- */
-static __inline__ int ffs(int x)
-{
-	unsigned long i = (unsigned long)x;
-	return __ilog2(i & -i) + 1;
-}
+#include <asm-generic/bitops/builtin-ffs.h>
 
 /*
  * fls: find last (most-significant) bit set.
