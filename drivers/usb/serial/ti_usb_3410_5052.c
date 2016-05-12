@@ -226,27 +226,6 @@ struct ti_write_data_bytes {
 	__u8	bData[0];
 } __packed;
 
-struct ti_read_data_request {
-	__u8	bAddrType;
-	__u8	bDataType;
-	__u8	bDataCounter;
-	__be16	wBaseAddrHi;
-	__be16	wBaseAddrLo;
-} __packed;
-
-struct ti_read_data_bytes {
-	__u8	bCmdCode;
-	__u8	bModuleId;
-	__u8	bErrorCode;
-	__u8	bData[0];
-} __packed;
-
-/* Interrupt struct */
-struct ti_interrupt {
-	__u8	bICode;
-	__u8	bIInfo;
-} __packed;
-
 /* Interrupt codes */
 static inline int ti_get_port_from_code(unsigned char code)
 {
