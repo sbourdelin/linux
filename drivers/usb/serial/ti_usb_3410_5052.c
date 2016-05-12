@@ -1259,47 +1259,65 @@ static void ti_handle_new_msr(struct usb_serial_port *port, u8 msr)
 	tport->tp_msr = msr & TI_MSR_MASK;
 }
 
-static int ti_do_download(struct usb_device *dev, int pipe,
-						u8 *buffer, int size)
+static int ti_do_download(struct usb_serial *serial,
+			  const struct firmware *fw_p)
 {
 	int pos;
 	u8 cs = 0;
 	int done;
+	struct usb_device *dev = serial->dev;
 	struct ti_firmware_header *header;
 	int status = 0;
+	u8 *buffer;
+	int buffer_size;
 	int len;
+	unsigned int pipe;
 
-	for (pos = sizeof(struct ti_firmware_header); pos < size; pos++)
+	pipe = usb_sndbulkpipe(dev, serial->port[0]->bulk_out_endpointAddress);
+
+	buffer_size = fw_p->size;
+	buffer = kmalloc(buffer_size, GFP_KERNEL);
+	if (!buffer)
+		return -ENOMEM;
+
+	memcpy(buffer, fw_p->data, fw_p->size);
+
+	for (pos = sizeof(*header); pos < buffer_size; pos++)
 		cs = (u8)(cs + buffer[pos]);
 
 	header = (struct ti_firmware_header *)buffer;
-	header->wLength = cpu_to_le16((u16)(size
-					- sizeof(struct ti_firmware_header)));
+	header->wLength = cpu_to_le16(buffer_size - sizeof(*header));
 	header->bCheckSum = cs;
 
 	dev_dbg(&dev->dev, "%s - downloading firmware\n", __func__);
-	for (pos = 0; pos < size; pos += done) {
-		len = min(size - pos, TI_DOWNLOAD_MAX_PACKET_SIZE);
+	for (pos = 0; pos < buffer_size; pos += done) {
+		len = min(buffer_size - pos, TI_DOWNLOAD_MAX_PACKET_SIZE);
 		status = usb_bulk_msg(dev, pipe, buffer + pos, len, &done,
 				      TI_DOWNLOAD_TIMEOUT);
 		if (status)
 			break;
 	}
-	return status;
+
+	kfree(buffer);
+
+	if (status) {
+		dev_err(&dev->dev, "failed to download firmware: %d\n", status);
+		return status;
+	}
+
+	dev_dbg(&dev->dev, "%s - download successful\n", __func__);
+
+	return 0;
 }
 
 static int ti_download_firmware(struct usb_serial *serial)
 {
 	int status;
-	int buffer_size;
-	u8 *buffer;
 	struct usb_device *dev = serial->dev;
 	struct ti_device *tdev = usb_get_serial_data(serial);
-	unsigned int pipe;
 	const struct firmware *fw_p;
 	char buf[32];
 
-	pipe = usb_sndbulkpipe(dev, serial->port[0]->bulk_out_endpointAddress);
 
 	if (le16_to_cpu(dev->descriptor.idVendor) == MXU1_VENDOR_ID) {
 		snprintf(buf,
@@ -1354,30 +1372,16 @@ check_firmware:
 		dev_err(&dev->dev, "%s - firmware not found\n", __func__);
 		return -ENOENT;
 	}
+
 	if (fw_p->size > TI_FIRMWARE_BUF_SIZE) {
 		dev_err(&dev->dev, "%s - firmware too large %zu\n", __func__, fw_p->size);
 		release_firmware(fw_p);
 		return -ENOENT;
 	}
 
-	buffer_size = TI_FIRMWARE_BUF_SIZE + sizeof(struct ti_firmware_header);
-	buffer = kmalloc(buffer_size, GFP_KERNEL);
-	if (buffer) {
-		memcpy(buffer, fw_p->data, fw_p->size);
-		memset(buffer + fw_p->size, 0xff, buffer_size - fw_p->size);
-		status = ti_do_download(dev, pipe, buffer, fw_p->size);
-		kfree(buffer);
-	} else {
-		status = -ENOMEM;
-	}
-	release_firmware(fw_p);
-	if (status) {
-		dev_err(&dev->dev, "%s - error downloading firmware, %d\n",
-							__func__, status);
-		return status;
-	}
+	ti_do_download(serial, fw_p);
 
-	dev_dbg(&dev->dev, "%s - download successful\n", __func__);
+	release_firmware(fw_p);
 
 	return 0;
 }
