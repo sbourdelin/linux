@@ -10,9 +10,11 @@
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/i2c.h>
+#include <linux/i2c-smbus.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/of_irq.h>
 #include <linux/pci.h>
 
 #include "i2c-cavium.h"
@@ -106,6 +108,51 @@ static void thunder_i2c_clock_disable(struct device *dev, struct clk *clk)
 	devm_clk_put(dev, clk);
 }
 
+#if IS_ENABLED(CONFIG_I2C_SMBUS)
+static int thunder_i2c_smbus_setup_of(struct octeon_i2c *i2c,
+				      struct device_node *node)
+{
+	u32 type;
+
+	if (!node)
+		return -EINVAL;
+
+	i2c->alert_data.irq = irq_of_parse_and_map(node, 0);
+	if (!i2c->alert_data.irq)
+		return -EINVAL;
+
+	type = irqd_get_trigger_type(irq_get_irq_data(i2c->alert_data.irq));
+	i2c->alert_data.alert_edge_triggered =
+		(type & IRQ_TYPE_LEVEL_MASK) ? 1 : 0;
+
+	i2c->ara = i2c_setup_smbus_alert(&i2c->adap, &i2c->alert_data);
+	if (!i2c->ara)
+		return -ENODEV;
+	return 0;
+}
+#endif
+
+static int thunder_i2c_smbus_setup(struct octeon_i2c *i2c,
+				   struct device_node *node)
+{
+#if IS_ENABLED(CONFIG_I2C_SMBUS)
+	/* TODO: ACPI support */
+	if (!acpi_disabled)
+		return -EOPNOTSUPP;
+
+	return thunder_i2c_smbus_setup_of(i2c, node);
+#endif
+	return 0;
+}
+
+static void thunder_i2c_smbus_remove(struct octeon_i2c *i2c)
+{
+#if IS_ENABLED(CONFIG_I2C_SMBUS)
+	if (i2c->ara)
+		i2c_unregister_device(i2c->ara);
+#endif
+}
+
 static int thunder_i2c_probe_pci(struct pci_dev *pdev,
 				 const struct pci_device_id *ent)
 {
@@ -189,6 +236,9 @@ static int thunder_i2c_probe_pci(struct pci_dev *pdev,
 		goto out_irq;
 	}
 
+	ret = thunder_i2c_smbus_setup(i2c, pdev->dev.of_node);
+	if (ret < 0)
+		dev_info(dev, "SMBUS alert not active on this bus\n");
 	dev_info(i2c->dev, "probed\n");
 	return 0;
 
@@ -219,6 +269,7 @@ static void thunder_i2c_remove_pci(struct pci_dev *pdev)
 
 	dev = i2c->dev;
 	thunder_i2c_clock_disable(dev, i2c->clk);
+	thunder_i2c_smbus_remove(i2c);
 	i2c_del_adapter(&i2c->adap);
 	devm_free_irq(dev, i2c->i2c_msix.vector, i2c);
 	pci_disable_msix(pdev);
