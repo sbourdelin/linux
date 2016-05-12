@@ -67,18 +67,19 @@ static void do_set_multicast(struct work_struct *w)
 {
 	struct net_device_context *ndevctx =
 		container_of(w, struct net_device_context, work);
-	struct netvsc_device *nvdev;
+	struct hv_device *device_obj = ndevctx->device_ctx;
+	struct net_device *ndev = hv_get_drvdata(device_obj);
+	struct netvsc_device *nvdev = ndevctx->nvdev;
 	struct rndis_device *rdev;
 
-	nvdev = ndevctx->nvdev;
-	if (nvdev == NULL || nvdev->ndev == NULL)
+	if (!nvdev)
 		return;
 
 	rdev = nvdev->extension;
 	if (rdev == NULL)
 		return;
 
-	if (nvdev->ndev->flags & IFF_PROMISC)
+	if (ndev->flags & IFF_PROMISC)
 		rndis_filter_set_packet_filter(rdev,
 			NDIS_PACKET_TYPE_PROMISCUOUS);
 	else
@@ -998,15 +999,15 @@ static const struct net_device_ops device_ops = {
  */
 static void netvsc_link_change(struct work_struct *w)
 {
-	struct net_device_context *ndev_ctx;
-	struct net_device *net;
+	struct net_device_context *ndev_ctx =
+		container_of(w, struct net_device_context, dwork.work);
+	struct hv_device *device_obj = ndev_ctx->device_ctx;
+	struct net_device *net = hv_get_drvdata(device_obj);
 	struct netvsc_device *net_device;
 	struct rndis_device *rdev;
 	struct netvsc_reconfig *event = NULL;
 	bool notify = false, reschedule = false;
 	unsigned long flags, next_reconfig, delay;
-
-	ndev_ctx = container_of(w, struct net_device_context, dwork.work);
 
 	rtnl_lock();
 	if (ndev_ctx->start_remove)
@@ -1014,7 +1015,6 @@ static void netvsc_link_change(struct work_struct *w)
 
 	net_device = ndev_ctx->nvdev;
 	rdev = net_device->extension;
-	net = net_device->ndev;
 
 	next_reconfig = ndev_ctx->last_reconfig + LINKCHANGE_INT;
 	if (time_is_after_jiffies(next_reconfig)) {

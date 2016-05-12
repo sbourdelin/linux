@@ -701,8 +701,6 @@ struct netvsc_device {
 	struct nvsp_message revoke_packet;
 	/* unsigned char HwMacAddr[HW_MACADDR_LEN]; */
 
-	struct net_device *ndev;
-
 	struct vmbus_channel *chn_table[VRSS_CHANNEL_MAX];
 	u32 send_table[VRSS_SEND_TAB_SIZE];
 	u32 max_chn;
