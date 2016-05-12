@@ -821,6 +821,18 @@ config INTEL_IPS
 	  functionality.  If in doubt, say Y here; it will only load on
 	  supported platforms.
 
+config INTEL_PMC_CORE
+	bool "Intel PMC Core driver"
+	depends on X86 && PCI
+	---help---
+	  The Intel Platform Controller Hub for Intel Core SoCs provides access
+	  to Power Management Controller registers via a pci interface. This
+	  driver can utilize debugging capabilities and supported features as
+	  exposed by the Power Management Controller.
+
+	  Supported features:
+		- slp_s0_residency counter.
+
 config INTEL_IMR
 	bool "Intel Isolated Memory Region support"
 	default n
