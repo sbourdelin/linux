@@ -1914,7 +1914,7 @@ static int drm_pick_crtcs(struct drm_fb_helper *fb_helper,
 	if (modes[n] == NULL)
 		return best_score;
 
-	crtcs = kzalloc(dev->mode_config.num_connector *
+	crtcs = kzalloc(fb_helper->connector_count *
 			sizeof(struct drm_fb_helper_crtc *), GFP_KERNEL);
 	if (!crtcs)
 		return best_score;
@@ -1960,7 +1960,7 @@ static int drm_pick_crtcs(struct drm_fb_helper *fb_helper,
 		if (score > best_score) {
 			best_score = score;
 			memcpy(best_crtcs, crtcs,
-			       dev->mode_config.num_connector *
+			       fb_helper->connector_count *
 			       sizeof(struct drm_fb_helper_crtc *));
 		}
 	}
