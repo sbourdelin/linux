@@ -88,8 +88,13 @@ void __init kernel_randomize_memory(void)
 	if (!kaslr_enabled())
 		return;
 
+	/*
+	 * Update Physical memory mapping to available and
+	 * add padding if needed (especially for memory hotplug support).
+	 */
 	BUG_ON(kaslr_regions[0].base != &page_offset_base);
-	mem_tb = ((max_pfn << PAGE_SHIFT) >> TB_SHIFT);
+	mem_tb = ((max_pfn << PAGE_SHIFT) >> TB_SHIFT) +
+		CONFIG_RANDOMIZE_MEMORY_PHYSICAL_PADDING;
 
 	if (mem_tb < kaslr_regions[0].size_tb)
 		kaslr_regions[0].size_tb = mem_tb;
