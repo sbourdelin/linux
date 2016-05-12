@@ -9303,6 +9303,7 @@ static bool ironlake_get_pipe_config(struct intel_crtc *crtc,
 		ironlake_get_fdi_m_n_config(crtc, pipe_config);
 
 		if (HAS_PCH_IBX(dev_priv)) {
+			/* the pipe->pll mapping is fixed */
 			pll_id = (enum intel_dpll_id) crtc->pipe;
 		} else {
 			tmp = I915_READ(PCH_DPLL_SEL);
@@ -9851,6 +9852,10 @@ static bool hsw_get_transcoder_state(struct intel_crtc *crtc,
 	enum intel_display_power_domain power_domain;
 	u32 tmp;
 
+	/*
+	 * The transcoder->pipe mapping is fixed with the exception of the eDP
+	 * transcoder handled below.
+	 */
 	pipe_config->cpu_transcoder = (enum transcoder) crtc->pipe;
 
 	/*
