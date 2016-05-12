@@ -952,19 +952,20 @@ static void ti_set_termios(struct tty_struct *tty,
 		    break;
 	}
 
-	/* CMSPAR isn't supported by this driver */
-	tty->termios.c_cflag &= ~CMSPAR;
-
 	if (C_PARENB(tty)) {
-		if (C_PARODD(tty)) {
-			config->wFlags |= TI_UART_ENABLE_PARITY_CHECKING;
-			config->bParity = TI_UART_ODD_PARITY;
+		config->wFlags |= TI_UART_ENABLE_PARITY_CHECKING;
+		if (C_CMSPAR(tty)) {
+			if (C_PARODD(tty))
+				config->bParity = TI_UART_MARK_PARITY;
+			else
+				config->bParity = TI_UART_SPACE_PARITY;
 		} else {
-			config->wFlags |= TI_UART_ENABLE_PARITY_CHECKING;
-			config->bParity = TI_UART_EVEN_PARITY;
+			if (C_PARODD(tty))
+				config->bParity = TI_UART_ODD_PARITY;
+			else
+				config->bParity = TI_UART_EVEN_PARITY;
 		}
 	} else {
-		config->wFlags &= ~TI_UART_ENABLE_PARITY_CHECKING;
 		config->bParity = TI_UART_NO_PARITY;
 	}
 
