@@ -77,23 +77,30 @@ struct s626_buffer_dma {
 struct s626_private {
 	uint8_t ai_cmd_running;		/* ai_cmd is running */
 	unsigned int ai_sample_timer;	/* time between samples in
-					 * units of the timer */
+					 * units of the timer
+					 */
 	int ai_convert_count;		/* conversion counter */
 	unsigned int ai_convert_timer;	/* time between conversion in
-					 * units of the timer */
+					 * units of the timer
+					 */
 	uint16_t counter_int_enabs;	/* counter interrupt enable mask
-					 * for MISC2 register */
+					 * for MISC2 register
+					 */
 	uint8_t adc_items;		/* number of items in ADC poll list */
 	struct s626_buffer_dma rps_buf;	/* DMA buffer used to hold ADC (RPS1)
-					 * program */
+					 * program
+					 */
 	struct s626_buffer_dma ana_buf;	/* DMA buffer used to receive ADC data
-					 * and hold DAC data */
+					 * and hold DAC data
+					 */
 	uint32_t *dac_wbuf;		/* pointer to logical adrs of DMA buffer
-					 * used to hold DAC data */
+					 * used to hold DAC data
+					 */
 	uint16_t dacpol;		/* image of DAC polarity register */
 	uint8_t trim_setpoint[12];	/* images of TrimDAC setpoints */
 	uint32_t i2c_adrs;		/* I2C device address for onboard EEPROM
-					 * (board rev dependent) */
+					 * (board rev dependent)
+					 */
 };
 
 /* Counter overflow/index event flag masks for RDMISC2. */
@@ -572,11 +579,14 @@ static int s626_set_dac(struct comedi_device *dev,
 	 * running after the packet has been sent to the target DAC.
 	 */
 	val = 0x0F000000;	/* Continue clock after target DAC data
-				 * (write to non-existent trimdac). */
+				 * (write to non-existent trimdac).
+				 */
 	val |= 0x00004000;	/* Address the two main dual-DAC devices
-				 * (TSL's chip select enables target device). */
+				 * (TSL's chip select enables target device).
+				 */
 	val |= ((uint32_t)(chan & 1) << 15);	/* Address the DAC channel
-						 * within the device. */
+						 * within the device.
+						 */
 	val |= (uint32_t)dacdata;	/* Include DAC setpoint data. */
 	return s626_send_dac(dev, val);
 }
