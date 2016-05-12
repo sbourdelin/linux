@@ -1423,6 +1423,32 @@ struct super_block {
 	struct completion	s_kobj_del; /* Wait for kobjects deletion */
 };
 
+struct super_block_attribute {
+	struct attribute attr;
+	ssize_t (*show)(struct super_block *sb, struct super_block_attribute *,
+			char *buf);
+	ssize_t (*store)(struct super_block *sb, struct super_block_attribute *,
+			const char *buf, size_t count);
+};
+
+#define SB_ATTR(_name, _mode)                  		\
+	struct super_block_attribute sb_attr_##_name = {\
+		.attr = {.name = __stringify(_name),    \
+			.mode = _mode},                 \
+		.show = _name##_show,                   \
+		.store = _name##_store,                 \
+	}
+
+#define SB_ATTR_RO(_name)                      		\
+	struct super_block_attribute sb_attr_##_name = {\
+		.attr = {.name = __stringify(_name),    \
+			.mode = S_IRUGO},               \
+		.show = _name##_show,                   \
+	}
+
+extern const struct sysfs_ops super_block_sysfs_ops;
+void super_block_release(struct kobject *kobj);
+
 extern struct timespec current_fs_time(struct super_block *sb);
 
 /*

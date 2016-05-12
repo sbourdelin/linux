@@ -1396,3 +1396,41 @@ out:
 	return 0;
 }
 EXPORT_SYMBOL(thaw_super);
+
+static ssize_t super_block_attribute_show(struct kobject *kobj,
+		struct attribute *attr, char *buf)
+{
+	struct super_block_attribute *sattr =
+		container_of(attr, struct super_block_attribute, attr);
+	struct super_block *sb = container_of(kobj, struct super_block, s_kobj);
+	if (!sattr->show)
+		return -EIO;
+
+	return sattr->show(sb, sattr, buf);
+}
+
+static ssize_t super_block_attribute_store(struct kobject *kobj,
+		struct attribute *attr, const char *buf, size_t count)
+{
+	struct super_block_attribute *sattr =
+		container_of(attr, struct super_block_attribute, attr);
+	struct super_block *sb = container_of(kobj, struct super_block, s_kobj);
+	if (!sattr->store)
+		return -EIO;
+
+	return sattr->store(sb, sattr, buf, count);
+}
+
+const struct sysfs_ops super_block_sysfs_ops = {
+	.show = super_block_attribute_show,
+	.store = super_block_attribute_store,
+};
+
+EXPORT_SYMBOL(super_block_sysfs_ops);
+
+void super_block_release(struct kobject *kobj)
+{
+	struct super_block *sb = container_of(kobj, struct super_block, s_kobj);
+	complete(&sb->s_kobj_del);
+}
+EXPORT_SYMBOL(super_block_release);
