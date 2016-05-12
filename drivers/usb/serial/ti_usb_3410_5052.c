@@ -1240,9 +1240,12 @@ static void ti_handle_new_msr(struct usb_serial_port *port, u8 msr)
 
 	dev_dbg(&port->dev, "%s - msr 0x%02X\n", __func__, msr);
 
+	spin_lock_irqsave(&tport->tp_lock, flags);
+	tport->tp_msr = msr & TI_MSR_MASK;
+	spin_unlock_irqrestore(&tport->tp_lock, flags);
+
 	if (msr & TI_MSR_DELTA_MASK) {
-		spin_lock_irqsave(&tport->tp_lock, flags);
-		icount = &tport->tp_port->icount;
+		icount = &port->icount;
 		if (msr & TI_MSR_DELTA_CTS)
 			icount->cts++;
 		if (msr & TI_MSR_DELTA_DSR)
@@ -1251,11 +1254,9 @@ static void ti_handle_new_msr(struct usb_serial_port *port, u8 msr)
 			icount->dcd++;
 		if (msr & TI_MSR_DELTA_RI)
 			icount->rng++;
-		wake_up_interruptible(&port->port.delta_msr_wait);
-		spin_unlock_irqrestore(&tport->tp_lock, flags);
-	}
 
-	tport->tp_msr = msr & TI_MSR_MASK;
+		wake_up_interruptible(&port->port.delta_msr_wait);
+	}
 }
 
 static int ti_do_download(struct usb_serial *serial,
