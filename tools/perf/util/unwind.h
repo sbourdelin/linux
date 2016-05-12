@@ -21,20 +21,38 @@ int unwind__get_entries(unwind_entry_cb_t cb, void *arg,
 /* libunwind specific */
 #ifdef HAVE_LIBUNWIND_SUPPORT
 int libunwind__arch_reg_id(int regnum);
-int unwind__prepare_access(struct thread *thread);
 void unwind__flush_access(struct thread *thread);
 void unwind__finish_access(struct thread *thread);
 void unwind__get_arch(struct thread *thread, struct map *map);
-#else
-static inline int unwind__prepare_access(struct thread *thread __maybe_unused)
-{
-	return 0;
-}
+void register_unwind_libunwind_ops(struct unwind_libunwind_ops *ops,
+				   struct thread *thread);
+void register_null_unwind_libunwind_ops(struct thread *thread);
 
+#ifndef HAVE_LIBUNWIND_LOCAL_SUPPORT
+static inline void
+register_local_unwind_libunwind_ops(struct thread *thread) {
+	register_null_unwind_libunwind_ops(thread);
+}
+#else
+void register_local_unwind_libunwind_ops(struct thread *thread);
+#endif
+
+#define unwind__get_entries(cb, arg,					\
+			    thread,					\
+			    data, max_stack)				\
+	thread->unwind_libunwind_ops->get_entries(cb,			\
+						  arg,			\
+						  thread,		\
+						  data,			\
+						  max_stack)
+
+#else
 static inline void unwind__flush_access(struct thread *thread __maybe_unused) {}
 static inline void unwind__finish_access(struct thread *thread __maybe_unused) {}
 static inline void unwind__get_arch(struct thread *thread __maybe_unused,
 				    struct map *map __maybe_unused) {}
+static inline void
+register_null_unwind_libunwind_ops(struct thread *thread __maybe_unused) {}
 #endif
 #else
 static inline int
@@ -47,14 +65,11 @@ unwind__get_entries(unwind_entry_cb_t cb __maybe_unused,
 	return 0;
 }
 
-static inline int unwind__prepare_access(struct thread *thread __maybe_unused)
-{
-	return 0;
-}
-
 static inline void unwind__flush_access(struct thread *thread __maybe_unused) {}
 static inline void unwind__finish_access(struct thread *thread __maybe_unused) {}
 static inline void unwind__get_arch(struct thread *thread __maybe_unused,
 				    struct map *map __maybe_unused) {}
+static inline void
+register_null_unwind_libunwind_ops(struct thread *thread __maybe_unused) {}
 #endif /* HAVE_DWARF_UNWIND_SUPPORT */
 #endif /* __UNWIND_H */
