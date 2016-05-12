@@ -172,20 +172,22 @@ static void nbd_end_request(struct nbd_device *nbd, struct request *req)
  */
 static void sock_shutdown(struct nbd_device *nbd)
 {
+	struct socket *sock;
+
 	spin_lock_irq(&nbd->sock_lock);
-
-	if (!nbd->sock) {
-		spin_unlock_irq(&nbd->sock_lock);
-		return;
-	}
-
-	dev_warn(disk_to_dev(nbd->disk), "shutting down socket\n");
-	kernel_sock_shutdown(nbd->sock, SHUT_RDWR);
-	sockfd_put(nbd->sock);
+	sock = nbd->sock;
 	nbd->sock = NULL;
 	spin_unlock_irq(&nbd->sock_lock);
 
+	if (!sock)
+		return;
+
 	del_timer(&nbd->timeout_timer);
+
+	dev_warn(disk_to_dev(nbd->disk), "shutting down socket\n");
+	kernel_sock_shutdown(sock, SHUT_RDWR);
+	sockfd_put(sock);
+
 }
 
 static void nbd_xmit_timeout(unsigned long arg)
