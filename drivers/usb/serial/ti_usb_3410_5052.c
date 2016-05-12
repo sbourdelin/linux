@@ -694,7 +694,6 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 	port_number = port->port_number;
 
 	tport->tp_msr = 0;
-	tport->tp_shadow_mcr |= (TI_MCR_RTS | TI_MCR_DTR);
 
 	/* start interrupt urb the first time a port is opened on this device */
 	if (tdev->td_open_port_count == 0) {
