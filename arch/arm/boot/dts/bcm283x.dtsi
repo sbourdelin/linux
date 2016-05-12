@@ -22,6 +22,12 @@
 		#address-cells = <1>;
 		#size-cells = <1>;
 
+		memory-controller@7e002000 {
+			compatible = "brcm,bcm2835-sdram";
+			reg = <0x7e002000 0x58>, <0x7e002800 0x58>;
+			clocks = <&clocks BCM2835_CLOCK_SDRAM>;
+		};
+
 		timer@7e003000 {
 			compatible = "brcm,bcm2835-system-timer";
 			reg = <0x7e003000 0x1000>;
