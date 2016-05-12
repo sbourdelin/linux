@@ -1205,7 +1205,7 @@ static int ti_get_serial_info(struct ti_port *tport,
 	ret_serial.type = PORT_16550A;
 	ret_serial.line = port->minor;
 	ret_serial.port = port->port_number;
-	ret_serial.xmit_fifo_size = kfifo_size(&port->write_fifo);
+	ret_serial.xmit_fifo_size = port->bulk_out_size;
 	ret_serial.baud_base = baud_base;
 	ret_serial.closing_wait = cwait;
 
