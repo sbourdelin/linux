@@ -193,6 +193,56 @@ static unsigned long init_fadump_mem_struct(struct fadump_mem_struct *fdm,
 	return addr;
 }
 
+/*
+ * This function parses command line for fadump_reserve_mem=
+ *
+ * Supports the below two syntaxes:
+ *    1. fadump_reserve_mem=size
+ *    2. fadump_reserve_mem=ramsize-range:size[,...]
+ *
+ * Sets fw_dump.reserve_bootvar with the memory size
+ * provided, 0 otherwise
+ *
+ * The function returns -EINVAL on failure, 0 otherwise.
+ */
+static int __init parse_fadump_reserve_mem(void)
+{
+	char *name = "fadump_reserve_mem=";
+	char *fadump_cmdline = NULL, *cur;
+
+	fw_dump.reserve_bootvar = 0;
+
+	/* find fadump_reserve_mem and use the last one if there are many */
+	cur = strstr(boot_command_line, name);
+	while (cur) {
+		fadump_cmdline = cur;
+		cur = strstr(cur+1, name);
+	}
+
+	/* when no fadump_reserve_mem= cmdline option is provided */
+	if (!fadump_cmdline)
+		return 0;
+
+	fadump_cmdline += strlen(name);
+
+	/* for fadump_reserve_mem=size cmdline syntax */
+	if (!is_param_range_based(fadump_cmdline)) {
+		fw_dump.reserve_bootvar = memparse(fadump_cmdline, NULL);
+		return 0;
+	}
+
+	/* for fadump_reserve_mem=ramsize-range:size[,...] cmdline syntax */
+	cur = fadump_cmdline;
+	fw_dump.reserve_bootvar = parse_mem_range_size("fadump_reserve_mem",
+					&cur, memblock_phys_mem_size());
+	if (cur == fadump_cmdline) {
+		printk(KERN_INFO "fadump_reserve_mem: Invaild syntax!\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 /**
  * fadump_calculate_reserve_size(): reserve variable boot area 5% of System RAM
  *
@@ -212,12 +262,17 @@ static inline unsigned long fadump_calculate_reserve_size(void)
 {
 	unsigned long size;
 
+	/* sets fw_dump.reserve_bootvar */
+	parse_fadump_reserve_mem();
+
 	/*
 	 * Check if the size is specified through fadump_reserve_mem= cmdline
 	 * option. If yes, then use that.
 	 */
 	if (fw_dump.reserve_bootvar)
 		return fw_dump.reserve_bootvar;
+	else
+		printk(KERN_INFO "fadump: calculating default boot size\n");
 
 	/* divide by 20 to get 5% of value */
 	size = memblock_end_of_DRAM() / 20;
@@ -347,15 +402,6 @@ static int __init early_fadump_param(char *p)
 	return 0;
 }
 early_param("fadump", early_fadump_param);
-
-/* Look for fadump_reserve_mem= cmdline option */
-static int __init early_fadump_reserve_mem(char *p)
-{
-	if (p)
-		fw_dump.reserve_bootvar = memparse(p, &p);
-	return 0;
-}
-early_param("fadump_reserve_mem", early_fadump_reserve_mem);
 
 static void register_fw_dump(struct fadump_mem_struct *fdm)
 {
