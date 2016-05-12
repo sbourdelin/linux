@@ -783,21 +783,21 @@ static void stm32_pconf_dbg_show(struct pinctrl_dev *pctldev,
 		drive = stm32_pconf_get_driving(bank, offset);
 		speed = stm32_pconf_get_speed(bank, offset);
 		val = stm32_pconf_output_get(bank, offset);
-		seq_printf(s, "- %s - %s - %s - %s %s",
+		seq_printf(s, "- %s - %s - %s - %s speed",
 			   val ? "high" : "low",
 			   drive ? "open drain" : "push pull",
 			   biasing[bias],
-			   speeds[speed], "speed");
+			   speeds[speed]);
 		break;
 
 	/* alternate */
 	case 2:
 		drive = stm32_pconf_get_driving(bank, offset);
 		speed = stm32_pconf_get_speed(bank, offset);
-		seq_printf(s, "%d - %s -%s", alt,
+		seq_printf(s, "%d - %s -%s - %s speed", alt,
 			   drive ? "open drain" : "push pull",
 			   biasing[bias],
-			   speeds[speed], "speed");
+			   speeds[speed]);
 		break;
 
 	/* analog */
