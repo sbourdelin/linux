@@ -1,6 +1,7 @@
 /*
  * TI 3410/5052 USB Serial Driver
  *
+ * Copyright (C) 2016 Mathieu Othacehe <m.othacehe@gmail.com>
  * Copyright (C) 2004 Texas Instruments
  *
  * This driver is based on the Linux io_ti driver, which is
@@ -256,7 +257,7 @@ struct ti_firmware_header {
 #define TI_UART_OFFSET_LCR		0x0002	/* UART MCR register offset */
 #define TI_UART_OFFSET_MCR		0x0004	/* UART MCR register offset */
 
-#define TI_DRIVER_AUTHOR	"Al Borchers <alborchers@steinerpoint.com>"
+#define TI_DRIVER_AUTHOR	"Al Borchers <alborchers@steinerpoint.com>, Mathieu OTHACEHE <m.othacehe@gmail.com>"
 #define TI_DRIVER_DESC		"TI USB 3410/5052 Serial Driver"
 
 #define TI_3410_BAUD_BASE       923077
