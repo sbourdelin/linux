@@ -274,8 +274,6 @@ struct ti_port {
 	u8			tp_shadow_mcr;
 	u8			tp_uart_mode;	/* 232 or 485 modes */
 	unsigned int		tp_uart_base_addr;
-	struct ti_device	*tp_tdev;
-	struct usb_serial_port	*tp_port;
 	spinlock_t		tp_lock;
 };
 
@@ -304,8 +302,8 @@ static int ti_tiocmset(struct tty_struct *tty,
 static void ti_break(struct tty_struct *tty, int break_state);
 static void ti_interrupt_callback(struct urb *urb);
 
-static int ti_set_mcr(struct ti_port *tport, unsigned int mcr);
-static int ti_get_lsr(struct ti_port *tport, u8 *lsr);
+static int ti_set_mcr(struct usb_serial_port *port, unsigned int mcr);
+static int ti_get_lsr(struct usb_serial_port *port, u8 *lsr);
 static void ti_handle_new_msr(struct usb_serial_port *port, u8 msr);
 static int ti_download_firmware(struct usb_serial *serial);
 
@@ -631,6 +629,7 @@ static void ti_release(struct usb_serial *serial)
 static int ti_port_probe(struct usb_serial_port *port)
 {
 	struct ti_port *tport;
+	struct ti_device *tdev;
 
 	tport = kzalloc(sizeof(*tport), GFP_KERNEL);
 	if (!tport)
@@ -642,10 +641,9 @@ static int ti_port_probe(struct usb_serial_port *port)
 	else
 		tport->tp_uart_base_addr = TI_UART2_BASE_ADDR;
 
-	tport->tp_port = port;
-	tport->tp_tdev = usb_get_serial_data(port->serial);
+	tdev = usb_get_serial_data(port->serial);
 
-	if (tport->tp_tdev->td_rs485_only)
+	if (tdev->td_rs485_only)
 		tport->tp_uart_mode = TI_UART_485_RECEIVER_DISABLED;
 	else
 		tport->tp_uart_mode = TI_UART_232;
@@ -672,8 +670,8 @@ static int ti_port_remove(struct usb_serial_port *port)
 static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 {
 	struct ti_port *tport = usb_get_serial_port_data(port);
+	struct ti_device *tdev = usb_get_serial_data(port->serial);
 	struct usb_serial *serial = port->serial;
-	struct ti_device *tdev;
 	struct urb *urb;
 	int port_number;
 	int status;
@@ -682,8 +680,6 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 	open_settings = (TI_PIPE_MODE_CONTINUOUS |
 			 TI_PIPE_TIMEOUT_ENABLE |
 			 (TI_TRANSFER_TIMEOUT << 2));
-
-	tdev = tport->tp_tdev;
 
 	/* only one open on any port on a device at a time */
 	if (mutex_lock_interruptible(&tdev->td_open_close_lock))
@@ -804,11 +800,11 @@ static void ti_close(struct usb_serial_port *port)
 
 	/* if mutex_lock is interrupted, continue anyway */
 	do_unlock = !mutex_lock_interruptible(&tdev->td_open_close_lock);
-	--tport->tp_tdev->td_open_port_count;
-	if (tport->tp_tdev->td_open_port_count <= 0) {
+	tdev->td_open_port_count--;
+	if (tdev->td_open_port_count <= 0) {
 		/* last port is closed, shut down interrupt urb */
 		usb_kill_urb(port->serial->port[0]->interrupt_in_urb);
-		tport->tp_tdev->td_open_port_count = 0;
+		tdev->td_open_port_count = 0;
 	}
 	if (do_unlock)
 		mutex_unlock(&tdev->td_open_close_lock);
@@ -816,11 +812,10 @@ static void ti_close(struct usb_serial_port *port)
 
 static bool ti_tx_empty(struct usb_serial_port *port)
 {
-	struct ti_port *tport = usb_get_serial_port_data(port);
 	int ret;
 	u8 lsr;
 
-	ret = ti_get_lsr(tport, &lsr);
+	ret = ti_get_lsr(port, &lsr);
 	if (!ret && !(lsr & TI_LSR_TX_EMPTY))
 		return false;
 
@@ -901,6 +896,7 @@ static void ti_set_termios(struct tty_struct *tty,
 		struct usb_serial_port *port, struct ktermios *old_termios)
 {
 	struct ti_port *tport = usb_get_serial_port_data(port);
+	struct ti_device *tdev = usb_get_serial_data(port->serial);
 	struct ti_uart_config *config;
 	tcflag_t cflag, iflag;
 	int baud;
@@ -995,7 +991,7 @@ static void ti_set_termios(struct tty_struct *tty,
 	baud = tty_get_baud_rate(tty);
 	if (!baud)
 		baud = 9600;
-	if (tport->tp_tdev->td_is_3410)
+	if (tdev->td_is_3410)
 		config->wBaudRate = (TI_3410_BAUD_BASE + baud / 2) / baud;
 	else
 		config->wBaudRate = (TI_5052_BAUD_BASE + baud / 2) / baud;
@@ -1029,7 +1025,7 @@ static void ti_set_termios(struct tty_struct *tty,
 	else if (old_termios && (old_termios->c_cflag & CBAUD) == B0)
 		mcr |= TI_MCR_DTR | TI_MCR_RTS;
 
-	status = ti_set_mcr(tport, mcr);
+	status = ti_set_mcr(port, mcr);
 	if (status) {
 		dev_err(&port->dev,
 			"cannot set modem control on port %d: %d\n",
@@ -1094,7 +1090,7 @@ static int ti_tiocmset(struct tty_struct *tty,
 		mcr &= ~TI_MCR_LOOP;
 	spin_unlock_irqrestore(&tport->tp_lock, flags);
 
-	return ti_set_mcr(tport, mcr);
+	return ti_set_mcr(port, mcr);
 }
 
 
@@ -1184,14 +1180,15 @@ exit:
 			status);
 }
 
-static int ti_set_mcr(struct ti_port *tport, unsigned int mcr)
+static int ti_set_mcr(struct usb_serial_port *port, unsigned int mcr)
 {
+	struct ti_port *tport = usb_get_serial_port_data(port);
 	unsigned long flags;
 	int status;
 
-	status = ti_write_byte(tport->tp_port,
-		tport->tp_uart_base_addr + TI_UART_OFFSET_MCR,
-		TI_MCR_RTS | TI_MCR_DTR | TI_MCR_LOOP, mcr);
+	status = ti_write_byte(port,
+			       tport->tp_uart_base_addr + TI_UART_OFFSET_MCR,
+			       TI_MCR_RTS | TI_MCR_DTR | TI_MCR_LOOP, mcr);
 
 	spin_lock_irqsave(&tport->tp_lock, flags);
 	if (!status)
@@ -1202,10 +1199,9 @@ static int ti_set_mcr(struct ti_port *tport, unsigned int mcr)
 }
 
 
-static int ti_get_lsr(struct ti_port *tport, u8 *lsr)
+static int ti_get_lsr(struct usb_serial_port *port, u8 *lsr)
 {
 	int size, status;
-	struct usb_serial_port *port = tport->tp_port;
 	int port_number = port->port_number;
 	struct ti_port_status *data;
 
