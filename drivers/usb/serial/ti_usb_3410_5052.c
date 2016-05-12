@@ -1316,7 +1316,10 @@ static int ti_download_firmware(struct usb_serial *serial)
 	struct ti_device *tdev = usb_get_serial_data(serial);
 	const struct firmware *fw_p;
 	char buf[32];
+	__le16 vendor, product;
 
+	vendor = le16_to_cpu(dev->descriptor.idVendor);
+	product = le16_to_cpu(dev->descriptor.idProduct);
 
 	if (le16_to_cpu(dev->descriptor.idVendor) == MXU1_VENDOR_ID) {
 		snprintf(buf,
@@ -1329,15 +1332,13 @@ static int ti_download_firmware(struct usb_serial *serial)
 	}
 
 	/* try ID specific firmware first, then try generic firmware */
-	sprintf(buf, "ti_usb-v%04x-p%04x.fw",
-			le16_to_cpu(dev->descriptor.idVendor),
-			le16_to_cpu(dev->descriptor.idProduct));
+	sprintf(buf, "ti_usb-v%04x-p%04x.fw", vendor, product);
 	status = request_firmware(&fw_p, buf, &dev->dev);
 
 	if (status != 0) {
 		buf[0] = '\0';
-		if (le16_to_cpu(dev->descriptor.idVendor) == MTS_VENDOR_ID) {
-			switch (le16_to_cpu(dev->descriptor.idProduct)) {
+		if (vendor == MTS_VENDOR_ID) {
+			switch (product) {
 			case MTS_CDMA_PRODUCT_ID:
 				strcpy(buf, "mts_cdma.fw");
 				break;
@@ -1357,6 +1358,7 @@ static int ti_download_firmware(struct usb_serial *serial)
 				strcpy(buf, "mts_mt9234zba.fw");
 				break;			}
 		}
+
 		if (buf[0] == '\0') {
 			if (tdev->td_is_3410)
 				strcpy(buf, "ti_3410.fw");
