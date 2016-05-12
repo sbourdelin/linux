@@ -265,18 +265,13 @@ struct ti_firmware_header {
 
 #define TI_DEFAULT_CLOSING_WAIT	4000		/* in .01 secs */
 
-/* supported setserial flags */
-#define TI_SET_SERIAL_FLAGS	0
-
 #define TI_EXTRA_VID_PID_COUNT	5
 
 struct ti_port {
-	int			tp_is_open;
 	u8			tp_msr;
 	u8			tp_shadow_mcr;
 	u8			tp_uart_mode;	/* 232 or 485 modes */
 	unsigned int		tp_uart_base_addr;
-	int			tp_flags;
 	struct ti_device	*tp_tdev;
 	struct usb_serial_port	*tp_port;
 	spinlock_t		tp_lock;
@@ -705,7 +700,6 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 		goto unlink_int_urb;
 	}
 
-	tport->tp_is_open = 1;
 	++tdev->td_open_port_count;
 
 	goto release_lock;
@@ -730,8 +724,6 @@ static void ti_close(struct usb_serial_port *port)
 
 	tdev = usb_get_serial_data(port->serial);
 	tport = usb_get_serial_port_data(port);
-
-	tport->tp_is_open = 0;
 
 	usb_kill_urb(port->read_urb);
 	usb_kill_urb(port->write_urb);
@@ -1017,11 +1009,9 @@ static void ti_interrupt_callback(struct urb *urb)
 	case -ENOENT:
 	case -ESHUTDOWN:
 		dev_dbg(dev, "%s - urb shutting down, %d\n", __func__, status);
-		tdev->td_urb_error = 1;
 		return;
 	default:
 		dev_err(dev, "%s - nonzero urb status, %d\n", __func__, status);
-		tdev->td_urb_error = 1;
 		goto exit;
 	}
 
@@ -1146,7 +1136,6 @@ static int ti_get_serial_info(struct ti_port *tport,
 	ret_serial.type = PORT_16550A;
 	ret_serial.line = port->minor;
 	ret_serial.port = port->port_number;
-	ret_serial.flags = tport->tp_flags;
 	ret_serial.xmit_fifo_size = kfifo_size(&port->write_fifo);
 	ret_serial.baud_base = tport->tp_tdev->td_is_3410 ? 921600 : 460800;
 	ret_serial.closing_wait = cwait;
@@ -1171,7 +1160,6 @@ static int ti_set_serial_info(struct tty_struct *tty, struct ti_port *tport,
 	if (cwait != ASYNC_CLOSING_WAIT_NONE)
 		cwait = msecs_to_jiffies(10 * new_serial.closing_wait);
 
-	tport->tp_flags = new_serial.flags & TI_SET_SERIAL_FLAGS;
 	tport->tp_port->port.closing_wait = cwait;
 
 	return 0;
