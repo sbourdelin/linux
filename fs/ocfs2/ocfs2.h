@@ -472,6 +472,13 @@ struct ocfs2_super
 	 * workqueue and schedule on our own.
 	 */
 	struct workqueue_struct *ocfs2_wq;
+
+	/* file check */
+	struct list_head file_check_entries;
+	unsigned int fc_size;
+	unsigned int fc_max;
+	unsigned int fc_done;
+	spinlock_t fc_lock;
 };
 
 #define OCFS2_SB(sb)	    ((struct ocfs2_super *)(sb)->s_fs_info)

@@ -42,8 +42,18 @@ enum {
 
 #define OCFS2_FILECHECK_ERR_START	OCFS2_FILECHECK_ERR_FAILED
 #define OCFS2_FILECHECK_ERR_END		OCFS2_FILECHECK_ERR_UNSUPPORTED
+#define OCFS2_FILECHECK_MAXSIZE         100
+#define OCFS2_FILECHECK_MINSIZE         10
+
+/* File check operation type */
+#define OCFS2_FILECHECK_TYPE_CHK  	1   /* Check a file(inode) */
+#define OCFS2_FILECHECK_TYPE_FIX  	2   /* Fix a file(inode) */
 
 int ocfs2_filecheck_create_sysfs(struct super_block *sb);
 int ocfs2_filecheck_remove_sysfs(struct super_block *sb);
+int ocfs2_filefix_inode(struct ocfs2_super *osb, unsigned long ino);
+int ocfs2_filecheck_add_inode(struct ocfs2_super *osb, unsigned long ino);
+int ocfs2_filecheck_set_max_entries(struct ocfs2_super *osb, int num);
+int ocfs2_filecheck_show(struct ocfs2_super *osb, unsigned int type, char *buf);
 
 #endif  /* FILECHECK_H */

@@ -2212,6 +2212,13 @@ static int ocfs2_initialize_super(struct super_block *sb,
 
 	get_random_bytes(&osb->s_next_generation, sizeof(u32));
 
+	/* file check information */
+	INIT_LIST_HEAD(&osb->file_check_entries);
+	osb->fc_max = OCFS2_FILECHECK_MINSIZE;
+	osb->fc_size = 0;
+	osb->fc_done = 0;
+	spin_lock_init(&osb->fc_lock);
+
 	/* FIXME
 	 * This should be done in ocfs2_journal_init(), but unknown
 	 * ordering issues will cause the filesystem to crash.
