@@ -114,6 +114,15 @@ static u_char id_bytes[8] = {
 	[3] = CONFIG_NANDSIM_FOURTH_ID_BYTE,
 	[4 ... 7] = 0xFF,
 };
+static unsigned int approx[3];
+
+static struct nand_onfi_params id_onfi = {
+	.sig = {'O', 'N', 'F', 'I'},
+	.manufacturer = "nandsim     ",
+	.model = "nandsim            ",
+};
+
+static unsigned char *id_p;
 
 module_param_array(id_bytes, byte, NULL, 0400);
 module_param_named(first_id_byte, id_bytes[0], byte, 0400);
@@ -139,6 +148,7 @@ module_param(overridesize,   uint, 0400);
 module_param(cache_file,     charp, 0400);
 module_param(bbt,	     uint, 0400);
 module_param(bch,	     uint, 0400);
+module_param_array(approx, uint, NULL, 0400);
 
 MODULE_PARM_DESC(id_bytes,       "The ID bytes returned by NAND Flash 'read ID' command");
 MODULE_PARM_DESC(first_id_byte,  "The first byte returned by NAND Flash 'read ID' command (manufacturer ID) (obsolete)");
@@ -174,6 +184,10 @@ MODULE_PARM_DESC(cache_file,     "File to use to cache nand pages instead of mem
 MODULE_PARM_DESC(bbt,		 "0 OOB, 1 BBT with marker in OOB, 2 BBT with marker in data area");
 MODULE_PARM_DESC(bch,		 "Enable BCH ecc and set how many bits should "
 				 "be correctable in 512-byte blocks");
+MODULE_PARM_DESC(approx,	 "Approximation mode, simulate a good enough NAND that satisfies"
+				 " page size, block size and number of blocks."
+				 " e.g. 4096,128,8192 will give you a NAND with 4KiB page size, 128 pages per"
+				 " block and 8192 blocks in total.");
 
 /* The largest possible page size */
 #define NS_LARGEST_PAGE_SIZE	4096
@@ -229,6 +243,7 @@ MODULE_PARM_DESC(bch,		 "Enable BCH ecc and set how many bits should "
 #define STATE_CMD_RESET        0x0000000C /* reset */
 #define STATE_CMD_RNDOUT       0x0000000D /* random output command */
 #define STATE_CMD_RNDOUTSTART  0x0000000E /* random output start command */
+#define STATE_CMD_PARAM        0x0000000F /* param output start command */
 #define STATE_CMD_MASK         0x0000000F /* command states mask */
 
 /* After an address is input, the simulator goes to one of these states */
@@ -245,7 +260,8 @@ MODULE_PARM_DESC(bch,		 "Enable BCH ecc and set how many bits should "
 #define STATE_DATAOUT          0x00001000 /* waiting for page data output */
 #define STATE_DATAOUT_ID       0x00002000 /* waiting for ID bytes output */
 #define STATE_DATAOUT_STATUS   0x00003000 /* waiting for status output */
-#define STATE_DATAOUT_MASK     0x00007000 /* data output states mask */
+#define STATE_DATAOUT_ONFI    0x00007000 /* waiting for ONFI output */
+#define STATE_DATAOUT_MASK     0x0000F000 /* data output states mask */
 
 /* Previous operation is done, ready to accept new requests */
 #define STATE_READY            0x00000000
@@ -307,7 +323,6 @@ struct nandsim {
 	unsigned int nbparts;
 
 	uint busw;              /* flash chip bus width (8 or 16) */
-	u_char ids[8];          /* chip's ID bytes */
 	uint32_t options;       /* chip's characteristic bits */
 	uint32_t state;         /* current chip state */
 	uint32_t nxstate;       /* next expected state */
@@ -408,6 +423,8 @@ static struct nandsim_operations {
 	{OPT_ANY, {STATE_CMD_STATUS, STATE_DATAOUT_STATUS, STATE_READY}},
 	/* Read ID */
 	{OPT_ANY, {STATE_CMD_READID, STATE_ADDR_ZERO, STATE_DATAOUT_ID, STATE_READY}},
+	/* Read param */
+	{OPT_ANY, {STATE_CMD_PARAM, STATE_ADDR_ZERO, STATE_DATAOUT_ONFI, STATE_READY}},
 	/* Large page devices read page */
 	{OPT_LARGEPAGE, {STATE_CMD_READ0, STATE_ADDR_PAGE, STATE_CMD_READSTART | ACTION_CPY,
 			       STATE_DATAOUT, STATE_READY}},
@@ -1077,6 +1094,8 @@ static char *get_state_name(uint32_t state)
 			return "STATE_CMD_RNDOUT";
 		case STATE_CMD_RNDOUTSTART:
 			return "STATE_CMD_RNDOUTSTART";
+		case STATE_CMD_PARAM:
+			return "STATE_CMD_PARAM";
 		case STATE_ADDR_PAGE:
 			return "STATE_ADDR_PAGE";
 		case STATE_ADDR_SEC:
@@ -1125,6 +1144,7 @@ static int check_command(int cmd)
 	case NAND_CMD_RESET:
 	case NAND_CMD_RNDOUT:
 	case NAND_CMD_RNDOUTSTART:
+	case NAND_CMD_PARAM:
 		return 0;
 
 	default:
@@ -1164,6 +1184,8 @@ static uint32_t get_state_by_command(unsigned command)
 			return STATE_CMD_RNDOUT;
 		case NAND_CMD_RNDOUTSTART:
 			return STATE_CMD_RNDOUTSTART;
+		case NAND_CMD_PARAM:
+			return STATE_CMD_PARAM;
 	}
 
 	NS_ERR("get_state_by_command: unknown command, BUG\n");
@@ -1856,9 +1878,17 @@ static void switch_state(struct nandsim *ns)
 				break;
 
 			case STATE_DATAOUT_ID:
-				ns->regs.num = ns->geom.idbytes;
+				if (ns->regs.row == 0x20) {
+					ns->regs.num = sizeof(id_onfi.sig);
+					id_p = (unsigned char *)id_onfi.sig;
+				} else {
+					ns->regs.num = ns->geom.idbytes;
+					id_p = (unsigned char *)id_bytes;
+				}
 				break;
-
+			case STATE_DATAOUT_ONFI:
+				ns->regs.num = sizeof(id_onfi);
+				break;
 			case STATE_DATAOUT_STATUS:
 				ns->regs.count = ns->regs.num = 0;
 				break;
@@ -1951,7 +1981,11 @@ static u_char ns_nand_read_byte(struct mtd_info *mtd)
 			break;
 		case STATE_DATAOUT_ID:
 			NS_DBG("read_byte: read ID byte %d, total = %d\n", ns->regs.count, ns->regs.num);
-			outb = ns->ids[ns->regs.count];
+			outb = id_p[ns->regs.count];
+			ns->regs.count += 1;
+			break;
+		case STATE_DATAOUT_ONFI:
+			outb = ((unsigned char *)&id_onfi)[ns->regs.count];
 			ns->regs.count += 1;
 			break;
 		default:
@@ -2289,10 +2323,26 @@ static int __init ns_init_module(void)
 		nand->geom.idbytes = 4;
 	else
 		nand->geom.idbytes = 2;
+
+	if (approx[0] && approx[1] && approx[2]) {
+		id_onfi.byte_per_page = cpu_to_le32(approx[0]);
+		id_onfi.pages_per_block = cpu_to_le32(approx[1]);
+		id_onfi.blocks_per_lun = cpu_to_le32(approx[2]);
+
+		id_onfi.spare_bytes_per_page = cpu_to_le32(128);
+		id_onfi.lun_count = cpu_to_le32(1);
+		id_onfi.bits_per_cell = cpu_to_le32(1);
+		id_onfi.revision = cpu_to_le32(1 << 5);
+		id_onfi.crc = cpu_to_le16(nand_onfi_crc16(ONFI_CRC_BASE, (uint8_t *)&id_onfi,
+					  sizeof(id_onfi) - sizeof(id_onfi.crc)));
+
+		nand->geom.idbytes = 2;
+		id_bytes[0] = id_bytes[1] = 0xFF;
+	}
+
 	nand->regs.status = NS_STATUS_OK(nand);
 	nand->nxstate = STATE_UNKNOWN;
 	nand->options |= OPT_PAGE512; /* temporary value */
-	memcpy(nand->ids, id_bytes, sizeof(nand->ids));
 	if (bus_width == 16) {
 		nand->busw = 16;
 		chip->options |= NAND_BUSWIDTH_16;

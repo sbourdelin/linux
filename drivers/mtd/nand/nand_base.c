@@ -3208,7 +3208,7 @@ static void sanitize_string(uint8_t *s, size_t len)
 	strim(s);
 }
 
-static u16 onfi_crc16(u16 crc, u8 const *p, size_t len)
+u16 nand_onfi_crc16(u16 crc, u8 const *p, size_t len)
 {
 	int i;
 	while (len--) {
@@ -3246,7 +3246,7 @@ static int nand_flash_detect_ext_param_page(struct mtd_info *mtd,
 
 	/* Read out the Extended Parameter Page. */
 	chip->read_buf(mtd, (uint8_t *)ep, len);
-	if ((onfi_crc16(ONFI_CRC_BASE, ((uint8_t *)ep) + 2, len - 2)
+	if ((nand_onfi_crc16(ONFI_CRC_BASE, ((uint8_t *)ep) + 2, len - 2)
 		!= le16_to_cpu(ep->crc))) {
 		pr_debug("fail in the CRC.\n");
 		goto ext_out;
@@ -3328,14 +3328,16 @@ static int nand_flash_detect_onfi(struct mtd_info *mtd, struct nand_chip *chip,
 	/* Try ONFI for unknown chip or LP */
 	chip->cmdfunc(mtd, NAND_CMD_READID, 0x20, -1);
 	if (chip->read_byte(mtd) != 'O' || chip->read_byte(mtd) != 'N' ||
-		chip->read_byte(mtd) != 'F' || chip->read_byte(mtd) != 'I')
+		chip->read_byte(mtd) != 'F' || chip->read_byte(mtd) != 'I') {
+
 		return 0;
+	}
 
 	chip->cmdfunc(mtd, NAND_CMD_PARAM, 0, -1);
 	for (i = 0; i < 3; i++) {
 		for (j = 0; j < sizeof(*p); j++)
 			((uint8_t *)p)[j] = chip->read_byte(mtd);
-		if (onfi_crc16(ONFI_CRC_BASE, (uint8_t *)p, 254) ==
+		if (nand_onfi_crc16(ONFI_CRC_BASE, (uint8_t *)p, 254) ==
 				le16_to_cpu(p->crc)) {
 			break;
 		}
@@ -3442,7 +3444,7 @@ static int nand_flash_detect_jedec(struct mtd_info *mtd, struct nand_chip *chip,
 		for (j = 0; j < sizeof(*p); j++)
 			((uint8_t *)p)[j] = chip->read_byte(mtd);
 
-		if (onfi_crc16(ONFI_CRC_BASE, (uint8_t *)p, 510) ==
+		if (nand_onfi_crc16(ONFI_CRC_BASE, (uint8_t *)p, 510) ==
 				le16_to_cpu(p->crc))
 			break;
 	}

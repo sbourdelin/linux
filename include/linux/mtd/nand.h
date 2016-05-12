@@ -50,6 +50,9 @@ extern int nand_lock(struct mtd_info *mtd, loff_t ofs, uint64_t len);
 /* unlocks specified locked blocks */
 extern int nand_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len);
 
+/* calculate ONFI CRC */
+extern u16 nand_onfi_crc16(u16 crc, u8 const *p, size_t len);
+
 /* The maximum number of NAND chips in an array */
 #define NAND_MAX_CHIPS		8
 
