@@ -5,6 +5,7 @@
 #include "../../util/unwind.h"
 #include "../../util/debug.h"
 
+#ifndef LIBUNWIND_X86_32
 #ifdef HAVE_ARCH_X86_64_SUPPORT
 int libunwind__arch_reg_id(int regnum)
 {
@@ -110,3 +111,44 @@ int libunwind__arch_reg_id(int regnum)
 	return id;
 }
 #endif /* HAVE_ARCH_X86_64_SUPPORT */
+#else
+int libunwind__x86_reg_id(int regnum)
+{
+	int id;
+
+	switch (regnum) {
+	case UNW_X86_EAX:
+		id = PERF_REG_X86_AX;
+		break;
+	case UNW_X86_EDX:
+		id = PERF_REG_X86_DX;
+		break;
+	case UNW_X86_ECX:
+		id = PERF_REG_X86_CX;
+		break;
+	case UNW_X86_EBX:
+		id = PERF_REG_X86_BX;
+		break;
+	case UNW_X86_ESI:
+		id = PERF_REG_X86_SI;
+		break;
+	case UNW_X86_EDI:
+		id = PERF_REG_X86_DI;
+		break;
+	case UNW_X86_EBP:
+		id = PERF_REG_X86_BP;
+		break;
+	case UNW_X86_ESP:
+		id = PERF_REG_X86_SP;
+		break;
+	case UNW_X86_EIP:
+		id = PERF_REG_X86_IP;
+		break;
+	default:
+		pr_err("unwind: invalid reg id %d\n", regnum);
+		return -EINVAL;
+	}
+
+	return id;
+}
+#endif /* LIBUNWIND_X86_32 */
