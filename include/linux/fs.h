@@ -1419,6 +1419,8 @@ struct super_block {
 	/* s_inode_list_lock protects s_inodes */
 	spinlock_t		s_inode_list_lock ____cacheline_aligned_in_smp;
 	struct list_head	s_inodes;	/* all inodes */
+	struct kobject		s_kobj;	    /* kobject to create /sys/fs/<type>/<s_id> */
+	struct completion	s_kobj_del; /* Wait for kobjects deletion */
 };
 
 extern struct timespec current_fs_time(struct super_block *sb);

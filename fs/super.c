@@ -414,6 +414,9 @@ void generic_shutdown_super(struct super_block *sb)
 		sync_filesystem(sb);
 		sb->s_flags &= ~MS_ACTIVE;
 
+		if (sb->s_type->sb_ktype)
+			kobject_put(&sb->s_kobj);
+
 		fsnotify_unmount_inodes(sb);
 		cgroup_writeback_umount();
 
@@ -426,6 +429,9 @@ void generic_shutdown_super(struct super_block *sb)
 
 		if (sop->put_super)
 			sop->put_super(sb);
+
+		if (sb->s_type->sb_ktype)
+			wait_for_completion(&sb->s_kobj_del);
 
 		if (!list_empty(&sb->s_inodes)) {
 			printk("VFS: Busy inodes after unmount of %s. "
@@ -1020,6 +1026,18 @@ struct dentry *mount_bdev(struct file_system_type *fs_type,
 		if (error) {
 			deactivate_locked_super(s);
 			goto error;
+		}
+
+		if (fs_type->sb_ktype) {
+			s->s_kobj.kset = fs_type->kset;
+			init_completion(&s->s_kobj_del);
+			error = kobject_init_and_add(&s->s_kobj,
+					fs_type->sb_ktype,
+					NULL, "%s", s->s_id);
+			if (error) {
+				deactivate_locked_super(s);
+				goto error;
+			}
 		}
 
 		s->s_flags |= MS_ACTIVE;
