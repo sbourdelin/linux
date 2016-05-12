@@ -312,10 +312,6 @@ static int ti_get_serial_info(struct ti_port *tport,
 static int ti_set_serial_info(struct tty_struct *tty, struct ti_port *tport,
 	struct serial_struct __user *new_arg);
 static void ti_handle_new_msr(struct ti_port *tport, u8 msr);
-
-static int ti_write_byte(struct usb_serial_port *port, struct ti_device *tdev,
-			 unsigned long addr, u8 mask, u8 byte);
-
 static int ti_download_firmware(struct ti_device *tdev);
 
 static const struct usb_device_id ti_id_table_3410[] = {
@@ -520,6 +516,39 @@ static int ti_recv_ctrl_data_urb(struct usb_serial *serial, u8 request,
 	}
 
 	return 0;
+}
+
+static int ti_write_byte(struct usb_serial_port *port, u32 addr,
+			u8 mask, u8 byte)
+{
+	int status;
+	size_t size;
+	struct ti_write_data_bytes *data;
+
+	dev_dbg(&port->dev, "%s - addr 0x%08X, mask 0x%02X, byte 0x%02X\n",
+		__func__, addr, mask, byte);
+
+	size = sizeof(struct ti_write_data_bytes) + 2;
+	data = kmalloc(size, GFP_KERNEL);
+	if (!data)
+		return -ENOMEM;
+
+	data->bAddrType = TI_RW_DATA_ADDR_XDATA;
+	data->bDataType = TI_RW_DATA_BYTE;
+	data->bDataCounter = 1;
+	data->wBaseAddrHi = cpu_to_be16(addr >> 16);
+	data->wBaseAddrLo = cpu_to_be16(addr);
+	data->bData[0] = mask;
+	data->bData[1] = byte;
+
+	status = ti_send_ctrl_data_urb(port->serial, TI_WRITE_DATA, 0,
+				       TI_RAM_PORT, data, size);
+	if (status < 0)
+		dev_err(&port->dev, "%s - failed, %d\n", __func__, status);
+
+	kfree(data);
+
+	return status;
 }
 
 static int ti_startup(struct usb_serial *serial)
@@ -1042,10 +1071,9 @@ static void ti_break(struct tty_struct *tty, int break_state)
 	struct ti_port *tport = usb_get_serial_port_data(port);
 	int status;
 
-	status = ti_write_byte(port, tport->tp_tdev,
+	status = ti_write_byte(port,
 		tport->tp_uart_base_addr + TI_UART_OFFSET_LCR,
 		TI_LCR_BREAK, break_state == -1 ? TI_LCR_BREAK : 0);
-
 	if (status)
 		dev_dbg(&port->dev, "%s - error setting break, %d\n", __func__, status);
 }
@@ -1136,7 +1164,7 @@ static int ti_set_mcr(struct ti_port *tport, unsigned int mcr)
 	unsigned long flags;
 	int status;
 
-	status = ti_write_byte(tport->tp_port, tport->tp_tdev,
+	status = ti_write_byte(tport->tp_port,
 		tport->tp_uart_base_addr + TI_UART_OFFSET_MCR,
 		TI_MCR_RTS | TI_MCR_DTR | TI_MCR_LOOP, mcr);
 
@@ -1258,40 +1286,6 @@ static void ti_handle_new_msr(struct ti_port *tport, u8 msr)
 	}
 
 	tport->tp_msr = msr & TI_MSR_MASK;
-}
-
-static int ti_write_byte(struct usb_serial_port *port,
-			 struct ti_device *tdev, unsigned long addr,
-			 u8 mask, u8 byte)
-{
-	int status;
-	unsigned int size;
-	struct ti_write_data_bytes *data;
-
-	dev_dbg(&port->dev, "%s - addr 0x%08lX, mask 0x%02X, byte 0x%02X\n", __func__,
-		addr, mask, byte);
-
-	size = sizeof(struct ti_write_data_bytes) + 2;
-	data = kmalloc(size, GFP_KERNEL);
-	if (!data)
-		return -ENOMEM;
-
-	data->bAddrType = TI_RW_DATA_ADDR_XDATA;
-	data->bDataType = TI_RW_DATA_BYTE;
-	data->bDataCounter = 1;
-	data->wBaseAddrHi = cpu_to_be16(addr>>16);
-	data->wBaseAddrLo = cpu_to_be16(addr);
-	data->bData[0] = mask;
-	data->bData[1] = byte;
-
-	status = ti_send_ctrl_data_urb(port->serial, TI_WRITE_DATA, 0,
-				       TI_RAM_PORT, data, size);
-	if (status < 0)
-		dev_err(&port->dev, "%s - failed, %d\n", __func__, status);
-
-	kfree(data);
-
-	return status;
 }
 
 static int ti_do_download(struct usb_device *dev, int pipe,
