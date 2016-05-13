@@ -1358,6 +1358,10 @@ int perf_session__deliver_synth_event(struct perf_session *session,
 {
 	struct perf_evlist *evlist = session->evlist;
 	struct perf_tool *tool = session->tool;
+	u8 mode = event->header.misc & PERF_RECORD_MISC_CPUMODE_MASK;
+
+	if (sample)
+		sample->cpumode = mode;
 
 	events_stats__inc(&evlist->stats, event->header.type);
 
