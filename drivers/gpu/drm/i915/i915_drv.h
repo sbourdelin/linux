@@ -751,7 +751,7 @@ struct intel_csr {
 	func(has_ddi) sep \
 	func(has_fpga_dbg)
 
-#define DEFINE_FLAG(name) u8 name:1
+#define DEFINE_FLAG(name) bool name:1
 #define SEP_SEMICOLON ;
 
 struct intel_device_info {
