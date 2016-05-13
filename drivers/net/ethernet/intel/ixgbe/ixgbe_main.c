@@ -9413,6 +9413,10 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		indices = IXGBE_MAX_RSS_INDICES;
 #endif
 	}
+	/* Don't allocate too more queues than online cpus number */
+	indices = min_t(int, indices, num_online_cpus());
+	/* To make sure TC works, allocate at least 1 queue per TC */
+	indices = max_t(int, indices, MAX_TRAFFIC_CLASS);
 
 	netdev = alloc_etherdev_mq(sizeof(struct ixgbe_adapter), indices);
 	if (!netdev) {
