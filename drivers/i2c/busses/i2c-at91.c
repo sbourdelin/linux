@@ -1013,7 +1013,9 @@ static int at91_twi_configure_dma(struct at91_twi_dev *dev, u32 phy_addr)
 
 error:
 	if (ret != -EPROBE_DEFER)
-		dev_info(dev->dev, "can't use DMA, error %d\n", ret);
+		dev_info(dev->dev,
+			 "can't request DMA channels, continue without DMA support\n",
+			 ret);
 	if (dma->chan_rx)
 		dma_release_channel(dma->chan_rx);
 	if (dma->chan_tx)
