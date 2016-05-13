@@ -608,6 +608,18 @@ static ssize_t msg_print_ext_body(char *buf, size_t size,
 	return p - buf;
 }
 
+#if defined(CONFIG_PRINTK_APPEND_UNAME)
+static ssize_t msg_print_ext_uname(char *buf, size_t size)
+{
+	return scnprintf(buf, size, " UNAME=%s\n", init_utsname()->release);
+}
+#else
+static ssize_t msg_print_ext_uname(char *buf, size_t size)
+{
+	return 0;
+}
+#endif
+
 /* /dev/kmsg - userspace message inject/listen interface */
 struct devkmsg_user {
 	u64 seq;
@@ -2305,6 +2317,8 @@ skip:
 						sizeof(ext_text) - ext_len,
 						log_dict(msg), msg->dict_len,
 						log_text(msg), msg->text_len);
+			ext_len += msg_print_ext_uname(ext_text + ext_len,
+						sizeof(ext_text) - ext_len);
 		}
 		console_idx = log_next(console_idx);
 		console_seq++;

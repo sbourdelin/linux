@@ -1454,6 +1454,14 @@ config PRINTK
 	  very difficult to diagnose system problems, saying N here is
 	  strongly discouraged.
 
+config PRINTK_APPEND_UNAME
+	default n
+	bool "Append the kernel version to the printk() dict" if EXPERT
+	help
+	  This option causes the printk() implementation to append the kernel
+	  version for extended console messages. This can be very useful for
+	  monitoring a large deployment of servers with extended netconsole.
+
 config BUG
 	bool "BUG() support" if EXPERT
 	default y
