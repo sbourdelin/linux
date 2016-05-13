@@ -42,6 +42,24 @@ struct xilinx_vdma_config {
 };
 
 /**
+ * struct zynqmp_dma_config - ZYNQMP DMA Configuration structure
+ * @ovrfetch: Overfetch status
+ * @has_sg: Support scatter gather transfers
+ * @ratectrl: Rate control value
+ * @src_issue: Out standing transactions on source
+ * @src_burst_len: Source burst length
+ * @dst_burst_len: Dest burst length
+ */
+struct zynqmp_dma_config {
+	bool ovrfetch;
+	bool has_sg;
+	u32 ratectrl;
+	u32 src_issue;
+	u32 src_burst_len;
+	u32 dst_burst_len;
+};
+
+/**
  * enum xdma_ip_type: DMA IP type.
  *
  * XDMA_TYPE_AXIDMA: Axi dma ip.
@@ -57,5 +75,6 @@ enum xdma_ip_type {
 
 int xilinx_vdma_channel_set_config(struct dma_chan *dchan,
 					struct xilinx_vdma_config *cfg);
-
+int zynqmp_dma_channel_set_config(struct dma_chan *dchan,
+					struct zynqmp_dma_config *cfg);
 #endif
