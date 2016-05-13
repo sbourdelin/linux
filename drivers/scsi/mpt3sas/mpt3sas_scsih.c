@@ -8170,6 +8170,8 @@ void scsih_remove(struct pci_dev *pdev)
 		_scsih_raid_device_remove(ioc, raid_device);
 	}
 
+	scsi_remove_host(shost);
+
 	/* free ports attached to the sas_host */
 	list_for_each_entry_safe(mpt3sas_port, next_port,
 	   &ioc->sas_hba.sas_port_list, port_list) {
@@ -8193,7 +8195,6 @@ void scsih_remove(struct pci_dev *pdev)
 	}
 
 	sas_remove_host(shost);
-	scsi_remove_host(shost);
 	mpt3sas_base_detach(ioc);
 	spin_lock(&gioc_lock);
 	list_del(&ioc->list);
