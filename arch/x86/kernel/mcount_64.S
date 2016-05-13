@@ -178,6 +178,15 @@ GLOBAL(ftrace_return)
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 GLOBAL(ftrace_graph_call)
 	jmp ftrace_stub
+	/*
+	 * The above jmp is generated as a short jump which occupies 2 bytes
+	 * but ftrace_enable/disable_ftrace_graph_caller() assumes it's a
+	 * near jump which occupies 5 bytes so breaks ftrace_stub() below.
+	 * Add 3 bytes padding to avoid that.
+	 */
+	nop
+	nop
+	nop
 #endif
 
 GLOBAL(ftrace_stub)
