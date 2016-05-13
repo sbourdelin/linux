@@ -502,6 +502,18 @@ int __must_check __media_device_register(struct media_device *mdev,
 void media_device_unregister(struct media_device *mdev);
 
 /**
+ * media_device_unregister_put() - Unregisters a media device element
+ *
+ * @mdev:	pointer to struct &media_device
+ *
+ * Should be called to unregister media device allocated with Media Device
+ * Allocator API media_device_get() interface.
+ * It is safe to call this function on an unregistered (but initialised)
+ * media device.
+ */
+void media_device_unregister_put(struct media_device *mdev);
+
+/**
  * media_device_register_entity() - registers a media entity inside a
  *	previously registered media device.
  *
@@ -659,6 +671,9 @@ static inline int media_device_register(struct media_device *mdev)
 	return 0;
 }
 static inline void media_device_unregister(struct media_device *mdev)
+{
+}
+static inline void media_device_unregister_put(struct media_device *mdev)
 {
 }
 static inline int media_device_register_entity(struct media_device *mdev,

@@ -36,6 +36,7 @@
 #include <media/media-device.h>
 #include <media/media-devnode.h>
 #include <media/media-entity.h>
+#include <media/media-dev-allocator.h>
 
 #ifdef CONFIG_MEDIA_CONTROLLER
 
@@ -799,6 +800,16 @@ void media_device_unregister(struct media_device *mdev)
 	media_devnode_unregister(&mdev->devnode);
 }
 EXPORT_SYMBOL_GPL(media_device_unregister);
+
+void media_device_unregister_put(struct media_device *mdev)
+{
+	if (mdev == NULL)
+		return;
+
+	dev_dbg(mdev->dev, "%s: mdev %p\n", __func__, mdev);
+	media_device_put(mdev);
+}
+EXPORT_SYMBOL_GPL(media_device_unregister_put);
 
 static void media_device_release_devres(struct device *dev, void *res)
 {
