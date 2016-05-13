@@ -1,0 +1,31 @@
+* Cadence MACB MDIO controller
+
+Required properties:
+- compatible: Should be "cdns,macb-mdio"
+- reg: Address and length of the register set of MAC to be used
+- clock-names: Tuple listing input clock names.
+	Required elements: 'pclk', 'hclk'
+	Optional elements: 'tx_clk'
+- clocks: Phandles to input clocks.
+
+Examples:
+
+	mdio {
+		compatible = "cdns,macb-mdio";
+		reg = <0x0 0xff0b0000 0x0 0x1000>;
+		clocks = <&clk125>, <&clk125>, <&clk125>;
+		clock-names = "pclk", "hclk", "tx_clk";
+		ethernet_phyC: ethernet-phy@C {
+			reg = <C>;
+		};
+		ethernet_phy7: ethernet-phy@7 {
+			reg = <7>;
+		};
+		ethernet_phy3: ethernet-phy@3 {
+			reg = <3>;
+		};
+		ethernet_phy8: ethernet-phy@8 {
+			reg = <8>;
+		};
+	};
+
