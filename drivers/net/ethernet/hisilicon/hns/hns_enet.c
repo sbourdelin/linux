@@ -987,6 +987,41 @@ static void hns_nic_adjust_link(struct net_device *ndev)
 	h->dev->ops->adjust_link(h, ndev->phydev->speed, ndev->phydev->duplex);
 }
 
+static
+struct phy_device *hns_nic_phy_attach(struct net_device *dev,
+				      struct phy_device *phy,
+				      u32 flags,
+				      phy_interface_t iface)
+{
+	int ret;
+
+	if (!phy)
+		return NULL;
+
+	ret = phy_attach_direct(dev, phy, flags, iface);
+
+	return ret ? NULL : phy;
+}
+
+static
+struct phy_device *hns_nic_phy_connect(struct net_device *dev,
+				       struct phy_device *phy,
+				       void (*hndlr)(struct net_device *),
+				       u32 flags,
+				       phy_interface_t iface)
+{
+	int ret;
+
+	if (!phy)
+		return NULL;
+
+	phy->dev_flags = flags;
+
+	ret = phy_connect_direct(dev, phy, hndlr, iface);
+
+	return ret ? NULL : phy;
+}
+
 /**
  *hns_nic_init_phy - init phy
  *@ndev: net device
@@ -996,16 +1031,17 @@ static void hns_nic_adjust_link(struct net_device *ndev)
 int hns_nic_init_phy(struct net_device *ndev, struct hnae_handle *h)
 {
 	struct hns_nic_priv *priv = netdev_priv(ndev);
-	struct phy_device *phy_dev = NULL;
+	struct phy_device *phy_dev = h->phy_dev;
 
-	if (!h->phy_node)
+	if (!h->phy_dev)
 		return 0;
 
 	if (h->phy_if != PHY_INTERFACE_MODE_XGMII)
-		phy_dev = of_phy_connect(ndev, h->phy_node,
-					 hns_nic_adjust_link, 0, h->phy_if);
+		phy_dev = hns_nic_phy_connect(ndev, phy_dev,
+					      hns_nic_adjust_link,
+					      0, h->phy_if);
 	else
-		phy_dev = of_phy_attach(ndev, h->phy_node, 0, h->phy_if);
+		phy_dev = hns_nic_phy_attach(ndev, phy_dev, 0, h->phy_if);
 
 	if (unlikely(!phy_dev) || IS_ERR(phy_dev))
 		return !phy_dev ? -ENODEV : PTR_ERR(phy_dev);
