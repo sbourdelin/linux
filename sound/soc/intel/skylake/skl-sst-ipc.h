@@ -60,6 +60,10 @@ struct skl_sst {
 	void (*enable_miscbdcge)(struct device *dev, bool enable);
 	/*Is CGCTL.MISCBDCGE disabled*/
 	bool miscbdcg_disabled;
+
+	/* Populate module information */
+	struct uuid_tbl *tbl;
+	int num_modules;
 };
 
 struct skl_ipc_init_instance_msg {
