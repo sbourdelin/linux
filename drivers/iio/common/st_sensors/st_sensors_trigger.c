@@ -40,13 +40,16 @@ int st_sensors_allocate_trigger(struct iio_dev *indio_dev,
 	 * If the IRQ is triggered on falling edge, we need to mark the
 	 * interrupt as active low, if the hardware supports this.
 	 */
-	if (irq_trig == IRQF_TRIGGER_FALLING) {
+	if (irq_trig == IRQF_TRIGGER_FALLING || irq_trig == IRQF_TRIGGER_LOW) {
 		if (!sdata->sensor_settings->drdy_irq.addr_ihl) {
 			dev_err(&indio_dev->dev,
-				"falling edge specified for IRQ but hardware "
-				"only support rising edge, will request "
-				"rising edge\n");
-			irq_trig = IRQF_TRIGGER_RISING;
+				"active low specified for IRQ but hardware "
+				"only support active high, will request "
+				"active high\n");
+			if (irq_trig == IRQF_TRIGGER_FALLING)
+				irq_trig = IRQF_TRIGGER_RISING;
+			else if (irq_trig == IRQF_TRIGGER_LOW)
+				irq_trig = IRQF_TRIGGER_HIGH;
 		} else {
 			/* Set up INT active low i.e. falling edge */
 			err = st_sensors_write_data_with_mask(indio_dev,
@@ -55,18 +58,17 @@ int st_sensors_allocate_trigger(struct iio_dev *indio_dev,
 			if (err < 0)
 				goto iio_trigger_free;
 			dev_info(&indio_dev->dev,
-				 "interrupts on the falling edge\n");
+				 "interrupts are active low\n");
 		}
-	} else if (irq_trig == IRQF_TRIGGER_RISING) {
+	} else if (irq_trig == IRQF_TRIGGER_RISING || irq_trig == IRQF_TRIGGER_HIGH) {
 		dev_info(&indio_dev->dev,
-			 "interrupts on the rising edge\n");
+			 "interrupts are active high\n");
 
 	} else {
 		dev_err(&indio_dev->dev,
-		"unsupported IRQ trigger specified (%lx), only "
-			"rising and falling edges supported, enforce "
-			"rising edge\n", irq_trig);
-		irq_trig = IRQF_TRIGGER_RISING;
+			"unsupported IRQ trigger specified (%lx) "
+			"enforce level high\n", irq_trig);
+		irq_trig = IRQF_TRIGGER_HIGH;
 	}
 
 	/*
