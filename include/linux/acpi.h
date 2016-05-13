@@ -933,7 +933,18 @@ int __acpi_probe_device_table(struct acpi_probe_entry *start, int nr);
 					  (&ACPI_PROBE_TABLE_END(t) -	\
 					   &ACPI_PROBE_TABLE(t)));	\
 	})
+
+int acpi_match_device_ids(struct acpi_device *device,
+			  const struct acpi_device_id *ids);
+
 #else
+
+static inline int acpi_match_device_ids(struct acpi_device *device,
+					const struct acpi_device_id *ids)
+{
+	return -ENOENT;
+}
+
 static inline int acpi_dev_get_property(struct acpi_device *adev,
 					const char *name, acpi_object_type type,
 					const union acpi_object **obj)
