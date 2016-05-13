@@ -26,6 +26,7 @@
 #include <linux/resource_ext.h>
 #include <linux/device.h>
 #include <linux/property.h>
+#include <linux/irqdomain.h>
 
 #ifndef _LINUX
 #define _LINUX
@@ -287,6 +288,11 @@ int acpi_isa_irq_to_gsi (unsigned isa_irq, u32 *gsi);
 
 void acpi_set_irq_model(enum acpi_irq_model_id model,
 			struct fwnode_handle *fwnode);
+
+int acpi_irq_domain_register_irq(struct acpi_resource_source *source, u32 rcirq,
+		      int trigger, int polarity);
+int acpi_irq_domain_unregister_irq(struct acpi_resource_source *source,
+				   u32 rcirq);
 
 #ifdef CONFIG_X86_IO_APIC
 extern int acpi_get_override_irq(u32 gsi, int *trigger, int *polarity);
