@@ -1325,23 +1325,6 @@ target_setup_cmd_from_cdb(struct se_cmd *cmd, unsigned char *cdb)
 
 	trace_target_sequencer_start(cmd);
 
-	/*
-	 * Check for an existing UNIT ATTENTION condition
-	 */
-	ret = target_scsi3_ua_check(cmd);
-	if (ret)
-		return ret;
-
-	ret = target_alua_state_check(cmd);
-	if (ret)
-		return ret;
-
-	ret = target_check_reservation(cmd);
-	if (ret) {
-		cmd->scsi_status = SAM_STAT_RESERVATION_CONFLICT;
-		return ret;
-	}
-
 	ret = dev->transport->parse_cdb(cmd);
 	if (ret == TCM_UNSUPPORTED_SCSI_OPCODE)
 		pr_warn_ratelimited("%s/%s: Unsupported SCSI Opcode 0x%02x, sending CHECK_CONDITION.\n",
@@ -1887,6 +1870,8 @@ static int __transport_check_aborted_status(struct se_cmd *, int);
 
 void target_execute_cmd(struct se_cmd *cmd)
 {
+	sense_reason_t ret;
+
 	/*
 	 * Determine if frontend context caller is requesting the stopping of
 	 * this command for frontend exceptions.
@@ -1918,6 +1903,28 @@ void target_execute_cmd(struct se_cmd *cmd)
 		spin_lock_irq(&cmd->t_state_lock);
 		cmd->transport_state &= ~(CMD_T_BUSY | CMD_T_SENT);
 		spin_unlock_irq(&cmd->t_state_lock);
+		return;
+	}
+
+	/*
+	 * Check for an existing UNIT ATTENTION condition
+	 */
+	ret = target_scsi3_ua_check(cmd);
+	if (ret) {
+		transport_generic_request_failure(cmd, ret);
+		return;
+	}
+
+	ret = target_alua_state_check(cmd);
+	if (ret) {
+		transport_generic_request_failure(cmd, ret);
+		return;
+	}
+
+	ret = target_check_reservation(cmd);
+	if (ret) {
+		cmd->scsi_status = SAM_STAT_RESERVATION_CONFLICT;
+		transport_generic_request_failure(cmd, ret);
 		return;
 	}
 
