@@ -536,7 +536,7 @@ static int rxq_process(struct rx_queue *rxq, int budget)
 		cmd_sts = rx_desc->cmd_sts;
 		if (cmd_sts & BUFFER_OWNED_BY_DMA)
 			break;
-		rmb();
+		dma_rmb();
 
 		skb = rxq->rx_skb[rxq->rx_curr_desc];
 		rxq->rx_skb[rxq->rx_curr_desc] = NULL;
@@ -647,9 +647,9 @@ static int rxq_refill(struct rx_queue *rxq, int budget)
 						  DMA_FROM_DEVICE);
 		rx_desc->buf_size = size;
 		rxq->rx_skb[rx] = skb;
-		wmb();
+		dma_wmb();
 		rx_desc->cmd_sts = BUFFER_OWNED_BY_DMA | RX_ENABLE_INTERRUPT;
-		wmb();
+		dma_wmb();
 
 		/*
 		 * The hardware automatically prepends 2 bytes of
@@ -889,7 +889,7 @@ static int txq_submit_tso(struct tx_queue *txq, struct sk_buff *skb,
 	skb_tx_timestamp(skb);
 
 	/* ensure all other descriptors are written before first cmd_sts */
-	wmb();
+	dma_wmb();
 	first_tx_desc->cmd_sts = first_cmd_sts;
 
 	/* clear TX_END status */
@@ -994,7 +994,7 @@ static int txq_submit_skb(struct tx_queue *txq, struct sk_buff *skb,
 	skb_tx_timestamp(skb);
 
 	/* ensure all other descriptors are written before first cmd_sts */
-	wmb();
+	dma_wmb();
 	desc->cmd_sts = cmd_sts;
 
 	/* clear TX_END status */
