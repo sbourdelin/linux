@@ -13589,7 +13589,7 @@ static int intel_atomic_commit(struct drm_device *dev,
 
 	ret = intel_atomic_prepare_commit(dev, state, nonblock);
 	if (ret) {
-		DRM_DEBUG_ATOMIC("Preparing state failed with %i\n", ret);
+		DRM_DEBUG_KMS("Preparing state failed with %i\n", ret);
 		return ret;
 	}
 
