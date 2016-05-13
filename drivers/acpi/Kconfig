@@ -321,6 +321,13 @@ config ACPI_TABLE_UPGRADE
 	  initrd, therefore it's safe to say Y.
 	  See Documentation/acpi/initrd_table_override.txt for details
 
+config ACPI_NO_ERROR_MESSAGES
+	bool "Disable error messages"
+	default n
+	help
+	  The ACPI subsystem can produce error messages. Saying Y disables
+	  this output.
+
 config ACPI_DEBUG
 	bool "Debug Statements"
 	default n

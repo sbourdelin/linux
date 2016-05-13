@@ -73,6 +73,10 @@
 #define ACPI_DEBUGGER
 #endif
 
+#ifdef CONFIG_ACPI_NO_ERROR_MESSAGES
+#define ACPI_NO_ERROR_MESSAGES
+#endif
+
 #include <linux/string.h>
 #include <linux/kernel.h>
 #include <linux/ctype.h>
