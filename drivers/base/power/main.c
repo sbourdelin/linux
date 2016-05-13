@@ -1207,10 +1207,13 @@ static int __device_suspend_late(struct device *dev, pm_message_t state, bool as
 	}
 
 	error = dpm_run_callback(callback, dev, state, info);
-	if (!error)
+	if (!error) {
 		dev->power.is_late_suspended = true;
-	else
+	} else {
 		async_error = error;
+		if (!is_async(dev))
+			pm_runtime_enable(dev);
+	}
 
 Complete:
 	TRACE_SUSPEND(error);
