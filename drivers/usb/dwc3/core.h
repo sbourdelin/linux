@@ -734,6 +734,9 @@ struct dwc3_scratchpad_array {
  * 	1	- -3.5dB de-emphasis
  * 	2	- No de-emphasis
  * 	3	- Reserved
+ * @can_save_power: set if the gadget will power off when no cable plug in.
+ * @need_restart: set if we need to restart the gadget.
+ * @cable_connected: set if one usb cable is plugging in.
  */
 struct dwc3 {
 	struct usb_ctrlrequest	*ctrl_req;
@@ -876,6 +879,9 @@ struct dwc3 {
 
 	unsigned		tx_de_emphasis_quirk:1;
 	unsigned		tx_de_emphasis:2;
+	unsigned		can_save_power:1;
+	unsigned		need_restart:1;
+	unsigned		cable_connected:1;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -1026,6 +1032,8 @@ struct dwc3_gadget_ep_cmd_params {
 /* prototypes */
 void dwc3_set_mode(struct dwc3 *dwc, u32 mode);
 int dwc3_gadget_resize_tx_fifos(struct dwc3 *dwc);
+int dwc3_soft_reset(struct dwc3 *dwc);
+int dwc3_event_buffers_setup(struct dwc3 *dwc);
 
 /* check whether we are on the DWC_usb31 core */
 static inline bool dwc3_is_usb31(struct dwc3 *dwc)
@@ -1052,6 +1060,8 @@ int dwc3_gadget_set_link_state(struct dwc3 *dwc, enum dwc3_link_state state);
 int dwc3_send_gadget_ep_cmd(struct dwc3 *dwc, unsigned ep,
 		unsigned cmd, struct dwc3_gadget_ep_cmd_params *params);
 int dwc3_send_gadget_generic_command(struct dwc3 *dwc, unsigned cmd, u32 param);
+void dwc3_gadget_connect(struct dwc3 *dwc);
+void dwc3_gadget_disconnect(struct dwc3 *dwc);
 #else
 static inline int dwc3_gadget_init(struct dwc3 *dwc)
 { return 0; }
@@ -1071,6 +1081,10 @@ static inline int dwc3_send_gadget_ep_cmd(struct dwc3 *dwc, unsigned ep,
 static inline int dwc3_send_gadget_generic_command(struct dwc3 *dwc,
 		int cmd, u32 param)
 { return 0; }
+static inline void dwc3_gadget_connect(struct dwc3 *dwc)
+{ }
+static inline void dwc3_gadget_disconnect(struct dwc3 *dwc)
+{ }
 #endif
 
 /* power management interface */

@@ -1512,13 +1512,75 @@ static int dwc3_gadget_set_selfpowered(struct usb_gadget *g,
 	return 0;
 }
 
+void dwc3_gadget_connect(struct dwc3 *dwc)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&dwc->lock, flags);
+	dwc->cable_connected = true;
+	spin_unlock_irqrestore(&dwc->lock, flags);
+}
+
+void dwc3_gadget_disconnect(struct dwc3 *dwc)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&dwc->lock, flags);
+	dwc->cable_connected = false;
+	spin_unlock_irqrestore(&dwc->lock, flags);
+}
+
+static bool dwc3_gadget_is_connected(struct dwc3 *dwc)
+{
+	/*
+	 * If the gadget is always power on, then no need to check if the
+	 * cable is plugin or not.
+	 */
+	if (!dwc->can_save_power)
+		return true;
+
+	return dwc->cable_connected;
+}
+
+static int __dwc3_gadget_start(struct dwc3 *dwc);
+
 static int dwc3_gadget_run_stop(struct dwc3 *dwc, int is_on, int suspend)
 {
 	u32			reg;
 	u32			timeout = 500;
+	int			ret;
+
+	if (!dwc3_gadget_is_connected(dwc) || !dwc->gadget_driver)
+		return 0;
 
 	reg = dwc3_readl(dwc->regs, DWC3_DCTL);
 	if (is_on) {
+		if (dwc->need_restart) {
+			/*
+			 * We need to reset the device firstly when the device
+			 * is power on.
+			 */
+			ret = dwc3_soft_reset(dwc);
+			if (ret)
+				return ret;
+
+			/*
+			 * After resetting the device, it need to re-setup the
+			 * event buffer.
+			 */
+			ret = dwc3_event_buffers_setup(dwc);
+			if (ret) {
+				dev_err(dwc->dev,
+					"failed to setup event buffers\n");
+				return ret;
+			}
+
+			/* Start the gadget */
+			ret = __dwc3_gadget_start(dwc);
+			if (ret)
+				return ret;
+		}
+
 		if (dwc->revision <= DWC3_REVISION_187A) {
 			reg &= ~DWC3_DCTL_TRGTULST_MASK;
 			reg |= DWC3_DCTL_TRGTULST_RX_DET;
@@ -1608,36 +1670,11 @@ static void dwc3_gadget_disable_irq(struct dwc3 *dwc)
 static irqreturn_t dwc3_interrupt(int irq, void *_dwc);
 static irqreturn_t dwc3_thread_interrupt(int irq, void *_dwc);
 
-static int dwc3_gadget_start(struct usb_gadget *g,
-		struct usb_gadget_driver *driver)
+static int __dwc3_gadget_start(struct dwc3 *dwc)
 {
-	struct dwc3		*dwc = gadget_to_dwc(g);
 	struct dwc3_ep		*dep;
-	unsigned long		flags;
 	int			ret = 0;
-	int			irq;
 	u32			reg;
-
-	irq = platform_get_irq(to_platform_device(dwc->dev), 0);
-	ret = request_threaded_irq(irq, dwc3_interrupt, dwc3_thread_interrupt,
-			IRQF_SHARED, "dwc3", dwc);
-	if (ret) {
-		dev_err(dwc->dev, "failed to request irq #%d --> %d\n",
-				irq, ret);
-		goto err0;
-	}
-
-	spin_lock_irqsave(&dwc->lock, flags);
-
-	if (dwc->gadget_driver) {
-		dev_err(dwc->dev, "%s is already bound to %s\n",
-				dwc->gadget.name,
-				dwc->gadget_driver->driver.name);
-		ret = -EBUSY;
-		goto err1;
-	}
-
-	dwc->gadget_driver	= driver;
 
 	reg = dwc3_readl(dwc->regs, DWC3_DCFG);
 	reg &= ~(DWC3_DCFG_SPEED_MASK);
@@ -1690,7 +1727,7 @@ static int dwc3_gadget_start(struct usb_gadget *g,
 			false);
 	if (ret) {
 		dev_err(dwc->dev, "failed to enable %s\n", dep->name);
-		goto err2;
+		return ret;
 	}
 
 	dep = dwc->eps[1];
@@ -1698,7 +1735,8 @@ static int dwc3_gadget_start(struct usb_gadget *g,
 			false);
 	if (ret) {
 		dev_err(dwc->dev, "failed to enable %s\n", dep->name);
-		goto err3;
+		__dwc3_gadget_ep_disable(dwc->eps[0]);
+		return ret;
 	}
 
 	/* begin to receive SETUP packets */
@@ -1707,12 +1745,56 @@ static int dwc3_gadget_start(struct usb_gadget *g,
 
 	dwc3_gadget_enable_irq(dwc);
 
+	return 0;
+}
+
+static int dwc3_gadget_start(struct usb_gadget *g,
+		struct usb_gadget_driver *driver)
+{
+	struct dwc3		*dwc = gadget_to_dwc(g);
+	unsigned long		flags;
+	int			ret = 0;
+	int			irq;
+
+	irq = platform_get_irq(to_platform_device(dwc->dev), 0);
+	ret = request_threaded_irq(irq, dwc3_interrupt, dwc3_thread_interrupt,
+			IRQF_SHARED, "dwc3", dwc);
+	if (ret) {
+		dev_err(dwc->dev, "failed to request irq #%d --> %d\n",
+				irq, ret);
+		goto err0;
+	}
+
+	spin_lock_irqsave(&dwc->lock, flags);
+
+	if (dwc->gadget_driver) {
+		dev_err(dwc->dev, "%s is already bound to %s\n",
+				dwc->gadget.name,
+				dwc->gadget_driver->driver.name);
+		ret = -EBUSY;
+		goto err1;
+	}
+
+	dwc->gadget_driver	= driver;
+
+	/*
+	 * If the gadget can be power off when there is no cable plug in, we
+	 * need to check if the device power is on or not. If not, we should
+	 * not access the device registers.
+	 */
+	if (!dwc3_gadget_is_connected(dwc)) {
+		dwc->need_restart = 1;
+		spin_unlock_irqrestore(&dwc->lock, flags);
+		return 0;
+	}
+
+	ret = __dwc3_gadget_start(dwc);
+	if (ret)
+		goto err2;
+
 	spin_unlock_irqrestore(&dwc->lock, flags);
 
 	return 0;
-
-err3:
-	__dwc3_gadget_ep_disable(dwc->eps[0]);
 
 err2:
 	dwc->gadget_driver = NULL;

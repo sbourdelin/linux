@@ -109,7 +109,7 @@ static int dwc3_core_soft_reset(struct dwc3 *dwc)
  * dwc3_soft_reset - Issue soft reset
  * @dwc: Pointer to our controller context structure
  */
-static int dwc3_soft_reset(struct dwc3 *dwc)
+int dwc3_soft_reset(struct dwc3 *dwc)
 {
 	unsigned long timeout;
 	u32 reg;
@@ -253,7 +253,7 @@ static int dwc3_alloc_event_buffers(struct dwc3 *dwc, unsigned length)
  *
  * Returns 0 on success otherwise negative errno.
  */
-static int dwc3_event_buffers_setup(struct dwc3 *dwc)
+int dwc3_event_buffers_setup(struct dwc3 *dwc)
 {
 	struct dwc3_event_buffer	*evt;
 	int				n;
@@ -948,6 +948,7 @@ static int dwc3_probe(struct platform_device *pdev)
 
 		dwc->hsphy_interface = pdata->hsphy_interface;
 		fladj = pdata->fladj_value;
+		dwc->can_save_power = pdata->can_save_power;
 	}
 
 	dwc->lpm_nyet_threshold = lpm_nyet_threshold;

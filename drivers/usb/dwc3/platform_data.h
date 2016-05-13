@@ -46,6 +46,7 @@ struct dwc3_platform_data {
 
 	unsigned tx_de_emphasis_quirk:1;
 	unsigned tx_de_emphasis:2;
+	unsigned can_save_power:1;
 
 	u32 fladj_value;
 
