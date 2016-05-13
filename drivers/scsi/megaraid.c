@@ -4702,7 +4702,7 @@ static int __init megaraid_init(void)
 	 * major number allocation.
 	 */
 	major = register_chrdev(0, "megadev_legacy", &megadev_fops);
-	if (!major) {
+	if (major < 0) {
 		printk(KERN_WARNING
 				"megaraid: failed to register char device\n");
 	}
@@ -4715,7 +4715,10 @@ static void __exit megaraid_exit(void)
 	/*
 	 * Unregister the character device interface to the driver.
 	 */
-	unregister_chrdev(major, "megadev_legacy");
+	if (major > 0) {
+		unregister_chrdev(major, "megadev_legacy");
+		major = 0;
+	}
 
 	pci_unregister_driver(&megaraid_pci_driver);
 
