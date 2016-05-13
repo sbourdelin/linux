@@ -178,7 +178,7 @@ static void wdm_in_callback(struct urb *urb)
 				"nonzero urb status received: -ESHUTDOWN");
 			goto skip_error;
 		case -EPIPE:
-			dev_err(&desc->intf->dev,
+			dev_dbg(&desc->intf->dev,
 				"nonzero urb status received: -EPIPE\n");
 			break;
 		default:
@@ -200,6 +200,19 @@ static void wdm_in_callback(struct urb *urb)
 			desc->reslength = length;
 		}
 	}
+
+	/*
+	 * If desc->resp_count is unset, then the urb was submitted
+	 * without a prior notification.  If the device returned any
+	 * data, then this implies that it had messages queued without
+	 * notifying us.  Continue reading until that queue is flushed.
+	 */
+	if (!desc->resp_count && length) {
+		dev_dbg(&desc->intf->dev, "got %d bytes without notification\n", length);
+		set_bit(WDM_RESPONDING, &desc->flags);
+		usb_submit_urb(desc->response, GFP_ATOMIC);
+	}
+
 skip_error:
 	wake_up(&desc->wait);
 
@@ -647,6 +660,16 @@ static int wdm_open(struct inode *inode, struct file *file)
 			dev_err(&desc->intf->dev,
 				"Error submitting int urb - %d\n", rv);
 			rv = usb_translate_errors(rv);
+		} else {
+			/*
+			 * Some devices keep pending messages queued
+			 * without resending notifications.  We must
+			 * flush the message queue before we can
+			 * assume a one-to-one relationship between
+			 * notifications and messages in the queue
+			 */
+			set_bit(WDM_RESPONDING, &desc->flags);
+			rv = usb_submit_urb(desc->response, GFP_KERNEL);
 		}
 	} else {
 		rv = 0;
