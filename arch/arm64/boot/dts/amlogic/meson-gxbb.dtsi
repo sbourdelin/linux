@@ -127,6 +127,12 @@
 		#size-cells = <2>;
 		ranges;
 
+		reset: reset-controller@c1004404 {
+			compatible = "amlogic,meson-gxbb-reset";
+			reg = <0x0 0xc1004404 0x0 0x1c>;
+			#reset-cells = <1>;
+		};
+
 		cbus: cbus@c1100000 {
 			compatible = "simple-bus";
 			reg = <0x0 0xc1100000 0x0 0x100000>;
