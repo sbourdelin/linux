@@ -160,9 +160,29 @@ static struct notifier_block acpi_cpu_notifier = {
 };
 
 #ifdef CONFIG_ACPI_CPU_FREQ_PSS
+static struct thermal_cooling_device *
+acpi_pss_register_cooling(struct acpi_processor *pr, struct acpi_device *device)
+{
+	int i, cpu = pr->id;
+
+	for_each_online_cpu(i) {
+		if (topology_physical_package_id(i) ==
+		    topology_physical_package_id(cpu)) {
+			struct acpi_processor *pre = per_cpu(processors, i);
+
+			if (pre->cdev && !IS_ERR(pre->cdev))
+				return pre->cdev;
+		}
+	}
+
+	return thermal_cooling_device_register("Processor", device,
+					       &processor_cooling_ops);
+}
+
 static int acpi_pss_perf_init(struct acpi_processor *pr,
 		struct acpi_device *device)
 {
+	char cpu_id[15];
 	int result = 0;
 
 	acpi_processor_ppc_has_changed(pr, 0);
@@ -172,8 +192,7 @@ static int acpi_pss_perf_init(struct acpi_processor *pr,
 	if (pr->flags.throttling)
 		pr->flags.limit = 1;
 
-	pr->cdev = thermal_cooling_device_register("Processor", device,
-						   &processor_cooling_ops);
+	pr->cdev = acpi_pss_register_cooling(pr, device);
 	if (IS_ERR(pr->cdev)) {
 		result = PTR_ERR(pr->cdev);
 		return result;
@@ -191,9 +210,10 @@ static int acpi_pss_perf_init(struct acpi_processor *pr,
 		goto err_thermal_unregister;
 	}
 
+	snprintf(cpu_id, sizeof(cpu_id), "device.%d", pr->id);
 	result = sysfs_create_link(&pr->cdev->device.kobj,
 				   &device->dev.kobj,
-				   "device");
+				   cpu_id);
 	if (result) {
 		dev_err(&pr->cdev->device,
 			"Failed to create sysfs link 'device'\n");
@@ -213,11 +233,25 @@ static int acpi_pss_perf_init(struct acpi_processor *pr,
 static void acpi_pss_perf_exit(struct acpi_processor *pr,
 		struct acpi_device *device)
 {
+	char cpu_id[15];
+	int i;
+
 	if (pr->cdev) {
 		sysfs_remove_link(&device->dev.kobj, "thermal_cooling");
+		snprintf(cpu_id, sizeof(cpu_id), "device.%d", pr->id);
 		sysfs_remove_link(&pr->cdev->device.kobj, "device");
 		thermal_cooling_device_unregister(pr->cdev);
 		pr->cdev = NULL;
+
+		for_each_online_cpu(i) {
+			if (topology_physical_package_id(i) ==
+			    topology_physical_package_id(pr->id)) {
+				struct acpi_processor *pre;
+
+				pre = per_cpu(processors, i);
+				pre->cdev = NULL;
+			}
+		}
 	}
 }
 #else
