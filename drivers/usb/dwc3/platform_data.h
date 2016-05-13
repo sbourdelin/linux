@@ -45,6 +45,8 @@ struct dwc3_platform_data {
 	unsigned dis_rxdet_inp3_quirk:1;
 	unsigned dis_u2_freeclk_exists_quirk:1;
 
+	unsigned phyif_utmi_quirk:1;
+	unsigned phyif_utmi:1;
 	unsigned tx_de_emphasis_quirk:1;
 	unsigned tx_de_emphasis:2;
 
