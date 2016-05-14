@@ -22,6 +22,11 @@ Optional properties:
 		      AXP152/20X: range:  750-1875, Default: 1.5 MHz
 		      AXP22X/80X: range: 1800-4050, Default: 3   MHz
 
+- x-powers,drivebus: axp221 / axp223 only boolean, set this when the N_VBUSEN
+                  pin is used as an output pin to control an external regulator
+                  to drive the OTG VBus, rather then as an input pin which
+                  signals whether the board is driving OTG VBus or not.
+
 - <input>-supply: a phandle to the regulator supply node. May be omitted if
 		  inputs are unregulated, such as using the IPSOUT output
 		  from the PMIC.
