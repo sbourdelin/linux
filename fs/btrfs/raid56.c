@@ -2139,7 +2139,7 @@ int raid56_parity_recover(struct btrfs_root *root, struct bio *bio,
 
 	rbio->faila = find_logical_bio_stripe(rbio, bio);
 	if (rbio->faila == -1) {
-		BUG();
+		WARN_ONCE(1, KERN_WARNING "rbio->faila is -1\n");
 		if (generic_io)
 			btrfs_put_bbio(bbio);
 		kfree(rbio);
