@@ -42,6 +42,7 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include <sound/initval.h>
+#include <sound/tlv.h>
 
 #include <trace/events/asoc.h>
 
@@ -722,16 +723,46 @@ static int dapm_connect_mux(struct snd_soc_dapm_context *dapm,
 	return -ENODEV;
 }
 
+static int dapm_find_tlv_mute(const unsigned int *tlv)
+{
+	int cnt;
+	const unsigned int *range;
+
+	if (!tlv || tlv[0] != SNDRV_CTL_TLVT_DB_RANGE)
+		return 0;
+
+	cnt = tlv[1] / sizeof(unsigned int);
+
+	/*
+	 * Each group of six values should be
+	 * { start end type len min step/mute }
+	 */
+	for (range = &tlv[2]; cnt >= 6; cnt -= 6, range += 6) {
+		if (range[2] != SNDRV_CTL_TLVT_DB_SCALE)
+			return 0; /* wrong type, terminate */
+		if (range[3] != 2 * sizeof(unsigned int))
+			return 0; /* wrong len, terminate */
+		if (!(range[5] & TLV_DB_SCALE_MUTE))
+			continue; /* no mute in this range */
+		return range[0]; /* start of this range is the mute value */
+	}
+
+	return 0;
+}
+
 /* set up initial codec paths */
 static void dapm_set_mixer_path_status(struct snd_soc_dapm_path *p, int i)
 {
+	const struct snd_kcontrol_new *kcontrol_new
+		= &p->sink->kcontrol_news[i];
 	struct soc_mixer_control *mc = (struct soc_mixer_control *)
-		p->sink->kcontrol_news[i].private_value;
+		kcontrol_new->private_value;
 	unsigned int reg = mc->reg;
 	unsigned int shift = mc->shift;
 	unsigned int max = mc->max;
 	unsigned int mask = (1 << fls(max)) - 1;
 	unsigned int invert = mc->invert;
+	int mute_value = dapm_find_tlv_mute(kcontrol_new->tlv.p);
 	unsigned int val;
 
 	if (reg != SND_SOC_NOPM) {
@@ -739,7 +770,7 @@ static void dapm_set_mixer_path_status(struct snd_soc_dapm_path *p, int i)
 		val = (val >> shift) & mask;
 		if (invert)
 			val = max - val;
-		p->connect = !!val;
+		p->connect = val != mute_value;
 	} else {
 		p->connect = 0;
 	}
@@ -3045,6 +3076,7 @@ int snd_soc_dapm_put_volsw(struct snd_kcontrol *kcontrol,
 	int max = mc->max;
 	unsigned int mask = (1 << fls(max)) - 1;
 	unsigned int invert = mc->invert;
+	int mute_value = dapm_find_tlv_mute(kcontrol->tlv.p);
 	unsigned int val;
 	int connect, change, reg_change = 0;
 	struct snd_soc_dapm_update update;
@@ -3056,7 +3088,7 @@ int snd_soc_dapm_put_volsw(struct snd_kcontrol *kcontrol,
 			 kcontrol->id.name);
 
 	val = (ucontrol->value.integer.value[0] & mask);
-	connect = !!val;
+	connect = val != mute_value;
 
 	if (invert)
 		val = max - val;
