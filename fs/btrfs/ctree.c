@@ -2755,6 +2755,13 @@ again:
 			}
 		}
 	}
+	if (level > BTRFS_MAX_LEVEL - 1 || level < 0) {
+		WARN_ONCE(1, KERN_WARNING "Invalid btree height %d\n", level);
+		if (!p->skip_locking)
+			btrfs_tree_unlock_rw(b, root_lock);
+		free_extent_buffer(b);
+		return -EINVAL;
+	}
 	p->nodes[level] = b;
 	if (!p->skip_locking)
 		p->locks[level] = root_lock;
