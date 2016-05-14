@@ -2841,6 +2841,8 @@ static int cgroup_procs_write_permission(struct task_struct *task,
 					 struct cgroup *dst_cgrp,
 					 struct kernfs_open_file *of)
 {
+	struct cgroup_namespace *ns = current->nsproxy->cgroup_ns;
+	struct cgroup_namespace *tns = task->nsproxy->cgroup_ns;
 	const struct cred *cred = current_cred();
 	const struct cred *tcred = get_task_cred(task);
 	int ret = 0;
@@ -2850,6 +2852,10 @@ static int cgroup_procs_write_permission(struct task_struct *task,
 	 * need to check permissions on one of them.
 	 */
 	if (!uid_eq(cred->euid, GLOBAL_ROOT_UID) &&
+	    !capable(CAP_SYS_ADMIN) &&
+	    !(ns == tns && ns_capable(tcred->user_ns, CAP_SYS_ADMIN) &&
+	      ns_capable(cred->user_ns, CAP_SYS_ADMIN) &&
+	      ns_capable(ns->user_ns, CAP_SYS_ADMIN)) &&
 	    !uid_eq(cred->euid, tcred->uid) &&
 	    !uid_eq(cred->euid, tcred->suid))
 		ret = -EACCES;
