@@ -265,7 +265,7 @@ static int __init nf_conntrack_irc_init(void)
 		if (ports[i] == IRC_PORT)
 			sprintf(irc[i].name, "irc");
 		else
-			sprintf(irc[i].name, "irc-%u", i);
+			sprintf(irc[i].name, "irc-%u", ports[i]);
 
 		ret = nf_conntrack_helper_register(&irc[i]);
 		if (ret) {

@@ -136,7 +136,7 @@ static int __init nf_conntrack_tftp_init(void)
 			if (ports[i] == TFTP_PORT)
 				sprintf(tftp[i][j].name, "tftp");
 			else
-				sprintf(tftp[i][j].name, "tftp-%u", i);
+				sprintf(tftp[i][j].name, "tftp-%u", ports[i]);
 
 			ret = nf_conntrack_helper_register(&tftp[i][j]);
 			if (ret) {

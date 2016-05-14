@@ -1661,7 +1661,7 @@ static int __init nf_conntrack_sip_init(void)
 			if (ports[i] == SIP_PORT)
 				sprintf(sip[i][j].name, "sip");
 			else
-				sprintf(sip[i][j].name, "sip-%u", i);
+				sprintf(sip[i][j].name, "sip-%u", ports[i]);
 
 			pr_debug("port #%u: %u\n", i, ports[i]);
 
