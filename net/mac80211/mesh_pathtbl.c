@@ -87,6 +87,10 @@ void mesh_path_assign_nexthop(struct mesh_path *mpath, struct sta_info *sta)
 	struct ieee80211_hdr *hdr;
 	unsigned long flags;
 
+	/* sta is being deleted, don't add back */
+	if (test_sta_flag(sta, WLAN_STA_BLOCK_MPATH))
+		return;
+
 	rcu_assign_pointer(mpath->next_hop, sta);
 
 	spin_lock_irqsave(&mpath->frame_queue.lock, flags);

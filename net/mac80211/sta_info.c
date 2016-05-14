@@ -914,6 +914,16 @@ static int __must_check __sta_info_destroy_part1(struct sta_info *sta)
 	list_del_rcu(&sta->list);
 	sta->removed = true;
 
+	/*
+	 * Remove all path table references to the station (and prevent
+	 * adding new ones) so that new mesh transmissions won't use it
+	 * as a next hop.
+	 */
+	if (ieee80211_vif_is_mesh(&sdata->vif)) {
+		set_sta_flag(sta, WLAN_STA_BLOCK_MPATH);
+		mesh_path_flush_by_nexthop(sta);
+	}
+
 	drv_sta_pre_rcu_remove(local, sta->sdata, sta);
 
 	if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN &&

@@ -70,6 +70,7 @@
  * @WLAN_STA_MPSP_RECIPIENT: local STA is recipient of a MPSP.
  * @WLAN_STA_PS_DELIVER: station woke up, but we're still blocking TX
  *	until pending frames are delivered
+ * @WLAN_STA_BLOCK_MPATH: block adding this station as a mesh path
  *
  * @NUM_WLAN_STA_FLAGS: number of defined flags
  */
@@ -100,6 +101,7 @@ enum ieee80211_sta_info_flags {
 	WLAN_STA_MPSP_OWNER,
 	WLAN_STA_MPSP_RECIPIENT,
 	WLAN_STA_PS_DELIVER,
+	WLAN_STA_BLOCK_MPATH,
 
 	NUM_WLAN_STA_FLAGS,
 };
