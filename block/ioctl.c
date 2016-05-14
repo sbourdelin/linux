@@ -520,6 +520,45 @@ static int blkdev_bszset(struct block_device *bdev, fmode_t mode,
 	return ret;
 }
 
+static int blkdev_hipriget(struct block_device *bdev)
+{
+	return !!(bdev->bd_inode->i_flags & S_HIPRI);
+}
+
+static int blkdev_hipriset(struct block_device *bdev, fmode_t mode,
+		int __user *argp)
+{
+	int n;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EACCES;
+	if (!argp)
+		return -EINVAL;
+	if (get_user(n, argp))
+		return -EFAULT;
+
+	n = !!n;
+	if (n == blkdev_hipriget(bdev))
+		return 0;
+
+	if (!(mode & FMODE_EXCL)) {
+		bdgrab(bdev);
+		if (blkdev_get(bdev, mode | FMODE_EXCL, &bdev) < 0)
+			return -EBUSY;
+	}
+
+	inode_lock(bdev->bd_inode);
+	if (n)
+		bdev->bd_inode->i_flags |= S_HIPRI;
+	else
+		bdev->bd_inode->i_flags &= ~S_HIPRI;
+	inode_unlock(bdev->bd_inode);
+
+	if (!(mode & FMODE_EXCL))
+		blkdev_put(bdev, mode | FMODE_EXCL);
+	return 0;
+}
+
 /*
  * always keep this in sync with compat_blkdev_ioctl()
  */
@@ -601,6 +640,10 @@ int blkdev_ioctl(struct block_device *bdev, fmode_t mode, unsigned cmd,
 	case BLKDAXGET:
 		return put_int(arg, !!(bdev->bd_inode->i_flags & S_DAX));
 		break;
+	case BLKHIPRISET:
+		return blkdev_hipriset(bdev, mode, argp);
+	case BLKHIPRIGET:
+		return put_int(arg, blkdev_hipriget(bdev));
 	case IOC_PR_REGISTER:
 		return blkdev_pr_register(bdev, argp);
 	case IOC_PR_RESERVE:

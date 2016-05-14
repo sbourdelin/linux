@@ -223,6 +223,8 @@ struct fsxattr {
 #define BLKROTATIONAL _IO(0x12,126)
 #define BLKZEROOUT _IO(0x12,127)
 #define BLKDAXGET _IO(0x12,129)
+#define BLKHIPRISET _IOW(0x12,130,int)
+#define BLKHIPRIGET _IO(0x12,131)
 
 #define BMAP_IOCTL 1		/* obsolete - kept for compatibility */
 #define FIBMAP	   _IO(0x00,1)	/* bmap access */
