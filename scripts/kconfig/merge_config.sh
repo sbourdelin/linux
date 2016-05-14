@@ -32,6 +32,7 @@ usage() {
 	echo "  -m    only merge the fragments, do not execute the make command"
 	echo "  -n    use allnoconfig instead of alldefconfig"
 	echo "  -r    list redundant entries when merging fragments"
+	echo "  -C    dir in which to run make"
 	echo "  -O    dir to put generated output files.  Consider setting \$KCONFIG_CONFIG instead."
 }
 
@@ -59,6 +60,16 @@ while true; do
 	"-r")
 		WARNREDUN=true
 		shift
+		continue
+		;;
+	"-C")
+		if [ -d $2 ];then
+			MAKEDIR=$(echo $2 | sed 's/\/*$//')
+		else
+			echo "make directory $2 does not exist" 1>&2
+			exit 1
+		fi
+		shift 2
 		continue
 		;;
 	"-O")
@@ -151,7 +162,7 @@ fi
 # Use the merged file as the starting point for:
 # alldefconfig: Fills in any missing symbols with Kconfig default
 # allnoconfig: Fills in any missing symbols with # CONFIG_* is not set
-make KCONFIG_ALLCONFIG=$TMP_FILE $OUTPUT_ARG $ALLTARGET
+make -C "$MAKEDIR" KCONFIG_ALLCONFIG=$TMP_FILE $OUTPUT_ARG $ALLTARGET
 
 
 # Check all specified config values took (might have missed-dependency issues)
