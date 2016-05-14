@@ -3069,6 +3069,30 @@ static int __do_readpage(struct extent_io_tree *tree,
 			*bio_flags = this_bio_flag;
 		} else {
 			SetPageError(page);
+			/*
+			 * Only metadata io request has this issue, for data it
+			 * just unlocks extent and releases page's lock.
+			 *
+			 * eb->io_pages is set in read_extent_buffer_pages().
+			 *
+			 * When this eb's page fails to add itself to bio,
+			 * it cannot decrease eb->io_pages via bio_endio, and
+			 * ends up with extent_buffer_under_io() always being
+			 * true, because of that, eb won't be freed and we have
+			 * a memory leak eventually.
+			 *
+			 * Here we still hold this page's lock, and other tasks
+			 * who're also reading this eb are blocked.
+			 */
+			if (rw & REQ_META) {
+				struct extent_buffer *eb;
+
+				WARN_ON_ONCE(!PagePrivate(page));
+				eb = (struct extent_buffer *)page->private;
+
+				WARN_ON_ONCE(atomic_read(&eb->io_pages) < 1);
+				atomic_dec(&eb->io_pages);
+			}
 			unlock_extent(tree, cur, cur + iosize - 1);
 		}
 		cur = cur + iosize;
