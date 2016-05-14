@@ -4870,6 +4870,10 @@ struct extent_buffer *alloc_extent_buffer(struct btrfs_fs_info *fs_info,
 	int uptodate = 1;
 	int ret;
 
+	WARN_ONCE(!IS_ALIGNED(start, fs_info->tree_root->sectorsize),
+		  KERN_WARNING "eb->start(%llu) is not aligned to root->sectorsize(%u)\n",
+		  start, fs_info->tree_root->sectorsize);
+
 	eb = find_extent_buffer(fs_info, start);
 	if (eb)
 		return eb;
