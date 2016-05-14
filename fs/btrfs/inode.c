@@ -1827,8 +1827,10 @@ int btrfs_merge_bio_hook(int rw, struct page *page, unsigned long offset,
 	map_length = length;
 	ret = btrfs_map_block(root->fs_info, rw, logical,
 			      &map_length, NULL, 0);
-	/* Will always return 0 with map_multi == NULL */
-	BUG_ON(ret < 0);
+	if (ret < 0) {
+		WARN_ONCE(ret < 0, KERN_ERR "ret = %d\n", ret);
+		return ret;
+	}
 	if (map_length < length + size)
 		return 1;
 	return 0;
