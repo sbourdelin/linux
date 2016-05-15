@@ -623,9 +623,10 @@ add_numbered_child(unsigned mod_no, const char *name, int num,
 
 	pdev = platform_device_alloc(name, num);
 	if (!pdev) {
-		dev_dbg(&twl->client->dev, "can't alloc dev\n");
-		status = -ENOMEM;
-		goto err;
+		dev_err(&twl->client->dev,
+			"Allocation failed for device: %s\n",
+			name);
+		return ERR_PTR(-ENOMEM);
 	}
 
 	pdev->dev.parent = &twl->client->dev;
