@@ -184,7 +184,7 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 	struct scatterlist *sg;
 	int i, ret;
 
-	buffer = kzalloc(sizeof(struct ion_buffer), GFP_KERNEL);
+	buffer = kzalloc(sizeof(*buffer), GFP_KERNEL);
 	if (!buffer)
 		return ERR_PTR(-ENOMEM);
 
