@@ -319,8 +319,9 @@ static int send_reply_to_slave(int slave, struct mcast_group *group,
 		struct ib_sa_mad *req_sa_mad, u16 status)
 {
 	struct ib_sa_mad mad;
+	struct ib_sa_mcmember_data req_data;
 	struct ib_sa_mcmember_data *sa_data = (struct ib_sa_mcmember_data *)&mad.data;
-	struct ib_sa_mcmember_data *req_sa_data = (struct ib_sa_mcmember_data *)&req_sa_mad->data;
+	struct ib_sa_mcmember_data *req_sa_data = &req_data;
 	int ret;
 
 	memset(&mad, 0, sizeof mad);
@@ -343,6 +344,11 @@ static int send_reply_to_slave(int slave, struct mcast_group *group,
 	/* reconstruct VF's requested join_state and port_gid */
 	sa_data->scope_join_state &= 0xf0;
 	sa_data->scope_join_state |= (group->func[slave].join_state & 0x0f);
+	BUILD_BUG_ON(sizeof(req_sa_mad->data) < sizeof(req_data));
+	/* req_sa_mad is packed structure whose start address is not
+	 * aligned to 8
+	 */
+	memcpy(&req_data, &req_sa_mad->data, sizeof(req_data));
 	memcpy(&sa_data->port_gid, &req_sa_data->port_gid, sizeof req_sa_data->port_gid);
 
 	ret = send_mad_to_slave(slave, group->demux, (struct ib_mad *)&mad);
