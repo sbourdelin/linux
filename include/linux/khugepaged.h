@@ -9,19 +9,16 @@ extern void __khugepaged_exit(struct mm_struct *mm);
 extern int khugepaged_enter_vma_merge(struct vm_area_struct *vma,
 				      unsigned long vm_flags);
 
-#define khugepaged_enabled()					       \
-	(transparent_hugepage_flags &				       \
-	 ((1<<TRANSPARENT_HUGEPAGE_FLAG) |		       \
-	  (1<<TRANSPARENT_HUGEPAGE_REQ_MADV_FLAG)))
 #define khugepaged_always()				\
 	(transparent_hugepage_flags &			\
-	 (1<<TRANSPARENT_HUGEPAGE_FLAG))
-#define khugepaged_req_madv()					\
-	(transparent_hugepage_flags &				\
-	 (1<<TRANSPARENT_HUGEPAGE_REQ_MADV_FLAG))
-#define khugepaged_defrag()					\
-	(transparent_hugepage_flags &				\
-	 (1<<TRANSPARENT_HUGEPAGE_DEFRAG_KHUGEPAGED_FLAG))
+	 (1 << TRANSPARENT_HUGEPAGE_FLAG))
+#define khugepaged_req_madv()				\
+	(transparent_hugepage_flags &			\
+	 (1 << TRANSPARENT_HUGEPAGE_REQ_MADV_FLAG))
+#define khugepaged_enabled()	(khugepaged_always() | khugepaged_req_madv())
+#define khugepaged_defrag()				\
+	(transparent_hugepage_flags &			\
+	 (1 << TRANSPARENT_HUGEPAGE_DEFRAG_KHUGEPAGED_FLAG))
 
 static inline int khugepaged_fork(struct mm_struct *mm, struct mm_struct *oldmm)
 {
@@ -43,8 +40,7 @@ static inline int khugepaged_enter(struct vm_area_struct *vma,
 		if ((khugepaged_always() ||
 		     (khugepaged_req_madv() && (vm_flags & VM_HUGEPAGE))) &&
 		    !(vm_flags & VM_NOHUGEPAGE))
-			if (__khugepaged_enter(vma->vm_mm))
-				return -ENOMEM;
+			return __khugepaged_enter(vma->vm_mm);
 	return 0;
 }
 #else /* CONFIG_TRANSPARENT_HUGEPAGE */
