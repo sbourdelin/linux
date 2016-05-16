@@ -429,6 +429,7 @@ struct cfs_rq {
 	int on_list;
 	struct list_head leaf_cfs_rq_list;
 	struct task_group *tg;	/* group that "owns" this runqueue */
+	unsigned long shares;
 
 #ifdef CONFIG_CFS_BANDWIDTH
 	int runtime_enabled;

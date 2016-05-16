@@ -2522,21 +2522,21 @@ static long calc_cfs_shares(struct cfs_rq *cfs_rq, struct task_group *tg)
 	tg_weight = calc_tg_weight(tg, cfs_rq);
 	load = cfs_rq->load.weight;
 
-	shares = (tg->shares * load);
+	shares = (cfs_rq->shares * load);
 	if (tg_weight)
 		shares /= tg_weight;
 
 	if (shares < MIN_SHARES)
 		shares = MIN_SHARES;
-	if (shares > tg->shares)
-		shares = tg->shares;
+	if (shares > cfs_rq->shares)
+		shares = cfs_rq->shares;
 
 	return shares;
 }
 # else /* CONFIG_SMP */
 static inline long calc_cfs_shares(struct cfs_rq *cfs_rq, struct task_group *tg)
 {
-	return tg->shares;
+	return cfs_rq->shares;
 }
 # endif /* CONFIG_SMP */
 static void reweight_entity(struct cfs_rq *cfs_rq, struct sched_entity *se,
@@ -2568,7 +2568,7 @@ static void update_cfs_shares(struct cfs_rq *cfs_rq)
 	if (!se || throttled_hierarchy(cfs_rq))
 		return;
 #ifndef CONFIG_SMP
-	if (likely(se->load.weight == tg->shares))
+	if (likely(se->load.weight == cfs_rq->shares))
 		return;
 #endif
 	shares = calc_cfs_shares(cfs_rq, tg);
@@ -8584,6 +8584,7 @@ void init_tg_cfs_entry(struct task_group *tg, struct cfs_rq *cfs_rq,
 
 	se->my_q = cfs_rq;
 	/* guarantee group entities always have weight */
+	cfs_rq->shares = NICE_0_LOAD;
 	update_load_set(&se->load, NICE_0_LOAD);
 	se->parent = parent;
 }
@@ -8618,6 +8619,7 @@ int sched_group_set_shares(struct task_group *tg, unsigned long shares)
 
 		/* Possible calls to update_curr() need rq clock */
 		update_rq_clock(rq);
+		group_cfs_rq(se)->shares = shares;
 		for_each_sched_entity(se)
 			update_cfs_shares(group_cfs_rq(se));
 		raw_spin_unlock_irqrestore(&rq->lock, flags);
