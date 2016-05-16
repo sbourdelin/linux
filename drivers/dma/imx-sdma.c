@@ -572,6 +572,27 @@ static void sdma_enable_channel(struct sdma_engine *sdma, int channel)
 	spin_unlock_irqrestore(&sdmac->lock, flags);
 }
 
+static struct sdma_channel *to_sdma_chan(struct dma_chan *chan)
+{
+	return container_of(chan, struct sdma_channel, chan);
+}
+
+static int sdma_disable_channel(struct dma_chan *chan)
+{
+	struct sdma_channel *sdmac = to_sdma_chan(chan);
+	struct sdma_engine *sdma = sdmac->sdma;
+	int channel = sdmac->channel;
+	unsigned long flags;
+
+	spin_lock_irqsave(&sdmac->lock, flags);
+	sdmac->enabled = false;
+	writel_relaxed(BIT(channel), sdma->regs + SDMA_H_STATSTOP);
+	sdmac->status = DMA_ERROR;
+	spin_unlock_irqrestore(&sdmac->lock, flags);
+
+	return 0;
+}
+
 /*
  * sdma_run_channel0 - run a channel and wait till it's done
  */
@@ -592,6 +613,7 @@ static int sdma_run_channel0(struct sdma_engine *sdma)
 		/* Clear the interrupt status */
 		writel_relaxed(ret, sdma->regs + SDMA_H_INTR);
 	} else {
+		sdma_disable_channel(&sdma->channel[0].chan);
 		dev_err(sdma->dev, "Timeout waiting for CH0 ready\n");
 	}
 
@@ -914,27 +936,6 @@ static int sdma_load_context(struct sdma_channel *sdmac)
 	spin_unlock_irqrestore(&sdma->channel_0_lock, flags);
 
 	return ret;
-}
-
-static struct sdma_channel *to_sdma_chan(struct dma_chan *chan)
-{
-	return container_of(chan, struct sdma_channel, chan);
-}
-
-static int sdma_disable_channel(struct dma_chan *chan)
-{
-	struct sdma_channel *sdmac = to_sdma_chan(chan);
-	struct sdma_engine *sdma = sdmac->sdma;
-	int channel = sdmac->channel;
-	unsigned long flags;
-
-	spin_lock_irqsave(&sdmac->lock, flags);
-	sdmac->enabled = false;
-	writel_relaxed(BIT(channel), sdma->regs + SDMA_H_STATSTOP);
-	sdmac->status = DMA_ERROR;
-	spin_unlock_irqrestore(&sdmac->lock, flags);
-
-	return 0;
 }
 
 static void sdma_set_watermarklevel_for_p2p(struct sdma_channel *sdmac)
