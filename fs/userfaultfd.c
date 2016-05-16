@@ -70,6 +70,20 @@ struct userfaultfd_wake_range {
 	unsigned long len;
 };
 
+/*
+ * mm_struct can't go away, but we need to verify that this memory is still
+ * alive and avoid the race with exit_mmap().
+ */
+static inline bool userfaultfd_get_mm(struct userfaultfd_ctx *ctx)
+{
+	return atomic_inc_not_zero(&ctx->mm->mm_users);
+}
+
+static inline void userfaultfd_put_mm(struct userfaultfd_ctx *ctx)
+{
+	mmput(ctx->mm);
+}
+
 static int userfaultfd_wake_function(wait_queue_t *wq, unsigned mode,
 				     int wake_flags, void *key)
 {
@@ -137,7 +151,7 @@ static void userfaultfd_ctx_put(struct userfaultfd_ctx *ctx)
 		VM_BUG_ON(waitqueue_active(&ctx->fault_wqh));
 		VM_BUG_ON(spin_is_locked(&ctx->fd_wqh.lock));
 		VM_BUG_ON(waitqueue_active(&ctx->fd_wqh));
-		mmput(ctx->mm);
+		mmdrop(ctx->mm);
 		kmem_cache_free(userfaultfd_ctx_cachep, ctx);
 	}
 }
@@ -434,6 +448,9 @@ static int userfaultfd_release(struct inode *inode, struct file *file)
 
 	ACCESS_ONCE(ctx->released) = true;
 
+	if (!userfaultfd_get_mm(ctx))
+		goto wakeup;
+
 	/*
 	 * Flush page faults out of all CPUs. NOTE: all page faults
 	 * must be retried without returning VM_FAULT_SIGBUS if
@@ -466,7 +483,8 @@ static int userfaultfd_release(struct inode *inode, struct file *file)
 		vma->vm_userfaultfd_ctx = NULL_VM_UFFD_CTX;
 	}
 	up_write(&mm->mmap_sem);
-
+	userfaultfd_put_mm(ctx);
+wakeup:
 	/*
 	 * After no new page faults can wait on this fault_*wqh, flush
 	 * the last page faults that may have been already waiting on
@@ -760,10 +778,12 @@ static int userfaultfd_register(struct userfaultfd_ctx *ctx,
 	start = uffdio_register.range.start;
 	end = start + uffdio_register.range.len;
 
+	ret = -ENOMEM;
+	if (!userfaultfd_get_mm(ctx))
+		goto out;
+
 	down_write(&mm->mmap_sem);
 	vma = find_vma_prev(mm, start, &prev);
-
-	ret = -ENOMEM;
 	if (!vma)
 		goto out_unlock;
 
@@ -864,6 +884,7 @@ static int userfaultfd_register(struct userfaultfd_ctx *ctx,
 	} while (vma && vma->vm_start < end);
 out_unlock:
 	up_write(&mm->mmap_sem);
+	userfaultfd_put_mm(ctx);
 	if (!ret) {
 		/*
 		 * Now that we scanned all vmas we can already tell
@@ -902,10 +923,12 @@ static int userfaultfd_unregister(struct userfaultfd_ctx *ctx,
 	start = uffdio_unregister.start;
 	end = start + uffdio_unregister.len;
 
+	ret = -ENOMEM;
+	if (!userfaultfd_get_mm(ctx))
+		goto out;
+
 	down_write(&mm->mmap_sem);
 	vma = find_vma_prev(mm, start, &prev);
-
-	ret = -ENOMEM;
 	if (!vma)
 		goto out_unlock;
 
@@ -998,6 +1021,7 @@ static int userfaultfd_unregister(struct userfaultfd_ctx *ctx,
 	} while (vma && vma->vm_start < end);
 out_unlock:
 	up_write(&mm->mmap_sem);
+	userfaultfd_put_mm(ctx);
 out:
 	return ret;
 }
@@ -1067,9 +1091,11 @@ static int userfaultfd_copy(struct userfaultfd_ctx *ctx,
 		goto out;
 	if (uffdio_copy.mode & ~UFFDIO_COPY_MODE_DONTWAKE)
 		goto out;
-
-	ret = mcopy_atomic(ctx->mm, uffdio_copy.dst, uffdio_copy.src,
-			   uffdio_copy.len);
+	if (userfaultfd_get_mm(ctx)) {
+		ret = mcopy_atomic(ctx->mm, uffdio_copy.dst, uffdio_copy.src,
+				   uffdio_copy.len);
+		userfaultfd_put_mm(ctx);
+	}
 	if (unlikely(put_user(ret, &user_uffdio_copy->copy)))
 		return -EFAULT;
 	if (ret < 0)
@@ -1110,8 +1136,11 @@ static int userfaultfd_zeropage(struct userfaultfd_ctx *ctx,
 	if (uffdio_zeropage.mode & ~UFFDIO_ZEROPAGE_MODE_DONTWAKE)
 		goto out;
 
-	ret = mfill_zeropage(ctx->mm, uffdio_zeropage.range.start,
-			     uffdio_zeropage.range.len);
+	if (userfaultfd_get_mm(ctx)) {
+		ret = mfill_zeropage(ctx->mm, uffdio_zeropage.range.start,
+				     uffdio_zeropage.range.len);
+		userfaultfd_put_mm(ctx);
+	}
 	if (unlikely(put_user(ret, &user_uffdio_zeropage->zeropage)))
 		return -EFAULT;
 	if (ret < 0)
@@ -1289,12 +1318,12 @@ static struct file *userfaultfd_file_create(int flags)
 	ctx->released = false;
 	ctx->mm = current->mm;
 	/* prevent the mm struct to be freed */
-	atomic_inc(&ctx->mm->mm_users);
+	atomic_inc(&ctx->mm->mm_count);
 
 	file = anon_inode_getfile("[userfaultfd]", &userfaultfd_fops, ctx,
 				  O_RDWR | (flags & UFFD_SHARED_FCNTL_FLAGS));
 	if (IS_ERR(file)) {
-		mmput(ctx->mm);
+		mmdrop(ctx->mm);
 		kmem_cache_free(userfaultfd_ctx_cachep, ctx);
 	}
 out:
