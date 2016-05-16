@@ -7684,6 +7684,7 @@ ahc_handle_en_lun(struct ahc_softc *ahc, struct cam_sim *sim, union ccb *ccb)
 
 		if (ccb->ccb_h.status != CAM_REQ_CMP) {
 			ahc_unlock(ahc, &s);
+			kfree(lstate);
 			return;
 		}
 
