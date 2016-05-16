@@ -768,12 +768,16 @@ static void sdma_tasklet(unsigned long data)
 static irqreturn_t sdma_int_handler(int irq, void *dev_id)
 {
 	struct sdma_engine *sdma = dev_id;
-	unsigned long stat;
+	unsigned long stat, flags;
+
+	spin_lock_irqsave(&sdma->channel_0_lock, flags);
 
 	stat = readl_relaxed(sdma->regs + SDMA_H_INTR);
+	writel_relaxed(stat, sdma->regs + SDMA_H_INTR);
 	/* not interested in channel 0 interrupts */
 	stat &= ~1;
-	writel_relaxed(stat, sdma->regs + SDMA_H_INTR);
+
+	spin_unlock_irqrestore(&sdma->channel_0_lock, flags);
 
 	while (stat) {
 		int channel = fls(stat) - 1;
