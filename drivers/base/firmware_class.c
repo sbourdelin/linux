@@ -106,11 +106,6 @@ static inline long firmware_loading_timeout(void)
 #else
 #define FW_OPT_USERHELPER	0
 #endif
-#ifdef CONFIG_FW_LOADER_USER_HELPER_FALLBACK
-#define FW_OPT_FALLBACK		FW_OPT_USERHELPER
-#else
-#define FW_OPT_FALLBACK		0
-#endif
 #define FW_OPT_NO_WARN	(1U << 3)
 
 struct firmware_cache {
@@ -1185,7 +1180,7 @@ request_firmware(const struct firmware **firmware_p, const char *name,
 	/* Need to pin this module until return */
 	__module_get(THIS_MODULE);
 	ret = _request_firmware(firmware_p, name, device,
-				FW_OPT_UEVENT | FW_OPT_FALLBACK);
+				FW_OPT_UEVENT);
 	module_put(THIS_MODULE);
 	return ret;
 }
@@ -1301,7 +1296,7 @@ request_firmware_nowait(
 	fw_work->device = device;
 	fw_work->context = context;
 	fw_work->cont = cont;
-	fw_work->opt_flags = FW_OPT_NOWAIT | FW_OPT_FALLBACK |
+	fw_work->opt_flags = FW_OPT_NOWAIT |
 		(uevent ? FW_OPT_UEVENT : FW_OPT_USERHELPER);
 
 	if (!try_module_get(module)) {
