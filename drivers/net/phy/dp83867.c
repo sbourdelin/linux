@@ -99,7 +99,6 @@ static int dp83867_config_intr(struct phy_device *phydev)
 	return phy_write(phydev, MII_DP83867_MICR, micr_status);
 }
 
-#ifdef CONFIG_OF_MDIO
 static int dp83867_of_init(struct phy_device *phydev)
 {
 	struct dp83867_private *dp83867 = phydev->priv;
@@ -123,12 +122,6 @@ static int dp83867_of_init(struct phy_device *phydev)
 	return of_property_read_u32(of_node, "ti,fifo-depth",
 				   &dp83867->fifo_depth);
 }
-#else
-static int dp83867_of_init(struct phy_device *phydev)
-{
-	return 0;
-}
-#endif /* CONFIG_OF_MDIO */
 
 static int dp83867_config_init(struct phy_device *phydev)
 {
