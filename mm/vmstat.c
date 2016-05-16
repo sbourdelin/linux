@@ -1370,6 +1370,7 @@ static void refresh_vm_stats(struct work_struct *work)
 	refresh_cpu_vm_stats(true);
 }
 
+#ifdef CONFIG_PROC_FS
 int vmstat_refresh(struct ctl_table *table, int write,
 		   void __user *buffer, size_t *lenp, loff_t *ppos)
 {
@@ -1422,6 +1423,7 @@ int vmstat_refresh(struct ctl_table *table, int write,
 		*lenp = 0;
 	return 0;
 }
+#endif
 
 static void vmstat_update(struct work_struct *w)
 {
