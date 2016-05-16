@@ -2233,6 +2233,7 @@ int i40evf_process_config(struct i40evf_adapter *adapter)
 				   NETIF_F_GSO_IPIP		|
 				   NETIF_F_GSO_SIT		|
 				   NETIF_F_GSO_UDP_TUNNEL	|
+				   NETIF_F_RXHASH	        |
 				   NETIF_F_GSO_UDP_TUNNEL_CSUM	|
 				   NETIF_F_GSO_PARTIAL		|
 				   NETIF_F_SCTP_CRC		|
