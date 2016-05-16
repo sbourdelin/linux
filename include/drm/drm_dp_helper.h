@@ -840,6 +840,15 @@ struct drm_dp_hdmi {
 };
 
 /*
+ * DP to DP++
+ */
+struct drm_dp_dual_mode {
+	int tmds_clk;
+	uint8_t bpc;
+	bool frame_seq_to_frame_pack;
+};
+
+/*
  * Branch device
  */
 struct drm_dp_bd {
@@ -850,6 +859,7 @@ struct drm_dp_bd {
 		struct drm_dp_vga vga;
 		struct drm_dp_dvi dvi;
 		struct drm_dp_hdmi hdmi;
+		struct drm_dp_dual_mode dual_mode;
 	} dfp;
 };
 
