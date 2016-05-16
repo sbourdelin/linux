@@ -468,6 +468,13 @@ int drm_dp_bd(struct drm_dp_aux *aux, struct drm_dp_bd *bd)
 			bd->dfp.dual_mode.tmds_clk = info[1] * 2500;
 			bd->dfp.dual_mode.bpc = info[2] & DP_DS_VGA_MAX_BPC_MASK;
 			bd->dfp.dual_mode.frame_seq_to_frame_pack = info[3] & FRAME_SEQ_TO_FRAME_PACK;
+		} else if (bd->type & DP_DS_PORT_TYPE_WIRELESS) {
+			bd->dfp.wireless.wireless_tech = info[1] & DP_DS_WIRELESS_TECH_MASK;
+
+			if (bd->dfp.wireless.wireless_tech == 0x0) {
+				bd->dfp.wireless.number_of_wde_tx_on_device = info[2] & WIRELESS_MASK;
+				bd->dfp.wireless.wde_tx_concurrency_cap = (info[2]>>2) & WIRELESS_MASK;
+			}
 		}
 	}
 
