@@ -33,6 +33,7 @@
 
 /* State for one irq source */
 struct ics_irq_state {
+	arch_spinlock_t lock;
 	u32 number;
 	u32 server;
 	u8  priority;
@@ -93,7 +94,6 @@ struct kvmppc_icp {
 };
 
 struct kvmppc_ics {
-	arch_spinlock_t lock;
 	u16 icsid;
 	struct ics_irq_state irq_state[KVMPPC_XICS_IRQ_PER_ICS];
 };

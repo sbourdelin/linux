@@ -36,20 +36,19 @@ static void ics_rm_check_resend(struct kvmppc_xics *xics,
 {
 	int i;
 
-	arch_spin_lock(&ics->lock);
-
 	for (i = 0; i < KVMPPC_XICS_IRQ_PER_ICS; i++) {
 		struct ics_irq_state *state = &ics->irq_state[i];
 
-		if (!state->resend)
+		arch_spin_lock(&state->lock);
+
+		if (!state->resend) {
+			arch_spin_unlock(&state->lock);
 			continue;
+		}
 
-		arch_spin_unlock(&ics->lock);
+		arch_spin_unlock(&state->lock);
 		icp_rm_deliver_irq(xics, icp, state->number);
-		arch_spin_lock(&ics->lock);
 	}
-
-	arch_spin_unlock(&ics->lock);
 }
 
 /* -- ICP routines -- */
@@ -310,8 +309,7 @@ static void icp_rm_deliver_irq(struct kvmppc_xics *xics, struct kvmppc_icp *icp,
 	}
 	state = &ics->irq_state[src];
 
-	/* Get a lock on the ICS */
-	arch_spin_lock(&ics->lock);
+	arch_spin_lock(&state->lock);
 
 	/* Get our server */
 	if (!icp || state->server != icp->server_num) {
@@ -367,7 +365,7 @@ static void icp_rm_deliver_irq(struct kvmppc_xics *xics, struct kvmppc_icp *icp,
 		 * Delivery was successful, did we reject somebody else ?
 		 */
 		if (reject && reject != XICS_IPI) {
-			arch_spin_unlock(&ics->lock);
+			arch_spin_unlock(&state->lock);
 			new_irq = reject;
 			goto again;
 		}
@@ -387,12 +385,12 @@ static void icp_rm_deliver_irq(struct kvmppc_xics *xics, struct kvmppc_icp *icp,
 		 */
 		smp_mb();
 		if (!icp->state.need_resend) {
-			arch_spin_unlock(&ics->lock);
+			arch_spin_unlock(&state->lock);
 			goto again;
 		}
 	}
- out:
-	arch_spin_unlock(&ics->lock);
+out:
+	arch_spin_unlock(&state->lock);
 }
 
 static void icp_rm_down_cppr(struct kvmppc_xics *xics, struct kvmppc_icp *icp,

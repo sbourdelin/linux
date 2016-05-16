@@ -113,25 +113,26 @@ static void ics_check_resend(struct kvmppc_xics *xics, struct kvmppc_ics *ics,
 	unsigned long flags;
 
 	local_irq_save(flags);
-	arch_spin_lock(&ics->lock);
 
 	for (i = 0; i < KVMPPC_XICS_IRQ_PER_ICS; i++) {
 		struct ics_irq_state *state = &ics->irq_state[i];
 
-		if (!state->resend)
+		arch_spin_lock(&state->lock);
+
+		if (!state->resend) {
+			arch_spin_unlock(&state->lock);
 			continue;
+		}
 
 		XICS_DBG("resend %#x prio %#x\n", state->number,
 			      state->priority);
 
-		arch_spin_unlock(&ics->lock);
+		arch_spin_unlock(&state->lock);
 		local_irq_restore(flags);
 		icp_deliver_irq(xics, icp, state->number);
 		local_irq_save(flags);
-		arch_spin_lock(&ics->lock);
 	}
 
-	arch_spin_unlock(&ics->lock);
 	local_irq_restore(flags);
 }
 
@@ -143,7 +144,7 @@ static bool write_xive(struct kvmppc_xics *xics, struct kvmppc_ics *ics,
 	unsigned long flags;
 
 	local_irq_save(flags);
-	arch_spin_lock(&ics->lock);
+	arch_spin_lock(&state->lock);
 
 	state->server = server;
 	state->priority = priority;
@@ -154,7 +155,7 @@ static bool write_xive(struct kvmppc_xics *xics, struct kvmppc_ics *ics,
 		deliver = true;
 	}
 
-	arch_spin_unlock(&ics->lock);
+	arch_spin_unlock(&state->lock);
 	local_irq_restore(flags);
 
 	return deliver;
@@ -207,10 +208,10 @@ int kvmppc_xics_get_xive(struct kvm *kvm, u32 irq, u32 *server, u32 *priority)
 	state = &ics->irq_state[src];
 
 	local_irq_save(flags);
-	arch_spin_lock(&ics->lock);
+	arch_spin_lock(&state->lock);
 	*server = state->server;
 	*priority = state->priority;
-	arch_spin_unlock(&ics->lock);
+	arch_spin_unlock(&state->lock);
 	local_irq_restore(flags);
 
 	return 0;
@@ -406,7 +407,7 @@ static void icp_deliver_irq(struct kvmppc_xics *xics, struct kvmppc_icp *icp,
 
 	/* Get a lock on the ICS */
 	local_irq_save(flags);
-	arch_spin_lock(&ics->lock);
+	arch_spin_lock(&state->lock);
 
 	/* Get our server */
 	if (!icp || state->server != icp->server_num) {
@@ -463,7 +464,7 @@ static void icp_deliver_irq(struct kvmppc_xics *xics, struct kvmppc_icp *icp,
 		 * Delivery was successful, did we reject somebody else ?
 		 */
 		if (reject && reject != XICS_IPI) {
-			arch_spin_unlock(&ics->lock);
+			arch_spin_unlock(&state->lock);
 			local_irq_restore(flags);
 			new_irq = reject;
 			goto again;
@@ -484,13 +485,13 @@ static void icp_deliver_irq(struct kvmppc_xics *xics, struct kvmppc_icp *icp,
 		 */
 		smp_mb();
 		if (!icp->state.need_resend) {
-			arch_spin_unlock(&ics->lock);
+			arch_spin_unlock(&state->lock);
 			local_irq_restore(flags);
 			goto again;
 		}
 	}
  out:
-	arch_spin_unlock(&ics->lock);
+	arch_spin_unlock(&state->lock);
 	local_irq_restore(flags);
 }
 
@@ -950,18 +951,18 @@ static int xics_debug_show(struct seq_file *m, void *private)
 			   icsid);
 
 		local_irq_save(flags);
-		arch_spin_lock(&ics->lock);
 
 		for (i = 0; i < KVMPPC_XICS_IRQ_PER_ICS; i++) {
 			struct ics_irq_state *irq = &ics->irq_state[i];
+			arch_spin_lock(&irq->lock);
 
 			seq_printf(m, "irq 0x%06x: server %#x prio %#x save prio %#x asserted %d resend %d masked pending %d\n",
 				   irq->number, irq->server, irq->priority,
 				   irq->saved_priority, irq->asserted,
 				   irq->resend, irq->masked_pending);
+			arch_spin_unlock(&irq->lock);
 
 		}
-		arch_spin_unlock(&ics->lock);
 		local_irq_restore(flags);
 	}
 	return 0;
@@ -1021,6 +1022,8 @@ static struct kvmppc_ics *kvmppc_xics_create_ics(struct kvm *kvm,
 		ics->irq_state[i].number = (icsid << KVMPPC_XICS_ICS_SHIFT) | i;
 		ics->irq_state[i].priority = MASKED;
 		ics->irq_state[i].saved_priority = MASKED;
+		ics->irq_state[i].lock =
+			(arch_spinlock_t)__ARCH_SPIN_LOCK_UNLOCKED;
 	}
 	smp_wmb();
 	xics->ics[icsid] = ics;
@@ -1164,7 +1167,7 @@ static int xics_get_source(struct kvmppc_xics *xics, long irq, u64 addr)
 
 	irqp = &ics->irq_state[idx];
 	local_irq_save(flags);
-	arch_spin_lock(&ics->lock);
+	arch_spin_lock(&irqp->lock);
 	ret = -ENOENT;
 	if (irqp->exists) {
 		val = irqp->server;
@@ -1180,7 +1183,7 @@ static int xics_get_source(struct kvmppc_xics *xics, long irq, u64 addr)
 			val |= KVM_XICS_PENDING;
 		ret = 0;
 	}
-	arch_spin_unlock(&ics->lock);
+	arch_spin_unlock(&irqp->lock);
 	local_irq_restore(flags);
 
 	if (!ret && put_user(val, ubufp))
@@ -1220,7 +1223,7 @@ static int xics_set_source(struct kvmppc_xics *xics, long irq, u64 addr)
 		return -EINVAL;
 
 	local_irq_save(flags);
-	arch_spin_lock(&ics->lock);
+	arch_spin_lock(&irqp->lock);
 	irqp->server = server;
 	irqp->saved_priority = prio;
 	if (val & KVM_XICS_MASKED)
@@ -1232,7 +1235,7 @@ static int xics_set_source(struct kvmppc_xics *xics, long irq, u64 addr)
 	if ((val & KVM_XICS_PENDING) && (val & KVM_XICS_LEVEL_SENSITIVE))
 		irqp->asserted = 1;
 	irqp->exists = 1;
-	arch_spin_unlock(&ics->lock);
+	arch_spin_unlock(&irqp->lock);
 	local_irq_restore(flags);
 
 	if (val & KVM_XICS_PENDING)
