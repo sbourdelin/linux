@@ -3,6 +3,12 @@
 # you somehow have an implicit or explicit dependency on SERIAL_8250.
 #
 
+config SERIAL_8250_EARLYCON
+	bool "Early console using 8250"
+	select SERIAL_CORE
+	select SERIAL_CORE_CONSOLE
+	select SERIAL_EARLYCON
+
 config SERIAL_8250
 	tristate "8250/16550 and compatible serial support"
 	select SERIAL_CORE
@@ -72,8 +78,7 @@ config SERIAL_8250_FINTEK
 config SERIAL_8250_CONSOLE
 	bool "Console on 8250/16550 and compatible serial port"
 	depends on SERIAL_8250=y
-	select SERIAL_CORE_CONSOLE
-	select SERIAL_EARLYCON
+	select SERIAL_8250_EARLYCON
 	---help---
 	  If you say Y here, it will be possible to use a serial port as the
 	  system console (the system console is the device which receives all
