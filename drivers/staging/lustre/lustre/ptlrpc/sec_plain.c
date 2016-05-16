@@ -542,6 +542,7 @@ int plain_alloc_reqbuf(struct ptlrpc_sec *sec,
 {
 	__u32 buflens[PLAIN_PACK_SEGMENTS] = { 0, };
 	int alloc_len;
+	int desc;
 
 	buflens[PLAIN_PACK_HDR_OFF] = sizeof(struct plain_header);
 	buflens[PLAIN_PACK_MSG_OFF] = msgsize;
@@ -574,8 +575,12 @@ int plain_alloc_reqbuf(struct ptlrpc_sec *sec,
 	lustre_init_msg_v2(req->rq_reqbuf, PLAIN_PACK_SEGMENTS, buflens, NULL);
 	req->rq_reqmsg = lustre_msg_buf(req->rq_reqbuf, PLAIN_PACK_MSG_OFF, 0);
 
-	if (req->rq_pack_udesc)
-		sptlrpc_pack_user_desc(req->rq_reqbuf, PLAIN_PACK_USER_OFF);
+	if (req->rq_pack_udesc) {
+		desc = sptlrpc_pack_user_desc(req->rq_reqbuf,
+					      PLAIN_PACK_USER_OFF);
+		if (!desc)
+			return desc;
+	}
 
 	return 0;
 }
