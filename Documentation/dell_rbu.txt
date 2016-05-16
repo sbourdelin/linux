@@ -31,8 +31,6 @@ The user should not unload the rbu driver after downloading the BIOS image
 or updating.
 
 The driver load creates the following directories under the /sys file system.
-/sys/class/firmware/dell_rbu/loading
-/sys/class/firmware/dell_rbu/data
 /sys/devices/platform/dell_rbu/image_type
 /sys/devices/platform/dell_rbu/data
 /sys/devices/platform/dell_rbu/packet_size
@@ -60,7 +58,7 @@ added together should match the specified packet_size. This makes one
 packet, the user needs to create more such packets out of the entire BIOS
 image file and then arrange all these packets back to back in to one single
 file.
-This file is then copied to /sys/class/firmware/dell_rbu/data.
+This file is then copied to /lib/firmware/dell_rbu.
 Once this file gets to the driver, the driver extracts packet_size data from
 the file and spreads it across the physical memory in contiguous packet_sized
 space.
@@ -70,29 +68,13 @@ In monolithic update the user simply get the BIOS image (.hdr file) and copies
 to the data file as is without any change to the BIOS image itself.
 
 Do the steps below to download the BIOS image.
-1) echo 1 > /sys/class/firmware/dell_rbu/loading
-2) cp bios_image.hdr /sys/class/firmware/dell_rbu/data
-3) echo 0 > /sys/class/firmware/dell_rbu/loading
-
-The /sys/class/firmware/dell_rbu/ entries will remain till the following is
-done.
-echo -1 > /sys/class/firmware/dell_rbu/loading
-Until this step is completed the driver cannot be unloaded.
-Also echoing either mono, packet or init in to image_type will free up the
-memory allocated by the driver.
-
-If a user by accident executes steps 1 and 3 above without executing step 2;
-it will make the /sys/class/firmware/dell_rbu/ entries disappear.
-The entries can be recreated by doing the following
-echo init > /sys/devices/platform/dell_rbu/image_type
-NOTE: echoing init in image_type does not change it original value.
+1) Prepare BIOS image and place in /lib/firmware/dell_rbu
+2) echo "init" > /sys/devices/platform/dell_rbu/packet_type
 
 Also the driver provides /sys/devices/platform/dell_rbu/data readonly file to
 read back the image downloaded.
 
 NOTE:
-This driver requires a patch for firmware_class.c which has the modified
-request_firmware_nowait function.
 Also after updating the BIOS image a user mode application needs to execute
 code which sends the BIOS update request to the BIOS. So on the next reboot
 the BIOS knows about the new image downloaded and it updates itself.
