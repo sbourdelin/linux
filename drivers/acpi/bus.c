@@ -30,6 +30,8 @@
 #include <linux/acpi.h>
 #include <linux/slab.h>
 #include <linux/regulator/machine.h>
+#include <linux/workqueue.h>
+#include <linux/reboot.h>
 #ifdef CONFIG_X86
 #include <asm/mpspec.h>
 #endif
@@ -473,6 +475,52 @@ static void acpi_device_remove_notify_handler(struct acpi_device *device)
 	else
 		acpi_remove_notify_handler(device->handle, ACPI_DEVICE_NOTIFY,
 					   acpi_device_notify);
+}
+
+/* Handle events targeting \_SB device (at present only graceful shutdown) */
+
+#define ACPI_SB_NOTIFY_SHUTDOWN_REQUEST 0x81
+#define ACPI_SYBUS_INDICATE_INTERVAL	10000
+
+static void sybus_evaluate_ost(struct work_struct *dummy);
+static DECLARE_DELAYED_WORK(acpi_sybus_work, sybus_evaluate_ost);
+
+static void sybus_evaluate_ost(struct work_struct *dummy)
+{
+	acpi_handle sb_handle;
+
+	if (ACPI_SUCCESS(acpi_get_handle(NULL, "\\_SB", &sb_handle))) {
+		acpi_evaluate_ost(sb_handle, ACPI_OST_EC_OSPM_SHUTDOWN,
+				ACPI_OST_SC_OS_SHUTDOWN_IN_PROGRESS, NULL);
+		schedule_delayed_work(&acpi_sybus_work,
+				msecs_to_jiffies(ACPI_SYBUS_INDICATE_INTERVAL));
+		pr_info("Graceful shutdown in progress.\n");
+	}
+}
+
+static void acpi_sybus_notify(acpi_handle handle, u32 event, void *data)
+{
+	if (event == ACPI_SB_NOTIFY_SHUTDOWN_REQUEST) {
+		if (!delayed_work_pending(&acpi_sybus_work)) {
+			sybus_evaluate_ost(NULL);
+			orderly_poweroff(true);
+		}
+	} else
+		pr_warn("event %x is not supported by \\_SB device\n", event);
+}
+
+static int __init acpi_setup_sybus_notify_handler(void)
+{
+	acpi_handle sb_handle;
+
+	if (ACPI_FAILURE(acpi_get_handle(NULL, "\\_SB", &sb_handle)))
+		return -ENXIO;
+
+	if (ACPI_FAILURE(acpi_install_notify_handler(sb_handle, ACPI_DEVICE_NOTIFY,
+						acpi_sybus_notify, NULL)))
+		return -EINVAL;
+
+	return 0;
 }
 
 /* --------------------------------------------------------------------------
@@ -1124,6 +1172,7 @@ static int __init acpi_init(void)
 	acpi_sleep_proc_init();
 	acpi_wakeup_device_init();
 	acpi_debugger_init();
+	acpi_setup_sybus_notify_handler();
 	return 0;
 }
 
