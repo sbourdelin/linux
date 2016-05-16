@@ -456,6 +456,14 @@ int drm_dp_bd(struct drm_dp_aux *aux, struct drm_dp_bd *bd)
 			bd->dfp.dvi.bpc = info[2] & DP_DS_VGA_MAX_BPC_MASK;
 			bd->dfp.dvi.dual_link = info[3] & DP_DS_DVI_DUAL_LINK;
 			bd->dfp.dvi.hi_color_depth = info[3] & DP_DS_DVI_HI_COLOR_DEPTH;
+		} else if (bd->type & DP_DS_PORT_TYPE_HDMI) {
+			bd->dfp.hdmi.tmds_clk = info[1] * 2500;
+			bd->dfp.hdmi.bpc = info[2] & DP_DS_VGA_MAX_BPC_MASK;
+			bd->dfp.hdmi.frame_seq_to_frame_pack = info[3] & FRAME_SEQ_TO_FRAME_PACK;
+			bd->dfp.hdmi.ycbcr422_pass_through = info[3] & YCBCR422_PASS_THROUGH;
+			bd->dfp.hdmi.ycbcr420_pass_through = info[3] & YCBCR420_PASS_THROUGH;
+			bd->dfp.hdmi.conversion_from_ycbcr444_to_ycbcr422 = info[3] & YCBCR444_TO_YCBCR422;
+			bd->dfp.hdmi.conversion_from_ycbcr444_to_ycbcr420 = info[3] & YCBCR444_TO_YCBCR420;
 		}
 	}
 
