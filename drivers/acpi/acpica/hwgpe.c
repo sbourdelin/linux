@@ -98,7 +98,7 @@ acpi_status
 acpi_hw_low_set_gpe(struct acpi_gpe_event_info *gpe_event_info, u32 action)
 {
 	struct acpi_gpe_register_info *gpe_register_info;
-	acpi_status status;
+	acpi_status status = AE_OK;
 	u32 enable_mask;
 	u32 register_bit;
 
@@ -148,9 +148,21 @@ acpi_hw_low_set_gpe(struct acpi_gpe_event_info *gpe_event_info, u32 action)
 		return (AE_BAD_PARAMETER);
 	}
 
-	/* Write the updated enable mask */
+	/* Check if there is an administrative GPE enabling/disabling */
 
-	status = acpi_hw_write(enable_mask, &gpe_register_info->enable_address);
+	if (gpe_event_info->flags & ACPI_GPE_MANAGED_FLAG_MASK) {
+		if (enable_mask & register_bit) {
+			gpe_event_info->blocked_enabled = TRUE;
+		} else {
+			gpe_event_info->blocked_enabled = FALSE;
+		}
+	} else {
+		/* Write the updated enable mask */
+
+		status =
+		    acpi_hw_write(enable_mask,
+				  &gpe_register_info->enable_address);
+	}
 	return (status);
 }
 
@@ -226,6 +238,12 @@ acpi_hw_get_gpe_status(struct acpi_gpe_event_info *gpe_event_info,
 	if (ACPI_GPE_DISPATCH_TYPE(gpe_event_info->flags) !=
 	    ACPI_GPE_DISPATCH_NONE) {
 		local_event_status |= ACPI_EVENT_FLAG_HAS_HANDLER;
+	}
+
+	/* GPE currently managed? (enabled/disabled by the system admin?) */
+
+	if (gpe_event_info->flags & ACPI_GPE_MANAGED_FLAG_MASK) {
+		local_event_status |= ACPI_EVENT_FLAG_MANAGED;
 	}
 
 	/* Get the info block for the entire GPE register */

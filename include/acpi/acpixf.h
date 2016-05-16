@@ -732,14 +732,27 @@ ACPI_HW_DEPENDENT_RETURN_STATUS(acpi_status
 						u32 gpe_number))
 
 ACPI_HW_DEPENDENT_RETURN_STATUS(acpi_status
-				acpi_mark_gpe_for_wake(acpi_handle gpe_device,
-						       u32 gpe_number))
+				acpi_block_gpe(acpi_handle gpe_device,
+					       u32 gpe_number))
 
 ACPI_HW_DEPENDENT_RETURN_STATUS(acpi_status
-				acpi_setup_gpe_for_wake(acpi_handle
-							parent_device,
-							acpi_handle gpe_device,
+				acpi_unblock_gpe(acpi_handle gpe_device,
+						 u32 gpe_number))
+
+ACPI_HW_DEPENDENT_RETURN_STATUS(acpi_status
+				acpi_control_gpe_handling(acpi_handle
+							  gpe_device,
+							  u32 gpe_number,
+							  u8 use_interrupt_mode,
+							  u8 use_polling_mode))
+ACPI_HW_DEPENDENT_RETURN_STATUS(acpi_status
+				 acpi_mark_gpe_for_wake(acpi_handle gpe_device,
 							u32 gpe_number))
+ACPI_HW_DEPENDENT_RETURN_STATUS(acpi_status
+				 acpi_setup_gpe_for_wake(acpi_handle
+							 parent_device,
+							 acpi_handle gpe_device,
+							 u32 gpe_number))
 ACPI_HW_DEPENDENT_RETURN_STATUS(acpi_status
 				 acpi_set_gpe_wake_mask(acpi_handle gpe_device,
 							u32 gpe_number,

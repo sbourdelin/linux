@@ -130,6 +130,90 @@ acpi_status acpi_ev_enable_gpe(struct acpi_gpe_event_info *gpe_event_info)
 
 /*******************************************************************************
  *
+ * FUNCTION:    acpi_ev_manage_gpe
+ *
+ * PARAMETERS:  gpe_event_info          - GPE to force enabling/disabling
+ *              action                  - ACPI_GPE_ENABLE, ACPI_GPE_DISABLE or
+ *                                        ACPI_GPE_UNMANAGE
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Unconditionally enable or disable an individual GPE for the
+ *              administrative purposes during the runtime.
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ev_manage_gpe(struct acpi_gpe_event_info *gpe_event_info, u8 action)
+{
+	acpi_status status;
+	acpi_event_status event_status;
+
+	ACPI_FUNCTION_TRACE(ev_manage_gpe);
+
+	/* Perform the action */
+
+	switch (action) {
+	case ACPI_GPE_ENABLE:
+	case ACPI_GPE_DISABLE:
+
+		if (!(gpe_event_info->flags & ACPI_GPE_MANAGED_FLAG_MASK)) {
+			status =
+			    acpi_hw_get_gpe_status(gpe_event_info,
+						   &event_status);
+			if (ACPI_FAILURE(status)) {
+				return_ACPI_STATUS(status);
+			}
+			if (event_status & ACPI_EVENT_FLAG_ENABLE_SET) {
+				gpe_event_info->blocked_enabled = TRUE;
+			} else {
+				gpe_event_info->blocked_enabled = FALSE;
+			}
+		}
+
+		/* Reset flags so that acpi_hw_low_set_gpe() can take effective */
+
+		gpe_event_info->flags &= ~ACPI_GPE_MANAGED_FLAG_MASK;
+		if (action == ACPI_GPE_ENABLE) {
+			(void)acpi_hw_low_set_gpe(gpe_event_info,
+						  ACPI_GPE_ENABLE);
+			gpe_event_info->flags |= ACPI_GPE_MANAGED_ENABLED;
+		} else {
+			(void)acpi_hw_low_set_gpe(gpe_event_info,
+						  ACPI_GPE_DISABLE);
+			gpe_event_info->flags |= ACPI_GPE_MANAGED_DISABLED;
+		}
+		break;
+
+	case ACPI_GPE_UNMANAGE:
+
+		if (!(gpe_event_info->flags & ACPI_GPE_MANAGED_FLAG_MASK)) {
+			return_ACPI_STATUS(AE_BAD_PARAMETER);
+		}
+
+		/* Reset flags so that acpi_hw_low_set_gpe() can take effective */
+
+		gpe_event_info->flags &= ~ACPI_GPE_MANAGED_FLAG_MASK;
+		if (gpe_event_info->blocked_enabled) {
+			(void)acpi_hw_low_set_gpe(gpe_event_info,
+						  ACPI_GPE_ENABLE);
+		} else {
+			(void)acpi_hw_low_set_gpe(gpe_event_info,
+						  ACPI_GPE_DISABLE);
+		}
+		gpe_event_info->blocked_enabled = FALSE;
+		break;
+
+	default:
+
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
+	}
+
+	return_ACPI_STATUS(AE_OK);
+}
+
+/*******************************************************************************
+ *
  * FUNCTION:    acpi_ev_add_gpe_reference
  *
  * PARAMETERS:  gpe_event_info          - Add a reference to this GPE

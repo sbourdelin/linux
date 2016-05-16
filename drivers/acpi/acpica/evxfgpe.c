@@ -257,6 +257,148 @@ ACPI_EXPORT_SYMBOL(acpi_set_gpe)
 
 /*******************************************************************************
  *
+ * FUNCTION:    acpi_block_gpe
+ *
+ * PARAMETERS:  gpe_device          - Parent GPE Device. NULL for GPE0/GPE1
+ *              gpe_number          - GPE level within the GPE block
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Unconditionally disable an individual GPE.
+ *              This API is typically used by the system administrator to
+ *              block the GPE enabling, ex., prevent the GPE flooding.
+ *
+ ******************************************************************************/
+acpi_status acpi_block_gpe(acpi_handle gpe_device, u32 gpe_number)
+{
+	struct acpi_gpe_event_info *gpe_event_info;
+	acpi_status status;
+	acpi_cpu_flags flags;
+
+	ACPI_FUNCTION_TRACE(acpi_block_gpe);
+
+	flags = acpi_os_acquire_lock(acpi_gbl_gpe_lock);
+
+	/* Ensure that we have a valid GPE number */
+
+	gpe_event_info = acpi_ev_get_gpe_event_info(gpe_device, gpe_number);
+	if (!gpe_event_info) {
+		status = AE_BAD_PARAMETER;
+		goto unlock_and_exit;
+	}
+
+	status = acpi_ev_manage_gpe(gpe_event_info, ACPI_GPE_DISABLE);
+
+unlock_and_exit:
+	acpi_os_release_lock(acpi_gbl_gpe_lock, flags);
+	return_ACPI_STATUS(status);
+}
+
+ACPI_EXPORT_SYMBOL(acpi_block_gpe)
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_unblock_gpe
+ *
+ * PARAMETERS:  gpe_device          - Parent GPE Device. NULL for GPE0/GPE1
+ *              gpe_number          - GPE level within the GPE block
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Stop unconditional GPE disabling.
+ *              This API reverts acpi_block_gpe().
+ *
+ ******************************************************************************/
+acpi_status acpi_unblock_gpe(acpi_handle gpe_device, u32 gpe_number)
+{
+	struct acpi_gpe_event_info *gpe_event_info;
+	acpi_status status;
+	acpi_cpu_flags flags;
+
+	ACPI_FUNCTION_TRACE(acpi_unblock_gpe);
+
+	flags = acpi_os_acquire_lock(acpi_gbl_gpe_lock);
+
+	/* Ensure that we have a valid GPE number */
+
+	gpe_event_info = acpi_ev_get_gpe_event_info(gpe_device, gpe_number);
+	if (!gpe_event_info) {
+		status = AE_BAD_PARAMETER;
+		goto unlock_and_exit;
+	}
+
+	status = acpi_ev_manage_gpe(gpe_event_info, ACPI_GPE_UNMANAGE);
+
+unlock_and_exit:
+	acpi_os_release_lock(acpi_gbl_gpe_lock, flags);
+	return_ACPI_STATUS(status);
+}
+
+ACPI_EXPORT_SYMBOL(acpi_unblock_gpe)
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_control_gpe_handling
+ *
+ * PARAMETERS:  gpe_device          - Parent GPE Device. NULL for GPE0/GPE1
+ *              gpe_number          - GPE level within the GPE block
+ *              use_interrupt_mode  - Allow the GPE to be dispatched in the
+ *                                    interrupt mode
+ *              use_polling_mode    - Allow the GPE to be dispatched in the
+ *                                    polling mode
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Switch the GPE handling mode between the interrupt only mode,
+ *              the polling only mode and the interrupt/polling adaptive mode.
+ *
+ ******************************************************************************/
+acpi_status
+acpi_control_gpe_handling(acpi_handle gpe_device,
+			  u32 gpe_number,
+			  u8 use_interrupt_mode, u8 use_polling_mode)
+{
+	struct acpi_gpe_event_info *gpe_event_info;
+	acpi_status status;
+	acpi_cpu_flags flags;
+	u8 action;
+
+	ACPI_FUNCTION_TRACE(acpi_control_gpe_handling);
+
+	if (!use_interrupt_mode && !use_polling_mode) {
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
+	}
+
+	flags = acpi_os_acquire_lock(acpi_gbl_gpe_lock);
+
+	/* Ensure that we have a valid GPE number */
+
+	gpe_event_info = acpi_ev_get_gpe_event_info(gpe_device, gpe_number);
+	if (!gpe_event_info) {
+		status = AE_BAD_PARAMETER;
+		goto unlock_and_exit;
+	}
+
+	/* Pick up and peform the correct action */
+
+	action = ACPI_GPE_UNMANAGE;
+	if (!use_interrupt_mode) {
+		action = ACPI_GPE_DISABLE;
+	}
+	if (!use_polling_mode) {
+		action = ACPI_GPE_ENABLE;
+	}
+	status = acpi_ev_manage_gpe(gpe_event_info, action);
+
+unlock_and_exit:
+	acpi_os_release_lock(acpi_gbl_gpe_lock, flags);
+	return_ACPI_STATUS(status);
+}
+
+ACPI_EXPORT_SYMBOL(acpi_control_gpe_handling)
+
+/*******************************************************************************
+ *
  * FUNCTION:    acpi_mark_gpe_for_wake
  *
  * PARAMETERS:  gpe_device          - Parent GPE Device. NULL for GPE0/GPE1

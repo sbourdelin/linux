@@ -732,16 +732,17 @@ typedef u32 acpi_event_type;
  * The encoding of acpi_event_status is illustrated below.
  * Note that a set bit (1) indicates the property is TRUE
  * (e.g. if bit 0 is set then the event is enabled).
- * +-------------+-+-+-+-+-+
- * |   Bits 31:5 |4|3|2|1|0|
- * +-------------+-+-+-+-+-+
- *          |     | | | | |
- *          |     | | | | +- Enabled?
- *          |     | | | +--- Enabled for wake?
- *          |     | | +----- Status bit set?
- *          |     | +------- Enable bit set?
- *          |     +--------- Has a handler?
- *          +--------------- <Reserved>
+ * +-------------+-+-+-+-+-+-+
+ * |   Bits 31:6 |5|4|3|2|1|0|
+ * +-------------+-+-+-+-+-+-+
+ *          |     | | | | | |
+ *          |     | | | | | +- Enabled?
+ *          |     | | | | +--- Enabled for wake?
+ *          |     | | | +----- Status bit set?
+ *          |     | | +------- Enable bit set?
+ *          |     | +--------- Has a handler?
+ *          |     +----------- Enabling/disabling forced?
+ *          +----------------- <Reserved>
  */
 typedef u32 acpi_event_status;
 
@@ -751,6 +752,7 @@ typedef u32 acpi_event_status;
 #define ACPI_EVENT_FLAG_STATUS_SET      (acpi_event_status) 0x04
 #define ACPI_EVENT_FLAG_ENABLE_SET      (acpi_event_status) 0x08
 #define ACPI_EVENT_FLAG_HAS_HANDLER     (acpi_event_status) 0x10
+#define ACPI_EVENT_FLAG_MANAGED         (acpi_event_status) 0x20
 #define ACPI_EVENT_FLAG_SET             ACPI_EVENT_FLAG_STATUS_SET
 
 /* Actions for acpi_set_gpe, acpi_gpe_wakeup, acpi_hw_low_set_gpe */
@@ -758,17 +760,20 @@ typedef u32 acpi_event_status;
 #define ACPI_GPE_ENABLE                 0
 #define ACPI_GPE_DISABLE                1
 #define ACPI_GPE_CONDITIONAL_ENABLE     2
+#define ACPI_GPE_UNMANAGE               3
 
 /*
  * GPE info flags - Per GPE
- * +-------+-+-+---+
- * |  7:5  |4|3|2:0|
- * +-------+-+-+---+
- *     |    | |  |
- *     |    | |  +-- Type of dispatch:to method, handler, notify, or none
- *     |    | +----- Interrupt type: edge or level triggered
- *     |    +------- Is a Wake GPE
- *     +------------ <Reserved>
+ * +-+-+-+-+-+---+
+ * |7|6|5|4|3|2:0|
+ * +-+-+-+-+-+---+
+ *  | | | | |  |
+ *  | | | | |  +-- Type of dispatch:to method, handler, notify, or none
+ *  | | | | +----- Interrupt type: edge or level triggered
+ *  | | | +------- Is a Wake GPE
+ *  | | +--------- Force GPE enabling
+ *  | +----------- Force GPE disabling
+ *  +------------- <Reserved>
  */
 #define ACPI_GPE_DISPATCH_NONE          (u8) 0x00
 #define ACPI_GPE_DISPATCH_METHOD        (u8) 0x01
@@ -783,6 +788,50 @@ typedef u32 acpi_event_status;
 #define ACPI_GPE_XRUPT_TYPE_MASK        (u8) 0x08
 
 #define ACPI_GPE_CAN_WAKE               (u8) 0x10
+
+/*
+ * Flags used by the GPE management APIs
+ *
+ * The GPE management APIs are not implemented for the GPE drivers. It is
+ * designed for providing the management purposes out of the GPE drivers'
+ * awareness. The GPE driver APIs should still be working as expected
+ * during the period the GPE management purposes are applied. There are 2
+ * use cases for the flags:
+ *
+ * 1. Prevent the GPE flooding
+ *    These flags can be used to control how the GPE is dispatched by the
+ *    event dispatcher. Note that the ACPI_GPE_MANAGED_DISABLED can also be
+ *    used to prevent the GPE flooding that cannot be prevented due to the
+ *    ACPI_GPE_DISPATCH_NONE sanity check. This kind of the GPE flooding
+ *    happens on the GPE where there is a _Lxx/_Exx prepared by the BIOS
+ *    but the OSPM still cannot handle it correctly by executing the
+ *    method. Such kind of incapability is mostly because of the feature
+ *    gaps in the OSPM:
+ *    ACPI_GPE_MANAGED_ENABLED:  force the event dispatcher to always
+ *                               enable the GPE
+ *    ACPI_GPE_MANAGED_DISABLED: force the event dispatcher to always
+ *                               disable the GPE
+ *                               prevent the GPE from flooding
+ *    acpi_block_gpe()/acpi_unblock_gpe() are the APIs offering the GPE
+ *    flooding prevention feature.
+ *
+ * 2. Control the GPE handling mode
+ *    A GPE driver may be able to handle the GPE both in the interrupt mode
+ *    and in the polling mode. Since the polling mode is a mechanism
+ *    implemented by the driver itself and is not controlled by the event
+ *    dispatcher, this mechanism can be used to switch between the
+ *    interrupt mode (dispatched via the event dispatcher) and the polling
+ *    mode (implemented by the GPE drivers):
+ *    ACPI_GPE_MANAGED_ENABLED:  force the driver to use the interrupt mode
+ *    ACPI_GPE_MANAGED_DISABLED: force the driver to use the polling mode
+ *    None:                      allow the driver to use the
+ *                               interrupt/polling adaptive mode
+ *    acpi_control_gpe_handling() is the API offering the GPE handling mode
+ *    switch feature.
+ */
+#define ACPI_GPE_MANAGED_ENABLED        (u8) 0x20
+#define ACPI_GPE_MANAGED_DISABLED       (u8) 0x40
+#define ACPI_GPE_MANAGED_FLAG_MASK      (u8) 0x60
 
 /*
  * Flags for GPE and Lock interfaces
