@@ -130,12 +130,24 @@ struct ffs_epfile {
 
 	struct dentry			*dentry;
 
+	/*
+	 * Buffer for holding data from partial reads which may happen since
+	 * we’re rounding user read requests to a multiple of a max packet size.
+	 */
+	struct ffs_buffer		*read_buffer;
+
 	char				name[5];
 
 	unsigned char			in;	/* P: ffs->eps_lock */
 	unsigned char			isoc;	/* P: ffs->eps_lock */
 
 	unsigned char			_pad;
+};
+
+struct ffs_buffer {
+	size_t length;
+	char *data;
+	char storage[];
 };
 
 /*  ffs_io_data structure ***************************************************/
@@ -680,6 +692,24 @@ static void ffs_epfile_async_io_complete(struct usb_ep *_ep,
 	schedule_work(&io_data->work);
 }
 
+static ssize_t ffs_epfile_read_buffered(struct ffs_epfile *epfile,
+					struct iov_iter *iter)
+{
+	struct ffs_buffer *buf = epfile->read_buffer;
+	ssize_t ret = 0;
+	if (buf) {
+		ret = copy_to_iter(buf->data, buf->length, iter);
+		buf->length -= ret;
+		if (buf->length) {
+			buf->data += ret;
+		} else {
+			kfree(buf);
+			epfile->read_buffer = NULL;
+		}
+	}
+	return ret;
+}
+
 static ssize_t ffs_epfile_io(struct file *file, struct ffs_io_data *io_data)
 {
 	struct ffs_epfile *epfile = file->private_data;
@@ -708,6 +738,18 @@ static ssize_t ffs_epfile_io(struct file *file, struct ffs_io_data *io_data)
 	halt = (!io_data->read == !epfile->in);
 	if (halt && epfile->isoc)
 		return -EINVAL;
+
+	/*
+	 * Do we have buffered data from previous partial read?  Check that for
+	 * synchronous case only because we do not have facility to ‘wake up’
+	 * a pending asynchronous read and push buffered data to it which we
+	 * would need to make things behave consistently.
+	 */
+	if (!halt && !io_data->aio && io_data->read) {
+		ret = ffs_epfile_read_buffered(epfile, &io_data->data);
+		if (ret)
+			return ret;
+	}
 
 	/* Allocate & copy */
 	if (!halt) {
@@ -803,17 +845,24 @@ static ssize_t ffs_epfile_io(struct file *file, struct ffs_io_data *io_data)
 			interrupted = ep->status < 0;
 		}
 
-		/*
-		 * XXX We may end up silently droping data here.  Since data_len
-		 * (i.e. req->length) may be bigger than len (after being
-		 * rounded up to maxpacketsize), we may end up with more data
-		 * then user space has space for.
-		 */
 		ret = interrupted ? -EINTR : ep->status;
 		if (io_data->read && ret > 0) {
+			size_t left;
 			ret = copy_to_iter(data, ret, &io_data->data);
-			if (!ret)
+			left = ep->status - ret;
+			if (!left) {
+				/* nop */
+			} else if (iov_iter_count(&io_data->data)) {
 				ret = -EFAULT;
+			} else {
+				struct ffs_buffer *buf = kmalloc(
+					sizeof(*epfile->read_buffer) + left,
+					GFP_KERNEL);
+				buf->length = left;
+				buf->data = buf->storage;
+				memcpy(buf->storage, data + ret, left);
+				epfile->read_buffer = buf;
+			}
 		}
 		goto error_mutex;
 	} else if (!(req = usb_ep_alloc_request(ep->ep, GFP_KERNEL))) {
