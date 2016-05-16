@@ -620,7 +620,7 @@ static ssize_t write_rbu_image_type(struct file *filp, struct kobject *kobj,
 		if (!rbu_data.entry_created) {
 			spin_unlock(&rbu_data.lock);
 			req_firm_rc = request_firmware_nowait(THIS_MODULE,
-				FW_ACTION_NOHOTPLUG, "dell_rbu",
+				FW_ACTION_HOTPLUG, "dell_rbu",
 				&rbu_device->dev, GFP_KERNEL, &context,
 				callbackfn_rbu);
 			if (req_firm_rc) {
