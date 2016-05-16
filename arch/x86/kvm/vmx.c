@@ -4778,13 +4778,6 @@ static u32 vmx_pin_based_exec_ctrl(struct vcpu_vmx *vmx)
 	return pin_based_exec_ctrl;
 }
 
-static void vmx_refresh_apicv_exec_ctrl(struct kvm_vcpu *vcpu)
-{
-	struct vcpu_vmx *vmx = to_vmx(vcpu);
-
-	vmcs_write32(PIN_BASED_VM_EXEC_CONTROL, vmx_pin_based_exec_ctrl(vmx));
-}
-
 static u32 vmx_exec_control(struct vcpu_vmx *vmx)
 {
 	u32 exec_control = vmcs_config.cpu_based_exec_ctrl;
@@ -4841,6 +4834,16 @@ static u32 vmx_secondary_exec_control(struct vcpu_vmx *vmx)
 	exec_control &= ~SECONDARY_EXEC_PCOMMIT;
 
 	return exec_control;
+}
+
+static void vmx_refresh_apicv_exec_ctrl(struct kvm_vcpu *vcpu)
+{
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+
+	vmcs_write32(PIN_BASED_VM_EXEC_CONTROL, vmx_pin_based_exec_ctrl(vmx));
+	if (cpu_has_secondary_exec_ctrls())
+		vmcs_write32(SECONDARY_VM_EXEC_CONTROL,
+				vmx_secondary_exec_control(vmx));
 }
 
 static void ept_set_mmio_spte_mask(void)
