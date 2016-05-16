@@ -243,8 +243,8 @@ struct ib_class_port_info {
 	u8			base_version;
 	u8			class_version;
 	__be16			capability_mask;
-	u8			reserved[3];
-	u8			resp_time_value;
+	  /* 27 bits for cap_mask2, 5 bits for resp_time */
+	__be32			cap_mask2_resp_time;
 	u8			redirect_gid[16];
 	__be32			redirect_tcslfl;
 	__be16			redirect_lid;
@@ -258,6 +258,64 @@ struct ib_class_port_info {
 	__be32			trap_hlqp;
 	__be32			trap_qkey;
 };
+
+/**
+ * ib_get_cpi_resp_time - Returns the resp_time value from
+ * cap_mask2_resp_time in ib_class_port_info.
+ * @cpi: A struct ib_class_port_info mad.
+ */
+static inline u8 ib_get_cpi_resp_time(struct ib_class_port_info *cpi)
+{
+	return ((be32_to_cpu(cpi->cap_mask2_resp_time) & 0xF8) >> 3);
+}
+
+/**
+ * ib_set_cpi_resptime - Sets the response time in an
+ * ib_class_port_info mad.
+ * @cpi: A struct ib_class_port_info.
+ * @rtime: The response time to set.
+ */
+static inline void ib_set_cpi_resp_time(struct ib_class_port_info *cpi,
+					u8 rtime)
+{
+	u32 tmp;
+	u32 tmp2;
+
+	tmp = rtime;
+	tmp = tmp << 3;
+	tmp2 = (be32_to_cpu(cpi->cap_mask2_resp_time) & ~0xF8);
+	tmp = tmp | tmp2;
+	cpi->cap_mask2_resp_time = cpu_to_be32(tmp);
+}
+
+/**
+ * ib_get_cpi_capmask2 - Returns the capmask2 value from
+ * cap_mask2_resp_time in ib_class_port_info.
+ * @cpi: A struct ib_class_port_info mad.
+ */
+static inline u32 ib_get_cpi_capmask2(struct ib_class_port_info *cpi)
+{
+	u8 tmp;
+
+	tmp = ((be32_to_cpu(cpi->cap_mask2_resp_time) & 0x7) << 5);
+	return (((be32_to_cpu(cpi->cap_mask2_resp_time) & ~0xFF) >> 5) | tmp);
+}
+
+/**
+ * ib_set_cpi_capmask2 - Sets the capmask2 in an
+ * ib_class_port_info mad.
+ * @cpi: A struct ib_class_port_info.
+ * @capmask2: The capmask2 to set.
+ */
+static inline void ib_set_cpi_capmask2(struct ib_class_port_info *cpi,
+				       u32 capmask2)
+{
+	u32 tmp;
+
+	tmp = ib_get_cpi_resp_time(cpi);
+	tmp = tmp << 27;
+	cpi->cap_mask2_resp_time = (__force __be32)(tmp | capmask2);
+}
 
 struct ib_mad_notice_attr {
 	u8 generic_type;
