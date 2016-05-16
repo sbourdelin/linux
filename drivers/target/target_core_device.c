@@ -826,8 +826,8 @@ bool target_configure_unmap_from_queue(struct se_dev_attrib *attrib,
 	if (!blk_queue_discard(q))
 		return false;
 
-	attrib->max_unmap_lba_count = (q->limits.max_discard_sectors << 9) /
-								block_size;
+	attrib->max_unmap_lba_count =
+			((u64)q->limits.max_discard_sectors << 9) / block_size;
 	/*
 	 * Currently hardcoded to 1 in Linux/SCSI code..
 	 */
