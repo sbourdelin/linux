@@ -8235,7 +8235,8 @@ const u64 min_cfs_quota_period = 1 * NSEC_PER_MSEC; /* 1ms */
 
 static int __cfs_schedulable(struct task_group *tg, u64 period, u64 runtime);
 
-static int tg_set_cfs_bandwidth(struct task_group *tg, u64 period, u64 quota)
+static int tg_set_cfs_bandwidth(struct task_group *tg, u64 period,
+				u64 quota, u64 reserve)
 {
 	int i, ret = 0, runtime_enabled, runtime_was_enabled;
 	struct cfs_bandwidth *cfs_b = &tg->cfs_bandwidth;
@@ -8269,8 +8270,9 @@ static int tg_set_cfs_bandwidth(struct task_group *tg, u64 period, u64 quota)
 	if (ret)
 		goto out_unlock;
 
-	runtime_enabled = quota != RUNTIME_INF;
-	runtime_was_enabled = cfs_b->quota != RUNTIME_INF;
+	runtime_enabled = quota != RUNTIME_INF || reserve != 0;
+	runtime_was_enabled = cfs_b->quota != RUNTIME_INF ||
+			      cfs_b->reserve != 0;
 	/*
 	 * If we need to toggle cfs_bandwidth_used, off->on must occur
 	 * before making related changes, and on->off must occur afterwards
@@ -8280,6 +8282,7 @@ static int tg_set_cfs_bandwidth(struct task_group *tg, u64 period, u64 quota)
 	raw_spin_lock_irq(&cfs_b->lock);
 	cfs_b->period = ns_to_ktime(period);
 	cfs_b->quota = quota;
+	cfs_b->reserve = reserve;
 
 	/* restart the period timer (if active) to handle new period expiry */
 	if (runtime_enabled) {
@@ -8298,6 +8301,10 @@ static int tg_set_cfs_bandwidth(struct task_group *tg, u64 period, u64 quota)
 
 		if (cfs_rq->throttled)
 			unthrottle_cfs_rq(cfs_rq);
+
+		if (cfs_rq->reserve_active)
+			deactivate_cfs_rq_reserve(cfs_rq);
+
 		raw_spin_unlock_irq(&rq->lock);
 	}
 	if (runtime_was_enabled && !runtime_enabled)
@@ -8309,17 +8316,39 @@ out_unlock:
 	return ret;
 }
 
+static int tg_set_cfs_reserve(struct task_group *tg, long cfs_reserve_us)
+{
+	u64 reserve, quota, period;
+
+	period = ktime_to_ns(tg->cfs_bandwidth.period);
+	quota = tg->cfs_bandwidth.quota;
+	reserve = (u64)cfs_reserve_us * NSEC_PER_USEC;
+
+	return tg_set_cfs_bandwidth(tg, period, quota, reserve);
+}
+
+static long tg_get_cfs_reserve(struct task_group *tg)
+{
+	u64 reserve_us;
+
+	reserve_us = tg->cfs_bandwidth.reserve;
+	do_div(reserve_us, NSEC_PER_USEC);
+
+	return reserve_us;
+}
+
 int tg_set_cfs_quota(struct task_group *tg, long cfs_quota_us)
 {
-	u64 quota, period;
+	u64 reserve, quota, period;
 
 	period = ktime_to_ns(tg->cfs_bandwidth.period);
 	if (cfs_quota_us < 0)
 		quota = RUNTIME_INF;
 	else
 		quota = (u64)cfs_quota_us * NSEC_PER_USEC;
+	reserve = tg->cfs_bandwidth.reserve;
 
-	return tg_set_cfs_bandwidth(tg, period, quota);
+	return tg_set_cfs_bandwidth(tg, period, quota, reserve);
 }
 
 long tg_get_cfs_quota(struct task_group *tg)
@@ -8337,12 +8366,13 @@ long tg_get_cfs_quota(struct task_group *tg)
 
 int tg_set_cfs_period(struct task_group *tg, long cfs_period_us)
 {
-	u64 quota, period;
+	u64 reserve, quota, period;
 
 	period = (u64)cfs_period_us * NSEC_PER_USEC;
 	quota = tg->cfs_bandwidth.quota;
+	reserve = tg->cfs_bandwidth.reserve;
 
-	return tg_set_cfs_bandwidth(tg, period, quota);
+	return tg_set_cfs_bandwidth(tg, period, quota, reserve);
 }
 
 long tg_get_cfs_period(struct task_group *tg)
@@ -8353,6 +8383,43 @@ long tg_get_cfs_period(struct task_group *tg)
 	do_div(cfs_period_us, NSEC_PER_USEC);
 
 	return cfs_period_us;
+}
+
+static u64 cpu_cfs_reserve_read_u64(struct cgroup_subsys_state *css,
+				    struct cftype *cft)
+{
+	return tg_get_cfs_reserve(css_tg(css));
+}
+
+static int cpu_cfs_reserve_write_u64(struct cgroup_subsys_state *css,
+				     struct cftype *cftype, u64 cfs_reserve_us)
+{
+	return tg_set_cfs_reserve(css_tg(css), cfs_reserve_us);
+}
+
+static u64 cpu_cfs_reserve_shares_read_u64(struct cgroup_subsys_state *css,
+					   struct cftype *cft)
+{
+	return scale_load_down(css_tg(css)->cfs_bandwidth.reserve_shares);
+}
+
+static int cpu_cfs_reserve_shares_write_u64(struct cgroup_subsys_state *css,
+					    struct cftype *cftype, u64 shares)
+{
+	struct task_group *tg = css_tg(css);
+	u64 reserve, quota, period;
+
+	if (!css->parent)
+		return -EINVAL;
+
+	shares = clamp_t(u64, shares, MIN_SHARES, MAX_SHARES);
+	css_tg(css)->cfs_bandwidth.reserve_shares = scale_load(shares);
+
+	period = ktime_to_ns(tg->cfs_bandwidth.period);
+	quota = tg->cfs_bandwidth.quota;
+	reserve = tg->cfs_bandwidth.reserve;
+
+	return tg_set_cfs_bandwidth(tg, period, quota, reserve);
 }
 
 static s64 cpu_cfs_quota_read_s64(struct cgroup_subsys_state *css,
@@ -8506,6 +8573,16 @@ static struct cftype cpu_files[] = {
 	},
 #endif
 #ifdef CONFIG_CFS_BANDWIDTH
+	{
+		.name = "cfs_reserve_us",
+		.read_u64 = cpu_cfs_reserve_read_u64,
+		.write_u64 = cpu_cfs_reserve_write_u64,
+	},
+	{
+		.name = "cfs_reserve_shares",
+		.read_u64 = cpu_cfs_reserve_shares_read_u64,
+		.write_u64 = cpu_cfs_reserve_shares_write_u64,
+	},
 	{
 		.name = "cfs_quota_us",
 		.read_s64 = cpu_cfs_quota_read_s64,
