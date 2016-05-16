@@ -39,14 +39,9 @@ static void ics_rm_check_resend(struct kvmppc_xics *xics,
 	for (i = 0; i < KVMPPC_XICS_IRQ_PER_ICS; i++) {
 		struct ics_irq_state *state = &ics->irq_state[i];
 
-		arch_spin_lock(&state->lock);
-
-		if (!state->resend) {
-			arch_spin_unlock(&state->lock);
+		if (!state->resend)
 			continue;
-		}
 
-		arch_spin_unlock(&state->lock);
 		icp_rm_deliver_irq(xics, icp, state->number);
 	}
 }
@@ -374,8 +369,13 @@ static void icp_rm_deliver_irq(struct kvmppc_xics *xics, struct kvmppc_icp *icp,
 		 * We failed to deliver the interrupt we need to set the
 		 * resend map bit and mark the ICS state as needing a resend
 		 */
-		set_bit(ics->icsid, icp->resend_map);
 		state->resend = 1;
+		/*
+		 * Make sure when checking resend, we don't miss the resend if
+		 * resend_map bit is seen and cleared.
+		 */
+		smp_wmb();
+		set_bit(ics->icsid, icp->resend_map);
 
 		/*
 		 * If the need_resend flag got cleared in the ICP some time

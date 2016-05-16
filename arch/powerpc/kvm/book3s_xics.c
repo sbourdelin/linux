@@ -110,30 +110,17 @@ static void ics_check_resend(struct kvmppc_xics *xics, struct kvmppc_ics *ics,
 {
 	int i;
 
-	unsigned long flags;
-
-	local_irq_save(flags);
-
 	for (i = 0; i < KVMPPC_XICS_IRQ_PER_ICS; i++) {
 		struct ics_irq_state *state = &ics->irq_state[i];
 
-		arch_spin_lock(&state->lock);
-
-		if (!state->resend) {
-			arch_spin_unlock(&state->lock);
+		if (!state->resend)
 			continue;
-		}
 
 		XICS_DBG("resend %#x prio %#x\n", state->number,
 			      state->priority);
 
-		arch_spin_unlock(&state->lock);
-		local_irq_restore(flags);
 		icp_deliver_irq(xics, icp, state->number);
-		local_irq_save(flags);
 	}
-
-	local_irq_restore(flags);
 }
 
 static bool write_xive(struct kvmppc_xics *xics, struct kvmppc_ics *ics,
@@ -474,8 +461,13 @@ static void icp_deliver_irq(struct kvmppc_xics *xics, struct kvmppc_icp *icp,
 		 * We failed to deliver the interrupt we need to set the
 		 * resend map bit and mark the ICS state as needing a resend
 		 */
-		set_bit(ics->icsid, icp->resend_map);
 		state->resend = 1;
+		/*
+		 * Make sure when checking resend, we don't miss the resend if
+		 * resend_map bit is seen and cleared.
+		 */
+		smp_wmb();
+		set_bit(ics->icsid, icp->resend_map);
 
 		/*
 		 * If the need_resend flag got cleared in the ICP some time
