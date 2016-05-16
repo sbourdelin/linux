@@ -717,8 +717,8 @@ next_step:
 		ofs_in_node = le16_to_cpu(entry->ofs_in_node);
 
 		if (phase == 2) {
-			inode = f2fs_iget(sb, dni.ino);
-			if (IS_ERR(inode) || is_bad_inode(inode))
+			inode = ilookup(sb, dni.ino);
+			if (!inode || IS_ERR(inode) || is_bad_inode(inode))
 				continue;
 
 			/* if encrypted inode, let's go phase 3 */
