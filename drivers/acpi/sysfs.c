@@ -599,6 +599,19 @@ static ssize_t counter_show(struct kobject *kobj,
 	if (result)
 		goto end;
 
+	if (status & ACPI_EVENT_FLAG_ENABLE_SET)
+		size += sprintf(buf + size, "      EN");
+	else
+		size += sprintf(buf + size, "     !EN");
+	if (status & ACPI_EVENT_FLAG_MANAGED)
+		size += sprintf(buf + size, "*");
+	else
+		size += sprintf(buf + size, " ");
+	if (status & ACPI_EVENT_FLAG_STATUS_SET)
+		size += sprintf(buf + size, "     STS");
+	else
+		size += sprintf(buf + size, "    !STS");
+
 	if (!(status & ACPI_EVENT_FLAG_HAS_HANDLER))
 		size += sprintf(buf + size, "   invalid");
 	else if (status & ACPI_EVENT_FLAG_ENABLED)
@@ -656,8 +669,23 @@ static ssize_t counter_set(struct kobject *kobj,
 		else if (!strcmp(buf, "enable\n") &&
 			 !(status & ACPI_EVENT_FLAG_ENABLED))
 			result = acpi_enable_gpe(handle, index);
+		else if (!strcmp(buf, "block\n"))
+			result = acpi_block_gpe(handle, index);
+		else if (!strcmp(buf, "unblock\n") &&
+			 (status & ACPI_EVENT_FLAG_MANAGED))
+			result = acpi_unblock_gpe(handle, index);
+		else if (!strcmp(buf, "force-poll\n"))
+			result = acpi_control_gpe_handling(handle, index,
+							   TRUE, FALSE);
+		else if (!strcmp(buf, "force-irq\n"))
+			result = acpi_control_gpe_handling(handle, index,
+							   FALSE, TRUE);
+		else if (!strcmp(buf, "unforce\n") &&
+			 (status & ACPI_EVENT_FLAG_MANAGED))
+			result = acpi_control_gpe_handling(handle, index,
+							   TRUE, TRUE);
 		else if (!strcmp(buf, "clear\n") &&
-			 (status & ACPI_EVENT_FLAG_SET))
+			 (status & ACPI_EVENT_FLAG_STATUS_SET))
 			result = acpi_clear_gpe(handle, index);
 		else if (!kstrtoul(buf, 0, &tmp))
 			all_counters[index].count = tmp;
@@ -666,13 +694,13 @@ static ssize_t counter_set(struct kobject *kobj,
 	} else if (index < num_gpes + ACPI_NUM_FIXED_EVENTS) {
 		int event = index - num_gpes;
 		if (!strcmp(buf, "disable\n") &&
-		    (status & ACPI_EVENT_FLAG_ENABLED))
+		    (status & ACPI_EVENT_FLAG_ENABLE_SET))
 			result = acpi_disable_event(event, ACPI_NOT_ISR);
 		else if (!strcmp(buf, "enable\n") &&
-			 !(status & ACPI_EVENT_FLAG_ENABLED))
+			 !(status & ACPI_EVENT_FLAG_ENABLE_SET))
 			result = acpi_enable_event(event, ACPI_NOT_ISR);
 		else if (!strcmp(buf, "clear\n") &&
-			 (status & ACPI_EVENT_FLAG_SET))
+			 (status & ACPI_EVENT_FLAG_STATUS_SET))
 			result = acpi_clear_event(event);
 		else if (!kstrtoul(buf, 0, &tmp))
 			all_counters[index].count = tmp;
