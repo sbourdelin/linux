@@ -1958,6 +1958,7 @@ int __init acpi_scan_init(void)
 		}
 	}
 
+	acpi_gpe_apply_blocked_gpes();
 	acpi_update_all_gpes();
 
  out:

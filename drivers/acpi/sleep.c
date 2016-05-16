@@ -414,6 +414,7 @@ static void acpi_pm_finish(void)
 		acpi_state);
 	acpi_disable_wakeup_devices(acpi_state);
 	acpi_leave_sleep_state(acpi_state);
+	acpi_gpe_apply_blocked_gpes();
 
 	/* reset firmware waking vector */
 	acpi_set_waking_vector(0);
@@ -774,6 +775,7 @@ static void acpi_pm_thaw(void)
 {
 	acpi_ec_unblock_transactions();
 	acpi_enable_all_runtime_gpes();
+	acpi_gpe_apply_blocked_gpes();
 }
 
 static const struct platform_hibernation_ops acpi_hibernation_ops = {

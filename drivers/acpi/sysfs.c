@@ -715,6 +715,62 @@ end:
 	return result ? result : size;
 }
 
+/*
+ * A Quirk Mechanism for GPE Flooding Prevention:
+ *
+ * Quirks may be needed to prevent GPE flooding on a specific GPE. The
+ * flooding typically cannot be detected and automatically prevented by
+ * ACPI_GPE_DISPATCH_NONE check because there is a _Lxx/_Exx prepared in
+ * the AML tables. This normally indicates a feature gap in Linux, thus
+ * instead of providing endless quirk tables, we provide a boot parameter
+ * for those who want this quirk. For example, if the users want to prevent
+ * the GPE flooding for GPE 00, they need to specify the following boot
+ * parameter:
+ *   acpi.block_gpe=0x00
+ * The blocking status can be modified by the following runtime controlling
+ * interface:
+ *   echo unblock > /sys/firmware/acpi/interrupts/gpe00
+ */
+
+/*
+ * Currently, the GPE flooding prevention only supports to block the GPEs
+ * numbered from 00 to 63.
+ */
+#define ACPI_BLOCKABLE_GPE_MAX	64
+
+static u64 acpi_blocked_gpes;
+
+static int __init acpi_gpe_set_blocked_gpes(char *val)
+{
+	u8 gpe;
+
+	if (kstrtou8(val, 0, &gpe) || gpe > ACPI_BLOCKABLE_GPE_MAX)
+		return -EINVAL;
+	acpi_blocked_gpes |= ((u64)1<<gpe);
+
+	return 1;
+}
+__setup("acpi_block_gpe=", acpi_gpe_set_blocked_gpes);
+
+void acpi_gpe_apply_blocked_gpes(void)
+{
+	acpi_handle handle;
+	acpi_status status;
+	u8 gpe;
+
+	for (gpe = 0;
+	     gpe < min_t(u8, ACPI_BLOCKABLE_GPE_MAX, acpi_current_gpe_count);
+	     gpe++) {
+		if (acpi_blocked_gpes & ((u64)1<<gpe)) {
+			status = acpi_get_gpe_device(gpe, &handle);
+			if (ACPI_SUCCESS(status)) {
+				pr_info("Blocking GPE 0x%x.\n", gpe);
+				(void)acpi_block_gpe(handle, gpe);
+			}
+		}
+	}
+}
+
 void acpi_irq_stats_init(void)
 {
 	acpi_status status;
