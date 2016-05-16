@@ -73,21 +73,59 @@ int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
 	}
 	return 0;
 }
+
+static int vfio_platform_acpi_call_reset(struct vfio_platform_device *vdev)
+{
+	struct device *dev = vdev->device;
+	acpi_handle handle = ACPI_HANDLE(dev);
+	acpi_status acpi_ret;
+	unsigned long long val;
+
+	acpi_ret = acpi_evaluate_integer(handle, "_RST", NULL, &val);
+	if (ACPI_FAILURE(acpi_ret))
+		return -EINVAL;
+
+	return 0;
+}
+
+static bool vfio_platform_acpi_has_reset(struct vfio_platform_device *vdev)
+{
+	struct device *dev = vdev->device;
+	acpi_handle handle = ACPI_HANDLE(dev);
+
+	return acpi_has_method(handle, "_RST");
+}
 #else
 int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
 			     struct device *dev)
 {
 	return -EINVAL;
 }
+
+static int vfio_platform_acpi_call_reset(struct vfio_platform_device *vdev)
+{
+	return -EINVAL;
+}
+
+static bool vfio_platform_acpi_has_reset(struct vfio_platform_device *vdev)
+{
+	return false;
+}
 #endif
 
 static bool vfio_platform_has_reset(struct vfio_platform_device *vdev)
 {
+	if (vdev->acpihid)
+		return vfio_platform_acpi_has_reset(vdev);
+
 	return vdev->of_reset ? true : false;
 }
 
 static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
 {
+	if (vdev->acpihid)
+		return;
+
 	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
 						    &vdev->reset_module);
 	if (!vdev->of_reset) {
@@ -99,6 +137,9 @@ static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
 
 static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
 {
+	if (vdev->acpihid)
+		return;
+
 	if (vdev->of_reset)
 		module_put(vdev->reset_module);
 }
@@ -177,6 +218,9 @@ static int vfio_platform_call_reset(struct vfio_platform_device *vdev)
 		dev_info(vdev->device, "reset\n");
 		vdev->of_reset(vdev);
 		return 0;
+	} else if (vdev->acpihid) {
+		dev_info(vdev->device, "reset\n");
+		return vfio_platform_acpi_call_reset(vdev);
 	}
 
 	dev_warn(vdev->device, "no reset function found!\n");
