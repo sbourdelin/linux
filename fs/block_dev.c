@@ -1159,6 +1159,20 @@ void bd_set_size(struct block_device *bdev, loff_t size)
 }
 EXPORT_SYMBOL(bd_set_size);
 
+static void bd_add_dax(struct inode *inode)
+{
+	inode_lock(inode);
+	inode->i_flags |= S_DAX;
+	inode_unlock(inode);
+}
+
+static void bd_clear_dax(struct inode *inode)
+{
+	inode_lock(inode);
+	inode->i_flags &= ~S_DAX;
+	inode_unlock(inode);
+}
+
 static void __blkdev_put(struct block_device *bdev, fmode_t mode, int for_part);
 
 /*
@@ -1172,6 +1186,7 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 {
 	struct gendisk *disk;
 	struct module *owner;
+	struct inode *inode;
 	int ret;
 	int partno;
 	int perm = 0;
@@ -1198,6 +1213,7 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 	if (!disk)
 		goto out;
 	owner = disk->fops->owner;
+	inode = bdev->bd_inode;
 
 	disk_block_events(disk);
 	mutex_lock_nested(&bdev->bd_mutex, for_part);
@@ -1206,9 +1222,7 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 		bdev->bd_queue = disk->queue;
 		bdev->bd_contains = bdev;
 		if (IS_ENABLED(CONFIG_BLK_DEV_DAX) && disk->fops->direct_access)
-			bdev->bd_inode->i_flags = S_DAX;
-		else
-			bdev->bd_inode->i_flags = 0;
+			bd_add_dax(inode);
 
 		if (!partno) {
 			ret = -ENXIO;
@@ -1228,6 +1242,7 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 					bdev->bd_part = NULL;
 					bdev->bd_disk = NULL;
 					bdev->bd_queue = NULL;
+					bd_clear_dax(inode);
 					mutex_unlock(&bdev->bd_mutex);
 					disk_unblock_events(disk);
 					put_disk(disk);
@@ -1239,7 +1254,7 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 			if (!ret) {
 				bd_set_size(bdev,(loff_t)get_capacity(disk)<<9);
 				if (!blkdev_dax_capable(bdev))
-					bdev->bd_inode->i_flags &= ~S_DAX;
+					bd_clear_dax(inode);
 			}
 
 			/*
@@ -1276,7 +1291,7 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 			}
 			bd_set_size(bdev, (loff_t)bdev->bd_part->nr_sects << 9);
 			if (!blkdev_dax_capable(bdev))
-				bdev->bd_inode->i_flags &= ~S_DAX;
+				bd_clear_dax(inode);
 		}
 	} else {
 		if (bdev->bd_contains == bdev) {
@@ -1297,6 +1312,11 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 		put_disk(disk);
 		module_put(owner);
 	}
+	inode_lock(inode);
+	if (inode->i_flags & S_DAX)
+		inode->i_flags = S_DAX;
+	inode_unlock(inode);
+
 	bdev->bd_openers++;
 	if (for_part)
 		bdev->bd_part_count++;
@@ -1309,6 +1329,7 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 	bdev->bd_disk = NULL;
 	bdev->bd_part = NULL;
 	bdev->bd_queue = NULL;
+	bd_clear_dax(inode);
 	if (bdev != bdev->bd_contains)
 		__blkdev_put(bdev->bd_contains, mode, 1);
 	bdev->bd_contains = NULL;
