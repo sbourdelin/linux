@@ -422,8 +422,8 @@ static void bad_page(struct page *page, const char *reason,
 	static unsigned long nr_shown;
 	static unsigned long nr_unshown;
 
-	/* Don't complain about poisoned pages */
-	if (PageHWPoison(page)) {
+	/* Don't complain about hwpoisoned pages */
+	if (bad_flags == __PG_HWPOISON) {
 		page_mapcount_reset(page); /* remove PageBuddy */
 		return;
 	}
