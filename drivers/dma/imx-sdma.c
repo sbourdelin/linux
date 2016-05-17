@@ -664,16 +664,25 @@ static void sdma_event_disable(struct sdma_channel *sdmac, unsigned int event)
 static void sdma_handle_channel_loop(struct sdma_channel *sdmac)
 {
 	struct sdma_buffer_descriptor *bd;
+	unsigned long flags;
 
 	/*
 	 * loop mode. Iterate over descriptors, re-setup them and
 	 * call callback function.
 	 */
 	while (1) {
+		spin_lock_irqsave(&sdmac->lock, flags);
+		if (!sdmac->enabled) {
+			spin_unlock_irqrestore(&sdmac->lock, flags);
+			break;
+		}
+
 		bd = &sdmac->bd[sdmac->buf_tail];
 
-		if (bd->mode.status & BD_DONE)
+		if (bd->mode.status & BD_DONE) {
+			spin_unlock_irqrestore(&sdmac->lock, flags);
 			break;
+		}
 
 		if (bd->mode.status & BD_RROR)
 			sdmac->status = DMA_ERROR;
@@ -690,6 +699,7 @@ static void sdma_handle_channel_loop(struct sdma_channel *sdmac)
 			bd->mode.count = sdmac->chn_count;
 		}
 
+		spin_unlock_irqrestore(&sdmac->lock, flags);
 		if (sdmac->desc.callback)
 			sdmac->desc.callback(sdmac->desc.callback_param);
 	}
