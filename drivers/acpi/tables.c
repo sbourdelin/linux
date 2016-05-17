@@ -34,6 +34,7 @@
 #include <linux/bootmem.h>
 #include <linux/earlycpio.h>
 #include <linux/memblock.h>
+#include <linux/initrd.h>
 #include "internal.h"
 
 #ifdef CONFIG_ACPI_CUSTOM_DSDT
@@ -742,9 +743,11 @@ acpi_os_table_override(struct acpi_table_header *existing_table,
 	return AE_OK;
 }
 
-void __init early_acpi_table_init(void *data, size_t size)
+void __init early_initrd_acpi_init(void)
 {
-	acpi_table_initrd_init(data, size);
+#ifdef CONFIG_BLK_DEV_INITRD
+	acpi_table_initrd_init((void *)initrd_start, initrd_end - initrd_start);
+#endif
 }
 
 /*
