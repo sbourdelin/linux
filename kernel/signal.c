@@ -2430,6 +2430,47 @@ out:
 	}
 }
 
+static unsigned long gen_sigcookie(unsigned long __user *location)
+{
+
+	unsigned long sig_cookie;
+
+	sig_cookie = (unsigned long) location ^ current->sighand->sig_cookie;
+
+	return sig_cookie;
+}
+
+int set_sigcookie(unsigned long __user *location)
+{
+
+	unsigned long sig_cookie = gen_sigcookie(location);
+
+	return put_user(sig_cookie, location);
+}
+
+int verify_clear_sigcookie(unsigned long __user *sig_cookie_ptr)
+{
+	unsigned long user_cookie;
+	unsigned long calculated_cookie;
+
+	if (get_user(user_cookie, sig_cookie_ptr))
+		return 1;
+
+	calculated_cookie = gen_sigcookie(sig_cookie_ptr);
+
+	if (user_cookie != calculated_cookie) {
+		pr_warn("Signal protector does not match what kernel set it to"\
+			". Possible exploit attempt or buggy program!\n");
+		return 1;
+
+	}
+
+	user_cookie = 0;
+	return put_user(user_cookie, sig_cookie_ptr);
+}
+
+EXPORT_SYMBOL(verify_clear_sigcookie);
+EXPORT_SYMBOL(set_sigcookie);
 EXPORT_SYMBOL(recalc_sigpending);
 EXPORT_SYMBOL_GPL(dequeue_signal);
 EXPORT_SYMBOL(flush_signals);
