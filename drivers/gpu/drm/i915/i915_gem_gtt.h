@@ -376,6 +376,7 @@ struct i915_hw_ppgtt {
 
 	gen6_pte_t __iomem *pd_addr;
 
+	void (*kunmap_page_dma)(void *vaddr);
 	int (*enable)(struct i915_hw_ppgtt *ppgtt);
 	int (*switch_mm)(struct i915_hw_ppgtt *ppgtt,
 			 struct drm_i915_gem_request *req);

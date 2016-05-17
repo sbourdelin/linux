@@ -350,29 +350,30 @@ static void *kmap_page_dma(struct i915_page_dma *p)
 	return kmap_atomic(p->page);
 }
 
+static void kunmap_page_dma(void *vaddr)
+{
+	kunmap_atomic(vaddr);
+}
+
 /* We use the flushing unmap only with ppgtt structures:
  * page directories, page tables and scratch pages.
  */
-static void kunmap_page_dma(struct drm_device *dev, void *vaddr)
+static void kunmap_page_dma_flush(void *vaddr)
 {
-	/* There are only few exceptions for gen >=6. chv and bxt.
-	 * And we are not sure about the latter so play safe for now.
-	 */
-	if (IS_CHERRYVIEW(dev) || IS_BROXTON(dev))
-		drm_clflush_virt_range(vaddr, PAGE_SIZE);
+	drm_clflush_virt_range(vaddr, PAGE_SIZE);
 
 	kunmap_atomic(vaddr);
 }
 
 #define kmap_px(px) kmap_page_dma(px_base(px))
-#define kunmap_px(ppgtt, vaddr) kunmap_page_dma((ppgtt)->base.dev, (vaddr))
+#define kunmap_px(ppgtt, vaddr) (ppgtt)->kunmap_page_dma((vaddr))
 
 #define setup_px(dev, px) setup_page_dma((dev), px_base(px))
 #define cleanup_px(dev, px) cleanup_page_dma((dev), px_base(px))
-#define fill_px(dev, px, v) fill_page_dma((dev), px_base(px), (v))
-#define fill32_px(dev, px, v) fill_page_dma_32((dev), px_base(px), (v))
+#define fill_px(ppgtt, px, v) fill_page_dma((ppgtt), px_base(px), (v))
+#define fill32_px(ppgtt, px, v) fill_page_dma_32((ppgtt), px_base(px), (v))
 
-static void fill_page_dma(struct drm_device *dev, struct i915_page_dma *p,
+static void fill_page_dma(struct i915_hw_ppgtt *ppgtt, struct i915_page_dma *p,
 			  const uint64_t val)
 {
 	int i;
@@ -381,17 +382,17 @@ static void fill_page_dma(struct drm_device *dev, struct i915_page_dma *p,
 	for (i = 0; i < 512; i++)
 		vaddr[i] = val;
 
-	kunmap_page_dma(dev, vaddr);
+	ppgtt->kunmap_page_dma(vaddr);
 }
 
-static void fill_page_dma_32(struct drm_device *dev, struct i915_page_dma *p,
-			     const uint32_t val32)
+static void fill_page_dma_32(struct i915_hw_ppgtt *ppgtt,
+			     struct i915_page_dma *p, const uint32_t val32)
 {
 	uint64_t v = val32;
 
 	v = v << 32 | val32;
 
-	fill_page_dma(dev, p, v);
+	fill_page_dma(ppgtt, p, v);
 }
 
 static struct i915_page_scratch *alloc_scratch_page(struct drm_device *dev)
@@ -469,7 +470,7 @@ static void gen8_initialize_pt(struct i915_address_space *vm,
 	scratch_pte = gen8_pte_encode(px_dma(vm->scratch_page),
 				      I915_CACHE_LLC, true);
 
-	fill_px(vm->dev, pt, scratch_pte);
+	fill_px(i915_vm_to_ppgtt(vm), pt, scratch_pte);
 }
 
 static void gen6_initialize_pt(struct i915_address_space *vm,
@@ -482,7 +483,7 @@ static void gen6_initialize_pt(struct i915_address_space *vm,
 	scratch_pte = vm->pte_encode(px_dma(vm->scratch_page),
 				     I915_CACHE_LLC, true, 0);
 
-	fill32_px(vm->dev, pt, scratch_pte);
+	fill32_px(i915_vm_to_ppgtt(vm), pt, scratch_pte);
 }
 
 static struct i915_page_directory *alloc_pd(struct drm_device *dev)
@@ -529,7 +530,7 @@ static void gen8_initialize_pd(struct i915_address_space *vm,
 
 	scratch_pde = gen8_pde_encode(px_dma(vm->scratch_pt), I915_CACHE_LLC);
 
-	fill_px(vm->dev, pd, scratch_pde);
+	fill_px(i915_vm_to_ppgtt(vm), pd, scratch_pde);
 }
 
 static int __pdp_init(struct drm_device *dev,
@@ -610,7 +611,7 @@ static void gen8_initialize_pdp(struct i915_address_space *vm,
 
 	scratch_pdpe = gen8_pdpe_encode(px_dma(vm->scratch_pd), I915_CACHE_LLC);
 
-	fill_px(vm->dev, pdp, scratch_pdpe);
+	fill_px(i915_vm_to_ppgtt(vm), pdp, scratch_pdpe);
 }
 
 static void gen8_initialize_pml4(struct i915_address_space *vm,
@@ -621,7 +622,7 @@ static void gen8_initialize_pml4(struct i915_address_space *vm,
 	scratch_pml4e = gen8_pml4e_encode(px_dma(vm->scratch_pdp),
 					  I915_CACHE_LLC);
 
-	fill_px(vm->dev, pml4, scratch_pml4e);
+	fill_px(i915_vm_to_ppgtt(vm), pml4, scratch_pml4e);
 }
 
 static void
@@ -1494,7 +1495,16 @@ static int gen8_preallocate_top_level_pdps(struct i915_hw_ppgtt *ppgtt)
  */
 static int gen8_ppgtt_init(struct i915_hw_ppgtt *ppgtt)
 {
+	struct drm_i915_private *dev_priv = to_i915(ppgtt->base.dev);
 	int ret;
+
+	/* There are only few exceptions for gen >=6. chv and bxt.
+	 * And we are not sure about the latter so play safe for now.
+	 */
+	if (IS_BROADWELL(dev_priv) || IS_CHERRYVIEW(dev_priv))
+		ppgtt->kunmap_page_dma = kunmap_page_dma_flush;
+	else
+		ppgtt->kunmap_page_dma = kunmap_page_dma;
 
 	ret = gen8_init_scratch(&ppgtt->base);
 	if (ret)
@@ -2055,6 +2065,9 @@ static int gen6_ppgtt_init(struct i915_hw_ppgtt *ppgtt)
 	int ret;
 
 	ppgtt->base.pte_encode = ggtt->base.pte_encode;
+
+	ppgtt->kunmap_page_dma = kunmap_page_dma;
+
 	if (IS_GEN6(dev)) {
 		ppgtt->switch_mm = gen6_mm_switch;
 	} else if (IS_HASWELL(dev)) {
