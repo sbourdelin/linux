@@ -143,16 +143,16 @@ of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
 	if (args->args[0] >= pc->npwm)
 		return ERR_PTR(-EINVAL);
 
-	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
-	if (IS_ERR(pwm))
-		return pwm;
-
 	pwm->args.period = args->args[1];
 
 	if (args->args[2] & PWM_POLARITY_INVERTED)
 		pwm->args.polarity = PWM_POLARITY_INVERSED;
 	else
 		pwm->args.polarity = PWM_POLARITY_NORMAL;
+
+	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
+	if (IS_ERR(pwm))
+		return pwm;
 
 	return pwm;
 }
@@ -169,11 +169,11 @@ of_pwm_simple_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
 	if (args->args[0] >= pc->npwm)
 		return ERR_PTR(-EINVAL);
 
+	pwm->args.period = args->args[1];
+
 	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
 	if (IS_ERR(pwm))
 		return pwm;
-
-	pwm->args.period = args->args[1];
 
 	return pwm;
 }
