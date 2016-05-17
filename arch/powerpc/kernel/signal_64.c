@@ -24,6 +24,7 @@
 #include <linux/elf.h>
 #include <linux/ptrace.h>
 #include <linux/ratelimit.h>
+#include <linux/signal.h>
 
 #include <asm/sigcontext.h>
 #include <asm/ucontext.h>
@@ -35,6 +36,7 @@
 #include <asm/vdso.h>
 #include <asm/switch_to.h>
 #include <asm/tm.h>
+#include <asm/compat.h>
 
 #include "signal.h"
 
@@ -48,7 +50,7 @@
 /*
  * When we have signals to deliver, we set up on the user stack,
  * going down from the original stack pointer:
- *	1) a rt_sigframe struct which contains the ucontext	
+ *	1) a rt_sigframe struct which contains the ucontext.
  *	2) a gap of __SIGNAL_FRAMESIZE bytes which acts as a dummy caller
  *	   frame for the signal handler.
  */
@@ -64,6 +66,7 @@ struct rt_sigframe {
 	struct siginfo __user *pinfo;
 	void __user *puc;
 	struct siginfo info;
+	unsigned long user_cookie;
 	/* New 64 bit little-endian ABI allows redzone of 512 bytes below sp */
 	char abigap[USER_REDZONE_SIZE];
 } __attribute__ ((aligned (16)));
@@ -661,6 +664,10 @@ int sys_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 	unsigned long msr;
 #endif
+	/* Only need the sigframe to get the cookie */
+	struct rt_sigframe __user *sf = (struct rt_sigframe __user
+			*)regs->gpr[1];
+	void __user *user_cookie = &(sf->user_cookie);
 
 	/* Always make any pending restarted system calls return -EINTR */
 	current->restart_block.fn = do_no_restart_syscall;
@@ -682,13 +689,16 @@ int sys_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 		if (restore_tm_sigcontexts(regs, &uc->uc_mcontext,
 					   &uc_transact->uc_mcontext))
 			goto badframe;
+		if (verify_clear_sigcookie(user_cookie))
+			goto badframe;
 	}
 	else
 	/* Fall through, for non-TM restore */
 #endif
 	if (restore_sigcontext(regs, NULL, 1, &uc->uc_mcontext))
 		goto badframe;
-
+	if (verify_clear_sigcookie(user_cookie))
+		goto badframe;
 	if (restore_altstack(&uc->uc_stack))
 		goto badframe;
 
@@ -710,6 +720,7 @@ int handle_rt_signal64(struct ksignal *ksig, sigset_t *set, struct pt_regs *regs
 	struct rt_sigframe __user *frame;
 	unsigned long newsp = 0;
 	long err = 0;
+	void __user *cookie_location;
 
 	frame = get_sigframe(ksig, get_tm_stackpointer(regs), sizeof(*frame), 0);
 	if (unlikely(frame == NULL))
@@ -724,12 +735,17 @@ int handle_rt_signal64(struct ksignal *ksig, sigset_t *set, struct pt_regs *regs
 	/* Create the ucontext.  */
 	err |= __put_user(0, &frame->uc.uc_flags);
 	err |= __save_altstack(&frame->uc.uc_stack, regs->gpr[1]);
+
+	cookie_location = &(frame->user_cookie);
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 	if (MSR_TM_ACTIVE(regs->msr)) {
 		/* The ucontext_t passed to userland points to the second
 		 * ucontext_t (for transactional state) with its uc_link ptr.
 		 */
 		err |= __put_user(&frame->uc_transact, &frame->uc.uc_link);
+
+		err |= set_sigcookie(cookie_location);
+
 		err |= setup_tm_sigcontexts(&frame->uc.uc_mcontext,
 					    &frame->uc_transact.uc_mcontext,
 					    regs, ksig->sig,
@@ -739,6 +755,7 @@ int handle_rt_signal64(struct ksignal *ksig, sigset_t *set, struct pt_regs *regs
 #endif
 	{
 		err |= __put_user(0, &frame->uc.uc_link);
+		err |= set_sigcookie(cookie_location);
 		err |= setup_sigcontext(&frame->uc.uc_mcontext, regs, ksig->sig,
 					NULL, (unsigned long)ksig->ka.sa.sa_handler,
 					1);

@@ -207,6 +207,7 @@ static inline int restore_general_regs(struct pt_regs *regs,
  * When we have signals to deliver, we set up on the
  * user stack, going down from the original stack pointer:
  *	an ABI gap of 56 words
+ *	a cookie
  *	an mcontext struct
  *	a sigcontext struct
  *	a gap of __SIGNAL_FRAMESIZE bytes
@@ -222,6 +223,7 @@ struct sigframe {
 	struct sigcontext sctx_transact;
 	struct mcontext	mctx_transact;
 #endif
+	unsigned long user_cookie;
 	/*
 	 * Programs using the rs6000/xcoff abi can save up to 19 gp
 	 * regs and 18 fp regs below sp before decrementing it.
@@ -235,7 +237,7 @@ struct sigframe {
 /*
  *  When we have rt signals to deliver, we set up on the
  *  user stack, going down from the original stack pointer:
- *	one rt_sigframe struct (siginfo + ucontext + ABI gap)
+ *	one rt_sigframe struct (siginfo + ucontext + cookie + ABI gap)
  *	a gap of __SIGNAL_FRAMESIZE+16 bytes
  *  (the +16 is to get the siginfo and ucontext in the same
  *  positions as in older kernels).
@@ -253,6 +255,7 @@ struct rt_sigframe {
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 	struct ucontext	uc_transact;
 #endif
+	unsigned long user_cookie;
 	/*
 	 * Programs using the rs6000/xcoff abi can save up to 19 gp
 	 * regs and 18 fp regs below sp before decrementing it.
@@ -980,11 +983,12 @@ int handle_rt_signal32(struct ksignal *ksig, sigset_t *oldset,
 	unsigned long newsp = 0;
 	int sigret;
 	unsigned long tramp;
-
+	void __user *cookie_location;
 	/* Set up Signal Frame */
 	/* Put a Real Time Context onto stack */
 	rt_sf = get_sigframe(ksig, get_tm_stackpointer(regs), sizeof(*rt_sf), 1);
 	addr = rt_sf;
+	cookie_location = &(rt_sf->user_cookie);
 	if (unlikely(rt_sf == NULL))
 		goto badframe;
 
@@ -1016,6 +1020,8 @@ int handle_rt_signal32(struct ksignal *ksig, sigset_t *oldset,
 		    __put_user((unsigned long)tm_frame,
 			       &rt_sf->uc_transact.uc_regs))
 			goto badframe;
+		if (set_sigcookie(cookie_location))
+			goto badframe;
 		if (save_tm_user_regs(regs, frame, tm_frame, sigret))
 			goto badframe;
 	}
@@ -1023,6 +1029,8 @@ int handle_rt_signal32(struct ksignal *ksig, sigset_t *oldset,
 #endif
 	{
 		if (__put_user(0, &rt_sf->uc.uc_link))
+			goto badframe;
+		if (set_sigcookie(cookie_location))
 			goto badframe;
 		if (save_user_regs(regs, frame, tm_frame, sigret, 1))
 			goto badframe;
@@ -1219,11 +1227,13 @@ long sys_rt_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
 	unsigned long tmp;
 	int tm_restore = 0;
 #endif
+	void __user *user_cookie;
 	/* Always make any pending restarted system calls return -EINTR */
 	current->restart_block.fn = do_no_restart_syscall;
 
 	rt_sf = (struct rt_sigframe __user *)
 		(regs->gpr[1] + __SIGNAL_FRAMESIZE + 16);
+	user_cookie = &(rt_sf->user_cookie);
 	if (!access_ok(VERIFY_READ, rt_sf, sizeof(*rt_sf)))
 		goto bad;
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
@@ -1264,6 +1274,9 @@ long sys_rt_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
 	 * always done it up until now so it is probably better not to
 	 * change it.  -- paulus
 	 */
+
+	if (verify_clear_sigcookie(user_cookie))
+		goto bad;
 #ifdef CONFIG_PPC64
 	if (compat_restore_altstack(&rt_sf->uc.uc_stack))
 		goto bad;
@@ -1404,11 +1417,12 @@ int handle_signal32(struct ksignal *ksig, sigset_t *oldset, struct pt_regs *regs
 	unsigned long newsp = 0;
 	int sigret;
 	unsigned long tramp;
-
+	void __user *cookie_location;
 	/* Set up Signal Frame */
 	frame = get_sigframe(ksig, get_tm_stackpointer(regs), sizeof(*frame), 1);
 	if (unlikely(frame == NULL))
 		goto badframe;
+	cookie_location = &(frame->user_cookie);
 	sc = (struct sigcontext __user *) &frame->sctx;
 
 #if _NSIG != 64
@@ -1436,6 +1450,8 @@ int handle_signal32(struct ksignal *ksig, sigset_t *oldset, struct pt_regs *regs
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 	tm_mctx = &frame->mctx_transact;
 	if (MSR_TM_ACTIVE(regs->msr)) {
+		if (set_sigcookie(cookie_location))
+			goto badframe;
 		if (save_tm_user_regs(regs, &frame->mctx, &frame->mctx_transact,
 				      sigret))
 			goto badframe;
@@ -1443,6 +1459,8 @@ int handle_signal32(struct ksignal *ksig, sigset_t *oldset, struct pt_regs *regs
 	else
 #endif
 	{
+		if (set_sigcookie(cookie_location))
+			goto badframe;
 		if (save_user_regs(regs, &frame->mctx, tm_mctx, sigret, 1))
 			goto badframe;
 	}
@@ -1491,11 +1509,12 @@ long sys_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
 	struct mcontext __user *mcp, *tm_mcp;
 	unsigned long msr_hi;
 #endif
-
+	void __user *user_cookie;
 	/* Always make any pending restarted system calls return -EINTR */
 	current->restart_block.fn = do_no_restart_syscall;
 
 	sf = (struct sigframe __user *)(regs->gpr[1] + __SIGNAL_FRAMESIZE);
+	user_cookie = &(sf->user_cookie);
 	sc = &sf->sctx;
 	addr = sc;
 	if (copy_from_user(&sigctx, sc, sizeof(sigctx)))
@@ -1521,13 +1540,19 @@ long sys_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
 	if (MSR_TM_ACTIVE(msr_hi<<32)) {
 		if (!cpu_has_feature(CPU_FTR_TM))
 			goto badframe;
+		if (verify_clear_sigcookie(user_cookie))
+			goto badframe;
 		if (restore_tm_user_regs(regs, mcp, tm_mcp))
 			goto badframe;
 	} else
 #endif
 	{
+
 		sr = (struct mcontext __user *)from_user_ptr(sigctx.regs);
 		addr = sr;
+		if (verify_clear_sigcookie(user_cookie))
+			goto badframe;
+
 		if (!access_ok(VERIFY_READ, sr, sizeof(*sr))
 		    || restore_user_regs(regs, sr, 1))
 			goto badframe;
