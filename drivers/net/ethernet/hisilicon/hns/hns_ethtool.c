@@ -720,7 +720,7 @@ static int hns_set_pauseparam(struct net_device *net_dev,
 	struct hnae_handle *h;
 	struct hnae_ae_ops *ops;
 
-	assert(priv || priv->ae_handle);
+	assert(priv && priv->ae_handle);
 
 	h = priv->ae_handle;
 	ops = h->dev->ops;
@@ -780,7 +780,7 @@ static int hns_set_coalesce(struct net_device *net_dev,
 	struct hnae_ae_ops *ops;
 	int ret;
 
-	assert(priv || priv->ae_handle);
+	assert(priv && priv->ae_handle);
 
 	ops = priv->ae_handle->dev->ops;
 
@@ -1111,7 +1111,7 @@ void hns_get_regs(struct net_device *net_dev, struct ethtool_regs *cmd,
 	struct hns_nic_priv *priv = netdev_priv(net_dev);
 	struct hnae_ae_ops *ops;
 
-	assert(priv || priv->ae_handle);
+	assert(priv && priv->ae_handle);
 
 	ops = priv->ae_handle->dev->ops;
 
@@ -1135,7 +1135,7 @@ static int hns_get_regs_len(struct net_device *net_dev)
 	struct hns_nic_priv *priv = netdev_priv(net_dev);
 	struct hnae_ae_ops *ops;
 
-	assert(priv || priv->ae_handle);
+	assert(priv && priv->ae_handle);
 
 	ops = priv->ae_handle->dev->ops;
 	if (!ops->get_regs_len) {
