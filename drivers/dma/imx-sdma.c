@@ -656,12 +656,6 @@ static void sdma_event_disable(struct sdma_channel *sdmac, unsigned int event)
 
 static void sdma_handle_channel_loop(struct sdma_channel *sdmac)
 {
-	if (sdmac->desc.callback)
-		sdmac->desc.callback(sdmac->desc.callback_param);
-}
-
-static void sdma_update_channel_loop(struct sdma_channel *sdmac)
-{
 	struct sdma_buffer_descriptor *bd;
 
 	/*
@@ -685,6 +679,9 @@ static void sdma_update_channel_loop(struct sdma_channel *sdmac)
 			sdmac->chn_real_count = bd->mode.count;
 			bd->mode.count = sdmac->chn_count;
 		}
+
+		if (sdmac->desc.callback)
+			sdmac->desc.callback(sdmac->desc.callback_param);
 	}
 }
 
@@ -739,9 +736,6 @@ static irqreturn_t sdma_int_handler(int irq, void *dev_id)
 	while (stat) {
 		int channel = fls(stat) - 1;
 		struct sdma_channel *sdmac = &sdma->channel[channel];
-
-		if (sdmac->flags & IMX_DMA_SG_LOOP)
-			sdma_update_channel_loop(sdmac);
 
 		tasklet_schedule(&sdmac->tasklet);
 
