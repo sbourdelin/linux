@@ -1,0 +1,16 @@
+UIO device for dynamic memory allocation
+----------------------------------------
+
+When binding the uio_dmem_genirq via the device tree by setting
+the of_id from command line, the following OF properties are
+used for initialization:
+
+- uio,number-of-dynamic-regions
+
+  Determines the number of dynamically allocated memory regions
+  for the device.
+
+- uio,dynamic-regions-sizes
+
+  Sizes of regions to be allocated. It is expected to contain
+  at least uio,number-of-dynamic-regions sizes.
