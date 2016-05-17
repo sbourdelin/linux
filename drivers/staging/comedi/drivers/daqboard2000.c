@@ -232,16 +232,16 @@ static const struct comedi_lrange range_daqboard2000_ai = {
 #define DAQBOARD2000_DAC_CONTROL_PATTERN_ENABLE			0x0061
 
 /* Trigger Control */
-#define DAQBOARD2000_TrigAnalog                  0x0000
-#define DAQBOARD2000_TrigTTL                     0x0010
-#define DAQBOARD2000_TrigTransHiLo               0x0004
-#define DAQBOARD2000_TrigTransLoHi               0x0000
-#define DAQBOARD2000_TrigAbove                   0x0000
-#define DAQBOARD2000_TrigBelow                   0x0004
-#define DAQBOARD2000_TrigLevelSense              0x0002
-#define DAQBOARD2000_TrigEdgeSense               0x0000
-#define DAQBOARD2000_TrigEnable                  0x0001
-#define DAQBOARD2000_TrigDisable                 0x0000
+#define DAQBOARD2000_TRIG_CONTROL_TYPE_ANALOG			0x0000
+#define DAQBOARD2000_TRIG_CONTROL_TYPE_TTL			0x0010
+#define DAQBOARD2000_TRIG_CONTROL_EDGE_HI_LO			0x0004
+#define DAQBOARD2000_TRIG_CONTROL_EDGE_LO_HI			0x0000
+#define DAQBOARD2000_TRIG_CONTROL_LEVEL_ABOVE			0x0000
+#define DAQBOARD2000_TRIG_CONTROL_LEVEL_BELOW			0x0004
+#define DAQBOARD2000_TRIG_CONTROL_SENSE_LEVEL			0x0002
+#define DAQBOARD2000_TRIG_CONTROL_SENSE_EDGE			0x0000
+#define DAQBOARD2000_TRIG_CONTROL_ENABLE			0x0001
+#define DAQBOARD2000_TRIG_CONTROL_DISABLE			0x0000
 
 /* Reference Dac Selection */
 #define DAQBOARD2000_PosRefDacSelect             0x0100
@@ -543,10 +543,12 @@ static void daqboard2000_adcDisarm(struct comedi_device *dev)
 {
 	/* Disable hardware triggers */
 	udelay(2);
-	writew(DAQBOARD2000_TrigAnalog | DAQBOARD2000_TrigDisable,
+	writew(DAQBOARD2000_TRIG_CONTROL_TYPE_ANALOG |
+	       DAQBOARD2000_TRIG_CONTROL_DISABLE,
 	       dev->mmio + DAQBOARD2000_REG_TRIG_CONTROL);
 	udelay(2);
-	writew(DAQBOARD2000_TrigTTL | DAQBOARD2000_TrigDisable,
+	writew(DAQBOARD2000_TRIG_CONTROL_TYPE_TTL |
+	       DAQBOARD2000_TRIG_CONTROL_DISABLE,
 	       dev->mmio + DAQBOARD2000_REG_TRIG_CONTROL);
 
 	/* Stop the scan list FIFO from loading the configuration pipe */
