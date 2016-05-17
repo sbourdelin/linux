@@ -194,9 +194,13 @@ toolchain-msa				:= $(call cc-option-yn,$(mips-cflags) -mhard-float -mfp64 -Wa$(
 cflags-$(toolchain-msa)			+= -DTOOLCHAIN_SUPPORTS_MSA
 endif
 
-cflags-$(CONFIG_MIPS_COMPACT_BRANCHES_NEVER)	+= -mcompact-branches=never
-cflags-$(CONFIG_MIPS_COMPACT_BRANCHES_OPTIMAL)	+= -mcompact-branches=optimal
-cflags-$(CONFIG_MIPS_COMPACT_BRANCHES_ALWAYS)	+= -mcompact-branches=always
+ifeq ($(call cc-option-yn,-mcompact-branches=optimal), y)
+  cflags-$(CONFIG_MIPS_COMPACT_BRANCHES_NEVER)		+= -mcompact-branches=never
+  cflags-$(CONFIG_MIPS_COMPACT_BRANCHES_OPTIMAL)	+= -mcompact-branches=optimal
+  cflags-$(CONFIG_MIPS_COMPACT_BRANCHES_ALWAYS)		+= -mcompact-branches=always
+else ifneq ($(CONFIG_MIPS_COMPACT_BRANCHES_DEFAULT),y)
+  $(error Compact branch policy specified, but lacking toolchain support)
+endif
 
 #
 # Firmware support
