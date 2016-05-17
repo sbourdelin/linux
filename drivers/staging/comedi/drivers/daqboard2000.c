@@ -278,9 +278,7 @@ struct daqboard2000_private {
 
 static void writeAcqScanListEntry(struct comedi_device *dev, u16 entry)
 {
-	/* udelay(4); */
 	writew(entry & 0x00ff, dev->mmio + acqScanListFIFO);
-	/* udelay(4); */
 	writew((entry >> 8) & 0x00ff, dev->mmio + acqScanListFIFO);
 }
 
@@ -315,10 +313,6 @@ static void setup_sampling(struct comedi_device *dev, int chan, int gain)
 		word3 = 0;
 		break;
 	}
-/*
-  dev->eeprom.correctionDACSE[i][j][k].offset = 0x800;
-  dev->eeprom.correctionDACSE[i][j][k].gain = 0xc00;
-*/
 	/* These should be read from EEPROM */
 	word2 |= 0x0800;
 	word3 |= 0xc000;
