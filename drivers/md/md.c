@@ -4350,6 +4350,7 @@ action_store(struct mddev *mddev, const char *page, size_t len)
 			else {
 				clear_bit(MD_RECOVERY_FROZEN, &mddev->recovery);
 				err = mddev->pers->start_reshape(mddev);
+				md_update_sb(mddev, 1);
 			}
 			mddev_unlock(mddev);
 		}
