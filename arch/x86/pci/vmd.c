@@ -135,6 +135,7 @@ static void vmd_irq_disable(struct irq_data *data)
 
 	raw_spin_lock(&list_lock);
 	list_del_rcu(&vmdirq->node);
+	LIST_HEAD_INIT_RCU(&vmdirq->node);
 	raw_spin_unlock(&list_lock);
 }
 
