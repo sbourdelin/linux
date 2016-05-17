@@ -23,6 +23,13 @@
 
 #include "intel_drv.h"
 
+/** intel_get_shared_dpll_by_id - get a DPLL given its id
+ * @dev_priv: i915 device instance
+ * @id: pll id
+ *
+ * Returns:
+ * A pointer the DPLL with @id
+ */
 struct intel_shared_dpll *
 intel_get_shared_dpll_by_id(struct drm_i915_private *dev_priv,
 			    enum intel_dpll_id id)
@@ -30,6 +37,13 @@ intel_get_shared_dpll_by_id(struct drm_i915_private *dev_priv,
 	return &dev_priv->shared_dplls[id];
 }
 
+/** intel_get_shared_dpll_id - get the id of a DPLL
+ * @dev_priv: i915 device instance
+ * @pll: the DPLL
+ *
+ * Returns:
+ * The id of @pll
+ */
 enum intel_dpll_id
 intel_get_shared_dpll_id(struct drm_i915_private *dev_priv,
 			 struct intel_shared_dpll *pll)
@@ -41,6 +55,15 @@ intel_get_shared_dpll_id(struct drm_i915_private *dev_priv,
 	return (enum intel_dpll_id) (pll - dev_priv->shared_dplls);
 }
 
+/** intel_shared_dpll_config_get - get a reference to a DPLL for a crtc
+ * @config: a intel_shared_dpll_config struct
+ * @pll: pll to get a reference to
+ * @crtc: crtc that references the pll
+ *
+ * This gets a reference to @pll for @crtc. Internally is sets the pll's
+ * crtc_mask. @config should be the pll configuration in an atomic state.
+ * A crtc can reference a pll only once.
+ */
 void
 intel_shared_dpll_config_get(struct intel_shared_dpll_config *config,
 			     struct intel_shared_dpll *pll,
@@ -52,6 +75,14 @@ intel_shared_dpll_config_get(struct intel_shared_dpll_config *config,
 	config[id].crtc_mask |= 1 << crtc->pipe;
 }
 
+/** intel_shared_dpll_config_put - release a reference to a DPLL for a crtc
+ * @config: a intel_shared_dpll_config struct
+ * @pll: pll that is referenced by @crtc
+ * @crtc: crtc that references the pll
+ *
+ * This releases the reference to @pll for @crtc. Internally is sets the pll's
+ * crtc_mask. @config should be the pll configuration in an atomic state.
+ */
 void
 intel_shared_dpll_config_put(struct intel_shared_dpll_config *config,
 			     struct intel_shared_dpll *pll,
@@ -80,6 +111,9 @@ void assert_shared_dpll(struct drm_i915_private *dev_priv,
 			pll->name, onoff(state), onoff(cur_state));
 }
 
+/** intel_prepare_shared_dpll - call a dpll's mode_set hook
+ * @crtc: crtc which has a shared dpll
+ */
 void intel_prepare_shared_dpll(struct intel_crtc *crtc)
 {
 	struct drm_device *dev = crtc->base.dev;
@@ -102,12 +136,10 @@ void intel_prepare_shared_dpll(struct intel_crtc *crtc)
 }
 
 /**
- * intel_enable_shared_dpll - enable PCH PLL
- * @dev_priv: i915 private structure
- * @pipe: pipe PLL to enable
+ * intel_enable_shared_dpll - enable a crtc's shared DPLL
+ * @crtc: crtc which has a shared DPLL
  *
- * The PCH PLL needs to be enabled before the PCH transcoder, since it
- * drives the transcoder clock.
+ * Enable the shared DPLL used by @crtc.
  */
 void intel_enable_shared_dpll(struct intel_crtc *crtc)
 {
@@ -148,6 +180,12 @@ out:
 	mutex_unlock(&dev_priv->dpll_lock);
 }
 
+/**
+ * intel_disable_shared_dpll - disable a crtc's shared DPLL
+ * @crtc: crtc which has a shared DPLL
+ *
+ * Disable the shared DPLL used by @crtc.
+ */
 void intel_disable_shared_dpll(struct intel_crtc *crtc)
 {
 	struct drm_device *dev = crtc->base.dev;
@@ -250,6 +288,11 @@ intel_reference_shared_dpll(struct intel_shared_dpll *pll,
 	intel_shared_dpll_config_get(shared_dpll, pll, crtc);
 }
 
+/** intel_shared_dpll_commit - make atomic state DPLL configuration effective
+ * @state: atomic state
+ *
+ * Makes the DPLL configuration in @state effective.
+ */
 void intel_shared_dpll_commit(struct drm_atomic_state *state)
 {
 	struct drm_i915_private *dev_priv = to_i915(state->dev);
@@ -1725,6 +1768,11 @@ static const struct intel_dpll_mgr bxt_pll_mgr = {
 	.get_dpll = bxt_get_dpll,
 };
 
+/** intel_shared_dpll_init - Initialize shared DPLLs
+ * @dev: drm device
+ *
+ * Initialize shared DPLLs for @dev.
+ */
 void intel_shared_dpll_init(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -1768,6 +1816,16 @@ void intel_shared_dpll_init(struct drm_device *dev)
 		intel_ddi_pll_init(dev);
 }
 
+/** intel_get_shared_dpll - get a shared DPLL for crtc and encoder combination
+ * @crtc: crtc
+ * @crtc_state: atomic state for @crtc
+ * @encoder: encoder
+ *
+ * Find an appropriate DPLL for the given crtc and encoder combination.
+ *
+ * Returns:
+ * A shared DPLL to be used by @crtc and @encoder with the given @crtc_state.
+ */
 struct intel_shared_dpll *
 intel_get_shared_dpll(struct intel_crtc *crtc,
 		      struct intel_crtc_state *crtc_state,
