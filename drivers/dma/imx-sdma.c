@@ -1401,6 +1401,13 @@ static void sdma_issue_pending(struct dma_chan *chan)
 		sdma_enable_channel(sdma, sdmac->channel);
 }
 
+static int sdma_terminate_all(struct dma_chan *chan)
+{
+	sdma_disable_channel(chan);
+
+	return 0;
+}
+
 #define SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V1	34
 #define SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V2	38
 #define SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V3	41
@@ -1819,6 +1826,7 @@ static int sdma_probe(struct platform_device *pdev)
 	sdma->dma_device.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
 	sdma->dma_device.residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
 	sdma->dma_device.device_issue_pending = sdma_issue_pending;
+	sdma->dma_device.device_terminate_all = sdma_terminate_all;
 	sdma->dma_device.dev->dma_parms = &sdma->dma_parms;
 	dma_set_max_seg_size(sdma->dma_device.dev, 65535);
 
