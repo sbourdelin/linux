@@ -2388,8 +2388,15 @@ static int __clk_core_init(struct clk_core *core)
 	hlist_for_each_entry_safe(orphan, tmp2, &clk_orphan_list, child_node) {
 		struct clk_core *parent = __clk_init_parent(orphan);
 
-		if (parent)
+		if (parent) {
 			clk_core_reparent(orphan, parent);
+
+			if (orphan->prepare_count)
+				clk_core_prepare(parent);
+
+			if (orphan->enable_count)
+				clk_core_enable(parent);
+		}
 	}
 
 	/*
