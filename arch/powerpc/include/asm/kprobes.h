@@ -38,7 +38,25 @@ struct pt_regs;
 struct kprobe;
 
 typedef ppc_opcode_t kprobe_opcode_t;
+
+extern kprobe_opcode_t optinsn_slot;
+/* Optinsn template address */
+extern kprobe_opcode_t optprobe_template_entry[];
+extern kprobe_opcode_t optprobe_template_call_handler[];
+extern kprobe_opcode_t optprobe_template_call_emulate[];
+extern kprobe_opcode_t optprobe_template_ret_branch[];
+extern kprobe_opcode_t optprobe_template_ret[];
+extern kprobe_opcode_t optprobe_template_insn[];
+extern kprobe_opcode_t optprobe_template_op_address1[];
+extern kprobe_opcode_t optprobe_template_op_address2[];
+extern kprobe_opcode_t optprobe_template_end[];
+
 #define MAX_INSN_SIZE 1
+#define MAX_OPTIMIZED_LENGTH    4
+#define MAX_OPTINSN_SIZE				\
+	((unsigned long)&optprobe_template_end -	\
+	(unsigned long)&optprobe_template_entry)
+#define RELATIVEJUMP_SIZE       4
 
 #ifdef CONFIG_PPC64
 #if defined(_CALL_ELF) && _CALL_ELF == 2
@@ -129,5 +147,12 @@ struct kprobe_ctlblk {
 extern int kprobe_exceptions_notify(struct notifier_block *self,
 					unsigned long val, void *data);
 extern int kprobe_fault_handler(struct pt_regs *regs, int trapnr);
+
+struct arch_optimized_insn {
+	kprobe_opcode_t copied_insn[1];
+	/* detour buffer */
+	kprobe_opcode_t *insn;
+};
+
 #endif /* __KERNEL__ */
 #endif	/* _ASM_POWERPC_KPROBES_H */
