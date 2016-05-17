@@ -18,8 +18,6 @@
 #include <xen/xen.h>
 
 #include "xenfs.h"
-#include "../privcmd.h"
-#include "../xenbus/xenbus_comms.h"
 
 #include <asm/xen/hypervisor.h>
 
@@ -45,16 +43,16 @@ static const struct file_operations capabilities_file_ops = {
 static int xenfs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	static struct tree_descr xenfs_files[] = {
-		[2] = { "xenbus", &xen_xenbus_fops, S_IRUSR|S_IWUSR },
+		[2] = { "xenbus", NULL, S_IFLNK | S_IRWXUGO, "/dev/xen/xenbus" },
 		{ "capabilities", &capabilities_file_ops, S_IRUGO },
-		{ "privcmd", &xen_privcmd_fops, S_IRUSR|S_IWUSR },
+		{ "privcmd", NULL, S_IFLNK | S_IRWXUGO, "/dev/xen/privcmd" },
 		{""},
 	};
 
 	static struct tree_descr xenfs_init_files[] = {
-		[2] = { "xenbus", &xen_xenbus_fops, S_IRUSR|S_IWUSR },
+		[2] = { "xenbus", NULL, S_IFLNK | S_IRWXUGO, "/dev/xen/xenbus" },
 		{ "capabilities", &capabilities_file_ops, S_IRUGO },
-		{ "privcmd", &xen_privcmd_fops, S_IRUSR|S_IWUSR },
+		{ "privcmd", NULL, S_IFLNK | S_IRWXUGO, "/dev/xen/privcmd" },
 		{ "xsd_kva", &xsd_kva_file_ops, S_IRUSR|S_IWUSR},
 		{ "xsd_port", &xsd_port_file_ops, S_IRUSR|S_IWUSR},
 #ifdef CONFIG_XEN_SYMS
