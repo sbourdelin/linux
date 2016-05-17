@@ -84,6 +84,7 @@
 /* opcode and xopcode for instructions */
 #define OP_TRAP 3
 #define OP_TRAP_64 2
+#define OP_31		31
 
 #define OP_31_XOP_TRAP      4
 #define OP_31_XOP_LWZX      23

@@ -334,6 +334,7 @@ static inline int check_io_access(struct pt_regs *regs)
 
 	if (((msr & 0xffff0000) == 0 || (msr & (0x80000 | 0x40000)))
 	    && (entry = search_exception_tables(regs->nip)) != NULL) {
+		int op, xop;
 		/*
 		 * Check that it's a sync instruction, or somewhere
 		 * in the twi; isync; nop sequence that inb/inw/inl uses.
@@ -346,10 +347,18 @@ static inline int check_io_access(struct pt_regs *regs)
 			nip -= 2;
 		else if (*nip == PPC_INST_ISYNC)
 			--nip;
-		if (*nip == PPC_INST_SYNC || (*nip >> 26) == OP_TRAP) {
+		if (*nip == PPC_INST_SYNC || (*nip >> 26) == OP_TRAP)
+			--nip;
+		op = *nip >> 26;
+		xop = (*nip >> 1) & 0x3ff;
+		if (op == OP_LWZ || op == OP_LBZ || op == OP_STW ||
+		    op == OP_STB || op == OP_LHZ || op == OP_STH ||
+		    (op == OP_31 &&
+		     (xop == OP_31_XOP_LBZX || xop == OP_31_XOP_LHBRX ||
+		      xop == OP_31_XOP_LWBRX || xop == OP_31_XOP_STBX ||
+		      xop == OP_31_XOP_STHBRX || xop == OP_31_XOP_STWBRX))) {
 			unsigned int rb;
 
-			--nip;
 			rb = (*nip >> 11) & 0x1f;
 			printk(KERN_DEBUG "%s bad port %lx at %p\n",
 			       (*nip & 0x100)? "OUT to": "IN from",
