@@ -117,7 +117,16 @@ if CPU_MIPSR6
 
 choice
 	prompt "Compact branch policy"
-	default MIPS_COMPACT_BRANCHES_OPTIMAL
+	depends on DEBUG_KERNEL
+	default MIPS_COMPACT_BRANCHES_DEFAULT
+
+config MIPS_COMPACT_BRANCHES_DEFAULT
+	bool "Toolchain Default (don't specify)"
+	help
+	  Don't pass the -mcompact-branches flag to the compiler, allowing it
+	  to use its default (generally "optimal"). This is particularly
+	  useful for early R6-supporting toolchains which don't support the
+	  -mcompact-branches flag.
 
 config MIPS_COMPACT_BRANCHES_NEVER
 	bool "Never (force delay slot branches)"
