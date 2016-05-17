@@ -984,6 +984,15 @@ static long uinput_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 static long uinput_compat_ioctl(struct file *file,
 				unsigned int cmd, unsigned long arg)
 {
+	switch (_IOC_NR(cmd)) {
+		case _IOC_NR(UI_SET_PHYS):
+			if (_IOC_SIZE(cmd) == sizeof(compat_uptr_t)) {
+				cmd &= ~IOCSIZE_MASK;
+				cmd |= sizeof(void *) << IOCSIZE_SHIFT;
+			}
+			break;
+	}
+
 	return uinput_ioctl_handler(file, cmd, arg, compat_ptr(arg));
 }
 #endif
