@@ -1408,6 +1408,13 @@ static int sdma_terminate_all(struct dma_chan *chan)
 	return 0;
 }
 
+static void sdma_synchronize(struct dma_chan *chan)
+{
+	struct sdma_channel *sdmac = to_sdma_chan(chan);
+
+	tasklet_kill(&sdmac->tasklet);
+}
+
 #define SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V1	34
 #define SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V2	38
 #define SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V3	41
@@ -1827,6 +1834,7 @@ static int sdma_probe(struct platform_device *pdev)
 	sdma->dma_device.residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
 	sdma->dma_device.device_issue_pending = sdma_issue_pending;
 	sdma->dma_device.device_terminate_all = sdma_terminate_all;
+	sdma->dma_device.device_synchronize = sdma_synchronize;
 	sdma->dma_device.dev->dma_parms = &sdma->dma_parms;
 	dma_set_max_seg_size(sdma->dma_device.dev, 65535);
 
