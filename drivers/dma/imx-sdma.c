@@ -680,6 +680,11 @@ static void sdma_update_channel_loop(struct sdma_channel *sdmac)
 		bd->mode.status |= BD_DONE;
 		sdmac->buf_tail++;
 		sdmac->buf_tail %= sdmac->num_bd;
+		if (sdmac->peripheral_type == IMX_DMATYPE_UART) {
+			/* restore mode.count after counter readed */
+			sdmac->chn_real_count = bd->mode.count;
+			bd->mode.count = sdmac->chn_count;
+		}
 	}
 }
 
@@ -1285,6 +1290,9 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
 		goto err_out;
 	}
 
+	if (sdmac->peripheral_type == IMX_DMATYPE_UART)
+		sdmac->chn_count = period_len;
+
 	while (buf < buf_len) {
 		struct sdma_buffer_descriptor *bd = &sdmac->bd[i];
 		int param;
@@ -1361,7 +1369,8 @@ static enum dma_status sdma_tx_status(struct dma_chan *chan,
 	struct sdma_channel *sdmac = to_sdma_chan(chan);
 	u32 residue;
 
-	if (sdmac->flags & IMX_DMA_SG_LOOP)
+	if ((sdmac->flags & IMX_DMA_SG_LOOP) &&
+	    (sdmac->peripheral_type != IMX_DMATYPE_UART))
 		residue = (sdmac->num_bd - sdmac->buf_tail) * sdmac->period_len;
 	else
 		residue = sdmac->chn_count - sdmac->chn_real_count;
