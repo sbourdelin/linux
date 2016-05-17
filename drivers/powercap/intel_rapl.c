@@ -29,6 +29,7 @@
 #include <linux/sysfs.h>
 #include <linux/cpu.h>
 #include <linux/powercap.h>
+#include <asm/hypervisor.h>
 #include <asm/iosf_mbi.h>
 
 #include <asm/processor.h>
@@ -1532,6 +1533,10 @@ static int __init rapl_init(void)
 
 		return -ENODEV;
 	}
+
+	/* Intel RAPL is not supported on virtualized environments */
+	if (x86_hyper)
+		return -ENODEV;
 
 	rapl_defaults = (struct rapl_defaults *)id->driver_data;
 
