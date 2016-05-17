@@ -24,6 +24,7 @@
 #include <asm/irq.h>
 #include <asm/unwind.h>
 #include <asm/mach_desc.h>
+#include <asm/mcip.h>
 #include <asm/smp.h>
 
 #define FIX_PTR(x)  __asm__ __volatile__(";" : "+r"(x))
@@ -374,6 +375,8 @@ static inline int is_kernel(unsigned long addr)
 
 void __init setup_arch(char **cmdline_p)
 {
+	unsigned int num_cores;
+
 #ifdef CONFIG_ARC_UBOOT_SUPPORT
 	/* make sure that uboot passed pointer to cmdline/dtb is valid */
 	if (uboot_tag && is_kernel((unsigned long)uboot_arg))
@@ -412,6 +415,15 @@ void __init setup_arch(char **cmdline_p)
 	/* Platform/board specific: e.g. early console registration */
 	if (machine_desc->init_early)
 		machine_desc->init_early();
+
+	num_cores = (read_aux_reg(ARC_REG_MCIP_BCR) >> 16) & 0x3F;
+#ifdef CONFIG_ARC_MCIP
+	if (!num_cores)
+		panic("SMP kernel is run on a UP hardware!\n");
+#else
+	if (num_cores)
+		panic("UP kernel is run on a SMP hardware!\n");
+#endif
 
 	smp_init_cpus();
 
