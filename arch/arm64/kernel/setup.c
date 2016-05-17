@@ -261,10 +261,12 @@ void __init setup_arch(char **cmdline_p)
 	efi_init();
 	arm64_memblock_init();
 
+	paging_init();
+
+	early_initrd_acpi_init();
+
 	/* Parse the ACPI tables for possible boot-time configuration */
 	acpi_boot_table_init();
-
-	paging_init();
 
 	if (acpi_disabled)
 		unflatten_device_tree();

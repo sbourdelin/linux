@@ -313,7 +313,7 @@ config ACPI_CUSTOM_DSDT
 
 config ACPI_TABLE_UPGRADE
 	bool "Allow upgrading ACPI tables via initrd"
-	depends on BLK_DEV_INITRD && X86
+	depends on BLK_DEV_INITRD && (X86 || ARM64)
 	default y
 	help
 	  This option provides functionality to upgrade arbitrary ACPI tables

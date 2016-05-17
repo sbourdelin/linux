@@ -482,6 +482,14 @@ static DECLARE_BITMAP(acpi_initrd_installed, NR_ACPI_INITRD_TABLES);
 
 #define MAP_CHUNK_SIZE   (NR_FIX_BTMAPS << PAGE_SHIFT)
 
+#if defined(CONFIG_X86)
+#define MAX_PHYS_ACPI_TABLES (max_low_pfn_mapped << PAGE_SHIFT)
+#elif defined(CONFIG_ARM64)
+#define MAX_PHYS_ACPI_TABLES PFN_PHYS(max_pfn)
+#else
+#error "MAX_PHYS_ACPI_TABLES is not defiend for this architecture"
+#endif
+
 static void __init acpi_table_initrd_init(void *data, size_t size)
 {
 	int sig, no, table_nr = 0, total_offset = 0;
@@ -541,7 +549,7 @@ static void __init acpi_table_initrd_init(void *data, size_t size)
 		return;
 
 	acpi_tables_addr =
-		memblock_find_in_range(0, max_low_pfn_mapped << PAGE_SHIFT,
+		memblock_find_in_range(0, MAX_PHYS_ACPI_TABLES,
 				       all_tables_size, PAGE_SIZE);
 	if (!acpi_tables_addr) {
 		WARN_ON(1);
