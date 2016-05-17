@@ -517,9 +517,20 @@ int simple_fill_super(struct super_block *s, unsigned long magic,
 			dput(dentry);
 			goto out;
 		}
-		inode->i_mode = S_IFREG | files->mode;
+		if (files->mode & S_IFLNK) {
+			inode->i_mode = files->mode;
+			inode->i_op = &simple_symlink_inode_operations;
+			inode->i_link = kstrdup(files->link, GFP_KERNEL);
+			if (!inode->i_link) {
+				iput(inode);
+				dput(dentry);
+				goto out;
+			}
+		} else {
+			inode->i_mode = S_IFREG | files->mode;
+			inode->i_fop = files->ops;
+		}
 		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
-		inode->i_fop = files->ops;
 		inode->i_ino = i;
 		d_add(dentry, inode);
 	}
