@@ -15,9 +15,10 @@
 	.globl \name
 	.type \name, @function
 \name:
+	/* push 1 register if frame pointers are enabled */
 	FRAME_BEGIN
 
-	/* this one pushes 9 elems, the next one would be %rIP */
+	/* push 9 registers */
 	pushq %rdi
 	pushq %rsi
 	pushq %rdx
@@ -29,8 +30,8 @@
 	pushq %r11
 
 	.if \put_ret_addr_in_rdi
-	/* 9*8(%rsp) is return addr on stack */
-	movq 9*8(%rsp), %rdi
+	/* (9*8)+FRAME_OFFSET(%rsp) is return addr on stack */
+	movq (9*8)+FRAME_OFFSET(%rsp), %rdi
 	.endif
 
 	call \func
