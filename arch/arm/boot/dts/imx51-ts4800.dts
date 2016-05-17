@@ -149,6 +149,16 @@
 		#size-cells = <1>;
 		ranges = <0 0 0 0x1d000>;
 
+		can@0,1a000 {
+			compatible = "technologic,sja1000";
+			reg = <0x1a000 0x00000100>;
+			interrupt-parent = <&fpga_irqc>;
+			interrupts = <1>;
+			reg-io-width = <2>;
+			nxp,tx-output-config = <0x06>;
+			nxp,external-clock-frequency = <24000000>;
+		};
+
 		fpga_irqc: fpga_irqc@0,15000 {
 			compatible = "technologic,ts4800-irqc";
 			reg = <0x15000 0x1000>;
