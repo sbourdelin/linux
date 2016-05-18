@@ -389,7 +389,7 @@ ds1685_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	ds1685_rtc_end_data_access(rtc);
 
 	/* Check month date. */
-	if (!(mday >= 1) && (mday <= 31))
+	if ((mday < 1) || (mday > 31))
 		return -EDOM;
 
 	/*
@@ -461,7 +461,7 @@ ds1685_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 				     RTC_MDAY_BCD_MASK);
 
 	/* Check the month date for validity. */
-	if (!(mday >= 1) && (mday <= 31))
+	if ((mday < 1) || (mday > 31))
 		return -EDOM;
 
 	/*
