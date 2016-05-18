@@ -794,6 +794,7 @@ struct signal_struct {
 	struct tty_audit_buf *tty_audit_buf;
 #endif
 
+	atomic_t oom_victims; /* # of TIF_MEDIE threads in this thread group */
 	/*
 	 * Thread is the potential origin of an oom condition; kill first on
 	 * oom
