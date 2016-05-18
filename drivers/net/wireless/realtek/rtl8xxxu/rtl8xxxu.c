@@ -44,6 +44,7 @@
 
 static int rtl8xxxu_debug;
 static bool rtl8xxxu_ht40_2g;
+static int rtl8xxxu_firmware_poll_max = RTL8XXXU_FIRMWARE_POLL_MAX;
 
 MODULE_AUTHOR("Jes Sorensen <Jes.Sorensen@redhat.com>");
 MODULE_DESCRIPTION("RTL8XXXu USB mac80211 Wireless LAN Driver");
@@ -59,6 +60,8 @@ module_param_named(debug, rtl8xxxu_debug, int, 0600);
 MODULE_PARM_DESC(debug, "Set debug mask");
 module_param_named(ht40_2g, rtl8xxxu_ht40_2g, bool, 0600);
 MODULE_PARM_DESC(ht40_2g, "Enable HT40 support on the 2.4GHz band");
+module_param_named(firmware_poll_max, rtl8xxxu_firmware_poll_max, int, 0600);
+MODULE_PARM_DESC(firmware_poll_max, "Maximum polling count for firmware startup (increase if firmware fails to start)");
 
 #define USB_VENDOR_ID_REALTEK		0x0bda
 /* Minimum IEEE80211_MAX_FRAME_LEN */
@@ -2050,13 +2053,13 @@ static int rtl8xxxu_start_firmware(struct rtl8xxxu_priv *priv)
 	u32 val32;
 
 	/* Poll checksum report */
-	for (i = 0; i < RTL8XXXU_FIRMWARE_POLL_MAX; i++) {
+	for (i = 0; i < rtl8xxxu_firmware_poll_max; i++) {
 		val32 = rtl8xxxu_read32(priv, REG_MCU_FW_DL);
 		if (val32 & MCU_FW_DL_CSUM_REPORT)
 			break;
 	}
 
-	if (i == RTL8XXXU_FIRMWARE_POLL_MAX) {
+	if (i == rtl8xxxu_firmware_poll_max) {
 		dev_warn(dev, "Firmware checksum poll timed out\n");
 		ret = -EAGAIN;
 		goto exit;
@@ -2068,7 +2071,7 @@ static int rtl8xxxu_start_firmware(struct rtl8xxxu_priv *priv)
 	rtl8xxxu_write32(priv, REG_MCU_FW_DL, val32);
 
 	/* Wait for firmware to become ready */
-	for (i = 0; i < RTL8XXXU_FIRMWARE_POLL_MAX; i++) {
+	for (i = 0; i < rtl8xxxu_firmware_poll_max; i++) {
 		val32 = rtl8xxxu_read32(priv, REG_MCU_FW_DL);
 		if (val32 & MCU_WINT_INIT_READY)
 			break;
@@ -2076,7 +2079,7 @@ static int rtl8xxxu_start_firmware(struct rtl8xxxu_priv *priv)
 		udelay(100);
 	}
 
-	if (i == RTL8XXXU_FIRMWARE_POLL_MAX) {
+	if (i == rtl8xxxu_firmware_poll_max) {
 		dev_warn(dev, "Firmware failed to start\n");
 		ret = -EAGAIN;
 		goto exit;
