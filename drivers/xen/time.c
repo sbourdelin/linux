@@ -75,6 +75,15 @@ bool xen_vcpu_stolen(int vcpu)
 	return per_cpu(xen_runstate, vcpu).state == RUNSTATE_runnable;
 }
 
+static u64 xen_steal_clock(int cpu)
+{
+	struct vcpu_runstate_info state;
+
+	BUG_ON(cpu != smp_processor_id());
+	xen_get_runstate_snapshot(&state);
+	return state.time[RUNSTATE_runnable] + state.time[RUNSTATE_offline];
+}
+
 void xen_setup_runstate_info(int cpu)
 {
 	struct vcpu_register_runstate_memory_area area;
@@ -86,3 +95,13 @@ void xen_setup_runstate_info(int cpu)
 		BUG();
 }
 
+void __init xen_time_setup_guest(void)
+{
+	pv_time_ops.steal_clock = xen_steal_clock;
+
+	static_key_slow_inc(&paravirt_steal_enabled);
+	/*
+	 * We can't set paravirt_steal_rq_enabled as this would require the
+	 * capability to read another cpu's runstate info.
+	 */
+}
