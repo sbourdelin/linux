@@ -546,8 +546,11 @@ static int vmbus_close_internal(struct vmbus_channel *channel)
 		put_cpu();
 		smp_call_function_single(channel->target_cpu, reset_channel_cb,
 					 channel, true);
+		smp_call_function_single(channel->target_cpu,
+					 percpu_channel_deq, channel, true);
 	} else {
 		reset_channel_cb(channel);
+		percpu_channel_deq(channel);
 		put_cpu();
 	}
 
@@ -592,6 +595,8 @@ static int vmbus_close_internal(struct vmbus_channel *channel)
 
 out:
 	tasklet_enable(tasklet);
+	/* for possible pending event */
+	tasklet_schedule(tasklet);
 
 	return ret;
 }
