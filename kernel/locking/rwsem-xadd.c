@@ -148,9 +148,14 @@ __rwsem_do_wake(struct rw_semaphore *sem, enum rwsem_wake_type wake_type)
  try_reader_grant:
 		oldcount = rwsem_atomic_update(adjustment, sem) - adjustment;
 		if (unlikely(oldcount < RWSEM_WAITING_BIAS)) {
-			/* A writer stole the lock. Undo our reader grant. */
-			if (rwsem_atomic_update(-adjustment, sem) &
-						RWSEM_ACTIVE_MASK)
+			/*
+			 * If the count is still less than RWSEM_WAITING_BIAS
+			 * after removing the adjustment, it is assumed that
+			 * a writer has stolen the lock. We have to undo our
+			 * reader grant.
+			 */
+			if (rwsem_atomic_update(-adjustment, sem)
+			    < RWSEM_WAITING_BIAS)
 				goto out;
 			/* Last active locker left. Retry waking readers. */
 			goto try_reader_grant;
