@@ -383,12 +383,11 @@ struct sock {
 	int			sk_sndbuf;
 	struct sk_buff_head	sk_write_queue;
 	kmemcheck_bitfield_begin(flags);
-	unsigned int		sk_shutdown  : 2,
+	unsigned int		sk_type : 16,
+				sk_protocol : 8,
 				sk_no_check_tx : 1,
 				sk_no_check_rx : 1,
-				sk_userlocks : 4,
-				sk_protocol  : 8,
-				sk_type      : 16;
+				sk_userlocks : 4;
 #define SK_PROTOCOL_MAX U8_MAX
 	kmemcheck_bitfield_end(flags);
 	int			sk_wmem_queued;
@@ -418,6 +417,7 @@ struct sock {
 	struct timer_list	sk_timer;
 	ktime_t			sk_stamp;
 	u16			sk_tsflags;
+	u8			sk_shutdown;
 	u32			sk_tskey;
 	struct socket		*sk_socket;
 	void			*sk_user_data;
