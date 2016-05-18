@@ -212,4 +212,47 @@ void cxl_perst_reloads_same_image(struct cxl_afu *afu,
  */
 ssize_t cxl_read_adapter_vpd(struct pci_dev *dev, void *buf, size_t count);
 
+/*
+ * AFU driver ops allows an AFU driver to create their own events to pass to
+ * userspace through the file descriptor as a simpler alternative to overriding
+ * the read() and poll() calls that works with the generic cxl events. These
+ * events are given priority over the generic cxl events, so they will be
+ * delivered first if multiple types of events are pending.
+ *
+ * The AFU driver must call cxl_context_events_pending() to notify the cxl
+ * driver that new events are ready to be delivered for a specific context.
+ * cxl_context_events_pending() will adjust the current count of AFU driver
+ * events for this context, and wake up anyone waiting on the context wait
+ * queue.
+ *
+ * The cxl driver will then call deliver_event() to fill out a cxl_event
+ * structure with the driver specific event. The header will already have the
+ * type and process_element fields filled in, and header.size will be set to
+ * sizeof(struct cxl_event_header). The AFU driver can extend that size up to
+ * max_size (if an afu driver requires more space, they should submit a patch
+ * increasing the size in the struct cxl_event_afu_driver_reserved definition).
+ *
+ * deliver_event() is called with a spin lock held, so it must not sleep.
+ */
+struct cxl_afu_driver_ops {
+	void (*deliver_event) (struct cxl_context *ctx,
+			       struct cxl_event *event, size_t max_size);
+};
+
+/*
+ * Associate the above driver ops with a specific context.
+ * Reset the current count of AFU driver events.
+ */
+void cxl_set_driver_ops(struct cxl_context *ctx,
+			struct cxl_afu_driver_ops *ops);
+/*
+ * Remove the driver ops from a specific context.
+ * The current count of AFU driver events must be 0.
+ */
+int cxl_unset_driver_ops(struct cxl_context *ctx);
+
+/* Notify cxl driver that new events are ready to be delivered for context */
+void cxl_context_events_pending(struct cxl_context *ctx,
+				unsigned int new_events);
+
 #endif /* _MISC_CXL_H */
