@@ -443,48 +443,21 @@ void __init efi_dump_pagetable(void)
 }
 
 #ifdef CONFIG_EFI_MIXED
-extern efi_status_t efi64_thunk(u32, ...);
-
-#define runtime_service32(func)						 \
-({									 \
-	u32 table = (u32)(unsigned long)efi.systab;			 \
-	u32 *rt, *___f;							 \
-									 \
-	rt = (u32 *)(table + offsetof(efi_system_table_32_t, runtime));	 \
-	___f = (u32 *)(*rt + offsetof(efi_runtime_services_32_t, func)); \
-	*___f;								 \
-})
 
 /*
- * Switch to the EFI page tables early so that we can access the 1:1
- * runtime services mappings which are not mapped in any other page
- * tables. This function must be called before runtime_service32().
+ * Note that we pass in NULL here instead of the systab/function name combo
+ * that usually gets us what we need.  This is because the EFI_MIXED code
+ * still assumes that all EFI callback function pointers will be in
+ * efi.systab->runtime.  Currently there are no users in the EFI_MIXED code
+ * that require efi_thunk to behave otherwise.
  *
- * Also, disable interrupts because the IDT points to 64-bit handlers,
- * which aren't going to function correctly when we switch to 32-bit.
+ * If EFI_MIXED users want to call runtime functions that *don't* live in
+ * efi.systab->runtime, runtime_service32 and some of the related macros
+ * will need to be updated to handle this.  Not a major headache, but
+ * something to keep in mind.
  */
-#define efi_thunk(f, ...)						\
-({									\
-	efi_status_t __s;						\
-	unsigned long flags;						\
-	u32 func;							\
-									\
-	efi_sync_low_kernel_mappings();					\
-	local_irq_save(flags);						\
-									\
-	efi_scratch.prev_cr3 = read_cr3();				\
-	write_cr3((unsigned long)efi_scratch.efi_pgt);			\
-	__flush_tlb_all();						\
-									\
-	func = runtime_service32(f);					\
-	__s = efi64_thunk(func, __VA_ARGS__);			\
-									\
-	write_cr3(efi_scratch.prev_cr3);				\
-	__flush_tlb_all();						\
-	local_irq_restore(flags);					\
-									\
-	__s;								\
-})
+#define efi_thunk(f, args...)   \
+	efi_call_virt_generic(NULL, f, args)
 
 efi_status_t efi_thunk_set_virtual_address_map(
 	void *phys_set_virtual_address_map,
