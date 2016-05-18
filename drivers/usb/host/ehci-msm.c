@@ -30,14 +30,11 @@
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/usb/otg.h>
-#include <linux/usb/msm_hsusb_hw.h>
 #include <linux/usb.h>
 #include <linux/usb/hcd.h>
 #include <linux/acpi.h>
 
 #include "ehci.h"
-
-#define MSM_USB_BASE (hcd->regs)
 
 #define DRIVER_DESC "Qualcomm On-Chip EHCI Host Controller"
 
@@ -49,23 +46,12 @@ static int ehci_msm_reset(struct usb_hcd *hcd)
 	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
 	int retval;
 
-	ehci->caps = USB_CAPLENGTH;
+	ehci->caps = hcd->regs + 0x100;
 	hcd->has_tt = 1;
 
 	retval = ehci_setup(hcd);
 	if (retval)
 		return retval;
-
-	/* select ULPI phy and clear other status/control bits in PORTSC */
-	writel(PORTSC_PTS_ULPI, USB_PORTSC);
-	/* bursts of unspecified length. */
-	writel(0, USB_AHBBURST);
-	/* Use the AHB transactor, allow posted data writes */
-	writel(0x8, USB_AHBMODE);
-	/* Disable streaming mode and select host mode */
-	writel(0x13, USB_USBMODE);
-	/* Disable ULPI_TX_PKT_EN_CLR_FIX which is valid only for HSIC */
-	writel(readl(USB_GENCONFIG_2) & ~ULPI_TX_PKT_EN_CLR_FIX, USB_GENCONFIG_2);
 
 	return 0;
 }
@@ -144,6 +130,7 @@ static int ehci_msm_probe(struct platform_device *pdev)
 		pm_runtime_no_callbacks(&pdev->dev);
 		pm_runtime_enable(&pdev->dev);
 	} else {
+		usb_phy_init(phy);
 		ret = usb_add_hcd(hcd, hcd->irq, IRQF_SHARED);
 		if (ret)
 			goto put_hcd;
