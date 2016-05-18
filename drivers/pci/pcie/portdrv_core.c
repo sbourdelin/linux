@@ -336,13 +336,14 @@ static int pcie_device_init(struct pci_dev *pdev, int service, int irq)
 		     get_descriptor_id(pci_pcie_type(pdev), service));
 	device->parent = &pdev->dev;
 	device_enable_async_suspend(device);
-	pm_runtime_no_callbacks(device);
 
 	retval = device_register(device);
 	if (retval) {
 		put_device(device);
 		return retval;
 	}
+
+	pm_runtime_no_callbacks(device);
 
 	return 0;
 }
