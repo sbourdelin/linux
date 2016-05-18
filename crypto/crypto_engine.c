@@ -19,7 +19,7 @@
 #define CRYPTO_ENGINE_MAX_QLEN 10
 
 void crypto_finalize_request(struct crypto_engine *engine,
-			     struct ablkcipher_request *req, int err);
+			     struct crypto_async_request *req, int err);
 
 /**
  * crypto_pump_requests - dequeue one request from engine queue to process
@@ -34,7 +34,6 @@ static void crypto_pump_requests(struct crypto_engine *engine,
 				 bool in_kthread)
 {
 	struct crypto_async_request *async_req, *backlog;
-	struct ablkcipher_request *req;
 	unsigned long flags;
 	bool was_busy = false;
 	int ret;
@@ -82,9 +81,7 @@ static void crypto_pump_requests(struct crypto_engine *engine,
 	if (!async_req)
 		goto out;
 
-	req = ablkcipher_request_cast(async_req);
-
-	engine->cur_req = req;
+	engine->cur_req = async_req;
 	if (backlog)
 		backlog->complete(backlog, -EINPROGRESS);
 
@@ -142,7 +139,7 @@ static void crypto_pump_work(struct kthread_work *work)
  * @req: the request need to be listed into the engine queue
  */
 int crypto_transfer_request(struct crypto_engine *engine,
-			    struct ablkcipher_request *req, bool need_pump)
+			    struct crypto_async_request *req, bool need_pump)
 {
 	unsigned long flags;
 	int ret;
@@ -154,7 +151,7 @@ int crypto_transfer_request(struct crypto_engine *engine,
 		return -ESHUTDOWN;
 	}
 
-	ret = ablkcipher_enqueue_request(&engine->queue, req);
+	ret = crypto_enqueue_request(&engine->queue, req);
 
 	if (!engine->busy && need_pump)
 		queue_kthread_work(&engine->kworker, &engine->pump_requests);
@@ -171,7 +168,7 @@ EXPORT_SYMBOL_GPL(crypto_transfer_request);
  * @req: the request need to be listed into the engine queue
  */
 int crypto_transfer_request_to_engine(struct crypto_engine *engine,
-				      struct ablkcipher_request *req)
+				      struct crypto_async_request *req)
 {
 	return crypto_transfer_request(engine, req, true);
 }
@@ -184,7 +181,7 @@ EXPORT_SYMBOL_GPL(crypto_transfer_request_to_engine);
  * @err: error number
  */
 void crypto_finalize_request(struct crypto_engine *engine,
-			     struct ablkcipher_request *req, int err)
+			     struct crypto_async_request *req, int err)
 {
 	unsigned long flags;
 	bool finalize_cur_req = false;
@@ -208,7 +205,7 @@ void crypto_finalize_request(struct crypto_engine *engine,
 		spin_unlock_irqrestore(&engine->queue_lock, flags);
 	}
 
-	req->base.complete(&req->base, err);
+	req->complete(req, err);
 
 	queue_kthread_work(&engine->kworker, &engine->pump_requests);
 }
