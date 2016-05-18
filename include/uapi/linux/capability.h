@@ -62,6 +62,9 @@ typedef struct __user_cap_data_struct {
 #define VFS_CAP_U32_2           2
 #define XATTR_CAPS_SZ_2         (sizeof(__le32)*(1 + 2*VFS_CAP_U32_2))
 
+/* version number for security.nscapability xattrs hdr->hdr_info */
+#define VFS_NS_CAP_REVISION     1
+
 #define XATTR_CAPS_SZ           XATTR_CAPS_SZ_2
 #define VFS_CAP_U32             VFS_CAP_U32_2
 #define VFS_CAP_REVISION	VFS_CAP_REVISION_2
@@ -72,6 +75,22 @@ struct vfs_cap_data {
 		__le32 permitted;    /* Little endian */
 		__le32 inheritable;  /* Little endian */
 	} data[VFS_CAP_U32];
+};
+
+#define VFS_NS_CAP_EFFECTIVE    0x1
+/*
+ * 32-bit hdr_info contains
+ * 16 leftmost: reserved
+ * next 8: flags (only VFS_NS_CAP_EFFECTIVE so far)
+ * last 8: version
+ */
+struct vfs_ns_cap_data {
+       __le32 magic_etc;
+       __le32 rootid;
+       struct {
+               __le32 permitted;    /* Little endian */
+               __le32 inheritable;  /* Little endian */
+       } data[VFS_CAP_U32];
 };
 
 #ifndef __KERNEL__

@@ -310,13 +310,18 @@ int cap_inode_need_killpriv(struct dentry *dentry)
 	struct inode *inode = d_backing_inode(dentry);
 	int error;
 
-	if (!inode->i_op->getxattr)
+	if (!inode || !inode->i_op->getxattr)
 	       return 0;
 
+	error = inode->i_op->getxattr(dentry, XATTR_NAME_NS_CAPS, NULL, 0);
+	if (error > 0)
+		return 1;
+
 	error = inode->i_op->getxattr(dentry, XATTR_NAME_CAPS, NULL, 0);
-	if (error <= 0)
-		return 0;
-	return 1;
+	if (error > 0)
+		return 1;
+
+	return 0;
 }
 
 /**
@@ -330,11 +335,155 @@ int cap_inode_need_killpriv(struct dentry *dentry)
 int cap_inode_killpriv(struct dentry *dentry)
 {
 	struct inode *inode = d_backing_inode(dentry);
+	int ret1, ret2;
 
-	if (!inode->i_op->removexattr)
+	if (!inode || !inode->i_op->removexattr)
 	       return 0;
 
-	return inode->i_op->removexattr(dentry, XATTR_NAME_CAPS);
+	ret1 = inode->i_op->removexattr(dentry, XATTR_NAME_CAPS);
+	ret2 = inode->i_op->removexattr(dentry, XATTR_NAME_NS_CAPS);
+
+	if (ret1 != 0 && ret1 != -ENODATA)
+		return ret1;
+	if (ret2 == -ENODATA)
+		return 0;
+	return ret2;
+}
+
+/*
+ * getsecurity: We are called if reading of security.capable
+ * failed.  Since that does not exist, check whether the
+ * security.nscapability exists.  If it does, convert the kuid
+ * into the caller's context and return it
+ */
+static int cap_inode_getsecurity(struct inode *inode, const char *name, void **buffer, bool alloc)
+{
+	int error, ret;
+	struct user_namespace *ns;
+	kuid_t kroot;
+	uid_t root;
+	char *tmpbuf = NULL;
+	bool foundroot = false;
+	struct vfs_ns_cap_data *nscap;
+	struct dentry *dentry;
+
+	if (!inode->i_op->getxattr)
+		return -EOPNOTSUPP;
+
+	/* TODO - do we want to return the capability with the rootid converted
+	 * if this is security.nscapability?  It's not critical, so just say
+	 * no for now. */
+	if (strcmp(name, "nscapability") == 0 && current_user_ns() != &init_user_ns)
+		return -EPERM;
+
+	if (strcmp(name, "capability") != 0)
+		return -EOPNOTSUPP;
+
+	dentry = d_find_alias(inode);
+	if (!dentry)
+		return -EINVAL;
+
+	ret = vfs_getxattr_alloc(dentry, "security.nscapability",
+			&tmpbuf, 0, GFP_NOFS);
+
+	if (ret != sizeof(struct vfs_ns_cap_data)) {
+		kfree(tmpbuf);
+		return -EOPNOTSUPP;
+	}
+
+	/* verify the uid maps to a ancestor root uid, if so convert
+	   this to a valid security.capability */
+	nscap = (struct vfs_ns_cap_data *) tmpbuf;
+	root = le32_to_cpu(nscap->rootid);
+	kroot = make_kuid(&init_user_ns, root);
+	for (ns = current_user_ns(); ; ns = ns->parent) {
+		if (from_kuid(ns, kroot) == 0) {
+			foundroot = true;
+			break;
+		}
+		if (ns == &init_user_ns)
+			break;
+	}
+	if (!foundroot) {
+		kfree(tmpbuf);
+		return -EOPNOTSUPP;
+	}
+
+	error = sizeof(struct vfs_cap_data);
+	if (alloc) {
+		*buffer = kmalloc(sizeof(struct vfs_cap_data), GFP_ATOMIC);
+		if (*buffer) {
+			struct vfs_ns_cap_data *cap = *buffer;
+			__le32 nsmagic, magic;
+			memcpy(&cap->data, &nscap->data, sizeof(__le32) * 2 * VFS_CAP_U32);
+			nsmagic = le32_to_cpu(nscap->magic_etc);
+			magic = VFS_CAP_REVISION;
+			if (NS_CAPS_FLAGS(nsmagic) & VFS_NS_CAP_EFFECTIVE)
+				magic |= VFS_CAP_FLAGS_EFFECTIVE;
+			cap->magic_etc = cpu_to_le32(magic);
+		}
+	}
+	kfree(tmpbuf);
+	return error;
+}
+
+static bool dentry_has_nonns_capability(struct dentry *dentry)
+{
+	struct inode *inode = d_backing_inode(dentry);
+	int error;
+
+	if (!inode || !inode->i_op->getxattr)
+		return false;
+	error = inode->i_op->getxattr(dentry, "security.capability", NULL, 0);
+	if (error >= 0)
+		return true;
+	return false;
+}
+
+/*
+ * Use requested a write of security.capability but is in a non-init
+ * userns.  So we construct and write a security.nscapability.
+ *
+ * If all is ok, wvalue has an allocated new value.  Otherwise, wvalue
+ * is NULL.
+ */
+void cap_setxattr_make_nscap(struct dentry *dentry, const void *value, size_t size,
+				    void **wvalue, size_t *wsize)
+{
+	struct vfs_ns_cap_data nscap;
+	const struct vfs_cap_data *cap = value;
+	__u32 magic, nsmagic;
+	struct user_namespace *ns = current_user_ns();
+	struct inode *inode = d_backing_inode(dentry);
+	kuid_t rootid;
+
+	if (!value || size != sizeof(struct vfs_cap_data))
+		return;
+	if (!inode || !capable_wrt_inode_uidgid(inode, CAP_SETFCAP))
+		return;
+
+	/* refuse if security.capability exists */
+	if (dentry_has_nonns_capability(dentry))
+		return;
+
+	rootid = make_kuid(ns, 0);
+	if (!uid_valid(rootid))
+		return;
+
+	nscap.rootid = cpu_to_le32(from_kuid(&init_user_ns, rootid));
+	nsmagic = VFS_NS_CAP_REVISION;
+	magic = le32_to_cpu(cap->magic_etc);
+	if (magic & VFS_CAP_FLAGS_EFFECTIVE)
+		nsmagic |= VFS_NS_CAP_REVISION << 8;
+	nscap.magic_etc = cpu_to_le32(nsmagic);
+	memcpy(&nscap.data, &cap->data, sizeof(__le32) * 2 * VFS_CAP_U32);
+
+	*wsize = sizeof(struct vfs_ns_cap_data);
+	*wvalue = kmalloc(*wsize, GFP_ATOMIC);
+	if (!*wvalue)
+		return;
+	memcpy(*wvalue, &nscap, *wsize);
+	return;
 }
 
 /*
@@ -438,6 +587,68 @@ int get_vfs_caps_from_disk(const struct dentry *dentry, struct cpu_vfs_cap_data 
 	return 0;
 }
 
+int get_vfs_ns_caps_from_disk(const struct dentry *dentry, struct cpu_vfs_cap_data *cpu_caps)
+{
+	struct inode *inode = d_backing_inode(dentry);
+	unsigned i;
+	u32 magic_etc;
+	ssize_t size;
+	struct vfs_ns_cap_data nscap;
+	bool foundroot = false;
+	kuid_t kroot;
+	uid_t root;
+	struct user_namespace *ns;
+
+	memset(cpu_caps, 0, sizeof(struct cpu_vfs_cap_data));
+
+	if (!inode || !inode->i_op->getxattr)
+		return -ENODATA;
+
+	size = inode->i_op->getxattr((struct dentry *)dentry, XATTR_NAME_NS_CAPS,
+			&nscap, sizeof(nscap));
+	if (size == -ENODATA || size == -EOPNOTSUPP)
+		/* no data, that's ok */
+		return -ENODATA;
+	if (size < 0)
+		return size;
+	if (size != sizeof(nscap))
+		return -EINVAL;
+
+	root = le32_to_cpu(nscap.rootid);
+	kroot = make_kuid(&init_user_ns, root);
+	for (ns = current_user_ns(); ; ns = ns->parent) {
+		if (from_kuid(ns, kroot) == 0) {
+			foundroot = true;
+			break;
+		}
+		if (ns == &init_user_ns)
+			break;
+	}
+	if (!foundroot)
+		return -ENODATA;
+
+	magic_etc = le32_to_cpu(nscap.magic_etc);
+
+	if (NS_CAPS_VERSION(magic_etc) != VFS_NS_CAP_REVISION)
+		return -EINVAL;
+
+	cpu_caps->magic_etc = VFS_CAP_REVISION_2;
+	if (NS_CAPS_FLAGS(magic_etc) & VFS_NS_CAP_EFFECTIVE)
+		cpu_caps->magic_etc |= VFS_CAP_FLAGS_EFFECTIVE;
+	/* copy the entry */
+	CAP_FOR_EACH_U32(i) {
+		if (i >= VFS_CAP_U32_2)
+			break;
+		cpu_caps->permitted.cap[i] = le32_to_cpu(nscap.data[i].permitted);
+		cpu_caps->inheritable.cap[i] = le32_to_cpu(nscap.data[i].inheritable);
+	}
+
+	cpu_caps->permitted.cap[CAP_LAST_U32] &= CAP_LAST_U32_VALID_MASK;
+	cpu_caps->inheritable.cap[CAP_LAST_U32] &= CAP_LAST_U32_VALID_MASK;
+
+	return 0;
+}
+
 /*
  * Attempt to get the on-exec apply capability sets for an executable file from
  * its xattrs and, if present, apply them to the proposed credentials being
@@ -457,10 +668,12 @@ static int get_file_caps(struct linux_binprm *bprm, bool *effective, bool *has_c
 		return 0;
 
 	rc = get_vfs_caps_from_disk(bprm->file->f_path.dentry, &vcaps);
+	if (rc == -ENODATA)
+		rc = get_vfs_ns_caps_from_disk(bprm->file->f_path.dentry, &vcaps);
 	if (rc < 0) {
 		if (rc == -EINVAL)
-			printk(KERN_NOTICE "%s: get_vfs_caps_from_disk returned %d for %s\n",
-				__func__, rc, bprm->filename);
+			printk(KERN_NOTICE "Invalid argument reading file caps for %s\n",
+					bprm->filename);
 		else if (rc == -ENODATA)
 			rc = 0;
 		goto out;
@@ -657,6 +870,18 @@ int cap_inode_setxattr(struct dentry *dentry, const char *name,
 		       const void *value, size_t size, int flags)
 {
 	if (!strcmp(name, XATTR_NAME_CAPS)) {
+		if (current_user_ns() == &init_user_ns && !capable(CAP_SETFCAP))
+			return -EPERM;
+		/* for non-init userns we'll check permission later in
+		 * cap_setxattr_make_nscap() */
+		return 0;
+	}
+
+	if (!strcmp(name, XATTR_NAME_NS_CAPS)) {
+		/* only initial userns is allowed to set security.nscapability
+		 * directly.  We could be more flexible, but would need to
+		 * convert the rootid to target ns.  Defer.
+		 */
 		if (!capable(CAP_SETFCAP))
 			return -EPERM;
 		return 0;
@@ -682,8 +907,19 @@ int cap_inode_setxattr(struct dentry *dentry, const char *name,
  */
 int cap_inode_removexattr(struct dentry *dentry, const char *name)
 {
+	struct inode *inode = d_backing_inode(dentry);
 	if (!strcmp(name, XATTR_NAME_CAPS)) {
 		if (!capable(CAP_SETFCAP))
+			return -EPERM;
+		return 0;
+	}
+
+	if (!strcmp(name, XATTR_NAME_NS_CAPS)) {
+		/* do allow root to clear this capability out if they really
+		 * want to */
+		if (!inode)
+			return -EINVAL;
+		if (!capable_wrt_inode_uidgid(inode, CAP_SETFCAP))
 			return -EPERM;
 		return 0;
 	}
@@ -1078,6 +1314,7 @@ struct security_hook_list capability_hooks[] = {
 	LSM_HOOK_INIT(bprm_secureexec, cap_bprm_secureexec),
 	LSM_HOOK_INIT(inode_need_killpriv, cap_inode_need_killpriv),
 	LSM_HOOK_INIT(inode_killpriv, cap_inode_killpriv),
+	LSM_HOOK_INIT(inode_getsecurity, cap_inode_getsecurity),
 	LSM_HOOK_INIT(mmap_addr, cap_mmap_addr),
 	LSM_HOOK_INIT(mmap_file, cap_mmap_file),
 	LSM_HOOK_INIT(task_fix_setuid, cap_task_fix_setuid),
