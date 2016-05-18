@@ -383,7 +383,7 @@ struct scsi_host_template {
 	 * maximum, and may be over the transfer limits allowed for
 	 * individual devices (e.g. 256 for SCSI-1).
 	 */
-#define SCSI_DEFAULT_MAX_SECTORS	1024
+#define SCSI_DEFAULT_MAX_SECTORS        65535
 
 	/*
 	 * True if this host adapter can make good use of linked commands.
