@@ -246,6 +246,7 @@ config ACPI_CPPC_CPUFREQ
 	tristate "CPUFreq driver based on the ACPI CPPC spec"
 	depends on ACPI
 	select ACPI_CPPC_LIB
+	select DMI
 	default n
 	help
 	  This adds a CPUFreq driver which uses CPPC methods

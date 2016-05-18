@@ -40,6 +40,9 @@
 #include <linux/cpufreq.h>
 #include <linux/delay.h>
 #include <linux/ktime.h>
+#include <linux/dmi.h>
+
+#include <asm/unaligned.h>
 
 #include <acpi/cppc_acpi.h>
 /*
@@ -709,6 +712,55 @@ static int cpc_write(struct cpc_reg *reg, u64 val)
 	return ret_val;
 }
 
+static u64 cppc_dmi_khz;
+
+static void cppc_find_dmi_mhz(const struct dmi_header *dm, void *private)
+{
+	u16 *mhz = (u16 *)private;
+	const u8 *dmi_data = (const u8 *)dm;
+
+	if (dm->type == DMI_ENTRY_PROCESSOR && dm->length >= 48)
+		*mhz = (u16)get_unaligned((const u16 *)(dmi_data + 0x14));
+}
+
+
+static u64 cppc_get_dmi_khz(void)
+{
+	u16 mhz;
+
+	dmi_walk(cppc_find_dmi_mhz, &mhz);
+
+	/*
+	 * Real stupid fallback value, just in case there is no
+	 * actual value set.
+	 */
+	mhz = mhz ? mhz : 1;
+
+	return (1000 * mhz);
+}
+
+static u64 cppc_unitless_to_khz(u64 min_in, u64 max_in, u64 val)
+{
+	/*
+	 * The incoming val should be min <= val <= max.  Our
+	 * job is to convert that to KHz so it can be properly
+	 * reported to user space via cpufreq_policy.
+	 */
+	u64 curval = val;
+	u64 maxf = max_in;
+	u64 minf = min_in;
+
+	if (!cppc_dmi_khz)
+		cppc_dmi_khz = cppc_get_dmi_khz();
+
+	/* range check the input values */
+	curval = curval < minf ? minf : curval;
+	curval = curval > maxf ? maxf : curval;
+	minf = minf >= maxf ? maxf - 1 : minf;
+
+	return ((curval - minf) * cppc_dmi_khz) / (maxf - minf);
+}
+
 /**
  * cppc_get_perf_caps - Get a CPUs performance capabilities.
  * @cpunum: CPU from which to get capabilities info.
@@ -748,17 +800,51 @@ int cppc_get_perf_caps(int cpunum, struct cppc_perf_caps *perf_caps)
 		}
 	}
 
+	/*
+	 * Since these values in perf_caps will be used in setting
+	 * up the cpufreq policy, they must always be stored in units
+	 * of KHz.  If they are not, user space tools will become very
+	 * confused since they assume these are in KHz when reading
+	 * sysfs.
+	 *
+	 * NB: there may be better approaches to this problem that, as
+	 * of this writing, are still being explored.  Ideally, this is
+	 * a short term solution since correlating CPPC abstract values
+	 * with CPU frequency may or may not reflect actual performance.
+	 *
+	 * The reason longer term solutions are being explored is because
+	 * this solution requires we make the following assumptions:
+	 *
+	 *    (1) It relies on SMBIOS3 being used, *and* that the Max
+	 *        Frequency value for a processor is set to a non-zero value.
+	 *
+	 *    (2) It assumes that all processors run at the same speed, or
+	 *        that the CPPC values have all been scaled to reflect any
+	 *        relative differences.  This code retrieves the first CPU
+	 *        Max Frequency from a type 4 DMI record that it can find.
+	 *        This may not be an issue, however, as a sampling of DMI
+	 *        data on x86 and arm64 indicates there is often only one
+	 *        such record regardless.
+	 *
+	 *    (3) It assumes that performance and frequency both scale
+	 *        linearly.
+	 *
+	 * None of these are particularly horrible assumptions.  But, they
+	 * are assumptions and ultimately we'd like to be able to report
+	 * performance without quite so many of them.
+	 *
+	 */
 	cpc_read(&highest_reg->cpc_entry.reg, &high);
-	perf_caps->highest_perf = high;
-
 	cpc_read(&lowest_reg->cpc_entry.reg, &low);
-	perf_caps->lowest_perf = low;
+
+	perf_caps->highest_perf = cppc_unitless_to_khz(low, high, high);
+	perf_caps->lowest_perf = cppc_unitless_to_khz(low, high, low);
 
 	cpc_read(&ref_perf->cpc_entry.reg, &ref);
-	perf_caps->reference_perf = ref;
+	perf_caps->reference_perf = cppc_unitless_to_khz(low, high, ref);
 
 	cpc_read(&nom_perf->cpc_entry.reg, &nom);
-	perf_caps->nominal_perf = nom;
+	perf_caps->nominal_perf = cppc_unitless_to_khz(low, high, nom);
 
 	if (!ref)
 		perf_caps->reference_perf = perf_caps->nominal_perf;
