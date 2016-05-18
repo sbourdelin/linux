@@ -431,6 +431,22 @@ LEAF(mips_cps_boot_vpes)
 	mfc0	t0, CP0_CONFIG
 	mttc0	t0, CP0_CONFIG
 
+	/* Copy the EVA config from this VPE if the CPU supports it */
+	mfc0	t0, CP0_CONFIG, 1
+	bgez	t0, 1f
+	 mfc0	t0, CP0_CONFIG, 2
+	bgez	t0, 1f
+	 mfc0	t0, CP0_CONFIG, 3
+	and	t0, t0, MIPS_CONF3_SC
+	beqz	t0, 1f
+	 nop
+	mfc0    t0, CP0_SEGCTL0
+	mttc0	t0, CP0_SEGCTL0
+	mfc0    t0, CP0_SEGCTL1
+	mttc0	t0, CP0_SEGCTL1
+	mfc0    t0, CP0_SEGCTL2
+	mttc0	t0, CP0_SEGCTL2
+1:
 	/* Ensure no software interrupts are pending */
 	mttc0	zero, CP0_CAUSE
 	mttc0	zero, CP0_STATUS
