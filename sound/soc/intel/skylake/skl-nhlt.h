@@ -103,4 +103,26 @@ struct nhlt_resource_desc  {
 	u64 length;
 } __packed;
 
+#define MIC_ARRAY_2CH 2
+#define MIC_ARRAY_4CH 4
+
+struct nhlt_tdm_config {
+	uint8_t virtual_slot;
+	uint8_t config_type;
+} __packed;
+
+struct nhlt_dmic_array_config {
+	struct nhlt_tdm_config tdm_config;
+	uint8_t array_type;
+} __packed;
+
+enum {
+	NHLT_MIC_ARRAY_2CH_SMALL = 0xa,
+	NHLT_MIC_ARRAY_2CH_BIG = 0xb,
+	NHLT_MIC_ARRAY_4CH_1ST_GEOM = 0xc,
+	NHLT_MIC_ARRAY_4CH_L_SHAPED = 0xd,
+	NHLT_MIC_ARRAY_4CH_2ND_GEOM = 0xe,
+	NHLT_MIC_ARRAY_VENDOR_DEFINED = 0xf,
+};
+
 #endif
