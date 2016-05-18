@@ -143,6 +143,7 @@ config USB_MSM_OTG
 	depends on RESET_CONTROLLER
 	depends on EXTCON
 	select USB_PHY
+	select QCOM_TCSR if ARCH_QCOM
 	help
 	  Enable this to support the USB OTG transceiver on Qualcomm chips. It
 	  handles PHY initialization, clock management, and workarounds

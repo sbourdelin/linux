@@ -31,6 +31,7 @@
 #include <linux/uaccess.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
+#include <linux/soc/qcom/tcsr.h>
 #include <linux/pm_runtime.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
@@ -1820,7 +1821,6 @@ static int msm_otg_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct msm_otg *motg;
 	struct usb_phy *phy;
-	void __iomem *phy_select;
 
 	motg = devm_kzalloc(&pdev->dev, sizeof(struct msm_otg), GFP_KERNEL);
 	if (!motg)
@@ -1882,13 +1882,9 @@ static int msm_otg_probe(struct platform_device *pdev)
 	 * the dwc3 driver does not set this bit in an incompatible way.
 	 */
 	if (motg->phy_number) {
-		phy_select = devm_ioremap_nocache(&pdev->dev, USB2_PHY_SEL, 4);
-		if (!phy_select) {
-			ret = -ENOMEM;
+		ret = qcom_tcsr_phy_sel(0x1);
+		if (ret)
 			goto unregister_extcon;
-		}
-		/* Enable second PHY with the OTG port */
-		writel(0x1, phy_select);
 	}
 
 	dev_info(&pdev->dev, "OTG regs = %p\n", motg->regs);
