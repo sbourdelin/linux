@@ -2293,7 +2293,7 @@ struct kmem_cache *__memcg_kmem_get_cache(struct kmem_cache *cachep, gfp_t gfp)
 
 	/*
 	 * If we are in a safe context (can wait, and not in interrupt
-	 * context), we could be be predictable and return right away.
+	 * context), we could be predictable and return right away.
 	 * This would guarantee that the allocation being performed
 	 * already belongs in the new cache.
 	 *

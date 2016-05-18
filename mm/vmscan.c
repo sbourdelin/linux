@@ -1683,8 +1683,8 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 			set_bit(ZONE_DIRTY, &zone->flags);
 
 		/*
-		 * If kswapd scans pages marked marked for immediate
-		 * reclaim and under writeback (nr_immediate), it implies
+		 * If kswapd scans pages marked for immediate reclaim
+		 * and under writeback (nr_immediate), it implies
 		 * that pages are cycling through the LRU faster than
 		 * they are written so also forcibly stall.
 		 */
@@ -3267,8 +3267,7 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 			/*
 			 * There should be no need to raise the scanning
 			 * priority if enough pages are already being scanned
-			 * that that high watermark would be met at 100%
-			 * efficiency.
+			 * that high watermark would be met at 100% efficiency.
 			 */
 			if (kswapd_shrink_zone(zone, end_zone, &sc))
 				raise_priority = false;
