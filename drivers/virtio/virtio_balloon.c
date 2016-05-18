@@ -76,6 +76,7 @@ struct virtio_balloon {
 	/* The array of pfns we tell the Host about. */
 	unsigned int num_pfns;
 	u32 pfns[VIRTIO_BALLOON_ARRAY_PFNS_MAX];
+	__virtio32 vpfns[VIRTIO_BALLOON_ARRAY_PFNS_MAX];
 
 	/* Memory statistics */
 	struct virtio_balloon_stat stats[VIRTIO_BALLOON_S_NR];
@@ -115,8 +116,11 @@ static void tell_host(struct virtio_balloon *vb, struct virtqueue *vq)
 {
 	struct scatterlist sg;
 	unsigned int len;
+	int i;
 
-	sg_init_one(&sg, vb->pfns, sizeof(vb->pfns[0]) * vb->num_pfns);
+	for (i = 0; i < vb->num_pfns; i++)
+		vb->vpfns[i] = cpu_to_virtio32(vb->vdev, vb->pfns[i]);
+	sg_init_one(&sg, vb->vpfns, sizeof(vb->vpfns[0]) * vb->num_pfns);
 
 	/* We should always be able to add one buffer to an empty queue. */
 	virtqueue_add_outbuf(vq, &sg, 1, vb, GFP_KERNEL);
