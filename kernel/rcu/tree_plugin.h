@@ -1165,7 +1165,7 @@ static void rcu_boost_kthread_setaffinity(struct rcu_node *rnp, int outgoingcpu)
 		return;
 	if (!zalloc_cpumask_var(&cm, GFP_KERNEL))
 		return;
-	for_each_leaf_node_cpu_bit(rnp, cpu, bit)
+	for_each_leaf_node_possible_cpu_bit(rnp, cpu, bit)
 		if ((mask & bit) && cpu != outgoingcpu)
 			cpumask_set_cpu(cpu, cm);
 	if (cpumask_weight(cm) == 0)
