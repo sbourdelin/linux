@@ -770,7 +770,8 @@ static void dwc3_gadget_ep_free_request(struct usb_ep *ep,
  */
 static void dwc3_prepare_one_trb(struct dwc3_ep *dep,
 		struct dwc3_request *req, dma_addr_t dma,
-		unsigned length, unsigned last, unsigned chain, unsigned node)
+		unsigned length, unsigned last, unsigned chain,
+		unsigned node, int starting)
 {
 	struct dwc3_trb		*trb;
 
@@ -779,6 +780,15 @@ static void dwc3_prepare_one_trb(struct dwc3_ep *dep,
 			length, last ? " last" : "",
 			chain ? " chain" : "");
 
+	/*
+	 * When trying to issue Update Transfer, we can remove LST bit from
+	 * previous TRB and avoid a XferComplete
+	 */
+	if (!starting) {
+		trb = &dep->trb_pool[dep->trb_enqueue - 1];
+		if (trb->ctrl & DWC3_TRB_CTRL_HWO)
+			trb->ctrl &= ~DWC3_TRB_CTRL_LST;
+	}
 
 	trb = &dep->trb_pool[dep->trb_enqueue];
 
@@ -871,7 +881,8 @@ static u32 dwc3_calc_trbs_left(struct dwc3_ep *dep)
 }
 
 static void dwc3_prepare_one_trb_sg(struct dwc3_ep *dep,
-		struct dwc3_request *req, unsigned int trbs_left)
+		struct dwc3_request *req, unsigned int trbs_left,
+		int starting)
 {
 	struct usb_request *request = &req->request;
 	struct scatterlist *sg = request->sg;
@@ -901,7 +912,7 @@ static void dwc3_prepare_one_trb_sg(struct dwc3_ep *dep,
 			chain = false;
 
 		dwc3_prepare_one_trb(dep, req, dma, length,
-				last, chain, i);
+				last, chain, i, starting);
 
 		if (last)
 			break;
@@ -909,7 +920,8 @@ static void dwc3_prepare_one_trb_sg(struct dwc3_ep *dep,
 }
 
 static void dwc3_prepare_one_trb_linear(struct dwc3_ep *dep,
-		struct dwc3_request *req, unsigned int trbs_left)
+		struct dwc3_request *req, unsigned int trbs_left,
+		int starting)
 {
 	unsigned int	last = false;
 	unsigned int	length;
@@ -926,7 +938,7 @@ static void dwc3_prepare_one_trb_linear(struct dwc3_ep *dep,
 		last = true;
 
 	dwc3_prepare_one_trb(dep, req, dma, length,
-			last, false, 0);
+			last, false, 0, starting);
 }
 
 /*
@@ -937,7 +949,7 @@ static void dwc3_prepare_one_trb_linear(struct dwc3_ep *dep,
  * transfers. The function returns once there are no more TRBs available or
  * it runs out of requests.
  */
-static void dwc3_prepare_trbs(struct dwc3_ep *dep)
+static void dwc3_prepare_trbs(struct dwc3_ep *dep, int starting)
 {
 	struct dwc3_request	*req, *n;
 	u32			trbs_left;
@@ -948,9 +960,11 @@ static void dwc3_prepare_trbs(struct dwc3_ep *dep)
 
 	list_for_each_entry_safe(req, n, &dep->pending_list, list) {
 		if (req->request.num_mapped_sgs > 0)
-			dwc3_prepare_one_trb_sg(dep, req, trbs_left--);
+			dwc3_prepare_one_trb_sg(dep, req, trbs_left--,
+					starting);
 		else
-			dwc3_prepare_one_trb_linear(dep, req, trbs_left--);
+			dwc3_prepare_one_trb_linear(dep, req, trbs_left--,
+					starting);
 
 		if (!trbs_left)
 			return;
@@ -968,7 +982,7 @@ static int __dwc3_gadget_kick_transfer(struct dwc3_ep *dep, u16 cmd_param)
 
 	starting = !(dep->flags & DWC3_EP_BUSY);
 
-	dwc3_prepare_trbs(dep);
+	dwc3_prepare_trbs(dep, starting);
 	req = next_request(&dep->started_list);
 	if (!req) {
 		dep->flags |= DWC3_EP_PENDING_REQUEST;
