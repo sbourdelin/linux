@@ -61,6 +61,8 @@ Required properties:
 - compatible : shall be:
   "st,flexgen"
   "st,stih407-clkgend0", "st,flexgen" (enable clock propagation on parent)
+  "st,stih407-clkgend2", "st,flexgen" (enable clock propagation on parent
+					and activate synchronous mode)
 
 - #clock-cells : from common clock binding; shall be set to 1 (multiple clock
   outputs).
