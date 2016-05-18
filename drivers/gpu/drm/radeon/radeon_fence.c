@@ -471,12 +471,12 @@ static bool radeon_fence_any_seq_signaled(struct radeon_device *rdev, u64 *seq)
  *
  * @rdev: radeon device pointer
  * @target_seq: sequence number(s) we want to wait for
- * @intr: use interruptable sleep
+ * @intr: use interruptible sleep
  * @timeout: maximum time to wait, or MAX_SCHEDULE_TIMEOUT for infinite wait
  *
  * Wait for the requested sequence number(s) to be written by any ring
  * (all asics).  Sequnce number array is indexed by ring id.
- * @intr selects whether to use interruptable (true) or non-interruptable
+ * @intr selects whether to use interruptible (true) or non-interruptible
  * (false) sleep when waiting for the sequence number.  Helper function
  * for radeon_fence_wait_*().
  * Returns remaining time if the sequence number has passed, 0 when
@@ -533,7 +533,7 @@ static long radeon_fence_wait_seq_timeout(struct radeon_device *rdev,
  * @intr: use interruptible sleep
  *
  * Wait for the requested fence to signal (all asics).
- * @intr selects whether to use interruptable (true) or non-interruptable
+ * @intr selects whether to use interruptible (true) or non-interruptible
  * (false) sleep when waiting for the fence.
  * @timeout: maximum time to wait, or MAX_SCHEDULE_TIMEOUT for infinite wait
  * Returns remaining time if the sequence number has passed, 0 when
@@ -573,7 +573,7 @@ long radeon_fence_wait_timeout(struct radeon_fence *fence, bool intr, long timeo
  * @intr: use interruptible sleep
  *
  * Wait for the requested fence to signal (all asics).
- * @intr selects whether to use interruptable (true) or non-interruptable
+ * @intr selects whether to use interruptible (true) or non-interruptible
  * (false) sleep when waiting for the fence.
  * Returns 0 if the fence has passed, error for all other cases.
  */
@@ -592,11 +592,11 @@ int radeon_fence_wait(struct radeon_fence *fence, bool intr)
  *
  * @rdev: radeon device pointer
  * @fences: radeon fence object(s)
- * @intr: use interruptable sleep
+ * @intr: use interruptible sleep
  *
  * Wait for any requested fence to signal (all asics).  Fence
  * array is indexed by ring id.  @intr selects whether to use
- * interruptable (true) or non-interruptable (false) sleep when
+ * interruptible (true) or non-interruptible (false) sleep when
  * waiting for the fences. Used by the suballocator.
  * Returns 0 if any fence has passed, error for all other cases.
  */

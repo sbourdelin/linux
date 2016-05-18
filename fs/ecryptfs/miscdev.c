@@ -265,7 +265,7 @@ check_list:
 	}
 	if (list_empty(&daemon->msg_ctx_out_queue)) {
 		/* Something else jumped in since the
-		 * wait_event_interruptable() and removed the
+		 * wait_event_interruptible() and removed the
 		 * message from the queue; try again */
 		goto check_list;
 	}

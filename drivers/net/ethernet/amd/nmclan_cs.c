@@ -479,7 +479,7 @@ static void nmclan_detach(struct pcmcia_device *link)
 /* ----------------------------------------------------------------------------
 mace_read
 	Reads a MACE register.  This is bank independent; however, the
-	caller must ensure that this call is not interruptable.  We are
+	caller must ensure that this call is not interruptible.  We are
 	assuming that during normal operation, the MACE is always in
 	bank 0.
 ---------------------------------------------------------------------------- */
@@ -506,7 +506,7 @@ static int mace_read(mace_private *lp, unsigned int ioaddr, int reg)
 /* ----------------------------------------------------------------------------
 mace_write
 	Writes to a MACE register.  This is bank independent; however,
-	the caller must ensure that this call is not interruptable.  We
+	the caller must ensure that this call is not interruptible.  We
 	are assuming that during normal operation, the MACE is always in
 	bank 0.
 ---------------------------------------------------------------------------- */

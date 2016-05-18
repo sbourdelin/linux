@@ -32,7 +32,7 @@
 #define AUX_IRQ_ACT_BIT_U	31
 
 /*
- * User space should be interruptable even by lowest prio interrupt
+ * User space should be interruptible even by lowest prio interrupt
  * Safe even if actual interrupt priorities is fewer or even one
  */
 #define ARCV2_IRQ_DEF_PRIO	15

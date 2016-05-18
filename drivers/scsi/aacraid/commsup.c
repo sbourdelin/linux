@@ -607,7 +607,7 @@ int aac_fib_send(u16 command, struct fib *fibptr, unsigned long size,
 
 	if (wait) {
 		spin_unlock_irqrestore(&fibptr->event_lock, flags);
-		/* Only set for first known interruptable command */
+		/* Only set for first known interruptible command */
 		if (wait < 0) {
 			/*
 			 * *VERY* Dangerous to time out a command, the

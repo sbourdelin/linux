@@ -84,7 +84,7 @@ void sst_set_fw_state_locked(
  * @sst_drv_ctx: Driver context
  * @block: Driver block to wait on
  *
- * This function waits without a timeout (and is interruptable) for a
+ * This function waits without a timeout (and is interruptible) for a
  * given block event
  */
 int sst_wait_interruptible(struct intel_sst_drv *sst_drv_ctx,

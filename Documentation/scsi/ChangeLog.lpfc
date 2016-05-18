@@ -389,7 +389,7 @@ Changes from 20041220 to 20041229
 	  moved to kthread. kthread_stop() is not able to wake up thread
 	  waiting on a semaphore and "modprobe -r lpfc" is not always
 	  (most of the times) able to complete. Fix is in not using
-	  semaphore for the interruptable sleep.
+	  semaphore for the interruptible sleep.
 	* Small Makefile cleanup - Remove remnants of 2.4 vs. 2.6
 	  determination.
 

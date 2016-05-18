@@ -893,7 +893,7 @@ static void hil_mlc_serio_close(struct serio *serio)
 
 	serio_set_drvdata(serio, NULL);
 	serio->drv = NULL;
-	/* TODO wake up interruptable */
+	/* TODO wake up interruptible */
 }
 
 static const struct serio_device_id hil_mlc_serio_id = {

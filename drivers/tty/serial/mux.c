@@ -490,7 +490,7 @@ static int __init mux_probe(struct parisc_device *dev)
 
 		/* The port->timeout needs to match what is present in
 		 * uart_wait_until_sent in serial_core.c.  Otherwise
-		 * the time spent in msleep_interruptable will be very
+		 * the time spent in msleep_interruptible will be very
 		 * long, causing the appearance of a console hang.
 		 */
 		port->timeout   = HZ / 50;

@@ -1236,7 +1236,7 @@ void process_uv2_message(struct msg_desc *mdp, struct bau_control *bcp)
  *
  * All cores/threads on this hub get this interrupt.
  * The last one to see it does the software ack.
- * (the resource will not be freed until noninterruptable cpus see this
+ * (the resource will not be freed until noninterruptible cpus see this
  *  interrupt; hardware may timeout the s/w ack and reply ERROR)
  */
 void uv_bau_message_interrupt(struct pt_regs *regs)

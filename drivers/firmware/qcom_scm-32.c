@@ -317,7 +317,7 @@ out:
  * @arg1: first argument
  *
  * This shall only be used with commands that are guaranteed to be
- * uninterruptable, atomic and SMP safe.
+ * uninterruptible, atomic and SMP safe.
  */
 static s32 qcom_scm_call_atomic1(u32 svc, u32 cmd, u32 arg1)
 {

@@ -548,6 +548,7 @@ interrface||interface
 interrrupt||interrupt
 interrup||interrupt
 interrups||interrupts
+interruptable||interruptible
 interruptted||interrupted
 interupted||interrupted
 interupt||interrupt
@@ -1013,6 +1014,7 @@ unexpectd||unexpected
 unexpeted||unexpected
 unfortunatelly||unfortunately
 unifiy||unify
+uninterruptable||uninterruptible
 unintialized||uninitialized
 unknonw||unknown
 unknow||unknown
