@@ -261,6 +261,7 @@ int ir_raw_event_register(struct rc_dev *dev)
 {
 	int rc;
 	struct ir_raw_handler *handler;
+	unsigned fifo_size = dev->raw_fifo_size ?: MAX_IR_EVENT_SIZE;
 
 	if (!dev)
 		return -EINVAL;
@@ -271,7 +272,10 @@ int ir_raw_event_register(struct rc_dev *dev)
 
 	dev->raw->dev = dev;
 	dev->change_protocol = change_protocol;
-	INIT_KFIFO(dev->raw->kfifo);
+
+	rc = kfifo_alloc(&dev->raw->kfifo, fifo_size, GFP_KERNEL);
+	if (rc)
+		goto out;
 
 	spin_lock_init(&dev->raw->lock);
 	dev->raw->thread = kthread_run(ir_raw_event_thread, dev->raw,
@@ -279,7 +283,7 @@ int ir_raw_event_register(struct rc_dev *dev)
 
 	if (IS_ERR(dev->raw->thread)) {
 		rc = PTR_ERR(dev->raw->thread);
-		goto out;
+		goto out_kfifo;
 	}
 
 	mutex_lock(&ir_raw_handler_lock);
@@ -291,6 +295,8 @@ int ir_raw_event_register(struct rc_dev *dev)
 
 	return 0;
 
+out_kfifo:
+	kfifo_free(&dev->raw->kfifo);
 out:
 	kfree(dev->raw);
 	dev->raw = NULL;
@@ -313,6 +319,7 @@ void ir_raw_event_unregister(struct rc_dev *dev)
 			handler->raw_unregister(dev);
 	mutex_unlock(&ir_raw_handler_lock);
 
+	kfifo_free(&dev->raw->kfifo);
 	kfree(dev->raw);
 	dev->raw = NULL;
 }
