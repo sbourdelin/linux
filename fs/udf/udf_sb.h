@@ -63,6 +63,7 @@ struct udf_meta_data {
 	__u32	s_bitmap_file_loc;
 	__u32	s_alloc_unit_size;
 	__u16	s_align_unit_size;
+	__u16   s_partition_ref;
 	int	s_flags;
 	struct inode *s_metadata_fe;
 	struct inode *s_mirror_fe;
