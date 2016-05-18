@@ -127,8 +127,6 @@ static struct notifier_block cs_cpufreq_notifier_block = {
 };
 
 /************************** sysfs interface ************************/
-static struct dbs_governor cs_dbs_gov;
-
 static ssize_t store_sampling_down_factor(struct gov_attr_set *attr_set,
 					  const char *buf, size_t count)
 {
