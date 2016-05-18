@@ -684,7 +684,7 @@ void igb_ptp_rx_hang(struct igb_adapter *adapter)
 	u32 tsyncrxctl = rd32(E1000_TSYNCRXCTL);
 	unsigned long rx_event;
 
-	if (hw->mac.type != e1000_82576)
+	if (!(adapter->ptp_flags & IGB_PTP_ENABLED))
 		return;
 
 	/* If we don't have a valid timestamp in the registers, just update the
@@ -1156,7 +1156,7 @@ void igb_ptp_init(struct igb_adapter *adapter)
 	} else {
 		dev_info(&adapter->pdev->dev, "added PHC on %s\n",
 			 adapter->netdev->name);
-		adapter->flags |= IGB_FLAG_PTP;
+		adapter->ptp_flags |= IGB_PTP_ENABLED;
 	}
 }
 
@@ -1194,7 +1194,7 @@ void igb_ptp_stop(struct igb_adapter *adapter)
 		ptp_clock_unregister(adapter->ptp_clock);
 		dev_info(&adapter->pdev->dev, "removed PHC on %s\n",
 			 adapter->netdev->name);
-		adapter->flags &= ~IGB_FLAG_PTP;
+		adapter->ptp_flags &= ~IGB_PTP_ENABLED;
 	}
 }
 
@@ -1209,7 +1209,7 @@ void igb_ptp_reset(struct igb_adapter *adapter)
 	struct e1000_hw *hw = &adapter->hw;
 	unsigned long flags;
 
-	if (!(adapter->flags & IGB_FLAG_PTP))
+	if (!(adapter->ptp_flags & IGB_PTP_ENABLED))
 		return;
 
 	/* reset the tstamp_config */
