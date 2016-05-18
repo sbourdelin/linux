@@ -329,7 +329,7 @@ uint32_t udf_get_pblock_meta25(struct super_block *sb, uint32_t block,
 		}
 
 		inode = mdata->s_mirror_fe;
-		if (!inode)
+		if (IS_ERR(inode))
 			return 0xFFFFFFFF;
 		retblk = udf_try_read_meta(inode, block, partition, offset);
 	}
