@@ -37,6 +37,13 @@
 	} while (0)
 #endif
 
+#ifdef CONFIG_F2FS_16TB_VOLUME_SUPPORT
+#define F2FS_MAX_SUPP_MAJOR_VERSION		(2)
+#define F2FS_MIN_16TB_VOLUME_SUPPORT_VERSION	(2)
+#else
+#define F2FS_MAX_SUPP_MAJOR_VERSION		(1)
+#endif
+
 /*
  * For mount options
  */
@@ -75,7 +82,8 @@ struct f2fs_mount_info {
 	unsigned int	opt;
 };
 
-#define F2FS_FEATURE_ENCRYPT	0x0001
+#define F2FS_FEATURE_ENCRYPT		(1 << 0)
+#define F2FS_FEATURE_16TB_SUPPORT	(1 << 1)
 
 #define F2FS_HAS_FEATURE(sb, mask)					\
 	((F2FS_SB(sb)->raw_super->feature & cpu_to_le32(mask)) != 0)

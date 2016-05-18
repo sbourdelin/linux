@@ -1318,6 +1318,53 @@ int f2fs_commit_super(struct f2fs_sb_info *sbi, bool recover)
 	return err;
 }
 
+static int f2fs_check_version_and_features(struct super_block *sb,
+					   struct f2fs_super_block *raw_super)
+{
+	u16 major_ver = le16_to_cpu(raw_super->major_ver);
+	u32 feature = le32_to_cpu(raw_super->feature);
+
+	if (major_ver > F2FS_MAX_SUPP_MAJOR_VERSION) {
+		f2fs_msg(sb, KERN_CRIT,
+			 "Failed to mount volume: "
+			 "major version %u, max supported version %u",
+			 major_ver,
+			 F2FS_MAX_SUPP_MAJOR_VERSION);
+		return -EOPNOTSUPP;
+	}
+
+#ifdef CONFIG_F2FS_16TB_VOLUME_SUPPORT
+
+	if (major_ver < F2FS_MIN_16TB_VOLUME_SUPPORT_VERSION) {
+		if (feature & F2FS_FEATURE_16TB_SUPPORT) {
+			f2fs_msg(sb, KERN_CRIT,
+				 "Failed to mount corrupted volume. "
+				 "Please, check the volume by FSCK utility.");
+			return -EOPNOTSUPP;
+		}
+	} else {
+		if (!(feature & F2FS_FEATURE_16TB_SUPPORT)) {
+			f2fs_msg(sb, KERN_CRIT,
+				 "Failed to mount corrupted volume. "
+				 "Please, check the volume by FSCK utility.");
+			return -EOPNOTSUPP;
+		}
+	}
+
+#else
+
+	if (feature & F2FS_FEATURE_16TB_SUPPORT) {
+		f2fs_msg(sb, KERN_CRIT,
+			 "Failed to mount corrupted volume. "
+			 "Please, check the volume by FSCK utility.");
+		return -EOPNOTSUPP;
+	}
+
+#endif
+
+	return 0;
+}
+
 static int f2fs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct f2fs_sb_info *sbi;
@@ -1357,6 +1404,10 @@ try_onemore:
 
 	err = read_raw_super_block(sb, &raw_super, &valid_super_block,
 								&recovery);
+	if (err)
+		goto free_sbi;
+
+	err = f2fs_check_version_and_features(sb, raw_super);
 	if (err)
 		goto free_sbi;
 
