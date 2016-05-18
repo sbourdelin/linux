@@ -72,10 +72,10 @@ static int mpd4_lvds_pll_enable(struct clk_hw *hw)
 	const struct pll_rate *pll_rate = find_rate(lvds_pll->pixclk);
 	int i;
 
-	DBG("pixclk=%lu (%lu)", lvds_pll->pixclk, pll_rate->rate);
-
 	if (WARN_ON(!pll_rate))
 		return -EINVAL;
+
+	DBG("pixclk=%lu (%lu)", lvds_pll->pixclk, pll_rate->rate);
 
 	mdp4_write(mdp4_kms, REG_MDP4_LCDC_LVDS_PHY_RESET, 0x33);
 
