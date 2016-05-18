@@ -2030,8 +2030,7 @@ static int msm_otg_remove(struct platform_device *pdev)
 	clk_disable_unprepare(motg->clk);
 	if (!IS_ERR(motg->core_clk))
 		clk_disable_unprepare(motg->core_clk);
-	/* vddcx is left active */
-	regulator_bulk_disable(2, &motg->regulators[V3P3]);
+	regulator_bulk_disable(ARRAY_SIZE(motg->regulators), motg->regulators);
 
 	pm_runtime_set_suspended(&pdev->dev);
 
