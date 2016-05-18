@@ -1,0 +1,47 @@
+= Atmel Secumod device tree bindings =
+
+This binding is intended to represent Atmel's Secumod which is found
+in SAMA5D2 and perhaps others.
+
+Required properties:
+- compatible: should be "atmel,sama5d2-secumod"
+- reg: Should contain RAM location and length, followed
+       by register location and length of the Secumod controller.
+
+= Data cells =
+Are child nodes of secumod, bindings of which as described in
+bindings/nvmem/nvmem.txt
+
+Example:
+
+    secumod@fc040000 {
+            compatible = "atmel,sama5d2-secumod";
+            reg = <0xf8044000 0x1420>, <0xfc040000 0x4000>;
+            reg-names = "SECURAM", "SECUMOD";
+            status = "okay";
+
+            #address-cells = <1>;
+            #size-cells = <1>;
+            ranges;
+
+            secram-auto-erasable@0 {
+                    reg = <0x0000 0x1000>;
+            };
+            secram@1000 {
+                    reg = <0x1000 0x400>;
+            };
+            ram@1400 {
+                    reg = <0x1400 0x20>;
+            };
+    };
+
+= Data consumers =
+Are device nodes which consume nvmem data cells.
+
+For example:
+
+	ram {
+		...
+		nvmem-cells = <&ram>;
+		nvmem-cell-names = "RAM";
+	};

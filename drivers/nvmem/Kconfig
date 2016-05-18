@@ -102,4 +102,11 @@ config NVMEM_VF610_OCOTP
 	  This driver can also be build as a module. If so, the module will
 	  be called nvmem-vf610-ocotp.
 
+config NVMEM_ATMEL_SECUMOD
+       tristate "Atmel Secure Module driver"
+       depends on ARCH_AT91
+       help
+         Select this to get support for the secure module (SECUMOD) built
+	 into the SAMA5D2 chips.
+
 endif
