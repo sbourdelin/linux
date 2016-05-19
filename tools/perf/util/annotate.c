@@ -66,16 +66,16 @@ static int call__parse(struct ins_operands *ops)
 
 	name++;
 
-#ifdef __arm__
-	if (strchr(name, '+'))
-		return -1;
-#endif
-
 	tok = strchr(name, '>');
 	if (tok == NULL)
 		return -1;
 
 	*tok = '\0';
+
+	name = arch_parse_call_target(name);
+	if (name == NULL)
+		return -1;
+
 	ops->target.name = strdup(name);
 	*tok = '>';
 
@@ -252,11 +252,8 @@ static int mov__parse(struct ins_operands *ops)
 		return -1;
 
 	target = ++s;
-#ifdef __arm__
-	comment = strchr(s, ';');
-#else
-	comment = strchr(s, '#');
-#endif
+
+	comment = arch_parse_mov_comment(s);
 
 	if (comment != NULL)
 		s = comment - 1;
