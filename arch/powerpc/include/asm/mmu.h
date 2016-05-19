@@ -12,7 +12,7 @@
  */
 
 /*
- * First half is MMU families
+ * MMU families
  */
 #define MMU_FTR_HPTE_TABLE		ASM_CONST(0x00000001)
 #define MMU_FTR_TYPE_8xx		ASM_CONST(0x00000002)
@@ -20,9 +20,12 @@
 #define MMU_FTR_TYPE_44x		ASM_CONST(0x00000008)
 #define MMU_FTR_TYPE_FSL_E		ASM_CONST(0x00000010)
 #define MMU_FTR_TYPE_47x		ASM_CONST(0x00000020)
-
 /*
- * This is individual features
+ * Radix page table available
+ */
+#define MMU_FTR_TYPE_RADIX		ASM_CONST(0x00000040)
+/*
+ * individual features
  */
 
 /* Enable use of high BAT registers */
@@ -88,11 +91,6 @@
  */
 #define MMU_FTR_1T_SEGMENT		ASM_CONST(0x40000000)
 
-/*
- * Radix page table available
- */
-#define MMU_FTR_RADIX			ASM_CONST(0x80000000)
-
 /* MMU feature bit sets for various CPUs */
 #define MMU_FTRS_DEFAULT_HPTE_ARCH_V2	\
 	MMU_FTR_HPTE_TABLE | MMU_FTR_PPCAS_ARCH_V2
@@ -126,7 +124,7 @@ enum {
 		MMU_FTR_LOCKLESS_TLBIE | MMU_FTR_CI_LARGE_PAGE |
 		MMU_FTR_1T_SEGMENT |
 #ifdef CONFIG_PPC_RADIX_MMU
-		MMU_FTR_RADIX |
+		MMU_FTR_TYPE_RADIX |
 #endif
 		0,
 };
