@@ -82,9 +82,11 @@ void unwind__get_arch(struct thread *thread, struct map *map)
 	if (!strcmp(arch, "x86")) {
 		if (dso_type != DSO__TYPE_64BIT) {
 #ifdef HAVE_LIBUNWIND_X86_SUPPORT
-			pr_err("unwind: target platform=%s is not implemented\n", arch);
-#endif
+			register_unwind_libunwind_ops(
+				&_Ux86_unwind_libunwind_ops, thread);
+#else
 			register_null_unwind_libunwind_ops(thread);
+#endif
 			use_local_unwind = 0;
 		}
 	}

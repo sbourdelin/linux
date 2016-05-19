@@ -5,7 +5,7 @@
 #include "../../util/unwind.h"
 #include "../../util/debug.h"
 
-#ifdef HAVE_ARCH_X86_64_SUPPORT
+#if !defined(LIBUNWIND_X86_32) && defined(HAVE_ARCH_X86_64_SUPPORT)
 int libunwind__arch_reg_id(int regnum)
 {
 	int id;
@@ -69,8 +69,14 @@ int libunwind__arch_reg_id(int regnum)
 
 	return id;
 }
-#else
+#endif
+
+#if defined(LIBUNWIND_X86_32) || !defined(HAVE_ARCH_X86_64_SUPPORT)
+#ifndef LIBUNWIND_X86_32
 int libunwind__arch_reg_id(int regnum)
+#else
+int libunwind__x86_reg_id(int regnum)
+#endif
 {
 	int id;
 
@@ -109,4 +115,4 @@ int libunwind__arch_reg_id(int regnum)
 
 	return id;
 }
-#endif /* HAVE_ARCH_X86_64_SUPPORT */
+#endif
