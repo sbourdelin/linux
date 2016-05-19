@@ -819,7 +819,7 @@ int __dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
 	struct block_device *bdev;
 	pgoff_t size, pgoff;
 	sector_t block;
-	int error, result = 0;
+	int result = 0;
 	bool alloc = false;
 
 	/* dax pmd mappings require pfn_t_devmap() */
