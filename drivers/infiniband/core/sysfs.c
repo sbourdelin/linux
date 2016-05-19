@@ -56,8 +56,10 @@ struct ib_port {
 	struct gid_attr_group *gid_attr_group;
 	struct attribute_group gid_group;
 	struct attribute_group pkey_group;
-	u8                     port_num;
 	struct attribute_group *pma_table;
+	struct attribute_group *prot_stats_attr_group;
+	struct rdma_protocol_stats *prot_stats;
+	u8                     port_num;
 };
 
 struct port_attribute {
@@ -78,6 +80,18 @@ struct port_table_attribute {
 	char			name[8];
 	int			index;
 	__be16			attr_id;
+};
+
+struct prot_stats_attribute {
+	struct attribute	attr;
+	ssize_t			(*show)(struct kobject *kobj,
+					struct attribute *attr, char *buf);
+	ssize_t			(*store)(struct kobject *kobj,
+					 struct attribute *attr,
+					 const char *buf,
+					 size_t count);
+	int			index;
+	u8			port_num;
 };
 
 static ssize_t port_attr_show(struct kobject *kobj,
@@ -733,6 +747,220 @@ static struct attribute_group *get_counter_table(struct ib_device *dev,
 	return &pma_group;
 }
 
+static int update_protocol_stats(struct ib_device *dev,
+				 struct rdma_protocol_stats *stats,
+				 u8 port_num)
+{
+	int ret;
+
+	if (time_is_after_eq_jiffies(stats->timestamp + stats->lifespan))
+		return 0;
+	ret = dev->get_protocol_stats(dev, stats, port_num);
+	if (ret)
+		return ret;
+	stats->timestamp = jiffies;
+
+	return 0;
+}
+
+static ssize_t print_protocol_stat(struct rdma_protocol_stats *stats,
+				   int index, char *buf)
+{
+	return sprintf(buf, "%llu\n", stats->value[index]);
+}
+
+static ssize_t show_protocol_stats(struct kobject *kobj,
+				   struct attribute *attr, char *buf)
+{
+	struct ib_device *dev;
+	struct ib_port *port;
+	struct prot_stats_attribute *psa;
+	struct rdma_protocol_stats *stats;
+	int ret;
+
+	psa = container_of(attr, struct prot_stats_attribute, attr);
+	if (!psa->port_num) {
+		dev = container_of((struct device *)kobj,
+				   struct ib_device, dev);
+		stats = dev->prot_stats;
+	} else {
+		port = container_of(kobj, struct ib_port, kobj);
+		dev = port->ibdev;
+		stats = port->prot_stats;
+	}
+	ret = update_protocol_stats(dev, stats, psa->port_num);
+	if (ret)
+		return ret;
+	return print_protocol_stat(stats, psa->index, buf);
+}
+
+static ssize_t show_stats_lifespan(struct kobject *kobj,
+				   struct attribute *attr,
+				   char *buf)
+{
+	struct prot_stats_attribute *psa;
+	int msecs;
+
+	psa = container_of(attr, struct prot_stats_attribute, attr);
+	if (!psa->port_num) {
+		struct ib_device *dev = container_of((struct device *)kobj,
+						     struct ib_device, dev);
+		msecs = jiffies_to_msecs(dev->prot_stats->lifespan);
+	} else {
+		struct ib_port *p = container_of(kobj, struct ib_port, kobj);
+		msecs = jiffies_to_msecs(p->prot_stats->lifespan);
+	}
+	return sprintf(buf, "%d msecs (rounded from jiffies), 0-10000 allowed "
+		       "range\n", msecs);
+}
+
+static ssize_t set_stats_lifespan(struct kobject *kobj,
+				  struct attribute *attr,
+				  const char *buf, size_t count)
+{
+	struct prot_stats_attribute *psa;
+	int msecs;
+	int jiffies;
+	int ret;
+
+	ret = kstrtoint(buf, 10, &msecs);
+	if (ret)
+		return ret;
+	if (msecs < 0 || msecs > 10000)
+		return -EINVAL;
+	jiffies = msecs_to_jiffies(msecs);
+	psa = container_of(attr, struct prot_stats_attribute, attr);
+	if (!psa->port_num) {
+		struct ib_device *dev = container_of((struct device *)kobj,
+						     struct ib_device, dev);
+		dev->prot_stats->lifespan = jiffies;
+	} else {
+		struct ib_port *p = container_of(kobj, struct ib_port, kobj);
+		p->prot_stats->lifespan = jiffies;
+	}
+	return count;
+}
+
+static void free_prot_stats_attr_group(struct kobject *kobj,
+				       struct attribute_group *attr_group)
+{
+	struct attribute **attr;
+
+	sysfs_remove_group(kobj, attr_group);
+
+	for (attr = attr_group->attrs; *attr; attr++)
+		kfree(*attr);
+	kfree(attr_group);
+}
+
+static struct attribute *alloc_stats_attribute(int index, u8 port_num,
+					       char *name)
+{
+	struct prot_stats_attribute *psa;
+
+	psa = kmalloc(sizeof(*psa), GFP_KERNEL);
+	if (!psa)
+		return NULL;
+
+	psa->attr.name = name;
+	psa->attr.mode = S_IRUGO;
+	psa->show = show_protocol_stats;
+	psa->store = NULL;
+	psa->index = index;
+	psa->port_num = port_num;
+
+	return &psa->attr;
+}
+
+static struct attribute *alloc_stats_lifespan(char *name, u8 port_num)
+{
+	struct prot_stats_attribute *psa;
+
+	psa = kmalloc(sizeof(*psa), GFP_KERNEL);
+	if (!psa)
+		return NULL;
+
+	psa->attr.name = name;
+	psa->attr.mode = S_IWUSR | S_IRUGO;
+	psa->show = show_stats_lifespan;
+	psa->store = set_stats_lifespan;
+	psa->index = 0;
+	psa->port_num = port_num;
+
+	return &psa->attr;
+}
+
+static void create_protocol_stats(struct ib_device *device,
+				  struct ib_port *port, u8 port_num)
+{
+	struct attribute_group *psag = NULL;
+	struct rdma_protocol_stats *stats;
+	int i = 0, ret;
+
+	stats = device->alloc_protocol_stats(device, port_num);
+
+	if (!stats)
+		return;
+
+	if (!stats->dirname || !stats->name || stats->num_counters <= 0)
+		goto err;
+
+	/* Don't overwrite the stats lifetime if the driver set it */
+	if (stats->lifespan == 0)
+		stats->lifespan = msecs_to_jiffies(10);
+
+	psag = kzalloc(sizeof(*psag) +
+		       // 1 extra for the lifespan config entry
+		       sizeof(void *) * (stats->num_counters + 1),
+		       GFP_KERNEL);
+	if (!psag)
+		return;
+
+	ret = device->get_protocol_stats(device, stats, port_num);
+	if (ret)
+		goto err;
+
+	stats->timestamp = jiffies;
+
+	psag->name = stats->dirname;
+	psag->attrs = (void *)psag + sizeof(*psag);
+
+	for (i = 0; i < stats->num_counters; i++) {
+		psag->attrs[i] = alloc_stats_attribute(i, port_num,
+						       stats->name[i]);
+		if (!psag->attrs[i])
+			goto err;
+	}
+
+	/* treat an error here as non-fatal */
+	psag->attrs[i] = alloc_stats_lifespan("stats_lifespan", port_num);
+
+	if (port) {
+		struct kobject *kobj = &port->kobj;
+		ret = sysfs_create_group(kobj, psag);
+		if (ret)
+			goto err;
+		port->prot_stats_attr_group = psag;
+		port->prot_stats = stats;
+	} else {
+		struct kobject *kobj = &device->dev.kobj;
+		ret = sysfs_create_group(kobj, psag);
+		if (ret)
+			goto err;
+		device->prot_stats_attr_group = psag;
+		device->prot_stats = stats;
+	}
+
+	return;
+
+err:
+	kfree(stats);
+	for (; i >= 0; i--)
+		kfree(psag->attrs[i]);
+	kfree(psag);
+	return;
+}
+
 static int add_port(struct ib_device *device, int port_num,
 		    int (*port_callback)(struct ib_device *,
 					 u8, struct kobject *))
@@ -834,6 +1062,12 @@ static int add_port(struct ib_device *device, int port_num,
 		if (ret)
 			goto err_remove_pkey;
 	}
+
+	/* If port == 0, it means we have only one port, so the device should
+	 * hold the protocol stats
+	 */
+	if (device->alloc_protocol_stats && port_num)
+		create_protocol_stats(device, p, port_num);
 
 	list_add_tail(&p->kobj.entry, &device->port_list);
 
@@ -972,120 +1206,6 @@ static struct device_attribute *ib_class_attributes[] = {
 	&dev_attr_node_desc
 };
 
-/* Show a given an attribute in the statistics group */
-static ssize_t show_protocol_stat(const struct device *device,
-			    struct device_attribute *attr, char *buf,
-			    unsigned offset)
-{
-	struct ib_device *dev = container_of(device, struct ib_device, dev);
-	union rdma_protocol_stats stats;
-	ssize_t ret;
-
-	ret = dev->get_protocol_stats(dev, &stats);
-	if (ret)
-		return ret;
-
-	return sprintf(buf, "%llu\n",
-		       (unsigned long long) ((u64 *) &stats)[offset]);
-}
-
-/* generate a read-only iwarp statistics attribute */
-#define IW_STATS_ENTRY(name)						\
-static ssize_t show_##name(struct device *device,			\
-			   struct device_attribute *attr, char *buf)	\
-{									\
-	return show_protocol_stat(device, attr, buf,			\
-				  offsetof(struct iw_protocol_stats, name) / \
-				  sizeof (u64));			\
-}									\
-static DEVICE_ATTR(name, S_IRUGO, show_##name, NULL)
-
-IW_STATS_ENTRY(ipInReceives);
-IW_STATS_ENTRY(ipInHdrErrors);
-IW_STATS_ENTRY(ipInTooBigErrors);
-IW_STATS_ENTRY(ipInNoRoutes);
-IW_STATS_ENTRY(ipInAddrErrors);
-IW_STATS_ENTRY(ipInUnknownProtos);
-IW_STATS_ENTRY(ipInTruncatedPkts);
-IW_STATS_ENTRY(ipInDiscards);
-IW_STATS_ENTRY(ipInDelivers);
-IW_STATS_ENTRY(ipOutForwDatagrams);
-IW_STATS_ENTRY(ipOutRequests);
-IW_STATS_ENTRY(ipOutDiscards);
-IW_STATS_ENTRY(ipOutNoRoutes);
-IW_STATS_ENTRY(ipReasmTimeout);
-IW_STATS_ENTRY(ipReasmReqds);
-IW_STATS_ENTRY(ipReasmOKs);
-IW_STATS_ENTRY(ipReasmFails);
-IW_STATS_ENTRY(ipFragOKs);
-IW_STATS_ENTRY(ipFragFails);
-IW_STATS_ENTRY(ipFragCreates);
-IW_STATS_ENTRY(ipInMcastPkts);
-IW_STATS_ENTRY(ipOutMcastPkts);
-IW_STATS_ENTRY(ipInBcastPkts);
-IW_STATS_ENTRY(ipOutBcastPkts);
-IW_STATS_ENTRY(tcpRtoAlgorithm);
-IW_STATS_ENTRY(tcpRtoMin);
-IW_STATS_ENTRY(tcpRtoMax);
-IW_STATS_ENTRY(tcpMaxConn);
-IW_STATS_ENTRY(tcpActiveOpens);
-IW_STATS_ENTRY(tcpPassiveOpens);
-IW_STATS_ENTRY(tcpAttemptFails);
-IW_STATS_ENTRY(tcpEstabResets);
-IW_STATS_ENTRY(tcpCurrEstab);
-IW_STATS_ENTRY(tcpInSegs);
-IW_STATS_ENTRY(tcpOutSegs);
-IW_STATS_ENTRY(tcpRetransSegs);
-IW_STATS_ENTRY(tcpInErrs);
-IW_STATS_ENTRY(tcpOutRsts);
-
-static struct attribute *iw_proto_stats_attrs[] = {
-	&dev_attr_ipInReceives.attr,
-	&dev_attr_ipInHdrErrors.attr,
-	&dev_attr_ipInTooBigErrors.attr,
-	&dev_attr_ipInNoRoutes.attr,
-	&dev_attr_ipInAddrErrors.attr,
-	&dev_attr_ipInUnknownProtos.attr,
-	&dev_attr_ipInTruncatedPkts.attr,
-	&dev_attr_ipInDiscards.attr,
-	&dev_attr_ipInDelivers.attr,
-	&dev_attr_ipOutForwDatagrams.attr,
-	&dev_attr_ipOutRequests.attr,
-	&dev_attr_ipOutDiscards.attr,
-	&dev_attr_ipOutNoRoutes.attr,
-	&dev_attr_ipReasmTimeout.attr,
-	&dev_attr_ipReasmReqds.attr,
-	&dev_attr_ipReasmOKs.attr,
-	&dev_attr_ipReasmFails.attr,
-	&dev_attr_ipFragOKs.attr,
-	&dev_attr_ipFragFails.attr,
-	&dev_attr_ipFragCreates.attr,
-	&dev_attr_ipInMcastPkts.attr,
-	&dev_attr_ipOutMcastPkts.attr,
-	&dev_attr_ipInBcastPkts.attr,
-	&dev_attr_ipOutBcastPkts.attr,
-	&dev_attr_tcpRtoAlgorithm.attr,
-	&dev_attr_tcpRtoMin.attr,
-	&dev_attr_tcpRtoMax.attr,
-	&dev_attr_tcpMaxConn.attr,
-	&dev_attr_tcpActiveOpens.attr,
-	&dev_attr_tcpPassiveOpens.attr,
-	&dev_attr_tcpAttemptFails.attr,
-	&dev_attr_tcpEstabResets.attr,
-	&dev_attr_tcpCurrEstab.attr,
-	&dev_attr_tcpInSegs.attr,
-	&dev_attr_tcpOutSegs.attr,
-	&dev_attr_tcpRetransSegs.attr,
-	&dev_attr_tcpInErrs.attr,
-	&dev_attr_tcpOutRsts.attr,
-	NULL
-};
-
-static struct attribute_group iw_stats_group = {
-	.name	= "proto_stats",
-	.attrs	= iw_proto_stats_attrs,
-};
-
 static void free_port_list_attributes(struct ib_device *device)
 {
 	struct kobject *p, *t;
@@ -1093,6 +1213,11 @@ static void free_port_list_attributes(struct ib_device *device)
 	list_for_each_entry_safe(p, t, &device->port_list, entry) {
 		struct ib_port *port = container_of(p, struct ib_port, kobj);
 		list_del(&p->entry);
+		if (port->prot_stats) {
+			kfree(port->prot_stats);
+			free_prot_stats_attr_group(&port->kobj,
+						   port->prot_stats_attr_group);
+		}
 		sysfs_remove_group(p, port->pma_table);
 		sysfs_remove_group(p, &port->pkey_group);
 		sysfs_remove_group(p, &port->gid_group);
@@ -1149,11 +1274,8 @@ int ib_device_register_sysfs(struct ib_device *device,
 		}
 	}
 
-	if (device->node_type == RDMA_NODE_RNIC && device->get_protocol_stats) {
-		ret = sysfs_create_group(&class_dev->kobj, &iw_stats_group);
-		if (ret)
-			goto err_put;
-	}
+	if (device->alloc_protocol_stats)
+		create_protocol_stats(device, NULL, 0);
 
 	return 0;
 
@@ -1169,14 +1291,15 @@ err:
 
 void ib_device_unregister_sysfs(struct ib_device *device)
 {
-	/* Hold kobject until ib_dealloc_device() */
-	struct kobject *kobj_dev = kobject_get(&device->dev.kobj);
 	int i;
 
-	if (device->node_type == RDMA_NODE_RNIC && device->get_protocol_stats)
-		sysfs_remove_group(kobj_dev, &iw_stats_group);
-
 	free_port_list_attributes(device);
+
+	if (device->prot_stats) {
+		kfree(device->prot_stats);
+		free_prot_stats_attr_group(&device->dev.kobj,
+					   device->prot_stats_attr_group);
+	}
 
 	for (i = 0; i < ARRAY_SIZE(ib_class_attributes); ++i)
 		device_remove_file(&device->dev, ib_class_attributes[i]);

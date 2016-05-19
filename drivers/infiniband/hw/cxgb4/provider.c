@@ -446,18 +446,51 @@ static ssize_t show_board(struct device *dev, struct device_attribute *attr,
 		       c4iw_dev->rdev.lldi.pdev->device);
 }
 
+enum counters {
+	TCPINSEGS,
+	TCPOUTSEGS,
+	TCPRETRANSSEGS,
+	TCPOUTRSTS,
+	NR_COUNTERS
+};
+
+static char *names[] = {
+	[TCPINSEGS] = "tcpInSegs",
+	[TCPOUTSEGS] = "tcpOutSegs",
+	[TCPRETRANSSEGS] = "tcpRetransSegs",
+	[TCPOUTRSTS] = "tcpOutRsts",
+	[NR_COUNTERS] = NULL
+};
+
+static struct rdma_protocol_stats *c4iw_alloc_stats(struct ib_device *ibdev,
+						    u8 port_num)
+{
+	struct rdma_protocol_stats *stats;
+
+	if (port_num != 0)
+		return NULL;
+
+	stats = kzalloc(sizeof(*stats) + NR_COUNTERS * sizeof(u64), GFP_KERNEL);
+	if (!stats)
+		return NULL;
+	stats->dirname = "iw_stats";
+	stats->name = names;
+	stats->num_counters = NR_COUNTERS;
+	return stats;
+}
+
 static int c4iw_get_mib(struct ib_device *ibdev,
-			union rdma_protocol_stats *stats)
+			struct rdma_protocol_stats *stats,
+			u8 port)
 {
 	struct tp_tcp_stats v4, v6;
 	struct c4iw_dev *c4iw_dev = to_c4iw_dev(ibdev);
 
 	cxgb4_get_tcp_stats(c4iw_dev->rdev.lldi.pdev, &v4, &v6);
-	memset(stats, 0, sizeof *stats);
-	stats->iw.tcpInSegs = v4.tcp_in_segs + v6.tcp_in_segs;
-	stats->iw.tcpOutSegs = v4.tcp_out_segs + v6.tcp_out_segs;
-	stats->iw.tcpRetransSegs = v4.tcp_retrans_segs + v6.tcp_retrans_segs;
-	stats->iw.tcpOutRsts = v4.tcp_out_rsts + v6.tcp_out_rsts;
+	stats->value[TCPINSEGS] = v4.tcp_in_segs + v6.tcp_in_segs;
+	stats->value[TCPOUTSEGS] = v4.tcp_out_segs + v6.tcp_out_segs;
+	stats->value[TCPRETRANSSEGS] = v4.tcp_retrans_segs + v6.tcp_retrans_segs;
+	stats->value[TCPOUTRSTS] = v4.tcp_out_rsts + v6.tcp_out_rsts;
 
 	return 0;
 }
@@ -562,6 +595,7 @@ int c4iw_register_device(struct c4iw_dev *dev)
 	dev->ibdev.req_notify_cq = c4iw_arm_cq;
 	dev->ibdev.post_send = c4iw_post_send;
 	dev->ibdev.post_recv = c4iw_post_receive;
+	dev->ibdev.alloc_protocol_stats = c4iw_alloc_stats;
 	dev->ibdev.get_protocol_stats = c4iw_get_mib;
 	dev->ibdev.uverbs_abi_ver = C4IW_UVERBS_ABI_VERSION;
 	dev->ibdev.get_port_immutable = c4iw_port_immutable;

@@ -403,55 +403,20 @@ enum ib_port_speed {
 	IB_SPEED_EDR	= 32
 };
 
-struct ib_protocol_stats {
-	/* TBD... */
-};
-
-struct iw_protocol_stats {
-	u64	ipInReceives;
-	u64	ipInHdrErrors;
-	u64	ipInTooBigErrors;
-	u64	ipInNoRoutes;
-	u64	ipInAddrErrors;
-	u64	ipInUnknownProtos;
-	u64	ipInTruncatedPkts;
-	u64	ipInDiscards;
-	u64	ipInDelivers;
-	u64	ipOutForwDatagrams;
-	u64	ipOutRequests;
-	u64	ipOutDiscards;
-	u64	ipOutNoRoutes;
-	u64	ipReasmTimeout;
-	u64	ipReasmReqds;
-	u64	ipReasmOKs;
-	u64	ipReasmFails;
-	u64	ipFragOKs;
-	u64	ipFragFails;
-	u64	ipFragCreates;
-	u64	ipInMcastPkts;
-	u64	ipOutMcastPkts;
-	u64	ipInBcastPkts;
-	u64	ipOutBcastPkts;
-
-	u64	tcpRtoAlgorithm;
-	u64	tcpRtoMin;
-	u64	tcpRtoMax;
-	u64	tcpMaxConn;
-	u64	tcpActiveOpens;
-	u64	tcpPassiveOpens;
-	u64	tcpAttemptFails;
-	u64	tcpEstabResets;
-	u64	tcpCurrEstab;
-	u64	tcpInSegs;
-	u64	tcpOutSegs;
-	u64	tcpRetransSegs;
-	u64	tcpInErrs;
-	u64	tcpOutRsts;
-};
-
-union rdma_protocol_stats {
-	struct ib_protocol_stats	ib;
-	struct iw_protocol_stats	iw;
+struct rdma_protocol_stats {
+	unsigned long	timestamp; /* when did we last update the counters */
+	unsigned long	lifespan; /* how long should the counters be considered
+				   * valid, presented to user in milliseconds,
+				   * but stored in jiffies
+				   */
+	char		*dirname; /* Sysfs directory name */
+	char		**name;   /* array of names of the counters in the
+				   * sysfs dir
+				   */
+	int		num_counters;
+	u64		value[]; /* The actual counters, array dynamically
+				  * sized based upon number of names
+				  */
 };
 
 /* Define bits for the various functionality this port needs to be supported by
@@ -1707,8 +1672,11 @@ struct ib_device {
 
 	struct iw_cm_verbs	     *iwcm;
 
+	struct rdma_protocol_stats *(*alloc_protocol_stats)(struct ib_device *device,
+							    u8 port_num);
 	int		           (*get_protocol_stats)(struct ib_device *device,
-							 union rdma_protocol_stats *stats);
+							 struct rdma_protocol_stats *stats,
+							 u8 port);
 	int		           (*query_device)(struct ib_device *device,
 						   struct ib_device_attr *device_attr,
 						   struct ib_udata *udata);
@@ -1926,6 +1894,8 @@ struct ib_device {
 	u8                           node_type;
 	u8                           phys_port_cnt;
 	struct ib_device_attr        attrs;
+	struct attribute_group	     *prot_stats_attr_group;
+	struct rdma_protocol_stats   *prot_stats;
 
 	/**
 	 * The following mandatory functions are used only at device
