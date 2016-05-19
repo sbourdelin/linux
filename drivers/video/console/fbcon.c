@@ -396,13 +396,23 @@ static void fb_flashcursor(struct work_struct *work)
 	console_unlock();
 }
 
+static int cursor_blink_jiffies(int candidate)
+{
+	if (candidate >= msecs_to_jiffies(50) &&
+	    candidate <= msecs_to_jiffies(USHRT_MAX))
+		return candidate;
+	else
+		return HZ / 5;
+}
+
 static void cursor_timer_handler(unsigned long dev_addr)
 {
 	struct fb_info *info = (struct fb_info *) dev_addr;
 	struct fbcon_ops *ops = info->fbcon_par;
 
 	queue_work(system_power_efficient_wq, &info->queue);
-	mod_timer(&ops->cursor_timer, jiffies + ops->cur_blink_jiffies);
+	mod_timer(&ops->cursor_timer, jiffies +
+	    cursor_blink_jiffies(ops->cur_blink_jiffies));
 }
 
 static void fbcon_add_cursor_timer(struct fb_info *info)
@@ -417,7 +427,8 @@ static void fbcon_add_cursor_timer(struct fb_info *info)
 
 		init_timer(&ops->cursor_timer);
 		ops->cursor_timer.function = cursor_timer_handler;
-		ops->cursor_timer.expires = jiffies + ops->cur_blink_jiffies;
+		ops->cursor_timer.expires = jiffies +
+		    cursor_blink_jiffies(ops->cur_blink_jiffies);
 		ops->cursor_timer.data = (unsigned long ) info;
 		add_timer(&ops->cursor_timer);
 		ops->flags |= FBCON_FLAGS_CURSOR_TIMER;
@@ -709,7 +720,6 @@ static int con2fb_acquire_newinfo(struct vc_data *vc, struct fb_info *info,
 	}
 
 	if (!err) {
-		ops->cur_blink_jiffies = HZ / 5;
 		info->fbcon_par = ops;
 
 		if (vc)
@@ -957,7 +967,6 @@ static const char *fbcon_startup(void)
 	ops->currcon = -1;
 	ops->graphics = 1;
 	ops->cur_rotate = -1;
-	ops->cur_blink_jiffies = HZ / 5;
 	info->fbcon_par = ops;
 	p->con_rotate = initial_rotation;
 	set_blitting_type(vc, info);
