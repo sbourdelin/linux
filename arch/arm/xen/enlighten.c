@@ -84,19 +84,6 @@ int xen_unmap_domain_gfn_range(struct vm_area_struct *vma,
 }
 EXPORT_SYMBOL_GPL(xen_unmap_domain_gfn_range);
 
-static unsigned long long xen_stolen_accounting(int cpu)
-{
-	struct vcpu_runstate_info state;
-
-	BUG_ON(cpu != smp_processor_id());
-
-	xen_get_runstate_snapshot(&state);
-
-	WARN_ON(state.state != RUNSTATE_running);
-
-	return state.time[RUNSTATE_runnable] + state.time[RUNSTATE_offline];
-}
-
 static void xen_read_wallclock(struct timespec64 *ts)
 {
 	u32 version;
@@ -410,8 +397,8 @@ static int __init xen_guest_init(void)
 
 	register_cpu_notifier(&xen_cpu_notifier);
 
-	pv_time_ops.steal_clock = xen_stolen_accounting;
-	static_key_slow_inc(&paravirt_steal_enabled);
+	xen_time_setup_guest();
+
 	if (xen_initial_domain())
 		pvclock_gtod_register_notifier(&xen_pvclock_gtod_notifier);
 
