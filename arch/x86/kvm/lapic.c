@@ -256,6 +256,13 @@ static inline int apic_lvtt_tscdeadline(struct kvm_lapic *apic)
 	return apic->lapic_timer.timer_mode == APIC_LVT_TIMER_TSCDEADLINE;
 }
 
+unsigned int apic_get_timer_expire(struct kvm_vcpu *vcpu)
+{
+	struct kvm_lapic *apic = vcpu->arch.apic;
+
+	return ktime_to_ns(hrtimer_get_remaining(&apic->lapic_timer.timer));
+}
+
 static inline int apic_lvt_nmi_mode(u32 lvt_val)
 {
 	return (lvt_val & (APIC_MODE_MASK | APIC_LVT_MASKED)) == APIC_DM_NMI;
