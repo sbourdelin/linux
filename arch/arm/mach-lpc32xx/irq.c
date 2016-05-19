@@ -81,7 +81,7 @@ struct lpc32xx_event_info {
 /*
  * Maps an IRQ number to and event mask and register
  */
-static const struct lpc32xx_event_info lpc32xx_events[NR_IRQS] = {
+static const struct lpc32xx_event_info lpc32xx_events[LPC32XX_NR_IRQS] = {
 	[IRQ_LPC32XX_GPI_08] = {
 		.event_group = &lpc32xx_event_pin_regs,
 		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_08_BIT,
@@ -431,7 +431,7 @@ void __init lpc32xx_init_irq(void)
 				LPC32XX_INTC_ACT_TYPE(LPC32XX_SIC2_BASE));
 
 	/* Configure supported IRQ's */
-	for (i = 0; i < NR_IRQS; i++) {
+	for (i = 0; i < LPC32XX_NR_IRQS; i++) {
 		irq_set_chip_and_handler(i, &lpc32xx_irq_chip,
 					 handle_level_irq);
 		irq_clear_status_flags(i, IRQ_NOREQUEST);
@@ -465,7 +465,7 @@ void __init lpc32xx_init_irq(void)
 
 	of_irq_init(mic_of_match);
 
-	lpc32xx_mic_domain = irq_domain_add_legacy(lpc32xx_mic_np, NR_IRQS,
+	lpc32xx_mic_domain = irq_domain_add_legacy(lpc32xx_mic_np, LPC32XX_NR_IRQS,
 						   0, 0, &irq_domain_simple_ops,
 						   NULL);
 	if (!lpc32xx_mic_domain)
