@@ -89,6 +89,16 @@ void unwind__get_arch(struct thread *thread, struct map *map)
 #endif
 			use_local_unwind = 0;
 		}
+	} else if (!strcmp(arch, "arm64") || !strcmp(arch, "arm")) {
+		if (dso_type == DSO__TYPE_64BIT) {
+#ifdef HAVE_LIBUNWIND_AARCH64_SUPPORT
+			register_unwind_libunwind_ops(
+				&_Uaarch64_unwind_libunwind_ops, thread);
+#else
+			register_null_unwind_libunwind_ops(thread);
+#endif
+			use_local_unwind = 0;
+		}
 	}
 
 	if (use_local_unwind)
