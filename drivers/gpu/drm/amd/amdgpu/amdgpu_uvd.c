@@ -295,11 +295,9 @@ int amdgpu_uvd_suspend(struct amdgpu_device *adev)
 	size = amdgpu_bo_size(adev->uvd.vcpu_bo);
 	ptr = adev->uvd.cpu_addr;
 
-	adev->uvd.saved_bo = kmalloc(size, GFP_KERNEL);
+	adev->uvd.saved_bo = kmemdup(ptr, size, GFP_KERNEL);
 	if (!adev->uvd.saved_bo)
 		return -ENOMEM;
-
-	memcpy(adev->uvd.saved_bo, ptr, size);
 
 	return 0;
 }
