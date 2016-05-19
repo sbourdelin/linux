@@ -114,6 +114,9 @@ static int c_show(struct seq_file *m, void *v)
 		 * online processors, looking for lines beginning with
 		 * "processor".  Give glibc what it expects.
 		 */
+		seq_printf(m, "Processor\t: AArch64 Processor rev %d (%s)\n",
+				read_cpuid_id() & 15, ELF_PLATFORM);
+
 		seq_printf(m, "processor\t: %d\n", i);
 
 		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
