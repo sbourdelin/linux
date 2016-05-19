@@ -3,6 +3,11 @@
 #include <linux/compiler.h>
 #include <util/annotate_ins.h>
 
+bool arch_is_return_ins(const char *s __maybe_unused)
+{
+	return false;
+}
+
 char *arch_parse_mov_comment(const char *s __maybe_unused)
 {
 	return NULL;

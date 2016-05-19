@@ -8,6 +8,7 @@
 #include "../../util/sort.h"
 #include "../../util/symbol.h"
 #include "../../util/evsel.h"
+#include "../../util/annotate_ins.h"
 #include <pthread.h>
 
 struct disasm_line_samples {
@@ -226,11 +227,11 @@ static void annotate_browser__write(struct ui_browser *browser, void *entry, int
 				ui_browser__write_nstring(browser, " ", 2);
 			}
 		} else {
-			if (strcmp(dl->name, "retq")) {
-				ui_browser__write_nstring(browser, " ", 2);
-			} else {
+			if (arch_is_return_ins(dl->name)) {
 				ui_browser__write_graph(browser, SLSMG_LARROW_CHAR);
 				SLsmg_write_char(' ');
+			} else {
+				ui_browser__write_nstring(browser, " ", 2);
 			}
 		}
 
@@ -843,9 +844,9 @@ show_help:
 			else if (browser->selection->offset == -1)
 				ui_helpline__puts("Actions are only available for assembly lines.");
 			else if (!browser->selection->ins) {
-				if (strcmp(browser->selection->name, "retq"))
-					goto show_sup_ins;
-				goto out;
+				if (arch_is_return_ins(browser->selection->name))
+					goto out;
+				goto show_sup_ins;
 			} else if (!(annotate_browser__jump(browser) ||
 				     annotate_browser__callq(browser, evsel, hbt))) {
 show_sup_ins:
