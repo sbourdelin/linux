@@ -791,6 +791,7 @@ static int nvm_create_target(struct nvm_dev *dev,
 	struct nvm_tgt_type *tt;
 	struct nvm_target *t;
 	void *targetdata;
+	int ret = -ENOMEM;
 
 	if (!dev->mt) {
 		pr_info("nvm: device has no media manager registered.\n");
@@ -801,21 +802,20 @@ static int nvm_create_target(struct nvm_dev *dev,
 	tt = nvm_find_target_type(create->tgttype);
 	if (!tt) {
 		pr_err("nvm: target type %s not found\n", create->tgttype);
-		up_write(&nvm_lock);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_unlock;
 	}
 
 	t = nvm_find_target(create->tgtname);
 	if (t) {
 		pr_err("nvm: target name already exists.\n");
-		up_write(&nvm_lock);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_unlock;
 	}
-	up_write(&nvm_lock);
 
 	t = kmalloc(sizeof(struct nvm_target), GFP_KERNEL);
 	if (!t)
-		return -ENOMEM;
+		goto err_unlock;
 
 	tqueue = blk_alloc_queue_node(GFP_KERNEL, dev->q->node);
 	if (!tqueue)
@@ -848,8 +848,6 @@ static int nvm_create_target(struct nvm_dev *dev,
 	t->type = tt;
 	t->disk = tdisk;
 	t->dev = dev;
-
-	down_write(&nvm_lock);
 	list_add_tail(&t->list, &nvm_targets);
 	up_write(&nvm_lock);
 
@@ -860,7 +858,9 @@ err_queue:
 	blk_cleanup_queue(tqueue);
 err_t:
 	kfree(t);
-	return -ENOMEM;
+err_unlock:
+	up_write(&nvm_lock);
+	return ret;
 }
 
 static int __nvm_configure_create(struct nvm_ioctl_create *create)
