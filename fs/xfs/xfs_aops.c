@@ -94,7 +94,9 @@ xfs_finish_page_writeback(
 	struct bio_vec		*bvec,
 	int			error)
 {
+#if defined(DEBUG) || defined(XFS_WARN)
 	unsigned int		blockmask = (1 << inode->i_blkbits) - 1;
+#endif
 	unsigned int		end = bvec->bv_offset + bvec->bv_len - 1;
 	struct buffer_head	*head, *bh;
 	unsigned int		off = 0;
