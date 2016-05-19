@@ -3512,7 +3512,6 @@ int btrfs_write_out_ino_cache(struct btrfs_root *root,
 	struct btrfs_free_space_ctl *ctl = root->free_ino_ctl;
 	int ret;
 	struct btrfs_io_ctl io_ctl;
-	bool release_metadata = true;
 
 	if (!btrfs_test_opt(root, INODE_MAP_CACHE))
 		return 0;
@@ -3520,26 +3519,16 @@ int btrfs_write_out_ino_cache(struct btrfs_root *root,
 	memset(&io_ctl, 0, sizeof(io_ctl));
 	ret = __btrfs_write_out_cache(root, inode, ctl, NULL, &io_ctl,
 				      trans, path, 0);
-	if (!ret) {
-		/*
-		 * At this point writepages() didn't error out, so our metadata
-		 * reservation is released when the writeback finishes, at
-		 * inode.c:btrfs_finish_ordered_io(), regardless of it finishing
-		 * with or without an error.
-		 */
-		release_metadata = false;
+	if (!ret)
 		ret = btrfs_wait_cache_io(root, trans, NULL, &io_ctl, path, 0);
-	}
 
-	if (ret) {
-		if (release_metadata)
-			btrfs_delalloc_release_metadata(inode, inode->i_size);
 #ifdef DEBUG
+	if (ret) {
 		btrfs_err(root->fs_info,
 			"failed to write free ino cache for root %llu",
 			root->root_key.objectid);
-#endif
 	}
+#endif
 
 	return ret;
 }
