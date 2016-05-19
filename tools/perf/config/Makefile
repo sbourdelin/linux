@@ -47,6 +47,7 @@ endif
 
 ifeq ($(ARCH),arm64)
   NO_PERF_REGS := 0
+  NO_ANNOTATE_INS := 0
   LIBUNWIND_LIBS = -lunwind -lunwind-aarch64
 endif
 

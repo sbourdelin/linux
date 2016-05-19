@@ -1,2 +1,4 @@
+libperf-y     += annotate_ins.o
+
 libperf-$(CONFIG_DWARF)     += dwarf-regs.o
 libperf-$(CONFIG_LIBUNWIND) += unwind-libunwind.o
