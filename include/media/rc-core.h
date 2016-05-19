@@ -72,6 +72,7 @@ enum rc_filter_type {
  *	anyone can call show_protocols or store_protocols
  * @minor: unique minor remote control device number
  * @raw: additional data for raw pulse/space devices
+ * @raw_fifo_size: size of fifo for raw events
  * @input_dev: the input child device used to communicate events to userspace
  * @driver_type: specifies if protocol decoding is done in hardware or software
  * @idle: used to keep track of RX state
@@ -133,6 +134,7 @@ struct rc_dev {
 	struct mutex			lock;
 	unsigned int			minor;
 	struct ir_raw_event_ctrl	*raw;
+	unsigned			raw_fifo_size;
 	struct input_dev		*input_dev;
 	enum rc_driver_type		driver_type;
 	bool				idle;
