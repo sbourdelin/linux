@@ -98,6 +98,9 @@ static void rrpc_discard(struct rrpc *rrpc, struct bio *bio)
 
 	do {
 		rqd = rrpc_inflight_laddr_acquire(rrpc, slba, len);
+		if (rqd)
+			break;
+
 		schedule();
 	} while (!rqd);
 
