@@ -394,6 +394,7 @@ int __init acpi_table_parse(char *id, acpi_tbl_table_handler handler)
 {
 	struct acpi_table_header *table = NULL;
 	acpi_size tbl_size;
+	int ret;
 
 	if (acpi_disabled)
 		return -ENODEV;
@@ -407,9 +408,9 @@ int __init acpi_table_parse(char *id, acpi_tbl_table_handler handler)
 		acpi_get_table_with_size(id, 0, &table, &tbl_size);
 
 	if (table) {
-		handler(table);
+		ret = handler(table);
 		early_acpi_os_unmap_memory(table, tbl_size);
-		return 0;
+		return ret;
 	} else
 		return -ENODEV;
 }
