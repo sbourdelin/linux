@@ -22,6 +22,7 @@ include $(srctree)/tools/scripts/Makefile.arch
 $(call detected_var,ARCH)
 
 NO_PERF_REGS := 1
+NO_ANNOTATE_INS := 1
 
 # Additional ARCH settings for x86
 ifeq ($(ARCH),x86)
@@ -35,10 +36,12 @@ ifeq ($(ARCH),x86)
     LIBUNWIND_LIBS = -lunwind-x86 -llzma -lunwind
   endif
   NO_PERF_REGS := 0
+  NO_ANNOTATE_INS := 0
 endif
 
 ifeq ($(ARCH),arm)
   NO_PERF_REGS := 0
+  NO_ANNOTATE_INS := 0
   LIBUNWIND_LIBS = -lunwind -lunwind-arm
 endif
 
@@ -49,6 +52,10 @@ endif
 
 ifeq ($(NO_PERF_REGS),0)
   $(call detected,CONFIG_PERF_REGS)
+endif
+
+ifeq ($(NO_ANNOTATE_INS),0)
+  $(call detected,CONFIG_ANNOTATE_INS)
 endif
 
 # So far there's only x86 and arm libdw unwind support merged in perf.
@@ -81,6 +88,10 @@ FEATURE_CHECK_LDFLAGS-libunwind-debug-frame = $(LIBUNWIND_LDFLAGS)
 
 ifeq ($(NO_PERF_REGS),0)
   CFLAGS += -DHAVE_PERF_REGS_SUPPORT
+endif
+
+ifeq ($(NO_ANNOTATE_INS),0)
+  CFLAGS += -DHAVE_ANNOTATE_INS_SUPPORT
 endif
 
 # for linking with debug library, run like:
