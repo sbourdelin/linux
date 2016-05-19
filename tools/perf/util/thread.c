@@ -205,6 +205,8 @@ void thread__insert_map(struct thread *thread, struct map *map)
 {
 	map_groups__fixup_overlappings(thread->mg, map, stderr);
 	map_groups__insert(thread->mg, map);
+
+	unwind__get_arch(thread, map);
 }
 
 static int thread__clone_map_groups(struct thread *thread,
