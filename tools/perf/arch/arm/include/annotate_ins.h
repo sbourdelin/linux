@@ -22,4 +22,6 @@
 	{ .name = "orr",   .ops  = &mov_ops, }, \
 	}
 
+#define ARCH_ACTIONS "Actions are only available for branch instructions."
+
 #endif /* ARCH_ANNOTATE_INS_H */

@@ -850,7 +850,7 @@ show_help:
 			} else if (!(annotate_browser__jump(browser) ||
 				     annotate_browser__callq(browser, evsel, hbt))) {
 show_sup_ins:
-				ui_helpline__puts("Actions are only available for 'callq', 'retq' & jump instructions.");
+				ui_helpline__puts(ARCH_ACTIONS);
 			}
 			continue;
 		case 't':

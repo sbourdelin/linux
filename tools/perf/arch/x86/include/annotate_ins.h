@@ -79,4 +79,6 @@
 	{ .name = "xbeginq", .ops  = &jump_ops, }, \
 	}
 
+#define ARCH_ACTIONS "Actions are only available for 'callq', 'retq' & jump instructions."
+
 #endif /* ARCH_ANNOTATE_INS_H */

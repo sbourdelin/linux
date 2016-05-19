@@ -11,6 +11,7 @@ extern char *arch_parse_call_target(char *t);
 #include <annotate_ins.h>
 #else
 #define ARCH_INSTRUCTIONS { }
+#define ARCH_ACTIONS "Actions are not supported on this architecture"
 #endif
 
 #endif /* __ANNOTATE_INS_H */
