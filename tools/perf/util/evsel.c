@@ -29,17 +29,7 @@
 #include "trace-event.h"
 #include "stat.h"
 
-static struct {
-	bool sample_id_all;
-	bool exclude_guest;
-	bool mmap2;
-	bool cloexec;
-	bool clockid;
-	bool clockid_wrong;
-	bool lbr_flags;
-	bool write_backward;
-} perf_missing_features;
-
+struct perf_missing_features perf_missing_features;
 static clockid_t clockid;
 
 static int perf_evsel__no_extra_init(struct perf_evsel *evsel __maybe_unused)
@@ -684,8 +674,11 @@ static void apply_config_terms(struct perf_evsel *evsel,
 	 * possible to set overwrite globally, without config
 	 * terms.
 	 */
-	if (evsel->overwrite)
+	if (evsel->overwrite) {
+		WARN_ONCE(perf_missing_features.write_backward,
+			  "Reading from overwrite event is not supported by this kernel\n");
 		attr->write_backward = 1;
+	}
 
 	/* User explicitly set per-event callgraph, clear the old setting and reset. */
 	if ((callgraph_buf != NULL) || (dump_size > 0)) {

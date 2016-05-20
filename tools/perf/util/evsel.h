@@ -11,6 +11,19 @@
 #include "cpumap.h"
 #include "counts.h"
 
+struct perf_missing_features {
+	bool sample_id_all;
+	bool exclude_guest;
+	bool mmap2;
+	bool cloexec;
+	bool clockid;
+	bool clockid_wrong;
+	bool lbr_flags;
+	bool write_backward;
+};
+
+extern struct perf_missing_features perf_missing_features;
+
 struct perf_evsel;
 
 /*
