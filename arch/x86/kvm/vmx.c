@@ -10652,6 +10652,10 @@ static void vmx_sched_in(struct kvm_vcpu *vcpu, int cpu)
 		shrink_ple_window(vcpu);
 }
 
+static void vmx_sched_out(struct kvm_vcpu *vcpu)
+{
+}
+
 static void vmx_slot_enable_log_dirty(struct kvm *kvm,
 				     struct kvm_memory_slot *slot)
 {
@@ -10997,6 +11001,7 @@ static struct kvm_x86_ops vmx_x86_ops = {
 	.check_nested_events = vmx_check_nested_events,
 
 	.sched_in = vmx_sched_in,
+	.sched_out = vmx_sched_out,
 
 	.slot_enable_log_dirty = vmx_slot_enable_log_dirty,
 	.slot_disable_log_dirty = vmx_slot_disable_log_dirty,

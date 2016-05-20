@@ -7727,6 +7727,12 @@ void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu)
 	kvm_x86_ops->sched_in(vcpu, cpu);
 }
 
+void kvm_arch_sched_out(struct kvm_vcpu *vcpu)
+{
+	if (kvm_x86_ops->sched_out)
+		kvm_x86_ops->sched_out(vcpu);
+}
+
 int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 {
 	if (type)
