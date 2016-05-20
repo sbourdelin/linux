@@ -1,0 +1,20 @@
+Vybrid System-on-Chip
+---------------------
+
+Required properties:
+
+- compatible: "fsl,vf610-soc"
+- rom-revision: phandle to the on-chip ROM node
+- mscm: phandle to the MSCM CPU configuration node
+- nvmem-cells: phandles to two OCOTP child nodes ocotp_cfg0 and ocotp_cfg1
+- nvmem-cell-names: should contain string names "cfg0" and "cfg1"
+
+Example:
+
+	vf610-soc {
+		compatible = "fsl,vf610-soc";
+		rom-revision = <&ocrom>;
+		mscm = <&mscm_cpucfg>;
+		nvmem-cells = <&ocotp_cfg0>, <&ocotp_cfg1>;
+		nvmem-cell-names = "cfg0", "cfg1";
+	};
