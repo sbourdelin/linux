@@ -7572,6 +7572,8 @@ static int handle_preemption_timer(struct kvm_vcpu *vcpu)
 {
 	struct kvm_lapic *apic = vcpu->arch.apic;
 
+	trace_kvm_hw_emul_exit(vcpu->vcpu_id, apic->lapic_timer.hw_emulation);
+
 	if (apic->lapic_timer.hw_emulation != HWEMUL_INJECTED)
 		printk(KERN_WARNING "Preemption timer w/o hwemulation\n");
 

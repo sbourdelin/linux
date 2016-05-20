@@ -1416,6 +1416,7 @@ void switch_to_hw_lapic_timer(struct kvm_vcpu *vcpu)
 
 	if (apic->lapic_timer.hw_emulation)
 		return;
+	trace_kvm_hw_emul_sched_in(apic->lapic_timer.hw_emulation);
 
 	if (apic_lvtt_tscdeadline(apic) &&
 	    !atomic_read(&apic->lapic_timer.pending)) {
@@ -1433,6 +1434,8 @@ void switch_to_sw_lapic_timer(struct kvm_vcpu *vcpu)
 
 	if (!apic->lapic_timer.hw_emulation)
 		return;
+
+	trace_kvm_hw_emul_sched_out(apic->lapic_timer.hw_emulation);
 
 	if (apic->lapic_timer.hw_emulation == HWEMUL_INJECTED)
 		kvm_x86_ops->clear_hwemul_timer(vcpu);
@@ -1495,6 +1498,8 @@ int inject_pending_hwemul_timer(struct kvm_vcpu *vcpu)
 
 		kvm_x86_ops->set_hwemul_timer(vcpu, hwemultsc);
 		apic->lapic_timer.hw_emulation = HWEMUL_INJECTED;
+		trace_kvm_hw_emul_entry(vcpu->vcpu_id,
+				apic->lapic_timer.hw_emulation);
 		return 1;
 	}
 

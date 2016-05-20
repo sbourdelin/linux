@@ -1349,6 +1349,54 @@ TRACE_EVENT(kvm_avic_unaccelerated_access,
 		  __entry->vec)
 );
 
+TRACE_EVENT(kvm_hw_emul_sched_in,
+       TP_PROTO(unsigned int prev_value),
+       TP_ARGS(prev_value),
+       TP_STRUCT__entry(
+               __field(        unsigned int, prev_value)
+       ),
+       TP_fast_assign(
+               __entry->prev_value = prev_value;
+       ),
+       TP_printk("prev hw_emu value %x\n", __entry->prev_value)
+);
+
+TRACE_EVENT(kvm_hw_emul_sched_out,
+       TP_PROTO(unsigned int prev_value),
+       TP_ARGS(prev_value),
+       TP_STRUCT__entry(
+               __field(        unsigned int, prev_value)
+       ),
+       TP_fast_assign(
+               __entry->prev_value = prev_value;
+       ),
+       TP_printk("prev hw_emu value %x\n", __entry->prev_value)
+);
+
+TRACE_EVENT(kvm_hw_emul_state,
+       TP_PROTO(unsigned int vcpu_id, bool exit, unsigned int hw_emulated),
+       TP_ARGS(vcpu_id, exit, hw_emulated),
+       TP_STRUCT__entry(
+               __field(        unsigned int, vcpu_id)
+               __field(        bool, exit)
+               __field(        unsigned int, hw_emulated)
+       ),
+       TP_fast_assign(
+               __entry->vcpu_id = vcpu_id;
+               __entry->exit = exit;
+               __entry->hw_emulated = hw_emulated;
+       ),
+       TP_printk("vcpu_id %x %s preemption timer %x\n",
+		 __entry->vcpu_id,
+		 __entry->exit ? "exit" : "entry",
+		 __entry->hw_emulated)
+);
+#define trace_kvm_hw_emul_entry(vcpu_id, hw_emulated) \
+	trace_kvm_hw_emul_state(vcpu_id, false, hw_emulated)
+
+#define trace_kvm_hw_emul_exit(vcpu_id, hw_emulated) \
+	trace_kvm_hw_emul_state(vcpu_id, true, hw_emulated)
+
 #endif /* _TRACE_KVM_H */
 
 #undef TRACE_INCLUDE_PATH
