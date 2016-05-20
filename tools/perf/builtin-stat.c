@@ -1337,23 +1337,38 @@ static void print_interval(char *prefix, struct timespec *ts)
 
 	sprintf(prefix, "%6lu.%09lu%s", ts->tv_sec, ts->tv_nsec, csv_sep);
 
-	if (num_print_interval == 0 && !csv_output && !metric_only) {
+	if (num_print_interval == 0 && !csv_output) {
 		switch (stat_config.aggr_mode) {
 		case AGGR_SOCKET:
-			fprintf(output, "#           time socket cpus             counts %*s events\n", unit_width, "unit");
+			fprintf(output, "#           time socket cpus");
+			if (!metric_only)
+				fprintf(output, "             counts %*s events", unit_width, "unit");
+			fputc('\n', output);
 			break;
 		case AGGR_CORE:
-			fprintf(output, "#           time core         cpus             counts %*s events\n", unit_width, "unit");
+			fprintf(output, "#           time core         cpus");
+			if (!metric_only)
+				fprintf(output, "             counts %*s events", unit_width, "unit");
+			fputc('\n', output);
 			break;
 		case AGGR_NONE:
-			fprintf(output, "#           time CPU                counts %*s events\n", unit_width, "unit");
+			fprintf(output, "#           time CPU");
+			if (!metric_only)
+				fprintf(output, "                counts %*s events", unit_width, "unit");
+			fputc('\n', output);
 			break;
 		case AGGR_THREAD:
-			fprintf(output, "#           time             comm-pid                  counts %*s events\n", unit_width, "unit");
+			fprintf(output, "#           time             comm-pid");
+			if (!metric_only)
+				fprintf(output, "                  counts %*s events\n", unit_width, "unit");
+			fputc('\n', output);
 			break;
 		case AGGR_GLOBAL:
 		default:
-			fprintf(output, "#           time             counts %*s events\n", unit_width, "unit");
+			fprintf(output, "#           time");
+			if (!metric_only)
+				fprintf(output, "             counts %*s events\n", unit_width, "unit");
+			fputc('\n', output);
 		case AGGR_UNSET:
 			break;
 		}
