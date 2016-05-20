@@ -3253,6 +3253,88 @@ static int nfs4_do_find_root_sec(struct nfs_server *server,
 	return nfs_v4_minor_ops[mv]->find_root_sec(server, fhandle, info);
 }
 
+static int _nfs4_proc_fs_locations_probe(struct nfs_server *server,
+					 struct nfs_fh *fhandle,
+					 struct nfs4_fs_locations *fs_locations,
+					 struct page *page)
+{
+	u32 bitmask[3] = {
+		[0] = FATTR4_WORD0_FS_LOCATIONS,
+	};
+	struct nfs4_fs_locations_arg args = {
+		.fh = fhandle,
+		.page = page,
+		.bitmask = bitmask,
+		.replicas = 1,
+	};
+	struct nfs4_fs_locations_res res = {
+		.fs_locations = fs_locations,
+		.replicas = 1,
+	};
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_FS_LOCATIONS],
+		.rpc_argp = &args,
+		.rpc_resp = &res,
+	};
+	struct rpc_clnt *clnt = server->nfs_client->cl_rpcclient;
+
+	nfs_fattr_init(&fs_locations->fattr);
+	fs_locations->nlocations = 0;
+	fs_locations->server = server;
+	return nfs4_call_sync(clnt, server, &msg, &args.seq_args,
+				&res.seq_res, 0);
+}
+
+static int nfs4_proc_fs_locations_probe(struct nfs_server *server,
+					struct nfs_fh *fhandle,
+					struct nfs4_fs_locations *fs_locations,
+					struct page *page)
+{
+	struct nfs4_exception exception = { };
+	int err;
+
+	do {
+		err = _nfs4_proc_fs_locations_probe(server, fhandle,
+						fs_locations, page);
+		err = nfs4_handle_exception(server, err, &exception);
+	} while (exception.retry);
+	return err;
+}
+
+
+/**
+ * Probe the pseudo filesystem for an fs_locations replicas list.
+ * Note: The replicas list on a pseudofs is a list of multipath
+ * addresses
+ */
+void nfs4_get_pseudofs_replicas(struct nfs_server *server,
+				       struct nfs_fh *mntfh)
+{
+	struct page *page = NULL;
+	struct nfs4_fs_locations *locations = NULL;
+	int status;
+
+	if (server->nfs_client->cl_minorversion == 0)
+		return;
+
+	page = alloc_page(GFP_KERNEL);
+	if (page == NULL)
+		goto out;
+	locations = kmalloc(sizeof(struct nfs4_fs_locations), GFP_KERNEL);
+	if (locations == NULL)
+		goto out;
+
+	status = nfs4_proc_fs_locations_probe(server, mntfh, locations, page);
+	if (status != 0)
+		goto out;
+
+	/* test replicas for session trunking here */
+out:
+	if (page)
+		__free_page(page);
+	kfree(locations);
+}
+
 /**
  * nfs4_proc_get_rootfh - get file handle for server's pseudoroot
  * @server: initialized nfs_server handle

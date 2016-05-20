@@ -36,6 +36,9 @@ int nfs4_get_rootfh(struct nfs_server *server, struct nfs_fh *mntfh, bool auth_p
 	}
 
 	memcpy(&server->fsid, &fsinfo.fattr->fsid, sizeof(server->fsid));
+
+	nfs4_get_pseudofs_replicas(server, mntfh);
+
 out:
 	nfs_free_fattr(fsinfo.fattr);
 	dprintk("<-- nfs4_get_rootfh() = %d\n", ret);

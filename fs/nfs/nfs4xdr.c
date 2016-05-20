@@ -2685,18 +2685,17 @@ static void nfs4_xdr_enc_fs_locations(struct rpc_rqst *req,
 
 	encode_compound_hdr(xdr, req, &hdr);
 	encode_sequence(xdr, &args->seq_args, &hdr);
-	if (args->migration) {
+	if (args->replicas || args->migration) {
 		encode_putfh(xdr, args->fh, &hdr);
-		replen = hdr.replen;
-		encode_fs_locations(xdr, args->bitmask, &hdr);
-		if (args->renew)
-			encode_renew(xdr, args->clientid, &hdr);
 	} else {
 		encode_putfh(xdr, args->dir_fh, &hdr);
 		encode_lookup(xdr, args->name, &hdr);
-		replen = hdr.replen;
-		encode_fs_locations(xdr, args->bitmask, &hdr);
 	}
+	replen = hdr.replen;
+	encode_fs_locations(xdr, args->bitmask, &hdr);
+
+	if(args->migration && args->renew)
+		encode_renew(xdr, args->clientid, &hdr);
 
 	/* Set up reply kvec to capture returned fs_locations array. */
 	xdr_inline_pages(&req->rq_rcv_buf, replen << 2, &args->page,
@@ -6916,26 +6915,19 @@ static int nfs4_xdr_dec_fs_locations(struct rpc_rqst *req,
 	status = decode_putfh(xdr);
 	if (status)
 		goto out;
-	if (res->migration) {
-		xdr_enter_page(xdr, PAGE_SIZE);
-		status = decode_getfattr_generic(xdr,
-					&res->fs_locations->fattr,
-					 NULL, res->fs_locations,
-					 NULL, res->fs_locations->server);
-		if (status)
-			goto out;
-		if (res->renew)
-			status = decode_renew(xdr);
-	} else {
+	if (!res->replicas && !res->migration) {
 		status = decode_lookup(xdr);
 		if (status)
 			goto out;
-		xdr_enter_page(xdr, PAGE_SIZE);
-		status = decode_getfattr_generic(xdr,
-					&res->fs_locations->fattr,
-					 NULL, res->fs_locations,
-					 NULL, res->fs_locations->server);
 	}
+	xdr_enter_page(xdr, PAGE_SIZE);
+	status = decode_getfattr_generic(xdr,
+				&res->fs_locations->fattr,
+				NULL, res->fs_locations,
+				NULL, res->fs_locations->server);
+	if (res->migration && res->renew && !status)
+		status = decode_renew(xdr);
+
 out:
 	return status;
 }
