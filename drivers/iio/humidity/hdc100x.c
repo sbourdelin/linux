@@ -302,6 +302,8 @@ static int hdc100x_probe(struct i2c_client *client,
 
 static const struct i2c_device_id hdc100x_id[] = {
 	{ "hdc100x", 0 },
+	{ "hdc1000", 0 },
+	{ "hdc1008", 0 },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, hdc100x_id);
