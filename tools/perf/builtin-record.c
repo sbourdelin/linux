@@ -50,6 +50,7 @@ struct record {
 	struct perf_data_file	file;
 	struct auxtrace_record	*itr;
 	struct perf_evlist	*evlist;
+	struct perf_evlist	*overwrite_evlist;
 	struct perf_session	*session;
 	const char		*progname;
 	int			realtime_prio;
@@ -341,6 +342,78 @@ int auxtrace_record__snapshot_start(struct auxtrace_record *itr __maybe_unused)
 
 #endif
 
+static int record__create_overwrite_evlist(struct record *rec)
+{
+	struct perf_evlist *evlist = rec->evlist;
+	struct perf_evsel *pos;
+
+	evlist__for_each(evlist, pos) {
+		if (!pos->overwrite)
+			continue;
+
+		if (!rec->overwrite_evlist) {
+			rec->overwrite_evlist = perf_evlist__new_aux(evlist);
+			if (rec->overwrite_evlist) {
+				rec->overwrite_evlist->backward = true;
+				rec->overwrite_evlist->overwrite = true;
+				return 0;
+			} else
+				return -ENOMEM;
+		}
+	}
+	return 0;
+}
+
+static int record__mmap_evlist(struct record *rec,
+			       struct perf_evlist *evlist)
+{
+	struct record_opts *opts = &rec->opts;
+	char msg[512];
+
+	if (perf_evlist__mmap_ex(evlist, opts->mmap_pages, evlist->backward,
+				 opts->auxtrace_mmap_pages,
+				 opts->auxtrace_snapshot_mode) < 0) {
+		if (errno == EPERM) {
+			pr_err("Permission error mapping pages.\n"
+			       "Consider increasing "
+			       "/proc/sys/kernel/perf_event_mlock_kb,\n"
+			       "or try again with a smaller value of -m/--mmap_pages.\n"
+			       "(current value: %u,%u)\n",
+			       opts->mmap_pages, opts->auxtrace_mmap_pages);
+			return -errno;
+		} else {
+			pr_err("failed to mmap with %d (%s)\n", errno,
+				strerror_r(errno, msg, sizeof(msg)));
+			if (errno)
+				return -errno;
+			else
+				return -EINVAL;
+		}
+	}
+	return 0;
+}
+
+static int record__mmap(struct record *rec)
+{
+	int err;
+
+	err = record__create_overwrite_evlist(rec);
+	if (err)
+		return err;
+
+	err = record__mmap_evlist(rec, rec->evlist);
+	if (err)
+		return err;
+
+	if (!rec->overwrite_evlist)
+		return 0;
+
+	err = record__mmap_evlist(rec, rec->overwrite_evlist);
+	if (err)
+		return err;
+	return 0;
+}
+
 static int record__open(struct record *rec)
 {
 	char msg[512];
@@ -353,6 +426,13 @@ static int record__open(struct record *rec)
 	perf_evlist__config(evlist, opts, &callchain_param);
 
 	evlist__for_each(evlist, pos) {
+		if (pos->overwrite) {
+			if (!pos->attr.write_backward) {
+				ui__warning("Unable to read from overwrite ring buffer\n\n");
+				rc = -ENOSYS;
+				goto out;
+			}
+		}
 try_again:
 		if (perf_evsel__open(pos, pos->cpus, pos->threads) < 0) {
 			if (perf_evsel__fallback(pos, errno, msg, sizeof(msg))) {
@@ -377,28 +457,9 @@ try_again:
 		goto out;
 	}
 
-	if (perf_evlist__mmap_ex(evlist, opts->mmap_pages, false,
-				 opts->auxtrace_mmap_pages,
-				 opts->auxtrace_snapshot_mode) < 0) {
-		if (errno == EPERM) {
-			pr_err("Permission error mapping pages.\n"
-			       "Consider increasing "
-			       "/proc/sys/kernel/perf_event_mlock_kb,\n"
-			       "or try again with a smaller value of -m/--mmap_pages.\n"
-			       "(current value: %u,%u)\n",
-			       opts->mmap_pages, opts->auxtrace_mmap_pages);
-			rc = -errno;
-		} else {
-			pr_err("failed to mmap with %d (%s)\n", errno,
-				strerror_r(errno, msg, sizeof(msg)));
-			if (errno)
-				rc = -errno;
-			else
-				rc = -EINVAL;
-		}
+	rc = record__mmap(rec);
+	if (rc)
 		goto out;
-	}
-
 	session->evlist = evlist;
 	perf_session__set_id_hdr_size(session);
 out:
@@ -655,10 +716,26 @@ perf_event__synth_time_conv(const struct perf_event_mmap_page *pc __maybe_unused
 	return 0;
 }
 
+static const struct perf_event_mmap_page *
+perf_evlist__pick_pc(struct perf_evlist *evlist)
+{
+	if (evlist && evlist->mmap && evlist->mmap[0].base)
+		return evlist->mmap[0].base;
+	return NULL;
+}
+
 static const struct perf_event_mmap_page *record__pick_pc(struct record *rec)
 {
-	if (rec->evlist && rec->evlist->mmap && rec->evlist->mmap[0].base)
-		return rec->evlist->mmap[0].base;
+	const struct perf_event_mmap_page *pc;
+
+	/* Change it to a loop if a new aux evlist is added */
+	pc = perf_evlist__pick_pc(rec->evlist);
+	if (pc)
+		return pc;
+	pc = perf_evlist__pick_pc(rec->overwrite_evlist);
+	if (pc)
+		return pc;
+
 	return NULL;
 }
 
@@ -1566,6 +1643,8 @@ int cmd_record(int argc, const char **argv, const char *prefix __maybe_unused)
 	err = __cmd_record(&record, argc, argv);
 out_symbol_exit:
 	perf_evlist__delete(rec->evlist);
+	if (rec->overwrite_evlist)
+		perf_evlist__delete(rec->overwrite_evlist);
 	symbol__exit();
 	auxtrace_record__free(rec->itr);
 	return err;
