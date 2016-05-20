@@ -2139,6 +2139,12 @@ void drain_all_pages(struct zone *zone)
 								zone, 1);
 }
 
+unsigned long get_max_pfn(void)
+{
+	return max_pfn;
+}
+EXPORT_SYMBOL(get_max_pfn);
+
 #ifdef CONFIG_HIBERNATION
 
 void mark_free_pages(struct zone *zone)
