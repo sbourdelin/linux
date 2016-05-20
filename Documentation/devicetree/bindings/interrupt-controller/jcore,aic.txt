@@ -1,0 +1,28 @@
+J-Core Advanced Interrupt Controller
+
+Required properties:
+
+- compatible : Should be "jcore,aic1" for the (obsolete) first-generation aic
+  with 8 interrupt lines with programmable priorities, or "jcore,aic2" for
+  the "aic2" core with 64 interrupts.
+
+- interrupt-controller : Identifies the node as an interrupt controller
+
+- #interrupt-cells : Specifies the number of cells needed to encode an
+  interrupt source. The value shall be 1.
+
+Additional properties required for aic1:
+
+- reg : Memory region for configuration.
+
+- cpu-offset : For SMP, the offset to the per-cpu memory region for
+  configuration, to be scaled by the cpu number.
+
+
+Example:
+
+aic: interrupt-controller {
+	compatible = "jcore,aic2";
+	interrupt-controller;
+	#interrupt-cells = <1>;
+};
