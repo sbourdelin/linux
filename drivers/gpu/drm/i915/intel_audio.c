@@ -424,12 +424,8 @@ static void ilk_audio_codec_enable(struct drm_connector *connector,
 	if (WARN_ON(port == PORT_A))
 		return;
 
-	/*
-	 * FIXME: We're supposed to wait for vblank here, but we have vblanks
-	 * disabled during the mode set. The proper fix would be to push the
-	 * rest of the setup into a vblank work item, queued here, but the
-	 * infrastructure is not there yet.
-	 */
+	/* Need to wait one vblank before enabling audio */
+	intel_wait_for_vblank(connector->dev, pipe);
 
 	if (HAS_PCH_IBX(connector->dev)) {
 		hdmiw_hdmiedid = IBX_HDMIW_HDMIEDID(pipe);
