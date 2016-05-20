@@ -7568,6 +7568,23 @@ static int handle_pcommit(struct kvm_vcpu *vcpu)
 	return 1;
 }
 
+static int handle_preemption_timer(struct kvm_vcpu *vcpu)
+{
+	struct kvm_lapic *apic = vcpu->arch.apic;
+
+	if (apic->lapic_timer.hw_emulation != HWEMUL_INJECTED)
+		printk(KERN_WARNING "Preemption timer w/o hwemulation\n");
+
+	if (!atomic_read(&apic->lapic_timer.pending)) {
+		atomic_inc(&apic->lapic_timer.pending);
+		kvm_make_request(KVM_REQ_PENDING_TIMER, vcpu);
+	}
+
+	apic->lapic_timer.hw_emulation = 0;
+	vmcs_clear_bits(PIN_BASED_VM_EXEC_CONTROL,
+			PIN_BASED_VMX_PREEMPTION_TIMER);
+	return 1;
+}
 /*
  * The exit handlers return 1 if the exit was handled fully and guest execution
  * may resume.  Otherwise they set the kvm_run parameter to indicate what needs
@@ -7619,6 +7636,7 @@ static int (*const kvm_vmx_exit_handlers[])(struct kvm_vcpu *vcpu) = {
 	[EXIT_REASON_XRSTORS]                 = handle_xrstors,
 	[EXIT_REASON_PML_FULL]		      = handle_pml_full,
 	[EXIT_REASON_PCOMMIT]                 = handle_pcommit,
+	[EXIT_REASON_PREEMPTION_TIMER]	      = handle_preemption_timer,
 };
 
 static const int kvm_vmx_max_exit_handlers =
@@ -8669,6 +8687,8 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 	 * case. */
 	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP)
 		vmx_set_interrupt_shadow(vcpu, 0);
+
+	inject_pending_hwemul_timer(vcpu);
 
 	if (vmx->guest_pkru_valid)
 		__write_pkru(vmx->guest_pkru);
@@ -10689,10 +10709,16 @@ static void vmx_sched_in(struct kvm_vcpu *vcpu, int cpu)
 {
 	if (ple_gap)
 		shrink_ple_window(vcpu);
+	if (vmx_hwemul_timer(vcpu))
+		switch_to_hw_lapic_timer(vcpu);
 }
 
 static void vmx_sched_out(struct kvm_vcpu *vcpu)
 {
+	struct kvm_lapic *apic = vcpu->arch.apic;
+
+	if (apic->lapic_timer.hw_emulation)
+		switch_to_sw_lapic_timer(vcpu);
 }
 
 static void vmx_slot_enable_log_dirty(struct kvm *kvm,

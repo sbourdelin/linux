@@ -6608,6 +6608,8 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 
 	local_irq_disable();
 
+	inject_expired_hwemul_timer(vcpu);
+
 	if (vcpu->mode == EXITING_GUEST_MODE || vcpu->requests
 	    || need_resched() || signal_pending(current)) {
 		vcpu->mode = OUTSIDE_GUEST_MODE;
@@ -6773,6 +6775,10 @@ static int vcpu_run(struct kvm_vcpu *vcpu)
 			break;
 
 		clear_bit(KVM_REQ_PENDING_TIMER, &vcpu->requests);
+
+		/* Inject the hwemul timer if expired to avoid one VMExit */
+		inject_expired_hwemul_timer(vcpu);
+
 		if (kvm_cpu_has_pending_timer(vcpu))
 			kvm_inject_pending_timer_irqs(vcpu);
 

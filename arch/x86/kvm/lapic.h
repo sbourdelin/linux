@@ -12,6 +12,10 @@
 #define KVM_APIC_SHORT_MASK	0xc0000
 #define KVM_APIC_DEST_MASK	0x800
 
+#define HWEMUL_ENABLED		1
+/* The VMCS has been set for the vmx preemption timer */
+#define HWEMUL_INJECTED		2
+
 struct kvm_timer {
 	struct hrtimer timer;
 	s64 period; 				/* unit: ns */
@@ -20,6 +24,7 @@ struct kvm_timer {
 	u64 tscdeadline;
 	u64 expired_tscdeadline;
 	atomic_t pending;			/* accumulated triggered timers */
+	int hw_emulation;
 };
 
 struct kvm_lapic {
@@ -212,4 +217,9 @@ bool kvm_intr_is_single_vcpu_fast(struct kvm *kvm, struct kvm_lapic_irq *irq,
 			struct kvm_vcpu **dest_vcpu);
 int kvm_vector_to_index(u32 vector, u32 dest_vcpus,
 			const unsigned long *bitmap, u32 bitmap_size);
+void switch_to_sw_lapic_timer(struct kvm_vcpu *vcpu);
+void switch_to_hw_lapic_timer(struct kvm_vcpu *vcpu);
+int check_apic_hwemul_timer(struct kvm_vcpu *vcpu);
+int inject_expired_hwemul_timer(struct kvm_vcpu *vcpu);
+int inject_pending_hwemul_timer(struct kvm_vcpu *vcpu);
 #endif

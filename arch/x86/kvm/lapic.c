@@ -1320,7 +1320,7 @@ void wait_lapic_expire(struct kvm_vcpu *vcpu)
 		__delay(tsc_deadline - guest_tsc);
 }
 
-static void start_sw_tscdeadline(struct kvm_lapic *apic)
+static void start_sw_tscdeadline(struct kvm_lapic *apic, int no_expire)
 {
 	u64 guest_tsc, tscdeadline = apic->lapic_timer.tscdeadline;
 	u64 ns = 0;
@@ -1337,7 +1337,8 @@ static void start_sw_tscdeadline(struct kvm_lapic *apic)
 
 	now = apic->lapic_timer.timer.base->get_time();
 	guest_tsc = kvm_read_l1_tsc(vcpu, rdtsc());
-	if (likely(tscdeadline > guest_tsc)) {
+	/* Not trigger the apic_timer if invoked from sched_out */
+	if (no_expire || likely(tscdeadline > guest_tsc)) {
 		ns = (tscdeadline - guest_tsc) * 1000000ULL;
 		do_div(ns, this_tsc_khz);
 		expire = ktime_add_ns(now, ns);
@@ -1396,9 +1397,110 @@ static void start_apic_timer(struct kvm_lapic *apic)
 			   ktime_to_ns(ktime_add_ns(now,
 					apic->lapic_timer.period)));
 	} else if (apic_lvtt_tscdeadline(apic)) {
-		start_sw_tscdeadline(apic);
+		/* lapic timer in tsc deadline mode */
+		if (hw_emul_timer(apic)) {
+			if (unlikely(!apic->lapic_timer.tscdeadline ||
+					!apic->vcpu->arch.virtual_tsc_khz))
+				return;
+
+			/* Expired timer will be checked on vcpu_run() */
+			apic->lapic_timer.hw_emulation = HWEMUL_ENABLED;
+		} else
+			start_sw_tscdeadline(apic, 0);
 	}
 }
+
+void switch_to_hw_lapic_timer(struct kvm_vcpu *vcpu)
+{
+	struct kvm_lapic *apic = vcpu->arch.apic;
+
+	if (apic->lapic_timer.hw_emulation)
+		return;
+
+	if (apic_lvtt_tscdeadline(apic) &&
+	    !atomic_read(&apic->lapic_timer.pending)) {
+		hrtimer_cancel(&apic->lapic_timer.timer);
+		/* In case the timer triggered in above small window */
+		if (!atomic_read(&apic->lapic_timer.pending))
+			apic->lapic_timer.hw_emulation = HWEMUL_ENABLED;
+	}
+}
+EXPORT_SYMBOL_GPL(switch_to_hw_lapic_timer);
+
+void switch_to_sw_lapic_timer(struct kvm_vcpu *vcpu)
+{
+	struct kvm_lapic *apic = vcpu->arch.apic;
+
+	if (!apic->lapic_timer.hw_emulation)
+		return;
+
+	if (apic->lapic_timer.hw_emulation == HWEMUL_INJECTED)
+		kvm_x86_ops->clear_hwemul_timer(vcpu);
+	apic->lapic_timer.hw_emulation = 0;
+
+	if (atomic_read(&apic->lapic_timer.pending))
+		return;
+
+	/* Don't trigger the apic_timer_expired() for deadlock */
+	start_sw_tscdeadline(apic, 1);
+}
+EXPORT_SYMBOL_GPL(switch_to_sw_lapic_timer);
+
+/*
+ * Check the hwemul timer status.
+ * -1: hwemul timer is not enabled
+ * >0: hwemul timer it not expired yet, the return is the delta tsc
+ *  0: hwemul timer expired already
+ */
+int check_apic_hwemul_timer(struct kvm_vcpu *vcpu)
+{
+	struct kvm_lapic *apic = vcpu->arch.apic;
+
+	if (apic->lapic_timer.hw_emulation) {
+		u64 tscdeadline = apic->lapic_timer.tscdeadline;
+		u64 guest_tsc = kvm_read_l1_tsc(vcpu, rdtsc());
+
+		if (tscdeadline <= guest_tsc)
+			return 0;
+		else
+			return (tscdeadline - guest_tsc);
+	}
+	return -1;
+}
+
+int inject_expired_hwemul_timer(struct kvm_vcpu *vcpu)
+{
+	if (!check_apic_hwemul_timer(vcpu)) {
+		struct kvm_lapic *apic = vcpu->arch.apic;
+
+		if (apic->lapic_timer.hw_emulation == HWEMUL_INJECTED)
+			kvm_x86_ops->clear_hwemul_timer(vcpu);
+		apic->lapic_timer.hw_emulation = 0;
+		atomic_inc(&apic->lapic_timer.pending);
+		kvm_set_pending_timer(vcpu);
+		return 1;
+	}
+
+	return 0;
+}
+
+int inject_pending_hwemul_timer(struct kvm_vcpu *vcpu)
+{
+	u64 hwemultsc;
+
+	hwemultsc = check_apic_hwemul_timer(vcpu);
+	/* Just before vmentry, so inject even if expired */
+	if (hwemultsc >= 0) {
+		struct kvm_lapic *apic = vcpu->arch.apic;
+
+		kvm_x86_ops->set_hwemul_timer(vcpu, hwemultsc);
+		apic->lapic_timer.hw_emulation = HWEMUL_INJECTED;
+		return 1;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(inject_pending_hwemul_timer);
 
 static void apic_manage_nmi_watchdog(struct kvm_lapic *apic, u32 lvt0_val)
 {
