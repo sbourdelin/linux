@@ -42,6 +42,28 @@
 #include <sys/mman.h>
 #include <asm/bug.h>
 
+/*
+ * State machine of overwrite_evt_state:
+ *
+ * RUNNING --(1)--> DATA_PENDING --(2)--> EMPTY
+ *    ^                  ^                 |
+ *    |                  |___(disallow)___/|
+ *    |                                    |
+ *     \_________________(3)______________/
+ *
+ * RUNNING      : Overwritable ring buffers are recording
+ * DATA_PENDING : We are required to collect overwritable ring buffers
+ * EMPTY        : We have collected data from those ring buffers.
+ *
+ * (1): Pause ring buffers for reading
+ * (2): N/A
+ * (3): Resume ring buffers for recording
+ */
+enum overwrite_evt_state {
+	OVERWRITE_EVT_RUNNING,
+	OVERWRITE_EVT_DATA_PENDING,
+	OVERWRITE_EVT_EMPTY,
+};
 
 struct record {
 	struct perf_tool	tool;
@@ -61,6 +83,7 @@ struct record {
 	bool			buildid_all;
 	bool			timestamp_filename;
 	bool			switch_output;
+	enum overwrite_evt_state overwrite_evt_state;
 	unsigned long long	samples;
 };
 
@@ -132,9 +155,9 @@ rb_find_range(struct perf_evlist *evlist,
 	return backward_rb_find_range(data, mask, head, start, end);
 }
 
-static int record__mmap_read(struct record *rec, int idx)
+static int record__mmap_read(struct record *rec, struct perf_evlist *evlist, int idx)
 {
-	struct perf_mmap *md = &rec->evlist->mmap[idx];
+	struct perf_mmap *md = &evlist->mmap[idx];
 	u64 head = perf_mmap__read_head(md);
 	u64 old = md->prev;
 	u64 end = head, start = old;
@@ -143,7 +166,7 @@ static int record__mmap_read(struct record *rec, int idx)
 	void *buf;
 	int rc = 0;
 
-	if (rb_find_range(rec->evlist, data, md->mask, head,
+	if (rb_find_range(evlist, data, md->mask, head,
 			  old, &start, &end))
 		return -1;
 
@@ -157,7 +180,7 @@ static int record__mmap_read(struct record *rec, int idx)
 		WARN_ONCE(1, "failed to keep up with mmap data. (warn only once)\n");
 
 		md->prev = head;
-		perf_evlist__mmap_consume(rec->evlist, idx);
+		perf_evlist__mmap_consume(evlist, idx);
 		return 0;
 	}
 
@@ -182,7 +205,7 @@ static int record__mmap_read(struct record *rec, int idx)
 	}
 
 	md->prev = head;
-	perf_evlist__mmap_consume(rec->evlist, idx);
+	perf_evlist__mmap_consume(evlist, idx);
 out:
 	return rc;
 }
@@ -462,6 +485,7 @@ try_again:
 		goto out;
 	session->evlist = evlist;
 	perf_session__set_id_hdr_size(session);
+	rec->overwrite_evt_state = OVERWRITE_EVT_RUNNING;
 out:
 	return rc;
 }
@@ -542,17 +566,62 @@ static struct perf_event_header finished_round_event = {
 	.type = PERF_RECORD_FINISHED_ROUND,
 };
 
-static int record__mmap_read_all(struct record *rec)
+static void
+record__toggle_overwrite_evsels(struct record *rec,
+				enum overwrite_evt_state state)
+{
+	struct perf_evlist *evlist = rec->overwrite_evlist;
+	enum overwrite_evt_state old_state = rec->overwrite_evt_state;
+	enum action {
+		NONE,
+		PAUSE,
+		RESUME,
+	} action = NONE;
+
+	switch (old_state) {
+	case OVERWRITE_EVT_RUNNING:
+		if (state != OVERWRITE_EVT_RUNNING)
+			action = PAUSE;
+		break;
+	case OVERWRITE_EVT_DATA_PENDING:
+		if (state == OVERWRITE_EVT_RUNNING)
+			action = RESUME;
+		break;
+	case OVERWRITE_EVT_EMPTY:
+		if (state == OVERWRITE_EVT_RUNNING)
+			action = RESUME;
+		if (state == OVERWRITE_EVT_DATA_PENDING)
+			state = OVERWRITE_EVT_EMPTY;
+		break;
+	default:
+		WARN_ONCE(1, "Shouldn't get there\n");
+	}
+
+	rec->overwrite_evt_state = state;
+
+	if (action == NONE)
+		return;
+
+	if (!evlist)
+		return;
+
+	perf_evlist__toggle_paused(evlist, action == PAUSE);
+}
+
+static int __record__mmap_read_evlist(struct record *rec, struct perf_evlist *evlist)
 {
 	u64 bytes_written = rec->bytes_written;
 	int i;
 	int rc = 0;
 
-	for (i = 0; i < rec->evlist->nr_mmaps; i++) {
-		struct auxtrace_mmap *mm = &rec->evlist->mmap[i].auxtrace_mmap;
+	if (!evlist)
+		return 0;
 
-		if (rec->evlist->mmap[i].base) {
-			if (record__mmap_read(rec, i) != 0) {
+	for (i = 0; i < evlist->nr_mmaps; i++) {
+		struct auxtrace_mmap *mm = &evlist->mmap[i].auxtrace_mmap;
+
+		if (evlist->mmap[i].base) {
+			if (record__mmap_read(rec, evlist, i) != 0) {
 				rc = -1;
 				goto out;
 			}
@@ -574,6 +643,23 @@ static int record__mmap_read_all(struct record *rec)
 
 out:
 	return rc;
+}
+
+static int record__mmap_read_all(struct record *rec)
+{
+	int err;
+
+	err = __record__mmap_read_evlist(rec, rec->evlist);
+	if (err)
+		return err;
+
+	if (rec->overwrite_evt_state == OVERWRITE_EVT_DATA_PENDING) {
+		err = __record__mmap_read_evlist(rec, rec->overwrite_evlist);
+		if (err)
+			return err;
+		record__toggle_overwrite_evsels(rec, OVERWRITE_EVT_EMPTY);
+	}
+	return 0;
 }
 
 static void record__init_features(struct record *rec)
@@ -972,6 +1058,17 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 	for (;;) {
 		unsigned long long hits = rec->samples;
 
+		/*
+		 * rec->overwrite_evt_state is possible to be
+		 * OVERWRITE_EVT_EMPTY here: when done == true and
+		 * hits != rec->samples after previous reading.
+		 *
+		 * record__toggle_overwrite_evsels ensure we never
+		 * convert OVERWRITE_EVT_EMPTY to OVERWRITE_EVT_DATA_PENDING.
+		 */
+		if (trigger_is_hit(&switch_output_trigger) || done || draining)
+			record__toggle_overwrite_evsels(rec, OVERWRITE_EVT_DATA_PENDING);
+
 		if (record__mmap_read_all(rec) < 0) {
 			trigger_error(&auxtrace_snapshot_trigger);
 			trigger_error(&switch_output_trigger);
@@ -991,7 +1088,26 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 		}
 
 		if (trigger_is_hit(&switch_output_trigger)) {
+			/*
+			 * If switch_output_trigger is hit, the data in
+			 * overwritable ring buffer should have been collected,
+			 * so overwrite_evt_state should be set to
+			 * OVERWRITE_EVT_EMPTY.
+			 *
+			 * If SIGUSR2 raise after or during record__mmap_read_all(),
+			 * record__mmap_read_all() didn't collect data from
+			 * overwritable ring buffer. Read again.
+			 */
+			if (rec->overwrite_evt_state == OVERWRITE_EVT_RUNNING)
+				continue;
 			trigger_ready(&switch_output_trigger);
+
+			/*
+			 * Reenable events in overwrite ring buffer after
+			 * record__mmap_read_all(): we should have collected
+			 * data from it.
+			 */
+			record__toggle_overwrite_evsels(rec, OVERWRITE_EVT_RUNNING);
 
 			if (!quiet)
 				fprintf(stderr, "[ perf record: dump data: Woken up %ld times ]\n",
