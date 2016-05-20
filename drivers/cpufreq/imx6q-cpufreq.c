@@ -212,7 +212,7 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
 
 	if (of_machine_is_compatible("fsl,imx6ul")) {
 		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
-		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel");
+		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel_clk");
 		if (IS_ERR(pll2_bus_clk) || IS_ERR(secondary_sel_clk)) {
 			dev_err(cpu_dev, "failed to get clocks specific to imx6ul\n");
 			ret = -ENOENT;
