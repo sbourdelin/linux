@@ -770,5 +770,13 @@
 			compatible = "iio-hwmon";
 			io-channels = <&adc0 16>, <&adc1 16>;
 		};
+
+		vf610-soc {
+			compatible = "fsl,vf610-soc";
+			rom-revision = <&ocrom>;
+			mscm = <&mscm_cpucfg>;
+			nvmem-cells = <&ocotp_cfg0>, <&ocotp_cfg1>;
+			nvmem-cell-names = "cfg0", "cfg1";
+		};
 	};
 };
