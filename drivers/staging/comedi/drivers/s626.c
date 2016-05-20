@@ -76,24 +76,38 @@ struct s626_buffer_dma {
 
 struct s626_private {
 	u8 ai_cmd_running;		/* ai_cmd is running */
-	unsigned int ai_sample_timer;	/* time between samples in
-					 * units of the timer */
+	unsigned int ai_sample_timer;	/*
+					 * time between samples in
+					 * units of the timer
+					 */
 	int ai_convert_count;		/* conversion counter */
-	unsigned int ai_convert_timer;	/* time between conversion in
-					 * units of the timer */
-	u16 counter_int_enabs;		/* counter interrupt enable mask
-					 * for MISC2 register */
+	unsigned int ai_convert_timer;	/*
+					 * time between conversion in
+					 * units of the timer
+					 */
+	u16 counter_int_enabs;		/*
+					 * counter interrupt enable mask
+					 * for MISC2 register
+					 */
 	u8 adc_items;			/* number of items in ADC poll list */
-	struct s626_buffer_dma rps_buf;	/* DMA buffer used to hold ADC (RPS1)
-					 * program */
-	struct s626_buffer_dma ana_buf;	/* DMA buffer used to receive ADC data
-					 * and hold DAC data */
-	u32 *dac_wbuf;			/* pointer to logical adrs of DMA buffer
-					 * used to hold DAC data */
+	struct s626_buffer_dma rps_buf;	/*
+					 * DMA buffer used to hold ADC (RPS1)
+					 * program
+					 */
+	struct s626_buffer_dma ana_buf;	/*
+					 * DMA buffer used to receive ADC data
+					 * and hold DAC data
+					 */
+	u32 *dac_wbuf;			/*
+					 * pointer to logical adrs of DMA buffer
+					 * used to hold DAC data
+					 */
 	u16 dacpol;			/* image of DAC polarity register */
 	u8 trim_setpoint[12];		/* images of TrimDAC setpoints */
-	u32 i2c_adrs;			/* I2C device address for onboard EEPROM
-					 * (board rev dependent) */
+	u32 i2c_adrs;			/*
+					 * I2C device address for onboard EEPROM
+					 * (board rev dependent)
+					 */
 };
 
 /* Counter overflow/index event flag masks for RDMISC2. */
@@ -571,12 +585,18 @@ static int s626_set_dac(struct comedi_device *dev,
 	 * to a  non-existent TrimDac channel) that serves to keep the clock
 	 * running after the packet has been sent to the target DAC.
 	 */
-	val = 0x0F000000;	/* Continue clock after target DAC data
-				 * (write to non-existent trimdac). */
-	val |= 0x00004000;	/* Address the two main dual-DAC devices
-				 * (TSL's chip select enables target device). */
-	val |= ((uint32_t)(chan & 1) << 15);	/* Address the DAC channel
-						 * within the device. */
+	val = 0x0F000000;	/*
+				 * Continue clock after target DAC data
+				 * (write to non-existent trimdac).
+				 */
+	val |= 0x00004000;	/*
+				 * Address the two main dual-DAC devices
+				 * (TSL's chip select enables target device).
+				 */
+	val |= ((uint32_t)(chan & 1) << 15);	/*
+						 * Address the DAC channel
+						 * within the device.
+						 */
 	val |= (uint32_t)dacdata;	/* Include DAC setpoint data. */
 	return s626_send_dac(dev, val);
 }
