@@ -829,11 +829,11 @@ retry_pg80:
 			kfree(vpd_buf);
 			goto retry_pg80;
 		}
-		mutex_lock(&sdev->inquiry_mutex);
+		spin_lock(&sdev->inquiry_lock);
 		orig_vpd_buf = sdev->vpd_pg80;
 		sdev->vpd_pg80_len = result;
 		rcu_assign_pointer(sdev->vpd_pg80, vpd_buf);
-		mutex_unlock(&sdev->inquiry_mutex);
+		spin_unlock(&sdev->inquiry_lock);
 		synchronize_rcu();
 		if (orig_vpd_buf) {
 			kfree(orig_vpd_buf);
@@ -858,11 +858,11 @@ retry_pg83:
 			kfree(vpd_buf);
 			goto retry_pg83;
 		}
-		mutex_lock(&sdev->inquiry_mutex);
+		spin_lock(&sdev->inquiry_lock);
 		orig_vpd_buf = sdev->vpd_pg83;
 		sdev->vpd_pg83_len = result;
 		rcu_assign_pointer(sdev->vpd_pg83, vpd_buf);
-		mutex_unlock(&sdev->inquiry_mutex);
+		spin_unlock(&sdev->inquiry_lock);
 		synchronize_rcu();
 		if (orig_vpd_buf)
 			kfree(orig_vpd_buf);
