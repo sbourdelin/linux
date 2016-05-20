@@ -148,7 +148,7 @@ static ssize_t btrfs_feature_attr_store(struct kobject *kobj,
 	if ((val && !(set & fa->feature_bit)) ||
 	    (!val && !(clear & fa->feature_bit))) {
 		btrfs_info(fs_info,
-			"%sabling feature %s on mounted fs is not supported.",
+			"%sabling [ <- Already OK?  Nicholas D Steeves ] feature %s on mounted fs is not supported.",
 			val ? "En" : "Dis", fa->kobj_attr.attr.name);
 		return -EPERM;
 	}
