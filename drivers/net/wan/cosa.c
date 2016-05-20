@@ -876,15 +876,10 @@ static ssize_t cosa_write(struct file *file,
 		count = COSA_MTU;
 	
 	/* Allocate the buffer */
-	kbuf = kmalloc(count, GFP_KERNEL|GFP_DMA);
-	if (kbuf == NULL) {
+	kbuf = memdup_user(buf, count);
+	if (IS_ERR(kbuf)) {
 		up(&chan->wsem);
-		return -ENOMEM;
-	}
-	if (copy_from_user(kbuf, buf, count)) {
-		up(&chan->wsem);
-		kfree(kbuf);
-		return -EFAULT;
+		return PTR_ERR(kbuf);
 	}
 	chan->tx_status=0;
 	cosa_start_tx(chan, kbuf, count);
