@@ -360,6 +360,20 @@ particular perf.data snapshot should be kept or not.
 
 Implies --timestamp-filename, --no-buildid and --no-buildid-cache.
 
+--overwrite::
+Makes all events use overwritable ring buffer. Event with overwritable ring
+buffer works like a flight recorder: when buffer gets full, instead of dumping
+records into output file, kernel overwrites old records silently. Perf dumps
+data from overwritable ring buffer when switching output (see --switch-output)
+and before terminate.
+
+Perf behaves like a daemon when '--overwrite' and '--switch-output' are
+provided. It record and drop events in background, and dumps data when
+something unusual is detected.
+
+'overwrite' attribute can also be set or canceled for specific event using
+config terms like 'cycles/overwrite/' and 'instructions/no-overwrite/'.
+
 SEE ALSO
 --------
 linkperf:perf-stat[1], linkperf:perf-list[1]

@@ -671,10 +671,21 @@ static void apply_config_terms(struct perf_evsel *evsel,
 			 */
 			attr->inherit = term->val.inherit ? 1 : 0;
 			break;
+		case PERF_EVSEL__CONFIG_TERM_OVERWRITE:
+			evsel->overwrite = term->val.overwrite ? 1 : 0;
+			break;
 		default:
 			break;
 		}
 	}
+
+	/*
+	 * Set backward after config term processing because it is
+	 * possible to set overwrite globally, without config
+	 * terms.
+	 */
+	if (evsel->overwrite)
+		attr->write_backward = 1;
 
 	/* User explicitly set per-event callgraph, clear the old setting and reset. */
 	if ((callgraph_buf != NULL) || (dump_size > 0)) {
@@ -747,6 +758,7 @@ void perf_evsel__config(struct perf_evsel *evsel, struct record_opts *opts,
 
 	attr->sample_id_all = perf_missing_features.sample_id_all ? 0 : 1;
 	attr->inherit	    = !opts->no_inherit;
+	evsel->overwrite    = opts->overwrite;
 
 	perf_evsel__set_sample_bit(evsel, IP);
 	perf_evsel__set_sample_bit(evsel, TID);
