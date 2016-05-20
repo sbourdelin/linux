@@ -763,7 +763,7 @@ befs_fill_super(struct super_block *sb, void *data, int silent)
 
 	save_mount_options(sb, data);
 
-	sb->s_fs_info = kzalloc(sizeof(*befs_sb), GFP_KERNEL);
+	sb->s_fs_info = kzalloc(sizeof(*befs_sb), GFP_NOFS);
 	if (sb->s_fs_info == NULL) {
 		pr_err("(%s): Unable to allocate memory for private "
 		       "portion of superblock. Bailing.\n", sb->s_id);
