@@ -403,6 +403,7 @@ struct rpc_xprt *xprt_iter_xprt(struct rpc_xprt_iter *xpi)
 	WARN_ON_ONCE(!rcu_read_lock_held());
 	return xprt_iter_ops(xpi)->xpi_xprt(xpi);
 }
+EXPORT_SYMBOL_GPL(xprt_iter_xprt);
 
 static
 struct rpc_xprt *xprt_iter_get_helper(struct rpc_xprt_iter *xpi,
