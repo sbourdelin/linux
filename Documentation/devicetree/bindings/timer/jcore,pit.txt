@@ -1,0 +1,28 @@
+J-Core Programmable Interval Timer and Realtime Clock
+
+Required properties:
+
+- compatible: Must be "jcore,pit".
+
+- reg: Memory region for timer/rtc registers.
+
+- interrupts: An interrupt to assign for the timer. The actual pit
+  core is integrated with the aic and allows the timer interrupt
+  assignment to be programmed by software, but this property is
+  required in order to reserve an interrupt number that doesn't
+  conflict with other devices.
+
+Optional properties:
+
+- cpu-offset: For SMP, the per-cpu offset to the local timer
+  programming memory range.
+
+
+Example:
+
+timer {
+	compatible = "jcore,pit";
+	reg = < 0x200 0x30 >;
+	cpu-offset = < 0x300 >;
+	interrupts = < 0x48 >;
+};
