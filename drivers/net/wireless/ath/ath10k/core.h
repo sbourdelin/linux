@@ -571,6 +571,7 @@ enum ath10k_cal_mode {
 	ATH10K_CAL_MODE_DT,
 	ATH10K_PRE_CAL_MODE_FILE,
 	ATH10K_PRE_CAL_MODE_DT,
+	ATH10K_CAL_MODE_EEPROM,
 };
 
 enum ath10k_crypt_mode {
@@ -593,6 +594,8 @@ static inline const char *ath10k_cal_mode_str(enum ath10k_cal_mode mode)
 		return "pre-cal-file";
 	case ATH10K_PRE_CAL_MODE_DT:
 		return "pre-cal-dt";
+	case ATH10K_CAL_MODE_EEPROM:
+		return "eeprom";
 	}
 
 	return "unknown";
