@@ -679,6 +679,28 @@ static struct perf_evsel *perf_evlist__event2evsel(struct perf_evlist *evlist,
 	return NULL;
 }
 
+int perf_evlist__toggle_paused(struct perf_evlist *evlist, bool pause)
+{
+	int i;
+
+	for (i = 0; i < evlist->nr_mmaps; i++) {
+		int fd = evlist->mmap[i].fd;
+		int err;
+
+		if (fd < 0)
+			continue;
+		err = ioctl(fd, PERF_EVENT_IOC_PAUSE_OUTPUT,
+			    pause ? 1 : 0);
+		if (err) {
+			err = (errno == 0 ? -EINVAL : -errno);
+			pr_err("Unable to pause output on %d: %s\n",
+			       fd, strerror(-err));
+			return err;
+		}
+	}
+	return 0;
+}
+
 /* When check_messup is true, 'end' must points to a good entry */
 static union perf_event *
 perf_mmap__read(struct perf_mmap *md, bool check_messup, u64 start,
