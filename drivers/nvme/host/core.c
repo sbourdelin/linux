@@ -132,24 +132,25 @@ static void nvme_put_ns(struct nvme_ns *ns)
 static struct nvme_ns *nvme_get_ns_from_disk(struct gendisk *disk)
 {
 	struct nvme_ns *ns;
+	struct module *module;
 
 	spin_lock(&dev_list_lock);
 	ns = disk->private_data;
 	if (ns) {
-		if (!kref_get_unless_zero(&ns->kref))
-			goto fail;
-		if (!try_module_get(ns->ctrl->ops->module))
-			goto fail_put_ns;
+		if (!kref_get_unless_zero(&ns->kref)) {
+			spin_unlock(&dev_list_lock);
+			return NULL;
+		}
+		module = ns->ctrl->ops->module;
 	}
 	spin_unlock(&dev_list_lock);
 
-	return ns;
+	if (!try_module_get(module)) {
+		nvme_put_ns(ns);
+		return NULL;
+	}
 
-fail_put_ns:
-	kref_put(&ns->kref, nvme_free_ns);
-fail:
-	spin_unlock(&dev_list_lock);
-	return NULL;
+	return ns;
 }
 
 void nvme_requeue_req(struct request *req)
