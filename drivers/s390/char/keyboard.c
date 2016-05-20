@@ -438,13 +438,9 @@ do_kdgkb_ioctl(struct kbd_data *kbd, struct kbsentry __user *u_kbs,
 			return -EFAULT;
 		if (len > sizeof(u_kbs->kb_string))
 			return -EINVAL;
-		p = kmalloc(len, GFP_KERNEL);
-		if (!p)
-			return -ENOMEM;
-		if (copy_from_user(p, u_kbs->kb_string, len)) {
-			kfree(p);
-			return -EFAULT;
-		}
+		p = memdup_user(u_kbs->kb_string, len);
+		if (IS_ERR(p))
+			return PTR_ERR(p);
 		/*
 		 * Make sure the string is terminated by 0. User could have
 		 * modified it between us running strnlen_user() and copying it.
