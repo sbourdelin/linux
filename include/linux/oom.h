@@ -90,7 +90,7 @@ extern void check_panic_on_oom(struct oom_control *oc,
 			       struct mem_cgroup *memcg);
 
 extern enum oom_scan_t oom_scan_process_thread(struct oom_control *oc,
-		struct task_struct *task, unsigned long totalpages);
+					       struct task_struct *task);
 
 extern bool out_of_memory(struct oom_control *oc);
 
