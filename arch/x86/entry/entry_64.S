@@ -387,7 +387,7 @@ ENTRY(ret_from_fork)
 	 */
 	movq	RBP(%rsp), %rdi
 	call	*RBX(%rsp)
-	movl	$0, RAX(%rsp)
+	movq	%rax, RAX(%rsp)
 
 	/*
 	 * Fall through as though we're exiting a syscall.  This makes a

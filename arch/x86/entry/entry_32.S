@@ -221,7 +221,7 @@ ENTRY(ret_from_kernel_thread)
 	popl	%eax
 	movl	PT_EBP(%esp), %eax
 	call	*PT_EBX(%esp)
-	movl	$0, PT_EAX(%esp)
+	movl	%eax, PT_EAX(%esp)
 
 	/*
 	 * Kernel threads return to userspace as if returning from a syscall.
