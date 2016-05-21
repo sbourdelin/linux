@@ -241,35 +241,29 @@ END(__switch_to_asm)
  * A newly forked process directly context switches into this address.
  *
  * eax: prev task we switched from
+ * ebx: kernel thread func
+ * edi: kernel thread arg
  */
 ENTRY(ret_from_fork)
 	pushl	%eax
 	call	schedule_tail
 	popl	%eax
 
+	testl	%ebx, %ebx
+	jnz	1f
+
+2:
 	/* When we fork, we trace the syscall return in the child, too. */
 	movl    %esp, %eax
 	call    syscall_return_slowpath
 	jmp     restore_all
-END(ret_from_fork)
 
-ENTRY(ret_from_kernel_thread)
-	pushl	%eax
-	call	schedule_tail
-	popl	%eax
-	movl	PT_EBP(%esp), %eax
-	call	*PT_EBX(%esp)
+	/* kernel thread */
+1:	movl	%edi, %eax
+	call	*%ebx
 	movl	%eax, PT_EAX(%esp)
-
-	/*
-	 * Kernel threads return to userspace as if returning from a syscall.
-	 * We should check whether anything actually uses this path and, if so,
-	 * consider switching it over to ret_from_fork.
-	 */
-	movl    %esp, %eax
-	call    syscall_return_slowpath
-	jmp     restore_all
-ENDPROC(ret_from_kernel_thread)
+	jmp	2b
+END(ret_from_fork)
 
 /*
  * Return to user mode is not as complex as all this looks,
