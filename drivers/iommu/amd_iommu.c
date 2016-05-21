@@ -3289,8 +3289,10 @@ static void amd_iommu_put_dm_regions(struct device *dev,
 {
 	struct iommu_dm_region *entry, *next;
 
-	list_for_each_entry_safe(entry, next, head, list)
+	list_for_each_entry_safe(entry, next, head, list) {
+		list_del(&entry->list);
 		kfree(entry);
+	}
 }
 
 static const struct iommu_ops amd_iommu_ops = {
