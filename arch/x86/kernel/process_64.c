@@ -142,11 +142,14 @@ int copy_thread_tls(unsigned long clone_flags, unsigned long sp,
 	int err;
 	struct pt_regs *childregs;
 	struct task_struct *me = current;
+	struct fork_frame *frame;
 
 	p->thread.sp0 = (unsigned long)task_stack_page(p) + THREAD_SIZE;
 	childregs = task_pt_regs(p);
-	p->thread.sp = (unsigned long) childregs;
-	set_tsk_thread_flag(p, TIF_FORK);
+	frame = container_of(childregs, struct fork_frame, regs);
+	frame->bp = 0;
+	frame->ret_addr = (unsigned long) ret_from_fork;
+	p->thread.sp = (unsigned long) frame;
 	p->thread.io_bitmap_ptr = NULL;
 
 	savesegment(gs, p->thread.gsindex);

@@ -204,6 +204,44 @@
 	POP_GS_EX
 .endm
 
+/*
+ * %eax: prev task
+ * %edx: next task
+ */
+ENTRY(__switch_to_asm)
+	/*
+	 * Save callee-saved registers
+	 * This must match the order in struct fork_frame
+	 * Frame pointer must be last for get_wchan
+	 */
+	pushl	%ebx
+	pushl	%edi
+	pushl	%esi
+	pushl	%ebp
+
+	/* switch stack */
+	movl	%esp, TASK_threadsp(%eax)
+	movl	TASK_threadsp(%edx), %esp
+
+#ifdef CONFIG_CC_STACKPROTECTOR
+	movl	TASK_stack_canary(%edx), %ebx
+	movl	%ebx, PER_CPU_VAR(stack_canary)+stack_canary_offset
+#endif
+
+	/* restore callee-saved registers */
+	popl	%ebp
+	popl	%esi
+	popl	%edi
+	popl	%ebx
+
+	jmp	__switch_to
+END(__switch_to_asm)
+
+/*
+ * A newly forked process directly context switches into this address.
+ *
+ * eax: prev task we switched from
+ */
 ENTRY(ret_from_fork)
 	pushl	%eax
 	call	schedule_tail
