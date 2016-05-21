@@ -186,6 +186,19 @@ unsigned long oom_badness(struct task_struct *p, struct mem_cgroup *memcg,
 	}
 
 	/*
+	 * If task is allocating a lot of memory and has been marked to be
+	 * killed first if it triggers an oom, then select it.
+	 *
+	 * Score ULONG_MAX / 1000 rather than ULONG_MAX is used in order to
+	 * avoid overflow when the caller multiplies this score later using
+	 * "1000 / totalpages".
+	 */
+	if (oom_task_origin(p)) {
+		task_unlock(p);
+		return ULONG_MAX / 1000;
+	}
+
+	/*
 	 * The baseline for the badness score is the proportion of RAM that each
 	 * task's rss, pagetable and swap space use.
 	 */
@@ -286,13 +299,6 @@ enum oom_scan_t oom_scan_process_thread(struct oom_control *oc,
 	if (!is_sysrq_oom(oc) && atomic_read(&task->signal->oom_victims))
 		return OOM_SCAN_ABORT;
 
-	/*
-	 * If task is allocating a lot of memory and has been marked to be
-	 * killed first if it triggers an oom, then select it.
-	 */
-	if (oom_task_origin(task))
-		return OOM_SCAN_SELECT;
-
 	return OOM_SCAN_OK;
 }
 
@@ -309,13 +315,9 @@ static struct task_struct *select_bad_process(struct oom_control *oc,
 
 	rcu_read_lock();
 	for_each_process(p) {
-		unsigned int points;
+		unsigned long points;
 
 		switch (oom_scan_process_thread(oc, p)) {
-		case OOM_SCAN_SELECT:
-			chosen = p;
-			chosen_points = ULONG_MAX;
-			/* fall through */
 		case OOM_SCAN_CONTINUE:
 			continue;
 		case OOM_SCAN_ABORT:
