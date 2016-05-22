@@ -1076,19 +1076,14 @@ static int copy_and_ioctl(int cmd, struct obd_export *exp,
 	void *copy;
 	int rc;
 
-	copy = kzalloc(size, GFP_NOFS);
-	if (!copy)
-		return -ENOMEM;
-
-	if (copy_from_user(copy, data, size)) {
-		rc = -EFAULT;
+	copy = memdup_user(data, size);
+	if (IS_ERR(copy)) {
+		rc = PTR_ERR(copy);
 		goto out;
 	}
 
 	rc = obd_iocontrol(cmd, exp, size, copy, NULL);
 out:
-	kfree(copy);
-
 	return rc;
 }
 
@@ -1689,12 +1684,9 @@ out_poll:
 	case LL_IOC_QUOTACTL: {
 		struct if_quotactl *qctl;
 
-		qctl = kzalloc(sizeof(*qctl), GFP_NOFS);
-		if (!qctl)
-			return -ENOMEM;
-
-		if (copy_from_user(qctl, (void __user *)arg, sizeof(*qctl))) {
-			rc = -EFAULT;
+		qctl = memdup_user((void __user *)arg, sizeof(*qctl));
+		if (IS_ERR(qctl)) {
+			rc = PTR_ERR(qctl);
 			goto out_quotactl;
 		}
 
@@ -1704,8 +1696,8 @@ out_poll:
 					    sizeof(*qctl)))
 			rc = -EFAULT;
 
-out_quotactl:
 		kfree(qctl);
+out_quotactl:
 		return rc;
 	}
 	case OBD_IOC_GETDTNAME:

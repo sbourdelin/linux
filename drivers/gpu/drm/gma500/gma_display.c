@@ -285,7 +285,7 @@ void gma_crtc_dpms(struct drm_crtc *crtc, int mode)
 
 		/* Wait for vblank for the disable to take effect */
 		gma_wait_for_vblank(dev);
-
+l
 		/* Disable plane */
 		temp = REG_READ(map->cntr);
 		if ((temp & DISPLAY_PLANE_ENABLE) != 0) {
