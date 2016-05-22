@@ -751,25 +751,33 @@ extern void ftrace_init(void);
 static inline void ftrace_init(void) { }
 #endif
 
+#ifndef CONFIG_HAVE_64BIT_ALIGNED_ACCESS
+# define FTRACE_ALIGNMENT	4
+#else
+# define FTRACE_ALIGNMENT	8
+#endif
+
+#define FTRACE_ALIGN_DATA	__attribute__((packed, aligned(FTRACE_ALIGNMENT)))
+
 /*
  * Structure that defines an entry function trace.
  */
 struct ftrace_graph_ent {
 	unsigned long func; /* Current function */
 	int depth;
-};
+} FTRACE_ALIGN_DATA;
 
 /*
  * Structure that defines a return function trace.
  */
 struct ftrace_graph_ret {
 	unsigned long func; /* Current function */
-	unsigned long long calltime;
-	unsigned long long rettime;
 	/* Number of functions that overran the depth limit for current task */
 	unsigned long overrun;
+	unsigned long long calltime;
+	unsigned long long rettime;
 	int depth;
-};
+} FTRACE_ALIGN_DATA;
 
 /* Type of the callback handlers for tracing function graph*/
 typedef void (*trace_func_graph_ret_t)(struct ftrace_graph_ret *); /* return */

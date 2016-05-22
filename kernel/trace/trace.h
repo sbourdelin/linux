@@ -80,6 +80,12 @@ enum trace_type {
 	FTRACE_ENTRY(name, struct_name, id, PARAMS(tstruct), PARAMS(print), \
 		     filter)
 
+#undef FTRACE_ENTRY_PACKED
+#define FTRACE_ENTRY_PACKED(name, struct_name, id, tstruct, print,	\
+			    filter)					\
+	FTRACE_ENTRY(name, struct_name, id, PARAMS(tstruct), PARAMS(print), \
+		     filter) FTRACE_ALIGN_DATA
+
 #include "trace_entries.h"
 
 /*
@@ -1416,6 +1422,11 @@ int set_tracer_flag(struct trace_array *tr, unsigned int mask, int enabled);
 #define FTRACE_ENTRY_DUP(call, struct_name, id, tstruct, print, filter)	\
 	FTRACE_ENTRY(call, struct_name, id, PARAMS(tstruct), PARAMS(print), \
 		     filter)
+#undef FTRACE_ENTRY_PACKED
+#define FTRACE_ENTRY_PACKED(call, struct_name, id, tstruct, print, filter) \
+	FTRACE_ENTRY(call, struct_name, id, PARAMS(tstruct), PARAMS(print), \
+		     filter)
+
 #include "trace_entries.h"
 
 #if defined(CONFIG_PERF_EVENTS) && defined(CONFIG_FUNCTION_TRACER)
