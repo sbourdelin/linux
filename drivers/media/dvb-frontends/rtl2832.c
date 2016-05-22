@@ -409,6 +409,7 @@ static int rtl2832_init(struct dvb_frontend *fe)
 	c->post_bit_count.len = 1;
 	c->post_bit_count.stat[0].scale = FE_SCALE_NOT_AVAILABLE;
 	dev->sleeping = false;
+	dev->slave_ts = false;
 
 	return 0;
 err:
@@ -1103,6 +1104,8 @@ static int rtl2832_slave_ts_ctrl(struct i2c_client *client, bool enable)
 			goto err;
 	}
 
+	dev->slave_ts = enable;
+
 	return 0;
 err:
 	dev_dbg(&client->dev, "failed=%d\n", ret);
@@ -1116,7 +1119,7 @@ static int rtl2832_pid_filter_ctrl(struct dvb_frontend *fe, int onoff)
 	int ret;
 	u8 u8tmp;
 
-	dev_dbg(&client->dev, "onoff=%d\n", onoff);
+	dev_dbg(&client->dev, "onoff=%d, slave_ts=%d\n", onoff, dev->slave_ts);
 
 	/* enable / disable PID filter */
 	if (onoff)
@@ -1124,7 +1127,10 @@ static int rtl2832_pid_filter_ctrl(struct dvb_frontend *fe, int onoff)
 	else
 		u8tmp = 0x00;
 
-	ret = rtl2832_update_bits(client, 0x061, 0xc0, u8tmp);
+	if (dev->slave_ts)
+		ret = rtl2832_update_bits(client, 0x021, 0xc0, u8tmp);
+	else
+		ret = rtl2832_update_bits(client, 0x061, 0xc0, u8tmp);
 	if (ret)
 		goto err;
 
@@ -1142,8 +1148,8 @@ static int rtl2832_pid_filter(struct dvb_frontend *fe, u8 index, u16 pid,
 	int ret;
 	u8 buf[4];
 
-	dev_dbg(&client->dev, "index=%d pid=%04x onoff=%d\n",
-		index, pid, onoff);
+	dev_dbg(&client->dev, "index=%d pid=%04x onoff=%d slave_ts=%d\n",
+		index, pid, onoff, dev->slave_ts);
 
 	/* skip invalid PIDs (0x2000) */
 	if (pid > 0x1fff || index > 32)
@@ -1159,14 +1165,22 @@ static int rtl2832_pid_filter(struct dvb_frontend *fe, u8 index, u16 pid,
 	buf[1] = (dev->filters >>  8) & 0xff;
 	buf[2] = (dev->filters >> 16) & 0xff;
 	buf[3] = (dev->filters >> 24) & 0xff;
-	ret = rtl2832_bulk_write(client, 0x062, buf, 4);
+
+	if (dev->slave_ts)
+		ret = rtl2832_bulk_write(client, 0x022, buf, 4);
+	else
+		ret = rtl2832_bulk_write(client, 0x062, buf, 4);
 	if (ret)
 		goto err;
 
 	/* add PID */
 	buf[0] = (pid >> 8) & 0xff;
 	buf[1] = (pid >> 0) & 0xff;
-	ret = rtl2832_bulk_write(client, 0x066 + 2 * index, buf, 2);
+
+	if (dev->slave_ts)
+		ret = rtl2832_bulk_write(client, 0x026 + 2 * index, buf, 2);
+	else
+		ret = rtl2832_bulk_write(client, 0x066 + 2 * index, buf, 2);
 	if (ret)
 		goto err;
 
