@@ -1241,9 +1241,10 @@ error2:
 error:
 	mdiobus_unregister(priv->mdio);
 	mdiobus_free(priv->mdio);
-free:
+
 	if (priv->clk)
 		clk_disable_unprepare(priv->clk);
+free:
 	free_netdev(netdev);
 out:
 	return ret;
