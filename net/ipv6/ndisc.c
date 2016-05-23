@@ -152,9 +152,9 @@ EXPORT_SYMBOL_GPL(nd_tbl);
 
 static void ndisc_fill_addr_option(struct sk_buff *skb, int type, void *data)
 {
-	int pad   = ndisc_addr_option_pad(skb->dev->type);
+	int pad = ndisc_addr_option_pad(skb->dev->type);
 	int data_len = skb->dev->addr_len;
-	int space = ndisc_opt_addr_space(skb->dev);
+	int space = ndisc_opt_addr_space(data_len, pad);
 	u8 *opt = skb_put(skb, space);
 
 	opt[0] = type;
@@ -509,7 +509,7 @@ void ndisc_send_na(struct net_device *dev, const struct in6_addr *daddr,
 	if (!dev->addr_len)
 		inc_opt = 0;
 	if (inc_opt)
-		optlen += ndisc_opt_addr_space(dev);
+		optlen += ndisc_dev_opt_addr_space(dev);
 
 	skb = ndisc_alloc_skb(dev, sizeof(*msg) + optlen);
 	if (!skb)
@@ -574,7 +574,7 @@ void ndisc_send_ns(struct net_device *dev, const struct in6_addr *solicit,
 	if (ipv6_addr_any(saddr))
 		inc_opt = false;
 	if (inc_opt)
-		optlen += ndisc_opt_addr_space(dev);
+		optlen += ndisc_dev_opt_addr_space(dev);
 
 	skb = ndisc_alloc_skb(dev, sizeof(*msg) + optlen);
 	if (!skb)
@@ -626,7 +626,7 @@ void ndisc_send_rs(struct net_device *dev, const struct in6_addr *saddr,
 	}
 #endif
 	if (send_sllao)
-		optlen += ndisc_opt_addr_space(dev);
+		optlen += ndisc_dev_opt_addr_space(dev);
 
 	skb = ndisc_alloc_skb(dev, sizeof(*msg) + optlen);
 	if (!skb)
@@ -1563,7 +1563,7 @@ void ndisc_send_redirect(struct sk_buff *skb, const struct in6_addr *target)
 			memcpy(ha_buf, neigh->ha, dev->addr_len);
 			read_unlock_bh(&neigh->lock);
 			ha = ha_buf;
-			optlen += ndisc_opt_addr_space(dev);
+			optlen += ndisc_dev_opt_addr_space(dev);
 		} else
 			read_unlock_bh(&neigh->lock);
 
