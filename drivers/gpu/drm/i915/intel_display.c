@@ -8278,7 +8278,8 @@ static void ironlake_init_pch_refclk(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_encoder *encoder;
-	u32 val, final;
+	int i;
+	u32 val, temp, final;
 	bool has_lvds = false;
 	bool has_cpu_edp = false;
 	bool has_panel = false;
@@ -8417,6 +8418,22 @@ static void ironlake_init_pch_refclk(struct drm_device *dev)
 		I915_WRITE(PCH_DREF_CONTROL, val);
 		POSTING_READ(PCH_DREF_CONTROL);
 		udelay(200);
+
+		/* Unset SSC as the refclk for all of the DPLLs */
+		for (i = 0; i < dev_priv->num_shared_dpll; i++) {
+			temp = I915_READ(PCH_DPLL(i));
+
+			if (!(temp & PLLB_REF_INPUT_SPREADSPECTRUMIN))
+				continue;
+
+			DRM_DEBUG_KMS("Disabling SSC refclk for %s\n",
+				      dev_priv->shared_dplls[i].name);
+
+			/* Change refclk to DREFCLK */
+			temp &= ~PLL_REF_INPUT_MASK;
+
+			I915_WRITE(PCH_DPLL(i), temp);
+		}
 	}
 
 	BUG_ON(val != final);
