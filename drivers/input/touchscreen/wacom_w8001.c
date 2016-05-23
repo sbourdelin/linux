@@ -283,6 +283,15 @@ static irqreturn_t w8001_interrupt(struct serio *serio,
 	unsigned char tmp;
 
 	w8001->data[w8001->idx] = data;
+
+	/* ignore bogus idx values */
+	if (w8001->idx >= W8001_MAX_LENGTH) {
+		pr_info("w8001: ignored interrupt: data 0x%02x idx %d\n", data,
+			w8001->idx);
+		w8001->idx = 0;
+		return IRQ_HANDLED;
+	}
+
 	switch (w8001->idx++) {
 	case 0:
 		if ((data & W8001_LEAD_MASK) != W8001_LEAD_BYTE) {
