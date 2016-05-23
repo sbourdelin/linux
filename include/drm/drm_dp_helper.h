@@ -458,6 +458,7 @@
 #define DP_SINK_OUI			    0x400
 #define DP_BRANCH_OUI			    0x500
 #define DP_BRANCH_ID                        0x503
+#define DP_BRANCH_HW_REV                    0x509
 
 #define DP_SET_POWER                        0x600
 # define DP_SET_POWER_D0                    0x1
@@ -870,6 +871,7 @@ struct drm_dp_bd {
 	int type;
 	bool hpd;
 	uint8_t id[6];
+	uint8_t hw_rev;
 	union {
 		struct drm_dp_vga vga;
 		struct drm_dp_dvi dvi;
