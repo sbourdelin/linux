@@ -3908,7 +3908,12 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 
 	trace_event=[event-list]
 			[FTRACE] Set and start specified trace events in order
-			to facilitate early boot debugging.
+			to facilitate early boot debugging. The event-list is a
+			comma separated list of trace events to enable, as if
+			you were to append the event(s) to
+
+			    /sys/kernel/debug/tracing/set_event
+
 			See also Documentation/trace/events.txt
 
 	trace_options=[option-list]
