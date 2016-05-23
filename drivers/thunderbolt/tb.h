@@ -97,6 +97,13 @@ struct tb_path {
  * struct tb - main thunderbolt bus structure
  */
 struct tb {
+	bool icm_enabled;	/* icm_enabled must be the first field */
+	bool hotplug_active; /*
+			      * tb_handle_hotplug will stop progressing plug
+			      * events and exit if this is not set (it needs to
+			      * acquire the lock one more time). Used to drain
+			      * wq after cfg has been paused.
+			      */
 	struct mutex lock;	/*
 				 * Big lock. Must be held when accessing cfg or
 				 * any struct tb_switch / struct tb_port.
@@ -106,13 +113,6 @@ struct tb {
 	struct workqueue_struct *wq; /* ordered workqueue for plug events */
 	struct tb_switch *root_switch;
 	struct list_head tunnel_list; /* list of active PCIe tunnels */
-	bool hotplug_active; /*
-			      * tb_handle_hotplug will stop progressing plug
-			      * events and exit if this is not set (it needs to
-			      * acquire the lock one more time). Used to drain
-			      * wq after cfg has been paused.
-			      */
-
 };
 
 /* helper functions & macros */

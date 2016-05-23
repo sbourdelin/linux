@@ -1,5 +1,5 @@
 /*
- * Thunderbolt Cactus Ridge driver - NHI driver
+ * Thunderbolt driver - NHI driver
  *
  * The NHI (native host interface) is the pci device that allows us to send and
  * receive frames from the thunderbolt bus.
@@ -16,6 +16,7 @@
 #include <linux/dmi.h>
 
 #include "nhi.h"
+#include "icm_nhi.h"
 #include "nhi_regs.h"
 #include "tb.h"
 
@@ -498,7 +499,9 @@ static int nhi_suspend_noirq(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct tb *tb = pci_get_drvdata(pdev);
-	thunderbolt_suspend(tb);
+
+	if (!tb->icm_enabled)
+		thunderbolt_suspend(tb);
 	return 0;
 }
 
@@ -506,7 +509,9 @@ static int nhi_resume_noirq(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct tb *tb = pci_get_drvdata(pdev);
-	thunderbolt_resume(tb);
+
+	if (!tb->icm_enabled)
+		thunderbolt_resume(tb);
 	return 0;
 }
 
@@ -535,8 +540,7 @@ static void nhi_shutdown(struct tb_nhi *nhi)
 
 static int nhi_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
-	struct tb_nhi *nhi;
-	struct tb *tb;
+	void __iomem *iobase;
 	int res;
 
 	res = pcim_enable_device(pdev);
@@ -545,65 +549,86 @@ static int nhi_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		return res;
 	}
 
-	res = pci_enable_msi(pdev);
-	if (res) {
-		dev_err(&pdev->dev, "cannot enable MSI, aborting\n");
-		return res;
-	}
-
-	res = pcim_iomap_regions(pdev, 1 << 0, "thunderbolt");
+	res = pcim_iomap_regions(pdev, 1 << NHI_MMIO_BAR, pci_name(pdev));
 	if (res) {
 		dev_err(&pdev->dev, "cannot obtain PCI resources, aborting\n");
 		return res;
 	}
 
-	nhi = devm_kzalloc(&pdev->dev, sizeof(*nhi), GFP_KERNEL);
-	if (!nhi)
-		return -ENOMEM;
+	/* cannot fail - table is allocated in pcim_iomap_regions */
+	iobase = pcim_iomap_table(pdev)[NHI_MMIO_BAR];
+	/* check if ICM is running */
+	if (DEVICE_DATA_ICM_CAPABLITY(id->driver_data)
+	    && (ioread32(iobase + REG_FW_STS) & REG_FW_STS_ICM_EN)) {
+		res = icm_nhi_init(pdev, id, iobase);
+		if (res)
+			return res;
+	} else if (dmi_match(DMI_BOARD_VENDOR, "Apple Inc.")) {
+		struct tb_nhi *nhi;
+		struct tb *tb;
 
-	nhi->pdev = pdev;
-	/* cannot fail - table is allocated bin pcim_iomap_regions */
-	nhi->iobase = pcim_iomap_table(pdev)[0];
-	nhi->hop_count = ioread32(nhi->iobase + REG_HOP_COUNT) & 0x3ff;
-	if (nhi->hop_count != 12 && nhi->hop_count != 32)
-		dev_warn(&pdev->dev, "unexpected hop count: %d\n",
-			 nhi->hop_count);
-	INIT_WORK(&nhi->interrupt_work, nhi_interrupt_work);
+		BUILD_BUG_ON(offsetof(struct tb, icm_enabled) != 0);
 
-	nhi->tx_rings = devm_kcalloc(&pdev->dev, nhi->hop_count,
-				     sizeof(*nhi->tx_rings), GFP_KERNEL);
-	nhi->rx_rings = devm_kcalloc(&pdev->dev, nhi->hop_count,
-				     sizeof(*nhi->rx_rings), GFP_KERNEL);
-	if (!nhi->tx_rings || !nhi->rx_rings)
-		return -ENOMEM;
+		res = pci_enable_msi(pdev);
+		if (res) {
+			dev_err(&pdev->dev, "cannot enable MSI, aborting\n");
+			return res;
+		}
 
-	nhi_disable_interrupts(nhi); /* In case someone left them on. */
-	res = devm_request_irq(&pdev->dev, pdev->irq, nhi_msi,
-			       IRQF_NO_SUSPEND, /* must work during _noirq */
-			       "thunderbolt", nhi);
-	if (res) {
-		dev_err(&pdev->dev, "request_irq failed, aborting\n");
-		return res;
+		nhi = devm_kzalloc(&pdev->dev, sizeof(*nhi), GFP_KERNEL);
+		if (!nhi)
+			return -ENOMEM;
+
+		nhi->pdev = pdev;
+		nhi->iobase = iobase;
+		nhi->hop_count = ioread32(nhi->iobase + REG_HOP_COUNT) & 0x3ff;
+		if (nhi->hop_count != 12 && nhi->hop_count != 32)
+			dev_warn(&pdev->dev, "unexpected hop count: %d\n",
+				 nhi->hop_count);
+		INIT_WORK(&nhi->interrupt_work, nhi_interrupt_work);
+
+		nhi->tx_rings = devm_kcalloc(&pdev->dev, nhi->hop_count,
+					     sizeof(*nhi->tx_rings),
+					     GFP_KERNEL);
+		nhi->rx_rings = devm_kcalloc(&pdev->dev, nhi->hop_count,
+					     sizeof(*nhi->rx_rings),
+					     GFP_KERNEL);
+		if (!nhi->tx_rings || !nhi->rx_rings)
+			return -ENOMEM;
+
+		nhi_disable_interrupts(nhi); /* In case someone left them on */
+		res = devm_request_irq(&pdev->dev, pdev->irq, nhi_msi,
+				       /* must work during _noirq */
+				       IRQF_NO_SUSPEND,
+				       DRV_NAME, nhi);
+		if (res) {
+			dev_err(&pdev->dev, "request_irq failed, aborting\n");
+			return res;
+		}
+
+		mutex_init(&nhi->lock);
+
+		pci_set_master(pdev);
+
+		/* magic value - clock related? */
+		iowrite32(3906250 / 10000,
+			  nhi->iobase + REG_INT_THROTTLING_RATE);
+
+		dev_info(&nhi->pdev->dev,
+			 "NHI initialized, starting thunderbolt\n");
+		tb = thunderbolt_alloc_and_start(nhi);
+		if (!tb) {
+			/*
+			 * At this point the RX/TX rings might already have
+			 * been activated. Do a proper shutdown.
+			 */
+			nhi_shutdown(nhi);
+			return -EIO;
+		}
+		pci_set_drvdata(pdev, tb);
+	} else {
+		return -ENODEV;
 	}
-
-	mutex_init(&nhi->lock);
-
-	pci_set_master(pdev);
-
-	/* magic value - clock related? */
-	iowrite32(3906250 / 10000, nhi->iobase + 0x38c00);
-
-	dev_info(&nhi->pdev->dev, "NHI initialized, starting thunderbolt\n");
-	tb = thunderbolt_alloc_and_start(nhi);
-	if (!tb) {
-		/*
-		 * At this point the RX/TX rings might already have been
-		 * activated. Do a proper shutdown.
-		 */
-		nhi_shutdown(nhi);
-		return -EIO;
-	}
-	pci_set_drvdata(pdev, tb);
 
 	return 0;
 }
@@ -611,9 +636,15 @@ static int nhi_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 static void nhi_remove(struct pci_dev *pdev)
 {
 	struct tb *tb = pci_get_drvdata(pdev);
-	struct tb_nhi *nhi = tb->nhi;
-	thunderbolt_shutdown_and_free(tb);
-	nhi_shutdown(nhi);
+
+	if (!tb->icm_enabled) {
+		struct tb_nhi *nhi = tb->nhi;
+
+		thunderbolt_shutdown_and_free(tb);
+		nhi_shutdown(nhi);
+	} else {
+		icm_nhi_deinit(pdev);
+	}
 }
 
 /*
@@ -622,6 +653,7 @@ static void nhi_remove(struct pci_dev *pdev)
  * resume_noirq until we are done.
  */
 static const struct dev_pm_ops nhi_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(nhi_suspend, nhi_resume)
 	.suspend_noirq = nhi_suspend_noirq,
 	.resume_noirq = nhi_resume_noirq,
 	.freeze_noirq = nhi_suspend_noirq, /*
@@ -631,7 +663,7 @@ static const struct dev_pm_ops nhi_pm_ops = {
 	.restore_noirq = nhi_resume_noirq,
 };
 
-static struct pci_device_id nhi_ids[] = {
+static const struct pci_device_id nhi_ids[] = {
 	/*
 	 * We have to specify class, the TB bridges use the same device and
 	 * vendor (sub)id on gen 1 and gen 2 controllers.
@@ -648,35 +680,60 @@ static struct pci_device_id nhi_ids[] = {
 		.device = PCI_DEVICE_ID_INTEL_CACTUS_RIDGE_4C,
 		.subvendor = 0x2222, .subdevice = 0x1111,
 	},
-	{
-		.class = PCI_CLASS_SYSTEM_OTHER << 8, .class_mask = ~0,
-		.vendor = PCI_VENDOR_ID_INTEL,
-		.device = PCI_DEVICE_ID_INTEL_FALCON_RIDGE_4C_NHI,
-		.subvendor = PCI_ANY_ID, .subdevice = PCI_ANY_ID,
-	},
-	{ 0,}
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_REDWOOD_RIDGE_2C_NHI),
+					DEVICE_DATA(1, 5, 0xa, false, false) },
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_REDWOOD_RIDGE_4C_NHI),
+					DEVICE_DATA(2, 5, 0xa, false, false) },
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_FALCON_RIDGE_2C_NHI),
+					DEVICE_DATA(1, 5, 0xa, false, false) },
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_FALCON_RIDGE_4C_NHI),
+					DEVICE_DATA(2, 5, 0xa, false, false) },
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_WIN_RIDGE_2C_NHI),
+					DEVICE_DATA(1, 3, 0xa, false, false) },
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_ALPINE_RIDGE_2C_NHI),
+					DEVICE_DATA(1, 5, 0xa, true, true) },
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_ALPINE_RIDGE_4C_NHI),
+					DEVICE_DATA(2, 5, 0xa, true, true) },
+	{ 0, }
 };
 
 MODULE_DEVICE_TABLE(pci, nhi_ids);
 MODULE_LICENSE("GPL");
+MODULE_VERSION(DRV_VERSION);
 
 static struct pci_driver nhi_driver = {
-	.name = "thunderbolt",
+	.name = DRV_NAME,
 	.id_table = nhi_ids,
 	.probe = nhi_probe,
 	.remove = nhi_remove,
+	.shutdown = icm_nhi_shutdown,
 	.driver.pm = &nhi_pm_ops,
 };
 
 static int __init nhi_init(void)
 {
-	if (!dmi_match(DMI_BOARD_VENDOR, "Apple Inc."))
-		return -ENOSYS;
-	return pci_register_driver(&nhi_driver);
+	int rc = nhi_genl_register();
+
+	if (rc)
+		goto failure;
+
+	rc = pci_register_driver(&nhi_driver);
+	if (rc)
+		goto failure_genl;
+
+	return 0;
+
+failure_genl:
+	nhi_genl_unregister();
+
+failure:
+	pr_debug("nhi: error %d occurred in %s\n", rc, __func__);
+	return rc;
 }
 
 static void __exit nhi_unload(void)
 {
+	nhi_genl_unregister();
 	pci_unregister_driver(&nhi_driver);
 }
 
