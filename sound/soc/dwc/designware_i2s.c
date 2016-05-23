@@ -690,15 +690,16 @@ static int dw_i2s_probe(struct platform_device *pdev)
 				dev_err(&pdev->dev, "no clock configure method\n");
 				return -ENODEV;
 			}
+		} else {
+			dev->clk = devm_clk_get(&pdev->dev, clk_id);
+
+			if (IS_ERR(dev->clk))
+				return PTR_ERR(dev->clk);
+
+			ret = clk_prepare_enable(dev->clk);
+			if (ret < 0)
+				return ret;
 		}
-		dev->clk = devm_clk_get(&pdev->dev, clk_id);
-
-		if (IS_ERR(dev->clk))
-			return PTR_ERR(dev->clk);
-
-		ret = clk_prepare_enable(dev->clk);
-		if (ret < 0)
-			return ret;
 	}
 
 	dev_set_drvdata(&pdev->dev, dev);
