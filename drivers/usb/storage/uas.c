@@ -972,7 +972,8 @@ static int uas_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	 * 1 tag is reserved for untagged commands +
 	 * 1 tag to avoid off by one errors in some bridge firmwares
 	 */
-	shost->can_queue = devinfo->qdepth - 2;
+	if (devinfo->qdepth - 2 < MAX_CMNDS)
+		shost->can_queue = devinfo->qdepth - 2;
 
 	usb_set_intfdata(intf, shost);
 	result = scsi_add_host(shost, &intf->dev);
