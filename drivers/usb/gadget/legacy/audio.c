@@ -55,29 +55,20 @@ MODULE_PARM_DESC(c_ssize, "Capture Sample Size(bytes)");
 #else
 #include "u_uac1.h"
 
-static char *fn_play = FILE_PCM_PLAYBACK;
-module_param(fn_play, charp, S_IRUGO);
-MODULE_PARM_DESC(fn_play, "Playback PCM device file name");
+/* Capture(USB-OUT) Default Stereo - Fl/Fr */
+static int c_chmask = UAC1_DEF_CCHMASK;
+module_param(c_chmask, uint, S_IRUGO);
+MODULE_PARM_DESC(c_chmask, "Capture Channel Mask");
 
-static char *fn_cap = FILE_PCM_CAPTURE;
-module_param(fn_cap, charp, S_IRUGO);
-MODULE_PARM_DESC(fn_cap, "Capture PCM device file name");
+/* Capture Default 48 KHz */
+static int c_srate = UAC1_DEF_CSRATE;
+module_param(c_srate, uint, S_IRUGO);
+MODULE_PARM_DESC(c_srate, "Capture Sampling Rate");
 
-static char *fn_cntl = FILE_CONTROL;
-module_param(fn_cntl, charp, S_IRUGO);
-MODULE_PARM_DESC(fn_cntl, "Control device file name");
-
-static int req_buf_size = UAC1_OUT_EP_MAX_PACKET_SIZE;
-module_param(req_buf_size, int, S_IRUGO);
-MODULE_PARM_DESC(req_buf_size, "ISO OUT endpoint request buffer size");
-
-static int req_count = UAC1_REQ_COUNT;
-module_param(req_count, int, S_IRUGO);
-MODULE_PARM_DESC(req_count, "ISO OUT endpoint request count");
-
-static int audio_buf_size = UAC1_AUDIO_BUF_SIZE;
-module_param(audio_buf_size, int, S_IRUGO);
-MODULE_PARM_DESC(audio_buf_size, "Audio buffer size");
+/* Capture Default 16bits/sample */
+static int c_ssize = UAC1_DEF_CSSIZE;
+module_param(c_ssize, uint, S_IRUGO);
+MODULE_PARM_DESC(c_ssize, "Capture Sample Size(bytes)");
 #endif
 
 /* string IDs are assigned dynamically */
@@ -231,12 +222,9 @@ static int audio_bind(struct usb_composite_dev *cdev)
 	uac2_opts->c_ssize = c_ssize;
 #else
 	uac1_opts = container_of(fi_uac1, struct f_uac1_opts, func_inst);
-	uac1_opts->fn_play = fn_play;
-	uac1_opts->fn_cap = fn_cap;
-	uac1_opts->fn_cntl = fn_cntl;
-	uac1_opts->req_buf_size = req_buf_size;
-	uac1_opts->req_count = req_count;
-	uac1_opts->audio_buf_size = audio_buf_size;
+	uac1_opts->c_chmask = c_chmask;
+	uac1_opts->c_srate = c_srate;
+	uac1_opts->c_ssize = c_ssize;
 #endif
 
 	status = usb_string_ids_tab(cdev, strings_dev);
