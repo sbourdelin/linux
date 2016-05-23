@@ -52,6 +52,9 @@ void mctrl_gpio_set(struct mctrl_gpios *gpios, unsigned int mctrl)
 	int value_array[UART_GPIO_MAX];
 	unsigned int count = 0;
 
+	if (gpios == NULL)
+		return;
+
 	for (i = 0; i < UART_GPIO_MAX; i++)
 		if (gpios->gpio[i] && mctrl_gpios_desc[i].dir_out) {
 			desc_array[count] = gpios->gpio[i];
@@ -73,6 +76,9 @@ unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
 {
 	enum mctrl_gpio_idx i;
 
+	if (gpios == NULL)
+		return *mctrl;
+
 	for (i = 0; i < UART_GPIO_MAX; i++) {
 		if (gpios->gpio[i] && !mctrl_gpios_desc[i].dir_out) {
 			if (gpiod_get_value(gpios->gpio[i]))
@@ -90,6 +96,9 @@ unsigned int
 mctrl_gpio_get_outputs(struct mctrl_gpios *gpios, unsigned int *mctrl)
 {
 	enum mctrl_gpio_idx i;
+
+	if (gpios == NULL)
+		return *mctrl;
 
 	for (i = 0; i < UART_GPIO_MAX; i++) {
 		if (gpios->gpio[i] && mctrl_gpios_desc[i].dir_out) {
@@ -178,7 +187,7 @@ struct mctrl_gpios *mctrl_gpio_init(struct uart_port *port, unsigned int idx)
 
 	gpios = mctrl_gpio_init_noauto(port->dev, idx);
 	if (IS_ERR(gpios))
-		return gpios;
+		return NULL;
 
 	gpios->port = port;
 
@@ -193,7 +202,7 @@ struct mctrl_gpios *mctrl_gpio_init(struct uart_port *port, unsigned int idx)
 			dev_err(port->dev,
 				"failed to find corresponding irq for %s (idx=%d, err=%d)\n",
 				mctrl_gpios_desc[i].name, idx, ret);
-			return ERR_PTR(ret);
+			return NULL;
 		}
 		gpios->irq[i] = ret;
 
@@ -209,7 +218,7 @@ struct mctrl_gpios *mctrl_gpio_init(struct uart_port *port, unsigned int idx)
 			dev_err(port->dev,
 				"failed to request irq for %s (idx=%d, err=%d)\n",
 				mctrl_gpios_desc[i].name, idx, ret);
-			return ERR_PTR(ret);
+			return NULL;
 		}
 	}
 
@@ -220,6 +229,9 @@ EXPORT_SYMBOL_GPL(mctrl_gpio_init);
 void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios)
 {
 	enum mctrl_gpio_idx i;
+
+	if (gpios == NULL)
+		return;
 
 	for (i = 0; i < UART_GPIO_MAX; i++) {
 		if (gpios->irq[i])
@@ -235,6 +247,9 @@ EXPORT_SYMBOL_GPL(mctrl_gpio_free);
 void mctrl_gpio_enable_ms(struct mctrl_gpios *gpios)
 {
 	enum mctrl_gpio_idx i;
+
+	if (gpios == NULL)
+		return;
 
 	/* .enable_ms may be called multiple times */
 	if (gpios->mctrl_on)
@@ -257,6 +272,9 @@ EXPORT_SYMBOL_GPL(mctrl_gpio_enable_ms);
 void mctrl_gpio_disable_ms(struct mctrl_gpios *gpios)
 {
 	enum mctrl_gpio_idx i;
+
+	if (gpios == NULL)
+		return;
 
 	if (!gpios->mctrl_on)
 		return;
