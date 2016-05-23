@@ -3597,7 +3597,7 @@ static int avic_incomplete_ipi_interception(struct vcpu_svm *svm)
 	u32 icrh = svm->vmcb->control.exit_info_1 >> 32;
 	u32 icrl = svm->vmcb->control.exit_info_1;
 	u32 id = svm->vmcb->control.exit_info_2 >> 32;
-	u32 index = svm->vmcb->control.exit_info_2 && 0xFF;
+	u32 index = svm->vmcb->control.exit_info_2 & 0xFF;
 	struct kvm_lapic *apic = svm->vcpu.arch.apic;
 
 	trace_kvm_avic_incomplete_ipi(svm->vcpu.vcpu_id, icrh, icrl, id, index);
