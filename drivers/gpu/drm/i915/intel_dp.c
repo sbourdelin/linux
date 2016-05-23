@@ -3834,6 +3834,12 @@ intel_dp_probe_oui(struct intel_dp *intel_dp)
 	if (drm_dp_dpcd_read(&intel_dp->aux, DP_BRANCH_OUI, buf, 3) == 3)
 		DRM_DEBUG_KMS("Branch OUI: %02hx%02hx%02hx\n",
 			      buf[0], buf[1], buf[2]);
+
+	if (intel_dp->bd.present) {
+		if (drm_dp_dpcd_read(&intel_dp->aux, DP_BRANCH_ID, intel_dp->bd.id,
+				     sizeof(intel_dp->bd.id)) == sizeof(intel_dp->bd.id))
+			DRM_DEBUG_KMS("Device ID: %s\n", intel_dp->bd.id);
+	}
 }
 
 static bool
