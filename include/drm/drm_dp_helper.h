@@ -224,6 +224,12 @@
 /* offset 3 for DVI dual link and high color depth */
 # define DP_DS_DVI_DUAL_LINK                (1<<1)
 # define DP_DS_DVI_HI_COLOR_DEPTH           (1<<2)
+/* offset 3 for HDMI */
+# define FRAME_SEQ_TO_FRAME_PACK            (1<<0)
+# define YCBCR422_PASS_THROUGH              (1<<1)
+# define YCBCR420_PASS_THROUGH              (1<<2)
+# define YCBCR444_TO_YCBCR422               (1<<3)
+# define YCBCR444_TO_YCBCR420               (1<<4)
 
 /* link configuration */
 #define	DP_LINK_BW_SET		            0x100
@@ -821,6 +827,18 @@ struct drm_dp_dvi {
 	bool dual_link;
 	bool hi_color_depth;
 };
+/*
+ * DP to HDMI
+ */
+struct drm_dp_hdmi {
+	int tmds_clk;
+	uint8_t bpc;
+	bool frame_seq_to_frame_pack;
+	bool ycbcr422_pass_through;
+	bool ycbcr420_pass_through;
+	bool conversion_from_ycbcr444_to_ycbcr422;
+	bool conversion_from_ycbcr444_to_ycbcr420;
+};
 
 /*
  * Branch device
@@ -832,6 +850,7 @@ struct drm_dp_bd {
 	union {
 		struct drm_dp_vga vga;
 		struct drm_dp_dvi dvi;
+		struct drm_dp_hdmi hdmi;
 	} dfp;
 };
 
