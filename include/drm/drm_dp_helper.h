@@ -230,6 +230,9 @@
 # define YCBCR420_PASS_THROUGH              (1<<2)
 # define YCBCR444_TO_YCBCR422               (1<<3)
 # define YCBCR444_TO_YCBCR420               (1<<4)
+/* offset 3 for Wireless */
+# define DP_DS_WIRELESS_TECH_MASK           0xf
+# define WIRELESS_MASK                      3
 
 /* link configuration */
 #define	DP_LINK_BW_SET		            0x100
@@ -850,6 +853,15 @@ struct drm_dp_dual_mode {
 };
 
 /*
+ * DP to Wireless
+ */
+struct drm_dp_wireless {
+	int wireless_tech;
+	int number_of_wde_tx_on_device;
+	int wde_tx_concurrency_cap;
+};
+
+/*
  * Branch device
  */
 struct drm_dp_bd {
@@ -861,6 +873,7 @@ struct drm_dp_bd {
 		struct drm_dp_dvi dvi;
 		struct drm_dp_hdmi hdmi;
 		struct drm_dp_dual_mode dual_mode;
+		struct drm_dp_wireless wireless;
 	} dfp;
 };
 
