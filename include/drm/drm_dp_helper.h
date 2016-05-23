@@ -221,6 +221,9 @@
 # define DP_DS_VGA_10BPC		    1
 # define DP_DS_VGA_12BPC		    2
 # define DP_DS_VGA_16BPC		    3
+/* offset 3 for DVI dual link and high color depth */
+# define DP_DS_DVI_DUAL_LINK                (1<<1)
+# define DP_DS_DVI_HI_COLOR_DEPTH           (1<<2)
 
 /* link configuration */
 #define	DP_LINK_BW_SET		            0x100
@@ -810,6 +813,16 @@ struct drm_dp_vga {
 };
 
 /*
+ * DP to DVI
+ */
+struct drm_dp_dvi {
+	int tmds_clk;
+	uint8_t bpc;
+	bool dual_link;
+	bool hi_color_depth;
+};
+
+/*
  * Branch device
  */
 struct drm_dp_bd {
@@ -818,6 +831,7 @@ struct drm_dp_bd {
 	bool hpd;
 	union {
 		struct drm_dp_vga vga;
+		struct drm_dp_dvi dvi;
 	} dfp;
 };
 

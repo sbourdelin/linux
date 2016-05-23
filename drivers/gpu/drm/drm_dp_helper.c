@@ -451,6 +451,11 @@ int drm_dp_bd(struct drm_dp_aux *aux, struct drm_dp_bd *bd)
 		if (bd->type & DP_DS_PORT_TYPE_VGA) {
 			bd->dfp.vga.dot_clk = info[1] * 8 * 1000;
 			bd->dfp.vga.bpc = info[2] & DP_DS_VGA_MAX_BPC_MASK;
+		} else if (bd->type & DP_DS_PORT_TYPE_DVI) {
+			bd->dfp.dvi.tmds_clk = info[1] * 2500;
+			bd->dfp.dvi.bpc = info[2] & DP_DS_VGA_MAX_BPC_MASK;
+			bd->dfp.dvi.dual_link = info[3] & DP_DS_DVI_DUAL_LINK;
+			bd->dfp.dvi.hi_color_depth = info[3] & DP_DS_DVI_HI_COLOR_DEPTH;
 		}
 	}
 
