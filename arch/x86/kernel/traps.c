@@ -270,6 +270,7 @@ static void do_error_trap(struct pt_regs *regs, long error_code, char *str,
 
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) !=
 			NOTIFY_STOP) {
+		memset(&info, 0, sizeof(info));
 		cond_local_irq_enable(regs);
 		do_trap(trapnr, signr, str, regs, error_code,
 			fill_trap_info(regs, signr, trapnr, &info));
