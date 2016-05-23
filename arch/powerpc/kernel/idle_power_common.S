@@ -284,7 +284,7 @@ ALT_FTR_SECTION_END_NESTED_IFSET(CPU_FTR_ARCH_207S, 66);		\
  * r13 - Contents of HSPRG0
  * cr3 - set to gt if waking up with partial/complete hypervisor state loss
  */
-_GLOBAL(power7_restore_hyp_resource)
+_GLOBAL(pnv_restore_hyp_resource)
 	/*
 	 * Check if last bit of HSPGR0 is set. This indicates whether we are
 	 * waking up from winkle.
@@ -296,7 +296,7 @@ _GLOBAL(power7_restore_hyp_resource)
 
 	lbz	r0,PACA_THREAD_IDLE_STATE(r13)
 	cmpwi   cr2,r0,PNV_THREAD_NAP
-	bgt     cr2,power7_wakeup_tb_loss	/* Either sleep or Winkle */
+	bgt     cr2,pnv_wakeup_tb_loss	/* Either sleep or Winkle */
 
 	/*
 	 * We fall through here if PACA_THREAD_IDLE_STATE shows we are waking
@@ -306,10 +306,10 @@ _GLOBAL(power7_restore_hyp_resource)
 	bgt	cr3,.
 
 	blr	/* Return back to System Reset vector from where
-		   power7_restore_hyp_resource was invoked */
+		   pnv_restore_hyp_resource was invoked */
 
 
-_GLOBAL(power7_wakeup_tb_loss)
+_GLOBAL(pnv_wakeup_tb_loss)
 	ld	r2,PACATOC(r13);
 	ld	r1,PACAR1(r13)
 	/*
@@ -476,7 +476,7 @@ hypervisor_state_restored:
 	mtspr	SPRN_SRR1,r16
 	mtlr	r17
 	blr	/* Return back to System Reset vector from where
-		   power7_restore_hyp_resource was invoked */
+		   pnv_restore_hyp_resource was invoked */
 
 fastsleep_workaround_at_exit:
 	li	r3,1
@@ -489,7 +489,7 @@ fastsleep_workaround_at_exit:
  * R3 here contains the value that will be returned to the caller
  * of power7_nap.
  */
-_GLOBAL(power7_wakeup_loss)
+_GLOBAL(pnv_wakeup_loss)
 	ld	r1,PACAR1(r13)
 BEGIN_FTR_SECTION
 	CHECK_HMI_INTERRUPT
@@ -509,10 +509,10 @@ END_FTR_SECTION_IFSET(CPU_FTR_HVMODE)
  * R3 here contains the value that will be returned to the caller
  * of power7_nap.
  */
-_GLOBAL(power7_wakeup_noloss)
+_GLOBAL(pnv_wakeup_noloss)
 	lbz	r0,PACA_NAPSTATELOST(r13)
 	cmpwi	r0,0
-	bne	power7_wakeup_loss
+	bne	pnv_wakeup_loss
 BEGIN_FTR_SECTION
 	CHECK_HMI_INTERRUPT
 END_FTR_SECTION_IFSET(CPU_FTR_HVMODE)
