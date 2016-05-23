@@ -1098,7 +1098,10 @@ void page_move_anon_rmap(struct page *page,
 
 	VM_BUG_ON_PAGE(!PageLocked(page), page);
 	VM_BUG_ON_VMA(!anon_vma, vma);
-	VM_BUG_ON_PAGE(page->index != linear_page_index(vma, address), page);
+	VM_BUG_ON_PAGE(page->index !=
+		       linear_page_index(vma, PageTransHuge(page) ?
+					 address & HPAGE_PMD_MASK :
+					 address), page);
 
 	anon_vma = (void *) anon_vma + PAGE_MAPPING_ANON;
 	/*
