@@ -22,8 +22,18 @@
 #include <linux/livepatch.h>
 
 /*
- * This (dumb) live patch overrides the function that prints the
- * kernel boot cmdline when /proc/cmdline is read.
+ * This (dumb) live patch overrides output from the following files
+ * that provide information about the system:
+ *
+ *	/proc/cmdline
+ *	/proc/uptime
+ *	/proc/consoles
+ *
+ * and also output from sysfs entries created by the module kobject_example:
+ *
+ *	/sys/kernel/kobject_example/foo
+ *	/sys/kernel/kobject_example/bar
+ *	/sys/kernel/kobject_example/baz
  *
  * Example:
  *
@@ -40,23 +50,136 @@
  */
 
 #include <linux/seq_file.h>
+#include <linux/kernel_stat.h>
+#include <linux/cputime.h>
+#include <linux/console.h>
+#include <linux/tty_driver.h>
+
 static int livepatch_cmdline_proc_show(struct seq_file *m, void *v)
 {
 	seq_printf(m, "%s\n", "this has been live patched");
 	return 0;
 }
 
+static int livepatch_uptime_proc_show(struct seq_file *m, void *v)
+{
+	struct timespec uptime;
+	struct timespec idle;
+	u64 idletime;
+	u64 nsec;
+	u32 rem;
+	int i;
+
+	idletime = 0;
+	for_each_possible_cpu(i)
+		idletime += (__force u64) kcpustat_cpu(i).cpustat[CPUTIME_IDLE];
+
+	get_monotonic_boottime(&uptime);
+	nsec = cputime64_to_jiffies64(idletime) * TICK_NSEC;
+	idle.tv_sec = div_u64_rem(nsec, NSEC_PER_SEC, &rem);
+	idle.tv_nsec = rem;
+	seq_printf(m, "%s\n", "this has been live patched");
+	seq_printf(m, "%lu.%02lu %lu.%02lu\n",
+			(unsigned long) uptime.tv_sec,
+			(uptime.tv_nsec / (NSEC_PER_SEC / 100)),
+			(unsigned long) idle.tv_sec,
+			(idle.tv_nsec / (NSEC_PER_SEC / 100)));
+	return 0;
+}
+
+static int livepatch_show_console_dev(struct seq_file *m, void *v)
+{
+	static const struct {
+		short flag;
+		char name;
+	} con_flags[] = {
+		{ CON_ENABLED,		'E' },
+		{ CON_CONSDEV,		'C' },
+		{ CON_BOOT,		'B' },
+		{ CON_PRINTBUFFER,	'p' },
+		{ CON_BRL,		'b' },
+		{ CON_ANYTIME,		'a' },
+	};
+	char flags[ARRAY_SIZE(con_flags) + 1];
+	struct console *con = v;
+	unsigned int a;
+	dev_t dev = 0;
+
+	seq_printf(m, "%s\n", "this has been live patched");
+
+	if (con->device) {
+		const struct tty_driver *driver;
+		int index;
+
+		driver = con->device(con, &index);
+		if (driver) {
+			dev = MKDEV(driver->major, driver->minor_start);
+			dev += index;
+		}
+	}
+
+	for (a = 0; a < ARRAY_SIZE(con_flags); a++)
+		flags[a] = (con->flags & con_flags[a].flag) ?
+			con_flags[a].name : ' ';
+	flags[a] = 0;
+
+	seq_setwidth(m, 21 - 1);
+	seq_printf(m, "%s%d", con->name, con->index);
+	seq_pad(m, ' ');
+	seq_printf(m, "%c%c%c (%s)", con->read ? 'R' : '-',
+			con->write ? 'W' : '-', con->unblank ? 'U' : '-',
+			flags);
+	if (dev)
+		seq_printf(m, " %4d:%d", MAJOR(dev), MINOR(dev));
+
+	seq_puts(m, "\n");
+
+	return 0;
+}
+
+static ssize_t livepatch_foo_show(struct kobject *kobj,
+				  struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "foo: this has been livepatched\n");
+}
+
+static ssize_t livepatch_b_show(struct kobject *kobj,
+				struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%s: this has been livepatched\n", attr->attr.name);
+}
+
 static struct klp_func funcs[] = {
 	{
 		.old_name = "cmdline_proc_show",
 		.new_func = livepatch_cmdline_proc_show,
+	}, {
+		.old_name = "uptime_proc_show",
+		.new_func = livepatch_uptime_proc_show,
+	}, {
+		.old_name = "show_console_dev",
+		.new_func = livepatch_show_console_dev,
 	}, { }
 };
+
+static struct klp_func kobject_example_funcs[] = {
+	{
+		.old_name = "foo_show",
+		.new_func = livepatch_foo_show,
+	}, {
+		.old_name = "b_show",
+		.new_func = livepatch_b_show,
+	}, { }
+};
+
 
 static struct klp_object objs[] = {
 	{
 		/* name being NULL means vmlinux */
 		.funcs = funcs,
+	}, {
+		.name = "kobject_example",
+		.funcs = kobject_example_funcs,
 	}, { }
 };
 
