@@ -1743,14 +1743,14 @@ static int pch_udc_pcd_ep_disable(struct usb_ep *usbep)
 	if ((usbep->name == ep0_string) || !ep->ep.desc)
 		return -EINVAL;
 
-	spin_lock_irqsave(&ep->dev->lock, iflags);
+	spin_lock_irqsave(&dev->lock, iflags);
 	empty_req_queue(ep);
 	ep->halted = 1;
 	pch_udc_ep_disable(ep);
-	pch_udc_disable_ep_interrupts(ep->dev, PCH_UDC_EPINT(ep->in, ep->num));
+	pch_udc_disable_ep_interrupts(dev, PCH_UDC_EPINT(ep->in, ep->num));
 	ep->ep.desc = NULL;
 	INIT_LIST_HEAD(&ep->queue);
-	spin_unlock_irqrestore(&ep->dev->lock, iflags);
+	spin_unlock_irqrestore(&dev->lock, iflags);
 	return 0;
 }
 
@@ -1782,10 +1782,10 @@ static struct usb_request *pch_udc_alloc_request(struct usb_ep *usbep,
 	req->req.dma = DMA_ADDR_INVALID;
 	req->dma = DMA_ADDR_INVALID;
 	INIT_LIST_HEAD(&req->queue);
-	if (!ep->dev->dma_addr)
+	if (!dev->dma_addr)
 		return &req->req;
 	/* ep0 in requests are allocated from data pool here */
-	dma_desc = pci_pool_alloc(ep->dev->data_requests, gfp,
+	dma_desc = pci_pool_alloc(dev->data_requests, gfp,
 				  &req->td_data_phys);
 	if (NULL == dma_desc) {
 		kfree(req);
@@ -1957,7 +1957,7 @@ static int pch_udc_pcd_dequeue(struct usb_ep *usbep,
 	if (!usbep || !usbreq || (!ep->ep.desc && ep->num))
 		return ret;
 	req = container_of(usbreq, struct pch_udc_request, req);
-	spin_lock_irqsave(&ep->dev->lock, flags);
+	spin_lock_irqsave(&dev->lock, flags);
 	/* make sure it's still queued on this endpoint */
 	list_for_each_entry(req, &ep->queue, queue) {
 		if (&req->req == usbreq) {
@@ -1968,7 +1968,7 @@ static int pch_udc_pcd_dequeue(struct usb_ep *usbep,
 			break;
 		}
 	}
-	spin_unlock_irqrestore(&ep->dev->lock, flags);
+	spin_unlock_irqrestore(&dev->lock, flags);
 	return ret;
 }
 
@@ -1995,17 +1995,16 @@ static int pch_udc_pcd_set_halt(struct usb_ep *usbep, int halt)
 	dev = ep->dev;
 	if (!ep->ep.desc && !ep->num)
 		return -EINVAL;
-	if (!ep->dev->driver || (ep->dev->gadget.speed == USB_SPEED_UNKNOWN))
+	if (!dev->driver || (dev->gadget.speed == USB_SPEED_UNKNOWN))
 		return -ESHUTDOWN;
 	spin_lock_irqsave(&udc_stall_spinlock, iflags);
 	if (list_empty(&ep->queue)) {
 		if (halt) {
 			if (ep->num == PCH_UDC_EP0)
-				ep->dev->stall = 1;
+				dev->stall = 1;
 			pch_udc_ep_set_stall(ep);
-			pch_udc_enable_ep_interrupts(ep->dev,
-						     PCH_UDC_EPINT(ep->in,
-								   ep->num));
+			pch_udc_enable_ep_interrupts(
+				dev, PCH_UDC_EPINT(ep->in, ep->num));
 		} else {
 			pch_udc_ep_clear_stall(ep);
 		}
@@ -2040,18 +2039,18 @@ static int pch_udc_pcd_set_wedge(struct usb_ep *usbep)
 	dev = ep->dev;
 	if (!ep->ep.desc && !ep->num)
 		return -EINVAL;
-	if (!ep->dev->driver || (ep->dev->gadget.speed == USB_SPEED_UNKNOWN))
+	if (!dev->driver || (dev->gadget.speed == USB_SPEED_UNKNOWN))
 		return -ESHUTDOWN;
 	spin_lock_irqsave(&udc_stall_spinlock, iflags);
 	if (!list_empty(&ep->queue)) {
 		ret = -EAGAIN;
 	} else {
 		if (ep->num == PCH_UDC_EP0)
-			ep->dev->stall = 1;
+			dev->stall = 1;
 		pch_udc_ep_set_stall(ep);
-		pch_udc_enable_ep_interrupts(ep->dev,
+		pch_udc_enable_ep_interrupts(dev,
 					     PCH_UDC_EPINT(ep->in, ep->num));
-		ep->dev->prot_stall = 1;
+		dev->prot_stall = 1;
 		ret = 0;
 	}
 	spin_unlock_irqrestore(&udc_stall_spinlock, iflags);
@@ -2472,16 +2471,11 @@ static void pch_udc_svc_control_out(struct pch_udc_dev *dev)
  */
 static void pch_udc_postsvc_epinters(struct pch_udc_dev *dev, int ep_num)
 {
-	struct pch_udc_ep	*ep;
-	struct pch_udc_request *req;
-
-	ep = &dev->ep[UDC_EPIN_IDX(ep_num)];
-	if (!list_empty(&ep->queue)) {
-		req = list_entry(ep->queue.next, struct pch_udc_request, queue);
-		pch_udc_enable_ep_interrupts(ep->dev,
-					     PCH_UDC_EPINT(ep->in, ep->num));
-		pch_udc_ep_clear_nak(ep);
-	}
+	struct pch_udc_ep *ep = &dev->ep[UDC_EPIN_IDX(ep_num)];
+	if (list_empty(&ep->queue))
+		return;
+	pch_udc_enable_ep_interrupts(ep->dev, PCH_UDC_EPINT(ep->in, ep->num));
+	pch_udc_ep_clear_nak(ep);
 }
 
 /**
@@ -2647,7 +2641,7 @@ static void pch_udc_svc_enum_interrupt(struct pch_udc_dev *dev)
 static void pch_udc_svc_intf_interrupt(struct pch_udc_dev *dev)
 {
 	u32 reg, dev_stat = 0;
-	int i, ret;
+	int i;
 
 	dev_stat = pch_udc_read_device_status(dev);
 	dev->cfg_data.cur_intf = (dev_stat & UDC_DEVSTS_INTF_MASK) >>
@@ -2676,7 +2670,7 @@ static void pch_udc_svc_intf_interrupt(struct pch_udc_dev *dev)
 	}
 	dev->stall = 0;
 	spin_lock(&dev->lock);
-	ret = dev->driver->setup(&dev->gadget, &dev->setup_data);
+	dev->driver->setup(&dev->gadget, &dev->setup_data);
 	spin_unlock(&dev->lock);
 }
 
@@ -2687,7 +2681,7 @@ static void pch_udc_svc_intf_interrupt(struct pch_udc_dev *dev)
  */
 static void pch_udc_svc_cfg_interrupt(struct pch_udc_dev *dev)
 {
-	int i, ret;
+	int i;
 	u32 reg, dev_stat = 0;
 
 	dev_stat = pch_udc_read_device_status(dev);
@@ -2713,7 +2707,7 @@ static void pch_udc_svc_cfg_interrupt(struct pch_udc_dev *dev)
 
 	/* call gadget zero with setup data received */
 	spin_lock(&dev->lock);
-	ret = dev->driver->setup(&dev->gadget, &dev->setup_data);
+	dev->driver->setup(&dev->gadget, &dev->setup_data);
 	spin_unlock(&dev->lock);
 }
 
