@@ -3844,6 +3844,11 @@ intel_dp_probe_oui(struct intel_dp *intel_dp)
 				     sizeof(intel_dp->bd.hw_rev)) == sizeof(intel_dp->bd.hw_rev))
 			DRM_DEBUG_KMS("HW revision: %.2d.%.2d\n",
 				      intel_dp->bd.hw_rev & 0xf, (intel_dp->bd.hw_rev>>4) & 0xf);
+
+		if (drm_dp_dpcd_read(&intel_dp->aux, DP_BRANCH_SW_REV, intel_dp->bd.sw_rev,
+				     sizeof(intel_dp->bd.sw_rev)) == sizeof(intel_dp->bd.sw_rev))
+			DRM_DEBUG_KMS("SW revision: %.2d.%.2d\n",
+				      intel_dp->bd.sw_rev[0], intel_dp->bd.sw_rev[1]);
 	}
 }
 
