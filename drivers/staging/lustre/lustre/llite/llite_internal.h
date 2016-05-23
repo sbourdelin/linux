@@ -1402,4 +1402,7 @@ int cl_local_size(struct inode *inode);
 __u64 cl_fid_build_ino(const struct lu_fid *fid, int api32);
 __u32 cl_fid_build_gen(const struct lu_fid *fid);
 
+void posix_acl_fix_xattr_from_user(void *value, size_t size);
+void posix_acl_fix_xattr_to_user(void *value, size_t size);
+
 #endif /* LLITE_INTERNAL_H */

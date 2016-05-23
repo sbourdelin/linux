@@ -3337,10 +3337,25 @@ CIFSSMB_set_compression(const unsigned int xid, struct cifs_tcon *tcon,
 static void cifs_convert_ace(posix_acl_xattr_entry *ace,
 			     struct cifs_posix_ace *cifs_ace)
 {
+	u32 cifs_id, id = -1;
+
 	/* u8 cifs fields do not need le conversion */
 	ace->e_perm = cpu_to_le16(cifs_ace->cifs_e_perm);
 	ace->e_tag  = cpu_to_le16(cifs_ace->cifs_e_tag);
-	ace->e_id   = cpu_to_le32(le64_to_cpu(cifs_ace->cifs_uid));
+	switch(cifs_ace->cifs_e_tag) {
+	case ACL_USER:
+		cifs_id = le64_to_cpu(cifs_ace->cifs_uid);
+		id = from_kuid(current_user_ns(),
+			       make_kuid(&init_user_ns, cifs_id));
+		break;
+
+	case ACL_GROUP:
+		cifs_id = le64_to_cpu(cifs_ace->cifs_uid);
+		id = from_kgid(current_user_ns(),
+			       make_kgid(&init_user_ns, cifs_id));
+		break;
+	}
+	ace->e_id = cpu_to_le32(id);
 /*
 	cifs_dbg(FYI, "perm %d tag %d id %d\n",
 		 ace->e_perm, ace->e_tag, ace->e_id);
@@ -3408,21 +3423,29 @@ static int cifs_copy_posix_acl(char *trgt, char *src, const int buflen,
 static __u16 convert_ace_to_cifs_ace(struct cifs_posix_ace *cifs_ace,
 				     const posix_acl_xattr_entry *local_ace)
 {
-	__u16 rc = 0; /* 0 = ACL converted ok */
+	u32 cifs_id = -1, id;
 
 	cifs_ace->cifs_e_perm = le16_to_cpu(local_ace->e_perm);
 	cifs_ace->cifs_e_tag =  le16_to_cpu(local_ace->e_tag);
-	/* BB is there a better way to handle the large uid? */
-	if (local_ace->e_id == cpu_to_le32(-1)) {
-	/* Probably no need to le convert -1 on any arch but can not hurt */
-		cifs_ace->cifs_uid = cpu_to_le64(-1);
-	} else
-		cifs_ace->cifs_uid = cpu_to_le64(le32_to_cpu(local_ace->e_id));
+	switch(cifs_ace->cifs_e_tag) {
+	case ACL_USER:
+		id = le32_to_cpu(local_ace->e_id);
+		cifs_id = from_kuid(&init_user_ns,
+				    make_kuid(current_user_ns(), id));
+		break;
+
+	case ACL_GROUP:
+		id = le32_to_cpu(local_ace->e_id);
+		cifs_id = from_kgid(&init_user_ns,
+				    make_kgid(current_user_ns(), id));
+		break;
+	}
+	cifs_ace->cifs_uid = cpu_to_le64(cifs_id);
 /*
 	cifs_dbg(FYI, "perm %d tag %d id %d\n",
 		 ace->e_perm, ace->e_tag, ace->e_id);
 */
-	return rc;
+	return 0;
 }
 
 /* Convert ACL from local Linux POSIX xattr to CIFS POSIX ACL wire format */

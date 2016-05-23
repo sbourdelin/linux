@@ -144,6 +144,9 @@ int ll_setxattr_common(struct inode *inode, const char *name,
 		return -EOPNOTSUPP;
 
 #ifdef CONFIG_FS_POSIX_ACL
+	if (xattr_type == XATTR_ACL_ACCESS_T ||
+	    xattr_type == XATTR_ACL_DEFAULT_T)
+		posix_acl_fix_xattr_from_user((void *)value, size);
 	if (sbi->ll_flags & LL_SBI_RMT_CLIENT &&
 	    (xattr_type == XATTR_ACL_ACCESS_T ||
 	    xattr_type == XATTR_ACL_DEFAULT_T)) {
@@ -348,7 +351,7 @@ int ll_getxattr_common(struct inode *inode, const char *name,
 		if (!acl)
 			return -ENODATA;
 
-		rc = posix_acl_to_xattr(&init_user_ns, acl, buffer, size);
+		rc = posix_acl_to_xattr(current_user_ns(), acl, buffer, size);
 		posix_acl_release(acl);
 		return rc;
 	}
@@ -436,6 +439,9 @@ getxattr_nocache:
 			goto out;
 		}
 	}
+	if (rc >= 0 && (xattr_type == XATTR_ACL_ACCESS_T ||
+			xattr_type == XATTR_ACL_DEFAULT_T))
+		posix_acl_fix_xattr_to_user(buffer, rc);
 #endif
 
 out_xattr:
