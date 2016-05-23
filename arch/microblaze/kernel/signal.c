@@ -200,6 +200,7 @@ static int setup_rt_frame(struct ksignal *ksig, sigset_t *set,
 					address), address);
 
 	preempt_disable();
+	invalidate_icache_range(address, address + 8);
 	ptep = pte_offset_map(pmdp, address);
 	if (pte_present(*ptep)) {
 		address = (unsigned long) page_address(pte_page(*ptep));
@@ -207,7 +208,6 @@ static int setup_rt_frame(struct ksignal *ksig, sigset_t *set,
 		address += ((unsigned long)frame->tramp) & ~PAGE_MASK;
 		/* MS address is virtual */
 		address = __virt_to_phys(address);
-		invalidate_icache_range(address, address + 8);
 		flush_dcache_range(address, address + 8);
 	}
 	pte_unmap(ptep);

@@ -106,11 +106,11 @@ static inline void copy_to_user_page(struct vm_area_struct *vma,
 				     struct page *page, unsigned long vaddr,
 				     void *dst, void *src, int len)
 {
-	u32 addr = virt_to_phys(dst);
+	u32 paddr = virt_to_phys(dst);
 	memcpy(dst, src, len);
 	if (vma->vm_flags & VM_EXEC) {
-		invalidate_icache_range(addr, addr + PAGE_SIZE);
-		flush_dcache_range(addr, addr + PAGE_SIZE);
+		invalidate_icache_range(vaddr, vaddr + PAGE_SIZE);
+		flush_dcache_range(paddr, paddr + PAGE_SIZE);
 	}
 }
 
