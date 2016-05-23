@@ -40,6 +40,7 @@ enum klp_state {
  * @old_sympos: a hint indicating which symbol position the old function
  *		can be found (optional)
  * @old_addr:	the address of the function being patched
+ * @list:	list node for the list of patched functions in an object
  * @kobj:	kobject for sysfs resources
  * @state:	tracks function-level patch application state
  * @stack_node:	list node for klp_ops func_stack list
@@ -59,15 +60,17 @@ struct klp_func {
 
 	/* internal */
 	unsigned long old_addr;
+	struct list_head list;
+	struct list_head stack_node;
 	struct kobject kobj;
 	enum klp_state state;
-	struct list_head stack_node;
 };
 
 /**
  * struct klp_object - kernel object structure for live patching
  * @name:	module name (or NULL for vmlinux)
  * @funcs:	function entries for functions to be patched in the object
+ * @list:	list node for the list of patched objects
  * @kobj:	kobject for sysfs resources
  * @mod:	kernel module associated with the patched object
  * 		(NULL for vmlinux)
@@ -76,9 +79,10 @@ struct klp_func {
 struct klp_object {
 	/* external */
 	const char *name;
-	struct klp_func *funcs;
 
 	/* internal */
+	struct list_head funcs;
+	struct list_head list;
 	struct kobject kobj;
 	struct module *mod;
 	enum klp_state state;
@@ -95,30 +99,74 @@ struct klp_object {
 struct klp_patch {
 	/* external */
 	struct module *mod;
-	struct klp_object *objs;
 
 	/* internal */
+	struct list_head objs;
 	struct list_head list;
 	struct kobject kobj;
 	enum klp_state state;
 };
 
-#define klp_for_each_object(patch, obj) \
-	for (obj = patch->objs; obj->funcs || obj->name; obj++)
-
-#define klp_for_each_func(obj, func) \
-	for (func = obj->funcs; \
-	     func->old_name || func->new_func || func->old_sympos; \
-	     func++)
+struct klp_patch *klp_create_empty_patch(struct module *mod);
+struct klp_object *klp_add_object(struct klp_patch *patch,
+				  const char *name);
+struct klp_func *klp_add_func(struct klp_object *obj,
+			      const char *old_name,
+			      void *new_func,
+			      unsigned long old_sympos);
 
 int klp_register_patch(struct klp_patch *);
-int klp_unregister_patch(struct klp_patch *);
+int klp_release_patch(struct klp_patch *);
 int klp_enable_patch(struct klp_patch *);
 int klp_disable_patch(struct klp_patch *);
 
 /* Called from the module loader during module coming/going states */
 int klp_module_coming(struct module *mod);
 void klp_module_going(struct module *mod);
+
+#define klp_create_patch_or_die(mod)					\
+({									\
+	struct klp_patch *__patch;					\
+									\
+	__patch = klp_create_empty_patch(mod);				\
+	if (IS_ERR(__patch)) {						\
+		pr_err("livepatch: failed to create empty patch (%ld)\n", \
+		       PTR_ERR(__patch));				\
+		return PTR_ERR(__patch);				\
+	}								\
+	__patch;							\
+})
+
+#define klp_add_object_or_die(patch, obj_name)				\
+({									\
+	struct klp_object *__obj;					\
+									\
+	__obj = klp_add_object(patch, obj_name);			\
+	if (IS_ERR(__obj)) {						\
+		pr_err("livepatch: failed to add the object '%s' for the patch '%s' (%ld)\n", \
+		       obj_name ? obj_name : "vmlinux",			\
+		       patch->mod->name, PTR_ERR(__obj));		\
+		WARN_ON(klp_release_patch(patch));			\
+		return PTR_ERR(__obj);					\
+	}								\
+	__obj;								\
+})
+
+#define klp_add_func_or_die(patch, obj, old_name, new_func, sympos)	\
+({									\
+	struct klp_func *__func;					\
+									\
+	__func = klp_add_func(obj, old_name, new_func, sympos);		\
+	if (IS_ERR(__func)) {						\
+		pr_err("livepatch: failed to add the function '%s' for the object '%s' in the patch '%s' (%ld)\n", \
+		       old_name ? old_name : "NULL",			\
+		       obj->name ? obj->name : "vmlinux",		\
+		       patch->mod->name, PTR_ERR(__func));		\
+		WARN_ON(klp_release_patch(patch));			\
+		return PTR_ERR(__func);					\
+	}								\
+	__func;								\
+})
 
 #else /* !CONFIG_LIVEPATCH */
 

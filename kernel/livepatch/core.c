@@ -451,7 +451,7 @@ static void klp_disable_object(struct klp_object *obj)
 {
 	struct klp_func *func;
 
-	klp_for_each_func(obj, func)
+	list_for_each_entry(func, &obj->funcs, list)
 		if (func->state == KLP_ENABLED)
 			klp_disable_func(func);
 
@@ -469,7 +469,7 @@ static int klp_enable_object(struct klp_object *obj)
 	if (WARN_ON(!klp_is_object_loaded(obj)))
 		return -EINVAL;
 
-	klp_for_each_func(obj, func) {
+	list_for_each_entry(func, &obj->funcs, list) {
 		ret = klp_enable_func(func);
 		if (ret) {
 			klp_disable_object(obj);
@@ -492,7 +492,7 @@ static int __klp_disable_patch(struct klp_patch *patch)
 
 	pr_notice("disabling patch '%s'\n", patch->mod->name);
 
-	klp_for_each_object(patch, obj) {
+	list_for_each_entry(obj, &patch->objs, list) {
 		if (obj->state == KLP_ENABLED)
 			klp_disable_object(obj);
 	}
@@ -552,7 +552,7 @@ static int __klp_enable_patch(struct klp_patch *patch)
 
 	pr_notice("enabling patch '%s'\n", patch->mod->name);
 
-	klp_for_each_object(patch, obj) {
+	list_for_each_entry(obj, &patch->objs, list) {
 		if (!klp_is_object_loaded(obj))
 			continue;
 
@@ -668,10 +668,13 @@ static struct attribute *klp_patch_attrs[] = {
 
 static void klp_kobj_release_patch(struct kobject *kobj)
 {
+	struct klp_patch *patch = container_of(kobj, struct klp_patch, kobj);
+
 	/*
 	 * Once we have a consistency model we'll need to module_put() the
 	 * patch module here.  See klp_register_patch() for more details.
 	 */
+	kfree(patch);
 }
 
 static struct kobj_type klp_ktype_patch = {
@@ -682,6 +685,10 @@ static struct kobj_type klp_ktype_patch = {
 
 static void klp_kobj_release_object(struct kobject *kobj)
 {
+	struct klp_object *obj = container_of(kobj, struct klp_object, kobj);
+
+	kfree(obj->name);
+	kfree(obj);
 }
 
 static struct kobj_type klp_ktype_object = {
@@ -691,6 +698,10 @@ static struct kobj_type klp_ktype_object = {
 
 static void klp_kobj_release_func(struct kobject *kobj)
 {
+	struct klp_func *func = container_of(kobj, struct klp_func, kobj);
+
+	kfree(func->old_name);
+	kfree(func);
 }
 
 static struct kobj_type klp_ktype_func = {
@@ -699,60 +710,89 @@ static struct kobj_type klp_ktype_func = {
 };
 
 /*
- * Free all functions' kobjects in the array up to some limit. When limit is
- * NULL, all kobjects are freed.
+ * Free all klp_func structures listed for the given object.  It is called
+ * also when the patch creation or registration fails and some kobjects are
+ * not initialized.  For these, the release function must be called directly.
  */
-static void klp_free_funcs_limited(struct klp_object *obj,
-				   struct klp_func *limit)
+static void klp_release_funcs(struct klp_object *obj)
 {
-	struct klp_func *func;
+	struct klp_func *func, *tmp;
 
-	for (func = obj->funcs; func->old_name && func != limit; func++)
-		kobject_put(&func->kobj);
+	list_for_each_entry_safe(func, tmp, &obj->funcs, list) {
+		list_del(&func->list);
+		if (func->kobj.state_initialized)
+			kobject_put(&func->kobj);
+		else
+			klp_kobj_release_func(&func->kobj);
+	}
 }
 
 /* Clean up when a patched object is unloaded */
-static void klp_free_object_loaded(struct klp_object *obj)
+static void klp_unregister_object_loaded(struct klp_object *obj)
 {
 	struct klp_func *func;
 
 	obj->mod = NULL;
 
-	klp_for_each_func(obj, func)
+	list_for_each_entry(func, &obj->funcs, list)
 		func->old_addr = 0;
 }
 
 /*
- * Free all objects' kobjects in the array up to some limit. When limit is
- * NULL, all kobjects are freed.
+ * Free all klp_object structures listed for the given patch.  It is called
+ * also when the patch creation or registration fails and some kobjects are
+ * not initialized.  For these, the release function must be called directly.
  */
-static void klp_free_objects_limited(struct klp_patch *patch,
-				     struct klp_object *limit)
+static void klp_release_objects(struct klp_patch *patch)
 {
-	struct klp_object *obj;
+	struct klp_object *obj, *tmp;
 
-	for (obj = patch->objs; obj->funcs && obj != limit; obj++) {
-		klp_free_funcs_limited(obj, NULL);
-		kobject_put(&obj->kobj);
+	list_for_each_entry_safe(obj, tmp, &patch->objs, list) {
+		klp_release_funcs(obj);
+		list_del(&obj->list);
+		if (obj->kobj.state_initialized)
+			kobject_put(&obj->kobj);
+		else
+			klp_kobj_release_object(&obj->kobj);
 	}
 }
 
-static void klp_free_patch(struct klp_patch *patch)
+/**
+ * klp_release_patch() - unregisters a patch and frees all structures
+ * @patch:	Disabled patch to be released
+ *
+ * Removes the patch from the global list, removes the sysfs interface
+ * and frees all the data structures for the patch, objects, and functions.
+ *
+ * Return: 0 on success, otherwise error
+ */
+int klp_release_patch(struct klp_patch *patch)
 {
-	klp_free_objects_limited(patch, NULL);
+	int ret = 0;
+
+	mutex_lock(&klp_mutex);
+
+	if (patch->state == KLP_ENABLED) {
+		ret = -EBUSY;
+		goto err;
+	}
+
+	klp_release_objects(patch);
 	if (!list_empty(&patch->list))
 		list_del(&patch->list);
-	kobject_put(&patch->kobj);
+	if (patch->kobj.state_initialized)
+		kobject_put(&patch->kobj);
+	else
+		klp_kobj_release_patch(&patch->kobj);
+
+err:
+	mutex_unlock(&klp_mutex);
+	return ret;
 }
+EXPORT_SYMBOL_GPL(klp_release_patch);
 
-static int klp_init_func(struct klp_object *obj, struct klp_func *func)
+static int klp_register_func(struct klp_object *obj, struct klp_func *func)
 {
-	if (!func->old_name || !func->new_func)
-		return -EINVAL;
-
-	INIT_LIST_HEAD(&func->stack_node);
-	func->state = KLP_DISABLED;
-
 	/* The format for the sysfs directory is <function,sympos> where sympos
 	 * is the nth occurrence of this symbol in kallsyms for the patched
 	 * object. If the user selects 0 for old_sympos, then 1 will be used
@@ -764,7 +804,7 @@ static int klp_init_func(struct klp_object *obj, struct klp_func *func)
 }
 
 /* parts of the initialization that is done only when the object is loaded */
-static int klp_init_object_loaded(struct klp_patch *patch,
+static int klp_register_object_loaded(struct klp_patch *patch,
 				  struct klp_object *obj)
 {
 	struct klp_func *func;
@@ -774,7 +814,7 @@ static int klp_init_object_loaded(struct klp_patch *patch,
 	if (ret)
 		return ret;
 
-	klp_for_each_func(obj, func) {
+	list_for_each_entry(func, &obj->funcs, list) {
 		ret = klp_find_object_symbol(obj->name, func->old_name,
 					     func->old_sympos,
 					     &func->old_addr);
@@ -785,17 +825,11 @@ static int klp_init_object_loaded(struct klp_patch *patch,
 	return 0;
 }
 
-static int klp_init_object(struct klp_patch *patch, struct klp_object *obj)
+static int klp_register_object(struct klp_patch *patch, struct klp_object *obj)
 {
 	struct klp_func *func;
 	int ret;
 	const char *name;
-
-	if (!obj->funcs)
-		return -EINVAL;
-
-	obj->state = KLP_DISABLED;
-	obj->mod = NULL;
 
 	klp_find_object_module(obj);
 
@@ -805,116 +839,35 @@ static int klp_init_object(struct klp_patch *patch, struct klp_object *obj)
 	if (ret)
 		return ret;
 
-	klp_for_each_func(obj, func) {
-		ret = klp_init_func(obj, func);
+	list_for_each_entry(func, &obj->funcs, list) {
+		ret = klp_register_func(obj, func);
 		if (ret)
-			goto free;
+			return ret;
 	}
 
-	if (klp_is_object_loaded(obj)) {
-		ret = klp_init_object_loaded(patch, obj);
-		if (ret)
-			goto free;
-	}
+	if (klp_is_object_loaded(obj))
+		ret = klp_register_object_loaded(patch, obj);
 
-	return 0;
-
-free:
-	klp_free_funcs_limited(obj, func);
-	kobject_put(&obj->kobj);
 	return ret;
 }
-
-static int klp_init_patch(struct klp_patch *patch)
-{
-	struct klp_object *obj;
-	int ret;
-
-	if (!patch->objs)
-		return -EINVAL;
-
-	mutex_lock(&klp_mutex);
-
-	patch->state = KLP_DISABLED;
-
-	ret = kobject_init_and_add(&patch->kobj, &klp_ktype_patch,
-				   klp_root_kobj, "%s", patch->mod->name);
-	if (ret)
-		goto unlock;
-
-	klp_for_each_object(patch, obj) {
-		ret = klp_init_object(patch, obj);
-		if (ret)
-			goto free;
-	}
-
-	list_add_tail(&patch->list, &klp_patches);
-
-	mutex_unlock(&klp_mutex);
-
-	return 0;
-
-free:
-	klp_free_objects_limited(patch, obj);
-	kobject_put(&patch->kobj);
-unlock:
-	mutex_unlock(&klp_mutex);
-	return ret;
-}
-
-/**
- * klp_unregister_patch() - unregisters a patch
- * @patch:	Disabled patch to be unregistered
- *
- * Frees the data structures and removes the sysfs interface.
- *
- * Return: 0 on success, otherwise error
- */
-int klp_unregister_patch(struct klp_patch *patch)
-{
-	int ret = 0;
-
-	mutex_lock(&klp_mutex);
-
-	if (!klp_is_patch_registered(patch)) {
-		ret = -EINVAL;
-		goto out;
-	}
-
-	if (patch->state == KLP_ENABLED) {
-		ret = -EBUSY;
-		goto out;
-	}
-
-	klp_free_patch(patch);
-
-out:
-	mutex_unlock(&klp_mutex);
-	return ret;
-}
-EXPORT_SYMBOL_GPL(klp_unregister_patch);
 
 /**
  * klp_register_patch() - registers a patch
  * @patch:	Patch to be registered
  *
- * Initializes the data structure associated with the patch and
- * creates the sysfs interface.
+ * Creates sysfs interface for the given patch, detects missing
+ * information for loaded objects, links the patch to the global list.
+ *
+ * Never add new objects of functions once the patch gets registered.
+ * These operations are not safe wrt coming or leaving modules and
+ * also wrt enabling or disabling the patch.
  *
  * Return: 0 on success, otherwise error
  */
 int klp_register_patch(struct klp_patch *patch)
 {
+	struct klp_object *obj;
 	int ret;
-
-	if (!patch || !patch->mod)
-		return -EINVAL;
-
-	if (!is_livepatch_module(patch->mod)) {
-		pr_err("module %s is not marked as a livepatch module",
-		       patch->mod->name);
-		return -EINVAL;
-	}
 
 	if (!klp_initialized())
 		return -ENODEV;
@@ -929,13 +882,171 @@ int klp_register_patch(struct klp_patch *patch)
 	if (!try_module_get(patch->mod))
 		return -ENODEV;
 
-	ret = klp_init_patch(patch);
+	mutex_lock(&klp_mutex);
+
+	if (klp_is_patch_registered(patch)) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	ret = kobject_init_and_add(&patch->kobj, &klp_ktype_patch,
+				   klp_root_kobj, "%s", patch->mod->name);
 	if (ret)
-		module_put(patch->mod);
+		goto err;
+
+	list_for_each_entry(obj, &patch->objs, list) {
+		ret = klp_register_object(patch, obj);
+		if (ret)
+			goto err;
+	}
+
+	list_add_tail(&patch->list, &klp_patches);
+
+err:
+	mutex_unlock(&klp_mutex);
 
 	return ret;
 }
 EXPORT_SYMBOL_GPL(klp_register_patch);
+
+/**
+ * klp_add_func() - allocate and initialize struct klp_func, link it into
+ *	the given object structure
+ * @obj:	object structure where the patched function belongs to
+ * @old_name:	name of the function to be patched
+ * @new_func:	pointer to the new function code
+ * @old_sympos: a hint indicating which symbol position the old function
+ *		can be found
+ *
+ * Allocates and initializes struct klp_func. Then it links the structure
+ * into the given object structure.
+ *
+ * The structure must be freed only using klp_release_patch() called for
+ * the related patch structure!
+ *
+ * Never add new functions once the patch is registered! You would risk
+ * an inconsistent state wrt coming or leaving modules and also wrt
+ * enabling or disabling the patch.
+ *
+ * Return: valid pointer on success, ERR_PTR otherwise.
+ */
+struct klp_func *klp_add_func(struct klp_object *obj, const char *old_name,
+			      void *new_func, unsigned long old_sympos)
+{
+	struct klp_func *func;
+
+	if (!obj || !old_name || !new_func || obj->state == KLP_ENABLED)
+		return ERR_PTR(-EINVAL);
+
+	func = kzalloc(sizeof(*func), GFP_KERNEL);
+	if (!func)
+		return ERR_PTR(-ENOMEM);
+
+	func->old_name = kstrdup(old_name, GFP_KERNEL);
+	if (!func->old_name) {
+		kfree(func);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	func->new_func = new_func;
+	func->old_sympos = old_sympos;
+	INIT_LIST_HEAD(&func->list);
+	INIT_LIST_HEAD(&func->stack_node);
+	func->state = KLP_DISABLED;
+
+	list_add(&func->list, &obj->funcs);
+
+	return func;
+}
+EXPORT_SYMBOL_GPL(klp_add_func);
+
+/**
+ * klp_add_object() - allocate and initialize struct klp_object, link it into
+ *	to the given patch
+ * &patch	patch structure that will modify the given object
+ * @name:	name of the patched object, it is a name of a kernel module
+ *		or NULL for vmlinux
+ *
+ * Allocates and initializes struct klp_object. Links the structure
+ * into the given patch structure.
+ *
+ * The structure must be freed only using klp_release_patch() called for
+ * the related patch structure!
+ *
+ * Never add new objects once the patch is registered! You would risk
+ * an inconsistent state wrt coming or leaving modules and also wrt
+ * enabling or disabling the patch.
+ *
+ * Return: valid pointer on success, ERR_PTR otherwise.
+ */
+struct klp_object *klp_add_object(struct klp_patch *patch, const char *name)
+{
+	struct klp_object *obj;
+
+	if (!patch || !list_empty(&patch->list))
+		return ERR_PTR(-EINVAL);
+
+	obj = kzalloc(sizeof(*obj), GFP_KERNEL);
+	if (!obj)
+		return ERR_PTR(-ENOMEM);
+
+	if (name) {
+		obj->name = kstrdup(name, GFP_KERNEL);
+		if (!obj->name) {
+			kfree(obj);
+			return ERR_PTR(-ENOMEM);
+		}
+	}
+
+	INIT_LIST_HEAD(&obj->funcs);
+	INIT_LIST_HEAD(&obj->list);
+	obj->state = KLP_DISABLED;
+	obj->mod = NULL;
+
+	list_add(&obj->list, &patch->objs);
+
+	return obj;
+}
+EXPORT_SYMBOL_GPL(klp_add_object);
+
+/**
+ * klp_create_empty_patch() - allocate and initialize struct klp_patch
+ * @mod:	kernel module that provides the livepatch
+ *
+ * Allocates and initializes struct klp_patch. The links to the patched
+ * objects and functions can be added using klp_add_object() and
+ * klp_add_func().
+ *
+ * The structure must be freed only using klp_release_patch()!
+ *
+ * Return: valid pointer on success, ERR_PTR otherwise.
+ */
+struct klp_patch *klp_create_empty_patch(struct module *mod)
+{
+	struct klp_patch *patch;
+
+	if (!mod)
+		return ERR_PTR(-EINVAL);
+
+	if (!is_livepatch_module(mod)) {
+		pr_err("module '%s' is not marked as a livepatch module\n",
+		       mod->name);
+		return ERR_PTR(-EINVAL);
+	}
+
+	patch = kzalloc(sizeof(*patch), GFP_KERNEL);
+	if (!patch)
+		return ERR_PTR(-ENOMEM);
+
+	INIT_LIST_HEAD(&patch->objs);
+	INIT_LIST_HEAD(&patch->list);
+	patch->state = KLP_DISABLED;
+	patch->mod = mod;
+
+	return patch;
+
+}
+EXPORT_SYMBOL_GPL(klp_create_empty_patch);
 
 int klp_module_coming(struct module *mod)
 {
@@ -955,13 +1066,13 @@ int klp_module_coming(struct module *mod)
 	mod->klp_alive = true;
 
 	list_for_each_entry(patch, &klp_patches, list) {
-		klp_for_each_object(patch, obj) {
+		list_for_each_entry(obj, &patch->objs, list) {
 			if (!klp_is_module(obj) || strcmp(obj->name, mod->name))
 				continue;
 
 			obj->mod = mod;
 
-			ret = klp_init_object_loaded(patch, obj);
+			ret = klp_register_object_loaded(patch, obj);
 			if (ret) {
 				pr_warn("failed to initialize patch '%s' for module '%s' (%d)\n",
 					patch->mod->name, obj->mod->name, ret);
@@ -997,7 +1108,7 @@ err:
 	pr_warn("patch '%s' failed for module '%s', refusing to load module '%s'\n",
 		patch->mod->name, obj->mod->name, obj->mod->name);
 	mod->klp_alive = false;
-	klp_free_object_loaded(obj);
+	klp_unregister_object_loaded(obj);
 	mutex_unlock(&klp_mutex);
 
 	return ret;
@@ -1021,7 +1132,7 @@ void klp_module_going(struct module *mod)
 	mod->klp_alive = false;
 
 	list_for_each_entry(patch, &klp_patches, list) {
-		klp_for_each_object(patch, obj) {
+		list_for_each_entry(obj, &patch->objs, list) {
 			if (!klp_is_module(obj) || strcmp(obj->name, mod->name))
 				continue;
 
@@ -1031,7 +1142,7 @@ void klp_module_going(struct module *mod)
 				klp_disable_object(obj);
 			}
 
-			klp_free_object_loaded(obj);
+			klp_unregister_object_loaded(obj);
 			break;
 		}
 	}

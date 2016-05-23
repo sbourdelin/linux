@@ -149,55 +149,39 @@ static ssize_t livepatch_b_show(struct kobject *kobj,
 	return sprintf(buf, "%s: this has been livepatched\n", attr->attr.name);
 }
 
-static struct klp_func funcs[] = {
-	{
-		.old_name = "cmdline_proc_show",
-		.new_func = livepatch_cmdline_proc_show,
-	}, {
-		.old_name = "uptime_proc_show",
-		.new_func = livepatch_uptime_proc_show,
-	}, {
-		.old_name = "show_console_dev",
-		.new_func = livepatch_show_console_dev,
-	}, { }
-};
-
-static struct klp_func kobject_example_funcs[] = {
-	{
-		.old_name = "foo_show",
-		.new_func = livepatch_foo_show,
-	}, {
-		.old_name = "b_show",
-		.new_func = livepatch_b_show,
-	}, { }
-};
-
-
-static struct klp_object objs[] = {
-	{
-		/* name being NULL means vmlinux */
-		.funcs = funcs,
-	}, {
-		.name = "kobject_example",
-		.funcs = kobject_example_funcs,
-	}, { }
-};
-
-static struct klp_patch patch = {
-	.mod = THIS_MODULE,
-	.objs = objs,
-};
+static struct klp_patch *patch;
 
 static int livepatch_init(void)
 {
+	struct klp_object *obj;
 	int ret;
 
-	ret = klp_register_patch(&patch);
-	if (ret)
-		return ret;
-	ret = klp_enable_patch(&patch);
+	/* create empty patch structure */
+	patch = klp_create_patch_or_die(THIS_MODULE);
+
+	/* add info about changes against vmlinux */
+	obj = klp_add_object_or_die(patch, NULL);
+	klp_add_func_or_die(patch, obj, "cmdline_proc_show",
+			    livepatch_cmdline_proc_show, 0);
+	klp_add_func_or_die(patch, obj, "uptime_proc_show",
+			    livepatch_uptime_proc_show, 0);
+	klp_add_func_or_die(patch, obj, "show_console_dev",
+			    livepatch_show_console_dev, 0);
+
+	/* add info about changes against the module kobject_example */
+	obj = klp_add_object_or_die(patch, "kobject_example");
+	klp_add_func_or_die(patch, obj, "foo_show", livepatch_foo_show, 0);
+	klp_add_func_or_die(patch, obj, "b_show", livepatch_b_show, 0);
+
+	ret = klp_register_patch(patch);
 	if (ret) {
-		WARN_ON(klp_unregister_patch(&patch));
+		WARN_ON(klp_release_patch(patch));
+		return ret;
+	}
+
+	ret = klp_enable_patch(patch);
+	if (ret) {
+		WARN_ON(klp_release_patch(patch));
 		return ret;
 	}
 	return 0;
@@ -205,8 +189,8 @@ static int livepatch_init(void)
 
 static void livepatch_exit(void)
 {
-	WARN_ON(klp_disable_patch(&patch));
-	WARN_ON(klp_unregister_patch(&patch));
+	WARN_ON(klp_disable_patch(patch));
+	WARN_ON(klp_release_patch(patch));
 }
 
 module_init(livepatch_init);
