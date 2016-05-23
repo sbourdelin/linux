@@ -421,7 +421,7 @@ int hfi1_make_rc_req(struct rvt_qp *qp, struct hfi1_pkt_state *ps)
 			goto bail;
 		/* We are in the error state, flush the work request. */
 		smp_read_barrier_depends(); /* see post_one_send() */
-		if (qp->s_last == ACCESS_ONCE(qp->s_head))
+		if (qp->s_last == READ_ONCE(qp->s_head))
 			goto bail;
 		/* If DMAs are in progress, we can't flush immediately. */
 		if (iowait_sdma_pending(&priv->s_iowait)) {
@@ -1103,7 +1103,7 @@ void hfi1_rc_send_complete(struct rvt_qp *qp, struct hfi1_ib_header *hdr)
 	struct hfi1_other_headers *ohdr;
 	struct rvt_swqe *wqe;
 	struct ib_wc wc;
-	unsigned i;
+	unsigned int i;
 	u32 opcode;
 	u32 psn;
 
@@ -1196,7 +1196,7 @@ static struct rvt_swqe *do_rc_completion(struct rvt_qp *qp,
 					 struct hfi1_ibport *ibp)
 {
 	struct ib_wc wc;
-	unsigned i;
+	unsigned int i;
 
 	/*
 	 * Don't decrement refcount and don't generate a
@@ -1571,7 +1571,7 @@ static void rc_rcv_resp(struct hfi1_ibport *ibp,
 
 	/* Ignore invalid responses. */
 	smp_read_barrier_depends(); /* see post_one_send */
-	if (cmp_psn(psn, ACCESS_ONCE(qp->s_next_psn)) >= 0)
+	if (cmp_psn(psn, READ_ONCE(qp->s_next_psn)) >= 0)
 		goto ack_done;
 
 	/* Ignore duplicate responses. */
@@ -1970,9 +1970,9 @@ void hfi1_rc_error(struct rvt_qp *qp, enum ib_wc_status err)
 	}
 }
 
-static inline void update_ack_queue(struct rvt_qp *qp, unsigned n)
+static inline void update_ack_queue(struct rvt_qp *qp, unsigned int n)
 {
-	unsigned next;
+	unsigned int next;
 
 	next = n + 1;
 	if (next > HFI1_MAX_RDMA_ATOMIC)

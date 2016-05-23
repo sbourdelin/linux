@@ -239,7 +239,7 @@ bail:
 	return ret;
 }
 
-static __be64 get_sguid(struct hfi1_ibport *ibp, unsigned index)
+static __be64 get_sguid(struct hfi1_ibport *ibp, unsigned int index)
 {
 	if (!index) {
 		struct hfi1_pportdata *ppd = ppd_from_ibp(ibp);
@@ -393,7 +393,7 @@ static void ruc_loopback(struct rvt_qp *sqp)
 
 again:
 	smp_read_barrier_depends(); /* see post_one_send() */
-	if (sqp->s_last == ACCESS_ONCE(sqp->s_head))
+	if (sqp->s_last == READ_ONCE(sqp->s_head))
 		goto clr_busy;
 	wqe = rvt_get_swqe_ptr(sqp, sqp->s_last);
 
@@ -927,7 +927,7 @@ void hfi1_send_complete(struct rvt_qp *qp, struct rvt_swqe *wqe,
 			enum ib_wc_status status)
 {
 	u32 old_last, last;
-	unsigned i;
+	unsigned int i;
 
 	if (!(ib_rvt_state_ops[qp->state] & RVT_PROCESS_OR_FLUSH_SEND))
 		return;
