@@ -248,6 +248,7 @@ static noinline void do_sigsegv(struct pt_regs *regs, int si_code)
 	si.si_signo = SIGSEGV;
 	si.si_code = si_code;
 	si.si_addr = (void __user *)(regs->int_parm_long & __FAIL_ADDR_MASK);
+	si.si_errno = 0;
 	force_sig_info(SIGSEGV, &si, current);
 }
 
