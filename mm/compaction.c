@@ -1260,13 +1260,6 @@ static unsigned long __compaction_suitable(struct zone *zone, int order,
 		return COMPACT_CONTINUE;
 
 	watermark = low_wmark_pages(zone);
-	/*
-	 * If watermarks for high-order allocation are already met, there
-	 * should be no need for compaction at all.
-	 */
-	if (zone_watermark_ok(zone, order, watermark, classzone_idx,
-								alloc_flags))
-		return COMPACT_PARTIAL;
 
 	/*
 	 * Watermarks for order-0 must be met for compaction. Note the 2UL.
