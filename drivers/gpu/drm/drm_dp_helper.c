@@ -464,6 +464,10 @@ int drm_dp_bd(struct drm_dp_aux *aux, struct drm_dp_bd *bd)
 			bd->dfp.hdmi.ycbcr420_pass_through = info[3] & YCBCR420_PASS_THROUGH;
 			bd->dfp.hdmi.conversion_from_ycbcr444_to_ycbcr422 = info[3] & YCBCR444_TO_YCBCR422;
 			bd->dfp.hdmi.conversion_from_ycbcr444_to_ycbcr420 = info[3] & YCBCR444_TO_YCBCR420;
+		} else if (bd->type & DP_DS_PORT_TYPE_DP_DUALMODE) {
+			bd->dfp.dual_mode.tmds_clk = info[1] * 2500;
+			bd->dfp.dual_mode.bpc = info[2] & DP_DS_VGA_MAX_BPC_MASK;
+			bd->dfp.dual_mode.frame_seq_to_frame_pack = info[3] & FRAME_SEQ_TO_FRAME_PACK;
 		}
 	}
 
