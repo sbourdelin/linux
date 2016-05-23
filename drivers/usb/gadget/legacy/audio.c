@@ -55,6 +55,21 @@ MODULE_PARM_DESC(c_ssize, "Capture Sample Size(bytes)");
 #else
 #include "u_uac1.h"
 
+/* Playback(USB-IN) Default Stereo - Fl/Fr */
+static int p_chmask = UAC1_DEF_PCHMASK;
+module_param(p_chmask, uint, S_IRUGO);
+MODULE_PARM_DESC(p_chmask, "Playback Channel Mask");
+
+/* Playback Default 48 KHz */
+static int p_srate = UAC1_DEF_PSRATE;
+module_param(p_srate, uint, S_IRUGO);
+MODULE_PARM_DESC(p_srate, "Playback Sampling Rate");
+
+/* Playback Default 16bits/sample */
+static int p_ssize = UAC1_DEF_PSSIZE;
+module_param(p_ssize, uint, S_IRUGO);
+MODULE_PARM_DESC(p_ssize, "Playback Sample Size(bytes)");
+
 /* Capture(USB-OUT) Default Stereo - Fl/Fr */
 static int c_chmask = UAC1_DEF_CCHMASK;
 module_param(c_chmask, uint, S_IRUGO);
@@ -222,6 +237,9 @@ static int audio_bind(struct usb_composite_dev *cdev)
 	uac2_opts->c_ssize = c_ssize;
 #else
 	uac1_opts = container_of(fi_uac1, struct f_uac1_opts, func_inst);
+	uac1_opts->p_chmask = p_chmask;
+	uac1_opts->p_srate = p_srate;
+	uac1_opts->p_ssize = p_ssize;
 	uac1_opts->c_chmask = c_chmask;
 	uac1_opts->c_srate = c_srate;
 	uac1_opts->c_ssize = c_ssize;

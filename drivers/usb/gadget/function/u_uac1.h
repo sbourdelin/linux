@@ -21,6 +21,9 @@
 #define UAC1_DEF_CCHMASK	0x3
 #define UAC1_DEF_CSRATE		48000
 #define UAC1_DEF_CSSIZE		2
+#define UAC1_DEF_PCHMASK	0x3
+#define UAC1_DEF_PSRATE		48000
+#define UAC1_DEF_PSSIZE		2
 
 
 struct f_uac1_opts {
@@ -28,6 +31,9 @@ struct f_uac1_opts {
 	int				c_chmask;
 	int				c_srate;
 	int				c_ssize;
+	int				p_chmask;
+	int				p_srate;
+	int				p_ssize;
 	unsigned			bound:1;
 
 	struct mutex			lock;
