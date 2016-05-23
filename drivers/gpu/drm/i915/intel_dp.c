@@ -206,6 +206,8 @@ intel_dp_mode_valid(struct drm_connector *connector,
 	int max_rate, mode_rate, max_lanes, max_link_clock;
 	int max_dotclk = to_i915(connector->dev)->max_dotclk_freq;
 
+	max_dotclk = drm_dp_max_sink_dotclock(max_dotclk, &intel_dp->bd);
+
 	if (is_edp(intel_dp) && fixed_mode) {
 		if (mode->hdisplay > fixed_mode->hdisplay)
 			return MODE_PANEL;
@@ -4952,6 +4954,7 @@ intel_dp_hpd_pulse(struct intel_digital_port *intel_dig_port, bool long_hpd)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	enum intel_display_power_domain power_domain;
 	enum irqreturn ret = IRQ_NONE;
+	int err;
 
 	if (intel_dig_port->base.type != INTEL_OUTPUT_EDP &&
 	    intel_dig_port->base.type != INTEL_OUTPUT_HDMI)
@@ -4975,6 +4978,10 @@ intel_dp_hpd_pulse(struct intel_digital_port *intel_dig_port, bool long_hpd)
 
 	power_domain = intel_display_port_aux_power_domain(intel_encoder);
 	intel_display_power_get(dev_priv, power_domain);
+
+	err = drm_dp_bd(&intel_dp->aux, &intel_dp->bd);
+	if (err < 0)
+		DRM_DEBUG_KMS("error reading DPCD[0x80] for DP branch device\n");
 
 	if (long_hpd) {
 		/* indicate that we need to restart link training */
