@@ -413,6 +413,28 @@ int drm_dp_link_power_down(struct drm_dp_aux *aux, struct drm_dp_link *link)
 EXPORT_SYMBOL(drm_dp_link_power_down);
 
 /*
+ * drm_dp_max_sink_dotclock() - Compute max pixel rate
+ * @dotclk: reference pixel rate
+ * @bd: pointer to a structure containing DP branch device information
+ *
+ * Returns max supported pixel rate.
+ */
+int drm_dp_max_sink_dotclock(int dotclk, struct drm_dp_bd *bd)
+{
+	int max_dotclk = dotclk;
+
+	/* DP to VGA dongle may define max pixel rate in DPCD */
+	if (bd->present) {
+		if ((bd->type & DP_DS_PORT_TYPE_VGA) &&
+		    (bd->dfp.vga.dot_clk > 0))
+			max_dotclk = min(dotclk, bd->dfp.vga.dot_clk);
+	}
+
+	return max_dotclk;
+}
+EXPORT_SYMBOL(drm_dp_max_sink_dotclock);
+
+/*
  * drm_dp_bd() - read DisplayPort Receiver Capability Fields for
  * DP branch devices
  * @aux: DisplayPort AUX channel

@@ -881,6 +881,7 @@ int drm_dp_link_probe(struct drm_dp_aux *aux, struct drm_dp_link *link);
 int drm_dp_link_power_up(struct drm_dp_aux *aux, struct drm_dp_link *link);
 int drm_dp_link_power_down(struct drm_dp_aux *aux, struct drm_dp_link *link);
 int drm_dp_link_configure(struct drm_dp_aux *aux, struct drm_dp_link *link);
+int drm_dp_max_sink_dotclock(int dotclk, struct drm_dp_bd *bd);
 int drm_dp_bd(struct drm_dp_aux *aux, struct drm_dp_bd *bd);
 
 int drm_dp_aux_register(struct drm_dp_aux *aux);
