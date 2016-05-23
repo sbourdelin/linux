@@ -57,6 +57,11 @@ static int tas571x_register_size(struct tas571x_private *priv, unsigned int reg)
 	case TAS571X_CH1_VOL_REG:
 	case TAS571X_CH2_VOL_REG:
 		return priv->chip->vol_reg_size;
+	case TAS5717_CH1_RIGHT_CH_MIX_REG:
+	case TAS5717_CH1_LEFT_CH_MIX_REG:
+	case TAS5717_CH2_LEFT_CH_MIX_REG:
+	case TAS5717_CH2_RIGHT_CH_MIX_REG:
+		return 4;
 	default:
 		return 1;
 	}
@@ -293,6 +298,16 @@ static const struct snd_kcontrol_new tas5717_controls[] = {
 		   TAS571X_SOFT_MUTE_REG,
 		   TAS571X_SOFT_MUTE_CH1_SHIFT, TAS571X_SOFT_MUTE_CH2_SHIFT,
 		   1, 1),
+
+	SOC_DOUBLE_R_RANGE("CH1 Mixer Volume",
+			   TAS5717_CH1_LEFT_CH_MIX_REG,
+			   TAS5717_CH1_RIGHT_CH_MIX_REG,
+			   16, 0, 0x80, 0),
+
+	SOC_DOUBLE_R_RANGE("CH2 Mixer Volume",
+			   TAS5717_CH2_LEFT_CH_MIX_REG,
+			   TAS5717_CH2_RIGHT_CH_MIX_REG,
+			   16, 0, 0x80, 0),
 };
 
 static const struct reg_default tas5717_reg_defaults[] = {
@@ -303,6 +318,10 @@ static const struct reg_default tas5717_reg_defaults[] = {
 	{ 0x08, 0x00c0 },
 	{ 0x09, 0x00c0 },
 	{ 0x1b, 0x82 },
+	{ TAS5717_CH1_RIGHT_CH_MIX_REG, 0x0 },
+	{ TAS5717_CH1_LEFT_CH_MIX_REG, 0x800000},
+	{ TAS5717_CH2_LEFT_CH_MIX_REG, 0x0 },
+	{ TAS5717_CH2_RIGHT_CH_MIX_REG, 0x800000},
 };
 
 static const struct regmap_config tas5717_regmap_config = {
