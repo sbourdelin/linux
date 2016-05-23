@@ -33,5 +33,3 @@ EXPORT_SYMBOL(store_vr_state);
 #ifdef CONFIG_EPAPR_PARAVIRT
 EXPORT_SYMBOL(epapr_hypercall_start);
 #endif
-
-EXPORT_SYMBOL(current_stack_pointer);

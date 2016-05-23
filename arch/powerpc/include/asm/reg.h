@@ -1301,7 +1301,12 @@ static inline unsigned long mfvtb (void)
 
 #define proc_trap()	asm volatile("trap")
 
-extern unsigned long current_stack_pointer(void);
+static inline unsigned long current_stack_pointer(void)
+{
+	register unsigned long *ptr asm("r1");
+
+	return *ptr;
+}
 
 extern unsigned long scom970_read(unsigned int address);
 extern void scom970_write(unsigned int address, unsigned long value);
