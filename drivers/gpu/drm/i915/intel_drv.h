@@ -860,6 +860,8 @@ struct intel_dp {
 
 	bool train_set_valid;
 
+	struct drm_dp_bd bd;
+
 	/* Displayport compliance testing */
 	unsigned long compliance_test_type;
 	unsigned long compliance_test_data;

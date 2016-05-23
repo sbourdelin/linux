@@ -412,6 +412,52 @@ int drm_dp_link_power_down(struct drm_dp_aux *aux, struct drm_dp_link *link)
 }
 EXPORT_SYMBOL(drm_dp_link_power_down);
 
+/*
+ * drm_dp_bd() - read DisplayPort Receiver Capability Fields for
+ * DP branch devices
+ * @aux: DisplayPort AUX channel
+ * @bd: pointer to a structure containing DP branch device information
+ *
+ * Returns 0 on success or a negative error code on failure.
+ */
+int drm_dp_bd(struct drm_dp_aux *aux, struct drm_dp_bd *bd)
+{
+	uint8_t info[4];
+	uint8_t dfp;
+	bool detailed_cap_info;
+	int err, size;
+
+	err = drm_dp_dpcd_read(aux, DP_DOWNSTREAMPORT_PRESENT, &dfp, sizeof(dfp));
+	if (err < 0)
+		return err;
+
+	bd->present = dfp & 0x1;
+
+	if (!bd->present)
+		return 0;
+
+	detailed_cap_info = dfp & DP_DETAILED_CAP_INFO_AVAILABLE;
+
+	size = detailed_cap_info ? 4 : 1;
+
+	err = drm_dp_dpcd_read(aux, DP_DOWNSTREAM_PORT_0, info, size);
+	if (err < 0)
+		return err;
+
+	bd->type = info[0] & DP_DS_PORT_TYPE_MASK;
+	bd->hpd = info[0] & DP_DS_PORT_HPD;
+
+	if (detailed_cap_info) {
+		if (bd->type & DP_DS_PORT_TYPE_VGA) {
+			bd->dfp.vga.dot_clk = info[1] * 8 * 1000;
+			bd->dfp.vga.bpc = info[2] & DP_DS_VGA_MAX_BPC_MASK;
+		}
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_dp_bd);
+
 /**
  * drm_dp_link_configure() - configure a DisplayPort link
  * @aux: DisplayPort AUX channel

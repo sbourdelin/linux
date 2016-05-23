@@ -801,10 +801,31 @@ struct drm_dp_link {
 	unsigned long capabilities;
 };
 
+/*
+ * DP to VGA
+ */
+struct drm_dp_vga {
+	int dot_clk;
+	uint8_t bpc;
+};
+
+/*
+ * Branch device
+ */
+struct drm_dp_bd {
+	bool present;
+	int type;
+	bool hpd;
+	union {
+		struct drm_dp_vga vga;
+	} dfp;
+};
+
 int drm_dp_link_probe(struct drm_dp_aux *aux, struct drm_dp_link *link);
 int drm_dp_link_power_up(struct drm_dp_aux *aux, struct drm_dp_link *link);
 int drm_dp_link_power_down(struct drm_dp_aux *aux, struct drm_dp_link *link);
 int drm_dp_link_configure(struct drm_dp_aux *aux, struct drm_dp_link *link);
+int drm_dp_bd(struct drm_dp_aux *aux, struct drm_dp_bd *bd);
 
 int drm_dp_aux_register(struct drm_dp_aux *aux);
 void drm_dp_aux_unregister(struct drm_dp_aux *aux);
