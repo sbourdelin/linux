@@ -52,7 +52,7 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
 {
 	struct stm32_rng_private *priv =
 	    container_of(rng, struct stm32_rng_private, rng);
-	u32 sr;
+	u32 sr = 0;
 	int retval = 0;
 
 	pm_runtime_get_sync((struct device *) priv->rng.priv);
