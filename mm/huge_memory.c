@@ -2386,13 +2386,14 @@ static bool hugepage_vma_check(struct vm_area_struct *vma)
  * but with mmap_sem held to protect against vma changes.
  */
 
-static void __collapse_huge_page_swapin(struct mm_struct *mm,
+static bool __collapse_huge_page_swapin(struct mm_struct *mm,
 					struct vm_area_struct *vma,
 					unsigned long address, pmd_t *pmd)
 {
 	unsigned long _address;
 	pte_t *pte, pteval;
 	int swapped_in = 0, ret = 0;
+	struct vm_area_struct *vma_orig = vma;
 
 	pte = pte_offset_map(pmd, address);
 	for (_address = address; _address < address + HPAGE_PMD_NR*PAGE_SIZE;
@@ -2402,11 +2403,19 @@ static void __collapse_huge_page_swapin(struct mm_struct *mm,
 			continue;
 		swapped_in++;
 		ret = do_swap_page(mm, vma, _address, pte, pmd,
-				   FAULT_FLAG_ALLOW_RETRY|FAULT_FLAG_RETRY_NOWAIT,
+				   FAULT_FLAG_ALLOW_RETRY,
 				   pteval);
+		/* do_swap_page returns VM_FAULT_RETRY with released mmap_sem */
+		if (ret & VM_FAULT_RETRY) {
+			down_read(&mm->mmap_sem);
+			vma = find_vma(mm, address);
+			/* vma is no longer available, don't continue to swapin */
+			if (vma != vma_orig)
+				return false;
+		}
 		if (ret & VM_FAULT_ERROR) {
 			trace_mm_collapse_huge_page_swapin(mm, swapped_in, 0);
-			return;
+			return false;
 		}
 		/* pte is unmapped now, we need to map it */
 		pte = pte_offset_map(pmd, _address);
@@ -2414,6 +2423,7 @@ static void __collapse_huge_page_swapin(struct mm_struct *mm,
 	pte--;
 	pte_unmap(pte);
 	trace_mm_collapse_huge_page_swapin(mm, swapped_in, 1);
+	return true;
 }
 
 static void collapse_huge_page(struct mm_struct *mm,
@@ -2459,7 +2469,7 @@ static void collapse_huge_page(struct mm_struct *mm,
 	 * gup_fast later hanlded by the ptep_clear_flush and the VM
 	 * handled by the anon_vma lock + PG_lock.
 	 */
-	down_write(&mm->mmap_sem);
+	down_read(&mm->mmap_sem);
 	if (unlikely(khugepaged_test_exit(mm))) {
 		result = SCAN_ANY_PROCESS;
 		goto out;
@@ -2490,9 +2500,20 @@ static void collapse_huge_page(struct mm_struct *mm,
 	 * Don't perform swapin readahead when the system is under pressure,
 	 * to avoid unnecessary resource consumption.
 	 */
-	if (allocstall == curr_allocstall && swap != 0)
-		__collapse_huge_page_swapin(mm, vma, address, pmd);
+	if (allocstall == curr_allocstall && swap != 0) {
+		/*
+		 * __collapse_huge_page_swapin always returns with mmap_sem
+		 * locked. If it fails, release mmap_sem and jump directly
+		 * label out. Continuing to collapse causes inconsistency.
+		 */
+		if (!__collapse_huge_page_swapin(mm, vma, address, pmd)) {
+			up_read(&mm->mmap_sem);
+			goto out;
+		}
+	}
 
+	up_read(&mm->mmap_sem);
+	down_write(&mm->mmap_sem);
 	anon_vma_lock_write(vma->anon_vma);
 
 	pte = pte_offset_map(pmd, address);
