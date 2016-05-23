@@ -636,8 +636,7 @@ int blk_init_rl(struct request_list *rl, struct request_queue *q,
 
 void blk_exit_rl(struct request_list *rl)
 {
-	if (rl->rq_pool)
-		mempool_destroy(rl->rq_pool);
+	mempool_destroy(rl->rq_pool);
 }
 
 struct request_queue *blk_alloc_queue(gfp_t gfp_mask)
