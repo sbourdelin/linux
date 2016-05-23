@@ -2439,6 +2439,19 @@ config PCI_CNB20LE_QUIRK
 
 source "drivers/pci/Kconfig"
 
+config ISA_BUS_API
+	def_bool ISA
+
+config ISA_BUS
+	bool "ISA-style bus support on modern systems" if (X86 && EXPERT)
+	default y
+	select ISA_BUS_API
+	help
+	  Enables ISA-style drivers on modern systems. This is necessary to
+	  support PC/104 devices on X86_64 platforms.
+
+	  If unsure, say Y.
+
 # x86_64 have no ISA slots, but can have ISA-style DMA.
 config ISA_DMA_API
 	bool "ISA-style DMA support" if (X86_64 && EXPERT)
