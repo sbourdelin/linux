@@ -2531,7 +2531,7 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len, bool sllao)
 
 	if (pinfo->autoconf && in6_dev->cnf.autoconf) {
 		struct in6_addr addr;
-		bool tokenized = false;
+		bool tokenized = false, dev_addr_generated = false;
 
 		if (pinfo->prefix_len == 64) {
 			memcpy(&addr, &pinfo->prefix, 8);
@@ -2551,6 +2551,8 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len, bool sllao)
 				   ipv6_inherit_eui64(addr.s6_addr + 8, in6_dev)) {
 				in6_dev_put(in6_dev);
 				return;
+			} else {
+				dev_addr_generated = true;
 			}
 			goto ok;
 		}
@@ -2564,6 +2566,11 @@ ok:
 					     addr_type, addr_flags, sllao,
 					     tokenized, valid_lft,
 					     prefered_lft);
+		ndisc_ops_prefix_rcv_add_addr(net, dev, pinfo, in6_dev, &addr,
+					      addr_type, addr_flags, sllao,
+					      tokenized, valid_lft,
+					      prefered_lft,
+					      dev_addr_generated);
 	}
 	inet6_prefix_notify(RTM_NEWPREFIX, in6_dev, pinfo);
 	in6_dev_put(in6_dev);

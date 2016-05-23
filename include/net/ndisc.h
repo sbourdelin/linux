@@ -58,6 +58,7 @@ struct inet6_dev;
 struct net_device;
 struct net_proto_family;
 struct sk_buff;
+struct prefix_info;
 
 extern struct neigh_table nd_tbl;
 
@@ -110,7 +111,8 @@ struct ndisc_options {
 
 #define NDISC_OPT_SPACE(len) (((len)+2+7)&~7)
 
-struct ndisc_options *ndisc_parse_options(u8 *opt, int opt_len,
+struct ndisc_options *ndisc_parse_options(const struct net_device *dev,
+					  u8 *opt, int opt_len,
 					  struct ndisc_options *ndopts);
 
 /*
@@ -183,6 +185,175 @@ static inline struct neighbour *__ipv6_neigh_lookup(struct net_device *dev, cons
 	return n;
 }
 
+#if IS_ENABLED(CONFIG_IPV6)
+#define NDISC_OPS_REDIRECT_DATA_SPACE	2
+
+/*
+ * This structure defines the hooks for IPv6 neighbour discovery.
+ * The following hooks can be defined; unless noted otherwise, they are
+ * optional and can be filled with a null pointer.
+ *
+ * int (*is_useropt)(u8 nd_opt_type);
+ *     This function is called when IPv6 decide RA userspace options. if
+ *     this function returns 1 then the option given by nd_opt_type will
+ *     be handled as userspace option additional to the IPv6 options.
+ *
+ * void (*parse_opts)(const struct net_device *dev,
+ *		      struct nd_opt_hdr *nd_opt,
+ *		      struct ndisc_options *ndopts):
+ *     This function is called while parsing ndisc ops and put each position
+ *     as pointer into ndopts. If this function return unequal 0, then this
+ *     function took care about the ndisc option, if 0 then the IPv6 ndisc
+ *     option parser will take care about that option.
+ *
+ * int (*neigh_update)(const struct net_device *dev,
+ *		       struct neighbour *n, u32 flags, u8 icmp6_type,
+ *		       const struct ndisc_options *ndopts):
+ *     This function is called when IPv6 ndisc updates the neighbour cache
+ *     entry. Additional options which can be updated may be previously
+ *     parsed by parse_opts callback and accessible over ndopts parameter.
+ *
+ * int (*opt_space)(const struct net_device *dev, u8 icmp6_type,
+ *		    const struct neighbour *neigh, u8 *ha_buf,
+ *		    u8 **ha):
+ *     This function is called when the necessary option space will be
+ *     calculated before allocating a skb. The parameters neigh, ha_buf
+ *     abd ha are available on NDISC_REDIRECT messages only. In case
+ *     of NDISC_REDIRECT the neigh->lock spinlock will be held.
+ *
+ * int (*fill_opts)(const struct net_device *dev, struct sk_buff *skb,
+ *		    u8 icmp6_type, const u8 *ha):
+ *     This function is called when the skb will finally fill the option
+ *     fields inside skb. NOTE: this callback should fill the option
+ *     fields to the skb which are previously indicated by opt_space
+ *     parameter. That means the decision to add such option should
+ *     not lost between these two callbacks, e.g. protected by interface
+ *     up state.
+ *
+ * int (*prefix_rcv_add_addr)(struct net *net, struct net_device *dev,
+ *			      const struct prefix_info *pinfo,
+ *			      struct inet6_dev *in6_dev,
+ *			      struct in6_addr *addr,
+ *			      int addr_type, u32 addr_flags,
+ *			      bool sllao, bool tokenized,
+ *			      __u32 valid_lft, u32 prefered_lft,
+ *			      bool dev_addr_generated):
+ *     This function is called when a RA messages is received with valid
+ *     PIO option fields and an IPv6 address will be added to the interface
+ *     for autoconfiguration. The parameter dev_addr_generated reports about
+ *     if the address was based on dev->dev_addr or not. This can be used
+ *     to add a second address if link-layer operates with two link layer
+ *     addresses. E.g. 802.15.4 6LoWPAN.
+ */
+struct ndisc_ops {
+	int	(*is_useropt)(u8 nd_opt_type);
+	int	(*parse_opts)(const struct net_device *dev,
+			      struct nd_opt_hdr *nd_opt,
+			      struct ndisc_options *ndopts);
+	void	(*neigh_update)(const struct net_device *dev,
+				struct neighbour *n, u32 flags, u8 icmp6_type,
+				const struct ndisc_options *ndopts);
+	int	(*opt_space)(const struct net_device *dev, u8 icmp6_type,
+			     const struct neighbour *neigh, u8 *ha_buf,
+			     u8 **ha);
+	void	(*fill_opts)(const struct net_device *dev, struct sk_buff *skb,
+			     u8 icmp6_type, const u8 *ha);
+	void	(*prefix_rcv_add_addr)(struct net *net, struct net_device *dev,
+				       const struct prefix_info *pinfo,
+				       struct inet6_dev *in6_dev,
+				       struct in6_addr *addr,
+				       int addr_type, u32 addr_flags,
+				       bool sllao, bool tokenized,
+				       __u32 valid_lft, u32 prefered_lft,
+				       bool dev_addr_generated);
+};
+
+static inline int ndisc_ops_is_useropt(const struct net_device *dev,
+				       u8 nd_opt_type)
+{
+	if (dev->ndisc_ops && dev->ndisc_ops->is_useropt)
+		return dev->ndisc_ops->is_useropt(nd_opt_type);
+	else
+		return 0;
+}
+
+static inline int ndisc_ops_parse_opts(const struct net_device *dev,
+				       struct nd_opt_hdr *nd_opt,
+				       struct ndisc_options *ndopts)
+{
+	if (dev->ndisc_ops && dev->ndisc_ops->parse_opts)
+		return dev->ndisc_ops->parse_opts(dev, nd_opt, ndopts);
+	else
+		return 0;
+}
+
+static inline void ndisc_ops_neigh_update(const struct net_device *dev,
+					  struct neighbour *n, u32 flags,
+					  u8 icmp6_type,
+					  const struct ndisc_options *ndopts)
+{
+	if (dev->ndisc_ops && dev->ndisc_ops->neigh_update)
+		dev->ndisc_ops->neigh_update(dev, n, flags, icmp6_type,
+					     ndopts);
+}
+
+static inline int ndisc_ops_opt_space(const struct net_device *dev,
+				      u8 icmp6_type)
+{
+	if (dev->ndisc_ops && dev->ndisc_ops->opt_space)
+		return dev->ndisc_ops->opt_space(dev, icmp6_type, NULL, NULL,
+						 NULL);
+	else
+		return 0;
+}
+
+static inline int ndisc_ops_redirect_opt_space(const struct net_device *dev,
+					       const struct neighbour *neigh,
+					       u8 *ha_buf, u8 **ha)
+{
+	if (dev->ndisc_ops && dev->ndisc_ops->opt_space)
+		return dev->ndisc_ops->opt_space(dev, NDISC_REDIRECT,
+						 neigh, ha_buf, ha);
+	else
+		return 0;
+}
+
+static inline void ndisc_ops_fill_opts(const struct net_device *dev,
+				       struct sk_buff *skb, u8 icmp6_type)
+{
+	if (dev->ndisc_ops && dev->ndisc_ops->fill_opts)
+		dev->ndisc_ops->fill_opts(dev, skb, icmp6_type, NULL);
+}
+
+static inline void ndisc_ops_redirect_fill_addr_option(const struct net_device *dev,
+						       struct sk_buff *skb,
+						       const u8 *ha)
+{
+	if (dev->ndisc_ops && dev->ndisc_ops->fill_opts)
+		dev->ndisc_ops->fill_opts(dev, skb, NDISC_REDIRECT, ha);
+}
+
+static inline void ndisc_ops_prefix_rcv_add_addr(struct net *net,
+						 struct net_device *dev,
+						 const struct prefix_info *pinfo,
+						 struct inet6_dev *in6_dev,
+						 struct in6_addr *addr,
+						 int addr_type, u32 addr_flags,
+						 bool sllao, bool tokenized,
+						 __u32 valid_lft,
+						 u32 prefered_lft,
+						 bool dev_addr_generated)
+{
+	if (dev->ndisc_ops && dev->ndisc_ops->prefix_rcv_add_addr)
+		dev->ndisc_ops->prefix_rcv_add_addr(net, dev, pinfo, in6_dev,
+						    addr, addr_type,
+						    addr_flags, sllao,
+						    tokenized, valid_lft,
+						    prefered_lft,
+						    dev_addr_generated);
+}
+#endif
+
 int ndisc_init(void);
 int ndisc_late_init(void);
 
@@ -205,6 +376,9 @@ void ndisc_send_redirect(struct sk_buff *skb, const struct in6_addr *target);
 int ndisc_mc_map(const struct in6_addr *addr, char *buf, struct net_device *dev,
 		 int dir);
 
+void ndisc_neigh_update(const struct net_device *dev, struct neighbour *neigh,
+			const u8 *lladdr, u8 new, u32 flags, u8 icmp6_type,
+			struct ndisc_options *ndopts);
 
 /*
  *	IGMP
