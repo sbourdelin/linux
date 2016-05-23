@@ -2917,6 +2917,43 @@ static void intel_dp_info(struct seq_file *m,
 
 	seq_printf(m, "\tDPCD rev: %x\n", intel_dp->dpcd[DP_DPCD_REV]);
 	seq_printf(m, "\taudio support: %s\n", yesno(intel_dp->has_audio));
+	seq_printf(m, "\tbranch device: %s\n", yesno(intel_dp->bd.present));
+
+	if (intel_dp->bd.present) {
+		switch (intel_dp->bd.type) {
+		case DP_DS_PORT_TYPE_DP:
+			seq_printf(m, "\ttype: DisplayPort\n");
+			break;
+		case DP_DS_PORT_TYPE_VGA:
+			seq_printf(m, "\ttype: VGA\n");
+			break;
+		case DP_DS_PORT_TYPE_DVI:
+			seq_printf(m, "\ttype: DVI\n");
+			break;
+		case DP_DS_PORT_TYPE_HDMI:
+			seq_printf(m, "\ttype: HDMI\n");
+			break;
+		case DP_DS_PORT_TYPE_NON_EDID:
+			seq_printf(m, "\ttype: others without EDID support\n");
+			break;
+		case DP_DS_PORT_TYPE_DP_DUALMODE:
+			seq_printf(m, "\ttype: DP++\n");
+			break;
+		case DP_DS_PORT_TYPE_WIRELESS:
+			seq_printf(m, "\ttype: Wireless\n");
+			break;
+		default:
+			seq_printf(m, "\ttype: N/A\n");
+		}
+
+		seq_printf(m, "\tHPD aware: %s\n", yesno(intel_dp->bd.hpd));
+		seq_printf(m, "\tDevice id: %s\n", intel_dp->bd.id);
+		seq_printf(m, "\tHW revision: %.2d.%.2d\n",
+			   intel_dp->bd.hw_rev & 0xf, (intel_dp->bd.hw_rev>>4) & 0xf);
+		seq_printf(m, "\tSW revision: %.2d.%.2d\n",
+			   intel_dp->bd.sw_rev[0], intel_dp->bd.sw_rev[1]);
+	}
+
 	if (intel_encoder->type == INTEL_OUTPUT_EDP)
 		intel_panel_info(m, &intel_connector->panel);
 }
