@@ -78,6 +78,10 @@ module_param(halt_poll_ns_grow, uint, S_IRUGO | S_IWUSR);
 static unsigned int halt_poll_ns_shrink;
 module_param(halt_poll_ns_shrink, uint, S_IRUGO | S_IWUSR);
 
+/* lower-end of message passing workload latency TCP_RR's poll time < 10us */
+static unsigned int halt_poll_ns_timer = 10000;
+module_param(halt_poll_ns_timer, uint, S_IRUGO | S_IWUSR);
+
 /*
  * Ordering of locks:
  *
@@ -1966,7 +1970,7 @@ static void grow_halt_poll_ns(struct kvm_vcpu *vcpu)
 	grow = READ_ONCE(halt_poll_ns_grow);
 	/* 10us base */
 	if (val == 0 && grow)
-		val = 10000;
+		val = halt_poll_ns_timer;
 	else
 		val *= grow;
 
@@ -2014,12 +2018,15 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
 	ktime_t start, cur;
 	DECLARE_SWAITQUEUE(wait);
 	bool waited = false;
-	u64 block_ns;
+	u64 block_ns, delta, remaining;
 
+	remaining = kvm_arch_timer_remaining(vcpu);
 	start = cur = ktime_get();
-	if (vcpu->halt_poll_ns) {
-		ktime_t stop = ktime_add_ns(ktime_get(), vcpu->halt_poll_ns);
+	if (vcpu->halt_poll_ns || remaining < halt_poll_ns_timer) {
+		ktime_t stop;
 
+		delta = vcpu->halt_poll_ns ? vcpu->halt_poll_ns : remaining;
+		stop = ktime_add_ns(ktime_get(), delta);
 		++vcpu->stat.halt_attempted_poll;
 		do {
 			/*
