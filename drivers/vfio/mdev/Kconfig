@@ -1,0 +1,11 @@
+
+config MDEV
+    tristate "Mediated device driver framework"
+    depends on VFIO
+    default n
+    help
+        MDEV provides a framework to virtualize device without SR-IOV cap
+        See Documentation/mdev.txt for more details.
+
+        If you don't know what do here, say N.
+
