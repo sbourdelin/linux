@@ -134,6 +134,12 @@ static inline long vfio_spapr_iommu_eeh_ioctl(struct iommu_group *group,
 }
 #endif /* CONFIG_EEH */
 
+extern long vfio_pin_pages(void *iommu_data, dma_addr_t *vaddr, long npage,
+			   int prot, dma_addr_t *pfn_base);
+
+extern long vfio_unpin_pages(void *iommu_data, dma_addr_t *pfn, long npage,
+			     int prot);
+
 /*
  * IRQfd - generic
  */
