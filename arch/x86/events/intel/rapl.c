@@ -712,6 +712,7 @@ static int __init rapl_pmu_init(void)
 		break;
 	case 63: /* Haswell-Server */
 	case 79: /* Broadwell-Server */
+	case 85: /* Skylake-Server */
 		apply_quirk = true;
 		rapl_cntr_mask = RAPL_IDX_SRV;
 		rapl_pmu_events_group.attrs = rapl_events_srv_attr;
