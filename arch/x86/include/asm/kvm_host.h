@@ -959,6 +959,7 @@ struct kvm_x86_ops {
 	int (*check_nested_events)(struct kvm_vcpu *vcpu, bool external_intr);
 
 	void (*sched_in)(struct kvm_vcpu *kvm, int cpu);
+	void (*sched_out)(struct kvm_vcpu *vcpu);
 
 	/*
 	 * Arch-specific dirty logging hooks. These hooks are only supposed to
