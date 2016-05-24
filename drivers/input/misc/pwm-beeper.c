@@ -20,21 +20,41 @@
 #include <linux/platform_device.h>
 #include <linux/pwm.h>
 #include <linux/slab.h>
+#include <linux/workqueue.h>
 
 struct pwm_beeper {
 	struct input_dev *input;
 	struct pwm_device *pwm;
+	struct work_struct work;
 	unsigned long period;
 };
 
 #define HZ_TO_NANOSECONDS(x) (1000000000UL/(x))
 
+static void __pwm_beeper_set(struct pwm_beeper *beeper)
+{
+	unsigned long period = beeper->period;
+
+	pwm_config(beeper->pwm, period / 2, period);
+
+	if (period == 0)
+		pwm_disable(beeper->pwm);
+	else
+		pwm_enable(beeper->pwm);
+}
+
+static void pwm_beeper_work(struct work_struct *work)
+{
+	struct pwm_beeper *beeper =
+		container_of(work, struct pwm_beeper, work);
+
+	__pwm_beeper_set(beeper);
+}
+
 static int pwm_beeper_event(struct input_dev *input,
 			    unsigned int type, unsigned int code, int value)
 {
-	int ret = 0;
 	struct pwm_beeper *beeper = input_get_drvdata(input);
-	unsigned long period;
 
 	if (type != EV_SND || value < 0)
 		return -EINVAL;
@@ -49,18 +69,12 @@ static int pwm_beeper_event(struct input_dev *input,
 		return -EINVAL;
 	}
 
-	if (value == 0) {
-		pwm_disable(beeper->pwm);
-	} else {
-		period = HZ_TO_NANOSECONDS(value);
-		ret = pwm_config(beeper->pwm, period / 2, period);
-		if (ret)
-			return ret;
-		ret = pwm_enable(beeper->pwm);
-		if (ret)
-			return ret;
-		beeper->period = period;
-	}
+	if (value == 0)
+		beeper->period = 0;
+	else
+		beeper->period = HZ_TO_NANOSECONDS(value);
+
+	schedule_work(&beeper->work);
 
 	return 0;
 }
@@ -86,6 +100,8 @@ static int pwm_beeper_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Failed to request pwm device: %d\n", error);
 		goto err_free;
 	}
+
+	INIT_WORK(&beeper->work, pwm_beeper_work);
 
 	beeper->input = input_allocate_device();
 	if (!beeper->input) {
@@ -135,6 +151,8 @@ static int pwm_beeper_remove(struct platform_device *pdev)
 
 	input_unregister_device(beeper->input);
 
+	cancel_work_sync(&beeper->work);
+
 	pwm_disable(beeper->pwm);
 	pwm_free(beeper->pwm);
 
@@ -147,6 +165,8 @@ static int __maybe_unused pwm_beeper_suspend(struct device *dev)
 {
 	struct pwm_beeper *beeper = dev_get_drvdata(dev);
 
+	cancel_work_sync(&beeper->work);
+
 	if (beeper->period)
 		pwm_disable(beeper->pwm);
 
@@ -157,10 +177,8 @@ static int __maybe_unused pwm_beeper_resume(struct device *dev)
 {
 	struct pwm_beeper *beeper = dev_get_drvdata(dev);
 
-	if (beeper->period) {
-		pwm_config(beeper->pwm, beeper->period / 2, beeper->period);
-		pwm_enable(beeper->pwm);
-	}
+	if (beeper->period)
+		__pwm_beeper_set(beeper);
 
 	return 0;
 }
