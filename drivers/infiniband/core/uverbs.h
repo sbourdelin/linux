@@ -84,6 +84,14 @@
  * released when the CQ is destroyed.
  */
 
+struct nlattr __user *ib_uverbs_nla_put(struct ib_udata *udata,
+					int attrtype, int attrlen,
+					const void *data);
+void ib_uverbs_nla_nest_end(struct ib_udata *udata,
+			    struct nlattr __user *nla);
+struct nlattr __user *ib_uverbs_nla_nest_start(struct ib_udata *udata,
+					       uint16_t type);
+
 struct ib_uverbs_device {
 	atomic_t				refcount;
 	int					num_comp_vectors;
