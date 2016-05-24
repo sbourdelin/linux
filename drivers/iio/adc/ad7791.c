@@ -272,24 +272,17 @@ static ssize_t ad7791_write_frequency(struct device *dev,
 	struct ad7791_state *st = iio_priv(indio_dev);
 	int i, ret;
 
-	mutex_lock(&indio_dev->mlock);
-	if (iio_buffer_enabled(indio_dev)) {
-		mutex_unlock(&indio_dev->mlock);
-		return -EBUSY;
-	}
-	mutex_unlock(&indio_dev->mlock);
-
-	ret = -EINVAL;
-
 	for (i = 0; i < ARRAY_SIZE(ad7791_sample_freq_avail); i++) {
 		if (sysfs_streq(ad7791_sample_freq_avail[i], buf)) {
 
-			mutex_lock(&indio_dev->mlock);
+			ret = iio_device_claim_direct_mode(indio_dev);
+			if (ret)
+				return ret;
 			st->filter &= ~AD7791_FILTER_RATE_MASK;
 			st->filter |= i;
 			ad_sd_write_reg(&st->sd, AD7791_REG_FILTER,
 					 sizeof(st->filter), st->filter);
-			mutex_unlock(&indio_dev->mlock);
+			iio_device_release_direct_mode(indio_dev);
 			ret = 0;
 			break;
 		}
