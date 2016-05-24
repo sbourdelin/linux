@@ -1344,7 +1344,7 @@ static inline void slab_free_hook(struct kmem_cache *s, void *x)
 	if (!(s->flags & SLAB_DEBUG_OBJECTS))
 		debug_check_no_obj_freed(x, s->object_size);
 
-	kasan_slab_free(s, x);
+	kasan_slab_free(s, x, _RET_IP_);
 }
 
 static inline void slab_free_freelist_hook(struct kmem_cache *s,

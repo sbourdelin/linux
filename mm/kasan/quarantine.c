@@ -148,7 +148,9 @@ static void qlink_free(struct qlist_node *qlink, struct kmem_cache *cache)
 	unsigned long flags;
 
 	local_irq_save(flags);
+	kasan_meta_lock(alloc_info);
 	alloc_info->state = KASAN_STATE_FREE;
+	kasan_meta_unlock(alloc_info);
 	___cache_free(cache, object, _THIS_IP_);
 	local_irq_restore(flags);
 }

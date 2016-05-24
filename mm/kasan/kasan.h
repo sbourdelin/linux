@@ -3,12 +3,14 @@
 
 #include <linux/kasan.h>
 #include <linux/stackdepot.h>
+#include <linux/bit_spinlock.h>
 
 #define KASAN_SHADOW_SCALE_SIZE (1UL << KASAN_SHADOW_SCALE_SHIFT)
 #define KASAN_SHADOW_MASK       (KASAN_SHADOW_SCALE_SIZE - 1)
 
 #define KASAN_FREE_PAGE         0xFF  /* page was freed */
 #define KASAN_PAGE_REDZONE      0xFE  /* redzone for kmalloc_large allocations */
+#define KASAN_KMALLOC_BAD_META  0xFD  /* slab object header was overwritten */
 #define KASAN_KMALLOC_REDZONE   0xFC  /* redzone inside slub object */
 #define KASAN_KMALLOC_FREE      0xFB  /* object was freed (kmem_cache_free/kfree) */
 #define KASAN_GLOBAL_REDZONE    0xFA  /* redzone for global variable */
@@ -74,9 +76,17 @@ struct kasan_track {
 };
 
 struct kasan_alloc_meta {
+	union {
+		u64 data;
+		struct {
+			u32 lock : 1;		/* lock bit */
+			u32 state : 2;          /* enum kasan_state */
+			u32 size_delta : 23;    /* object_size - alloc size */
+			u32 unused1 : 6;
+			u32 unused2;
+		};
+	};
 	struct kasan_track track;
-	u32 state : 2;	/* enum kasan_state */
-	u32 alloc_size : 30;
 };
 
 struct qlist_node {
@@ -114,6 +124,36 @@ void kasan_report(unsigned long addr, size_t size,
 void quarantine_put(struct kasan_free_meta *info, struct kmem_cache *cache);
 void quarantine_reduce(void);
 void quarantine_remove_cache(struct kmem_cache *cache);
+
+/* acquire per-object lock for access to KASAN metadata. */
+static inline void kasan_meta_lock(struct kasan_alloc_meta *alloc_info)
+{
+	unsigned long *lockp = (unsigned long *)&alloc_info->data;
+
+	while (unlikely(!bit_spin_trylock(0, lockp))) {
+		u8 *shadow = (u8 *)kasan_mem_to_shadow((void *)lockp);
+
+		if (READ_ONCE(*shadow) == KASAN_KMALLOC_BAD_META) {
+			/*
+			 * a prior out-of-bounds access overwrote object header,
+			 * flipping lock bit; break out to allow deallocation.
+			 */
+			preempt_disable();
+			return;
+		}
+		while (test_bit(0, lockp))
+			cpu_relax();
+	}
+}
+
+/* release lock after a kasan_meta_lock(). */
+static inline void kasan_meta_unlock(struct kasan_alloc_meta *alloc_info)
+{
+	__bit_spin_unlock(0, (unsigned long *)&alloc_info->data);
+}
+
+void kasan_mark_bad_meta(struct kasan_alloc_meta *alloc_info,
+		struct kasan_access_info *info);
 #else
 static inline void quarantine_put(struct kasan_free_meta *info,
 				struct kmem_cache *cache) { }

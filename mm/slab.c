@@ -2651,6 +2651,7 @@ static void cache_init_objs(struct kmem_cache *cachep,
 			cachep->ctor(objp);
 			kasan_poison_object_data(cachep, objp);
 		}
+		kasan_init_object(cachep, index_to_obj(cachep, page, i));
 
 		if (!shuffled)
 			set_free_obj(page, i, i);
@@ -3548,7 +3549,7 @@ static inline void __cache_free(struct kmem_cache *cachep, void *objp,
 				unsigned long caller)
 {
 	/* Put the object into the quarantine, don't touch it for now. */
-	if (kasan_slab_free(cachep, objp))
+	if (kasan_slab_free(cachep, objp, _RET_IP_))
 		return;
 
 	___cache_free(cachep, objp, caller);

@@ -402,6 +402,35 @@ void kasan_cache_create(struct kmem_cache *cache, size_t *size,
 			cache->object_size +
 			optimal_redzone(cache->object_size)));
 }
+
+void kasan_init_object(struct kmem_cache *cache, void *object)
+{
+	if (cache->flags & SLAB_KASAN) {
+		struct kasan_alloc_meta *alloc_info;
+
+		alloc_info = get_alloc_info(cache, object);
+		__memset(alloc_info, 0, sizeof(*alloc_info));
+	}
+}
+
+/* flags shadow for object header if it has been overwritten. */
+void kasan_mark_bad_meta(struct kasan_alloc_meta *alloc_info,
+		struct kasan_access_info *info)
+{
+	u8 *datap = (u8 *)&alloc_info->data;
+
+	if ((((u8 *)info->access_addr + info->access_size) > datap) &&
+			((u8 *)info->first_bad_addr <= datap) &&
+			info->is_write)
+		kasan_poison_shadow((void *)datap, KASAN_SHADOW_SCALE_SIZE,
+				KASAN_KMALLOC_BAD_META);
+}
+
+static void kasan_unmark_bad_meta(struct kasan_alloc_meta *alloc_info)
+{
+	kasan_poison_shadow((void *)&alloc_info->data, KASAN_SHADOW_SCALE_SIZE,
+			KASAN_KMALLOC_REDZONE);
+}
 #endif
 
 void kasan_cache_shrink(struct kmem_cache *cache)
@@ -431,13 +460,6 @@ void kasan_poison_object_data(struct kmem_cache *cache, void *object)
 	kasan_poison_shadow(object,
 			round_up(cache->object_size, KASAN_SHADOW_SCALE_SIZE),
 			KASAN_KMALLOC_REDZONE);
-#ifdef CONFIG_SLAB
-	if (cache->flags & SLAB_KASAN) {
-		struct kasan_alloc_meta *alloc_info =
-			get_alloc_info(cache, object);
-		alloc_info->state = KASAN_STATE_INIT;
-	}
-#endif
 }
 
 #ifdef CONFIG_SLAB
@@ -520,35 +542,41 @@ void kasan_poison_slab_free(struct kmem_cache *cache, void *object)
 	kasan_poison_shadow(object, rounded_up_size, KASAN_KMALLOC_FREE);
 }
 
-bool kasan_slab_free(struct kmem_cache *cache, void *object)
+bool kasan_slab_free(struct kmem_cache *cache, void *object,
+		unsigned long caller)
 {
 #ifdef CONFIG_SLAB
+	struct kasan_alloc_meta *alloc_info;
+	struct kasan_free_meta *free_info;
+
 	/* RCU slabs could be legally used after free within the RCU period */
 	if (unlikely(cache->flags & SLAB_DESTROY_BY_RCU))
 		return false;
 
-	if (likely(cache->flags & SLAB_KASAN)) {
-		struct kasan_alloc_meta *alloc_info =
-			get_alloc_info(cache, object);
-		struct kasan_free_meta *free_info =
-			get_free_info(cache, object);
+	if (unlikely(!(cache->flags & SLAB_KASAN)))
+		return false;
 
-		switch (alloc_info->state) {
-		case KASAN_STATE_ALLOC:
-			alloc_info->state = KASAN_STATE_QUARANTINE;
-			quarantine_put(free_info, cache);
-			set_track(&free_info->track, GFP_NOWAIT);
-			kasan_poison_slab_free(cache, object);
-			return true;
+	alloc_info = get_alloc_info(cache, object);
+	kasan_meta_lock(alloc_info);
+	if (alloc_info->state == KASAN_STATE_ALLOC) {
+		free_info = get_free_info(cache, object);
+		quarantine_put(free_info, cache);
+		set_track(&free_info->track, GFP_NOWAIT);
+		kasan_poison_slab_free(cache, object);
+		alloc_info->state = KASAN_STATE_QUARANTINE;
+		kasan_meta_unlock(alloc_info);
+		return true;
+	}
+	switch (alloc_info->state) {
 		case KASAN_STATE_QUARANTINE:
 		case KASAN_STATE_FREE:
-			pr_err("Double free");
-			dump_stack();
-			break;
+			kasan_report((unsigned long)object, 0, false, caller);
+			kasan_meta_unlock(alloc_info);
+			return true;
 		default:
 			break;
-		}
 	}
+	kasan_meta_unlock(alloc_info);
 	return false;
 #else
 	kasan_poison_slab_free(cache, object);
@@ -580,10 +608,16 @@ void kasan_kmalloc(struct kmem_cache *cache, const void *object, size_t size,
 	if (cache->flags & SLAB_KASAN) {
 		struct kasan_alloc_meta *alloc_info =
 			get_alloc_info(cache, object);
+		unsigned long flags;
 
+		local_irq_save(flags);
+		kasan_meta_lock(alloc_info);
 		alloc_info->state = KASAN_STATE_ALLOC;
-		alloc_info->alloc_size = size;
+		alloc_info->size_delta = cache->object_size - size;
 		set_track(&alloc_info->track, flags);
+		kasan_unmark_bad_meta(alloc_info);
+		kasan_meta_unlock(alloc_info);
+		local_irq_restore(flags);
 	}
 #endif
 }
@@ -636,7 +670,7 @@ void kasan_kfree(void *ptr)
 		kasan_poison_shadow(ptr, PAGE_SIZE << compound_order(page),
 				KASAN_FREE_PAGE);
 	else
-		kasan_slab_free(page->slab_cache, ptr);
+		kasan_slab_free(page->slab_cache, ptr, _RET_IP_);
 }
 
 void kasan_kfree_large(const void *ptr)
