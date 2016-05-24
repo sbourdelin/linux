@@ -1750,6 +1750,7 @@ static void __usb_hcd_giveback_urb(struct urb *urb)
 	/* pass ownership to the completion handler */
 	urb->status = status;
 
+	debug_urb_deactivate(urb);
 	/*
 	 * We disable local IRQs here avoid possible deadlock because
 	 * drivers may call spin_lock() to hold lock which might be

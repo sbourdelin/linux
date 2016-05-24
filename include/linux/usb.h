@@ -1606,6 +1606,14 @@ static inline void usb_fill_int_urb(struct urb *urb,
 	urb->start_frame = -1;
 }
 
+#ifdef CONFIG_DEBUG_OBJECTS_URB
+extern int debug_urb_activate(struct urb *urb);
+extern void debug_urb_deactivate(struct urb *urb);
+#else
+static inline int debug_urb_activate(struct urb *urb) { return 0; }
+static inline void debug_urb_deactivate(struct urb *urb) { }
+#endif
+
 extern void usb_init_urb(struct urb *urb);
 extern struct urb *usb_alloc_urb(int iso_packets, gfp_t mem_flags);
 extern void usb_free_urb(struct urb *urb);

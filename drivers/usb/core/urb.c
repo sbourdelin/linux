@@ -10,6 +10,100 @@
 
 #define to_urb(d) container_of(d, struct urb, kref)
 
+#ifdef CONFIG_DEBUG_OBJECTS_URB
+static struct debug_obj_descr urb_debug_descr;
+
+static void *urb_debug_hint(void *addr)
+{
+	return ((struct urb *) addr)->complete;
+}
+
+/*
+ * fixup_init is called when:
+ * - an active object is initialized
+ */
+static bool urb_fixup_init(void *addr, enum debug_obj_state state)
+{
+	struct urb *urb = addr;
+
+	switch (state) {
+	case ODEBUG_STATE_ACTIVE:
+		usb_kill_urb(urb);
+		debug_object_init(urb, &urb_debug_descr);
+		return true;
+	default:
+		return false;
+	}
+}
+
+/*
+ * fixup_activate is called when:
+ * - an active object is activated
+ * - an unknown non-static object is activated
+ */
+static bool urb_fixup_activate(void *addr, enum debug_obj_state state)
+{
+	struct urb *urb = urb;
+
+	switch (state) {
+	case ODEBUG_STATE_ACTIVE:
+		usb_kill_urb(urb);
+		debug_object_activate(urb, &urb_debug_descr);
+		return true;
+	default:
+		return false;
+	}
+}
+
+/*
+ * fixup_free is called when:
+ * - an active object is freed
+ */
+static bool urb_fixup_free(void *addr, enum debug_obj_state state)
+{
+	struct urb *urb = addr;
+
+	switch (state) {
+	case ODEBUG_STATE_ACTIVE:
+		usb_kill_urb(urb);
+		debug_object_free(urb, &urb_debug_descr);
+		return true;
+	default:
+		return false;
+	}
+}
+
+static struct debug_obj_descr urb_debug_descr = {
+	.name		= "urb",
+	.debug_hint	= urb_debug_hint,
+	.fixup_init	= urb_fixup_init,
+	.fixup_activate	= urb_fixup_activate,
+	.fixup_free	= urb_fixup_free,
+};
+
+static void debug_urb_init(struct urb *urb)
+{
+	/**
+	 * The struct urb structure must never be
+	 * created statically, so no init object
+	 * on stack case.
+	 */
+	debug_object_init(urb, &urb_debug_descr);
+}
+
+int debug_urb_activate(struct urb *urb)
+{
+	return debug_object_activate(urb, &urb_debug_descr);
+}
+
+void debug_urb_deactivate(struct urb *urb)
+{
+	debug_object_deactivate(urb, &urb_debug_descr);
+}
+
+#else
+static inline void debug_urb_init(struct urb *urb) { }
+#endif
 
 static void urb_destroy(struct kref *kref)
 {
@@ -41,6 +135,7 @@ void usb_init_urb(struct urb *urb)
 		memset(urb, 0, sizeof(*urb));
 		kref_init(&urb->kref);
 		INIT_LIST_HEAD(&urb->anchor_list);
+		debug_urb_init(urb);
 	}
 }
 EXPORT_SYMBOL_GPL(usb_init_urb);
@@ -331,6 +426,7 @@ int usb_submit_urb(struct urb *urb, gfp_t mem_flags)
 	struct usb_host_endpoint	*ep;
 	int				is_out;
 	unsigned int			allowed;
+	int				ret;
 
 	if (!urb || !urb->complete)
 		return -EINVAL;
@@ -539,9 +635,22 @@ int usb_submit_urb(struct urb *urb, gfp_t mem_flags)
 		}
 	}
 
-	return usb_hcd_submit_urb(urb, mem_flags);
+	ret = debug_urb_activate(urb);
+	if (ret)
+		return ret;
+	ret = usb_hcd_submit_urb(urb, mem_flags);
+	if (ret)
+		debug_urb_deactivate(urb);
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(usb_submit_urb);
+
+static inline int __usb_unlink_urb(struct urb *urb, int status)
+{
+	debug_urb_deactivate(urb);
+	return usb_hcd_unlink_urb(urb, status);
+}
 
 /*-------------------------------------------------------------------*/
 
@@ -626,7 +735,7 @@ int usb_unlink_urb(struct urb *urb)
 		return -ENODEV;
 	if (!urb->ep)
 		return -EIDRM;
-	return usb_hcd_unlink_urb(urb, -ECONNRESET);
+	return __usb_unlink_urb(urb, -ECONNRESET);
 }
 EXPORT_SYMBOL_GPL(usb_unlink_urb);
 
@@ -664,7 +773,7 @@ void usb_kill_urb(struct urb *urb)
 		return;
 	atomic_inc(&urb->reject);
 
-	usb_hcd_unlink_urb(urb, -ENOENT);
+	__usb_unlink_urb(urb, -ENOENT);
 	wait_event(usb_kill_urb_queue, atomic_read(&urb->use_count) == 0);
 
 	atomic_dec(&urb->reject);
@@ -708,7 +817,7 @@ void usb_poison_urb(struct urb *urb)
 	if (!urb->dev || !urb->ep)
 		return;
 
-	usb_hcd_unlink_urb(urb, -ENOENT);
+	__usb_unlink_urb(urb, -ENOENT);
 	wait_event(usb_kill_urb_queue, atomic_read(&urb->use_count) == 0);
 }
 EXPORT_SYMBOL_GPL(usb_poison_urb);
