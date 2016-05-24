@@ -4423,7 +4423,7 @@ brcmf_cfg80211_start_ap(struct wiphy *wiphy, struct net_device *ndev,
 	struct brcmf_join_params join_params;
 	enum nl80211_iftype dev_role;
 	struct brcmf_fil_bss_enable_le bss_enable;
-	u16 chanspec;
+	u16 chanspec = chandef_to_chanspec(&cfg->d11inf, &settings->chandef);
 	bool mbss;
 	int is_11d;
 
@@ -4499,16 +4499,16 @@ brcmf_cfg80211_start_ap(struct wiphy *wiphy, struct net_device *ndev,
 
 	brcmf_config_ap_mgmt_ie(ifp->vif, &settings->beacon);
 
-	if (!mbss) {
-		chanspec = chandef_to_chanspec(&cfg->d11inf,
-					       &settings->chandef);
+	if (dev_role == NL80211_IFTYPE_P2P_GO) {
 		err = brcmf_fil_iovar_int_set(ifp, "chanspec", chanspec);
 		if (err < 0) {
 			brcmf_err("Set Channel failed: chspec=%d, %d\n",
 				  chanspec, err);
 			goto exit;
 		}
+	}
 
+	if (!mbss) {
 		if (is_11d != ifp->vif->is_11d) {
 			err = brcmf_fil_cmd_int_set(ifp, BRCMF_C_SET_REGULATORY,
 						    is_11d);
@@ -4564,6 +4564,14 @@ brcmf_cfg80211_start_ap(struct wiphy *wiphy, struct net_device *ndev,
 		if (err < 0) {
 			brcmf_err("setting AP mode failed %d\n", err);
 			goto exit;
+		}
+		if (!mbss) {
+			err = brcmf_fil_iovar_int_set(ifp, "chanspec", chanspec);
+			if (err < 0) {
+				brcmf_err("Set Channel failed: chspec=%d, %d\n",
+					  chanspec, err);
+				goto exit;
+			}
 		}
 		err = brcmf_fil_cmd_int_set(ifp, BRCMF_C_UP, 1);
 		if (err < 0) {
