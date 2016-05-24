@@ -38,6 +38,11 @@
 
 #define IB_IOCTL_MAGIC		0x1b
 
+#define IB_CMD_DIRECT		0x2
+
+#define IB_IOCTL_DIRECT \
+	_IOWR(IB_IOCTL_MAGIC, IB_CMD_DIRECT, unsigned long)
+
 /* Legacy part
  * !!!! NOTE: It uses the same command index as VERBS
  */

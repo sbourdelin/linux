@@ -850,6 +850,37 @@ out:
 	return ret;
 }
 
+static long ib_uverbs_ioctl(struct file *filp, unsigned int cmd,
+			    unsigned long arg)
+{
+	struct ib_uverbs_file *file = filp->private_data;
+	struct ib_device *ib_dev;
+	int srcu_key;
+
+	if (WARN_ON_ONCE(!ib_safe_file_access(filp)))
+		return -EACCES;
+
+	if (cmd == IB_IOCTL_DIRECT) {
+		long ret = 0;
+
+		srcu_key = srcu_read_lock(&file->device->disassociate_srcu);
+		ib_dev = srcu_dereference(file->device->ib_dev,
+					  &file->device->disassociate_srcu);
+		if (!ib_dev) {
+			srcu_read_unlock(&file->device->disassociate_srcu, srcu_key);
+			return -EIO;
+		}
+
+		if (ib_dev->direct_fn)
+			ret = ib_dev->direct_fn(filp, arg);
+
+		srcu_read_unlock(&file->device->disassociate_srcu, srcu_key);
+		return ret;
+	}
+
+	return -ENOIOCTLCMD;
+}
+
 static int ib_uverbs_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	struct ib_uverbs_file *file = filp->private_data;
@@ -985,6 +1016,7 @@ static const struct file_operations uverbs_fops = {
 	.open	 = ib_uverbs_open,
 	.release = ib_uverbs_close,
 	.llseek	 = no_llseek,
+	.unlocked_ioctl = ib_uverbs_ioctl,
 };
 
 static const struct file_operations uverbs_mmap_fops = {
@@ -994,6 +1026,7 @@ static const struct file_operations uverbs_mmap_fops = {
 	.open	 = ib_uverbs_open,
 	.release = ib_uverbs_close,
 	.llseek	 = no_llseek,
+	.unlocked_ioctl = ib_uverbs_ioctl,
 };
 
 static struct ib_client uverbs_client = {

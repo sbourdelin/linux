@@ -1685,6 +1685,8 @@ struct ib_device {
 
 	struct iw_cm_verbs	     *iwcm;
 
+	long		           (*direct_fn)(struct file *filp,
+						unsigned long arg);
 	int		           (*get_protocol_stats)(struct ib_device *device,
 							 union rdma_protocol_stats *stats);
 	int		           (*query_device)(struct ib_device *device,
