@@ -636,7 +636,15 @@ int gpiochip_add_data(struct gpio_chip *chip, void *data)
 			 * If we have .get_direction, set up the initial
 			 * direction flag from the hardware.
 			 */
-			int dir = chip->get_direction(chip, i);
+			int dir;
+
+			if (chip->can_sleep)
+				spin_unlock_irqrestore(&gpio_lock, flags);
+
+			dir = chip->get_direction(chip, i);
+
+			if (chip->can_sleep)
+				spin_lock_irqsave(&gpio_lock, flags);
 
 			if (!dir)
 				set_bit(FLAG_IS_OUT, &desc->flags);
