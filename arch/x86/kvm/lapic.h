@@ -12,6 +12,12 @@
 #define KVM_APIC_SHORT_MASK	0xc0000
 #define KVM_APIC_DEST_MASK	0x800
 
+enum {
+	HV_TIMER_NOT_USED,
+	HV_TIMER_NEEDS_ARMING,
+	HV_TIMER_ARMED,
+};
+
 struct kvm_timer {
 	struct hrtimer timer;
 	s64 period; 				/* unit: ns */
@@ -20,6 +26,7 @@ struct kvm_timer {
 	u64 tscdeadline;
 	u64 expired_tscdeadline;
 	atomic_t pending;			/* accumulated triggered timers */
+	int hv_timer_state;
 };
 
 struct kvm_lapic {
@@ -212,4 +219,8 @@ bool kvm_intr_is_single_vcpu_fast(struct kvm *kvm, struct kvm_lapic_irq *irq,
 			struct kvm_vcpu **dest_vcpu);
 int kvm_vector_to_index(u32 vector, u32 dest_vcpus,
 			const unsigned long *bitmap, u32 bitmap_size);
+void switch_to_sw_lapic_timer(struct kvm_vcpu *vcpu);
+void switch_to_hv_lapic_timer(struct kvm_vcpu *vcpu);
+void kvm_lapic_arm_hv_timer(struct kvm_vcpu *vcpu);
+void kvm_lapic_expired_hv_timer(struct kvm_vcpu *vcpu);
 #endif

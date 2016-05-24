@@ -7572,6 +7572,11 @@ static int handle_pcommit(struct kvm_vcpu *vcpu)
 	return 1;
 }
 
+static int handle_preemption_timer(struct kvm_vcpu *vcpu)
+{
+	kvm_lapic_expired_hv_timer(vcpu);
+	return 1;
+}
 /*
  * The exit handlers return 1 if the exit was handled fully and guest execution
  * may resume.  Otherwise they set the kvm_run parameter to indicate what needs
@@ -7623,6 +7628,7 @@ static int (*const kvm_vmx_exit_handlers[])(struct kvm_vcpu *vcpu) = {
 	[EXIT_REASON_XRSTORS]                 = handle_xrstors,
 	[EXIT_REASON_PML_FULL]		      = handle_pml_full,
 	[EXIT_REASON_PCOMMIT]                 = handle_pcommit,
+	[EXIT_REASON_PREEMPTION_TIMER]	      = handle_preemption_timer,
 };
 
 static const int kvm_vmx_max_exit_handlers =
@@ -8673,6 +8679,8 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 	 * case. */
 	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP)
 		vmx_set_interrupt_shadow(vcpu, 0);
+
+	kvm_lapic_arm_hv_timer(vcpu);
 
 	if (vmx->guest_pkru_valid)
 		__write_pkru(vmx->guest_pkru);

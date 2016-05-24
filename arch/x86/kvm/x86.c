@@ -7724,11 +7724,15 @@ void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu)
 
 void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu)
 {
+	if (kvm_x86_ops->set_hv_timer)
+		switch_to_hv_lapic_timer(vcpu);
 	kvm_x86_ops->sched_in(vcpu, cpu);
 }
 
 void kvm_arch_sched_out(struct kvm_vcpu *vcpu)
 {
+	if (kvm_x86_ops->set_hv_timer)
+		switch_to_sw_lapic_timer(vcpu);
 }
 
 int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)

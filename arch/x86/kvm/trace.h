@@ -6,6 +6,7 @@
 #include <asm/svm.h>
 #include <asm/clocksource.h>
 #include <asm/pvclock-abi.h>
+#include <lapic.h>
 
 #undef TRACE_SYSTEM
 #define TRACE_SYSTEM kvm
@@ -1349,6 +1350,27 @@ TRACE_EVENT(kvm_avic_unaccelerated_access,
 		  __entry->vec)
 );
 
+#define kvm_trace_symbol_hv_timer		\
+	{HV_TIMER_NOT_USED, "no"},		\
+	{HV_TIMER_NEEDS_ARMING, "need_arming"},	\
+	{HV_TIMER_ARMED, "armed"}
+
+TRACE_EVENT(kvm_hv_timer_state,
+		TP_PROTO(unsigned int vcpu_id, unsigned int hv_timer_state),
+		TP_ARGS(vcpu_id, hv_timer_state),
+		TP_STRUCT__entry(
+			__field(unsigned int, vcpu_id)
+			__field(unsigned int, hv_timer_state)
+			),
+		TP_fast_assign(
+			__entry->vcpu_id = vcpu_id;
+			__entry->hv_timer_state = hv_timer_state;
+			),
+		TP_printk("vcpu_id %x hv_timer %s\n",
+			__entry->vcpu_id,
+			__print_symbolic(__entry->hv_timer_state,
+				kvm_trace_symbol_hv_timer))
+	   );
 #endif /* _TRACE_KVM_H */
 
 #undef TRACE_INCLUDE_PATH

@@ -1313,7 +1313,7 @@ void wait_lapic_expire(struct kvm_vcpu *vcpu)
 		__delay(tsc_deadline - guest_tsc);
 }
 
-static void start_sw_tscdeadline(struct kvm_lapic *apic)
+static void start_sw_tscdeadline(struct kvm_lapic *apic, int no_expire)
 {
 	u64 guest_tsc, tscdeadline = apic->lapic_timer.tscdeadline;
 	u64 ns = 0;
@@ -1330,7 +1330,7 @@ static void start_sw_tscdeadline(struct kvm_lapic *apic)
 
 	now = apic->lapic_timer.timer.base->get_time();
 	guest_tsc = kvm_read_l1_tsc(vcpu, rdtsc());
-	if (likely(tscdeadline > guest_tsc)) {
+	if (no_expire || likely(tscdeadline > guest_tsc)) {
 		ns = (tscdeadline - guest_tsc) * 1000000ULL;
 		do_div(ns, this_tsc_khz);
 		expire = ktime_add_ns(now, ns);
@@ -1342,6 +1342,85 @@ static void start_sw_tscdeadline(struct kvm_lapic *apic)
 
 	local_irq_restore(flags);
 }
+
+void kvm_lapic_arm_hv_timer(struct kvm_vcpu *vcpu)
+{
+	struct kvm_lapic *apic = vcpu->arch.apic;
+	u64 tscdeadline, guest_tsc;
+
+	if (apic->lapic_timer.hv_timer_state == HV_TIMER_NOT_USED)
+		return;
+
+	tscdeadline = apic->lapic_timer.tscdeadline;
+	guest_tsc = kvm_read_l1_tsc(vcpu, rdtsc());
+
+	if (tscdeadline >= guest_tsc)
+		kvm_x86_ops->set_hv_timer(vcpu, tscdeadline - guest_tsc);
+	else
+		kvm_x86_ops->set_hv_timer(vcpu, 0);
+
+	apic->lapic_timer.hv_timer_state = HV_TIMER_ARMED;
+	trace_kvm_hv_timer_state(vcpu->vcpu_id,
+			apic->lapic_timer.hv_timer_state);
+}
+EXPORT_SYMBOL_GPL(kvm_lapic_arm_hv_timer);
+
+void kvm_lapic_expired_hv_timer(struct kvm_vcpu *vcpu)
+{
+	struct kvm_lapic *apic = vcpu->arch.apic;
+
+	WARN_ON(apic->lapic_timer.hv_timer_state != HV_TIMER_ARMED);
+	WARN_ON(swait_active(&vcpu->wq));
+	kvm_x86_ops->cancel_hv_timer(vcpu);
+	apic->lapic_timer.hv_timer_state = HV_TIMER_NOT_USED;
+	apic_timer_expired(apic);
+}
+EXPORT_SYMBOL_GPL(kvm_lapic_expired_hv_timer);
+
+void switch_to_hv_lapic_timer(struct kvm_vcpu *vcpu)
+{
+	struct kvm_lapic *apic = vcpu->arch.apic;
+
+	WARN_ON(apic->lapic_timer.hv_timer_state != HV_TIMER_NOT_USED);
+
+	if (apic_lvtt_tscdeadline(apic) &&
+	    !atomic_read(&apic->lapic_timer.pending)) {
+		hrtimer_cancel(&apic->lapic_timer.timer);
+		/* In case the timer triggered in above small window */
+		if (!atomic_read(&apic->lapic_timer.pending)) {
+			apic->lapic_timer.hv_timer_state =
+				HV_TIMER_NEEDS_ARMING;
+			trace_kvm_hv_timer_state(vcpu->vcpu_id,
+					apic->lapic_timer.hv_timer_state);
+		}
+	}
+}
+EXPORT_SYMBOL_GPL(switch_to_hv_lapic_timer);
+
+void switch_to_sw_lapic_timer(struct kvm_vcpu *vcpu)
+{
+	struct kvm_lapic *apic = vcpu->arch.apic;
+
+	/* Possibly the TSC deadline timer is not enabled yet */
+	if (apic->lapic_timer.hv_timer_state == HV_TIMER_NOT_USED)
+		return;
+
+	if (apic->lapic_timer.hv_timer_state == HV_TIMER_ARMED)
+		kvm_x86_ops->cancel_hv_timer(vcpu);
+	apic->lapic_timer.hv_timer_state = HV_TIMER_NOT_USED;
+
+	if (atomic_read(&apic->lapic_timer.pending))
+		return;
+
+	/*
+	 * Don't trigger the apic_timer_expired() for deadlock,
+	 * because the swake_up() from apic_timer_expired() will
+	 * try to get the run queue lock, which has been held here
+	 * since we are in context switch procedure already.
+	 */
+	start_sw_tscdeadline(apic, 1);
+}
+EXPORT_SYMBOL_GPL(switch_to_sw_lapic_timer);
 
 static void start_apic_timer(struct kvm_lapic *apic)
 {
@@ -1389,7 +1468,19 @@ static void start_apic_timer(struct kvm_lapic *apic)
 			   ktime_to_ns(ktime_add_ns(now,
 					apic->lapic_timer.period)));
 	} else if (apic_lvtt_tscdeadline(apic)) {
-		start_sw_tscdeadline(apic);
+		/* lapic timer in tsc deadline mode */
+		if (kvm_x86_ops->set_hv_timer) {
+			if (unlikely(!apic->lapic_timer.tscdeadline ||
+					!apic->vcpu->arch.virtual_tsc_khz))
+				return;
+
+			/* Expired timer will be checked on vcpu_run() */
+			apic->lapic_timer.hv_timer_state =
+				HV_TIMER_NEEDS_ARMING;
+			trace_kvm_hv_timer_state(apic->vcpu->vcpu_id,
+					apic->lapic_timer.hv_timer_state);
+		} else
+			start_sw_tscdeadline(apic, 0);
 	}
 }
 
