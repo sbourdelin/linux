@@ -49,6 +49,7 @@
 #include <asm/uaccess.h>
 
 #include <rdma/ib.h>
+#include <rdma/ib_ioctl.h>
 
 #include "uverbs.h"
 

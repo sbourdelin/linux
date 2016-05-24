@@ -52,8 +52,8 @@
 
 #include <asm/uaccess.h>
 
+#include <rdma/ib_ioctl.h>
 #include <rdma/ib_mad.h>
-#include <rdma/ib_user_mad.h>
 
 MODULE_AUTHOR("Roland Dreier");
 MODULE_DESCRIPTION("InfiniBand userspace MAD packet access");
