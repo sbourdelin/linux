@@ -1673,6 +1673,38 @@ static int proc_do_uuid(struct ctl_table *table, int write,
 	return proc_dostring(&fake_table, write, buffer, lenp, ppos);
 }
 
+static int proc_do_uuid_le(struct ctl_table *table, int write,
+			   void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	struct ctl_table fake_table;
+	unsigned char buf[64];
+	uuid_le uuid;
+
+	uuid_le_gen(&uuid);
+	sprintf(buf, "%pUl", &uuid);
+
+	fake_table.data = buf;
+	fake_table.maxlen = sizeof(buf);
+
+	return proc_dostring(&fake_table, write, buffer, lenp, ppos);
+}
+
+static int proc_do_uuid_be(struct ctl_table *table, int write,
+			   void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	struct ctl_table fake_table;
+	unsigned char buf[64];
+	uuid_be uuid;
+
+	uuid_be_gen(&uuid);
+	sprintf(buf, "%pUb", &uuid);
+
+	fake_table.data = buf;
+	fake_table.maxlen = sizeof(buf);
+
+	return proc_dostring(&fake_table, write, buffer, lenp, ppos);
+}
+
 /*
  * Return entropy available scaled to integral bits
  */
@@ -1744,6 +1776,18 @@ struct ctl_table random_table[] = {
 		.maxlen		= 16,
 		.mode		= 0444,
 		.proc_handler	= proc_do_uuid,
+	},
+	{
+		.procname	= "uuid_le",
+		.maxlen		= 16,
+		.mode		= 0444,
+		.proc_handler	= proc_do_uuid_le,
+	},
+	{
+		.procname	= "uuid_be",
+		.maxlen		= 16,
+		.mode		= 0444,
+		.proc_handler	= proc_do_uuid_be,
 	},
 #ifdef ADD_INTERRUPT_BENCH
 	{

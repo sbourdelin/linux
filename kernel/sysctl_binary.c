@@ -28,6 +28,8 @@ static bin_convert_t bin_string;
 static bin_convert_t bin_intvec;
 static bin_convert_t bin_ulongvec;
 static bin_convert_t bin_uuid;
+static bin_convert_t bin_uuid_le;
+static bin_convert_t bin_uuid_be;
 static bin_convert_t bin_dn_node_address;
 
 #define CTL_DIR   bin_dir
@@ -35,6 +37,8 @@ static bin_convert_t bin_dn_node_address;
 #define CTL_INT   bin_intvec
 #define CTL_ULONG bin_ulongvec
 #define CTL_UUID  bin_uuid
+#define CTL_UUID_LE  bin_uuid_le
+#define CTL_UUID_BE  bin_uuid_be
 #define CTL_DNADR bin_dn_node_address
 
 #define BUFSZ 256
@@ -53,6 +57,8 @@ static const struct bin_table bin_random_table[] = {
 	{ CTL_INT,	RANDOM_WRITE_THRESH,	"write_wakeup_threshold" },
 	{ CTL_UUID,	RANDOM_BOOT_ID,		"boot_id" },
 	{ CTL_UUID,	RANDOM_UUID,		"uuid" },
+	{ CTL_UUID_LE,	RANDOM_UUID_LE,		"uuid_le" },
+	{ CTL_UUID_BE,	RANDOM_UUID_BE,		"uuid_be" },
 	{}
 };
 
@@ -1111,7 +1117,7 @@ out:
 	return result;
 }
 
-static ssize_t bin_uuid(struct file *file,
+static ssize_t bin_uuid_be(struct file *file,
 	void __user *oldval, size_t oldlen, void __user *newval, size_t newlen)
 {
 	ssize_t result, copied = 0;
@@ -1143,6 +1149,46 @@ static ssize_t bin_uuid(struct file *file,
 	result = copied;
 out:
 	return result;
+}
+
+static ssize_t bin_uuid_le(struct file *file,
+	void __user *oldval, size_t oldlen, void __user *newval, size_t newlen)
+{
+	ssize_t result, copied = 0;
+
+	/* Only supports reads */
+	if (oldval && oldlen) {
+		char buf[UUID_STRING_LEN + 1];
+		uuid_le uuid;
+
+		result = kernel_read(file, 0, buf, sizeof(buf) - 1);
+		if (result < 0)
+			goto out;
+
+		buf[result] = '\0';
+
+		result = -EIO;
+		if (uuid_le_to_bin(buf, &uuid))
+			goto out;
+
+		if (oldlen > 16)
+			oldlen = 16;
+
+		result = -EFAULT;
+		if (copy_to_user(oldval, &uuid, oldlen))
+			goto out;
+
+		copied = oldlen;
+	}
+	result = copied;
+out:
+	return result;
+}
+
+static ssize_t bin_uuid(struct file *file,
+	void __user *oldval, size_t oldlen, void __user *newval, size_t newlen)
+{
+	return bin_uuid_be(file, oldval, oldlen, newval, newlen);
 }
 
 static ssize_t bin_dn_node_address(struct file *file,
