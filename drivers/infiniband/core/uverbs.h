@@ -46,11 +46,13 @@
 #include <rdma/ib_verbs.h>
 #include <rdma/ib_umem.h>
 #include <rdma/ib_user_verbs.h>
+#include <rdma/ib_user_ioctl.h>
 
 #define INIT_UDATA(udata, ibuf, obuf, ilen, olen)			\
 	do {								\
 		(udata)->inbuf  = (const void __user *) (ibuf);		\
 		(udata)->outbuf = (void __user *) (obuf);		\
+		(udata)->outptr = (void __user *)(obuf);		\
 		(udata)->inlen  = (ilen);				\
 		(udata)->outlen = (olen);				\
 	} while (0)
@@ -59,6 +61,7 @@
 	do {									\
 		(udata)->inbuf  = (ilen) ? (const void __user *) (ibuf) : NULL;	\
 		(udata)->outbuf = (olen) ? (void __user *) (obuf) : NULL;	\
+		(udata)->outptr = (olen) ? (void __user *)(obuf) : NULL;	\
 		(udata)->inlen  = (ilen);					\
 		(udata)->outlen = (olen);					\
 	} while (0)

@@ -1347,6 +1347,7 @@ struct ib_uobject {
 struct ib_udata {
 	const void __user *inbuf;
 	void __user *outbuf;
+	void __user *outptr;
 	size_t       inlen;
 	size_t       outlen;
 };
@@ -1967,7 +1968,12 @@ static inline int ib_copy_from_udata(void *dest, struct ib_udata *udata, size_t 
 
 static inline int ib_copy_to_udata(struct ib_udata *udata, void *src, size_t len)
 {
-	return copy_to_user(udata->outbuf, src, len) ? -EFAULT : 0;
+	int ret = copy_to_user(udata->outptr, src, len) ? -EFAULT : 0;
+
+	if (!ret)
+		udata->outptr += len;
+
+	return ret;
 }
 
 static inline bool ib_is_udata_cleared(struct ib_udata *udata,
