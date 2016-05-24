@@ -290,15 +290,31 @@ static inline void list_add_leaf_cfs_rq(struct cfs_rq *cfs_rq)
 		 * Ensure we either appear before our parent (if already
 		 * enqueued) or force our parent to appear after us when it is
 		 * enqueued.  The fact that we always enqueue bottom-up
-		 * reduces this to two cases.
+		 * reduces this to two cases and a special case for the root
+		 * cfs_rq.
 		 */
 		if (cfs_rq->tg->parent &&
 		    cfs_rq->tg->parent->cfs_rq[cpu_of(rq_of(cfs_rq))]->on_list) {
-			list_add_rcu(&cfs_rq->leaf_cfs_rq_list,
-				&rq_of(cfs_rq)->leaf_cfs_rq_list);
-		} else {
+			/* Add the child just before its parent */
+			list_add_tail_rcu(&cfs_rq->leaf_cfs_rq_list,
+				&(cfs_rq->tg->parent->cfs_rq[cpu_of(rq_of(cfs_rq))]->leaf_cfs_rq_list));
+			rq_of(cfs_rq)->leaf_alone = &rq_of(cfs_rq)->leaf_cfs_rq_list;
+		} else if (!cfs_rq->tg->parent) {
+			/*
+			 * cfs_rq without parent should be
+			 * at the end of the list
+			 */
 			list_add_tail_rcu(&cfs_rq->leaf_cfs_rq_list,
 				&rq_of(cfs_rq)->leaf_cfs_rq_list);
+			rq_of(cfs_rq)->leaf_alone = &rq_of(cfs_rq)->leaf_cfs_rq_list;
+		} else {
+			/*
+			 * Our parent has not already been added so make sure
+			 * that it will be put after us
+			 */
+			list_add_rcu(&cfs_rq->leaf_cfs_rq_list,
+				rq_of(cfs_rq)->leaf_alone);
+			rq_of(cfs_rq)->leaf_alone = &cfs_rq->leaf_cfs_rq_list;
 		}
 
 		cfs_rq->on_list = 1;
