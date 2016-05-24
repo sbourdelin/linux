@@ -4023,7 +4023,8 @@ struct page *alloc_kmem_pages(gfp_t gfp_mask, unsigned int order)
 	struct page *page;
 
 	page = alloc_pages(gfp_mask, order);
-	if (page && memcg_kmem_charge(page, gfp_mask, order) != 0) {
+	if (memcg_kmem_enabled() && (gfp_mask & __GFP_ACCOUNT) &&
+	    page && memcg_kmem_charge(page, gfp_mask, order) != 0) {
 		__free_pages(page, order);
 		page = NULL;
 	}
@@ -4035,7 +4036,8 @@ struct page *alloc_kmem_pages_node(int nid, gfp_t gfp_mask, unsigned int order)
 	struct page *page;
 
 	page = alloc_pages_node(nid, gfp_mask, order);
-	if (page && memcg_kmem_charge(page, gfp_mask, order) != 0) {
+	if (memcg_kmem_enabled() && (gfp_mask & __GFP_ACCOUNT) &&
+	    page && memcg_kmem_charge(page, gfp_mask, order) != 0) {
 		__free_pages(page, order);
 		page = NULL;
 	}
@@ -4048,7 +4050,8 @@ struct page *alloc_kmem_pages_node(int nid, gfp_t gfp_mask, unsigned int order)
  */
 void __free_kmem_pages(struct page *page, unsigned int order)
 {
-	memcg_kmem_uncharge(page, order);
+	if (memcg_kmem_enabled())
+		memcg_kmem_uncharge(page, order);
 	__free_pages(page, order);
 }
 
