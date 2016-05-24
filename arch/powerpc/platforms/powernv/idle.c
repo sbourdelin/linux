@@ -242,6 +242,11 @@ static DEVICE_ATTR(fastsleep_workaround_applyonce, 0600,
  */
 u64 pnv_first_deep_stop_state;
 
+/*
+ * Deepest stop idle state. Used when a cpu is offlined
+ */
+u64 pnv_deepest_stop_state;
+
 static int __init pnv_init_idle_states(void)
 {
 	struct device_node *power_mgt;
@@ -290,8 +295,11 @@ static int __init pnv_init_idle_states(void)
 		}
 
 		/*
-		 * Set pnv_first_deep_stop_state to the first stop level
-		 * to cause hypervisor state loss
+		 * Set pnv_first_deep_stop_state and pnv_deepest_stop_state.
+		 * pnv_first_deep_stop_state should be set to the first stop
+		 * level to cause hypervisor state loss.
+		 * pnv_deepest_stop_state should be set to the deepest stop
+		 * stop state.
 		 */
 		pnv_first_deep_stop_state = MAX_POSSIBLE_STOP_STATE;
 		for (i = 0; i < dt_idle_states; i++) {
@@ -300,6 +308,9 @@ static int __init pnv_init_idle_states(void)
 			if ((flags[i] & OPAL_PM_LOSE_FULL_CONTEXT) &&
 			     (pnv_first_deep_stop_state > psscr_rl))
 				pnv_first_deep_stop_state = psscr_rl;
+
+			if (pnv_deepest_stop_state < psscr_rl)
+				pnv_deepest_stop_state = psscr_rl;
 		}
 	}
 
