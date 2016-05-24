@@ -94,3 +94,13 @@ SPI example for an MPC5200 SPI bus:
 			reg = <1>;
 		};
 	};
+
+Normally SPI buses are assigned dynamic bus numbers starting at 32766
+and counting downwards.  It is possible to assign the bus number
+statically using devicetee aliases.  For example, on the MPC5200 the
+"spi@f00" device above is connected to the "soc" bus.  To set its
+bus_num to 1 add an aliases entry like this:
+
+	aliases {
+		spi1 = "/soc/spi@f00";
+	};
