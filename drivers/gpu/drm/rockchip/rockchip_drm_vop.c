@@ -836,6 +836,12 @@ static const struct drm_plane_funcs vop_plane_funcs = {
 	.atomic_destroy_state = vop_atomic_plane_destroy_state,
 };
 
+bool rockchip_drm_crtc_has_pending_event(struct drm_crtc *crtc)
+{
+	assert_spin_locked(&crtc->dev->event_lock);
+	return to_vop(crtc)->event;
+}
+
 static int vop_crtc_enable_vblank(struct drm_crtc *crtc)
 {
 	struct vop *vop = to_vop(crtc);
