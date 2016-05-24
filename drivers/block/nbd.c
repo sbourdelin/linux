@@ -71,6 +71,8 @@ struct nbd_device {
 	struct dentry *dbg_dir;
 #endif
 	struct work_struct ws_nbd;
+	struct kref users;
+	struct completion user_completion;
 };
 
 #if IS_ENABLED(CONFIG_DEBUG_FS)
@@ -674,6 +676,7 @@ static void nbd_reset(struct nbd_device *nbd)
 	nbd->flags = 0;
 	nbd->xmit_timeout = 0;
 	INIT_WORK(&nbd->ws_nbd, nbd_work_func);
+	init_completion(&nbd->user_completion);
 	queue_flag_clear_unlocked(QUEUE_FLAG_DISCARD, nbd->disk->queue);
 	del_timer_sync(&nbd->timeout_timer);
 }
@@ -808,6 +811,7 @@ static int __nbd_ioctl(struct block_device *bdev, struct nbd_device *nbd,
 		kthread_stop(thread);
 
 		sock_shutdown(nbd);
+		wait_for_completion(&nbd->user_completion);
 		mutex_lock(&nbd->tx_lock);
 		nbd_clear_que(nbd);
 		kill_bdev(bdev);
@@ -859,11 +863,57 @@ static int nbd_ioctl(struct block_device *bdev, fmode_t mode,
 	return error;
 }
 
+static void nbd_kref_release(struct kref *kref_users)
+{
+	struct nbd_device *nbd = container_of(kref_users, struct nbd_device,
+			users);
+	pr_debug("Releasing kref [%s]\n", __FUNCTION__);
+	complete(&nbd->user_completion);
+
+}
+
+static int nbd_open(struct block_device *bdev, fmode_t mode)
+{
+	struct nbd_device *nbd_dev = bdev->bd_disk->private_data;
+
+	kref_get(&nbd_dev->users);
+	pr_debug("Opening nbd_dev %s. Active users = %u\n",
+			bdev->bd_disk->disk_name,
+			atomic_read(&nbd_dev->users.refcount) - 1);
+	return 0;
+}
+
+static void nbd_release(struct gendisk *disk, fmode_t mode)
+{
+	struct nbd_device *nbd_dev = disk->private_data;
+	/*
+	*kref_init initializes ref count to 1, so we
+	*we check for refcount to be 2 for a final put.
+	*
+	*kref needs to be re-initialized just here as the
+	*other process holding it must see the ref count as 2.
+	*/
+	kref_put(&nbd_dev->users,  nbd_kref_release);
+
+	if (atomic_read(&nbd_dev->users.refcount) == 2) {
+		kref_sub(&nbd_dev->users, 2, nbd_kref_release);
+		kref_init(&nbd_dev->users);
+		kref_get(&nbd_dev->users);
+	}
+
+	pr_debug("Closing nbd_dev %s. Active users = %u\n",
+			disk->disk_name,
+			atomic_read(&nbd_dev->users.refcount) - 1);
+}
+
 static const struct block_device_operations nbd_fops = {
 	.owner =	THIS_MODULE,
 	.ioctl =	nbd_ioctl,
 	.compat_ioctl =	nbd_ioctl,
+	.open = 	nbd_open,
+	.release = 	nbd_release
 };
+
 
 static void nbd_work_func(struct work_struct *ws_nbd)
 {
@@ -1099,6 +1149,7 @@ static int __init nbd_init(void)
 		disk->first_minor = i << part_shift;
 		disk->fops = &nbd_fops;
 		disk->private_data = &nbd_dev[i];
+		kref_init(&nbd_dev[i].users);
 		sprintf(disk->disk_name, "nbd%d", i);
 		nbd_reset(&nbd_dev[i]);
 		add_disk(disk);
