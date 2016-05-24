@@ -327,4 +327,13 @@ IB_UVERBS_DECLARE_EX_CMD(query_device);
 IB_UVERBS_DECLARE_EX_CMD(create_cq);
 IB_UVERBS_DECLARE_EX_CMD(create_qp);
 
+#define IB_UVERBS_DECLARE_CMD_NL_CREATE(name)				       \
+	ssize_t ib_uverbs_nl_##name(struct ib_uverbs_file *filp,	       \
+				    struct ib_device *ib_dev,		       \
+				    struct ib_uverbs_ioctl_hdr *hdr,	       \
+				    struct nlattr **tb, struct ib_udata *uresp,\
+				    struct ib_udata *uhw)
+
+IB_UVERBS_DECLARE_CMD_NL_CREATE(context_create);
+
 #endif /* UVERBS_H */

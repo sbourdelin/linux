@@ -35,4 +35,4 @@ ib_umad-y :=			user_mad.o
 ib_ucm-y :=			ucm.o
 
 ib_uverbs-y :=			uverbs_main.o uverbs_cmd.o uverbs_marshall.o \
-				uverbs_nl.o uverbs_cmd_common.o
+				uverbs_nl.o uverbs_cmd_nl.o uverbs_cmd_common.o

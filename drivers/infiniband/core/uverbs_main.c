@@ -884,6 +884,15 @@ void ib_build_udata_from_nl(struct ib_udata *udata, struct nlattr **tb,
 				    .len = sizeof(struct ib_uverbs_uptr)},\
 	[IBNL_PROVIDER_RESP_UPTR]	 = {.type = NLA_BINARY,		  \
 				    .len = sizeof(struct ib_uverbs_uptr)}
+
+static const struct nla_policy ibnl_create_device_policy[] = {
+	IBNL_VENDOR_POLICY_ATTRS,
+      /*
+       * If there are other command attributes:
+       * [IBNL_CREATE_DEVICE_CORE]		 = {.type = NLA_BINARY, .len = sizeof(cmd)},
+       */
+};
+
 struct object_action {
 	struct {
 		struct validate_op validator;
@@ -906,7 +915,23 @@ struct object_action {
 	} ops[];
 };
 
-static const struct object_action object_actions[IB_OBJ_TYPE_MAX];
+static const struct object_action object_actions[IB_OBJ_TYPE_MAX] = {
+	[IB_OBJ_TYPE_DEVICE] = {
+		.create = {
+			.fn = ib_uverbs_nl_context_create,
+			.validator = {.policy = ibnl_create_device_policy,
+				      /*
+				       * TODO: Mandatory fields validator
+				       * .mandatory_fields =
+				       *	IB_UVERBS_MANDATORY_FIELDS(IBNL_CREATE_DEVICE_CORE),
+				       */
+
+					.resp_min_sz = sizeof(struct ib_uverbs_get_context_resp),
+				},
+			.max_attrs = IB_UVERBS_MAX_ATTRS(IBNL_CREATE_DEVICE_MAX),
+		}
+	}
+};
 
 struct nla_validator_cb_priv {
 	int maxtype;

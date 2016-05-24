@@ -118,4 +118,9 @@ enum ib_uverbs_common_resp_types {
 #define IB_USER_MAD_REGISTER_AGENT2     _IOWR(IB_IOCTL_MAGIC, 4, \
 					      struct ib_user_mad_reg_req2)
 
+enum ibnl_create_device {
+	IBNL_CREATE_DEVICE_CORE = IBNL_VENDOR_ATTRS_MAX,
+	IBNL_CREATE_DEVICE_MAX
+};
+
 #endif /* IB_USER_IOCTL_H */
