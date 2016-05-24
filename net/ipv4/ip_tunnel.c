@@ -620,9 +620,11 @@ void ip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev,
 		if (skb->protocol == htons(ETH_P_IP)) {
 			tos = inner_iph->tos;
 			connected = false;
+#if IS_ENABLED(CONFIG_IPV6)
 		} else if (skb->protocol == htons(ETH_P_IPV6)) {
 			tos = ipv6_get_dsfield((const struct ipv6hdr *)inner_iph);
 			connected = false;
+#endif
 		}
 	}
 
