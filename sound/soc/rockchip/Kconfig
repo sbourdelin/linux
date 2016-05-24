@@ -41,3 +41,14 @@ config SND_SOC_ROCKCHIP_RT5645
 	help
 	  Say Y or M here if you want to add support for SoC audio on Rockchip
 	  boards using the RT5645/RT5650 codec, such as Veyron.
+
+config SND_SOC_ROCKCHIP_MAX98357A_RT5514_DA7219
+	tristate "ASoC support for Rockchip boards using the MAX98357A/RT5514/DA7219"
+	depends on SND_SOC_ROCKCHIP && GPIOLIB
+	select SND_SOC_ROCKCHIP_I2S
+	select SND_SOC_MAX98357A
+	select SND_SOC_RT5514
+	select SND_SOC_DA7219
+	help
+	  Say Y or M here if you want to add support for SoC audio on Rockchip
+	  boards using the MAX98357A/RT5514/DA7219.
