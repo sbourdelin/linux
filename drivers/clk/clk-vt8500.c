@@ -461,7 +461,7 @@ static int wm8750_find_pll_bits(unsigned long rate, unsigned long parent_rate,
 {
 	u32 mul;
 	int div1, div2;
-	u32 best_mul, best_div1, best_div2;
+	u32 best_mul = 0, best_div1 = 0, best_div2 = 0;
 	unsigned long tclk, rate_err, best_err;
 
 	best_err = (unsigned long)-1;
@@ -513,7 +513,7 @@ static int wm8850_find_pll_bits(unsigned long rate, unsigned long parent_rate,
 {
 	u32 mul;
 	int div1, div2;
-	u32 best_mul, best_div1, best_div2;
+	u32 best_mul = 0, best_div1 = 0, best_div2 = 0;
 	unsigned long tclk, rate_err, best_err;
 
 	best_err = (unsigned long)-1;
