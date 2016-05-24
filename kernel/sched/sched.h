@@ -614,6 +614,7 @@ struct rq {
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	/* list of leaf cfs_rq on this cpu: */
 	struct list_head leaf_cfs_rq_list;
+	struct list_head *leaf_alone;
 #endif /* CONFIG_FAIR_GROUP_SCHED */
 
 	/*
