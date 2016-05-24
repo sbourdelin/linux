@@ -130,7 +130,7 @@ static int freq_table_get_index(struct cpufreq_stats *stats, unsigned int freq)
 	return -1;
 }
 
-static void __cpufreq_stats_free_table(struct cpufreq_policy *policy)
+static void cpufreq_stats_free_table(struct cpufreq_policy *policy)
 {
 	struct cpufreq_stats *stats = policy->stats;
 
@@ -146,20 +146,7 @@ static void __cpufreq_stats_free_table(struct cpufreq_policy *policy)
 	policy->stats = NULL;
 }
 
-static void cpufreq_stats_free_table(unsigned int cpu)
-{
-	struct cpufreq_policy *policy;
-
-	policy = cpufreq_cpu_get(cpu);
-	if (!policy)
-		return;
-
-	__cpufreq_stats_free_table(policy);
-
-	cpufreq_cpu_put(policy);
-}
-
-static int __cpufreq_stats_create_table(struct cpufreq_policy *policy)
+static int cpufreq_stats_create_table(struct cpufreq_policy *policy)
 {
 	unsigned int i = 0, count = 0, ret = -ENOMEM;
 	struct cpufreq_stats *stats;
@@ -226,23 +213,6 @@ free_stat:
 	return ret;
 }
 
-static void cpufreq_stats_create_table(unsigned int cpu)
-{
-	struct cpufreq_policy *policy;
-
-	/*
-	 * "likely(!policy)" because normally cpufreq_stats will be registered
-	 * before cpufreq driver
-	 */
-	policy = cpufreq_cpu_get(cpu);
-	if (likely(!policy))
-		return;
-
-	__cpufreq_stats_create_table(policy);
-
-	cpufreq_cpu_put(policy);
-}
-
 static int cpufreq_stat_notifier_policy(struct notifier_block *nb,
 		unsigned long val, void *data)
 {
@@ -250,9 +220,9 @@ static int cpufreq_stat_notifier_policy(struct notifier_block *nb,
 	struct cpufreq_policy *policy = data;
 
 	if (val == CPUFREQ_CREATE_POLICY)
-		ret = __cpufreq_stats_create_table(policy);
+		ret = cpufreq_stats_create_table(policy);
 	else if (val == CPUFREQ_REMOVE_POLICY)
-		__cpufreq_stats_free_table(policy);
+		cpufreq_stats_free_table(policy);
 
 	return ret;
 }
@@ -314,7 +284,6 @@ static struct notifier_block notifier_trans_block = {
 static int __init cpufreq_stats_init(void)
 {
 	int ret;
-	unsigned int cpu;
 
 	spin_lock_init(&cpufreq_stats_lock);
 	ret = cpufreq_register_notifier(&notifier_policy_block,
@@ -322,31 +291,21 @@ static int __init cpufreq_stats_init(void)
 	if (ret)
 		return ret;
 
-	for_each_online_cpu(cpu)
-		cpufreq_stats_create_table(cpu);
-
 	ret = cpufreq_register_notifier(&notifier_trans_block,
 				CPUFREQ_TRANSITION_NOTIFIER);
 	if (ret) {
 		cpufreq_unregister_notifier(&notifier_policy_block,
 				CPUFREQ_POLICY_NOTIFIER);
-		for_each_online_cpu(cpu)
-			cpufreq_stats_free_table(cpu);
-		return ret;
 	}
 
-	return 0;
+	return ret;
 }
 static void __exit cpufreq_stats_exit(void)
 {
-	unsigned int cpu;
-
-	cpufreq_unregister_notifier(&notifier_policy_block,
-			CPUFREQ_POLICY_NOTIFIER);
 	cpufreq_unregister_notifier(&notifier_trans_block,
 			CPUFREQ_TRANSITION_NOTIFIER);
-	for_each_online_cpu(cpu)
-		cpufreq_stats_free_table(cpu);
+	cpufreq_unregister_notifier(&notifier_policy_block,
+			CPUFREQ_POLICY_NOTIFIER);
 }
 
 MODULE_AUTHOR("Zou Nan hai <nanhai.zou@intel.com>");

@@ -1272,10 +1272,10 @@ static int cpufreq_online(unsigned int cpu)
 		ret = cpufreq_add_dev_interface(policy);
 		if (ret)
 			goto out_exit_policy;
+		write_lock_irqsave(&cpufreq_driver_lock, flags);
 		blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
 				CPUFREQ_CREATE_POLICY, policy);
 
-		write_lock_irqsave(&cpufreq_driver_lock, flags);
 		list_add(&policy->policy_list, &cpufreq_policy_list);
 		write_unlock_irqrestore(&cpufreq_driver_lock, flags);
 	}
@@ -1728,6 +1728,8 @@ EXPORT_SYMBOL_GPL(cpufreq_get_driver_data);
  */
 int cpufreq_register_notifier(struct notifier_block *nb, unsigned int list)
 {
+	struct cpufreq_policy *policy;
+	unsigned long flags;
 	int ret;
 
 	if (cpufreq_disabled())
@@ -1751,8 +1753,28 @@ int cpufreq_register_notifier(struct notifier_block *nb, unsigned int list)
 		mutex_unlock(&cpufreq_fast_switch_lock);
 		break;
 	case CPUFREQ_POLICY_NOTIFIER:
+		write_lock_irqsave(&cpufreq_driver_lock, flags);
+
+		/* Notify about all existing policies */
+		for_each_policy(policy) {
+			nb->notifier_call(nb, CPUFREQ_CREATE_POLICY,
+					policy);
+			if (policy_is_inactive(policy))
+				continue;
+
+			nb->notifier_call(nb, CPUFREQ_START, policy);
+		}
+
 		ret = blocking_notifier_chain_register(
 				&cpufreq_policy_notifier_list, nb);
+		if (ret) {
+			/* Notify about all existing policies */
+			for_each_policy(policy) {
+				nb->notifier_call(nb, CPUFREQ_REMOVE_POLICY,
+						  policy);
+			}
+		}
+		write_unlock_irqrestore(&cpufreq_driver_lock, flags);
 		break;
 	default:
 		ret = -EINVAL;
@@ -1774,6 +1796,8 @@ EXPORT_SYMBOL(cpufreq_register_notifier);
  */
 int cpufreq_unregister_notifier(struct notifier_block *nb, unsigned int list)
 {
+	struct cpufreq_policy *policy;
+	unsigned long flags;
 	int ret;
 
 	if (cpufreq_disabled())
@@ -1793,6 +1817,15 @@ int cpufreq_unregister_notifier(struct notifier_block *nb, unsigned int list)
 	case CPUFREQ_POLICY_NOTIFIER:
 		ret = blocking_notifier_chain_unregister(
 				&cpufreq_policy_notifier_list, nb);
+		if (!ret) {
+			write_lock_irqsave(&cpufreq_driver_lock, flags);
+			/* Notify about all existing policies */
+			for_each_policy(policy) {
+				nb->notifier_call(nb, CPUFREQ_REMOVE_POLICY,
+						  policy);
+			}
+			write_unlock_irqrestore(&cpufreq_driver_lock, flags);
+		}
 		break;
 	default:
 		ret = -EINVAL;
