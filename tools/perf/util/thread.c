@@ -43,9 +43,6 @@ struct thread *thread__new(pid_t pid, pid_t tid)
 		thread->cpu = -1;
 		INIT_LIST_HEAD(&thread->comm_list);
 
-		if (unwind__prepare_access(thread) < 0)
-			goto err_thread;
-
 		comm_str = malloc(32);
 		if (!comm_str)
 			goto err_thread;
@@ -59,6 +56,8 @@ struct thread *thread__new(pid_t pid, pid_t tid)
 		list_add(&comm->list, &thread->comm_list);
 		atomic_set(&thread->refcnt, 1);
 		RB_CLEAR_NODE(&thread->rb_node);
+
+		register_null_unwind_libunwind_ops(thread);
 	}
 
 	return thread;
