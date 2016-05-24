@@ -9,3 +9,10 @@ config MDEV
 
         If you don't know what do here, say N.
 
+config VFIO_MPCI
+    tristate "VFIO support for Mediated PCI devices"
+    depends on VFIO && PCI && MDEV
+    default n
+    help
+        VFIO based driver for mediated PCI devices.
+
