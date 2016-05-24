@@ -91,9 +91,8 @@ static int mpc85xx_l2ctlr_of_probe(struct platform_device *dev)
 	l2cache_size = *prop;
 
 	if (get_cache_sram_params(&sram_params)) {
-		dev_err(&dev->dev,
-			"Entire L2 as cache, provide valid sram offset and size\n");
-		return -EINVAL;
+		dev_info(&dev->dev, "Configure entire L2 as cache\n");
+		return 0;
 	}
 
 
