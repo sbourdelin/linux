@@ -35,4 +35,15 @@
 
 #include <uapi/rdma/ib_user_ioctl.h>
 
+#define IB_UVERBS_MANDATORY_FIELDS(mandatory_bitmap)		\
+	{.bitmap = (unsigned long []){(mandatory_bitmap)} }
+
+#define IB_UVERBS_MAX_ATTRS(max_attr)				\
+	((max_attr) + IB_UVERBS_CHECK_MAX(max_attr) -		\
+		IB_UVERBS_CHECK_MAX(max_attr))
+
+#define IB_UVERBS_MAX_SUPPORTED_ATTRS	(BITS_PER_LONG)
+#define IB_UVERBS_CHECK_MAX(val) \
+	(sizeof(char[1 - 2 * !!((val) > IB_UVERBS_MAX_SUPPORTED_ATTRS)]))
+
 #endif /* IB_IOCTL_H */

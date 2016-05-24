@@ -36,9 +36,70 @@
 #include <linux/types.h>
 #include <linux/ioctl.h>
 
+struct ib_uverbs_uptr {
+	__u64 ptr;
+	__u32 len;
+};
+
+struct ib_uverbs_ioctl_hdr {
+	__u32 length;
+	__u16 flags;
+	__u16 object_type;
+	__u16 reserved;
+	__u16 action;
+	__u32 user_handler;
+	/*
+	 * These fields represent core response only,
+	 * provider's response is given as a netlink attribute.
+	 */
+	struct ib_uverbs_uptr resp;
+};
+
+enum ib_uverbs_object_type {
+	IB_OBJ_TYPE_OBJECT, /* query supported types */
+	IB_OBJ_TYPE_DEVICE,
+	IB_OBJ_TYPE_QP,
+	IB_OBJ_TYPE_CQ,
+	IB_OBJ_TYPE_PD,
+	IB_OBJ_TYPE_MR,
+	IB_OBJ_TYPE_MW,
+	IB_OBJ_TYPE_FLOW,
+	IB_OBJ_TYPE_MAX
+};
+
+enum ib_uverbs_object_type_flags {
+	/* vendor flag should go here */
+	IB_UVERBS_OBJECT_TYPE_FLAGS_MAX = 1 << 0,
+};
+
+enum ib_uverbs_common_actions {
+	IBNL_OBJECT_CREATE,
+	IBNL_OBJECT_DESTROY,
+	IBNL_OBJECT_QUERY,
+	IBNL_OBJECT_MODIFY,
+	IBNL_OBJECT_MAX = 8
+};
+
+/* Couldn't be extended! */
+enum ibnl_vendor_attrs {
+	IBNL_PROVIDER_CMD_UPTR,
+	IBNL_PROVIDER_RESP_UPTR,
+	IBNL_VENDOR_ATTRS_MAX
+};
+
+enum ib_uverbs_common_resp_types {
+	IBNL_RESPONSE_TYPE_RESP,
+	IBNL_RESPONSE_TYPE_VENDOR,
+	IBNL_RESPONSE_TYPE_MAX = 8
+};
+
 #define IB_IOCTL_MAGIC		0x1b
 
+#define IB_CMD_VERBS		0x1
 #define IB_CMD_DIRECT		0x2
+
+#define IB_IOCTL_VERBS \
+	_IOWR(IB_IOCTL_MAGIC, IB_CMD_VERBS, struct ib_uverbs_ioctl_hdr)
 
 #define IB_IOCTL_DIRECT \
 	_IOWR(IB_IOCTL_MAGIC, IB_CMD_DIRECT, unsigned long)

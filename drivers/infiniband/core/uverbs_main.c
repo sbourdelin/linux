@@ -850,9 +850,230 @@ out:
 	return ret;
 }
 
+struct mandatory_fields {
+	unsigned long *bitmap;
+};
+
+struct validate_op {
+	const struct nla_policy		*policy;
+	struct mandatory_fields		mandatory_fields;
+	size_t				resp_min_sz;
+};
+
+void ib_build_udata_from_nl(struct ib_udata *udata, struct nlattr **tb,
+			    uint16_t resp_type)
+{
+	struct ib_uverbs_uptr ucmd = {};
+	struct ib_uverbs_uptr uresp = {};
+	struct ib_uverbs_uptr *pucmd = &ucmd;
+	struct ib_uverbs_uptr *puresp = &uresp;
+
+	if (tb[IBNL_PROVIDER_CMD_UPTR])
+		pucmd = (struct ib_uverbs_uptr *)nla_data(tb[IBNL_PROVIDER_CMD_UPTR]);
+
+	if (tb[IBNL_PROVIDER_RESP_UPTR])
+		puresp = (struct ib_uverbs_uptr *)nla_data(tb[IBNL_PROVIDER_RESP_UPTR]);
+
+	INIT_UDATA_BUF_OR_NULL(udata, (const void __user *)pucmd->ptr,
+			       (void __user *)puresp->ptr, pucmd->len,
+			       puresp->len);
+}
+
+#define IBNL_VENDOR_POLICY_ATTRS					  \
+	[IBNL_PROVIDER_CMD_UPTR]	 = {.type = NLA_BINARY,		  \
+				    .len = sizeof(struct ib_uverbs_uptr)},\
+	[IBNL_PROVIDER_RESP_UPTR]	 = {.type = NLA_BINARY,		  \
+				    .len = sizeof(struct ib_uverbs_uptr)}
+struct object_action {
+	struct {
+		struct validate_op validator;
+		long (*fn)(struct ib_uverbs_file *filp,
+			   struct ib_device *ib_dev,
+			   struct ib_uverbs_ioctl_hdr *hdr,
+			   struct nlattr **tb, struct ib_udata *resp,
+			   struct ib_udata *uhw);
+		unsigned int max_attrs;
+	} create;
+	/* other ops */
+	struct {
+		struct validate_op validator;
+		long (*fn)(struct ib_uverbs_file *filp,
+			   struct ib_device *ib_dev,
+			   struct ib_uverbs_ioctl_hdr *hdr, uint32_t id,
+			   struct nlattr **tb, struct ib_udata *resp,
+			   struct ib_udata *uhw);
+		unsigned int max_attrs;
+	} ops[];
+};
+
+static const struct object_action object_actions[IB_OBJ_TYPE_MAX];
+
+struct nla_validator_cb_priv {
+	int maxtype;
+	unsigned long *fields;
+};
+
+static int ib_set_bit(const struct nlattr *nla, void *priv)
+{
+	struct nla_validator_cb_priv *validator =
+		(struct nla_validator_cb_priv *)priv;
+	u16 type = nla_type(nla);
+
+	if (type >= validator->maxtype)
+		return -EOPNOTSUPP;
+
+	set_bit(type, validator->fields);
+
+	return 0;
+};
+
+static int nla_strict_parse(struct nlattr **tb, int maxtype,
+			    const struct nlattr *head, int len,
+			    const struct validate_op *validate)
+{
+	int err = 0;
+	const struct nla_policy	*policy = validate->policy;
+	DECLARE_BITMAP(fields, maxtype);
+	struct nla_validator_cb_priv validate_priv = {.maxtype = maxtype,
+						      .fields = fields};
+
+	err = nla_validate(head, len, maxtype, policy);
+	if (err)
+		return err;
+
+	err = nla_parse_cb(tb, maxtype, head, len, policy, ib_set_bit,
+			   &validate_priv);
+	if (err) {
+		err = -EINVAL;
+		goto errout;
+	}
+
+	bitmap_and(fields, fields, validate->mandatory_fields.bitmap,
+		   IB_UVERBS_MAX_SUPPORTED_ATTRS);
+	if (!bitmap_equal(fields, validate->mandatory_fields.bitmap,
+			  IB_UVERBS_MAX_SUPPORTED_ATTRS)) {
+		err = -EINVAL;
+		goto errout;
+	}
+
+errout:
+	return err;
+}
+
+#define IB_UVERBS_MAX_CMD_SZ	4096
+
+static long ib_uverbs_cmd_verbs(struct file *filp,
+				struct ib_uverbs_ioctl_hdr *hdr,
+				void __user *buf)
+{
+	struct ib_uverbs_file *file = filp->private_data;
+	enum ib_uverbs_object_type obj_type = hdr->object_type;
+	void *cmd_buf = NULL;
+	struct nlattr **tb = NULL;
+	struct ib_device *ib_dev;
+	int srcu_key;
+	int err = 0;
+
+	if (obj_type >= IB_OBJ_TYPE_MAX)
+		return -EOPNOTSUPP;
+
+	cmd_buf = kmalloc(hdr->length, GFP_KERNEL);
+	if (!cmd_buf)
+		return -ENOMEM;
+
+	if (copy_from_user(cmd_buf, buf, hdr->length - sizeof(*hdr))) {
+		pr_debug("copy_from_user failed while attempting to read uverbs command buffer: %p, %zd bytes\n",
+			 buf, hdr->length - sizeof(*hdr));
+		err = -EFAULT;
+		goto err1;
+	}
+
+	srcu_key = srcu_read_lock(&file->device->disassociate_srcu);
+	ib_dev = srcu_dereference(file->device->ib_dev,
+				  &file->device->disassociate_srcu);
+	if (!ib_dev) {
+		err = -EIO;
+		goto err;
+	}
+
+	/* TODO: handle flags, for example user specific object */
+
+	switch (hdr->action) {
+	case IBNL_OBJECT_CREATE: {
+		struct ib_udata uhw;
+		struct ib_udata uresp;
+		struct nlattr __user *nla_resp = NULL;
+
+		if (!object_actions[obj_type].create.fn) {
+			err = -EOPNOTSUPP;
+			goto err;
+		}
+
+		if (hdr->action || hdr->user_handler) {
+			pr_debug("invalid uverbs command. action=%d, user_handler=%d\n",
+				 hdr->action, hdr->user_handler);
+			err = -EINVAL;
+			goto err;
+		}
+
+		/* validate response */
+		if (hdr->resp.len < object_actions[obj_type].create.validator.resp_min_sz) {
+			err = -ENOSPC;
+			goto err;
+		}
+
+		tb = kcalloc(object_actions[obj_type].create.max_attrs + 1,
+			     sizeof(*tb), GFP_KERNEL);
+		if (!tb) {
+			err = -ENOMEM;
+			goto err;
+		}
+
+		err = nla_strict_parse(tb, object_actions[obj_type].create.max_attrs,
+				       (const struct nlattr *)cmd_buf,
+				       hdr->length - sizeof(*hdr),
+				       &object_actions[obj_type].create.validator);
+		if (err)
+			goto err;
+
+		ib_build_udata_from_nl(&uhw, tb,
+				       IBNL_RESPONSE_TYPE_VENDOR);
+
+		if (hdr->resp.len) {
+			INIT_UDATA_BUF_OR_NULL(&uresp, NULL,
+					       (void __user *)hdr->resp.ptr,
+					       0, hdr->resp.len);
+			nla_resp = ib_uverbs_nla_nest_start(&uresp,
+							    IBNL_RESPONSE_TYPE_RESP);
+			if (err)
+				goto err;
+		}
+
+		err = object_actions[obj_type].create.fn(file, ib_dev, hdr, tb,
+							 &uresp, &uhw);
+
+		if (nla_resp)
+			ib_uverbs_nla_nest_end(&uresp, nla_resp);
+		break;
+	}
+	default:
+		/* TODO: check object's specific actions */
+		return -ENOIOCTLCMD;
+	}
+err:
+	srcu_read_unlock(&file->device->disassociate_srcu, srcu_key);
+err1:
+	kfree(cmd_buf);
+	kfree(tb);
+	return err;
+}
+
 static long ib_uverbs_ioctl(struct file *filp, unsigned int cmd,
 			    unsigned long arg)
 {
+	struct ib_uverbs_ioctl_hdr __user *user_hdr =
+		(struct ib_uverbs_ioctl_hdr __user *)arg;
+	struct ib_uverbs_ioctl_hdr hdr;
 	struct ib_uverbs_file *file = filp->private_data;
 	struct ib_device *ib_dev;
 	int srcu_key;
@@ -878,7 +1099,31 @@ static long ib_uverbs_ioctl(struct file *filp, unsigned int cmd,
 		return ret;
 	}
 
-	return -ENOIOCTLCMD;
+	/*
+	 * Right now, we are supporting two possible calls
+	 * DIRECT	- go to driver, no parsing, no verification
+	 * VERBS	- pass verification, TLV parsing
+	 */
+	if (cmd != IB_IOCTL_VERBS)
+		return -ENOIOCTLCMD;
+
+	if (copy_from_user(&hdr, user_hdr, sizeof(hdr))) {
+		pr_debug("copy_from_user failed while attempting to read uverbs command header: %p. %zd bytes\n",
+			 user_hdr, sizeof(hdr));
+		return -EFAULT;
+	}
+
+	if (hdr.length > IB_UVERBS_MAX_CMD_SZ || hdr.length <= sizeof(hdr)) {
+		pr_debug("invalid uverbs ioctl command length %d\n", hdr.length);
+		return -EINVAL;
+	}
+
+	/* currently there are no flags supported */
+	if (hdr.flags || hdr.reserved)
+		return -EOPNOTSUPP;
+
+	return ib_uverbs_cmd_verbs(filp, &hdr,
+				   (__user void *)arg + sizeof(hdr));
 }
 
 static int ib_uverbs_mmap(struct file *filp, struct vm_area_struct *vma)
