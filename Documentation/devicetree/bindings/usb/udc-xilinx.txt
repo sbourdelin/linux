@@ -1,18 +1,23 @@
 Xilinx USB2 device controller
 
 Required properties:
-- compatible		: Should be "xlnx,usb2-device-4.00.a"
+- compatible		: Should be "xlnx,usb2-device-4.00.a" or
+			  "xlnx,usb2-device-5.00"
 - reg			: Physical base address and size of the USB2
 			  device registers map.
 - interrupts		: Should contain single irq line of USB2 device
 			  controller
 - xlnx,has-builtin-dma	: if DMA is included
+- dma-ranges		: Should be as the following
+			  <child-bus-address, parent-bus-address, length>
+- xlnx,addrwidth	: Should be the dma addressing size in bits(ex: 64 bits)
 
 Example:
- 		axi-usb2-device@42e00000 {
-                        compatible = "xlnx,usb2-device-4.00.a";
-                        interrupts = <0x0 0x39 0x1>;
-                        reg = <0x42e00000 0x10000>;
-                        xlnx,has-builtin-dma;
-                };
-
+		axi-usb2-device@42e00000 {
+			compatible = "xlnx,usb2-device-4.00.a";
+			interrupts = <0x0 0x39 0x1>;
+			reg = <0x42e00000 0x10000>;
+			dma-ranges = <0x00000000 0x00000000 0x40000000>;
+			xlnx,has-builtin-dma;
+			xlnx,addrwidth = <0x40>;
+		};
