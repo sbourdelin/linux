@@ -8586,6 +8586,14 @@ void init_tg_cfs_entry(struct task_group *tg, struct cfs_rq *cfs_rq,
 		se->depth = parent->depth + 1;
 	}
 
+	/*
+	 * Set last_update_time to something different from 0 to make
+	 * sure the 1st sched_entity will not be attached twice: once
+	 * when attaching the task to the group and one more time when
+	 * enqueueing the task.
+	 */
+	tg->cfs_rq[cpu]->avg.last_update_time = rq_clock_task(rq_of(cfs_rq));
+
 	se->my_q = cfs_rq;
 	/* guarantee group entities always have weight */
 	update_load_set(&se->load, NICE_0_LOAD);
