@@ -27,6 +27,11 @@ extern void debug_mutex_unlock(struct mutex *lock);
 extern void debug_mutex_init(struct mutex *lock, const char *name,
 			     struct lock_class_key *key);
 
+/*
+ * In the debug case, we don't need to use WRITE_ONCE
+ * to set and clear the owner, because the wait_lock
+ * is taken when reading and writing to the owner field.
+ */
 static inline void mutex_set_owner(struct mutex *lock)
 {
 	lock->owner = current;
