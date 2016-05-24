@@ -165,6 +165,67 @@ nla_policy_len(const struct nla_policy *p, int n)
 EXPORT_SYMBOL(nla_policy_len);
 
 /**
+ * nla_parse_cb - Parse a stream of attributes into a tb buffer with callback
+ * @tb: destination array with maxtype+1 elements
+ * @maxtype: maximum attribute type to be expected
+ * @head: head of attribute stream
+ * @len: length of attribute stream
+ * @policy: validation policy
+ * @cb: callback function and data, must not be NULL
+ * @cb_priv: private data for the callback
+ *
+ * Parses a stream of attributes and stores a pointer to each attribute in
+ * the tb array accessible via the attribute type. Attributes with a type
+ * exceeding maxtype will be silently ignored for backwards compatibility
+ * reasons. policy may be set to NULL if no validation is required.
+ * For every validated nla, the function calls the user-space callback.
+ * If the callback fails (returns with non-zero value), parsing is terminated
+ * and this value is returned as error.
+ *
+ * Returns 0 on success or a negative error code.
+ */
+int nla_parse_cb(struct nlattr **tb, int maxtype, const struct nlattr *head,
+		 int len, const struct nla_policy *policy,
+		 int (*cb)(const struct nlattr *, void *), void *cb_priv)
+{
+	const struct nlattr *nla;
+	int rem, err;
+
+	memset(tb, 0, sizeof(struct nlattr *) * (maxtype + 1));
+
+	nla_for_each_attr(nla, head, len, rem) {
+		u16 type = nla_type(nla);
+
+		if (type > 0 && type <= maxtype) {
+			if (policy) {
+				err = validate_nla(nla, maxtype, policy);
+				if (err < 0)
+					goto errout;
+			}
+			err = cb(nla, cb_priv);
+			if (err)
+				goto errout;
+
+			tb[type] = (struct nlattr *)nla;
+		}
+	}
+
+	if (unlikely(rem > 0))
+		pr_warn_ratelimited("netlink: %d bytes leftover after parsing attributes in process `%s'.\n",
+				    rem, current->comm);
+
+	err = 0;
+errout:
+	return err;
+}
+EXPORT_SYMBOL(nla_parse_cb);
+
+static int nla_pass_all_cb(const struct nlattr *nla, void *priv)
+{
+	return 0;
+}
+
+/**
  * nla_parse - Parse a stream of attributes into a tb buffer
  * @tb: destination array with maxtype+1 elements
  * @maxtype: maximum attribute type to be expected
@@ -182,32 +243,8 @@ EXPORT_SYMBOL(nla_policy_len);
 int nla_parse(struct nlattr **tb, int maxtype, const struct nlattr *head,
 	      int len, const struct nla_policy *policy)
 {
-	const struct nlattr *nla;
-	int rem, err;
-
-	memset(tb, 0, sizeof(struct nlattr *) * (maxtype + 1));
-
-	nla_for_each_attr(nla, head, len, rem) {
-		u16 type = nla_type(nla);
-
-		if (type > 0 && type <= maxtype) {
-			if (policy) {
-				err = validate_nla(nla, maxtype, policy);
-				if (err < 0)
-					goto errout;
-			}
-
-			tb[type] = (struct nlattr *)nla;
-		}
-	}
-
-	if (unlikely(rem > 0))
-		pr_warn_ratelimited("netlink: %d bytes leftover after parsing attributes in process `%s'.\n",
-				    rem, current->comm);
-
-	err = 0;
-errout:
-	return err;
+	return nla_parse_cb(tb, maxtype, head, len, policy, nla_pass_all_cb,
+			    NULL);
 }
 EXPORT_SYMBOL(nla_parse);
 

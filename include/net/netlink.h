@@ -149,6 +149,8 @@
  *   nla_find()				find attribute in stream of attributes
  *   nla_find_nested()			find attribute in nested attributes
  *   nla_parse()			parse and validate stream of attrs
+ *   nla_parse_cb()			parse stream of attrs and call to
+ *						callback for every nlattr
  *   nla_parse_nested()			parse nested attribuets
  *   nla_for_each_attr()		loop over all attributes
  *   nla_for_each_nested()		loop over the nested attributes
@@ -237,6 +239,9 @@ int nla_validate(const struct nlattr *head, int len, int maxtype,
 		 const struct nla_policy *policy);
 int nla_parse(struct nlattr **tb, int maxtype, const struct nlattr *head,
 	      int len, const struct nla_policy *policy);
+int nla_parse_cb(struct nlattr **tb, int maxtype, const struct nlattr *head,
+		 int len, const struct nla_policy *policy,
+		 int (*cb)(const struct nlattr *, void *), void *cb_priv);
 int nla_policy_len(const struct nla_policy *, int);
 struct nlattr *nla_find(const struct nlattr *head, int len, int attrtype);
 size_t nla_strlcpy(char *dst, const struct nlattr *nla, size_t dstsize);

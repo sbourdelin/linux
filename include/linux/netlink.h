@@ -117,7 +117,6 @@ netlink_skb_clone(struct sk_buff *skb, gfp_t gfp_mask)
 
 #define NLMSG_DEFAULT_SIZE (NLMSG_GOODSIZE - NLMSG_HDRLEN)
 
-
 struct netlink_callback {
 	struct sk_buff		*skb;
 	const struct nlmsghdr	*nlh;
