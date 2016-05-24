@@ -39,6 +39,7 @@
 #include <asm/types.h>
 
 #include <linux/nbd.h>
+#include <linux/workqueue.h>
 
 struct nbd_device {
 	u32 flags;
@@ -57,7 +58,7 @@ struct nbd_device {
 	int blksize;
 	loff_t bytesize;
 	int xmit_timeout;
-	bool timedout;
+	atomic_t timedout;
 	bool disconnect; /* a disconnect has been requested by user */
 
 	struct timer_list timeout_timer;
@@ -69,6 +70,7 @@ struct nbd_device {
 #if IS_ENABLED(CONFIG_DEBUG_FS)
 	struct dentry *dbg_dir;
 #endif
+	struct work_struct ws_nbd;
 };
 
 #if IS_ENABLED(CONFIG_DEBUG_FS)
@@ -94,6 +96,7 @@ static int max_part;
  * Thanks go to Jens Axboe and Al Viro for their LKML emails explaining this!
  */
 static DEFINE_SPINLOCK(nbd_lock);
+static void nbd_work_func(struct work_struct *);
 
 static inline struct device *nbd_to_dev(struct nbd_device *nbd)
 {
@@ -172,39 +175,31 @@ static void nbd_end_request(struct nbd_device *nbd, struct request *req)
  */
 static void sock_shutdown(struct nbd_device *nbd)
 {
-	spin_lock_irq(&nbd->sock_lock);
+	struct socket *sock;
 
-	if (!nbd->sock) {
-		spin_unlock_irq(&nbd->sock_lock);
-		return;
-	}
-
-	dev_warn(disk_to_dev(nbd->disk), "shutting down socket\n");
-	kernel_sock_shutdown(nbd->sock, SHUT_RDWR);
-	sockfd_put(nbd->sock);
+	spin_lock(&nbd->sock_lock);
+	sock = nbd->sock;
 	nbd->sock = NULL;
-	spin_unlock_irq(&nbd->sock_lock);
+	spin_unlock(&nbd->sock_lock);
+
+	if (!sock)
+		return;
 
 	del_timer(&nbd->timeout_timer);
+	dev_warn(disk_to_dev(nbd->disk), "shutting down socket\n");
+	kernel_sock_shutdown(sock, SHUT_RDWR);
+	sockfd_put(sock);
 }
 
 static void nbd_xmit_timeout(unsigned long arg)
 {
 	struct nbd_device *nbd = (struct nbd_device *)arg;
-	unsigned long flags;
 
 	if (list_empty(&nbd->queue_head))
 		return;
-
-	spin_lock_irqsave(&nbd->sock_lock, flags);
-
-	nbd->timedout = true;
-
-	if (nbd->sock)
-		kernel_sock_shutdown(nbd->sock, SHUT_RDWR);
-
-	spin_unlock_irqrestore(&nbd->sock_lock, flags);
-
+	atomic_inc(&nbd->timedout);
+	schedule_work(&nbd->ws_nbd);
+	wake_up(&nbd->waiting_wq);
 	dev_err(nbd_to_dev(nbd), "Connection timed out, shutting down connection\n");
 }
 
@@ -592,7 +587,11 @@ static int nbd_thread_send(void *data)
 		spin_unlock_irq(&nbd->queue_lock);
 
 		/* handle request */
-		nbd_handle_req(nbd, req);
+		if (atomic_read(&nbd->timedout)) {
+			req->errors++;
+			nbd_end_request(nbd, req);
+		} else
+			nbd_handle_req(nbd, req);
 	}
 
 	nbd->task_send = NULL;
@@ -666,12 +665,13 @@ out:
 static void nbd_reset(struct nbd_device *nbd)
 {
 	nbd->disconnect = false;
-	nbd->timedout = false;
+	atomic_set(&nbd->timedout, 0);
 	nbd->blksize = 1024;
 	nbd->bytesize = 0;
 	set_capacity(nbd->disk, 0);
 	nbd->flags = 0;
 	nbd->xmit_timeout = 0;
+	INIT_WORK(&nbd->ws_nbd, nbd_work_func);
 	queue_flag_clear_unlocked(QUEUE_FLAG_DISCARD, nbd->disk->queue);
 	del_timer_sync(&nbd->timeout_timer);
 }
@@ -805,16 +805,16 @@ static int __nbd_ioctl(struct block_device *bdev, struct nbd_device *nbd,
 		nbd_dev_dbg_close(nbd);
 		kthread_stop(thread);
 
-		mutex_lock(&nbd->tx_lock);
-
 		sock_shutdown(nbd);
+		mutex_lock(&nbd->tx_lock);
 		nbd_clear_que(nbd);
 		kill_bdev(bdev);
 		nbd_bdev_reset(bdev);
 
 		if (nbd->disconnect) /* user requested, ignore socket errors */
 			error = 0;
-		if (nbd->timedout)
+
+		if (atomic_read(&nbd->timedout))
 			error = -ETIMEDOUT;
 
 		nbd_reset(nbd);
@@ -863,6 +863,14 @@ static const struct block_device_operations nbd_fops =
 	.ioctl =	nbd_ioctl,
 	.compat_ioctl =	nbd_ioctl,
 };
+
+static void nbd_work_func(struct work_struct *ws_nbd)
+{
+	struct nbd_device *nbd_dev = container_of(ws_nbd, struct nbd_device,
+								ws_nbd);
+
+	sock_shutdown(nbd_dev);
+}
 
 #if IS_ENABLED(CONFIG_DEBUG_FS)
 
