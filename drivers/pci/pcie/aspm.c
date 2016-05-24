@@ -439,9 +439,9 @@ static void pcie_config_aspm_link(struct pcie_link_state *link, u32 state)
 		return;
 	/* Convert ASPM state to upstream/downstream ASPM register state */
 	if (state & ASPM_STATE_L0S_UP)
-		dwstream |= PCI_EXP_LNKCTL_ASPM_L0S;
-	if (state & ASPM_STATE_L0S_DW)
 		upstream |= PCI_EXP_LNKCTL_ASPM_L0S;
+	if (state & ASPM_STATE_L0S_DW)
+		dwstream |= PCI_EXP_LNKCTL_ASPM_L0S;
 	if (state & ASPM_STATE_L1) {
 		upstream |= PCI_EXP_LNKCTL_ASPM_L1;
 		dwstream |= PCI_EXP_LNKCTL_ASPM_L1;
