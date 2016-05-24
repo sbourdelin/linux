@@ -1,12 +1,18 @@
 
 #include <errno.h>
+#if defined(LIBUNWIND_X86_32)
+#include <libunwind-x86.h>
+#elif defined(LIBUNWIND_X86_64)
+#include <libunwind-x86_64.h>
+#elif defined(HAVE_LIBUNWIND_LOCAL_SUPPORT)
 #include <libunwind.h>
+#endif
 #include "perf_regs.h"
 #include "../../util/unwind.h"
 #include "../../util/debug.h"
 
-#ifdef HAVE_ARCH_X86_64_SUPPORT
-int libunwind__arch_reg_id(int regnum)
+#if !defined(REMOTE_UNWIND_LIBUNWIND) && defined(HAVE_ARCH_X86_64_SUPPORT)
+int LIBUNWIND__ARCH_REG_ID(int regnum)
 {
 	int id;
 
@@ -69,8 +75,11 @@ int libunwind__arch_reg_id(int regnum)
 
 	return id;
 }
-#else
-int libunwind__arch_reg_id(int regnum)
+#endif
+
+#if !defined(REMOTE_UNWIND_LIBUNWIND) && !defined(HAVE_ARCH_X86_64_SUPPORT) || \
+	defined(LIBUNWIND_X86_32)
+int LIBUNWIND__ARCH_REG_ID(int regnum)
 {
 	int id;
 
@@ -109,4 +118,4 @@ int libunwind__arch_reg_id(int regnum)
 
 	return id;
 }
-#endif /* HAVE_ARCH_X86_64_SUPPORT */
+#endif

@@ -56,6 +56,11 @@ static inline void unwind__get_arch(struct thread *thread __maybe_unused,
 static inline void
 register_null_unwind_libunwind_ops(struct thread *thread __maybe_unused) {}
 #endif
+
+#ifdef HAVE_LIBUNWIND_X86_SUPPORT
+extern struct unwind_libunwind_ops _Ux86_unwind_libunwind_ops;
+#endif
+
 #else
 static inline int
 unwind__get_entries(unwind_entry_cb_t cb __maybe_unused,
