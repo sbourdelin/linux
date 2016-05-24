@@ -110,6 +110,10 @@ module_param_named(pml, enable_pml, bool, S_IRUGO);
 
 #define KVM_VMX_TSC_MULTIPLIER_MAX     0xffffffffffffffffULL
 
+static int cpu_preemption_timer_multi;
+static bool __read_mostly enable_hv_timer;
+module_param_named(enable_hv_timer, enable_hv_timer, bool, S_IRUGO);
+
 #define KVM_GUEST_CR0_MASK (X86_CR0_NW | X86_CR0_CD)
 #define KVM_VM_CR0_ALWAYS_ON_UNRESTRICTED_GUEST (X86_CR0_WP | X86_CR0_NE)
 #define KVM_VM_CR0_ALWAYS_ON						\
@@ -1054,6 +1058,12 @@ static inline bool cpu_has_vmx_virtual_intr_delivery(void)
 {
 	return vmcs_config.cpu_based_2nd_exec_ctrl &
 		SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY;
+}
+
+static inline bool cpu_has_vmx_preemption_timer(void)
+{
+	return vmcs_config.pin_based_exec_ctrl &
+		PIN_BASED_VMX_PREEMPTION_TIMER;
 }
 
 static inline bool cpu_has_vmx_posted_intr(void)
@@ -3302,7 +3312,8 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf)
 		return -EIO;
 
 	min = PIN_BASED_EXT_INTR_MASK | PIN_BASED_NMI_EXITING;
-	opt = PIN_BASED_VIRTUAL_NMIS | PIN_BASED_POSTED_INTR;
+	opt = PIN_BASED_VIRTUAL_NMIS | PIN_BASED_POSTED_INTR |
+		 PIN_BASED_VMX_PREEMPTION_TIMER;
 	if (adjust_vmx_controls(min, opt, MSR_IA32_VMX_PINBASED_CTLS,
 				&_pin_based_exec_control) < 0)
 		return -EIO;
@@ -4775,6 +4786,8 @@ static u32 vmx_pin_based_exec_ctrl(struct vcpu_vmx *vmx)
 
 	if (!kvm_vcpu_apicv_active(&vmx->vcpu))
 		pin_based_exec_ctrl &= ~PIN_BASED_POSTED_INTR;
+	/* Enable the preemption timer dynamically */
+	pin_based_exec_ctrl &= ~PIN_BASED_VMX_PREEMPTION_TIMER;
 	return pin_based_exec_ctrl;
 }
 
@@ -6371,6 +6384,17 @@ static __init int hardware_setup(void)
 		kvm_x86_ops->slot_disable_log_dirty = NULL;
 		kvm_x86_ops->flush_log_dirty = NULL;
 		kvm_x86_ops->enable_log_dirty_pt_masked = NULL;
+	}
+
+	if (cpu_has_vmx_preemption_timer() && enable_hv_timer) {
+		u64 vmx_msr;
+
+		rdmsrl(MSR_IA32_VMX_MISC, vmx_msr);
+		cpu_preemption_timer_multi =
+			 vmx_msr & VMX_MISC_PREEMPTION_TIMER_RATE_MASK;
+	} else {
+		kvm_x86_ops->set_hv_timer = NULL;
+		kvm_x86_ops->cancel_hv_timer = NULL;
 	}
 
 	kvm_set_posted_intr_wakeup_handler(wakeup_handler);
@@ -10646,6 +10670,20 @@ static int vmx_check_intercept(struct kvm_vcpu *vcpu,
 	return X86EMUL_CONTINUE;
 }
 
+static void vmx_set_hv_timer(struct kvm_vcpu *vcpu, u64 delta_tsc)
+{
+	vmcs_write32(VMX_PREEMPTION_TIMER_VALUE,
+			delta_tsc >> cpu_preemption_timer_multi);
+	vmcs_set_bits(PIN_BASED_VM_EXEC_CONTROL,
+			PIN_BASED_VMX_PREEMPTION_TIMER);
+}
+
+static void vmx_cancel_hv_timer(struct kvm_vcpu *vcpu)
+{
+	vmcs_clear_bits(PIN_BASED_VM_EXEC_CONTROL,
+			PIN_BASED_VMX_PREEMPTION_TIMER);
+}
+
 static void vmx_sched_in(struct kvm_vcpu *vcpu, int cpu)
 {
 	if (ple_gap)
@@ -11009,6 +11047,9 @@ static struct kvm_x86_ops vmx_x86_ops = {
 	.pmu_ops = &intel_pmu_ops,
 
 	.update_pi_irte = vmx_update_pi_irte,
+
+	.set_hv_timer = vmx_set_hv_timer,
+	.cancel_hv_timer = vmx_cancel_hv_timer,
 };
 
 static int __init vmx_init(void)
