@@ -193,8 +193,6 @@ extern struct idr ib_uverbs_srq_idr;
 extern struct idr ib_uverbs_xrcd_idr;
 extern struct idr ib_uverbs_rule_idr;
 
-void idr_remove_uobj(struct idr *idp, struct ib_uobject *uobj);
-
 struct file *ib_uverbs_alloc_event_file(struct ib_uverbs_file *uverbs_file,
 					struct ib_device *ib_dev,
 					int is_async);
@@ -232,6 +230,48 @@ struct ib_uverbs_flow_spec {
 		struct ib_uverbs_flow_spec_tcp_udp tcp_udp;
 	};
 };
+
+struct uverbs_lock_class {
+	struct lock_class_key	key;
+	char			name[16];
+};
+
+extern struct uverbs_lock_class pd_lock_class;
+extern struct uverbs_lock_class mr_lock_class;
+extern struct uverbs_lock_class mw_lock_class;
+extern struct uverbs_lock_class cq_lock_class;
+extern struct uverbs_lock_class qp_lock_class;
+extern struct uverbs_lock_class ah_lock_class;
+extern struct uverbs_lock_class srq_lock_class;
+extern struct uverbs_lock_class xrcd_lock_class;
+extern struct uverbs_lock_class rule_lock_class;
+
+void ib_init_uobj(struct ib_uobject *uobj, u64 user_handle,
+		  struct ib_ucontext *context, struct uverbs_lock_class *c);
+void ib_put_uobj(struct ib_uobject *uobj);
+void ib_put_uobj_read(struct ib_uobject *uobj);
+void ib_put_uobj_write(struct ib_uobject *uobj);
+int ib_idr_add_uobj(struct idr *idr, struct ib_uobject *uobj);
+void ib_idr_remove_uobj(struct idr *idr, struct ib_uobject *uobj);
+struct ib_uobject *ib_idr_read_uobj(struct idr *idr, int id,
+				    struct ib_ucontext *context, int nested);
+struct ib_uobject *ib_idr_write_uobj(struct idr *idr, int id,
+				     struct ib_ucontext *context);
+struct ib_pd *ib_idr_read_pd(int pd_handle, struct ib_ucontext *context);
+void ib_put_read_pd(struct ib_pd *pd);
+struct ib_cq *ib_idr_read_cq(int cq_handle, struct ib_ucontext *context, int nested);
+void ib_put_read_cq(struct ib_cq *cq);
+struct ib_ah *ib_idr_read_ah(int ah_handle, struct ib_ucontext *context);
+void ib_put_read_ah(struct ib_ah *ah);
+struct ib_qp *ib_idr_read_qp(int qp_handle, struct ib_ucontext *context);
+struct ib_qp *ib_idr_write_qp(int qp_handle, struct ib_ucontext *context);
+void ib_put_read_qp(struct ib_qp *qp);
+void ib_put_write_qp(struct ib_qp *qp);
+struct ib_srq *ib_idr_read_srq(int srq_handle, struct ib_ucontext *context);
+void ib_put_read_srq(struct ib_srq *srq);
+struct ib_xrcd *ib_idr_read_xrcd(int xrcd_handle, struct ib_ucontext *context,
+				 struct ib_uobject **uobj);
+void ib_put_xrcd_read(struct ib_uobject *uobj);
 
 #define IB_UVERBS_DECLARE_CMD(name)					\
 	ssize_t ib_uverbs_##name(struct ib_uverbs_file *file,		\
