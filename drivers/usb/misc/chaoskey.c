@@ -84,6 +84,7 @@ struct chaoskey {
 	int open;			/* open count */
 	bool present;			/* device not disconnected */
 	bool reading;			/* ongoing IO */
+	bool verified;			/* the device is sure to be genuine */
 	int size;			/* size of buf */
 	int valid;			/* bytes of buf read */
 	int used;			/* bytes of buf consumed */
@@ -207,7 +208,12 @@ static int chaoskey_probe(struct usb_interface *interface,
 	dev->hwrng.name = dev->name ? dev->name : chaoskey_driver.name;
 	dev->hwrng.read = chaoskey_rng_read;
 
-	/* Set the 'quality' metric.  Quality is measured in units of
+	/* 
+	 * There is a problem here. We need to be sure that the other side
+	 * is a genuine chaoskey. So to be on the safe side we need to set
+	 * the initial quality to 0 if we are not. An admin can raise it later.
+	 *
+	 * Quality is measured in units of
 	 * 1/1024's of a bit ("mills"). This should be set to 1024,
 	 * but there is a bug in the hwrng core which masks it with
 	 * 1023.
@@ -218,7 +224,7 @@ static int chaoskey_probe(struct usb_interface *interface,
 	 * merged and 1024 afterwards. We'll patch this driver once
 	 * both bits of code are in the same tree.
 	 */
-	dev->hwrng.quality = 1024 + 1023;
+	dev->hwrng.quality = dev->verified ? 1024 + 1023 : 0;
 
 	dev->hwrng_registered = (hwrng_register(&dev->hwrng) == 0);
 	if (!dev->hwrng_registered)
