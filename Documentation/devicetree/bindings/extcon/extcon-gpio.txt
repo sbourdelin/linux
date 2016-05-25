@@ -1,0 +1,22 @@
+EXTCON FOR GPIO
+
+extcon-gpio responsible to detect external cable state when
+attached or detached.
+
+Required Properties:
+ - compatible : Should be "extcon-gpio";
+
+Optional Properties:
+ - extcon-gpio,name: Name of extcon device.
+ - gpios: gpio number.
+ - extcon-gpio,irq-flags: IRQ flags for gpio.
+ - debounce-ms: Debounce time in ms.
+ - extcon-gpio,cable-names: The unique id of specific external connector
+	defined in include/linux/extcon.h
+
+extcon-gpio {
+	compatible = "extcon-gpio";
+        extcon-gpio,name = "VBUS";
+	gpios = <&gpio 20 0>;
+	extcon-gpio,cable-names = <EXTCON_USB EXTCON_NONE>;
+};
