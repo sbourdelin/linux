@@ -1140,16 +1140,16 @@ repeat:
 	if (err < 0) {
 		f2fs_put_page(page, 1);
 		return ERR_PTR(err);
-	} else if (err == LOCKED_PAGE) {
-		goto page_hit;
+	} else if (err != LOCKED_PAGE) {
+		lock_page(page);
 	}
 
 	if (parent)
 		ra_node_pages(parent, start + 1, MAX_RA_NODE);
 
-	lock_page(page);
-
-	if (unlikely(!PageUptodate(page))) {
+	if (unlikely(!PageUptodate(page) || nid != nid_of_node(page))) {
+		f2fs_bug_on(sbi, 1);
+		ClearPageUptodate(page);
 		f2fs_put_page(page, 1);
 		return ERR_PTR(-EIO);
 	}
@@ -1157,8 +1157,6 @@ repeat:
 		f2fs_put_page(page, 1);
 		goto repeat;
 	}
-page_hit:
-	f2fs_bug_on(sbi, nid != nid_of_node(page));
 	return page;
 }
 
