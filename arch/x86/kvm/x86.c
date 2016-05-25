@@ -7623,6 +7623,11 @@ bool kvm_vcpu_compatible(struct kvm_vcpu *vcpu)
 struct static_key kvm_no_apic_vcpu __read_mostly;
 EXPORT_SYMBOL_GPL(kvm_no_apic_vcpu);
 
+u64 kvm_arch_timer_remaining(struct kvm_vcpu *vcpu)
+{
+	return apic_get_timer_expire(vcpu);
+}
+
 int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
 {
 	struct page *page;
