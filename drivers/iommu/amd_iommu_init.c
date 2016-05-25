@@ -664,6 +664,44 @@ static int get_dev_entry_bit(u16 devid, u8 bit)
 }
 
 
+static int copy_dev_tables(void)
+{
+	u64 entry;
+	u32 lo, hi, devid;
+	phys_addr_t old_devtb_phys;
+	struct dev_table_entry *old_devtb;
+	u16 dom_id, dte_v;
+	struct amd_iommu *iommu;
+	static int copied;
+
+        for_each_iommu(iommu) {
+		if (!translation_pre_enabled()) {
+			pr_err("IOMMU:%d is not pre-enabled!/n", iommu->index);
+			return -1;
+		}
+
+		if (copied)
+			continue;
+
+                lo = readl(iommu->mmio_base + MMIO_DEV_TABLE_OFFSET);
+                hi = readl(iommu->mmio_base + MMIO_DEV_TABLE_OFFSET + 4);
+                entry = (((u64) hi) << 32) + lo;
+                old_devtb_phys = entry & PAGE_MASK;
+                old_devtb = memremap(old_devtb_phys, dev_table_size, MEMREMAP_WB);
+                for (devid = 0; devid <= amd_iommu_last_bdf; ++devid) {
+                        amd_iommu_dev_table[devid] = old_devtb[devid];
+                        dom_id = amd_iommu_dev_table[devid].data[1] & DEV_DOMID_MASK;
+			dte_v = amd_iommu_dev_table[devid].data[0] & DTE_FLAG_V;
+			if (!dte_v)
+				continue;
+                        __set_bit(dom_id, amd_iommu_pd_alloc_bitmap);
+                }
+		memunmap(old_devtb);
+		copied = 1;
+        }
+	return 0;
+}
+
 void amd_iommu_apply_erratum_63(u16 devid)
 {
 	int sysmgt;
