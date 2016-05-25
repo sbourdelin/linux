@@ -195,8 +195,9 @@ static void release_pages_balloon(struct virtio_balloon *vb)
 static unsigned leak_balloon(struct virtio_balloon *vb, size_t num)
 {
 	unsigned num_freed_pages;
-	struct page *page;
+	struct page *page, *next;
 	struct balloon_dev_info *vb_dev_info = &vb->vb_dev_info;
+	LIST_HEAD(pages);		/* Pages dequeued for handing to Host */
 
 	/* We can only do one array worth at a time. */
 	num = min(num, ARRAY_SIZE(vb->pfns));
@@ -207,9 +208,12 @@ static unsigned leak_balloon(struct virtio_balloon *vb, size_t num)
 		page = balloon_page_dequeue(vb_dev_info);
 		if (!page)
 			break;
-		set_page_pfns(vb, vb->pfns + vb->num_pfns, page);
+		list_add(&page->lru, &pages);
 		vb->num_pages -= VIRTIO_BALLOON_PAGES_PER_PAGE;
 	}
+
+	list_for_each_entry_safe(page, next, &pages, lru)
+		set_page_pfns(vb, vb->pfns + vb->num_pfns, page);
 
 	num_freed_pages = vb->num_pfns;
 	/*
