@@ -1432,7 +1432,11 @@ static int __init amd_iommu_init_pci(void)
 			break;
 	}
 
-	init_device_table_dma();
+	for_each_iommu(iommu) {
+		if ( !translation_pre_enabled(iommu) )
+			init_device_table_dma();
+			break;
+	}
 
 	for_each_iommu(iommu)
 		iommu_flush_all_caches(iommu);
@@ -1612,8 +1616,7 @@ static int __init init_memory_definitions(struct acpi_table_header *table)
 }
 
 /*
- * Init the device table to not allow DMA access for devices and
- * suppress all page faults
+ * Init the device table to not allow DMA access for devices.
  */
 static void init_device_table_dma(void)
 {
