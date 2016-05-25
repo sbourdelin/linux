@@ -2031,7 +2031,7 @@ static int brcmf_p2p_request_p2p_if(struct brcmf_p2p_info *p2p,
 	err = brcmf_fil_iovar_data_set(ifp, "p2p_ifadd", &if_request,
 				       sizeof(if_request));
 	if (err)
-		return err;
+		brcmf_err("p2p_ifadd failed %d\n", err);
 
 	return err;
 }
@@ -2185,6 +2185,7 @@ struct wireless_dev *brcmf_p2p_add_vif(struct wiphy *wiphy, const char *name,
 	err = brcmf_p2p_request_p2p_if(&cfg->p2p, ifp, cfg->p2p.int_addr,
 				       iftype);
 	if (err) {
+		brcmf_err("Failed to request P2P virtual interface %s\n", name);
 		brcmf_cfg80211_arm_vif_event(cfg, NULL);
 		goto fail;
 	}
