@@ -86,4 +86,12 @@ config ST_REMOTEPROC
 	  processor framework.
 	  This can be either built-in or a loadable module.
 
+config ST_XP70_REMOTEPROC
+	tristate "XP70 slim remoteproc support"
+	depends on ARCH_STI
+	select REMOTEPROC
+	help
+	  Say y here to support xp70 slim core.
+	  If unsure say N.
+
 endmenu
