@@ -527,6 +527,18 @@ config ZX_DMA
 	help
 	  Support the DMA engine for ZTE ZX296702 platform devices.
 
+config ST_FDMA
+	tristate "ST FDMA dmaengine support"
+	depends on ARCH_STI || COMPILE_TEST
+        depends on ST_XP70_REMOTEPROC
+	select DMA_ENGINE
+	select DMA_VIRTUAL_CHANNELS
+	help
+	  Enable support for ST FDMA controller.
+	  It supports 16 independent DMA channels, accepts up to 32 DMA requests
+
+	  Say Y here if you have such a chipset.
+	  If unsure, say N.
 
 # driver files
 source "drivers/dma/bestcomm/Kconfig"
