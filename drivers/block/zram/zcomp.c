@@ -102,7 +102,7 @@ void zcomp_stream_put(struct zcomp *comp)
 	put_cpu_ptr(comp->stream);
 }
 
-int zcomp_compress(struct zcomp *comp, struct zcomp_strm *zstrm,
+int zcomp_compress(struct zcomp_strm *zstrm,
 		const unsigned char *src, unsigned int *dst_len)
 {
 	/*
@@ -126,8 +126,7 @@ int zcomp_compress(struct zcomp *comp, struct zcomp_strm *zstrm,
 			zstrm->buffer, dst_len);
 }
 
-int zcomp_decompress(struct zcomp *comp,
-		struct zcomp_strm *zstrm,
+int zcomp_decompress(struct zcomp_strm *zstrm,
 		const unsigned char *src,
 		size_t src_len, unsigned char *dst)
 {

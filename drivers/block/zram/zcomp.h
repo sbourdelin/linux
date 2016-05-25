@@ -53,10 +53,10 @@ void zcomp_destroy(struct zcomp *comp);
 struct zcomp_strm *zcomp_stream_get(struct zcomp *comp);
 void zcomp_stream_put(struct zcomp *comp);
 
-int zcomp_compress(struct zcomp *comp, struct zcomp_strm *zstrm,
+int zcomp_compress(struct zcomp_strm *zstrm,
 		const unsigned char *src, unsigned int *dst_len);
 
-int zcomp_decompress(struct zcomp *comp, struct zcomp_strm *zstrm,
+int zcomp_decompress(struct zcomp_strm *zstrm,
 		const unsigned char *src,
 		size_t src_len, unsigned char *dst);
 
