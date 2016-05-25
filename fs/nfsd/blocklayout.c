@@ -23,7 +23,7 @@ nfsd4_block_proc_layoutget(struct inode *inode, const struct svc_fh *fhp,
 	struct nfsd4_layout_seg *seg = &args->lg_seg;
 	struct super_block *sb = inode->i_sb;
 	u32 block_size = (1 << inode->i_blkbits);
-	struct pnfs_block_extent *bex;
+	struct pnfs_block_extent *bex = NULL;
 	struct iomap iomap;
 	u32 device_generation = 0;
 	int error;
@@ -105,9 +105,11 @@ nfsd4_block_proc_layoutget(struct inode *inode, const struct svc_fh *fhp,
 	return 0;
 
 out_error:
+	kfree(bex);
 	seg->length = 0;
 	return nfserrno(error);
 out_layoutunavailable:
+	kfree(bex);
 	seg->length = 0;
 	return nfserr_layoutunavailable;
 }
