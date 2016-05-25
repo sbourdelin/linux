@@ -937,42 +937,6 @@ struct sg_table *ion_sg_table(struct ion_client *client,
 }
 EXPORT_SYMBOL(ion_sg_table);
 
-static void ion_buffer_sync_for_device(struct ion_buffer *buffer,
-				       struct device *dev,
-				       enum dma_data_direction direction);
-
-static struct sg_table *ion_map_dma_buf(struct dma_buf_attachment *attachment,
-					enum dma_data_direction direction)
-{
-	struct dma_buf *dmabuf = attachment->dmabuf;
-	struct ion_buffer *buffer = dmabuf->priv;
-
-	ion_buffer_sync_for_device(buffer, attachment->dev, direction);
-	return buffer->sg_table;
-}
-
-static void ion_unmap_dma_buf(struct dma_buf_attachment *attachment,
-			      struct sg_table *table,
-			      enum dma_data_direction direction)
-{
-}
-
-void ion_pages_sync_for_device(struct device *dev, struct page *page,
-		size_t size, enum dma_data_direction dir)
-{
-	struct scatterlist sg;
-
-	sg_init_table(&sg, 1);
-	sg_set_page(&sg, page, size, 0);
-	/*
-	 * This is not correct - sg_dma_address needs a dma_addr_t that is valid
-	 * for the targeted device, but this works on the currently targeted
-	 * hardware.
-	 */
-	sg_dma_address(&sg) = page_to_phys(page);
-	dma_sync_sg_for_device(dev, &sg, 1, dir);
-}
-
 struct ion_vma_list {
 	struct list_head list;
 	struct vm_area_struct *vma;
@@ -997,8 +961,7 @@ static void ion_buffer_sync_for_device(struct ion_buffer *buffer,
 		struct page *page = buffer->pages[i];
 
 		if (ion_buffer_page_is_dirty(page))
-			ion_pages_sync_for_device(dev, ion_buffer_page(page),
-							PAGE_SIZE, dir);
+			ion_clean_page(ion_buffer_page(page), PAGE_SIZE);
 
 		ion_buffer_page_clean(buffer->pages + i);
 	}
@@ -1009,6 +972,22 @@ static void ion_buffer_sync_for_device(struct ion_buffer *buffer,
 			       NULL);
 	}
 	mutex_unlock(&buffer->lock);
+}
+
+static struct sg_table *ion_map_dma_buf(struct dma_buf_attachment *attachment,
+					enum dma_data_direction direction)
+{
+	struct dma_buf *dmabuf = attachment->dmabuf;
+	struct ion_buffer *buffer = dmabuf->priv;
+
+	ion_buffer_sync_for_device(buffer, attachment->dev, direction);
+	return buffer->sg_table;
+}
+
+static void ion_unmap_dma_buf(struct dma_buf_attachment *attachment,
+			      struct sg_table *table,
+			      enum dma_data_direction direction)
+{
 }
 
 static int ion_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
@@ -1293,8 +1272,8 @@ static int ion_sync_for_device(struct ion_client *client, int fd)
 	}
 	buffer = dmabuf->priv;
 
-	dma_sync_sg_for_device(NULL, buffer->sg_table->sgl,
-			       buffer->sg_table->nents, DMA_BIDIRECTIONAL);
+	ion_clean_buffer(buffer);
+
 	dma_buf_put(dmabuf);
 	return 0;
 }

@@ -30,8 +30,7 @@ static void *ion_page_pool_alloc_pages(struct ion_page_pool *pool)
 
 	if (!page)
 		return NULL;
-	ion_pages_sync_for_device(NULL, page, PAGE_SIZE << pool->order,
-						DMA_BIDIRECTIONAL);
+	ion_clean_page(page, PAGE_SIZE << pool->order);
 	return page;
 }
 

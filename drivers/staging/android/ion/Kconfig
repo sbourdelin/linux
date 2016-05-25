@@ -1,6 +1,6 @@
 menuconfig ION
 	bool "Ion Memory Manager"
-	depends on HAVE_MEMBLOCK && HAS_DMA && MMU
+	depends on HAVE_MEMBLOCK && HAS_DMA && MMU && (X86 || ARM || ARM64)
 	select GENERIC_ALLOCATOR
 	select DMA_SHARED_BUFFER
 	---help---
@@ -9,6 +9,18 @@ menuconfig ION
 	  from userspace that can be shared between drivers.
 	  If you're not using Android its probably safe to
 	  say N here.
+
+config ION_ARM
+	depends on ION && ARM
+	def_bool y
+
+config ION_ARM64
+	depends on ION && ARM64
+	def_bool y
+
+config ION_X86
+	depends on ION && X86
+	def_bool y
 
 config ION_TEST
 	tristate "Ion Test Device"
