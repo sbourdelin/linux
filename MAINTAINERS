@@ -6336,6 +6336,8 @@ S:	Maintained
 F:	include/linux/kexec.h
 F:	include/uapi/linux/kexec.h
 F:	kernel/kexec.c
+F:	kernel/kexec_core.c
+F:	kernel/kexec_file.c
 
 KEYS/KEYRINGS:
 M:	David Howells <dhowells@redhat.com>
