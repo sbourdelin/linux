@@ -31,6 +31,9 @@
  * 	master MTD flag set for the corresponding MTD partition.
  * 	For example, to force a read-only partition, simply adding
  * 	MTD_WRITEABLE to the mask_flags will do the trick.
+ * node: contains device node pointer, necessary to reference device using
+ *	devicetree.
+
  *
  * Note: writeable partitions require their size and offset be
  * erasesize aligned (e.g. use MTDPART_OFS_NEXTBLK).
@@ -41,6 +44,7 @@ struct mtd_partition {
 	uint64_t size;			/* partition size */
 	uint64_t offset;		/* offset within the master MTD space */
 	uint32_t mask_flags;		/* master MTD flags to mask out for this partition */
+	struct device_node *node;	/* pointer to the device node */
 };
 
 #define MTDPART_OFS_RETAIN	(-3)
