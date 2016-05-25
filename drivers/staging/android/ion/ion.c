@@ -980,7 +980,18 @@ static struct sg_table *ion_map_dma_buf(struct dma_buf_attachment *attachment,
 	struct dma_buf *dmabuf = attachment->dmabuf;
 	struct ion_buffer *buffer = dmabuf->priv;
 
+	/* Necessary but not sufficient: This is for userspace */
 	ion_buffer_sync_for_device(buffer, attachment->dev, direction);
+
+	/* The rest of this is for the standard mappings */
+	buffer->sg_table->nents = dma_map_sg(attachment->dev,
+					buffer->sg_table->sgl,
+					buffer->sg_table->orig_nents,
+					direction);
+
+	if (!buffer->sg_table->nents)
+		return ERR_PTR(-EIO);
+
 	return buffer->sg_table;
 }
 
@@ -988,6 +999,7 @@ static void ion_unmap_dma_buf(struct dma_buf_attachment *attachment,
 			      struct sg_table *table,
 			      enum dma_data_direction direction)
 {
+	dma_unmap_sg(attachment->dev, table->sgl, table->nents, direction);
 }
 
 static int ion_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
