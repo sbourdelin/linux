@@ -1755,7 +1755,7 @@ static int fuse_setxattr(struct dentry *entry, const char *name,
 	return err;
 }
 
-static ssize_t fuse_getxattr(struct dentry *entry, struct inode *inode,
+static ssize_t fuse_getxattr(struct dentry *unused, struct inode *inode,
 			     const char *name, void *value, size_t size)
 {
 	struct fuse_conn *fc = get_fuse_conn(inode);
