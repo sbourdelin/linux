@@ -1,0 +1,62 @@
+Representing OTP regions in devicetree
+
+OTP regions can be represented by sub-nodes of an mtd device.
+
+The partition table should be a subnode of the mtd node and should be names
+'otp-partitions'. This node should have the following property:
+
+- compatible: (required) must be 'fixed-partitions'
+
+OTP regions are then defined in subnodes of the partitions node.
+
+Required properties for OTP regions:
+- reg: The region's offset and size within the mtd device
+
+Optional properties:
+- label: The label / name for this region. If ommited, the label is taken
+  from the node name (excluding the unit address).
+
+Example:
+
+flash@0 {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		partition@0 {
+			label = "uboot-spl";
+			reg = <0x0 0xe0000>;
+		};
+		partition@1 {
+			label = "uboot-env";
+			reg = <0xe0000 0x20000>;
+		};
+		partition@2 {
+			label = "uboot";
+			reg = <0x100000 0x100000>;
+		};
+	};
+
+	otp-partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		region@0 {
+			label = "factory-data";
+			reg = <0x0 0x40>;
+
+			#address-cells = <0x1>;
+			#size-cells = <0x1>;
+
+			product: nvmem@0 {
+				reg = <0x0 0x2>;
+			};
+
+			revision: nvmem@3 {
+				reg = <0x3 0x2>;
+			};
+		};
+	};
+}
