@@ -27,6 +27,9 @@ static const struct nfsd4_callback_ops nfsd4_cb_layout_ops;
 static const struct lock_manager_operations nfsd4_layouts_lm_ops;
 
 const struct nfsd4_layout_ops *nfsd4_layout_ops[LAYOUT_TYPE_MAX] =  {
+#ifdef CONFIG_NFSD_FLEXFILELAYOUT
+	[LAYOUT_FLEX_FILES]	= &ff_layout_ops,
+#endif
 #ifdef CONFIG_NFSD_BLOCKLAYOUT
 	[LAYOUT_BLOCK_VOLUME]	= &bl_layout_ops,
 #endif
@@ -122,7 +125,9 @@ nfsd4_set_deviceid(struct nfsd4_deviceid *id, const struct svc_fh *fhp,
 
 void nfsd4_setup_layout_type(struct svc_export *exp)
 {
+#if defined(CONFIG_NFSD_BLOCKLAYOUT) || defined(CONFIG_NFSD_SCSILAYOUT)
 	struct super_block *sb = exp->ex_path.mnt->mnt_sb;
+#endif
 
 	if (!(exp->ex_flags & NFSEXP_PNFS))
 		return;
@@ -144,6 +149,11 @@ void nfsd4_setup_layout_type(struct svc_export *exp)
 	    sb->s_export_op->commit_blocks &&
 	    sb->s_bdev && sb->s_bdev->bd_disk->fops->pr_ops)
 		exp->ex_layout_type = LAYOUT_SCSI;
+#endif
+#ifdef CONFIG_NFSD_FLEXFILELAYOUT
+	// FIXME: How do we "export" this and how does it mingle with
+	// the above types?
+	exp->ex_layout_type = LAYOUT_FLEX_FILES;
 #endif
 }
 
