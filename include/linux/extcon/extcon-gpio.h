@@ -31,15 +31,17 @@
  *			If false, high state of gpio means active.
  * @debounce:		Debounce time for GPIO IRQ in ms.
  * @irq_flags:		IRQ Flags (e.g., IRQF_TRIGGER_LOW).
+ * extcon_cable_cnt:    External cable count.
  * @check_on_resume:	Boolean describing whether to check the state of gpio
  *			while resuming from sleep.
  */
 struct gpio_extcon_pdata {
-	unsigned int extcon_id;
+	unsigned int *extcon_id;
 	unsigned gpio;
 	bool gpio_active_low;
 	unsigned long debounce;
 	unsigned long irq_flags;
+	int extcon_cable_cnt;
 
 	bool check_on_resume;
 };
