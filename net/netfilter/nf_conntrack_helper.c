@@ -361,9 +361,10 @@ EXPORT_SYMBOL_GPL(nf_ct_helper_log);
 
 int nf_conntrack_helper_register(struct nf_conntrack_helper *me)
 {
-	int ret = 0;
 	struct nf_conntrack_helper *cur;
 	unsigned int h = helper_hash(&me->tuple);
+	const char *slash;
+	int len, ret = 0;
 
 	BUG_ON(me->expect_policy == NULL);
 	BUG_ON(me->expect_class_max >= NF_CT_MAX_EXPECT_CLASSES);
@@ -371,7 +372,13 @@ int nf_conntrack_helper_register(struct nf_conntrack_helper *me)
 
 	mutex_lock(&nf_ct_helper_mutex);
 	hlist_for_each_entry(cur, &nf_ct_helper_hash[h], hnode) {
-		if (strncmp(cur->name, me->name, NF_CT_HELPER_NAME_LEN) == 0 &&
+		slash = strchr(cur->name, '-');
+		if (slash)
+			len = slash - cur->name;
+		else
+			len = NF_CT_HELPER_NAME_LEN;
+
+		if (strncmp(cur->name, me->name, len) == 0 &&
 		    cur->tuple.src.l3num == me->tuple.src.l3num &&
 		    cur->tuple.dst.protonum == me->tuple.dst.protonum) {
 			ret = -EEXIST;
