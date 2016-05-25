@@ -103,7 +103,7 @@ void zcomp_stream_put(struct zcomp *comp)
 }
 
 int zcomp_compress(struct zcomp_strm *zstrm,
-		const unsigned char *src, unsigned int *dst_len)
+		const u8 *src, unsigned int *dst_len)
 {
 	/*
 	 * Our dst memory (zstrm->buffer) is always `2 * PAGE_SIZE' sized
@@ -127,8 +127,7 @@ int zcomp_compress(struct zcomp_strm *zstrm,
 }
 
 int zcomp_decompress(struct zcomp_strm *zstrm,
-		const unsigned char *src,
-		size_t src_len, unsigned char *dst)
+		const u8 *src, unsigned int src_len, u8 *dst)
 {
 	unsigned int dst_len = PAGE_SIZE;
 

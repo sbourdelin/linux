@@ -54,11 +54,10 @@ struct zcomp_strm *zcomp_stream_get(struct zcomp *comp);
 void zcomp_stream_put(struct zcomp *comp);
 
 int zcomp_compress(struct zcomp_strm *zstrm,
-		const unsigned char *src, unsigned int *dst_len);
+		const u8 *src, unsigned int *dst_len);
 
 int zcomp_decompress(struct zcomp_strm *zstrm,
-		const unsigned char *src,
-		size_t src_len, unsigned char *dst);
+		const u8 *src, unsigned int src_len, u8 *dst);
 
 bool zcomp_set_max_streams(struct zcomp *comp, int num_strm);
 #endif /* _ZCOMP_H_ */
