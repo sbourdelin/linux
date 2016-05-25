@@ -33,6 +33,7 @@
 #include <linux/kconfig.h>
 
 #include "mtdcore.h"
+#include "mtdnvmem.h"
 
 /* Our partition linked list */
 static LIST_HEAD(mtd_partitions);
@@ -44,6 +45,7 @@ struct mtd_part {
 	struct mtd_info *master;
 	uint64_t offset;
 	struct list_head list;
+	struct mtd_nvmem *nv;
 };
 
 /*
@@ -319,6 +321,10 @@ static int part_block_markbad(struct mtd_info *mtd, loff_t ofs)
 
 static inline void free_partition(struct mtd_part *p)
 {
+#ifdef CONFIG_MTD_NVMEM
+	if (p->nv)
+		mtd_otp_nvmem_remove(p->nv);
+#endif
 	kfree(p->mtd.name);
 	kfree(p);
 }
@@ -348,6 +354,72 @@ int del_mtd_partitions(struct mtd_info *master)
 
 	return err;
 }
+
+#ifdef CONFIG_MTD_NVMEM
+static struct mtd_part *allocate_otp_region(struct mtd_info *master,
+					    const struct mtd_partition *part,
+					    int partno, uint64_t cur_offset)
+{
+	struct mtd_part *slave;
+	char *name;
+
+	/* allocate the partition structure */
+	slave = kzalloc(sizeof(*slave), GFP_KERNEL);
+	name = kstrdup(part->name, GFP_KERNEL);
+	if (!name || !slave) {
+		pr_err("memory allocation error while creating partitions for \"%s\"\n",
+		       master->name);
+		kfree(name);
+		kfree(slave);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	/* set up the MTD object for this partition */
+	slave->mtd.type = master->type;
+	slave->mtd.flags = master->flags & ~part->mask_flags;
+	slave->mtd.size = part->size;
+	slave->mtd.writesize = 1;
+	slave->mtd.writebufsize = 1;
+	slave->mtd.erasesize = 1;
+	slave->mtd.oobsize = 0;
+	slave->mtd.oobavail = 0;
+	slave->mtd.subpage_sft = master->subpage_sft;
+
+	slave->mtd.name = name;
+	slave->mtd.owner = master->owner;
+	slave->mtd.dev.of_node = part->node;
+
+	if (master->_read_user_prot_reg)
+		slave->mtd._read_user_prot_reg = part_read_user_prot_reg;
+	if (master->_read_fact_prot_reg)
+		slave->mtd._read_fact_prot_reg = part_read_fact_prot_reg;
+	if (master->_write_user_prot_reg)
+		slave->mtd._write_user_prot_reg = part_write_user_prot_reg;
+	if (master->_lock_user_prot_reg)
+		slave->mtd._lock_user_prot_reg = part_lock_user_prot_reg;
+	if (master->_get_user_prot_info)
+		slave->mtd._get_user_prot_info = part_get_user_prot_info;
+	if (master->_get_fact_prot_info)
+		slave->mtd._get_fact_prot_info = part_get_fact_prot_info;
+
+	if (!partno && !master->dev.class && master->_suspend &&
+	    master->_resume) {
+		slave->mtd._suspend = part_suspend;
+		slave->mtd._resume = part_resume;
+	}
+
+	slave->master = master;
+	slave->offset = part->offset;
+	slave->mtd.size = part->size;
+
+	pr_notice("0x%012llx-0x%012llx : \"%s\"\n",
+		  (unsigned long long)slave->offset,
+		  (unsigned long long)(slave->offset + slave->mtd.size),
+		  slave->mtd.name);
+
+	return slave;
+}
+#endif
 
 static struct mtd_part *allocate_partition(struct mtd_info *master,
 			const struct mtd_partition *part, int partno,
@@ -680,6 +752,46 @@ int add_mtd_partitions(struct mtd_info *master,
 
 	return 0;
 }
+
+#ifdef CONFIG_MTD_NVMEM
+int add_otp_regions(struct mtd_info *master,
+		    const struct mtd_partition *parts, int nbparts)
+{
+	struct mtd_part *slave;
+	u64 cur_offset = 0;
+	int i;
+
+	pr_notice("Creating %d MTD OTP region(s) on \"%s\":\n", nbparts,
+		  master->name);
+
+	for (i = 0; i < nbparts; i++) {
+		slave = allocate_otp_region(master, parts + i, i, cur_offset);
+		if (IS_ERR(slave)) {
+			del_mtd_partitions(master);
+			return PTR_ERR(slave);
+		}
+
+		mutex_lock(&mtd_partitions_mutex);
+		list_add(&slave->list, &mtd_partitions);
+		mutex_unlock(&mtd_partitions_mutex);
+
+		add_mtd_device(&slave->mtd);
+		mtd_add_partition_attrs(slave);
+
+		slave->nv = mtd_otp_nvmem_register(&slave->mtd);
+
+		cur_offset = slave->offset + slave->mtd.size;
+	}
+
+	return 0;
+}
+#else
+int add_otp_regions(struct mtd_info *master,
+		    const struct mtd_partition *parts, int nbparts)
+{
+	return 0;
+}
+#endif
 
 static DEFINE_SPINLOCK(part_parser_lock);
 static LIST_HEAD(part_parsers);

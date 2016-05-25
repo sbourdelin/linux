@@ -9,6 +9,7 @@ struct mtd_info *__mtd_next_device(int i);
 int add_mtd_device(struct mtd_info *mtd);
 int del_mtd_device(struct mtd_info *mtd);
 int add_mtd_partitions(struct mtd_info *, const struct mtd_partition *, int);
+int add_otp_regions(struct mtd_info *, const struct mtd_partition *, int);
 int del_mtd_partitions(struct mtd_info *);
 
 struct mtd_partitions;

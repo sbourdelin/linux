@@ -309,6 +309,14 @@ config MTD_SWAP
 	  The driver provides wear leveling by storing erase counter into the
 	  OOB.
 
+config MTD_NVMEM
+	tristate "Expose OTP regions as NVMEM providers"
+	depends on MTD && NVMEM
+	help
+	  Allows exposing OTP regions in mtd devices via nvmem.
+	  This is useful for storing information like calibration data,
+	  serial numbers, or mac addresses.
+
 config MTD_PARTITIONED_MASTER
 	bool "Retain master device when partitioned"
 	default n

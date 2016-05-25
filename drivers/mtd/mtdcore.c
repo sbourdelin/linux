@@ -45,6 +45,7 @@
 #include <linux/mtd/partitions.h>
 
 #include "mtdcore.h"
+#include "mtdnvmem.h"
 
 static struct backing_dev_info mtd_bdi = {
 };
@@ -545,6 +546,30 @@ static int mtd_add_device_partitions(struct mtd_info *mtd,
 	return 0;
 }
 
+#ifdef CONFIG_MTD_NVMEM
+static int mtd_add_device_otp_regions(struct mtd_info *mtd,
+				      struct mtd_partitions *parts)
+{
+	const struct mtd_partition *real_parts = parts->parts;
+	int nbparts = parts->nr_parts;
+	int ret;
+
+	if (nbparts > 0) {
+		ret = add_otp_regions(mtd, real_parts, nbparts);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+#else
+static int mtd_add_device_otp_regions(struct mtd_info *mtd,
+				      struct mtd_partitions *parts)
+{
+	return 0;
+}
+#endif
+
 /*
  * Set a few defaults based on the parent devices, if not provided by the
  * driver
@@ -560,6 +585,8 @@ static void mtd_set_dev_defaults(struct mtd_info *mtd)
 		pr_debug("mtd device won't show a device symlink in sysfs\n");
 	}
 }
+
+static const char const *otp_types[] = {"ofotp", NULL};
 
 /**
  * mtd_device_parse_register - parse partitions and register an MTD device.
@@ -618,6 +645,14 @@ int mtd_device_parse_register(struct mtd_info *mtd, const char * const *types,
 	}
 
 	ret = mtd_add_device_partitions(mtd, &parsed);
+	if (ret)
+		goto out;
+
+	ret = parse_mtd_partitions(mtd, otp_types, &parsed, parser_data);
+	if (ret)
+		goto out;
+
+	ret = mtd_add_device_otp_regions(mtd, &parsed);
 	if (ret)
 		goto out;
 

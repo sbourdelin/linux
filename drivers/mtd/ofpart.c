@@ -144,6 +144,106 @@ static struct mtd_part_parser ofpart_parser = {
 	.name = "ofpart",
 };
 
+static int parse_ofotp_partitions(struct mtd_info *master,
+				  const struct mtd_partition **pparts,
+				  struct mtd_part_parser_data *data)
+{
+	struct mtd_partition *parts;
+	struct device_node *mtd_node;
+	struct device_node *ofpart_node;
+	const char *partname;
+	struct device_node *pp;
+	int nr_parts, i, ret = 0;
+
+	/* Pull of_node from the master device node */
+	mtd_node = mtd_get_of_node(master);
+	if (!mtd_node)
+		return 0;
+
+	ofpart_node = of_get_child_by_name(mtd_node, "otp-partitions");
+	if (!ofpart_node) {
+		/*
+		 * We might get here even when ofpart isn't used at all (e.g.,
+		 * when using another parser), so don't be louder than
+		 * KERN_DEBUG
+		 */
+		pr_debug("%s: 'otp-partitions' subnode not found on %s\n",
+			 master->name, mtd_node->full_name);
+		return 0;
+	} else if (!of_device_is_compatible(ofpart_node, "fixed-partitions")) {
+		/* The 'partitions' subnode might be used by another parser */
+		return 0;
+	}
+
+	/* First count the subnodes */
+	nr_parts = 0;
+	for_each_child_of_node(ofpart_node,  pp)
+		nr_parts++;
+
+	if (nr_parts == 0)
+		return 0;
+
+	parts = kcalloc(nr_parts, sizeof(*parts), GFP_KERNEL);
+	if (!parts)
+		return -ENOMEM;
+
+	i = 0;
+	for_each_child_of_node(ofpart_node,  pp) {
+		const __be32 *reg;
+		int len;
+		int a_cells, s_cells;
+
+		reg = of_get_property(pp, "reg", &len);
+		if (!reg) {
+			nr_parts--;
+			continue;
+		}
+
+		a_cells = of_n_addr_cells(pp);
+		s_cells = of_n_size_cells(pp);
+		if (len / 4 != a_cells + s_cells) {
+			pr_debug("%s: ofpart partition %s (%s) error parsing reg property.\n",
+				 master->name, pp->full_name,
+				 mtd_node->full_name);
+			goto ofpart_fail;
+		}
+
+		parts[i].offset = of_read_number(reg, a_cells);
+		parts[i].size = of_read_number(reg + a_cells, s_cells);
+		parts[i].node = pp;
+
+		partname = of_get_property(pp, "label", &len);
+		if (!partname)
+			partname = of_get_property(pp, "name", &len);
+		parts[i].name = partname;
+
+		if (of_get_property(pp, "read-only", &len))
+			parts[i].mask_flags |= MTD_WRITEABLE;
+
+		i++;
+	}
+
+	if (!nr_parts)
+		goto ofpart_none;
+
+	*pparts = parts;
+	return nr_parts;
+
+ofpart_fail:
+	pr_err("%s: error parsing ofotp partition %s (%s)\n",
+	       master->name, pp->full_name, mtd_node->full_name);
+	ret = -EINVAL;
+ofpart_none:
+	of_node_put(pp);
+	kfree(parts);
+	return ret;
+}
+
+static struct mtd_part_parser ofotp_parser = {
+	.parse_fn = parse_ofotp_partitions,
+	.name = "ofotp",
+};
+
 static int parse_ofoldpart_partitions(struct mtd_info *master,
 				      const struct mtd_partition **pparts,
 				      struct mtd_part_parser_data *data)
@@ -209,6 +309,7 @@ static int __init ofpart_parser_init(void)
 {
 	register_mtd_parser(&ofpart_parser);
 	register_mtd_parser(&ofoldpart_parser);
+	register_mtd_parser(&ofotp_parser);
 	return 0;
 }
 
@@ -216,6 +317,7 @@ static void __exit ofpart_parser_exit(void)
 {
 	deregister_mtd_parser(&ofpart_parser);
 	deregister_mtd_parser(&ofoldpart_parser);
+	deregister_mtd_parser(&ofotp_parser);
 }
 
 module_init(ofpart_parser_init);
