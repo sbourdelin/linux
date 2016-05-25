@@ -40,6 +40,8 @@ struct zcomp {
 	struct zcomp_strm * __percpu *stream;
 	struct zcomp_backend *backend;
 	struct notifier_block notifier;
+
+	const char *name;
 };
 
 ssize_t zcomp_available_show(const char *comp, char *buf);
@@ -52,9 +54,10 @@ struct zcomp_strm *zcomp_stream_get(struct zcomp *comp);
 void zcomp_stream_put(struct zcomp *comp);
 
 int zcomp_compress(struct zcomp *comp, struct zcomp_strm *zstrm,
-		const unsigned char *src, size_t *dst_len);
+		const unsigned char *src, unsigned int *dst_len);
 
-int zcomp_decompress(struct zcomp *comp, const unsigned char *src,
+int zcomp_decompress(struct zcomp *comp, struct zcomp_strm *zstrm,
+		const unsigned char *src,
 		size_t src_len, unsigned char *dst);
 
 bool zcomp_set_max_streams(struct zcomp *comp, int num_strm);

@@ -14,26 +14,23 @@
 #include <linux/wait.h>
 #include <linux/sched.h>
 #include <linux/cpu.h>
+#include <linux/crypto.h>
 
 #include "zcomp.h"
-#include "zcomp_lzo.h"
-#ifdef CONFIG_ZRAM_LZ4_COMPRESS
-#include "zcomp_lz4.h"
-#endif
 
-static struct zcomp_backend *backends[] = {
-	&zcomp_lzo,
+static const char * const backends[] = {
+	"lzo",
 #ifdef CONFIG_ZRAM_LZ4_COMPRESS
-	&zcomp_lz4,
+	"lz4",
 #endif
 	NULL
 };
 
-static struct zcomp_backend *find_backend(const char *compress)
+static const char *find_backend(const char *compress)
 {
 	int i = 0;
 	while (backends[i]) {
-		if (sysfs_streq(compress, backends[i]->name))
+		if (sysfs_streq(compress, backends[i]))
 			break;
 		i++;
 	}
@@ -42,8 +39,8 @@ static struct zcomp_backend *find_backend(const char *compress)
 
 static void zcomp_strm_free(struct zcomp *comp, struct zcomp_strm *zstrm)
 {
-	if (zstrm->private)
-		comp->backend->destroy(zstrm->private);
+	if (!IS_ERR_OR_NULL(zstrm->private))
+		crypto_free_comp(zstrm->private);
 	free_pages((unsigned long)zstrm->buffer, 1);
 	kfree(zstrm);
 }
@@ -58,13 +55,13 @@ static struct zcomp_strm *zcomp_strm_alloc(struct zcomp *comp, gfp_t flags)
 	if (!zstrm)
 		return NULL;
 
-	zstrm->private = comp->backend->create(flags);
+	zstrm->private = crypto_alloc_comp(comp->name, 0, 0);
 	/*
 	 * allocate 2 pages. 1 for compressed data, plus 1 extra for the
 	 * case when compressed size is larger than the original one
 	 */
 	zstrm->buffer = (void *)__get_free_pages(flags | __GFP_ZERO, 1);
-	if (!zstrm->private || !zstrm->buffer) {
+	if (IS_ERR_OR_NULL(zstrm->private) || !zstrm->buffer) {
 		zcomp_strm_free(comp, zstrm);
 		zstrm = NULL;
 	}
@@ -78,12 +75,12 @@ ssize_t zcomp_available_show(const char *comp, char *buf)
 	int i = 0;
 
 	while (backends[i]) {
-		if (!strcmp(comp, backends[i]->name))
+		if (!strcmp(comp, backends[i]))
 			sz += scnprintf(buf + sz, PAGE_SIZE - sz - 2,
-					"[%s] ", backends[i]->name);
+					"[%s] ", backends[i]);
 		else
 			sz += scnprintf(buf + sz, PAGE_SIZE - sz - 2,
-					"%s ", backends[i]->name);
+					"%s ", backends[i]);
 		i++;
 	}
 	sz += scnprintf(buf + sz, PAGE_SIZE - sz, "\n");
@@ -106,16 +103,39 @@ void zcomp_stream_put(struct zcomp *comp)
 }
 
 int zcomp_compress(struct zcomp *comp, struct zcomp_strm *zstrm,
-		const unsigned char *src, size_t *dst_len)
+		const unsigned char *src, unsigned int *dst_len)
 {
-	return comp->backend->compress(src, zstrm->buffer, dst_len,
-			zstrm->private);
+	/*
+	 * Our dst memory (zstrm->buffer) is always `2 * PAGE_SIZE' sized
+	 * because sometimes we can endup having a bigger compressed data
+	 * due to various reasons: for example compression algorithms tend
+	 * to add some padding to the compressed buffer. Speaking of padding,
+	 * comp algorithm `842' pads the compressed length to multiple of 8
+	 * and returns -ENOSP when the dst memory is not big enough, which
+	 * is not something that ZRAM wants to see. We can handle the
+	 * `compressed_size > PAGE_SIZE' case easily in ZRAM, but when we
+	 * receive -ERRNO from the compressing backend we can't help it
+	 * anymore. To make `842' happy we need to tell the exact size of
+	 * the dst buffer, zram_drv will take care of the fact that
+	 * compressed buffer is too big.
+	 */
+	*dst_len = PAGE_SIZE * 2;
+
+	return crypto_comp_compress(zstrm->private,
+			src, PAGE_SIZE,
+			zstrm->buffer, dst_len);
 }
 
-int zcomp_decompress(struct zcomp *comp, const unsigned char *src,
+int zcomp_decompress(struct zcomp *comp,
+		struct zcomp_strm *zstrm,
+		const unsigned char *src,
 		size_t src_len, unsigned char *dst)
 {
-	return comp->backend->decompress(src, src_len, dst);
+	unsigned int dst_len = PAGE_SIZE;
+
+	return crypto_comp_decompress(zstrm->private,
+			src, src_len,
+			dst, &dst_len);
 }
 
 static int __zcomp_cpu_notifier(struct zcomp *comp,
@@ -209,7 +229,7 @@ void zcomp_destroy(struct zcomp *comp)
 struct zcomp *zcomp_create(const char *compress)
 {
 	struct zcomp *comp;
-	struct zcomp_backend *backend;
+	const char *backend;
 	int error;
 
 	backend = find_backend(compress);
@@ -220,7 +240,7 @@ struct zcomp *zcomp_create(const char *compress)
 	if (!comp)
 		return ERR_PTR(-ENOMEM);
 
-	comp->backend = backend;
+	comp->name = backend;
 	error = zcomp_init(comp);
 	if (error) {
 		kfree(comp);
