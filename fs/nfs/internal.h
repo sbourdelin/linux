@@ -368,7 +368,7 @@ ssize_t nfs_file_write(struct kiocb *, struct iov_iter *);
 int nfs_file_release(struct inode *, struct file *);
 int nfs_lock(struct file *, int, struct file_lock *);
 int nfs_flock(struct file *, int, struct file_lock *);
-int nfs_check_flags(int);
+int nfs_check_flags(unsigned int, struct file *, int);
 
 /* inode.c */
 extern struct workqueue_struct *nfsiod_workqueue;

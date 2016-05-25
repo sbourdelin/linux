@@ -496,6 +496,7 @@ static int file_ioctl(struct file *filp, unsigned int cmd,
 static int ioctl_fionbio(struct file *filp, int __user *argp)
 {
 	unsigned int flag;
+	unsigned int setfl;
 	int on, error;
 
 	error = get_user(on, argp);
@@ -512,7 +513,15 @@ static int ioctl_fionbio(struct file *filp, int __user *argp)
 		filp->f_flags |= flag;
 	else
 		filp->f_flags &= ~flag;
+	setfl = filp->f_flags;
 	spin_unlock(&filp->f_lock);
+
+	/*
+	 * Do the same as in fcntl().
+	 */
+	if (filp->f_op->check_flags)
+		error = filp->f_op->check_flags(setfl, filp, 1);
+
 	return error;
 }
 

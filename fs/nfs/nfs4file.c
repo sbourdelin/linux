@@ -44,7 +44,7 @@ nfs4_file_open(struct inode *inode, struct file *filp)
 
 	dprintk("NFS: open file(%pd2)\n", dentry);
 
-	err = nfs_check_flags(openflags);
+	err = nfs_check_flags(openflags, filp, 0);
 	if (err)
 		return err;
 
