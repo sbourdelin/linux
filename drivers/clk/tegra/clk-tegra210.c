@@ -2655,7 +2655,7 @@ static void __init tegra210_pll_init(void __iomem *clk_base,
 
 	/* PLLRE */
 	clk = tegra_clk_register_pllre_tegra210("pll_re_vco", "pll_ref",
-						clk_base, pmc, 0,
+						clk_base, pmc, CLK_IS_CRITICAL,
 						&pll_re_vco_params,
 						&pll_re_lock, pll_ref_freq);
 	clk_register_clkdev(clk, "pll_re_vco", NULL);
