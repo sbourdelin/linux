@@ -27,6 +27,7 @@
 		i2c2 = &i2c3;
 		i2c3 = &i2c4;
 		i2c4 = &i2c5;
+		i2c5 = &i2c6;
 		serial0 = &uart1;
 		serial1 = &uart2;
 		serial2 = &uart3;
@@ -873,6 +874,16 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			ti,hwmods = "i2c5";
+			status = "disabled";
+		};
+
+		i2c6: i2c@48458000 {
+			compatible = "ti,omap4-i2c";
+			reg = <0x48458000 0x100>;
+			interrupts = <GIC_SPI 402 IRQ_TYPE_LEVEL_HIGH>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			ti,hwmods = "i2c6";
 			status = "disabled";
 		};
 
