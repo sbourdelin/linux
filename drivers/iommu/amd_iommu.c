@@ -2016,7 +2016,7 @@ static struct dma_ops_domain *dma_ops_domain_alloc(void)
 	 * mark the first page as allocated so we never return 0 as
 	 * a valid dma-address. So we can use 0 as error value
 	 */
-	dma_dom->aperture[0]->bitmap[0] = 1;
+	__set_bit(0, dma_dom->aperture[0]->bitmap);
 
 	for_each_possible_cpu(cpu)
 		*per_cpu_ptr(dma_dom->next_index, cpu) = 0;
