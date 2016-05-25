@@ -29,12 +29,16 @@ static const char * const backends[] = {
 static const char *find_backend(const char *compress)
 {
 	int i = 0;
+
 	while (backends[i]) {
 		if (sysfs_streq(compress, backends[i]))
 			break;
 		i++;
 	}
-	return backends[i];
+
+	if (backends[i] && crypto_has_comp(backends[i], 0, 0))
+		return backends[i];
+	return NULL;
 }
 
 static void zcomp_strm_free(struct zcomp *comp, struct zcomp_strm *zstrm)
@@ -74,14 +78,16 @@ ssize_t zcomp_available_show(const char *comp, char *buf)
 	ssize_t sz = 0;
 	int i = 0;
 
-	while (backends[i]) {
+	for (; backends[i]; i++) {
+		if (!crypto_has_comp(backends[i], 0, 0))
+			continue;
+
 		if (!strcmp(comp, backends[i]))
 			sz += scnprintf(buf + sz, PAGE_SIZE - sz - 2,
 					"[%s] ", backends[i]);
 		else
 			sz += scnprintf(buf + sz, PAGE_SIZE - sz - 2,
 					"%s ", backends[i]);
-		i++;
 	}
 	sz += scnprintf(buf + sz, PAGE_SIZE - sz, "\n");
 	return sz;
