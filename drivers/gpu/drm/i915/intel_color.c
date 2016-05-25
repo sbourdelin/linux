@@ -509,7 +509,7 @@ int intel_color_check(struct drm_crtc *crtc,
 	     crtc_state->degamma_lut->length == degamma_length) &&
 	    (!crtc_state->gamma_lut ||
 	     crtc_state->gamma_lut->length == gamma_length))
-		return 0;
+		goto success;
 
 	/*
 	 * We also allow no degamma lut and a gamma lut at the legacy
@@ -518,9 +518,19 @@ int intel_color_check(struct drm_crtc *crtc,
 	if (!crtc_state->degamma_lut &&
 	    crtc_state->gamma_lut &&
 	    crtc_state->gamma_lut->length == LEGACY_LUT_LENGTH)
-		return 0;
+		goto success;
 
 	return -EINVAL;
+
+ success:
+
+	/*
+	 * Changing color management on Intel hardware is handled as part of
+	 * planes update.
+	 */
+	crtc_state->planes_changed = true;
+
+	return 0;
 }
 
 void intel_color_init(struct drm_crtc *crtc)
