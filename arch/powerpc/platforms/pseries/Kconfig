@@ -21,6 +21,7 @@ config PPC_PSERIES
 	select HOTPLUG_CPU if SMP
 	select ARCH_RANDOM
 	select PPC_DOORBELL
+	select ARCH_USE_QUEUED_SPINLOCKS
 	default y
 
 config PPC_SPLPAR
