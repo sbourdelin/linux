@@ -765,14 +765,16 @@ befs_fill_super(struct super_block *sb, void *data, int silent)
 
 	sb->s_fs_info = kzalloc(sizeof(*befs_sb), GFP_KERNEL);
 	if (sb->s_fs_info == NULL) {
-		pr_err("(%s): Unable to allocate memory for private "
-		       "portion of superblock. Bailing.\n", sb->s_id);
+		if (!silent)
+			pr_err("(%s): Unable to allocate memory for private "
+				"portion of superblock. Bailing.\n", sb->s_id);
 		goto unacquire_none;
 	}
 	befs_sb = BEFS_SB(sb);
 
 	if (!parse_options((char *) data, &befs_sb->mount_opts)) {
-		befs_error(sb, "cannot parse mount options");
+		if (!silent)
+			befs_error(sb, "cannot parse mount options");
 		goto unacquire_priv_sbp;
 	}
 
@@ -796,7 +798,8 @@ befs_fill_super(struct super_block *sb, void *data, int silent)
 	sb_min_blocksize(sb, 1024);
 
 	if (!(bh = sb_bread(sb, sb_block))) {
-		befs_error(sb, "unable to read superblock");
+		if (!silent)
+			befs_error(sb, "unable to read superblock");
 		goto unacquire_priv_sbp;
 	}
 
@@ -820,9 +823,10 @@ befs_fill_super(struct super_block *sb, void *data, int silent)
 	brelse(bh);
 
 	if( befs_sb->num_blocks > ~((sector_t)0) ) {
-		befs_error(sb, "blocks count: %llu "
-			"is larger than the host can use",
-			befs_sb->num_blocks);
+		if (!silent)
+			befs_error(sb, "blocks count: %llu "
+					"is larger than the host can use",
+					befs_sb->num_blocks);
 		goto unacquire_priv_sbp;
 	}
 
@@ -841,7 +845,8 @@ befs_fill_super(struct super_block *sb, void *data, int silent)
 	}
 	sb->s_root = d_make_root(root);
 	if (!sb->s_root) {
-		befs_error(sb, "get root inode failed");
+		if (!silent)
+			befs_error(sb, "get root inode failed");
 		goto unacquire_priv_sbp;
 	}
 
