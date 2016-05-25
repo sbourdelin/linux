@@ -1117,6 +1117,11 @@ static int ion_dma_buf_begin_cpu_access(struct dma_buf *dmabuf,
 	mutex_lock(&buffer->lock);
 	vaddr = ion_buffer_kmap_get(buffer);
 	mutex_unlock(&buffer->lock);
+
+	if (direction != DMA_TO_DEVICE) {
+		ion_invalidate_buffer(buffer);
+	}
+
 	return PTR_ERR_OR_ZERO(vaddr);
 }
 
@@ -1128,6 +1133,12 @@ static int ion_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
 	mutex_lock(&buffer->lock);
 	ion_buffer_kmap_put(buffer);
 	mutex_unlock(&buffer->lock);
+
+	if (direction == DMA_FROM_DEVICE) {
+		ion_invalidate_buffer(buffer);
+	} else {
+		ion_clean_buffer(buffer);
+	}
 
 	return 0;
 }
@@ -1258,6 +1269,8 @@ static int ion_sync_for_device(struct ion_client *client, int fd)
 {
 	struct dma_buf *dmabuf;
 	struct ion_buffer *buffer;
+
+	WARN_ONCE(1, "This API is deprecated in favor of the dma_buf ioctl\n");
 
 	dmabuf = dma_buf_get(fd);
 	if (IS_ERR(dmabuf))
