@@ -670,7 +670,7 @@ static int copy_dev_tables(void)
 	u32 lo, hi, devid;
 	phys_addr_t old_devtb_phys;
 	struct dev_table_entry *old_devtb;
-	u16 dom_id, dte_v;
+	u16 dom_id, dte_v, irq_v;
 	struct amd_iommu *iommu;
 	static int copied;
 
@@ -692,7 +692,8 @@ static int copy_dev_tables(void)
                         amd_iommu_dev_table[devid] = old_devtb[devid];
                         dom_id = amd_iommu_dev_table[devid].data[1] & DEV_DOMID_MASK;
 			dte_v = amd_iommu_dev_table[devid].data[0] & DTE_FLAG_V;
-			if (!dte_v)
+			irq_v = amd_iommu_dev_table[devid].data[2] & DTE_IRQ_REMAP_ENABLE;
+			if (!dte_v || !irq_v || !dom_id)
 				continue;
                         __set_bit(dom_id, amd_iommu_pd_alloc_bitmap);
                 }
