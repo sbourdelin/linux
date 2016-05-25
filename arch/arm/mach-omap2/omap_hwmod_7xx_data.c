@@ -1127,6 +1127,20 @@ static struct omap_hwmod dra7xx_i2c5_hwmod = {
 	.dev_attr	= &i2c_dev_attr,
 };
 
+/* i2c6 */
+static struct omap_hwmod dra7xx_i2c6_hwmod = {
+	.name		= "i2c6",
+	.class		= &dra7xx_i2c_hwmod_class,
+	.clkdm_name	= "l4per2_clkdm",
+	.flags		= HWMOD_16BIT_REG | HWMOD_SET_DEFAULT_CLOCKACT,
+	.main_clk	= "func_96m_fclk",
+	.prcm = {
+		.omap4 = {
+		},
+	},
+	.dev_attr	= &i2c_dev_attr,
+};
+
 /*
  * 'mailbox' class
  *
@@ -3186,6 +3200,14 @@ static struct omap_hwmod_ocp_if dra7xx_l4_per1__i2c5 = {
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 };
 
+/* l4_per2 -> i2c6 */
+static struct omap_hwmod_ocp_if dra7xx_l4_per2__i2c6 = {
+	.master		= &dra7xx_l4_per2_hwmod,
+	.slave		= &dra7xx_i2c6_hwmod,
+	.clk		= "l3_iclk_div",
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
 /* l4_cfg -> mailbox1 */
 static struct omap_hwmod_ocp_if dra7xx_l4_cfg__mailbox1 = {
 	.master		= &dra7xx_l4_cfg_hwmod,
@@ -3857,6 +3879,7 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
 	&dra7xx_l4_per1__i2c3,
 	&dra7xx_l4_per1__i2c4,
 	&dra7xx_l4_per1__i2c5,
+	&dra7xx_l4_per2__i2c6,
 	&dra7xx_l4_cfg__mailbox1,
 	&dra7xx_l4_per3__mailbox2,
 	&dra7xx_l4_per3__mailbox3,
