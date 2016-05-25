@@ -1942,8 +1942,9 @@ static void clk_summary_show_one(struct seq_file *s, struct clk_core *c,
 	if (!c)
 		return;
 
-	seq_printf(s, "%*s%-*s %11d %12d %11lu %10lu %-3d\n",
-		   level * 3 + 1, "",
+	seq_printf(s, "%s%*s%-*s %11d %12d %11lu %10lu %-3d\n",
+		   (c->flags & CLK_IS_CRITICAL ? "^" : ""),
+		   level * 3 + (c->flags & CLK_IS_CRITICAL ? 0 : 1), "",
 		   30 - level * 3, c->name,
 		   c->enable_count, c->prepare_count, clk_core_get_rate(c),
 		   clk_core_get_accuracy(c), clk_core_get_phase(c));
@@ -1978,6 +1979,8 @@ static int clk_summary_show(struct seq_file *s, void *data)
 			clk_summary_show_subtree(s, c, 0);
 
 	clk_prepare_unlock();
+
+	seq_puts(s, "clocks starting with ^ are marked as CRITICAL\n");
 
 	return 0;
 }
