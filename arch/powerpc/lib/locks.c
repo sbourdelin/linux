@@ -23,6 +23,7 @@
 #include <asm/hvcall.h>
 #include <asm/smp.h>
 
+#ifndef CONFIG_QUEUED_SPINLOCKS
 void __spin_yield(arch_spinlock_t *lock)
 {
 	unsigned int lock_value, holder_cpu, yield_count;
@@ -42,6 +43,7 @@ void __spin_yield(arch_spinlock_t *lock)
 		get_hard_smp_processor_id(holder_cpu), yield_count);
 }
 EXPORT_SYMBOL_GPL(__spin_yield);
+#endif
 
 /*
  * Waiting for a read lock or a write lock on a rwlock...
@@ -69,6 +71,7 @@ void __rw_yield(arch_rwlock_t *rw)
 }
 #endif
 
+#ifndef CONFIG_QUEUED_SPINLOCKS
 void arch_spin_unlock_wait(arch_spinlock_t *lock)
 {
 	smp_mb();
@@ -84,3 +87,4 @@ void arch_spin_unlock_wait(arch_spinlock_t *lock)
 }
 
 EXPORT_SYMBOL(arch_spin_unlock_wait);
+#endif
