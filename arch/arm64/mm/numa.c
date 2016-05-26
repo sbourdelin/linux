@@ -362,7 +362,8 @@ static int __init dummy_numa_init(void)
 	int ret;
 	struct memblock_region *mblk;
 
-	pr_info("%s\n", "No NUMA configuration found");
+	if (numa_off)
+		pr_info("%s\n", "No NUMA configuration found");
 	pr_info("NUMA: Faking a node at [mem %#018Lx-%#018Lx]\n",
 	       0LLU, PFN_PHYS(max_pfn) - 1);
 
