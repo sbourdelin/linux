@@ -105,6 +105,7 @@ struct idmac_desc {
 static bool dw_mci_reset(struct dw_mci *host);
 static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
 static int dw_mci_card_busy(struct mmc_host *mmc);
+static int dw_mci_get_cd(struct mmc_host *mmc);
 
 #if defined(CONFIG_DEBUG_FS)
 static int dw_mci_req_show(struct seq_file *s, void *v)
@@ -1247,6 +1248,8 @@ static void dw_mci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	struct dw_mci *host = slot->host;
 
 	WARN_ON(slot->mrq);
+
+	dw_mci_get_cd(mmc);
 
 	/*
 	 * The check for card presence and queueing of the request must be
