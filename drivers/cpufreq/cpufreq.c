@@ -1956,7 +1956,7 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
 	if (!cpufreq_driver->target_index)
 		return -EINVAL;
 
-	freq_table = cpufreq_frequency_get_table(policy->cpu);
+	freq_table = cpufreq_get_policy_table(policy);
 	if (unlikely(!freq_table)) {
 		pr_err("%s: Unable to find freq_table\n", __func__);
 		return -EINVAL;
@@ -2310,7 +2310,7 @@ static int cpufreq_boost_set_sw(int state)
 	int ret = -EINVAL;
 
 	for_each_active_policy(policy) {
-		freq_table = cpufreq_frequency_get_table(policy->cpu);
+		freq_table = cpufreq_get_policy_table(policy);
 		if (freq_table) {
 			ret = cpufreq_frequency_table_cpuinfo(policy,
 							freq_table);
