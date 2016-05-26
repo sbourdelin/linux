@@ -217,12 +217,35 @@ ww_mutex_set_context_slowpath(struct ww_mutex *lock,
 }
 
 #ifdef CONFIG_MUTEX_SPIN_ON_OWNER
+static bool ww_mutex_may_deadlock(struct mutex *lock,
+				  struct ww_acquire_ctx *ww_ctx)
+{
+	if (ww_ctx && ww_ctx->acquired > 0) {
+		struct ww_mutex *ww;
+
+		ww = container_of(lock, struct ww_mutex, base);
+		/*
+		 * If ww->ctx is set the contents are undefined, only
+		 * by acquiring wait_lock there is a guarantee that
+		 * they are not invalid when reading.
+		 *
+		 * As such, when deadlock detection needs to be
+		 * performed the optimistic spinning cannot be done.
+		 */
+		if (READ_ONCE(ww->ctx))
+			return true;
+	}
+
+	return false;
+}
+
 /*
  * Look out! "owner" is an entirely speculative pointer
  * access and not reliable.
  */
 static noinline
-bool mutex_spin_on_owner(struct mutex *lock, struct task_struct *owner)
+bool mutex_spin_on_owner(struct mutex *lock, struct task_struct *owner,
+			 struct ww_acquire_ctx *ww_ctx)
 {
 	bool ret = true;
 
@@ -241,6 +264,11 @@ bool mutex_spin_on_owner(struct mutex *lock, struct task_struct *owner)
 			break;
 		}
 
+		if (ww_mutex_may_deadlock(lock, ww_ctx)) {
+			ret = false;
+			break;
+		}
+
 		cpu_relax_lowlatency();
 	}
 	rcu_read_unlock();
@@ -251,12 +279,16 @@ bool mutex_spin_on_owner(struct mutex *lock, struct task_struct *owner)
 /*
  * Initial check for entering the mutex spinning loop
  */
-static inline int mutex_can_spin_on_owner(struct mutex *lock)
+static inline int mutex_can_spin_on_owner(struct mutex *lock,
+					  struct ww_acquire_ctx *ww_ctx)
 {
 	struct task_struct *owner;
 	int retval = 1;
 
 	if (need_resched())
+		return 0;
+
+	if (ww_mutex_may_deadlock(lock, ww_ctx))
 		return 0;
 
 	rcu_read_lock();
@@ -308,7 +340,7 @@ static bool mutex_optimistic_spin(struct mutex *lock,
 {
 	struct task_struct *task = current;
 
-	if (!mutex_can_spin_on_owner(lock))
+	if (!mutex_can_spin_on_owner(lock, ww_ctx))
 		goto done;
 
 	/*
@@ -322,28 +354,12 @@ static bool mutex_optimistic_spin(struct mutex *lock,
 	while (true) {
 		struct task_struct *owner;
 
-		if (use_ww_ctx && ww_ctx->acquired > 0) {
-			struct ww_mutex *ww;
-
-			ww = container_of(lock, struct ww_mutex, base);
-			/*
-			 * If ww->ctx is set the contents are undefined, only
-			 * by acquiring wait_lock there is a guarantee that
-			 * they are not invalid when reading.
-			 *
-			 * As such, when deadlock detection needs to be
-			 * performed the optimistic spinning cannot be done.
-			 */
-			if (READ_ONCE(ww->ctx))
-				break;
-		}
-
 		/*
 		 * If there's an owner, wait for it to either
 		 * release the lock or go to sleep.
 		 */
 		owner = READ_ONCE(lock->owner);
-		if (owner && !mutex_spin_on_owner(lock, owner))
+		if (owner && !mutex_spin_on_owner(lock, owner, ww_ctx))
 			break;
 
 		/* Try to acquire the mutex if it is unlocked. */
