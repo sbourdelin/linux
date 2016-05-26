@@ -106,15 +106,6 @@ static int page_cache_pipe_buf_confirm(struct pipe_inode_info *pipe,
 		lock_page(page);
 
 		/*
-		 * Page got truncated/unhashed. This will cause a 0-byte
-		 * splice, if this is the first page.
-		 */
-		if (!page->mapping) {
-			err = -ENODATA;
-			goto error;
-		}
-
-		/*
 		 * Uh oh, read-error from disk.
 		 */
 		if (!PageUptodate(page)) {
