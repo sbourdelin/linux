@@ -545,7 +545,7 @@ xfs_setattr_time(
  * Set non-size attributes of an inode.
  *
  * Caution: The caller of this function is responsible for calling
- * inode_change_ok() or otherwise verifying the change is fine.
+ * setattr_prepare() or otherwise verifying the change is fine.
  */
 int
 xfs_setattr_nonsize(
@@ -751,7 +751,7 @@ xfs_vn_setattr_nonsize(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return -EIO;
 
-	error = inode_change_ok(inode, iattr);
+	error = setattr_prepare(dentry, iattr);
 	if (error)
 		return error;
 	return xfs_setattr_nonsize(ip, iattr, 0);
@@ -782,7 +782,7 @@ xfs_vn_setattr_size(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return -EIO;
 
-	error = inode_change_ok(inode, iattr);
+	error = setattr_prepare(dentry, iattr);
 	if (error)
 		return error;
 
