@@ -63,7 +63,7 @@ static int __init of_numa_parse_memory_nodes(void)
 	struct device_node *np = NULL;
 	struct resource rsrc;
 	u32 nid;
-	int r = 0;
+	int i, r = 0;
 
 	for (;;) {
 		np = of_find_node_by_type(np, "memory");
@@ -82,17 +82,27 @@ static int __init of_numa_parse_memory_nodes(void)
 			/* some other error */
 			break;
 
-		r = of_address_to_resource(np, 0, &rsrc);
-		if (r) {
-			pr_err("NUMA: bad reg property in memory node\n");
-			break;
-		}
+		for (i = 0; ; i++) {
+			r = of_address_to_resource(np, i, &rsrc);
+			if (r) {
+				/* reached the end of of_address */
+				if (i > 0) {
+					r = 0;
+					break;
+				}
 
-		r = numa_add_memblk(nid, rsrc.start,
-				    rsrc.end - rsrc.start + 1);
-		if (r)
-			break;
+				pr_err("NUMA: bad reg property in memory node\n");
+				goto finished;
+			}
+
+			r = numa_add_memblk(nid, rsrc.start,
+					    rsrc.end - rsrc.start + 1);
+			if (r)
+				goto finished;
+		}
 	}
+
+finished:
 	of_node_put(np);
 
 	return r;
