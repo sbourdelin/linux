@@ -81,7 +81,7 @@ int orangefs_set_acl(struct inode *inode, struct posix_acl *acl, int type)
 			 * can we represent this with the traditional file
 			 * mode permission bits?
 			 */
-			error = posix_acl_equiv_mode(acl, &mode);
+			error = posix_acl_equiv_mode(inode, acl, &mode);
 			if (error < 0) {
 				gossip_err("%s: posix_acl_equiv_mode err: %d\n",
 					   __func__,

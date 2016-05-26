@@ -94,7 +94,7 @@ int ceph_set_acl(struct inode *inode, struct posix_acl *acl, int type)
 	case ACL_TYPE_ACCESS:
 		name = XATTR_NAME_POSIX_ACL_ACCESS;
 		if (acl) {
-			ret = posix_acl_equiv_mode(acl, &new_mode);
+			ret = posix_acl_equiv_mode(inode, acl, &new_mode);
 			if (ret < 0)
 				goto out;
 			if (ret == 0)
@@ -169,7 +169,7 @@ int ceph_pre_init_acls(struct inode *dir, umode_t *mode,
 		return err;
 
 	if (acl) {
-		int ret = posix_acl_equiv_mode(acl, mode);
+		int ret = posix_acl_equiv_mode(dir, acl, mode);
 		if (ret < 0)
 			goto out_err;
 		if (ret == 0) {

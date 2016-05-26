@@ -240,7 +240,8 @@ EXPORT_SYMBOL(posix_acl_valid);
  * file mode permission bits, or else 1. Returns -E... on error.
  */
 int
-posix_acl_equiv_mode(const struct posix_acl *acl, umode_t *mode_p)
+posix_acl_equiv_mode(struct inode *inode, const struct posix_acl *acl,
+		     umode_t *mode_p)
 {
 	const struct posix_acl_entry *pa, *pe;
 	umode_t mode = 0;
@@ -852,7 +853,7 @@ int simple_set_acl(struct inode *inode, struct posix_acl *acl, int type)
 	int error;
 
 	if (type == ACL_TYPE_ACCESS) {
-		error = posix_acl_equiv_mode(acl, &inode->i_mode);
+		error = posix_acl_equiv_mode(inode, acl, &inode->i_mode);
 		if (error < 0)
 			return 0;
 		if (error == 0)

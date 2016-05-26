@@ -266,7 +266,7 @@ xfs_set_acl(struct inode *inode, struct posix_acl *acl, int type)
 
 	if (type == ACL_TYPE_ACCESS) {
 		umode_t mode = inode->i_mode;
-		error = posix_acl_equiv_mode(acl, &mode);
+		error = posix_acl_equiv_mode(inode, acl, &mode);
 
 		if (error <= 0) {
 			acl = NULL;

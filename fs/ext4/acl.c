@@ -196,7 +196,8 @@ __ext4_set_acl(handle_t *handle, struct inode *inode, int type,
 	case ACL_TYPE_ACCESS:
 		name_index = EXT4_XATTR_INDEX_POSIX_ACL_ACCESS;
 		if (acl) {
-			error = posix_acl_equiv_mode(acl, &inode->i_mode);
+			error = posix_acl_equiv_mode(inode, acl,
+						     &inode->i_mode);
 			if (error < 0)
 				return error;
 			else {

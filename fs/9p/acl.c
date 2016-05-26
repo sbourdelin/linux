@@ -277,7 +277,7 @@ static int v9fs_xattr_set_acl(const struct xattr_handler *handler,
 	case ACL_TYPE_ACCESS:
 		if (acl) {
 			umode_t mode = inode->i_mode;
-			retval = posix_acl_equiv_mode(acl, &mode);
+			retval = posix_acl_equiv_mode(inode, acl, &mode);
 			if (retval < 0)
 				goto err_out;
 			else {

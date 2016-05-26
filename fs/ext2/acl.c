@@ -193,7 +193,8 @@ ext2_set_acl(struct inode *inode, struct posix_acl *acl, int type)
 		case ACL_TYPE_ACCESS:
 			name_index = EXT2_XATTR_INDEX_POSIX_ACL_ACCESS;
 			if (acl) {
-				error = posix_acl_equiv_mode(acl, &inode->i_mode);
+				error = posix_acl_equiv_mode(inode, acl,
+							     &inode->i_mode);
 				if (error < 0)
 					return error;
 				else {
