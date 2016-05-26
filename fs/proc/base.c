@@ -1043,10 +1043,13 @@ static ssize_t oom_adj_read(struct file *file, char __user *buf, size_t count,
 
 static int __set_oom_adj(struct file *file, int oom_adj, bool legacy)
 {
+	static DEFINE_MUTEX(oom_adj_mutex);
+	struct mm_struct *mm = NULL;
 	struct task_struct *task;
 	unsigned long flags;
 	int err = 0;
 
+	mutex_lock(&oom_adj_mutex);
 	task = get_proc_task(file_inode(file));
 	if (!task) {
 		err = -ESRCH;
@@ -1085,6 +1088,20 @@ static int __set_oom_adj(struct file *file, int oom_adj, bool legacy)
 		}
 	}
 
+	/*
+	 * If we are not in the vfork and share mm with other processes we
+	 * have to propagate the score otherwise we would have a schizophrenic
+	 * requirements for the same mm. We can use racy check because we
+	 * only risk the slow path.
+	 */
+	if (!task->vfork_done &&
+			atomic_read(&task->mm->mm_users) > get_nr_threads(task)) {
+		mm = task->mm;
+
+		/* pin the mm so it doesn't go away and get reused */
+		atomic_inc(&mm->mm_count);
+	}
+
 	task->signal->oom_score_adj = oom_adj;
 	if (!legacy && has_capability_noaudit(current, CAP_SYS_RESOURCE))
 		task->signal->oom_score_adj_min = (short)oom_adj;
@@ -1094,7 +1111,25 @@ err_sighand:
 err_task_lock:
 	task_unlock(task);
 	put_task_struct(task);
+
+	if (mm) {
+		struct task_struct *p;
+
+		rcu_read_lock();
+		for_each_process(p) {
+			task_lock(p);
+			if (!p->vfork_done && process_shares_mm(p, mm)) {
+				p->signal->oom_score_adj = oom_adj;
+				if (!legacy && has_capability_noaudit(current, CAP_SYS_RESOURCE))
+					p->signal->oom_score_adj_min = (short)oom_adj;
+			}
+			task_unlock(p);
+		}
+		rcu_read_unlock();
+		mmdrop(mm);
+	}
 out:
+	mutex_unlock(&oom_adj_mutex);
 	return err;
 }
 
