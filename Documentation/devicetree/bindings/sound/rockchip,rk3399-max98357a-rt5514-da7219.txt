@@ -1,0 +1,15 @@
+ROCKCHIP with MAX98357A/RT5514/DA7219 codecs
+
+Required properties:
+- compatible: "rockchip,rk3399-max98357a-rt5514-da7219"
+- rockchip,cpu: The phandle of the Rockchip I2S controller that's
+  connected to the codecs
+- rockchip,codec: The phandle of the MAX98357A/RT5514/DA7219 codecs
+
+Example:
+
+sound {
+	compatible = "rockchip,rk3399-max98357a-rt5514-da7219";
+	rockchip,cpu = <&i2s0 &i2s0 &i2s1>;
+	rockchip,codec = <&max98357a &headsetcodec &codec>;
+};
