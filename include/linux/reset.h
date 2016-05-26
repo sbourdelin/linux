@@ -14,9 +14,23 @@ int reset_control_status(struct reset_control *rstc);
 
 struct reset_control *__of_reset_control_get(struct device_node *node,
 				     const char *id, int index, int shared);
+
+struct reset_control *__of_reset_control_get_optional(struct device_node *node,
+				     const char *id, int index, int shared)
+{
+	return __of_reset_control_get(node, id, index, shared);
+}
+
 void reset_control_put(struct reset_control *rstc);
 struct reset_control *__devm_reset_control_get(struct device *dev,
 				     const char *id, int index, int shared);
+
+static inline struct reset_control *__devm_reset_control_get_optional(
+					struct device *dev,
+					const char *id, int index, int shared)
+{
+	return __devm_reset_control_get(dev, id, index, shared);
+}
 
 int __must_check device_reset(struct device *dev);
 
@@ -74,11 +88,25 @@ static inline struct reset_control *__of_reset_control_get(
 	return ERR_PTR(-EINVAL);
 }
 
+static inline struct reset_control *__of_reset_control_get_optional(
+					struct device_node *node,
+					const char *id, int index, int shared)
+{
+	return ERR_PTR(-ENOTSUPP);
+}
+
 static inline struct reset_control *__devm_reset_control_get(
 					struct device *dev,
 					const char *id, int index, int shared)
 {
 	return ERR_PTR(-EINVAL);
+}
+
+static inline struct reset_control *__devm_reset_control_get_optional(
+					struct device *dev,
+					const char *id, int index, int shared)
+{
+	return ERR_PTR(-ENOTSUPP);
 }
 
 #endif /* CONFIG_RESET_CONTROLLER */
@@ -110,7 +138,8 @@ static inline struct reset_control *__must_check reset_control_get(
 static inline struct reset_control *reset_control_get_optional(
 					struct device *dev, const char *id)
 {
-	return __of_reset_control_get(dev ? dev->of_node : NULL, id, 0, 0);
+	return __of_reset_control_get_optional(dev ? dev->of_node : NULL,
+					       id, 0, 0);
 }
 
 /**
@@ -194,7 +223,7 @@ static inline struct reset_control *__must_check devm_reset_control_get(
 static inline struct reset_control *devm_reset_control_get_optional(
 					struct device *dev, const char *id)
 {
-	return __devm_reset_control_get(dev, id, 0, 0);
+	return __devm_reset_control_get_optional(dev, id, 0, 0);
 }
 
 /**
