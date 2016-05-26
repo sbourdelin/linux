@@ -223,6 +223,11 @@ struct ath_rx_rate_stats {
 	} cck_stats[4];
 };
 
+struct ath_airtime_stats {
+	u32 rx_airtime;
+	u32 tx_airtime;
+};
+
 #define ANT_MAIN 0
 #define ANT_ALT  1
 
@@ -316,8 +321,24 @@ ath9k_debug_sync_cause(struct ath_softc *sc, u32 sync_cause)
 void ath_debug_rate_stats(struct ath_softc *sc,
 			  struct ath_rx_status *rs,
 			  struct sk_buff *skb);
+void ath_debug_tx_airtime(struct ath_softc *sc,
+		          struct ath_node *an,
+			  struct ath_tx_status *ts);
+void ath_debug_rx_airtime(struct ath_softc *sc,
+			  struct ath_rx_status *rs,
+			  struct sk_buff *skb);
 #else
 static inline void ath_debug_rate_stats(struct ath_softc *sc,
+					struct ath_rx_status *rs,
+					struct sk_buff *skb)
+{
+}
+static inline void ath_debug_tx_airtime(struct ath_softc *sc,
+					struct ath_node *an,
+					struct ath_tx_status *ts)
+{
+}
+static inline void ath_debug_rx_airtime(struct ath_softc *sc,
 					struct ath_rx_status *rs,
 					struct sk_buff *skb)
 {

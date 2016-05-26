@@ -242,6 +242,107 @@ static const struct file_operations fops_node_recv = {
 	.llseek = default_llseek,
 };
 
+void ath_debug_tx_airtime(struct ath_softc *sc,
+		          struct ath_node *an,
+		          struct ath_tx_status *ts)
+{
+	struct ath_airtime_stats *astats;
+
+	rcu_read_lock();
+
+	astats = &an->airtime_stats;
+	astats->tx_airtime += ts->duration;
+
+	rcu_read_unlock();
+}
+
+void ath_debug_rx_airtime(struct ath_softc *sc,
+			  struct ath_rx_status *rs,
+			  struct sk_buff *skb)
+{
+	struct ath_airtime_stats *astats;
+	struct ath_node *an;
+	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *) skb->data;
+	struct ath_hw *ah = sc->sc_ah;
+	struct ath_common *common = ath9k_hw_common(ah);
+	struct ieee80211_sta *sta;
+	struct ieee80211_rx_status *rxs;
+	const struct ieee80211_rate *rate;
+	bool is_sgi, is_40, is_sp;
+	int phy;
+
+	if (!ieee80211_is_data(hdr->frame_control))
+		return;
+
+	rcu_read_lock();
+
+	sta = ieee80211_find_sta_by_ifaddr(sc->hw, hdr->addr2, NULL);
+	if (!sta)
+		goto exit;
+	an = (struct ath_node *) sta->drv_priv;
+	rxs = IEEE80211_SKB_RXCB(skb);
+	astats = &an->airtime_stats;
+
+	is_sgi = !!(rxs->flag & RX_FLAG_SHORT_GI);
+	is_40 = !!(rxs->flag & RX_FLAG_40MHZ);
+	is_sp = !!(rxs->flag & RX_FLAG_SHORTPRE);
+
+	if (!!(rxs->flag & RX_FLAG_HT)) {
+		/* MCS rates */
+
+		astats->rx_airtime += ath_pkt_duration(sc, rxs->rate_idx, rs->rs_datalen,
+						is_40, is_sgi, is_sp);
+		goto exit;
+	}
+
+	if (IS_CCK_RATE(rs->rs_rate))
+		phy = WLAN_RC_PHY_CCK;
+	else
+		phy = WLAN_RC_PHY_OFDM;
+
+	rate = &common->sbands[rxs->band].bitrates[rxs->rate_idx];
+	astats->rx_airtime += ath9k_hw_computetxtime(ah, phy, rate->bitrate * 100,
+						rs->rs_datalen, rxs->rate_idx, is_sp);
+
+
+exit:
+	rcu_read_unlock();
+}
+
+
+static ssize_t read_airtime(struct file *file, char __user *user_buf,
+			size_t count, loff_t *ppos)
+{
+	struct ath_node *an = file->private_data;
+	struct ath_airtime_stats *astats;
+	u32 len = 0, size = 128;
+	char *buf;
+	size_t retval;
+
+	buf = kzalloc(size, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	astats = &an->airtime_stats;
+
+	len += scnprintf(buf + len, size - len, "RX: %u us\n", astats->rx_airtime);
+	len += scnprintf(buf + len, size - len, "TX: %u us\n", astats->tx_airtime);
+
+	retval = simple_read_from_buffer(user_buf, count, ppos, buf, len);
+	kfree(buf);
+
+	return retval;
+}
+
+
+static const struct file_operations fops_airtime = {
+	.read = read_airtime,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
+
+
 void ath9k_sta_add_debugfs(struct ieee80211_hw *hw,
 			   struct ieee80211_vif *vif,
 			   struct ieee80211_sta *sta,
@@ -251,4 +352,5 @@ void ath9k_sta_add_debugfs(struct ieee80211_hw *hw,
 
 	debugfs_create_file("node_aggr", S_IRUGO, dir, an, &fops_node_aggr);
 	debugfs_create_file("node_recv", S_IRUGO, dir, an, &fops_node_recv);
+	debugfs_create_file("airtime", S_IRUGO, dir, an, &fops_airtime);
 }
