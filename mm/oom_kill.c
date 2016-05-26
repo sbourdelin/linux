@@ -510,8 +510,10 @@ static void oom_reap_task(struct task_struct *tsk)
 	int attempts = 0;
 
 	/* Retry the down_read_trylock(mmap_sem) a few times */
+	atomic_inc(&tsk->signal->oom_victims);
 	while (attempts++ < MAX_OOM_REAP_RETRIES && !__oom_reap_task(tsk))
 		schedule_timeout_idle(HZ/10);
+	atomic_dec(&tsk->signal->oom_victims);
 
 	if (attempts > MAX_OOM_REAP_RETRIES) {
 		pr_info("oom_reaper: unable to reap pid:%d (%s)\n",
