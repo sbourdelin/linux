@@ -262,12 +262,10 @@ static struct inode *ubifs_alloc_inode(struct super_block *sb)
 {
 	struct ubifs_inode *ui;
 
-	ui = kmem_cache_alloc(ubifs_inode_slab, GFP_NOFS);
+	ui = kmem_cache_zalloc(ubifs_inode_slab, GFP_NOFS);
 	if (!ui)
 		return NULL;
 
-	memset((void *)ui + sizeof(struct inode), 0,
-	       sizeof(struct ubifs_inode) - sizeof(struct inode));
 	mutex_init(&ui->ui_mutex);
 	spin_lock_init(&ui->ui_lock);
 	return &ui->vfs_inode;
