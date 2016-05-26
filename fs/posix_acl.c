@@ -277,8 +277,12 @@ posix_acl_equiv_mode(struct inode *inode, const struct posix_acl *acl,
 				return -EINVAL;
 		}
 	}
-        if (mode_p)
+        if (mode_p) {
+		if (!in_group_p(inode->i_gid) &&
+		    !capable_wrt_inode_uidgid(inode, CAP_FSETID))
+			*mode_p &= ~S_ISGID;
                 *mode_p = (*mode_p & ~S_IRWXUGO) | mode;
+	}
         return not_equiv;
 }
 EXPORT_SYMBOL(posix_acl_equiv_mode);
