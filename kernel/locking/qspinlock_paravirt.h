@@ -369,12 +369,16 @@ static void pv_kick_node(struct qspinlock *lock, struct mcs_spinlock *node)
 	/*
 	 * Put the lock into the hash table and set the _Q_SLOW_VAL.
 	 *
-	 * As this is the same vCPU that will check the _Q_SLOW_VAL value and
-	 * the hash table later on at unlock time, no atomic instruction is
-	 * needed.
+	 * It is very unlikely that this will race with the _Q_SLOW_VAL setting
+	 * in pv_wait_head_or_lock(). However, we use cmpxchg() here to be
+	 * sure that we won't do a double pv_hash().
+	 *
+	 * As it is the lock holder, it won't race with
+	 * __pv_queued_spin_unlock().
 	 */
-	WRITE_ONCE(l->locked, _Q_SLOW_VAL);
-	(void)pv_hash(lock, pn);
+	if (likely(cmpxchg(&l->locked, _Q_LOCKED_VAL, _Q_SLOW_VAL)
+			== _Q_LOCKED_VAL))
+		pv_hash(lock, pn);
 }
 
 /*
@@ -389,16 +393,8 @@ pv_wait_head_or_lock(struct qspinlock *lock, struct mcs_spinlock *node)
 {
 	struct pv_node *pn = (struct pv_node *)node;
 	struct __qspinlock *l = (void *)lock;
-	struct qspinlock **lp = NULL;
 	int waitcnt = 0;
 	int loop;
-
-	/*
-	 * If pv_kick_node() already advanced our state, we don't need to
-	 * insert ourselves into the hash table anymore.
-	 */
-	if (READ_ONCE(pn->state) == vcpu_hashed)
-		lp = (struct qspinlock **)1;
 
 	/*
 	 * Tracking # of slowpath locking operations
@@ -422,11 +418,19 @@ pv_wait_head_or_lock(struct qspinlock *lock, struct mcs_spinlock *node)
 				goto gotlock;
 			cpu_relax();
 		}
-		clear_pending(lock);
 
+		/*
+		 * Make sure the lock value check below is executed after
+		 * all the previous loads.
+		 */
+		smp_rmb();
 
-		if (!lp) { /* ONCE */
-			lp = pv_hash(lock, pn);
+		/*
+		 * Set _Q_SLOW_VAL and hash the PV node, if necessary.
+		 */
+		if (READ_ONCE(l->locked) != _Q_SLOW_VAL) {
+			struct qspinlock **lp = pv_hash(lock, pn);
+			u8 locked;
 
 			/*
 			 * We must hash before setting _Q_SLOW_VAL, such that
@@ -439,7 +443,8 @@ pv_wait_head_or_lock(struct qspinlock *lock, struct mcs_spinlock *node)
 			 *
 			 * Matches the smp_rmb() in __pv_queued_spin_unlock().
 			 */
-			if (xchg(&l->locked, _Q_SLOW_VAL) == 0) {
+			locked = xchg(&l->locked, _Q_SLOW_VAL);
+			if (locked == 0) {
 				/*
 				 * The lock was free and now we own the lock.
 				 * Change the lock value back to _Q_LOCKED_VAL
@@ -447,9 +452,18 @@ pv_wait_head_or_lock(struct qspinlock *lock, struct mcs_spinlock *node)
 				 */
 				WRITE_ONCE(l->locked, _Q_LOCKED_VAL);
 				WRITE_ONCE(*lp, NULL);
+				clear_pending(lock);
 				goto gotlock;
+			} else if (unlikely(locked == _Q_SLOW_VAL)) {
+				/*
+				 * Racing with pv_kick_node(), need to undo
+				 * the pv_hash().
+				 */
+				WRITE_ONCE(*lp, NULL);
 			}
 		}
+		clear_pending(lock);	/* Enable lock stealing */
+
 		WRITE_ONCE(pn->state, vcpu_halted);
 		qstat_inc(qstat_pv_wait_head, true);
 		qstat_inc(qstat_pv_wait_again, waitcnt);
