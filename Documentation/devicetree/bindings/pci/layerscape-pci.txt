@@ -19,7 +19,7 @@ Required properties:
 - interrupts: A list of interrupt outputs of the controller. Must contain an
   entry for each entry in the interrupt-names property.
 - interrupt-names: Must include the following entries:
-  "intr": The interrupt that is asserted for controller interrupts
+  "aer" : The interrupt that is asserted for aer interrupts
 - fsl,pcie-scfg: Must include two entries.
   The first entry must be a link to the SCFG device node
   The second entry must be '0' or '1' based on physical PCIe controller index.
