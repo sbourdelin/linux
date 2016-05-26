@@ -820,6 +820,13 @@ void oom_kill_process(struct oom_control *oc, struct task_struct *p,
 	task_unlock(victim);
 
 	/*
+	 * skip expensive iterations over all tasks if we know that there
+	 * are no users outside of threads in the same thread group
+	 */
+	if (atomic_read(&mm->mm_users) <= get_nr_threads(victim))
+		goto oom_reap;
+
+	/*
 	 * Kill all user processes sharing victim->mm in other thread groups, if
 	 * any.  They don't get access to memory reserves, though, to avoid
 	 * depletion of all memory.  This prevents mm->mmap_sem livelock when an
@@ -848,6 +855,7 @@ void oom_kill_process(struct oom_control *oc, struct task_struct *p,
 	}
 	rcu_read_unlock();
 
+oom_reap:
 	if (can_oom_reap)
 		wake_oom_reaper(victim);
 
