@@ -590,7 +590,7 @@ static void kvm_kick_cpu(int cpu)
 
 #include <asm/qspinlock.h>
 
-static void kvm_wait(u8 *ptr, u8 val)
+static void kvm_wait(u8 *ptr, u8 val, int lockcpu)
 {
 	unsigned long flags;
 

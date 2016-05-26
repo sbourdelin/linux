@@ -268,12 +268,12 @@ static inline void __pv_kick(int cpu)
 /*
  * Replacement function for pv_wait()
  */
-static inline void __pv_wait(u8 *ptr, u8 val)
+static inline void __pv_wait(u8 *ptr, u8 val, int lockcpu)
 {
 	u64 *pkick_time = this_cpu_ptr(&pv_kick_time);
 
 	*pkick_time = 0;
-	pv_wait(ptr, val);
+	pv_wait(ptr, val, lockcpu);
 	if (*pkick_time) {
 		this_cpu_add(qstats[qstat_pv_latency_wake],
 			     sched_clock() - *pkick_time);
@@ -281,8 +281,8 @@ static inline void __pv_wait(u8 *ptr, u8 val)
 	}
 }
 
-#define pv_kick(c)	__pv_kick(c)
-#define pv_wait(p, v)	__pv_wait(p, v)
+#define pv_kick(c)		__pv_kick(c)
+#define pv_wait(p, v, c)	__pv_wait(p, v, c)
 
 #else /* CONFIG_QUEUED_LOCK_STAT */
 
