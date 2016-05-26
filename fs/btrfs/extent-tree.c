@@ -6243,6 +6243,7 @@ void btrfs_dec_block_group_reservations(struct btrfs_fs_info *fs_info,
 	ASSERT(bg);
 	if (atomic_dec_and_test(&bg->reservations))
 		wake_up_atomic_t(&bg->reservations);
+	WARN_ON(atomic_read(&bg->reservations) < 0)
 	btrfs_put_block_group(bg);
 }
 
