@@ -1,8 +1,8 @@
 /*
  * Single-state GPIO extcon driver based on extcon class
  *
- * Copyright (C) 2012 Samsung Electronics
- * Author: MyungJoo Ham <myungjoo.ham@samsung.com>
+ * Copyright (C) 2016 Chanwoo Choi <cw00.choi@samsung.com>, Samsung Electronics
+ * Copyright (C) 2012 MyungJoo Ham <myungjoo.ham@samsung.com>, Samsung Electronics
  *
  * based on switch class driver
  * Copyright (C) 2008 Google, Inc.
@@ -35,10 +35,10 @@
  *			while resuming from sleep.
  */
 struct gpio_extcon_pdata {
-	unsigned int extcon_id;
+	u32 extcon_id;
 	unsigned gpio;
 	bool gpio_active_low;
-	unsigned long debounce;
+	u32 debounce;
 	unsigned long irq_flags;
 
 	bool check_on_resume;

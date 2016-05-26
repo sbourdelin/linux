@@ -1,0 +1,48 @@
+GPIO Extcon device
+
+This is a virtual device used to generate the specific cable states from the
+GPIO pin.
+
+Required properties:
+- compatible: Must be "extcon-gpio".
+- extcon-id: The extcon support the various type of external connector to check
+  whether connector is attached or detached. The each external connector has
+  the unique number to identify it. So this property includes the unique number
+  which indicates the specific external connector. When external connector is
+  attached or detached, GPIO pin detect the changed state. See include/
+  dt-bindings/extcon/extcon.h which defines the unique number for supported
+  external connector from extcon framework.
+- gpios: GPIO pin to detect the external connector. See gpio binding.
+
+Optional properties:
+- debounce-ms: the debounce dealy for GPIO pin in millisecond.
+- wakeup-source: Boolean, extcon can wake-up the system from suspend.
+  if gpio provided in extcon-gpio DT node is registered as interrupt,
+  then extcon can wake-up the system from suspend if wakeup-source property
+  is available in DT node, if gpio registered as interrupt but wakeup-source
+  is not available in DT node, then system wake-up due to extcon events
+  not supported.
+
+Example: Examples of extcon-gpio node as listed below:
+
+	usb_cable: extcon-gpio-0 {
+		compatible = "extcon-gpio";
+		extcon-id = <EXTCON_USB>;
+		extcon-gpio = <&gpio6 1 GPIO_ACTIVE_HIGH>;
+	}
+
+	ta_cable: extcon-gpio-1 {
+		compatible = "extcon-gpio";
+		extcon-id = <EXTCON_CHG_USB_DCP>;
+		extcon-gpio = <&gpio3 2 GPIO_ACTIVE_LOW>;
+		debounce-ms = <50>;	/* 50 millisecond */
+		wakeup-source;
+	}
+
+	&dwc3_usb {
+		extcon = <&usb_cable>;
+	};
+
+	&charger {
+		extcon = <&ta_cable>;
+	};
