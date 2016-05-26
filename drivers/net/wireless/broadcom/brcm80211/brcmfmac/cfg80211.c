@@ -669,14 +669,18 @@ static struct wireless_dev *brcmf_cfg80211_add_iface(struct wiphy *wiphy,
 		return ERR_PTR(-EOPNOTSUPP);
 	case NL80211_IFTYPE_AP:
 		wdev = brcmf_ap_add_vif(wiphy, name, flags, params);
-		if (!IS_ERR(wdev))
+		if (IS_ERR(wdev))
+			brcmf_err("Failed to create AP interface %s: %d\n", name, PTR_ERR(wdev));
+		else
 			brcmf_cfg80211_update_proto_addr_mode(wdev);
 		return wdev;
 	case NL80211_IFTYPE_P2P_CLIENT:
 	case NL80211_IFTYPE_P2P_GO:
 	case NL80211_IFTYPE_P2P_DEVICE:
 		wdev = brcmf_p2p_add_vif(wiphy, name, name_assign_type, type, flags, params);
-		if (!IS_ERR(wdev))
+		if (IS_ERR(wdev))
+			brcmf_err("Failed to create P2P interface %s: %d\n", name, PTR_ERR(wdev));
+		else
 			brcmf_cfg80211_update_proto_addr_mode(wdev);
 		return wdev;
 	case NL80211_IFTYPE_UNSPECIFIED:
