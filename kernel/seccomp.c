@@ -672,6 +672,46 @@ u32 seccomp_phase1(struct seccomp_data *sd)
 }
 
 /**
+ * seccomp_phase1_recheck() - recheck phase1 in the context of ptrace
+ *
+ * This re-runs phase 1 seccomp checks in the case where ptrace may have
+ * just changed things out from under us.
+ *
+ * Returns 0 if the syscall should be processed or -1 to skip the syscall.
+ */
+int seccomp_phase1_recheck(void)
+{
+	u32 action;
+
+	/* If we're not under seccomp, continue normally. */
+	if (!test_thread_flag(TIF_SECCOMP))
+		return 0;
+
+	/* Pass NULL struct seccomp_data to force reload after ptrace. */
+	action = seccomp_phase1(NULL);
+	switch (action) {
+	case SECCOMP_PHASE1_OK:
+		/* Passes seccomp, continue normally. */
+		break;
+	case SECCOMP_PHASE1_SKIP:
+		/* Skip the syscall. */
+		return -1;
+	default:
+		if ((action & SECCOMP_RET_ACTION) != SECCOMP_RET_TRACE) {
+			/* Impossible return value: kill the process. */
+			do_exit(SIGSYS);
+		}
+		/*
+		 * We've hit a trace request, but ptrace already put us
+		 * into this state, so just continue.
+		 */
+		break;
+	}
+
+	return 0;
+}
+
+/**
  * seccomp_phase2() - finish slow path seccomp work for the current syscall
  * @phase1_result: The return value from seccomp_phase1()
  *
@@ -708,6 +748,8 @@ int seccomp_phase2(u32 phase1_result)
 		do_exit(SIGSYS);
 	if (syscall_get_nr(current, regs) < 0)
 		return -1;  /* Explicit request to skip. */
+	if (seccomp_phase1_recheck() < 0)
+		return -1;
 
 	return 0;
 }

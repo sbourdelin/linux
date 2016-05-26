@@ -48,6 +48,7 @@
 
 #include <linux/sched.h>
 #include <linux/ptrace.h>
+#include <linux/seccomp.h>
 #include <linux/security.h>
 #include <linux/task_work.h>
 #include <linux/memcontrol.h>
@@ -100,7 +101,12 @@ static inline int ptrace_report_syscall(struct pt_regs *regs)
 static inline __must_check int tracehook_report_syscall_entry(
 	struct pt_regs *regs)
 {
-	return ptrace_report_syscall(regs);
+	int skip;
+
+	skip = ptrace_report_syscall(regs);
+	if (skip)
+		return skip;
+	return seccomp_phase1_recheck();
 }
 
 /**
