@@ -176,11 +176,13 @@ unsigned long oom_badness(struct task_struct *p, struct mem_cgroup *memcg,
 
 	/*
 	 * Do not even consider tasks which are explicitly marked oom
-	 * unkillable or have been already oom reaped.
+	 * unkillable or have been already oom reaped or they are in
+	 * the middle of vfork
 	 */
 	adj = (long)p->signal->oom_score_adj;
 	if (adj == OOM_SCORE_ADJ_MIN ||
-			test_bit(MMF_OOM_REAPED, &p->mm->flags)) {
+			test_bit(MMF_OOM_REAPED, &p->mm->flags) ||
+			p->vfork_done) {
 		task_unlock(p);
 		return 0;
 	}
@@ -838,6 +840,13 @@ void oom_kill_process(struct oom_control *oc, struct task_struct *p,
 	rcu_read_lock();
 	for_each_process(p) {
 		if (!process_shares_mm(p, mm))
+			continue;
+		/*
+		 * vforked tasks are ignored because they will drop the mm soon
+		 * hopefully and even if not they will not mind being oom
+		 * reaped because they cannot touch any memory.
+		 */
+		if (p->vfork_done)
 			continue;
 		if (same_thread_group(p, victim))
 			continue;
