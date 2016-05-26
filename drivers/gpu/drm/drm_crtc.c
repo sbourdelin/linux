@@ -692,7 +692,7 @@ int drm_crtc_init_with_planes(struct drm_device *dev, struct drm_crtc *crtc,
 	crtc->base.properties = &crtc->properties;
 
 	list_add_tail(&crtc->head, &config->crtc_list);
-	config->num_crtc++;
+	crtc->index = config->num_crtc++;
 
 	crtc->primary = primary;
 	crtc->cursor = cursor;
@@ -721,6 +721,11 @@ EXPORT_SYMBOL(drm_crtc_init_with_planes);
 void drm_crtc_cleanup(struct drm_crtc *crtc)
 {
 	struct drm_device *dev = crtc->dev;
+	struct drm_crtc *other;
+
+	other = list_next_entry(crtc, head);
+	list_for_each_entry_from(other, &dev->mode_config.crtc_list, head)
+		other->index--;
 
 	kfree(crtc->gamma_store);
 	crtc->gamma_store = NULL;
@@ -740,29 +745,6 @@ void drm_crtc_cleanup(struct drm_crtc *crtc)
 	memset(crtc, 0, sizeof(*crtc));
 }
 EXPORT_SYMBOL(drm_crtc_cleanup);
-
-/**
- * drm_crtc_index - find the index of a registered CRTC
- * @crtc: CRTC to find index for
- *
- * Given a registered CRTC, return the index of that CRTC within a DRM
- * device's list of CRTCs.
- */
-unsigned int drm_crtc_index(struct drm_crtc *crtc)
-{
-	unsigned int index = 0;
-	struct drm_crtc *tmp;
-
-	drm_for_each_crtc(tmp, crtc->dev) {
-		if (tmp == crtc)
-			return index;
-
-		index++;
-	}
-
-	BUG();
-}
-EXPORT_SYMBOL(drm_crtc_index);
 
 /*
  * drm_mode_remove - remove and free a mode
@@ -1166,7 +1148,7 @@ int drm_encoder_init(struct drm_device *dev,
 	}
 
 	list_add_tail(&encoder->head, &dev->mode_config.encoder_list);
-	dev->mode_config.num_encoder++;
+	encoder->index = dev->mode_config.num_encoder++;
 
 out_put:
 	if (ret)
@@ -1180,29 +1162,6 @@ out_unlock:
 EXPORT_SYMBOL(drm_encoder_init);
 
 /**
- * drm_encoder_index - find the index of a registered encoder
- * @encoder: encoder to find index for
- *
- * Given a registered encoder, return the index of that encoder within a DRM
- * device's list of encoders.
- */
-unsigned int drm_encoder_index(struct drm_encoder *encoder)
-{
-	unsigned int index = 0;
-	struct drm_encoder *tmp;
-
-	drm_for_each_encoder(tmp, encoder->dev) {
-		if (tmp == encoder)
-			return index;
-
-		index++;
-	}
-
-	BUG();
-}
-EXPORT_SYMBOL(drm_encoder_index);
-
-/**
  * drm_encoder_cleanup - cleans up an initialised encoder
  * @encoder: encoder to cleanup
  *
@@ -1211,6 +1170,11 @@ EXPORT_SYMBOL(drm_encoder_index);
 void drm_encoder_cleanup(struct drm_encoder *encoder)
 {
 	struct drm_device *dev = encoder->dev;
+	struct drm_encoder *other;
+
+	other = list_next_entry(encoder, head);
+	list_for_each_entry_from(other, &dev->mode_config.encoder_list, head)
+		other->index--;
 
 	drm_modeset_lock_all(dev);
 	drm_mode_object_unregister(dev, &encoder->base);
@@ -1300,7 +1264,7 @@ int drm_universal_plane_init(struct drm_device *dev, struct drm_plane *plane,
 	plane->type = type;
 
 	list_add_tail(&plane->head, &config->plane_list);
-	config->num_total_plane++;
+	plane->index = config->num_total_plane++;
 	if (plane->type == DRM_PLANE_TYPE_OVERLAY)
 		config->num_overlay_plane++;
 
@@ -1367,12 +1331,17 @@ EXPORT_SYMBOL(drm_plane_init);
 void drm_plane_cleanup(struct drm_plane *plane)
 {
 	struct drm_device *dev = plane->dev;
+	struct drm_plane *other;
 
 	drm_modeset_lock_all(dev);
 	kfree(plane->format_types);
 	drm_mode_object_unregister(dev, &plane->base);
 
 	BUG_ON(list_empty(&plane->head));
+
+	other = list_next_entry(plane, head);
+	list_for_each_entry_from(other, &dev->mode_config.plane_list, head)
+		other->index--;
 
 	list_del(&plane->head);
 	dev->mode_config.num_total_plane--;
@@ -1391,29 +1360,6 @@ void drm_plane_cleanup(struct drm_plane *plane)
 EXPORT_SYMBOL(drm_plane_cleanup);
 
 /**
- * drm_plane_index - find the index of a registered plane
- * @plane: plane to find index for
- *
- * Given a registered plane, return the index of that CRTC within a DRM
- * device's list of planes.
- */
-unsigned int drm_plane_index(struct drm_plane *plane)
-{
-	unsigned int index = 0;
-	struct drm_plane *tmp;
-
-	drm_for_each_plane(tmp, plane->dev) {
-		if (tmp == plane)
-			return index;
-
-		index++;
-	}
-
-	BUG();
-}
-EXPORT_SYMBOL(drm_plane_index);
-
-/**
  * drm_plane_from_index - find the registered plane at an index
  * @dev: DRM device
  * @idx: index of registered plane to find for
@@ -1425,13 +1371,11 @@ struct drm_plane *
 drm_plane_from_index(struct drm_device *dev, int idx)
 {
 	struct drm_plane *plane;
-	unsigned int i = 0;
 
-	drm_for_each_plane(plane, dev) {
-		if (i == idx)
+	drm_for_each_plane(plane, dev)
+		if (idx == plane->index)
 			return plane;
-		i++;
-	}
+
 	return NULL;
 }
 EXPORT_SYMBOL(drm_plane_from_index);
