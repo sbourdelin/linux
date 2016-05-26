@@ -1881,13 +1881,6 @@ int __ceph_setattr(struct inode *inode, struct iattr *attr)
 	int inode_dirty_flags = 0;
 	bool lock_snap_rwsem = false;
 
-	if (ceph_snap(inode) != CEPH_NOSNAP)
-		return -EROFS;
-
-	err = inode_change_ok(inode, attr);
-	if (err != 0)
-		return err;
-
 	prealloc_cf = ceph_alloc_cap_flush();
 	if (!prealloc_cf)
 		return -ENOMEM;
@@ -2100,7 +2093,17 @@ out_put:
  */
 int ceph_setattr(struct dentry *dentry, struct iattr *attr)
 {
-	return __ceph_setattr(d_inode(dentry), attr);
+	struct inode *inode = d_inode(dentry);
+	int err;
+
+	if (ceph_snap(inode) != CEPH_NOSNAP)
+		return -EROFS;
+
+	err = inode_change_ok(inode, attr);
+	if (err != 0)
+		return err;
+
+	return __ceph_setattr(inode, attr);
 }
 
 /*
