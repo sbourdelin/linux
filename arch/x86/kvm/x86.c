@@ -5810,10 +5810,10 @@ static int pvclock_gtod_notify(struct notifier_block *nb, unsigned long unused,
 
 	update_pvclock_gtod(tk);
 
-	/* disable master clock if host does not trust, or does not
-	 * use, TSC clocksource
+	/* only schedule per-VM master clock updates if the host uses TSC and
+	 * there's at least one VM in need of an update
 	 */
-	if (gtod->clock.vclock_mode != VCLOCK_TSC &&
+	if (gtod->clock.vclock_mode == VCLOCK_TSC &&
 	    atomic_read(&kvm_guest_has_master_clock) != 0)
 		queue_work(system_long_wq, &pvclock_gtod_work);
 
