@@ -463,6 +463,9 @@ int pwm_apply_state(struct pwm_device *pwm, struct pwm_state *state)
 	if (!memcmp(state, &pwm->state, sizeof(*state)))
 		return 0;
 
+	if (state->duty_cycle > state->period)
+		return -EINVAL;
+
 	if (pwm->chip->ops->apply) {
 		err = pwm->chip->ops->apply(pwm->chip, pwm, state);
 		if (err)
