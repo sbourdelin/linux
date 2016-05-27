@@ -1468,7 +1468,8 @@ struct task_struct {
 #endif
 	int on_rq;
 
-	int prio, static_prio, normal_prio;
+	int prio; /* Updated through sched_set_prio() */
+	int static_prio, normal_prio;
 	unsigned int rt_priority;
 	const struct sched_class *sched_class;
 	struct sched_entity se;

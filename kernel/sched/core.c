@@ -2312,6 +2312,11 @@ int sysctl_schedstats(struct ctl_table *table, int write,
 #endif
 #endif
 
+static void sched_set_prio(struct task_struct *p, int prio)
+{
+	p->prio = prio;
+}
+
 /*
  * fork()/clone()-time setup:
  */
@@ -2331,7 +2336,7 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 	/*
 	 * Make sure we do not leak PI boosting priority to the child.
 	 */
-	p->prio = current->normal_prio;
+	sched_set_prio(p, current->normal_prio);
 
 	/*
 	 * Revert to default priority/policy on fork if requested.
@@ -2344,7 +2349,8 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 		} else if (PRIO_TO_NICE(p->static_prio) < 0)
 			p->static_prio = NICE_TO_PRIO(0);
 
-		p->prio = p->normal_prio = __normal_prio(p);
+		p->normal_prio = __normal_prio(p);
+		sched_set_prio(p, p->normal_prio);
 		set_load_weight(p);
 
 		/*
@@ -3614,7 +3620,7 @@ void rt_mutex_setprio(struct task_struct *p, int prio)
 		p->sched_class = &fair_sched_class;
 	}
 
-	p->prio = prio;
+	sched_set_prio(p, prio);
 
 	if (running)
 		p->sched_class->set_curr_task(rq);
@@ -3661,7 +3667,7 @@ void set_user_nice(struct task_struct *p, long nice)
 	p->static_prio = NICE_TO_PRIO(nice);
 	set_load_weight(p);
 	old_prio = p->prio;
-	p->prio = effective_prio(p);
+	sched_set_prio(p, effective_prio(p));
 	delta = p->prio - old_prio;
 
 	if (queued) {
@@ -3868,9 +3874,10 @@ static void __setscheduler(struct rq *rq, struct task_struct *p,
 	 * sched_setscheduler().
 	 */
 	if (keep_boost)
-		p->prio = rt_mutex_get_effective_prio(p, normal_prio(p));
+		sched_set_prio(p, rt_mutex_get_effective_prio(p,
+					normal_prio(p)));
 	else
-		p->prio = normal_prio(p);
+		sched_set_prio(p, normal_prio(p));
 
 	if (dl_prio(p->prio))
 		p->sched_class = &dl_sched_class;
