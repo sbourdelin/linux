@@ -40,10 +40,18 @@
 #define VIRTIO_BALLOON_ARRAY_PFNS_MAX 256
 #define OOM_VBALLOON_DEFAULT_PAGES 256
 #define VIRTBALLOON_OOM_NOTIFY_PRIORITY 80
+#define VIRTIO_BALLOON_PFNS_LIMIT ((2 * (1ULL << 30)) >> PAGE_SHIFT) /* 2GB */
 
 static int oom_pages = OOM_VBALLOON_DEFAULT_PAGES;
 module_param(oom_pages, int, S_IRUSR | S_IWUSR);
 MODULE_PARM_DESC(oom_pages, "pages to free on OOM");
+
+struct balloon_bmap_hdr {
+	__virtio32 type;
+	__virtio32 page_shift;
+	__virtio64 start_pfn;
+	__virtio64 bmap_len;
+};
 
 struct virtio_balloon {
 	struct virtio_device *vdev;
@@ -62,6 +70,13 @@ struct virtio_balloon {
 
 	/* Number of balloon pages we've told the Host we're not using. */
 	unsigned int num_pages;
+	/* Bitmap and length used to tell the host the pages */
+	unsigned long *page_bitmap;
+	unsigned long bmap_len;
+	/* Used to record the processed pfn range */
+	unsigned long min_pfn, max_pfn, start_pfn, end_pfn;
+	/* Used for sending page bitmap and header */
+	struct scatterlist sg[2];
 	/*
 	 * The pages we've told the Host we're not using are enqueued
 	 * at vb_dev_info->pages list.
@@ -111,15 +126,39 @@ static void balloon_ack(struct virtqueue *vq)
 	wake_up(&vb->acked);
 }
 
+static inline void init_pfn_range(struct virtio_balloon *vb)
+{
+	vb->min_pfn = (1UL << 48);
+	vb->max_pfn = 0;
+}
+
 static void tell_host(struct virtio_balloon *vb, struct virtqueue *vq)
 {
-	struct scatterlist sg;
 	unsigned int len;
 
-	sg_init_one(&sg, vb->pfns, sizeof(vb->pfns[0]) * vb->num_pfns);
+	if (virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_PAGE_BITMAP)) {
+		struct balloon_bmap_hdr hdr;
+		unsigned long bmap_len;
 
-	/* We should always be able to add one buffer to an empty queue. */
-	virtqueue_add_outbuf(vq, &sg, 1, vb, GFP_KERNEL);
+		hdr.type = cpu_to_virtio32(vb->vdev, 0);
+		hdr.page_shift = cpu_to_virtio32(vb->vdev, PAGE_SHIFT);
+		hdr.start_pfn = cpu_to_virtio64(vb->vdev, vb->start_pfn);
+		bmap_len = min(vb->bmap_len,
+                         (vb->end_pfn - vb->start_pfn) / BITS_PER_BYTE);
+		hdr.bmap_len = cpu_to_virtio64(vb-vdev, bmap_len);
+		sg_set_buf(&vb->sg[0], &hdr, sizeof(hdr));
+		sg_set_buf(&vb->sg[1], vb->page_bitmap, bmap_len);
+		virtqueue_add_outbuf(vq, vb->sg, 2, vb, GFP_KERNEL);
+	} else {
+		struct scatterlist sg;
+
+		sg_init_one(&sg, vb->pfns, sizeof(vb->pfns[0]) * vb->num_pfns);
+		/* We should always be able to add one buffer to an
+		* empty queue.
+		*/
+		virtqueue_add_outbuf(vq, &sg, 1, vb, GFP_KERNEL);
+	}
+
 	virtqueue_kick(vq);
 
 	/* When host has read buffer, this completes via balloon_ack */
@@ -139,7 +178,18 @@ static void set_page_pfns(struct virtio_balloon *vb,
 					  page_to_balloon_pfn(page) + i);
 }
 
-static unsigned fill_balloon(struct virtio_balloon *vb, size_t num)
+static inline void update_pfn_range(struct virtio_balloon *vb,
+				 struct page *page)
+{
+	unsigned long balloon_pfn = page_to_balloon_pfn(page);
+
+	if (balloon_pfn < vb->min_pfn)
+		vb->min_pfn = balloon_pfn;
+	if (balloon_pfn > vb->max_pfn)
+		vb->max_pfn = balloon_pfn;
+}
+
+static unsigned int fill_balloon_pfns(struct virtio_balloon *vb, size_t num)
 {
 	struct balloon_dev_info *vb_dev_info = &vb->vb_dev_info;
 	unsigned num_allocated_pages;
@@ -176,7 +226,126 @@ static unsigned fill_balloon(struct virtio_balloon *vb, size_t num)
 	return num_allocated_pages;
 }
 
-static void release_pages_balloon(struct virtio_balloon *vb)
+static void tell_host_bitmap(struct virtio_balloon *vb,
+			 struct list_head *pages, struct virtqueue *vq)
+{
+	unsigned long pfn;
+	struct page *page, *next;
+	bool find;
+
+	vb->min_pfn = rounddown(vb->min_pfn, BITS_PER_LONG);
+	vb->max_pfn = roundup(vb->max_pfn, BITS_PER_LONG);
+	for (pfn = vb->min_pfn; pfn < vb->max_pfn;
+			pfn += VIRTIO_BALLOON_PFNS_LIMIT) {
+		vb->start_pfn = pfn;
+		vb->end_pfn = pfn;
+		memset(vb->page_bitmap, 0, vb->bmap_len);
+		find = false;
+		list_for_each_entry_safe(page, next, pages, lru) {
+			unsigned long balloon_pfn = page_to_balloon_pfn(page);
+
+			if (balloon_pfn < pfn ||
+				 balloon_pfn >= pfn + VIRTIO_BALLOON_PFNS_LIMIT)
+				continue;
+			set_bit(balloon_pfn - pfn, vb->page_bitmap);
+			if (balloon_pfn > vb->end_pfn)
+				vb->end_pfn = balloon_pfn;
+			find = true;
+		}
+		if (find) {
+			vb->end_pfn = roundup(vb->end_pfn, BITS_PER_LONG);
+			tell_host(vb, vq);
+		}
+	}
+}
+
+static long fill_balloon_bitmap(struct virtio_balloon *vb, size_t num)
+{
+	struct balloon_dev_info *vb_dev_info = &vb->vb_dev_info;
+	long num_allocated_pages;
+
+	init_pfn_range(vb);
+	mutex_lock(&vb->balloon_lock);
+	for (vb->num_pfns = 0; vb->num_pfns < num;
+		vb->num_pfns += VIRTIO_BALLOON_PAGES_PER_PAGE) {
+		struct page *page = balloon_page_enqueue(vb_dev_info);
+
+		if (!page) {
+			dev_info_ratelimited(&vb->vdev->dev,
+					     "Out of puff! Can't get %u pages\n",
+					     VIRTIO_BALLOON_PAGES_PER_PAGE);
+			/* Sleep for at least 1/5 of a second before retry. */
+			msleep(200);
+			break;
+		}
+		update_pfn_range(vb, page);
+		vb->num_pages += VIRTIO_BALLOON_PAGES_PER_PAGE;
+		if (!virtio_has_feature(vb->vdev,
+					VIRTIO_BALLOON_F_DEFLATE_ON_OOM))
+			adjust_managed_page_count(page, -1);
+	}
+
+	num_allocated_pages = vb->num_pfns;
+	tell_host_bitmap(vb, &vb_dev_info->pages, vb->inflate_vq);
+	mutex_unlock(&vb->balloon_lock);
+
+	return num_allocated_pages;
+}
+
+static long fill_balloon(struct virtio_balloon *vb, size_t num)
+{
+	long num_allocated_pages;
+
+	if (virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_PAGE_BITMAP))
+		num_allocated_pages = fill_balloon_bitmap(vb, num);
+	else
+		num_allocated_pages = fill_balloon_pfns(vb, num);
+
+	return num_allocated_pages;
+}
+
+static void release_pages_balloon_bitmap(struct virtio_balloon *vb,
+				 struct list_head *pages)
+{
+	struct page *page, *next;
+
+	list_for_each_entry_safe(page, next, pages, lru) {
+		if (!virtio_has_feature(vb->vdev,
+			VIRTIO_BALLOON_F_DEFLATE_ON_OOM))
+			adjust_managed_page_count(page, 1);
+		list_del(&page->lru);
+		put_page(page);
+	}
+}
+
+static unsigned long leak_balloon_bitmap(struct virtio_balloon *vb, size_t num)
+{
+	unsigned long num_freed_pages;
+	struct page *page;
+	struct balloon_dev_info *vb_dev_info = &vb->vb_dev_info;
+	LIST_HEAD(pages);
+
+	init_pfn_range(vb);
+	mutex_lock(&vb->balloon_lock);
+	for (vb->num_pfns = 0; vb->num_pfns < num;
+	     vb->num_pfns += VIRTIO_BALLOON_PAGES_PER_PAGE) {
+		page = balloon_page_dequeue(vb_dev_info);
+		if (!page)
+			break;
+		update_pfn_range(vb, page);
+		list_add(&page->lru, &pages);
+		vb->num_pages -= VIRTIO_BALLOON_PAGES_PER_PAGE;
+	}
+
+	num_freed_pages = vb->num_pfns;
+	tell_host_bitmap(vb, &pages, vb->deflate_vq);
+	release_pages_balloon_bitmap(vb, &pages);
+	mutex_unlock(&vb->balloon_lock);
+
+	return num_freed_pages;
+}
+
+static void release_pages_balloon_pfns(struct virtio_balloon *vb)
 {
 	unsigned int i;
 	struct page *page;
@@ -192,7 +361,7 @@ static void release_pages_balloon(struct virtio_balloon *vb)
 	}
 }
 
-static unsigned leak_balloon(struct virtio_balloon *vb, size_t num)
+static unsigned int leak_balloon_pfns(struct virtio_balloon *vb, size_t num)
 {
 	unsigned num_freed_pages;
 	struct page *page;
@@ -219,8 +388,20 @@ static unsigned leak_balloon(struct virtio_balloon *vb, size_t num)
 	 */
 	if (vb->num_pfns != 0)
 		tell_host(vb, vb->deflate_vq);
-	release_pages_balloon(vb);
+	release_pages_balloon_pfns(vb);
 	mutex_unlock(&vb->balloon_lock);
+	return num_freed_pages;
+}
+
+static long leak_balloon(struct virtio_balloon *vb, size_t num)
+{
+	long num_freed_pages;
+
+	if (virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_PAGE_BITMAP))
+		num_freed_pages = leak_balloon_bitmap(vb, num);
+	else
+		num_freed_pages = leak_balloon_pfns(vb, num);
+
 	return num_freed_pages;
 }
 
@@ -514,6 +695,14 @@ static int virtballoon_probe(struct virtio_device *vdev)
 	spin_lock_init(&vb->stop_update_lock);
 	vb->stop_update = false;
 	vb->num_pages = 0;
+	vb->bmap_len = ALIGN(VIRTIO_BALLOON_PFNS_LIMIT, BITS_PER_LONG) /
+		 BITS_PER_BYTE + 2 * sizeof(unsigned long);
+	vb->page_bitmap = kzalloc(vb->bmap_len, GFP_KERNEL);
+	if (!vb->page_bitmap) {
+		err = -ENOMEM;
+		goto out;
+	}
+	sg_init_table(vb->sg, 2);
 	mutex_init(&vb->balloon_lock);
 	init_waitqueue_head(&vb->acked);
 	vb->vdev = vdev;
@@ -571,6 +760,7 @@ static void virtballoon_remove(struct virtio_device *vdev)
 	cancel_work_sync(&vb->update_balloon_stats_work);
 
 	remove_common(vb);
+	kfree(vb->page_bitmap);
 	kfree(vb);
 }
 
@@ -609,6 +799,7 @@ static unsigned int features[] = {
 	VIRTIO_BALLOON_F_MUST_TELL_HOST,
 	VIRTIO_BALLOON_F_STATS_VQ,
 	VIRTIO_BALLOON_F_DEFLATE_ON_OOM,
+	VIRTIO_BALLOON_F_PAGE_BITMAP,
 };
 
 static struct virtio_driver virtio_balloon_driver = {
