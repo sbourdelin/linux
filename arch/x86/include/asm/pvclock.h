@@ -88,6 +88,18 @@ unsigned __pvclock_read_cycles(const struct pvclock_vcpu_time_info *src,
 	return version;
 }
 
+static __always_inline unsigned int __pvclock_read_flags(
+		const struct pvclock_vcpu_time_info *src, u8 *flags)
+{
+	unsigned int version;
+
+	version = src->version;
+	/* Make the latest version visible */
+	smp_rmb();
+	*flags = src->flags;
+	return version;
+}
+
 struct pvclock_vsyscall_time_info {
 	struct pvclock_vcpu_time_info pvti;
 } __attribute__((__aligned__(SMP_CACHE_BYTES)));
