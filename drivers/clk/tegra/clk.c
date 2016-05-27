@@ -262,6 +262,11 @@ void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
 				WARN_ON(1);
 			}
 
+		/* Using the init_table to enable clks at boot is
+		 * deprecated. Clks that need to be enabled through early
+		 * boot, they should be marked as CLK_IS_CRITICAL
+		 */
+		WARN_ON_ONCE(tbl->state);
 		if (tbl->state)
 			if (clk_prepare_enable(clk)) {
 				pr_err("%s: Failed to enable %s\n", __func__,
