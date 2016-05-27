@@ -48,6 +48,16 @@ int sysctl_panic_on_oom;
 int sysctl_oom_kill_allocating_task;
 int sysctl_oom_dump_tasks = 1;
 
+/*
+ * Types of limitations to the nodes from which allocations may occur
+ */
+enum oom_constraint {
+	CONSTRAINT_NONE,
+	CONSTRAINT_CPUSET,
+	CONSTRAINT_MEMORY_POLICY,
+	CONSTRAINT_MEMCG,
+};
+
 DEFINE_MUTEX(oom_lock);
 
 #ifdef CONFIG_NUMA
@@ -97,6 +107,28 @@ static bool has_intersects_mems_allowed(struct task_struct *tsk,
 	return true;
 }
 #endif /* CONFIG_NUMA */
+
+static bool task_will_free_mem(struct task_struct *task)
+{
+	struct signal_struct *sig = task->signal;
+
+	/*
+	 * A coredumping process may sleep for an extended period in exit_mm(),
+	 * so the oom killer cannot assume that the process will promptly exit
+	 * and release memory.
+	 */
+	if (sig->flags & SIGNAL_GROUP_COREDUMP)
+		return false;
+
+	if (!(task->flags & PF_EXITING))
+		return false;
+
+	/* Make sure that the whole thread group is going down */
+	if (!thread_group_empty(task) && !(sig->flags & SIGNAL_GROUP_EXIT))
+		return false;
+
+	return true;
+}
 
 /*
  * The process p may have detached its own ->mm while exiting or through
@@ -214,7 +246,6 @@ unsigned long oom_badness(struct task_struct *p, struct mem_cgroup *memcg,
 /*
  * Determine the type of allocation constraint.
  */
-#ifdef CONFIG_NUMA
 static enum oom_constraint constrained_alloc(struct oom_control *oc,
 					     unsigned long *totalpages)
 {
@@ -224,8 +255,16 @@ static enum oom_constraint constrained_alloc(struct oom_control *oc,
 	bool cpuset_limited = false;
 	int nid;
 
+	if (oc->memcg) {
+		*totalpages = mem_cgroup_get_limit(oc->memcg) ?: 1;
+		return CONSTRAINT_MEMCG;
+	}
+
 	/* Default to all available memory */
 	*totalpages = totalram_pages + total_swap_pages;
+
+	if (!IS_ENABLED(CONFIG_NUMA))
+		return CONSTRAINT_NONE;
 
 	if (!oc->zonelist)
 		return CONSTRAINT_NONE;
@@ -264,36 +303,77 @@ static enum oom_constraint constrained_alloc(struct oom_control *oc,
 	}
 	return CONSTRAINT_NONE;
 }
-#else
-static enum oom_constraint constrained_alloc(struct oom_control *oc,
-					     unsigned long *totalpages)
-{
-	*totalpages = totalram_pages + total_swap_pages;
-	return CONSTRAINT_NONE;
-}
-#endif
 
-enum oom_scan_t oom_scan_process_thread(struct oom_control *oc,
-			struct task_struct *task, unsigned long totalpages)
+static void oom_scan_tasks(struct oom_control *oc,
+			   int (*fn)(struct task_struct *, void *), void *arg)
 {
+	struct task_struct *p;
+
+	if (oc->memcg) {
+		mem_cgroup_scan_tasks(oc->memcg, fn, arg);
+		return;
+	}
+
+	rcu_read_lock();
+	for_each_process(p) {
+		if (fn(p, arg))
+			break;
+	}
+	rcu_read_unlock();
+}
+
+struct oom_evaluate_task_arg {
+	struct oom_control *oc;
+	unsigned long totalpages;
+	struct task_struct *chosen;
+	unsigned long chosen_points;
+};
+
+static int oom_evaluate_task(struct task_struct *task, void *_arg)
+{
+	struct oom_evaluate_task_arg *arg = _arg;
+	struct oom_control *oc = arg->oc;
+	unsigned long totalpages = arg->totalpages;
+	unsigned long points;
+
 	if (oom_unkillable_task(task, NULL, oc->nodemask))
-		return OOM_SCAN_CONTINUE;
+		return 0;
 
 	/*
 	 * This task already has access to memory reserves and is being killed.
 	 * Don't allow any other task to have access to the reserves.
 	 */
-	if (!is_sysrq_oom(oc) && atomic_read(&task->signal->oom_victims))
-		return OOM_SCAN_ABORT;
+	if (!is_sysrq_oom(oc) && atomic_read(&task->signal->oom_victims)) {
+		if (arg->chosen)
+			put_task_struct(arg->chosen);
+		arg->chosen = (struct task_struct *)(-1UL);
+		return 1;
+	}
 
 	/*
 	 * If task is allocating a lot of memory and has been marked to be
 	 * killed first if it triggers an oom, then select it.
 	 */
-	if (oom_task_origin(task))
-		return OOM_SCAN_SELECT;
+	if (oom_task_origin(task)) {
+		points = ULONG_MAX;
+		goto select;
+	}
 
-	return OOM_SCAN_OK;
+	points = oom_badness(task, NULL, oc->nodemask, totalpages);
+	if (!points || points < arg->chosen_points)
+		return 0;
+
+	/* Prefer thread group leaders for display purposes */
+	if (points == arg->chosen_points &&
+	    thread_group_leader(arg->chosen))
+		return 0;
+select:
+	if (arg->chosen)
+		put_task_struct(arg->chosen);
+	get_task_struct(task);
+	arg->chosen = task;
+	arg->chosen_points = points;
+	return 0;
 }
 
 /*
@@ -303,40 +383,15 @@ enum oom_scan_t oom_scan_process_thread(struct oom_control *oc,
 static struct task_struct *select_bad_process(struct oom_control *oc,
 		unsigned int *ppoints, unsigned long totalpages)
 {
-	struct task_struct *p;
-	struct task_struct *chosen = NULL;
-	unsigned long chosen_points = 0;
+	struct oom_evaluate_task_arg arg = {
+		.oc = oc,
+		.totalpages = totalpages,
+	};
 
-	rcu_read_lock();
-	for_each_process(p) {
-		unsigned int points;
+	oom_scan_tasks(oc, oom_evaluate_task, &arg);
 
-		switch (oom_scan_process_thread(oc, p, totalpages)) {
-		case OOM_SCAN_SELECT:
-			chosen = p;
-			chosen_points = ULONG_MAX;
-			/* fall through */
-		case OOM_SCAN_CONTINUE:
-			continue;
-		case OOM_SCAN_ABORT:
-			rcu_read_unlock();
-			return (struct task_struct *)(-1UL);
-		case OOM_SCAN_OK:
-			break;
-		};
-		points = oom_badness(p, NULL, oc->nodemask, totalpages);
-		if (!points || points < chosen_points)
-			continue;
-
-		chosen = p;
-		chosen_points = points;
-	}
-	if (chosen)
-		get_task_struct(chosen);
-	rcu_read_unlock();
-
-	*ppoints = chosen_points * 1000 / totalpages;
-	return chosen;
+	*ppoints = arg.chosen_points * 1000 / totalpages;
+	return arg.chosen;
 }
 
 /**
@@ -674,7 +729,7 @@ static void wake_oom_reaper(struct task_struct *tsk)
  * Has to be called with oom_lock held and never after
  * oom has been disabled already.
  */
-void mark_oom_victim(struct task_struct *tsk)
+static void mark_oom_victim(struct task_struct *tsk)
 {
 	WARN_ON(oom_killer_disabled);
 	/* OOM killer might race with memcg OOM */
@@ -745,9 +800,8 @@ void oom_killer_enable(void)
  * Must be called while holding a reference to p, which will be released upon
  * returning.
  */
-void oom_kill_process(struct oom_control *oc, struct task_struct *p,
-		      unsigned int points, unsigned long totalpages,
-		      const char *message)
+static void oom_kill_process(struct oom_control *oc, struct task_struct *p,
+			     unsigned int points, unsigned long totalpages)
 {
 	struct task_struct *victim = p;
 	struct task_struct *child;
@@ -776,7 +830,8 @@ void oom_kill_process(struct oom_control *oc, struct task_struct *p,
 		dump_header(oc, p);
 
 	pr_err("%s: Kill process %d (%s) score %u or sacrifice child\n",
-		message, task_pid_nr(p), p->comm, points);
+	       oc->memcg ? "Memory cgroup out of memory" : "Out of memory",
+	       task_pid_nr(p), p->comm, points);
 
 	/*
 	 * If any of p's children has a different mm and is eligible for kill,
@@ -873,7 +928,8 @@ void oom_kill_process(struct oom_control *oc, struct task_struct *p,
 /*
  * Determines whether the kernel must panic because of the panic_on_oom sysctl.
  */
-void check_panic_on_oom(struct oom_control *oc, enum oom_constraint constraint)
+static void check_panic_on_oom(struct oom_control *oc,
+			       enum oom_constraint constraint)
 {
 	if (likely(!sysctl_panic_on_oom))
 		return;
@@ -928,10 +984,12 @@ bool out_of_memory(struct oom_control *oc)
 	if (oom_killer_disabled)
 		return false;
 
-	blocking_notifier_call_chain(&oom_notify_list, 0, &freed);
-	if (freed > 0)
-		/* Got some memory back in the last second. */
-		return true;
+	if (!oc->memcg) {
+		blocking_notifier_call_chain(&oom_notify_list, 0, &freed);
+		if (freed > 0)
+			/* Got some memory back in the last second. */
+			return true;
+	}
 
 	/*
 	 * If current has a pending SIGKILL or is exiting, then automatically
@@ -959,7 +1017,7 @@ bool out_of_memory(struct oom_control *oc)
 
 	/*
 	 * Check if there were limitations on the allocation (only relevant for
-	 * NUMA) that may require different handling.
+	 * NUMA and memcg) that may require different handling.
 	 */
 	constraint = constrained_alloc(oc, &totalpages);
 	if (constraint != CONSTRAINT_MEMORY_POLICY)
@@ -970,26 +1028,25 @@ bool out_of_memory(struct oom_control *oc)
 	    !oom_unkillable_task(current, NULL, oc->nodemask) &&
 	    current->signal->oom_score_adj != OOM_SCORE_ADJ_MIN) {
 		get_task_struct(current);
-		oom_kill_process(oc, current, 0, totalpages,
-				 "Out of memory (oom_kill_allocating_task)");
+		oom_kill_process(oc, current, 0, totalpages);
 		return true;
 	}
 
 	p = select_bad_process(oc, &points, totalpages);
 	/* Found nothing?!?! Either we hang forever, or we panic. */
-	if (!p && !is_sysrq_oom(oc)) {
+	if (!p && !is_sysrq_oom(oc) && !oc->memcg) {
 		dump_header(oc, NULL);
 		panic("Out of memory and no killable processes...\n");
 	}
 	if (p && p != (void *)-1UL) {
-		oom_kill_process(oc, p, points, totalpages, "Out of memory");
+		oom_kill_process(oc, p, points, totalpages);
 		/*
 		 * Give the killed process a good chance to exit before trying
 		 * to allocate memory again.
 		 */
 		schedule_timeout_killable(1);
 	}
-	return true;
+	return !!p;
 }
 
 /*
