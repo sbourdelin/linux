@@ -780,6 +780,8 @@ struct dwc3_scratchpad_array {
  * @dis_u2_freeclk_exists_quirk : set if we clear u2_freeclk_exists
  *			in GUSB2PHYCFG, specify that USB2 PHY doesn't
  *			provide a free-running PHY clock.
+ * @dis_del_phy_power_chg_quirk: set if we disable delay phy power
+ *			change quirk.
  * @phyif_utmi_quirk: set if we enable phyif UTMI+ quirk
  * @phyif_utmi: UTMI+ PHY interface value
  *	0	- 8 bits
@@ -928,6 +930,7 @@ struct dwc3 {
 	unsigned		dis_enblslpm_quirk:1;
 	unsigned		dis_rxdet_inp3_quirk:1;
 	unsigned		dis_u2_freeclk_exists_quirk:1;
+	unsigned		dis_del_phy_power_chg_quirk:1;
 
 	unsigned		phyif_utmi_quirk:1;
 	unsigned		phyif_utmi:1;
