@@ -194,6 +194,15 @@ enum reconstruct_states {
 	reconstruct_state_result,
 };
 
+enum r5c_states {
+	R5C_STATE_CLEAN = 0,		/* all data in RAID HDDs are up to date */
+	R5C_STATE_RUNNING = 1,		/* stripe can accept new writes */
+	R5C_STATE_FROZEN = 2,		/* Doesn't accept new data and is reclaiming */
+	R5C_STATE_PARITY_RUN = 3,	/* stripe parity is being written to cache disk */
+	R5C_STATE_PARITY_DONE = 4,	/* stripe parity is in cache disk */
+	R5C_STATE_INRAID = R5C_STATE_CLEAN,     /* stripe data/parity are in raid disks */
+};
+
 struct stripe_head {
 	struct hlist_node	hash;
 	struct list_head	lru;	      /* inactive_list or handle_list */
@@ -216,6 +225,7 @@ struct stripe_head {
 						  */
 	enum check_states	check_state;
 	enum reconstruct_states reconstruct_state;
+	enum r5c_states		r5c_state;
 	spinlock_t		stripe_lock;
 	int			cpu;
 	struct r5worker_group	*group;
@@ -226,6 +236,7 @@ struct stripe_head {
 
 	struct r5l_io_unit	*log_io;
 	struct list_head	log_list;
+	atomic_t		dev_in_cache;
 	/**
 	 * struct stripe_operations
 	 * @target - STRIPE_OP_COMPUTE_BLK target
@@ -263,6 +274,7 @@ struct stripe_head_state {
 	 */
 	int syncing, expanding, expanded, replacing;
 	int locked, uptodate, to_read, to_write, failed, written;
+	int to_cache, in_cache, just_cached, parity_cached;
 	int to_fill, compute, req_compute, non_overwrite;
 	int failed_num[2];
 	int p_failed, q_failed;
@@ -313,6 +325,8 @@ enum r5dev_flags {
 			 */
 	R5_Discard,	/* Discard the stripe */
 	R5_SkipCopy,	/* Don't copy data from bio to stripe cache */
+	R5_Wantcache,	/* Want write data to write cache */
+	R5_InCache,	/* Data in cache */
 };
 
 /*
@@ -345,7 +359,8 @@ enum {
 	STRIPE_BITMAP_PENDING,	/* Being added to bitmap, don't add
 				 * to batch yet.
 				 */
-	STRIPE_LOG_TRAPPED, /* trapped into log */
+	STRIPE_LOG_TRAPPED,	/* trapped into log */
+	STRIPE_IN_R5C_CACHE,	/* in r5c cache (to-be/being handled or in conf->r5c_cached_list) */
 };
 
 #define STRIPE_EXPAND_SYNC_FLAGS \
@@ -521,6 +536,8 @@ struct r5conf {
 	 */
 	atomic_t		active_stripes;
 	struct list_head	inactive_list[NR_STRIPE_HASH_LOCKS];
+	atomic_t		r5c_cached_stripes;
+	struct list_head	r5c_cached_list;
 	atomic_t		empty_inactive_list_nr;
 	struct llist_head	released_stripes;
 	wait_queue_head_t	wait_for_quiescent;
@@ -690,10 +707,29 @@ extern void r5l_stripe_write_finished(struct stripe_head *sh);
 extern int r5l_handle_flush_request(struct r5l_log *log, struct bio *bio);
 extern void r5l_quiesce(struct r5l_log *log, int state);
 extern bool r5l_log_disk_error(struct r5conf *conf);
+extern void r5l_wake_reclaim(struct r5l_log *log, sector_t space);
 
 extern struct bio *r5c_lookup_chunk(struct r5l_log *log, struct bio *raid_bio);
 extern struct stripe_head *__find_stripe(struct r5conf *conf, sector_t sector,
 					 short generation);
 
 extern ssize_t r5c_stat_show(struct mddev *mddev, char* page);
+
+extern int r5c_handle_stripe_dirtying(struct r5conf *conf, struct stripe_head *sh,
+				      struct stripe_head_state *s, int disks);
+extern int r5c_cache_data(struct r5l_log *log, struct stripe_head *sh,
+			  struct stripe_head_state *s);
+extern int r5c_cache_parity(struct r5l_log *log, struct stripe_head *sh,
+			    struct stripe_head_state *s);
+extern void r5c_handle_stripe_flush(struct r5conf *conf, struct stripe_head *sh,
+				    struct stripe_head_state *s, int disks);
+extern void r5c_freeze_stripe_for_reclaim(struct stripe_head *sh);
+extern void r5c_do_reclaim(struct r5conf *conf);
+
+extern ssize_t r5c_cached_stripes_show(struct mddev *mddev, char* page);
+extern ssize_t r5c_cached_stripes_store(struct mddev *mddev, const char *page, size_t len);
+extern int r5c_flush_cache(struct r5conf *conf);
+extern ssize_t r5c_show_cache_mode(struct mddev *mddev, char *page);
+extern ssize_t r5c_store_cache_mode(struct mddev *mddev, const char *page, size_t len);
+extern void r5c_set_state(struct stripe_head *sh, enum r5c_states new_state);
 #endif
