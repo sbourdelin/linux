@@ -141,7 +141,7 @@ static void __exit kfd_module_exit(void)
 	dev_info(kfd_device, "Removed module\n");
 }
 
-module_init(kfd_module_init);
+late_initcall(kfd_module_init);
 module_exit(kfd_module_exit);
 
 MODULE_AUTHOR(KFD_DRIVER_AUTHOR);
