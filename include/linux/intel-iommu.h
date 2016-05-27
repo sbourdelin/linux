@@ -412,6 +412,8 @@ struct intel_iommu {
 
 #ifdef CONFIG_INTEL_IOMMU
 	unsigned long 	*domain_ids; /* bitmap of domains */
+#define DMAR_DOMS_SHIFT 8
+#define DMAR_DOMS_SIZE (1 << DMAR_DOMS_SHIFT )
 	struct dmar_domain ***domains; /* ptr to domains */
 	spinlock_t	lock; /* protect context, domain ids */
 	struct root_entry *root_entry; /* virtual address */
