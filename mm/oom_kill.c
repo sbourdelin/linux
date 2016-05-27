@@ -447,7 +447,7 @@ static bool __oom_reap_task(struct task_struct *tsk)
 	struct task_struct *p;
 	struct zap_details details = {.check_swap_entries = true,
 				      .ignore_dirty = true};
-	bool ret = true;
+	bool ret;
 
 	/*
 	 * We have to make sure to not race with the victim exit path
@@ -472,13 +472,16 @@ static bool __oom_reap_task(struct task_struct *tsk)
 	 * is no mm.
 	 */
 	p = find_lock_task_mm(tsk);
-	if (!p)
-		goto unlock_oom;
+	if (!p) {
+		mutex_unlock(&oom_lock);
+		return true;
+	}
 
 	mm = p->mm;
 	if (!atomic_inc_not_zero(&mm->mm_users)) {
 		task_unlock(p);
-		goto unlock_oom;
+		mutex_unlock(&oom_lock);
+		return true;
 	}
 
 	task_unlock(p);
@@ -527,6 +530,7 @@ static bool __oom_reap_task(struct task_struct *tsk)
 	 * to release its memory.
 	 */
 	set_bit(MMF_OOM_REAPED, &mm->flags);
+	ret = true;
 unlock_oom:
 	mutex_unlock(&oom_lock);
 	/*
