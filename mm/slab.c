@@ -2494,8 +2494,13 @@ static void slab_put_obj(struct kmem_cache *cachep,
 static void slab_map_pages(struct kmem_cache *cache, struct page *page,
 			   void *freelist)
 {
-	page->slab_cache = cache;
+	int i, nr_pages;
+	char *start = page_address(page);
+
 	page->freelist = freelist;
+	nr_pages = (1 << cache->gfporder);
+	for (i = 0; i < nr_pages; i++)
+		virt_to_page(start + PAGE_SIZE * i)->slab_cache = cache;
 }
 
 /*
