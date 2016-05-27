@@ -784,6 +784,15 @@ config HID_HYPERV_MOUSE
 	---help---
 	Select this option to enable the Hyper-V mouse driver.
 
+config HID_RIKA
+	tristate "Riso Kaguku Webmail Notifier USB LED"
+	depends on HIDRAW
+	depends on LEDS_CLASS
+	depends on USB_LED = 'n'
+	---help---
+	Support for the Riso Kagaku Webmail Notifier. This driver registers
+	a LED class instance for red, green, and blue color component.
+
 config HID_SMARTJOYPLUS
 	tristate "SmartJoy PLUS PS2/USB adapter support"
 	depends on HID
