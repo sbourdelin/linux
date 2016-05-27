@@ -95,7 +95,7 @@ acpi_hw_get_access_bit_width(struct acpi_generic_address *reg, u8 max_bit_width)
 		if (!reg->bit_offset && reg->bit_width &&
 		    ACPI_IS_POWER_OF_TWO(reg->bit_width) &&
 		    ACPI_IS_ALIGNED(reg->bit_width, 8) &&
-		    ACPI_IS_ALIGNED(address, reg->bit_width)) {
+		    ACPI_IS_ALIGNED(address, reg->bit_width >> 3)) {
 			return (reg->bit_width);
 		} else {
 			if (reg->space_id == ACPI_ADR_SPACE_SYSTEM_IO) {
