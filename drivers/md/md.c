@@ -158,10 +158,9 @@ static const struct block_device_operations md_fops;
 
 static int start_readonly;
 
-/* bio_clone_mddev
- * like bio_clone, but with a local bio set
+/* bio_alloc_mddev, bio_clone_mddev, bio_split_mddev
+ * like bio_alloc, bio_clone, bio_split, but with a local bio set
  */
-
 struct bio *bio_alloc_mddev(gfp_t gfp_mask, int nr_iovecs,
 			    struct mddev *mddev)
 {
@@ -186,6 +185,15 @@ struct bio *bio_clone_mddev(struct bio *bio, gfp_t gfp_mask,
 	return bio_clone_bioset(bio, gfp_mask, mddev->bio_set);
 }
 EXPORT_SYMBOL_GPL(bio_clone_mddev);
+
+struct bio *bio_split_mddev(struct bio *bio, int sectors,
+			    gfp_t gfp, struct mddev *mddev)
+{
+	if (!mddev || !mddev->bio_set)
+		return bio_split(bio, sectors, gfp, NULL);
+	return bio_split(bio, sectors, gfp, mddev->bio_set);
+}
+EXPORT_SYMBOL_GPL(bio_split_mddev);
 
 /*
  * We have a system wide 'event count' that is incremented

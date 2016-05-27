@@ -642,6 +642,8 @@ extern struct bio *bio_clone_mddev(struct bio *bio, gfp_t gfp_mask,
 				   struct mddev *mddev);
 extern struct bio *bio_alloc_mddev(gfp_t gfp_mask, int nr_iovecs,
 				   struct mddev *mddev);
+extern struct bio *bio_split_mddev(struct bio *bio, int sectors,
+				   gfp_t gfp, struct mddev *mddev);
 
 extern void md_unplug(struct blk_plug_cb *cb, bool from_schedule);
 extern void md_reload_sb(struct mddev *mddev, int raid_disk);
