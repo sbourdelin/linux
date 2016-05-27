@@ -3815,7 +3815,7 @@ static int nand_detect(struct nand_chip *chip, struct nand_flash_dev *type)
 {
 	struct mtd_info *mtd = nand_to_mtd(chip);
 	int busw;
-	int i, maf_idx;
+	int i, maf_idx, ret;
 	u8 *id_data = chip->id.data;
 	u8 maf_id, dev_id;
 
@@ -3925,6 +3925,19 @@ ident_done:
 			break;
 	}
 
+	nand_decode_bbm_options(chip);
+
+	/*
+	 * Vendor specific initialization. This function can ajust the setting
+	 * extracted from generic auto-detection.
+	 */
+	chip->manufacturer.ops = nand_manuf_ids[maf_idx].ops;
+	if (chip->manufacturer.ops && chip->manufacturer.ops->init) {
+		ret = chip->manufacturer.ops->init(chip);
+		if (ret)
+			return ret;
+	}
+
 	if (chip->options & NAND_BUSWIDTH_AUTO) {
 		WARN_ON(busw & NAND_BUSWIDTH_16);
 		nand_set_defaults(chip);
@@ -3938,10 +3951,9 @@ ident_done:
 		pr_info("%s %s\n", nand_manuf_ids[maf_idx].name, mtd->name);
 		pr_warn("bus width %d instead %d bit\n", busw ? 16 : 8,
 			(chip->options & NAND_BUSWIDTH_16) ? 16 : 8);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_cleanup;
 	}
-
-	nand_decode_bbm_options(chip);
 
 	/* Calculate the address shift from the page size */
 	chip->page_shift = ffs(mtd->writesize) - 1;
@@ -3981,6 +3993,12 @@ ident_done:
 		(int)(chip->chipsize >> 20), nand_is_slc(chip) ? "SLC" : "MLC",
 		mtd->erasesize >> 10, mtd->writesize, mtd->oobsize);
 	return 0;
+
+err_cleanup:
+	if (chip->manufacturer.ops && chip->manufacturer.ops->cleanup)
+		chip->manufacturer.ops->cleanup(chip);
+
+	return ret;
 }
 
 static const char * const nand_ecc_modes[] = {
@@ -4635,6 +4653,10 @@ void nand_release(struct mtd_info *mtd)
 	if (chip->badblock_pattern && chip->badblock_pattern->options
 			& NAND_BBT_DYNAMICSTRUCT)
 		kfree(chip->badblock_pattern);
+
+	/* Release manufacturer private data */
+	if (chip->manufacturer.ops && chip->manufacturer.ops->cleanup)
+		chip->manufacturer.ops->cleanup(chip);
 }
 EXPORT_SYMBOL_GPL(nand_release);
 
