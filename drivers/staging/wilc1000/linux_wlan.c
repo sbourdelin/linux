@@ -1260,7 +1260,7 @@ int wilc_netdev_init(struct wilc **wilc, struct device *dev, int io_type,
 
 	sema_init(&close_exit_sync, 0);
 
-	wl = kzalloc(sizeof(*wl), GFP_KERNEL);
+	wl = kzalloc(sizeof(struct wilc), GFP_KERNEL);
 	if (!wl)
 		return -ENOMEM;
 
