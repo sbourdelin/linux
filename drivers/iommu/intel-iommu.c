@@ -1633,7 +1633,7 @@ static int iommu_init_domains(struct intel_iommu *iommu)
 		return -ENOMEM;
 	}
 
-	size = ((ndomains >> 8) + 1) * sizeof(struct dmar_domain **);
+	size = DIV_ROUND_UP(ndomains, 256) * sizeof(struct dmar_domain **);
 	iommu->domains = kzalloc(size, GFP_KERNEL);
 
 	if (iommu->domains) {
@@ -1698,7 +1698,7 @@ static void disable_dmar_iommu(struct intel_iommu *iommu)
 static void free_dmar_iommu(struct intel_iommu *iommu)
 {
 	if ((iommu->domains) && (iommu->domain_ids)) {
-		int elems = (cap_ndoms(iommu->cap) >> 8) + 1;
+		int elems = DIV_ROUND_UP(cap_ndoms(iommu->cap), 256);
 		int i;
 
 		for (i = 0; i < elems; i++)
