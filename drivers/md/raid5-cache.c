@@ -40,8 +40,15 @@
  */
 #define R5L_POOL_SIZE	4
 
+struct r5c_cache {
+	atomic64_t read_full_hits;	/* the whole chunk in cache */
+	atomic64_t read_partial_hits;	/* some pages of the chunk in cache */
+	atomic64_t read_misses;		/* the whold chunk is not in cache */
+};
+
 struct r5l_log {
 	struct md_rdev *rdev;
+	struct r5c_cache cache;
 
 	u32 uuid_checksum;
 
@@ -133,6 +140,21 @@ enum r5l_io_unit_state {
 	IO_UNIT_IO_END = 2,	/* io_unit bio finish writing to log */
 	IO_UNIT_STRIPE_END = 3,	/* stripes data finished writing to raid */
 };
+
+struct r5c_chunk_map {
+	int sh_count;
+	struct r5conf *conf;
+	struct bio *parent_bi;
+	int dd_idx;
+	struct stripe_head *sh_array[0];
+};
+
+static void init_r5c_cache(struct r5conf *conf, struct r5c_cache *cache)
+{
+	atomic64_set(&cache->read_full_hits, 0);
+	atomic64_set(&cache->read_partial_hits, 0);
+	atomic64_set(&cache->read_misses, 0);
+}
 
 static sector_t r5l_ring_add(struct r5l_log *log, sector_t start, sector_t inc)
 {
@@ -1120,6 +1142,220 @@ static void r5l_write_super(struct r5l_log *log, sector_t cp)
 	set_bit(MD_CHANGE_DEVS, &mddev->flags);
 }
 
+/* TODO: use async copy */
+static void r5c_copy_data_to_bvec(struct r5dev *rdev, int sh_offset,
+				  struct bio_vec *bvec, int bvec_offset, int len)
+{
+	/* We always copy data from orig_page. This is because in R-M-W, we use
+	 * page to do prexor of parity */
+	void *src_p = kmap_atomic(rdev->orig_page);
+	void *dst_p = kmap_atomic(bvec->bv_page);
+	memcpy(dst_p + bvec_offset, src_p + sh_offset, len);
+	kunmap_atomic(dst_p);
+	kunmap_atomic(src_p);
+}
+
+/*
+ * copy data from a chunk_map to a bio
+ */
+static void r5c_copy_chunk_map_to_bio(struct r5c_chunk_map *chunk_map,
+			 struct bio *bio)
+{
+	struct bvec_iter iter;
+	struct bio_vec bvec;
+	int sh_idx;
+	unsigned sh_offset;
+
+	sh_idx = 0;
+	sh_offset = (bio->bi_iter.bi_sector & ((sector_t)STRIPE_SECTORS-1)) << 9;
+
+	/*
+	 * If bio is not page aligned, the chunk_map will have 1 more sh than bvecs
+	 * in the bio. Chunk_map may also have NULL-sh. To copy the right data, we
+	 * need to walk through the chunk_map carefully. In this implementation,
+	 * bvec/bvec_offset always matches with sh_array[sh_idx]/sh_offset.
+	 *
+	 * In the following example, the nested loop will run 4 times; and
+	 * r5c_copy_data_to_bvec will be called for the first and last iteration.
+	 *
+	 *             --------------------------------
+	 * chunk_map   | valid sh |  NULL  | valid sh |
+	 *             --------------------------------
+	 *                   ---------------------
+	 * bio               |         |         |
+	 *                   ---------------------
+	 *
+	 *                   |    |    |   |     |
+	 * copy_data         | Y  | N  | N |  Y  |
+	 */
+	bio_for_each_segment(bvec, bio, iter) {
+		int len;
+		unsigned bvec_offset = bvec.bv_offset;
+		while (bvec_offset < PAGE_SIZE) {
+			len = min_t(unsigned, PAGE_SIZE - bvec_offset, PAGE_SIZE - sh_offset);
+			if (chunk_map->sh_array[sh_idx])
+				r5c_copy_data_to_bvec(&chunk_map->sh_array[sh_idx]->dev[chunk_map->dd_idx], sh_offset,
+						      &bvec, bvec_offset, len);
+			bvec_offset += len;
+			sh_offset += len;
+			if (sh_offset == PAGE_SIZE) {
+				sh_idx += 1;
+				sh_offset = 0;
+			}
+		}
+	}
+	return;
+}
+
+/*
+ * release stripes in chunk_map and free the chunk_map
+ */
+static void free_r5c_chunk_map(struct r5c_chunk_map *chunk_map)
+{
+	unsigned sh_idx;
+	struct stripe_head *sh;
+
+	for (sh_idx = 0; sh_idx < chunk_map->sh_count; ++sh_idx) {
+		sh = chunk_map->sh_array[sh_idx];
+		if (sh) {
+			set_bit(STRIPE_HANDLE, &sh->state);
+			raid5_release_stripe(sh);
+		}
+	}
+	kfree(chunk_map);
+}
+
+static void r5c_chunk_aligned_read_endio(struct bio *bio)
+{
+	struct r5c_chunk_map *chunk_map = (struct r5c_chunk_map *) bio->bi_private;
+	struct bio *parent_bi = chunk_map->parent_bi;
+
+	r5c_copy_chunk_map_to_bio(chunk_map, bio);
+	free_r5c_chunk_map(chunk_map);
+	bio_put(bio);
+	bio_endio(parent_bi);
+}
+
+/*
+ * look up bio in stripe cache
+ * return raid_bio	-> no data in cache, read the chunk from disk
+ * return new r5c_bio	-> partial data in cache, read from disk, and amend in r5c_align_endio
+ * return NULL		-> all data in cache, no need to read disk
+ */
+struct bio *r5c_lookup_chunk(struct r5l_log *log, struct bio *raid_bio)
+{
+	struct r5conf *conf;
+	sector_t logical_sector;
+	sector_t first_stripe, last_stripe;  /* first (inclusive) stripe and last (exclusive) */
+	int dd_idx;
+	struct stripe_head *sh;
+	unsigned sh_count, sh_idx, sh_cached;
+	struct r5c_chunk_map *chunk_map;
+	struct bio *r5c_bio;
+	int hash;
+	unsigned long flags;
+
+	if (!log)
+		return raid_bio;
+
+	conf = log->rdev->mddev->private;
+
+	logical_sector = raid_bio->bi_iter.bi_sector &
+		~((sector_t)STRIPE_SECTORS-1);
+	sh_count = DIV_ROUND_UP_SECTOR_T(bio_end_sector(raid_bio) - logical_sector, STRIPE_SECTORS);
+
+	first_stripe = raid5_compute_sector(conf, logical_sector, 0, &dd_idx, NULL);
+	last_stripe = first_stripe + STRIPE_SECTORS * sh_count;
+
+	chunk_map = kzalloc(sizeof(struct r5c_chunk_map) + sh_count * sizeof(struct stripe_head*), GFP_NOIO);
+	sh_cached = 0;
+
+	for (sh_idx = 0; sh_idx < sh_count; ++sh_idx) {
+		hash = stripe_hash_locks_hash(first_stripe + sh_idx * STRIPE_SECTORS);
+		spin_lock_irqsave(conf->hash_locks + hash, flags);
+		sh = __find_stripe(conf, first_stripe + sh_idx * STRIPE_SECTORS, conf->generation);
+		if (sh &&
+		    test_bit(R5_UPTODATE, &sh->dev[dd_idx].flags)) {
+			if (!atomic_inc_not_zero(&sh->count)) {
+				spin_lock(&conf->device_lock);
+				if (!atomic_read(&sh->count)) {
+					if (!test_bit(STRIPE_HANDLE, &sh->state))
+						atomic_inc(&conf->active_stripes);
+					BUG_ON(list_empty(&sh->lru) &&
+					       !test_bit(STRIPE_EXPANDING, &sh->state));
+					list_del_init(&sh->lru);
+					if (sh->group) {
+						sh->group->stripes_cnt--;
+						sh->group = NULL;
+					}
+				}
+				atomic_inc(&sh->count);
+				spin_unlock(&conf->device_lock);
+			}
+			chunk_map->sh_array[sh_idx] = sh;
+			++sh_cached;
+		}
+		spin_unlock_irqrestore(conf->hash_locks + hash, flags);
+	}
+
+	if (sh_cached == 0) {
+		atomic64_inc(&log->cache.read_misses);
+		kfree(chunk_map);
+		return raid_bio;
+	}
+
+	chunk_map->sh_count = sh_count;
+	chunk_map->dd_idx = dd_idx;
+
+	if (sh_cached == sh_count) {
+		atomic64_inc(&log->cache.read_full_hits);
+		r5c_copy_chunk_map_to_bio(chunk_map, raid_bio);
+		free_r5c_chunk_map(chunk_map);
+		bio_endio(raid_bio);
+		return NULL;
+	}
+
+	chunk_map->parent_bi = raid_bio;
+	chunk_map->conf = conf;
+
+	atomic64_inc(&log->cache.read_partial_hits);
+
+	/* TODO: handle bio_clone failure? */
+	r5c_bio = bio_clone_mddev(raid_bio, GFP_NOIO, log->rdev->mddev);
+
+	r5c_bio->bi_private = chunk_map;
+	r5c_bio->bi_end_io = r5c_chunk_aligned_read_endio;
+
+	return r5c_bio;
+}
+
+ssize_t
+r5c_stat_show(struct mddev *mddev, char* page)
+{
+	struct r5conf *conf = mddev->private;
+	struct r5l_log *log;
+	int ret = 0;
+
+	if (!conf)
+		return 0;
+
+	log = conf->log;
+
+	if (!log)
+		return 0;
+
+	ret += snprintf(page + ret, PAGE_SIZE - ret, "r5c_read_full_hits: %llu\n",
+			(unsigned long long) atomic64_read(&log->cache.read_full_hits));
+
+	ret += snprintf(page + ret, PAGE_SIZE - ret, "r5c_read_partial_hits: %llu\n",
+			(unsigned long long) atomic64_read(&log->cache.read_partial_hits));
+
+	ret += snprintf(page + ret, PAGE_SIZE - ret, "r5c_read_misses: %llu\n",
+			(unsigned long long) atomic64_read(&log->cache.read_misses));
+
+	return ret;
+}
+
 static int r5l_load_log(struct r5l_log *log)
 {
 	struct md_rdev *rdev = log->rdev;
@@ -1237,6 +1473,8 @@ int r5l_init_log(struct r5conf *conf, struct md_rdev *rdev)
 
 	INIT_LIST_HEAD(&log->no_space_stripes);
 	spin_lock_init(&log->no_space_stripes_lock);
+
+	init_r5c_cache(conf, &log->cache);
 
 	if (r5l_load_log(log))
 		goto error;

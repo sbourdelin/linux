@@ -690,4 +690,10 @@ extern void r5l_stripe_write_finished(struct stripe_head *sh);
 extern int r5l_handle_flush_request(struct r5l_log *log, struct bio *bio);
 extern void r5l_quiesce(struct r5l_log *log, int state);
 extern bool r5l_log_disk_error(struct r5conf *conf);
+
+extern struct bio *r5c_lookup_chunk(struct r5l_log *log, struct bio *raid_bio);
+extern struct stripe_head *__find_stripe(struct r5conf *conf, sector_t sector,
+					 short generation);
+
+extern ssize_t r5c_stat_show(struct mddev *mddev, char* page);
 #endif

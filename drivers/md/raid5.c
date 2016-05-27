@@ -503,7 +503,7 @@ retry:
 	set_bit(STRIPE_BATCH_READY, &sh->state);
 }
 
-static struct stripe_head *__find_stripe(struct r5conf *conf, sector_t sector,
+struct stripe_head *__find_stripe(struct r5conf *conf, sector_t sector,
 					 short generation)
 {
 	struct stripe_head *sh;
@@ -515,6 +515,7 @@ static struct stripe_head *__find_stripe(struct r5conf *conf, sector_t sector,
 	pr_debug("__stripe %llu not in cache\n", (unsigned long long)sector);
 	return NULL;
 }
+EXPORT_SYMBOL(__find_stripe);
 
 /*
  * Need to check if array has failed when deciding whether to:
@@ -4726,13 +4727,26 @@ static int raid5_read_one_chunk(struct mddev *mddev, struct bio *raid_bio)
 {
 	struct r5conf *conf = mddev->private;
 	int dd_idx;
-	struct bio* align_bi;
+	struct bio *align_bi;
+	struct bio *r5c_bio;
 	struct md_rdev *rdev;
 	sector_t end_sector;
 
 	if (!in_chunk_boundary(mddev, raid_bio)) {
 		pr_debug("%s: non aligned\n", __func__);
 		return 0;
+	}
+
+	r5c_bio = r5c_lookup_chunk(conf->log, raid_bio);
+
+	if (r5c_bio == NULL) {
+		pr_debug("Read all data from stripe cache\n");
+		return 1;
+	} else if (r5c_bio == raid_bio)
+		pr_debug("No data in stripe cache, read all from disk\n");
+	else {
+		pr_debug("Partial data in stripe cache, read and amend\n");
+		raid_bio = r5c_bio;
 	}
 	/*
 	 * use bio_clone_mddev to make a copy of the bio
@@ -6157,6 +6171,10 @@ raid5_group_thread_cnt = __ATTR(group_thread_cnt, S_IRUGO | S_IWUSR,
 				raid5_show_group_thread_cnt,
 				raid5_store_group_thread_cnt);
 
+static struct md_sysfs_entry
+r5c_cache_stats = __ATTR(r5c_cache_stats, S_IRUGO,
+			 r5c_stat_show, NULL);
+
 static struct attribute *raid5_attrs[] =  {
 	&raid5_stripecache_size.attr,
 	&raid5_stripecache_active.attr,
@@ -6164,6 +6182,7 @@ static struct attribute *raid5_attrs[] =  {
 	&raid5_group_thread_cnt.attr,
 	&raid5_skip_copy.attr,
 	&raid5_rmw_level.attr,
+	&r5c_cache_stats.attr,
 	NULL,
 };
 static struct attribute_group raid5_attrs_group = {
