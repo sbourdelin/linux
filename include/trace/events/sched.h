@@ -407,11 +407,7 @@ DEFINE_EVENT(sched_stat_runtime, sched_stat_runtime,
 	     TP_PROTO(struct task_struct *tsk, u64 runtime, u64 vruntime),
 	     TP_ARGS(tsk, runtime, vruntime));
 
-/*
- * Tracepoint for showing priority inheritance modifying a tasks
- * priority.
- */
-TRACE_EVENT(sched_pi_setprio,
+DECLARE_EVENT_CLASS(sched_prio_template,
 
 	TP_PROTO(struct task_struct *tsk, int newprio),
 
@@ -435,6 +431,21 @@ TRACE_EVENT(sched_pi_setprio,
 			__entry->comm, __entry->pid,
 			__entry->oldprio, __entry->newprio)
 );
+
+/*
+ * Tracepoint for showing priority inheritance modifying a tasks
+ * priority.
+ */
+DEFINE_EVENT(sched_prio_template, sched_pi_setprio,
+		TP_PROTO(struct task_struct *tsk, int newprio),
+		TP_ARGS(tsk, newprio));
+
+/*
+ * Tracepoint for priority changes of a task.
+ */
+DEFINE_EVENT(sched_prio_template, sched_set_prio,
+		TP_PROTO(struct task_struct *tsk, int newprio),
+		TP_ARGS(tsk, newprio));
 
 #ifdef CONFIG_DETECT_HUNG_TASK
 TRACE_EVENT(sched_process_hang,

@@ -2314,6 +2314,7 @@ int sysctl_schedstats(struct ctl_table *table, int write,
 
 static void sched_set_prio(struct task_struct *p, int prio)
 {
+	trace_sched_set_prio(p, prio);
 	p->prio = prio;
 }
 
