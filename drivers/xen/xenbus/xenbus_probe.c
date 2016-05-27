@@ -592,6 +592,8 @@ int xenbus_dev_suspend(struct device *dev)
 
 	DPRINTK("%s", xdev->nodename);
 
+	cancel_work_sync(&xdev->work);
+
 	if (dev->driver == NULL)
 		return 0;
 	drv = to_xenbus_driver(dev->driver);
