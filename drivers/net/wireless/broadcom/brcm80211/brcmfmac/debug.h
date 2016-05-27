@@ -138,4 +138,18 @@ int brcmf_debugfs_add_entry(struct brcmf_pub *drvr, const char *fn,
 }
 #endif
 
+#ifdef CONFIG_BRCM_TRACING
+void brcmf_dbg_dissect_event(void *data, int len);
+void brcmf_dbg_dissect_ioctl(int tx, void *data, int len);
+#else
+static inline
+void brcmf_dbg_dissect_event(void *data, int len)
+{
+}
+static inline
+void brcmf_dbg_dissect_ioctl(int tx, void *data, int len)
+{
+}
+#endif
+
 #endif /* BRCMFMAC_DEBUG_H */

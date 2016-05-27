@@ -110,6 +110,59 @@ TRACE_EVENT(brcmf_bcdchdr,
 	TP_printk("bcdc: prio=%d siglen=%d", __entry->prio, __entry->siglen)
 );
 
+TRACE_EVENT(brcmf_dissect_event,
+	TP_PROTO(void *data, size_t len),
+	TP_ARGS(data, len),
+	TP_STRUCT__entry(
+		__field(unsigned long, len)
+		__field(unsigned long, addr)
+		__dynamic_array(u8, hdata, len)
+	),
+	TP_fast_assign(
+		__entry->len = len;
+		__entry->addr = (unsigned long)data;
+		memcpy(__get_dynamic_array(hdata), data, len);
+	),
+	TP_printk("dissect_event [addr=%lx, length=%lu]",
+		  __entry->addr, __entry->len)
+);
+
+TRACE_EVENT(brcmf_dissect_ioctl,
+	TP_PROTO(int tx, void *data, size_t len),
+	TP_ARGS(tx, data, len),
+	TP_STRUCT__entry(
+		__field(int, tx)
+		__field(unsigned long, len)
+		__field(unsigned long, addr)
+		__dynamic_array(u8, hdata, len)
+	),
+	TP_fast_assign(
+		__entry->tx = tx;
+		__entry->len = len;
+		__entry->addr = (unsigned long)data;
+		memcpy(__get_dynamic_array(hdata), data, len);
+	),
+	TP_printk("dissect_ioctl [tx=%d addr=%lx, length=%lu]",
+		  __entry->tx, __entry->addr, __entry->len)
+);
+
+TRACE_EVENT(brcmf_dissect_data,
+	TP_PROTO(void *data, size_t len),
+	TP_ARGS(data, len),
+	TP_STRUCT__entry(
+		__field(unsigned long, len)
+		__field(unsigned long, addr)
+		__dynamic_array(u8, hdata, len)
+	),
+	TP_fast_assign(
+		__entry->len = len;
+		__entry->addr = (unsigned long)data;
+		memcpy(__get_dynamic_array(hdata), data, len);
+	),
+	TP_printk("dissect_data [addr=%lx, length=%lu]",
+		  __entry->addr, __entry->len)
+);
+
 #ifndef SDPCM_RX
 #define SDPCM_RX	0
 #endif

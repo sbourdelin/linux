@@ -134,6 +134,8 @@ brcmf_proto_bcdc_msg(struct brcmf_pub *drvr, int ifidx, uint cmd, void *buf,
 	if (len > BRCMF_TX_IOCTL_MAX_MSG_SIZE)
 		len = BRCMF_TX_IOCTL_MAX_MSG_SIZE;
 
+	brcmf_dbg_dissect_ioctl(1, &bcdc->msg, len);
+
 	/* Send request */
 	return brcmf_bus_txctl(drvr->bus_if, (unsigned char *)&bcdc->msg, len);
 }
@@ -151,6 +153,8 @@ static int brcmf_proto_bcdc_cmplt(struct brcmf_pub *drvr, u32 id, u32 len)
 		if (ret < 0)
 			break;
 	} while (BCDC_DCMD_ID(le32_to_cpu(bcdc->msg.flags)) != id);
+
+	brcmf_dbg_dissect_ioctl(0, &bcdc->msg, len);
 
 	return ret;
 }

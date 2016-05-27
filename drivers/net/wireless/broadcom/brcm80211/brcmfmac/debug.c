@@ -24,6 +24,7 @@
 #include "bus.h"
 #include "fweh.h"
 #include "debug.h"
+#include "tracepoint.h"
 
 static struct dentry *root_folder;
 
@@ -109,3 +110,25 @@ int brcmf_debugfs_add_entry(struct brcmf_pub *drvr, const char *fn,
 					drvr->dbgfs_dir, read_fn);
 	return PTR_ERR_OR_ZERO(e);
 }
+
+#ifdef CONFIG_BRCM_TRACING
+void brcmf_dbg_dissect_event(void *data, int len)
+{
+	if (!trace_brcmf_dissect_event_enabled())
+		return;
+
+	/* Event tracing only needed if not done through data dump */
+	if (trace_brcmf_dissect_data_enabled())
+		return;
+
+	trace_brcmf_dissect_event(data, len);
+}
+
+void brcmf_dbg_dissect_ioctl(int tx, void *data, int len)
+{
+	if (!trace_brcmf_dissect_ioctl_enabled())
+		return;
+
+	trace_brcmf_dissect_ioctl(tx, data, len);
+}
+#endif

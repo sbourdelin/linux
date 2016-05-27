@@ -246,6 +246,7 @@ static void brcmf_fweh_event_worker(struct work_struct *work)
 		emsg.ifidx = emsg_be->ifidx;
 		emsg.bsscfgidx = emsg_be->bsscfgidx;
 
+		brcmf_dbg_dissect_event(&event->emsg, sizeof(event->emsg));
 		brcmf_dbg(EVENT, "  version %u flags %u status %u reason %u\n",
 			  emsg.version, emsg.flags, emsg.status, emsg.reason);
 		brcmf_dbg_hex_dump(BRCMF_EVENT_ON(), event->data,

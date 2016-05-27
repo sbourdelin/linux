@@ -28,6 +28,7 @@
 #include "core.h"
 #include "bus.h"
 #include "debug.h"
+#include "tracepoint.h"
 #include "fwil_types.h"
 #include "p2p.h"
 #include "cfg80211.h"
@@ -250,6 +251,8 @@ static netdev_tx_t brcmf_netdev_start_xmit(struct sk_buff *skb,
 	if (eh->h_proto == htons(ETH_P_PAE))
 		atomic_inc(&ifp->pend_8021x_cnt);
 
+	trace_brcmf_dissect_data(skb->data, skb->len);
+
 	ret = brcmf_fws_process_skb(ifp, skb);
 
 done:
@@ -300,6 +303,8 @@ void brcmf_txflowblock(struct device *dev, bool state)
 
 void brcmf_netif_rx(struct brcmf_if *ifp, struct sk_buff *skb)
 {
+	trace_brcmf_dissect_data(skb->data, skb->len);
+
 	if (skb->pkt_type == PACKET_MULTICAST)
 		ifp->stats.multicast++;
 
