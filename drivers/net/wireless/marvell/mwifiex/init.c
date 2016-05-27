@@ -24,6 +24,7 @@
 #include "main.h"
 #include "wmm.h"
 #include "11n.h"
+#include "sdio.h"
 
 /*
  * This function adds a BSS priority table to the table list.
@@ -737,8 +738,12 @@ mwifiex_shutdown_drv(struct mwifiex_adapter *adapter)
 int mwifiex_dnld_fw(struct mwifiex_adapter *adapter,
 		    struct mwifiex_fw_image *pmfw)
 {
+	struct sdio_mmc_card *card = adapter->card;
 	int ret;
 	u32 poll_num = 1;
+
+	if (adapter->iface_type == MWIFIEX_SDIO)
+		sdio_claim_host(card->func);
 
 	if (adapter->if_ops.check_fw_status) {
 		/* check if firmware is already running */
@@ -746,7 +751,7 @@ int mwifiex_dnld_fw(struct mwifiex_adapter *adapter,
 		if (!ret) {
 			mwifiex_dbg(adapter, MSG,
 				    "WLAN FW already running! Skip FW dnld\n");
-			return 0;
+			goto release_host;
 		}
 	}
 
@@ -759,7 +764,7 @@ int mwifiex_dnld_fw(struct mwifiex_adapter *adapter,
 		if (ret) {
 			mwifiex_dbg(adapter, MSG,
 				    "WLAN read winner status failed!\n");
-			return ret;
+			goto release_host;
 		}
 
 		if (!adapter->winner) {
@@ -775,7 +780,7 @@ int mwifiex_dnld_fw(struct mwifiex_adapter *adapter,
 		if (ret) {
 			mwifiex_dbg(adapter, ERROR,
 				    "prog_fw failed ret=%#x\n", ret);
-			return ret;
+			goto release_host;
 		}
 	}
 
@@ -785,6 +790,9 @@ poll_fw:
 	if (ret)
 		mwifiex_dbg(adapter, ERROR,
 			    "FW failed to be active in time\n");
+release_host:
+	if (adapter->iface_type == MWIFIEX_SDIO)
+		sdio_release_host(card->func);
 
 	return ret;
 }
