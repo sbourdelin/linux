@@ -217,7 +217,7 @@ static DECLARE_WORK(reg_work, reg_todo);
 /* We keep a static world regulatory domain in case of the absence of CRDA */
 static const struct ieee80211_regdomain world_regdom = {
 	.n_reg_rules = 8,
-	.alpha2 =  "00",
+	.alpha2 = "00",
 	.reg_rules = {
 		/* IEEE 802.11b/g, channels 1..11 */
 		REG_RULE(2412-10, 2462+10, 40, 6, 20, 0),
