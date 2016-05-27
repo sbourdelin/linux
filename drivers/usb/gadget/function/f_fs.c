@@ -2778,11 +2778,11 @@ static int _ffs_func_bind(struct usb_configuration *c,
 	       ffs->raw_descs_length);
 
 	memset(vla_ptr(vlabuf, d, inums), 0xff, d_inums__sz);
-	for (ret = ffs->eps_count; ret; --ret) {
+	for (i = 0; i < ffs->eps_count; i++) {
 		struct ffs_ep *ptr;
 
 		ptr = vla_ptr(vlabuf, d, eps);
-		ptr[ret].num = -1;
+		ptr[i].num = -1;
 	}
 
 	/* Save pointers
