@@ -1271,15 +1271,12 @@ static bool mem_cgroup_out_of_memory(struct mem_cgroup *memcg, gfp_t gfp_mask,
 	mutex_lock(&oom_lock);
 
 	/*
-	 * If current has a pending SIGKILL or is exiting, then automatically
+	 * If current's memory is ready to be OOM-reaped, then automatically
 	 * select it.  The goal is to allow it to allocate so that it may
 	 * quickly exit and free its memory.
 	 */
-	if (fatal_signal_pending(current) || task_will_free_mem(current)) {
-		mark_oom_victim(current);
-		try_oom_reaper(current);
+	if (task_is_reapable(current))
 		goto unlock;
-	}
 
 	check_panic_on_oom(&oc, CONSTRAINT_MEMCG, memcg);
 	totalpages = mem_cgroup_get_limit(memcg) ? : 1;

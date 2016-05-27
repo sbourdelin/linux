@@ -428,6 +428,50 @@ static bool process_shares_mm(struct task_struct *p, struct mm_struct *mm)
 	return false;
 }
 
+bool mm_is_reapable(struct mm_struct *mm)
+{
+	struct task_struct *p;
+
+	if (!mm)
+		return false;
+	if (test_bit(MMF_OOM_REAPABLE, &mm->flags))
+		return true;
+	if (!down_read_trylock(&mm->mmap_sem))
+		return false;
+	up_read(&mm->mmap_sem);
+	/*
+	 * There might be other threads/processes which are either not
+	 * dying or even not killable.
+	 */
+	if (atomic_read(&mm->mm_users) > 1) {
+		rcu_read_lock();
+		for_each_process(p) {
+			bool exiting;
+
+			if (!process_shares_mm(p, mm))
+				continue;
+			if (fatal_signal_pending(p))
+				continue;
+
+			/*
+			 * If the task is exiting make sure the whole thread
+			 * group is exiting and cannot access mm anymore.
+			 */
+			spin_lock_irq(&p->sighand->siglock);
+			exiting = signal_group_exit(p->signal);
+			spin_unlock_irq(&p->sighand->siglock);
+			if (exiting)
+				continue;
+
+			/* Give up */
+			rcu_read_unlock();
+			return false;
+		}
+		rcu_read_unlock();
+	}
+	set_bit(MMF_OOM_REAPABLE, &mm->flags);
+	return true;
+}
 
 #ifdef CONFIG_MMU
 /*
@@ -483,7 +527,7 @@ static bool __oom_reap_task(struct task_struct *tsk)
 
 	task_unlock(p);
 
-	if (!down_read_trylock(&mm->mmap_sem)) {
+	if (!mm_is_reapable(mm) || !down_read_trylock(&mm->mmap_sem)) {
 		ret = false;
 		goto unlock_oom;
 	}
@@ -553,6 +597,9 @@ static void oom_reap_task(struct task_struct *tsk)
 		debug_show_all_locks();
 	}
 
+	/* Do not allow the OOM killer to select this thread group again. */
+	tsk->signal->oom_score_adj = OOM_SCORE_ADJ_MIN;
+
 	/*
 	 * Clear TIF_MEMDIE because the task shouldn't be sitting on a
 	 * reasonably reclaimable memory anymore or it is not a good candidate
@@ -606,51 +653,6 @@ static void wake_oom_reaper(struct task_struct *tsk)
 	wake_up(&oom_reaper_wait);
 }
 
-/* Check if we can reap the given task. This has to be called with stable
- * tsk->mm
- */
-void try_oom_reaper(struct task_struct *tsk)
-{
-	struct mm_struct *mm = tsk->mm;
-	struct task_struct *p;
-
-	if (!mm)
-		return;
-
-	/*
-	 * There might be other threads/processes which are either not
-	 * dying or even not killable.
-	 */
-	if (atomic_read(&mm->mm_users) > 1) {
-		rcu_read_lock();
-		for_each_process(p) {
-			bool exiting;
-
-			if (!process_shares_mm(p, mm))
-				continue;
-			if (fatal_signal_pending(p))
-				continue;
-
-			/*
-			 * If the task is exiting make sure the whole thread group
-			 * is exiting and cannot acces mm anymore.
-			 */
-			spin_lock_irq(&p->sighand->siglock);
-			exiting = signal_group_exit(p->signal);
-			spin_unlock_irq(&p->sighand->siglock);
-			if (exiting)
-				continue;
-
-			/* Give up */
-			rcu_read_unlock();
-			return;
-		}
-		rcu_read_unlock();
-	}
-
-	wake_oom_reaper(tsk);
-}
-
 static int __init oom_init(void)
 {
 	oom_reaper_th = kthread_run(oom_reaper, NULL, "oom_reaper");
@@ -675,7 +677,7 @@ static void wake_oom_reaper(struct task_struct *tsk)
  * Has to be called with oom_lock held and never after
  * oom has been disabled already.
  */
-void mark_oom_victim(struct task_struct *tsk)
+static void mark_oom_victim(struct task_struct *tsk)
 {
 	WARN_ON(oom_killer_disabled);
 	/* OOM killer might race with memcg OOM */
@@ -743,6 +745,24 @@ void oom_killer_enable(void)
 }
 
 /*
+ * Try to mark the given task as an OOM victim.
+ *
+ * @tsk: Task to check.
+ *
+ * Needs task_lock(@tsk)/task_unlock(@tsk) unless @tsk == current.
+ */
+bool task_is_reapable(struct task_struct *tsk)
+{
+	if ((fatal_signal_pending(tsk) || (tsk->flags & PF_EXITING)) &&
+	    mm_is_reapable(tsk->mm)) {
+		mark_oom_victim(tsk);
+		wake_oom_reaper(tsk);
+		return true;
+	}
+	return false;
+}
+
+/*
  * Must be called while holding a reference to p, which will be released upon
  * returning.
  */
@@ -757,16 +777,14 @@ void oom_kill_process(struct oom_control *oc, struct task_struct *p,
 	unsigned int victim_points = 0;
 	static DEFINE_RATELIMIT_STATE(oom_rs, DEFAULT_RATELIMIT_INTERVAL,
 					      DEFAULT_RATELIMIT_BURST);
-	bool can_oom_reap = true;
 
 	/*
-	 * If the task is already exiting, don't alarm the sysadmin or kill
-	 * its children or threads, just set TIF_MEMDIE so it can die quickly
+	 * If the task's memory is ready to be OOM-reaped, then don't alarm
+	 * the sysadmin or kill its children or threads, just set TIF_MEMDIE
+	 * so it can die quickly.
 	 */
 	task_lock(p);
-	if (p->mm && task_will_free_mem(p)) {
-		mark_oom_victim(p);
-		try_oom_reaper(p);
+	if (task_is_reapable(p)) {
 		task_unlock(p);
 		put_task_struct(p);
 		return;
@@ -849,22 +867,18 @@ void oom_kill_process(struct oom_control *oc, struct task_struct *p,
 			continue;
 		if (same_thread_group(p, victim))
 			continue;
-		if (unlikely(p->flags & PF_KTHREAD) || is_global_init(p) ||
-		    p->signal->oom_score_adj == OOM_SCORE_ADJ_MIN) {
-			/*
-			 * We cannot use oom_reaper for the mm shared by this
-			 * process because it wouldn't get killed and so the
-			 * memory might be still used.
-			 */
-			can_oom_reap = false;
+		if (unlikely(p->flags & PF_KTHREAD))
 			continue;
-		}
+		if (is_global_init(p))
+			continue;
+		if (p->signal->oom_score_adj == OOM_SCORE_ADJ_MIN)
+			continue;
+
 		do_send_sig_info(SIGKILL, SEND_SIG_FORCED, p, true);
 	}
 	rcu_read_unlock();
 
-	if (can_oom_reap)
-		wake_oom_reaper(victim);
+	wake_oom_reaper(victim);
 
 	mmdrop(mm);
 	put_task_struct(victim);
@@ -936,19 +950,12 @@ bool out_of_memory(struct oom_control *oc)
 		return true;
 
 	/*
-	 * If current has a pending SIGKILL or is exiting, then automatically
+	 * If current's memory is ready to be OOM-reaped, then automatically
 	 * select it.  The goal is to allow it to allocate so that it may
 	 * quickly exit and free its memory.
-	 *
-	 * But don't select if current has already released its mm and cleared
-	 * TIF_MEMDIE flag at exit_mm(), otherwise an OOM livelock may occur.
 	 */
-	if (current->mm &&
-	    (fatal_signal_pending(current) || task_will_free_mem(current))) {
-		mark_oom_victim(current);
-		try_oom_reaper(current);
+	if (task_is_reapable(current))
 		return true;
-	}
 
 	/*
 	 * The OOM killer does not compensate for IO-less reclaim.
