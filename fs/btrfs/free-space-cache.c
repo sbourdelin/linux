@@ -3662,6 +3662,7 @@ have_info:
 			if (tmp->offset + tmp->bytes < offset)
 				break;
 			if (offset + bytes < tmp->offset) {
+				info = tmp;
 				n = rb_prev(&info->offset_index);
 				continue;
 			}
@@ -3676,6 +3677,7 @@ have_info:
 			if (offset + bytes < tmp->offset)
 				break;
 			if (tmp->offset + tmp->bytes < offset) {
+				info = tmp;
 				n = rb_next(&info->offset_index);
 				continue;
 			}
