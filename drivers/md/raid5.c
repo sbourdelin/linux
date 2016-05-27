@@ -636,6 +636,8 @@ raid5_get_active_stripe(struct r5conf *conf, sector_t sector,
 			if (!sh) {
 				set_bit(R5_INACTIVE_BLOCKED,
 					&conf->cache_state);
+				if (conf->log)
+					r5l_wake_reclaim(conf->log, 0);
 				wait_event_lock_irq(
 					conf->wait_for_stripe,
 					!list_empty(conf->inactive_list + hash) &&
@@ -670,6 +672,15 @@ raid5_get_active_stripe(struct r5conf *conf, sector_t sector,
 	} while (sh == NULL);
 
 	spin_unlock_irq(conf->hash_locks + hash);
+
+	if (conf->log &&
+	    (atomic_read(&conf->active_stripes) +
+	     atomic_read(&conf->r5c_cached_stripes) >
+	     conf->max_nr_stripes * 3 / 4)) {
+		set_bit(R5_INACTIVE_BLOCKED, &conf->cache_state);
+		r5l_wake_reclaim(conf->log, 0);
+	}
+
 	return sh;
 }
 
@@ -1965,8 +1976,10 @@ static struct stripe_head *alloc_stripe(struct kmem_cache *sc, gfp_t gfp)
 		spin_lock_init(&sh->batch_lock);
 		INIT_LIST_HEAD(&sh->batch_list);
 		INIT_LIST_HEAD(&sh->lru);
+		INIT_LIST_HEAD(&sh->r5c);
 		atomic_set(&sh->count, 1);
 		atomic_set(&sh->dev_in_cache, 0);
+		sh->journal_start = -1L;
 	}
 	return sh;
 }
@@ -5965,7 +5978,6 @@ static void raid5d(struct md_thread *thread)
 			md_check_recovery(mddev);
 			spin_lock_irq(&conf->device_lock);
 		}
-		r5c_do_reclaim(conf);
 	}
 	pr_debug("%d stripes handled\n", handled);
 
