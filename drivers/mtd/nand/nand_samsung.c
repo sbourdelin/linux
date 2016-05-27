@@ -1,0 +1,90 @@
+/*
+ * Copyright (C) 2013 Boris Brezillon <boris.brezillon@free-electrons.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include <linux/mtd/nand.h>
+
+static int samsung_nand_decode_id(struct nand_chip *chip)
+{
+	struct mtd_info *mtd = nand_to_mtd(chip);
+
+	/*
+	 * The NAND is compatible with the JEDEC or ONFI standard, we already
+	 * have all the information we could retrieve from the extended ID.
+	 */
+	if (chip->onfi_version || chip->jedec_version)
+		return 0;
+
+	/* New Samsung (6 byte ID): Samsung K9GAG08U0F (p.44) */
+	if (chip->id.len == 6 && !nand_is_slc(chip) &&
+	    chip->id.data[5] != 0x00) {
+		u8 extid = chip->id.data[3] >> 2;
+
+		/* Adjust pagesize */
+		mtd->writesize <<= 1;
+
+		/* Fix oobsize */
+		switch (((extid >> 2) & 0x4) | (extid & 0x3)) {
+		case 1:
+			mtd->oobsize = 128;
+			break;
+		case 2:
+			mtd->oobsize = 218;
+			break;
+		case 3:
+			mtd->oobsize = 400;
+			break;
+		case 4:
+			mtd->oobsize = 436;
+			break;
+		case 5:
+			mtd->oobsize = 512;
+			break;
+		case 6:
+			mtd->oobsize = 640;
+			break;
+		default:
+			return -EINVAL;
+		}
+
+		/* Fix blocksize */
+		extid >>= 2;
+		mtd->erasesize = (128 * 1024) <<
+				 (((extid >> 1) & 0x04) | (extid & 0x03));
+	}
+
+	if (mtd->writesize > 512)
+		chip->options |= NAND_SAMSUNG_LP_OPTIONS;
+
+	return 0;
+}
+
+static int samsung_nand_init(struct nand_chip *chip)
+{
+	int ret;
+
+	ret = samsung_nand_decode_id(chip);
+	if (ret)
+		return ret;
+
+	if (!nand_is_slc(chip))
+		chip->bbt_options |= NAND_BBT_SCANLASTPAGE;
+	else
+		chip->bbt_options |= NAND_BBT_SCAN2NDPAGE;
+
+	return 0;
+}
+
+const struct nand_manufacturer_ops samsung_nand_manuf_ops = {
+	.init = samsung_nand_init,
+};
