@@ -728,7 +728,7 @@ static u16 s626_get_mode_a(struct comedi_device *dev,
 	u16 cra;
 	u16 crb;
 	u16 setup;
-	unsigned cntsrc, clkmult, clkpol, encmode;
+	unsigned int cntsrc, clkmult, clkpol, encmode;
 
 	/* Fetch CRA and CRB register images. */
 	cra = s626_debi_read(dev, S626_LP_CRA(chan));
@@ -783,7 +783,7 @@ static u16 s626_get_mode_b(struct comedi_device *dev,
 	u16 cra;
 	u16 crb;
 	u16 setup;
-	unsigned cntsrc, clkmult, clkpol, encmode;
+	unsigned int cntsrc, clkmult, clkpol, encmode;
 
 	/* Fetch CRA and CRB register images. */
 	cra = s626_debi_read(dev, S626_LP_CRA(chan));
@@ -858,7 +858,7 @@ static void s626_set_mode_a(struct comedi_device *dev,
 	struct s626_private *devpriv = dev->private;
 	u16 cra;
 	u16 crb;
-	unsigned cntsrc, clkmult, clkpol;
+	unsigned int cntsrc, clkmult, clkpol;
 
 	/* Initialize CRA and CRB images. */
 	/* Preload trigger is passed through. */
@@ -936,7 +936,7 @@ static void s626_set_mode_b(struct comedi_device *dev,
 	struct s626_private *devpriv = dev->private;
 	u16 cra;
 	u16 crb;
-	unsigned cntsrc, clkmult, clkpol;
+	unsigned int cntsrc, clkmult, clkpol;
 
 	/* Initialize CRA and CRB images. */
 	/* IndexSrc is passed through. */
