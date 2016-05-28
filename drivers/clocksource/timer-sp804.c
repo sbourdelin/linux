@@ -105,7 +105,7 @@ void __init __sp804_clocksource_and_sched_clock_init(void __iomem *base,
 		return;
 
 	/* setup timer 0 as free-running clocksource */
-	writel(0, base + TIMER_CTRL);
+	sp804_timer_disable(base);
 	writel(0xffffffff, base + TIMER_VALUE);
 	sp804_load_mode_set(base, 0xffffffff, TIMER_CTRL_PERIODIC & ~TIMER_CTRL_IE);
 
@@ -196,8 +196,7 @@ void __init __sp804_clockevents_init(void __iomem *base, unsigned int irq, struc
 	evt->irq = irq;
 	evt->cpumask = cpu_possible_mask;
 
-	writel(0, base + TIMER_CTRL);
-
+	sp804_timer_disable(base);
 	setup_irq(irq, &sp804_timer_irq);
 	clockevents_config_and_register(evt, rate, 0xf, 0xffffffff);
 }
@@ -216,8 +215,8 @@ static void __init sp804_of_init(struct device_node *np)
 		return;
 
 	/* Ensure timers are disabled */
-	writel(0, base + TIMER_CTRL);
-	writel(0, base + TIMER_2_BASE + TIMER_CTRL);
+	sp804_timer_disable(base);
+	sp804_timer_disable(base + TIMER_2_BASE);
 
 	if (initialized || !of_device_is_available(np))
 		goto err;
@@ -274,7 +273,7 @@ static void __init integrator_cp_of_init(struct device_node *np)
 		return;
 
 	/* Ensure timer is disabled */
-	writel(0, base + TIMER_CTRL);
+	sp804_timer_disable(base);
 
 	if (init_count == 2 || !of_device_is_available(np))
 		goto err;
