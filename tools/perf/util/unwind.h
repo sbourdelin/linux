@@ -56,6 +56,16 @@ register_x86_32_unwind_libunwind_ops(struct thread *thread __maybe_unused)
 }
 #endif
 
+#ifdef HAVE_LIBUNWIND_AARCH64_SUPPORT
+int register_arm64_unwind_libunwind_ops(struct thread *thread);
+#else
+static inline int
+register_arm64_unwind_libunwind_ops(struct thread *thread __maybe_unused)
+{
+	return -1;
+}
+#endif
+
 #else
 static inline int
 unwind__get_entries(unwind_entry_cb_t cb __maybe_unused,

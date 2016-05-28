@@ -25,9 +25,13 @@ int unwind__prepare_access(struct thread *thread, struct map *map)
 
 	arch = normalize_arch(thread->mg->machine->env->arch);
 
-	if (!strcmp(arch, "x86"))
+	if (!strcmp(arch, "x86")) {
 		if (dso_type != DSO__TYPE_64BIT)
 			register_func = register_x86_32_unwind_libunwind_ops;
+	} else if (!strcmp(arch, "arm64") || !strcmp(arch, "arm")) {
+		if (dso_type == DSO__TYPE_64BIT)
+			register_func = register_arm64_unwind_libunwind_ops;
+	}
 
 	if (register_func) {
 		ret = register_func(thread);

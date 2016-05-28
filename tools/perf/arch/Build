@@ -1,3 +1,4 @@
 libperf-y += common.o
 libperf-y += $(ARCH)/
 libperf-$(CONFIG_LIBUNWIND_X86)      += x86/util/unwind-libunwind_x86_32.o
+libperf-$(CONFIG_LIBUNWIND_AARCH64)  += arm64/util/unwind-libunwind_arm64.o
