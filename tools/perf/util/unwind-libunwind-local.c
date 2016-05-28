@@ -5,7 +5,9 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <linux/list.h>
+#ifndef REMOTE_UNWIND_LIBUNWIND
 #include <libunwind.h>
+#endif
 #include "callchain.h"
 #include "thread.h"
 #include "session.h"
@@ -671,7 +673,9 @@ _unwind_libunwind_ops = {
 	.get_entries    = _unwind__get_entries,
 };
 
+#ifndef REMOTE_UNWIND_LIBUNWIND
 void register_local_unwind_libunwind_ops(struct thread *thread)
 {
 	thread->unwind_libunwind_ops = &_unwind_libunwind_ops;
 }
+#endif

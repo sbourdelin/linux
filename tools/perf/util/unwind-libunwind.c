@@ -8,6 +8,9 @@ int unwind__prepare_access(struct thread *thread, struct map *map)
 {
 	const char *arch;
 	enum dso_type dso_type;
+	int use_local_unwind = 1;
+	int ret;
+	int (*register_func)(struct thread *thread) = NULL;
 
 	if (!thread->mg->machine->env)
 		return -1;
@@ -22,16 +25,20 @@ int unwind__prepare_access(struct thread *thread, struct map *map)
 
 	arch = normalize_arch(thread->mg->machine->env->arch);
 
-	if (!strcmp(arch, "x86")) {
+	if (!strcmp(arch, "x86"))
 		if (dso_type != DSO__TYPE_64BIT)
-#ifdef HAVE_LIBUNWIND_X86_SUPPORT
-			pr_err("unwind: target platform=%s is not implemented\n", arch);
-#else
+			register_func = register_x86_32_unwind_libunwind_ops;
+
+	if (register_func) {
+		ret = register_func(thread);
+		if (!ret)
+			use_local_unwind = 0;
+		else
 			pr_err("unwind: target platform=%s is not supported\n", arch);
-#endif
 	}
 
-	register_local_unwind_libunwind_ops(thread);
+	if (use_local_unwind)
+		register_local_unwind_libunwind_ops(thread);
 
 	return thread->unwind_libunwind_ops->prepare_access(thread);
 }

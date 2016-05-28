@@ -1,2 +1,3 @@
 libperf-y += common.o
 libperf-y += $(ARCH)/
+libperf-$(CONFIG_LIBUNWIND_X86)      += x86/util/unwind-libunwind_x86_32.o
