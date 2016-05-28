@@ -1,0 +1,18 @@
+We have built a fundamental vhost-pci based inter-VM communication framework
+for network packet transmission. To test the throughput affected by scaling
+with more VMs to stream out packets, we chain 2 to 5 VMs, and follow the vsperf
+test methodology proposed by OPNFV, as shown in Fig. 2. The first VM is
+passthrough-ed with a physical NIC to inject packets from an external packet
+generator, and the last VM is passthrough-ed with a physical NIC to eject
+packets back to the external generator. A layer2 forwarding module in each VM
+is responsible for forwarding incoming packets from NIC1 (the injection NIC) to
+NIC2 (the ejection NIC). In the traditional way, NIC2 is a virtio-net device
+connected to the vhost-user backend in OVS. With our proposed solution, NIC2 is
+a vhost-pci device, which directly copies packets to the next VM. The packet
+generator implements the RFC2544 standard, which keeps running at a 0 packet
+loss rate.
+
+Fig. 3 shows the scalability test results. In the vhost-user case, a
+significant performance drop (40%~55%) occurs when 4 and 5 VMs are chained
+together. The vhost-pci based inter-VM communication scales well (no
+significant throughput drop) with more VMs are chained together.
