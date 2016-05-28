@@ -38,6 +38,7 @@ struct plat_ls1x_nand ls1x_nand_pdata = {
 	.nr_parts	= ARRAY_SIZE(ls1x_nand_parts),
 	.hold_cycle	= 0x2,
 	.wait_cycle	= 0xc,
+	.dma_filter	= ls1x_dma_filter,
 };
 
 static const struct gpio_led ls1x_gpio_leds[] __initconst = {
