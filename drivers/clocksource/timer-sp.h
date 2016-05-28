@@ -16,6 +16,7 @@
 #define TIMER_VALUE	0x04			/* ACVR ro */
 #define TIMER_CTRL	0x08			/* ACVR rw */
 #define TIMER_CTRL_ONESHOT	(1 << 0)	/*  CVR */
+/* Used in hisilicon timer64, it means enabling 64bit mode */
 #define TIMER_CTRL_32BIT	(1 << 1)	/*  CVR */
 #define TIMER_CTRL_DIV1		(0 << 2)	/* ACVR */
 #define TIMER_CTRL_DIV16	(1 << 2)	/* ACVR */

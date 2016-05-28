@@ -17,6 +17,7 @@ Optional properties:
 - arm,sp804-has-irq = <#>: In the case of only 1 timer irq line connected, this
 	specifies if the irq connection is for timer 1 or timer 2. A value of 1
 	or 2 should be used.
+- hisilicon,timer64: Support hisilicon 64bit mode timer.
 
 Example:
 

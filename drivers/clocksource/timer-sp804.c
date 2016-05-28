@@ -34,6 +34,16 @@
 
 #include "timer-sp.h"
 
+#define TIMER64_2_BASE	0x40
+#define TIMER64_LOAD_L	0x00
+#define TIMER64_LOAD_H	0x04
+#define TIMER64_VALUE_L	0x08
+#define TIMER64_VALUE_H	0x0C
+
+#define HISI_OFFSET	0x8
+
+static int timer64_offset;
+
 static long __init sp804_get_clock_rate(struct clk *clk, const char *name)
 {
 	long rate;
@@ -78,8 +88,8 @@ static inline void sp804_load_mode_set(void __iomem *base, unsigned long load, i
 	unsigned long ctrl = TIMER_CTRL_32BIT | TIMER_CTRL_IE |
 			     mode | TIMER_CTRL_ENABLE;
 
-	writel(load, base + TIMER_LOAD);
-	writel(ctrl, base + TIMER_CTRL);
+	writel(load, base + TIMER_LOAD); /* equal TIMER64_LOAD_L when timer64*/
+	writel(ctrl, base + TIMER_CTRL + timer64_offset);
 }
 
 static void __iomem *sched_clock_base;
@@ -89,10 +99,36 @@ static u64 notrace sp804_read(void)
 	return ~readl_relaxed(sched_clock_base + TIMER_VALUE);
 }
 
+static u64 notrace hisi_timer64_read(void)
+{
+	u32 val_lo, val_hi, tmp_hi;
+
+	do {
+		val_hi = readl_relaxed(sched_clock_base + TIMER64_VALUE_H);
+		val_lo = readl_relaxed(sched_clock_base + TIMER64_VALUE_L);
+		tmp_hi = readl_relaxed(sched_clock_base + TIMER64_VALUE_H);
+	} while (val_hi != tmp_hi);
+
+	return ((u64) val_hi << 32) | val_lo;
+}
+
 void __init sp804_timer_disable(void __iomem *base)
 {
-	writel(0, base + TIMER_CTRL);
+	writel(0, base + TIMER_CTRL + timer64_offset);
 }
+
+static cycle_t hisi_clocksource_read(struct clocksource *cs)
+{
+	return hisi_timer64_read();
+}
+
+static struct clocksource hisi_clocksource = {
+	.name	= "hisilicon_timer64",
+	.rating	= 200,
+	.read	= hisi_clocksource_read,
+	.mask	= CLOCKSOURCE_MASK(64),
+	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
+};
 
 void __init __sp804_clocksource_and_sched_clock_init(void __iomem *base,
 						     const char *name,
@@ -106,15 +142,25 @@ void __init __sp804_clocksource_and_sched_clock_init(void __iomem *base,
 
 	/* setup timer 0 as free-running clocksource */
 	sp804_timer_disable(base);
-	writel(0xffffffff, base + TIMER_VALUE);
+	writel(0xffffffff, base + TIMER_VALUE); /* equal TIMER64_LOAD_H when tiemr64*/
+	if (timer64_offset) {
+		writel(0xffffffff, base + TIMER64_VALUE_L);
+		writel(0xffffffff, base + TIMER64_VALUE_H);
+	}
 	sp804_load_mode_set(base, 0xffffffff, TIMER_CTRL_PERIODIC & ~TIMER_CTRL_IE);
 
-	clocksource_mmio_init(base + TIMER_VALUE, name,
-		rate, 200, 32, clocksource_mmio_readl_down);
+	if (timer64_offset)
+		clocksource_register_hz(&hisi_clocksource, rate);
+	else
+		clocksource_mmio_init(base + TIMER_VALUE, name, rate, 200, 32,
+				      clocksource_mmio_readl_down);
 
 	if (use_sched_clock) {
 		sched_clock_base = base;
-		sched_clock_register(sp804_read, 32, rate);
+		if (timer64_offset)
+			sched_clock_register(hisi_timer64_read, 64, rate);
+		else
+			sched_clock_register(sp804_read, 32, rate);
 	}
 }
 
@@ -130,7 +176,7 @@ static irqreturn_t sp804_timer_interrupt(int irq, void *dev_id)
 	struct clock_event_device *evt = dev_id;
 
 	/* clear the interrupt */
-	writel(1, clkevt_base + TIMER_INTCLR);
+	writel(1, clkevt_base + TIMER_INTCLR + timer64_offset);
 
 	evt->event_handler(evt);
 
@@ -139,7 +185,7 @@ static irqreturn_t sp804_timer_interrupt(int irq, void *dev_id)
 
 static inline void timer_shutdown(struct clock_event_device *evt)
 {
-	writel(0, clkevt_base + TIMER_CTRL);
+	writel(0, clkevt_base + TIMER_CTRL + timer64_offset);
 }
 
 static int sp804_shutdown(struct clock_event_device *evt)
@@ -204,6 +250,7 @@ void __init __sp804_clockevents_init(void __iomem *base, unsigned int irq, struc
 static void __init sp804_of_init(struct device_node *np)
 {
 	static bool initialized = false;
+	int timer_2_base = TIMER_2_BASE;
 	void __iomem *base;
 	int irq;
 	u32 irq_num = 0;
@@ -214,9 +261,14 @@ static void __init sp804_of_init(struct device_node *np)
 	if (WARN_ON(!base))
 		return;
 
+	if (of_property_read_bool(np, "hisilicon,timer64")) {
+		timer64_offset = HISI_OFFSET;
+		timer_2_base = TIMER64_2_BASE;
+	}
+
 	/* Ensure timers are disabled */
 	sp804_timer_disable(base);
-	sp804_timer_disable(base + TIMER_2_BASE);
+	sp804_timer_disable(base + timer_2_base);
 
 	if (initialized || !of_device_is_available(np))
 		goto err;
@@ -242,11 +294,11 @@ static void __init sp804_of_init(struct device_node *np)
 
 	of_property_read_u32(np, "arm,sp804-has-irq", &irq_num);
 	if (irq_num == 2) {
-		__sp804_clockevents_init(base + TIMER_2_BASE, irq, clk2, name);
+		__sp804_clockevents_init(base + timer_2_base, irq, clk2, name);
 		__sp804_clocksource_and_sched_clock_init(base, name, clk1, 1);
 	} else {
 		__sp804_clockevents_init(base, irq, clk1 , name);
-		__sp804_clocksource_and_sched_clock_init(base + TIMER_2_BASE,
+		__sp804_clocksource_and_sched_clock_init(base + timer_2_base,
 							 name, clk2, 1);
 	}
 	initialized = true;
