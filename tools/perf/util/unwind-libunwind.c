@@ -695,10 +695,9 @@ void register_local_unwind_libunwind_ops(struct thread *thread)
 
 int unwind__prepare_access(struct thread *thread)
 {
-	if (thread->unwind_libunwind_ops)
-		return thread->unwind_libunwind_ops->prepare_access(thread);
-	else
-		return 0;
+	register_local_unwind_libunwind_ops(thread);
+
+	return thread->unwind_libunwind_ops->prepare_access(thread);
 }
 
 void unwind__flush_access(struct thread *thread)
