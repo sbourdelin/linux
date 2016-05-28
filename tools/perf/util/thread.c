@@ -43,6 +43,8 @@ struct thread *thread__new(pid_t pid, pid_t tid)
 		thread->cpu = -1;
 		INIT_LIST_HEAD(&thread->comm_list);
 
+		register_local_unwind_libunwind_ops(thread);
+
 		if (unwind__prepare_access(thread) < 0)
 			goto err_thread;
 
