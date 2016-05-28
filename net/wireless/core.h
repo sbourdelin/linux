@@ -16,7 +16,6 @@
 #include <net/cfg80211.h>
 #include "reg.h"
 
-
 #define WIPHY_IDX_INVALID	-1
 
 struct cfg80211_registered_device {
@@ -33,18 +32,19 @@ struct cfg80211_registered_device {
 	 * on the same alpha2 quickly. The alpha2 may differ from
 	 * cfg80211_regdomain's alpha2 when an intersection has occurred.
 	 * If the AP is reconfigured this can also be used to tell us if
-	 * the country on the country IE changed. */
+	 * the country on the country IE changed.
+	 */
 	char country_ie_alpha2[2];
 
-	/*
-	 * the driver requests the regulatory core to set this regulatory
+	/* The driver requests the regulatory core to set this regulatory
 	 * domain as the wiphy's. Only used for %REGULATORY_WIPHY_SELF_MANAGED
 	 * devices using the regulatory_set_wiphy_regd() API
 	 */
 	const struct ieee80211_regdomain *requested_regd;
 
 	/* If a Country IE has been received this tells us the environment
-	 * which its telling us its in. This defaults to ENVIRON_ANY */
+	 * which its telling us its in. This defaults to ENVIRON_ANY
+	 */
 	enum environment_cap env;
 
 	/* wiphy index, internal only */
@@ -90,6 +90,7 @@ struct cfg80211_registered_device {
 
 	struct cfg80211_coalesce *coalesce;
 
+	/* Destroy interfaces for given registered device */
 	spinlock_t destroy_list_lock;
 	struct list_head destroy_list;
 	struct work_struct destroy_work;
@@ -97,7 +98,8 @@ struct cfg80211_registered_device {
 	struct work_struct sched_scan_stop_wk;
 
 	/* must be last because of the way we do wiphy_priv(),
-	 * and it should at least be aligned to NETDEV_ALIGN */
+	 * and it should at least be aligned to NETDEV_ALIGN
+	 */
 	struct wiphy wiphy __aligned(NETDEV_ALIGN);
 };
 
@@ -145,7 +147,8 @@ struct cfg80211_internal_bss {
 	struct cfg80211_bss pub;
 };
 
-static inline struct cfg80211_internal_bss *bss_from_pub(struct cfg80211_bss *pub)
+static inline
+struct cfg80211_internal_bss *bss_from_pub(struct cfg80211_bss *pub)
 {
 	return container_of(pub, struct cfg80211_internal_bss, pub);
 }
@@ -158,9 +161,9 @@ static inline void cfg80211_hold_bss(struct cfg80211_internal_bss *bss)
 static inline void cfg80211_unhold_bss(struct cfg80211_internal_bss *bss)
 {
 	int r = atomic_dec_return(&bss->hold);
+
 	WARN_ON(r < 0);
 }
-
 
 struct cfg80211_registered_device *cfg80211_rdev_by_wiphy_idx(int wiphy_idx);
 int get_wiphy_idx(struct wiphy *wiphy);
@@ -186,7 +189,8 @@ static inline void wdev_unlock(struct wireless_dev *wdev)
 
 #define ASSERT_WDEV_LOCK(wdev) lockdep_assert_held(&(wdev)->mtx)
 
-static inline bool cfg80211_has_monitors_only(struct cfg80211_registered_device *rdev)
+static inline
+bool cfg80211_has_monitors_only(struct cfg80211_registered_device *rdev)
 {
 	ASSERT_RTNL();
 
@@ -270,7 +274,7 @@ void ieee80211_set_bitrate_flags(struct wiphy *wiphy);
 
 void cfg80211_bss_expire(struct cfg80211_registered_device *rdev);
 void cfg80211_bss_age(struct cfg80211_registered_device *rdev,
-                      unsigned long age_secs);
+		      unsigned long age_secs);
 
 /* IBSS */
 int cfg80211_join_ibss(struct cfg80211_registered_device *rdev,
@@ -451,9 +455,9 @@ static inline unsigned int elapsed_jiffies_msecs(unsigned long start)
 
 void
 cfg80211_get_chan_state(struct wireless_dev *wdev,
-		        struct ieee80211_channel **chan,
-		        enum cfg80211_chan_mode *chanmode,
-		        u8 *radar_detect);
+			struct ieee80211_channel **chan,
+			enum cfg80211_chan_mode *chanmode,
+			u8 *radar_detect);
 
 int cfg80211_set_monitor_channel(struct cfg80211_registered_device *rdev,
 				 struct cfg80211_chan_def *chandef);
@@ -481,8 +485,7 @@ void cfg80211_stop_p2p_device(struct cfg80211_registered_device *rdev,
 #ifdef CONFIG_CFG80211_DEVELOPER_WARNINGS
 #define CFG80211_DEV_WARN_ON(cond)	WARN_ON(cond)
 #else
-/*
- * Trick to enable using it as a condition,
+/* Trick to enable using it as a condition,
  * and also not give a warning when it's
  * not used that way.
  */

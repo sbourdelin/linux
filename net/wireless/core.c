@@ -102,8 +102,7 @@ static int cfg80211_dev_check_name(struct cfg80211_registered_device *rdev,
 		digits = 1;
 		while (wiphy_idx /= 10)
 			digits++;
-		/*
-		 * deny the name if it is phy<idx> where <idx> is printed
+		/* deny the name if it is phy<idx> where <idx> is printed
 		 * without leading zeroes. taken == strlen(newname) here
 		 */
 		if (taken == strlen(PHY_NAME) + digits)
@@ -179,7 +178,7 @@ int cfg80211_switch_netns(struct cfg80211_registered_device *rdev,
 				continue;
 			wdev->netdev->features &= ~NETIF_F_NETNS_LOCAL;
 			err = dev_change_net_namespace(wdev->netdev, net,
-							"wlan%d");
+						       "wlan%d");
 			WARN_ON(err);
 			wdev->netdev->features |= NETIF_F_NETNS_LOCAL;
 		}
@@ -267,7 +266,8 @@ static void cfg80211_rfkill_sync_work(struct work_struct *work)
 {
 	struct cfg80211_registered_device *rdev;
 
-	rdev = container_of(work, struct cfg80211_registered_device, rfkill_sync);
+	rdev = container_of(work, struct cfg80211_registered_device,
+			    rfkill_sync);
 	cfg80211_rfkill_set_block(rdev, rfkill_blocked(rdev->rfkill));
 }
 
@@ -328,7 +328,7 @@ static void cfg80211_sched_scan_stop_wk(struct work_struct *work)
 	struct cfg80211_registered_device *rdev;
 
 	rdev = container_of(work, struct cfg80211_registered_device,
-			   sched_scan_stop_wk);
+			    sched_scan_stop_wk);
 
 	rtnl_lock();
 
@@ -461,15 +461,14 @@ use_default_name:
 
 	init_waitqueue_head(&rdev->dev_wait);
 
-	/*
-	 * Initialize wiphy parameters to IEEE 802.11 MIB default values.
+	/* Initialize wiphy parameters to IEEE 802.11 MIB default values.
 	 * Fragmentation and RTS threshold are disabled by default with the
 	 * special -1 value.
 	 */
 	rdev->wiphy.retry_short = 7;
 	rdev->wiphy.retry_long = 4;
-	rdev->wiphy.frag_threshold = (u32) -1;
-	rdev->wiphy.rts_threshold = (u32) -1;
+	rdev->wiphy.frag_threshold = (u32)-1;
+	rdev->wiphy.rts_threshold = (u32)-1;
 	rdev->wiphy.coverage_class = 0;
 
 	rdev->wiphy.max_num_csa_counters = 1;
@@ -492,8 +491,7 @@ static int wiphy_verify_combinations(struct wiphy *wiphy)
 
 		c = &wiphy->iface_combinations[i];
 
-		/*
-		 * Combinations with just one interface aren't real,
+		/* Combinations with just one interface aren't real,
 		 * however we make an exception for DFS.
 		 */
 		if (WARN_ON((c->max_interfaces < 2) && !c->radar_detect_widths))
@@ -503,8 +501,7 @@ static int wiphy_verify_combinations(struct wiphy *wiphy)
 		if (WARN_ON(!c->num_different_channels))
 			return -EINVAL;
 
-		/*
-		 * Put a sane limit on maximum number of different
+		/* Put a sane limit on maximum number of different
 		 * channels to simplify channel accounting code.
 		 */
 		if (WARN_ON(c->num_different_channels >
@@ -540,8 +537,7 @@ static int wiphy_verify_combinations(struct wiphy *wiphy)
 				return -EINVAL;
 
 			cnt += c->limits[j].max;
-			/*
-			 * Don't advertise an unsupported type
+			/* Don't advertise an unsupported type
 			 * in a combination.
 			 */
 			if (WARN_ON((wiphy->interface_modes & types) != types))
@@ -581,8 +577,7 @@ int wiphy_register(struct wiphy *wiphy)
 		     !rdev->ops->tdls_cancel_channel_switch)))
 		return -EINVAL;
 
-	/*
-	 * if a wiphy has unsupported modes for regulatory channel enforcement,
+	/* if a wiphy has unsupported modes for regulatory channel enforcement,
 	 * opt-out of enforcement checking
 	 */
 	if (wiphy->interface_modes & ~(BIT(NL80211_IFTYPE_STATION) |
@@ -633,11 +628,12 @@ int wiphy_register(struct wiphy *wiphy)
 	 * hence subtract 2 as bit 0 is invalid.
 	 */
 	if (WARN_ON(wiphy->bss_select_support &&
-		    (wiphy->bss_select_support & ~(BIT(__NL80211_BSS_SELECT_ATTR_AFTER_LAST) - 2))))
+		    (wiphy->bss_select_support &
+		     ~(BIT(__NL80211_BSS_SELECT_ATTR_AFTER_LAST) - 2))))
 		return -EINVAL;
 
 	if (wiphy->addresses)
-		memcpy(wiphy->perm_addr, wiphy->addresses[0].addr, ETH_ALEN);
+		ether_addr_copy(wiphy->perm_addr, wiphy->addresses[0].addr);
 
 	/* sanity check ifmodes */
 	WARN_ON(!ifmodes);
@@ -658,16 +654,14 @@ int wiphy_register(struct wiphy *wiphy)
 		sband->band = band;
 		if (WARN_ON(!sband->n_channels))
 			return -EINVAL;
-		/*
-		 * on 60GHz band, there are no legacy rates, so
+		/* On 60GHz band, there are no legacy rates, so
 		 * n_bitrates is 0
 		 */
 		if (WARN_ON(band != NL80211_BAND_60GHZ &&
 			    !sband->n_bitrates))
 			return -EINVAL;
 
-		/*
-		 * Since cfg80211_disable_40mhz_24ghz is global, we can
+		/* Since cfg80211_disable_40mhz_24ghz is global, we can
 		 * modify the sband's ht data even if the driver uses a
 		 * global structure for that.
 		 */
@@ -678,8 +672,7 @@ int wiphy_register(struct wiphy *wiphy)
 			sband->ht_cap.cap &= ~IEEE80211_HT_CAP_SGI_40;
 		}
 
-		/*
-		 * Since we use a u32 for rate bitmaps in
+		/* Since we use a u32 for rate bitmaps in
 		 * ieee80211_get_response_rate, we cannot
 		 * have more than 32 legacy rates.
 		 */
@@ -790,6 +783,7 @@ void wiphy_unregister(struct wiphy *wiphy)
 
 	wait_event(rdev->dev_wait, ({
 		int __count;
+
 		rtnl_lock();
 		__count = rdev->opencount;
 		rtnl_unlock();
@@ -804,16 +798,14 @@ void wiphy_unregister(struct wiphy *wiphy)
 
 	WARN_ON(!list_empty(&rdev->wiphy.wdev_list));
 
-	/*
-	 * First remove the hardware from everywhere, this makes
+	/* First remove the hardware from everywhere, this makes
 	 * it impossible to find from userspace.
 	 */
 	debugfs_remove_recursive(rdev->wiphy.debugfsdir);
 	list_del_rcu(&rdev->list);
 	synchronize_rcu();
 
-	/*
-	 * If this device got a regulatory hint tell core its
+	/* If this device got a regulatory hint tell core its
 	 * free to listen now to a new shiny device regulatory hint
 	 */
 	wiphy_regulatory_deregister(wiphy);
@@ -844,6 +836,7 @@ void cfg80211_dev_free(struct cfg80211_registered_device *rdev)
 {
 	struct cfg80211_internal_bss *scan, *tmp;
 	struct cfg80211_beacon_registration *reg, *treg;
+
 	rfkill_destroy(rdev->rfkill);
 	list_for_each_entry_safe(reg, treg, &rdev->beacon_registrations, list) {
 		list_del(&reg->list);
@@ -1012,8 +1005,7 @@ static int cfg80211_netdev_notifier_call(struct notifier_block *nb,
 		SET_NETDEV_DEVTYPE(dev, &wiphy_type);
 		break;
 	case NETDEV_REGISTER:
-		/*
-		 * NB: cannot take rdev->mtx here because this may be
+		/* NB: cannot take rdev->mtx here because this may be
 		 * called within code protected by it when interfaces
 		 * are added with nl80211.
 		 */
@@ -1089,15 +1081,16 @@ static int cfg80211_netdev_notifier_call(struct notifier_block *nb,
 			{
 				/* backward compat code... */
 				struct mesh_setup setup;
+
 				memcpy(&setup, &default_mesh_setup,
-						sizeof(setup));
+				       sizeof(setup));
 				 /* back compat only needed for mesh_id */
 				setup.mesh_id = wdev->ssid;
 				setup.mesh_id_len = wdev->mesh_id_up_len;
 				if (wdev->mesh_id_up_len)
 					__cfg80211_join_mesh(rdev, dev,
-							&setup,
-							&default_mesh_config);
+							     &setup,
+							     &default_mesh_config);
 				break;
 			}
 #endif
@@ -1107,8 +1100,7 @@ static int cfg80211_netdev_notifier_call(struct notifier_block *nb,
 		wdev_unlock(wdev);
 		rdev->opencount++;
 
-		/*
-		 * Configure power management to the driver here so that its
+		/* Configure power management to the driver here so that its
 		 * correctly set also after interface type changes etc.
 		 */
 		if ((wdev->iftype == NL80211_IFTYPE_STATION ||
@@ -1121,8 +1113,7 @@ static int cfg80211_netdev_notifier_call(struct notifier_block *nb,
 			}
 		break;
 	case NETDEV_UNREGISTER:
-		/*
-		 * It is possible to get NETDEV_UNREGISTER
+		/* It is possible to get NETDEV_UNREGISTER
 		 * multiple times. To detect that, check
 		 * that the interface is still on the list
 		 * of registered interfaces, and only then
@@ -1137,16 +1128,14 @@ static int cfg80211_netdev_notifier_call(struct notifier_block *nb,
 			kzfree(wdev->wext.keys);
 #endif
 		}
-		/*
-		 * synchronise (so that we won't find this netdev
+		/* synchronise (so that we won't find this netdev
 		 * from other code any more) and then clear the list
 		 * head so that the above code can safely check for
 		 * !list_empty() to avoid double-cleanup.
 		 */
 		synchronize_rcu();
 		INIT_LIST_HEAD(&wdev->list);
-		/*
-		 * Ensure that all events have been processed and
+		/* Ensure that all events have been processed and
 		 * freed.
 		 */
 		cfg80211_process_wdev_events(wdev);
