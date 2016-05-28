@@ -283,8 +283,8 @@ enum oom_scan_t oom_scan_process_thread(struct oom_control *oc,
 	 * This task already has access to memory reserves and is being killed.
 	 * Don't allow any other task to have access to the reserves.
 	 */
-	if (!is_sysrq_oom(oc) && atomic_read(&task->signal->oom_victims))
-		return OOM_SCAN_ABORT;
+	if (atomic_read(&task->signal->oom_victims))
+		return !is_sysrq_oom(oc) ? OOM_SCAN_ABORT : OOM_SCAN_CONTINUE;
 
 	/*
 	 * If task is allocating a lot of memory and has been marked to be
@@ -791,6 +791,14 @@ void oom_kill_process(struct oom_control *oc, struct task_struct *p,
 			unsigned int child_points;
 
 			if (process_shares_mm(child, p->mm))
+				continue;
+			/*
+			 * Don't select TIF_MEMDIE child by SysRq-f case, or
+			 * we will get stuck by selecting the same TIF_MEMDIE
+			 * child forever.
+			 */
+			if (is_sysrq_oom(oc) &&
+			    atomic_read(&child->signal->oom_victims))
 				continue;
 			/*
 			 * oom_badness() returns 0 if the thread is unkillable
