@@ -40,6 +40,9 @@
 #define EC_MAX_REQUEST_OVERHEAD		1
 #define EC_MAX_RESPONSE_OVERHEAD	2
 
+/* ec_command return value for non-success result from EC */
+#define EECRESULT 1000
+
 /*
  * Command interface between EC and AP, for LPC, I2C and SPI interfaces.
  */
@@ -222,6 +225,21 @@ int cros_ec_check_result(struct cros_ec_device *ec_dev,
  */
 int cros_ec_cmd_xfer(struct cros_ec_device *ec_dev,
 		     struct cros_ec_command *msg);
+
+/**
+ * cros_ec_cmd_xfer_status - Send a command to the ChromeOS EC
+ *
+ * This function is identical to cros_ec_cmd_xfer, except it returns succes
+ * status only if both the command was transmitted successfully and the EC
+ * replied with success status. It's not necessary to check msg->result when
+ * using this function.
+ *
+ * @ec_dev: EC device
+ * @msg: Message to write
+ * @return: Num. of bytes transferred on success, <0 on failure
+ */
+int cros_ec_cmd_xfer_status(struct cros_ec_device *ec_dev,
+			    struct cros_ec_command *msg);
 
 /**
  * cros_ec_remove - Remove a ChromeOS EC
