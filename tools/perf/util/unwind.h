@@ -18,13 +18,13 @@ typedef int (*unwind_entry_cb_t)(struct unwind_entry *entry, void *arg);
 int unwind__get_entries(unwind_entry_cb_t cb, void *arg,
 			struct thread *thread,
 			struct perf_sample *data, int max_stack);
+
 /* libunwind specific */
 #ifdef HAVE_LIBUNWIND_SUPPORT
 int libunwind__arch_reg_id(int regnum);
 int unwind__prepare_access(struct thread *thread);
 void unwind__flush_access(struct thread *thread);
 void unwind__finish_access(struct thread *thread);
-void register_local_unwind_libunwind_ops(struct thread *thread);
 #else
 static inline int unwind__prepare_access(struct thread *thread __maybe_unused)
 {
@@ -33,9 +33,15 @@ static inline int unwind__prepare_access(struct thread *thread __maybe_unused)
 
 static inline void unwind__flush_access(struct thread *thread __maybe_unused) {}
 static inline void unwind__finish_access(struct thread *thread __maybe_unused) {}
+#endif
+
+#ifdef HAVE_LIBUNWIND_LOCAL_SUPPORT
+void register_local_unwind_libunwind_ops(struct thread *thread);
+#else
 static inline void
 register_local_unwind_libunwind_ops(struct thread *thread __maybe_unused) {}
 #endif
+
 #else
 static inline int
 unwind__get_entries(unwind_entry_cb_t cb __maybe_unused,

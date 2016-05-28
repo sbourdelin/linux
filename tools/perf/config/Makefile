@@ -354,10 +354,24 @@ ifeq ($(ARCH),powerpc)
 endif
 
 ifndef NO_LIBUNWIND
+  have_libunwind :=
   ifneq ($(feature-libunwind), 1)
     msg := $(warning No libunwind found. Please install libunwind-dev[el] >= 1.1 and/or set LIBUNWIND_DIR);
-    NO_LIBUNWIND := 1
+    NO_LOCAL_LIBUNWIND := 1
+  else
+    have_libunwind := 1
+    CFLAGS += -DHAVE_LIBUNWIND_LOCAL_SUPPORT
+    $(call detected,CONFIG_LOCAL_LIBUNWIND)
   endif
+
+  ifneq ($(have_libunwind), 1)
+    NO_LIBUNWIND := 1
+  else
+    CFLAGS += -I$(LIBUNWIND_DIR)/include
+    LDFLAGS += -L$(LIBUNWIND_DIR)/lib
+  endif
+else
+  NO_LOCAL_LIBUNWIND := 1
 endif
 
 ifndef NO_LIBBPF
@@ -395,7 +409,7 @@ else
   NO_DWARF_UNWIND := 1
 endif
 
-ifndef NO_LIBUNWIND
+ifndef NO_LOCAL_LIBUNWIND
   ifeq ($(ARCH),$(filter $(ARCH),arm arm64))
     $(call feature_check,libunwind-debug-frame)
     ifneq ($(feature-libunwind-debug-frame), 1)
@@ -406,10 +420,13 @@ ifndef NO_LIBUNWIND
     # non-ARM has no dwarf_find_debug_frame() function:
     CFLAGS += -DNO_LIBUNWIND_DEBUG_FRAME
   endif
-  CFLAGS  += -DHAVE_LIBUNWIND_SUPPORT
   EXTLIBS += $(LIBUNWIND_LIBS)
   CFLAGS  += $(LIBUNWIND_CFLAGS)
   LDFLAGS += $(LIBUNWIND_LDFLAGS)
+endif
+
+ifndef NO_LIBUNWIND
+  CFLAGS  += -DHAVE_LIBUNWIND_SUPPORT
 endif
 
 ifndef NO_LIBAUDIT
