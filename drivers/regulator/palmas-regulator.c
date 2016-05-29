@@ -980,9 +980,6 @@ static int palmas_ldo_registration(struct palmas_pmic *pmic,
 			return PTR_ERR(rdev);
 		}
 
-		/* Save regulator for cleanup */
-		pmic->rdev[id] = rdev;
-
 		/* Initialise sleep/init values from platform data */
 		if (pdata) {
 			reg_init = pdata->reg_init[id];
@@ -1089,9 +1086,6 @@ static int tps65917_ldo_registration(struct palmas_pmic *pmic,
 				pdev_name);
 			return PTR_ERR(rdev);
 		}
-
-		/* Save regulator for cleanup */
-		pmic->rdev[id] = rdev;
 
 		/* Initialise sleep/init values from platform data */
 		if (pdata) {
@@ -1277,9 +1271,6 @@ static int palmas_smps_registration(struct palmas_pmic *pmic,
 				pdev_name);
 			return PTR_ERR(rdev);
 		}
-
-		/* Save regulator for cleanup */
-		pmic->rdev[id] = rdev;
 	}
 
 	return 0;
@@ -1383,9 +1374,6 @@ static int tps65917_smps_registration(struct palmas_pmic *pmic,
 				pdev_name);
 			return PTR_ERR(rdev);
 		}
-
-		/* Save regulator for cleanup */
-		pmic->rdev[id] = rdev;
 	}
 
 	return 0;
