@@ -127,6 +127,17 @@ config CM36651
 	 To compile this driver as a module, choose M here:
 	 the module will be called cm36651.
 
+config CM36672
+	depends on I2C
+	tristate "CM36672 proximity sensor"
+	 help
+	 Say Y here if you use cm36672.
+	 This option enables proximity sensor using Vishay
+	 Capella cm36672 device driver.
+
+	 To compile this driver as a module, choose M here:
+	 the module will be called cm36672.
+
 config GP2AP020A00F
 	tristate "Sharp GP2AP020A00F Proximity/ALS sensor"
 	depends on I2C

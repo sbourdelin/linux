@@ -2737,10 +2737,11 @@ F:	security/commoncap.c
 F:	kernel/capability.c
 
 CAPELLA MICROSYSTEMS LIGHT SENSOR DRIVER
-M:	Kevin Tsai <ktsai@capellamicro.com>
+M:	Kevin Tsai <capellamicro@gmail.com>
 S:	Maintained
 F:	drivers/iio/light/cm*
 F:	Documentation/devicetree/bindings/i2c/trivial-devices.txt
+F:	Documentation/devicetree/bindings/iio/light/cm*.txt
 
 CAVIUM LIQUIDIO NETWORK DRIVER
 M:     Derek Chickles <derek.chickles@caviumnetworks.com>
