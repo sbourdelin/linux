@@ -1,0 +1,21 @@
+The vhost-pci design is currently suitable for a group of VMs who trust each
+other. To extend it to a more general use case, two security features can be
+added in the future.
+
+1 vIOMMU
+vIOMMU provides the driver VM with the ability to restrict the device VM to
+transiently access a specified portion of its memory. The vhost-pci design
+proposed in this RFC can be extended to access the driver VM's memory with
+vIOMMU. Precisely, the vIOMMU engine in the driver VM configures access
+permissions (R/W) for the vhost-pci device to access its memory. More details
+can be found at https://wiki.opnfv.org/display/kvm/Vm2vm+Mst and
+https://lists.gnu.org/archive/html/qemu-devel/2015-08/msg03993.html
+
+2 eptp switching
+The idea of eptp swithing allows a vhost-pci device driver to access the mapped
+driver VM's memory in an alternative view, where only a piece of trusted code
+can access the driver VM's memory. More details can be found at
+http://events.linuxfoundation.org/sites/events/files/slides/
+Jun_Nakajima_NFV_KVM%202015_final.pdf
+
+
