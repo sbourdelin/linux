@@ -637,7 +637,7 @@ follow_huge_addr(struct mm_struct *mm, unsigned long address, int write)
 	struct page *page = ERR_PTR(-EINVAL);
 
 	local_irq_save(flags);
-	ptep = find_linux_pte_or_hugepte(mm->pgd, address, &is_thp, &shift);
+	ptep = __find_linux_pte_or_hugepte(mm->pgd, address, &is_thp, &shift);
 	if (!ptep)
 		goto no_page;
 	pte = READ_ONCE(*ptep);
