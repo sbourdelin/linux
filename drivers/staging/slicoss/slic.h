@@ -52,8 +52,8 @@
 
 #define GB_RCVUCODE_VERS_STRING  "1.2"
 #define GB_RCVUCODE_VERS_DATE    "2006/03/27 15:12:15"
-static u32 OasisRcvUCodeLen = 512;
-static u32 GBRcvUCodeLen = 512;
+static u32 oasis_rcvucodelen = 512;
+static u32 gb_rcvucodelen = 512;
 #define SECTION_SIZE 65536
 
 #define SLIC_RSPQ_PAGES_GB	  10
@@ -370,20 +370,20 @@ struct slic_upr {
 struct slic_ifevents {
 	uint        oflow802;
 	uint        uflow802;
-	uint        Tprtoflow;
+	uint        tprtoflow;
 	uint        rcvearly;
-	uint        Bufov;
-	uint        Carre;
-	uint        Longe;
-	uint        Invp;
-	uint        Crc;
-	uint        Drbl;
-	uint        Code;
-	uint        IpHlen;
-	uint        IpLen;
-	uint        IpCsum;
-	uint        TpCsum;
-	uint        TpHlen;
+	uint        bufov;
+	uint        carre;
+	uint        longe;
+	uint        invp;
+	uint        crc;
+	uint        drbl;
+	uint        code;
+	uint        iphlen;
+	uint        iplen;
+	uint        ipcsum;
+	uint        tpcsum;
+	uint        tphlen;
 };
 
 struct adapter {
