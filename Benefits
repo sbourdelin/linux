@@ -1,0 +1,8 @@
+The vhost-pci design provides KVM with a faster and more scalable inter-VM
+communication mechanism. In NFV usages and today's virtualized datacenters,
+where multiple VMs connect to a centralized vswitch to communicate, the more
+the VMs connect to (or chained via) the vswitch, the lower the inter-VM
+communication throughput will be. The vhost-pci design successfully resolves
+this scalability issue and makes KVM a better hypervisor for NFV and
+datacenters.
+
