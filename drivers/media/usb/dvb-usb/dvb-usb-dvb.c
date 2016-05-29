@@ -271,7 +271,7 @@ static int dvb_usb_fe_sleep(struct dvb_frontend *fe)
 
 int dvb_usb_adapter_frontend_init(struct dvb_usb_adapter *adap)
 {
-	int ret, i;
+	int ret = -ENODEV, i;
 
 	/* register all given adapter frontends */
 	for (i = 0; i < adap->props.num_frontends; i++) {
