@@ -1,0 +1,31 @@
+Current vhost-user based backend designs for virtio-net devices present scaling
+challenges, as communication intensive applications (e.g. virtual network
+functions) running in VMs start to stress this centralized design and resources
+assigned to it.
+
+Vhost-pci was initially proposed by Michael S. Tsirkin with vIOMMU support to
+offer a protected and point-to-point based inter-VM communication. In many
+cases, such as network function virtualization (NFV) and software defined
+networking (SDN) usages, VMs in an isolated network trust each other and they
+may be chained together to complete a task. In these use cases, people care
+more about performance than security. In this RFC we present a comprehensive
+design of vhost-pci without vIOMMU support. A VM with such a vhost-pci device
+is able to copy data to another VM's memory directly. The advantages of using
+vhost-pci over vhost-user are: 1) one less packet copy per packet transfer; and
+2) better scalability.
+
+To follow the naming conventions in the virtio specification, we call the VM
+who sends packets to the destination VM the device VM, and the VM who provides
+the vring and receives packets the driver VM. The vhost-pci device/driver works
+independently in the device VM. It can be considered as a simple device mapping
+the entire memory of a driver VM. But a lot of times, it may be used to
+communicate to a virtio device in the driver VM. That is, it usually plays the
+role of a backend part of a virtio device of a driver VM.
+
+The vhost-pci design is not limited to networking usages. The design presented
+in this RFC is quite fundamental, and it is potentially useful for other
+inter-VM data moving usages. For the convenience of descriptions, we will
+simply use "virtio device" to refer to the device on a driver VM that is backed
+by a vhost-pci device. The figures of this RFC are shown in this link:
+https://etherpad.opnfv.org/p/vhost-pci_RFC
+
