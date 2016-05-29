@@ -1,0 +1,324 @@
+1 Device ID
+TBD
+
+2 Virtqueues
+0 controlq
+
+3 Feature Bits
+3.1 Local Feature Bits
+Currently no local feature bits are defined, so the standard virtio feature
+bits negation will always be successful and complete.
+
+3.2 Remote Feature Bits
+The remote feature bits are obtained from the frontend virtio device and
+negotiated with the vhost-pci driver via the controlq. The negotiation steps
+are described in 4.5 Device Initialization.
+
+4 Device Configuration Layout
+struct vhost_pci_config {
+	#define VHOST_PCI_CONTROLQ_MEMORY_INFO_ACK 0
+	#define VHOST_PCI_CONTROLQ_DEVICE_INFO_ACK 1
+	#define VHOST_PCI_CONTROLQ_FEATURE_BITS_ACK 2
+	u32 ack_type;
+	u32 ack_device_type;
+	u64 ack_device_id;
+	union {
+		#define VHOST_PCI_CONTROLQ_ACK_ADD_DONE 0
+		#define VHOST_PCI_CONTROLQ_ACK_ADD_FAIL 1
+		#define VHOST_PCI_CONTROLQ_ACK_DEL_DONE 2
+		#define VHOST_PCI_CONTROLQ_ACK_DEL_FAIL 3
+		u64 ack_memory_info;		
+		u64 ack_device_info;
+		u64 ack_feature_bits;
+	};
+};
+
+The configuration fields are currently used for the vhost-pci driver to
+acknowledge to the vhost-pci device after it receives controlq messages. 
+
+4.5 Device Initialization
+When a device VM boots, it creates a vhost-pci server socket.
+
+When a virtio device on the driver VM is created with specifying the use of a
+vhost-pci device as a backend, a client socket is created and connected to the
+corresponding vhost-pci server for message exchanges.
+
+The messages passed to the vhost-pci server is proceeded by the following
+header:
+struct vhost_pci_socket_hdr {
+	#define VHOST_PCI_SOCKET_MEMORY_INFO 0
+	#define VHOST_PCI_SOCKET_MEMORY_INFO_ACK 1
+	#define VHOST_PCI_SOCKET_DEVICE_INFO 2
+	#define VHOST_PCI_SOCKET_DEVICE_INFO_ACK 3
+	#define VHOST_PCI_SOCKET_FEATURE_BITS 4
+	#define VHOST_PCI_SOCKET_FEATURE_BITS_ACK 5
+	u16 msg_type;
+	u16 msg_version;
+	u32 msg_len;
+	u64 qemu_pid;
+};
+
+The payload of the above message types can be constructed using the structures
+below:
+/* VHOST_PCI_SOCKET_MEMORY_INFO message */
+struct vhost_pci_socket_memory_info {
+	#define VHOST_PCI_ADD_MEMORY 0
+	#define VHOST_PCI_DEL_MEMORY 1
+	u16 ops;
+	u32 nregions;
+	struct vhost_pci_memory_region {
+		int fd;
+		u64 guest_phys_addr;
+		u64 memory_size;
+		u64 mmap_offset;
+	} regions[VHOST_PCI_MAX_NREGIONS];
+};
+
+/* VHOST_PCI_SOCKET_DEVICE_INFO message */
+struct vhost_pci_device_info {
+	#define VHOST_PCI_ADD_FRONTEND_DEVICE 0
+	#define VHOST_PCI_DEL_FRONTEND_DEVICE 1
+	u16    ops;
+	u32    nvirtq;
+	#define VHOST_PCI_FRONTEND_DEVICE_NET 1
+	#define VHOST_PCI_FRONTEND_DEVICE_BLK 2
+	#define VHOST_PCI_FRONTEND_DEVICE_CONSOLE 3
+	#define VHOST_PCI_FRONTEND_DEVICE_ENTROPY 4
+	#define VHOST_PCI_FRONTEND_DEVICE_BALLOON 5
+	#define VHOST_PCI_FRONTEND_DEVICE_SCSI 8
+	u32    device_type;
+	u64    device_id;
+	struct virtq exotic_virtq[VHOST_PCI_MAX_NVIRTQ];
+};
+The device_id field identifies the device. For example, it can be used to 
+store a MAC address if the device_type is VHOST_PCI_FRONTEND_DEVICE_NET.
+
+/* VHOST_PCI_SOCKET_FEATURE_BITS message*/
+struct vhost_pci_feature_bits {
+	u64 feature_bits;
+};
+
+/* VHOST_PCI_SOCKET_xx_ACK messages */
+struct vhost_pci_socket_ack {
+	#define VHOST_PCI_SOCKET_ACK_ADD_DONE 0
+	#define VHOST_PCI_SOCKET_ACK_ADD_FAIL 1
+	#define VHOST_PCI_SOCKET_ACK_DEL_DONE 2
+	#define VHOST_PCI_SOCKET_ACK_DEL_FAIL 3
+	u64 ack;
+};
+
+The driver update message passed via the controlq is preceded by the following
+header:
+struct vhost_pci_controlq_hdr {
+	#define VHOST_PCI_CONTROLQ_MEMORY_INFO 0
+	#define VHOST_PCI_CONTROLQ_DEVICE_INFO 1
+	#define VHOST_PCI_CONTROLQ_FEATURE_BITS 2
+	#define VHOST_PCI_CONTROLQ_UPDATE_DONE 3
+	u16 msg_type;
+	u16 msg_version;
+	u32 msg_len;
+};
+
+The payload of a VHOST_PCI_CONTROLQ_MEMORY_INFO message can be constructed
+using the following structure:
+/* VHOST_PCI_CONTROLQ_MEMORY_INFO message */
+struct vhost_pci_controlq_memory_info {
+	#define VHOST_PCI_ADD_MEMORY 0
+	#define VHOST_PCI_DEL_MEMORY 1
+	u16  ops;
+	u32 nregion;
+	struct exotic_memory_region {
+		u64   region_base_xgpa;
+		u64   size;
+		u64   offset_in_bar_area;
+	} region[VHOST_PCI_MAX_NREGIONS];
+};
+
+The payload of VHOST_PCI_CONTROLQ_DEVICE_INFO and
+VHOST_PCI_CONTROLQ_FEATURE_BITS messages can be constructed using the
+vhost_pci_device_info structure and the vhost_pci_feature_bits structure
+respectively.
+
+The payload of a VHOST_PCI_CONTROLQ_UPDATE_DONE message can be constructed
+using the structure below:
+struct vhost_pci_controlq_update_done {
+	u32    device_type;
+	u64    device_id;
+};
+
+Fig. 1 shows the initialization steps.
+
+When the vhost-pci server receives a VHOST_PCI_SOCKET_MEMORY_INFO(ADD) message,
+it checks if a vhost-pci device has been created for the requesting VM whose
+QEMU process id is qemu_pid. If yes, it will simply update the subsequent
+received messages to the vhost-pci driver via the controlq. Otherwise, the
+server creates a new vhost-pci device, and continues the following
+initialization steps.
+
+The vhost-pci server adds up all the memory region size, and uses a 64-bit
+device bar for the mapping of all the memory regions obtained from the socket
+message. To better support memory hot-plugging of the driver VM, the bar is
+configured with a double size of the driver VM's memory. The server maps the
+received memory info via the QEMU MemoryRegion mechanism, and then the new
+created vhost-pci device is hot-plugged to the VM.
+
+When the device status is updated with DRIVER_OK, a
+VHOST_PCI_CONTROLQ_MEMORY_INFO(ADD) message, which is stemed from the memory
+info socket message, is put on the controlq and a controlq interrupt is injected
+to the VM.
+
+When the vhost-pci server receives a
+VHOST_PCI_CONTROLQ_MEMORY_INFO_ACK(ADD_DONE) acknowledgement from the driver,
+it sends a VHOST_PCI_SOCKET_MEMORY_INFO_ACK(ADD_DONE) message to the client
+that is identified by the ack_device_type and ack_device_id fields.
+
+When the vhost-pci server receives a
+VHOST_PCI_SOCKET_FEATURE_BITS(feature bits) message, a
+VHOST_PCI_CONTROLQ_FEATURE_BITS(feature bits) message is put on the controlq
+and a controlq interrupt is injected to the VM.
+
+If the vhost-pci server notices that the driver fully accepted the offered
+feature bits, it sends a VHOST_PCI_SOCKET_FEATURE_BITS_ACK(ADD_DONE) message
+to the client. If the vhost-pci server notices that the vhost-pci driver only
+accepted a subset of the offered feature bits, it sends a
+VHOST_PCI_SOCKET_FEATURE_BITS(accepted feature bits) message back to the
+client. The client side virtio device re-negotiates the new feature bits with
+its driver, and sends back a VHOST_PCI_SOCKET_FEATURE_BITS_ACK(ADD_DONE)
+message to the server.
+
+Either when the vhost-pci driver fully accepted the offered feature bits or a
+VHOST_PCI_SOCKET_FEATURE_BITS_ACK(ADD_DONE) message is received from the
+client, the vhost-pci server puts a VHOST_PCI_CONTROLQ_UPDATE_DONE message on
+the controlq, and a controlq interrupt is injected to the VM.
+
+When the vhost-pci server receives a VHOST_PCI_SOCKET_DEVICE_INFO(ADD) message,
+a VHOST_PCI_CONTROLQ_DEVICE_INFO(ADD) message is put on the controlq and a
+controlq interrupt is injected to the VM.
+
+When the vhost-pci server receives a
+VHOST_PCI_CONTROLQ_DEVICE_INFO_ACK(ADD_DONE) acknowledgement from the driver,
+it sends a VHOST_PCI_SOCKET_DEVICE_INFO_ACK(ADD_DONE) message to the
+corresponding client.
+
+4.5.1 Device Requirements: Device Initialization
+To let a VM be capable of creating vhost-pci devices, a vhost-pci server MUST
+be created when it boots.
+
+The vhost-pci server socket path SHOULD be provided to a virtio client socket
+for the connection to the vhost-pci server.
+
+The virtio device MUST finish the feature bits negotiation with its driver
+before negotiating them with the vhost-pci device.
+
+If the client receives a VHOST_PCI_SOCKET_FEATURE_BITS(feature bits) message,
+it MUST reset the device to go into backwards capability mode, re-negotiate
+the received feature bits with its driver, and send back a
+VHOST_PCI_SOCKET_FEATURE_BITS_ACK(ADD_DONE) message to the server.
+
+In any cases that an acknowledgement from the vhost-pci driver indicates a
+FAIL, the vhost-pci server SHOULD send a FAIL socket message to the client.
+
+In any cases that the msg_type is different between the sender and the
+receiver, the receiver SHOULD acknowledge a FAIL to the sender or convert the
+message to its version if the converted version is still functionally usable.
+
+4.5.2 Driver Requirements: Device Initialization
+The vhost-pci driver MUST NOT accept any feature bits that are not offered by
+the remote feature bits, and SHOULD acknowledge to the device of the accepted
+feature bits by writing them to the vhost_pci_config fields.
+
+When the vhost-pci driver receives a VHOST_PCI_CONTROLQ_UPDATE_DONE message
+from the controlq, the vhost-pci driver MUST initialize the corresponding
+driver interface of the device_type if it has not been initialized, and add
+the device_id to the frontend device list that records all the frontend virtio
+devices being supported by vhost-pci for inter-VM communications.
+
+The vhost-pci driver SHOULD acknowledge to the device that the device and
+memory info update (add or delete) is DONE or FAIL by writing the
+acknowledgement (DONE or FAIL) to the vhost_pci_config fields.
+
+The vhost-pci driver MUST ensure that writing to the vhost_pci_config fields
+to be atomic.
+
+4.6 Device Operation
+4.6.1 Device Requirements: Device Operation
+4.6.1.1 Frontend Device Info Update
+When the frontend virtio device changes any info (e.g. device_id, virtq
+address) that it has sent to the vhost-pci device, it SHOULD send a
+VHOST_PCI_SOCKET_DEVICE_INFO(ADD) message, which contains the new device info,
+to the vhost-pci server. The vhost-pci device SHOULD insert a
+VHOST_PCI_CONTROLQ_DEVICE_INFO(ADD) to the controlq and inject a contrlq
+interrupt to the VM.
+
+When the vhost-pci device receives a
+VHOST_PCI_CONTROLQ_DEVICE_INFO_ACK(ADD_DONE) acknowledgement from the driver,
+it SHOULD send a VHOST_PCI_SOCKET_DEVICE_INFO_ACK(ADD_DONE) message to the
+client that is identified by the ack_device_type and ack_device_id fields, to
+indicate that the vhost-pci driver has finished the handling of the device
+info update.
+
+4.6.1.2 Frontend Device Remove
+When the frontend virtio device is removed (e.g. hot-plug out), the client
+SHOULD send a VHOST_PCI_SOCKET_DEVICE_INFO(DEL) message to the vhost-pci
+server. The vhost-pci device SHOULD put a VHOST_PCI_CONTROLQ_DEVICE_INFO(DEL)
+message on the controlq and inject a contrlq interrupt to the VM.
+
+When the vhost-pci receives a VHOST_PCI_CONTROLQ_DEVICE_INFO_ACK(DEL_DONE), it
+SHOULD send a VHOST_PCI_SOCKET_DEVICE_INFO_ACK(DEL_DONE) message to the
+corresponding client to indicate that the vhost-pci driver has removed the
+vhost-pci based inter-VM communication support for the requesting virtio
+device.
+
+4.6.1.3 Driver VM Shutdown and Migration
+Before the driver VM is destroyed or migrated, all the clients that connect to
+the vhost-pci server SHOULD send a VHOST_PCI_SOCKET_DEVICE_INFO(DEL) message to
+the vhost-pci server. The destroying or migrating activity MUST wait until all
+the VHOST_PCI_SOCKET_DEL_CONNECTION_ACK(DEL_DONE) messages are received.
+
+When a vhost-pci device has no frontend devices, the vhost-pci device SHOULD be
+destroyed.
+
+4.6.1.4 Driver VM Memory Hot-plug
+When the vhost-pci server receives a VHOST_PCI_SOCKET_MEMORY_INFO(DEL) message,
+a VHOST_PCI_CONTROLQ_MEMORY_INFO(DEL) message SHOULD be put on the controlq and
+a controlq interrupt is injected to the VM. When the vhost-pci server receives
+a VHOST_PCI_CONTROLQ_MEMORY_INFO_ACK(DEL_DONE) acknowledgement from the driver,
+it SHOULD unmap that memory region and send a
+VHOST_PCI_SOCKET_MEMORY_INFO_ACK(DEL_DONE) message to the client.
+
+When the vhost-pci server receives a VHOST_PCI_SOCKET_MEMORY_INFO(ADD) message,
+and the received memory info is new to what has already been mapped, it
+calculates the total received memory size.
+
+If the new memory size plus the mapped memory size is smaller than the address
+space size reserved by the bar, the server SHOULD map the new memory and expose
+it to the VM via the QEMU MemoryRegion mechanism. Then it SHOULD put the new
+memory info on the controlq, and injects a controlq interrupt to the VM.
+
+If the new memory size plus the mapped memory size is larger than the address
+space size reserved by the bar, the server clones out a new vhost-pci device,
+configures the bar size to be double of the current memory, hot-plugs out the
+old vhost-pci device, and hot-plugs in the new vhost-pci device to the VM. The
+initialization steps SHOULD follow 4.5 Device Initialization, except the
+interaction between the server and client is not needed.
+
+When the vhost-pci server receives a
+VHOST_PCI_CONTROLQ_MEMORY_INFO_ACK(ADD_DONE) acknowledgement from the driver,
+it SHOULD send a VHOST_PCI_SOCKET_MEMORY_INFO_ACK(ADD_DONE) message to the
+client.
+
+4.6.2 Driver Requirements: Device Operation
+The vhost-pci driver SHOULD acknowledge to the vhost-pci device by writing
+VHOST_PCI_CONTROLQ_DEVICE_INFO_ACK(ADD_DONE) to the vhost_pci_config fields
+when it finishes handling the device info update.
+
+The vhost-pci driver SHOULD ensure that all the CPUs are noticed about the
+device info update before acknowledging to the vhost-pci device.
+
+The vhost-pci driver SHOULD acknowledge to the vhost-pci device by writing
+VHOST_PCI_CONTROLQ_DEVICE_INFO_ACK(DEL_DONE) to vhost_pci_config fields when
+it finishes removing the vhost-pci support for the requesting virtio device.
+
+The vhost-pci driver SHOULD ensure that all the CPUs are noticed about the
+removing of the vhost-pci support for the requesting virtio device before
+acknowledging to the vhost-pci device.
