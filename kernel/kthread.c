@@ -559,6 +559,7 @@ void __init_kthread_worker(struct kthread_worker *worker,
 	spin_lock_init(&worker->lock);
 	lockdep_set_class_and_name(&worker->lock, key, name);
 	INIT_LIST_HEAD(&worker->work_list);
+	INIT_LIST_HEAD(&worker->delayed_work_list);
 	worker->task = NULL;
 }
 EXPORT_SYMBOL_GPL(__init_kthread_worker);
@@ -762,6 +763,107 @@ bool queue_kthread_work(struct kthread_worker *worker,
 	return ret;
 }
 EXPORT_SYMBOL_GPL(queue_kthread_work);
+
+/**
+ * delayed_kthread_work_timer_fn - callback that queues the associated delayed
+ *	kthread work when the timer expires.
+ * @__data: pointer to the data associated with the timer
+ *
+ * The format of the function is defined by struct timer_list.
+ * It should have been called from irqsafe timer with irq already off.
+ */
+void delayed_kthread_work_timer_fn(unsigned long __data)
+{
+	struct delayed_kthread_work *dwork =
+		(struct delayed_kthread_work *)__data;
+	struct kthread_work *work = &dwork->work;
+	struct kthread_worker *worker = work->worker;
+
+	/*
+	 * This might happen when a pending work is reinitialized.
+	 * It means that it is used a wrong way.
+	 */
+	if (WARN_ON_ONCE(!worker))
+		return;
+
+	spin_lock(&worker->lock);
+	/* Work must not be used with more workers, see queue_kthread_work(). */
+	WARN_ON_ONCE(work->worker != worker);
+
+	/* Move the work from worker->delayed_work_list. */
+	WARN_ON_ONCE(list_empty(&work->node));
+	list_del_init(&work->node);
+	insert_kthread_work(worker, work, &worker->work_list);
+
+	spin_unlock(&worker->lock);
+}
+EXPORT_SYMBOL(delayed_kthread_work_timer_fn);
+
+void __queue_delayed_kthread_work(struct kthread_worker *worker,
+				struct delayed_kthread_work *dwork,
+				unsigned long delay)
+{
+	struct timer_list *timer = &dwork->timer;
+	struct kthread_work *work = &dwork->work;
+
+	WARN_ON_ONCE(timer->function != delayed_kthread_work_timer_fn ||
+		     timer->data != (unsigned long)dwork);
+
+	/*
+	 * If @delay is 0, queue @dwork->work immediately.  This is for
+	 * both optimization and correctness.  The earliest @timer can
+	 * expire is on the closest next tick and delayed_work users depend
+	 * on that there's no such delay when @delay is 0.
+	 */
+	if (!delay) {
+		insert_kthread_work(worker, work, &worker->work_list);
+		return;
+	}
+
+	/* Be paranoid and try to detect possible races already now. */
+	insert_kthread_work_sanity_check(worker, work);
+
+	list_add(&work->node, &worker->delayed_work_list);
+	work->worker = worker;
+	timer_stats_timer_set_start_info(&dwork->timer);
+	timer->expires = jiffies + delay;
+	add_timer(timer);
+}
+
+/**
+ * queue_delayed_kthread_work - queue the associated kthread work
+ *	after a delay.
+ * @worker: target kthread_worker
+ * @dwork: delayed_kthread_work to queue
+ * @delay: number of jiffies to wait before queuing
+ *
+ * If the work has not been pending it starts a timer that will queue
+ * the work after the given @delay. If @delay is zero, it queues the
+ * work immediately.
+ *
+ * Return: %false if the @work has already been pending. It means that
+ * either the timer was running or the work was queued. It returns %true
+ * otherwise.
+ */
+bool queue_delayed_kthread_work(struct kthread_worker *worker,
+				struct delayed_kthread_work *dwork,
+				unsigned long delay)
+{
+	struct kthread_work *work = &dwork->work;
+	unsigned long flags;
+	bool ret = false;
+
+	spin_lock_irqsave(&worker->lock, flags);
+
+	if (list_empty(&work->node)) {
+		__queue_delayed_kthread_work(worker, dwork, delay);
+		ret = true;
+	}
+
+	spin_unlock_irqrestore(&worker->lock, flags);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(queue_delayed_kthread_work);
 
 struct kthread_flush_work {
 	struct kthread_work	work;
