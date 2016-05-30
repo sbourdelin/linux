@@ -5712,6 +5712,7 @@ static int __init mem_cgroup_init(void)
 
 		rtpn = kzalloc_node(sizeof(*rtpn), GFP_KERNEL,
 				    node_online(node) ? node : NUMA_NO_NODE);
+		BUG_ON(!rtpn);
 
 		for (zone = 0; zone < MAX_NR_ZONES; zone++) {
 			struct mem_cgroup_tree_per_zone *rtpz;
