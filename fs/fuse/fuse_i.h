@@ -956,4 +956,6 @@ int fuse_do_setattr(struct inode *inode, struct iattr *attr,
 
 void fuse_set_initialized(struct fuse_conn *fc);
 
+extern const struct xattr_handler *fuse_xattr_handlers[];
+
 #endif /* _FS_FUSE_I_H */
