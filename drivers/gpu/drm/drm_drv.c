@@ -511,6 +511,7 @@ static struct dentry *drm_fs_mount(struct file_system_type *fs_type, int flags,
 	return mount_pseudo(fs_type,
 			    "drm:",
 			    &drm_fs_sops,
+			    NULL,
 			    &drm_fs_dops,
 			    0x010203ff);
 }

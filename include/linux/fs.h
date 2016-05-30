@@ -2059,6 +2059,7 @@ struct super_block *sget(struct file_system_type *type,
 			int flags, void *data);
 extern struct dentry *mount_pseudo(struct file_system_type *, char *,
 	const struct super_operations *ops,
+	const struct xattr_handler **xattr,
 	const struct dentry_operations *dops,
 	unsigned long);
 
