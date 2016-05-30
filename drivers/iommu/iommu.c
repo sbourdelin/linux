@@ -872,6 +872,14 @@ static int add_iommu_group(struct device *dev, void *data)
 	const struct iommu_ops *ops = cb->ops;
 	int ret;
 
+	/*
+	 * Set PCI_BUS_FLAGS_MSI_REMAP for all PCI buses when IOMMU
+	 * have capability of IRQ remapping.
+	 */
+	if (dev_is_pci(dev) && ops->capable &&
+			ops->capable(IOMMU_CAP_INTR_REMAP))
+		to_pci_dev(dev)->bus->bus_flags |= PCI_BUS_FLAGS_MSI_REMAP;
+
 	if (!ops->add_device)
 		return 0;
 
