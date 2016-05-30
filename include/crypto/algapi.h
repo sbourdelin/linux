@@ -173,26 +173,26 @@ struct crypto_engine {
 	int (*unprepare_crypt_hardware)(struct crypto_engine *engine);
 
 	int (*prepare_request)(struct crypto_engine *engine,
-			       struct ablkcipher_request *req);
+			       struct crypto_async_request *req);
 	int (*unprepare_request)(struct crypto_engine *engine,
-				 struct ablkcipher_request *req);
+				 struct crypto_async_request *req);
 	int (*crypt_one_request)(struct crypto_engine *engine,
-				 struct ablkcipher_request *req);
+				 struct crypto_async_request *req);
 
 	struct kthread_worker           kworker;
 	struct task_struct              *kworker_task;
 	struct kthread_work             pump_requests;
 
 	void				*priv_data;
-	struct ablkcipher_request	*cur_req;
+	struct crypto_async_request	*cur_req;
 };
 
 int crypto_transfer_request(struct crypto_engine *engine,
-			    struct ablkcipher_request *req, bool need_pump);
+			    struct crypto_async_request *req, bool need_pump);
 int crypto_transfer_request_to_engine(struct crypto_engine *engine,
-				      struct ablkcipher_request *req);
+				      struct crypto_async_request *req);
 void crypto_finalize_request(struct crypto_engine *engine,
-			     struct ablkcipher_request *req, int err);
+			     struct crypto_async_request *req, int err);
 int crypto_engine_start(struct crypto_engine *engine);
 int crypto_engine_stop(struct crypto_engine *engine);
 struct crypto_engine *crypto_engine_alloc_init(struct device *dev, bool rt);
