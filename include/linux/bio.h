@@ -41,6 +41,13 @@
 #endif
 
 #define BIO_MAX_PAGES		256
+
+/*
+ * This is obsolete now and shouldn't be used, and the macro
+ * doesn't make any sense especially when multipage bvecs is
+ * supported. Even now some drivers may pass big bio which size
+ * is more than the value, such as bcache.
+ */
 #define BIO_MAX_SIZE		(BIO_MAX_PAGES << PAGE_SHIFT)
 
 /*
