@@ -587,6 +587,17 @@ static void tda998x_detect_work(struct work_struct *work)
 		drm_kms_helper_hotplug_event(dev);
 }
 
+/* handle HDMI connect/disconnect */
+static void tda998x_hpd(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct tda998x_priv *priv =
+			container_of(dwork, struct tda998x_priv, dwork);
+
+	if (&priv->encoder && priv->encoder.dev)
+		drm_kms_helper_hotplug_event(priv->encoder.dev);
+}
+
 /*
  * only 2 interrupts may occur: screen plug/unplug and EDID read
  */
@@ -1303,6 +1314,7 @@ static int tda998x_create(struct i2c_client *client, struct tda998x_priv *priv)
 
 		/* init read EDID waitqueue and HDP work */
 		init_waitqueue_head(&priv->wq_edid);
+		INIT_DELAYED_WORK(&priv->dwork, tda998x_hpd);
 
 		/* clear pending interrupts */
 		reg_read(priv, REG_INT_FLAGS_0);
