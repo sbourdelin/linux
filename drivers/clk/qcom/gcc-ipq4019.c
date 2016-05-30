@@ -1455,9 +1455,27 @@ static const struct of_device_id gcc_ipq4019_match_table[] = {
 };
 MODULE_DEVICE_TABLE(of, gcc_ipq4019_match_table);
 
+int cpu_clk_notifier_fn(struct notifier_block *nb,
+			unsigned long action, void *data)
+{
+	int err = 0;
+
+	if (action == PRE_RATE_CHANGE) {
+		err = clk_rcg2_ops.set_parent(&apps_clk_src.clkr.hw,
+							P_FEPLL500);
+	}
+
+	return notifier_from_errno(err);
+}
+
+struct notifier_block cpu_clk_notifier = {
+	.notifier_call = cpu_clk_notifier_fn,
+};
+
 static int gcc_ipq4019_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
+	int err;
 
 	clk_register_fixed_rate(dev, "fepll125", "xo", 0, 125000000);
 	clk_register_fixed_rate(dev, "fepll125dly", "xo", 0, 125000000);
@@ -1469,7 +1487,13 @@ static int gcc_ipq4019_probe(struct platform_device *pdev)
 	clk_register_fixed_rate(dev, "ddrpllsdcc", "xo", 0, 193000000);
 	clk_register_fixed_rate(dev, "pcnoc_clk_src", "xo", 0, 100000000);
 
-	return qcom_cc_probe(pdev, &gcc_ipq4019_desc);
+	err = qcom_cc_probe(pdev, &gcc_ipq4019_desc);
+
+	if (!err)
+		clk_notifier_register(apps_clk_src.clkr.hw.clk,
+					&cpu_clk_notifier);
+
+	return err;
 }
 
 static struct platform_driver gcc_ipq4019_driver = {
