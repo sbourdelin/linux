@@ -574,6 +574,9 @@ EXPORT_SYMBOL_GPL(__init_kthread_worker);
  * The works are not allowed to keep any locks, disable preemption or interrupts
  * when they finish. There is defined a safe point for freezing when one work
  * finishes and before a new one is started.
+ *
+ * Also the works must not be handled by more workers at the same time, see also
+ * queue_kthread_work().
  */
 int kthread_worker_fn(void *worker_ptr)
 {
@@ -710,12 +713,21 @@ create_kthread_worker_on_cpu(int cpu, const char namefmt[], ...)
 }
 EXPORT_SYMBOL(create_kthread_worker_on_cpu);
 
-/* insert @work before @pos in @worker */
-static void insert_kthread_work(struct kthread_worker *worker,
-			       struct kthread_work *work,
-			       struct list_head *pos)
+static void insert_kthread_work_sanity_check(struct kthread_worker *worker,
+					       struct kthread_work *work)
 {
 	lockdep_assert_held(&worker->lock);
+	WARN_ON_ONCE(!list_empty(&work->node));
+	/* Do not use a work with more workers, see queue_kthread_work() */
+	WARN_ON_ONCE(work->worker && work->worker != worker);
+}
+
+/* insert @work before @pos in @worker */
+static void insert_kthread_work(struct kthread_worker *worker,
+				struct kthread_work *work,
+				struct list_head *pos)
+{
+	insert_kthread_work_sanity_check(worker, work);
 
 	list_add_tail(&work->node, pos);
 	work->worker = worker;
@@ -731,6 +743,9 @@ static void insert_kthread_work(struct kthread_worker *worker,
  * Queue @work to work processor @task for async execution.  @task
  * must have been created with kthread_worker_create().  Returns %true
  * if @work was successfully queued, %false if it was already pending.
+ *
+ * Reinitialize the work if it needs to be used by another worker.
+ * For example, when the worker was stopped and started again.
  */
 bool queue_kthread_work(struct kthread_worker *worker,
 			struct kthread_work *work)
@@ -775,16 +790,13 @@ void flush_kthread_work(struct kthread_work *work)
 	struct kthread_worker *worker;
 	bool noop = false;
 
-retry:
 	worker = work->worker;
 	if (!worker)
 		return;
 
 	spin_lock_irq(&worker->lock);
-	if (work->worker != worker) {
-		spin_unlock_irq(&worker->lock);
-		goto retry;
-	}
+	/* Work must not be used with more workers, see queue_kthread_work(). */
+	WARN_ON_ONCE(work->worker != worker);
 
 	if (!list_empty(&work->node))
 		insert_kthread_work(worker, &fwork.work, work->node.next);
