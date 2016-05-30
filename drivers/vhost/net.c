@@ -301,6 +301,32 @@ static bool vhost_can_busy_poll(struct vhost_dev *dev,
 	       !vhost_has_work(dev);
 }
 
+static void vhost_net_disable_vq(struct vhost_net *n,
+				 struct vhost_virtqueue *vq)
+{
+	struct vhost_net_virtqueue *nvq =
+		container_of(vq, struct vhost_net_virtqueue, vq);
+	struct vhost_poll *poll = n->poll + (nvq - n->vqs);
+	if (!vq->private_data)
+		return;
+	vhost_poll_stop(poll);
+}
+
+static int vhost_net_enable_vq(struct vhost_net *n,
+				struct vhost_virtqueue *vq)
+{
+	struct vhost_net_virtqueue *nvq =
+		container_of(vq, struct vhost_net_virtqueue, vq);
+	struct vhost_poll *poll = n->poll + (nvq - n->vqs);
+	struct socket *sock;
+
+	sock = vq->private_data;
+	if (!sock)
+		return 0;
+
+	return vhost_poll_start(poll, sock->file);
+}
+
 static int vhost_net_tx_get_vq_desc(struct vhost_net *net,
 				    struct vhost_virtqueue *vq,
 				    struct iovec iov[], unsigned int iov_size,
@@ -613,6 +639,7 @@ static void handle_rx(struct vhost_net *net)
 	if (!sock)
 		goto out;
 	vhost_disable_notify(&net->dev, vq);
+	vhost_net_disable_vq(net, vq);
 
 	vhost_hlen = nvq->vhost_hlen;
 	sock_hlen = nvq->sock_hlen;
@@ -701,9 +728,10 @@ static void handle_rx(struct vhost_net *net)
 		total_len += vhost_len;
 		if (unlikely(total_len >= VHOST_NET_WEIGHT)) {
 			vhost_poll_queue(&vq->poll);
-			break;
+			goto out;
 		}
 	}
+	vhost_net_enable_vq(net, vq);
 out:
 	mutex_unlock(&vq->mutex);
 }
@@ -780,32 +808,6 @@ static int vhost_net_open(struct inode *inode, struct file *f)
 	f->private_data = n;
 
 	return 0;
-}
-
-static void vhost_net_disable_vq(struct vhost_net *n,
-				 struct vhost_virtqueue *vq)
-{
-	struct vhost_net_virtqueue *nvq =
-		container_of(vq, struct vhost_net_virtqueue, vq);
-	struct vhost_poll *poll = n->poll + (nvq - n->vqs);
-	if (!vq->private_data)
-		return;
-	vhost_poll_stop(poll);
-}
-
-static int vhost_net_enable_vq(struct vhost_net *n,
-				struct vhost_virtqueue *vq)
-{
-	struct vhost_net_virtqueue *nvq =
-		container_of(vq, struct vhost_net_virtqueue, vq);
-	struct vhost_poll *poll = n->poll + (nvq - n->vqs);
-	struct socket *sock;
-
-	sock = vq->private_data;
-	if (!sock)
-		return 0;
-
-	return vhost_poll_start(poll, sock->file);
 }
 
 static struct socket *vhost_net_stop_vq(struct vhost_net *n,
