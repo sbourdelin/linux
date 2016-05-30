@@ -665,11 +665,12 @@ static struct clk_apps_cpu_div gcc_apps_cpu_div_clk = {
 };
 
 static const struct freq_tbl ftbl_gcc_apps_clk[] = {
-	F(48000000, P_XO,	   1, 0, 0),
-	F(200000000, P_FEPLL200,   1, 0, 0),
-	F(500000000, P_FEPLL500,   1, 0, 0),
+	F(48000000, P_XO, 1, 0, 0),
+	F(200000000, P_FEPLL200, 1, 0, 0),
+	F(500000000, P_FEPLL500, 1, 0, 0),
 	F(626000000, P_DDRPLLAPSS, 1, 0, 0),
-	{ }
+	F(710000000, P_DDRPLLAPSS, 1, 0, 0),
+	{}
 };
 
 static struct clk_rcg2 apps_clk_src = {
