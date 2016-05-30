@@ -16,8 +16,9 @@
 #include <linux/mutex.h>
 #include <linux/gpio.h>
 
-#include <video/omapdss.h>
 #include <video/omap-panel-data.h>
+
+#include "../dss/omapdss.h"
 
 static struct omap_video_timings lb035q02_timings = {
 	.x_res = 320,
