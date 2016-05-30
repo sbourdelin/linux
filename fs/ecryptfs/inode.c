@@ -1043,8 +1043,12 @@ static ssize_t
 ecryptfs_getxattr(struct dentry *dentry, struct inode *inode,
 		  const char *name, void *value, size_t size)
 {
-	return ecryptfs_getxattr_lower(ecryptfs_dentry_to_lower(dentry),
-				       ecryptfs_inode_to_lower(inode),
+	struct dentry *lower_dentry;
+	struct inode *lower_inode;
+
+	lower_dentry = dentry ? ecryptfs_dentry_to_lower(dentry) : NULL;
+	lower_inode = ecryptfs_inode_to_lower(inode);
+	return ecryptfs_getxattr_lower(lower_dentry, lower_inode,
 				       name, value, size);
 }
 

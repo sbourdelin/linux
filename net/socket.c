@@ -473,6 +473,9 @@ static ssize_t sockfs_getxattr(struct dentry *dentry, struct inode *inode,
 	size_t proto_size;
 	int error;
 
+	if (!dentry)
+		return -ECHILD;
+
 	error = -ENODATA;
 	if (!strncmp(name, XATTR_NAME_SOCKPROTONAME, XATTR_NAME_SOCKPROTONAME_LEN)) {
 		proto_name = dentry->d_name.name;

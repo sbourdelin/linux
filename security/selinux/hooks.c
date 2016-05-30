@@ -1387,33 +1387,7 @@ static int inode_doinit_with_dentry(struct inode *inode, struct dentry *opt_dent
 	case SECURITY_FS_USE_NATIVE:
 		break;
 	case SECURITY_FS_USE_XATTR:
-		if (!inode->i_op->getxattr) {
-			isec->sid = sbsec->def_sid;
-			break;
-		}
-
-		/* Need a dentry, since the xattr API requires one.
-		   Life would be simpler if we could just pass the inode. */
-		if (opt_dentry) {
-			/* Called from d_instantiate or d_splice_alias. */
-			dentry = dget(opt_dentry);
-		} else {
-			/* Called from selinux_complete_init, try to find a dentry. */
-			dentry = d_find_alias(inode);
-		}
-		if (!dentry) {
-			/*
-			 * this is can be hit on boot when a file is accessed
-			 * before the policy is loaded.  When we load policy we
-			 * may find inodes that have no dentry on the
-			 * sbsec->isec_head list.  No reason to complain as these
-			 * will get fixed up the next time we go through
-			 * inode_doinit with a dentry, before these inodes could
-			 * be used again by userspace.
-			 */
-			goto out_unlock;
-		}
-
+		dentry = dget(opt_dentry);
 		len = INITCONTEXTLEN;
 		context = kmalloc(len+1, GFP_NOFS);
 		if (!context) {
@@ -1448,7 +1422,20 @@ static int inode_doinit_with_dentry(struct inode *inode, struct dentry *opt_dent
 		}
 		dput(dentry);
 		if (rc < 0) {
-			if (rc != -ENODATA) {
+			if (rc == -ECHILD) {
+				/*
+				 * The dentry is NULL and this ->getxattr
+				 * requires a dentry.  We will keep trying
+				 * until we have a dentry and the label can be
+				 * loaded.
+				 *
+				 * (We could also remember when >getxattr
+				 * requires a dentry in the superblock if
+				 * retrying becomes too inefficient.)
+				 */
+				kfree(context);
+				goto out_unlock;
+			} else if (rc != -EOPNOTSUPP && rc != -ENODATA) {
 				printk(KERN_WARNING "SELinux: %s:  getxattr returned "
 				       "%d for dev=%s ino=%ld\n", __func__,
 				       -rc, inode->i_sb->s_id, inode->i_ino);

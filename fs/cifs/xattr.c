@@ -150,12 +150,17 @@ static int cifs_xattr_get(const struct xattr_handler *handler,
 {
 	ssize_t rc = -EOPNOTSUPP;
 	unsigned int xid;
-	struct super_block *sb = dentry->d_sb;
-	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
+	struct super_block *sb;
+	struct cifs_sb_info *cifs_sb;
 	struct tcon_link *tlink;
 	struct cifs_tcon *pTcon;
 	char *full_path;
 
+	if (!dentry)
+		return -ECHILD;
+
+	sb = dentry->d_sb;
+	cifs_sb = CIFS_SB(sb);
 	tlink = cifs_sb_tlink(cifs_sb);
 	if (IS_ERR(tlink))
 		return PTR_ERR(tlink);

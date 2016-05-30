@@ -251,8 +251,12 @@ ssize_t ovl_getxattr(struct dentry *dentry, struct inode *inode,
 		     const char *name, void *value, size_t size)
 {
 	struct path realpath;
-	enum ovl_path_type type = ovl_path_real(dentry, &realpath);
+	enum ovl_path_type type;
 
+	if (!dentry)
+		return -ECHILD;
+
+	type = ovl_path_real(dentry, &realpath);
 	if (ovl_need_xattr_filter(dentry, type) && ovl_is_private_xattr(name))
 		return -ENODATA;
 

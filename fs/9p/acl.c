@@ -220,6 +220,9 @@ static int v9fs_xattr_get_acl(const struct xattr_handler *handler,
 	struct posix_acl *acl;
 	int error;
 
+	if (!dentry)
+		return -ECHILD;
+
 	v9ses = v9fs_dentry2v9ses(dentry);
 	/*
 	 * We allow set/get/list of acl when access=client is not specified

@@ -143,6 +143,9 @@ static int v9fs_xattr_handler_get(const struct xattr_handler *handler,
 {
 	const char *full_name = xattr_full_name(handler, name);
 
+	if (!dentry)
+		return -ECHILD;
+
 	return v9fs_xattr_get(dentry, full_name, buffer, size);
 }
 
