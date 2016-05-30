@@ -713,6 +713,9 @@ static void pci_set_bus_msi_domain(struct pci_bus *bus)
 	if (!d)
 		d = pci_host_bridge_msi_domain(b);
 
+	if (b == bus && pci_bus_msi_isolated(bus, d))
+		bus->bus_flags |= PCI_BUS_FLAGS_MSI_REMAP;
+
 	dev_set_msi_domain(&bus->dev, d);
 }
 
