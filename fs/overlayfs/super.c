@@ -70,9 +70,8 @@ static struct dentry *__ovl_dentry_lower(struct ovl_entry *oe)
 	return oe->numlower ? oe->lowerstack[0].dentry : NULL;
 }
 
-enum ovl_path_type ovl_path_type(struct dentry *dentry)
+enum ovl_path_type __ovl_path_type(struct ovl_entry *oe, umode_t mode)
 {
-	struct ovl_entry *oe = dentry->d_fsdata;
 	enum ovl_path_type type = 0;
 
 	if (oe->__upperdentry) {
@@ -82,7 +81,7 @@ enum ovl_path_type ovl_path_type(struct dentry *dentry)
 		 * Non-dir dentry can hold lower dentry from previous
 		 * location. Its purity depends only on opaque flag.
 		 */
-		if (oe->numlower && S_ISDIR(dentry->d_inode->i_mode))
+		if (oe->numlower && S_ISDIR(mode))
 			type |= __OVL_PATH_MERGE;
 		else if (!oe->opaque)
 			type |= __OVL_PATH_PURE;
@@ -91,6 +90,11 @@ enum ovl_path_type ovl_path_type(struct dentry *dentry)
 			type |= __OVL_PATH_MERGE;
 	}
 	return type;
+}
+
+enum ovl_path_type ovl_path_type(struct dentry *dentry)
+{
+	return __ovl_path_type(dentry->d_fsdata, dentry->d_inode->i_mode);
 }
 
 static struct dentry *ovl_upperdentry_dereference(struct ovl_entry *oe)
