@@ -154,5 +154,6 @@
 #define GCC_QDSS_BCR					69
 #define GCC_MPM_BCR					70
 #define GCC_SPDM_BCR					71
+#define GCC_APPS_CLK_CPU_DIV				72
 
 #endif

@@ -143,7 +143,7 @@ static const char * const gcc_xo_ddr_500_200[] = {
 	"xo",
 	"fepll200",
 	"fepll500",
-	"ddrpllapss",
+	"gcc_apps_cpu_div_clk",
 };
 
 #define F(f, s, h, m, n) { (f), (s), (2 * (h) - 1), (m), (n) }
@@ -682,6 +682,7 @@ static struct clk_rcg2 apps_clk_src = {
 		.parent_names = gcc_xo_ddr_500_200,
 		.num_parents = 4,
 		.ops = &clk_rcg2_ops,
+		.flags = CLK_SET_RATE_PARENT,
 	},
 };
 
@@ -1355,6 +1356,7 @@ static struct clk_regmap *gcc_ipq4019_clocks[] = {
 	[GCC_WCSS5G_CLK] = &gcc_wcss5g_clk.clkr,
 	[GCC_WCSS5G_REF_CLK] = &gcc_wcss5g_ref_clk.clkr,
 	[GCC_WCSS5G_RTC_CLK] = &gcc_wcss5g_rtc_clk.clkr,
+	[GCC_APPS_CLK_CPU_DIV] = &gcc_apps_cpu_div_clk.cdiv.clkr,
 };
 
 static const struct qcom_reset_map gcc_ipq4019_resets[] = {
@@ -1435,7 +1437,7 @@ static const struct regmap_config gcc_ipq4019_regmap_config = {
 	.reg_bits	= 32,
 	.reg_stride	= 4,
 	.val_bits	= 32,
-	.max_register	= 0x2dfff,
+	.max_register	= 0x2FFFF,
 	.fast_io	= true,
 };
 
