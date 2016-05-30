@@ -3609,7 +3609,7 @@ static int ext4_ext_convert_to_initialized(handle_t *handle,
 				goto out;
 			split_map.m_lblk = map->m_lblk;
 			split_map.m_len = allocated;
-		} else if (map->m_lblk - ee_block + map->m_len < max_zeroout) {
+		} else if (map->m_lblk - ee_block + map->m_len <= max_zeroout) {
 			/* case 2 */
 			if (map->m_lblk != ee_block) {
 				zero_ex.ee_block = ex->ee_block;
