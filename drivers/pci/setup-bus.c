@@ -1256,6 +1256,8 @@ void __pci_bus_size_bridges(struct pci_bus *bus, struct list_head *realloc_head)
 			additional_io_size  = pci_hotplug_io_size;
 			additional_mem_size = pci_hotplug_mem_size;
 		}
+
+		pci_fixup_device(pci_fixup_assign, bus->self);
 		/* Fall through */
 	default:
 		pbus_size_io(bus, realloc_head ? 0 : additional_io_size,

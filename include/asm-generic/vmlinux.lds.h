@@ -281,6 +281,9 @@
 		VMLINUX_SYMBOL(__start_pci_fixups_final) = .;		\
 		*(.pci_fixup_final)					\
 		VMLINUX_SYMBOL(__end_pci_fixups_final) = .;		\
+		VMLINUX_SYMBOL(__start_pci_fixups_assign) = .;		\
+		*(.pci_fixup_assign)					\
+		VMLINUX_SYMBOL(__end_pci_fixups_assign) = .;		\
 		VMLINUX_SYMBOL(__start_pci_fixups_enable) = .;		\
 		*(.pci_fixup_enable)					\
 		VMLINUX_SYMBOL(__end_pci_fixups_enable) = .;		\

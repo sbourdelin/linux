@@ -3370,6 +3370,8 @@ extern struct pci_fixup __start_pci_fixups_header[];
 extern struct pci_fixup __end_pci_fixups_header[];
 extern struct pci_fixup __start_pci_fixups_final[];
 extern struct pci_fixup __end_pci_fixups_final[];
+extern struct pci_fixup __start_pci_fixups_assign[];
+extern struct pci_fixup __end_pci_fixups_assign[];
 extern struct pci_fixup __start_pci_fixups_enable[];
 extern struct pci_fixup __end_pci_fixups_enable[];
 extern struct pci_fixup __start_pci_fixups_resume[];
@@ -3403,6 +3405,11 @@ void pci_fixup_device(enum pci_fixup_pass pass, struct pci_dev *dev)
 			return;
 		start = __start_pci_fixups_final;
 		end = __end_pci_fixups_final;
+		break;
+
+	case pci_fixup_assign:
+		start = __start_pci_fixups_assign;
+		end = __end_pci_fixups_assign;
 		break;
 
 	case pci_fixup_enable:
@@ -4419,3 +4426,21 @@ static void quirk_intel_qat_vf_cap(struct pci_dev *pdev)
 	}
 }
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443, quirk_intel_qat_vf_cap);
+
+/*
+ * On Mac Pro 11, the allocation of pci bridge memory resource
+ * broke ACPI Sleep Type register region.
+ */
+static void quirk_mac_disable_mmio_bar(struct pci_dev *dev)
+{
+	struct resource *b_res;
+
+	dev_info(&dev->dev, "[Quirk] Disable mmio on Mac Pro 11\n");
+	if ((dev->class >> 8) != PCI_CLASS_BRIDGE_PCI)
+		return;
+
+	b_res = &dev->resource[PCI_BRIDGE_RESOURCES];
+	b_res[1].flags = 0;
+	b_res[2].flags = 0;
+}
+DECLARE_PCI_FIXUP_ASSIGN(PCI_VENDOR_ID_INTEL, 0x8c10, quirk_mac_disable_mmio_bar);
