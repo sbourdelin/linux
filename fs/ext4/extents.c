@@ -3597,11 +3597,11 @@ static int ext4_ext_convert_to_initialized(handle_t *handle,
 	split_map.m_len = map->m_len;
 
 	if (max_zeroout && (allocated > map->m_len)) {
-		if (allocated <= max_zeroout) {
+		if (allocated - map->m_len <= max_zeroout) {
 			/* case 3 */
 			zero_ex.ee_block =
-					 cpu_to_le32(map->m_lblk);
-			zero_ex.ee_len = cpu_to_le16(allocated);
+			    cpu_to_le32(map->m_lblk + map->m_len);
+			zero_ex.ee_len = cpu_to_le16(allocated - map->m_len);
 			ext4_ext_store_pblock(&zero_ex,
 				ext4_ext_pblock(ex) + map->m_lblk - ee_block);
 			err = ext4_ext_zeroout(inode, &zero_ex);
