@@ -244,9 +244,7 @@ void cfg80211_conn_work(struct work_struct *work)
 		if (cfg80211_conn_do_work(wdev)) {
 			__cfg80211_connect_result(
 					wdev->netdev, bssid,
-					NULL, 0, NULL, 0,
-					WLAN_STATUS_UNSPECIFIED_FAILURE,
-					false, NULL);
+					NULL, 0, NULL, 0, -1, false, NULL);
 		}
 		wdev_unlock(wdev);
 	}
@@ -648,7 +646,7 @@ static DECLARE_WORK(cfg80211_disconnect_work, disconnect_work);
 void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
 			       const u8 *req_ie, size_t req_ie_len,
 			       const u8 *resp_ie, size_t resp_ie_len,
-			       u16 status, bool wextev,
+			       int status, bool wextev,
 			       struct cfg80211_bss *bss)
 {
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
