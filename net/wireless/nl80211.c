@@ -2603,7 +2603,8 @@ static int nl80211_set_interface(struct sk_buff *skb, struct genl_info *info)
 
 	memset(&params, 0, sizeof(params));
 
-	otype = ntype = dev->ieee80211_ptr->iftype;
+	otype = dev->ieee80211_ptr->iftype;
+	ntype = dev->ieee80211_ptr->iftype;
 
 	if (info->attrs[NL80211_ATTR_IFTYPE]) {
 		ntype = nla_get_u32(info->attrs[NL80211_ATTR_IFTYPE]);
