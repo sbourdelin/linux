@@ -928,7 +928,7 @@ static struct ieee80211_channel *nl80211_get_valid_chan(struct wiphy *wiphy,
 {
 	struct ieee80211_channel *chan;
 
-	if (tb == NULL)
+	if (!tb)
 		return NULL;
 	chan = ieee80211_get_channel(wiphy, nla_get_u32(tb));
 	if (!chan || chan->flags & IEEE80211_CHAN_DISABLED)
@@ -8575,7 +8575,7 @@ static int nl80211_set_tx_bitrate_mask(struct sk_buff *skb,
 		if (band < 0 || band >= NUM_NL80211_BANDS)
 			return -EINVAL;
 		sband = rdev->wiphy.bands[band];
-		if (sband == NULL)
+		if (!sband)
 			return -EINVAL;
 		err = nla_parse(tb, NL80211_TXRATE_MAX, nla_data(tx_rates),
 				nla_len(tx_rates), nl80211_txattr_policy);
