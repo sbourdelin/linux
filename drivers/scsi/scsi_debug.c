@@ -3331,13 +3331,12 @@ static int resp_report_luns(struct scsi_cmnd *scp,
 	tlun_cnt = lun_cnt + wlun_cnt;
 
 	rlen = (tlun_cnt * sizeof(struct scsi_lun)) + 8;
-	arr = vmalloc(rlen);
+	arr = kzalloc(rlen, GFP_ATOMIC);
 	if (!arr) {
 		mk_sense_buffer(scp, ILLEGAL_REQUEST, INSUFF_RES_ASC,
 				INSUFF_RES_ASCQ);
 		return check_condition_result;
 	}
-	memset(arr, 0, rlen);
 	pr_debug("select_report %d luns = %d wluns = %d no_lun0 %d\n",
 		 select_report, lun_cnt, wlun_cnt, sdebug_no_lun_0);
 
@@ -3355,7 +3354,7 @@ static int resp_report_luns(struct scsi_cmnd *scp,
 	put_unaligned_be32(rlen - 8, &arr[0]);
 
 	res = fill_from_dev_buffer(scp, arr, rlen);
-	vfree(arr);
+	kfree(arr);
 	return res;
 }
 
