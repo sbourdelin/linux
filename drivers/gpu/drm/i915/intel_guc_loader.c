@@ -480,6 +480,11 @@ int intel_guc_setup(struct drm_device *dev)
 		/* The execbuf_client will be recreated. Release it first. */
 		i915_guc_submission_disable(dev);
 
+		WARN_ON(!(I915_READ(GEN6_PMINTRMSK) |
+				GEN8_PMINTR_REDIRECT_TO_NON_DISP));
+		WARN_ON(I915_READ(GEN6_PMINTRMSK) |
+				GEN8_ARAT_EXPIRED_INT_MASK);
+
 		err = i915_guc_submission_enable(dev);
 		if (err)
 			goto fail;
