@@ -13,6 +13,8 @@ struct soc_device_attribute {
 	const char *family;
 	const char *revision;
 	const char *soc_id;
+
+	const void *data;
 };
 
 /**
@@ -33,5 +35,7 @@ void soc_device_unregister(struct soc_device *soc_dev);
  * @soc: Previously registered SoC device container
  */
 struct device *soc_device_to_device(struct soc_device *soc);
+
+struct soc_device_attribute *soc_device_match(struct soc_device_attribute *matches);
 
 #endif /* __SOC_BUS_H */
