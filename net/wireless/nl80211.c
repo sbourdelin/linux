@@ -3194,7 +3194,7 @@ static struct cfg80211_acl_data *parse_acl_data(struct wiphy *wiphy,
 		return ERR_PTR(-ENOMEM);
 
 	nla_for_each_nested(attr, info->attrs[NL80211_ATTR_MAC_ADDRS], tmp) {
-		memcpy(acl->mac_addrs[i].addr, nla_data(attr), ETH_ALEN);
+		ether_addr_copy(acl->mac_addrs[i].addr, nla_data(attr));
 		i++;
 	}
 
@@ -5892,8 +5892,8 @@ static int nl80211_parse_random_mac(struct nlattr **attrs,
 	if (!attrs[NL80211_ATTR_MAC] || !attrs[NL80211_ATTR_MAC_MASK])
 		return -EINVAL;
 
-	memcpy(mac_addr, nla_data(attrs[NL80211_ATTR_MAC]), ETH_ALEN);
-	memcpy(mac_addr_mask, nla_data(attrs[NL80211_ATTR_MAC_MASK]), ETH_ALEN);
+	ether_addr_copy(mac_addr, nla_data(attrs[NL80211_ATTR_MAC]));
+	ether_addr_copy(mac_addr_mask, nla_data(attrs[NL80211_ATTR_MAC_MASK]));
 
 	/* don't allow or configure an mcast address */
 	if (!is_multicast_ether_addr(mac_addr_mask) ||
@@ -9405,8 +9405,7 @@ static int nl80211_parse_wowlan_tcp(struct cfg80211_registered_device *rdev,
 		return -ENOMEM;
 	cfg->src = nla_get_in_addr(tb[NL80211_WOWLAN_TCP_SRC_IPV4]);
 	cfg->dst = nla_get_in_addr(tb[NL80211_WOWLAN_TCP_DST_IPV4]);
-	memcpy(cfg->dst_mac, nla_data(tb[NL80211_WOWLAN_TCP_DST_MAC]),
-	       ETH_ALEN);
+	ether_addr_copy(cfg->dst_mac, nla_data(tb[NL80211_WOWLAN_TCP_DST_MAC]));
 	if (tb[NL80211_WOWLAN_TCP_SRC_PORT])
 		port = nla_get_u16(tb[NL80211_WOWLAN_TCP_SRC_PORT]);
 	else
