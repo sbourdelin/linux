@@ -502,22 +502,25 @@ static const struct attribute_group *thermal_zone_attribute_groups[] = {
  */
 static int create_trip_attrs(struct thermal_zone_device *tz, int mask)
 {
-	int size = sizeof(struct thermal_attr) * tz->trips;
 	struct attribute **attrs;
 	int indx;
 
-	tz->trip_type_attrs = kzalloc(size, GFP_KERNEL);
+	tz->trip_type_attrs = kcalloc(tz->trips, sizeof(*tz->trip_type_attrs),
+				      GFP_KERNEL);
 	if (!tz->trip_type_attrs)
 		return -ENOMEM;
 
-	tz->trip_temp_attrs = kzalloc(size, GFP_KERNEL);
+	tz->trip_temp_attrs = kcalloc(tz->trips, sizeof(*tz->trip_temp_attrs),
+				      GFP_KERNEL);
 	if (!tz->trip_temp_attrs) {
 		kfree(tz->trip_type_attrs);
 		return -ENOMEM;
 	}
 
 	if (tz->ops->get_trip_hyst) {
-		tz->trip_hyst_attrs = kzalloc(size, GFP_KERNEL);
+		tz->trip_hyst_attrs = kcalloc(tz->trips,
+					      sizeof(*tz->trip_hyst_attrs),
+					      GFP_KERNEL);
 		if (!tz->trip_hyst_attrs) {
 			kfree(tz->trip_type_attrs);
 			kfree(tz->trip_temp_attrs);
@@ -525,7 +528,7 @@ static int create_trip_attrs(struct thermal_zone_device *tz, int mask)
 		}
 	}
 
-	attrs = kzalloc(sizeof(*attrs) * tz->trips * 3, GFP_KERNEL);
+	attrs = kcalloc(tz->trips * 3, sizeof(*attrs), GFP_KERNEL);
 	if (!attrs) {
 		kfree(tz->trip_type_attrs);
 		kfree(tz->trip_temp_attrs);
