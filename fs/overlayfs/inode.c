@@ -210,9 +210,8 @@ static bool ovl_is_private_xattr(const char *name)
 	return strncmp(name, OVL_XATTR_PRE_NAME, OVL_XATTR_PRE_LEN) == 0;
 }
 
-int ovl_setxattr(struct dentry *dentry, struct inode *inode,
-		 const char *name, const void *value,
-		 size_t size, int flags)
+static int ovl_setxattr(struct dentry *dentry, const char *name,
+			const void *value, size_t size, int flags)
 {
 	int err;
 	struct dentry *upperdentry;
@@ -247,8 +246,8 @@ static bool ovl_need_xattr_filter(struct dentry *dentry,
 		return false;
 }
 
-ssize_t ovl_getxattr(struct dentry *dentry, struct inode *inode,
-		     const char *name, void *value, size_t size)
+static ssize_t ovl_getxattr(struct dentry *dentry, struct inode *inode,
+			    const char *name, void *value, size_t size)
 {
 	struct path realpath;
 	enum ovl_path_type type = ovl_path_real(dentry, &realpath);
@@ -291,7 +290,7 @@ ssize_t ovl_listxattr(struct dentry *dentry, char *list, size_t size)
 	return res;
 }
 
-int ovl_removexattr(struct dentry *dentry, const char *name)
+static int ovl_removexattr(struct dentry *dentry, const char *name)
 {
 	int err;
 	struct path realpath;
@@ -375,10 +374,10 @@ static const struct inode_operations ovl_file_inode_operations = {
 	.setattr	= ovl_setattr,
 	.permission	= ovl_permission,
 	.getattr	= ovl_getattr,
-	.setxattr	= ovl_setxattr,
-	.getxattr	= ovl_getxattr,
+	.setxattr	= generic_setxattr,
+	.getxattr	= generic_getxattr,
 	.listxattr	= ovl_listxattr,
-	.removexattr	= ovl_removexattr,
+	.removexattr	= generic_removexattr,
 };
 
 static const struct inode_operations ovl_symlink_inode_operations = {
@@ -386,10 +385,10 @@ static const struct inode_operations ovl_symlink_inode_operations = {
 	.get_link	= ovl_get_link,
 	.readlink	= ovl_readlink,
 	.getattr	= ovl_getattr,
-	.setxattr	= ovl_setxattr,
-	.getxattr	= ovl_getxattr,
+	.setxattr	= generic_setxattr,
+	.getxattr	= generic_getxattr,
 	.listxattr	= ovl_listxattr,
-	.removexattr	= ovl_removexattr,
+	.removexattr	= generic_removexattr,
 };
 
 struct inode *ovl_new_inode(struct super_block *sb, umode_t mode,
@@ -434,3 +433,34 @@ struct inode *ovl_new_inode(struct super_block *sb, umode_t mode,
 
 	return inode;
 }
+
+static int ovl_xattr_get(const struct xattr_handler *handler,
+			 struct dentry *dentry, struct inode *inode,
+			 const char *name, void *buffer, size_t size)
+{
+	return ovl_getxattr(dentry, inode, name, buffer, size);
+}
+
+static int ovl_xattr_set(const struct xattr_handler *handler,
+			 struct dentry *dentry, struct inode *inode,
+			 const char *name, const void *value, size_t size,
+			 int flags)
+{
+	if (value)
+		return ovl_setxattr(dentry, name, value, size, flags);
+	else {
+		BUG_ON(flags != XATTR_REPLACE);
+		return ovl_removexattr(dentry, name);
+	}
+}
+
+const struct xattr_handler ovl_xattr_handler = {
+	.prefix = "",  /* match anything */
+	.get = ovl_xattr_get,
+	.set = ovl_xattr_set,
+};
+
+const struct xattr_handler *ovl_xattr_handlers[] = {
+	&ovl_xattr_handler,
+	NULL
+};

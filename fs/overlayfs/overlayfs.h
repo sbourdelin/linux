@@ -172,13 +172,7 @@ int ovl_check_d_type_supported(struct path *realpath);
 /* inode.c */
 int ovl_setattr(struct dentry *dentry, struct iattr *attr);
 int ovl_permission(struct inode *inode, int mask);
-int ovl_setxattr(struct dentry *dentry, struct inode *inode,
-		 const char *name, const void *value,
-		 size_t size, int flags);
-ssize_t ovl_getxattr(struct dentry *dentry, struct inode *inode,
-		     const char *name, void *value, size_t size);
 ssize_t ovl_listxattr(struct dentry *dentry, char *list, size_t size);
-int ovl_removexattr(struct dentry *dentry, const char *name);
 struct inode *ovl_d_select_inode(struct dentry *dentry, unsigned file_flags);
 
 struct inode *ovl_new_inode(struct super_block *sb, umode_t mode,
@@ -188,6 +182,7 @@ static inline void ovl_copyattr(struct inode *from, struct inode *to)
 	to->i_uid = from->i_uid;
 	to->i_gid = from->i_gid;
 }
+extern const struct xattr_handler *ovl_xattr_handlers[];
 
 /* dir.c */
 extern const struct inode_operations ovl_dir_inode_operations;
