@@ -52,4 +52,12 @@ config DRM_PARADE_PS8622
 
 source "drivers/gpu/drm/bridge/analogix/Kconfig"
 
+config DRM_GE_B850V3_LVDS_DP
+	tristate "LVDS/DP bridge"
+	depends on OF
+	select DRM_KMS_HELPER
+	select DRM_PANEL
+	---help---
+	  Driver for GE B850v3 DP2 LVDS to DP+ Bridge
+
 endmenu
