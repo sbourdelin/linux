@@ -299,10 +299,7 @@ struct inode_operations orangefs_file_inode_operations = {
 	.set_acl = orangefs_set_acl,
 	.setattr = orangefs_setattr,
 	.getattr = orangefs_getattr,
-	.setxattr = generic_setxattr,
-	.getxattr = generic_getxattr,
 	.listxattr = orangefs_listxattr,
-	.removexattr = generic_removexattr,
 	.permission = orangefs_permission,
 };
 
