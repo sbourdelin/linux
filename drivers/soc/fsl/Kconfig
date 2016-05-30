@@ -1,0 +1,15 @@
+#
+# Freescale SOC drivers
+#
+
+source "drivers/soc/fsl/qe/Kconfig"
+
+config FSL_GUTS
+	bool "NXP Layerscale SoC identification"
+	depends on PPC_FSL || SOC_LS1021A || ARCH_LAYERSCAPE || COMPILE_TEST
+	default PPC_FSL || SOC_LS1021A || ARCH_LAYERSCAPE
+	select SOC_BUS
+	help
+	  This registers a SoC device for NXP (formerly Freescale)
+	  Layerscape devices, making information about the system
+	  available in /sys/devices/soc/
