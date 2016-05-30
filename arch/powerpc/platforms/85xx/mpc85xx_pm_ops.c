@@ -14,8 +14,8 @@
 #include <linux/kernel.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
-#include <linux/fsl/guts.h>
 
+#include <asm/fsl_guts.h>
 #include <asm/io.h>
 #include <asm/fsl_pm.h>
 

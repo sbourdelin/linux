@@ -12,7 +12,6 @@
 
 #include <linux/clk.h>
 #include <linux/clk-provider.h>
-#include <linux/fsl/guts.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -20,6 +19,10 @@
 #include <linux/of_platform.h>
 #include <linux/of.h>
 #include <linux/slab.h>
+
+#ifdef CONFIG_PPC
+#include <asm/fsl_guts.h>
+#endif
 
 #define PLL_DIV1	0
 #define PLL_DIV2	1
@@ -341,6 +344,8 @@ static const struct clockgen_muxinfo t4240_hwa5 = {
 	},
 };
 
+#ifdef CONFIG_PPC
+
 #define RCWSR7_FM1_CLK_SEL	0x40000000
 #define RCWSR7_FM2_CLK_SEL	0x20000000
 #define RCWSR7_HWA_ASYNC_DIV	0x04000000
@@ -408,6 +413,7 @@ static void __init p5040_init_periph(struct clockgen *cg)
 	else
 		cg->fman[1] = cg->pll[PLATFORM_PLL].div[PLL_DIV2].clk;
 }
+#endif
 
 static void __init t1023_init_periph(struct clockgen *cg)
 {
@@ -499,6 +505,7 @@ static const struct clockgen_chipinfo chipinfo[] = {
 		.pll_mask = 0x37,
 		.flags = CG_VER3 | CG_LITTLE_ENDIAN,
 	},
+#ifdef CONFIG_PPC
 	{
 		.compat = "fsl,p2041-clockgen",
 		.guts_compat = "fsl,qoriq-device-config-1.0",
@@ -559,6 +566,7 @@ static const struct clockgen_chipinfo chipinfo[] = {
 		},
 		.pll_mask = 0x0f,
 	},
+#endif
 	{
 		.compat = "fsl,t1023-clockgen",
 		.guts_compat = "fsl,t1023-device-config",

@@ -35,7 +35,6 @@
 #include "fman.h"
 #include "fman_muram.h"
 
-#include <linux/fsl/guts.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/module.h>
@@ -45,6 +44,10 @@
 #include <linux/of_irq.h>
 #include <linux/interrupt.h>
 #include <linux/libfdt_env.h>
+
+#ifdef CONFIG_PPC
+#include <asm/fsl_guts.h>
+#endif
 
 /* General defines */
 #define FMAN_LIODN_TBL			64	/* size of LIODN table */
@@ -1889,7 +1892,9 @@ static int fman_reset(struct fman *fman)
 			err = -EBUSY;
 
 		goto _return;
-	} else {
+	}
+#ifdef CONFIG_PPC
+	else {
 		struct device_node *guts_node;
 		struct ccsr_guts __iomem *guts_regs;
 		u32 devdisr2, reg;
@@ -1952,6 +1957,7 @@ guts_node:
 		dev_dbg(fman->dev, "%s: Didn't perform FManV3 reset due to Errata A007273!\n",
 			__func__);
 	}
+#endif
 _return:
 	return err;
 }
