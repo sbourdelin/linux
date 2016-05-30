@@ -80,7 +80,7 @@ static struct parent_map gcc_xo_sdcc1_500_map[] = {
 
 static const char * const gcc_xo_sdcc1_500[] = {
 	"xo",
-	"ddrpll",
+	"ddrpllsdcc",
 	"fepll500",
 };
 
@@ -1317,13 +1317,15 @@ static int gcc_ipq4019_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 
-	clk_register_fixed_rate(dev, "fepll125", "xo", 0, 200000000);
-	clk_register_fixed_rate(dev, "fepll125dly", "xo", 0, 200000000);
-	clk_register_fixed_rate(dev, "fepllwcss2g", "xo", 0, 200000000);
-	clk_register_fixed_rate(dev, "fepllwcss5g", "xo", 0, 200000000);
+	clk_register_fixed_rate(dev, "fepll125", "xo", 0, 125000000);
+	clk_register_fixed_rate(dev, "fepll125dly", "xo", 0, 125000000);
+	clk_register_fixed_rate(dev, "fepllwcss2g", "xo", 0, 250000000);
+	clk_register_fixed_rate(dev, "fepllwcss5g", "xo", 0, 250000000);
 	clk_register_fixed_rate(dev, "fepll200", "xo", 0, 200000000);
-	clk_register_fixed_rate(dev, "fepll500", "xo", 0, 200000000);
+	clk_register_fixed_rate(dev, "fepll500", "xo", 0, 500000000);
 	clk_register_fixed_rate(dev, "ddrpllapss", "xo", 0, 666000000);
+	clk_register_fixed_rate(dev, "ddrpllsdcc", "xo", 0, 193000000);
+	clk_register_fixed_rate(dev, "pcnoc_clk_src", "xo", 0, 100000000);
 
 	return qcom_cc_probe(pdev, &gcc_ipq4019_desc);
 }
