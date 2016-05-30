@@ -73,14 +73,16 @@ static u32 esdhc_readl_fixup(struct sdhci_host *host,
 static u16 esdhc_readw_fixup(struct sdhci_host *host,
 				     int spec_reg, u32 value)
 {
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_esdhc *esdhc = sdhci_pltfm_priv(pltfm_host);
 	u16 ret;
 	int shift = (spec_reg & 0x2) * 8;
 
 	if (spec_reg == SDHCI_HOST_VERSION)
-		ret = value & 0xffff;
-	else
-		ret = (value >> shift) & 0xffff;
-	return ret;
+		return esdhc->vendor_ver << SDHCI_VENDOR_VER_SHIFT |
+		       esdhc->spec_ver;
+
+	return (value >> shift) & 0xffff;
 }
 
 static u8 esdhc_readb_fixup(struct sdhci_host *host,
@@ -562,16 +564,32 @@ static const struct sdhci_pltfm_data sdhci_esdhc_le_pdata = {
 	.ops = &sdhci_esdhc_le_ops,
 };
 
+#define T4240_HOST_VER ((VENDOR_V_23 << SDHCI_VENDOR_VER_SHIFT) | SDHCI_SPEC_200)
+static const struct soc_device_attribute esdhc_t4240_quirk = {
+	/* T4240 revision < 0x20 uses vendor version 23, SDHCI version 200 */
+	{ .soc_id = "T4*(0x824000)", .revision = "0x[01]?",
+	  .data = (void *)(uintptr_t)(T4240_HOST_VER) },
+	{ },
+};
+
 static void esdhc_init(struct platform_device *pdev, struct sdhci_host *host)
 {
 	struct sdhci_pltfm_host *pltfm_host;
 	struct sdhci_esdhc *esdhc;
-	u16 host_ver;
 
 	pltfm_host = sdhci_priv(host);
 	esdhc = sdhci_pltfm_priv(pltfm_host);
 
 	host_ver = sdhci_readw(host, SDHCI_HOST_VERSION);
+
+	if (of_device_is_compatible(pdev->dev.of_node, "fsl,t4240-esdhc")) {
+		struct soc_device_attribute *match;
+
+		match = soc_device_match(&esdhc_t4240_quirk);
+		if (match)
+			host_ver = (uintptr_t)match->data;
+	}
+
 	esdhc->vendor_ver = (host_ver & SDHCI_VENDOR_VER_MASK) >>
 			     SDHCI_VENDOR_VER_SHIFT;
 	esdhc->spec_ver = host_ver & SDHCI_SPEC_VER_MASK;
