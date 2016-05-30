@@ -16,6 +16,7 @@
 #include <linux/aer.h>
 #include <linux/acpi.h>
 #include <linux/irqdomain.h>
+#include <linux/iommu.h>
 #include "pci.h"
 
 #define CARDBUS_LATENCY_TIMER	176	/* secondary latency timer */
@@ -2159,6 +2160,9 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
 	device_enable_async_suspend(b->bridge);
 	pci_set_bus_of_node(b);
 	pci_set_bus_msi_domain(b);
+
+	if (iommu_capable(&pci_bus_type, IOMMU_CAP_INTR_REMAP))
+		b->bus_flags |= PCI_BUS_FLAGS_MSI_REMAP;
 
 	if (!parent)
 		set_dev_node(b->bridge, pcibus_to_node(b));
