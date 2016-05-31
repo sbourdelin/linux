@@ -16,7 +16,6 @@
 #include "core.h"
 #include "rdev-ops.h"
 
-
 struct ieee80211_rate *
 ieee80211_get_response_rate(struct ieee80211_supported_band *sband,
 			    u32 basic_rates, int bitrate)
@@ -1309,7 +1308,6 @@ int cfg80211_get_p2p_attr(const u8 *ies, unsigned int len,
 				out += min(bufsize, copy);
 				bufsize -= min(bufsize, copy);
 			}
-
 
 			if (copy == attr_remaining)
 				return desired_len;

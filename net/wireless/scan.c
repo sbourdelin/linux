@@ -1622,7 +1622,6 @@ ieee80211_bss(struct wiphy *wiphy, struct iw_request_info *info,
 	return current_ev;
 }
 
-
 static int ieee80211_scan_results(struct cfg80211_registered_device *rdev,
 				  struct iw_request_info *info,
 				  char *buf, size_t len)
