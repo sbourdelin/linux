@@ -1075,6 +1075,16 @@ config I2C_ROBOTFUZZ_OSIF
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-osif.
 
+config I2C_SM_USB_DIG
+	tristate "Texas Instruments SM-USB-DIG I2C interface"
+	depends on MFD_SM_USB_DIG
+	help
+	  This adds support for the I2C bus functionality of the
+	  TI SM-USB-DIG USB interface adapter.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-sm-usb-dig.
+
 config I2C_TAOS_EVM
 	tristate "TAOS evaluation module"
 	depends on TTY
