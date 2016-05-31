@@ -4820,17 +4820,14 @@ static void
 lpfc_disable_pci_dev(struct lpfc_hba *phba)
 {
 	struct pci_dev *pdev;
-	int bars;
 
 	/* Obtain PCI device reference */
 	if (!phba->pcidev)
 		return;
 	else
 		pdev = phba->pcidev;
-	/* Select PCI BARs */
-	bars = pci_select_bars(pdev, IORESOURCE_MEM);
 	/* Release PCI resource and disable PCI device */
-	pci_release_selected_regions(pdev, bars);
+	pci_release_mem_regions(pdev);
 	pci_disable_device(pdev);
 
 	return;
