@@ -1351,7 +1351,10 @@ int machine__process_mmap2_event(struct machine *machine,
 	if (map == NULL)
 		goto out_problem_map;
 
-	thread__insert_map(thread, map);
+	ret = thread__insert_map(thread, map);
+	if (ret)
+		pr_err("Thread insert map error\n");
+
 	thread__put(thread);
 	map__put(map);
 	return 0;
@@ -1401,7 +1404,10 @@ int machine__process_mmap_event(struct machine *machine, union perf_event *event
 	if (map == NULL)
 		goto out_problem_map;
 
-	thread__insert_map(thread, map);
+	ret = thread__insert_map(thread, map);
+	if (ret)
+		pr_err("Thread insert map error\n");
+
 	thread__put(thread);
 	map__put(map);
 	return 0;

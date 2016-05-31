@@ -43,15 +43,6 @@ struct thread *thread__new(pid_t pid, pid_t tid)
 		thread->cpu = -1;
 		INIT_LIST_HEAD(&thread->comm_list);
 
-#ifdef HAVE_LIBUNWIND_SUPPORT
-		unwind__register_ops(thread, local_unwind_libunwind_ops);
-#else
-		unwind__register_ops(thread, NULL);
-#endif
-
-		if (unwind__prepare_access(thread) < 0)
-			goto err_thread;
-
 		comm_str = malloc(32);
 		if (!comm_str)
 			goto err_thread;
@@ -207,10 +198,12 @@ size_t thread__fprintf(struct thread *thread, FILE *fp)
 	       map_groups__fprintf(thread->mg, fp);
 }
 
-void thread__insert_map(struct thread *thread, struct map *map)
+int thread__insert_map(struct thread *thread, struct map *map)
 {
 	map_groups__fixup_overlappings(thread->mg, map, stderr);
 	map_groups__insert(thread->mg, map);
+
+	return unwind__prepare_access(thread);
 }
 
 static int thread__clone_map_groups(struct thread *thread,
