@@ -312,7 +312,7 @@ struct pv_lock_ops {
 	void (*queued_spin_lock_slowpath)(struct qspinlock *lock, u32 val);
 	struct paravirt_callee_save queued_spin_unlock;
 
-	void (*wait)(u8 *ptr, u8 val);
+	void (*wait)(u8 *ptr, u8 val, int lockcpu);
 	void (*kick)(int cpu);
 #else /* !CONFIG_QUEUED_SPINLOCKS */
 	struct paravirt_callee_save lock_spinning;

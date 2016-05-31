@@ -39,7 +39,7 @@ static void xen_qlock_kick(int cpu)
 /*
  * Halt the current CPU & release it back to the host
  */
-static void xen_qlock_wait(u8 *byte, u8 val)
+static void xen_qlock_wait(u8 *byte, u8 val, int lockcpu)
 {
 	int irq = __this_cpu_read(lock_kicker_irq);
 
