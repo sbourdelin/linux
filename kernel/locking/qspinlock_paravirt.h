@@ -468,8 +468,10 @@ pv_wait_head_or_lock(struct qspinlock *lock, struct mcs_spinlock *node)
 					WRITE_ONCE(l->locked, _Q_LOCKED_VAL);
 					clear_pending(lock);
 					goto gotlock;
+				} else {
+					/* old == _Q_SLOW_VAL. */
+					qstat_inc(qstat_pv_slow_race, true);
 				}
-				/* old == _Q_SLOW_VAL. */
 			}
 		}
 		clear_pending(lock);	/* Enable lock stealing */

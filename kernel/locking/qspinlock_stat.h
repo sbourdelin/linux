@@ -24,6 +24,7 @@
  *   pv_latency_wake	- average latency (ns) from vCPU kick to wakeup
  *   pv_lock_slowpath	- # of locking operations via the slowpath
  *   pv_lock_stealing	- # of lock stealing operations
+ *   pv_slow_race	- # of _Q_SLOW_VAL races between lock owner & qhead
  *   pv_spurious_wakeup	- # of spurious wakeups in non-head vCPUs
  *   pv_wait_again	- # of wait's after a queue head vCPU kick
  *   pv_wait_early	- # of early vCPU wait's
@@ -48,6 +49,7 @@ enum qlock_stats {
 	qstat_pv_latency_wake,
 	qstat_pv_lock_slowpath,
 	qstat_pv_lock_stealing,
+	qstat_pv_slow_race,
 	qstat_pv_spurious_wakeup,
 	qstat_pv_wait_again,
 	qstat_pv_wait_early,
@@ -69,11 +71,12 @@ static const char * const qstat_names[qstat_num + 1] = {
 	[qstat_pv_hash_hops]	   = "pv_hash_hops",
 	[qstat_pv_kick_unlock]     = "pv_kick_unlock",
 	[qstat_pv_kick_wake]       = "pv_kick_wake",
-	[qstat_pv_spurious_wakeup] = "pv_spurious_wakeup",
 	[qstat_pv_latency_kick]	   = "pv_latency_kick",
 	[qstat_pv_latency_wake]    = "pv_latency_wake",
 	[qstat_pv_lock_slowpath]   = "pv_lock_slowpath",
 	[qstat_pv_lock_stealing]   = "pv_lock_stealing",
+	[qstat_pv_slow_race]	   = "pv_slow_race",
+	[qstat_pv_spurious_wakeup] = "pv_spurious_wakeup",
 	[qstat_pv_wait_again]      = "pv_wait_again",
 	[qstat_pv_wait_early]      = "pv_wait_early",
 	[qstat_pv_wait_head]       = "pv_wait_head",
