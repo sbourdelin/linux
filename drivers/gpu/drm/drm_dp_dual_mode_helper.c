@@ -148,6 +148,12 @@ static bool is_type2_adaptor(uint8_t adaptor_id)
 			      DP_DUAL_MODE_REV_TYPE2);
 }
 
+bool is_lspcon_adaptor(const char hdmi_id[DP_DUAL_MODE_HDMI_ID_LEN],
+	const uint8_t adaptor_id)
+{
+	return is_hdmi_adaptor(hdmi_id) && (adaptor_id == 0xa8);
+}
+
 /**
  * drm_dp_dual_mode_detect - Identify the DP dual mode adaptor
  * @adapter: I2C adapter for the DDC bus
@@ -203,6 +209,8 @@ enum drm_dp_dual_mode_type drm_dp_dual_mode_detect(struct i2c_adapter *adapter)
 	ret = drm_dp_dual_mode_read(adapter, DP_DUAL_MODE_ADAPTOR_ID,
 				    &adaptor_id, sizeof(adaptor_id));
 	if (ret == 0) {
+		if (is_lspcon_adaptor(hdmi_id, adaptor_id))
+			return DRM_DP_DUAL_MODE_LSPCON;
 		if (is_type2_adaptor(adaptor_id)) {
 			if (is_hdmi_adaptor(hdmi_id))
 				return DRM_DP_DUAL_MODE_TYPE2_HDMI;
@@ -364,3 +372,80 @@ const char *drm_dp_get_dual_mode_type_name(enum drm_dp_dual_mode_type type)
 	}
 }
 EXPORT_SYMBOL(drm_dp_get_dual_mode_type_name);
+
+/**
+ * drm_lspcon_get_current_mode: Get LSPCON's current mode of operation by
+ * by reading offset (0x80, 0x41)
+ * @i2c_adapter: I2C-over-aux adapter
+ *
+ * Returns:
+ * Enum representing current mode of operation
+ */
+enum drm_lspcon_mode
+drm_lspcon_get_current_mode(struct i2c_adapter *adapter)
+{
+	u8 data;
+	int err = 0;
+
+	/* Read Status: i2c over aux */
+	err = drm_dp_dual_mode_read(adapter, DP_DUAL_MODE_LSPCON_CURRENT_MODE,
+			(void *)&data, sizeof(data));
+	if (err < 0) {
+		DRM_ERROR("LSPCON read(0x80, 0x41) failed\n");
+		return DRM_LSPCON_MODE_INVALID;
+	}
+
+	return data & DP_DUAL_MODE_LSPCON_MODE_MASK ?
+		DRM_LSPCON_MODE_PCON : DRM_LSPCON_MODE_LS;
+}
+EXPORT_SYMBOL(drm_lspcon_get_current_mode);
+
+/**
+ * drm_lspcon_change_mode: Change LSPCON's mode of operation by
+ * by writing offset (0x80, 0x40)
+ * @i2c_adapter: I2C-over-aux adapter
+ * @reqd_mode: required mode of operation
+ *
+ * Returns:
+ * 0 on success, -error on failure/timeout
+ */
+int drm_lspcon_change_mode(struct i2c_adapter *adapter,
+	enum drm_lspcon_mode reqd_mode)
+{
+	u8 data;
+	int err;
+	int time_out = 200;
+
+	if (reqd_mode == DRM_LSPCON_MODE_LS)
+		data = ~DP_DUAL_MODE_LSPCON_MODE_MASK;
+	else
+		data = DP_DUAL_MODE_LSPCON_MODE_MASK;
+
+	/* Change mode */
+	err = drm_dp_dual_mode_write(adapter, DP_DUAL_MODE_LSPCON_MODE_CHANGE,
+			&data, sizeof(data));
+	if (err < 0) {
+		DRM_ERROR("LSPCON mode change failed\n");
+		return err;
+	}
+
+	/*
+	* Confirm mode change by reading the status bit.
+	* Sometimes, it takes a while to change the mode,
+	* so wait and retry until time out or done.
+	*/
+	while (time_out) {
+		if (reqd_mode != drm_lspcon_get_current_mode(adapter)) {
+			mdelay(10);
+			time_out -= 10;
+		} else {
+			DRM_DEBUG_KMS("LSPCON mode changed to %s\n",
+			reqd_mode == DRM_LSPCON_MODE_LS ? "LS" : "PCON");
+			return 0;
+		}
+	}
+
+	DRM_ERROR("LSPCON mode change timed out\n");
+	return -EFAULT;
+}
+EXPORT_SYMBOL(drm_lspcon_change_mode);
