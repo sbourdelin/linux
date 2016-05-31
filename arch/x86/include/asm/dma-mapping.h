@@ -30,14 +30,11 @@ extern struct dma_map_ops *dma_ops;
 
 static inline struct dma_map_ops *get_dma_ops(struct device *dev)
 {
-#ifndef CONFIG_X86_DEV_DMA_OPS
-	return dma_ops;
-#else
-	if (unlikely(!dev) || !dev->archdata.dma_ops)
-		return dma_ops;
-	else
+#ifdef CONFIG_X86_DEV_DMA_OPS
+	if (likely(dev) && dev->archdata.dma_ops)
 		return dev->archdata.dma_ops;
 #endif
+	return dma_ops;
 }
 
 bool arch_dma_alloc_attrs(struct device **dev, gfp_t *gfp);
