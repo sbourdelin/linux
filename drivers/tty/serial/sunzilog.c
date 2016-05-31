@@ -1217,7 +1217,7 @@ sunzilog_console_write(struct console *con, const char *s, unsigned int count)
 		spin_unlock_irqrestore(&up->port.lock, flags);
 }
 
-static int __init sunzilog_console_setup(struct console *con, char *options)
+static int sunzilog_console_setup(struct console *con, char *options)
 {
 	struct uart_sunzilog_port *up = &sunzilog_port_table[con->index];
 	unsigned long flags;

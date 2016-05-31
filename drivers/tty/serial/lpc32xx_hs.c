@@ -160,8 +160,8 @@ static void lpc32xx_hsuart_console_write(struct console *co, const char *s,
 	local_irq_restore(flags);
 }
 
-static int __init lpc32xx_hsuart_console_setup(struct console *co,
-					       char *options)
+static int lpc32xx_hsuart_console_setup(struct console *co,
+					char *options)
 {
 	struct uart_port *port;
 	int baud = 115200;

@@ -1400,9 +1400,8 @@ auart_console_write(struct console *co, const char *str, unsigned int count)
 	clk_disable(s->clk);
 }
 
-static void __init
-auart_console_get_options(struct mxs_auart_port *s, int *baud,
-			  int *parity, int *bits)
+static void auart_console_get_options(struct mxs_auart_port *s, int *baud,
+				      int *parity, int *bits)
 {
 	struct uart_port *port = &s->port;
 	unsigned int lcr_h, quot;
@@ -1435,8 +1434,7 @@ auart_console_get_options(struct mxs_auart_port *s, int *baud,
 	*baud = (port->uartclk << 2) / quot;
 }
 
-static int __init
-auart_console_setup(struct console *co, char *options)
+static int auart_console_setup(struct console *co, char *options)
 {
 	struct mxs_auart_port *s;
 	int baud = 9600;

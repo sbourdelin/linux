@@ -86,8 +86,7 @@ cris_console_write(struct console *co, const char *s, unsigned int count)
 		REG_WR(ser, up->regi_ser, rw_tr_dma_en, old);
 }
 
-static int __init
-cris_console_setup(struct console *co, char *options)
+static int cris_console_setup(struct console *co, char *options)
 {
 	struct uart_port *port;
 	int baud = 115200;

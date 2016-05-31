@@ -1537,9 +1537,8 @@ mpc52xx_uart_int(int irq, void *dev_id)
 
 #ifdef CONFIG_SERIAL_MPC52xx_CONSOLE
 
-static void __init
-mpc52xx_console_get_options(struct uart_port *port,
-			    int *baud, int *parity, int *bits, int *flow)
+static void mpc52xx_console_get_options(struct uart_port *port, int *baud,
+					int *parity, int *bits, int *flow)
 {
 	unsigned char mr1;
 
@@ -1607,8 +1606,7 @@ mpc52xx_console_write(struct console *co, const char *s, unsigned int count)
 }
 
 
-static int __init
-mpc52xx_console_setup(struct console *co, char *options)
+static int mpc52xx_console_setup(struct console *co, char *options)
 {
 	struct uart_port *port = &mpc52xx_uart_ports[co->index];
 	struct device_node *np = mpc52xx_uart_nodes[co->index];

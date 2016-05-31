@@ -727,8 +727,7 @@ static void serial_pxa_put_poll_char(struct uart_port *port,
 
 #endif /* CONFIG_CONSOLE_POLL */
 
-static int __init
-serial_pxa_console_setup(struct console *co, char *options)
+static int serial_pxa_console_setup(struct console *co, char *options)
 {
 	struct uart_pxa_port *up;
 	int baud = 9600;

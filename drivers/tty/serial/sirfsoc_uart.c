@@ -1081,8 +1081,7 @@ static struct uart_ops sirfsoc_uart_ops = {
 };
 
 #ifdef CONFIG_SERIAL_SIRFSOC_CONSOLE
-static int __init
-sirfsoc_uart_console_setup(struct console *co, char *options)
+static int sirfsoc_uart_console_setup(struct console *co, char *options)
 {
 	unsigned int baud = 115200;
 	unsigned int bits = 8;
