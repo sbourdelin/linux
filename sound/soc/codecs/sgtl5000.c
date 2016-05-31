@@ -1286,17 +1286,14 @@ static int sgtl5000_enable_regulators(struct snd_soc_codec *codec)
 	for (i = 0; i < ARRAY_SIZE(sgtl5000->supplies); i++)
 		sgtl5000->supplies[i].supply = supply_names[i];
 
-	/* External VDDD only works before revision 0x11 */
-	if (sgtl5000->revision < 0x11) {
-		vddd = regulator_get_optional(codec->dev, "VDDD");
-		if (IS_ERR(vddd)) {
-			/* See if it's just not registered yet */
-			if (PTR_ERR(vddd) == -EPROBE_DEFER)
-				return -EPROBE_DEFER;
-		} else {
-			external_vddd = 1;
-			regulator_put(vddd);
-		}
+	vddd = regulator_get_optional(codec->dev, "VDDD");
+	if (IS_ERR(vddd)) {
+		/* See if it's just not registered yet */
+		if (PTR_ERR(vddd) == -EPROBE_DEFER)
+			return -EPROBE_DEFER;
+	} else {
+		external_vddd = 1;
+		regulator_put(vddd);
 	}
 
 	if (!external_vddd) {
