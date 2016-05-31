@@ -690,7 +690,8 @@ static void pnx8xxx_console_putchar(struct uart_port *port, int ch)
 
 /*
  * Interrupts are disabled on entering
- */static void
+ */
+static void
 pnx8xxx_console_write(struct console *co, const char *s, unsigned int count)
 {
 	struct pnx8xxx_port *sport = &pnx8xxx_ports[co->index];
