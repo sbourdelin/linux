@@ -1150,6 +1150,7 @@ static const struct x86_cpu_id rapl_ids[] __initconst = {
 	RAPL_CPU(0x57, rapl_defaults_hsw_server),/* Knights Landing */
 	RAPL_CPU(0x8E, rapl_defaults_core),/* Kabylake */
 	RAPL_CPU(0x9E, rapl_defaults_core),/* Kabylake */
+	RAPL_CPU(0x5F, rapl_defaults_core),/* Denverton micro server */
 	{}
 };
 MODULE_DEVICE_TABLE(x86cpu, rapl_ids);
