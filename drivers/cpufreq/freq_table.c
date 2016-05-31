@@ -118,6 +118,130 @@ int cpufreq_generic_frequency_table_verify(struct cpufreq_policy *policy)
 }
 EXPORT_SYMBOL_GPL(cpufreq_generic_frequency_table_verify);
 
+static int cpufreq_find_target_index_l(struct cpufreq_policy *policy,
+				       unsigned int target_freq)
+{
+	struct cpufreq_frequency_table *pos, *best = NULL;
+	unsigned int freq;
+
+	cpufreq_for_each_valid_entry(pos, policy->sorted_freq_table) {
+		freq = pos->frequency;
+
+		if ((freq < policy->min) || (freq > policy->max))
+			continue;
+
+		if (freq >= target_freq)
+			return pos->driver_data;
+
+		best = pos;
+	}
+
+	if (best)
+		return best->driver_data;
+
+	return -EINVAL;
+}
+
+static int cpufreq_find_target_index_h(struct cpufreq_policy *policy,
+				       unsigned int target_freq)
+{
+	struct cpufreq_frequency_table *pos, *best = NULL;
+	unsigned int freq;
+
+	cpufreq_for_each_valid_entry(pos, policy->sorted_freq_table) {
+		freq = pos->frequency;
+
+		if ((freq < policy->min) || (freq > policy->max))
+			continue;
+
+		if (freq == target_freq)
+			return pos->driver_data;
+
+		if (freq < target_freq) {
+			best = pos;
+			continue;
+		}
+
+		/* No freq found below target_freq */
+		if (!best)
+			best = pos;
+		break;
+	}
+
+	if (best)
+		return best->driver_data;
+
+	return -EINVAL;
+}
+
+static int cpufreq_find_target_index_c(struct cpufreq_policy *policy,
+				       unsigned int target_freq)
+{
+	struct cpufreq_frequency_table *pos, *best = NULL;
+	unsigned int freq;
+
+	cpufreq_for_each_valid_entry(pos, policy->sorted_freq_table) {
+		freq = pos->frequency;
+
+		if ((freq < policy->min) || (freq > policy->max))
+			continue;
+
+		if (freq == target_freq)
+			return pos->driver_data;
+
+		if (freq < target_freq) {
+			best = pos;
+			continue;
+		}
+
+		/* No freq found below target_freq */
+		if (!best) {
+			best = pos;
+			break;
+		}
+
+		/* Choose the closest freq */
+		if (target_freq - best->frequency > freq - target_freq)
+			best = pos;
+
+		break;
+	}
+
+	if (best)
+		return best->driver_data;
+
+	return -EINVAL;
+}
+
+int cpufreq_find_target_index(struct cpufreq_policy *policy,
+			      unsigned int target_freq, unsigned int relation,
+			      unsigned int *index)
+{
+	int new_index;
+
+	switch (relation) {
+	case CPUFREQ_RELATION_L:
+		new_index = cpufreq_find_target_index_l(policy, target_freq);
+		break;
+	case CPUFREQ_RELATION_H:
+		new_index = cpufreq_find_target_index_h(policy, target_freq);
+		break;
+	case CPUFREQ_RELATION_C:
+		new_index = cpufreq_find_target_index_c(policy, target_freq);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	if (new_index == -EINVAL)
+		return new_index;
+
+	*index = new_index;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(cpufreq_find_target_index);
+
+/* Deprecated */
 int cpufreq_frequency_table_target(struct cpufreq_policy *policy,
 				   struct cpufreq_frequency_table *table,
 				   unsigned int target_freq,

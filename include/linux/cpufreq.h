@@ -585,6 +585,10 @@ int cpufreq_frequency_table_verify(struct cpufreq_policy *policy,
 				   struct cpufreq_frequency_table *table);
 int cpufreq_generic_frequency_table_verify(struct cpufreq_policy *policy);
 
+int cpufreq_find_target_index(struct cpufreq_policy *policy,
+			      unsigned int target_freq, unsigned int relation,
+			      unsigned int *index);
+/* Deprecated */
 int cpufreq_frequency_table_target(struct cpufreq_policy *policy,
 				   struct cpufreq_frequency_table *table,
 				   unsigned int target_freq,
