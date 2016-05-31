@@ -125,6 +125,8 @@ int rcu_num_lvls __read_mostly = RCU_NUM_LVLS;
 /* Number of rcu_nodes at specified level. */
 static int num_rcu_lvl[] = NUM_RCU_LVL_INIT;
 int rcu_num_nodes __read_mostly = NUM_RCU_NODES; /* Total # rcu_nodes in use. */
+/* panic() on RCU Stall sysctl*/
+int sysctl_panic_on_rcu_stall;
 
 /*
  * The rcu_scheduler_active variable transitions from zero to one just
@@ -1390,6 +1392,9 @@ static void print_other_cpu_stall(struct rcu_state *rsp, unsigned long gpnum)
 
 	rcu_check_gp_kthread_starvation(rsp);
 
+	if (sysctl_panic_on_rcu_stall)
+		panic("RCU Stall\n");
+
 	force_quiescent_state(rsp);  /* Kick them all. */
 }
 
@@ -1429,6 +1434,9 @@ static void print_cpu_stall(struct rcu_state *rsp)
 		WRITE_ONCE(rsp->jiffies_stall,
 			   jiffies + 3 * rcu_jiffies_till_stall_check() + 3);
 	raw_spin_unlock_irqrestore_rcu_node(rnp, flags);
+
+	if (sysctl_panic_on_rcu_stall)
+		panic("RCU Stall\n");
 
 	/*
 	 * Attempt to revive the RCU machinery by forcing a context switch.
