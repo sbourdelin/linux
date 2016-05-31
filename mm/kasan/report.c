@@ -90,6 +90,9 @@ static void print_error_description(struct kasan_access_info *info)
 	case KASAN_KMALLOC_FREE:
 		bug_type = "use-after-free";
 		break;
+	case KASAN_KMALLOC_META:
+		bug_type = "touching kmalloc metadata";
+		break;
 	}
 
 	pr_err("BUG: KASAN: %s in %pS at addr %p\n",

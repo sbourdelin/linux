@@ -518,6 +518,19 @@ void kasan_poison_slab_free(struct kmem_cache *cache, void *object)
 		return;
 
 	kasan_poison_shadow(object, rounded_up_size, KASAN_KMALLOC_FREE);
+#ifdef CONFIG_SLAB
+	if (cache->flags & SLAB_KASAN) {
+		struct kasan_alloc_meta *alloc_info =
+			get_alloc_info(cache, object);
+		struct kasan_free_meta *free_info =
+			get_free_info(cache, object);
+		kasan_poison_shadow(alloc_info,
+			sizeof(struct kasan_alloc_meta), KASAN_KMALLOC_META);
+		kasan_poison_shadow(free_info,
+			sizeof(struct kasan_free_meta), KASAN_KMALLOC_META);
+	}
+#endif
+
 }
 
 bool kasan_slab_free(struct kmem_cache *cache, void *object)
@@ -584,6 +597,8 @@ void kasan_kmalloc(struct kmem_cache *cache, const void *object, size_t size,
 		alloc_info->state = KASAN_STATE_ALLOC;
 		alloc_info->alloc_size = size;
 		set_track(&alloc_info->track, flags);
+		kasan_poison_shadow(alloc_info,
+			sizeof(struct kasan_alloc_meta), KASAN_KMALLOC_META);
 	}
 #endif
 }
