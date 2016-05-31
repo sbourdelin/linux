@@ -1,5 +1,8 @@
 #include "unwind.h"
 #include "thread.h"
+#include "session.h"
+#include "debug.h"
+#include "arch/common.h"
 
 struct unwind_libunwind_ops __weak *local_unwind_libunwind_ops;
 
@@ -9,11 +12,32 @@ void unwind__register_ops(struct thread *thread,
 	thread->unwind_libunwind_ops = ops;
 }
 
-int unwind__prepare_access(struct thread *thread)
+int unwind__prepare_access(struct thread *thread, struct map *map)
 {
-	unwind__register_ops(thread, local_unwind_libunwind_ops);
+	const char *arch;
+	enum dso_type dso_type;
+	struct unwind_libunwind_ops *ops = local_unwind_libunwind_ops;
 
-	return thread->unwind_libunwind_ops->prepare_access(thread);
+	if (!thread->mg->machine->env)
+		return 0;
+
+	dso_type = dso__type(map->dso, thread->mg->machine);
+	if (dso_type == DSO__TYPE_UNKNOWN)
+		return 0;
+
+	if (thread->addr_space)
+		pr_debug("unwind: thread map already set, 64bit is %d, dso=%s\n",
+			 dso_type == DSO__TYPE_64BIT, map->dso->name);
+
+	arch = normalize_arch(thread->mg->machine->env->arch);
+	pr_debug("unwind: target platform=%s\n", arch);
+
+	unwind__register_ops(thread, ops);
+
+	if (thread->unwind_libunwind_ops)
+		return thread->unwind_libunwind_ops->prepare_access(thread);
+	else
+		return 0;
 }
 
 void unwind__flush_access(struct thread *thread)
