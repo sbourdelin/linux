@@ -3367,10 +3367,9 @@ __alloc_pages_direct_reclaim(gfp_t gfp_mask, unsigned int order,
 	bool drained = false;
 
 	*did_some_progress = __perform_reclaim(gfp_mask, order, ac);
-	if (unlikely(!(*did_some_progress)))
-		return NULL;
 
 retry:
+	/* We attempt even when no progress, as kswapd might have done some */
 	page = get_page_from_freelist(gfp_mask, order, alloc_flags, ac);
 
 	/*
@@ -3378,7 +3377,7 @@ retry:
 	 * pages are pinned on the per-cpu lists or in high alloc reserves.
 	 * Shrink them them and try again
 	 */
-	if (!page && !drained) {
+	if (!page && *did_some_progress && !drained) {
 		unreserve_highatomic_pageblock(ac);
 		drain_all_pages(NULL);
 		drained = true;
@@ -3592,14 +3591,21 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	 */
 	alloc_flags = gfp_to_alloc_flags(gfp_mask);
 
-retry:
 	if (gfp_mask & __GFP_KSWAPD_RECLAIM)
 		wake_all_kswapds(order, ac);
 
-	/* This is the last chance, in general, before the goto nopage. */
+	/*
+	 * The adjusted alloc_flags might result in immediate success, so try
+	 * that first
+	 */
 	page = get_page_from_freelist(gfp_mask, order, alloc_flags, ac);
 	if (page)
 		goto got_pg;
+
+retry:
+	/* Ensure kswapd doesn't accidentally go to sleep as long as we loop */
+	if (gfp_mask & __GFP_KSWAPD_RECLAIM)
+		wake_all_kswapds(order, ac);
 
 	/* Allocate without watermarks if the context allows */
 	if (gfp_pfmemalloc_allowed(gfp_mask)) {
