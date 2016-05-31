@@ -14,6 +14,17 @@ struct unwind_entry {
 
 typedef int (*unwind_entry_cb_t)(struct unwind_entry *entry, void *arg);
 
+struct unwind_libunwind_ops {
+	int (*prepare_access)(struct thread *thread);
+	void (*flush_access)(struct thread *thread);
+	void (*finish_access)(struct thread *thread);
+	int (*get_entries)(unwind_entry_cb_t cb, void *arg,
+			   struct thread *thread,
+			   struct perf_sample *data, int max_stack);
+};
+
+struct unwind_libunwind_ops *local_unwind_libunwind_ops;
+
 #ifdef HAVE_DWARF_UNWIND_SUPPORT
 int unwind__get_entries(unwind_entry_cb_t cb, void *arg,
 			struct thread *thread,
@@ -24,6 +35,8 @@ int libunwind__arch_reg_id(int regnum);
 int unwind__prepare_access(struct thread *thread);
 void unwind__flush_access(struct thread *thread);
 void unwind__finish_access(struct thread *thread);
+void unwind__register_ops(struct thread *thread,
+			  struct unwind_libunwind_ops *ops);
 #else
 static inline int unwind__prepare_access(struct thread *thread __maybe_unused)
 {
@@ -32,6 +45,9 @@ static inline int unwind__prepare_access(struct thread *thread __maybe_unused)
 
 static inline void unwind__flush_access(struct thread *thread __maybe_unused) {}
 static inline void unwind__finish_access(struct thread *thread __maybe_unused) {}
+static inline void
+unwind__register_ops(struct thread *thread __maybe_unused,
+		     struct unwind_libunwind_ops *ops __maybe_unused) {}
 #endif
 #else
 static inline int
@@ -51,5 +67,8 @@ static inline int unwind__prepare_access(struct thread *thread __maybe_unused)
 
 static inline void unwind__flush_access(struct thread *thread __maybe_unused) {}
 static inline void unwind__finish_access(struct thread *thread __maybe_unused) {}
+static inline void
+unwind__register_ops(struct thread *thread __maybe_unused,
+		     struct unwind_libunwind_ops *ops __maybe_unused) {}
 #endif /* HAVE_DWARF_UNWIND_SUPPORT */
 #endif /* __UNWIND_H */
