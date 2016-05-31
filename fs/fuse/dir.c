@@ -932,6 +932,38 @@ int fuse_update_attributes(struct inode *inode, struct kstat *stat,
 	return err;
 }
 
+int fuse_reverse_inval_dircache_entries(struct super_block *sb,
+					u64 parent_nodeid)
+{
+	int err = -ENOTDIR;
+	struct inode *parent;
+	struct dentry *dir;
+	struct dentry *child;
+
+	parent = ilookup5(sb, parent_nodeid, fuse_inode_eq, &parent_nodeid);
+	if (!parent)
+		return -ENOENT;
+
+	inode_lock(parent);
+	if (!S_ISDIR(parent->i_mode))
+		goto unlock;
+
+	err = -ENOENT;
+	dir = d_find_alias(parent);
+	if (!dir)
+		goto unlock;
+	err = 0;
+	spin_lock(&dir->d_lock);
+	list_for_each_entry(child, &dir->d_subdirs, d_child)
+		fuse_invalidate_entry_cache(child);
+	spin_unlock(&dir->d_lock);
+	dput(dir);
+ unlock:
+	inode_unlock(parent);
+	iput(parent);
+	return err;
+}
+
 int fuse_reverse_inval_entry(struct super_block *sb, u64 parent_nodeid,
 			     u64 child_nodeid, struct qstr *name)
 {

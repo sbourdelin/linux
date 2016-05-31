@@ -374,6 +374,7 @@ enum fuse_notify_code {
 	FUSE_NOTIFY_STORE = 4,
 	FUSE_NOTIFY_RETRIEVE = 5,
 	FUSE_NOTIFY_DELETE = 6,
+	FUSE_NOTIFY_INVAL_DIRCACHE_ENTRIES = 7,
 	FUSE_NOTIFY_CODE_MAX,
 };
 
@@ -714,6 +715,10 @@ struct fuse_direntplus {
 	offsetof(struct fuse_direntplus, dirent.name)
 #define FUSE_DIRENTPLUS_SIZE(d) \
 	FUSE_DIRENT_ALIGN(FUSE_NAME_OFFSET_DIRENTPLUS + (d)->dirent.namelen)
+
+struct fuse_notify_inval_dircache_entries_out {
+	uint64_t	parent;
+};
 
 struct fuse_notify_inval_inode_out {
 	uint64_t	ino;

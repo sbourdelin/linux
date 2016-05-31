@@ -924,6 +924,9 @@ int fuse_reverse_inval_inode(struct super_block *sb, u64 nodeid,
 int fuse_reverse_inval_entry(struct super_block *sb, u64 parent_nodeid,
 			     u64 child_nodeid, struct qstr *name);
 
+int fuse_reverse_inval_dircache_entries(struct super_block *sb,
+					u64 parent_nodeid);
+
 int fuse_do_open(struct fuse_conn *fc, u64 nodeid, struct file *file,
 		 bool isdir);
 

@@ -1490,6 +1490,31 @@ err:
 	return err;
 }
 
+static int
+fuse_notify_inval_dircache_entries(struct fuse_conn *fc, unsigned int size,
+				   struct fuse_copy_state *cs)
+{
+	struct fuse_notify_inval_dircache_entries_out outarg;
+	int err = -EINVAL;
+
+	if (size < sizeof(outarg))
+		goto err;
+	err = fuse_copy_one(cs, &outarg, sizeof(outarg));
+	if (err)
+		goto err;
+	fuse_copy_finish(cs);
+	down_read(&fc->killsb);
+	err = -ENOENT;
+	if (fc->sb)
+		err = fuse_reverse_inval_dircache_entries(fc->sb,
+							  outarg.parent);
+	up_read(&fc->killsb);
+	return err;
+err:
+	fuse_copy_finish(cs);
+	return err;
+}
+
 static int fuse_notify_inval_entry(struct fuse_conn *fc, unsigned int size,
 				   struct fuse_copy_state *cs)
 {
@@ -1814,6 +1839,9 @@ static int fuse_notify(struct fuse_conn *fc, enum fuse_notify_code code,
 
 	case FUSE_NOTIFY_DELETE:
 		return fuse_notify_delete(fc, size, cs);
+
+	case FUSE_NOTIFY_INVAL_DIRCACHE_ENTRIES:
+		return fuse_notify_inval_dircache_entries(fc, size, cs);
 
 	default:
 		fuse_copy_finish(cs);
