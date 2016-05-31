@@ -136,6 +136,7 @@ struct cpuinfo_x86 {
 	/* Index into per_cpu list: */
 	u16			cpu_index;
 	u32			microcode;
+	u32			platform_id;
 };
 
 #define X86_VENDOR_INTEL	0
