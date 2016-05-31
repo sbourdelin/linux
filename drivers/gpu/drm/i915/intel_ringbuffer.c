@@ -2179,7 +2179,7 @@ static int intel_alloc_ringbuffer_obj(struct drm_device *dev,
 	obj = NULL;
 	if (!HAS_LLC(dev))
 		obj = i915_gem_object_create_stolen(dev, ringbuf->size);
-	if (obj == NULL)
+	if (IS_ERR_OR_NULL(obj))
 		obj = i915_gem_object_create(dev, ringbuf->size);
 	if (IS_ERR(obj))
 		return PTR_ERR(obj);
@@ -2740,7 +2740,7 @@ int intel_init_render_ring_buffer(struct drm_device *dev)
 	engine->hw_id = 0;
 	engine->mmio_base = RENDER_RING_BASE;
 
-	if (INTEL_GEN(dev_priv) >= 8) {
+	if (INTEL_INFO(dev)->gen >= 8) {
 		if (i915_semaphore_is_enabled(dev_priv)) {
 			obj = i915_gem_object_create(dev, 4096);
 			if (IS_ERR(obj)) {

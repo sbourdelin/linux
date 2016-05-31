@@ -598,27 +598,30 @@ int i915_guc_submit(struct drm_i915_gem_request *rq)
  * object needs to be pinned lifetime. Also we must pin it to gtt space other
  * than [0, GUC_WOPCM_TOP) because this range is reserved inside GuC.
  *
- * Return:	A drm_i915_gem_object if successful, otherwise NULL.
+ * Return:	A drm_i915_gem_object if successful, otherwise error pointer.
  */
 static struct drm_i915_gem_object *gem_allocate_guc_obj(struct drm_device *dev,
 							u32 size)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct drm_i915_gem_object *obj;
+	int ret;
 
 	obj = i915_gem_object_create(dev, size);
 	if (IS_ERR(obj))
-		return NULL;
+		return obj;
 
-	if (i915_gem_object_get_pages(obj)) {
+	ret = i915_gem_object_get_pages(obj);
+	if (ret) {
 		drm_gem_object_unreference(&obj->base);
-		return NULL;
+		return ERR_PTR(ret);
 	}
 
-	if (i915_gem_obj_ggtt_pin(obj, PAGE_SIZE,
-			PIN_OFFSET_BIAS | GUC_WOPCM_TOP)) {
+	ret = i915_gem_obj_ggtt_pin(obj, PAGE_SIZE,
+				    PIN_OFFSET_BIAS | GUC_WOPCM_TOP);
+	if (ret) {
 		drm_gem_object_unreference(&obj->base);
-		return NULL;
+		return ERR_PTR(ret);
 	}
 
 	/* Invalidate GuC TLB to let GuC take the latest updates to GTT. */
@@ -693,7 +696,7 @@ static void guc_client_free(struct drm_device *dev,
  * @ctx:	the context that owns the client (we use the default render
  * 		context)
  *
- * Return:	An i915_guc_client object if success, else NULL.
+ * Return:	An i915_guc_client object if success, error pointer on failure.
  */
 static struct i915_guc_client *guc_client_alloc(struct drm_device *dev,
 						uint32_t priority,
@@ -703,10 +706,11 @@ static struct i915_guc_client *guc_client_alloc(struct drm_device *dev,
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_guc *guc = &dev_priv->guc;
 	struct drm_i915_gem_object *obj;
+	int ret;
 
 	client = kzalloc(sizeof(*client), GFP_KERNEL);
 	if (!client)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
 	client->doorbell_id = GUC_INVALID_DOORBELL_ID;
 	client->priority = priority;
@@ -717,13 +721,16 @@ static struct i915_guc_client *guc_client_alloc(struct drm_device *dev,
 			GUC_MAX_GPU_CONTEXTS, GFP_KERNEL);
 	if (client->ctx_index >= GUC_MAX_GPU_CONTEXTS) {
 		client->ctx_index = GUC_INVALID_CTX_ID;
+		ret = -EINVAL;
 		goto err;
 	}
 
 	/* The first page is doorbell/proc_desc. Two followed pages are wq. */
 	obj = gem_allocate_guc_obj(dev, GUC_DB_SIZE + GUC_WQ_SIZE);
-	if (!obj)
+	if (IS_ERR(obj)) {
+		ret = PTR_ERR(obj);
 		goto err;
+	}
 
 	/* We'll keep just the first (doorbell/proc) page permanently kmap'd. */
 	client->client_obj = obj;
@@ -744,9 +751,11 @@ static struct i915_guc_client *guc_client_alloc(struct drm_device *dev,
 		client->proc_desc_offset = (GUC_DB_SIZE / 2);
 
 	client->doorbell_id = assign_doorbell(guc, client->priority);
-	if (client->doorbell_id == GUC_INVALID_DOORBELL_ID)
+	if (client->doorbell_id == GUC_INVALID_DOORBELL_ID) {
 		/* XXX: evict a doorbell instead */
+		ret = -EINVAL;
 		goto err;
+	}
 
 	guc_init_proc_desc(guc, client);
 	guc_init_ctx_desc(guc, client);
@@ -754,7 +763,8 @@ static struct i915_guc_client *guc_client_alloc(struct drm_device *dev,
 
 	/* XXX: Any cache flushes needed? General domain mgmt calls? */
 
-	if (host2guc_allocate_doorbell(guc, client))
+	ret = host2guc_allocate_doorbell(guc, client);
+	if (ret)
 		goto err;
 
 	DRM_DEBUG_DRIVER("new priority %u client %p: ctx_index %u db_id %u\n",
@@ -766,7 +776,7 @@ err:
 	DRM_ERROR("FAILED to create priority %u GuC client!\n", priority);
 
 	guc_client_free(dev, client);
-	return NULL;
+	return ERR_PTR(ret);
 }
 
 static void guc_create_log(struct intel_guc *guc)
@@ -791,7 +801,7 @@ static void guc_create_log(struct intel_guc *guc)
 	obj = guc->log_obj;
 	if (!obj) {
 		obj = gem_allocate_guc_obj(dev_priv->dev, size);
-		if (!obj) {
+		if (IS_ERR(obj)) {
 			/* logging will be off */
 			i915.guc_log_level = -1;
 			return;
@@ -911,6 +921,7 @@ int i915_guc_submission_init(struct drm_device *dev)
 	const size_t poolsize = GUC_MAX_GPU_CONTEXTS * ctxsize;
 	const size_t gemsize = round_up(poolsize, PAGE_SIZE);
 	struct intel_guc *guc = &dev_priv->guc;
+	int ret;
 
 	if (!i915.enable_guc_submission)
 		return 0; /* not enabled  */
@@ -919,8 +930,11 @@ int i915_guc_submission_init(struct drm_device *dev)
 		return 0; /* already allocated */
 
 	guc->ctx_pool_obj = gem_allocate_guc_obj(dev_priv->dev, gemsize);
-	if (!guc->ctx_pool_obj)
-		return -ENOMEM;
+	if (IS_ERR(guc->ctx_pool_obj)) {
+		ret = PTR_ERR(guc->ctx_pool_obj);
+		guc->ctx_pool_obj = NULL;
+		return ret;
+	}
 
 	ida_init(&guc->ctx_ids);
 
@@ -941,9 +955,9 @@ int i915_guc_submission_enable(struct drm_device *dev)
 	client = guc_client_alloc(dev,
 				  GUC_CTX_PRIORITY_KMD_NORMAL,
 				  dev_priv->kernel_context);
-	if (!client) {
+	if (IS_ERR(client)) {
 		DRM_ERROR("Failed to create execbuf guc_client\n");
-		return -ENOMEM;
+		return PTR_ERR(client);
 	}
 
 	guc->execbuf_client = client;
