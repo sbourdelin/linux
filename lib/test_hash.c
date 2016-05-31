@@ -143,7 +143,7 @@ static int __init
 test_hash_init(void)
 {
 	char buf[SIZE+1];
-	u32 string_or = 0, hash_or[2][33] = { 0 };
+	u32 string_or = 0, hash_or[2][33] = { { 0 } };
 	unsigned tests = 0;
 	unsigned long long h64 = 0;
 	int i, j;
@@ -221,17 +221,17 @@ test_hash_init(void)
 	/* Issue notices about skipped tests. */
 #ifndef HAVE_ARCH__HASH_32
 	pr_info("__hash_32() has no arch implementation to test.");
-#elif HAVE_ARCH__HASH_32 != 1
+#elif defined(HAVE_ARCH__HASH_32) && HAVE_ARCH__HASH_32 != 1
 	pr_info("__hash_32() is arch-specific; not compared to generic.");
 #endif
 #ifndef HAVE_ARCH_HASH_32
 	pr_info("hash_32() has no arch implementation to test.");
-#elif HAVE_ARCH_HASH_32 != 1
+#elif defined(HAVE_ARCH_HASH_32) && HAVE_ARCH_HASH_32 != 1
 	pr_info("hash_32() is arch-specific; not compared to generic.");
 #endif
 #ifndef HAVE_ARCH_HASH_64
 	pr_info("hash_64() has no arch implementation to test.");
-#elif HAVE_ARCH_HASH_64 != 1
+#elif defined(HAVE_ARCH_HASH_64) && HAVE_ARCH_HASH_64 != 1
 	pr_info("hash_64() is arch-specific; not compared to generic.");
 #endif
 
