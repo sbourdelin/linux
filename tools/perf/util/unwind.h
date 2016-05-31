@@ -23,8 +23,6 @@ struct unwind_libunwind_ops {
 			   struct perf_sample *data, int max_stack);
 };
 
-struct unwind_libunwind_ops *local_unwind_libunwind_ops;
-
 #ifdef HAVE_DWARF_UNWIND_SUPPORT
 int unwind__get_entries(unwind_entry_cb_t cb, void *arg,
 			struct thread *thread,
