@@ -523,15 +523,23 @@ static struct snd_soc_dai_driver ak4642_dai = {
 	.symmetric_rates = 1,
 };
 
+static int ak4642_suspend(struct snd_soc_codec *codec)
+{
+	struct regmap *regmap = dev_get_regmap(codec->dev, NULL);
+
+	regcache_cache_only(regmap, true);
+	regcache_mark_dirty(regmap);
+	return 0;
+}
+
 static int ak4642_resume(struct snd_soc_codec *codec)
 {
 	struct regmap *regmap = dev_get_regmap(codec->dev, NULL);
 
-	regcache_mark_dirty(regmap);
+	regcache_cache_only(regmap, false);
 	regcache_sync(regmap);
 	return 0;
 }
-
 static int ak4642_probe(struct snd_soc_codec *codec)
 {
 	struct ak4642_priv *priv = snd_soc_codec_get_drvdata(codec);
