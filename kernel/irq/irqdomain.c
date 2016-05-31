@@ -114,6 +114,10 @@ struct irq_domain *__irq_domain_add(struct fwnode_handle *fwnode, int size,
 	domain->hwirq_max = hwirq_max;
 	domain->revmap_size = size;
 	domain->revmap_direct_max_irq = direct_max;
+	if (is_fwnode_irqchip(fwnode))
+		domain->name = container_of(fwnode, struct irqchip_fwid, fwnode)->name;
+	else
+		domain->name = of_node_full_name(of_node);
 	irq_domain_check_hierarchy(domain);
 
 	mutex_lock(&irq_domain_mutex);
