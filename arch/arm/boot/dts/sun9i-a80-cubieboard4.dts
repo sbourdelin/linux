@@ -255,6 +255,18 @@
 
 #include "axp809.dtsi"
 
+&reg_vcc3v0 {
+	status = "disabled";
+};
+
+&reg_vcc3v3 {
+	status = "disabled";
+};
+
+&reg_vcc5v0 {
+	status = "disabled";
+};
+
 &uart0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&uart0_pins_a>;
