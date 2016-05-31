@@ -1066,6 +1066,22 @@ static int i915_pm_suspend(struct device *dev)
 	return i915_drm_suspend(drm_dev);
 }
 
+/* freeze: before creating the hibernation_image */
+static int i915_pm_freeze(struct device *dev)
+{
+	int ret;
+
+	ret = i915_gem_freeze(pci_get_drvdata(to_pci_dev(dev)));
+	if (ret)
+		return ret;
+
+	ret = i915_pm_suspend(dev);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
 static int i915_pm_suspend_late(struct device *dev)
 {
 	struct drm_device *drm_dev = dev_to_i915(dev)->dev;
@@ -1113,12 +1129,6 @@ static int i915_pm_resume(struct device *dev)
 		return 0;
 
 	return i915_drm_resume(drm_dev);
-}
-
-/* freeze: before creating the hibernation_image */
-static int i915_pm_freeze(struct device *dev)
-{
-	return i915_pm_suspend(dev);
 }
 
 static int i915_pm_freeze_late(struct device *dev)
