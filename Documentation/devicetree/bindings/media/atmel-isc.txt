@@ -1,0 +1,88 @@
+Atmel Image Sensor Controller (ISC)
+----------------------------------------------
+
+Required properties for ISC:
+- compatible
+	Must be "atmel,sama5d2-isc"
+- reg
+	Physical base address and length of the registers set for the device;
+- interrupts
+	Should contain IRQ line for the ISI;
+- clocks
+	List of clock specifiers, corresponding to entries in
+	the clock-names property;
+	Please refer to clock-bindings.txt.
+- clock-names
+	Required elements: "hclock", "ispck".
+- pinctrl-names, pinctrl-0
+	Please refer to pinctrl-bindings.txt.
+- isc-ispck
+	The clock for the ISC digital pipeline.
+	- compatible
+		Must be "atmel,sama5d2-isc-ispck".
+	- clock-cells
+		From common clock binding; should be set to 0.
+	- clocks
+		The clock source phandles.
+- isc-mck
+	The clock for the image sensor.
+	- compatible
+		Must be "atmel,sama5d2-isc-mck".
+	- clock-cells
+		From common clock binding; should be set to 0.
+	- clocks
+		The clock source phandles.
+
+ISC supports a single port node with parallel bus. It should contain one
+'port' child node with child 'endpoint' node. Please refer to the bindings
+defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
+
+Example:
+isc: isc@f0008000 {
+	compatible = "atmel,sama5d2-isc";
+	reg = <0xf0008000 0x4000>;
+	interrupts = <46 IRQ_TYPE_LEVEL_HIGH 5>;
+	clocks = <&isc_clk>, <&isc_ispck>;
+	clock-names = "hclock", "ispck";
+
+	port {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		isc_0: endpoint {
+			remote-endpoint = <&ov7740_0>;
+			hsync-active = <1>;
+			vsync-active = <0>;
+			pclk-sample = <1>;
+		};
+	};
+
+	isc_ispck: isc-ispck@0 {
+		compatible = "atmel,sama5d2-isc-ispck";
+		#clock-cells = <0>;
+		clocks = <&isc_clk>, <&iscck>;
+	};
+
+	isc_mck: isc-mck@1 {
+		compatible = "atmel,sama5d2-isc-mck";
+		#clock-cells = <0>;
+		clocks = <&isc_clk>, <&iscck>, <&isc_gclk>;
+	};
+};
+
+i2c1: i2c@fc028000 {
+	ov7740: camera@21 {
+	compatible = "ovti,ov7740";
+	reg = <0x21>;
+
+	clocks = <&isc_mck>;
+	clock-names = "xvclk";
+	assigned-clocks = <&isc_mck>;
+	assigned-clock-rates = <24000000>;
+
+	port {
+		ov7740_0: endpoint {
+			remote-endpoint = <&isc_0>;
+		};
+	};
+};
