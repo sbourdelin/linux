@@ -2243,11 +2243,25 @@ static bool intel_ddi_compute_config(struct intel_encoder *encoder,
 {
 	int type = encoder->type;
 	int port = intel_ddi_get_encoder_port(encoder);
+	struct intel_digital_port *dig_port = enc_to_dig_port(&encoder->base);
 
 	WARN(type == INTEL_OUTPUT_UNKNOWN, "compute_config() on unknown output!\n");
 
 	if (port == PORT_A)
 		pipe_config->cpu_transcoder = TRANSCODER_EDP;
+
+	/*
+	* A digital port with active lspcon device, should be detected
+	* as HDMI when in LS mode and as DP when in PCON mode.
+	*/
+	if (is_lspcon_active(dig_port)) {
+		struct intel_lspcon *lspcon = &dig_port->lspcon;
+
+		if (lspcon->mode_of_op == DRM_LSPCON_MODE_LS)
+			type = INTEL_OUTPUT_HDMI;
+		else
+			type = INTEL_OUTPUT_DISPLAYPORT;
+	}
 
 	if (type == INTEL_OUTPUT_HDMI)
 		return intel_hdmi_compute_config(encoder, pipe_config);

@@ -1452,6 +1452,8 @@ struct intel_hdmi *enc_to_intel_hdmi(struct drm_encoder *encoder);
 bool intel_hdmi_compute_config(struct intel_encoder *encoder,
 			       struct intel_crtc_state *pipe_config);
 void intel_dp_dual_mode_set_tmds_output(struct intel_hdmi *hdmi, bool enable);
+enum drm_connector_status
+intel_hdmi_detect(struct drm_connector *connector, bool force);
 
 /* intel_lvds.c */
 void intel_lvds_init(struct drm_device *dev);

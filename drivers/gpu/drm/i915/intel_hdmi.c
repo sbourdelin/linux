@@ -1444,15 +1444,21 @@ intel_hdmi_set_edid(struct drm_connector *connector, bool force)
 {
 	struct drm_i915_private *dev_priv = to_i915(connector->dev);
 	struct intel_hdmi *intel_hdmi = intel_attached_hdmi(connector);
+	struct intel_digital_port *dig_port = hdmi_to_dig_port(intel_hdmi);
+	struct i2c_adapter *adapter;
 	struct edid *edid = NULL;
 	bool connected = false;
 
 	if (force) {
 		intel_display_power_get(dev_priv, POWER_DOMAIN_GMBUS);
 
-		edid = drm_get_edid(connector,
-				    intel_gmbus_get_adapter(dev_priv,
-				    intel_hdmi->ddc_bus));
+		if (is_lspcon_active(dig_port))
+			adapter = &dig_port->lspcon.aux->ddc;
+		else
+			adapter = intel_gmbus_get_adapter(dev_priv,
+				intel_hdmi->ddc_bus);
+
+		edid = drm_get_edid(connector, adapter);
 
 		intel_hdmi_dp_dual_mode_detect(connector, edid != NULL);
 
@@ -1479,7 +1485,7 @@ intel_hdmi_set_edid(struct drm_connector *connector, bool force)
 	return connected;
 }
 
-static enum drm_connector_status
+enum drm_connector_status
 intel_hdmi_detect(struct drm_connector *connector, bool force)
 {
 	enum drm_connector_status status;

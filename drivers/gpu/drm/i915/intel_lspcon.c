@@ -37,6 +37,12 @@ bool is_lspcon_active(struct intel_digital_port *dig_port)
 	return dig_port->lspcon.active;
 }
 
+enum drm_connector_status
+lspcon_ls_mode_detect(struct drm_connector *connector, bool force)
+{
+	return intel_hdmi_detect(connector, force);
+}
+
 enum drm_lspcon_mode lspcon_get_current_mode(struct intel_lspcon *lspcon)
 {
 	enum drm_lspcon_mode current_mode;

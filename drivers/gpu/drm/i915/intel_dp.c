@@ -4276,6 +4276,18 @@ intel_dp_detect(struct drm_connector *connector, bool force)
 	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n",
 		      connector->base.id, connector->name);
 
+	/*
+	* LSPCON is a DP->HDMI converter which should be detected as
+	* HDMI in LS mode, and DP in PCON mode. So if LSPCON is in LS
+	* mode, do not try to read DPCD, but detect as HDMI.
+	*/
+	if (is_lspcon_active(intel_dig_port)) {
+		struct intel_lspcon *lspcon = &intel_dig_port->lspcon;
+
+		if (lspcon->mode_of_op == DRM_LSPCON_MODE_LS)
+			return lspcon_ls_mode_detect(connector, force);
+	}
+
 	if (intel_dp->is_mst) {
 		/* MST devices are disconnected from a monitor POV */
 		intel_dp_unset_edid(intel_dp);
