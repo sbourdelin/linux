@@ -152,6 +152,22 @@ static int max77620_gpio_dir_output(struct gpio_chip *gc, unsigned int offset,
 	return ret;
 }
 
+static int max77620_gpio_get_direction(struct gpio_chip *gc,
+				       unsigned int offset)
+{
+	struct max77620_gpio *mgpio = gpiochip_get_data(gc);
+	unsigned int val;
+	int ret;
+
+	ret = regmap_read(mgpio->rmap, GPIO_REG_ADDR(offset), &val);
+	if (ret < 0) {
+		dev_err(mgpio->dev, "GPIO register read failed: %d\n", ret);
+		return ret;
+	}
+
+	return !!(val & MAX77620_CNFG_GPIO_DIR_MASK);
+}
+
 static int max77620_gpio_set_debounce(struct gpio_chip *gc,
 				      unsigned int offset,
 				      unsigned int debounce)
@@ -258,6 +274,7 @@ static int max77620_gpio_probe(struct platform_device *pdev)
 	mgpio->gpio_chip.direction_input = max77620_gpio_dir_input;
 	mgpio->gpio_chip.get = max77620_gpio_get;
 	mgpio->gpio_chip.direction_output = max77620_gpio_dir_output;
+	mgpio->gpio_chip.get_direction = max77620_gpio_get_direction;
 	mgpio->gpio_chip.set_debounce = max77620_gpio_set_debounce;
 	mgpio->gpio_chip.set = max77620_gpio_set;
 	mgpio->gpio_chip.set_single_ended = max77620_gpio_set_single_ended;
