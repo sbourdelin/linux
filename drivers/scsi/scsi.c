@@ -527,7 +527,7 @@ void scsi_log_completion(struct scsi_cmnd *cmd, int disposition)
 				scmd_printk(KERN_INFO, cmd,
 					    "scsi host busy %d failed %d\n",
 					    atomic_read(&cmd->device->host->host_busy),
-					    cmd->device->host->host_failed);
+					    atomic_read(&cmd->device->host->host_failed));
 		}
 	}
 }
