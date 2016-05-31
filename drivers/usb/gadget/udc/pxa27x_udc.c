@@ -1829,9 +1829,6 @@ static void stop_activity(struct pxa_udc *udc, struct usb_gadget_driver *driver)
 {
 	int i;
 
-	/* don't disconnect drivers more than once */
-	if (udc->gadget.speed == USB_SPEED_UNKNOWN)
-		driver = NULL;
 	udc->gadget.speed = USB_SPEED_UNKNOWN;
 
 	for (i = 0; i < NR_USB_ENDPOINTS; i++)
