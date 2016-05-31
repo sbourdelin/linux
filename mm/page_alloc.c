@@ -3235,28 +3235,35 @@ should_compact_retry(struct alloc_context *ac, int order, int alloc_flags,
 		return false;
 
 	/*
-	 * compaction considers all the zone as desperately out of memory
-	 * so it doesn't really make much sense to retry except when the
-	 * failure could be caused by insufficient priority
+	 * Compaction backed off due to watermark checks for order-0
+	 * so the regular reclaim has to try harder and reclaim something
+	 * Retry only if it looks like reclaim might have a chance.
 	 */
-	if (compaction_failed(compact_result)) {
-		if (*compact_priority > MIN_COMPACT_PRIORITY) {
-			(*compact_priority)--;
-			return true;
-		}
-		return false;
-	}
-
-	/*
-	 * make sure the compaction wasn't deferred or didn't bail out early
-	 * due to locks contention before we declare that we should give up.
-	 * But do not retry if the given zonelist is not suitable for
-	 * compaction.
-	 */
-	if (compaction_withdrawn(compact_result))
+	if (compact_result == COMPACT_SKIPPED)
 		return compaction_zonelist_suitable(ac, order, alloc_flags);
 
 	/*
+	 * Compaction could have withdrawn early or skip some zones or
+	 * pageblocks. We were asked to retry, which means the allocation
+	 * should try really hard, so increase the priority if possible.
+	 */
+	if (*compact_priority > MIN_COMPACT_PRIORITY) {
+		(*compact_priority)--;
+		return true;
+	}
+
+	/*
+	 * Compaction considers all the zones as unfixably fragmented and we
+	 * are on the highest priority, which means it can't be due to
+	 * heuristics and it doesn't really make much sense to retry.
+	 */
+	if (compaction_failed(compact_result))
+		return false;
+
+	/*
+	 * The remaining possibility is that compaction made progress and
+	 * created a high-order page, but it was allocated by somebody else.
+	 * To prevent thrashing, limit the number of retries in such case.
 	 * !costly requests are much more important than __GFP_REPEAT
 	 * costly ones because they are de facto nofail and invoke OOM
 	 * killer to move on while costly can fail and users are ready

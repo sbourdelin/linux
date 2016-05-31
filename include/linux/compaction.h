@@ -105,47 +105,6 @@ static inline bool compaction_failed(enum compact_result result)
 	return false;
 }
 
-/*
- * Compaction  has backed off for some reason. It might be throttling or
- * lock contention. Retrying is still worthwhile.
- */
-static inline bool compaction_withdrawn(enum compact_result result)
-{
-	/*
-	 * Compaction backed off due to watermark checks for order-0
-	 * so the regular reclaim has to try harder and reclaim something.
-	 */
-	if (result == COMPACT_SKIPPED)
-		return true;
-
-	/*
-	 * If compaction is deferred for high-order allocations, it is
-	 * because sync compaction recently failed. If this is the case
-	 * and the caller requested a THP allocation, we do not want
-	 * to heavily disrupt the system, so we fail the allocation
-	 * instead of entering direct reclaim.
-	 */
-	if (result == COMPACT_DEFERRED)
-		return true;
-
-	/*
-	 * If compaction in async mode encounters contention or blocks higher
-	 * priority task we back off early rather than cause stalls.
-	 */
-	if (result == COMPACT_CONTENDED)
-		return true;
-
-	/*
-	 * Page scanners have met but we haven't scanned full zones so this
-	 * is a back off in fact.
-	 */
-	if (result == COMPACT_PARTIAL_SKIPPED)
-		return true;
-
-	return false;
-}
-
-
 bool compaction_zonelist_suitable(struct alloc_context *ac, int order,
 					int alloc_flags);
 
@@ -181,11 +140,6 @@ static inline bool compaction_made_progress(enum compact_result result)
 static inline bool compaction_failed(enum compact_result result)
 {
 	return false;
-}
-
-static inline bool compaction_withdrawn(enum compact_result result)
-{
-	return true;
 }
 
 static inline int kcompactd_run(int nid)
