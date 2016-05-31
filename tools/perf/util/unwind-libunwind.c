@@ -6,6 +6,7 @@
 
 struct unwind_libunwind_ops __weak *local_unwind_libunwind_ops;
 struct unwind_libunwind_ops __weak *x86_32_unwind_libunwind_ops;
+struct unwind_libunwind_ops __weak *arm64_unwind_libunwind_ops;
 
 void unwind__register_ops(struct thread *thread,
 			  struct unwind_libunwind_ops *ops)
@@ -32,9 +33,13 @@ int unwind__prepare_access(struct thread *thread, struct map *map)
 
 	arch = normalize_arch(thread->mg->machine->env->arch);
 
-	if (!strcmp(arch, "x86"))
+	if (!strcmp(arch, "x86")) {
 		if (dso_type != DSO__TYPE_64BIT)
 			ops = x86_32_unwind_libunwind_ops;
+	} else if (!strcmp(arch, "arm64") || !strcmp(arch, "arm")) {
+		if (dso_type == DSO__TYPE_64BIT)
+			ops = arm64_unwind_libunwind_ops;
+	}
 
 	if (!ops)
 		pr_err("unwind: target platform=%s is not supported\n", arch);
