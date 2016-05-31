@@ -2485,7 +2485,8 @@ static void blkback_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateConnected:
-		if (dev->state != XenbusStateInitialised) {
+		if ((dev->state != XenbusStateInitialised) &&
+			(dev->state != XenbusStateConnected)) {
 			if (talk_to_blkback(dev, info))
 				break;
 		}
