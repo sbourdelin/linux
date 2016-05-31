@@ -215,7 +215,7 @@ struct kvm_sregs {
 			__u32 tsr;	/* KVM_SREGS_E_UPDATE_TSR */
 			__u32 tcr;
 			__u32 decar;
-			__u32 dec;	/* KVM_SREGS_E_UPDATE_DEC */
+			__u64 dec;	/* KVM_SREGS_E_UPDATE_DEC */
 
 			/*
 			 * Userspace can read TB directly, but the

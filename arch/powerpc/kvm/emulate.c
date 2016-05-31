@@ -39,7 +39,7 @@ void kvmppc_emulate_dec(struct kvm_vcpu *vcpu)
 	unsigned long dec_nsec;
 	unsigned long long dec_time;
 
-	pr_debug("mtDEC: %x\n", vcpu->arch.dec);
+	pr_debug("mtDEC: %llx\n", vcpu->arch.dec);
 	hrtimer_try_to_cancel(&vcpu->arch.dec_timer);
 
 #ifdef CONFIG_PPC_BOOK3S
@@ -47,7 +47,7 @@ void kvmppc_emulate_dec(struct kvm_vcpu *vcpu)
 	kvmppc_core_dequeue_dec(vcpu);
 
 	/* POWER4+ triggers a dec interrupt if the value is < 0 */
-	if (vcpu->arch.dec & 0x80000000) {
+	if ((s64) vcpu->arch.dec < 0) {
 		kvmppc_core_queue_dec(vcpu);
 		return;
 	}
@@ -78,7 +78,7 @@ void kvmppc_emulate_dec(struct kvm_vcpu *vcpu)
 	vcpu->arch.dec_jiffies = get_tb();
 }
 
-u32 kvmppc_get_dec(struct kvm_vcpu *vcpu, u64 tb)
+u64 kvmppc_get_dec(struct kvm_vcpu *vcpu, u64 tb)
 {
 	u64 jd = tb - vcpu->arch.dec_jiffies;
 

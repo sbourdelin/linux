@@ -516,7 +516,7 @@ struct kvm_vcpu_arch {
 	ulong mcsrr0;
 	ulong mcsrr1;
 	ulong mcsr;
-	u32 dec;
+	u64 dec;
 #ifdef CONFIG_BOOKE
 	u32 decar;
 #endif
