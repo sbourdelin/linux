@@ -2309,11 +2309,9 @@ static bool in_reclaim_compaction(struct scan_control *sc)
 static inline bool should_continue_reclaim(struct zone *zone,
 					unsigned long nr_reclaimed,
 					unsigned long nr_scanned,
-					struct scan_control *sc)
+					struct scan_control *sc,
+					int classzone_idx)
 {
-	unsigned long pages_for_compaction;
-	unsigned long inactive_lru_pages;
-
 	/* If not in reclaim/compaction mode, stop */
 	if (!in_reclaim_compaction(sc))
 		return false;
@@ -2341,20 +2339,8 @@ static inline bool should_continue_reclaim(struct zone *zone,
 			return false;
 	}
 
-	/*
-	 * If we have not reclaimed enough pages for compaction and the
-	 * inactive lists are large enough, continue reclaiming
-	 */
-	pages_for_compaction = compact_gap(sc->order);
-	inactive_lru_pages = zone_page_state(zone, NR_INACTIVE_FILE);
-	if (get_nr_swap_pages() > 0)
-		inactive_lru_pages += zone_page_state(zone, NR_INACTIVE_ANON);
-	if (sc->nr_reclaimed < pages_for_compaction &&
-			inactive_lru_pages > pages_for_compaction)
-		return true;
-
 	/* If compaction would go ahead or the allocation would succeed, stop */
-	switch (compaction_suitable(zone, sc->order, 0, 0)) {
+	switch (compaction_suitable(zone, sc->order, 0, classzone_idx)) {
 	case COMPACT_PARTIAL:
 	case COMPACT_CONTINUE:
 		return false;
@@ -2364,11 +2350,12 @@ static inline bool should_continue_reclaim(struct zone *zone,
 }
 
 static bool shrink_zone(struct zone *zone, struct scan_control *sc,
-			bool is_classzone)
+			int classzone_idx)
 {
 	struct reclaim_state *reclaim_state = current->reclaim_state;
 	unsigned long nr_reclaimed, nr_scanned;
 	bool reclaimable = false;
+	bool is_classzone = (classzone_idx == zone_idx(zone));
 
 	do {
 		struct mem_cgroup *root = sc->target_mem_cgroup;
@@ -2450,7 +2437,7 @@ static bool shrink_zone(struct zone *zone, struct scan_control *sc,
 			reclaimable = true;
 
 	} while (should_continue_reclaim(zone, sc->nr_reclaimed - nr_reclaimed,
-					 sc->nr_scanned - nr_scanned, sc));
+			 sc->nr_scanned - nr_scanned, sc, classzone_idx));
 
 	return reclaimable;
 }
@@ -2580,7 +2567,7 @@ static void shrink_zones(struct zonelist *zonelist, struct scan_control *sc)
 			/* need some check for avoid more shrink_zone() */
 		}
 
-		shrink_zone(zone, sc, zone_idx(zone) == classzone_idx);
+		shrink_zone(zone, sc, classzone_idx);
 	}
 
 	/*
@@ -3076,7 +3063,7 @@ static bool kswapd_shrink_zone(struct zone *zone,
 						balance_gap, classzone_idx))
 		return true;
 
-	shrink_zone(zone, sc, zone_idx(zone) == classzone_idx);
+	shrink_zone(zone, sc, classzone_idx);
 
 	clear_bit(ZONE_WRITEBACK, &zone->flags);
 
@@ -3678,7 +3665,7 @@ static int __zone_reclaim(struct zone *zone, gfp_t gfp_mask, unsigned int order)
 		 * priorities until we have enough memory freed.
 		 */
 		do {
-			shrink_zone(zone, &sc, true);
+			shrink_zone(zone, &sc, zone_idx(zone));
 		} while (sc.nr_reclaimed < nr_pages && --sc.priority >= 0);
 	}
 
