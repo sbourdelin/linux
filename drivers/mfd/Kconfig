@@ -1373,6 +1373,14 @@ config MFD_LM3533
 	  additional drivers must be enabled in order to use the LED,
 	  backlight or ambient-light-sensor functionality of the device.
 
+config MFD_SM_USB_DIG
+	tristate "Texas Instruments SM-USB-DIG interface adapter"
+	select MFD_CORE
+	help
+	  Support for the TI SM-USB-DIG USB to SPI/I2C/1Wire/GPIO adapter.
+	  Additional drivers such as SPI_SM_USB_DIG, I2C_SM_USB_DIG, etc. must
+	  be enabled in order to use the functionality of the device.
+
 config MFD_TIMBERDALE
 	tristate "Timberdale FPGA"
 	select MFD_CORE
