@@ -59,6 +59,7 @@ show up in /proc/sys/kernel:
 - panic_on_unrecovered_nmi
 - panic_on_warn
 - panic_on_rcu_stall
+- panic_on_sched_in_atomic
 - perf_cpu_time_max_percent
 - perf_event_paranoid
 - perf_event_max_stack
@@ -627,6 +628,18 @@ is useful to define the root cause of RCU stalls using a vmcore.
 0: do not panic() when RCU stall takes place, default behavior.
 
 1: panic() after printing RCU stall messages.
+
+==============================================================
+
+panic_on_sched_in_atomic:
+
+When set to 1, calls panic() in the schedule while in atomic detection.
+This is useful get a vmcore to inspect the root cause of a schedule()
+call in the atomic context.
+
+0: do not panic() on scheduling while in atomic, default behavior.
+
+1: panic() after printing schedule while in atomic messages.
 
 ==============================================================
 

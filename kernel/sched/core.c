@@ -152,6 +152,11 @@ __read_mostly int scheduler_running;
  */
 int sysctl_sched_rt_runtime = 950000;
 
+/*
+ * panic on scheduling while atomic
+ */
+__read_mostly int sysctl_panic_on_sched_in_atomic = 0;
+
 /* cpus with isolated domains */
 cpumask_var_t cpu_isolated_map;
 
@@ -3146,6 +3151,8 @@ static noinline void __schedule_bug(struct task_struct *prev)
 		pr_cont("\n");
 	}
 #endif
+	if (sysctl_panic_on_sched_in_atomic)
+		panic("scheduling while atomic\n");
 	dump_stack();
 	add_taint(TAINT_WARN, LOCKDEP_STILL_OK);
 }

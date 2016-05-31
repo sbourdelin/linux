@@ -1216,6 +1216,15 @@ static struct ctl_table kern_table[] = {
 		.extra2		= &one,
 	},
 #endif
+	{
+		.procname	= "panic_on_sched_in_atomic",
+		.data		= &sysctl_panic_on_sched_in_atomic,
+		.maxlen		= sizeof(sysctl_panic_on_sched_in_atomic),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &one,
+	},
 	{ }
 };
 
