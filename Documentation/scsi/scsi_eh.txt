@@ -252,7 +252,7 @@ scmd->allowed.
 	- set scmd->eh_eflags
 	- add scmd to shost->eh_cmd_q
 	- set SHOST_RECOVERY
-	- shost->host_failed++
+	- atomic_inc(&shost->host_failed)
     LOCKING: shost->host_lock
 
  2. EH starts
@@ -263,7 +263,7 @@ scmd->allowed.
 
  3. scmd recovered
     ACTION: scsi_eh_finish_cmd() is invoked to EH-finish scmd
-	- shost->host_failed--
+	- atomic_dec(&shost->host_failed)
 	- clear scmd->eh_eflags
 	- scsi_setup_cmd_retry()
 	- move from local eh_work_q to local eh_done_q
