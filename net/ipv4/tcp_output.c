@@ -75,6 +75,10 @@ static void tcp_event_new_data_sent(struct sock *sk, const struct sk_buff *skb)
 	tcp_advance_send_head(sk, skb);
 	tp->snd_nxt = TCP_SKB_CB(skb)->end_seq;
 
+	/* All sent data have to fit into the window */
+	if (unlikely(tp->repair) && before(tcp_wnd_end(tp), tp->snd_nxt))
+		tp->snd_wnd = tp->snd_nxt - tp->snd_una;
+
 	tp->packets_out += tcp_skb_pcount(skb);
 	if (!prior_packets || icsk->icsk_pending == ICSK_TIME_EARLY_RETRANS ||
 	    icsk->icsk_pending == ICSK_TIME_LOSS_PROBE) {
