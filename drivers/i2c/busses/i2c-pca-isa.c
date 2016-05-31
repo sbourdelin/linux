@@ -193,16 +193,6 @@ static struct isa_driver pca_isa_driver = {
 	}
 };
 
-static int __init pca_isa_init(void)
-{
-	return isa_register_driver(&pca_isa_driver, 1);
-}
-
-static void __exit pca_isa_exit(void)
-{
-	isa_unregister_driver(&pca_isa_driver);
-}
-
 MODULE_AUTHOR("Ian Campbell <icampbell@arcom.com>");
 MODULE_DESCRIPTION("ISA base PCA9564/PCA9665 driver");
 MODULE_LICENSE("GPL");
@@ -221,5 +211,4 @@ MODULE_PARM_DESC(clock, "Clock rate in hertz.\n\t\t"
 		"\t\t\t\tFast+: 400100 - 10000099\n"
 		"\t\t\t\tTurbo: Up to 1265800");
 
-module_init(pca_isa_init);
-module_exit(pca_isa_exit);
+module_isa_driver(pca_isa_driver, 1);
