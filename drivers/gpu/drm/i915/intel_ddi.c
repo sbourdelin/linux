@@ -2314,8 +2314,9 @@ void intel_ddi_init(struct drm_device *dev, enum port port)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_digital_port *intel_dig_port;
 	struct intel_encoder *intel_encoder;
+	struct intel_connector *intel_connector = NULL;
 	struct drm_encoder *encoder;
-	bool init_hdmi, init_dp;
+	bool init_hdmi, init_dp, init_lspcon = false;
 	int max_lanes;
 
 	if (I915_READ(DDI_BUF_CTL(PORT_A)) & DDI_A_4_LANES) {
@@ -2347,6 +2348,19 @@ void intel_ddi_init(struct drm_device *dev, enum port port)
 	init_hdmi = (dev_priv->vbt.ddi_port_info[port].supports_dvi ||
 		     dev_priv->vbt.ddi_port_info[port].supports_hdmi);
 	init_dp = dev_priv->vbt.ddi_port_info[port].supports_dp;
+
+	if (intel_bios_is_lspcon_present(dev_priv, port)) {
+		/*
+		* Lspcon device needs to be driven with DP connector
+		* with special detection sequence. So make sure DP
+		* is initialized before lspcon.
+		*/
+		init_dp = true;
+		init_lspcon = true;
+		init_hdmi = false;
+		DRM_DEBUG_KMS("VBT says port %c has lspcon\n", port_name(port));
+	}
+
 	if (!init_dp && !init_hdmi) {
 		DRM_DEBUG_KMS("VBT says port %c is not DVI/HDMI/DP compatible, respect it\n",
 			      port_name(port));
@@ -2399,7 +2413,8 @@ void intel_ddi_init(struct drm_device *dev, enum port port)
 	intel_encoder->cloneable = 0;
 
 	if (init_dp) {
-		if (!intel_ddi_init_dp_connector(intel_dig_port))
+		intel_connector = intel_ddi_init_dp_connector(intel_dig_port);
+		if (!intel_connector)
 			goto err;
 
 		intel_dig_port->hpd_pulse = intel_dp_hpd_pulse;
@@ -2418,6 +2433,23 @@ void intel_ddi_init(struct drm_device *dev, enum port port)
 	if (intel_encoder->type != INTEL_OUTPUT_EDP && init_hdmi) {
 		if (!intel_ddi_init_hdmi_connector(intel_dig_port))
 			goto err;
+	}
+
+	if (init_lspcon) {
+		if (lspcon_init(intel_dig_port)) {
+			if (intel_hdmi_init_minimum(intel_dig_port,
+				intel_connector)) {
+				DRM_ERROR("HDMI init for LSPCON failed\n");
+				goto err;
+			}
+		} else {
+			/*
+			* LSPCON init faied, but DP init was success, so lets try to
+			* drive as DP++ port.
+			*/
+			DRM_ERROR("LSPCON init failed on port %c\n",
+				port_name(port));
+		}
 	}
 
 	return;

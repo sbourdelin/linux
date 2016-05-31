@@ -1931,6 +1931,23 @@ void intel_hdmi_init_connector(struct intel_digital_port *intel_dig_port,
 	}
 }
 
+int intel_hdmi_init_minimum(struct intel_digital_port *intel_dig_port,
+			       struct intel_connector *intel_connector)
+{
+	struct intel_hdmi *intel_hdmi = &intel_dig_port->hdmi;
+
+	if (WARN(intel_dig_port->max_lanes < 4,
+		"Not enough lanes (%d) for HDMI on port %c\n",
+		intel_dig_port->max_lanes, port_name(intel_dig_port->port)))
+		return -EINVAL;
+
+	intel_hdmi->write_infoframe = hsw_write_infoframe;
+	intel_hdmi->set_infoframes = hsw_set_infoframes;
+	intel_hdmi->infoframe_enabled = hsw_infoframe_enabled;
+	intel_hdmi->attached_connector = intel_connector;
+	return 0;
+}
+
 void intel_hdmi_init(struct drm_device *dev,
 		     i915_reg_t hdmi_reg, enum port port)
 {
