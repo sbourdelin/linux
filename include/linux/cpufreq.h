@@ -87,6 +87,7 @@ struct cpufreq_policy {
 
 	struct cpufreq_user_policy user_policy;
 	struct cpufreq_frequency_table	*freq_table;
+	struct cpufreq_frequency_table	*sorted_freq_table;
 
 	struct list_head        policy_list;
 	struct kobject		kobj;
@@ -577,6 +578,8 @@ static inline void dev_pm_opp_free_cpufreq_table(struct device *dev,
 
 int cpufreq_frequency_table_cpuinfo(struct cpufreq_policy *policy,
 				    struct cpufreq_frequency_table *table);
+int create_sorted_freq_table(struct cpufreq_policy *policy);
+void free_sorted_freq_table(struct cpufreq_policy *policy);
 
 int cpufreq_frequency_table_verify(struct cpufreq_policy *policy,
 				   struct cpufreq_frequency_table *table);

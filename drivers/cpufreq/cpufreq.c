@@ -1151,6 +1151,16 @@ static void cpufreq_policy_free(struct cpufreq_policy *policy, bool notify)
 	kfree(policy);
 }
 
+static void cpufreq_policy_exit(struct cpufreq_policy *policy)
+{
+	if (!cpufreq_driver->exit)
+		return;
+
+	cpufreq_driver->exit(policy);
+	free_sorted_freq_table(policy);
+	policy->freq_table = NULL;
+}
+
 static int cpufreq_online(unsigned int cpu)
 {
 	struct cpufreq_policy *policy;
@@ -1191,6 +1201,10 @@ static int cpufreq_online(unsigned int cpu)
 		pr_debug("initialization failed\n");
 		goto out_free_policy;
 	}
+
+	ret = create_sorted_freq_table(policy);
+	if (ret)
+		goto out_exit_policy;
 
 	down_write(&policy->rwsem);
 
@@ -1303,9 +1317,7 @@ static int cpufreq_online(unsigned int cpu)
 
 out_exit_policy:
 	up_write(&policy->rwsem);
-
-	if (cpufreq_driver->exit)
-		cpufreq_driver->exit(policy);
+	cpufreq_policy_exit(policy);
 out_free_policy:
 	cpufreq_policy_free(policy, !new_policy);
 	return ret;
@@ -1390,10 +1402,7 @@ static void cpufreq_offline(unsigned int cpu)
 	 * since this is a core component, and is essential for the
 	 * subsequent light-weight ->init() to succeed.
 	 */
-	if (cpufreq_driver->exit) {
-		cpufreq_driver->exit(policy);
-		policy->freq_table = NULL;
-	}
+	cpufreq_policy_exit(policy);
 
 unlock:
 	up_write(&policy->rwsem);

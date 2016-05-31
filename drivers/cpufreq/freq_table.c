@@ -13,6 +13,7 @@
 
 #include <linux/cpufreq.h>
 #include <linux/module.h>
+#include <linux/slab.h>
 
 /*********************************************************************
  *                     FREQUENCY TABLE HELPERS                       *
@@ -299,6 +300,72 @@ struct freq_attr *cpufreq_generic_attr[] = {
 	NULL,
 };
 EXPORT_SYMBOL_GPL(cpufreq_generic_attr);
+
+static int next_larger(struct cpufreq_policy *policy, unsigned int freq,
+		       struct cpufreq_frequency_table *table)
+{
+	struct cpufreq_frequency_table *pos;
+	unsigned int next_freq = ~0;
+	int index = -EINVAL;
+
+	cpufreq_for_each_valid_entry(pos, table) {
+		if (pos->frequency <= freq)
+			continue;
+
+		if (next_freq > pos->frequency) {
+			next_freq = pos->frequency;
+			index = pos - table;
+		}
+	}
+
+	return index;
+}
+
+void free_sorted_freq_table(struct cpufreq_policy *policy)
+{
+	kfree(policy->sorted_freq_table);
+	policy->sorted_freq_table = NULL;
+}
+
+int create_sorted_freq_table(struct cpufreq_policy *policy)
+{
+	struct cpufreq_frequency_table *pos, *new_table;
+	unsigned int freq, index, i, count = 0;
+	struct cpufreq_frequency_table *table = policy->freq_table;
+
+	if (!table)
+		return 0;
+
+	cpufreq_for_each_valid_entry(pos, table)
+		count++;
+
+	/* Extra entry for CPUFREQ_TABLE_END */
+	count++;
+
+	new_table = kmalloc_array(count, sizeof(*new_table), GFP_KERNEL);
+	if (!new_table)
+		return -ENOMEM;
+
+	for (i = 0, freq = 0; i < count - 1; i++) {
+		index = next_larger(policy, freq, table);
+		if (index == -EINVAL)
+			break;
+
+		/*
+		 * driver_data of the sorted table points to the index of the
+		 * unsorted table.
+		 */
+		new_table[i].driver_data = index;
+		new_table[i].frequency = table[index].frequency;
+
+		freq = table[index].frequency;
+	}
+
+	new_table[i].frequency = CPUFREQ_TABLE_END;
+	policy->sorted_freq_table = new_table;
+
+	return 0;
+}
 
 int cpufreq_table_validate_and_show(struct cpufreq_policy *policy,
 				      struct cpufreq_frequency_table *table)
