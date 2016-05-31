@@ -586,7 +586,7 @@ static ssize_t sca3000_read_frequency(struct device *dev,
 {
 	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
 	struct sca3000_state *st = iio_priv(indio_dev);
-	int ret, len = 0, base_freq = 0, val;
+	int ret, len = 0, base_freq = 0;
 
 	mutex_lock(&st->lock);
 	ret = __sca3000_get_base_freq(st, st->info, &base_freq);
@@ -596,20 +596,8 @@ static ssize_t sca3000_read_frequency(struct device *dev,
 	mutex_unlock(&st->lock);
 	if (ret)
 		goto error_ret;
-	val = ret;
 	if (base_freq > 0)
-		switch (val & 0x03) {
-		case 0x00:
-		case 0x03:
-			len = sprintf(buf, "%d\n", base_freq);
-			break;
-		case 0x01:
-			len = sprintf(buf, "%d\n", base_freq / 2);
-			break;
-		case 0x02:
-			len = sprintf(buf, "%d\n", base_freq / 4);
-			break;
-	}
+		len = sprintf(buf, "%d\n", base_freq);
 
 	return len;
 error_ret_mut:
