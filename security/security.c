@@ -178,8 +178,28 @@ int security_capset(struct cred *new, const struct cred *old,
 		    const kernel_cap_t *inheritable,
 		    const kernel_cap_t *permitted)
 {
-	return call_int_hook(capset, 0, new, old,
-				effective, inheritable, permitted);
+	struct security_hook_list *hp;
+	int rc;
+
+	/*
+	 * Special case handling because the "new" capabilities
+	 * should not be set until it has been determined that
+	 * all modules approve of the change. Passing NULL pointers
+	 * to all modules except the capabilty module as it is
+	 * expected that only the capability modules needs the
+	 * result pointers.
+	 *
+	 * cap_capset() must not be in the capability module hook list!
+	 */
+	list_for_each_entry(hp, &security_hook_heads.capset, list) {
+		rc = hp->hook.capset(new, old, NULL, NULL, NULL);
+		if (rc != 0)
+			return rc;
+	}
+	/*
+	 * Call cap_capset now to update the new capset.
+	 */
+	return cap_capset(new, old, effective, inheritable, permitted);
 }
 
 int security_capable(const struct cred *cred, struct user_namespace *ns,

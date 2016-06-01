@@ -1073,7 +1073,7 @@ struct security_hook_list capability_hooks[] = {
 	LSM_HOOK_INIT(ptrace_access_check, cap_ptrace_access_check),
 	LSM_HOOK_INIT(ptrace_traceme, cap_ptrace_traceme),
 	LSM_HOOK_INIT(capget, cap_capget),
-	LSM_HOOK_INIT(capset, cap_capset),
+	/* Carefull! Do not include cap_capset! */
 	LSM_HOOK_INIT(bprm_set_creds, cap_bprm_set_creds),
 	LSM_HOOK_INIT(bprm_secureexec, cap_bprm_secureexec),
 	LSM_HOOK_INIT(inode_need_killpriv, cap_inode_need_killpriv),
