@@ -44,6 +44,7 @@
 
 #include "trace.h"
 #include "trace_output.h"
+#include "trace_output_stm.h"
 
 /*
  * On boot up, the ring buffer is set to the minimum size, so that
@@ -1884,8 +1885,10 @@ trace_function(struct trace_array *tr,
 	entry->ip			= ip;
 	entry->parent_ip		= parent_ip;
 
-	if (!call_filter_check_discard(call, entry, buffer, event))
+	if (!call_filter_check_discard(call, entry, buffer, event)) {
 		__buffer_unlock_commit(buffer, event);
+		ftrace_stm_func(ip, parent_ip);
+	}
 }
 
 #ifdef CONFIG_STACKTRACE
