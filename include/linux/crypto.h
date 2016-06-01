@@ -63,6 +63,7 @@
 #define CRYPTO_ALG_DEAD			0x00000020
 #define CRYPTO_ALG_DYING		0x00000040
 #define CRYPTO_ALG_ASYNC		0x00000080
+#define CRYPTO_ALG_BULK			0x00000100
 
 /*
  * Set this bit if and only if the algorithm requires another algorithm of
@@ -621,6 +622,11 @@ static inline int crypto_tfm_alg_priority(struct crypto_tfm *tfm)
 static inline u32 crypto_tfm_alg_type(struct crypto_tfm *tfm)
 {
 	return tfm->__crt_alg->cra_flags & CRYPTO_ALG_TYPE_MASK;
+}
+
+static inline unsigned int crypto_tfm_alg_bulk(struct crypto_tfm *tfm)
+{
+	return tfm->__crt_alg->cra_flags & CRYPTO_ALG_BULK;
 }
 
 static inline unsigned int crypto_tfm_alg_blocksize(struct crypto_tfm *tfm)

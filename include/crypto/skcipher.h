@@ -520,5 +520,12 @@ static inline void skcipher_request_set_crypt(
 	req->iv = iv;
 }
 
+static inline unsigned int skcipher_is_bulk_mode(struct crypto_skcipher *sk_tfm)
+{
+	struct crypto_tfm *tfm = crypto_skcipher_tfm(sk_tfm);
+
+	return crypto_tfm_alg_bulk(tfm);
+}
+
 #endif	/* _CRYPTO_SKCIPHER_H */
 
