@@ -660,11 +660,11 @@ static int max8997_muic_probe(struct platform_device *pdev)
 
 	for (i = 0; i < ARRAY_SIZE(muic_irqs); i++) {
 		struct max8997_muic_irq *muic_irq = &muic_irqs[i];
-		unsigned int virq = 0;
+		int virq = 0;
 
 		virq = regmap_irq_get_virq(max8997->irq_data_muic,
 					muic_irq->irq);
-		if (!virq) {
+		if (virq <= 0) {
 			ret = -EINVAL;
 			goto err_irq;
 		}
