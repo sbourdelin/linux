@@ -838,8 +838,6 @@ struct user_struct {
 #ifdef CONFIG_INOTIFY_USER
 	spinlock_t inotify_lock;
 	DECLARE_HASHTABLE(inotify_tbl, 6);
-	atomic_t inotify_watches; /* How many inotify watches does this user have? */
-	atomic_t inotify_devs;	/* How many inotify devs does this user have opened? */
 #endif
 #ifdef CONFIG_FANOTIFY
 	atomic_t fanotify_listeners;

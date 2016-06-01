@@ -166,7 +166,19 @@ static void inotify_free_group_priv(struct fsnotify_group *group)
 	idr_for_each(&group->inotify_data.idr, idr_callback, group);
 	idr_destroy(&group->inotify_data.idr);
 	if (group->inotify_data.user) {
-		atomic_dec(&group->inotify_data.user->inotify_devs);
+		struct user_struct *user = group->inotify_data.user;
+		void *key = group->inotify_data.userns_ptr;
+		struct inotify_state *state;
+
+		spin_lock(&user->inotify_lock);
+		state = __find_inotify_state(user, key);
+		if (--state->inotify_devs == 0)
+			hash_del(&state->node);
+		spin_unlock(&user->inotify_lock);
+
+		if (state->inotify_devs == 0)
+			kfree(state);
+
 		free_uid(group->inotify_data.user);
 	}
 }

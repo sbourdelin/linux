@@ -94,7 +94,7 @@ static int inotify_init_state(struct user_struct *user,
 	int ret = 0;
 
 	spin_lock(&user->inotify_lock);
-	state =  __find_inotify_count(user, key);
+	state =  __find_inotify_state(user, key);
 
 	if (!state) {
 		spin_unlock(&user->inotify_lock);
@@ -536,7 +536,8 @@ void inotify_ignored_and_remove_idr(struct fsnotify_mark *fsn_mark,
 	/* remove this mark from the idr */
 	inotify_remove_from_idr(group, i_mark);
 
-	atomic_dec(&group->inotify_data.user->inotify_watches);
+	inotify_dec_watches(group->inotify_data.user,
+			    group->inotify_data.userns_ptr);
 }
 
 /* ding dong the mark is dead */
@@ -609,6 +610,8 @@ static int inotify_new_watch(struct fsnotify_group *group,
 	int ret;
 	struct idr *idr = &group->inotify_data.idr;
 	spinlock_t *idr_lock = &group->inotify_data.idr_lock;
+	struct user_struct *user = group->inotify_data.user;
+	void *key = group->inotify_data.userns_ptr;
 
 	mask = inotify_arg_to_mask(arg);
 
@@ -621,7 +624,7 @@ static int inotify_new_watch(struct fsnotify_group *group,
 	tmp_i_mark->wd = -1;
 
 	ret = -ENOSPC;
-	if (atomic_read(&group->inotify_data.user->inotify_watches) >= inotify_max_user_watches)
+	if (inotify_read_watches(user, key) >= inotify_max_user_watches)
 		goto out_err;
 
 	ret = inotify_add_to_idr(idr, idr_lock, tmp_i_mark);
@@ -638,7 +641,7 @@ static int inotify_new_watch(struct fsnotify_group *group,
 	}
 
 	/* increment the number of watches the user has */
-	atomic_inc(&group->inotify_data.user->inotify_watches);
+	inotify_inc_watches(user, key);
 
 	/* return the watch descriptor for this new mark */
 	ret = tmp_i_mark->wd;
@@ -669,6 +672,9 @@ static struct fsnotify_group *inotify_new_group(unsigned int max_events)
 {
 	struct fsnotify_group *group;
 	struct inotify_event_info *oevent;
+	struct user_struct *user = get_current_user();
+	void *key = current_user_ns();
+	int ret;
 
 	group = fsnotify_alloc_group(&inotify_fsnotify_ops);
 	if (IS_ERR(group))
@@ -689,12 +695,13 @@ static struct fsnotify_group *inotify_new_group(unsigned int max_events)
 
 	spin_lock_init(&group->inotify_data.idr_lock);
 	idr_init(&group->inotify_data.idr);
-	group->inotify_data.user = get_current_user();
+	group->inotify_data.user = user;
+	group->inotify_data.userns_ptr = key;
 
-	if (atomic_inc_return(&group->inotify_data.user->inotify_devs) >
-	    inotify_max_user_instances) {
+	ret = inotify_init_state(user, key);
+	if (ret < 0) {
 		fsnotify_destroy_group(group);
-		return ERR_PTR(-EMFILE);
+		return ERR_PTR(ret);
 	}
 
 	return group;
