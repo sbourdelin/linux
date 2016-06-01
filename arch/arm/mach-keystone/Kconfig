@@ -14,3 +14,22 @@ config ARCH_KEYSTONE
 	help
 	  Support for boards based on the Texas Instruments Keystone family of
 	  SoCs.
+
+if ARCH_KEYSTONE
+
+menu "TI Keystone Specific Features"
+
+config ARCH_KEYSTONE_TYPICAL
+	bool "Typical Keystone configuration"
+	depends on ARM_LPAE
+	default y
+	select AEABI
+	select HIGHMEM
+	select NEON
+	select PM
+	select VFP
+	help
+	  Compile a kernel suitable for booting most boards on Keystone
+	  architecture to at least a simple initramfs
+endmenu
+endif
