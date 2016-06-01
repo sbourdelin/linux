@@ -2970,6 +2970,8 @@ static inline void update_load_avg(struct sched_entity *se, int update_tg)
 
 static void attach_entity_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *se)
 {
+	struct cfs_rq* root_cfs_rq;
+
 	if (!sched_feat(ATTACH_AGE_LOAD))
 		goto skip_aging;
 
@@ -2995,8 +2997,16 @@ skip_aging:
 	if (!entity_is_task(se))
 		return;
 
-	rq_of(cfs_rq)->cfs.avg.util_avg += se->avg.util_avg;
-	rq_of(cfs_rq)->cfs.avg.util_sum += se->avg.util_sum;
+	root_cfs_rq = &rq_of(cfs_rq)->cfs;
+
+	if (parent_entity(se))
+		__update_load_avg(cfs_rq_clock_task(root_cfs_rq),
+				  cpu_of(rq_of(root_cfs_rq)), &root_cfs_rq->avg,
+				  scale_load_down(root_cfs_rq->load.weight),
+				  upd_util_cfs_rq(root_cfs_rq), root_cfs_rq);
+
+	root_cfs_rq->avg.util_avg += se->avg.util_avg;
+	root_cfs_rq->avg.util_sum += se->avg.util_sum;
 
 	cfs_rq_util_change(cfs_rq);
 }
@@ -3012,6 +3022,10 @@ static void detach_entity_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *s
 
 	if (!entity_is_task(se))
 		return;
+
+	__update_load_avg(rq_of(cfs_rq)->cfs.avg.last_update_time, cpu_of(rq_of(cfs_rq)),
+			  &se->avg, se->on_rq * scale_load_down(se->load.weight),
+			  cfs_rq->curr == se, NULL);
 
 	rq_of(cfs_rq)->cfs.avg.util_avg =
 	    max_t(long, rq_of(cfs_rq)->cfs.avg.util_avg - se->avg.util_avg, 0);
@@ -3105,6 +3119,9 @@ void remove_entity_load_avg(struct sched_entity *se)
 	if (!entity_is_task(se))
 		return;
 
+	last_update_time = cfs_rq_last_update_time(&rq_of(cfs_rq)->cfs);
+
+	__update_load_avg(last_update_time, cpu_of(rq_of(cfs_rq)), &se->avg, 0, 0, NULL);
 	atomic_long_add(se->avg.util_avg, &rq_of(cfs_rq)->cfs.removed_util_avg);
 }
 
