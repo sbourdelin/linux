@@ -1,0 +1,40 @@
+HiSilicon hi6552 PMIC Power Key
+
+PROPERTIES
+
+- compatible:
+	Usage: required
+	Value type: <string>
+	Definition: must be one of:
+		    "hisilicon,hi6552-powerkey"
+
+- interrupt-parent
+	Usage: (required if interrupt property is defined)
+	Value type: <phandle>
+	Definition: A single <phandle> value that points to the interrupt
+		    parent to which the child domain is being mapped.
+
+- interrupts:
+	Usage: required
+	Value type: <prop-encoded-array>
+	Definition: The first interrupt specifies the key release interrupt
+		    and the second interrupt specifies the key press interrupt,
+		    the third defines the timed key-hold interrupt.
+		    The format of the specifier is defined by the binding
+		    document describing the node's interrupt parent.
+
+- interrupt-names:
+	Usage: required
+	Value type: "down", "up", "hold 4s"
+	Definition: String names for the press, release and timed hold
+		    interrupts.
+
+
+EXAMPLE
+
+	powerkey:powerkey@b1{
+		compatible = "hisilicon,hi6552-powerkey";
+		interrupt-parent = <&pmic>;
+		interrupts = <6 0>, <5 0>, <4 0>;
+		interrupt-names = "down", "up", "hold 4s";
+	};
