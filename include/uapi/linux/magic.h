@@ -81,4 +81,6 @@
 /* Since UDF 2.01 is ISO 13346 based... */
 #define UDF_SUPER_MAGIC		0x15013346
 
+#define SHIFTFS_MAGIC		0x6a656a62
+
 #endif /* __LINUX_MAGIC_H__ */
