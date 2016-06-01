@@ -2463,8 +2463,7 @@ struct drm_i915_gem_request * __must_check
 i915_gem_request_alloc(struct intel_engine_cs *engine,
 		       struct i915_gem_context *ctx);
 
-static inline bool i915_gem_request_completed(struct drm_i915_gem_request *req,
-					      bool lazy_coherency)
+static inline bool i915_gem_request_completed(struct drm_i915_gem_request *req)
 {
 	return fence_is_signaled(&req->fence);
 }
