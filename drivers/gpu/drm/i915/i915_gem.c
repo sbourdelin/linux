@@ -1170,6 +1170,7 @@ static int __i915_spin_request(struct drm_i915_gem_request *req, int state)
 {
 	unsigned long timeout;
 	unsigned cpu;
+	uint32_t seqno;
 
 	/* When waiting for high frequency requests, e.g. during synchronous
 	 * rendering split between the CPU and GPU, the finite amount of time
@@ -1185,12 +1186,14 @@ static int __i915_spin_request(struct drm_i915_gem_request *req, int state)
 		return -EBUSY;
 
 	/* Only spin if we know the GPU is processing this request */
-	if (!i915_gem_request_started(req, true))
+	seqno = req->engine->get_seqno(req->engine);
+	if (!i915_seqno_passed(seqno, req->previous_seqno))
 		return -EAGAIN;
 
 	timeout = local_clock_us(&cpu) + 5;
 	while (!need_resched()) {
-		if (i915_gem_request_completed(req, true))
+		seqno = req->engine->get_seqno(req->engine);
+		if (i915_seqno_passed(seqno, req->seqno))
 			return 0;
 
 		if (signal_pending_state(state, current))
@@ -1202,7 +1205,10 @@ static int __i915_spin_request(struct drm_i915_gem_request *req, int state)
 		cpu_relax_lowlatency();
 	}
 
-	if (i915_gem_request_completed(req, false))
+	if (req->engine->irq_seqno_barrier)
+		req->engine->irq_seqno_barrier(req->engine);
+	seqno = req->engine->get_seqno(req->engine);
+	if (i915_seqno_passed(seqno, req->seqno))
 		return 0;
 
 	return -EAGAIN;
@@ -2733,12 +2739,88 @@ static void i915_set_reset_status(struct drm_i915_private *dev_priv,
 	}
 }
 
-void i915_gem_request_free(struct kref *req_ref)
+static void i915_gem_request_free_rcu(struct rcu_head *head)
 {
-	struct drm_i915_gem_request *req = container_of(req_ref,
-						 typeof(*req), ref);
+	struct drm_i915_gem_request *req;
+
+	req = container_of(head, typeof(*req), rcu_head);
 	kmem_cache_free(req->i915->requests, req);
 }
+
+static void i915_gem_request_free(struct fence *req_fence)
+{
+	struct drm_i915_gem_request *req;
+
+	req = container_of(req_fence, typeof(*req), fence);
+	call_rcu(&req->rcu_head, i915_gem_request_free_rcu);
+}
+
+static bool i915_gem_request_enable_signaling(struct fence *req_fence)
+{
+	/* Interrupt driven fences are not implemented yet.*/
+	WARN(true, "This should not be called!");
+	return true;
+}
+
+static bool i915_gem_request_is_completed(struct fence *req_fence)
+{
+	struct drm_i915_gem_request *req = container_of(req_fence,
+						 typeof(*req), fence);
+	u32 seqno;
+
+	seqno = req->engine->get_seqno(req->engine);
+
+	return i915_seqno_passed(seqno, req->seqno);
+}
+
+static const char *i915_gem_request_get_driver_name(struct fence *req_fence)
+{
+	return "i915";
+}
+
+static const char *i915_gem_request_get_timeline_name(struct fence *req_fence)
+{
+	struct drm_i915_gem_request *req;
+	struct i915_fence_timeline *timeline;
+
+	req = container_of(req_fence, typeof(*req), fence);
+	timeline = &req->ctx->engine[req->engine->id].fence_timeline;
+
+	return timeline->name;
+}
+
+static void i915_gem_request_timeline_value_str(struct fence *req_fence,
+						char *str, int size)
+{
+	struct drm_i915_gem_request *req;
+
+	req = container_of(req_fence, typeof(*req), fence);
+
+	/* Last signalled timeline value ??? */
+	snprintf(str, size, "? [%d]"/*, timeline->value*/,
+		 req->engine->get_seqno(req->engine));
+}
+
+static void i915_gem_request_fence_value_str(struct fence *req_fence,
+					     char *str, int size)
+{
+	struct drm_i915_gem_request *req;
+
+	req = container_of(req_fence, typeof(*req), fence);
+
+	snprintf(str, size, "%d [%d]", req->fence.seqno, req->seqno);
+}
+
+static const struct fence_ops i915_gem_request_fops = {
+	.enable_signaling	= i915_gem_request_enable_signaling,
+	.signaled		= i915_gem_request_is_completed,
+	.wait			= fence_default_wait,
+	.release		= i915_gem_request_free,
+	.get_driver_name	= i915_gem_request_get_driver_name,
+	.get_timeline_name	= i915_gem_request_get_timeline_name,
+	.fence_value_str	= i915_gem_request_fence_value_str,
+	.timeline_value_str	= i915_gem_request_timeline_value_str,
+};
 
 int i915_create_fence_timeline(struct drm_device *dev,
 			       struct i915_gem_context *ctx,
@@ -2767,7 +2849,7 @@ int i915_create_fence_timeline(struct drm_device *dev,
 	return 0;
 }
 
-unsigned i915_fence_timeline_get_next_seqno(struct i915_fence_timeline *timeline)
+static unsigned i915_fence_timeline_get_next_seqno(struct i915_fence_timeline *timeline)
 {
 	unsigned seqno;
 
@@ -2811,12 +2893,15 @@ __i915_gem_request_alloc(struct intel_engine_cs *engine,
 	if (ret)
 		goto err;
 
-	kref_init(&req->ref);
 	req->i915 = dev_priv;
 	req->engine = engine;
 	req->reset_counter = reset_counter;
 	req->ctx  = ctx;
 	i915_gem_context_reference(req->ctx);
+
+	fence_init(&req->fence, &i915_gem_request_fops, &engine->fence_lock,
+		   ctx->engine[engine->id].fence_timeline.fence_context,
+		   i915_fence_timeline_get_next_seqno(&ctx->engine[engine->id].fence_timeline));
 
 	/*
 	 * Reserve space in the ring buffer for all the commands required to

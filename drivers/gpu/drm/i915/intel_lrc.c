@@ -2030,6 +2030,7 @@ logical_ring_setup(struct drm_device *dev, enum intel_engine_id id)
 	INIT_LIST_HEAD(&engine->buffers);
 	INIT_LIST_HEAD(&engine->execlist_queue);
 	spin_lock_init(&engine->execlist_lock);
+	spin_lock_init(&engine->fence_lock);
 
 	tasklet_init(&engine->irq_tasklet,
 		     intel_lrc_irq_handler, (unsigned long)engine);

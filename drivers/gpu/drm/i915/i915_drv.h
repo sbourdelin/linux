@@ -42,6 +42,7 @@
 #include <linux/kref.h>
 #include <linux/pm_qos.h>
 #include <linux/shmem_fs.h>
+#include <linux/fence.h>
 
 #include <drm/drmP.h>
 #include <drm/intel-gtt.h>
@@ -2355,7 +2356,11 @@ static inline struct scatterlist *__sg_next(struct scatterlist *sg)
  * initial reference taken using kref_init
  */
 struct drm_i915_gem_request {
-	struct kref ref;
+	/**
+	 * Underlying object for implementing the signal/wait stuff.
+	 */
+	struct fence fence;
+	struct rcu_head rcu_head;
 
 	/** On Which ring this request was generated */
 	struct drm_i915_private *i915;
@@ -2457,7 +2462,13 @@ struct drm_i915_gem_request {
 struct drm_i915_gem_request * __must_check
 i915_gem_request_alloc(struct intel_engine_cs *engine,
 		       struct i915_gem_context *ctx);
-void i915_gem_request_free(struct kref *req_ref);
+
+static inline bool i915_gem_request_completed(struct drm_i915_gem_request *req,
+					      bool lazy_coherency)
+{
+	return fence_is_signaled(&req->fence);
+}
+
 int i915_gem_request_add_to_client(struct drm_i915_gem_request *req,
 				   struct drm_file *file);
 
@@ -2477,14 +2488,14 @@ static inline struct drm_i915_gem_request *
 i915_gem_request_reference(struct drm_i915_gem_request *req)
 {
 	if (req)
-		kref_get(&req->ref);
+		fence_get(&req->fence);
 	return req;
 }
 
 static inline void
 i915_gem_request_unreference(struct drm_i915_gem_request *req)
 {
-	kref_put(&req->ref, i915_gem_request_free);
+	fence_put(&req->fence);
 }
 
 static inline void i915_gem_request_assign(struct drm_i915_gem_request **pdst,
@@ -2498,12 +2509,6 @@ static inline void i915_gem_request_assign(struct drm_i915_gem_request **pdst,
 
 	*pdst = src;
 }
-
-/*
- * XXX: i915_gem_request_completed should be here but currently needs the
- * definition of i915_seqno_passed() which is below. It will be moved in
- * a later patch when the call to i915_seqno_passed() is obsoleted...
- */
 
 /*
  * A command that requires special handling by the command parser.
@@ -3211,24 +3216,6 @@ static inline bool
 i915_seqno_passed(uint32_t seq1, uint32_t seq2)
 {
 	return (int32_t)(seq1 - seq2) >= 0;
-}
-
-static inline bool i915_gem_request_started(struct drm_i915_gem_request *req,
-					   bool lazy_coherency)
-{
-	if (!lazy_coherency && req->engine->irq_seqno_barrier)
-		req->engine->irq_seqno_barrier(req->engine);
-	return i915_seqno_passed(req->engine->get_seqno(req->engine),
-				 req->previous_seqno);
-}
-
-static inline bool i915_gem_request_completed(struct drm_i915_gem_request *req,
-					      bool lazy_coherency)
-{
-	if (!lazy_coherency && req->engine->irq_seqno_barrier)
-		req->engine->irq_seqno_barrier(req->engine);
-	return i915_seqno_passed(req->engine->get_seqno(req->engine),
-				 req->seqno);
 }
 
 int __must_check i915_gem_get_seqno(struct drm_i915_private *dev_priv, u32 *seqno);
