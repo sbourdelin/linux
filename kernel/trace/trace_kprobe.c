@@ -214,6 +214,18 @@ static void FETCH_FUNC_NAME(memory, string_size)(struct pt_regs *regs,
 }
 NOKPROBE_SYMBOL(FETCH_FUNC_NAME(memory, string_size));
 
+#define DEFINE_FETCH_comm(type)					\
+void FETCH_FUNC_NAME(comm, type)(struct pt_regs *regs,		\
+				 void *data, void *dest)	\
+{								\
+	fetch_memory_##type(regs, current->comm, dest);		\
+}								\
+NOKPROBE_SYMBOL(FETCH_FUNC_NAME(comm, type));
+
+DEFINE_BASIC_FETCH_FUNCS(comm)
+DEFINE_FETCH_comm(string)
+DEFINE_FETCH_comm(string_size)
+
 #define DEFINE_FETCH_symbol(type)					\
 void FETCH_FUNC_NAME(symbol, type)(struct pt_regs *regs, void *data, void *dest)\
 {									\
@@ -587,6 +599,7 @@ static int create_trace_kprobe(int argc, char **argv)
 	 *  $retval	: fetch return value
 	 *  $stack	: fetch stack address
 	 *  $stackN	: fetch Nth of stack (N:0-)
+	 *  $comm       : fetch current task comm
 	 *  @ADDR	: fetch memory at ADDR (ADDR should be in kernel)
 	 *  @SYM[+|-offs] : fetch memory at SYM +|- offs (SYM is a data symbol)
 	 *  %REG	: fetch register REG

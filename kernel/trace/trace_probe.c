@@ -348,6 +348,11 @@ static int parse_probe_vars(char *arg, const struct fetch_type *t,
 			}
 		} else
 			ret = -EINVAL;
+	} else if (strcmp(arg, "comm") == 0) {
+		if (is_kprobe)
+			f->fn = t->fetch[FETCH_MTD_comm];
+		else
+			ret = -EINVAL;
 	} else
 		ret = -EINVAL;
 

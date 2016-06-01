@@ -40,6 +40,7 @@ Synopsis of kprobe_events
   $stackN	: Fetch Nth entry of stack (N >= 0)
   $stack	: Fetch stack address.
   $retval	: Fetch return value.(*)
+  $comm		: Fetch current task comm.(***)
   +|-offs(FETCHARG) : Fetch memory at FETCHARG +|- offs address.(**)
   NAME=FETCHARG : Set NAME as the argument name of FETCHARG.
   FETCHARG:TYPE : Set TYPE as the type of FETCHARG. Currently, basic types
@@ -48,6 +49,7 @@ Synopsis of kprobe_events
 
   (*) only for return probe.
   (**) this is useful for fetching a field of data structures.
+  (***) you probably want this as a string, i.e., $comm:string
 
 Types
 -----

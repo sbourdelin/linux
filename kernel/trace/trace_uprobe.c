@@ -172,6 +172,13 @@ static void FETCH_FUNC_NAME(memory, string_size)(struct pt_regs *regs,
 		*(u32 *)dest = len;
 }
 
+#define fetch_comm_u8		NULL
+#define fetch_comm_u16		NULL
+#define fetch_comm_u32		NULL
+#define fetch_comm_u64		NULL
+#define fetch_comm_string	NULL
+#define fetch_comm_string_size	NULL
+
 static unsigned long translate_user_vaddr(void *file_offset)
 {
 	unsigned long base_addr;
