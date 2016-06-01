@@ -513,21 +513,21 @@ static int btmrvl_check_device_tree(struct btmrvl_private *priv)
 	struct btmrvl_sdio_card *card = priv->btmrvl_dev.card;
 	u8 cal_data[BT_CAL_HDR_LEN + BT_CAL_DATA_SIZE];
 	int ret = 0;
-	u16 gpio, gap;
+	u32 gpio, gap;
 
 	if (card->plt_of_node) {
 		dt_node = card->plt_of_node;
-		ret = of_property_read_u16(dt_node, "marvell,wakeup-pin",
+		ret = of_property_read_u32(dt_node, "marvell,wakeup-pin",
 					   &gpio);
 		if (ret)
 			gpio = (priv->btmrvl_dev.gpio_gap & 0xff00) >> 8;
 
-		ret = of_property_read_u16(dt_node, "marvell,wakeup-gap-ms",
+		ret = of_property_read_u32(dt_node, "marvell,wakeup-gap-ms",
 					   &gap);
 		if (ret)
 			gap = (u8)(priv->btmrvl_dev.gpio_gap & 0x00ff);
 
-		priv->btmrvl_dev.gpio_gap = (gpio << 8) + gap;
+		priv->btmrvl_dev.gpio_gap = ((gpio & 0xff) << 8) + (gap & 0xff);
 
 		ret = of_property_read_u8_array(dt_node, "marvell,cal-data",
 						cal_data + BT_CAL_HDR_LEN,
