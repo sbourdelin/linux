@@ -131,25 +131,6 @@ static long posix_clock_ioctl(struct file *fp,
 	return err;
 }
 
-#ifdef CONFIG_COMPAT
-static long posix_clock_compat_ioctl(struct file *fp,
-				     unsigned int cmd, unsigned long arg)
-{
-	struct posix_clock *clk = get_posix_clock(fp);
-	int err = -ENOTTY;
-
-	if (!clk)
-		return -ENODEV;
-
-	if (clk->ops.ioctl)
-		err = clk->ops.ioctl(clk, cmd, arg);
-
-	put_posix_clock(clk);
-
-	return err;
-}
-#endif
-
 static int posix_clock_open(struct inode *inode, struct file *fp)
 {
 	int err;
@@ -201,9 +182,6 @@ static const struct file_operations posix_clock_file_operations = {
 	.release	= posix_clock_release,
 	.fasync		= posix_clock_fasync,
 	.mmap		= posix_clock_mmap,
-#ifdef CONFIG_COMPAT
-	.compat_ioctl	= posix_clock_compat_ioctl,
-#endif
 };
 
 int posix_clock_register(struct posix_clock *clk, dev_t devid)
