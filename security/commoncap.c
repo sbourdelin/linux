@@ -976,7 +976,7 @@ int cap_task_prctl(int option, unsigned long arg2, unsigned long arg3,
 
 	case PR_CAP_AMBIENT:
 		if (arg2 == PR_CAP_AMBIENT_CLEAR_ALL) {
-			if (arg3 | arg4 | arg5)
+			if (arg3 || arg4 || arg5)
 				return -EINVAL;
 
 			new = prepare_creds();
@@ -986,7 +986,7 @@ int cap_task_prctl(int option, unsigned long arg2, unsigned long arg3,
 			return commit_creds(new);
 		}
 
-		if (((!cap_valid(arg3)) | arg4 | arg5))
+		if (((!cap_valid(arg3)) || arg4 || arg5))
 			return -EINVAL;
 
 		if (arg2 == PR_CAP_AMBIENT_IS_SET) {
