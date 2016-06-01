@@ -198,6 +198,7 @@ enum {
 	das16_pg_1601,
 	das16_pg_1602,
 };
+
 static const int *const das16_gainlists[] = {
 	NULL,
 	das16jr_gainlist,
@@ -428,8 +429,10 @@ static const struct das16_board das16_boards[] = {
 	},
 };
 
-/* Period for timer interrupt in jiffies.  It's a function
- * to deal with possibility of dynamic HZ patches  */
+/*
+ * Period for timer interrupt in jiffies.  It's a function
+ * to deal with possibility of dynamic HZ patches
+ */
 static inline int timer_period(void)
 {
 	return HZ / 20;
