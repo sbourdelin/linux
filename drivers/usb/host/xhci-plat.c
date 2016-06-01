@@ -57,12 +57,14 @@ static int xhci_priv_init_quirk(struct usb_hcd *hcd)
 
 static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
 {
+	struct xhci_plat_priv *priv = xhci_to_priv(xhci);
+
 	/*
 	 * As of now platform drivers don't provide MSI support so we ensure
 	 * here that the generic code does not try to make a pci_dev from our
 	 * dev struct in order to setup MSI
 	 */
-	xhci->quirks |= XHCI_PLAT;
+	xhci->quirks |= XHCI_PLAT | priv->quirks;
 }
 
 /* called during probe() after chip reset completes */
@@ -89,16 +91,24 @@ static const struct xhci_plat_priv xhci_plat_marvell_armada = {
 	.init_quirk = xhci_mvebu_mbus_init_quirk,
 };
 
+/*
+ * On R-Car Gen2 and Gen3, the AC64 bit (bit 0) of HCCPARAMS1 is set to 1.
+ * However, these SoCs don't support 64-bit address memory pointers. So, this
+ * driver clears the AC64 bit of xhci->hcc_params to call
+ * dma_set_coherent_mask(dev, DMA_BIT_MASK(32)) in xhci_gen_setup().
+ */
 static const struct xhci_plat_priv xhci_plat_renesas_rcar_gen2 = {
 	.firmware_name = XHCI_RCAR_FIRMWARE_NAME_V1,
 	.init_quirk = xhci_rcar_init_quirk,
 	.plat_start = xhci_rcar_start,
+	.quirks = XHCI_NO_64BIT_SUPPORT,
 };
 
 static const struct xhci_plat_priv xhci_plat_renesas_rcar_gen3 = {
 	.firmware_name = XHCI_RCAR_FIRMWARE_NAME_V2,
 	.init_quirk = xhci_rcar_init_quirk,
 	.plat_start = xhci_rcar_start,
+	.quirks = XHCI_NO_64BIT_SUPPORT,
 };
 
 static const struct of_device_id usb_xhci_of_match[] = {

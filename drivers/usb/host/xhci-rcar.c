@@ -87,14 +87,6 @@ static int xhci_rcar_is_gen2(struct device *dev)
 		of_device_is_compatible(node, "renensas,rcar-gen2-xhci");
 }
 
-static int xhci_rcar_is_gen3(struct device *dev)
-{
-	struct device_node *node = dev->of_node;
-
-	return of_device_is_compatible(node, "renesas,xhci-r8a7795") ||
-		of_device_is_compatible(node, "renesas,rcar-gen3-xhci");
-}
-
 void xhci_rcar_start(struct usb_hcd *hcd)
 {
 	u32 temp;
@@ -175,22 +167,9 @@ static int xhci_rcar_download_firmware(struct usb_hcd *hcd)
 /* This function needs to initialize a "phy" of usb before */
 int xhci_rcar_init_quirk(struct usb_hcd *hcd)
 {
-	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
-
 	/* If hcd->regs is NULL, we don't just call the following function */
 	if (!hcd->regs)
 		return 0;
-
-	/*
-	 * On R-Car Gen2 and Gen3, the AC64 bit (bit 0) of HCCPARAMS1 is set
-	 * to 1. However, these SoCs don't support 64-bit address memory
-	 * pointers. So, this driver clears the AC64 bit of xhci->hcc_params
-	 * to call dma_set_coherent_mask(dev, DMA_BIT_MASK(32)) in
-	 * xhci_gen_setup().
-	 */
-	if (xhci_rcar_is_gen2(hcd->self.controller) ||
-			xhci_rcar_is_gen3(hcd->self.controller))
-		xhci->quirks |= XHCI_NO_64BIT_SUPPORT;
 
 	return xhci_rcar_download_firmware(hcd);
 }

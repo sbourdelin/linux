@@ -20,5 +20,6 @@ struct xhci_plat_priv {
 	unsigned int quirks;
 };
 
+#define xhci_to_priv(x) ((struct xhci_plat_priv *)(x)->priv)
 #define hcd_to_xhci_priv(h) ((struct xhci_plat_priv *)hcd_to_xhci(h)->priv)
 #endif	/* _XHCI_PLAT_H */
