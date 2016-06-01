@@ -49,7 +49,7 @@ static int blksize;
 #define KEY_TRUSTED_PREFIX_LEN (sizeof (KEY_TRUSTED_PREFIX) - 1)
 #define KEY_USER_PREFIX_LEN (sizeof (KEY_USER_PREFIX) - 1)
 #define KEY_ECRYPTFS_DESC_LEN 16
-#define HASH_SIZE SHA256_DIGEST_SIZE
+#define E_HASH_SIZE SHA256_DIGEST_SIZE
 #define MAX_DATA_SIZE 4096
 #define MIN_DATA_SIZE  20
 
@@ -380,8 +380,8 @@ static int get_derived_key(u8 *derived_key, enum derived_key_type key_type,
 	int ret;
 
 	derived_buf_len = strlen("AUTH_KEY") + 1 + master_keylen;
-	if (derived_buf_len < HASH_SIZE)
-		derived_buf_len = HASH_SIZE;
+	if (derived_buf_len < E_HASH_SIZE)
+		derived_buf_len = E_HASH_SIZE;
 
 	derived_buf = kzalloc(derived_buf_len, GFP_KERNEL);
 	if (!derived_buf) {
@@ -517,7 +517,7 @@ out:
 static int datablob_hmac_append(struct encrypted_key_payload *epayload,
 				const u8 *master_key, size_t master_keylen)
 {
-	u8 derived_key[HASH_SIZE];
+	u8 derived_key[E_HASH_SIZE];
 	u8 *digest;
 	int ret;
 
@@ -529,7 +529,7 @@ static int datablob_hmac_append(struct encrypted_key_payload *epayload,
 	ret = calc_hmac(digest, derived_key, sizeof derived_key,
 			epayload->format, epayload->datablob_len);
 	if (!ret)
-		dump_hmac(NULL, digest, HASH_SIZE);
+		dump_hmac(NULL, digest, E_HASH_SIZE);
 out:
 	return ret;
 }
@@ -539,8 +539,8 @@ static int datablob_hmac_verify(struct encrypted_key_payload *epayload,
 				const u8 *format, const u8 *master_key,
 				size_t master_keylen)
 {
-	u8 derived_key[HASH_SIZE];
-	u8 digest[HASH_SIZE];
+	u8 derived_key[E_HASH_SIZE];
+	u8 digest[E_HASH_SIZE];
 	int ret;
 	char *p;
 	unsigned short len;
@@ -565,8 +565,8 @@ static int datablob_hmac_verify(struct encrypted_key_payload *epayload,
 		ret = -EINVAL;
 		dump_hmac("datablob",
 			  epayload->format + epayload->datablob_len,
-			  HASH_SIZE);
-		dump_hmac("calc", digest, HASH_SIZE);
+			  E_HASH_SIZE);
+		dump_hmac("calc", digest, E_HASH_SIZE);
 	}
 out:
 	return ret;
@@ -651,12 +651,12 @@ static struct encrypted_key_payload *encrypted_key_alloc(struct key *key,
 	    + strlen(datalen) + 1 + ivsize + 1 + encrypted_datalen;
 
 	ret = key_payload_reserve(key, payload_datalen + datablob_len
-				  + HASH_SIZE + 1);
+				  + E_HASH_SIZE + 1);
 	if (ret < 0)
 		return ERR_PTR(ret);
 
 	epayload = kzalloc(sizeof(*epayload) + payload_datalen +
-			   datablob_len + HASH_SIZE + 1, GFP_KERNEL);
+			   datablob_len + E_HASH_SIZE + 1, GFP_KERNEL);
 	if (!epayload)
 		return ERR_PTR(-ENOMEM);
 
@@ -670,7 +670,7 @@ static int encrypted_key_decrypt(struct encrypted_key_payload *epayload,
 				 const char *format, const char *hex_encoded_iv)
 {
 	struct key *mkey;
-	u8 derived_key[HASH_SIZE];
+	u8 derived_key[E_HASH_SIZE];
 	const u8 *master_key;
 	u8 *hmac;
 	const char *hex_encoded_data;
@@ -680,7 +680,7 @@ static int encrypted_key_decrypt(struct encrypted_key_payload *epayload,
 	int ret;
 
 	encrypted_datalen = roundup(epayload->decrypted_datalen, blksize);
-	asciilen = (ivsize + 1 + encrypted_datalen + HASH_SIZE) * 2;
+	asciilen = (ivsize + 1 + encrypted_datalen + E_HASH_SIZE) * 2;
 	if (strlen(hex_encoded_iv) != asciilen)
 		return -EINVAL;
 
@@ -695,7 +695,7 @@ static int encrypted_key_decrypt(struct encrypted_key_payload *epayload,
 
 	hmac = epayload->format + epayload->datablob_len;
 	ret = hex2bin(hmac, hex_encoded_data + (encrypted_datalen * 2),
-		      HASH_SIZE);
+		      E_HASH_SIZE);
 	if (ret < 0)
 		return -EINVAL;
 
@@ -918,7 +918,7 @@ static long encrypted_read(const struct key *key, char __user *buffer,
 	struct key *mkey;
 	const u8 *master_key;
 	size_t master_keylen;
-	char derived_key[HASH_SIZE];
+	char derived_key[E_HASH_SIZE];
 	char *ascii_buf;
 	size_t asciiblob_len;
 	int ret;
@@ -928,7 +928,7 @@ static long encrypted_read(const struct key *key, char __user *buffer,
 	/* returns the hex encoded iv, encrypted-data, and hmac as ascii */
 	asciiblob_len = epayload->datablob_len + ivsize + 1
 	    + roundup(epayload->decrypted_datalen, blksize)
-	    + (HASH_SIZE * 2);
+	    + (E_HASH_SIZE * 2);
 
 	if (!buffer || buflen < asciiblob_len)
 		return asciiblob_len;
