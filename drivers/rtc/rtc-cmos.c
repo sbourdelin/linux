@@ -918,6 +918,9 @@ static void cmos_check_alarm(struct device *dev)
 		cmos->suspend_ctrl &= ~RTC_AIE;
 		rtc_set_alarm(cmos->rtc, &alarm);
 	}
+
+	/* The BIOS might have changed the alarm, restore it */
+	cmos_set_alarm(dev, &alarm);
 }
 
 static int cmos_resume(struct device *dev)
