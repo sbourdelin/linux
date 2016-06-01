@@ -573,13 +573,24 @@ int dw_pcie_host_init(struct pcie_port *pp)
 	return 0;
 }
 
-static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+static int dw_pcie_rd_other_conf(struct pci_bus *bus,
 		u32 devfn, int where, int size, u32 *val)
 {
 	int ret, type;
 	u32 busdev, cfg_size;
 	u64 cpu_addr;
 	void __iomem *va_cfg_base;
+	struct pcie_port *pp = bus->sysdata;
+
+	/*
+	 * If there is no link, then there is no device.
+	 *
+	 * do not read more than one device on the bus directly attached
+	 * to RC's (Virtual Bridge's) DS side.
+	 */
+	if (!dw_pcie_link_up(pp) ||
+	    (bus->primary == pp->root_bus_nr && PCI_SLOT(devfn) > 0))
+		return PCIBIOS_DEVICE_NOT_FOUND;
 
 	if (pp->ops->rd_other_conf)
 		return pp->ops->rd_other_conf(pp, bus, devfn, where, size, val);
@@ -610,13 +621,18 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
 	return ret;
 }
 
-static int dw_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+static int dw_pcie_wr_other_conf(struct pci_bus *bus,
 		u32 devfn, int where, int size, u32 val)
 {
 	int ret, type;
 	u32 busdev, cfg_size;
 	u64 cpu_addr;
 	void __iomem *va_cfg_base;
+	struct pcie_port *pp = bus->sysdata;
+
+	if (!dw_pcie_link_up(pp) ||
+	    (bus->primary == pp->root_bus_nr && PCI_SLOT(devfn) > 0))
+		return PCIBIOS_DEVICE_NOT_FOUND;
 
 	if (pp->ops->wr_other_conf)
 		return pp->ops->wr_other_conf(pp, bus, devfn, where, size, val);
@@ -647,62 +663,29 @@ static int dw_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
 	return ret;
 }
 
-static int dw_pcie_valid_config(struct pcie_port *pp,
-				struct pci_bus *bus, int dev)
-{
-	/* If there is no link, then there is no device */
-	if (bus->number != pp->root_bus_nr) {
-		if (!dw_pcie_link_up(pp))
-			return 0;
-	}
-
-	/* access only one slot on each root port */
-	if (bus->number == pp->root_bus_nr && dev > 0)
-		return 0;
-
-	/*
-	 * do not read more than one device on the bus directly attached
-	 * to RC's (Virtual Bridge's) DS side.
-	 */
-	if (bus->primary == pp->root_bus_nr && dev > 0)
-		return 0;
-
-	return 1;
-}
-
-static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+static int dw_pcie_rd_bridge_conf(struct pci_bus *bus, u32 devfn, int where,
 			int size, u32 *val)
 {
-	struct pcie_port *pp = bus->sysdata;
-
-	if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0) {
-		*val = 0xffffffff;
+	if (PCI_SLOT(devfn) > 0)
 		return PCIBIOS_DEVICE_NOT_FOUND;
-	}
 
-	if (bus->number == pp->root_bus_nr)
-		return dw_pcie_rd_own_conf(pp, where, size, val);
-
-	return dw_pcie_rd_other_conf(pp, bus, devfn, where, size, val);
+	return dw_pcie_rd_own_conf(bus->sysdata, where, size, val);
 }
 
-static int dw_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+static int dw_pcie_wr_bridge_conf(struct pci_bus *bus, u32 devfn,
 			int where, int size, u32 val)
 {
-	struct pcie_port *pp = bus->sysdata;
-
-	if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0)
+	if (PCI_SLOT(devfn) > 0)
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-	if (bus->number == pp->root_bus_nr)
-		return dw_pcie_wr_own_conf(pp, where, size, val);
-
-	return dw_pcie_wr_other_conf(pp, bus, devfn, where, size, val);
+	return dw_pcie_wr_own_conf(bus->sysdata, where, size, val);
 }
 
 static struct pci_ops dw_pcie_ops = {
-	.read = dw_pcie_rd_conf,
-	.write = dw_pcie_wr_conf,
+	.read_bridge = dw_pcie_rd_bridge_conf,
+	.write_bridge = dw_pcie_wr_bridge_conf,
+	.read = dw_pcie_rd_other_conf,
+	.write = dw_pcie_wr_other_conf,
 };
 
 void dw_pcie_setup_rc(struct pcie_port *pp)
