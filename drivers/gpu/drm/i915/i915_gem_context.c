@@ -320,6 +320,22 @@ i915_gem_create_context(struct drm_device *dev,
 	if (IS_ERR(ctx))
 		return ctx;
 
+	if (!i915.enable_execlists) {
+		struct intel_engine_cs *engine;
+
+		/* Create a per context timeline for fences */
+		for_each_engine(engine, to_i915(dev)) {
+			int ret = i915_create_fence_timeline(dev, ctx, engine);
+			if (ret) {
+				DRM_ERROR("Fence timeline creation failed for legacy %s: %p\n",
+					  engine->name, ctx);
+				idr_remove(&file_priv->context_idr, ctx->user_handle);
+				i915_gem_context_unreference(ctx);
+				return ERR_PTR(ret);
+			}
+		}
+	}
+
 	if (USES_FULL_PPGTT(dev)) {
 		struct i915_hw_ppgtt *ppgtt = i915_ppgtt_create(dev, file_priv);
 

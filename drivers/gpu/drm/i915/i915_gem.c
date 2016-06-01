@@ -2740,6 +2740,46 @@ void i915_gem_request_free(struct kref *req_ref)
 	kmem_cache_free(req->i915->requests, req);
 }
 
+int i915_create_fence_timeline(struct drm_device *dev,
+			       struct i915_gem_context *ctx,
+			       struct intel_engine_cs *engine)
+{
+	struct i915_fence_timeline *timeline;
+
+	timeline = &ctx->engine[engine->id].fence_timeline;
+
+	if (timeline->engine)
+		return 0;
+
+	timeline->fence_context = fence_context_alloc(1);
+
+	/*
+	 * Start the timeline from seqno 0 as this is a special value
+	 * that is reserved for invalid sync points.
+	 */
+	timeline->next       = 1;
+	timeline->ctx        = ctx;
+	timeline->engine     = engine;
+
+	snprintf(timeline->name, sizeof(timeline->name), "%d>%s:%d",
+		 timeline->fence_context, engine->name, ctx->user_handle);
+
+	return 0;
+}
+
+unsigned i915_fence_timeline_get_next_seqno(struct i915_fence_timeline *timeline)
+{
+	unsigned seqno;
+
+	seqno = timeline->next;
+
+	/* Reserve zero for invalid */
+	if (++timeline->next == 0)
+		timeline->next = 1;
+
+	return seqno;
+}
+
 static inline int
 __i915_gem_request_alloc(struct intel_engine_cs *engine,
 			 struct i915_gem_context *ctx,
