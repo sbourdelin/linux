@@ -450,6 +450,7 @@ struct intel_crtc_wm_state {
 		} ilk;
 
 		struct {
+			struct vlv_wm_state intermediate;
 			struct vlv_wm_state optimal;
 		} vlv;
 
@@ -683,8 +684,6 @@ struct intel_crtc {
 			struct skl_pipe_wm skl;
 		} active;
 
-		/* allow CxSR on this pipe */
-		bool cxsr_allowed;
 	} wm;
 
 	int scanline_offset;

@@ -4602,8 +4602,6 @@ static void intel_post_plane_update(struct intel_crtc_state *old_crtc_state)
 
 	intel_frontbuffer_flip(dev, pipe_config->fb_bits);
 
-	crtc->wm.cxsr_allowed = true;
-
 	if (pipe_config->update_wm_post && pipe_config->base.active)
 		intel_update_watermarks(&crtc->base);
 
@@ -4649,7 +4647,6 @@ static void intel_pre_plane_update(struct intel_crtc_state *old_crtc_state)
 	}
 
 	if (pipe_config->disable_cxsr) {
-		crtc->wm.cxsr_allowed = false;
 
 		/*
 		 * Vblank time updates from the shadow to live plane control register
@@ -6176,7 +6173,7 @@ static void valleyview_crtc_enable(struct drm_crtc *crtc)
 
 	intel_color_load_luts(&pipe_config->base);
 
-	intel_update_watermarks(crtc);
+	dev_priv->display.initial_watermarks(pipe_config);
 	intel_enable_pipe(intel_crtc);
 
 	assert_vblank_disabled(crtc);
@@ -14506,8 +14503,6 @@ static void intel_crtc_init(struct drm_device *dev, int pipe)
 	intel_crtc->cursor_base = ~0;
 	intel_crtc->cursor_cntl = ~0;
 	intel_crtc->cursor_size = ~0;
-
-	intel_crtc->wm.cxsr_allowed = true;
 
 	BUG_ON(pipe >= ARRAY_SIZE(dev_priv->plane_to_crtc_mapping) ||
 	       dev_priv->plane_to_crtc_mapping[intel_crtc->plane] != NULL);
