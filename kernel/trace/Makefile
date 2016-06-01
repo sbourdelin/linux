@@ -69,4 +69,5 @@ obj-$(CONFIG_UPROBE_EVENT) += trace_uprobe.o
 
 obj-$(CONFIG_TRACEPOINT_BENCHMARK) += trace_benchmark.o
 
+obj-$(CONFIG_STM_FTRACE) += trace_output_stm.o
 libftrace-y := ftrace.o
