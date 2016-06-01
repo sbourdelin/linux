@@ -624,6 +624,7 @@ struct intel_crtc_state {
 struct vlv_wm_state {
 	struct vlv_pipe_wm wm[3];
 	struct vlv_sr_wm sr[3];
+	uint16_t fifo_size[I915_MAX_PLANES];
 	uint8_t num_active_planes;
 	uint8_t num_levels;
 	uint8_t level;
@@ -696,10 +697,6 @@ struct intel_crtc {
 	struct vlv_wm_state wm_state;
 };
 
-struct intel_plane_wm_parameters {
-	uint16_t fifo_size;
-};
-
 struct intel_plane {
 	struct drm_plane base;
 	int plane;
@@ -707,13 +704,6 @@ struct intel_plane {
 	bool can_scale;
 	int max_downscale;
 	uint32_t frontbuffer_bit;
-
-	/* Since we need to change the watermarks before/after
-	 * enabling/disabling the planes, we need to store the parameters here
-	 * as the other pieces of the struct may not reflect the values we want
-	 * for the watermark calculations. Currently only Haswell uses this.
-	 */
-	struct intel_plane_wm_parameters wm;
 
 	/*
 	 * NOTE: Do not place new plane state fields here (e.g., when adding

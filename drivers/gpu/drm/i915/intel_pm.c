@@ -55,7 +55,7 @@
 #define INTEL_RC6pp_ENABLE			(1<<2)
 
 /*
- * Return the index of a plane in the DDB and wm result arrays.  Primary
+ * Return the index of a plane in the wm result arrays.  Primary
  * plane is always in slot 0, cursor is always in slot I915_MAX_PLANES-1, and
  * other universal planes are in indices 1..n.  Note that this may leave unused
  * indices between the top "sprite" plane and the cursor.
@@ -983,14 +983,17 @@ static uint16_t vlv_compute_wm_level(struct intel_plane *plane,
 	return min_t(int, wm, USHRT_MAX);
 }
 
-static void vlv_compute_fifo(struct intel_crtc *crtc)
+static void vlv_compute_fifo(struct intel_crtc_state *cstate,
+				struct vlv_wm_state *wm_state)
 {
+	struct intel_crtc *crtc = to_intel_crtc(cstate->base.crtc);
 	struct drm_device *dev = crtc->base.dev;
-	struct vlv_wm_state *wm_state = &crtc->wm_state;
 	struct intel_plane *plane;
 	unsigned int total_rate = 0;
 	const int fifo_size = 512 - 1;
 	int fifo_extra, fifo_left = fifo_size;
+	int rate[I915_MAX_PLANES] = {};
+	int i;
 
 	for_each_intel_plane_on_crtc(dev, crtc, plane) {
 		struct intel_plane_state *state =
@@ -1001,58 +1004,55 @@ static void vlv_compute_fifo(struct intel_crtc *crtc)
 
 		if (state->visible) {
 			wm_state->num_active_planes++;
-			total_rate += drm_format_plane_cpp(state->base.fb->pixel_format, 0);
+			rate[wm_plane_id(plane)] =
+			drm_format_plane_cpp(state->base.fb->pixel_format, 0);
+			total_rate += rate[wm_plane_id(plane)];
 		}
 	}
 
-	for_each_intel_plane_on_crtc(dev, crtc, plane) {
-		struct intel_plane_state *state =
-			to_intel_plane_state(plane->base.state);
-		unsigned int rate;
-
-		if (plane->base.type == DRM_PLANE_TYPE_CURSOR) {
-			plane->wm.fifo_size = 63;
+	for (i = 0; i < I915_MAX_PLANES; i++) {
+		if (i == PLANE_CURSOR) {
+			wm_state->fifo_size[i] = 63;
 			continue;
 		}
 
-		if (!state->visible) {
-			plane->wm.fifo_size = 0;
+		if (!rate[i]) {
+			wm_state->fifo_size[i] = 0;
 			continue;
 		}
 
-		rate = drm_format_plane_cpp(state->base.fb->pixel_format, 0);
-		plane->wm.fifo_size = fifo_size * rate / total_rate;
-		fifo_left -= plane->wm.fifo_size;
+		wm_state->fifo_size[i] = fifo_size * rate[i] / total_rate;
+		fifo_left -= wm_state->fifo_size[i];
 	}
 
 	fifo_extra = DIV_ROUND_UP(fifo_left, wm_state->num_active_planes ?: 1);
 
 	/* spread the remainder evenly */
-	for_each_intel_plane_on_crtc(dev, crtc, plane) {
+	for (i = 0; i < I915_MAX_PLANES; i++) {
 		int plane_extra;
 
 		if (fifo_left == 0)
 			break;
 
-		if (plane->base.type == DRM_PLANE_TYPE_CURSOR)
+		if (i == PLANE_CURSOR)
 			continue;
 
 		/* give it all to the first plane if none are active */
-		if (plane->wm.fifo_size == 0 &&
+		if (!wm_state->fifo_size[i] &&
 		    wm_state->num_active_planes)
 			continue;
 
 		plane_extra = min(fifo_extra, fifo_left);
-		plane->wm.fifo_size += plane_extra;
+		wm_state->fifo_size[i] += plane_extra;
 		fifo_left -= plane_extra;
 	}
 
 	WARN_ON(fifo_left != 0);
 }
 
-static void vlv_invert_wms(struct intel_crtc *crtc)
+static void vlv_invert_wms(struct intel_crtc *crtc,
+			struct vlv_wm_state *wm_state)
 {
-	struct vlv_wm_state *wm_state = &crtc->wm_state;
 	int level;
 
 	for (level = 0; level < wm_state->num_levels; level++) {
@@ -1064,19 +1064,24 @@ static void vlv_invert_wms(struct intel_crtc *crtc)
 		wm_state->sr[level].cursor = 63 - wm_state->sr[level].cursor;
 
 		for_each_intel_plane_on_crtc(dev, crtc, plane) {
+			int i = wm_plane_id(plane);
+
 			switch (plane->base.type) {
 				int sprite;
 			case DRM_PLANE_TYPE_CURSOR:
-				wm_state->wm[level].cursor = plane->wm.fifo_size -
+				wm_state->wm[level].cursor =
+					wm_state->fifo_size[i] -
 					wm_state->wm[level].cursor;
 				break;
 			case DRM_PLANE_TYPE_PRIMARY:
-				wm_state->wm[level].primary = plane->wm.fifo_size -
+				wm_state->wm[level].primary =
+					wm_state->fifo_size[i] -
 					wm_state->wm[level].primary;
 				break;
 			case DRM_PLANE_TYPE_OVERLAY:
 				sprite = plane->plane;
-				wm_state->wm[level].sprite[sprite] = plane->wm.fifo_size -
+				wm_state->wm[level].sprite[sprite] =
+					wm_state->fifo_size[i] -
 					wm_state->wm[level].sprite[sprite];
 				break;
 			}
@@ -1084,8 +1089,9 @@ static void vlv_invert_wms(struct intel_crtc *crtc)
 	}
 }
 
-static void vlv_compute_wm(struct intel_crtc *crtc)
+static int vlv_compute_wm(struct intel_crtc_state *cstate)
 {
+	struct intel_crtc *crtc = to_intel_crtc(cstate->base.crtc);
 	struct drm_device *dev = crtc->base.dev;
 	struct vlv_wm_state *wm_state = &crtc->wm_state;
 	struct intel_plane *plane;
@@ -1099,7 +1105,7 @@ static void vlv_compute_wm(struct intel_crtc *crtc)
 
 	wm_state->num_active_planes = 0;
 
-	vlv_compute_fifo(crtc);
+	vlv_compute_fifo(cstate, wm_state);
 
 	if (wm_state->num_active_planes != 1)
 		wm_state->cxsr = false;
@@ -1123,11 +1129,16 @@ static void vlv_compute_wm(struct intel_crtc *crtc)
 			int wm = vlv_compute_wm_level(plane, crtc, state, level);
 			int max_wm = plane->base.type == DRM_PLANE_TYPE_CURSOR ? 63 : 511;
 
-			/* hack */
-			if (WARN_ON(level == 0 && wm > max_wm))
-				wm = max_wm;
+			if (level == 0 && wm > max_wm) {
+				DRM_DEBUG_KMS("Requested display configuration "
+				"exceeds system watermark limitations\n");
+				DRM_DEBUG_KMS("Plane %d.%d: blocks required = %u/%u\n",
+				      to_intel_crtc(cstate->base.crtc)->pipe,
+				      drm_plane_index(&plane->base), wm, max_wm);
+				return -EINVAL;
+			}
 
-			if (wm > plane->wm.fifo_size)
+			if (wm > wm_state->fifo_size[wm_plane_id(plane)])
 				break;
 
 			switch (plane->base.type) {
@@ -1180,7 +1191,9 @@ static void vlv_compute_wm(struct intel_crtc *crtc)
 		memset(&wm_state->sr[level], 0, sizeof(wm_state->sr[level]));
 	}
 
-	vlv_invert_wms(crtc);
+	vlv_invert_wms(crtc, wm_state);
+
+	return 0;
 }
 
 #define VLV_FIFO(plane, value) \
@@ -1190,24 +1203,18 @@ static void vlv_pipe_set_fifo_size(struct intel_crtc *crtc)
 {
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
-	struct intel_plane *plane;
 	int sprite0_start = 0, sprite1_start = 0, fifo_size = 0;
+	const struct vlv_wm_state *wm_state = &crtc->wm_state;
 
-	for_each_intel_plane_on_crtc(dev, crtc, plane) {
-		if (plane->base.type == DRM_PLANE_TYPE_CURSOR) {
-			WARN_ON(plane->wm.fifo_size != 63);
-			continue;
-		}
 
-		if (plane->base.type == DRM_PLANE_TYPE_PRIMARY)
-			sprite0_start = plane->wm.fifo_size;
-		else if (plane->plane == 0)
-			sprite1_start = sprite0_start + plane->wm.fifo_size;
-		else
-			fifo_size = sprite1_start + plane->wm.fifo_size;
-	}
+	WARN_ON(wm_state->fifo_size[PLANE_CURSOR] != 63);
+	sprite0_start = wm_state->fifo_size[0];
+	sprite1_start = sprite0_start + wm_state->fifo_size[1];
+	fifo_size = sprite1_start + wm_state->fifo_size[2];
 
-	WARN_ON(fifo_size != 512 - 1);
+	WARN(fifo_size != 512 - 1, "Pipe %c FIFO split %d / %d / %d\n",
+		      pipe_name(crtc->pipe), sprite0_start,
+		      sprite1_start, fifo_size);
 
 	DRM_DEBUG_KMS("Pipe %c FIFO split %d / %d / %d\n",
 		      pipe_name(crtc->pipe), sprite0_start,
@@ -1327,7 +1334,7 @@ static void vlv_update_wm(struct drm_crtc *crtc)
 	enum pipe pipe = intel_crtc->pipe;
 	struct vlv_wm_values wm = {};
 
-	vlv_compute_wm(intel_crtc);
+	vlv_compute_wm(intel_crtc->config);
 	vlv_merge_wm(dev, &wm);
 
 	if (memcmp(&dev_priv->wm.vlv, &wm, sizeof(wm)) == 0) {
@@ -4216,6 +4223,7 @@ void vlv_wm_get_hw_state(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct vlv_wm_values *wm = &dev_priv->wm.vlv;
+	struct intel_crtc *crtc;
 	struct intel_plane *plane;
 	enum pipe pipe;
 	u32 val;
@@ -4223,17 +4231,20 @@ void vlv_wm_get_hw_state(struct drm_device *dev)
 	vlv_read_wm_values(dev_priv, wm);
 
 	for_each_intel_plane(dev, plane) {
+		struct vlv_wm_state *wm_state;
+		int i = wm_plane_id(plane);
+
+		crtc = to_intel_crtc(intel_get_crtc_for_pipe(dev, plane->pipe));
+		wm_state = &crtc->wm_state;
+
 		switch (plane->base.type) {
-			int sprite;
 		case DRM_PLANE_TYPE_CURSOR:
-			plane->wm.fifo_size = 63;
+			wm_state->fifo_size[i] = 63;
 			break;
 		case DRM_PLANE_TYPE_PRIMARY:
-			plane->wm.fifo_size = vlv_get_fifo_size(dev, plane->pipe, 0);
-			break;
 		case DRM_PLANE_TYPE_OVERLAY:
-			sprite = plane->plane;
-			plane->wm.fifo_size = vlv_get_fifo_size(dev, plane->pipe, sprite + 1);
+			wm_state->fifo_size[i] =
+				vlv_get_fifo_size(dev, plane->pipe, i);
 			break;
 		}
 	}
