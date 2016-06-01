@@ -33,6 +33,7 @@
 #include <linux/mfd/core.h>
 #include <linux/mfd/max8997.h>
 #include <linux/mfd/max8997-private.h>
+#include <linux/regmap.h>
 
 #define I2C_ADDR_PMIC	(0xCC >> 1)
 #define I2C_ADDR_MUIC	(0x4A >> 1)
@@ -58,81 +59,29 @@ static const struct of_device_id max8997_pmic_dt_match[] = {
 MODULE_DEVICE_TABLE(of, max8997_pmic_dt_match);
 #endif
 
-int max8997_read_reg(struct i2c_client *i2c, u8 reg, u8 *dest)
-{
-	struct max8997_dev *max8997 = i2c_get_clientdata(i2c);
-	int ret;
+static const struct regmap_config max8997_regmap_config = {
+	.reg_bits = 8,
+	.val_bits = 8,
+	.max_register = MAX8997_REG_PMIC_END,
+};
 
-	mutex_lock(&max8997->iolock);
-	ret = i2c_smbus_read_byte_data(i2c, reg);
-	mutex_unlock(&max8997->iolock);
-	if (ret < 0)
-		return ret;
+static const struct regmap_config max8997_regmap_rtc_config = {
+	.reg_bits = 8,
+	.val_bits = 8,
+	.max_register = MAX8997_RTC_REG_END,
+};
 
-	ret &= 0xff;
-	*dest = ret;
-	return 0;
-}
-EXPORT_SYMBOL_GPL(max8997_read_reg);
+static const struct regmap_config max8997_regmap_haptic_config = {
+	.reg_bits = 8,
+	.val_bits = 8,
+	.max_register = MAX8997_HAPTIC_REG_END,
+};
 
-int max8997_bulk_read(struct i2c_client *i2c, u8 reg, int count, u8 *buf)
-{
-	struct max8997_dev *max8997 = i2c_get_clientdata(i2c);
-	int ret;
-
-	mutex_lock(&max8997->iolock);
-	ret = i2c_smbus_read_i2c_block_data(i2c, reg, count, buf);
-	mutex_unlock(&max8997->iolock);
-	if (ret < 0)
-		return ret;
-
-	return 0;
-}
-EXPORT_SYMBOL_GPL(max8997_bulk_read);
-
-int max8997_write_reg(struct i2c_client *i2c, u8 reg, u8 value)
-{
-	struct max8997_dev *max8997 = i2c_get_clientdata(i2c);
-	int ret;
-
-	mutex_lock(&max8997->iolock);
-	ret = i2c_smbus_write_byte_data(i2c, reg, value);
-	mutex_unlock(&max8997->iolock);
-	return ret;
-}
-EXPORT_SYMBOL_GPL(max8997_write_reg);
-
-int max8997_bulk_write(struct i2c_client *i2c, u8 reg, int count, u8 *buf)
-{
-	struct max8997_dev *max8997 = i2c_get_clientdata(i2c);
-	int ret;
-
-	mutex_lock(&max8997->iolock);
-	ret = i2c_smbus_write_i2c_block_data(i2c, reg, count, buf);
-	mutex_unlock(&max8997->iolock);
-	if (ret < 0)
-		return ret;
-
-	return 0;
-}
-EXPORT_SYMBOL_GPL(max8997_bulk_write);
-
-int max8997_update_reg(struct i2c_client *i2c, u8 reg, u8 val, u8 mask)
-{
-	struct max8997_dev *max8997 = i2c_get_clientdata(i2c);
-	int ret;
-
-	mutex_lock(&max8997->iolock);
-	ret = i2c_smbus_read_byte_data(i2c, reg);
-	if (ret >= 0) {
-		u8 old_val = ret & 0xff;
-		u8 new_val = (val & mask) | (old_val & (~mask));
-		ret = i2c_smbus_write_byte_data(i2c, reg, new_val);
-	}
-	mutex_unlock(&max8997->iolock);
-	return ret;
-}
-EXPORT_SYMBOL_GPL(max8997_update_reg);
+static const struct regmap_config max8997_regmap_muic_config = {
+	.reg_bits = 8,
+	.val_bits = 8,
+	.max_register = MAX8997_MUIC_REG_END,
+};
 
 /*
  * Only the common platform data elements for max8997 are parsed here from the
@@ -231,6 +180,41 @@ static int max8997_i2c_probe(struct i2c_client *i2c,
 	}
 	i2c_set_clientdata(max8997->muic, max8997);
 
+	max8997->regmap = devm_regmap_init_i2c(i2c, &max8997_regmap_config);
+	if (IS_ERR(max8997->regmap)) {
+		ret = PTR_ERR(max8997->regmap);
+		dev_err(max8997->dev,
+				"failed to allocate register map: %d\n", ret);
+		return ret;
+	}
+
+	max8997->regmap_rtc = devm_regmap_init_i2c(max8997->rtc,
+					&max8997_regmap_rtc_config);
+	if (IS_ERR(max8997->regmap_rtc)) {
+		ret = PTR_ERR(max8997->regmap_rtc);
+		dev_err(max8997->dev,
+				"failed to allocate register map: %d\n", ret);
+		goto err_regmap;
+	}
+
+	max8997->regmap_haptic = devm_regmap_init_i2c(max8997->haptic,
+					&max8997_regmap_haptic_config);
+	if (IS_ERR(max8997->regmap_haptic)) {
+		ret = PTR_ERR(max8997->regmap_haptic);
+		dev_err(max8997->dev,
+				"failed to allocate register map: %d\n", ret);
+		goto err_regmap;
+	}
+
+	max8997->regmap_muic = devm_regmap_init_i2c(max8997->muic,
+					&max8997_regmap_muic_config);
+	if (IS_ERR(max8997->regmap_muic)) {
+		ret = PTR_ERR(max8997->regmap_muic);
+		dev_err(max8997->dev,
+				"failed to allocate register map: %d\n", ret);
+		goto err_regmap;
+	}
+
 	pm_runtime_set_active(max8997->dev);
 
 	max8997_irq_init(max8997);
@@ -255,6 +239,7 @@ static int max8997_i2c_probe(struct i2c_client *i2c,
 
 err_mfd:
 	mfd_remove_devices(max8997->dev);
+err_regmap:
 	i2c_unregister_device(max8997->muic);
 err_i2c_muic:
 	i2c_unregister_device(max8997->haptic);
@@ -442,15 +427,15 @@ static int max8997_freeze(struct device *dev)
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(max8997_dumpaddr_pmic); i++)
-		max8997_read_reg(i2c, max8997_dumpaddr_pmic[i],
+		regmap_read(max8997->regmap, max8997_dumpaddr_pmic[i],
 				&max8997->reg_dump[i]);
 
 	for (i = 0; i < ARRAY_SIZE(max8997_dumpaddr_muic); i++)
-		max8997_read_reg(i2c, max8997_dumpaddr_muic[i],
+		regmap_read(max8997->regmap_muic, max8997_dumpaddr_muic[i],
 				&max8997->reg_dump[i + MAX8997_REG_PMIC_END]);
 
 	for (i = 0; i < ARRAY_SIZE(max8997_dumpaddr_haptic); i++)
-		max8997_read_reg(i2c, max8997_dumpaddr_haptic[i],
+		regmap_read(max8997->regmap_haptic, max8997_dumpaddr_haptic[i],
 				&max8997->reg_dump[i + MAX8997_REG_PMIC_END +
 				MAX8997_MUIC_REG_END]);
 
@@ -464,15 +449,15 @@ static int max8997_restore(struct device *dev)
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(max8997_dumpaddr_pmic); i++)
-		max8997_write_reg(i2c, max8997_dumpaddr_pmic[i],
+		regmap_write(max8997->regmap, max8997_dumpaddr_pmic[i],
 				max8997->reg_dump[i]);
 
 	for (i = 0; i < ARRAY_SIZE(max8997_dumpaddr_muic); i++)
-		max8997_write_reg(i2c, max8997_dumpaddr_muic[i],
+		regmap_write(max8997->regmap_muic, max8997_dumpaddr_muic[i],
 				max8997->reg_dump[i + MAX8997_REG_PMIC_END]);
 
 	for (i = 0; i < ARRAY_SIZE(max8997_dumpaddr_haptic); i++)
-		max8997_write_reg(i2c, max8997_dumpaddr_haptic[i],
+		regmap_write(max8997->regmap_haptic, max8997_dumpaddr_haptic[i],
 				max8997->reg_dump[i + MAX8997_REG_PMIC_END +
 				MAX8997_MUIC_REG_END]);
 

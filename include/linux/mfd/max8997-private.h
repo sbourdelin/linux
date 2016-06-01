@@ -309,6 +309,8 @@ enum max8997_rtc_reg {
 	MAX8997_RTC_ALARM2_MONTH	= 0x22,
 	MAX8997_RTC_ALARM2_YEAR		= 0x23,
 	MAX8997_RTC_ALARM2_DAY_OF_MONTH	= 0x24,
+
+	MAX8997_RTC_REG_END		= 0x25,
 };
 
 enum max8997_irq_source {
@@ -390,6 +392,11 @@ struct max8997_dev {
 	unsigned long type;
 	struct platform_device *battery; /* battery control (not fuel gauge) */
 
+	struct regmap *regmap;
+	struct regmap *regmap_rtc;
+	struct regmap *regmap_haptic;
+	struct regmap *regmap_muic;
+
 	int irq;
 	int ono;
 	struct irq_domain *irq_domain;
@@ -398,7 +405,7 @@ struct max8997_dev {
 	int irq_masks_cache[MAX8997_IRQ_GROUP_NR];
 
 	/* For hibernation */
-	u8 reg_dump[MAX8997_REG_PMIC_END + MAX8997_MUIC_REG_END +
+	unsigned int reg_dump[MAX8997_REG_PMIC_END + MAX8997_MUIC_REG_END +
 		MAX8997_HAPTIC_REG_END];
 
 	bool gpio_status[MAX8997_NUM_GPIO];
@@ -412,14 +419,6 @@ enum max8997_types {
 extern int max8997_irq_init(struct max8997_dev *max8997);
 extern void max8997_irq_exit(struct max8997_dev *max8997);
 extern int max8997_irq_resume(struct max8997_dev *max8997);
-
-extern int max8997_read_reg(struct i2c_client *i2c, u8 reg, u8 *dest);
-extern int max8997_bulk_read(struct i2c_client *i2c, u8 reg, int count,
-				u8 *buf);
-extern int max8997_write_reg(struct i2c_client *i2c, u8 reg, u8 value);
-extern int max8997_bulk_write(struct i2c_client *i2c, u8 reg, int count,
-				u8 *buf);
-extern int max8997_update_reg(struct i2c_client *i2c, u8 reg, u8 val, u8 mask);
 
 #define MAX8997_GPIO_INT_BOTH	(0x3 << 4)
 #define MAX8997_GPIO_INT_RISE	(0x2 << 4)

@@ -26,6 +26,7 @@
 #include <linux/interrupt.h>
 #include <linux/mfd/max8997.h>
 #include <linux/mfd/max8997-private.h>
+#include <linux/regmap.h>
 
 static const u8 max8997_mask_reg[] = {
 	[PMIC_INT1] = MAX8997_REG_INT1MSK,
@@ -40,25 +41,6 @@ static const u8 max8997_mask_reg[] = {
 	[GPIO_HI] = MAX8997_REG_INVALID,
 	[FLASH_STATUS] = MAX8997_REG_INVALID,
 };
-
-static struct i2c_client *get_i2c(struct max8997_dev *max8997,
-				enum max8997_irq_source src)
-{
-	switch (src) {
-	case PMIC_INT1 ... PMIC_INT4:
-		return max8997->i2c;
-	case FUEL_GAUGE:
-		return NULL;
-	case MUIC_INT1 ... MUIC_INT3:
-		return max8997->muic;
-	case GPIO_LOW ... GPIO_HI:
-		return max8997->i2c;
-	case FLASH_STATUS:
-		return max8997->i2c;
-	default:
-		return ERR_PTR(-EINVAL);
-	}
-}
 
 struct max8997_irq_data {
 	int mask;
@@ -124,15 +106,20 @@ static void max8997_irq_sync_unlock(struct irq_data *data)
 	int i;
 
 	for (i = 0; i < MAX8997_IRQ_GROUP_NR; i++) {
+		struct regmap *map;
 		u8 mask_reg = max8997_mask_reg[i];
-		struct i2c_client *i2c = get_i2c(max8997, i);
+
+		if (i >= MUIC_INT1 && i <= MUIC_INT3)
+			map = max8997->regmap_muic;
+		else
+			map = max8997->regmap;
 
 		if (mask_reg == MAX8997_REG_INVALID ||
-				IS_ERR_OR_NULL(i2c))
+				IS_ERR_OR_NULL(map))
 			continue;
 		max8997->irq_masks_cache[i] = max8997->irq_masks_cur[i];
 
-		max8997_write_reg(i2c, max8997_mask_reg[i],
+		regmap_write(map, max8997_mask_reg[i],
 				max8997->irq_masks_cur[i]);
 	}
 
@@ -180,11 +167,11 @@ static irqreturn_t max8997_irq_thread(int irq, void *data)
 {
 	struct max8997_dev *max8997 = data;
 	u8 irq_reg[MAX8997_IRQ_GROUP_NR] = {};
-	u8 irq_src;
+	unsigned int irq_src;
 	int ret;
 	int i, cur_irq;
 
-	ret = max8997_read_reg(max8997->i2c, MAX8997_REG_INTSRC, &irq_src);
+	ret = regmap_read(max8997->regmap, MAX8997_REG_INTSRC, &irq_src);
 	if (ret < 0) {
 		dev_err(max8997->dev, "Failed to read interrupt source: %d\n",
 				ret);
@@ -193,8 +180,8 @@ static irqreturn_t max8997_irq_thread(int irq, void *data)
 
 	if (irq_src & MAX8997_IRQSRC_PMIC) {
 		/* PMIC INT1 ~ INT4 */
-		max8997_bulk_read(max8997->i2c, MAX8997_REG_INT1, 4,
-				&irq_reg[PMIC_INT1]);
+		regmap_bulk_read(max8997->regmap, MAX8997_REG_INT1,
+				&irq_reg[PMIC_INT1], 4);
 	}
 	if (irq_src & MAX8997_IRQSRC_FUELGAUGE) {
 		/*
@@ -214,8 +201,8 @@ static irqreturn_t max8997_irq_thread(int irq, void *data)
 	}
 	if (irq_src & MAX8997_IRQSRC_MUIC) {
 		/* MUIC INT1 ~ INT3 */
-		max8997_bulk_read(max8997->muic, MAX8997_MUIC_REG_INT1, 3,
-				&irq_reg[MUIC_INT1]);
+		regmap_bulk_read(max8997->regmap_muic, MAX8997_MUIC_REG_INT1,
+				&irq_reg[MUIC_INT1], 3);
 	}
 	if (irq_src & MAX8997_IRQSRC_GPIO) {
 		/* GPIO Interrupt */
@@ -224,8 +211,8 @@ static irqreturn_t max8997_irq_thread(int irq, void *data)
 		irq_reg[GPIO_LOW] = 0;
 		irq_reg[GPIO_HI] = 0;
 
-		max8997_bulk_read(max8997->i2c, MAX8997_REG_GPIOCNTL1,
-				MAX8997_NUM_GPIO, gpio_info);
+		regmap_bulk_read(max8997->regmap, MAX8997_REG_GPIOCNTL1,
+				gpio_info, MAX8997_NUM_GPIO);
 		for (i = 0; i < MAX8997_NUM_GPIO; i++) {
 			bool interrupt = false;
 
@@ -259,8 +246,10 @@ static irqreturn_t max8997_irq_thread(int irq, void *data)
 	}
 	if (irq_src & MAX8997_IRQSRC_FLASH) {
 		/* Flash Status Interrupt */
-		ret = max8997_read_reg(max8997->i2c, MAX8997_REG_FLASHSTATUS,
-				&irq_reg[FLASH_STATUS]);
+		unsigned int data;
+		ret = regmap_read(max8997->regmap,
+				MAX8997_REG_FLASHSTATUS, &data);
+		irq_reg[FLASH_STATUS] = data;
 	}
 
 	/* Apply masking */
@@ -308,7 +297,7 @@ int max8997_irq_init(struct max8997_dev *max8997)
 	struct irq_domain *domain;
 	int i;
 	int ret;
-	u8 val;
+	unsigned int val;
 
 	if (!max8997->irq) {
 		dev_warn(max8997->dev, "No interrupt specified.\n");
@@ -319,22 +308,19 @@ int max8997_irq_init(struct max8997_dev *max8997)
 
 	/* Mask individual interrupt sources */
 	for (i = 0; i < MAX8997_IRQ_GROUP_NR; i++) {
-		struct i2c_client *i2c;
-
 		max8997->irq_masks_cur[i] = 0xff;
 		max8997->irq_masks_cache[i] = 0xff;
-		i2c = get_i2c(max8997, i);
 
-		if (IS_ERR_OR_NULL(i2c))
+		if (IS_ERR_OR_NULL(max8997->regmap))
 			continue;
 		if (max8997_mask_reg[i] == MAX8997_REG_INVALID)
 			continue;
 
-		max8997_write_reg(i2c, max8997_mask_reg[i], 0xff);
+		regmap_write(max8997->regmap, max8997_mask_reg[i], 0xff);
 	}
 
 	for (i = 0; i < MAX8997_NUM_GPIO; i++) {
-		max8997->gpio_status[i] = (max8997_read_reg(max8997->i2c,
+		max8997->gpio_status[i] = (regmap_read(max8997->regmap,
 						MAX8997_REG_GPIOCNTL1 + i,
 						&val)
 					& MAX8997_GPIO_DATA_MASK) ?
