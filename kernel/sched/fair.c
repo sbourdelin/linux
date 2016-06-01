@@ -2705,6 +2705,7 @@ __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 	u32 contrib;
 	unsigned int delta_w, scaled_delta_w, decayed = 0;
 	unsigned long scale_freq, scale_cpu;
+	int update_util = 0;
 
 	delta = now - sa->last_update_time;
 	/*
@@ -2724,6 +2725,12 @@ __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 	if (!delta)
 		return 0;
 	sa->last_update_time = now;
+
+	if (cfs_rq) {
+		if (&rq_of(cfs_rq)->cfs == cfs_rq)
+			update_util = 1;
+	} else if (entity_is_task(container_of(sa, struct sched_entity, avg)))
+			update_util = 1;
 
 	scale_freq = arch_scale_freq_capacity(NULL, cpu);
 	scale_cpu = arch_scale_cpu_capacity(NULL, cpu);
@@ -2750,7 +2757,7 @@ __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 						weight * scaled_delta_w;
 			}
 		}
-		if (running)
+		if (update_util && running)
 			sa->util_sum += scaled_delta_w * scale_cpu;
 
 		delta -= delta_w;
@@ -2774,7 +2781,7 @@ __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 			if (cfs_rq)
 				cfs_rq->runnable_load_sum += weight * contrib;
 		}
-		if (running)
+		if (update_util && running)
 			sa->util_sum += contrib * scale_cpu;
 	}
 
@@ -2785,7 +2792,7 @@ __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 		if (cfs_rq)
 			cfs_rq->runnable_load_sum += weight * scaled_delta;
 	}
-	if (running)
+	if (update_util && running)
 		sa->util_sum += scaled_delta * scale_cpu;
 
 	sa->period_contrib += delta;
@@ -2796,7 +2803,8 @@ __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 			cfs_rq->runnable_load_avg =
 				div_u64(cfs_rq->runnable_load_sum, LOAD_AVG_MAX);
 		}
-		sa->util_avg = sa->util_sum / LOAD_AVG_MAX;
+		if (update_util)
+			sa->util_avg = sa->util_sum / LOAD_AVG_MAX;
 	}
 
 	return decayed;
@@ -2918,7 +2926,8 @@ update_cfs_rq_load_avg(u64 now, struct cfs_rq *cfs_rq, bool update_freq)
 		removed_load = 1;
 	}
 
-	if (atomic_long_read(&cfs_rq->removed_util_avg)) {
+	if ((&rq_of(cfs_rq)->cfs == cfs_rq) &&
+	    atomic_long_read(&cfs_rq->removed_util_avg)) {
 		long r = atomic_long_xchg(&cfs_rq->removed_util_avg, 0);
 		sa->util_avg = max_t(long, sa->util_avg - r, 0);
 		sa->util_sum = max_t(s32, sa->util_sum - r * LOAD_AVG_MAX, 0);
@@ -2982,8 +2991,12 @@ skip_aging:
 	se->avg.last_update_time = cfs_rq->avg.last_update_time;
 	cfs_rq->avg.load_avg += se->avg.load_avg;
 	cfs_rq->avg.load_sum += se->avg.load_sum;
-	cfs_rq->avg.util_avg += se->avg.util_avg;
-	cfs_rq->avg.util_sum += se->avg.util_sum;
+
+	if (!entity_is_task(se))
+		return;
+
+	rq_of(cfs_rq)->cfs.avg.util_avg += se->avg.util_avg;
+	rq_of(cfs_rq)->cfs.avg.util_sum += se->avg.util_sum;
 
 	cfs_rq_util_change(cfs_rq);
 }
@@ -2996,8 +3009,14 @@ static void detach_entity_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *s
 
 	cfs_rq->avg.load_avg = max_t(long, cfs_rq->avg.load_avg - se->avg.load_avg, 0);
 	cfs_rq->avg.load_sum = max_t(s64,  cfs_rq->avg.load_sum - se->avg.load_sum, 0);
-	cfs_rq->avg.util_avg = max_t(long, cfs_rq->avg.util_avg - se->avg.util_avg, 0);
-	cfs_rq->avg.util_sum = max_t(s32,  cfs_rq->avg.util_sum - se->avg.util_sum, 0);
+
+	if (!entity_is_task(se))
+		return;
+
+	rq_of(cfs_rq)->cfs.avg.util_avg =
+	    max_t(long, rq_of(cfs_rq)->cfs.avg.util_avg - se->avg.util_avg, 0);
+	rq_of(cfs_rq)->cfs.avg.util_sum =
+	    max_t(s32, rq_of(cfs_rq)->cfs.avg.util_sum - se->avg.util_sum, 0);
 
 	cfs_rq_util_change(cfs_rq);
 }
@@ -3082,7 +3101,11 @@ void remove_entity_load_avg(struct sched_entity *se)
 
 	__update_load_avg(last_update_time, cpu_of(rq_of(cfs_rq)), &se->avg, 0, 0, NULL);
 	atomic_long_add(se->avg.load_avg, &cfs_rq->removed_load_avg);
-	atomic_long_add(se->avg.util_avg, &cfs_rq->removed_util_avg);
+
+	if (!entity_is_task(se))
+		return;
+
+	atomic_long_add(se->avg.util_avg, &rq_of(cfs_rq)->cfs.removed_util_avg);
 }
 
 static inline unsigned long cfs_rq_runnable_load_avg(struct cfs_rq *cfs_rq)
@@ -8460,7 +8483,9 @@ void init_cfs_rq(struct cfs_rq *cfs_rq)
 #endif
 #ifdef CONFIG_SMP
 	atomic_long_set(&cfs_rq->removed_load_avg, 0);
-	atomic_long_set(&cfs_rq->removed_util_avg, 0);
+
+	if (&rq_of(cfs_rq)->cfs == cfs_rq)
+		atomic_long_set(&cfs_rq->removed_util_avg, 0);
 #endif
 }
 
@@ -8525,7 +8550,6 @@ int alloc_fair_sched_group(struct task_group *tg, struct task_group *parent)
 		init_cfs_rq(cfs_rq);
 		init_tg_cfs_entry(tg, cfs_rq, se, i, parent->se[i]);
 		init_entity_runnable_average(se);
-		post_init_entity_util_avg(se);
 	}
 
 	return 1;
