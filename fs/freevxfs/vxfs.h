@@ -2,6 +2,9 @@
  * Copyright (c) 2000-2001 Christoph Hellwig.
  * All rights reserved.
  *
+ * (c) 2016 Krzysztof Blaszkowski
+ *       bug fixes, improvements & tests with HP-UX B.10.20 (pa-risc)
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
