@@ -30,7 +30,6 @@ struct twl6040_clk {
 	struct twl6040 *twl6040;
 	struct device *dev;
 	struct clk_hw mcpdm_fclk;
-	struct clk *clk;
 	int enabled;
 };
 
@@ -80,6 +79,7 @@ static int twl6040_clk_probe(struct platform_device *pdev)
 {
 	struct twl6040 *twl6040 = dev_get_drvdata(pdev->dev.parent);
 	struct twl6040_clk *clkdata;
+	int ret;
 
 	clkdata = devm_kzalloc(&pdev->dev, sizeof(*clkdata), GFP_KERNEL);
 	if (!clkdata)
@@ -89,9 +89,9 @@ static int twl6040_clk_probe(struct platform_device *pdev)
 	clkdata->twl6040 = twl6040;
 
 	clkdata->mcpdm_fclk.init = &wm831x_clkout_init;
-	clkdata->clk = devm_clk_register(&pdev->dev, &clkdata->mcpdm_fclk);
-	if (IS_ERR(clkdata->clk))
-		return PTR_ERR(clkdata->clk);
+	ret = devm_clk_hw_register(&pdev->dev, &clkdata->mcpdm_fclk);
+	if (ret)
+		return ret;
 
 	platform_set_drvdata(pdev, clkdata);
 
