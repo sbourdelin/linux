@@ -13,7 +13,10 @@
 #include <linux/proc_fs.h>
 #include <linux/exportfs.h>
 
+#ifdef CONFIG_INOTIFY_USER
 #include "inotify/inotify.h"
+#endif
+
 #include "../fs/mount.h"
 
 #if defined(CONFIG_PROC_FS)
