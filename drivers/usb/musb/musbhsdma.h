@@ -113,7 +113,7 @@ static inline void musb_write_hsdma_count(void __iomem *mbase,
 				u8 bchannel, u32 len)
 {
 	musb_writew(mbase,
-		MUSB_HSDMA_CHANNEL_OFFSET(bchannel, MUSB_HSDMA_COUNT_LOW),len);
+		MUSB_HSDMA_CHANNEL_OFFSET(bchannel, MUSB_HSDMA_COUNT_LOW), len);
 	musb_writew(mbase,
 		MUSB_HSDMA_CHANNEL_OFFSET(bchannel, MUSB_HSDMA_COUNT_HIGH),
 		(len >> 16));
