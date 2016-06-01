@@ -2254,12 +2254,15 @@ static int intel_init_ring_buffer(struct drm_device *dev,
 	INIT_LIST_HEAD(&engine->request_list);
 	INIT_LIST_HEAD(&engine->execlist_queue);
 	INIT_LIST_HEAD(&engine->buffers);
+	INIT_LIST_HEAD(&engine->fence_signal_list);
 	spin_lock_init(&engine->fence_lock);
 	i915_gem_batch_pool_init(dev, &engine->batch_pool);
 	memset(engine->semaphore.sync_seqno, 0,
 	       sizeof(engine->semaphore.sync_seqno));
 
 	init_waitqueue_head(&engine->irq_queue);
+
+	INIT_WORK(&engine->request_work, i915_gem_request_worker);
 
 	ringbuf = intel_engine_create_ringbuffer(engine, 32 * PAGE_SIZE);
 	if (IS_ERR(ringbuf)) {
@@ -2306,6 +2309,8 @@ void intel_cleanup_engine(struct intel_engine_cs *engine)
 		return;
 
 	dev_priv = engine->i915;
+
+	cancel_work_sync(&engine->request_work);
 
 	if (engine->buffer) {
 		intel_stop_engine(engine);

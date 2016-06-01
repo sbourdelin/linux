@@ -1879,6 +1879,8 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *engine)
 
 	dev_priv = engine->i915;
 
+	cancel_work_sync(&engine->request_work);
+
 	if (engine->buffer) {
 		intel_logical_ring_stop(engine);
 		WARN_ON((I915_READ_MODE(engine) & MODE_IDLE) == 0);
@@ -2027,6 +2029,7 @@ logical_ring_setup(struct drm_device *dev, enum intel_engine_id id)
 
 	INIT_LIST_HEAD(&engine->active_list);
 	INIT_LIST_HEAD(&engine->request_list);
+	INIT_LIST_HEAD(&engine->fence_signal_list);
 	INIT_LIST_HEAD(&engine->buffers);
 	INIT_LIST_HEAD(&engine->execlist_queue);
 	spin_lock_init(&engine->execlist_lock);
@@ -2034,6 +2037,8 @@ logical_ring_setup(struct drm_device *dev, enum intel_engine_id id)
 
 	tasklet_init(&engine->irq_tasklet,
 		     intel_lrc_irq_handler, (unsigned long)engine);
+
+	INIT_WORK(&engine->request_work, i915_gem_request_worker);
 
 	logical_ring_init_platform_invariants(engine);
 	logical_ring_default_vfuncs(engine);

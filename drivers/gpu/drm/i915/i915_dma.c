@@ -1022,9 +1022,13 @@ static int i915_workqueues_init(struct drm_i915_private *dev_priv)
 	if (dev_priv->wq == NULL)
 		goto out_err;
 
+	dev_priv->req_wq = alloc_ordered_workqueue("i915-rq", 0);
+	if (dev_priv->req_wq == NULL)
+		goto out_free_wq;
+
 	dev_priv->hotplug.dp_wq = alloc_ordered_workqueue("i915-dp", 0);
 	if (dev_priv->hotplug.dp_wq == NULL)
-		goto out_free_wq;
+		goto out_free_req_wq;
 
 	dev_priv->gpu_error.hangcheck_wq =
 		alloc_ordered_workqueue("i915-hangcheck", 0);
@@ -1035,6 +1039,8 @@ static int i915_workqueues_init(struct drm_i915_private *dev_priv)
 
 out_free_dp_wq:
 	destroy_workqueue(dev_priv->hotplug.dp_wq);
+out_free_req_wq:
+	destroy_workqueue(dev_priv->req_wq);
 out_free_wq:
 	destroy_workqueue(dev_priv->wq);
 out_err:
@@ -1047,6 +1053,7 @@ static void i915_workqueues_cleanup(struct drm_i915_private *dev_priv)
 {
 	destroy_workqueue(dev_priv->gpu_error.hangcheck_wq);
 	destroy_workqueue(dev_priv->hotplug.dp_wq);
+	destroy_workqueue(dev_priv->req_wq);
 	destroy_workqueue(dev_priv->wq);
 }
 

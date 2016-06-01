@@ -1853,6 +1853,9 @@ struct drm_i915_private {
 	 */
 	struct workqueue_struct *wq;
 
+	/* Work queue for request completion processing */
+	struct workqueue_struct *req_wq;
+
 	/* Display functions */
 	struct drm_i915_display_funcs display;
 
@@ -2361,6 +2364,10 @@ struct drm_i915_gem_request {
 	 */
 	struct fence fence;
 	struct rcu_head rcu_head;
+	struct list_head signal_link;
+	bool cancelled;
+	bool irq_enabled;
+	bool signal_requested;
 
 	/** On Which ring this request was generated */
 	struct drm_i915_private *i915;
@@ -2462,6 +2469,10 @@ struct drm_i915_gem_request {
 struct drm_i915_gem_request * __must_check
 i915_gem_request_alloc(struct intel_engine_cs *engine,
 		       struct i915_gem_context *ctx);
+void i915_gem_request_enable_interrupt(struct drm_i915_gem_request *req,
+				       bool fence_locked);
+void i915_gem_request_notify(struct intel_engine_cs *ring, bool fence_locked);
+void i915_gem_request_worker(struct work_struct *work);
 
 static inline bool i915_gem_request_completed(struct drm_i915_gem_request *req)
 {
