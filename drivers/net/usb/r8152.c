@@ -26,6 +26,7 @@
 #include <linux/mdio.h>
 #include <linux/usb/cdc.h>
 #include <linux/suspend.h>
+#include <linux/acpi.h>
 
 /* Information for net-next */
 #define NETNEXT_VERSION		"08"
@@ -1030,6 +1031,39 @@ out1:
 	return ret;
 }
 
+static u8 amac_ascii_to_hex(int c)
+{
+	if (c <= 0x39)
+		return (u8)(c - 0x30);
+	else if (c <= 0x46)
+		return (u8)(c - 0x37);
+	return (u8)(c - 0x57);
+}
+
+static void set_auxiliary_addr(struct sockaddr *sa)
+{
+	acpi_status status;
+	acpi_handle handle;
+	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
+	union acpi_object *obj;
+	int i;
+	char *ptr;
+
+	acpi_get_handle(NULL, "\\_SB", &handle);
+	status = acpi_evaluate_object(handle, "AMAC", NULL, &buffer);
+	obj = (union acpi_object *)buffer.pointer;
+	if (ACPI_SUCCESS(status) && (obj->string.length == 0x17)) {
+		/* returns _AUXMAC_#AABBCCDDEEFF#
+		 * this pulls out _AUXMAC# from start and # from end
+		 */
+		ptr = obj->string.pointer + 9;
+		pr_info("r8152: Using system auxiliary MAC address");
+		for (i = 0; i < 6; i++, ptr += 2)
+			sa->sa_data[i] = amac_ascii_to_hex(*ptr) << 4 |
+					 amac_ascii_to_hex(*(ptr + 1));
+	}
+}
+
 static int set_ethernet_addr(struct r8152 *tp)
 {
 	struct net_device *dev = tp->netdev;
@@ -1040,6 +1074,9 @@ static int set_ethernet_addr(struct r8152 *tp)
 		ret = pla_ocp_read(tp, PLA_IDR, 8, sa.sa_data);
 	else
 		ret = pla_ocp_read(tp, PLA_BACKUP, 8, sa.sa_data);
+
+	/* if system provides auxiliary MAC address */
+	set_auxiliary_addr(&sa);
 
 	if (ret < 0) {
 		netif_err(tp, probe, dev, "Get ether addr fail\n");
