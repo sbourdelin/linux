@@ -64,6 +64,13 @@ static inline u32 _down_sema(struct semaphore *sema)
 	return _SUCCESS;
 }
 
+static inline u32 _wait_completion(struct completion *comp)
+{
+	if (wait_for_completion_interruptible(comp))
+		return _FAIL;
+	return _SUCCESS;
+}
+
 static inline u32 end_of_queue_search(struct list_head *head,
 		struct list_head *plist)
 {
