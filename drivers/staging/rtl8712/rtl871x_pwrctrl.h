@@ -93,7 +93,7 @@ static inline void _enter_pwrlock(struct semaphore *plock)
 }
 
 struct	pwrctrl_priv {
-	struct semaphore lock;
+	struct mutex mutex_lock;
 	/*volatile*/ u8 rpwm; /* requested power state for fw */
 	/* fw current power state. updated when 1. read from HCPWM or
 	 * 2. driver lowers power level */
