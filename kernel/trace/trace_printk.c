@@ -55,6 +55,8 @@ void hold_module_trace_bprintk_format(const char **start, const char **end)
 
 	mutex_lock(&btrace_mutex);
 	for (iter = start; iter < end; iter++) {
+		if (!*iter)
+			goto err;
 		struct trace_bprintk_fmt *tb_fmt = lookup_format(*iter);
 		if (tb_fmt) {
 			*iter = tb_fmt->fmt;
@@ -75,6 +77,7 @@ void hold_module_trace_bprintk_format(const char **start, const char **end)
 		*iter = fmt;
 
 	}
+err:
 	mutex_unlock(&btrace_mutex);
 }
 
