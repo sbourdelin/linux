@@ -31,6 +31,8 @@
 #include <linux/reset.h>
 #include <linux/delay.h>
 
+#include <soc/rockchip/rockchip_dmc.h>
+
 #include "rockchip_drm_drv.h"
 #include "rockchip_drm_gem.h"
 #include "rockchip_drm_fb.h"
@@ -115,6 +117,9 @@ struct vop {
 	struct drm_pending_vblank_event *event;
 
 	const struct vop_data *data;
+
+	struct notifier_block dmc_nb;
+	int dmc_in_process;
 
 	uint32_t *regsbak;
 	void __iomem *regs;
@@ -426,13 +431,40 @@ static void vop_dsp_hold_valid_irq_disable(struct vop *vop)
 	spin_unlock_irqrestore(&vop->irq_lock, flags);
 }
 
+static int dmc_notify(struct notifier_block *nb, unsigned long event,
+		      void *data)
+{
+	struct vop *vop = container_of(nb, struct vop, dmc_nb);
+
+	if (event == DMCFREQ_ADJUST)
+		vop->dmc_in_process = 1;
+	else if (event == DMCFREQ_FINISH)
+		vop->dmc_in_process = 0;
+
+	return NOTIFY_OK;
+}
+
 static void vop_enable(struct drm_crtc *crtc)
 {
 	struct vop *vop = to_vop(crtc);
 	int ret;
+	int timeout_count = 500;
+	int timeout_loop = 0;
 
 	if (vop->is_enabled)
 		return;
+
+	/*
+	 * if in dmc scaling frequency process, wait until it finish
+	 * use 100ms as timeout time.
+	 */
+	while (timeout_loop < timeout_count) {
+		if (vop->dmc_in_process == 0)
+			break;
+
+		timeout_loop++;
+		usleep_range(150, 200);
+	}
 
 	ret = pm_runtime_get_sync(vop->dev);
 	if (ret < 0) {
@@ -485,6 +517,7 @@ static void vop_enable(struct drm_crtc *crtc)
 	enable_irq(vop->irq);
 
 	drm_crtc_vblank_on(crtc);
+	rockchip_dmc_get(&vop->dmc_nb);
 
 	return;
 
@@ -500,9 +533,23 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
 {
 	struct vop *vop = to_vop(crtc);
 	int i;
+	int timeout_count = 500;
+	int timeout_loop = 0;
 
 	if (!vop->is_enabled)
 		return;
+
+	/*
+	 * if in dmc scaling frequency process, wait until it finish
+	 * use 100ms as timeout time.
+	 */
+	while (timeout_loop < timeout_count) {
+		if (vop->dmc_in_process == 0)
+			break;
+
+		timeout_loop++;
+		usleep_range(150, 200);
+	}
 
 	/*
 	 * We need to make sure that all windows are disabled before we
@@ -517,7 +564,7 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
 		VOP_WIN_SET(vop, win, enable, 0);
 		spin_unlock(&vop->reg_lock);
 	}
-
+	rockchip_dmc_put(&vop->dmc_nb);
 	drm_crtc_vblank_off(crtc);
 
 	/*
@@ -1243,7 +1290,7 @@ static int vop_create_crtc(struct vop *vop)
 		ret = -ENOENT;
 		goto err_cleanup_crtc;
 	}
-
+	vop->dmc_nb.notifier_call = dmc_notify;
 	init_completion(&vop->dsp_hold_completion);
 	init_completion(&vop->wait_update_complete);
 	crtc->port = port;
