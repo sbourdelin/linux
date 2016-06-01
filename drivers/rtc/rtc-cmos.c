@@ -900,10 +900,32 @@ static inline int cmos_poweroff(struct device *dev)
 
 #ifdef	CONFIG_PM_SLEEP
 
+static void cmos_check_alarm(struct device *dev)
+{
+	struct cmos_rtc *cmos = dev_get_drvdata(dev);
+	struct rtc_wkalrm alarm;
+	struct rtc_time now;
+	time64_t t_now;
+	time64_t t_expires;
+
+	cmos_read_time(dev, &now);
+	rtc_read_alarm(cmos->rtc, &alarm);
+	t_now = rtc_tm_to_time64(&now);
+	t_expires = rtc_tm_to_time64(&alarm.time);
+
+	if (t_expires <= t_now && alarm.enabled) {
+		alarm.enabled = 0;
+		cmos->suspend_ctrl &= ~RTC_AIE;
+		rtc_set_alarm(cmos->rtc, &alarm);
+	}
+}
+
 static int cmos_resume(struct device *dev)
 {
 	struct cmos_rtc	*cmos = dev_get_drvdata(dev);
 	unsigned char tmp;
+
+	cmos_check_alarm(dev);
 
 	if (cmos->enabled_wake) {
 		if (cmos->wake_off)
