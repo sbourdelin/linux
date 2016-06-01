@@ -191,6 +191,7 @@ struct lpfc_sli_intf {
 /* Algrithmns for scheduling FCP commands to WQs */
 #define	LPFC_FCP_SCHED_ROUND_ROBIN	0
 #define	LPFC_FCP_SCHED_BY_CPU		1
+#define	LPFC_FCP_SCHED_BY_CPU_CORE	2
 
 /* Delay Multiplier constant */
 #define LPFC_DMULT_CONST       651042

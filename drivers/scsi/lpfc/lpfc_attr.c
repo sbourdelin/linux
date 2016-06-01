@@ -4517,12 +4517,16 @@ LPFC_ATTR_R(ack0, 0, 0, 1, "Enable ACK0 support");
 # For [0], FCP commands are issued to Work Queues ina round robin fashion.
 # For [1], FCP commands are issued to a Work Queue associated with the
 #          current CPU.
+# For [2], FCP commands are issued to a Work Queue associated with the
+#          current CPU core (same Work Queue for all CPUs of a core).
 # It would be set to 1 by the driver if it's able to set up cpu affinity
 # for FCP I/Os through Work Queue associated with the current CPU. Otherwise,
 # roundrobin scheduling of FCP I/Os through WQs will be used.
+# It would remain set to 2 by the driver, likewise, if 2 was requested.
 */
-LPFC_ATTR_RW(fcp_io_sched, 0, 0, 1, "Determine scheduling algorithm for "
-		"issuing commands [0] - Round Robin, [1] - Current CPU");
+LPFC_ATTR_RW(fcp_io_sched, 0, 0, 2, "Determine scheduling algorithm for "
+		"issuing commands [0] - Round Robin, [1] - Current CPU, "
+		"[2] - Current CPU core");
 
 /*
 # lpfc_fcp2_no_tgt_reset: Determine bus reset behavior
