@@ -503,9 +503,13 @@ struct kasan_free_meta *get_free_info(struct kmem_cache *cache,
 }
 #endif
 
-void kasan_slab_alloc(struct kmem_cache *cache, void *object, gfp_t flags)
+void kasan_slab_alloc(struct kmem_cache *cache, void *object,
+			bool just_unpoison, gfp_t flags)
 {
-	kasan_kmalloc(cache, object, cache->object_size, flags);
+	if (just_unpoison)
+		kasan_unpoison_shadow(object, cache->object_size);
+	else
+		kasan_kmalloc(cache, object, cache->object_size, flags);
 }
 
 void kasan_poison_slab_free(struct kmem_cache *cache, void *object)
@@ -611,6 +615,31 @@ void kasan_kmalloc_large(const void *ptr, size_t size, gfp_t flags)
 		KASAN_PAGE_REDZONE);
 }
 
+void kasan_unpoison_kmalloc(const void *object, size_t size, gfp_t flags)
+{
+	struct page *page;
+	unsigned long redzone_start;
+	unsigned long redzone_end;
+
+	if (unlikely(object == ZERO_SIZE_PTR) || (object == NULL))
+		return;
+
+	page = virt_to_head_page(object);
+	redzone_start = round_up((unsigned long)(object + size),
+				KASAN_SHADOW_SCALE_SIZE);
+
+	if (unlikely(!PageSlab(page)))
+		redzone_end = (unsigned long)object +
+			(PAGE_SIZE << compound_order(page));
+	else
+		redzone_end = round_up(
+			(unsigned long)object + page->slab_cache->object_size,
+			KASAN_SHADOW_SCALE_SIZE);
+	kasan_unpoison_shadow(object, size);
+	kasan_poison_shadow((void *)redzone_start, redzone_end - redzone_start,
+		KASAN_KMALLOC_REDZONE);
+}
+
 void kasan_krealloc(const void *object, size_t size, gfp_t flags)
 {
 	struct page *page;
@@ -636,7 +665,20 @@ void kasan_kfree(void *ptr)
 		kasan_poison_shadow(ptr, PAGE_SIZE << compound_order(page),
 				KASAN_FREE_PAGE);
 	else
-		kasan_slab_free(page->slab_cache, ptr);
+		kasan_poison_slab_free(page->slab_cache, ptr);
+}
+
+void kasan_poison_kfree(void *ptr)
+{
+	struct page *page;
+
+	page = virt_to_head_page(ptr);
+
+	if (unlikely(!PageSlab(page)))
+		kasan_poison_shadow(ptr, PAGE_SIZE << compound_order(page),
+				KASAN_FREE_PAGE);
+	else
+		kasan_poison_slab_free(page->slab_cache, ptr);
 }
 
 void kasan_kfree_large(const void *ptr)

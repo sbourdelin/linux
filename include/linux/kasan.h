@@ -63,8 +63,10 @@ void kasan_kfree(void *ptr);
 void kasan_kmalloc(struct kmem_cache *s, const void *object, size_t size,
 		  gfp_t flags);
 void kasan_krealloc(const void *object, size_t new_size, gfp_t flags);
+void kasan_unpoison_kmalloc(const void *object, size_t size, gfp_t flags);
 
-void kasan_slab_alloc(struct kmem_cache *s, void *object, gfp_t flags);
+void kasan_slab_alloc(struct kmem_cache *s, void *object, bool just_unpoison,
+			gfp_t flags);
 bool kasan_slab_free(struct kmem_cache *s, void *object);
 void kasan_poison_slab_free(struct kmem_cache *s, void *object);
 
@@ -107,9 +109,11 @@ static inline void kasan_kmalloc(struct kmem_cache *s, const void *object,
 				size_t size, gfp_t flags) {}
 static inline void kasan_krealloc(const void *object, size_t new_size,
 				 gfp_t flags) {}
+static inline void kasan_unpoison_kmalloc(const void *object, size_t size,
+					gfp_t flags) {}
 
 static inline void kasan_slab_alloc(struct kmem_cache *s, void *object,
-				   gfp_t flags) {}
+				   bool just_unpoison, gfp_t flags) {}
 static inline bool kasan_slab_free(struct kmem_cache *s, void *object)
 {
 	return false;

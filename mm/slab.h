@@ -405,7 +405,7 @@ static inline void slab_post_alloc_hook(struct kmem_cache *s, gfp_t flags,
 		kmemcheck_slab_alloc(s, flags, object, slab_ksize(s));
 		kmemleak_alloc_recursive(object, s->object_size, 1,
 					 s->flags, flags);
-		kasan_slab_alloc(s, object, flags);
+		kasan_slab_alloc(s, object, /*just_unpoison*/false, flags);
 	}
 	memcg_kmem_put_cache(s);
 }
