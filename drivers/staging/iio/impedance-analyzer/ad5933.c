@@ -444,10 +444,13 @@ static ssize_t ad5933_store(struct device *dev,
 		st->settling_cycles = val;
 
 		/* 2x, 4x handling, see datasheet */
-		if (val > 511)
-			val = (val >> 1) | (1 << 9);
-		else if (val > 1022)
-			val = (val >> 2) | (3 << 9);
+		if (val & 0x400 && val & 0x200) {
+			val &= 0x1ff;
+			val *= 4;
+		} else if (val & 0x200) {
+			val &= 0x1ff;
+			val *= 2;
+		}
 
 		dat = cpu_to_be16(val);
 		ret = ad5933_i2c_write(st->client,
