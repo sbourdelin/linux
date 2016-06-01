@@ -1093,7 +1093,7 @@ static int vlv_compute_wm(struct intel_crtc_state *cstate)
 {
 	struct intel_crtc *crtc = to_intel_crtc(cstate->base.crtc);
 	struct drm_device *dev = crtc->base.dev;
-	struct vlv_wm_state *wm_state = &crtc->wm_state;
+	struct vlv_wm_state *wm_state = &cstate->wm.vlv.optimal;
 	struct intel_plane *plane;
 	int sr_fifo_size = INTEL_INFO(dev)->num_pipes * 512 - 1;
 	int level;
@@ -1335,6 +1335,7 @@ static void vlv_update_wm(struct drm_crtc *crtc)
 	struct vlv_wm_values wm = {};
 
 	vlv_compute_wm(intel_crtc->config);
+	intel_crtc->wm_state = intel_crtc->config->wm.vlv.optimal;
 	vlv_merge_wm(dev, &wm);
 
 	if (memcmp(&dev_priv->wm.vlv, &wm, sizeof(wm)) == 0) {
@@ -1377,6 +1378,7 @@ static void vlv_update_wm(struct drm_crtc *crtc)
 		chv_set_memory_dvfs(dev_priv, true);
 
 	dev_priv->wm.vlv = wm;
+
 }
 
 #define single_plane_enabled(mask) is_power_of_2(mask)
@@ -4286,10 +4288,15 @@ void vlv_wm_get_hw_state(struct drm_device *dev)
 		mutex_unlock(&dev_priv->rps.hw_lock);
 	}
 
-	for_each_pipe(dev_priv, pipe)
+	for_each_intel_crtc(dev, crtc) {
+		pipe = crtc->pipe;
+		to_intel_crtc_state(crtc->base.state)->wm.vlv.optimal
+			= crtc->wm_state;
+
 		DRM_DEBUG_KMS("Initial watermarks: pipe %c, plane=%d, cursor=%d, sprite0=%d, sprite1=%d\n",
 			      pipe_name(pipe), wm->pipe[pipe].primary, wm->pipe[pipe].cursor,
 			      wm->pipe[pipe].sprite[0], wm->pipe[pipe].sprite[1]);
+	}
 
 	DRM_DEBUG_KMS("Initial watermarks: SR plane=%d, SR cursor=%d level=%d cxsr=%d\n",
 		      wm->sr.plane, wm->sr.cursor, wm->level, wm->cxsr);

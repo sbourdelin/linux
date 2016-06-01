@@ -420,6 +420,16 @@ struct skl_pipe_wm {
 	uint32_t linetime;
 };
 
+struct vlv_wm_state {
+	struct vlv_pipe_wm wm[3];
+	struct vlv_sr_wm sr[3];
+	uint16_t fifo_size[I915_MAX_PLANES];
+	uint8_t num_active_planes;
+	uint8_t num_levels;
+	uint8_t level;
+	bool cxsr;
+};
+
 struct intel_crtc_wm_state {
 	union {
 		struct {
@@ -438,6 +448,10 @@ struct intel_crtc_wm_state {
 			 */
 			struct intel_pipe_wm optimal;
 		} ilk;
+
+		struct {
+			struct vlv_wm_state optimal;
+		} vlv;
 
 		struct {
 			/* gen9+ only needs 1-step wm programming */
@@ -621,15 +635,6 @@ struct intel_crtc_state {
 	uint32_t gamma_mode;
 };
 
-struct vlv_wm_state {
-	struct vlv_pipe_wm wm[3];
-	struct vlv_sr_wm sr[3];
-	uint16_t fifo_size[I915_MAX_PLANES];
-	uint8_t num_active_planes;
-	uint8_t num_levels;
-	uint8_t level;
-	bool cxsr;
-};
 
 struct intel_crtc {
 	struct drm_crtc base;
