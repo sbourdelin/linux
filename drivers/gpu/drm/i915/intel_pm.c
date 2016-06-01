@@ -54,6 +54,28 @@
 #define INTEL_RC6p_ENABLE			(1<<1)
 #define INTEL_RC6pp_ENABLE			(1<<2)
 
+/*
+ * Return the index of a plane in the DDB and wm result arrays.  Primary
+ * plane is always in slot 0, cursor is always in slot I915_MAX_PLANES-1, and
+ * other universal planes are in indices 1..n.  Note that this may leave unused
+ * indices between the top "sprite" plane and the cursor.
+ */
+static int
+wm_plane_id(const struct intel_plane *plane)
+{
+	switch (plane->base.type) {
+	case DRM_PLANE_TYPE_PRIMARY:
+		return 0;
+	case DRM_PLANE_TYPE_CURSOR:
+		return PLANE_CURSOR;
+	case DRM_PLANE_TYPE_OVERLAY:
+		return plane->plane + 1;
+	default:
+		MISSING_CASE(plane->base.type);
+		return plane->plane;
+	}
+}
+
 static void bxt_init_clock_gating(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -2828,27 +2850,6 @@ bool ilk_disable_lp_wm(struct drm_device *dev)
 #define SKL_DDB_SIZE		896	/* in blocks */
 #define BXT_DDB_SIZE		512
 
-/*
- * Return the index of a plane in the SKL DDB and wm result arrays.  Primary
- * plane is always in slot 0, cursor is always in slot I915_MAX_PLANES-1, and
- * other universal planes are in indices 1..n.  Note that this may leave unused
- * indices between the top "sprite" plane and the cursor.
- */
-static int
-skl_wm_plane_id(const struct intel_plane *plane)
-{
-	switch (plane->base.type) {
-	case DRM_PLANE_TYPE_PRIMARY:
-		return 0;
-	case DRM_PLANE_TYPE_CURSOR:
-		return PLANE_CURSOR;
-	case DRM_PLANE_TYPE_OVERLAY:
-		return plane->plane + 1;
-	default:
-		MISSING_CASE(plane->base.type);
-		return plane->plane;
-	}
-}
 
 static void
 skl_ddb_get_pipe_allocation_limits(struct drm_device *dev,
@@ -3011,7 +3012,7 @@ skl_get_total_relative_data_rate(struct intel_crtc_state *intel_cstate)
 
 	/* Calculate and cache data rate for each plane */
 	for_each_plane_in_state(state, plane, pstate, i) {
-		id = skl_wm_plane_id(to_intel_plane(plane));
+		id = wm_plane_id(to_intel_plane(plane));
 		intel_plane = to_intel_plane(plane);
 
 		if (intel_plane->pipe != intel_crtc->pipe)
@@ -3030,7 +3031,7 @@ skl_get_total_relative_data_rate(struct intel_crtc_state *intel_cstate)
 
 	/* Calculate CRTC's total data rate from cached values */
 	for_each_intel_plane_on_crtc(dev, intel_crtc, intel_plane) {
-		int id = skl_wm_plane_id(intel_plane);
+		int id = wm_plane_id(intel_plane);
 
 		/* packed/uv */
 		total_data_rate += intel_cstate->wm.skl.plane_data_rate[id];
@@ -3088,7 +3089,7 @@ skl_allocate_pipe_ddb(struct intel_crtc_state *cstate,
 	/* 1. Allocate the mininum required blocks for each active plane */
 	for_each_plane_in_state(state, plane, pstate, i) {
 		intel_plane = to_intel_plane(plane);
-		id = skl_wm_plane_id(intel_plane);
+		id = wm_plane_id(intel_plane);
 
 		if (intel_plane->pipe != pipe)
 			continue;
@@ -3130,7 +3131,7 @@ skl_allocate_pipe_ddb(struct intel_crtc_state *cstate,
 	for_each_intel_plane_on_crtc(dev, intel_crtc, intel_plane) {
 		unsigned int data_rate, y_data_rate;
 		uint16_t plane_blocks, y_plane_blocks = 0;
-		int id = skl_wm_plane_id(intel_plane);
+		int id = wm_plane_id(intel_plane);
 
 		data_rate = cstate->wm.skl.plane_data_rate[id];
 
@@ -3321,7 +3322,7 @@ static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 			DRM_DEBUG_KMS("Requested display configuration exceeds system watermark limitations\n");
 			DRM_DEBUG_KMS("Plane %d.%d: blocks required = %u/%u, lines required = %u/31\n",
 				      to_intel_crtc(cstate->base.crtc)->pipe,
-				      skl_wm_plane_id(to_intel_plane(pstate->plane)),
+				      wm_plane_id(to_intel_plane(pstate->plane)),
 				      res_blocks, ddb_allocation, res_lines);
 
 			return -EINVAL;
@@ -3359,7 +3360,7 @@ skl_compute_wm_level(const struct drm_i915_private *dev_priv,
 	memset(result, 0, sizeof(*result));
 
 	for_each_intel_plane_mask(dev, intel_plane, cstate->base.plane_mask) {
-		int i = skl_wm_plane_id(intel_plane);
+		int i = wm_plane_id(intel_plane);
 
 		plane = &intel_plane->base;
 		intel_pstate = NULL;
@@ -3428,7 +3429,7 @@ static void skl_compute_transition_wm(struct intel_crtc_state *cstate,
 
 	/* Until we know more, just disable transition WMs */
 	for_each_intel_plane_on_crtc(crtc->dev, intel_crtc, intel_plane) {
-		int i = skl_wm_plane_id(intel_plane);
+		int i = wm_plane_id(intel_plane);
 
 		trans_wm->plane_en[i] = false;
 	}
@@ -4068,7 +4069,7 @@ void skl_wm_get_hw_state(struct drm_device *dev)
 		for_each_intel_plane_on_crtc(dev, intel_crtc, intel_plane) {
 			const struct drm_plane_state *pstate =
 				intel_plane->base.state;
-			int id = skl_wm_plane_id(intel_plane);
+			int id = wm_plane_id(intel_plane);
 
 			cstate->wm.skl.plane_data_rate[id] =
 				skl_plane_relative_data_rate(cstate, pstate, 0);
