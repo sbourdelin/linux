@@ -161,7 +161,7 @@ int intel_sanitize_enable_ppgtt(struct drm_i915_private *dev_priv,
 	if (INTEL_GEN(dev_priv) >= 8 && i915.enable_execlists)
 		return has_full_48bit_ppgtt ? 3 : 2;
 	else
-		return has_aliasing_ppgtt ? 1 : 0;
+		return has_aliasing_ppgtt;
 }
 
 static int ppgtt_bind_vma(struct i915_vma *vma,
