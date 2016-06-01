@@ -376,7 +376,7 @@ new_segment:
 
 static int __blk_bios_map_sg(struct request_queue *q, struct bio *bio,
 			     struct scatterlist *sglist,
-			     struct scatterlist **sg)
+			     struct scatterlist **sg, bool single_bio)
 {
 	struct bio_vec bvec, bvprv = { NULL };
 	struct bvec_iter iter;
@@ -408,13 +408,39 @@ single_segment:
 		return 1;
 	}
 
-	for_each_bio(bio)
+	if (!single_bio) {
+		for_each_bio(bio)
+			bio_for_each_segment(bvec, bio, iter)
+				__blk_segment_map_sg(q, &bvec, sglist, &bvprv,
+						     sg, &nsegs, &cluster);
+	} else {
 		bio_for_each_segment(bvec, bio, iter)
-			__blk_segment_map_sg(q, &bvec, sglist, &bvprv, sg,
-					     &nsegs, &cluster);
+			__blk_segment_map_sg(q, &bvec, sglist, &bvprv,
+					     sg, &nsegs, &cluster);
+	}
 
 	return nsegs;
 }
+
+/*
+ * Map a bio to scatterlist, return number of sg entries setup. Caller must
+ * make sure sg can hold bio segments entries.
+ */
+int blk_bio_map_sg(struct request_queue *q, struct bio *bio,
+		   struct scatterlist *sglist)
+{
+	struct scatterlist *sg = NULL;
+	int nsegs = 0;
+
+	if (bio)
+		nsegs = __blk_bios_map_sg(q, bio, sglist, &sg, true);
+
+	if (sg)
+		sg_mark_end(sg);
+
+	return nsegs;
+}
+EXPORT_SYMBOL(blk_bio_map_sg);
 
 /*
  * map a request to scatterlist, return number of sg entries setup. Caller
@@ -427,7 +453,7 @@ int blk_rq_map_sg(struct request_queue *q, struct request *rq,
 	int nsegs = 0;
 
 	if (rq->bio)
-		nsegs = __blk_bios_map_sg(q, rq->bio, sglist, &sg);
+		nsegs = __blk_bios_map_sg(q, rq->bio, sglist, &sg, false);
 
 	if (unlikely(rq->cmd_flags & REQ_COPY_USER) &&
 	    (blk_rq_bytes(rq) & q->dma_pad_mask)) {
