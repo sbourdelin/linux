@@ -589,6 +589,13 @@ struct rchan *relay_open(const char *base_filename,
 	chan->parent = parent;
 	chan->private_data = private_data;
 	if (base_filename) {
+		if (!cb || !cb->create_buf_file) {
+			printk(KERN_ERR
+			       "relay_open: has base filename without "
+			       "providing hook to create file\n");
+			kfree(chan);
+			return NULL;
+		}
 		chan->has_base_filename = 1;
 		strlcpy(chan->base_filename, base_filename, NAME_MAX);
 	}
@@ -614,6 +621,7 @@ free_bufs:
 
 	kref_put(&chan->kref, relay_destroy_channel);
 	mutex_unlock(&relay_channels_mutex);
+	kfree(chan);
 	return NULL;
 }
 EXPORT_SYMBOL_GPL(relay_open);
