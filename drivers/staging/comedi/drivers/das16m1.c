@@ -1,56 +1,56 @@
 /*
-    comedi/drivers/das16m1.c
-    CIO-DAS16/M1 driver
-    Author: Frank Mori Hess, based on code from the das16
-      driver.
-    Copyright (C) 2001 Frank Mori Hess <fmhess@users.sourceforge.net>
-
-    COMEDI - Linux Control and Measurement Device Interface
-    Copyright (C) 2000 David A. Schleef <ds@schleef.org>
-
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-*/
+ * comedi/drivers/das16m1.c
+ * CIO-DAS16/M1 driver
+ * Author: Frank Mori Hess, based on code from the das16
+ * driver.
+ * Copyright (C) 2001 Frank Mori Hess <fmhess@users.sourceforge.net>
+ *
+ * COMEDI - Linux Control and Measurement Device Interface
+ * Copyright (C) 2000 David A. Schleef <ds@schleef.org>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
 /*
-Driver: das16m1
-Description: CIO-DAS16/M1
-Author: Frank Mori Hess <fmhess@users.sourceforge.net>
-Devices: [Measurement Computing] CIO-DAS16/M1 (das16m1)
-Status: works
-
-This driver supports a single board - the CIO-DAS16/M1.
-As far as I know, there are no other boards that have
-the same register layout.  Even the CIO-DAS16/M1/16 is
-significantly different.
-
-I was _barely_ able to reach the full 1 MHz capability
-of this board, using a hard real-time interrupt
-(set the TRIG_RT flag in your struct comedi_cmd and use
-rtlinux or RTAI).  The board can't do dma, so the bottleneck is
-pulling the data across the ISA bus.  I timed the interrupt
-handler, and it took my computer ~470 microseconds to pull 512
-samples from the board.  So at 1 Mhz sampling rate,
-expect your CPU to be spending almost all of its
-time in the interrupt handler.
-
-This board has some unusual restrictions for its channel/gain list.  If the
-list has 2 or more channels in it, then two conditions must be satisfied:
-(1) - even/odd channels must appear at even/odd indices in the list
-(2) - the list must have an even number of entries.
-
-Options:
-	[0] - base io address
-	[1] - irq (optional, but you probably want it)
-
-irq can be omitted, although the cmd interface will not work without it.
-*/
+ * Driver: das16m1
+ * Description: CIO-DAS16/M1
+ * Author: Frank Mori Hess <fmhess@users.sourceforge.net>
+ * Devices: [Measurement Computing] CIO-DAS16/M1 (das16m1)
+ * Status: works
+ *
+ * This driver supports a single board - the CIO-DAS16/M1.
+ * As far as I know, there are no other boards that have
+ * the same register layout.  Even the CIO-DAS16/M1/16 is
+ * significantly different.
+ *
+ * I was _barely_ able to reach the full 1 MHz capability
+ * of this board, using a hard real-time interrupt
+ * (set the TRIG_RT flag in your struct comedi_cmd and use
+ * rtlinux or RTAI).  The board can't do dma, so the bottleneck is
+ * pulling the data across the ISA bus.  I timed the interrupt
+ * handler, and it took my computer ~470 microseconds to pull 512
+ * samples from the board.  So at 1 Mhz sampling rate,
+ * expect your CPU to be spending almost all of its
+ * time in the interrupt handler.
+ *
+ * This board has some unusual restrictions for its channel/gain list.  If the
+ * list has 2 or more channels in it, then two conditions must be satisfied:
+ * (1) - even/odd channels must appear at even/odd indices in the list
+ * (2) - the list must have an even number of entries.
+ *
+ * Options:
+ *	[0] - base io address
+ *	[1] - irq (optional, but you probably want it)
+ *
+ * irq can be omitted, although the cmd interface will not work without it.
+ */
 
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -65,24 +65,24 @@ irq can be omitted, although the cmd interface will not work without it.
 #define FIFO_SIZE 1024		/*  1024 sample fifo */
 
 /*
-    CIO-DAS16_M1.pdf
-
-    "cio-das16/m1"
-
-  0		a/d bits 0-3, mux		start 12 bit
-  1		a/d bits 4-11		unused
-  2		status		control
-  3		di 4 bit		do 4 bit
-  4		unused			clear interrupt
-  5		interrupt, pacer
-  6		channel/gain queue address
-  7		channel/gain queue data
-  89ab		8254
-  cdef		8254
-  400		8255
-  404-407	8254
-
-*/
+ *  CIO-DAS16_M1.pdf
+ *
+ *  "cio-das16/m1"
+ *
+ * 0		a/d bits 0-3, mux		start 12 bit
+ * 1		a/d bits 4-11		unused
+ * 2		status		control
+ * 3		di 4 bit		do 4 bit
+ * 4		unused			clear interrupt
+ * 5		interrupt, pacer
+ * 6		channel/gain queue address
+ * 7		channel/gain queue data
+ * 89ab		8254
+ * cdef		8254
+ * 400		8255
+ * 404-407	8254
+ *
+ */
 
 #define DAS16M1_AI             0	/*  16-bit wide register */
 #define   AI_CHAN(x)             ((x) & 0xf)
@@ -125,9 +125,11 @@ struct das16m1_private_struct {
 	struct comedi_8254 *counter;
 	unsigned int control_state;
 	unsigned int adc_count;	/*  number of samples completed */
-	/* initial value in lower half of hardware conversion counter,
+	/*
+	 * initial value in lower half of hardware conversion counter,
 	 * needed to keep track of whether new count has been loaded into
-	 * counter yet (loaded by first sample conversion) */
+	 * counter yet (loaded by first sample conversion)
+	 */
 	u16 initial_hw_count;
 	unsigned short ai_buffer[FIFO_SIZE];
 	unsigned long extra_iobase;
@@ -295,8 +297,10 @@ static int das16m1_cmd_exec(struct comedi_device *dev,
 
 	/*  set control & status register */
 	byte = 0;
-	/* if we are using external start trigger (also board dislikes having
-	 * both start and conversion triggers external simultaneously) */
+	/*
+	 * if we are using external start trigger (also board dislikes having
+	 * both start and conversion triggers external simultaneously)
+	 */
 	if (cmd->start_src == TRIG_EXT && cmd->convert_src != TRIG_EXT)
 		byte |= EXT_TRIG_BIT;
 
@@ -409,20 +413,24 @@ static void das16m1_handler(struct comedi_device *dev, unsigned int status)
 
 	/* figure out how many samples are in fifo */
 	hw_counter = comedi_8254_read(devpriv->counter, 1);
-	/* make sure hardware counter reading is not bogus due to initial value
-	 * not having been loaded yet */
+	/*
+	 * make sure hardware counter reading is not bogus due to initial value
+	 * not having been loaded yet
+	 */
 	if (devpriv->adc_count == 0 &&
 	    hw_counter == devpriv->initial_hw_count) {
 		num_samples = 0;
 	} else {
-		/* The calculation of num_samples looks odd, but it uses the
+		/*
+		 * The calculation of num_samples looks odd, but it uses the
 		 * following facts. 16 bit hardware counter is initialized with
 		 * value of zero (which really means 0x1000).  The counter
 		 * decrements by one on each conversion (when the counter
 		 * decrements from zero it goes to 0xffff).  num_samples is a
 		 * 16 bit variable, so it will roll over in a similar fashion
 		 * to the hardware counter.  Work it out, and this is what you
-		 * get. */
+		 * get.
+		 */
 		num_samples = -hw_counter - devpriv->adc_count;
 	}
 	/*  check if we only need some of the points */
@@ -445,8 +453,10 @@ static void das16m1_handler(struct comedi_device *dev, unsigned int status)
 		}
 	}
 
-	/* this probably won't catch overruns since the card doesn't generate
-	 * overrun interrupts, but we might as well try */
+	/*
+	 * this probably won't catch overruns since the card doesn't generate
+	 * overrun interrupts, but we might as well try
+	 */
 	if (status & OVRUN) {
 		async->events |= COMEDI_CB_ERROR;
 		dev_err(dev->class_dev, "fifo overflow\n");
