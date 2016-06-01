@@ -9,3 +9,5 @@ obj-$(CONFIG_STM_SOURCE_HEARTBEAT)	+= stm_heartbeat.o
 
 stm_console-y		:= console.o
 stm_heartbeat-y		:= heartbeat.o
+
+obj-$(CONFIG_STM_FTRACE)	+= stm_ftrace.o
