@@ -86,6 +86,42 @@ struct ctl_table inotify_table[] = {
 };
 #endif /* CONFIG_SYSCTL */
 
+
+static int inotify_init_state(struct user_struct *user,
+						  void *key)
+{
+	struct inotify_state *state;
+	int ret = 0;
+
+	spin_lock(&user->inotify_lock);
+	state =  __find_inotify_count(user, key);
+
+	if (!state) {
+		spin_unlock(&user->inotify_lock);
+		state = kzalloc(sizeof(struct inotify_state), GFP_KERNEL);
+		if (!state)
+			return -ENOMEM;
+
+		state->key = current_user_ns();
+		state->inotify_watches = 0;
+		state->inotify_devs = 1;
+
+		spin_lock(&user->inotify_lock);
+		hash_add(user->inotify_tbl, &state->node, (unsigned long)key);
+
+		goto out;
+	} else {
+
+		if (++state->inotify_devs > inotify_max_user_instances) {
+			ret = -EMFILE;
+			goto out;
+		}
+	}
+out:
+	spin_unlock(&user->inotify_lock);
+	return ret;
+}
+
 static inline __u32 inotify_arg_to_mask(u32 arg)
 {
 	__u32 mask;

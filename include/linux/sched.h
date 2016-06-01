@@ -58,6 +58,7 @@ struct sched_param {
 #include <linux/uidgid.h>
 #include <linux/gfp.h>
 #include <linux/magic.h>
+#include <linux/hashtable.h>
 #include <linux/cgroup-defs.h>
 
 #include <asm/processor.h>
@@ -835,6 +836,8 @@ struct user_struct {
 	atomic_t processes;	/* How many processes does this user have? */
 	atomic_t sigpending;	/* How many pending signals does this user have? */
 #ifdef CONFIG_INOTIFY_USER
+	spinlock_t inotify_lock;
+	DECLARE_HASHTABLE(inotify_tbl, 6);
 	atomic_t inotify_watches; /* How many inotify watches does this user have? */
 	atomic_t inotify_devs;	/* How many inotify devs does this user have opened? */
 #endif

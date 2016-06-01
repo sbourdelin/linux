@@ -17,6 +17,8 @@
 #include <linux/export.h>
 #include <linux/user_namespace.h>
 #include <linux/proc_ns.h>
+#include <linux/hashtable.h>
+
 
 /*
  * userns count is 1 for root user, 1 for init_uts_ns,
@@ -94,6 +96,9 @@ struct user_struct root_user = {
 	.sigpending	= ATOMIC_INIT(0),
 	.locked_shm     = 0,
 	.uid		= GLOBAL_ROOT_UID,
+#ifdef CONFIG_INOTIFY_USER
+	.inotify_lock	= __SPIN_LOCK_UNLOCKED(root_user.inotify_lock),
+#endif
 };
 
 /*
@@ -184,6 +189,10 @@ struct user_struct *alloc_uid(kuid_t uid)
 
 		new->uid = uid;
 		atomic_set(&new->__count, 1);
+#ifdef CONFIG_INOTIFY_USER
+		spin_lock_init(&new->inotify_lock);
+		hash_init(new->inotify_tbl);
+#endif
 
 		/*
 		 * Before adding this, check whether we raced
@@ -222,6 +231,10 @@ static int __init uid_cache_init(void)
 	spin_lock_irq(&uidhash_lock);
 	uid_hash_insert(&root_user, uidhashentry(GLOBAL_ROOT_UID));
 	spin_unlock_irq(&uidhash_lock);
+
+#ifdef CONFIG_INOTIFY_USER
+	hash_init(root_user.inotify_tbl);
+#endif
 
 	return 0;
 }

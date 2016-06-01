@@ -170,6 +170,7 @@ struct fsnotify_group {
 			spinlock_t	idr_lock;
 			struct idr      idr;
 			struct user_struct      *user;
+			void *userns_ptr;
 		} inotify_data;
 #endif
 #ifdef CONFIG_FANOTIFY
