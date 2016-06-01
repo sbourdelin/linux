@@ -497,7 +497,7 @@ static int max8997_rtc_probe(struct platform_device *pdev)
 	}
 
 	virq = regmap_irq_get_virq(max8997->irq_data, MAX8997_PMICIRQ_RTCA1);
-	if (!virq) {
+	if (virq <= 0) {
 		dev_err(&pdev->dev, "Failed to create mapping alarm IRQ\n");
 		ret = -ENXIO;
 		goto err_out;
