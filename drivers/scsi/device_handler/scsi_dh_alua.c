@@ -1152,7 +1152,7 @@ static int __init alua_init(void)
 		/* Temporary failure, bypass */
 		return SCSI_DH_DEV_TEMP_BUSY;
 	}
-	kaluad_sync_wq = create_workqueue("kaluad_sync");
+	kaluad_sync_wq = alloc_workqueue("kaluad_sync", WQ_MEM_RECLAIM, 0);
 	if (!kaluad_sync_wq) {
 		destroy_workqueue(kaluad_wq);
 		return SCSI_DH_DEV_TEMP_BUSY;
