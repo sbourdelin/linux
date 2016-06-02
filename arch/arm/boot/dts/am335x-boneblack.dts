@@ -64,6 +64,13 @@
 			AM33XX_IOPAD(0x9b0, PIN_OUTPUT_PULLDOWN | MUX_MODE3)	/* xdma_event_intr0 */
 		>;
 	};
+
+	i2c1_pins: pinmux_i2c1_pins {
+		pinctrl-single,pins = <
+			AM33XX_IOPAD(0x958, PIN_INPUT_PULLUP | MUX_MODE2)       /* spi0_d1.i2c1_sda */
+			AM33XX_IOPAD(0x95c, PIN_INPUT_PULLUP | MUX_MODE2)       /* spi0_cs0.i2c1_scl */
+		>;
+	};
 };
 
 &lcdc {
@@ -89,6 +96,14 @@
 			};
 		};
 	};
+};
+
+&i2c1 {
+       pinctrl-names = "default";
+       pinctrl-0 = <&i2c2_pins>;
+
+       status = "okay";
+       clock-frequency = <100000>;
 };
 
 &rtc {
