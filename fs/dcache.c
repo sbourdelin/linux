@@ -2565,7 +2565,8 @@ static inline void __d_add(struct dentry *dentry, struct inode *inode)
 		raw_write_seqcount_end(&dentry->d_seq);
 		__fsnotify_d_instantiate(dentry);
 	}
-	_d_rehash(dentry);
+	if (d_unhashed(dentry))
+		_d_rehash(dentry);
 	if (dir)
 		end_dir_add(dir, n);
 	spin_unlock(&dentry->d_lock);
@@ -2584,6 +2585,8 @@ static inline void __d_add(struct dentry *dentry, struct inode *inode)
 
 void d_add(struct dentry *entry, struct inode *inode)
 {
+	BUG_ON(!d_unhashed(entry));
+
 	if (inode) {
 		security_d_instantiate(entry, inode);
 		spin_lock(&inode->i_lock);
@@ -2985,8 +2988,6 @@ struct dentry *d_splice_alias(struct inode *inode, struct dentry *dentry)
 {
 	if (IS_ERR(inode))
 		return ERR_CAST(inode);
-
-	BUG_ON(!d_unhashed(dentry));
 
 	if (!inode)
 		goto out;
