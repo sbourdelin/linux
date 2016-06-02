@@ -73,4 +73,5 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
 #define flush_tlb_page(vma, addr)	local_flush_tlb_page(vma, addr)
 #endif /* CONFIG_SMP */
 
+extern void flush_tlb_pgtable(struct mmu_gather *tlb, unsigned long address);
 #endif /*  _ASM_POWERPC_BOOK3S_64_TLBFLUSH_H */

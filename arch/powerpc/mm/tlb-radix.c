@@ -180,6 +180,30 @@ no_context:
 }
 EXPORT_SYMBOL(radix__flush_tlb_mm);
 
+void radix__flush_tlb_mm_pwc(struct mm_struct *mm)
+{
+	unsigned int pid;
+
+	preempt_disable();
+	pid = mm->context.id;
+	if (unlikely(pid == MMU_NO_CONTEXT))
+		goto no_context;
+
+	if (!mm_is_core_local(mm)) {
+		int lock_tlbie = !mmu_has_feature(MMU_FTR_LOCKLESS_TLBIE);
+
+		if (lock_tlbie)
+			raw_spin_lock(&native_tlbie_lock);
+		_tlbie_pid(pid, RIC_FLUSH_PWC);
+		if (lock_tlbie)
+			raw_spin_unlock(&native_tlbie_lock);
+	} else
+		_tlbiel_pid(pid, RIC_FLUSH_PWC);
+no_context:
+	preempt_enable();
+}
+EXPORT_SYMBOL(radix__flush_tlb_mm_pwc);
+
 void radix___flush_tlb_page(struct mm_struct *mm, unsigned long vmaddr,
 		       unsigned long ap, int nid)
 {
@@ -246,4 +270,19 @@ void radix__tlb_flush(struct mmu_gather *tlb)
 {
 	struct mm_struct *mm = tlb->mm;
 	radix__flush_tlb_mm(mm);
+}
+/*
+ * flush the page walk cache for the address
+ */
+void flush_tlb_pgtable(struct mmu_gather *tlb, unsigned long address)
+{
+	struct mm_struct *mm = tlb->mm;
+	/*
+	 * flush the page table walk cache on freeing page table. We already
+	 * have marked the upper/higher level page table entry none by now.
+	 * So it is safe to flush PWC here.
+	 */
+	if (!radix_enabled())
+		return;
+	radix__flush_tlb_mm_pwc(mm);
 }
