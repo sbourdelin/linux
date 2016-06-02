@@ -1,0 +1,28 @@
+Maxim Semiconductor MAX8903 Battery Charger bindings
+
+Required properties:
+- compatible: "max8903-charger" for MAX8903 Battery Charger
+- dc_valid:
+	- dok: DC power OK pin
+- usb_valid:
+	- uok: USB power OK pin
+
+Optional properties:
+- cen: Charge enable pin
+- chg: Charger status pin
+- flt: Fault pin
+- dcm: Current limit mode setting (DC or USB)
+- usus: USB suspend pin
+
+
+Example:
+
+	max8903-charger {
+		compatible = "max8903-charger";
+		dok = <&gpio2 3 GPIO_ACTIVE_LOW>;
+		flt = <&gpio2 2 GPIO_ACTIVE_LOW>;
+		chg = <&gpio3 15 GPIO_ACTIVE_LOW>;
+		cen = <&gpio2 5 GPIO_ACTIVE_LOW>;
+		dc_valid;
+		status = "okay";
+	};
