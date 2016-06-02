@@ -396,6 +396,19 @@ config HW_RANDOM_PIC32
 
 	  If unsure, say Y.
 
+config HW_RANDOM_ALEA
+	tristate "Araneus Alea I USB Random Number Generator support"
+	depends on HW_RANDOM && USB
+	default n
+	---help---
+	  This driver provides kernel-side support for the Araneus
+	  Alea I USB hardware Random Number Generator.
+
+	  To compile this driver as a module, choose M here. the
+	  module will be called alea.
+
+	  If unsure, say N.
+
 endif # HW_RANDOM
 
 config UML_RANDOM
