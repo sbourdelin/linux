@@ -1610,7 +1610,7 @@ static void print_conf(struct r10conf *conf)
 
 	/* This is only called with ->reconfix_mutex held, so
 	 * rcu protection of rdev is not needed */
-	for (i = 0; i < conf->geo.raid_disks; i++) {
+	for (i = 0; i < conf->geo.raid_disks && i < 16; i++) {
 		char b[BDEVNAME_SIZE];
 		rdev = conf->mirrors[i].rdev;
 		if (rdev)
@@ -1619,6 +1619,8 @@ static void print_conf(struct r10conf *conf)
 			        !test_bit(Faulty, &rdev->flags),
 				bdevname(rdev->bdev,b));
 	}
+	if (conf->geo.raid_disks > 16)
+		printk(KERN_DEBUG " remaining devices excluded for brevity\n");
 }
 
 static void close_sync(struct r10conf *conf)
