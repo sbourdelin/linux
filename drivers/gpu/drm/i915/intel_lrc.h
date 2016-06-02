@@ -28,6 +28,17 @@
 
 #define GEN8_LR_CONTEXT_ALIGN 4096
 
+enum {
+	ADVANCED_CONTEXT = 0,
+	LEGACY_32B_CONTEXT,
+	ADVANCED_AD_CONTEXT,
+	LEGACY_64B_CONTEXT
+};
+#define GEN8_CTX_ADDRESSING_MODE_SHIFT 3
+#define GEN8_CTX_ADDRESSING_MODE(dev_priv) (USES_FULL_48BIT_PPGTT(dev_priv) ?\
+		LEGACY_64B_CONTEXT : \
+		LEGACY_32B_CONTEXT)
+
 /* Execlists regs */
 #define RING_ELSP(ring)				_MMIO((ring)->mmio_base + 0x230)
 #define RING_EXECLIST_STATUS_LO(ring)		_MMIO((ring)->mmio_base + 0x234)
