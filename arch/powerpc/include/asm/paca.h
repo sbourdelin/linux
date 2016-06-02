@@ -171,6 +171,8 @@ struct paca_struct {
 	/* Mask to denote subcore sibling threads */
 	u8 subcore_sibling_mask;
 #endif
+	/* Template for PSSCR with EC, ESL, TR, PSLL, MTL fields set */
+	u64 thread_psscr;
 
 #ifdef CONFIG_PPC_BOOK3S_64
 	/* Exclusive emergency stack pointer for machine check exception. */
