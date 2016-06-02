@@ -452,13 +452,13 @@ static void execlists_context_unqueue(struct intel_engine_cs *engine)
 				 * req0 (after merged) ctx requires single
 				 * submission, stop picking
 				 */
-				if (req0->ctx->lrc_ctx_single_submission)
+				if (req0->ctx->enable_lrc_single_submission)
 					break;
 				/*
 				 * req0 ctx doesn't require single submission,
 				 * but next req ctx requires, stop picking
 				 */
-				if (cursor->ctx->lrc_ctx_single_submission)
+				if (cursor->ctx->enable_lrc_single_submission)
 					break;
 			}
 			req1 = cursor;
