@@ -1033,6 +1033,7 @@ skip:
 	memcpy(*buf, rcd->data, len - sizeof(*rcd));
 	*id = record_id;
 	*compressed = false;
+	*ecc_notice_size = 0;
 	if (uuid_le_cmp(rcd->sec_hdr.section_type,
 			CPER_SECTION_TYPE_DMESG_Z) == 0) {
 		*type = PSTORE_TYPE_DMESG;
