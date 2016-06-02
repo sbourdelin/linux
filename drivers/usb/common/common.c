@@ -145,7 +145,7 @@ enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *phy_np)
 	int err;
 
 	do {
-		controller = of_find_node_with_property(controller, "phys");
+		controller = of_find_node_with_property(controller, "dr_mode");
 		index = 0;
 		do {
 			phy = of_parse_phandle(controller, "phys", index);
