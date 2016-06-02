@@ -16,6 +16,7 @@
 #include <linux/delay.h>
 #include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
+#include <linux/regulator/machine.h>
 #include <linux/regulator/driver.h>
 #include <linux/module.h>
 
@@ -374,7 +375,7 @@ int regulator_list_voltage_linear_range(struct regulator_dev *rdev,
 					unsigned int selector)
 {
 	const struct regulator_linear_range *range;
-	int i;
+	int i, v;
 
 	if (!rdev->desc->n_linear_ranges) {
 		BUG_ON(!rdev->desc->n_linear_ranges);
@@ -389,8 +390,13 @@ int regulator_list_voltage_linear_range(struct regulator_dev *rdev,
 			continue;
 
 		selector -= range->min_sel;
+		v = range->min_uV + (range->uV_step * selector);
 
-		return range->min_uV + (range->uV_step * selector);
+		if (v < rdev->constraints->min_uV ||
+		    v > rdev->constraints->max_uV)
+			return -EINVAL;
+		else
+			return v;
 	}
 
 	return -EINVAL;
