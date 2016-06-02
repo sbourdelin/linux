@@ -38,13 +38,10 @@ static long clk_factor_round_rate(struct clk_hw *hw, unsigned long rate,
 				unsigned long *prate)
 {
 	struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
+	unsigned long best_parent;
 
-	if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
-		unsigned long best_parent;
-
-		best_parent = (rate / fix->mult) * fix->div;
-		*prate = clk_hw_round_rate(clk_hw_get_parent(hw), best_parent);
-	}
+	best_parent  = (rate / fix->mult) * fix->div;
+	*prate = clk_hw_round_rate(clk_hw_get_parent(hw), best_parent);
 
 	return (*prate / fix->div) * fix->mult;
 }
@@ -88,7 +85,7 @@ struct clk_hw *clk_hw_register_fixed_factor(struct device *dev,
 
 	init.name = name;
 	init.ops = &clk_fixed_factor_ops;
-	init.flags = flags | CLK_IS_BASIC;
+	init.flags = flags | CLK_IS_BASIC | CLK_SET_RATE_PARENT;
 	init.parent_names = &parent_name;
 	init.num_parents = 1;
 
