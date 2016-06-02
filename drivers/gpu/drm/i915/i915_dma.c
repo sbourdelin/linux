@@ -35,6 +35,7 @@
 #include "intel_drv.h"
 #include <drm/i915_drm.h>
 #include "i915_drv.h"
+#include "intel_gvt.h"
 #include "i915_vgpu.h"
 #include "i915_trace.h"
 #include <linux/pci.h>
@@ -1244,18 +1245,22 @@ static int i915_driver_init_hw(struct drm_i915_private *dev_priv)
 		goto out_ggtt;
 	}
 
+	ret = intel_gvt_init(dev_priv);
+	if (ret)
+		goto out_ggtt;
+
 	/* WARNING: Apparently we must kick fbdev drivers before vgacon,
 	 * otherwise the vga fbdev driver falls over. */
 	ret = i915_kick_out_firmware_fb(dev_priv);
 	if (ret) {
 		DRM_ERROR("failed to remove conflicting framebuffer drivers\n");
-		goto out_ggtt;
+		goto out_gvt;
 	}
 
 	ret = i915_kick_out_vgacon(dev_priv);
 	if (ret) {
 		DRM_ERROR("failed to remove conflicting VGA console\n");
-		goto out_ggtt;
+		goto out_gvt;
 	}
 
 	pci_set_master(dev->pdev);
@@ -1266,7 +1271,7 @@ static int i915_driver_init_hw(struct drm_i915_private *dev_priv)
 		if (ret) {
 			DRM_ERROR("failed to set DMA mask\n");
 
-			goto out_ggtt;
+			goto out_gvt;
 		}
 	}
 
@@ -1296,7 +1301,7 @@ static int i915_driver_init_hw(struct drm_i915_private *dev_priv)
 				     aperture_size);
 	if (!ggtt->mappable) {
 		ret = -EIO;
-		goto out_ggtt;
+		goto out_gvt;
 	}
 
 	ggtt->mtrr = arch_phys_wc_add(ggtt->mappable_base,
@@ -1329,6 +1334,8 @@ static int i915_driver_init_hw(struct drm_i915_private *dev_priv)
 
 	return 0;
 
+out_gvt:
+	intel_gvt_cleanup(dev_priv);
 out_ggtt:
 	i915_ggtt_cleanup_hw(dev);
 
@@ -1486,6 +1493,8 @@ int i915_driver_unload(struct drm_device *dev)
 	int ret;
 
 	intel_fbdev_fini(dev);
+
+	intel_gvt_cleanup(dev_priv);
 
 	ret = i915_gem_suspend(dev);
 	if (ret) {
