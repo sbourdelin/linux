@@ -240,7 +240,7 @@ static void cppi41_dma_callback(void *private_data)
 	transferred = cppi41_channel->prog_len - txstate.residue;
 	cppi41_channel->transferred += transferred;
 
-	dev_dbg(musb->controller, "DMA transfer done on hw_ep=%d bytes=%d/%d\n",
+	musb_dbg(musb, "DMA transfer done on hw_ep=%d bytes=%d/%d",
 		hw_ep->epnum, cppi41_channel->transferred,
 		cppi41_channel->total_len);
 
@@ -374,8 +374,8 @@ static bool cppi41_configure_channel(struct dma_channel *channel,
 	struct musb *musb = cppi41_channel->controller->musb;
 	unsigned use_gen_rndis = 0;
 
-	dev_dbg(musb->controller,
-		"configure ep%d/%x packet_sz=%d, mode=%d, dma_addr=0x%llx, len=%d is_tx=%d\n",
+	musb_dbg(musb,
+		"configure ep%d/%x packet_sz=%d, mode=%d, dma_addr=0x%llx, len=%d is_tx=%d",
 		cppi41_channel->port_num, RNDIS_REG(cppi41_channel->port_num),
 		packet_sz, mode, (unsigned long long) dma_addr,
 		len, cppi41_channel->is_tx);
@@ -537,7 +537,7 @@ static int cppi41_dma_channel_abort(struct dma_channel *channel)
 	u16 csr;
 
 	is_tx = cppi41_channel->is_tx;
-	dev_dbg(musb->controller, "abort channel=%d, is_tx=%d\n",
+	musb_dbg(musb, "abort channel=%d, is_tx=%d",
 			cppi41_channel->port_num, is_tx);
 
 	if (cppi41_channel->channel.status == MUSB_DMA_STATUS_FREE)
