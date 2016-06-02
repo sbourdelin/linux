@@ -1896,6 +1896,12 @@ static int virtnet_probe(struct virtio_device *vdev)
 	if (virtio_has_feature(vdev, VIRTIO_NET_F_CTRL_VQ))
 		vi->has_cvq = true;
 
+	if (virtio_has_feature(vdev, VIRTIO_NET_F_MTU)) {
+		dev->mtu = virtio_cread16(vdev,
+					  offsetof(struct virtio_net_config,
+						   mtu));
+	}
+
 	if (vi->any_header_sg)
 		dev->needed_headroom = vi->hdr_len;
 
@@ -2067,6 +2073,7 @@ static unsigned int features[] = {
 	VIRTIO_NET_F_GUEST_ANNOUNCE, VIRTIO_NET_F_MQ,
 	VIRTIO_NET_F_CTRL_MAC_ADDR,
 	VIRTIO_F_ANY_LAYOUT,
+	VIRTIO_NET_F_MTU,
 };
 
 static struct virtio_driver virtio_net_driver = {
