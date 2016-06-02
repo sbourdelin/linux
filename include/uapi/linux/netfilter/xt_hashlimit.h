@@ -18,6 +18,10 @@
 struct xt_hashlimit_htable;
 
 enum {
+	XT_HASHLIMIT_FLAG_PROCFS = 1
+};
+
+enum {
 	XT_HASHLIMIT_HASH_DIP = 1 << 0,
 	XT_HASHLIMIT_HASH_DPT = 1 << 1,
 	XT_HASHLIMIT_HASH_SIP = 1 << 2,
@@ -76,6 +80,9 @@ struct hashlimit_cfg2 {
 	__u32 expire;	/* when do entries expire? */
 
 	__u8 srcmask, dstmask;
+
+	__u8 procfs_suffix;
+	__u32 flags;
 };
 
 struct xt_hashlimit_mtinfo1 {
