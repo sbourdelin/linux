@@ -692,7 +692,6 @@ nfulnl_log_packet(struct net *net,
 		if (qthreshold > li->u.ulog.qthreshold)
 			qthreshold = li->u.ulog.qthreshold;
 
-
 	switch (inst->copy_mode) {
 	case NFULNL_COPY_META:
 	case NFULNL_COPY_NONE:
@@ -700,10 +699,12 @@ nfulnl_log_packet(struct net *net,
 		break;
 
 	case NFULNL_COPY_PACKET:
-		if (inst->copy_range > skb->len)
+		data_len = inst->copy_range;
+		if (li->u.ulog.copy_len < data_len)
+			data_len = li->u.ulog.copy_len;
+
+		if (data_len > skb->len)
 			data_len = skb->len;
-		else
-			data_len = inst->copy_range;
 
 		size += nla_total_size(data_len);
 		break;
