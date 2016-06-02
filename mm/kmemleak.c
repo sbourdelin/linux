@@ -82,7 +82,6 @@
 #include <linux/fs.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
-#include <linux/cpumask.h>
 #include <linux/spinlock.h>
 #include <linux/mutex.h>
 #include <linux/rcupdate.h>
