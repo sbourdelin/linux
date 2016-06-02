@@ -63,7 +63,12 @@ extern void __chk_io_ptr(const volatile void __iomem *);
 #if defined(CC_USING_HOTPATCH) && !defined(__CHECKER__)
 #define notrace __attribute__((hotpatch(0,0)))
 #else
+/* Should really read "#ifdef CC_USING_PROLOG_PAD" : */
+#if defined(__aarch64__) && defined(CONFIG_DYNAMIC_FTRACE_WITH_REGS)
+#define notrace __attribute__((prolog_pad(0)))
+#else
 #define notrace __attribute__((no_instrument_function))
+#endif
 #endif
 
 /* Intel compiler defines __GNUC__. So we will overwrite implementations

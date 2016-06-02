@@ -39,6 +39,9 @@ static int ftrace_modify_code(unsigned long pc, u32 old, u32 new,
 		if (aarch64_insn_read((void *)pc, &replaced))
 			return -EFAULT;
 
+		if (replaced == new)
+			return 0;
+
 		if (replaced != old)
 			return -EINVAL;
 	}
@@ -68,11 +71,31 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
  */
 int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
 {
-	unsigned long pc = rec->ip;
+	unsigned long pc = rec->ip+REC_IP_BRANCH_OFFSET;
+	int ret;
 	u32 old, new;
 
+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
 	old = aarch64_insn_gen_nop();
+	new = 0xaa1e03e9;	/* mov x9,x30 */
+	ret = ftrace_modify_code(pc-REC_IP_BRANCH_OFFSET, old, new, true);
+	if (ret)
+		return ret;
+	smp_wmb();
+#endif
 	new = aarch64_insn_gen_branch_imm(pc, addr, AARCH64_INSN_BRANCH_LINK);
+
+	return ftrace_modify_code(pc, old, new, true);
+}
+
+int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
+		unsigned long addr)
+{
+	unsigned long pc = rec->ip+REC_IP_BRANCH_OFFSET;
+	u32 old, new;
+
+	old = aarch64_insn_gen_branch_imm(pc, old_addr, true);
+	new = aarch64_insn_gen_branch_imm(pc, addr, true);
 
 	return ftrace_modify_code(pc, old, new, true);
 }
@@ -83,13 +106,24 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
 int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
 		    unsigned long addr)
 {
-	unsigned long pc = rec->ip;
+	unsigned long pc = rec->ip+REC_IP_BRANCH_OFFSET;
 	u32 old, new;
+	int ret;
+
 
 	old = aarch64_insn_gen_branch_imm(pc, addr, AARCH64_INSN_BRANCH_LINK);
 	new = aarch64_insn_gen_nop();
 
-	return ftrace_modify_code(pc, old, new, true);
+	ret = ftrace_modify_code(pc, old, new, true);
+	if (ret)
+		return ret;
+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+	smp_wmb();
+	old = 0xaa1e03e9;	/* mov x9,x30 */
+	new = aarch64_insn_gen_nop();
+	ret = ftrace_modify_code(pc-REC_IP_BRANCH_OFFSET, old, new, true);
+#endif
+	return ret;
 }
 
 void arch_ftrace_update_code(int command)
