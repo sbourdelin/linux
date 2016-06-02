@@ -12,6 +12,7 @@
 #ifndef __DRM_MIPI_DSI_H__
 #define __DRM_MIPI_DSI_H__
 
+#include <linux/backlight.h>
 #include <linux/device.h>
 
 struct mipi_dsi_host;
@@ -269,6 +270,8 @@ int mipi_dsi_dcs_set_tear_off(struct mipi_dsi_device *dsi);
 int mipi_dsi_dcs_set_tear_on(struct mipi_dsi_device *dsi,
 			     enum mipi_dsi_dcs_tear_mode mode);
 int mipi_dsi_dcs_set_pixel_format(struct mipi_dsi_device *dsi, u8 format);
+struct backlight_device
+	*drm_panel_create_dsi_backlight(struct mipi_dsi_device *dsi);
 
 /**
  * struct mipi_dsi_driver - DSI driver
