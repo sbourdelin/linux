@@ -519,7 +519,7 @@ static void omap_aes_finish_req(struct omap_aes_dev *dd, int err)
 
 	pr_debug("err: %d\n", err);
 
-	crypto_finalize_request(dd->engine, req, err);
+	crypto_finalize_request(dd->engine, &req->base, err);
 }
 
 static int omap_aes_crypt_dma_stop(struct omap_aes_dev *dd)
@@ -592,14 +592,15 @@ static int omap_aes_handle_queue(struct omap_aes_dev *dd,
 				 struct ablkcipher_request *req)
 {
 	if (req)
-		return crypto_transfer_request_to_engine(dd->engine, req);
+		return crypto_transfer_request_to_engine(dd->engine, &req->base);
 
 	return 0;
 }
 
 static int omap_aes_prepare_req(struct crypto_engine *engine,
-				struct ablkcipher_request *req)
+				struct crypto_async_request *areq)
 {
+	struct ablkcipher_request *req = ablkcipher_request_cast(areq);
 	struct omap_aes_ctx *ctx = crypto_ablkcipher_ctx(
 			crypto_ablkcipher_reqtfm(req));
 	struct omap_aes_dev *dd = omap_aes_find_dev(ctx);
@@ -608,6 +609,9 @@ static int omap_aes_prepare_req(struct crypto_engine *engine,
 
 	if (!dd)
 		return -ENODEV;
+
+	if (crypto_tfm_alg_type(areq->tfm) != CRYPTO_ALG_TYPE_ABLKCIPHER)
+		return -EINVAL;
 
 	/* assign new request to device */
 	dd->req = req;
@@ -642,14 +646,18 @@ static int omap_aes_prepare_req(struct crypto_engine *engine,
 }
 
 static int omap_aes_crypt_req(struct crypto_engine *engine,
-			      struct ablkcipher_request *req)
+			      struct crypto_async_request *areq)
 {
+	struct ablkcipher_request *req = ablkcipher_request_cast(areq);
 	struct omap_aes_ctx *ctx = crypto_ablkcipher_ctx(
 			crypto_ablkcipher_reqtfm(req));
 	struct omap_aes_dev *dd = omap_aes_find_dev(ctx);
 
 	if (!dd)
 		return -ENODEV;
+
+	if (crypto_tfm_alg_type(areq->tfm) != CRYPTO_ALG_TYPE_ABLKCIPHER)
+		return -EINVAL;
 
 	return omap_aes_crypt_dma_start(dd);
 }
@@ -1205,7 +1213,7 @@ static int omap_aes_probe(struct platform_device *pdev)
 		goto err_algs;
 
 	dd->engine->prepare_request = omap_aes_prepare_req;
-	dd->engine->crypt_one_request = omap_aes_crypt_req;
+	dd->engine->do_one_request = omap_aes_crypt_req;
 	err = crypto_engine_start(dd->engine);
 	if (err)
 		goto err_engine;
