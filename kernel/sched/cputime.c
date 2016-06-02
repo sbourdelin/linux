@@ -265,7 +265,13 @@ static __always_inline bool steal_account_process_tick(void)
 		unsigned long steal_jiffies;
 
 		steal = paravirt_steal_clock(smp_processor_id());
-		steal -= this_rq()->prev_steal_time;
+		if (likely(steal > this_rq()->prev_steal_time))
+			steal -= this_rq()->prev_steal_time;
+		else {
+			/* steal clock warp */
+			this_rq()->prev_steal_time = steal;
+			return false;
+		}
 
 		/*
 		 * steal is in nsecs but our caller is expecting steal
