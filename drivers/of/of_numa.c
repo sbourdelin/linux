@@ -16,6 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define pr_fmt(fmt)	"OF: " fmt
+
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/nodemask.h>
@@ -65,11 +67,7 @@ static int __init of_numa_parse_memory_nodes(void)
 	u32 nid;
 	int r = 0;
 
-	for (;;) {
-		np = of_find_node_by_type(np, "memory");
-		if (!np)
-			break;
-
+	for_each_node_by_type(np, "memory") {
 		r = of_property_read_u32(np, "numa-node-id", &nid);
 		if (r == -EINVAL)
 			/*
@@ -83,18 +81,10 @@ static int __init of_numa_parse_memory_nodes(void)
 			break;
 
 		r = of_address_to_resource(np, 0, &rsrc);
-		if (r) {
-			pr_err("NUMA: bad reg property in memory node\n");
-			break;
-		}
-
-		pr_debug("NUMA:  base = %llx len = %llx, node = %u\n",
-			 rsrc.start, rsrc.end - rsrc.start + 1, nid);
-
-		r = numa_add_memblk(nid, rsrc.start,
+		for (i = 0; !r; i++, r = of_address_to_resource(np, i, &rsrc)) {
+			r = numa_add_memblk(nid, rsrc.start,
 				    rsrc.end - rsrc.start + 1);
-		if (r)
-			break;
+		}
 	}
 	of_node_put(np);
 
