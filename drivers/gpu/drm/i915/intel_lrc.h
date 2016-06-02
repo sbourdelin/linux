@@ -68,6 +68,11 @@ enum {
 #define GEN8_CSB_READ_PTR(csb_status) \
 	(((csb_status) & GEN8_CSB_READ_PTR_MASK) >> 8)
 
+enum {
+	CONTEXT_SCHEDULE_IN = 0,
+	CONTEXT_SCHEDULE_OUT,
+};
+
 /* Logical Rings */
 int intel_logical_ring_alloc_request_extras(struct drm_i915_gem_request *request);
 int intel_logical_ring_reserve_space(struct drm_i915_gem_request *request);
