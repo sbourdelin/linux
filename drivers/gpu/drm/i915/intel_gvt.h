@@ -24,6 +24,31 @@
 #ifndef _INTEL_GVT_H_
 #define _INTEL_GVT_H_
 
+/*
+ * Under GVT-g, i915 host driver only owned limited graphics resources,
+ * others are managed by GVT-g resource allocator and kept for other vGPUs.
+ *
+ * For graphics memory space partition, a typical layout looks like:
+ *
+ * +-------+-----------------------+------+-----------------------+
+ * |* Host |   *GVT-g Resource     |* Host|   *GVT-g Resource     |
+ * | Owned |   Allocator Managed   | Owned|   Allocator Managed   |
+ * |       |                       |      |                       |
+ * +---------------+-------+----------------------+-------+-------+
+ * |       |       |       |       |      |       |       |       |
+ * | i915  | vm 1  | vm 2  | vm 3  | i915 | vm 1  | vm 2  | vm 3  |
+ * |       |       |       |       |      |       |       |       |
+ * +-------+-------+-------+--------------+-------+-------+-------+
+ * |           Aperture            |            Hidden            |
+ * +-------------------------------+------------------------------+
+ * |                       GGTT memory space                      |
+ * +--------------------------------------------------------------+
+ */
+
+/* GGTT memory space owned by host */
+#define INTEL_GVT_HOST_LOW_GM_SIZE (96 * 1024 * 1024)
+#define INTEL_GVT_HOST_HIGH_GM_SIZE (384 * 1024 * 1024)
+
 #ifdef CONFIG_DRM_I915_GVT
 #include "gvt/gvt.h"
 extern int intel_gvt_init(struct drm_i915_private *dev_priv);
