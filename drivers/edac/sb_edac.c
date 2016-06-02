@@ -23,6 +23,7 @@
 #include <linux/math64.h>
 #include <linux/mod_devicetable.h>
 #include <asm/cpu_device_id.h>
+#include <asm/intel-family.h>
 #include <asm/processor.h>
 #include <asm/mce.h>
 
@@ -3359,11 +3360,11 @@ fail0:
 
 /* Order here must match "enum type" */
 static const struct x86_cpu_id sbridge_cpuids[] = {
-	ICPU(0x2d, pci_dev_descr_sbridge_table),	/* SANDY_BRIDGE */
-	ICPU(0x3e, pci_dev_descr_ibridge_table),	/* IVY_BRIDGE */
-	ICPU(0x3f, pci_dev_descr_haswell_table),	/* HASWELL */
-	ICPU(0x4f, pci_dev_descr_broadwell_table),	/* BROADWELL */
-	ICPU(0x57, pci_dev_descr_knl_table),		/* KNIGHTS_LANDING */
+	ICPU(INTEL_FAM6_MODEL_SANDYBRIDGE_X,	pci_dev_descr_sbridge_table),
+	ICPU(INTEL_FAM6_MODEL_IVYBRIDGE_X,	pci_dev_descr_ibridge_table),
+	ICPU(INTEL_FAM6_MODEL_HASWELL_X,	pci_dev_descr_haswell_table),
+	ICPU(INTEL_FAM6_MODEL_BROADWELL_X,	pci_dev_descr_broadwell_table),
+	ICPU(INTEL_FAM6_MODEL_XEON_PHI_KNL,	pci_dev_descr_knl_table),
 	{ }
 };
 MODULE_DEVICE_TABLE(x86cpu, sbridge_cpuids);
