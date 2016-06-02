@@ -342,6 +342,38 @@ i915_gem_create_context(struct drm_device *dev,
 	return ctx;
 }
 
+/**
+ * i915_gem_create_gvt_context - create a GVT GEM context
+ * @dev: drm device *
+ *
+ * This function is used to create a GVT specific GEM context.
+ *
+ * Returns:
+ * pointer to i915_gem_context on success, error pointer if failed
+ *
+ */
+struct i915_gem_context *
+i915_gem_create_gvt_context(struct drm_device *dev)
+{
+	struct i915_gem_context *ctx;
+
+	if (!IS_ENABLED(CONFIG_DRM_I915_GVT))
+		return ERR_PTR(-ENODEV);
+
+	mutex_lock(&dev->struct_mutex);
+
+	ctx = i915_gem_create_context(dev, NULL);
+	if (IS_ERR(ctx))
+		goto out;
+
+	ctx->enable_lrc_status_change_notification = true;
+	ctx->enable_lrc_single_submission = true;
+	ctx->lrc_ring_buffer_size = 512 * PAGE_SIZE; /* Max ring buffer size */
+out:
+	mutex_unlock(&dev->struct_mutex);
+	return ctx;
+}
+
 static void i915_gem_context_unpin(struct i915_gem_context *ctx,
 				   struct intel_engine_cs *engine)
 {
