@@ -57,7 +57,6 @@
 #include <linux/slab.h>
 #include <asm/tlbflush.h>
 #include <asm/pgtable.h>
-#include <linux/cpumask.h>
 #include <linux/cpu.h>
 #include <linux/vmalloc.h>
 #include <linux/preempt.h>
