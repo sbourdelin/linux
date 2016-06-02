@@ -55,6 +55,7 @@ static LIST_HEAD(regulator_map_list);
 static LIST_HEAD(regulator_ena_gpio_list);
 static LIST_HEAD(regulator_supply_alias_list);
 static bool has_full_constraints;
+static bool regulator_has_booted;
 
 static struct dentry *debugfs_root;
 
@@ -1047,6 +1048,13 @@ static int set_machine_constraints(struct regulator_dev *rdev,
 					    GFP_KERNEL);
 	if (!rdev->constraints)
 		return -ENOMEM;
+
+	/*
+	 * If a regulator driver is registered after late_initcall, the
+	 * boot_protection should be ingnored.
+	 */
+	if (regulator_has_booted)
+		rdev->constraints->boot_protection = 0;
 
 	ret = machine_constraints_voltage(rdev, rdev->constraints);
 	if (ret != 0)
@@ -2255,8 +2263,14 @@ static int _regulator_disable(struct regulator_dev *rdev)
 	if (rdev->use_count == 1 &&
 	    (rdev->constraints && !rdev->constraints->always_on)) {
 
-		/* we are last user */
-		if (regulator_ops_is_valid(rdev, REGULATOR_CHANGE_STATUS)) {
+		/*
+		 * We are last user.
+		 *
+		 * If boot_protection is set, we only clear use_count,
+		 * and regulator_init_complete() will disable it.
+		 */
+		if (!rdev->constraints->boot_protection &&
+		    regulator_ops_is_valid(rdev, REGULATOR_CHANGE_STATUS)) {
 			ret = _notifier_call_chain(rdev,
 						   REGULATOR_EVENT_PRE_DISABLE,
 						   NULL);
@@ -2356,6 +2370,10 @@ int regulator_force_disable(struct regulator *regulator)
 {
 	struct regulator_dev *rdev = regulator->rdev;
 	int ret;
+
+	WARN(rdev->constraints->boot_protection,
+		"disable regulator %s with boot protection flag\n",
+		rdev->desc->name);
 
 	mutex_lock(&rdev->mutex);
 	regulator->uA_load = 0;
@@ -2912,6 +2930,10 @@ static int regulator_set_voltage_unlocked(struct regulator *regulator,
 	if (ret < 0)
 		goto out2;
 
+	/* We need to change voltage, but boot_protection is set. */
+	if (rdev->constraints->boot_protection)
+		goto out;
+
 	if (rdev->supply && (rdev->desc->min_dropout_uV ||
 				!rdev->desc->ops->get_voltage)) {
 		int current_supply_uV;
@@ -3129,6 +3151,9 @@ int regulator_sync_voltage(struct regulator *regulator)
 	if (ret < 0)
 		goto out;
 
+	if (rdev->constraints->boot_protection)
+		goto out;
+
 	ret = _regulator_do_set_voltage(rdev, min_uV, max_uV);
 
 out:
@@ -3238,6 +3263,15 @@ int regulator_set_current_limit(struct regulator *regulator,
 	if (ret < 0)
 		goto out;
 
+	/*
+	 * Stage new current value, and applied it later.
+	 */
+	if (rdev->constraints->boot_protection) {
+		regulator->min_uA = min_uA;
+		regulator->max_uA = max_uA;
+		goto out;
+	}
+
 	ret = rdev->desc->ops->set_current_limit(rdev, min_uA, max_uA);
 out:
 	mutex_unlock(&rdev->mutex);
@@ -3317,6 +3351,11 @@ int regulator_set_mode(struct regulator *regulator, unsigned int mode)
 	if (ret < 0)
 		goto out;
 
+	if (rdev->constraints->boot_protection) {
+		rdev->boot_mode = mode;
+		goto out;
+	}
+
 	ret = rdev->desc->ops->set_mode(rdev, mode);
 out:
 	mutex_unlock(&rdev->mutex);
@@ -3383,11 +3422,14 @@ EXPORT_SYMBOL_GPL(regulator_get_mode);
 int regulator_set_load(struct regulator *regulator, int uA_load)
 {
 	struct regulator_dev *rdev = regulator->rdev;
-	int ret;
+	int ret = 0;
 
 	mutex_lock(&rdev->mutex);
 	regulator->uA_load = uA_load;
-	ret = drms_uA_update(rdev);
+
+	if (!rdev->constraints->boot_protection)
+		ret = drms_uA_update(rdev);
+
 	mutex_unlock(&rdev->mutex);
 
 	return ret;
@@ -3421,7 +3463,8 @@ int regulator_allow_bypass(struct regulator *regulator, bool enable)
 	if (enable && !regulator->bypass) {
 		rdev->bypass_count++;
 
-		if (rdev->bypass_count == rdev->open_count) {
+		if (rdev->bypass_count == rdev->open_count &&
+				!rdev->constraints->boot_protection) {
 			ret = rdev->desc->ops->set_bypass(rdev, enable);
 			if (ret != 0)
 				rdev->bypass_count--;
@@ -3430,7 +3473,8 @@ int regulator_allow_bypass(struct regulator *regulator, bool enable)
 	} else if (!enable && regulator->bypass) {
 		rdev->bypass_count--;
 
-		if (rdev->bypass_count != rdev->open_count) {
+		if (rdev->bypass_count != rdev->open_count &&
+				!rdev->constraints->boot_protection) {
 			ret = rdev->desc->ops->set_bypass(rdev, enable);
 			if (ret != 0)
 				rdev->bypass_count++;
@@ -4443,12 +4487,60 @@ static int __init regulator_init(void)
 /* init early to allow our consumers to complete system booting */
 core_initcall(regulator_init);
 
+static void __init regulator_clear_boot_protection(struct regulator_dev *rdev)
+{
+	struct regulator *regulator;
+	int min_uA = INT_MAX, max_uA = 0;
+
+	mutex_lock(&rdev->mutex);
+
+	rdev->constraints->boot_protection = 0;
+
+	/* update current setting */
+	list_for_each_entry(regulator, &rdev->consumer_list, list) {
+		if (regulator->min_uA < min_uA)
+			min_uA = regulator->min_uA;
+		if (regulator->max_uA > max_uA)
+			max_uA = regulator->max_uA;
+	}
+
+	if (max_uA && !regulator_check_current_limit(rdev, &min_uA, &max_uA))
+		rdev->desc->ops->set_current_limit(rdev, min_uA, max_uA);
+
+	/* constraints check has already done */
+	if (rdev->boot_mode)
+		rdev->desc->ops->set_mode(rdev, rdev->boot_mode);
+
+	/* update regulator load */
+	drms_uA_update(rdev);
+
+	/* check if we need to set bypass mode */
+	if (rdev->desc->ops->set_bypass && rdev->bypass_count &&
+		regulator_ops_is_valid(rdev, REGULATOR_CHANGE_BYPASS)) {
+		if (rdev->bypass_count == rdev->open_count)
+			rdev->desc->ops->set_bypass(rdev, true);
+		else
+			rdev->desc->ops->set_bypass(rdev, false);
+	}
+
+	regulator = list_first_entry_or_null(&rdev->consumer_list,
+			struct regulator, list);
+	mutex_unlock(&rdev->mutex);
+
+	if (regulator)
+		regulator_set_voltage(regulator, regulator->min_uV,
+				regulator->max_uV);
+}
+
 static int __init regulator_late_cleanup(struct device *dev, void *data)
 {
 	struct regulator_dev *rdev = dev_to_rdev(dev);
 	const struct regulator_ops *ops = rdev->desc->ops;
 	struct regulation_constraints *c = rdev->constraints;
 	int enabled, ret;
+
+	if (c->boot_protection)
+		regulator_clear_boot_protection(rdev);
 
 	if (c && c->always_on)
 		return 0;
@@ -4502,6 +4594,8 @@ static int __init regulator_init_complete(void)
 	 */
 	if (of_have_populated_dt())
 		has_full_constraints = true;
+
+	regulator_has_booted = true;
 
 	/* If we have a full configuration then disable any regulators
 	 * we have permission to change the status for and which are

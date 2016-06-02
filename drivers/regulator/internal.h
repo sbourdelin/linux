@@ -29,6 +29,8 @@ struct regulator {
 	int uA_load;
 	int min_uV;
 	int max_uV;
+	int min_uA;
+	int max_uA;
 	char *supply_name;
 	struct device_attribute dev_attr;
 	struct regulator_dev *rdev;
