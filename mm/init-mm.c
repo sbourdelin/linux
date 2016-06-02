@@ -3,7 +3,6 @@
 #include <linux/rwsem.h>
 #include <linux/spinlock.h>
 #include <linux/list.h>
-#include <linux/cpumask.h>
 
 #include <linux/atomic.h>
 #include <asm/pgtable.h>
