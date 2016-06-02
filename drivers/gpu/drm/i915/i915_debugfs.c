@@ -5164,10 +5164,9 @@ struct sseu_dev_status {
 	unsigned int eu_per_subslice;
 };
 
-static void cherryview_sseu_device_status(struct drm_device *dev,
+static void cherryview_sseu_device_status(struct drm_i915_private *dev_priv,
 					  struct sseu_dev_status *stat)
 {
-	struct drm_i915_private *dev_priv = dev->dev_private;
 	int ss_max = 2;
 	int ss;
 	u32 sig1[ss_max], sig2[ss_max];
@@ -5196,16 +5195,15 @@ static void cherryview_sseu_device_status(struct drm_device *dev,
 	stat->subslice_total = stat->subslice_per_slice;
 }
 
-static void gen9_sseu_device_status(struct drm_device *dev,
+static void gen9_sseu_device_status(struct drm_i915_private *dev_priv,
 				    struct sseu_dev_status *stat)
 {
-	struct drm_i915_private *dev_priv = dev->dev_private;
 	int s_max = 3, ss_max = 4;
 	int s, ss;
 	u32 s_reg[s_max], eu_reg[2*s_max], eu_mask[2];
 
 	/* BXT has a single slice and at most 3 subslices. */
-	if (IS_BROXTON(dev)) {
+	if (IS_BROXTON(dev_priv)) {
 		s_max = 1;
 		ss_max = 3;
 	}
@@ -5234,18 +5232,18 @@ static void gen9_sseu_device_status(struct drm_device *dev,
 
 		stat->slice_total++;
 
-		if (IS_SKYLAKE(dev) || IS_KABYLAKE(dev))
-			ss_cnt = INTEL_INFO(dev)->subslice_per_slice;
+		if (IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv))
+			ss_cnt = INTEL_INFO(dev_priv)->subslice_per_slice;
 
 		for (ss = 0; ss < ss_max; ss++) {
 			unsigned int eu_cnt;
 
-			if (IS_BROXTON(dev) &&
+			if (IS_BROXTON(dev_priv) &&
 			    !(s_reg[s] & (GEN9_PGCTL_SS_ACK(ss))))
 				/* skip disabled subslice */
 				continue;
 
-			if (IS_BROXTON(dev))
+			if (IS_BROXTON(dev_priv))
 				ss_cnt++;
 
 			eu_cnt = 2 * hweight32(eu_reg[2*s + ss/2] &
@@ -5261,25 +5259,25 @@ static void gen9_sseu_device_status(struct drm_device *dev,
 	}
 }
 
-static void broadwell_sseu_device_status(struct drm_device *dev,
+static void broadwell_sseu_device_status(struct drm_i915_private *dev_priv,
 					 struct sseu_dev_status *stat)
 {
-	struct drm_i915_private *dev_priv = dev->dev_private;
 	int s;
 	u32 slice_info = I915_READ(GEN8_GT_SLICE_INFO);
 
 	stat->slice_total = hweight32(slice_info & GEN8_LSLICESTAT_MASK);
 
 	if (stat->slice_total) {
-		stat->subslice_per_slice = INTEL_INFO(dev)->subslice_per_slice;
+		stat->subslice_per_slice =
+				INTEL_INFO(dev_priv)->subslice_per_slice;
 		stat->subslice_total = stat->slice_total *
 				       stat->subslice_per_slice;
-		stat->eu_per_subslice = INTEL_INFO(dev)->eu_per_subslice;
+		stat->eu_per_subslice = INTEL_INFO(dev_priv)->eu_per_subslice;
 		stat->eu_total = stat->eu_per_subslice * stat->subslice_total;
 
 		/* subtract fused off EU(s) from enabled slice(s) */
 		for (s = 0; s < stat->slice_total; s++) {
-			u8 subslice_7eu = INTEL_INFO(dev)->subslice_7eu[s];
+			u8 subslice_7eu = INTEL_INFO(dev_priv)->subslice_7eu[s];
 
 			stat->eu_total -= hweight8(subslice_7eu);
 		}
@@ -5289,38 +5287,40 @@ static void broadwell_sseu_device_status(struct drm_device *dev,
 static int i915_sseu_status(struct seq_file *m, void *unused)
 {
 	struct drm_info_node *node = (struct drm_info_node *) m->private;
-	struct drm_device *dev = node->minor->dev;
+	struct drm_i915_private *dev_priv = to_i915(node->minor->dev);
 	struct sseu_dev_status stat;
 
-	if (INTEL_INFO(dev)->gen < 8)
+	if (INTEL_GEN(dev_priv) < 8)
 		return -ENODEV;
+
+	intel_runtime_pm_get(dev_priv);
 
 	seq_puts(m, "SSEU Device Info\n");
 	seq_printf(m, "  Available Slice Total: %u\n",
-		   INTEL_INFO(dev)->slice_total);
+		   INTEL_INFO(dev_priv)->slice_total);
 	seq_printf(m, "  Available Subslice Total: %u\n",
-		   INTEL_INFO(dev)->subslice_total);
+		   INTEL_INFO(dev_priv)->subslice_total);
 	seq_printf(m, "  Available Subslice Per Slice: %u\n",
-		   INTEL_INFO(dev)->subslice_per_slice);
+		   INTEL_INFO(dev_priv)->subslice_per_slice);
 	seq_printf(m, "  Available EU Total: %u\n",
-		   INTEL_INFO(dev)->eu_total);
+		   INTEL_INFO(dev_priv)->eu_total);
 	seq_printf(m, "  Available EU Per Subslice: %u\n",
-		   INTEL_INFO(dev)->eu_per_subslice);
+		   INTEL_INFO(dev_priv)->eu_per_subslice);
 	seq_printf(m, "  Has Slice Power Gating: %s\n",
-		   yesno(INTEL_INFO(dev)->has_slice_pg));
+		   yesno(INTEL_INFO(dev_priv)->has_slice_pg));
 	seq_printf(m, "  Has Subslice Power Gating: %s\n",
-		   yesno(INTEL_INFO(dev)->has_subslice_pg));
+		   yesno(INTEL_INFO(dev_priv)->has_subslice_pg));
 	seq_printf(m, "  Has EU Power Gating: %s\n",
-		   yesno(INTEL_INFO(dev)->has_eu_pg));
+		   yesno(INTEL_INFO(dev_priv)->has_eu_pg));
 
 	seq_puts(m, "SSEU Device Status\n");
 	memset(&stat, 0, sizeof(stat));
-	if (IS_CHERRYVIEW(dev)) {
-		cherryview_sseu_device_status(dev, &stat);
-	} else if (IS_BROADWELL(dev)) {
-		broadwell_sseu_device_status(dev, &stat);
-	} else if (INTEL_INFO(dev)->gen >= 9) {
-		gen9_sseu_device_status(dev, &stat);
+	if (IS_CHERRYVIEW(dev_priv)) {
+		cherryview_sseu_device_status(dev_priv, &stat);
+	} else if (IS_BROADWELL(dev_priv)) {
+		broadwell_sseu_device_status(dev_priv, &stat);
+	} else if (INTEL_INFO(dev_priv)->gen >= 9) {
+		gen9_sseu_device_status(dev_priv, &stat);
 	}
 	seq_printf(m, "  Enabled Slice Total: %u\n",
 		   stat.slice_total);
@@ -5332,6 +5332,8 @@ static int i915_sseu_status(struct seq_file *m, void *unused)
 		   stat.eu_total);
 	seq_printf(m, "  Enabled EU Per Subslice: %u\n",
 		   stat.eu_per_subslice);
+
+	intel_runtime_pm_put(dev_priv);
 
 	return 0;
 }
