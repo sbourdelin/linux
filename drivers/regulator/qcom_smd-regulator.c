@@ -246,7 +246,10 @@ static const struct regulator_desc pm8941_nldo = {
 };
 
 static const struct regulator_desc pm8941_lnldo = {
-	.fixed_uV = 1740000,
+	.linear_ranges = (struct regulator_linear_range[]) {
+		REGULATOR_LINEAR_RANGE(1740000, 0, 0, 1740000),
+	},
+	.n_linear_ranges = 1,
 	.n_voltages = 1,
 	.ops = &rpm_smps_ldo_ops,
 };
