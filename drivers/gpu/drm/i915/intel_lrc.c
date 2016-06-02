@@ -446,6 +446,21 @@ static void execlists_context_unqueue(struct intel_engine_cs *engine)
 			i915_gem_request_unreference(req0);
 			req0 = cursor;
 		} else {
+			/* Compiler will do the dead-code elimination */
+			if (IS_ENABLED(CONFIG_DRM_I915_GVT)) {
+				/*
+				 * req0 (after merged) ctx requires single
+				 * submission, stop picking
+				 */
+				if (req0->ctx->enable_lrc_single_submission)
+					break;
+				/*
+				 * req0 ctx doesn't require single submission,
+				 * but next req ctx requires, stop picking
+				 */
+				if (cursor->ctx->enable_lrc_single_submission)
+					break;
+			}
 			req1 = cursor;
 			WARN_ON(req1->elsp_submitted);
 			break;

@@ -882,6 +882,7 @@ struct i915_gem_context {
 	u32 lrc_ring_buffer_size;
 	u32 lrc_addressing_mode_bits;
 	bool enable_lrc_status_change_notification;
+	bool enable_lrc_single_submission;
 
 	struct list_head link;
 
