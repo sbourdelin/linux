@@ -34,6 +34,7 @@ LIST_HEAD(cpuidle_detected_devices);
 static int enabled_devices;
 static int off __read_mostly;
 static int initialized __read_mostly;
+static int cpuidle_freeze_error;
 
 int cpuidle_disabled(void)
 {
@@ -109,9 +110,11 @@ int cpuidle_find_deepest_state(struct cpuidle_driver *drv,
 	return find_deepest_state(drv, dev, UINT_MAX, 0, false);
 }
 
-static void enter_freeze_proper(struct cpuidle_driver *drv,
+static int enter_freeze_proper(struct cpuidle_driver *drv,
 				struct cpuidle_device *dev, int index)
 {
+	int ret;
+
 	/*
 	 * trace_suspend_resume() called by tick_freeze() for the last CPU
 	 * executing it contains RCU usage regarded as invalid in the idle
@@ -124,7 +127,7 @@ static void enter_freeze_proper(struct cpuidle_driver *drv,
 	 * suspended is generally unsafe.
 	 */
 	stop_critical_timings();
-	drv->states[index].enter_freeze(dev, drv, index);
+	ret = drv->states[index].enter_freeze(dev, drv, index);
 	WARN_ON(!irqs_disabled());
 	/*
 	 * timekeeping_resume() that will be called by tick_unfreeze() for the
@@ -133,6 +136,7 @@ static void enter_freeze_proper(struct cpuidle_driver *drv,
 	 */
 	RCU_NONIDLE(tick_unfreeze());
 	start_critical_timings();
+	return ret;
 }
 
 /**
@@ -145,7 +149,7 @@ static void enter_freeze_proper(struct cpuidle_driver *drv,
  */
 int cpuidle_enter_freeze(struct cpuidle_driver *drv, struct cpuidle_device *dev)
 {
-	int index;
+	int index, ret = 0;
 
 	/*
 	 * Find the deepest state with ->enter_freeze present, which guarantees
@@ -153,8 +157,13 @@ int cpuidle_enter_freeze(struct cpuidle_driver *drv, struct cpuidle_device *dev)
 	 * be frozen safely.
 	 */
 	index = find_deepest_state(drv, dev, UINT_MAX, 0, true);
-	if (index > 0)
-		enter_freeze_proper(drv, dev, index);
+	if (index >= 0)
+		ret = enter_freeze_proper(drv, dev, index);
+
+	if (ret < 0) {
+		cpuidle_freeze_error = ret;
+		freeze_wake();
+	}
 
 	return index;
 }
@@ -351,6 +360,18 @@ void cpuidle_resume(void)
 	mutex_lock(&cpuidle_lock);
 	cpuidle_install_idle_handler();
 	mutex_unlock(&cpuidle_lock);
+}
+
+void cpuidle_prepare_freeze(void)
+{
+	cpuidle_freeze_error = 0;
+	cpuidle_resume();
+}
+
+int cpuidle_complete_freeze(void)
+{
+	cpuidle_pause();
+	return cpuidle_freeze_error;
 }
 
 /**
