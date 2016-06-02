@@ -5290,10 +5290,13 @@ static int i915_sseu_status(struct seq_file *m, void *unused)
 {
 	struct drm_info_node *node = (struct drm_info_node *) m->private;
 	struct drm_device *dev = node->minor->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct sseu_dev_status stat;
 
 	if (INTEL_INFO(dev)->gen < 8)
 		return -ENODEV;
+
+	intel_runtime_pm_get(dev_priv);
 
 	seq_puts(m, "SSEU Device Info\n");
 	seq_printf(m, "  Available Slice Total: %u\n",
@@ -5332,6 +5335,8 @@ static int i915_sseu_status(struct seq_file *m, void *unused)
 		   stat.eu_total);
 	seq_printf(m, "  Enabled EU Per Subslice: %u\n",
 		   stat.eu_per_subslice);
+
+	intel_runtime_pm_put(dev_priv);
 
 	return 0;
 }
