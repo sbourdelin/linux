@@ -139,7 +139,7 @@ static inline void queued_read_unlock(struct qrwlock *lock)
  */
 static inline void queued_write_unlock(struct qrwlock *lock)
 {
-	smp_store_release((u8 *)&lock->cnts, 0);
+	(void)atomic_sub_return_release(_QW_LOCKED, &lock->cnts);
 }
 
 /*
