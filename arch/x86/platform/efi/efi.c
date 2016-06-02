@@ -66,10 +66,32 @@ static efi_config_table_type_t arch_tables[] __initdata = {
 
 u64 efi_setup;		/* efi setup_data physical address */
 
-static int add_efi_memmap __initdata;
+static __initdata enum {
+	EFI_MEMMAP_DEFAULT,
+	EFI_MEMMAP_ENABLED,
+	EFI_MEMMAP_DISABLED
+} add_efi_memmap;
+
 static int __init setup_add_efi_memmap(char *arg)
 {
-	add_efi_memmap = 1;
+	static bool arg_as_bool;
+	int ret = strtobool(arg, &arg_as_bool);
+
+	/* check for a non-existent arg, to maintain backward compatibility */
+	if (!arg) {
+		add_efi_memmap = EFI_MEMMAP_ENABLED;
+	} else {
+		if (ret) {
+			/* a bad argument was passed... */
+			return ret;
+		} else {
+			if (arg_as_bool)
+				add_efi_memmap = EFI_MEMMAP_ENABLED;
+			else
+				add_efi_memmap = EFI_MEMMAP_DISABLED;
+		}
+	}
+
 	return 0;
 }
 early_param("add_efi_memmap", setup_add_efi_memmap);
@@ -433,6 +455,7 @@ static int __init efi_runtime_init(void)
 static int __init efi_memmap_init(void)
 {
 	unsigned long addr, size;
+	bool is_uv_sys;
 
 	if (efi_enabled(EFI_PARAVIRT))
 		return 0;
@@ -449,8 +472,20 @@ static int __init efi_memmap_init(void)
 
 	efi.memmap.map_end = efi.memmap.map + size;
 
-	if (add_efi_memmap)
-		do_add_efi_memmap();
+	is_uv_sys = !((efi.uv_systab == EFI_INVALID_TABLE_ADDR)
+			|| !efi.uv_systab);
+
+	if (add_efi_memmap != EFI_MEMMAP_DISABLED) {
+		if (add_efi_memmap == EFI_MEMMAP_ENABLED) {
+			do_add_efi_memmap();
+			pr_info("EFI memmap enabled: Explicitly\n");
+		} else if (is_uv_sys) {
+			do_add_efi_memmap();
+			pr_info("EFI memmap enabled: this is a UV system\n");
+		}
+	} else {
+		pr_info("EFI memmap disabled: Explicitly\n");
+	}
 
 	set_bit(EFI_MEMMAP, &efi.flags);
 
