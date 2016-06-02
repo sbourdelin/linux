@@ -404,6 +404,22 @@ static void execlists_submit_requests(struct drm_i915_gem_request *rq0,
 	spin_unlock_irq(&dev_priv->uncore.lock);
 }
 
+static inline void execlists_context_status_change(
+		struct drm_i915_gem_request *rq,
+		unsigned long status)
+{
+	/* The compiler should be fine with the dead-code elimination */
+	if (!IS_ENABLED(CONFIG_DRM_I915_GVT))
+		return;
+
+	if (!rq->ctx->enable_lrc_status_change_notification)
+		return;
+
+	atomic_notifier_call_chain(
+			&rq->ctx->engine[rq->engine->id].status_notifier,
+			status, rq);
+}
+
 static void execlists_context_unqueue(struct intel_engine_cs *engine)
 {
 	struct drm_i915_gem_request *req0 = NULL, *req1 = NULL;
@@ -438,6 +454,11 @@ static void execlists_context_unqueue(struct intel_engine_cs *engine)
 
 	if (unlikely(!req0))
 		return;
+
+	execlists_context_status_change(req0, CONTEXT_SCHEDULE_IN);
+
+	if (req1)
+		execlists_context_status_change(req1, CONTEXT_SCHEDULE_IN);
 
 	if (req0->elsp_submitted & engine->idle_lite_restore_wa) {
 		/*
@@ -476,6 +497,8 @@ execlists_check_remove_request(struct intel_engine_cs *engine, u32 ctx_id)
 
 	if (--head_req->elsp_submitted > 0)
 		return 0;
+
+	execlists_context_status_change(head_req, CONTEXT_SCHEDULE_OUT);
 
 	list_del(&head_req->execlist_link);
 	i915_gem_request_unreference(head_req);
@@ -2489,6 +2512,7 @@ static int execlists_context_deferred_alloc(struct i915_gem_context *ctx,
 	ce->ringbuf = ringbuf;
 	ce->state = ctx_obj;
 	ce->initialised = engine->init_context == NULL;
+	ATOMIC_INIT_NOTIFIER_HEAD(&ce->status_notifier);
 
 	return 0;
 
