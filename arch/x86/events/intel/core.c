@@ -3309,6 +3309,7 @@ static void intel_snb_check_microcode(void)
 static bool check_msr(unsigned long msr, u64 mask)
 {
 	u64 val_old, val_new, val_tmp;
+	u64 (*wr_quirk)(u64);
 
 	/*
 	 * Read the current value, change it and read it back to see if it
@@ -3322,13 +3323,30 @@ static bool check_msr(unsigned long msr, u64 mask)
 	 * Only change the bits which can be updated by wrmsrl.
 	 */
 	val_tmp = val_old ^ mask;
+
+	/* Use wr quirk for lbr msr's. */
+	if ((x86_pmu.lbr_from <= msr &&
+	     msr < x86_pmu.lbr_from + x86_pmu.lbr_nr) ||
+	    (x86_pmu.lbr_to <= msr &&
+	     msr < x86_pmu.lbr_to + x86_pmu.lbr_nr))
+		wr_quirk = lbr_from_signext_quirk_wr;
+
+	if (wr_quirk)
+		val_tmp = wr_quirk(val_tmp);
+
+
 	if (wrmsrl_safe(msr, val_tmp) ||
 	    rdmsrl_safe(msr, &val_new))
 		return false;
 
+	/* quirk only affects validation in wrmsr, so wrmsrl'value
+	 * should equal rdmsrl's one even with the quirk.
+	 */
 	if (val_new != val_tmp)
 		return false;
 
+	if (wr_quirk)
+		val_old = wr_quirk(val_old);
 	/* Here it's sure that the MSR can be safely accessed.
 	 * Restore the old value and return.
 	 */

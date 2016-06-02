@@ -80,6 +80,7 @@ static enum {
 #define LBR_FROM_FLAG_MISPRED  (1ULL << 63)
 #define LBR_FROM_FLAG_IN_TX    (1ULL << 62)
 #define LBR_FROM_FLAG_ABORT    (1ULL << 61)
+#define LBR_FROM_SIGNEXT_MSB   (1ULL << 60)
 
 /*
  * x86control flow change classification
@@ -235,6 +236,62 @@ enum {
 	LBR_VALID,
 };
 
+/*
+ * For formats with LBR_TSX flags (e.g. LBR_FORMAT_EIP_FLAGS2), bits 61:62 in
+ * MSR_LAST_BRANCH_FROM_x are the TSX flags when TSX is supported.
+ * When TSX support is disabled the behavior differs as follows:
+ *   - For wrmsr, bits 61:62 are considered part of the sign-extension.
+ *   - HW updates to the MSR (no through wrmsr) will clear bits 61:62,
+ *   regardless of the sign of bit at position 47, i.e. bit 61:62 are not part
+ *   of the sign-extension.
+ *
+ * Therefore, if the conditions:
+ *   1) LBR has TSX format.
+ *   2) CPU has no TSX support enabled.
+ *   3) data in MSR (bits 0:48) is negative.
+ * are all true, then any value passed to wrmsr must be signed-extended to
+ * 63 bits and any value from rdmsr must be converted to 61 bits, ignoring
+ * the TSX flags.
+ */
+
+static inline bool lbr_from_signext_quirk_on(void)
+{
+	int lbr_format = x86_pmu.intel_cap.lbr_format;
+	bool tsx_support = boot_cpu_has(X86_FEATURE_HLE) ||
+			   boot_cpu_has(X86_FEATURE_RTM);
+
+	return !tsx_support && (lbr_desc[lbr_format] & LBR_TSX);
+}
+
+DEFINE_STATIC_KEY_FALSE(lbr_from_quirk_key);
+
+static inline bool lbr_from_signext_quirk_test(u64 val)
+{
+	return static_branch_unlikely(&lbr_from_quirk_key) &&
+	       (val & LBR_FROM_SIGNEXT_MSB);
+}
+
+/*
+ * If quirk is needed, do sign extension to 63 bits.
+ */
+inline u64 lbr_from_signext_quirk_wr(u64 val)
+{
+	if (lbr_from_signext_quirk_test(val))
+		val |= (LBR_FROM_FLAG_IN_TX | LBR_FROM_FLAG_ABORT);
+	return val;
+}
+
+/*
+ * If quirk is needed, ensure sign extension is 61 bits.
+ */
+
+u64 lbr_from_signext_quirk_rd(u64 val)
+{
+	if (lbr_from_signext_quirk_test(val))
+		val &= ~(LBR_FROM_FLAG_IN_TX | LBR_FROM_FLAG_ABORT);
+	return val;
+}
+
 static void __intel_pmu_lbr_restore(struct x86_perf_task_context *task_ctx)
 {
 	int i;
@@ -251,7 +308,8 @@ static void __intel_pmu_lbr_restore(struct x86_perf_task_context *task_ctx)
 	tos = task_ctx->tos;
 	for (i = 0; i < tos; i++) {
 		lbr_idx = (tos - i) & mask;
-		wrmsrl(x86_pmu.lbr_from + lbr_idx, task_ctx->lbr_from[i]);
+		wrmsrl(x86_pmu.lbr_from + lbr_idx,
+			lbr_from_signext_quirk_wr(task_ctx->lbr_from[i]));
 		wrmsrl(x86_pmu.lbr_to + lbr_idx, task_ctx->lbr_to[i]);
 		if (x86_pmu.intel_cap.lbr_format == LBR_FORMAT_INFO)
 			wrmsrl(MSR_LBR_INFO_0 + lbr_idx, task_ctx->lbr_info[i]);
@@ -264,7 +322,7 @@ static void __intel_pmu_lbr_save(struct x86_perf_task_context *task_ctx)
 {
 	int i;
 	unsigned lbr_idx, mask;
-	u64 tos;
+	u64 tos, val;
 
 	if (task_ctx->lbr_callstack_users == 0) {
 		task_ctx->lbr_stack_state = LBR_NONE;
@@ -275,7 +333,8 @@ static void __intel_pmu_lbr_save(struct x86_perf_task_context *task_ctx)
 	tos = intel_pmu_lbr_tos();
 	for (i = 0; i < tos; i++) {
 		lbr_idx = (tos - i) & mask;
-		rdmsrl(x86_pmu.lbr_from + lbr_idx, task_ctx->lbr_from[i]);
+		rdmsrl(x86_pmu.lbr_from + lbr_idx, val);
+		task_ctx->lbr_from[i] = lbr_from_signext_quirk_rd(val);
 		rdmsrl(x86_pmu.lbr_to + lbr_idx, task_ctx->lbr_to[i]);
 		if (x86_pmu.intel_cap.lbr_format == LBR_FORMAT_INFO)
 			rdmsrl(MSR_LBR_INFO_0 + lbr_idx, task_ctx->lbr_info[i]);
@@ -316,7 +375,7 @@ void intel_pmu_lbr_sched_task(struct perf_event_context *ctx, bool sched_in)
 	 * level (which could be a useful measurement in system-wide
 	 * mode). In that case, the risk is high of having a branch
 	 * stack with branch from multiple tasks.
- 	 */
+	 */
 	if (sched_in) {
 		intel_pmu_lbr_reset();
 		cpuc->lbr_context = ctx;
@@ -453,6 +512,8 @@ static void intel_pmu_lbr_read_64(struct cpu_hw_events *cpuc)
 		int lbr_flags = lbr_desc[lbr_format];
 
 		rdmsrl(x86_pmu.lbr_from + lbr_idx, from);
+		from = lbr_from_signext_quirk_rd(from);
+
 		rdmsrl(x86_pmu.lbr_to   + lbr_idx, to);
 
 		if (lbr_format == LBR_FORMAT_INFO && need_info) {
@@ -535,6 +596,7 @@ static int intel_pmu_setup_sw_lbr_filter(struct perf_event *event)
 {
 	u64 br_type = event->attr.branch_sample_type;
 	int mask = 0;
+
 
 	if (br_type & PERF_SAMPLE_BRANCH_USER)
 		mask |= X86_BR_USER;
@@ -1007,6 +1069,9 @@ void intel_pmu_lbr_init_hsw(void)
 
 	x86_pmu.lbr_sel_mask = LBR_SEL_MASK;
 	x86_pmu.lbr_sel_map  = hsw_lbr_sel_map;
+
+	if (lbr_from_signext_quirk_on())
+		static_branch_enable(&lbr_from_quirk_key);
 }
 
 /* skylake */
