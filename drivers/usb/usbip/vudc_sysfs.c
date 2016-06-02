@@ -35,13 +35,16 @@
 int get_gadget_descs(struct vudc *udc)
 {
 	struct vrequest *usb_req;
-	struct vep *ep0 = to_vep(udc->gadget.ep0);
-	struct usb_device_descriptor *ddesc = &udc->dev_desc;
+	struct vep *ep0;
+	struct usb_device_descriptor *ddesc;
 	struct usb_ctrlrequest req;
 	int ret;
 
 	if (!udc || !udc->driver || !udc->pullup)
 		return -EINVAL;
+
+	ep0 = to_vep(udc->gadget.ep0);
+	ddesc = &udc->dev_desc;
 
 	req.bRequestType = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
 	req.bRequest = USB_REQ_GET_DESCRIPTOR;
