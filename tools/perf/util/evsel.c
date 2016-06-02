@@ -574,9 +574,20 @@ void perf_evsel__config_callchain(struct perf_evsel *evsel,
 	if (param->record_mode == CALLCHAIN_LBR) {
 		if (!opts->branch_stack) {
 			if (attr->exclude_user) {
-				pr_warning("LBR callstack option is only available "
-					   "to get user callchain information. "
-					   "Falling back to framepointers.\n");
+				/*
+				 * Sample kernel AND user branches. Do not exclude user
+				 * branches because task_ctx->lbr_callstack_users in
+				 * arch/x86/events/intel/lbr.c only count users for
+				 * user branches.
+				 */
+				pr_warning("BRANCH_STACK with kernel and user\n");
+				perf_evsel__set_sample_bit(evsel, BRANCH_STACK);
+				attr->branch_sample_type = PERF_SAMPLE_BRANCH_KERNEL |
+							PERF_SAMPLE_BRANCH_USER |
+							PERF_SAMPLE_BRANCH_CALL_STACK |
+							PERF_SAMPLE_BRANCH_NO_CYCLES |
+							PERF_SAMPLE_BRANCH_NO_FLAGS;
+
 			} else {
 				perf_evsel__set_sample_bit(evsel, BRANCH_STACK);
 				attr->branch_sample_type = PERF_SAMPLE_BRANCH_USER |
