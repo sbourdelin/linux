@@ -262,17 +262,28 @@ static __always_inline bool steal_account_process_tick(void)
 #ifdef CONFIG_PARAVIRT
 	if (static_key_false(&paravirt_steal_enabled)) {
 		u64 steal;
+		s64 delta;
 		unsigned long steal_jiffies;
 
 		steal = paravirt_steal_clock(smp_processor_id());
-		steal -= this_rq()->prev_steal_time;
+		delta = steal - this_rq()->prev_steal_time;
+		/*
+		 * Ignore this steal time difference if the guest and the host got
+		 * out of sync. This can happen due to events like live migration,
+		 * or CPU hotplug. The upper threshold is set to one second to match
+		 * the one second timer tick with nohz_full.
+		 */
+		if (unlikely(delta < 0 || delta > NSEC_PER_SEC)) {
+			this_rq()->prev_steal_time = steal;
+			return 0;
+		}
 
 		/*
 		 * steal is in nsecs but our caller is expecting steal
 		 * time in jiffies. Lets cast the result to jiffies
 		 * granularity and account the rest on the next rounds.
 		 */
-		steal_jiffies = nsecs_to_jiffies(steal);
+		steal_jiffies = nsecs_to_jiffies(delta);
 		this_rq()->prev_steal_time += jiffies_to_nsecs(steal_jiffies);
 
 		account_steal_time(jiffies_to_cputime(steal_jiffies));
