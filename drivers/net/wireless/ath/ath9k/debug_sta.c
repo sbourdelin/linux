@@ -245,6 +245,17 @@ static const struct file_operations fops_node_recv = {
 	.llseek = default_llseek,
 };
 
+void ath_debug_airtime(struct ath_softc *sc,
+		struct ath_node *an,
+		u32 rx,
+		u32 tx)
+{
+	struct ath_airtime_stats *astats = &an->airtime_stats;
+
+	astats->rx_airtime += rx;
+	astats->tx_airtime += tx;
+}
+
 void ath_debug_tx_airtime(struct ath_softc *sc,
 		          struct ath_buf *bf,
 		          struct ath_tx_status *ts)
@@ -353,6 +364,7 @@ static ssize_t read_airtime(struct file *file, char __user *user_buf,
 
 	len += scnprintf(buf + len, size - len, "RX: %u us\n", astats->rx_airtime);
 	len += scnprintf(buf + len, size - len, "TX: %u us\n", astats->tx_airtime);
+	len += scnprintf(buf + len, size - len, "Deficit: %lld us\n", an->airtime_deficit);
 
 	retval = simple_read_from_buffer(user_buf, count, ppos, buf, len);
 	kfree(buf);
