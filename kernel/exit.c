@@ -732,6 +732,12 @@ void do_exit(long code)
 	tsk->exit_code = code;
 	taskstats_exit(tsk, group_dead);
 
+	if (tsk->policy == SCHED_FIFO || tsk->policy == SCHED_RR) {
+		struct sched_param param = { .sched_priority = 0 };
+
+		sched_setscheduler_nocheck(current, SCHED_NORMAL, &param);
+	}
+
 	exit_mm(tsk);
 
 	if (group_dead)
