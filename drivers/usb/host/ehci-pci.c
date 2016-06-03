@@ -263,6 +263,9 @@ static int ehci_pci_setup(struct usb_hcd *hcd)
 	case PCI_VENDOR_ID_INTEL:
 		ehci->need_io_watchdog = 0;
 		break;
+	case PCI_VENDOR_ID_AMD:
+		ehci->need_io_watchdog = 0;
+		break;
 	case PCI_VENDOR_ID_NVIDIA:
 		switch (pdev->device) {
 		/* MCP89 chips on the MacBookAir3,1 give EPROTO when
