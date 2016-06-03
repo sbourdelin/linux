@@ -1538,6 +1538,7 @@ int ixgbe_ndo_set_vf_spoofchk(struct net_device *netdev, int vf, bool setting)
 		hw->mac.ops.set_ethertype_anti_spoofing(hw, setting, vf);
 	}
 
+
 	return 0;
 }
 
