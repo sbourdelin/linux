@@ -3341,6 +3341,7 @@ static ssize_t ext4_direct_IO_write(struct kiocb *iocb, struct iov_iter *iter)
 	loff_t final_size = offset + count;
 	int orphan = 0;
 	handle_t *handle;
+	bool is_dax = IS_DAX(inode);
 
 	if (final_size > inode->i_size) {
 		/* Credits for sb + inode write */
@@ -3364,11 +3365,11 @@ static ssize_t ext4_direct_IO_write(struct kiocb *iocb, struct iov_iter *iter)
 	/*
 	 * Make all waiters for direct IO properly wait also for extent
 	 * conversion. This also disallows race between truncate() and
-	 * overwrite DIO as i_dio_count needs to be incremented under i_mutex.
+	 * overwrite DIO as i_dio_count needs to be incremented under i_rwsem.
 	 */
 	inode_dio_begin(inode);
 
-	/* If we do a overwrite dio, i_mutex locking can be released */
+	/* If we do a overwrite dio, i_rwsem locking can be released */
 	overwrite = *((int *)iocb->private);
 
 	if (overwrite)
@@ -3397,7 +3398,7 @@ static ssize_t ext4_direct_IO_write(struct kiocb *iocb, struct iov_iter *iter)
 	iocb->private = NULL;
 	if (overwrite)
 		get_block_func = ext4_dio_get_block_overwrite;
-	else if (IS_DAX(inode)) {
+	else if (is_dax) {
 		/*
 		 * We can avoid zeroing for aligned DAX writes beyond EOF. Other
 		 * writes need zeroing either because they can race with page
@@ -3423,7 +3424,12 @@ static ssize_t ext4_direct_IO_write(struct kiocb *iocb, struct iov_iter *iter)
 #ifdef CONFIG_EXT4_FS_ENCRYPTION
 	BUG_ON(ext4_encrypted_inode(inode) && S_ISREG(inode->i_mode));
 #endif
-	if (IS_DAX(inode)) {
+	if (is_dax) {
+		/*
+		 * All DAX I/Os are synchronous, so we can skip updating
+		 * DIO count in dax_do_io.
+		 */
+		dio_flags |= DIO_SKIP_DIO_COUNT;
 		ret = dax_do_io(iocb, inode, iter, get_block_func,
 				ext4_end_io_dio, dio_flags);
 	} else
@@ -3447,7 +3453,7 @@ static ssize_t ext4_direct_IO_write(struct kiocb *iocb, struct iov_iter *iter)
 	}
 
 	inode_dio_end(inode);
-	/* take i_mutex locking again if we do a ovewrite dio */
+	/* take i_rwsem locking again if we do a ovewrite dio */
 	if (overwrite)
 		inode_lock(inode);
 
@@ -3516,8 +3522,14 @@ static ssize_t ext4_direct_IO_read(struct kiocb *iocb, struct iov_iter *iter)
 			unlocked = 1;
 	}
 	if (IS_DAX(inode)) {
+		/*
+		 * All DAX I/Os are synchronous, so we can skip updating
+		 * DIO count if inode_dio_begin() has been called before
+		 * or DIO_LOCKING is enabled.
+		 */
 		ret = dax_do_io(iocb, inode, iter, ext4_dio_get_block,
-				NULL, unlocked ? 0 : DIO_LOCKING);
+				NULL, DIO_SKIP_DIO_COUNT |
+				(unlocked ? 0 : DIO_LOCKING));
 	} else {
 		ret = __blockdev_direct_IO(iocb, inode, inode->i_sb->s_bdev,
 					   iter, ext4_dio_get_block,
