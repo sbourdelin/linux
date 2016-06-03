@@ -6,6 +6,9 @@
  *
  * The "_X" parts are generally the EP and EX Xeons, or the
  * "Extreme" ones, like Broadwell-E.
+ *
+ * Things ending in "2" are usually because we have no better
+ * name for them.  There's no processor called "WESTMERE2".
  */
 
 #define INTEL_FAM6_CORE_YONAH		0x0E
@@ -18,6 +21,7 @@
 #define INTEL_FAM6_NEHALEM_EP		0x1A
 #define INTEL_FAM6_NEHALEM_EX		0x2E
 #define INTEL_FAM6_WESTMERE		0x25
+#define INTEL_FAM6_WESTMERE2		0x1F
 #define INTEL_FAM6_WESTMERE_EP		0x2C
 #define INTEL_FAM6_WESTMERE_EX		0x2F
 
@@ -49,9 +53,9 @@
 #define INTEL_FAM6_ATOM_PENWELL		0x27
 #define INTEL_FAM6_ATOM_CLOVERVIEW	0x35
 #define INTEL_FAM6_ATOM_CEDARVIEW	0x36
-#define INTEL_FAM6_ATOM_SILVERMONT1	0x37
+#define INTEL_FAM6_ATOM_SILVERMONT1	0x37 /* BayTrail/BYT */
 #define INTEL_FAM6_ATOM_SILVERMONT2	0x4D /* Avaton/Rangely */
-#define INTEL_FAM6_ATOM_AIRMONT		0x4C
+#define INTEL_FAM6_ATOM_AIRMONT		0x4C /* CherryTrail */
 #define INTEL_FAM6_ATOM_GOLDMONT	0x5C
 #define INTEL_FAM6_ATOM_DENVERTON	0x5F /* Goldmont Microserver */
 
