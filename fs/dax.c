@@ -247,8 +247,8 @@ static ssize_t dax_io(struct inode *inode, struct iov_iter *iter,
  * @flags: See below
  *
  * This function uses the same locking scheme as do_blockdev_direct_IO:
- * If @flags has DIO_LOCKING set, we assume that the i_mutex is held by the
- * caller for writes.  For reads, we take and release the i_mutex ourselves.
+ * If @flags has DIO_LOCKING set, we assume that the i_rwsem is held by the
+ * caller for writes.  For reads, we take and release the i_rwsem ourselves.
  * If DIO_LOCKING is not set, the filesystem takes care of its own locking.
  * As with do_blockdev_direct_IO(), we increment i_dio_count while the I/O
  * is in progress.
@@ -265,8 +265,9 @@ ssize_t dax_do_io(struct kiocb *iocb, struct inode *inode,
 	memset(&bh, 0, sizeof(bh));
 	bh.b_bdev = inode->i_sb->s_bdev;
 
+	/* Take the shared lock for read */
 	if ((flags & DIO_LOCKING) && iov_iter_rw(iter) == READ)
-		inode_lock(inode);
+		inode_lock_shared(inode);
 
 	/* Protects against truncate */
 	if (!(flags & DIO_SKIP_DIO_COUNT))
@@ -275,7 +276,7 @@ ssize_t dax_do_io(struct kiocb *iocb, struct inode *inode,
 	retval = dax_io(inode, iter, pos, end, get_block, &bh);
 
 	if ((flags & DIO_LOCKING) && iov_iter_rw(iter) == READ)
-		inode_unlock(inode);
+		inode_unlock_shared(inode);
 
 	if (end_io) {
 		int err;
