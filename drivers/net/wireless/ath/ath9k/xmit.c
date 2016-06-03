@@ -739,6 +739,8 @@ static void ath_tx_process_buffer(struct ath_softc *sc, struct ath_txq *txq,
 
 	ts->duration = ath9k_hw_get_duration(sc->sc_ah, bf->bf_desc,
 					     ts->ts_rateindex);
+	ath_debug_tx_airtime(sc, bf, ts);
+
 	if (!bf_isampdu(bf)) {
 		if (!flush) {
 			info = IEEE80211_SKB_CB(bf->bf_mpdu);
@@ -1090,8 +1092,8 @@ ath_tx_form_aggr(struct ath_softc *sc, struct ath_txq *txq,
  * width  - 0 for 20 MHz, 1 for 40 MHz
  * half_gi - to use 4us v/s 3.6 us for symbol time
  */
-static u32 ath_pkt_duration(struct ath_softc *sc, u8 rix, int pktlen,
-			    int width, int half_gi, bool shortPreamble)
+u32 ath_pkt_duration(struct ath_softc *sc, u8 rix, int pktlen,
+		     int width, int half_gi, bool shortPreamble)
 {
 	u32 nbits, nsymbits, duration, nsymbols;
 	int streams;
