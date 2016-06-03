@@ -534,6 +534,10 @@ static int rk_gmac_init(struct platform_device *pdev, void *priv)
 	struct rk_priv_data *bsp_priv = priv;
 	int ret;
 
+	/* Keep the PHY up if we use Wake-on-Lan. */
+	if (device_may_wakeup(&pdev->dev))
+		return 0;
+
 	ret = phy_power_on(bsp_priv, true);
 	if (ret)
 		return ret;
@@ -548,6 +552,10 @@ static int rk_gmac_init(struct platform_device *pdev, void *priv)
 static void rk_gmac_exit(struct platform_device *pdev, void *priv)
 {
 	struct rk_priv_data *gmac = priv;
+
+	/* The PHY was up for Wake-on-Lan. */
+	if (device_may_wakeup(&pdev->dev))
+		return;
 
 	phy_power_on(gmac, false);
 	gmac_clk_enable(gmac, false);
