@@ -1273,9 +1273,35 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 	return error;
 }
 
+/**
+ * scsi_filter_sd - Look up the device structure embedded in a disk structure
+ * @dev: A sdev_gendev device
+ * @data: A struct device pointer
+ *
+ * sdev_gendev devices have two children - the sdev_dev device and for SCSI
+ * disks, the device embedded in a scsi_disk.
+ */
+static int scsi_filter_sd(struct device *dev, void *data)
+{
+	struct device **childp = data;
+
+	if (dev->class != &sdev_class)
+		*childp = dev;
+	return 0;
+}
+
+/* Caller must call put_device() if this function does not return NULL. */
+static struct device *scsi_get_sd(struct device *dev)
+{
+	struct device *child = NULL;
+
+	device_for_each_child(dev, &child, scsi_filter_sd);
+	return get_device(child);
+}
+
 void __scsi_remove_device(struct scsi_device *sdev)
 {
-	struct device *dev = &sdev->sdev_gendev;
+	struct device *dev = &sdev->sdev_gendev, *sdp = NULL;
 
 	/*
 	 * This cleanup path is not reentrant and while it is impossible
@@ -1290,6 +1316,7 @@ void __scsi_remove_device(struct scsi_device *sdev)
 			return;
 
 		bsg_unregister_queue(sdev->request_queue);
+		sdp = scsi_get_sd(dev);
 		device_unregister(&sdev->sdev_dev);
 		transport_remove_device(dev);
 		scsi_dh_remove_device(sdev);
@@ -1305,6 +1332,16 @@ void __scsi_remove_device(struct scsi_device *sdev)
 	scsi_device_set_state(sdev, SDEV_DEL);
 	blk_cleanup_queue(sdev->request_queue);
 	cancel_work_sync(&sdev->requeue_work);
+
+	/*
+	 * blk_cleanup_queue() unregisters the BDI device. The name of the
+	 * BDI device is derived from the dev_t of the /dev/sd<n> device.
+	 * Keep a reference to the /dev/sd<n> device until the BDI device
+	 * has been unregistered to avoid that a BDI device with the same
+	 * name gets registered before blk_cleanup_queue() has finished.
+	 */
+	if (sdp)
+		put_device(sdp);
 
 	if (sdev->host->hostt->slave_destroy)
 		sdev->host->hostt->slave_destroy(sdev);
