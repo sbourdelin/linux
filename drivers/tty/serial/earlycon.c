@@ -29,7 +29,7 @@
 #include <asm/serial.h>
 
 static struct console early_con = {
-	.name =		"uart",		/* fixed up at earlycon registration */
+	.name =		"earlycon",
 	.flags =	CON_PRINTBUFFER | CON_BOOT,
 	.index =	0,
 };
@@ -60,24 +60,13 @@ static void __init earlycon_init(struct earlycon_device *device,
 {
 	struct console *earlycon = device->con;
 	struct uart_port *port = &device->port;
-	const char *s;
-	size_t len;
 
-	/* scan backwards from end of string for first non-numeral */
-	for (s = name + strlen(name);
-	     s > name && s[-1] >= '0' && s[-1] <= '9';
-	     s--)
-		;
-	if (*s)
-		earlycon->index = simple_strtoul(s, NULL, 10);
-	len = s - name;
-	strlcpy(earlycon->name, name, min(len + 1, sizeof(earlycon->name)));
 	earlycon->data = &early_console_dev;
 
 	if (port->iotype == UPIO_MEM || port->iotype == UPIO_MEM16 ||
 	    port->iotype == UPIO_MEM32 || port->iotype == UPIO_MEM32BE)
-		pr_info("%s%d at MMIO%s %pa (options '%s')\n",
-			earlycon->name, earlycon->index,
+		pr_info("%s%d (%s) at MMIO%s %pa (options '%s')\n",
+			earlycon->name, earlycon->index, name,
 			(port->iotype == UPIO_MEM) ? "" :
 			(port->iotype == UPIO_MEM16) ? "16" :
 			(port->iotype == UPIO_MEM32) ? "32" : "32be",
