@@ -317,6 +317,20 @@ int rmi_2d_sensor_of_probe(struct device *dev,
 
 	pdata->rezero_wait = val;
 
+	retval = rmi_of_property_read_u32(dev, &val, "syna,dribble",
+						1);
+	if (retval)
+		return retval;
+
+	pdata->dribble = val;
+
+	retval = rmi_of_property_read_u32(dev, &val, "syna,palm_detect",
+						1);
+	if (retval)
+		return retval;
+
+	pdata->palm_detect = val;
+
 	return 0;
 }
 #else

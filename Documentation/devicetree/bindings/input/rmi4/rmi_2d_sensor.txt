@@ -37,6 +37,11 @@ Optional Properties:
 				disable reporing absolute position data.
 - syna,rezero-wait-ms: Time in miliseconds to wait after issuing a rezero
 				command.
+- syna,dribble: Control reporting of dribble packets. Values are 0 for
+		default, 1 for explicitly disable, 2 for explicitly enable.
+- syna,palm_detect: Control reporting of the palm detect gesture. Values
+			are 0 for default, 1 for explicitly disable, 2 for
+			explicitly enable.
 
 
 Example of a RMI4 I2C device with F11:
