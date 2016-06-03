@@ -618,16 +618,14 @@ void rockchip_clk_protect_critical(const char *const clocks[], int nclocks);
 void rockchip_register_restart_notifier(struct rockchip_clk_provider *ctx,
 					unsigned int reg, void (*cb)(void));
 
-#define ROCKCHIP_SOFTRST_HIWORD_MASK	BIT(0)
-
 #ifdef CONFIG_RESET_CONTROLLER
 void rockchip_register_softrst(struct device_node *np,
 			       unsigned int num_regs,
-			       void __iomem *base, u8 flags);
+			       void __iomem *base);
 #else
 static inline void rockchip_register_softrst(struct device_node *np,
 			       unsigned int num_regs,
-			       void __iomem *base, u8 flags)
+			       void __iomem *base)
 {
 }
 #endif

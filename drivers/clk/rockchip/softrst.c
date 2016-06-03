@@ -24,8 +24,6 @@ struct rockchip_softrst {
 	void __iomem			*reg_base;
 	int				num_regs;
 	int				num_per_reg;
-	u8				flags;
-	spinlock_t			lock;
 };
 
 static int rockchip_softrst_assert(struct reset_controller_dev *rcdev,
@@ -37,20 +35,8 @@ static int rockchip_softrst_assert(struct reset_controller_dev *rcdev,
 	int bank = id / softrst->num_per_reg;
 	int offset = id % softrst->num_per_reg;
 
-	if (softrst->flags & ROCKCHIP_SOFTRST_HIWORD_MASK) {
-		writel(BIT(offset) | (BIT(offset) << 16),
-		       softrst->reg_base + (bank * 4));
-	} else {
-		unsigned long flags;
-		u32 reg;
-
-		spin_lock_irqsave(&softrst->lock, flags);
-
-		reg = readl(softrst->reg_base + (bank * 4));
-		writel(reg | BIT(offset), softrst->reg_base + (bank * 4));
-
-		spin_unlock_irqrestore(&softrst->lock, flags);
-	}
+	writel(BIT(offset) | (BIT(offset) << 16),
+	       softrst->reg_base + (bank * 4));
 
 	return 0;
 }
@@ -64,19 +50,7 @@ static int rockchip_softrst_deassert(struct reset_controller_dev *rcdev,
 	int bank = id / softrst->num_per_reg;
 	int offset = id % softrst->num_per_reg;
 
-	if (softrst->flags & ROCKCHIP_SOFTRST_HIWORD_MASK) {
-		writel((BIT(offset) << 16), softrst->reg_base + (bank * 4));
-	} else {
-		unsigned long flags;
-		u32 reg;
-
-		spin_lock_irqsave(&softrst->lock, flags);
-
-		reg = readl(softrst->reg_base + (bank * 4));
-		writel(reg & ~BIT(offset), softrst->reg_base + (bank * 4));
-
-		spin_unlock_irqrestore(&softrst->lock, flags);
-	}
+	writel((BIT(offset) << 16), softrst->reg_base + (bank * 4));
 
 	return 0;
 }
@@ -88,7 +62,7 @@ static const struct reset_control_ops rockchip_softrst_ops = {
 
 void __init rockchip_register_softrst(struct device_node *np,
 				      unsigned int num_regs,
-				      void __iomem *base, u8 flags)
+				      void __iomem *base)
 {
 	struct rockchip_softrst *softrst;
 	int ret;
@@ -97,13 +71,9 @@ void __init rockchip_register_softrst(struct device_node *np,
 	if (!softrst)
 		return;
 
-	spin_lock_init(&softrst->lock);
-
 	softrst->reg_base = base;
-	softrst->flags = flags;
 	softrst->num_regs = num_regs;
-	softrst->num_per_reg = (flags & ROCKCHIP_SOFTRST_HIWORD_MASK) ? 16
-								      : 32;
+	softrst->num_per_reg = 16;
 
 	softrst->rcdev.owner = THIS_MODULE;
 	softrst->rcdev.nr_resets =  num_regs * softrst->num_per_reg;

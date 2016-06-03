@@ -1542,8 +1542,7 @@ static void __init rk3399_clk_init(struct device_node *np)
 			&rk3399_cpuclkb_data, rk3399_cpuclkb_rates,
 			ARRAY_SIZE(rk3399_cpuclkb_rates));
 
-	rockchip_register_softrst(np, 21, reg_base + RK3399_SOFTRST_CON(0),
-				  ROCKCHIP_SOFTRST_HIWORD_MASK);
+	rockchip_register_softrst(np, 21, reg_base + RK3399_SOFTRST_CON(0));
 
 	rockchip_register_restart_notifier(ctx, RK3399_GLB_SRST_FST, NULL);
 
@@ -1578,8 +1577,7 @@ static void __init rk3399_pmu_clk_init(struct device_node *np)
 	rockchip_clk_protect_critical(rk3399_pmucru_critical_clocks,
 				  ARRAY_SIZE(rk3399_pmucru_critical_clocks));
 
-	rockchip_register_softrst(np, 2, reg_base + RK3399_PMU_SOFTRST_CON(0),
-				  ROCKCHIP_SOFTRST_HIWORD_MASK);
+	rockchip_register_softrst(np, 2, reg_base + RK3399_PMU_SOFTRST_CON(0));
 
 	rockchip_clk_of_add_provider(np, ctx);
 }
