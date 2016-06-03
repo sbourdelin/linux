@@ -296,6 +296,26 @@ static void fetch_user_stack_address(struct pt_regs *regs, void *dummy, void *de
 }
 NOKPROBE_SYMBOL(fetch_user_stack_address);
 
+static int parse_fetch_type(const char *t, ssize_t *size,
+			    const struct fetch_type **tp,
+			    const struct fetch_type *ftbl,
+			    const char *default_t)
+{
+	if (!t)
+		t = default_t;
+
+	*tp = find_fetch_type(t, ftbl);
+	if (!*tp) {
+		pr_info("Unsupported type: %s\n", t);
+		return -EINVAL;
+	}
+
+	if (size)
+		*size += (*tp)->size;
+
+	return 0;
+}
+
 static fetch_func_t get_fetch_size_function(const struct fetch_type *type,
 					    fetch_func_t orig_fn,
 					    const struct fetch_type *ftbl)
@@ -339,21 +359,28 @@ int traceprobe_split_symbol_offset(char *symbol, unsigned long *offset)
 
 #define PARAM_MAX_STACK (THREAD_SIZE / sizeof(unsigned long))
 
-static int parse_probe_vars(char *arg, const struct fetch_type *t,
-			    struct fetch_param *f, bool is_return,
-			    bool is_kprobe)
+static int parse_probe_vars(char *arg, const char *t, ssize_t *size,
+			    const struct fetch_type **tp, struct fetch_param *f,
+			    bool is_return, bool is_kprobe,
+			    const struct fetch_type *ftbl)
 {
 	int ret = 0;
 	unsigned long param;
 
 	if (strcmp(arg, "retval") == 0) {
+		ret = parse_fetch_type(t, size, tp, ftbl, NULL);
+		if (ret)
+			return ret;
 		if (is_return)
-			f->fn = t->fetch[FETCH_MTD_retval];
+			f->fn = (*tp)->fetch[FETCH_MTD_retval];
 		else
 			ret = -EINVAL;
 	} else if (strncmp(arg, "stack", 5) == 0) {
+		ret = parse_fetch_type(t, size, tp, ftbl, NULL);
+		if (ret)
+			return ret;
 		if (arg[5] == '\0') {
-			if (strcmp(t->name, DEFAULT_FETCH_TYPE_STR))
+			if (strcmp((*tp)->name, DEFAULT_FETCH_TYPE_STR))
 				return -EINVAL;
 
 			if (is_kprobe)
@@ -365,16 +392,19 @@ static int parse_probe_vars(char *arg, const struct fetch_type *t,
 			if (ret || (is_kprobe && param > PARAM_MAX_STACK))
 				ret = -EINVAL;
 			else {
-				f->fn = t->fetch[FETCH_MTD_stack];
+				f->fn = (*tp)->fetch[FETCH_MTD_stack];
 				f->data = (void *)param;
 			}
 		} else
 			ret = -EINVAL;
 	} else if (strcmp(arg, "comm") == 0) {
-		if (strcmp(t->name, "string") != 0 &&
-		    strcmp(t->name, "string_size") != 0)
+		ret = parse_fetch_type(t, size, tp, ftbl, "string");
+		if (ret)
+			return ret;
+		if (strcmp((*tp)->name, "string") != 0 &&
+		    strcmp((*tp)->name, "string_size") != 0)
 			return -EINVAL;
-		f->fn = t->fetch[FETCH_MTD_comm];
+		f->fn = (*tp)->fetch[FETCH_MTD_comm];
 	} else
 		ret = -EINVAL;
 
@@ -382,9 +412,10 @@ static int parse_probe_vars(char *arg, const struct fetch_type *t,
 }
 
 /* Recursive argument parser */
-static int parse_probe_arg(char *arg, const struct fetch_type *t,
-		     struct fetch_param *f, bool is_return, bool is_kprobe,
-		     const struct fetch_type *ftbl)
+static int parse_probe_arg(char *arg, const char *t, ssize_t *size,
+			   const struct fetch_type **tp,
+			   struct fetch_param *f, bool is_return,
+			   bool is_kprobe, const struct fetch_type *ftbl)
 {
 	unsigned long param;
 	long offset;
@@ -393,25 +424,32 @@ static int parse_probe_arg(char *arg, const struct fetch_type *t,
 
 	switch (arg[0]) {
 	case '$':
-		ret = parse_probe_vars(arg + 1, t, f, is_return, is_kprobe);
+		ret = parse_probe_vars(arg + 1, t, size, tp, f, is_return,
+				       is_kprobe, ftbl);
 		break;
 
 	case '%':	/* named register */
+		ret = parse_fetch_type(t, size, tp, ftbl, NULL);
+		if (ret)
+			break;
 		ret = regs_query_register_offset(arg + 1);
 		if (ret >= 0) {
-			f->fn = t->fetch[FETCH_MTD_reg];
+			f->fn = (*tp)->fetch[FETCH_MTD_reg];
 			f->data = (void *)(unsigned long)ret;
 			ret = 0;
 		}
 		break;
 
 	case '@':	/* memory, file-offset or symbol */
+		ret = parse_fetch_type(t, size, tp, ftbl, NULL);
+		if (ret)
+			break;
 		if (isdigit(arg[1])) {
 			ret = kstrtoul(arg + 1, 0, &param);
 			if (ret)
 				break;
 
-			f->fn = t->fetch[FETCH_MTD_memory];
+			f->fn = (*tp)->fetch[FETCH_MTD_memory];
 			f->data = (void *)param;
 		} else if (arg[1] == '+') {
 			/* kprobes don't support file offsets */
@@ -422,7 +460,7 @@ static int parse_probe_arg(char *arg, const struct fetch_type *t,
 			if (ret)
 				break;
 
-			f->fn = t->fetch[FETCH_MTD_file_offset];
+			f->fn = (*tp)->fetch[FETCH_MTD_file_offset];
 			f->data = (void *)offset;
 		} else {
 			/* uprobes don't support symbols */
@@ -435,13 +473,16 @@ static int parse_probe_arg(char *arg, const struct fetch_type *t,
 
 			f->data = alloc_symbol_cache(arg + 1, offset);
 			if (f->data)
-				f->fn = t->fetch[FETCH_MTD_symbol];
+				f->fn = (*tp)->fetch[FETCH_MTD_symbol];
 		}
 		break;
 
 	case '+':	/* deref memory */
 		arg++;	/* Skip '+', because kstrtol() rejects it. */
 	case '-':
+		ret = parse_fetch_type(t, size, tp, ftbl, NULL);
+		if (ret)
+			break;
 		tmp = strchr(arg, '(');
 		if (!tmp)
 			break;
@@ -459,7 +500,6 @@ static int parse_probe_arg(char *arg, const struct fetch_type *t,
 			struct deref_fetch_param	*dprm;
 			const struct fetch_type		*t2;
 
-			t2 = find_fetch_type(NULL, ftbl);
 			*tmp = '\0';
 			dprm = kzalloc(sizeof(struct deref_fetch_param), GFP_KERNEL);
 
@@ -467,22 +507,24 @@ static int parse_probe_arg(char *arg, const struct fetch_type *t,
 				return -ENOMEM;
 
 			dprm->offset = offset;
-			dprm->fetch = t->fetch[FETCH_MTD_memory];
-			dprm->fetch_size = get_fetch_size_function(t,
-							dprm->fetch, ftbl);
-			ret = parse_probe_arg(arg, t2, &dprm->orig, is_return,
-							is_kprobe, ftbl);
+			dprm->fetch = (*tp)->fetch[FETCH_MTD_memory];
+			dprm->fetch_size = get_fetch_size_function((*tp),
+								   dprm->fetch,
+								   ftbl);
+			ret = parse_probe_arg(arg, NULL, NULL, &t2, &dprm->orig,
+					      is_return, is_kprobe, ftbl);
 			if (ret)
 				kfree(dprm);
 			else {
-				f->fn = t->fetch[FETCH_MTD_deref];
+				f->fn = (*tp)->fetch[FETCH_MTD_deref];
 				f->data = (void *)dprm;
 			}
 		}
 		break;
 	}
 	if (!ret && !f->fn) {	/* Parsed, but do not find fetch method */
-		pr_info("%s type has no corresponding fetch method.\n", t->name);
+		pr_info("%s type has no corresponding fetch method.\n",
+			(*tp)->name);
 		ret = -EINVAL;
 	}
 
@@ -549,15 +591,9 @@ int traceprobe_parse_probe_arg(char *arg, ssize_t *size,
 		arg[t - parg->comm] = '\0';
 		t++;
 	}
-	parg->type = find_fetch_type(t, ftbl);
-	if (!parg->type) {
-		pr_info("Unsupported type: %s\n", t);
-		return -EINVAL;
-	}
 	parg->offset = *size;
-	*size += parg->type->size;
-	ret = parse_probe_arg(arg, parg->type, &parg->fetch, is_return,
-			      is_kprobe, ftbl);
+	ret = parse_probe_arg(arg, t, size, &parg->type, &parg->fetch,
+			      is_return, is_kprobe, ftbl);
 
 	if (ret >= 0 && t != NULL)
 		ret = __parse_bitfield_probe_arg(t, parg->type, &parg->fetch);
