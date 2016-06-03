@@ -131,32 +131,37 @@ EXPORT_SYMBOL_GPL(usb_get_dr_mode);
  * of_usb_get_dr_mode_by_phy - Get dual role mode for the controller device
  * which is associated with the given phy device_node
  * @np:	Pointer to the given phy device_node
+ * @arg0: phandle args[0] for phy's with #phy-cells >= 1
  *
  * In dts a usb controller associates with phy devices.  The function gets
  * the string from property 'dr_mode' of the controller associated with the
  * given phy device node, and returns the correspondig enum usb_dr_mode.
  */
-enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *phy_np)
+enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *np, int arg0)
 {
 	struct device_node *controller = NULL;
-	struct device_node *phy;
+	struct of_phandle_args args;
 	const char *dr_mode;
 	int index;
 	int err;
+	bool found = false;
 
 	do {
 		controller = of_find_node_with_property(controller, "phys");
-		index = 0;
-		do {
-			phy = of_parse_phandle(controller, "phys", index);
-			of_node_put(phy);
-			if (phy == phy_np)
-				goto finish;
-			index++;
-		} while (phy);
-	} while (controller);
+		for (index = 0; !found; index++) {
+			err = of_parse_phandle_with_args(controller, "phys",
+					"#phy-cells", index, &args);
+			if (err)
+				break;
 
-finish:
+			if (args.np == np && (args.args_count == 0 ||
+					      args.args[0] == arg0))
+				found = true;
+
+			of_node_put(args.np);
+		}
+	} while (controller && !found);
+
 	err = of_property_read_string(controller, "dr_mode", &dr_mode);
 	of_node_put(controller);
 
