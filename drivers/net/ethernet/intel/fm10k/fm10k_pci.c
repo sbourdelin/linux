@@ -1613,7 +1613,7 @@ void fm10k_down(struct fm10k_intfc *interface)
 {
 	struct net_device *netdev = interface->netdev;
 	struct fm10k_hw *hw = &interface->hw;
-	int err;
+	int err, i = 0, count = 0;
 
 	/* signal that we are down to the interrupt handler and service task */
 	if (test_and_set_bit(__FM10K_DOWN, &interface->state))
@@ -1629,9 +1629,36 @@ void fm10k_down(struct fm10k_intfc *interface)
 	/* reset Rx filters */
 	fm10k_reset_rx_state(interface);
 
-	/* allow 10ms for device to quiesce */
-	usleep_range(10000, 20000);
+	/* skip waiting for TX DMA if we lost PCIe link */
+	if (FM10K_REMOVED(hw->hw_addr))
+		goto skip_tx_dma_drain;
 
+	/* in some circumstances it can take up to 500ms for the Tx queues to
+	 * quiesce and stop the Tx DMA engine. To avoid forcing a long sleep,
+	 * we'll repeat checking the Tx queues every few milliseconds. If we
+	 * exceed too long a delay we'll log an error message. For PF, this
+	 * should result in a data path reset. For VF, this may result in the
+	 * VF being disabled, as there is no equivalent data path reset.
+	 */
+#define TX_DMA_DRAIN_RETRIES 50
+	for (count = 0; count < TX_DMA_DRAIN_RETRIES; count++) {
+		usleep_range(10000, 20000);
+
+		/* start checking at the last ring to have pending Tx */
+		for (; i < interface->num_tx_queues; i++)
+			if (fm10k_get_tx_pending(interface->tx_ring[i]))
+				break;
+
+		/* if all the queues are drained, we can break now */
+		if (i == interface->num_tx_queues)
+			break;
+	}
+
+	if (count == TX_DMA_DRAIN_RETRIES)
+		dev_err(&interface->pdev->dev,
+			"Tx queues failed to drain after ~500ms. Tx DMA is probably hung.\n");
+
+skip_tx_dma_drain:
 	/* disable polling routines */
 	fm10k_napi_disable_all(interface);
 
@@ -1645,8 +1672,8 @@ void fm10k_down(struct fm10k_intfc *interface)
 	/* Disable DMA engine for Tx/Rx */
 	err = hw->mac.ops.stop_hw(hw);
 	if (err == FM10K_ERR_REQUESTS_PENDING)
-		dev_info(&interface->pdev->dev,
-			 "due to pending requests hw was not shut down gracefully\n");
+		dev_err(&interface->pdev->dev,
+			"due to pending requests hw was not shut down gracefully\n");
 	else if (err)
 		dev_err(&interface->pdev->dev, "stop_hw failed: %d\n", err);
 
