@@ -4350,6 +4350,12 @@ sub process {
 			}
 		}
 
+# return with a value is not usually a good sign, unless the function is supposed to return a value
+		if (defined($stat) && $stat =~ /^.\s*return\s*-[0-9]+\s*;/s) {
+			CHK("RETURN_NUMBER",
+			    "Suspect error return with a value, If this is error value, refer to include/uapi/asm-generic/errno-base.h  and include/uapi/asm-generic/errno.h\n" . $herecurr);
+		}
+
 # unnecessary return in a void function
 # at end-of-function, with the previous line a single leading tab, then return;
 # and the line before that not a goto label target like "out:"
