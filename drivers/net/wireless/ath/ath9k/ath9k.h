@@ -145,8 +145,6 @@ int ath_descdma_setup(struct ath_softc *sc, struct ath_descdma *dd,
 #define BAW_WITHIN(_start, _bawsz, _seqno) \
 	((((_seqno) - (_start)) & 4095) < (_bawsz))
 
-#define ATH_AN_2_TID(_an, _tidno)  (&(_an)->tid[(_tidno)])
-
 #define IS_HT_RATE(rate)   (rate & 0x80)
 #define IS_CCK_RATE(rate)  ((rate >= 0x18) && (rate <= 0x1e))
 #define IS_OFDM_RATE(rate) ((rate >= 0x8) && (rate <= 0xf))
@@ -232,8 +230,10 @@ struct ath_buf {
 
 struct ath_atx_tid {
 	struct list_head list;
+	struct sk_buff_head i_q;
 	struct sk_buff_head buf_q;
 	struct sk_buff_head retry_q;
+	struct ieee80211_txq *swq;
 	struct ath_node *an;
 	struct ath_txq *txq;
 	unsigned long tx_buf[BITS_TO_LONGS(ATH_TID_MAX_BUFS)];
@@ -247,13 +247,13 @@ struct ath_atx_tid {
 	s8 bar_index;
 	bool active;
 	bool clear_ps_filter;
+	bool swq_nonempty;
 };
 
 struct ath_node {
 	struct ath_softc *sc;
 	struct ieee80211_sta *sta; /* station struct we're part of */
 	struct ieee80211_vif *vif; /* interface with which we're associated */
-	struct ath_atx_tid tid[IEEE80211_NUM_TIDS];
 
 	u16 maxampdu;
 	u8 mpdudensity;
@@ -270,6 +270,15 @@ struct ath_node {
 	u32 ackto;
 	struct list_head list;
 };
+
+static inline
+struct ath_atx_tid *ath_an_2_tid(struct ath_node *an, u8 tidno)
+{
+	struct ieee80211_sta *sta = an->sta;
+	struct ieee80211_vif *vif = an->vif;
+	struct ieee80211_txq *swq = sta ? sta->txq[tidno] : vif->txq;
+	return (struct ath_atx_tid *) swq->drv_priv;
+}
 
 struct ath_tx_control {
 	struct ath_txq *txq;
@@ -585,6 +594,7 @@ void ath9k_release_buffered_frames(struct ieee80211_hw *hw,
 				   u16 tids, int nframes,
 				   enum ieee80211_frame_release_type reason,
 				   bool more_data);
+void ath9k_wake_tx_queue(struct ieee80211_hw *hw, struct ieee80211_txq *swq);
 
 /********/
 /* VIFs */
