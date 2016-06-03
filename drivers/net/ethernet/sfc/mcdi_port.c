@@ -189,6 +189,10 @@ static u32 mcdi_to_ethtool_cap(u32 media, u32 cap)
 
 	case MC_CMD_MEDIA_XFP:
 	case MC_CMD_MEDIA_SFP_PLUS:
+		if (cap & (1 << MC_CMD_PHY_CAP_1000FDX_LBN))
+			result |= SUPPORTED_1000baseKX_Full;
+		if (cap & (1 << MC_CMD_PHY_CAP_10000FDX_LBN))
+			result |= SUPPORTED_10000baseKX4_Full;
 		result |= SUPPORTED_FIBRE;
 		break;
 
