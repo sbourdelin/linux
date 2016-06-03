@@ -69,6 +69,7 @@ int vmbus_open(struct vmbus_channel *newchannel, u32 send_ringbuffer_size,
 		     void (*onchannelcallback)(void *context), void *context)
 {
 	struct vmbus_channel_open_channel *open_msg;
+	struct vmbus_channel_close_channel *close_msg;
 	struct vmbus_channel_msginfo *open_info = NULL;
 	void *in, *out;
 	unsigned long flags;
@@ -183,8 +184,19 @@ int vmbus_open(struct vmbus_channel *newchannel, u32 send_ringbuffer_size,
 		goto error1;
 	}
 
-	t = wait_for_completion_timeout(&open_info->waitevent, 5*HZ);
+	t = wait_for_completion_timeout(&open_info->waitevent, 15*HZ);
 	if (t == 0) {
+		/*
+		 * We won't be able to tear down the gpadl handle if the
+		 * channel finally gets openned, send channel close message
+		 * to be on the safe side.
+		 */
+		close_msg = &newchannel->close_msg.msg;
+		close_msg->header.msgtype = CHANNELMSG_CLOSECHANNEL;
+		close_msg->child_relid = newchannel->offermsg.child_relid;
+		vmbus_post_msg(close_msg,
+			       sizeof(struct vmbus_channel_close_channel));
+
 		err = -ETIMEDOUT;
 		goto error1;
 	}
