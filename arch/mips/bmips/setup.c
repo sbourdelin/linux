@@ -95,6 +95,14 @@ static void bcm6328_quirks(void)
 		bcm63xx_fixup_cpu1();
 }
 
+static void bcm6345_quirks(void)
+{
+	/*
+	 * BCM6345 has only one CPU and no SMP support
+	 */
+	bmips_smp_enabled = 0;
+}
+
 static void bcm6358_quirks(void)
 {
 	/*
@@ -113,6 +121,7 @@ static const struct bmips_quirk bmips_quirk_list[] = {
 	{ "brcm,bcm3384-viper",		&bcm3384_viper_quirks		},
 	{ "brcm,bcm33843-viper",	&bcm3384_viper_quirks		},
 	{ "brcm,bcm6328",		&bcm6328_quirks			},
+	{ "brcm,bcm6345",		&bcm6345_quirks			},
 	{ "brcm,bcm6358",		&bcm6358_quirks			},
 	{ "brcm,bcm6368",		&bcm6368_quirks			},
 	{ "brcm,bcm63168",		&bcm6368_quirks			},
