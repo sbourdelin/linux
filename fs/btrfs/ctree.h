@@ -754,6 +754,9 @@ struct btrfs_fs_info {
 	unsigned long pending_changes;
 	unsigned long compress_type:4;
 	int commit_interval;
+
+	int chunk_width_limit;
+
 	/*
 	 * It is a suggestive number, the read side is safe even it gets a
 	 * wrong number because we will write out the data into a regular

@@ -300,7 +300,7 @@ enum {
 	Opt_commit_interval, Opt_barrier, Opt_nodefrag, Opt_nodiscard,
 	Opt_noenospc_debug, Opt_noflushoncommit, Opt_acl, Opt_datacow,
 	Opt_datasum, Opt_treelog, Opt_noinode_cache, Opt_usebackuproot,
-	Opt_nologreplay, Opt_norecovery,
+	Opt_nologreplay, Opt_norecovery, Opt_width_limit,
 #ifdef CONFIG_BTRFS_DEBUG
 	Opt_fragment_data, Opt_fragment_metadata, Opt_fragment_all,
 #endif
@@ -360,6 +360,7 @@ static const match_table_t tokens = {
 	{Opt_rescan_uuid_tree, "rescan_uuid_tree"},
 	{Opt_fatal_errors, "fatal_errors=%s"},
 	{Opt_commit_interval, "commit=%d"},
+	{Opt_width_limit, "chunk_width_limit=%d"},
 #ifdef CONFIG_BTRFS_DEBUG
 	{Opt_fragment_data, "fragment=data"},
 	{Opt_fragment_metadata, "fragment=metadata"},
@@ -780,6 +781,22 @@ int btrfs_parse_options(struct btrfs_root *root, char *options,
 				btrfs_info(root->fs_info, "using default commit interval %ds",
 				    BTRFS_DEFAULT_COMMIT_INTERVAL);
 				info->commit_interval = BTRFS_DEFAULT_COMMIT_INTERVAL;
+			}
+			break;
+		case Opt_width_limit:
+			intarg = 0;
+			ret = match_int(&args[0], &intarg);
+			if (ret < 0) {
+				btrfs_err(root->fs_info, "invalid chunk width limit");
+				ret = -EINVAL;
+				goto out;
+			}
+
+			if (intarg > 0) {
+				info->chunk_width_limit = intarg;
+			} else {
+				btrfs_info(root->fs_info, "chunk width is unlimited");
+				info->chunk_width_limit = 0;
 			}
 			break;
 #ifdef CONFIG_BTRFS_DEBUG
@@ -1207,6 +1224,9 @@ static int btrfs_show_options(struct seq_file *seq, struct dentry *dentry)
 	if (info->thread_pool_size !=  min_t(unsigned long,
 					     num_online_cpus() + 2, 8))
 		seq_printf(seq, ",thread_pool=%d", info->thread_pool_size);
+	if (info->chunk_width_limit != 0)
+		seq_printf(seq, ",chunk_width_limit=%d",
+			info->chunk_width_limit);
 	if (btrfs_test_opt(root, COMPRESS)) {
 		if (info->compress_type == BTRFS_COMPRESS_ZLIB)
 			compress_type = "zlib";

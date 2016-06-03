@@ -4558,6 +4558,32 @@ static int __btrfs_alloc_chunk(struct btrfs_trans_handle *trans,
 	devs_increment = btrfs_raid_array[index].devs_increment;
 	ncopies = btrfs_raid_array[index].ncopies;
 
+	/*
+	 * if we have a statically-configured chunk width, and the type doesn't
+	 * specify one, go ahead and use the statically-configured max instead.
+	 *
+	 * If the static value is greater than the BTRFS_MAX_DEVS for the
+	 * chunk tree, we ignore it.
+	 *
+	 * Also, we ignore the static value for system chunks.
+	 */
+	if (
+		devs_max == 0 && info->chunk_width_limit != 0
+		&& !(type & BTRFS_BLOCK_GROUP_SYSTEM)
+		&& info->chunk_width_limit <= BTRFS_MAX_DEVS(info->chunk_root)
+	) {
+		if (info->chunk_width_limit >= devs_min) {
+			devs_max = info->chunk_width_limit;
+		} else {
+			/* warn that the static devs_max is unusable */
+			btrfs_warn(info,
+				"can't satisfy max chunk width of %d; "
+				"minimum %d devices needed",
+				info->chunk_width_limit, devs_max
+			);
+		}
+	}
+
 	if (type & BTRFS_BLOCK_GROUP_DATA) {
 		max_stripe_size = SZ_1G;
 		max_chunk_size = 10 * max_stripe_size;
