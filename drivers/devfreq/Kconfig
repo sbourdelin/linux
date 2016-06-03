@@ -101,5 +101,6 @@ config ARM_TEGRA_DEVFREQ
          operating frequencies and voltages with OPP support.
 
 source "drivers/devfreq/event/Kconfig"
+source "drivers/devfreq/rockchip/Kconfig"
 
 endif # PM_DEVFREQ
