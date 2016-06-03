@@ -145,6 +145,8 @@ u32 nd_cmd_out_size(struct nvdimm *nvdimm, int cmd,
 int nvdimm_bus_check_dimm_count(struct nvdimm_bus *nvdimm_bus, int dimm_count);
 struct nd_region *nvdimm_pmem_region_create(struct nvdimm_bus *nvdimm_bus,
 		struct nd_region_desc *ndr_desc);
+struct nd_region *nvdimm_vcd_region_create(struct nvdimm_bus *nvdimm_bus,
+		struct nd_region_desc *ndr_desc);
 struct nd_region *nvdimm_blk_region_create(struct nvdimm_bus *nvdimm_bus,
 		struct nd_region_desc *ndr_desc);
 struct nd_region *nvdimm_volatile_region_create(struct nvdimm_bus *nvdimm_bus,

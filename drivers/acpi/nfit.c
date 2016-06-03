@@ -1949,6 +1949,7 @@ static int acpi_nfit_init_mapping(struct acpi_nfit_desc *acpi_desc,
 	switch (nfit_spa_type(spa)) {
 	case NFIT_SPA_PM:
 	case NFIT_SPA_VOLATILE:
+	case NFIT_SPA_VCD:
 		nd_mapping->start = memdev->address;
 		nd_mapping->size = memdev->region_size;
 		break;
@@ -1995,7 +1996,7 @@ static int acpi_nfit_register_region(struct acpi_nfit_desc *acpi_desc,
 	if (nfit_spa->nd_region)
 		return 0;
 
-	if (spa->range_index == 0) {
+	if (spa->range_index == 0 && nfit_spa_type(spa) != NFIT_SPA_VCD) {
 		dev_dbg(acpi_desc->dev, "%s: detected invalid spa index\n",
 				__func__);
 		return 0;
@@ -2056,6 +2057,11 @@ static int acpi_nfit_register_region(struct acpi_nfit_desc *acpi_desc,
 			rc = -ENOMEM;
 	} else if (nfit_spa_type(spa) == NFIT_SPA_VOLATILE) {
 		nfit_spa->nd_region = nvdimm_volatile_region_create(nvdimm_bus,
+				ndr_desc);
+		if (!nfit_spa->nd_region)
+			rc = -ENOMEM;
+	} else if (nfit_spa_type(spa) == NFIT_SPA_VCD) {
+		nfit_spa->nd_region = nvdimm_vcd_region_create(nvdimm_bus,
 				ndr_desc);
 		if (!nfit_spa->nd_region)
 			rc = -ENOMEM;

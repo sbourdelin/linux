@@ -56,9 +56,19 @@ static struct device_type nd_volatile_device_type = {
 	.release = nd_region_release,
 };
 
+static struct device_type nd_vcd_device_type = {
+	.name = "nd_vcd",
+	.release = nd_region_release,
+};
+
+bool is_nd_vcd(struct device *dev)
+{
+	return dev ? dev->type == &nd_vcd_device_type : false;
+}
+
 bool is_nd_pmem(struct device *dev)
 {
-	return dev ? dev->type == &nd_pmem_device_type : false;
+	return dev ? dev->type == &nd_pmem_device_type || is_nd_vcd(dev) : false;
 }
 
 bool is_nd_blk(struct device *dev)
@@ -337,6 +347,9 @@ static ssize_t read_only_store(struct device *dev,
 	bool ro;
 	int rc = strtobool(buf, &ro);
 	struct nd_region *nd_region = to_nd_region(dev);
+
+	if (is_nd_vcd(dev))
+		return -ENXIO;
 
 	if (rc)
 		return rc;
@@ -687,6 +700,9 @@ static struct nd_region *nd_region_create(struct nvdimm_bus *nvdimm_bus,
 			ro = 1;
 	}
 
+	if (dev_type == &nd_vcd_device_type)
+		ro = 1;
+
 	if (dev_type == &nd_blk_device_type) {
 		struct nd_blk_region_desc *ndbr_desc;
 		struct nd_blk_region *ndbr;
@@ -773,6 +789,14 @@ struct nd_region *nvdimm_pmem_region_create(struct nvdimm_bus *nvdimm_bus,
 			__func__);
 }
 EXPORT_SYMBOL_GPL(nvdimm_pmem_region_create);
+
+struct nd_region *nvdimm_vcd_region_create(struct nvdimm_bus *nvdimm_bus,
+		struct nd_region_desc *ndr_desc)
+{
+	return nd_region_create(nvdimm_bus, ndr_desc, &nd_vcd_device_type,
+			__func__);
+}
+EXPORT_SYMBOL_GPL(nvdimm_vcd_region_create);
 
 struct nd_region *nvdimm_blk_region_create(struct nvdimm_bus *nvdimm_bus,
 		struct nd_region_desc *ndr_desc)
