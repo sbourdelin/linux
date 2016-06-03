@@ -40,6 +40,16 @@ config AL3320A
 	 To compile this driver as a module, choose M here: the
 	 module will be called al3320a.
 
+config AL3010
+	tristate "AL3010 ambient light sensor"
+	depends on I2C
+	help
+	 Say Y here if you want to build a driver for the Dyna Image AL3010
+	 ambient light sensor.
+
+	 To compile this driver as a module, choose M here: the
+	 module will be called al3010.
+
 config APDS9300
 	tristate "APDS9300 ambient light sensor"
 	depends on I2C
