@@ -842,7 +842,7 @@ error:
  * low timeout interval so that if a connection is lost, we retry through
  * the MDS.
  */
-struct nfs_client *nfs4_set_ds_client(struct nfs_client* mds_clp,
+struct nfs_client *nfs4_set_ds_client(struct nfs_client* mds_clp, int noresvport,
 		const struct sockaddr *ds_addr, int ds_addrlen,
 		int ds_proto, unsigned int ds_timeo, unsigned int ds_retrans,
 		u32 minor_version, rpc_authflavor_t au_flavor)
@@ -862,6 +862,9 @@ struct nfs_client *nfs4_set_ds_client(struct nfs_client* mds_clp,
 	if (rpc_ntop(ds_addr, buf, sizeof(buf)) <= 0)
 		return ERR_PTR(-EINVAL);
 	cl_init.hostname = buf;
+
+	if (noresvport)
+		set_bit(NFS_CS_NORESVPORT, &cl_init.init_flags);
 
 	/*
 	 * Set an authflavor equual to the MDS value. Use the MDS nfs_client

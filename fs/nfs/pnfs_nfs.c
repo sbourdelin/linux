@@ -8,6 +8,7 @@
  */
 
 #include <linux/nfs_fs.h>
+#include <linux/nfs_mount.h>
 #include <linux/nfs_page.h>
 #include <linux/sunrpc/addr.h>
 #include <linux/module.h>
@@ -683,6 +684,7 @@ static int _nfs4_pnfs_v4_ds_connect(struct nfs_server *mds_srv,
 			__func__, ds->ds_remotestr, da->da_remotestr);
 
 		clp = nfs4_set_ds_client(mds_srv->nfs_client,
+					mds_srv->flags & NFS_MOUNT_NORESVPORT ? 1 : 0,
 					(struct sockaddr *)&da->da_addr,
 					da->da_addrlen, IPPROTO_TCP,
 					timeo, retrans, minor_version,
