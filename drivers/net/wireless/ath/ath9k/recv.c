@@ -991,6 +991,55 @@ static void ath9k_apply_ampdu_details(struct ath_softc *sc,
 	}
 }
 
+static void ath_rx_count_airtime(struct ath_softc *sc,
+				 struct ath_rx_status *rs,
+				 struct sk_buff *skb)
+{
+	struct ath_node *an;
+	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *) skb->data;
+	struct ath_hw *ah = sc->sc_ah;
+	struct ath_common *common = ath9k_hw_common(ah);
+	struct ieee80211_sta *sta;
+	struct ieee80211_rx_status *rxs;
+	const struct ieee80211_rate *rate;
+	bool is_sgi, is_40, is_sp;
+	int phy;
+	u32 airtime = 0;
+
+	if (!ieee80211_is_data(hdr->frame_control))
+		return;
+
+	rcu_read_lock();
+
+	sta = ieee80211_find_sta_by_ifaddr(sc->hw, hdr->addr2, NULL);
+	if (!sta)
+		goto exit;
+	an = (struct ath_node *) sta->drv_priv;
+	rxs = IEEE80211_SKB_RXCB(skb);
+
+	is_sgi = !!(rxs->flag & RX_FLAG_SHORT_GI);
+	is_40 = !!(rxs->flag & RX_FLAG_40MHZ);
+	is_sp = !!(rxs->flag & RX_FLAG_SHORTPRE);
+
+	if (!!(rxs->flag & RX_FLAG_HT)) {
+		/* MCS rates */
+
+		airtime += ath_pkt_duration(sc, rxs->rate_idx, rs->rs_datalen,
+					is_40, is_sgi, is_sp);
+	} else {
+
+		phy = IS_CCK_RATE(rs->rs_rate) ? WLAN_RC_PHY_CCK : WLAN_RC_PHY_OFDM;
+		rate = &common->sbands[rxs->band].bitrates[rxs->rate_idx];
+		airtime += ath9k_hw_computetxtime(ah, phy, rate->bitrate * 100,
+						rs->rs_datalen, rxs->rate_idx, is_sp);
+	}
+
+	an->airtime_deficit -= airtime;
+	ath_debug_airtime(sc, an, airtime, 0);
+exit:
+	rcu_read_unlock();
+}
+
 int ath_rx_tasklet(struct ath_softc *sc, int flush, bool hp)
 {
 	struct ath_rxbuf *bf;
@@ -1137,7 +1186,7 @@ int ath_rx_tasklet(struct ath_softc *sc, int flush, bool hp)
 		ath9k_antenna_check(sc, &rs);
 		ath9k_apply_ampdu_details(sc, &rs, rxs);
 		ath_debug_rate_stats(sc, &rs, skb);
-		ath_debug_rx_airtime(sc, &rs, skb);
+		ath_rx_count_airtime(sc, &rs, skb);
 
 		hdr = (struct ieee80211_hdr *)skb->data;
 		if (ieee80211_is_ack(hdr->frame_control))
