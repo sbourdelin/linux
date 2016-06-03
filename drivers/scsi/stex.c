@@ -26,6 +26,7 @@
 #include <linux/module.h>
 #include <linux/spinlock.h>
 #include <linux/ktime.h>
+#include <linux/reboot.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/byteorder.h>
@@ -360,6 +361,12 @@ struct st_card_info {
 	u16 rq_count;
 	u16 rq_size;
 	u16 sts_count;
+};
+
+int S6flag;
+static int stex_halt(struct notifier_block *nb, ulong event, void *buf);
+static struct notifier_block stex_notifier = {
+	stex_halt, NULL, 0
 };
 
 static int msi;
@@ -1669,6 +1676,9 @@ static int stex_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	pci_set_master(pdev);
 
+	S6flag = 0;
+	register_reboot_notifier(&stex_notifier);
+
 	host = scsi_host_alloc(&driver_template, sizeof(struct st_hba));
 
 	if (!host) {
@@ -1944,15 +1954,19 @@ static void stex_remove(struct pci_dev *pdev)
 	scsi_host_put(hba->host);
 
 	pci_disable_device(pdev);
+
+	unregister_reboot_notifier(&stex_notifier);
 }
 
 static void stex_shutdown(struct pci_dev *pdev)
 {
 	struct st_hba *hba = pci_get_drvdata(pdev);
-
-	if (hba->supports_pm == 0)
+	if (hba->supports_pm == 0) {
 		stex_hba_stop(hba, ST_IGNORED);
-	else
+	} else if (hba->supports_pm == 1 && S6flag) {
+		unregister_reboot_notifier(&stex_notifier);
+		stex_hba_stop(hba, ST_S6);
+	} else
 		stex_hba_stop(hba, ST_S5);
 }
 
@@ -1989,6 +2003,13 @@ static int stex_resume(struct pci_dev *pdev)
 	stex_handshake(hba);
 	return 0;
 }
+
+static int stex_halt(struct notifier_block *nb, unsigned long event, void *buf)
+{
+	S6flag = 1;
+	return NOTIFY_OK;
+}
+
 MODULE_DEVICE_TABLE(pci, stex_pci_tbl);
 
 static struct pci_driver stex_pci_driver = {
