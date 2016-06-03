@@ -598,6 +598,7 @@ struct kvm_vcpu_arch {
 	u64 mcg_cap;
 	u64 mcg_status;
 	u64 mcg_ctl;
+	u64 mcg_ext_ctl;
 	u64 *mce_banks;
 
 	/* Cache MMIO info */
@@ -1076,6 +1077,8 @@ extern u32  kvm_max_guest_tsc_khz;
 extern u8   kvm_tsc_scaling_ratio_frac_bits;
 /* maximum allowed value of TSC scaling ratio */
 extern u64  kvm_max_tsc_scaling_ratio;
+
+extern u64 kvm_mce_cap_supported;
 
 enum emulation_result {
 	EMULATE_DONE,         /* no further processing */

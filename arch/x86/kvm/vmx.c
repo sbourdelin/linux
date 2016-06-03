@@ -2863,6 +2863,11 @@ static int vmx_get_vmx_msr(struct kvm_vcpu *vcpu, u32 msr_index, u64 *pdata)
 	return 0;
 }
 
+static inline bool vmx_feature_control_msr_required(struct kvm_vcpu *vcpu)
+{
+	return nested_vmx_allowed(vcpu) || (vcpu->arch.mcg_cap & MCG_LMCE_P);
+}
+
 /*
  * Reads an msr value (of 'msr_index') into 'pdata'.
  * Returns 0 on success, non-0 otherwise.
@@ -2904,8 +2909,15 @@ static int vmx_get_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 			return 1;
 		msr_info->data = vmcs_read64(GUEST_BNDCFGS);
 		break;
+	case MSR_IA32_MCG_EXT_CTL:
+		if (!(vcpu->arch.mcg_cap & MCG_LMCE_P) ||
+		    !(to_vmx(vcpu)->nested.msr_ia32_feature_control &
+		      FEATURE_CONTROL_LMCE))
+			return 1;
+		msr_info->data = vcpu->arch.mcg_ext_ctl;
+		break;
 	case MSR_IA32_FEATURE_CONTROL:
-		if (!nested_vmx_allowed(vcpu))
+		if (!vmx_feature_control_msr_required(vcpu))
 			return 1;
 		msr_info->data = to_vmx(vcpu)->nested.msr_ia32_feature_control;
 		break;
@@ -2997,8 +3009,17 @@ static int vmx_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 	case MSR_IA32_TSC_ADJUST:
 		ret = kvm_set_msr_common(vcpu, msr_info);
 		break;
+	case MSR_IA32_MCG_EXT_CTL:
+		if (!(vcpu->arch.mcg_cap & MCG_LMCE_P) ||
+		    !(to_vmx(vcpu)->nested.msr_ia32_feature_control &
+		      FEATURE_CONTROL_LMCE))
+			return 1;
+		if (data && data != 0x1)
+			return -1;
+		vcpu->arch.mcg_ext_ctl = data;
+		break;
 	case MSR_IA32_FEATURE_CONTROL:
-		if (!nested_vmx_allowed(vcpu) ||
+		if (!vmx_feature_control_msr_required(vcpu) ||
 		    (to_vmx(vcpu)->nested.msr_ia32_feature_control &
 		     FEATURE_CONTROL_LOCKED && !msr_info->host_initiated))
 			return 1;
@@ -6390,6 +6411,8 @@ static __init int hardware_setup(void)
 	}
 
 	kvm_set_posted_intr_wakeup_handler(wakeup_handler);
+
+	kvm_mce_cap_supported |= MCG_LMCE_P;
 
 	return alloc_kvm_area();
 

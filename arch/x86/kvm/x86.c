@@ -70,7 +70,8 @@
 
 #define MAX_IO_MSRS 256
 #define KVM_MAX_MCE_BANKS 32
-#define KVM_MCE_CAP_SUPPORTED (MCG_CTL_P | MCG_SER_P)
+u64 __read_mostly kvm_mce_cap_supported = MCG_CTL_P | MCG_SER_P;
+EXPORT_SYMBOL_GPL(kvm_mce_cap_supported);
 
 #define emul_to_vcpu(ctxt) \
 	container_of(ctxt, struct kvm_vcpu, arch.emulate_ctxt)
@@ -982,6 +983,7 @@ static u32 emulated_msrs[] = {
 	MSR_IA32_MISC_ENABLE,
 	MSR_IA32_MCG_STATUS,
 	MSR_IA32_MCG_CTL,
+	MSR_IA32_MCG_EXT_CTL,
 	MSR_IA32_SMBASE,
 };
 
@@ -2683,11 +2685,9 @@ long kvm_arch_dev_ioctl(struct file *filp,
 		break;
 	}
 	case KVM_X86_GET_MCE_CAP_SUPPORTED: {
-		u64 mce_cap;
-
-		mce_cap = KVM_MCE_CAP_SUPPORTED;
 		r = -EFAULT;
-		if (copy_to_user(argp, &mce_cap, sizeof mce_cap))
+		if (copy_to_user(argp, &kvm_mce_cap_supported,
+				 sizeof(kvm_mce_cap_supported)))
 			goto out;
 		r = 0;
 		break;
@@ -2865,7 +2865,7 @@ static int kvm_vcpu_ioctl_x86_setup_mce(struct kvm_vcpu *vcpu,
 	r = -EINVAL;
 	if (!bank_num || bank_num >= KVM_MAX_MCE_BANKS)
 		goto out;
-	if (mcg_cap & ~(KVM_MCE_CAP_SUPPORTED | 0xff | 0xff0000))
+	if (mcg_cap & ~(kvm_mce_cap_supported | 0xff | 0xff0000))
 		goto out;
 	r = 0;
 	vcpu->arch.mcg_cap = mcg_cap;
