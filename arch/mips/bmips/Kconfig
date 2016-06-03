@@ -25,6 +25,10 @@ config DT_BCM963268VR3032U
         bool "BCM963268VR3032U"
         select BUILTIN_DTB
 
+config DT_BCM96345GW2
+        bool "BCM96345GW2"
+        select BUILTIN_DTB
+
 config DT_BCM96358NB4SER
 	bool "BCM96358NB4SER"
 	select BUILTIN_DTB

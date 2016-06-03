@@ -1,0 +1,21 @@
+/dts-v1/;
+
+/include/ "bcm6345.dtsi"
+
+/ {
+	compatible = "brcm,bcm96345gw2", "brcm,bcm6345";
+	model = "Broadcom BCM96345GW2";
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x00000000 0x01000000>;
+	};
+
+	chosen {
+		stdout-path = &uart0;
+	};
+};
+
+&uart0 {
+	status = "okay";
+};
