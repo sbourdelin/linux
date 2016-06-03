@@ -1116,217 +1116,6 @@ enum wmi_event_id {
 	WMI_GPIO_INPUT_EVENTID = WMI_EVT_GRP_START_ID(WMI_GRP_GPIO),
 };
 
-/* Command IDs and command events for 10.X firmware */
-enum wmi_10x_cmd_id {
-	WMI_10X_START_CMDID = 0x9000,
-	WMI_10X_END_CMDID = 0x9FFF,
-
-	/* initialize the wlan sub system */
-	WMI_10X_INIT_CMDID,
-
-	/* Scan specific commands */
-
-	WMI_10X_START_SCAN_CMDID = WMI_10X_START_CMDID,
-	WMI_10X_STOP_SCAN_CMDID,
-	WMI_10X_SCAN_CHAN_LIST_CMDID,
-	WMI_10X_ECHO_CMDID,
-
-	/* PDEV(physical device) specific commands */
-	WMI_10X_PDEV_SET_REGDOMAIN_CMDID,
-	WMI_10X_PDEV_SET_CHANNEL_CMDID,
-	WMI_10X_PDEV_SET_PARAM_CMDID,
-	WMI_10X_PDEV_PKTLOG_ENABLE_CMDID,
-	WMI_10X_PDEV_PKTLOG_DISABLE_CMDID,
-	WMI_10X_PDEV_SET_WMM_PARAMS_CMDID,
-	WMI_10X_PDEV_SET_HT_CAP_IE_CMDID,
-	WMI_10X_PDEV_SET_VHT_CAP_IE_CMDID,
-	WMI_10X_PDEV_SET_BASE_MACADDR_CMDID,
-	WMI_10X_PDEV_SET_DSCP_TID_MAP_CMDID,
-	WMI_10X_PDEV_SET_QUIET_MODE_CMDID,
-	WMI_10X_PDEV_GREEN_AP_PS_ENABLE_CMDID,
-	WMI_10X_PDEV_GET_TPC_CONFIG_CMDID,
-
-	/* VDEV(virtual device) specific commands */
-	WMI_10X_VDEV_CREATE_CMDID,
-	WMI_10X_VDEV_DELETE_CMDID,
-	WMI_10X_VDEV_START_REQUEST_CMDID,
-	WMI_10X_VDEV_RESTART_REQUEST_CMDID,
-	WMI_10X_VDEV_UP_CMDID,
-	WMI_10X_VDEV_STOP_CMDID,
-	WMI_10X_VDEV_DOWN_CMDID,
-	WMI_10X_VDEV_STANDBY_RESPONSE_CMDID,
-	WMI_10X_VDEV_RESUME_RESPONSE_CMDID,
-	WMI_10X_VDEV_SET_PARAM_CMDID,
-	WMI_10X_VDEV_INSTALL_KEY_CMDID,
-
-	/* peer specific commands */
-	WMI_10X_PEER_CREATE_CMDID,
-	WMI_10X_PEER_DELETE_CMDID,
-	WMI_10X_PEER_FLUSH_TIDS_CMDID,
-	WMI_10X_PEER_SET_PARAM_CMDID,
-	WMI_10X_PEER_ASSOC_CMDID,
-	WMI_10X_PEER_ADD_WDS_ENTRY_CMDID,
-	WMI_10X_PEER_REMOVE_WDS_ENTRY_CMDID,
-	WMI_10X_PEER_MCAST_GROUP_CMDID,
-
-	/* beacon/management specific commands */
-
-	WMI_10X_BCN_TX_CMDID,
-	WMI_10X_BCN_PRB_TMPL_CMDID,
-	WMI_10X_BCN_FILTER_RX_CMDID,
-	WMI_10X_PRB_REQ_FILTER_RX_CMDID,
-	WMI_10X_MGMT_TX_CMDID,
-
-	/* commands to directly control ba negotiation directly from host. */
-	WMI_10X_ADDBA_CLEAR_RESP_CMDID,
-	WMI_10X_ADDBA_SEND_CMDID,
-	WMI_10X_ADDBA_STATUS_CMDID,
-	WMI_10X_DELBA_SEND_CMDID,
-	WMI_10X_ADDBA_SET_RESP_CMDID,
-	WMI_10X_SEND_SINGLEAMSDU_CMDID,
-
-	/* Station power save specific config */
-	WMI_10X_STA_POWERSAVE_MODE_CMDID,
-	WMI_10X_STA_POWERSAVE_PARAM_CMDID,
-	WMI_10X_STA_MIMO_PS_MODE_CMDID,
-
-	/* set debug log config */
-	WMI_10X_DBGLOG_CFG_CMDID,
-
-	/* DFS-specific commands */
-	WMI_10X_PDEV_DFS_ENABLE_CMDID,
-	WMI_10X_PDEV_DFS_DISABLE_CMDID,
-
-	/* QVIT specific command id */
-	WMI_10X_PDEV_QVIT_CMDID,
-
-	/* Offload Scan and Roaming related  commands */
-	WMI_10X_ROAM_SCAN_MODE,
-	WMI_10X_ROAM_SCAN_RSSI_THRESHOLD,
-	WMI_10X_ROAM_SCAN_PERIOD,
-	WMI_10X_ROAM_SCAN_RSSI_CHANGE_THRESHOLD,
-	WMI_10X_ROAM_AP_PROFILE,
-	WMI_10X_OFL_SCAN_ADD_AP_PROFILE,
-	WMI_10X_OFL_SCAN_REMOVE_AP_PROFILE,
-	WMI_10X_OFL_SCAN_PERIOD,
-
-	/* P2P specific commands */
-	WMI_10X_P2P_DEV_SET_DEVICE_INFO,
-	WMI_10X_P2P_DEV_SET_DISCOVERABILITY,
-	WMI_10X_P2P_GO_SET_BEACON_IE,
-	WMI_10X_P2P_GO_SET_PROBE_RESP_IE,
-
-	/* AP power save specific config */
-	WMI_10X_AP_PS_PEER_PARAM_CMDID,
-	WMI_10X_AP_PS_PEER_UAPSD_COEX_CMDID,
-
-	/* Rate-control specific commands */
-	WMI_10X_PEER_RATE_RETRY_SCHED_CMDID,
-
-	/* WLAN Profiling commands. */
-	WMI_10X_WLAN_PROFILE_TRIGGER_CMDID,
-	WMI_10X_WLAN_PROFILE_SET_HIST_INTVL_CMDID,
-	WMI_10X_WLAN_PROFILE_GET_PROFILE_DATA_CMDID,
-	WMI_10X_WLAN_PROFILE_ENABLE_PROFILE_ID_CMDID,
-	WMI_10X_WLAN_PROFILE_LIST_PROFILE_ID_CMDID,
-
-	/* Suspend resume command Ids */
-	WMI_10X_PDEV_SUSPEND_CMDID,
-	WMI_10X_PDEV_RESUME_CMDID,
-
-	/* Beacon filter commands */
-	WMI_10X_ADD_BCN_FILTER_CMDID,
-	WMI_10X_RMV_BCN_FILTER_CMDID,
-
-	/* WOW Specific WMI commands*/
-	WMI_10X_WOW_ADD_WAKE_PATTERN_CMDID,
-	WMI_10X_WOW_DEL_WAKE_PATTERN_CMDID,
-	WMI_10X_WOW_ENABLE_DISABLE_WAKE_EVENT_CMDID,
-	WMI_10X_WOW_ENABLE_CMDID,
-	WMI_10X_WOW_HOSTWAKEUP_FROM_SLEEP_CMDID,
-
-	/* RTT measurement related cmd */
-	WMI_10X_RTT_MEASREQ_CMDID,
-	WMI_10X_RTT_TSF_CMDID,
-
-	/* transmit beacon by value */
-	WMI_10X_PDEV_SEND_BCN_CMDID,
-
-	/* F/W stats */
-	WMI_10X_VDEV_SPECTRAL_SCAN_CONFIGURE_CMDID,
-	WMI_10X_VDEV_SPECTRAL_SCAN_ENABLE_CMDID,
-	WMI_10X_REQUEST_STATS_CMDID,
-
-	/* GPIO Configuration */
-	WMI_10X_GPIO_CONFIG_CMDID,
-	WMI_10X_GPIO_OUTPUT_CMDID,
-
-	WMI_10X_PDEV_UTF_CMDID = WMI_10X_END_CMDID - 1,
-};
-
-enum wmi_10x_event_id {
-	WMI_10X_SERVICE_READY_EVENTID = 0x8000,
-	WMI_10X_READY_EVENTID,
-	WMI_10X_START_EVENTID = 0x9000,
-	WMI_10X_END_EVENTID = 0x9FFF,
-
-	/* Scan specific events */
-	WMI_10X_SCAN_EVENTID = WMI_10X_START_EVENTID,
-	WMI_10X_ECHO_EVENTID,
-	WMI_10X_DEBUG_MESG_EVENTID,
-	WMI_10X_UPDATE_STATS_EVENTID,
-
-	/* Instantaneous RSSI event */
-	WMI_10X_INST_RSSI_STATS_EVENTID,
-
-	/* VDEV specific events */
-	WMI_10X_VDEV_START_RESP_EVENTID,
-	WMI_10X_VDEV_STANDBY_REQ_EVENTID,
-	WMI_10X_VDEV_RESUME_REQ_EVENTID,
-	WMI_10X_VDEV_STOPPED_EVENTID,
-
-	/* peer  specific events */
-	WMI_10X_PEER_STA_KICKOUT_EVENTID,
-
-	/* beacon/mgmt specific events */
-	WMI_10X_HOST_SWBA_EVENTID,
-	WMI_10X_TBTTOFFSET_UPDATE_EVENTID,
-	WMI_10X_MGMT_RX_EVENTID,
-
-	/* Channel stats event */
-	WMI_10X_CHAN_INFO_EVENTID,
-
-	/* PHY Error specific WMI event */
-	WMI_10X_PHYERR_EVENTID,
-
-	/* Roam event to trigger roaming on host */
-	WMI_10X_ROAM_EVENTID,
-
-	/* matching AP found from list of profiles */
-	WMI_10X_PROFILE_MATCH,
-
-	/* debug print message used for tracing FW code while debugging */
-	WMI_10X_DEBUG_PRINT_EVENTID,
-	/* VI spoecific event */
-	WMI_10X_PDEV_QVIT_EVENTID,
-	/* FW code profile data in response to profile request */
-	WMI_10X_WLAN_PROFILE_DATA_EVENTID,
-
-	/*RTT related event ID*/
-	WMI_10X_RTT_MEASUREMENT_REPORT_EVENTID,
-	WMI_10X_TSF_MEASUREMENT_REPORT_EVENTID,
-	WMI_10X_RTT_ERROR_REPORT_EVENTID,
-
-	WMI_10X_WOW_WAKEUP_HOST_EVENTID,
-	WMI_10X_DCS_INTERFERENCE_EVENTID,
-
-	/* TPC config for the current operating channel */
-	WMI_10X_PDEV_TPC_CONFIG_EVENTID,
-
-	WMI_10X_GPIO_INPUT_EVENTID,
-	WMI_10X_PDEV_UTF_EVENTID = WMI_10X_END_EVENTID - 1,
-};
-
 enum wmi_10_2_cmd_id {
 	WMI_10_2_START_CMDID = 0x9000,
 	WMI_10_2_END_CMDID = 0x9FFF,
@@ -2736,12 +2525,6 @@ struct wmi_host_mem_chunks {
 
 struct wmi_init_cmd {
 	struct wmi_resource_config resource_config;
-	struct wmi_host_mem_chunks mem_chunks;
-} __packed;
-
-/* _10x stucture is from 10.X FW API */
-struct wmi_init_cmd_10x {
-	struct wmi_resource_config_10x resource_config;
 	struct wmi_host_mem_chunks mem_chunks;
 } __packed;
 
@@ -4239,14 +4022,6 @@ struct wmi_pdev_stats_extra {
 	__le32 fcs_bad;
 	__le32 no_beacons;
 	__le32 mib_int_count;
-} __packed;
-
-struct wmi_10x_pdev_stats {
-	struct wmi_pdev_stats_base base;
-	struct wmi_pdev_stats_tx tx;
-	struct wmi_pdev_stats_rx rx;
-	struct wmi_pdev_stats_peer peer;
-	struct wmi_pdev_stats_extra extra;
 } __packed;
 
 struct wmi_pdev_stats_mem {
@@ -5863,23 +5638,6 @@ enum wmi_peer_flags {
 	WMI_PEER_PMF = 0x10000000,
 };
 
-enum wmi_10x_peer_flags {
-	WMI_10X_PEER_AUTH = 0x00000001,
-	WMI_10X_PEER_QOS = 0x00000002,
-	WMI_10X_PEER_NEED_PTK_4_WAY = 0x00000004,
-	WMI_10X_PEER_NEED_GTK_2_WAY = 0x00000010,
-	WMI_10X_PEER_APSD = 0x00000800,
-	WMI_10X_PEER_HT = 0x00001000,
-	WMI_10X_PEER_40MHZ = 0x00002000,
-	WMI_10X_PEER_STBC = 0x00008000,
-	WMI_10X_PEER_LDPC = 0x00010000,
-	WMI_10X_PEER_DYN_MIMOPS = 0x00020000,
-	WMI_10X_PEER_STATIC_MIMOPS = 0x00040000,
-	WMI_10X_PEER_SPATIAL_MUX = 0x00200000,
-	WMI_10X_PEER_VHT = 0x02000000,
-	WMI_10X_PEER_80MHZ = 0x04000000,
-};
-
 enum wmi_10_2_peer_flags {
 	WMI_10_2_PEER_AUTH = 0x00000001,
 	WMI_10_2_PEER_QOS = 0x00000002,
@@ -5947,10 +5705,6 @@ struct wmi_main_peer_assoc_complete_cmd {
 	/* HT Operation Element of the peer. Five bytes packed in 2
 	 *  INT32 array and filled from lsb to msb. */
 	__le32 peer_ht_info[2];
-} __packed;
-
-struct wmi_10_1_peer_assoc_complete_cmd {
-	struct wmi_common_peer_assoc_complete_cmd cmd;
 } __packed;
 
 #define WMI_PEER_ASSOC_INFO0_MAX_MCS_IDX_LSB 0
