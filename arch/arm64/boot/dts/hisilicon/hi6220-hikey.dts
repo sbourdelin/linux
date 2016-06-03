@@ -144,6 +144,13 @@
 		#interrupt-cells = <2>;
 		pmic-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
 
+		powerkey {
+			compatible = "hisilicon,hi6552-powerkey";
+			interrupt-parent = <&pmic>;
+			interrupts = <6 0>, <5 0>, <4 0>;
+			interrupt-names = "down", "up", "hold 4s";
+		};
+
 		regulators {
 			ldo2: LDO2 {
 				regulator-name = "LDO2_2V8";
