@@ -1950,6 +1950,7 @@ static int init_active_labels(struct nd_region *nd_region)
 		}
 		nd_mapping->ndd = ndd;
 		atomic_inc(&nvdimm->busy);
+		device_disable_unbind_attr(&nvdimm->dev);
 		get_ndd(ndd);
 
 		count = nd_label_active_count(ndd);

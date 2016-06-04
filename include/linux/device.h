@@ -849,6 +849,7 @@ struct device {
 
 	void	(*release)(struct device *dev);
 	struct iommu_group	*iommu_group;
+	atomic_t		suppress_unbind_attr; /* disable manual unbind */
 
 	bool			offline_disabled:1;
 	bool			offline:1;
@@ -986,6 +987,25 @@ static inline void device_unlock(struct device *dev)
 static inline void device_lock_assert(struct device *dev)
 {
 	lockdep_assert_held(&dev->mutex);
+}
+
+static inline bool device_disable_unbind_attr(struct device *dev)
+{
+	bool suppressed = false;
+
+	device_lock(dev);
+	if (dev->driver) {
+		atomic_inc(&dev->suppress_unbind_attr);
+		suppressed = true;
+	}
+	device_unlock(dev);
+
+	return suppressed;
+}
+
+static inline bool device_enable_unbind_attr(struct device *dev)
+{
+	return atomic_dec_and_test(&dev->suppress_unbind_attr);
 }
 
 static inline struct device_node *dev_of_node(struct device *dev)

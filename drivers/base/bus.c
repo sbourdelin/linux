@@ -188,10 +188,18 @@ static ssize_t unbind_store(struct device_driver *drv, const char *buf,
 	if (dev && dev->driver == drv) {
 		if (dev->parent)	/* Needed for USB */
 			device_lock(dev->parent);
-		device_release_driver(dev);
+
+		device_lock(dev);
+		if (atomic_read(&dev->suppress_unbind_attr) > 0)
+			err = -EBUSY;
+		else {
+			__device_release_driver(dev);
+			err = count;
+		}
+		device_unlock(dev);
+
 		if (dev->parent)
 			device_unlock(dev->parent);
-		err = count;
 	}
 	put_device(dev);
 	bus_put(bus);

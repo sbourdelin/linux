@@ -427,8 +427,10 @@ static void nd_region_notify_driver_action(struct nvdimm_bus *nvdimm_bus,
 			nd_mapping->labels = NULL;
 			put_ndd(ndd);
 			nd_mapping->ndd = NULL;
-			if (ndd)
+			if (ndd) {
 				atomic_dec(&nvdimm->busy);
+				device_enable_unbind_attr(&nvdimm->dev);
+			}
 		}
 
 		if (is_nd_pmem(dev))
