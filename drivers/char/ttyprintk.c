@@ -51,7 +51,7 @@ static int tpk_printk(const unsigned char *buf, int count)
 			/* non nl or cr terminated message - add nl */
 			tmp[tpk_curr + 0] = '\n';
 			tmp[tpk_curr + 1] = '\0';
-			printk(KERN_INFO "%s%s", tpk_tag, tmp);
+			pr_info("%s%s", tpk_tag, tmp);
 			tpk_curr = 0;
 		}
 		return i;
@@ -65,14 +65,14 @@ static int tpk_printk(const unsigned char *buf, int count)
 				/* replace cr with nl */
 				tmp[tpk_curr + 0] = '\n';
 				tmp[tpk_curr + 1] = '\0';
-				printk(KERN_INFO "%s%s", tpk_tag, tmp);
+				pr_info("%s%s", tpk_tag, tmp);
 				tpk_curr = 0;
 				if ((i + 1) < count && buf[i + 1] == '\n')
 					i++;
 				break;
 			case '\n':
 				tmp[tpk_curr + 1] = '\0';
-				printk(KERN_INFO "%s%s", tpk_tag, tmp);
+				pr_info("%s%s", tpk_tag, tmp);
 				tpk_curr = 0;
 				break;
 			default:
@@ -83,7 +83,7 @@ static int tpk_printk(const unsigned char *buf, int count)
 			tmp[tpk_curr + 1] = '\\';
 			tmp[tpk_curr + 2] = '\n';
 			tmp[tpk_curr + 3] = '\0';
-			printk(KERN_INFO "%s%s", tpk_tag, tmp);
+			pr_info("%s%s", tpk_tag, tmp);
 			tpk_curr = 0;
 		}
 	}
@@ -203,7 +203,7 @@ static int __init ttyprintk_init(void)
 
 	ret = tty_register_driver(ttyprintk_driver);
 	if (ret < 0) {
-		printk(KERN_ERR "Couldn't register ttyprintk driver\n");
+		pr_err("Couldn't register ttyprintk driver\n");
 		goto error;
 	}
 
