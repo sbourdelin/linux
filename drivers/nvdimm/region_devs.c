@@ -14,6 +14,7 @@
 #include <linux/highmem.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/pmem.h>
 #include <linux/sort.h>
 #include <linux/io.h>
 #include <linux/nd.h>
@@ -795,6 +796,40 @@ struct nd_region *nvdimm_volatile_region_create(struct nvdimm_bus *nvdimm_bus,
 			__func__);
 }
 EXPORT_SYMBOL_GPL(nvdimm_volatile_region_create);
+
+/**
+ * nvdimm_flush - flush any posted write queues between the cpu and pmem media
+ * @nd_region: blk or interleaved pmem region
+ */
+void nvdimm_flush(struct nd_region *nd_region)
+{
+	/*
+	 * TODO: replace wmb_pmem() usage with flush hint writes where
+	 * available.
+	 */
+	wmb_pmem();
+}
+EXPORT_SYMBOL_GPL(nvdimm_flush);
+
+/**
+ * nvdimm_has_flush - determine write flushing requirements
+ * @nd_region: blk or interleaved pmem region
+ *
+ * Returns 1 if writes require flushing
+ * Returns 0 if writes do not require flushing
+ * Returns -ENXIO if flushing capability can not be determined
+ */
+int nvdimm_has_flush(struct nd_region *nd_region)
+{
+	/*
+	 * TODO: return 0 / 1 for NFIT regions depending on presence of
+	 * flush hint tables
+	 */
+	if (arch_has_wmb_pmem())
+		return 1;
+	return -ENXIO;
+}
+EXPORT_SYMBOL_GPL(nvdimm_has_flush);
 
 void __exit nd_region_devs_exit(void)
 {
