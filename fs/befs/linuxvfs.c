@@ -198,6 +198,8 @@ befs_lookup(struct inode *dir, struct dentry *dentry, unsigned int flags)
 
 	d_add(dentry, inode);
 
+	inode->i_count.counter++;
+
 	befs_debug(sb, "<--- %s", __func__);
 
 	return NULL;
