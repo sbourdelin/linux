@@ -383,5 +383,3 @@ unsigned int formatPllReg(pll_value_t *pPLL)
 
 	return reg;
 }
-
-
