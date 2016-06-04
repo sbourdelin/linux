@@ -2683,6 +2683,13 @@ sub process {
 			     "Use of boolean is deprecated, please use bool instead.\n" . $herecurr);
 		}
 
+# discourage the use of default n
+		if ($realfile =~ /Kconfig/ &&
+		    $line =~ /^\+\s*default\s*n\s*(#.*|$)/i) {
+			WARN("CONFIG_DEFAULT_N",
+			     "Use of default n is unnecessary, default is n when omitted.\n" . $herecurr);
+		}
+
 		if (($realfile =~ /Makefile.*/ || $realfile =~ /Kbuild.*/) &&
 		    ($line =~ /\+(EXTRA_[A-Z]+FLAGS).*/)) {
 			my $flag = $1;
