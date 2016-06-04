@@ -47,6 +47,7 @@ struct nvdimm_drvdata {
 	int ns_current, ns_next;
 	struct resource dpa;
 	struct kref kref;
+	unsigned int flush_mask;
 	void __iomem *flush_wpq[0];
 };
 

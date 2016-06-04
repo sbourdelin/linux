@@ -35,10 +35,12 @@ struct nvdimm_drvdata *nvdimm_alloc_drvdata(struct device *dev)
 
 int nvdimm_populate_flush_hints(struct device *dev)
 {
+	struct nvdimm *nvdimm = to_nvdimm(dev);
 	struct nvdimm_drvdata *ndd = dev_get_drvdata(dev);
 	struct nvdimm_bus *nvdimm_bus = walk_to_nvdimm_bus(dev);
 	struct nvdimm_bus_descriptor *nd_desc = nvdimm_bus->nd_desc;
 
+	ndd->flush_mask = (1 << ilog2(nvdimm->flush_hints)) - 1;
 	if (nd_desc->populate_flush_hints)
 		return nd_desc->populate_flush_hints(dev, ndd->flush_wpq);
 	return 0;

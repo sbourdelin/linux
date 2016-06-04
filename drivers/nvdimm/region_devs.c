@@ -22,6 +22,7 @@
 #include "nd.h"
 
 static DEFINE_IDA(region_ida);
+static DEFINE_PER_CPU(int, flush_idx);
 
 static void nd_region_release(struct device *dev)
 {
@@ -814,6 +815,7 @@ void nvdimm_flush(struct nd_region *nd_region)
 	 */
 	wmb();
 	for (i = 0; i < nd_region->ndr_mappings; i++) {
+		int idx;
 		struct nd_mapping *nd_mapping = &nd_region->mapping[i];
 		struct nvdimm_drvdata *ndd = to_ndd_unlocked(nd_mapping);
 
@@ -822,8 +824,10 @@ void nvdimm_flush(struct nd_region *nd_region)
 		 * arrange for all associated regions to be disabled
 		 * before the dimm is disabled.
 		 */
-		if (ndd->flush_wpq[0])
-			writeq(1, ndd->flush_wpq[0]);
+		if (ndd->flush_wpq[0]) {
+			idx = this_cpu_inc_return(flush_idx) & ndd->flush_mask;
+			writeq(1, ndd->flush_wpq[idx]);
+		}
 	}
 	wmb();
 }
