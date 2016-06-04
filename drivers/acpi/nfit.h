@@ -161,7 +161,7 @@ enum nd_blk_mmio_selector {
 struct nd_blk_addr {
 	union {
 		void __iomem *base;
-		void __pmem  *aperture;
+		void *aperture;
 	};
 };
 

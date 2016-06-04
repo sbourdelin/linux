@@ -1612,8 +1612,7 @@ static void __iomem *__nfit_spa_map(struct acpi_nfit_desc *acpi_desc,
 
 	spa_map->type = type;
 	if (type == SPA_MAP_APERTURE)
-		spa_map->addr.aperture = (void __pmem *)memremap(start, n,
-							ARCH_MEMREMAP_PMEM);
+		spa_map->addr.aperture = memremap(start, n, ARCH_MEMREMAP_PMEM);
 	else
 		spa_map->addr.base = ioremap_nocache(start, n);
 
