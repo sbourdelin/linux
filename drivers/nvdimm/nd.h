@@ -47,6 +47,7 @@ struct nvdimm_drvdata {
 	int ns_current, ns_next;
 	struct resource dpa;
 	struct kref kref;
+	void __iomem *flush_wpq[0];
 };
 
 struct nd_region_namespaces {
@@ -189,12 +190,25 @@ void nvdimm_exit(void);
 void nd_region_exit(void);
 struct nvdimm;
 struct nvdimm_drvdata *to_ndd(struct nd_mapping *nd_mapping);
+
+/*
+ * ...for contexts where the dimm is guaranteed not to be disabled while
+ * the returned data is in use.
+ */
+static inline struct nvdimm_drvdata *to_ndd_unlocked(
+		struct nd_mapping *nd_mapping)
+{
+	return nd_mapping->ndd;
+}
+
 int nvdimm_init_nsarea(struct nvdimm_drvdata *ndd);
 int nvdimm_init_config_data(struct nvdimm_drvdata *ndd);
 int nvdimm_set_config_data(struct nvdimm_drvdata *ndd, size_t offset,
 		void *buf, size_t len);
 long nvdimm_clear_poison(struct device *dev, phys_addr_t phys,
 		unsigned int len);
+int nvdimm_populate_flush_hints(struct device *dev);
+struct nvdimm_drvdata *nvdimm_alloc_drvdata(struct device *dev);
 struct nd_btt *to_nd_btt(struct device *dev);
 
 struct nd_gen_sb {

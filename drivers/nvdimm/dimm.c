@@ -26,7 +26,7 @@ static int nvdimm_probe(struct device *dev)
 	struct nvdimm_drvdata *ndd;
 	int rc;
 
-	ndd = kzalloc(sizeof(*ndd), GFP_KERNEL);
+	ndd = nvdimm_alloc_drvdata(dev);
 	if (!ndd)
 		return -ENOMEM;
 
@@ -39,6 +39,11 @@ static int nvdimm_probe(struct device *dev)
 	ndd->dev = dev;
 	get_device(dev);
 	kref_init(&ndd->kref);
+
+	/* trigger bus-provider specific probing */
+	rc = nvdimm_populate_flush_hints(dev);
+	if (rc)
+		goto err;
 
 	rc = nvdimm_init_nsarea(ndd);
 	if (rc)

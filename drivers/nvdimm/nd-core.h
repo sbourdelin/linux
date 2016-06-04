@@ -39,6 +39,7 @@ struct nvdimm {
 	void *provider_data;
 	unsigned long cmd_mask;
 	struct device dev;
+	int flush_hints;
 	atomic_t busy;
 	int id;
 };

@@ -24,6 +24,26 @@
 
 static DEFINE_IDA(dimm_ida);
 
+struct nvdimm_drvdata *nvdimm_alloc_drvdata(struct device *dev)
+{
+	struct nvdimm *nvdimm = to_nvdimm(dev);
+
+	return kzalloc(sizeof(struct nvdimm_drvdata)
+			+ sizeof(void *) * max(1, nvdimm->flush_hints),
+			GFP_KERNEL);
+}
+
+int nvdimm_populate_flush_hints(struct device *dev)
+{
+	struct nvdimm_drvdata *ndd = dev_get_drvdata(dev);
+	struct nvdimm_bus *nvdimm_bus = walk_to_nvdimm_bus(dev);
+	struct nvdimm_bus_descriptor *nd_desc = nvdimm_bus->nd_desc;
+
+	if (nd_desc->populate_flush_hints)
+		return nd_desc->populate_flush_hints(dev, ndd->flush_wpq);
+	return 0;
+}
+
 /*
  * Retrieve bus and dimm handle and return if this bus supports
  * get_config_data commands
@@ -346,7 +366,7 @@ EXPORT_SYMBOL_GPL(nvdimm_attribute_group);
 
 struct nvdimm *nvdimm_create(struct nvdimm_bus *nvdimm_bus, void *provider_data,
 		const struct attribute_group **groups, unsigned long flags,
-		unsigned long cmd_mask)
+		unsigned long cmd_mask, int flush_hints)
 {
 	struct nvdimm *nvdimm = kzalloc(sizeof(*nvdimm), GFP_KERNEL);
 	struct device *dev;
@@ -362,6 +382,7 @@ struct nvdimm *nvdimm_create(struct nvdimm_bus *nvdimm_bus, void *provider_data,
 	nvdimm->provider_data = provider_data;
 	nvdimm->flags = flags;
 	nvdimm->cmd_mask = cmd_mask;
+	nvdimm->flush_hints = flush_hints;
 	atomic_set(&nvdimm->busy, 0);
 	dev = &nvdimm->dev;
 	dev_set_name(dev, "nmem%d", nvdimm->id);
@@ -370,6 +391,8 @@ struct nvdimm *nvdimm_create(struct nvdimm_bus *nvdimm_bus, void *provider_data,
 	dev->devt = MKDEV(nvdimm_major, nvdimm->id);
 	dev->groups = groups;
 	nd_device_register(dev);
+	dev_dbg(dev, "%s: flush_hints: %d cmds: %#lx\n", __func__, flush_hints,
+			cmd_mask);
 
 	return nvdimm;
 }

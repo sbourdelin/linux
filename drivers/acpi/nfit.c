@@ -1104,6 +1104,47 @@ static struct nvdimm *acpi_nfit_dimm_by_handle(struct acpi_nfit_desc *acpi_desc,
 	return NULL;
 }
 
+static int acpi_nfit_populate_flush_hints(struct device *dev,
+		void __iomem *flush_wpq[])
+{
+	int i, j;
+	struct nfit_flush *nfit_flush;
+	struct acpi_nfit_flush_address *flush;
+	struct nvdimm *nvdimm = to_nvdimm(dev);
+	struct nfit_mem *nfit_mem = nvdimm_provider_data(nvdimm);
+
+	nfit_flush = nfit_mem->nfit_flush;
+	if (!nfit_flush || !nfit_flush->flush->hint_count)
+		return 0;
+	flush = nfit_flush->flush;
+
+	for (i = 0; i < flush->hint_count; i++) {
+		unsigned long pfn = PHYS_PFN(flush->hint_address[i]);
+		void __iomem *hint_page;
+
+		/* check if flush hints share a page */
+		for (j = 0; j < i; j++) {
+			unsigned long pfn_j = PHYS_PFN(flush->hint_address[j]);
+
+			if (pfn == pfn_j)
+				break;
+		}
+
+		if (j < i)
+			hint_page = (void *) ((unsigned long) flush_wpq[j]
+					& PAGE_MASK);
+		else
+			hint_page = devm_ioremap_nocache(dev,
+					PHYS_PFN(pfn), PAGE_SIZE);
+		if (!hint_page)
+			return -ENXIO;
+		flush_wpq[i] = hint_page
+			+ (flush->hint_address[i] & ~PAGE_MASK);
+	}
+
+	return 0;
+}
+
 static int acpi_nfit_add_dimm(struct acpi_nfit_desc *acpi_desc,
 		struct nfit_mem *nfit_mem, u32 device_handle)
 {
@@ -1170,10 +1211,10 @@ static int acpi_nfit_register_dimms(struct acpi_nfit_desc *acpi_desc)
 
 	list_for_each_entry(nfit_mem, &acpi_desc->dimms, list) {
 		unsigned long flags = 0, cmd_mask;
+		int rc, flush_hints = 0;
 		struct nvdimm *nvdimm;
 		u32 device_handle;
 		u16 mem_flags;
-		int rc;
 
 		device_handle = __to_nfit_memdev(nfit_mem)->device_handle;
 		nvdimm = acpi_nfit_dimm_by_handle(acpi_desc, device_handle);
@@ -1202,9 +1243,16 @@ static int acpi_nfit_register_dimms(struct acpi_nfit_desc *acpi_desc)
 		if (nfit_mem->family == NVDIMM_FAMILY_INTEL)
 			cmd_mask |= nfit_mem->dsm_mask;
 
+		if (nfit_mem->nfit_flush) {
+			struct acpi_nfit_flush_address *flush;
+
+			flush = nfit_mem->nfit_flush->flush;
+			flush_hints = flush->hint_count;
+		}
+
 		nvdimm = nvdimm_create(acpi_desc->nvdimm_bus, nfit_mem,
 				acpi_nfit_dimm_attribute_groups,
-				flags, cmd_mask);
+				flags, cmd_mask, flush_hints);
 		if (!nvdimm)
 			return -ENOMEM;
 
@@ -1372,24 +1420,6 @@ static u64 to_interleave_offset(u64 offset, struct nfit_blk_mmio *mmio)
 	return mmio->base_offset + line_offset + table_offset + sub_line_offset;
 }
 
-static void wmb_blk(struct nfit_blk *nfit_blk)
-{
-
-	if (nfit_blk->nvdimm_flush) {
-		/*
-		 * The first wmb() is needed to 'sfence' all previous writes
-		 * such that they are architecturally visible for the platform
-		 * buffer flush.  Note that we've already arranged for pmem
-		 * writes to avoid the cache via arch_memcpy_to_pmem().  The
-		 * final wmb() ensures ordering for the NVDIMM flush write.
-		 */
-		wmb();
-		writeq(1, nfit_blk->nvdimm_flush);
-		wmb();
-	} else
-		wmb_pmem();
-}
-
 static u32 read_blk_stat(struct nfit_blk *nfit_blk, unsigned int bw)
 {
 	struct nfit_blk_mmio *mmio = &nfit_blk->mmio[DCR];
@@ -1424,7 +1454,7 @@ static void write_blk_ctl(struct nfit_blk *nfit_blk, unsigned int bw,
 		offset = to_interleave_offset(offset, mmio);
 
 	writeq(cmd, mmio->addr.base + offset);
-	wmb_blk(nfit_blk);
+	nvdimm_flush(nfit_blk->nd_region);
 
 	if (nfit_blk->dimm_flags & NFIT_BLK_DCR_LATCH)
 		readq(mmio->addr.base + offset);
@@ -1475,7 +1505,7 @@ static int acpi_nfit_blk_single_io(struct nfit_blk *nfit_blk,
 	}
 
 	if (rw)
-		wmb_blk(nfit_blk);
+		nvdimm_flush(nfit_blk->nd_region);
 
 	rc = read_blk_stat(nfit_blk, lane) ? -EIO : 0;
 	return rc;
@@ -1669,7 +1699,6 @@ static int acpi_nfit_blk_region_enable(struct nvdimm_bus *nvdimm_bus,
 	struct nvdimm_bus_descriptor *nd_desc = to_nd_desc(nvdimm_bus);
 	struct acpi_nfit_desc *acpi_desc = to_acpi_desc(nd_desc);
 	struct nd_blk_region *ndbr = to_nd_blk_region(dev);
-	struct nfit_flush *nfit_flush;
 	struct nfit_blk_mmio *mmio;
 	struct nfit_blk *nfit_blk;
 	struct nfit_mem *nfit_mem;
@@ -1744,15 +1773,7 @@ static int acpi_nfit_blk_region_enable(struct nvdimm_bus *nvdimm_bus,
 		return rc;
 	}
 
-	nfit_flush = nfit_mem->nfit_flush;
-	if (nfit_flush && nfit_flush->flush->hint_count != 0) {
-		nfit_blk->nvdimm_flush = devm_ioremap_nocache(dev,
-				nfit_flush->flush->hint_address[0], 8);
-		if (!nfit_blk->nvdimm_flush)
-			return -ENOMEM;
-	}
-
-	if (!arch_has_wmb_pmem() && !nfit_blk->nvdimm_flush)
+	if (nvdimm_has_flush(nfit_blk->nd_region) < 0)
 		dev_warn(dev, "unable to guarantee persistence of writes\n");
 
 	if (mmio->line_size == 0)
@@ -2504,6 +2525,7 @@ void acpi_nfit_desc_init(struct acpi_nfit_desc *acpi_desc, struct device *dev)
 	nd_desc = &acpi_desc->nd_desc;
 	nd_desc->provider_name = "ACPI.NFIT";
 	nd_desc->ndctl = acpi_nfit_ctl;
+	nd_desc->populate_flush_hints = acpi_nfit_populate_flush_hints;
 	nd_desc->flush_probe = acpi_nfit_flush_probe;
 	nd_desc->clear_to_send = acpi_nfit_clear_to_send;
 	nd_desc->attr_groups = acpi_nfit_attribute_groups;

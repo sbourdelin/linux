@@ -803,11 +803,29 @@ EXPORT_SYMBOL_GPL(nvdimm_volatile_region_create);
  */
 void nvdimm_flush(struct nd_region *nd_region)
 {
+	int i;
+
 	/*
-	 * TODO: replace wmb_pmem() usage with flush hint writes where
-	 * available.
+	 * The first wmb() is needed to 'sfence' all previous writes
+	 * such that they are architecturally visible for the platform
+	 * buffer flush.  Note that we've already arranged for pmem
+	 * writes to avoid the cache via arch_memcpy_to_pmem().  The
+	 * final wmb() ensures ordering for the NVDIMM flush write.
 	 */
-	wmb_pmem();
+	wmb();
+	for (i = 0; i < nd_region->ndr_mappings; i++) {
+		struct nd_mapping *nd_mapping = &nd_region->mapping[i];
+		struct nvdimm_drvdata *ndd = to_ndd_unlocked(nd_mapping);
+
+		/*
+		 * Note, nvdimm_drvdata guaranteed to be live since we
+		 * arrange for all associated regions to be disabled
+		 * before the dimm is disabled.
+		 */
+		if (ndd->flush_wpq[0])
+			writeq(1, ndd->flush_wpq[0]);
+	}
+	wmb();
 }
 EXPORT_SYMBOL_GPL(nvdimm_flush);
 
@@ -821,13 +839,26 @@ EXPORT_SYMBOL_GPL(nvdimm_flush);
  */
 int nvdimm_has_flush(struct nd_region *nd_region)
 {
+	int i;
+
+	/* no nvdimm == flushing capability unknown */
+	if (nd_region->ndr_mappings == 0)
+		return -ENXIO;
+
+	for (i = 0; i < nd_region->ndr_mappings; i++) {
+		struct nd_mapping *nd_mapping = &nd_region->mapping[i];
+		struct nvdimm *nvdimm = nd_mapping->nvdimm;
+
+		/* flush hints present, flushing required */
+		if (nvdimm->flush_hints)
+			return 1;
+	}
+
 	/*
-	 * TODO: return 0 / 1 for NFIT regions depending on presence of
-	 * flush hint tables
+	 * The platform defines dimm devices without hints, assume
+	 * platform persistence mechanism like ADR
 	 */
-	if (arch_has_wmb_pmem())
-		return 1;
-	return -ENXIO;
+	return 0;
 }
 EXPORT_SYMBOL_GPL(nvdimm_has_flush);
 

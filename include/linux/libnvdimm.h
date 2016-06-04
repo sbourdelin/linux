@@ -66,11 +66,17 @@ struct nd_mapping {
 	struct nvdimm_drvdata *ndd;
 };
 
+/**
+ * struct nvdimm_bus_descriptor - operations and attributes for an nvdimm bus
+ * @attr_groups: sysfs attributes for this bus
+ */
 struct nvdimm_bus_descriptor {
 	const struct attribute_group **attr_groups;
 	unsigned long cmd_mask;
 	char *provider_name;
 	ndctl_fn ndctl;
+	int (*populate_flush_hints)(struct device *dev,
+			void __iomem *flush_wpq[]);
 	int (*flush_probe)(struct nvdimm_bus_descriptor *nd_desc);
 	int (*clear_to_send)(struct nvdimm_bus_descriptor *nd_desc,
 			struct nvdimm *nvdimm, unsigned int cmd);
@@ -134,7 +140,7 @@ unsigned long nvdimm_cmd_mask(struct nvdimm *nvdimm);
 void *nvdimm_provider_data(struct nvdimm *nvdimm);
 struct nvdimm *nvdimm_create(struct nvdimm_bus *nvdimm_bus, void *provider_data,
 		const struct attribute_group **groups, unsigned long flags,
-		unsigned long cmd_mask);
+		unsigned long cmd_mask, int flush_hints);
 const struct nd_cmd_desc *nd_cmd_dimm_desc(int cmd);
 const struct nd_cmd_desc *nd_cmd_bus_desc(int cmd);
 u32 nd_cmd_in_size(struct nvdimm *nvdimm, int cmd,
