@@ -21,11 +21,6 @@
 #include <linux/uuid.h>
 #include <linux/random.h>
 
-const u8 uuid_le_index[16] = {3,2,1,0,5,4,7,6,8,9,10,11,12,13,14,15};
-EXPORT_SYMBOL(uuid_le_index);
-const u8 uuid_be_index[16] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
-EXPORT_SYMBOL(uuid_be_index);
-
 /***************************************************************
  * Random UUID interface
  *
@@ -97,32 +92,31 @@ bool uuid_is_valid(const char *uuid)
 }
 EXPORT_SYMBOL(uuid_is_valid);
 
-static int __uuid_to_bin(const char *uuid, __u8 b[16], const u8 ei[16])
+/* For each binary byte, string offset in ASCII UUID where it appears */
+const u8 uuid_be_pos[16] = {0,2,4,6,9,11,14,16,19,21,24,26,28,30,32,34};
+const u8 uuid_le_pos[16] = {6,4,2,0,11,9,16,14,19,21,24,26,28,30,32,34};
+
+static int __uuid_to_bin(const char uuid[36], __u8 b[16], const u8 pos[16])
 {
-	static const u8 si[16] = {0,2,4,6,9,11,14,16,19,21,24,26,28,30,32,34};
 	unsigned int i;
 
 	if (!uuid_is_valid(uuid))
 		return -EINVAL;
 
-	for (i = 0; i < 16; i++) {
-		int hi = hex_to_bin(uuid[si[i]] + 0);
-		int lo = hex_to_bin(uuid[si[i]] + 1);
-
-		b[ei[i]] = (hi << 4) | lo;
-	}
+	for (i = 0; i < 16; i++)
+		hex2bin(b + i, uuid + pos[i], 1);
 
 	return 0;
 }
 
 int uuid_le_to_bin(const char *uuid, uuid_le *u)
 {
-	return __uuid_to_bin(uuid, u->b, uuid_le_index);
+	return __uuid_to_bin(uuid, u->b, uuid_le_pos);
 }
 EXPORT_SYMBOL(uuid_le_to_bin);
 
 int uuid_be_to_bin(const char *uuid, uuid_be *u)
 {
-	return __uuid_to_bin(uuid, u->b, uuid_be_index);
+	return __uuid_to_bin(uuid, u->b, uuid_be_pos);
 }
 EXPORT_SYMBOL(uuid_be_to_bin);

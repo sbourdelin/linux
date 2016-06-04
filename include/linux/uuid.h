@@ -41,8 +41,9 @@ extern void uuid_be_gen(uuid_be *u);
 
 bool __must_check uuid_is_valid(const char *uuid);
 
-extern const u8 uuid_le_index[16];
-extern const u8 uuid_be_index[16];
+/* For each binary byte, string offset in ASCII UUID where it appears */
+extern const u8 uuid_be_pos[16];
+extern const u8 uuid_le_pos[16];
 
 int uuid_le_to_bin(const char *uuid, uuid_le *u);
 int uuid_be_to_bin(const char *uuid, uuid_be *u);

@@ -1306,38 +1306,32 @@ char *uuid_string(char *buf, char *end, const u8 *addr,
 		  struct printf_spec spec, const char *fmt)
 {
 	char uuid[UUID_STRING_LEN + 1];
-	char *p = uuid;
 	int i;
-	const u8 *index = uuid_be_index;
+	const u8 *pos = uuid_be_pos;
 	const char *hex = hex_asc;
 
 	switch (fmt[1]) {
 	case 'L':
 		hex = hex_asc_upper;	/* fall-through */
 	case 'l':
-		index = uuid_le_index;
+		pos = uuid_le_pos;
 		break;
 	case 'B':
 		hex = hex_asc_upper;
 		break;
 	}
 
+	/* Format each byte of the raw uuid into the buffer */
 	for (i = 0; i < 16; i++) {
-		u8 byte = addr[index[i]];
+		u8 byte = addr[i];
+		char *p = uuid + pos[i];
 
-		*p++ = hex[byte >> 4];
-		*p++ = hex[byte & 0x0f];
-		switch (i) {
-		case 3:
-		case 5:
-		case 7:
-		case 9:
-			*p++ = '-';
-			break;
-		}
+		p[0] = hex[byte >> 4];
+		p[1] = hex[byte & 0x0f];
 	}
-
-	*p = 0;
+	/* Insert the fixed punctuation */
+	uuid[23] = uuid[18] = uuid[13] = uuid[8] = '-';
+	uuid[UUID_STRING_LEN] = '\0';
 
 	return string(buf, end, uuid, spec);
 }
