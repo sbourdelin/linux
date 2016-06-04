@@ -37,6 +37,10 @@ Properties for PIP port which is a child the PIP interface:
 
 - phy-handle: Optional, see ethernet.txt file in the same directory.
 
+- rx-delay: Delay value for RGMII receive clock. Optional. Disabled if 0.
+
+- tx-delay: Delay value for RGMII transmit clock. Optional. Disabled if 0.
+
 Example:
 
 	pip@11800a0000000 {
