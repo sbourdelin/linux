@@ -2735,10 +2735,25 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 	}
 
 	if (unlikely(vcpu->cpu != cpu) || check_tsc_unstable()) {
+		u64 tscl = rdtsc();
 		s64 tsc_delta = !vcpu->arch.last_host_tsc ? 0 :
-				rdtsc() - vcpu->arch.last_host_tsc;
+				tscl - vcpu->arch.last_host_tsc;
 		if (tsc_delta < 0)
 			mark_tsc_unstable("KVM discovered backwards TSC");
+
+		/*
+		 * If tsc backwrap, we need update the hv_deadline_tsc,
+		 * otherwise, the ((hv_deadline_tsc-tsc) >>
+		 * cpu_preemption_timer_multi) may >32bit on vcpu_run().
+		 * This may cause deadline_tsc not so accurate, but that's
+		 * inevitable anyway.
+		 */
+		if (tscl < vcpu->arch.hv_orig_tsc) {
+			vcpu->arch.hv_orig_tsc = tscl;
+			vcpu->arch.hv_deadline_tsc -=
+				vcpu->arch.hv_orig_tsc - tscl;
+		}
+
 		if (check_tsc_unstable()) {
 			u64 offset = kvm_compute_tsc_offset(vcpu,
 						vcpu->arch.last_guest_tsc);

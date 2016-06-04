@@ -7644,6 +7644,11 @@ static int handle_pcommit(struct kvm_vcpu *vcpu)
 	return 1;
 }
 
+static int handle_preemption_timer(struct kvm_vcpu *vcpu)
+{
+	kvm_lapic_expired_hv_timer(vcpu);
+	return 1;
+}
 /*
  * The exit handlers return 1 if the exit was handled fully and guest execution
  * may resume.  Otherwise they set the kvm_run parameter to indicate what needs
@@ -7695,6 +7700,7 @@ static int (*const kvm_vmx_exit_handlers[])(struct kvm_vcpu *vcpu) = {
 	[EXIT_REASON_XRSTORS]                 = handle_xrstors,
 	[EXIT_REASON_PML_FULL]		      = handle_pml_full,
 	[EXIT_REASON_PCOMMIT]                 = handle_pcommit,
+	[EXIT_REASON_PREEMPTION_TIMER]	      = handle_preemption_timer,
 };
 
 static const int kvm_vmx_max_exit_handlers =
@@ -8703,6 +8709,26 @@ static void atomic_switch_perf_msrs(struct vcpu_vmx *vmx)
 					msrs[i].host);
 }
 
+void vmx_arm_hv_timer(struct kvm_vcpu *vcpu)
+{
+	struct kvm_lapic *apic = vcpu->arch.apic;
+	u64 tscl;
+	u32 delta_tsc;
+
+	if (!apic->lapic_timer.hv_timer_in_use)
+		return;
+
+	tscl = rdtsc();
+	if (vcpu->arch.hv_deadline_tsc > tscl)
+		/* sure to be 32 bit only because checked on set_hv_timer */
+		delta_tsc = (u32)((vcpu->arch.hv_deadline_tsc - tscl) >>
+			cpu_preemption_timer_multi);
+	else
+		delta_tsc = 0;
+
+	vmcs_write32(VMX_PREEMPTION_TIMER_VALUE, delta_tsc);
+}
+
 static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
@@ -8751,6 +8777,8 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 
 	atomic_switch_perf_msrs(vmx);
 	debugctlmsr = get_debugctlmsr();
+
+	vmx_arm_hv_timer(vcpu);
 
 	vmx->__launched = vmx->loaded_vmcs->launched;
 	asm(
@@ -10892,6 +10920,9 @@ static int vmx_pre_block(struct kvm_vcpu *vcpu)
 	if (pi_pre_block(vcpu))
 		return 1;
 
+	if (kvm_lapic_hv_timer_in_use(vcpu))
+		kvm_lapic_switch_to_sw_timer(vcpu);
+
 	return 0;
 }
 
@@ -10938,6 +10969,9 @@ static void pi_post_block(struct kvm_vcpu *vcpu)
 
 static void vmx_post_block(struct kvm_vcpu *vcpu)
 {
+	if (kvm_x86_ops->set_hv_timer)
+		kvm_lapic_switch_to_hv_timer(vcpu);
+
 	pi_post_block(vcpu);
 }
 
