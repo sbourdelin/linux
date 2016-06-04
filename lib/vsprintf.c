@@ -1309,24 +1309,24 @@ char *uuid_string(char *buf, char *end, const u8 *addr,
 	char *p = uuid;
 	int i;
 	const u8 *index = uuid_be_index;
-	bool uc = false;
+	const char *hex = hex_asc;
 
-	switch (*(++fmt)) {
+	switch (fmt[1]) {
 	case 'L':
-		uc = true;		/* fall-through */
+		hex = hex_asc_upper;	/* fall-through */
 	case 'l':
 		index = uuid_le_index;
 		break;
 	case 'B':
-		uc = true;
+		hex = hex_asc_upper;
 		break;
 	}
 
 	for (i = 0; i < 16; i++) {
-		if (uc)
-			p = hex_byte_pack_upper(p, addr[index[i]]);
-		else
-			p = hex_byte_pack(p, addr[index[i]]);
+		u8 byte = addr[index[i]];
+
+		*p++ = hex[byte >> 4];
+		*p++ = hex[byte & 0x0f];
 		switch (i) {
 		case 3:
 		case 5:
