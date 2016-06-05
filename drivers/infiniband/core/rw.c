@@ -398,8 +398,6 @@ int rdma_rw_ctx_signature_init(struct rdma_rw_ctx *ctx, struct ib_qp *qp,
 		else
 			prev_wr->next = &ctx->sig->prot.reg_wr.wr;
 		prev_wr = &ctx->sig->prot.reg_wr.wr;
-	} else {
-		ctx->sig->prot.mr = NULL;
 	}
 
 	ctx->sig->sig_mr = ib_mr_pool_get(qp, &qp->sig_mrs);
