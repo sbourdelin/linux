@@ -27,11 +27,19 @@
 #define KASAN_ABI_VERSION 1
 #endif
 
+/*
+ * Distinguish memory access
+ */
+enum acc_type {
+	READ_MODE,
+	WRITE_MODE
+};
+
 struct kasan_access_info {
 	const void *access_addr;
 	const void *first_bad_addr;
 	size_t access_size;
-	bool is_write;
+	enum acc_type access_type;
 	unsigned long ip;
 };
 
@@ -108,7 +116,7 @@ static inline bool kasan_report_enabled(void)
 }
 
 void kasan_report(unsigned long addr, size_t size,
-		bool is_write, unsigned long ip);
+		enum acc_type type, unsigned long ip);
 
 #ifdef CONFIG_SLAB
 void quarantine_put(struct kasan_free_meta *info, struct kmem_cache *cache);

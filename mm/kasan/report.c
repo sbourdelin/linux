@@ -96,7 +96,7 @@ static void print_error_description(struct kasan_access_info *info)
 		bug_type, (void *)info->ip,
 		info->access_addr);
 	pr_err("%s of size %zu by task %s/%d\n",
-		info->is_write ? "Write" : "Read",
+		info->access_type == WRITE_MODE ? "Write" : "Read",
 		info->access_size, current->comm, task_pid_nr(current));
 }
 
@@ -267,7 +267,7 @@ static void kasan_report_error(struct kasan_access_info *info)
 		pr_err("BUG: KASAN: %s on address %p\n",
 			bug_type, info->access_addr);
 		pr_err("%s of size %zu by task %s/%d\n",
-			info->is_write ? "Write" : "Read",
+			info->access_type == WRITE_MODE ? "Write" : "Read",
 			info->access_size, current->comm,
 			task_pid_nr(current));
 		dump_stack();
@@ -283,7 +283,7 @@ static void kasan_report_error(struct kasan_access_info *info)
 }
 
 void kasan_report(unsigned long addr, size_t size,
-		bool is_write, unsigned long ip)
+		enum acc_type type, unsigned long ip)
 {
 	struct kasan_access_info info;
 
@@ -292,7 +292,7 @@ void kasan_report(unsigned long addr, size_t size,
 
 	info.access_addr = (void *)addr;
 	info.access_size = size;
-	info.is_write = is_write;
+	info.access_type = type;
 	info.ip = ip;
 
 	kasan_report_error(&info);
@@ -302,14 +302,14 @@ void kasan_report(unsigned long addr, size_t size,
 #define DEFINE_ASAN_REPORT_LOAD(size)                     \
 void __asan_report_load##size##_noabort(unsigned long addr) \
 {                                                         \
-	kasan_report(addr, size, false, _RET_IP_);	  \
+	kasan_report(addr, size, READ_MODE, _RET_IP_);	  \
 }                                                         \
 EXPORT_SYMBOL(__asan_report_load##size##_noabort)
 
 #define DEFINE_ASAN_REPORT_STORE(size)                     \
 void __asan_report_store##size##_noabort(unsigned long addr) \
 {                                                          \
-	kasan_report(addr, size, true, _RET_IP_);	   \
+	kasan_report(addr, size, WRITE_MODE, _RET_IP_);	   \
 }                                                          \
 EXPORT_SYMBOL(__asan_report_store##size##_noabort)
 
@@ -326,12 +326,12 @@ DEFINE_ASAN_REPORT_STORE(16);
 
 void __asan_report_load_n_noabort(unsigned long addr, size_t size)
 {
-	kasan_report(addr, size, false, _RET_IP_);
+	kasan_report(addr, size, READ_MODE, _RET_IP_);
 }
 EXPORT_SYMBOL(__asan_report_load_n_noabort);
 
 void __asan_report_store_n_noabort(unsigned long addr, size_t size)
 {
-	kasan_report(addr, size, true, _RET_IP_);
+	kasan_report(addr, size, WRITE_MODE, _RET_IP_);
 }
 EXPORT_SYMBOL(__asan_report_store_n_noabort);

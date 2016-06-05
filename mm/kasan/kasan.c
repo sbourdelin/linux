@@ -274,7 +274,7 @@ static __always_inline bool memory_is_poisoned(unsigned long addr, size_t size)
 }
 
 static __always_inline void check_memory_region_inline(unsigned long addr,
-						size_t size, bool write,
+						size_t size, enum acc_type type,
 						unsigned long ret_ip)
 {
 	if (unlikely(size == 0))
@@ -282,39 +282,39 @@ static __always_inline void check_memory_region_inline(unsigned long addr,
 
 	if (unlikely((void *)addr <
 		kasan_shadow_to_mem((void *)KASAN_SHADOW_START))) {
-		kasan_report(addr, size, write, ret_ip);
+		kasan_report(addr, size, type, ret_ip);
 		return;
 	}
 
 	if (likely(!memory_is_poisoned(addr, size)))
 		return;
 
-	kasan_report(addr, size, write, ret_ip);
+	kasan_report(addr, size, type, ret_ip);
 }
 
 static void check_memory_region(unsigned long addr,
-				size_t size, bool write,
+				size_t size, enum acc_type type,
 				unsigned long ret_ip)
 {
-	check_memory_region_inline(addr, size, write, ret_ip);
+	check_memory_region_inline(addr, size, type, ret_ip);
 }
 
 void kasan_check_read(const void *p, unsigned int size)
 {
-	check_memory_region((unsigned long)p, size, false, _RET_IP_);
+	check_memory_region((unsigned long)p, size, READ_MODE, _RET_IP_);
 }
 EXPORT_SYMBOL(kasan_check_read);
 
 void kasan_check_write(const void *p, unsigned int size)
 {
-	check_memory_region((unsigned long)p, size, true, _RET_IP_);
+	check_memory_region((unsigned long)p, size, WRITE_MODE, _RET_IP_);
 }
 EXPORT_SYMBOL(kasan_check_write);
 
 #undef memset
 void *memset(void *addr, int c, size_t len)
 {
-	check_memory_region((unsigned long)addr, len, true, _RET_IP_);
+	check_memory_region((unsigned long)addr, len, WRITE_MODE, _RET_IP_);
 
 	return __memset(addr, c, len);
 }
@@ -322,8 +322,8 @@ void *memset(void *addr, int c, size_t len)
 #undef memmove
 void *memmove(void *dest, const void *src, size_t len)
 {
-	check_memory_region((unsigned long)src, len, false, _RET_IP_);
-	check_memory_region((unsigned long)dest, len, true, _RET_IP_);
+	check_memory_region((unsigned long)src, len, READ_MODE, _RET_IP_);
+	check_memory_region((unsigned long)dest, len, WRITE_MODE, _RET_IP_);
 
 	return __memmove(dest, src, len);
 }
@@ -331,8 +331,8 @@ void *memmove(void *dest, const void *src, size_t len)
 #undef memcpy
 void *memcpy(void *dest, const void *src, size_t len)
 {
-	check_memory_region((unsigned long)src, len, false, _RET_IP_);
-	check_memory_region((unsigned long)dest, len, true, _RET_IP_);
+	check_memory_region((unsigned long)src, len, READ_MODE, _RET_IP_);
+	check_memory_region((unsigned long)dest, len, WRITE_MODE, _RET_IP_);
 
 	return __memcpy(dest, src, len);
 }
@@ -709,7 +709,7 @@ EXPORT_SYMBOL(__asan_unregister_globals);
 #define DEFINE_ASAN_LOAD_STORE(size)					\
 	void __asan_load##size(unsigned long addr)			\
 	{								\
-		check_memory_region_inline(addr, size, false, _RET_IP_);\
+		check_memory_region_inline(addr, size, READ_MODE, _RET_IP_);\
 	}								\
 	EXPORT_SYMBOL(__asan_load##size);				\
 	__alias(__asan_load##size)					\
@@ -717,7 +717,7 @@ EXPORT_SYMBOL(__asan_unregister_globals);
 	EXPORT_SYMBOL(__asan_load##size##_noabort);			\
 	void __asan_store##size(unsigned long addr)			\
 	{								\
-		check_memory_region_inline(addr, size, true, _RET_IP_);	\
+		check_memory_region_inline(addr, size, WRITE_MODE, _RET_IP_);\
 	}								\
 	EXPORT_SYMBOL(__asan_store##size);				\
 	__alias(__asan_store##size)					\
@@ -732,7 +732,7 @@ DEFINE_ASAN_LOAD_STORE(16);
 
 void __asan_loadN(unsigned long addr, size_t size)
 {
-	check_memory_region(addr, size, false, _RET_IP_);
+	check_memory_region(addr, size, READ_MODE, _RET_IP_);
 }
 EXPORT_SYMBOL(__asan_loadN);
 
@@ -742,7 +742,7 @@ EXPORT_SYMBOL(__asan_loadN_noabort);
 
 void __asan_storeN(unsigned long addr, size_t size)
 {
-	check_memory_region(addr, size, true, _RET_IP_);
+	check_memory_region(addr, size, WRITE_MODE, _RET_IP_);
 }
 EXPORT_SYMBOL(__asan_storeN);
 
