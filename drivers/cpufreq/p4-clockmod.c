@@ -49,7 +49,7 @@ enum {
 #define DC_ENTRIES	8
 
 
-static int has_N44_O17_errata[NR_CPUS];
+static DECLARE_BITMAP(has_N44_O17_errata, NR_CPUS);
 static unsigned int stock_freq;
 static struct cpufreq_driver p4clockmod_driver;
 static unsigned int cpufreq_p4_get(unsigned int cpu);
@@ -66,7 +66,7 @@ static int cpufreq_p4_setdc(unsigned int cpu, unsigned int newstate)
 	if (l & 0x01)
 		pr_debug("CPU#%d currently thermal throttled\n", cpu);
 
-	if (has_N44_O17_errata[cpu] &&
+	if (test_bit(cpu, has_N44_O17_errata) &&
 	    (newstate == DC_25PT || newstate == DC_DFLT))
 		newstate = DC_38PT;
 
@@ -174,7 +174,7 @@ static int cpufreq_p4_cpu_init(struct cpufreq_policy *policy)
 	case 0x0f0a:
 	case 0x0f11:
 	case 0x0f12:
-		has_N44_O17_errata[policy->cpu] = 1;
+		set_bit(policy->cpu, has_N44_O17_errata);
 		pr_debug("has errata -- disabling low frequencies\n");
 	}
 
@@ -191,7 +191,7 @@ static int cpufreq_p4_cpu_init(struct cpufreq_policy *policy)
 
 	/* table init */
 	for (i = 1; (p4clockmod_table[i].frequency != CPUFREQ_TABLE_END); i++) {
-		if ((i < 2) && (has_N44_O17_errata[policy->cpu]))
+		if ((i < 2) && test_bit(policy->cpu, has_N44_O17_errata))
 			p4clockmod_table[i].frequency = CPUFREQ_ENTRY_INVALID;
 		else
 			p4clockmod_table[i].frequency = (stock_freq * i)/8;
