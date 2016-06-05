@@ -393,7 +393,7 @@ static void free_buffer(struct videobuf_queue *vq, struct viu_buf *buf)
 	buf->vb.state = VIDEOBUF_NEEDS_INIT;
 }
 
-inline int buffer_activate(struct viu_dev *dev, struct viu_buf *buf)
+static inline int buffer_activate(struct viu_dev *dev, struct viu_buf *buf)
 {
 	struct viu_reg *vr = dev->vr;
 	int bpp;
@@ -961,7 +961,7 @@ static int vidioc_s_input(struct file *file, void *priv, unsigned int i)
 	return 0;
 }
 
-inline void viu_activate_next_buf(struct viu_dev *dev,
+static inline void viu_activate_next_buf(struct viu_dev *dev,
 				struct viu_dmaqueue *viuq)
 {
 	struct viu_dmaqueue *vidq = viuq;
@@ -985,7 +985,7 @@ inline void viu_activate_next_buf(struct viu_dev *dev,
 	}
 }
 
-inline void viu_default_settings(struct viu_reg *viu_reg)
+static void viu_default_settings(struct viu_reg *viu_reg)
 {
 	struct viu_reg *vr = viu_reg;
 
