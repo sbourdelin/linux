@@ -906,7 +906,7 @@ static void setup_hw_stats(struct ib_device *device, struct ib_port *port,
 		       sizeof(void *) * (stats->num_counters + 1),
 		       GFP_KERNEL);
 	if (!hsag)
-		return;
+		goto err;
 
 	ret = device->get_hw_stats(device, stats, port_num,
 				   stats->num_counters);
