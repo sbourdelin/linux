@@ -32,6 +32,11 @@ int dwc3_host_init(struct dwc3 *dwc)
 		return -ENOMEM;
 	}
 
+#ifdef CONFIG_ARM64
+	if (get_dma_ops(&xhci->dev) == get_dma_ops(NULL))
+		xhci->dev.archdata.dma_ops = get_dma_ops(dwc->dev);
+#endif
+
 	dma_set_coherent_mask(&xhci->dev, dwc->dev->coherent_dma_mask);
 
 	xhci->dev.parent	= dwc->dev;
