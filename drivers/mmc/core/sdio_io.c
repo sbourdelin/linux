@@ -720,3 +720,30 @@ int sdio_set_host_pm_flags(struct sdio_func *func, mmc_pm_flag_t flags)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(sdio_set_host_pm_flags);
+
+/**
+ *	sdio_get_host_max_seg_size - get host maximum segment size
+ *	@func: SDIO function attached to host
+ */
+unsigned int sdio_get_host_max_seg_size(struct sdio_func *func)
+{
+	WARN_ON(!func);
+	WARN_ON(!func->card);
+
+	return func->card->host->max_seg_size;
+}
+EXPORT_SYMBOL_GPL(sdio_get_host_max_seg_size);
+
+/**
+ *	sdio_get_host_max_seg_count - get host maximum segment count
+ *	@func: SDIO function attached to host
+ */
+unsigned short sdio_get_host_max_seg_count(struct sdio_func *func)
+{
+	WARN_ON(!func);
+	WARN_ON(!func->card);
+
+	return func->card->host->max_segs;
+}
+EXPORT_SYMBOL_GPL(sdio_get_host_max_seg_count);
+
