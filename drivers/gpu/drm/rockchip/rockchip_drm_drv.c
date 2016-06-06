@@ -22,6 +22,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/pm_runtime.h>
 #include <linux/module.h>
+#include <linux/of_device.h>
 #include <linux/of_graph.h>
 #include <linux/component.h>
 
@@ -414,13 +415,6 @@ static const struct dev_pm_ops rockchip_drm_pm_ops = {
 				rockchip_drm_sys_resume)
 };
 
-static int compare_of(struct device *dev, void *data)
-{
-	struct device_node *np = data;
-
-	return dev->of_node == np;
-}
-
 static void release_of(struct device *dev, void *data)
 {
 	of_node_put(data);
@@ -445,7 +439,7 @@ static void rockchip_add_endpoints(struct device *dev,
 		}
 
 		component_match_add_release(dev, match, release_of,
-					    compare_of, remote);
+					    of_device_match, remote);
 	}
 }
 
@@ -525,7 +519,7 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
 
 		of_node_get(port->parent);
 		component_match_add_release(dev, &match, release_of,
-					    compare_of, port->parent);
+					    of_device_match, port->parent);
 		of_node_put(port);
 	}
 
