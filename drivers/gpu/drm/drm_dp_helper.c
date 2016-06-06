@@ -479,6 +479,34 @@ int drm_dp_downstream_type(const u8 dpcd[DP_RECEIVER_CAP_SIZE],
 }
 EXPORT_SYMBOL(drm_dp_downstream_type);
 
+/**
+ * drm_dp_downstream_max_clock() - extract branch device max
+ *                                 pixel rate for legacy VGA
+ *                                 converter or max TMDS clock
+ *                                 rate for others
+ * @dpcd: DisplayPort configuration data
+ * @port_cap: port capabilities
+ *
+ * Returns max clock in kHz on success or negative error code on failure
+ */
+int drm_dp_downstream_max_clock(const u8 dpcd[DP_RECEIVER_CAP_SIZE],
+                               const u8 port_cap[4])
+{
+	int type = drm_dp_downstream_type(dpcd, port_cap);
+	bool detailed_cap_info = dpcd[DP_DOWNSTREAMPORT_PRESENT] &
+		DP_DETAILED_CAP_INFO_AVAILABLE;
+
+	if (detailed_cap_info) {
+		if (type == DP_DS_PORT_TYPE_VGA)
+			return port_cap[1] * 8 * 1000;
+		else if (type != DP_DS_PORT_TYPE_WIRELESS)
+			return port_cap[1] * 2500;
+	}
+
+	return -EINVAL;
+}
+EXPORT_SYMBOL(drm_dp_downstream_max_clock);
+
 /*
  * I2C-over-AUX implementation
  */
