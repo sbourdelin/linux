@@ -15,6 +15,7 @@
  */
 
 #include <linux/component.h>
+#include <linux/of_device.h>
 #include <linux/of_platform.h>
 
 #include "etnaviv_drv.h"
@@ -606,13 +607,6 @@ static const struct component_master_ops etnaviv_master_ops = {
 	.unbind = etnaviv_unbind,
 };
 
-static int compare_of(struct device *dev, void *data)
-{
-	struct device_node *np = data;
-
-	return dev->of_node == np;
-}
-
 static int compare_str(struct device *dev, void *data)
 {
 	return !strcmp(dev_name(dev), data);
@@ -635,8 +629,8 @@ static int etnaviv_pdev_probe(struct platform_device *pdev)
 			if (!core_node)
 				break;
 
-			component_match_add(&pdev->dev, &match, compare_of,
-					    core_node);
+			component_match_add(&pdev->dev, &match,
+					    of_device_match, core_node);
 			of_node_put(core_node);
 		}
 	} else if (dev->platform_data) {
