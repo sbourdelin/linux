@@ -133,7 +133,6 @@ static const struct alps_model_info alps_model_data[] = {
 	/* Dell Latitude E5500, E6400, E6500, Precision M4400 */
 	{ { 0x62, 0x02, 0x14 }, 0x00, { ALPS_PROTO_V2, 0xcf, 0xcf,
 		ALPS_PASS | ALPS_DUALPOINT | ALPS_PS2_INTERLEAVED } },
-	{ { 0x73, 0x00, 0x14 }, 0x00, { ALPS_PROTO_V6, 0xff, 0xff, ALPS_DUALPOINT } },		/* Dell XT2 */
 	{ { 0x73, 0x02, 0x50 }, 0x00, { ALPS_PROTO_V2, 0xcf, 0xcf, ALPS_FOUR_BUTTONS } },	/* Dell Vostro 1400 */
 	{ { 0x52, 0x01, 0x14 }, 0x00, { ALPS_PROTO_V2, 0xff, 0xff,
 		ALPS_PASS | ALPS_DUALPOINT | ALPS_PS2_INTERLEAVED } },				/* Toshiba Tecra A11-11L */
@@ -150,6 +149,10 @@ static const struct alps_protocol_info alps_v3_rushmore_data = {
 
 static const struct alps_protocol_info alps_v5_protocol_data = {
 	ALPS_PROTO_V5, 0xc8, 0xd8, 0
+};
+
+static const struct alps_protocol_info alps_v6_protocol_data = {
+	ALPS_PROTO_V6, 0xff, 0xff, ALPS_DUALPOINT
 };
 
 static const struct alps_protocol_info alps_v7_protocol_data = {
@@ -2756,6 +2759,8 @@ static int alps_identify(struct psmouse *psmouse, struct alps_data *priv)
 		if (e7[0] == 0x73 && e7[1] == 0x03 && e7[2] == 0x50 &&
 			   ec[0] == 0x73 && (ec[1] == 0x01 || ec[1] == 0x02)) {
 			protocol = &alps_v5_protocol_data;
+		} else if (e7[0] == 0x73 && e7[1] == 0x00 && e7[2] == 0x14) {
+			protocol = &alps_v6_protocol_data;
 		} else if (ec[0] == 0x88 &&
 			   ((ec[1] & 0xf0) == 0xb0 || (ec[1] & 0xf0) == 0xc0)) {
 			protocol = &alps_v7_protocol_data;
