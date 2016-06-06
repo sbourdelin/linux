@@ -13,6 +13,7 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/i2c.h>
+#include <linux/of_device.h>
 #include <linux/usb/phy.h>
 #include <linux/usb/isp1301.h>
 
@@ -138,18 +139,12 @@ static struct i2c_driver isp1301_driver = {
 
 module_i2c_driver(isp1301_driver);
 
-static int match(struct device *dev, void *data)
-{
-	struct device_node *node = (struct device_node *)data;
-	return (dev->of_node == node) &&
-		(dev->driver == &isp1301_driver.driver);
-}
-
 struct i2c_client *isp1301_get_client(struct device_node *node)
 {
 	if (node) { /* reference of ISP1301 I2C node via DT */
-		struct device *dev = bus_find_device(&i2c_bus_type, NULL,
-						     node, match);
+		struct device *dev = driver_find_device(&isp1301_driver.driver,
+							NULL, node,
+							of_device_match);
 		if (!dev)
 			return NULL;
 		return to_i2c_client(dev);
