@@ -775,6 +775,24 @@ int mwifiex_set_tx_power(struct mwifiex_private *priv,
 }
 
 /*
+ * IOCTL request handler to get tx power configuration.
+ *
+ * This function prepares the correct firmware command and
+ * issues it.
+ */
+int mwifiex_get_tx_power(struct mwifiex_private *priv, int *dbm)
+{
+	int ret;
+
+	ret = mwifiex_send_cmd(priv, HostCmd_CMD_TXPWR_CFG,
+			       HostCmd_ACT_GEN_GET, 0, NULL, true);
+
+	*dbm = priv->tx_power_level;
+
+	return ret;
+}
+
+/*
  * IOCTL request handler to get power save mode.
  *
  * This function prepares the correct firmware command and

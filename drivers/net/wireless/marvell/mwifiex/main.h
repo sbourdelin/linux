@@ -1464,6 +1464,8 @@ int mwifiex_drv_get_driver_version(struct mwifiex_adapter *adapter,
 int mwifiex_set_tx_power(struct mwifiex_private *priv,
 			 struct mwifiex_power_cfg *power_cfg);
 
+int mwifiex_get_tx_power(struct mwifiex_private *priv, int *dbm);
+
 int mwifiex_main_process(struct mwifiex_adapter *);
 
 int mwifiex_queue_tx_pkt(struct mwifiex_private *priv, struct sk_buff *skb);
