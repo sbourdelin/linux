@@ -2909,9 +2909,75 @@ static void intel_dp_info(struct seq_file *m,
 {
 	struct intel_encoder *intel_encoder = intel_connector->encoder;
 	struct intel_dp *intel_dp = enc_to_intel_dp(&intel_encoder->base);
+	struct drm_dp_revision rev;
+	bool is_branch_device;
+	int type;
+	int clk;
+	int bpc;
+	int cap_size;
+	uint8_t cap[4];
+	char id[6];
 
 	seq_printf(m, "\tDPCD rev: %x\n", intel_dp->dpcd[DP_DPCD_REV]);
 	seq_printf(m, "\taudio support: %s\n", yesno(intel_dp->has_audio));
+
+	is_branch_device = intel_dp->dpcd[DP_DOWNSTREAMPORT_PRESENT] &
+		DP_DWN_STRM_PORT_PRESENT;
+	seq_printf(m, "\tbranch device: %s\n", yesno(is_branch_device));
+
+	if (is_branch_device) {
+		cap_size = drm_dp_downstream_port_cap(&intel_dp->aux,
+						      intel_dp->dpcd, cap);
+
+		type = drm_dp_downstream_type(intel_dp->dpcd, cap);
+
+		switch (type) {
+		case DP_DS_PORT_TYPE_DP:
+			seq_printf(m, "\ttype: DisplayPort\n");
+			break;
+		case DP_DS_PORT_TYPE_VGA:
+			seq_printf(m, "\ttype: VGA\n");
+			break;
+		case DP_DS_PORT_TYPE_DVI:
+			seq_printf(m, "\ttype: DVI\n");
+			break;
+		case DP_DS_PORT_TYPE_HDMI:
+			seq_printf(m, "\ttype: HDMI\n");
+			break;
+		case DP_DS_PORT_TYPE_NON_EDID:
+			seq_printf(m, "\ttype: others without EDID support\n");
+			break;
+		case DP_DS_PORT_TYPE_DP_DUALMODE:
+			seq_printf(m, "\ttype: DP++\n");
+			break;
+		case DP_DS_PORT_TYPE_WIRELESS:
+			seq_printf(m, "\ttype: Wireless\n");
+			break;
+		default:
+			seq_printf(m, "\ttype: N/A\n");
+		}
+
+		drm_dp_downstream_id(&intel_dp->aux, id);
+		seq_printf(m, "\tDevice id: %s\n", id);
+
+		rev = drm_dp_downstream_hw_rev(&intel_dp->aux);
+		seq_printf(m, "\tHW revision: %.2d.%.2d\n", rev.major, rev.minor);
+
+		rev = drm_dp_downstream_sw_rev(&intel_dp->aux);
+		seq_printf(m, "\tSW revision: %.2d.%.2d\n", rev.major, rev.minor);
+
+		if (cap_size == 4) {
+			clk = drm_dp_downstream_max_clock(intel_dp->dpcd, cap);
+			if (type == DP_DS_PORT_TYPE_VGA)
+				seq_printf(m, "\tMax dot clock: %d kHz\n", clk);
+			else
+				seq_printf(m, "\tMax TMDS clock: %d kHz\n", clk);
+
+			bpc = drm_dp_downstream_max_bpc(intel_dp->dpcd, cap);
+			seq_printf(m, "\tMax bpc: %d\n", bpc);
+		}
+	}
+
 	if (intel_encoder->type == INTEL_OUTPUT_EDP)
 		intel_panel_info(m, &intel_connector->panel);
 }
