@@ -737,7 +737,7 @@ redo:
 		 * We know how to handle that.
 		 */
 		is_unevictable = false;
-		lru_cache_add(page);
+		lru_cache_putback(page);
 	} else {
 		/*
 		 * Put unevictable pages directly on zone's unevictable
