@@ -255,6 +255,9 @@ struct ion_heap {
 	wait_queue_head_t waitqueue;
 	struct task_struct *task;
 
+	unsigned int *fallbacks;
+	int fallback_cnt;
+
 	int (*debug_show)(struct ion_heap *heap, struct seq_file *, void *);
 };
 
@@ -381,6 +384,10 @@ size_t ion_heap_freelist_shrink(struct ion_heap *heap,
 size_t ion_heap_freelist_size(struct ion_heap *heap);
 
 
+int ion_map_usage_ids(struct ion_client *client,
+			unsigned int __user *usage_ids,
+			int cnt);
+
 /**
  * functions for creating and destroying the built in ion heaps.
  * architectures can add their own custom architecture specific
@@ -494,5 +501,13 @@ struct ion_handle *ion_handle_get_by_id(struct ion_client *client,
 						int id);
 
 int ion_handle_put(struct ion_handle *handle);
+
+struct ion_handle *ion_alloc2(struct ion_client *client, size_t len,
+				size_t align, unsigned int usage_id,
+				unsigned int flags);
+
+int ion_query_heaps(struct ion_client *client,
+		struct ion_heap_data __user *buffer,
+		int cnt);
 
 #endif /* _ION_PRIV_H */

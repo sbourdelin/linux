@@ -459,6 +459,48 @@ static struct ion_handle *__ion_alloc(struct ion_client *client, size_t len,
 	return handle;
 }
 
+struct ion_handle *ion_alloc2(struct ion_client *client, size_t len,
+				size_t align, unsigned int usage_id,
+				unsigned int flags)
+{
+	struct ion_device *dev = client->dev;
+	struct ion_heap *heap;
+	struct ion_handle *handle = ERR_PTR(-ENODEV);
+
+	down_read(&dev->lock);
+	heap = idr_find(&dev->idr, usage_id);
+	if (!heap) {
+		handle = ERR_PTR(-EINVAL);
+		goto out;
+	}
+
+	if (heap->type == ION_USAGE_ID_MAP) {
+		int i;
+
+		for (i = 0; i < heap->fallback_cnt; i++){
+			heap = idr_find(&dev->idr, heap->fallbacks[i]);
+			if (!heap)
+				continue;
+
+			/* Don't recurse for now? */
+			if (heap->type == ION_USAGE_ID_MAP)
+				continue;
+
+			handle =  __ion_alloc(client, len, align, heap, flags);
+			if (IS_ERR(handle))
+				continue;
+			else
+				break;
+		}
+	} else {
+		handle = __ion_alloc(client, len, align, heap, flags);
+	}
+out:
+	up_read(&dev->lock);
+	return handle;
+}
+EXPORT_SYMBOL(ion_alloc2);
+
 struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 				size_t align, unsigned int heap_mask,
 				unsigned int flags)
@@ -1243,6 +1285,55 @@ int ion_sync_for_device(struct ion_client *client, int fd)
 	return 0;
 }
 
+struct ion_query_data {
+	struct ion_heap_data __user *buffer;
+	int cnt;
+	int max_cnt;
+};
+
+int __ion_query(int id, void *p, void *data)
+{
+	struct ion_heap *heap = p;
+	struct ion_query_data *query = data;
+	struct ion_heap_data hdata = {0};
+
+	if (query->cnt >= query->max_cnt)
+		return -ENOSPC;
+
+	strncpy(hdata.name, heap->name, 20);
+	hdata.name[sizeof(hdata.name) - 1] = '\0';
+	hdata.type = heap->type;
+	hdata.usage_id = heap->id;
+
+	return copy_to_user(&query->buffer[query->cnt++], &hdata, sizeof(hdata));
+}
+
+int ion_query_heaps(struct ion_client *client,
+		struct ion_heap_data __user *buffer,
+		int cnt)
+{
+	struct ion_device *dev = client->dev;
+	struct ion_query_data data;
+	int ret;
+
+	data.buffer = buffer;
+	data.cnt = 0;
+	data.max_cnt = cnt;
+
+	down_read(&dev->lock);
+	if (data.max_cnt < 0 || data.max_cnt > dev->heap_cnt) {
+		ret = -EINVAL;
+		goto out;
+	}
+	ret = idr_for_each(&dev->idr, __ion_query, &data);
+out:
+	up_read(&dev->lock);
+
+	return ret;
+}
+
+
+
 static int ion_release(struct inode *inode, struct file *file)
 {
 	struct ion_client *client = file->private_data;
@@ -1407,13 +1498,69 @@ static int debug_shrink_get(void *data, u64 *val)
 DEFINE_SIMPLE_ATTRIBUTE(debug_shrink_fops, debug_shrink_get,
 			debug_shrink_set, "%llu\n");
 
+int ion_map_usage_ids(struct ion_client *client,
+			unsigned int __user *usage_ids,
+			int cnt)
+{
+	struct ion_heap *heap = kzalloc(sizeof(*heap), GFP_KERNEL);
+	unsigned int *fallbacks;
+	int i;
+	int ret;
+
+	if (!heap)
+		return -ENOMEM;
+
+	fallbacks = kzalloc(sizeof(unsigned int)*cnt, GFP_KERNEL);
+	if (!fallbacks) {
+		ret = -ENOMEM;
+		goto out1;
+	}
+
+	ret = copy_from_user(fallbacks, usage_ids, sizeof(unsigned int)*cnt);
+	if (ret)
+		goto out2;
+
+	down_read(&client->dev->lock);
+	for (i = 0; i < cnt; i++) {
+		if (idr_find(&client->dev->idr, fallbacks[i]) == NULL) {
+			ret = -EINVAL;
+			goto out3;
+		}
+	}
+	up_read(&client->dev->lock);
+
+	/*
+	 * This is a racy check since the lock is dropped before the heap
+	 * is actually added. It's okay though because ids are never actually
+	 * deleted. Worst case some user gets an error back and an indication
+	 * to fix races in their code.
+	 */
+
+	heap->fallbacks = fallbacks;
+	heap->fallback_cnt = cnt;
+	heap->type = ION_USAGE_ID_MAP;
+	heap->id = ION_DYNAMIC_HEAP_ASSIGN;
+	ion_device_add_heap(client->dev, heap);
+	return heap->id;
+out3:
+	up_read(&client->dev->lock);
+out2:
+	kfree(fallbacks);
+out1:
+	kfree(heap);
+	return ret;
+}
+
 int ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap)
 {
 	struct dentry *debug_file;
 	int ret;
 
-	if (!heap->ops->allocate || !heap->ops->free || !heap->ops->map_dma ||
-	    !heap->ops->unmap_dma) {
+	if (heap->type != ION_USAGE_ID_MAP &&
+	   (!heap->ops->allocate ||
+	    !heap->ops->free ||
+	    !heap->ops->map_dma ||
+	    !heap->ops->unmap_dma)) {
 		pr_err("%s: can not add heap with invalid ops struct.\n",
 		       __func__);
 		return -EINVAL;
@@ -1425,18 +1572,36 @@ int ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap)
 	if (heap->flags & ION_HEAP_FLAG_DEFER_FREE)
 		ion_heap_init_deferred_free(heap);
 
-	if ((heap->flags & ION_HEAP_FLAG_DEFER_FREE) || heap->ops->shrink)
+	if ((heap->flags & ION_HEAP_FLAG_DEFER_FREE) || (heap->ops && heap->ops->shrink))
 		ion_heap_init_shrinker(heap);
 
 	heap->dev = dev;
 	down_write(&dev->lock);
 
-	ret = idr_alloc(&dev->idr, heap, heap->id, heap->id + 1, GFP_KERNEL);
-	if (ret < 0 || ret != heap->id) {
-		pr_info("%s: Failed to add heap id, expected %d got %d\n",
-			__func__, heap->id, ret);
-		up_write(&dev->lock);
-		return ret < 0 ? ret : -EINVAL;
+	if (heap->id == ION_DYNAMIC_HEAP_ASSIGN) {
+		ret = idr_alloc(&dev->idr, heap,
+				ION_DYNAMIC_HEAP_ASSIGN + 1, 0, GFP_KERNEL);
+		if (ret < 0)
+			goto out_unlock;
+
+		heap->id = ret;
+	} else {
+		ret = idr_alloc(&dev->idr, heap, heap->id, heap->id + 1,
+				GFP_KERNEL);
+		if (ret < 0 || ret != heap->id) {
+			pr_info("%s: Failed to add heap id, expected %d got %d\n",
+				__func__, heap->id, ret);
+			ret = ret < 0 ? ret : -EINVAL;
+			goto out_unlock;
+		}
+	}
+
+	if (!heap->name) {
+		heap->name = kasprintf(GFP_KERNEL, "heap%d", heap->id);
+		if (!heap->name) {
+			ret = -ENOMEM;
+			goto out_unlock;
+		}
 	}
 
 	debug_file = debugfs_create_file(heap->name, 0664,
@@ -1467,6 +1632,7 @@ int ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap)
 		}
 	}
 	dev->heap_cnt++;
+out_unlock:
 	up_write(&dev->lock);
 	return 0;
 }

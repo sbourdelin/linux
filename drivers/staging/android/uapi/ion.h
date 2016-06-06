@@ -45,9 +45,16 @@ enum ion_heap_type {
 			       * must be last so device specific heaps always
 			       * are at the end of this enum
 			       */
+	ION_USAGE_ID_MAP,
 };
 
 #define ION_NUM_HEAP_IDS		(sizeof(unsigned int) * 8)
+
+/*
+ * This isn't completely random. The old Ion heap ID namespace goes up to
+ * 32 bits so take the first one after that to use as a dynamic setting
+ */
+#define ION_DYNAMIC_HEAP_ASSIGN		33
 
 /**
  * allocation flags - the lower 16 bits are used by core ion, the upper 16
@@ -65,6 +72,11 @@ enum ion_heap_type {
 					 * caches must be managed
 					 * manually
 					 */
+#define ION_FLAG_NO_HANDLE 3		/*
+					 * Return only an fd associated with
+					 * this buffer and not a handle
+					 */
+
 
 /**
  * DOC: Ion Userspace API
@@ -142,6 +154,96 @@ struct ion_abi_version {
 	__u32 reserved;
 };
 
+/**
+ * struct ion_new_alloc_data - metadata to/from usersapce allocation v2
+ * @len:		size of the allocation
+ * @align:		required alignment of the allocation
+ * @usage_id:		mapping to heap id to allocate. Will try fallbacks
+ *			if specified in the heap mapping
+ * @flags:		flags passed to heap
+ * @handle:		pointer that will be populated with a cookie to use to
+ *			refer to this allocation
+ * @fd:			optionally, may return just an fd with no handle
+ *			reference
+ */
+struct ion_new_alloc_data {
+	__u64 len;
+	__u64 align;
+	__u32 usage_id;
+	__u32 flags;
+	/*
+	 * I'd like to add a flag to just return the fd instead of just
+	 * a handle for those who want to skip the next step.
+	 */
+	union {
+		__u32 fd;
+		__u32 handle;
+	};
+	/*
+	 * Allocation has a definite problem of 'creep' so give more than
+	 * enough extra bits for expansion
+	 */
+	__u32 reserved0;
+	__u32 reserved1;
+	__u32 reserved2;
+};
+
+/**
+ * struct ion_usage_id_map - metadata to create a new usage map
+ * @usage_id - userspace allocated array of existing usage ids
+ * @cnt - number of ids to be mapped
+ * @new_id - will be populated with the new usage id
+ */
+struct ion_usage_id_map {
+	/* Array of usage ids provided by user */
+	__u64 usage_ids;
+	__u32 cnt;
+
+	/* Returned on success */
+	__u32 new_id;
+	/* Fields for future growth */
+	__u32 reserved0;
+	__u32 reserved1;
+};
+
+/**
+ * struct ion_usage_cnt - meta data for the count of heaps
+ * @cnt - returned count of number of heaps present
+ */
+struct ion_usage_cnt {
+	__u32 cnt; /* cnt returned */
+	__u32 reserved;
+};
+
+/**
+ * struct ion_heap_data - data about a heap
+ * @name - first 32 characters of the heap name
+ * @type - heap type
+ * @usage_id - usage id for the heap
+ */
+struct ion_heap_data {
+	char name[32];
+	__u32 type;
+	__u32 usage_id;
+	__u32 reserved0;
+	__u32 reserved1;
+	__u32 reserved2;
+};
+
+/**
+ * struct ion_heap_query - collection of data about all heaps
+ * @cnt - total number of heaps to be copied
+ * @heaps - buffer to copy heap data
+ */
+struct ion_heap_query {
+	__u32 cnt; /* Total number of heaps to be copied */
+	__u64 heaps; /* buffer to be populated */
+	__u32 reserved0;
+	__u32 reserved1;
+	__u32 reserved2;
+};
+
+
 #define ION_IOC_MAGIC		'I'
 
 /**
@@ -216,5 +318,38 @@ struct ion_abi_version {
 #define ION_IOC_ABI_VERSION    _IOR(ION_IOC_MAGIC, 8, \
 					struct ion_abi_version)
 
+/**
+ * DOC: ION_IOC_ALLOC2 - allocate memory via new API
+ *
+ * Same concept as ION_IOC_ALLOC except with updated ABI. Can return an fd
+ * directly in addition to a handle
+ */
+#define ION_IOC_ALLOC2           _IOWR(ION_IOC_MAGIC, 9, \
+					struct ion_new_alloc_data)
+
+/**
+ * DOC: ION_IOC_ID_MAP - remap an array of heap IDs
+ *
+ * Takes an ion_usage_id_map structure populated with information about
+ * fallback information. Returns a new usage id for use in allocation.
+ */
+#define ION_IOC_ID_MAP         _IOWR(ION_IOC_MAGIC, 10, \
+					struct ion_usage_id_map)
+/**
+ * DOC: ION_IOC_USAGE_CNT - returns a count of the number of usage ids
+ *
+ * Takes an ion_usage_cnt structure and returns the total number of usage
+ * ids available.
+ */
+#define ION_IOC_USAGE_CNT      _IOR(ION_IOC_MAGIC, 11, \
+					struct ion_usage_cnt)
+/**
+ * DOC: ION_IOC_HEAP_QUERY - information about available heaps
+ *
+ * Takes an ion_heap_query structure and populates information about
+ * availble Ion heaps.
+ */
+#define ION_IOC_HEAP_QUERY     _IOWR(ION_IOC_MAGIC, 12, \
+					struct ion_heap_query)
 
 #endif /* _UAPI_LINUX_ION_H */
