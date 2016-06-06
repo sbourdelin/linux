@@ -11,6 +11,7 @@
  */
 
 #include <linux/component.h>
+#include <linux/of_device.h>
 #include <linux/of_graph.h>
 
 #include <drm/drmP.h>
@@ -219,15 +220,6 @@ static bool sun4i_drv_node_is_tcon(struct device_node *node)
 	return of_device_is_compatible(node, "allwinner,sun5i-a13-tcon");
 }
 
-static int compare_of(struct device *dev, void *data)
-{
-	DRM_DEBUG_DRIVER("Comparing of node %s with %s\n",
-			 of_node_full_name(dev->of_node),
-			 of_node_full_name(data));
-
-	return dev->of_node == data;
-}
-
 static int sun4i_drv_add_endpoints(struct device *dev,
 				   struct component_match **match,
 				   struct device_node *node)
@@ -248,7 +240,7 @@ static int sun4i_drv_add_endpoints(struct device *dev,
 		/* Add current component */
 		DRM_DEBUG_DRIVER("Adding component %s\n",
 				 of_node_full_name(node));
-		component_match_add(dev, match, compare_of, node);
+		component_match_add(dev, match, of_device_match, node);
 		count++;
 	}
 
