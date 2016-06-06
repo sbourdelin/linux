@@ -26,6 +26,7 @@
 #include <linux/mdio.h>
 #include <linux/usb/cdc.h>
 #include <linux/suspend.h>
+#include <linux/acpi.h>
 
 /* Information for net-next */
 #define NETNEXT_VERSION		"08"
@@ -454,6 +455,11 @@
 
 /* SRAM_IMPEDANCE */
 #define RX_DRIVING_MASK		0x6000
+
+/* MAC PASSTHRU */
+#define AD_MASK			0xfee0
+#define EFUSE			0xcfdb
+#define PASS_THRU_MASK		0x1
 
 enum rtl_register_content {
 	_1000bps	= 0x10,
@@ -1030,6 +1036,53 @@ out1:
 	return ret;
 }
 
+static int get_passthru_addr(struct r8152 *tp, struct sockaddr *sa)
+{
+	acpi_status status;
+	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
+	union acpi_object *obj;
+	int ret = -EINVAL;
+	u32 ocp_data;
+	unsigned char buf[6];
+
+	ocp_data = ocp_read_word(tp, MCU_TYPE_USB, USB_MISC_0);
+	if ((ocp_data & AD_MASK) != 0x1000)
+		return -ENODEV;
+
+	ocp_data = ocp_read_byte(tp, MCU_TYPE_USB, EFUSE);
+	if ((ocp_data & PASS_THRU_MASK) != 1)
+		return -ENODEV;
+
+	/* returns _AUXMAC_#AABBCCDDEEFF# */
+	status = acpi_evaluate_object(NULL, "\\_SB.AMAC", NULL, &buffer);
+	obj = (union acpi_object *)buffer.pointer;
+	if (ACPI_SUCCESS(status)) {
+		if (obj->type != ACPI_TYPE_BUFFER ||
+		    obj->string.length != 0x17) {
+			pr_warn("r8152: get_passthru_addr: Invalid buffer");
+			goto amacout;
+		}
+		if (strncmp(obj->string.pointer, "_AUXMAC_#", 9) != 0) {
+			pr_warn("r8152: get_passthru_addr: Invalid header");
+			goto amacout;
+		}
+		ret = hex2bin(buf, obj->string.pointer + 9, 6);
+		if (ret < 0 || !is_valid_ether_addr(buf)) {
+			pr_warn("r8152: get_passthru_addr: Invalid MAC");
+			goto amacout;
+		}
+		memcpy(sa->sa_data, buf, 6);
+		ether_addr_copy(tp->netdev->dev_addr, sa->sa_data);
+		netdev_info(tp->netdev, "Using pass-through MAC address %pM\n",
+			    sa->sa_data);
+		ret = 0;
+	}
+
+amacout:
+	kfree(obj);
+	return ret;
+}
+
 static int set_ethernet_addr(struct r8152 *tp)
 {
 	struct net_device *dev = tp->netdev;
@@ -1038,8 +1091,11 @@ static int set_ethernet_addr(struct r8152 *tp)
 
 	if (tp->version == RTL_VER_01)
 		ret = pla_ocp_read(tp, PLA_IDR, 8, sa.sa_data);
-	else
-		ret = pla_ocp_read(tp, PLA_BACKUP, 8, sa.sa_data);
+	else {
+		ret = get_passthru_addr(tp, &sa);
+		if (ret < 0)
+			ret = pla_ocp_read(tp, PLA_BACKUP, 8, sa.sa_data);
+	}
 
 	if (ret < 0) {
 		netif_err(tp, probe, dev, "Get ether addr fail\n");
