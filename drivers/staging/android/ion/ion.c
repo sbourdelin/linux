@@ -55,13 +55,14 @@ struct ion_device {
 	struct rb_root buffers;
 	struct mutex buffer_lock;
 	struct rw_semaphore lock;
-	struct plist_head heaps;
 	long (*custom_ioctl)(struct ion_client *client, unsigned int cmd,
 			     unsigned long arg);
 	struct rb_root clients;
 	struct dentry *debug_root;
 	struct dentry *heaps_debug_root;
 	struct dentry *clients_debug_root;
+	struct idr idr;
+	int heap_cnt;
 };
 
 /**
@@ -488,39 +489,22 @@ static int ion_handle_add(struct ion_client *client, struct ion_handle *handle)
 	return 0;
 }
 
-struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
-			     size_t align, unsigned int heap_id_mask,
+static struct ion_handle *__ion_alloc(struct ion_client *client, size_t len,
+			     size_t align, struct ion_heap *heap,
 			     unsigned int flags)
 {
 	struct ion_handle *handle;
 	struct ion_device *dev = client->dev;
 	struct ion_buffer *buffer = NULL;
-	struct ion_heap *heap;
 	int ret;
 
-	pr_debug("%s: len %zu align %zu heap_id_mask %u flags %x\n", __func__,
-		 len, align, heap_id_mask, flags);
-	/*
-	 * traverse the list of heaps available in this system in priority
-	 * order.  If the heap type is supported by the client, and matches the
-	 * request of the caller allocate from it.  Repeat until allocate has
-	 * succeeded or all heaps have been tried
-	 */
+
 	len = PAGE_ALIGN(len);
 
 	if (!len)
 		return ERR_PTR(-EINVAL);
 
-	down_read(&dev->lock);
-	plist_for_each_entry(heap, &dev->heaps, node) {
-		/* if the caller didn't specify this heap id */
-		if (!((1 << heap->id) & heap_id_mask))
-			continue;
-		buffer = ion_buffer_create(heap, dev, len, align, flags);
-		if (!IS_ERR(buffer))
-			break;
-	}
-	up_read(&dev->lock);
+	buffer = ion_buffer_create(heap, dev, len, align, flags);
 
 	if (buffer == NULL)
 		return ERR_PTR(-ENODEV);
@@ -547,6 +531,41 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 		handle = ERR_PTR(ret);
 	}
 
+	return handle;
+}
+
+struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
+				size_t align, unsigned int heap_mask,
+				unsigned int flags)
+{
+	int bit;
+	struct ion_handle *handle = ERR_PTR(-ENODEV);
+
+	pr_debug("%s: len %zu align %zu heap_id_mask %u flags %x\n", __func__,
+		 len, align, heap_mask, flags);
+
+	down_read(&client->dev->lock);
+	/*
+	 * traverse the list of heaps available in this system in priority
+	 * order.  If the heap type is supported by the client, and matches the
+	 * request of the caller allocate from it.  Repeat until allocate has
+	 * succeeded or all heaps have been tried
+	 */
+	for_each_set_bit(bit, (unsigned long *)&heap_mask, 32) {
+		struct ion_heap *heap;
+
+		heap = idr_find(&client->dev->idr, bit);
+		if (!heap)
+			continue;
+
+		handle = __ion_alloc(client, len, align, heap, flags);
+		if (IS_ERR(handle))
+			continue;
+		else
+			break;
+	}
+
+	up_read(&client->dev->lock);
 	return handle;
 }
 EXPORT_SYMBOL(ion_alloc);
@@ -1587,6 +1606,7 @@ DEFINE_SIMPLE_ATTRIBUTE(debug_shrink_fops, debug_shrink_get,
 int ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap)
 {
 	struct dentry *debug_file;
+	int ret;
 
 	if (!heap->ops->allocate || !heap->ops->free || !heap->ops->map_dma ||
 	    !heap->ops->unmap_dma) {
@@ -1606,12 +1626,15 @@ int ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap)
 
 	heap->dev = dev;
 	down_write(&dev->lock);
-	/*
-	 * use negative heap->id to reverse the priority -- when traversing
-	 * the list later attempt higher id numbers first
-	 */
-	plist_node_init(&heap->node, -heap->id);
-	plist_add(&heap->node, &dev->heaps);
+
+	ret = idr_alloc(&dev->idr, heap, heap->id, heap->id + 1, GFP_KERNEL);
+	if (ret < 0 || ret != heap->id) {
+		pr_info("%s: Failed to add heap id, expected %d got %d\n",
+			__func__, heap->id, ret);
+		up_write(&dev->lock);
+		return ret < 0 ? ret : -EINVAL;
+	}
+
 	debug_file = debugfs_create_file(heap->name, 0664,
 					dev->heaps_debug_root, heap,
 					&debug_heap_fops);
@@ -1639,7 +1662,7 @@ int ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap)
 				path, debug_name);
 		}
 	}
-
+	dev->heap_cnt++;
 	up_write(&dev->lock);
 	return 0;
 }
@@ -1689,7 +1712,7 @@ debugfs_done:
 	idev->buffers = RB_ROOT;
 	mutex_init(&idev->buffer_lock);
 	init_rwsem(&idev->lock);
-	plist_head_init(&idev->heaps);
+	idr_init(&idev->idr);
 	idev->clients = RB_ROOT;
 	ion_root_client = &idev->clients;
 	mutex_init(&debugfs_mutex);
