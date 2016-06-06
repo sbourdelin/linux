@@ -48,6 +48,7 @@ long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		struct ion_allocation_data allocation;
 		struct ion_handle_data handle;
 		struct ion_custom_data custom;
+		struct ion_abi_version abi_version;
 	} data;
 
 	dir = ion_ioctl_dir(cmd);
@@ -127,6 +128,11 @@ long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			return -ENOTTY;
 		ret = dev->custom_ioctl(client, data.custom.cmd,
 						data.custom.arg);
+		break;
+	}
+	case ION_IOC_ABI_VERSION:
+	{
+		data.abi_version.abi_version = ION_ABI_VERSION;
 		break;
 	}
 	default:

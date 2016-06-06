@@ -19,6 +19,7 @@
 
 #include <linux/ioctl.h>
 #include <linux/types.h>
+#include <linux/version.h>
 
 typedef int ion_user_handle_t;
 
@@ -128,6 +129,19 @@ struct ion_custom_data {
 	unsigned long arg;
 };
 
+/**
+ * struct ion_abi_version
+ *
+ *  @version - current ABI version
+ */
+
+#define ION_ABI_VERSION                KERNEL_VERSION(0, 1, 0)
+
+struct ion_abi_version {
+	__u32 abi_version;
+	__u32 reserved;
+};
+
 #define ION_IOC_MAGIC		'I'
 
 /**
@@ -193,5 +207,14 @@ struct ion_custom_data {
  * passes appropriate userdata for that ioctl
  */
 #define ION_IOC_CUSTOM		_IOWR(ION_IOC_MAGIC, 6, struct ion_custom_data)
+
+/**
+ * DOC: ION_IOC_ABI_VERSION - return ABI version
+ *
+ * Returns the ABI version of this driver.
+ */
+#define ION_IOC_ABI_VERSION    _IOR(ION_IOC_MAGIC, 8, \
+					struct ion_abi_version)
+
 
 #endif /* _UAPI_LINUX_ION_H */
