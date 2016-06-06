@@ -347,6 +347,36 @@ static ssize_t at24_eeprom_read_serial(struct at24_data *at24, char *buf,
 	return -ETIMEDOUT;
 }
 
+static ssize_t at24_eeprom_read_mac(struct at24_data *at24, char *buf,
+				    unsigned int offset, size_t count)
+{
+	unsigned long timeout, read_time;
+	struct i2c_client *client;
+	struct i2c_msg msg[2];
+	u8 addrbuf[2];
+	int status;
+
+	client = at24_translate_offset(at24, &offset);
+
+	memset(msg, 0, sizeof(msg));
+	msg[0].addr = client->addr;
+	msg[0].buf = addrbuf;
+	addrbuf[0] = 0x90 + offset;
+	msg[0].len = 1;
+	msg[1].addr = client->addr;
+	msg[1].flags = I2C_M_RD;
+	msg[1].buf = buf;
+	msg[1].len = count;
+
+	loop_until_timeout(timeout, read_time) {
+		status = i2c_transfer(client->adapter, msg, 2);
+		if (status == 2)
+			return count;
+	}
+
+	return -ETIMEDOUT;
+}
+
 /*
  * Note that if the hardware write-protect pin is pulled high, the whole
  * chip is normally write protected. But there are plenty of product
@@ -648,8 +678,16 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	at24->chip = chip;
 	at24->num_addresses = num_addresses;
 
+	if ((chip.flags & AT24_FLAG_SERIAL) && (chip.flags & AT24_FLAG_MAC)) {
+		dev_err(&client->dev,
+			"invalid device data - cannot have both AT24_FLAG_SERIAL & AT24_FLAG_MAC.");
+		return -EINVAL;
+	}
+
 	if (chip.flags & AT24_FLAG_SERIAL) {
 		at24->read_func = at24_eeprom_read_serial;
+	} else if (chip.flags & AT24_FLAG_MAC) {
+		at24->read_func = at24_eeprom_read_mac;
 	} else {
 		at24->read_func = at24->use_smbus ? at24_eeprom_read_smbus
 						  : at24_eeprom_read_i2c;
