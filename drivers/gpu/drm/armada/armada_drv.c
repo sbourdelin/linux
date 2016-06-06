@@ -8,6 +8,7 @@
 #include <linux/clk.h>
 #include <linux/component.h>
 #include <linux/module.h>
+#include <linux/of_device.h>
 #include <linux/of_graph.h>
 #include <drm/drmP.h>
 #include <drm/drm_crtc_helper.h>
@@ -227,11 +228,6 @@ static void armada_drm_unbind(struct device *dev)
 	drm_put_dev(dev_get_drvdata(dev));
 }
 
-static int compare_of(struct device *dev, void *data)
-{
-	return dev->of_node == data;
-}
-
 static void release_of(struct device *dev, void *data)
 {
 	of_node_put(data);
@@ -261,7 +257,7 @@ static void armada_add_endpoints(struct device *dev,
 		}
 
 		component_match_add_release(dev, match, release_of,
-					    compare_of, remote);
+					    of_device_match, remote);
 	}
 }
 
