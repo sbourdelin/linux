@@ -438,6 +438,33 @@ int drm_dp_link_configure(struct drm_dp_aux *aux, struct drm_dp_link *link)
 }
 EXPORT_SYMBOL(drm_dp_link_configure);
 
+/**
+ * drm_dp_downstream_port_cap() - read downstream port capabilities
+ * @dpcd: DisplayPort configuration data
+ * @port_cap: port capabilities
+ *
+ * returns size of the port capabilites
+ */
+int drm_dp_downstream_port_cap(struct drm_dp_aux *aux,
+			       const u8 dpcd[DP_RECEIVER_CAP_SIZE],
+			       u8 port_cap[4])
+{
+	int size;
+	bool detailed_cap_info = dpcd[DP_DOWNSTREAMPORT_PRESENT] &
+		DP_DETAILED_CAP_INFO_AVAILABLE;
+
+	if (detailed_cap_info) {
+		size = 4;
+		drm_dp_dpcd_read(aux, DP_DOWNSTREAM_PORT_0, port_cap, size);
+	} else {
+		size = 1;
+		drm_dp_dpcd_read(aux, DP_DOWNSTREAM_PORT_0, &port_cap[0], size);
+	}
+
+	return size;
+}
+EXPORT_SYMBOL(drm_dp_downstream_port_cap);
+
 /*
  * I2C-over-AUX implementation
  */
