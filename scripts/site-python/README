@@ -1,0 +1,14 @@
+.. -*- coding: utf-8; mode: rst -*-
+
+===========
+site-python
+===========
+
+The ``site-python`` folder gather python extensions (packages and modules).
+With a PYTHONPATH [1] or a sys.path [2] entry pointing to this folder, these
+extensions can be imported from any python script. If you are unfamiliar with
+python packages consult [3] at least.
+
+[1] https://docs.python.org/3/using/cmdline.html#envvar-PYTHONPATH
+[2] https://docs.python.org/3/install/#inst-search-path
+[3] https://docs.python.org/3/tutorial/modules.html#packages
