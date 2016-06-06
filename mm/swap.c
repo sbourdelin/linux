@@ -249,15 +249,10 @@ void rotate_reclaimable_page(struct page *page)
 	}
 }
 
-static void update_page_reclaim_stat(struct lruvec *lruvec,
-				     int file, int rotated,
-				     unsigned int nr_pages)
+void lru_note_cost(struct lruvec *lruvec, bool file, unsigned int nr_pages)
 {
-	struct zone_reclaim_stat *reclaim_stat = &lruvec->reclaim_stat;
-
-	reclaim_stat->recent_scanned[file] += nr_pages;
-	if (rotated)
-		reclaim_stat->recent_rotated[file] += nr_pages;
+	lruvec->balance.numer[file] += nr_pages;
+	lruvec->balance.denom += nr_pages;
 }
 
 static void __activate_page(struct page *page, struct lruvec *lruvec,
@@ -543,7 +538,7 @@ static void lru_deactivate_file_fn(struct page *page, struct lruvec *lruvec,
 
 	if (active)
 		__count_vm_event(PGDEACTIVATE);
-	update_page_reclaim_stat(lruvec, file, 0, hpage_nr_pages(page));
+	lru_note_cost(lruvec, !file, hpage_nr_pages(page));
 }
 
 
@@ -560,7 +555,7 @@ static void lru_deactivate_fn(struct page *page, struct lruvec *lruvec,
 		add_page_to_lru_list(page, lruvec, lru);
 
 		__count_vm_event(PGDEACTIVATE);
-		update_page_reclaim_stat(lruvec, file, 0, hpage_nr_pages(page));
+		lru_note_cost(lruvec, !file, hpage_nr_pages(page));
 	}
 }
 
