@@ -84,6 +84,28 @@ int __blkdev_issue_discard(struct block_device *bdev, sector_t sector,
 }
 EXPORT_SYMBOL(__blkdev_issue_discard);
 
+static int do_blkdev_issue_discard(struct block_device *bdev, sector_t sector,
+		sector_t nr_sects, gfp_t gfp_mask, unsigned long flags,
+		int *io_err)
+{
+	int type = REQ_WRITE | REQ_DISCARD;
+	struct bio *bio = NULL;
+	struct blk_plug plug;
+	int ret;
+
+	if (flags & BLKDEV_DISCARD_SECURE)
+		type |= REQ_SECURE;
+
+	blk_start_plug(&plug);
+	ret = __blkdev_issue_discard(bdev, sector, nr_sects, gfp_mask, type,
+			&bio);
+	if (!ret && bio)
+		*io_err = submit_bio_wait(type, bio);
+	blk_finish_plug(&plug);
+
+	return ret;
+}
+
 /**
  * blkdev_issue_discard - queue a discard
  * @bdev:	blockdev to issue discard for
@@ -98,23 +120,12 @@ EXPORT_SYMBOL(__blkdev_issue_discard);
 int blkdev_issue_discard(struct block_device *bdev, sector_t sector,
 		sector_t nr_sects, gfp_t gfp_mask, unsigned long flags)
 {
-	int type = REQ_WRITE | REQ_DISCARD;
-	struct bio *bio = NULL;
-	struct blk_plug plug;
-	int ret;
+	int ret, io_err;
 
-	if (flags & BLKDEV_DISCARD_SECURE)
-		type |= REQ_SECURE;
-
-	blk_start_plug(&plug);
-	ret = __blkdev_issue_discard(bdev, sector, nr_sects, gfp_mask, type,
-			&bio);
-	if (!ret && bio) {
-		ret = submit_bio_wait(type, bio);
-		if (ret == -EOPNOTSUPP)
-			ret = 0;
-	}
-	blk_finish_plug(&plug);
+	ret = do_blkdev_issue_discard(bdev, sector, nr_sects, gfp_mask,
+		flags, &io_err);
+	if (!ret && io_err != -EOPNOTSUPP)
+		ret = io_err;
 
 	return ret;
 }
@@ -167,7 +178,7 @@ int blkdev_issue_write_same(struct block_device *bdev, sector_t sector,
 
 	if (bio)
 		ret = submit_bio_wait(REQ_WRITE | REQ_WRITE_SAME, bio);
-	return ret != -EOPNOTSUPP ? ret : 0;
+	return ret;
 }
 EXPORT_SYMBOL(blkdev_issue_write_same);
 
@@ -236,9 +247,11 @@ int blkdev_issue_zeroout(struct block_device *bdev, sector_t sector,
 			 sector_t nr_sects, gfp_t gfp_mask, bool discard)
 {
 	struct request_queue *q = bdev_get_queue(bdev);
+	int io_err = 0;
 
 	if (discard && blk_queue_discard(q) && q->limits.discard_zeroes_data &&
-	    blkdev_issue_discard(bdev, sector, nr_sects, gfp_mask, 0) == 0)
+	    (do_blkdev_issue_discard(bdev, sector, nr_sects, gfp_mask, 0,
+				     &io_err) == 0 && io_err == 0))
 		return 0;
 
 	if (bdev_write_same(bdev) &&
