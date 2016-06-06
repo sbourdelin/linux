@@ -561,11 +561,15 @@ static int power_supply_read_temp(struct thermal_zone_device *tzd,
 {
 	struct power_supply *psy;
 	union power_supply_propval val;
-	int ret;
+	int ret = -EAGAIN;
 
 	WARN_ON(tzd == NULL);
+
 	psy = tzd->devdata;
-	ret = psy->desc->get_property(psy, POWER_SUPPLY_PROP_TEMP, &val);
+
+	if (atomic_read(&psy->use_cnt) > 0)
+		ret = psy->desc->get_property(psy, POWER_SUPPLY_PROP_TEMP,
+					      &val);
 
 	/* Convert tenths of degree Celsius to milli degree Celsius. */
 	if (!ret)
