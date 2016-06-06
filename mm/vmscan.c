@@ -1216,6 +1216,7 @@ activate_locked:
 		if (PageSwapCache(page) && mem_cgroup_swap_full(page))
 			try_to_free_swap(page);
 		VM_BUG_ON_PAGE(PageActive(page), page);
+		SetPageWorkingset(page);
 		SetPageActive(page);
 		pgactivate++;
 keep_locked:
@@ -1524,7 +1525,7 @@ putback_inactive_pages(struct lruvec *lruvec, struct list_head *page_list)
 			 * Rotating pages costs CPU without actually
 			 * progressing toward the reclaim goal.
 			 */
-			lru_note_cost(lruvec, file, numpages);
+			lru_note_cost(lruvec, COST_CPU, file, numpages);
 		}
 
 		if (put_page_testzero(page)) {
@@ -1849,7 +1850,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
 	 * Rotating pages costs CPU without actually
 	 * progressing toward the reclaim goal.
 	 */
-	lru_note_cost(lruvec, file, nr_rotated);
+	lru_note_cost(lruvec, COST_CPU, file, nr_rotated);
 
 	move_active_pages_to_lru(lruvec, &l_active, &l_hold, lru);
 	move_active_pages_to_lru(lruvec, &l_inactive, &l_hold, lru - LRU_ACTIVE);
