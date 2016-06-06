@@ -144,20 +144,9 @@ static struct pcie_port_service_driver dpcdriver = {
 	.remove		= dpc_remove,
 };
 
-static int __init dpc_service_init(void)
-{
-	return pcie_port_service_register(&dpcdriver);
-}
-
-static void __exit dpc_service_exit(void)
-{
-	pcie_port_service_unregister(&dpcdriver);
-}
+module_pcie_port_service(dpcdriver);
 
 MODULE_DESCRIPTION("PCI Express Downstream Port Containment driver");
 MODULE_AUTHOR("Keith Busch <keith.busch@intel.com>");
 MODULE_LICENSE("GPL");
 MODULE_VERSION("0.1");
-
-module_init(dpc_service_init);
-module_exit(dpc_service_exit);
