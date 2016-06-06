@@ -509,9 +509,6 @@ static int afs_deliver_cb_probe_uuid(struct afs_call *call, struct sk_buff *skb,
 		break;
 	}
 
-	if (!last)
-		return 0;
-
 	call->state = AFS_CALL_REPLYING;
 
 	INIT_WORK(&call->work, SRXAFSCB_ProbeUuid);
