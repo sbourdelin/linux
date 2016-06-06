@@ -1584,14 +1584,16 @@ static int debug_shrink_get(void *data, u64 *val)
 DEFINE_SIMPLE_ATTRIBUTE(debug_shrink_fops, debug_shrink_get,
 			debug_shrink_set, "%llu\n");
 
-void ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap)
+int ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap)
 {
 	struct dentry *debug_file;
 
 	if (!heap->ops->allocate || !heap->ops->free || !heap->ops->map_dma ||
-	    !heap->ops->unmap_dma)
+	    !heap->ops->unmap_dma) {
 		pr_err("%s: can not add heap with invalid ops struct.\n",
 		       __func__);
+		return -EINVAL;
+	}
 
 	spin_lock_init(&heap->free_lock);
 	heap->free_list_size = 0;
@@ -1639,6 +1641,7 @@ void ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap)
 	}
 
 	up_write(&dev->lock);
+	return 0;
 }
 EXPORT_SYMBOL(ion_device_add_heap);
 

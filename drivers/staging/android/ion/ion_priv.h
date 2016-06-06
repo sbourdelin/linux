@@ -221,7 +221,7 @@ void ion_device_destroy(struct ion_device *dev);
  * @dev:		the device
  * @heap:		the heap to add
  */
-void ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap);
+int ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap);
 
 /**
  * some helpers for common operations on buffers using the sg_table
