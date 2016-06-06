@@ -707,7 +707,7 @@ static int vhost_memory_reg_sort_cmp(const void *p1, const void *p2)
 
 static void *vhost_kvzalloc(unsigned long size)
 {
-	void *n = kzalloc(size, GFP_KERNEL | __GFP_NOWARN | __GFP_REPEAT);
+	void *n = kzalloc(size, GFP_KERNEL | __GFP_NOWARN | __GFP_RETRY_HARD);
 
 	if (!n)
 		n = vzalloc(size);

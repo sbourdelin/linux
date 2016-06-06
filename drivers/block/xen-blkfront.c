@@ -2029,7 +2029,7 @@ static int blkif_recover(struct blkfront_info *info)
 		rinfo = &info->rinfo[r_index];
 		/* Stage 1: Make a safe copy of the shadow state. */
 		copy = kmemdup(rinfo->shadow, sizeof(rinfo->shadow),
-			       GFP_NOIO | __GFP_REPEAT | __GFP_HIGH);
+			       GFP_NOIO | __GFP_RETRY_HARD | __GFP_HIGH);
 		if (!copy)
 			return -ENOMEM;
 

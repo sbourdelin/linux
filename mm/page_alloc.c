@@ -3262,7 +3262,7 @@ should_compact_retry(struct alloc_context *ac, int order, int alloc_flags,
 		return compaction_zonelist_suitable(ac, order, alloc_flags);
 
 	/*
-	 * !costly requests are much more important than __GFP_REPEAT
+	 * !costly requests are much more important than __GFP_RETRY_HARD
 	 * costly ones because they are de facto nofail and invoke OOM
 	 * killer to move on while costly can fail and users are ready
 	 * to cope with that. 1/4 retries is rather arbitrary but we
@@ -3550,6 +3550,7 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	enum compact_result compact_result;
 	int compaction_retries = 0;
 	int no_progress_loops = 0;
+	bool passed_oom = false;
 
 	/*
 	 * In the slowpath, we sanity check order to avoid ever trying to
@@ -3680,9 +3681,9 @@ retry:
 
 	/*
 	 * Do not retry costly high order allocations unless they are
-	 * __GFP_REPEAT
+	 * __GFP_RETRY_HARD
 	 */
-	if (order > PAGE_ALLOC_COSTLY_ORDER && !(gfp_mask & __GFP_REPEAT))
+	if (order > PAGE_ALLOC_COSTLY_ORDER && !(gfp_mask & __GFP_RETRY_HARD))
 		goto noretry;
 
 	/*
@@ -3711,6 +3712,17 @@ retry:
 				compaction_retries))
 		goto retry;
 
+	/*
+	 * We have already exhausted all our reclaim opportunities including
+	 * the OOM killer without any success so it is time to admit defeat.
+	 * We do not care about the order because we want all orders to behave
+	 * consistently including !costly ones. costly are handled in
+	 * __alloc_pages_may_oom and will bail out even before the first OOM
+	 * killer invocation
+	 */
+	if (passed_oom && (gfp_mask & __GFP_RETRY_HARD))
+		goto nopage;
+
 	/* Reclaim has failed us, start killing things */
 	page = __alloc_pages_may_oom(gfp_mask, order, ac, &did_some_progress);
 	if (page)
@@ -3719,6 +3731,7 @@ retry:
 	/* Retry as long as the OOM killer is making progress */
 	if (did_some_progress) {
 		no_progress_loops = 0;
+		passed_oom = true;
 		goto retry;
 	}
 

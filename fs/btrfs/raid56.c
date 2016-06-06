@@ -218,7 +218,7 @@ int btrfs_alloc_stripe_hash_table(struct btrfs_fs_info *info)
 	 * of a failing mount.
 	 */
 	table_size = sizeof(*table) + sizeof(*h) * num_entries;
-	table = kzalloc(table_size, GFP_KERNEL | __GFP_NOWARN | __GFP_REPEAT);
+	table = kzalloc(table_size, GFP_KERNEL | __GFP_NOWARN | __GFP_RETRY_HARD);
 	if (!table) {
 		table = vzalloc(table_size);
 		if (!table)

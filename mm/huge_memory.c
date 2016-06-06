@@ -378,7 +378,7 @@ static ssize_t single_flag_store(struct kobject *kobj,
 
 /*
  * Currently defrag only disables __GFP_NOWAIT for allocation. A blind
- * __GFP_REPEAT is too aggressive, it's never worth swapping tons of
+ * __GFP_RETRY_HARD is too aggressive, it's never worth swapping tons of
  * memory just to allocate one more hugepage.
  */
 static ssize_t defrag_show(struct kobject *kobj,

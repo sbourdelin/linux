@@ -56,7 +56,7 @@ static inline pgd_t *radix__pgd_alloc(struct mm_struct *mm)
 	return (pgd_t *)__get_free_page(PGALLOC_GFP);
 #else
 	struct page *page;
-	page = alloc_pages(PGALLOC_GFP | __GFP_REPEAT, 4);
+	page = alloc_pages(PGALLOC_GFP | __GFP_RETRY_HARD, 4);
 	if (!page)
 		return NULL;
 	return (pgd_t *) page_address(page);
