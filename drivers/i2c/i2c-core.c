@@ -490,15 +490,21 @@ static inline int acpi_i2c_install_space_handler(struct i2c_adapter *adapter)
 
 /* ------------------------------------------------------------------------- */
 
-static const struct i2c_device_id *i2c_match_id(const struct i2c_device_id *id,
-						const struct i2c_client *client)
+static const struct i2c_device_id *i2c_match_id_name(const struct i2c_device_id *id,
+						     const char *id_name)
 {
 	while (id->name[0]) {
-		if (strcmp(client->name, id->name) == 0)
+		if (strcmp(id_name, id->name) == 0)
 			return id;
 		id++;
 	}
 	return NULL;
+}
+
+static const struct i2c_device_id *i2c_match_id(const struct i2c_device_id *id,
+						const struct i2c_client *client)
+{
+	return i2c_match_id_name(id, client->name);
 }
 
 static int i2c_device_match(struct device *dev, struct device_driver *drv)
@@ -670,6 +676,7 @@ static int i2c_device_probe(struct device *dev)
 {
 	struct i2c_client	*client = i2c_verify_client(dev);
 	struct i2c_driver	*driver;
+	const struct i2c_device_id *i2c_device_id;
 	int status;
 
 	if (!client)
@@ -729,6 +736,19 @@ static int i2c_device_probe(struct device *dev)
 	if (status == -EPROBE_DEFER)
 		goto err_clear_wakeup_irq;
 
+	i2c_device_id = i2c_match_id(driver->id_table, client);
+#ifdef CONFIG_ACPI
+	if (!i2c_device_id) {
+		const char *id_name;
+		const struct of_device_id *ofid;
+
+		ofid = acpi_of_match_device(ACPI_COMPANION(&client->dev),
+					    driver->driver.of_match_table);
+		id_name = strchr(ofid->name, ',');
+		id_name = id_name ? id_name + 1 : ofid->name;
+		i2c_device_id = i2c_match_id_name(driver->id_table, id_name);
+	}
+#endif
 	status = driver->probe(client, i2c_match_id(driver->id_table, client));
 	if (status)
 		goto err_detach_pm_domain;
