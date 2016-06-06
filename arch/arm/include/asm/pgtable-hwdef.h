@@ -16,4 +16,25 @@
 #include <asm/pgtable-2level-hwdef.h>
 #endif
 
+#ifdef CONFIG_ARM_PV_FIXUP
+
+#define MAX_ATTR_MOD_ENTRIES	64
+
+#ifndef __ASSEMBLY__
+
+struct attr_mod_entry {
+	pmdval_t	test_mask;
+	pmdval_t	test_value;
+	pmdval_t	clear_mask;
+	pmdval_t	set_mask;
+};
+
+bool attr_mod_add(struct attr_mod_entry *pmod);
+
+extern int num_attr_mods;
+extern struct attr_mod_entry attr_mod_table[MAX_ATTR_MOD_ENTRIES];
+
+#endif	/* __ASSEMBLY__ */
+#endif	/* CONFIG_ARM_PV_FIXUP */
+
 #endif

@@ -1496,23 +1496,41 @@ extern unsigned long __atags_pointer;
 typedef void pgtables_remap(long long offset, unsigned long pgd, void *bdata);
 pgtables_remap lpae_pgtables_remap_asm;
 
+int num_attr_mods;
+
+/* add an entry to the early page table attribute modification list */
+bool __init attr_mod_add(struct attr_mod_entry *pmod)
+{
+	if (num_attr_mods >= MAX_ATTR_MOD_ENTRIES) {
+		pr_crit("Out of room for (or late use of) early page table attribute modifications.\n");
+		return false;
+	}
+
+	attr_mod_table[num_attr_mods++] = *pmod;
+	return true;
+}
+
 /*
  * early_paging_init() recreates boot time page table setup, allowing machines
  * to switch over to a high (>4G) address space on LPAE systems
+ *
+ * This function also applies any attribute modifications specified in
+ * attr_mod_table.  These may have been added before we got here (early_param)
+ * or from within mdesc->pv_fixup called by this function
  */
 void __init early_paging_init(const struct machine_desc *mdesc)
 {
 	pgtables_remap *lpae_pgtables_remap;
 	unsigned long pa_pgd;
 	unsigned int cr, ttbcr;
-	long long offset;
+	long long offset = 0;
 	void *boot_data;
+	unsigned long pmd;
 
-	if (!mdesc->pv_fixup)
-		return;
+	if (mdesc->pv_fixup)
+		offset = mdesc->pv_fixup();
 
-	offset = mdesc->pv_fixup();
-	if (offset == 0)
+	if (offset == 0 && num_attr_mods == 0)
 		return;
 
 	/*
@@ -1564,6 +1582,14 @@ void __init early_paging_init(const struct machine_desc *mdesc)
 	/* Re-enable the caches and cacheable TLB walks */
 	asm volatile("mcr p15, 0, %0, c2, c0, 2" : : "r" (ttbcr));
 	set_cr(cr);
+
+	/* disable any further use of attribute fixup */
+	num_attr_mods = MAX_ATTR_MOD_ENTRIES + 1;
+
+	/* record the new "initial" pmd and cachepolicy */
+	pmd = pmd_val(*pmd_off_k((unsigned long)_data));
+	pmd &= ~PMD_MASK;
+	init_default_cache_policy(pmd);
 }
 
 #else
