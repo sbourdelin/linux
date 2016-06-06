@@ -54,6 +54,9 @@ kmem_flags_convert(xfs_km_flags_t flags)
 			lflags &= ~__GFP_FS;
 	}
 
+	if (flags & KM_MAYFAIL)
+		lflags |= __GFP_RETRY_HARD;
+
 	if (flags & KM_ZERO)
 		lflags |= __GFP_ZERO;
 
