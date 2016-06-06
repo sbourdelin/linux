@@ -14,6 +14,7 @@
 
 #include <linux/device.h>
 #include <linux/mod_devicetable.h>
+#include <linux/scatterlist.h>
 
 #include <linux/mmc/pm.h>
 
@@ -135,6 +136,11 @@ extern int sdio_memcpy_fromio(struct sdio_func *func, void *dst,
 	unsigned int addr, int count);
 extern int sdio_readsb(struct sdio_func *func, void *dst,
 	unsigned int addr, int count);
+
+int sdio_readsb_sg_enh(struct sdio_func *func, unsigned int addr,
+		       struct sg_table *dst);
+int sdio_writesb_sg_enh(struct sdio_func *func, unsigned int addr,
+			struct sg_table *src);
 
 extern void sdio_writeb(struct sdio_func *func, u8 b,
 	unsigned int addr, int *err_ret);

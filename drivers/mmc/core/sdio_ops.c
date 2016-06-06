@@ -118,16 +118,39 @@ int mmc_io_rw_direct(struct mmc_card *card, int write, unsigned fn,
 	return mmc_io_rw_direct_host(card->host, write, fn, addr, in, out);
 }
 
+/**
+ *     mmc_io_rw_extended - wrapper for sdio command 53 read/write operation
+ *     @card: destination device for read/write
+ *     @write: zero indcate read, non-zero indicate write.
+ *     @fn: SDIO function to access
+ *     @addr: address of (single byte) FIFO
+ *     @incr_addr: set to 1 indicate read or write multiple bytes
+		of data to/from an IO register address that
+		increment by 1 after each operation.
+ *     @sg_enhance: if set true, the caller of this function will
+		prepare scatter gather dma buffer list.
+ *     @buf: buffer that contains the data to write. if sg_enhance
+		is set, it point to SG dma buffer list.
+ *     @blocks: number of blocks of data transfer.
+		if set zero, indicate byte mode
+		if set non-zero, indicate block mode
+		if sg_enhance is set, this parameter will not be used.
+ *     @blksz: block size for block mode data transfer.
+ *
+ */
 int mmc_io_rw_extended(struct mmc_card *card, int write, unsigned fn,
-	unsigned addr, int incr_addr, u8 *buf, unsigned blocks, unsigned blksz)
+		       unsigned int addr, int incr_addr, bool sg_enhance,
+		       void *buf, unsigned int blocks, unsigned int blksz)
 {
 	struct mmc_request mrq = {NULL};
 	struct mmc_command cmd = {0};
 	struct mmc_data data = {0};
 	struct scatterlist sg, *sg_ptr;
 	struct sg_table sgtable;
+	struct sg_table *sgtable_external;
 	unsigned int nents, left_size, i;
 	unsigned int seg_size = card->host->max_seg_size;
+	unsigned int sg_blocks = 0;
 
 	BUG_ON(!card);
 	BUG_ON(fn > 7);
@@ -145,16 +168,35 @@ int mmc_io_rw_extended(struct mmc_card *card, int write, unsigned fn,
 	cmd.arg |= fn << 28;
 	cmd.arg |= incr_addr ? 0x04000000 : 0x00000000;
 	cmd.arg |= addr << 9;
+	cmd.flags = MMC_RSP_SPI_R5 | MMC_RSP_R5 | MMC_CMD_ADTC;
+
+	data.flags = write ? MMC_DATA_WRITE : MMC_DATA_READ;
+	data.blksz = blksz;
+
+	if (sg_enhance) {
+		sgtable_external = buf;
+
+		for_each_sg(sgtable_external->sgl, sg_ptr,
+			    sgtable_external->nents, i) {
+			if (sg_ptr->length > card->host->max_seg_size)
+				return -EINVAL;
+			sg_blocks += DIV_ROUND_UP(sg_ptr->length, blksz);
+		}
+
+		cmd.arg |= 0x08000000 | sg_blocks;
+		data.blocks = sg_blocks;
+		data.sg = sgtable_external->sgl;
+		data.sg_len = sgtable_external->nents;
+		goto mmc_data_req;
+	}
+
 	if (blocks == 0)
 		cmd.arg |= (blksz == 512) ? 0 : blksz;	/* byte mode */
 	else
 		cmd.arg |= 0x08000000 | blocks;		/* block mode */
-	cmd.flags = MMC_RSP_SPI_R5 | MMC_RSP_R5 | MMC_CMD_ADTC;
 
-	data.blksz = blksz;
 	/* Code in host drivers/fwk assumes that "blocks" always is >=1 */
 	data.blocks = blocks ? blocks : 1;
-	data.flags = write ? MMC_DATA_WRITE : MMC_DATA_READ;
 
 	left_size = data.blksz * data.blocks;
 	nents = (left_size - 1) / seg_size + 1;
@@ -178,11 +220,12 @@ int mmc_io_rw_extended(struct mmc_card *card, int write, unsigned fn,
 		sg_init_one(&sg, buf, left_size);
 	}
 
+mmc_data_req:
 	mmc_set_data_timeout(&data, card);
 
 	mmc_wait_for_req(card->host, &mrq);
 
-	if (nents > 1)
+	if (!sg_enhance && nents > 1)
 		sg_free_table(&sgtable);
 
 	if (cmd.error)
