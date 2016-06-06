@@ -55,13 +55,14 @@ struct its_collection {
 };
 
 /*
- * The ITS_BASER structure - contains memory information and cached
- * value of BASER register configuration.
+ * The ITS_BASER structure - contains memory information, cached value
+ * of BASER register configuration and register idx.
  */
 struct its_baser {
 	void		*base;
 	u64		val;
 	u32		order;
+	u32		idx;
 };
 
 /*
@@ -810,6 +811,17 @@ static const char *its_base_type_string[] = {
 	[GITS_BASER_TYPE_RESERVED7] 	= "Reserved (7)",
 };
 
+static u64 its_read_baser(struct its_node *its, struct its_baser *baser)
+{
+	return readq_relaxed(its->base + GITS_BASER + (baser->idx << 3));
+}
+
+static void its_write_baser(struct its_node *its, struct its_baser *baser,
+			    u64 val)
+{
+	writeq_relaxed(val, its->base + GITS_BASER + (baser->idx << 3));
+}
+
 static void its_free_tables(struct its_node *its)
 {
 	int i;
@@ -849,13 +861,19 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
 	its->device_ids = ids;
 
 	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
-		u64 val = readq_relaxed(its->base + GITS_BASER + i * 8);
-		u64 type = GITS_BASER_TYPE(val);
-		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
+		struct its_baser *baser = its->tables + i;
 		int order = get_order(psz);
+		u64 val, type, entry_size;
 		int alloc_pages;
 		u64 tmp;
 		void *base;
+
+		/* Record the register index */
+		baser->idx = i;
+
+		val = its_read_baser(its, baser);
+		type = GITS_BASER_TYPE(val);
+		entry_size = GITS_BASER_ENTRY_SIZE(val);
 
 		if (type == GITS_BASER_TYPE_NONE)
 			continue;
@@ -925,8 +943,8 @@ retry_baser:
 		val |= alloc_pages - 1;
 		its->tables[i].val = val;
 
-		writeq_relaxed(val, its->base + GITS_BASER + i * 8);
-		tmp = readq_relaxed(its->base + GITS_BASER + i * 8);
+		its_write_baser(its, baser, val);
+		tmp = its_read_baser(its, baser);
 
 		if ((val ^ tmp) & GITS_BASER_SHAREABILITY_MASK) {
 			/*
