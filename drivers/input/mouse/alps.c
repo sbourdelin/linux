@@ -106,7 +106,6 @@ static const struct alps_nibble_commands alps_v6_nibble_commands[] = {
 
 static const struct alps_model_info alps_model_data[] = {
 	{ { 0x32, 0x02, 0x14 }, 0x00, { ALPS_PROTO_V2, 0xf8, 0xf8, ALPS_PASS | ALPS_DUALPOINT } },	/* Toshiba Salellite Pro M10 */
-	{ { 0x33, 0x02, 0x0a }, 0x00, { ALPS_PROTO_V1, 0x88, 0xf8, 0 } },				/* UMAX-530T */
 	{ { 0x53, 0x02, 0x0a }, 0x00, { ALPS_PROTO_V2, 0xf8, 0xf8, 0 } },
 	{ { 0x53, 0x02, 0x14 }, 0x00, { ALPS_PROTO_V2, 0xf8, 0xf8, 0 } },
 	{ { 0x60, 0x03, 0xc8 }, 0x00, { ALPS_PROTO_V2, 0xf8, 0xf8, 0 } },				/* HP ze1115 */
@@ -136,6 +135,10 @@ static const struct alps_model_info alps_model_data[] = {
 	{ { 0x73, 0x02, 0x50 }, 0x00, { ALPS_PROTO_V2, 0xcf, 0xcf, ALPS_FOUR_BUTTONS } },	/* Dell Vostro 1400 */
 	{ { 0x52, 0x01, 0x14 }, 0x00, { ALPS_PROTO_V2, 0xff, 0xff,
 		ALPS_PASS | ALPS_DUALPOINT | ALPS_PS2_INTERLEAVED } },				/* Toshiba Tecra A11-11L */
+};
+
+static const struct alps_protocol_info alps_v1_protocol_data = {
+	ALPS_PROTO_V1, 0x88, 0xf8, 0
 };
 
 static const struct alps_protocol_info alps_v3_protocol_data = {
@@ -2759,7 +2762,9 @@ static int alps_identify(struct psmouse *psmouse, struct alps_data *priv)
 
 	protocol = alps_match_table(e7, ec);
 	if (!protocol) {
-		if (e7[0] == 0x73 && e7[1] == 0x02 && e7[2] == 0x64 &&
+		if (e7[0] == 0x33 && e7[1] == 0x02 && e7[2] == 0x0a) {
+			protocol = &alps_v1_protocol_data;
+		} else if (e7[0] == 0x73 && e7[1] == 0x02 && e7[2] == 0x64 &&
 			   ec[2] == 0x8a) {
 			protocol = &alps_v4_protocol_data;
 		} else if (e7[0] == 0x73 && e7[1] == 0x03 && e7[2] == 0x50 &&
