@@ -574,18 +574,18 @@ struct acpi_device *acpi_companion_match(const struct device *dev)
  * identifiers and a _DSD object with the "compatible" property, use that
  * property to match against the given list of identifiers.
  */
-static bool acpi_of_match_device(struct acpi_device *adev,
-				 const struct of_device_id *of_match_table)
+const struct of_device_id* acpi_of_match_device(const struct acpi_device *adev,
+						const struct of_device_id *of_match_table)
 {
 	const union acpi_object *of_compatible, *obj;
 	int i, nval;
 
 	if (!adev)
-		return false;
+		return NULL;
 
 	of_compatible = adev->data.of_compatible;
 	if (!of_match_table || !of_compatible)
-		return false;
+		return NULL;
 
 	if (of_compatible->type == ACPI_TYPE_PACKAGE) {
 		nval = of_compatible->package.count;
@@ -600,11 +600,12 @@ static bool acpi_of_match_device(struct acpi_device *adev,
 
 		for (id = of_match_table; id->compatible[0]; id++)
 			if (!strcasecmp(obj->string.pointer, id->compatible))
-				return true;
+				return id;
 	}
 
-	return false;
+	return NULL;
 }
+EXPORT_SYMBOL(acpi_of_match_device);
 
 static bool __acpi_match_device_cls(const struct acpi_device_id *id,
 				    struct acpi_hardware_id *hwid)

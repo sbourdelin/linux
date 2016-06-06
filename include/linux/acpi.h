@@ -536,6 +536,8 @@ extern int acpi_nvs_for_each_region(int (*func)(__u64, __u64, void *),
 
 const struct acpi_device_id *acpi_match_device(const struct acpi_device_id *ids,
 					       const struct device *dev);
+const struct of_device_id *acpi_of_match_device(const struct acpi_device *dev,
+						const struct of_device_id *ids);
 
 extern bool acpi_driver_match_device(struct device *dev,
 				     const struct device_driver *drv);
@@ -658,6 +660,12 @@ struct acpi_device_id;
 
 static inline const struct acpi_device_id *acpi_match_device(
 	const struct acpi_device_id *ids, const struct device *dev)
+{
+	return NULL;
+}
+
+const struct of_device_id *acpi_of_match_device(const struct acpi_device *dev,
+						const struct acpi_device_id *ids);
 {
 	return NULL;
 }
