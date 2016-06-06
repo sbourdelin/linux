@@ -812,6 +812,8 @@ int drm_dp_downstream_port_cap(struct drm_dp_aux *aux,
 int drm_dp_downstream_type(const u8 dpcd[DP_RECEIVER_CAP_SIZE], const u8 port_cap[4]);
 int drm_dp_downstream_max_clock(const u8 dpcd[DP_RECEIVER_CAP_SIZE],
                                 const u8 port_cap[4]);
+int drm_dp_downstream_max_bpc(const u8 dpcd[DP_RECEIVER_CAP_SIZE],
+                              const u8 port_cap[4]);
 
 int drm_dp_aux_register(struct drm_dp_aux *aux);
 void drm_dp_aux_unregister(struct drm_dp_aux *aux);

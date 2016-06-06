@@ -507,6 +507,37 @@ int drm_dp_downstream_max_clock(const u8 dpcd[DP_RECEIVER_CAP_SIZE],
 }
 EXPORT_SYMBOL(drm_dp_downstream_max_clock);
 
+/**
+ * drm_dp_downstream_max_bpc() - extract branch device max
+ *                               bits per component
+ * @dpcd: DisplayPort configuration data
+ * @port_cap: port capabilities
+ *
+ * Returns max bpc on success or negative error code on failure
+ */
+int drm_dp_downstream_max_bpc(const u8 dpcd[DP_RECEIVER_CAP_SIZE],
+                              const u8 port_cap[4])
+{
+	int type = drm_dp_downstream_type(dpcd, port_cap);
+	bool detailed_cap_info = dpcd[DP_DOWNSTREAMPORT_PRESENT] &
+		DP_DETAILED_CAP_INFO_AVAILABLE;
+
+	if (detailed_cap_info) {
+		if (type != DP_DS_PORT_TYPE_WIRELESS) {
+			int tmp;
+			tmp = port_cap[2] & DP_DS_VGA_MAX_BPC_MASK;
+
+			if (tmp == 0)
+				return 8;
+			else
+				return 8 + (1<<tmp);
+		}
+	}
+
+	return -EINVAL;
+}
+EXPORT_SYMBOL(drm_dp_downstream_max_bpc);
+
 /*
  * I2C-over-AUX implementation
  */
