@@ -43,6 +43,7 @@ static char resume_file[256] = CONFIG_PM_STD_PARTITION;
 dev_t swsusp_resume_device;
 sector_t swsusp_resume_block;
 __visible int in_suspend __nosavedata;
+bool in_resume_hibernate;
 
 enum {
 	HIBERNATION_INVALID,
@@ -432,7 +433,9 @@ static int resume_target_kernel(bool platform_mode)
 	if (error)
 		goto Cleanup;
 
+	in_resume_hibernate = true;
 	error = disable_nonboot_cpus();
+	in_resume_hibernate = false;
 	if (error)
 		goto Enable_cpus;
 

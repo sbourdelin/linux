@@ -53,6 +53,7 @@
 #include <linux/stackprotector.h>
 #include <linux/gfp.h>
 #include <linux/cpuidle.h>
+#include <linux/suspend.h>
 
 #include <asm/acpi.h>
 #include <asm/desc.h>
@@ -1477,8 +1478,21 @@ static inline void mwait_play_dead(void)
 	 * This should be a memory location in a cache line which is
 	 * unlikely to be touched by other processors.  The actual
 	 * content is immaterial as it is not actually modified in any way.
+	 *
+	 * However in hibernation resume process, this address could be
+	 * touched by BSP when restoring page frames, if the page table
+	 * for this address is not coherent across hibernation(due to
+	 * inconsistence of e820 memory map), access from APs might
+	 * cause exception. So change the mwait address to zero page,
+	 * which is located in .bss, in this way we can avoid illegal
+	 * access from APs because page table for kernel mapping
+	 * of text/data/bss should keeps unchanged according to
+	 * hibernation semantic.
 	 */
-	mwait_ptr = &current_thread_info()->flags;
+	if (hibernation_in_resume())
+		mwait_ptr = empty_zero_page;
+	else
+		mwait_ptr = &current_thread_info()->flags;
 
 	wbinvd();
 
