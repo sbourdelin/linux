@@ -15,6 +15,7 @@
  *
  */
 
+#include <linux/of_device.h>
 #include <linux/of_platform.h>
 #include <linux/component.h>
 #include <linux/of_graph.h>
@@ -196,11 +197,6 @@ static struct drm_driver kirin_drm_driver = {
 	.minor			= 0,
 };
 
-static int compare_of(struct device *dev, void *data)
-{
-	return dev->of_node == data;
-}
-
 static int kirin_drm_bind(struct device *dev)
 {
 	struct drm_driver *driver = &kirin_drm_driver;
@@ -303,7 +299,7 @@ static int kirin_drm_platform_probe(struct platform_device *pdev)
 	if (IS_ERR(remote))
 		return PTR_ERR(remote);
 
-	component_match_add(dev, &match, compare_of, remote);
+	component_match_add(dev, &match, of_device_match, remote);
 
 	return component_master_add_with_match(dev, &kirin_drm_ops, match);
 
