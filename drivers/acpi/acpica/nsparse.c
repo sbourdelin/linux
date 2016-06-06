@@ -135,10 +135,12 @@ acpi_ns_execute_table(u32 table_index, struct acpi_namespace_node *start_node)
 	(void)acpi_ut_acquire_mutex(ACPI_MTX_NAMESPACE);
 
 cleanup:
-	acpi_ut_remove_reference(method_obj);
-	ACPI_FREE(info->full_pathname);
-	info->full_pathname = NULL;
+	if (info) {
+		ACPI_FREE(info->full_pathname);
+		info->full_pathname = NULL;
+	}
 	ACPI_FREE(info);
+	acpi_ut_remove_reference(method_obj);
 	return_ACPI_STATUS(status);
 }
 
