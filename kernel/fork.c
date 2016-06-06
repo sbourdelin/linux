@@ -1028,7 +1028,8 @@ fail_nomem:
 	return retval;
 }
 
-static int copy_fs(unsigned long clone_flags, struct task_struct *tsk)
+static int copy_fs(unsigned long clone_flags, struct task_struct *tsk,
+		   struct path *root_override)
 {
 	struct fs_struct *fs = current->fs;
 	if (clone_flags & CLONE_FS) {
@@ -1042,7 +1043,7 @@ static int copy_fs(unsigned long clone_flags, struct task_struct *tsk)
 		spin_unlock(&fs->lock);
 		return 0;
 	}
-	tsk->fs = copy_fs_struct(fs);
+	tsk->fs = copy_fs_struct(fs, root_override);
 	if (!tsk->fs)
 		return -ENOMEM;
 	return 0;
@@ -1284,7 +1285,8 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 					struct pid *pid,
 					int trace,
 					unsigned long tls,
-					int node)
+					int node,
+					struct path *root_override)
 {
 	int retval;
 	struct task_struct *p;
@@ -1472,7 +1474,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	retval = copy_files(clone_flags, p);
 	if (retval)
 		goto bad_fork_cleanup_semundo;
-	retval = copy_fs(clone_flags, p);
+	retval = copy_fs(clone_flags, p, root_override);
 	if (retval)
 		goto bad_fork_cleanup_files;
 	retval = copy_sighand(clone_flags, p);
@@ -1715,7 +1717,7 @@ struct task_struct *fork_idle(int cpu)
 {
 	struct task_struct *task;
 	task = copy_process(CLONE_VM, 0, 0, NULL, &init_struct_pid, 0, 0,
-			    cpu_to_node(cpu));
+			    cpu_to_node(cpu), NULL);
 	if (!IS_ERR(task)) {
 		init_idle_pids(task->pids);
 		init_idle(task, cpu);
@@ -1735,7 +1737,8 @@ long _do_fork(unsigned long clone_flags,
 	      unsigned long stack_size,
 	      int __user *parent_tidptr,
 	      int __user *child_tidptr,
-	      unsigned long tls)
+	      unsigned long tls,
+	      struct path *root_override)
 {
 	struct task_struct *p;
 	int trace = 0;
@@ -1760,7 +1763,8 @@ long _do_fork(unsigned long clone_flags,
 	}
 
 	p = copy_process(clone_flags, stack_start, stack_size,
-			 child_tidptr, NULL, trace, tls, NUMA_NO_NODE);
+			 child_tidptr, NULL, trace, tls, NUMA_NO_NODE,
+			 root_override);
 	/*
 	 * Do this prior waking up the new thread - the thread pointer
 	 * might get invalid after that point, if the thread exits quickly.
@@ -1811,24 +1815,25 @@ long do_fork(unsigned long clone_flags,
 	      int __user *child_tidptr)
 {
 	return _do_fork(clone_flags, stack_start, stack_size,
-			parent_tidptr, child_tidptr, 0);
+			parent_tidptr, child_tidptr, 0, NULL);
 }
 #endif
 
 /*
  * Create a kernel thread.
  */
-pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
+pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags,
+		    struct path *root_override)
 {
 	return _do_fork(flags|CLONE_VM|CLONE_UNTRACED, (unsigned long)fn,
-		(unsigned long)arg, NULL, NULL, 0);
+		(unsigned long)arg, NULL, NULL, 0, root_override);
 }
 
 #ifdef __ARCH_WANT_SYS_FORK
 SYSCALL_DEFINE0(fork)
 {
 #ifdef CONFIG_MMU
-	return _do_fork(SIGCHLD, 0, 0, NULL, NULL, 0);
+	return _do_fork(SIGCHLD, 0, 0, NULL, NULL, 0, NULL);
 #else
 	/* can not support in nommu mode */
 	return -EINVAL;
@@ -1840,7 +1845,7 @@ SYSCALL_DEFINE0(fork)
 SYSCALL_DEFINE0(vfork)
 {
 	return _do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, 0,
-			0, NULL, NULL, 0);
+			0, NULL, NULL, 0, NULL);
 }
 #endif
 
@@ -1868,7 +1873,8 @@ SYSCALL_DEFINE5(clone, unsigned long, clone_flags, unsigned long, newsp,
 		 unsigned long, tls)
 #endif
 {
-	return _do_fork(clone_flags, newsp, 0, parent_tidptr, child_tidptr, tls);
+	return _do_fork(clone_flags, newsp, 0, parent_tidptr, child_tidptr,
+			tls, NULL);
 }
 #endif
 
@@ -1964,7 +1970,7 @@ static int unshare_fs(unsigned long unshare_flags, struct fs_struct **new_fsp)
 	if (fs->users == 1)
 		return 0;
 
-	*new_fsp = copy_fs_struct(fs);
+	*new_fsp = copy_fs_struct(fs, NULL);
 	if (!*new_fsp)
 		return -ENOMEM;
 

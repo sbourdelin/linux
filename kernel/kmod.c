@@ -91,7 +91,7 @@ static int call_modprobe(char *module_name, int wait)
 	argv[4] = NULL;
 
 	info = call_usermodehelper_setup(modprobe_path, argv, envp, GFP_KERNEL,
-					 NULL, free_modprobe_argv, NULL);
+					 NULL, free_modprobe_argv, NULL, NULL);
 	if (!info)
 		goto free_module_name;
 
@@ -272,7 +272,8 @@ static void call_usermodehelper_exec_sync(struct subprocess_info *sub_info)
 
 	/* If SIGCLD is ignored sys_wait4 won't populate the status. */
 	kernel_sigaction(SIGCHLD, SIG_DFL);
-	pid = kernel_thread(call_usermodehelper_exec_async, sub_info, SIGCHLD);
+	pid = kernel_thread(call_usermodehelper_exec_async, sub_info, SIGCHLD,
+			    sub_info->root_override);
 	if (pid < 0) {
 		sub_info->retval = pid;
 	} else {
@@ -333,7 +334,8 @@ static void call_usermodehelper_exec_work(struct work_struct *work)
 		 * that always ignores SIGCHLD to ensure auto-reaping.
 		 */
 		pid = kernel_thread(call_usermodehelper_exec_async, sub_info,
-				    CLONE_PARENT | SIGCHLD);
+				    CLONE_PARENT | SIGCHLD,
+				    sub_info->root_override);
 		if (pid < 0) {
 			sub_info->retval = pid;
 			umh_complete(sub_info);
@@ -520,7 +522,7 @@ struct subprocess_info *call_usermodehelper_setup(char *path, char **argv,
 		char **envp, gfp_t gfp_mask,
 		int (*init)(struct subprocess_info *info, struct cred *new),
 		void (*cleanup)(struct subprocess_info *info),
-		void *data)
+		void *data, struct path *root_override)
 {
 	struct subprocess_info *sub_info;
 	sub_info = kzalloc(sizeof(struct subprocess_info), gfp_mask);
@@ -528,6 +530,7 @@ struct subprocess_info *call_usermodehelper_setup(char *path, char **argv,
 		goto out;
 
 	INIT_WORK(&sub_info->work, call_usermodehelper_exec_work);
+	sub_info->root_override = root_override;
 	sub_info->path = path;
 	sub_info->argv = argv;
 	sub_info->envp = envp;
@@ -619,7 +622,7 @@ int call_usermodehelper(char *path, char **argv, char **envp, int wait)
 	gfp_t gfp_mask = (wait == UMH_NO_WAIT) ? GFP_ATOMIC : GFP_KERNEL;
 
 	info = call_usermodehelper_setup(path, argv, envp, gfp_mask,
-					 NULL, NULL, NULL);
+					 NULL, NULL, NULL, NULL);
 	if (info == NULL)
 		return -ENOMEM;
 
