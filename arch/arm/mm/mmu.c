@@ -1524,6 +1524,7 @@ typedef void pgtables_remap(long long offset, unsigned long pgd, void *bdata);
 pgtables_remap lpae_pgtables_remap_asm;
 
 int num_attr_mods;
+static const char *defshared_seen;
 
 /* add an entry to the early page table attribute modification list */
 bool __init attr_mod_add(struct attr_mod_entry *pmod)
@@ -1547,14 +1548,49 @@ bool __init use_outer_shared(void)
 		.set_mask    = PTE_EXT_OSHARED
 	};
 
+	if (defshared_seen) {
+		pr_err("Default Sharing already set to %s\n", defshared_seen);
+		return false;
+	}
+
 	if (attr_mod_add(&mod) >= 0) {
 		l_pte_shared = PTE_EXT_OSHARED;
 		pmd_sect_s   = PMD_SECT_OSHARED;
+		defshared_seen = "outer";
 		return true;
 	}
 
 	return false;
 }
+
+/* explicitly use inner shared */
+bool __init use_inner_shared(void)
+{
+	if (defshared_seen) {
+		pr_err("Default Sharing already set to %s\n", defshared_seen);
+		return false;
+	}
+
+	defshared_seen = "inner";
+	return true;
+}
+
+/*
+ * Allow sharing type to be set
+ */
+static int __init early_defshared(char *p)
+{
+	if (strcmp(p, "outer") == 0)
+		use_outer_shared();
+	else if (strcmp(p, "inner") == 0)
+		use_inner_shared();
+	else
+		pr_err("Unknown defshared mode %s\n", p);
+
+	return 0;
+}
+
+early_param("defshared", early_defshared);
 
 /*
  * early_paging_init() recreates boot time page table setup, allowing machines
