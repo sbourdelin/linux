@@ -5839,10 +5839,11 @@ static int nl80211_set_reg(struct sk_buff *skb, struct genl_info *info)
 
 	r = set_regdom(rd, REGD_SOURCE_CRDA);
 	/* set_regdom took ownership */
-	rd = NULL;
 
  bad_reg:
 	kfree(rd);
+	rd = NULL;
+
 	return r;
 }
 #endif /* CONFIG_CFG80211_CRDA_SUPPORT */
