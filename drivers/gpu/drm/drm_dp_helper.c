@@ -571,6 +571,28 @@ struct drm_dp_revision drm_dp_downstream_hw_rev(struct drm_dp_aux *aux)
 }
 EXPORT_SYMBOL(drm_dp_downstream_hw_rev);
 
+/**
+ * drm_dp_downstream_sw_rev() - read DP branch device SW revision
+ * @aux: DisplayPort AUX channel
+ *
+ * Returns SW revision on success or negative error code on failure
+ */
+struct drm_dp_revision drm_dp_downstream_sw_rev(struct drm_dp_aux *aux)
+{
+	uint8_t tmp[2];
+	struct drm_dp_revision rev = { .major = -EINVAL, .minor = -EINVAL };
+
+	if (drm_dp_dpcd_read(aux, DP_BRANCH_SW_REV, tmp, 2) != 2)
+		return rev;
+
+	rev.major = tmp[0];
+	rev.minor = tmp[1];
+
+	return rev;
+
+}
+EXPORT_SYMBOL(drm_dp_downstream_sw_rev);
+
 /*
  * I2C-over-AUX implementation
  */
