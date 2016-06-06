@@ -297,23 +297,12 @@ static int mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 	return 0;
 }
 
-/**
- *	mmc_start_bkops - start BKOPS for supported cards
- *	@card: MMC card to start BKOPS
- *	@form_exception: A flag to indicate if this function was
- *			 called due to an exception raised by the card
- *
- *	Start background operations whenever requested.
- *	When the urgent BKOPS bit is set in a R1 command response
- *	then background operations should be started immediately.
-*/
-void mmc_start_bkops(struct mmc_card *card, bool from_exception)
+static void  mmc_start_man_bkops(struct mmc_card *card,
+				 bool from_exception)
 {
 	int err;
 	int timeout;
 	bool use_busy_signal;
-
-	BUG_ON(!card);
 
 	if (!card->ext_csd.man_bkops_en || mmc_card_doing_bkops(card))
 		return;
@@ -347,7 +336,7 @@ void mmc_start_bkops(struct mmc_card *card, bool from_exception)
 			EXT_CSD_BKOPS_START, 1, timeout,
 			use_busy_signal, true, false);
 	if (err) {
-		pr_warn("%s: Error %d starting bkops\n",
+		pr_warn("%s: Error %d starting manual bkops\n",
 			mmc_hostname(card->host), err);
 		mmc_retune_release(card->host);
 		goto out;
@@ -364,6 +353,55 @@ void mmc_start_bkops(struct mmc_card *card, bool from_exception)
 		mmc_retune_release(card->host);
 out:
 	mmc_release_host(card->host);
+}
+
+static void  mmc_start_auto_bkops(struct mmc_card *card)
+{
+	int err;
+
+	/* If it's already enable auto_bkops, nothing to do */
+	if (card->ext_csd.auto_bkops_en)
+		return;
+
+	mmc_claim_host(card->host);
+
+	mmc_retune_hold(card->host);
+
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_BKOPS_EN, 2,
+			card->ext_csd.generic_cmd6_time);
+	if (err)
+		pr_warn("%s: Error %d starting auto bkops\n",
+			mmc_hostname(card->host), err);
+
+	card->ext_csd.auto_bkops_en = true;
+	mmc_card_set_doing_bkops(card);
+	mmc_retune_release(card->host);
+	mmc_release_host(card->host);
+}
+
+
+/**
+ *	mmc_start_bkops - start BKOPS for supported cards
+ *	@card: MMC card to start BKOPS
+ *	@form_exception: A flag to indicate if this function was
+ *			 called due to an exception raised by the card
+ *          @is_auto: A flag to indicate if we should use auto bkops
+ *
+ *	Start background operations whenever requested.
+ *	When the urgent BKOPS bit is set in a R1 command response
+ *	then background operations should be started immediately, which is
+ *	only needed for man_bkops.
+*/
+void mmc_start_bkops(struct mmc_card *card, bool from_exception,
+		     bool is_auto)
+{
+	BUG_ON(!card);
+
+	if (is_auto)
+		return mmc_start_auto_bkops(card);
+	else
+		return mmc_start_man_bkops(card, from_exception);
 }
 EXPORT_SYMBOL(mmc_start_bkops);
 
@@ -610,7 +648,9 @@ struct mmc_async_req *mmc_start_req(struct mmc_host *host,
 			if (areq)
 				mmc_post_req(host, areq->mrq, -EINVAL);
 
-			mmc_start_bkops(host->card, true);
+			/* Prefer to use auto bkops for eMMC 5.1 or later */
+			mmc_start_bkops(host->card, true,
+					host->card->ext_csd.rev >= 8);
 
 			/* prepare the request again */
 			if (areq)
@@ -751,20 +791,10 @@ int mmc_wait_for_cmd(struct mmc_host *host, struct mmc_command *cmd, int retries
 
 EXPORT_SYMBOL(mmc_wait_for_cmd);
 
-/**
- *	mmc_stop_bkops - stop ongoing BKOPS
- *	@card: MMC card to check BKOPS
- *
- *	Send HPI command to stop ongoing background operations to
- *	allow rapid servicing of foreground operations, e.g. read/
- *	writes. Wait until the card comes out of the programming state
- *	to avoid errors in servicing read/write requests.
- */
-int mmc_stop_bkops(struct mmc_card *card)
+static int mmc_stop_man_bkops(struct mmc_card *card)
 {
 	int err = 0;
 
-	BUG_ON(!card);
 	err = mmc_interrupt_hpi(card);
 
 	/*
@@ -778,6 +808,51 @@ int mmc_stop_bkops(struct mmc_card *card)
 	}
 
 	return err;
+}
+
+static int mmc_stop_auto_bkops(struct mmc_card *card)
+{
+	int err = 0;
+
+	if (!card->ext_csd.auto_bkops_en)
+		return 0;
+
+	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_BKOPS_EN, 0, MMC_BKOPS_MAX_TIMEOUT,
+			true, true, false);
+	if (err)
+		pr_warn("%s: Error %d stoping auto bkops\n",
+			mmc_hostname(card->host), err);
+
+	card->ext_csd.auto_bkops_en = false;
+	mmc_card_clr_doing_bkops(card);
+	mmc_retune_release(card->host);
+
+	return err;
+}
+
+/**
+ *	mmc_stop_bkops - stop ongoing BKOPS
+ *	@card: MMC card to check BKOPS
+ *	@is_auto: A flag to indicate if we should use auto bkops
+ *
+ *	Send HPI command to stop ongoing background operations to
+ *	allow rapid servicing of foreground operations, e.g. read/
+ *	writes. Wait until the card comes out of the programming state
+ *	to avoid errors in servicing read/write requests.
+ *
+ *	But for auto bkops, we could only disable AUTO_EN instead of
+ *	sending HPI. And the firmware could do it automatically.
+ *
+ */
+int mmc_stop_bkops(struct mmc_card *card, bool is_auto)
+{
+	BUG_ON(!card);
+
+	if (is_auto)
+		return mmc_stop_auto_bkops(card);
+	else
+		return mmc_stop_man_bkops(card);
 }
 EXPORT_SYMBOL(mmc_stop_bkops);
 

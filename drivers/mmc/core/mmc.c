@@ -508,6 +508,13 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		/* check whether the eMMC card supports BKOPS */
 		if (ext_csd[EXT_CSD_BKOPS_SUPPORT] & 0x1) {
 			card->ext_csd.bkops = 1;
+
+			/* for eMMC v5.1 or later, we could use auto_bkops */
+			if (card->ext_csd.rev >= 8)
+				card->ext_csd.auto_bkops_en =
+					(ext_csd[EXT_CSD_BKOPS_EN] &
+						EXT_CSD_AUTO_BKOPS_MASK);
+
 			card->ext_csd.man_bkops_en =
 					(ext_csd[EXT_CSD_BKOPS_EN] &
 						EXT_CSD_MANUAL_BKOPS_MASK);
@@ -515,6 +522,9 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
 				ext_csd[EXT_CSD_BKOPS_STATUS];
 			if (!card->ext_csd.man_bkops_en)
 				pr_debug("%s: MAN_BKOPS_EN bit is not set\n",
+					mmc_hostname(card->host));
+			if (!card->ext_csd.auto_bkops_en)
+				pr_debug("%s: AUTO_BKOPS_EN bit is not set\n",
 					mmc_hostname(card->host));
 		}
 
@@ -1241,7 +1251,7 @@ static int mmc_select_hs400es(struct mmc_card *card)
 	}
 
 	err = mmc_select_bus_width(card);
-	if (IS_ERR_VALUE(err))
+	if (err < 0)
 		goto out_err;
 
 	/* Switch card to HS mode */
@@ -1676,6 +1686,21 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	mmc_select_powerclass(card);
 
 	/*
+	 * Enable auto bkops feature which is mandatory for
+	 * eMMC v5.1 or later
+	 */
+	if (card->ext_csd.rev >= 8) {
+		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+				 EXT_CSD_BKOPS_EN, 2,
+				 card->ext_csd.generic_cmd6_time);
+		if (err)
+			pr_warn("%s: Error %d starting auto bkops\n",
+				mmc_hostname(card->host), err);
+
+		card->ext_csd.auto_bkops_en = true;
+	}
+
+	/*
 	 * Enable HPI feature (if supported)
 	 */
 	if (card->ext_csd.hpi) {
@@ -1898,7 +1923,8 @@ static int _mmc_suspend(struct mmc_host *host, bool is_suspend)
 		goto out;
 
 	if (mmc_card_doing_bkops(host->card)) {
-		err = mmc_stop_bkops(host->card);
+		err = mmc_stop_bkops(host->card,
+				     host->card->ext_csd.rev >= 8);
 		if (err)
 			goto out;
 	}
