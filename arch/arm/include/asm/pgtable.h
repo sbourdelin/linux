@@ -86,6 +86,9 @@ extern pgprot_t		pgprot_hyp_device;
 extern pgprot_t		pgprot_s2;
 extern pgprot_t		pgprot_s2_device;
 
+extern pmdval_t		pmd_sect_s;
+extern pteval_t		l_pte_shared;
+
 #define _MOD_PROT(p, b)	__pgprot(pgprot_val(p) | (b))
 
 #define PAGE_NONE		_MOD_PROT(pgprot_user, L_PTE_XN | L_PTE_RDONLY | L_PTE_NONE)

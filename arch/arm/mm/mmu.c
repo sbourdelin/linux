@@ -70,6 +70,13 @@ pgprot_t pgprot_hyp_device;
 pgprot_t pgprot_s2;
 pgprot_t pgprot_s2_device;
 
+/* For LPAE hold the value of Inner or Outer Shared attribute selected at
+ * early init, which starts out as inner shared
+ * For non_LPAE these are always just the single S Bit
+ */
+pmdval_t pmd_sect_s    = PMD_SECT_EARLY_S;
+pteval_t l_pte_shared  = L_PTE_EARLY_SHARED;
+
 EXPORT_SYMBOL(pgprot_user);
 EXPORT_SYMBOL(pgprot_kernel);
 
@@ -246,12 +253,12 @@ __setup("noalign", noalign_setup);
 static struct mem_type mem_types[] = {
 	[MT_DEVICE] = {		  /* Strongly ordered / ARMv6 shared device */
 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_SHARED |
-				  L_PTE_SHARED,
+				  L_PTE_EARLY_SHARED,
 		.prot_pte_s2	= s2_policy(PROT_PTE_S2_DEVICE) |
 				  s2_policy(L_PTE_S2_MT_DEV_SHARED) |
-				  L_PTE_SHARED,
+				  L_PTE_EARLY_SHARED,
 		.prot_l1	= PMD_TYPE_TABLE,
-		.prot_sect	= PROT_SECT_DEVICE | PMD_SECT_S,
+		.prot_sect	= PROT_SECT_DEVICE | PMD_SECT_EARLY_S,
 		.domain		= DOMAIN_IO,
 	},
 	[MT_DEVICE_NONSHARED] = { /* ARMv6 non-shared device */
@@ -340,8 +347,9 @@ static struct mem_type mem_types[] = {
 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
 				L_PTE_MT_UNCACHED | L_PTE_XN,
 		.prot_l1   = PMD_TYPE_TABLE,
-		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_S |
-				PMD_SECT_UNCACHED | PMD_SECT_XN,
+		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
+				PMD_SECT_EARLY_S | PMD_SECT_UNCACHED |
+				PMD_SECT_XN,
 		.domain    = DOMAIN_KERNEL,
 	},
 	[MT_MEMORY_DMA_READY] = {
@@ -422,6 +430,15 @@ void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
 	local_flush_tlb_kernel_range(vaddr, vaddr + PAGE_SIZE);
 }
 
+#ifdef CONFIG_ARM_LPAE
+static void __init fixup_mem_type_shared(struct mem_type *pmt)
+{
+	pmt->prot_sect   = (pmt->prot_sect   & ~PMD_SECT_SMASK) | pmd_sect_s;
+	pmt->prot_pte    = (pmt->prot_pte    & ~PTE_EXT_SMASK)  | l_pte_shared;
+	pmt->prot_pte_s2 = (pmt->prot_pte_s2 & ~PTE_EXT_SMASK)  | l_pte_shared;
+}
+#endif
+
 /*
  * Adjust the PMD section entries according to the CPU in use.
  */
@@ -449,14 +466,24 @@ static void __init build_mem_type_table(void)
 		ecc_mask = 0;
 	}
 
+#ifdef CONFIG_ARM_LPAE
+	if (pmd_sect_s != PMD_SECT_EARLY_S)
+		/* we are using different sharable value than was set at
+		 * compile time, fixup the mem types
+		 */
+		for (i = 0; i < ARRAY_SIZE(mem_types); i++)
+			if (mem_types[i].prot_sect & PMD_SECT_SMASK)
+				fixup_mem_type_shared(&mem_types[i]);
+#endif
+
 	if (is_smp()) {
 		if (cachepolicy != CPOLICY_WRITEALLOC) {
 			pr_warn("Forcing write-allocate cache policy for SMP\n");
 			cachepolicy = CPOLICY_WRITEALLOC;
 		}
-		if (!(initial_pmd_value & PMD_SECT_S)) {
+		if (!(initial_pmd_value & PMD_SECT_SMASK)) {
 			pr_warn("Forcing shared mappings for SMP\n");
-			initial_pmd_value |= PMD_SECT_S;
+			initial_pmd_value |= pmd_sect_s;
 		}
 	}
 
@@ -470,7 +497,7 @@ static void __init build_mem_type_table(void)
 			mem_types[i].prot_sect &= ~PMD_SECT_TEX(7);
 	if ((cpu_arch < CPU_ARCH_ARMv6 || !(cr & CR_XP)) && !cpu_is_xsc3())
 		for (i = 0; i < ARRAY_SIZE(mem_types); i++)
-			mem_types[i].prot_sect &= ~PMD_SECT_S;
+			mem_types[i].prot_sect &= ~PMD_SECT_SMASK;
 
 	/*
 	 * ARMv5 and lower, bit 4 must be set for page tables (was: cache
@@ -592,25 +619,25 @@ static void __init build_mem_type_table(void)
 #endif
 
 		/*
-		 * If the initial page tables were created with the S bit
-		 * set, then we need to do the same here for the same
-		 * reasons given in early_cachepolicy().
+		 * If we are using shared mode (ex SMP)
+		 * then we need to add the shared attribute to all needed
+		 * mem_types
 		 */
-		if (initial_pmd_value & PMD_SECT_S) {
+		if (initial_pmd_value & PMD_SECT_SMASK) {
 			user_pgprot |= L_PTE_SHARED;
 			kern_pgprot |= L_PTE_SHARED;
 			vecs_pgprot |= L_PTE_SHARED;
 			s2_pgprot |= L_PTE_SHARED;
-			mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_S;
+			mem_types[MT_DEVICE_WC].prot_sect |= pmd_sect_s;
 			mem_types[MT_DEVICE_WC].prot_pte |= L_PTE_SHARED;
-			mem_types[MT_DEVICE_CACHED].prot_sect |= PMD_SECT_S;
+			mem_types[MT_DEVICE_CACHED].prot_sect |= pmd_sect_s;
 			mem_types[MT_DEVICE_CACHED].prot_pte |= L_PTE_SHARED;
-			mem_types[MT_MEMORY_RWX].prot_sect |= PMD_SECT_S;
+			mem_types[MT_MEMORY_RWX].prot_sect |= pmd_sect_s;
 			mem_types[MT_MEMORY_RWX].prot_pte |= L_PTE_SHARED;
-			mem_types[MT_MEMORY_RW].prot_sect |= PMD_SECT_S;
+			mem_types[MT_MEMORY_RW].prot_sect |= pmd_sect_s;
 			mem_types[MT_MEMORY_RW].prot_pte |= L_PTE_SHARED;
 			mem_types[MT_MEMORY_DMA_READY].prot_pte |= L_PTE_SHARED;
-			mem_types[MT_MEMORY_RWX_NONCACHED].prot_sect |= PMD_SECT_S;
+			mem_types[MT_MEMORY_RWX_NONCACHED].prot_sect |= pmd_sect_s;
 			mem_types[MT_MEMORY_RWX_NONCACHED].prot_pte |= L_PTE_SHARED;
 		}
 	}
@@ -1508,6 +1535,25 @@ bool __init attr_mod_add(struct attr_mod_entry *pmod)
 
 	attr_mod_table[num_attr_mods++] = *pmod;
 	return true;
+}
+
+/* use outer shared wherever we would have used inner shared */
+bool __init use_outer_shared(void)
+{
+	struct attr_mod_entry mod = {
+		.test_mask   = PTE_EXT_SMASK,
+		.test_value  = PTE_EXT_ISHARED,
+		.clear_mask  = PTE_EXT_SMASK,
+		.set_mask    = PTE_EXT_OSHARED
+	};
+
+	if (attr_mod_add(&mod) >= 0) {
+		l_pte_shared = PTE_EXT_OSHARED;
+		pmd_sect_s   = PMD_SECT_OSHARED;
+		return true;
+	}
+
+	return false;
 }
 
 /*

@@ -30,6 +30,7 @@ struct attr_mod_entry {
 };
 
 bool attr_mod_add(struct attr_mod_entry *pmod);
+bool use_outer_shared(void);
 
 extern int num_attr_mods;
 extern struct attr_mod_entry attr_mod_table[MAX_ATTR_MOD_ENTRIES];

@@ -38,7 +38,7 @@
 
 /* PTWs cacheable, inner WBWA shareable, outer WBWA not shareable */
 #define TTB_FLAGS_SMP	(TTB_IRGN_WBWA|TTB_S|TTB_RGN_OC_WBWA)
-#define PMD_FLAGS_SMP	(PMD_SECT_WBWA|PMD_SECT_S)
+#define PMD_FLAGS_SMP	(PMD_SECT_WBWA|PMD_SECT_EARLY_S)
 
 #ifndef __ARMEB__
 #  define rpgdl	r0

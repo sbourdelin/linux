@@ -68,10 +68,24 @@ static const struct prot_bits pte_bits[] = {
 		.set	= "NX",
 		.clear	= "x ",
 	}, {
+#ifndef CONFIG_ARM_LPAE
 		.mask	= L_PTE_SHARED,
 		.val	= L_PTE_SHARED,
 		.set	= "SHD",
 		.clear	= "   ",
+#else
+		.mask	= PTE_EXT_SMASK,
+		.val	= PTE_EXT_ISHARED,
+		.set	= "ISHD",
+	}, {
+		.mask	= PTE_EXT_SMASK,
+		.val	= PTE_EXT_OSHARED,
+		.set	= "OSHD",
+	}, {
+		.mask	= PTE_EXT_SMASK,
+		.val	= 0,
+		.set	= "    ",
+#endif
 	}, {
 		.mask	= L_PTE_MT_MASK,
 		.val	= L_PTE_MT_UNCACHED,
@@ -172,10 +186,24 @@ static const struct prot_bits section_bits[] = {
 		.set	= "NX",
 		.clear	= "x ",
 	}, {
+#ifndef CONFIG_ARM_LPAE
 		.mask	= PMD_SECT_S,
 		.val	= PMD_SECT_S,
 		.set	= "SHD",
 		.clear	= "   ",
+#else
+		.mask	= PMD_SECT_SMASK,
+		.val	= PMD_SECT_ISHARED,
+		.set	= "ISHD",
+	}, {
+		.mask	= PMD_SECT_SMASK,
+		.val	= PMD_SECT_OSHARED,
+		.set	= "OSHD",
+	}, {
+		.mask	= PMD_SECT_SMASK,
+		.val	= 0,
+		.set	= "    ",
+#endif
 	},
 };
 

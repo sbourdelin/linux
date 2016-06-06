@@ -93,4 +93,10 @@
 
 #define PHYS_MASK		(~0UL)
 
+/* These are here to share more code between 2level & 3level */
+#define L_PTE_EARLY_SHARED	PTE_EXT_SHARED
+#define PTE_EXT_SMASK		PTE_EXT_SHARED
+#define PMD_SECT_EARLY_S	PMD_SECT_S
+#define PMD_SECT_SMASK		PMD_SECT_S
+
 #endif

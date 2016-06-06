@@ -44,7 +44,9 @@
 #define PMD_SECT_CACHEABLE	(_AT(pmdval_t, 1) << 3)
 #define PMD_SECT_USER		(_AT(pmdval_t, 1) << 6)		/* AP[1] */
 #define PMD_SECT_AP2		(_AT(pmdval_t, 1) << 7)		/* read only */
-#define PMD_SECT_S		(_AT(pmdval_t, 3) << 8)
+#define PMD_SECT_SMASK		(_AT(pmdval_t, 3) << 8)		/* shareable bits */
+#define PMD_SECT_ISHARED	(_AT(pmdval_t, 3) << 8)		/* inner sharable */
+#define PMD_SECT_OSHARED	(_AT(pmdval_t, 2) << 8)		/* outer sharable */
 #define PMD_SECT_AF		(_AT(pmdval_t, 1) << 10)
 #define PMD_SECT_nG		(_AT(pmdval_t, 1) << 11)
 #define PMD_SECT_PXN		(_AT(pmdval_t, 1) << 53)
@@ -73,11 +75,19 @@
 #define PTE_BUFFERABLE		(_AT(pteval_t, 1) << 2)		/* AttrIndx[0] */
 #define PTE_CACHEABLE		(_AT(pteval_t, 1) << 3)		/* AttrIndx[1] */
 #define PTE_AP2			(_AT(pteval_t, 1) << 7)		/* AP[2] */
-#define PTE_EXT_SHARED		(_AT(pteval_t, 3) << 8)		/* SH[1:0], inner shareable */
+#define PTE_EXT_SMASK		(_AT(pteval_t, 3) << 8)		/* SH[1:0], shareable */
+#define PTE_EXT_ISHARED	(_AT(pteval_t, 3) << 8)		/* SH[1:0], inner shareable */
+#define PTE_EXT_OSHARED	(_AT(pteval_t, 2) << 8)		/* SH[1:0], outer shareable */
 #define PTE_EXT_AF		(_AT(pteval_t, 1) << 10)	/* Access Flag */
 #define PTE_EXT_NG		(_AT(pteval_t, 1) << 11)	/* nG */
 #define PTE_EXT_PXN		(_AT(pteval_t, 1) << 53)	/* PXN */
 #define PTE_EXT_XN		(_AT(pteval_t, 1) << 54)	/* XN */
+
+/* in early boot we assume inner shared,
+ * afterward use L_PTE_SHARED but only in code, can't be static initializer
+ */
+#define L_PTE_EARLY_SHARED	PTE_EXT_ISHARED
+#define PMD_SECT_EARLY_S	PMD_SECT_ISHARED
 
 /*
  * 40-bit physical address supported.
