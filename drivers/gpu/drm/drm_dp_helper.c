@@ -465,6 +465,20 @@ int drm_dp_downstream_port_cap(struct drm_dp_aux *aux,
 }
 EXPORT_SYMBOL(drm_dp_downstream_port_cap);
 
+/**
+ * drm_dp_downstream_type() - extract downstream port type
+ * @dpcd: DisplayPort configuration data
+ * @port_cap: port capabilities
+ *
+ * Returns type in success or negative error code on failure
+ */
+int drm_dp_downstream_type(const u8 dpcd[DP_RECEIVER_CAP_SIZE],
+			   const u8 port_cap[4])
+{
+	return port_cap[0] & DP_DS_PORT_TYPE_MASK;
+}
+EXPORT_SYMBOL(drm_dp_downstream_type);
+
 /*
  * I2C-over-AUX implementation
  */
