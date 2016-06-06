@@ -200,6 +200,23 @@ intel_dp_mode_valid(struct drm_connector *connector,
 	int target_clock = mode->clock;
 	int max_rate, mode_rate, max_lanes, max_link_clock;
 	int max_dotclk = to_i915(connector->dev)->max_dotclk_freq;
+	bool is_branch_device;
+	int max_dp_clk;
+	int type;
+	uint8_t port_cap[4];
+
+	is_branch_device = intel_dp->dpcd[DP_DOWNSTREAMPORT_PRESENT] &
+		DP_DWN_STRM_PORT_PRESENT;
+
+	if (is_branch_device) {
+		drm_dp_downstream_port_cap(&intel_dp->aux, intel_dp->dpcd, port_cap);
+		type = drm_dp_downstream_type(intel_dp->dpcd, port_cap);
+		max_dp_clk = drm_dp_downstream_max_clock(intel_dp->dpcd, port_cap);
+
+		if ((type == DP_DS_PORT_TYPE_VGA) && (max_dp_clk > 0)) {
+			max_dotclk = min(max_dotclk, max_dp_clk);
+		}
+	}
 
 	if (is_edp(intel_dp) && fixed_mode) {
 		if (mode->hdisplay > fixed_mode->hdisplay)
