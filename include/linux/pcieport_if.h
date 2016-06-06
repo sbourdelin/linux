@@ -67,4 +67,17 @@ struct pcie_port_service_driver {
 int pcie_port_service_register(struct pcie_port_service_driver *new);
 void pcie_port_service_unregister(struct pcie_port_service_driver *new);
 
+/**
+ * module_pcie_port_service() - Helper macro for registering a PCI driver
+ * @__port_service: pcie_port_service struct
+ *
+ * Helper macro for PCIe port service drivers which do not do anything
+ * special in module init/exit. This eliminates a lot of boilerplate. Each
+ * module may only use this macro once, and calling it replaces
+ * module_init() and module_exit()
+ */
+#define module_pcie_port_service(__port_service) \
+	module_driver(__port_service, pcie_port_service_register, \
+		      pcie_port_service_unregister)
+
 #endif /* _PCIEPORT_IF_H_ */
