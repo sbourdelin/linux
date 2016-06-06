@@ -446,6 +446,7 @@
 #define DP_SINK_OUI			    0x400
 #define DP_BRANCH_OUI			    0x500
 #define DP_BRANCH_ID                        0x503
+#define DP_BRANCH_HW_REV                    0x509
 
 #define DP_SET_POWER                        0x600
 # define DP_SET_POWER_D0                    0x1
@@ -803,6 +804,11 @@ struct drm_dp_link {
 	unsigned long capabilities;
 };
 
+struct drm_dp_revision {
+       int major;
+       int minor;
+};
+
 int drm_dp_link_probe(struct drm_dp_aux *aux, struct drm_dp_link *link);
 int drm_dp_link_power_up(struct drm_dp_aux *aux, struct drm_dp_link *link);
 int drm_dp_link_power_down(struct drm_dp_aux *aux, struct drm_dp_link *link);
@@ -816,6 +822,7 @@ int drm_dp_downstream_max_clock(const u8 dpcd[DP_RECEIVER_CAP_SIZE],
 int drm_dp_downstream_max_bpc(const u8 dpcd[DP_RECEIVER_CAP_SIZE],
                               const u8 port_cap[4]);
 int drm_dp_downstream_id(struct drm_dp_aux *aux, char id[6]);
+struct drm_dp_revision drm_dp_downstream_hw_rev(struct drm_dp_aux *aux);
 
 int drm_dp_aux_register(struct drm_dp_aux *aux);
 void drm_dp_aux_unregister(struct drm_dp_aux *aux);
