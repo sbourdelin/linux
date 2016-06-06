@@ -1,0 +1,111 @@
+# -*- coding: utf-8; mode: make -*-
+# Makefile for restructuredText (reST) content
+
+export PYTHONPATH := $(abspath ../scripts/site-python/):$(PYTHONPATH)
+
+ifndef obj
+  obj := .
+endif
+
+CACHE          := $(obj)/cache
+BOOKS_FOLDER   := books
+DIST           := $(obj)/dist
+
+# External programs used
+
+SPHINXBUILD    := sphinx-build
+PDFLATEX       := pdflatex
+
+BOOKS := $(filter %/, $(wildcard $(BOOKS_FOLDER)/*/))
+BOOKS := $(BOOKS:%/=%)
+BOOKS_HTML := $(patsubst %, %.html, $(BOOKS))
+BOOKS_HTML_CLEAN := $(patsubst %, %.clean, $(BOOKS))
+
+# sphinx-doc setup
+SPHINXOPTS  :=
+PAPER       :=
+
+PAPEROPT_a4     = -D latex_paper_size=a4
+PAPEROPT_letter = -D latex_paper_size=letter
+ALLSPHINXOPTS   = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) .
+# the i18n builder cannot share the environment and doctrees with the others
+I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) .
+
+FMT = cat
+ifeq ($(shell which fmt >/dev/null 2>&1; echo $$?), 0)
+FMT = fmt
+endif
+
+# ------------------------------------------------------------------------------
+# requirements
+# ------------------------------------------------------------------------------
+
+.PHONY: sphinx-doc
+
+ifeq ($(shell which $(SPHINXBUILD) >/dev/null 2>&1; echo $$?), 1)
+sphinx-doc: msg-SphinxDoc
+	$(error The '$(SPHINXBUILD)' command was not found)
+else
+sphinx-doc:
+	@:
+endif
+
+msg-SphinxDoc:
+	@echo "\nsphinx-doc:\n\n\
+ Make sure you have an updated Sphinx installed, grab it from\
+ http://sphinx-doc.org or install it from the python package\
+ manager (pip). \n\n\
+ On debian based OS these requirements are installed by::\n\n\
+   sudo apt-get install pip \n\n\
+   pip install Sphinx\n" | $(FMT)
+
+# ------------------------------------------------------------------------------
+# usage
+# ------------------------------------------------------------------------------
+
+.PHONY: help help-requirements
+help:
+	@echo "Please use \`make <target>' where <target> is one of ..."
+	@echo
+	@echo "all-HTML : builds all HTML outputs/targets"
+	@echo
+	@echo "make {book/*} : builds only the HTML of {book}, valid"
+	@echo "    values for {book/*} are: \n\n    $(BOOKS_HTML)" | $(FMT)
+	@echo
+	@echo "The output formats are placed into folder:"
+	@echo
+	@echo "    $(DIST)"
+	@echo
+
+help-requirements: msg-SphinxDoc
+
+
+# ------------------------------------------------------------------------------
+# main targets
+# ------------------------------------------------------------------------------
+
+.PHONY: all-HTML clean-HTML $(BOOKS_HTML)
+
+all-HTML: sphinx-doc $(BOOKS_HTML)
+clean-HTML: clean-books.html
+
+$(DIST):
+	mkdir -p $(DIST)
+
+# ------------------------------------------------------------------------------
+# BOOKs
+# ------------------------------------------------------------------------------
+
+# reST-book --> HTML (sphinx-doc projects)
+# ----------------------------------------
+
+$(BOOKS_HTML): sphinx-doc | $(DIST)
+	@echo "building $@ ..."
+	SPHPROJ_CONF=$(patsubst %.html,%.conf,$@) $(SPHINXBUILD) -c . -b html -d $(CACHE)/doctrees/$(patsubst %.html,%,$@) $(patsubst %.html,%,$@) $(DIST)/$(patsubst %.html,%,$@)
+
+$(BOOKS_HTML_CLEAN):
+	rm -rf $(DIST)/$(patsubst %.clean,%,$@) $(CACHE)/doctrees/$(patsubst %.clean,%,$@)
+
+.PHONY: clean-books.html
+clean-books.html: $(BOOKS_HTML_CLEAN)
+
