@@ -3911,6 +3911,17 @@ intel_dp_detect_dpcd(struct intel_dp *intel_dp)
 {
 	uint8_t *dpcd = intel_dp->dpcd;
 	uint8_t type;
+	uint8_t cap[4];
+
+	if (dpcd[DP_DOWNSTREAMPORT_PRESENT] & DP_DWN_STRM_PORT_PRESENT) {
+		int bpc;
+
+		drm_dp_downstream_port_cap(&intel_dp->aux, dpcd, cap);
+		bpc = drm_dp_downstream_max_bpc(dpcd, cap);
+
+		if (bpc > 0)
+			intel_dp->attached_connector->base.display_info.bpc = bpc;
+	}
 
 	if (!intel_dp_get_dpcd(intel_dp))
 		return connector_status_disconnected;
@@ -3947,6 +3958,7 @@ intel_dp_detect_dpcd(struct intel_dp *intel_dp)
 		    type == DP_DWN_STRM_PORT_TYPE_OTHER)
 			return connector_status_unknown;
 	}
+
 
 	/* Anything else is out of spec, warn and ignore */
 	DRM_DEBUG_KMS("Broken DP branch device, ignoring\n");
