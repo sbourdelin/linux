@@ -10,6 +10,7 @@
 #include <linux/debugfs.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/of_device.h>
 #include <linux/of_platform.h>
 
 #include <drm/drm_atomic.h>
@@ -341,11 +342,6 @@ static struct drm_driver sti_driver = {
 	.minor = DRIVER_MINOR,
 };
 
-static int compare_of(struct device *dev, void *data)
-{
-	return dev->of_node == data;
-}
-
 static void release_of(struct device *dev, void *data)
 {
 	of_node_put(data);
@@ -381,7 +377,7 @@ static int sti_platform_probe(struct platform_device *pdev)
 
 	while (child_np) {
 		component_match_add_release(dev, &match, release_of,
-					    compare_of, child_np);
+					    of_device_match, child_np);
 		child_np = of_get_next_available_child(node, child_np);
 	}
 
