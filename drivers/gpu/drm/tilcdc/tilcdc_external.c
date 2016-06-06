@@ -9,6 +9,7 @@
  */
 
 #include <linux/component.h>
+#include <linux/of_device.h>
 #include <linux/of_graph.h>
 
 #include "tilcdc_drv.h"
@@ -130,11 +131,6 @@ void tilcdc_remove_external_encoders(struct drm_device *dev)
 						 priv->connector_funcs[i]);
 }
 
-static int dev_match_of(struct device *dev, void *data)
-{
-	return dev->of_node == data;
-}
-
 static void dev_release_of(struct device *dev, void *data)
 {
 	of_node_put(data);
@@ -158,7 +154,7 @@ int tilcdc_get_external_components(struct device *dev,
 		dev_dbg(dev, "Subdevice node '%s' found\n", node->name);
 		if (match)
 			component_match_add_release(dev, match, dev_release_of,
-						    dev_match_of, node);
+						    of_device_match, node);
 		count++;
 	}
 
