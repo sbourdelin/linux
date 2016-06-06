@@ -14,6 +14,7 @@
 #include <linux/clk.h>
 #include <linux/component.h>
 #include <linux/list.h>
+#include <linux/of_device.h>
 #include <linux/of_graph.h>
 #include <linux/of_reserved_mem.h>
 #include <linux/pm_runtime.h>
@@ -429,11 +430,6 @@ static const struct component_master_ops hdlcd_master_ops = {
 	.unbind		= hdlcd_drm_unbind,
 };
 
-static int compare_of(struct device *dev, void *data)
-{
-	return dev->of_node == data;
-}
-
 static void release_of(struct device *dev, void *data)
 {
 	of_node_put(data);
@@ -466,7 +462,7 @@ static int hdlcd_probe(struct platform_device *pdev)
 	}
 
 	component_match_add_release(&pdev->dev, &match, release_of,
-				    compare_of, port);
+				    of_device_match, port);
 
 	return component_master_add_with_match(&pdev->dev, &hdlcd_master_ops,
 					       match);
