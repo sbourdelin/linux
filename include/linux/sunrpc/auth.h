@@ -95,7 +95,7 @@ struct rpc_auth {
 				/* for gss, used to calculate au_rslack: */
 	unsigned int		au_verfsize;
 
-	unsigned int		au_flags;	/* various flags */
+	unsigned long		au_flags;	/* various flags */
 	const struct rpc_authops *au_ops;		/* operations */
 	rpc_authflavor_t	au_flavor;	/* pseudoflavor (note may
 						 * differ from the flavor in
@@ -106,6 +106,9 @@ struct rpc_auth {
 	struct rpc_cred_cache *	au_credcache;
 	/* per-flavor data */
 };
+
+/* au_flags */
+#define RPCAUTH_AUTH_DATATOUCH	0
 
 struct rpc_auth_create_args {
 	rpc_authflavor_t pseudoflavor;

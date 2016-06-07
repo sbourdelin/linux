@@ -990,7 +990,8 @@ gss_create_new(struct rpc_auth_create_args *args, struct rpc_clnt *clnt)
 
 	if (!try_module_get(THIS_MODULE))
 		return ERR_PTR(err);
-	if (!(gss_auth = kmalloc(sizeof(*gss_auth), GFP_KERNEL)))
+	gss_auth = kzalloc(sizeof(*gss_auth), GFP_KERNEL);
+	if (!gss_auth)
 		goto out_dec;
 	INIT_HLIST_NODE(&gss_auth->hash);
 	gss_auth->target_name = NULL;
@@ -1017,6 +1018,8 @@ gss_create_new(struct rpc_auth_create_args *args, struct rpc_clnt *clnt)
 	auth->au_rslack = GSS_VERF_SLACK >> 2;
 	auth->au_ops = &authgss_ops;
 	auth->au_flavor = flavor;
+	if (gss_pseudoflavor_to_datatouch(gss_auth->mech, flavor))
+		set_bit(RPCAUTH_AUTH_DATATOUCH, &auth->au_flags);
 	atomic_set(&auth->au_count, 1);
 	kref_init(&gss_auth->kref);
 
