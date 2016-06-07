@@ -35,30 +35,6 @@
 /* Maximum scatter/gather per FMR */
 #define RPCRDMA_MAX_FMR_SGES	(64)
 
-static struct workqueue_struct *fmr_recovery_wq;
-
-#define FMR_RECOVERY_WQ_FLAGS		(WQ_UNBOUND)
-
-int
-fmr_alloc_recovery_wq(void)
-{
-	fmr_recovery_wq = alloc_workqueue("fmr_recovery", WQ_UNBOUND, 0);
-	return !fmr_recovery_wq ? -ENOMEM : 0;
-}
-
-void
-fmr_destroy_recovery_wq(void)
-{
-	struct workqueue_struct *wq;
-
-	if (!fmr_recovery_wq)
-		return;
-
-	wq = fmr_recovery_wq;
-	fmr_recovery_wq = NULL;
-	destroy_workqueue(wq);
-}
-
 static int
 __fmr_unmap(struct rpcrdma_mw *mw)
 {
@@ -68,53 +44,29 @@ __fmr_unmap(struct rpcrdma_mw *mw)
 	return ib_unmap_fmr(&l);
 }
 
-static void
-__fmr_dma_unmap(struct rpcrdma_mw *mw)
-{
-	struct rpcrdma_xprt *r_xprt = mw->mw_xprt;
-
-	ib_dma_unmap_sg(r_xprt->rx_ia.ri_device,
-			mw->mw_sg, mw->mw_nents, mw->mw_dir);
-	rpcrdma_put_mw(r_xprt, mw);
-}
-
+/* Reset of a single FMR.
+ *
+ * There's no recovery if this fails. The FMR is abandoned, but
+ * remains in rb_all. It will be cleaned up when the transport is
+ * destroyed.
+ */
 static void
 __fmr_reset_and_unmap(struct rpcrdma_mw *mw)
 {
+	struct rpcrdma_xprt *r_xprt = mw->mw_xprt;
 	int rc;
 
 	/* ORDER */
 	rc = __fmr_unmap(mw);
+	ib_dma_unmap_sg(r_xprt->rx_ia.ri_device,
+			mw->mw_sg, mw->mw_nents, mw->mw_dir);
 	if (rc) {
 		pr_warn("rpcrdma: ib_unmap_fmr status %d, fmr %p orphaned\n",
 			rc, mw);
 		return;
 	}
-	__fmr_dma_unmap(mw);
+	rpcrdma_put_mw(r_xprt, mw);
  }
-
-/* Deferred reset of a single FMR. Generate a fresh rkey by
- * replacing the MR. There's no recovery if this fails.
- */
-static void
-__fmr_recovery_worker(struct work_struct *work)
-{
-	struct rpcrdma_mw *mw = container_of(work, struct rpcrdma_mw,
-					     mw_work);
-
-	__fmr_reset_and_unmap(mw);
-	return;
-}
-
-/* A broken MR was discovered in a context that can't sleep.
- * Defer recovery to the recovery worker.
- */
-static void
-__fmr_queue_recovery(struct rpcrdma_mw *mw)
-{
-	INIT_WORK(&mw->mw_work, __fmr_recovery_worker);
-	queue_work(fmr_recovery_wq, &mw->mw_work);
-}
 
 static void
 __fmr_release(struct rpcrdma_mw *r)
@@ -140,6 +92,12 @@ fmr_op_open(struct rpcrdma_ia *ia, struct rpcrdma_ep *ep,
 						      RPCRDMA_MAX_DATA_SEGS /
 						      RPCRDMA_MAX_FMR_SGES));
 	return 0;
+}
+
+static void
+fmr_op_recover_mr(struct rpcrdma_mw *mw)
+{
+	__fmr_reset_and_unmap(mw);
 }
 
 /* FMR mode conveys up to 64 pages of payload per chunk segment.
@@ -287,7 +245,9 @@ out_maperr:
 	pr_err("rpcrdma: ib_map_phys_fmr %u@0x%llx+%i (%d) status %i\n",
 	       len, (unsigned long long)dma_pages[0],
 	       pageoff, mw->mw_nents, rc);
-	__fmr_dma_unmap(mw);
+	ib_dma_unmap_sg(r_xprt->rx_ia.ri_device,
+			mw->mw_sg, mw->mw_nents, mw->mw_dir);
+	rpcrdma_put_mw(r_xprt, mw);
 	return rc;
 }
 
@@ -331,7 +291,9 @@ fmr_op_unmap_sync(struct rpcrdma_xprt *r_xprt, struct rpcrdma_req *req)
 		seg = &req->rl_segments[i];
 		mw = seg->rl_mw;
 
-		__fmr_dma_unmap(mw);
+		ib_dma_unmap_sg(r_xprt->rx_ia.ri_device,
+				mw->mw_sg, mw->mw_nents, mw->mw_dir);
+		rpcrdma_put_mw(r_xprt, mw);
 
 		i += seg->mr_nsegs;
 		seg->mr_nsegs = 0;
@@ -359,7 +321,7 @@ fmr_op_unmap_safe(struct rpcrdma_xprt *r_xprt, struct rpcrdma_req *req,
 		if (sync)
 			__fmr_reset_and_unmap(mw);
 		else
-			__fmr_queue_recovery(mw);
+			rpcrdma_defer_mr_recovery(mw);
 
 		i += seg->mr_nsegs;
 		seg->mr_nsegs = 0;
@@ -384,6 +346,7 @@ const struct rpcrdma_memreg_ops rpcrdma_fmr_memreg_ops = {
 	.ro_map				= fmr_op_map,
 	.ro_unmap_sync			= fmr_op_unmap_sync,
 	.ro_unmap_safe			= fmr_op_unmap_safe,
+	.ro_recover_mr			= fmr_op_recover_mr,
 	.ro_open			= fmr_op_open,
 	.ro_maxpages			= fmr_op_maxpages,
 	.ro_init			= fmr_op_init,

@@ -741,7 +741,6 @@ void xprt_rdma_cleanup(void)
 			__func__, rc);
 
 	rpcrdma_destroy_wq();
-	frwr_destroy_recovery_wq();
 
 	rc = xprt_unregister_transport(&xprt_rdma_bc);
 	if (rc)
@@ -753,20 +752,13 @@ int xprt_rdma_init(void)
 {
 	int rc;
 
-	rc = frwr_alloc_recovery_wq();
+	rc = rpcrdma_alloc_wq();
 	if (rc)
 		return rc;
-
-	rc = rpcrdma_alloc_wq();
-	if (rc) {
-		frwr_destroy_recovery_wq();
-		return rc;
-	}
 
 	rc = xprt_register_transport(&xprt_rdma);
 	if (rc) {
 		rpcrdma_destroy_wq();
-		frwr_destroy_recovery_wq();
 		return rc;
 	}
 
@@ -774,7 +766,6 @@ int xprt_rdma_init(void)
 	if (rc) {
 		xprt_unregister_transport(&xprt_rdma);
 		rpcrdma_destroy_wq();
-		frwr_destroy_recovery_wq();
 		return rc;
 	}
 
