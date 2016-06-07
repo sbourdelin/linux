@@ -309,11 +309,10 @@ static int fd_do_rw(struct target_iostate *ios, struct file *fd,
 }
 
 static sense_reason_t
-fd_execute_sync_cache(struct se_cmd *cmd)
+fd_execute_sync_cache(struct target_iostate *ios, bool immed)
 {
-	struct se_device *dev = cmd->se_dev;
+	struct se_device *dev = ios->se_dev;
 	struct fd_dev *fd_dev = FD_DEV(dev);
-	int immed = (cmd->t_task_cdb[1] & 0x2);
 	loff_t start, end;
 	int ret;
 
@@ -322,18 +321,18 @@ fd_execute_sync_cache(struct se_cmd *cmd)
 	 * for this SYNCHRONIZE_CACHE op
 	 */
 	if (immed)
-		target_complete_cmd(cmd, SAM_STAT_GOOD);
+		ios->t_comp_func(ios, SAM_STAT_GOOD);
 
 	/*
 	 * Determine if we will be flushing the entire device.
 	 */
-	if (cmd->t_iostate.t_task_lba == 0 && cmd->t_iostate.data_length == 0) {
+	if (ios->t_task_lba == 0 && ios->data_length == 0) {
 		start = 0;
 		end = LLONG_MAX;
 	} else {
-		start = cmd->t_iostate.t_task_lba * dev->dev_attrib.block_size;
-		if (cmd->t_iostate.data_length)
-			end = start + cmd->t_iostate.data_length - 1;
+		start = ios->t_task_lba * dev->dev_attrib.block_size;
+		if (ios->data_length)
+			end = start + ios->data_length - 1;
 		else
 			end = LLONG_MAX;
 	}
@@ -346,9 +345,9 @@ fd_execute_sync_cache(struct se_cmd *cmd)
 		return 0;
 
 	if (ret)
-		target_complete_cmd(cmd, SAM_STAT_CHECK_CONDITION);
+		ios->t_comp_func(ios, SAM_STAT_CHECK_CONDITION);
 	else
-		target_complete_cmd(cmd, SAM_STAT_GOOD);
+		ios->t_comp_func(ios, SAM_STAT_GOOD);
 
 	return 0;
 }

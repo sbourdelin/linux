@@ -463,12 +463,14 @@ sbc_execute_rw(struct target_iostate *ios)
 			       cmd->t_iostate.data_direction, fua_write, &target_complete_ios);
 }
 
-static sense_reason_t sbc_execute_sync_cache(struct target_iostate *ios)
+static sense_reason_t
+sbc_execute_sync_cache(struct target_iostate *ios)
 {
 	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct sbc_ops *ops = cmd->protocol_data;
+	bool immed = (cmd->t_task_cdb[1] & 0x2);
 
-	return ops->execute_sync_cache(cmd);
+	return ops->execute_sync_cache(ios, immed);
 }
 
 static sense_reason_t compare_and_write_post(struct se_cmd *cmd, bool success,

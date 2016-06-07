@@ -351,16 +351,16 @@ static void iblock_submit_bios(struct bio_list *list, int rw)
 
 static void iblock_end_io_flush(struct bio *bio)
 {
-	struct se_cmd *cmd = bio->bi_private;
+	struct target_iostate *ios = bio->bi_private;
 
 	if (bio->bi_error)
 		pr_err("IBLOCK: cache flush failed: %d\n", bio->bi_error);
 
-	if (cmd) {
+	if (ios) {
 		if (bio->bi_error)
-			target_complete_cmd(cmd, SAM_STAT_CHECK_CONDITION);
+			ios->t_comp_func(ios, SAM_STAT_CHECK_CONDITION);
 		else
-			target_complete_cmd(cmd, SAM_STAT_GOOD);
+			ios->t_comp_func(ios, SAM_STAT_GOOD);
 	}
 
 	bio_put(bio);
@@ -371,10 +371,9 @@ static void iblock_end_io_flush(struct bio *bio)
  * always flush the whole cache.
  */
 static sense_reason_t
-iblock_execute_sync_cache(struct se_cmd *cmd)
+iblock_execute_sync_cache(struct target_iostate *ios, bool immed)
 {
-	struct iblock_dev *ib_dev = IBLOCK_DEV(cmd->se_dev);
-	int immed = (cmd->t_task_cdb[1] & 0x2);
+	struct iblock_dev *ib_dev = IBLOCK_DEV(ios->se_dev);
 	struct bio *bio;
 
 	/*
@@ -382,13 +381,13 @@ iblock_execute_sync_cache(struct se_cmd *cmd)
 	 * for this SYNCHRONIZE_CACHE op.
 	 */
 	if (immed)
-		target_complete_cmd(cmd, SAM_STAT_GOOD);
+		ios->t_comp_func(ios, SAM_STAT_GOOD);
 
 	bio = bio_alloc(GFP_KERNEL, 0);
 	bio->bi_end_io = iblock_end_io_flush;
 	bio->bi_bdev = ib_dev->ibd_bd;
 	if (!immed)
-		bio->bi_private = cmd;
+		bio->bi_private = ios;
 	submit_bio(WRITE_FLUSH, bio);
 	return 0;
 }
