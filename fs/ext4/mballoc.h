@@ -59,10 +59,10 @@ extern ushort ext4_mballoc_debug;
 #define MB_DEFAULT_STATS		0
 
 /*
- * files smaller than MB_DEFAULT_STREAM_THRESHOLD are served
+ * files larger than MB_DEFAULT_STREAM_THRESHOLD are served
  * by the stream allocator, which purpose is to pack requests
  * as close each to other as possible to produce smooth I/O traffic
- * We use locality group prealloc space for stream request.
+ * We use locality group prealloc space for non stream request.
  * We can tune the same via /proc/fs/ext4/<parition>/stream_req
  */
 #define MB_DEFAULT_STREAM_THRESHOLD	16	/* 64K */
