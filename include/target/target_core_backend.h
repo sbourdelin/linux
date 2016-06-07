@@ -51,8 +51,8 @@ struct sbc_ops {
 	sense_reason_t (*execute_sync_cache)(struct target_iostate *ios, bool immed);
 	sense_reason_t (*execute_write_same)(struct target_iostate *ios,
 					sector_t (*get_sectors)(struct target_iostate *));
-	sense_reason_t (*execute_unmap)(struct se_cmd *cmd,
-				sector_t lba, sector_t nolb);
+	sense_reason_t (*execute_unmap)(struct target_iostate *ios,
+					sector_t lba, sector_t nolb);
 };
 
 int	transport_backend_register(const struct target_backend_ops *);

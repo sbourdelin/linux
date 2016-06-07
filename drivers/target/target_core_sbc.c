@@ -230,7 +230,7 @@ sbc_execute_write_same_unmap(struct target_iostate *ios)
 	sense_reason_t ret;
 
 	if (nolb) {
-		ret = ops->execute_unmap(cmd, cmd->t_iostate.t_task_lba, nolb);
+		ret = ops->execute_unmap(&cmd->t_iostate, cmd->t_iostate.t_task_lba, nolb);
 		if (ret)
 			return ret;
 	}
@@ -1260,7 +1260,7 @@ sbc_execute_unmap(struct target_iostate *ios)
 			goto err;
 		}
 
-		ret = ops->execute_unmap(cmd, lba, range);
+		ret = ops->execute_unmap(ios, lba, range);
 		if (ret)
 			goto err;
 

@@ -442,7 +442,7 @@ fd_do_prot_fill(struct se_device *se_dev, sector_t lba, sector_t nolb,
 }
 
 static int
-fd_do_prot_unmap(struct se_cmd *cmd, sector_t lba, sector_t nolb)
+fd_do_prot_unmap(struct se_device *dev, sector_t lba, sector_t nolb)
 {
 	void *buf;
 	int rc;
@@ -454,7 +454,7 @@ fd_do_prot_unmap(struct se_cmd *cmd, sector_t lba, sector_t nolb)
 	}
 	memset(buf, 0xff, PAGE_SIZE);
 
-	rc = fd_do_prot_fill(cmd->se_dev, lba, nolb, buf, PAGE_SIZE);
+	rc = fd_do_prot_fill(dev, lba, nolb, buf, PAGE_SIZE);
 
 	free_page((unsigned long)buf);
 
@@ -462,14 +462,15 @@ fd_do_prot_unmap(struct se_cmd *cmd, sector_t lba, sector_t nolb)
 }
 
 static sense_reason_t
-fd_execute_unmap(struct se_cmd *cmd, sector_t lba, sector_t nolb)
+fd_execute_unmap(struct target_iostate *ios, sector_t lba, sector_t nolb)
 {
-	struct file *file = FD_DEV(cmd->se_dev)->fd_file;
+	struct se_device *dev = ios->se_dev;
+	struct file *file = FD_DEV(dev)->fd_file;
 	struct inode *inode = file->f_mapping->host;
 	int ret;
 
-	if (cmd->se_dev->dev_attrib.pi_prot_type) {
-		ret = fd_do_prot_unmap(cmd, lba, nolb);
+	if (ios->se_dev->dev_attrib.pi_prot_type) {
+		ret = fd_do_prot_unmap(dev, lba, nolb);
 		if (ret)
 			return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 	}
@@ -477,11 +478,10 @@ fd_execute_unmap(struct se_cmd *cmd, sector_t lba, sector_t nolb)
 	if (S_ISBLK(inode->i_mode)) {
 		/* The backend is block device, use discard */
 		struct block_device *bdev = inode->i_bdev;
-		struct se_device *dev = cmd->se_dev;
 
 		ret = blkdev_issue_discard(bdev,
 					   target_to_linux_sector(dev, lba),
-					   target_to_linux_sector(dev,  nolb),
+					   target_to_linux_sector(dev, nolb),
 					   GFP_KERNEL, 0);
 		if (ret < 0) {
 			pr_warn("FILEIO: blkdev_issue_discard() failed: %d\n",
@@ -490,9 +490,8 @@ fd_execute_unmap(struct se_cmd *cmd, sector_t lba, sector_t nolb)
 		}
 	} else {
 		/* The backend is normal file, use fallocate */
-		struct se_device *se_dev = cmd->se_dev;
-		loff_t pos = lba * se_dev->dev_attrib.block_size;
-		unsigned int len = nolb * se_dev->dev_attrib.block_size;
+		loff_t pos = lba * dev->dev_attrib.block_size;
+		unsigned int len = nolb * dev->dev_attrib.block_size;
 		int mode = FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE;
 
 		if (!file->f_op->fallocate)
