@@ -1785,9 +1785,10 @@ static void ath9k_bss_info_changed(struct ieee80211_hw *hw,
 	if ((avp->chanctx == sc->cur_chan) &&
 	    (changed & BSS_CHANGED_ERP_SLOT)) {
 		if (bss_conf->use_short_slot)
-			slottime = 9;
+			slottime = ATH9K_SLOT_TIME_9;
 		else
-			slottime = 20;
+			slottime = ATH9K_SLOT_TIME_20;
+
 		if (vif->type == NL80211_IFTYPE_AP) {
 			/*
 			 * Defer update, so that connected stations can adjust
