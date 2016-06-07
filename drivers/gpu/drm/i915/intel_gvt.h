@@ -26,6 +26,42 @@
 
 #include "gvt/gvt.h"
 
+/*
+ * Under GVT-g, i915 host driver only owned limited graphics resources,
+ * others are managed by GVT-g resource allocator and kept for other vGPUs.
+ *
+ * For graphics memory space partition, a typical layout looks like:
+ *
+ * +-------+-----------------------+------+-----------------------+
+ * |* Host |   *GVT-g Resource     |* Host|   *GVT-g Resource     |
+ * | Owned |   Allocator Managed   | Owned|   Allocator Managed   |
+ * |       |                       |      |                       |
+ * +---------------+-------+----------------------+-------+-------+
+ * |       |       |       |       |      |       |       |       |
+ * | i915  | vm 1  | vm 2  | vm 3  | i915 | vm 1  | vm 2  | vm 3  |
+ * |       |       |       |       |      |       |       |       |
+ * +-------+-------+-------+--------------+-------+-------+-------+
+ * |           Aperture            |            Hidden            |
+ * +-------------------------------+------------------------------+
+ * |                       GGTT memory space                      |
+ * +--------------------------------------------------------------+
+ */
+
+/* GGTT memory space owned by host */
+/*
+ * This amount is heavily related to the max screen resolution / multiple
+ * display in *host*. If you are using a 4K monitor or multiple display
+ * monitor, probably you should enlarge the low gm size.
+ */
+#define INTEL_GVT_HOST_LOW_GM_SIZE (96 * 1024 * 1024)
+
+/*
+ * This amount is related to the GPU workload in host. If you wish to run
+ * heavy workload like 3D gaming, media transcoding *in host* and encounter
+ * performance drops, probably you should enlarge the high gm size.
+ */
+#define INTEL_GVT_HOST_HIGH_GM_SIZE (384 * 1024 * 1024)
+
 #ifdef CONFIG_DRM_I915_GVT
 extern int intel_gvt_init(struct drm_i915_private *dev_priv);
 extern void intel_gvt_cleanup(struct drm_i915_private *dev_priv);

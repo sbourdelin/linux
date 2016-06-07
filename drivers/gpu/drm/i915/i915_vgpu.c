@@ -189,13 +189,24 @@ int intel_vgt_balloon(struct drm_i915_private *dev_priv)
 	unsigned long unmappable_base, unmappable_size, unmappable_end;
 	int ret, i;
 
-	if (!intel_vgpu_active(dev_priv))
+	if (intel_gvt_active(dev_priv)) {
+		/* Retrieve GGTT partition information from macros */
+		mappable_base = 0;
+		mappable_size = INTEL_GVT_HOST_LOW_GM_SIZE;
+		unmappable_base = dev_priv->ggtt.mappable_end;
+		unmappable_size = INTEL_GVT_HOST_HIGH_GM_SIZE;
+	} else if (intel_vgpu_active(dev_priv)) {
+		/* Retrieve GGTT partition information from PVINFO */
+		mappable_base = I915_READ(
+				vgtif_reg(avail_rs.mappable_gmadr.base));
+		mappable_size = I915_READ(
+				vgtif_reg(avail_rs.mappable_gmadr.size));
+		unmappable_base = I915_READ(
+				vgtif_reg(avail_rs.nonmappable_gmadr.base));
+		unmappable_size = I915_READ(
+				vgtif_reg(avail_rs.nonmappable_gmadr.size));
+	} else
 		return 0;
-
-	mappable_base = I915_READ(vgtif_reg(avail_rs.mappable_gmadr.base));
-	mappable_size = I915_READ(vgtif_reg(avail_rs.mappable_gmadr.size));
-	unmappable_base = I915_READ(vgtif_reg(avail_rs.nonmappable_gmadr.base));
-	unmappable_size = I915_READ(vgtif_reg(avail_rs.nonmappable_gmadr.size));
 
 	mappable_end = mappable_base + mappable_size;
 	unmappable_end = unmappable_base + unmappable_size;
