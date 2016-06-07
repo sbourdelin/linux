@@ -187,7 +187,7 @@ int intel_vgt_balloon(struct drm_i915_private *dev_priv)
 
 	unsigned long mappable_base, mappable_size, mappable_end;
 	unsigned long unmappable_base, unmappable_size, unmappable_end;
-	int ret;
+	int ret, i;
 
 	if (!intel_vgpu_active(dev_priv))
 		return 0;
@@ -263,6 +263,9 @@ int intel_vgt_balloon(struct drm_i915_private *dev_priv)
 
 err:
 	DRM_ERROR("VGT balloon fail\n");
-	intel_vgt_deballoon(dev_priv);
+	for (i = 0; i < ARRAY_SIZE(bl_info.space); i++) {
+		if (bl_info.space[i].allocated)
+			drm_mm_remove_node(&bl_info.space[i]);
+	}
 	return ret;
 }
