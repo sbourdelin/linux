@@ -4,10 +4,13 @@ Required properties:
   - compatible: "pwm-backlight"
   - pwms: OF device-tree PWM specification (see PWM binding[0])
   - brightness-levels: Array of distinct brightness levels. Typically these
-      are in the range from 0 to 255, but any range starting at 0 will do.
+      are in the range from 0 to 255, but any range will do.
       The actual brightness level (PWM duty cycle) will be interpolated
-      from these values. 0 means a 0% duty cycle (darkest/off), while the
-      last value in the array represents a 100% duty cycle (brightest).
+      from these values. 0 means a 0% duty cycle, while the highest value in
+      the array represents a 100% duty cycle.
+      The range may be in reverse order (starting with the maximum duty cycle
+      value) to create a PWM signal with the 100% duty cycle representing
+      minimum and 0% duty cycle maximum brigthness.
   - default-brightness-level: the default brightness level (index into the
       array defined by the "brightness-levels" property)
   - power-supply: regulator for supply voltage
