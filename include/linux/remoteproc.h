@@ -443,6 +443,7 @@ struct rproc {
 	struct resource_table *cached_table;
 	u32 table_csum;
 	bool has_iommu;
+	bool has_rsctable;
 };
 
 /* we currently support only two vrings per rvdev */

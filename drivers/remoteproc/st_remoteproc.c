@@ -235,6 +235,8 @@ static int st_rproc_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	rproc->has_iommu = false;
+	rproc->has_rsctable = true;
+
 	ddata = rproc->priv;
 	ddata->config = (struct st_rproc_config *)match->data;
 

@@ -170,6 +170,7 @@ static int wkup_m3_rproc_probe(struct platform_device *pdev)
 	wkupm3 = rproc->priv;
 	wkupm3->rproc = rproc;
 	wkupm3->pdev = pdev;
+	rproc->has_rsctable = true;
 
 	for (i = 0; i < ARRAY_SIZE(mem_names); i++) {
 		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
