@@ -879,6 +879,7 @@ struct i915_gem_context {
 		bool initialised;
 	} engine[I915_NUM_ENGINES];
 	u32 lrc_ring_buffer_size;
+	u32 lrc_addressing_mode_bits;
 
 	struct list_head link;
 

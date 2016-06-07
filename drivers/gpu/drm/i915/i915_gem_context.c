@@ -296,6 +296,8 @@ __create_hw_context(struct drm_device *dev,
 
 	ctx->hang_stats.ban_period_seconds = DRM_I915_CTX_BAN_PERIOD;
 	ctx->lrc_ring_buffer_size = 4 * PAGE_SIZE;
+	ctx->lrc_addressing_mode_bits = GEN8_CTX_ADDRESSING_MODE(dev_priv) <<
+		GEN8_CTX_ADDRESSING_MODE_SHIFT;
 
 	return ctx;
 
