@@ -164,6 +164,14 @@ rdmab_to_msg(struct rpcrdma_regbuf *rb)
  */
 #define RPCRDMA_MAX_HDR_SEGS	(8)
 
+/* An R_key is 32 bits wide. 24 bits are fixed per QP, and
+ * 8 bits vary for each registered MR. Thus only 256 R_keys
+ * can be registered at one time per QP.
+ */
+enum {
+	RPCRDMA_RKEYS_PER_QP	= 256
+};
+
 /*
  * struct rpcrdma_rep -- this structure encapsulates state required to recv
  * and complete a reply, asychronously. It needs several pieces of
