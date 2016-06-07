@@ -676,8 +676,8 @@ static struct dfs_node {
 
 static int __init debugfs_init(void)
 {
-	int i;
 	u64 cap;
+	int i;
 
 	rdmsrl(MSR_IA32_MCG_CAP, cap);
 	n_banks = cap & MCG_BANKCNT_MASK;
@@ -700,26 +700,10 @@ static int __init debugfs_init(void)
 	return 0;
 
 err_dfs_add:
-	while (--i >= 0)
-		debugfs_remove(dfs_fls[i].d);
-
-	debugfs_remove(dfs_inj);
+	debugfs_remove_recursive(dfs_inj);
 	dfs_inj = NULL;
 
 	return -ENOMEM;
-}
-
-static void __exit debugfs_exit(void)
-{
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(dfs_fls); i++)
-		debugfs_remove(dfs_fls[i].d);
-
-	memset(&dfs_fls, 0, sizeof(dfs_fls));
-
-	debugfs_remove(dfs_inj);
-	dfs_inj = NULL;
 }
 
 static int inject_init(void)
@@ -752,6 +736,16 @@ module_init(inject_init);
  * guarantee all openers of mce_chrdev will get a reference to us.
  */
 #ifndef CONFIG_X86_MCELOG
+static void __exit debugfs_exit(void)
+{
+	debugfs_remove_recursive(dfs_inj);
+	dfs_inj = NULL;
+
+	unregister_nmi_handler(NMI_LOCAL, "mce_notify");
+
+	free_cpumask_var(mce_inject_cpumask);
+}
+
 module_exit(debugfs_exit);
 #endif
 
