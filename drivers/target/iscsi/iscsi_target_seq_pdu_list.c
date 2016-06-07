@@ -220,7 +220,7 @@ static void iscsit_determine_counts_for_list(
 	u32 mdsl;
 	struct iscsi_conn *conn = cmd->conn;
 
-	if (cmd->se_cmd.data_direction == DMA_TO_DEVICE)
+	if (cmd->se_cmd.t_iostate.data_direction == DMA_TO_DEVICE)
 		mdsl = cmd->conn->conn_ops->MaxXmitDataSegmentLength;
 	else
 		mdsl = cmd->conn->conn_ops->MaxRecvDataSegmentLength;
@@ -231,10 +231,10 @@ static void iscsit_determine_counts_for_list(
 
 	if ((bl->type == PDULIST_UNSOLICITED) ||
 	    (bl->type == PDULIST_IMMEDIATE_AND_UNSOLICITED))
-		unsolicited_data_length = min(cmd->se_cmd.data_length,
+		unsolicited_data_length = min(cmd->se_cmd.t_iostate.data_length,
 			conn->sess->sess_ops->FirstBurstLength);
 
-	while (offset < cmd->se_cmd.data_length) {
+	while (offset < cmd->se_cmd.t_iostate.data_length) {
 		*pdu_count += 1;
 
 		if (check_immediate) {
@@ -247,10 +247,10 @@ static void iscsit_determine_counts_for_list(
 			continue;
 		}
 		if (unsolicited_data_length > 0) {
-			if ((offset + mdsl) >= cmd->se_cmd.data_length) {
+			if ((offset + mdsl) >= cmd->se_cmd.t_iostate.data_length) {
 				unsolicited_data_length -=
-					(cmd->se_cmd.data_length - offset);
-				offset += (cmd->se_cmd.data_length - offset);
+					(cmd->se_cmd.t_iostate.data_length - offset);
+				offset += (cmd->se_cmd.t_iostate.data_length - offset);
 				continue;
 			}
 			if ((offset + mdsl)
@@ -269,8 +269,8 @@ static void iscsit_determine_counts_for_list(
 			unsolicited_data_length -= mdsl;
 			continue;
 		}
-		if ((offset + mdsl) >= cmd->se_cmd.data_length) {
-			offset += (cmd->se_cmd.data_length - offset);
+		if ((offset + mdsl) >= cmd->se_cmd.t_iostate.data_length) {
+			offset += (cmd->se_cmd.t_iostate.data_length - offset);
 			continue;
 		}
 		if ((burstlength + mdsl) >=
@@ -303,7 +303,7 @@ static int iscsit_do_build_pdu_and_seq_lists(
 	struct iscsi_pdu *pdu = cmd->pdu_list;
 	struct iscsi_seq *seq = cmd->seq_list;
 
-	if (cmd->se_cmd.data_direction == DMA_TO_DEVICE)
+	if (cmd->se_cmd.t_iostate.data_direction == DMA_TO_DEVICE)
 		mdsl = cmd->conn->conn_ops->MaxXmitDataSegmentLength;
 	else
 		mdsl = cmd->conn->conn_ops->MaxRecvDataSegmentLength;
@@ -317,10 +317,10 @@ static int iscsit_do_build_pdu_and_seq_lists(
 
 	if ((bl->type == PDULIST_UNSOLICITED) ||
 	    (bl->type == PDULIST_IMMEDIATE_AND_UNSOLICITED))
-		unsolicited_data_length = min(cmd->se_cmd.data_length,
+		unsolicited_data_length = min(cmd->se_cmd.t_iostate.data_length,
 			conn->sess->sess_ops->FirstBurstLength);
 
-	while (offset < cmd->se_cmd.data_length) {
+	while (offset < cmd->se_cmd.t_iostate.data_length) {
 		pdu_count++;
 		if (!datapduinorder) {
 			pdu[i].offset = offset;
@@ -354,21 +354,21 @@ static int iscsit_do_build_pdu_and_seq_lists(
 			continue;
 		}
 		if (unsolicited_data_length > 0) {
-			if ((offset + mdsl) >= cmd->se_cmd.data_length) {
+			if ((offset + mdsl) >= cmd->se_cmd.t_iostate.data_length) {
 				if (!datapduinorder) {
 					pdu[i].type = PDUTYPE_UNSOLICITED;
 					pdu[i].length =
-						(cmd->se_cmd.data_length - offset);
+						(cmd->se_cmd.t_iostate.data_length - offset);
 				}
 				if (!datasequenceinorder) {
 					seq[seq_no].type = SEQTYPE_UNSOLICITED;
 					seq[seq_no].pdu_count = pdu_count;
 					seq[seq_no].xfer_len = (burstlength +
-						(cmd->se_cmd.data_length - offset));
+						(cmd->se_cmd.t_iostate.data_length - offset));
 				}
 				unsolicited_data_length -=
-						(cmd->se_cmd.data_length - offset);
-				offset += (cmd->se_cmd.data_length - offset);
+						(cmd->se_cmd.t_iostate.data_length - offset);
+				offset += (cmd->se_cmd.t_iostate.data_length - offset);
 				continue;
 			}
 			if ((offset + mdsl) >=
@@ -406,18 +406,18 @@ static int iscsit_do_build_pdu_and_seq_lists(
 			unsolicited_data_length -= mdsl;
 			continue;
 		}
-		if ((offset + mdsl) >= cmd->se_cmd.data_length) {
+		if ((offset + mdsl) >= cmd->se_cmd.t_iostate.data_length) {
 			if (!datapduinorder) {
 				pdu[i].type = PDUTYPE_NORMAL;
-				pdu[i].length = (cmd->se_cmd.data_length - offset);
+				pdu[i].length = (cmd->se_cmd.t_iostate.data_length - offset);
 			}
 			if (!datasequenceinorder) {
 				seq[seq_no].type = SEQTYPE_NORMAL;
 				seq[seq_no].pdu_count = pdu_count;
 				seq[seq_no].xfer_len = (burstlength +
-					(cmd->se_cmd.data_length - offset));
+					(cmd->se_cmd.t_iostate.data_length - offset));
 			}
-			offset += (cmd->se_cmd.data_length - offset);
+			offset += (cmd->se_cmd.t_iostate.data_length - offset);
 			continue;
 		}
 		if ((burstlength + mdsl) >=

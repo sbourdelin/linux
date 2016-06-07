@@ -564,7 +564,7 @@ static int target_xcopy_setup_pt_cmd(
 	if (alloc_mem) {
 		rc = target_alloc_sgl(&cmd->t_iomem.t_data_sg,
 				      &cmd->t_iomem.t_data_nents,
-				      cmd->data_length, false, false);
+				      cmd->t_iostate.data_length, false, false);
 		if (rc < 0) {
 			ret = rc;
 			goto out;
@@ -607,7 +607,7 @@ static int target_xcopy_issue_pt_cmd(struct xcopy_pt_cmd *xpt_cmd)
 	if (sense_rc)
 		return -EINVAL;
 
-	if (se_cmd->data_direction == DMA_TO_DEVICE)
+	if (se_cmd->t_iostate.data_direction == DMA_TO_DEVICE)
 		target_execute_cmd(se_cmd);
 
 	wait_for_completion_interruptible(&xpt_cmd->xpt_passthrough_sem);
@@ -927,9 +927,9 @@ static sense_reason_t target_rcr_operating_parameters(struct se_cmd *se_cmd)
 		return TCM_OUT_OF_RESOURCES;
 	}
 
-	if (se_cmd->data_length < 54) {
+	if (se_cmd->t_iostate.data_length < 54) {
 		pr_err("Receive Copy Results Op Parameters length"
-		       " too small: %u\n", se_cmd->data_length);
+		       " too small: %u\n", se_cmd->t_iostate.data_length);
 		transport_kunmap_data_sg(se_cmd);
 		return TCM_INVALID_CDB_FIELD;
 	}
@@ -1013,7 +1013,7 @@ sense_reason_t target_do_receive_copy_results(struct se_cmd *se_cmd)
 	sense_reason_t rc = TCM_NO_SENSE;
 
 	pr_debug("Entering target_do_receive_copy_results: SA: 0x%02x, List ID:"
-		" 0x%02x, AL: %u\n", sa, list_id, se_cmd->data_length);
+		" 0x%02x, AL: %u\n", sa, list_id, se_cmd->t_iostate.data_length);
 
 	if (list_id != 0) {
 		pr_err("Receive Copy Results with non zero list identifier"

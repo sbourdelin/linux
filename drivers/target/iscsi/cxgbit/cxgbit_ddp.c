@@ -248,10 +248,10 @@ cxgbit_get_r2t_ttt(struct iscsi_conn *conn, struct iscsi_cmd *cmd,
 	ttinfo->sgl = cmd->se_cmd.t_iomem.t_data_sg;
 	ttinfo->nents = cmd->se_cmd.t_iomem.t_data_nents;
 
-	ret = cxgbit_ddp_reserve(csk, ttinfo, cmd->se_cmd.data_length);
+	ret = cxgbit_ddp_reserve(csk, ttinfo, cmd->se_cmd.t_iostate.data_length);
 	if (ret < 0) {
 		pr_info("csk 0x%p, cmd 0x%p, xfer len %u, sgcnt %u no ddp.\n",
-			csk, cmd, cmd->se_cmd.data_length, ttinfo->nents);
+			csk, cmd, cmd->se_cmd.t_iostate.data_length, ttinfo->nents);
 
 		ttinfo->sgl = NULL;
 		ttinfo->nents = 0;

@@ -84,7 +84,7 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 	lport = ep->lp;
 	cmd->seq = lport->tt.seq_start_next(cmd->seq);
 
-	remaining = se_cmd->data_length;
+	remaining = se_cmd->t_iostate.data_length;
 
 	/*
 	 * Setup to use first mem list entry, unless no data.
@@ -279,10 +279,10 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 		goto drop;
 	frame_len -= sizeof(*fh);
 	from = fc_frame_payload_get(fp, 0);
-	if (rel_off >= se_cmd->data_length)
+	if (rel_off >= se_cmd->t_iostate.data_length)
 		goto drop;
-	if (frame_len + rel_off > se_cmd->data_length)
-		frame_len = se_cmd->data_length - rel_off;
+	if (frame_len + rel_off > se_cmd->t_iostate.data_length)
+		frame_len = se_cmd->t_iostate.data_length - rel_off;
 
 	/*
 	 * Setup to use first mem list entry, unless no data.
@@ -328,7 +328,7 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 		cmd->write_data_len += tlen;
 	}
 last_frame:
-	if (cmd->write_data_len == se_cmd->data_length) {
+	if (cmd->write_data_len == se_cmd->t_iostate.data_length) {
 		INIT_WORK(&cmd->work, ft_execute_work);
 		queue_work(cmd->sess->tport->tpg->workqueue, &cmd->work);
 	}

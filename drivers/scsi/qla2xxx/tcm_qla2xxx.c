@@ -378,7 +378,7 @@ static int tcm_qla2xxx_write_pending(struct se_cmd *se_cmd)
 		return 0;
 	}
 	cmd->cmd_flags |= BIT_3;
-	cmd->bufflen = se_cmd->data_length;
+	cmd->bufflen = se_cmd->t_iostate.data_length;
 	cmd->dma_data_direction = target_reverse_dma_direction(se_cmd);
 
 	cmd->sg_cnt = se_cmd->t_iomem.t_data_nents;
@@ -592,7 +592,7 @@ static int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 	}
 
 	cmd->cmd_flags |= BIT_4;
-	cmd->bufflen = se_cmd->data_length;
+	cmd->bufflen = se_cmd->t_iostate.data_length;
 	cmd->dma_data_direction = target_reverse_dma_direction(se_cmd);
 
 	cmd->sg_cnt = se_cmd->t_iomem.t_data_nents;
@@ -617,7 +617,7 @@ static int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 				struct qla_tgt_cmd, se_cmd);
 	int xmit_type = QLA_TGT_XMIT_STATUS;
 
-	cmd->bufflen = se_cmd->data_length;
+	cmd->bufflen = se_cmd->t_iostate.data_length;
 	cmd->sg = NULL;
 	cmd->sg_cnt = 0;
 	cmd->offset = 0;
@@ -628,7 +628,7 @@ static int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 	}
 	cmd->cmd_flags |= BIT_5;
 
-	if (se_cmd->data_direction == DMA_FROM_DEVICE) {
+	if (se_cmd->t_iostate.data_direction == DMA_FROM_DEVICE) {
 		/*
 		 * For FCP_READ with CHECK_CONDITION status, clear cmd->bufflen
 		 * for qla_tgt_xmit_response LLD code
@@ -638,7 +638,7 @@ static int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 			se_cmd->residual_count = 0;
 		}
 		se_cmd->se_cmd_flags |= SCF_UNDERFLOW_BIT;
-		se_cmd->residual_count += se_cmd->data_length;
+		se_cmd->residual_count += se_cmd->t_iostate.data_length;
 
 		cmd->bufflen = 0;
 	}

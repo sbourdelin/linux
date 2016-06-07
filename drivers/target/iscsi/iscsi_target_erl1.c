@@ -1115,8 +1115,8 @@ static int iscsit_set_dataout_timeout_values(
 	if (cmd->unsolicited_data) {
 		*offset = 0;
 		*length = (conn->sess->sess_ops->FirstBurstLength >
-			   cmd->se_cmd.data_length) ?
-			   cmd->se_cmd.data_length :
+			   cmd->se_cmd.t_iostate.data_length) ?
+			   cmd->se_cmd.t_iostate.data_length :
 			   conn->sess->sess_ops->FirstBurstLength;
 		return 0;
 	}
@@ -1187,8 +1187,8 @@ static void iscsit_handle_dataout_timeout(unsigned long data)
 		if (conn->sess->sess_ops->DataPDUInOrder) {
 			pdu_offset = cmd->write_data_done;
 			if ((pdu_offset + (conn->sess->sess_ops->MaxBurstLength -
-			     cmd->next_burst_len)) > cmd->se_cmd.data_length)
-				pdu_length = (cmd->se_cmd.data_length -
+			     cmd->next_burst_len)) > cmd->se_cmd.t_iostate.data_length)
+				pdu_length = (cmd->se_cmd.t_iostate.data_length -
 					cmd->write_data_done);
 			else
 				pdu_length = (conn->sess->sess_ops->MaxBurstLength -

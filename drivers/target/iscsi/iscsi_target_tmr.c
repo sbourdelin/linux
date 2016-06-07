@@ -280,9 +280,9 @@ static int iscsit_task_reassign_complete_write(
 		offset = cmd->next_burst_len = cmd->write_data_done;
 
 		if ((conn->sess->sess_ops->FirstBurstLength - offset) >=
-		     cmd->se_cmd.data_length) {
+		     cmd->se_cmd.t_iostate.data_length) {
 			no_build_r2ts = 1;
-			length = (cmd->se_cmd.data_length - offset);
+			length = (cmd->se_cmd.t_iostate.data_length - offset);
 		} else
 			length = (conn->sess->sess_ops->FirstBurstLength - offset);
 

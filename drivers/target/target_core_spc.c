@@ -752,7 +752,7 @@ spc_emulate_inquiry(struct se_cmd *cmd)
 out:
 	rbuf = transport_kmap_data_sg(cmd);
 	if (rbuf) {
-		memcpy(rbuf, buf, min_t(u32, SE_INQUIRY_BUF, cmd->data_length));
+		memcpy(rbuf, buf, min_t(u32, SE_INQUIRY_BUF, cmd->t_iostate.data_length));
 		transport_kunmap_data_sg(cmd);
 	}
 	kfree(buf);
@@ -1099,7 +1099,7 @@ set_length:
 
 	rbuf = transport_kmap_data_sg(cmd);
 	if (rbuf) {
-		memcpy(rbuf, buf, min_t(u32, SE_MODE_PAGE_BUF, cmd->data_length));
+		memcpy(rbuf, buf, min_t(u32, SE_MODE_PAGE_BUF, cmd->t_iostate.data_length));
 		transport_kunmap_data_sg(cmd);
 	}
 
@@ -1120,12 +1120,12 @@ static sense_reason_t spc_emulate_modeselect(struct se_cmd *cmd)
 	sense_reason_t ret = 0;
 	int i;
 
-	if (!cmd->data_length) {
+	if (!cmd->t_iostate.data_length) {
 		target_complete_cmd(cmd, GOOD);
 		return 0;
 	}
 
-	if (cmd->data_length < off + 2)
+	if (cmd->t_iostate.data_length < off + 2)
 		return TCM_PARAMETER_LIST_LENGTH_ERROR;
 
 	buf = transport_kmap_data_sg(cmd);
@@ -1152,7 +1152,7 @@ static sense_reason_t spc_emulate_modeselect(struct se_cmd *cmd)
 	goto out;
 
 check_contents:
-	if (cmd->data_length < off + length) {
+	if (cmd->t_iostate.data_length < off + length) {
 		ret = TCM_PARAMETER_LIST_LENGTH_ERROR;
 		goto out;
 	}
@@ -1194,7 +1194,7 @@ static sense_reason_t spc_emulate_request_sense(struct se_cmd *cmd)
 	else
 		scsi_build_sense_buffer(desc_format, buf, NO_SENSE, 0x0, 0x0);
 
-	memcpy(rbuf, buf, min_t(u32, sizeof(buf), cmd->data_length));
+	memcpy(rbuf, buf, min_t(u32, sizeof(buf), cmd->t_iostate.data_length));
 	transport_kunmap_data_sg(cmd);
 
 	target_complete_cmd(cmd, GOOD);
@@ -1212,7 +1212,7 @@ sense_reason_t spc_emulate_report_luns(struct se_cmd *cmd)
 	__be32 len;
 
 	buf = transport_kmap_data_sg(cmd);
-	if (cmd->data_length && !buf)
+	if (cmd->t_iostate.data_length && !buf)
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 
 	/*
@@ -1233,12 +1233,12 @@ sense_reason_t spc_emulate_report_luns(struct se_cmd *cmd)
 		 * See SPC2-R20 7.19.
 		 */
 		lun_count++;
-		if (offset >= cmd->data_length)
+		if (offset >= cmd->t_iostate.data_length)
 			continue;
 
 		int_to_scsilun(deve->mapped_lun, &slun);
 		memcpy(buf + offset, &slun,
-		       min(8u, cmd->data_length - offset));
+		       min(8u, cmd->t_iostate.data_length - offset));
 		offset += 8;
 	}
 	rcu_read_unlock();
@@ -1252,15 +1252,15 @@ done:
 	 */
 	if (lun_count == 0) {
 		int_to_scsilun(0, &slun);
-		if (cmd->data_length > 8)
+		if (cmd->t_iostate.data_length > 8)
 			memcpy(buf + offset, &slun,
-			       min(8u, cmd->data_length - offset));
+			       min(8u, cmd->t_iostate.data_length - offset));
 		lun_count = 1;
 	}
 
 	if (buf) {
 		len = cpu_to_be32(lun_count * 8);
-		memcpy(buf, &len, min_t(int, sizeof len, cmd->data_length));
+		memcpy(buf, &len, min_t(int, sizeof len, cmd->t_iostate.data_length));
 		transport_kunmap_data_sg(cmd);
 	}
 
@@ -1316,7 +1316,7 @@ spc_parse_cdb(struct se_cmd *cmd, unsigned int *size)
 		if (cdb[0] == RELEASE_10)
 			*size = (cdb[7] << 8) | cdb[8];
 		else
-			*size = cmd->data_length;
+			*size = cmd->t_iostate.data_length;
 
 		cmd->execute_cmd = target_scsi2_reservation_release;
 		break;
@@ -1329,7 +1329,7 @@ spc_parse_cdb(struct se_cmd *cmd, unsigned int *size)
 		if (cdb[0] == RESERVE_10)
 			*size = (cdb[7] << 8) | cdb[8];
 		else
-			*size = cmd->data_length;
+			*size = cmd->t_iostate.data_length;
 
 		cmd->execute_cmd = target_scsi2_reservation_reserve;
 		break;

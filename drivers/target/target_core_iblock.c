@@ -430,7 +430,8 @@ iblock_execute_write_same_direct(struct block_device *bdev, struct se_cmd *cmd)
 	}
 
 	ret = blkdev_issue_write_same(bdev,
-				target_to_linux_sector(dev, cmd->t_task_lba),
+				target_to_linux_sector(dev,
+					cmd->t_iostate.t_task_lba),
 				target_to_linux_sector(dev,
 					sbc_get_write_same_sectors(cmd)),
 				GFP_KERNEL, page ? page : sg_page(sg));
@@ -452,11 +453,11 @@ iblock_execute_write_same(struct se_cmd *cmd)
 	struct bio *bio;
 	struct bio_list list;
 	struct se_device *dev = cmd->se_dev;
-	sector_t block_lba = target_to_linux_sector(dev, cmd->t_task_lba);
+	sector_t block_lba = target_to_linux_sector(dev, cmd->t_iostate.t_task_lba);
 	sector_t sectors = target_to_linux_sector(dev,
 					sbc_get_write_same_sectors(cmd));
 
-	if (cmd->prot_op) {
+	if (cmd->t_iostate.prot_op) {
 		pr_err("WRITE_SAME: Protection information with IBLOCK"
 		       " backends not supported\n");
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
@@ -643,7 +644,7 @@ iblock_alloc_bip(struct se_cmd *cmd, struct bio *bio)
 		return PTR_ERR(bip);
 	}
 
-	bip->bip_iter.bi_size = (cmd->data_length / dev->dev_attrib.block_size) *
+	bip->bip_iter.bi_size = (cmd->t_iostate.data_length / dev->dev_attrib.block_size) *
 			 dev->prot_length;
 	bip->bip_iter.bi_sector = bio->bi_iter.bi_sector;
 
@@ -671,7 +672,7 @@ iblock_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 		  enum dma_data_direction data_direction)
 {
 	struct se_device *dev = cmd->se_dev;
-	sector_t block_lba = target_to_linux_sector(dev, cmd->t_task_lba);
+	sector_t block_lba = target_to_linux_sector(dev, cmd->t_iostate.t_task_lba);
 	struct iblock_req *ibr;
 	struct bio *bio, *bio_start;
 	struct bio_list list;
@@ -751,7 +752,7 @@ iblock_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 		sg_num--;
 	}
 
-	if (cmd->prot_type && dev->dev_attrib.pi_prot_type) {
+	if (cmd->t_iostate.prot_type && dev->dev_attrib.pi_prot_type) {
 		int rc = iblock_alloc_bip(cmd, bio_start);
 		if (rc)
 			goto fail_put_bios;

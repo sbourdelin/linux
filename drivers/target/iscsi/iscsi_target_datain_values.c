@@ -108,7 +108,7 @@ static struct iscsi_datain_req *iscsit_set_datain_values_yes_and_yes(
 	read_data_done = (!dr->recovery) ?
 			cmd->read_data_done : dr->read_data_done;
 
-	read_data_left = (cmd->se_cmd.data_length - read_data_done);
+	read_data_left = (cmd->se_cmd.t_iostate.data_length - read_data_done);
 	if (!read_data_left) {
 		pr_err("ITT: 0x%08x read_data_left is zero!\n",
 				cmd->init_task_tag);
@@ -207,7 +207,7 @@ static struct iscsi_datain_req *iscsit_set_datain_values_no_and_yes(
 	seq_send_order = (!dr->recovery) ?
 			cmd->seq_send_order : dr->seq_send_order;
 
-	read_data_left = (cmd->se_cmd.data_length - read_data_done);
+	read_data_left = (cmd->se_cmd.t_iostate.data_length - read_data_done);
 	if (!read_data_left) {
 		pr_err("ITT: 0x%08x read_data_left is zero!\n",
 				cmd->init_task_tag);
@@ -226,8 +226,8 @@ static struct iscsi_datain_req *iscsit_set_datain_values_no_and_yes(
 	offset = (seq->offset + seq->next_burst_len);
 
 	if ((offset + conn->conn_ops->MaxRecvDataSegmentLength) >=
-	     cmd->se_cmd.data_length) {
-		datain->length = (cmd->se_cmd.data_length - offset);
+	     cmd->se_cmd.t_iostate.data_length) {
+		datain->length = (cmd->se_cmd.t_iostate.data_length - offset);
 		datain->offset = offset;
 
 		datain->flags |= ISCSI_FLAG_CMD_FINAL;
@@ -259,7 +259,7 @@ static struct iscsi_datain_req *iscsit_set_datain_values_no_and_yes(
 		}
 	}
 
-	if ((read_data_done + datain->length) == cmd->se_cmd.data_length)
+	if ((read_data_done + datain->length) == cmd->se_cmd.t_iostate.data_length)
 		datain->flags |= ISCSI_FLAG_DATA_STATUS;
 
 	datain->data_sn = (!dr->recovery) ? cmd->data_sn++ : dr->data_sn++;
@@ -328,7 +328,7 @@ static struct iscsi_datain_req *iscsit_set_datain_values_yes_and_no(
 	read_data_done = (!dr->recovery) ?
 			cmd->read_data_done : dr->read_data_done;
 
-	read_data_left = (cmd->se_cmd.data_length - read_data_done);
+	read_data_left = (cmd->se_cmd.t_iostate.data_length - read_data_done);
 	if (!read_data_left) {
 		pr_err("ITT: 0x%08x read_data_left is zero!\n",
 				cmd->init_task_tag);
@@ -339,7 +339,7 @@ static struct iscsi_datain_req *iscsit_set_datain_values_yes_and_no(
 	if (!pdu)
 		return dr;
 
-	if ((read_data_done + pdu->length) == cmd->se_cmd.data_length) {
+	if ((read_data_done + pdu->length) == cmd->se_cmd.t_iostate.data_length) {
 		pdu->flags |= (ISCSI_FLAG_CMD_FINAL | ISCSI_FLAG_DATA_STATUS);
 		if (conn->sess->sess_ops->ErrorRecoveryLevel > 0)
 			pdu->flags |= ISCSI_FLAG_DATA_ACK;
@@ -428,7 +428,7 @@ static struct iscsi_datain_req *iscsit_set_datain_values_no_and_no(
 	seq_send_order = (!dr->recovery) ?
 			cmd->seq_send_order : dr->seq_send_order;
 
-	read_data_left = (cmd->se_cmd.data_length - read_data_done);
+	read_data_left = (cmd->se_cmd.t_iostate.data_length - read_data_done);
 	if (!read_data_left) {
 		pr_err("ITT: 0x%08x read_data_left is zero!\n",
 				cmd->init_task_tag);
@@ -458,7 +458,7 @@ static struct iscsi_datain_req *iscsit_set_datain_values_no_and_no(
 	} else
 		seq->next_burst_len += pdu->length;
 
-	if ((read_data_done + pdu->length) == cmd->se_cmd.data_length)
+	if ((read_data_done + pdu->length) == cmd->se_cmd.t_iostate.data_length)
 		pdu->flags |= ISCSI_FLAG_DATA_STATUS;
 
 	pdu->data_sn = (!dr->recovery) ? cmd->data_sn++ : dr->data_sn++;

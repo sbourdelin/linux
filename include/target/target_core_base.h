@@ -449,6 +449,29 @@ struct target_iomem {
 	unsigned int		t_prot_nents;
 };
 
+struct target_iostate {
+	unsigned long long	t_task_lba;
+	unsigned int		t_task_nolb;
+	/* Total size in bytes associated with command */
+	unsigned int		data_length;
+	/* See include/linux/dma-mapping.h */
+	enum dma_data_direction data_direction;
+
+	/* DIF related members */
+	enum target_prot_op	prot_op;
+	enum target_prot_type	prot_type;
+	u8			prot_checks;
+	bool			prot_pto;
+	u32			prot_length;
+	u32			reftag_seed;
+	sector_t		bad_sector;
+
+	struct target_iomem	*iomem;
+	struct se_device	*se_dev;
+	void			(*t_comp_func)(struct target_iostate *, u16);
+	void			*priv;
+};
+
 struct se_cmd {
 	/* SAM response code being sent to initiator */
 	u8			scsi_status;
@@ -461,8 +484,6 @@ struct se_cmd {
 	u64			tag; /* SAM command identifier aka task tag */
 	/* Delay for ALUA Active/NonOptimized state access in milliseconds */
 	int			alua_nonop_delay;
-	/* See include/linux/dma-mapping.h */
-	enum dma_data_direction	data_direction;
 	/* For SAM Task Attribute */
 	int			sam_task_attr;
 	/* Used for se_sess->sess_tag_pool */
@@ -471,8 +492,6 @@ struct se_cmd {
 	enum transport_state_table t_state;
 	/* See se_cmd_flags_table */
 	u32			se_cmd_flags;
-	/* Total size in bytes associated with command */
-	u32			data_length;
 	u32			residual_count;
 	u64			orig_fe_lun;
 	/* Persistent Reservation key */
@@ -495,8 +514,7 @@ struct se_cmd {
 
 	unsigned char		*t_task_cdb;
 	unsigned char		__t_task_cdb[TCM_MAX_COMMAND_SIZE];
-	unsigned long long	t_task_lba;
-	unsigned int		t_task_nolb;
+
 	unsigned int		transport_state;
 #define CMD_T_ABORTED		(1 << 0)
 #define CMD_T_ACTIVE		(1 << 1)
@@ -512,6 +530,7 @@ struct se_cmd {
 	struct completion	t_transport_stop_comp;
 
 	struct work_struct	work;
+	struct target_iostate	t_iostate;
 	struct target_iomem	t_iomem;
 
 	/* Used for lun->lun_ref counting */
@@ -522,15 +541,7 @@ struct se_cmd {
 	/* backend private data */
 	void			*priv;
 
-	/* DIF related members */
-	enum target_prot_op	prot_op;
-	enum target_prot_type	prot_type;
-	u8			prot_checks;
-	bool			prot_pto;
-	u32			prot_length;
-	u32			reftag_seed;
 	sense_reason_t		pi_err;
-	sector_t		bad_sector;
 	int			cpuid;
 };
 

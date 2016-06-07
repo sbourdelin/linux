@@ -197,7 +197,7 @@ target_reverse_dma_direction(struct se_cmd *se_cmd)
 	if (se_cmd->se_cmd_flags & SCF_BIDI)
 		return DMA_BIDIRECTIONAL;
 
-	switch (se_cmd->data_direction) {
+	switch (se_cmd->t_iostate.data_direction) {
 	case DMA_TO_DEVICE:
 		return DMA_FROM_DEVICE;
 	case DMA_FROM_DEVICE:

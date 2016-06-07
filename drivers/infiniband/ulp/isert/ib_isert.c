@@ -65,7 +65,7 @@ static inline bool
 isert_prot_cmd(struct isert_conn *conn, struct se_cmd *cmd)
 {
 	return (conn->pi_support &&
-		cmd->prot_op != TARGET_PROT_NORMAL);
+		cmd->t_iostate.prot_op != TARGET_PROT_NORMAL);
 }
 
 
@@ -1111,7 +1111,7 @@ isert_handle_scsi_cmd(struct isert_conn *isert_conn,
 	imm_data = cmd->immediate_data;
 	imm_data_len = cmd->first_burst_len;
 	unsol_data = cmd->unsolicited_data;
-	data_len = cmd->se_cmd.data_length;
+	data_len = cmd->se_cmd.t_iostate.data_length;
 
 	if (imm_data && imm_data_len == data_len)
 		cmd->se_cmd.se_cmd_flags |= SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC;
@@ -1143,7 +1143,7 @@ isert_handle_scsi_cmd(struct isert_conn *isert_conn,
 
 	cmd->write_data_done += imm_data_len;
 
-	if (cmd->write_data_done == cmd->se_cmd.data_length) {
+	if (cmd->write_data_done == cmd->se_cmd.t_iostate.data_length) {
 		spin_lock_bh(&cmd->istate_lock);
 		cmd->cmd_flags |= ICF_GOT_LAST_DATAOUT;
 		cmd->i_state = ISTATE_RECEIVED_LAST_DATAOUT;
@@ -1189,7 +1189,7 @@ isert_handle_iscsi_dataout(struct isert_conn *isert_conn,
 	isert_dbg("Unsolicited DataOut unsol_data_len: %u, "
 		  "write_data_done: %u, data_length: %u\n",
 		  unsol_data_len,  cmd->write_data_done,
-		  cmd->se_cmd.data_length);
+		  cmd->se_cmd.t_iostate.data_length);
 
 	sg_off = cmd->write_data_done / PAGE_SIZE;
 	sg_start = &cmd->se_cmd.t_iomem.t_data_sg[sg_off];
@@ -1614,12 +1614,12 @@ isert_check_pi_status(struct se_cmd *se_cmd, struct ib_mr *sig_mr)
 		}
 		sec_offset_err = mr_status.sig_err.sig_err_offset;
 		do_div(sec_offset_err, block_size);
-		se_cmd->bad_sector = sec_offset_err + se_cmd->t_task_lba;
+		se_cmd->t_iostate.bad_sector = sec_offset_err + se_cmd->t_iostate.t_task_lba;
 
 		isert_err("PI error found type %d at sector 0x%llx "
 			  "expected 0x%x vs actual 0x%x\n",
 			  mr_status.sig_err.err_type,
-			  (unsigned long long)se_cmd->bad_sector,
+			  (unsigned long long)se_cmd->t_iostate.bad_sector,
 			  mr_status.sig_err.expected,
 			  mr_status.sig_err.actual);
 		ret = 1;
@@ -2025,7 +2025,7 @@ isert_set_dif_domain(struct se_cmd *se_cmd, struct ib_sig_attrs *sig_attrs,
 	domain->sig_type = IB_SIG_TYPE_T10_DIF;
 	domain->sig.dif.bg_type = IB_T10DIF_CRC;
 	domain->sig.dif.pi_interval = se_cmd->se_dev->dev_attrib.block_size;
-	domain->sig.dif.ref_tag = se_cmd->reftag_seed;
+	domain->sig.dif.ref_tag = se_cmd->t_iostate.reftag_seed;
 	/*
 	 * At the moment we hard code those, but if in the future
 	 * the target core would like to use it, we will take it
@@ -2034,17 +2034,19 @@ isert_set_dif_domain(struct se_cmd *se_cmd, struct ib_sig_attrs *sig_attrs,
 	domain->sig.dif.apptag_check_mask = 0xffff;
 	domain->sig.dif.app_escape = true;
 	domain->sig.dif.ref_escape = true;
-	if (se_cmd->prot_type == TARGET_DIF_TYPE1_PROT ||
-	    se_cmd->prot_type == TARGET_DIF_TYPE2_PROT)
+	if (se_cmd->t_iostate.prot_type == TARGET_DIF_TYPE1_PROT ||
+	    se_cmd->t_iostate.prot_type == TARGET_DIF_TYPE2_PROT)
 		domain->sig.dif.ref_remap = true;
 };
 
 static int
 isert_set_sig_attrs(struct se_cmd *se_cmd, struct ib_sig_attrs *sig_attrs)
 {
+	struct target_iostate *ios = &se_cmd->t_iostate;
+
 	memset(sig_attrs, 0, sizeof(*sig_attrs));
 
-	switch (se_cmd->prot_op) {
+	switch (se_cmd->t_iostate.prot_op) {
 	case TARGET_PROT_DIN_INSERT:
 	case TARGET_PROT_DOUT_STRIP:
 		sig_attrs->mem.sig_type = IB_SIG_TYPE_NONE;
@@ -2061,14 +2063,14 @@ isert_set_sig_attrs(struct se_cmd *se_cmd, struct ib_sig_attrs *sig_attrs)
 		isert_set_dif_domain(se_cmd, sig_attrs, &sig_attrs->mem);
 		break;
 	default:
-		isert_err("Unsupported PI operation %d\n", se_cmd->prot_op);
+		isert_err("Unsupported PI operation %d\n", se_cmd->t_iostate.prot_op);
 		return -EINVAL;
 	}
 
 	sig_attrs->check_mask =
-	       (se_cmd->prot_checks & TARGET_DIF_CHECK_GUARD  ? 0xc0 : 0) |
-	       (se_cmd->prot_checks & TARGET_DIF_CHECK_REFTAG ? 0x30 : 0) |
-	       (se_cmd->prot_checks & TARGET_DIF_CHECK_REFTAG ? 0x0f : 0);
+	       (ios->prot_checks & TARGET_DIF_CHECK_GUARD  ? 0xc0 : 0) |
+	       (ios->prot_checks & TARGET_DIF_CHECK_REFTAG ? 0x30 : 0) |
+	       (ios->prot_checks & TARGET_DIF_CHECK_REFTAG ? 0x0f : 0);
 	return 0;
 }
 
@@ -2133,7 +2135,7 @@ isert_put_datain(struct iscsi_conn *conn, struct iscsi_cmd *cmd)
 	int rc;
 
 	isert_dbg("Cmd: %p RDMA_WRITE data_length: %u\n",
-		 isert_cmd, se_cmd->data_length);
+		 isert_cmd, se_cmd->t_iostate.data_length);
 
 	if (isert_prot_cmd(isert_conn, se_cmd)) {
 		isert_cmd->tx_desc.tx_cqe.done = isert_rdma_write_done;
@@ -2168,9 +2170,10 @@ static int
 isert_get_dataout(struct iscsi_conn *conn, struct iscsi_cmd *cmd, bool recovery)
 {
 	struct isert_cmd *isert_cmd = iscsit_priv_cmd(cmd);
+	struct se_cmd *se_cmd = &cmd->se_cmd;
 
 	isert_dbg("Cmd: %p RDMA_READ data_length: %u write_data_done: %u\n",
-		 isert_cmd, cmd->se_cmd.data_length, cmd->write_data_done);
+		 isert_cmd, se_cmd->t_iostate.data_length, cmd->write_data_done);
 
 	isert_cmd->tx_desc.tx_cqe.done = isert_rdma_read_done;
 	isert_rdma_rw_ctx_post(isert_cmd, conn->context,
@@ -2556,7 +2559,7 @@ isert_put_unsol_pending_cmds(struct iscsi_conn *conn)
 	list_for_each_entry_safe(cmd, tmp, &conn->conn_cmd_list, i_conn_node) {
 		if ((cmd->cmd_flags & ICF_NON_IMMEDIATE_UNSOLICITED_DATA) &&
 		    (cmd->write_data_done < conn->sess->sess_ops->FirstBurstLength) &&
-		    (cmd->write_data_done < cmd->se_cmd.data_length))
+		    (cmd->write_data_done < cmd->se_cmd.t_iostate.data_length))
 			list_move_tail(&cmd->i_conn_node, &drop_cmd_list);
 	}
 	spin_unlock_bh(&conn->cmd_lock);

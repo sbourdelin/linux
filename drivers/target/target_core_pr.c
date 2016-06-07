@@ -497,7 +497,7 @@ static int core_scsi3_pr_seq_non_holder(struct se_cmd *cmd, u32 pr_reg_type,
 	 * WRITE_EXCLUSIVE_* reservation.
 	 */
 	if (we && !registered_nexus) {
-		if (cmd->data_direction == DMA_TO_DEVICE) {
+		if (cmd->t_iostate.data_direction == DMA_TO_DEVICE) {
 			/*
 			 * Conflict for write exclusive
 			 */
@@ -545,7 +545,7 @@ static int core_scsi3_pr_seq_non_holder(struct se_cmd *cmd, u32 pr_reg_type,
                 * Reads are allowed for Write Exclusive locks
                 * from all registrants.
                 */
-               if (cmd->data_direction == DMA_FROM_DEVICE) {
+               if (cmd->t_iostate.data_direction == DMA_FROM_DEVICE) {
                        pr_debug("Allowing READ CDB: 0x%02x for %s"
                                " reservation\n", cdb[0],
                                core_scsi3_pr_dump_type(pr_reg_type));
@@ -1543,9 +1543,9 @@ core_scsi3_decode_spec_i_port(
 	tidh_new->dest_se_deve = NULL;
 	list_add_tail(&tidh_new->dest_list, &tid_dest_list);
 
-	if (cmd->data_length < 28) {
+	if (cmd->t_iostate.data_length < 28) {
 		pr_warn("SPC-PR: Received PR OUT parameter list"
-			" length too small: %u\n", cmd->data_length);
+			" length too small: %u\n", cmd->t_iostate.data_length);
 		ret = TCM_INVALID_PARAMETER_LIST;
 		goto out;
 	}
@@ -1566,10 +1566,10 @@ core_scsi3_decode_spec_i_port(
 	tpdl |= (buf[26] & 0xff) << 8;
 	tpdl |= buf[27] & 0xff;
 
-	if ((tpdl + 28) != cmd->data_length) {
+	if ((tpdl + 28) != cmd->t_iostate.data_length) {
 		pr_err("SPC-3 PR: Illegal tpdl: %u + 28 byte header"
-			" does not equal CDB data_length: %u\n", tpdl,
-			cmd->data_length);
+			" does not equal CDB t_iostate.data_length: %u\n", tpdl,
+			cmd->t_iostate.data_length);
 		ret = TCM_INVALID_PARAMETER_LIST;
 		goto out_unmap;
 	}
@@ -1658,9 +1658,9 @@ core_scsi3_decode_spec_i_port(
 			goto out_unmap;
 		}
 
-		pr_debug("SPC-3 PR SPEC_I_PT: Got %s data_length: %u tpdl: %u"
+		pr_debug("SPC-3 PR SPEC_I_PT: Got %s t_iostate.data_length: %u tpdl: %u"
 			" tid_len: %d for %s + %s\n",
-			dest_tpg->se_tpg_tfo->get_fabric_name(), cmd->data_length,
+			dest_tpg->se_tpg_tfo->get_fabric_name(), cmd->t_iostate.data_length,
 			tpdl, tid_len, i_str, iport_ptr);
 
 		if (tid_len > tpdl) {
@@ -3229,10 +3229,10 @@ core_scsi3_emulate_pro_register_and_move(struct se_cmd *cmd, u64 res_key,
 	transport_kunmap_data_sg(cmd);
 	buf = NULL;
 
-	if ((tid_len + 24) != cmd->data_length) {
+	if ((tid_len + 24) != cmd->t_iostate.data_length) {
 		pr_err("SPC-3 PR: Illegal tid_len: %u + 24 byte header"
-			" does not equal CDB data_length: %u\n", tid_len,
-			cmd->data_length);
+			" does not equal CDB t_iostate.data_length: %u\n", tid_len,
+			cmd->t_iostate.data_length);
 		ret = TCM_INVALID_PARAMETER_LIST;
 		goto out_put_pr_reg;
 	}
@@ -3598,9 +3598,9 @@ target_scsi3_emulate_pr_out(struct se_cmd *cmd)
 	if (!cmd->se_sess)
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 
-	if (cmd->data_length < 24) {
+	if (cmd->t_iostate.data_length < 24) {
 		pr_warn("SPC-PR: Received PR OUT parameter list"
-			" length too small: %u\n", cmd->data_length);
+			" length too small: %u\n", cmd->t_iostate.data_length);
 		return TCM_INVALID_PARAMETER_LIST;
 	}
 
@@ -3658,9 +3658,9 @@ target_scsi3_emulate_pr_out(struct se_cmd *cmd)
 	 * code set to PARAMETER LIST LENGTH ERROR.
 	 */
 	if (!spec_i_pt && ((cdb[1] & 0x1f) != PRO_REGISTER_AND_MOVE) &&
-	    (cmd->data_length != 24)) {
+	    (cmd->t_iostate.data_length != 24)) {
 		pr_warn("SPC-PR: Received PR OUT illegal parameter"
-			" list length: %u\n", cmd->data_length);
+			" list length: %u\n", cmd->t_iostate.data_length);
 		return TCM_INVALID_PARAMETER_LIST;
 	}
 
@@ -3723,9 +3723,9 @@ core_scsi3_pri_read_keys(struct se_cmd *cmd)
 	unsigned char *buf;
 	u32 add_len = 0, off = 8;
 
-	if (cmd->data_length < 8) {
+	if (cmd->t_iostate.data_length < 8) {
 		pr_err("PRIN SA READ_KEYS SCSI Data Length: %u"
-			" too small\n", cmd->data_length);
+			" too small\n", cmd->t_iostate.data_length);
 		return TCM_INVALID_CDB_FIELD;
 	}
 
@@ -3745,7 +3745,7 @@ core_scsi3_pri_read_keys(struct se_cmd *cmd)
 		 * Check for overflow of 8byte PRI READ_KEYS payload and
 		 * next reservation key list descriptor.
 		 */
-		if ((add_len + 8) > (cmd->data_length - 8))
+		if ((add_len + 8) > (cmd->t_iostate.data_length - 8))
 			break;
 
 		buf[off++] = ((pr_reg->pr_res_key >> 56) & 0xff);
@@ -3785,9 +3785,9 @@ core_scsi3_pri_read_reservation(struct se_cmd *cmd)
 	u64 pr_res_key;
 	u32 add_len = 16; /* Hardcoded to 16 when a reservation is held. */
 
-	if (cmd->data_length < 8) {
+	if (cmd->t_iostate.data_length < 8) {
 		pr_err("PRIN SA READ_RESERVATIONS SCSI Data Length: %u"
-			" too small\n", cmd->data_length);
+			" too small\n", cmd->t_iostate.data_length);
 		return TCM_INVALID_CDB_FIELD;
 	}
 
@@ -3811,7 +3811,7 @@ core_scsi3_pri_read_reservation(struct se_cmd *cmd)
 		buf[6] = ((add_len >> 8) & 0xff);
 		buf[7] = (add_len & 0xff);
 
-		if (cmd->data_length < 22)
+		if (cmd->t_iostate.data_length < 22)
 			goto err;
 
 		/*
@@ -3871,9 +3871,9 @@ core_scsi3_pri_report_capabilities(struct se_cmd *cmd)
 	unsigned char *buf;
 	u16 add_len = 8; /* Hardcoded to 8. */
 
-	if (cmd->data_length < 6) {
+	if (cmd->t_iostate.data_length < 6) {
 		pr_err("PRIN SA REPORT_CAPABILITIES SCSI Data Length:"
-			" %u too small\n", cmd->data_length);
+			" %u too small\n", cmd->t_iostate.data_length);
 		return TCM_INVALID_CDB_FIELD;
 	}
 
@@ -3936,9 +3936,9 @@ core_scsi3_pri_read_full_status(struct se_cmd *cmd)
 	int exp_desc_len, desc_len;
 	bool all_reg = false;
 
-	if (cmd->data_length < 8) {
+	if (cmd->t_iostate.data_length < 8) {
 		pr_err("PRIN SA READ_FULL_STATUS SCSI Data Length: %u"
-			" too small\n", cmd->data_length);
+			" too small\n", cmd->t_iostate.data_length);
 		return TCM_INVALID_CDB_FIELD;
 	}
 
@@ -3981,9 +3981,9 @@ core_scsi3_pri_read_full_status(struct se_cmd *cmd)
 		exp_desc_len = target_get_pr_transport_id_len(se_nacl, pr_reg,
 					&format_code);
 		if (exp_desc_len < 0 ||
-		    exp_desc_len + add_len > cmd->data_length) {
+		    exp_desc_len + add_len > cmd->t_iostate.data_length) {
 			pr_warn("SPC-3 PRIN READ_FULL_STATUS ran"
-				" out of buffer: %d\n", cmd->data_length);
+				" out of buffer: %d\n", cmd->t_iostate.data_length);
 			spin_lock(&pr_tmpl->registration_lock);
 			atomic_dec_mb(&pr_reg->pr_res_holders);
 			break;

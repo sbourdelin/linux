@@ -1262,7 +1262,7 @@ static int sbp_rw_data(struct sbp_target_request *req)
 	struct fw_card *card;
 	struct sg_mapping_iter iter;
 
-	if (req->se_cmd.data_direction == DMA_FROM_DEVICE) {
+	if (req->se_cmd.t_iostate.data_direction == DMA_FROM_DEVICE) {
 		tcode = TCODE_WRITE_BLOCK_REQUEST;
 		sg_miter_flags = SG_MITER_FROM_SG;
 	} else {
@@ -1296,7 +1296,7 @@ static int sbp_rw_data(struct sbp_target_request *req)
 		num_pte = 0;
 
 		offset = sbp2_pointer_to_addr(&req->orb.data_descriptor);
-		length = req->se_cmd.data_length;
+		length = req->se_cmd.t_iostate.data_length;
 	}
 
 	sg_miter_start(&iter, req->se_cmd.t_iomem.t_data_sg,

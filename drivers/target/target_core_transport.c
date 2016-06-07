@@ -754,15 +754,15 @@ EXPORT_SYMBOL(target_complete_cmd);
 
 void target_complete_cmd_with_length(struct se_cmd *cmd, u8 scsi_status, int length)
 {
-	if (scsi_status == SAM_STAT_GOOD && length < cmd->data_length) {
+	if (scsi_status == SAM_STAT_GOOD && length < cmd->t_iostate.data_length) {
 		if (cmd->se_cmd_flags & SCF_UNDERFLOW_BIT) {
-			cmd->residual_count += cmd->data_length - length;
+			cmd->residual_count += cmd->t_iostate.data_length - length;
 		} else {
 			cmd->se_cmd_flags |= SCF_UNDERFLOW_BIT;
-			cmd->residual_count = cmd->data_length - length;
+			cmd->residual_count = cmd->t_iostate.data_length - length;
 		}
 
-		cmd->data_length = length;
+		cmd->t_iostate.data_length = length;
 	}
 
 	target_complete_cmd(cmd, scsi_status);
@@ -818,7 +818,7 @@ void target_qf_do_work(struct work_struct *work)
 
 unsigned char *transport_dump_cmd_direction(struct se_cmd *cmd)
 {
-	switch (cmd->data_direction) {
+	switch (cmd->t_iostate.data_direction) {
 	case DMA_NONE:
 		return "NONE";
 	case DMA_FROM_DEVICE:
@@ -1118,21 +1118,21 @@ target_check_max_data_sg_nents(struct se_cmd *cmd, struct se_device *dev,
 		return TCM_NO_SENSE;
 	/*
 	 * Check if fabric enforced maximum SGL entries per I/O descriptor
-	 * exceeds se_cmd->data_length.  If true, set SCF_UNDERFLOW_BIT +
-	 * residual_count and reduce original cmd->data_length to maximum
+	 * exceeds se_cmd->t_iostate.data_length.  If true, set SCF_UNDERFLOW_BIT +
+	 * residual_count and reduce original cmd->t_iostate.data_length to maximum
 	 * length based on single PAGE_SIZE entry scatter-lists.
 	 */
 	mtl = (cmd->se_tfo->max_data_sg_nents * PAGE_SIZE);
-	if (cmd->data_length > mtl) {
+	if (cmd->t_iostate.data_length > mtl) {
 		/*
 		 * If an existing CDB overflow is present, calculate new residual
 		 * based on CDB size minus fabric maximum transfer length.
 		 *
 		 * If an existing CDB underflow is present, calculate new residual
-		 * based on original cmd->data_length minus fabric maximum transfer
+		 * based on original cmd->t_iostate.data_length minus fabric maximum transfer
 		 * length.
 		 *
-		 * Otherwise, set the underflow residual based on cmd->data_length
+		 * Otherwise, set the underflow residual based on cmd->t_iostate.data_length
 		 * minus fabric maximum transfer length.
 		 */
 		if (cmd->se_cmd_flags & SCF_OVERFLOW_BIT) {
@@ -1142,16 +1142,16 @@ target_check_max_data_sg_nents(struct se_cmd *cmd, struct se_device *dev,
 			cmd->residual_count = (orig_dl - mtl);
 		} else {
 			cmd->se_cmd_flags |= SCF_UNDERFLOW_BIT;
-			cmd->residual_count = (cmd->data_length - mtl);
+			cmd->residual_count = (cmd->t_iostate.data_length - mtl);
 		}
-		cmd->data_length = mtl;
+		cmd->t_iostate.data_length = mtl;
 		/*
 		 * Reset sbc_check_prot() calculated protection payload
 		 * length based upon the new smaller MTL.
 		 */
-		if (cmd->prot_length) {
+		if (cmd->t_iostate.prot_length) {
 			u32 sectors = (mtl / dev->dev_attrib.block_size);
-			cmd->prot_length = dev->prot_length * sectors;
+			cmd->t_iostate.prot_length = dev->prot_length * sectors;
 		}
 	}
 	return TCM_NO_SENSE;
@@ -1163,14 +1163,14 @@ target_cmd_size_check(struct se_cmd *cmd, unsigned int size)
 	struct se_device *dev = cmd->se_dev;
 
 	if (cmd->unknown_data_length) {
-		cmd->data_length = size;
-	} else if (size != cmd->data_length) {
+		cmd->t_iostate.data_length = size;
+	} else if (size != cmd->t_iostate.data_length) {
 		pr_warn("TARGET_CORE[%s]: Expected Transfer Length:"
 			" %u does not match SCSI CDB Length: %u for SAM Opcode:"
 			" 0x%02x\n", cmd->se_tfo->get_fabric_name(),
-				cmd->data_length, size, cmd->t_task_cdb[0]);
+				cmd->t_iostate.data_length, size, cmd->t_task_cdb[0]);
 
-		if (cmd->data_direction == DMA_TO_DEVICE &&
+		if (cmd->t_iostate.data_direction == DMA_TO_DEVICE &&
 		    cmd->se_cmd_flags & SCF_SCSI_DATA_CDB) {
 			pr_err("Rejecting underflow/overflow WRITE data\n");
 			return TCM_INVALID_CDB_FIELD;
@@ -1188,17 +1188,17 @@ target_cmd_size_check(struct se_cmd *cmd, unsigned int size)
 		}
 		/*
 		 * For the overflow case keep the existing fabric provided
-		 * ->data_length.  Otherwise for the underflow case, reset
-		 * ->data_length to the smaller SCSI expected data transfer
+		 * ->t_iostate.data_length.  Otherwise for the underflow case, reset
+		 * ->t_iostate.data_length to the smaller SCSI expected data transfer
 		 * length.
 		 */
-		if (size > cmd->data_length) {
+		if (size > cmd->t_iostate.data_length) {
 			cmd->se_cmd_flags |= SCF_OVERFLOW_BIT;
-			cmd->residual_count = (size - cmd->data_length);
+			cmd->residual_count = (size - cmd->t_iostate.data_length);
 		} else {
 			cmd->se_cmd_flags |= SCF_UNDERFLOW_BIT;
-			cmd->residual_count = (cmd->data_length - size);
-			cmd->data_length = size;
+			cmd->residual_count = (cmd->t_iostate.data_length - size);
+			cmd->t_iostate.data_length = size;
 		}
 	}
 
@@ -1233,8 +1233,8 @@ void transport_init_se_cmd(
 
 	cmd->se_tfo = tfo;
 	cmd->se_sess = se_sess;
-	cmd->data_length = data_length;
-	cmd->data_direction = data_direction;
+	cmd->t_iostate.data_length = data_length;
+	cmd->t_iostate.data_direction = data_direction;
 	cmd->sam_task_attr = task_attr;
 	cmd->sense_buffer = sense_buffer;
 
@@ -1418,7 +1418,7 @@ transport_generic_map_mem_to_cmd(struct se_cmd *cmd, struct scatterlist *sgl,
  * @cdb: pointer to SCSI CDB
  * @sense: pointer to SCSI sense buffer
  * @unpacked_lun: unpacked LUN to reference for struct se_lun
- * @data_length: fabric expected data transfer length
+ * @t_iostate.data_length: fabric expected data transfer length
  * @task_addr: SAM task attribute
  * @data_dir: DMA data direction
  * @flags: flags for command submission from target_sc_flags_tables
@@ -1525,7 +1525,7 @@ int target_submit_cmd_map_sgls(struct se_cmd *se_cmd, struct se_session *se_sess
 		 * -> transport_generic_cmd_sequencer().
 		 */
 		if (!(se_cmd->se_cmd_flags & SCF_SCSI_DATA_CDB) &&
-		     se_cmd->data_direction == DMA_FROM_DEVICE) {
+		     se_cmd->t_iostate.data_direction == DMA_FROM_DEVICE) {
 			unsigned char *buf = NULL;
 
 			if (sgl)
@@ -1564,7 +1564,7 @@ EXPORT_SYMBOL(target_submit_cmd_map_sgls);
  * @cdb: pointer to SCSI CDB
  * @sense: pointer to SCSI sense buffer
  * @unpacked_lun: unpacked LUN to reference for struct se_lun
- * @data_length: fabric expected data transfer length
+ * @t_iostate.data_length: fabric expected data transfer length
  * @task_addr: SAM task attribute
  * @data_dir: DMA data direction
  * @flags: flags for command submission from target_sc_flags_tables
@@ -1810,7 +1810,7 @@ static int target_write_prot_action(struct se_cmd *cmd)
 	 * device has PI enabled, if the transport has not already generated
 	 * PI using hardware WRITE_INSERT offload.
 	 */
-	switch (cmd->prot_op) {
+	switch (cmd->t_iostate.prot_op) {
 	case TARGET_PROT_DOUT_INSERT:
 		if (!(cmd->se_sess->sup_prot_ops & TARGET_PROT_DOUT_INSERT))
 			sbc_dif_generate(cmd);
@@ -1819,8 +1819,8 @@ static int target_write_prot_action(struct se_cmd *cmd)
 		if (cmd->se_sess->sup_prot_ops & TARGET_PROT_DOUT_STRIP)
 			break;
 
-		sectors = cmd->data_length >> ilog2(cmd->se_dev->dev_attrib.block_size);
-		cmd->pi_err = sbc_dif_verify(cmd, cmd->t_task_lba,
+		sectors = cmd->t_iostate.data_length >> ilog2(cmd->se_dev->dev_attrib.block_size);
+		cmd->pi_err = sbc_dif_verify(cmd, cmd->t_iostate.t_task_lba,
 					     sectors, 0, cmd->t_iomem.t_prot_sg, 0);
 		if (unlikely(cmd->pi_err)) {
 			spin_lock_irq(&cmd->t_state_lock);
@@ -1998,7 +1998,7 @@ static void transport_complete_qf(struct se_cmd *cmd)
 		goto out;
 	}
 
-	switch (cmd->data_direction) {
+	switch (cmd->t_iostate.data_direction) {
 	case DMA_FROM_DEVICE:
 		if (cmd->scsi_status)
 			goto queue_status;
@@ -2044,13 +2044,13 @@ static void transport_handle_queue_full(
 
 static bool target_read_prot_action(struct se_cmd *cmd)
 {
-	switch (cmd->prot_op) {
+	switch (cmd->t_iostate.prot_op) {
 	case TARGET_PROT_DIN_STRIP:
 		if (!(cmd->se_sess->sup_prot_ops & TARGET_PROT_DIN_STRIP)) {
-			u32 sectors = cmd->data_length >>
+			u32 sectors = cmd->t_iostate.data_length >>
 				  ilog2(cmd->se_dev->dev_attrib.block_size);
 
-			cmd->pi_err = sbc_dif_verify(cmd, cmd->t_task_lba,
+			cmd->pi_err = sbc_dif_verify(cmd, cmd->t_iostate.t_task_lba,
 						     sectors, 0,
 						     cmd->t_iomem.t_prot_sg, 0);
 			if (cmd->pi_err)
@@ -2111,7 +2111,7 @@ static void target_complete_ok_work(struct work_struct *work)
 	if (cmd->transport_complete_callback) {
 		sense_reason_t rc;
 		bool caw = (cmd->se_cmd_flags & SCF_COMPARE_AND_WRITE);
-		bool zero_dl = !(cmd->data_length);
+		bool zero_dl = !(cmd->t_iostate.data_length);
 		int post_ret = 0;
 
 		rc = cmd->transport_complete_callback(cmd, true, &post_ret);
@@ -2133,12 +2133,12 @@ static void target_complete_ok_work(struct work_struct *work)
 	}
 
 queue_rsp:
-	switch (cmd->data_direction) {
+	switch (cmd->t_iostate.data_direction) {
 	case DMA_FROM_DEVICE:
 		if (cmd->scsi_status)
 			goto queue_status;
 
-		atomic_long_add(cmd->data_length,
+		atomic_long_add(cmd->t_iostate.data_length,
 				&cmd->se_lun->lun_stats.tx_data_octets);
 		/*
 		 * Perform READ_STRIP of PI using software emulation when
@@ -2162,13 +2162,13 @@ queue_rsp:
 			goto queue_full;
 		break;
 	case DMA_TO_DEVICE:
-		atomic_long_add(cmd->data_length,
+		atomic_long_add(cmd->t_iostate.data_length,
 				&cmd->se_lun->lun_stats.rx_data_octets);
 		/*
 		 * Check if we need to send READ payload for BIDI-COMMAND
 		 */
 		if (cmd->se_cmd_flags & SCF_BIDI) {
-			atomic_long_add(cmd->data_length,
+			atomic_long_add(cmd->t_iostate.data_length,
 					&cmd->se_lun->lun_stats.tx_data_octets);
 			ret = cmd->se_tfo->queue_data_in(cmd);
 			if (ret == -EAGAIN || ret == -ENOMEM)
@@ -2193,7 +2193,7 @@ queue_status:
 
 queue_full:
 	pr_debug("Handling complete_ok QUEUE_FULL: se_cmd: %p,"
-		" data_direction: %d\n", cmd, cmd->data_direction);
+		" t_iostate.data_direction: %d\n", cmd, cmd->t_iostate.data_direction);
 	cmd->t_state = TRANSPORT_COMPLETE_QF_OK;
 	transport_handle_queue_full(cmd, cmd->se_dev);
 }
@@ -2381,11 +2381,11 @@ transport_generic_new_cmd(struct se_cmd *cmd)
 	int ret = 0;
 	bool zero_flag = !(cmd->se_cmd_flags & SCF_SCSI_DATA_CDB);
 
-	if (cmd->prot_op != TARGET_PROT_NORMAL &&
+	if (cmd->t_iostate.prot_op != TARGET_PROT_NORMAL &&
 	    !(cmd->se_cmd_flags & SCF_PASSTHROUGH_PROT_SG_TO_MEM_NOALLOC)) {
 		ret = target_alloc_sgl(&cmd->t_iomem.t_prot_sg,
 				       &cmd->t_iomem.t_prot_nents,
-				       cmd->prot_length, true, false);
+				       cmd->t_iostate.prot_length, true, false);
 		if (ret < 0)
 			return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 	}
@@ -2396,17 +2396,17 @@ transport_generic_new_cmd(struct se_cmd *cmd)
 	 * beforehand.
 	 */
 	if (!(cmd->se_cmd_flags & SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC) &&
-	    cmd->data_length) {
+	    cmd->t_iostate.data_length) {
 
 		if ((cmd->se_cmd_flags & SCF_BIDI) ||
 		    (cmd->se_cmd_flags & SCF_COMPARE_AND_WRITE)) {
 			u32 bidi_length;
 
 			if (cmd->se_cmd_flags & SCF_COMPARE_AND_WRITE)
-				bidi_length = cmd->t_task_nolb *
+				bidi_length = cmd->t_iostate.t_task_nolb *
 					      cmd->se_dev->dev_attrib.block_size;
 			else
-				bidi_length = cmd->data_length;
+				bidi_length = cmd->t_iostate.data_length;
 
 			ret = target_alloc_sgl(&cmd->t_iomem.t_bidi_data_sg,
 					       &cmd->t_iomem.t_bidi_data_nents,
@@ -2417,16 +2417,16 @@ transport_generic_new_cmd(struct se_cmd *cmd)
 
 		ret = target_alloc_sgl(&cmd->t_iomem.t_data_sg,
 				       &cmd->t_iomem.t_data_nents,
-				       cmd->data_length, zero_flag, false);
+				       cmd->t_iostate.data_length, zero_flag, false);
 		if (ret < 0)
 			return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 	} else if ((cmd->se_cmd_flags & SCF_COMPARE_AND_WRITE) &&
-		    cmd->data_length) {
+		    cmd->t_iostate.data_length) {
 		/*
 		 * Special case for COMPARE_AND_WRITE with fabrics
 		 * using SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC.
 		 */
-		u32 caw_length = cmd->t_task_nolb *
+		u32 caw_length = cmd->t_iostate.t_task_nolb *
 				 cmd->se_dev->dev_attrib.block_size;
 
 		ret = target_alloc_sgl(&cmd->t_iomem.t_bidi_data_sg,
@@ -2441,7 +2441,7 @@ transport_generic_new_cmd(struct se_cmd *cmd)
 	 * and let it call back once the write buffers are ready.
 	 */
 	target_add_to_state_list(cmd);
-	if (cmd->data_direction != DMA_TO_DEVICE || cmd->data_length == 0) {
+	if (cmd->t_iostate.data_direction != DMA_TO_DEVICE || cmd->t_iostate.data_length == 0) {
 		target_execute_cmd(cmd);
 		return 0;
 	}
@@ -2919,7 +2919,7 @@ static int translate_sense_reason(struct se_cmd *cmd, sense_reason_t reason)
 	if (si->add_sector_info)
 		return scsi_set_sense_information(buffer,
 						  cmd->scsi_sense_length,
-						  cmd->bad_sector);
+						  cmd->t_iostate.bad_sector);
 
 	return 0;
 }
@@ -3016,7 +3016,7 @@ void transport_send_task_abort(struct se_cmd *cmd)
 	 * response.  This response with TASK_ABORTED status will be
 	 * queued back to fabric module by transport_check_aborted_status().
 	 */
-	if (cmd->data_direction == DMA_TO_DEVICE) {
+	if (cmd->t_iostate.data_direction == DMA_TO_DEVICE) {
 		if (cmd->se_tfo->write_pending_status(cmd) != 0) {
 			spin_lock_irqsave(&cmd->t_state_lock, flags);
 			if (cmd->se_cmd_flags & SCF_SEND_DELAYED_TAS) {

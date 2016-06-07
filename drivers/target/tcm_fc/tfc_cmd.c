@@ -56,7 +56,7 @@ static void _ft_dump_cmd(struct ft_cmd *cmd, const char *caller)
 
 	pr_debug("%s: cmd %p data_nents %u len %u se_cmd_flags <0x%x>\n",
 		caller, cmd, se_cmd->t_iomem.t_data_nents,
-	       se_cmd->data_length, se_cmd->se_cmd_flags);
+	       se_cmd->t_iostate.data_length, se_cmd->se_cmd_flags);
 
 	for_each_sg(se_cmd->t_iomem.t_data_sg, sg, se_cmd->t_iomem.t_data_nents, count)
 		pr_debug("%s: cmd %p sg %p page %p "
@@ -191,7 +191,7 @@ int ft_write_pending_status(struct se_cmd *se_cmd)
 {
 	struct ft_cmd *cmd = container_of(se_cmd, struct ft_cmd, se_cmd);
 
-	return cmd->write_data_len != se_cmd->data_length;
+	return cmd->write_data_len != se_cmd->t_iostate.data_length;
 }
 
 /*
@@ -219,7 +219,7 @@ int ft_write_pending(struct se_cmd *se_cmd)
 
 	txrdy = fc_frame_payload_get(fp, sizeof(*txrdy));
 	memset(txrdy, 0, sizeof(*txrdy));
-	txrdy->ft_burst_len = htonl(se_cmd->data_length);
+	txrdy->ft_burst_len = htonl(se_cmd->t_iostate.data_length);
 
 	cmd->seq = lport->tt.seq_start_next(cmd->seq);
 	fc_fill_fc_hdr(fp, FC_RCTL_DD_DATA_DESC, ep->did, ep->sid, FC_TYPE_FCP,

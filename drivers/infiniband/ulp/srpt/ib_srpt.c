@@ -937,7 +937,7 @@ static int srpt_get_desc_tbl(struct srpt_send_ioctx *ioctx,
 		*dir = DMA_NONE;
 
 	/* initialize data_direction early as srpt_alloc_rw_ctxs needs it */
-	ioctx->cmd.data_direction = *dir;
+	ioctx->cmd.t_iostate.data_direction = *dir;
 
 	if (((srp_cmd->buf_fmt & 0xf) == SRP_DATA_DESC_DIRECT) ||
 	    ((srp_cmd->buf_fmt >> 4) == SRP_DATA_DESC_DIRECT)) {
@@ -2296,8 +2296,8 @@ static void srpt_queue_response(struct se_cmd *cmd)
 	}
 
 	/* For read commands, transfer the data to the initiator. */
-	if (ioctx->cmd.data_direction == DMA_FROM_DEVICE &&
-	    ioctx->cmd.data_length &&
+	if (ioctx->cmd.t_iostate.data_direction == DMA_FROM_DEVICE &&
+	    ioctx->cmd.t_iostate.data_length &&
 	    !ioctx->queue_status_only) {
 		for (i = ioctx->n_rw_ctx - 1; i >= 0; i--) {
 			struct srpt_rw_ctx *ctx = &ioctx->rw_ctxs[i];

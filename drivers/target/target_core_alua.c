@@ -71,9 +71,9 @@ target_emulate_report_referrals(struct se_cmd *cmd)
 	unsigned char *buf;
 	u32 rd_len = 0, off;
 
-	if (cmd->data_length < 4) {
+	if (cmd->t_iostate.data_length < 4) {
 		pr_warn("REPORT REFERRALS allocation length %u too"
-			" small\n", cmd->data_length);
+			" small\n", cmd->t_iostate.data_length);
 		return TCM_INVALID_CDB_FIELD;
 	}
 
@@ -96,10 +96,10 @@ target_emulate_report_referrals(struct se_cmd *cmd)
 		int pg_num;
 
 		off += 4;
-		if (cmd->data_length > off)
+		if (cmd->t_iostate.data_length > off)
 			put_unaligned_be64(map->lba_map_first_lba, &buf[off]);
 		off += 8;
-		if (cmd->data_length > off)
+		if (cmd->t_iostate.data_length > off)
 			put_unaligned_be64(map->lba_map_last_lba, &buf[off]);
 		off += 8;
 		rd_len += 20;
@@ -109,19 +109,19 @@ target_emulate_report_referrals(struct se_cmd *cmd)
 			int alua_state = map_mem->lba_map_mem_alua_state;
 			int alua_pg_id = map_mem->lba_map_mem_alua_pg_id;
 
-			if (cmd->data_length > off)
+			if (cmd->t_iostate.data_length > off)
 				buf[off] = alua_state & 0x0f;
 			off += 2;
-			if (cmd->data_length > off)
+			if (cmd->t_iostate.data_length > off)
 				buf[off] = (alua_pg_id >> 8) & 0xff;
 			off++;
-			if (cmd->data_length > off)
+			if (cmd->t_iostate.data_length > off)
 				buf[off] = (alua_pg_id & 0xff);
 			off++;
 			rd_len += 4;
 			pg_num++;
 		}
-		if (cmd->data_length > desc_num)
+		if (cmd->t_iostate.data_length > desc_num)
 			buf[desc_num] = pg_num;
 	}
 	spin_unlock(&dev->t10_alua.lba_map_lock);
@@ -161,9 +161,9 @@ target_emulate_report_target_port_groups(struct se_cmd *cmd)
 	else
 		off = 4;
 
-	if (cmd->data_length < off) {
+	if (cmd->t_iostate.data_length < off) {
 		pr_warn("REPORT TARGET PORT GROUPS allocation length %u too"
-			" small for %s header\n", cmd->data_length,
+			" small for %s header\n", cmd->t_iostate.data_length,
 			(ext_hdr) ? "extended" : "normal");
 		return TCM_INVALID_CDB_FIELD;
 	}
@@ -181,7 +181,7 @@ target_emulate_report_target_port_groups(struct se_cmd *cmd)
 		 * the allocation length and the response is truncated.
 		 */
 		if ((off + 8 + (tg_pt_gp->tg_pt_gp_members * 4)) >
-		     cmd->data_length) {
+		     cmd->t_iostate.data_length) {
 			rd_len += 8 + (tg_pt_gp->tg_pt_gp_members * 4);
 			continue;
 		}
@@ -289,9 +289,9 @@ target_emulate_set_target_port_groups(struct se_cmd *cmd)
 	int alua_access_state, primary = 0, valid_states;
 	u16 tg_pt_id, rtpi;
 
-	if (cmd->data_length < 4) {
+	if (cmd->t_iostate.data_length < 4) {
 		pr_warn("SET TARGET PORT GROUPS parameter list length %u too"
-			" small\n", cmd->data_length);
+			" small\n", cmd->t_iostate.data_length);
 		return TCM_INVALID_PARAMETER_LIST;
 	}
 
@@ -324,7 +324,7 @@ target_emulate_set_target_port_groups(struct se_cmd *cmd)
 
 	ptr = &buf[4]; /* Skip over RESERVED area in header */
 
-	while (len < cmd->data_length) {
+	while (len < cmd->t_iostate.data_length) {
 		bool found = false;
 		alua_access_state = (ptr[0] & 0x0f);
 		/*
@@ -483,10 +483,10 @@ static inline int core_alua_state_lba_dependent(
 	spin_lock(&dev->t10_alua.lba_map_lock);
 	segment_size = dev->t10_alua.lba_map_segment_size;
 	segment_mult = dev->t10_alua.lba_map_segment_multiplier;
-	sectors = cmd->data_length / dev->dev_attrib.block_size;
+	sectors = cmd->t_iostate.data_length / dev->dev_attrib.block_size;
 
-	lba = cmd->t_task_lba;
-	while (lba < cmd->t_task_lba + sectors) {
+	lba = cmd->t_iostate.t_task_lba;
+	while (lba < cmd->t_iostate.t_task_lba + sectors) {
 		struct t10_alua_lba_map *cur_map = NULL, *map;
 		struct t10_alua_lba_map_member *map_mem;
 

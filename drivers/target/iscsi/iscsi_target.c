@@ -978,7 +978,7 @@ static void iscsit_ack_from_expstatsn(struct iscsi_conn *conn, u32 exp_statsn)
 
 static int iscsit_allocate_iovecs(struct iscsi_cmd *cmd)
 {
-	u32 iov_count = max(1UL, DIV_ROUND_UP(cmd->se_cmd.data_length, PAGE_SIZE));
+	u32 iov_count = max(1UL, DIV_ROUND_UP(cmd->se_cmd.t_iostate.data_length, PAGE_SIZE));
 
 	iov_count += ISCSI_IOV_DATA_BUFFER;
 
@@ -1478,10 +1478,10 @@ iscsit_check_dataout_hdr(struct iscsi_conn *conn, unsigned char *buf,
 	se_cmd = &cmd->se_cmd;
 	iscsit_mod_dataout_timer(cmd);
 
-	if ((be32_to_cpu(hdr->offset) + payload_length) > cmd->se_cmd.data_length) {
+	if ((be32_to_cpu(hdr->offset) + payload_length) > cmd->se_cmd.t_iostate.data_length) {
 		pr_err("DataOut Offset: %u, Length %u greater than"
 			" iSCSI Command EDTL %u, protocol error.\n",
-			hdr->offset, payload_length, cmd->se_cmd.data_length);
+			hdr->offset, payload_length, cmd->se_cmd.t_iostate.data_length);
 		return iscsit_reject_cmd(cmd, ISCSI_REASON_BOOKMARK_INVALID, buf);
 	}
 
@@ -2650,7 +2650,7 @@ static int iscsit_handle_immediate_data(
 
 	cmd->write_data_done += length;
 
-	if (cmd->write_data_done == cmd->se_cmd.data_length) {
+	if (cmd->write_data_done == cmd->se_cmd.t_iostate.data_length) {
 		spin_lock_bh(&cmd->istate_lock);
 		cmd->cmd_flags |= ICF_GOT_LAST_DATAOUT;
 		cmd->i_state = ISTATE_RECEIVED_LAST_DATAOUT;
@@ -2808,11 +2808,11 @@ static int iscsit_send_datain(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 	/*
 	 * Be paranoid and double check the logic for now.
 	 */
-	if ((datain.offset + datain.length) > cmd->se_cmd.data_length) {
+	if ((datain.offset + datain.length) > cmd->se_cmd.t_iostate.data_length) {
 		pr_err("Command ITT: 0x%08x, datain.offset: %u and"
 			" datain.length: %u exceeds cmd->data_length: %u\n",
 			cmd->init_task_tag, datain.offset, datain.length,
-			cmd->se_cmd.data_length);
+			cmd->se_cmd.t_iostate.data_length);
 		return -1;
 	}
 
@@ -3116,8 +3116,8 @@ int iscsit_build_r2ts_for_cmd(
 					conn->sess->sess_ops->MaxBurstLength -
 					cmd->next_burst_len;
 
-				if (new_data_end > cmd->se_cmd.data_length)
-					xfer_len = cmd->se_cmd.data_length - offset;
+				if (new_data_end > cmd->se_cmd.t_iostate.data_length)
+					xfer_len = cmd->se_cmd.t_iostate.data_length - offset;
 				else
 					xfer_len =
 						conn->sess->sess_ops->MaxBurstLength -
@@ -3126,14 +3126,14 @@ int iscsit_build_r2ts_for_cmd(
 				int new_data_end = offset +
 					conn->sess->sess_ops->MaxBurstLength;
 
-				if (new_data_end > cmd->se_cmd.data_length)
-					xfer_len = cmd->se_cmd.data_length - offset;
+				if (new_data_end > cmd->se_cmd.t_iostate.data_length)
+					xfer_len = cmd->se_cmd.t_iostate.data_length - offset;
 				else
 					xfer_len = conn->sess->sess_ops->MaxBurstLength;
 			}
 			cmd->r2t_offset += xfer_len;
 
-			if (cmd->r2t_offset == cmd->se_cmd.data_length)
+			if (cmd->r2t_offset == cmd->se_cmd.t_iostate.data_length)
 				cmd->cmd_flags |= ICF_SENT_LAST_R2T;
 		} else {
 			struct iscsi_seq *seq;

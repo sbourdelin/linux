@@ -640,7 +640,7 @@ static void pscsi_transport_complete(struct se_cmd *cmd, struct scatterlist *sg,
 	 * Hack to make sure that Write-Protect modepage is set if R/O mode is
 	 * forced.
 	 */
-	if (!cmd->data_length)
+	if (!cmd->t_iostate.data_length)
 		goto after_mode_sense;
 
 	if (((cdb[0] == MODE_SENSE) || (cdb[0] == MODE_SENSE_10)) &&
@@ -667,7 +667,7 @@ static void pscsi_transport_complete(struct se_cmd *cmd, struct scatterlist *sg,
 	}
 after_mode_sense:
 
-	if (sd->type != TYPE_TAPE || !cmd->data_length)
+	if (sd->type != TYPE_TAPE || !cmd->t_iostate.data_length)
 		goto after_mode_select;
 
 	/*
@@ -882,8 +882,8 @@ pscsi_map_sg(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 	struct bio *bio = NULL, *tbio = NULL;
 	struct page *page;
 	struct scatterlist *sg;
-	u32 data_len = cmd->data_length, i, len, bytes, off;
-	int nr_pages = (cmd->data_length + sgl[0].offset +
+	u32 data_len = cmd->t_iostate.data_length, i, len, bytes, off;
+	int nr_pages = (cmd->t_iostate.data_length + sgl[0].offset +
 			PAGE_SIZE - 1) >> PAGE_SHIFT;
 	int nr_vecs = 0, rc;
 	int rw = (data_direction == DMA_TO_DEVICE);
@@ -992,7 +992,7 @@ pscsi_execute_cmd(struct se_cmd *cmd)
 {
 	struct scatterlist *sgl = cmd->t_iomem.t_data_sg;
 	u32 sgl_nents = cmd->t_iomem.t_data_nents;
-	enum dma_data_direction data_direction = cmd->data_direction;
+	enum dma_data_direction data_direction = cmd->t_iostate.data_direction;
 	struct pscsi_dev_virt *pdv = PSCSI_DEV(cmd->se_dev);
 	struct pscsi_plugin_task *pt;
 	struct request *req;
@@ -1024,7 +1024,7 @@ pscsi_execute_cmd(struct se_cmd *cmd)
 
 		blk_rq_set_block_pc(req);
 	} else {
-		BUG_ON(!cmd->data_length);
+		BUG_ON(!cmd->t_iostate.data_length);
 
 		ret = pscsi_map_sg(cmd, sgl, sgl_nents, data_direction, &hbio);
 		if (ret)

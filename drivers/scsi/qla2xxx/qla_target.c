@@ -1808,7 +1808,7 @@ static int qlt_pci_map_calc_cnt(struct qla_tgt_prm *prm)
 
 	prm->cmd->sg_mapped = 1;
 
-	if (cmd->se_cmd.prot_op == TARGET_PROT_NORMAL) {
+	if (cmd->se_cmd.t_iostate.prot_op == TARGET_PROT_NORMAL) {
 		/*
 		 * If greater than four sg entries then we need to allocate
 		 * the continuation entries
@@ -1819,8 +1819,8 @@ static int qlt_pci_map_calc_cnt(struct qla_tgt_prm *prm)
 			prm->tgt->datasegs_per_cont);
 	} else {
 		/* DIF */
-		if ((cmd->se_cmd.prot_op == TARGET_PROT_DIN_INSERT) ||
-		    (cmd->se_cmd.prot_op == TARGET_PROT_DOUT_STRIP)) {
+		if ((cmd->se_cmd.t_iostate.prot_op == TARGET_PROT_DIN_INSERT) ||
+		    (cmd->se_cmd.t_iostate.prot_op == TARGET_PROT_DOUT_STRIP)) {
 			prm->seg_cnt = DIV_ROUND_UP(cmd->bufflen, cmd->blk_sz);
 			prm->tot_dsds = prm->seg_cnt;
 		} else
@@ -1834,8 +1834,8 @@ static int qlt_pci_map_calc_cnt(struct qla_tgt_prm *prm)
 			if (unlikely(prm->prot_seg_cnt == 0))
 				goto out_err;
 
-			if ((cmd->se_cmd.prot_op == TARGET_PROT_DIN_INSERT) ||
-			    (cmd->se_cmd.prot_op == TARGET_PROT_DOUT_STRIP)) {
+			if ((cmd->se_cmd.t_iostate.prot_op == TARGET_PROT_DIN_INSERT) ||
+			    (cmd->se_cmd.t_iostate.prot_op == TARGET_PROT_DOUT_STRIP)) {
 				/* Dif Bundling not support here */
 				prm->prot_seg_cnt = DIV_ROUND_UP(cmd->bufflen,
 								cmd->blk_sz);
@@ -2355,7 +2355,7 @@ qlt_hba_err_chk_enabled(struct se_cmd *se_cmd)
 	 return 0;
 	 *
 	 */
-	switch (se_cmd->prot_op) {
+	switch (se_cmd->t_iostate.prot_op) {
 	case TARGET_PROT_DOUT_INSERT:
 	case TARGET_PROT_DIN_STRIP:
 		if (ql2xenablehba_err_chk >= 1)
@@ -2382,7 +2382,7 @@ qlt_hba_err_chk_enabled(struct se_cmd *se_cmd)
 static inline void
 qlt_set_t10dif_tags(struct se_cmd *se_cmd, struct crc_context *ctx)
 {
-	uint32_t lba = 0xffffffff & se_cmd->t_task_lba;
+	uint32_t lba = 0xffffffff & se_cmd->t_iostate.t_task_lba;
 
 	/* wait til Mode Sense/Select cmd, modepage Ah, subpage 2
 	 * have been immplemented by TCM, before AppTag is avail.
@@ -2392,7 +2392,7 @@ qlt_set_t10dif_tags(struct se_cmd *se_cmd, struct crc_context *ctx)
 	ctx->app_tag_mask[0] = 0x0;
 	ctx->app_tag_mask[1] = 0x0;
 
-	switch (se_cmd->prot_type) {
+	switch (se_cmd->t_iostate.prot_type) {
 	case TARGET_DIF_TYPE0_PROT:
 		/*
 		 * No check for ql2xenablehba_err_chk, as it would be an
@@ -2479,18 +2479,18 @@ qlt_build_ctio_crc2_pkt(struct qla_tgt_prm *prm, scsi_qla_host_t *vha)
 
 	ql_dbg(ql_dbg_tgt, vha, 0xe071,
 		"qla_target(%d):%s: se_cmd[%p] CRC2 prot_op[0x%x] cmd prot sg:cnt[%p:%x] lba[%llu]\n",
-		vha->vp_idx, __func__, se_cmd, se_cmd->prot_op,
-		prm->prot_sg, prm->prot_seg_cnt, se_cmd->t_task_lba);
+		vha->vp_idx, __func__, se_cmd, se_cmd->t_iostate.prot_op,
+		prm->prot_sg, prm->prot_seg_cnt, se_cmd->t_iostate.t_task_lba);
 
-	if ((se_cmd->prot_op == TARGET_PROT_DIN_INSERT) ||
-	    (se_cmd->prot_op == TARGET_PROT_DOUT_STRIP))
+	if ((se_cmd->t_iostate.prot_op == TARGET_PROT_DIN_INSERT) ||
+	    (se_cmd->t_iostate.prot_op == TARGET_PROT_DOUT_STRIP))
 		bundling = 0;
 
 	/* Compute dif len and adjust data len to incude protection */
 	data_bytes = cmd->bufflen;
 	dif_bytes  = (data_bytes / cmd->blk_sz) * 8;
 
-	switch (se_cmd->prot_op) {
+	switch (se_cmd->t_iostate.prot_op) {
 	case TARGET_PROT_DIN_INSERT:
 	case TARGET_PROT_DOUT_STRIP:
 		transfer_length = data_bytes;
@@ -2513,14 +2513,14 @@ qlt_build_ctio_crc2_pkt(struct qla_tgt_prm *prm, scsi_qla_host_t *vha)
 		fw_prot_opts |= 0x10; /* Disable Guard tag checking */
 	/* HBA error checking enabled */
 	else if (IS_PI_UNINIT_CAPABLE(ha)) {
-		if ((se_cmd->prot_type == TARGET_DIF_TYPE1_PROT) ||
-		    (se_cmd->prot_type == TARGET_DIF_TYPE2_PROT))
+		if ((se_cmd->t_iostate.prot_type == TARGET_DIF_TYPE1_PROT) ||
+		    (se_cmd->t_iostate.prot_type == TARGET_DIF_TYPE2_PROT))
 			fw_prot_opts |= PO_DIS_VALD_APP_ESC;
-		else if (se_cmd->prot_type == TARGET_DIF_TYPE3_PROT)
+		else if (se_cmd->t_iostate.prot_type == TARGET_DIF_TYPE3_PROT)
 			fw_prot_opts |= PO_DIS_VALD_APP_REF_ESC;
 	}
 
-	switch (se_cmd->prot_op) {
+	switch (se_cmd->t_iostate.prot_op) {
 	case TARGET_PROT_DIN_INSERT:
 	case TARGET_PROT_DOUT_INSERT:
 		fw_prot_opts |= PO_MODE_DIF_INSERT;
@@ -2732,7 +2732,7 @@ int qlt_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type,
 	if (unlikely(res))
 		goto out_unmap_unlock;
 
-	if (cmd->se_cmd.prot_op && (xmit_type & QLA_TGT_XMIT_DATA))
+	if (cmd->se_cmd.t_iostate.prot_op && (xmit_type & QLA_TGT_XMIT_DATA))
 		res = qlt_build_ctio_crc2_pkt(&prm, vha);
 	else
 		res = qlt_24xx_build_ctio_pkt(&prm, vha);
@@ -2748,7 +2748,7 @@ int qlt_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type,
 		    cpu_to_le16(CTIO7_FLAGS_DATA_IN |
 			CTIO7_FLAGS_STATUS_MODE_0);
 
-		if (cmd->se_cmd.prot_op == TARGET_PROT_NORMAL)
+		if (cmd->se_cmd.t_iostate.prot_op == TARGET_PROT_NORMAL)
 			qlt_load_data_segments(&prm, vha);
 
 		if (prm.add_status_pkt == 0) {
@@ -2873,7 +2873,7 @@ int qlt_rdy_to_xfer(struct qla_tgt_cmd *cmd)
 	res = qlt_check_reserve_free_req(vha, prm.req_cnt);
 	if (res != 0)
 		goto out_unlock_free_unmap;
-	if (cmd->se_cmd.prot_op)
+	if (cmd->se_cmd.t_iostate.prot_op)
 		res = qlt_build_ctio_crc2_pkt(&prm, vha);
 	else
 		res = qlt_24xx_build_ctio_pkt(&prm, vha);
@@ -2887,7 +2887,7 @@ int qlt_rdy_to_xfer(struct qla_tgt_cmd *cmd)
 	pkt->u.status0.flags |= cpu_to_le16(CTIO7_FLAGS_DATA_OUT |
 	    CTIO7_FLAGS_STATUS_MODE_0);
 
-	if (cmd->se_cmd.prot_op == TARGET_PROT_NORMAL)
+	if (cmd->se_cmd.t_iostate.prot_op == TARGET_PROT_NORMAL)
 		qlt_load_data_segments(&prm, vha);
 
 	cmd->state = QLA_TGT_STATE_NEED_DATA;
@@ -2922,7 +2922,7 @@ qlt_handle_dif_error(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd,
 	uint32_t	e_ref_tag, a_ref_tag;
 	uint16_t	e_app_tag, a_app_tag;
 	uint16_t	e_guard, a_guard;
-	uint64_t	lba = cmd->se_cmd.t_task_lba;
+	uint64_t	lba = cmd->se_cmd.t_iostate.t_task_lba;
 
 	a_guard   = be16_to_cpu(*(uint16_t *)(ap + 0));
 	a_app_tag = be16_to_cpu(*(uint16_t *)(ap + 2));
@@ -2946,13 +2946,13 @@ qlt_handle_dif_error(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd,
 	 * For type 0,1,2: app tag is all 'f's
 	 */
 	if ((a_app_tag == 0xffff) &&
-	    ((cmd->se_cmd.prot_type != TARGET_DIF_TYPE3_PROT) ||
+	    ((cmd->se_cmd.t_iostate.prot_type != TARGET_DIF_TYPE3_PROT) ||
 	     (a_ref_tag == 0xffffffff))) {
 		uint32_t blocks_done;
 
 		/* 2TB boundary case covered automatically with this */
 		blocks_done = e_ref_tag - (uint32_t)lba + 1;
-		cmd->se_cmd.bad_sector = e_ref_tag;
+		cmd->se_cmd.t_iostate.bad_sector = e_ref_tag;
 		cmd->se_cmd.pi_err = 0;
 		ql_dbg(ql_dbg_tgt, vha, 0xf074,
 			"need to return scsi good\n");
@@ -2993,7 +2993,7 @@ qlt_handle_dif_error(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd,
 			spt += j;
 
 			spt->app_tag = 0xffff;
-			if (cmd->se_cmd.prot_type == SCSI_PROT_DIF_TYPE3)
+			if (cmd->se_cmd.t_iostate.prot_type == SCSI_PROT_DIF_TYPE3)
 				spt->ref_tag = 0xffffffff;
 #endif
 		}
@@ -3004,7 +3004,7 @@ qlt_handle_dif_error(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd,
 	/* check guard */
 	if (e_guard != a_guard) {
 		cmd->se_cmd.pi_err = TCM_LOGICAL_BLOCK_GUARD_CHECK_FAILED;
-		cmd->se_cmd.bad_sector = cmd->se_cmd.t_task_lba;
+		cmd->se_cmd.t_iostate.bad_sector = cmd->se_cmd.t_iostate.t_task_lba;
 
 		ql_log(ql_log_warn, vha, 0xe076,
 		    "Guard ERR: cdb 0x%x lba 0x%llx: [Actual|Expected] Ref Tag[0x%x|0x%x], App Tag [0x%x|0x%x], Guard [0x%x|0x%x] cmd=%p\n",
@@ -3017,7 +3017,7 @@ qlt_handle_dif_error(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd,
 	/* check ref tag */
 	if (e_ref_tag != a_ref_tag) {
 		cmd->se_cmd.pi_err = TCM_LOGICAL_BLOCK_REF_TAG_CHECK_FAILED;
-		cmd->se_cmd.bad_sector = e_ref_tag;
+		cmd->se_cmd.t_iostate.bad_sector = e_ref_tag;
 
 		ql_log(ql_log_warn, vha, 0xe077,
 			"Ref Tag ERR: cdb 0x%x lba 0x%llx: [Actual|Expected] Ref Tag[0x%x|0x%x], App Tag [0x%x|0x%x], Guard [0x%x|0x%x] cmd=%p\n",
@@ -3030,7 +3030,7 @@ qlt_handle_dif_error(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd,
 	/* check appl tag */
 	if (e_app_tag != a_app_tag) {
 		cmd->se_cmd.pi_err = TCM_LOGICAL_BLOCK_APP_TAG_CHECK_FAILED;
-		cmd->se_cmd.bad_sector = cmd->se_cmd.t_task_lba;
+		cmd->se_cmd.t_iostate.bad_sector = cmd->se_cmd.t_iostate.t_task_lba;
 
 		ql_log(ql_log_warn, vha, 0xe078,
 			"App Tag ERR: cdb 0x%x lba 0x%llx: [Actual|Expected] Ref Tag[0x%x|0x%x], App Tag [0x%x|0x%x], Guard [0x%x|0x%x] cmd=%p\n",
@@ -4734,7 +4734,7 @@ static void qlt_handle_srr(struct scsi_qla_host *vha,
 			    "scsi_status\n");
 			goto out_reject;
 		}
-		cmd->bufflen = se_cmd->data_length;
+		cmd->bufflen = se_cmd->t_iostate.data_length;
 
 		if (qlt_has_data(cmd)) {
 			if (qlt_srr_adjust_data(cmd, offset, &xmit_type) != 0)
@@ -4766,7 +4766,7 @@ static void qlt_handle_srr(struct scsi_qla_host *vha,
 			    " with non GOOD scsi_status\n");
 			goto out_reject;
 		}
-		cmd->bufflen = se_cmd->data_length;
+		cmd->bufflen = se_cmd->t_iostate.data_length;
 
 		if (qlt_has_data(cmd)) {
 			if (qlt_srr_adjust_data(cmd, offset, &xmit_type) != 0)

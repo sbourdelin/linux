@@ -793,7 +793,7 @@ static void vhost_scsi_submission_work(struct work_struct *work)
 		if (cmd->tvc_prot_sgl_count)
 			sg_prot_ptr = cmd->tvc_prot_sgl;
 		else
-			se_cmd->prot_pto = true;
+			se_cmd->t_iostate.prot_pto = true;
 	} else {
 		sg_ptr = NULL;
 	}

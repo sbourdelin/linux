@@ -69,11 +69,11 @@ transport_lookup_cmd_lun(struct se_cmd *se_cmd, u64 unpacked_lun)
 	if (deve) {
 		atomic_long_inc(&deve->total_cmds);
 
-		if (se_cmd->data_direction == DMA_TO_DEVICE)
-			atomic_long_add(se_cmd->data_length,
+		if (se_cmd->t_iostate.data_direction == DMA_TO_DEVICE)
+			atomic_long_add(se_cmd->t_iostate.data_length,
 					&deve->write_bytes);
-		else if (se_cmd->data_direction == DMA_FROM_DEVICE)
-			atomic_long_add(se_cmd->data_length,
+		else if (se_cmd->t_iostate.data_direction == DMA_FROM_DEVICE)
+			atomic_long_add(se_cmd->t_iostate.data_length,
 					&deve->read_bytes);
 
 		se_lun = rcu_dereference(deve->se_lun);
@@ -85,7 +85,7 @@ transport_lookup_cmd_lun(struct se_cmd *se_cmd, u64 unpacked_lun)
 		percpu_ref_get(&se_lun->lun_ref);
 		se_cmd->lun_ref_active = true;
 
-		if ((se_cmd->data_direction == DMA_TO_DEVICE) &&
+		if ((se_cmd->t_iostate.data_direction == DMA_TO_DEVICE) &&
 		    deve->lun_access_ro) {
 			pr_err("TARGET_CORE[%s]: Detected WRITE_PROTECTED LUN"
 				" Access for 0x%08llx\n",
@@ -123,8 +123,8 @@ transport_lookup_cmd_lun(struct se_cmd *se_cmd, u64 unpacked_lun)
 		/*
 		 * Force WRITE PROTECT for virtual LUN 0
 		 */
-		if ((se_cmd->data_direction != DMA_FROM_DEVICE) &&
-		    (se_cmd->data_direction != DMA_NONE)) {
+		if ((se_cmd->t_iostate.data_direction != DMA_FROM_DEVICE) &&
+		    (se_cmd->t_iostate.data_direction != DMA_NONE)) {
 			ret = TCM_WRITE_PROTECTED;
 			goto ref_dev;
 		}
@@ -139,11 +139,11 @@ ref_dev:
 	se_cmd->se_dev = rcu_dereference_raw(se_lun->lun_se_dev);
 	atomic_long_inc(&se_cmd->se_dev->num_cmds);
 
-	if (se_cmd->data_direction == DMA_TO_DEVICE)
-		atomic_long_add(se_cmd->data_length,
+	if (se_cmd->t_iostate.data_direction == DMA_TO_DEVICE)
+		atomic_long_add(se_cmd->t_iostate.data_length,
 				&se_cmd->se_dev->write_bytes);
-	else if (se_cmd->data_direction == DMA_FROM_DEVICE)
-		atomic_long_add(se_cmd->data_length,
+	else if (se_cmd->t_iostate.data_direction == DMA_FROM_DEVICE)
+		atomic_long_add(se_cmd->t_iostate.data_length,
 				&se_cmd->se_dev->read_bytes);
 
 	return ret;

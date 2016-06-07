@@ -413,7 +413,7 @@ cxgbit_tx_datain_iso(struct cxgbit_sock *csk, struct iscsi_cmd *cmd,
 	struct sk_buff *skb;
 	struct iscsi_datain datain;
 	struct cxgbit_iso_info iso_info;
-	u32 data_length = cmd->se_cmd.data_length;
+	u32 data_length = cmd->se_cmd.t_iostate.data_length;
 	u32 mrdsl = conn->conn_ops->MaxRecvDataSegmentLength;
 	u32 num_pdu, plen, tx_data = 0;
 	bool task_sense = !!(cmd->se_cmd.se_cmd_flags &
@@ -531,7 +531,7 @@ cxgbit_xmit_datain_pdu(struct iscsi_conn *conn, struct iscsi_cmd *cmd,
 		       const struct iscsi_datain *datain)
 {
 	struct cxgbit_sock *csk = conn->context;
-	u32 data_length = cmd->se_cmd.data_length;
+	u32 data_length = cmd->se_cmd.t_iostate.data_length;
 	u32 padding = ((-data_length) & 3);
 	u32 mrdsl = conn->conn_ops->MaxRecvDataSegmentLength;
 
@@ -877,7 +877,7 @@ cxgbit_handle_immediate_data(struct iscsi_cmd *cmd, struct iscsi_scsi_req *hdr,
 
 	cmd->write_data_done += pdu_cb->dlen;
 
-	if (cmd->write_data_done == cmd->se_cmd.data_length) {
+	if (cmd->write_data_done == cmd->se_cmd.t_iostate.data_length) {
 		spin_lock_bh(&cmd->istate_lock);
 		cmd->cmd_flags |= ICF_GOT_LAST_DATAOUT;
 		cmd->i_state = ISTATE_RECEIVED_LAST_DATAOUT;
@@ -954,7 +954,7 @@ cxgbit_handle_scsi_cmd(struct cxgbit_sock *csk, struct iscsi_cmd *cmd)
 	if (rc < 0)
 		return rc;
 
-	if (pdu_cb->dlen && (pdu_cb->dlen == cmd->se_cmd.data_length) &&
+	if (pdu_cb->dlen && (pdu_cb->dlen == cmd->se_cmd.t_iostate.data_length) &&
 	    (pdu_cb->nr_dfrags == 1))
 		cmd->se_cmd.se_cmd_flags |= SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC;
 
@@ -1001,7 +1001,7 @@ static int cxgbit_handle_iscsi_dataout(struct cxgbit_sock *csk)
 	pr_debug("DataOut data_len: %u, "
 		"write_data_done: %u, data_length: %u\n",
 		  data_len,  cmd->write_data_done,
-		  cmd->se_cmd.data_length);
+		  cmd->se_cmd.t_iostate.data_length);
 
 	if (!(pdu_cb->flags & PDUCBF_RX_DATA_DDPD)) {
 		sg_off = data_offset / PAGE_SIZE;

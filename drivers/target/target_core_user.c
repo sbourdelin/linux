@@ -427,7 +427,7 @@ static int tcmu_queue_cmd_ring(struct tcmu_cmd *tcmu_cmd)
 
 	mb = udev->mb_addr;
 	cmd_head = mb->cmd_head % udev->cmdr_size; /* UAM */
-	data_length = se_cmd->data_length;
+	data_length = se_cmd->t_iostate.data_length;
 	if (se_cmd->se_cmd_flags & SCF_BIDI) {
 		BUG_ON(!(se_cmd->t_iomem.t_bidi_data_sg &&
 			 se_cmd->t_iomem.t_bidi_data_nents));
@@ -493,7 +493,7 @@ static int tcmu_queue_cmd_ring(struct tcmu_cmd *tcmu_cmd)
 	 */
 	iov = &entry->req.iov[0];
 	iov_cnt = 0;
-	copy_to_data_area = (se_cmd->data_direction == DMA_TO_DEVICE
+	copy_to_data_area = (se_cmd->t_iostate.data_direction == DMA_TO_DEVICE
 		|| se_cmd->se_cmd_flags & SCF_BIDI);
 	alloc_and_scatter_data_area(udev, se_cmd->t_iomem.t_data_sg,
 		se_cmd->t_iomem.t_data_nents, &iov, &iov_cnt, copy_to_data_area);
@@ -587,18 +587,18 @@ static void tcmu_handle_completion(struct tcmu_cmd *cmd, struct tcmu_cmd_entry *
 		gather_data_area(udev, bitmap,
 			se_cmd->t_iomem.t_bidi_data_sg, se_cmd->t_iomem.t_bidi_data_nents);
 		free_data_area(udev, cmd);
-	} else if (se_cmd->data_direction == DMA_FROM_DEVICE) {
+	} else if (se_cmd->t_iostate.data_direction == DMA_FROM_DEVICE) {
 		DECLARE_BITMAP(bitmap, DATA_BLOCK_BITS);
 
 		bitmap_copy(bitmap, cmd->data_bitmap, DATA_BLOCK_BITS);
 		gather_data_area(udev, bitmap,
 			se_cmd->t_iomem.t_data_sg, se_cmd->t_iomem.t_data_nents);
 		free_data_area(udev, cmd);
-	} else if (se_cmd->data_direction == DMA_TO_DEVICE) {
+	} else if (se_cmd->t_iostate.data_direction == DMA_TO_DEVICE) {
 		free_data_area(udev, cmd);
-	} else if (se_cmd->data_direction != DMA_NONE) {
+	} else if (se_cmd->t_iostate.data_direction != DMA_NONE) {
 		pr_warn("TCMU: data direction was %d!\n",
-			se_cmd->data_direction);
+			se_cmd->t_iostate.data_direction);
 	}
 
 	target_complete_cmd(cmd->se_cmd, entry->rsp.scsi_status);

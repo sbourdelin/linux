@@ -213,14 +213,14 @@ static int bot_send_read_response(struct usbg_cmd *cmd)
 	}
 
 	if (!gadget->sg_supported) {
-		cmd->data_buf = kmalloc(se_cmd->data_length, GFP_ATOMIC);
+		cmd->data_buf = kmalloc(se_cmd->t_iostate.data_length, GFP_ATOMIC);
 		if (!cmd->data_buf)
 			return -ENOMEM;
 
 		sg_copy_to_buffer(se_cmd->t_iomem.t_data_sg,
 				se_cmd->t_iomem.t_data_nents,
 				cmd->data_buf,
-				se_cmd->data_length);
+				se_cmd->t_iostate.data_length);
 
 		fu->bot_req_in->buf = cmd->data_buf;
 	} else {
@@ -230,7 +230,7 @@ static int bot_send_read_response(struct usbg_cmd *cmd)
 	}
 
 	fu->bot_req_in->complete = bot_read_compl;
-	fu->bot_req_in->length = se_cmd->data_length;
+	fu->bot_req_in->length = se_cmd->t_iostate.data_length;
 	fu->bot_req_in->context = cmd;
 	ret = usb_ep_queue(fu->ep_in, fu->bot_req_in, GFP_ATOMIC);
 	if (ret)
@@ -257,7 +257,7 @@ static int bot_send_write_request(struct usbg_cmd *cmd)
 	}
 
 	if (!gadget->sg_supported) {
-		cmd->data_buf = kmalloc(se_cmd->data_length, GFP_KERNEL);
+		cmd->data_buf = kmalloc(se_cmd->t_iostate.data_length, GFP_KERNEL);
 		if (!cmd->data_buf)
 			return -ENOMEM;
 
@@ -269,7 +269,7 @@ static int bot_send_write_request(struct usbg_cmd *cmd)
 	}
 
 	fu->bot_req_out->complete = usbg_data_write_cmpl;
-	fu->bot_req_out->length = se_cmd->data_length;
+	fu->bot_req_out->length = se_cmd->t_iostate.data_length;
 	fu->bot_req_out->context = cmd;
 
 	ret = usbg_prepare_w_request(cmd, fu->bot_req_out);
@@ -515,14 +515,14 @@ static int uasp_prepare_r_request(struct usbg_cmd *cmd)
 	struct uas_stream *stream = cmd->stream;
 
 	if (!gadget->sg_supported) {
-		cmd->data_buf = kmalloc(se_cmd->data_length, GFP_ATOMIC);
+		cmd->data_buf = kmalloc(se_cmd->t_iostate.data_length, GFP_ATOMIC);
 		if (!cmd->data_buf)
 			return -ENOMEM;
 
 		sg_copy_to_buffer(se_cmd->t_iomem.t_data_sg,
 				se_cmd->t_iomem.t_data_nents,
 				cmd->data_buf,
-				se_cmd->data_length);
+				se_cmd->t_iostate.data_length);
 
 		stream->req_in->buf = cmd->data_buf;
 	} else {
@@ -532,7 +532,7 @@ static int uasp_prepare_r_request(struct usbg_cmd *cmd)
 	}
 
 	stream->req_in->complete = uasp_status_data_cmpl;
-	stream->req_in->length = se_cmd->data_length;
+	stream->req_in->length = se_cmd->t_iostate.data_length;
 	stream->req_in->context = cmd;
 
 	cmd->state = UASP_SEND_STATUS;
@@ -963,7 +963,7 @@ static void usbg_data_write_cmpl(struct usb_ep *ep, struct usb_request *req)
 		sg_copy_from_buffer(se_cmd->t_iomem.t_data_sg,
 				se_cmd->t_iomem.t_data_nents,
 				cmd->data_buf,
-				se_cmd->data_length);
+				se_cmd->t_iostate.data_length);
 	}
 
 	complete(&cmd->write_complete);
@@ -980,7 +980,7 @@ static int usbg_prepare_w_request(struct usbg_cmd *cmd, struct usb_request *req)
 	struct usb_gadget *gadget = fuas_to_gadget(fu);
 
 	if (!gadget->sg_supported) {
-		cmd->data_buf = kmalloc(se_cmd->data_length, GFP_ATOMIC);
+		cmd->data_buf = kmalloc(se_cmd->t_iostate.data_length, GFP_ATOMIC);
 		if (!cmd->data_buf)
 			return -ENOMEM;
 
@@ -992,7 +992,7 @@ static int usbg_prepare_w_request(struct usbg_cmd *cmd, struct usb_request *req)
 	}
 
 	req->complete = usbg_data_write_cmpl;
-	req->length = se_cmd->data_length;
+	req->length = se_cmd->t_iostate.data_length;
 	req->context = cmd;
 	return 0;
 }
