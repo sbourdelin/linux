@@ -417,6 +417,25 @@ single_segment:
 }
 
 /*
+ * Map a bio to scatterlist, return number of sg entries setup. Caller must
+ * make sure sg can hold bio segments entries and detach the bio from list.
+ */
+int blk_bio_map_sg(struct request_queue *q, struct bio *bio,
+		   struct scatterlist *sglist)
+{
+	struct scatterlist *sg = NULL;
+	int nsegs;
+
+	nsegs = __blk_bios_map_sg(q, bio, sglist, &sg);
+
+	if (sg)
+		sg_mark_end(sg);
+
+	return nsegs;
+}
+EXPORT_SYMBOL(blk_bio_map_sg);
+
+/*
  * map a request to scatterlist, return number of sg entries setup. Caller
  * must make sure sg can hold rq->nr_phys_segments entries
  */
