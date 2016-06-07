@@ -662,6 +662,7 @@ static const struct target_backend_ops rd_mcp_ops = {
 	.name			= "rd_mcp",
 	.inquiry_prod		= "RAMDISK-MCP",
 	.inquiry_rev		= RD_MCP_VERSION,
+	.sbc_ops		= &rd_sbc_ops,
 	.attach_hba		= rd_attach_hba,
 	.detach_hba		= rd_detach_hba,
 	.alloc_device		= rd_alloc_device,

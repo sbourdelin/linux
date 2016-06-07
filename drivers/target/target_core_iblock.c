@@ -833,6 +833,7 @@ static const struct target_backend_ops iblock_ops = {
 	.inquiry_prod		= "IBLOCK",
 	.inquiry_rev		= IBLOCK_VERSION,
 	.owner			= THIS_MODULE,
+	.sbc_ops		= &iblock_sbc_ops,
 	.attach_hba		= iblock_attach_hba,
 	.detach_hba		= iblock_detach_hba,
 	.alloc_device		= iblock_alloc_device,

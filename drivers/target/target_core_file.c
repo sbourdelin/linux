@@ -815,6 +815,7 @@ static const struct target_backend_ops fileio_ops = {
 	.inquiry_prod		= "FILEIO",
 	.inquiry_rev		= FD_VERSION,
 	.owner			= THIS_MODULE,
+	.sbc_ops		= &fd_sbc_ops,
 	.attach_hba		= fd_attach_hba,
 	.detach_hba		= fd_detach_hba,
 	.alloc_device		= fd_alloc_device,

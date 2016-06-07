@@ -1127,6 +1127,7 @@ static void pscsi_req_done(struct request *req, int uptodate)
 static const struct target_backend_ops pscsi_ops = {
 	.name			= "pscsi",
 	.owner			= THIS_MODULE,
+	.sbc_ops		= NULL,
 	.transport_flags	= TRANSPORT_FLAG_PASSTHROUGH,
 	.attach_hba		= pscsi_attach_hba,
 	.detach_hba		= pscsi_detach_hba,

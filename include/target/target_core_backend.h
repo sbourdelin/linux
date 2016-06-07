@@ -8,6 +8,10 @@ struct target_backend_ops {
 	char inquiry_prod[16];
 	char inquiry_rev[4];
 	struct module *owner;
+	/*
+	 * Used by NVMe-target for se_cmd dispatch without SCSI CDB parsing
+	 */
+	struct sbc_ops *sbc_ops;
 
 	u8 transport_flags;
 
