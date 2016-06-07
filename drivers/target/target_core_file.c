@@ -375,12 +375,12 @@ fd_execute_write_same(struct se_cmd *cmd)
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 	}
 
-	if (cmd->t_data_nents > 1 ||
-	    cmd->t_data_sg[0].length != cmd->se_dev->dev_attrib.block_size) {
+	if (cmd->t_iomem.t_data_nents > 1 ||
+	    cmd->t_iomem.t_data_sg[0].length != cmd->se_dev->dev_attrib.block_size) {
 		pr_err("WRITE_SAME: Illegal SGL t_data_nents: %u length: %u"
 			" block_size: %u\n",
-			cmd->t_data_nents,
-			cmd->t_data_sg[0].length,
+			cmd->t_iomem.t_data_nents,
+			cmd->t_iomem.t_data_sg[0].length,
 			cmd->se_dev->dev_attrib.block_size);
 		return TCM_INVALID_CDB_FIELD;
 	}
@@ -390,9 +390,9 @@ fd_execute_write_same(struct se_cmd *cmd)
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 
 	for (i = 0; i < nolb; i++) {
-		bvec[i].bv_page = sg_page(&cmd->t_data_sg[0]);
-		bvec[i].bv_len = cmd->t_data_sg[0].length;
-		bvec[i].bv_offset = cmd->t_data_sg[0].offset;
+		bvec[i].bv_page = sg_page(&cmd->t_iomem.t_data_sg[0]);
+		bvec[i].bv_len = cmd->t_iomem.t_data_sg[0].length;
+		bvec[i].bv_offset = cmd->t_iomem.t_data_sg[0].offset;
 
 		len += se_dev->dev_attrib.block_size;
 	}
@@ -534,7 +534,8 @@ fd_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 	if (data_direction == DMA_FROM_DEVICE) {
 		if (cmd->prot_type && dev->dev_attrib.pi_prot_type) {
 			ret = fd_do_rw(cmd, pfile, dev->prot_length,
-				       cmd->t_prot_sg, cmd->t_prot_nents,
+				       cmd->t_iomem.t_prot_sg,
+				       cmd->t_iomem.t_prot_nents,
 				       cmd->prot_length, 0);
 			if (ret < 0)
 				return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
@@ -548,7 +549,7 @@ fd_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 					ilog2(dev->dev_attrib.block_size);
 
 			rc = sbc_dif_verify(cmd, cmd->t_task_lba, sectors,
-					    0, cmd->t_prot_sg, 0);
+					    0, cmd->t_iomem.t_prot_sg, 0);
 			if (rc)
 				return rc;
 		}
@@ -558,7 +559,7 @@ fd_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 					ilog2(dev->dev_attrib.block_size);
 
 			rc = sbc_dif_verify(cmd, cmd->t_task_lba, sectors,
-					    0, cmd->t_prot_sg, 0);
+					    0, cmd->t_iomem.t_prot_sg, 0);
 			if (rc)
 				return rc;
 		}
@@ -585,7 +586,8 @@ fd_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 
 		if (ret > 0 && cmd->prot_type && dev->dev_attrib.pi_prot_type) {
 			ret = fd_do_rw(cmd, pfile, dev->prot_length,
-				       cmd->t_prot_sg, cmd->t_prot_nents,
+				       cmd->t_iomem.t_prot_sg,
+				       cmd->t_iomem.t_prot_nents,
 				       cmd->prot_length, 1);
 			if (ret < 0)
 				return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;

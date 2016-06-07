@@ -432,6 +432,23 @@ enum target_core_dif_check {
 #define TCM_ORDERED_TAG	0x22
 #define TCM_ACA_TAG	0x24
 
+struct target_iomem {
+	/* Used to store READ/WRITE payloads */
+	struct scatterlist	*t_data_sg;
+	unsigned int		t_data_nents;
+	/* Used to store COMPARE_AND_WRITE payload */
+	struct scatterlist	*t_data_sg_orig;
+	unsigned int		t_data_nents_orig;
+	/* Used to map payload for CONTROL CDB emulation */
+	void			*t_data_vmap;
+	/* Used to store bidirectional READ payload */
+	struct scatterlist	*t_bidi_data_sg;
+	unsigned int		t_bidi_data_nents;
+	/* Used to store T10-PI payload */
+	struct scatterlist	*t_prot_sg;
+	unsigned int		t_prot_nents;
+};
+
 struct se_cmd {
 	/* SAM response code being sent to initiator */
 	u8			scsi_status;
@@ -495,14 +512,7 @@ struct se_cmd {
 	struct completion	t_transport_stop_comp;
 
 	struct work_struct	work;
-
-	struct scatterlist	*t_data_sg;
-	struct scatterlist	*t_data_sg_orig;
-	unsigned int		t_data_nents;
-	unsigned int		t_data_nents_orig;
-	void			*t_data_vmap;
-	struct scatterlist	*t_bidi_data_sg;
-	unsigned int		t_bidi_data_nents;
+	struct target_iomem	t_iomem;
 
 	/* Used for lun->lun_ref counting */
 	int			lun_ref_active;
@@ -519,8 +529,6 @@ struct se_cmd {
 	bool			prot_pto;
 	u32			prot_length;
 	u32			reftag_seed;
-	struct scatterlist	*t_prot_sg;
-	unsigned int		t_prot_nents;
 	sense_reason_t		pi_err;
 	sector_t		bad_sector;
 	int			cpuid;

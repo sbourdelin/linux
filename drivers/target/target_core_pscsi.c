@@ -990,8 +990,8 @@ pscsi_parse_cdb(struct se_cmd *cmd)
 static sense_reason_t
 pscsi_execute_cmd(struct se_cmd *cmd)
 {
-	struct scatterlist *sgl = cmd->t_data_sg;
-	u32 sgl_nents = cmd->t_data_nents;
+	struct scatterlist *sgl = cmd->t_iomem.t_data_sg;
+	u32 sgl_nents = cmd->t_iomem.t_data_nents;
 	enum dma_data_direction data_direction = cmd->data_direction;
 	struct pscsi_dev_virt *pdv = PSCSI_DEV(cmd->se_dev);
 	struct pscsi_plugin_task *pt;

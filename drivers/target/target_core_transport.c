@@ -720,7 +720,7 @@ void target_complete_cmd(struct se_cmd *cmd, u8 scsi_status)
 
 	if (dev && dev->transport->transport_complete) {
 		dev->transport->transport_complete(cmd,
-				cmd->t_data_sg,
+				cmd->t_iomem.t_data_sg,
 				transport_get_sense_buffer(cmd));
 		if (cmd->se_cmd_flags & SCF_TRANSPORT_TASK_SENSE)
 			success = 1;
@@ -1400,10 +1400,10 @@ transport_generic_map_mem_to_cmd(struct se_cmd *cmd, struct scatterlist *sgl,
 		return TCM_INVALID_CDB_FIELD;
 	}
 
-	cmd->t_data_sg = sgl;
-	cmd->t_data_nents = sgl_count;
-	cmd->t_bidi_data_sg = sgl_bidi;
-	cmd->t_bidi_data_nents = sgl_bidi_count;
+	cmd->t_iomem.t_data_sg = sgl;
+	cmd->t_iomem.t_data_nents = sgl_count;
+	cmd->t_iomem.t_bidi_data_sg = sgl_bidi;
+	cmd->t_iomem.t_bidi_data_nents = sgl_bidi_count;
 
 	cmd->se_cmd_flags |= SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC;
 	return 0;
@@ -1503,8 +1503,8 @@ int target_submit_cmd_map_sgls(struct se_cmd *se_cmd, struct se_session *se_sess
 	 * if present.
 	 */
 	if (sgl_prot_count) {
-		se_cmd->t_prot_sg = sgl_prot;
-		se_cmd->t_prot_nents = sgl_prot_count;
+		se_cmd->t_iomem.t_prot_sg = sgl_prot;
+		se_cmd->t_iomem.t_prot_nents = sgl_prot_count;
 		se_cmd->se_cmd_flags |= SCF_PASSTHROUGH_PROT_SG_TO_MEM_NOALLOC;
 	}
 
@@ -1821,7 +1821,7 @@ static int target_write_prot_action(struct se_cmd *cmd)
 
 		sectors = cmd->data_length >> ilog2(cmd->se_dev->dev_attrib.block_size);
 		cmd->pi_err = sbc_dif_verify(cmd, cmd->t_task_lba,
-					     sectors, 0, cmd->t_prot_sg, 0);
+					     sectors, 0, cmd->t_iomem.t_prot_sg, 0);
 		if (unlikely(cmd->pi_err)) {
 			spin_lock_irq(&cmd->t_state_lock);
 			cmd->transport_state &= ~(CMD_T_BUSY|CMD_T_SENT);
@@ -2051,8 +2051,8 @@ static bool target_read_prot_action(struct se_cmd *cmd)
 				  ilog2(cmd->se_dev->dev_attrib.block_size);
 
 			cmd->pi_err = sbc_dif_verify(cmd, cmd->t_task_lba,
-						     sectors, 0, cmd->t_prot_sg,
-						     0);
+						     sectors, 0,
+						     cmd->t_iomem.t_prot_sg, 0);
 			if (cmd->pi_err)
 				return true;
 		}
@@ -2216,22 +2216,22 @@ static inline void transport_reset_sgl_orig(struct se_cmd *cmd)
 	 * Check for saved t_data_sg that may be used for COMPARE_AND_WRITE
 	 * emulation, and free + reset pointers if necessary..
 	 */
-	if (!cmd->t_data_sg_orig)
+	if (!cmd->t_iomem.t_data_sg_orig)
 		return;
 
-	kfree(cmd->t_data_sg);
-	cmd->t_data_sg = cmd->t_data_sg_orig;
-	cmd->t_data_sg_orig = NULL;
-	cmd->t_data_nents = cmd->t_data_nents_orig;
-	cmd->t_data_nents_orig = 0;
+	kfree(cmd->t_iomem.t_data_sg);
+	cmd->t_iomem.t_data_sg = cmd->t_iomem.t_data_sg_orig;
+	cmd->t_iomem.t_data_sg_orig = NULL;
+	cmd->t_iomem.t_data_nents = cmd->t_iomem.t_data_nents_orig;
+	cmd->t_iomem.t_data_nents_orig = 0;
 }
 
 static inline void transport_free_pages(struct se_cmd *cmd)
 {
 	if (!(cmd->se_cmd_flags & SCF_PASSTHROUGH_PROT_SG_TO_MEM_NOALLOC)) {
-		target_free_sgl(cmd->t_prot_sg, cmd->t_prot_nents);
-		cmd->t_prot_sg = NULL;
-		cmd->t_prot_nents = 0;
+		target_free_sgl(cmd->t_iomem.t_prot_sg, cmd->t_iomem.t_prot_nents);
+		cmd->t_iomem.t_prot_sg = NULL;
+		cmd->t_iomem.t_prot_nents = 0;
 	}
 
 	if (cmd->se_cmd_flags & SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC) {
@@ -2240,23 +2240,23 @@ static inline void transport_free_pages(struct se_cmd *cmd)
 		 * SG_TO_MEM_NOALLOC to function with COMPARE_AND_WRITE
 		 */
 		if (cmd->se_cmd_flags & SCF_COMPARE_AND_WRITE) {
-			target_free_sgl(cmd->t_bidi_data_sg,
-					   cmd->t_bidi_data_nents);
-			cmd->t_bidi_data_sg = NULL;
-			cmd->t_bidi_data_nents = 0;
+			target_free_sgl(cmd->t_iomem.t_bidi_data_sg,
+					cmd->t_iomem.t_bidi_data_nents);
+			cmd->t_iomem.t_bidi_data_sg = NULL;
+			cmd->t_iomem.t_bidi_data_nents = 0;
 		}
 		transport_reset_sgl_orig(cmd);
 		return;
 	}
 	transport_reset_sgl_orig(cmd);
 
-	target_free_sgl(cmd->t_data_sg, cmd->t_data_nents);
-	cmd->t_data_sg = NULL;
-	cmd->t_data_nents = 0;
+	target_free_sgl(cmd->t_iomem.t_data_sg, cmd->t_iomem.t_data_nents);
+	cmd->t_iomem.t_data_sg = NULL;
+	cmd->t_iomem.t_data_nents = 0;
 
-	target_free_sgl(cmd->t_bidi_data_sg, cmd->t_bidi_data_nents);
-	cmd->t_bidi_data_sg = NULL;
-	cmd->t_bidi_data_nents = 0;
+	target_free_sgl(cmd->t_iomem.t_bidi_data_sg, cmd->t_iomem.t_bidi_data_nents);
+	cmd->t_iomem.t_bidi_data_sg = NULL;
+	cmd->t_iomem.t_bidi_data_nents = 0;
 }
 
 /**
@@ -2277,7 +2277,7 @@ static int transport_put_cmd(struct se_cmd *cmd)
 
 void *transport_kmap_data_sg(struct se_cmd *cmd)
 {
-	struct scatterlist *sg = cmd->t_data_sg;
+	struct scatterlist *sg = cmd->t_iomem.t_data_sg;
 	struct page **pages;
 	int i;
 
@@ -2286,43 +2286,44 @@ void *transport_kmap_data_sg(struct se_cmd *cmd)
 	 * tcm_loop who may be using a contig buffer from the SCSI midlayer for
 	 * control CDBs passed as SGLs via transport_generic_map_mem_to_cmd()
 	 */
-	if (!cmd->t_data_nents)
+	if (!cmd->t_iomem.t_data_nents)
 		return NULL;
 
 	BUG_ON(!sg);
-	if (cmd->t_data_nents == 1)
+	if (cmd->t_iomem.t_data_nents == 1)
 		return kmap(sg_page(sg)) + sg->offset;
 
 	/* >1 page. use vmap */
-	pages = kmalloc(sizeof(*pages) * cmd->t_data_nents, GFP_KERNEL);
+	pages = kmalloc(sizeof(*pages) * cmd->t_iomem.t_data_nents, GFP_KERNEL);
 	if (!pages)
 		return NULL;
 
 	/* convert sg[] to pages[] */
-	for_each_sg(cmd->t_data_sg, sg, cmd->t_data_nents, i) {
+	for_each_sg(cmd->t_iomem.t_data_sg, sg, cmd->t_iomem.t_data_nents, i) {
 		pages[i] = sg_page(sg);
 	}
 
-	cmd->t_data_vmap = vmap(pages, cmd->t_data_nents,  VM_MAP, PAGE_KERNEL);
+	cmd->t_iomem.t_data_vmap = vmap(pages, cmd->t_iomem.t_data_nents,
+					VM_MAP, PAGE_KERNEL);
 	kfree(pages);
-	if (!cmd->t_data_vmap)
+	if (!cmd->t_iomem.t_data_vmap)
 		return NULL;
 
-	return cmd->t_data_vmap + cmd->t_data_sg[0].offset;
+	return cmd->t_iomem.t_data_vmap + cmd->t_iomem.t_data_sg[0].offset;
 }
 EXPORT_SYMBOL(transport_kmap_data_sg);
 
 void transport_kunmap_data_sg(struct se_cmd *cmd)
 {
-	if (!cmd->t_data_nents) {
+	if (!cmd->t_iomem.t_data_nents) {
 		return;
-	} else if (cmd->t_data_nents == 1) {
-		kunmap(sg_page(cmd->t_data_sg));
+	} else if (cmd->t_iomem.t_data_nents == 1) {
+		kunmap(sg_page(cmd->t_iomem.t_data_sg));
 		return;
 	}
 
-	vunmap(cmd->t_data_vmap);
-	cmd->t_data_vmap = NULL;
+	vunmap(cmd->t_iomem.t_data_vmap);
+	cmd->t_iomem.t_data_vmap = NULL;
 }
 EXPORT_SYMBOL(transport_kunmap_data_sg);
 
@@ -2382,7 +2383,8 @@ transport_generic_new_cmd(struct se_cmd *cmd)
 
 	if (cmd->prot_op != TARGET_PROT_NORMAL &&
 	    !(cmd->se_cmd_flags & SCF_PASSTHROUGH_PROT_SG_TO_MEM_NOALLOC)) {
-		ret = target_alloc_sgl(&cmd->t_prot_sg, &cmd->t_prot_nents,
+		ret = target_alloc_sgl(&cmd->t_iomem.t_prot_sg,
+				       &cmd->t_iomem.t_prot_nents,
 				       cmd->prot_length, true, false);
 		if (ret < 0)
 			return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
@@ -2406,14 +2408,15 @@ transport_generic_new_cmd(struct se_cmd *cmd)
 			else
 				bidi_length = cmd->data_length;
 
-			ret = target_alloc_sgl(&cmd->t_bidi_data_sg,
-					       &cmd->t_bidi_data_nents,
+			ret = target_alloc_sgl(&cmd->t_iomem.t_bidi_data_sg,
+					       &cmd->t_iomem.t_bidi_data_nents,
 					       bidi_length, zero_flag, false);
 			if (ret < 0)
 				return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 		}
 
-		ret = target_alloc_sgl(&cmd->t_data_sg, &cmd->t_data_nents,
+		ret = target_alloc_sgl(&cmd->t_iomem.t_data_sg,
+				       &cmd->t_iomem.t_data_nents,
 				       cmd->data_length, zero_flag, false);
 		if (ret < 0)
 			return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
@@ -2426,8 +2429,8 @@ transport_generic_new_cmd(struct se_cmd *cmd)
 		u32 caw_length = cmd->t_task_nolb *
 				 cmd->se_dev->dev_attrib.block_size;
 
-		ret = target_alloc_sgl(&cmd->t_bidi_data_sg,
-				       &cmd->t_bidi_data_nents,
+		ret = target_alloc_sgl(&cmd->t_iomem.t_bidi_data_sg,
+				       &cmd->t_iomem.t_bidi_data_nents,
 				       caw_length, zero_flag, false);
 		if (ret < 0)
 			return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;

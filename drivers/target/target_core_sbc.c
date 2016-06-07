@@ -404,11 +404,11 @@ static sense_reason_t xdreadwrite_callback(struct se_cmd *cmd, bool success,
 		return TCM_OUT_OF_RESOURCES;
 	}
 	/*
-	 * Copy the scatterlist WRITE buffer located at cmd->t_data_sg
+	 * Copy the scatterlist WRITE buffer located at cmd->t_iomem.t_data_sg
 	 * into the locally allocated *buf
 	 */
-	sg_copy_to_buffer(cmd->t_data_sg,
-			  cmd->t_data_nents,
+	sg_copy_to_buffer(cmd->t_iomem.t_data_sg,
+			  cmd->t_iomem.t_data_nents,
 			  buf,
 			  cmd->data_length);
 
@@ -418,7 +418,8 @@ static sense_reason_t xdreadwrite_callback(struct se_cmd *cmd, bool success,
 	 */
 
 	offset = 0;
-	for_each_sg(cmd->t_bidi_data_sg, sg, cmd->t_bidi_data_nents, count) {
+	for_each_sg(cmd->t_iomem.t_bidi_data_sg, sg,
+		    cmd->t_iomem.t_bidi_data_nents, count) {
 		addr = kmap_atomic(sg_page(sg));
 		if (!addr) {
 			ret = TCM_OUT_OF_RESOURCES;
@@ -442,7 +443,7 @@ sbc_execute_rw(struct se_cmd *cmd)
 {
 	struct sbc_ops *ops = cmd->protocol_data;
 
-	return ops->execute_rw(cmd, cmd->t_data_sg, cmd->t_data_nents,
+	return ops->execute_rw(cmd, cmd->t_iomem.t_data_sg, cmd->t_iomem.t_data_nents,
 			       cmd->data_direction);
 }
 
@@ -490,7 +491,7 @@ static sense_reason_t compare_and_write_callback(struct se_cmd *cmd, bool succes
 	 * Handle early failure in transport_generic_request_failure(),
 	 * which will not have taken ->caw_sem yet..
 	 */
-	if (!success && (!cmd->t_data_sg || !cmd->t_bidi_data_sg))
+	if (!success && (!cmd->t_iomem.t_data_sg || !cmd->t_iomem.t_bidi_data_sg))
 		return TCM_NO_SENSE;
 	/*
 	 * Handle special case for zero-length COMPARE_AND_WRITE
@@ -514,19 +515,19 @@ static sense_reason_t compare_and_write_callback(struct se_cmd *cmd, bool succes
 		goto out;
 	}
 
-	write_sg = kmalloc(sizeof(struct scatterlist) * cmd->t_data_nents,
+	write_sg = kmalloc(sizeof(struct scatterlist) * cmd->t_iomem.t_data_nents,
 			   GFP_KERNEL);
 	if (!write_sg) {
 		pr_err("Unable to allocate compare_and_write sg\n");
 		ret = TCM_OUT_OF_RESOURCES;
 		goto out;
 	}
-	sg_init_table(write_sg, cmd->t_data_nents);
+	sg_init_table(write_sg, cmd->t_iomem.t_data_nents);
 	/*
 	 * Setup verify and write data payloads from total NumberLBAs.
 	 */
-	rc = sg_copy_to_buffer(cmd->t_data_sg, cmd->t_data_nents, buf,
-			       cmd->data_length);
+	rc = sg_copy_to_buffer(cmd->t_iomem.t_data_sg, cmd->t_iomem.t_data_nents,
+			       buf, cmd->data_length);
 	if (!rc) {
 		pr_err("sg_copy_to_buffer() failed for compare_and_write\n");
 		ret = TCM_OUT_OF_RESOURCES;
@@ -535,7 +536,8 @@ static sense_reason_t compare_and_write_callback(struct se_cmd *cmd, bool succes
 	/*
 	 * Compare against SCSI READ payload against verify payload
 	 */
-	for_each_sg(cmd->t_bidi_data_sg, sg, cmd->t_bidi_data_nents, i) {
+	for_each_sg(cmd->t_iomem.t_bidi_data_sg, sg,
+		    cmd->t_iomem.t_bidi_data_nents, i) {
 		addr = (unsigned char *)kmap_atomic(sg_page(sg));
 		if (!addr) {
 			ret = TCM_OUT_OF_RESOURCES;
@@ -560,7 +562,8 @@ static sense_reason_t compare_and_write_callback(struct se_cmd *cmd, bool succes
 
 	i = 0;
 	len = cmd->t_task_nolb * block_size;
-	sg_miter_start(&m, cmd->t_data_sg, cmd->t_data_nents, SG_MITER_TO_SG);
+	sg_miter_start(&m, cmd->t_iomem.t_data_sg, cmd->t_iomem.t_data_nents,
+		       SG_MITER_TO_SG);
 	/*
 	 * Currently assumes NoLB=1 and SGLs are PAGE_SIZE..
 	 */
@@ -584,10 +587,10 @@ static sense_reason_t compare_and_write_callback(struct se_cmd *cmd, bool succes
 	 * assignments, to be released in transport_free_pages() ->
 	 * transport_reset_sgl_orig()
 	 */
-	cmd->t_data_sg_orig = cmd->t_data_sg;
-	cmd->t_data_sg = write_sg;
-	cmd->t_data_nents_orig = cmd->t_data_nents;
-	cmd->t_data_nents = 1;
+	cmd->t_iomem.t_data_sg_orig = cmd->t_iomem.t_data_sg;
+	cmd->t_iomem.t_data_sg = write_sg;
+	cmd->t_iomem.t_data_nents_orig = cmd->t_iomem.t_data_nents;
+	cmd->t_iomem.t_data_nents = 1;
 
 	cmd->sam_task_attr = TCM_HEAD_TAG;
 	cmd->transport_complete_callback = compare_and_write_post;
@@ -645,8 +648,8 @@ sbc_compare_and_write(struct se_cmd *cmd)
 	 */
 	cmd->data_length = cmd->t_task_nolb * dev->dev_attrib.block_size;
 
-	ret = ops->execute_rw(cmd, cmd->t_bidi_data_sg, cmd->t_bidi_data_nents,
-			      DMA_FROM_DEVICE);
+	ret = ops->execute_rw(cmd, cmd->t_iomem.t_bidi_data_sg,
+			      cmd->t_iomem.t_bidi_data_nents, DMA_FROM_DEVICE);
 	if (ret) {
 		cmd->transport_complete_callback = NULL;
 		up(&dev->caw_sem);
@@ -730,7 +733,7 @@ sbc_check_prot(struct se_device *dev, struct se_cmd *cmd, unsigned char *cdb,
 	int pi_prot_type = dev->dev_attrib.pi_prot_type;
 	bool fabric_prot = false;
 
-	if (!cmd->t_prot_sg || !cmd->t_prot_nents) {
+	if (!cmd->t_iomem.t_prot_sg || !cmd->t_iomem.t_prot_nents) {
 		if (unlikely(protect &&
 		    !dev->dev_attrib.pi_prot_type && !cmd->se_sess->sess_prot_type)) {
 			pr_err("CDB contains protect bit, but device + fabric does"
@@ -1244,13 +1247,13 @@ sbc_dif_generate(struct se_cmd *cmd)
 {
 	struct se_device *dev = cmd->se_dev;
 	struct t10_pi_tuple *sdt;
-	struct scatterlist *dsg = cmd->t_data_sg, *psg;
+	struct scatterlist *dsg = cmd->t_iomem.t_data_sg, *psg;
 	sector_t sector = cmd->t_task_lba;
 	void *daddr, *paddr;
 	int i, j, offset = 0;
 	unsigned int block_size = dev->dev_attrib.block_size;
 
-	for_each_sg(cmd->t_prot_sg, psg, cmd->t_prot_nents, i) {
+	for_each_sg(cmd->t_iomem.t_prot_sg, psg, cmd->t_iomem.t_prot_nents, i) {
 		paddr = kmap_atomic(sg_page(psg)) + psg->offset;
 		daddr = kmap_atomic(sg_page(dsg)) + dsg->offset;
 
@@ -1362,7 +1365,7 @@ void sbc_dif_copy_prot(struct se_cmd *cmd, unsigned int sectors, bool read,
 
 	left = sectors * dev->prot_length;
 
-	for_each_sg(cmd->t_prot_sg, psg, cmd->t_prot_nents, i) {
+	for_each_sg(cmd->t_iomem.t_prot_sg, psg, cmd->t_iomem.t_prot_nents, i) {
 		unsigned int psg_len, copied = 0;
 
 		paddr = kmap_atomic(sg_page(psg)) + psg->offset;
@@ -1399,7 +1402,7 @@ sbc_dif_verify(struct se_cmd *cmd, sector_t start, unsigned int sectors,
 {
 	struct se_device *dev = cmd->se_dev;
 	struct t10_pi_tuple *sdt;
-	struct scatterlist *dsg = cmd->t_data_sg;
+	struct scatterlist *dsg = cmd->t_iomem.t_data_sg;
 	sector_t sector = start;
 	void *daddr, *paddr;
 	int i;

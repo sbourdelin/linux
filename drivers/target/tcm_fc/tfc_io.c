@@ -89,9 +89,9 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 	/*
 	 * Setup to use first mem list entry, unless no data.
 	 */
-	BUG_ON(remaining && !se_cmd->t_data_sg);
+	BUG_ON(remaining && !se_cmd->t_iomem.t_data_sg);
 	if (remaining) {
-		sg = se_cmd->t_data_sg;
+		sg = se_cmd->t_iomem.t_data_sg;
 		mem_len = sg->length;
 		mem_off = sg->offset;
 		page = sg_page(sg);
@@ -248,7 +248,8 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 				"payload, Frame will be dropped if"
 				"'Sequence Initiative' bit in f_ctl is"
 				"not set\n", __func__, ep->xid, f_ctl,
-				se_cmd->t_data_sg, se_cmd->t_data_nents);
+				se_cmd->t_iomem.t_data_sg,
+				se_cmd->t_iomem.t_data_nents);
 		/*
 		 * Invalidate HW DDP context if it was setup for respective
 		 * command. Invalidation of HW DDP context is requited in both
@@ -286,9 +287,9 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 	/*
 	 * Setup to use first mem list entry, unless no data.
 	 */
-	BUG_ON(frame_len && !se_cmd->t_data_sg);
+	BUG_ON(frame_len && !se_cmd->t_iomem.t_data_sg);
 	if (frame_len) {
-		sg = se_cmd->t_data_sg;
+		sg = se_cmd->t_iomem.t_data_sg;
 		mem_len = sg->length;
 		mem_off = sg->offset;
 		page = sg_page(sg);

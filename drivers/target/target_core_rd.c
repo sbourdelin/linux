@@ -426,7 +426,7 @@ static sense_reason_t rd_do_prot_rw(struct se_cmd *cmd, bool is_read)
 				    prot_sg, prot_offset);
 	else
 		rc = sbc_dif_verify(cmd, cmd->t_task_lba, sectors, 0,
-				    cmd->t_prot_sg, 0);
+				    cmd->t_iomem.t_prot_sg, 0);
 
 	if (!rc)
 		sbc_dif_copy_prot(cmd, sectors, is_read, prot_sg, prot_offset);

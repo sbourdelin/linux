@@ -1299,8 +1299,8 @@ static int sbp_rw_data(struct sbp_target_request *req)
 		length = req->se_cmd.data_length;
 	}
 
-	sg_miter_start(&iter, req->se_cmd.t_data_sg, req->se_cmd.t_data_nents,
-		sg_miter_flags);
+	sg_miter_start(&iter, req->se_cmd.t_iomem.t_data_sg,
+		       req->se_cmd.t_iomem.t_data_nents, sg_miter_flags);
 
 	while (length || num_pte) {
 		if (!length) {

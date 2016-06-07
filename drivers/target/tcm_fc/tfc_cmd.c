@@ -55,10 +55,10 @@ static void _ft_dump_cmd(struct ft_cmd *cmd, const char *caller)
 		caller, cmd, cmd->sess, cmd->seq, se_cmd);
 
 	pr_debug("%s: cmd %p data_nents %u len %u se_cmd_flags <0x%x>\n",
-		caller, cmd, se_cmd->t_data_nents,
+		caller, cmd, se_cmd->t_iomem.t_data_nents,
 	       se_cmd->data_length, se_cmd->se_cmd_flags);
 
-	for_each_sg(se_cmd->t_data_sg, sg, se_cmd->t_data_nents, count)
+	for_each_sg(se_cmd->t_iomem.t_data_sg, sg, se_cmd->t_iomem.t_data_nents, count)
 		pr_debug("%s: cmd %p sg %p page %p "
 			"len 0x%x off 0x%x\n",
 			caller, cmd, sg,
@@ -237,8 +237,8 @@ int ft_write_pending(struct se_cmd *se_cmd)
 		    (fh->fh_r_ctl == FC_RCTL_DD_DATA_DESC)) {
 			if ((se_cmd->se_cmd_flags & SCF_SCSI_DATA_CDB) &&
 			    lport->tt.ddp_target(lport, ep->xid,
-						 se_cmd->t_data_sg,
-						 se_cmd->t_data_nents))
+						 se_cmd->t_iomem.t_data_sg,
+						 se_cmd->t_iomem.t_data_nents))
 				cmd->was_ddp_setup = 1;
 		}
 	}

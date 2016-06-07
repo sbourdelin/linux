@@ -1128,14 +1128,14 @@ isert_handle_scsi_cmd(struct isert_conn *isert_conn,
 
 	if (imm_data_len != data_len) {
 		sg_nents = max(1UL, DIV_ROUND_UP(imm_data_len, PAGE_SIZE));
-		sg_copy_from_buffer(cmd->se_cmd.t_data_sg, sg_nents,
+		sg_copy_from_buffer(cmd->se_cmd.t_iomem.t_data_sg, sg_nents,
 				    &rx_desc->data[0], imm_data_len);
 		isert_dbg("Copy Immediate sg_nents: %u imm_data_len: %d\n",
 			  sg_nents, imm_data_len);
 	} else {
 		sg_init_table(&isert_cmd->sg, 1);
-		cmd->se_cmd.t_data_sg = &isert_cmd->sg;
-		cmd->se_cmd.t_data_nents = 1;
+		cmd->se_cmd.t_iomem.t_data_sg = &isert_cmd->sg;
+		cmd->se_cmd.t_iomem.t_data_nents = 1;
 		sg_set_buf(&isert_cmd->sg, &rx_desc->data[0], imm_data_len);
 		isert_dbg("Transfer Immediate imm_data_len: %d\n",
 			  imm_data_len);
@@ -1192,7 +1192,7 @@ isert_handle_iscsi_dataout(struct isert_conn *isert_conn,
 		  cmd->se_cmd.data_length);
 
 	sg_off = cmd->write_data_done / PAGE_SIZE;
-	sg_start = &cmd->se_cmd.t_data_sg[sg_off];
+	sg_start = &cmd->se_cmd.t_iomem.t_data_sg[sg_off];
 	sg_nents = max(1UL, DIV_ROUND_UP(unsol_data_len, PAGE_SIZE));
 	page_off = cmd->write_data_done % PAGE_SIZE;
 	/*
@@ -1463,6 +1463,7 @@ static void
 isert_rdma_rw_ctx_destroy(struct isert_cmd *cmd, struct isert_conn *conn)
 {
 	struct se_cmd *se_cmd = &cmd->iscsi_cmd->se_cmd;
+	struct target_iomem *iomem = &se_cmd->t_iomem;
 	enum dma_data_direction dir = target_reverse_dma_direction(se_cmd);
 
 	if (!cmd->rw.nr_ops)
@@ -1470,12 +1471,12 @@ isert_rdma_rw_ctx_destroy(struct isert_cmd *cmd, struct isert_conn *conn)
 
 	if (isert_prot_cmd(conn, se_cmd)) {
 		rdma_rw_ctx_destroy_signature(&cmd->rw, conn->qp,
-				conn->cm_id->port_num, se_cmd->t_data_sg,
-				se_cmd->t_data_nents, se_cmd->t_prot_sg,
-				se_cmd->t_prot_nents, dir);
+				conn->cm_id->port_num, iomem->t_data_sg,
+				iomem->t_data_nents, iomem->t_prot_sg,
+				iomem->t_prot_nents, dir);
 	} else {
 		rdma_rw_ctx_destroy(&cmd->rw, conn->qp, conn->cm_id->port_num,
-				se_cmd->t_data_sg, se_cmd->t_data_nents, dir);
+				iomem->t_data_sg, iomem->t_data_nents, dir);
 	}
 
 	cmd->rw.nr_ops = 0;
@@ -2076,6 +2077,7 @@ isert_rdma_rw_ctx_post(struct isert_cmd *cmd, struct isert_conn *conn,
 		struct ib_cqe *cqe, struct ib_send_wr *chain_wr)
 {
 	struct se_cmd *se_cmd = &cmd->iscsi_cmd->se_cmd;
+	struct target_iomem *iomem = &se_cmd->t_iomem;
 	enum dma_data_direction dir = target_reverse_dma_direction(se_cmd);
 	u8 port_num = conn->cm_id->port_num;
 	u64 addr;
@@ -2101,12 +2103,12 @@ isert_rdma_rw_ctx_post(struct isert_cmd *cmd, struct isert_conn *conn,
 
 		WARN_ON_ONCE(offset);
 		ret = rdma_rw_ctx_signature_init(&cmd->rw, conn->qp, port_num,
-				se_cmd->t_data_sg, se_cmd->t_data_nents,
-				se_cmd->t_prot_sg, se_cmd->t_prot_nents,
+				iomem->t_data_sg, iomem->t_data_nents,
+				iomem->t_prot_sg, iomem->t_prot_nents,
 				&sig_attrs, addr, rkey, dir);
 	} else {
 		ret = rdma_rw_ctx_init(&cmd->rw, conn->qp, port_num,
-				se_cmd->t_data_sg, se_cmd->t_data_nents,
+				iomem->t_data_sg, iomem->t_data_nents,
 				offset, addr, rkey, dir);
 	}
 	if (ret < 0) {

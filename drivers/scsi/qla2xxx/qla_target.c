@@ -4903,8 +4903,8 @@ restart:
 		}
 		se_cmd = &cmd->se_cmd;
 
-		cmd->sg_cnt = se_cmd->t_data_nents;
-		cmd->sg = se_cmd->t_data_sg;
+		cmd->sg_cnt = se_cmd->t_iomem.t_data_nents;
+		cmd->sg = se_cmd->t_iomem.t_data_sg;
 
 		ql_dbg(ql_dbg_tgt_mgt, vha, 0xf02c,
 		       "SRR cmd %p (se_cmd %p, tag %lld, op %x), sg_cnt=%d, offset=%d",

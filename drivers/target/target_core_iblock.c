@@ -416,7 +416,7 @@ static sense_reason_t
 iblock_execute_write_same_direct(struct block_device *bdev, struct se_cmd *cmd)
 {
 	struct se_device *dev = cmd->se_dev;
-	struct scatterlist *sg = &cmd->t_data_sg[0];
+	struct scatterlist *sg = &cmd->t_iomem.t_data_sg[0];
 	struct page *page = NULL;
 	int ret;
 
@@ -424,7 +424,8 @@ iblock_execute_write_same_direct(struct block_device *bdev, struct se_cmd *cmd)
 		page = alloc_page(GFP_KERNEL);
 		if (!page)
 			return TCM_OUT_OF_RESOURCES;
-		sg_copy_to_buffer(sg, cmd->t_data_nents, page_address(page),
+		sg_copy_to_buffer(sg, cmd->t_iomem.t_data_nents,
+				  page_address(page),
 				  dev->dev_attrib.block_size);
 	}
 
@@ -460,12 +461,12 @@ iblock_execute_write_same(struct se_cmd *cmd)
 		       " backends not supported\n");
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 	}
-	sg = &cmd->t_data_sg[0];
+	sg = &cmd->t_iomem.t_data_sg[0];
 
-	if (cmd->t_data_nents > 1 ||
+	if (cmd->t_iomem.t_data_nents > 1 ||
 	    sg->length != cmd->se_dev->dev_attrib.block_size) {
 		pr_err("WRITE_SAME: Illegal SGL t_data_nents: %u length: %u"
-			" block_size: %u\n", cmd->t_data_nents, sg->length,
+			" block_size: %u\n", cmd->t_iomem.t_data_nents, sg->length,
 			cmd->se_dev->dev_attrib.block_size);
 		return TCM_INVALID_CDB_FIELD;
 	}
@@ -636,7 +637,7 @@ iblock_alloc_bip(struct se_cmd *cmd, struct bio *bio)
 		return -ENODEV;
 	}
 
-	bip = bio_integrity_alloc(bio, GFP_NOIO, cmd->t_prot_nents);
+	bip = bio_integrity_alloc(bio, GFP_NOIO, cmd->t_iomem.t_prot_nents);
 	if (IS_ERR(bip)) {
 		pr_err("Unable to allocate bio_integrity_payload\n");
 		return PTR_ERR(bip);
@@ -649,7 +650,7 @@ iblock_alloc_bip(struct se_cmd *cmd, struct bio *bio)
 	pr_debug("IBLOCK BIP Size: %u Sector: %llu\n", bip->bip_iter.bi_size,
 		 (unsigned long long)bip->bip_iter.bi_sector);
 
-	for_each_sg(cmd->t_prot_sg, sg, cmd->t_prot_nents, i) {
+	for_each_sg(cmd->t_iomem.t_prot_sg, sg, cmd->t_iomem.t_prot_nents, i) {
 
 		rc = bio_integrity_add_page(bio, sg_page(sg), sg->length,
 					    sg->offset);

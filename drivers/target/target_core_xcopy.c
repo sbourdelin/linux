@@ -562,7 +562,8 @@ static int target_xcopy_setup_pt_cmd(
 	}
 
 	if (alloc_mem) {
-		rc = target_alloc_sgl(&cmd->t_data_sg, &cmd->t_data_nents,
+		rc = target_alloc_sgl(&cmd->t_iomem.t_data_sg,
+				      &cmd->t_iomem.t_data_nents,
 				      cmd->data_length, false, false);
 		if (rc < 0) {
 			ret = rc;
@@ -588,7 +589,7 @@ static int target_xcopy_setup_pt_cmd(
 		}
 
 		pr_debug("Setup PASSTHROUGH_NOALLOC t_data_sg: %p t_data_nents:"
-			 " %u\n", cmd->t_data_sg, cmd->t_data_nents);
+			 " %u\n", cmd->t_iomem.t_data_sg, cmd->t_iomem.t_data_nents);
 	}
 
 	return 0;
@@ -657,8 +658,8 @@ static int target_xcopy_read_source(
 		return rc;
 	}
 
-	xop->xop_data_sg = se_cmd->t_data_sg;
-	xop->xop_data_nents = se_cmd->t_data_nents;
+	xop->xop_data_sg = se_cmd->t_iomem.t_data_sg;
+	xop->xop_data_nents = se_cmd->t_iomem.t_data_nents;
 	pr_debug("XCOPY-READ: Saved xop->xop_data_sg: %p, num: %u for READ"
 		" memory\n", xop->xop_data_sg, xop->xop_data_nents);
 
@@ -671,8 +672,8 @@ static int target_xcopy_read_source(
 	 * Clear off the allocated t_data_sg, that has been saved for
 	 * zero-copy WRITE submission reuse in struct xcopy_op..
 	 */
-	se_cmd->t_data_sg = NULL;
-	se_cmd->t_data_nents = 0;
+	se_cmd->t_iomem.t_data_sg = NULL;
+	se_cmd->t_iomem.t_data_nents = 0;
 
 	return 0;
 }
@@ -720,8 +721,8 @@ static int target_xcopy_write_destination(
 		 * core releases this memory on error during X-COPY WRITE I/O.
 		 */
 		src_cmd->se_cmd_flags &= ~SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC;
-		src_cmd->t_data_sg = xop->xop_data_sg;
-		src_cmd->t_data_nents = xop->xop_data_nents;
+		src_cmd->t_iomem.t_data_sg = xop->xop_data_sg;
+		src_cmd->t_iomem.t_data_nents = xop->xop_data_nents;
 
 		transport_generic_free_cmd(se_cmd, 0);
 		return rc;

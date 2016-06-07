@@ -381,11 +381,11 @@ static int tcm_qla2xxx_write_pending(struct se_cmd *se_cmd)
 	cmd->bufflen = se_cmd->data_length;
 	cmd->dma_data_direction = target_reverse_dma_direction(se_cmd);
 
-	cmd->sg_cnt = se_cmd->t_data_nents;
-	cmd->sg = se_cmd->t_data_sg;
+	cmd->sg_cnt = se_cmd->t_iomem.t_data_nents;
+	cmd->sg = se_cmd->t_iomem.t_data_sg;
 
-	cmd->prot_sg_cnt = se_cmd->t_prot_nents;
-	cmd->prot_sg = se_cmd->t_prot_sg;
+	cmd->prot_sg_cnt = se_cmd->t_iomem.t_prot_nents;
+	cmd->prot_sg = se_cmd->t_iomem.t_prot_sg;
 	cmd->blk_sz  = se_cmd->se_dev->dev_attrib.block_size;
 	se_cmd->pi_err = 0;
 
@@ -595,12 +595,12 @@ static int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 	cmd->bufflen = se_cmd->data_length;
 	cmd->dma_data_direction = target_reverse_dma_direction(se_cmd);
 
-	cmd->sg_cnt = se_cmd->t_data_nents;
-	cmd->sg = se_cmd->t_data_sg;
+	cmd->sg_cnt = se_cmd->t_iomem.t_data_nents;
+	cmd->sg = se_cmd->t_iomem.t_data_sg;
 	cmd->offset = 0;
 
-	cmd->prot_sg_cnt = se_cmd->t_prot_nents;
-	cmd->prot_sg = se_cmd->t_prot_sg;
+	cmd->prot_sg_cnt = se_cmd->t_iomem.t_prot_nents;
+	cmd->prot_sg = se_cmd->t_iomem.t_prot_sg;
 	cmd->blk_sz  = se_cmd->se_dev->dev_attrib.block_size;
 	se_cmd->pi_err = 0;
 
@@ -1817,7 +1817,8 @@ static const struct target_core_fabric_ops tcm_qla2xxx_ops = {
 	.node_acl_size			= sizeof(struct tcm_qla2xxx_nacl),
 	/*
 	 * XXX: Limit assumes single page per scatter-gather-list entry.
-	 * Current maximum is ~4.9 MB per se_cmd->t_data_sg with PAGE_SIZE=4096
+	 * Current maximum is ~4.9 MB per se_cmd->t_iomem.t_data_sg with
+	 * PAGE_SIZE=4096
 	 */
 	.max_data_sg_nents		= 1200,
 	.get_fabric_name		= tcm_qla2xxx_get_fabric_name,

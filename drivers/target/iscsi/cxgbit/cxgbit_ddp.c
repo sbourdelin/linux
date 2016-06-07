@@ -245,8 +245,8 @@ cxgbit_get_r2t_ttt(struct iscsi_conn *conn, struct iscsi_cmd *cmd,
 
 	ccmd->setup_ddp = false;
 
-	ttinfo->sgl = cmd->se_cmd.t_data_sg;
-	ttinfo->nents = cmd->se_cmd.t_data_nents;
+	ttinfo->sgl = cmd->se_cmd.t_iomem.t_data_sg;
+	ttinfo->nents = cmd->se_cmd.t_iomem.t_data_nents;
 
 	ret = cxgbit_ddp_reserve(csk, ttinfo, cmd->se_cmd.data_length);
 	if (ret < 0) {

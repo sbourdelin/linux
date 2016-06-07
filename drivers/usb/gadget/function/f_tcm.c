@@ -217,16 +217,16 @@ static int bot_send_read_response(struct usbg_cmd *cmd)
 		if (!cmd->data_buf)
 			return -ENOMEM;
 
-		sg_copy_to_buffer(se_cmd->t_data_sg,
-				se_cmd->t_data_nents,
+		sg_copy_to_buffer(se_cmd->t_iomem.t_data_sg,
+				se_cmd->t_iomem.t_data_nents,
 				cmd->data_buf,
 				se_cmd->data_length);
 
 		fu->bot_req_in->buf = cmd->data_buf;
 	} else {
 		fu->bot_req_in->buf = NULL;
-		fu->bot_req_in->num_sgs = se_cmd->t_data_nents;
-		fu->bot_req_in->sg = se_cmd->t_data_sg;
+		fu->bot_req_in->num_sgs = se_cmd->t_iomem.t_data_nents;
+		fu->bot_req_in->sg = se_cmd->t_iomem.t_data_sg;
 	}
 
 	fu->bot_req_in->complete = bot_read_compl;
@@ -264,8 +264,8 @@ static int bot_send_write_request(struct usbg_cmd *cmd)
 		fu->bot_req_out->buf = cmd->data_buf;
 	} else {
 		fu->bot_req_out->buf = NULL;
-		fu->bot_req_out->num_sgs = se_cmd->t_data_nents;
-		fu->bot_req_out->sg = se_cmd->t_data_sg;
+		fu->bot_req_out->num_sgs = se_cmd->t_iomem.t_data_nents;
+		fu->bot_req_out->sg = se_cmd->t_iomem.t_data_sg;
 	}
 
 	fu->bot_req_out->complete = usbg_data_write_cmpl;
@@ -519,16 +519,16 @@ static int uasp_prepare_r_request(struct usbg_cmd *cmd)
 		if (!cmd->data_buf)
 			return -ENOMEM;
 
-		sg_copy_to_buffer(se_cmd->t_data_sg,
-				se_cmd->t_data_nents,
+		sg_copy_to_buffer(se_cmd->t_iomem.t_data_sg,
+				se_cmd->t_iomem.t_data_nents,
 				cmd->data_buf,
 				se_cmd->data_length);
 
 		stream->req_in->buf = cmd->data_buf;
 	} else {
 		stream->req_in->buf = NULL;
-		stream->req_in->num_sgs = se_cmd->t_data_nents;
-		stream->req_in->sg = se_cmd->t_data_sg;
+		stream->req_in->num_sgs = se_cmd->t_iomem.t_data_nents;
+		stream->req_in->sg = se_cmd->t_iomem.t_data_sg;
 	}
 
 	stream->req_in->complete = uasp_status_data_cmpl;
@@ -960,8 +960,8 @@ static void usbg_data_write_cmpl(struct usb_ep *ep, struct usb_request *req)
 	}
 
 	if (req->num_sgs == 0) {
-		sg_copy_from_buffer(se_cmd->t_data_sg,
-				se_cmd->t_data_nents,
+		sg_copy_from_buffer(se_cmd->t_iomem.t_data_sg,
+				se_cmd->t_iomem.t_data_nents,
 				cmd->data_buf,
 				se_cmd->data_length);
 	}
@@ -987,8 +987,8 @@ static int usbg_prepare_w_request(struct usbg_cmd *cmd, struct usb_request *req)
 		req->buf = cmd->data_buf;
 	} else {
 		req->buf = NULL;
-		req->num_sgs = se_cmd->t_data_nents;
-		req->sg = se_cmd->t_data_sg;
+		req->num_sgs = se_cmd->t_iomem.t_data_nents;
+		req->sg = se_cmd->t_iomem.t_data_sg;
 	}
 
 	req->complete = usbg_data_write_cmpl;

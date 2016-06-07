@@ -368,7 +368,7 @@ cxgbit_map_skb(struct iscsi_cmd *cmd, struct sk_buff *skb, u32 data_offset,
 	/*
 	 * We know each entry in t_data_sg contains a page.
 	 */
-	sg = &cmd->se_cmd.t_data_sg[data_offset / PAGE_SIZE];
+	sg = &cmd->se_cmd.t_iomem.t_data_sg[data_offset / PAGE_SIZE];
 	page_off = (data_offset % PAGE_SIZE);
 
 	while (data_length && (i < nr_frags)) {
@@ -864,12 +864,12 @@ cxgbit_handle_immediate_data(struct iscsi_cmd *cmd, struct iscsi_scsi_req *hdr,
 			    dfrag->page_offset);
 		get_page(dfrag->page.p);
 
-		cmd->se_cmd.t_data_sg = &ccmd->sg;
-		cmd->se_cmd.t_data_nents = 1;
+		cmd->se_cmd.t_iomem.t_data_sg = &ccmd->sg;
+		cmd->se_cmd.t_iomem.t_data_nents = 1;
 
 		ccmd->release = true;
 	} else {
-		struct scatterlist *sg = &cmd->se_cmd.t_data_sg[0];
+		struct scatterlist *sg = &cmd->se_cmd.t_iomem.t_data_sg[0];
 		u32 sg_nents = max(1UL, DIV_ROUND_UP(pdu_cb->dlen, PAGE_SIZE));
 
 		cxgbit_skb_copy_to_sg(csk->skb, sg, sg_nents);
@@ -1005,7 +1005,7 @@ static int cxgbit_handle_iscsi_dataout(struct cxgbit_sock *csk)
 
 	if (!(pdu_cb->flags & PDUCBF_RX_DATA_DDPD)) {
 		sg_off = data_offset / PAGE_SIZE;
-		sg_start = &cmd->se_cmd.t_data_sg[sg_off];
+		sg_start = &cmd->se_cmd.t_iomem.t_data_sg[sg_off];
 		sg_nents = max(1UL, DIV_ROUND_UP(data_len, PAGE_SIZE));
 
 		cxgbit_skb_copy_to_sg(csk->skb, sg_start, sg_nents);

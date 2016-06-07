@@ -907,12 +907,12 @@ static int iscsit_map_iovec(
 	 */
 	u32 ent = data_offset / PAGE_SIZE;
 
-	if (ent >= cmd->se_cmd.t_data_nents) {
+	if (ent >= cmd->se_cmd.t_iomem.t_data_nents) {
 		pr_err("Initial page entry out-of-bounds\n");
 		return -1;
 	}
 
-	sg = &cmd->se_cmd.t_data_sg[ent];
+	sg = &cmd->se_cmd.t_iomem.t_data_sg[ent];
 	page_off = (data_offset % PAGE_SIZE);
 
 	cmd->first_data_sg = sg;

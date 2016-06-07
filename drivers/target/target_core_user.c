@@ -415,8 +415,8 @@ static int tcmu_queue_cmd_ring(struct tcmu_cmd *tcmu_cmd)
 	 * expensive to tell how many regions are freed in the bitmap
 	*/
 	base_command_size = max(offsetof(struct tcmu_cmd_entry,
-				req.iov[se_cmd->t_bidi_data_nents +
-					se_cmd->t_data_nents]),
+				req.iov[se_cmd->t_iomem.t_bidi_data_nents +
+					se_cmd->t_iomem.t_data_nents]),
 				sizeof(struct tcmu_cmd_entry));
 	command_size = base_command_size
 		+ round_up(scsi_command_size(se_cmd->t_task_cdb), TCMU_OP_ALIGN_SIZE);
@@ -429,8 +429,9 @@ static int tcmu_queue_cmd_ring(struct tcmu_cmd *tcmu_cmd)
 	cmd_head = mb->cmd_head % udev->cmdr_size; /* UAM */
 	data_length = se_cmd->data_length;
 	if (se_cmd->se_cmd_flags & SCF_BIDI) {
-		BUG_ON(!(se_cmd->t_bidi_data_sg && se_cmd->t_bidi_data_nents));
-		data_length += se_cmd->t_bidi_data_sg->length;
+		BUG_ON(!(se_cmd->t_iomem.t_bidi_data_sg &&
+			 se_cmd->t_iomem.t_bidi_data_nents));
+		data_length += se_cmd->t_iomem.t_bidi_data_sg->length;
 	}
 	if ((command_size > (udev->cmdr_size / 2))
 	    || data_length > udev->data_size)
@@ -494,15 +495,15 @@ static int tcmu_queue_cmd_ring(struct tcmu_cmd *tcmu_cmd)
 	iov_cnt = 0;
 	copy_to_data_area = (se_cmd->data_direction == DMA_TO_DEVICE
 		|| se_cmd->se_cmd_flags & SCF_BIDI);
-	alloc_and_scatter_data_area(udev, se_cmd->t_data_sg,
-		se_cmd->t_data_nents, &iov, &iov_cnt, copy_to_data_area);
+	alloc_and_scatter_data_area(udev, se_cmd->t_iomem.t_data_sg,
+		se_cmd->t_iomem.t_data_nents, &iov, &iov_cnt, copy_to_data_area);
 	entry->req.iov_cnt = iov_cnt;
 	entry->req.iov_dif_cnt = 0;
 
 	/* Handle BIDI commands */
 	iov_cnt = 0;
-	alloc_and_scatter_data_area(udev, se_cmd->t_bidi_data_sg,
-		se_cmd->t_bidi_data_nents, &iov, &iov_cnt, false);
+	alloc_and_scatter_data_area(udev, se_cmd->t_iomem.t_bidi_data_sg,
+		se_cmd->t_iomem.t_bidi_data_nents, &iov, &iov_cnt, false);
 	entry->req.iov_bidi_cnt = iov_cnt;
 
 	/* cmd's data_bitmap is what changed in process */
@@ -584,14 +585,14 @@ static void tcmu_handle_completion(struct tcmu_cmd *cmd, struct tcmu_cmd_entry *
 		/* Get Data-In buffer before clean up */
 		bitmap_copy(bitmap, cmd->data_bitmap, DATA_BLOCK_BITS);
 		gather_data_area(udev, bitmap,
-			se_cmd->t_bidi_data_sg, se_cmd->t_bidi_data_nents);
+			se_cmd->t_iomem.t_bidi_data_sg, se_cmd->t_iomem.t_bidi_data_nents);
 		free_data_area(udev, cmd);
 	} else if (se_cmd->data_direction == DMA_FROM_DEVICE) {
 		DECLARE_BITMAP(bitmap, DATA_BLOCK_BITS);
 
 		bitmap_copy(bitmap, cmd->data_bitmap, DATA_BLOCK_BITS);
 		gather_data_area(udev, bitmap,
-			se_cmd->t_data_sg, se_cmd->t_data_nents);
+			se_cmd->t_iomem.t_data_sg, se_cmd->t_iomem.t_data_nents);
 		free_data_area(udev, cmd);
 	} else if (se_cmd->data_direction == DMA_TO_DEVICE) {
 		free_data_area(udev, cmd);
