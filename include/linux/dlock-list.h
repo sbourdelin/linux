@@ -108,7 +108,8 @@ static inline void init_dlock_list_node(struct dlock_list_node *node)
 	node->lockptr = NULL;
 }
 
-static inline void free_dlock_list_head(struct dlock_list_head **pdlock_head)
+static inline void
+free_dlock_list_head(struct dlock_list_head __percpu **pdlock_head)
 {
 	free_percpu(*pdlock_head);
 	*pdlock_head = NULL;
@@ -117,7 +118,7 @@ static inline void free_dlock_list_head(struct dlock_list_head **pdlock_head)
 /*
  * Check if all the per-cpu lists are empty
  */
-static inline bool dlock_list_empty(struct dlock_list_head *dlock_head)
+static inline bool dlock_list_empty(struct dlock_list_head __percpu *dlock_head)
 {
 	int cpu;
 
@@ -134,7 +135,7 @@ static inline bool dlock_list_empty(struct dlock_list_head *dlock_head)
  * Return: true if the entry is found, false if all the lists exhausted
  */
 static __always_inline bool
-__dlock_list_next_cpu(struct dlock_list_head *head,
+__dlock_list_next_cpu(struct dlock_list_head __percpu *head,
 		      struct dlock_list_state *state)
 {
 	if (state->lock)
@@ -172,7 +173,7 @@ next_cpu:
  *
  * Return: true if the next entry is found, false if all the entries iterated
  */
-static inline bool dlock_list_iterate(struct dlock_list_head *head,
+static inline bool dlock_list_iterate(struct dlock_list_head __percpu *head,
 				      struct dlock_list_state *state)
 {
 	/*
@@ -200,8 +201,9 @@ static inline bool dlock_list_iterate(struct dlock_list_head *head,
  *
  * Return: true if the next entry is found, false if all the entries iterated
  */
-static inline bool dlock_list_iterate_safe(struct dlock_list_head *head,
-					   struct dlock_list_state *state)
+static inline bool
+dlock_list_iterate_safe(struct dlock_list_head __percpu *head,
+			struct dlock_list_state *state)
 {
 	/*
 	 * Find next entry
@@ -226,8 +228,8 @@ static inline bool dlock_list_iterate_safe(struct dlock_list_head *head,
 }
 
 extern void dlock_list_add(struct dlock_list_node *node,
-			  struct dlock_list_head *head);
+			   struct dlock_list_head __percpu *head);
 extern void dlock_list_del(struct dlock_list_node *node);
-extern int  init_dlock_list_head(struct dlock_list_head **pdlock_head);
+extern int  init_dlock_list_head(struct dlock_list_head __percpu **pdlock_head);
 
 #endif /* __LINUX_DLOCK_LIST_H */
