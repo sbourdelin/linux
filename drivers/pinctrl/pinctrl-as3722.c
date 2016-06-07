@@ -23,7 +23,7 @@
 #include <linux/delay.h>
 #include <linux/gpio.h>
 #include <linux/kernel.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/mfd/as3722.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
@@ -599,31 +599,17 @@ fail_range_add:
 	return ret;
 }
 
-static int as3722_pinctrl_remove(struct platform_device *pdev)
-{
-	struct as3722_pctrl_info *as_pci = platform_get_drvdata(pdev);
-
-	gpiochip_remove(&as_pci->gpio_chip);
-	return 0;
-}
-
 static const struct of_device_id as3722_pinctrl_of_match[] = {
 	{ .compatible = "ams,as3722-pinctrl", },
 	{ },
 };
-MODULE_DEVICE_TABLE(of, as3722_pinctrl_of_match);
 
 static struct platform_driver as3722_pinctrl_driver = {
 	.driver = {
 		.name = "as3722-pinctrl",
+		.suppress_bind_attrs = true,
 		.of_match_table = as3722_pinctrl_of_match,
 	},
 	.probe = as3722_pinctrl_probe,
-	.remove = as3722_pinctrl_remove,
 };
-module_platform_driver(as3722_pinctrl_driver);
-
-MODULE_ALIAS("platform:as3722-pinctrl");
-MODULE_DESCRIPTION("AS3722 pin control and GPIO driver");
-MODULE_AUTHOR("Laxman Dewangan<ldewangan@nvidia.com>");
-MODULE_LICENSE("GPL v2");
+builtin_platform_driver(as3722_pinctrl_driver);
