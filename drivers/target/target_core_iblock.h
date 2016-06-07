@@ -6,11 +6,6 @@
 #define IBLOCK_MAX_CDBS		16
 #define IBLOCK_LBA_SHIFT	9
 
-struct iblock_req {
-	atomic_t pending;
-	atomic_t ib_bio_err_cnt;
-} ____cacheline_aligned;
-
 #define IBDF_HAS_UDEV_PATH		0x01
 
 struct iblock_dev {

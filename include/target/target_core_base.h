@@ -469,7 +469,10 @@ struct target_iostate {
 	struct target_iomem	*iomem;
 	struct se_device	*se_dev;
 	void			(*t_comp_func)(struct target_iostate *, u16);
-	void			*priv;
+
+	/* Used by IBLOCK for BIO submission + completion */
+	atomic_t		backend_pending;
+	atomic_t		backend_err_cnt;
 };
 
 struct se_cmd {
