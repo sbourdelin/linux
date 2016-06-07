@@ -100,19 +100,19 @@ static int ufshcd_parse_clock_info(struct ufs_hba *hba)
 	if (ret && (ret != -EINVAL)) {
 		dev_err(dev, "%s: error reading array %d\n",
 				"freq-table-hz", ret);
-		return ret;
+		goto out_free;
 	}
 
 	for (i = 0; i < sz; i += 2) {
 		ret = of_property_read_string_index(np,
 				"clock-names", i/2, (const char **)&name);
 		if (ret)
-			goto out;
+			goto out_free;
 
 		clki = devm_kzalloc(dev, sizeof(*clki), GFP_KERNEL);
 		if (!clki) {
 			ret = -ENOMEM;
-			goto out;
+			goto out_free;
 		}
 
 		clki->min_freq = clkfreq[i];
@@ -122,6 +122,10 @@ static int ufshcd_parse_clock_info(struct ufs_hba *hba)
 				clki->min_freq, clki->max_freq, clki->name);
 		list_add_tail(&clki->list, &hba->clk_list_head);
 	}
+
+out_free:
+	devm_kfree(dev, clkfreq);
+	clkfreq = NULL;
 out:
 	return ret;
 }
