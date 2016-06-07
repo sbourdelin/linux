@@ -1381,10 +1381,9 @@ check_ref:
 	return 0;
 }
 
-void sbc_dif_copy_prot(struct se_cmd *cmd, unsigned int sectors, bool read,
-		       struct scatterlist *sg, int sg_off)
+void sbc_dif_copy_prot(struct target_iomem *iomem, unsigned int sectors, bool read,
+		       struct scatterlist *sg, int sg_off, u32 prot_length)
 {
-	struct se_device *dev = cmd->se_dev;
 	struct scatterlist *psg;
 	void *paddr, *addr;
 	unsigned int i, len, left;
@@ -1393,9 +1392,9 @@ void sbc_dif_copy_prot(struct se_cmd *cmd, unsigned int sectors, bool read,
 	if (!sg)
 		return;
 
-	left = sectors * dev->prot_length;
+	left = sectors * prot_length;
 
-	for_each_sg(cmd->t_iomem.t_prot_sg, psg, cmd->t_iomem.t_prot_nents, i) {
+	for_each_sg(iomem->t_prot_sg, psg, iomem->t_prot_nents, i) {
 		unsigned int psg_len, copied = 0;
 
 		paddr = kmap_atomic(sg_page(psg)) + psg->offset;

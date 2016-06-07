@@ -398,19 +398,21 @@ static struct rd_dev_sg_table *rd_get_prot_table(struct rd_dev *rd_dev, u32 page
 	return NULL;
 }
 
-static sense_reason_t rd_do_prot_rw(struct se_cmd *cmd, bool is_read)
+static sense_reason_t rd_do_prot_rw(struct target_iostate *ios, bool is_read)
 {
-	struct se_device *se_dev = cmd->se_dev;
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
+	struct se_device *se_dev = ios->se_dev;
+	struct target_iomem *iomem = ios->iomem;
 	struct rd_dev *dev = RD_DEV(se_dev);
 	struct rd_dev_sg_table *prot_table;
 	struct scatterlist *prot_sg;
-	u32 sectors = cmd->t_iostate.data_length / se_dev->dev_attrib.block_size;
+	u32 sectors = ios->data_length / se_dev->dev_attrib.block_size;
 	u32 prot_offset, prot_page;
 	u32 prot_npages __maybe_unused;
 	u64 tmp;
 	sense_reason_t rc = TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 
-	tmp = cmd->t_iostate.t_task_lba * se_dev->prot_length;
+	tmp = ios->t_task_lba * se_dev->prot_length;
 	prot_offset = do_div(tmp, PAGE_SIZE);
 	prot_page = tmp;
 
@@ -422,14 +424,15 @@ static sense_reason_t rd_do_prot_rw(struct se_cmd *cmd, bool is_read)
 					prot_table->page_start_offset];
 
 	if (is_read)
-		rc = sbc_dif_verify(cmd, cmd->t_iostate.t_task_lba, sectors, 0,
+		rc = sbc_dif_verify(cmd, ios->t_task_lba, sectors, 0,
 				    prot_sg, prot_offset);
 	else
-		rc = sbc_dif_verify(cmd, cmd->t_iostate.t_task_lba, sectors, 0,
-				    cmd->t_iomem.t_prot_sg, 0);
+		rc = sbc_dif_verify(cmd, ios->t_task_lba, sectors, 0,
+				    iomem->t_prot_sg, 0);
 
 	if (!rc)
-		sbc_dif_copy_prot(cmd, sectors, is_read, prot_sg, prot_offset);
+		sbc_dif_copy_prot(iomem, sectors, is_read, prot_sg, prot_offset,
+				  se_dev->prot_length);
 
 	return rc;
 }
@@ -439,7 +442,6 @@ rd_execute_rw(struct target_iostate *ios, struct scatterlist *sgl, u32 sgl_nents
 	      enum dma_data_direction data_direction, bool fua_write,
 	      void (*t_comp_func)(struct target_iostate *, u16))
 {
-	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct se_device *se_dev = ios->se_dev;
 	struct rd_dev *dev = RD_DEV(se_dev);
 	struct rd_dev_sg_table *table;
@@ -475,7 +477,7 @@ rd_execute_rw(struct target_iostate *ios, struct scatterlist *sgl, u32 sgl_nents
 
 	if (ios->prot_type && se_dev->dev_attrib.pi_prot_type &&
 	    data_direction == DMA_TO_DEVICE) {
-		rc = rd_do_prot_rw(cmd, false);
+		rc = rd_do_prot_rw(ios, false);
 		if (rc)
 			return rc;
 	}
@@ -543,7 +545,7 @@ rd_execute_rw(struct target_iostate *ios, struct scatterlist *sgl, u32 sgl_nents
 
 	if (ios->prot_type && se_dev->dev_attrib.pi_prot_type &&
 	    data_direction == DMA_FROM_DEVICE) {
-		rc = rd_do_prot_rw(cmd, true);
+		rc = rd_do_prot_rw(ios, true);
 		if (rc)
 			return rc;
 	}
