@@ -10,5 +10,6 @@ obj-y += ccu_mp.o
 obj-y += ccu_mux.o
 obj-y += ccu_nk.o
 obj-y += ccu_nkm.o
+obj-y += ccu_nkmp.o
 obj-y += ccu_nm.o
 obj-y += ccu_phase.o
