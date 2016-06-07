@@ -4612,7 +4612,7 @@ static void rebind_workers(struct worker_pool *pool)
  *
  * An unbound pool may end up with a cpumask which doesn't have any online
  * CPUs.  When a worker of such pool get scheduled, the scheduler resets
- * its cpus_allowed.  If @cpu is in @pool's cpumask which didn't have any
+ * its cpus_allowed.  If @cpu is in @pool's cpumask which had at most one
  * online CPU before, cpus_allowed of all its workers should be restored.
  */
 static void restore_unbound_workers_cpumask(struct worker_pool *pool, int cpu)
@@ -4626,15 +4626,26 @@ static void restore_unbound_workers_cpumask(struct worker_pool *pool, int cpu)
 	if (!cpumask_test_cpu(cpu, pool->attrs->cpumask))
 		return;
 
-	/* is @cpu the only online CPU? */
 	cpumask_and(&cpumask, pool->attrs->cpumask, cpu_online_mask);
-	if (cpumask_weight(&cpumask) != 1)
+
+	/*
+	 * The affinity needs to be set
+	 * a) to @cpu when that is the only online CPU in
+	 *    pool->attrs->cpumask.
+	 * b) to pool->attrs->cpumask when exactly two CPUs in
+	 *    pool->attrs->cpumask are online. This affinity will be
+	 *    retained when subsequent CPUs come online.
+	 */
+	if (cpumask_weight(&cpumask) > 2)
 		return;
+
+	if (cpumask_weight(&cpumask) == 2)
+		cpumask_copy(&cpumask, pool->attrs->cpumask);
 
 	/* as we're called from CPU_ONLINE, the following shouldn't fail */
 	for_each_pool_worker(worker, pool)
 		WARN_ON_ONCE(set_cpus_allowed_ptr(worker->task,
-						  pool->attrs->cpumask) < 0);
+						  &cpumask) < 0);
 }
 
 /*
