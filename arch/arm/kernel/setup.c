@@ -33,6 +33,7 @@
 #include <linux/compiler.h>
 #include <linux/sort.h>
 #include <linux/psci.h>
+#include <linux/clk.h>
 
 #include <asm/unified.h>
 #include <asm/cp15.h>
@@ -1178,10 +1179,32 @@ static const char *hwcap2_str[] = {
 	NULL
 };
 
+static unsigned long cpu_freq(unsigned int core)
+{
+	struct device_node *np;
+	struct clk *c;
+	unsigned long rate = 0;
+
+	np = of_get_cpu_node(core, NULL);
+	if (!np)
+		goto err;
+
+	c = of_clk_get_by_name(np, NULL);
+	if (IS_ERR(c))
+		goto err;
+
+	rate = clk_get_rate(c);
+
+	clk_put(c);
+err:
+	return rate;
+}
+
 static int c_show(struct seq_file *m, void *v)
 {
 	int i, j;
 	u32 cpuid;
+	unsigned long rate;
 
 	for_each_online_cpu(i) {
 		/*
@@ -1193,6 +1216,12 @@ static int c_show(struct seq_file *m, void *v)
 		cpuid = is_smp() ? per_cpu(cpu_data, i).cpuid : read_cpuid_id();
 		seq_printf(m, "model name\t: %s rev %d (%s)\n",
 			   cpu_name, cpuid & 15, elf_platform);
+
+		rate = cpu_freq(i);
+		if (rate)
+			/* Change from Hz into MHz */
+			seq_printf(m, "cpu MHz\t\t: %lu.%03lu\n",
+				   rate / 1000000, rate / 1000 % 1000);
 
 #if defined(CONFIG_SMP)
 		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
