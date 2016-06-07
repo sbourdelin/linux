@@ -400,7 +400,6 @@ static struct rd_dev_sg_table *rd_get_prot_table(struct rd_dev *rd_dev, u32 page
 
 static sense_reason_t rd_do_prot_rw(struct target_iostate *ios, bool is_read)
 {
-	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct se_device *se_dev = ios->se_dev;
 	struct target_iomem *iomem = ios->iomem;
 	struct rd_dev *dev = RD_DEV(se_dev);
@@ -424,10 +423,10 @@ static sense_reason_t rd_do_prot_rw(struct target_iostate *ios, bool is_read)
 					prot_table->page_start_offset];
 
 	if (is_read)
-		rc = sbc_dif_verify(cmd, ios->t_task_lba, sectors, 0,
+		rc = sbc_dif_verify(ios, ios->t_task_lba, sectors, 0,
 				    prot_sg, prot_offset);
 	else
-		rc = sbc_dif_verify(cmd, ios->t_task_lba, sectors, 0,
+		rc = sbc_dif_verify(ios, ios->t_task_lba, sectors, 0,
 				    iomem->t_prot_sg, 0);
 
 	if (!rc)

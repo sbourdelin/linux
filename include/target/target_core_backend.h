@@ -71,7 +71,7 @@ u32	sbc_get_device_rev(struct se_device *dev);
 u32	sbc_get_device_type(struct se_device *dev);
 sector_t	sbc_get_write_same_sectors(struct se_cmd *cmd);
 void	sbc_dif_generate(struct se_cmd *);
-sense_reason_t	sbc_dif_verify(struct se_cmd *, sector_t, unsigned int,
+sense_reason_t	sbc_dif_verify(struct target_iostate *, sector_t, unsigned int,
 				     unsigned int, struct scatterlist *, int);
 void sbc_dif_copy_prot(struct target_iomem *, unsigned int, bool,
 		       struct scatterlist *, int, u32);

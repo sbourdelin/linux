@@ -512,7 +512,6 @@ fd_execute_rw(struct target_iostate *ios, struct scatterlist *sgl, u32 sgl_nents
 	      enum dma_data_direction data_direction, bool fua_write,
 	      void (*t_comp_func)(struct target_iostate *, u16))
 {
-	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct target_iomem *iomem = ios->iomem;
 	struct se_device *dev = ios->se_dev;
 	struct fd_dev *fd_dev = FD_DEV(dev);
@@ -552,7 +551,7 @@ fd_execute_rw(struct target_iostate *ios, struct scatterlist *sgl, u32 sgl_nents
 			u32 sectors = ios->data_length >>
 					ilog2(dev->dev_attrib.block_size);
 
-			rc = sbc_dif_verify(cmd, ios->t_task_lba, sectors,
+			rc = sbc_dif_verify(ios, ios->t_task_lba, sectors,
 					    0, iomem->t_prot_sg, 0);
 			if (rc)
 				return rc;
@@ -562,7 +561,7 @@ fd_execute_rw(struct target_iostate *ios, struct scatterlist *sgl, u32 sgl_nents
 			u32 sectors = ios->data_length >>
 					ilog2(dev->dev_attrib.block_size);
 
-			rc = sbc_dif_verify(cmd, ios->t_task_lba, sectors,
+			rc = sbc_dif_verify(ios, ios->t_task_lba, sectors,
 					    0, iomem->t_prot_sg, 0);
 			if (rc)
 				return rc;

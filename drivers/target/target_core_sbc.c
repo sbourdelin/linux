@@ -1341,12 +1341,12 @@ sbc_dif_generate(struct se_cmd *cmd)
 }
 
 static sense_reason_t
-sbc_dif_v1_verify(struct se_cmd *cmd, struct t10_pi_tuple *sdt,
+sbc_dif_v1_verify(struct target_iostate *ios, struct t10_pi_tuple *sdt,
 		  __u16 crc, sector_t sector, unsigned int ei_lba)
 {
 	__be16 csum;
 
-	if (!(cmd->t_iostate.prot_checks & TARGET_DIF_CHECK_GUARD))
+	if (!(ios->prot_checks & TARGET_DIF_CHECK_GUARD))
 		goto check_ref;
 
 	csum = cpu_to_be16(crc);
@@ -1359,10 +1359,10 @@ sbc_dif_v1_verify(struct se_cmd *cmd, struct t10_pi_tuple *sdt,
 	}
 
 check_ref:
-	if (!(cmd->t_iostate.prot_checks & TARGET_DIF_CHECK_REFTAG))
+	if (!(ios->prot_checks & TARGET_DIF_CHECK_REFTAG))
 		return 0;
 
-	if (cmd->t_iostate.prot_type == TARGET_DIF_TYPE1_PROT &&
+	if (ios->prot_type == TARGET_DIF_TYPE1_PROT &&
 	    be32_to_cpu(sdt->ref_tag) != (sector & 0xffffffff)) {
 		pr_err("DIFv1 Type 1 reference failed on sector: %llu tag: 0x%08x"
 		       " sector MSB: 0x%08x\n", (unsigned long long)sector,
@@ -1370,7 +1370,7 @@ check_ref:
 		return TCM_LOGICAL_BLOCK_REF_TAG_CHECK_FAILED;
 	}
 
-	if (cmd->t_iostate.prot_type == TARGET_DIF_TYPE2_PROT &&
+	if (ios->prot_type == TARGET_DIF_TYPE2_PROT &&
 	    be32_to_cpu(sdt->ref_tag) != ei_lba) {
 		pr_err("DIFv1 Type 2 reference failed on sector: %llu tag: 0x%08x"
 		       " ei_lba: 0x%08x\n", (unsigned long long)sector,
@@ -1426,12 +1426,13 @@ void sbc_dif_copy_prot(struct target_iomem *iomem, unsigned int sectors, bool re
 EXPORT_SYMBOL(sbc_dif_copy_prot);
 
 sense_reason_t
-sbc_dif_verify(struct se_cmd *cmd, sector_t start, unsigned int sectors,
+sbc_dif_verify(struct target_iostate *ios, sector_t start, unsigned int sectors,
 	       unsigned int ei_lba, struct scatterlist *psg, int psg_off)
 {
-	struct se_device *dev = cmd->se_dev;
+	struct target_iomem *iomem = ios->iomem;
+	struct se_device *dev = ios->se_dev;
 	struct t10_pi_tuple *sdt;
-	struct scatterlist *dsg = cmd->t_iomem.t_data_sg;
+	struct scatterlist *dsg = iomem->t_data_sg;
 	sector_t sector = start;
 	void *daddr, *paddr;
 	int i;
@@ -1488,11 +1489,11 @@ sbc_dif_verify(struct se_cmd *cmd, sector_t start, unsigned int sectors,
 				dsg_off += block_size;
 			}
 
-			rc = sbc_dif_v1_verify(cmd, sdt, crc, sector, ei_lba);
+			rc = sbc_dif_v1_verify(ios, sdt, crc, sector, ei_lba);
 			if (rc) {
 				kunmap_atomic(daddr - dsg->offset);
 				kunmap_atomic(paddr - psg->offset);
-				cmd->t_iostate.bad_sector = sector;
+				ios->bad_sector = sector;
 				return rc;
 			}
 next:

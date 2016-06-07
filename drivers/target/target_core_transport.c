@@ -1815,8 +1815,11 @@ err:
 	transport_generic_request_failure(cmd, ret);
 }
 
+// XXX: Convert target_write_prot_action to target_iostate
 static int target_write_prot_action(struct se_cmd *cmd)
 {
+	struct target_iostate *ios = &cmd->t_iostate;
+	struct target_iomem *iomem = ios->iomem;
 	u32 sectors;
 	/*
 	 * Perform WRITE_INSERT of PI using software emulation when backend
@@ -1833,8 +1836,8 @@ static int target_write_prot_action(struct se_cmd *cmd)
 			break;
 
 		sectors = cmd->t_iostate.data_length >> ilog2(cmd->se_dev->dev_attrib.block_size);
-		cmd->pi_err = sbc_dif_verify(cmd, cmd->t_iostate.t_task_lba,
-					     sectors, 0, cmd->t_iomem.t_prot_sg, 0);
+		cmd->pi_err = sbc_dif_verify(ios, ios->t_task_lba,
+					     sectors, 0, iomem->t_prot_sg, 0);
 		if (unlikely(cmd->pi_err)) {
 			spin_lock_irq(&cmd->t_state_lock);
 			cmd->transport_state &= ~(CMD_T_BUSY|CMD_T_SENT);
@@ -2055,17 +2058,21 @@ static void transport_handle_queue_full(
 	schedule_work(&cmd->se_dev->qf_work_queue);
 }
 
+// XXX: Convert target_read_prot_action to target_iostate
 static bool target_read_prot_action(struct se_cmd *cmd)
 {
+	struct target_iostate *ios = &cmd->t_iostate;
+	struct target_iomem *iomem = ios->iomem;
+
 	switch (cmd->t_iostate.prot_op) {
 	case TARGET_PROT_DIN_STRIP:
 		if (!(cmd->se_sess->sup_prot_ops & TARGET_PROT_DIN_STRIP)) {
 			u32 sectors = cmd->t_iostate.data_length >>
 				  ilog2(cmd->se_dev->dev_attrib.block_size);
 
-			cmd->pi_err = sbc_dif_verify(cmd, cmd->t_iostate.t_task_lba,
+			cmd->pi_err = sbc_dif_verify(ios, ios->t_task_lba,
 						     sectors, 0,
-						     cmd->t_iomem.t_prot_sg, 0);
+						     iomem->t_prot_sg, 0);
 			if (cmd->pi_err)
 				return true;
 		}
