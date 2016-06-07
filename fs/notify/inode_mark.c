@@ -151,14 +151,15 @@ int fsnotify_add_inode_mark(struct fsnotify_mark *mark,
 void fsnotify_unmount_inodes(struct super_block *sb)
 {
 	struct inode *inode, *iput_inode = NULL;
+	DEFINE_PCPU_LIST_STATE(state);
 
-	spin_lock(&sb->s_inode_list_lock);
-	list_for_each_entry(inode, &sb->s_inodes, i_sb_list) {
+	while (pcpu_list_iterate(sb->s_inodes, &state)) {
 		/*
 		 * We cannot __iget() an inode in state I_FREEING,
 		 * I_WILL_FREE, or I_NEW which is fine because by that point
 		 * the inode cannot have any associated watches.
 		 */
+		inode = list_entry(state.curr, struct inode, i_sb_list);
 		spin_lock(&inode->i_lock);
 		if (inode->i_state & (I_FREEING|I_WILL_FREE|I_NEW)) {
 			spin_unlock(&inode->i_lock);
@@ -178,7 +179,7 @@ void fsnotify_unmount_inodes(struct super_block *sb)
 
 		__iget(inode);
 		spin_unlock(&inode->i_lock);
-		spin_unlock(&sb->s_inode_list_lock);
+		spin_unlock(state.lock);
 
 		if (iput_inode)
 			iput(iput_inode);
@@ -190,9 +191,8 @@ void fsnotify_unmount_inodes(struct super_block *sb)
 
 		iput_inode = inode;
 
-		spin_lock(&sb->s_inode_list_lock);
+		spin_lock(state.lock);
 	}
-	spin_unlock(&sb->s_inode_list_lock);
 
 	if (iput_inode)
 		iput(iput_inode);

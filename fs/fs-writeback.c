@@ -2155,6 +2155,7 @@ EXPORT_SYMBOL(__mark_inode_dirty);
 static void wait_sb_inodes(struct super_block *sb)
 {
 	struct inode *inode, *old_inode = NULL;
+	DEFINE_PCPU_LIST_STATE(state);
 
 	/*
 	 * We need to be protected against the filesystem going from
@@ -2163,7 +2164,6 @@ static void wait_sb_inodes(struct super_block *sb)
 	WARN_ON(!rwsem_is_locked(&sb->s_umount));
 
 	mutex_lock(&sb->s_sync_lock);
-	spin_lock(&sb->s_inode_list_lock);
 
 	/*
 	 * Data integrity sync. Must wait for all pages under writeback,
@@ -2172,9 +2172,11 @@ static void wait_sb_inodes(struct super_block *sb)
 	 * In which case, the inode may not be on the dirty list, but
 	 * we still have to wait for that writeout.
 	 */
-	list_for_each_entry(inode, &sb->s_inodes, i_sb_list) {
-		struct address_space *mapping = inode->i_mapping;
+	while (pcpu_list_iterate(sb->s_inodes, &state)) {
+		struct address_space *mapping;
 
+		inode   = list_entry(state.curr, struct inode, i_sb_list);
+		mapping = inode->i_mapping;
 		spin_lock(&inode->i_lock);
 		if ((inode->i_state & (I_FREEING|I_WILL_FREE|I_NEW)) ||
 		    (mapping->nrpages == 0)) {
@@ -2183,7 +2185,7 @@ static void wait_sb_inodes(struct super_block *sb)
 		}
 		__iget(inode);
 		spin_unlock(&inode->i_lock);
-		spin_unlock(&sb->s_inode_list_lock);
+		spin_unlock(state.lock);
 
 		/*
 		 * We hold a reference to 'inode' so it couldn't have been
@@ -2205,9 +2207,8 @@ static void wait_sb_inodes(struct super_block *sb)
 
 		cond_resched();
 
-		spin_lock(&sb->s_inode_list_lock);
+		spin_lock(state.lock);
 	}
-	spin_unlock(&sb->s_inode_list_lock);
 	iput(old_inode);
 	mutex_unlock(&sb->s_sync_lock);
 }
