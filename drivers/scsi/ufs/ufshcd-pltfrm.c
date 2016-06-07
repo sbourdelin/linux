@@ -122,6 +122,10 @@ static int ufshcd_parse_clock_info(struct ufs_hba *hba)
 				clki->min_freq, clki->max_freq, clki->name);
 		list_add_tail(&clki->list, &hba->clk_list_head);
 	}
+
+	devm_kfree(dev, clkfreq);
+	clkfreq = NULL;
+
 out:
 	return ret;
 }
