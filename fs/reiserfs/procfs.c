@@ -402,7 +402,7 @@ static const struct file_operations r_file_operations = {
 	.release = single_release,
 };
 
-static struct proc_dir_entry *proc_info_root = NULL;
+static struct proc_dir_entry *proc_info_root;
 static const char proc_info_root_name[] = "fs/reiserfs";
 
 static void add_file(struct super_block *sb, char *name,
