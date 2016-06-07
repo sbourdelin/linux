@@ -221,22 +221,54 @@ sector_t sbc_get_write_same_sectors(struct target_iostate *ios)
 }
 EXPORT_SYMBOL(sbc_get_write_same_sectors);
 
+static void sbc_discard_bio_done(struct bio *bio)
+{
+	struct se_cmd *cmd = bio->bi_private;
+	int err = bio->bi_error;
+
+	bio_put(bio);
+	target_complete_cmd(cmd, (err) ? SAM_STAT_CHECK_CONDITION :
+			    SAM_STAT_GOOD);
+}
+
+static void
+sbc_execute_discard_bio(struct se_cmd *cmd, struct bio *bio,
+		        sense_reason_t *status)
+{
+	if (bio) {
+		bio->bi_private = cmd;
+		bio->bi_end_io = sbc_discard_bio_done;
+		if (status) {
+			bio->bi_error = -EIO;
+			bio_endio(bio);
+		} else {
+			submit_bio(REQ_WRITE | REQ_DISCARD, bio);
+                }
+        } else {
+                if (!status)
+                        target_complete_cmd(cmd, GOOD);
+        }
+}
+
 static sense_reason_t
 sbc_execute_write_same_unmap(struct target_iostate *ios)
 {
 	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct sbc_ops *ops = cmd->protocol_data;
+	struct bio *bio = NULL;
 	sector_t nolb = sbc_get_write_same_sectors(ios);
-	sense_reason_t ret;
+	sense_reason_t ret = TCM_NO_SENSE;
 
 	if (nolb) {
-		ret = ops->execute_unmap(&cmd->t_iostate, cmd->t_iostate.t_task_lba, nolb);
+		ret = ops->execute_unmap(&cmd->t_iostate, cmd->t_iostate.t_task_lba,
+					 nolb, &bio);
 		if (ret)
 			return ret;
 	}
 
-	target_complete_cmd(cmd, GOOD);
-	return 0;
+
+	sbc_execute_discard_bio(cmd, bio, &ret);
+	return ret;
 }
 
 static sense_reason_t
@@ -1198,6 +1230,7 @@ sbc_execute_unmap(struct target_iostate *ios)
 	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct sbc_ops *ops = cmd->protocol_data;
 	struct se_device *dev = cmd->se_dev;
+	struct bio *bio = NULL;
 	unsigned char *buf, *ptr = NULL;
 	sector_t lba;
 	int size;
@@ -1260,7 +1293,7 @@ sbc_execute_unmap(struct target_iostate *ios)
 			goto err;
 		}
 
-		ret = ops->execute_unmap(ios, lba, range);
+		ret = ops->execute_unmap(ios, lba, range, &bio);
 		if (ret)
 			goto err;
 
@@ -1270,8 +1303,8 @@ sbc_execute_unmap(struct target_iostate *ios)
 
 err:
 	transport_kunmap_data_sg(cmd);
-	if (!ret)
-		target_complete_cmd(cmd, GOOD);
+
+	sbc_execute_discard_bio(cmd, bio, &ret);
 	return ret;
 }
 

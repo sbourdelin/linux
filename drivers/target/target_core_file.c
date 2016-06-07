@@ -462,7 +462,8 @@ fd_do_prot_unmap(struct se_device *dev, sector_t lba, sector_t nolb)
 }
 
 static sense_reason_t
-fd_execute_unmap(struct target_iostate *ios, sector_t lba, sector_t nolb)
+fd_execute_unmap(struct target_iostate *ios, sector_t lba, sector_t nolb,
+		 struct bio **bio)
 {
 	struct se_device *dev = ios->se_dev;
 	struct file *file = FD_DEV(dev)->fd_file;
@@ -479,10 +480,11 @@ fd_execute_unmap(struct target_iostate *ios, sector_t lba, sector_t nolb)
 		/* The backend is block device, use discard */
 		struct block_device *bdev = inode->i_bdev;
 
-		ret = blkdev_issue_discard(bdev,
+		ret = __blkdev_issue_discard(bdev,
 					   target_to_linux_sector(dev, lba),
 					   target_to_linux_sector(dev, nolb),
-					   GFP_KERNEL, 0);
+					   GFP_KERNEL, REQ_WRITE | REQ_DISCARD,
+					   bio);
 		if (ret < 0) {
 			pr_warn("FILEIO: blkdev_issue_discard() failed: %d\n",
 				ret);

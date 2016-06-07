@@ -393,16 +393,18 @@ iblock_execute_sync_cache(struct target_iostate *ios, bool immed)
 }
 
 static sense_reason_t
-iblock_execute_unmap(struct target_iostate *ios, sector_t lba, sector_t nolb)
+iblock_execute_unmap(struct target_iostate *ios, sector_t lba, sector_t nolb,
+		     struct bio **bio)
 {
 	struct block_device *bdev = IBLOCK_DEV(ios->se_dev)->ibd_bd;
 	struct se_device *dev = ios->se_dev;
 	int ret;
 
-	ret = blkdev_issue_discard(bdev,
+	ret = __blkdev_issue_discard(bdev,
 				   target_to_linux_sector(dev, lba),
 				   target_to_linux_sector(dev, nolb),
-				   GFP_KERNEL, 0);
+				   GFP_KERNEL, REQ_WRITE | REQ_DISCARD,
+				   bio);
 	if (ret < 0) {
 		pr_err("blkdev_issue_discard() failed: %d\n", ret);
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
