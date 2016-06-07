@@ -197,8 +197,9 @@ sbc_emulate_startstop(struct target_iostate *ios)
 	return 0;
 }
 
-sector_t sbc_get_write_same_sectors(struct se_cmd *cmd)
+sector_t sbc_get_write_same_sectors(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	u32 num_blocks;
 
 	if (cmd->t_task_cdb[0] == WRITE_SAME)
@@ -225,7 +226,7 @@ sbc_execute_write_same_unmap(struct target_iostate *ios)
 {
 	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct sbc_ops *ops = cmd->protocol_data;
-	sector_t nolb = sbc_get_write_same_sectors(cmd);
+	sector_t nolb = sbc_get_write_same_sectors(ios);
 	sense_reason_t ret;
 
 	if (nolb) {
@@ -329,7 +330,7 @@ static sense_reason_t sbc_execute_write_same(struct target_iostate *ios)
 	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct sbc_ops *ops = cmd->protocol_data;
 
-	return ops->execute_write_same(cmd);
+	return ops->execute_write_same(ios, &sbc_get_write_same_sectors);
 }
 
 static sense_reason_t
@@ -337,7 +338,7 @@ sbc_setup_write_same(struct se_cmd *cmd, unsigned char *flags, struct sbc_ops *o
 {
 	struct se_device *dev = cmd->se_dev;
 	sector_t end_lba = dev->transport->get_blocks(dev) + 1;
-	unsigned int sectors = sbc_get_write_same_sectors(cmd);
+	unsigned int sectors = sbc_get_write_same_sectors(&cmd->t_iostate);
 	sense_reason_t ret;
 
 	if ((flags[0] & 0x04) || (flags[0] & 0x02)) {

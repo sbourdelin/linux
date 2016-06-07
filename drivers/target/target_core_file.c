@@ -353,34 +353,36 @@ fd_execute_sync_cache(struct target_iostate *ios, bool immed)
 }
 
 static sense_reason_t
-fd_execute_write_same(struct se_cmd *cmd)
+fd_execute_write_same(struct target_iostate *ios,
+		      sector_t (*get_sectors)(struct target_iostate *))
 {
-	struct se_device *se_dev = cmd->se_dev;
+	struct target_iomem *iomem = ios->iomem;
+	struct se_device *se_dev = ios->se_dev;
 	struct fd_dev *fd_dev = FD_DEV(se_dev);
-	loff_t pos = cmd->t_iostate.t_task_lba * se_dev->dev_attrib.block_size;
-	sector_t nolb = sbc_get_write_same_sectors(cmd);
+	loff_t pos = ios->t_task_lba * se_dev->dev_attrib.block_size;
+	sector_t nolb = get_sectors(ios);
 	struct iov_iter iter;
 	struct bio_vec *bvec;
 	unsigned int len = 0, i;
 	ssize_t ret;
 
 	if (!nolb) {
-		target_complete_cmd(cmd, SAM_STAT_GOOD);
+		ios->t_comp_func(ios, SAM_STAT_GOOD);
 		return 0;
 	}
-	if (cmd->t_iostate.prot_op) {
+	if (ios->prot_op) {
 		pr_err("WRITE_SAME: Protection information with FILEIO"
 		       " backends not supported\n");
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 	}
 
-	if (cmd->t_iomem.t_data_nents > 1 ||
-	    cmd->t_iomem.t_data_sg[0].length != cmd->se_dev->dev_attrib.block_size) {
+	if (iomem->t_data_nents > 1 ||
+	    iomem->t_data_sg[0].length != se_dev->dev_attrib.block_size) {
 		pr_err("WRITE_SAME: Illegal SGL t_data_nents: %u length: %u"
 			" block_size: %u\n",
-			cmd->t_iomem.t_data_nents,
-			cmd->t_iomem.t_data_sg[0].length,
-			cmd->se_dev->dev_attrib.block_size);
+			iomem->t_data_nents,
+			iomem->t_data_sg[0].length,
+			se_dev->dev_attrib.block_size);
 		return TCM_INVALID_CDB_FIELD;
 	}
 
@@ -389,9 +391,9 @@ fd_execute_write_same(struct se_cmd *cmd)
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 
 	for (i = 0; i < nolb; i++) {
-		bvec[i].bv_page = sg_page(&cmd->t_iomem.t_data_sg[0]);
-		bvec[i].bv_len = cmd->t_iomem.t_data_sg[0].length;
-		bvec[i].bv_offset = cmd->t_iomem.t_data_sg[0].offset;
+		bvec[i].bv_page = sg_page(&iomem->t_data_sg[0]);
+		bvec[i].bv_len = iomem->t_data_sg[0].length;
+		bvec[i].bv_offset = iomem->t_data_sg[0].offset;
 
 		len += se_dev->dev_attrib.block_size;
 	}
@@ -405,7 +407,7 @@ fd_execute_write_same(struct se_cmd *cmd)
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 	}
 
-	target_complete_cmd(cmd, SAM_STAT_GOOD);
+	ios->t_comp_func(ios, SAM_STAT_GOOD);
 	return 0;
 }
 

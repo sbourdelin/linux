@@ -412,10 +412,11 @@ iblock_execute_unmap(struct se_cmd *cmd, sector_t lba, sector_t nolb)
 }
 
 static sense_reason_t
-iblock_execute_write_same_direct(struct block_device *bdev, struct se_cmd *cmd)
+iblock_execute_write_same_direct(struct block_device *bdev, struct target_iostate *ios,
+				 struct target_iomem *iomem, sector_t num_blocks)
 {
-	struct se_device *dev = cmd->se_dev;
-	struct scatterlist *sg = &cmd->t_iomem.t_data_sg[0];
+	struct se_device *dev = ios->se_dev;
+	struct scatterlist *sg = &iomem->t_data_sg[0];
 	struct page *page = NULL;
 	int ret;
 
@@ -423,56 +424,56 @@ iblock_execute_write_same_direct(struct block_device *bdev, struct se_cmd *cmd)
 		page = alloc_page(GFP_KERNEL);
 		if (!page)
 			return TCM_OUT_OF_RESOURCES;
-		sg_copy_to_buffer(sg, cmd->t_iomem.t_data_nents,
+		sg_copy_to_buffer(sg, iomem->t_data_nents,
 				  page_address(page),
 				  dev->dev_attrib.block_size);
 	}
 
 	ret = blkdev_issue_write_same(bdev,
-				target_to_linux_sector(dev,
-					cmd->t_iostate.t_task_lba),
-				target_to_linux_sector(dev,
-					sbc_get_write_same_sectors(cmd)),
+				target_to_linux_sector(dev, ios->t_task_lba),
+				target_to_linux_sector(dev, num_blocks),
 				GFP_KERNEL, page ? page : sg_page(sg));
 	if (page)
 		__free_page(page);
 	if (ret)
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 
-	target_complete_cmd(cmd, GOOD);
+	ios->t_comp_func(ios, GOOD);
 	return 0;
 }
 
 static sense_reason_t
-iblock_execute_write_same(struct se_cmd *cmd)
+iblock_execute_write_same(struct target_iostate *ios,
+			  sector_t (*get_sectors)(struct target_iostate *))
 {
-	struct target_iostate *ios = &cmd->t_iostate;
-	struct block_device *bdev = IBLOCK_DEV(cmd->se_dev)->ibd_bd;
+	struct target_iomem *iomem = ios->iomem;
+	struct block_device *bdev = IBLOCK_DEV(ios->se_dev)->ibd_bd;
 	struct scatterlist *sg;
 	struct bio *bio;
 	struct bio_list list;
-	struct se_device *dev = cmd->se_dev;
-	sector_t block_lba = target_to_linux_sector(dev, cmd->t_iostate.t_task_lba);
-	sector_t sectors = target_to_linux_sector(dev,
-					sbc_get_write_same_sectors(cmd));
+	struct se_device *dev = ios->se_dev;
+	sector_t block_lba = target_to_linux_sector(dev, ios->t_task_lba);
+	sector_t num_blocks = get_sectors(ios);
+	sector_t sectors = target_to_linux_sector(dev, num_blocks);
 
-	if (cmd->t_iostate.prot_op) {
+	if (ios->prot_op) {
 		pr_err("WRITE_SAME: Protection information with IBLOCK"
 		       " backends not supported\n");
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 	}
-	sg = &cmd->t_iomem.t_data_sg[0];
+	sg = &iomem->t_data_sg[0];
 
-	if (cmd->t_iomem.t_data_nents > 1 ||
-	    sg->length != cmd->se_dev->dev_attrib.block_size) {
+	if (iomem->t_data_nents > 1 ||
+	    sg->length != dev->dev_attrib.block_size) {
 		pr_err("WRITE_SAME: Illegal SGL t_data_nents: %u length: %u"
-			" block_size: %u\n", cmd->t_iomem.t_data_nents, sg->length,
-			cmd->se_dev->dev_attrib.block_size);
+			" block_size: %u\n", iomem->t_data_nents, sg->length,
+			dev->dev_attrib.block_size);
 		return TCM_INVALID_CDB_FIELD;
 	}
 
 	if (bdev_write_same(bdev))
-		return iblock_execute_write_same_direct(bdev, cmd);
+		return iblock_execute_write_same_direct(bdev, ios, iomem,
+							num_blocks);
 
 	bio = iblock_get_bio(ios, block_lba, 1);
 	if (!bio)

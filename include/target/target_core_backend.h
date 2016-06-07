@@ -49,7 +49,8 @@ struct sbc_ops {
 				     u32, enum dma_data_direction, bool fua_write,
 				     void (*t_comp_func)(struct target_iostate *ios, u16));
 	sense_reason_t (*execute_sync_cache)(struct target_iostate *ios, bool immed);
-	sense_reason_t (*execute_write_same)(struct se_cmd *cmd);
+	sense_reason_t (*execute_write_same)(struct target_iostate *ios,
+					sector_t (*get_sectors)(struct target_iostate *));
 	sense_reason_t (*execute_unmap)(struct se_cmd *cmd,
 				sector_t lba, sector_t nolb);
 };
@@ -69,7 +70,6 @@ sense_reason_t	spc_emulate_evpd_83(struct se_cmd *, unsigned char *);
 sense_reason_t	sbc_parse_cdb(struct se_cmd *cmd, struct sbc_ops *ops);
 u32	sbc_get_device_rev(struct se_device *dev);
 u32	sbc_get_device_type(struct se_device *dev);
-sector_t	sbc_get_write_same_sectors(struct se_cmd *cmd);
 void	sbc_dif_generate(struct se_cmd *);
 sense_reason_t	sbc_dif_verify(struct target_iostate *, sector_t, unsigned int,
 				     unsigned int, struct scatterlist *, int);
