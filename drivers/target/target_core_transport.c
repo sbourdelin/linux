@@ -1797,6 +1797,12 @@ void __target_execute_cmd(struct se_cmd *cmd, bool do_checks)
 			goto err;
 		}
 	}
+	/*
+	 * Setup t_iostate + t_iomem for backend device submission
+	 */
+	cmd->t_iostate.se_dev = cmd->se_dev;
+	cmd->t_iostate.iomem = &cmd->t_iomem;
+	cmd->t_iostate.t_comp_func = &target_complete_ios;
 
 	ret = cmd->execute_cmd(cmd);
 	if (!ret)
