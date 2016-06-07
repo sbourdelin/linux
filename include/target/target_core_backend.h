@@ -58,6 +58,7 @@ void	target_backend_unregister(const struct target_backend_ops *);
 
 void	target_complete_cmd(struct se_cmd *, u8);
 void	target_complete_cmd_with_length(struct se_cmd *, u8, int);
+void	target_complete_ios(struct target_iostate *, u16);
 
 sense_reason_t	spc_parse_cdb(struct se_cmd *cmd, unsigned int *size);
 sense_reason_t	spc_emulate_report_luns(struct se_cmd *cmd);

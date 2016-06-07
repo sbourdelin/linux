@@ -1109,13 +1109,13 @@ static void pscsi_req_done(struct request *req, int uptodate)
 
 	switch (host_byte(pt->pscsi_result)) {
 	case DID_OK:
-		target_complete_cmd(cmd, cmd->scsi_status);
+		target_complete_ios(&cmd->t_iostate, cmd->scsi_status);
 		break;
 	default:
 		pr_debug("PSCSI Host Byte exception at cmd: %p CDB:"
 			" 0x%02x Result: 0x%08x\n", cmd, pt->pscsi_cdb[0],
 			pt->pscsi_result);
-		target_complete_cmd(cmd, SAM_STAT_CHECK_CONDITION);
+		target_complete_ios(&cmd->t_iostate, SAM_STAT_CHECK_CONDITION);
 		break;
 	}
 

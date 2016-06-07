@@ -714,7 +714,6 @@ void target_complete_cmd(struct se_cmd *cmd, u8 scsi_status)
 
 	cmd->scsi_status = scsi_status;
 
-
 	spin_lock_irqsave(&cmd->t_state_lock, flags);
 	cmd->transport_state &= ~CMD_T_BUSY;
 
@@ -751,6 +750,14 @@ void target_complete_cmd(struct se_cmd *cmd, u8 scsi_status)
 		queue_work(target_completion_wq, &cmd->work);
 }
 EXPORT_SYMBOL(target_complete_cmd);
+
+void target_complete_ios(struct target_iostate *ios, u16 scsi_status)
+{
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
+
+	target_complete_cmd(cmd, scsi_status);
+}
+EXPORT_SYMBOL(target_complete_ios);
 
 void target_complete_cmd_with_length(struct se_cmd *cmd, u8 scsi_status, int length)
 {
