@@ -136,7 +136,7 @@ static int idr_callback(int id, void *p, void *data)
 {
 	struct fsnotify_mark *fsn_mark;
 	struct inotify_inode_mark *i_mark;
-	static bool warned = false;
+	static bool warned;
 
 	if (warned)
 		return 0;
