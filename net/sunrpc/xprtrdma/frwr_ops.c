@@ -140,7 +140,6 @@ __frwr_init(struct rpcrdma_mw *r, struct ib_pd *pd, unsigned int depth)
 		goto out_list_err;
 
 	sg_init_table(r->mw_sg, depth);
-
 	init_completion(&f->fr_linv_done);
 
 	return 0;
@@ -164,11 +163,17 @@ __frwr_release(struct rpcrdma_mw *r)
 {
 	int rc;
 
+	/* Ensure MW is not on any rl_registered list */
+	if (!list_empty(&r->mw_list))
+		list_del(&r->mw_list);
+
 	rc = ib_dereg_mr(r->frmr.fr_mr);
 	if (rc)
 		dprintk("RPC:       %s: ib_dereg_mr status %i\n",
 			__func__, rc);
+
 	kfree(r->mw_sg);
+	kfree(r);
 }
 
 static int
@@ -344,10 +349,9 @@ frwr_op_init(struct rpcrdma_xprt *r_xprt)
  */
 static int
 frwr_op_map(struct rpcrdma_xprt *r_xprt, struct rpcrdma_mr_seg *seg,
-	    int nsegs, bool writing)
+	    int nsegs, bool writing, struct rpcrdma_mw **out)
 {
 	struct rpcrdma_ia *ia = &r_xprt->rx_ia;
-	struct rpcrdma_mr_seg *seg1 = seg;
 	struct rpcrdma_mw *mw;
 	struct rpcrdma_frmr *frmr;
 	struct ib_mr *mr;
@@ -356,8 +360,7 @@ frwr_op_map(struct rpcrdma_xprt *r_xprt, struct rpcrdma_mr_seg *seg,
 	int rc, i, n, dma_nents;
 	u8 key;
 
-	mw = seg1->rl_mw;
-	seg1->rl_mw = NULL;
+	mw = NULL;
 	do {
 		if (mw)
 			rpcrdma_defer_mr_recovery(mw);
@@ -425,12 +428,11 @@ frwr_op_map(struct rpcrdma_xprt *r_xprt, struct rpcrdma_mr_seg *seg,
 	if (rc)
 		goto out_senderr;
 
-	seg1->rl_mw = mw;
-	seg1->mr_rkey = mr->rkey;
-	seg1->mr_base = mr->iova;
-	seg1->mr_nsegs = mw->mw_nents;
-	seg1->mr_len = mr->length;
+	mw->mw_handle = mr->rkey;
+	mw->mw_length = mr->length;
+	mw->mw_offset = mr->iova;
 
+	*out = mw;
 	return mw->mw_nents;
 
 out_dmamap_err:
@@ -451,9 +453,8 @@ out_senderr:
 }
 
 static struct ib_send_wr *
-__frwr_prepare_linv_wr(struct rpcrdma_mr_seg *seg)
+__frwr_prepare_linv_wr(struct rpcrdma_mw *mw)
 {
-	struct rpcrdma_mw *mw = seg->rl_mw;
 	struct rpcrdma_frmr *f = &mw->frmr;
 	struct ib_send_wr *invalidate_wr;
 
@@ -473,14 +474,14 @@ __frwr_prepare_linv_wr(struct rpcrdma_mr_seg *seg)
  *
  * Sleeps until it is safe for the host CPU to access the
  * previously mapped memory regions.
+ *
+ * Caller ensures that req->rl_registered is not empty.
  */
 static void
 frwr_op_unmap_sync(struct rpcrdma_xprt *r_xprt, struct rpcrdma_req *req)
 {
 	struct ib_send_wr *invalidate_wrs, *pos, *prev, *bad_wr;
 	struct rpcrdma_ia *ia = &r_xprt->rx_ia;
-	struct rpcrdma_mr_seg *seg;
-	unsigned int i, nchunks;
 	struct rpcrdma_frmr *f;
 	struct rpcrdma_mw *mw;
 	int rc;
@@ -492,22 +493,18 @@ frwr_op_unmap_sync(struct rpcrdma_xprt *r_xprt, struct rpcrdma_req *req)
 	 * Chain the LOCAL_INV Work Requests and post them with
 	 * a single ib_post_send() call.
 	 */
+	f = NULL;
 	invalidate_wrs = pos = prev = NULL;
-	seg = NULL;
-	for (i = 0, nchunks = req->rl_nchunks; nchunks; nchunks--) {
-		seg = &req->rl_segments[i];
-
-		pos = __frwr_prepare_linv_wr(seg);
+	list_for_each_entry(mw, &req->rl_registered, mw_list) {
+		pos = __frwr_prepare_linv_wr(mw);
 
 		if (!invalidate_wrs)
 			invalidate_wrs = pos;
 		else
 			prev->next = pos;
 		prev = pos;
-
-		i += seg->mr_nsegs;
+		f = &mw->frmr;
 	}
-	f = &seg->rl_mw->frmr;
 
 	/* Strong send queue ordering guarantees that when the
 	 * last WR in the chain completes, all WRs in the chain
@@ -532,20 +529,15 @@ frwr_op_unmap_sync(struct rpcrdma_xprt *r_xprt, struct rpcrdma_req *req)
 	 * them to the free MW list.
 	 */
 unmap:
-	for (i = 0, nchunks = req->rl_nchunks; nchunks; nchunks--) {
-		seg = &req->rl_segments[i];
-		mw = seg->rl_mw;
-		seg->rl_mw = NULL;
+	while (!list_empty(&req->rl_registered)) {
+		mw = list_first_entry(&req->rl_registered,
+				      struct rpcrdma_mw, mw_list);
+		list_del_init(&mw->mw_list);
 
 		ib_dma_unmap_sg(ia->ri_device,
 				mw->mw_sg, mw->mw_nents, mw->mw_dir);
 		rpcrdma_put_mw(r_xprt, mw);
-
-		i += seg->mr_nsegs;
-		seg->mr_nsegs = 0;
 	}
-
-	req->rl_nchunks = 0;
 	return;
 
 reset_mrs:
@@ -554,17 +546,12 @@ reset_mrs:
 	/* Find and reset the MRs in the LOCAL_INV WRs that did not
 	 * get posted. This is synchronous, and slow.
 	 */
-	for (i = 0, nchunks = req->rl_nchunks; nchunks; nchunks--) {
-		seg = &req->rl_segments[i];
-		mw = seg->rl_mw;
+	list_for_each_entry(mw, &req->rl_registered, mw_list) {
 		f = &mw->frmr;
-
 		if (mw->frmr.fr_mr->rkey == bad_wr->ex.invalidate_rkey) {
 			__frwr_reset_mr(ia, mw);
 			bad_wr = bad_wr->next;
 		}
-
-		i += seg->mr_nsegs;
 	}
 	goto unmap;
 }
@@ -576,22 +563,17 @@ static void
 frwr_op_unmap_safe(struct rpcrdma_xprt *r_xprt, struct rpcrdma_req *req,
 		   bool sync)
 {
-	struct rpcrdma_mr_seg *seg;
 	struct rpcrdma_mw *mw;
-	unsigned int i;
 
-	for (i = 0; req->rl_nchunks; req->rl_nchunks--) {
-		seg = &req->rl_segments[i];
-		mw = seg->rl_mw;
+	while (!list_empty(&req->rl_registered)) {
+		mw = list_first_entry(&req->rl_registered,
+				      struct rpcrdma_mw, mw_list);
+		list_del_init(&mw->mw_list);
 
 		if (sync)
 			__frwr_reset_and_unmap(mw);
 		else
 			rpcrdma_defer_mr_recovery(mw);
-
-		i += seg->mr_nsegs;
-		seg->mr_nsegs = 0;
-		seg->rl_mw = NULL;
 	}
 }
 
@@ -603,8 +585,8 @@ frwr_op_destroy(struct rpcrdma_buffer *buf)
 	while (!list_empty(&buf->rb_all)) {
 		r = list_entry(buf->rb_all.next, struct rpcrdma_mw, mw_all);
 		list_del(&r->mw_all);
+
 		__frwr_release(r);
-		kfree(r);
 	}
 }
 
