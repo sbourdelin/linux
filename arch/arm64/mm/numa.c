@@ -141,6 +141,11 @@ int __init numa_add_memblk(int nid, u64 start, u64 end)
 {
 	int ret;
 
+	if (nid >= MAX_NUMNODES) {
+		pr_warn("NUMA: Node id %u exceeds maximum value\n", nid);
+		return -EINVAL;
+	}
+
 	ret = memblock_set_node(start, (end - start), &memblock.memory, nid);
 	if (ret < 0) {
 		pr_err("NUMA: memblock [0x%llx - 0x%llx] failed to add on node %d\n",
