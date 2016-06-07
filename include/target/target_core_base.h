@@ -449,6 +449,8 @@ struct target_iomem {
 	unsigned int		t_prot_nents;
 };
 
+#define IOS_MAX_INLINE_BIOVEC		8
+
 struct target_iostate {
 	unsigned long long	t_task_lba;
 	unsigned int		t_task_nolb;
@@ -473,6 +475,8 @@ struct target_iostate {
 	/* Used by IBLOCK for BIO submission + completion */
 	atomic_t		backend_pending;
 	atomic_t		backend_err_cnt;
+	struct bio		inline_bio;
+	struct bio_vec		inline_bvec[IOS_MAX_INLINE_BIOVEC];
 };
 
 struct se_cmd {
