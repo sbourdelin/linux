@@ -43,14 +43,14 @@
 #define to_synth(_hw)		container_of(_hw, struct fapll_synth, hw)
 
 /* The bypass bit is inverted on the ddr_pll.. */
-#define fapll_is_ddr_pll(va)	(((u32)(va) & 0xffff) == 0x0440)
+#define fapll_is_ddr_pll(va)	(((u32 __force)(va) & 0xffff) == 0x0440)
 
 /*
  * The audio_pll_clk1 input is hard wired to the 27MHz bypass clock,
  * and the audio_pll_clk1 synthesizer is hardwared to 32KiHz output.
  */
-#define is_ddr_pll_clk1(va)	(((u32)(va) & 0xffff) == 0x044c)
-#define is_audio_pll_clk1(va)	(((u32)(va) & 0xffff) == 0x04a8)
+#define is_ddr_pll_clk1(va)	(((u32 __force)(va) & 0xffff) == 0x044c)
+#define is_audio_pll_clk1(va)	(((u32 __force)(va) & 0xffff) == 0x04a8)
 
 /* Synthesizer divider register */
 #define SYNTH_LDMDIV1		BIT(8)
