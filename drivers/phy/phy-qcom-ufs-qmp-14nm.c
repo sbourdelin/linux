@@ -139,11 +139,9 @@ static int ufs_qcom_phy_qmp_14nm_probe(struct platform_device *pdev)
 	int err = 0;
 
 	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
-	if (!phy) {
-		dev_err(dev, "%s: failed to allocate phy\n", __func__);
+	if (!phy)
 		err = -ENOMEM;
 		goto out;
-	}
 
 	generic_phy = ufs_qcom_phy_generic_probe(pdev, &phy->common_cfg,
 				&ufs_qcom_phy_qmp_14nm_phy_ops, &phy_14nm_ops);
