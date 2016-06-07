@@ -1804,7 +1804,7 @@ void __target_execute_cmd(struct se_cmd *cmd, bool do_checks)
 	cmd->t_iostate.iomem = &cmd->t_iomem;
 	cmd->t_iostate.t_comp_func = &target_complete_ios;
 
-	ret = cmd->execute_cmd(cmd);
+	ret = cmd->execute_cmd(&cmd->t_iostate);
 	if (!ret)
 		return;
 err:

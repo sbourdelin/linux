@@ -54,7 +54,7 @@ static inline struct pscsi_dev_virt *PSCSI_DEV(struct se_device *dev)
 	return container_of(dev, struct pscsi_dev_virt, dev);
 }
 
-static sense_reason_t pscsi_execute_cmd(struct se_cmd *cmd);
+static sense_reason_t pscsi_execute_cmd(struct target_iostate *ios);
 static void pscsi_req_done(struct request *, int);
 
 /*	pscsi_attach_hba():
@@ -988,8 +988,9 @@ pscsi_parse_cdb(struct se_cmd *cmd)
 }
 
 static sense_reason_t
-pscsi_execute_cmd(struct se_cmd *cmd)
+pscsi_execute_cmd(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct scatterlist *sgl = cmd->t_iomem.t_data_sg;
 	u32 sgl_nents = cmd->t_iomem.t_data_nents;
 	enum dma_data_direction data_direction = cmd->t_iostate.data_direction;

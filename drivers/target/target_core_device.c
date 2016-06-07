@@ -1026,7 +1026,7 @@ void core_dev_release_virtual_lun0(void)
  */
 sense_reason_t
 passthrough_parse_cdb(struct se_cmd *cmd,
-	sense_reason_t (*exec_cmd)(struct se_cmd *cmd))
+	sense_reason_t (*exec_cmd)(struct target_iostate *ios))
 {
 	unsigned char *cdb = cmd->t_task_cdb;
 

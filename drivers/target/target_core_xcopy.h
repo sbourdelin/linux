@@ -58,5 +58,5 @@ struct xcopy_op {
 
 extern int target_xcopy_setup_pt(void);
 extern void target_xcopy_release_pt(void);
-extern sense_reason_t target_do_xcopy(struct se_cmd *);
-extern sense_reason_t target_do_receive_copy_results(struct se_cmd *);
+extern sense_reason_t target_do_xcopy(struct target_iostate *);
+extern sense_reason_t target_do_receive_copy_results(struct target_iostate *);

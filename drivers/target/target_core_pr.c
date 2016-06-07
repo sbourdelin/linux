@@ -197,8 +197,9 @@ static int target_check_scsi2_reservation_conflict(struct se_cmd *cmd)
 }
 
 sense_reason_t
-target_scsi2_reservation_release(struct se_cmd *cmd)
+target_scsi2_reservation_release(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct se_device *dev = cmd->se_dev;
 	struct se_session *sess = cmd->se_sess;
 	struct se_portal_group *tpg;
@@ -243,8 +244,9 @@ out:
 }
 
 sense_reason_t
-target_scsi2_reservation_reserve(struct se_cmd *cmd)
+target_scsi2_reservation_reserve(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct se_device *dev = cmd->se_dev;
 	struct se_session *sess = cmd->se_sess;
 	struct se_portal_group *tpg;
@@ -3565,8 +3567,9 @@ static unsigned long long core_scsi3_extract_reservation_key(unsigned char *cdb)
  * See spc4r17 section 6.14 Table 170
  */
 sense_reason_t
-target_scsi3_emulate_pr_out(struct se_cmd *cmd)
+target_scsi3_emulate_pr_out(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct se_device *dev = cmd->se_dev;
 	unsigned char *cdb = &cmd->t_task_cdb[0];
 	unsigned char *buf;
@@ -4092,8 +4095,9 @@ core_scsi3_pri_read_full_status(struct se_cmd *cmd)
 }
 
 sense_reason_t
-target_scsi3_emulate_pr_in(struct se_cmd *cmd)
+target_scsi3_emulate_pr_in(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	sense_reason_t ret;
 
 	/*

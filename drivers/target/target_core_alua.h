@@ -88,9 +88,9 @@ extern struct kmem_cache *t10_alua_tg_pt_gp_cache;
 extern struct kmem_cache *t10_alua_lba_map_cache;
 extern struct kmem_cache *t10_alua_lba_map_mem_cache;
 
-extern sense_reason_t target_emulate_report_target_port_groups(struct se_cmd *);
-extern sense_reason_t target_emulate_set_target_port_groups(struct se_cmd *);
-extern sense_reason_t target_emulate_report_referrals(struct se_cmd *);
+extern sense_reason_t target_emulate_report_target_port_groups(struct target_iostate *);
+extern sense_reason_t target_emulate_set_target_port_groups(struct target_iostate *);
+extern sense_reason_t target_emulate_report_referrals(struct target_iostate *);
 extern int core_alua_check_nonop_delay(struct se_cmd *);
 extern int core_alua_do_port_transition(struct t10_alua_tg_pt_gp *,
 				struct se_device *, struct se_lun *,

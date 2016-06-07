@@ -63,8 +63,9 @@ struct t10_alua_lu_gp *default_lu_gp;
  * See sbc3r35 section 5.23
  */
 sense_reason_t
-target_emulate_report_referrals(struct se_cmd *cmd)
+target_emulate_report_referrals(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct se_device *dev = cmd->se_dev;
 	struct t10_alua_lba_map *map;
 	struct t10_alua_lba_map_member *map_mem;
@@ -143,8 +144,9 @@ target_emulate_report_referrals(struct se_cmd *cmd)
  * See spc4r17 section 6.27
  */
 sense_reason_t
-target_emulate_report_target_port_groups(struct se_cmd *cmd)
+target_emulate_report_target_port_groups(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct se_device *dev = cmd->se_dev;
 	struct t10_alua_tg_pt_gp *tg_pt_gp;
 	struct se_lun *lun;
@@ -276,8 +278,9 @@ target_emulate_report_target_port_groups(struct se_cmd *cmd)
  * See spc4r17 section 6.35
  */
 sense_reason_t
-target_emulate_set_target_port_groups(struct se_cmd *cmd)
+target_emulate_set_target_port_groups(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct se_device *dev = cmd->se_dev;
 	struct se_lun *l_lun = cmd->se_lun;
 	struct se_node_acl *nacl = cmd->se_sess->se_node_acl;

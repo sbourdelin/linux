@@ -1130,8 +1130,9 @@ static sector_t tcmu_get_blocks(struct se_device *dev)
 }
 
 static sense_reason_t
-tcmu_pass_op(struct se_cmd *se_cmd)
+tcmu_pass_op(struct target_iostate *ios)
 {
+	struct se_cmd *se_cmd = container_of(ios, struct se_cmd, t_iostate);
 	int ret = tcmu_queue_cmd(se_cmd);
 
 	if (ret != 0)

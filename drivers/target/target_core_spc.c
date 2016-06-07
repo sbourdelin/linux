@@ -702,8 +702,9 @@ spc_emulate_evpd_00(struct se_cmd *cmd, unsigned char *buf)
 }
 
 static sense_reason_t
-spc_emulate_inquiry(struct se_cmd *cmd)
+spc_emulate_inquiry(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct se_device *dev = cmd->se_dev;
 	struct se_portal_group *tpg = cmd->se_lun->lun_tpg;
 	unsigned char *rbuf;
@@ -982,8 +983,9 @@ static int spc_modesense_long_blockdesc(unsigned char *buf, u64 blocks, u32 bloc
 	return 17;
 }
 
-static sense_reason_t spc_emulate_modesense(struct se_cmd *cmd)
+static sense_reason_t spc_emulate_modesense(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct se_device *dev = cmd->se_dev;
 	char *cdb = cmd->t_task_cdb;
 	unsigned char buf[SE_MODE_PAGE_BUF], *rbuf;
@@ -1107,8 +1109,9 @@ set_length:
 	return 0;
 }
 
-static sense_reason_t spc_emulate_modeselect(struct se_cmd *cmd)
+static sense_reason_t spc_emulate_modeselect(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	char *cdb = cmd->t_task_cdb;
 	bool ten = cdb[0] == MODE_SELECT_10;
 	int off = ten ? 8 : 4;
@@ -1168,8 +1171,9 @@ out:
 	return ret;
 }
 
-static sense_reason_t spc_emulate_request_sense(struct se_cmd *cmd)
+static sense_reason_t spc_emulate_request_sense(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	unsigned char *cdb = cmd->t_task_cdb;
 	unsigned char *rbuf;
 	u8 ua_asc = 0, ua_ascq = 0;
@@ -1201,8 +1205,9 @@ static sense_reason_t spc_emulate_request_sense(struct se_cmd *cmd)
 	return 0;
 }
 
-sense_reason_t spc_emulate_report_luns(struct se_cmd *cmd)
+sense_reason_t spc_emulate_report_luns(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct se_dev_entry *deve;
 	struct se_session *sess = cmd->se_sess;
 	struct se_node_acl *nacl;
@@ -1270,8 +1275,10 @@ done:
 EXPORT_SYMBOL(spc_emulate_report_luns);
 
 static sense_reason_t
-spc_emulate_testunitready(struct se_cmd *cmd)
+spc_emulate_testunitready(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
+
 	target_complete_cmd(cmd, GOOD);
 	return 0;
 }

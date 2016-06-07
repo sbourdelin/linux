@@ -822,8 +822,9 @@ out:
 	target_complete_cmd(ec_cmd, SAM_STAT_CHECK_CONDITION);
 }
 
-sense_reason_t target_do_xcopy(struct se_cmd *se_cmd)
+sense_reason_t target_do_xcopy(struct target_iostate *ios)
 {
+	struct se_cmd *se_cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct se_device *dev = se_cmd->se_dev;
 	struct xcopy_op *xop = NULL;
 	unsigned char *p = NULL, *seg_desc;
@@ -1006,8 +1007,9 @@ static sense_reason_t target_rcr_operating_parameters(struct se_cmd *se_cmd)
 	return TCM_NO_SENSE;
 }
 
-sense_reason_t target_do_receive_copy_results(struct se_cmd *se_cmd)
+sense_reason_t target_do_receive_copy_results(struct target_iostate *ios)
 {
+	struct se_cmd *se_cmd = container_of(ios, struct se_cmd, t_iostate);
 	unsigned char *cdb = &se_cmd->t_task_cdb[0];
 	int sa = (cdb[1] & 0x1f), list_id = cdb[2];
 	sense_reason_t rc = TCM_NO_SENSE;

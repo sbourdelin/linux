@@ -61,7 +61,7 @@ void	target_complete_cmd_with_length(struct se_cmd *, u8, int);
 void	target_complete_ios(struct target_iostate *, u16);
 
 sense_reason_t	spc_parse_cdb(struct se_cmd *cmd, unsigned int *size);
-sense_reason_t	spc_emulate_report_luns(struct se_cmd *cmd);
+sense_reason_t	spc_emulate_report_luns(struct target_iostate *ios);
 sense_reason_t	spc_emulate_inquiry_std(struct se_cmd *, unsigned char *);
 sense_reason_t	spc_emulate_evpd_83(struct se_cmd *, unsigned char *);
 
@@ -91,7 +91,7 @@ sense_reason_t	transport_generic_map_mem_to_cmd(struct se_cmd *,
 
 bool	target_lun_is_rdonly(struct se_cmd *);
 sense_reason_t passthrough_parse_cdb(struct se_cmd *cmd,
-	sense_reason_t (*exec_cmd)(struct se_cmd *cmd));
+	sense_reason_t (*exec_cmd)(struct target_iostate *ios));
 
 bool target_sense_desc_format(struct se_device *dev);
 sector_t target_to_linux_sector(struct se_device *dev, sector_t lb);

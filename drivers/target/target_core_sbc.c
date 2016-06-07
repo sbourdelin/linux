@@ -38,11 +38,12 @@
 
 static sense_reason_t
 sbc_check_prot(struct se_device *, struct se_cmd *, unsigned char *, u32, bool);
-static sense_reason_t sbc_execute_unmap(struct se_cmd *cmd);
+static sense_reason_t sbc_execute_unmap(struct target_iostate *ios);
 
 static sense_reason_t
-sbc_emulate_readcapacity(struct se_cmd *cmd)
+sbc_emulate_readcapacity(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct se_device *dev = cmd->se_dev;
 	unsigned char *cdb = cmd->t_task_cdb;
 	unsigned long long blocks_long = dev->transport->get_blocks(dev);
@@ -90,8 +91,9 @@ sbc_emulate_readcapacity(struct se_cmd *cmd)
 }
 
 static sense_reason_t
-sbc_emulate_readcapacity_16(struct se_cmd *cmd)
+sbc_emulate_readcapacity_16(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct se_device *dev = cmd->se_dev;
 	struct se_session *sess = cmd->se_sess;
 	int pi_prot_type = dev->dev_attrib.pi_prot_type;
@@ -163,8 +165,9 @@ sbc_emulate_readcapacity_16(struct se_cmd *cmd)
 }
 
 static sense_reason_t
-sbc_emulate_startstop(struct se_cmd *cmd)
+sbc_emulate_startstop(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	unsigned char *cdb = cmd->t_task_cdb;
 
 	/*
@@ -218,8 +221,9 @@ sector_t sbc_get_write_same_sectors(struct se_cmd *cmd)
 EXPORT_SYMBOL(sbc_get_write_same_sectors);
 
 static sense_reason_t
-sbc_execute_write_same_unmap(struct se_cmd *cmd)
+sbc_execute_write_same_unmap(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct sbc_ops *ops = cmd->protocol_data;
 	sector_t nolb = sbc_get_write_same_sectors(cmd);
 	sense_reason_t ret;
@@ -235,8 +239,10 @@ sbc_execute_write_same_unmap(struct se_cmd *cmd)
 }
 
 static sense_reason_t
-sbc_emulate_noop(struct se_cmd *cmd)
+sbc_emulate_noop(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
+
 	target_complete_cmd(cmd, GOOD);
 	return 0;
 }
@@ -318,6 +324,14 @@ static inline unsigned long long transport_lba_64_ext(unsigned char *cdb)
 	return ((unsigned long long)__v2) | (unsigned long long)__v1 << 32;
 }
 
+static sense_reason_t sbc_execute_write_same(struct target_iostate *ios)
+{
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
+	struct sbc_ops *ops = cmd->protocol_data;
+
+	return ops->execute_write_same(cmd);
+}
+
 static sense_reason_t
 sbc_setup_write_same(struct se_cmd *cmd, unsigned char *flags, struct sbc_ops *ops)
 {
@@ -375,7 +389,7 @@ sbc_setup_write_same(struct se_cmd *cmd, unsigned char *flags, struct sbc_ops *o
 	if (ret)
 		return ret;
 
-	cmd->execute_cmd = ops->execute_write_same;
+	cmd->execute_cmd = &sbc_execute_write_same;
 	return 0;
 }
 
@@ -439,12 +453,21 @@ out:
 }
 
 static sense_reason_t
-sbc_execute_rw(struct se_cmd *cmd)
+sbc_execute_rw(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct sbc_ops *ops = cmd->protocol_data;
 
 	return ops->execute_rw(cmd, cmd->t_iomem.t_data_sg, cmd->t_iomem.t_data_nents,
 			       cmd->t_iostate.data_direction);
+}
+
+static sense_reason_t sbc_execute_sync_cache(struct target_iostate *ios)
+{
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
+	struct sbc_ops *ops = cmd->protocol_data;
+
+	return ops->execute_sync_cache(cmd);
 }
 
 static sense_reason_t compare_and_write_post(struct se_cmd *cmd, bool success,
@@ -626,8 +649,9 @@ out:
 }
 
 static sense_reason_t
-sbc_compare_and_write(struct se_cmd *cmd)
+sbc_compare_and_write(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct sbc_ops *ops = cmd->protocol_data;
 	struct se_device *dev = cmd->se_dev;
 	sense_reason_t ret;
@@ -1054,7 +1078,7 @@ sbc_parse_cdb(struct se_cmd *cmd, struct sbc_ops *ops)
 			cmd->t_iostate.t_task_lba = transport_lba_64(cdb);
 		}
 		if (ops->execute_sync_cache) {
-			cmd->execute_cmd = ops->execute_sync_cache;
+			cmd->execute_cmd = sbc_execute_sync_cache;
 			goto check_lba;
 		}
 		size = 0;
@@ -1163,8 +1187,9 @@ u32 sbc_get_device_type(struct se_device *dev)
 EXPORT_SYMBOL(sbc_get_device_type);
 
 static sense_reason_t
-sbc_execute_unmap(struct se_cmd *cmd)
+sbc_execute_unmap(struct target_iostate *ios)
 {
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct sbc_ops *ops = cmd->protocol_data;
 	struct se_device *dev = cmd->se_dev;
 	unsigned char *buf, *ptr = NULL;
