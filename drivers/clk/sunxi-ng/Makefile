@@ -4,3 +4,4 @@ obj-y += ccu_reset.o
 obj-y += ccu_frac.o
 
 obj-y += ccu_fixed_factor.o
+obj-y += ccu_gate.o
