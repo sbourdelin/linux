@@ -163,6 +163,7 @@ static void destroy_super(struct super_block *s)
 {
 	list_lru_destroy(&s->s_dentry_lru);
 	list_lru_destroy(&s->s_inode_lru);
+	free_dlock_list_head(&s->s_inodes);
 	security_sb_free(s);
 	WARN_ON(!list_empty(&s->s_mounts));
 	kfree(s->s_subtype);
@@ -204,9 +205,9 @@ static struct super_block *alloc_super(struct file_system_type *type, int flags)
 	INIT_HLIST_NODE(&s->s_instances);
 	INIT_HLIST_BL_HEAD(&s->s_anon);
 	mutex_init(&s->s_sync_lock);
-	INIT_LIST_HEAD(&s->s_inodes);
-	spin_lock_init(&s->s_inode_list_lock);
 
+	if (init_dlock_list_head(&s->s_inodes))
+		goto fail;
 	if (list_lru_init_memcg(&s->s_dentry_lru))
 		goto fail;
 	if (list_lru_init_memcg(&s->s_inode_lru))
@@ -427,7 +428,7 @@ void generic_shutdown_super(struct super_block *sb)
 		if (sop->put_super)
 			sop->put_super(sb);
 
-		if (!list_empty(&sb->s_inodes)) {
+		if (!dlock_list_empty(sb->s_inodes)) {
 			printk("VFS: Busy inodes after unmount of %s. "
 			   "Self-destruct in 5 seconds.  Have a nice day...\n",
 			   sb->s_id);
