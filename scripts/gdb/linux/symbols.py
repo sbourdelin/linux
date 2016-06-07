@@ -81,6 +81,12 @@ lx-symbols command."""
                         self.module_files.append(root + "/" + name)
         self.module_files_updated = True
 
+    def __expand_homedir(self):
+        for index, path in enumerate(self.module_paths):
+            if path.startswith("~"):
+                self.module_paths[index] = os.path.expanduser(path)
+
+
     def _get_module_file(self, module_name):
         module_pattern = ".*/{0}\.ko$".format(
             module_name.replace("_", r"[_\-]"))
@@ -160,6 +166,7 @@ lx-symbols command."""
         self.module_files = []
         self.module_files_updated = False
 
+        self.__expand_homedir()
         self.load_all_symbols()
 
         if hasattr(gdb, 'Breakpoint'):
