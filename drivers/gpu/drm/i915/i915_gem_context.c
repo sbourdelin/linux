@@ -298,6 +298,7 @@ __create_hw_context(struct drm_device *dev,
 	ctx->lrc_ring_buffer_size = 4 * PAGE_SIZE;
 	ctx->lrc_addressing_mode_bits = GEN8_CTX_ADDRESSING_MODE(dev_priv) <<
 		GEN8_CTX_ADDRESSING_MODE_SHIFT;
+	ATOMIC_INIT_NOTIFIER_HEAD(&ctx->status_notifier);
 
 	return ctx;
 

@@ -880,6 +880,8 @@ struct i915_gem_context {
 	} engine[I915_NUM_ENGINES];
 	u32 lrc_ring_buffer_size;
 	u32 lrc_addressing_mode_bits;
+	struct atomic_notifier_head status_notifier;
+	bool enable_lrc_status_change_notification;
 
 	struct list_head link;
 
