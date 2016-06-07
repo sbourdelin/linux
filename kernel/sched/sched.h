@@ -1813,12 +1813,12 @@ static inline void cpufreq_trigger_update(u64 time) {}
 static inline void account_reset_rq(struct rq *rq)
 {
 #ifdef CONFIG_IRQ_TIME_ACCOUNTING
-	rq->prev_irq_time = 0;
+	rq->prev_irq_time = irq_time_read(cpu_of(rq));
 #endif
 #ifdef CONFIG_PARAVIRT
-	rq->prev_steal_time = 0;
+	rq->prev_steal_time = paravirt_steal_clock(cpu_of(rq));
 #endif
 #ifdef CONFIG_PARAVIRT_TIME_ACCOUNTING
-	rq->prev_steal_time_rq = 0;
+	rq->prev_steal_time_rq = paravirt_steal_clock(cpu_of(rq));
 #endif
 }
