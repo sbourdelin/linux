@@ -394,6 +394,81 @@ struct mbox_chan *mbox_request_channel_byname(struct mbox_client *cl,
 }
 EXPORT_SYMBOL_GPL(mbox_request_channel_byname);
 
+static struct mbox_chan *mbox_get_channel_byid(struct mbox_controller *mbox,
+					       int id)
+{
+	if (id >= mbox->num_chans)
+		return ERR_PTR(-EINVAL);
+
+	return &mbox->chans[id];
+}
+
+/**
+ * mbox_request_channel_byid - Request a mailbox channel.
+ * @cl: Identity of the client requesting the channel.
+ * @mbox_name: Pointer to the mailbox controller name.
+ * @id: Mailbox channel index. This is used to lookup the
+ *      array of mailbox channels of the mailbox controller.
+ *
+ * Return: Pointer to the channel assigned to the client if successful.
+ *		ERR_PTR for request failure.
+ */
+struct mbox_chan *mbox_request_channel_byid(struct mbox_client *cl,
+					    const char *mbox_name,
+					    int id)
+{
+	struct device *dev = cl->dev;
+	struct mbox_controller *mbox;
+	struct mbox_chan *chan;
+	unsigned long flags;
+	int ret;
+
+	mutex_lock(&con_mutex);
+
+	chan = ERR_PTR(-EPROBE_DEFER);
+	list_for_each_entry(mbox, &mbox_cons, node)
+		if (!strncmp(mbox->dev->of_node->name,
+			     mbox_name,
+			     strlen(mbox_name))) {
+			chan = mbox_get_channel_byid(mbox, id);
+			break;
+		}
+
+	if (IS_ERR(chan)) {
+		mutex_unlock(&con_mutex);
+		return chan;
+	}
+
+	if (chan->cl || !try_module_get(mbox->dev->driver->owner)) {
+		dev_dbg(dev, "%s: mailbox not free\n", __func__);
+		mutex_unlock(&con_mutex);
+		return ERR_PTR(-EBUSY);
+	}
+
+	spin_lock_irqsave(&chan->lock, flags);
+	chan->msg_free = 0;
+	chan->msg_count = 0;
+	chan->active_req = NULL;
+	chan->cl = cl;
+	init_completion(&chan->tx_complete);
+
+	if (chan->txdone_method	== TXDONE_BY_POLL && cl->knows_txdone)
+		chan->txdone_method |= TXDONE_BY_ACK;
+
+	spin_unlock_irqrestore(&chan->lock, flags);
+
+	ret = chan->mbox->ops->startup(chan);
+	if (ret) {
+		dev_err(dev, "Unable to startup the chan (%d)\n", ret);
+		mbox_free_channel(chan);
+		chan = ERR_PTR(ret);
+	}
+
+	mutex_unlock(&con_mutex);
+	return chan;
+}
+EXPORT_SYMBOL_GPL(mbox_request_channel_byid);
+
 /**
  * mbox_free_channel - The client relinquishes control of a mailbox
  *			channel by this call.
