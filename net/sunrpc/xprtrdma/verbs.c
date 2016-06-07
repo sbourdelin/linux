@@ -822,6 +822,9 @@ rpcrdma_buffer_create(struct rpcrdma_xprt *r_xprt)
 
 	buf->rb_max_requests = r_xprt->rx_data.max_requests;
 	buf->rb_bc_srv_max_requests = 0;
+	spin_lock_init(&buf->rb_mwlock);
+	INIT_LIST_HEAD(&buf->rb_mws);
+	INIT_LIST_HEAD(&buf->rb_all);
 	spin_lock_init(&buf->rb_lock);
 	atomic_set(&buf->rb_credits, 1);
 

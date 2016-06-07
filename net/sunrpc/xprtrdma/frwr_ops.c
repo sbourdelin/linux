@@ -355,10 +355,6 @@ frwr_op_init(struct rpcrdma_xprt *r_xprt)
 	struct ib_pd *pd = r_xprt->rx_ia.ri_pd;
 	int i;
 
-	spin_lock_init(&buf->rb_mwlock);
-	INIT_LIST_HEAD(&buf->rb_mws);
-	INIT_LIST_HEAD(&buf->rb_all);
-
 	i = max_t(int, RPCRDMA_MAX_DATA_SEGS / depth, 1);
 	i += 2;				/* head + tail */
 	i *= buf->rb_max_requests;	/* one set for each RPC slot */
