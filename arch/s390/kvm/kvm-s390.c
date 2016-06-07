@@ -29,7 +29,7 @@
 #include <linux/bitmap.h>
 #include <asm/asm-offsets.h>
 #include <asm/lowcore.h>
-#include <asm/etr.h>
+#include <asm/timex.h>
 #include <asm/pgtable.h>
 #include <asm/gmap.h>
 #include <asm/nmi.h>
@@ -227,7 +227,9 @@ static void kvm_s390_cpu_feat_init(void)
 	}
 
 	if (test_facility(28)) /* TOD-clock steering */
-		etr_ptff(kvm_s390_available_subfunc.ptff, ETR_PTFF_QAF);
+		ptff(kvm_s390_available_subfunc.ptff,
+		     sizeof(kvm_s390_available_subfunc.ptff),
+		     PTFF_QAF);
 
 	if (test_facility(17)) { /* MSA */
 		__cpacf_query(CPACF_KMAC, kvm_s390_available_subfunc.kmac);
