@@ -3685,7 +3685,7 @@ static int __init srp_init_module(void)
 		indirect_sg_entries = cmd_sg_entries;
 	}
 
-	srp_remove_wq = create_workqueue("srp_remove");
+	srp_remove_wq = alloc_workqueue("srp_remove", WQ_MEM_RECLAIM, 0);
 	if (!srp_remove_wq) {
 		ret = -ENOMEM;
 		goto out;
