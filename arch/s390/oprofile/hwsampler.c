@@ -42,7 +42,6 @@ static DEFINE_MUTEX(hws_sem_oom);
 static unsigned char hws_flush_all;
 static unsigned int hws_oom;
 static unsigned int hws_alert;
-static struct workqueue_struct *hws_wq;
 
 static unsigned int hws_state;
 enum {
@@ -189,8 +188,7 @@ static void hws_ext_handler(struct ext_code ext_code,
 	inc_irq_stat(IRQEXT_CMS);
 	atomic_xchg(&cb->ext_params, atomic_read(&cb->ext_params) | param32);
 
-	if (hws_wq)
-		queue_work(hws_wq, &cb->worker);
+		queue_work(system_long_wq, &cb->worker);
 }
 
 static void worker(struct work_struct *work);
@@ -566,14 +564,11 @@ int hwsampler_deactivate(unsigned int cpu)
 			} else  {
 				hws_flush_all = 1;
 				/* Add work to queue to read pending samples.*/
-				queue_work_on(cpu, hws_wq, &cb->worker);
+				queue_work_on(cpu, system_long_wq, &cb->worker);
 			}
 		}
 	}
 	mutex_unlock(&hws_sem);
-
-	if (hws_wq)
-		flush_workqueue(hws_wq);
 
 	return rc;
 }
@@ -740,7 +735,7 @@ static void worker_on_finish(unsigned int cpu)
 					continue;
 				if (!cb->finish) {
 					cb->finish = 1;
-					queue_work_on(i, hws_wq,
+					queue_work_on(i, system_long_wq,
 						&cb->worker);
 				}
 			}
@@ -997,9 +992,6 @@ int hwsampler_setup(void)
 		goto setup_exit;
 
 	rc = -EINVAL;
-	hws_wq = create_workqueue("hwsampler");
-	if (!hws_wq)
-		goto setup_exit;
 
 	register_cpu_notifier(&hws_cpu_notifier);
 
@@ -1049,19 +1041,12 @@ int hwsampler_shutdown(void)
 	if (hws_state == HWS_DEALLOCATED || hws_state == HWS_STOPPED) {
 		mutex_unlock(&hws_sem);
 
-		if (hws_wq)
-			flush_workqueue(hws_wq);
-
 		mutex_lock(&hws_sem);
 
 		if (hws_state == HWS_STOPPED) {
 			irq_subclass_unregister(IRQ_SUBCLASS_MEASUREMENT_ALERT);
 			hws_alert = 0;
 			deallocate_sdbt();
-		}
-		if (hws_wq) {
-			destroy_workqueue(hws_wq);
-			hws_wq = NULL;
 		}
 
 		unregister_external_irq(EXT_IRQ_MEASURE_ALERT, hws_ext_handler);
