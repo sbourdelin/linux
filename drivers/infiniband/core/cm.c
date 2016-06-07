@@ -4004,7 +4004,7 @@ static int __init ib_cm_init(void)
 		goto error1;
 	}
 
-	cm.wq = create_workqueue("ib_cm");
+	cm.wq = alloc_workqueue("ib_cm", WQ_MEM_RECLAIM, 0);
 	if (!cm.wq) {
 		ret = -ENOMEM;
 		goto error2;
