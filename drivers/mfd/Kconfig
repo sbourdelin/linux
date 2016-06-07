@@ -324,8 +324,9 @@ config MFD_INTEL_QUARK_I2C_GPIO
 
 config LPC_ICH
 	tristate "Intel ICH LPC"
-	depends on PCI
+	depends on X86 && PCI
 	select MFD_CORE
+	select P2SB if X86_INTEL_NON_ACPI
 	help
 	  The LPC bridge function of the Intel ICH provides support for
 	  many functional units. This driver provides needed support for
