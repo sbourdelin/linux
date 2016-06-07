@@ -4664,6 +4664,10 @@ static int workqueue_cpu_up_callback(struct notifier_block *nfb,
 	case CPU_ONLINE:
 		mutex_lock(&wq_pool_mutex);
 
+		/* update NUMA affinity of unbound workqueues */
+		list_for_each_entry(wq, &workqueues, list)
+			wq_update_unbound_numa(wq, cpu, true);
+
 		for_each_pool(pool, pi) {
 			mutex_lock(&pool->attach_mutex);
 
@@ -4674,10 +4678,6 @@ static int workqueue_cpu_up_callback(struct notifier_block *nfb,
 
 			mutex_unlock(&pool->attach_mutex);
 		}
-
-		/* update NUMA affinity of unbound workqueues */
-		list_for_each_entry(wq, &workqueues, list)
-			wq_update_unbound_numa(wq, cpu, true);
 
 		mutex_unlock(&wq_pool_mutex);
 		break;
