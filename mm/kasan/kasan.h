@@ -12,6 +12,8 @@
 #define KASAN_KMALLOC_REDZONE   0xFC  /* redzone inside slub object */
 #define KASAN_KMALLOC_FREE      0xFB  /* object was freed (kmem_cache_free/kfree) */
 #define KASAN_GLOBAL_REDZONE    0xFA  /* redzone for global variable */
+#define KASAN_KMALLOC_META      0xE0  /* slab object header shadow; see union kasan_shadow_meta */
+#define KASAN_KMALLOC_META_MAX  0xEF  /* end of header shadow code */
 
 /*
  * Stack redzone shadow values
@@ -73,10 +75,24 @@ struct kasan_track {
 	depot_stack_handle_t stack;
 };
 
+/*
+ * Object header lock bit and allocation state are stored in shadow memory to
+ * prevent out-of-bounds accesses on object from overwriting them.
+ */
+union kasan_shadow_meta {
+	u8 data;
+	struct {
+		u8 lock : 1;	/* lock bit */
+		u8 state : 2;	/* enum kasan_state */
+		u8 unused : 1;
+		u8 poison : 4;	/* poison constant; do not use */
+	};
+};
+
 struct kasan_alloc_meta {
+	u32 alloc_size : 24;
+	u32 unused : 8;
 	struct kasan_track track;
-	u32 state : 2;	/* enum kasan_state */
-	u32 alloc_size : 30;
 };
 
 struct qlist_node {
@@ -114,6 +130,10 @@ void kasan_report(unsigned long addr, size_t size,
 void quarantine_put(struct kasan_free_meta *info, struct kmem_cache *cache);
 void quarantine_reduce(void);
 void quarantine_remove_cache(struct kmem_cache *cache);
+void kasan_meta_lock(struct kasan_alloc_meta *alloc_info);
+void kasan_meta_unlock(struct kasan_alloc_meta *alloc_info);
+u8 get_alloc_state(struct kasan_alloc_meta *alloc_info);
+void set_alloc_state(struct kasan_alloc_meta *alloc_info, u8 state);
 #else
 static inline void quarantine_put(struct kasan_free_meta *info,
 				struct kmem_cache *cache) { }

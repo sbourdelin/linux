@@ -53,6 +53,17 @@ static void print_error_description(struct kasan_access_info *info)
 	const char *bug_type = "unknown-crash";
 	u8 *shadow_addr;
 
+#ifdef CONFIG_SLAB
+	if (!info->access_size) {
+		bug_type = "double-free";
+		pr_err("BUG: KASAN: %s attempt in %pS on object at addr %p\n",
+				bug_type, (void *)info->ip, info->access_addr);
+		pr_err("%s by task %s/%d\n", bug_type, current->comm,
+				task_pid_nr(current));
+		info->first_bad_addr = info->access_addr;
+		return;
+	}
+#endif
 	info->first_bad_addr = find_first_bad_addr(info->access_addr,
 						info->access_size);
 
@@ -75,6 +86,7 @@ static void print_error_description(struct kasan_access_info *info)
 		break;
 	case KASAN_PAGE_REDZONE:
 	case KASAN_KMALLOC_REDZONE:
+	case KASAN_KMALLOC_META ... KASAN_KMALLOC_META_MAX:
 		bug_type = "slab-out-of-bounds";
 		break;
 	case KASAN_GLOBAL_REDZONE:
@@ -131,7 +143,7 @@ static void print_track(struct kasan_track *track)
 }
 
 static void object_err(struct kmem_cache *cache, struct page *page,
-			void *object, char *unused_reason)
+			void *object, struct kasan_access_info *info)
 {
 	struct kasan_alloc_meta *alloc_info = get_alloc_info(cache, object);
 	struct kasan_free_meta *free_info;
@@ -140,7 +152,9 @@ static void object_err(struct kmem_cache *cache, struct page *page,
 	pr_err("Object at %p, in cache %s\n", object, cache->name);
 	if (!(cache->flags & SLAB_KASAN))
 		return;
-	switch (alloc_info->state) {
+	if (info->access_size)
+		kasan_meta_lock(alloc_info);
+	switch (get_alloc_state(alloc_info)) {
 	case KASAN_STATE_INIT:
 		pr_err("Object not allocated yet\n");
 		break;
@@ -161,6 +175,8 @@ static void object_err(struct kmem_cache *cache, struct page *page,
 		print_track(&free_info->track);
 		break;
 	}
+	if (info->access_size)
+		kasan_meta_unlock(alloc_info);
 }
 #endif
 
@@ -177,8 +193,12 @@ static void print_address_description(struct kasan_access_info *info)
 			struct kmem_cache *cache = page->slab_cache;
 			object = nearest_obj(cache, page,
 						(void *)info->access_addr);
+#ifdef CONFIG_SLAB
+			object_err(cache, page, object, info);
+#else
 			object_err(cache, page, object,
 					"kasan: bad access detected");
+#endif
 			return;
 		}
 		dump_page(page, "kasan: bad access detected");

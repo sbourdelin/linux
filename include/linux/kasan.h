@@ -53,6 +53,7 @@ void kasan_cache_create(struct kmem_cache *cache, size_t *size,
 void kasan_cache_shrink(struct kmem_cache *cache);
 void kasan_cache_destroy(struct kmem_cache *cache);
 
+void kasan_init_object(struct kmem_cache *cache, void *object);
 void kasan_poison_slab(struct page *page);
 void kasan_unpoison_object_data(struct kmem_cache *cache, void *object);
 void kasan_poison_object_data(struct kmem_cache *cache, void *object);
@@ -65,7 +66,7 @@ void kasan_kmalloc(struct kmem_cache *s, const void *object, size_t size,
 void kasan_krealloc(const void *object, size_t new_size, gfp_t flags);
 
 void kasan_slab_alloc(struct kmem_cache *s, void *object, gfp_t flags);
-bool kasan_slab_free(struct kmem_cache *s, void *object);
+bool kasan_slab_free(struct kmem_cache *s, void *object, unsigned long caller);
 void kasan_poison_slab_free(struct kmem_cache *s, void *object);
 
 struct kasan_cache {
@@ -94,6 +95,7 @@ static inline void kasan_cache_create(struct kmem_cache *cache,
 static inline void kasan_cache_shrink(struct kmem_cache *cache) {}
 static inline void kasan_cache_destroy(struct kmem_cache *cache) {}
 
+static inline void kasan_init_object(struct kmem_cache *s, void *object) {}
 static inline void kasan_poison_slab(struct page *page) {}
 static inline void kasan_unpoison_object_data(struct kmem_cache *cache,
 					void *object) {}
@@ -110,7 +112,8 @@ static inline void kasan_krealloc(const void *object, size_t new_size,
 
 static inline void kasan_slab_alloc(struct kmem_cache *s, void *object,
 				   gfp_t flags) {}
-static inline bool kasan_slab_free(struct kmem_cache *s, void *object)
+static inline bool kasan_slab_free(struct kmem_cache *s, void *object,
+		unsigned long caller)
 {
 	return false;
 }
