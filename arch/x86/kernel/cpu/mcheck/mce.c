@@ -35,6 +35,7 @@
 #include <linux/poll.h>
 #include <linux/nmi.h>
 #include <linux/cpu.h>
+#include <linux/ras.h>
 #include <linux/smp.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
@@ -151,14 +152,71 @@ static struct mce_log mcelog = {
 	.recordlen	= sizeof(struct mce),
 };
 
-void mce_log(struct mce *mce)
+static bool memory_error(struct mce *m)
+{
+	struct cpuinfo_x86 *c = &boot_cpu_data;
+
+	if (c->x86_vendor == X86_VENDOR_AMD) {
+		/* ErrCodeExt[20:16] */
+		u8 xec = (m->status >> 16) & 0x1f;
+
+		return (xec == 0x0 || xec == 0x8);
+	} else if (c->x86_vendor == X86_VENDOR_INTEL) {
+		/*
+		 * Intel SDM Volume 3B - 15.9.2 Compound Error Codes
+		 *
+		 * Bit 7 of the MCACOD field of IA32_MCi_STATUS is used for
+		 * indicating a memory error. Bit 8 is used for indicating a
+		 * cache hierarchy error. The combination of bit 2 and bit 3
+		 * is used for indicating a `generic' cache hierarchy error
+		 * But we can't just blindly check the above bits, because if
+		 * bit 11 is set, then it is a bus/interconnect error - and
+		 * either way the above bits just gives more detail on what
+		 * bus/interconnect error happened. Note that bit 12 can be
+		 * ignored, as it's the "filter" bit.
+		 */
+		return (m->status & 0xef80) == BIT(7) ||
+		       (m->status & 0xef00) == BIT(8) ||
+		       (m->status & 0xeffc) == 0xc;
+	}
+
+	return false;
+}
+
+/*
+ * Check if the address reported by the CPU is in a format we can parse.
+ * It would be possible to add code for most other cases, but all would
+ * be somewhat complicated (e.g. segment offset would require an instruction
+ * parser). So only support physical addresses up to page granuality for now.
+ */
+static int mce_usable_address(struct mce *m)
+{
+	if (!(m->status & MCI_STATUS_MISCV) || !(m->status & MCI_STATUS_ADDRV))
+		return 0;
+
+	/* Checks after this one are Intel-specific: */
+	if (boot_cpu_data.x86_vendor != X86_VENDOR_INTEL)
+		return 1;
+
+	if (MCI_MISC_ADDR_LSB(m->misc) > PAGE_SHIFT)
+		return 0;
+	if (MCI_MISC_ADDR_MODE(m->misc) != MCI_MISC_ADDR_PHYS)
+		return 0;
+	return 1;
+}
+
+void mce_log(struct mce *m)
 {
 	unsigned next, entry;
 
-	/* Emit the trace record: */
-	trace_mce_record(mce);
+	if (!in_atomic() && memory_error(m) && mce_usable_address(m))
+		if (!ce_add_elem(m->addr >> PAGE_SHIFT))
+			return;
 
-	if (!mce_gen_pool_add(mce))
+	/* Emit the trace record: */
+	trace_mce_record(m);
+
+	if (!mce_gen_pool_add(m))
 		irq_work_queue(&mce_irq_work);
 
 	wmb();
@@ -188,7 +246,7 @@ void mce_log(struct mce *mce)
 		if (cmpxchg(&mcelog.next, entry, next) == entry)
 			break;
 	}
-	memcpy(mcelog.entry + entry, mce, sizeof(struct mce));
+	memcpy(mcelog.entry + entry, m, sizeof(struct mce));
 	wmb();
 	mcelog.entry[entry].finished = 1;
 	wmb();
@@ -518,28 +576,6 @@ static void mce_report_event(struct pt_regs *regs)
 	irq_work_queue(&mce_irq_work);
 }
 
-/*
- * Check if the address reported by the CPU is in a format we can parse.
- * It would be possible to add code for most other cases, but all would
- * be somewhat complicated (e.g. segment offset would require an instruction
- * parser). So only support physical addresses up to page granuality for now.
- */
-static int mce_usable_address(struct mce *m)
-{
-	if (!(m->status & MCI_STATUS_MISCV) || !(m->status & MCI_STATUS_ADDRV))
-		return 0;
-
-	/* Checks after this one are Intel-specific: */
-	if (boot_cpu_data.x86_vendor != X86_VENDOR_INTEL)
-		return 1;
-
-	if (MCI_MISC_ADDR_LSB(m->misc) > PAGE_SHIFT)
-		return 0;
-	if (MCI_MISC_ADDR_MODE(m->misc) != MCI_MISC_ADDR_PHYS)
-		return 0;
-	return 1;
-}
-
 static int srao_decode_notifier(struct notifier_block *nb, unsigned long val,
 				void *data)
 {
@@ -580,37 +616,6 @@ static void mce_read_aux(struct mce *m, int i)
 			m->addr <<= shift;
 		}
 	}
-}
-
-static bool memory_error(struct mce *m)
-{
-	struct cpuinfo_x86 *c = &boot_cpu_data;
-
-	if (c->x86_vendor == X86_VENDOR_AMD) {
-		/* ErrCodeExt[20:16] */
-		u8 xec = (m->status >> 16) & 0x1f;
-
-		return (xec == 0x0 || xec == 0x8);
-	} else if (c->x86_vendor == X86_VENDOR_INTEL) {
-		/*
-		 * Intel SDM Volume 3B - 15.9.2 Compound Error Codes
-		 *
-		 * Bit 7 of the MCACOD field of IA32_MCi_STATUS is used for
-		 * indicating a memory error. Bit 8 is used for indicating a
-		 * cache hierarchy error. The combination of bit 2 and bit 3
-		 * is used for indicating a `generic' cache hierarchy error
-		 * But we can't just blindly check the above bits, because if
-		 * bit 11 is set, then it is a bus/interconnect error - and
-		 * either way the above bits just gives more detail on what
-		 * bus/interconnect error happened. Note that bit 12 can be
-		 * ignored, as it's the "filter" bit.
-		 */
-		return (m->status & 0xef80) == BIT(7) ||
-		       (m->status & 0xef00) == BIT(8) ||
-		       (m->status & 0xeffc) == 0xc;
-	}
-
-	return false;
 }
 
 DEFINE_PER_CPU(unsigned, mce_poll_count);
@@ -2679,6 +2684,7 @@ static int __init mcheck_debugfs_init(void) { return -EINVAL; }
 static int __init mcheck_late_init(void)
 {
 	mcheck_debugfs_init();
+	ce_init();
 
 	/*
 	 * Flush out everything that has been logged during early boot, now that
