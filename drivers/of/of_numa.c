@@ -122,13 +122,23 @@ static int __init of_numa_parse_distance_map_v1(struct device_node *map)
 		numa_set_distance(nodea, nodeb, distance);
 		pr_debug("distance[node%d -> node%d] = %d\n",
 			 nodea, nodeb, distance);
-
-		/* Set default distance of node B->A same as A->B */
-		if (nodeb > nodea)
-			numa_set_distance(nodeb, nodea, distance);
 	}
 
 	return 0;
+}
+
+static void __init fill_default_distances(void)
+{
+	int i, j;
+
+	for (i = 0; i < nr_node_ids; i++)
+		for (j = 0; j < nr_node_ids; j++)
+			if (i == j)
+				numa_set_distance(i, j, LOCAL_DISTANCE);
+			else if (!node_distance(i, j))
+				numa_set_distance(i, j,
+				    node_distance(j, i) ? : REMOTE_DISTANCE);
+
 }
 
 static int __init of_numa_parse_distance_map(void)
@@ -140,8 +150,10 @@ static int __init of_numa_parse_distance_map(void)
 				     "numa-distance-map-v1");
 	if (np)
 		ret = of_numa_parse_distance_map_v1(np);
-
 	of_node_put(np);
+
+	fill_default_distances();
+
 	return ret;
 }
 
