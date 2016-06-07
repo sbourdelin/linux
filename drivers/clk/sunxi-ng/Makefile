@@ -13,3 +13,5 @@ obj-y += ccu_nkm.o
 obj-y += ccu_nkmp.o
 obj-y += ccu_nm.o
 obj-y += ccu_phase.o
+
+obj-$(CONFIG_MACH_SUN8I) += ccu-sun8i-h3.o
