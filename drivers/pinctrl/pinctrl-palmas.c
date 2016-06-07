@@ -21,7 +21,7 @@
  */
 
 #include <linux/delay.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/mfd/palmas.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
@@ -1059,10 +1059,4 @@ static struct platform_driver palmas_pinctrl_driver = {
 	},
 	.probe = palmas_pinctrl_probe,
 };
-
-module_platform_driver(palmas_pinctrl_driver);
-
-MODULE_DESCRIPTION("Palmas pin control driver");
-MODULE_AUTHOR("Laxman Dewangan<ldewangan@nvidia.com>");
-MODULE_ALIAS("platform:palmas-pinctrl");
-MODULE_LICENSE("GPL v2");
+builtin_platform_driver(palmas_pinctrl_driver);
