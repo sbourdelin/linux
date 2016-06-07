@@ -435,10 +435,12 @@ static sense_reason_t rd_do_prot_rw(struct se_cmd *cmd, bool is_read)
 }
 
 static sense_reason_t
-rd_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
-	      enum dma_data_direction data_direction)
+rd_execute_rw(struct target_iostate *ios, struct scatterlist *sgl, u32 sgl_nents,
+	      enum dma_data_direction data_direction, bool fua_write,
+	      void (*t_comp_func)(struct target_iostate *, u16))
 {
-	struct se_device *se_dev = cmd->se_dev;
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
+	struct se_device *se_dev = ios->se_dev;
 	struct rd_dev *dev = RD_DEV(se_dev);
 	struct rd_dev_sg_table *table;
 	struct scatterlist *rd_sg;
@@ -451,14 +453,14 @@ rd_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 	sense_reason_t rc;
 
 	if (dev->rd_flags & RDF_NULLIO) {
-		target_complete_cmd(cmd, SAM_STAT_GOOD);
+		(*t_comp_func)(ios, SAM_STAT_GOOD);
 		return 0;
 	}
 
-	tmp = cmd->t_iostate.t_task_lba * se_dev->dev_attrib.block_size;
+	tmp = ios->t_task_lba * se_dev->dev_attrib.block_size;
 	rd_offset = do_div(tmp, PAGE_SIZE);
 	rd_page = tmp;
-	rd_size = cmd->t_iostate.data_length;
+	rd_size = ios->data_length;
 
 	table = rd_get_sg_table(dev, rd_page);
 	if (!table)
@@ -469,9 +471,9 @@ rd_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 	pr_debug("RD[%u]: %s LBA: %llu, Size: %u Page: %u, Offset: %u\n",
 			dev->rd_dev_id,
 			data_direction == DMA_FROM_DEVICE ? "Read" : "Write",
-			cmd->t_iostate.t_task_lba, rd_size, rd_page, rd_offset);
+			ios->t_task_lba, rd_size, rd_page, rd_offset);
 
-	if (cmd->t_iostate.prot_type && se_dev->dev_attrib.pi_prot_type &&
+	if (ios->prot_type && se_dev->dev_attrib.pi_prot_type &&
 	    data_direction == DMA_TO_DEVICE) {
 		rc = rd_do_prot_rw(cmd, false);
 		if (rc)
@@ -539,14 +541,14 @@ rd_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 	}
 	sg_miter_stop(&m);
 
-	if (cmd->t_iostate.prot_type && se_dev->dev_attrib.pi_prot_type &&
+	if (ios->prot_type && se_dev->dev_attrib.pi_prot_type &&
 	    data_direction == DMA_FROM_DEVICE) {
 		rc = rd_do_prot_rw(cmd, true);
 		if (rc)
 			return rc;
 	}
 
-	target_complete_cmd(cmd, SAM_STAT_GOOD);
+	(*t_comp_func)(ios, SAM_STAT_GOOD);
 	return 0;
 }
 

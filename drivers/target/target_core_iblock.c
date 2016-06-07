@@ -275,9 +275,9 @@ static unsigned long long iblock_emulate_read_cap_with_block_size(
 	return blocks_long;
 }
 
-static void iblock_complete_cmd(struct se_cmd *cmd)
+static void iblock_complete_cmd(struct target_iostate *ios)
 {
-	struct iblock_req *ibr = cmd->priv;
+	struct iblock_req *ibr = ios->priv;
 	u8 status;
 
 	if (!atomic_dec_and_test(&ibr->pending))
@@ -288,14 +288,16 @@ static void iblock_complete_cmd(struct se_cmd *cmd)
 	else
 		status = SAM_STAT_GOOD;
 
-	target_complete_cmd(cmd, status);
+	// XXX: ios status SAM completion translation
+	ios->t_comp_func(ios, status);
+
 	kfree(ibr);
 }
 
 static void iblock_bio_done(struct bio *bio)
 {
-	struct se_cmd *cmd = bio->bi_private;
-	struct iblock_req *ibr = cmd->priv;
+	struct target_iostate *ios = bio->bi_private;
+	struct iblock_req *ibr = ios->priv;
 
 	if (bio->bi_error) {
 		pr_err("bio error: %p,  err: %d\n", bio, bio->bi_error);
@@ -308,13 +310,15 @@ static void iblock_bio_done(struct bio *bio)
 
 	bio_put(bio);
 
-	iblock_complete_cmd(cmd);
+	iblock_complete_cmd(ios);
 }
 
+
+
 static struct bio *
-iblock_get_bio(struct se_cmd *cmd, sector_t lba, u32 sg_num)
+iblock_get_bio(struct target_iostate *ios, sector_t lba, u32 sg_num)
 {
-	struct iblock_dev *ib_dev = IBLOCK_DEV(cmd->se_dev);
+	struct iblock_dev *ib_dev = IBLOCK_DEV(ios->se_dev);
 	struct bio *bio;
 
 	/*
@@ -331,7 +335,7 @@ iblock_get_bio(struct se_cmd *cmd, sector_t lba, u32 sg_num)
 	}
 
 	bio->bi_bdev = ib_dev->ibd_bd;
-	bio->bi_private = cmd;
+	bio->bi_private = ios;
 	bio->bi_end_io = &iblock_bio_done;
 	bio->bi_iter.bi_sector = lba;
 
@@ -447,6 +451,7 @@ iblock_execute_write_same_direct(struct block_device *bdev, struct se_cmd *cmd)
 static sense_reason_t
 iblock_execute_write_same(struct se_cmd *cmd)
 {
+	struct target_iostate *ios = &cmd->t_iostate;
 	struct block_device *bdev = IBLOCK_DEV(cmd->se_dev)->ibd_bd;
 	struct iblock_req *ibr;
 	struct scatterlist *sg;
@@ -478,9 +483,9 @@ iblock_execute_write_same(struct se_cmd *cmd)
 	ibr = kzalloc(sizeof(struct iblock_req), GFP_KERNEL);
 	if (!ibr)
 		goto fail;
-	cmd->priv = ibr;
+	ios->priv = ibr;
 
-	bio = iblock_get_bio(cmd, block_lba, 1);
+	bio = iblock_get_bio(ios, block_lba, 1);
 	if (!bio)
 		goto fail_free_ibr;
 
@@ -493,7 +498,7 @@ iblock_execute_write_same(struct se_cmd *cmd)
 		while (bio_add_page(bio, sg_page(sg), sg->length, sg->offset)
 				!= sg->length) {
 
-			bio = iblock_get_bio(cmd, block_lba, 1);
+			bio = iblock_get_bio(ios, block_lba, 1);
 			if (!bio)
 				goto fail_put_bios;
 
@@ -623,9 +628,10 @@ static ssize_t iblock_show_configfs_dev_params(struct se_device *dev, char *b)
 }
 
 static int
-iblock_alloc_bip(struct se_cmd *cmd, struct bio *bio)
+iblock_alloc_bip(struct target_iostate *ios, struct target_iomem *iomem,
+		 struct bio *bio)
 {
-	struct se_device *dev = cmd->se_dev;
+	struct se_device *dev = ios->se_dev;
 	struct blk_integrity *bi;
 	struct bio_integrity_payload *bip;
 	struct iblock_dev *ib_dev = IBLOCK_DEV(dev);
@@ -638,20 +644,20 @@ iblock_alloc_bip(struct se_cmd *cmd, struct bio *bio)
 		return -ENODEV;
 	}
 
-	bip = bio_integrity_alloc(bio, GFP_NOIO, cmd->t_iomem.t_prot_nents);
+	bip = bio_integrity_alloc(bio, GFP_NOIO, iomem->t_prot_nents);
 	if (IS_ERR(bip)) {
 		pr_err("Unable to allocate bio_integrity_payload\n");
 		return PTR_ERR(bip);
 	}
 
-	bip->bip_iter.bi_size = (cmd->t_iostate.data_length / dev->dev_attrib.block_size) *
+	bip->bip_iter.bi_size = (ios->data_length / dev->dev_attrib.block_size) *
 			 dev->prot_length;
 	bip->bip_iter.bi_sector = bio->bi_iter.bi_sector;
 
 	pr_debug("IBLOCK BIP Size: %u Sector: %llu\n", bip->bip_iter.bi_size,
 		 (unsigned long long)bip->bip_iter.bi_sector);
 
-	for_each_sg(cmd->t_iomem.t_prot_sg, sg, cmd->t_iomem.t_prot_nents, i) {
+	for_each_sg(iomem->t_prot_sg, sg, iomem->t_prot_nents, i) {
 
 		rc = bio_integrity_add_page(bio, sg_page(sg), sg->length,
 					    sg->offset);
@@ -668,11 +674,12 @@ iblock_alloc_bip(struct se_cmd *cmd, struct bio *bio)
 }
 
 static sense_reason_t
-iblock_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
-		  enum dma_data_direction data_direction)
+iblock_execute_rw(struct target_iostate *ios, struct scatterlist *sgl, u32 sgl_nents,
+		  enum dma_data_direction data_direction, bool fua_write,
+		  void (*t_comp_func)(struct target_iostate *ios, u16))
 {
-	struct se_device *dev = cmd->se_dev;
-	sector_t block_lba = target_to_linux_sector(dev, cmd->t_iostate.t_task_lba);
+	struct se_device *dev = ios->se_dev;
+	sector_t block_lba = target_to_linux_sector(dev, ios->t_task_lba);
 	struct iblock_req *ibr;
 	struct bio *bio, *bio_start;
 	struct bio_list list;
@@ -690,7 +697,7 @@ iblock_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 		 * is not enabled, or if initiator set the Force Unit Access bit.
 		 */
 		if (test_bit(QUEUE_FLAG_FUA, &q->queue_flags)) {
-			if (cmd->se_cmd_flags & SCF_FUA)
+			if (fua_write)
 				rw = WRITE_FUA;
 			else if (!test_bit(QUEUE_FLAG_WC, &q->queue_flags))
 				rw = WRITE_FUA;
@@ -706,15 +713,15 @@ iblock_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 	ibr = kzalloc(sizeof(struct iblock_req), GFP_KERNEL);
 	if (!ibr)
 		goto fail;
-	cmd->priv = ibr;
+	ios->priv = ibr;
 
 	if (!sgl_nents) {
 		atomic_set(&ibr->pending, 1);
-		iblock_complete_cmd(cmd);
+		iblock_complete_cmd(ios);
 		return 0;
 	}
 
-	bio = iblock_get_bio(cmd, block_lba, sgl_nents);
+	bio = iblock_get_bio(ios, block_lba, sgl_nents);
 	if (!bio)
 		goto fail_free_ibr;
 
@@ -738,7 +745,7 @@ iblock_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 				bio_cnt = 0;
 			}
 
-			bio = iblock_get_bio(cmd, block_lba, sg_num);
+			bio = iblock_get_bio(ios, block_lba, sg_num);
 			if (!bio)
 				goto fail_put_bios;
 
@@ -752,14 +759,14 @@ iblock_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 		sg_num--;
 	}
 
-	if (cmd->t_iostate.prot_type && dev->dev_attrib.pi_prot_type) {
-		int rc = iblock_alloc_bip(cmd, bio_start);
+	if (ios->prot_type && dev->dev_attrib.pi_prot_type) {
+		int rc = iblock_alloc_bip(ios, ios->iomem, bio_start);
 		if (rc)
 			goto fail_put_bios;
 	}
 
 	iblock_submit_bios(&list, rw);
-	iblock_complete_cmd(cmd);
+	iblock_complete_cmd(ios);
 	return 0;
 
 fail_put_bios:

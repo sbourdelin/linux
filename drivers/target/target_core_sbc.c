@@ -457,9 +457,10 @@ sbc_execute_rw(struct target_iostate *ios)
 {
 	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct sbc_ops *ops = cmd->protocol_data;
+	bool fua_write = (cmd->se_cmd_flags & SCF_FUA);
 
-	return ops->execute_rw(cmd, cmd->t_iomem.t_data_sg, cmd->t_iomem.t_data_nents,
-			       cmd->t_iostate.data_direction);
+	return ops->execute_rw(ios, cmd->t_iomem.t_data_sg, cmd->t_iomem.t_data_nents,
+			       cmd->t_iostate.data_direction, fua_write, &target_complete_ios);
 }
 
 static sense_reason_t sbc_execute_sync_cache(struct target_iostate *ios)
@@ -654,6 +655,7 @@ sbc_compare_and_write(struct target_iostate *ios)
 	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
 	struct sbc_ops *ops = cmd->protocol_data;
 	struct se_device *dev = cmd->se_dev;
+	bool fua_write = (cmd->se_cmd_flags & SCF_FUA);
 	sense_reason_t ret;
 	int rc;
 	/*
@@ -673,8 +675,9 @@ sbc_compare_and_write(struct target_iostate *ios)
 	cmd->t_iostate.data_length = cmd->t_iostate.t_task_nolb *
 				     dev->dev_attrib.block_size;
 
-	ret = ops->execute_rw(cmd, cmd->t_iomem.t_bidi_data_sg,
-			      cmd->t_iomem.t_bidi_data_nents, DMA_FROM_DEVICE);
+	ret = ops->execute_rw(ios, cmd->t_iomem.t_bidi_data_sg,
+			      cmd->t_iomem.t_bidi_data_nents, DMA_FROM_DEVICE,
+			      fua_write, &target_complete_ios);
 	if (ret) {
 		cmd->transport_complete_callback = NULL;
 		up(&dev->caw_sem);

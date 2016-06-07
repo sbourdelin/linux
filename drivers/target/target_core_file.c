@@ -246,7 +246,7 @@ static void fd_free_device(struct se_device *dev)
 	call_rcu(&dev->rcu_head, fd_dev_call_rcu);
 }
 
-static int fd_do_rw(struct se_cmd *cmd, struct file *fd,
+static int fd_do_rw(struct target_iostate *ios, struct file *fd,
 		    u32 block_size, struct scatterlist *sgl,
 		    u32 sgl_nents, u32 data_length, int is_write)
 {
@@ -254,7 +254,7 @@ static int fd_do_rw(struct se_cmd *cmd, struct file *fd,
 	struct iov_iter iter;
 	struct bio_vec *bvec;
 	ssize_t len = 0;
-	loff_t pos = (cmd->t_iostate.t_task_lba * block_size);
+	loff_t pos = (ios->t_task_lba * block_size);
 	int ret = 0, i;
 
 	bvec = kcalloc(sgl_nents, sizeof(struct bio_vec), GFP_KERNEL);
@@ -508,23 +508,27 @@ fd_execute_unmap(struct se_cmd *cmd, sector_t lba, sector_t nolb)
 }
 
 static sense_reason_t
-fd_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
-	      enum dma_data_direction data_direction)
+fd_execute_rw(struct target_iostate *ios, struct scatterlist *sgl, u32 sgl_nents,
+	      enum dma_data_direction data_direction, bool fua_write,
+	      void (*t_comp_func)(struct target_iostate *, u16))
 {
-	struct se_device *dev = cmd->se_dev;
+	struct se_cmd *cmd = container_of(ios, struct se_cmd, t_iostate);
+	struct target_iomem *iomem = ios->iomem;
+	struct se_device *dev = ios->se_dev;
 	struct fd_dev *fd_dev = FD_DEV(dev);
 	struct file *file = fd_dev->fd_file;
 	struct file *pfile = fd_dev->fd_prot_file;
 	sense_reason_t rc;
 	int ret = 0;
+
 	/*
 	 * We are currently limited by the number of iovecs (2048) per
 	 * single vfs_[writev,readv] call.
 	 */
-	if (cmd->t_iostate.data_length > FD_MAX_BYTES) {
+	if (ios->data_length > FD_MAX_BYTES) {
 		pr_err("FILEIO: Not able to process I/O of %u bytes due to"
 		       "FD_MAX_BYTES: %u iovec count limitiation\n",
-			cmd->t_iostate.data_length, FD_MAX_BYTES);
+			ios->data_length, FD_MAX_BYTES);
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 	}
 	/*
@@ -532,63 +536,63 @@ fd_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 	 * physical memory addresses to struct iovec virtual memory.
 	 */
 	if (data_direction == DMA_FROM_DEVICE) {
-		if (cmd->t_iostate.prot_type && dev->dev_attrib.pi_prot_type) {
-			ret = fd_do_rw(cmd, pfile, dev->prot_length,
-				       cmd->t_iomem.t_prot_sg,
-				       cmd->t_iomem.t_prot_nents,
-				       cmd->t_iostate.prot_length, 0);
+		if (ios->prot_type && dev->dev_attrib.pi_prot_type) {
+			ret = fd_do_rw(ios, pfile, dev->prot_length,
+				       iomem->t_prot_sg,
+				       iomem->t_prot_nents,
+				       ios->prot_length, 0);
 			if (ret < 0)
 				return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 		}
 
-		ret = fd_do_rw(cmd, file, dev->dev_attrib.block_size,
-			       sgl, sgl_nents, cmd->t_iostate.data_length, 0);
+		ret = fd_do_rw(ios, file, dev->dev_attrib.block_size,
+			       sgl, sgl_nents, ios->data_length, 0);
 
-		if (ret > 0 && cmd->t_iostate.prot_type && dev->dev_attrib.pi_prot_type) {
-			u32 sectors = cmd->t_iostate.data_length >>
+		if (ret > 0 && ios->prot_type && dev->dev_attrib.pi_prot_type) {
+			u32 sectors = ios->data_length >>
 					ilog2(dev->dev_attrib.block_size);
 
-			rc = sbc_dif_verify(cmd, cmd->t_iostate.t_task_lba, sectors,
-					    0, cmd->t_iomem.t_prot_sg, 0);
+			rc = sbc_dif_verify(cmd, ios->t_task_lba, sectors,
+					    0, iomem->t_prot_sg, 0);
 			if (rc)
 				return rc;
 		}
 	} else {
-		if (cmd->t_iostate.prot_type && dev->dev_attrib.pi_prot_type) {
-			u32 sectors = cmd->t_iostate.data_length >>
+		if (ios->prot_type && dev->dev_attrib.pi_prot_type) {
+			u32 sectors = ios->data_length >>
 					ilog2(dev->dev_attrib.block_size);
 
-			rc = sbc_dif_verify(cmd, cmd->t_iostate.t_task_lba, sectors,
-					    0, cmd->t_iomem.t_prot_sg, 0);
+			rc = sbc_dif_verify(cmd, ios->t_task_lba, sectors,
+					    0, iomem->t_prot_sg, 0);
 			if (rc)
 				return rc;
 		}
 
-		ret = fd_do_rw(cmd, file, dev->dev_attrib.block_size,
-			       sgl, sgl_nents, cmd->t_iostate.data_length, 1);
+		ret = fd_do_rw(ios, file, dev->dev_attrib.block_size,
+			       sgl, sgl_nents, ios->data_length, 1);
 		/*
 		 * Perform implicit vfs_fsync_range() for fd_do_writev() ops
 		 * for SCSI WRITEs with Forced Unit Access (FUA) set.
 		 * Allow this to happen independent of WCE=0 setting.
 		 */
-		if (ret > 0 && (cmd->se_cmd_flags & SCF_FUA)) {
-			loff_t start = cmd->t_iostate.t_task_lba *
+		if (ret > 0 && fua_write) {
+			loff_t start = ios->t_task_lba *
 				dev->dev_attrib.block_size;
 			loff_t end;
 
-			if (cmd->t_iostate.data_length)
-				end = start + cmd->t_iostate.data_length - 1;
+			if (ios->data_length)
+				end = start + ios->data_length - 1;
 			else
 				end = LLONG_MAX;
 
 			vfs_fsync_range(fd_dev->fd_file, start, end, 1);
 		}
 
-		if (ret > 0 && cmd->t_iostate.prot_type && dev->dev_attrib.pi_prot_type) {
-			ret = fd_do_rw(cmd, pfile, dev->prot_length,
-				       cmd->t_iomem.t_prot_sg,
-				       cmd->t_iomem.t_prot_nents,
-				       cmd->t_iostate.prot_length, 1);
+		if (ret > 0 && ios->prot_type && dev->dev_attrib.pi_prot_type) {
+			ret = fd_do_rw(ios, pfile, dev->prot_length,
+				       iomem->t_prot_sg,
+				       iomem->t_prot_nents,
+				       ios->prot_length, 1);
 			if (ret < 0)
 				return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 		}
@@ -598,7 +602,7 @@ fd_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 
 	if (ret)
-		target_complete_cmd(cmd, SAM_STAT_GOOD);
+		ios->t_comp_func(ios, SAM_STAT_GOOD);
 	return 0;
 }
 

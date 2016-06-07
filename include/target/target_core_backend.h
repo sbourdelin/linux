@@ -45,8 +45,9 @@ struct target_backend_ops {
 };
 
 struct sbc_ops {
-	sense_reason_t (*execute_rw)(struct se_cmd *cmd, struct scatterlist *,
-				     u32, enum dma_data_direction);
+	sense_reason_t (*execute_rw)(struct target_iostate *ios, struct scatterlist *,
+				     u32, enum dma_data_direction, bool fua_write,
+				     void (*t_comp_func)(struct target_iostate *ios, u16));
 	sense_reason_t (*execute_sync_cache)(struct se_cmd *cmd);
 	sense_reason_t (*execute_write_same)(struct se_cmd *cmd);
 	sense_reason_t (*execute_unmap)(struct se_cmd *cmd,
