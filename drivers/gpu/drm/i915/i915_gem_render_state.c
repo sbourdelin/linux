@@ -59,8 +59,11 @@ static int render_state_init(struct render_state *so,
 		return -EINVAL;
 
 	so->obj = i915_gem_object_create(dev_priv->dev, 4096);
-	if (IS_ERR(so->obj))
-		return PTR_ERR(so->obj);
+	if (IS_ERR(so->obj)) {
+		ret = PTR_ERR(so->obj);
+		so->obj = NULL;
+		return ret;
+	}
 
 	ret = i915_gem_obj_ggtt_pin(so->obj, 4096, 0);
 	if (ret)
