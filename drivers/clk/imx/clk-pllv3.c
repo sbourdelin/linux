@@ -29,8 +29,8 @@
  * struct clk_pllv3 - IMX PLL clock version 3
  * @clk_hw:	 clock source
  * @base:	 base address of PLL registers
- * @powerup_set: set POWER bit to power up the PLL
- * @powerdown:   pll powerdown offset bit
+ * @powerdown:	 pll powerdown bit offset
+ * @power_invert: set powerdown bit to power up the PLL
  * @div_mask:	 mask of divider bits
  * @div_shift:	 shift of divider bits
  *
@@ -40,7 +40,7 @@
 struct clk_pllv3 {
 	struct clk_hw	hw;
 	void __iomem	*base;
-	bool		powerup_set;
+	bool		power_invert;
 	u32		powerdown;
 	u32		div_mask;
 	u32		div_shift;
@@ -55,7 +55,7 @@ static int clk_pllv3_wait_lock(struct clk_pllv3 *pll)
 	u32 val = readl_relaxed(pll->base) & pll->powerdown;
 
 	/* No need to wait for lock when pll is not powered up */
-	if ((pll->powerup_set && !val) || (!pll->powerup_set && val))
+	if ((pll->power_invert && !val) || (!pll->power_invert && val))
 		return 0;
 
 	/* Wait for PLL to lock */
@@ -76,7 +76,7 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
 	u32 val;
 
 	val = readl_relaxed(pll->base);
-	if (pll->powerup_set)
+	if (pll->power_invert)
 		val |= pll->powerdown;
 	else
 		val &= ~pll->powerdown;
@@ -91,7 +91,7 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
 	u32 val;
 
 	val = readl_relaxed(pll->base);
-	if (pll->powerup_set)
+	if (pll->power_invert)
 		val &= ~pll->powerdown;
 	else
 		val |= pll->powerdown;
@@ -326,7 +326,7 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
 		pll->div_shift = 1;
 	case IMX_PLLV3_USB:
 		ops = &clk_pllv3_ops;
-		pll->powerup_set = true;
+		pll->power_invert = true;
 		break;
 	case IMX_PLLV3_AV:
 		ops = &clk_pllv3_av_ops;
