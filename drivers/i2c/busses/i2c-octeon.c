@@ -975,12 +975,8 @@ restart:
 
 		data[i] = octeon_i2c_data_read(i2c);
 		if (recv_len && i == 0) {
-			if (data[i] > I2C_SMBUS_BLOCK_MAX + 1) {
-				dev_err(i2c->dev,
-					"%s: read len > I2C_SMBUS_BLOCK_MAX %d\n",
-					__func__, data[i]);
+			if (data[i] > I2C_SMBUS_BLOCK_MAX + 1)
 				return -EPROTO;
-			}
 			length += data[i];
 		}
 
