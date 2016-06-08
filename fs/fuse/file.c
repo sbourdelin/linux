@@ -1509,7 +1509,8 @@ __acquires(fc->lock)
 	struct fuse_req *req;
 
 	while (fi->writectr >= 0 && !list_empty(&fi->queued_writes)) {
-		req = list_entry(fi->queued_writes.next, struct fuse_req, list);
+		req = list_first_entry(&fi->queued_writes, struct fuse_req,
+				       list);
 		list_del_init(&req->list);
 		fuse_send_writepage(fc, req, crop);
 	}

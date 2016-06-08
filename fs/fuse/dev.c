@@ -359,7 +359,7 @@ static void flush_bg_queue(struct fuse_conn *fc)
 		struct fuse_req *req;
 		struct fuse_iqueue *fiq = &fc->iq;
 
-		req = list_entry(fc->bg_queue.next, struct fuse_req, list);
+		req = list_first_entry(&fc->bg_queue, struct fuse_req, list);
 		list_del(&req->list);
 		fc->active_background++;
 		spin_lock(&fiq->waitq.lock);
@@ -1272,7 +1272,7 @@ static ssize_t fuse_dev_do_read(struct fuse_dev *fud, struct file *file,
 			fiq->forget_batch = 16;
 	}
 
-	req = list_entry(fiq->pending.next, struct fuse_req, list);
+	req = list_first_entry(&fiq->pending, struct fuse_req, list);
 	clear_bit(FR_PENDING, &req->flags);
 	list_del_init(&req->list);
 	spin_unlock(&fiq->waitq.lock);
@@ -2080,7 +2080,7 @@ static void end_requests(struct fuse_conn *fc, struct list_head *head)
 {
 	while (!list_empty(head)) {
 		struct fuse_req *req;
-		req = list_entry(head->next, struct fuse_req, list);
+		req = list_first_entry(head, struct fuse_req, list);
 		req->out.h.error = -ECONNABORTED;
 		clear_bit(FR_PENDING, &req->flags);
 		clear_bit(FR_SENT, &req->flags);
