@@ -290,7 +290,9 @@ begin:
 		if (score > badness) {
 			reuseport = sk->sk_reuseport;
 			if (reuseport) {
-				hash = udp6_ehashfn(net, daddr, hnum,
+				hash = udp6_ehashfn(net,
+						    &sk->sk_v6_rcv_saddr,
+						    hnum,
 						    saddr, sport);
 				result = reuseport_select_sock(sk, hash, skb,
 							sizeof(struct udphdr));

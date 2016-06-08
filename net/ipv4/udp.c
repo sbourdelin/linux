@@ -577,7 +577,9 @@ begin:
 		if (score > badness) {
 			reuseport = sk->sk_reuseport;
 			if (reuseport) {
-				hash = udp_ehashfn(net, daddr, hnum,
+				hash = udp_ehashfn(net,
+						   inet_sk(sk)->inet_rcv_saddr,
+						   hnum,
 						   saddr, sport);
 				result = reuseport_select_sock(sk, hash, skb,
 							sizeof(struct udphdr));
