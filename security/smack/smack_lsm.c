@@ -3570,22 +3570,28 @@ unlockandout:
  *
  * Returns the length of the smack label or an error code
  */
-static int smack_getprocattr(struct task_struct *p, char *name, char **value)
+static int smack_getprocattr(struct task_struct *p, const char *lsm, char *name,
+				char **value)
 {
 	struct smack_known *skp = smk_of_task_struct(p);
 	char *cp;
 	int slen;
 
-	if (strcmp(name, "current") != 0)
+	if (strcmp(name, "current") == 0) {
+		cp = kstrdup(skp->smk_known, GFP_KERNEL);
+		if (cp == NULL)
+			return -ENOMEM;
+	} else if (strcmp(name, "context") == 0) {
+		slen = strlen(skp->smk_known) + 9;
+		cp = kzalloc(slen, GFP_KERNEL);
+		if (cp == NULL)
+			return -ENOMEM;
+		sprintf(cp, "smack='%s'", skp->smk_known);
+	} else
 		return -EINVAL;
 
-	cp = kstrdup(skp->smk_known, GFP_KERNEL);
-	if (cp == NULL)
-		return -ENOMEM;
-
-	slen = strlen(cp);
 	*value = cp;
-	return slen;
+	return strlen(cp);
 }
 
 /**
@@ -3600,7 +3606,7 @@ static int smack_getprocattr(struct task_struct *p, char *name, char **value)
  *
  * Returns the length of the smack label or an error code
  */
-static int smack_setprocattr(struct task_struct *p, char *name,
+static int smack_setprocattr(struct task_struct *p, const char *lsm, char *name,
 			     void *value, size_t size)
 {
 	struct task_smack *tsp = current_security();
@@ -3622,7 +3628,7 @@ static int smack_setprocattr(struct task_struct *p, char *name,
 	if (value == NULL || size == 0 || size >= SMK_LONGLABEL)
 		return -EINVAL;
 
-	if (strcmp(name, "current") != 0)
+	if (strcmp(name, "current") != 0 && strcmp(name, "context") != 0)
 		return -EINVAL;
 
 	skp = smk_import_entry(value, size);
@@ -4801,7 +4807,7 @@ static __init int smack_init(void)
 	/*
 	 * Register with LSM
 	 */
-	security_add_hooks(smack_hooks, ARRAY_SIZE(smack_hooks));
+	security_add_hooks(smack_hooks, ARRAY_SIZE(smack_hooks), "smack");
 
 	return 0;
 }
