@@ -18,6 +18,15 @@
 / {
 	model = "Hardkernel Odroid XU3";
 	compatible = "hardkernel,odroid-xu3", "samsung,exynos5800", "samsung,exynos5";
+
+	extcon_usb: extcon_usb {
+		compatible = "linux,extcon-usb-gpio";
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&usb_otg_id &usb_vbus>;
+		id-gpio = <&gpx1 1 GPIO_ACTIVE_HIGH>;
+		vbus-gpio = <&gpx3 4 GPIO_ACTIVE_HIGH>;
+	};
 };
 
 &i2c_0 {
@@ -49,6 +58,18 @@
 		compatible = "ti,ina231";
 		reg = <0x45>;
 		shunt-resistor = <10000>;
+	};
+};
+
+&pinctrl_0 {
+	usb_otg_id: usb-otg-id {
+		samsung,pins = "gpx1-1";
+		samsung,pin-pud = <0>;
+	};
+
+	usb_vbus: usb-vbus {
+		samsung,pins = "gpx3-4";
+		samsung,pin-pud = <0>;
 	};
 };
 
