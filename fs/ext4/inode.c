@@ -2748,13 +2748,27 @@ retry:
 				done = true;
 			}
 		}
-		ext4_journal_stop(handle);
 		/* Submit prepared bio */
 		ext4_io_submit(&mpd.io_submit);
 		/* Unlock pages we didn't use */
 		mpage_release_unused_pages(&mpd, give_up_on_write);
-		/* Drop our io_end reference we got from init */
-		ext4_put_io_end(mpd.io_submit.io_end);
+		/*
+		 * Drop our io_end reference we got from init. We have to be
+		 * careful and use deferred io_end finishing as we can release
+		 * the last reference to io_end which may end up doing unwritten
+		 * extent conversion which we cannot do while holding
+		 * transaction handle.
+		 */
+		ext4_put_io_end_defer(mpd.io_submit.io_end);
+		/*
+		 * Caution: ext4_journal_stop() can wait for transaction commit
+		 * to finish which may depend on writeback of pages to complete
+		 * or on page lock to be released. So we can call it only
+		 * after we have submitted all the IO, released page locks
+		 * we hold, and dropped io_end reference (for extent conversion
+		 * to be able to complete).
+		 */
+		ext4_journal_stop(handle);
 
 		if (ret == -ENOSPC && sbi->s_journal) {
 			/*
