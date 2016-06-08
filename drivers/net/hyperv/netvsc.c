@@ -249,7 +249,6 @@ static int netvsc_destroy_buf(struct hv_device *device)
 static int netvsc_init_buf(struct hv_device *device)
 {
 	int ret = 0;
-	unsigned long t;
 	struct netvsc_device *net_device;
 	struct nvsp_message *init_packet;
 	struct net_device *ndev;
@@ -310,9 +309,7 @@ static int netvsc_init_buf(struct hv_device *device)
 		goto cleanup;
 	}
 
-	t = wait_for_completion_timeout(&net_device->channel_init_wait, 5*HZ);
-	BUG_ON(t == 0);
-
+	wait_for_completion(&net_device->channel_init_wait);
 
 	/* Check the response */
 	if (init_packet->msg.v1_msg.
@@ -395,8 +392,7 @@ static int netvsc_init_buf(struct hv_device *device)
 		goto cleanup;
 	}
 
-	t = wait_for_completion_timeout(&net_device->channel_init_wait, 5*HZ);
-	BUG_ON(t == 0);
+	wait_for_completion(&net_device->channel_init_wait);
 
 	/* Check the response */
 	if (init_packet->msg.v1_msg.
@@ -450,7 +446,6 @@ static int negotiate_nvsp_ver(struct hv_device *device,
 {
 	struct net_device *ndev = hv_get_drvdata(device);
 	int ret;
-	unsigned long t;
 
 	memset(init_packet, 0, sizeof(struct nvsp_message));
 	init_packet->hdr.msg_type = NVSP_MSG_TYPE_INIT;
@@ -467,10 +462,7 @@ static int negotiate_nvsp_ver(struct hv_device *device,
 	if (ret != 0)
 		return ret;
 
-	t = wait_for_completion_timeout(&net_device->channel_init_wait, 5*HZ);
-
-	if (t == 0)
-		return -ETIMEDOUT;
+	wait_for_completion(&net_device->channel_init_wait);
 
 	if (init_packet->msg.init_msg.init_complete.status !=
 	    NVSP_STAT_SUCCESS)
