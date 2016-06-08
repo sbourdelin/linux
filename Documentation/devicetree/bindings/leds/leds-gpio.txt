@@ -35,7 +35,7 @@ leds {
 	hdd {
 		label = "IDE Activity";
 		gpios = <&mcu_pio 0 GPIO_ACTIVE_LOW>;
-		linux,default-trigger = "ide-disk";
+		linux,default-trigger = "disk-activity";
 	};
 
 	fault {
