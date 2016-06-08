@@ -1605,6 +1605,24 @@ static int ath6kl_wmi_txe_notify_event_rx(struct wmi *wmi, u8 *datap, int len,
 	return 0;
 }
 
+int ath6kl_wmi_set_antenna(struct wmi *wmi, u8 idx,
+			      u32 tx_ant, u32 rx_ant)
+{
+	struct sk_buff *skb;
+	struct wmi_txe_notify_cmd *cmd;
+
+	skb = ath6kl_wmi_get_new_buf(sizeof(*cmd));
+	if (!skb)
+		return -ENOMEM;
+
+	cmd = (struct wmi_set_antenna_cmd *) skb->data;
+	cmd->tx_ant = cpu_to_le32(tx_ant);
+	cmd->rx_ant = cpu_to_le32(rx_ant);
+
+	return ath6kl_wmi_cmd_send(wmi, idx, skb, WMI_SET_ANTENNA_CMDID,
+			NO_SYNC_WMIFLAG);
+}
+
 int ath6kl_wmi_set_txe_notify(struct wmi *wmi, u8 idx,
 			      u32 rate, u32 pkts, u32 intvl)
 {

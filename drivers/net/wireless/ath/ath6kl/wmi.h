@@ -642,6 +642,7 @@ enum wmi_cmd_id {
 	WMI_SET_RECOVERY_TEST_PARAMETER_CMDID, /*0xf094*/
 
 	WMI_ENABLE_SCHED_SCAN_CMDID,
+	WMI_SET_ANTENNA_CMDID,
 };
 
 enum wmi_mgmt_frame_type {
@@ -2310,6 +2311,11 @@ struct wmi_set_inact_period_cmd {
 /* AP mode events */
 struct wmi_ap_set_apsd_cmd {
 	u8 enable;
+} __packed;
+
+struct wmi_set_antenna_cmd {
+	__le32 tx_ant;
+	__le32 rx_ant;
 } __packed;
 
 enum wmi_ap_apsd_buffered_traffic_flags {
