@@ -220,7 +220,6 @@ static void guc_init_doorbell(struct intel_guc *guc,
 	struct guc_doorbell_info *doorbell;
 
 	doorbell = client->client_base + client->doorbell_offset;
-
 	guc_update_doorbell_id(client, doorbell, db_id);
 }
 
@@ -702,6 +701,46 @@ static void guc_client_free(struct drm_device *dev,
 	kfree(client);
 }
 
+/*
+ * Borrow the first client to set up & tear down every doorbell
+ * in turn, to ensure that all doorbell h/w is (re)initialised.
+ */
+static void guc_init_doorbell_hw(struct intel_guc *guc)
+{
+	struct drm_i915_private *dev_priv = guc_to_i915(guc);
+	struct i915_guc_client *client = guc->execbuf_client;
+	struct guc_doorbell_info *doorbell;
+	uint16_t db_id, i;
+	int ret;
+
+	doorbell = client->client_base + client->doorbell_offset;
+	db_id = client->doorbell_id;
+
+	for (i = 0; i < GUC_MAX_DOORBELLS; ++i) {
+		i915_reg_t drbreg = GEN8_DRBREGL(i);
+		u32 value = I915_READ(drbreg);
+
+		ret = guc_update_doorbell_id(client, doorbell, i);
+
+		if (((value & GUC_DOORBELL_ENABLED) && (i != db_id)) || ret)
+			DRM_DEBUG_DRIVER("Doorbell reg 0x%x was 0x%x, ret %d\n",
+				drbreg.reg, value, ret);
+	}
+
+	/* Restore to original value */
+	guc_update_doorbell_id(client, doorbell, db_id);
+
+	for (i = 0; i < GUC_MAX_DOORBELLS; ++i) {
+		i915_reg_t drbreg = GEN8_DRBREGL(i);
+		u32 value = I915_READ(drbreg);
+
+		if ((value & GUC_DOORBELL_ENABLED) && (i != db_id))
+			DRM_DEBUG_DRIVER("Doorbell reg 0x%x finally 0x%x\n",
+						drbreg.reg, value);
+
+	}
+}
+
 /**
  * guc_client_alloc() - Allocate an i915_guc_client
  * @dev:	drm device
@@ -971,8 +1010,8 @@ int i915_guc_submission_enable(struct drm_device *dev)
 	}
 
 	guc->execbuf_client = client;
-
 	host2guc_sample_forcewake(guc, client);
+	guc_init_doorbell_hw(guc);
 
 	return 0;
 }
