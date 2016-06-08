@@ -603,7 +603,14 @@ int ext4_claim_free_clusters(struct ext4_sb_info *sbi,
  */
 int ext4_should_retry_alloc(struct super_block *sb, int *retries)
 {
-	if (!ext4_has_free_clusters(EXT4_SB(sb), 1, 0) ||
+	unsigned int pending_blocks;
+
+	spin_lock(&EXT4_SB(sb)->s_md_lock);
+	pending_blocks = EXT4_SB(sb)->s_mb_free_pending;
+	spin_unlock(&EXT4_SB(sb)->s_md_lock);
+
+	if (pending_blocks == 0 ||
+	    !ext4_has_free_clusters(EXT4_SB(sb), 1, 0) ||
 	    (*retries)++ > 3 ||
 	    !EXT4_SB(sb)->s_journal)
 		return 0;
