@@ -330,6 +330,8 @@ asmlinkage long compat_sys_keyctl(u32 option,
 			      u32 arg2, u32 arg3, u32 arg4, u32 arg5);
 asmlinkage long compat_sys_ustat(unsigned dev, struct compat_ustat __user *u32);
 
+asmlinkage ssize_t compat_sys_read(unsigned int fd,
+		char __user * buf, compat_size_t count);
 asmlinkage ssize_t compat_sys_readv(compat_ulong_t fd,
 		const struct compat_iovec __user *vec, compat_ulong_t vlen);
 asmlinkage ssize_t compat_sys_writev(compat_ulong_t fd,

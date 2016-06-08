@@ -630,6 +630,14 @@ SYSCALL_DEFINE3(write, unsigned int, fd, const char __user *, buf,
 	return ret;
 }
 
+#ifdef CONFIG_COMPAT
+COMPAT_SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf,
+		compat_size_t, count)
+{
+        return sys_read(fd, buf, (compat_ssize_t)count);
+}
+#endif
+
 SYSCALL_DEFINE4(pread64, unsigned int, fd, char __user *, buf,
 			size_t, count, loff_t, pos)
 {

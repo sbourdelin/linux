@@ -198,7 +198,7 @@ __SC_COMP(__NR_getdents64, sys_getdents64, compat_sys_getdents64)
 #define __NR3264_lseek 62
 __SC_3264(__NR3264_lseek, sys_llseek, sys_lseek)
 #define __NR_read 63
-__SYSCALL(__NR_read, sys_read)
+__SC_COMP(__NR_read, sys_read, compat_sys_read)
 #define __NR_write 64
 __SYSCALL(__NR_write, sys_write)
 #define __NR_readv 65

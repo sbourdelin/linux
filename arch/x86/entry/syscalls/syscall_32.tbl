@@ -9,7 +9,7 @@
 0	i386	restart_syscall		sys_restart_syscall
 1	i386	exit			sys_exit
 2	i386	fork			sys_fork			sys_fork
-3	i386	read			sys_read
+3	i386	read			sys_read			compat_sys_read
 4	i386	write			sys_write
 5	i386	open			sys_open			compat_sys_open
 6	i386	close			sys_close
