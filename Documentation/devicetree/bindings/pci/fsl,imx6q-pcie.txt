@@ -10,8 +10,8 @@ Required properties:
   entry for each entry in the interrupt-names property.
 - interrupt-names: Must include the following entries:
 	- "msi": The interrupt that is asserted when an MSI is received
-- clock-names: Must include the following additional entries:
-	- "pcie_phy"
+- clock-names: Must include the following entries:
+	- "pcie", "pcie_bus" and "pcie_phy".
 
 Optional properties:
 - fsl,tx-deemph-gen1: Gen1 De-emphasis value. Default: 0
