@@ -881,6 +881,7 @@ struct i915_gem_context {
 	u32 ring_size;
 	u32 addressing_mode;
 	struct atomic_notifier_head status_notifier;
+	bool execlists_force_single_submission;
 
 	struct list_head link;
 
