@@ -24,6 +24,7 @@
 #include <net/tcp_states.h> /* for TCP_TIME_WAIT */
 #include <net/netfilter/nf_tables.h>
 #include <net/netfilter/nf_tables_core.h>
+#include <net/netfilter/nf_log.h>
 #include <net/netfilter/nft_meta.h>
 
 #include <uapi/linux/netfilter_bridge.h> /* NF_BR_PRE_ROUTING */
@@ -348,8 +349,13 @@ int nft_meta_set_init(const struct nft_ctx *ctx,
 	if (err < 0)
 		return err;
 
-	if (priv->key == NFT_META_NFTRACE)
+	if (priv->key == NFT_META_NFTRACE) {
+		err = nf_logger_find_get(ctx->afi->family, NF_LOG_TYPE_LOG);
+		if (err < 0)
+			return err;
+
 		static_branch_inc(&nft_trace_enabled);
+	}
 
 	return 0;
 }
@@ -393,8 +399,10 @@ void nft_meta_set_destroy(const struct nft_ctx *ctx,
 {
 	const struct nft_meta *priv = nft_expr_priv(expr);
 
-	if (priv->key == NFT_META_NFTRACE)
+	if (priv->key == NFT_META_NFTRACE) {
 		static_branch_dec(&nft_trace_enabled);
+		nf_logger_put(ctx->afi->family, NF_LOG_TYPE_LOG);
+	}
 }
 EXPORT_SYMBOL_GPL(nft_meta_set_destroy);
 
