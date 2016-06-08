@@ -1885,6 +1885,8 @@ static int fm10k_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	pci_enable_pcie_error_reporting(pdev);
 
+	pci_set_power_state(pdev, PCI_D0);
+
 	pci_set_master(pdev);
 	pci_save_state(pdev);
 
