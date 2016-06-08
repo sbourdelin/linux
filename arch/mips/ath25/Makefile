@@ -5,7 +5,7 @@
 #
 # Copyright (C) 2006 FON Technology, SL.
 # Copyright (C) 2006 Imre Kaloz <kaloz@openwrt.org>
-# Copyright (C) 2006-2009 Felix Fietkau <nbd@openwrt.org>
+# Copyright (C) 2006-2009 Felix Fietkau <nbd@nbd.name>
 #
 
 obj-y += board.o prom.o devices.o

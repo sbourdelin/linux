@@ -2,7 +2,7 @@
  *  Driver for the IDT RC32434 (Korina) on-chip ethernet controller.
  *
  *  Copyright 2004 IDT Inc. (rischelp@idt.com)
- *  Copyright 2006 Felix Fietkau <nbd@openwrt.org>
+ *  Copyright 2006 Felix Fietkau <nbd@nbd.name>
  *  Copyright 2008 Florian Fainelli <florian@openwrt.org>
  *
  *  This program is free software; you can redistribute  it and/or modify it
@@ -1224,7 +1224,7 @@ static struct platform_driver korina_driver = {
 module_platform_driver(korina_driver);
 
 MODULE_AUTHOR("Philip Rischel <rischelp@idt.com>");
-MODULE_AUTHOR("Felix Fietkau <nbd@openwrt.org>");
+MODULE_AUTHOR("Felix Fietkau <nbd@nbd.name>");
 MODULE_AUTHOR("Florian Fainelli <florian@openwrt.org>");
 MODULE_DESCRIPTION("IDT RC32434 (Korina) Ethernet driver");
 MODULE_LICENSE("GPL");

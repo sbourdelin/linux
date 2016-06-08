@@ -10,7 +10,7 @@
  *  GNU General Public License for more details.
  *
  *  Copyright (C) 2004 IDT Inc.
- *  Copyright (C) 2006 Felix Fietkau <nbd@openwrt.org>
+ *  Copyright (C) 2006 Felix Fietkau <nbd@nbd.name>
  */
 #ifndef __ASM_RC32434_RB_H
 #define __ASM_RC32434_RB_H

@@ -4,7 +4,7 @@
  *  Copyright (C) 2003, Peter Sadik <peter.sadik@idt.com>
  *  Copyright (C) 2005-2006, P.Christeas <p_christ@hol.gr>
  *  Copyright (C) 2007, Gabor Juhos <juhosg@openwrt.org>
- *			Felix Fietkau <nbd@openwrt.org>
+ *			Felix Fietkau <nbd@nbd.name>
  *			Florian Fainelli <florian@openwrt.org>
  *
  *  This program is free software; you can redistribute it and/or

@@ -3,7 +3,7 @@
  * Copyright (C) 2002 David S. Miller (davem@redhat.com)
  * Copyright (C) 2004 Pekka Pietikainen (pp@ee.oulu.fi)
  * Copyright (C) 2004 Florian Schirmer (jolt@tuxbox.org)
- * Copyright (C) 2006 Felix Fietkau (nbd@openwrt.org)
+ * Copyright (C) 2006 Felix Fietkau (nbd@nbd.name)
  * Copyright (C) 2006 Broadcom Corporation.
  * Copyright (C) 2007 Michael Buesch <m@bues.ch>
  * Copyright (C) 2013 Hauke Mehrtens <hauke@hauke-m.de>

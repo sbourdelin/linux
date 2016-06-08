@@ -3,7 +3,7 @@
  *     pci_ops for IDT EB434 board
  *
  *  Copyright 2004 IDT Inc. (rischelp@idt.com)
- *  Copyright 2006 Felix Fietkau <nbd@openwrt.org>
+ *  Copyright 2006 Felix Fietkau <nbd@nbd.name>
  *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the

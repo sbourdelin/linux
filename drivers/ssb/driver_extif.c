@@ -4,7 +4,7 @@
  *
  * Copyright 2005, Broadcom Corporation
  * Copyright 2006, 2007, Michael Buesch <m@bues.ch>
- * Copyright 2006, 2007, Felix Fietkau <nbd@openwrt.org>
+ * Copyright 2006, 2007, Felix Fietkau <nbd@nbd.name>
  * Copyright 2007, Aurelien Jarno <aurelien@aurel32.net>
  *
  * Licensed under the GNU/GPL. See COPYING for details.

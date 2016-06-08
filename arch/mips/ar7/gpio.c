@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007 Felix Fietkau <nbd@openwrt.org>
+ * Copyright (C) 2007 Felix Fietkau <nbd@nbd.name>
  * Copyright (C) 2007 Eugene Konev <ejka@openwrt.org>
  * Copyright (C) 2009-2010 Florian Fainelli <florian@openwrt.org>
  *

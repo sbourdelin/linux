@@ -2,7 +2,7 @@
 	Copyright (C) 2010 Willow Garage <http://www.willowgarage.com>
 	Copyright (C) 2009 - 2010 Ivo van Doorn <IvDoorn@gmail.com>
 	Copyright (C) 2009 Mattias Nissler <mattias.nissler@gmx.de>
-	Copyright (C) 2009 Felix Fietkau <nbd@openwrt.org>
+	Copyright (C) 2009 Felix Fietkau <nbd@nbd.name>
 	Copyright (C) 2009 Xose Vazquez Perez <xose.vazquez@gmail.com>
 	Copyright (C) 2009 Axel Kollhofer <rain_maker@root-forum.org>
 	<http://rt2x00.serialmonkey.com>

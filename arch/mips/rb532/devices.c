@@ -1,7 +1,7 @@
 /*
  *  RouterBoard 500 Platform devices
  *
- *  Copyright (C) 2006 Felix Fietkau <nbd@openwrt.org>
+ *  Copyright (C) 2006 Felix Fietkau <nbd@nbd.name>
  *  Copyright (C) 2007 Florian Fainelli <florian@openwrt.org>
  *
  *  This program is free software; you can redistribute it and/or modify

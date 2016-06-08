@@ -2,7 +2,7 @@
  * net/sched/act_connmark.c  netfilter connmark retriever action
  * skb mark is over-written
  *
- * Copyright (c) 2011 Felix Fietkau <nbd@openwrt.org>
+ * Copyright (c) 2011 Felix Fietkau <nbd@nbd.name>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -233,7 +233,7 @@ static void __exit connmark_cleanup_module(void)
 
 module_init(connmark_init_module);
 module_exit(connmark_cleanup_module);
-MODULE_AUTHOR("Felix Fietkau <nbd@openwrt.org>");
+MODULE_AUTHOR("Felix Fietkau <nbd@nbd.name>");
 MODULE_DESCRIPTION("Connection tracking mark restoring");
 MODULE_LICENSE("GPL");
 

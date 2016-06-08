@@ -1,6 +1,6 @@
 /*	Copyright (C) 2009 - 2010 Ivo van Doorn <IvDoorn@gmail.com>
  *	Copyright (C) 2009 Alban Browaeys <prahal@yahoo.com>
- *	Copyright (C) 2009 Felix Fietkau <nbd@openwrt.org>
+ *	Copyright (C) 2009 Felix Fietkau <nbd@nbd.name>
  *	Copyright (C) 2009 Luis Correia <luis.f.correia@gmail.com>
  *	Copyright (C) 2009 Mattias Nissler <mattias.nissler@gmx.de>
  *	Copyright (C) 2009 Mark Asselstine <asselsm@gmail.com>

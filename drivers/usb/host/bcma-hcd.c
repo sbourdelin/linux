@@ -3,7 +3,7 @@
  * Broadcom USB-core driver (BCMA bus glue)
  *
  * Copyright 2011-2015 Hauke Mehrtens <hauke@hauke-m.de>
- * Copyright 2015 Felix Fietkau <nbd@openwrt.org>
+ * Copyright 2015 Felix Fietkau <nbd@nbd.name>
  *
  * Based on ssb-ohci driver
  * Copyright 2007 Michael Buesch <m@bues.ch>

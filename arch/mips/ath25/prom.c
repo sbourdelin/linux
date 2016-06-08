@@ -7,7 +7,7 @@
  * Copyright (C) 2003 Atheros Communications, Inc.,  All Rights Reserved.
  * Copyright (C) 2006 FON Technology, SL.
  * Copyright (C) 2006 Imre Kaloz <kaloz@openwrt.org>
- * Copyright (C) 2006 Felix Fietkau <nbd@openwrt.org>
+ * Copyright (C) 2006 Felix Fietkau <nbd@nbd.name>
  */
 
 /*

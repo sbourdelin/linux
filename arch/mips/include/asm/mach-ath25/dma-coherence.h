@@ -4,7 +4,7 @@
  * for more details.
  *
  * Copyright (C) 2006  Ralf Baechle <ralf@linux-mips.org>
- * Copyright (C) 2007  Felix Fietkau <nbd@openwrt.org>
+ * Copyright (C) 2007  Felix Fietkau <nbd@nbd.name>
  *
  */
 #ifndef __ASM_MACH_ATH25_DMA_COHERENCE_H

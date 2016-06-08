@@ -5,7 +5,7 @@
  *
  * Copyright (C) 2003 Atheros Communications, Inc.,  All Rights Reserved.
  * Copyright (C) 2006 Imre Kaloz <kaloz@openwrt.org>
- * Copyright (C) 2006 Felix Fietkau <nbd@openwrt.org>
+ * Copyright (C) 2006 Felix Fietkau <nbd@nbd.name>
  */
 
 #ifndef __ASM_MACH_ATH25_AR5312_REGS_H

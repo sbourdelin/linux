@@ -8,7 +8,7 @@
  *   GNU General Public License for more details.
  *
  *   Copyright (C) 2009-2016 John Crispin <blogic@openwrt.org>
- *   Copyright (C) 2009-2016 Felix Fietkau <nbd@openwrt.org>
+ *   Copyright (C) 2009-2016 Felix Fietkau <nbd@nbd.name>
  *   Copyright (C) 2013-2016 Michael Lee <igvtee@gmail.com>
  */
 

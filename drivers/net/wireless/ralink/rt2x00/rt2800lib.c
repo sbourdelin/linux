@@ -6,7 +6,7 @@
 
 	Based on the original rt2800pci.c and rt2800usb.c.
 	  Copyright (C) 2009 Alban Browaeys <prahal@yahoo.com>
-	  Copyright (C) 2009 Felix Fietkau <nbd@openwrt.org>
+	  Copyright (C) 2009 Felix Fietkau <nbd@nbd.name>
 	  Copyright (C) 2009 Luis Correia <luis.f.correia@gmail.com>
 	  Copyright (C) 2009 Mattias Nissler <mattias.nissler@gmx.de>
 	  Copyright (C) 2009 Mark Asselstine <asselsm@gmail.com>

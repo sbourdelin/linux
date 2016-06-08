@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Felix Fietkau <nbd@openwrt.org>
+ * Copyright (C) 2014 Felix Fietkau <nbd@nbd.name>
  * Copyright (C) 2015 Jakub Kicinski <kubakici@wp.pl>
  *
  * This program is free software; you can redistribute it and/or modify

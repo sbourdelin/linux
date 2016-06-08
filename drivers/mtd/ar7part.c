@@ -16,7 +16,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * TI AR7 flash partition table.
- * Based on ar7 map by Felix Fietkau <nbd@openwrt.org>
+ * Based on ar7 map by Felix Fietkau <nbd@nbd.name>
  *
  */
 
@@ -138,6 +138,6 @@ static struct mtd_part_parser ar7_parser = {
 module_mtd_part_parser(ar7_parser);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR(	"Felix Fietkau <nbd@openwrt.org>, "
+MODULE_AUTHOR(	"Felix Fietkau <nbd@nbd.name>, "
 		"Eugene Konev <ejka@openwrt.org>");
 MODULE_DESCRIPTION("MTD partitioning for TI AR7");

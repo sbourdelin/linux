@@ -7224,7 +7224,7 @@ F:	include/uapi/linux/ivtv*
 F:	include/uapi/linux/uvcvideo.h
 
 MEDIATEK ETHERNET DRIVER
-M:	Felix Fietkau <nbd@openwrt.org>
+M:	Felix Fietkau <nbd@nbd.name>
 M:	John Crispin <blogic@openwrt.org>
 L:	netdev@vger.kernel.org
 S:	Maintained
