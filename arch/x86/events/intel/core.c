@@ -177,6 +177,17 @@ static struct event_constraint intel_slm_event_constraints[] __read_mostly =
 	EVENT_CONSTRAINT_END
 };
 
+static struct event_constraint intel_knl_event_constraints[] __read_mostly = {
+	FIXED_EVENT_CONSTRAINT(0x00c0, 0), /* INST_RETIRED.ANY */
+	FIXED_EVENT_CONSTRAINT(0x003c, 1), /* CPU_CLK_UNHALTED.CORE */
+	FIXED_EVENT_CONSTRAINT(0x0300, 2), /* pseudo CPU_CLK_UNHALTED.REF */
+	/* MSR_OFFCORE_RSP_1 bits 8, 11, 14 can be used only on PMC1 */
+	INTEL_EEVENT_CONSTRAINT(0x02b7, 2, 0x4900),
+	/* MSR_OFFCORE_RSP_0 bit 38 can be used only on PMC0 */
+	INTEL_EEVENT_CONSTRAINT(0x01b7, 1, 1ull<<38),
+	EVENT_CONSTRAINT_END
+};
+
 struct event_constraint intel_skl_event_constraints[] = {
 	FIXED_EVENT_CONSTRAINT(0x00c0, 0),	/* INST_RETIRED.ANY */
 	FIXED_EVENT_CONSTRAINT(0x003c, 1),	/* CPU_CLK_UNHALTED.CORE */
@@ -2284,16 +2295,16 @@ x86_get_event_constraints(struct cpu_hw_events *cpuc, int idx,
 			  struct perf_event *event)
 {
 	struct event_constraint *c;
-
 	if (x86_pmu.event_constraints) {
 		for_each_event_constraint(c, x86_pmu.event_constraints) {
 			if ((event->hw.config & c->cmask) == c->code) {
+				if (c->emask && !(c->emask & event->attr.config1))
+					continue;
 				event->hw.flags |= c->flags;
 				return c;
 			}
 		}
 	}
-
 	return &unconstrained;
 }
 
@@ -3784,7 +3795,7 @@ __init int intel_pmu_init(void)
 		       knl_hw_cache_extra_regs, sizeof(hw_cache_extra_regs));
 		intel_pmu_lbr_init_knl();
 
-		x86_pmu.event_constraints = intel_slm_event_constraints;
+		x86_pmu.event_constraints = intel_knl_event_constraints;
 		x86_pmu.pebs_constraints = intel_slm_pebs_event_constraints;
 		x86_pmu.extra_regs = intel_knl_extra_regs;
 

@@ -52,6 +52,7 @@ struct event_constraint {
 	int	weight;
 	int	overlap;
 	int	flags;
+	u64	emask;
 };
 /*
  * struct hw_perf_event.flags flags
@@ -239,21 +240,22 @@ struct cpu_hw_events {
 	void				*kfree_on_online[X86_PERF_KFREE_MAX];
 };
 
-#define __EVENT_CONSTRAINT(c, n, m, w, o, f) {\
+#define __EVENT_CONSTRAINT(c, n, m, w, o, f, e) {\
 	{ .idxmsk64 = (n) },		\
 	.code = (c),			\
 	.cmask = (m),			\
 	.weight = (w),			\
 	.overlap = (o),			\
-	.flags = f,			\
+	.flags = (f),			\
+	.emask = (e),			\
 }
 
 #define EVENT_CONSTRAINT(c, n, m)	\
-	__EVENT_CONSTRAINT(c, n, m, HWEIGHT(n), 0, 0)
+	__EVENT_CONSTRAINT(c, n, m, HWEIGHT(n), 0, 0, 0)
 
 #define INTEL_EXCLEVT_CONSTRAINT(c, n)	\
 	__EVENT_CONSTRAINT(c, n, ARCH_PERFMON_EVENTSEL_EVENT, HWEIGHT(n),\
-			   0, PERF_X86_EVENT_EXCL)
+			   0, PERF_X86_EVENT_EXCL, 0)
 
 /*
  * The overlap flag marks event constraints with overlapping counter
@@ -277,13 +279,19 @@ struct cpu_hw_events {
  * and its counter masks must be kept at a minimum.
  */
 #define EVENT_CONSTRAINT_OVERLAP(c, n, m)	\
-	__EVENT_CONSTRAINT(c, n, m, HWEIGHT(n), 1, 0)
+	__EVENT_CONSTRAINT(c, n, m, HWEIGHT(n), 1, 0, 0)
 
 /*
  * Constraint on the Event code.
  */
 #define INTEL_EVENT_CONSTRAINT(c, n)	\
 	EVENT_CONSTRAINT(c, n, ARCH_PERFMON_EVENTSEL_EVENT)
+
+/*
+ * Constraint on the Extended Event code
+ */
+#define INTEL_EEVENT_CONSTRAINT(c, n, e) \
+	__EVENT_CONSTRAINT(c, n, INTEL_ARCH_EVENT_MASK, HWEIGHT(n), 0, 0, e)
 
 /*
  * Constraint on the Event code + UMask + fixed-mask
@@ -318,15 +326,15 @@ struct cpu_hw_events {
 
 #define INTEL_EXCLUEVT_CONSTRAINT(c, n)	\
 	__EVENT_CONSTRAINT(c, n, INTEL_ARCH_EVENT_MASK, \
-			   HWEIGHT(n), 0, PERF_X86_EVENT_EXCL)
+			   HWEIGHT(n), 0, PERF_X86_EVENT_EXC, 0)
 
 #define INTEL_PLD_CONSTRAINT(c, n)	\
 	__EVENT_CONSTRAINT(c, n, INTEL_ARCH_EVENT_MASK|X86_ALL_EVENT_FLAGS, \
-			   HWEIGHT(n), 0, PERF_X86_EVENT_PEBS_LDLAT)
+			   HWEIGHT(n), 0, PERF_X86_EVENT_PEBS_LDLAT, 0)
 
 #define INTEL_PST_CONSTRAINT(c, n)	\
 	__EVENT_CONSTRAINT(c, n, INTEL_ARCH_EVENT_MASK|X86_ALL_EVENT_FLAGS, \
-			  HWEIGHT(n), 0, PERF_X86_EVENT_PEBS_ST)
+			  HWEIGHT(n), 0, PERF_X86_EVENT_PEBS_ST, 0)
 
 /* Event constraint, but match on all event flags too. */
 #define INTEL_FLAGS_EVENT_CONSTRAINT(c, n) \
@@ -340,50 +348,49 @@ struct cpu_hw_events {
 #define INTEL_FLAGS_EVENT_CONSTRAINT_DATALA_ST(code, n) \
 	__EVENT_CONSTRAINT(code, n, 			\
 			  ARCH_PERFMON_EVENTSEL_EVENT|X86_ALL_EVENT_FLAGS, \
-			  HWEIGHT(n), 0, PERF_X86_EVENT_PEBS_ST_HSW)
+			  HWEIGHT(n), 0, PERF_X86_EVENT_PEBS_ST_HSW, 0)
 
 /* Check flags and event code, and set the HSW load flag */
 #define INTEL_FLAGS_EVENT_CONSTRAINT_DATALA_LD(code, n) \
 	__EVENT_CONSTRAINT(code, n,			\
 			  ARCH_PERFMON_EVENTSEL_EVENT|X86_ALL_EVENT_FLAGS, \
-			  HWEIGHT(n), 0, PERF_X86_EVENT_PEBS_LD_HSW)
+			  HWEIGHT(n), 0, PERF_X86_EVENT_PEBS_LD_HSW, 0)
 
 #define INTEL_FLAGS_EVENT_CONSTRAINT_DATALA_XLD(code, n) \
 	__EVENT_CONSTRAINT(code, n,			\
 			  ARCH_PERFMON_EVENTSEL_EVENT|X86_ALL_EVENT_FLAGS, \
 			  HWEIGHT(n), 0, \
-			  PERF_X86_EVENT_PEBS_LD_HSW|PERF_X86_EVENT_EXCL)
+			  PERF_X86_EVENT_PEBS_LD_HSW|PERF_X86_EVENT_EXCL, 0)
 
 /* Check flags and event code/umask, and set the HSW store flag */
 #define INTEL_FLAGS_UEVENT_CONSTRAINT_DATALA_ST(code, n) \
 	__EVENT_CONSTRAINT(code, n, 			\
 			  INTEL_ARCH_EVENT_MASK|X86_ALL_EVENT_FLAGS, \
-			  HWEIGHT(n), 0, PERF_X86_EVENT_PEBS_ST_HSW)
+			  HWEIGHT(n), 0, PERF_X86_EVENT_PEBS_ST_HSW, 0)
 
 #define INTEL_FLAGS_UEVENT_CONSTRAINT_DATALA_XST(code, n) \
 	__EVENT_CONSTRAINT(code, n,			\
 			  INTEL_ARCH_EVENT_MASK|X86_ALL_EVENT_FLAGS, \
 			  HWEIGHT(n), 0, \
-			  PERF_X86_EVENT_PEBS_ST_HSW|PERF_X86_EVENT_EXCL)
+			  PERF_X86_EVENT_PEBS_ST_HSW|PERF_X86_EVENT_EXCL, 0)
 
 /* Check flags and event code/umask, and set the HSW load flag */
 #define INTEL_FLAGS_UEVENT_CONSTRAINT_DATALA_LD(code, n) \
 	__EVENT_CONSTRAINT(code, n, 			\
 			  INTEL_ARCH_EVENT_MASK|X86_ALL_EVENT_FLAGS, \
-			  HWEIGHT(n), 0, PERF_X86_EVENT_PEBS_LD_HSW)
+			  HWEIGHT(n), 0, PERF_X86_EVENT_PEBS_LD_HSW, 0)
 
 #define INTEL_FLAGS_UEVENT_CONSTRAINT_DATALA_XLD(code, n) \
 	__EVENT_CONSTRAINT(code, n,			\
 			  INTEL_ARCH_EVENT_MASK|X86_ALL_EVENT_FLAGS, \
 			  HWEIGHT(n), 0, \
-			  PERF_X86_EVENT_PEBS_LD_HSW|PERF_X86_EVENT_EXCL)
+			  PERF_X86_EVENT_PEBS_LD_HSW|PERF_X86_EVENT_EXCL, 0)
 
 /* Check flags and event code/umask, and set the HSW N/A flag */
 #define INTEL_FLAGS_UEVENT_CONSTRAINT_DATALA_NA(code, n) \
 	__EVENT_CONSTRAINT(code, n, 			\
 			  INTEL_ARCH_EVENT_MASK|X86_ALL_EVENT_FLAGS, \
-			  HWEIGHT(n), 0, PERF_X86_EVENT_PEBS_NA_HSW)
-
+			  HWEIGHT(n), 0, PERF_X86_EVENT_PEBS_NA_HSW, 0)
 
 /*
  * We define the end marker as having a weight of -1

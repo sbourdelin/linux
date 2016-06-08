@@ -839,7 +839,7 @@ static int __init uncore_type_init(struct intel_uncore_type *type, bool setid)
 	type->pmus = pmus;
 	type->unconstrainted = (struct event_constraint)
 		__EVENT_CONSTRAINT(0, (1ULL << type->num_counters) - 1,
-				0, type->num_counters, 0, 0);
+				0, type->num_counters, 0, 0, 0);
 
 	if (type->event_descs) {
 		for (i = 0; type->event_descs[i].attr.attr.name; i++);

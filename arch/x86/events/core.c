@@ -122,6 +122,7 @@ static int x86_pmu_extra_regs(u64 config, struct perf_event *event)
 			continue;
 		if (event->attr.config1 & ~er->valid_mask)
 			return -EINVAL;
+
 		/* Check if the extra msrs can be safely accessed*/
 		if (!er->extra_msr_access)
 			return -ENXIO;
@@ -1736,7 +1737,7 @@ static int __init init_hw_perf_events(void)
 
 	unconstrained = (struct event_constraint)
 		__EVENT_CONSTRAINT(0, (1ULL << x86_pmu.num_counters) - 1,
-				   0, x86_pmu.num_counters, 0, 0);
+				   0, x86_pmu.num_counters, 0, 0, 0);
 
 	x86_pmu_format_group.attrs = x86_pmu.format_attrs;
 
