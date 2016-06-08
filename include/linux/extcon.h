@@ -66,7 +66,13 @@
 #define EXTCON_JIG		61
 #define EXTCON_MECHANICAL	62
 
-#define EXTCON_NUM		63
+/* Raw status, useful for USB controllers */
+#define EXTCON_USB_ID		63
+#define EXTCON_USB_VBUS		64
+
+#define EXTCON_NUM		65
+
+
 
 struct extcon_cable;
 

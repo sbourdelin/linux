@@ -74,6 +74,9 @@ static const char *extcon_name[] =  {
 	[EXTCON_JIG]			= "JIG",
 	[EXTCON_MECHANICAL]		= "MECHANICAL",
 
+	[EXTCON_USB_ID]			= "USB-ID",
+	[EXTCON_USB_VBUS]		= "USB-VBUS",
+
 	NULL,
 };
 
