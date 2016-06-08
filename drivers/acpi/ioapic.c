@@ -189,16 +189,17 @@ exit:
 	return AE_OK;
 }
 
-int acpi_ioapic_add(struct acpi_pci_root *root)
+int acpi_ioapic_add(acpi_handle root_handle)
 {
 	acpi_status status, retval = AE_OK;
 
-	status = acpi_walk_namespace(ACPI_TYPE_DEVICE, root->device->handle,
+	status = acpi_walk_namespace(ACPI_TYPE_DEVICE, root_handle,
 				     UINT_MAX, handle_ioapic_add, NULL,
-				     root->device->handle, (void **)&retval);
+				     root_handle, (void **)&retval);
 
 	return ACPI_SUCCESS(status) && ACPI_SUCCESS(retval) ? 0 : -ENODEV;
 }
+EXPORT_SYMBOL_GPL(acpi_ioapic_add);
 
 int acpi_ioapic_remove(struct acpi_pci_root *root)
 {
