@@ -1,0 +1,22 @@
+Rockchip PCIE PHY
+-----------------------
+
+Required properties:
+ - compatible: rockchip,rk3399-pcie-phy
+ - #phy-cells: must be 0
+
+Example:
+
+grf: syscon@ff770000 {
+	compatible = "rockchip,rk3399-grf", "syscon", "simple-mfd";
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	...
+
+	pcie_phy: phy@e220 {
+		compatible = "rockchip,rk3399-pcie-phy";
+		#phy-cells = <0>;
+	};
+};
+
