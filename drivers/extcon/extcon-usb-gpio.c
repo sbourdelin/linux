@@ -103,6 +103,7 @@ static int usb_extcon_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct device_node *np = dev->of_node;
 	struct usb_extcon_info *info;
+	u32 debounce;
 	int ret;
 
 	if (!np && !ACPI_HANDLE(dev))
@@ -113,6 +114,11 @@ static int usb_extcon_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	info->dev = dev;
+
+	ret = of_property_read_u32(np, "debounce", &debounce);
+	if (ret < 0)
+		debounce = USB_GPIO_DEBOUNCE_MS;
+
 	info->id_gpiod = devm_gpiod_get_optional(&pdev->dev, "id", GPIOD_IN);
 	info->vbus_gpiod = devm_gpiod_get_optional(&pdev->dev, "vbus",
 						   GPIOD_IN);
@@ -134,16 +140,14 @@ static int usb_extcon_probe(struct platform_device *pdev)
 	}
 
 	if (info->id_gpiod)
-		ret = gpiod_set_debounce(info->id_gpiod,
-			USB_GPIO_DEBOUNCE_MS * 1000);
+		ret = gpiod_set_debounce(info->id_gpiod, debounce * 1000);
 	if (!ret && info->vbus_gpiod) {
-		ret = gpiod_set_debounce(info->vbus_gpiod,
-			USB_GPIO_DEBOUNCE_MS * 1000);
+		ret = gpiod_set_debounce(info->vbus_gpiod, debounce * 1000);
 		if (ret < 0 && info->id_gpiod)
 			gpiod_set_debounce(info->vbus_gpiod, 0);
 	}
 	if (ret < 0)
-		info->debounce_jiffies = msecs_to_jiffies(USB_GPIO_DEBOUNCE_MS);
+		info->debounce_jiffies = msecs_to_jiffies(debounce);
 
 	INIT_DELAYED_WORK(&info->wq_detcable, usb_extcon_detect_cable);
 
