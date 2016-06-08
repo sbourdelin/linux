@@ -17,6 +17,7 @@
 
 #include <linux/rwsem.h>
 #include <linux/zsmalloc.h>
+#include <linux/zpool.h>
 #include <linux/crypto.h>
 
 #include "zcomp.h"
@@ -91,7 +92,11 @@ struct zram_stats {
 
 struct zram_meta {
 	struct zram_table_entry *table;
+#ifdef CONFIG_ZPOOL
+	struct zpool *mem_pool;
+#else
 	struct zs_pool *mem_pool;
+#endif
 };
 
 struct zram {
