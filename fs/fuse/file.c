@@ -1565,14 +1565,13 @@ static void fuse_writepage_end(struct fuse_conn *fc, struct fuse_req *req)
 static struct fuse_file *__fuse_write_file_get(struct fuse_conn *fc,
 					       struct fuse_inode *fi)
 {
-	struct fuse_file *ff = NULL;
+	struct fuse_file *ff;
 
 	spin_lock(&fc->lock);
-	if (!list_empty(&fi->write_files)) {
-		ff = list_entry(fi->write_files.next, struct fuse_file,
-				write_entry);
+	ff = list_first_entry_or_null(&fi->write_files, struct fuse_file,
+				      write_entry);
+	if (ff)
 		fuse_file_get(ff);
-	}
 	spin_unlock(&fc->lock);
 
 	return ff;

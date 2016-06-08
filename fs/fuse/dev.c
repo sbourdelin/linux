@@ -1259,11 +1259,10 @@ static ssize_t fuse_dev_do_read(struct fuse_dev *fud, struct file *file,
 	if (!fiq->connected)
 		goto err_unlock;
 
-	if (!list_empty(&fiq->interrupts)) {
-		req = list_entry(fiq->interrupts.next, struct fuse_req,
-				 intr_entry);
+	req = list_first_entry_or_null(&fiq->interrupts, struct fuse_req,
+				       intr_entry);
+	if (req)
 		return fuse_read_interrupt(fiq, cs, nbytes, req);
-	}
 
 	if (forget_pending(fiq)) {
 		if (list_empty(&fiq->pending) || fiq->forget_batch-- > 0)
