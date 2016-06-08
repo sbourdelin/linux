@@ -1,5 +1,5 @@
 /*
- * LED IDE-Disk Activity Trigger
+ * LED Disk Activity Trigger
  *
  * Copyright 2006 Openedhand Ltd.
  *
@@ -17,20 +17,20 @@
 
 #define BLINK_DELAY 30
 
-DEFINE_LED_TRIGGER(ledtrig_ide);
+DEFINE_LED_TRIGGER(ledtrig_disk);
 
-void ledtrig_ide_activity(void)
+void ledtrig_disk_activity(void)
 {
-	unsigned long ide_blink_delay = BLINK_DELAY;
+	unsigned long disk_blink_delay = BLINK_DELAY;
 
-	led_trigger_blink_oneshot(ledtrig_ide,
-				  &ide_blink_delay, &ide_blink_delay, 0);
+	led_trigger_blink_oneshot(ledtrig_disk,
+				  &disk_blink_delay, &disk_blink_delay, 0);
 }
-EXPORT_SYMBOL(ledtrig_ide_activity);
+EXPORT_SYMBOL(ledtrig_disk_activity);
 
-static int __init ledtrig_ide_init(void)
+static int __init ledtrig_disk_init(void)
 {
-	led_trigger_register_simple("ide-disk", &ledtrig_ide);
+	led_trigger_register_simple("disk-activity", &ledtrig_disk);
 	return 0;
 }
-device_initcall(ledtrig_ide_init);
+device_initcall(ledtrig_disk_init);
