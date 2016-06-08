@@ -1457,30 +1457,30 @@ static struct slic_hostcmd *slic_cmdq_getfree(struct adapter *adapter)
 	struct slic_hostcmd *cmd = NULL;
 	unsigned long flags;
 
-lock_and_retry:
 	spin_lock_irqsave(&cmdq->lock, flags);
-retry:
 	cmd = cmdq->head;
-	if (cmd) {
-		cmdq->head = cmd->next;
-		cmdq->count--;
-		spin_unlock_irqrestore(&cmdq->lock, flags);
-	} else {
+	while (!cmd) {
 		slic_cmdq_getdone(adapter);
 		cmd = cmdq->head;
-		if (cmd) {
-			goto retry;
-		} else {
+		if (cmd)
+			continue;
+		else {
 			u32 *pageaddr;
 
 			spin_unlock_irqrestore(&cmdq->lock, flags);
 			pageaddr = slic_cmdqmem_addpage(adapter);
 			if (pageaddr) {
 				slic_cmdq_addcmdpage(adapter, pageaddr);
-				goto lock_and_retry;
+				spin_lock_irqsave(&cmdq->lock, flags);
+				cmd = cmdq->head;
+				continue;
 			}
+			return cmd;
 		}
 	}
+	cmdq->head = cmd->next;
+	cmdq->count--;
+	spin_unlock_irqrestore(&cmdq->lock, flags);
 	return cmd;
 }
 
