@@ -6422,7 +6422,7 @@ ahd_init_scbdata(struct ahd_softc *ahd)
 	scb_data->maxhscbs = ahd_probe_scbs(ahd);
 	if (scb_data->maxhscbs == 0) {
 		printk("%s: No SCB space found\n", ahd_name(ahd));
-		return (ENXIO);
+		return -ENXIO;
 	}
 
 	ahd_initialize_hscbs(ahd);
@@ -6501,7 +6501,7 @@ ahd_init_scbdata(struct ahd_softc *ahd)
 
 error_exit:
 
-	return (ENOMEM);
+	return -ENOMEM;
 }
 
 static struct scb *
@@ -7076,7 +7076,7 @@ ahd_init(struct ahd_softc *ahd)
 	ahd->stack_size = ahd_probe_stack_size(ahd);
 	ahd->saved_stack = kmalloc(ahd->stack_size * sizeof(uint16_t), GFP_ATOMIC);
 	if (ahd->saved_stack == NULL)
-		return (ENOMEM);
+		return -ENOMEM;
 
 	/*
 	 * Verify that the compiler hasn't over-aggressively
@@ -7115,7 +7115,7 @@ ahd_init(struct ahd_softc *ahd)
 			       /*maxsegsz*/AHD_MAXTRANSFER_SIZE,
 			       /*flags*/BUS_DMA_ALLOCNOW,
 			       &ahd->buffer_dmat) != 0) {
-		return (ENOMEM);
+		return -ENOMEM;
 	}
 #endif
 
@@ -7143,7 +7143,7 @@ ahd_init(struct ahd_softc *ahd)
 			       /*nsegments*/1,
 			       /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
 			       /*flags*/0, &ahd->shared_data_dmat) != 0) {
-		return (ENOMEM);
+		return -ENOMEM;
 	}
 
 	ahd->init_level++;
@@ -7153,7 +7153,7 @@ ahd_init(struct ahd_softc *ahd)
 			     (void **)&ahd->shared_data_map.vaddr,
 			     BUS_DMA_NOWAIT,
 			     &ahd->shared_data_map.dmamap) != 0) {
-		return (ENOMEM);
+		return -ENOMEM;
 	}
 
 	ahd->init_level++;
@@ -7194,7 +7194,7 @@ ahd_init(struct ahd_softc *ahd)
 
 	/* Allocate SCB data now that buffer_dmat is initialized */
 	if (ahd_init_scbdata(ahd) != 0)
-		return (ENOMEM);
+		return -ENOMEM;
 
 	if ((ahd->flags & AHD_INITIATORROLE) == 0)
 		ahd->flags &= ~AHD_RESET_BUS_A;
@@ -7644,7 +7644,7 @@ ahd_default_config(struct ahd_softc *ahd)
 	if (ahd_alloc_tstate(ahd, ahd->our_id, 'A') == NULL) {
 		printk("%s: unable to allocate ahd_tmode_tstate.  "
 		       "Failing attach\n", ahd_name(ahd));
-		return (ENOMEM);
+		return -ENOMEM;
 	}
 
 	for (targ = 0; targ < AHD_NUM_TARGETS; targ++) {
@@ -7723,7 +7723,7 @@ ahd_parse_cfgdata(struct ahd_softc *ahd, struct seeprom_config *sc)
 	if (ahd_alloc_tstate(ahd, ahd->our_id, 'A') == NULL) {
 		printk("%s: unable to allocate ahd_tmode_tstate.  "
 		       "Failing attach\n", ahd_name(ahd));
-		return (ENOMEM);
+		return -ENOMEM;
 	}
 
 	for (targ = 0; targ < max_targ; targ++) {
@@ -7967,7 +7967,7 @@ ahd_suspend(struct ahd_softc *ahd)
 
 	if (LIST_FIRST(&ahd->pending_scbs) != NULL) {
 		ahd_unpause(ahd);
-		return (EBUSY);
+		return -EBUSY;
 	}
 	ahd_shutdown(ahd);
 	return (0);
@@ -10126,7 +10126,7 @@ ahd_wait_seeprom(struct ahd_softc *ahd)
 		ahd_delay(5);
 
 	if (cnt == 0)
-		return (ETIMEDOUT);
+		return -ETIMEDOUT;
 	return (0);
 }
 
@@ -10227,7 +10227,7 @@ ahd_wait_flexport(struct ahd_softc *ahd)
 		ahd_delay(5);
 
 	if (cnt == 0)
-		return (ETIMEDOUT);
+		return -ETIMEDOUT;
 	return (0);
 }
 

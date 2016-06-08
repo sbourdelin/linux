@@ -806,7 +806,7 @@ ahc_pci_config(struct ahc_softc *ahc, const struct ahc_pci_identity *entry)
 
 	error = ahc_reset(ahc, /*reinit*/FALSE);
 	if (error != 0)
-		return (ENXIO);
+		return -ENXIO;
 
 	if ((ahc->features & AHC_DT) != 0) {
 		u_int sfunct;
@@ -2387,7 +2387,7 @@ static int
 ahc_raid_setup(struct ahc_softc *ahc)
 {
 	printk("RAID functionality unsupported\n");
-	return (ENXIO);
+	return -ENXIO;
 }
 
 static int

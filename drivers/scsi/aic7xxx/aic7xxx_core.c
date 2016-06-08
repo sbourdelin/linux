@@ -4466,7 +4466,7 @@ ahc_softc_init(struct ahc_softc *ahc)
 	if (ahc->scb_data == NULL) {
 		ahc->scb_data = kzalloc(sizeof(*ahc->scb_data), GFP_ATOMIC);
 		if (ahc->scb_data == NULL)
-			return (ENOMEM);
+			return -ENOMEM;
 	}
 
 	return (0);
@@ -4782,14 +4782,14 @@ ahc_init_scbdata(struct ahc_softc *ahc)
 	scb_data->scbarray = kzalloc(sizeof(struct scb) * AHC_SCB_MAX_ALLOC,
 				GFP_ATOMIC);
 	if (scb_data->scbarray == NULL)
-		return (ENOMEM);
+		return -ENOMEM;
 
 	/* Determine the number of hardware SCBs and initialize them */
 
 	scb_data->maxhscbs = ahc_probe_scbs(ahc);
 	if (ahc->scb_data->maxhscbs == 0) {
 		printk("%s: No SCB space found\n", ahc_name(ahc));
-		return (ENXIO);
+		return -ENXIO;
 	}
 
 	/*
@@ -4904,7 +4904,7 @@ ahc_init_scbdata(struct ahc_softc *ahc)
 
 error_exit:
 
-	return (ENOMEM);
+	return -ENOMEM;
 }
 
 static void
@@ -5339,7 +5339,7 @@ ahc_init(struct ahc_softc *ahc)
 			       /*maxsegsz*/AHC_MAXTRANSFER_SIZE,
 			       /*flags*/BUS_DMA_ALLOCNOW,
 			       &ahc->buffer_dmat) != 0) {
-		return (ENOMEM);
+		return -ENOMEM;
 	}
 #endif
 
@@ -5367,7 +5367,7 @@ ahc_init(struct ahc_softc *ahc)
 			       /*nsegments*/1,
 			       /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
 			       /*flags*/0, &ahc->shared_data_dmat) != 0) {
-		return (ENOMEM);
+		return -ENOMEM;
 	}
 
 	ahc->init_level++;
@@ -5376,7 +5376,7 @@ ahc_init(struct ahc_softc *ahc)
 	if (ahc_dmamem_alloc(ahc, ahc->shared_data_dmat,
 			     (void **)&ahc->qoutfifo,
 			     BUS_DMA_NOWAIT, &ahc->shared_data_dmamap) != 0) {
-		return (ENOMEM);
+		return -ENOMEM;
 	}
 
 	ahc->init_level++;
@@ -5404,7 +5404,7 @@ ahc_init(struct ahc_softc *ahc)
 	/* Allocate SCB data now that buffer_dmat is initialized */
 	if (ahc->scb_data->maxhscbs == 0)
 		if (ahc_init_scbdata(ahc) != 0)
-			return (ENOMEM);
+			return -ENOMEM;
 
 	/*
 	 * Allocate a tstate to house information for our
@@ -5414,14 +5414,14 @@ ahc_init(struct ahc_softc *ahc)
 	if (ahc_alloc_tstate(ahc, ahc->our_id, 'A') == NULL) {
 		printk("%s: unable to allocate ahc_tmode_tstate.  "
 		       "Failing attach\n", ahc_name(ahc));
-		return (ENOMEM);
+		return -ENOMEM;
 	}
 
 	if ((ahc->features & AHC_TWIN) != 0) {
 		if (ahc_alloc_tstate(ahc, ahc->our_id_b, 'B') == NULL) {
 			printk("%s: unable to allocate ahc_tmode_tstate.  "
 			       "Failing attach\n", ahc_name(ahc));
-			return (ENOMEM);
+			return -ENOMEM;
 		}
 	}
 
@@ -5660,7 +5660,7 @@ ahc_suspend(struct ahc_softc *ahc)
 
 	if (LIST_FIRST(&ahc->pending_scbs) != NULL) {
 		ahc_unpause(ahc);
-		return (EBUSY);
+		return -EBUSY;
 	}
 
 #ifdef AHC_TARGET_MODE
@@ -5671,7 +5671,7 @@ ahc_suspend(struct ahc_softc *ahc)
 	 */
 	if (ahc->pending_device != NULL) {
 		ahc_unpause(ahc);
-		return (EBUSY);
+		return -EBUSY;
 	}
 #endif
 	ahc_shutdown(ahc);
@@ -6908,7 +6908,7 @@ ahc_loadseq(struct ahc_softc *ahc)
 			printk("\n%s: Program too large for instruction memory "
 			       "size of %d!\n", ahc_name(ahc),
 			       ahc->instruction_ram_size);
-			return (ENOMEM);
+			return -ENOMEM;
 		}
 
 		/*

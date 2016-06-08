@@ -259,12 +259,12 @@ ahd_linux_pci_reserve_io_regions(struct ahd_softc *ahd, resource_size_t *base,
 	 */
 	*base2 = pci_resource_start(ahd->dev_softc, 3);
 	if (*base == 0 || *base2 == 0)
-		return (ENOMEM);
+		return -ENOMEM;
 	if (!request_region(*base, 256, "aic79xx"))
-		return (ENOMEM);
+		return -ENOMEM;
 	if (!request_region(*base2, 256, "aic79xx")) {
 		release_region(*base, 256);
-		return (ENOMEM);
+		return -ENOMEM;
 	}
 	return (0);
 }
@@ -280,10 +280,10 @@ ahd_linux_pci_reserve_mem_region(struct ahd_softc *ahd,
 	int	error = 0;
 
 	if (aic79xx_allow_memio == 0)
-		return (ENOMEM);
+		return -ENOMEM;
 
 	if ((ahd->bugs & AHD_PCIX_MMAPIO_BUG) != 0)
-		return (ENOMEM);
+		return -ENOMEM;
 
 	start = pci_resource_start(ahd->dev_softc, 1);
 	base_page = start & PAGE_MASK;
@@ -291,17 +291,17 @@ ahd_linux_pci_reserve_mem_region(struct ahd_softc *ahd,
 	if (start != 0) {
 		*bus_addr = start;
 		if (!request_mem_region(start, 0x1000, "aic79xx"))
-			error = ENOMEM;
+			error = -ENOMEM;
 		if (!error) {
 			*maddr = ioremap_nocache(base_page, base_offset + 512);
 			if (*maddr == NULL) {
-				error = ENOMEM;
+				error = -ENOMEM;
 				release_mem_region(start, 0x1000);
 			} else
 				*maddr += base_offset;
 		}
 	} else
-		error = ENOMEM;
+		error = -ENOMEM;
 	return (error);
 }
 

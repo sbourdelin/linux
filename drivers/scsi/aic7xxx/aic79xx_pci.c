@@ -360,7 +360,7 @@ ahd_pci_config(struct ahd_softc *ahd, const struct ahd_pci_identity *entry)
 
 	error = ahd_reset(ahd, /*reinit*/FALSE);
 	if (error != 0)
-		return (ENXIO);
+		return -ENXIO;
 
 	ahd->pci_cachesize =
 	    ahd_pci_read_config(ahd->dev_softc, CSIZE_LATTIME,

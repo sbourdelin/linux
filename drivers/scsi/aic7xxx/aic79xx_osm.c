@@ -940,7 +940,7 @@ ahd_dma_tag_create(struct ahd_softc *ahd, bus_dma_tag_t parent,
 
 	dmat = kmalloc(sizeof(*dmat), GFP_ATOMIC);
 	if (dmat == NULL)
-		return (ENOMEM);
+		return -ENOMEM;
 
 	/*
 	 * Linux is very simplistic about DMA memory.  For now don't
@@ -969,7 +969,7 @@ ahd_dmamem_alloc(struct ahd_softc *ahd, bus_dma_tag_t dmat, void** vaddr,
 	*vaddr = pci_alloc_consistent(ahd->dev_softc,
 				      dmat->maxsize, mapp);
 	if (*vaddr == NULL)
-		return (ENOMEM);
+		return -ENOMEM;
 	return(0);
 }
 
@@ -1232,7 +1232,7 @@ ahd_linux_register_host(struct ahd_softc *ahd, struct scsi_host_template *templa
 	template->name = ahd->description;
 	host = scsi_host_alloc(template, sizeof(struct ahd_softc *));
 	if (host == NULL)
-		return (ENOMEM);
+		return -ENOMEM;
 
 	*((struct ahd_softc **)host->hostdata) = ahd;
 	ahd->platform_data->host = host;
@@ -1327,7 +1327,7 @@ ahd_platform_alloc(struct ahd_softc *ahd, void *platform_arg)
 	ahd->platform_data =
 	    kzalloc(sizeof(struct ahd_platform_data), GFP_ATOMIC);
 	if (ahd->platform_data == NULL)
-		return (ENOMEM);
+		return -ENOMEM;
 	ahd->platform_data->irq = AHD_LINUX_NOIRQ;
 	ahd_lockinit(ahd);
 	ahd->seltime = (aic79xx_seltime & 0x3) << 4;
