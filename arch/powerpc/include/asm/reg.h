@@ -145,6 +145,16 @@
 #define MSR_64BIT	0
 #endif
 
+/* Power Management - PSSCR Fields */
+#define PSSCR_RL_MASK		0x0000000F
+#define PSSCR_MTL_MASK		0x000000F0
+#define PSSCR_TR_MASK		0x00000300
+#define PSSCR_PSLL_MASK		0x000F0000
+#define PSSCR_EC		0x00100000
+#define PSSCR_ESL		0x00200000
+#define PSSCR_SD		0x00400000
+
+
 /* Floating Point Status and Control Register (FPSCR) Fields */
 #define FPSCR_FX	0x80000000	/* FPU exception summary */
 #define FPSCR_FEX	0x40000000	/* FPU enabled exception summary */
@@ -288,6 +298,7 @@
 #define SPRN_PMICR	0x354   /* Power Management Idle Control Reg */
 #define SPRN_PMSR	0x355   /* Power Management Status Reg */
 #define SPRN_PMMAR	0x356	/* Power Management Memory Activity Register */
+#define SPRN_PSSCR	0x357	/* Processor Stop Status and Control Register */
 #define SPRN_PMCR	0x374	/* Power Management Control Register */
 
 /* HFSCR and FSCR bit numbers are the same */
@@ -761,6 +772,9 @@
 #define   SIER_SDAR_VALID	0x0200000	/* SDAR contents valid */
 #define SPRN_SIAR	796
 #define SPRN_SDAR	797
+#define SPRN_LMRR	813
+#define SPRN_LMSER	814
+#define SPRN_ASDR	816
 #define SPRN_TACR	888
 #define SPRN_TCSCR	889
 #define SPRN_CSIGR	890
