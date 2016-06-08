@@ -14279,6 +14279,81 @@ void intel_create_rotation_property(struct drm_device *dev, struct intel_plane *
 				plane->base.state->rotation);
 }
 
+static void vlv_unpin_buffer_obj(struct drm_i915_gem_object *obj,
+			  char __iomem *buffer_start)
+{
+	iounmap(buffer_start);
+	i915_gem_object_ggtt_unpin(obj);
+}
+
+static char __iomem *vlv_pin_and_map_buffer_obj
+				(struct drm_i915_gem_object *obj)
+{
+	struct drm_i915_private *dev_priv = obj->base.dev->dev_private;
+	char __iomem *buffer_start;
+	int ret;
+
+	ret = i915_gem_obj_ggtt_pin(obj, PAGE_SIZE, PIN_MAPPABLE);
+	if (ret)
+		return NULL;
+
+	ret = i915_gem_object_set_to_gtt_domain(obj, true);
+	if (ret) {
+		i915_gem_object_ggtt_unpin(obj);
+		return NULL;
+	}
+
+	buffer_start = ioremap_wc(dev_priv->gtt.mappable_base +
+			i915_gem_obj_ggtt_offset(obj), obj->base.size);
+	if (buffer_start == NULL) {
+		i915_gem_object_ggtt_unpin(obj);
+		return NULL;
+	}
+
+	return buffer_start;
+}
+
+static int vlv_cursor_crop(struct intel_plane_state *state,
+				      int prev_x)
+{
+	struct drm_i915_gem_object *obj = intel_fb_obj(state->base.fb);
+	struct drm_framebuffer *fb = state->base.fb;
+	char __iomem *buffer = state->vlv_cursor_image;
+	char __iomem *base, *cursor_base;
+	int size = obj->base.size;
+	int i, x = state->base.crtc_x;
+	int bytes_per_pixel = fb->bits_per_pixel / 8;
+
+	base = vlv_pin_and_map_buffer_obj(obj);
+	if (base == NULL)
+		return -ENOMEM;
+
+	if (prev_x >= 0) {
+		if (buffer != NULL)
+			kfree(buffer);
+		buffer = kzalloc(size, GFP_KERNEL);
+		state->vlv_cursor_image = buffer;
+		if (buffer == NULL)
+			return -ENOMEM;
+		memcpy(buffer, base, size);
+	}
+	cursor_base = buffer;
+	x = -x;
+	for (i = 0; i < state->base.crtc_h; i++) {
+		cursor_base += x * bytes_per_pixel;
+		memcpy(base, cursor_base,
+			(state->base.crtc_w - x) * bytes_per_pixel);
+		base += (state->base.crtc_w - x) * bytes_per_pixel;
+		memset(base, 0, x * bytes_per_pixel);
+		base += x * bytes_per_pixel;
+		cursor_base += (state->base.crtc_w - x) * bytes_per_pixel;
+	}
+
+	vlv_unpin_buffer_obj(obj, base);
+
+	return 0;
+}
+
 static int
 intel_check_cursor_plane(struct drm_plane *plane,
 			 struct intel_crtc_state *crtc_state,
@@ -14287,8 +14362,10 @@ intel_check_cursor_plane(struct drm_plane *plane,
 	struct drm_crtc *crtc = crtc_state->base.crtc;
 	struct drm_framebuffer *fb = state->base.fb;
 	struct drm_i915_gem_object *obj = intel_fb_obj(fb);
+	enum pipe pipe = to_intel_plane(plane)->pipe;
 	unsigned stride;
 	int ret;
+	int crtc_prev_x = state->vlv_cursor_prev_x;
 
 	ret = drm_plane_helper_check_update(plane, crtc, fb, &state->src,
 					    &state->dst, &state->clip,
@@ -14309,6 +14386,32 @@ intel_check_cursor_plane(struct drm_plane *plane,
 		return -EINVAL;
 	}
 
+	/*
+	 * There is an issue in CHV PIPE C where we hit underrun on
+	 * -ve value of cursor. To avoid this we are cropping the
+	 *  image for all PIPE C -ve values.
+	 */
+	if (IS_CHERRYVIEW(plane->dev)) {
+		if (pipe == PIPE_C && state->visible &&
+		    state->base.crtc_x < 0) {
+			ret = vlv_cursor_crop(state, crtc_prev_x);
+			if (ret)
+				return -ENOMEM;
+		} else if (crtc_prev_x < 0) { /* Restore the image back */
+			char __iomem *base;
+			char __iomem *org_image = state->vlv_cursor_image;
+			int size = obj->base.size;
+
+			if (org_image == NULL)
+				return -ENOMEM;
+			base = vlv_pin_and_map_buffer_obj(obj);
+			if (base == NULL)
+				return -ENOMEM;
+			memcpy(base, org_image, size);
+			vlv_unpin_buffer_obj(obj, base);
+		}
+	}
+
 	stride = roundup_pow_of_two(state->base.crtc_w) * 4;
 	if (obj->base.size < stride * state->base.crtc_h) {
 		DRM_DEBUG_KMS("buffer is too small\n");
@@ -14318,6 +14421,16 @@ intel_check_cursor_plane(struct drm_plane *plane,
 	if (fb->modifier[0] != DRM_FORMAT_MOD_NONE) {
 		DRM_DEBUG_KMS("cursor cannot be tiled\n");
 		return -EINVAL;
+	}
+
+	if (IS_CHERRYVIEW(plane->dev)) {
+		if (pipe == PIPE_C &&
+		    state->visible && state->base.crtc_x < 0) {
+			state->vlv_cursor_prev_x = state->base.crtc_x;
+			state->base.crtc_x = 0;
+		} else {
+			state->vlv_cursor_prev_x = state->base.crtc_x;
+		}
 	}
 
 	return 0;

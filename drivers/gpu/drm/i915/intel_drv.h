@@ -350,6 +350,9 @@ struct intel_plane_state {
 
 	/* async flip related structures */
 	struct drm_i915_gem_request *wait_req;
+
+	char __iomem *vlv_cursor_image;
+	int vlv_cursor_prev_x;
 };
 
 struct intel_initial_plane_config {
