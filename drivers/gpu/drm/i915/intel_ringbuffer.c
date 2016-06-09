@@ -1022,6 +1022,9 @@ static int gen9_init_workarounds(struct intel_engine_cs *engine)
 	if (ret)
 		return ret;
 
+	/* WaConextSwitchWithConcurrentTLBInvalidate:skl,bxt,kbl */
+	I915_WRITE(GEN9_CSFE_CHICKEN1_RCS, _MASKED_BIT_ENABLE(GEN9_PREEMPT_GPGPU_SYNC_SWITCH_DISABLE));
+
 	return 0;
 }
 
