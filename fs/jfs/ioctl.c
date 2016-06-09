@@ -60,6 +60,7 @@ long jfs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct inode *inode = file_inode(filp);
 	struct jfs_inode_info *jfs_inode = JFS_IP(inode);
+	struct super_block *sb = inode->i_sb;
 	unsigned int flags;
 
 	switch (cmd) {
@@ -121,7 +122,7 @@ long jfs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		jfs_set_inode_flags(inode);
 		inode_unlock(inode);
-		inode->i_ctime = CURRENT_TIME_SEC;
+		inode->i_ctime = current_fs_time(sb);
 		mark_inode_dirty(inode);
 setflags_out:
 		mnt_drop_write_file(filp);
@@ -130,7 +131,6 @@ setflags_out:
 
 	case FITRIM:
 	{
-		struct super_block *sb = inode->i_sb;
 		struct request_queue *q = bdev_get_queue(sb->s_bdev);
 		struct fstrim_range range;
 		s64 ret = 0;
