@@ -447,6 +447,30 @@ struct drm_driver {
 	u32 (*get_vblank_counter) (struct drm_device *dev, unsigned int pipe);
 
 	/**
+	 * prepare_vblank - Optional prepare vblank hook.
+	 * @dev: DRM device
+	 * @pipe: counter to fetch
+	 *
+	 * Drivers that need to handle any kind of mutex or any other sleeping
+	 * code in combination with vblanks need to implement this hook
+	 * that will be called before drm_vblank_get spin_lock gets.
+	 */
+	void (*prepare_vblank) (struct drm_device *dev, unsigned int pipe);
+
+	/**
+	 * unprepare_vblank - Optional unprepare vblank hook.
+	 * @dev: DRM device
+	 * @pipe: counter to fetch
+	 *
+	 * Drivers that need to handle any kind of mutex or any other sleeping
+	 * code in combination with vblanks need to implement this hook
+	 * that will be called in a work queue to be executed after spin lock
+	 * areas of drm_vblank_put.
+	 */
+	void (*unprepare_vblank) (struct drm_device *dev, unsigned int pipe);
+
+
+	/**
 	 * enable_vblank - enable vblank interrupt events
 	 * @dev: DRM device
 	 * @pipe: which irq to enable
@@ -720,6 +744,11 @@ struct drm_pending_vblank_event {
 	struct drm_event_vblank event;
 };
 
+struct drm_vblank_unprepare {
+	struct work_struct work;	/* Post disable worker */
+	atomic_t counter;		/* Number of vblanks handled */
+};
+
 struct drm_vblank_crtc {
 	struct drm_device *dev;		/* pointer to the drm_device */
 	wait_queue_head_t queue;	/**< VBLANK wait queue */
@@ -740,6 +769,7 @@ struct drm_vblank_crtc {
 	int linedur_ns;			/* line duration in ns */
 	bool enabled;			/* so we don't call enable more than
 					   once per disable */
+	struct drm_vblank_unprepare unprepare;  /* Unprepare work helper */
 };
 
 /**

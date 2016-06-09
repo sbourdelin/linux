@@ -377,6 +377,8 @@ void drm_vblank_cleanup(struct drm_device *dev)
 			drm_core_check_feature(dev, DRIVER_MODESET));
 
 		del_timer_sync(&vblank->disable_timer);
+
+		flush_work(&vblank->unprepare.work);
 	}
 
 	kfree(dev->vblank);
@@ -384,6 +386,20 @@ void drm_vblank_cleanup(struct drm_device *dev)
 	dev->num_crtcs = 0;
 }
 EXPORT_SYMBOL(drm_vblank_cleanup);
+
+static void drm_vblank_unprepare_work_fn(struct work_struct *work)
+{
+	struct drm_vblank_crtc *vblank;
+	struct drm_device *dev;
+
+	vblank = container_of(work, typeof(*vblank), unprepare.work);
+	dev = vblank->dev;
+
+	do {
+		if (dev->driver->unprepare_vblank)
+			dev->driver->unprepare_vblank(dev, vblank->pipe);
+	} while (!atomic_dec_and_test(&vblank->unprepare.counter));
+}
 
 /**
  * drm_vblank_init - initialize vblank support
@@ -417,6 +433,8 @@ int drm_vblank_init(struct drm_device *dev, unsigned int num_crtcs)
 		init_waitqueue_head(&vblank->queue);
 		setup_timer(&vblank->disable_timer, vblank_disable_fn,
 			    (unsigned long)vblank);
+		INIT_WORK(&vblank->unprepare.work,
+			  drm_vblank_unprepare_work_fn);
 	}
 
 	DRM_INFO("Supports vblank timestamp caching Rev 2 (21.10.2013).\n");
@@ -1205,6 +1223,9 @@ int drm_vblank_get(struct drm_device *dev, unsigned int pipe)
 	if (WARN_ON(pipe >= dev->num_crtcs))
 		return -EINVAL;
 
+	if (dev->driver->prepare_vblank)
+		dev->driver->prepare_vblank(dev, pipe);
+
 	spin_lock_irqsave(&dev->vbl_lock, irqflags);
 	/* Going from 0->1 means we have to enable interrupts again */
 	if (atomic_add_return(1, &vblank->refcount) == 1) {
@@ -1216,6 +1237,9 @@ int drm_vblank_get(struct drm_device *dev, unsigned int pipe)
 		}
 	}
 	spin_unlock_irqrestore(&dev->vbl_lock, irqflags);
+
+	if (ret != 0 && dev->driver->unprepare_vblank)
+		dev->driver->unprepare_vblank(dev, pipe);
 
 	return ret;
 }
@@ -1269,6 +1293,9 @@ void drm_vblank_put(struct drm_device *dev, unsigned int pipe)
 			mod_timer(&vblank->disable_timer,
 				  jiffies + ((drm_vblank_offdelay * HZ)/1000));
 	}
+
+	atomic_inc(&vblank->unprepare.counter);
+	schedule_work(&vblank->unprepare.work);
 }
 EXPORT_SYMBOL(drm_vblank_put);
 
@@ -1703,7 +1730,6 @@ static int drm_queue_vblank_event(struct drm_device *dev, unsigned int pipe,
 	}
 
 	spin_unlock_irqrestore(&dev->event_lock, flags);
-
 	return 0;
 
 err_unlock:
