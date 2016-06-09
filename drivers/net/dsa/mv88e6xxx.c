@@ -3723,6 +3723,29 @@ static void mv88e6xxx_unregister_switch(struct mv88e6xxx_priv_state *ps)
 	dsa_unregister_switch(ps->ds);
 }
 
+static const struct of_device_id mv88e6xxx_of_id_table[] = {
+	{ .compatible = "marvell,mv88e6085", .data = (void *)MV88E6085 },
+	{ .compatible = "marvell,mv88e6095", .data = (void *)MV88E6095 },
+	{ .compatible = "marvell,mv88e6123", .data = (void *)MV88E6123 },
+	{ .compatible = "marvell,mv88e6131", .data = (void *)MV88E6131 },
+	{ .compatible = "marvell,mv88e6161", .data = (void *)MV88E6161 },
+	{ .compatible = "marvell,mv88e6165", .data = (void *)MV88E6165 },
+	{ .compatible = "marvell,mv88e6171", .data = (void *)MV88E6171 },
+	{ .compatible = "marvell,mv88e6172", .data = (void *)MV88E6172 },
+	{ .compatible = "marvell,mv88e6175", .data = (void *)MV88E6175 },
+	{ .compatible = "marvell,mv88e6176", .data = (void *)MV88E6176 },
+	{ .compatible = "marvell,mv88e6185", .data = (void *)MV88E6185 },
+	{ .compatible = "marvell,mv88e6240", .data = (void *)MV88E6240 },
+	{ .compatible = "marvell,mv88e6320", .data = (void *)MV88E6320 },
+	{ .compatible = "marvell,mv88e6321", .data = (void *)MV88E6321 },
+	{ .compatible = "marvell,mv88e6350", .data = (void *)MV88E6350 },
+	{ .compatible = "marvell,mv88e6351", .data = (void *)MV88E6351 },
+	{ .compatible = "marvell,mv88e6352", .data = (void *)MV88E6352 },
+	{ /* sentinel */ },
+};
+
+MODULE_DEVICE_TABLE(of, mv88e6xxx_of_id_table);
+
 int mv88e6xxx_probe(struct mdio_device *mdiodev)
 {
 	struct device *dev = &mdiodev->dev;
@@ -3772,19 +3795,12 @@ static void mv88e6xxx_remove(struct mdio_device *mdiodev)
 	mv88e6xxx_mdio_unregister(ps);
 }
 
-static const struct of_device_id mv88e6xxx_of_match[] = {
-	{ .compatible = "marvell,mv88e6085" },
-	{ /* sentinel */ },
-};
-
-MODULE_DEVICE_TABLE(of, mv88e6xxx_of_match);
-
 static struct mdio_driver mv88e6xxx_driver = {
 	.probe	= mv88e6xxx_probe,
 	.remove = mv88e6xxx_remove,
 	.mdiodrv.driver = {
-		.name = "mv88e6085",
-		.of_match_table = mv88e6xxx_of_match,
+		.name = "mv88e6xxx",
+		.of_match_table = mv88e6xxx_of_id_table,
 	},
 };
 

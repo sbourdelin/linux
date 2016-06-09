@@ -80,7 +80,7 @@ linked into one DSA cluster.
 	#size-cells = <0>;
 
 	switch0: switch0@0 {
-		compatible = "marvell,mv88e6085";
+		compatible = "marvell,mv88e6352";
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0>;
@@ -135,7 +135,7 @@ linked into one DSA cluster.
 	#size-cells = <0>;
 
 	switch1: switch1@0 {
-		compatible = "marvell,mv88e6085";
+		compatible = "marvell,mv88e6352";
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0>;
@@ -206,7 +206,7 @@ linked into one DSA cluster.
 	#size-cells = <0>;
 
 	switch2: switch2@0 {
-		compatible = "marvell,mv88e6085";
+		compatible = "marvell,mv88e6352";
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0>;
