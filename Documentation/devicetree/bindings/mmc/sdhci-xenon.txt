@@ -1,0 +1,27 @@
+* Marvell sdhci-xenon controller
+
+This file documents differences between the core properties in mmc.txt
+and the properties used by the sdhci-xenon drivers.
+
+Required properties:
+- compatible: Should be "marvell,xenon-sdhci".
+- reg:
+  one register area for the SDHCI registers.
+- interrupts-extended: interrupt number and attributes
+- clocks: array of clocks required for SDHCI.
+- bus-width: max bus width in unit of bit, normally should be 1 bit, 4 bits or 8 bits
+
+Optional properties:
+- non-removable: whether card is non-removable.
+- auto-cmd12: whether cmd12 is sent automatically.
+Example:
+
+sdhci0: sdhci@D8000 {
+	compatible = "marvell,xenon-sdhci";
+	reg = <0xD8000 0x300>;
+	interrupts-extended = <&gic GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+	non-removable;
+	bus-width = <8>;
+	auto-cmd12;
+	status = "disabled";
+};
