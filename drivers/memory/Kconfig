@@ -51,6 +51,7 @@ config TI_EMIF
 
 config OMAP_GPMC
 	bool
+	default y
 	select GPIOLIB
 	help
 	  This driver is for the General Purpose Memory Controller (GPMC)
