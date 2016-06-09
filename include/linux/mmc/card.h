@@ -527,6 +527,7 @@ struct mmc_driver {
 	void (*shutdown)(struct mmc_card *);
 };
 
+extern int card_alive(struct mmc_card *);
 extern int mmc_register_driver(struct mmc_driver *);
 extern void mmc_unregister_driver(struct mmc_driver *);
 

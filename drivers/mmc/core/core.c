@@ -2473,6 +2473,13 @@ int mmc_hw_reset(struct mmc_host *host)
 }
 EXPORT_SYMBOL(mmc_hw_reset);
 
+
+int card_alive(struct mmc_card *card)
+{
+	return card->host->bus_ops->alive(card->host);
+}
+EXPORT_SYMBOL(card_alive);
+
 static int mmc_rescan_try_freq(struct mmc_host *host, unsigned freq)
 {
 	host->f_init = freq;
