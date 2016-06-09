@@ -1161,7 +1161,6 @@ static int acm_probe(struct usb_interface *intf,
 	int minor;
 	int ctrlsize, readsize;
 	u8 *buf;
-	u8 ac_management_function = 0;
 	int call_interface_num = -1;
 	int data_interface_num = -1;
 	unsigned long quirks;
@@ -1329,11 +1328,8 @@ made_compressed_probe:
 		goto alloc_fail;
 
 	minor = acm_alloc_minor(acm);
-	if (minor < 0) {
-		dev_err(&intf->dev, "no more free acm devices\n");
-		kfree(acm);
-		return -ENODEV;
-	}
+	if (minor < 0)
+		goto alloc_fail1;
 
 	ctrlsize = usb_endpoint_maxp(epctrl);
 	readsize = usb_endpoint_maxp(epread) *
@@ -1524,6 +1520,7 @@ alloc_fail4:
 	usb_free_coherent(usb_dev, ctrlsize, acm->ctrl_buffer, acm->ctrl_dma);
 alloc_fail2:
 	acm_release_minor(acm);
+alloc_fail1:
 	kfree(acm);
 alloc_fail:
 	return rv;
