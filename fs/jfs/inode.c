@@ -374,6 +374,7 @@ const struct address_space_operations jfs_aops = {
  */
 void jfs_truncate_nolock(struct inode *ip, loff_t length)
 {
+	struct super_block *sb = ip->i_sb;
 	loff_t newsize;
 	tid_t tid;
 
@@ -385,7 +386,7 @@ void jfs_truncate_nolock(struct inode *ip, loff_t length)
 	}
 
 	do {
-		tid = txBegin(ip->i_sb, 0);
+		tid = txBegin(sb, 0);
 
 		/*
 		 * The commit_mutex cannot be taken before txBegin.
@@ -403,7 +404,7 @@ void jfs_truncate_nolock(struct inode *ip, loff_t length)
 			break;
 		}
 
-		ip->i_mtime = ip->i_ctime = CURRENT_TIME;
+		ip->i_mtime = ip->i_ctime = current_fs_time(sb);
 		mark_inode_dirty(ip);
 
 		txCommit(tid, 1, &ip, 0);

@@ -402,6 +402,7 @@ static int orangefs_rename(struct inode *old_dir,
 			struct dentry *new_dentry)
 {
 	struct orangefs_kernel_op_s *new_op;
+	struct inode *new_inode;
 	int ret;
 
 	gossip_debug(GOSSIP_NAME_DEBUG,
@@ -434,8 +435,9 @@ static int orangefs_rename(struct inode *old_dir,
 		     "orangefs_rename: got downcall status %d\n",
 		     ret);
 
-	if (new_dentry->d_inode)
-		new_dentry->d_inode->i_ctime = CURRENT_TIME;
+	new_inode = new_dentry->d_inode;
+	if (new_inode)
+		new_inode->i_ctime = current_fs_time(new_inode->i_sb);
 
 	op_release(new_op);
 	return ret;

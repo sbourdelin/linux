@@ -597,7 +597,7 @@ void f2fs_delete_inline_entry(struct f2fs_dir_entry *dentry, struct page *page,
 
 	set_page_dirty(page);
 
-	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
+	dir->i_ctime = dir->i_mtime = current_fs_time(dir->i_sb);
 
 	if (inode)
 		f2fs_drop_nlink(dir, inode, page);

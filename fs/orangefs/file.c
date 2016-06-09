@@ -358,7 +358,7 @@ out:
 			file_accessed(file);
 		} else {
 			SetMtimeFlag(orangefs_inode);
-			inode->i_mtime = CURRENT_TIME;
+			inode->i_mtime = current_fs_time(inode->i_sb);
 			mark_inode_dirty_sync(inode);
 		}
 	}

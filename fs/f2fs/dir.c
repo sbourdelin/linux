@@ -303,7 +303,7 @@ void f2fs_set_link(struct inode *dir, struct f2fs_dir_entry *de,
 	set_de_type(de, inode->i_mode);
 	f2fs_dentry_kunmap(dir, page);
 	set_page_dirty(page);
-	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
+	dir->i_mtime = dir->i_ctime = current_fs_time(dir->i_sb);
 	mark_inode_dirty(dir);
 
 	f2fs_put_page(page, 1);
@@ -461,7 +461,7 @@ void update_parent_metadata(struct inode *dir, struct inode *inode,
 		}
 		clear_inode_flag(F2FS_I(inode), FI_NEW_INODE);
 	}
-	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
+	dir->i_mtime = dir->i_ctime = current_fs_time(dir->i_sb);
 	mark_inode_dirty(dir);
 
 	if (F2FS_I(dir)->i_current_depth != current_depth) {
@@ -681,7 +681,7 @@ void f2fs_drop_nlink(struct inode *dir, struct inode *inode, struct page *page)
 		else
 			update_inode_page(dir);
 	}
-	inode->i_ctime = CURRENT_TIME;
+	inode->i_ctime = current_fs_time(inode->i_sb);
 
 	drop_nlink(inode);
 	if (S_ISDIR(inode->i_mode)) {
@@ -729,7 +729,7 @@ void f2fs_delete_entry(struct f2fs_dir_entry *dentry, struct page *page,
 	kunmap(page); /* kunmap - pair of f2fs_find_entry */
 	set_page_dirty(page);
 
-	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
+	dir->i_ctime = dir->i_mtime = current_fs_time(dir->i_sb);
 
 	if (inode)
 		f2fs_drop_nlink(dir, inode, NULL);

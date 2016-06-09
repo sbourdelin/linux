@@ -48,6 +48,7 @@ void *ns_get_path(struct path *path, struct task_struct *task,
 			const struct proc_ns_operations *ns_ops)
 {
 	struct vfsmount *mnt = mntget(nsfs_mnt);
+	struct super_block *s = mnt->mnt_sb;
 	struct qstr qname = { .name = "", };
 	struct dentry *dentry;
 	struct inode *inode;
@@ -75,14 +76,14 @@ got_it:
 	return NULL;
 slow:
 	rcu_read_unlock();
-	inode = new_inode_pseudo(mnt->mnt_sb);
+	inode = new_inode_pseudo(s);
 	if (!inode) {
 		ns_ops->put(ns);
 		mntput(mnt);
 		return ERR_PTR(-ENOMEM);
 	}
 	inode->i_ino = ns->inum;
-	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+	inode->i_mtime = inode->i_atime = inode->i_ctime = current_fs_time(s);
 	inode->i_flags |= S_IMMUTABLE;
 	inode->i_mode = S_IFREG | S_IRUGO;
 	inode->i_fop = &ns_file_operations;

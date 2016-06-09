@@ -672,7 +672,8 @@ static const struct dentry_operations pipefs_dentry_operations = {
 
 static struct inode * get_pipe_inode(void)
 {
-	struct inode *inode = new_inode_pseudo(pipe_mnt->mnt_sb);
+	struct super_block *s = pipe_mnt->mnt_sb;
+	struct inode *inode = new_inode_pseudo(s);
 	struct pipe_inode_info *pipe;
 
 	if (!inode)
@@ -699,7 +700,7 @@ static struct inode * get_pipe_inode(void)
 	inode->i_mode = S_IFIFO | S_IRUSR | S_IWUSR;
 	inode->i_uid = current_fsuid();
 	inode->i_gid = current_fsgid();
-	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+	inode->i_atime = inode->i_mtime = inode->i_ctime = current_fs_time(s);
 
 	return inode;
 

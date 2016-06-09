@@ -550,7 +550,8 @@ static int autofs4_dir_symlink(struct inode *dir,
 			       struct dentry *dentry,
 			       const char *symname)
 {
-	struct autofs_sb_info *sbi = autofs4_sbi(dir->i_sb);
+	struct super_block *sb = dir->i_sb;
+	struct autofs_sb_info *sbi = autofs4_sbi(sb);
 	struct autofs_info *ino = autofs4_dentry_ino(dentry);
 	struct autofs_info *p_ino;
 	struct inode *inode;
@@ -574,7 +575,7 @@ static int autofs4_dir_symlink(struct inode *dir,
 
 	strcpy(cp, symname);
 
-	inode = autofs4_get_inode(dir->i_sb, S_IFLNK | 0555);
+	inode = autofs4_get_inode(sb, S_IFLNK | 0555);
 	if (!inode) {
 		kfree(cp);
 		if (!dentry->d_fsdata)
@@ -591,7 +592,7 @@ static int autofs4_dir_symlink(struct inode *dir,
 	if (p_ino && !IS_ROOT(dentry))
 		atomic_inc(&p_ino->count);
 
-	dir->i_mtime = CURRENT_TIME;
+	dir->i_mtime = current_fs_time(sb);
 
 	return 0;
 }
@@ -613,7 +614,8 @@ static int autofs4_dir_symlink(struct inode *dir,
  */
 static int autofs4_dir_unlink(struct inode *dir, struct dentry *dentry)
 {
-	struct autofs_sb_info *sbi = autofs4_sbi(dir->i_sb);
+	struct super_block *sb = dir->i_sb;
+	struct autofs_sb_info *sbi = autofs4_sbi(sb);
 	struct autofs_info *ino = autofs4_dentry_ino(dentry);
 	struct autofs_info *p_ino;
 
@@ -631,7 +633,7 @@ static int autofs4_dir_unlink(struct inode *dir, struct dentry *dentry)
 	d_inode(dentry)->i_size = 0;
 	clear_nlink(d_inode(dentry));
 
-	dir->i_mtime = CURRENT_TIME;
+	dir->i_mtime = current_fs_time(sb);
 
 	spin_lock(&sbi->lookup_lock);
 	__autofs4_add_expiring(dentry);
@@ -732,7 +734,8 @@ static int autofs4_dir_rmdir(struct inode *dir, struct dentry *dentry)
 static int autofs4_dir_mkdir(struct inode *dir,
 			     struct dentry *dentry, umode_t mode)
 {
-	struct autofs_sb_info *sbi = autofs4_sbi(dir->i_sb);
+	struct super_block *sb = dir->i_sb;
+	struct autofs_sb_info *sbi = autofs4_sbi(sb);
 	struct autofs_info *ino = autofs4_dentry_ino(dentry);
 	struct autofs_info *p_ino;
 	struct inode *inode;
@@ -748,7 +751,7 @@ static int autofs4_dir_mkdir(struct inode *dir,
 
 	autofs4_del_active(dentry);
 
-	inode = autofs4_get_inode(dir->i_sb, S_IFDIR | 0555);
+	inode = autofs4_get_inode(sb, S_IFDIR | 0555);
 	if (!inode)
 		return -ENOMEM;
 	d_add(dentry, inode);
@@ -762,7 +765,7 @@ static int autofs4_dir_mkdir(struct inode *dir,
 	if (p_ino && !IS_ROOT(dentry))
 		atomic_inc(&p_ino->count);
 	inc_nlink(dir);
-	dir->i_mtime = CURRENT_TIME;
+	dir->i_mtime = current_fs_time(sb);
 
 	return 0;
 }
