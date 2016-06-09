@@ -902,10 +902,10 @@ static inline int ra_has_index(struct file_ra_state *ra, pgoff_t index)
 struct file {
 	union {
 		struct llist_node	fu_llist;
-		struct rcu_head 	fu_rcuhead;
+		struct rcu_head		fu_rcuhead;
 	} f_u;
-	struct path		f_path;
-	struct inode		*f_inode;	/* cached value */
+	struct path			f_path;
+	struct inode			*f_inode; /* cached value */
 	const struct file_operations	*f_op;
 
 	/*
@@ -914,7 +914,7 @@ struct file {
 	 */
 	spinlock_t		f_lock;
 	atomic_long_t		f_count;
-	unsigned int 		f_flags;
+	unsigned int		f_flags;
 	fmode_t			f_mode;
 	struct mutex		f_pos_lock;
 	loff_t			f_pos;
@@ -960,7 +960,7 @@ static inline struct file *get_file(struct file *f)
 #if BITS_PER_LONG==32
 #define MAX_LFS_FILESIZE	(((loff_t)PAGE_SIZE << (BITS_PER_LONG-1))-1)
 #elif BITS_PER_LONG==64
-#define MAX_LFS_FILESIZE 	((loff_t)0x7fffffffffffffffLL)
+#define MAX_LFS_FILESIZE	((loff_t)0x7fffffffffffffffLL)
 #endif
 
 #define FL_POSIX	1
@@ -1385,7 +1385,7 @@ struct super_block {
 	char s_id[32];				/* Informational name */
 	u8 s_uuid[16];				/* UUID */
 
-	void 			*s_fs_info;	/* Filesystem private info */
+	void			*s_fs_info;	/* Filesystem private info */
 	unsigned int		s_max_links;
 	fmode_t			s_mode;
 
@@ -1687,12 +1687,17 @@ struct file_operations {
 	int (*aio_fsync) (struct kiocb *, int datasync);
 	int (*fasync) (int, struct file *, int);
 	int (*lock) (struct file *, int, struct file_lock *);
-	ssize_t (*sendpage) (struct file *, struct page *, int, size_t, loff_t *, int);
-	unsigned long (*get_unmapped_area)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
+	ssize_t (*sendpage) (struct file *, struct page *, int, size_t,
+			     loff_t *, int);
+	unsigned long (*get_unmapped_area)(struct file *, unsigned long,
+					   unsigned long, unsigned long,
+					   unsigned long);
 	int (*check_flags)(int);
 	int (*flock) (struct file *, int, struct file_lock *);
-	ssize_t (*splice_write)(struct pipe_inode_info *, struct file *, loff_t *, size_t, unsigned int);
-	ssize_t (*splice_read)(struct file *, loff_t *, struct pipe_inode_info *, size_t, unsigned int);
+	ssize_t (*splice_write)(struct pipe_inode_info *, struct file *,
+				loff_t *, size_t, unsigned int);
+	ssize_t (*splice_read)(struct file *, loff_t *, struct pipe_inode_info *,
+			       size_t, unsigned int);
 	int (*setlease)(struct file *, long, struct file_lock **, void **);
 	long (*fallocate)(struct file *file, int mode, loff_t offset,
 			  loff_t len);
@@ -1710,7 +1715,8 @@ struct file_operations {
 
 struct inode_operations {
 	struct dentry * (*lookup) (struct inode *,struct dentry *, unsigned int);
-	const char * (*get_link) (struct dentry *, struct inode *, struct delayed_call *);
+	const char * (*get_link) (struct dentry *, struct inode *,
+				  struct delayed_call *);
 	int (*permission) (struct inode *, int);
 	struct posix_acl * (*get_acl)(struct inode *, int);
 
@@ -1766,10 +1772,10 @@ extern int vfs_dedupe_file_range(struct file *file,
 				 struct file_dedupe_range *same);
 
 struct super_operations {
-   	struct inode *(*alloc_inode)(struct super_block *sb);
+	struct inode *(*alloc_inode)(struct super_block *sb);
 	void (*destroy_inode)(struct inode *);
 
-   	void (*dirty_inode) (struct inode *, int flags);
+	void (*dirty_inode) (struct inode *, int flags);
 	int (*write_inode) (struct inode *, struct writeback_control *wbc);
 	int (*drop_inode) (struct inode *);
 	void (*evict_inode) (struct inode *);
@@ -2006,11 +2012,11 @@ int sync_inode_metadata(struct inode *inode, int wait);
 struct file_system_type {
 	const char *name;
 	int fs_flags;
-#define FS_REQUIRES_DEV		1 
+#define FS_REQUIRES_DEV		1
 #define FS_BINARY_MOUNTDATA	2
 #define FS_HAS_SUBTYPE		4
 #define FS_USERNS_MOUNT		8	/* Can be mounted by userns root */
-#define FS_USERNS_DEV_MOUNT	16 /* A userns mount does not imply MNT_NODEV */
+#define FS_USERNS_DEV_MOUNT	16	/* A userns mount does not imply MNT_NODEV */
 #define FS_USERNS_VISIBLE	32	/* FS must already be visible */
 #define FS_RENAME_DOES_D_MOVE	32768	/* FS will handle d_move() during rename() internally. */
 	struct dentry *(*mount) (struct file_system_type *, int,
