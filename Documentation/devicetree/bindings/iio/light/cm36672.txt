@@ -1,0 +1,37 @@
+* Vishay Capella CM36672 I2C Proximity sensor
+
+Required properties:
+- compatible: must be capella,cm36672"
+- reg: the I2C slave address, usually 0x60
+- interrupts: interrupt mapping for GPIO IRQ
+
+Optional properties:
+- interrupt-parent: interrupt controller
+- interrupts: interrupt mapping for GPIO IRQ
+- cm36672,prx_led_current: LED current, must be one of the following values:
+    - 0: 50mA
+    - 1: 75mA
+    - 2: 100mA
+    - 3: 120mA
+    - 4: 140mA
+    - 5: 160mA
+    - 6: 180mA
+    - 7: 200mA
+- cm36672,prx_hd: width of proximity sensor output data, must be one of the
+  following values:
+    - 0: 12-bit
+    - 1: 16-bit
+
+Example:
+
+    cm36672@60 {
+        compatible = "capella,cm36672";
+        reg = <0x60>;
+        interrupt-parent = <&gpio0>;
+        interrupts = <30 0>;
+
+        /* cm36672-specific properties */
+        cm36672,prx_led_current = <2>;
+        cm36672,prx_hd = <1>;
+    };
+
