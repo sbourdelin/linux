@@ -3958,6 +3958,11 @@ static __be32 nfs4_get_vfs_file(struct svc_rqst *rqstp, struct nfs4_file *fp,
 
 	spin_lock(&fp->fi_lock);
 
+	if (test_access(open->op_share_access, stp)) {
+		spin_unlock(&fp->fi_lock);
+		return nfserr_eagain;
+	}
+
 	/*
 	 * Are we trying to set a deny mode that would conflict with
 	 * current access?
@@ -4017,11 +4022,21 @@ nfs4_upgrade_open(struct svc_rqst *rqstp, struct nfs4_file *fp, struct svc_fh *c
 	__be32 status;
 	unsigned char old_deny_bmap = stp->st_deny_bmap;
 
-	if (!test_access(open->op_share_access, stp))
-		return nfs4_get_vfs_file(rqstp, fp, cur_fh, stp, open);
+again:
+	spin_lock(&fp->fi_lock);
+	if (!test_access(open->op_share_access, stp)) {
+		spin_unlock(&fp->fi_lock);
+		status = nfs4_get_vfs_file(rqstp, fp, cur_fh, stp, open);
+		/*
+		 * Somebody won the race for access while we did not hold
+		 * the lock here
+		 */
+		if (status == nfserr_eagain)
+			goto again;
+		return status;
+	}
 
 	/* test and set deny mode */
-	spin_lock(&fp->fi_lock);
 	status = nfs4_file_check_deny(fp, open->op_share_deny);
 	if (status == nfs_ok) {
 		set_deny(open->op_share_deny, stp);
@@ -4361,6 +4376,13 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 		status = nfs4_get_vfs_file(rqstp, fp, current_fh, stp, open);
 		if (status) {
 			up_read(&stp->st_rwsem);
+			/*
+			 * EAGAIN is returned when there's a racing access,
+			 * this should never happen as we are the only user
+			 * of this new state, and since it's not yet hashed,
+			 * nobody can find it
+			 */
+			WARN_ON(status == nfserr_eagain);
 			release_open_stateid(stp);
 			goto out;
 		}
