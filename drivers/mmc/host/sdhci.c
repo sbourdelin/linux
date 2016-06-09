@@ -1729,6 +1729,10 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
 	if (host->version < SDHCI_SPEC_300)
 		return 0;
 
+	/* Some controller need to do more before switching */
+	if (host->ops->voltage_switch_pre)
+		host->ops->voltage_switch_pre(host);
+
 	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
 
 	switch (ios->signal_voltage) {
