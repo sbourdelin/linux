@@ -490,7 +490,7 @@ static void mv88e6xxx_adjust_link(struct dsa_switch *ds, int port,
 
 	reg |= PORT_PCS_CTRL_FORCE_LINK;
 	if (phydev->link)
-			reg |= PORT_PCS_CTRL_LINK_UP;
+		reg |= PORT_PCS_CTRL_LINK_UP;
 
 	if (mv88e6xxx_6065_family(ps) && phydev->speed > SPEED_100)
 		goto out;
@@ -1314,9 +1314,9 @@ static int _mv88e6xxx_port_state(struct mv88e6xxx_priv_state *ps, int port,
 		 * Blocking or Listening state.
 		 */
 		if ((oldstate == PORT_CONTROL_STATE_LEARNING ||
-		     oldstate == PORT_CONTROL_STATE_FORWARDING)
-		    && (state == PORT_CONTROL_STATE_DISABLED ||
-			state == PORT_CONTROL_STATE_BLOCKING)) {
+		     oldstate == PORT_CONTROL_STATE_FORWARDING) &&
+		    (state == PORT_CONTROL_STATE_DISABLED ||
+		     state == PORT_CONTROL_STATE_BLOCKING)) {
 			ret = _mv88e6xxx_atu_remove(ps, 0, port, false);
 			if (ret)
 				return ret;
@@ -1659,7 +1659,8 @@ static int mv88e6xxx_port_vlan_dump(struct dsa_switch *ds, int port,
 			continue;
 
 		/* reinit and dump this VLAN obj */
-		vlan->vid_begin = vlan->vid_end = next.vid;
+		vlan->vid_begin = next.vid;
+		vlan->vid_end = next.vid;
 		vlan->flags = 0;
 
 		if (next.data[port] == GLOBAL_VTU_DATA_MEMBER_TAG_UNTAGGED)
@@ -2093,9 +2094,10 @@ unlock:
 	return ret;
 }
 
-static int mv88e6xxx_port_vlan_prepare(struct dsa_switch *ds, int port,
-				       const struct switchdev_obj_port_vlan *vlan,
-				       struct switchdev_trans *trans)
+static int
+mv88e6xxx_port_vlan_prepare(struct dsa_switch *ds, int port,
+			    const struct switchdev_obj_port_vlan *vlan,
+			    struct switchdev_trans *trans)
 {
 	struct mv88e6xxx_priv_state *ps = ds_to_priv(ds);
 	int err;
@@ -2735,7 +2737,7 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_priv_state *ps, int port)
 		    mv88e6xxx_6165_family(ps) || mv88e6xxx_6097_family(ps) ||
 		    mv88e6xxx_6095_family(ps) || mv88e6xxx_6065_family(ps) ||
 		    mv88e6xxx_6185_family(ps) || mv88e6xxx_6320_family(ps)) {
-				reg |= PORT_CONTROL_EGRESS_ADD_TAG;
+			reg |= PORT_CONTROL_EGRESS_ADD_TAG;
 		}
 	}
 	if (dsa_is_dsa_port(ds, port)) {
