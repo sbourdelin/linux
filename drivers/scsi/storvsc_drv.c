@@ -1673,11 +1673,15 @@ static int storvsc_probe(struct hv_device *device,
 	/* max cmd length */
 	host->max_cmd_len = STORVSC_MAX_CMD_LEN;
 
+#ifdef CONFIG_64BIT
 	/*
 	 * set the table size based on the info we got
 	 * from the host.
 	 */
 	host->sg_tablesize = (stor_device->max_transfer_bytes >> PAGE_SHIFT);
+#else
+	host->sg_tablesize = MAX_MULTIPAGE_BUFFER_COUNT;
+#endif
 
 	/* Register the HBA and start the scsi bus scan */
 	ret = scsi_add_host(host, &device->device);
