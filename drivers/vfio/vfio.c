@@ -646,6 +646,7 @@ static int vfio_dev_viable(struct device *dev, void *data)
 static int vfio_group_nb_add_dev(struct vfio_group *group, struct device *dev)
 {
 	struct vfio_device *device;
+	struct pci_dev *pdev;
 
 	/* Do we already know about it?  We shouldn't */
 	device = vfio_group_get_device(group, dev);
@@ -658,10 +659,19 @@ static int vfio_group_nb_add_dev(struct vfio_group *group, struct device *dev)
 	if (!atomic_read(&group->container_users))
 		return 0;
 
-	/* TODO Prevent device auto probing */
-	WARN(1, "Device %s added to live group %d!\n", dev_name(dev),
-	     iommu_group_id(group->iommu_group));
-
+	if (dev_is_pci(dev)) {
+		/* a device that shares a group with another VFIO
+		 * device should also be probed by VFIO
+		 */
+		pdev = to_pci_dev(dev);
+		if (pdev->driver_override)
+			kfree(pdev->driver_override);
+		pdev->driver_override = kstrdup("vfio-pci", GFP_KERNEL);
+	} else {
+		/* TODO Prevent device auto probing */
+		WARN(1, "Device %s added to live group %d!\n", dev_name(dev),
+		     iommu_group_id(group->iommu_group));
+	}
 	return 0;
 }
 
