@@ -3231,6 +3231,16 @@ static int ath6kl_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 					wait, buf, len, no_cck);
 }
 
+static int ath6kl_set_antenna(struct wiphy *wiphy,
+				u32 tx_ant, u32 rx_ant)
+{
+	/*
+	 * Note: This callback should be implement when firmware support this
+	 * command.
+	 */
+	return 0;
+}
+
 static int ath6kl_get_antenna(struct wiphy *wiphy,
 			      u32 *tx_ant, u32 *rx_ant)
 {
@@ -3456,6 +3466,7 @@ static struct cfg80211_ops ath6kl_cfg80211_ops = {
 	.cancel_remain_on_channel = ath6kl_cancel_remain_on_channel,
 	.mgmt_tx = ath6kl_mgmt_tx,
 	.mgmt_frame_register = ath6kl_mgmt_frame_register,
+	.set_antenna = ath6kl_set_antenna,
 	.get_antenna = ath6kl_get_antenna,
 	.sched_scan_start = ath6kl_cfg80211_sscan_start,
 	.sched_scan_stop = ath6kl_cfg80211_sscan_stop,
