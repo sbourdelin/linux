@@ -225,12 +225,6 @@ CPU thread. Per core mode is automatically enabled
 and -a (global monitoring) is needed, requiring root rights or
 perf.perf_event_paranoid=-1.
 
-Topdown uses the full Performance Monitoring Unit, and needs
-disabling of the NMI watchdog (as root):
-echo 0 > /proc/sys/kernel/nmi_watchdog
-for best results. Otherwise the bottlenecks may be inconsistent
-on workload with changing phases.
-
 This enables --metric-only, unless overriden with --no-metric-only.
 
 To interpret the results it is usually needed to know on which

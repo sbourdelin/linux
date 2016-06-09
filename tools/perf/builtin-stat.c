@@ -59,10 +59,8 @@
 #include "util/thread.h"
 #include "util/thread_map.h"
 #include "util/counts.h"
-#include "util/group.h"
 #include "util/session.h"
 #include "util/tool.h"
-#include "util/group.h"
 #include "asm/bug.h"
 
 #include <api/fs/fs.h>
@@ -1861,16 +1859,6 @@ static int topdown_filter_events(const char **attr, char **str, bool use_group)
 	return 0;
 }
 
-__weak bool arch_topdown_check_group(bool *warn)
-{
-	*warn = false;
-	return false;
-}
-
-__weak void arch_topdown_group_warn(void)
-{
-}
-
 /*
  * Add default attributes, if there were no attributes specified or
  * if -d/--detailed, -d -d or -d -d -d is used:
@@ -2010,7 +1998,6 @@ static int add_default_attributes(void)
 
 	if (topdown_run) {
 		char *str = NULL;
-		bool warn = false;
 
 		if (stat_config.aggr_mode != AGGR_GLOBAL &&
 		    stat_config.aggr_mode != AGGR_CORE) {
@@ -2025,14 +2012,11 @@ static int add_default_attributes(void)
 
 		if (!force_metric_only)
 			metric_only = true;
-		if (topdown_filter_events(topdown_attrs, &str,
-				arch_topdown_check_group(&warn)) < 0) {
+		if (topdown_filter_events(topdown_attrs, &str, true) < 0) {
 			pr_err("Out of memory\n");
 			return -1;
 		}
 		if (topdown_attrs[0] && str) {
-			if (warn)
-				arch_topdown_group_warn();
 			err = parse_events(evsel_list, str, NULL);
 			if (err) {
 				fprintf(stderr,
