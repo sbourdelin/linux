@@ -54,6 +54,10 @@ static void sdhci_f_sdh30_soft_voltage_switch(struct sdhci_host *host)
 	struct f_sdhost_priv *priv = sdhci_priv(host);
 	u32 ctrl = 0;
 
+	/* Initially this function was called only for the 1.8V case */
+	if (host->mmc->ios.signal_voltage != MMC_SIGNAL_VOLTAGE_180)
+		return;
+
 	usleep_range(2500, 3000);
 	ctrl = sdhci_readl(host, F_SDH30_IO_CONTROL2);
 	ctrl |= F_SDH30_CRES_O_DN;
