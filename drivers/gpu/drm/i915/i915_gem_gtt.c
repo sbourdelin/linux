@@ -2156,6 +2156,12 @@ static void gtt_write_workarounds(struct drm_device *dev)
 		I915_WRITE(GEN8_L3_LRA_1_GPGPU, GEN9_L3_LRA_1_GPGPU_DEFAULT_VALUE_SKL);
 	else if (IS_BROXTON(dev))
 		I915_WRITE(GEN8_L3_LRA_1_GPGPU, GEN9_L3_LRA_1_GPGPU_DEFAULT_VALUE_BXT);
+
+	/* WaConextSwitchWithConcurrentTLBInvalidate:gen9 */
+	if (IS_GEN9(dev))
+	{
+		I915_WRITE(GEN9_CSFE_CHICKEN1_RCS, _MASKED_BIT_ENABLE(GEN9_PREEMPT_GPGPU_SYNC_SWITCH_DISABLE));
+	}
 }
 
 static int i915_ppgtt_init(struct drm_device *dev, struct i915_hw_ppgtt *ppgtt)
