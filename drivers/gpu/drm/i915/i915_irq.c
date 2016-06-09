@@ -2813,6 +2813,16 @@ static int gen8_enable_vblank(struct drm_device *dev, unsigned int pipe)
 	return 0;
 }
 
+static void valleyview_prepare_vblank(struct drm_device *dev, unsigned int pipe)
+{
+	vlv_psr_src_timing_get(dev);
+}
+
+static void valleyview_unprepare_vblank(struct drm_device *dev, unsigned int pipe){
+
+	vlv_psr_src_timing_put(dev);
+}
+
 /* Called from drm generic code, passed 'crtc' which
  * we use as a pipe index
  */
@@ -4643,6 +4653,8 @@ void intel_irq_init(struct drm_i915_private *dev_priv)
 		dev->driver->irq_uninstall = cherryview_irq_uninstall;
 		dev->driver->enable_vblank = valleyview_enable_vblank;
 		dev->driver->disable_vblank = valleyview_disable_vblank;
+		dev->driver->prepare_vblank = valleyview_prepare_vblank;
+		dev->driver->unprepare_vblank = valleyview_unprepare_vblank;
 		dev_priv->display.hpd_irq_setup = i915_hpd_irq_setup;
 	} else if (IS_VALLEYVIEW(dev_priv)) {
 		dev->driver->irq_handler = valleyview_irq_handler;

@@ -479,6 +479,7 @@ void intel_psr_enable(struct intel_dp *intel_dp)
 
 		/* Enable PSR on the panel */
 		vlv_psr_enable_sink(intel_dp);
+		dev_priv->psr.vlv_src_timing = false;
 
 		/* On HSW+ enable_source also means go to PSR entry/active
 		 * state as soon as idle_frame achieved and here would be
@@ -625,8 +626,10 @@ static void intel_psr_work(struct work_struct *work)
 	 * The delayed work can race with an invalidate hence we need to
 	 * recheck. Since psr_flush first clears this and then reschedules we
 	 * won't ever miss a flush when bailing out here.
+	 * Also, do not enable PSR if source is required to generate timing
+	 * signals like vblanks.
 	 */
-	if (dev_priv->psr.busy_frontbuffer_bits)
+	if (dev_priv->psr.busy_frontbuffer_bits || dev_priv->psr.vlv_src_timing)
 		goto unlock;
 
 	intel_psr_activate(intel_dp);
@@ -721,6 +724,62 @@ void intel_psr_single_frame_update(struct drm_device *dev,
 		 */
 		I915_WRITE(VLV_PSRCTL(pipe), val | VLV_EDP_PSR_SINGLE_FRAME_UPDATE);
 	}
+	mutex_unlock(&dev_priv->psr.lock);
+}
+
+/**
+ * vlv_psr_src_timing_get - src timing generation requested
+ *
+ * CHV does not have HW tracking to trigger PSR exit when VBI are enabled nor
+ * does enabling vblank interrupts prevent PSR entry. This function is called
+ * before enabling VBI to exit PSR and prevent PSR re-entry until vblanks are
+ * disabled again.
+ */
+void vlv_psr_src_timing_get(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	mutex_lock(&dev_priv->psr.lock);
+        if (!dev_priv->psr.enabled) {
+                mutex_unlock(&dev_priv->psr.lock);
+                return;
+	}
+
+	//Handle racing with intel_psr_work with this flag
+	dev_priv->psr.vlv_src_timing = true;
+
+	if(dev_priv->psr.active)
+		intel_psr_exit(dev);
+
+	mutex_unlock(&dev_priv->psr.lock);
+
+}
+
+
+/**
+ * vlv_psr_src_timing_put - src timing generation not required
+ *
+ * CHV does not have HW tracking to trigger PSR exit when VBI are enabled nor
+ * does enabling vblank interrupts prevent PSR entry. This function is called
+ * when VBI are not required and PSR can be activated.
+ */
+void vlv_psr_src_timing_put(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	mutex_lock(&dev_priv->psr.lock);
+	if (!dev_priv->psr.enabled) {
+                mutex_unlock(&dev_priv->psr.lock);
+                return;
+        }
+
+	dev_priv->psr.vlv_src_timing = false;
+
+	if (!dev_priv->psr.active)
+                if (!work_busy(&dev_priv->psr.work.work))
+			schedule_delayed_work(&dev_priv->psr.work,
+                                              msecs_to_jiffies(100));
+
 	mutex_unlock(&dev_priv->psr.lock);
 }
 

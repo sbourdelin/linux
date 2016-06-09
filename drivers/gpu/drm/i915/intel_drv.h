@@ -1473,6 +1473,8 @@ void intel_psr_flush(struct drm_device *dev,
 void intel_psr_init(struct drm_device *dev);
 void intel_psr_single_frame_update(struct drm_device *dev,
 				   unsigned frontbuffer_bits);
+void vlv_psr_src_timing_get(struct drm_device *dev);
+void vlv_psr_src_timing_put(struct drm_device *dev);
 
 /* intel_runtime_pm.c */
 int intel_power_domains_init(struct drm_i915_private *);
