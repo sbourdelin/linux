@@ -382,6 +382,7 @@ struct file *sock_alloc_file(struct socket *sock, int flags, const char *dname)
 	}
 
 	sock->file = file;
+	file->f_owner.sock_pid  = find_get_pid(task_pid_nr(current));
 	file->f_flags = O_RDWR | (flags & O_NONBLOCK);
 	file->private_data = sock;
 	return file;

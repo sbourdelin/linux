@@ -278,6 +278,24 @@ nla_put_failure:
 	return -1;
 }
 
+static int nfqnl_put_sk_pid(struct sk_buff *skb, struct sock *sk)
+{
+	struct pid *sk_pid;
+	int err = 0;
+
+	if (!sk_fullsock(sk))
+		return 0;
+
+	read_lock_bh(&sk->sk_callback_lock);
+	if (sk->sk_socket && sk->sk_socket->file) {
+		sk_pid = sk->sk_socket->file->f_owner.sock_pid;
+		if (sk_pid)
+			err = nla_put_be32(skb, NFQA_PID, htonl(pid_nr(sk_pid)));
+	}
+	read_unlock_bh(&sk->sk_callback_lock);
+	return err;
+}
+
 static u32 nfqnl_get_sk_secctx(struct sk_buff *skb, char **secdata)
 {
 	u32 seclen = 0;
@@ -440,6 +458,9 @@ nfqnl_build_packet_message(struct net *net, struct nfqnl_instance *queue,
 			size += nla_total_size(seclen);
 	}
 
+	if (queue->flags & NFQA_CFG_F_PID)
+		size += nla_total_size(sizeof(int32_t)); /* pid */
+
 	skb = alloc_skb(size, GFP_ATOMIC);
 	if (!skb) {
 		skb_tx_error(entskb);
@@ -568,6 +589,10 @@ nfqnl_build_packet_message(struct net *net, struct nfqnl_instance *queue,
 
 	if ((queue->flags & NFQA_CFG_F_UID_GID) && entskb->sk &&
 	    nfqnl_put_sk_uidgid(skb, entskb->sk) < 0)
+		goto nla_put_failure;
+
+	if ((queue->flags & NFQA_CFG_F_PID) && entskb->sk &&
+	    nfqnl_put_sk_pid(skb, entskb->sk) < 0)
 		goto nla_put_failure;
 
 	if (seclen && nla_put(skb, NFQA_SECCTX, seclen, secdata))

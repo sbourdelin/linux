@@ -871,6 +871,7 @@ extern struct block_device *I_BDEV(struct inode *inode);
 struct fown_struct {
 	rwlock_t lock;          /* protects pid, uid, euid fields */
 	struct pid *pid;	/* pid or -pgrp where SIGIO should be sent */
+	struct pid *sock_pid;	/* pid of the process that created the socket */
 	enum pid_type pid_type;	/* Kind of process group SIGIO should be sent to */
 	kuid_t uid, euid;	/* uid/euid of process setting the owner */
 	int signum;		/* posix.1b rt signal to be delivered on IO */
