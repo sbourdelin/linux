@@ -45,6 +45,7 @@ struct i915_params i915 __read_mostly = {
 	.fastboot = 0,
 	.prefault_disable = 0,
 	.load_detect_test = 0,
+	.watermark_test = 0,
 	.reset = true,
 	.invert_brightness = 0,
 	.disable_display = 0,

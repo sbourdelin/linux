@@ -14116,6 +14116,9 @@ static void intel_begin_crtc_commit(struct drm_crtc *crtc,
 		to_intel_crtc_state(old_crtc_state);
 	bool modeset = needs_modeset(crtc->state);
 
+	if (i915.watermark_test)
+		intel_wait_for_vblank(dev, intel_crtc->pipe);
+
 	/* Perform vblank evasion around commit operation */
 	intel_pipe_update_start(intel_crtc);
 
@@ -14139,6 +14142,9 @@ static void intel_finish_crtc_commit(struct drm_crtc *crtc,
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 
 	intel_pipe_update_end(intel_crtc, NULL);
+
+	if (i915.watermark_test)
+		intel_wait_for_vblank(crtc->dev, intel_crtc->pipe);
 }
 
 /**
