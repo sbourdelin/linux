@@ -3706,7 +3706,6 @@ int mv88e6xxx_probe(struct mdio_device *mdiodev)
 	ds->priv = ps;
 	ds->dev = dev;
 	ps->dev = dev;
-	ps->ds = ds;
 	ps->bus = mdiodev->bus;
 	ps->sw_addr = mdiodev->addr;
 	mutex_init(&ps->smi_mutex);
@@ -3745,8 +3744,6 @@ int mv88e6xxx_probe(struct mdio_device *mdiodev)
 	err = mv88e6xxx_mdio_register(ps, mdiodev->dev.of_node);
 	if (err)
 		return err;
-
-	ds->slave_mii_bus = ps->mdio_bus;
 
 	dev_set_drvdata(dev, ds);
 
