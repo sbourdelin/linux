@@ -21,6 +21,7 @@
 #include <linux/list.h>
 #include <linux/mdio.h>
 #include <linux/module.h>
+#include <linux/of_device.h>
 #include <linux/of_mdio.h>
 #include <linux/netdevice.h>
 #include <linux/gpio/consumer.h>
@@ -3746,6 +3747,28 @@ static const struct of_device_id mv88e6xxx_of_id_table[] = {
 
 MODULE_DEVICE_TABLE(of, mv88e6xxx_of_id_table);
 
+static bool mv88e6xxx_of_matches(struct mv88e6xxx_priv_state *ps)
+{
+	const struct mv88e6xxx_info *info;
+	const struct of_device_id *id;
+	enum mv88e6xxx_model model;
+
+	id = of_match_device(mv88e6xxx_of_id_table, ps->dev);
+	if (!id)
+		return false;
+
+	model = (enum mv88e6xxx_model)id->data;
+	info = &mv88e6xxx_table[model];
+
+	if (ps->info->prod_num == info->prod_num)
+		return true;
+
+	dev_err(ps->dev, "described node %s mismatches probed model %s\n",
+		id->compatible, ps->info->name);
+
+	return false;
+}
+
 int mv88e6xxx_probe(struct mdio_device *mdiodev)
 {
 	struct device *dev = &mdiodev->dev;
@@ -3757,6 +3780,9 @@ int mv88e6xxx_probe(struct mdio_device *mdiodev)
 	ps = mv88e6xxx_detect(dev, mdiodev->bus, mdiodev->addr);
 	if (!ps)
 		return -ENODEV;
+
+	if (!mv88e6xxx_of_matches(ps))
+		return -EINVAL;
 
 	ps->reset = devm_gpiod_get(dev, "reset", GPIOD_ASIS);
 	if (IS_ERR(ps->reset)) {
