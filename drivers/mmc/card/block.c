@@ -1317,6 +1317,13 @@ static int mmc_blk_issue_flush(struct mmc_queue *mq, struct request *req)
 	return ret ? 0 : 1;
 }
 
+static void mmc_blk_requeue(struct request_queue *q, struct request *req)
+{
+	spin_lock_irq(q->queue_lock);
+	blk_requeue_request(q, req);
+	spin_unlock_irq(q->queue_lock);
+}
+
 /*
  * Reformat current write as a reliable write, supporting
  * both legacy and the enhanced reliable write MMC cards.
@@ -1776,11 +1783,8 @@ static u8 mmc_blk_prep_packed_list(struct mmc_queue *mq, struct request *req)
 		reqs++;
 	} while (1);
 
-	if (put_back) {
-		spin_lock_irq(q->queue_lock);
-		blk_requeue_request(q, next);
-		spin_unlock_irq(q->queue_lock);
-	}
+	if (put_back)
+		mmc_blk_requeue(q, next);
 
 	if (reqs > 0) {
 		list_add(&req->queuelist, &mqrq->packed->list);
@@ -1968,9 +1972,7 @@ static void mmc_blk_revert_packed_req(struct mmc_queue *mq,
 		prq = list_entry_rq(packed->list.prev);
 		if (prq->queuelist.prev != &packed->list) {
 			list_del_init(&prq->queuelist);
-			spin_lock_irq(q->queue_lock);
-			blk_requeue_request(mq->queue, prq);
-			spin_unlock_irq(q->queue_lock);
+			mmc_blk_requeue(q, prq);
 		} else {
 			list_del_init(&prq->queuelist);
 		}
