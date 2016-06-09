@@ -302,6 +302,10 @@ static void tegra_sdhci_voltage_switch(struct sdhci_host *host)
 	struct sdhci_tegra *tegra_host = sdhci_pltfm_priv(pltfm_host);
 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
 
+	/* initially this function was called only for the 1.8V case */
+	if (host->mmc->ios.signal_voltage != MMC_SIGNAL_VOLTAGE_180)
+		return;
+
 	if (soc_data->nvquirks & NVQUIRK_HAS_PADCALIB)
 		tegra_host->pad_calib_required = true;
 }
