@@ -3240,6 +3240,12 @@ static int mmc_test_probe(struct mmc_card *card)
 	if (ret)
 		return ret;
 
+	if (card->ext_csd.cmdq_en) {
+		ret = mmc_cmdq_disable(card);
+		if (ret)
+			return ret;
+	}
+
 	dev_info(&card->dev, "Card claimed for testing.\n");
 
 	return 0;
@@ -3247,6 +3253,8 @@ static int mmc_test_probe(struct mmc_card *card)
 
 static void mmc_test_remove(struct mmc_card *card)
 {
+	if (card->reenable_cmdq)
+		mmc_cmdq_enable(card);
 	mmc_test_free_result(card);
 	mmc_test_free_dbgfs_file(card);
 }
