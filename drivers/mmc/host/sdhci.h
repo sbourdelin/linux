@@ -551,6 +551,7 @@ struct sdhci_ops {
 					 int card_drv, int *drv_type);
 	void	(*init_card)(struct sdhci_host *host, struct mmc_card *card);
 	void	(*voltage_switch_pre)(struct sdhci_host *host);
+	int	(*delay_adj)(struct sdhci_host *host, struct mmc_ios *ios);
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
