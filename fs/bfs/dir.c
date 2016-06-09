@@ -97,7 +97,7 @@ static int bfs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 	set_bit(ino, info->si_imap);
 	info->si_freei--;
 	inode_init_owner(inode, dir, mode);
-	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME_SEC;
+	inode->i_mtime = inode->i_atime = inode->i_ctime = current_fs_time(s);
 	inode->i_blocks = 0;
 	inode->i_op = &bfs_file_inops;
 	inode->i_fop = &bfs_file_operations;
@@ -154,7 +154,8 @@ static int bfs_link(struct dentry *old, struct inode *dir,
 						struct dentry *new)
 {
 	struct inode *inode = d_inode(old);
-	struct bfs_sb_info *info = BFS_SB(inode->i_sb);
+	struct super_block *s = inode->i_sb;
+	struct bfs_sb_info *info = BFS_SB(s);
 	int err;
 
 	mutex_lock(&info->bfs_lock);
@@ -165,7 +166,7 @@ static int bfs_link(struct dentry *old, struct inode *dir,
 		return err;
 	}
 	inc_nlink(inode);
-	inode->i_ctime = CURRENT_TIME_SEC;
+	inode->i_ctime = current_fs_time(s);
 	mark_inode_dirty(inode);
 	ihold(inode);
 	d_instantiate(new, inode);
@@ -194,7 +195,7 @@ static int bfs_unlink(struct inode *dir, struct dentry *dentry)
 	}
 	de->ino = 0;
 	mark_buffer_dirty_inode(bh, dir);
-	dir->i_ctime = dir->i_mtime = CURRENT_TIME_SEC;
+	dir->i_ctime = dir->i_mtime = current_fs_time(dir->i_sb);
 	mark_inode_dirty(dir);
 	inode->i_ctime = dir->i_ctime;
 	inode_dec_link_count(inode);
@@ -249,10 +250,10 @@ static int bfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			goto end_rename;
 	}
 	old_de->ino = 0;
-	old_dir->i_ctime = old_dir->i_mtime = CURRENT_TIME_SEC;
+	old_dir->i_ctime = old_dir->i_mtime = current_fs_time(old_dir->i_sb);
 	mark_inode_dirty(old_dir);
 	if (new_inode) {
-		new_inode->i_ctime = CURRENT_TIME_SEC;
+		new_inode->i_ctime = current_fs_time(new_dir->i_sb);
 		inode_dec_link_count(new_inode);
 	}
 	mark_buffer_dirty_inode(old_bh, old_dir);
@@ -278,6 +279,7 @@ static int bfs_add_entry(struct inode *dir, const unsigned char *name,
 {
 	struct buffer_head *bh;
 	struct bfs_dirent *de;
+	struct super_block *s = dir->i_sb;
 	int block, sblock, eblock, off, pos;
 	int i;
 
@@ -300,9 +302,9 @@ static int bfs_add_entry(struct inode *dir, const unsigned char *name,
 				pos = (block - sblock) * BFS_BSIZE + off;
 				if (pos >= dir->i_size) {
 					dir->i_size += BFS_DIRENT_SIZE;
-					dir->i_ctime = CURRENT_TIME_SEC;
+					dir->i_ctime = current_fs_time(s);
 				}
-				dir->i_mtime = CURRENT_TIME_SEC;
+				dir->i_mtime = current_fs_time(s);
 				mark_inode_dirty(dir);
 				de->ino = cpu_to_le16((u16)ino);
 				for (i = 0; i < BFS_NAMELEN; i++)

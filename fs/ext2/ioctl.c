@@ -21,6 +21,7 @@ long ext2_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct inode *inode = file_inode(filp);
 	struct ext2_inode_info *ei = EXT2_I(inode);
+	struct super_block *sb = inode->i_sb;
 	unsigned int flags;
 	unsigned short rsv_window_size;
 	int ret;
@@ -79,7 +80,7 @@ long ext2_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		ei->i_flags = flags;
 
 		ext2_set_inode_flags(inode);
-		inode->i_ctime = CURRENT_TIME_SEC;
+		inode->i_ctime = current_fs_time(sb);
 		inode_unlock(inode);
 
 		mark_inode_dirty(inode);
@@ -103,7 +104,7 @@ setflags_out:
 		}
 
 		inode_lock(inode);
-		inode->i_ctime = CURRENT_TIME_SEC;
+		inode->i_ctime = current_fs_time(sb);
 		inode->i_generation = generation;
 		inode_unlock(inode);
 

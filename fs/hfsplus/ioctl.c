@@ -122,7 +122,7 @@ static int hfsplus_ioctl_setflags(struct file *file, int __user *user_flags)
 	else
 		hip->userflags &= ~HFSPLUS_FLG_NODUMP;
 
-	inode->i_ctime = CURRENT_TIME_SEC;
+	inode->i_ctime = current_fs_time(inode->i_sb);
 	mark_inode_dirty(inode);
 
 out_unlock_inode:

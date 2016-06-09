@@ -178,8 +178,7 @@ struct inode *afs_iget_autocell(struct inode *dir, const char *dev_name,
 	set_nlink(inode, 2);
 	inode->i_uid		= GLOBAL_ROOT_UID;
 	inode->i_gid		= GLOBAL_ROOT_GID;
-	inode->i_ctime.tv_sec	= get_seconds();
-	inode->i_ctime.tv_nsec	= 0;
+	inode->i_ctime		= current_fs_time(sb);
 	inode->i_atime		= inode->i_mtime = inode->i_ctime;
 	inode->i_blocks		= 0;
 	inode->i_version	= 0;

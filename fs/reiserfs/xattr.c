@@ -456,7 +456,7 @@ static void update_ctime(struct inode *inode)
 	    timespec_equal(&inode->i_ctime, &now))
 		return;
 
-	inode->i_ctime = CURRENT_TIME_SEC;
+	inode->i_ctime = current_fs_time(inode->i_sb);
 	mark_inode_dirty(inode);
 }
 

@@ -194,7 +194,7 @@ ext2_set_acl(struct inode *inode, struct posix_acl *acl, int type)
 				if (error < 0)
 					return error;
 				else {
-					inode->i_ctime = CURRENT_TIME_SEC;
+					inode->i_ctime = current_fs_time(inode->i_sb);
 					mark_inode_dirty(inode);
 					if (error == 0)
 						acl = NULL;

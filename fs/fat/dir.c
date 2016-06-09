@@ -1071,7 +1071,7 @@ int fat_remove_entries(struct inode *dir, struct fat_slot_info *sinfo)
 		}
 	}
 
-	dir->i_mtime = dir->i_atime = CURRENT_TIME_SEC;
+	dir->i_mtime = dir->i_atime = current_fs_time(sb);
 	if (IS_DIRSYNC(dir))
 		(void)fat_sync_inode(dir);
 	else
