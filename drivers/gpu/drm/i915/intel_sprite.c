@@ -96,13 +96,15 @@ void intel_pipe_update_start(struct intel_crtc *crtc)
 	min = vblank_start - usecs_to_scanlines(adjusted_mode, 100);
 	max = vblank_start - 1;
 
-	local_irq_disable();
-
-	if (min <= 0 || max <= 0)
-		return;
-
 	if (WARN_ON(drm_crtc_vblank_get(&crtc->base)))
 		return;
+
+	local_irq_disable();
+
+	if (min <= 0 || max <= 0) {
+		drm_crtc_vblank_put(&crtc->base);
+		return;
+	}
 
 	crtc->debug.min_vbl = min;
 	crtc->debug.max_vbl = max;
