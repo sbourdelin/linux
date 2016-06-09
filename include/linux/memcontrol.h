@@ -327,10 +327,7 @@ void mem_cgroup_iter_break(struct mem_cgroup *, struct mem_cgroup *);
 
 static inline unsigned short mem_cgroup_id(struct mem_cgroup *memcg)
 {
-	if (mem_cgroup_disabled())
-		return 0;
-
-	return memcg->css.id;
+	return mem_cgroup_disabled() ? 0 : memcg->css.id;
 }
 
 /**
@@ -341,10 +338,7 @@ static inline unsigned short mem_cgroup_id(struct mem_cgroup *memcg)
  */
 static inline struct mem_cgroup *mem_cgroup_from_id(unsigned short id)
 {
-	struct cgroup_subsys_state *css;
-
-	css = css_from_id(id, &memory_cgrp_subsys);
-	return mem_cgroup_from_css(css);
+	return mem_cgroup_from_css(css_from_id(id, &memory_cgrp_subsys));
 }
 
 /**
@@ -390,9 +384,7 @@ ino_t page_cgroup_ino(struct page *page);
 
 static inline bool mem_cgroup_online(struct mem_cgroup *memcg)
 {
-	if (mem_cgroup_disabled())
-		return true;
-	return !!(memcg->css.flags & CSS_ONLINE);
+	return mem_cgroup_disabled() || (memcg->css.flags & CSS_ONLINE);
 }
 
 /*
@@ -401,7 +393,7 @@ static inline bool mem_cgroup_online(struct mem_cgroup *memcg)
 int mem_cgroup_select_victim_node(struct mem_cgroup *memcg);
 
 void mem_cgroup_update_lru_size(struct lruvec *lruvec, enum lru_list lru,
-		int nr_pages);
+				int nr_pages);
 
 unsigned long mem_cgroup_node_nr_lru_pages(struct mem_cgroup *memcg,
 					   int nid, unsigned int lru_mask);
@@ -452,9 +444,8 @@ void unlock_page_memcg(struct page *page);
  * @idx: page state item to account
  * @val: number of pages (positive or negative)
  *
- * The @page must be locked or the caller must use lock_page_memcg()
- * to prevent double accounting when the page is concurrently being
- * moved to another memcg:
+ * The @page must be locked or the caller must use lock_page_memcg() to prevent
+ * double accounting when the page is concurrently being moved to another memcg:
  *
  *   lock_page(page) or lock_page_memcg(page)
  *   if (TestClearPageState(page))
@@ -462,7 +453,7 @@ void unlock_page_memcg(struct page *page);
  *   unlock_page(page) or unlock_page_memcg(page)
  */
 static inline void mem_cgroup_update_page_stat(struct page *page,
-				 enum mem_cgroup_stat_index idx, int val)
+					enum mem_cgroup_stat_index idx, int val)
 {
 	VM_BUG_ON(!(rcu_read_lock_held() || PageLocked(page)));
 
@@ -569,7 +560,7 @@ static inline void mem_cgroup_uncharge_list(struct list_head *page_list)
 {
 }
 
-static inline void mem_cgroup_migrate(struct page *old, struct page *new)
+static inline void mem_cgroup_migrate(struct page *old, struct page *newpage)
 {
 }
 
@@ -586,7 +577,7 @@ static inline struct lruvec *mem_cgroup_page_lruvec(struct page *page,
 }
 
 static inline bool mm_match_cgroup(struct mm_struct *mm,
-		struct mem_cgroup *memcg)
+				   struct mem_cgroup *memcg)
 {
 	return true;
 }
@@ -868,7 +859,7 @@ static __always_inline void memcg_kmem_put_cache(struct kmem_cache *cachep)
  * @val: number of pages (positive or negative)
  */
 static inline void memcg_kmem_update_page_stat(struct page *page,
-				enum mem_cgroup_stat_index idx, int val)
+					enum mem_cgroup_stat_index idx, int val)
 {
 	if (memcg_kmem_enabled() && page->mem_cgroup)
 		this_cpu_add(page->mem_cgroup->stat->count[idx], val);
@@ -916,7 +907,7 @@ static inline void memcg_kmem_put_cache(struct kmem_cache *cachep)
 }
 
 static inline void memcg_kmem_update_page_stat(struct page *page,
-				enum mem_cgroup_stat_index idx, int val)
+					enum mem_cgroup_stat_index idx, int val)
 {
 }
 #endif /* CONFIG_MEMCG && !CONFIG_SLOB */
