@@ -1180,6 +1180,8 @@ static int vfio_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		pci_set_power_state(pdev, PCI_D3hot);
 	}
 
+	pdev->dev_flags |= PCI_DEV_FLAGS_UNTRUSTED;
+
 	return ret;
 }
 
@@ -1187,6 +1189,7 @@ static void vfio_pci_remove(struct pci_dev *pdev)
 {
 	struct vfio_pci_device *vdev;
 
+	pdev->dev_flags &= ~PCI_DEV_FLAGS_UNTRUSTED;
 	vdev = vfio_del_group_dev(&pdev->dev);
 	if (!vdev)
 		return;

@@ -753,6 +753,10 @@ struct iommu_group *pci_device_group(struct device *dev)
 	struct pci_bus *bus;
 	struct iommu_group *group = NULL;
 	u64 devfns[4] = { 0 };
+	
+	if (pdev->is_virtfn && 
+	   (pdev->physfn->dev_flags & PCI_DEV_FLAGS_UNTRUSTED))
+		return iommu_group_get(&pdev->physfn->dev);
 
 	if (WARN_ON(!dev_is_pci(dev)))
 		return ERR_PTR(-EINVAL);
