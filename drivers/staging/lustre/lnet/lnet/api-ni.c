@@ -103,6 +103,46 @@ lnet_init_locks(void)
 	mutex_init(&the_lnet.ln_api_mutex);
 }
 
+struct kmem_cache *lnet_mes_cachep;		/* MEs kmem_cache */
+struct kmem_cache *lnet_small_mds_cachep;	/* <= LNET_SMALL_MD_SIZE bytes
+						 *  MDs kmem_cache
+						 */
+static int
+lnet_descriptor_setup(void)
+{
+	/*
+	 * create specific kmem_cache for MEs and small MDs (i.e., originally
+	 * allocated in <size-xxx> kmem_cache).
+	 */
+	lnet_mes_cachep = kmem_cache_create("lnet_MEs", sizeof(lnet_me_t),
+					    0, 0, NULL);
+	if (!lnet_mes_cachep)
+		return -ENOMEM;
+
+	lnet_small_mds_cachep = kmem_cache_create("lnet_small_MDs",
+						  LNET_SMALL_MD_SIZE, 0, 0,
+						  NULL);
+	if (!lnet_small_mds_cachep)
+		return -ENOMEM;
+
+	return 0;
+}
+
+static void
+lnet_descriptor_cleanup(void)
+{
+
+	if (lnet_small_mds_cachep) {
+		kmem_cache_destroy(lnet_small_mds_cachep);
+		lnet_small_mds_cachep = NULL;
+	}
+
+	if (lnet_mes_cachep) {
+		kmem_cache_destroy(lnet_mes_cachep);
+		lnet_mes_cachep = NULL;
+	}
+}
+
 static int
 lnet_create_remote_nets_table(void)
 {
@@ -553,6 +593,10 @@ lnet_prepare(lnet_pid_t requested_pid)
 	INIT_LIST_HEAD(&the_lnet.ln_drop_rules);
 	INIT_LIST_HEAD(&the_lnet.ln_delay_rules);
 
+	rc = lnet_descriptor_setup();
+	if (rc)
+		goto failed;
+
 	rc = lnet_create_remote_nets_table();
 	if (rc)
 		goto failed;
@@ -652,6 +696,7 @@ lnet_unprepare(void)
 		the_lnet.ln_counters = NULL;
 	}
 	lnet_destroy_remote_nets_table();
+	lnet_descriptor_cleanup();
 
 	return 0;
 }
