@@ -78,6 +78,12 @@
 	status = "okay";
 };
 
+&sdhci1 {
+	broken-cd;
+	bus-width = <4>;
+	status = "okay";
+};
+
 /* CON31 */
 &usb3 {
 	status = "okay";
