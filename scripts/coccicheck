@@ -5,6 +5,8 @@
 # version 1.0.0-rc11.
 #
 
+DIR=$(dirname $(readlink -f $0))
+DIR="${DIR}/../"
 SPATCH="`which ${SPATCH:=spatch}`"
 
 if [ ! -x "$SPATCH" ]; then
@@ -14,6 +16,20 @@ fi
 
 USE_JOBS="no"
 $SPATCH --help | grep "\-\-jobs" > /dev/null && USE_JOBS="yes"
+
+# 0. --use-glimpse currently outperforms all. Refer
+#    to scripts/glimpse.sh for details.
+# 1. Second best is --use-gitgrep, this is very comparable to --use-glimpse
+# 2. Use --use-coccigrep if no indexing options are available and your
+#    version of coccinelle supports it
+USE_GLIMPSE="no"
+$SPATCH --help | grep "\-\-use\-glimpse" > /dev/null && [ -f $DIR/.glimpse_index ] && USE_GLIMPSE="yes"
+
+USE_GITGREP="no"
+$SPATCH --help | grep "\-\-use\-gitgrep" > /dev/null && [ -d $DIR/.git ] && USE_GITGREP="yes"
+
+USE_COCCIGREP="no"
+$SPATCH --help | grep "\-\-use\-coccigrep" > /dev/null && USE_COCCIGREP="yes"
 
 # The verbosity may be set by the environmental parameter V=
 # as for example with 'make V=1 coccicheck'
@@ -87,6 +103,14 @@ if [ "$USE_JOBS" = "no" ]; then
 	declare -a SPATCH_PID
 else
 	OPTIONS="$OPTIONS --jobs $NPROC --chunksize 1"
+fi
+
+if [ "$USE_GLIMPSE" = "yes" ]; then
+	OPTIONS="$OPTIONS --use-glimpse"
+elif [ "$USE_GITGREP" = "yes" ]; then
+	OPTIONS="$OPTIONS --use-gitgrep"
+elif [ "$USE_COCCIGREP" = "yes" ]; then
+	OPTIONS="$OPTIONS --use-coccigrep"
 fi
 
 run_cmd_paramap() {
