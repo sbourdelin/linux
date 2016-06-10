@@ -282,9 +282,7 @@ static int max8903_probe(struct platform_device *pdev)
 
 	if (charger->pdata->dc_valid) {
 		if (charger->pdata->dok &&
-				gpio_is_valid(charger->pdata->dok) &&
-				charger->pdata->dcm &&
-				gpio_is_valid(charger->pdata->dcm)) {
+				gpio_is_valid(charger->pdata->dok)) {
 			ret = devm_gpio_request(dev,
 						charger->pdata->dok,
 						charger->psy_desc.name);
@@ -295,6 +293,17 @@ static int max8903_probe(struct platform_device *pdev)
 				return -EINVAL;
 			}
 
+			gpio = charger->pdata->dok; /* PULL_UPed Interrupt */
+			ta_in = gpio_get_value(gpio) ? 0 : 1;
+		} else {
+			dev_err(dev, "When DC is wired, DOK should"
+					" be wired as well.\n");
+			return -EINVAL;
+		}
+	}
+
+	if (charger->pdata->dcm) {
+		if (gpio_is_valid(charger->pdata->dcm)) {
 			ret = devm_gpio_request(dev,
 						charger->pdata->dcm,
 						charger->psy_desc.name);
@@ -305,34 +314,11 @@ static int max8903_probe(struct platform_device *pdev)
 				return -EINVAL;
 			}
 
-			gpio = charger->pdata->dok; /* PULL_UPed Interrupt */
-			ta_in = gpio_get_value(gpio) ? 0 : 1;
-
 			gpio = charger->pdata->dcm; /* Output */
 			gpio_set_value(gpio, ta_in);
 		} else {
-			dev_err(dev, "When DC is wired, DOK and DCM should"
-					" be wired as well.\n");
+			dev_err(dev, "Invalid pin: dcm.\n");
 			return -EINVAL;
-		}
-	} else {
-		if (charger->pdata->dcm) {
-			if (gpio_is_valid(charger->pdata->dcm)) {
-				ret = devm_gpio_request(dev,
-							charger->pdata->dcm,
-							charger->psy_desc.name);
-				if (ret) {
-					dev_err(dev,
-						"Failed GPIO request for dcm: %d err %d\n",
-						charger->pdata->dcm, ret);
-					return -EINVAL;
-				}
-
-				gpio_set_value(charger->pdata->dcm, 0);
-			} else {
-				dev_err(dev, "Invalid pin: dcm.\n");
-				return -EINVAL;
-			}
 		}
 	}
 
