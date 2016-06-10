@@ -4,7 +4,7 @@
  * Licensed under the GPL-2 or later
  */
 
-#define pr_fmt(fmt) "module %s: " fmt, mod->name
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/moduleloader.h>
 #include <linux/elf.h>
