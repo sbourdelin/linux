@@ -1320,8 +1320,8 @@ static int scsi_eh_test_devices(struct list_head *cmd_list,
  *    no sense to try and abort the command, since as far as the shost
  *    adapter is concerned, it isn't running.
  */
-static int scsi_eh_abort_cmds(struct list_head *work_q,
-			      struct list_head *done_q)
+int scsi_eh_abort_cmds(struct list_head *work_q,
+		       struct list_head *done_q)
 {
 	struct scsi_cmnd *scmd, *next;
 	LIST_HEAD(check_list);
@@ -1361,6 +1361,7 @@ static int scsi_eh_abort_cmds(struct list_head *work_q,
 
 	return scsi_eh_test_devices(&check_list, work_q, done_q, 0);
 }
+EXPORT_SYMBOL_GPL(scsi_eh_abort_cmds);
 
 /**
  * scsi_eh_try_stu - Send START_UNIT to device.
