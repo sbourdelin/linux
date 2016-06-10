@@ -168,6 +168,11 @@ static inline bool kmem_cache_has_cpu_partial(struct kmem_cache *s)
  */
 #define MAX_PARTIAL 10
 
+#define REAPTIMEOUT_CPU		(2 * HZ)
+#define REAPTIMEOUT_NODE	(4 * HZ)
+
+static DEFINE_PER_CPU(struct delayed_work, cache_reap_work);
+
 #define DEBUG_DEFAULT_FLAGS (SLAB_CONSISTENCY_CHECKS | SLAB_RED_ZONE | \
 				SLAB_POISON | SLAB_STORE_USER)
 
@@ -1672,6 +1677,10 @@ static void *get_partial_node(struct kmem_cache *s, struct kmem_cache_node *n,
 	int available = 0;
 	int objects;
 
+	/* Prevent cache_reap from draining this per node cache */
+	if (unlikely(!n->touched))
+		n->touched = true;
+
 	/*
 	 * Racy check. If we mistakenly see no partial slabs then we
 	 * just allocate an empty slab. If we mistakenly try to get a
@@ -2515,6 +2524,10 @@ redo:
 	} while (IS_ENABLED(CONFIG_PREEMPT) &&
 		 unlikely(tid != READ_ONCE(c->tid)));
 
+	/* Prevent cache_reap from draining this per cpu cache */
+	if (unlikely(!c->touched))
+		c->touched = true;
+
 	/*
 	 * Irqless object alloc/free algorithm used here depends on sequence
 	 * of fetching cpu_slab's data. tid should be fetched before anything
@@ -3119,6 +3132,9 @@ init_kmem_cache_node(struct kmem_cache_node *n)
 	n->nr_partial = 0;
 	spin_lock_init(&n->list_lock);
 	INIT_LIST_HEAD(&n->partial);
+	n->next_reap = jiffies + REAPTIMEOUT_NODE +
+			((unsigned long)n) % REAPTIMEOUT_NODE;
+	n->touched = false;
 #ifdef CONFIG_SLUB_DEBUG
 	atomic_long_set(&n->nr_slabs, 0);
 	atomic_long_set(&n->total_objects, 0);
@@ -3663,6 +3679,108 @@ void kfree(const void *x)
 }
 EXPORT_SYMBOL(kfree);
 
+static void cache_reap(struct work_struct *w)
+{
+	struct delayed_work *work = to_delayed_work(w);
+	int cpu = smp_processor_id();
+	int node = numa_mem_id();
+	struct kmem_cache *s;
+
+	BUG_ON(irqs_disabled());
+
+	if (!mutex_trylock(&slab_mutex))
+		/* Give up. Setup the next iteration. */
+		goto out;
+
+	list_for_each_entry(s, &slab_caches, list) {
+		struct kmem_cache_cpu *c = per_cpu_ptr(s->cpu_slab, cpu);
+		struct kmem_cache_node *n = get_node(s, node);
+		struct page *page, *t;
+		LIST_HEAD(discard);
+		int scanned = 0;
+
+		/* This cpu's cache was used recently, do not touch. */
+		if (c->touched) {
+			c->touched = false;
+			goto next;
+		}
+
+		local_irq_disable();
+		if (c->page)
+			flush_slab(s, c);
+		unfreeze_partials(s, c);
+		local_irq_enable();
+
+		/*
+		 * These are racy checks but it does not matter
+		 * if we skip one check or scan twice.
+		 */
+		if (time_after(n->next_reap, jiffies))
+			goto next;
+
+		n->next_reap = jiffies + REAPTIMEOUT_NODE;
+
+		/* This node's cache was used recently, do not touch. */
+		if (n->touched) {
+			n->touched = false;
+			goto next;
+		}
+
+		if (!n->nr_partial || !s->min_partial)
+			goto next;
+
+		spin_lock_irq(&n->list_lock);
+		list_for_each_entry_safe(page, t, &n->partial, lru) {
+			if (!page->inuse) {
+				list_move(&page->lru, &discard);
+				n->nr_partial--;
+			}
+			/*
+			 * Do not spend too much time trying to find all empty
+			 * slabs - if there are a lot of slabs on the partial
+			 * list, empty slabs shouldn't be a big problem, as
+			 * their number is limited by min_partial.
+			 */
+			if (++scanned >= s->min_partial * 4)
+				break;
+		}
+		spin_unlock_irq(&n->list_lock);
+
+		list_for_each_entry_safe(page, t, &discard, lru)
+			discard_slab(s, page);
+next:
+		cond_resched();
+	}
+
+	mutex_unlock(&slab_mutex);
+out:
+	schedule_delayed_work(work, round_jiffies_relative(REAPTIMEOUT_CPU));
+}
+
+static void start_cache_reap(int cpu)
+{
+	struct delayed_work *work = &per_cpu(cache_reap_work, cpu);
+
+	schedule_delayed_work_on(cpu, work, __round_jiffies_relative(HZ, cpu));
+}
+
+static void stop_cache_reap(int cpu)
+{
+	struct delayed_work *work = &per_cpu(cache_reap_work, cpu);
+
+	cancel_delayed_work_sync(work);
+}
+
+static int __init init_cache_reap(void)
+{
+	int i;
+
+	for_each_online_cpu(i)
+		start_cache_reap(i);
+	return 0;
+}
+__initcall(init_cache_reap);
+
 #define SHRINK_PROMOTE_MAX 32
 
 /*
@@ -3914,6 +4032,7 @@ void __init kmem_cache_init(void)
 {
 	static __initdata struct kmem_cache boot_kmem_cache,
 		boot_kmem_cache_node;
+	int i;
 
 	if (debug_guardpage_minorder())
 		slub_max_order = 0;
@@ -3946,6 +4065,9 @@ void __init kmem_cache_init(void)
 	/* Now we can use the kmem_cache to allocate kmalloc slabs */
 	setup_kmalloc_cache_index_table();
 	create_kmalloc_caches(0);
+
+	for_each_possible_cpu(i)
+		INIT_DEFERRABLE_WORK(&per_cpu(cache_reap_work, i), cache_reap);
 
 #ifdef CONFIG_SMP
 	register_cpu_notifier(&slab_notifier);
@@ -4026,6 +4148,16 @@ static int slab_cpuup_callback(struct notifier_block *nfb,
 	unsigned long flags;
 
 	switch (action) {
+	case CPU_DOWN_PREPARE:
+	case CPU_DOWN_PREPARE_FROZEN:
+		stop_cache_reap(cpu);
+		break;
+	case CPU_ONLINE:
+	case CPU_ONLINE_FROZEN:
+	case CPU_DOWN_FAILED:
+	case CPU_DOWN_FAILED_FROZEN:
+		start_cache_reap(cpu);
+		break;
 	case CPU_UP_CANCELED:
 	case CPU_UP_CANCELED_FROZEN:
 	case CPU_DEAD:
