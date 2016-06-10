@@ -2532,6 +2532,7 @@ static const struct pid_entry selinux_attr_dir_stuff[] = {
 	ATTR("selinux", "fscreate",	S_IRUGO|S_IWUGO),
 	ATTR("selinux", "keycreate",	S_IRUGO|S_IWUGO),
 	ATTR("selinux", "sockcreate",	S_IRUGO|S_IWUGO),
+	ATTR("selinux", "context",	S_IRUGO|S_IWUGO),
 };
 LSM_DIR_OPS(selinux);
 #endif
@@ -2539,6 +2540,7 @@ LSM_DIR_OPS(selinux);
 #ifdef CONFIG_SECURITY_SMACK
 static const struct pid_entry smack_attr_dir_stuff[] = {
 	ATTR("smack", "current",	S_IRUGO|S_IWUGO),
+	ATTR("smack", "context",	S_IRUGO|S_IWUGO),
 };
 LSM_DIR_OPS(smack);
 #endif
@@ -2548,6 +2550,7 @@ static const struct pid_entry apparmor_attr_dir_stuff[] = {
 	ATTR("apparmor", "current",	S_IRUGO|S_IWUGO),
 	ATTR("apparmor", "prev",	S_IRUGO),
 	ATTR("apparmor", "exec",	S_IRUGO|S_IWUGO),
+	ATTR("apparmor", "context",	S_IRUGO|S_IWUGO),
 };
 LSM_DIR_OPS(apparmor);
 #endif
@@ -2559,6 +2562,7 @@ static const struct pid_entry attr_dir_stuff[] = {
 	ATTR(NULL, "fscreate",		S_IRUGO|S_IWUGO),
 	ATTR(NULL, "keycreate",		S_IRUGO|S_IWUGO),
 	ATTR(NULL, "sockcreate",	S_IRUGO|S_IWUGO),
+	ATTR(NULL, "context",		S_IRUGO|S_IWUGO),
 #ifdef CONFIG_SECURITY_SELINUX
 	DIR("selinux",			S_IRUGO|S_IXUGO,
 	    proc_selinux_attr_dir_inode_ops, proc_selinux_attr_dir_ops),

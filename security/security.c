@@ -1187,8 +1187,49 @@ int security_getprocattr(struct task_struct *p, const char *lsm, char *name,
 				char **value)
 {
 	struct security_hook_list *hp;
+	char *vp;
+	char *cp = NULL;
 	int rc = -EINVAL;
+	int trc;
 
+	/*
+	 * "context" requires work here in addition to what
+	 * the modules provide.
+	 */
+	if (strcmp(name, "context") == 0) {
+		*value = NULL;
+		list_for_each_entry(hp,
+				&security_hook_heads.getprocattr, list) {
+			if (lsm != NULL && strcmp(lsm, hp->lsm))
+				continue;
+			trc = hp->hook.getprocattr(p, "context", &vp);
+			if (trc == -ENOENT)
+				continue;
+			if (trc <= 0) {
+				kfree(*value);
+				return trc;
+			}
+			rc = trc;
+			if (*value == NULL) {
+				*value = vp;
+			} else {
+				cp = kzalloc(strlen(*value) + strlen(vp) + 1,
+					GFP_KERNEL);
+				if (cp == NULL) {
+					kfree(*value);
+					kfree(vp);
+					return -ENOMEM;
+				}
+				sprintf(cp, "%s%s", *value, vp);
+				kfree(*value);
+				kfree(vp);
+				*value = cp;
+			}
+		}
+		if (rc > 0)
+			return strlen(*value);
+		return rc;
+	}
 
 	list_for_each_entry(hp, &security_hook_heads.getprocattr, list) {
 		if (lsm != NULL && strcmp(lsm, hp->lsm))
@@ -1205,7 +1246,63 @@ int security_setprocattr(struct task_struct *p, const char *lsm, char *name,
 {
 	struct security_hook_list *hp;
 	int rc = -EINVAL;
+	char *local;
+	char *cp;
+	int slen;
+	int failed = 0;
 
+	/*
+	 * "context" is handled directly here.
+	 */
+	if (strcmp(name, "context") == 0) {
+		/*
+		 * First verify that the input is acceptable.
+		 * lsm1='v1'lsm2='v2'lsm3='v3'
+		 *
+		 * A note on the use of strncmp() below.
+		 * The check is for the substring at the beginning of cp.
+		 */
+		local = kzalloc(size + 1, GFP_KERNEL);
+		memcpy(local, value, size);
+		cp = local;
+		list_for_each_entry(hp, &security_hook_heads.setprocattr,
+					list) {
+			if (lsm != NULL && strcmp(lsm, hp->lsm))
+				continue;
+			slen = strlen(hp->lsm);
+			if (strncmp(cp, hp->lsm, slen))
+				goto free_out;
+			cp += slen;
+			if (cp[0] != '=' || cp[1] != '\'' || cp[2] == '\'')
+				goto free_out;
+			for (cp += 2; cp[0] != '\''; cp++)
+				if (cp[0] == '\0')
+					goto free_out;
+			cp++;
+		}
+		cp = local;
+		list_for_each_entry(hp, &security_hook_heads.setprocattr,
+					list) {
+			if (lsm != NULL && strcmp(lsm, hp->lsm))
+				continue;
+			cp += strlen(hp->lsm) + 2;
+			for (slen = 0; cp[slen] != '\''; slen++)
+				;
+			cp[slen] = '\0';
+
+			rc = hp->hook.setprocattr(p, "context", cp, slen);
+			if (rc < 0)
+				failed = rc;
+			cp += slen + 1;
+		}
+		if (failed != 0)
+			rc = failed;
+		else
+			rc = size;
+free_out:
+		kfree(local);
+		return rc;
+	}
 	list_for_each_entry(hp, &security_hook_heads.setprocattr, list) {
 		if (lsm != NULL && strcmp(lsm, hp->lsm))
 			continue;
