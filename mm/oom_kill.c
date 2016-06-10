@@ -559,9 +559,15 @@ static void oom_reap_task(struct task_struct *tsk)
 	 * reasonably reclaimable memory anymore or it is not a good candidate
 	 * for the oom victim right now because it cannot release its memory
 	 * itself nor by the oom reaper.
+	 *
+	 * But be sure to check race with oom_killer_disable() because
+	 * oom_reaper() is frozen after oom_killer_disable() returned.
 	 */
 	tsk->oom_reaper_list = NULL;
-	exit_oom_victim(tsk);
+	mutex_lock(&oom_lock);
+	if (!oom_killer_disabled)
+		exit_oom_victim(tsk);
+	mutex_unlock(&oom_lock);
 
 	/* Drop a reference taken by wake_oom_reaper */
 	put_task_struct(tsk);
@@ -678,6 +684,7 @@ void mark_oom_victim(struct task_struct *tsk)
 	if (test_and_set_tsk_thread_flag(tsk, TIF_MEMDIE))
 		return;
 	atomic_inc(&tsk->signal->oom_victims);
+#ifndef CONFIG_MMU
 	/*
 	 * Make sure that the task is woken up from uninterruptible sleep
 	 * if it is frozen because OOM killer wouldn't be able to free
@@ -685,6 +692,7 @@ void mark_oom_victim(struct task_struct *tsk)
 	 * that TIF_MEMDIE tasks should be ignored.
 	 */
 	__thaw_task(tsk);
+#endif
 	atomic_inc(&oom_victims);
 }
 
@@ -923,8 +931,24 @@ bool out_of_memory(struct oom_control *oc)
 	unsigned int uninitialized_var(points);
 	enum oom_constraint constraint = CONSTRAINT_NONE;
 
+#ifdef CONFIG_MMU
+	/*
+	 * If oom_killer_disable() is called, wait for the OOM reaper to reap
+	 * all victim's memory. Since oom_killer_disable() is called between
+	 * after all userspace threads except the one calling
+	 * oom_killer_disable() are frozen and before freezable kernel threads
+	 * are frozen, the OOM reaper is known to be not yet frozen. Also,
+	 * since anyone who calls out_of_memory() while oom_killer_disable() is
+	 * waiting for all victims to terminate is known to be a kernel thread,
+	 * it is better to retry allocation as long as the OOM reaper can find
+	 * reapable memory.
+	 */
+	if (oom_killer_disabled)
+		return atomic_read(&oom_victims);
+#else
 	if (oom_killer_disabled)
 		return false;
+#endif
 
 	blocking_notifier_call_chain(&oom_notify_list, 0, &freed);
 	if (freed > 0)
