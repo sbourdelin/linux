@@ -255,6 +255,16 @@ config ATMEL_ARM_TCB_CLKSRC
 	  to make a single 32-bit timer.
 	  It can also be used as a clock event device supporting oneshot mode.
 
+config ATMEL_ARM_TCB_CLKEVT
+	bool "TC Block Clockevent"
+	select REGMAP_MMIO
+	depends on GENERIC_CLOCKEVENTS
+	depends on SOC_AT91RM9200 || SOC_AT91SAM9 || SOC_SAMA5
+	default SOC_AT91RM9200 || SOC_AT91SAM9 || SOC_SAMA5
+	help
+	  Select this to get a high precision clockevent device based on a TC
+	  Block with the slow clock as its input.
+
 config CLKSRC_METAG_GENERIC
 	def_bool y if METAG
 	help
