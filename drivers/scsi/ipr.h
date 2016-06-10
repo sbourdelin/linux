@@ -1283,6 +1283,7 @@ struct ipr_sata_port {
 	struct ipr_ioa_cfg *ioa_cfg;
 	struct ata_port *ap;
 	struct ipr_resource_entry *res;
+	struct work_struct work;
 	struct ipr_ioasa_gata ioasa;
 };
 
@@ -1563,6 +1564,7 @@ struct ipr_ioa_cfg {
 
 	struct work_struct work_q;
 	struct workqueue_struct *reset_work_q;
+	struct workqueue_struct *sata_work_q;
 
 	wait_queue_head_t reset_wait_q;
 	wait_queue_head_t msi_wait_q;
