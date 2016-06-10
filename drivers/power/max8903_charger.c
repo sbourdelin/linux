@@ -246,10 +246,8 @@ static int max8903_probe(struct platform_device *pdev)
 	int usb_in = 0;
 
 	charger = devm_kzalloc(dev, sizeof(struct max8903_data), GFP_KERNEL);
-	if (charger == NULL) {
-		dev_err(dev, "Cannot allocate memory.\n");
+	if (!charger)
 		return -ENOMEM;
-	}
 
 	charger->pdata = pdev->dev.platform_data;
 	if (IS_ENABLED(CONFIG_OF) && !charger->pdata && dev->of_node) {
