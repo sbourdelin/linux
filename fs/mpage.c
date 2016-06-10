@@ -71,7 +71,7 @@ mpage_alloc(struct block_device *bdev,
 {
 	struct bio *bio;
 
-	bio = bio_alloc(gfp_flags, nr_vecs);
+	bio = bio_alloc(gfp_flags & GFP_KERNEL, nr_vecs);
 
 	if (bio == NULL && (current->flags & PF_MEMALLOC)) {
 		while (!bio && (nr_vecs /= 2))
