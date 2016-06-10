@@ -63,6 +63,18 @@
 				};
 			};
 
+			tcb0: timer@fff7c000 {
+				timer@0 {
+					compatible = "atmel,tcb-clksrc";
+					reg = <0>, <1>;
+				};
+
+				timer@2 {
+					compatible = "atmel,tcb-clkevt";
+					reg = <2>;
+				};
+			};
+
 			mmc0: mmc@fff80000 {
 				pinctrl-0 = <
 					&pinctrl_board_mmc
