@@ -104,6 +104,12 @@ static const struct gpmi_devdata gpmi_devdata_imx6q = {
 	.max_chain_delay = 12,
 };
 
+static const struct gpmi_devdata gpmi_devdata_imx6qp = {
+	.type = IS_MX6QP,
+	.bch_max_ecc_strength = 40,
+	.max_chain_delay = 12,
+};
+
 static const struct gpmi_devdata gpmi_devdata_imx6sx = {
 	.type = IS_MX6SX,
 	.bch_max_ecc_strength = 62,
@@ -2085,6 +2091,9 @@ static const struct of_device_id gpmi_nand_id_table[] = {
 	}, {
 		.compatible = "fsl,imx6q-gpmi-nand",
 		.data = &gpmi_devdata_imx6q,
+	}, {
+		.compatible = "fsl,imx6qp-gpmi-nand",
+		.data = &gpmi_devdata_imx6qp,
 	}, {
 		.compatible = "fsl,imx6sx-gpmi-nand",
 		.data = &gpmi_devdata_imx6sx,
