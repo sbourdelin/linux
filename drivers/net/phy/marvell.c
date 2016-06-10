@@ -115,10 +115,6 @@
 #define MII_88E1318S_PHY_WOL_CTRL_CLEAR_WOL_STATUS          BIT(12)
 #define MII_88E1318S_PHY_WOL_CTRL_MAGIC_PACKET_MATCH_ENABLE BIT(14)
 
-#define MII_88E1121_PHY_LED_CTRL	16
-#define MII_88E1121_PHY_LED_PAGE	3
-#define MII_88E1121_PHY_LED_DEF		0x0030
-
 #define MII_M1011_PHY_STATUS		0x11
 #define MII_M1011_PHY_STATUS_1000	0x8000
 #define MII_M1011_PHY_STATUS_100	0x4000
@@ -407,15 +403,7 @@ static int m88e1121_config_aneg(struct phy_device *phydev)
 	if (err < 0)
 		return err;
 
-	oldpage = phy_read(phydev, MII_MARVELL_PHY_PAGE);
-
-	phy_write(phydev, MII_MARVELL_PHY_PAGE, MII_88E1121_PHY_LED_PAGE);
-	phy_write(phydev, MII_88E1121_PHY_LED_CTRL, MII_88E1121_PHY_LED_DEF);
-	phy_write(phydev, MII_MARVELL_PHY_PAGE, oldpage);
-
-	err = genphy_config_aneg(phydev);
-
-	return err;
+	return genphy_config_aneg(phydev);
 }
 
 static int m88e1318_config_aneg(struct phy_device *phydev)
