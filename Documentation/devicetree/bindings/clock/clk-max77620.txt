@@ -1,0 +1,31 @@
+* Maxim MAX77620 32KHz clocks *
+
+Maxim Power Management IC (PMIC) has clock output pins for 32KHz.
+
+This binding uses the common clock binding ./clock-bindings.txt.
+
+Required Properties:
+--------------------
+
+-#clock-cells : shall be set to 0.
+
+Example:
+
+#include <dt-bindings/mfd/max77620.h>
+...
+
+i2c@7000d000 {
+	spmic: max77620@3c {
+		compatible = "maxim,max77620";
+		:::::
+		#clock-cells = <0>;
+		:::
+       };
+};
+
+bluetooth {
+	compatible = "bcom,bluuetooth-device";
+	clocks = <&smic>;
+	clock-names = "in-32k";
+	:::
+};
