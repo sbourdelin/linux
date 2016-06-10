@@ -335,7 +335,7 @@ relocate_entry_gtt(struct drm_i915_gem_object *obj,
 					      offset & PAGE_MASK);
 	iowrite32(lower_32_bits(delta), reloc_page + offset_in_page(offset));
 
-	if (INTEL_INFO(dev)->gen >= 8) {
+	if (INTEL_GEN(dev_priv) >= 8) {
 		offset += sizeof(uint32_t);
 
 		if (offset_in_page(offset) == 0) {
@@ -1254,19 +1254,19 @@ i915_gem_ringbuffer_submission(struct i915_execbuffer_params *params,
 		}
 
 		if (instp_mode != dev_priv->relative_constants_mode) {
-			if (INTEL_INFO(dev)->gen < 4) {
+			if (INTEL_GEN(dev_priv) < 4) {
 				DRM_DEBUG("no rel constants on pre-gen4\n");
 				return -EINVAL;
 			}
 
-			if (INTEL_INFO(dev)->gen > 5 &&
+			if (INTEL_GEN(dev_priv) > 5 &&
 			    instp_mode == I915_EXEC_CONSTANTS_REL_SURFACE) {
 				DRM_DEBUG("rel surface constants mode invalid on gen5+\n");
 				return -EINVAL;
 			}
 
 			/* The HW changed the meaning on this bit on gen6 */
-			if (INTEL_INFO(dev)->gen >= 6)
+			if (INTEL_GEN(dev_priv) >= 6)
 				instp_mask &= ~I915_EXEC_CONSTANTS_REL_SURFACE;
 		}
 		break;

@@ -2324,7 +2324,7 @@ void i915_gem_suspend_gtt_mappings(struct drm_device *dev)
 	/* Don't bother messing with faults pre GEN6 as we have little
 	 * documentation supporting that it's a good idea.
 	 */
-	if (INTEL_INFO(dev)->gen < 6)
+	if (INTEL_GEN(dev_priv) < 6)
 		return;
 
 	i915_check_and_clear_faults(dev_priv);
@@ -3054,7 +3054,7 @@ static int gen8_gmch_probe(struct i915_ggtt *ggtt)
 
 	pci_read_config_word(dev->pdev, SNB_GMCH_CTRL, &snb_gmch_ctl);
 
-	if (INTEL_INFO(dev)->gen >= 9) {
+	if (INTEL_GEN(dev_priv) >= 9) {
 		ggtt->stolen_size = gen9_get_stolen_size(snb_gmch_ctl);
 		ggtt->size = gen8_get_total_gtt_size(snb_gmch_ctl);
 	} else if (IS_CHERRYVIEW(dev)) {
@@ -3173,10 +3173,10 @@ int i915_ggtt_init_hw(struct drm_device *dev)
 	struct i915_ggtt *ggtt = &dev_priv->ggtt;
 	int ret;
 
-	if (INTEL_INFO(dev)->gen <= 5) {
+	if (INTEL_GEN(dev_priv) <= 5) {
 		ggtt->probe = i915_gmch_probe;
 		ggtt->base.cleanup = i915_gmch_remove;
-	} else if (INTEL_INFO(dev)->gen < 8) {
+	} else if (INTEL_GEN(dev_priv) < 8) {
 		ggtt->probe = gen6_gmch_probe;
 		ggtt->base.cleanup = gen6_gmch_remove;
 
@@ -3186,7 +3186,7 @@ int i915_ggtt_init_hw(struct drm_device *dev)
 			ggtt->base.pte_encode = hsw_pte_encode;
 		else if (IS_VALLEYVIEW(dev))
 			ggtt->base.pte_encode = byt_pte_encode;
-		else if (INTEL_INFO(dev)->gen >= 7)
+		else if (INTEL_GEN(dev_priv) >= 7)
 			ggtt->base.pte_encode = ivb_pte_encode;
 		else
 			ggtt->base.pte_encode = snb_pte_encode;
@@ -3271,7 +3271,7 @@ void i915_gem_restore_gtt_mappings(struct drm_device *dev)
 			WARN_ON(i915_gem_object_set_to_gtt_domain(obj, false));
 	}
 
-	if (INTEL_INFO(dev)->gen >= 8) {
+	if (INTEL_GEN(dev_priv) >= 8) {
 		if (IS_CHERRYVIEW(dev) || IS_BROXTON(dev))
 			chv_setup_private_ppat(dev_priv);
 		else

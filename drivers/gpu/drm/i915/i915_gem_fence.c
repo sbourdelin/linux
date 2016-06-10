@@ -62,7 +62,7 @@ static void i965_write_fence_reg(struct drm_device *dev, int reg,
 	i915_reg_t fence_reg_lo, fence_reg_hi;
 	int fence_pitch_shift;
 
-	if (INTEL_INFO(dev)->gen >= 6) {
+	if (INTEL_GEN(dev_priv) >= 6) {
 		fence_reg_lo = FENCE_REG_GEN6_LO(reg);
 		fence_reg_hi = FENCE_REG_GEN6_HI(reg);
 		fence_pitch_shift = GEN6_FENCE_PITCH_SHIFT;
@@ -209,7 +209,7 @@ static void i915_gem_write_fence(struct drm_device *dev, int reg,
 		i830_write_fence_reg(dev, reg, obj);
 	else if (IS_GEN3(dev))
 		i915_write_fence_reg(dev, reg, obj);
-	else if (INTEL_INFO(dev)->gen >= 4)
+	else if (INTEL_GEN(dev_priv) >= 4)
 		i965_write_fence_reg(dev, reg, obj);
 
 	/* And similarly be paranoid that no direct access to this region
@@ -553,7 +553,7 @@ i915_gem_detect_bit_6_swizzle(struct drm_device *dev)
 	uint32_t swizzle_x = I915_BIT_6_SWIZZLE_UNKNOWN;
 	uint32_t swizzle_y = I915_BIT_6_SWIZZLE_UNKNOWN;
 
-	if (INTEL_INFO(dev)->gen >= 8 || IS_VALLEYVIEW(dev)) {
+	if (INTEL_GEN(dev_priv) >= 8 || IS_VALLEYVIEW(dev)) {
 		/*
 		 * On BDW+, swizzling is not used. We leave the CPU memory
 		 * controller in charge of optimizing memory accesses without
@@ -563,7 +563,7 @@ i915_gem_detect_bit_6_swizzle(struct drm_device *dev)
 		 */
 		swizzle_x = I915_BIT_6_SWIZZLE_NONE;
 		swizzle_y = I915_BIT_6_SWIZZLE_NONE;
-	} else if (INTEL_INFO(dev)->gen >= 6) {
+	} else if (INTEL_GEN(dev_priv) >= 6) {
 		if (dev_priv->preserve_bios_swizzle) {
 			if (I915_READ(DISP_ARB_CTL) &
 			    DISP_TILE_SURFACE_SWIZZLING) {

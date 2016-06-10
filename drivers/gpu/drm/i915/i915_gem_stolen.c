@@ -108,7 +108,7 @@ static unsigned long i915_stolen_to_physical(struct drm_device *dev)
 	 *
 	 */
 	base = 0;
-	if (INTEL_INFO(dev)->gen >= 3) {
+	if (INTEL_GEN(dev_priv) >= 3) {
 		u32 bsm;
 
 		pci_read_config_dword(dev->pdev, INTEL_BSM, &bsm);
@@ -192,7 +192,7 @@ static unsigned long i915_stolen_to_physical(struct drm_device *dev)
 		return 0;
 
 	/* make sure we don't clobber the GTT if it's within stolen memory */
-	if (INTEL_INFO(dev)->gen <= 4 && !IS_G33(dev) && !IS_G4X(dev)) {
+	if (INTEL_GEN(dev_priv) <= 4 && !IS_G33(dev) && !IS_G4X(dev)) {
 		struct {
 			u32 start, end;
 		} stolen[2] = {
@@ -405,7 +405,7 @@ int i915_gem_init_stolen(struct drm_device *dev)
 	mutex_init(&dev_priv->mm.stolen_lock);
 
 #ifdef CONFIG_INTEL_IOMMU
-	if (intel_iommu_gfx_mapped && INTEL_INFO(dev)->gen < 8) {
+	if (intel_iommu_gfx_mapped && INTEL_GEN(dev_priv) < 8) {
 		DRM_INFO("DMAR active, disabling use of stolen memory\n");
 		return 0;
 	}

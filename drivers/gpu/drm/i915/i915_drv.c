@@ -998,7 +998,7 @@ int i915_reset(struct drm_i915_private *dev_priv)
 	 * previous concerns that it doesn't respond well to some forms
 	 * of re-init after reset.
 	 */
-	if (INTEL_INFO(dev)->gen > 5)
+	if (INTEL_GEN(dev_priv) > 5)
 		intel_enable_gt_powersave(dev_priv);
 
 	return 0;
