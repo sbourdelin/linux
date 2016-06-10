@@ -50,6 +50,15 @@ bool ins__is_jump(const struct ins *ins);
 bool ins__is_call(const struct ins *ins);
 bool ins__is_ret(const struct ins *ins);
 int ins__scnprintf(struct ins *ins, char *bf, size_t size, struct ins_operands *ops);
+struct ins *ins__find(const char *name);
+
+extern struct ins_ops call_ops;
+extern struct ins_ops jump_ops;
+extern struct ins_ops ret_ops;
+extern struct ins_ops mov_ops;
+extern struct ins_ops lock_ops;
+extern struct ins_ops dec_ops;
+extern struct ins_ops nop_ops;
 
 struct annotation;
 
