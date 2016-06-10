@@ -34,6 +34,15 @@ source "drivers/clk/versatile/Kconfig"
 config COMMON_CLK_MAX_GEN
         bool
 
+config COMMON_CLK_MAX77620
+	tristate "Clock driver for Maxim 77620/MAX20024 MFD"
+	depends on MFD_MAX77620
+	---help---
+	  This driver supports Maxim MAX77620/MAX20024 32KHz crystal
+	  oscillator. These multi-function devices have one fixed rate.
+	  The clock can be ON and OFF. Say y to make this driver as
+	  built-in and m to make it as module.
+
 config COMMON_CLK_MAX77686
 	tristate "Clock driver for Maxim 77686 MFD"
 	depends on MFD_MAX77686
