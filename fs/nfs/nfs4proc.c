@@ -2745,7 +2745,7 @@ static int nfs4_do_setattr(struct inode *inode, struct rpc_cred *cred,
 		.state = state,
 		.inode = inode,
 	};
-	int err;
+	int err, save_err;
 	do {
 		err = _nfs4_do_setattr(inode, cred, fattr, sattr, state, ilabel, olabel);
 		switch (err) {
@@ -2764,7 +2764,14 @@ static int nfs4_do_setattr(struct inode *inode, struct rpc_cred *cred,
 				goto out;
 			}
 		}
+		save_err = err;
 		err = nfs4_handle_exception(server, err, &exception);
+		switch (save_err) {
+		case -NFS4ERR_DELEG_REVOKED:
+		case -NFS4ERR_ADMIN_REVOKED:
+		case -NFS4ERR_BAD_STATEID:
+			exception.retry = 1;
+		}
 	} while (exception.retry);
 out:
 	return err;
