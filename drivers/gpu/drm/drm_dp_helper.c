@@ -514,6 +514,27 @@ int drm_dp_downstream_max_bpc(const u8 dpcd[DP_RECEIVER_CAP_SIZE],
 EXPORT_SYMBOL(drm_dp_downstream_max_bpc);
 
 /**
+ * drm_dp_downstream_hw_rev() - read DP branch device HW revision
+ * @aux: DisplayPort AUX channel
+ *
+ * Returns HW revision on succes or negative error code on failure
+ */
+struct drm_dp_revision drm_dp_downstream_hw_rev(struct drm_dp_aux *aux)
+{
+	uint8_t tmp;
+	struct drm_dp_revision rev = { .major = -EINVAL, .minor = -EINVAL };
+
+	if (drm_dp_dpcd_read(aux, DP_BRANCH_HW_REV, &tmp, 1) != 1)
+		return rev;
+
+	rev.major = (tmp & 0xf0) >> 4;
+	rev.minor = tmp & 0xf;
+
+	return rev;
+}
+EXPORT_SYMBOL(drm_dp_downstream_hw_rev);
+
+/**
  * drm_dp_downstream_id() - identify branch device
  * @aux: DisplayPort AUX channel
  *
