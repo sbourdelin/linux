@@ -76,7 +76,7 @@ static int clk_slow_osc_prepare(struct clk_hw *hw)
 
 	writel(tmp | AT91_SCKC_OSC32EN, sckcr);
 
-	usleep_range(osc->startup_usec, osc->startup_usec + 1);
+	udelay(osc->startup_usec);
 
 	return 0;
 }
@@ -195,7 +195,7 @@ static int clk_slow_rc_osc_prepare(struct clk_hw *hw)
 
 	writel(readl(sckcr) | AT91_SCKC_RCEN, sckcr);
 
-	usleep_range(osc->startup_usec, osc->startup_usec + 1);
+	udelay(osc->startup_usec);
 
 	return 0;
 }
@@ -304,7 +304,7 @@ static int clk_sam9x5_slow_set_parent(struct clk_hw *hw, u8 index)
 
 	writel(tmp, sckcr);
 
-	usleep_range(SLOWCK_SW_TIME_USEC, SLOWCK_SW_TIME_USEC + 1);
+	udelay(SLOWCK_SW_TIME_USEC);
 
 	return 0;
 }
