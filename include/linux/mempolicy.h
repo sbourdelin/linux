@@ -85,9 +85,7 @@ static inline void mpol_cond_put(struct mempolicy *pol)
 extern struct mempolicy *__mpol_dup(struct mempolicy *pol);
 static inline struct mempolicy *mpol_dup(struct mempolicy *pol)
 {
-	if (pol)
-		pol = __mpol_dup(pol);
-	return pol;
+	return pol ? __mpol_dup(pol) : NULL;
 }
 
 #define vma_policy(vma) ((vma)->vm_policy)
@@ -101,9 +99,7 @@ static inline void mpol_get(struct mempolicy *pol)
 extern bool __mpol_equal(struct mempolicy *a, struct mempolicy *b);
 static inline bool mpol_equal(struct mempolicy *a, struct mempolicy *b)
 {
-	if (a == b)
-		return true;
-	return __mpol_equal(a, b);
+	return (a == b) || __mpol_equal(a, b);
 }
 
 /*
@@ -136,7 +132,7 @@ struct mempolicy *mpol_shared_policy_lookup(struct shared_policy *sp,
 
 struct mempolicy *get_task_policy(struct task_struct *p);
 struct mempolicy *__get_vma_policy(struct vm_area_struct *vma,
-		unsigned long addr);
+				unsigned long addr);
 bool vma_policy_mof(struct vm_area_struct *vma);
 
 extern void numa_default_policy(void);
@@ -150,7 +146,7 @@ extern struct zonelist *huge_zonelist(struct vm_area_struct *vma,
 				struct mempolicy **mpol, nodemask_t **nodemask);
 extern bool init_nodemask_of_mempolicy(nodemask_t *mask);
 extern bool mempolicy_nodemask_intersects(struct task_struct *tsk,
-				const nodemask_t *mask);
+					const nodemask_t *mask);
 extern unsigned int mempolicy_slab_node(void);
 
 extern enum zone_type policy_zone;
@@ -187,11 +183,9 @@ static inline bool vma_migratable(struct vm_area_struct *vma)
 	 * do so then migration (at least from node to node) is not
 	 * possible.
 	 */
-	if (vma->vm_file &&
+	return !(vma->vm_file &&
 		gfp_zone(mapping_gfp_mask(vma->vm_file->f_mapping))
-								< policy_zone)
-			return false;
-	return true;
+								< policy_zone);
 }
 
 extern int mpol_misplaced(struct page *, struct vm_area_struct *, unsigned long);
