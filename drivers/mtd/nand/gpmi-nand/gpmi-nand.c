@@ -1043,6 +1043,7 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
 {
 	struct gpmi_nand_data *this = nand_get_controller_data(chip);
 	struct bch_geometry *nfc_geo = &this->bch_geometry;
+	void __iomem *bch_regs = this->resources.bch_regs;
 	void          *payload_virt;
 	dma_addr_t    payload_phys;
 	void          *auxiliary_virt;
@@ -1051,6 +1052,8 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
 	unsigned char *status;
 	unsigned int  max_bitflips = 0;
 	int           ret;
+	int bitflips = 0;
+	int bitflip_flag = 0;
 
 	dev_dbg(this->dev, "page number is : %d\n", page);
 	ret = read_page_prepare(this, buf, nfc_geo->payload_size,
@@ -1088,8 +1091,20 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
 			   payload_virt, payload_phys);
 
 	for (i = 0; i < nfc_geo->ecc_chunk_count; i++, status++) {
-		if ((*status == STATUS_GOOD) || (*status == STATUS_ERASED))
+		if (*status == STATUS_GOOD)
 			continue;
+		if (*status == STATUS_ERASED) {
+			if (GPMI_IS_MX6QP(this) || GPMI_IS_MX7(this)) {
+				bitflips = readl(bch_regs + HW_BCH_DEBUG1);
+				if (bitflips) {
+					bitflip_flag = 1;
+					max_bitflips = max_t(unsigned int,
+							     max_bitflips,
+							     bitflips);
+				}
+			}
+			continue;
+		}
 
 		if (*status == STATUS_UNCORRECTABLE) {
 			int eccbits = nfc_geo->ecc_strength * nfc_geo->gf_len;
@@ -1097,6 +1112,10 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
 			int offset, bitoffset;
 			int eccbytes;
 			int flips;
+
+			/* shortcut for i.MX7 and i.MX6QP */
+			if (GPMI_IS_MX6QP(this) || GPMI_IS_MX7(this))
+				continue;
 
 			/* Read ECC bytes into our internal raw_buffer */
 			offset = nfc_geo->metadata_size * 8;
@@ -1180,6 +1199,12 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
 		 */
 		memset(chip->oob_poi, ~0, mtd->oobsize);
 		chip->oob_poi[0] = ((uint8_t *) auxiliary_virt)[0];
+	}
+
+	/* if bitflip occurred in erased page, change data to all 0xff */
+	if (bitflip_flag) {
+		memset(buf, ~0, nfc_geo->payload_size);
+		memset(chip->oob_poi, ~0, mtd->oobsize);
 	}
 
 	return max_bitflips;
