@@ -32,6 +32,8 @@
  * @ZOPT_NON_WP_ZONES: Zones that do not have Write Pointers (conventional)
  * @ZOPT_PARTIAL_FLAG: Modifies the definition of the Zone List Length field.
  *
+ * @ZOPT_USE_ATA_PASS: Flag used in kernel to service command I/O
+ *
  * Used by Report Zones in bdev_zone_get_report: report_option
  */
 enum zone_report_option {
@@ -47,6 +49,8 @@ enum zone_report_option {
 	ZOPT_NON_SEQ             = 0x11,
 	ZOPT_NON_WP_ZONES        = 0x3f,
 	ZOPT_PARTIAL_FLAG        = 0x80,
+
+	ZOPT_USE_ATA_PASS        = 0x40, /* reserved by spec */
 };
 
 /**
