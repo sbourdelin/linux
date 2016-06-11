@@ -193,6 +193,13 @@ memory. A lower value can prevent THPs from being
 collapsed, resulting fewer pages being collapsed into
 THPs, and lower memory access performance.
 
+min_ptes_young specifies at least how many young pages needed
+to create a THP. This threshold also effects when making swapin
+readahead (if needed) to create a THP. We decide whether to make
+swapin readahed wortwhile looking the value.
+
+/sys/kernel/mm/transparent_hugepage/khugepaged/min_ptes_young
+
 == Boot parameter ==
 
 You can change the sysfs boot time defaults of Transparent Hugepage
