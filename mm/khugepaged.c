@@ -27,7 +27,7 @@ enum scan_result {
 	SCAN_EXCEED_NONE_PTE,
 	SCAN_PTE_NON_PRESENT,
 	SCAN_PAGE_RO,
-	SCAN_NO_REFERENCED_PAGE,
+	SCAN_LACK_REFERENCED_PAGE,
 	SCAN_PAGE_NULL,
 	SCAN_SCAN_ABORT,
 	SCAN_PAGE_COUNT,
@@ -68,6 +68,7 @@ static DECLARE_WAIT_QUEUE_HEAD(khugepaged_wait);
  */
 static unsigned int khugepaged_max_ptes_none __read_mostly;
 static unsigned int khugepaged_max_ptes_swap __read_mostly;
+static unsigned int khugepaged_min_ptes_young __read_mostly;
 
 static int khugepaged(void *none);
 
@@ -282,6 +283,32 @@ static struct kobj_attribute khugepaged_max_ptes_swap_attr =
 	__ATTR(max_ptes_swap, 0644, khugepaged_max_ptes_swap_show,
 	       khugepaged_max_ptes_swap_store);
 
+static ssize_t khugepaged_min_ptes_young_show(struct kobject *kobj,
+					      struct kobj_attribute *attr,
+					      char *buf)
+{
+	return sprintf(buf, "%u\n", khugepaged_min_ptes_young);
+}
+
+static ssize_t khugepaged_min_ptes_young_store(struct kobject *kobj,
+					       struct kobj_attribute *attr,
+					       const char *buf, size_t count)
+{
+	int err;
+	unsigned long min_ptes_young;
+	err  = kstrtoul(buf, 10, &min_ptes_young);
+	if (err || min_ptes_young > HPAGE_PMD_NR-1)
+		return -EINVAL;
+
+	khugepaged_min_ptes_young = min_ptes_young;
+
+	return count;
+}
+
+static struct kobj_attribute khugepaged_min_ptes_young_attr =
+		__ATTR(min_ptes_young, 0644, khugepaged_min_ptes_young_show,
+		khugepaged_min_ptes_young_store);
+
 static struct attribute *khugepaged_attr[] = {
 	&khugepaged_defrag_attr.attr,
 	&khugepaged_max_ptes_none_attr.attr,
@@ -291,6 +318,7 @@ static struct attribute *khugepaged_attr[] = {
 	&scan_sleep_millisecs_attr.attr,
 	&alloc_sleep_millisecs_attr.attr,
 	&khugepaged_max_ptes_swap_attr.attr,
+	&khugepaged_min_ptes_young_attr.attr,
 	NULL,
 };
 
@@ -502,8 +530,8 @@ static int __collapse_huge_page_isolate(struct vm_area_struct *vma,
 {
 	struct page *page = NULL;
 	pte_t *_pte;
-	int none_or_zero = 0, result = 0;
-	bool referenced = false, writable = false;
+	int none_or_zero = 0, result = 0, referenced = 0;
+	bool writable = false;
 
 	for (_pte = pte; _pte < pte+HPAGE_PMD_NR;
 	     _pte++, address += PAGE_SIZE) {
@@ -582,14 +610,14 @@ static int __collapse_huge_page_isolate(struct vm_area_struct *vma,
 		VM_BUG_ON_PAGE(!PageLocked(page), page);
 		VM_BUG_ON_PAGE(PageLRU(page), page);
 
-		/* If there is no mapped pte young don't collapse the page */
+		/* There should be enough young pte to collapse the page */
 		if (pte_young(pteval) ||
 		    page_is_young(page) || PageReferenced(page) ||
 		    mmu_notifier_test_young(vma->vm_mm, address))
-			referenced = true;
+			referenced++;
 	}
 	if (likely(writable)) {
-		if (likely(referenced)) {
+		if (referenced >= khugepaged_min_ptes_young) {
 			result = SCAN_SUCCEED;
 			trace_mm_collapse_huge_page_isolate(page, none_or_zero,
 							    referenced, writable, result);
@@ -1082,11 +1110,11 @@ static int khugepaged_scan_pmd(struct mm_struct *mm,
 	pmd_t *pmd;
 	pte_t *pte, *_pte;
 	int ret = 0, none_or_zero = 0, result = 0;
+	int node = NUMA_NO_NODE, unmapped = 0, referenced = 0;
 	struct page *page = NULL;
 	unsigned long _address;
 	spinlock_t *ptl;
-	int node = NUMA_NO_NODE, unmapped = 0;
-	bool writable = false, referenced = false;
+	bool writable = false;
 
 	VM_BUG_ON(address & ~HPAGE_PMD_MASK);
 
@@ -1174,14 +1202,14 @@ static int khugepaged_scan_pmd(struct mm_struct *mm,
 		if (pte_young(pteval) ||
 		    page_is_young(page) || PageReferenced(page) ||
 		    mmu_notifier_test_young(vma->vm_mm, address))
-			referenced = true;
+			referenced++;
 	}
 	if (writable) {
-		if (referenced) {
+		if (referenced >= khugepaged_min_ptes_young) {
 			result = SCAN_SUCCEED;
 			ret = 1;
 		} else {
-			result = SCAN_NO_REFERENCED_PAGE;
+			result = SCAN_LACK_REFERENCED_PAGE;
 		}
 	} else {
 		result = SCAN_PAGE_RO;
