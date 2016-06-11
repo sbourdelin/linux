@@ -17,6 +17,11 @@ Required properties:
 - clock-names: Must contain "core" for the core clock, "iface" for the interface
   clock and "bus" for the bus clock per the requirements of the compatible.
 
+Optional properties:
+- #reset-cells: must be 1, if specified. Specifies that the scm implements a
+  reset controller exposing the modem subsystem reset as a single reset, at
+  index 0.
+
 Example for MSM8916:
 
 	firmware {
@@ -24,5 +29,6 @@ Example for MSM8916:
 			compatible = "qcom,scm";
 			clocks = <&gcc GCC_CRYPTO_CLK> , <&gcc GCC_CRYPTO_AXI_CLK>, <&gcc GCC_CRYPTO_AHB_CLK>;
 			clock-names = "core", "bus", "iface";
+			#reset-cells = <1>;
 		};
 	};
