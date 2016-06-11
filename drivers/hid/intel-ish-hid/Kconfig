@@ -5,10 +5,15 @@ config INTEL_ISH_HID_TRANSPORT
 	bool
 	default n
 
+config INTEL_ISH_HID_IPC
+	bool
+	default n
+
 config INTEL_ISH_HID
 	bool "Intel Integrated Sensor Hub"
 	default n
 	select INTEL_ISH_HID_TRANSPORT
+	select INTEL_ISH_HID_IPC
 	help
 	  The Integrated Sensor Hub (ISH) enables the ability to offload
 	  sensor polling and algorithm processing to a dedicated low power
