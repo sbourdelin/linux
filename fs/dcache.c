@@ -280,6 +280,44 @@ static inline int dname_external(const struct dentry *dentry)
 	return dentry->d_name.name != dentry->d_iname;
 }
 
+#if CONFIG_L1_DCACHE_BITS > 0
+/*
+ * Reschedule RCU reclamation for the *next* grace period.
+ * That's a longer wait than usually necessary, but this is so rare
+ * that optimizing it is not important.
+ */
+static void __d_free_delayed(struct rcu_head *head)
+{
+	struct dentry *dentry = container_of(head, struct dentry, d_u.d_rcu);
+
+	if (dname_external(dentry))
+		call_rcu(&dentry->d_u.d_rcu, __d_free_external);
+	else
+		call_rcu(&dentry->d_u.d_rcu, __d_free);
+}
+
+/*
+ * This is an Evil RCU Hack.  A rare race condition leaks an RCU-protected
+ * pointer to a freed dentry to another CPU.  An even rarer race results
+ * in the first CPU exiting an RCU read locked region and triggering
+ * the end of the grace period while the second CPU is still using the
+ * pointer.  So if we detect the first race happening, we call this to
+ * defer the RCU reclamation for a second grace period.
+ *
+ * The evil part: we can't remove it from the singly-linked RCU callback
+ * list, but we can safely change the callback function out from under
+ * the RCU code.
+ *
+ * The other evil part: This is a harmless no-op if the dentry is not
+ * on the RCU list at all.  We just need to be sure that the d_alias
+ * list, which overlaps with d_rcu, is not used.
+ */
+static void dentry_delay_free(struct dentry *dentry)
+{
+	WRITE_ONCE(dentry->d_u.d_rcu.func, __d_free_delayed);
+}
+#endif
+
 static inline void __d_set_inode_and_type(struct dentry *dentry,
 					  struct inode *inode,
 					  unsigned type_flags)
@@ -311,6 +349,7 @@ static void dentry_free(struct dentry *dentry)
 			call_rcu(&dentry->d_u.d_rcu, __d_free_external);
 			return;
 		}
+		dentry->d_name.name = dentry->d_iname;
 	}
 	/* if dentry was never visible to RCU, immediate free is OK */
 	if (!(dentry->d_flags & DCACHE_RCUACCESS))
@@ -461,6 +500,120 @@ static void dentry_lru_add(struct dentry *dentry)
 		d_lru_add(dentry);
 }
 
+#if CONFIG_L1_DCACHE_BITS > 0
+/*
+ * In front of the main dcache, we have an inclusive "L1 dcache".
+ * This is a simple direct-mapped hash table.
+ *
+ * The L1 dcache is *written* to locklessly, which is fragile as heck.
+ * The main point is that write/write races don't matter.  As long
+ * as the reader gets *some* valid dentry pointer, it doesn't much
+ * matter which.
+ *
+ * The nasty cases occur when we add an entry to the L1 cache as it's
+ * being deallocated.  There's no way to atomically check for validity
+ * and store, so we have to notice the problem after storing the entry and
+ * undo the damage.  RCU helps a lot here, but doesn't solve everything.
+ */
+
+/*
+ * This has a NULL parent and zero length, and will thus
+ * never match anything. But it means that the dcache_l1
+ * array never contains NULL, so you don't need to check.
+ */
+static struct dentry invalid_dentry;
+
+#define L1_DCACHE_SIZE (1u << CONFIG_L1_DCACHE_BITS)
+
+static struct dentry *dcache_l1[L1_DCACHE_SIZE] = {
+	[0 ... L1_DCACHE_SIZE-1] = &invalid_dentry
+};
+
+static unsigned int dentry_l1_index(unsigned int hash, const struct dentry *dir)
+{
+	hash += (unsigned long) dir / L1_CACHE_BYTES;
+	hash = hash + (hash >> CONFIG_L1_DCACHE_BITS);
+	return hash & (L1_DCACHE_SIZE-1);
+}
+
+static struct dentry *d_lookup_l1(unsigned int hash, const struct dentry *dir)
+{
+	unsigned int n = dentry_l1_index(hash, dir);
+
+	return READ_ONCE(dcache_l1[n]);
+}
+
+static void d_remove_from_l1(const struct dentry *dentry)
+{
+	unsigned int n = dentry_l1_index(dentry->d_name.hash, dentry->d_parent);
+
+	WRITE_ONCE(dcache_l1[n], &invalid_dentry);
+}
+
+/*
+ * Add a dentry to L1, and take it right back out again if it was changed
+ * in the meantime.  There are two races we have to worry about:
+ * 1) A race with __d_drop (but not __d_kill):
+ *    An invalid entry just causes an L1 miss, but we have to be sure that
+ *    *someone* removes the dentry from L1.  __d_drop removes it *after*
+ *    bumping the seqno, so if we don't see sequence jump, it's safe to
+ *    leave it in L1.
+ * 2) A race with __dentry_kill.  This is a *very* narrow race, and probably
+ *    impossible to hit without preemption, but it exists.
+ *
+ *    Suppose that just as we (on CPU #1) entered this function, CPU
+ *    #2 performed __dentry_kill.  I.e. after we checked the dentry
+ *    for validity but before the actual store.  We noticed the problem
+ *    *after* the store and will pull the entry out, but the following
+ *    events happen in the following order:
+ *    a) CPU #2 schedules reclamation with call_rcu(__d_free).
+ *    b) CPU #3 enters an RCU read-side critical section and fetches
+ *       the pointer from the L1 array.
+ *    c) Then CPU #1 invalidates the L1 cache entry.
+ *    d) Then CPU #1 goes RCU-idle (e.g. returns to user space).
+ *    e) This ends an RCU grace period and triggers reclamation.
+ *    g) Then CPU #3 tries to read from the reclaimed dentry.  Oops!
+ *    The problem is that RCU depends on knowing that, after call_rcu(),
+ *    only CPUs already in read-side critical sections can possibly
+ *    access the object.  By publishing the pointer in dcache_l1[], we
+ *    broke that guarantee.
+ *
+ *    The solution is to keep the dentry alive for a little bit longer.
+ */
+static bool d_add_to_l1(struct dentry *dentry, unsigned int hash,
+	const struct dentry *parent, unsigned int seq)
+{
+	unsigned int n = dentry_l1_index(hash, parent);
+	bool b;
+
+	WRITE_ONCE(dcache_l1[n], dentry);
+	smp_mb();	/* Pairs with dentry_rcuwalk_invalidate in __d_drop */
+	b = __read_seqcount_retry(&dentry->d_seq, seq);
+	if (unlikely(b)) {
+		WRITE_ONCE(dcache_l1[n], &invalid_dentry);
+		smp_mb();	/* Pairs with lock/unlock(dentry->d_lock) */
+		if (dentry->d_flags & DCACHE_DENTRY_KILLED)
+			dentry_delay_free(dentry);
+	}
+	return !b;
+}
+#else
+static inline void d_remove_from_l1(const struct dentry *dentry)
+{
+	(void)dentry;
+}
+
+static inline bool d_add_to_l1(struct dentry *dentry, unsigned int hash,
+	const struct dentry *parent, unsigned int seq)
+{
+	(void)dentry;
+	(void)hash;
+	(void)parent;
+	(void)seq;
+	return true;
+}
+#endif
+
 /**
  * d_drop - drop a dentry
  * @dentry: dentry to drop
@@ -495,6 +648,7 @@ void __d_drop(struct dentry *dentry)
 		dentry->d_hash.pprev = NULL;
 		hlist_bl_unlock(b);
 		dentry_rcuwalk_invalidate(dentry);
+		d_remove_from_l1(dentry);
 	}
 }
 EXPORT_SYMBOL(__d_drop);
@@ -2060,7 +2214,7 @@ static noinline enum slow_d_compare slow_dentry_cmp(
 }
 
 /**
- * __d_lookup_rcu - search for a dentry (racy, store-free)
+ * __d_lookup_rcu_slow - search for a dentry (racy, store-free)
  * @parent: parent dentry
  * @name: qstr of name we wish to find
  * @seqp: returns d_seq value at the point where the dentry was found
@@ -2088,7 +2242,7 @@ static noinline enum slow_d_compare slow_dentry_cmp(
  * NOTE! The caller *has* to check the resulting dentry against the sequence
  * number we've returned before using any of the resulting dentry state!
  */
-struct dentry *__d_lookup_rcu(const struct dentry *parent,
+static noinline struct dentry *__d_lookup_rcu_slow(const struct dentry *parent,
 				const struct qstr *name,
 				unsigned *seqp)
 {
@@ -2159,11 +2313,56 @@ seqretry:
 		if (dentry->d_name.hash_len != hashlen)
 			continue;
 		*seqp = seq;
-		if (!dentry_cmp(dentry, str, hashlen_len(hashlen)))
-			return dentry;
+		if (dentry_cmp(dentry, str, hashlen_len(hashlen)))
+			continue;
+		if (!d_add_to_l1(dentry, hashlen_hash(hashlen), parent, seq))
+			goto seqretry;
+		return dentry;
 	}
 	return NULL;
 }
+
+#if CONFIG_L1_DCACHE_BITS > 0
+/*
+ * Fast non-chained L1 hash lookup.
+ *
+ * This queries a fixed-size non-chained "level 1" hash table
+ * before falling back to the main dcache.
+ *
+ * The lookup is simplified by not putting anything in the hash
+ * table that would complicate the fast path.  In particular:
+ * - We don't need to worry about NULL pointers because the cache
+ *   is filled with dummy sentinel dentries that match nothing.
+ * - We don't need to worry about DCACHE_OP_COMPARE, because such
+ *   dentries are never added to the L1 cache.
+ */
+struct dentry *__d_lookup_rcu(const struct dentry *parent,
+				const struct qstr *name,
+				unsigned int *seqp)
+{
+	u64 hashlen = name->hash_len;
+	struct dentry *dentry = d_lookup_l1(hashlen_hash(hashlen), parent);
+	unsigned int seq = raw_seqcount_begin(&dentry->d_seq);
+
+	do {
+		if (unlikely(dentry->d_parent != parent))
+			break;
+		if (unlikely(dentry->d_name.hash_len != hashlen))
+			break;
+		*seqp = seq;
+		if (unlikely(dentry_cmp(dentry, name->name, hashlen_len(hashlen))))
+			break;
+		if (unlikely(d_unhashed(dentry)))
+			break;
+		return dentry;
+	} while (0);
+	return __d_lookup_rcu_slow(parent, name, seqp);
+}
+#else
+__alias(__d_lookup_rcu_slow) struct dentry *__d_lookup_rcu(
+	const struct dentry *parent,
+	const struct qstr *name, unsigned int *seqp);
+#endif
 
 /**
  * d_lookup - search for a dentry
