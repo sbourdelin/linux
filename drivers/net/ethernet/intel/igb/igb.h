@@ -356,6 +356,7 @@ struct hwmon_buff {
 #define IGB_RETA_SIZE	128
 
 /* board specific private data structure */
+
 struct igb_adapter {
 	unsigned long active_vlans[BITS_TO_LONGS(VLAN_N_VID)];
 
@@ -472,6 +473,13 @@ struct igb_adapter {
 	int copper_tries;
 	struct e1000_info ei;
 	u16 eee_advert;
+
+#if IS_ENABLED(CONFIG_IGB_TSN)
+	/* Reserved BW for class A and B */
+	u16 sra_idleslope_res;
+	u16 srb_idleslope_res;
+	u8 tsn_ready:1;
+#endif	/* IGB_TSN */
 };
 
 #define IGB_FLAG_HAS_MSI		BIT(0)
@@ -552,6 +560,17 @@ void igb_ptp_rx_pktstamp(struct igb_q_vector *q_vector, unsigned char *va,
 			 struct sk_buff *skb);
 int igb_ptp_set_ts_config(struct net_device *netdev, struct ifreq *ifr);
 int igb_ptp_get_ts_config(struct net_device *netdev, struct ifreq *ifr);
+/* This should be the only place where we add ifdeffery
+ * to include tsn-stuff or not. Everything else is located in igb_tsn.c
+ */
+#if IS_ENABLED(CONFIG_IGB_TSN)
+void igb_tsn_init(struct igb_adapter *adapter);
+int igb_tsn_capable(struct net_device *netdev);
+int igb_tsn_link_configure(struct net_device *netdev, enum sr_class sr_class,
+			   u16 framesize, u16 vid);
+#else
+static inline void igb_tsn_init(struct igb_adapter *adapter) { }
+#endif	/* CONFIG_IGB_TSN */
 void igb_set_flag_queue_pairs(struct igb_adapter *, const u32);
 #ifdef CONFIG_IGB_HWMON
 void igb_sysfs_exit(struct igb_adapter *adapter);

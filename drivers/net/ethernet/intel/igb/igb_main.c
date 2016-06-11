@@ -2142,6 +2142,10 @@ static const struct net_device_ops igb_netdev_ops = {
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	.ndo_poll_controller	= igb_netpoll,
 #endif
+#if IS_ENABLED(CONFIG_IGB_TSN)
+	.ndo_tsn_capable	= igb_tsn_capable,
+	.ndo_tsn_link_configure = igb_tsn_link_configure,
+#endif	/* CONFIG_IGB_TSN */
 	.ndo_fix_features	= igb_fix_features,
 	.ndo_set_features	= igb_set_features,
 	.ndo_fdb_add		= igb_ndo_fdb_add,
@@ -2664,6 +2668,8 @@ static int igb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	/* do hw tstamp init after resetting */
 	igb_ptp_init(adapter);
+
+	igb_tsn_init(adapter);
 
 	dev_info(&pdev->dev, "Intel(R) Gigabit Ethernet Network Connection\n");
 	/* print bus type/speed/width info, not applicable to i354 */
@@ -5323,8 +5329,10 @@ static netdev_tx_t igb_xmit_frame(struct sk_buff *skb,
 	/* The minimum packet size with TCTL.PSP set is 17 so pad the skb
 	 * in order to meet this minimum size requirement.
 	 */
-	if (skb_put_padto(skb, 17))
+	if (skb_put_padto(skb, 17)) {
+		pr_err("%s: skb_put_padto FAILED. skb->len < 17\n", __func__);
 		return NETDEV_TX_OK;
+	}
 
 	return igb_xmit_frame_ring(skb, igb_tx_queue_mapping(adapter, skb));
 }
