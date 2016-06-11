@@ -163,16 +163,9 @@ static int zx296702_pd_probe(struct platform_device *pdev)
 	genpd_data->num_domains = ARRAY_SIZE(zx296702_pm_domains);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!res) {
-		dev_err(&pdev->dev, "no memory resource defined\n");
-		return -ENODEV;
-	}
-
 	pcubase = devm_ioremap_resource(&pdev->dev, res);
-	if (!pcubase) {
-		dev_err(&pdev->dev, "ioremap fail.\n");
-		return -EIO;
-	}
+	if (IS_ERR(pcubase))
+		return PTR_ERR(pcubase);
 
 	for (i = 0; i < ARRAY_SIZE(zx296702_pm_domains); ++i)
 		pm_genpd_init(zx296702_pm_domains[i], NULL, false);
