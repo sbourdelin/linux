@@ -219,7 +219,8 @@ static void nft_rbtree_walk(const struct nft_ctx *ctx,
 
 		if (iter->count < iter->skip)
 			goto cont;
-		if (!nft_set_elem_active(&rbe->ext, genmask))
+		if (iter->ignore_inactive &&
+		    !nft_set_elem_active(&rbe->ext, genmask))
 			goto cont;
 
 		elem.priv = rbe;

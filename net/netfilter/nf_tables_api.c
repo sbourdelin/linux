@@ -2949,10 +2949,11 @@ int nf_tables_bind_set(const struct nft_ctx *ctx, struct nft_set *set,
 				goto bind;
 		}
 
-		iter.skip 	= 0;
-		iter.count	= 0;
-		iter.err	= 0;
-		iter.fn		= nf_tables_bind_check_setelem;
+		iter.ignore_inactive	= false;
+		iter.skip		= 0;
+		iter.count		= 0;
+		iter.err		= 0;
+		iter.fn			= nf_tables_bind_check_setelem;
 
 		set->ops->walk(ctx, set, &iter);
 		if (iter.err < 0) {
@@ -3190,12 +3191,13 @@ static int nf_tables_dump_set(struct sk_buff *skb, struct netlink_callback *cb)
 	if (nest == NULL)
 		goto nla_put_failure;
 
-	args.cb		= cb;
-	args.skb	= skb;
-	args.iter.skip	= cb->args[0];
-	args.iter.count	= 0;
-	args.iter.err   = 0;
-	args.iter.fn	= nf_tables_dump_setelem;
+	args.cb				= cb;
+	args.skb			= skb;
+	args.iter.ignore_inactive	= true;
+	args.iter.skip			= cb->args[0];
+	args.iter.count			= 0;
+	args.iter.err			= 0;
+	args.iter.fn			= nf_tables_dump_setelem;
 	set->ops->walk(&ctx, set, &args.iter);
 
 	nla_nest_end(skb, nest);
@@ -4282,10 +4284,11 @@ static int nf_tables_check_loops(const struct nft_ctx *ctx,
 			    binding->chain != chain)
 				continue;
 
-			iter.skip 	= 0;
-			iter.count	= 0;
-			iter.err	= 0;
-			iter.fn		= nf_tables_loop_check_setelem;
+			iter.ignore_inactive	= false;
+			iter.skip		= 0;
+			iter.count		= 0;
+			iter.err		= 0;
+			iter.fn			= nf_tables_loop_check_setelem;
 
 			set->ops->walk(ctx, set, &iter);
 			if (iter.err < 0)

@@ -167,6 +167,7 @@ struct nft_set_elem {
 
 struct nft_set;
 struct nft_set_iter {
+	bool		ignore_inactive;
 	unsigned int	count;
 	unsigned int	skip;
 	int		err;

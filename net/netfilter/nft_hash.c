@@ -218,7 +218,8 @@ static void nft_hash_walk(const struct nft_ctx *ctx, const struct nft_set *set,
 			goto cont;
 		if (nft_set_elem_expired(&he->ext))
 			goto cont;
-		if (!nft_set_elem_active(&he->ext, genmask))
+		if (iter->ignore_inactive &&
+		    !nft_set_elem_active(&he->ext, genmask))
 			goto cont;
 
 		elem.priv = he;
