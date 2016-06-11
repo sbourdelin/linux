@@ -411,6 +411,11 @@ int i915_gem_init_stolen(struct drm_device *dev)
 	}
 #endif
 
+	if (!i915.enable_stolen) {
+		DRM_INFO("Disabling use of stolen memory at user request.\n");
+		return 0;
+	}
+
 	if (ggtt->stolen_size == 0)
 		return 0;
 

@@ -60,6 +60,7 @@ struct i915_params i915 __read_mostly = {
 	.enable_dp_mst = true,
 	.inject_load_failure = 0,
 	.enable_dpcd_backlight = false,
+	.enable_stolen = true,
 };
 
 module_param_named(modeset, i915.modeset, int, 0400);
@@ -117,6 +118,11 @@ module_param_named_unsafe(enable_hangcheck, i915.enable_hangcheck, bool, 0644);
 MODULE_PARM_DESC(enable_hangcheck,
 	"Periodically check GPU activity for detecting hangs. "
 	"WARNING: Disabling this can cause system wide hangs. "
+	"(default: true)");
+
+module_param_named(enable_stolen, i915.enable_stolen, bool, 0400);
+MODULE_PARM_DESC(enable_stolen,
+	"Enable use of memory reserved (stolen) by the BIOS for graphics. "
 	"(default: true)");
 
 module_param_named_unsafe(enable_ppgtt, i915.enable_ppgtt, int, 0400);
