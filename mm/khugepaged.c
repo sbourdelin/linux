@@ -68,7 +68,6 @@ static DECLARE_WAIT_QUEUE_HEAD(khugepaged_wait);
  */
 static unsigned int khugepaged_max_ptes_none __read_mostly;
 static unsigned int khugepaged_max_ptes_swap __read_mostly;
-static unsigned long allocstall;
 
 static int khugepaged(void *none);
 
@@ -926,7 +925,6 @@ static void collapse_huge_page(struct mm_struct *mm,
 	struct page *new_page;
 	spinlock_t *pmd_ptl, *pte_ptl;
 	int isolated = 0, result = 0;
-	unsigned long swap, curr_allocstall;
 	struct mem_cgroup *memcg;
 	unsigned long mmun_start;	/* For mmu_notifiers */
 	unsigned long mmun_end;		/* For mmu_notifiers */
@@ -955,8 +953,6 @@ static void collapse_huge_page(struct mm_struct *mm,
 		goto out_nolock;
 	}
 
-	swap = get_mm_counter(mm, MM_SWAPENTS);
-	curr_allocstall = sum_vm_event(ALLOCSTALL);
 	down_read(&mm->mmap_sem);
 	result = hugepage_vma_revalidate(mm, address);
 	if (result) {
@@ -972,22 +968,15 @@ static void collapse_huge_page(struct mm_struct *mm,
 		up_read(&mm->mmap_sem);
 		goto out_nolock;
 	}
-
 	/*
-	 * Don't perform swapin readahead when the system is under pressure,
-	 * to avoid unnecessary resource consumption.
+	 * __collapse_huge_page_swapin always returns with mmap_sem
+	 * locked.  If it fails, release mmap_sem and jump directly
+	 * out.  Continuing to collapse causes inconsistency.
 	 */
-	if (allocstall == curr_allocstall && swap != 0) {
-		/*
-		 * __collapse_huge_page_swapin always returns with mmap_sem
-		 * locked.  If it fails, release mmap_sem and jump directly
-		 * out.  Continuing to collapse causes inconsistency.
-		 */
-		if (!__collapse_huge_page_swapin(mm, vma, address, pmd)) {
-			mem_cgroup_cancel_charge(new_page, memcg, true);
-			up_read(&mm->mmap_sem);
-			goto out_nolock;
-		}
+	if (!__collapse_huge_page_swapin(mm, vma, address, pmd)) {
+		mem_cgroup_cancel_charge(new_page, memcg, true);
+		up_read(&mm->mmap_sem);
+		goto out_nolock;
 	}
 
 	up_read(&mm->mmap_sem);
@@ -1822,7 +1811,6 @@ static void khugepaged_wait_work(void)
 		if (!scan_sleep_jiffies)
 			return;
 
-		allocstall = sum_vm_event(ALLOCSTALL);
 		khugepaged_sleep_expire = jiffies + scan_sleep_jiffies;
 		wait_event_freezable_timeout(khugepaged_wait,
 					     khugepaged_should_wakeup(),
@@ -1830,10 +1818,8 @@ static void khugepaged_wait_work(void)
 		return;
 	}
 
-	if (khugepaged_enabled()) {
-		allocstall = sum_vm_event(ALLOCSTALL);
+	if (khugepaged_enabled())
 		wait_event_freezable(khugepaged_wait, khugepaged_wait_event());
-	}
 }
 
 static int khugepaged(void *none)
@@ -1842,7 +1828,6 @@ static int khugepaged(void *none)
 
 	set_freezable();
 	set_user_nice(current, MAX_NICE);
-	allocstall = sum_vm_event(ALLOCSTALL);
 
 	while (!kthread_should_stop()) {
 		khugepaged_do_scan();
