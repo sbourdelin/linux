@@ -384,7 +384,8 @@ static struct task_desc *register_pid(struct perf_sched *sched,
 	sched->tasks[task->nr] = task;
 
 	if (verbose)
-		printf("registered task #%ld, PID %ld (%s)\n", sched->nr_tasks, pid, comm);
+		printf("registered task #%lu, PID %lu (%s)\n",
+		       sched->nr_tasks, pid, comm);
 
 	return task;
 }
@@ -397,7 +398,7 @@ static void print_task_traces(struct perf_sched *sched)
 
 	for (i = 0; i < sched->nr_tasks; i++) {
 		task = sched->tasks[i];
-		printf("task %6ld (%20s:%10ld), nr_events: %ld\n",
+		printf("task %6lu (%20s:%10lu), nr_events: %ld\n",
 			task->nr, task->comm, task->pid, task->nr_events);
 	}
 }
@@ -667,7 +668,7 @@ static void run_one_test(struct perf_sched *sched)
 		sched->run_avg = delta;
 	sched->run_avg = (sched->run_avg * (sched->replay_repeat - 1) + delta) / sched->replay_repeat;
 
-	printf("#%-3ld: %0.3f, ", sched->nr_runs, (double)delta / 1000000.0);
+	printf("#%-3lu: %0.3f, ", sched->nr_runs, (double)delta / 1000000.0);
 
 	printf("ravg: %0.2f, ", (double)sched->run_avg / 1e6);
 
@@ -687,7 +688,8 @@ static void run_one_test(struct perf_sched *sched)
 	printf("\n");
 
 	if (sched->nr_sleep_corrections)
-		printf(" (%ld sleep corrections)\n", sched->nr_sleep_corrections);
+		printf(" (%lu sleep corrections)\n",
+		       sched->nr_sleep_corrections);
 	sched->nr_sleep_corrections = 0;
 }
 
@@ -1652,17 +1654,17 @@ out_delete:
 static void print_bad_events(struct perf_sched *sched)
 {
 	if (sched->nr_unordered_timestamps && sched->nr_timestamps) {
-		printf("  INFO: %.3f%% unordered timestamps (%ld out of %ld)\n",
+		printf("  INFO: %.3f%% unordered timestamps (%lu out of %lu)\n",
 			(double)sched->nr_unordered_timestamps/(double)sched->nr_timestamps*100.0,
 			sched->nr_unordered_timestamps, sched->nr_timestamps);
 	}
 	if (sched->nr_lost_events && sched->nr_events) {
-		printf("  INFO: %.3f%% lost events (%ld out of %ld, in %ld chunks)\n",
+		printf("  INFO: %.3f%% lost events (%lu out of %lu, in %ld chunks)\n",
 			(double)sched->nr_lost_events/(double)sched->nr_events * 100.0,
 			sched->nr_lost_events, sched->nr_events, sched->nr_lost_chunks);
 	}
 	if (sched->nr_context_switch_bugs && sched->nr_timestamps) {
-		printf("  INFO: %.3f%% context switch bugs (%ld out of %ld)",
+		printf("  INFO: %.3f%% context switch bugs (%lu out of %lu)",
 			(double)sched->nr_context_switch_bugs/(double)sched->nr_timestamps*100.0,
 			sched->nr_context_switch_bugs, sched->nr_timestamps);
 		if (sched->nr_lost_events)
@@ -1852,16 +1854,18 @@ static int perf_sched__replay(struct perf_sched *sched)
 	if (perf_sched__read_events(sched))
 		return -1;
 
-	printf("nr_run_events:        %ld\n", sched->nr_run_events);
-	printf("nr_sleep_events:      %ld\n", sched->nr_sleep_events);
-	printf("nr_wakeup_events:     %ld\n", sched->nr_wakeup_events);
+	printf("nr_run_events:        %lu\n", sched->nr_run_events);
+	printf("nr_sleep_events:      %lu\n", sched->nr_sleep_events);
+	printf("nr_wakeup_events:     %lu\n", sched->nr_wakeup_events);
 
 	if (sched->targetless_wakeups)
-		printf("target-less wakeups:  %ld\n", sched->targetless_wakeups);
+		printf("target-less wakeups:  %lu\n",
+		       sched->targetless_wakeups);
 	if (sched->multitarget_wakeups)
-		printf("multi-target wakeups: %ld\n", sched->multitarget_wakeups);
+		printf("multi-target wakeups: %lu\n",
+		       sched->multitarget_wakeups);
 	if (sched->nr_run_events_optimized)
-		printf("run atoms optimized: %ld\n",
+		printf("run atoms optimized: %lu\n",
 			sched->nr_run_events_optimized);
 
 	print_task_traces(sched);
