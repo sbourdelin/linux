@@ -177,11 +177,13 @@ struct tagtable {
 	((unsigned long)(&((struct tag *)0L)->member + 1)	\
 		<= (tag)->hdr.size * 4)
 
-#define tag_next(t)	((struct tag *)((__u32 *)(t) + (t)->hdr.size))
+#define tag_next(t)	((struct tag *)((__u32 *)(t) +		\
+					le32_to_cpu((t)->hdr.size)))
+
 #define tag_size(type)	((sizeof(struct tag_header) + sizeof(struct type)) >> 2)
 
 #define for_each_tag(t,base)		\
-	for (t = base; t->hdr.size; t = tag_next(t))
+	for (t = base; le32_to_cpu(t->hdr.size); t = tag_next(t))
 
 
 #endif /* _UAPI__ASMARM_SETUP_H */

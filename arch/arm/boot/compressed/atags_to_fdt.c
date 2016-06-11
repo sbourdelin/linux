@@ -123,9 +123,9 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
 	       return 0;
 
 	/* validate the ATAG */
-	if (atag->hdr.tag != ATAG_CORE ||
-	    (atag->hdr.size != tag_size(tag_core) &&
-	     atag->hdr.size != 2))
+	if (le32_to_cpu(atag->hdr.tag) != ATAG_CORE ||
+	    (le32_to_cpu(atag->hdr.size) != tag_size(tag_core) &&
+	     le32_to_cpu(atag->hdr.size) != 2))
 		return 1;
 
 	/* let's give it all the room it could need */
@@ -134,7 +134,7 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
 		return ret;
 
 	for_each_tag(atag, atag_list) {
-		if (atag->hdr.tag == ATAG_CMDLINE) {
+		if (le32_to_cpu(atag->hdr.tag) == ATAG_CMDLINE) {
 			/* Append the ATAGS command line to the device tree
 			 * command line.
 			 * NB: This means that if the same parameter is set in
@@ -147,10 +147,10 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
 			else
 				setprop_string(fdt, "/chosen", "bootargs",
 					       atag->u.cmdline.cmdline);
-		} else if (atag->hdr.tag == ATAG_MEM) {
+		} else if (le32_to_cpu(atag->hdr.tag) == ATAG_MEM) {
 			if (memcount >= sizeof(mem_reg_property)/4)
 				continue;
-			if (!atag->u.mem.size)
+			if (!le32_to_cpu(atag->u.mem.size))
 				continue;
 			memsize = get_cell_size(fdt);
 
@@ -161,20 +161,24 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
 				uint64_t *mem_reg_prop64 =
 					(uint64_t *)mem_reg_property;
 				mem_reg_prop64[memcount++] =
-					cpu_to_fdt64(atag->u.mem.start);
+					cpu_to_fdt64(
+						le32_to_cpu(atag->u.mem.start));
 				mem_reg_prop64[memcount++] =
-					cpu_to_fdt64(atag->u.mem.size);
+					cpu_to_fdt64(
+						le32_to_cpu(atag->u.mem.size));
 			} else {
 				mem_reg_property[memcount++] =
-					cpu_to_fdt32(atag->u.mem.start);
+					cpu_to_fdt32(
+						le32_to_cpu(atag->u.mem.start));
 				mem_reg_property[memcount++] =
-					cpu_to_fdt32(atag->u.mem.size);
+					cpu_to_fdt32(
+						le32_to_cpu(atag->u.mem.size));
 			}
 
-		} else if (atag->hdr.tag == ATAG_INITRD2) {
+		} else if (le32_to_cpu(atag->hdr.tag) == ATAG_INITRD2) {
 			uint32_t initrd_start, initrd_size;
-			initrd_start = atag->u.initrd.start;
-			initrd_size = atag->u.initrd.size;
+			initrd_start = le32_to_cpu(atag->u.initrd.start);
+			initrd_size = le32_to_cpu(atag->u.initrd.size);
 			setprop_cell(fdt, "/chosen", "linux,initrd-start",
 					initrd_start);
 			setprop_cell(fdt, "/chosen", "linux,initrd-end",
