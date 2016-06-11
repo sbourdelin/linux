@@ -917,7 +917,8 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 			trigger_ready(&switch_output_trigger);
 
 			if (!quiet)
-				fprintf(stderr, "[ perf record: dump data: Woken up %ld times ]\n",
+				fprintf(stderr,
+					"[ perf record: dump data: Woken up %lu times ]\n",
 					waking);
 			waking = 0;
 			fd = record__switch_output(rec, false);
@@ -968,7 +969,9 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 	}
 
 	if (!quiet)
-		fprintf(stderr, "[ perf record: Woken up %ld times to write data ]\n", waking);
+		fprintf(stderr,
+			"[ perf record: Woken up %lu times to write data ]\n",
+			waking);
 
 out_child:
 	if (forks) {
