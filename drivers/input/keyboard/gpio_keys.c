@@ -542,7 +542,8 @@ static int gpio_keys_setup_key(struct platform_device *pdev,
 	 * Install custom action to cancel release timer and
 	 * workqueue item.
 	 */
-	error = devm_add_action(&pdev->dev, gpio_keys_quiesce_key, bdata);
+	error = devm_add_action_or_reset(&pdev->dev,
+					 gpio_keys_quiesce_key, bdata);
 	if (error) {
 		dev_err(&pdev->dev,
 			"failed to register quiesce action, error: %d\n",
