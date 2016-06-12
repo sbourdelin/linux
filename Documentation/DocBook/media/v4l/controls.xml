@@ -5502,4 +5502,57 @@ receiving given frequency when that control is set. This is a read-only control.
         </tgroup>
       </table>
     </section>
-</section>
+
+    <section id="voice-coil-controls">
+      <title>Voice Coil Control Reference</title>
+
+      <para>The Voice Coil class controls are used to control voice
+      coil lens devices. These are very simple devices that consist of
+      a voice coil, a spring and a lens. The current applied on a
+      voice coil is used to move the lens away from the resting
+      position which typically is (close to) infinity.</para>
+
+      <table pgwide="1" frame="none" id="voice-coil-control-id">
+      <title>Voice Coil Control IDs</title>
+
+      <tgroup cols="4">
+        <colspec colname="c1" colwidth="1*" />
+        <colspec colname="c2" colwidth="6*" />
+        <colspec colname="c3" colwidth="2*" />
+        <colspec colname="c4" colwidth="6*" />
+        <spanspec namest="c1" nameend="c2" spanname="id" />
+        <spanspec namest="c2" nameend="c4" spanname="descr" />
+        <thead>
+          <row>
+            <entry spanname="id" align="left">ID</entry>
+            <entry align="left">Type</entry>
+          </row><row rowsep="1"><entry spanname="descr" align="left">Description</entry>
+          </row>
+        </thead>
+        <tbody valign="top">
+          <row><entry></entry></row>
+          <row>
+            <entry spanname="id"><constant>V4L2_CID_VOICE_COIL_CLASS</constant>&nbsp;</entry>
+            <entry>class</entry>
+          </row><row><entry spanname="descr">The Voice Coil class
+descriptor. Calling &VIDIOC-QUERYCTRL; for this control will return a
+description of this control class.</entry>
+          </row>
+          <row>
+            <entry spanname="id"><constant>V4L2_CID_VOICE_COIL_CURRENT</constant>&nbsp;</entry>
+            <entry>integer</entry>
+          </row><row><entry spanname="descr">Current applied on a
+          voice coil. The more current is applied, the more is the
+          position of the lens moved from its resting position. Do
+          note that there may be a ringing effect; the lens will
+          oscillate after changing the current applied unless the
+          device implements ringing compensation.
+          </entry>
+          </row>
+        </tbody>
+      </tgroup>
+      </table>
+
+      </section>
+
+  </section>
