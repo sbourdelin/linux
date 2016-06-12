@@ -15,6 +15,7 @@ ifdef CONFIG_GCC_PLUGINS
         CFLAGS_KCOV := $(SANCOV_PLUGIN)
       else
         $(warning warning: cannot use CONFIG_KCOV: -fsanitize-coverage=trace-pc is not supported by compiler)
+        CFLAGS_KCOV =
       endif
     endif
   endif
@@ -31,13 +32,12 @@ ifdef CONFIG_GCC_PLUGINS
       else
         $(warning warning: your gcc version does not support plugins, you should upgrade it to gcc 4.5 at least)
       endif
+      GCC_PLUGINS_CFLAGS =
     endif
-  else
-    # SANCOV_PLUGIN can be only in CFLAGS_KCOV because avoid duplication.
-    GCC_PLUGINS_CFLAGS := $(filter-out $(SANCOV_PLUGIN), $(GCC_PLUGINS_CFLAGS))
   endif
 
-  KBUILD_CFLAGS += $(GCC_PLUGINS_CFLAGS)
+  # SANCOV_PLUGIN can be only in CFLAGS_KCOV because avoid duplication.
+  KBUILD_CFLAGS += $(filter-out $(SANCOV_PLUGIN), $(GCC_PLUGINS_CFLAGS))
   GCC_PLUGIN := $(gcc-plugin-y)
 
 endif
