@@ -450,8 +450,6 @@ static int aio_setup_ring(struct kioctx *ctx)
 	size += sizeof(struct io_event) * nr_events;
 
 	nr_pages = PFN_UP(size);
-	if (nr_pages < 0)
-		return -EINVAL;
 
 	file = aio_private_file(ctx, nr_pages);
 	if (IS_ERR(file)) {
