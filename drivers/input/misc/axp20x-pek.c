@@ -260,10 +260,10 @@ static int axp20x_pek_probe(struct platform_device *pdev)
 		return error;
 	}
 
-	error = devm_add_action(&pdev->dev,
-				axp20x_remove_sysfs_group, &pdev->dev);
+	error = devm_add_action_or_reset(&pdev->dev,
+					 axp20x_remove_sysfs_group,
+					 &pdev->dev);
 	if (error) {
-		axp20x_remove_sysfs_group(&pdev->dev);
 		dev_err(&pdev->dev, "Failed to add sysfs cleanup action: %d\n",
 			error);
 		return error;
