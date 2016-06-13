@@ -3691,6 +3691,8 @@ void set_user_nice(struct task_struct *p, long nice)
 		if (delta < 0 || (delta > 0 && task_running(rq, p)))
 			resched_curr(rq);
 	}
+	task_bump_rlimit(p, RLIMIT_NICE, nice_to_rlimit(nice));
+
 out_unlock:
 	task_rq_unlock(rq, p, &rf);
 }
