@@ -83,6 +83,12 @@ void udp_tunnel_push_rx_port(struct net_device *dev, struct socket *sock,
 	sa_family_t sa_family = sk->sk_family;
 	__be16 port = inet_sk(sk)->inet_sport;
 
+	if (dev->netdev_ops->ndo_add_udp_enc_port) {
+		dev->netdev_ops->ndo_add_udp_enc_port(dev, sa_family,
+						      port, type);
+		return;
+	}
+
 	switch (type) {
 	case UDP_ENC_OFFLOAD_TYPE_VXLAN:
 		if (!dev->netdev_ops->ndo_add_vxlan_port)
@@ -121,6 +127,12 @@ static void udp_tunnel_pull_rx_port(struct net_device *dev,
 	struct sock *sk = sock->sk;
 	sa_family_t sa_family = sk->sk_family;
 	__be16 port = inet_sk(sk)->inet_sport;
+
+	if (dev->netdev_ops->ndo_del_udp_enc_port) {
+		dev->netdev_ops->ndo_del_udp_enc_port(dev, sa_family,
+						      port, type);
+		return;
+	}
 
 	switch (type) {
 	case UDP_ENC_OFFLOAD_TYPE_VXLAN:

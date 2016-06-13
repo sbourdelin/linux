@@ -1270,6 +1270,14 @@ struct net_device_ops {
 	void			(*ndo_del_geneve_port)(struct  net_device *dev,
 						       sa_family_t sa_family,
 						       __be16 port);
+	void			(*ndo_add_udp_enc_port)(struct  net_device *dev,
+						       sa_family_t sa_family,
+						       __be16 port,
+						       unsigned int type);
+	void			(*ndo_del_udp_enc_port)(struct  net_device *dev,
+						       sa_family_t sa_family,
+						       __be16 port,
+						       unsigned int type);
 	void*			(*ndo_dfwd_add_station)(struct net_device *pdev,
 							struct net_device *dev);
 	void			(*ndo_dfwd_del_station)(struct net_device *pdev,
@@ -2233,8 +2241,7 @@ struct netdev_lag_lower_state_info {
 #define NETDEV_BONDING_INFO	0x0019
 #define NETDEV_PRECHANGEUPPER	0x001A
 #define NETDEV_CHANGELOWERSTATE	0x001B
-#define NETDEV_OFFLOAD_PUSH_VXLAN	0x001C
-#define NETDEV_OFFLOAD_PUSH_GENEVE	0x001D
+#define NETDEV_OFFLOAD_PUSH_UDP_ENC_OFFLOAD	0x001C
 
 int register_netdevice_notifier(struct notifier_block *nb);
 int unregister_netdevice_notifier(struct notifier_block *nb);
