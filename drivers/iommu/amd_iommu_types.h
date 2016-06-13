@@ -811,6 +811,7 @@ struct irq_2_irte {
 
 struct amd_ir_data {
 	struct hlist_node	hnode;
+	void			*ref;
 	struct irq_2_irte	irq_2_irte;
 	union irte		irte_entry;
 	struct irte_ga		irte_ga_entry;

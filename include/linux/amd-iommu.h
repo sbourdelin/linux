@@ -173,6 +173,9 @@ extern int amd_iommu_set_invalidate_ctx_cb(struct pci_dev *pdev,
 extern int
 amd_iommu_register_ga_log_notifier(int (*notifier)(int, int, int));
 
+extern int
+amd_iommu_update_ga(u32 vcpu_id, u32 cpu, u32 ga_tag, u64 base, bool is_run);
+
 #else
 
 static inline int amd_iommu_detect(void) { return -ENODEV; }
@@ -183,6 +186,11 @@ amd_iommu_register_ga_log_notifier(int (*notifier)(int, int, int))
 	return 0;
 }
 
+static inline int
+amd_iommu_update_ga(u32 vcpu_id, u32 cpu, u32 ga_tag, u64 base, bool is_run)
+{
+	return 0;
+}
 #endif
 
 #endif /* _ASM_X86_AMD_IOMMU_H */
