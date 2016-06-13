@@ -313,13 +313,14 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid)
 		end -= PAGE_SIZE;
 
 	seq_setwidth(m, 25 + sizeof(void *) * 6 - 1);
-	seq_printf(m, "%08lx-%08lx %c%c%c%c %08llx %02x:%02x %lu ",
+	seq_printf(m, "%08lx-%08lx %c%c%c%c%c %08llx %02x:%02x %lu ",
 			start,
 			end,
 			flags & VM_READ ? 'r' : '-',
 			flags & VM_WRITE ? 'w' : '-',
 			flags & VM_EXEC ? 'x' : '-',
 			flags & VM_MAYSHARE ? 's' : 'p',
+			flags & VM_LOCKED ? 'l' : '-',
 			pgoff,
 			MAJOR(dev), MINOR(dev), ino);
 
