@@ -22,6 +22,12 @@
 
 #include <linux/types.h>
 
+struct amd_iommu_pi_data {
+	u32 vcpu_id;
+	u32 avic_tag;
+	struct vcpu_data *vcpu_data;
+};
+
 #ifdef CONFIG_AMD_IOMMU
 
 struct task_struct;

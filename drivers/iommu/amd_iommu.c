@@ -4334,6 +4334,70 @@ static struct irq_domain_ops amd_ir_domain_ops = {
 	.deactivate = irq_remapping_deactivate,
 };
 
+static int amd_ir_set_vcpu_affinity(struct irq_data *data, void *vcpu_info)
+{
+	unsigned long flags;
+	struct amd_iommu *iommu;
+	struct amd_iommu_pi_data *pi_data = vcpu_info;
+	struct vcpu_data *vcpu_pi_info = pi_data->vcpu_data;
+	struct amd_ir_data *ir_data = data->chip_data;
+	struct irte_ga *irte = &ir_data->irte_ga_entry;
+	struct irq_2_irte *irte_info = &ir_data->irq_2_irte;
+	struct iommu_dev_data *dev_data = search_dev_data(irte_info->devid);
+
+	/* Note:
+	 * This device has never been set up for guest mode.
+	 * we should not modify the IRTE
+	 */
+	if (!dev_data || !dev_data->use_vapic)
+		return 0;
+
+	/* Note:
+	 * SVM tries to set up for GA mode, but we are in
+	 * legacy mode. So, we force legacy mode instead.
+	 */
+	if (!AMD_IOMMU_GUEST_IR_VAPIC(amd_iommu_guest_ir)) {
+		pr_debug("AMD-Vi: %s: Fall back to using intr legacy remap\n",
+			 __func__);
+		vcpu_pi_info = NULL;
+	}
+
+	iommu = amd_iommu_rlookup_table[irte_info->devid];
+	if (iommu == NULL)
+		return -EINVAL;
+
+	spin_lock_irqsave(&iommu->ga_hash_lock, flags);
+
+	if (vcpu_pi_info) {
+		/* Setting */
+		irte->hi.fields.vector = vcpu_pi_info->vector;
+		irte->lo.fields_vapic.guest_mode = 1;
+		irte->lo.fields_vapic.ga_tag =
+			AMD_IOMMU_GATAG(pi_data->avic_tag, pi_data->vcpu_id);
+
+		if (!hash_hashed(&ir_data->hnode))
+			hash_add(iommu->ga_hash, &ir_data->hnode,
+				 (u16)(irte->lo.fields_vapic.ga_tag));
+	} else {
+		/* Un-Setting */
+		struct irq_cfg *cfg = irqd_cfg(data);
+
+		irte->hi.val = 0;
+		irte->lo.val = 0;
+		irte->hi.fields.vector = cfg->vector;
+		irte->lo.fields_remap.guest_mode = 0;
+		irte->lo.fields_remap.destination = cfg->dest_apicid;
+		irte->lo.fields_remap.int_type = apic->irq_delivery_mode;
+		irte->lo.fields_remap.dm = apic->irq_dest_mode;
+
+		hash_del(&ir_data->hnode);
+	}
+
+	spin_unlock_irqrestore(&iommu->ga_hash_lock, flags);
+
+	return modify_irte_ga(irte_info->devid, irte_info->index, irte);
+}
+
 static int amd_ir_set_affinity(struct irq_data *data,
 			       const struct cpumask *mask, bool force)
 {
@@ -4385,6 +4449,7 @@ static void ir_compose_msi_msg(struct irq_data *irq_data, struct msi_msg *msg)
 static struct irq_chip amd_ir_chip = {
 	.irq_ack = ir_ack_apic_edge,
 	.irq_set_affinity = amd_ir_set_affinity,
+	.irq_set_vcpu_affinity = amd_ir_set_vcpu_affinity,
 	.irq_compose_msi_msg = ir_compose_msi_msg,
 };
 
