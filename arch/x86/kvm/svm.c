@@ -34,6 +34,8 @@
 #include <linux/sched.h>
 #include <linux/trace_events.h>
 #include <linux/slab.h>
+#include <linux/amd-iommu.h>
+#include <linux/hashtable.h>
 
 #include <asm/apic.h>
 #include <asm/perf_event.h>
@@ -926,6 +928,45 @@ static void svm_disable_lbrv(struct vcpu_svm *svm)
 	set_msr_interception(msrpm, MSR_IA32_LASTINTTOIP, 0, 0);
 }
 
+#define SVM_VM_DATA_HASH_BITS	8
+DECLARE_HASHTABLE(svm_vm_data_hash, SVM_VM_DATA_HASH_BITS);
+static spinlock_t svm_vm_data_hash_lock;
+
+static int avic_ga_log_notifier(int avic_tag, int vcpu_id, int vec)
+{
+	unsigned long flags;
+	struct kvm_arch *ka = NULL;
+	struct kvm_vcpu *vcpu = NULL;
+	struct vcpu_svm *svm = NULL;
+
+	pr_debug("SVM: %s: avic_tag=%#x, vcpu_id=%#x, vec=%#x\n",
+		 __func__, avic_tag, vcpu_id, vec);
+
+	spin_lock_irqsave(&svm_vm_data_hash_lock, flags);
+	hash_for_each_possible(svm_vm_data_hash, ka, hnode, avic_tag) {
+		struct kvm *kvm = container_of(ka, struct kvm, arch);
+
+		vcpu = kvm_get_vcpu_by_id(kvm, vcpu_id);
+		break;
+	}
+	spin_unlock_irqrestore(&svm_vm_data_hash_lock, flags);
+
+	if (!vcpu)
+		return 0;
+
+	svm = to_svm(vcpu);
+
+	/* Note:
+	 * At this point, the IOMMU should have already set the pending
+	 * bit in the vAPIC backing page. So, we just need to schedule
+	 * in the vcpu.
+	 */
+	if (vcpu->mode == OUTSIDE_GUEST_MODE)
+		kvm_vcpu_wake_up(vcpu);
+
+	return 0;
+}
+
 static __init int svm_hardware_setup(void)
 {
 	int cpu;
@@ -984,8 +1025,13 @@ static __init int svm_hardware_setup(void)
 	if (avic && (!npt_enabled || !boot_cpu_has(X86_FEATURE_AVIC)))
 		avic = false;
 
-	if (avic)
+	if (avic) {
 		pr_info("AVIC enabled\n");
+
+		hash_init(svm_vm_data_hash);
+		spin_lock_init(&svm_vm_data_hash_lock);
+		amd_iommu_register_ga_log_notifier(&avic_ga_log_notifier);
+	}
 
 	return 0;
 
@@ -1277,16 +1323,22 @@ static int avic_init_backing_page(struct kvm_vcpu *vcpu)
 
 static void avic_vm_destroy(struct kvm *kvm)
 {
+	unsigned long flags;
 	struct kvm_arch *vm_data = &kvm->arch;
 
 	if (vm_data->avic_logical_id_table_page)
 		__free_page(vm_data->avic_logical_id_table_page);
 	if (vm_data->avic_physical_id_table_page)
 		__free_page(vm_data->avic_physical_id_table_page);
+
+	spin_lock_irqsave(&svm_vm_data_hash_lock, flags);
+	hash_del(&vm_data->hnode);
+	spin_unlock_irqrestore(&svm_vm_data_hash_lock, flags);
 }
 
 static int avic_vm_init(struct kvm *kvm)
 {
+	unsigned long flags;
 	int err = -ENOMEM;
 	struct kvm_arch *vm_data = &kvm->arch;
 	struct page *p_page;
@@ -1310,6 +1362,10 @@ static int avic_vm_init(struct kvm *kvm)
 
 	vm_data->avic_logical_id_table_page = l_page;
 	clear_page(page_address(l_page));
+
+	spin_lock_irqsave(&svm_vm_data_hash_lock, flags);
+	hash_add(svm_vm_data_hash, &vm_data->hnode, vm_data->avic_tag);
+	spin_unlock_irqrestore(&svm_vm_data_hash_lock, flags);
 
 	return 0;
 
