@@ -48,6 +48,7 @@ struct pids_cgroup {
 	 * %PIDS_MAX = (%PID_MAX_LIMIT + 1).
 	 */
 	atomic64_t			counter;
+	atomic64_t			cur_max;
 	int64_t				limit;
 };
 
@@ -72,6 +73,7 @@ pids_css_alloc(struct cgroup_subsys_state *parent)
 
 	pids->limit = PIDS_MAX;
 	atomic64_set(&pids->counter, 0);
+	atomic64_set(&pids->cur_max, 0);
 	return &pids->css;
 }
 
@@ -182,6 +184,10 @@ static int pids_can_attach(struct cgroup_taskset *tset)
 
 		pids_charge(pids, 1);
 		pids_uncharge(old_pids, 1);
+		if (atomic64_read(&pids->cur_max) <
+		    atomic64_read(&pids->counter))
+			atomic64_set(&pids->cur_max,
+				     atomic64_read(&pids->counter));
 	}
 
 	return 0;
@@ -202,6 +208,10 @@ static void pids_cancel_attach(struct cgroup_taskset *tset)
 
 		pids_charge(old_pids, 1);
 		pids_uncharge(pids, 1);
+		if (atomic64_read(&old_pids->cur_max) <
+		    atomic64_read(&old_pids->counter))
+			atomic64_set(&old_pids->cur_max,
+				     atomic64_read(&old_pids->counter));
 	}
 }
 
@@ -234,6 +244,14 @@ static void pids_free(struct task_struct *task)
 	struct pids_cgroup *pids = css_pids(task_css(task, pids_cgrp_id));
 
 	pids_uncharge(pids, 1);
+}
+
+static void pids_fork(struct task_struct *task)
+{
+	struct pids_cgroup *pids = css_pids(task_css(task, pids_cgrp_id));
+
+	if (atomic64_read(&pids->cur_max) < atomic64_read(&pids->counter))
+		atomic64_set(&pids->cur_max, atomic64_read(&pids->counter));
 }
 
 static ssize_t pids_max_write(struct kernfs_open_file *of, char *buf,
@@ -288,6 +306,14 @@ static s64 pids_current_read(struct cgroup_subsys_state *css,
 	return atomic64_read(&pids->counter);
 }
 
+static s64 pids_current_max_read(struct cgroup_subsys_state *css,
+				 struct cftype *cft)
+{
+	struct pids_cgroup *pids = css_pids(css);
+
+	return atomic64_read(&pids->cur_max);
+}
+
 static struct cftype pids_files[] = {
 	{
 		.name = "max",
@@ -298,6 +324,11 @@ static struct cftype pids_files[] = {
 	{
 		.name = "current",
 		.read_s64 = pids_current_read,
+		.flags = CFTYPE_NOT_ON_ROOT,
+	},
+	{
+		.name = "current_max",
+		.read_s64 = pids_current_max_read,
 		.flags = CFTYPE_NOT_ON_ROOT,
 	},
 	{ }	/* terminate */
@@ -313,4 +344,5 @@ struct cgroup_subsys pids_cgrp_subsys = {
 	.free		= pids_free,
 	.legacy_cftypes	= pids_files,
 	.dfl_cftypes	= pids_files,
+	.fork		= pids_fork,
 };
