@@ -19,7 +19,22 @@
 
 static void pci_ptm_info(struct pci_dev *dev)
 {
-	dev_info(&dev->dev, "PTM enabled%s\n", dev->ptm_root ? " (root)" : "");
+	char clock_desc[8];
+
+	switch (dev->ptm_granularity) {
+	case 0:
+		snprintf(clock_desc, sizeof(clock_desc), "unknown");
+		break;
+	case 255:
+		snprintf(clock_desc, sizeof(clock_desc), ">254ns");
+		break;
+	default:
+		snprintf(clock_desc, sizeof(clock_desc), "%udns",
+			 dev->ptm_granularity);
+		break;
+	}
+	dev_info(&dev->dev, "PTM enabled%s, %s granularity\n",
+		 dev->ptm_root ? " (root)" : "", clock_desc);
 }
 
 void pci_ptm_init(struct pci_dev *dev)
@@ -27,6 +42,7 @@ void pci_ptm_init(struct pci_dev *dev)
 	int pos;
 	struct pci_dev *ups;
 	u32 cap, ctrl;
+	u8 local_clock;
 
 	if (!pci_is_pcie(dev))
 		return;
@@ -45,6 +61,7 @@ void pci_ptm_init(struct pci_dev *dev)
 		return;
 
 	pci_read_config_dword(dev, pos + PCI_PTM_CAP, &cap);
+	local_clock = (cap & PCI_PTM_GRANULARITY_MASK) >> 8;
 
 	/*
 	 * There's no point in enabling PTM unless it's enabled in the
@@ -55,14 +72,20 @@ void pci_ptm_init(struct pci_dev *dev)
 	ups = pci_upstream_bridge(dev);
 	if (ups && ups->ptm_enabled) {
 		ctrl = PCI_PTM_CTRL_ENABLE;
+		if (ups->ptm_granularity == 0)
+			dev->ptm_granularity = 0;
+		else if (ups->ptm_granularity > local_clock)
+			dev->ptm_granularity = ups->ptm_granularity;
 	} else {
 		if (cap & PCI_PTM_CAP_ROOT) {
 			ctrl = PCI_PTM_CTRL_ENABLE | PCI_PTM_CTRL_ROOT;
 			dev->ptm_root = 1;
+			dev->ptm_granularity = local_clock;
 		} else
 			return;
 	}
 
+	ctrl |= dev->ptm_granularity << 8;
 	pci_write_config_dword(dev, pos + PCI_PTM_CTRL, ctrl);
 	dev->ptm_enabled = 1;
 
@@ -103,6 +126,8 @@ int pci_enable_ptm(struct pci_dev *dev, u8 *granularity)
 	if (!(cap & PCI_PTM_CAP_REQ))
 		return -EINVAL;
 
+	dev->ptm_granularity = ups->ptm_granularity;
+
 	ctrl = PCI_PTM_CTRL_ENABLE;
 	pci_write_config_dword(dev, pos + PCI_PTM_CTRL, ctrl);
 	dev->ptm_enabled = 1;
@@ -110,6 +135,6 @@ int pci_enable_ptm(struct pci_dev *dev, u8 *granularity)
 	pci_ptm_info(dev);
 
 	if (granularity)
-		*granularity = 0;
+		*granularity = dev->ptm_granularity;
 	return 0;
 }
