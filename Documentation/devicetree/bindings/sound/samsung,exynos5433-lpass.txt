@@ -1,0 +1,8 @@
+
+Samsung Exynos SoC Low Power Audio Subsystem (LPASS)
+
+Required properties:
+
+ - compatible : "samsung,exynos5433-lpass"
+ - reg : should contain the LPASS SFR region location and size
+ - samsung,pmu-syscon : the phandle to the Power Management Unit node
