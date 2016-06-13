@@ -18,7 +18,11 @@
 
 #ifdef CONFIG_SPARSEMEM
 #define MAX_PHYSMEM_BITS	48
+#ifdef CONFIG_ARM64_64K_PAGES
 #define SECTION_SIZE_BITS	30
+#else
+#define SECTION_SIZE_BITS	27
+#endif
 #endif
 
 #endif
