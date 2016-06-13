@@ -2263,6 +2263,7 @@ static inline int in_gate_area(struct mm_struct *mm, unsigned long addr)
 extern int sysctl_drop_caches;
 int drop_caches_sysctl_handler(struct ctl_table *, int,
 					void __user *, size_t *, loff_t *);
+void drop_caches(int drop_ctl);
 #endif
 
 void drop_slab(void);
