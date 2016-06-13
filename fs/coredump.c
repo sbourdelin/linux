@@ -784,20 +784,25 @@ int dump_emit(struct coredump_params *cprm, const void *addr, int nr)
 	struct file *file = cprm->file;
 	loff_t pos = file->f_pos;
 	ssize_t n;
+	int r = 0;
+
 	if (cprm->written + nr > cprm->limit)
 		return 0;
 	while (nr) {
 		if (dump_interrupted())
-			return 0;
+			goto err;
 		n = __kernel_write(file, addr, nr, &pos);
 		if (n <= 0)
-			return 0;
+			goto err;
 		file->f_pos = pos;
 		cprm->written += n;
 		cprm->pos += n;
 		nr -= n;
 	}
-	return 1;
+	r = 1;
+ err:
+	bump_rlimit(RLIMIT_CORE, cprm->written);
+	return r;
 }
 EXPORT_SYMBOL(dump_emit);
 
