@@ -95,3 +95,15 @@ config PCIE_DPC
 
 	  To compile this driver as a module, choose M here: the module
 	  will be called pcie-dpc.
+
+config PCIE_PTM
+	bool "PCIe Precision Time Measurement support"
+	default y
+	depends on PCIEPORTBUS
+	help
+	  This enables PCI Express Precision Time Measurement (PTM)
+	  support.  If you have devices that support PTM, it will be
+	  enabled automatically.
+
+	  This is only useful if you have devices that support PTM, but it
+	  is safe to enable even if you don't.
