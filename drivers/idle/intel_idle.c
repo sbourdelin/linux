@@ -1034,6 +1034,7 @@ static const struct x86_cpu_id intel_idle_ids[] __initconst = {
 	ICPU(INTEL_FAM6_SANDYBRIDGE_X,		idle_cpu_snb),
 	ICPU(INTEL_FAM6_ATOM_CEDARVIEW,		idle_cpu_atom),
 	ICPU(INTEL_FAM6_ATOM_SILVERMONT1,	idle_cpu_byt),
+	ICPU(INTEL_FAM6_ATOM_MERRIFIELD1,	idle_cpu_atom),
 	ICPU(INTEL_FAM6_ATOM_AIRMONT,		idle_cpu_cht),
 	ICPU(INTEL_FAM6_IVYBRIDGE,		idle_cpu_ivb),
 	ICPU(INTEL_FAM6_IVYBRIDGE_X,		idle_cpu_ivt),
