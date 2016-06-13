@@ -287,6 +287,8 @@ static struct inode *mqueue_get_inode(struct super_block *sb,
 
 		/* all is ok */
 		info->user = get_uid(u);
+		/* XXX resource limits apply per task, not per user */
+		bump_rlimit(RLIMIT_MSGQUEUE, u->mq_bytes);
 	} else if (S_ISDIR(mode)) {
 		inc_nlink(inode);
 		/* Some things misbehave if size == 0 on a directory */
