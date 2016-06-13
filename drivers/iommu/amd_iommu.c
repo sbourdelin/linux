@@ -105,6 +105,7 @@ struct iommu_dev_data {
 	bool pri_tlp;			  /* PASID TLB required for
 					     PPR completions */
 	u32 errata;			  /* Bitmap for errata to apply */
+	u32 use_vapic;		  /* Enable device to use vapic mode */
 };
 
 /*
@@ -3232,6 +3233,10 @@ static void amd_iommu_detach_device(struct iommu_domain *dom,
 	if (!iommu)
 		return;
 
+	if (AMD_IOMMU_GUEST_IR_VAPIC(amd_iommu_guest_ir) &&
+	    (dom->type == IOMMU_DOMAIN_UNMANAGED))
+		dev_data->use_vapic = 0;
+
 	iommu_completion_wait(iommu);
 }
 
@@ -3256,6 +3261,13 @@ static int amd_iommu_attach_device(struct iommu_domain *dom,
 		detach_device(dev);
 
 	ret = attach_device(dev, domain);
+
+	if (AMD_IOMMU_GUEST_IR_VAPIC(amd_iommu_guest_ir)) {
+		if (dom->type == IOMMU_DOMAIN_UNMANAGED)
+			dev_data->use_vapic = 1;
+		else
+			dev_data->use_vapic = 0;
+	}
 
 	iommu_completion_wait(iommu);
 
@@ -4161,7 +4173,8 @@ static void irq_remapping_prepare_irte(struct amd_ir_data *data,
 
 		irte->lo.val                      = 0;
 		irte->hi.val                      = 0;
-		irte->lo.fields_remap.guest_mode  = 0;
+		irte->lo.fields_remap.guest_mode  = dev_data ?
+						    dev_data->use_vapic : 0;
 		irte->lo.fields_remap.int_type    = apic->irq_delivery_mode;
 		irte->lo.fields_remap.dm          = apic->irq_dest_mode;
 		irte->hi.fields.vector            = irq_cfg->vector;
@@ -4405,6 +4418,7 @@ static int amd_ir_set_affinity(struct irq_data *data,
 	struct irq_2_irte *irte_info = &ir_data->irq_2_irte;
 	struct irq_cfg *cfg = irqd_cfg(data);
 	struct irq_data *parent = data->parent_data;
+	struct iommu_dev_data *dev_data = search_dev_data(irte_info->devid);
 	int ret;
 
 	ret = parent->chip->irq_set_affinity(parent, mask, force);
@@ -4420,7 +4434,7 @@ static int amd_ir_set_affinity(struct irq_data *data,
 		ir_data->irte_entry.fields.destination = cfg->dest_apicid;
 		modify_irte(irte_info->devid, irte_info->index,
 			    ir_data->irte_entry);
-	} else {
+	} else if (!dev_data || !dev_data->use_vapic) {
 		struct irte_ga *entry = &ir_data->irte_ga_entry;
 
 		entry->hi.fields.vector = cfg->vector;

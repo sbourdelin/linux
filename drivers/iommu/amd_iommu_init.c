@@ -146,7 +146,7 @@ struct ivmd_header {
 bool amd_iommu_dump;
 bool amd_iommu_irq_remap __read_mostly;
 
-int amd_iommu_guest_ir;
+int amd_iommu_guest_ir = AMD_IOMMU_GUEST_IR_VAPIC;
 
 static bool amd_iommu_detected;
 static bool __initdata amd_iommu_disabled;
