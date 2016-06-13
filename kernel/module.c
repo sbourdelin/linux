@@ -46,6 +46,7 @@
 #include <linux/string.h>
 #include <linux/mutex.h>
 #include <linux/rculist.h>
+#include <linux/bootmem.h>
 #include <asm/uaccess.h>
 #include <asm/cacheflush.h>
 #include <asm/mmu_context.h>
@@ -3155,15 +3156,51 @@ int __weak module_frob_arch_sections(Elf_Ehdr *hdr,
 	return 0;
 }
 
+struct mod_blacklist_entry {
+	struct list_head next;
+	char *buf;
+};
+
+static LIST_HEAD(blacklisted_modules);
+static int __init module_blacklist(char *str)
+{
+	char *str_entry;
+	struct mod_blacklist_entry *entry;
+
+	/* str argument is a comma-separated list of module names */
+	do {
+		str_entry = strsep(&str, ",");
+		if (str_entry) {
+			pr_debug("blacklisting module %s\n", str_entry);
+			entry = alloc_bootmem(sizeof(*entry));
+			entry->buf = alloc_bootmem(strlen(str_entry) + 1);
+			strcpy(entry->buf, str_entry);
+			list_add(&entry->next, &blacklisted_modules);
+		}
+	} while (str_entry);
+
+	return 0;
+}
+__setup("module_blacklist=", module_blacklist);
+
 static struct module *layout_and_allocate(struct load_info *info, int flags)
 {
 	/* Module within temporary copy. */
 	struct module *mod;
 	int err;
+	struct mod_blacklist_entry *entry;
 
 	mod = setup_load_info(info, flags);
 	if (IS_ERR(mod))
 		return mod;
+
+	/* Has this module been blacklisted by the user? */
+	list_for_each_entry(entry, &blacklisted_modules, next) {
+		if (!strcmp(mod->name, entry->buf)) {
+			pr_debug("module %s blacklisted\n", mod->name);
+			return ERR_PTR(-EPERM);
+		}
+	}
 
 	err = check_modinfo(mod, info, flags);
 	if (err)
