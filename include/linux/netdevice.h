@@ -1258,18 +1258,6 @@ struct net_device_ops {
 							struct netdev_phys_item_id *ppid);
 	int			(*ndo_get_phys_port_name)(struct net_device *dev,
 							  char *name, size_t len);
-	void			(*ndo_add_vxlan_port)(struct  net_device *dev,
-						      sa_family_t sa_family,
-						      __be16 port);
-	void			(*ndo_del_vxlan_port)(struct  net_device *dev,
-						      sa_family_t sa_family,
-						      __be16 port);
-	void			(*ndo_add_geneve_port)(struct  net_device *dev,
-						       sa_family_t sa_family,
-						       __be16 port);
-	void			(*ndo_del_geneve_port)(struct  net_device *dev,
-						       sa_family_t sa_family,
-						       __be16 port);
 	void			(*ndo_add_udp_enc_port)(struct  net_device *dev,
 						       sa_family_t sa_family,
 						       __be16 port,
