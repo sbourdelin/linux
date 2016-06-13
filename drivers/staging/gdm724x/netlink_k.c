@@ -21,13 +21,7 @@
 
 #include "netlink_k.h"
 
-#if defined(DEFINE_MUTEX)
-static DEFINE_MUTEX(netlink_mutex);
-#else
-static struct semaphore netlink_mutex;
-#define mutex_lock(x)		down(x)
-#define mutex_unlock(x)		up(x)
-#endif
+static struct mutex netlink_mutex;
 
 #define ND_MAX_GROUP		30
 #define ND_IFINDEX_LEN		sizeof(int)
@@ -96,9 +90,7 @@ struct sock *netlink_init(int unit,
 		.input  = netlink_rcv,
 	};
 
-#if !defined(DEFINE_MUTEX)
-	init_MUTEX(&netlink_mutex);
-#endif
+	mutex_init(&netlink_mutex);
 
 	sock = netlink_kernel_create(&init_net, unit, &cfg);
 
