@@ -169,9 +169,19 @@ typedef void (*amd_iommu_invalidate_ctx)(struct pci_dev *pdev, int pasid);
 extern int amd_iommu_set_invalidate_ctx_cb(struct pci_dev *pdev,
 					   amd_iommu_invalidate_ctx cb);
 
+/* IOMMU AVIC Function */
+extern int
+amd_iommu_register_ga_log_notifier(int (*notifier)(int, int, int));
+
 #else
 
 static inline int amd_iommu_detect(void) { return -ENODEV; }
+
+static inline int
+amd_iommu_register_ga_log_notifier(int (*notifier)(int, int, int))
+{
+	return 0;
+}
 
 #endif
 

@@ -1577,6 +1577,10 @@ static int iommu_init_pci(struct amd_iommu *iommu)
 	    !iommu_feature(iommu, FEATURE_GAM_VAPIC))
 		amd_iommu_guest_ir = AMD_IOMMU_GUEST_IR_LEGACY_GA;
 
+	if (AMD_IOMMU_GUEST_IR_VAPIC(amd_iommu_guest_ir)) {
+		hash_init(iommu->ga_hash);
+		spin_lock_init(&iommu->ga_hash_lock);
+	}
 
 	ret = iommu_init_ga_log(iommu);
 	if (ret)
