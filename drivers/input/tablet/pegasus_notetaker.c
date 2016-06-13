@@ -218,14 +218,11 @@ static int pegasus_open(struct input_dev *dev)
 static void pegasus_close(struct input_dev *dev)
 {
 	struct pegasus *pegasus = input_get_drvdata(dev);
-	int autopm_error;
 
-	autopm_error = usb_autopm_get_interface(pegasus->intf);
 	usb_kill_urb(pegasus->irq);
 	cancel_work_sync(&pegasus->init);
 
-	if (!autopm_error)
-		usb_autopm_put_interface(pegasus->intf);
+	usb_autopm_put_interface(pegasus->intf);
 }
 
 static int pegasus_probe(struct usb_interface *intf,
@@ -373,6 +370,7 @@ static int pegasus_suspend(struct usb_interface *intf, pm_message_t message)
 
 	mutex_lock(&pegasus->dev->mutex);
 	usb_kill_urb(pegasus->irq);
+	cancel_work_sync(&pegasus->init);
 	mutex_unlock(&pegasus->dev->mutex);
 
 	return 0;
@@ -393,6 +391,11 @@ static int pegasus_resume(struct usb_interface *intf)
 
 static int pegasus_reset_resume(struct usb_interface *intf)
 {
+	struct pegasus *pegasus = usb_get_intfdata(intf);
+
+	if (pegasus->dev->users)
+		pegasus_set_mode(pegasus, PEN_MODE_XY, NOTETAKER_LED_MOUSE);
+
 	return pegasus_resume(intf);
 }
 
