@@ -1,0 +1,47 @@
+/*
+ * Copyright (C) 2015 - 2016 Samsung Electronics Co., Ltd.
+ *	Inha Song <ideal.song@samsung.com>
+ *
+ * Low Power Audio Subsystem driver for Samsung Exynos
+ *
+ * This program is free software; you can redistribute  it and/or modify it
+ * under  the terms of  the GNU General  Public License as published by the
+ * Free Software Foundation;  either version 2 of the  License, or (at your
+ * option) any later version.
+ */
+#ifndef SND_SOC_SAMSUNG_LPASS_H_
+#define SND_SOC_SAMSUNG_LPASS_H_
+
+/* SFR */
+#define SFR_LPASS_CORE_SW_RESET	(0x08)
+#define SFR_LPASS_INTR_CA5_MASK	(0x48)
+#define SFR_LPASS_INTR_CPU_MASK	(0x58)
+
+/* SW_RESET */
+#define LPASS_SW_RESET_CA5	(1 << 0)
+#define LPASS_SW_RESET_SB	(1 << 11)
+
+/* Interrupt mask */
+#define LPASS_INTR_APM		(1 << 9)
+#define LPASS_INTR_MIF		(1 << 8)
+#define LPASS_INTR_TIMER	(1 << 7)
+#define LPASS_INTR_DMA		(1 << 6)
+#define LPASS_INTR_GPIO		(1 << 5)
+#define LPASS_INTR_I2S		(1 << 4)
+#define LPASS_INTR_PCM		(1 << 3)
+#define LPASS_INTR_SB		(1 << 2)
+#define LPASS_INTR_UART		(1 << 1)
+#define LPASS_INTR_SFR		(1 << 0)
+
+/* SW Reset bit */
+enum {
+	SW_RESET_DMA = 0,
+	SW_RESET_MEM,
+	SW_RESET_TIMER,
+	SW_RESET_I2S = 8,
+	SW_RESET_PCM,
+	SW_RESET_UART,
+	SW_RESET_SLIMBUS,
+};
+
+#endif /* SND_SOC_SAMSUNG_LPASS_H_ */
