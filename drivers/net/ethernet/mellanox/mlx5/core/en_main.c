@@ -2520,9 +2520,13 @@ static int mlx5e_get_vf_stats(struct net_device *dev,
 }
 
 static void mlx5e_add_vxlan_port(struct net_device *netdev,
-				 sa_family_t sa_family, __be16 port)
+				 sa_family_t sa_family, __be16 port,
+				 unsigned int type)
 {
 	struct mlx5e_priv *priv = netdev_priv(netdev);
+
+	if (type != UDP_ENC_OFFLOAD_TYPE_VXLAN)
+		return;
 
 	if (!mlx5e_vxlan_allowed(priv->mdev))
 		return;
@@ -2531,9 +2535,13 @@ static void mlx5e_add_vxlan_port(struct net_device *netdev,
 }
 
 static void mlx5e_del_vxlan_port(struct net_device *netdev,
-				 sa_family_t sa_family, __be16 port)
+				 sa_family_t sa_family, __be16 port,
+				 unsigned int type)
 {
 	struct mlx5e_priv *priv = netdev_priv(netdev);
+
+	if (type != UDP_ENC_OFFLOAD_TYPE_VXLAN)
+		return;
 
 	if (!mlx5e_vxlan_allowed(priv->mdev))
 		return;
@@ -2624,8 +2632,8 @@ static const struct net_device_ops mlx5e_netdev_ops_sriov = {
 	.ndo_set_features        = mlx5e_set_features,
 	.ndo_change_mtu          = mlx5e_change_mtu,
 	.ndo_do_ioctl            = mlx5e_ioctl,
-	.ndo_add_vxlan_port      = mlx5e_add_vxlan_port,
-	.ndo_del_vxlan_port      = mlx5e_del_vxlan_port,
+	.ndo_add_udp_enc_port	 = mlx5e_add_vxlan_port,
+	.ndo_del_udp_enc_port	 = mlx5e_del_vxlan_port,
 	.ndo_features_check      = mlx5e_features_check,
 #ifdef CONFIG_RFS_ACCEL
 	.ndo_rx_flow_steer	 = mlx5e_rx_flow_steer,
@@ -3128,7 +3136,7 @@ static void *mlx5e_create_netdev(struct mlx5_core_dev *mdev)
 
 	if (mlx5e_vxlan_allowed(mdev)) {
 		rtnl_lock();
-		vxlan_get_rx_port(netdev);
+		udp_tunnel_get_rx_port(netdev);
 		rtnl_unlock();
 	}
 
