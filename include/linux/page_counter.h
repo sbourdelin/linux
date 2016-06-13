@@ -9,9 +9,9 @@ struct page_counter {
 	atomic_long_t count;
 	unsigned long limit;
 	struct page_counter *parent;
+	unsigned long watermark;
 
 	/* legacy */
-	unsigned long watermark;
 	unsigned long failcnt;
 };
 
@@ -32,6 +32,11 @@ static inline void page_counter_init(struct page_counter *counter,
 static inline unsigned long page_counter_read(struct page_counter *counter)
 {
 	return atomic_long_read(&counter->count);
+}
+
+static inline unsigned long page_counter_read_watermark(struct page_counter *counter)
+{
+	return counter->watermark;
 }
 
 void page_counter_cancel(struct page_counter *counter, unsigned long nr_pages);
