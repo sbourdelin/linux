@@ -1653,6 +1653,11 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	trace_task_newtask(p, clone_flags);
 	uprobe_copy_process(p, clone_flags);
 
+	if (atomic_read(&p->real_cred->user->max_processes) <
+	    atomic_read(&p->real_cred->user->processes))
+		atomic_set(&p->real_cred->user->max_processes,
+			   atomic_read(&p->real_cred->user->processes));
+
 	return p;
 
 bad_fork_cancel_cgroup:

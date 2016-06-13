@@ -439,6 +439,11 @@ static int set_user(struct cred *new)
 	else
 		current->flags &= ~PF_NPROC_EXCEEDED;
 
+	if (atomic_read(&new_user->max_processes) <
+	    atomic_read(&new_user->processes))
+		atomic_set(&new_user->max_processes,
+			   atomic_read(&new_user->processes));
+
 	free_uid(new->user);
 	new->user = new_user;
 	return 0;

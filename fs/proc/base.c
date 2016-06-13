@@ -670,6 +670,10 @@ static int proc_pid_limits(struct seq_file *m, struct pid_namespace *ns,
 				seq_printf(m, "%-20lu\n", psecs);
 			}
 			break;
+		case RLIMIT_NPROC:
+			seq_printf(m, "%-20d\n",
+				   atomic_read(&task->real_cred->user->max_processes));
+			break;
 		default:
 			seq_printf(m, "%-20lu\n",
 				   task->signal->rlim_curmax[i]);
