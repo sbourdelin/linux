@@ -5,10 +5,10 @@
  *
  *  Copyright (c) 2001, 2002, 2003, 2004
  *    Hiroyuki Kondo, Naoto Sugai, Hayato Fujiwara
+ *
+ *  License: Dual MPL/GPL
  */
 
-#include <linux/module.h>
-#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
@@ -729,23 +729,6 @@ static int __init init_m32r_pcc(void)
 
 	return 0;
 } /* init_m32r_pcc */
+device_initcall(init_m32r_pcc);
 
-static void __exit exit_m32r_pcc(void)
-{
-	int i;
-
-	for (i = 0; i < pcc_sockets; i++)
-		if (socket[i].flags & IS_REGISTERED)
-			pcmcia_unregister_socket(&socket[i].socket);
-
-	platform_device_unregister(&pcc_device);
-	if (poll_interval != 0)
-		del_timer_sync(&poll_timer);
-
-	platform_driver_unregister(&pcc_driver);
-} /* exit_m32r_pcc */
-
-module_init(init_m32r_pcc);
-module_exit(exit_m32r_pcc);
-MODULE_LICENSE("Dual MPL/GPL");
 /*====================================================================*/
