@@ -650,8 +650,30 @@ static int proc_pid_limits(struct seq_file *m, struct pid_namespace *ns,
 			seq_printf(m, "%-10s", lnames[i].unit);
 		else
 			seq_printf(m, "%-10s", "");
-		seq_printf(m, "%-20lu\n",
-			   task->signal->rlim_curmax[i]);
+
+		switch (i) {
+		case RLIMIT_RTTIME:
+		case RLIMIT_CPU:
+			if (rlim[i].rlim_max == RLIM_INFINITY)
+				seq_printf(m, "%-20s\n", "-");
+			else {
+				unsigned long long utime, ptime;
+				unsigned long psecs;
+				struct task_cputime cputime;
+
+				thread_group_cputimer(task, &cputime);
+				utime = cputime_to_expires(cputime.utime);
+				ptime = utime + cputime_to_expires(cputime.stime);
+				psecs = cputime_to_secs(ptime);
+				if (i == RLIMIT_RTTIME)
+					psecs *= USEC_PER_SEC;
+				seq_printf(m, "%-20lu\n", psecs);
+			}
+			break;
+		default:
+			seq_printf(m, "%-20lu\n",
+				   task->signal->rlim_curmax[i]);
+		}
 	}
 
 	return 0;
