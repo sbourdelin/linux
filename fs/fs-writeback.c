@@ -478,14 +478,15 @@ static void inode_switch_wbs(struct inode *inode, int new_wb_id)
 	spin_lock(&inode->i_lock);
 	if (!(inode->i_sb->s_flags & MS_ACTIVE) ||
 	    inode->i_state & (I_WB_SWITCH | I_FREEING) ||
+	    atomic_read(&inode->i_count) == 0 ||
 	    inode_to_wb(inode) == isw->new_wb) {
 		spin_unlock(&inode->i_lock);
 		goto out_free;
 	}
 	inode->i_state |= I_WB_SWITCH;
+	ihold(inode);
 	spin_unlock(&inode->i_lock);
 
-	ihold(inode);
 	isw->inode = inode;
 
 	atomic_inc(&isw_nr_in_flight);
