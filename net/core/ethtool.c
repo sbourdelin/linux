@@ -50,6 +50,27 @@ int ethtool_op_get_ts_info(struct net_device *dev, struct ethtool_ts_info *info)
 }
 EXPORT_SYMBOL(ethtool_op_get_ts_info);
 
+int ethtool_op_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	if (!dev->phydev)
+		return -ENODEV;
+
+	return phy_ethtool_gset(dev->phydev, cmd);
+}
+EXPORT_SYMBOL(ethtool_op_get_settings);
+
+int ethtool_op_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	if (!dev->phydev)
+		return -ENODEV;
+
+	return phy_ethtool_sset(dev->phydev, cmd);
+}
+EXPORT_SYMBOL(ethtool_op_set_settings);
+
 /* Handlers for each ethtool command */
 
 #define ETHTOOL_DEV_FEATURE_WORDS	((NETDEV_FEATURE_COUNT + 31) / 32)

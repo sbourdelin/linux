@@ -82,6 +82,8 @@ struct net_device;
 /* Some generic methods drivers may use in their ethtool_ops */
 u32 ethtool_op_get_link(struct net_device *dev);
 int ethtool_op_get_ts_info(struct net_device *dev, struct ethtool_ts_info *eti);
+int ethtool_op_get_settings(struct net_device *dev, struct ethtool_cmd *cmd);
+int ethtool_op_set_settings(struct net_device *dev, struct ethtool_cmd *cmd);
 
 /**
  * ethtool_rxfh_indir_default - get default value for RX flow hash indirection
