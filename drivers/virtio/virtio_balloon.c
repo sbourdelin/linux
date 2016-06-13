@@ -46,6 +46,15 @@ static int oom_pages = OOM_VBALLOON_DEFAULT_PAGES;
 module_param(oom_pages, int, S_IRUSR | S_IWUSR);
 MODULE_PARM_DESC(oom_pages, "pages to free on OOM");
 
+enum balloon_req_id {
+	BALLOON_DROP_CACHE,
+};
+
+struct balloon_req_hdr {
+	__virtio32 id;
+	__virtio32 param;
+};
+
 struct balloon_bmap_hdr {
 	__virtio32 id;
 	__virtio32 page_shift;
@@ -55,7 +64,7 @@ struct balloon_bmap_hdr {
 
 struct virtio_balloon {
 	struct virtio_device *vdev;
-	struct virtqueue *inflate_vq, *deflate_vq, *stats_vq;
+	struct virtqueue *inflate_vq, *deflate_vq, *stats_vq, *misc_vq;
 
 	/* The balloon servicing is delegated to a freezable workqueue. */
 	struct work_struct update_balloon_stats_work;
@@ -75,6 +84,7 @@ struct virtio_balloon {
 	unsigned long bmap_len;
 	/* Used to record the processed pfn range */
 	unsigned long min_pfn, max_pfn, start_pfn, end_pfn;
+	struct balloon_req_hdr req_hdr;
 	/*
 	 * The pages we've told the Host we're not using are enqueued
 	 * at vb_dev_info->pages list.
@@ -498,18 +508,62 @@ static void update_balloon_size_func(struct work_struct *work)
 		queue_work(system_freezable_wq, work);
 }
 
+static void misc_handle_rq(struct virtio_balloon *vb)
+{
+	struct virtqueue *vq;
+	struct scatterlist sg_out;
+	unsigned int len;
+	struct balloon_req_hdr *ptr_hdr;
+	struct scatterlist sg_in;
+
+	vq = vb->misc_vq;
+	ptr_hdr = virtqueue_get_buf(vq, &len);
+
+	if (!ptr_hdr || len != sizeof(vb->req_hdr))
+		return;
+
+	switch (ptr_hdr->id) {
+	case BALLOON_DROP_CACHE:
+#ifdef CONFIG_SYSCTL
+		drop_caches(ptr_hdr->param);
+#endif
+		sg_init_one(&sg_out, &ptr_hdr->id, sizeof(ptr_hdr->id));
+		virtqueue_add_outbuf(vq, &sg_out, 1, vb, GFP_KERNEL);
+		sg_init_one(&sg_in, &vb->req_hdr, sizeof(vb->req_hdr));
+		virtqueue_add_inbuf(vq, &sg_in, 1, &vb->req_hdr, GFP_KERNEL);
+		break;
+	default:
+		break;
+	}
+
+	virtqueue_kick(vq);
+}
+
+static void misc_request(struct virtqueue *vq)
+{
+	struct virtio_balloon *vb = vq->vdev->priv;
+
+	misc_handle_rq(vb);
+}
+
 static int init_vqs(struct virtio_balloon *vb)
 {
-	struct virtqueue *vqs[3];
-	vq_callback_t *callbacks[] = { balloon_ack, balloon_ack, stats_request };
-	static const char * const names[] = { "inflate", "deflate", "stats" };
+	struct virtqueue *vqs[4];
+	vq_callback_t *callbacks[] = { balloon_ack, balloon_ack,
+					 stats_request, misc_request };
+	const char *names[] = { "inflate", "deflate", "stats", "misc" };
 	int err, nvqs;
 
 	/*
 	 * We expect two virtqueues: inflate and deflate, and
 	 * optionally stat.
 	 */
-	nvqs = virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_STATS_VQ) ? 3 : 2;
+	if (virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_MISC))
+		nvqs = 4;
+	else
+		nvqs = virtio_has_feature(vb->vdev,
+					  VIRTIO_BALLOON_F_STATS_VQ) ? 3 : 2;
+
 	err = vb->vdev->config->find_vqs(vb->vdev, nvqs, vqs, callbacks, names);
 	if (err)
 		return err;
@@ -529,6 +583,16 @@ static int init_vqs(struct virtio_balloon *vb)
 		    < 0)
 			BUG();
 		virtqueue_kick(vb->stats_vq);
+	}
+	if (virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_MISC)) {
+		struct scatterlist sg_in;
+
+		vb->misc_vq = vqs[3];
+		sg_init_one(&sg_in, &vb->req_hdr, sizeof(vb->req_hdr));
+		if (virtqueue_add_inbuf(vb->misc_vq, &sg_in, 1,
+		    &vb->req_hdr, GFP_KERNEL) < 0)
+			BUG();
+		virtqueue_kick(vb->misc_vq);
 	}
 	return 0;
 }
@@ -725,6 +789,7 @@ static unsigned int features[] = {
 	VIRTIO_BALLOON_F_STATS_VQ,
 	VIRTIO_BALLOON_F_DEFLATE_ON_OOM,
 	VIRTIO_BALLOON_F_PAGE_BITMAP,
+	VIRTIO_BALLOON_F_MISC,
 };
 
 static struct virtio_driver virtio_balloon_driver = {
