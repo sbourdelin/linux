@@ -84,6 +84,18 @@ struct udp_tunnel_sock_cfg {
 void setup_udp_tunnel_sock(struct net *net, struct socket *sock,
 			   struct udp_tunnel_sock_cfg *sock_cfg);
 
+/* List of offloadable UDP tunnel types */
+enum udp_enc_offloads {
+	UDP_ENC_OFFLOAD_TYPE_VXLAN,	/* RFC 7348 */
+	UDP_ENC_OFFLOAD_TYPE_GENEVE,	/* draft-ietf-nvo3-geneve */
+};
+
+/* Notify network devices of offloadable types */
+void udp_tunnel_push_rx_port(struct net_device *dev, struct socket *sock,
+			     unsigned int type);
+void udp_tunnel_notify_add_rx_port(struct socket *sock, unsigned int type);
+void udp_tunnel_notify_del_rx_port(struct socket *sock, unsigned int type);
+
 /* Transmit the skb using UDP encapsulation. */
 void udp_tunnel_xmit_skb(struct rtable *rt, struct sock *sk, struct sk_buff *skb,
 			 __be32 src, __be32 dst, __u8 tos, __u8 ttl,
