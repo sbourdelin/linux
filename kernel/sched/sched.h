@@ -1504,10 +1504,15 @@ static inline int _double_lock_balance(struct rq *this_rq, struct rq *busiest)
 	__acquires(busiest->lock)
 	__acquires(this_rq->lock)
 {
-	raw_spin_unlock(&this_rq->lock);
-	double_rq_lock(this_rq, busiest);
+	int ret = 0;
 
-	return 1;
+	if (unlikely(!raw_spin_trylock(&busiest->lock))) {
+		raw_spin_unlock(&this_rq->lock);
+		double_rq_lock(this_rq, busiest);
+		ret = 1;
+	}
+
+	return ret;
 }
 
 #else
