@@ -83,6 +83,12 @@ static const struct command cmds[] = {
 		.usage = usbip_connect_usage
 	},
 	{
+		.name  = "disconnect",
+		.fn    = usbip_disconnect,
+		.help  = "Disconnect a USB device from a remote computer",
+		.usage = usbip_disconnect_usage
+	},
+	{
 		.name  = "list",
 		.fn    = usbip_list,
 		.help  = "List exportable or local USB devices",
