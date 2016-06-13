@@ -547,6 +547,8 @@ repeat:
 	}
 #endif
 
+	bump_rlimit(RLIMIT_NOFILE, fd);
+
 out:
 	spin_unlock(&files->file_lock);
 	return error;
@@ -856,6 +858,8 @@ __releases(&files->file_lock)
 
 	if (tofree)
 		filp_close(tofree, files);
+
+	bump_rlimit(RLIMIT_NOFILE, fd);
 
 	return fd;
 

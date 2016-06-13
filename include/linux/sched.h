@@ -782,6 +782,7 @@ struct signal_struct {
 	 * have no need to disable irqs.
 	 */
 	struct rlimit rlim[RLIM_NLIMITS];
+	unsigned long rlim_curmax[RLIM_NLIMITS];
 
 #ifdef CONFIG_BSD_PROCESS_ACCT
 	struct pacct_struct pacct;	/* per-process accounting information */
@@ -3377,6 +3378,12 @@ static inline unsigned long rlimit(unsigned int limit)
 static inline unsigned long rlimit_max(unsigned int limit)
 {
 	return task_rlimit_max(current, limit);
+}
+
+static inline void bump_rlimit(unsigned int limit, unsigned long r)
+{
+	if (READ_ONCE(current->signal->rlim_curmax[limit]) < r)
+		current->signal->rlim_curmax[limit] = r;
 }
 
 #ifdef CONFIG_CPU_FREQ

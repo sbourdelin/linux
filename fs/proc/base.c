@@ -630,8 +630,8 @@ static int proc_pid_limits(struct seq_file *m, struct pid_namespace *ns,
 	/*
 	 * print the file header
 	 */
-       seq_printf(m, "%-25s %-20s %-20s %-10s\n",
-		  "Limit", "Soft Limit", "Hard Limit", "Units");
+	seq_printf(m, "%-25s %-20s %-20s %-10s %-20s\n",
+		   "Limit", "Soft Limit", "Hard Limit", "Units", "Max");
 
 	for (i = 0; i < RLIM_NLIMITS; i++) {
 		if (rlim[i].rlim_cur == RLIM_INFINITY)
@@ -647,9 +647,11 @@ static int proc_pid_limits(struct seq_file *m, struct pid_namespace *ns,
 			seq_printf(m, "%-20lu ", rlim[i].rlim_max);
 
 		if (lnames[i].unit)
-			seq_printf(m, "%-10s\n", lnames[i].unit);
+			seq_printf(m, "%-10s", lnames[i].unit);
 		else
-			seq_putc(m, '\n');
+			seq_printf(m, "%-10s", "");
+		seq_printf(m, "%-20lu\n",
+			   task->signal->rlim_curmax[i]);
 	}
 
 	return 0;
