@@ -81,17 +81,19 @@ static void __init nps_setup_clocksource(struct device_node *node,
 	}
 }
 
-static void __init nps_timer_init(struct device_node *node)
+static int __init nps_timer_init(struct device_node *node)
 {
 	struct clk *clk;
 
 	clk = of_clk_get(node, 0);
 	if (IS_ERR(clk)) {
 		pr_err("Can't get timer clock.\n");
-		return;
+		return PTR_ERR(clk);
 	}
 
 	nps_setup_clocksource(node, clk);
+
+	return 0;
 }
 
 CLOCKSOURCE_OF_DECLARE(ezchip_nps400_clksrc, "ezchip,nps400-timer",
