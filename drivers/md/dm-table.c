@@ -833,7 +833,7 @@ static bool __table_type_request_based(unsigned table_type)
 static int dm_table_set_type(struct dm_table *t)
 {
 	unsigned i;
-	unsigned bio_based = 0, request_based = 0, hybrid = 0;
+	unsigned bio_based = 0, request_based = 0, hybrid = 0, num_dax = 0;
 	bool use_blk_mq = false;
 	struct dm_target *tgt;
 	struct dm_dev_internal *dd;
@@ -848,6 +848,9 @@ static int dm_table_set_type(struct dm_table *t)
 			request_based = 1;
 		else
 			bio_based = 1;
+
+		if (tgt->dax_supported)
+			num_dax++;
 
 		if (bio_based && request_based) {
 			DMWARN("Inconsistent table: different target types"
@@ -870,7 +873,10 @@ static int dm_table_set_type(struct dm_table *t)
 
 	if (bio_based) {
 		/* We must use this table as bio-based */
-		t->type = DM_TYPE_BIO_BASED;
+		if (num_dax && num_dax == t->num_targets)
+			t->type = DM_TYPE_DAX_BIO_BASED;
+		else
+			t->type = DM_TYPE_BIO_BASED;
 		return 0;
 	}
 
@@ -978,7 +984,7 @@ static int dm_table_alloc_md_mempools(struct dm_table *t, struct mapped_device *
 		return -EINVAL;
 	}
 
-	if (type == DM_TYPE_BIO_BASED)
+	if (dm_type_bio_based(type))
 		for (i = 0; i < t->num_targets; i++) {
 			tgt = t->targets + i;
 			per_io_data_size = max(per_io_data_size, tgt->per_io_data_size);

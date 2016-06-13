@@ -2494,7 +2494,7 @@ static void __bind_mempools(struct mapped_device *md, struct dm_table *t)
 
 	if (md->bs) {
 		/* The md already has necessary mempools. */
-		if (dm_table_get_type(t) == DM_TYPE_BIO_BASED) {
+		if (dm_type_bio_based(dm_table_get_type(t))) {
 			/*
 			 * Reload bioset because front_pad may have changed
 			 * because a different table was loaded.
@@ -2661,6 +2661,9 @@ void dm_set_md_type(struct mapped_device *md, unsigned type)
 {
 	BUG_ON(!mutex_is_locked(&md->type_lock));
 	md->type = type;
+
+	if (type == DM_TYPE_DAX_BIO_BASED)
+		dm_disk(md)->flags |= GENHD_FL_DAX;
 }
 
 unsigned dm_get_md_type(struct mapped_device *md)
@@ -2839,7 +2842,7 @@ out_kfree_tag_set:
 
 static unsigned filter_md_type(unsigned type, struct mapped_device *md)
 {
-	if (type == DM_TYPE_BIO_BASED)
+	if (dm_type_bio_based(type))
 		return type;
 
 	return !md->use_blk_mq ? DM_TYPE_REQUEST_BASED : DM_TYPE_MQ_REQUEST_BASED;
@@ -2869,6 +2872,7 @@ int dm_setup_md_queue(struct mapped_device *md, struct dm_table *t)
 		}
 		break;
 	case DM_TYPE_BIO_BASED:
+	case DM_TYPE_DAX_BIO_BASED:
 		dm_init_normal_md_queue(md);
 		blk_queue_make_request(md->queue, dm_make_request);
 		/*
@@ -3575,6 +3579,7 @@ struct dm_md_mempools *dm_alloc_md_mempools(struct mapped_device *md, unsigned t
 
 	switch (type) {
 	case DM_TYPE_BIO_BASED:
+	case DM_TYPE_DAX_BIO_BASED:
 		cachep = _io_cache;
 		pool_size = dm_get_reserved_bio_based_ios();
 		front_pad = roundup(per_io_data_size, __alignof__(struct dm_target_io)) + offsetof(struct dm_target_io, clone);

@@ -39,6 +39,13 @@
 #define DM_TYPE_BIO_BASED		1
 #define DM_TYPE_REQUEST_BASED		2
 #define DM_TYPE_MQ_REQUEST_BASED	3
+#define DM_TYPE_DAX_BIO_BASED		4
+
+/*
+ * To check whether the DM type is bio-based or not.
+ */
+#define dm_type_bio_based(type) (((type) == DM_TYPE_BIO_BASED) || \
+				 ((type) == DM_TYPE_DAX_BIO_BASED))
 
 /*
  * List of devices that a metadevice uses and should open/close.
