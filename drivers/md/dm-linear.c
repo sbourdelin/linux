@@ -141,6 +141,22 @@ static int linear_iterate_devices(struct dm_target *ti,
 	return fn(ti, lc->dev, lc->start, ti->len, data);
 }
 
+static long linear_direct_access(struct dm_target *ti, sector_t sector,
+		void __pmem **kaddr, pfn_t *pfn, long size)
+{
+	struct linear_c *lc;
+	struct block_device *tbdev;
+	const struct block_device_operations *tops;
+	sector_t tsector;
+
+	lc = ti->private;
+	tbdev = lc->dev->bdev;
+	tops = tbdev->bd_disk->fops;
+	tsector = linear_map_sector(ti, sector);
+
+	return tops->direct_access(tbdev, tsector, kaddr, pfn, size);
+}
+
 static struct target_type linear_target = {
 	.name   = "linear",
 	.version = {1, 2, 1},
@@ -151,6 +167,7 @@ static struct target_type linear_target = {
 	.status = linear_status,
 	.prepare_ioctl = linear_prepare_ioctl,
 	.iterate_devices = linear_iterate_devices,
+	.direct_access = linear_direct_access,
 };
 
 int __init dm_linear_init(void)
