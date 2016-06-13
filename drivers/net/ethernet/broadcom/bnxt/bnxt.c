@@ -5074,8 +5074,8 @@ static int __bnxt_open_nic(struct bnxt *bp, bool irq_re_init, bool link_re_init)
 	}
 
 	if (irq_re_init) {
-#if defined(CONFIG_VXLAN) || defined(CONFIG_VXLAN_MODULE)
-		vxlan_get_rx_port(bp->dev);
+#if IS_ENABLED(CONFIG_VXLAN)
+		udp_tunnel_get_rx_port(bp->dev);
 #endif
 		if (!bnxt_hwrm_tunnel_dst_port_alloc(
 				bp, htons(0x17c1),
@@ -6049,14 +6049,17 @@ static void bnxt_cfg_ntp_filters(struct bnxt *bp)
 #endif /* CONFIG_RFS_ACCEL */
 
 static void bnxt_add_vxlan_port(struct net_device *dev, sa_family_t sa_family,
-				__be16 port)
+				__be16 port, unsigned int type)
 {
 	struct bnxt *bp = netdev_priv(dev);
 
-	if (!netif_running(dev))
+	if (type != UDP_ENC_OFFLOAD_TYPE_VXLAN)
 		return;
 
 	if (sa_family != AF_INET6 && sa_family != AF_INET)
+		return;
+
+	if (!netif_running(dev))
 		return;
 
 	if (bp->vxlan_port_cnt && bp->vxlan_port != port)
@@ -6071,14 +6074,17 @@ static void bnxt_add_vxlan_port(struct net_device *dev, sa_family_t sa_family,
 }
 
 static void bnxt_del_vxlan_port(struct net_device *dev, sa_family_t sa_family,
-				__be16 port)
+				__be16 port, unsigned int type)
 {
 	struct bnxt *bp = netdev_priv(dev);
 
-	if (!netif_running(dev))
+	if (type != UDP_ENC_OFFLOAD_TYPE_VXLAN)
 		return;
 
 	if (sa_family != AF_INET6 && sa_family != AF_INET)
+		return;
+
+	if (!netif_running(dev))
 		return;
 
 	if (bp->vxlan_port_cnt && bp->vxlan_port == port) {
@@ -6119,8 +6125,8 @@ static const struct net_device_ops bnxt_netdev_ops = {
 #ifdef CONFIG_RFS_ACCEL
 	.ndo_rx_flow_steer	= bnxt_rx_flow_steer,
 #endif
-	.ndo_add_vxlan_port	= bnxt_add_vxlan_port,
-	.ndo_del_vxlan_port	= bnxt_del_vxlan_port,
+	.ndo_add_udp_enc_port	= bnxt_add_vxlan_port,
+	.ndo_del_udp_enc_port	= bnxt_del_vxlan_port,
 #ifdef CONFIG_NET_RX_BUSY_POLL
 	.ndo_busy_poll		= bnxt_busy_poll,
 #endif
