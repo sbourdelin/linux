@@ -387,6 +387,8 @@ __sigqueue_alloc(int sig, struct task_struct *t, gfp_t flags, int override_rlimi
 		INIT_LIST_HEAD(&q->list);
 		q->flags = 0;
 		q->user = user;
+		/* XXX resource limits apply per task, not per user */
+		bump_rlimit(RLIMIT_SIGPENDING, atomic_read(&user->sigpending));
 	}
 
 	return q;
