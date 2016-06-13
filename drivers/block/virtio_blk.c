@@ -819,6 +819,9 @@ static int virtblk_restore(struct virtio_device *vdev)
 	if (ret)
 		return ret;
 
+	if (vblk->num_vqs != vblk->tag_set.nr_hw_queues)
+		blk_mq_update_nr_hw_queues(&vblk->tag_set, vblk->num_vqs);
+
 	virtio_device_ready(vdev);
 
 	blk_mq_start_stopped_hw_queues(vblk->disk->queue, true);
