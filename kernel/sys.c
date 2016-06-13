@@ -1896,6 +1896,8 @@ static int prctl_set_mm_map(int opt, const void __user *addr, unsigned long data
 	if (prctl_map.auxv_size)
 		memcpy(mm->saved_auxv, user_auxv, sizeof(user_auxv));
 
+	bump_limit(RLIMIT_DATA, mm->end_data - mm->start_data);
+
 	up_write(&mm->mmap_sem);
 	return 0;
 }

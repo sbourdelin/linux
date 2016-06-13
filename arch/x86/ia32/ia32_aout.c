@@ -398,6 +398,7 @@ beyond_if:
 	regs->r8 = regs->r9 = regs->r10 = regs->r11 =
 	regs->r12 = regs->r13 = regs->r14 = regs->r15 = 0;
 	set_fs(USER_DS);
+	bump_limit(RLIMIT_DATA, ex.a_data + ex.a_bss);
 	return 0;
 }
 

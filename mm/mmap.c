@@ -228,6 +228,8 @@ SYSCALL_DEFINE1(brk, unsigned long, brk)
 		goto out;
 
 set_brk:
+	bump_rlimit(RLIMIT_DATA, (brk - mm->start_brk) +
+		    (mm->end_data - mm->start_data));
 	mm->brk = brk;
 	populate = newbrk > oldbrk && (mm->def_flags & VM_LOCKED) != 0;
 	up_write(&mm->mmap_sem);
@@ -2924,8 +2926,10 @@ void vm_stat_account(struct mm_struct *mm, vm_flags_t flags, long npages)
 		mm->exec_vm += npages;
 	else if (is_stack_mapping(flags))
 		mm->stack_vm += npages;
-	else if (is_data_mapping(flags))
+	else if (is_data_mapping(flags)) {
 		mm->data_vm += npages;
+		bump_rlimit(RLIMIT_DATA, mm->data_vm << PAGE_SHIFT);
+	}
 }
 
 static int special_mapping_fault(struct vm_area_struct *vma,

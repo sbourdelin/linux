@@ -330,6 +330,7 @@ beyond_if:
 	regs->gp = ex.a_gpvalue;
 #endif
 	start_thread(regs, ex.a_entry, current->mm->start_stack);
+	bump_limit(RLIMIT_DATA, ex.a_data + ex.a_bss);
 	return 0;
 }
 

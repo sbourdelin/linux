@@ -792,6 +792,7 @@ static int load_flat_file(struct linux_binprm * bprm,
 			libinfo->lib_list[id].start_brk) +	/* start brk */
 			stack_len);
 
+	bump_limit(RLIMIT_DATA, data_len + bss_len);
 	return 0;
 err:
 	return ret;
