@@ -589,7 +589,7 @@ static struct dentry *dentry_kill(struct dentry *dentry)
 
 failed:
 	spin_unlock(&dentry->d_lock);
-	cpu_relax();
+	cond_resched();
 	return dentry; /* try again with same dentry */
 }
 
