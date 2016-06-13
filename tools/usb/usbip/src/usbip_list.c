@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2011 matt mooney <mfm@muteddisk.com>
+ * Copyright (C) 2015 Nobuo Iwata
+ *               2011 matt mooney <mfm@muteddisk.com>
  *               2005-2007 Takahiro Hirofuchi
  * Copyright (C) 2015-2016 Samsung Electronics
  *               Igor Kotrasinski <i.kotrasinsk@samsung.com>
@@ -42,9 +43,9 @@
 #include "usbip.h"
 
 static const char usbip_list_usage_string[] =
-	"usbip list [-p|--parsable] <args>\n"
+	"usbip list <args>\n"
 	"    -p, --parsable         Parsable list format\n"
-	"    -r, --remote=<host>    List the exportable USB devices on <host>\n"
+	"    -r, --remote=<host>    List the importable USB devices on <host>\n"
 	"    -l, --local            List the local USB devices\n";
 
 void usbip_list_usage(void)
@@ -52,7 +53,7 @@ void usbip_list_usage(void)
 	printf("usage: %s", usbip_list_usage_string);
 }
 
-static int get_exported_devices(char *host, int sockfd)
+static int get_importable_devices(char *host, int sockfd)
 {
 	char product_name[100];
 	char class_name[100];
@@ -82,14 +83,14 @@ static int get_exported_devices(char *host, int sockfd)
 		return -1;
 	}
 	PACK_OP_DEVLIST_REPLY(0, &reply);
-	dbg("exportable devices: %d\n", reply.ndev);
+	dbg("importable devices: %d\n", reply.ndev);
 
 	if (reply.ndev == 0) {
-		info("no exportable devices found on %s", host);
+		info("no importable devices found on %s", host);
 		return 0;
 	}
 
-	printf("Exportable USB devices\n");
+	printf("Importable USB devices\n");
 	printf("======================\n");
 	printf(" - %s\n", host);
 
@@ -134,7 +135,7 @@ static int get_exported_devices(char *host, int sockfd)
 	return 0;
 }
 
-static int list_exported_devices(char *host)
+static int list_importable_devices(char *host)
 {
 	int rc;
 	int sockfd;
@@ -147,9 +148,10 @@ static int list_exported_devices(char *host)
 	}
 	dbg("connected to %s:%s", host, usbip_port_string);
 
-	rc = get_exported_devices(host, sockfd);
+	rc = get_importable_devices(host, sockfd);
 	if (rc < 0) {
 		err("failed to get device list from %s", host);
+		close(sockfd);
 		return -1;
 	}
 
@@ -351,7 +353,7 @@ int usbip_list(int argc, char *argv[])
 			parsable = true;
 			break;
 		case 'r':
-			ret = list_exported_devices(optarg);
+			ret = list_importable_devices(optarg);
 			goto out;
 		case 'l':
 			ret = list_devices(parsable);
