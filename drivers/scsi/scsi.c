@@ -796,6 +796,7 @@ retry_pg0:
 	result = scsi_vpd_inquiry(sdev, vpd_buf, 0, vpd_len);
 	if (result < 0) {
 		kfree(vpd_buf);
+		sdev->skip_vpd_pages = 1;
 		return;
 	}
 	if (result > vpd_len) {
@@ -822,6 +823,7 @@ retry_pg80:
 		result = scsi_vpd_inquiry(sdev, vpd_buf, 0x80, vpd_len);
 		if (result < 0) {
 			kfree(vpd_buf);
+			sdev->skip_vpd_pages = 1;
 			return;
 		}
 		if (result > vpd_len) {
@@ -851,6 +853,7 @@ retry_pg83:
 		result = scsi_vpd_inquiry(sdev, vpd_buf, 0x83, vpd_len);
 		if (result < 0) {
 			kfree(vpd_buf);
+			sdev->skip_vpd_pages = 1;
 			return;
 		}
 		if (result > vpd_len) {
