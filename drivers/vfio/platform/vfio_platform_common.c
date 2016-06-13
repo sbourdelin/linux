@@ -128,10 +128,10 @@ static bool vfio_platform_has_reset(struct vfio_platform_device *vdev)
 	return vdev->of_reset ? true : false;
 }
 
-static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
+static int vfio_platform_get_reset(struct vfio_platform_device *vdev)
 {
 	if (vdev->acpihid)
-		return;
+		return vfio_platform_acpi_has_reset(vdev) ? 0 : -ENOENT;
 
 	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
 						    &vdev->reset_module);
@@ -140,6 +140,8 @@ static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
 		vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
 							&vdev->reset_module);
 	}
+
+	return vdev->of_reset ? 0 : -ENOENT;
 }
 
 static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
@@ -670,16 +672,22 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
 	}
 
 	ret = vfio_add_group_dev(dev, &vfio_platform_ops, vdev);
-	if (ret) {
-		iommu_group_put(group);
-		return ret;
-	}
+	if (ret)
+		goto out;
 
-	vfio_platform_get_reset(vdev);
+	ret = vfio_platform_get_reset(vdev);
+	if (ret && vdev->reset_required) {
+		pr_err("vfio: no reset function found for device %s\n",
+		       vdev->name);
+		goto out;
+	}
 
 	mutex_init(&vdev->igate);
 
 	return 0;
+out:
+	iommu_group_put(group);
+	return ret;
 }
 EXPORT_SYMBOL_GPL(vfio_platform_probe_common);
 
