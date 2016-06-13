@@ -1,0 +1,94 @@
+/*
+ * MAX98504 ALSA SoC Audio driver
+ *
+ * Copyright 2011 - 2012 Maxim Integrated Products
+ * Copyright 2016 Samsung Electronics Co., Ltd.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+#ifndef MAX98504_H_
+#define MAX98504_H_
+
+/*
+ * MAX98504 Register Definitions
+ */
+#define MAX98504_REG_INTERRUPT_STATUS		0x01
+#define MAX98504_REG_INTERRUPT_FLAGS		0x02
+#define MAX98504_REG_INTERRUPT_ENABLE		0x03
+#define MAX98504_REG_INTERRUPT_FLAG_CLEARS	0x04
+#define MAX98504_REG_GPIO_ENABLE		0x10
+#define MAX98504_REG_GPIO_CONFIG		0x11
+#define MAX98504_REG_WATCHDOG_ENABLE		0x12
+#define MAX98504_REG_WATCHDOG_CONFIG		0x13
+#define MAX98504_REG_WATCHDOG_CLEAR		0x14
+#define MAX98504_REG_CLOCK_MONITOR_ENABLE	0x15
+#define MAX98504_REG_PVDD_BROWNOUT_ENABLE	0x16
+/* n = 1...4 */
+#define MAX98504_REG_PVDD_BROWNOUT_CONFIG(n)	(0x17 + (n) - 1)
+#define MAX98504_REG_PCM_RX_ENABLE		0x20
+#define MAX98504_REG_PCM_TX_ENABLE		0x21
+#define MAX98504_REG_PCM_TX_HIZ_CONTROL		0x22
+#define MAX98504_REG_PCM_TX_CHANNEL_SOURCES	0x23
+#define MAX98504_REG_PCM_MODE_CONFIG		0x24
+#define MAX98504_REG_PCM_DSP_CONFIG		0x25
+#define MAX98504_REG_PCM_CLOCK_SETUP		0x26
+#define MAX98504_REG_PCM_SAMPLE_RATE_SETUP	0x27
+#define MAX98504_REG_PCM_TO_SPEAKER_MONOMIX	0x28
+#define MAX98504_REG_PDM_TX_ENABLE		0x30
+#define MAX98504_REG_PDM_TX_HIZ_CONTROL		0x31
+#define MAX98504_REG_PDM_TX_CONTROL		0x32
+#define MAX98504_REG_PDM_RX_ENABLE		0x33
+#define MAX98504_REG_SPEAKER_ENABLE		0x34
+#define MAX98504_REG_SPEAKER_SOURCE_SELECT	0x35
+#define MAX98504_REG_MEASUREMENT_ENABLE		0x36
+#define MAX98504_REG_ANALOGUE_INPUT_GAIN	0x37
+#define MAX98504_REG_TEMPERATURE_LIMIT_CONFIG	0x38
+#define MAX98504_REG_ANALOGUE_SPARE		0x39
+#define MAX98504_REG_GLOBAL_ENABLE		0x40
+#define MAX98504_REG_SOFTWARE_RESET		0x41
+#define MAX98504_REG_REV_ID			0x7fff
+
+#define MAX98504_MAX_REGISTER			0x7fff
+
+/* Register Bit Fields */
+
+/* MAX98504_REG_PCM_DSP_CONFIG */
+#define M98504_PCM_DSP_CFG_TX_DITH_EN_MASK	(1 << 7)
+#define M98504_PCM_DSP_CFG_MEAS_DCBLK_EN_MASK	(1 << 6)
+#define M98504_PCM_DSP_CFG_RX_DITH_EN_MASK	(1 << 5)
+#define M98504_PCM_DSP_CFG_RX_FLT_MODE_MASK	(1 << 4)
+
+/* MAX98504_REG_PDM_RX_ENABLE */
+#define M98504_PDM_RX_EN_MASK			(1 << 0)
+
+/* MAX98504_REG_SPEAKER_SOURCE_SELECT */
+#define M98504_SPK_SRC_SEL_MASK			(0x3 << 0)
+#define M98504_SPK_SRC_SEL_PDM_CH1		(0x3 << 0)
+#define M98504_SPK_SRC_SEL_PDM_CH0		(0x2 << 0)
+#define M98504_SPK_SRC_SEL_ANALOG		(0x1 << 0)
+#define M98504_SPK_SRC_SEL_PCM_MONOMIX		(0x0 << 0)
+
+enum max98504_rx_path {
+	MODE_RX_PCM,
+	MODE_RX_AIN,
+	MODE_RX_PDM0,
+	MODE_RX_PDM1,
+};
+
+enum max98504_tx_path {
+	MODE_TX_PCM,
+	MODE_TX_PDM,
+};
+
+struct max98504_priv {
+	struct regmap *regmap;
+	u32 rx_path;
+	u32 tx_path;
+	u32 rx_ch_enable;
+	u32 tx_ch_enable;
+	u32 tx_ch_source;
+};
+
+#endif /* MAX98504_H_ */
