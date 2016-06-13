@@ -95,6 +95,9 @@ struct scan_control {
 	/* Can cgroups be reclaimed below their normal consumption range? */
 	unsigned int may_thrash:1;
 
+	/* reclaim pages unconditionally */
+	unsigned int force_reclaim:1;
+
 	unsigned int hibernation_mode:1;
 
 	/* One of the zones is ready for compaction */
@@ -783,6 +786,7 @@ redo:
 }
 
 enum page_references {
+	PAGEREF_NONE,
 	PAGEREF_RECLAIM,
 	PAGEREF_RECLAIM_CLEAN,
 	PAGEREF_KEEP,
@@ -884,8 +888,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 				      unsigned long *ret_nr_unqueued_dirty,
 				      unsigned long *ret_nr_congested,
 				      unsigned long *ret_nr_writeback,
-				      unsigned long *ret_nr_immediate,
-				      bool force_reclaim)
+				      unsigned long *ret_nr_immediate)
 {
 	LIST_HEAD(ret_pages);
 	LIST_HEAD(free_pages);
@@ -903,7 +906,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		struct address_space *mapping;
 		struct page *page;
 		int may_enter_fs;
-		enum page_references references = PAGEREF_RECLAIM_CLEAN;
+		enum page_references references = PAGEREF_NONE;
 		bool dirty, writeback;
 		bool lazyfree = false;
 		int ret = SWAP_SUCCESS;
@@ -927,13 +930,15 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		if (!sc->may_unmap && page_mapped(page))
 			goto keep_locked;
 
-		/* Double the slab pressure for mapped and swapcache pages */
-		if (page_mapped(page) || PageSwapCache(page))
-			sc->nr_scanned++;
-
 		may_enter_fs = (sc->gfp_mask & __GFP_FS) ||
 			(PageSwapCache(page) && (sc->gfp_mask & __GFP_IO));
 
+		if (sc->force_reclaim)
+			goto force_reclaim;
+
+		/* Double the slab pressure for mapped and swapcache pages */
+		if (page_mapped(page) || PageSwapCache(page))
+			sc->nr_scanned++;
 		/*
 		 * The number of dirty pages determines if a zone is marked
 		 * reclaim_congested which affects wait_iff_congested. kswapd
@@ -1028,19 +1033,18 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 			}
 		}
 
-		if (!force_reclaim)
-			references = page_check_references(page, sc);
+		references = page_check_references(page, sc);
 
 		switch (references) {
 		case PAGEREF_ACTIVATE:
 			goto activate_locked;
 		case PAGEREF_KEEP:
 			goto keep_locked;
-		case PAGEREF_RECLAIM:
-		case PAGEREF_RECLAIM_CLEAN:
-			; /* try to reclaim the page below */
+		default:
+			break; /* try to reclaim the page below */
 		}
 
+force_reclaim:
 		/*
 		 * Anonymous process memory has backing store?
 		 * Try to allocate it some swap space here.
@@ -1247,6 +1251,8 @@ unsigned long reclaim_clean_pages_from_list(struct zone *zone,
 		.gfp_mask = GFP_KERNEL,
 		.priority = DEF_PRIORITY,
 		.may_unmap = 1,
+		.may_writepage = 0,
+		.force_reclaim = 1,
 	};
 	unsigned long ret, dummy1, dummy2, dummy3, dummy4, dummy5;
 	struct page *page, *next;
@@ -1262,7 +1268,7 @@ unsigned long reclaim_clean_pages_from_list(struct zone *zone,
 
 	ret = shrink_page_list(&clean_pages, zone, &sc,
 			TTU_UNMAP|TTU_IGNORE_ACCESS,
-			&dummy1, &dummy2, &dummy3, &dummy4, &dummy5, true);
+			&dummy1, &dummy2, &dummy3, &dummy4, &dummy5);
 	list_splice(&clean_pages, page_list);
 	mod_zone_page_state(zone, NR_ISOLATED_FILE, -ret);
 	return ret;
@@ -1617,8 +1623,7 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 
 	nr_reclaimed = shrink_page_list(&page_list, zone, sc, TTU_UNMAP,
 				&nr_dirty, &nr_unqueued_dirty, &nr_congested,
-				&nr_writeback, &nr_immediate,
-				false);
+				&nr_writeback, &nr_immediate);
 
 	spin_lock_irq(&zone->lru_lock);
 
