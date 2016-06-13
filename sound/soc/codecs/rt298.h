@@ -211,6 +211,8 @@ enum {
 };
 
 int rt298_mic_detect(struct snd_soc_codec *codec, struct snd_soc_jack *jack);
+void rt298_jack_suspend(struct snd_soc_codec *codec);
+void rt298_jack_resume(struct snd_soc_codec *codec);
 
 #endif /* __RT298_H__ */
 

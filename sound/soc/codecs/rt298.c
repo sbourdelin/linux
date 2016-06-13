@@ -1271,6 +1271,26 @@ static int rt298_i2c_remove(struct i2c_client *i2c)
 	return 0;
 }
 
+void rt298_jack_suspend(struct snd_soc_codec *codec)
+{
+	struct rt298_priv *rt298 = snd_soc_codec_get_drvdata(codec);
+	struct snd_soc_dapm_context *dapm;
+
+	dapm = snd_soc_codec_get_dapm(rt298->codec);
+	snd_soc_dapm_disable_pin(dapm, "LDO1");
+	snd_soc_dapm_sync(dapm);
+}
+EXPORT_SYMBOL_GPL(rt298_jack_suspend);
+
+void rt298_jack_resume(struct snd_soc_codec *codec)
+{
+	struct rt298_priv *rt298 = snd_soc_codec_get_drvdata(codec);
+	bool hp = false;
+	bool mic = false;
+
+	rt298_jack_detect(rt298, &hp, &mic);
+}
+EXPORT_SYMBOL_GPL(rt298_jack_resume);
 
 static struct i2c_driver rt298_i2c_driver = {
 	.driver = {
