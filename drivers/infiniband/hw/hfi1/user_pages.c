@@ -111,6 +111,7 @@ int hfi1_acquire_user_pages(unsigned long vaddr, size_t npages, bool writable,
 
 	down_write(&current->mm->mmap_sem);
 	current->mm->pinned_vm += ret;
+	bump_rlimit(RLIMIT_MEMLOCK, current->mm->pinned_vm << PAGE_SHIFT);
 	up_write(&current->mm->mmap_sem);
 
 	return ret;

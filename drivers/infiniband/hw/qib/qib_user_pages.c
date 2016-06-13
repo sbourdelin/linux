@@ -74,6 +74,7 @@ static int __qib_get_user_pages(unsigned long start_page, size_t num_pages,
 	}
 
 	current->mm->pinned_vm += num_pages;
+	bump_rlimit(RLIMIT_MEMLOCK, current->mm->pinned_vm << PAGE_SHIFT);
 
 	ret = 0;
 	goto bail;

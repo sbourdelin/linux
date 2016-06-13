@@ -224,6 +224,7 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
 
 	ret = 0;
 
+	bump_rlimit(RLIMIT_MEMLOCK, locked << PAGE_SHIFT);
 out:
 	if (ret < 0) {
 		if (need_release)

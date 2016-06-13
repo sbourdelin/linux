@@ -5077,6 +5077,7 @@ accounting:
 		if (!ret)
 			rb->aux_mmap_locked = extra;
 	}
+	bump_rlimit(RLIMIT_MEMLOCK, locked << PAGE_SHIFT);
 
 unlock:
 	if (!ret) {

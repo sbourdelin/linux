@@ -306,6 +306,7 @@ static inline int __scif_check_inc_pinned_vm(struct mm_struct *mm,
 		return -ENOMEM;
 	}
 	mm->pinned_vm = locked;
+	bump_rlimit(RLIMIT_MEMLOCK, locked << PAGE_SHIFT);
 	return 0;
 }
 

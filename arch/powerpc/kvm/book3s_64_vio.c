@@ -71,6 +71,7 @@ static long kvmppc_account_memlimit(unsigned long stt_pages, bool inc)
 			ret = -ENOMEM;
 		else
 			current->mm->locked_vm += stt_pages;
+		bump_rlimit(RLIMIT_MEMLOCK, locked << PAGE_SHIFT);
 	} else {
 		if (WARN_ON_ONCE(stt_pages > current->mm->locked_vm))
 			stt_pages = current->mm->locked_vm;

@@ -55,6 +55,8 @@ static long try_increment_locked_vm(long npages)
 			rlimit(RLIMIT_MEMLOCK),
 			ret ? " - exceeded" : "");
 
+	bump_rlimit(RLIMIT_MEMLOCK, locked << PAGE_SHIFT);
+
 	up_write(&current->mm->mmap_sem);
 
 	return ret;

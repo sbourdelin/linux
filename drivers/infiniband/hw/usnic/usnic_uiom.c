@@ -183,6 +183,8 @@ static int usnic_uiom_get_pages(unsigned long addr, size_t size, int writable,
 		ret = 0;
 	}
 
+	bump_rlimit(RLIMIT_MEMLOCK, locked << PAGE_SHIFT);
+
 out:
 	if (ret < 0)
 		usnic_uiom_put_pages(chunk_list, 0);

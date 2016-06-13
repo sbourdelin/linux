@@ -3381,10 +3381,16 @@ static inline unsigned long rlimit_max(unsigned int limit)
 	return task_rlimit_max(current, limit);
 }
 
+static inline void task_bump_rlimit(struct task_struct *tsk,
+				    unsigned int limit, unsigned long r)
+{
+	if (READ_ONCE(tsk->signal->rlim_curmax[limit]) < r)
+		tsk->signal->rlim_curmax[limit] = r;
+}
+
 static inline void bump_rlimit(unsigned int limit, unsigned long r)
 {
-	if (READ_ONCE(current->signal->rlim_curmax[limit]) < r)
-		current->signal->rlim_curmax[limit] = r;
+	return task_bump_rlimit(current, limit, r);
 }
 
 #ifdef CONFIG_CPU_FREQ

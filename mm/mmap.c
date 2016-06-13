@@ -2020,6 +2020,9 @@ static int acct_stack_growth(struct vm_area_struct *vma, unsigned long size, uns
 		return -ENOMEM;
 
 	bump_rlimit(RLIMIT_STACK, actual_size);
+	if (vma->vm_flags & VM_LOCKED)
+		bump_rlimit(RLIMIT_MEMLOCK,
+			    (mm->locked_vm + grow) << PAGE_SHIFT);
 
 	return 0;
 }

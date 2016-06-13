@@ -312,6 +312,8 @@ static long vfio_pin_pages(unsigned long vaddr, long npage,
 		}
 	}
 
+	bump_rlimit(RLIMIT_MEMLOCK, (current->mm->locked_vm + i) << PAGE_SHIFT);
+
 	if (!rsvd)
 		vfio_lock_acct(i);
 

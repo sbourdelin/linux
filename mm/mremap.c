@@ -394,6 +394,9 @@ static struct vm_area_struct *vma_to_resize(unsigned long addr,
 		*p = charged;
 	}
 
+	if (vma->vm_flags & VM_LOCKED)
+		bump_rlimit(RLIMIT_MEMLOCK, (mm->locked_vm << PAGE_SHIFT) +
+			    new_len - old_len);
 	return vma;
 }
 

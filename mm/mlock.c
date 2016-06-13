@@ -648,6 +648,8 @@ static __must_check int do_mlock(unsigned long start, size_t len, vm_flags_t fla
 	if (error)
 		return error;
 
+	bump_rlimit(RLIMIT_MEMLOCK, locked << PAGE_SHIFT);
+
 	error = __mm_populate(start, len, 0);
 	if (error)
 		return __mlock_posix_error_return(error);
@@ -761,6 +763,8 @@ SYSCALL_DEFINE1(mlockall, int, flags)
 	if (!ret && (flags & MCL_CURRENT))
 		mm_populate(0, TASK_SIZE);
 
+	bump_rlimit(RLIMIT_MEMLOCK, current->mm->total_vm << PAGE_SHIFT);
+
 	return ret;
 }
 
@@ -798,6 +802,9 @@ int user_shm_lock(size_t size, struct user_struct *user)
 	get_uid(user);
 	user->locked_shm += locked;
 	allowed = 1;
+
+	/* XXX resource limits apply per task, not per user */
+	bump_rlimit(RLIMIT_MEMLOCK, user->locked_shm << PAGE_SHIFT);
 out:
 	spin_unlock(&shmlock_user_lock);
 	return allowed;

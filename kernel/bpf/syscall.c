@@ -76,6 +76,9 @@ static int bpf_map_charge_memlock(struct bpf_map *map)
 		return -EPERM;
 	}
 	map->user = user;
+	/* XXX resource limits apply per task, not per user */
+	bump_rlimit(RLIMIT_MEMLOCK, atomic_long_read(&user->locked_vm) <<
+		    PAGE_SHIFT);
 	return 0;
 }
 
@@ -601,6 +604,9 @@ static int bpf_prog_charge_memlock(struct bpf_prog *prog)
 		return -EPERM;
 	}
 	prog->aux->user = user;
+	/* XXX resource limits apply per task, not per user */
+	bump_rlimit(RLIMIT_MEMLOCK, atomic_long_read(&user->locked_vm) <<
+		    PAGE_SHIFT);
 	return 0;
 }
 

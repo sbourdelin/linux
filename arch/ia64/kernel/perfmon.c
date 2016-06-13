@@ -2341,6 +2341,7 @@ pfm_smpl_buffer_alloc(struct task_struct *task, struct file *filp, pfm_context_t
 	ctx->ctx_smpl_vaddr = (void *)vma->vm_start;
 	*(unsigned long *)user_vaddr = vma->vm_start;
 
+	task_bump_rlimit(task, RLIMIT_MEMLOCK, size);
 	return 0;
 
 error:
