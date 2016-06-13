@@ -2531,6 +2531,13 @@ static sector_t sync_request(struct mddev *mddev, sector_t sector_nr, int *skipp
 		return sync_blocks;
 	}
 
+	/*   
+	* If there is non-resync activity waiting for a turn,
+	* then let it though before starting on this new sync request.
+	*/
+	if (conf->nr_waiting)
+		schedule_timeout_uninterruptible(1);
+
 	/* we are incrementing sector_nr below. To be safe, we check against
 	 * sector_nr + two times RESYNC_SECTORS
 	 */
