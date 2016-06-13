@@ -13,6 +13,10 @@ choice
 config DT_NONE
 	bool "None"
 
+config DT_BCM93368CVG834G
+	bool "BCM93368CVG834G"
+	select BUILTIN_DTB
+
 config DT_BCM93384WVG
 	bool "BCM93384WVG Zephyr CPU"
 	select BUILTIN_DTB

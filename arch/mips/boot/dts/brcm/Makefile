@@ -1,3 +1,4 @@
+dtb-$(CONFIG_DT_BCM93368CVG834G)	+= bcm93368cvg834g.dtb
 dtb-$(CONFIG_DT_BCM93384WVG)		+= bcm93384wvg.dtb
 dtb-$(CONFIG_DT_BCM93384WVG_VIPER)	+= bcm93384wvg_viper.dtb
 dtb-$(CONFIG_DT_BCM963268VR3032U)	+= bcm963268vr3032u.dtb
@@ -14,6 +15,7 @@ dtb-$(CONFIG_DT_BCM97425SVMB)		+= bcm97425svmb.dtb
 dtb-$(CONFIG_DT_BCM97435SVMB)		+= bcm97435svmb.dtb
 
 dtb-$(CONFIG_DT_NONE)			+= \
+						bcm93368cvg834g.dtb	\
 						bcm93384wvg.dtb		\
 						bcm93384wvg_viper.dtb	\
 						bcm963268vr3032u.dtb	\
