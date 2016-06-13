@@ -842,7 +842,7 @@ error:
  * low timeout interval so that if a connection is lost, we retry through
  * the MDS.
  */
-struct nfs_client *nfs4_set_ds_client(struct nfs_client* mds_clp,
+struct nfs_client *nfs4_set_ds_client(struct nfs_server *mds_srv,
 		const struct sockaddr *ds_addr, int ds_addrlen,
 		int ds_proto, unsigned int ds_timeo, unsigned int ds_retrans,
 		u32 minor_version, rpc_authflavor_t au_flavor)
@@ -853,7 +853,7 @@ struct nfs_client *nfs4_set_ds_client(struct nfs_client* mds_clp,
 		.nfs_mod = &nfs_v4,
 		.proto = ds_proto,
 		.minorversion = minor_version,
-		.net = mds_clp->cl_net,
+		.net = mds_srv->nfs_client->cl_net,
 	};
 	struct rpc_timeout ds_timeout;
 	struct nfs_client *clp;
@@ -863,13 +863,16 @@ struct nfs_client *nfs4_set_ds_client(struct nfs_client* mds_clp,
 		return ERR_PTR(-EINVAL);
 	cl_init.hostname = buf;
 
+	if (mds_srv->flags & NFS_MOUNT_NORESVPORT)
+		set_bit(NFS_CS_NORESVPORT, &cl_init.init_flags);
+
 	/*
 	 * Set an authflavor equual to the MDS value. Use the MDS nfs_client
 	 * cl_ipaddr so as to use the same EXCHANGE_ID co_ownerid as the MDS
 	 * (section 13.1 RFC 5661).
 	 */
 	nfs_init_timeout_values(&ds_timeout, ds_proto, ds_timeo, ds_retrans);
-	clp = nfs_get_client(&cl_init, &ds_timeout, mds_clp->cl_ipaddr,
+	clp = nfs_get_client(&cl_init, &ds_timeout, mds_srv->nfs_client->cl_ipaddr,
 			     au_flavor);
 
 	dprintk("<-- %s %p\n", __func__, clp);
