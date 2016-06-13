@@ -3,6 +3,7 @@ dtb-$(CONFIG_DT_BCM93384WVG)		+= bcm93384wvg.dtb
 dtb-$(CONFIG_DT_BCM93384WVG_VIPER)	+= bcm93384wvg_viper.dtb
 dtb-$(CONFIG_DT_BCM963268VR3032U)	+= bcm963268vr3032u.dtb
 dtb-$(CONFIG_DT_BCM96358NB4SER)		+= bcm96358nb4ser.dtb
+dtb-$(CONFIG_DT_BCM96362NB6SER)		+= bcm96362nb6ser.dtb
 dtb-$(CONFIG_DT_BCM96368MVWG)		+= bcm96368mvwg.dtb
 dtb-$(CONFIG_DT_BCM9EJTAGPRB)		+= bcm9ejtagprb.dtb
 dtb-$(CONFIG_DT_BCM97125CBMB)		+= bcm97125cbmb.dtb
@@ -20,6 +21,7 @@ dtb-$(CONFIG_DT_NONE)			+= \
 						bcm93384wvg_viper.dtb	\
 						bcm963268vr3032u.dtb	\
 						bcm96358nb4ser.dtb	\
+						bcm96362nb6ser.dtb	\
 						bcm96368mvwg.dtb	\
 						bcm9ejtagprb.dtb	\
 						bcm97125cbmb.dtb	\
