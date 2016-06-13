@@ -145,6 +145,8 @@ struct ivmd_header {
 bool amd_iommu_dump;
 bool amd_iommu_irq_remap __read_mostly;
 
+int amd_iommu_guest_ir;
+
 static bool amd_iommu_detected;
 static bool __initdata amd_iommu_disabled;
 static int amd_iommu_target_ivhd_type;
@@ -1258,6 +1260,8 @@ static int __init init_iommu_one(struct amd_iommu *iommu, struct ivhd_header *h)
 			iommu->mmio_phys_end = MMIO_REG_END_OFFSET;
 		else
 			iommu->mmio_phys_end = MMIO_CNTR_CONF_OFFSET;
+		if (((h->efr_attr & (0x1 << 6)) == 0))
+			amd_iommu_guest_ir = AMD_IOMMU_GUEST_IR_LEGACY;
 		break;
 	case 0x11:
 	case 0x40:
@@ -1265,6 +1269,8 @@ static int __init init_iommu_one(struct amd_iommu *iommu, struct ivhd_header *h)
 			iommu->mmio_phys_end = MMIO_REG_END_OFFSET;
 		else
 			iommu->mmio_phys_end = MMIO_CNTR_CONF_OFFSET;
+		if (((h->efr_reg & (0x1 << 7)) == 0))
+			amd_iommu_guest_ir = AMD_IOMMU_GUEST_IR_LEGACY;
 		break;
 	default:
 		return -EINVAL;
@@ -1488,6 +1494,14 @@ static int iommu_init_pci(struct amd_iommu *iommu)
 	if (iommu_feature(iommu, FEATURE_PPR) && alloc_ppr_log(iommu))
 		return -ENOMEM;
 
+	/* Note: We have already checked GASup from IVRS table.
+	 *       Now, we need to make sure that GAMSup is set.
+	 */
+	if (AMD_IOMMU_GUEST_IR_VAPIC(amd_iommu_guest_ir) &&
+	    !iommu_feature(iommu, FEATURE_GAM_VAPIC))
+		amd_iommu_guest_ir = AMD_IOMMU_GUEST_IR_LEGACY_GA;
+
+
 	if (iommu->cap & (1UL << IOMMU_CAP_NPCACHE))
 		amd_iommu_np_cache = true;
 
@@ -1545,16 +1559,24 @@ static void print_iommu_info(void)
 			dev_name(&iommu->dev->dev), iommu->cap_ptr);
 
 		if (iommu->cap & (1 << IOMMU_CAP_EFR)) {
-			pr_info("AMD-Vi:  Extended features: ");
+			pr_info("AMD-Vi: Extended features (%#llx):\n",
+				iommu->features);
 			for (i = 0; i < ARRAY_SIZE(feat_str); ++i) {
 				if (iommu_feature(iommu, (1ULL << i)))
 					pr_cont(" %s", feat_str[i]);
 			}
+
+			if (iommu->features & FEATURE_GAM_VAPIC)
+				pr_cont(" GA_vAPIC");
+
 			pr_cont("\n");
 		}
 	}
-	if (irq_remapping_enabled)
+	if (irq_remapping_enabled) {
 		pr_info("AMD-Vi: Interrupt remapping enabled\n");
+		if (AMD_IOMMU_GUEST_IR_VAPIC(amd_iommu_guest_ir))
+			pr_info("AMD-Vi: virtual APIC enabled\n");
+	}
 }
 
 static int __init amd_iommu_init_pci(void)
@@ -1852,6 +1874,20 @@ static void iommu_apply_resume_quirks(struct amd_iommu *iommu)
 			       iommu->stored_addr_lo | 1);
 }
 
+static void iommu_enable_ga(struct amd_iommu *iommu)
+{
+	switch (amd_iommu_guest_ir) {
+	case AMD_IOMMU_GUEST_IR_VAPIC:
+		iommu_feature_enable(iommu, CONTROL_GAM_EN);
+		/* Fall through */
+	case AMD_IOMMU_GUEST_IR_LEGACY_GA:
+		iommu_feature_enable(iommu, CONTROL_GA_EN);
+		break;
+	default:
+		break;
+	}
+}
+
 /*
  * This function finally enables all IOMMUs found in the system after
  * they have been initialized
@@ -1867,9 +1903,13 @@ static void early_enable_iommus(void)
 		iommu_enable_command_buffer(iommu);
 		iommu_enable_event_buffer(iommu);
 		iommu_set_exclusion_range(iommu);
+		iommu_enable_ga(iommu);
 		iommu_enable(iommu);
 		iommu_flush_all_caches(iommu);
 	}
+
+	if (AMD_IOMMU_GUEST_IR_VAPIC(amd_iommu_guest_ir))
+		amd_iommu_irq_ops.capability |= (1 << IRQ_POSTING_CAP);
 }
 
 static void enable_iommus_v2(void)
@@ -1895,6 +1935,9 @@ static void disable_iommus(void)
 
 	for_each_iommu(iommu)
 		iommu_disable(iommu);
+
+	if (AMD_IOMMU_GUEST_IR_VAPIC(amd_iommu_guest_ir))
+		amd_iommu_irq_ops.capability &= ~(1 << IRQ_POSTING_CAP);
 }
 
 /*
@@ -2147,10 +2190,16 @@ static int __init early_amd_iommu_init(void)
 		 * remapping tables.
 		 */
 		ret = -ENOMEM;
-		amd_iommu_irq_cache = kmem_cache_create("irq_remap_cache",
-				MAX_IRQS_PER_TABLE * sizeof(u32),
-				IRQ_TABLE_ALIGNMENT,
-				0, NULL);
+		if (!AMD_IOMMU_GUEST_IR_GA(amd_iommu_guest_ir))
+			amd_iommu_irq_cache = kmem_cache_create("irq_remap_cache",
+					MAX_IRQS_PER_TABLE * sizeof(u32),
+					IRQ_TABLE_ALIGNMENT,
+					0, NULL);
+		else
+			amd_iommu_irq_cache = kmem_cache_create("irq_remap_cache",
+					MAX_IRQS_PER_TABLE * (sizeof(u64) * 2),
+					IRQ_TABLE_ALIGNMENT,
+					0, NULL);
 		if (!amd_iommu_irq_cache)
 			goto out;
 
@@ -2403,6 +2452,21 @@ static int __init parse_amd_iommu_dump(char *str)
 	return 1;
 }
 
+static int __init parse_amd_iommu_intr(char *str)
+{
+	for (; *str; ++str) {
+		if (strncmp(str, "legacy", 6) == 0) {
+			amd_iommu_guest_ir = AMD_IOMMU_GUEST_IR_LEGACY;
+			break;
+		}
+		if (strncmp(str, "vapic", 2) == 0) {
+			amd_iommu_guest_ir = AMD_IOMMU_GUEST_IR_VAPIC;
+			break;
+		}
+	}
+	return 1;
+}
+
 static int __init parse_amd_iommu_options(char *str)
 {
 	for (; *str; ++str) {
@@ -2511,6 +2575,7 @@ static int __init parse_ivrs_acpihid(char *str)
 
 __setup("amd_iommu_dump",	parse_amd_iommu_dump);
 __setup("amd_iommu=",		parse_amd_iommu_options);
+__setup("amd_iommu_intr=",	parse_amd_iommu_intr);
 __setup("ivrs_ioapic",		parse_ivrs_ioapic);
 __setup("ivrs_hpet",		parse_ivrs_hpet);
 __setup("ivrs_acpihid",		parse_ivrs_acpihid);
