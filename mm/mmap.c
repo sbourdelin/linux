@@ -2019,6 +2019,8 @@ static int acct_stack_growth(struct vm_area_struct *vma, unsigned long size, uns
 	if (security_vm_enough_memory_mm(mm, grow))
 		return -ENOMEM;
 
+	bump_rlimit(RLIMIT_STACK, actual_size);
+
 	return 0;
 }
 
