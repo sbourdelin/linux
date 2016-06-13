@@ -287,7 +287,7 @@ static int pmem_attach_disk(struct device *dev,
 
 	disk->fops		= &pmem_fops;
 	disk->queue		= q;
-	disk->flags		= GENHD_FL_EXT_DEVT;
+	disk->flags		= GENHD_FL_EXT_DEVT | GENHD_FL_DAX;
 	nvdimm_namespace_disk_name(ndns, disk->disk_name);
 	disk->driverfs_dev = dev;
 	set_capacity(disk, (pmem->size - pmem->pfn_pad - pmem->data_offset)

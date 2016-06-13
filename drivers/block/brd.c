@@ -518,7 +518,7 @@ static struct brd_device *brd_alloc(int i)
 	disk->fops		= &brd_fops;
 	disk->private_data	= brd;
 	disk->queue		= brd->brd_queue;
-	disk->flags		= GENHD_FL_EXT_DEVT;
+	disk->flags		= GENHD_FL_EXT_DEVT | GENHD_FL_DAX;
 	sprintf(disk->disk_name, "ram%d", i);
 	set_capacity(disk, rd_size * 2);
 
