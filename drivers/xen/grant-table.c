@@ -224,6 +224,13 @@ static void gnttab_update_entry_v1(grant_ref_t ref, domid_t domid,
 {
 	gnttab_shared.v1[ref].domid = domid;
 	gnttab_shared.v1[ref].frame = frame;
+
+	/*
+	 * V1 only supports 32-bit frame, check the truncation
+	 * to avoid giving access to the wrong frame.
+	 */
+	BUG_ON(gnttab_shared.v1[ref].frame != frame);
+
 	wmb();
 	gnttab_shared.v1[ref].flags = flags;
 }
