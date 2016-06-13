@@ -4515,6 +4515,46 @@ void show_free_areas(unsigned int filter)
 	show_swap_cache_info();
 }
 
+unsigned long get_max_pfn(void)
+{
+	return max_pfn;
+}
+EXPORT_SYMBOL(get_max_pfn);
+
+static void mark_free_pages_bitmap(struct zone *zone,
+		unsigned long *bitmap, unsigned long len)
+{
+	unsigned long pfn, flags, limit, page_num;
+	unsigned int order, t;
+	struct list_head *curr;
+
+	if (zone_is_empty(zone))
+		return;
+
+	spin_lock_irqsave(&zone->lock, flags);
+
+	limit = min(len, max_pfn);
+	for_each_migratetype_order(order, t) {
+		list_for_each(curr, &zone->free_area[order].free_list[t]) {
+			pfn = page_to_pfn(list_entry(curr, struct page, lru));
+			page_num = 1UL << order;
+			if (pfn + page_num < limit)
+				bitmap_set(bitmap, pfn, page_num);
+		}
+	}
+
+	spin_unlock_irqrestore(&zone->lock, flags);
+}
+
+void get_free_pages(unsigned long *bitmap, unsigned long len)
+{
+	struct zone *zone;
+
+	for_each_populated_zone(zone)
+		mark_free_pages_bitmap(zone, bitmap, len);
+}
+EXPORT_SYMBOL(get_free_pages);
+
 static void zoneref_set_zone(struct zone *zone, struct zoneref *zoneref)
 {
 	zoneref->zone = zone;
