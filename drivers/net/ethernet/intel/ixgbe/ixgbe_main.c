@@ -6159,7 +6159,7 @@ int ixgbe_open(struct net_device *netdev)
 
 	ixgbe_clear_vxlan_port(adapter);
 #ifdef CONFIG_IXGBE_VXLAN
-	vxlan_get_rx_port(netdev);
+	udp_tunnel_get_rx_port(netdev);
 #endif
 
 	return 0;
@@ -7263,12 +7263,12 @@ static void ixgbe_service_task(struct work_struct *work)
 		return;
 	}
 #ifdef CONFIG_IXGBE_VXLAN
-	rtnl_lock();
 	if (adapter->flags2 & IXGBE_FLAG2_VXLAN_REREG_NEEDED) {
+		rtnl_lock();
 		adapter->flags2 &= ~IXGBE_FLAG2_VXLAN_REREG_NEEDED;
-		vxlan_get_rx_port(adapter->netdev);
+		udp_tunnel_get_rx_port(adapter->netdev);
+		rtnl_unlock();
 	}
-	rtnl_unlock();
 #endif /* CONFIG_IXGBE_VXLAN */
 	ixgbe_reset_subtask(adapter);
 	ixgbe_phy_interrupt_subtask(adapter);
@@ -8788,23 +8788,26 @@ static int ixgbe_set_features(struct net_device *netdev,
 	return 0;
 }
 
-#ifdef CONFIG_IXGBE_VXLAN
 /**
  * ixgbe_add_vxlan_port - Get notifications about VXLAN ports that come up
  * @dev: The port's netdev
  * @sa_family: Socket Family that VXLAN is notifiying us about
  * @port: New UDP port number that VXLAN started listening to
+ * @type: Enumerated type specifying UDP tunnel type
  **/
 static void ixgbe_add_vxlan_port(struct net_device *dev, sa_family_t sa_family,
-				 __be16 port)
+				 __be16 port, unsigned int type)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(dev);
 	struct ixgbe_hw *hw = &adapter->hw;
 
-	if (!(adapter->flags & IXGBE_FLAG_VXLAN_OFFLOAD_CAPABLE))
+	if (type != UDP_ENC_OFFLOAD_TYPE_VXLAN)
 		return;
 
-	if (sa_family == AF_INET6)
+	if (sa_family != AF_INET)
+		return;
+
+	if (!(adapter->flags & IXGBE_FLAG_VXLAN_OFFLOAD_CAPABLE))
 		return;
 
 	if (adapter->vxlan_port == port)
@@ -8826,16 +8829,20 @@ static void ixgbe_add_vxlan_port(struct net_device *dev, sa_family_t sa_family,
  * @dev: The port's netdev
  * @sa_family: Socket Family that VXLAN is notifying us about
  * @port: UDP port number that VXLAN stopped listening to
+ * @type: Enumerated type specifying UDP tunnel type
  **/
 static void ixgbe_del_vxlan_port(struct net_device *dev, sa_family_t sa_family,
-				 __be16 port)
+				 __be16 port, unsigned int type)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(dev);
 
-	if (!(adapter->flags & IXGBE_FLAG_VXLAN_OFFLOAD_CAPABLE))
+	if (type != UDP_ENC_OFFLOAD_TYPE_VXLAN)
 		return;
 
-	if (sa_family == AF_INET6)
+	if (sa_family != AF_INET)
+		return;
+
+	if (!(adapter->flags & IXGBE_FLAG_VXLAN_OFFLOAD_CAPABLE))
 		return;
 
 	if (adapter->vxlan_port != port) {
@@ -8847,7 +8854,6 @@ static void ixgbe_del_vxlan_port(struct net_device *dev, sa_family_t sa_family,
 	ixgbe_clear_vxlan_port(adapter);
 	adapter->flags2 |= IXGBE_FLAG2_VXLAN_REREG_NEEDED;
 }
-#endif /* CONFIG_IXGBE_VXLAN */
 
 static int ixgbe_ndo_fdb_add(struct ndmsg *ndm, struct nlattr *tb[],
 			     struct net_device *dev,
@@ -9160,10 +9166,8 @@ static const struct net_device_ops ixgbe_netdev_ops = {
 	.ndo_bridge_getlink	= ixgbe_ndo_bridge_getlink,
 	.ndo_dfwd_add_station	= ixgbe_fwd_add,
 	.ndo_dfwd_del_station	= ixgbe_fwd_del,
-#ifdef CONFIG_IXGBE_VXLAN
-	.ndo_add_vxlan_port	= ixgbe_add_vxlan_port,
-	.ndo_del_vxlan_port	= ixgbe_del_vxlan_port,
-#endif /* CONFIG_IXGBE_VXLAN */
+	.ndo_add_udp_enc_port	= ixgbe_add_vxlan_port,
+	.ndo_del_udp_enc_port	= ixgbe_del_vxlan_port,
 	.ndo_features_check	= ixgbe_features_check,
 };
 
