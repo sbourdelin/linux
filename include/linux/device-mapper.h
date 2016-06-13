@@ -290,6 +290,11 @@ struct dm_target {
 	 * Set if this target does not return zeroes on discarded blocks.
 	 */
 	bool discard_zeroes_data_unsupported:1;
+
+	/*
+	 * Set if the target supports DAX (direct access).
+	 */
+	bool dax_supported:1;
 };
 
 /* Each target can link one of these into the table */
