@@ -1384,6 +1384,18 @@ free_avic:
 	return err;
 }
 
+static inline int
+avic_update_iommu(struct kvm_vcpu *vcpu, int cpu, phys_addr_t pa, bool r)
+{
+	struct kvm_arch *vm_data = &vcpu->kvm->arch;
+
+	if (!kvm_arch_has_assigned_device(vcpu->kvm))
+		return 0;
+
+	return amd_iommu_update_ga(vcpu->vcpu_id, cpu, vm_data->avic_tag,
+				   (pa & AVIC_HPA_MASK), r);
+}
+
 /**
  * This function is called during VCPU halt/unhalt.
  */
@@ -1406,9 +1418,16 @@ static void avic_set_running(struct kvm_vcpu *vcpu, bool is_run)
 	WARN_ON(is_run == !!(entry & AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK));
 
 	entry &= ~AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK;
-	if (is_run)
+	if (is_run) {
 		entry |= AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK;
-	WRITE_ONCE(*(svm->avic_physical_id_cache), entry);
+		WRITE_ONCE(*(svm->avic_physical_id_cache), entry);
+		avic_update_iommu(vcpu, h_physical_id,
+				  page_to_phys(svm->avic_backing_page), 1);
+	} else {
+		avic_update_iommu(vcpu, h_physical_id,
+				  page_to_phys(svm->avic_backing_page), 0);
+		WRITE_ONCE(*(svm->avic_physical_id_cache), entry);
+	}
 }
 
 static void avic_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
@@ -1435,6 +1454,9 @@ static void avic_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 		entry |= AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK;
 
 	WRITE_ONCE(*(svm->avic_physical_id_cache), entry);
+	avic_update_iommu(vcpu, h_physical_id,
+			  page_to_phys(svm->avic_backing_page),
+			  svm->avic_is_running);
 }
 
 static void avic_vcpu_put(struct kvm_vcpu *vcpu)
@@ -1446,6 +1468,10 @@ static void avic_vcpu_put(struct kvm_vcpu *vcpu)
 		return;
 
 	entry = READ_ONCE(*(svm->avic_physical_id_cache));
+	if (entry & AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK)
+		avic_update_iommu(vcpu, -1,
+				  page_to_phys(svm->avic_backing_page), 0);
+
 	entry &= ~AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK;
 	WRITE_ONCE(*(svm->avic_physical_id_cache), entry);
 }
