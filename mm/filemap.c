@@ -2447,6 +2447,7 @@ inline ssize_t generic_write_checks(struct kiocb *iocb, struct iov_iter *from)
 			send_sig(SIGXFSZ, current, 0);
 			return -EFBIG;
 		}
+		bump_rlimit(RLIMIT_FSIZE, iocb->ki_pos);
 		iov_iter_truncate(from, limit - (unsigned long)pos);
 	}
 

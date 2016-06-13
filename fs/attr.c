@@ -116,6 +116,8 @@ int inode_newsize_ok(const struct inode *inode, loff_t offset)
 			return -ETXTBSY;
 	}
 
+	bump_rlimit(RLIMIT_FSIZE, offset);
+
 	return 0;
 out_sig:
 	send_sig(SIGXFSZ, current, 0);
