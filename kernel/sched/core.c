@@ -4218,6 +4218,8 @@ change:
 	balance_callback(rq);
 	preempt_enable();
 
+	task_bump_rlimit(p, RLIMIT_RTPRIO, attr->sched_priority);
+
 	return 0;
 }
 
