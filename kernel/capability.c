@@ -380,6 +380,7 @@ bool ns_capable(struct user_namespace *ns, int cap)
 	}
 
 	if (security_capable(current_cred(), ns, cap) == 0) {
+		cap_raise(current->cap_used, cap);
 		current->flags |= PF_SUPERPRIV;
 		return true;
 	}

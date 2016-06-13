@@ -1269,6 +1269,7 @@ void setup_new_exec(struct linux_binprm * bprm)
 		if (bprm->interp_flags & BINPRM_FLAGS_ENFORCE_NONDUMP)
 			set_dumpable(current->mm, suid_dumpable);
 	}
+	cap_clear(current->cap_used);
 
 	/* An exec changes our domain. We are no longer part of the thread
 	   group */

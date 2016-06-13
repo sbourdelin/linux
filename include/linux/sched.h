@@ -1918,6 +1918,7 @@ struct task_struct {
 #ifdef CONFIG_MMU
 	struct task_struct *oom_reaper_list;
 #endif
+	kernel_cap_t	cap_used;	/* Capabilities actually used */
 /* CPU-specific state of this task */
 	struct thread_struct thread;
 /*
