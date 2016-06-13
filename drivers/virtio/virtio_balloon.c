@@ -46,8 +46,12 @@ static int oom_pages = OOM_VBALLOON_DEFAULT_PAGES;
 module_param(oom_pages, int, S_IRUSR | S_IWUSR);
 MODULE_PARM_DESC(oom_pages, "pages to free on OOM");
 
+extern void get_free_pages(unsigned long *free_page_bitmap, unsigned long len);
+extern unsigned long get_max_pfn(void);
+
 enum balloon_req_id {
 	BALLOON_DROP_CACHE,
+	BALLOON_GET_FREE_PAGES,
 };
 
 struct balloon_req_hdr {
@@ -85,6 +89,9 @@ struct virtio_balloon {
 	/* Used to record the processed pfn range */
 	unsigned long min_pfn, max_pfn, start_pfn, end_pfn;
 	struct balloon_req_hdr req_hdr;
+	/* Free page bitmap and length to tell the host */
+	unsigned long *free_pages;
+	unsigned long free_bmap_len;
 	/*
 	 * The pages we've told the Host we're not using are enqueued
 	 * at vb_dev_info->pages list.
@@ -370,6 +377,41 @@ static void update_balloon_stats(struct virtio_balloon *vb)
 				pages_to_bytes(available));
 }
 
+static int reset_free_page_bmap(struct virtio_balloon *vb,
+				 unsigned long *max_pfn)
+{
+	int err = 0;
+	unsigned long bitmap_bytes;
+
+	*max_pfn = get_max_pfn();
+	bitmap_bytes = ALIGN(*max_pfn, BITS_PER_LONG) / BITS_PER_BYTE;
+
+	if (bitmap_bytes < vb->free_bmap_len)
+		memset(vb->free_pages, 0, bitmap_bytes);
+	else {
+		kfree(vb->free_pages);
+		vb->free_bmap_len = bitmap_bytes;
+		vb->free_pages = kzalloc(bitmap_bytes, GFP_KERNEL);
+	}
+
+	if (!vb->free_pages) {
+		err = -ENOMEM;
+		vb->free_bmap_len = 0;
+	}
+
+	return err;
+}
+
+static void update_free_pages_stats(struct virtio_balloon *vb)
+{
+	unsigned long max_pfn;
+
+	if (!reset_free_page_bmap(vb, &max_pfn))
+		get_free_pages(vb->free_pages, max_pfn);
+	else
+		dev_err(&vb->vdev->dev, "%s failure: No memory!\n", __func__);
+}
+
 /*
  * While most virtqueues communicate guest-initiated requests to the hypervisor,
  * the stats queue operates in reverse.  The driver initializes the virtqueue
@@ -511,10 +553,11 @@ static void update_balloon_size_func(struct work_struct *work)
 static void misc_handle_rq(struct virtio_balloon *vb)
 {
 	struct virtqueue *vq;
-	struct scatterlist sg_out;
+	struct scatterlist sg_out, sg[2];
 	unsigned int len;
 	struct balloon_req_hdr *ptr_hdr;
 	struct scatterlist sg_in;
+	struct balloon_bmap_hdr hdr;
 
 	vq = vb->misc_vq;
 	ptr_hdr = virtqueue_get_buf(vq, &len);
@@ -531,6 +574,18 @@ static void misc_handle_rq(struct virtio_balloon *vb)
 		virtqueue_add_outbuf(vq, &sg_out, 1, vb, GFP_KERNEL);
 		sg_init_one(&sg_in, &vb->req_hdr, sizeof(vb->req_hdr));
 		virtqueue_add_inbuf(vq, &sg_in, 1, &vb->req_hdr, GFP_KERNEL);
+		break;
+	case BALLOON_GET_FREE_PAGES:
+		update_free_pages_stats(vb);
+		sg_init_table(sg, 2);
+
+		hdr.id = cpu_to_virtio32(vb->vdev, BALLOON_GET_FREE_PAGES);
+		hdr.page_shift = cpu_to_virtio32(vb->vdev, PAGE_SHIFT);
+		hdr.start_pfn = cpu_to_virtio64(vb->vdev, 0);
+		hdr.bmap_len = cpu_to_virtio64(vb->vdev, vb->free_bmap_len);
+		sg_set_buf(&sg[0], &hdr, sizeof(hdr));
+		sg_set_buf(&sg[1], vb->free_pages, vb->free_bmap_len);
+		virtqueue_add_outbuf(vq, &sg[0], 2, vb, GFP_KERNEL);
 		break;
 	default:
 		break;
@@ -689,6 +744,12 @@ static int virtballoon_probe(struct virtio_device *vdev)
 		err = -ENOMEM;
 		goto out;
 	}
+	vb->free_bmap_len = ALIGN(get_max_pfn(), BITS_PER_LONG) / BITS_PER_BYTE;
+	vb->free_pages = kzalloc(vb->free_bmap_len, GFP_KERNEL);
+	if (!vb->free_pages) {
+		err = -ENOMEM;
+		goto out;
+	}
 	mutex_init(&vb->balloon_lock);
 	init_waitqueue_head(&vb->acked);
 	vb->vdev = vdev;
@@ -750,6 +811,7 @@ static void virtballoon_remove(struct virtio_device *vdev)
 
 	remove_common(vb);
 	kfree(vb->page_bitmap);
+	kfree(vb->free_pages);
 	kfree(vb);
 }
 
