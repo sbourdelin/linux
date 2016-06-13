@@ -88,6 +88,7 @@ void setup_udp_tunnel_sock(struct net *net, struct socket *sock,
 enum udp_enc_offloads {
 	UDP_ENC_OFFLOAD_TYPE_VXLAN,	/* RFC 7348 */
 	UDP_ENC_OFFLOAD_TYPE_GENEVE,	/* draft-ietf-nvo3-geneve */
+	UDP_ENC_OFFLOAD_TYPE_VXLAN_GPE,	/* draft-ietf-nvo3-vxlan-gpe */
 };
 
 /* Notify network devices of offloadable types */
