@@ -2706,6 +2706,9 @@ static int do_brk(unsigned long addr, unsigned long len)
 out:
 	perf_event_mmap(vma);
 	mm->total_vm += len >> PAGE_SHIFT;
+
+	bump_rlimit(RLIMIT_AS, mm->total_vm << PAGE_SHIFT);
+
 	mm->data_vm += len >> PAGE_SHIFT;
 	if (flags & VM_LOCKED)
 		mm->locked_vm += (len >> PAGE_SHIFT);
@@ -2926,6 +2929,7 @@ bool may_expand_vm(struct mm_struct *mm, vm_flags_t flags, unsigned long npages)
 void vm_stat_account(struct mm_struct *mm, vm_flags_t flags, long npages)
 {
 	mm->total_vm += npages;
+	bump_rlimit(RLIMIT_AS, mm->total_vm << PAGE_SHIFT);
 
 	if (is_exec_mapping(flags))
 		mm->exec_vm += npages;
