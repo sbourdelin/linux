@@ -1,0 +1,44 @@
+
+Maxim MAX98504 class D mono speaker amplifier
+
+Required properties:
+
+ - compatible : "maxim,max98504"
+ - reg : should contain the I2C slave device address
+
+Optional properties:
+
+ - maxim,rx-path : indicates speaker source interface:
+    0 - PCM monomix output,
+    1 - Analog input,
+    2 - left PDM channel (CH0),
+    3 - right PDM channel (CH1)
+
+ - maxim,rx-channel-mask : a bitmask indicating active PCM Rx channels,
+   bits b7...b0 correspond to channels CH7...CH0
+
+ - maxim,tx-path : indicates the V/I sense (feedback) Tx data interface used:
+    0 - PCM, 1 - TDM
+
+ - maxim,tx-channel-mask : a bitmask indicating active PCM or PDM Tx channels,
+   bits b7...b0 correspond to channels CH7...CH0, for PCM are meaningful
+   channels CH7...CH0, for PDM only channels CH1, CH0
+
+ - maxim,tx-channel-source : a bitmask indicating V/I sense source type for
+   each PCM or PDM Tx channel; bits b7...b0 correspond to channels CH7...CH0,
+   for PCM are meaningful channels CH7...CH0, for PDM only channels CH1, CH0:
+    0 - selects voltage measurement data (V),
+    1 - selects current measurement data (I)
+
+If any of the above optional properties is missing its value defaults to 0.
+
+Example:
+
+ max98504: max98504@31 {
+	compatible = "maxim,max98504";
+	reg = <0x31>;
+	maxim,rx-path = <1>;		// Analog input
+	maxim,tx-path = <1>;		// V/I sense PDM Tx
+	maxim,tx-channel-mask = <3>;	// channels CH1, CH0
+	maxim,tx-channel-source = <2>;	// CH1 current, CH0 voltage
+};
