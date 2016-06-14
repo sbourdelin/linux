@@ -22,6 +22,7 @@
 #include <linux/pid_namespace.h>
 #include <net/net_namespace.h>
 #include <linux/ipc_namespace.h>
+#include <linux/perf_namespace.h>
 #include <linux/proc_ns.h>
 #include <linux/file.h>
 #include <linux/syscalls.h>
@@ -42,6 +43,9 @@ struct nsproxy init_nsproxy = {
 #endif
 #ifdef CONFIG_CGROUPS
 	.cgroup_ns		= &init_cgroup_ns,
+#endif
+#ifdef CONFIG_PERF_NS
+	.perf_ns		= &init_perf_ns,
 #endif
 };
 
@@ -103,6 +107,12 @@ static struct nsproxy *create_new_namespaces(unsigned long flags,
 		goto out_cgroup;
 	}
 
+	new_nsp->perf_ns = copy_perf_ns(flags, user_ns, tsk->nsproxy->perf_ns);
+	if (IS_ERR(new_nsp->perf_ns)) {
+		err = PTR_ERR(new_nsp->perf_ns);
+		goto out_perf;
+	}
+
 	new_nsp->net_ns = copy_net_ns(flags, user_ns, tsk->nsproxy->net_ns);
 	if (IS_ERR(new_nsp->net_ns)) {
 		err = PTR_ERR(new_nsp->net_ns);
@@ -113,6 +123,9 @@ static struct nsproxy *create_new_namespaces(unsigned long flags,
 
 out_net:
 	put_cgroup_ns(new_nsp->cgroup_ns);
+out_perf:
+	if (new_nsp->net_ns)
+		put_net(new_nsp->net_ns);
 out_cgroup:
 	if (new_nsp->pid_ns_for_children)
 		put_pid_ns(new_nsp->pid_ns_for_children);
@@ -142,7 +155,7 @@ int copy_namespaces(unsigned long flags, struct task_struct *tsk)
 
 	if (likely(!(flags & (CLONE_NEWNS | CLONE_NEWUTS | CLONE_NEWIPC |
 			      CLONE_NEWPID | CLONE_NEWNET |
-			      CLONE_NEWCGROUP)))) {
+			      CLONE_NEWCGROUP | CLONE_NEWPERF)))) {
 		get_nsproxy(old_ns);
 		return 0;
 	}
@@ -177,6 +190,8 @@ void free_nsproxy(struct nsproxy *ns)
 		put_uts_ns(ns->uts_ns);
 	if (ns->ipc_ns)
 		put_ipc_ns(ns->ipc_ns);
+	if (ns->perf_ns)
+		put_perf_ns(ns->perf_ns);
 	if (ns->pid_ns_for_children)
 		put_pid_ns(ns->pid_ns_for_children);
 	put_cgroup_ns(ns->cgroup_ns);
@@ -195,7 +210,8 @@ int unshare_nsproxy_namespaces(unsigned long unshare_flags,
 	int err = 0;
 
 	if (!(unshare_flags & (CLONE_NEWNS | CLONE_NEWUTS | CLONE_NEWIPC |
-			       CLONE_NEWNET | CLONE_NEWPID | CLONE_NEWCGROUP)))
+			       CLONE_NEWNET | CLONE_NEWPID |
+			       CLONE_NEWCGROUP | CLONE_NEWPERF)))
 		return 0;
 
 	user_ns = new_cred ? new_cred->user_ns : current_user_ns();

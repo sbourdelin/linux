@@ -1221,6 +1221,13 @@ config NET_NS
 	  Allow user space to create what appear to be multiple instances
 	  of the network stack.
 
+config PERF_NS
+	bool "Perf Namespaces"
+	default y if PERF_EVENTS
+	help
+	  Support perf namespaces. A namespace to provide isolated tracing
+	  support in context of this namespace.
+
 endif # NAMESPACES
 
 config SCHED_AUTOGROUP
