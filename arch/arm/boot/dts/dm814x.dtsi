@@ -25,6 +25,8 @@
 		usb1 = &usb1;
 		phy0 = &usb0_phy;
 		phy1 = &usb1_phy;
+		gpio0 = &gpio1;
+		gpio1 = &gpio2;
 	};
 
 	cpus {

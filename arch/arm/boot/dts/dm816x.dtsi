@@ -21,6 +21,8 @@
 		serial2 = &uart3;
 		ethernet0 = &eth0;
 		ethernet1 = &eth1;
+		gpio0 = &gpio1;
+		gpio1 = &gpio2;
 	};
 
 	cpus {

@@ -31,6 +31,12 @@
 		ethernet0 = &cpsw_emac0;
 		ethernet1 = &cpsw_emac1;
 		spi0 = &qspi;
+		gpio0 = &gpio0;
+		gpio1 = &gpio1;
+		gpio2 = &gpio2;
+		gpio3 = &gpio3;
+		gpio4 = &gpio4;
+		gpio5 = &gpio5;
 	};
 
 	cpus {

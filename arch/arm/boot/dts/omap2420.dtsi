@@ -13,6 +13,13 @@
 / {
 	compatible = "ti,omap2420", "ti,omap2";
 
+	aliases {
+		gpio0 = &gpio1;
+		gpio1 = &gpio2;
+		gpio2 = &gpio3;
+		gpio3 = &gpio4;
+	};
+
 	ocp {
 		l4: l4@48000000 {
 			compatible = "ti,omap2-l4", "simple-bus";

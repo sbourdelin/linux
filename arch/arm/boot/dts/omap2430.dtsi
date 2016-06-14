@@ -13,6 +13,14 @@
 / {
 	compatible = "ti,omap2430", "ti,omap2";
 
+	aliases {
+		gpio0 = &gpio1;
+		gpio1 = &gpio2;
+		gpio2 = &gpio3;
+		gpio3 = &gpio4;
+		gpio4 = &gpio5;
+	};
+
 	ocp {
 		l4_wkup: l4_wkup@49000000 {
 			compatible = "ti,omap2-l4-wkup", "simple-bus";
