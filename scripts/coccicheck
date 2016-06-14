@@ -5,6 +5,8 @@
 # version 1.0.0-rc11.
 #
 
+DIR=$(dirname $(readlink -f $0))
+DIR="${DIR}/../"
 SPATCH="`which ${SPATCH:=spatch}`"
 
 if [ ! -x "$SPATCH" ]; then
@@ -14,6 +16,80 @@ fi
 
 USE_JOBS="no"
 $SPATCH --help | grep "\-\-jobs" > /dev/null && USE_JOBS="yes"
+
+# Indexing USE_* optimizations heuristics.
+#
+# Linux runs on git (TM). However, if you have supplemental indexing options
+# you may use them to help Coccinelle further. If you are using Coccinelle
+# within a target git tree --use-gitrep will be used, and this should
+# suffice for most uses. If you however want optimal performance do
+# consider embracing a supplemental indexing as part of your development.
+# For instance glimpse, and idutils can be used, however you should
+# be sure to update the indexes as often as you update your git tree to
+# ensure your indexes are not stale.
+#
+# idutils is currently not as efficient as glimpse because the query language
+# for glimpse is simpler, so when idutils is used more filtering has to be
+# done at the ocaml level within Coccinelle. Glimpse allows queries that are
+# arbitrary formulas, up to a limited level of complexity, involving both
+# && and ||. For idutils, Coccinelle runs lid intersections on the result.
+#
+# You can override these heuristics with COCCI_INDEX="--use-gitgrep" for
+# example. This will force to use --use-gitgrep even if you have a glimpse
+# index. Other examples:
+#
+# $ export COCCI=scripts/coccinelle/misc/irqf_oneshot.cocci
+# $ make coccicheck V=1 MODE=report COCCI_INDEX="--use-coccigrep"
+# $ make coccicheck V=1 MODE=report COCCI_INDEX="--use-idutils ID"
+# $ make coccicheck V=1 MODE=report COCCI_INDEX="--use-glimpse"
+# $ make coccicheck V=1 MODE=report COCCI_INDEX="--use-gitgrep"
+#
+# The order of heuristics for indexing used by coccicheck is listed below.
+#
+# 0. Glimpse currently should outperform all indexing options. so if a glimpse
+#    index is used we use it. Refer to Linux scripts/glimpse.sh for details.
+#    If you think you should be getting better performance with glimpse than
+#    what you would expect inspect the stderr log file for cocciecheck:
+#
+#    ${DIR}/coccicheck.$$.err
+#
+#    If glimpse is running correctly there should be very few occurrences
+#    of "Skipping", also coccinelle will inform you if it could not use
+#    glimpse. As an example an output of the following would indicate glimpse
+#    was properly used on ${DIR}/coccicheck.$$.err :
+#
+#    There are matches to 1252 out of 47281 files
+#    glimpse request = request_threaded_irq
+#
+# 1. Use idutils next. You'll need to generate an index using either of these:
+#
+#	a) mkid -s
+#       By default this dumps the index into ./ID
+#
+#	b) mkid -i C --output .id-utils.index *
+#       This method is provided with coccinelle repo on
+#       scripts/idutils_index.sh
+#
+# 2. Next best is --use-gitgrep and if you are working within a git tree
+#    this will be used by default.
+#
+# 3. By default coccinelle internally uses --use-coccigrep if no indexing
+#    options are requested and your version of coccinelle supports it so we
+#    do not need to be specific about requesting that as a fallback mechanism.
+#    Use of --use-coccigrep is comparable to --use-gitgrep.
+#
+# XXX: Glimpse is not well maintained. See if we can add similar indexing
+# features and query language glimpse supports to git.
+if [ "$COCCI_INDEX" = "" ] ; then
+	USE_GLIMPSE="no"
+	$SPATCH --help | grep "\-\-use\-glimpse" > /dev/null && [ -f $DIR/.glimpse_index ] && USE_GLIMPSE="yes"
+
+	USE_IDUTILS="no"
+	$SPATCH --help | grep "\-\-use\-idutils" > /dev/null && [ -f $DIR/ID -o -f $DIR/.id-utils.index ] && USE_IDUTILS="yes"
+
+	USE_GITGREP="no"
+	$SPATCH --help | grep "\-\-use\-gitgrep" > /dev/null && [ -d $DIR/.git ] && USE_GITGREP="yes"
+fi
 
 # The verbosity may be set by the environmental parameter V=
 # as for example with 'make V=1 coccicheck'
@@ -87,6 +163,27 @@ if [ "$USE_JOBS" = "no" ]; then
 	declare -a SPATCH_PID
 else
 	OPTIONS="$OPTIONS --jobs $NPROC --chunksize 1"
+fi
+
+# Check COCCI_INDEX first to manual override, otherwise rely on
+# internal heuristics documented above.
+if [ "$COCCI_INDEX" != "" ] ; then
+	OPTIONS="$OPTIONS $COCCI_INDEX"
+elif [ "$USE_GLIMPSE" = "yes" ]; then
+	OPTIONS="$OPTIONS --use-glimpse"
+elif [ "$USE_IDUTILS" = "yes" ]; then
+	index=""
+	if [ -f $DIR/ID ]; then
+		index="$DIR/ID"
+	elif [ -f $DIR/.id-utils.index ]; then
+		index="$DIR/.id-utils.index"
+	else
+		echo "idutils index not found, expected: $DIR/ID or $DIR/.id-utils.index"
+		exit 1
+	fi
+	OPTIONS="$OPTIONS --use-idutils $index"
+elif [ "$USE_GITGREP" = "yes" ]; then
+	OPTIONS="$OPTIONS --use-gitgrep"
 fi
 
 run_cmd_parmap() {
