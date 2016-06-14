@@ -64,7 +64,7 @@ struct mtk_ddp_comp;
 
 struct mtk_ddp_comp_funcs {
 	void (*config)(struct mtk_ddp_comp *comp, unsigned int w,
-		       unsigned int h, unsigned int vrefresh);
+		       unsigned int h, unsigned int vrefresh, unsigned int bpc);
 	void (*start)(struct mtk_ddp_comp *comp);
 	void (*stop)(struct mtk_ddp_comp *comp);
 	void (*enable_vblank)(struct mtk_ddp_comp *comp, struct drm_crtc *crtc);
@@ -88,10 +88,10 @@ struct mtk_ddp_comp {
 
 static inline void mtk_ddp_comp_config(struct mtk_ddp_comp *comp,
 				       unsigned int w, unsigned int h,
-				       unsigned int vrefresh)
+				       unsigned int vrefresh, unsigned int bpc)
 {
 	if (comp->funcs && comp->funcs->config)
-		comp->funcs->config(comp, w, h, vrefresh);
+		comp->funcs->config(comp, w, h, vrefresh, bpc);
 }
 
 static inline void mtk_ddp_comp_start(struct mtk_ddp_comp *comp)
