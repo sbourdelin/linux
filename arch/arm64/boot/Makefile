@@ -14,6 +14,10 @@
 # Based on the ia64 boot/Makefile.
 #
 
+# Avoid potential boot-time problems with kcov instrumentation. We are mostly
+# interested in syscall coverage, so boot code is not interesting anyway.
+KCOV_INSTRUMENT		:= n
+
 targets := Image Image.gz
 
 $(obj)/Image: vmlinux FORCE
