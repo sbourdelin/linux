@@ -24,6 +24,7 @@
 #include "mtk_drm_drv.h"
 #include "mtk_drm_plane.h"
 #include "mtk_drm_ddp_comp.h"
+#include "mtk_drm_crtc.h"
 
 #define DISP_OD_EN				0x0000
 #define DISP_OD_INTEN				0x0008
@@ -37,6 +38,18 @@
 #define DISP_COLOR_START			0x0c00
 #define DISP_COLOR_WIDTH			0x0c50
 #define DISP_COLOR_HEIGHT			0x0c54
+
+#define DISP_AAL_EN				0x000
+#define DISP_AAL_SIZE				0x030
+
+#define DISP_GAMMA_CFG				0x020
+#define DISP_GAMMA_LUT				0x700
+
+#define LUT_10BIT_MASK				0x3ff
+
+#define AAL_EN			BIT(0)
+
+#define GAMMA_LUT_EN		BIT(1)
 
 #define	OD_RELAY_MODE		BIT(0)
 
@@ -76,6 +89,40 @@ static void mtk_ufoe_start(struct mtk_ddp_comp *comp)
 	writel(UFO_BYPASS, comp->regs + DISP_REG_UFO_START);
 }
 
+static void mtk_aal_config(struct mtk_ddp_comp *comp, unsigned int w,
+			   unsigned int h, unsigned int vrefresh)
+{
+	writel(h << 16 | w, comp->regs + DISP_AAL_SIZE);
+}
+
+static void mtk_aal_start(struct mtk_ddp_comp *comp)
+{
+	writel(AAL_EN, comp->regs  + DISP_AAL_EN);
+}
+
+static void mtk_aal_stop(struct mtk_ddp_comp *comp)
+{
+	writel_relaxed(0x0, comp->regs  + DISP_AAL_EN);
+}
+
+static void mtk_gamma_set(struct mtk_ddp_comp *comp, u16 *r, u16 *g,
+			  u16 *b, uint32_t start, uint32_t size)
+{
+	int i;
+	unsigned int lut;
+	int end = (start + size > MTK_LUT_SIZE) ? MTK_LUT_SIZE : start + size;
+	void __iomem *lut_base;
+
+	writel(GAMMA_LUT_EN, comp->regs + DISP_GAMMA_CFG);
+	lut_base = comp->regs + DISP_GAMMA_LUT;
+	for (i = start; i < end; i++) {
+		lut = (((r[i] >> 6) & LUT_10BIT_MASK) << 20) +
+			(((g[i] >> 6) & LUT_10BIT_MASK) << 10) +
+			((b[i] >> 6) & LUT_10BIT_MASK);
+		writel(lut, (lut_base + i * 4));
+	}
+}
+
 static const struct mtk_ddp_comp_funcs ddp_color = {
 	.config = mtk_color_config,
 	.start = mtk_color_start,
@@ -88,6 +135,13 @@ static const struct mtk_ddp_comp_funcs ddp_od = {
 
 static const struct mtk_ddp_comp_funcs ddp_ufoe = {
 	.start = mtk_ufoe_start,
+};
+
+static const struct mtk_ddp_comp_funcs ddp_aal = {
+	.gamma_set = mtk_gamma_set,
+	.config = mtk_aal_config,
+	.start = mtk_aal_start,
+	.stop = mtk_aal_stop,
 };
 
 static const char * const mtk_ddp_comp_stem[MTK_DDP_COMP_TYPE_MAX] = {
@@ -112,7 +166,7 @@ struct mtk_ddp_comp_match {
 };
 
 static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
-	[DDP_COMPONENT_AAL]	= { MTK_DISP_AAL,	0, NULL },
+	[DDP_COMPONENT_AAL]	= { MTK_DISP_AAL,	0, &ddp_aal },
 	[DDP_COMPONENT_COLOR0]	= { MTK_DISP_COLOR,	0, &ddp_color },
 	[DDP_COMPONENT_COLOR1]	= { MTK_DISP_COLOR,	1, &ddp_color },
 	[DDP_COMPONENT_DPI0]	= { MTK_DPI,		0, NULL },

@@ -127,6 +127,16 @@ static void mtk_drm_crtc_reset(struct drm_crtc *crtc)
 	state->base.crtc = crtc;
 }
 
+static void mtk_crtc_gamma_set(struct drm_crtc *crtc, u16 *r,
+			       u16 *g, u16 *b, uint32_t start, uint32_t size)
+{
+	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+	unsigned int i;
+
+	for (i = 0; i < mtk_crtc->ddp_comp_nr; i++)
+		mtk_ddp_gamma_set(mtk_crtc->ddp_comp[i], r, g, b, start, size);
+}
+
 static struct drm_crtc_state *mtk_drm_crtc_duplicate_state(struct drm_crtc *crtc)
 {
 	struct mtk_crtc_state *state;
@@ -418,6 +428,7 @@ static const struct drm_crtc_funcs mtk_crtc_funcs = {
 	.reset			= mtk_drm_crtc_reset,
 	.atomic_duplicate_state	= mtk_drm_crtc_duplicate_state,
 	.atomic_destroy_state	= mtk_drm_crtc_destroy_state,
+	.gamma_set		= mtk_crtc_gamma_set,
 };
 
 static const struct drm_crtc_helper_funcs mtk_crtc_helper_funcs = {
@@ -569,6 +580,7 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
 	if (ret < 0)
 		goto unprepare;
 
+	drm_mode_crtc_set_gamma_size(&mtk_crtc->base, MTK_LUT_SIZE);
 	priv->crtc[pipe] = &mtk_crtc->base;
 	priv->num_pipes++;
 

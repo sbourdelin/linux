@@ -73,6 +73,8 @@ struct mtk_ddp_comp_funcs {
 	void (*layer_off)(struct mtk_ddp_comp *comp, unsigned int idx);
 	void (*layer_config)(struct mtk_ddp_comp *comp, unsigned int idx,
 			     struct mtk_plane_state *state);
+	void (*gamma_set)(struct mtk_ddp_comp *comp, u16 *r, u16 *g, u16 *b,
+			  u32 start, u32 size);
 };
 
 struct mtk_ddp_comp {
@@ -137,6 +139,13 @@ static inline void mtk_ddp_comp_layer_config(struct mtk_ddp_comp *comp,
 {
 	if (comp->funcs && comp->funcs->layer_config)
 		comp->funcs->layer_config(comp, idx, state);
+}
+
+static inline void mtk_ddp_gamma_set(struct mtk_ddp_comp *comp, u16 *r, u16 *g,
+				     u16 *b, uint32_t start, uint32_t size)
+{
+	if (comp->funcs && comp->funcs->gamma_set)
+		comp->funcs->gamma_set(comp, r, g, b, start, size);
 }
 
 int mtk_ddp_comp_get_id(struct device_node *node,
