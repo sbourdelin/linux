@@ -25,6 +25,7 @@
 #include <linux/sched.h>
 #include <linux/ktime.h>
 #include <linux/mm.h>
+#include <linux/of_irq.h>
 #include <asm/dma.h>	/* isa_dma_bridge_buggy */
 #include "pci.h"
 
@@ -4419,3 +4420,31 @@ static void quirk_intel_qat_vf_cap(struct pci_dev *pdev)
 	}
 }
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443, quirk_intel_qat_vf_cap);
+
+/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
+ * but use standalone irq. Read the device tree for the aer
+ * interrupt number.
+ */
+static void quirk_aer_interrupt(struct pci_dev *dev)
+{
+	int ret;
+	u8 header_type;
+	struct device_node *np = NULL;
+
+	/* Only for the RC mode device */
+	pci_read_config_byte(dev, PCI_HEADER_TYPE, &header_type);
+	if ((header_type & 0x7F) != PCI_HEADER_TYPE_BRIDGE)
+		return;
+
+	if (dev->bus->dev.of_node)
+		np = dev->bus->dev.of_node;
+
+	if (IS_ENABLED(CONFIG_OF_IRQ) && np) {
+		ret = of_irq_get_byname(np, "aer");
+		if (ret > 0) {
+			dev->no_msi = 1;
+			dev->irq = ret;
+		}
+	}
+}
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID, quirk_aer_interrupt);
