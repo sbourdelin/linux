@@ -3668,6 +3668,25 @@ mv88e6xxx_smi_detect(struct device *dev, struct mii_bus *bus, int sw_addr,
 	return ps;
 }
 
+static struct mv88e6xxx_priv_state *
+mv88e6xxx_drv_detect(struct device *dev, struct mii_bus *bus, int sw_addr)
+{
+	struct mv88e6xxx_priv_state *ps = NULL;
+	const struct mv88e6xxx_info *info;
+	const struct of_device_id *id;
+
+	/* Iterate over compatible info to detect the chip */
+	for (id = &mv88e6xxx_of_id_table[0]; id && id->data; ++id) {
+		info = (const struct mv88e6xxx_info *)id->data;
+
+		ps = mv88e6xxx_smi_detect(dev, bus, sw_addr, info);
+		if (ps)
+			break;
+	}
+
+	return ps;
+}
+
 static const char *mv88e6xxx_drv_probe(struct device *dsa_dev,
 				       struct device *host_dev, int sw_addr,
 				       void **priv)
@@ -3680,7 +3699,7 @@ static const char *mv88e6xxx_drv_probe(struct device *dsa_dev,
 	if (!bus)
 		return NULL;
 
-	ps = mv88e6xxx_smi_detect(dsa_dev, bus, sw_addr, &mv88e6xxx_table[0]);
+	ps = mv88e6xxx_drv_detect(dsa_dev, bus, sw_addr);
 	if (!ps)
 		return NULL;
 
