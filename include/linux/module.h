@@ -182,6 +182,7 @@ void trim_init_extable(struct module *m);
  * The following license idents are currently accepted as indicating free
  * software modules
  *
+ *	"copyleft-next"			[copyleft-next 0.3.1 or later]
  *	"GPL"				[GNU Public License v2 or later]
  *	"GPL v2"			[GNU Public License v2]
  *	"GPL and additional rights"	[GNU Public License v2 rights and more]
