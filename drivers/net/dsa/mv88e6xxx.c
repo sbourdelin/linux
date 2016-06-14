@@ -52,7 +52,7 @@ static int mv88e6xxx_smi_direct_read(struct mii_bus *bus, int sw_addr,
 {
 	int ret;
 
-	ret = mdiobus_read_nested(bus, addr, reg);
+	ret = mdiobus_read_nested(bus, sw_addr + addr, reg);
 	if (ret < 0)
 		return ret;
 
@@ -66,7 +66,7 @@ static int mv88e6xxx_smi_direct_write(struct mii_bus *bus, int sw_addr,
 {
 	int ret;
 
-	ret = mdiobus_write_nested(bus, addr, reg, val);
+	ret = mdiobus_write_nested(bus, sw_addr + addr, reg, val);
 	if (ret < 0)
 		return ret;
 
@@ -3681,7 +3681,7 @@ mv88e6xxx_smi_detect(struct device *dev, struct mii_bus *bus, int sw_addr,
 	u16 id;
 
 	ops = &mv88e6xxx_smi_direct_ops;
-	if (sw_addr > 0)
+	if (sw_addr > 0 && info->flags & MV88E6XXX_FLAG_MULTI_CHIP)
 		ops = &mv88e6xxx_smi_indirect_ops;
 
 	if (ops->read(bus, sw_addr, info->port_base_addr, PORT_SWITCH_ID, &id))
