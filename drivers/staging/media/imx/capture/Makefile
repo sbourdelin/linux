@@ -3,3 +3,4 @@ imx-camera-objs := imx-camif.o imx-ic-prpenc.o imx-of.o \
 
 obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-camera.o
 obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-csi.o
+obj-$(CONFIG_IMX_MIPI_CSI2) += mipi-csi2.o
