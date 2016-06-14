@@ -3442,6 +3442,7 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.name = "Marvell 88E6085",
 		.num_databases = 4096,
 		.num_ports = 10,
+		.port_base_addr = 0x10,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6097,
 	},
 
@@ -3451,6 +3452,7 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.name = "Marvell 88E6095/88E6095F",
 		.num_databases = 256,
 		.num_ports = 11,
+		.port_base_addr = 0x10,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6095,
 	},
 
@@ -3460,6 +3462,7 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.name = "Marvell 88E6123",
 		.num_databases = 4096,
 		.num_ports = 3,
+		.port_base_addr = 0x10,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6165,
 	},
 
@@ -3469,6 +3472,7 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.name = "Marvell 88E6131",
 		.num_databases = 256,
 		.num_ports = 8,
+		.port_base_addr = 0x10,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6185,
 	},
 
@@ -3478,6 +3482,7 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.name = "Marvell 88E6161",
 		.num_databases = 4096,
 		.num_ports = 6,
+		.port_base_addr = 0x10,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6165,
 	},
 
@@ -3487,6 +3492,7 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.name = "Marvell 88E6165",
 		.num_databases = 4096,
 		.num_ports = 6,
+		.port_base_addr = 0x10,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6165,
 	},
 
@@ -3496,6 +3502,7 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.name = "Marvell 88E6171",
 		.num_databases = 4096,
 		.num_ports = 7,
+		.port_base_addr = 0x10,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6351,
 	},
 
@@ -3505,6 +3512,7 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.name = "Marvell 88E6172",
 		.num_databases = 4096,
 		.num_ports = 7,
+		.port_base_addr = 0x10,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6352,
 	},
 
@@ -3514,6 +3522,7 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.name = "Marvell 88E6175",
 		.num_databases = 4096,
 		.num_ports = 7,
+		.port_base_addr = 0x10,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6351,
 	},
 
@@ -3523,6 +3532,7 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.name = "Marvell 88E6176",
 		.num_databases = 4096,
 		.num_ports = 7,
+		.port_base_addr = 0x10,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6352,
 	},
 
@@ -3532,6 +3542,7 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.name = "Marvell 88E6185",
 		.num_databases = 256,
 		.num_ports = 10,
+		.port_base_addr = 0x10,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6185,
 	},
 
@@ -3541,6 +3552,7 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.name = "Marvell 88E6240",
 		.num_databases = 4096,
 		.num_ports = 7,
+		.port_base_addr = 0x10,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6352,
 	},
 
@@ -3550,6 +3562,7 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.name = "Marvell 88E6320",
 		.num_databases = 4096,
 		.num_ports = 7,
+		.port_base_addr = 0x10,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6320,
 	},
 
@@ -3559,6 +3572,7 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.name = "Marvell 88E6321",
 		.num_databases = 4096,
 		.num_ports = 7,
+		.port_base_addr = 0x10,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6320,
 	},
 
@@ -3568,6 +3582,7 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.name = "Marvell 88E6350",
 		.num_databases = 4096,
 		.num_ports = 7,
+		.port_base_addr = 0x10,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6351,
 	},
 
@@ -3577,6 +3592,7 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.name = "Marvell 88E6351",
 		.num_databases = 4096,
 		.num_ports = 7,
+		.port_base_addr = 0x10,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6351,
 	},
 
@@ -3586,6 +3602,7 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.name = "Marvell 88E6352",
 		.num_databases = 4096,
 		.num_ports = 7,
+		.port_base_addr = 0x10,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6352,
 	},
 };
