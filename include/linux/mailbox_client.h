@@ -48,4 +48,8 @@ void mbox_client_txdone(struct mbox_chan *chan, int r); /* atomic */
 bool mbox_client_peek_data(struct mbox_chan *chan); /* atomic */
 void mbox_free_channel(struct mbox_chan *chan); /* may sleep */
 
+/* Methods to interact with the PCC mailbox controller. */
+struct mbox_chan *pcc_mbox_request_channel(struct mbox_client *, int);
+void pcc_mbox_free_channel(struct mbox_chan *chan);
+
 #endif /* __MAILBOX_CLIENT_H */
