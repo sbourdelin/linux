@@ -80,7 +80,7 @@ static acpi_status find_csr_space(struct acpi_resource *resource, void *data)
 
 static acpi_status hp_crs_locate(acpi_handle obj, u64 *base, u64 *length)
 {
-	struct csr_space space = { 0, 0 };
+	struct csr_space space = { .base = 0, .length = 0 };
 
 	acpi_walk_resources(obj, METHOD_NAME__CRS, find_csr_space, &space);
 	if (!space.length)
