@@ -2404,6 +2404,10 @@ static inline bool debug_guardpage_enabled(void) { return false; }
 static inline bool page_is_guard(struct page *page) { return false; }
 #endif /* CONFIG_DEBUG_PAGEALLOC */
 
+#ifndef ARCH_HAS_NEEDS_SWAP_PTL
+static inline bool arch_needs_swap_ptl(void) { return false; }
+#endif
+
 #if MAX_NUMNODES > 1
 void __init setup_nr_node_ids(void);
 #else

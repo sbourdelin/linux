@@ -41,10 +41,17 @@ static inline void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
 	set_pte_at(mm, addr, ptep, pte);
 }
 
+extern void fix_pte_leak(struct mm_struct *mm, unsigned long addr,
+			 pte_t *ptep);
+
 static inline pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
 					    unsigned long addr, pte_t *ptep)
 {
-	return ptep_get_and_clear(mm, addr, ptep);
+	pte_t pte = ptep_get_and_clear(mm, addr, ptep);
+
+	if (boot_cpu_has_bug(X86_BUG_PTE_LEAK))
+		fix_pte_leak(mm, addr, ptep);
+	return pte;
 }
 
 static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
