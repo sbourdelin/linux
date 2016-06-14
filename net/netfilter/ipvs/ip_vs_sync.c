@@ -1539,7 +1539,9 @@ static struct socket *make_receive_sock(struct netns_ipvs *ipvs, int id, int ifi
 	}
 
 	/* it is equivalent to the REUSEADDR option in user-space */
+	lock_sock(sock->sk);
 	sock->sk->sk_reuse = SK_CAN_REUSE;
+	release_sock(sock->sk);
 	result = sysctl_sync_sock_size(ipvs);
 	if (result > 0)
 		set_sock_size(sock->sk, 0, result);
