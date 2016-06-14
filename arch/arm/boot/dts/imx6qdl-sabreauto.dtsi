@@ -129,6 +129,9 @@
 				reg = <0x30>;
 				gpio-controller;
 				#gpio-cells = <2>;
+				pinctrl-names = "default";	
+				pinctrl-0 = <&pinctrl_max7310>;
+				reset-gpios = <&gpio1 15 1>;
 			};
 
 			max7310_b: gpio@32 {
@@ -136,6 +139,9 @@
 				reg = <0x32>;
 				gpio-controller;
 				#gpio-cells = <2>;
+				pinctrl-names = "default";	
+				pinctrl-0 = <&pinctrl_max7310>;
+				reset-gpios = <&gpio1 15 1>;
 			};
 
 			max7310_c: gpio@34 {
@@ -143,6 +149,9 @@
 				reg = <0x34>;
 				gpio-controller;
 				#gpio-cells = <2>;
+				pinctrl-names = "default";	
+				pinctrl-0 = <&pinctrl_max7310>;
+				reset-gpios = <&gpio1 15 1>;
 			};
 		};
 	};
@@ -438,6 +447,12 @@
 		pinctrl_i2c3mux: i2c3muxgrp {
 			fsl,pins = <
 				MX6QDL_PAD_EIM_A24__GPIO5_IO04 0x80000000
+			>;
+		};
+
+		pinctrl_max7310: max7310grp {
+			fsl,pins = <
+				MX6QDL_PAD_SD2_DAT0__GPIO1_IO15 0x80000000
 			>;
 		};
 
