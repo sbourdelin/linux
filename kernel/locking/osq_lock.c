@@ -115,7 +115,7 @@ bool osq_lock(struct optimistic_spin_queue *lock)
 	 * cmpxchg in an attempt to undo our queueing.
 	 */
 
-	while (!READ_ONCE(node->locked)) {
+	while (!smp_load_acquire(&node->locked)) {
 		/*
 		 * If we need to reschedule bail... so we can block.
 		 */
@@ -198,7 +198,7 @@ void osq_unlock(struct optimistic_spin_queue *lock)
 	 * Second most likely case.
 	 */
 	node = this_cpu_ptr(&osq_node);
-	next = xchg(&node->next, NULL);
+	next = xchg_release(&node->next, NULL);
 	if (next) {
 		WRITE_ONCE(next->locked, 1);
 		return;
