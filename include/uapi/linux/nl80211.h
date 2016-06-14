@@ -1819,6 +1819,15 @@ enum nl80211_commands {
  *
  * @NL80211_ATTR_PAD: attribute used for padding for 64-bit alignment
  *
+ * @NL80211_ATTR_STA_TX_POWER_SETTING: Transmit power setting type (u32) for
+ *	station associated with the AP. See &enum nl80211_tx_power_setting for
+ *	possible values.
+ * @NL80211_ATTR_STA_TX_POWER: Transmit power level (u32) in mBm units. This
+ *	allows to set Tx power for a station. If this attribute is not included,
+ *	the default per-interface tx power setting will be overriding. Driver
+ *	should be picking up the lowest tx power, either tx power per-interface
+ *	or per-station.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2200,6 +2209,9 @@ enum nl80211_attrs {
 	NL80211_ATTR_STA_SUPPORT_P2P_PS,
 
 	NL80211_ATTR_PAD,
+
+	NL80211_ATTR_STA_TX_POWER_SETTING,
+	NL80211_ATTR_STA_TX_POWER,
 
 	/* add attributes here, update the policy in nl80211.c */
 

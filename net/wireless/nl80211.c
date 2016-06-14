@@ -257,6 +257,8 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 	[NL80211_ATTR_STA_SUPPORTED_RATES] = { .type = NLA_BINARY,
 					       .len = NL80211_MAX_SUPP_RATES },
 	[NL80211_ATTR_STA_PLINK_ACTION] = { .type = NLA_U8 },
+	[NL80211_ATTR_STA_TX_POWER_SETTING] = { .type = NLA_U32 },
+	[NL80211_ATTR_STA_TX_POWER] = { .type = NLA_U32 },
 	[NL80211_ATTR_STA_VLAN] = { .type = NLA_U32 },
 	[NL80211_ATTR_MNTR_FLAGS] = { /* NLA_NESTED can't be empty */ },
 	[NL80211_ATTR_MESH_ID] = { .type = NLA_BINARY,
@@ -4380,6 +4382,32 @@ static int nl80211_set_station(struct sk_buff *skb, struct genl_info *info)
 		params.local_pm = pm;
 	}
 
+	if (info->attrs[NL80211_ATTR_STA_TX_POWER_SETTING]) {
+		enum nl80211_tx_power_setting type;
+		int idx;
+
+		if (!rdev->ops->set_tx_power)
+			return -EOPNOTSUPP;
+
+		idx = NL80211_ATTR_STA_TX_POWER_SETTING;
+		type = nla_get_u32(info->attrs[idx]);
+
+		if (!info->attrs[NL80211_ATTR_STA_TX_POWER] &&
+		    (type != NL80211_TX_POWER_AUTOMATIC))
+			return -EINVAL;
+
+		if (type != NL80211_TX_POWER_AUTOMATIC) {
+			if (type == NL80211_TX_POWER_LIMITED) {
+				idx = NL80211_ATTR_STA_TX_POWER;
+				params.txpwr = nla_get_u32(info->attrs[idx]);
+			} else {
+				return -EINVAL;
+			}
+		} else {
+			params.txpwr = 0;
+		}
+	}
+
 	/* Include parameters for TDLS peer (will check later) */
 	err = nl80211_set_station_tdls(info, &params);
 	if (err)
@@ -4505,6 +4533,32 @@ static int nl80211_new_station(struct sk_buff *skb, struct genl_info *info)
 			nla_get_u8(info->attrs[NL80211_ATTR_STA_PLINK_ACTION]);
 		if (params.plink_action >= NUM_NL80211_PLINK_ACTIONS)
 			return -EINVAL;
+	}
+
+	if (info->attrs[NL80211_ATTR_STA_TX_POWER_SETTING]) {
+		enum nl80211_tx_power_setting type;
+		int idx;
+
+		if (!rdev->ops->set_tx_power)
+			return -EOPNOTSUPP;
+
+		idx = NL80211_ATTR_STA_TX_POWER_SETTING;
+		type = nla_get_u32(info->attrs[idx]);
+
+		if (!info->attrs[NL80211_ATTR_STA_TX_POWER] &&
+		    (type != NL80211_TX_POWER_AUTOMATIC))
+			return -EINVAL;
+
+		if (type != NL80211_TX_POWER_AUTOMATIC) {
+			if (type == NL80211_TX_POWER_LIMITED) {
+				idx = NL80211_ATTR_STA_TX_POWER;
+				params.txpwr = nla_get_u32(info->attrs[idx]);
+			} else {
+				return -EINVAL;
+			}
+		} else {
+			params.txpwr = 0;
+		}
 	}
 
 	err = nl80211_parse_sta_channel_info(info, &params);

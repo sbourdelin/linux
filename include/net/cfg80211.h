@@ -797,6 +797,10 @@ enum station_parameters_apply_mask {
  * @opmode_notif: operating mode field from Operating Mode Notification
  * @opmode_notif_used: information if operating mode field is used
  * @support_p2p_ps: information if station supports P2P PS mechanism
+ * @txpwr: tx power (in mBm) to be used for sending data traffic. If tx power
+ *	is not provided, the default per-interface tx power setting will be
+ *	overriding. Driver should be picking up the lowest tx power, either tx
+ *	power per-interface or per-station.
  */
 struct station_parameters {
 	const u8 *supported_rates;
@@ -823,6 +827,7 @@ struct station_parameters {
 	u8 opmode_notif;
 	bool opmode_notif_used;
 	int support_p2p_ps;
+	unsigned int txpwr;
 };
 
 /**
