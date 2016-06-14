@@ -542,6 +542,13 @@ struct mv88e6xxx_vtu_stu_entry {
 	u8	data[DSA_MAX_PORTS];
 };
 
+struct mv88e6xxx_smi_ops {
+	int (*read)(struct mii_bus *bus, int sw_addr,
+		    int addr, int reg, u16 *val);
+	int (*write)(struct mii_bus *bus, int sw_addr,
+		     int addr, int reg, u16 val);
+};
+
 struct mv88e6xxx_priv_port {
 	struct net_device *bridge_dev;
 };
@@ -554,6 +561,8 @@ struct mv88e6xxx_priv_state {
 
 	/* The device this structure is associated to */
 	struct device *dev;
+
+	const struct mv88e6xxx_smi_ops *smi_ops;
 
 	/* When using multi-chip addressing, this mutex protects
 	 * access to the indirect access registers.  (In single-chip
