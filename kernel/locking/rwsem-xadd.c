@@ -85,6 +85,7 @@ void __init_rwsem(struct rw_semaphore *sem, const char *name,
 	INIT_LIST_HEAD(&sem->wait_list);
 #ifdef CONFIG_RWSEM_SPIN_ON_OWNER
 	sem->owner = NULL;
+	sem->rspin_enabled = RWSEM_RSPIN_ENABLED_DEFAULT;
 	osq_lock_init(&sem->osq);
 #endif
 }
@@ -347,9 +348,10 @@ static inline bool rwsem_can_spin_on_owner(struct rw_semaphore *sem)
 	owner = READ_ONCE(sem->owner);
 	if (!rwsem_owner_is_writer(owner)) {
 		/*
-		 * Don't spin if the rwsem is readers owned.
+		 * Don't spin if the rwsem is readers owned and the
+		 * reader spinning threshold isn't set.
 		 */
-		ret = !rwsem_owner_is_reader(owner);
+		ret = !rwsem_owner_is_reader(owner) || sem->rspin_enabled;
 		goto done;
 	}
 
@@ -398,7 +400,8 @@ out:
 
 static bool rwsem_optimistic_spin(struct rw_semaphore *sem)
 {
-	bool taken = false;
+	bool taken = false, can_spin;
+	int loopcnt;
 
 	preempt_disable();
 
@@ -409,6 +412,8 @@ static bool rwsem_optimistic_spin(struct rw_semaphore *sem)
 	if (!osq_lock(&sem->osq))
 		goto done;
 
+	loopcnt = sem->rspin_enabled ? RWSEM_RSPIN_THRESHOLD : 0;
+
 	/*
 	 * Optimistically spin on the owner field and attempt to acquire the
 	 * lock whenever the owner changes. Spinning will be stopped when:
@@ -416,7 +421,7 @@ static bool rwsem_optimistic_spin(struct rw_semaphore *sem)
 	 *  2) readers own the lock as we can't determine if they are
 	 *     actively running or not.
 	 */
-	while (rwsem_spin_on_owner(sem)) {
+	while ((can_spin = rwsem_spin_on_owner(sem)) || loopcnt) {
 		/*
 		 * Try to acquire the lock
 		 */
@@ -425,13 +430,16 @@ static bool rwsem_optimistic_spin(struct rw_semaphore *sem)
 			break;
 		}
 
+		if (!can_spin && loopcnt)
+			loopcnt--;
+
 		/*
-		 * When there's no owner, we might have preempted between the
-		 * owner acquiring the lock and setting the owner field. If
-		 * we're an RT task that will live-lock because we won't let
-		 * the owner complete.
+		 * The need_resched() check in rwsem_spin_on_owner() won't
+		 * break the loop anymore. So we need to check this in
+		 * the outer loop. If we're an RT task that will live-lock
+		 * because we won't let the owner complete.
 		 */
-		if (!sem->owner && (need_resched() || rt_task(current)))
+		if (need_resched() || rt_task(current))
 			break;
 
 		/*
@@ -441,6 +449,22 @@ static bool rwsem_optimistic_spin(struct rw_semaphore *sem)
 		 * values at the cost of a few extra spins.
 		 */
 		cpu_relax_lowlatency();
+	}
+	/*
+	 * Was owner a reader?
+	 */
+	if (rwsem_owner_is_reader(sem->owner)) {
+		/*
+		 * Update rspin_enabled for reader spinning
+		 * Increment by 1 if successfully & decrement by 8 if
+		 * unsuccessful. The decrement amount is kind of arbitrary
+		 * and can be adjusted if necessary.
+		 */
+		if (taken && (sem->rspin_enabled < RWSEM_RSPIN_ENABLED_MAX))
+			sem->rspin_enabled++;
+		else if (!taken)
+			sem->rspin_enabled = (sem->rspin_enabled >= 8)
+					   ? sem->rspin_enabled - 8 : 0;
 	}
 	osq_unlock(&sem->osq);
 done:
@@ -456,6 +480,13 @@ static inline bool rwsem_has_spinner(struct rw_semaphore *sem)
 	return osq_is_locked(&sem->osq);
 }
 
+/*
+ * Return true if reader optimistic spinning is enabled
+ */
+static inline bool reader_spinning_enabled(struct rw_semaphore *sem)
+{
+	return sem->rspin_enabled;
+}
 #else
 static bool rwsem_optimistic_spin(struct rw_semaphore *sem)
 {
@@ -463,6 +494,11 @@ static bool rwsem_optimistic_spin(struct rw_semaphore *sem)
 }
 
 static inline bool rwsem_has_spinner(struct rw_semaphore *sem)
+{
+	return false;
+}
+
+static inline bool reader_spinning_enabled(struct rw_semaphore *sem)
 {
 	return false;
 }
