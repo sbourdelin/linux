@@ -21,6 +21,7 @@
 #include <linux/list.h>
 #include <linux/mdio.h>
 #include <linux/module.h>
+#include <linux/of_device.h>
 #include <linux/of_mdio.h>
 #include <linux/netdevice.h>
 #include <linux/gpio/consumer.h>
@@ -3745,6 +3746,8 @@ static int mv88e6xxx_probe(struct mdio_device *mdiodev)
 {
 	struct device *dev = &mdiodev->dev;
 	struct device_node *np = dev->of_node;
+	const struct of_device_id *of_id;
+	const struct mv88e6xxx_info *info;
 	struct mv88e6xxx_priv_state *ps;
 	int id, prod_num, rev;
 	u32 eeprom_len;
@@ -3759,7 +3762,13 @@ static int mv88e6xxx_probe(struct mdio_device *mdiodev)
 	ps->sw_addr = mdiodev->addr;
 	mutex_init(&ps->smi_mutex);
 
-	id = mv88e6xxx_reg_read(ps, REG_PORT(0), PORT_SWITCH_ID);
+	of_id = of_match_node(mv88e6xxx_of_id_table, np);
+	if (!of_id)
+		return -EINVAL;
+
+	info = (const struct mv88e6xxx_info *)of_id->data;
+
+	id = mv88e6xxx_reg_read(ps, info->port_base_addr, PORT_SWITCH_ID);
 	if (id < 0)
 		return id;
 
