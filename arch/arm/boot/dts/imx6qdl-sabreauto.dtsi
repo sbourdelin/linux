@@ -184,6 +184,12 @@
 			enable = <1>;
 		};
 	};
+
+	ipum2m0: ipum2m@ipu1 {
+		compatible = "fsl,imx-video-mem2mem";
+		ipu = <&ipu1>;
+		status = "okay";
+	};
 };
 
 &ipu1_csi0_from_ipu1_csi0_mux {

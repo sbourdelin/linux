@@ -18,7 +18,14 @@
 / {
 	model = "Freescale i.MX6 Quad SABRE Automotive Board";
 	compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
+
+	ipum2m1: ipum2m@ipu2 {
+		compatible = "fsl,imx-video-mem2mem";
+		ipu = <&ipu2>;
+		status = "okay";
+	};
 };
+
 
 &sata {
 	status = "okay";

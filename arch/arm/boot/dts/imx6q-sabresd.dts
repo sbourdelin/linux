@@ -18,6 +18,12 @@
 / {
 	model = "Freescale i.MX6 Quad SABRE Smart Device Board";
 	compatible = "fsl,imx6q-sabresd", "fsl,imx6q";
+
+	ipum2m1: ipum2m@ipu2 {
+		compatible = "fsl,imx-video-mem2mem";
+		ipu = <&ipu2>;
+		status = "okay";
+	};
 };
 
 &sata {

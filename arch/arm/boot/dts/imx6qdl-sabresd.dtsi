@@ -168,6 +168,12 @@
 		ports = <&ipu1_csi1>;
 		status = "okay";
 	};
+
+	ipum2m0: ipum2m@ipu1 {
+		compatible = "fsl,imx-video-mem2mem";
+		ipu = <&ipu1>;
+		status = "okay";
+	};
 };
 
 #ifdef __ENABLE_OV5642__
