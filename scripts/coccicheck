@@ -1,9 +1,14 @@
 #!/bin/bash
-
+# Linux kernel coccicheck
+#
+# For more detailed documentation refer to:
+#
+# https://bottest.wiki.kernel.org/coccicheck
+#
+# This documentation always refers to the linux-next version of the script.
 #
 # This script requires at least spatch
 # version 1.0.0-rc11.
-#
 
 DIR=$(dirname $(readlink -f $0))
 DIR="${DIR}/../"
