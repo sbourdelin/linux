@@ -229,7 +229,7 @@ static inline unsigned long hpte_encode_avpn(unsigned long vpn, int psize,
 	 */
 	v = (vpn >> (23 - VPN_SHIFT)) & ~(mmu_psize_defs[psize].avpnm);
 	v <<= HPTE_V_AVPN_SHIFT;
-	if (!cpu_has_feature(CPU_FTR_ARCH_300))
+	if (!mmu_has_feature(MMU_FTR_ISA3_HPTE_FORMAT))
 		v |= ((unsigned long) ssize) << HPTE_V_SSIZE_SHIFT;
 	return v;
 }
@@ -256,8 +256,7 @@ static inline unsigned long hpte_encode_v(unsigned long vpn, int base_psize,
 static inline unsigned long hpte_encode_r(unsigned long pa, int base_psize,
 					  int actual_psize, int ssize)
 {
-
-	if (cpu_has_feature(CPU_FTR_ARCH_300))
+	if (mmu_has_feature(MMU_FTR_ISA3_HPTE_FORMAT))
 		pa |= ((unsigned long) ssize) << HPTE_R_3_0_SSIZE_SHIFT;
 
 	/* A 4K page needs no special encoding */
