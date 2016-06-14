@@ -106,7 +106,26 @@ else
 	NPROC="$J"
 fi
 
-FLAGS="$SPFLAGS --very-quiet"
+# You can use SPFLAGS to append extra arguments to coccicheck.
+# A good example is if you want to debug your cocci script, you can
+# for instance use the following:
+#
+# $ export COCCI=scripts/coccinelle/misc/irqf_oneshot.cocci
+# $ time make coccicheck MODE=report SPFLAGS="--profile --show-trying" M=./drivers/mfd/arizona-irq.c
+#
+# "--show-trying" should show you what rule is being processed as it goes, if
+# you have issues with a rule getting stuck you can then inspect the file:
+#
+# ${DIR}/coccicheck.$$.err
+#
+# which will have the profile output.
+#
+# --profile will not output if --very-quiet is used, so avoid it.
+if [[ $SPFLAGS  == *"--profile"* ]]; then
+	FLAGS="$SPFLAGS"
+else
+	FLAGS="$SPFLAGS --very-quiet"
+fi
 
 # spatch only allows include directories with the syntax "-I include"
 # while gcc also allows "-Iinclude" and "-include include"
