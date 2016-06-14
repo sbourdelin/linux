@@ -12,8 +12,8 @@ if [ ! -x "$SPATCH" ]; then
     exit 1
 fi
 
-trap kill_running SIGTERM SIGINT
-declare -a SPATCH_PID
+USE_JOBS="no"
+$SPATCH --help | grep "\-\-jobs" > /dev/null && USE_JOBS="yes"
 
 # The verbosity may be set by the environmental parameter V=
 # as for example with 'make V=1 coccicheck'
@@ -82,7 +82,21 @@ if [ "$ONLINE" = "0" ] ; then
     echo ''
 fi
 
-run_cmd() {
+if [ "$USE_JOBS" = "no" ]; then
+	trap kill_running SIGTERM SIGINT
+	declare -a SPATCH_PID
+else
+	OPTIONS="$OPTIONS --jobs $NPROC --chunksize 1"
+fi
+
+run_cmd_parmap() {
+	if [ $VERBOSE -ne 0 ] ; then
+		echo "Running ($NPROC in parallel): $@"
+	fi
+	$@ 2> ${DIR}/coccicheck.$$.err
+}
+
+run_cmd_old() {
 	local i
 	if [ $VERBOSE -ne 0 ] ; then
 		echo "Running ($NPROC in parallel): $@"
@@ -95,6 +109,14 @@ run_cmd() {
 		fi
 	done
 	wait
+}
+
+run_cmd() {
+	if [ "$USE_JOBS" = "yes" ]; then
+		run_cmd_parmap $@
+	else
+		run_cmd_old $@
+	fi
 }
 
 kill_running() {
