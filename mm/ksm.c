@@ -1094,6 +1094,21 @@ static struct page *try_to_merge_two_pages(struct rmap_item *rmap_item,
 {
 	int err;
 
+	/*
+	 * select more mapcount page as kpage
+	 */
+	if (page_mapcount(page) < page_mapcount(tree_page)) {
+		struct page *tmp_page;
+		struct rmap_item *tmp_rmap_item;
+
+		tmp_page = page;
+		page = tree_page;
+		tree_page = tmp_page;
+		tmp_rmap_item = rmap_item;
+		rmap_item = tree_rmap_item;
+		tree_rmap_item = tmp_rmap_item;
+	}
+
 	err = try_to_merge_with_ksm_page(rmap_item, page, NULL);
 	if (!err) {
 		err = try_to_merge_with_ksm_page(tree_rmap_item,
