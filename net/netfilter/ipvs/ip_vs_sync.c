@@ -1670,8 +1670,17 @@ static int sync_thread_master(void *data)
 	struct ip_vs_sync_buff *sb;
 
 	pr_info("sync thread started: state = MASTER, mcast_ifn = %s, "
-		"syncid = %d, id = %d\n",
-		ipvs->mcfg.mcast_ifn, ipvs->mcfg.syncid, tinfo->id);
+			"syncid = %d, id = %d, maxlen = %d\n",
+			ipvs->mcfg.mcast_ifn, ipvs->mcfg.syncid,
+			tinfo->id, ipvs->mcfg.sync_maxlen);
+	if (ipvs->mcfg.mcast_af == AF_INET)
+		pr_info("                   : group = %pI4, port = %d, ttl = %d\n",
+			&ipvs->mcfg.mcast_group.in, ipvs->mcfg.mcast_port,
+			ipvs->mcfg.mcast_ttl);
+	else
+		pr_info("                   : group = %pI6c, port = %d, ttl = %d\n",
+			&ipvs->mcfg.mcast_group.in6, ipvs->mcfg.mcast_port,
+			ipvs->mcfg.mcast_ttl);
 
 	for (;;) {
 		sb = next_sync_buff(ipvs, ms);
@@ -1724,8 +1733,17 @@ static int sync_thread_backup(void *data)
 	int len;
 
 	pr_info("sync thread started: state = BACKUP, mcast_ifn = %s, "
-		"syncid = %d, id = %d\n",
-		ipvs->bcfg.mcast_ifn, ipvs->bcfg.syncid, tinfo->id);
+			"syncid = %d, id = %d, maxlen = %d\n",
+			ipvs->bcfg.mcast_ifn, ipvs->bcfg.syncid,
+			tinfo->id, ipvs->bcfg.sync_maxlen);
+	if (ipvs->bcfg.mcast_af == AF_INET)
+		pr_info("                   : group = %pI4, port = %d, ttl = %d\n",
+			&ipvs->bcfg.mcast_group.in, ipvs->bcfg.mcast_port,
+			ipvs->bcfg.mcast_ttl);
+	else
+		pr_info("                   : group = %pI6c, port = %d, ttl = %d\n",
+			&ipvs->bcfg.mcast_group.in6, ipvs->bcfg.mcast_port,
+			ipvs->bcfg.mcast_ttl);
 
 	while (!kthread_should_stop()) {
 		wait_event_interruptible(*sk_sleep(tinfo->sock->sk),
