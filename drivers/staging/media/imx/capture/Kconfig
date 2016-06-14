@@ -32,4 +32,11 @@ config IMX_CAMERA_OV5640_MIPI
        ---help---
          MIPI CSI-2 OV5640 Camera support.
 
+config IMX_CAMERA_ADV7180
+       tristate "Analog Devices ADV7180 Video Decoder support"
+       depends on VIDEO_IMX_CAMERA
+       default y
+       ---help---
+         Analog Devices ADV7180 Video Decoder support.
+
 endmenu

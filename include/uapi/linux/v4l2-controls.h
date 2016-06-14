@@ -184,6 +184,10 @@ enum v4l2_colorfx {
  * We reserve 16 controls for this driver. */
 #define V4L2_CID_USER_IMX_BASE			(V4L2_CID_USER_BASE + 0x1090)
 
+/* The base for the ADV718x sensor controls.
+ * We reserve 32 controls for this driver. */
+#define V4L2_CID_USER_ADV718X_BASE		(V4L2_CID_USER_BASE + 0x10a0)
+
 /* MPEG-class control IDs */
 /* The MPEG controls are applicable to all codec controls
  * and the 'MPEG' part of the define is historical */

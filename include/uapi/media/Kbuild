@@ -1,2 +1,3 @@
 # UAPI Header export list
 header-y += imx.h
+header-y += adv718x.h
