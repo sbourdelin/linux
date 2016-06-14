@@ -358,7 +358,7 @@ int ks_wlan_read_config_file(struct ks_wlan_private *priv)
 					break;
 				wk_p++;
 				for (j = 0; *wk_p != '"'; j++) {
-					if (wk_p == '\0') {
+					if (*wk_p == '\0') {
 						break;
 					}
 					priv->reg.ssid.body[j] = *wk_p++;
@@ -443,7 +443,7 @@ int ks_wlan_read_config_file(struct ks_wlan_private *priv)
 					break;
 				wk_p++;
 				for (j = 0; *wk_p != '"'; j++) {
-					if (wk_p == '\0') {
+					if (*wk_p == '\0') {
 						break;
 					}
 					priv->reg.rom_file[j] = *wk_p++;
