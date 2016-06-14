@@ -18,15 +18,16 @@
  */
 #ifdef CONFIG_64BIT
 # define RWSEM_ACTIVE_MASK		0xffffffffL
+# define RWSEM_WAITING_BIAS		(-(1L << 62))
 #else
 # define RWSEM_ACTIVE_MASK		0x0000ffffL
+# define RWSEM_WAITING_BIAS		(-(1L << 30))
 #endif
 
 #define RWSEM_UNLOCKED_VALUE		0x00000000L
 #define RWSEM_ACTIVE_BIAS		0x00000001L
-#define RWSEM_WAITING_BIAS		(-RWSEM_ACTIVE_MASK-1)
 #define RWSEM_ACTIVE_READ_BIAS		RWSEM_ACTIVE_BIAS
-#define RWSEM_ACTIVE_WRITE_BIAS		(RWSEM_WAITING_BIAS + RWSEM_ACTIVE_BIAS)
+#define RWSEM_ACTIVE_WRITE_BIAS		(-RWSEM_ACTIVE_MASK)
 
 /*
  * lock for reading
@@ -120,8 +121,8 @@ static inline void __downgrade_write(struct rw_semaphore *sem)
 	 * read-locked region is ok to be re-ordered into the
 	 * write side. As such, rely on RELEASE semantics.
 	 */
-	tmp = atomic_long_add_return_release(-RWSEM_WAITING_BIAS,
-				     (atomic_long_t *)&sem->count);
+	tmp = atomic_long_add_return_release(-RWSEM_ACTIVE_WRITE_BIAS +
+			RWSEM_ACTIVE_READ_BIAS, (atomic_long_t *)&sem->count);
 	if (tmp < 0)
 		rwsem_downgrade_wake(sem);
 }

@@ -30,9 +30,9 @@
 #define RWSEM_UNLOCKED_VALUE		__IA64_UL_CONST(0x0000000000000000)
 #define RWSEM_ACTIVE_BIAS		(1L)
 #define RWSEM_ACTIVE_MASK		(0xffffffffL)
-#define RWSEM_WAITING_BIAS		(-0x100000000L)
+#define RWSEM_WAITING_BIAS		(-(1L << 62))
 #define RWSEM_ACTIVE_READ_BIAS		RWSEM_ACTIVE_BIAS
-#define RWSEM_ACTIVE_WRITE_BIAS		(RWSEM_WAITING_BIAS + RWSEM_ACTIVE_BIAS)
+#define RWSEM_ACTIVE_WRITE_BIAS		(-RWSEM_ACTIVE_MASK)
 
 /*
  * lock for reading
@@ -144,7 +144,7 @@ __downgrade_write (struct rw_semaphore *sem)
 
 	do {
 		old = atomic_long_read(&sem->count);
-		new = old - RWSEM_WAITING_BIAS;
+		new = old - RWSEM_ACTIVE_WRITE_BIAS + RWSEM_ACTIVE_READ_BIAS;
 	} while (atomic_long_cmpxchg_release(&sem->count, old, new) != old);
 
 	if (old < 0)

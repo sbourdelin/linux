@@ -42,9 +42,9 @@
 #define RWSEM_UNLOCKED_VALUE	0x0000000000000000L
 #define RWSEM_ACTIVE_BIAS	0x0000000000000001L
 #define RWSEM_ACTIVE_MASK	0x00000000ffffffffL
-#define RWSEM_WAITING_BIAS	(-0x0000000100000000L)
+#define RWSEM_WAITING_BIAS	0xc000000000000000L
 #define RWSEM_ACTIVE_READ_BIAS	RWSEM_ACTIVE_BIAS
-#define RWSEM_ACTIVE_WRITE_BIAS	(RWSEM_WAITING_BIAS + RWSEM_ACTIVE_BIAS)
+#define RWSEM_ACTIVE_WRITE_BIAS	(-RWSEM_ACTIVE_MASK)
 
 /*
  * lock for reading
@@ -193,7 +193,7 @@ static inline void __downgrade_write(struct rw_semaphore *sem)
 {
 	signed long old, new, tmp;
 
-	tmp = -RWSEM_WAITING_BIAS;
+	tmp = -RWSEM_ACTIVE_WRITE_BIAS + RWSEM_ACTIVE_READ_BIAS;
 	asm volatile(
 		"	lg	%0,%2\n"
 		"0:	lgr	%1,%0\n"
