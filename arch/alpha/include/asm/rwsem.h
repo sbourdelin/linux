@@ -17,9 +17,9 @@
 #define RWSEM_UNLOCKED_VALUE		0x0000000000000000L
 #define RWSEM_ACTIVE_BIAS		0x0000000000000001L
 #define RWSEM_ACTIVE_MASK		0x00000000ffffffffL
-#define RWSEM_WAITING_BIAS		(-0x0000000100000000L)
+#define RWSEM_WAITING_BIAS		0xc000000000000000L
 #define RWSEM_ACTIVE_READ_BIAS		RWSEM_ACTIVE_BIAS
-#define RWSEM_ACTIVE_WRITE_BIAS		(RWSEM_WAITING_BIAS + RWSEM_ACTIVE_BIAS)
+#define RWSEM_ACTIVE_WRITE_BIAS		(-RWSEM_ACTIVE_MASK)
 
 static inline void __down_read(struct rw_semaphore *sem)
 {
@@ -185,7 +185,8 @@ static inline void __downgrade_write(struct rw_semaphore *sem)
 	"2:	br	1b\n"
 	".previous"
 	:"=&r" (oldcount), "=m" (sem->count), "=&r" (temp)
-	:"Ir" (-RWSEM_WAITING_BIAS), "m" (sem->count) : "memory");
+	:"Ir" (-RWSEM_ACTIVE_WRITE_BIAS + RWSEM_ACTIVE_READ_BIAS),
+	 "m" (sem->count) : "memory");
 #endif
 	if (unlikely(oldcount < 0))
 		rwsem_downgrade_wake(sem);
