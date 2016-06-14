@@ -238,7 +238,9 @@ module_param(nested, int, S_IRUGO);
 
 /* enable / disable AVIC */
 static int avic;
+#ifdef CONFIG_X86_LOCAL_APIC
 module_param(avic, int, S_IRUGO);
+#endif
 
 static void svm_set_cr0(struct kvm_vcpu *vcpu, unsigned long cr0);
 static void svm_flush_tlb(struct kvm_vcpu *vcpu);
@@ -1323,6 +1325,7 @@ free_avic:
  */
 static void avic_set_running(struct kvm_vcpu *vcpu, bool is_run)
 {
+#ifdef CONFIG_X86_LOCAL_APIC
 	u64 entry;
 	int h_physical_id = __default_cpu_present_to_apicid(vcpu->cpu);
 	struct vcpu_svm *svm = to_svm(vcpu);
@@ -1343,10 +1346,12 @@ static void avic_set_running(struct kvm_vcpu *vcpu, bool is_run)
 	if (is_run)
 		entry |= AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK;
 	WRITE_ONCE(*(svm->avic_physical_id_cache), entry);
+#endif
 }
 
 static void avic_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 {
+#ifdef CONFIG_X86_LOCAL_APIC
 	u64 entry;
 	/* ID = 0xff (broadcast), ID > 0xff (reserved) */
 	int h_physical_id = __default_cpu_present_to_apicid(cpu);
@@ -1369,10 +1374,12 @@ static void avic_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 		entry |= AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK;
 
 	WRITE_ONCE(*(svm->avic_physical_id_cache), entry);
+#endif
 }
 
 static void avic_vcpu_put(struct kvm_vcpu *vcpu)
 {
+#ifdef CONFIG_X86_LOCAL_APIC
 	u64 entry;
 	struct vcpu_svm *svm = to_svm(vcpu);
 
@@ -1382,6 +1389,7 @@ static void avic_vcpu_put(struct kvm_vcpu *vcpu)
 	entry = READ_ONCE(*(svm->avic_physical_id_cache));
 	entry &= ~AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK;
 	WRITE_ONCE(*(svm->avic_physical_id_cache), entry);
+#endif
 }
 
 static void svm_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
@@ -4231,6 +4239,7 @@ static void svm_sync_pir_to_irr(struct kvm_vcpu *vcpu)
 
 static void svm_deliver_avic_intr(struct kvm_vcpu *vcpu, int vec)
 {
+#ifdef CONFIG_X86_LOCAL_APIC
 	kvm_lapic_set_irr(vec, vcpu->arch.apic);
 	smp_mb__after_atomic();
 
@@ -4239,6 +4248,9 @@ static void svm_deliver_avic_intr(struct kvm_vcpu *vcpu, int vec)
 		       __default_cpu_present_to_apicid(vcpu->cpu));
 	else
 		kvm_vcpu_wake_up(vcpu);
+#else
+	WARN_ON_ONCE(1);
+#endif
 }
 
 static int svm_nmi_allowed(struct kvm_vcpu *vcpu)
