@@ -27,6 +27,7 @@
 #include <linux/raid/pq.h>
 #include <linux/semaphore.h>
 #include <linux/uuid.h>
+#include <linux/delay.h>
 #include <asm/div64.h>
 #include "ctree.h"
 #include "extent_map.h"
@@ -252,6 +253,17 @@ static struct btrfs_device *__alloc_device(void)
 	INIT_RADIX_TREE(&dev->reada_extents, GFP_NOFS & ~__GFP_DIRECT_RECLAIM);
 
 	return dev;
+}
+
+static int is_device_closing(struct list_head *head)
+{
+	struct btrfs_device *dev;
+
+	list_for_each_entry(dev, head, dev_list) {
+		if (dev->bdev_closing)
+			return 1;
+	}
+	return 0;
 }
 
 static noinline struct btrfs_device *__find_device(struct list_head *head,
@@ -832,12 +844,22 @@ again:
 static void __free_device(struct work_struct *work)
 {
 	struct btrfs_device *device;
+	struct btrfs_device *new_device_addr;
 
 	device = container_of(work, struct btrfs_device, rcu_work);
 
 	if (device->bdev)
 		blkdev_put(device->bdev, device->mode);
 
+	/*
+	 * If we are coming here from btrfs_close_one_device()
+	 * then it allocates a new device structure for the same
+	 * devid, so find device again with the devid
+	 */
+	new_device_addr = __find_device(&device->fs_devices->devices,
+						device->devid, NULL);
+
+	new_device_addr->bdev_closing = 0;
 	rcu_string_free(device->name);
 	kfree(device);
 }
@@ -884,6 +906,12 @@ static void btrfs_close_one_device(struct btrfs_device *device)
 	list_replace_rcu(&device->dev_list, &new_device->dev_list);
 	new_device->fs_devices = device->fs_devices;
 
+	/*
+	 * So to wait for kworkers to finish all blkdev_puts,
+	 * so device is really free when umount is done.
+	 */
+	new_device->bdev_closing = 1;
+
 	call_rcu(&device->rcu, free_device);
 }
 
@@ -912,6 +940,7 @@ int btrfs_close_devices(struct btrfs_fs_devices *fs_devices)
 {
 	struct btrfs_fs_devices *seed_devices = NULL;
 	int ret;
+	int retry_cnt = 5;
 
 	mutex_lock(&uuid_mutex);
 	ret = __btrfs_close_devices(fs_devices);
@@ -927,12 +956,15 @@ int btrfs_close_devices(struct btrfs_fs_devices *fs_devices)
 		__btrfs_close_devices(fs_devices);
 		free_fs_devices(fs_devices);
 	}
-	/*
-	 * Wait for rcu kworkers under __btrfs_close_devices
-	 * to finish all blkdev_puts so device is really
-	 * free when umount is done.
-	 */
-	rcu_barrier();
+
+	while (is_device_closing(&fs_devices->devices) &&
+						--retry_cnt) {
+		mdelay(1000); //1 sec
+	}
+
+	if (!(retry_cnt > 0))
+		printk(KERN_WARNING "BTRFS: %pU bdev_put didn't complete, giving up\n",
+			fs_devices->fsid);
 	return ret;
 }
 
