@@ -23,3 +23,19 @@
 &sata {
 	status = "okay";
 };
+
+&ipu1_csi1_from_mipi_vc1 {
+	data-lanes = <0 1>;
+	clock-lanes = <2>;
+};
+
+/*
+ * if the OV5642 sensor is enabled, the ipu1_csi0_mux is also enabled,
+ * but we don't want to find the OV5640 through ipu1_csi0_mux path, so
+ * shutdown the link to the mipi-csi2 receiver.
+*/
+#ifdef __ENABLE_OV5642__
+&ipu1_csi0_mux_from_mipi_vc0 {
+	remote-endpoint = <>;
+};
+#endif

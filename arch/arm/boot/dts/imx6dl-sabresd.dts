@@ -15,3 +15,47 @@
 	model = "Freescale i.MX6 DualLite SABRE Smart Device Board";
 	compatible = "fsl,imx6dl-sabresd", "fsl,imx6dl";
 };
+
+&ipu1_csi1_from_ipu1_csi1_mux {
+	data-lanes = <0 1>;
+	clock-lanes = <2>;
+};
+
+&ipu1_csi1_mux {
+	status = "okay";
+};
+
+/*
+ * if the OV5642 sensor is enabled, the ipu1_csi0_mux is also enabled,
+ * but we don't want to find the OV5640 through ipu1_csi0_mux path to the
+ * mipi-csi2 receiver, so shutdown the link to the mipi-csi2 receiver at
+ * all virtual channels.
+*/
+#ifdef __ENABLE_OV5642__
+&ipu1_csi0_mux_from_mipi_vc0 {
+	remote-endpoint = <>;
+};
+&ipu1_csi0_mux_from_mipi_vc1 {
+	remote-endpoint = <>;
+};
+&ipu1_csi0_mux_from_mipi_vc2 {
+	remote-endpoint = <>;
+};
+&ipu1_csi0_mux_from_mipi_vc3 {
+	remote-endpoint = <>;
+};
+#endif
+
+/*
+ * shutdown links to mipi-csi2 channels 0,2,3 through ipu1_csi1_mux. The
+ * OV5640 is on VC1, so it must be found only on that ipu1_csi1_mux input.
+ */
+&ipu1_csi1_mux_from_mipi_vc0 {
+	remote-endpoint = <>;
+};
+&ipu1_csi1_mux_from_mipi_vc2 {
+	remote-endpoint = <>;
+};
+&ipu1_csi1_mux_from_mipi_vc3 {
+	remote-endpoint = <>;
+};
