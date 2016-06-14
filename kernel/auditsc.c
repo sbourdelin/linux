@@ -683,6 +683,10 @@ static int audit_filter_rules(struct task_struct *tsk,
 		}
 		if (!result)
 			return 0;
+		if (result < 0) {
+			*state = AUDIT_RECORD_CONTEXT;
+			return 1;
+		}
 	}
 
 	if (ctx) {
