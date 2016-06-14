@@ -469,3 +469,25 @@ static int __init create_tlb_single_page_flush_ceiling(void)
 late_initcall(create_tlb_single_page_flush_ceiling);
 
 #endif /* CONFIG_SMP */
+
+/*
+ * Workaround for KNL issue:
+ *
+ * A thread that is going to page fault due to P=0, may still
+ * non atomically set A or D bits, which could corrupt swap entries.
+ * Always flush the other CPUs and clear the PTE again to avoid
+ * this leakage. We are excluded using the pagetable lock.
+ */
+
+void fix_pte_leak(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
+{
+	smp_mb__after_atomic();
+	if (cpumask_any_but(mm_cpumask(mm), smp_processor_id()) < nr_cpu_ids) {
+		trace_tlb_flush(TLB_LOCAL_SHOOTDOWN, TLB_FLUSH_ALL);
+		flush_tlb_others(mm_cpumask(mm), mm, addr,
+				 addr + PAGE_SIZE);
+		mb();
+		set_pte(ptep, __pte(0));
+	}
+}
+

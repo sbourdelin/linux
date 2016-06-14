@@ -181,6 +181,16 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 		}
 	}
 
+	if (c->x86_model == 87) {
+		static bool printed;
+
+		if (!printed) {
+			pr_info("Enabling PTE leaking workaround\n");
+			printed = true;
+		}
+		set_cpu_bug(c, X86_BUG_PTE_LEAK);
+	}
+
 	/*
 	 * Intel Quark Core DevMan_001.pdf section 6.4.11
 	 * "The operating system also is required to invalidate (i.e., flush)

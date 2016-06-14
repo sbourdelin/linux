@@ -178,6 +178,12 @@ extern void cleanup_highmap(void);
 extern void init_extra_mapping_uc(unsigned long phys, unsigned long size);
 extern void init_extra_mapping_wb(unsigned long phys, unsigned long size);
 
+#define ARCH_HAS_NEEDS_SWAP_PTL 1
+static inline bool arch_needs_swap_ptl(void)
+{
+       return boot_cpu_has_bug(X86_BUG_PTE_LEAK);
+}
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* _ASM_X86_PGTABLE_64_H */

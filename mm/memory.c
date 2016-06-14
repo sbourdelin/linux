@@ -1960,7 +1960,8 @@ static inline int pte_unmap_same(struct mm_struct *mm, pmd_t *pmd,
 {
 	int same = 1;
 #if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
-	if (sizeof(pte_t) > sizeof(unsigned long)) {
+	if (arch_needs_swap_ptl() ||
+	    sizeof(pte_t) > sizeof(unsigned long)) {
 		spinlock_t *ptl = pte_lockptr(mm, pmd);
 		spin_lock(ptl);
 		same = pte_same(*page_table, orig_pte);

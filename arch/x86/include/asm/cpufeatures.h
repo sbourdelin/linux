@@ -303,6 +303,7 @@
 #define X86_BUG_SYSRET_SS_ATTRS	X86_BUG(8) /* SYSRET doesn't fix up SS attrs */
 #define X86_BUG_NULL_SEG	X86_BUG(9) /* Nulling a selector preserves the base */
 #define X86_BUG_SWAPGS_FENCE	X86_BUG(10) /* SWAPGS without input dep on GS */
+#define X86_BUG_PTE_LEAK        X86_BUG(11) /* PTE may leak A/D bits after clear */
 
 
 #ifdef CONFIG_X86_32
