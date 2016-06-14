@@ -233,8 +233,9 @@
 	    <entry>
 	      <para>This event is triggered when a source parameter change is
 	       detected during runtime by the video device. It can be a
-	       runtime resolution change triggered by a video decoder or the
-	       format change happening on an input connector.
+	       runtime resolution change or signal lock status change
+	       triggered by a video decoder, or the format change happening
+	       on an input connector.
 	       This event requires that the <structfield>id</structfield>
 	       matches the input index (when used with a video device node)
 	       or the pad index (when used with a subdevice node) from which
@@ -459,6 +460,13 @@
 	    <entry>This event gets triggered when a resolution change is
 	    detected at an input. This can come from an input connector or
 	    from a video decoder.
+	    </entry>
+	  </row>
+	  <row>
+	    <entry><constant>V4L2_EVENT_SRC_CH_LOCK_STATUS</constant></entry>
+	    <entry>0x0002</entry>
+	    <entry>This event gets triggered when there is a signal lock or
+	    unlock detected at the input of a video decoder.
 	    </entry>
 	  </row>
 	</tbody>
