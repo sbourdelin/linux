@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <linux/compiler.h>
 #include <linux/lockdep.h>
 #include <unistd.h>
@@ -10,6 +11,11 @@ static __thread struct task_struct current_obj;
 /* lockdep wants these */
 bool debug_locks = true;
 bool debug_locks_silent;
+u32 prandom_u32(void)
+{
+	/* Used only by lock_pin_lock() which is dead code */
+	abort();
+}
 
 __attribute__((destructor)) static void liblockdep_exit(void)
 {
