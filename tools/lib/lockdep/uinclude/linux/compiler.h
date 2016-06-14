@@ -2,6 +2,7 @@
 #define _LIBLOCKDEP_LINUX_COMPILER_H_
 
 #define __used		__attribute__((__unused__))
+#define __packed	__attribute__((__packed__))
 #define unlikely
 #define READ_ONCE(x) (x)
 #define WRITE_ONCE(x, val) x=(val)
