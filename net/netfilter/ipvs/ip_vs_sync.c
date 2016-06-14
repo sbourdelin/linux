@@ -1497,13 +1497,13 @@ static struct socket *make_send_sock(struct netns_ipvs *ipvs, int id, struct net
 			  ipvs->mcast_ifn, &addr);
 
 		result = bind_mcastif_addr(sock, dev);
+		if (result < 0) {
+			pr_err("Error binding address of the mcast interface\n");
+			goto error;
+		}
 	}
 	else
 		result = 0;
-	if (result < 0) {
-		pr_err("Error binding address of the mcast interface\n");
-		goto error;
-	}
 
 	get_mcast_sockaddr(&mcast_addr, &salen, &ipvs->mcfg, id);
 	result = sock->ops->connect(sock, (struct sockaddr *) &mcast_addr,
