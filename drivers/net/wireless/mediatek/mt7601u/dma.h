@@ -18,8 +18,6 @@
 #include <asm/unaligned.h>
 #include <linux/skbuff.h>
 
-#include "util.h"
-
 #define MT_DMA_HDR_LEN			4
 #define MT_RX_INFO_LEN			4
 #define MT_FCE_INFO_LEN			4
