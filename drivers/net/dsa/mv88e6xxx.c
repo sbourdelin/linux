@@ -3607,6 +3607,16 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 	},
 };
 
+static const struct of_device_id mv88e6xxx_of_id_table[] = {
+	{
+		.compatible = "marvell,mv88e6085",
+		.data = &mv88e6xxx_table[MV88E6085],
+	},
+	{ /* sentinel */ },
+};
+
+MODULE_DEVICE_TABLE(of, mv88e6xxx_of_id_table);
+
 static const struct mv88e6xxx_info *
 mv88e6xxx_lookup_info(unsigned int prod_num, const struct mv88e6xxx_info *table,
 		      unsigned int num)
@@ -3801,19 +3811,12 @@ static void mv88e6xxx_remove(struct mdio_device *mdiodev)
 	mv88e6xxx_mdio_unregister(ps);
 }
 
-static const struct of_device_id mv88e6xxx_of_match[] = {
-	{ .compatible = "marvell,mv88e6085" },
-	{ /* sentinel */ },
-};
-
-MODULE_DEVICE_TABLE(of, mv88e6xxx_of_match);
-
 static struct mdio_driver mv88e6xxx_driver = {
 	.probe	= mv88e6xxx_probe,
 	.remove = mv88e6xxx_remove,
 	.mdiodrv.driver = {
-		.name = "mv88e6085",
-		.of_match_table = mv88e6xxx_of_match,
+		.name = "mv88e6xxx",
+		.of_match_table = mv88e6xxx_of_id_table,
 	},
 };
 
