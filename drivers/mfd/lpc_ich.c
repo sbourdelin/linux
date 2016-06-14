@@ -83,6 +83,13 @@
 #define ACPIBASE_GCS_OFF	0x3410
 #define ACPIBASE_GCS_END	0x3414
 
+#define SPIBASE_BYT		0x54
+#define SPIBASE_BYT_EN		BIT(1)
+
+#define SPIBASE_LPT		0x3800
+#define BCR			0xdc
+#define BCR_WPD			BIT(0)
+
 #define GPIOBASE_ICH0		0x58
 #define GPIOCTRL_ICH0		0x5C
 #define GPIOBASE_ICH6		0x48
@@ -133,6 +140,12 @@ static struct resource gpio_ich_res[] = {
 	},
 };
 
+static struct resource intel_spi_res[] = {
+	{
+		.flags = IORESOURCE_MEM,
+	}
+};
+
 static struct mfd_cell lpc_ich_wdt_cell = {
 	.name = "iTCO_wdt",
 	.num_resources = ARRAY_SIZE(wdt_ich_res),
@@ -144,6 +157,14 @@ static struct mfd_cell lpc_ich_gpio_cell = {
 	.name = "gpio_ich",
 	.num_resources = ARRAY_SIZE(gpio_ich_res),
 	.resources = gpio_ich_res,
+	.ignore_resource_conflicts = true,
+};
+
+
+static struct mfd_cell lpc_ich_spi_cell = {
+	.name = "intel-spi",
+	.num_resources = ARRAY_SIZE(intel_spi_res),
+	.resources = intel_spi_res,
 	.ignore_resource_conflicts = true,
 };
 
@@ -493,10 +514,12 @@ static struct lpc_ich_info lpc_chipset_info[] = {
 	[LPC_LPT] = {
 		.name = "Lynx Point",
 		.iTCO_version = 2,
+		.spi_type = INTEL_SPI_LPT,
 	},
 	[LPC_LPT_LP] = {
 		.name = "Lynx Point_LP",
 		.iTCO_version = 2,
+		.spi_type = INTEL_SPI_LPT,
 	},
 	[LPC_WBG] = {
 		.name = "Wellsburg",
@@ -510,6 +533,7 @@ static struct lpc_ich_info lpc_chipset_info[] = {
 	[LPC_BAYTRAIL] = {
 		.name = "Bay Trail SoC",
 		.iTCO_version = 3,
+		.spi_type = INTEL_SPI_BYT,
 	},
 	[LPC_COLETO] = {
 		.name = "Coleto Creek",
@@ -518,10 +542,12 @@ static struct lpc_ich_info lpc_chipset_info[] = {
 	[LPC_WPT_LP] = {
 		.name = "Wildcat Point_LP",
 		.iTCO_version = 2,
+		.spi_type = INTEL_SPI_LPT,
 	},
 	[LPC_BRASWELL] = {
 		.name = "Braswell SoC",
 		.iTCO_version = 3,
+		.spi_type = INTEL_SPI_BYT,
 	},
 	[LPC_LEWISBURG] = {
 		.name = "Lewisburg",
@@ -875,6 +901,15 @@ static void lpc_ich_finalize_gpio_cell(struct pci_dev *dev)
 	cell->pdata_size = sizeof(struct lpc_ich_info);
 }
 
+static void lpc_ich_finalize_spi_cell(struct pci_dev *dev,
+				     struct intel_spi_boardinfo *info)
+{
+	struct mfd_cell *cell = &lpc_ich_spi_cell;
+
+	cell->platform_data = info;
+	cell->pdata_size = sizeof(*info);
+}
+
 /*
  * We don't check for resource conflict globally. There are 2 or 3 independent
  * GPIO groups and it's enough to have access to one of these to instantiate
@@ -1050,6 +1085,62 @@ wdt_done:
 	return ret;
 }
 
+static int lpc_ich_init_spi(struct pci_dev *dev)
+{
+	struct lpc_ich_priv *priv = pci_get_drvdata(dev);
+	struct resource *res = &intel_spi_res[0];
+	struct intel_spi_boardinfo *info;
+	u32 spi_base, rcba, bcr;
+
+	info = devm_kzalloc(&dev->dev, sizeof(*info), GFP_KERNEL);
+	if (!info)
+		return -ENOMEM;
+
+	info->type = lpc_chipset_info[priv->chipset].spi_type;
+
+	switch (lpc_chipset_info[priv->chipset].spi_type) {
+	case INTEL_SPI_BYT:
+		pci_read_config_dword(dev, SPIBASE_BYT, &spi_base);
+		if (spi_base & SPIBASE_BYT_EN) {
+			res->start = spi_base &= 0xfffffe00;
+			res->end = res->start + 512 - 1;
+		}
+		break;
+
+	case INTEL_SPI_LPT:
+		pci_read_config_dword(dev, RCBABASE, &rcba);
+		if (rcba & 1) {
+			spi_base = rcba & 0xfffffe00;
+			res->start = spi_base + SPIBASE_LPT;
+			res->end = res->start + 512 - 1;
+
+			/*
+			 * Try to make the flash chip writeable now by
+			 * setting BCR_WPD. It it fails we tell the driver
+			 * that it can only read the chip.
+			 */
+			pci_read_config_dword(dev, BCR, &bcr);
+			if (!(bcr & BCR_WPD)) {
+				bcr |= BCR_WPD;
+				pci_write_config_dword(dev, BCR, bcr);
+				pci_read_config_dword(dev, BCR, &bcr);
+			}
+			info->writeable = !!(bcr & BCR_WPD);
+		}
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	if (!res->start)
+		return -ENODEV;
+
+	lpc_ich_finalize_spi_cell(dev, info);
+	return mfd_add_devices(&dev->dev, -1, &lpc_ich_spi_cell, 1, NULL, 0,
+			       NULL);
+}
+
 static int lpc_ich_probe(struct pci_dev *dev,
 				const struct pci_device_id *id)
 {
@@ -1089,6 +1180,12 @@ static int lpc_ich_probe(struct pci_dev *dev,
 
 	if (lpc_chipset_info[priv->chipset].gpio_version) {
 		ret = lpc_ich_init_gpio(dev);
+		if (!ret)
+			cell_added = true;
+	}
+
+	if (lpc_chipset_info[priv->chipset].spi_type) {
+		ret = lpc_ich_init_spi(dev);
 		if (!ret)
 			cell_added = true;
 	}
