@@ -21,6 +21,7 @@
 #include <asm/unaligned.h>
 #include <linux/of_platform.h>
 #include <linux/acpi.h>
+#include <linux/of_gpio.h>
 
 #define PCA953X_INPUT		0
 #define PCA953X_OUTPUT		1
@@ -111,6 +112,11 @@ struct pca953x_chip {
 	const char *const *names;
 	int	chip_type;
 	unsigned long driver_data;
+
+#ifdef CONFIG_OF_GPIO
+	enum of_gpio_flags reset_gpio_flags;
+	int reset_gpio;
+#endif
 };
 
 static int pca953x_read_single(struct pca953x_chip *chip, int reg, u32 *val,
@@ -759,6 +765,28 @@ static int pca953x_probe(struct i2c_client *client,
 	} else {
 		chip->gpio_start = -1;
 		irq_base = 0;
+
+#ifdef CONFIG_OF_GPIO
+		/* see if we need to de-assert a reset pin */
+		ret = of_get_named_gpio_flags(client->dev.of_node,
+					      "reset-gpios", 0,
+					      &chip->reset_gpio_flags);
+		if (gpio_is_valid(ret)) {
+			chip->reset_gpio = ret;
+			ret = devm_gpio_request_one(&client->dev,
+						    chip->reset_gpio,
+						    GPIOF_DIR_OUT,
+						    "pca953x_reset");
+			if (ret == 0) {
+				/* bring chip out of reset */
+				dev_info(&client->dev, "releasing reset\n");
+				gpio_set_value(chip->reset_gpio,
+					       (chip->reset_gpio_flags ==
+						OF_GPIO_ACTIVE_LOW) ? 1 : 0);
+			}
+		} else if (ret == -EPROBE_DEFER)
+			return ret;
+#endif
 	}
 
 	chip->client = client;
