@@ -1,0 +1,23 @@
+config VIDEO_IMX
+	tristate "i.MX5/6 V4L2 devices"
+	depends on VIDEO_V4L2 && ARCH_MXC && IMX_IPUV3_CORE
+	default y
+	---help---
+	  Say yes here to enable support for video4linux drivers for
+	  the i.MX5/6 SOC.
+
+config VIDEO_IMX_CAMERA
+	tristate "i.MX5/6 Camera Interface driver"
+	depends on VIDEO_IMX && VIDEO_DEV && I2C
+	select VIDEOBUF2_DMA_CONTIG
+	default y
+	---help---
+	  A video4linux capture driver for i.MX5/6 SOC. Some of the
+	  features of this driver include MIPI CSI-2 sensor support,
+	  hardware scaling, colorspace conversion, and rotation,
+	  simultaneous capture from separate sensors, dmabuf
+	  importer/exporter, and full devicetree support.
+
+if VIDEO_IMX_CAMERA
+source "drivers/staging/media/imx/capture/Kconfig"
+endif
