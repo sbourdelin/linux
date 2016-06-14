@@ -1034,6 +1034,7 @@ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
 	static int gpio;
 	int irq_base = 0;
 	int ret;
+	int gpio_alias_id;
 
 	/*
 	 * REVISIT eventually switch from OMAP-specific gpio structs
@@ -1056,6 +1057,17 @@ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
 		bank->chip.label = "gpio";
 		bank->chip.base = gpio;
 	}
+
+	/*
+	 * Traditionally the base is given out in first-come-first-serve order.
+	 * This might shuffle the numbering of gpios if the probe order changes.
+	 * So make the base deterministical if the device tree specifies alias
+	 * ids.
+	 */
+	gpio_alias_id = of_alias_get_id(bank->chip.of_node, "gpio");
+	if (gpio_alias_id >= 0)
+		bank->chip.base = bank->width * gpio_alias_id;
+
 	bank->chip.ngpio = bank->width;
 
 	ret = gpiochip_add_data(&bank->chip, bank);
