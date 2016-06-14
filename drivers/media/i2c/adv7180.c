@@ -740,6 +740,27 @@ static int adv7180_g_mbus_config(struct v4l2_subdev *sd,
 	return 0;
 }
 
+static int adv7180_g_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *a)
+{
+	struct adv7180_state *state = to_state(sd);
+	struct v4l2_captureparm *cparm = &a->parm.capture;
+
+	if (a->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
+		return -EINVAL;
+
+	memset(a, 0, sizeof(*a));
+	a->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	if (state->curr_norm & V4L2_STD_525_60) {
+		cparm->timeperframe.numerator = 1001;
+		cparm->timeperframe.denominator = 30000;
+	} else {
+		cparm->timeperframe.numerator = 1;
+		cparm->timeperframe.denominator = 25;
+	}
+
+	return 0;
+}
+
 static int adv7180_cropcap(struct v4l2_subdev *sd, struct v4l2_cropcap *cropcap)
 {
 	struct adv7180_state *state = to_state(sd);
@@ -798,6 +819,7 @@ static int adv7180_subscribe_event(struct v4l2_subdev *sd,
 static const struct v4l2_subdev_video_ops adv7180_video_ops = {
 	.s_std = adv7180_s_std,
 	.g_std = adv7180_g_std,
+	.g_parm = adv7180_g_parm,
 	.querystd = adv7180_querystd,
 	.g_input_status = adv7180_g_input_status,
 	.s_routing = adv7180_s_routing,
