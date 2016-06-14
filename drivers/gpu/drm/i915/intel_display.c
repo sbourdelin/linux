@@ -11429,8 +11429,8 @@ static bool use_mmio_flip(struct intel_engine_cs *engine,
 		return true;
 	else if (i915.enable_execlists)
 		return true;
-	else if (obj->base.dma_buf &&
-		 !reservation_object_test_signaled_rcu(obj->base.dma_buf->resv,
+	else if (obj->base.import_attach &&
+		 !reservation_object_test_signaled_rcu(obj->base.import_attach->dmabuf->resv,
 						       false))
 		return true;
 	else
@@ -11530,8 +11530,8 @@ static void intel_mmio_flip_work_func(struct work_struct *w)
 					    &dev_priv->rps.mmioflips));
 
 	/* For framebuffer backed by dmabuf, wait for fence */
-	if (obj->base.dma_buf)
-		WARN_ON(reservation_object_wait_timeout_rcu(obj->base.dma_buf->resv,
+	if (obj->base.import_attach)
+		WARN_ON(reservation_object_wait_timeout_rcu(obj->base.import_attach->dmabuf->resv,
 							    false, false,
 							    MAX_SCHEDULE_TIMEOUT) < 0);
 
@@ -13957,10 +13957,10 @@ intel_prepare_plane_fb(struct drm_plane *plane,
 	}
 
 	/* For framebuffer backed by dmabuf, wait for fence */
-	if (obj && obj->base.dma_buf) {
+	if (obj && obj->base.import_attach) {
 		long lret;
 
-		lret = reservation_object_wait_timeout_rcu(obj->base.dma_buf->resv,
+		lret = reservation_object_wait_timeout_rcu(obj->base.import_attach->dmabuf->resv,
 							   false, true,
 							   MAX_SCHEDULE_TIMEOUT);
 		if (lret == -ERESTARTSYS)
