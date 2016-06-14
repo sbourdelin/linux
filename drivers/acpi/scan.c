@@ -1670,7 +1670,7 @@ static int acpi_check_spi_i2c_slave(struct acpi_resource *ares, void *data)
 	return -1;
 }
 
-static void acpi_default_enumeration(struct acpi_device *device)
+static bool acpi_default_enumeration(struct acpi_device *device)
 {
 	struct list_head resource_list;
 	bool is_spi_i2c_slave = false;
@@ -1685,6 +1685,7 @@ static void acpi_default_enumeration(struct acpi_device *device)
 	acpi_dev_free_resource_list(&resource_list);
 	if (!is_spi_i2c_slave)
 		acpi_create_platform_device(device);
+	return !is_spi_i2c_slave;
 }
 
 static const struct acpi_device_id generic_device_ids[] = {
@@ -1744,6 +1745,7 @@ static void acpi_bus_attach(struct acpi_device *device)
 	struct acpi_device *child;
 	acpi_handle ejd;
 	int ret;
+	bool enumerated = true;
 
 	if (ACPI_SUCCESS(acpi_bus_get_ejd(device->handle, &ejd)))
 		register_dock_dependent_device(device, ejd);
@@ -1766,7 +1768,7 @@ static void acpi_bus_attach(struct acpi_device *device)
 
 		device->flags.initialized = true;
 	}
-	device->flags.visited = false;
+
 	ret = acpi_scan_attach_handler(device);
 	if (ret < 0)
 		return;
@@ -1778,9 +1780,10 @@ static void acpi_bus_attach(struct acpi_device *device)
 			return;
 
 		if (!ret && device->pnp.type.platform_id)
-			acpi_default_enumeration(device);
+			enumerated = acpi_default_enumeration(device);
 	}
-	device->flags.visited = true;
+	if (enumerated)
+		device->flags.visited = true;
 
  ok:
 	list_for_each_entry(child, &device->children, node)
