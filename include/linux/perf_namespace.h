@@ -8,8 +8,14 @@
 struct user_namespace;
 extern struct user_namespace init_user_ns;
 
+struct perf_ns_info {
+	u64             time;
+	u64             timestamp;
+};
+
 struct perf_namespace {
 	struct kref kref;
+	struct perf_ns_info __percpu *info;
 	struct user_namespace *user_ns;	/* Owning user namespace */
 	struct ns_common ns;
 };

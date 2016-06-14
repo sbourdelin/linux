@@ -30,6 +30,13 @@ static struct perf_namespace *create_perf_ns(struct user_namespace *user_ns)
 
 	perf_ns->ns.ops = &perfns_operations;
 	perf_ns->user_ns = get_user_ns(user_ns);
+
+	perf_ns->info = alloc_percpu(struct perf_ns_info);
+	if (!perf_ns->info) {
+		kfree(perf_ns);
+		return ERR_PTR(-ENOMEM);
+	}
+
 	return perf_ns;
 }
 
@@ -115,6 +122,7 @@ struct perf_namespace init_perf_ns = {
 	.kref = {
 		.refcount = ATOMIC_INIT(2),
 	},
+	.info = NULL,
 	.user_ns = &init_user_ns,
 	.ns.inum = PROC_PERF_INIT_INO,
 #ifdef CONFIG_PERF_NS

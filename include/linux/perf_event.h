@@ -43,6 +43,7 @@ struct perf_guest_info_callbacks {
 #include <linux/hrtimer.h>
 #include <linux/fs.h>
 #include <linux/pid_namespace.h>
+#include <linux/perf_namespace.h>
 #include <linux/workqueue.h>
 #include <linux/ftrace.h>
 #include <linux/cpu.h>
@@ -656,6 +657,11 @@ struct perf_event {
 	struct rcu_head			rcu_head;
 
 	struct pid_namespace		*ns;
+#ifdef CONFIG_PERF_NS
+	struct perf_namespace           *perf_ns;
+	int     perfns_defer_enabled;
+#endif
+
 	u64				id;
 
 	u64				(*clock)(void);
@@ -725,6 +731,7 @@ struct perf_event_context {
 	u64				generation;
 	int				pin_count;
 	int				nr_cgroups;	 /* cgroup evts */
+	int				nr_perfns;
 	void				*task_ctx_data; /* pmu specific data */
 	struct rcu_head			rcu_head;
 };
@@ -751,6 +758,7 @@ struct perf_cpu_context {
 
 	struct pmu			*unique_pmu;
 	struct perf_cgroup		*cgrp;
+	struct perf_namespace   *perf_ns;
 };
 
 struct perf_output_handle {

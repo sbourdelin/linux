@@ -334,6 +334,7 @@ static DEFINE_MUTEX(perf_sched_mutex);
 static atomic_t perf_sched_count;
 
 static DEFINE_PER_CPU(atomic_t, perf_cgroup_events);
+static DEFINE_PER_CPU(atomic_t, perf_perfns_events);
 static DEFINE_PER_CPU(int, perf_sched_cb_usages);
 
 static atomic_t nr_mmap_events __read_mostly;
@@ -914,6 +915,288 @@ perf_cgroup_mark_enabled(struct perf_event *event,
 }
 #endif
 
+#ifdef CONFIG_PERF_NS
+static inline bool perf_perfns_match(struct perf_event *event)
+{
+	struct perf_event_context *ctx = event->ctx;
+	struct perf_cpu_context *cpuctx = __get_cpu_context(ctx);
+
+	/* @event doesn't care about perfns */
+	if (!event->perf_ns)
+		return true;
+
+	if (cpuctx->perf_ns != event->perf_ns)
+		return false;
+
+	return true;
+}
+
+static inline void perf_detach_perfns(struct perf_event *event)
+{
+	event->perf_ns = NULL;
+}
+
+static inline int is_perfns_event(struct perf_event *event)
+{
+	return event->perf_ns != NULL;
+}
+
+static inline u64 perf_perfns_event_time(struct perf_event *event)
+{
+	struct perf_ns_info *t;
+
+	t = per_cpu_ptr(event->perf_ns->info, event->cpu);
+	return t ? t->time : 0;
+}
+
+static inline void __update_perfns_time(struct perf_namespace *p_ns)
+{
+	struct perf_ns_info *info;
+	u64 now;
+
+	now = perf_clock();
+
+	if (!p_ns->info)
+		return;
+
+	info = this_cpu_ptr(p_ns->info);
+
+	info->time += now - info->timestamp;
+	info->timestamp = now;
+}
+
+static inline void update_perfns_time_from_cpuctx(struct perf_cpu_context *cpuctx)
+{
+	struct perf_namespace *perfns_out = cpuctx->perf_ns;
+
+	if (perfns_out)
+		__update_perfns_time(perfns_out);
+}
+
+static inline void update_perfns_time_from_event(struct perf_event *event)
+{
+	struct perf_namespace *perf_ns = current->nsproxy->perf_ns;
+
+	if (!is_perfns_event(event))
+		return;
+
+	if (perf_ns == event->perf_ns)
+		__update_perfns_time(event->perf_ns);
+}
+
+static inline void
+perf_perfns_set_timestamp(struct task_struct *task,
+			  struct perf_event_context *ctx)
+{
+	struct perf_namespace *perf_ns = task->nsproxy->perf_ns;
+	struct perf_ns_info *info;
+
+	if (!task || !ctx->nr_perfns)
+		return;
+
+	if (!perf_ns->info)
+		return;
+
+	info = this_cpu_ptr(perf_ns->info);
+	info->timestamp = ctx->timestamp;
+}
+
+#define PERF_PERFNS_SWOUT	0x1 /* perfns switch out every event */
+#define PERF_PERFNS_SWIN	0x2 /* perfns switch in events based on task */
+
+/*
+ * mode SWOUT : schedule out everything
+ * mode SWIN : schedule in based on perfns for next
+ */
+static void perf_perfns_switch(struct task_struct *task, int mode)
+{
+	struct perf_cpu_context *cpuctx;
+	struct pmu *pmu;
+	unsigned long flags;
+
+	local_irq_save(flags);
+
+	list_for_each_entry_rcu(pmu, &pmus, entry) {
+		cpuctx = this_cpu_ptr(pmu->pmu_cpu_context);
+		if (cpuctx->unique_pmu != pmu)
+			continue; /* ensure we process each cpuctx once */
+
+		if (cpuctx->ctx.nr_perfns > 0) {
+			perf_ctx_lock(cpuctx, cpuctx->task_ctx);
+			perf_pmu_disable(cpuctx->ctx.pmu);
+
+			if (mode & PERF_PERFNS_SWOUT) {
+				cpu_ctx_sched_out(cpuctx, EVENT_ALL);
+				/*
+				 * must not be done before ctxswout due
+				 * to event_filter_match() in event_sched_out()
+				 */
+				cpuctx->perf_ns = NULL;
+			}
+
+			if (mode & PERF_PERFNS_SWIN) {
+				WARN_ON_ONCE(cpuctx->perf_ns);
+
+				cpuctx->perf_ns = task->nsproxy->perf_ns;
+				cpu_ctx_sched_in(cpuctx, EVENT_ALL, task);
+			}
+			perf_pmu_enable(cpuctx->ctx.pmu);
+			perf_ctx_unlock(cpuctx, cpuctx->task_ctx);
+		}
+	}
+
+	local_irq_restore(flags);
+}
+
+static inline void perf_perfns_sched_out(struct task_struct *task,
+					 struct task_struct *next)
+{
+	rcu_read_lock();
+	perf_perfns_switch(task, PERF_PERFNS_SWOUT);
+	rcu_read_unlock();
+}
+
+static inline void perf_perfns_sched_in(struct task_struct *prev,
+					struct task_struct *task)
+{
+	rcu_read_lock();
+
+	if (task->nsproxy->perf_ns != &init_perf_ns)
+		perf_perfns_switch(task, PERF_PERFNS_SWIN);
+
+	rcu_read_unlock();
+}
+
+static inline int perf_perfns_connect(struct perf_event *event,
+				      struct perf_event *group_leader)
+{
+	if (current->nsproxy->perf_ns != &init_perf_ns) {
+		/*
+		 * If we are called from our own perf namespace, set
+		 * event->perf_ns
+		 */
+		event->perf_ns = current->nsproxy->perf_ns;
+
+		if (group_leader && group_leader->perf_ns != event->perf_ns) {
+			perf_detach_perfns(event);
+			return -EINVAL;
+		}
+	}
+	return 0;
+}
+
+static inline void
+perf_perfns_set_shadow_time(struct perf_event *event, u64 now)
+{
+	struct perf_ns_info *t;
+
+	t = per_cpu_ptr(event->perf_ns->info, event->cpu);
+	event->shadow_ctx_time = now - t->timestamp;
+}
+
+static inline void
+perf_perfns_defer_enabled(struct perf_event *event)
+{
+	if (is_perfns_event(event) && !perf_perfns_match(event))
+		event->perfns_defer_enabled = 1;
+}
+
+static inline void
+perf_perfns_mark_enabled(struct perf_event *event,
+			 struct perf_event_context *ctx)
+{
+	struct perf_event *sub;
+	u64 tstamp = perf_event_time(event);
+
+	if (!event->perfns_defer_enabled)
+		return;
+
+	event->perfns_defer_enabled = 0;
+
+	event->tstamp_enabled = tstamp - event->total_time_enabled;
+	list_for_each_entry(sub, &event->sibling_list, group_entry) {
+		if (sub->state >= PERF_EVENT_STATE_INACTIVE) {
+			sub->tstamp_enabled = tstamp - sub->total_time_enabled;
+			sub->perfns_defer_enabled = 0;
+		}
+	}
+}
+#else /* CONFIG_PERFNS */
+static inline bool perf_perfns_match(struct perf_event *event)
+{
+	return true;
+}
+
+static inline void perf_detach_perfns(struct perf_event *event)
+{}
+
+static inline int is_perfns_event(struct perf_event *event)
+{
+	return 0;
+}
+
+static inline u64 perf_perfns_event_perfns_time(struct perf_event *event)
+{
+	return 0;
+}
+
+static inline void update_perfns_time_from_event(struct perf_event *event)
+{
+}
+
+static inline void update_perfns_time_from_cpuctx(struct perf_cpu_context *cpuctx)
+{
+}
+
+static inline void perf_perfns_sched_out(struct task_struct *task,
+					 struct task_struct *next)
+{
+}
+
+static inline void perf_perfns_sched_in(struct task_struct *prev,
+					struct task_struct *task)
+{
+}
+
+static inline void
+perf_perfns_set_timestamp(struct task_struct *task,
+			  struct perf_event_context *ctx)
+{
+}
+
+void
+perf_perfns_switch(struct task_struct *task, struct task_struct *next)
+{
+}
+
+
+static inline int perf_perfns_connect(struct perf_event *event,
+				      struct perf_event *group_leader)
+{
+	return 0;
+}
+
+static inline void
+perf_perfns_set_shadow_time(struct perf_event *event, u64 now)
+{
+}
+
+static inline u64 perf_perfns_event_time(struct perf_event *event)
+{
+	return 0;
+}
+
+static inline void
+perf_perfns_defer_enabled(struct perf_event *event)
+{
+}
+
+static inline void
+perf_perfns_mark_enabled(struct perf_event *event,
+			 struct perf_event_context *ctx)
+{
+#endif /* CONFIG_PERF_NS */
+
 /*
  * set default to be dependent on timer tick just
  * like original code
@@ -1311,6 +1594,9 @@ static u64 perf_event_time(struct perf_event *event)
 	if (is_cgroup_event(event))
 		return perf_cgroup_event_time(event);
 
+	if (is_perfns_event(event))
+		return perf_perfns_event_time(event);
+
 	return ctx ? ctx->time : 0;
 }
 
@@ -1340,6 +1626,8 @@ static void update_event_times(struct perf_event *event)
 	 */
 	if (is_cgroup_event(event))
 		run_end = perf_cgroup_event_time(event);
+	else if (is_perfns_event(event))
+		run_end = perf_perfns_event_time(event);
 	else if (ctx->is_active)
 		run_end = ctx->time;
 	else
@@ -1406,6 +1694,9 @@ list_add_event(struct perf_event *event, struct perf_event_context *ctx)
 
 	if (is_cgroup_event(event))
 		ctx->nr_cgroups++;
+
+	if (is_perfns_event(event))
+		ctx->nr_perfns++;
 
 	list_add_rcu(&event->event_entry, &ctx->event_list);
 	ctx->nr_events++;
@@ -1601,6 +1892,13 @@ list_del_event(struct perf_event *event, struct perf_event_context *ctx)
 			cpuctx->cgrp = NULL;
 	}
 
+	if (is_perfns_event(event)) {
+		ctx->nr_perfns--;
+		cpuctx = __get_cpu_context(ctx);
+		if (!ctx->nr_perfns)
+			cpuctx->perf_ns = NULL;
+	}
+
 	ctx->nr_events--;
 	if (event->attr.inherit_stat)
 		ctx->nr_stat--;
@@ -1688,7 +1986,8 @@ static inline int
 event_filter_match(struct perf_event *event)
 {
 	return (event->cpu == -1 || event->cpu == smp_processor_id())
-	    && perf_cgroup_match(event) && pmu_filter_match(event);
+	    && perf_cgroup_match(event) && pmu_filter_match(event)
+			&& perf_perfns_match(event);
 }
 
 static void
@@ -1821,6 +2120,7 @@ static void __perf_event_disable(struct perf_event *event,
 
 	update_context_time(ctx);
 	update_cgrp_time_from_event(event);
+	update_perfns_time_from_event(event);
 	update_group_times(event);
 	if (event == event->group_leader)
 		group_sched_out(event, cpuctx, ctx);
@@ -1907,6 +2207,8 @@ static void perf_set_shadow_time(struct perf_event *event,
 	 */
 	if (is_cgroup_event(event))
 		perf_cgroup_set_shadow_time(event, tstamp);
+	else if (is_perfns_event(event))
+		perf_perfns_set_shadow_time(event, tstamp);
 	else
 		event->shadow_ctx_time = tstamp - ctx->timestamp;
 }
@@ -2300,6 +2602,8 @@ static void __perf_event_enable(struct perf_event *event,
 	if (!event_filter_match(event)) {
 		if (is_cgroup_event(event))
 			perf_cgroup_defer_enabled(event);
+		if (is_perfns_event(event))
+			perf_perfns_defer_enabled(event);
 		ctx_sched_in(ctx, cpuctx, EVENT_TIME, current);
 		return;
 	}
@@ -2546,6 +2850,7 @@ static void ctx_sched_out(struct perf_event_context *ctx,
 		/* update (and stop) ctx time */
 		update_context_time(ctx);
 		update_cgrp_time_from_cpuctx(cpuctx);
+		update_perfns_time_from_cpuctx(cpuctx);
 	}
 
 	is_active ^= ctx->is_active; /* changed bits */
@@ -2837,6 +3142,9 @@ void __perf_event_task_sched_out(struct task_struct *task,
 	 */
 	if (atomic_read(this_cpu_ptr(&perf_cgroup_events)))
 		perf_cgroup_sched_out(task, next);
+
+	if (atomic_read(this_cpu_ptr(&perf_perfns_events)))
+		perf_perfns_sched_out(task, next);
 }
 
 /*
@@ -2863,6 +3171,9 @@ ctx_pinned_sched_in(struct perf_event_context *ctx,
 		/* may need to reset tstamp_enabled */
 		if (is_cgroup_event(event))
 			perf_cgroup_mark_enabled(event, ctx);
+
+		if (is_perfns_event(event))
+			perf_perfns_mark_enabled(event, ctx);
 
 		if (group_can_go_on(event, cpuctx, 1))
 			group_sched_in(event, cpuctx, ctx);
@@ -2900,6 +3211,9 @@ ctx_flexible_sched_in(struct perf_event_context *ctx,
 		if (is_cgroup_event(event))
 			perf_cgroup_mark_enabled(event, ctx);
 
+		if (is_perfns_event(event))
+			perf_perfns_mark_enabled(event, ctx);
+
 		if (group_can_go_on(event, cpuctx, can_add_hw)) {
 			if (group_sched_in(event, cpuctx, ctx))
 				can_add_hw = 0;
@@ -2936,6 +3250,7 @@ ctx_sched_in(struct perf_event_context *ctx,
 		now = perf_clock();
 		ctx->timestamp = now;
 		perf_cgroup_set_timestamp(task, ctx);
+		perf_perfns_set_timestamp(task, ctx);
 	}
 
 	/*
@@ -3007,6 +3322,9 @@ void __perf_event_task_sched_in(struct task_struct *prev,
 	 */
 	if (atomic_read(this_cpu_ptr(&perf_cgroup_events)))
 		perf_cgroup_sched_in(prev, task);
+
+	if (atomic_read(this_cpu_ptr(&perf_perfns_events)))
+		perf_perfns_sched_in(prev, task);
 
 	for_each_task_context_nr(ctxn) {
 		ctx = task->perf_event_ctxp[ctxn];
@@ -3353,6 +3671,7 @@ static void __perf_event_read(void *info)
 	if (ctx->is_active) {
 		update_context_time(ctx);
 		update_cgrp_time_from_event(event);
+		update_perfns_time_from_event(event);
 	}
 
 	update_event_times(event);
@@ -3477,6 +3796,7 @@ static int perf_event_read(struct perf_event *event, bool group)
 		if (ctx->is_active) {
 			update_context_time(ctx);
 			update_cgrp_time_from_event(event);
+			update_perfns_time_from_event(event);
 		}
 		if (group)
 			update_group_times(event);
@@ -3672,6 +3992,9 @@ static void unaccount_event_cpu(struct perf_event *event, int cpu)
 
 	if (is_cgroup_event(event))
 		atomic_dec(&per_cpu(perf_cgroup_events, cpu));
+
+	if (is_perfns_event(event))
+		atomic_dec(&per_cpu(perf_perfns_events, cpu));
 }
 
 #ifdef CONFIG_NO_HZ_FULL
@@ -3718,6 +4041,8 @@ static void unaccount_event(struct perf_event *event)
 		atomic_dec(&nr_switch_events);
 	}
 	if (is_cgroup_event(event))
+		dec = true;
+	if (is_perfns_event(event))
 		dec = true;
 	if (has_branch_stack(event))
 		dec = true;
@@ -3846,6 +4171,9 @@ static void _free_event(struct perf_event *event)
 
 	if (is_cgroup_event(event))
 		perf_detach_cgroup(event);
+
+	if (is_perfns_event(event))
+		perf_detach_perfns(event);
 
 	if (!event->parent) {
 		if (event->attr.sample_type & PERF_SAMPLE_CALLCHAIN)
@@ -8653,6 +8981,9 @@ static void account_event_cpu(struct perf_event *event, int cpu)
 
 	if (is_cgroup_event(event))
 		atomic_inc(&per_cpu(perf_cgroup_events, cpu));
+
+	if (is_perfns_event(event))
+		atomic_inc(&per_cpu(perf_perfns_events, cpu));
 }
 
 /* Freq events need the tick to stay alive (see perf_event_task_tick). */
@@ -8700,6 +9031,8 @@ static void account_event(struct perf_event *event)
 	if (has_branch_stack(event))
 		inc = true;
 	if (is_cgroup_event(event))
+		inc = true;
+	if (is_perfns_event(event))
 		inc = true;
 
 	if (inc) {
@@ -8849,6 +9182,12 @@ perf_event_alloc(struct perf_event_attr *attr, int cpu,
 			goto err_ns;
 	}
 
+	if (!task) {
+		err = perf_perfns_connect(event, group_leader);
+		if (err)
+			goto err_ns;
+	}
+
 	pmu = perf_init_event(event);
 	if (!pmu)
 		goto err_ns;
@@ -8898,6 +9237,8 @@ err_pmu:
 err_ns:
 	if (is_cgroup_event(event))
 		perf_detach_cgroup(event);
+	if (is_perfns_event(event))
+		perf_detach_perfns(event);
 	if (event->ns)
 		put_pid_ns(event->ns);
 	kfree(event);
@@ -10364,6 +10705,10 @@ void __init perf_event_init(void)
 
 	ret = init_hw_breakpoint();
 	WARN(ret, "hw_breakpoint initialization failed with: %d", ret);
+
+	init_perf_ns.info = alloc_percpu(struct perf_ns_info);
+	if (!(init_perf_ns.info))
+		WARN(-ENOMEM, "perf namespace memory allocation failed");
 
 	/*
 	 * Build time assertion that we keep the data_head at the intended
