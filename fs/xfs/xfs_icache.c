@@ -71,6 +71,15 @@ xfs_inode_alloc(
 
 	mrlock_init(&ip->i_iolock, MRLOCK_BARRIER, "xfsio", ip->i_ino);
 
+	/*
+	 * Enable reader spinning for DAX nount point
+	 */
+	if (mp->m_flags & XFS_MOUNT_DAX) {
+		rwsem_set_rspin_threshold(&ip->i_iolock.mr_lock);
+		rwsem_set_rspin_threshold(&ip->i_mmaplock.mr_lock);
+		rwsem_set_rspin_threshold(&ip->i_lock.mr_lock);
+	}
+
 	/* initialise the xfs inode */
 	ip->i_ino = ino;
 	ip->i_mount = mp;
