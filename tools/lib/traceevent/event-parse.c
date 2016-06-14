@@ -31,6 +31,8 @@
 #include <errno.h>
 #include <stdint.h>
 #include <limits.h>
+#include <linux/kernel.h>
+#include <linux/types.h>
 
 #include <netinet/ip6.h>
 #include "event-parse.h"
@@ -2868,6 +2870,46 @@ process_str(struct event_format *event __maybe_unused, struct print_arg *arg,
 }
 
 static enum event_type
+process_sizeof(struct event_format *event __maybe_unused, struct print_arg *arg,
+	       char **tok)
+{
+	char *token;
+	char *atom;
+
+	if (process_paren(event, arg, &token) < 0)
+		goto out_free;
+
+	atom = arg->atom.atom;
+	if (arg->type != PRINT_ATOM) {
+		do_warning_event(event, "didn't understand %s for sizeof\n",
+				 token);
+		goto out_free_atom;
+	}
+
+	if (strcmp(token, "__u64") == 0) {
+		if (asprintf(&arg->atom.atom, "%zd", sizeof(__u64)) < 0)
+			goto out_free_atom;
+	} else if (strcmp(token, "__u32") == 0) {
+		if (asprintf(&arg->atom.atom, "%zd", sizeof(__u32)) < 0)
+			goto out_free_atom;
+	} else {
+		do_warning_event(event, "unknown sizeof %s\n", token);
+		goto out_free_atom;
+	}
+
+	free(atom);
+	*tok = token;
+	return EVENT_DELIM;
+
+ out_free_atom:
+	free_token(atom);
+ out_free:
+	free_token(token);
+	*tok = NULL;
+	return EVENT_ERROR;
+}
+
+static enum event_type
 process_bitmask(struct event_format *event __maybe_unused, struct print_arg *arg,
 	    char **tok)
 {
@@ -3025,6 +3067,10 @@ process_function(struct event_format *event, struct print_arg *arg,
 	if (strcmp(token, "__get_dynamic_array_len") == 0) {
 		free_token(token);
 		return process_dynamic_array_len(event, arg, tok);
+	}
+	if (strcmp(token, "sizeof") == 0) {
+		free_token(token);
+		return process_sizeof(event, arg, tok);
 	}
 
 	func = find_func_handler(event->pevent, token);
