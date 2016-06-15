@@ -174,11 +174,15 @@ int __of_attach_node_sysfs(struct device_node *np)
 		rc = kobject_add(&np->kobj, NULL, "%s",
 				 safe_name(&of_kset->kobj, "base"));
 	} else {
-		name = safe_name(&np->parent->kobj, kbasename(np->full_name));
+		const char *orig_name = kbasename(np->full_name);
+
+		name = safe_name(&np->parent->kobj, orig_name);
 		if (!name || !name[0])
 			return -EINVAL;
 
 		rc = kobject_add(&np->kobj, &np->parent->kobj, "%s", name);
+		if (name != orig_name)
+			kfree(name);
 	}
 	if (rc)
 		return rc;
