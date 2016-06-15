@@ -54,9 +54,7 @@
 #include <net/devlink.h>
 #include "mlx5_core.h"
 #include "fs_core.h"
-#ifdef CONFIG_MLX5_CORE_EN
 #include "eswitch.h"
-#endif
 
 MODULE_AUTHOR("Eli Cohen <eli@mellanox.com>");
 MODULE_DESCRIPTION("Mellanox Connect-IB, ConnectX-4 core driver");
@@ -1329,7 +1327,8 @@ static int init_one(struct pci_dev *pdev,
 	struct mlx5_priv *priv;
 	int err;
 
-	devlink = devlink_alloc(&mlx5_devlink_ops, sizeof(*dev));
+	devlink = devlink_alloc(IS_ENABLED(CONFIG_MLX5_CORE_EN) ?
+				&mlx5_devlink_ops : NULL, sizeof(*dev));
 	if (!devlink) {
 		dev_err(&pdev->dev, "kzalloc failed\n");
 		return -ENOMEM;
@@ -1372,7 +1371,8 @@ static int init_one(struct pci_dev *pdev,
 		goto clean_health;
 	}
 
-	err = devlink_register(devlink, &pdev->dev);
+	if (IS_ENABLED(CONFIG_MLX5_CORE_EN))
+		err = devlink_register(devlink, &pdev->dev);
 	if (err)
 		goto clean_load;
 
@@ -1397,7 +1397,8 @@ static void remove_one(struct pci_dev *pdev)
 	struct devlink *devlink = priv_to_devlink(dev);
 	struct mlx5_priv *priv = &dev->priv;
 
-	devlink_unregister(devlink);
+	if (IS_ENABLED(CONFIG_MLX5_CORE_EN))
+		devlink_unregister(devlink);
 	if (mlx5_unload_one(dev, priv)) {
 		dev_err(&dev->pdev->dev, "mlx5_unload_one failed\n");
 		mlx5_health_cleanup(dev);
