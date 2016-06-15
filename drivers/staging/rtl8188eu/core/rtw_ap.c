@@ -286,7 +286,7 @@ void	expire_timeout_chk(struct adapter *padapter)
 	struct sta_info *psta = NULL;
 	struct sta_priv *pstapriv = &padapter->stapriv;
 	u8 chk_alive_num = 0;
-	char chk_alive_list[NUM_STA];
+	s8 chk_alive_list[NUM_STA];
 	int i;
 
 	spin_lock_bh(&pstapriv->auth_list_lock);
