@@ -741,8 +741,10 @@ void do_coredump(const siginfo_t *siginfo)
 			goto close_fail;
 		if (!(cprm.file->f_mode & FMODE_CAN_WRITE))
 			goto close_fail;
-		if (do_truncate(cprm.file->f_path.dentry, 0, 0, cprm.file))
-			goto close_fail;
+		if (i_size_read(file_inode(cprm.file)) != 0) {
+			if (do_truncate(cprm.file->f_path.dentry, 0, 0, cprm.file))
+				goto close_fail;
+		}
 	}
 
 	/* get us an unshared descriptor table; almost always a no-op */
