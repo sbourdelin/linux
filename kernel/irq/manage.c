@@ -1055,9 +1055,7 @@ static struct task_struct *
 create_irq_thread(struct irqaction *new, unsigned int irq, bool secondary)
 {
 	struct task_struct *t;
-	struct sched_param param = {
-		.sched_priority = MAX_USER_RT_PRIO/2,
-	};
+	struct sched_param param;
 
 	if (!secondary) {
 		t = kthread_create(irq_thread, new, "irq/%d-%s", irq,
@@ -1071,7 +1069,12 @@ create_irq_thread(struct irqaction *new, unsigned int irq, bool secondary)
 	if (IS_ERR(t))
 		return t;
 
-	sched_setscheduler_nocheck(t, SCHED_FIFO, &param);
+	if (new->flags & IRQF_TH_SCHED_NORMAL) {
+		sched_setscheduler_nocheck(t, SCHED_NORMAL, &param);
+	} else {
+		param.sched_priority = MAX_USER_RT_PRIO/2;
+		sched_setscheduler_nocheck(t, SCHED_FIFO, &param);
+	}
 
 	/*
 	 * We keep the reference to the task struct even if
@@ -1100,7 +1103,8 @@ setup_irq_thread(struct irqaction *new, unsigned int irq, bool secondary)
 	 * correct as we want the thread to move to the cpu(s)
 	 * on which the requesting code placed the interrupt.
 	 */
-	set_bit(IRQTF_AFFINITY, &new->thread_flags);
+	if (!(new->flags & IRQF_TH_NO_AFFINITY))
+		set_bit(IRQTF_AFFINITY, &new->thread_flags);
 	return 0;
 }
 
@@ -1565,7 +1569,8 @@ void __irq_reconfigure_action(struct irq_desc *desc, struct irqaction *action,
 
 	action->thread = t;
 	set_bit(IRQTF_FORCED_THREAD, &action->thread_flags);
-	set_bit(IRQTF_AFFINITY, &action->thread_flags);
+	if (!(action->flags & IRQF_TH_NO_AFFINITY))
+		set_bit(IRQTF_AFFINITY, &action->thread_flags);
 
 	if (!(desc->irq_data.chip->flags & IRQCHIP_ONESHOT_SAFE)) {
 		/*
