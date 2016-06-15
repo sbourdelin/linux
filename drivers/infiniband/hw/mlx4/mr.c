@@ -278,30 +278,13 @@ mlx4_alloc_priv_pages(struct ib_device *device,
 		      int max_pages)
 {
 	int size = max_pages * sizeof(u64);
-	int add_size;
-	int ret;
 
-	add_size = max_t(int, MLX4_MR_PAGES_ALIGN - ARCH_KMALLOC_MINALIGN, 0);
-
-	mr->pages_alloc = kzalloc(size + add_size, GFP_KERNEL);
-	if (!mr->pages_alloc)
+	mr->pages = dma_alloc_coherent(device->dma_device, size,
+				       &mr->page_map, GFP_KERNEL);
+	if (!mr->pages)
 		return -ENOMEM;
 
-	mr->pages = PTR_ALIGN(mr->pages_alloc, MLX4_MR_PAGES_ALIGN);
-
-	mr->page_map = dma_map_single(device->dma_device, mr->pages,
-				      size, DMA_TO_DEVICE);
-
-	if (dma_mapping_error(device->dma_device, mr->page_map)) {
-		ret = -ENOMEM;
-		goto err;
-	}
-
 	return 0;
-err:
-	kfree(mr->pages_alloc);
-
-	return ret;
 }
 
 static void
@@ -311,9 +294,8 @@ mlx4_free_priv_pages(struct mlx4_ib_mr *mr)
 		struct ib_device *device = mr->ibmr.device;
 		int size = mr->max_pages * sizeof(u64);
 
-		dma_unmap_single(device->dma_device, mr->page_map,
-				 size, DMA_TO_DEVICE);
-		kfree(mr->pages_alloc);
+		dma_free_coherent(device->dma_device, size,
+				  mr->pages, mr->page_map);
 		mr->pages = NULL;
 	}
 }
@@ -532,19 +514,7 @@ int mlx4_ib_map_mr_sg(struct ib_mr *ibmr, struct scatterlist *sg, int sg_nents,
 		      unsigned int *sg_offset)
 {
 	struct mlx4_ib_mr *mr = to_mmr(ibmr);
-	int rc;
 
 	mr->npages = 0;
-
-	ib_dma_sync_single_for_cpu(ibmr->device, mr->page_map,
-				   sizeof(u64) * mr->max_pages,
-				   DMA_TO_DEVICE);
-
-	rc = ib_sg_to_pages(ibmr, sg, sg_nents, sg_offset, mlx4_set_page);
-
-	ib_dma_sync_single_for_device(ibmr->device, mr->page_map,
-				      sizeof(u64) * mr->max_pages,
-				      DMA_TO_DEVICE);
-
-	return rc;
+	return ib_sg_to_pages(ibmr, sg, sg_nents, sg_offset, mlx4_set_page);
 }
