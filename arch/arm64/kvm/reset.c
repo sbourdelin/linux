@@ -32,6 +32,7 @@
 #include <asm/kvm_asm.h>
 #include <asm/kvm_coproc.h>
 #include <asm/kvm_mmu.h>
+#include <asm/sections.h>
 
 /*
  * ARMv8 Reset Values
@@ -132,8 +133,6 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
 	/* Reset timer */
 	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
 }
-
-extern char __hyp_idmap_text_start[];
 
 unsigned long kvm_hyp_reset_entry(void)
 {

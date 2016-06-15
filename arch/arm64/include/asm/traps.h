@@ -19,6 +19,7 @@
 #define __ASM_TRAP_H
 
 #include <linux/list.h>
+#include <asm/sections.h>
 
 struct pt_regs;
 
@@ -52,8 +53,6 @@ static inline int __in_irqentry_text(unsigned long ptr)
 
 static inline int in_exception_text(unsigned long ptr)
 {
-	extern char __exception_text_start[];
-	extern char __exception_text_end[];
 	int in;
 
 	in = ptr >= (unsigned long)&__exception_text_start &&
