@@ -24,5 +24,6 @@ extern char __hibernate_exit_text_start[], __hibernate_exit_text_end[];
 extern char __hyp_idmap_text_start[], __hyp_idmap_text_end[];
 extern char __hyp_text_start[], __hyp_text_end[];
 extern char __idmap_text_start[], __idmap_text_end[];
+extern char __mmuoff_text_start[], __mmuoff_text_end[];
 
 #endif /* __ASM_SECTIONS_H */

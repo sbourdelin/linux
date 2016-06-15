@@ -97,6 +97,7 @@ ENTRY(__cpu_suspend_enter)
 ENDPROC(__cpu_suspend_enter)
 	.ltorg
 
+	.pushsection ".mmuoff.text", "ax"
 ENTRY(cpu_resume)
 	bl	el2_setup		// if in EL2 drop to EL1 cleanly
 	/* enable the MMU early - so we can access sleep_save_stash by va */
@@ -106,6 +107,7 @@ ENTRY(cpu_resume)
 	adrp	x26, swapper_pg_dir
 	b	__cpu_setup
 ENDPROC(cpu_resume)
+	.popsection
 
 ENTRY(_cpu_resume)
 	mrs	x1, mpidr_el1

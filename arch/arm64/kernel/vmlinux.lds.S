@@ -118,6 +118,9 @@ SECTIONS
 			__exception_text_end = .;
 			IRQENTRY_TEXT
 			SOFTIRQENTRY_TEXT
+			__mmuoff_text_start = .;
+			*(.mmuoff.text)
+			__mmuoff_text_end = .;
 			TEXT_TEXT
 			SCHED_TEXT
 			LOCK_TEXT

@@ -477,6 +477,7 @@ ENTRY(kimage_vaddr)
  * Returns either BOOT_CPU_MODE_EL1 or BOOT_CPU_MODE_EL2 in x20 if
  * booted in EL1 or EL2 respectively.
  */
+	.pushsection ".mmuoff.text", "ax"
 ENTRY(el2_setup)
 	mrs	x0, CurrentEL
 	cmp	x0, #CurrentEL_EL2
@@ -594,7 +595,7 @@ install_el2_stub:
 	mov	w20, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
 	eret
 ENDPROC(el2_setup)
-
+	.popsection
 /*
  * Sets the __boot_cpu_mode flag depending on the CPU boot mode passed
  * in x20. See arch/arm64/include/asm/virt.h for more info.
@@ -646,6 +647,7 @@ ENDPROC(secondary_holding_pen)
 	 * Secondary entry point that jumps straight into the kernel. Only to
 	 * be used where CPUs are brought online dynamically by the kernel.
 	 */
+	.pushsection ".mmuoff.text", "ax"
 ENTRY(secondary_entry)
 	bl	el2_setup			// Drop to EL1
 	bl	set_cpu_boot_mode_flag
@@ -677,7 +679,7 @@ __secondary_switched:
 	mov	x29, #0
 	b	secondary_start_kernel
 ENDPROC(__secondary_switched)
-
+	.popsection
 /*
  * The booting CPU updates the failed status @__early_cpu_boot_status,
  * with MMU turned off.
