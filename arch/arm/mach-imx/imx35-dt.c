@@ -20,12 +20,6 @@
 #include "common.h"
 #include "mx35.h"
 
-static void __init imx35_irq_init(void)
-{
-	imx_init_l2cache();
-	mx35_init_irq();
-}
-
 static const char * const imx35_dt_board_compat[] __initconst = {
 	"fsl,imx35",
 	NULL
@@ -34,6 +28,8 @@ static const char * const imx35_dt_board_compat[] __initconst = {
 DT_MACHINE_START(IMX35_DT, "Freescale i.MX35 (Device Tree Support)")
 	.map_io		= mx35_map_io,
 	.init_early	= imx35_init_early,
-	.init_irq	= imx35_irq_init,
+	.init_irq	= mx35_init_irq,
 	.dt_compat	= imx35_dt_board_compat,
+	.l2c_aux_val 	= 0,
+	.l2c_aux_mask	= ~0,
 MACHINE_END
