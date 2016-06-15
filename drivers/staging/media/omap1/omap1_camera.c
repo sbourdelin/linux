@@ -158,7 +158,6 @@ struct omap1_cam_dev {
 	int				dma_ch;
 
 	struct omap1_cam_platform_data	*pdata;
-	struct resource			*res;
 	unsigned long			pflags;
 	unsigned long			camexclk;
 
@@ -1569,11 +1568,10 @@ static int omap1_cam_probe(struct platform_device *pdev)
 	unsigned int irq;
 	int err = 0;
 
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	irq = platform_get_irq(pdev, 0);
-	if ((int)irq <= 0) {
-		err = -ENODEV;
-		goto exit;
-	}
+	if (!res || (int)irq <= 0)
+		return -ENODEV;
 
 	clk = devm_clk_get(&pdev->dev, "armper_ck");
 	if (IS_ERR(clk))
@@ -1614,7 +1612,6 @@ static int omap1_cam_probe(struct platform_device *pdev)
 	INIT_LIST_HEAD(&pcdev->capture);
 	spin_lock_init(&pcdev->lock);
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(base))
 		return PTR_ERR(base);
@@ -1663,7 +1660,6 @@ static int omap1_cam_probe(struct platform_device *pdev)
 
 exit_free_dma:
 	omap_free_dma(pcdev->dma_ch);
-exit:
 	return err;
 }
 
