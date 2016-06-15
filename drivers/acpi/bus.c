@@ -215,6 +215,8 @@ acpi_status acpi_str_to_uuid(char *str, u8 *uuid)
 }
 EXPORT_SYMBOL_GPL(acpi_str_to_uuid);
 
+static u8 pci_osc_uuid_str[] = "33DB4D5B-1FF7-401C-9657-7441C03DD766";
+
 acpi_status acpi_run_osc(acpi_handle handle, struct acpi_osc_context *context)
 {
 	acpi_status status;
@@ -267,9 +269,13 @@ acpi_status acpi_run_osc(acpi_handle handle, struct acpi_osc_context *context)
 		if (errors & OSC_REQUEST_ERROR)
 			acpi_print_osc_error(handle, context,
 				"_OSC request failed");
-		if (errors & OSC_INVALID_UUID_ERROR)
-			acpi_print_osc_error(handle, context,
-				"_OSC invalid UUID");
+		if (errors & OSC_INVALID_UUID_ERROR) {
+			if (!strcasecmp(context->uuid_str, pci_osc_uuid_str))
+				pr_info("PCI PME managed by ACPI.\n");
+			else
+				acpi_print_osc_error(handle, context,
+						     "_OSC invalid UUID");
+		}
 		if (errors & OSC_INVALID_REVISION_ERROR)
 			acpi_print_osc_error(handle, context,
 				"_OSC invalid revision");
