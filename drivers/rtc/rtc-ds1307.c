@@ -1271,6 +1271,157 @@ static bool ds1307_want_irq(const struct ds1307 *ds1307,
 	return false;
 }
 
+static int ds1307_chip_configure(struct ds1307 *ds1307)
+{
+	int tmp;
+	unsigned char *buf;
+	struct i2c_client *client = ds1307->client;
+
+	buf = ds1307->regs;
+
+	switch (ds1307->type) {
+	case ds_1337:
+	case ds_1339:
+	case ds_3231:
+	case ds_1341: {
+		static const int bbsqi_bitpos[] = {
+			[ds_1337] = 0,
+			[ds_1341] = 0,
+			[ds_1339] = DS1339_BIT_BBSQI,
+			[ds_3231] = DS3231_BIT_BBSQW,
+		};
+
+		/* get registers that the "rtc" read below won't read... */
+		tmp = ds1307->read_block_data(client,
+					      DS1337_REG_CONTROL, 2, buf);
+		if (tmp != 2) {
+			dev_dbg(&ds1307->client->dev, "read error %d\n", tmp);
+			return -EIO;
+		}
+
+		/* oscillator off?  turn it on, so clock can tick. */
+		if (ds1307->regs[0] & DS1337_BIT_nEOSC)
+			ds1307->regs[0] &= ~DS1337_BIT_nEOSC;
+
+		if (ds1307->type == ds_1341) {
+			/* Make sure we are not generating square wave
+			 * output */
+			ds1307->regs[1] &= ~DS1341_BIT_ECLK;
+
+			if (of_property_read_bool(client->dev.of_node,
+						  "disable-oscillator-stop-flag"))
+				ds1307->regs[1] |= DS1341_BIT_DOSF;
+			else
+				ds1307->regs[1] &= ~DS1341_BIT_DOSF;
+
+			if (of_property_read_bool(client->dev.of_node,
+						  "enable-glitch-filter"))
+				ds1307->regs[0] |= DS1341_BIT_EGFIL;
+			else
+				ds1307->regs[0] &= ~DS1341_BIT_EGFIL;
+
+			/*
+			 * Write status register. Control register
+			 * would be set by the code below
+			 */
+			i2c_smbus_write_byte_data(client,
+						  DS1337_REG_STATUS,
+						  ds1307->regs[1]);
+		}
+
+		/*
+		 * Disable the square wave and both alarms.
+		 * For some variants, be sure alarms can trigger when we're
+		 * running on Vbackup (BBSQI/BBSQW)
+		 */
+		ds1307->regs[0] |= DS1337_BIT_INTCN
+			| bbsqi_bitpos[ds1307->type];
+		ds1307->regs[0] &= ~(DS1337_BIT_A2IE | DS1337_BIT_A1IE);
+
+		i2c_smbus_write_byte_data(client,
+					  DS1337_REG_CONTROL,
+					  ds1307->regs[0]);
+
+		/* oscillator fault?  clear flag, and warn */
+		if (ds1307->regs[1] & DS1337_BIT_OSF) {
+			i2c_smbus_write_byte_data(client,
+						  DS1337_REG_STATUS,
+						  ds1307->regs[1] & ~DS1337_BIT_OSF);
+			dev_warn(&ds1307->client->dev, "SET TIME!\n");
+		}
+		break;
+	}
+	case rx_8025:
+		tmp = i2c_smbus_read_i2c_block_data(client,
+						    RX8025_REG_CTRL1 << 4 | 0x08,
+						    2, buf);
+		if (tmp != 2) {
+			dev_dbg(&client->dev, "read error %d\n", tmp);
+			return -EIO;
+		}
+
+		/* oscillator off?  turn it on, so clock can tick. */
+		if (!(ds1307->regs[1] & RX8025_BIT_XST)) {
+			ds1307->regs[1] |= RX8025_BIT_XST;
+			i2c_smbus_write_byte_data(client,
+						  RX8025_REG_CTRL2 << 4 | 0x08,
+						  ds1307->regs[1]);
+			dev_warn(&client->dev,
+				 "oscillator stop detected - SET TIME!\n");
+		}
+
+		if (ds1307->regs[1] & RX8025_BIT_PON) {
+			ds1307->regs[1] &= ~RX8025_BIT_PON;
+			i2c_smbus_write_byte_data(client,
+						  RX8025_REG_CTRL2 << 4 | 0x08,
+						  ds1307->regs[1]);
+			dev_warn(&client->dev, "power-on detected\n");
+		}
+
+		if (ds1307->regs[1] & RX8025_BIT_VDET) {
+			ds1307->regs[1] &= ~RX8025_BIT_VDET;
+			i2c_smbus_write_byte_data(client,
+						  RX8025_REG_CTRL2 << 4 | 0x08,
+						  ds1307->regs[1]);
+			dev_warn(&client->dev, "voltage drop detected\n");
+		}
+
+		/* make sure we are running in 24hour mode */
+		if (!(ds1307->regs[0] & RX8025_BIT_2412)) {
+			u8 hour;
+
+			/* switch to 24 hour mode */
+			i2c_smbus_write_byte_data(client,
+						  RX8025_REG_CTRL1 << 4 | 0x08,
+						  ds1307->regs[0] | RX8025_BIT_2412);
+
+			tmp = i2c_smbus_read_i2c_block_data(client,
+							    RX8025_REG_CTRL1 << 4 | 0x08,
+							    2, buf);
+			if (tmp != 2) {
+				dev_dbg(&client->dev, "read error %d\n", tmp);
+				return -EIO;
+			}
+
+			/* correct hour */
+			hour = bcd2bin(ds1307->regs[DS1307_REG_HOUR]);
+			if (hour == 12)
+				hour = 0;
+			if (ds1307->regs[DS1307_REG_HOUR] & DS1307_BIT_PM)
+				hour += 12;
+
+			i2c_smbus_write_byte_data(client,
+						  DS1307_REG_HOUR << 4 | 0x08,
+						  hour);
+		}
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
 static int ds1307_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
@@ -1283,12 +1434,6 @@ static int ds1307_probe(struct i2c_client *client,
 	struct ds1307_platform_data *pdata = dev_get_platdata(&client->dev);
 	irq_handler_t	irq_handler = ds1307_irq;
 
-	static const int	bbsqi_bitpos[] = {
-		[ds_1337] = 0,
-		[ds_1341] = 0,
-		[ds_1339] = DS1339_BIT_BBSQI,
-		[ds_3231] = DS3231_BIT_BBSQW,
-	};
 	const struct rtc_class_ops *rtc_ops = &ds13xx_rtc_ops;
 
 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA)
@@ -1327,134 +1472,11 @@ static int ds1307_probe(struct i2c_client *client,
 		ds1307->write_block_data = ds1307_write_block_data;
 	}
 
+	err = ds1307_chip_configure(ds1307);
+	if (err < 0)
+		return err;
+
 	switch (ds1307->type) {
-	case ds_1337:
-	case ds_1339:
-	case ds_3231:
-	case ds_1341:
-		/* get registers that the "rtc" read below won't read... */
-		tmp = ds1307->read_block_data(ds1307->client,
-				DS1337_REG_CONTROL, 2, buf);
-		if (tmp != 2) {
-			dev_dbg(&client->dev, "read error %d\n", tmp);
-			err = -EIO;
-			goto exit;
-		}
-
-		/* oscillator off?  turn it on, so clock can tick. */
-		if (ds1307->regs[0] & DS1337_BIT_nEOSC)
-			ds1307->regs[0] &= ~DS1337_BIT_nEOSC;
-
-		if (ds1307->type == ds_1341) {
-			/* Make sure we are not generating square wave
-			 * output */
-			ds1307->regs[1] &= ~DS1341_BIT_ECLK;
-
-			if (of_property_read_bool(client->dev.of_node,
-						  "disable-oscillator-stop-flag"))
-				ds1307->regs[1] |= DS1341_BIT_DOSF;
-			else
-				ds1307->regs[1] &= ~DS1341_BIT_DOSF;
-
-			if (of_property_read_bool(client->dev.of_node,
-						  "enable-glitch-filter"))
-				ds1307->regs[0] |= DS1341_BIT_EGFIL;
-			else
-				ds1307->regs[0] &= ~DS1341_BIT_EGFIL;
-
-			/*
-			 * Write status register. Control register
-			 * would be set by the code below
-			 */
-			i2c_smbus_write_byte_data(client, DS1337_REG_STATUS,
-						  ds1307->regs[1]);
-		}
-
-		/*
-		 * Disable the square wave and both alarms.
-		 * For some variants, be sure alarms can trigger when we're
-		 * running on Vbackup (BBSQI/BBSQW)
-		 */
-		ds1307->regs[0] |= DS1337_BIT_INTCN
-			| bbsqi_bitpos[ds1307->type];
-		ds1307->regs[0] &= ~(DS1337_BIT_A2IE | DS1337_BIT_A1IE);
-
-		i2c_smbus_write_byte_data(client, DS1337_REG_CONTROL,
-							ds1307->regs[0]);
-
-		/* oscillator fault?  clear flag, and warn */
-		if (ds1307->regs[1] & DS1337_BIT_OSF) {
-			i2c_smbus_write_byte_data(client, DS1337_REG_STATUS,
-				ds1307->regs[1] & ~DS1337_BIT_OSF);
-			dev_warn(&client->dev, "SET TIME!\n");
-		}
-		break;
-
-	case rx_8025:
-		tmp = i2c_smbus_read_i2c_block_data(ds1307->client,
-				RX8025_REG_CTRL1 << 4 | 0x08, 2, buf);
-		if (tmp != 2) {
-			dev_dbg(&client->dev, "read error %d\n", tmp);
-			err = -EIO;
-			goto exit;
-		}
-
-		/* oscillator off?  turn it on, so clock can tick. */
-		if (!(ds1307->regs[1] & RX8025_BIT_XST)) {
-			ds1307->regs[1] |= RX8025_BIT_XST;
-			i2c_smbus_write_byte_data(client,
-						  RX8025_REG_CTRL2 << 4 | 0x08,
-						  ds1307->regs[1]);
-			dev_warn(&client->dev,
-				 "oscillator stop detected - SET TIME!\n");
-		}
-
-		if (ds1307->regs[1] & RX8025_BIT_PON) {
-			ds1307->regs[1] &= ~RX8025_BIT_PON;
-			i2c_smbus_write_byte_data(client,
-						  RX8025_REG_CTRL2 << 4 | 0x08,
-						  ds1307->regs[1]);
-			dev_warn(&client->dev, "power-on detected\n");
-		}
-
-		if (ds1307->regs[1] & RX8025_BIT_VDET) {
-			ds1307->regs[1] &= ~RX8025_BIT_VDET;
-			i2c_smbus_write_byte_data(client,
-						  RX8025_REG_CTRL2 << 4 | 0x08,
-						  ds1307->regs[1]);
-			dev_warn(&client->dev, "voltage drop detected\n");
-		}
-
-		/* make sure we are running in 24hour mode */
-		if (!(ds1307->regs[0] & RX8025_BIT_2412)) {
-			u8 hour;
-
-			/* switch to 24 hour mode */
-			i2c_smbus_write_byte_data(client,
-						  RX8025_REG_CTRL1 << 4 | 0x08,
-						  ds1307->regs[0] |
-						  RX8025_BIT_2412);
-
-			tmp = i2c_smbus_read_i2c_block_data(ds1307->client,
-					RX8025_REG_CTRL1 << 4 | 0x08, 2, buf);
-			if (tmp != 2) {
-				dev_dbg(&client->dev, "read error %d\n", tmp);
-				err = -EIO;
-				goto exit;
-			}
-
-			/* correct hour */
-			hour = bcd2bin(ds1307->regs[DS1307_REG_HOUR]);
-			if (hour == 12)
-				hour = 0;
-			if (ds1307->regs[DS1307_REG_HOUR] & DS1307_BIT_PM)
-				hour += 12;
-
-			i2c_smbus_write_byte_data(client,
-						  DS1307_REG_HOUR << 4 | 0x08,
-						  hour);
-		}
-		break;
 	case ds_1388:
 		ds1307->offset = 1; /* Seconds starts at 1 */
 		break;
