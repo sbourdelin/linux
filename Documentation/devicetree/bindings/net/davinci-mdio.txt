@@ -3,7 +3,7 @@ TI SoC Davinci/Keystone2 MDIO Controller Device Tree Bindings
 
 Required properties:
 - compatible		: Should be "ti,davinci_mdio", "ti,keystone_mdio",
-			  "ti,am4372-mdio"
+			  "ti,am4372-mdio", "ti,cpsw-mdio"
 - reg			: physical base address and size of the davinci mdio
 			  registers map
 - bus_freq		: Mdio Bus frequency
