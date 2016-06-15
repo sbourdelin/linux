@@ -1424,87 +1424,100 @@ static int ds1307_chip_configure(const struct ds1307 *ds1307)
 
 static int ds1307_chip_sanity_check(const struct ds1307 *ds1307)
 {
-	int tmp;
+	int tmp, retries;
 	u8  regs[DS1307_REG_COUNT];
 	struct i2c_client *client = ds1307->client;
 
-read_rtc:
-	/* read RTC registers */
-	tmp = ds1307->read_block_data(ds1307->client, ds1307->offset, 8, regs);
-	if (tmp != 8) {
-		dev_dbg(&client->dev, "read error %d\n", tmp);
-		return -EIO;
-	}
-
-	/*
-	 * minimal sanity checking; some chips (like DS1340) don't
-	 * specify the extra bits as must-be-zero, but there are
-	 * still a few values that are clearly out-of-range.
-	 */
-	tmp = regs[DS1307_REG_SECS];
-	switch (ds1307->type) {
-	case ds_1307:
-	case m41t00:
-		/* clock halted?  turn it on, so clock can tick. */
-		if (tmp & DS1307_BIT_CH) {
-			i2c_smbus_write_byte_data(client, DS1307_REG_SECS, 0);
-			dev_warn(&client->dev, "SET TIME!\n");
-			goto read_rtc;
-		}
-		break;
-	case ds_1338:
-		/* clock halted?  turn it on, so clock can tick. */
-		if (tmp & DS1307_BIT_CH)
-			i2c_smbus_write_byte_data(client, DS1307_REG_SECS, 0);
-
-		/* oscillator fault?  clear flag, and warn */
-		if (regs[DS1307_REG_CONTROL] & DS1338_BIT_OSF) {
-			i2c_smbus_write_byte_data(client, DS1307_REG_CONTROL,
-					regs[DS1307_REG_CONTROL]
-					& ~DS1338_BIT_OSF);
-			dev_warn(&client->dev, "SET TIME!\n");
-			goto read_rtc;
-		}
-		break;
-	case ds_1340:
-		/* clock halted?  turn it on, so clock can tick. */
-		if (tmp & DS1340_BIT_nEOSC)
-			i2c_smbus_write_byte_data(client, DS1307_REG_SECS, 0);
-
-		tmp = i2c_smbus_read_byte_data(client, DS1340_REG_FLAG);
-		if (tmp < 0) {
+	for (retries = 0; retries < 5; retries++) {
+		/* read RTC registers */
+		tmp = ds1307->read_block_data(ds1307->client,
+					      ds1307->offset, 8, regs);
+		if (tmp != 8) {
 			dev_dbg(&client->dev, "read error %d\n", tmp);
 			return -EIO;
 		}
 
-		/* oscillator fault?  clear flag, and warn */
-		if (tmp & DS1340_BIT_OSF) {
-			i2c_smbus_write_byte_data(client, DS1340_REG_FLAG, 0);
-			dev_warn(&client->dev, "SET TIME!\n");
-		}
-		break;
-	case mcp794xx:
-		/* make sure that the backup battery is enabled */
-		if (!(regs[DS1307_REG_WDAY] & MCP794XX_BIT_VBATEN)) {
-			i2c_smbus_write_byte_data(client, DS1307_REG_WDAY,
-					regs[DS1307_REG_WDAY]
-					| MCP794XX_BIT_VBATEN);
+		/*
+		 * minimal sanity checking; some chips (like DS1340)
+		 * don't specify the extra bits as must-be-zero, but
+		 * there are still a few values that are clearly
+		 * out-of-range.
+		 */
+		tmp = regs[DS1307_REG_SECS];
+		switch (ds1307->type) {
+		case ds_1307:
+		case m41t00:
+			/* clock halted?  turn it on, so clock can tick. */
+			if (tmp & DS1307_BIT_CH) {
+				i2c_smbus_write_byte_data(client,
+							  DS1307_REG_SECS, 0);
+				dev_warn(&client->dev, "SET TIME!\n");
+				continue;
+			}
+			break;
+		case ds_1338:
+			/* clock halted?  turn it on, so clock can tick. */
+			if (tmp & DS1307_BIT_CH)
+				i2c_smbus_write_byte_data(client,
+							  DS1307_REG_SECS, 0);
+
+			/* oscillator fault?  clear flag, and warn */
+			if (regs[DS1307_REG_CONTROL] & DS1338_BIT_OSF) {
+				i2c_smbus_write_byte_data(client,
+							  DS1307_REG_CONTROL,
+							  regs[DS1307_REG_CONTROL]
+							  & ~DS1338_BIT_OSF);
+				dev_warn(&client->dev, "SET TIME!\n");
+				continue;
+			}
+			break;
+		case ds_1340:
+			/* clock halted?  turn it on, so clock can tick. */
+			if (tmp & DS1340_BIT_nEOSC)
+				i2c_smbus_write_byte_data(client,
+							  DS1307_REG_SECS, 0);
+
+			tmp = i2c_smbus_read_byte_data(client, DS1340_REG_FLAG);
+			if (tmp < 0) {
+				dev_dbg(&client->dev, "read error %d\n", tmp);
+				return -EIO;
+			}
+
+			/* oscillator fault?  clear flag, and warn */
+			if (tmp & DS1340_BIT_OSF) {
+				i2c_smbus_write_byte_data(client,
+							  DS1340_REG_FLAG, 0);
+				dev_warn(&client->dev, "SET TIME!\n");
+			}
+			return 0;
+
+		case mcp794xx:
+			/* make sure that the backup battery is enabled */
+			if (!(regs[DS1307_REG_WDAY] & MCP794XX_BIT_VBATEN)) {
+				i2c_smbus_write_byte_data(client,
+							  DS1307_REG_WDAY,
+							  regs[DS1307_REG_WDAY]
+							  | MCP794XX_BIT_VBATEN);
+			}
+
+			/* clock halted?  turn it on, so clock can tick. */
+			if (!(tmp & MCP794XX_BIT_ST)) {
+				i2c_smbus_write_byte_data(client,
+							  DS1307_REG_SECS,
+							  MCP794XX_BIT_ST);
+				dev_warn(&client->dev, "SET TIME!\n");
+				continue;
+			}
+
+			break;
+		default:
+			break;
 		}
 
-		/* clock halted?  turn it on, so clock can tick. */
-		if (!(tmp & MCP794XX_BIT_ST)) {
-			i2c_smbus_write_byte_data(client, DS1307_REG_SECS,
-					MCP794XX_BIT_ST);
-			dev_warn(&client->dev, "SET TIME!\n");
-			goto read_rtc;
-		}
-
-		break;
-	default:
-		break;
+		return 0;
 	}
 
-	return 0;
+	return -EIO;
 }
 
 static int ds1307_probe(struct i2c_client *client,
