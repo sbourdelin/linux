@@ -491,8 +491,11 @@ int power_supply_get_property(struct power_supply *psy,
 			    enum power_supply_property psp,
 			    union power_supply_propval *val)
 {
-	if (atomic_read(&psy->use_cnt) <= 0)
+	if (atomic_read(&psy->use_cnt) <= 0) {
+		if (!psy->initialized)
+			return -EAGAIN;
 		return -ENODEV;
+	}
 
 	return psy->desc->get_property(psy, psp, val);
 }
@@ -770,6 +773,7 @@ __power_supply_register(struct device *parent,
 	if (rc)
 		goto create_triggers_failed;
 
+	psy->initialized = true;
 	/*
 	 * Update use_cnt after any uevents (most notably from device_add()).
 	 * We are here still during driver's probe but
