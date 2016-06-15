@@ -35,6 +35,7 @@ enum ds_type {
 	ds_1338,
 	ds_1339,
 	ds_1340,
+	ds_1341,
 	ds_1388,
 	ds_3231,
 	m41t00,
@@ -178,6 +179,7 @@ static const struct i2c_device_id ds1307_id[] = {
 	{ "ds1337", ds_1337 },
 	{ "ds1338", ds_1338 },
 	{ "ds1339", ds_1339 },
+	{ "ds1341", ds_1341 },
 	{ "ds1388", ds_1388 },
 	{ "ds1340", ds_1340 },
 	{ "ds3231", ds_3231 },
@@ -424,6 +426,7 @@ static int ds1307_set_time(struct device *dev, struct rtc_time *t)
 	case ds_1337:
 	case ds_1339:
 	case ds_3231:
+	case ds_1341:
 		buf[DS1307_REG_MONTH] |= DS1337_BIT_CENTURY;
 		break;
 	case ds_1340:
@@ -1242,6 +1245,7 @@ static int ds1307_probe(struct i2c_client *client,
 
 	static const int	bbsqi_bitpos[] = {
 		[ds_1337] = 0,
+		[ds_1341] = 0,
 		[ds_1339] = DS1339_BIT_BBSQI,
 		[ds_3231] = DS3231_BIT_BBSQW,
 	};
@@ -1301,6 +1305,7 @@ static int ds1307_probe(struct i2c_client *client,
 	case ds_1337:
 	case ds_1339:
 	case ds_3231:
+	case ds_1341:
 		/* get registers that the "rtc" read below won't read... */
 		tmp = ds1307->read_block_data(ds1307->client,
 				DS1337_REG_CONTROL, 2, buf);
