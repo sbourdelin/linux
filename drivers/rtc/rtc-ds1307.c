@@ -103,9 +103,11 @@ enum ds_type {
 
 #define DS13XX_TRICKLE_CHARGER_MAGIC	0xa0
 
-#define RX8025_REG_CTRL1	0x0e
+#define RX8025_REG_CTRL1_	0x0e
+#define RX8025_REG_CTRL1	((RX8025_REG_CTRL1_ << 4) | 0x08)
 #	define RX8025_BIT_2412		0x20
-#define RX8025_REG_CTRL2	0x0f
+#define RX8025_REG_CTRL2_	0x0f
+#define RX8025_REG_CTRL2	((RX8025_REG_CTRL2_ << 4) | 0x08)
 #	define RX8025_BIT_PON		0x10
 #	define RX8025_BIT_VDET		0x40
 #	define RX8025_BIT_XST		0x20
@@ -1353,7 +1355,7 @@ static int ds1307_chip_configure(const struct ds1307 *ds1307)
 	}
 	case rx_8025:
 		tmp = i2c_smbus_read_i2c_block_data(client,
-						    RX8025_REG_CTRL1 << 4 | 0x08,
+						    RX8025_REG_CTRL1,
 						    2, regs);
 		if (tmp != 2) {
 			dev_dbg(&client->dev, "read error %d\n", tmp);
@@ -1364,7 +1366,7 @@ static int ds1307_chip_configure(const struct ds1307 *ds1307)
 		if (!(regs[1] & RX8025_BIT_XST)) {
 			regs[1] |= RX8025_BIT_XST;
 			i2c_smbus_write_byte_data(client,
-						  RX8025_REG_CTRL2 << 4 | 0x08,
+						  RX8025_REG_CTRL2,
 						  regs[1]);
 			dev_warn(&client->dev,
 				 "oscillator stop detected - SET TIME!\n");
@@ -1373,7 +1375,7 @@ static int ds1307_chip_configure(const struct ds1307 *ds1307)
 		if (regs[1] & RX8025_BIT_PON) {
 			regs[1] &= ~RX8025_BIT_PON;
 			i2c_smbus_write_byte_data(client,
-						  RX8025_REG_CTRL2 << 4 | 0x08,
+						  RX8025_REG_CTRL2,
 						  regs[1]);
 			dev_warn(&client->dev, "power-on detected\n");
 		}
@@ -1381,7 +1383,7 @@ static int ds1307_chip_configure(const struct ds1307 *ds1307)
 		if (regs[1] & RX8025_BIT_VDET) {
 			regs[1] &= ~RX8025_BIT_VDET;
 			i2c_smbus_write_byte_data(client,
-						  RX8025_REG_CTRL2 << 4 | 0x08,
+						  RX8025_REG_CTRL2,
 						  regs[1]);
 			dev_warn(&client->dev, "voltage drop detected\n");
 		}
@@ -1392,11 +1394,11 @@ static int ds1307_chip_configure(const struct ds1307 *ds1307)
 
 			/* switch to 24 hour mode */
 			i2c_smbus_write_byte_data(client,
-						  RX8025_REG_CTRL1 << 4 | 0x08,
+						  RX8025_REG_CTRL1,
 						  regs[0] | RX8025_BIT_2412);
 
 			tmp = i2c_smbus_read_i2c_block_data(client,
-							    RX8025_REG_CTRL1 << 4 | 0x08,
+							    RX8025_REG_CTRL1,
 							    2, regs);
 			if (tmp != 2) {
 				dev_dbg(&client->dev, "read error %d\n", tmp);
