@@ -344,6 +344,8 @@ static int cpu_uevent(struct device *dev, struct kobj_uevent_env *env)
 }
 #endif
 
+const struct attribute_group * __weak arch_get_cpu_group(void) { return NULL; }
+
 /*
  * register_cpu - Setup a sysfs device for a CPU.
  * @cpu - cpu->hotpluggable field set to 1 will generate a control file in
@@ -354,6 +356,8 @@ static int cpu_uevent(struct device *dev, struct kobj_uevent_env *env)
  */
 int register_cpu(struct cpu *cpu, int num)
 {
+	const struct attribute_group *arch_grp;
+	int grp_size;
 	int error;
 
 	cpu->node_id = cpu_to_node(num);
@@ -368,13 +372,31 @@ int register_cpu(struct cpu *cpu, int num)
 	cpu->dev.bus->uevent = cpu_uevent;
 #endif
 	cpu->dev.groups = common_cpu_attr_groups;
-	if (cpu->hotpluggable)
+	grp_size = ARRAY_SIZE(common_cpu_attr_groups);
+
+	if (cpu->hotpluggable) {
 		cpu->dev.groups = hotplugable_cpu_attr_groups;
+		grp_size = ARRAY_SIZE(hotplugable_cpu_attr_groups);
+	}
+
+	arch_grp = arch_get_cpu_group();
+	if (arch_grp) {
+		const struct attribute_group **tmp;
+
+		tmp = kcalloc(grp_size + 1, sizeof(struct attribute_group *), GFP_KERNEL);
+		if (tmp) {
+			memcpy(tmp, cpu->dev.groups, sizeof(*tmp) * grp_size);
+			tmp[grp_size - 1] = arch_grp;
+			cpu->dev.groups = tmp;
+		}
+	}
+
 	error = device_register(&cpu->dev);
-	if (!error)
+	if (!error) {
 		per_cpu(cpu_sys_devices, num) = &cpu->dev;
-	if (!error)
 		register_cpu_under_node(num, cpu_to_node(num));
+	}
+
 
 	return error;
 }

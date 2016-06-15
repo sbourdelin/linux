@@ -210,6 +210,8 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 	}
 
 	check_mpx_erratum(c);
+
+	setup_force_cpu_cap(X86_FEATURE_EPB);
 }
 
 #ifdef CONFIG_X86_32

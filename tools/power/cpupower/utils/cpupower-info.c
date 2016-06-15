@@ -15,6 +15,8 @@
 #include "helpers/helpers.h"
 #include "helpers/sysfs.h"
 
+#include "../../utils/utils.h"
+
 static struct option set_opts[] = {
      {"perf-bias", optional_argument, NULL, 'b'},
      { },
@@ -93,7 +95,7 @@ int cmd_info(int argc, char **argv)
 		}
 
 		if (params.perf_bias) {
-			ret = msr_intel_get_perf_bias(cpu);
+			ret = get_pref_hint(cpu);
 			if (ret < 0) {
 				fprintf(stderr,
 			_("Could not read perf-bias value[%d]\n"), ret);

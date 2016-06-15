@@ -43,6 +43,8 @@
 #include <linux/capability.h>
 #include <errno.h>
 
+#include "../../utils/utils.h"
+
 char *proc_stat = "/proc/stat";
 FILE *outf;
 int *fd_percpu;
@@ -2353,8 +2355,8 @@ dump_cstate_pstate_config_info(unsigned int family, unsigned int model)
  */
 int print_epb(struct thread_data *t, struct core_data *c, struct pkg_data *p)
 {
-	unsigned long long msr;
 	char *epb_string;
+	int pref_hint;
 	int cpu;
 
 	if (!has_epb)
@@ -2371,10 +2373,11 @@ int print_epb(struct thread_data *t, struct core_data *c, struct pkg_data *p)
 		return -1;
 	}
 
-	if (get_msr(cpu, MSR_IA32_ENERGY_PERF_BIAS, &msr))
+	pref_hint = get_pref_hint(cpu);
+	if (pref_hint < 0)
 		return 0;
 
-	switch (msr & 0xF) {
+	switch (pref_hint) {
 	case ENERGY_PERF_BIAS_PERFORMANCE:
 		epb_string = "performance";
 		break;
@@ -2388,7 +2391,7 @@ int print_epb(struct thread_data *t, struct core_data *c, struct pkg_data *p)
 		epb_string = "custom";
 		break;
 	}
-	fprintf(outf, "cpu%d: MSR_IA32_ENERGY_PERF_BIAS: 0x%08llx (%s)\n", cpu, msr, epb_string);
+	fprintf(outf, "cpu%d: %s\n", cpu, epb_string);
 
 	return 0;
 }

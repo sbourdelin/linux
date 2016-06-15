@@ -31,6 +31,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../../utils/utils.h"
+
 unsigned int verbose;		/* set with -v */
 unsigned int read_only;		/* set with -r */
 char *progname;
@@ -68,8 +70,6 @@ void usage(void)
 		progname);
 	exit(1);
 }
-
-#define MSR_IA32_ENERGY_PERF_BIAS	0x000001b0
 
 #define	BIAS_PERFORMANCE		0
 #define BIAS_BALANCE			6
@@ -184,79 +184,31 @@ void validate_cpuid(void)
 	return;	/* success */
 }
 
-unsigned long long get_msr(int cpu, int offset)
+void print_bias(int cpu)
 {
-	unsigned long long msr;
-	char msr_path[32];
-	int retval;
-	int fd;
+	unsigned int val;
 
-	sprintf(msr_path, "/dev/cpu/%d/msr", cpu);
-	fd = open(msr_path, O_RDONLY);
-	if (fd < 0) {
-		printf("Try \"# modprobe msr\"\n");
-		perror(msr_path);
-		exit(1);
-	}
+	val = get_pref_hint(cpu);
+	if (val < 0)
+		return;
 
-	retval = pread(fd, &msr, sizeof msr, offset);
-
-	if (retval != sizeof msr) {
-		printf("pread cpu%d 0x%x = %d\n", cpu, offset, retval);
-		exit(-2);
-	}
-	close(fd);
-	return msr;
-}
-
-unsigned long long  put_msr(int cpu, unsigned long long new_msr, int offset)
-{
-	unsigned long long old_msr;
-	char msr_path[32];
-	int retval;
-	int fd;
-
-	sprintf(msr_path, "/dev/cpu/%d/msr", cpu);
-	fd = open(msr_path, O_RDWR);
-	if (fd < 0) {
-		perror(msr_path);
-		exit(1);
-	}
-
-	retval = pread(fd, &old_msr, sizeof old_msr, offset);
-	if (retval != sizeof old_msr) {
-		perror("pwrite");
-		printf("pread cpu%d 0x%x = %d\n", cpu, offset, retval);
-		exit(-2);
-	}
-
-	retval = pwrite(fd, &new_msr, sizeof new_msr, offset);
-	if (retval != sizeof new_msr) {
-		perror("pwrite");
-		printf("pwrite cpu%d 0x%x = %d\n", cpu, offset, retval);
-		exit(-2);
-	}
-
-	close(fd);
-
-	return old_msr;
-}
-
-void print_msr(int cpu)
-{
-	printf("cpu%d: 0x%016llx\n",
-		cpu, get_msr(cpu, MSR_IA32_ENERGY_PERF_BIAS));
+	printf("cpu%d: 0x%08x\n", cpu, val);
 }
 
 void update_msr(int cpu)
 {
-	unsigned long long previous_msr;
+	unsigned int previous_val;
 
-	previous_msr = put_msr(cpu, new_bias, MSR_IA32_ENERGY_PERF_BIAS);
+	previous_val = get_pref_hint(cpu);
+	if (previous_val < 0)
+		return;
+
+	if (set_pref_hint(cpu, new_bias))
+		return;
 
 	if (verbose)
-		printf("cpu%d  msr0x%x 0x%016llx -> 0x%016llx\n",
-			cpu, MSR_IA32_ENERGY_PERF_BIAS, previous_msr, new_bias);
+		printf("cpu%d  pref hint: 0x%08x -> 0x%08x\n",
+			cpu, previous_val, new_bias);
 
 	return;
 }
@@ -310,12 +262,12 @@ int main(int argc, char **argv)
 
 	if (cpu != -1) {
 		if (read_only)
-			print_msr(cpu);
+			print_bias(cpu);
 		else
 			update_msr(cpu);
 	} else {
 		if (read_only)
-			for_every_cpu(print_msr);
+			for_every_cpu(print_bias);
 		else
 			for_every_cpu(update_msr);
 	}

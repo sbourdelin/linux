@@ -16,6 +16,8 @@
 #include "helpers/sysfs.h"
 #include "helpers/bitmask.h"
 
+#include "../../utils/utils.h"
+
 static struct option set_opts[] = {
 	{"perf-bias", required_argument, NULL, 'b'},
 	{ },
@@ -87,7 +89,7 @@ int cmd_set(int argc, char **argv)
 		}
 
 		if (params.perf_bias) {
-			ret = msr_intel_set_perf_bias(cpu, perf_bias);
+			ret = set_pref_hint(cpu, perf_bias);
 			if (ret) {
 				fprintf(stderr, _("Error setting perf-bias "
 						  "value on CPU %d\n"), cpu);
