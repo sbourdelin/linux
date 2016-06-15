@@ -1680,11 +1680,19 @@ static acpi_status acpi_spi_add_device(acpi_handle handle, u32 level,
 		return AE_OK;
 	}
 
+	if (adev->data.of_compatible) {
+		ret = acpi_of_modalias(adev, spi->modalias, sizeof(spi->modalias));
+		if (ret) {
+			spi_dev_put(spi);
+			return AE_NOT_FOUND;
+		}
+	} else
+		strlcpy(spi->modalias, acpi_device_hid(adev), sizeof(spi->modalias));
+
 	if (spi->irq < 0)
 		spi->irq = acpi_dev_gpio_irq_get(adev, 0);
 
 	adev->power.flags.ignore_parent = true;
-	strlcpy(spi->modalias, acpi_device_hid(adev), sizeof(spi->modalias));
 	if (spi_add_device(spi)) {
 		adev->power.flags.ignore_parent = false;
 		dev_err(&master->dev, "failed to add SPI device %s from ACPI\n",
