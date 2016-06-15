@@ -4837,7 +4837,8 @@ int __sched __cond_resched_softirq(void)
 {
 	BUG_ON(!in_softirq());
 
-	if (should_resched(SOFTIRQ_DISABLE_OFFSET)) {
+	if (should_resched(SOFTIRQ_DISABLE_OFFSET) ||
+	    local_softirq_pending()) {
 		local_bh_enable();
 		preempt_schedule_common();
 		local_bh_disable();
