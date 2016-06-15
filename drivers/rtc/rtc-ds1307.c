@@ -1344,66 +1344,23 @@ static int ds1307_chip_configure(const struct ds1307 *ds1307)
 					  DS1337_REG_CONTROL,
 					  regs[0]);
 
-		/* oscillator fault?  clear flag, and warn */
-		if (regs[1] & DS1337_BIT_OSF) {
-			i2c_smbus_write_byte_data(client,
-						  DS1337_REG_STATUS,
-						  regs[1] & ~DS1337_BIT_OSF);
-			dev_warn(&ds1307->client->dev, "SET TIME!\n");
-		}
 		break;
 	}
 	case rx_8025:
-		tmp = i2c_smbus_read_i2c_block_data(client,
-						    RX8025_REG_CTRL1,
-						    2, regs);
-		if (tmp != 2) {
+		tmp = i2c_smbus_read_byte_data(client, RX8025_REG_CTRL1);
+		if (tmp < 0) {
 			dev_dbg(&client->dev, "read error %d\n", tmp);
 			return -EIO;
 		}
 
-		/* oscillator off?  turn it on, so clock can tick. */
-		if (!(regs[1] & RX8025_BIT_XST)) {
-			regs[1] |= RX8025_BIT_XST;
-			i2c_smbus_write_byte_data(client,
-						  RX8025_REG_CTRL2,
-						  regs[1]);
-			dev_warn(&client->dev,
-				 "oscillator stop detected - SET TIME!\n");
-		}
-
-		if (regs[1] & RX8025_BIT_PON) {
-			regs[1] &= ~RX8025_BIT_PON;
-			i2c_smbus_write_byte_data(client,
-						  RX8025_REG_CTRL2,
-						  regs[1]);
-			dev_warn(&client->dev, "power-on detected\n");
-		}
-
-		if (regs[1] & RX8025_BIT_VDET) {
-			regs[1] &= ~RX8025_BIT_VDET;
-			i2c_smbus_write_byte_data(client,
-						  RX8025_REG_CTRL2,
-						  regs[1]);
-			dev_warn(&client->dev, "voltage drop detected\n");
-		}
-
 		/* make sure we are running in 24hour mode */
-		if (!(regs[0] & RX8025_BIT_2412)) {
+		if (!(tmp & RX8025_BIT_2412)) {
 			u8 hour;
 
 			/* switch to 24 hour mode */
 			i2c_smbus_write_byte_data(client,
 						  RX8025_REG_CTRL1,
-						  regs[0] | RX8025_BIT_2412);
-
-			tmp = i2c_smbus_read_i2c_block_data(client,
-							    RX8025_REG_CTRL1,
-							    2, regs);
-			if (tmp != 2) {
-				dev_dbg(&client->dev, "read error %d\n", tmp);
-				return -EIO;
-			}
+						  tmp | RX8025_BIT_2412);
 
 			/* correct hour */
 			hour = bcd2bin(regs[DS1307_REG_HOUR]);
@@ -1486,6 +1443,27 @@ static int ds1307_chip_sanity_check(const struct ds1307 *ds1307)
 				continue;
 			}
 			break;
+
+		case ds_1337:
+		case ds_1339:
+		case ds_3231:
+		case ds_1341:
+			tmp = i2c_smbus_read_byte_data(client,
+						       DS1337_REG_STATUS);
+			if (tmp < 0) {
+				dev_dbg(&client->dev, "read error %d\n", tmp);
+				return -EIO;
+			}
+
+			/* oscillator fault?  clear flag, and warn */
+			if (tmp & DS1337_BIT_OSF) {
+				i2c_smbus_write_byte_data(client,
+							  DS1337_REG_STATUS,
+							  regs[1] & ~DS1337_BIT_OSF);
+				ds1307_report_oscillator_fault(ds1307);
+			}
+			return 0;
+
 		case ds_1340:
 			/* clock halted?  turn it on, so clock can tick. */
 			if (tmp & DS1340_BIT_nEOSC) {
@@ -1529,6 +1507,40 @@ static int ds1307_chip_sanity_check(const struct ds1307 *ds1307)
 				continue;
 			}
 
+			break;
+
+		case rx_8025:
+			tmp = i2c_smbus_read_byte_data(client,
+						       RX8025_REG_CTRL2);
+			if (tmp < 0) {
+				dev_dbg(&client->dev, "read error %d\n", tmp);
+				return -EIO;
+			}
+
+			/* oscillator off?  turn it on, so clock can tick. */
+			if (!(tmp & RX8025_BIT_XST)) {
+				tmp |= RX8025_BIT_XST;
+				i2c_smbus_write_byte_data(client,
+							  RX8025_REG_CTRL2,
+							  tmp);
+				ds1307_report_clock_halt(ds1307);
+			}
+
+			if (tmp & RX8025_BIT_PON) {
+				tmp &= ~RX8025_BIT_PON;
+				i2c_smbus_write_byte_data(client,
+							  RX8025_REG_CTRL2,
+							  tmp);
+				dev_warn(&client->dev, "power-on detected\n");
+			}
+
+			if (tmp & RX8025_BIT_VDET) {
+				tmp &= ~RX8025_BIT_VDET;
+				i2c_smbus_write_byte_data(client,
+							  RX8025_REG_CTRL2,
+							  tmp);
+				dev_warn(&client->dev, "voltage drop detected\n");
+			}
 			break;
 		default:
 			break;
