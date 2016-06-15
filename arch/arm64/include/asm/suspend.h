@@ -46,5 +46,6 @@ int swsusp_arch_suspend(void);
 int swsusp_arch_resume(void);
 int arch_hibernation_header_save(void *addr, unsigned int max_size);
 int arch_hibernation_header_restore(void *addr);
+int arch_hibernation_disable_cpus(bool suspend);
 
 #endif
