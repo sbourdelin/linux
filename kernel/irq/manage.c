@@ -938,8 +938,7 @@ static int irq_thread(void *data)
 	irqreturn_t (*handler_fn)(struct irq_desc *desc,
 			struct irqaction *action);
 
-	if (force_irqthreads && test_bit(IRQTF_FORCED_THREAD,
-					&action->thread_flags))
+	if (test_bit(IRQTF_FORCED_THREAD, &action->thread_flags))
 		handler_fn = irq_forced_thread_fn;
 	else
 		handler_fn = irq_thread_fn;
@@ -1052,8 +1051,8 @@ static void irq_release_resources(struct irq_desc *desc)
 		c->irq_release_resources(d);
 }
 
-static int
-setup_irq_thread(struct irqaction *new, unsigned int irq, bool secondary)
+static struct task_struct *
+create_irq_thread(struct irqaction *new, unsigned int irq, bool secondary)
 {
 	struct task_struct *t;
 	struct sched_param param = {
@@ -1070,7 +1069,7 @@ setup_irq_thread(struct irqaction *new, unsigned int irq, bool secondary)
 	}
 
 	if (IS_ERR(t))
-		return PTR_ERR(t);
+		return t;
 
 	sched_setscheduler_nocheck(t, SCHED_FIFO, &param);
 
@@ -1080,6 +1079,17 @@ setup_irq_thread(struct irqaction *new, unsigned int irq, bool secondary)
 	 * references an already freed task_struct.
 	 */
 	get_task_struct(t);
+	return t;
+}
+
+static int
+setup_irq_thread(struct irqaction *new, unsigned int irq, bool secondary)
+{
+	struct task_struct *t = create_irq_thread(new, irq, secondary);
+
+	if (IS_ERR(t))
+		return PTR_ERR(t);
+
 	new->thread = t;
 	/*
 	 * Tell the thread to set its affinity. This is
@@ -1526,6 +1536,183 @@ static struct irqaction *__free_irq(unsigned int irq, void *dev_id)
 	kfree(action->secondary);
 	return action;
 }
+
+#ifdef CONFIG_IRQ_FORCED_THREADING
+/*
+ * Internal function to reconfigure an irqaction - change it to
+ * threaded mode if the specified task struct is not NULL and vice versa
+ */
+void __irq_reconfigure_action(struct irq_desc *desc, struct irqaction *action,
+			      struct task_struct *t)
+{
+	action->flags &= ~IRQF_ONESHOT;
+	action->thread_mask = 0;
+	if (!t) {
+		if (action->thread_fn) {
+			action->handler = action->thread_fn;
+			action->thread_fn = NULL;
+		}
+		clear_bit(IRQTF_FORCED_THREAD, &action->thread_flags);
+		action->thread = NULL;
+		return;
+	}
+
+	/* Force the irq in threaded mode */
+	if (!action->thread_fn) {
+		action->thread_fn = action->handler;
+		action->handler = irq_default_primary_handler;
+	}
+
+	action->thread = t;
+	set_bit(IRQTF_FORCED_THREAD, &action->thread_flags);
+	set_bit(IRQTF_AFFINITY, &action->thread_flags);
+
+	if (!(desc->irq_data.chip->flags & IRQCHIP_ONESHOT_SAFE)) {
+		/*
+		 * We already ensured no other actions is registered on
+		 * this irq
+		 */
+		action->thread_mask = 1;
+		action->flags |= IRQF_ONESHOT;
+		desc->istate |= IRQS_ONESHOT;
+	}
+}
+
+/* Internal function to check if the specified irqaction can be threadable */
+static bool __irq_check_threadable(struct irq_desc *desc, struct irqaction *act)
+{
+	if (irq_settings_is_nested_thread(desc) ||
+	    !irq_settings_can_thread(desc))
+		return false;
+
+	/*
+	 * Enabling thread mode is going to set IRQF_ONESHOT, unless the irq
+	 * chip will help us; in the first case the irq can't be shared: the
+	 * only registered action can be the current one
+	 */
+	if (desc->irq_data.chip->flags & IRQCHIP_ONESHOT_SAFE)
+		return true;
+	return !desc->action ||
+	       (act && desc->action == act && act->next == NULL);
+}
+
+/* Internal function to configure the specified action threaded mode */
+int irq_reconfigure(unsigned int irq, struct irqaction *act, bool threaded)
+{
+	struct task_struct *thread = NULL, *old_thread = NULL;
+	struct irq_desc *desc = irq_to_desc(irq);
+	struct irqaction *action;
+	int retval = -EINVAL;
+	unsigned long flags;
+
+	/*
+	 * Preallocate the kthread, so that we can update the action atomically
+	 * later
+	 */
+	if (threaded) {
+		old_thread = thread = create_irq_thread(act, irq, false);
+		if (IS_ERR(thread))
+			return PTR_ERR(thread);
+	}
+
+	disable_irq(irq);
+
+	chip_bus_lock(desc);
+	raw_spin_lock_irqsave(&desc->lock, flags);
+
+	/* Check for no-op under lock */
+	if (threaded == test_bit(IRQTF_FORCED_THREAD, &act->thread_flags))
+		goto unlock;
+
+	/* Even more pedantic check: look-up for our action */
+	for_each_action_of_desc(desc, action)
+		if (action->dev_id == act->dev_id)
+			break;
+	if (!action || action != act)
+		goto unlock;
+
+	/*
+	 * Check again for threadable constraints: the action list/desc
+	 * can be changed since the irq_set_threadable call
+	  */
+	if (!__irq_check_threadable(desc, action))
+		goto unlock;
+
+	old_thread = action->thread;
+	__irq_reconfigure_action(desc, action, thread);
+
+	if (action->mode_notifier)
+		action->mode_notifier(action->irq, action->dev_id, thread);
+	retval = 0;
+
+unlock:
+	raw_spin_unlock_irqrestore(&desc->lock, flags);
+	chip_bus_sync_unlock(desc);
+
+	if (old_thread) {
+		kthread_stop(old_thread);
+		put_task_struct(old_thread);
+	}
+
+	if (retval)
+		pr_err("can't change configuration for irq %d: %d\n", irq,
+		       retval);
+
+	enable_irq(irq);
+	return retval;
+}
+
+/**
+ *	irq_set_mode_notifier - register a mode change notifier
+ *	@irq: Interrupt line
+ *	@dev_id: The cookie used to identify the irq handler and passed back
+ *		 to the notifier
+ *	@mode_notifier: The callback to be registered
+ *
+ *	This call registers a callback to notify the device about irq mode
+ *	change (threaded/normal mode). Mode change are triggered writing on
+ *	the 'threaded' procfs entry.
+ *	When running in threaded mode the irq thread task struct will be passed
+ *	to the notifer, or NULL elsewhere. It's up to the device update its
+ *	internal state accordingly
+ */
+int irq_set_mode_notifier(unsigned int irq, void *dev_id,
+			  mode_notifier_t notifier)
+{
+	struct irq_desc *desc = irq_to_desc(irq);
+	struct irqaction *action;
+	unsigned long flags;
+	int ret = -EINVAL;
+
+	if (!desc)
+		return ret;
+
+	chip_bus_lock(desc);
+	raw_spin_lock_irqsave(&desc->lock, flags);
+
+	for_each_action_of_desc(desc, action)
+		if (action->dev_id == dev_id)
+			break;
+
+	if (!action || action->mode_notifier)
+		goto out;
+
+	/*
+	 * Sync current status, so that the device is fine if the irq has been
+	 * reconfigured before the notifer is registered
+	 */
+	action->mode_notifier = notifier;
+	if (notifier)
+		notifier(action->irq, action->dev_id, action->thread);
+	ret = 0;
+
+out:
+	raw_spin_unlock_irqrestore(&desc->lock, flags);
+	chip_bus_sync_unlock(desc);
+	return ret;
+}
+EXPORT_SYMBOL(irq_set_mode_notifier);
+#endif
 
 /**
  *	remove_irq - free an interrupt

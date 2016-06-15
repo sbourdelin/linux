@@ -90,6 +90,7 @@ enum {
 };
 
 typedef irqreturn_t (*irq_handler_t)(int, void *);
+typedef void (*mode_notifier_t)(int, void *, struct task_struct *);
 
 /**
  * struct irqaction - per interrupt action descriptor
@@ -106,6 +107,8 @@ typedef irqreturn_t (*irq_handler_t)(int, void *);
  * @thread_flags:	flags related to @thread
  * @thread_mask:	bitmask for keeping track of @thread activity
  * @dir:	pointer to the proc/irq/NN/name entry
+ * @mode_notifier:	callback to notify the device about irq mode change
+ *		(threaded vs normal mode)
  */
 struct irqaction {
 	irq_handler_t		handler;
@@ -121,6 +124,7 @@ struct irqaction {
 	unsigned long		thread_mask;
 	const char		*name;
 	struct proc_dir_entry	*dir;
+	mode_notifier_t		mode_notifier;
 } ____cacheline_internodealigned_in_smp;
 
 extern irqreturn_t no_action(int cpl, void *dev_id);
@@ -211,6 +215,17 @@ extern void irq_wake_thread(unsigned int irq, void *dev_id);
 /* The following three functions are for the core kernel use only. */
 extern void suspend_device_irqs(void);
 extern void resume_device_irqs(void);
+
+#ifdef CONFIG_IRQ_FORCED_THREADING
+extern int irq_set_mode_notifier(unsigned int irq, void *dev_id,
+				 mode_notifier_t notifier);
+#else
+static inline int
+irq_set_mode_notifier(unsigned int irq, void *dev_id, mode_notifier_t notifier)
+{
+	return 0;
+}
+#endif
 
 /**
  * struct irq_affinity_notify - context for notification of IRQ affinity changes

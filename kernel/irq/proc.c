@@ -302,6 +302,51 @@ static int name_unique(unsigned int irq, struct irqaction *new_action)
 	return ret;
 }
 
+#ifdef CONFIG_IRQ_FORCED_THREADING
+static int irqaction_threaded_proc_show(struct seq_file *m, void *v)
+{
+	struct irqaction *action = (struct irqaction *)m->private;
+
+	seq_printf(m, "%d\n",
+		   test_bit(IRQTF_FORCED_THREAD, &action->thread_flags));
+	return 0;
+}
+
+static int irqaction_threaded_proc_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, irqaction_threaded_proc_show, PDE_DATA(inode));
+}
+
+static ssize_t irqaction_threaded_proc_write(struct file *file,
+					     const char __user *buf,
+					     size_t count, loff_t *offs)
+{
+	struct irqaction *action = PDE_DATA(file_inode(file));
+	bool threaded;
+	size_t ret;
+
+	ret = kstrtobool_from_user(buf, count, &threaded);
+	if (ret)
+		return ret;
+
+	if (threaded == test_bit(IRQTF_FORCED_THREAD, &action->thread_flags))
+		goto out;
+
+	irq_reconfigure(action->irq, action, threaded);
+
+out:
+	return count;
+}
+
+static const struct file_operations irqaction_threaded_proc_fops = {
+	.open		= irqaction_threaded_proc_open,
+	.read		= seq_read,
+	.write		= irqaction_threaded_proc_write,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+#endif
+
 void register_handler_proc(unsigned int irq, struct irqaction *action)
 {
 	char name [MAX_NAMELEN];
@@ -315,7 +360,13 @@ void register_handler_proc(unsigned int irq, struct irqaction *action)
 
 	/* create /proc/irq/1234/handler/ */
 	action->dir = proc_mkdir(name, desc->dir);
+#ifdef CONFIG_IRQ_FORCED_THREADING
+	if (action->dir)
+		proc_create_data("threaded", 0644, action->dir,
+				 &irqaction_threaded_proc_fops, (void *)action);
+#endif
 }
+
 
 #undef MAX_NAMELEN
 
