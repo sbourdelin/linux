@@ -5642,22 +5642,29 @@ void btrfs_subvolume_release_metadata(struct btrfs_root *root,
 /**
  * drop_outstanding_extent - drop an outstanding extent
  * @inode: the inode we're dropping the extent for
- * @num_bytes: the number of bytes we're releasing.
+ * @num_bytes: the number of bytes we're relaseing.
+ * @max_extent_size: for in-band dedupe, max_extent_size will be set to in-band
+ * dedupe blocksize, othersize max_extent_size should be BTRFS_MAX_EXTENT_SIZE.
+ * Also if max_extent_size is 0, it'll be set to BTRFS_MAX_EXTENT_SIZE.
  *
  * This is called when we are freeing up an outstanding extent, either called
  * after an error or after an extent is written.  This will return the number of
  * reserved extents that need to be freed.  This must be called with
  * BTRFS_I(inode)->lock held.
  */
-static unsigned drop_outstanding_extent(struct inode *inode, u64 num_bytes)
+static unsigned drop_outstanding_extent(struct inode *inode, u64 num_bytes,
+					u32 max_extent_size)
 {
 	unsigned drop_inode_space = 0;
 	unsigned dropped_extents = 0;
 	unsigned num_extents = 0;
 
+	if (max_extent_size == 0)
+		max_extent_size = BTRFS_MAX_EXTENT_SIZE;
+
 	num_extents = (unsigned)div64_u64(num_bytes +
-					  BTRFS_MAX_EXTENT_SIZE - 1,
-					  BTRFS_MAX_EXTENT_SIZE);
+					  max_extent_size - 1,
+					  max_extent_size);
 	ASSERT(num_extents);
 	ASSERT(BTRFS_I(inode)->outstanding_extents >= num_extents);
 	BTRFS_I(inode)->outstanding_extents -= num_extents;
@@ -5727,7 +5734,13 @@ static u64 calc_csum_metadata_size(struct inode *inode, u64 num_bytes,
 	return btrfs_calc_trans_metadata_size(root, old_csums - num_csums);
 }
 
-int btrfs_delalloc_reserve_metadata(struct inode *inode, u64 num_bytes)
+/*
+ * @max_extent_size: for in-band dedupe, max_extent_size will be set to in-band
+ * dedupe blocksize, othersize max_extent_size should be BTRFS_MAX_EXTENT_SIZE.
+ * Also if max_extent_size is 0, it'll be set to BTRFS_MAX_EXTENT_SIZE.
+ */
+int btrfs_delalloc_reserve_metadata(struct inode *inode, u64 num_bytes,
+				    u32 max_extent_size)
 {
 	struct btrfs_root *root = BTRFS_I(inode)->root;
 	struct btrfs_block_rsv *block_rsv = &root->fs_info->delalloc_block_rsv;
@@ -5740,6 +5753,9 @@ int btrfs_delalloc_reserve_metadata(struct inode *inode, u64 num_bytes)
 	bool delalloc_lock = true;
 	u64 to_free = 0;
 	unsigned dropped;
+
+	if (max_extent_size == 0)
+		max_extent_size = BTRFS_MAX_EXTENT_SIZE;
 
 	/* If we are a free space inode we need to not flush since we will be in
 	 * the middle of a transaction commit.  We also don't need the delalloc
@@ -5762,8 +5778,8 @@ int btrfs_delalloc_reserve_metadata(struct inode *inode, u64 num_bytes)
 
 	spin_lock(&BTRFS_I(inode)->lock);
 	nr_extents = (unsigned)div64_u64(num_bytes +
-					 BTRFS_MAX_EXTENT_SIZE - 1,
-					 BTRFS_MAX_EXTENT_SIZE);
+					 max_extent_size - 1,
+					 max_extent_size);
 	BTRFS_I(inode)->outstanding_extents += nr_extents;
 	nr_extents = 0;
 
@@ -5821,7 +5837,7 @@ int btrfs_delalloc_reserve_metadata(struct inode *inode, u64 num_bytes)
 
 out_fail:
 	spin_lock(&BTRFS_I(inode)->lock);
-	dropped = drop_outstanding_extent(inode, num_bytes);
+	dropped = drop_outstanding_extent(inode, num_bytes, max_extent_size);
 	/*
 	 * If the inodes csum_bytes is the same as the original
 	 * csum_bytes then we know we haven't raced with any free()ers
@@ -5887,20 +5903,27 @@ out_fail:
  * btrfs_delalloc_release_metadata - release a metadata reservation for an inode
  * @inode: the inode to release the reservation for
  * @num_bytes: the number of bytes we're releasing
+ * @max_extent_size: for in-band dedupe, max_extent_size will be set to in-band
+ * dedupe blocksize, othersize max_extent_size should be BTRFS_MAX_EXTENT_SIZE.
+ * Also if max_extent_size is 0, it'll be set to BTRFS_MAX_EXTENT_SIZE.
  *
  * This will release the metadata reservation for an inode.  This can be called
  * once we complete IO for a given set of bytes to release their metadata
  * reservations.
  */
-void btrfs_delalloc_release_metadata(struct inode *inode, u64 num_bytes)
+void btrfs_delalloc_release_metadata(struct inode *inode, u64 num_bytes,
+				     u32 max_extent_size)
 {
 	struct btrfs_root *root = BTRFS_I(inode)->root;
 	u64 to_free = 0;
 	unsigned dropped;
 
+	if (max_extent_size == 0)
+		max_extent_size = BTRFS_MAX_EXTENT_SIZE;
+
 	num_bytes = ALIGN(num_bytes, root->sectorsize);
 	spin_lock(&BTRFS_I(inode)->lock);
-	dropped = drop_outstanding_extent(inode, num_bytes);
+	dropped = drop_outstanding_extent(inode, num_bytes, max_extent_size);
 
 	if (num_bytes)
 		to_free = calc_csum_metadata_size(inode, num_bytes, 0);
@@ -5924,6 +5947,9 @@ void btrfs_delalloc_release_metadata(struct inode *inode, u64 num_bytes)
  * @inode: inode we're writing to
  * @start: start range we are writing to
  * @len: how long the range we are writing to
+ * @max_extent_size: for in-band dedupe, max_extent_size will be set to in-band
+ * dedupe blocksize, othersize max_extent_size should be BTRFS_MAX_EXTENT_SIZE.
+ * Also if max_extent_size is 0, it'll be set to BTRFS_MAX_EXTENT_SIZE.
  *
  * TODO: This function will finally replace old btrfs_delalloc_reserve_space()
  *
@@ -5943,14 +5969,18 @@ void btrfs_delalloc_release_metadata(struct inode *inode, u64 num_bytes)
  * Return 0 for success
  * Return <0 for error(-ENOSPC or -EQUOT)
  */
-int btrfs_delalloc_reserve_space(struct inode *inode, u64 start, u64 len)
+int btrfs_delalloc_reserve_space(struct inode *inode, u64 start, u64 len,
+				 u32 max_extent_size)
 {
 	int ret;
+
+	if (max_extent_size == 0)
+		max_extent_size = BTRFS_MAX_EXTENT_SIZE;
 
 	ret = btrfs_check_data_free_space(inode, start, len);
 	if (ret < 0)
 		return ret;
-	ret = btrfs_delalloc_reserve_metadata(inode, len);
+	ret = btrfs_delalloc_reserve_metadata(inode, len, max_extent_size);
 	if (ret < 0)
 		btrfs_free_reserved_data_space(inode, start, len);
 	return ret;
@@ -5961,6 +5991,9 @@ int btrfs_delalloc_reserve_space(struct inode *inode, u64 start, u64 len)
  * @inode: inode we're releasing space for
  * @start: start position of the space already reserved
  * @len: the len of the space already reserved
+ * @max_extent_size: for in-band dedupe, max_extent_size will be set to in-band
+ * dedupe blocksize, othersize max_extent_size should be BTRFS_MAX_EXTENT_SIZE.
+ * Also if max_extent_size is 0, it'll be set to BTRFS_MAX_EXTENT_SIZE.
  *
  * This must be matched with a call to btrfs_delalloc_reserve_space.  This is
  * called in the case that we don't need the metadata AND data reservations
@@ -5971,9 +6004,10 @@ int btrfs_delalloc_reserve_space(struct inode *inode, u64 start, u64 len)
  * list if there are no delalloc bytes left.
  * Also it will handle the qgroup reserved space.
  */
-void btrfs_delalloc_release_space(struct inode *inode, u64 start, u64 len)
+void btrfs_delalloc_release_space(struct inode *inode, u64 start, u64 len,
+				  u32 max_extent_size)
 {
-	btrfs_delalloc_release_metadata(inode, len);
+	btrfs_delalloc_release_metadata(inode, len, max_extent_size);
 	btrfs_free_reserved_data_space(inode, start, len);
 }
 

@@ -22,6 +22,7 @@
 #include <linux/btrfs.h>
 #include <linux/wait.h>
 #include <crypto/hash.h>
+#include "btrfs_inode.h"
 
 static int btrfs_dedupe_sizes[] = { 32 };
 
@@ -62,6 +63,42 @@ struct btrfs_dedupe_info {
 };
 
 struct btrfs_trans_handle;
+
+static inline u64 btrfs_dedupe_blocksize(struct inode *inode)
+{
+	struct btrfs_fs_info *fs_info = BTRFS_I(inode)->root->fs_info;
+
+	BUG_ON(fs_info->dedupe_info == NULL);
+	return fs_info->dedupe_info->blocksize;
+}
+
+static inline int inode_need_dedupe(struct inode *inode)
+{
+	struct btrfs_fs_info *fs_info = BTRFS_I(inode)->root->fs_info;
+
+	if (!fs_info->dedupe_enabled)
+		return 0;
+
+	return 1;
+}
+
+/*
+ * For in-band dedupe, its max extent size will be limited by in-band
+ * dedupe blocksize.
+ */
+static inline u64 btrfs_max_extent_size(struct inode *inode, int do_dedupe)
+{
+	struct btrfs_fs_info *fs_info = BTRFS_I(inode)->root->fs_info;
+	struct btrfs_dedupe_info *dedupe_info = fs_info->dedupe_info;
+
+	if (do_dedupe) {
+		BUG_ON(dedupe_info == NULL);
+		return dedupe_info->blocksize;
+	} else {
+		return BTRFS_MAX_EXTENT_SIZE;
+	}
+}
+
 
 static inline int btrfs_dedupe_hash_hit(struct btrfs_dedupe_hash *hash)
 {
