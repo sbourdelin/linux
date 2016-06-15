@@ -323,6 +323,9 @@ struct napi_struct {
 	struct list_head	dev_list;
 	struct hlist_node	napi_hash_node;
 	unsigned int		napi_id;
+#ifdef CONFIG_IRQ_FORCED_THREADING
+	struct task_struct	*thread;
+#endif
 };
 
 enum {
@@ -331,6 +334,7 @@ enum {
 	NAPI_STATE_NPSVC,	/* Netpoll - don't dequeue from poll_list */
 	NAPI_STATE_HASHED,	/* In NAPI hash (busy polling possible) */
 	NAPI_STATE_NO_BUSY_POLL,/* Do not add in napi_hash, no busy polling */
+	NAPI_STATE_SCHED_THREAD, /* The poll thread is scheduled */
 };
 
 enum gro_result {

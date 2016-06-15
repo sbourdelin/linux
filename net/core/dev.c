@@ -93,6 +93,7 @@
 #include <linux/etherdevice.h>
 #include <linux/ethtool.h>
 #include <linux/notifier.h>
+#include <linux/kthread.h>
 #include <linux/skbuff.h>
 #include <net/net_namespace.h>
 #include <net/sock.h>
@@ -3453,10 +3454,68 @@ int netdev_tstamp_prequeue __read_mostly = 1;
 int netdev_budget __read_mostly = 300;
 int weight_p __read_mostly = 64;            /* old backlog weight */
 
+#if CONFIG_IRQ_FORCED_THREADING
+static int napi_poll(struct napi_struct *n, struct list_head *repoll);
+
+static void napi_threaded_poll(struct napi_struct *napi)
+{
+	unsigned long time_limit = jiffies + 2;
+	struct list_head dummy_repoll;
+	int budget = netdev_budget;
+	bool again = true;
+
+	if (test_and_set_bit(NAPI_STATE_SCHED_THREAD, &napi->state))
+		return;
+
+	local_irq_enable();
+	INIT_LIST_HEAD(&dummy_repoll);
+
+	while (again) {
+		/* ensure that the poll list is not empty */
+		if (list_empty(&dummy_repoll))
+			list_add(&napi->poll_list, &dummy_repoll);
+
+		budget -= napi_poll(napi, &dummy_repoll);
+
+		if (napi_disable_pending(napi))
+			again = false;
+		else if (!test_bit(NAPI_STATE_SCHED, &napi->state))
+			again = false;
+		else if (kthread_should_stop())
+			again = false;
+
+		if (!again || unlikely(budget <= 0 ||
+				       time_after_eq(jiffies, time_limit))) {
+			/* no need to reschedule if we are going to stop */
+			if (again)
+				cond_resched_softirq();
+			time_limit = jiffies + 2;
+			budget = netdev_budget;
+			rcu_bh_qs();
+			__kfree_skb_flush();
+		}
+	}
+
+	clear_bit(NAPI_STATE_SCHED_THREAD, &napi->state);
+	local_irq_disable();
+}
+
+static inline bool napi_is_threaded(struct napi_struct *napi)
+{
+	return current == napi->thread;
+}
+#else
+#define napi_is_threaded(napi) 0
+#endif
+
 /* Called with irq disabled */
 static inline void ____napi_schedule(struct softnet_data *sd,
 				     struct napi_struct *napi)
 {
+	if (napi_is_threaded(napi)) {
+		napi_threaded_poll(napi);
+		return;
+	}
 	list_add_tail(&napi->poll_list, &sd->poll_list);
 	__raise_softirq_irqoff(NET_RX_SOFTIRQ);
 }
