@@ -2962,7 +2962,8 @@ static int binder_open(struct inode *nodp, struct file *filp)
 		return -ENOMEM;
 	get_task_struct(current);
 	proc->tsk = current;
-	proc->vma_vm_mm = current->mm;
+	proc->vma_vm_mm = get_task_mm(current);
+	BUG_ON(proc->vma_vm_mm == NULL);
 	INIT_LIST_HEAD(&proc->todo);
 	init_waitqueue_head(&proc->wait);
 	proc->default_priority = task_nice(current);
@@ -3167,6 +3168,7 @@ static void binder_deferred_release(struct binder_proc *proc)
 		vfree(proc->buffer);
 	}
 
+	mmput(proc->vma_vm_mm);
 	put_task_struct(proc->tsk);
 
 	binder_debug(BINDER_DEBUG_OPEN_CLOSE,
