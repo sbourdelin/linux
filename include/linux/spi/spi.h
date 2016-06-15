@@ -1051,6 +1051,24 @@ spi_sync_transfer(struct spi_device *spi, struct spi_transfer *xfers,
 	return spi_sync(spi, &msg);
 }
 
+/**
+ * spi_sync_single_transfer - synchronous SPI data transfer of one spi_transfer
+ * @spi: device with which data will be exchanged
+ * @xfers: One spi_transfer struct
+ * Context: can sleep
+ *
+ * Does a synchronous SPI data transfer of a given spi_transfer.
+ *
+ * For more specific semantics see spi_sync_transfer().
+ *
+ * It returns zero on success, else a negative error code.
+ */
+static inline int
+spi_sync_single_transfer(struct spi_device *spi, struct spi_transfer *xfers)
+{
+	return spi_sync_transfer(spi, xfers, 1);
+}
+
 /* this copies txbuf and rxbuf data; for small transfers only! */
 extern int spi_write_then_read(struct spi_device *spi,
 		const void *txbuf, unsigned n_tx,
