@@ -4137,6 +4137,13 @@ int xhci_set_usb2_hardware_lpm(struct usb_hcd *hcd,
 	hlpm_addr = port_array[port_num] + PORTHLPMC;
 	field = le32_to_cpu(udev->bos->ext_cap->bmAttributes);
 
+	if (port_num >= xhci->num_usb2_ports)
+		dev_warn(&udev->dev, "USB2 LPM portnum %d > num_usb2_ports %d\n",
+			 port_num, xhci->num_usb2_ports);
+
+	if (udev->speed >= USB_SPEED_SUPER)
+		dev_warn(&udev->dev, "USB2 LPM for SS device!!\n");
+
 	xhci_dbg(xhci, "%s port %d USB2 hardware LPM\n",
 			enable ? "enable" : "disable", port_num + 1);
 
@@ -4247,6 +4254,10 @@ int xhci_update_device(struct usb_hcd *hcd, struct usb_device *udev)
 			xhci_check_usb2_port_capability(
 				xhci, portnum, XHCI_HLC)) {
 		udev->usb2_hw_lpm_capable = 1;
+		dev_err(&udev->dev, "USB2 LPM capable set, port %d speed %d\n",
+			portnum, udev->speed);
+		dev_err(&udev->dev, "max usb2 ports %d\n",
+			xhci->num_usb2_ports);
 		udev->l1_params.timeout = XHCI_L1_TIMEOUT;
 		udev->l1_params.besl = XHCI_DEFAULT_BESL;
 		if (xhci_check_usb2_port_capability(xhci, portnum,

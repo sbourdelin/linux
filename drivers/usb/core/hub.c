@@ -3201,9 +3201,11 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 	}
 
 	/* disable USB2 hardware LPM */
-	if (udev->usb2_hw_lpm_enabled == 1)
+	if (udev->usb2_hw_lpm_enabled == 1) {
+		if (!udev->usb2_hw_lpm_capable)
+			dev_err(&udev->dev, "USB2 LPM disabling for non-capable dev\n");
 		usb_set_usb2_hardware_lpm(udev, 0);
-
+	}
 	if (usb_disable_ltm(udev)) {
 		dev_err(&udev->dev, "Failed to disable LTM before suspend\n.");
 		status = -ENOMEM;
@@ -4306,6 +4308,9 @@ static void hub_set_initial_usb2_lpm_policy(struct usb_device *udev)
 	if (!udev->usb2_hw_lpm_capable)
 		return;
 
+	if (udev->speed >= USB_SPEED_SUPER)
+		dev_err(&udev->dev, "USB2 LPM: set initial for SS devic\n");
+
 	if (hub)
 		connect_type = hub->ports[udev->portnum - 1]->connect_type;
 
@@ -4648,7 +4653,12 @@ hub_port_init(struct usb_hub *hub, struct usb_device *udev, int port1,
 		hcd->driver->update_device(hcd, udev);
 	hub_set_initial_usb2_lpm_policy(udev);
 fail:
+
+
 	if (retval) {
+		if (udev->usb2_hw_lpm_capable)
+			dev_err(&udev->dev, "USB2 LPM %s fails but capable is set, speed %d\n",
+				__func__, udev->speed);
 		hub_port_disable(hub, port1, 0);
 		update_devnum(udev, devnum);	/* for disconnect processing */
 	}
@@ -4814,11 +4824,13 @@ static void hub_port_connect(struct usb_hub *hub, int port1, u16 portstatus,
 		udev->wusb = hub_is_wusb(hub);
 
 		/* Devices connected to SuperSpeed hubs are USB 3.0 or later */
-		if (hub_is_superspeed(hub->hdev))
+		if (hub_is_superspeed(hub->hdev)) {
 			udev->speed = USB_SPEED_SUPER;
-		else
+			if (udev->usb2_hw_lpm_capable)
+				dev_err(&udev->dev, "USB2 LPM capable set for fresh SS device\n");
+		} else {
 			udev->speed = USB_SPEED_UNKNOWN;
-
+		}
 		choose_devnum(udev);
 		if (udev->devnum <= 0) {
 			status = -ENOTCONN;	/* Don't retry */
@@ -5444,9 +5456,15 @@ static int usb_reset_and_verify_device(struct usb_device *udev)
 	/* Disable USB2 hardware LPM.
 	 * It will be re-enabled by the enumeration process.
 	 */
-	if (udev->usb2_hw_lpm_enabled == 1)
+	if (udev->usb2_hw_lpm_enabled == 1) {
+		if (udev->speed >= USB_SPEED_SUPER)
+			dev_err(&udev->dev, " USB2 LPM %s for SS device\n",
+				__func__);
+		if (!udev->usb2_hw_lpm_capable)
+			dev_err(&udev->dev, " USB2 LPM %s for uncapable device\n",
+				__func__);
 		usb_set_usb2_hardware_lpm(udev, 0);
-
+	}
 	/* Disable LPM and LTM while we reset the device and reinstall the alt
 	 * settings.  Device-initiated LPM settings, and system exit latency
 	 * settings are cleared when the device is reset, so we have to set
