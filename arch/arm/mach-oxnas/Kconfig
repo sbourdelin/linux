@@ -11,7 +11,7 @@ if ARCH_OXNAS
 
 config MACH_OX810SE
 	bool "Support OX810SE Based Products"
-	select ARM_TIMER_SP804
+	select OXNAS_RPS_TIMER
 	select COMMON_CLK_OXNAS
 	select CPU_ARM926T
 	select MFD_SYSCON
