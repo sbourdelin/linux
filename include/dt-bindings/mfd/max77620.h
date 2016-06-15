@@ -36,4 +36,8 @@
 #define MAX77620_FPS_SRC_NONE			3
 #define MAX77620_FPS_SRC_DEF			4
 
+/* MAX77686 clocks */
+#define MAX77620_CLKS_NUM			1
+#define MAX77620_CLK_32K_OUT0			0
+
 #endif
