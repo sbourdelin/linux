@@ -3,6 +3,7 @@
 #define DISABLE_BRANCH_PROFILING
 #include <linux/compiler.h>
 #include <linux/types.h>
+#include <linux/errno.h>
 #include <linux/file.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
@@ -159,6 +160,13 @@ exit:
 static int kcov_open(struct inode *inode, struct file *filep)
 {
 	struct kcov *kcov;
+
+	/*
+	 * CONFIG_KCOV was selected, but the compiler does not support the
+	 * options KCOV requires.
+	 */
+	if (!IS_ENABLED(CONFIG_KCOV_CC))
+		return -ENOTSUPP;
 
 	kcov = kzalloc(sizeof(*kcov), GFP_KERNEL);
 	if (!kcov)
