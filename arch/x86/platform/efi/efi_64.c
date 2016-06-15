@@ -469,18 +469,13 @@ extern efi_status_t efi64_thunk(u32, ...);
 	unsigned long flags;						\
 	u32 func;							\
 									\
-	efi_sync_low_kernel_mappings();					\
 	local_irq_save(flags);						\
-									\
-	efi_scratch.prev_cr3 = read_cr3();				\
-	write_cr3((unsigned long)efi_scratch.efi_pgt);			\
-	__flush_tlb_all();						\
+	arch_efi_call_virt_setup();					\
 									\
 	func = runtime_service32(f);					\
-	__s = efi64_thunk(func, __VA_ARGS__);			\
+	__s = efi64_thunk(func, __VA_ARGS__);				\
 									\
-	write_cr3(efi_scratch.prev_cr3);				\
-	__flush_tlb_all();						\
+	arch_efi_call_virt_teardown();					\
 	local_irq_restore(flags);					\
 									\
 	__s;								\
