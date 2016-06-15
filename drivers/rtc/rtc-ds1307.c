@@ -1320,19 +1320,17 @@ static int ds1307_probe(struct i2c_client *client,
 			ds1307->regs[0] &= ~DS1337_BIT_nEOSC;
 
 		/*
-		 * Using IRQ or defined as wakeup-source?
 		 * Disable the square wave and both alarms.
 		 * For some variants, be sure alarms can trigger when we're
 		 * running on Vbackup (BBSQI/BBSQW)
 		 */
-		if (chip->alarm && (ds1307->client->irq > 0 ||
-						ds1307_can_wakeup_device)) {
-			ds1307->regs[0] |= DS1337_BIT_INTCN
-					| bbsqi_bitpos[ds1307->type];
-			ds1307->regs[0] &= ~(DS1337_BIT_A2IE | DS1337_BIT_A1IE);
+		ds1307->regs[0] |= DS1337_BIT_INTCN
+			| bbsqi_bitpos[ds1307->type];
+		ds1307->regs[0] &= ~(DS1337_BIT_A2IE | DS1337_BIT_A1IE);
 
+		if (chip->alarm && (ds1307->client->irq > 0 ||
+				    ds1307_can_wakeup_device))
 			want_irq = true;
-		}
 
 		i2c_smbus_write_byte_data(client, DS1337_REG_CONTROL,
 							ds1307->regs[0]);
