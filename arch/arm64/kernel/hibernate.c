@@ -235,8 +235,15 @@ int swsusp_arch_suspend(void)
 	if (__cpu_suspend_enter(&state)) {
 		ret = swsusp_save();
 	} else {
-		/* Clean kernel to PoC for secondary core startup */
-		__flush_dcache_area(LMADDR(KERNEL_START), KERNEL_END - KERNEL_START);
+		/* Clean kernel core startup/idle code to PoC*/
+		__flush_dcache_area(__mmuoff_text_start,
+				    __mmuoff_text_end - __mmuoff_text_start);
+		__flush_dcache_area(__idmap_text_start,
+				    __idmap_text_end - __idmap_text_start);
+
+		/* Clean kvm setup code to PoC? */
+		if (el2_reset_needed())
+			__flush_dcache_area(__hyp_idmap_text_start, __hyp_idmap_text_end - __hyp_idmap_text_start);
 
 		/*
 		 * Tell the hibernation core that we've just restored
@@ -250,6 +257,32 @@ int swsusp_arch_suspend(void)
 	local_dbg_restore(flags);
 
 	return ret;
+}
+
+static void _copy_pte(pte_t *dst_pte, pte_t *src_pte, unsigned long addr)
+{
+	unsigned long pfn = virt_to_pfn(addr);
+
+	if (pte_valid(*src_pte)) {
+		/*
+		 * Resume will overwrite areas that may be marked
+		 * read only (code, rodata). Clear the RDONLY bit from
+		 * the temporary mappings we use during restore.
+		 */
+		set_pte(dst_pte, __pte(pte_val(*src_pte) & ~PTE_RDONLY));
+	} else if (debug_pagealloc_enabled()) {
+		/*
+		 * debug_pagealloc may have removed the PTE_VALID bit if
+		 * the page isn't in use by the resume kernel. It may have
+		 * been in use by the original kernel, in which case we need
+		 * to put it back in our copy to do the restore.
+		 *
+		 * Check for mappable memory that gives us a translation
+		 * like part of the linear map.
+		 */
+		if (pfn_valid(pfn) && pte_pfn(*src_pte) == pfn)
+			set_pte(dst_pte, __pte((pte_val(*src_pte) & ~PTE_RDONLY) | PTE_VALID));
+	}
 }
 
 static int copy_pte(pmd_t *dst_pmd, pmd_t *src_pmd, unsigned long start,
@@ -267,13 +300,7 @@ static int copy_pte(pmd_t *dst_pmd, pmd_t *src_pmd, unsigned long start,
 
 	src_pte = pte_offset_kernel(src_pmd, start);
 	do {
-		if (!pte_none(*src_pte))
-			/*
-			 * Resume will overwrite areas that may be marked
-			 * read only (code, rodata). Clear the RDONLY bit from
-			 * the temporary mappings we use during restore.
-			 */
-			set_pte(dst_pte, __pte(pte_val(*src_pte) & ~PTE_RDONLY));
+		_copy_pte(dst_pte, src_pte, addr);
 	} while (dst_pte++, src_pte++, addr += PAGE_SIZE, addr != end);
 
 	return 0;
