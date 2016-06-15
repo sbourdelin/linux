@@ -272,7 +272,7 @@ struct mlx5e_rx_am_stats {
 };
 
 struct mlx5e_rx_am_sample {
-	struct timespec	time;
+	ktime_t		time;
 	unsigned int	pkt_ctr;
 	u16		event_ctr;
 };

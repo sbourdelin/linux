@@ -267,7 +267,7 @@ static bool mlx5e_am_decision(struct mlx5e_rx_am_stats *curr_stats,
 static void mlx5e_am_sample(struct mlx5e_rq *rq,
 			    struct mlx5e_rx_am_sample *s)
 {
-	getnstimeofday(&s->time);
+	s->time	     = ktime_get();
 	s->pkt_ctr   = rq->stats.packets;
 	s->event_ctr = rq->cq.event_ctr;
 }
@@ -278,17 +278,17 @@ static void mlx5e_am_calc_stats(struct mlx5e_rx_am_sample *start,
 				struct mlx5e_rx_am_sample *end,
 				struct mlx5e_rx_am_stats *curr_stats)
 {
-	struct timespec time = timespec_sub(end->time, start->time);
-	s64 delta_us = timespec_to_ns(&time) / 1000;
-	s64 npkts = end->pkt_ctr - start->pkt_ctr;
+	/* u32 holds up to 71 minutes, should be enough */
+	u32 delta_us = ktime_us_delta(end->time, start->time);
+	unsigned int npkts = end->pkt_ctr - start->pkt_ctr;
 
 	if (!delta_us) {
 		WARN_ONCE(true, "mlx5e_am_calc_stats: delta_us=0\n");
 		return;
 	}
 
-	curr_stats->ppms =            (npkts * 1000) / delta_us;
-	curr_stats->epms = (MLX5E_AM_NEVENTS * 1000) / delta_us;
+	curr_stats->ppms = 	      (npkts * USEC_PER_MSEC) / delta_us;
+	curr_stats->epms = (MLX5E_AM_NEVENTS * USEC_PER_MSEC) / delta_us;
 }
 
 void mlx5e_rx_am_work(struct work_struct *work)
