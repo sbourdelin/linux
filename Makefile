@@ -369,7 +369,7 @@ LDFLAGS_MODULE  =
 CFLAGS_KERNEL	=
 AFLAGS_KERNEL	=
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage -fno-tree-loop-im -Wno-maybe-uninitialized
-CFLAGS_KCOV	= -fsanitize-coverage=trace-pc
+CFLAGS_KCOV	= -fsanitize-coverage=trace-pc -DCC_HAVE_SANCOV_TRACE_PC
 
 
 # Use USERINCLUDE when you must reference the UAPI directories only.
