@@ -58,7 +58,7 @@ struct cpu_spec {
 	unsigned long	cpu_features;		/* Kernel features */
 	unsigned int	cpu_user_features;	/* Userland features */
 	unsigned int	cpu_user_features2;	/* Userland features v2 */
-	unsigned int	mmu_features;		/* MMU features */
+	unsigned long	mmu_features;		/* MMU features */
 
 	/* cache line sizes */
 	unsigned int	icache_bsize;

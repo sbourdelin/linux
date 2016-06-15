@@ -92,6 +92,14 @@
  * Radix page table available
  */
 #define MMU_FTR_RADIX			ASM_CONST(0x80000000)
+/*
+ * Support of new PTE format as defined in ISA 3.0
+ */
+#ifdef CONFIG_PPC_STD_MMU_64
+#define MMU_FTR_ISA3_HASH_SUPPORT	ASM_CONST(0x100000000)
+#else
+#define MMU_FTR_ISA3_HASH_SUPPORT	ASM_CONST(0x0)
+#endif
 
 /* MMU feature bit sets for various CPUs */
 #define MMU_FTRS_DEFAULT_HPTE_ARCH_V2	\
@@ -128,10 +136,13 @@ enum {
 #ifdef CONFIG_PPC_RADIX_MMU
 		MMU_FTR_RADIX |
 #endif
+#ifdef CONFIG_PPC_STD_MMU_64
+		MMU_FTR_ISA3_HASH_SUPPORT |
+#endif
 		0,
 };
 
-static inline int mmu_has_feature(unsigned long feature)
+static inline unsigned long mmu_has_feature(unsigned long feature)
 {
 	return (MMU_FTRS_POSSIBLE & cur_cpu_spec->mmu_features & feature);
 }
