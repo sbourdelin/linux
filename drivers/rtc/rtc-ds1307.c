@@ -78,6 +78,7 @@ enum ds_type {
 #define DS1337_REG_CONTROL	0x0e
 #	define DS1337_BIT_nEOSC		0x80
 #	define DS1339_BIT_BBSQI		0x20
+#	define DS1341_BIT_EGFIL		0x20
 #	define DS3231_BIT_BBSQW		0x40 /* same as BBSQI */
 #	define DS1337_BIT_RS2		0x10
 #	define DS1337_BIT_RS1		0x08
@@ -93,7 +94,9 @@ enum ds_type {
 #	define DS1340_BIT_OSF		0x80
 #define DS1337_REG_STATUS	0x0f
 #	define DS1337_BIT_OSF		0x80
+#	define DS1341_BIT_DOSF		0x40
 #	define DS3231_BIT_EN32KHZ	0x08
+#	define DS1341_BIT_ECLK		0x04
 #	define DS1337_BIT_A2I		0x02
 #	define DS1337_BIT_A1I		0x01
 #define DS1339_REG_ALARM1_SECS	0x07
@@ -1318,6 +1321,31 @@ static int ds1307_probe(struct i2c_client *client,
 		/* oscillator off?  turn it on, so clock can tick. */
 		if (ds1307->regs[0] & DS1337_BIT_nEOSC)
 			ds1307->regs[0] &= ~DS1337_BIT_nEOSC;
+
+		if (ds1307->type == ds_1341) {
+			/* Make sure we are not generating square wave
+			 * output */
+			ds1307->regs[1] &= ~DS1341_BIT_ECLK;
+
+			if (of_property_read_bool(client->dev.of_node,
+						  "disable-oscillator-stop-flag"))
+				ds1307->regs[1] |= DS1341_BIT_DOSF;
+			else
+				ds1307->regs[1] &= ~DS1341_BIT_DOSF;
+
+			if (of_property_read_bool(client->dev.of_node,
+						  "enable-glitch-filter"))
+				ds1307->regs[0] |= DS1341_BIT_EGFIL;
+			else
+				ds1307->regs[0] &= ~DS1341_BIT_EGFIL;
+
+			/*
+			 * Write status register. Control register
+			 * would be set by the code below
+			 */
+			i2c_smbus_write_byte_data(client, DS1337_REG_STATUS,
+						  ds1307->regs[1]);
+		}
 
 		/*
 		 * Disable the square wave and both alarms.

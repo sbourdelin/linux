@@ -1,0 +1,23 @@
+* Dallas DS1341		I2C Serial Real-Time Clock
+
+Required properties:
+
+- compatible: Should contain "dallas,ds1341".
+
+- reg: I2C address for chip
+
+Optional properties:
+
+- disable-oscillator-stop-flag : Configure chip to disable oscillator
+  fault detection circuitry
+
+- enable-glitch-filter : Configure chip to enable crystal oscillator
+  output glitch filtering
+
+Example:
+	ds1341: rtc@68 {
+		compatible = "dallas,ds1341";
+		disable-oscillator-stop-flag;
+		enable-glitch-filter;
+		reg = <0x68>;
+	};
