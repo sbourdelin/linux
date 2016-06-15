@@ -37,7 +37,12 @@ static unsigned long _find_next_bit(const unsigned long *addr,
 	if (!nbits || start >= nbits)
 		return nbits;
 
+#if (__BYTE_ORDER == __BIG_ENDIAN) && (BITS_PER_LONG != 64)
+	tmp = addr[(((nbits - 1)/BITS_PER_LONG) - (start / BITS_PER_LONG))]
+								^ invert;
+#else
 	tmp = addr[start / BITS_PER_LONG] ^ invert;
+#endif
 
 	/* Handle 1st word. */
 	tmp &= BITMAP_FIRST_WORD_MASK(start);
@@ -48,7 +53,12 @@ static unsigned long _find_next_bit(const unsigned long *addr,
 		if (start >= nbits)
 			return nbits;
 
+#if (__BYTE_ORDER == __BIG_ENDIAN) && (BITS_PER_LONG != 64)
+		tmp = addr[(((nbits - 1)/BITS_PER_LONG) - (start / BITS_PER_LONG))]
+								^ invert;
+#else
 		tmp = addr[start / BITS_PER_LONG] ^ invert;
+#endif
 	}
 
 	return min(start + __ffs(tmp), nbits);
@@ -75,8 +85,15 @@ unsigned long find_first_bit(const unsigned long *addr, unsigned long size)
 	unsigned long idx;
 
 	for (idx = 0; idx * BITS_PER_LONG < size; idx++) {
+#if (__BYTE_ORDER == __BIG_ENDIAN) && (BITS_PER_LONG != 64)
+		if (addr[(((size-1)/BITS_PER_LONG) - idx)])
+			return min(idx * BITS_PER_LONG +
+				__ffs(addr[(((size-1)/BITS_PER_LONG) - idx)]),
+									size);
+#else
 		if (addr[idx])
 			return min(idx * BITS_PER_LONG + __ffs(addr[idx]), size);
+#endif
 	}
 
 	return size;
