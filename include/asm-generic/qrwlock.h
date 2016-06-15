@@ -27,11 +27,18 @@
 /*
  * Writer states & reader shift and bias
  */
-#define	_QW_WAITING	1		/* A writer is waiting	   */
-#define	_QW_LOCKED	0xff		/* A writer holds the lock */
-#define	_QW_WMASK	0xff		/* Writer mask		   */
+#ifdef	__LITTLE_ENDIAN
 #define	_QR_SHIFT	8		/* Reader count shift	   */
-#define _QR_BIAS	(1U << _QR_SHIFT)
+#define	_QW_SHIFT	0		/* Writer mode shift	*/
+#else
+#define	_QR_SHIFT	0		/* Reader count shift	   */
+#define	_QW_SHIFT	24		/* Writer mode shift	*/
+#endif
+
+#define	_QW_WAITING	(1U << _QW_SHIFT)	/* A writer is waiting	   */
+#define	_QW_LOCKED	(0xffU << _QW_SHIFT)	/* A writer holds the lock */
+#define	_QW_WMASK	(0xffU << _QW_SHIFT)	/* Writer mask		   */
+#define	_QR_BIAS	(1U << _QR_SHIFT)
 
 /*
  * External function declarations
