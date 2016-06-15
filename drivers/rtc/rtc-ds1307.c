@@ -1232,6 +1232,21 @@ static void ds1307_clks_register(struct ds1307 *ds1307)
 
 #endif /* CONFIG_COMMON_CLK */
 
+static bool ds1307_can_wakeup_device(const struct ds1307 *ds1307)
+{
+
+/*
+ * For devices with no IRQ directly connected to the SoC, the RTC chip
+ * can be forced as a wakeup source by stating that explicitly in
+ * the device's .dts file using the "wakeup-source" boolean property.
+ * If the "wakeup-source" property is set, don't request an IRQ.
+ * This will guarantee the 'wakealarm' sysfs entry is available on the device,
+ * if supported by the RTC.
+ */
+	return of_property_read_bool(ds1307->client->dev.of_node,
+				     "wakeup-source");
+}
+
 static int ds1307_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
@@ -1241,7 +1256,6 @@ static int ds1307_probe(struct i2c_client *client,
 	struct chip_desc	*chip = &chips[id->driver_data];
 	struct i2c_adapter	*adapter = to_i2c_adapter(client->dev.parent);
 	bool			want_irq = false;
-	bool			ds1307_can_wakeup_device = false;
 	unsigned char		*buf;
 	struct ds1307_platform_data *pdata = dev_get_platdata(&client->dev);
 	irq_handler_t	irq_handler = ds1307_irq;
@@ -1289,20 +1303,6 @@ static int ds1307_probe(struct i2c_client *client,
 		ds1307->read_block_data = ds1307_read_block_data;
 		ds1307->write_block_data = ds1307_write_block_data;
 	}
-
-#ifdef CONFIG_OF
-/*
- * For devices with no IRQ directly connected to the SoC, the RTC chip
- * can be forced as a wakeup source by stating that explicitly in
- * the device's .dts file using the "wakeup-source" boolean property.
- * If the "wakeup-source" property is set, don't request an IRQ.
- * This will guarantee the 'wakealarm' sysfs entry is available on the device,
- * if supported by the RTC.
- */
-	if (of_property_read_bool(client->dev.of_node, "wakeup-source")) {
-		ds1307_can_wakeup_device = true;
-	}
-#endif
 
 	switch (ds1307->type) {
 	case ds_1337:
@@ -1357,7 +1357,7 @@ static int ds1307_probe(struct i2c_client *client,
 		ds1307->regs[0] &= ~(DS1337_BIT_A2IE | DS1337_BIT_A1IE);
 
 		if (chip->alarm && (ds1307->client->irq > 0 ||
-				    ds1307_can_wakeup_device))
+				    ds1307_can_wakeup_device(ds1307)))
 			want_irq = true;
 
 		i2c_smbus_write_byte_data(client, DS1337_REG_CONTROL,
@@ -1567,7 +1567,8 @@ read_rtc:
 		return PTR_ERR(ds1307->rtc);
 	}
 
-	if (ds1307_can_wakeup_device && ds1307->client->irq <= 0) {
+	if (ds1307_can_wakeup_device(ds1307) &&
+	    ds1307->client->irq <= 0) {
 		/* Disable request for an IRQ */
 		want_irq = false;
 		dev_info(&client->dev, "'wakeup-source' is set, request for an IRQ is disabled!\n");
