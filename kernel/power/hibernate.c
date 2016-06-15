@@ -70,6 +70,16 @@ bool hibernation_available(void)
 }
 
 /**
+ * arch_hibernation_disable_cpus - Allow architectures to direct which CPU
+ * is used for suspend or resume.
+ * @suspend: True during hibernate, false for resume.
+ */
+int __weak arch_hibernation_disable_cpus(__maybe_unused bool suspend)
+{
+	return disable_nonboot_cpus();
+}
+
+/**
  * hibernation_set_ops - Set the global hibernate operations.
  * @ops: Hibernation operations to use in subsequent hibernation transitions.
  */
@@ -279,7 +289,7 @@ static int create_image(int platform_mode)
 	if (error || hibernation_test(TEST_PLATFORM))
 		goto Platform_finish;
 
-	error = disable_nonboot_cpus();
+	error = arch_hibernation_disable_cpus(true);
 	if (error || hibernation_test(TEST_CPUS))
 		goto Enable_cpus;
 
@@ -433,7 +443,7 @@ static int resume_target_kernel(bool platform_mode)
 	if (error)
 		goto Cleanup;
 
-	error = disable_nonboot_cpus();
+	error = arch_hibernation_disable_cpus(false);
 	if (error)
 		goto Enable_cpus;
 
@@ -551,7 +561,7 @@ int hibernation_platform_enter(void)
 	if (error)
 		goto Platform_finish;
 
-	error = disable_nonboot_cpus();
+	error = arch_hibernation_disable_cpus(true);
 	if (error)
 		goto Enable_cpus;
 
