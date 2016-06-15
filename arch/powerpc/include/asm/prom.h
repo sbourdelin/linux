@@ -111,7 +111,7 @@ struct of_drconf_cell {
 #define OV_IGNORE		0x80	/* ignore this vector */
 #define OV_CESSATION_POLICY	0x40	/* halt if unsupported option present*/
 
-/* Option vector 1: processor architectures supported */
+/* Option vector 1: byte 2, processor architectures supported */
 #define OV1_PPC_2_00		0x80	/* set if we support PowerPC 2.00 */
 #define OV1_PPC_2_01		0x40	/* set if we support PowerPC 2.01 */
 #define OV1_PPC_2_02		0x20	/* set if we support PowerPC 2.02 */
@@ -120,6 +120,9 @@ struct of_drconf_cell {
 #define OV1_PPC_2_05		0x04	/* set if we support PowerPC 2.05 */
 #define OV1_PPC_2_06		0x02	/* set if we support PowerPC 2.06 */
 #define OV1_PPC_2_07		0x01	/* set if we support PowerPC 2.07 */
+
+/* Option vector 1: byte 3, processor architectures supported */
+#define OV1_PPC_3_00		0x80	/* set if we support PowerPC 3.00 */
 
 /* Option vector 2: Open Firmware options supported */
 #define OV2_REAL_MODE		0x20	/* set if we want OF in real mode */
