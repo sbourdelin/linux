@@ -1247,6 +1247,30 @@ static bool ds1307_can_wakeup_device(const struct ds1307 *ds1307)
 				     "wakeup-source");
 }
 
+static bool ds1307_want_irq(const struct ds1307 *ds1307,
+			    const struct chip_desc *chip)
+{
+
+
+	if (chip->alarm) {
+		switch (ds1307->type) {
+		case ds_1337:
+		case ds_1339:
+		case ds_3231:
+		case ds_1341:
+			return (ds1307->client->irq > 0 ||
+				ds1307_can_wakeup_device(ds1307));
+
+		case mcp794xx:
+			return (ds1307->client->irq > 0);
+		default:
+			break;
+		}
+	}
+
+	return false;
+}
+
 static int ds1307_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
@@ -1255,7 +1279,6 @@ static int ds1307_probe(struct i2c_client *client,
 	int			tmp;
 	struct chip_desc	*chip = &chips[id->driver_data];
 	struct i2c_adapter	*adapter = to_i2c_adapter(client->dev.parent);
-	bool			want_irq = false;
 	unsigned char		*buf;
 	struct ds1307_platform_data *pdata = dev_get_platdata(&client->dev);
 	irq_handler_t	irq_handler = ds1307_irq;
@@ -1356,10 +1379,6 @@ static int ds1307_probe(struct i2c_client *client,
 			| bbsqi_bitpos[ds1307->type];
 		ds1307->regs[0] &= ~(DS1337_BIT_A2IE | DS1337_BIT_A1IE);
 
-		if (chip->alarm && (ds1307->client->irq > 0 ||
-				    ds1307_can_wakeup_device(ds1307)))
-			want_irq = true;
-
 		i2c_smbus_write_byte_data(client, DS1337_REG_CONTROL,
 							ds1307->regs[0]);
 
@@ -1441,10 +1460,7 @@ static int ds1307_probe(struct i2c_client *client,
 		break;
 	case mcp794xx:
 		rtc_ops = &mcp794xx_rtc_ops;
-		if (ds1307->client->irq > 0 && chip->alarm) {
-			irq_handler = mcp794xx_irq;
-			want_irq = true;
-		}
+		irq_handler = mcp794xx_irq;
 		break;
 	default:
 		break;
@@ -1557,7 +1573,7 @@ read_rtc:
 				bin2bcd(tmp));
 	}
 
-	if (want_irq) {
+	if (ds1307_want_irq(ds1307, chip)) {
 		device_set_wakeup_capable(&client->dev, true);
 		set_bit(HAS_ALARM, &ds1307->flags);
 	}
@@ -1570,13 +1586,11 @@ read_rtc:
 	if (ds1307_can_wakeup_device(ds1307) &&
 	    ds1307->client->irq <= 0) {
 		/* Disable request for an IRQ */
-		want_irq = false;
-		dev_info(&client->dev, "'wakeup-source' is set, request for an IRQ is disabled!\n");
+		dev_info(&client->dev,
+			 "'wakeup-source' is set, request for an IRQ is disabled!\n");
 		/* We cannot support UIE mode if we do not have an IRQ line */
 		ds1307->rtc->uie_unsupported = 1;
-	}
-
-	if (want_irq) {
+	} else if (ds1307_want_irq(ds1307, chip)) {
 		err = devm_request_threaded_irq(&client->dev,
 						client->irq, NULL, irq_handler,
 						IRQF_SHARED | IRQF_ONESHOT,
