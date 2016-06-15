@@ -2427,10 +2427,13 @@ static int run_one_delayed_ref(struct btrfs_trans_handle *trans,
 				 * a new extent is revered, then deleted
 				 * in one tran, and inc/dec get merged to 0.
 				 *
-				 * In this case, we need to remove its dedup
+				 * In this case, we need to remove its dedupe
 				 * hash.
 				 */
-				btrfs_dedupe_del(trans, fs_info, node->bytenr);
+				ret = btrfs_dedupe_del(trans, fs_info,
+						       node->bytenr);
+				if (ret < 0)
+					return ret;
 				ret = btrfs_del_csums(trans, root,
 						      node->bytenr,
 						      node->num_bytes);
