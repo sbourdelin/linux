@@ -303,7 +303,7 @@ static __init int nios2_clocksource_init(struct device_node *timer)
 	/* Calibrate the delay loop directly */
 	lpj_fine = freq / HZ;
 
-	returen 0;
+	return 0;
 }
 
 /*
