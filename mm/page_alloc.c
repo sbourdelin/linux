@@ -2484,23 +2484,14 @@ EXPORT_SYMBOL_GPL(split_page);
 
 int __isolate_free_page(struct page *page, unsigned int order)
 {
-	unsigned long watermark;
 	struct zone *zone;
-	int mt;
+	const int mt = get_pageblock_migratetype(page);
 
 	BUG_ON(!PageBuddy(page));
-
 	zone = page_zone(page);
-	mt = get_pageblock_migratetype(page);
 
-	if (!is_migrate_isolate(mt)) {
-		/* Obey watermarks as if the page was being allocated */
-		watermark = low_wmark_pages(zone) + (1 << order);
-		if (!zone_watermark_ok(zone, 0, watermark, 0, 0))
-			return 0;
-
+	if (!is_migrate_isolate(mt))
 		__mod_zone_freepage_state(zone, -(1UL << order), mt);
-	}
 
 	/* Remove page from free list */
 	list_del(&page->lru);
@@ -2519,7 +2510,6 @@ int __isolate_free_page(struct page *page, unsigned int order)
 							  MIGRATE_MOVABLE);
 		}
 	}
-
 
 	return 1UL << order;
 }
