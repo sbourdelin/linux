@@ -1650,7 +1650,11 @@ static int omap1_cam_probe(struct platform_device *pdev)
 	pcdev->soc_host.v4l2_dev.dev	= &pdev->dev;
 	pcdev->soc_host.nr		= pdev->id;
 
-	err = soc_camera_host_register(&pcdev->soc_host);
+	err = omap1_cam_clock_start(&pcdev->soc_host);
+	if (!err) {
+		err = soc_camera_host_register(&pcdev->soc_host);
+		omap1_cam_clock_stop(&pcdev->soc_host);
+	}
 	if (err)
 		return err;
 
