@@ -991,6 +991,7 @@ static inline bool kvm_is_error_gpa(struct kvm *kvm, gpa_t gpa)
 enum kvm_stat_kind {
 	KVM_STAT_VM,
 	KVM_STAT_VCPU,
+	KVM_STAT_VCPU_U64,
 };
 
 struct kvm_stat_data {

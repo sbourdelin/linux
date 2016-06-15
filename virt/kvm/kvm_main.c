@@ -3566,10 +3566,31 @@ static int vcpu_stat_get_per_vm(void *data, u64 *val)
 	return 0;
 }
 
+static int vcpu_stat_u64_get_per_vm(void *data, u64 *val)
+{
+	int i;
+	struct kvm_stat_data *stat_data = (struct kvm_stat_data *)data;
+	struct kvm_vcpu *vcpu;
+
+	*val = 0;
+
+	kvm_for_each_vcpu(i, vcpu, stat_data->kvm)
+		*val += *(u64 *)((void *)vcpu + stat_data->offset);
+
+	return 0;
+}
+
 static int vcpu_stat_get_per_vm_open(struct inode *inode, struct file *file)
 {
 	__simple_attr_check_format("%llu\n", 0ull);
 	return kvm_debugfs_open(inode, file, vcpu_stat_get_per_vm,
+				 NULL, "%llu\n");
+}
+
+static int vcpu_stat_u64_get_per_vm_open(struct inode *inode, struct file *file)
+{
+	__simple_attr_check_format("%llu\n", 0ull);
+	return kvm_debugfs_open(inode, file, vcpu_stat_u64_get_per_vm,
 				 NULL, "%llu\n");
 }
 
@@ -3582,9 +3603,19 @@ static const struct file_operations vcpu_stat_get_per_vm_fops = {
 	.llseek  = generic_file_llseek,
 };
 
+static const struct file_operations vcpu_stat_u64_get_per_vm_fops = {
+	.owner   = THIS_MODULE,
+	.open    = vcpu_stat_u64_get_per_vm_open,
+	.release = kvm_debugfs_release,
+	.read    = simple_attr_read,
+	.write   = simple_attr_write,
+	.llseek  = generic_file_llseek,
+};
+
 static const struct file_operations *stat_fops_per_vm[] = {
-	[KVM_STAT_VCPU] = &vcpu_stat_get_per_vm_fops,
-	[KVM_STAT_VM]   = &vm_stat_get_per_vm_fops,
+	[KVM_STAT_VCPU]		= &vcpu_stat_get_per_vm_fops,
+	[KVM_STAT_VCPU_U64]	= &vcpu_stat_u64_get_per_vm_fops,
+	[KVM_STAT_VM]		= &vm_stat_get_per_vm_fops,
 };
 
 static int vm_stat_get(void *_offset, u64 *val)
@@ -3627,9 +3658,30 @@ static int vcpu_stat_get(void *_offset, u64 *val)
 
 DEFINE_SIMPLE_ATTRIBUTE(vcpu_stat_fops, vcpu_stat_get, NULL, "%llu\n");
 
+static int vcpu_stat_u64_get(void *_offset, u64 *val)
+{
+	unsigned offset = (long)_offset;
+	struct kvm *kvm;
+	struct kvm_stat_data stat_tmp = {.offset = offset};
+	u64 tmp_val;
+
+	*val = 0;
+	spin_lock(&kvm_lock);
+	list_for_each_entry(kvm, &vm_list, vm_list) {
+		stat_tmp.kvm = kvm;
+		vcpu_stat_u64_get_per_vm((void *)&stat_tmp, &tmp_val);
+		*val += tmp_val;
+	}
+	spin_unlock(&kvm_lock);
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(vcpu_stat_u64_fops, vcpu_stat_u64_get, NULL, "%llu\n");
+
 static const struct file_operations *stat_fops[] = {
-	[KVM_STAT_VCPU] = &vcpu_stat_fops,
-	[KVM_STAT_VM]   = &vm_stat_fops,
+	[KVM_STAT_VCPU]		= &vcpu_stat_fops,
+	[KVM_STAT_VCPU_U64]	= &vcpu_stat_u64_fops,
+	[KVM_STAT_VM]		= &vm_stat_fops,
 };
 
 static int kvm_init_debug(void)
