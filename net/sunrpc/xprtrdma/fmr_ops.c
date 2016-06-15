@@ -63,9 +63,12 @@ static int
 __fmr_unmap(struct rpcrdma_mw *mw)
 {
 	LIST_HEAD(l);
+	int rc;
 
 	list_add(&mw->fmr.fmr->list, &l);
-	return ib_unmap_fmr(&l);
+	rc = ib_unmap_fmr(&l);
+	list_del_init(&mw->fmr.fmr->list);
+	return rc;
 }
 
 /* Deferred reset of a single FMR. Generate a fresh rkey by
@@ -149,6 +152,7 @@ fmr_op_init(struct rpcrdma_xprt *r_xprt)
 		r->fmr.fmr = ib_alloc_fmr(pd, mr_access_flags, &fmr_attr);
 		if (IS_ERR(r->fmr.fmr))
 			goto out_fmr_err;
+		INIT_LIST_HEAD(&r->fmr.fmr->list);
 
 		r->mw_xprt = r_xprt;
 		list_add(&r->mw_list, &buf->rb_mws);
@@ -267,7 +271,7 @@ fmr_op_unmap_sync(struct rpcrdma_xprt *r_xprt, struct rpcrdma_req *req)
 		seg = &req->rl_segments[i];
 		mw = seg->rl_mw;
 
-		list_add(&mw->fmr.fmr->list, &unmap_list);
+		list_add_tail(&mw->fmr.fmr->list, &unmap_list);
 
 		i += seg->mr_nsegs;
 	}
@@ -280,7 +284,9 @@ fmr_op_unmap_sync(struct rpcrdma_xprt *r_xprt, struct rpcrdma_req *req)
 	 */
 	for (i = 0, nchunks = req->rl_nchunks; nchunks; nchunks--) {
 		seg = &req->rl_segments[i];
+		mw = seg->rl_mw;
 
+		list_del_init(&mw->fmr.fmr->list);
 		__fmr_dma_unmap(r_xprt, seg);
 		rpcrdma_put_mw(r_xprt, seg->rl_mw);
 
