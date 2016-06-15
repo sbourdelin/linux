@@ -16,7 +16,7 @@ static int wep_type;
 
 static
 void analyze_character_wep_key(struct ks_wlan_parameter *param,
-			       int wep_key_index, char *value)
+			       int wep_key_index, const char *value)
 {
 	int i;
 	unsigned char wep_key[26], key_length;
@@ -39,7 +39,7 @@ void analyze_character_wep_key(struct ks_wlan_parameter *param,
 
 static
 void analyze_hex_wep_key(struct ks_wlan_parameter *param, int wep_key_index,
-			 char *value)
+			 const char *value)
 {
 	unsigned char wep_end[26], i, j, key_length;
 
@@ -93,7 +93,7 @@ void analyze_hex_wep_key(struct ks_wlan_parameter *param, int wep_key_index,
 }
 
 static
-int rate_set_configuration(struct ks_wlan_private *priv, char *value)
+int rate_set_configuration(struct ks_wlan_private *priv, const char *value)
 {
 	int rc = 0;
 
@@ -204,9 +204,10 @@ int ks_wlan_read_config_file(struct ks_wlan_private *priv)
 
 	const struct firmware *fw_entry;
 	struct device *dev = NULL;
-	char cfg_file[] = CFG_FILE;
-	char *cur_p, *end_p;
-	char wk_buff[256], *wk_p;
+	const char cfg_file[] = CFG_FILE;
+	const char *cur_p, *end_p;
+	char wk_buff[256];
+	const char *wk_p;
 
 	/* Initialize Variable */
 	priv->reg.operation_mode = MODE_INFRASTRUCTURE;	/* Infrastructure */
@@ -262,7 +263,6 @@ int ks_wlan_read_config_file(struct ks_wlan_private *priv)
 		fw_entry->size);
 	cur_p = fw_entry->data;
 	end_p = cur_p + fw_entry->size;
-	*end_p = '\0';
 
 	while (cur_p < end_p) {
 		int i, j, len;
