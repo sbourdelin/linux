@@ -90,6 +90,11 @@ static void perf_probe_context_switch(struct perf_evsel *evsel)
 	evsel->attr.context_switch = 1;
 }
 
+static void perf_probe_write_backward(struct perf_evsel *evsel)
+{
+	evsel->attr.write_backward = 1;
+}
+
 bool perf_can_sample_identifier(void)
 {
 	return perf_probe_api(perf_probe_sample_identifier);
@@ -129,6 +134,17 @@ bool perf_can_record_cpu_wide(void)
 	return true;
 }
 
+static void perf_check_write_backward(void)
+{
+	static bool checked = false;
+
+	if (!checked) {
+		perf_missing_features.write_backward =
+			!perf_probe_api(perf_probe_write_backward);
+		checked = true;
+	}
+}
+
 void perf_evlist__config(struct perf_evlist *evlist, struct record_opts *opts,
 			 struct callchain_param *callchain)
 {
@@ -136,6 +152,7 @@ void perf_evlist__config(struct perf_evlist *evlist, struct record_opts *opts,
 	bool use_sample_identifier = false;
 	bool use_comm_exec;
 
+	perf_check_write_backward();
 	/*
 	 * Set the evsel leader links before we configure attributes,
 	 * since some might depend on this info.
