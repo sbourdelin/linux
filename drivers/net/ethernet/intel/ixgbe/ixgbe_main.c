@@ -2890,6 +2890,14 @@ int ixgbe_poll(struct napi_struct *napi, int budget)
 	return 0;
 }
 
+static void ixgbe_irq_mode_notifier(int irq, void *data,
+				    struct task_struct *irq_thread)
+{
+	struct ixgbe_q_vector *q_vector = (struct ixgbe_q_vector *)data;
+
+	q_vector->napi.thread = irq_thread;
+}
+
 /**
  * ixgbe_request_msix_irqs - Initialize MSI-X interrupts
  * @adapter: board private structure
@@ -2921,8 +2929,12 @@ static int ixgbe_request_msix_irqs(struct ixgbe_adapter *adapter)
 			/* skip this unused q_vector */
 			continue;
 		}
-		err = request_irq(entry->vector, &ixgbe_msix_clean_rings, 0,
+		err = request_irq(entry->vector, &ixgbe_msix_clean_rings,
+				  IRQF_TH_NO_AFFINITY | IRQF_TH_SCHED_NORMAL,
 				  q_vector->name, q_vector);
+		if (!err)
+			err = irq_set_mode_notifier(entry->vector, q_vector,
+						    ixgbe_irq_mode_notifier);
 		if (err) {
 			e_err(probe, "request_irq failed for MSIX interrupt "
 			      "Error: %d\n", err);
