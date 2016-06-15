@@ -30,17 +30,14 @@ struct __qrwlock {
 	union {
 		atomic_t cnts;
 		struct {
-#ifdef __LITTLE_ENDIAN
 			u8 wmode;	/* Writer mode   */
 			u8 rcnts[3];	/* Reader counts */
-#else
-			u8 rcnts[3];	/* Reader counts */
-			u8 wmode;	/* Writer mode   */
-#endif
 		};
 	};
 	arch_spinlock_t	lock;
 };
+
+#define	_QW_MODEVAL(v)	((v) >> _QW_SHIFT)
 
 /**
  * rspin_until_writer_unlock - inc reader count & spin until writer is gone
@@ -127,7 +124,8 @@ void queued_write_lock_slowpath(struct qrwlock *lock)
 		struct __qrwlock *l = (struct __qrwlock *)lock;
 
 		if (!READ_ONCE(l->wmode) &&
-		   (cmpxchg_relaxed(&l->wmode, 0, _QW_WAITING) == 0))
+		   (cmpxchg_relaxed(&l->wmode, 0,
+					_QW_MODEVAL(_QW_WAITING)) == 0))
 			break;
 
 		cpu_relax_lowlatency();
