@@ -914,6 +914,26 @@ out:
 	return err;
 }
 
+static void record__munmap_filtered(struct fdarray *fda, int fd, void *arg)
+{
+	struct record *rec = (struct record *)arg;
+
+	perf_evlist__mmap_put(rec->evlist, fda->priv[fd].idx);
+	if (rec->overwrite_evlist)
+		perf_evlist__mmap_put(rec->overwrite_evlist, fda->priv[fd].idx);
+}
+
+static int record__filter_pollfd(struct record *rec)
+{
+	/*
+	 * Although we may have auxiliray evlist, there is
+	 * only one pollfd, so we don't need to filter pollfd
+	 * for auxiliray evlist.
+	 */
+	return fdarray__filter(&rec->evlist->pollfd, POLLERR | POLLHUP,
+			       record__munmap_filtered, rec);
+}
+
 static int __cmd_record(struct record *rec, int argc, const char **argv)
 {
 	int err;
@@ -1150,15 +1170,7 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 				err = 0;
 			waking++;
 
-			/*
-			 * Although we may have auxiliray evlist, there is
-			 * only one pollfd, so we don't need to filter pollfd
-			 * for auxiliray evlist.
-			 *
-			 * TODO: if an event is terminated (POLLERR | POLLHUP),
-			 * unmap mmaps for auxiliray evlist too.
-			 */
-			if (perf_evlist__filter_pollfd(rec->evlist, POLLERR | POLLHUP) == 0)
+			if (record__filter_pollfd(rec) == 0)
 				draining = true;
 		}
 

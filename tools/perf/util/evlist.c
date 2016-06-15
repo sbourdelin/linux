@@ -27,7 +27,6 @@
 #include <linux/log2.h>
 #include <linux/err.h>
 
-static void perf_evlist__mmap_put(struct perf_evlist *evlist, int idx);
 static void __perf_evlist__munmap(struct perf_evlist *evlist, int idx);
 
 #define FD(e, x, y) (*(int *)xyarray__entry(e->fd, x, y))
@@ -863,7 +862,7 @@ static void perf_evlist__mmap_get(struct perf_evlist *evlist, int idx)
 	atomic_inc(&evlist->mmap[idx].refcnt);
 }
 
-static void perf_evlist__mmap_put(struct perf_evlist *evlist, int idx)
+void perf_evlist__mmap_put(struct perf_evlist *evlist, int idx)
 {
 	struct perf_mmap *md = &evlist->mmap[idx];
 
