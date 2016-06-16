@@ -1863,6 +1863,11 @@ bool cpus_share_cache(int this_cpu, int that_cpu)
 {
 	return per_cpu(sd_llc_id, this_cpu) == per_cpu(sd_llc_id, that_cpu);
 }
+
+bool cpus_share_socket(int this_cpu, int that_cpu)
+{
+	return per_cpu(sd_socket_id, this_cpu) == per_cpu(sd_socket_id, that_cpu);
+}
 #endif /* CONFIG_SMP */
 
 static void ttwu_queue(struct task_struct *p, int cpu, int wake_flags)
@@ -5879,10 +5884,15 @@ static void destroy_sched_domains(struct sched_domain *sd)
  * Also keep a unique ID per domain (we use the first cpu number in
  * the cpumask of the domain), this allows us to quickly tell if
  * two cpus are in the same cache domain, see cpus_share_cache().
+
+ * And also keep a unique ID per socket (we use the first cpu number
+ * in the cpumask of the socket), this allows us to quickly tell if
+ * two cpus are in the same socket, see cpus_share_socket().
  */
 DEFINE_PER_CPU(struct sched_domain *, sd_llc);
 DEFINE_PER_CPU(int, sd_llc_size);
 DEFINE_PER_CPU(int, sd_llc_id);
+DEFINE_PER_CPU(int, sd_socket_id);
 DEFINE_PER_CPU(struct sched_domain_shared *, sd_llc_shared);
 DEFINE_PER_CPU(struct sched_domain *, sd_numa);
 DEFINE_PER_CPU(struct sched_domain *, sd_asym);
@@ -5891,8 +5901,7 @@ static void update_top_cache_domain(int cpu)
 {
 	struct sched_domain_shared *sds = NULL;
 	struct sched_domain *sd;
-	int id = cpu;
-	int size = 1;
+	int id = cpu, size = 1, socket_id = 0;
 
 	sd = highest_flag_domain(cpu, SD_SHARE_PKG_RESOURCES);
 	if (sd) {
@@ -5908,6 +5917,9 @@ static void update_top_cache_domain(int cpu)
 
 	sd = lowest_flag_domain(cpu, SD_NUMA);
 	rcu_assign_pointer(per_cpu(sd_numa, cpu), sd);
+	if (sd)
+		socket_id = cpumask_first(sched_group_cpus(sd->groups));
+	per_cpu(sd_socket_id, cpu) = socket_id;
 
 	sd = highest_flag_domain(cpu, SD_ASYM_PACKING);
 	rcu_assign_pointer(per_cpu(sd_asym, cpu), sd);
