@@ -292,6 +292,7 @@ static struct notifier_block power_cpu_notifier_nb = {
 
 static const struct x86_cpu_id cpu_match[] = {
 	{ .vendor = X86_VENDOR_AMD, .family = 0x15 },
+	{ .vendor = X86_VENDOR_AMD, .family = 0x16 },
 	{},
 };
 
