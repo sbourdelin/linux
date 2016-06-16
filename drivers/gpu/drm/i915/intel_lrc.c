@@ -1285,6 +1285,13 @@ static int gen9_init_perctx_bb(struct intel_engine_cs *engine,
 {
 	uint32_t index = wa_ctx_start(wa_ctx, *offset, CACHELINE_DWORDS);
 
+	/* WaDisableGatherAtSetShaderCommonSlice:skl,bxt,kbl */
+	wa_ctx_emit(batch, index, MI_LOAD_REGISTER_IMM(1));
+	wa_ctx_emit_reg(batch, index, COMMON_SLICE_CHICKEN2);
+	wa_ctx_emit(batch, index, _MASKED_BIT_DISABLE(
+			    GEN9_DISABLE_GATHER_AT_SET_SHADER_COMMON_SLICE));
+	wa_ctx_emit(batch, index, MI_NOOP);
+
 	/* WaSetDisablePixMaskCammingAndRhwoInCommonSliceChicken:skl,bxt */
 	if (IS_SKL_REVID(engine->i915, 0, SKL_REVID_B0) ||
 	    IS_BXT_REVID(engine->i915, 0, BXT_REVID_A1)) {
