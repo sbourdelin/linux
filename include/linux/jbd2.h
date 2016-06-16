@@ -491,10 +491,6 @@ struct jbd2_journal_handle
 
 	unsigned long		h_start_jiffies;
 	unsigned int		h_requested_credits;
-
-#ifdef CONFIG_DEBUG_LOCK_ALLOC
-	struct lockdep_map	h_lockdep_map;
-#endif
 };
 
 
@@ -1035,6 +1031,18 @@ struct journal_s
 
 	/* Precomputed journal UUID checksum for seeding other checksums */
 	__u32 j_csum_seed;
+
+#ifdef CONFIG_DEBUG_LOCK_ALLOC
+	/*
+	 * Lockdep entity to track transaction commit dependencies. Handles
+	 * hold this "lock" for read, when we wait for commit, we acquire the
+	 * "lock" for writing. This matches the properties of jbd2 journalling
+	 * where the running transaction has to wait for all handles to be
+	 * dropped to commit that transaction and also acquiring a handle may
+	 * require transaction commit to finish.
+	 */
+	struct lockdep_map	j_trans_commit_map;
+#endif
 };
 
 /* journal feature predicate functions */
