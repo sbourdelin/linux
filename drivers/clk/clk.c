@@ -290,6 +290,12 @@ struct clk_hw *__clk_get_hw(struct clk *clk)
 }
 EXPORT_SYMBOL_GPL(__clk_get_hw);
 
+unsigned int clk_get_num_parents(struct clk *clk)
+{
+	return !clk ? 0 : clk->core->num_parents;
+}
+EXPORT_SYMBOL_GPL(clk_get_num_parents);
+
 unsigned int clk_hw_get_num_parents(const struct clk_hw *hw)
 {
 	return hw->core->num_parents;
@@ -357,6 +363,19 @@ static struct clk_core *clk_core_get_parent_by_index(struct clk_core *core,
 
 	return core->parents[index];
 }
+
+struct clk *clk_get_parent_by_index(struct clk *clk, unsigned int index)
+{
+	struct clk_core *parent;
+
+	if (!clk)
+		return NULL;
+
+	parent = clk_core_get_parent_by_index(clk->core, index);
+
+	return !parent ? NULL : parent->hw->clk;
+}
+EXPORT_SYMBOL_GPL(clk_get_parent_by_index);
 
 struct clk_hw *
 clk_hw_get_parent_by_index(const struct clk_hw *hw, unsigned int index)
