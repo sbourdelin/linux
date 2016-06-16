@@ -347,11 +347,15 @@ struct intel_engine_cs {
 	u32 (*get_cmd_length_mask)(u32 cmd_header);
 
 	/*
-	 * This spinlock is used by the fence implementation internally. Note,
-	 * it can be acquire from interrupt context so all usage must be IRQ
-	 * safe.
+	 * This spinlock is used by the fence implementation internally and by
+	 * the i915 driver for operations on the fence_signal_list and on fences
+	 * in general. Note, it can be acquire from interrupt context so all
+	 * usage must be IRQ safe.
 	 */
 	spinlock_t fence_lock;
+	struct list_head fence_signal_list;
+
+	struct work_struct request_work;
 };
 
 static inline bool
