@@ -4986,12 +4986,14 @@ static void record_wakee(struct task_struct *p)
 	 */
 	if (time_after(jiffies, current->wakee_flip_decay_ts + HZ)) {
 		current->wakee_flips >>= 1;
+		current->wakee_count >>= 1;
 		current->wakee_flip_decay_ts = jiffies;
 	}
 
 	if (current->last_wakee != p) {
 		current->last_wakee = p;
 		current->wakee_flips++;
+		current->wakee_count++;
 	}
 }
 
@@ -5023,6 +5025,45 @@ static int wake_wide(struct task_struct *p)
 	if (slave < factor || master < slave * factor)
 		return 0;
 	return 1;
+}
+
+#define TP_IDENT	0x1	/* waker is wakee */
+#define TP_SMT		0x2	/* SMT sibling */
+#define TP_LLC		0x4	/* cpus_share_cache(waker, wakee) */
+#define TP_SHARE_CACHE	0x7	/* waker and wakee share cache */
+#define TP_LLC_SOCK	0x10	/* all CPUs have complete LLC coverage */
+#define TP_NOLLC_SOCK	0x20	/* !TP_LLC_SOCK */
+#define TP_NOLLC_XSOCK	0x40	/* cross socket */
+
+static int wake_wide2(int topology, struct task_struct *p)
+{
+	unsigned int master = current->wakee_count;
+	unsigned int slave = p->wakee_count;
+	unsigned int master_flips = current->wakee_flips;
+	unsigned int slave_flips = p->wakee_flips;
+	int factor = this_cpu_read(sd_llc_size);
+
+	if (!master_flips)
+		master /= master_flips;
+	else
+		master = !!master;
+
+	if (!slave_flips)
+		slave /= slave_flips;
+	else
+		slave = !!slave;
+
+	if (master < slave)
+		swap(master, slave);
+
+	/*
+	 * The system is either TP_NOLLC_SOCK or TP_NOLLC_XSOCK, the waker
+	 * and wakee may still share some cache though.
+	 */
+	if (topology | TP_SHARE_CACHE)
+		return master > factor;
+
+	return slave > factor;
 }
 
 static int wake_affine(struct sched_domain *sd, struct task_struct *p, int sync)
@@ -5399,6 +5440,20 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 	return cpu;
 }
 
+static int select_idle_cpu2(struct task_struct *p, struct sched_domain *sd, int target)
+{
+	int cpu, wrap;
+
+	for_each_cpu_wrap(cpu, sched_domain_span(sd), target, wrap) {
+		if (!cpumask_test_cpu(cpu, tsk_cpus_allowed(p)))
+			continue;
+		if (idle_cpu(cpu))
+			break;
+	}
+
+	return cpu;
+}
+
 /*
  * Try and locate an idle core/thread in the LLC cache domain.
  */
@@ -5424,7 +5479,10 @@ static int select_idle_sibling(struct task_struct *p, int target)
 	if ((unsigned)i < nr_cpumask_bits)
 		return i;
 
-	i = select_idle_cpu(p, sd, target);
+	if (sched_feat(NEW_SELECT))
+		i = select_idle_cpu2(p, sd, target);
+	else
+		i = select_idle_cpu(p, sd, target);
 	if ((unsigned)i < nr_cpumask_bits)
 		return i;
 
@@ -5470,6 +5528,227 @@ static int cpu_util(int cpu)
 }
 
 /*
+ * XXX just copied from waker_affine().
+ * use util other than load for some topologes?
+ * real-time vs. avg
+ */
+static int
+wake_waker(int topology, struct sched_domain *sd, struct task_struct *p, int sync)
+{
+	s64 this_load, load;
+	s64 this_eff_load, prev_eff_load;
+	int idx, this_cpu, prev_cpu;
+	struct task_group *tg;
+	unsigned long weight;
+	int balanced;
+
+	idx	  = sd->wake_idx;
+	this_cpu  = smp_processor_id();
+	prev_cpu  = task_cpu(p);
+	load	  = source_load(prev_cpu, idx);
+	this_load = target_load(this_cpu, idx);
+
+	/*
+	 * If sync wakeup then subtract the (maximum possible)
+	 * effect of the currently running task from the load
+	 * of the current CPU:
+	 */
+	if (sync) {
+		tg = task_group(current);
+		weight = current->se.avg.load_avg;
+
+		this_load += effective_load(tg, this_cpu, -weight, -weight);
+		load += effective_load(tg, prev_cpu, 0, -weight);
+	}
+
+	tg = task_group(p);
+	weight = p->se.avg.load_avg;
+
+	/*
+	 * In low-load situations, where prev_cpu is idle and this_cpu is idle
+	 * due to the sync cause above having dropped this_load to 0, we'll
+	 * always have an imbalance, but there's really nothing you can do
+	 * about that, so that's good too.
+	 *
+	 * Otherwise check if either cpus are near enough in load to allow this
+	 * task to be woken on this_cpu.
+	 */
+	this_eff_load = 100;
+	this_eff_load *= capacity_of(prev_cpu);
+
+	prev_eff_load = 100 + (sd->imbalance_pct - 100) / 2;
+	prev_eff_load *= capacity_of(this_cpu);
+
+	if (this_load > 0) {
+		this_eff_load *= this_load +
+			effective_load(tg, this_cpu, weight, weight);
+
+		prev_eff_load *= load + effective_load(tg, prev_cpu, 0, weight);
+	}
+
+	balanced = this_eff_load <= prev_eff_load;
+
+	schedstat_inc(p, se.statistics.nr_wakeups_affine_attempts);
+
+	if (!balanced)
+		return 0;
+
+	schedstat_inc(sd, ttwu_move_affine);
+	schedstat_inc(p, se.statistics.nr_wakeups_affine);
+
+	return 1;
+}
+static int wake_idle(struct sched_domain *sd)
+{
+	u64 avg_cost = sd->avg_scan_cost, avg_idle = this_rq()->avg_idle;
+
+	/*
+	 * Due to large variance we need a large fuzz factor; hackbench in
+	 * particularly is sensitive here.
+	 */
+	if ((avg_idle / 512) < avg_cost)
+		return 0;
+
+	return 1;
+}
+
+static inline int
+waker_wakee_topology(int waker, int wakee, int *allowed, struct task_struct *p)
+{
+	int topology;
+
+	if (static_branch_likely(&sched_llc_complete))
+		topology = TP_LLC_SOCK;
+
+	if (waker == wakee)
+		return TP_IDENT | topology;
+
+	*allowed = cpumask_test_cpu(waker, tsk_cpus_allowed(p));
+
+#ifdef CONFIG_SCHED_SMT
+	if (static_branch_likely(&sched_smt_present) &&
+	    cpumask_test_cpu(waker, cpu_smt_mask(wakee)))
+		return TP_SMT | topology;
+#endif
+	if (cpus_share_cache(wakee, waker))
+		return TP_LLC | topology;
+
+	/* We are here without TP_LLC_SOCK for sure */
+	if (unlikely(cpus_share_socket(wakee, waker)))
+		return TP_NOLLC_SOCK;
+
+	return TP_NOLLC_XSOCK;
+}
+
+/*
+ * Notes:
+ *  - how one-time local suboptimal select approaches to overall global optimal selects
+ *  - certain randomness
+ *  - spread vs. consolidate
+ *  - load vs. util, real-time vs. avg
+ *  - use topology more
+ */
+static int
+select_task_rq_fair2(struct task_struct *p, int prev_cpu, int sd_flag, int wake_flags)
+{
+	struct sched_domain *tmp, *sd = NULL, *this_sd_llc = NULL;
+	int waker_allowed = 1, select_idle = 0;
+	int cpu = smp_processor_id(), new_cpu = prev_cpu;
+	int sync = wake_flags & WF_SYNC;
+	int topology = waker_wakee_topology(cpu, prev_cpu, &waker_allowed, p);
+
+	record_wakee(p);
+
+	rcu_read_lock();
+
+	for_each_domain(cpu, tmp) {
+		/* Stop if domain flags says no */
+		if (!(tmp->flags & SD_LOAD_BALANCE) || !(tmp->flags & sd_flag))
+			break;
+
+		sd = tmp;
+	}
+
+	if (!sd)
+		goto out_unlock;
+
+	this_sd_llc = rcu_dereference(*this_cpu_ptr(&sd_llc));
+	if (!this_sd_llc || (sd->span_weight < this_sd_llc->span_weight))
+		goto select_avg;
+
+	/* Now we can attempt to fast select an idle CPU */
+	if (topology & TP_LLC_SOCK) {
+
+		if (wake_idle(this_sd_llc))
+			select_idle = 1;
+
+	} else if (!wake_wide2(topology, p))
+		select_idle = 1;
+
+	if (topology > TP_IDENT && waker_allowed &&
+	    wake_waker(topology, this_sd_llc, p, sync))
+		new_cpu = cpu;
+
+	if (select_idle) {
+		/*
+		 * Scan the LLC domain for idle CPUs; this is dynamically
+		 * regulated by comparing the average scan cost (tracked in
+		 * this_sd_llc->avg_scan_cost) against the average idle time
+		 * for this rq (as found in this_rq->avg_idle).
+		 */
+		u64 time = local_clock();
+
+		new_cpu = select_idle_sibling(p, new_cpu);
+		time = local_clock() - time;
+		this_sd_llc->avg_scan_cost +=
+			(s64)(time - this_sd_llc->avg_scan_cost) / 8;
+
+		goto out_unlock;
+	}
+
+select_avg:
+	while (sd) {
+		struct sched_group *group;
+		int weight;
+
+		if (!(sd->flags & sd_flag)) {
+			sd = sd->child;
+			continue;
+		}
+
+		group = find_idlest_group(sd, p, cpu, sd_flag);
+		if (!group) {
+			sd = sd->child;
+			continue;
+		}
+
+		new_cpu = find_idlest_cpu(group, p, cpu);
+		if (new_cpu == -1 || new_cpu == cpu) {
+			/* Now try balancing at a lower domain level of cpu */
+			sd = sd->child;
+			continue;
+		}
+
+		/* Now try balancing at a lower domain level of new_cpu */
+		cpu = new_cpu;
+		weight = sd->span_weight;
+		sd = NULL;
+		for_each_domain(cpu, tmp) {
+			if (weight <= tmp->span_weight)
+				break;
+			if (tmp->flags & sd_flag)
+				sd = tmp;
+		}
+		/* while loop will break here if sd == NULL */
+	}
+
+out_unlock:
+	rcu_read_unlock();
+
+	return new_cpu;
+}
+
+/*
  * select_task_rq_fair: Select target runqueue for the waking task in domains
  * that have the 'sd_flag' flag set. In practice, this is SD_BALANCE_WAKE,
  * SD_BALANCE_FORK, or SD_BALANCE_EXEC.
@@ -5488,6 +5767,9 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int sd_flag, int wake_f
 	int new_cpu = prev_cpu;
 	int want_affine = 0;
 	int sync = wake_flags & WF_SYNC;
+
+	if (sched_feat(NEW_SELECT))
+		return select_task_rq_fair2(p, prev_cpu, sd_flag, wake_flags);
 
 	if (sd_flag & SD_BALANCE_WAKE) {
 		record_wakee(p);
