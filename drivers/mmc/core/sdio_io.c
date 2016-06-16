@@ -322,7 +322,7 @@ static int sdio_io_rw_ext_helper(struct sdio_func *func, int write,
 			size = blocks * func->cur_blksize;
 
 			ret = mmc_io_rw_extended(func->card, write,
-				func->num, addr, incr_addr, buf,
+				func->num, addr, incr_addr, false, buf,
 				blocks, func->cur_blksize);
 			if (ret)
 				return ret;
@@ -340,7 +340,7 @@ static int sdio_io_rw_ext_helper(struct sdio_func *func, int write,
 
 		/* Indicate byte mode by setting "blocks" = 0 */
 		ret = mmc_io_rw_extended(func->card, write, func->num, addr,
-			 incr_addr, buf, 0, size);
+			 incr_addr, false, buf, 0, size);
 		if (ret)
 			return ret;
 
@@ -503,6 +503,24 @@ int sdio_writesb(struct sdio_func *func, unsigned int addr, void *src,
 	return sdio_io_rw_ext_helper(func, 1, addr, 0, src, count);
 }
 EXPORT_SYMBOL_GPL(sdio_writesb);
+
+int sdio_readsb_sg_enh(struct sdio_func *func, unsigned int addr,
+		       struct sg_table *dst)
+{
+	return mmc_io_rw_extended(func->card, 0, func->num,
+				  addr, 0, true,
+				  dst, 0, func->cur_blksize);
+}
+EXPORT_SYMBOL_GPL(sdio_readsb_sg_enh);
+
+int sdio_writesb_sg_enh(struct sdio_func *func, unsigned int addr,
+			struct sg_table *src)
+{
+	return mmc_io_rw_extended(func->card, 1, func->num,
+				  addr, 0, true,
+				  src, 0, func->cur_blksize);
+}
+EXPORT_SYMBOL_GPL(sdio_writesb_sg_enh);
 
 /**
  *	sdio_readw - read a 16 bit integer from a SDIO function
