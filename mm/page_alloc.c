@@ -3194,13 +3194,8 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 	struct page *page;
 	int contended_compaction;
 
-	if (!order)
-		return NULL;
-
-	current->flags |= PF_MEMALLOC;
 	*compact_result = try_to_compact_pages(gfp_mask, order, alloc_flags, ac,
 						mode, &contended_compaction);
-	current->flags &= ~PF_MEMALLOC;
 
 	if (*compact_result <= COMPACT_INACTIVE)
 		return NULL;

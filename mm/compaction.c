@@ -1626,12 +1626,16 @@ enum compact_result try_to_compact_pages(gfp_t gfp_mask, unsigned int order,
 
 	*contended = COMPACT_CONTENDED_NONE;
 
-	/* Check if the GFP flags allow compaction */
+	/*
+	 * Check if this is an order-0 request and
+	 * if the GFP flags allow compaction.
+	 */
 	if (!order || !may_enter_fs || !may_perform_io)
 		return COMPACT_SKIPPED;
 
 	trace_mm_compaction_try_to_compact_pages(order, gfp_mask, mode);
 
+	current->flags |= PF_MEMALLOC;
 	/* Compact each zone in the list */
 	for_each_zone_zonelist_nodemask(zone, z, ac->zonelist, ac->high_zoneidx,
 								ac->nodemask) {
@@ -1708,6 +1712,7 @@ break_loop:
 		all_zones_contended = 0;
 		break;
 	}
+	current->flags &= ~PF_MEMALLOC;
 
 	/*
 	 * If at least one zone wasn't deferred or skipped, we report if all
