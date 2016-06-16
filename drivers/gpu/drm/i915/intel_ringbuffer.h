@@ -354,6 +354,7 @@ struct intel_engine_cs {
 	 */
 	spinlock_t fence_lock;
 	struct list_head fence_signal_list;
+	uint32_t last_notify_seqno;
 
 	struct work_struct request_work;
 };

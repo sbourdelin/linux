@@ -1588,6 +1588,7 @@ out:
 			 * request has not actually been fully processed yet.
 			 */
 			spin_lock_irq(&req->engine->fence_lock);
+			req->engine->last_notify_seqno = 0;
 			i915_gem_request_notify(req->engine, true, true);
 			spin_unlock_irq(&req->engine->fence_lock);
 		}
@@ -2834,8 +2835,11 @@ i915_gem_init_seqno(struct drm_i915_private *dev_priv, u32 seqno)
 	i915_gem_retire_requests(dev_priv);
 
 	/* Finally reset hw state */
-	for_each_engine(engine, dev_priv)
+	for_each_engine(engine, dev_priv) {
 		intel_ring_init_seqno(engine, seqno);
+
+		engine->last_notify_seqno = 0;
+	}
 
 	return 0;
 }
@@ -3178,13 +3182,24 @@ void i915_gem_request_notify(struct intel_engine_cs *engine, bool fence_locked,
 		return;
 	}
 
-	if (!fence_locked)
-		spin_lock_irq(&engine->fence_lock);
-
+	/*
+	 * Check for a new seqno. If it hasn't actually changed then early
+	 * exit without even grabbing the spinlock. Note that this is safe
+	 * because any corruption of last_notify_seqno merely results in doing
+	 * the full processing when there is potentially no work to be done.
+	 * It can never lead to not processing work that does need to happen.
+	 */
 	if (!lazy_coherency && engine->irq_seqno_barrier)
 		engine->irq_seqno_barrier(engine);
 	seqno = engine->get_seqno(engine);
 	trace_i915_gem_request_notify(engine, seqno);
+	if (seqno == engine->last_notify_seqno)
+		return;
+
+	if (!fence_locked)
+		spin_lock_irq(&engine->fence_lock);
+
+	engine->last_notify_seqno = seqno;
 
 	list_for_each_entry_safe(req, req_next, &engine->fence_signal_list, signal_link) {
 		if (!req->cancelled && !i915_seqno_passed(seqno, req->seqno))
@@ -3476,7 +3491,10 @@ static void i915_gem_reset_engine_cleanup(struct drm_i915_private *dev_priv,
 	/*
 	 * Make sure that any requests that were on the signal pending list also
 	 * get cleaned up.
+	 * NB: The seqno cache must be cleared first otherwise the notify call
+	 * will simply return immediately.
 	 */
+	engine->last_notify_seqno = 0;
 	i915_gem_request_notify(engine, false, false);
 
 	/* Having flushed all requests from all queues, we know that all
