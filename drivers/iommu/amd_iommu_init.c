@@ -1526,6 +1526,8 @@ static int iommu_init_pci(struct amd_iommu *iommu)
 	iommu->iommu_dev = iommu_device_create(&iommu->dev->dev, iommu,
 					       amd_iommu_groups, "ivhd%d",
 					       iommu->index);
+	if (IS_ERR(iommu->iommu_dev))
+		return PTR_ERR(iommu->iommu_dev);
 
 	return pci_enable_device(iommu->dev);
 }

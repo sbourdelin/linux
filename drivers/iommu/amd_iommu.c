@@ -477,6 +477,7 @@ out:
 static int iommu_init_device(struct device *dev)
 {
 	struct iommu_dev_data *dev_data;
+	struct amd_iommu *iommu;
 	int devid;
 
 	if (dev->archdata.iommu)
@@ -492,17 +493,15 @@ static int iommu_init_device(struct device *dev)
 
 	dev_data->alias = get_alias(dev);
 
-	if (dev_is_pci(dev) && pci_iommuv2_capable(to_pci_dev(dev))) {
-		struct amd_iommu *iommu;
+	iommu = amd_iommu_rlookup_table[dev_data->devid];
 
-		iommu = amd_iommu_rlookup_table[dev_data->devid];
+	if (dev_is_pci(dev) && pci_iommuv2_capable(to_pci_dev(dev)))
 		dev_data->iommu_v2 = iommu->is_iommu_v2;
-	}
 
 	dev->archdata.iommu = dev_data;
 
-	iommu_device_link(amd_iommu_rlookup_table[dev_data->devid]->iommu_dev,
-			  dev);
+	if (iommu_device_link(iommu->iommu_dev, dev))
+		dev_warn(dev, "Creating iommu device link failed in sysfs.\n");
 
 	return 0;
 }
