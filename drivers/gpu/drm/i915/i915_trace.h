@@ -546,8 +546,8 @@ DEFINE_EVENT(i915_gem_request, i915_gem_request_add,
 );
 
 TRACE_EVENT(i915_gem_request_notify,
-	    TP_PROTO(struct intel_engine_cs *engine),
-	    TP_ARGS(engine),
+	    TP_PROTO(struct intel_engine_cs *engine, uint32_t seqno),
+	    TP_ARGS(engine, seqno),
 
 	    TP_STRUCT__entry(
 			     __field(u32, dev)
@@ -558,7 +558,7 @@ TRACE_EVENT(i915_gem_request_notify,
 	    TP_fast_assign(
 			   __entry->dev = engine->i915->dev->primary->index;
 			   __entry->ring = engine->id;
-			   __entry->seqno = engine->get_seqno(engine);
+			   __entry->seqno = seqno;
 			   ),
 
 	    TP_printk("dev=%u, ring=%u, seqno=%u",

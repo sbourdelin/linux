@@ -3173,8 +3173,10 @@ void i915_gem_request_notify(struct intel_engine_cs *engine, bool fence_locked,
 	 * not-empty. And a false not-empty is not an issue - it would just be
 	 * the same as not doing the early exit test at all.
 	 */
-	if (list_empty(&engine->fence_signal_list))
+	if (list_empty(&engine->fence_signal_list)) {
+		trace_i915_gem_request_notify(engine, 0);
 		return;
+	}
 
 	if (!fence_locked)
 		spin_lock_irq(&engine->fence_lock);
@@ -3182,6 +3184,7 @@ void i915_gem_request_notify(struct intel_engine_cs *engine, bool fence_locked,
 	if (!lazy_coherency && engine->irq_seqno_barrier)
 		engine->irq_seqno_barrier(engine);
 	seqno = engine->get_seqno(engine);
+	trace_i915_gem_request_notify(engine, seqno);
 
 	list_for_each_entry_safe(req, req_next, &engine->fence_signal_list, signal_link) {
 		if (!req->cancelled && !i915_seqno_passed(seqno, req->seqno))
@@ -3193,8 +3196,10 @@ void i915_gem_request_notify(struct intel_engine_cs *engine, bool fence_locked,
 		 */
 		list_del_init(&req->signal_link);
 
-		if (!req->cancelled)
+		if (!req->cancelled) {
 			fence_signal_locked(&req->fence);
+			trace_i915_gem_request_complete(req);
+		}
 
 		if (req->irq_enabled) {
 			req->engine->irq_put(req->engine);
