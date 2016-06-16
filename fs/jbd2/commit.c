@@ -379,6 +379,7 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	tid_t first_tid;
 	int update_tail;
 	int csum_size = 0;
+	int need_free = 0;
 	LIST_HEAD(io_bufs);
 	LIST_HEAD(log_bufs);
 
@@ -1100,9 +1101,6 @@ restart_loop:
 
 	write_unlock(&journal->j_state_lock);
 
-	if (journal->j_commit_callback)
-		journal->j_commit_callback(journal, commit_transaction);
-
 	trace_jbd2_end_commit(journal, commit_transaction);
 	jbd_debug(1, "JBD2: commit %d complete, head %d\n",
 		  journal->j_commit_sequence, journal->j_tail_sequence);
@@ -1114,11 +1112,17 @@ restart_loop:
 	if (commit_transaction->t_checkpoint_list == NULL &&
 	    commit_transaction->t_checkpoint_io_list == NULL) {
 		__jbd2_journal_drop_transaction(journal, commit_transaction);
-		jbd2_journal_free_transaction(commit_transaction);
+		need_free = 1;
 	}
 	spin_unlock(&journal->j_list_lock);
 	write_unlock(&journal->j_state_lock);
 	wake_up(&journal->j_wait_done_commit);
+
+	if (journal->j_commit_callback)
+		journal->j_commit_callback(journal, commit_transaction);
+
+	if (need_free)
+		jbd2_journal_free_transaction(commit_transaction);
 
 	/*
 	 * Calculate overall stats
