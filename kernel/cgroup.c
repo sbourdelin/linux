@@ -4961,10 +4961,10 @@ static void css_free_work_fn(struct work_struct *work)
 	if (ss) {
 		/* css free path */
 		struct cgroup_subsys_state *parent = css->parent;
-		int id = css->id;
 
 		ss->css_free(css);
-		cgroup_idr_remove(&ss->css_idr, id);
+		if (css->id)
+			cgroup_idr_remove(&ss->css_idr, css->id);
 		cgroup_put(cgrp);
 
 		if (parent)
@@ -6202,6 +6202,24 @@ struct cgroup *cgroup_get_from_path(const char *path)
 	return cgrp;
 }
 EXPORT_SYMBOL_GPL(cgroup_get_from_path);
+
+/**
+ * css_id_free - relinquish an existing CSS's ID
+ * @css: the CSS
+ *
+ * This releases the @css's ID and allows it to be recycled while the
+ * CSS continues to exist. This is useful for controllers with state
+ * that extends past a cgroup's lifetime but doesn't need precious ID
+ * address space.
+ *
+ * This invalidates @css->id, and css_from_id() might return NULL or a
+ * new css if the ID has been recycled in the meantime.
+ */
+void css_id_free(struct cgroup_subsys_state *css)
+{
+	cgroup_idr_remove(&css->ss->css_idr, css->id);
+	css->id = 0;
+}
 
 /*
  * sock->sk_cgrp_data handling.  For more info, see sock_cgroup_data
