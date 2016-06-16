@@ -4935,6 +4935,12 @@ out:
 static void svm_handle_external_intr(struct kvm_vcpu *vcpu)
 {
 	local_irq_enable();
+	/*
+	 * We must execute an instruction with interrupts enabled, so
+	 * the "cli" doesn't fall right on the interrupt shadow.
+	 */
+	asm("nop");
+	local_irq_disable();
 }
 
 static void svm_sched_in(struct kvm_vcpu *vcpu, int cpu)
