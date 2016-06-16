@@ -21,6 +21,7 @@
 #include "util/cpumap.h"
 #include "util/thread_map.h"
 #include "util/stat.h"
+#include "util/thread-stack.h"
 #include <linux/bitmap.h>
 #include <linux/stringify.h>
 #include "asm/bug.h"
@@ -63,6 +64,7 @@ enum perf_output_field {
 	PERF_OUTPUT_DATA_SRC	    = 1U << 17,
 	PERF_OUTPUT_WEIGHT	    = 1U << 18,
 	PERF_OUTPUT_BPF_OUTPUT	    = 1U << 19,
+	PERF_OUTPUT_CALLINDENT	    = 1U << 20,
 };
 
 struct output_option {
@@ -89,6 +91,7 @@ struct output_option {
 	{.str = "data_src", .field = PERF_OUTPUT_DATA_SRC},
 	{.str = "weight",   .field = PERF_OUTPUT_WEIGHT},
 	{.str = "bpf-output",   .field = PERF_OUTPUT_BPF_OUTPUT},
+	{.str = "callindent", .field = PERF_OUTPUT_CALLINDENT},
 };
 
 /* default set to maintain compatibility with current format */
@@ -560,6 +563,70 @@ static void print_sample_addr(struct perf_sample *sample,
 		map__fprintf_dsoname(al.map, stdout);
 		printf(")");
 	}
+}
+
+static void print_sample_callindent(struct perf_sample *sample,
+				    struct perf_evsel *evsel,
+				    struct thread *thread,
+				    struct addr_location *al)
+{
+	struct perf_event_attr *attr = &evsel->attr;
+	size_t depth = thread_stack__depth(thread);
+	const char *prefix = NULL, *name = NULL;
+	struct addr_location addr_al;
+	static int spacing;
+	int len = 0;
+	u64 ip = 0;
+
+	/*
+	 * The 'return' has already been popped off the stack so the depth has
+	 * to be adjusted to match the 'call'.
+	 */
+	if (thread->ts && sample->flags & PERF_IP_FLAG_RETURN)
+		depth += 1;
+
+	if (sample->flags & (PERF_IP_FLAG_CALL | PERF_IP_FLAG_TRACE_BEGIN)) {
+		if (sample->flags & PERF_IP_FLAG_TRACE_BEGIN)
+			prefix = "strt";
+		else
+			prefix = "call";
+		if (sample_addr_correlates_sym(attr)) {
+			thread__resolve(thread, &addr_al, sample);
+			if (addr_al.sym)
+				name = addr_al.sym->name;
+			else
+				ip = sample->addr;
+		} else {
+			ip = sample->addr;
+		}
+	} else if (sample->flags & (PERF_IP_FLAG_RETURN | PERF_IP_FLAG_TRACE_END)) {
+		if (sample->flags & PERF_IP_FLAG_TRACE_END)
+			prefix = "end";
+		else
+			prefix = "ret";
+		if (al->sym)
+			name = al->sym->name;
+		else
+			ip = sample->ip;
+	}
+
+	if (name)
+		len = printf("%*s%-4s %s", (int)depth * 4, "", prefix, name);
+	else if (prefix)
+		len = printf("%*s%-4s %16" PRIx64, (int)depth * 4, "", prefix, ip);
+
+	if (len < 0)
+		return;
+
+	/*
+	 * Try to keep the output length from changing frequently so that the
+	 * output lines up more nicely.
+	 */
+	if (len > spacing || (len && len < spacing - 52))
+		spacing = round_up(len + 4, 32);
+
+	if (len < spacing)
+		printf("%*s", spacing - len, "");
 }
 
 static void print_sample_bts(struct perf_sample *sample,
@@ -2258,6 +2325,9 @@ int cmd_script(int argc, const char **argv, const char *prefix __maybe_unused)
 
 	script.session = session;
 	script__setup_sample_type(&script);
+
+	if (output[PERF_TYPE_HARDWARE].fields & PERF_OUTPUT_CALLINDENT)
+		itrace_synth_opts.thread_stack = true;
 
 	session->itrace_synth_opts = &itrace_synth_opts;
 
