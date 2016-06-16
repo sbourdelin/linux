@@ -892,9 +892,9 @@ void brcmf_sdiod_sgtable_alloc(struct brcmf_sdio_dev *sdiodev)
 	max_blocks = min_t(uint, host->max_blk_count, 511u);
 	sdiodev->max_request_size = min_t(uint, host->max_req_size,
 					  max_blocks * func->cur_blksize);
-	sdiodev->max_segment_count = min_t(uint, host->max_segs,
-					   SG_MAX_SINGLE_ALLOC);
-	sdiodev->max_segment_size = host->max_seg_size;
+	sdiodev->max_segment_count = min_t(uint, SG_MAX_SINGLE_ALLOC,
+					   sdio_get_host_max_seg_count(func));
+	sdiodev->max_segment_size = sdio_get_host_max_seg_size(func);
 
 	if (!sdiodev->sg_support)
 		return;

@@ -159,4 +159,7 @@ extern void sdio_f0_writeb(struct sdio_func *func, unsigned char b,
 extern mmc_pm_flag_t sdio_get_host_pm_caps(struct sdio_func *func);
 extern int sdio_set_host_pm_flags(struct sdio_func *func, mmc_pm_flag_t flags);
 
+unsigned short sdio_get_host_max_seg_count(struct sdio_func *func);
+unsigned int sdio_get_host_max_seg_size(struct sdio_func *func);
+
 #endif /* LINUX_MMC_SDIO_FUNC_H */
