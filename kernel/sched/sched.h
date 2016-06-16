@@ -1818,3 +1818,20 @@ static inline void account_reset_rq(struct rq *rq)
 	rq->prev_steal_time_rq = 0;
 #endif
 }
+
+
+#ifdef CONFIG_SCHED_SMT
+
+extern struct static_key_false sched_smt_present;
+
+extern void __update_idle_core(struct rq *rq);
+
+static inline void update_idle_core(struct rq *rq)
+{
+	if (static_branch_unlikely(&sched_smt_present))
+		__update_idle_core(rq);
+}
+
+#else
+static inline void update_idle_core(struct rq *rq) { }
+#endif

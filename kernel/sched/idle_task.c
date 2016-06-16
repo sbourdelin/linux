@@ -23,8 +23,6 @@ static void check_preempt_curr_idle(struct rq *rq, struct task_struct *p, int fl
 	resched_curr(rq);
 }
 
-extern void update_idle_core(struct rq *rq);
-
 static struct task_struct *
 pick_next_task_idle(struct rq *rq, struct task_struct *prev, struct pin_cookie cookie)
 {
