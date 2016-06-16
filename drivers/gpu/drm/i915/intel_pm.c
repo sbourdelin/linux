@@ -4798,6 +4798,7 @@ static void valleyview_set_rps(struct drm_i915_private *dev_priv, u8 val)
 	WARN_ON(!mutex_is_locked(&dev_priv->rps.hw_lock));
 	WARN_ON(val > dev_priv->rps.max_freq);
 	WARN_ON(val < dev_priv->rps.min_freq);
+	WARN_ON(val < dev_priv->rps.idle_freq);
 
 	if (WARN_ONCE(IS_CHERRYVIEW(dev_priv) && (val & 1),
 		      "Odd GPU freq value\n"))
@@ -4815,31 +4816,11 @@ static void valleyview_set_rps(struct drm_i915_private *dev_priv, u8 val)
 	trace_intel_gpu_freq_change(intel_gpu_freq(dev_priv, val));
 }
 
-/* vlv_set_rps_idle: Set the frequency to idle, if Gfx clocks are down
- *
- * * If Gfx is Idle, then
- * 1. Forcewake Media well.
- * 2. Request idle freq.
- * 3. Release Forcewake of Media well.
-*/
-static void vlv_set_rps_idle(struct drm_i915_private *dev_priv)
-{
-	u32 val = dev_priv->rps.idle_freq;
-
-	if (dev_priv->rps.cur_freq <= val)
-		return;
-
-	/* Wake up the media well, as that takes a lot less
-	 * power than the Render well. */
-	intel_uncore_forcewake_get(dev_priv, FORCEWAKE_MEDIA);
-	valleyview_set_rps(dev_priv, val);
-	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_MEDIA);
-}
-
 void gen6_rps_busy(struct drm_i915_private *dev_priv)
 {
 	mutex_lock(&dev_priv->rps.hw_lock);
 	if (dev_priv->rps.enabled) {
+		intel_set_rps(dev_priv, dev_priv->rps.min_freq_softlimit);
 		if (dev_priv->pm_rps_events & (GEN6_PM_RP_DOWN_EI_EXPIRED | GEN6_PM_RP_UP_EI_EXPIRED))
 			gen6_rps_reset_ei(dev_priv);
 		I915_WRITE(GEN6_PMINTRMSK,
@@ -4852,10 +4833,7 @@ void gen6_rps_idle(struct drm_i915_private *dev_priv)
 {
 	mutex_lock(&dev_priv->rps.hw_lock);
 	if (dev_priv->rps.enabled) {
-		if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
-			vlv_set_rps_idle(dev_priv);
-		else
-			gen6_set_rps(dev_priv, dev_priv->rps.idle_freq);
+		intel_set_rps(dev_priv, dev_priv->rps.idle_freq);
 		dev_priv->rps.last_adj = 0;
 		I915_WRITE(GEN6_PMINTRMSK, 0xffffffff);
 	}
@@ -4905,8 +4883,11 @@ void gen6_rps_boost(struct drm_i915_private *dev_priv,
 
 void intel_set_rps(struct drm_i915_private *dev_priv, u8 val)
 {
-	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
+	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) {
+		intel_uncore_forcewake_get(dev_priv, FORCEWAKE_MEDIA);
 		valleyview_set_rps(dev_priv, val);
+		intel_uncore_forcewake_put(dev_priv, FORCEWAKE_MEDIA);
+	}
 	else
 		gen6_set_rps(dev_priv, val);
 }
