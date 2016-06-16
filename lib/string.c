@@ -939,16 +939,16 @@ EXPORT_SYMBOL(memchr_inv);
 /**
  * strreplace - Replace all occurrences of character in string.
  * @s: The string to operate on.
- * @old: The character being replaced.
- * @new: The character @old is replaced with.
+ * @oldstr: The character being replaced.
+ * @newstr: The character @oldstr is replaced with.
  *
  * Returns pointer to the nul byte at the end of @s.
  */
-char *strreplace(char *s, char old, char new)
+char *strreplace(char *s, char oldstr, char newstr)
 {
 	for (; *s; ++s)
-		if (*s == old)
-			*s = new;
+		if (*s == oldstr)
+			*s = newstr;
 	return s;
 }
 EXPORT_SYMBOL(strreplace);
