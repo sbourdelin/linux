@@ -1,0 +1,31 @@
+Binding for fractional scale clock source.
+
+This binding uses the common clock binding[1].
+
+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+
+Required properties:
+- compatible : shall be "fractional-scale-clock".
+- clocks : shall be the input parent clock phandle for the clock.
+- #clock-cells : shall be set to 1.
+- reg : shall be the physical register address for the clock.
+- clock-output-names : shall be the name of the clock referenced by derive clock.
+- clock-shift: Bit shift of the clock register. Default is 0.
+- clock-width: Width of the clock register. Default is 32.
+- clock-denom: shall be the denominator value. Default is 2^32.
+
+Optional properties:
+- clock-inverted: shall be 1 if the numerator is inverted.
+- clock-names : shall be the name of the clock. If missing, use the device name.
+
+Example:
+	clock {
+		compatible = "fractional-scale-clock";
+		clocks = <&parentclk>;
+		#clock-cells = <1>;
+		reg = <0x0 0xFFFF0000 0x0 0x10>
+		clock-shift = <8>;
+		clock-width = <3>;
+		clock-denom = <8>;
+		clock-inverted = <1>;
+	};
