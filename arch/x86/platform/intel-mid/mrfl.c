@@ -79,7 +79,7 @@ static unsigned long __init tangier_calibrate_tsc(void)
 			lapic_timer_frequency);
 
 	/* mark tsc clocksource as reliable */
-	set_cpu_cap(&boot_cpu_data, X86_FEATURE_TSC_RELIABLE);
+	setup_force_cpu_cap(X86_FEATURE_TSC_RELIABLE);
 
 	return fast_calibrate;
 }
