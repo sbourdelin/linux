@@ -1461,7 +1461,7 @@ static int devlink_nl_cmd_eswitch_mode_set_doit(struct sk_buff *skb,
 
 	mode = nla_get_u16(info->attrs[DEVLINK_ATTR_ESWITCH_MODE]);
 
-	if (ops && ops->eswitch_mode_get)
+	if (ops && ops->eswitch_mode_set)
 		return ops->eswitch_mode_set(devlink, mode);
 	return -EOPNOTSUPP;
 }
