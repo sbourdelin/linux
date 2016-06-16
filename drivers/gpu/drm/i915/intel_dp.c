@@ -1772,6 +1772,9 @@ static void intel_dp_prepare(struct intel_encoder *encoder)
 #define IDLE_CYCLE_MASK		(PP_ON | PP_SEQUENCE_MASK | PP_CYCLE_DELAY_ACTIVE | PP_SEQUENCE_STATE_MASK)
 #define IDLE_CYCLE_VALUE	(0     | PP_SEQUENCE_NONE | 0                     | PP_SEQUENCE_STATE_OFF_IDLE)
 
+static void intel_pps_verify_state(struct drm_i915_private *dev_priv,
+				   struct intel_dp *intel_dp);
+
 static void wait_panel_status(struct intel_dp *intel_dp,
 				       u32 mask,
 				       u32 value)
@@ -1781,6 +1784,8 @@ static void wait_panel_status(struct intel_dp *intel_dp,
 	i915_reg_t pp_stat_reg, pp_ctrl_reg;
 
 	lockdep_assert_held(&dev_priv->pps_mutex);
+
+	intel_pps_verify_state(dev_priv, intel_dp);
 
 	pp_stat_reg = _pp_stat_reg(intel_dp);
 	pp_ctrl_reg = _pp_ctrl_reg(intel_dp);
@@ -4821,6 +4826,35 @@ intel_pps_readout_hw_state(struct drm_i915_private *dev_priv,
 }
 
 static void
+intel_pps_dump_state(const char *state_name, const struct edp_power_seq *seq)
+{
+	DRM_DEBUG_KMS("%s t1_t3 %d t8 %d t9 %d t10 %d t11_t12 %d\n",
+		      state_name,
+		      seq->t1_t3, seq->t8, seq->t9, seq->t10, seq->t11_t12);
+}
+
+static void
+intel_pps_verify_state(struct drm_i915_private *dev_priv,
+		       struct intel_dp *intel_dp)
+{
+	struct edp_power_seq hw;
+	struct edp_power_seq *sw = &intel_dp->pps_delays;
+
+	intel_pps_readout_hw_state(dev_priv, intel_dp, &hw);
+
+	/*
+	 * We don't use/program the HW T8 and T9 timings as we use SW based
+	 * delays for these, so the HW state of these fields are dont-care.
+	 */
+	if (hw.t1_t3 != sw->t1_t3 || hw.t10 != sw->t10 ||
+	    hw.t11_t12 != sw->t11_t12) {
+		DRM_ERROR("PPS state mismatch\n");
+		intel_pps_dump_state("sw", sw);
+		intel_pps_dump_state("hw", &hw);
+	}
+}
+
+static void
 intel_dp_init_panel_power_sequencer(struct drm_device *dev,
 				    struct intel_dp *intel_dp)
 {
@@ -4836,8 +4870,7 @@ intel_dp_init_panel_power_sequencer(struct drm_device *dev,
 
 	intel_pps_readout_hw_state(dev_priv, intel_dp, &cur);
 
-	DRM_DEBUG_KMS("cur t1_t3 %d t8 %d t9 %d t10 %d t11_t12 %d\n",
-		      cur.t1_t3, cur.t8, cur.t9, cur.t10, cur.t11_t12);
+	intel_pps_dump_state("cur", &cur);
 
 	vbt = dev_priv->vbt.edp.pps;
 
@@ -4853,8 +4886,7 @@ intel_dp_init_panel_power_sequencer(struct drm_device *dev,
 	 * too. */
 	spec.t11_t12 = (510 + 100) * 10;
 
-	DRM_DEBUG_KMS("vbt t1_t3 %d t8 %d t9 %d t10 %d t11_t12 %d\n",
-		      vbt.t1_t3, vbt.t8, vbt.t9, vbt.t10, vbt.t11_t12);
+	intel_pps_dump_state("vbt", &vbt);
 
 	/* Use the max of the register settings and vbt. If both are
 	 * unset, fall back to the spec limits. */
