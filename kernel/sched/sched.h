@@ -1712,38 +1712,48 @@ DECLARE_PER_CPU(u64, cpu_softirq_time);
 
 #ifndef CONFIG_64BIT
 DECLARE_PER_CPU(seqcount_t, irq_time_seq);
+DECLARE_PER_CPU(seqcount_t, softirq_time_seq);
 
-static inline void irq_time_write_begin(void)
+static inline void irq_time_write_begin(int irqtype)
 {
-	__this_cpu_inc(irq_time_seq.sequence);
+	if (irqtype == HARDIRQ_OFFSET)
+		__this_cpu_inc(irq_time_seq.sequence);
+	else
+		__this_cpu_inc(softirq_time_seq.sequence);
 	smp_wmb();
 }
 
-static inline void irq_time_write_end(void)
+static inline void irq_time_write_end(int irqtype)
 {
 	smp_wmb();
-	__this_cpu_inc(irq_time_seq.sequence);
+	if (irqtype == HARDIRQ_OFFSET)
+		__this_cpu_inc(irq_time_seq.sequence);
+	else
+		__this_cpu_inc(softirq_time_seq.sequence);
 }
 
 static inline u64 irq_time_read(int cpu)
 {
 	u64 irq_time;
-	unsigned seq;
+	unsigned hi_seq;
+	unsigned si_seq;
 
 	do {
-		seq = read_seqcount_begin(&per_cpu(irq_time_seq, cpu));
+		hi_seq = read_seqcount_begin(&per_cpu(irq_time_seq, cpu));
+		si_seq = read_seqcount_begin(&per_cpu(softirq_time_seq, cpu));
 		irq_time = per_cpu(cpu_softirq_time, cpu) +
 			   per_cpu(cpu_hardirq_time, cpu);
-	} while (read_seqcount_retry(&per_cpu(irq_time_seq, cpu), seq));
+	} while (read_seqcount_retry(&per_cpu(irq_time_seq, cpu), hi_seq) ||
+		 read_seqcount_retry(&per_cpu(softirq_time_seq, cpu), si_seq));
 
 	return irq_time;
 }
 #else /* CONFIG_64BIT */
-static inline void irq_time_write_begin(void)
+static inline void irq_time_write_begin(int irqtype)
 {
 }
 
-static inline void irq_time_write_end(void)
+static inline void irq_time_write_end(int irqtype)
 {
 }
 
