@@ -602,7 +602,16 @@ struct vcpu_vmx {
 	u32 guest_pkru;
 	u32 host_pkru;
 
+	/*
+	 * Only bits masked by msr_ia32_feature_control_valid_bits can be set in
+	 * msr_ia32_feature_control.
+	 *
+	 * msr_ia32_feature_control_valid_bits should be modified by
+	 * feature_control_valid_bits_add/del(), and only bits masked by
+	 * FEATURE_CONTROL_MAX_VALID_BITS can be modified.
+	 */
 	u64 msr_ia32_feature_control;
+	u64 msr_ia32_feature_control_valid_bits;
 };
 
 enum segment_cache_field {
@@ -622,6 +631,30 @@ static inline struct vcpu_vmx *to_vmx(struct kvm_vcpu *vcpu)
 static struct pi_desc *vcpu_to_pi_desc(struct kvm_vcpu *vcpu)
 {
 	return &(to_vmx(vcpu)->pi_desc);
+}
+
+/*
+ * FEATURE_CONTROL_LOCKED is added/removed automatically by
+ * feature_control_valid_bits_add/del(), so it's not included here.
+ */
+#define FEATURE_CONTROL_MAX_VALID_BITS \
+	FEATURE_CONTROL_VMXON_ENABLED_OUTSIDE_SMX
+
+static void feature_control_valid_bits_add(struct kvm_vcpu *vcpu, uint64_t bits)
+{
+	ASSERT(!(bits & ~FEATURE_CONTROL_MAX_VALID_BITS));
+	to_vmx(vcpu)->msr_ia32_feature_control_valid_bits |=
+		bits | FEATURE_CONTROL_LOCKED;
+}
+
+static void feature_control_valid_bits_del(struct kvm_vcpu *vcpu, uint64_t bits)
+{
+	uint64_t *valid_bits =
+		&to_vmx(vcpu)->msr_ia32_feature_control_valid_bits;
+	ASSERT(!(bits & ~FEATURE_CONTROL_MAX_VALID_BITS));
+	*valid_bits &= ~bits;
+	if (!(*valid_bits & ~FEATURE_CONTROL_LOCKED))
+		*valid_bits = 0;
 }
 
 #define VMCS12_OFFSET(x) offsetof(struct vmcs12, x)
@@ -2864,6 +2897,14 @@ static int vmx_get_vmx_msr(struct kvm_vcpu *vcpu, u32 msr_index, u64 *pdata)
 	return 0;
 }
 
+static inline bool vmx_feature_control_msr_valid(struct kvm_vcpu *vcpu,
+						 uint64_t val)
+{
+	uint64_t valid_bits = to_vmx(vcpu)->msr_ia32_feature_control_valid_bits;
+
+	return valid_bits && !(val & ~valid_bits);
+}
+
 /*
  * Reads an msr value (of 'msr_index') into 'pdata'.
  * Returns 0 on success, non-0 otherwise.
@@ -2906,7 +2947,7 @@ static int vmx_get_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		msr_info->data = vmcs_read64(GUEST_BNDCFGS);
 		break;
 	case MSR_IA32_FEATURE_CONTROL:
-		if (!nested_vmx_allowed(vcpu))
+		if (!vmx_feature_control_msr_valid(vcpu, 0))
 			return 1;
 		msr_info->data = to_vmx(vcpu)->msr_ia32_feature_control;
 		break;
@@ -2999,7 +3040,7 @@ static int vmx_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		ret = kvm_set_msr_common(vcpu, msr_info);
 		break;
 	case MSR_IA32_FEATURE_CONTROL:
-		if (!nested_vmx_allowed(vcpu) ||
+		if (!vmx_feature_control_msr_valid(vcpu, data) ||
 		    (to_vmx(vcpu)->msr_ia32_feature_control &
 		     FEATURE_CONTROL_LOCKED && !msr_info->host_initiated))
 			return 1;
@@ -9095,6 +9136,13 @@ static void vmx_cpuid_update(struct kvm_vcpu *vcpu)
 			vmx->nested.nested_vmx_secondary_ctls_high &=
 				~SECONDARY_EXEC_PCOMMIT;
 	}
+
+	if (nested_vmx_allowed(vcpu))
+		feature_control_valid_bits_add
+			(vcpu, FEATURE_CONTROL_VMXON_ENABLED_OUTSIDE_SMX);
+	else
+		feature_control_valid_bits_del
+			(vcpu, FEATURE_CONTROL_VMXON_ENABLED_OUTSIDE_SMX);
 }
 
 static void vmx_set_supported_cpuid(u32 func, struct kvm_cpuid_entry2 *entry)
