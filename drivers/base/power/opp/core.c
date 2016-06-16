@@ -764,6 +764,9 @@ static struct opp_table *_add_opp_table(struct device *dev)
 	/* Set regulator to a non-NULL error value */
 	opp_table->regulator = ERR_PTR(-ENXIO);
 
+	/* Set sharing information as unknown */
+	opp_table->shared_opp = OPP_TABLE_SHARED_UNKNOWN;
+
 	/* Find clk for the device */
 	opp_table->clk = clk_get(dev, NULL);
 	if (IS_ERR(opp_table->clk)) {

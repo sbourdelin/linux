@@ -166,7 +166,10 @@ struct opp_table {
 	/* For backward compatibility with v1 bindings */
 	unsigned int voltage_tolerance_v1;
 
-	bool shared_opp;
+#define OPP_TABLE_IS_NOT_SHARED		0
+#define OPP_TABLE_IS_SHARED		1
+#define OPP_TABLE_SHARED_UNKNOWN	UINT_MAX
+	unsigned int shared_opp;
 	struct dev_pm_opp *suspend_opp;
 
 	unsigned int *supported_hw;
