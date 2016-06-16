@@ -1423,6 +1423,9 @@ struct ext4_sb_info {
 	unsigned long s_ext_extents;
 #endif
 
+	/* maximum possible extents tree depth, to be computed at mount time */
+	unsigned int s_max_ext_tree_depth;
+
 	/* for buddy allocator */
 	struct ext4_group_info ***s_group_info;
 	struct inode *s_buddy_cache;

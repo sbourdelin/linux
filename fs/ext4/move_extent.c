@@ -39,13 +39,11 @@ get_ext_path(struct inode *inode, ext4_lblk_t lblock,
 	path = ext4_find_extent(inode, lblock, ppath, EXT4_EX_NOCACHE);
 	if (IS_ERR(path))
 		return PTR_ERR(path);
-	if (path[ext_depth(inode)].p_ext == NULL) {
-		ext4_ext_drop_refs(path);
-		kfree(path);
-		*ppath = NULL;
+	if (path[ext_depth(inode)].p_ext == NULL)
 		return -ENODATA;
-	}
-	*ppath = path;
+	if (*ppath == NULL)
+		*ppath = path;
+	/* XXX else BUG_ON(path != *ppath); */
 	return 0;
 }
 

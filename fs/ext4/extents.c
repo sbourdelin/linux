@@ -876,19 +876,18 @@ ext4_find_extent(struct inode *inode, ext4_lblk_t block,
 
 	if (path) {
 		ext4_ext_drop_refs(path);
-		if (depth > path[0].p_maxdepth) {
-			kfree(path);
-			*orig_path = path = NULL;
-		}
-	}
-	if (!path) {
+		/* path has been allocated for the max possible depth
+		 * so we can simply reuse it */
+		/* XXX need to clear/zero old path content? */
+	} else {
 		/* account possible depth increase */
-		path = kzalloc(sizeof(struct ext4_ext_path) * (depth + 2),
+		path = kzalloc(sizeof(struct ext4_ext_path) *
+				EXT4_SB(inode->i_sb)->s_max_ext_tree_depth,
 				GFP_NOFS);
 		if (unlikely(!path))
 			return ERR_PTR(-ENOMEM);
-		path[0].p_maxdepth = depth + 1;
 	}
+	path[0].p_maxdepth = depth + 1;
 	path[0].p_hdr = eh;
 	path[0].p_bh = NULL;
 
@@ -932,9 +931,11 @@ ext4_find_extent(struct inode *inode, ext4_lblk_t block,
 
 err:
 	ext4_ext_drop_refs(path);
-	kfree(path);
-	if (orig_path)
-		*orig_path = NULL;
+
+	/* do not free *orig_path, it is likely to be referenced by callers */
+	if (!orig_path)
+		kfree(path);
+
 	return ERR_PTR(ret);
 }
 
@@ -2151,7 +2152,8 @@ static int ext4_fill_fiemap_extents(struct inode *inode,
 				    ext4_lblk_t block, ext4_lblk_t num,
 				    struct fiemap_extent_info *fieinfo)
 {
-	struct ext4_ext_path *path = NULL;
+	struct ext4_ext_path *path = NULL, *orig_path = NULL;
+	struct ext4_ext_path **orig_ppath = &orig_path;
 	struct ext4_extent *ex;
 	struct extent_status es;
 	ext4_lblk_t next, next_del, start = 0, end = 0;
@@ -2165,13 +2167,16 @@ static int ext4_fill_fiemap_extents(struct inode *inode,
 		/* find extent for this block */
 		down_read(&EXT4_I(inode)->i_data_sem);
 
-		path = ext4_find_extent(inode, block, &path, 0);
+		path = ext4_find_extent(inode, block, orig_ppath, 0);
 		if (IS_ERR(path)) {
 			up_read(&EXT4_I(inode)->i_data_sem);
 			err = PTR_ERR(path);
 			path = NULL;
 			break;
 		}
+		if (!orig_path)
+			orig_path = path;
+		/* XXX else BUG_ON(path != orig_path); */
 
 		depth = ext_depth(inode);
 		if (unlikely(path[depth].p_hdr == NULL)) {
@@ -2291,8 +2296,8 @@ static int ext4_fill_fiemap_extents(struct inode *inode,
 		block = es.es_lblk + es.es_len;
 	}
 
-	ext4_ext_drop_refs(path);
-	kfree(path);
+	ext4_ext_drop_refs(orig_path);
+	kfree(orig_path);
 	return err;
 }
 
@@ -2924,7 +2929,8 @@ again:
 			path[k].p_block =
 				le16_to_cpu(path[k].p_hdr->eh_entries)+1;
 	} else {
-		path = kzalloc(sizeof(struct ext4_ext_path) * (depth + 1),
+		path = kzalloc(sizeof(struct ext4_ext_path) *
+			       EXT4_SB(inode->i_sb)->s_max_ext_tree_depth,
 			       GFP_NOFS);
 		if (path == NULL) {
 			ext4_journal_stop(handle);
@@ -3065,13 +3071,14 @@ out:
  */
 void ext4_ext_init(struct super_block *sb)
 {
+	ext4_fsblk_t maxblocks;
+
 	/*
 	 * possible initialization would be here
 	 */
 
 	if (ext4_has_feature_extents(sb)) {
-#if defined(AGGRESSIVE_TEST) || defined(CHECK_BINSEARCH) || defined(EXTENTS_STATS)
-		printk(KERN_INFO "EXT4-fs: file extents enabled"
+		printk(KERN_INFO "EXT4-fs (%s): file extents enabled"
 #ifdef AGGRESSIVE_TEST
 		       ", aggressive tests"
 #endif
@@ -3081,8 +3088,36 @@ void ext4_ext_init(struct super_block *sb)
 #ifdef EXTENTS_STATS
 		       ", stats"
 #endif
-		       "\n");
+		       , sb->s_id);
+
+
+		EXT4_SB(sb)->s_max_ext_tree_depth = 1;
+
+		maxblocks = sb->s_maxbytes / sb->s_blocksize;
+
+		/* 1st/root level/node of extents tree stands in i_data and
+		 * entries stored in tree nodes can be of type ext4_extent
+		 * (leaf node) or ext4_extent_idx (internal node) */
+		maxblocks /= (sizeof(((struct ext4_inode_info *)0x0)->i_data) -
+			      sizeof(struct ext4_extent_header)) /
+			     max(sizeof(struct ext4_extent),
+				 sizeof(struct ext4_extent_idx));
+
+		/* compute maximum extents tree depth for a fully populated
+		 * file of max size made of only minimal/1-block extents */
+		while (maxblocks > 0) {
+			maxblocks /= (sb->s_blocksize -
+				      sizeof(struct ext4_extent_header)) /
+				     max(sizeof(struct ext4_extent),
+					 sizeof(struct ext4_extent_idx));
+			EXT4_SB(sb)->s_max_ext_tree_depth++;
+		}
+
+#ifdef EXT_DEBUG
+		printk(", maximum tree depth=%u",
+		       EXT4_SB(sb)->s_max_ext_tree_depth);
 #endif
+		printk("\n");
 #ifdef EXTENTS_STATS
 		spin_lock_init(&EXT4_SB(sb)->s_ext_stats_lock);
 		EXT4_SB(sb)->s_ext_min = 1 << 30;
@@ -5344,18 +5379,18 @@ ext4_ext_shift_extents(struct inode *inode, handle_t *handle,
 		       ext4_lblk_t start, ext4_lblk_t shift,
 		       enum SHIFT_DIRECTION SHIFT)
 {
-	struct ext4_ext_path *path;
+	struct ext4_ext_path *path, *orig_path;
 	int ret = 0, depth;
 	struct ext4_extent *extent;
 	ext4_lblk_t stop, *iterator, ex_start, ex_end;
 
 	/* Let path point to the last extent */
-	path = ext4_find_extent(inode, EXT_MAX_BLOCKS - 1, NULL, 0);
-	if (IS_ERR(path))
-		return PTR_ERR(path);
+	orig_path = ext4_find_extent(inode, EXT_MAX_BLOCKS - 1, NULL, 0);
+	if (IS_ERR(orig_path))
+		return PTR_ERR(orig_path);
 
-	depth = path->p_depth;
-	extent = path[depth].p_ext;
+	depth = orig_path->p_depth;
+	extent = orig_path[depth].p_ext;
 	if (!extent)
 		goto out;
 
@@ -5367,9 +5402,11 @@ ext4_ext_shift_extents(struct inode *inode, handle_t *handle,
 	 * sure the hole is big enough to accommodate the shift.
 	*/
 	if (SHIFT == SHIFT_LEFT) {
-		path = ext4_find_extent(inode, start - 1, &path, 0);
-		if (IS_ERR(path))
-			return PTR_ERR(path);
+		path = ext4_find_extent(inode, start - 1, &orig_path, 0);
+		if (IS_ERR(path)) {
+			ret = PTR_ERR(path);
+			goto out;
+		}
 		depth = path->p_depth;
 		extent =  path[depth].p_ext;
 		if (extent) {
@@ -5383,9 +5420,8 @@ ext4_ext_shift_extents(struct inode *inode, handle_t *handle,
 
 		if ((start == ex_start && shift > ex_start) ||
 		    (shift > start - ex_end)) {
-			ext4_ext_drop_refs(path);
-			kfree(path);
-			return -EINVAL;
+			ret = -EINVAL;
+			goto out;
 		}
 	}
 
@@ -5401,15 +5437,18 @@ ext4_ext_shift_extents(struct inode *inode, handle_t *handle,
 
 	/* Its safe to start updating extents */
 	while (start < stop) {
-		path = ext4_find_extent(inode, *iterator, &path, 0);
-		if (IS_ERR(path))
-			return PTR_ERR(path);
+		path = ext4_find_extent(inode, *iterator, &orig_path, 0);
+		if (IS_ERR(path)) {
+			ret = PTR_ERR(path);
+			goto out;
+		}
 		depth = path->p_depth;
 		extent = path[depth].p_ext;
 		if (!extent) {
 			EXT4_ERROR_INODE(inode, "unexpected hole at %lu",
 					 (unsigned long) *iterator);
-			return -EFSCORRUPTED;
+			ret =  -EFSCORRUPTED;
+			goto out;
 		}
 		if (SHIFT == SHIFT_LEFT && *iterator >
 		    le32_to_cpu(extent->ee_block)) {
@@ -5441,8 +5480,8 @@ ext4_ext_shift_extents(struct inode *inode, handle_t *handle,
 			break;
 	}
 out:
-	ext4_ext_drop_refs(path);
-	kfree(path);
+	ext4_ext_drop_refs(orig_path);
+	kfree(orig_path);
 	return ret;
 }
 

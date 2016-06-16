@@ -3715,6 +3715,8 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 		if (ext4_multi_mount_protect(sb, le64_to_cpu(es->s_mmp_block)))
 			goto failed_mount3a;
 
+	ext4_ext_init(sb); /* needed before using extent-mapped journal */
+
 	/*
 	 * The first inode we look at is the journal inode.  Don't try
 	 * root first: it may be modified in the journal!
@@ -3906,7 +3908,6 @@ no_journal:
 		goto failed_mount4a;
 	}
 
-	ext4_ext_init(sb);
 	err = ext4_mb_init(sb);
 	if (err) {
 		ext4_msg(sb, KERN_ERR, "failed to initialize mballoc (%d)",
