@@ -578,6 +578,47 @@ struct clk_hw *clk_hw_register_fractional_divider(struct device *dev,
 void clk_hw_unregister_fractional_divider(struct clk_hw *hw);
 
 /**
+ * struct clk_fractional_scale - Fractional scale clock
+ *
+ * @hw:		handle between common and hardware-specific interfaces
+ * @reg:	register containing the fractional scale multiplier (scaler)
+ * @shift:	shift to the unit bit field
+ * @width:	width of the unit bit field
+ * @denom:	1/denominator unit
+ * @lock:	register lock
+ *
+ * Clock with fractional scale affecting its output frequency.
+ *
+ * Flags:
+ * CLK_FRACTIONAL_SCALE_INVERTED - by default the scaler is the value read
+ *                                 from the register plus one. For example,
+ *                                   0 for (0 + 1) / denom,
+ *                                   1 for (1 + 1) / denom and etc.
+ *                                 If this flag is set, it is
+ *                                   0 for (denom - 0) / denom,
+ *                                   1 for (denom - 1) / denom and etc.
+ */
+
+struct clk_fractional_scale {
+	struct clk_hw	hw;
+	void __iomem	*reg;
+	u8		shift;
+	u32		mask;
+	u64		denom;
+	u32		flags;
+	spinlock_t	*lock;
+};
+
+#define CLK_FRACTIONAL_SCALE_INVERTED		BIT(0)
+
+extern const struct clk_ops clk_fractional_scale_ops;
+struct clk *clk_register_fractional_scale(struct device *dev,
+		const char *name, const char *parent_name, unsigned long flags,
+		void __iomem *reg, u8 shift, u8 width, u64 denom,
+		u32 clk_flags, spinlock_t *lock);
+
+
+/**
  * struct clk_multiplier - adjustable multiplier clock
  *
  * @hw:		handle between common and hardware-specific interfaces
