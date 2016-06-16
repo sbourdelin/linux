@@ -146,7 +146,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
 	struct clk *cpu_clk;
 	struct dev_pm_opp *suspend_opp;
 	unsigned int transition_latency;
-	bool fallback = false;
+	bool opp_v1 = false;
 	const char *name;
 	int ret;
 
@@ -166,16 +166,14 @@ static int cpufreq_init(struct cpufreq_policy *policy)
 	/* Get OPP-sharing information from "operating-points-v2" bindings */
 	ret = dev_pm_opp_of_get_sharing_cpus(cpu_dev, policy->cpus);
 	if (ret) {
-		if (ret != -ENOENT)
-			goto out_put_clk;
-
 		/*
 		 * operating-points-v2 not supported, fallback to old method of
-		 * finding shared-OPPs for backward compatibility if the
-		 * platform hasn't set sharing CPUs.
+		 * finding shared-OPPs for backward compatibility.
 		 */
-		if (dev_pm_opp_get_sharing_cpus(cpu_dev, policy->cpus))
-			fallback = true;
+		if (ret == -ENOENT)
+			opp_v1 = true;
+		else
+			goto out_put_clk;
 	}
 
 	/*
@@ -215,7 +213,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
 		goto out_free_opp;
 	}
 
-	if (fallback) {
+	if (opp_v1) {
 		cpumask_setall(policy->cpus);
 
 		/*
