@@ -658,6 +658,8 @@ unsigned char ibm_architecture_vec[] = {
 	W(0xffff0000), W(0x004b0000),	/* POWER8E */
 	W(0xffff0000), W(0x004c0000),   /* POWER8NVL */
 	W(0xffff0000), W(0x004d0000),	/* POWER8 */
+	W(0xffff0000), W(0x004e0000),	/* POWER9 */
+	W(0xffffffff), W(0x0f000005),	/* all 3.0-compliant */
 	W(0xffffffff), W(0x0f000004),	/* all 2.07-compliant */
 	W(0xffffffff), W(0x0f000003),	/* all 2.06-compliant */
 	W(0xffffffff), W(0x0f000002),	/* all 2.05-compliant */
@@ -665,10 +667,11 @@ unsigned char ibm_architecture_vec[] = {
 	NUM_VECTORS(6),			/* 6 option vectors */
 
 	/* option vector 1: processor architectures supported */
-	VECTOR_LENGTH(2),		/* length */
+	VECTOR_LENGTH(3),		/* length */
 	0,				/* don't ignore, don't halt */
 	OV1_PPC_2_00 | OV1_PPC_2_01 | OV1_PPC_2_02 | OV1_PPC_2_03 |
 	OV1_PPC_2_04 | OV1_PPC_2_05 | OV1_PPC_2_06 | OV1_PPC_2_07,
+	OV1_PPC_3_00,
 
 	/* option vector 2: Open Firmware options supported */
 	VECTOR_LENGTH(33),		/* length */
@@ -719,7 +722,7 @@ unsigned char ibm_architecture_vec[] = {
 	 * must match by the macro below. Update the definition if
 	 * the structure layout changes.
 	 */
-#define IBM_ARCH_VEC_NRCORES_OFFSET	133
+#define IBM_ARCH_VEC_NRCORES_OFFSET	150
 	W(NR_CPUS),			/* number of cores supported */
 	0,
 	0,
