@@ -833,6 +833,15 @@ struct i915_ctx_hang_stats {
 	bool banned;
 };
 
+struct i915_fence_timeline {
+	char     name[32];
+	u64      fence_context;
+	unsigned next;
+};
+
+int i915_create_fence_timeline(struct i915_gem_context *ctx,
+			       struct intel_engine_cs *ring);
+
 /* This must match up with the value previously used for execbuf2.rsvd1. */
 #define DEFAULT_CONTEXT_HANDLE 0
 
@@ -877,6 +886,7 @@ struct i915_gem_context {
 		u64 lrc_desc;
 		int pin_count;
 		bool initialised;
+		struct i915_fence_timeline fence_timeline;
 	} engine[I915_NUM_ENGINES];
 
 	struct list_head link;

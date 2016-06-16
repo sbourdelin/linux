@@ -2539,6 +2539,14 @@ static int execlists_context_deferred_alloc(struct i915_gem_context *ctx,
 		goto error_ringbuf;
 	}
 
+	/* Create a per context timeline for fences */
+	ret = i915_create_fence_timeline(ctx, engine);
+	if (ret) {
+		DRM_ERROR("Fence timeline creation failed for %s, ctx %p/%d\n",
+			  engine->name, ctx, ctx->user_handle);
+		goto error_ringbuf;
+	}
+
 	ce->ringbuf = ringbuf;
 	ce->state = ctx_obj;
 	ce->initialised = engine->init_context == NULL;
