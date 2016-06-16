@@ -18,6 +18,7 @@
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
 #include "mmci.h"
+#include "mmci_qcom_dml.h"
 
 /* Registers */
 #define DML_CONFIG			0x00
@@ -97,6 +98,7 @@ void dml_start_xfer(struct mmci_host *host, struct mmc_data *data)
 	/* make sure the dml is configured before dma is triggered */
 	wmb();
 }
+EXPORT_SYMBOL_GPL(dml_start_xfer);
 
 static int of_get_dml_pipe_index(struct device_node *np, const char *name)
 {
@@ -175,3 +177,4 @@ int dml_hw_init(struct mmci_host *host, struct device_node *np)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(dml_hw_init);
