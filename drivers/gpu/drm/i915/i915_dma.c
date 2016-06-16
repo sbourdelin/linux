@@ -1120,6 +1120,12 @@ static int i915_driver_init_early(struct drm_i915_private *dev_priv,
 	if (ret < 0)
 		return ret;
 
+	ret = intel_gvt_init(dev_priv);
+	if (ret < 0) {
+		i915_workqueues_cleanup(dev_priv);
+		return ret;
+	}
+
 	/* This must be called before any calls to HAS_PCH_* */
 	intel_detect_pch(dev);
 
@@ -1515,6 +1521,8 @@ int i915_driver_unload(struct drm_device *dev)
 	int ret;
 
 	intel_fbdev_fini(dev);
+
+	intel_gvt_cleanup(dev_priv);
 
 	ret = i915_gem_suspend(dev);
 	if (ret) {
