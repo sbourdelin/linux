@@ -79,34 +79,36 @@ void irqtime_account_irq(struct task_struct *curr)
 }
 EXPORT_SYMBOL_GPL(irqtime_account_irq);
 
-static int irqtime_account_hi_update(void)
+static unsigned long irqtime_account_hi_update(unsigned long max_jiffies)
 {
 	u64 *cpustat = kcpustat_this_cpu->cpustat;
+	unsigned long irq_jiffies;
 	unsigned long flags;
-	u64 latest_ns;
-	int ret = 0;
+	u64 irq;
 
 	local_irq_save(flags);
-	latest_ns = this_cpu_read(cpu_hardirq_time);
-	if (nsecs_to_cputime64(latest_ns) > cpustat[CPUTIME_IRQ])
-		ret = 1;
+	irq = this_cpu_read(cpu_hardirq_time) - cpustat[CPUTIME_IRQ];
+	irq_jiffies = min(cputime_to_jiffies(irq), max_jiffies);
+	if (irq_jiffies)
+		cpustat[CPUTIME_IRQ] += jiffies_to_cputime(irq_jiffies);
 	local_irq_restore(flags);
-	return ret;
+	return irq_jiffies;
 }
 
-static int irqtime_account_si_update(void)
+static unsigned long irqtime_account_si_update(unsigned long max_jiffies)
 {
 	u64 *cpustat = kcpustat_this_cpu->cpustat;
+	unsigned long si_jiffies;
 	unsigned long flags;
-	u64 latest_ns;
-	int ret = 0;
+	u64 softirq;
 
 	local_irq_save(flags);
-	latest_ns = this_cpu_read(cpu_softirq_time);
-	if (nsecs_to_cputime64(latest_ns) > cpustat[CPUTIME_SOFTIRQ])
-		ret = 1;
+	softirq = this_cpu_read(cpu_softirq_time) - cpustat[CPUTIME_SOFTIRQ];
+	si_jiffies = min(cputime_to_jiffies(softirq), max_jiffies);
+	if (si_jiffies)
+		cpustat[CPUTIME_SOFTIRQ] += jiffies_to_cputime(si_jiffies);
 	local_irq_restore(flags);
-	return ret;
+	return si_jiffies;
 }
 
 #else /* CONFIG_IRQ_TIME_ACCOUNTING */
@@ -283,6 +285,26 @@ static __always_inline unsigned long steal_account_process_tick(unsigned long ma
 }
 
 /*
+ * Account how much elapsed time was spent in steal, irq, or softirq time.
+ * Due to rounding errors, the calculated amount can sometimes exceed
+ * max_jiffies; be careful not to account more than max_jiffies.
+ */
+static inline int account_other_ticks(unsigned long max_jiffies)
+{
+	unsigned long accounted;
+
+	accounted = steal_account_process_tick(max_jiffies);
+
+	if (accounted < max_jiffies)
+		accounted += irqtime_account_hi_update(max_jiffies - accounted);
+
+	if (accounted < max_jiffies)
+		accounted += irqtime_account_si_update(max_jiffies - accounted);
+
+	return accounted;
+}
+
+/*
  * Accumulate raw cputime values of dead tasks (sig->[us]time) and live
  * tasks (sum on group iteration) belonging to @tsk's group.
  */
@@ -344,19 +366,24 @@ static void irqtime_account_process_tick(struct task_struct *p, int user_tick,
 {
 	cputime_t scaled = cputime_to_scaled(cputime_one_jiffy);
 	u64 cputime = (__force u64) cputime_one_jiffy;
-	u64 *cpustat = kcpustat_this_cpu->cpustat;
+	unsigned long other;
 
-	if (steal_account_process_tick(ULONG_MAX))
+	/*
+	 * When returning from idle, many ticks can get accounted at
+	 * once, including some ticks of steal, irq, and softirq time.
+	 * Subtract those ticks from the amount of time accounted to
+	 * idle, or potentially user or system time. Due to rounding,
+	 * other time can exceed ticks occasionally.
+	 */
+	other = account_other_ticks(ticks);
+	if (other >= ticks)
 		return;
+	ticks -= other;
 
 	cputime *= ticks;
 	scaled *= ticks;
 
-	if (irqtime_account_hi_update()) {
-		cpustat[CPUTIME_IRQ] += cputime;
-	} else if (irqtime_account_si_update()) {
-		cpustat[CPUTIME_SOFTIRQ] += cputime;
-	} else if (this_cpu_ksoftirqd() == p) {
+	if (this_cpu_ksoftirqd() == p) {
 		/*
 		 * ksoftirqd time do not get accounted in cpu_softirq_time.
 		 * So, we have to handle it separately here.
