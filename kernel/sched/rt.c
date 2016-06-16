@@ -1655,7 +1655,7 @@ static int find_lowest_rq(struct task_struct *task)
 
 	rcu_read_lock();
 	for_each_domain(cpu, sd) {
-		if (sd->flags & SD_WAKE_AFFINE) {
+		if (sd->flags & SD_BALANCE_WAKE) {
 			int best_cpu;
 
 			/*

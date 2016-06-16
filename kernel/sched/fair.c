@@ -5474,8 +5474,7 @@ static int cpu_util(int cpu)
  * that have the 'sd_flag' flag set. In practice, this is SD_BALANCE_WAKE,
  * SD_BALANCE_FORK, or SD_BALANCE_EXEC.
  *
- * Balances load by selecting the idlest cpu in the idlest group, or under
- * certain conditions an idle sibling cpu if the domain has SD_WAKE_AFFINE set.
+ * Balances load by selecting the idlest cpu in the idlest group.
  *
  * Returns the target cpu number.
  *
@@ -5502,9 +5501,9 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int sd_flag, int wake_f
 
 		/*
 		 * If both cpu and prev_cpu are part of this domain,
-		 * cpu is a valid SD_WAKE_AFFINE target.
+		 * cpu is a valid SD_BALANCE_WAKE target.
 		 */
-		if (want_affine && (tmp->flags & SD_WAKE_AFFINE) &&
+		if (want_affine && (tmp->flags & SD_BALANCE_WAKE) &&
 		    cpumask_test_cpu(prev_cpu, sched_domain_span(tmp))) {
 			affine_sd = tmp;
 			break;
@@ -5517,7 +5516,7 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int sd_flag, int wake_f
 	}
 
 	if (affine_sd) {
-		sd = NULL; /* Prefer wake_affine over balance flags */
+		sd = NULL; /* Prefer SD_BALANCE_WAKE over other balance flags */
 		if (cpu != prev_cpu && wake_affine(affine_sd, p, sync))
 			new_cpu = cpu;
 	}

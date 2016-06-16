@@ -1019,7 +1019,6 @@ extern void wake_up_q(struct wake_q_head *head);
 #define SD_BALANCE_EXEC		0x0004	/* Balance on exec */
 #define SD_BALANCE_FORK		0x0008	/* Balance on fork, clone */
 #define SD_BALANCE_WAKE		0x0010  /* Balance on wakeup */
-#define SD_WAKE_AFFINE		0x0020	/* Wake task to waking CPU */
 #define SD_SHARE_CPUCAPACITY	0x0080	/* Domain members share cpu power */
 #define SD_SHARE_POWERDOMAIN	0x0100	/* Domain members share power domain */
 #define SD_SHARE_PKG_RESOURCES	0x0200	/* Domain members share cpu pkg resources */

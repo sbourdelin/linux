@@ -5670,7 +5670,7 @@ static int sd_degenerate(struct sched_domain *sd)
 	}
 
 	/* Following flags don't use groups */
-	if (sd->flags & (SD_WAKE_AFFINE))
+	if (sd->flags & (SD_BALANCE_WAKE))
 		return 0;
 
 	return 1;
@@ -6365,8 +6365,7 @@ sd_init(struct sched_domain_topology_level *tl,
 					| 1*SD_BALANCE_NEWIDLE
 					| 1*SD_BALANCE_EXEC
 					| 1*SD_BALANCE_FORK
-					| 0*SD_BALANCE_WAKE
-					| 1*SD_WAKE_AFFINE
+					| 1*SD_BALANCE_WAKE
 					| 0*SD_SHARE_CPUCAPACITY
 					| 0*SD_SHARE_PKG_RESOURCES
 					| 0*SD_SERIALIZE
@@ -6416,7 +6415,7 @@ sd_init(struct sched_domain_topology_level *tl,
 		if (sched_domains_numa_distance[tl->numa_level] > RECLAIM_DISTANCE) {
 			sd->flags &= ~(SD_BALANCE_EXEC |
 				       SD_BALANCE_FORK |
-				       SD_WAKE_AFFINE);
+				       SD_BALANCE_WAKE);
 		}
 
 #endif
