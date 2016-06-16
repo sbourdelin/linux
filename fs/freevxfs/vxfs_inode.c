@@ -208,7 +208,7 @@ vxfs_transmod(struct vxfs_inode_info *vip)
 	if (VXFS_ISSOC(vip))
 		ret |= S_IFSOCK;
 
-	return (ret);
+	return ret;
 }
 
 /**
