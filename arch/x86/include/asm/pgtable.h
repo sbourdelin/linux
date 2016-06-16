@@ -794,11 +794,21 @@ extern int ptep_test_and_clear_young(struct vm_area_struct *vma,
 extern int ptep_clear_flush_young(struct vm_area_struct *vma,
 				  unsigned long address, pte_t *ptep);
 
+#if defined(CONFIG_X86_64) && defined(CONFIG_CPU_SUP_INTEL)
+extern void fix_pte_leak(struct mm_struct *mm, unsigned long addr,
+			 pte_t *ptep);
+#else
+static inline void fix_pte_leak(struct mm_struct *mm, unsigned long addr,
+				pte_t *ptep) {}
+#endif
+
 #define __HAVE_ARCH_PTEP_GET_AND_CLEAR
 static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr,
 				       pte_t *ptep)
 {
 	pte_t pte = native_ptep_get_and_clear(ptep);
+	if (static_cpu_has_bug(X86_BUG_PTE_LEAK))
+		fix_pte_leak(mm, addr, ptep);
 	pte_update(mm, addr, ptep);
 	return pte;
 }

@@ -178,6 +178,22 @@ extern void cleanup_highmap(void);
 extern void init_extra_mapping_uc(unsigned long phys, unsigned long size);
 extern void init_extra_mapping_wb(unsigned long phys, unsigned long size);
 
+/*
+ * Intel Xeon Phi x200 codenamed Knights Landing has an issue that a thread
+ * setting A or D bits may not do so atomically against checking the present
+ * bit. A thread which is going to page fault may still set those
+ * bits, even though the present bit was already atomically cleared.
+ *
+ * This implies that when the kernel clears present atomically,
+ * some time later the supposed to be zero entry could be corrupted
+ * with stray A or D bits.
+ */
+#define ARCH_HAS_NEEDS_SWAP_PTL 1
+static inline bool arch_needs_swap_ptl(void)
+{
+       return static_cpu_has_bug(X86_BUG_PTE_LEAK);
+}
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* _ASM_X86_PGTABLE_64_H */

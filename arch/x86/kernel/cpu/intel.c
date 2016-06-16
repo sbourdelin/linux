@@ -7,12 +7,17 @@
 #include <linux/thread_info.h>
 #include <linux/module.h>
 #include <linux/uaccess.h>
+#include <linux/mm_types.h>
 
 #include <asm/cpufeature.h>
 #include <asm/pgtable.h>
 #include <asm/msr.h>
 #include <asm/bugs.h>
 #include <asm/cpu.h>
+#include <asm/intel-family.h>
+#include <asm/tlbflush.h>
+
+#include <trace/events/tlb.h>
 
 #ifdef CONFIG_X86_64
 #include <linux/topology.h>
@@ -59,6 +64,35 @@ void check_mpx_erratum(struct cpuinfo_x86 *c)
 		pr_warn("x86/mpx: Disabling MPX since SMEP not present\n");
 	}
 }
+
+#ifdef CONFIG_X86_64
+/*
+ * Knights Landing has an issue that a thread setting A or D bits
+ * may not do so atomically against checking the present bit.
+ * A thread which is going to page fault may still set those
+ * bits, even though the present bit was already atomically cleared.
+ *
+ * Entering here, the current CPU just cleared the PTE.  But,
+ * another thread may have raced and set the A or D bits, or be
+ * _about_ to set the bits.  Shooting their TLB entry down will
+ * ensure they see the cleared PTE and will not set A or D and
+ * won't corrupt swap entries.
+ */
+void fix_pte_leak(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
+{
+	if (cpumask_any_but(mm_cpumask(mm), smp_processor_id()) < nr_cpu_ids) {
+		trace_tlb_flush(TLB_LOCAL_SHOOTDOWN, TLB_FLUSH_ALL);
+		flush_tlb_others(mm_cpumask(mm), mm, addr,
+				 addr + PAGE_SIZE);
+		mb();
+		/*
+		 * Clear the PTE one more time, in case the other thread set A/D
+		 * before we sent the TLB flush.
+		 */
+		set_pte(ptep, __pte(0));
+	}
+}
+#endif
 
 static void early_init_intel(struct cpuinfo_x86 *c)
 {
@@ -180,6 +214,13 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 			setup_clear_cpu_cap(X86_FEATURE_ERMS);
 		}
 	}
+
+#ifdef CONFIG_X86_64
+	if (c->x86_model == INTEL_FAM6_XEON_PHI_KNL) {
+		pr_info_once("x86/intel: Enabling PTE leaking workaround\n");
+		set_cpu_bug(c, X86_BUG_PTE_LEAK);
+	}
+#endif
 
 	/*
 	 * Intel Quark Core DevMan_001.pdf section 6.4.11
