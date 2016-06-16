@@ -638,7 +638,7 @@ static struct pi_desc *vcpu_to_pi_desc(struct kvm_vcpu *vcpu)
  * feature_control_valid_bits_add/del(), so it's not included here.
  */
 #define FEATURE_CONTROL_MAX_VALID_BITS \
-	FEATURE_CONTROL_VMXON_ENABLED_OUTSIDE_SMX
+	(FEATURE_CONTROL_VMXON_ENABLED_OUTSIDE_SMX | FEATURE_CONTROL_LMCE)
 
 static void feature_control_valid_bits_add(struct kvm_vcpu *vcpu, uint64_t bits)
 {
@@ -2905,6 +2905,15 @@ static inline bool vmx_feature_control_msr_valid(struct kvm_vcpu *vcpu,
 	return valid_bits && !(val & ~valid_bits);
 }
 
+static inline bool vmx_mcg_ext_ctrl_msr_present(struct kvm_vcpu *vcpu,
+						bool host_initiated)
+{
+	return (vcpu->arch.mcg_cap & MCG_LMCE_P) &&
+		(host_initiated ||
+		 (to_vmx(vcpu)->msr_ia32_feature_control &
+		  FEATURE_CONTROL_LMCE));
+}
+
 /*
  * Reads an msr value (of 'msr_index') into 'pdata'.
  * Returns 0 on success, non-0 otherwise.
@@ -2945,6 +2954,12 @@ static int vmx_get_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		if (!kvm_mpx_supported())
 			return 1;
 		msr_info->data = vmcs_read64(GUEST_BNDCFGS);
+		break;
+	case MSR_IA32_MCG_EXT_CTL:
+		if (!vmx_mcg_ext_ctrl_msr_present(vcpu,
+						  msr_info->host_initiated))
+			return 1;
+		msr_info->data = vcpu->arch.mcg_ext_ctl;
 		break;
 	case MSR_IA32_FEATURE_CONTROL:
 		if (!vmx_feature_control_msr_valid(vcpu, 0))
@@ -3038,6 +3053,13 @@ static int vmx_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		break;
 	case MSR_IA32_TSC_ADJUST:
 		ret = kvm_set_msr_common(vcpu, msr_info);
+		break;
+	case MSR_IA32_MCG_EXT_CTL:
+		if (!vmx_mcg_ext_ctrl_msr_present(vcpu,
+						  msr_info->host_initiated) ||
+		    (data & ~MCG_EXT_CTL_LMCE_EN))
+			return 1;
+		vcpu->arch.mcg_ext_ctl = data;
 		break;
 	case MSR_IA32_FEATURE_CONTROL:
 		if (!vmx_feature_control_msr_valid(vcpu, data) ||
@@ -6432,6 +6454,8 @@ static __init int hardware_setup(void)
 	}
 
 	kvm_set_posted_intr_wakeup_handler(wakeup_handler);
+
+	kvm_mce_cap_supported |= MCG_LMCE_P;
 
 	return alloc_kvm_area();
 
@@ -10950,6 +10974,14 @@ out:
 	return ret;
 }
 
+static void vmx_setup_mce(struct kvm_vcpu *vcpu)
+{
+	if (vcpu->arch.mcg_cap & MCG_LMCE_P)
+		feature_control_valid_bits_add(vcpu, FEATURE_CONTROL_LMCE);
+	else
+		feature_control_valid_bits_del(vcpu, FEATURE_CONTROL_LMCE);
+}
+
 static struct kvm_x86_ops vmx_x86_ops = {
 	.cpu_has_kvm_support = cpu_has_kvm_support,
 	.disabled_by_bios = vmx_disabled_by_bios,
@@ -11074,6 +11106,8 @@ static struct kvm_x86_ops vmx_x86_ops = {
 	.pmu_ops = &intel_pmu_ops,
 
 	.update_pi_irte = vmx_update_pi_irte,
+
+	.setup_mce = vmx_setup_mce,
 };
 
 static int __init vmx_init(void)
