@@ -106,10 +106,17 @@ bfad_iocmd_ioc_get_info(struct bfad_s *bfad, void *cmd)
 
 	/* set adapter hw path */
 	strcpy(iocmd->adapter_hwpath, bfad->pci_name);
-	for (i = 0; iocmd->adapter_hwpath[i] != ':' && i < BFA_STRING_32; i++)
-		;
-	for (; iocmd->adapter_hwpath[++i] != ':' && i < BFA_STRING_32; )
-		;
+	i = -1;
+	while (++i < BFA_STRING_32) {
+		if (iocmd->adapter_hwpath[i] == ':')
+			break;
+	}
+	while (++i < BFA_STRING_32) {
+		if (iocmd->adapter_hwpath[i] == ':')
+			break;
+	}
+	if (i >= BFA_STRING_32)
+		i = BFA_STRING_32 - 1;
 	iocmd->adapter_hwpath[i] = '\0';
 	iocmd->status = BFA_STATUS_OK;
 	return 0;
