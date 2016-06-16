@@ -719,8 +719,9 @@ static int writeout(struct address_space *mapping, struct page *page)
 /*
  * Default handling if a filesystem does not provide a migration function.
  */
-static int fallback_migrate_page(struct address_space *mapping,
-	struct page *newpage, struct page *page, enum migrate_mode mode)
+int generic_migrate_page(struct address_space *mapping,
+			 struct page *newpage, struct page *page,
+			 enum migrate_mode mode)
 {
 	if (PageDirty(page)) {
 		/* Only writeback pages in full synchronous migration */
@@ -771,8 +772,15 @@ static int move_to_new_page(struct page *newpage, struct page *page,
 		 * is the most common path for page migration.
 		 */
 		rc = mapping->a_ops->migratepage(mapping, newpage, page, mode);
-	else
-		rc = fallback_migrate_page(mapping, newpage, page, mode);
+	else {
+		/*
+		 * Dear filesystem maintainer, please verify whether
+		 * generic_migrate_page() is suitable for your
+		 * filesystem, especially wrt. page flag handling.
+		 */
+		WARN_ON_ONCE(1);
+		rc = -EINVAL;
+	}
 
 	/*
 	 * When successful, old pagecache page->mapping must be cleared before

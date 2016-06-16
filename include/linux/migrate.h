@@ -47,6 +47,9 @@ extern int migrate_page_move_mapping(struct address_space *mapping,
 		struct page *newpage, struct page *page,
 		struct buffer_head *head, enum migrate_mode mode,
 		int extra_count);
+extern int generic_migrate_page(struct address_space *mapping,
+				struct page *newpage, struct page *page,
+				enum migrate_mode mode);
 #else
 
 static inline void putback_movable_pages(struct list_head *l) {}
@@ -67,6 +70,12 @@ static inline int migrate_huge_page_move_mapping(struct address_space *mapping,
 	return -ENOSYS;
 }
 
+static inline int generic_migrate_page(struct address_space *mapping,
+				       struct page *newpage, struct page *page,
+				       enum migrate_mode mode)
+{
+	return -ENOSYS;
+}
 #endif /* CONFIG_MIGRATION */
 
 #ifdef CONFIG_NUMA_BALANCING
