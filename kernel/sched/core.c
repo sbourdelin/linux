@@ -7307,6 +7307,14 @@ static void sched_init_smt(void)
 static inline void sched_init_smt(void) { }
 #endif
 
+DEFINE_STATIC_KEY_TRUE(sched_llc_complete);
+
+static void sched_init_llc_complete(void)
+{
+	if (cpumask_weight(cpu_active_mask) > per_cpu(sd_llc_size, 0))
+		static_branch_disable(&sched_llc_complete);
+}
+
 void __init sched_init_smp(void)
 {
 	cpumask_var_t non_isolated_cpus;
@@ -7338,6 +7346,7 @@ void __init sched_init_smp(void)
 	init_sched_dl_class();
 
 	sched_init_smt();
+	sched_init_llc_complete();
 
 	sched_smp_initialized = true;
 }

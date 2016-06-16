@@ -1836,3 +1836,7 @@ static inline void update_idle_core(struct rq *rq)
 #else
 static inline void update_idle_core(struct rq *rq) { }
 #endif
+
+#ifdef CONFIG_SCHED_MC
+extern struct static_key_true sched_llc_complete;
+#endif
