@@ -223,6 +223,11 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 #define GEN8_CONFIG0			_MMIO(0xD00)
 #define  GEN9_DEFAULT_FIXES		(1 << 3 | 1 << 2 | 1 << 1)
 
+/* Slice GateWay mmio offset and related info*/
+#define GEN9_GW_DEST			_MMIO(0xE220)
+#define   GEN9_GW_DATA_PAIRS		32
+#define   GEN9_GW_PER_SLICE		3
+
 #define GAC_ECO_BITS			_MMIO(0x14090)
 #define   ECOBITS_SNB_BIT		(1<<13)
 #define   ECOBITS_PPGTT_CACHE64B	(3<<8)

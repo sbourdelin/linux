@@ -1236,6 +1236,52 @@ static int gen8_init_perctx_bb(struct intel_engine_cs *engine,
 	return wa_ctx_end(wa_ctx, *offset = index, 1);
 }
 
+static int do_WaMtpRenderPowerGatingBug(struct intel_engine_cs *engine,
+					uint32_t *const batch, uint32_t index)
+{
+	uint32_t num_lri = 0;
+	uint32_t GwWriteValue = 0;
+	i915_reg_t GwDestMmio = {0};
+	uint32_t i = 0;
+	uint32_t GwCount = 0;
+	uint32_t SliceCountMax = engine->i915->dev_priv->info.slice_total;
+	uint32_t SliceCount = 0;
+
+	/* Slice count should be non-zero */
+	WARN_ON(SliceCountMax == 0);
+
+	/* Mmios for GW are nice and sequential across slices, so we can
+	 * just do this single slice logic 3 times and the 'DestMmio will
+	 * be calculated properly'
+	 */
+	for (SliceCount = 0; SliceCount < SliceCountMax; SliceCount++) {
+		/* write the load reg immediate header */
+		num_lri = (GEN9_GW_PER_SLICE * GEN9_GW_DATA_PAIRS) + 1;
+		wa_ctx_emit(batch, index,
+			MI_LOAD_REGISTER_IMM(num_lri) | MI_LRI_FORCE_POSTED);
+
+		for (GwCount = 0; GwCount < GEN9_GW_PER_SLICE; GwCount++) {
+			GwDestMmio.reg = GEN9_GW_DEST.reg + (0x10 * GwCount)
+					+ (0x40 * SliceCount);
+
+			for (i = 0; i < GEN9_GW_DATA_PAIRS; i++) {
+				// Read bits [31:24] from the Context Offset to [7:0] of LRI
+				// Read bit [13] from Context Offset to [31] of LRI
+				// Put i into bits [28:24] of LRI
+				GwWriteValue = 0x1;
+				GwWriteValue |= i << 24;
+				wa_ctx_emit_reg(batch, index, GwDestMmio);
+				wa_ctx_emit(batch, index, GwWriteValue);
+			}
+		}
+		// Add one more 'dummy' data pair because the last MMIO in an LRI isn't actually 'posted'
+		wa_ctx_emit_reg(batch, index, GwDestMmio);
+		wa_ctx_emit(batch, index, GwWriteValue);
+	}
+	return index;
+}
+
+
 static int gen9_init_indirectctx_bb(struct intel_engine_cs *engine,
 				    struct i915_wa_ctx_bb *wa_ctx,
 				    uint32_t *const batch,
@@ -1271,6 +1317,12 @@ static int gen9_init_indirectctx_bb(struct intel_engine_cs *engine,
 		wa_ctx_emit(batch, index, 0);
 		wa_ctx_emit(batch, index, 0);
 	}
+
+	ret = do_WaMtpRenderPowerGatingBug(engine, batch, index);
+	if (ret < 0)
+		return ret;
+	index = ret;
+
 	/* Pad to end of cacheline */
 	while (index % CACHELINE_DWORDS)
 		wa_ctx_emit(batch, index, MI_NOOP);
