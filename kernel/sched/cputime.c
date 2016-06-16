@@ -115,6 +115,16 @@ static unsigned long irqtime_account_si_update(unsigned long max_jiffies)
 
 #define sched_clock_irqtime	(0)
 
+static unsigned long irqtime_account_hi_update(unsigned long dummy)
+{
+	return 0;
+}
+
+static unsigned long irqtime_account_si_update(unsigned long dummy)
+{
+	return 0;
+}
+
 #endif /* !CONFIG_IRQ_TIME_ACCOUNTING */
 
 static inline void task_group_account_field(struct task_struct *p, int index,
@@ -708,14 +718,14 @@ static cputime_t vtime_delta(struct task_struct *tsk)
 static cputime_t get_vtime_delta(struct task_struct *tsk)
 {
 	unsigned long now = READ_ONCE(jiffies);
-	unsigned long delta_jiffies, steal_jiffies;
+	unsigned long delta_jiffies, other_jiffies;
 
 	delta_jiffies = now - tsk->vtime_snap;
-	steal_jiffies = steal_account_process_tick(delta_jiffies);
+	other_jiffies = account_other_ticks(delta_jiffies);
 	WARN_ON_ONCE(tsk->vtime_snap_whence == VTIME_INACTIVE);
 	tsk->vtime_snap = now;
 
-	return jiffies_to_cputime(delta_jiffies - steal_jiffies);
+	return jiffies_to_cputime(delta_jiffies - other_jiffies);
 }
 
 static void __vtime_account_system(struct task_struct *tsk)
@@ -732,16 +742,6 @@ void vtime_account_system(struct task_struct *tsk)
 
 	write_seqcount_begin(&tsk->vtime_seqcount);
 	__vtime_account_system(tsk);
-	write_seqcount_end(&tsk->vtime_seqcount);
-}
-
-void vtime_gen_account_irq_exit(struct task_struct *tsk)
-{
-	write_seqcount_begin(&tsk->vtime_seqcount);
-	if (vtime_delta(tsk))
-		__vtime_account_system(tsk);
-	if (context_tracking_in_user())
-		tsk->vtime_snap_whence = VTIME_USER;
 	write_seqcount_end(&tsk->vtime_seqcount);
 }
 
