@@ -25,6 +25,7 @@ static ssize_t read_file_node_aggr(struct file *file, char __user *user_buf,
 {
 	struct ath_node *an = file->private_data;
 	struct ath_softc *sc = an->sc;
+	struct ieee80211_txq *swq;
 	struct ath_atx_tid *tid;
 	struct ath_txq *txq;
 	u32 len = 0, size = 4096;
@@ -52,8 +53,10 @@ static ssize_t read_file_node_aggr(struct file *file, char __user *user_buf,
 			 "TID", "SEQ_START", "SEQ_NEXT", "BAW_SIZE",
 			 "BAW_HEAD", "BAW_TAIL", "BAR_IDX", "SCHED", "PAUSED");
 
-	for (tidno = 0, tid = &an->tid[tidno];
-	     tidno < IEEE80211_NUM_TIDS; tidno++, tid++) {
+	for (tidno = 0;
+	     tidno < IEEE80211_NUM_TIDS; tidno++) {
+		swq = an->sta->txq[tidno];
+		tid = (struct ath_atx_tid *) swq->drv_priv;
 		txq = tid->txq;
 		ath_txq_lock(sc, txq);
 		if (tid->active) {
