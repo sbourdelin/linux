@@ -2509,7 +2509,7 @@ int __isolate_free_page(struct page *page, unsigned int order)
 
 	set_page_owner(page, order, __GFP_MOVABLE);
 
-	/* Set the pageblock if the isolated page is at least a pageblock */
+	/* Set the pageblock if the isolated page is at least half of a pageblock */
 	if (order >= pageblock_order - 1) {
 		struct page *endpage = page + (1 << order) - 1;
 		for (; page < endpage; page += pageblock_nr_pages) {
