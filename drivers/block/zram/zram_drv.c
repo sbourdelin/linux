@@ -293,13 +293,13 @@ static ssize_t mem_used_max_store(struct device *dev,
 	if (err || val != 0)
 		return -EINVAL;
 
-	down_read(&zram->init_lock);
+	down_write(&zram->init_lock);
 	if (init_done(zram)) {
 		struct zram_meta *meta = zram->meta;
 		atomic_long_set(&zram->stats.max_used_pages,
 				zs_get_total_pages(meta->mem_pool));
 	}
-	up_read(&zram->init_lock);
+	up_write(&zram->init_lock);
 
 	return len;
 }
@@ -370,15 +370,15 @@ static ssize_t compact_store(struct device *dev,
 	struct zram *zram = dev_to_zram(dev);
 	struct zram_meta *meta;
 
-	down_read(&zram->init_lock);
+	down_write(&zram->init_lock);
 	if (!init_done(zram)) {
-		up_read(&zram->init_lock);
+		up_write(&zram->init_lock);
 		return -EINVAL;
 	}
 
 	meta = zram->meta;
 	zs_compact(meta->mem_pool);
-	up_read(&zram->init_lock);
+	up_write(&zram->init_lock);
 
 	return len;
 }
