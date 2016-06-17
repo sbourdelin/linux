@@ -689,6 +689,8 @@ ifdef CONFIG_KCOV
     $(warning Cannot use CONFIG_KCOV: \
              -fsanitize-coverage=trace-pc is not supported by compiler)
     CFLAGS_KCOV =
+  else
+    KBUILD_CFLAGS += -DCC_HAVE_SANCOV_TRACE_PC
   endif
 endif
 
