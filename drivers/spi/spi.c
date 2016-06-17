@@ -504,8 +504,13 @@ int spi_add_device(struct spi_device *spi)
 	struct device *dev = master->dev.parent;
 	int status;
 
-	/* Chipselects are numbered 0..max; validate. */
-	if (spi->chip_select >= master->num_chipselect) {
+	/*
+	 * Chipselects are numbered 0..max; validate.
+	 * If there is no chip select (i.e. num_chipselect == 0),
+	 * the comparison doesn't make sense.
+	 */
+	if (master->num_chipselect &&
+				spi->chip_select >= master->num_chipselect) {
 		dev_err(dev, "cs%d >= max %d\n",
 			spi->chip_select,
 			master->num_chipselect);
@@ -1864,12 +1869,6 @@ int spi_register_master(struct spi_master *master)
 	status = of_spi_register_master(master);
 	if (status)
 		return status;
-
-	/* even if it's just one always-selected device, there must
-	 * be at least one chipselect
-	 */
-	if (master->num_chipselect == 0)
-		return -EINVAL;
 
 	if ((master->bus_num < 0) && master->dev.of_node)
 		master->bus_num = of_alias_get_id(master->dev.of_node, "spi");
