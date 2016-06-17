@@ -2,6 +2,8 @@
  * Marvell EBU SoC Device Bus Controller
  * (memory controller for NOR/NAND/SRAM/FPGA devices)
  *
+ * Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+ *
  * Copyright (C) 2013-2014 Marvell
  *
  * This program is free software: you can redistribute it and/or modify
@@ -19,7 +21,7 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/io.h>
@@ -340,7 +342,6 @@ static const struct of_device_id mvebu_devbus_of_match[] = {
 	{ .compatible = "marvell,orion-devbus" },
 	{},
 };
-MODULE_DEVICE_TABLE(of, mvebu_devbus_of_match);
 
 static struct platform_driver mvebu_devbus_driver = {
 	.probe		= mvebu_devbus_probe,
@@ -354,8 +355,4 @@ static int __init mvebu_devbus_init(void)
 {
 	return platform_driver_register(&mvebu_devbus_driver);
 }
-module_init(mvebu_devbus_init);
-
-MODULE_LICENSE("GPL v2");
-MODULE_AUTHOR("Ezequiel Garcia <ezequiel.garcia@free-electrons.com>");
-MODULE_DESCRIPTION("Marvell EBU SoC Device Bus controller");
+device_initcall(mvebu_devbus_init);
