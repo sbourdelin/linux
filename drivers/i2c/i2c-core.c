@@ -1145,6 +1145,47 @@ struct i2c_client *i2c_new_dummy(struct i2c_adapter *adapter, u16 address)
 }
 EXPORT_SYMBOL_GPL(i2c_new_dummy);
 
+static void devm_i2c_dummy_release(struct device *dev, void *res)
+{
+	i2c_unregister_device(*(struct i2c_client **)res);
+}
+
+/**
+ * devm_i2c_new_dummy - Resource managed version of i2c_new_dummy().
+ * @dev:	Device handle for which this resouce belongs to.
+ * @adapter:	the adapter managing the device
+ * @address:	seven bit address to be used
+ * Context:	can sleep
+
+ * Please refer the details of i2c_new_dummy() for more information.
+ *
+ * This returns the new i2c client on success; or NULL to indicate an error.
+ * The new i2c_client will be automatically released when the device is unbound.
+ */
+struct i2c_client *devm_i2c_new_dummy(struct device *dev,
+				      struct i2c_adapter *adapter,
+				      u16 address)
+{
+	struct i2c_client **ptr, *i2c_dummy;
+
+	ptr = devres_alloc(devm_i2c_dummy_release, sizeof(*ptr),
+			   GFP_KERNEL);
+	if (!ptr)
+		return NULL;
+
+	i2c_dummy = i2c_new_dummy(adapter, address);
+	if (!i2c_dummy) {
+		devres_free(ptr);
+		return NULL;
+	}
+
+	*ptr = i2c_dummy;
+	devres_add(dev, ptr);
+
+	return i2c_dummy;
+}
+EXPORT_SYMBOL_GPL(devm_i2c_new_dummy);
+
 /**
  * i2c_new_secondary_device - Helper to get the instantiated secondary address
  * and create the associated device
