@@ -57,4 +57,6 @@ obj-$(CONFIG_VIDEO_XILINX)		+= xilinx/
 
 obj-$(CONFIG_VIDEO_RCAR_VIN)		+= rcar-vin/
 
+obj-$(CONFIG_VIDEO_ATMEL_ISC)		+= atmel/
+
 ccflags-y += -I$(srctree)/drivers/media/i2c
