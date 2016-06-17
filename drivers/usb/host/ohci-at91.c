@@ -141,7 +141,7 @@ static void at91_stop_hc(struct platform_device *pdev)
 
 /*-------------------------------------------------------------------------*/
 
-struct regmap *at91_dt_syscon_sfr(void)
+static struct regmap *at91_dt_syscon_sfr(void)
 {
 	struct regmap *regmap;
 
