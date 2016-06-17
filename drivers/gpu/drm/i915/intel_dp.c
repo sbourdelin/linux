@@ -4496,6 +4496,9 @@ void intel_dp_encoder_destroy(struct drm_encoder *encoder)
 			intel_dp->edp_notifier.notifier_call = NULL;
 		}
 	}
+
+	intel_dp_aux_fini(intel_dp);
+
 	drm_encoder_cleanup(encoder);
 	kfree(intel_dig_port);
 }
