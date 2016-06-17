@@ -50,6 +50,8 @@ static unsigned long rxrpc_peer_hash_key(struct rxrpc_local *local,
 		size = sizeof(srx->transport.sin.sin_addr);
 		p = (u16 *)&srx->transport.sin.sin_addr;
 		break;
+	default:
+		return 0;
 	}
 
 	/* Step through the peer address in 16-bit portions for speed */
