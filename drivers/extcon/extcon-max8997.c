@@ -27,6 +27,7 @@
 #include <linux/mfd/max8997-private.h>
 #include <linux/extcon.h>
 #include <linux/irqdomain.h>
+#include <linux/regmap.h>
 
 #define	DEV_NAME			"max8997-muic"
 #define	DELAY_MS_DEFAULT		20000		/* unit: millisecond */
@@ -116,7 +117,7 @@ enum max8997_muic_charger_type {
 
 struct max8997_muic_info {
 	struct device *dev;
-	struct i2c_client *muic;
+	struct max8997_dev *max8997;
 	struct extcon_dev *edev;
 	int prev_cable_type;
 	int prev_chg_type;
@@ -174,10 +175,10 @@ static int max8997_muic_set_debounce_time(struct max8997_muic_info *info,
 	case ADC_DEBOUNCE_TIME_10MS:
 	case ADC_DEBOUNCE_TIME_25MS:
 	case ADC_DEBOUNCE_TIME_38_62MS:
-		ret = max8997_update_reg(info->muic,
+		ret = regmap_update_bits(info->max8997->regmap_muic,
 					  MAX8997_MUIC_REG_CONTROL3,
-					  time << CONTROL3_ADCDBSET_SHIFT,
-					  CONTROL3_ADCDBSET_MASK);
+					  CONTROL3_ADCDBSET_MASK,
+					  time << CONTROL3_ADCDBSET_SHIFT);
 		if (ret) {
 			dev_err(info->dev, "failed to set ADC debounce time\n");
 			return ret;
@@ -212,8 +213,8 @@ static int max8997_muic_set_path(struct max8997_muic_info *info,
 	else
 		ctrl1 = CONTROL1_SW_OPEN;
 
-	ret = max8997_update_reg(info->muic,
-			MAX8997_MUIC_REG_CONTROL1, ctrl1, COMP_SW_MASK);
+	ret = regmap_update_bits(info->max8997->regmap_muic,
+			MAX8997_MUIC_REG_CONTROL1, COMP_SW_MASK, ctrl1);
 	if (ret < 0) {
 		dev_err(info->dev, "failed to update MUIC register\n");
 		return ret;
@@ -224,9 +225,9 @@ static int max8997_muic_set_path(struct max8997_muic_info *info,
 	else
 		ctrl2 |= CONTROL2_LOWPWR_MASK;	/* LowPwr=1, CPEn=0 */
 
-	ret = max8997_update_reg(info->muic,
-			MAX8997_MUIC_REG_CONTROL2, ctrl2,
-			CONTROL2_LOWPWR_MASK | CONTROL2_CPEN_MASK);
+	ret = regmap_update_bits(info->max8997->regmap_muic,
+			MAX8997_MUIC_REG_CONTROL2,
+			CONTROL2_LOWPWR_MASK | CONTROL2_CPEN_MASK, ctrl2);
 	if (ret < 0) {
 		dev_err(info->dev, "failed to update MUIC register\n");
 		return ret;
@@ -530,8 +531,8 @@ static void max8997_muic_irq_work(struct work_struct *work)
 		if (info->irq == muic_irqs[i].virq)
 			irq_type = muic_irqs[i].irq;
 
-	ret = max8997_bulk_read(info->muic, MAX8997_MUIC_REG_STATUS1,
-				2, info->status);
+	ret = regmap_bulk_read(info->max8997->regmap_muic,
+				MAX8997_MUIC_REG_STATUS1, info->status, 2);
 	if (ret) {
 		dev_err(info->dev, "failed to read muic register\n");
 		mutex_unlock(&info->mutex);
@@ -590,8 +591,8 @@ static int max8997_muic_detect_dev(struct max8997_muic_info *info)
 	mutex_lock(&info->mutex);
 
 	/* Read STATUSx register to detect accessory */
-	ret = max8997_bulk_read(info->muic,
-			MAX8997_MUIC_REG_STATUS1, 2, info->status);
+	ret = regmap_bulk_read(info->max8997->regmap_muic,
+			MAX8997_MUIC_REG_STATUS1, info->status, 2);
 	if (ret) {
 		dev_err(info->dev, "failed to read MUIC register\n");
 		mutex_unlock(&info->mutex);
@@ -650,7 +651,7 @@ static int max8997_muic_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	info->dev = &pdev->dev;
-	info->muic = max8997->muic;
+	info->max8997 = max8997;
 
 	platform_set_drvdata(pdev, info);
 	mutex_init(&info->mutex);
@@ -700,7 +701,7 @@ static int max8997_muic_probe(struct platform_device *pdev)
 
 		/* Initialize registers according to platform data */
 		for (i = 0; i < muic_pdata->num_init_data; i++) {
-			max8997_write_reg(info->muic,
+			regmap_write(info->max8997->regmap_muic,
 					muic_pdata->init_data[i].addr,
 					muic_pdata->init_data[i].data);
 		}

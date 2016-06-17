@@ -26,6 +26,7 @@
 #include <linux/power_supply.h>
 #include <linux/mfd/max8997.h>
 #include <linux/mfd/max8997-private.h>
+#include <linux/regmap.h>
 
 struct charger_data {
 	struct device *dev;
@@ -45,14 +46,14 @@ static int max8997_battery_get_property(struct power_supply *psy,
 		union power_supply_propval *val)
 {
 	struct charger_data *charger = power_supply_get_drvdata(psy);
-	struct i2c_client *i2c = charger->iodev->i2c;
 	int ret;
-	u8 reg;
+	unsigned int reg;
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_STATUS:
 		val->intval = 0;
-		ret = max8997_read_reg(i2c, MAX8997_REG_STATUS4, &reg);
+		ret = regmap_read(charger->iodev->regmap,
+				MAX8997_REG_STATUS4, &reg);
 		if (ret)
 			return ret;
 		if ((reg & (1 << 0)) == 0x1)
@@ -61,7 +62,8 @@ static int max8997_battery_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_PRESENT:
 		val->intval = 0;
-		ret = max8997_read_reg(i2c, MAX8997_REG_STATUS4, &reg);
+		ret = regmap_read(charger->iodev->regmap,
+				MAX8997_REG_STATUS4, &reg);
 		if (ret)
 			return ret;
 		if ((reg & (1 << 2)) == 0x0)
@@ -70,7 +72,8 @@ static int max8997_battery_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_ONLINE:
 		val->intval = 0;
-		ret = max8997_read_reg(i2c, MAX8997_REG_STATUS4, &reg);
+		ret = regmap_read(charger->iodev->regmap,
+				MAX8997_REG_STATUS4, &reg);
 		if (ret)
 			return ret;
 		/* DCINOK */
@@ -111,8 +114,8 @@ static int max8997_battery_probe(struct platform_device *pdev)
 		if (val > 0xf)
 			val = 0xf;
 
-		ret = max8997_update_reg(iodev->i2c,
-				MAX8997_REG_MBCCTRL5, val, 0xf);
+		ret = regmap_update_bits(iodev->regmap,
+				MAX8997_REG_MBCCTRL5, 0xf, val);
 		if (ret < 0) {
 			dev_err(&pdev->dev, "Cannot use i2c bus.\n");
 			return ret;
@@ -121,20 +124,20 @@ static int max8997_battery_probe(struct platform_device *pdev)
 
 	switch (pdata->timeout) {
 	case 5:
-		ret = max8997_update_reg(iodev->i2c, MAX8997_REG_MBCCTRL1,
-				0x2 << 4, 0x7 << 4);
+		ret = regmap_update_bits(iodev->regmap,
+				MAX8997_REG_MBCCTRL1, 0x7 << 4, 0x2 << 4);
 		break;
 	case 6:
-		ret = max8997_update_reg(iodev->i2c, MAX8997_REG_MBCCTRL1,
-				0x3 << 4, 0x7 << 4);
+		ret = regmap_update_bits(iodev->regmap,
+				MAX8997_REG_MBCCTRL1, 0x7 << 4, 0x3 << 4);
 		break;
 	case 7:
-		ret = max8997_update_reg(iodev->i2c, MAX8997_REG_MBCCTRL1,
-				0x4 << 4, 0x7 << 4);
+		ret = regmap_update_bits(iodev->regmap,
+				MAX8997_REG_MBCCTRL1, 0x7 << 4, 0x4 << 4);
 		break;
 	case 0:
-		ret = max8997_update_reg(iodev->i2c, MAX8997_REG_MBCCTRL1,
-				0x7 << 4, 0x7 << 4);
+		ret = regmap_update_bits(iodev->regmap,
+				MAX8997_REG_MBCCTRL1, 0x7 << 4, 0x7 << 4);
 		break;
 	default:
 		dev_err(&pdev->dev, "incorrect timeout value (%d)\n",
