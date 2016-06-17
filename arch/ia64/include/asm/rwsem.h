@@ -26,13 +26,10 @@
 #endif
 
 #include <asm/intrinsics.h>
+#include <asm-generic/rwsem_types.h>
 
+#undef  RWSEM_UNLOCKED_VALUE
 #define RWSEM_UNLOCKED_VALUE		__IA64_UL_CONST(0x0000000000000000)
-#define RWSEM_ACTIVE_BIAS		(1L)
-#define RWSEM_ACTIVE_MASK		(0xffffffffL)
-#define RWSEM_WAITING_BIAS		(-0x100000000L)
-#define RWSEM_ACTIVE_READ_BIAS		RWSEM_ACTIVE_BIAS
-#define RWSEM_ACTIVE_WRITE_BIAS		(RWSEM_WAITING_BIAS + RWSEM_ACTIVE_BIAS)
 
 /*
  * lock for reading
