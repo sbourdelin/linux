@@ -841,6 +841,18 @@ config THRUSTMASTER_FF
 	  a THRUSTMASTER Dual Trigger 3-in-1 or a THRUSTMASTER Ferrari GT
 	  Rumble Force or Force Feedback Wheel.
 
+config HID_USB_LED
+	tristate "Simple USB RGB LED support"
+	depends on HID
+	depends on LEDS_CLASS
+	---help---
+	Support for simple USB RGB LED devices. Currently supported are the
+	Riso Kagaku Webmail Notifier and the Dream Cheeky Webmail Notifier
+	and Friends Alert.
+
+	To compile this driver as a module, choose M here: the
+	module will be called hid-usb-led.
+
 config HID_WACOM
 	tristate "Wacom Intuos/Graphire tablet support (USB)"
 	depends on HID
