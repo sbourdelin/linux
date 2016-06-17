@@ -108,16 +108,19 @@ void ath_txq_unlock_complete(struct ath_softc *sc, struct ath_txq *txq)
 static void ath_tx_queue_tid(struct ath_softc *sc, struct ath_txq *txq,
 			     struct ath_atx_tid *tid)
 {
-	struct list_head *list;
 	struct ath_vif *avp = (struct ath_vif *) tid->an->vif->drv_priv;
 	struct ath_chanctx *ctx = avp->chanctx;
+	struct ath_acq *acq;
+	struct list_head *tid_list;
 
 	if (!ctx)
 		return;
 
-	list = &ctx->acq[TID_TO_WME_AC(tid->tidno)];
+
+	acq = &ctx->acq[TID_TO_WME_AC(tid->tidno)];
+	tid_list = AIRTIME_ACTIVE(sc->airtime_flags) ? &acq->acq_new : &acq->acq_old;
 	if (list_empty(&tid->list))
-		list_add_tail(&tid->list, list);
+		list_add_tail(&tid->list, tid_list);
 }
 
 void ath9k_wake_tx_queue(struct ieee80211_hw *hw, struct ieee80211_txq *swq)
@@ -722,6 +725,48 @@ static bool bf_is_ampdu_not_probing(struct ath_buf *bf)
     return bf_isampdu(bf) && !(info->flags & IEEE80211_TX_CTL_RATE_CTRL_PROBE);
 }
 
+static void ath_tx_count_airtime(struct ath_softc *sc,
+				 struct ath_buf *bf,
+				 struct ath_tx_status *ts)
+{
+	struct ath_node *an;
+	struct sk_buff *skb;
+	struct ieee80211_hdr *hdr;
+	struct ieee80211_hw *hw = sc->hw;
+	struct ieee80211_tx_rate rates[4];
+	struct ieee80211_sta *sta;
+	int i;
+	u32 airtime = 0;
+
+	skb = bf->bf_mpdu;
+	if(!skb)
+		return;
+
+	hdr = (struct ieee80211_hdr *)skb->data;
+	memcpy(rates, bf->rates, sizeof(rates));
+
+	rcu_read_lock();
+
+	sta = ieee80211_find_sta_by_ifaddr(hw, hdr->addr1, hdr->addr2);
+	if(!sta)
+		goto exit;
+
+
+	an = (struct ath_node *) sta->drv_priv;
+
+	airtime += ts->duration * (ts->ts_longretry + 1);
+
+	for(i=0; i < ts->ts_rateindex; i++)
+		airtime += ath9k_hw_get_duration(sc->sc_ah, bf->bf_desc, i) * rates[i].count;
+
+	if (!!(sc->airtime_flags & AIRTIME_USE_TX))
+		an->airtime_deficit -= airtime;
+	ath_debug_airtime(sc, an, 0, airtime);
+
+exit:
+	rcu_read_unlock();
+}
+
 static void ath_tx_process_buffer(struct ath_softc *sc, struct ath_txq *txq,
 				  struct ath_tx_status *ts, struct ath_buf *bf,
 				  struct list_head *bf_head)
@@ -739,6 +784,8 @@ static void ath_tx_process_buffer(struct ath_softc *sc, struct ath_txq *txq,
 
 	ts->duration = ath9k_hw_get_duration(sc->sc_ah, bf->bf_desc,
 					     ts->ts_rateindex);
+	ath_tx_count_airtime(sc, bf, ts);
+
 	if (!bf_isampdu(bf)) {
 		if (!flush) {
 			info = IEEE80211_SKB_CB(bf->bf_mpdu);
@@ -750,6 +797,7 @@ static void ath_tx_process_buffer(struct ath_softc *sc, struct ath_txq *txq,
 		ath_tx_complete_buf(sc, bf, txq, bf_head, ts, txok);
 	} else
 		ath_tx_complete_aggr(sc, txq, bf, bf_head, ts, txok);
+
 
 	if (!flush)
 		ath_txq_schedule(sc, txq);
@@ -1090,8 +1138,8 @@ ath_tx_form_aggr(struct ath_softc *sc, struct ath_txq *txq,
  * width  - 0 for 20 MHz, 1 for 40 MHz
  * half_gi - to use 4us v/s 3.6 us for symbol time
  */
-static u32 ath_pkt_duration(struct ath_softc *sc, u8 rix, int pktlen,
-			    int width, int half_gi, bool shortPreamble)
+u32 ath_pkt_duration(struct ath_softc *sc, u8 rix, int pktlen,
+		     int width, int half_gi, bool shortPreamble)
 {
 	u32 nbits, nsymbits, duration, nsymbols;
 	int streams;
@@ -1490,7 +1538,7 @@ ath_tx_form_burst(struct ath_softc *sc, struct ath_txq *txq,
 }
 
 static bool ath_tx_sched_aggr(struct ath_softc *sc, struct ath_txq *txq,
-			      struct ath_atx_tid *tid, bool *stop)
+			      struct ath_atx_tid *tid)
 {
 	struct ath_buf *bf;
 	struct ieee80211_tx_info *tx_info;
@@ -1512,7 +1560,6 @@ static bool ath_tx_sched_aggr(struct ath_softc *sc, struct ath_txq *txq,
 	aggr = !!(tx_info->flags & IEEE80211_TX_CTL_AMPDU);
 	if ((aggr && txq->axq_ampdu_depth >= ATH_AGGR_MIN_QDEPTH) ||
 		(!aggr && txq->axq_depth >= ATH_NON_AGGR_MIN_QDEPTH)) {
-		*stop = true;
 		return false;
 	}
 
@@ -1984,9 +2031,10 @@ void ath_tx_cleanupq(struct ath_softc *sc, struct ath_txq *txq)
 void ath_txq_schedule(struct ath_softc *sc, struct ath_txq *txq)
 {
 	struct ath_common *common = ath9k_hw_common(sc->sc_ah);
-	struct ath_atx_tid *tid, *last_tid;
+	struct ath_atx_tid *tid;
 	struct list_head *tid_list;
-	bool sent = false;
+	struct ath_acq *acq;
+	bool active = AIRTIME_ACTIVE(sc->airtime_flags);
 
 	if (txq->mac80211_qnum < 0)
 		return;
@@ -1995,48 +2043,50 @@ void ath_txq_schedule(struct ath_softc *sc, struct ath_txq *txq)
 		return;
 
 	spin_lock_bh(&sc->chan_lock);
-	tid_list = &sc->cur_chan->acq[txq->mac80211_qnum];
+	acq = &sc->cur_chan->acq[txq->mac80211_qnum];
 
-	if (list_empty(tid_list)) {
-		spin_unlock_bh(&sc->chan_lock);
-		return;
-	}
+	if (sc->cur_chan->stopped)
+		goto out;
 
 	rcu_read_lock();
+begin:
+	tid_list = &acq->acq_new;
+	if (list_empty(tid_list)) {
+		tid_list = &acq->acq_old;
+		if (list_empty(tid_list))
+			goto out;
+	}
+	tid = list_first_entry(tid_list, struct ath_atx_tid, list);
 
-	last_tid = list_entry(tid_list->prev, struct ath_atx_tid, list);
-	while (!list_empty(tid_list)) {
-		bool stop = false;
-
-		if (sc->cur_chan->stopped)
-			break;
-
-		tid = list_first_entry(tid_list, struct ath_atx_tid, list);
-		list_del_init(&tid->list);
-
-		if (ath_tx_sched_aggr(sc, txq, tid, &stop))
-			sent = true;
-
-		/*
-		 * add tid to round-robin queue if more frames
-		 * are pending for the tid
-		 */
-		if (ath_tid_has_buffered(tid))
-			ath_tx_queue_tid(sc, txq, tid);
-
-		if (stop)
-			break;
-
-		if (tid == last_tid) {
-			if (!sent)
-				break;
-
-			sent = false;
-			last_tid = list_entry(tid_list->prev,
-					      struct ath_atx_tid, list);
-		}
+	if (active && tid->an->airtime_deficit <= 0) {
+		tid->an->airtime_deficit += 300;
+		list_move_tail(&tid->list, &acq->acq_old);
+		goto begin;
 	}
 
+	if (!ath_tid_has_buffered(tid)) {
+		if ((tid_list == &acq->acq_new) && !list_empty(&acq->acq_old))
+			list_move_tail(&tid->list, &acq->acq_old);
+		else
+			list_del_init(&tid->list);
+		goto begin;
+	}
+
+
+	/* If a station succeeds in queueing something, immediately restart the
+	 * loop. This makes sure the queues are shuffled if the station now has
+	 * no more packets queued, and also ensures we keep the hardware queues
+	 * full.
+	 *
+	 * If we dequeued from a new queue, shuffle the queues, to prevent it
+	 * from hogging too much airtime. */
+	if(ath_tx_sched_aggr(sc, txq, tid)) {
+		if (!active || ((tid_list == &acq->acq_new) && !list_empty(&acq->acq_old)))
+			list_move_tail(&tid->list, &acq->acq_old);
+		goto begin;
+	}
+
+out:
 	rcu_read_unlock();
 	spin_unlock_bh(&sc->chan_lock);
 }
@@ -2930,6 +2980,8 @@ void ath_tx_node_init(struct ath_softc *sc, struct ath_node *an)
 	struct ieee80211_vif *vif = an->vif;
 	struct ath_atx_tid *tid;
 	int tidno, acno;
+
+	an->airtime_deficit = 300;
 
 	for (tidno = 0;
 	     tidno < IEEE80211_NUM_TIDS;
