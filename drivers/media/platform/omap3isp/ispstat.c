@@ -508,6 +508,21 @@ int omap3isp_stat_request_statistics(struct ispstat *stat,
 	return 0;
 }
 
+int omap3isp_stat_request_statistics_time32(struct ispstat *stat,
+					struct omap3isp_stat_data_time32 *data)
+{
+	struct omap3isp_stat_data data64;
+	int ret;
+
+	ret = omap3isp_stat_request_statistics(stat, &data64);
+
+	data->ts.tv_sec = data64.ts.tv_sec;
+	data->ts.tv_usec = data64.ts.tv_usec;
+	memcpy(&data->buf, &data64.buf, sizeof(*data) - sizeof(data->ts));
+
+	return ret;
+}
+
 /*
  * omap3isp_stat_config - Receives new statistic engine configuration.
  * @new_conf: Pointer to config structure.
