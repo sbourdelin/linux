@@ -1,45 +1,45 @@
 /*
-   comedi/drivers/dt2811.c
-   Hardware driver for Data Translation DT2811
-
-   COMEDI - Linux Control and Measurement Device Interface
-   History:
-   Base Version  - David A. Schleef <ds@schleef.org>
-   December 1998 - Updated to work.  David does not have a DT2811
-   board any longer so this was suffering from bitrot.
-   Updated performed by ...
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+ * comedi/drivers/dt2811.c
+ * Hardware driver for Data Translation DT2811
+ *
+ * COMEDI - Linux Control and Measurement Device Interface
+ * History:
+ * Base Version  - David A. Schleef <ds@schleef.org>
+ * December 1998 - Updated to work.  David does not have a DT2811
+ * board any longer so this was suffering from bitrot.
+ * Updated performed by ...
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 /*
-Driver: dt2811
-Description: Data Translation DT2811
-Author: ds
-Devices: [Data Translation] DT2811-PGL (dt2811-pgl), DT2811-PGH (dt2811-pgh)
-Status: works
-
-Configuration options:
-  [0] - I/O port base address
-  [1] - IRQ, although this is currently unused
-  [2] - A/D reference
-	  0 = signle-ended
-	  1 = differential
-	  2 = pseudo-differential (common reference)
-  [3] - A/D range
-	  0 = [-5, 5]
-	  1 = [-2.5, 2.5]
-	  2 = [0, 5]
-  [4] - D/A 0 range (same choices)
-  [4] - D/A 1 range (same choices)
-*/
+ * Driver: dt2811
+ * Description: Data Translation DT2811
+ * Author: ds
+ * Devices: [Data Translation] DT2811-PGL (dt2811-pgl), DT2811-PGH (dt2811-pgh)
+ * Status: works
+ *
+ * Configuration options:
+ * [0] - I/O port base address
+ * [1] - IRQ, although this is currently unused
+ * [2] - A/D reference
+ *	  0 = signle-ended
+ *	  1 = differential
+ *	  2 = pseudo-differential (common reference)
+ * [3] - A/D range
+ *	  0 = [-5, 5]
+ *	  1 = [-2.5, 2.5]
+ *	  2 = [0, 5]
+ * [4] - D/A 0 range (same choices)
+ * [4] - D/A 1 range (same choices)
+ */
 
 #include <linux/module.h>
 #include "../comedidev.h"
@@ -99,72 +99,72 @@ static const struct comedi_lrange range_dt2811_pgl_ai_5_bipolar = {
 };
 
 /*
-
-   0x00    ADCSR R/W  A/D Control/Status Register
-   bit 7 - (R) 1 indicates A/D conversion done
-   reading ADDAT clears bit
-   (W) ignored
-   bit 6 - (R) 1 indicates A/D error
-   (W) ignored
-   bit 5 - (R) 1 indicates A/D busy, cleared at end
-   of conversion
-   (W) ignored
-   bit 4 - (R) 0
-   (W)
-   bit 3 - (R) 0
-   bit 2 - (R/W) 1 indicates interrupts enabled
-   bits 1,0 - (R/W) mode bits
-   00  single conversion on ADGCR load
-   01  continuous conversion, internal clock,
-   (clock enabled on ADGCR load)
-   10  continuous conversion, internal clock,
-   external trigger
-   11  continuous conversion, external clock,
-   external trigger
-
-   0x01    ADGCR R/W A/D Gain/Channel Register
-   bit 6,7 - (R/W) gain select
-   00  gain=1, both PGH, PGL models
-   01  gain=2 PGH, 10 PGL
-   10  gain=4 PGH, 100 PGL
-   11  gain=8 PGH, 500 PGL
-   bit 4,5 - reserved
-   bit 3-0 - (R/W) channel select
-   channel number from 0-15
-
-   0x02,0x03 (R) ADDAT A/D Data Register
-   (W) DADAT0 D/A Data Register 0
-   0x02 low byte
-   0x03 high byte
-
-   0x04,0x05 (W) DADAT0 D/A Data Register 1
-
-   0x06 (R) DIO0 Digital Input Port 0
-   (W) DIO1 Digital Output Port 1
-
-   0x07 TMRCTR (R/W) Timer/Counter Register
-   bits 6,7 - reserved
-   bits 5-3 - Timer frequency control (mantissa)
-   543  divisor  freqency (kHz)
-   000  1        600
-   001  10       60
-   010  2        300
-   011  3        200
-   100  4        150
-   101  5        120
-   110  6        100
-   111  12       50
-   bits 2-0 - Timer frequency control (exponent)
-   210  multiply divisor/divide frequency by
-   000  1
-   001  10
-   010  100
-   011  1000
-   100  10000
-   101  100000
-   110  1000000
-   111  10000000
-
+ *
+ * 0x00    ADCSR R/W  A/D Control/Status Register
+ * bit 7 - (R) 1 indicates A/D conversion done
+ * reading ADDAT clears bit
+ * (W) ignored
+ * bit 6 - (R) 1 indicates A/D error
+ * (W) ignored
+ * bit 5 - (R) 1 indicates A/D busy, cleared at end
+ * of conversion
+ * (W) ignored
+ * bit 4 - (R) 0
+ * (W)
+ * bit 3 - (R) 0
+ * bit 2 - (R/W) 1 indicates interrupts enabled
+ * bits 1,0 - (R/W) mode bits
+ * 00  single conversion on ADGCR load
+ * 01  continuous conversion, internal clock,
+ * (clock enabled on ADGCR load)
+ * 10  continuous conversion, internal clock,
+ * external trigger
+ * 11  continuous conversion, external clock,
+ * external trigger
+ *
+ * 0x01    ADGCR R/W A/D Gain/Channel Register
+ * bit 6,7 - (R/W) gain select
+ * 00  gain=1, both PGH, PGL models
+ * 01  gain=2 PGH, 10 PGL
+ * 10  gain=4 PGH, 100 PGL
+ * 11  gain=8 PGH, 500 PGL
+ * bit 4,5 - reserved
+ * bit 3-0 - (R/W) channel select
+ * channel number from 0-15
+ *
+ * 0x02,0x03 (R) ADDAT A/D Data Register
+ * (W) DADAT0 D/A Data Register 0
+ * 0x02 low byte
+ * 0x03 high byte
+ *
+ * 0x04,0x05 (W) DADAT0 D/A Data Register 1
+ *
+ * 0x06 (R) DIO0 Digital Input Port 0
+ * (W) DIO1 Digital Output Port 1
+ *
+ * 0x07 TMRCTR (R/W) Timer/Counter Register
+ * bits 6,7 - reserved
+ * bits 5-3 - Timer frequency control (mantissa)
+ * 543  divisor  freqency (kHz)
+ * 000  1        600
+ * 001  10       60
+ * 010  2        300
+ * 011  3        200
+ * 100  4        150
+ * 101  5        120
+ * 110  6        100
+ * 111  12       50
+ * bits 2-0 - Timer frequency control (exponent)
+ * 210  multiply divisor/divide frequency by
+ * 000  1
+ * 001  10
+ * 010  100
+ * 011  1000
+ * 100  10000
+ * 101  100000
+ * 110  1000000
+ * 111  10000000
+ *
  */
 
 #define TIMEOUT 10000
@@ -298,25 +298,25 @@ static int dt2811_do_insn_bits(struct comedi_device *dev,
 }
 
 /*
-  options[0]   Board base address
-  options[1]   IRQ
-  options[2]   Input configuration
-		 0 == single-ended
-		 1 == differential
-		 2 == pseudo-differential
-  options[3]   Analog input range configuration
-		 0 == bipolar 5  (-5V -- +5V)
-		 1 == bipolar 2.5V  (-2.5V -- +2.5V)
-		 2 == unipolar 5V  (0V -- +5V)
-  options[4]   Analog output 0 range configuration
-		 0 == bipolar 5  (-5V -- +5V)
-		 1 == bipolar 2.5V  (-2.5V -- +2.5V)
-		 2 == unipolar 5V  (0V -- +5V)
-  options[5]   Analog output 1 range configuration
-		 0 == bipolar 5  (-5V -- +5V)
-		 1 == bipolar 2.5V  (-2.5V -- +2.5V)
-		 2 == unipolar 5V  (0V -- +5V)
-*/
+ * options[0]   Board base address
+ * options[1]   IRQ
+ * options[2]   Input configuration
+ *		 0 == single-ended
+ *		 1 == differential
+ *		 2 == pseudo-differential
+ * options[3]   Analog input range configuration
+ *		 0 == bipolar 5  (-5V -- +5V)
+ *		 1 == bipolar 2.5V  (-2.5V -- +2.5V)
+ *		 2 == unipolar 5V  (0V -- +5V)
+ * options[4]   Analog output 0 range configuration
+ *		 0 == bipolar 5  (-5V -- +5V)
+ *		 1 == bipolar 2.5V  (-2.5V -- +2.5V)
+ *		 2 == unipolar 5V  (0V -- +5V)
+ * options[5]   Analog output 1 range configuration
+ *		 0 == bipolar 5  (-5V -- +5V)
+ *		 1 == bipolar 2.5V  (-2.5V -- +2.5V)
+ *		 2 == unipolar 5V  (0V -- +5V)
+ */
 static int dt2811_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 {
 	/* int i; */
