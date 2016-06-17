@@ -1,6 +1,8 @@
 /*
  * Tegra20 Memory Controller
  *
+ * Author: Hiroshi DOYU <hdoyu@nvidia.com>
+ *
  * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -19,7 +21,7 @@
 
 #include <linux/err.h>
 #include <linux/kernel.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/ratelimit.h>
 #include <linux/platform_device.h>
 #include <linux/interrupt.h>
@@ -246,9 +248,4 @@ static struct platform_driver tegra20_mc_driver = {
 		.of_match_table = tegra20_mc_of_match,
 	},
 };
-module_platform_driver(tegra20_mc_driver);
-
-MODULE_AUTHOR("Hiroshi DOYU <hdoyu@nvidia.com>");
-MODULE_DESCRIPTION("Tegra20 MC driver");
-MODULE_LICENSE("GPL v2");
-MODULE_ALIAS("platform:" DRV_NAME);
+builtin_platform_driver(tegra20_mc_driver);
