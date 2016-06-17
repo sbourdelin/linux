@@ -441,11 +441,30 @@ static int broxton_audio_probe(struct platform_device *pdev)
 	return devm_snd_soc_register_card(&pdev->dev, &broxton_audio_card);
 }
 
+#ifdef CONFIG_PM_SLEEP
+
+static void broxton_complete(struct device *dev)
+{
+	snd_soc_resume(dev);
+}
+
+#else
+#define broxton_complete NULL
+#endif
+
+static const struct dev_pm_ops broxton_pm_ops = {
+	.prepare = snd_soc_suspend,
+	.complete = broxton_complete,
+	.freeze = snd_soc_suspend,
+	.thaw = snd_soc_resume,
+	.poweroff = snd_soc_poweroff,
+	.restore = snd_soc_resume,
+};
 static struct platform_driver broxton_audio = {
 	.probe = broxton_audio_probe,
 	.driver = {
 		.name = "bxt_da7219_max98357a_i2s",
-		.pm = &snd_soc_pm_ops,
+		.pm = &broxton_pm_ops,
 	},
 };
 module_platform_driver(broxton_audio)
