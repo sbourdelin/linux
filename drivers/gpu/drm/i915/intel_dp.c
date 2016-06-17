@@ -5316,8 +5316,22 @@ static bool intel_edp_init_connector(struct intel_dp *intel_dp,
 	if (!is_edp(intel_dp))
 		return true;
 
+	/*
+	 * On ILK we may get here with LVDS already registered. Since the
+	 * driver uses the only internal power sequencer available for both
+	 * eDP and LVDS bail out early in this case to prevent interfering
+	 * with an already powered-on LVDS power sequencer.
+	 */
+	for_each_intel_encoder(dev, intel_encoder) {
+		if (intel_encoder->type == INTEL_OUTPUT_LVDS) {
+			DRM_INFO("LVDS was detected, not registering eDP\n");
+			return false;
+		}
+	}
+
 	pps_lock(intel_dp);
 	intel_edp_panel_vdd_sanitize(intel_dp);
+	intel_dp_init_panel_power_sequencer_registers(dev, intel_dp);
 	pps_unlock(intel_dp);
 
 	/* Cache DPCD and EDID for edp. */
@@ -5333,11 +5347,6 @@ static bool intel_edp_init_connector(struct intel_dp *intel_dp,
 		DRM_INFO("failed to retrieve link info, disabling eDP\n");
 		return false;
 	}
-
-	/* We now know it's not a ghost, init power sequence regs. */
-	pps_lock(intel_dp);
-	intel_dp_init_panel_power_sequencer_registers(dev, intel_dp);
-	pps_unlock(intel_dp);
 
 	mutex_lock(&dev->mode_config.mutex);
 	edid = drm_get_edid(connector, &intel_dp->aux.ddc);
