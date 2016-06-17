@@ -1220,6 +1220,18 @@ void intel_fbc_init_pipe_state(struct drm_i915_private *dev_priv)
 			dev_priv->fbc.visible_pipes_mask |= (1 << crtc->pipe);
 }
 
+static bool need_vtd_wa(struct drm_i915_private *dev_priv)
+{
+#ifdef CONFIG_INTEL_IOMMU
+	if (!intel_iommu_gfx_mapped)
+		return false;
+
+	if (INTEL_GEN(dev_priv) == 9)
+		return true;
+#endif
+	return false;
+}
+
 /**
  * intel_fbc_init - Initialize FBC
  * @dev_priv: the i915 device
@@ -1236,6 +1248,12 @@ void intel_fbc_init(struct drm_i915_private *dev_priv)
 	fbc->enabled = false;
 	fbc->active = false;
 	fbc->work.scheduled = false;
+
+	if (need_vtd_wa(dev_priv)) {
+		struct intel_device_info *info =
+			(struct intel_device_info *)&dev_priv->info;
+		info->has_fbc = false;
+	}
 
 	if (!HAS_FBC(dev_priv)) {
 		fbc->no_fbc_reason = "unsupported by this chipset";
