@@ -4245,7 +4245,7 @@ pte_t *huge_pmd_share(struct mm_struct *mm, unsigned long addr, pud_t *pud)
 				(pmd_t *)((unsigned long)spte & PAGE_MASK));
 	} else {
 		put_page(virt_to_page(spte));
-		mm_inc_nr_pmds(mm);
+		mm_dec_nr_pmds(mm);
 	}
 	spin_unlock(ptl);
 out:
