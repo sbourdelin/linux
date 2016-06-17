@@ -230,6 +230,25 @@ static inline void inode_detach_wb(struct inode *inode)
 }
 
 /**
+ * inode_detach_blkdev_wb - disassociate a bd_inode from its wb
+ * @bdev: block_device of interest
+ *
+ * @bdev is being put for the last time.  Detaching bdev inode in
+ * __destroy_inode() is too late: the queue which embeds its bdi (along
+ * with root wb) can be gone as soon as the containing disk is put.
+ *
+ * This function dissociates @bdev->bd_inode from its wb.  The inode must
+ * be clean and no further operations should be started on it.
+ */
+static inline void inode_detach_blkdev_wb(struct block_device *bdev)
+{
+	if (bdev->bd_inode->i_wb) {
+		flush_delayed_work(&bdev->bd_inode->i_wb->dwork);
+		inode_detach_wb(bdev->bd_inode);
+	}
+}
+
+/**
  * wbc_attach_fdatawrite_inode - associate wbc and inode for fdatawrite
  * @wbc: writeback_control of interest
  * @inode: target inode
@@ -274,6 +293,10 @@ static inline void inode_attach_wb(struct inode *inode, struct page *page)
 }
 
 static inline void inode_detach_wb(struct inode *inode)
+{
+}
+
+static inline void inode_detach_blkdev_wb(struct block_device *bdev)
 {
 }
 
