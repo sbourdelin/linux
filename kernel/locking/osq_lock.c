@@ -124,6 +124,11 @@ bool osq_lock(struct optimistic_spin_queue *lock)
 
 		cpu_relax_lowlatency();
 	}
+	/*
+	 * Add an acquire memory barrier for pairing with the release barrier
+	 * in unlock.
+	 */
+	smp_acquire__after_ctrl_dep();
 	return true;
 
 unqueue:
@@ -198,7 +203,7 @@ void osq_unlock(struct optimistic_spin_queue *lock)
 	 * Second most likely case.
 	 */
 	node = this_cpu_ptr(&osq_node);
-	next = xchg(&node->next, NULL);
+	next = xchg_release(&node->next, NULL);
 	if (next) {
 		WRITE_ONCE(next->locked, 1);
 		return;
