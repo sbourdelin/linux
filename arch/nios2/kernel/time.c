@@ -346,12 +346,10 @@ void __init time_init(void)
 	for_each_compatible_node(np, NULL,  ALTR_TIMER_COMPATIBLE)
 		count++;
 
-	if (count < 2) {
+	if (count < 2)
 		panic("%d timer is found, it needs 2 timers in system\n", count);
 
 	clocksource_probe();
-
-	return 0;
 }
 
 CLOCKSOURCE_OF_DECLARE(nios2_timer, ALTR_TIMER_COMPATIBLE, nios2_time_init);
