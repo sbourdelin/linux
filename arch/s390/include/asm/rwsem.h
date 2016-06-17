@@ -188,7 +188,7 @@ static inline void __downgrade_write(struct rw_semaphore *sem)
 {
 	signed long old, new, tmp;
 
-	tmp = -RWSEM_WAITING_BIAS;
+	tmp = -RWSEM_ACTIVE_WRITE_BIAS + RWSEM_ACTIVE_READ_BIAS;
 	asm volatile(
 		"	lg	%0,%2\n"
 		"0:	lgr	%1,%0\n"
