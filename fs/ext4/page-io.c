@@ -124,10 +124,18 @@ static void ext4_finish_bio(struct bio *bio)
 static void ext4_release_io_end(ext4_io_end_t *io_end)
 {
 	struct bio *bio, *next_bio;
+	unsigned long flags;
 
 	BUG_ON(!list_empty(&io_end->list));
 	BUG_ON(io_end->flag & EXT4_IO_END_UNWRITTEN);
 	WARN_ON(io_end->handle);
+
+	if (atomic_dec_and_test(&EXT4_I(io_end->inode)->i_ioend_count))
+		wake_up_all(ext4_ioend_wq(io_end->inode));
+
+	spin_lock_irqsave(&EXT4_I(io_end->inode)->i_completed_io_lock, flags);
+	list_del(&io_end->full_list);
+	spin_unlock_irqrestore(&EXT4_I(io_end->inode)->i_completed_io_lock, flags);
 
 	for (bio = io_end->bio; bio; bio = next_bio) {
 		next_bio = bio->bi_private;
@@ -253,9 +261,16 @@ ext4_io_end_t *ext4_init_io_end(struct inode *inode, gfp_t flags)
 {
 	ext4_io_end_t *io = kmem_cache_zalloc(io_end_cachep, flags);
 	if (io) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&EXT4_I(inode)->i_completed_io_lock, flags);
+		list_add(&io->full_list, &EXT4_I(inode)->i_ioend_list);
+		spin_unlock_irqrestore(&EXT4_I(inode)->i_completed_io_lock, flags);
+		atomic_inc(&EXT4_I(inode)->i_ioend_count);
 		io->inode = inode;
 		INIT_LIST_HEAD(&io->list);
 		atomic_set(&io->count, 1);
+		io->created_at = _RET_IP_;
 	}
 	return io;
 }

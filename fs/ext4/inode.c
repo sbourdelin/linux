@@ -176,6 +176,20 @@ int ext4_truncate_restart_trans(handle_t *handle, struct inode *inode,
 	return ret;
 }
 
+static void dump_ioends(struct inode *inode, struct list_head *head)
+{
+	ext4_io_end_t *io;
+	unsigned long flags;
+
+	spin_lock_irqsave(&EXT4_I(inode)->i_completed_io_lock, flags);
+	list_for_each_entry(io, head, full_list) {
+		printk("ioend %p, created at 0x%lx: handle=%p, bio=%p, flag=%u, offset=%lu, len=%u, count=%d\n",
+			io, io->created_at, io->handle, io->bio, io->flag, (unsigned long)io->offset,
+			(unsigned)io->size, (int)atomic_read(&io->count));
+	}
+	spin_unlock_irqrestore(&EXT4_I(inode)->i_completed_io_lock, flags);
+}
+
 /*
  * Called at the last iput() if i_nlink is zero.
  */
@@ -216,6 +230,10 @@ void ext4_evict_inode(struct inode *inode)
 		}
 		truncate_inode_pages_final(&inode->i_data);
 
+		if (WARN_ON(atomic_read(&EXT4_I(inode)->i_ioend_count))) {
+			printk("ioend_count=%d, i_unwritten=%d\n", (int)atomic_read(&EXT4_I(inode)->i_ioend_count), (int)atomic_read(&EXT4_I(inode)->i_unwritten));
+			dump_ioends(inode, &EXT4_I(inode)->i_ioend_list);
+		}
 		goto no_delete;
 	}
 
@@ -226,6 +244,11 @@ void ext4_evict_inode(struct inode *inode)
 	if (ext4_should_order_data(inode))
 		ext4_begin_ordered_truncate(inode, 0);
 	truncate_inode_pages_final(&inode->i_data);
+
+	if (WARN_ON(atomic_read(&EXT4_I(inode)->i_ioend_count))) {
+		printk("ioend_count=%d, i_unwritten=%d\n", (int)atomic_read(&EXT4_I(inode)->i_ioend_count), (int)atomic_read(&EXT4_I(inode)->i_unwritten));
+		dump_ioends(inode, &EXT4_I(inode)->i_ioend_list);
+	}
 
 	/*
 	 * Protect us against freezing - iput() caller didn't have to have any

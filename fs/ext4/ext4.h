@@ -189,6 +189,7 @@ struct ext4_map_blocks {
  */
 typedef struct ext4_io_end {
 	struct list_head	list;		/* per-file finished IO list */
+	struct list_head	full_list;
 	handle_t		*handle;	/* handle reserved for extent
 						 * conversion */
 	struct inode		*inode;		/* file being written to */
@@ -198,6 +199,7 @@ typedef struct ext4_io_end {
 	atomic_t		count;		/* reference counter */
 	loff_t			offset;		/* offset in the file */
 	ssize_t			size;		/* size of the extent */
+	unsigned long		created_at;
 } ext4_io_end_t;
 
 struct ext4_io_submit {
@@ -1063,8 +1065,14 @@ struct ext4_inode_info {
 	 * transaction reserved
 	 */
 	struct list_head i_rsv_conversion_list;
-	struct work_struct i_rsv_conversion_work;
+	struct list_head i_ioend_list;
+	/*
+	 * Completed IOs that need unwritten extents handling and don't have
+	 * transaction reserved
+	 */
+	atomic_t i_ioend_count;	/* Number of outstanding io_end structs */
 	atomic_t i_unwritten; /* Nr. of inflight conversions pending */
+	struct work_struct i_rsv_conversion_work;
 
 	spinlock_t i_block_reservation_lock;
 
