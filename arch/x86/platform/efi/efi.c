@@ -98,7 +98,7 @@ static efi_status_t __init phys_efi_set_virtual_address_map(
 	return status;
 }
 
-void efi_get_time(struct timespec *now)
+void efi_get_time(struct timespec64 *now)
 {
 	efi_status_t status;
 	efi_time_t eft;
@@ -108,8 +108,8 @@ void efi_get_time(struct timespec *now)
 	if (status != EFI_SUCCESS)
 		pr_err("Oops: efitime: can't read time!\n");
 
-	now->tv_sec = mktime(eft.year, eft.month, eft.day, eft.hour,
-			     eft.minute, eft.second);
+	now->tv_sec = mktime64(eft.year, eft.month, eft.day, eft.hour,
+			       eft.minute, eft.second);
 	now->tv_nsec = 0;
 }
 
