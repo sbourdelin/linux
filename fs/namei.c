@@ -3577,7 +3577,7 @@ static struct dentry *filename_create(int dfd, struct filename *name,
 	 * Note that only LOOKUP_REVAL and LOOKUP_DIRECTORY matter here. Any
 	 * other flags passed in are ignored!
 	 */
-	lookup_flags &= LOOKUP_REVAL;
+	lookup_flags &= LOOKUP_REVAL | LOOKUP_DFD_ROOT;
 
 	name = filename_parentat(dfd, name, lookup_flags, path, &last, &type);
 	if (IS_ERR(name))
@@ -4050,7 +4050,7 @@ slashes:
 
 SYSCALL_DEFINE3(unlinkat, int, dfd, const char __user *, pathname, int, flag)
 {
-	if ((flag & ~AT_REMOVEDIR) != 0)
+	if ((flag & ~(AT_REMOVEDIR | AT_FDROOT)) != 0)
 		return -EINVAL;
 
 	if (flag & AT_REMOVEDIR)
@@ -4212,7 +4212,7 @@ SYSCALL_DEFINE5(linkat, int, olddfd, const char __user *, oldname,
 	int how = 0;
 	int error;
 
-	if ((flags & ~(AT_SYMLINK_FOLLOW | AT_EMPTY_PATH)) != 0)
+	if ((flags & ~(AT_SYMLINK_FOLLOW | AT_EMPTY_PATH | AT_FDROOT)) != 0)
 		return -EINVAL;
 	/*
 	 * To use null names we require CAP_DAC_READ_SEARCH
@@ -4227,13 +4227,15 @@ SYSCALL_DEFINE5(linkat, int, olddfd, const char __user *, oldname,
 
 	if (flags & AT_SYMLINK_FOLLOW)
 		how |= LOOKUP_FOLLOW;
+	if (flags & AT_FDROOT)
+		how |= LOOKUP_DFD_ROOT;
 retry:
 	error = user_path_at(olddfd, oldname, how, &old_path);
 	if (error)
 		return error;
 
 	new_dentry = user_path_create(newdfd, newname, &new_path,
-					(how & LOOKUP_REVAL));
+				(how & (LOOKUP_REVAL | LOOKUP_DFD_ROOT)));
 	error = PTR_ERR(new_dentry);
 	if (IS_ERR(new_dentry))
 		goto out;

@@ -61,6 +61,9 @@
 #ifndef O_CLOEXEC
 #define O_CLOEXEC	02000000	/* set close_on_exec */
 #endif
+#ifndef O_ATROOT
+#define O_ATROOT	04000000	/* dfd is a root */
+#endif
 
 /*
  * Before Linux 2.6.33 only O_DSYNC semantics were implemented, but using
