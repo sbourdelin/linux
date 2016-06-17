@@ -247,6 +247,8 @@ struct scatterlist *sg_next(struct scatterlist *);
 struct scatterlist *sg_last(struct scatterlist *s, unsigned int);
 void sg_init_table(struct scatterlist *, unsigned int);
 void sg_init_one(struct scatterlist *, const void *, unsigned int);
+struct sg_table *sg_table_clone(struct sg_table *orig_table, u64 len,
+				gfp_t gfp_mask);
 int sg_split(struct scatterlist *in, const int in_mapped_nents,
 	     const off_t skip, const int nb_splits,
 	     const size_t *split_sizes,
