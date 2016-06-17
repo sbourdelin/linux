@@ -622,7 +622,7 @@ config MFD_MAX8997
 	depends on I2C=y
 	select MFD_CORE
 	select REGMAP_I2C
-	select IRQ_DOMAIN
+	select REGMAP_IRQ
 	help
 	  Say yes here to add support for Maxim Semiconductor MAX8997/8966.
 	  This is a Power Management IC with RTC, Flash, Fuel Gauge, Haptic,

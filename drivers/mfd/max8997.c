@@ -65,6 +65,49 @@ static const struct regmap_config max8997_regmap_config = {
 	.max_register = MAX8997_REG_PMIC_END,
 };
 
+static const struct regmap_irq max8997_irqs[] = {
+	/* PMIC_INT1 interrupts */
+	{ .reg_offset = 0, .mask = PMIC_INT1_PWRONR_MASK, },
+	{ .reg_offset = 0, .mask = PMIC_INT1_PWRONF_MASK, },
+	{ .reg_offset = 0, .mask = PMIC_INT1_PWRON1SEC_MASK, },
+	{ .reg_offset = 0, .mask = PMIC_INT1_JIGONR_MASK, },
+	{ .reg_offset = 0, .mask = PMIC_INT1_JIGONF_MASK, },
+	{ .reg_offset = 0, .mask = PMIC_INT1_LOWBAT2_MASK, },
+	{ .reg_offset = 0, .mask = PMIC_INT1_LOWBAT1_MASK, },
+	/* PMIC_INT2 interrupts */
+	{ .reg_offset = 1, .mask = PMIC_INT2_JIGR_MASK, },
+	{ .reg_offset = 1, .mask = PMIC_INT2_JIGF_MASK, },
+	{ .reg_offset = 1, .mask = PMIC_INT2_MR_MASK, },
+	{ .reg_offset = 1, .mask = PMIC_INT2_DVS1OK_MASK, },
+	{ .reg_offset = 1, .mask = PMIC_INT2_DVS2OK_MASK, },
+	{ .reg_offset = 1, .mask = PMIC_INT2_DVS3OK_MASK, },
+	{ .reg_offset = 1, .mask = PMIC_INT2_DVS4OK_MASK, },
+	/* PMIC_INT3 interrupts */
+	{ .reg_offset = 2, .mask = PMIC_INT3_CHGINS_MASK, },
+	{ .reg_offset = 2, .mask = PMIC_INT3_CHGRM_MASK, },
+	{ .reg_offset = 2, .mask = PMIC_INT3_DCINOVP_MASK, },
+	{ .reg_offset = 2, .mask = PMIC_INT3_TOPOFFR_MASK, },
+	{ .reg_offset = 2, .mask = PMIC_INT3_CHGRSTF_MASK, },
+	{ .reg_offset = 2, .mask = PMIC_INT3_MBCHGTMEXPD_MASK, },
+	/* PMIC_INT4 interrupts */
+	{ .reg_offset = 3, .mask = PMIC_INT4_RTC60S_MASK, },
+	{ .reg_offset = 3, .mask = PMIC_INT4_RTCA1_MASK, },
+	{ .reg_offset = 3, .mask = PMIC_INT4_RTCA2_MASK, },
+	{ .reg_offset = 3, .mask = PMIC_INT4_SMPL_INT_MASK, },
+	{ .reg_offset = 3, .mask = PMIC_INT4_RTC1S_MASK, },
+	{ .reg_offset = 3, .mask = PMIC_INT4_WTSR_MASK, },
+};
+
+static const struct regmap_irq_chip max8997_irq_chip = {
+	.name			= "max8997",
+	.status_base		= MAX8997_REG_INT1,
+	.mask_base		= MAX8997_REG_INT1MSK,
+	.mask_invert		= false,
+	.num_regs		= 4,
+	.irqs			= max8997_irqs,
+	.num_irqs		= ARRAY_SIZE(max8997_irqs),
+};
+
 static const struct regmap_config max8997_regmap_rtc_config = {
 	.reg_bits = 8,
 	.val_bits = 8,
@@ -81,6 +124,31 @@ static const struct regmap_config max8997_regmap_muic_config = {
 	.reg_bits = 8,
 	.val_bits = 8,
 	.max_register = MAX8997_MUIC_REG_END,
+};
+
+static const struct regmap_irq max8997_irqs_muic[] = {
+	/* MUIC_INT1 interrupts */
+	{ .reg_offset = 0, .mask = MUIC_INT1_ADC_MASK, },
+	{ .reg_offset = 0, .mask = MUIC_INT1_ADCLOW_MASK, },
+	{ .reg_offset = 0, .mask = MUIC_INT1_ADCERROR_MASK, },
+	/* MUIC_INT2 interrupts */
+	{ .reg_offset = 1, .mask = MUIC_INT2_CHGTYP_MASK, },
+	{ .reg_offset = 1, .mask = MUIC_INT2_CHGDETRUN_MASK, },
+	{ .reg_offset = 1, .mask = MUIC_INT2_DCDTMR_MASK, },
+	{ .reg_offset = 1, .mask = MUIC_INT2_DBCHG_MASK, },
+	{ .reg_offset = 1, .mask = MUIC_INT2_VBVOLT_MASK, },
+	/* MUIC_INT3 interrupts */
+	{ .reg_offset = 2, .mask = MUIC_INT3_OVP_MASK, },
+};
+
+static const struct regmap_irq_chip max8997_irq_chip_muic = {
+	.name			= "max8997-muic",
+	.status_base		= MAX8997_MUIC_REG_INT1,
+	.mask_base		= MAX8997_MUIC_REG_INTMASK1,
+	.mask_invert		= true,
+	.num_regs		= 3,
+	.irqs			= max8997_irqs_muic,
+	.num_irqs		= ARRAY_SIZE(max8997_irqs_muic),
 };
 
 /*
@@ -215,9 +283,26 @@ static int max8997_i2c_probe(struct i2c_client *i2c,
 		goto err_regmap;
 	}
 
-	pm_runtime_set_active(max8997->dev);
+	ret = regmap_add_irq_chip(max8997->regmap, max8997->irq,
+				IRQF_ONESHOT | IRQF_SHARED |
+				IRQF_TRIGGER_FALLING, 0,
+				&max8997_irq_chip, &max8997->irq_data);
+	if (ret) {
+		dev_err(max8997->dev, "failed to add irq chip: %d\n", ret);
+		goto err_regmap;
+	}
 
-	max8997_irq_init(max8997);
+	ret = regmap_add_irq_chip(max8997->regmap_muic, max8997->irq,
+				IRQF_ONESHOT | IRQF_SHARED |
+				IRQF_TRIGGER_FALLING, 0,
+				&max8997_irq_chip_muic,
+				&max8997->irq_data_muic);
+	if (ret) {
+		dev_err(max8997->dev, "failed to add irq chip: %d\n", ret);
+		goto err_irq_muic;
+	}
+
+	pm_runtime_set_active(max8997->dev);
 
 	ret = mfd_add_devices(max8997->dev, -1, max8997_devs,
 			ARRAY_SIZE(max8997_devs),
@@ -239,6 +324,9 @@ static int max8997_i2c_probe(struct i2c_client *i2c,
 
 err_mfd:
 	mfd_remove_devices(max8997->dev);
+	regmap_del_irq_chip(max8997->irq, max8997->irq_data_muic);
+err_irq_muic:
+	regmap_del_irq_chip(max8997->irq, max8997->irq_data);
 err_regmap:
 	i2c_unregister_device(max8997->muic);
 err_i2c_muic:
@@ -253,6 +341,10 @@ static int max8997_i2c_remove(struct i2c_client *i2c)
 	struct max8997_dev *max8997 = i2c_get_clientdata(i2c);
 
 	mfd_remove_devices(max8997->dev);
+
+	regmap_del_irq_chip(max8997->irq, max8997->irq_data_muic);
+	regmap_del_irq_chip(max8997->irq, max8997->irq_data);
+
 	i2c_unregister_device(max8997->muic);
 	i2c_unregister_device(max8997->haptic);
 	i2c_unregister_device(max8997->rtc);
@@ -469,8 +561,11 @@ static int max8997_suspend(struct device *dev)
 	struct i2c_client *i2c = to_i2c_client(dev);
 	struct max8997_dev *max8997 = i2c_get_clientdata(i2c);
 
-	if (device_may_wakeup(dev))
-		irq_set_irq_wake(max8997->irq, 1);
+	if (device_may_wakeup(dev)) {
+		enable_irq_wake(max8997->irq);
+		disable_irq(max8997->irq);
+	}
+
 	return 0;
 }
 
@@ -479,9 +574,12 @@ static int max8997_resume(struct device *dev)
 	struct i2c_client *i2c = to_i2c_client(dev);
 	struct max8997_dev *max8997 = i2c_get_clientdata(i2c);
 
-	if (device_may_wakeup(dev))
-		irq_set_irq_wake(max8997->irq, 0);
-	return max8997_irq_resume(max8997);
+	if (device_may_wakeup(dev)) {
+		disable_irq_wake(max8997->irq);
+		enable_irq(max8997->irq);
+	}
+
+	return 0;
 }
 
 static const struct dev_pm_ops max8997_pm = {
