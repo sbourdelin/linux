@@ -664,7 +664,7 @@ void bpf_jit_compile(struct bpf_prog *fp)
 
 	if (image) {
 		bpf_flush_icache(code_base, code_base + (proglen/4));
-#ifdef CONFIG_PPC64
+#if defined(CONFIG_PPC64) && (!defined(_CALL_ELF) || _CALL_ELF != 2)
 		/* Function descriptor nastiness: Address + TOC */
 		((u64 *)image)[0] = (u64)code_base;
 		((u64 *)image)[1] = local_paca->kernel_toc;
