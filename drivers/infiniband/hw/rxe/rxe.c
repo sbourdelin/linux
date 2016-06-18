@@ -187,7 +187,6 @@ static int rxe_init_ports(struct rxe_dev *rxe)
 	port->pkey_tbl[0] = 0xffff;
 
 	if (!port->attr.gid_tbl_len) {
-		kfree(port->pkey_tbl);
 		err = -EINVAL;
 		goto err1;
 	}
