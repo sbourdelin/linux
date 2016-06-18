@@ -513,6 +513,16 @@ unsigned long arch_randomize_brk(struct mm_struct *mm)
 }
 
 /*
+ * Return saved PC of a blocked thread.
+ */
+unsigned long thread_saved_pc(struct task_struct *tsk)
+{
+	struct inactive_task_frame *frame =
+		(struct inactive_task_frame *) READ_ONCE(tsk->thread.sp);
+	return READ_ONCE_NOCHECK(frame->ret_addr);
+}
+
+/*
  * Called from fs/proc with a reference on @p to find the function
  * which called into schedule(). This needs to be done carefully
  * because the task might wake up and we might look at a stack

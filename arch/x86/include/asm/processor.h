@@ -715,8 +715,6 @@ static inline void spin_lock_prefetch(const void *x)
 	.io_bitmap_ptr		= NULL,					  \
 }
 
-extern unsigned long thread_saved_pc(struct task_struct *tsk);
-
 /*
  * TOP_OF_KERNEL_STACK_PADDING reserves 8 bytes on top of the ring0 stack.
  * This is necessary to guarantee that the entire "struct pt_regs"
@@ -766,16 +764,12 @@ extern unsigned long thread_saved_pc(struct task_struct *tsk);
 	.sp0 = TOP_OF_INIT_STACK \
 }
 
-/*
- * Return saved PC of a blocked thread.
- * What is this good for? it will be always the scheduler or ret_from_fork.
- */
-#define thread_saved_pc(t)	READ_ONCE_NOCHECK(*(unsigned long *)((t)->thread.sp - 8))
-
 #define task_pt_regs(tsk)	((struct pt_regs *)(tsk)->thread.sp0 - 1)
 extern unsigned long KSTK_ESP(struct task_struct *task);
 
 #endif /* CONFIG_X86_64 */
+
+extern unsigned long thread_saved_pc(struct task_struct *tsk);
 
 extern void start_thread(struct pt_regs *regs, unsigned long new_ip,
 					       unsigned long new_sp);
