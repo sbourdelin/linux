@@ -1067,8 +1067,12 @@ struct mem_section {
 	 * section. (see page_ext.h about this.)
 	 */
 	struct page_ext *page_ext;
-	unsigned long pad;
+	unsigned long pad[3];
 #endif
+
+	unsigned long first_pfn;
+	unsigned long last_pfn;
+
 	/*
 	 * WARNING: mem_section must be a power-of-2 in size for the
 	 * calculation and use of SECTION_ROOT_MASK to make sense.
@@ -1140,23 +1144,29 @@ static inline int valid_section_nr(unsigned long nr)
 
 static inline struct mem_section *__pfn_to_section(unsigned long pfn)
 {
+	if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
+		return NULL;
+
 	return __nr_to_section(pfn_to_section_nr(pfn));
 }
 
 #ifndef CONFIG_HAVE_ARCH_PFN_VALID
 static inline int pfn_valid(unsigned long pfn)
 {
-	if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
+	struct mem_section *ms;
+
+	ms = __pfn_to_section(pfn);
+
+	if (ms && !(ms->first_pfn <= pfn && ms->last_pfn >= pfn))
 		return 0;
-	return valid_section(__nr_to_section(pfn_to_section_nr(pfn)));
+
+	return valid_section(ms);
 }
 #endif
 
 static inline int pfn_present(unsigned long pfn)
 {
-	if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
-		return 0;
-	return present_section(__nr_to_section(pfn_to_section_nr(pfn)));
+	return present_section(__pfn_to_section(pfn));
 }
 
 /*
