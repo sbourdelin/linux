@@ -1141,6 +1141,12 @@ config CGROUP_PERF
 
 	  Say N if unsure.
 
+config CGROUP_CAPABILITY
+	bool "Capability controller"
+	help
+	  Provides a simple controller for enforcement of and monitoring of
+	  capabilities in the cgroup.
+
 config CGROUP_DEBUG
 	bool "Example controller"
 	default n
