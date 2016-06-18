@@ -724,7 +724,6 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 
 	/* Time to isolate some pages for migration */
 	for (; low_pfn < end_pfn; low_pfn++) {
-		bool is_lru;
 
 		if (skip_on_failure && low_pfn >= next_skip_pfn) {
 			/*
@@ -807,8 +806,7 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 		 * It's possible to migrate LRU and non-lru movable pages.
 		 * Skip any other type of page
 		 */
-		is_lru = PageLRU(page);
-		if (!is_lru) {
+		if (!PageLRU(page)) {
 			/*
 			 * __PageMovable can return false positive so we need
 			 * to verify it under page_lock.
