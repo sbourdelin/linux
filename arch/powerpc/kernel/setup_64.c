@@ -466,7 +466,6 @@ static void __init initialize_cache_info(void)
  */
 void __init setup_system(void)
 {
-	DBG(" -> setup_system()\n");
 
 	/* Apply the CPUs-specific and firmware specific fixups to kernel
 	 * text (nop out sections not relevant to this CPU or this firmware)
@@ -576,7 +575,6 @@ void __init setup_system(void)
 		       (unsigned long long)PHYSICAL_START);
 	pr_info("-----------------------------------------------------\n");
 
-	DBG(" <- setup_system()\n");
 }
 
 /* This returns the limit below which memory accesses to the linear
