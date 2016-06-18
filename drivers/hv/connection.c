@@ -147,7 +147,8 @@ int vmbus_connect(void)
 
 	/* Initialize the vmbus connection */
 	vmbus_connection.conn_state = CONNECTING;
-	vmbus_connection.work_queue = create_workqueue("hv_vmbus_con");
+	vmbus_connection.work_queue = alloc_workqueue("hv_vmbus_con",
+						      WQ_MEM_RECLAIM, 0);
 	if (!vmbus_connection.work_queue) {
 		ret = -ENOMEM;
 		goto cleanup;
