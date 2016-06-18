@@ -52,8 +52,8 @@ static ssize_t read_file_node_aggr(struct file *file, char __user *user_buf,
 			 "TID", "SEQ_START", "SEQ_NEXT", "BAW_SIZE",
 			 "BAW_HEAD", "BAW_TAIL", "BAR_IDX", "SCHED", "PAUSED");
 
-	for (tidno = 0, tid = &an->tid[tidno];
-	     tidno < IEEE80211_NUM_TIDS; tidno++, tid++) {
+	for (tidno = 0; tidno < IEEE80211_NUM_TIDS; tidno++) {
+		tid = ATH_STA_2_TID(an->sta, tidno);
 		txq = tid->txq;
 		ath_txq_lock(sc, txq);
 		if (tid->active) {
