@@ -20,6 +20,7 @@
 #include <linux/rculist.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/pm_runtime.h>
 #include "tpm.h"
 
 #define ACPI_SIG_TPM2 "TPM2"
@@ -41,7 +42,6 @@ enum crb_ca_request {
 
 enum crb_ca_status {
 	CRB_CA_STS_ERROR	= BIT(0),
-	CRB_CA_STS_TPM_IDLE	= BIT(1),
 };
 
 enum crb_start {
@@ -83,7 +83,50 @@ struct crb_priv {
 	u8 __iomem *rsp;
 };
 
-static SIMPLE_DEV_PM_OPS(crb_pm, tpm_pm_suspend, tpm_pm_resume);
+/* CONFIG_PM */
+static int __maybe_unused crb_runtime_suspend(struct device *dev)
+{
+	struct tpm_chip *chip = dev_get_drvdata(dev);
+	struct crb_priv *priv = dev_get_drvdata(&chip->dev);
+	u32 req;
+
+	if (priv->flags & CRB_FL_ACPI_START)
+		return 0;
+
+	req = ioread32(&priv->cca->req);
+	iowrite32(cpu_to_le32(req | CRB_CA_REQ_GO_IDLE), &priv->cca->req);
+	msleep(chip->timeout_c);
+
+	if (ioread32(&priv->cca->req) & CRB_CA_REQ_GO_IDLE)
+		return -ETIME;
+
+	return 0;
+}
+
+/* CONFIG_PM */
+static int __maybe_unused crb_runtime_resume(struct device *dev)
+{
+	struct tpm_chip *chip = dev_get_drvdata(dev);
+	struct crb_priv *priv = dev_get_drvdata(&chip->dev);
+	u32 req;
+
+	if (priv->flags & CRB_FL_ACPI_START)
+		return 0;
+
+	req = ioread32(&priv->cca->req);
+	iowrite32(cpu_to_le32(req | CRB_CA_REQ_CMD_READY), &priv->cca->req);
+	msleep(chip->timeout_c);
+
+	if (ioread32(&priv->cca->req) & CRB_CA_REQ_CMD_READY)
+		return -ETIME;
+
+	return 0;
+}
+
+static const struct dev_pm_ops crb_pm = {
+	SET_RUNTIME_PM_OPS(crb_runtime_suspend, crb_runtime_resume, NULL)
+	SET_SYSTEM_SLEEP_PM_OPS(tpm_pm_suspend, tpm_pm_resume)
+};
 
 static u8 crb_status(struct tpm_chip *chip)
 {
@@ -206,6 +249,8 @@ static int crb_init(struct acpi_device *device, struct crb_priv *priv)
 	if (IS_ERR(chip))
 		return PTR_ERR(chip);
 
+	pm_runtime_set_active(&device->dev);
+	pm_runtime_enable(&device->dev);
 	dev_set_drvdata(&chip->dev, priv);
 	chip->acpi_dev_handle = device->handle;
 	chip->flags = TPM_CHIP_FLAG_TPM2;
@@ -366,6 +411,7 @@ static int crb_acpi_remove(struct acpi_device *device)
 
 	tpm_chip_unregister(chip);
 
+	pm_runtime_disable(dev);
 	return 0;
 }
 
