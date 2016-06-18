@@ -757,12 +757,9 @@ int octeon_setup_instr_queues(struct octeon_device *oct)
 
 	for (i = 0; i < num_iqs; i++) {
 		oct->instr_queue[i] =
-			vmalloc(sizeof(struct octeon_instr_queue));
+			vzalloc(sizeof(struct octeon_instr_queue));
 		if (!oct->instr_queue[i])
 			return 1;
-
-		memset(oct->instr_queue[i], 0,
-		       sizeof(struct octeon_instr_queue));
 
 		oct->instr_queue[i]->app_ctx = (void *)(size_t)i;
 		if (octeon_init_instr_queue(oct, i, num_descs))
@@ -793,11 +790,9 @@ int octeon_setup_output_queues(struct octeon_device *oct)
 	oct->num_oqs = 0;
 
 	for (i = 0; i < num_oqs; i++) {
-		oct->droq[i] = vmalloc(sizeof(*oct->droq[i]));
+		oct->droq[i] = vzalloc(sizeof(*oct->droq[i]));
 		if (!oct->droq[i])
 			return 1;
-
-		memset(oct->droq[i], 0, sizeof(struct octeon_droq));
 
 		if (octeon_init_droq(oct, i, num_descs, desc_size, NULL))
 			return 1;
