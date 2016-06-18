@@ -139,6 +139,7 @@ int copy_thread_tls(unsigned long clone_flags, unsigned long sp,
 	int err;
 
 	frame->bp = 0;
+	frame->ret_addr = (unsigned long) ret_from_fork;
 	p->thread.sp = (unsigned long) fork_frame;
 	p->thread.sp0 = (unsigned long) (childregs+1);
 	memset(p->thread.ptrace_bps, 0, sizeof(p->thread.ptrace_bps));
@@ -146,19 +147,12 @@ int copy_thread_tls(unsigned long clone_flags, unsigned long sp,
 	if (unlikely(p->flags & PF_KTHREAD)) {
 		/* kernel thread */
 		memset(childregs, 0, sizeof(struct pt_regs));
-		frame->ret_addr = (unsigned long) ret_from_kernel_thread;
-		task_user_gs(p) = __KERNEL_STACK_CANARY;
-		childregs->ds = __USER_DS;
-		childregs->es = __USER_DS;
-		childregs->fs = __KERNEL_PERCPU;
-		childregs->bx = sp;	/* function */
-		childregs->bp = arg;
-		childregs->orig_ax = -1;
-		childregs->cs = __KERNEL_CS | get_kernel_rpl();
-		childregs->flags = X86_EFLAGS_IF | X86_EFLAGS_FIXED;
+		frame->bx = sp;		/* function */
+		frame->di = arg;
 		p->thread.io_bitmap_ptr = NULL;
 		return 0;
 	}
+	frame->bx = 0;
 	*childregs = *current_pt_regs();
 	childregs->ax = 0;
 	if (sp)
