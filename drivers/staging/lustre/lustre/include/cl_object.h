@@ -1203,8 +1203,8 @@ struct cl_lock_descr {
 
 #define DDESCR "%s(%d):[%lu, %lu]:%x"
 #define PDESCR(descr)						   \
-	cl_lock_mode_name((descr)->cld_mode), (descr)->cld_mode,	\
-	(descr)->cld_start, (descr)->cld_end, (descr)->cld_enq_flags
+	(cl_lock_mode_name((descr)->cld_mode), (descr)->cld_mode,	\
+	(descr)->cld_start, (descr)->cld_end, (descr)->cld_enq_flags)
 
 const char *cl_lock_mode_name(const enum cl_lock_mode mode);
 
