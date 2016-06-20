@@ -2012,10 +2012,10 @@ int repair_io_failure(struct inode *inode, u64 start, u64 length, u64 logical,
 	int ret;
 
 	ASSERT(!(fs_info->sb->s_flags & MS_RDONLY));
-	BUG_ON(!mirror_num);
+	WARN_ON(!mirror_num);
 
 	/* we can't repair anything in raid56 yet */
-	if (btrfs_is_parity_mirror(map_tree, logical, length, mirror_num))
+	if (!mirror_num || btrfs_is_parity_mirror(map_tree, logical, length, mirror_num))
 		return 0;
 
 	bio = btrfs_io_bio_alloc(GFP_NOFS, 1);
@@ -2291,7 +2291,10 @@ int btrfs_check_repairable(struct inode *inode, struct bio *failed_bio,
 		 * if the following BUG_ON triggers, our validation request got
 		 * merged. we need separate requests for our algorithm to work.
 		 */
-		BUG_ON(failrec->in_validation);
+		if (failrec->in_validation) {
+			printk(KERN_ERR "failrec->in_validation at %s:%d\n", __FUNCTION__, __LINE__);
+			return 0;
+		}
 		failrec->in_validation = 1;
 		failrec->this_mirror = failed_mirror;
 	} else {
@@ -2301,7 +2304,10 @@ int btrfs_check_repairable(struct inode *inode, struct bio *failed_bio,
 		 * everything for repair_io_failure to do the rest for us.
 		 */
 		if (failrec->in_validation) {
-			BUG_ON(failrec->this_mirror != failed_mirror);
+			if (failrec->this_mirror != failed_mirror) {
+				printk(KERN_ERR "failrec->this_mirror (%d) != failed_mirror (%d) at %s:%d\n", failrec->this_mirror, failed_mirror, __FUNCTION__, __LINE__);
+				return 0;
+			}
 			failrec->in_validation = 0;
 			failrec->this_mirror = 0;
 		}
