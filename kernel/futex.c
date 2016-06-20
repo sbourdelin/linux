@@ -3203,7 +3203,7 @@ SYSCALL_DEFINE6(futex, u32 __user *, uaddr, int, op, u32, val,
 			return -EINVAL;
 
 		t = timespec_to_ktime(ts);
-		if (cmd == FUTEX_WAIT)
+		if (cmd == FUTEX_WAIT && !(op & FUTEX_CLOCK_REALTIME))
 			t = ktime_add_safe(ktime_get(), t);
 		tp = &t;
 	}
