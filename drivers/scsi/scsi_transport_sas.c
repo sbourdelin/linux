@@ -412,7 +412,8 @@ sas_tlr_supported(struct scsi_device *sdev)
 	char *buffer = kzalloc(vpd_len, GFP_KERNEL);
 	int ret = 0;
 
-	if (scsi_get_vpd_page(sdev, 0x90, buffer, vpd_len))
+	if (!scsi_device_supports_vpd(sdev) ||
+	    scsi_get_vpd_page(sdev, 0x90, buffer, vpd_len))
 		goto out;
 
 	/*

@@ -727,14 +727,13 @@ static int scsi_vpd_inquiry(struct scsi_device *sdev, unsigned char *buffer,
  * to a buffer containing the data from that page.  The caller is
  * responsible for calling kfree() on this pointer when it is no longer
  * needed.  If we cannot retrieve the VPD page this routine returns %NULL.
+ * The caller is responsible for checking if the device supports VPD
+ * pages prior to calling this function.
  */
 int scsi_get_vpd_page(struct scsi_device *sdev, u8 page, unsigned char *buf,
 		      int buf_len)
 {
 	int i, result;
-
-	if (sdev->skip_vpd_pages)
-		goto fail;
 
 	/* Ask for all the pages supported by this device */
 	result = scsi_vpd_inquiry(sdev, buf, 0, buf_len);
