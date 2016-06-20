@@ -661,8 +661,7 @@ static void netdev_setup(struct net_device *dev)
 {
 	dev->hard_header_len	= 0;
 	dev->needed_tailroom	= 0;
-	dev->flags		= IFF_RUNNING | IFF_POINTOPOINT |
-				  IFF_MULTICAST;
+	dev->flags		= IFF_RUNNING | IFF_MULTICAST;
 	dev->watchdog_timeo	= 0;
 
 	dev->netdev_ops		= &netdev_ops;
