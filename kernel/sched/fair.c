@@ -902,7 +902,15 @@ update_stats_curr_start(struct cfs_rq *cfs_rq, struct sched_entity *se)
 
 static bool dont_balance(struct task_struct *p)
 {
-	return sched_feat(REBALANCE_AFFINITY) && p->se.dont_balance;
+	bool dont_balance = false;
+
+	if (sched_feat(REBALANCE_AFFINITY) && p->se.dont_balance) {
+		dont_balance = true;
+		schedstat_inc(task_rq(p), nr_dont_balance);
+		schedstat_inc(p, se.statistics.nr_dont_balance);
+	}
+
+	return dont_balance;
 }
 
 /**************************************************
@@ -7903,6 +7911,7 @@ static void rebalance_affinity(struct rq *rq)
 		if (cpu >= nr_cpu_ids)
 			continue;
 
+		schedstat_inc(rq, nr_affinity_out);
 		__detach_task(p, rq, cpu);
 		raw_spin_unlock(&rq->lock);
 
@@ -7911,6 +7920,10 @@ static void rebalance_affinity(struct rq *rq)
 		raw_spin_lock(&dst_rq->lock);
 		attach_task(dst_rq, p);
 		p->se.dont_balance = true;
+
+		schedstat_inc(p, se.statistics.nr_balanced_affinity);
+		schedstat_inc(dst_rq, nr_affinity_in);
+
 		raw_spin_unlock(&dst_rq->lock);
 
 		local_irq_restore(flags);

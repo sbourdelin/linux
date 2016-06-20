@@ -635,6 +635,9 @@ do {									\
 		P(sched_goidle);
 		P(ttwu_count);
 		P(ttwu_local);
+		P(nr_dont_balance);
+		P(nr_affinity_out);
+		P(nr_affinity_in);
 	}
 
 #undef P
@@ -912,6 +915,7 @@ void proc_sched_show_task(struct task_struct *p, struct seq_file *m)
 		P(se.statistics.nr_wakeups_affine_attempts);
 		P(se.statistics.nr_wakeups_passive);
 		P(se.statistics.nr_wakeups_idle);
+		P(se.statistics.nr_dont_balance);
 
 		avg_atom = p->se.sum_exec_runtime;
 		if (nr_switches)

@@ -701,6 +701,11 @@ struct rq {
 	/* try_to_wake_up() stats */
 	unsigned int ttwu_count;
 	unsigned int ttwu_local;
+
+	/* rebalance_affinity() stats */
+	unsigned int nr_dont_balance;
+	unsigned int nr_affinity_out;
+	unsigned int nr_affinity_in;
 #endif
 
 #ifdef CONFIG_SMP
