@@ -435,7 +435,7 @@ static int orangefs_rename(struct inode *old_dir,
 		     ret);
 
 	if (new_dentry->d_inode)
-		new_dentry->d_inode->i_ctime = CURRENT_TIME;
+		new_dentry->d_inode->i_ctime = current_time(new_dentry->d_inode);
 
 	op_release(new_op);
 	return ret;

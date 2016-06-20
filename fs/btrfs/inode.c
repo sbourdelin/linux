@@ -9464,7 +9464,7 @@ static int btrfs_rename_exchange(struct inode *old_dir,
 	struct btrfs_root *dest = BTRFS_I(new_dir)->root;
 	struct inode *new_inode = new_dentry->d_inode;
 	struct inode *old_inode = old_dentry->d_inode;
-	struct timespec ctime = CURRENT_TIME;
+	struct timespec ctime = current_time(old_inode);
 	struct dentry *parent;
 	u64 old_ino = btrfs_ino(old_inode);
 	u64 new_ino = btrfs_ino(new_inode);
