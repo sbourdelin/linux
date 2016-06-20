@@ -77,14 +77,13 @@ acpi_os_create_cache(char *cache_name,
 
 	/* Create the cache object */
 
-	cache = acpi_os_allocate(sizeof(struct acpi_memory_list));
+	cache = acpi_os_allocate_zeroed(sizeof(struct acpi_memory_list));
 	if (!cache) {
 		return (AE_NO_MEMORY);
 	}
 
 	/* Populate the cache object and return it */
 
-	memset(cache, 0, sizeof(struct acpi_memory_list));
 	cache->list_name = cache_name;
 	cache->object_size = object_size;
 	cache->max_depth = max_depth;
