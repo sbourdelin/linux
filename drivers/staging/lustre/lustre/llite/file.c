@@ -476,10 +476,9 @@ void ll_ioepoch_open(struct ll_inode_info *lli, __u64 ioepoch)
 static int ll_och_fill(struct obd_export *md_exp, struct lookup_intent *it,
 		       struct obd_client_handle *och)
 {
-	struct ptlrpc_request *req = it->it_data;
 	struct mdt_body *body;
 
-	body = req_capsule_server_get(&req->rq_pill, &RMF_MDT_BODY);
+	body = req_capsule_server_get(&it->it_request->rq_pill, &RMF_MDT_BODY);
 	och->och_fh = body->handle;
 	och->och_fid = body->fid1;
 	och->och_lease_handle.cookie = it->it_lock_handle;
@@ -500,7 +499,6 @@ static int ll_local_open(struct file *file, struct lookup_intent *it,
 	LASSERT(fd);
 
 	if (och) {
-		struct ptlrpc_request *req = it->it_data;
 		struct mdt_body *body;
 		int rc;
 
@@ -508,7 +506,8 @@ static int ll_local_open(struct file *file, struct lookup_intent *it,
 		if (rc != 0)
 			return rc;
 
-		body = req_capsule_server_get(&req->rq_pill, &RMF_MDT_BODY);
+		body = req_capsule_server_get(&it->it_request->rq_pill,
+					      &RMF_MDT_BODY);
 		ll_ioepoch_open(lli, body->ioepoch);
 	}
 
@@ -725,7 +724,7 @@ out_openerr:
 	}
 
 	if (it && it_disposition(it, DISP_ENQ_OPEN_REF)) {
-		ptlrpc_req_finished(it->it_data);
+		ptlrpc_req_finished(it->it_request);
 		it_clear_disposition(it, DISP_ENQ_OPEN_REF);
 	}
 
@@ -1413,7 +1412,7 @@ out_unlock:
 out:
 	return rc;
 out_req_free:
-	ptlrpc_req_finished((struct ptlrpc_request *)oit.it_data);
+	ptlrpc_req_finished((struct ptlrpc_request *)oit.it_request);
 	goto out;
 }
 
@@ -1701,7 +1700,7 @@ int ll_release_openhandle(struct inode *inode, struct lookup_intent *it)
 out:
 	/* this one is in place of ll_file_open */
 	if (it_disposition(it, DISP_ENQ_OPEN_REF)) {
-		ptlrpc_req_finished(it->it_data);
+		ptlrpc_req_finished(it->it_request);
 		it_clear_disposition(it, DISP_ENQ_OPEN_REF);
 	}
 	return rc;
@@ -3610,8 +3609,8 @@ again:
 
 	rc = md_enqueue(sbi->ll_md_exp, &einfo, &it, op_data, &lockh,
 			NULL, 0, NULL, 0);
-	ptlrpc_req_finished(it.it_data);
-	it.it_data = NULL;
+	ptlrpc_req_finished(it.it_request);
+	it.it_request = NULL;
 
 	ll_finish_md_op_data(op_data);
 
