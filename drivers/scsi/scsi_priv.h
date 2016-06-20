@@ -31,7 +31,7 @@ extern void scsi_exit_hosts(void);
 /* scsi.c */
 extern int scsi_setup_command_freelist(struct Scsi_Host *shost);
 extern void scsi_destroy_command_freelist(struct Scsi_Host *shost);
-void scsi_attach_vpd(struct scsi_device *sdev);
+void scsi_attach_vpd(struct scsi_device *sdev, bool first_scan);
 #ifdef CONFIG_SCSI_LOGGING
 void scsi_log_send(struct scsi_cmnd *cmd);
 void scsi_log_completion(struct scsi_cmnd *cmd, int disposition);

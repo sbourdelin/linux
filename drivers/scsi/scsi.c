@@ -770,13 +770,14 @@ EXPORT_SYMBOL_GPL(scsi_get_vpd_page);
 /**
  * scsi_attach_vpd - Attach Vital Product Data to a SCSI device structure
  * @sdev: The device to ask
+ * @first_scan: true if called during initial scan
  *
  * Attach the 'Device Identification' VPD page (0x83) and the
  * 'Unit Serial Number' VPD page (0x80) to a SCSI device
  * structure. This information can be used to identify the device
  * uniquely.
  */
-void scsi_attach_vpd(struct scsi_device *sdev)
+void scsi_attach_vpd(struct scsi_device *sdev, bool first_scan)
 {
 	int result, i;
 	int vpd_len = SCSI_VPD_PG_LEN;
@@ -796,6 +797,8 @@ retry_pg0:
 	result = scsi_vpd_inquiry(sdev, vpd_buf, 0, vpd_len);
 	if (result < 0) {
 		kfree(vpd_buf);
+		if (first_scan)
+			sdev->skip_vpd_pages = 1;
 		return;
 	}
 	if (result > vpd_len) {
@@ -822,6 +825,8 @@ retry_pg80:
 		result = scsi_vpd_inquiry(sdev, vpd_buf, 0x80, vpd_len);
 		if (result < 0) {
 			kfree(vpd_buf);
+			if (first_scan)
+				sdev->skip_vpd_pages = 1;
 			return;
 		}
 		if (result > vpd_len) {
@@ -851,6 +856,8 @@ retry_pg83:
 		result = scsi_vpd_inquiry(sdev, vpd_buf, 0x83, vpd_len);
 		if (result < 0) {
 			kfree(vpd_buf);
+			if (first_scan)
+				sdev->skip_vpd_pages = 1;
 			return;
 		}
 		if (result > vpd_len) {
