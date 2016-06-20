@@ -496,7 +496,8 @@ int omap3isp_stat_request_statistics(struct ispstat *stat,
 		return PTR_ERR(buf);
 	}
 
-	data->ts = buf->ts;
+	data->ts.tv_sec = buf->ts.tv_sec;
+	data->ts.tv_usec = buf->ts.tv_usec;
 	data->config_counter = buf->config_counter;
 	data->frame_number = buf->frame_number;
 	data->buf_size = buf->buf_size;
@@ -506,6 +507,21 @@ int omap3isp_stat_request_statistics(struct ispstat *stat,
 	mutex_unlock(&stat->ioctl_lock);
 
 	return 0;
+}
+
+int omap3isp_stat_request_statistics_time32(struct ispstat *stat,
+					struct omap3isp_stat_data_time32 *data)
+{
+	struct omap3isp_stat_data data64;
+	int ret;
+
+	ret = omap3isp_stat_request_statistics(stat, &data64);
+
+	data->ts.tv_sec = data64.ts.tv_sec;
+	data->ts.tv_usec = data64.ts.tv_usec;
+	memcpy(&data->buf, &data64.buf, sizeof(*data) - sizeof(data->ts));
+
+	return ret;
 }
 
 /*

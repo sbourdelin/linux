@@ -130,6 +130,8 @@ struct ispstat_generic_config {
 int omap3isp_stat_config(struct ispstat *stat, void *new_conf);
 int omap3isp_stat_request_statistics(struct ispstat *stat,
 				     struct omap3isp_stat_data *data);
+int omap3isp_stat_request_statistics_time32(struct ispstat *stat,
+				     struct omap3isp_stat_data_time32 *data);
 int omap3isp_stat_init(struct ispstat *stat, const char *name,
 		       const struct v4l2_subdev_ops *sd_ops);
 void omap3isp_stat_cleanup(struct ispstat *stat);
