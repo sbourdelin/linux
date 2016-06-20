@@ -264,7 +264,6 @@ scmd->allowed.
  3. scmd recovered
     ACTION: scsi_eh_finish_cmd() is invoked to EH-finish scmd
 	- shost->host_failed--
-	- clear scmd->eh_eflags
 	- scsi_setup_cmd_retry()
 	- move from local eh_work_q to local eh_done_q
     LOCKING: none
@@ -451,8 +450,6 @@ except for #1 must be implemented by eh_strategy_handler().
  The following conditions must be true on exit from the handler.
 
  - shost->host_failed is zero.
-
- - Each scmd's eh_eflags field is cleared.
 
  - Each scmd is in such a state that scsi_setup_cmd_retry() on the
    scmd doesn't make any difference.
