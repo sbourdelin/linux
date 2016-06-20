@@ -388,6 +388,7 @@ static void dw_mci_stop_dma(struct dw_mci *host)
 	if (host->using_dma) {
 		host->dma_ops->stop(host);
 		host->dma_ops->cleanup(host);
+		host->using_dma = 0;
 	}
 
 	/* Data transfer was stopped by the interrupt handler */
@@ -455,6 +456,7 @@ static void dw_mci_dmac_complete_dma(void *arg)
 				    DMA_FROM_DEVICE);
 
 	host->dma_ops->cleanup(host);
+	host->using_dma = 0;
 
 	/*
 	 * If the card was removed, data will be NULL. No point in trying to
@@ -942,8 +944,6 @@ static int dw_mci_submit_data_dma(struct dw_mci *host, struct mmc_data *data)
 	unsigned long irqflags;
 	int sg_len;
 	u32 temp;
-
-	host->using_dma = 0;
 
 	/* If we don't have a channel, we can't do DMA */
 	if (!host->use_dma)
