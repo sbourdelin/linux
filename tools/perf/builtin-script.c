@@ -415,11 +415,16 @@ static void print_sample_iregs(struct perf_sample *sample,
 	struct regs_dump *regs = &sample->intr_regs;
 	uint64_t mask = attr->sample_regs_intr;
 	unsigned i = 0, r;
+	unsigned long _mask[sizeof(mask)/sizeof(unsigned long)];
 
 	if (!regs)
 		return;
 
-	for_each_set_bit(r, (unsigned long *) &mask, sizeof(mask) * 8) {
+	_mask[0] = mask & ULONG_MAX;
+	if (sizeof(mask) > sizeof(unsigned long))
+		_mask[1] = mask >> 32;
+
+	for_each_set_bit(r, _mask, sizeof(mask) * 8) {
 		u64 val = regs->regs[i++];
 		printf("%5s:0x%"PRIx64" ", perf_reg_name(r), val);
 	}
