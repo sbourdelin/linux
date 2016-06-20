@@ -130,27 +130,24 @@ int test__backward_ring_buffer(int subtest __maybe_unused)
 	}
 
 	bzero(&parse_error, sizeof(parse_error));
-	err = parse_events(evlist, "syscalls:sys_enter_prctl", &parse_error);
+	/*
+	 * Set backward bit, ring buffer should be writing from end. Record
+	 * it in aux evlist
+	 */
+	err = parse_events(evlist, "syscalls:sys_enter_prctl/overwrite/", &parse_error);
 	if (err) {
 		pr_debug("Failed to parse tracepoint event, try use root\n");
 		ret = TEST_SKIP;
 		goto out_delete_evlist;
 	}
 
-	/*
-	 * Set backward bit, ring buffer should be writing from end. Record
-	 * it in aux evlist
-	 */
-	perf_evlist__last(evlist)->overwrite = true;
-	perf_evlist__last(evlist)->attr.write_backward = 1;
-
+	/* Don't set backward bit for exit event. Record it in main evlist */
 	err = parse_events(evlist, "syscalls:sys_exit_prctl", &parse_error);
 	if (err) {
 		pr_debug("Failed to parse tracepoint event, try use root\n");
 		ret = TEST_SKIP;
 		goto out_delete_evlist;
 	}
-	/* Don't set backward bit for exit event. Record it in main evlist */
 
 	perf_evlist__config(evlist, &opts, NULL);
 
