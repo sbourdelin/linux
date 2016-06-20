@@ -305,8 +305,10 @@ static void macb_handle_link_change(struct net_device *dev)
 {
 	struct macb *bp = netdev_priv(dev);
 	struct phy_device *phydev = bp->phy_dev;
+	struct phy_device *gmii2rgmii_phydev = bp->gmii2rgmii_phy_dev;
 	unsigned long flags;
 	int status_change = 0;
+	u16 gmii2rgmii_reg = 0;
 
 	spin_lock_irqsave(&bp->lock, flags);
 
@@ -320,15 +322,26 @@ static void macb_handle_link_change(struct net_device *dev)
 			if (macb_is_gem(bp))
 				reg &= ~GEM_BIT(GBE);
 
-			if (phydev->duplex)
+			if (phydev->duplex) {
 				reg |= MACB_BIT(FD);
-			if (phydev->speed == SPEED_100)
+				gmii2rgmii_reg |= MACB_GMII2RGMII_FULLDPLX;
+			}
+			if (phydev->speed == SPEED_100) {
 				reg |= MACB_BIT(SPD);
+				gmii2rgmii_reg |= MACB_GMII2RGMII_SPEED100;
+			}
 			if (phydev->speed == SPEED_1000 &&
-			    bp->caps & MACB_CAPS_GIGABIT_MODE_AVAILABLE)
+			    bp->caps & MACB_CAPS_GIGABIT_MODE_AVAILABLE) {
 				reg |= GEM_BIT(GBE);
+				gmii2rgmii_reg |= MACB_GMII2RGMII_SPEED1000;
+			}
 
 			macb_or_gem_writel(bp, NCFGR, reg);
+			if (!gmii2rgmii_phydev) {
+				phy_write(gmii2rgmii_phydev,
+					  MACB_GMII2RGMII_REG_NUM,
+					  gmii2rgmii_reg);
+			}
 
 			bp->speed = phydev->speed;
 			bp->duplex = phydev->duplex;
@@ -375,6 +388,20 @@ static int macb_mii_probe(struct net_device *dev)
 	struct phy_device *phydev;
 	int phy_irq;
 	int ret;
+
+	if (bp->gmii2rgmii_phy_node) {
+		phydev = of_phy_attach(bp->dev,
+				       bp->gmii2rgmii_phy_node,
+				       0, 0);
+		if (!phydev) {
+			dev_err(&bp->pdev->dev, "%s: no gmii_to_rgmii found\n",
+				dev->name);
+			return -1;
+		}
+		bp->gmii2rgmii_phy_dev = phydev;
+	} else {
+		bp->gmii2rgmii_phy_dev = NULL;
+	}
 
 	phydev = phy_find_first(bp->mii_bus);
 	if (!phydev) {
@@ -3001,6 +3028,8 @@ static int macb_probe(struct platform_device *pdev)
 		bp->phy_interface = err;
 	}
 
+	bp->gmii2rgmii_phy_node = of_parse_phandle(bp->pdev->dev.of_node,
+						   "gmii2rgmii-phy-handle", 0);
 	/* IP specific init */
 	err = init(pdev);
 	if (err)
@@ -3059,6 +3088,8 @@ static int macb_remove(struct platform_device *pdev)
 		bp = netdev_priv(dev);
 		if (bp->phy_dev)
 			phy_disconnect(bp->phy_dev);
+		if (bp->gmii2rgmii_phy_dev)
+			phy_disconnect(bp->gmii2rgmii_phy_dev);
 		mdiobus_unregister(bp->mii_bus);
 		mdiobus_free(bp->mii_bus);
 

@@ -559,6 +559,11 @@ struct macb_dma_desc {
 /* limit RX checksum offload to TCP and UDP packets */
 #define GEM_RX_CSUM_CHECKED_MASK		2
 
+#define MACB_GMII2RGMII_FULLDPLX		BMCR_FULLDPLX
+#define MACB_GMII2RGMII_SPEED1000		BMCR_SPEED1000
+#define MACB_GMII2RGMII_SPEED100		BMCR_SPEED100
+#define MACB_GMII2RGMII_REG_NUM			0x10
+
 /* struct macb_tx_skb - data about an skb which is being transmitted
  * @skb: skb currently being transmitted, only set for the last buffer
  *       of the frame
@@ -846,6 +851,8 @@ struct macb {
 	unsigned int		jumbo_max_len;
 
 	u32			wol;
+	struct device_node *gmii2rgmii_phy_node;
+	struct phy_device *gmii2rgmii_phy_dev;
 };
 
 static inline bool macb_is_gem(struct macb *bp)
