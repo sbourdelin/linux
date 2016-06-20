@@ -360,6 +360,12 @@ particular perf.data snapshot should be kept or not.
 
 Implies --timestamp-filename, --no-buildid and --no-buildid-cache.
 
+--tail-synthesize::
+Instead of collecting non-sample events (for example, fork, comm, mmap) at
+the beginning of record, collect them during finalizing an output file.
+The collected non-sample events reflects the status of the system when
+record is finished.
+
 --overwrite::
 Makes all events use overwritable ring buffer. Event with overwritable ring
 buffer works like a flight recorder: when buffer gets full, instead of dumping
@@ -373,6 +379,8 @@ something unusual is detected.
 
 'overwrite' attribute can also be set or canceled for specific event using
 config terms like 'cycles/overwrite/' and 'instructions/no-overwrite/'.
+
+Implies --tail-synthesize.
 
 SEE ALSO
 --------
