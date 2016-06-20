@@ -1331,6 +1331,8 @@ struct sched_entity {
 
 	u64			nr_migrations;
 
+	bool			dont_balance;
+
 #ifdef CONFIG_SCHEDSTATS
 	struct sched_statistics statistics;
 #endif

@@ -900,6 +900,11 @@ update_stats_curr_start(struct cfs_rq *cfs_rq, struct sched_entity *se)
 	se->exec_start = rq_clock_task(rq_of(cfs_rq));
 }
 
+static bool dont_balance(struct task_struct *p)
+{
+	return sched_feat(REBALANCE_AFFINITY) && p->se.dont_balance;
+}
+
 /**************************************************
  * Scheduling class queueing methods:
  */
@@ -2172,6 +2177,10 @@ void task_numa_fault(int last_cpupid, int mem_node, int pages, int flags)
 	if (!static_branch_likely(&sched_numa_balancing))
 		return;
 
+	/* Don't move task if the affinity balance is active. */
+	if (dont_balance(p))
+		return;
+
 	/* for example, ksmd faulting in a user's mm */
 	if (!p->mm)
 		return;
@@ -3387,6 +3396,8 @@ dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 
 	update_min_vruntime(cfs_rq);
 	update_cfs_shares(cfs_rq);
+
+	se->dont_balance = false;
 }
 
 /*
@@ -6017,11 +6028,15 @@ int can_migrate_task(struct task_struct *p, struct lb_env *env)
 	/*
 	 * We do not migrate tasks that are:
 	 * 1) throttled_lb_pair, or
-	 * 2) cannot be migrated to this CPU due to cpus_allowed, or
-	 * 3) running (obviously), or
-	 * 4) are cache-hot on their current CPU.
+	 * 2) dont_balance is set, or
+	 * 3) cannot be migrated to this CPU due to cpus_allowed, or
+	 * 4) running (obviously), or
+	 * 5) are cache-hot on their current CPU.
 	 */
 	if (throttled_lb_pair(task_group(p), env->src_cpu, env->dst_cpu))
+		return 0;
+
+	if (dont_balance(p))
 		return 0;
 
 	if (!cpumask_test_cpu(env->dst_cpu, tsk_cpus_allowed(p))) {
