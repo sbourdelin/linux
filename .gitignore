@@ -112,3 +112,6 @@ all.config
 
 # Kdevelop4
 *.kdev4
+
+# Generated for CONFIG_GDB_SCRIPTS
+/scripts/gdb/linux/constants.py
