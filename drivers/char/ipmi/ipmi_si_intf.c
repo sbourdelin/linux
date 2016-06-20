@@ -3841,6 +3841,11 @@ static int init_ipmi_si(void)
 		spmi_find_bmc();
 #endif
 
+#ifdef CONFIG_ARM64
+	/* Don't touch port io space */
+	si_trydefaults = 0;
+#endif
+
 #ifdef CONFIG_PARISC
 	register_parisc_driver(&ipmi_parisc_driver);
 	parisc_registered = true;
