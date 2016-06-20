@@ -4293,6 +4293,103 @@ static bool nand_ecc_strength_good(struct mtd_info *mtd)
 	return corr >= ds_corr && ecc->strength >= chip->ecc_strength_ds;
 }
 
+static void nand_pairing_dist3_get_info(struct mtd_info *mtd, int page,
+					struct mtd_pairing_info *info)
+{
+	bool lastpage = ((page + 1) * mtd->writesize) == mtd->erasesize;
+
+	/*
+	 * The first and last pages are special cases.
+	 * To simplify the code and keep the same distance for everyone, we
+	 * increment all pages by 1 except the first one (page 0). The last
+	 * page receives an extra +1 for the same reason.
+	 */
+	page += (page != 0) + lastpage;
+
+	/*
+	 * The datasheets state that odd pages should be part of group
+	 * 0 and even ones part of group 1 (except for the last and
+	 * first pages), but we incremented the page number, that's why we're
+	 * doing the reverse test here.
+	 */
+	info->group = page & 1;
+
+	/*
+	 * We're trying to extract the pair id, which is always equal to
+	 * first_page_of_a_pair / 2. Subtract the distance to the page if it's
+	 * not part of group 0.
+	 */
+	if (page & 1)
+		page -= 3;
+
+	info->pair = page >> 1;
+}
+
+static int __pure nand_pairing_dist3_get_wunit(struct mtd_info *mtd,
+					const struct mtd_pairing_info *info)
+{
+	int page = (info->pair * 2) + (3 * info->group);
+	bool lastpage = ((page * mtd->writesize) > mtd->erasesize);
+
+	/*
+	 * The first and last pages are special cases.
+	 * To simplify the code and keep the same distance for everyone, we
+	 * incremented all pages by 1 except the first one (page 0). The last
+	 * page received an extra +1 for the same reason. Now we need to
+	 * revert that to get the real page number.
+	 */
+	page -= (page != 0) + lastpage;
+
+	return page;
+}
+
+const struct mtd_pairing_scheme dist3_pairing_scheme = {
+	.ngroups = 2,
+	.get_info = nand_pairing_dist3_get_info,
+	.get_wunit = nand_pairing_dist3_get_wunit,
+};
+EXPORT_SYMBOL_GPL(dist3_pairing_scheme);
+
+/*
+ * Distance-6 pairing works like distance-3 pairing, except that pages
+ * are taken two at a time.  The lsbit of the page number is chopped off
+ * and later re-added as the lsbit of the pair number.
+ */
+static void nand_pairing_dist6_get_info(struct mtd_info *mtd, int page,
+					struct mtd_pairing_info *info)
+{
+	bool last2pages, lsbit = page & 1;
+
+	page >>= 1;
+	last2pages = ((page + 1) * 2 * mtd->writesize) == mtd->erasesize;
+
+	page += (page != 0) + last2pages;
+
+	info->group = page & 1;
+	if (page & 1)
+		page -= 3;
+
+	info->pair = page | lsbit;
+}
+
+static int __pure nand_pairing_dist6_get_wunit(struct mtd_info *mtd,
+					const struct mtd_pairing_info *info)
+{
+	int page = (info->pair & ~1) + (3 * info->group);
+	bool last2pages = (page * 2 * mtd->writesize) > mtd->erasesize;
+
+	page -= (page != 0) + last2pages;
+
+	return 2 * page + (info->pair & 1);
+}
+
+const struct mtd_pairing_scheme dist6_pairing_scheme = {
+	.ngroups = 2,
+	.get_info = nand_pairing_dist6_get_info,
+	.get_wunit = nand_pairing_dist6_get_wunit,
+};
+EXPORT_SYMBOL_GPL(dist6_pairing_scheme);
+
 /**
  * nand_scan_tail - [NAND Interface] Scan for the NAND device
  * @mtd: MTD device structure
