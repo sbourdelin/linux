@@ -1461,6 +1461,7 @@ struct super_block {
 };
 
 extern struct timespec current_fs_time(struct super_block *sb);
+extern struct timespec current_time(struct inode *inode);
 
 static inline struct timespec current_fs_time_sec(struct super_block *sb)
 {
