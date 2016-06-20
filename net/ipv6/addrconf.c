@@ -2055,6 +2055,10 @@ static int ipv6_generate_eui64(u8 *eui, struct net_device *dev)
 	case ARPHRD_IPGRE:
 		return addrconf_ifid_gre(eui, dev);
 	case ARPHRD_6LOWPAN:
+		/* 6LoWPAN over BTLE */
+		if (dev->addr_len == ETH_ALEN)
+			return addrconf_ifid_eui48(eui, dev);
+
 		return addrconf_ifid_eui64(eui, dev);
 	case ARPHRD_IEEE1394:
 		return addrconf_ifid_ieee1394(eui, dev);
