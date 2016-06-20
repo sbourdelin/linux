@@ -2789,6 +2789,7 @@ static int kvm_vcpu_ioctl_set_lapic(struct kvm_vcpu *vcpu,
 {
 	kvm_apic_post_state_restore(vcpu, s);
 	update_cr8_intercept(vcpu);
+	vcpu->arch.apic->lapic_timer.expired_tscdeadline = 0;
 
 	return 0;
 }
