@@ -1261,6 +1261,53 @@ static int gen8_init_perctx_bb(struct intel_engine_cs *engine,
 	return wa_ctx_end(wa_ctx, *offset = index, 1);
 }
 
+/* Function to implement WaMtpRenderPowerGatingBug:skl */
+static int wa_mtp_render_power_gating(struct intel_engine_cs *engine,
+					uint32_t *const batch, uint32_t index)
+{
+	uint32_t num_lri = 0;
+	uint32_t gw_write_value = 0;
+	i915_reg_t gw_dest_mmio = {0};
+	uint32_t i = 0;
+	uint32_t gw_count = 0;
+	uint32_t slice_count_max = engine->i915->info.slice_total;
+	uint32_t slice_count = 0;
+
+	/* Slice count should be non-zero */
+	WARN_ON(slice_count_max == 0);
+
+	/* Mmios for GW are nice and sequential across slices, so we can
+	 * just do this single slice logic 3 times and the 'DestMmio will
+	 * be calculated properly'
+	 */
+	for (slice_count = 0; slice_count < slice_count_max; slice_count++) {
+		/* write the load reg immediate header */
+		num_lri = (GEN9_GW_PER_SLICE * GEN9_GW_DATA_PAIRS) + 1;
+		wa_ctx_emit(batch, index,
+			MI_LOAD_REGISTER_IMM(num_lri) | MI_LRI_FORCE_POSTED);
+
+		for (gw_count = 0; gw_count < GEN9_GW_PER_SLICE; gw_count++) {
+			gw_dest_mmio.reg = GEN9_GW_DEST.reg + (0x10 * gw_count)
+					+ (0x40 * slice_count);
+
+			for (i = 0; i < GEN9_GW_DATA_PAIRS; i++) {
+				// Read bits [31:24] from the Context Offset to [7:0] of LRI
+				// Read bit [13] from Context Offset to [31] of LRI
+				// Put i into bits [28:24] of LRI
+				gw_write_value = 0x1;
+				gw_write_value |= i << 24;
+				wa_ctx_emit_reg(batch, index, gw_dest_mmio);
+				wa_ctx_emit(batch, index, gw_write_value);
+			}
+		}
+		// Add one more 'dummy' data pair because the last MMIO in an LRI isn't actually 'posted'
+		wa_ctx_emit_reg(batch, index, gw_dest_mmio);
+		wa_ctx_emit(batch, index, gw_write_value);
+	}
+	return index;
+}
+
+
 static int gen9_init_indirectctx_bb(struct intel_engine_cs *engine,
 				    struct i915_wa_ctx_bb *wa_ctx,
 				    uint32_t *const batch,
@@ -1296,6 +1343,16 @@ static int gen9_init_indirectctx_bb(struct intel_engine_cs *engine,
 		wa_ctx_emit(batch, index, 0);
 		wa_ctx_emit(batch, index, 0);
 	}
+
+	/* WaMtpRenderPowerGatingBug:skl*/
+	if (IS_SKL_REVID(engine->i915, 0, SKL_REVID_G0))
+	{
+		ret = wa_mtp_render_power_gating(engine, batch, index);
+		if (ret < 0)
+			return ret;
+	}
+	index = ret;
+
 	/* Pad to end of cacheline */
 	while (index % CACHELINE_DWORDS)
 		wa_ctx_emit(batch, index, MI_NOOP);
