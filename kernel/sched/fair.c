@@ -6100,16 +6100,22 @@ int can_migrate_task(struct task_struct *p, struct lb_env *env)
 	return 0;
 }
 
+static void __detach_task(struct task_struct *p,
+			  struct rq *src_rq, int dst_cpu)
+{
+	lockdep_assert_held(&src_rq->lock);
+
+	p->on_rq = TASK_ON_RQ_MIGRATING;
+	deactivate_task(src_rq, p, 0);
+	set_task_cpu(p, dst_cpu);
+}
+
 /*
  * detach_task() -- detach the task for the migration specified in env
  */
 static void detach_task(struct task_struct *p, struct lb_env *env)
 {
-	lockdep_assert_held(&env->src_rq->lock);
-
-	p->on_rq = TASK_ON_RQ_MIGRATING;
-	deactivate_task(env->src_rq, p, 0);
-	set_task_cpu(p, env->dst_cpu);
+	__detach_task(p, env->src_rq, env->dst_cpu);
 }
 
 /*
@@ -7833,6 +7839,91 @@ void sched_idle_exit(int cpu)
 	}
 }
 
+static bool has_affinity_set(struct task_struct *p, cpumask_var_t mask)
+{
+	if (!cpumask_and(mask, tsk_cpus_allowed(p), cpu_active_mask))
+		return false;
+
+	cpumask_xor(mask, mask, cpu_active_mask);
+	return !cpumask_empty(mask);
+}
+
+static void rebalance_affinity(struct rq *rq)
+{
+	struct task_struct *p;
+	unsigned long flags;
+	cpumask_var_t mask;
+	bool mask_alloc = false;
+
+	/*
+	 * No need to bother if:
+	 * - there's only 1 task on the queue
+	 * - there's no idle cpu at the moment.
+	 */
+	if (rq->nr_running <= 1)
+		return;
+
+	if (!atomic_read(&balance.nr_cpus))
+		return;
+
+	raw_spin_lock_irqsave(&rq->lock, flags);
+
+	list_for_each_entry(p, &rq->cfs_tasks, se.group_node) {
+		struct rq *dst_rq;
+		int cpu;
+
+		/*
+		 * Force affinity balance only if:
+		 * - task is not current one
+		 * - task is already balanced (p->se.dont_balance is set)
+		 * - task has cpus_allowed set
+		 * - we have idle cpu ready within task's cpus_allowed
+		 */
+		if (task_running(rq, p))
+			continue;
+
+		if (p->se.dont_balance)
+			continue;
+
+		if (!mask_alloc) {
+			int ret = zalloc_cpumask_var(&mask, GFP_KERNEL);
+
+			if (WARN_ON_ONCE(!ret))
+				return;
+			mask_alloc = true;
+		}
+
+		if (!has_affinity_set(p, mask))
+			continue;
+
+		if (!cpumask_and(mask, tsk_cpus_allowed(p), balance.idle_cpus_mask))
+			continue;
+
+		cpu = cpumask_any_but(mask, task_cpu(p));
+		if (cpu >= nr_cpu_ids)
+			continue;
+
+		__detach_task(p, rq, cpu);
+		raw_spin_unlock(&rq->lock);
+
+		dst_rq = cpu_rq(cpu);
+
+		raw_spin_lock(&dst_rq->lock);
+		attach_task(dst_rq, p);
+		p->se.dont_balance = true;
+		raw_spin_unlock(&dst_rq->lock);
+
+		local_irq_restore(flags);
+		free_cpumask_var(mask);
+		return;
+	}
+
+	raw_spin_unlock_irqrestore(&rq->lock, flags);
+
+	if (mask_alloc)
+		free_cpumask_var(mask);
+}
+
 #ifdef CONFIG_NO_HZ_COMMON
 /*
  * idle load balancing details
@@ -8077,6 +8168,9 @@ out:
 			nohz.next_balance = rq->next_balance;
 #endif
 	}
+
+	if (sched_feat(REBALANCE_AFFINITY))
+		rebalance_affinity(rq);
 }
 
 #ifdef CONFIG_NO_HZ_COMMON
