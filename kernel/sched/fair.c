@@ -7802,6 +7802,37 @@ static inline int on_null_domain(struct rq *rq)
 	return unlikely(!rcu_dereference_sched(rq->sd));
 }
 
+static struct {
+	cpumask_var_t	idle_cpus_mask;
+	atomic_t	nr_cpus;
+} balance ____cacheline_aligned;
+
+void sched_idle_enter(int cpu)
+{
+	if (!sched_feat(REBALANCE_AFFINITY))
+		return;
+
+	if (!cpu_active(cpu))
+		return;
+
+	if (on_null_domain(cpu_rq(cpu)))
+		return;
+
+	cpumask_set_cpu(cpu, balance.idle_cpus_mask);
+	atomic_inc(&balance.nr_cpus);
+}
+
+void sched_idle_exit(int cpu)
+{
+	if (!sched_feat(REBALANCE_AFFINITY))
+		return;
+
+	if (likely(cpumask_test_cpu(cpu, balance.idle_cpus_mask))) {
+		cpumask_clear_cpu(cpu, balance.idle_cpus_mask);
+		atomic_dec(&balance.nr_cpus);
+	}
+}
+
 #ifdef CONFIG_NO_HZ_COMMON
 /*
  * idle load balancing details
@@ -8737,6 +8768,7 @@ __init void init_sched_fair_class(void)
 	nohz.next_balance = jiffies;
 	zalloc_cpumask_var(&nohz.idle_cpus_mask, GFP_NOWAIT);
 #endif
+	zalloc_cpumask_var(&balance.idle_cpus_mask, GFP_NOWAIT);
 #endif /* SMP */
 
 }

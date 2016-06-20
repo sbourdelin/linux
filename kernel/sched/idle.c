@@ -216,6 +216,7 @@ static void cpu_idle_loop(void)
 		__current_set_polling();
 		quiet_vmstat();
 		tick_nohz_idle_enter();
+		sched_idle_enter(cpu);
 
 		while (!need_resched()) {
 			check_pgt_cache();
@@ -256,6 +257,7 @@ static void cpu_idle_loop(void)
 		 */
 		preempt_set_need_resched();
 		tick_nohz_idle_exit();
+		sched_idle_exit(cpu);
 		__current_clr_polling();
 
 		/*

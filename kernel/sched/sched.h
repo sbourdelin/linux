@@ -1692,6 +1692,9 @@ extern void init_dl_rq(struct dl_rq *dl_rq);
 extern void cfs_bandwidth_usage_inc(void);
 extern void cfs_bandwidth_usage_dec(void);
 
+void sched_idle_enter(int cpu);
+void sched_idle_exit(int cpu);
+
 #ifdef CONFIG_NO_HZ_COMMON
 enum rq_nohz_flag_bits {
 	NOHZ_TICK_STOPPED,
