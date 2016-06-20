@@ -118,6 +118,7 @@ int devm_request_pci_bus_resources(struct device *dev,
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(devm_request_pci_bus_resources);
 
 static struct pci_bus_region pci_32_bit = {0, 0xffffffffULL};
 #ifdef CONFIG_PCI_BUS_ADDR_T_64BIT
