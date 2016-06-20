@@ -9,10 +9,11 @@
 /*
  * Available benchmark collection list:
  *
- *  sched ... scheduler and IPC performance
- *  mem   ... memory access performance
- *  numa  ... NUMA scheduling and MM performance
- *  futex ... Futex performance
+ *  sched   ... Scheduler and IPC performance
+ *  syscall ... System call performance
+ *  mem     ... Memory access performance
+ *  numa    ... NUMA scheduling and MM performance
+ *  futex   ... Futex performance
  */
 #include "perf.h"
 #include "util/util.h"
@@ -44,8 +45,14 @@ static struct bench numa_benchmarks[] = {
 static struct bench sched_benchmarks[] = {
 	{ "messaging",	"Benchmark for scheduling and IPC",		bench_sched_messaging	},
 	{ "pipe",	"Benchmark for pipe() between two processes",	bench_sched_pipe	},
-	{ "all",	"Run all scheduler benchmarks",		NULL			},
+	{ "all",	"Run all scheduler benchmarks",			NULL			},
 	{ NULL,		NULL,						NULL			}
+};
+
+static struct bench syscall_benchmarks[] = {
+	{ "basic",	"Benchmark for basic getppid() system calls",	bench_syscall_basic	},
+	{ "all",	"Run all syscall benchmarks",			NULL			},
+	{ NULL,		NULL,						NULL			},
 };
 
 static struct bench mem_benchmarks[] = {
@@ -74,6 +81,7 @@ struct collection {
 
 static struct collection collections[] = {
 	{ "sched",	"Scheduler and IPC benchmarks",			sched_benchmarks	},
+	{ "syscall",	"System call benchmarks",			syscall_benchmarks	},
 	{ "mem",	"Memory access benchmarks",			mem_benchmarks		},
 #ifdef HAVE_LIBNUMA_SUPPORT
 	{ "numa",	"NUMA scheduling and MM benchmarks",		numa_benchmarks		},
