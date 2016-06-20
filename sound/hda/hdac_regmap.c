@@ -279,7 +279,7 @@ static int hda_reg_write(void *context, unsigned int reg, unsigned int val)
 {
 	struct hdac_device *codec = context;
 	unsigned int verb;
-	int i, bytes, err;
+	int i, bytes, err = 0;
 	int pm_lock = 0;
 
 	if (codec->caps_overwriting)
