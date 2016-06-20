@@ -131,7 +131,8 @@ static void trace_note_time(struct blk_trace *bt)
 	unsigned long flags;
 	u32 words[2];
 
-	/* need to check user space to see if this breaks in y2038 or y2106 */
+	/* blktrace converts this to a time_t and will overflow in
+	   2106, not in 2038 */
 	ktime_get_real_ts64(&now);
 	words[0] = (u32)now.tv_sec;
 	words[1] = now.tv_nsec;
