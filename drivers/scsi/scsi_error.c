@@ -871,15 +871,6 @@ static int scsi_try_to_abort_cmd(struct scsi_host_template *hostt,
 	return hostt->eh_abort_handler(scmd);
 }
 
-static void scsi_abort_eh_cmnd(struct scsi_cmnd *scmd)
-{
-	if (scsi_try_to_abort_cmd(scmd->device->host->hostt, scmd) != SUCCESS)
-		if (scsi_try_bus_device_reset(scmd) != SUCCESS)
-			if (scsi_try_target_reset(scmd) != SUCCESS)
-				if (scsi_try_bus_reset(scmd) != SUCCESS)
-					scsi_try_host_reset(scmd);
-}
-
 /**
  * scsi_eh_prep_cmnd  - Save a scsi command info as part of error recovery
  * @scmd:       SCSI command structure to hijack
@@ -1063,10 +1054,8 @@ retry:
 			rtn = FAILED;
 			break;
 		}
-	} else if (rtn != FAILED) {
-		scsi_abort_eh_cmnd(scmd);
+	} else if (rtn != FAILED)
 		rtn = FAILED;
-	}
 
 	scsi_eh_restore_cmnd(scmd, &ses);
 
