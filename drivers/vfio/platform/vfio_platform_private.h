@@ -50,6 +50,7 @@ struct vfio_platform_region {
 };
 
 struct vfio_platform_device {
+	bool				reset_required;
 	struct vfio_platform_region	*regions;
 	u32				num_regions;
 	struct vfio_platform_irq	*irqs;
