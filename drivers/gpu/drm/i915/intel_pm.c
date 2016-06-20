@@ -4840,6 +4840,11 @@ void gen6_rps_busy(struct drm_i915_private *dev_priv)
 {
 	mutex_lock(&dev_priv->rps.hw_lock);
 	if (dev_priv->rps.enabled) {
+		/* Ensure we start at the user's desired frequency */
+		intel_set_rps(dev_priv,
+			      clamp(dev_priv->rps.cur_freq,
+				    dev_priv->rps.min_freq_softlimit,
+				    dev_priv->rps.max_freq_softlimit));
 		if (dev_priv->pm_rps_events & (GEN6_PM_RP_DOWN_EI_EXPIRED | GEN6_PM_RP_UP_EI_EXPIRED))
 			gen6_rps_reset_ei(dev_priv);
 		I915_WRITE(GEN6_PMINTRMSK,
