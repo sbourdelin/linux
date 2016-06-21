@@ -14,7 +14,7 @@
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/mutex.h>
 #include <linux/of_address.h>
 #include <linux/platform_device.h>
@@ -524,8 +524,4 @@ static struct platform_driver exynos_ppmu_driver = {
 		.of_match_table = exynos_ppmu_id_match,
 	},
 };
-module_platform_driver(exynos_ppmu_driver);
-
-MODULE_DESCRIPTION("Exynos PPMU(Platform Performance Monitoring Unit) driver");
-MODULE_AUTHOR("Chanwoo Choi <cw00.choi@samsung.com>");
-MODULE_LICENSE("GPL");
+builtin_platform_driver(exynos_ppmu_driver);
