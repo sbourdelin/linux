@@ -133,7 +133,12 @@ static inline int FNAME(is_present_gpte)(unsigned long pte)
 #if PTTYPE != PTTYPE_EPT
 	return is_present_gpte(pte);
 #else
-	return pte & 7;
+	/*
+	 * For EPT, bits [2:0] can be 001, 100 or 111
+	 * Further, for 100, logical processor should support
+	 * execute-only.
+	 */
+	return (pte & 1) || (shadow_xonly_valid && (pte & 4));
 #endif
 }
 

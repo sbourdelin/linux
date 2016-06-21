@@ -308,7 +308,10 @@ static int is_nx(struct kvm_vcpu *vcpu)
 
 static int is_shadow_present_pte(u64 pte)
 {
-	return pte & PT_PRESENT_MASK && !is_mmio_spte(pte);
+	int xbit = shadow_xonly_valid ? pte & shadow_x_mask : 0;
+
+	return (pte & PT_PRESENT_MASK) | xbit
+		&& !is_mmio_spte(pte);
 }
 
 static int is_large_pte(u64 pte)
