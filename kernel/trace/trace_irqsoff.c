@@ -32,6 +32,8 @@ static int trace_type __read_mostly;
 
 static int save_flags;
 
+extern int ftrace_graph_ignore_notrace;
+
 static void stop_irqsoff_tracer(struct trace_array *tr, int graph);
 static int start_irqsoff_tracer(struct trace_array *tr, int graph);
 
@@ -629,6 +631,9 @@ static int __irqsoff_tracer_init(struct trace_array *tr)
 
 	ftrace_init_array_ops(tr, irqsoff_tracer_call);
 
+	/* bypass function_graph notrace filter */
+	ftrace_graph_ignore_notrace = 1;
+
 	/* Only toplevel instance supports graph tracing */
 	if (start_irqsoff_tracer(tr, (tr->flags & TRACE_ARRAY_FL_GLOBAL &&
 				      is_graph(tr))))
@@ -650,6 +655,8 @@ static void irqsoff_tracer_reset(struct trace_array *tr)
 	ftrace_reset_array_ops(tr);
 
 	irqsoff_busy = false;
+
+	ftrace_graph_ignore_notrace = 0;
 }
 
 static void irqsoff_tracer_start(struct trace_array *tr)

@@ -757,6 +757,7 @@ extern void __trace_graph_return(struct trace_array *tr,
 extern int ftrace_graph_count;
 extern unsigned long ftrace_graph_funcs[FTRACE_GRAPH_MAX_FUNCS];
 extern int ftrace_graph_notrace_count;
+extern int ftrace_graph_ignore_notrace;
 extern unsigned long ftrace_graph_notrace_funcs[FTRACE_GRAPH_MAX_FUNCS];
 
 static inline int ftrace_graph_addr(unsigned long addr)
@@ -789,6 +790,9 @@ static inline int ftrace_graph_notrace_addr(unsigned long addr)
 	int i;
 
 	if (!ftrace_graph_notrace_count)
+		return 0;
+
+	if (unlikely(ftrace_graph_ignore_notrace))
 		return 0;
 
 	for (i = 0; i < ftrace_graph_notrace_count; i++) {
