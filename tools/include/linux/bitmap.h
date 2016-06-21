@@ -2,6 +2,7 @@
 #define _PERF_BITOPS_H
 
 #include <string.h>
+#include <limits.h>
 #include <linux/bitops.h>
 
 #define DECLARE_BITMAP(name,bits) \
@@ -21,6 +22,14 @@ void __bitmap_or(unsigned long *dst, const unsigned long *bitmap1,
 
 #define small_const_nbits(nbits) \
 	(__builtin_constant_p(nbits) && (nbits) <= BITS_PER_LONG)
+
+static inline void bitmap_from_u64(unsigned long *_mask, u64 mask)
+{
+	_mask[0] = mask & ULONG_MAX;
+
+	if (sizeof(mask) > sizeof(unsigned long))
+		_mask[1] = mask >> 32;
+}
 
 static inline void bitmap_zero(unsigned long *dst, int nbits)
 {

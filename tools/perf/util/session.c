@@ -942,8 +942,22 @@ static void branch_stack__printf(struct perf_sample *sample)
 static void regs_dump__printf(u64 mask, u64 *regs)
 {
 	unsigned rid, i = 0;
+	unsigned long _mask[sizeof(mask)/sizeof(unsigned long)];
 
-	for_each_set_bit(rid, (unsigned long *) &mask, sizeof(mask) * 8) {
+	/*
+	 * Since u64 is passed as 'unsigned long *', check
+	 * to see whether we need to swap words within u64.
+	 * Reason being, in 32 bit big endian userspace on a
+	 * 64bit kernel, 'unsigned long' is 32 bits.
+	 * When reading u64 using (u32 *)(&val)[0] and (u32 *)(&val)[1],
+	 * we will get wrong value for the mask. This is what
+	 * find_first_bit() and find_next_bit() is doing.
+	 * Issue here is "(u32 *)(&val)[0]" gets upper 32 bits of u64,
+	 * but perf assumes it gets lower 32bits of u64. Hence the check
+	 * and swap.
+	 */
+	bitmap_from_u64(_mask, mask);
+	for_each_set_bit(rid, _mask, sizeof(mask) * 8) {
 		u64 val = regs[i++];
 
 		printf(".... %-5s 0x%" PRIx64 "\n",
