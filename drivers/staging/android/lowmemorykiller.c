@@ -122,8 +122,6 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		return 0;
 	}
 
-	selected_oom_score_adj = min_score_adj;
-
 	rcu_read_lock();
 	for_each_process(tsk) {
 		struct task_struct *p;
@@ -151,18 +149,19 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		task_unlock(p);
 		if (tasksize <= 0)
 			continue;
-		if (selected) {
-			if (oom_score_adj < selected_oom_score_adj)
-				continue;
-			if (oom_score_adj == selected_oom_score_adj &&
-			    tasksize <= selected_tasksize)
-				continue;
+
+		/*
+		 * From the processes which score adj >= min_score_adj,
+		 * we select the one with the maximum tasksize.
+		 */
+		if (selected_tasksize < tasksize) {
+			selected = p;
+			selected_tasksize = tasksize;
+			selected_oom_score_adj = oom_score_adj;
+
+			lowmem_print(2, "select '%s' (%d), adj %hd, size %d, to kill\n",
+					 p->comm, p->pid, oom_score_adj, tasksize);
 		}
-		selected = p;
-		selected_tasksize = tasksize;
-		selected_oom_score_adj = oom_score_adj;
-		lowmem_print(2, "select '%s' (%d), adj %hd, size %d, to kill\n",
-			     p->comm, p->pid, oom_score_adj, tasksize);
 	}
 	if (selected) {
 		task_lock(selected);
