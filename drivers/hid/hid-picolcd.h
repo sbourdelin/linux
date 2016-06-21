@@ -17,6 +17,8 @@
  *   along with this software. If not see <http://www.gnu.org/licenses/>.  *
  ***************************************************************************/
 
+#include <linux/errno.h>
+
 #define PICOLCD_NAME "PicoLCD (graphic)"
 
 /* Report numbers */
@@ -192,11 +194,11 @@ void picolcd_fb_refresh(struct picolcd_data *data);
 #else
 static inline int picolcd_fb_reset(struct picolcd_data *data, int clear)
 {
-	return 0;
+	return -ENODEV;
 }
 static inline int picolcd_init_framebuffer(struct picolcd_data *data)
 {
-	return 0;
+	return -ENOMEM;
 }
 static inline void picolcd_exit_framebuffer(struct picolcd_data *data)
 {
@@ -221,14 +223,14 @@ void picolcd_suspend_backlight(struct picolcd_data *data);
 static inline int picolcd_init_backlight(struct picolcd_data *data,
 		struct hid_report *report)
 {
-	return 0;
+	return -ENODEV;
 }
 static inline void picolcd_exit_backlight(struct picolcd_data *data)
 {
 }
 static inline int picolcd_resume_backlight(struct picolcd_data *data)
 {
-	return 0;
+	return -ENODEV;
 }
 static inline void picolcd_suspend_backlight(struct picolcd_data *data)
 {
@@ -248,14 +250,14 @@ int picolcd_resume_lcd(struct picolcd_data *data);
 static inline int picolcd_init_lcd(struct picolcd_data *data,
 		struct hid_report *report)
 {
-	return 0;
+	return -ENODEV;
 }
 static inline void picolcd_exit_lcd(struct picolcd_data *data)
 {
 }
 static inline int picolcd_resume_lcd(struct picolcd_data *data)
 {
-	return 0;
+	return -ENODEV;
 }
 #endif /* CONFIG_HID_PICOLCD_LCD */
 
@@ -271,7 +273,7 @@ void picolcd_leds_set(struct picolcd_data *data);
 static inline int picolcd_init_leds(struct picolcd_data *data,
 		struct hid_report *report)
 {
-	return 0;
+	return -ENODEV;
 }
 static inline void picolcd_exit_leds(struct picolcd_data *data)
 {
@@ -297,7 +299,7 @@ static inline int picolcd_raw_cir(struct picolcd_data *data,
 }
 static inline int picolcd_init_cir(struct picolcd_data *data, struct hid_report *report)
 {
-	return 0;
+	return -ENOMEM;
 }
 static inline void picolcd_exit_cir(struct picolcd_data *data)
 {
