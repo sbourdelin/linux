@@ -464,8 +464,6 @@ int kexec_add_buffer(struct kimage *image, char *buffer, unsigned long bufsz,
 	memset(&buf, 0, sizeof(struct kexec_buf));
 	kbuf = &buf;
 	kbuf->image = image;
-	kbuf->buffer = buffer;
-	kbuf->bufsz = bufsz;
 
 	kbuf->memsz = ALIGN(memsz, PAGE_SIZE);
 	kbuf->buf_align = max(buf_align, PAGE_SIZE);
@@ -489,8 +487,8 @@ int kexec_add_buffer(struct kimage *image, char *buffer, unsigned long bufsz,
 
 	/* Found a suitable memory range */
 	ksegment = &image->segment[image->nr_segments];
-	ksegment->kbuf = kbuf->buffer;
-	ksegment->bufsz = kbuf->bufsz;
+	ksegment->kbuf = buffer;
+	ksegment->bufsz = bufsz;
 	ksegment->mem = kbuf->mem;
 	ksegment->memsz = kbuf->memsz;
 	image->nr_segments++;
