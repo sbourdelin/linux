@@ -216,11 +216,30 @@ nv50_fb_init(struct nvkm_fb *base)
 	struct nv50_fb *fb = nv50_fb(base);
 	struct nvkm_device *device = fb->base.subdev.device;
 
+	if (!fb->r100c08) {
+		/*
+		 * We are calling the DMA api way before the TTM layer sets the
+		 * DMA mask based on the MMU subdev parameters. This means we
+		 * are using the default DMA mask of 32, which may cause
+		 * problems on systems with no RAM below the 4 GB mark. So set
+		 * the streaming DMA mask here as well.
+		 */
+		dma_set_mask(device->dev, DMA_BIT_MASK(device->mmu->dma_bits));
+
+		fb->r100c08 = dma_map_page(device->dev, fb->r100c08_page, 0,
+					   PAGE_SIZE, DMA_BIDIRECTIONAL);
+		if (dma_mapping_error(device->dev, fb->r100c08)) {
+			nvkm_warn(&fb->base.subdev,
+				  "dma_map_page() failed on 100c08 page\n");
+		}
+	}
+
 	/* Not a clue what this is exactly.  Without pointing it at a
 	 * scratch page, VRAM->GART blits with M2MF (as in DDX DFS)
 	 * cause IOMMU "read from address 0" errors (rh#561267)
 	 */
-	nvkm_wr32(device, 0x100c08, fb->r100c08 >> 8);
+	if (fb->r100c08 != DMA_ERROR_CODE)
+		nvkm_wr32(device, 0x100c08, fb->r100c08 >> 8);
 
 	/* This is needed to get meaningful information from 100c90
 	 * on traps. No idea what these values mean exactly. */
@@ -233,11 +252,11 @@ nv50_fb_dtor(struct nvkm_fb *base)
 	struct nv50_fb *fb = nv50_fb(base);
 	struct nvkm_device *device = fb->base.subdev.device;
 
-	if (fb->r100c08_page) {
+	if (fb->r100c08 && fb->r100c08 != DMA_ERROR_CODE)
 		dma_unmap_page(device->dev, fb->r100c08, PAGE_SIZE,
 			       DMA_BIDIRECTIONAL);
-		__free_page(fb->r100c08_page);
-	}
+
+	__free_page(fb->r100c08_page);
 
 	return fb;
 }
@@ -264,13 +283,9 @@ nv50_fb_new_(const struct nv50_fb_func *func, struct nvkm_device *device,
 	*pfb = &fb->base;
 
 	fb->r100c08_page = alloc_page(GFP_KERNEL | __GFP_ZERO);
-	if (fb->r100c08_page) {
-		fb->r100c08 = dma_map_page(device->dev, fb->r100c08_page, 0,
-					   PAGE_SIZE, DMA_BIDIRECTIONAL);
-		if (dma_mapping_error(device->dev, fb->r100c08))
-			return -EFAULT;
-	} else {
-		nvkm_warn(&fb->base.subdev, "failed 100c08 page alloc\n");
+	if (!fb->r100c08_page) {
+		nvkm_error(&fb->base.subdev, "failed 100c08 page alloc\n");
+		return -ENOMEM;
 	}
 
 	return 0;
