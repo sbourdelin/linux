@@ -329,5 +329,6 @@ const struct smp_operations omap4_smp_ops __initconst = {
 	.smp_boot_secondary	= omap4_boot_secondary,
 #ifdef CONFIG_HOTPLUG_CPU
 	.cpu_die		= omap4_cpu_die,
+	.cpu_kill		= omap4_cpu_kill,
 #endif
 };
