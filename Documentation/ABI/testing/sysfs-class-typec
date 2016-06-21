@@ -1,0 +1,163 @@
+USB Type-C port devices (eg. /sys/class/typec/usbc0/)
+
+What:		/sys/class/typec/<port>/current_data_role
+Data:		June 2016
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		The current USB data role the port is operating in. This
+		attribute can be used for requestion data role swapping on th
+		port.
+
+What:		/sys/class/typec/<port>/current_power_role
+Data:		June 2016
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		The current power role, source or sink, of the port. This
+		attribute can be used to request power role swap on the port
+		when USB Power Delivery is available.
+
+What:		/sys/class/typec/<port>/current_vconn_role
+Data:		June 2016
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Shows the current VCONN role, source or sink, of the port. This
+		attribute can be used to request vconn role swap on the port
+		when USB Power Delivery is available.
+
+What:		/sys/class/typec/<port>/power_operation_mode
+Data:		June 2016
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Shows the current power power mode the port is in. Reads as on
+		of the following:
+		- USB - Normal power levels defined in USB specifications
+		- BC1.2 - Power levels defined in Battery Charging Specification
+			  v1.2
+		- USB Type-C 1.5A - Higher 1.5A current defined in USB Type-C
+				    specification.
+		- USB Type-C 3.0A - Higher 3A current defined in USB Type-C
+				    specification.
+                - USB Power Delivery - The voltages and currents defined in USB
+				       Power Delivery specification
+
+What:		/sys/class/typec/<port>/preferred_role
+Data:		June 2016
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		The user space can notify the driver about the preferred role.
+		It should be handled as enabling of Try.SRC or Try.SNK, as
+		defined in USB Type-C specification, in the port drivers.
+
+What:		/sys/class/typec/<port>/supported_accessory_modes
+Data:		June 2016
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Lists the Accessory Modes, defined in the USB Type-C
+		specification, the port supports.
+
+What:		/sys/class/typec/<port>/supported_data_roles
+Data:		June 2016
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Lists the USB data roles, host or device, the port is capable
+		of supporting.
+
+What:		/sys/class/typec/<port>/supported_power_roles
+Data:		June 2016
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Lists the power roles, source and/or sink, the port is capable
+		of supporting.
+
+What:		/sys/class/typec/<port>/supports_usb_power_delivery
+Data:		June 2016
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Shows if the port support USB Power Delivery.
+
+
+USB Type-C partner devices (eg. /sys/class/typec/usbc0-partner/)
+
+What:		/sys/class/typec/<port>-partner/accessory
+Data:		June 2016
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Shows the name of the Accessory Mode if the partner attached to
+		the port is an accessory. Otherwise shows nothing.
+
+What:		/sys/class/typec/<port>-partner/type
+Data:		June 2016
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Shows the type of the partner. Can be one of the following:
+		- USB - When the partner is normal USB host/peripheral.
+		- Charger - When the partner has been identified as dedicated
+			    charger.
+		- Alternate Mode - When the partner supports Alternate Modes.
+		- Accessory - When the partner is one of the accessories with
+			      specific Accessory Mode defined in USB Type-C
+			      specification.
+
+
+USB Type-C cable devices (eg. /sys/class/typec/usbc0-cable/)
+
+Note: The two cable plugs will have their own devices presenting when available
+(eg. /sys/class/typec/usbc0-plug0). Both plugs may have their own active
+alternate modes as described in USB Type-C and USB Power Delivery
+specifications.
+
+What:		/sys/class/typec/<port>-cable/active
+Data:		June 2016
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Shows if the cable is active or passive. Only active cables can
+		have configurable alternate modes, therefore only active cables
+		will have plug devices.
+
+What:		/sys/class/typec/<port>-cable/plug_type
+Data:		June 2016
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Shows type of the plug on the cable:
+		Type-A - Standard A
+		Type-B - Standard B
+		Type-C - USB Type-C
+		Captive - Non-standard
+
+
+Alternate Mode devices  (For example,
+/sys/class/typec/usbc0-partner/usbc0-partner.svid:xxxx/)
+
+What:		/sys/class/typec/<dev>/<dev>.svid:<svid>/<mode>/active
+Data:		June 2016
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Shows if the mode is active or not. The attribute can be used
+		for entering/exiting the mode with partners and cable plugs, and
+		with the port alternate modes it can be used for disabling
+		support for specific alternate modes.
+
+What:		/sys/class/typec/<dev>/<dev>.svid:<svid>/<mode>/description
+Data:		June 2016
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Shows description of the mode. The description is optional for
+		the drivers, just like with the Billboard Devices.
+
+What:		/sys/class/typec/<dev>/<dev>.svid:<svid>/<mode>/vdo
+Data:		June 2016
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Shows the VDO in hexadecimal returned from the Discover Modes
+		command.
+
+What:		/sys/class/typec/<port>/<port>.svid:<svid>/<mode>/supported_roles
+Data:		June 2016
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Shows the roles, source or sink, the mode is supported with.
+
+		This attribute is available for the devices describing the
+		alternate modes a port supports, and it will not be exposed with
+		the devices presenting the alternate modes the partners or cable
+		plugs support.
