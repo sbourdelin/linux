@@ -17,7 +17,7 @@
 #include <linux/devfreq-event.h>
 #include <linux/device.h>
 #include <linux/export.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/of_device.h>
 #include <linux/pm_opp.h>
 #include <linux/platform_device.h>
@@ -553,7 +553,6 @@ static const struct of_device_id exynos_bus_of_match[] = {
 	{ .compatible = "samsung,exynos-bus", },
 	{ /* sentinel */ },
 };
-MODULE_DEVICE_TABLE(of, exynos_bus_of_match);
 
 static struct platform_driver exynos_bus_platdrv = {
 	.probe		= exynos_bus_probe,
@@ -563,8 +562,4 @@ static struct platform_driver exynos_bus_platdrv = {
 		.of_match_table = of_match_ptr(exynos_bus_of_match),
 	},
 };
-module_platform_driver(exynos_bus_platdrv);
-
-MODULE_DESCRIPTION("Generic Exynos Bus frequency driver");
-MODULE_AUTHOR("Chanwoo Choi <cw00.choi@samsung.com>");
-MODULE_LICENSE("GPL v2");
+builtin_platform_driver(exynos_bus_platdrv);
