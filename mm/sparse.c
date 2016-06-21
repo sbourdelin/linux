@@ -166,24 +166,59 @@ void __meminit mminit_validate_memmodel_limits(unsigned long *start_pfn,
 	}
 }
 
+static int __init
+overlaps(u64 start1, u64 end1, u64 start2, u64 end2)
+{
+	u64 start, end;
+
+	start = max(start1, start2);
+	end = min(end1, end2);
+	return start <= end;
+}
+
 /* Record a memory area against a node. */
 void __init memory_present(int nid, unsigned long start, unsigned long end)
 {
+	unsigned long first_pfn = start;
 	unsigned long pfn;
 
 	start &= PAGE_SECTION_MASK;
 	mminit_validate_memmodel_limits(&start, &end);
 	for (pfn = start; pfn < end; pfn += PAGES_PER_SECTION) {
 		unsigned long section = pfn_to_section_nr(pfn);
+		unsigned long last_pfn = min(pfn + PAGES_PER_SECTION, end) - 1;
 		struct mem_section *ms;
 
 		sparse_index_init(section, nid);
 		set_section_nid(section, nid);
 
 		ms = __nr_to_section(section);
-		if (!ms->section_mem_map)
+		if (!ms->section_mem_map) {
 			ms->section_mem_map = sparse_encode_early_nid(nid) |
 							SECTION_MARKED_PRESENT;
+		} else {
+			/* Merge the two regions */
+			WARN_ON(sparse_early_nid(ms) != nid);
+
+			/*
+			 * If they don't overlap there will be a hole in
+			 * between where meta-data says it's valid even though
+			 * it's not.
+			 */
+			if (!overlaps(first_pfn, last_pfn + 1,
+				      ms->first_pfn, ms->last_pfn + 1))	{
+				pr_info("Merging non-contiguous pfn ranges 0x%lx-0x%lx and 0x%lx-0x%lx\n",
+					ms->first_pfn, ms->last_pfn,
+					first_pfn, last_pfn);
+			}
+			first_pfn = min(first_pfn, ms->first_pfn);
+			last_pfn = max(last_pfn, ms->last_pfn);
+		}
+
+		ms->first_pfn = first_pfn;
+		ms->last_pfn = last_pfn;
+
+		first_pfn = pfn + PAGES_PER_SECTION;
 	}
 }
 
