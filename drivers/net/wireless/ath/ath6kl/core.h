@@ -722,7 +722,7 @@ struct ath6kl {
 	 */
 	spinlock_t lock;
 
-	struct semaphore sem;
+	struct mutex mutex;
 	u8 lrssi_roam_threshold;
 	struct ath6kl_version version;
 	u32 target_type;

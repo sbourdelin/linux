@@ -102,13 +102,13 @@ int ath6kl_read_tgt_stats(struct ath6kl *ar, struct ath6kl_vif *vif)
 {
 	long left;
 
-	if (down_interruptible(&ar->sem))
+	if (mutex_lock_interruptible(&ar->mutex))
 		return -EBUSY;
 
 	set_bit(STATS_UPDATE_PEND, &vif->flags);
 
 	if (ath6kl_wmi_get_stats_cmd(ar->wmi, 0)) {
-		up(&ar->sem);
+		mutex_unlock(&ar->mutex);
 		return -EIO;
 	}
 
@@ -116,7 +116,7 @@ int ath6kl_read_tgt_stats(struct ath6kl *ar, struct ath6kl_vif *vif)
 						!test_bit(STATS_UPDATE_PEND,
 						&vif->flags), WMI_TIMEOUT);
 
-	up(&ar->sem);
+	mutex_unlock(&ar->mutex);
 
 	if (left <= 0)
 		return -ETIMEDOUT;
@@ -1167,20 +1167,20 @@ static ssize_t ath6kl_roam_table_read(struct file *file, char __user *user_buf,
 	unsigned int len, buf_len;
 	ssize_t ret_cnt;
 
-	if (down_interruptible(&ar->sem))
+	if (mutex_lock_interruptible(&ar->mutex))
 		return -EBUSY;
 
 	set_bit(ROAM_TBL_PEND, &ar->flag);
 
 	ret = ath6kl_wmi_get_roam_tbl_cmd(ar->wmi);
 	if (ret) {
-		up(&ar->sem);
+		mutex_unlock(&ar->sem);
 		return ret;
 	}
 
 	left = wait_event_interruptible_timeout(
 		ar->event_wq, !test_bit(ROAM_TBL_PEND, &ar->flag), WMI_TIMEOUT);
-	up(&ar->sem);
+	mutex_unlock(&ar->mutex);
 
 	if (left <= 0)
 		return -ETIMEDOUT;

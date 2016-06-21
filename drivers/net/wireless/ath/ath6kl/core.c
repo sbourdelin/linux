@@ -283,7 +283,7 @@ struct ath6kl *ath6kl_core_create(struct device *dev)
 	spin_lock_init(&ar->list_lock);
 
 	init_waitqueue_head(&ar->event_wq);
-	sema_init(&ar->sem, 1);
+	mutex_init(&ar->mutex);
 
 	INIT_LIST_HEAD(&ar->amsdu_rx_buffer_queue);
 	INIT_LIST_HEAD(&ar->vif_list);

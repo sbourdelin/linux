@@ -1890,8 +1890,8 @@ void ath6kl_stop_txrx(struct ath6kl *ar)
 
 	set_bit(DESTROY_IN_PROGRESS, &ar->flag);
 
-	if (down_interruptible(&ar->sem)) {
-		ath6kl_err("down_interruptible failed\n");
+	if (mutex_lock_interruptible(&ar->mutex)) {
+		ath6kl_err("mutex_lock_interruptible failed\n");
 		return;
 	}
 
@@ -1938,6 +1938,6 @@ void ath6kl_stop_txrx(struct ath6kl *ar)
 	 */
 	ath6kl_init_hw_reset(ar);
 
-	up(&ar->sem);
+	mutex_unlock(&ar->mutex);
 }
 EXPORT_SYMBOL(ath6kl_stop_txrx);
