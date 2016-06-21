@@ -13,6 +13,8 @@ Optional properties:
 
   - reset-gpios : a GPIO spec for the reset pin.
 
+  - mute-gpios : a GPIO spec for the MUTE pin.
+
   - cirrus,micbias-lvl : Set the output voltage level on the MICBIAS Pin.
 			 0 = Hi-Z
 			 1 = 1.80 V
