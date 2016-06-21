@@ -15,6 +15,8 @@
 #include <linux/seq_file.h>
 #include <linux/bitops.h>
 
+#include "internal.h"
+
 /*
  * The /proc/tty directory inodes...
  */
