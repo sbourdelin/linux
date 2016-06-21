@@ -280,6 +280,19 @@ static int lowpan_dev_debugfs_802154_init(const struct net_device *dev,
 	return 0;
 }
 
+static int lowpan_lltype_get(void *data, u64 *val)
+{
+	struct lowpan_dev *ldev = data;
+
+	rtnl_lock();
+	*val = ldev->lltype;
+	rtnl_unlock();
+
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(lowpan_lltype_fops, lowpan_lltype_get, NULL, "%llu\n");
+
 int lowpan_dev_debugfs_init(struct net_device *dev)
 {
 	struct lowpan_dev *ldev = lowpan_dev(dev);
@@ -290,6 +303,11 @@ int lowpan_dev_debugfs_init(struct net_device *dev)
 	ldev->iface_debugfs = debugfs_create_dir(dev->name, lowpan_debugfs);
 	if (!ldev->iface_debugfs)
 		goto fail;
+
+	dentry = debugfs_create_file("lltype", 0444, ldev->iface_debugfs,
+				     lowpan_dev(dev), &lowpan_lltype_fops);
+	if (!dentry)
+		goto remove_root;
 
 	contexts = debugfs_create_dir("contexts", ldev->iface_debugfs);
 	if (!contexts)
