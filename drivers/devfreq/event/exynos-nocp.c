@@ -10,7 +10,7 @@
  */
 
 #include <linux/clk.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/devfreq-event.h>
 #include <linux/kernel.h>
 #include <linux/of_address.h>
@@ -280,25 +280,12 @@ static int exynos_nocp_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int exynos_nocp_remove(struct platform_device *pdev)
-{
-	struct exynos_nocp *nocp = platform_get_drvdata(pdev);
-
-	clk_disable_unprepare(nocp->clk);
-
-	return 0;
-}
-
 static struct platform_driver exynos_nocp_driver = {
 	.probe	= exynos_nocp_probe,
-	.remove	= exynos_nocp_remove,
 	.driver = {
 		.name	= "exynos-nocp",
+		.suppress_bind_attrs = true,
 		.of_match_table = exynos_nocp_id_match,
 	},
 };
-module_platform_driver(exynos_nocp_driver);
-
-MODULE_DESCRIPTION("Exynos NoC (Network on Chip) Probe driver");
-MODULE_AUTHOR("Chanwoo Choi <cw00.choi@samsung.com>");
-MODULE_LICENSE("GPL");
+builtin_platform_driver(exynos_nocp_driver);
