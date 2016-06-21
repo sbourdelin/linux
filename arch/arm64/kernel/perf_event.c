@@ -533,6 +533,26 @@ static struct attribute_group armv8_pmuv3_events_attr_group = {
 
 PMU_FORMAT_ATTR(event, "config:0-9");
 
+static ssize_t
+cpumask_show(struct device *dev, struct device_attribute *attr, char *page)
+{
+	struct pmu *pmu = dev_get_drvdata(dev);
+	struct arm_pmu *cpu_pmu = container_of(pmu, struct arm_pmu, pmu);
+
+	return cpumap_print_to_pagebuf(true, page, &cpu_pmu->supported_cpus);
+}
+static DEVICE_ATTR_RO(cpumask);
+
+static struct attribute *armv8_pmuv3_attrs[] = {
+	 &dev_attr_cpumask.attr,
+	 NULL,
+};
+
+static struct attribute_group armv8_pmuv3_attr_group = {
+	.attrs = armv8_pmuv3_attrs,
+};
+
+
 static struct attribute *armv8_pmuv3_format_attrs[] = {
 	&format_attr_event.attr,
 	NULL,
@@ -544,6 +564,7 @@ static struct attribute_group armv8_pmuv3_format_attr_group = {
 };
 
 static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
+	&armv8_pmuv3_attr_group,
 	&armv8_pmuv3_events_attr_group,
 	&armv8_pmuv3_format_attr_group,
 	NULL,
