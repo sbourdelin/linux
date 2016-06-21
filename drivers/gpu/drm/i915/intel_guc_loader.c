@@ -82,6 +82,17 @@ const char *intel_uc_fw_status_repr(enum intel_uc_fw_status status)
 	}
 };
 
+u32 guc_wopcm_size(struct drm_device *dev)
+{
+	u32 wopcm_size = GUC_WOPCM_TOP;
+
+	/* On BXT, the top of WOPCM is reserved for RC6 context */
+	if (IS_BROXTON(dev))
+		wopcm_size -= BXT_GUC_WOPCM_RC6_RESERVED;
+
+	return wopcm_size;
+}
+
 static void direct_interrupts_to_host(struct drm_i915_private *dev_priv)
 {
 	struct intel_engine_cs *engine;
@@ -296,17 +307,6 @@ static int guc_ucode_xfer_dma(struct drm_i915_private *dev_priv)
 	return ret;
 }
 
-u32 guc_wopcm_size(struct drm_device *dev)
-{
-	u32 wopcm_size = GUC_WOPCM_TOP;
-
-	/* On BXT, the top of WOPCM is reserved for RC6 context */
-	if (IS_BROXTON(dev))
-		wopcm_size -= BXT_GUC_WOPCM_RC6_RESERVED;
-
-	return wopcm_size;
-}
-
 /*
  * Load the GuC firmware blob into the MinuteIA.
  */
@@ -332,6 +332,10 @@ static int guc_ucode_xfer(struct drm_i915_private *dev_priv)
 	I915_WRITE(GEN8_GTCR, GEN8_GTCR_INVALIDATE);
 
 	intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
+
+	/* init WOPCM */
+	I915_WRITE(GUC_WOPCM_SIZE, guc_wopcm_size(dev));
+	I915_WRITE(DMA_GUC_WOPCM_OFFSET, GUC_WOPCM_OFFSET_VALUE);
 
 	/* Enable MIA caching. GuC clock gating is disabled. */
 	I915_WRITE(GUC_SHIM_CONTROL, GUC_SHIM_CONTROL_VALUE);
@@ -483,6 +487,7 @@ int intel_guc_setup(struct drm_device *dev)
 			goto fail;
 		}
 
+		intel_huc_load(dev);
 		err = guc_ucode_xfer(dev_priv);
 		if (!err)
 			break;
@@ -638,7 +643,7 @@ void intel_uc_fw_fetch(struct drm_device *dev, struct intel_uc_fw *uc_fw)
 		size = uc_fw->header_size + uc_fw->ucode_size;
 
 		/* Top 32k of WOPCM is reserved (8K stack + 24k RC6 context). */
-		if (size > guc_wopcm_size(dev->dev_private)) {
+		if (size > guc_wopcm_size(dev)) {
 			DRM_ERROR("Firmware is too large to fit in WOPCM\n");
 			goto fail;
 		}

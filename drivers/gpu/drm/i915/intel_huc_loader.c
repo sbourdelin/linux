@@ -49,6 +49,9 @@
 #define I915_SKL_HUC_UCODE "i915/skl_huc_ver1.bin"
 MODULE_FIRMWARE(I915_SKL_HUC_UCODE);
 
+#define I915_BXT_HUC_UCODE "i915/bxt_huc_ver1.bin"
+MODULE_FIRMWARE(I915_BXT_HUC_UCODE);
+
 /**
  * intel_huc_load_ucode() - DMA's the firmware
  * @dev: the drm device
@@ -157,6 +160,10 @@ void intel_huc_init(struct drm_device *dev)
 		fw_path = I915_SKL_HUC_UCODE;
 		huc_fw->major_ver_wanted = 1;
 		huc_fw->minor_ver_wanted = 5;
+	} else if (IS_BROXTON(dev)) {
+		fw_path = I915_BXT_HUC_UCODE;
+		huc_fw->major_ver_wanted = 1;
+		huc_fw->minor_ver_wanted = 0;
 	}
 
 	if (fw_path == NULL)
