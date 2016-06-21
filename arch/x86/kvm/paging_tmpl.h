@@ -192,7 +192,7 @@ static inline unsigned FNAME(gpte_access)(struct kvm_vcpu *vcpu, u64 gpte)
 #if PTTYPE == PTTYPE_EPT
 	access = ((gpte & VMX_EPT_WRITABLE_MASK) ? ACC_WRITE_MASK : 0) |
 		((gpte & VMX_EPT_EXECUTABLE_MASK) ? ACC_EXEC_MASK : 0) |
-		ACC_USER_MASK;
+		((gpte & VMX_EPT_READABLE_MASK) ? ACC_USER_MASK : 0);
 #else
 	BUILD_BUG_ON(ACC_EXEC_MASK != PT_PRESENT_MASK);
 	BUILD_BUG_ON(ACC_EXEC_MASK != 1);

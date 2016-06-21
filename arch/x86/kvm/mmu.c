@@ -2528,7 +2528,8 @@ static int set_spte(struct kvm_vcpu *vcpu, u64 *sptep,
 	if (set_mmio_spte(vcpu, sptep, gfn, pfn, pte_access))
 		return 0;
 
-	spte = PT_PRESENT_MASK;
+	if (!shadow_xonly_valid)
+		spte = PT_PRESENT_MASK;
 	if (!speculative)
 		spte |= shadow_accessed_mask;
 
@@ -2537,8 +2538,12 @@ static int set_spte(struct kvm_vcpu *vcpu, u64 *sptep,
 	else
 		spte |= shadow_nx_mask;
 
-	if (pte_access & ACC_USER_MASK)
-		spte |= shadow_user_mask;
+	if (pte_access & ACC_USER_MASK) {
+		if (shadow_xonly_valid)
+			spte |= PT_PRESENT_MASK;
+		else
+			spte |= shadow_user_mask;
+	}
 
 	if (level > PT_PAGE_TABLE_LEVEL)
 		spte |= PT_PAGE_SIZE_MASK;
