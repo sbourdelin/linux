@@ -25,6 +25,8 @@
 #include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/module.h>
+#include <linux/of.h>
+#include <linux/of_device.h>
 
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
@@ -1516,6 +1518,50 @@ done:
 	return IRQ_HANDLED;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id max1363_of_match[] = {
+	{ .compatible = "maxim,max1361", .data = (void *)max1361 },
+	{ .compatible = "maxim,max1362", .data = (void *)max1362 },
+	{ .compatible = "maxim,max1363", .data = (void *)max1363 },
+	{ .compatible = "maxim,max1364", .data = (void *)max1364 },
+	{ .compatible = "maxim,max1036", .data = (void *)max1036 },
+	{ .compatible = "maxim,max1037", .data = (void *)max1037 },
+	{ .compatible = "maxim,max1038", .data = (void *)max1038 },
+	{ .compatible = "maxim,max1039", .data = (void *)max1039 },
+	{ .compatible = "maxim,max1136", .data = (void *)max1136 },
+	{ .compatible = "maxim,max1137", .data = (void *)max1137 },
+	{ .compatible = "maxim,max1138", .data = (void *)max1138 },
+	{ .compatible = "maxim,max1139", .data = (void *)max1139 },
+	{ .compatible = "maxim,max1236", .data = (void *)max1236 },
+	{ .compatible = "maxim,max1237", .data = (void *)max1237 },
+	{ .compatible = "maxim,max1238", .data = (void *)max1238 },
+	{ .compatible = "maxim,max1239", .data = (void *)max1239 },
+	{ .compatible = "maxim,max11600", .data = (void *)max11600 },
+	{ .compatible = "maxim,max11601", .data = (void *)max11601 },
+	{ .compatible = "maxim,max11602", .data = (void *)max11602 },
+	{ .compatible = "maxim,max11603", .data = (void *)max11603 },
+	{ .compatible = "maxim,max11604", .data = (void *)max11604 },
+	{ .compatible = "maxim,max11605", .data = (void *)max11605 },
+	{ .compatible = "maxim,max11606", .data = (void *)max11606 },
+	{ .compatible = "maxim,max11607", .data = (void *)max11607 },
+	{ .compatible = "maxim,max11608", .data = (void *)max11608 },
+	{ .compatible = "maxim,max11609", .data = (void *)max11609 },
+	{ .compatible = "maxim,max11610", .data = (void *)max11610 },
+	{ .compatible = "maxim,max11611", .data = (void *)max11611 },
+	{ .compatible = "maxim,max11612", .data = (void *)max11612 },
+	{ .compatible = "maxim,max11613", .data = (void *)max11613 },
+	{ .compatible = "maxim,max11614", .data = (void *)max11614 },
+	{ .compatible = "maxim,max11615", .data = (void *)max11615 },
+	{ .compatible = "maxim,max11616", .data = (void *)max11616 },
+	{ .compatible = "maxim,max11617", .data = (void *)max11617 },
+	{ .compatible = "maxim,max11644", .data = (void *)max11644 },
+	{ .compatible = "maxim,max11645", .data = (void *)max11645 },
+	{ .compatible = "maxim,max11646", .data = (void *)max11646 },
+	{ .compatible = "maxim,max11647", .data = (void *)max11647 },
+	{ /* sentinel */ }
+};
+#endif
+
 static int max1363_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
@@ -1523,6 +1569,15 @@ static int max1363_probe(struct i2c_client *client,
 	struct max1363_state *st;
 	struct iio_dev *indio_dev;
 	struct regulator *vref;
+	unsigned long devid;
+	const struct of_device_id *match;
+
+	match = of_match_device(of_match_ptr(max1363_of_match),
+				&client->dev);
+	if (match)
+		devid = (int)of_device_get_match_data(&client->dev);
+	else
+		devid = id->driver_data;
 
 	indio_dev = devm_iio_device_alloc(&client->dev,
 					  sizeof(struct max1363_state));
@@ -1549,7 +1604,7 @@ static int max1363_probe(struct i2c_client *client,
 	/* this is only used for device removal purposes */
 	i2c_set_clientdata(client, indio_dev);
 
-	st->chip_info = &max1363_chip_info_tbl[id->driver_data];
+	st->chip_info = &max1363_chip_info_tbl[devid];
 	st->client = client;
 
 	st->vref_uv = st->chip_info->int_vref_mv * 1000;
@@ -1692,6 +1747,7 @@ MODULE_DEVICE_TABLE(i2c, max1363_id);
 static struct i2c_driver max1363_driver = {
 	.driver = {
 		.name = "max1363",
+		.of_match_table = of_match_ptr(max1363_of_match),
 	},
 	.probe = max1363_probe,
 	.remove = max1363_remove,
