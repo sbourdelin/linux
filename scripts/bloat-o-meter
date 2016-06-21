@@ -68,4 +68,4 @@ for d, n in delta:
     if d: print("%-40s %7s %7s %+7d" % (n, old.get(n,"-"), new.get(n,"-"), d))
 
 print("Total: Before=%d, After=%d, chg %f%%" % \
-    (otot, ntot, (ntot - otot)*100/otot))
+    (otot, ntot, (ntot - otot)*100.0/otot))
