@@ -1,0 +1,44 @@
+* ON Semiconductor - NCP5623 3-Channel LED Driver
+
+The NCP5623 is a 3-channel I2C LED driver. The brightness of each
+channel can be independently set using 32 levels. Each LED is represented
+as a sub-node of the device.
+
+Required properties:
+  - compatible: Should be "onnn,ncp5623"
+  - reg: I2C slave address (fixed to 0x38)
+  - #address-cells: must be 1
+  - #size-cells: must be 0
+  - onnn,led-iref-microamp: Current on the Iref pin in microampere
+  - led-max-microamp: Desired maximum current for each LED in microampere
+                      (maximum 30000uA)
+
+LED sub-node properties:
+  - reg : LED channel number (0..2)
+  - For other LED properties see:
+      Documentation/devicetree/bindings/leds/common.txt
+
+Example:
+
+led1: ncp5623@38 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	compatible = "onnn,ncp5623";
+	reg = <0x38>;
+
+	led1_r@0 {
+		label = "ncp:power:red";
+		reg = <0>;
+		linux,default-trigger = "default-on";
+	};
+
+	led1_b@1 {
+		label = "ncp:power:blue";
+		reg = <1>;
+	};
+
+	led1_g@2 {
+		label = "ncp:power:green";
+		reg = <2>;
+	};
+};
