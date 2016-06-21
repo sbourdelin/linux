@@ -81,6 +81,8 @@
 #define ARM_CPU_XSCALE_ARCH_V2		0x4000
 #define ARM_CPU_XSCALE_ARCH_V3		0x6000
 
+#define ARM_PARTNUM(cpuid_id) (cpuid_id & ARM_CPU_PART_MASK)
+
 extern unsigned int processor_id;
 
 #ifdef CONFIG_CPU_CP15
@@ -180,7 +182,7 @@ static inline unsigned int __attribute_const__ read_cpuid_implementor(void)
  */
 static inline unsigned int __attribute_const__ read_cpuid_part(void)
 {
-	return read_cpuid_id() & ARM_CPU_PART_MASK;
+	return ARM_PARTNUM(read_cpuid_id());
 }
 
 static inline unsigned int __attribute_const__ __deprecated read_cpuid_part_number(void)
@@ -207,6 +209,8 @@ static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
 {
 	return read_cpuid(CPUID_MPIDR);
 }
+
+#define read_specific_cpuid(cpu_num) per_cpu_ptr(&cpu_data, cpu_num)->cpuid
 
 /*
  * Intel's XScale3 core supports some v6 features (supersections, L2)

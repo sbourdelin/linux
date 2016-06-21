@@ -38,6 +38,7 @@
 #define MIDR_PARTNUM_MASK	(0xfff << MIDR_PARTNUM_SHIFT)
 #define MIDR_PARTNUM(midr)	\
 	(((midr) & MIDR_PARTNUM_MASK) >> MIDR_PARTNUM_SHIFT)
+#define ARM_PARTNUM MIDR_PARTNUM
 #define MIDR_ARCHITECTURE_SHIFT	16
 #define MIDR_ARCHITECTURE_MASK	(0xf << MIDR_ARCHITECTURE_SHIFT)
 #define MIDR_ARCHITECTURE(midr)	\
@@ -126,6 +127,9 @@ static inline u32 __attribute_const__ read_cpuid_cachetype(void)
 {
 	return read_cpuid(CTR_EL0);
 }
+
+#define read_specific_cpuid(cpu_num) per_cpu_ptr(&cpu_data, cpu_num)->reg_midr
+
 #endif /* __ASSEMBLY__ */
 
 #endif
