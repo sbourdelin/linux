@@ -358,13 +358,13 @@ int mac802154_llsec_dev_add(struct mac802154_llsec *sec,
 {
 	struct mac802154_llsec_device *entry;
 	u32 skey = llsec_dev_hash_short(dev->short_addr, dev->pan_id);
-	u64 hwkey = llsec_dev_hash_long(dev->hwaddr);
+	u64 hwkey = llsec_dev_hash_long(dev->extended_addr);
 
 	BUILD_BUG_ON(sizeof(hwkey) != IEEE802154_ADDR_LEN);
 
 	if ((llsec_dev_use_shortaddr(dev->short_addr) &&
 	     llsec_dev_find_short(sec, dev->short_addr, dev->pan_id)) ||
-	     llsec_dev_find_long(sec, dev->hwaddr))
+	     llsec_dev_find_long(sec, dev->extended_addr))
 		return -EEXIST;
 
 	entry = kmalloc(sizeof(*entry), GFP_KERNEL);

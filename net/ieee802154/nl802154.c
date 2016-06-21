@@ -1628,7 +1628,7 @@ static int nl802154_send_device(struct sk_buff *msg, u32 cmd, u32 portid,
 	    nla_put_le16(msg, NL802154_DEV_ATTR_SHORT_ADDR,
 			 dev_desc->short_addr) ||
 	    nla_put_le64(msg, NL802154_DEV_ATTR_EXTENDED_ADDR,
-			 dev_desc->hwaddr, NL802154_DEV_ATTR_PAD) ||
+			 dev_desc->extended_addr, NL802154_DEV_ATTR_PAD) ||
 	    nla_put_u8(msg, NL802154_DEV_ATTR_SECLEVEL_EXEMPT,
 		       dev_desc->seclevel_exempt) ||
 	    nla_put_u32(msg, NL802154_DEV_ATTR_KEY_MODE, dev_desc->key_mode))
@@ -1725,8 +1725,7 @@ ieee802154_llsec_parse_device(struct nlattr *nla,
 	dev->frame_counter = nla_get_u32(attrs[NL802154_DEV_ATTR_FRAME_COUNTER]);
 	dev->pan_id = nla_get_le16(attrs[NL802154_DEV_ATTR_PAN_ID]);
 	dev->short_addr = nla_get_le16(attrs[NL802154_DEV_ATTR_SHORT_ADDR]);
-	/* TODO rename hwaddr to extended_addr */
-	dev->hwaddr = nla_get_le64(attrs[NL802154_DEV_ATTR_EXTENDED_ADDR]);
+	dev->extended_addr = nla_get_le64(attrs[NL802154_DEV_ATTR_EXTENDED_ADDR]);
 	dev->seclevel_exempt = nla_get_u8(attrs[NL802154_DEV_ATTR_SECLEVEL_EXEMPT]);
 	dev->key_mode = nla_get_u32(attrs[NL802154_DEV_ATTR_KEY_MODE]);
 
@@ -1850,7 +1849,7 @@ nl802154_dump_llsec_devkey(struct sk_buff *skb, struct netlink_callback *cb)
 						 cb->nlh->nlmsg_seq,
 						 NLM_F_MULTI, rdev,
 						 wpan_dev->netdev,
-						 dpos->hwaddr,
+						 dpos->extended_addr,
 						 kpos) < 0) {
 				/* TODO */
 				err = -EIO;
@@ -1903,9 +1902,7 @@ static int nl802154_add_llsec_devkey(struct sk_buff *skb, struct genl_info *info
 
 	/* TODO be32 */
 	key.frame_counter = nla_get_u32(attrs[NL802154_DEVKEY_ATTR_FRAME_COUNTER]);
-	/* TODO change naming hwaddr -> extended_addr
-	 * check unique identifier short+pan OR extended_addr
-	 */
+	/* TODO check unique identifier short+pan OR extended_addr */
 	extended_addr = nla_get_le64(attrs[NL802154_DEVKEY_ATTR_EXTENDED_ADDR]);
 	return rdev_add_devkey(rdev, wpan_dev, extended_addr, &key);
 }
@@ -1932,9 +1929,7 @@ static int nl802154_del_llsec_devkey(struct sk_buff *skb, struct genl_info *info
 					  &key.key_id) < 0)
 		return -ENOBUFS;
 
-	/* TODO change naming hwaddr -> extended_addr
-	 * check unique identifier short+pan OR extended_addr
-	 */
+	/* TODO check unique identifier short+pan OR extended_addr */
 	extended_addr = nla_get_le64(attrs[NL802154_DEVKEY_ATTR_EXTENDED_ADDR]);
 	return rdev_del_devkey(rdev, wpan_dev, extended_addr, &key);
 }
