@@ -73,10 +73,14 @@ static unsigned long lowmem_deathpending_timeout;
 static unsigned long lowmem_count(struct shrinker *s,
 				  struct shrink_control *sc)
 {
-	return global_page_state(NR_ACTIVE_ANON) +
-		global_page_state(NR_ACTIVE_FILE) +
-		global_page_state(NR_INACTIVE_ANON) +
-		global_page_state(NR_INACTIVE_FILE);
+	unsigned long freeable = global_page_state(NR_ACTIVE_FILE) +
+				global_page_state(NR_INACTIVE_FILE);
+
+	if (get_nr_swap_pages() > 0)
+		freeable += global_page_state(NR_ACTIVE_ANON) +
+				global_page_state(NR_INACTIVE_ANON);
+
+	return freeable;
 }
 
 static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
