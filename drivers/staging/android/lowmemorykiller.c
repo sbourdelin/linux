@@ -7,9 +7,9 @@
  * /sys/module/lowmemorykiller/parameters/minfree. Both files take a comma
  * separated list of numbers in ascending order.
  *
- * For example, write "0,8" to /sys/module/lowmemorykiller/parameters/adj and
- * "1024,4096" to /sys/module/lowmemorykiller/parameters/minfree to kill
- * processes with a oom_score_adj value of 8 or higher when the free memory
+ * For example, write "0,470" to /sys/module/lowmemorykiller/parameters/score_adj
+ * and "1024,4096" to /sys/module/lowmemorykiller/parameters/minfree to kill
+ * processes with a oom_score_adj value of 470 or higher when the free memory
  * drops below 4096 pages and kill processes with a oom_score_adj value of 0 or
  * higher when the free memory drops below 1024 pages.
  *
@@ -44,14 +44,15 @@
 #include <linux/notifier.h>
 
 static u32 lowmem_debug_level = 1;
-static short lowmem_adj[6] = {
+
+static short lowmem_score_adj[6] = {
 	0,
-	1,
-	6,
-	12,
+	58,
+	352,
+	705,
 };
 
-static int lowmem_adj_size = 4;
+static int lowmem_score_adj_size = 4;
 static int lowmem_minfree[6] = {
 	3 * 512,	/* 6MB */
 	2 * 1024,	/* 8MB */
@@ -89,20 +90,20 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 	int minfree = 0;
 	int selected_tasksize = 0;
 	short selected_oom_score_adj;
-	int array_size = ARRAY_SIZE(lowmem_adj);
+	int array_size = ARRAY_SIZE(lowmem_score_adj);
 	int other_free = global_page_state(NR_FREE_PAGES) - totalreserve_pages;
 	int other_file = global_page_state(NR_FILE_PAGES) -
 						global_page_state(NR_SHMEM) -
 						total_swapcache_pages();
 
-	if (lowmem_adj_size < array_size)
-		array_size = lowmem_adj_size;
+	if (lowmem_score_adj_size < array_size)
+		array_size = lowmem_score_adj_size;
 	if (lowmem_minfree_size < array_size)
 		array_size = lowmem_minfree_size;
 	for (i = 0; i < array_size; i++) {
 		minfree = lowmem_minfree[i];
 		if (other_free < minfree && other_file < minfree) {
-			min_score_adj = lowmem_adj[i];
+			min_score_adj = lowmem_score_adj[i];
 			break;
 		}
 	}
@@ -165,7 +166,7 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		if (selected->mm)
 			task_set_lmk_waiting(selected);
 		task_unlock(selected);
-		lowmem_print(1, "Killing '%s' (%d), adj %hd,\n"
+		lowmem_print(1, "Killing '%s' (%d), score adj %hd,\n"
 				 "   to free %ldkB on behalf of '%s' (%d) because\n"
 				 "   cache %ldkB is below limit %ldkB for oom_score_adj %hd\n"
 				 "   Free memory is %ldkB above reserved\n",
@@ -205,7 +206,7 @@ device_initcall(lowmem_init);
  * bootargs behaviour is to continue using module_param here.
  */
 module_param_named(cost, lowmem_shrinker.seeks, int, S_IRUGO | S_IWUSR);
-module_param_array_named(adj, lowmem_adj, short, &lowmem_adj_size,
+module_param_array_named(score_adj, lowmem_score_adj, short, &lowmem_score_adj_size,
 			 S_IRUGO | S_IWUSR);
 module_param_array_named(minfree, lowmem_minfree, uint, &lowmem_minfree_size,
 			 S_IRUGO | S_IWUSR);
