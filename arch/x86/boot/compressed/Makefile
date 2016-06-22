@@ -88,8 +88,16 @@ vmlinux-objs-$(CONFIG_EFI_MIXED) += $(obj)/efi_thunk_$(BITS).o
 $(obj)/vmlinux: $(vmlinux-objs-y) FORCE
 	$(call if_changed,ld)
 
+quiet_cmd_inscert = INSCERT /dev/null to $<
+      cmd_inscert = scripts/insert-sys-cert -b $< -c /dev/null > /dev/null
+
 OBJCOPYFLAGS_vmlinux.bin :=  -R .comment -S
 $(obj)/vmlinux.bin: vmlinux FORCE
+ifndef CROSS_COMPILE
+ifeq ("$(CONFIG_SYSTEM_EXTRA_CERTIFICATE)", "y")
+	$(call if_changed,inscert)
+endif
+endif
 	$(call if_changed,objcopy)
 
 targets += $(patsubst $(obj)/%,%,$(vmlinux-objs-y)) vmlinux.bin.all vmlinux.relocs
