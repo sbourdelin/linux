@@ -194,6 +194,9 @@ struct p9_fid {
 
 	struct list_head flist;
 	struct hlist_node dlist;	/* list of all fids attached to a dentry */
+	struct hlist_node ilist;	/* list of all open fids attached to an
+					 * inode
+					 */
 };
 
 /**
