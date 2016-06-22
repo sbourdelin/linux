@@ -100,6 +100,7 @@ mode_store(struct device *dev, struct device_attribute *attr,
 	mutex_lock(&tz->lock);
 	result = tz->ops->set_mode(tz, mode);
 	mutex_unlock(&tz->lock);
+	thermal_zone_device_update(tz);
 
 	if (result)
 		return result;
