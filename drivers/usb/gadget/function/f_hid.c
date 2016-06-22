@@ -809,11 +809,28 @@ end:
 
 CONFIGFS_ATTR(f_hid_opts_, report_desc);
 
+static ssize_t f_hid_opts_major_show(struct config_item *item, char *page)
+{
+	return sprintf(page, "%d\n", major);
+}
+
+static ssize_t f_hid_opts_minor_show(struct config_item *item, char *page)
+{
+	struct f_hid_opts *opts = to_f_hid_opts(item);
+
+	return sprintf(page, "%d\n", opts->minor);
+}
+
+CONFIGFS_ATTR_RO(f_hid_opts_, major);
+CONFIGFS_ATTR_RO(f_hid_opts_, minor);
+
 static struct configfs_attribute *hid_attrs[] = {
 	&f_hid_opts_attr_subclass,
 	&f_hid_opts_attr_protocol,
 	&f_hid_opts_attr_report_length,
 	&f_hid_opts_attr_report_desc,
+	&f_hid_opts_attr_major,
+	&f_hid_opts_attr_minor,
 	NULL,
 };
 
