@@ -589,7 +589,7 @@ static struct dentry *dentry_kill(struct dentry *dentry)
 
 failed:
 	spin_unlock(&dentry->d_lock);
-	cpu_relax();
+	cond_resched();
 	return dentry; /* try again with same dentry */
 }
 
@@ -763,6 +763,8 @@ void dput(struct dentry *dentry)
 		return;
 
 repeat:
+	might_sleep();
+
 	rcu_read_lock();
 	if (likely(fast_dput(dentry))) {
 		rcu_read_unlock();
