@@ -746,6 +746,13 @@ KBUILD_CFLAGS 	+= $(call cc-option, -femit-struct-debug-baseonly) \
 		   $(call cc-option,-fno-var-tracking)
 endif
 
+ifdef CONFIG_LIVEPATCH
+# The compiler might generate ABI "shortcuts" to speed up the code,
+# making assumptions which are no longer valid when live patching
+# is enabled. Disable all of them.
+KBUILD_CFLAGS	+= $(call cc-option,-fno-ipa-ra)
+endif
+
 ifdef CONFIG_FUNCTION_TRACER
 ifndef CC_FLAGS_FTRACE
 CC_FLAGS_FTRACE := -pg
