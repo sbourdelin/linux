@@ -13,6 +13,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/of.h>
+#include <linux/of_gpio.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/of_regulator.h>
@@ -350,3 +351,54 @@ struct regulator_init_data *regulator_of_get_init_data(struct device *dev,
 
 	return init_data;
 }
+
+int of_get_regulator_gpio_config(struct device *dev, struct device_node *np,
+				 const char *prop,
+				 struct regulator_config *cfg)
+{
+	enum of_gpio_flags flags;
+	bool active_high;
+	int ena_gpio;
+
+	/* Do we have an enable GPIO property? */
+	ena_gpio = of_get_named_gpio_flags(np, prop, 0, &flags);
+	if (!gpio_is_valid(ena_gpio)) {
+		/* No enable GPIO defined, nothing to do */
+		if (ena_gpio == -ENOENT)
+			return 0;
+
+		if (ena_gpio != -EPROBE_DEFER)
+			dev_err(dev, "error getting enable GPIO: %d\n",
+				ena_gpio);
+		return ena_gpio;
+	}
+
+	cfg->ena_gpio_initialized = true;
+	cfg->ena_gpio = ena_gpio;
+
+	/* Is GPIO active-low? */
+	active_high = of_property_read_bool(np, "enable-active-high");
+	cfg->ena_gpio_invert = of_property_read_bool(np, "enable-active-high") ?
+				false : !!(flags & OF_GPIO_ACTIVE_LOW);
+
+	/* Should GPIO be set? */
+	if (of_property_read_bool(np, "regulator-boot-on") ||
+	    of_property_read_bool(np, "regulator-always-on") ||
+	    of_property_read_bool(np, "enable-at-boot")) {
+		if (cfg->ena_gpio_invert)
+			cfg->ena_gpio_flags |= GPIOF_OUT_INIT_LOW;
+		else
+			cfg->ena_gpio_flags |= GPIOF_OUT_INIT_HIGH;
+	} else {
+		if (cfg->ena_gpio_invert)
+			cfg->ena_gpio_flags |= GPIOF_OUT_INIT_HIGH;
+		else
+			cfg->ena_gpio_flags |= GPIOF_OUT_INIT_LOW;
+	}
+
+	if (of_property_read_bool(np, "gpio_open_drain"))
+		cfg->ena_gpio_flags |= GPIOF_OPEN_DRAIN;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(of_get_regulator_gpio_config);

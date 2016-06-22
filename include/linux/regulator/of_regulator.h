@@ -7,6 +7,7 @@
 #define __LINUX_OF_REG_H
 
 struct regulator_desc;
+struct regulator_config;
 
 struct of_regulator_match {
 	const char *name;
@@ -24,6 +25,10 @@ extern struct regulator_init_data
 extern int of_regulator_match(struct device *dev, struct device_node *node,
 			      struct of_regulator_match *matches,
 			      unsigned int num_matches);
+extern int of_get_regulator_gpio_config(struct device *dev,
+					struct device_node *node,
+					const char *prop,
+					struct regulator_config *config);
 #else
 static inline struct regulator_init_data
 	*of_get_regulator_init_data(struct device *dev,
@@ -40,6 +45,15 @@ static inline int of_regulator_match(struct device *dev,
 {
 	return 0;
 }
+
+static inline int of_get_regulator_gpio_config(struct device *dev,
+					       struct device_node *node,
+					       const char *prop,
+					       struct regulator_config *config)
+{
+	return 0;
+}
+
 #endif /* CONFIG_OF */
 
 #endif /* __LINUX_OF_REG_H */
