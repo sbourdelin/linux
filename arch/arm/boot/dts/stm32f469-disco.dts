@@ -64,6 +64,17 @@
 	aliases {
 		serial0 = &usart3;
 	};
+
+	/* This turns on vbus for otg for host mode (dwc2) */
+	vcc5v_otg: vcc5v-otg-regulator {
+		compatible = "regulator-fixed";
+		enable-active-high;
+		gpio = <&gpiob 2 0>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&usbotg_pwren_h>;
+		regulator-name = "vcc5_host1";
+		regulator-always-on;
+	};
 };
 
 &clk_hse {
@@ -72,4 +83,23 @@
 
 &usart3 {
 	status = "okay";
+};
+
+&usbotg_fs {
+	dr_mode = "host";
+	pinctrl-0 = <&usbotg_fs_pins_a>;
+	pinctrl-names = "default";
+	status = "okay";
+};
+
+&pinctrl {
+	usb-host {
+		usbotg_pwren_h: usbotg-pwren-h {
+			pins {
+				pinmux = <STM32F429_PB2_FUNC_GPIO>;
+				bias-disable;
+				drive-push-pull;
+			};
+		};
+	};
 };
