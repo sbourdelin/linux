@@ -148,7 +148,7 @@ ebt_basic_match(const struct ebt_entry *e, const struct sk_buff *skb,
 		return 1;
 	if (FWINV2(ebt_dev_check(e->out, out), EBT_IOUT))
 		return 1;
-	/* rcu_read_lock()ed by nf_hook_slow */
+	/* rcu_read_lock()ed by nf_hook_thresh */
 	if (in && (p = br_port_get_rcu(in)) != NULL &&
 	    FWINV2(ebt_dev_check(e->logical_in, p->br->dev), EBT_ILOGICALIN))
 		return 1;
