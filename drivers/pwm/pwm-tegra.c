@@ -29,6 +29,7 @@
 #include <linux/pwm.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
+#include <linux/reset.h>
 
 #define PWM_ENABLE	(1 << 31)
 #define PWM_DUTY_WIDTH	8
@@ -43,6 +44,7 @@ struct tegra_pwm_chip {
 	struct device		*dev;
 
 	struct clk		*clk;
+	struct reset_control	*rstc;
 
 	void __iomem		*mmio_base;
 };
@@ -188,6 +190,14 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 	pwm->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(pwm->clk))
 		return PTR_ERR(pwm->clk);
+
+	pwm->rstc = devm_reset_control_get(&pdev->dev, "pwm");
+	if (IS_ERR(pwm->rstc)) {
+		ret = PTR_ERR(pwm->rstc);
+		dev_err(&pdev->dev, "Reset control is not found: %d\n", ret);
+		return ret;
+	}
+	reset_control_reset(pwm->rstc);
 
 	pwm->chip.dev = &pdev->dev;
 	pwm->chip.ops = &tegra_pwm_ops;
