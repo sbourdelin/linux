@@ -2696,7 +2696,7 @@ static int _nfs4_do_setattr(struct inode *inode, struct rpc_cred *cred,
 	struct rpc_cred *delegation_cred = NULL;
 	unsigned long timestamp = jiffies;
 	fmode_t fmode;
-	bool truncate;
+	bool truncate, use_delegation = false;
 	int status;
 
 	arg.bitmask = nfs4_bitmask(server, ilabel);
@@ -2711,6 +2711,7 @@ static int _nfs4_do_setattr(struct inode *inode, struct rpc_cred *cred,
 
 	if (nfs4_copy_delegation_stateid(inode, fmode, &arg.stateid, &delegation_cred)) {
 		/* Use that stateid */
+		use_delegation = true;
 	} else if (truncate && state != NULL) {
 		struct nfs_lockowner lockowner = {
 			.l_owner = current->files,
@@ -2732,6 +2733,13 @@ static int _nfs4_do_setattr(struct inode *inode, struct rpc_cred *cred,
 	if (status == 0 && state != NULL)
 		renew_lease(server, timestamp);
 	trace_nfs4_setattr(inode, &arg.stateid, status);
+	switch (status) {
+	case -NFS4ERR_DELEG_REVOKED:
+	case -NFS4ERR_ADMIN_REVOKED:
+	case -NFS4ERR_BAD_STATEID:
+		if (use_delegation && !nfs4_have_delegation(inode, fmode))
+			status = -EAGAIN;
+	}
 	return status;
 }
 
@@ -2765,6 +2773,8 @@ static int nfs4_do_setattr(struct inode *inode, struct rpc_cred *cred,
 			}
 		}
 		err = nfs4_handle_exception(server, err, &exception);
+		if (err == -EAGAIN)
+			exception.retry = 1;
 	} while (exception.retry);
 out:
 	return err;
