@@ -129,6 +129,13 @@ struct stm_source_data {
 	void			(*unlink)(struct stm_source_data *data);
 };
 
+struct stm_ftrace {
+	struct stm_source_data	data;
+	void (*write)(struct stm_source_data *data, const char *buf,
+		      unsigned int len, unsigned int chan);
+	bool available;
+};
+
 int stm_source_register_device(struct device *parent,
 			       struct stm_source_data *data);
 void stm_source_unregister_device(struct stm_source_data *data);
