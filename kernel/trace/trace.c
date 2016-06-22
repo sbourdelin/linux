@@ -41,6 +41,7 @@
 #include <linux/nmi.h>
 #include <linux/fs.h>
 #include <linux/sched/rt.h>
+#include <linux/trace_output_stm.h>
 
 #include "trace.h"
 #include "trace_output.h"
@@ -1884,8 +1885,10 @@ trace_function(struct trace_array *tr,
 	entry->ip			= ip;
 	entry->parent_ip		= parent_ip;
 
-	if (!call_filter_check_discard(call, entry, buffer, event))
+	if (!call_filter_check_discard(call, entry, buffer, event)) {
 		__buffer_unlock_commit(buffer, event);
+		trace_func_to_stm(ip, parent_ip);
+	}
 }
 
 #ifdef CONFIG_STACKTRACE
