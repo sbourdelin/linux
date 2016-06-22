@@ -13704,6 +13704,7 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 	struct drm_plane *plane;
 	struct drm_plane_state *plane_state;
 	bool hw_check = intel_state->modeset;
+	bool need_post_state;
 	unsigned long put_domains[I915_MAX_PIPES] = {};
 	unsigned crtc_vblank_mask = 0;
 	int i, ret;
@@ -13722,7 +13723,8 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 		WARN_ON(ret);
 	}
 
-	drm_atomic_helper_wait_for_dependencies(state);
+	if (!state->legacy_cursor_update)
+		drm_atomic_helper_wait_for_dependencies(state);
 
 	if (intel_state->modeset) {
 		memcpy(dev_priv->min_pixclk, intel_state->min_pixclk,
@@ -13819,6 +13821,17 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 			crtc_vblank_mask |= 1 << i;
 	}
 
+	need_post_state = false;
+	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
+		intel_cstate = to_intel_crtc_state(crtc->state);
+
+		if (intel_cstate->wm.need_postvbl_update)
+			need_post_state = true;
+
+		if (needs_modeset(crtc->state) || intel_cstate->update_pipe)
+			need_post_state = true;
+	}
+
 	/* FIXME: We should call drm_atomic_helper_commit_hw_done() here
 	 * already, but still need the state for the delayed optimization. To
 	 * fix this:
@@ -13828,6 +13841,9 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 	 * - switch over to the vblank wait helper in the core after that since
 	 *   we don't need out special handling any more.
 	 */
+	if (!need_post_state)
+		drm_atomic_helper_commit_hw_done(state);
+
 	if (!state->legacy_cursor_update)
 		intel_atomic_wait_for_vblanks(dev, dev_priv, crtc_vblank_mask);
 
@@ -13854,7 +13870,8 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 		intel_modeset_verify_crtc(crtc, old_crtc_state, crtc->state);
 	}
 
-	drm_atomic_helper_commit_hw_done(state);
+	if (need_post_state)
+		drm_atomic_helper_commit_hw_done(state);
 
 	if (intel_state->modeset)
 		intel_display_power_put(dev_priv, POWER_DOMAIN_MODESET);
