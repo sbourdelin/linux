@@ -134,7 +134,7 @@
 
 #if defined(CONFIG_PM) || defined(CONFIG_PMAC_BACKLIGHT) || \
 defined (CONFIG_FB_ATY_GENERIC_LCD) || defined(CONFIG_FB_ATY_BACKLIGHT)
-static const u32 lt_lcd_regs[] = {
+static const u32 lt_lcd_regs[LCD_REG_NUM] = {
 	CNFG_PANEL_LG,
 	LCD_GEN_CNTL_LG,
 	DSTN_CONTROL_LG,

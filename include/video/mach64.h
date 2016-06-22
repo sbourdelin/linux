@@ -1299,6 +1299,7 @@
 #define APC_LUT_KL		0x38
 #define APC_LUT_MN		0x39
 #define APC_LUT_OP		0x3A
+#define LCD_REG_NUM		0x3B /* total number */
 
 /* Values in LCD_GEN_CTRL */
 #define CRT_ON                          0x00000001ul
