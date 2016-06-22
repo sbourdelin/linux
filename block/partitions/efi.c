@@ -147,10 +147,13 @@ efi_crc32(const void *buf, unsigned long len)
  */
 static u64 last_lba(struct block_device *bdev)
 {
+	unsigned int blocksize;
+
 	if (!bdev || !bdev->bd_inode)
 		return 0;
-	return div_u64(bdev->bd_inode->i_size,
-		       bdev_logical_block_size(bdev)) - 1ULL;
+
+	blocksize = bdev_logical_block_size(bdev);
+	return (bdev->bd_inode->i_size >> ilog2(blocksize)) - 1ULL;
 }
 
 static inline int pmbr_part_valid(gpt_mbr_record *part)
