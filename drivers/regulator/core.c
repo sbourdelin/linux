@@ -2111,6 +2111,9 @@ static int _regulator_do_enable(struct regulator_dev *rdev)
 		}
 	}
 
+	if (!rdev->ena_pin && !rdev->desc->ops->enable)
+		return -EINVAL;
+
 	if (rdev->ena_pin) {
 		if (!rdev->ena_gpio_state) {
 			ret = regulator_ena_gpio_ctrl(rdev, true);
@@ -2118,12 +2121,12 @@ static int _regulator_do_enable(struct regulator_dev *rdev)
 				return ret;
 			rdev->ena_gpio_state = 1;
 		}
-	} else if (rdev->desc->ops->enable) {
+	}
+
+	if (rdev->desc->ops->enable) {
 		ret = rdev->desc->ops->enable(rdev);
 		if (ret < 0)
 			return ret;
-	} else {
-		return -EINVAL;
 	}
 
 	/* Allow the regulator to ramp; it would be useful to extend
@@ -2215,6 +2218,12 @@ static int _regulator_do_disable(struct regulator_dev *rdev)
 
 	trace_regulator_disable(rdev_get_name(rdev));
 
+	if (rdev->desc->ops->disable) {
+		ret = rdev->desc->ops->disable(rdev);
+		if (ret != 0)
+			return ret;
+	}
+
 	if (rdev->ena_pin) {
 		if (rdev->ena_gpio_state) {
 			ret = regulator_ena_gpio_ctrl(rdev, false);
@@ -2222,11 +2231,6 @@ static int _regulator_do_disable(struct regulator_dev *rdev)
 				return ret;
 			rdev->ena_gpio_state = 0;
 		}
-
-	} else if (rdev->desc->ops->disable) {
-		ret = rdev->desc->ops->disable(rdev);
-		if (ret != 0)
-			return ret;
 	}
 
 	/* cares about last_off_jiffy only if off_on_delay is required by
@@ -2436,15 +2440,17 @@ EXPORT_SYMBOL_GPL(regulator_disable_deferred);
 
 static int _regulator_is_enabled(struct regulator_dev *rdev)
 {
-	/* A GPIO control always takes precedence */
-	if (rdev->ena_pin)
-		return rdev->ena_gpio_state;
-
 	/* If we don't know then assume that the regulator is always on */
-	if (!rdev->desc->ops->is_enabled)
-		return 1;
+	bool pin_enb = true;
+	bool ops_enb = true;
 
-	return rdev->desc->ops->is_enabled(rdev);
+	if (rdev->ena_pin)
+		pin_enb = rdev->ena_gpio_state;
+
+	if (rdev->desc->ops->is_enabled)
+		ops_enb = rdev->desc->ops->is_enabled(rdev);
+
+	return pin_enb && ops_enb;
 }
 
 static int _regulator_list_voltage(struct regulator *regulator,
