@@ -200,9 +200,9 @@ static unsigned long long iblock_emulate_read_cap_with_block_size(
 	struct block_device *bd,
 	struct request_queue *q)
 {
-	unsigned long long blocks_long = (div_u64(i_size_read(bd->bd_inode),
-					bdev_logical_block_size(bd)) - 1);
 	u32 block_size = bdev_logical_block_size(bd);
+	unsigned int block_shift = ilog2(block_size);
+	unsigned long long blocks_long = (i_size_read(bd->bd_inode) >> block_shift) - 1;
 
 	if (block_size == dev->dev_attrib.block_size)
 		return blocks_long;
