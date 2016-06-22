@@ -2455,7 +2455,7 @@ static bool kvm_is_mmio_pfn(kvm_pfn_t pfn)
 	if (pfn_valid(pfn))
 		return !is_zero_pfn(pfn) && PageReserved(pfn_to_page(pfn));
 
-	return true;
+	return !e820_is_ram(pfn << PAGE_SHIFT);
 }
 
 static int set_spte(struct kvm_vcpu *vcpu, u64 *sptep,

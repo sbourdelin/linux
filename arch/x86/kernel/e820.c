@@ -104,6 +104,24 @@ int __init e820_all_mapped(u64 start, u64 end, unsigned type)
 	return 0;
 }
 
+bool
+e820_is_ram(u64 addr)
+{
+	int i;
+
+	for (i = 0; i < e820_saved.nr_map; i++) {
+		struct e820entry *ei = &e820_saved.map[i];
+
+		if (ei->type != E820_RAM)
+			continue;
+		if ((addr >= ei->addr) && (addr < (ei->addr + ei->size)))
+			return true;
+	}
+
+	return false;
+}
+EXPORT_SYMBOL_GPL(e820_is_ram);
+
 /*
  * Add a memory region to the kernel e820 map.
  */
