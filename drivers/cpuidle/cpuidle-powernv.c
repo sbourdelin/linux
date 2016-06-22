@@ -268,10 +268,24 @@ static int powernv_idle_probe(void)
 		cpuidle_state_table = powernv_states;
 		/* Device tree can indicate more idle states */
 		max_idle_state = powernv_add_idle_states();
+
+		/*
+		 * Staying in snooze for a long period can degrade the
+		 * perfomance of the sibling cpus. Set timeout for snooze such
+		 * that if the cpu stays in snooze longer than target residency
+		 * of the next available idle state then exit from snooze. This
+		 * gives a chance to the cpuidle governor to re-evaluate and
+		 * promote it to deeper idle states.
+		 */
 		if (max_idle_state > 1) {
 			snooze_timeout_en = true;
 			snooze_timeout = powernv_states[1].target_residency *
 					 tb_ticks_per_usec;
+			/*
+			 * Give a 5% margin since target residency related math
+			 * is not precise in cpuidle core.
+			 */
+			snooze_timeout += snooze_timeout / 20;
 		}
  	} else
  		return -ENODEV;

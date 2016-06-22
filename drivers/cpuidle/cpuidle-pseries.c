@@ -250,10 +250,23 @@ static int pseries_idle_probe(void)
 	} else
 		return -ENODEV;
 
+	/*
+	 * Staying in snooze for a long period can degrade the
+	 * perfomance of the sibling cpus. Set timeout for snooze such
+	 * that if the cpu stays in snooze longer than target residency
+	 * of the next available idle state then exit from snooze. This
+	 * gives a chance to the cpuidle governor to re-evaluate and
+	 * promote it to deeper idle states.
+	 */
 	if (max_idle_state > 1) {
 		snooze_timeout_en = true;
 		snooze_timeout = cpuidle_state_table[1].target_residency *
 				 tb_ticks_per_usec;
+		/*
+		 * Give a 5% margin since target residency related math
+		 * is not precise in cpuidle core.
+		 */
+		snooze_timeout += snooze_timeout / 20;
 	}
 	return 0;
 }
