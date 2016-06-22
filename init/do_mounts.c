@@ -599,7 +599,6 @@ void __init prepare_namespace(void)
 
 	mount_root();
 out:
-	devtmpfs_mount("dev");
 	sys_mount(".", "/", NULL, MS_MOVE, NULL);
 	sys_chroot(".");
 }
@@ -614,8 +613,9 @@ static struct dentry *rootfs_mount(struct file_system_type *fs_type,
 	if (test_and_set_bit(0, &once))
 		return ERR_PTR(-ENODEV);
 
-	if (IS_ENABLED(CONFIG_TMPFS) && is_tmpfs)
+	if (is_tmpfs)
 		fill = shmem_fill_super;
+	printk(KERN_INFO "rootfs is %s\n", is_tmpfs ? "tmpfs" : "ramfs");
 
 	return mount_nodev(fs_type, flags, data, fill);
 }
@@ -637,9 +637,8 @@ int __init init_rootfs(void)
 		(!root_fs_names || strstr(root_fs_names, "tmpfs"))) {
 		err = shmem_init();
 		is_tmpfs = true;
-	} else {
+	} else
 		err = init_ramfs_fs();
-	}
 
 	if (err)
 		unregister_filesystem(&rootfs_fs_type);
