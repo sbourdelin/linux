@@ -381,7 +381,7 @@ static int hfs_read_inode(struct inode *inode, void *data)
  */
 struct inode *hfs_iget(struct super_block *sb, struct hfs_cat_key *key, hfs_cat_rec *rec)
 {
-	struct hfs_iget_data data = { key, rec };
+	struct hfs_iget_data data = { .key = key, .rec = rec };
 	struct inode *inode;
 	u32 cnid;
 
@@ -528,7 +528,7 @@ static struct dentry *hfs_file_lookup(struct inode *dir, struct dentry *dentry,
 	fd.search_key->cat = HFS_I(dir)->cat_key;
 	res = hfs_brec_read(&fd, &rec, sizeof(rec));
 	if (!res) {
-		struct hfs_iget_data idata = { NULL, &rec };
+		struct hfs_iget_data idata = { .rec = &rec };
 		hfs_read_inode(inode, &idata);
 	}
 	hfs_find_exit(&fd);
