@@ -314,6 +314,7 @@ enum bpf_func_id {
 	 */
 	BPF_FUNC_skb_get_tunnel_opt,
 	BPF_FUNC_skb_set_tunnel_opt,
+	BPF_FUNC_skb_in_cgroup,
 	__BPF_FUNC_MAX_ID,
 };
 

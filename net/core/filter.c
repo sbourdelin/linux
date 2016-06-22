@@ -2024,6 +2024,40 @@ bpf_get_skb_set_tunnel_proto(enum bpf_func_id which)
 	}
 }
 
+static u64 bpf_skb_in_cgroup(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5)
+{
+	struct sk_buff *skb = (struct sk_buff *)(long)r1;
+	struct bpf_map *map = (struct bpf_map *)(long)r2;
+	struct bpf_array *array = container_of(map, struct bpf_array, map);
+	u32 i = (u32)r3;
+	struct cgroup *cgrp;
+	struct sock *sk;
+
+	WARN_ON_ONCE(!rcu_read_lock_held());
+
+	sk = skb->sk;
+	if (!sk || !sk_fullsock(sk))
+		return -ENOENT;
+
+	if (unlikely(i >= array->map.max_entries))
+		return -E2BIG;
+
+	cgrp = READ_ONCE(array->ptrs[i]);
+	if (unlikely(!cgrp))
+		return -ENOENT;
+
+	return cgroup_is_descendant(sock_cgroup_ptr(&sk->sk_cgrp_data), cgrp);
+}
+
+static const struct bpf_func_proto bpf_skb_in_cgroup_proto = {
+	.func		= bpf_skb_in_cgroup,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_CTX,
+	.arg2_type	= ARG_CONST_MAP_PTR,
+	.arg3_type	= ARG_ANYTHING,
+};
+
 static const struct bpf_func_proto *
 sk_filter_func_proto(enum bpf_func_id func_id)
 {
@@ -2086,6 +2120,8 @@ tc_cls_act_func_proto(enum bpf_func_id func_id)
 		return &bpf_get_route_realm_proto;
 	case BPF_FUNC_perf_event_output:
 		return bpf_get_event_output_proto();
+	case BPF_FUNC_skb_in_cgroup:
+		return &bpf_skb_in_cgroup_proto;
 	default:
 		return sk_filter_func_proto(func_id);
 	}
