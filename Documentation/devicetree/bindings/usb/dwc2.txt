@@ -11,6 +11,7 @@ Required properties:
   - "lantiq,arx100-usb": The DWC2 USB controller instance in Lantiq ARX SoCs;
   - "lantiq,xrx200-usb": The DWC2 USB controller instance in Lantiq XRX SoCs;
   - snps,dwc2: A generic DWC2 USB controller with default parameters.
+  - st,stm32-fsotg: The DWC2 USB controller instance in STM32F4 SoCs in FS mode;
 - reg : Should contain 1 register range (address and length)
 - interrupts : Should contain 1 interrupt
 - clocks: clock provider specifier
