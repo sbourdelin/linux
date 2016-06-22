@@ -1,0 +1,58 @@
+Binding for sbs-manager
+
+Required properties:
+- compatible: should be "sbs,sbs-manager" or "lltc,ltc1760" if device is a
+    ltc1760.
+- reg: integer, i2c address of the device. Should be <0xa>.
+
+Optional properties:
+- sbsm,i2c-retry-count: integer, number of retries for trying to read or write
+    to registers. Default: 1
+
+From OS view the device is basically an i2c-mux used to communicate with up to
+four smart battery devices at address 0xb. The driver actually implements this
+behaviour. So standard i2c-mux nodes can be used to register up to four slave
+batteries. Channels will be numerated as 1, 2, 4 and 8.
+
+Example:
+
+batman@0a {
+    compatible = "sbs,sbs-manager";
+    reg = <0x0a>;
+    sbsm,i2c-retry-count = <3>;
+    #address-cells = <1>;
+    #size-cells = <0>;
+
+    channel1@1 {
+        #address-cells = <1>;
+        #size-cells = <0>;
+        reg = <1>;
+
+        battery1@0b {
+            compatible = "sbs-battery";
+            reg = <0x0b>;
+        };
+    };
+
+    channel2@2 {
+        #address-cells = <1>;
+        #size-cells = <0>;
+        reg = <2>;
+
+        battery2@0b {
+            compatible = "sbs-battery";
+            reg = <0x0b>;
+        };
+    };
+
+    channel3@4 {
+        #address-cells = <1>;
+        #size-cells = <0>;
+        reg = <4>;
+
+        battery3@0b {
+            compatible = "sbs-battery";
+            reg = <0x0b>;
+        };
+    };
+};
