@@ -46,6 +46,7 @@
 #include <asm/sizes.h>
 #include <asm/tlb.h>
 #include <asm/alternative.h>
+#include <asm/memblock.h>
 
 #include "mm.h"
 
@@ -172,7 +173,7 @@ static void __init arm64_memory_present(void)
 }
 #endif
 
-static phys_addr_t memory_limit = (phys_addr_t)ULLONG_MAX;
+phys_addr_t memory_limit = (phys_addr_t)ULLONG_MAX;
 
 /*
  * Limit the memory size that was specified via FDT.

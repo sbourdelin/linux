@@ -28,6 +28,7 @@
 #include <asm/cputype.h>
 #include <asm/cpu_ops.h>
 #include <asm/smp_plat.h>
+#include <asm/memblock.h>
 
 #ifdef CONFIG_ACPI_APEI
 # include <linux/efi.h>
@@ -196,6 +197,8 @@ out:
  */
 void __init acpi_boot_table_init(void)
 {
+	int i;
+
 	/*
 	 * Enable ACPI instead of device tree unless
 	 * - ACPI has been disabled explicitly (acpi=off), or
@@ -225,6 +228,26 @@ void __init acpi_boot_table_init(void)
 		pr_err("Failed to init ACPI tables\n");
 		if (!param_acpi_force)
 			disable_acpi();
+	}
+
+	/*
+	 * For the case of 'mem=x' kernel parameter specified by cmdline:
+	 * when ACPI parses raw AML data within the ACPI data region,
+	 * sometimes it will produce non-alignment memory access, in order
+	 * to make kernel avoid generating alignment fault in this case, we
+	 * need to add back the firmware ACPI memory region into memblock,
+	 * thus the ACPI core will map it as normal memory, otherwise ACPI
+	 * will map the region as device memory type which trigers alignment
+	 * exception.
+	 */
+	if (!acpi_disabled && memory_limit != (phys_addr_t)ULLONG_MAX) {
+		for (i = 0; i < nr_acpi_regs; i++) {
+			memblock_add(acpi_regs[i].base, acpi_regs[i].size);
+			/* MEMBLOCK_NOMAP maybe cleaned before, re-flag it */
+			if (acpi_regs[i].resv)
+				memblock_mark_nomap(acpi_regs[i].base,
+					acpi_regs[i].size);
+		}
 	}
 }
 

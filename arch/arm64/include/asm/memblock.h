@@ -16,6 +16,18 @@
 #ifndef __ASM_MEMBLOCK_H
 #define __ASM_MEMBLOCK_H
 
-extern void arm64_memblock_init(void);
+#ifdef CONFIG_ACPI
+typedef struct {
+	u64 base;
+	u64 size;
+	int resv;
+} efi_acpi_reg_t;
 
+#define MAX_ACPI_REGS   4
+extern unsigned int nr_acpi_regs;
+extern efi_acpi_reg_t acpi_regs[MAX_ACPI_REGS];
+#endif
+
+extern void arm64_memblock_init(void);
+extern phys_addr_t memory_limit;
 #endif

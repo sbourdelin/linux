@@ -23,8 +23,14 @@
 #include <linux/screen_info.h>
 
 #include <asm/efi.h>
+#include <asm/memblock.h>
 
 u64 efi_system_table;
+
+#ifdef CONFIG_ACPI
+unsigned int nr_acpi_regs;
+efi_acpi_reg_t acpi_regs[MAX_ACPI_REGS];
+#endif
 
 static int __init is_normal_ram(efi_memory_desc_t *md)
 {
@@ -210,6 +216,19 @@ static __init void reserve_regions(void)
 		if (resv)
 			memblock_mark_nomap(paddr, size);
 
+#ifdef CONFIG_ACPI
+		if (md->type == EFI_ACPI_RECLAIM_MEMORY ||
+			md->type == EFI_ACPI_MEMORY_NVS) {
+			if (nr_acpi_regs >= MAX_ACPI_REGS) {
+				WARN_ONCE(1, "Too many ACPI mem regions: %d\n", nr_acpi_regs);
+				continue;
+			}
+			acpi_regs[nr_acpi_regs].base = paddr;
+			acpi_regs[nr_acpi_regs].size = size;
+			acpi_regs[nr_acpi_regs].resv = resv;
+			nr_acpi_regs++;
+		}
+#endif
 	}
 
 	set_bit(EFI_MEMMAP, &efi.flags);
