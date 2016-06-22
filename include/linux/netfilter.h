@@ -55,12 +55,12 @@ struct nf_hook_state {
 	struct net_device *out;
 	struct sock *sk;
 	struct net *net;
-	struct list_head *hook_list;
+	struct nf_hook_entry *hook_list;
 	int (*okfn)(struct net *, struct sock *, struct sk_buff *);
 };
 
 static inline void nf_hook_state_init(struct nf_hook_state *p,
-				      struct list_head *hook_list,
+				      struct nf_hook_entry *hook_list,
 				      unsigned int hook,
 				      int thresh, u_int8_t pf,
 				      struct net_device *indev,
@@ -95,6 +95,12 @@ struct nf_hook_ops {
 	unsigned int		hooknum;
 	/* Hooks are ordered in ascending priority. */
 	int			priority;
+};
+
+struct nf_hook_entry {
+	struct nf_hook_entry __rcu	*next;
+	struct nf_hook_ops		ops;
+	const struct nf_hook_ops	*orig_ops;
 };
 
 struct nf_sockopt_ops {
@@ -161,8 +167,6 @@ static inline int nf_hook_thresh(u_int8_t pf, unsigned int hook,
 				 int (*okfn)(struct net *, struct sock *, struct sk_buff *),
 				 int thresh)
 {
-	struct list_head *hook_list;
-
 #ifdef HAVE_JUMP_LABEL
 	if (__builtin_constant_p(pf) &&
 	    __builtin_constant_p(hook) &&
@@ -170,14 +174,14 @@ static inline int nf_hook_thresh(u_int8_t pf, unsigned int hook,
 		return 1;
 #endif
 
-	hook_list = &net->nf.hooks[pf][hook];
-
-	if (!list_empty(hook_list)) {
+	if (rcu_access_pointer(net->nf.hooks[pf][hook])) {
+		struct nf_hook_entry *hook_list;
 		struct nf_hook_state state;
 		int ret;
 
 		/* We may already have this, but read-locks nest anyway */
 		rcu_read_lock();
+		hook_list = rcu_dereference(net->nf.hooks[pf][hook]);
 		nf_hook_state_init(&state, hook_list, hook, thresh,
 				   pf, indev, outdev, sk, net, okfn);
 

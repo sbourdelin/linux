@@ -919,10 +919,11 @@ static struct notifier_block nfqnl_dev_notifier = {
 
 static int nf_hook_cmp(struct nf_queue_entry *entry, unsigned long ops_ptr)
 {
-	return entry->elem == (struct nf_hook_ops *)ops_ptr;
+	return entry->state.hook_list == (struct nf_hook_entry *)ops_ptr;
 }
 
-static void nfqnl_nf_hook_drop(struct net *net, struct nf_hook_ops *hook)
+static void nfqnl_nf_hook_drop(struct net *net,
+			       const struct nf_hook_entry *hook)
 {
 	struct nfnl_queue_net *q = nfnl_queue_pernet(net);
 	int i;

@@ -11,7 +11,6 @@ struct nf_queue_entry {
 	struct sk_buff		*skb;
 	unsigned int		id;
 
-	struct nf_hook_ops	*elem;
 	struct nf_hook_state	state;
 	u16			size; /* sizeof(entry) + saved route keys */
 
@@ -22,10 +21,10 @@ struct nf_queue_entry {
 
 /* Packet queuing */
 struct nf_queue_handler {
-	int			(*outfn)(struct nf_queue_entry *entry,
-					 unsigned int queuenum);
-	void			(*nf_hook_drop)(struct net *net,
-						struct nf_hook_ops *ops);
+	int		(*outfn)(struct nf_queue_entry *entry,
+				 unsigned int queuenum);
+	void		(*nf_hook_drop)(struct net *net,
+					const struct nf_hook_entry *ops);
 };
 
 void nf_register_queue_handler(struct net *net, const struct nf_queue_handler *qh);
