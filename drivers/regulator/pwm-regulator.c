@@ -273,6 +273,11 @@ static int pwm_regulator_probe(struct platform_device *pdev)
 	if (!init_data)
 		return -ENOMEM;
 
+	ret = of_get_regulator_gpio_config(&pdev->dev, np, "enable-gpio",
+					   &config);
+	if (ret)
+		return ret;
+
 	config.of_node = np;
 	config.dev = &pdev->dev;
 	config.driver_data = drvdata;
