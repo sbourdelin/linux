@@ -62,6 +62,7 @@
 #include <linux/proc_ns.h>
 #include <linux/nsproxy.h>
 #include <linux/proc_ns.h>
+#include <linux/file.h>
 #include <net/sock.h>
 
 /*
@@ -6196,6 +6197,31 @@ struct cgroup *cgroup_get_from_path(const char *path)
 	return cgrp;
 }
 EXPORT_SYMBOL_GPL(cgroup_get_from_path);
+
+struct cgroup *cgroup_get_from_fd(int fd)
+{
+	struct cgroup_subsys_state *css;
+	struct cgroup *cgrp;
+	struct file *f;
+
+	f = fget_raw(fd);
+	if (!f)
+		return NULL;
+
+	css = css_tryget_online_from_dir(f->f_path.dentry, NULL);
+	fput(f);
+	if (IS_ERR(css))
+		return ERR_CAST(css);
+
+	cgrp = css->cgroup;
+	if (!cgroup_on_dfl(cgrp)) {
+		cgroup_put(cgrp);
+		return ERR_PTR(-EINVAL);
+	}
+
+	return cgrp;
+}
+EXPORT_SYMBOL_GPL(cgroup_get_from_fd);
 
 /*
  * sock->sk_cgrp_data handling.  For more info, see sock_cgroup_data
