@@ -67,10 +67,16 @@ int do_truncate(struct dentry *dentry, loff_t length, unsigned int time_attrs,
 
 long vfs_truncate(const struct path *path, loff_t length)
 {
+	struct dentry *dentry = path->dentry;
 	struct inode *inode;
 	long error;
 
-	inode = path->dentry->d_inode;
+	if (dentry->d_flags & DCACHE_OP_SELECT_INODE) {
+		inode = dentry->d_op->d_select_inode(dentry, O_TRUNC);
+		if (IS_ERR(inode))
+			return PTR_ERR(inode);
+	} else
+		inode = dentry->d_inode;
 
 	/* For directories it's -EISDIR, for other non-regulars - -EINVAL */
 	if (S_ISDIR(inode->i_mode))
@@ -106,7 +112,7 @@ long vfs_truncate(const struct path *path, loff_t length)
 	if (!error)
 		error = security_path_truncate(path);
 	if (!error)
-		error = do_truncate(path->dentry, length, 0, NULL);
+		error = do_truncate(dentry, length, 0, NULL);
 
 put_write_and_out:
 	put_write_access(inode);
