@@ -822,6 +822,8 @@ print_graph_entry_nested(struct trace_iterator *iter,
 		cpu_data = per_cpu_ptr(data->cpu_data, cpu);
 		cpu_data->depth = call->depth;
 
+		WARN(call->depth < 0, "call->depth = %d\n", call->depth);
+
 		/* Save this function pointer to see if the exit matches */
 		if (call->depth < FTRACE_RETFUNC_DEPTH)
 			cpu_data->enter_funcs[call->depth] = call->func;

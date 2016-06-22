@@ -38,6 +38,7 @@ static void __wakeup_reset(struct trace_array *tr);
 static int save_flags;
 
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+extern int ftrace_graph_ignore_notrace;
 static int wakeup_display_graph(struct trace_array *tr, int set);
 # define is_graph(tr) ((tr)->trace_flags & TRACE_ITER_DISPLAY_GRAPH)
 #else
@@ -672,6 +673,12 @@ static int __wakeup_tracer_init(struct trace_array *tr)
 	tr->max_latency = 0;
 	wakeup_trace = tr;
 	ftrace_init_array_ops(tr, wakeup_tracer_call);
+
+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+	/* bypass function_graph notrace filter */
+	ftrace_graph_ignore_notrace = 1;
+#endif
+
 	start_wakeup_tracer(tr);
 
 	wakeup_busy = true;
@@ -721,6 +728,10 @@ static void wakeup_tracer_reset(struct trace_array *tr)
 	set_tracer_flag(tr, TRACE_ITER_OVERWRITE, overwrite_flag);
 	ftrace_reset_array_ops(tr);
 	wakeup_busy = false;
+
+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+	ftrace_graph_ignore_notrace = 0;
+#endif
 }
 
 static void wakeup_tracer_start(struct trace_array *tr)

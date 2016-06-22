@@ -4495,6 +4495,7 @@ static DEFINE_MUTEX(graph_lock);
 
 int ftrace_graph_count;
 int ftrace_graph_notrace_count;
+int ftrace_graph_ignore_notrace;
 unsigned long ftrace_graph_funcs[FTRACE_GRAPH_MAX_FUNCS] __read_mostly;
 unsigned long ftrace_graph_notrace_funcs[FTRACE_GRAPH_MAX_FUNCS] __read_mostly;
 
