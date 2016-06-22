@@ -2441,8 +2441,8 @@ static bool __collapse_huge_page_swapin(struct mm_struct *mm,
 		/* do_swap_page returns VM_FAULT_RETRY with released mmap_sem */
 		if (ret & VM_FAULT_RETRY) {
 			down_read(&mm->mmap_sem);
-			/* vma is no longer available, don't continue to swapin */
 			if (hugepage_vma_revalidate(mm, address)) {
+				/* vma is no longer available, don't continue to swapin */
 				trace_mm_collapse_huge_page_swapin(mm, swapped_in, referenced, 0);
 				return false;
 			}
@@ -2512,8 +2512,8 @@ static void collapse_huge_page(struct mm_struct *mm,
 
 	/*
 	 * __collapse_huge_page_swapin always returns with mmap_sem
-	 * locked.  If it fails, release mmap_sem and jump directly
-	 * out.  Continuing to collapse causes inconsistency.
+	 * locked. If it fails, we release mmap_sem and jump out_nolock.
+	 * Continuing to collapse causes inconsistency.
 	 */
 	if (!__collapse_huge_page_swapin(mm, vma, address, pmd, referenced)) {
 		mem_cgroup_cancel_charge(new_page, memcg, true);
