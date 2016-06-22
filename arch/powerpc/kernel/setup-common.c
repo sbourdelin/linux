@@ -76,7 +76,15 @@ EXPORT_SYMBOL(ppc_md);
 struct machdep_calls *machine_id;
 EXPORT_SYMBOL(machine_id);
 
+#ifdef CONFIG_PPC_PASEMI_SB600
+/* FIXME!!
+ * Current PASemi code does not correctly update the value of boot_cpuid
+ * As a temporary fix we use the default 0, which is known to work
+ */
+int boot_cpuid = 0;
+#else
 int boot_cpuid = -1;
+#endif
 EXPORT_SYMBOL_GPL(boot_cpuid);
 
 unsigned long klimit = (unsigned long) _end;

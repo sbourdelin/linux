@@ -103,11 +103,11 @@ static void i8259_set_irq_mask(int irq_nr)
 	outb(cached_21,0x21);
 }
 
-static void i8259_mask_irq(struct irq_data *d)
+void i8259_mask_irq(struct irq_data *d)
 {
 	unsigned long flags;
 
-	pr_debug("i8259_mask_irq(%d)\n", d->irq);
+	printk("i8259_mask_irq(%d)\n", d->irq);
 
 	raw_spin_lock_irqsave(&i8259_lock, flags);
 	if (d->irq < 8)
@@ -118,11 +118,11 @@ static void i8259_mask_irq(struct irq_data *d)
 	raw_spin_unlock_irqrestore(&i8259_lock, flags);
 }
 
-static void i8259_unmask_irq(struct irq_data *d)
+void i8259_unmask_irq(struct irq_data *d)
 {
 	unsigned long flags;
 
-	pr_debug("i8259_unmask_irq(%d)\n", d->irq);
+	printk("i8259_unmask_irq(%d)\n", d->irq);
 
 	raw_spin_lock_irqsave(&i8259_lock, flags);
 	if (d->irq < 8)
@@ -231,6 +231,8 @@ void i8259_init(struct device_node *node, unsigned long intack_addr)
 	/* initialize the controller */
 	raw_spin_lock_irqsave(&i8259_lock, flags);
 
+	printk("About to write to i8259\n");
+
 	/* Mask all first */
 	outb(0xff, 0xA1);
 	outb(0xff, 0x21);
@@ -261,7 +263,11 @@ void i8259_init(struct device_node *node, unsigned long intack_addr)
 	outb(cached_A1, 0xA1);
 	outb(cached_21, 0x21);
 
+	printk("Done write to i8259\n");
+
 	raw_spin_unlock_irqrestore(&i8259_lock, flags);
+
+#ifndef CONFIG_PPC_PASEMI_SB600
 
 	/* create a legacy host */
 	i8259_host = irq_domain_add_legacy_isa(node, &i8259_host_ops, NULL);
@@ -269,6 +275,8 @@ void i8259_init(struct device_node *node, unsigned long intack_addr)
 		printk(KERN_ERR "i8259: failed to allocate irq host !\n");
 		return;
 	}
+
+#endif
 
 	/* reserve our resources */
 	/* XXX should we continue doing that ? it seems to cause problems

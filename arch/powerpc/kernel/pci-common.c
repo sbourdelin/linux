@@ -731,6 +731,19 @@ void pci_process_bridge_OF_ranges(struct pci_controller *hose,
 				isa_io_base =
 					(unsigned long)hose->io_base_virt;
 #endif /* CONFIG_PPC32 */
+
+
+#ifdef CONFIG_PPC_PASEMI_SB600
+                       /* Workaround for lack of device tree. New for kernel 3.17: range.cpu_addr instead of cpu_addr and range.size instead of size Ch. Zigotzky */
+                       if (primary) {
+                               __ioremap_at(range.cpu_addr, (void *)ISA_IO_BASE,
+                               range.size,pgprot_val(pgprot_noncached(__pgprot(0))));
+                       hose->io_base_virt = (void *)_IO_BASE;
+		       /* _IO_BASE needs unsigned long long for the kernel 3.17 Ch. Zigotzky */
+                       printk("Initialised io_base_virt 0x%lx _IO_BASE 0x%llx\n", (unsigned long)hose->io_base_virt, (unsigned long long)_IO_BASE);
+                    }
+#endif
+
 			/* pci_io_size and io_base_phys always represent IO
 			 * space starting at 0 so we factor in pci_addr
 			 */
@@ -1190,6 +1203,7 @@ static void pcibios_allocate_bus_resources(struct pci_bus *bus)
 				&ioport_resource : &iomem_resource;
 		else {
 			pr = pci_find_parent_resource(bus->self, res);
+#ifndef CONFIG_PPC_PASEMI_SB600
 			if (pr == res) {
 				/* this happens when the generic PCI
 				 * code (wrongly) decides that this
@@ -1197,6 +1211,7 @@ static void pcibios_allocate_bus_resources(struct pci_bus *bus)
 				 */
 				continue;
 			}
+#endif
 		}
 
 		pr_debug("PCI: %s (bus %d) bridge rsrc %d: %pR, parent %p (%s)\n",
@@ -1619,8 +1634,9 @@ void pcibios_scan_phb(struct pci_controller *hose)
 	pr_debug("PCI: Scanning PHB %s\n", of_node_full_name(node));
 
 	/* Get some IO space for the new PHB */
+#ifndef CONFIG_PPC_PASEMI_SB600
 	pcibios_setup_phb_io_space(hose);
-
+#endif
 	/* Wire up PHB bus resources */
 	pcibios_setup_phb_resources(hose, &resources);
 

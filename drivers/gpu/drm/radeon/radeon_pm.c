@@ -226,7 +226,10 @@ static void radeon_set_power_state(struct radeon_device *rdev)
 		/* set memory clock */
 		if (rdev->asic->pm.set_memory_clock && (mclk != rdev->pm.current_mclk)) {
 			radeon_pm_debug_check_in_vbl(rdev, false);
+               /* D.Stevens 2012 for the A-EON AmigaOne X1000: Setting memory clock only works on CAICOS and 6570, don't set for anything else (We ignore 6570 here */
+               if (rdev->family == CHIP_CAICOS) {
 			radeon_set_memory_clock(rdev, mclk);
+               }
 			radeon_pm_debug_check_in_vbl(rdev, true);
 			rdev->pm.current_mclk = mclk;
 			DRM_DEBUG_DRIVER("Setting: m: %d\n", mclk);
@@ -1223,7 +1226,7 @@ static void radeon_pm_resume_old(struct radeon_device *rdev)
 						SET_VOLTAGE_TYPE_ASIC_VDDCI);
 		if (rdev->pm.default_sclk)
 			radeon_set_engine_clock(rdev, rdev->pm.default_sclk);
-		if (rdev->pm.default_mclk)
+		if (rdev->pm.default_mclk && (rdev->family == CHIP_CAICOS))     /* Fix for PPC systems HD6000 >6570 by A-EON Core Linux Support Team */	
 			radeon_set_memory_clock(rdev, rdev->pm.default_mclk);
 	}
 	/* asic init will reset the default power state */
@@ -1274,7 +1277,7 @@ dpm_resume_fail:
 						SET_VOLTAGE_TYPE_ASIC_VDDCI);
 		if (rdev->pm.default_sclk)
 			radeon_set_engine_clock(rdev, rdev->pm.default_sclk);
-		if (rdev->pm.default_mclk)
+		if (rdev->pm.default_mclk && (rdev->family == CHIP_CAICOS))     /* Fix for PPC & > HD6570 by A-EON Linux Core Support Team */	
 			radeon_set_memory_clock(rdev, rdev->pm.default_mclk);
 	}
 }
@@ -1321,7 +1324,7 @@ static int radeon_pm_init_old(struct radeon_device *rdev)
 							SET_VOLTAGE_TYPE_ASIC_VDDCI);
 			if (rdev->pm.default_sclk)
 				radeon_set_engine_clock(rdev, rdev->pm.default_sclk);
-			if (rdev->pm.default_mclk)
+			if (rdev->pm.default_mclk && (rdev->family == CHIP_CAICOS))     // D.Stevens 2013: fix for >HD6570 on PPC	
 				radeon_set_memory_clock(rdev, rdev->pm.default_mclk);
 		}
 	}
@@ -1412,7 +1415,7 @@ dpm_failed:
 						SET_VOLTAGE_TYPE_ASIC_VDDCI);
 		if (rdev->pm.default_sclk)
 			radeon_set_engine_clock(rdev, rdev->pm.default_sclk);
-		if (rdev->pm.default_mclk)
+		if (rdev->pm.default_mclk && (rdev->family == CHIP_CAICOS))  // D.Stevens 2013: Fix for >HD6570 on ppc	
 			radeon_set_memory_clock(rdev, rdev->pm.default_mclk);
 	}
 	DRM_ERROR("radeon: dpm initialization failed\n");

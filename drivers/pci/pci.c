@@ -432,7 +432,16 @@ struct resource *pci_find_parent_resource(const struct pci_dev *dev,
 	pci_bus_for_each_resource(bus, r, i) {
 		if (!r)
 			continue;
+#ifdef CONFIG_PPC_PASEMI_SB600
+	/* The new code here checks for resources that are not allocated, and no longer
+	 * returns these, however the SB600 code uses this feature to allocate IO ranges
+	 * in the ISA map, and this breaks booting on the AmigaOneX1000.
+	 * Temporary fix to get the kernel working, remove the resource allocated check.
+	 */
+		if (resource_contains(r, res)) {
+#else
 		if (res->start && resource_contains(r, res)) {
+#endif
 
 			/*
 			 * If the window is prefetchable but the BAR is

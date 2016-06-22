@@ -661,6 +661,56 @@ static inline void mpic_eoi(struct mpic *mpic)
  * Linux descriptor level callbacks
  */
 
+#ifdef CONFIG_PPC_PASEMI_SB600
+
+static int sb600_vector_to_irq(unsigned vector)
+{
+       switch(vector) {
+       case 212: return 9;
+       case 213: return 10;
+       case 214: return 11;
+       case 215: return 12;
+       case 216: return 3;
+       case 217: return 4;
+       case 218: return 5;
+       case 219: return 6;
+       case 220: return 7;
+       case 221: return 14;
+       case 222: return 8;
+       default: return -1;
+       }
+}
+
+extern void i8259_mask_irq(struct irq_data *d);
+extern void i8259_unmask_irq(struct irq_data *d);
+
+int sb600_unmask_irq(unsigned irq)
+{
+       int vector = sb600_vector_to_irq(irq);
+       if (vector >= 0) {
+               i8259_unmask_irq(irq_get_irq_data(vector));
+               return 1;
+       } else
+               return 0;
+}
+
+int sb600_mask_irq(unsigned irq)
+{
+       int vector = sb600_vector_to_irq(irq);
+       if (vector >= 0) {
+               i8259_mask_irq(irq_get_irq_data(vector));
+               return 1;
+       } else
+               return 0;
+}
+
+int sb600_end_irq(unsigned irq)
+{
+       int vector = sb600_vector_to_irq(irq);
+       return (vector >= 0);
+}
+
+#endif
 
 void mpic_unmask_irq(struct irq_data *d)
 {
@@ -668,7 +718,12 @@ void mpic_unmask_irq(struct irq_data *d)
 	struct mpic *mpic = mpic_from_irq_data(d);
 	unsigned int src = irqd_to_hwirq(d);
 
-	DBG("%p: %s: enable_irq: %d (src %d)\n", mpic, mpic->name, d->irq, src);
+#ifdef CONFIG_PPC_PASEMI_SB600
+       if (sb600_unmask_irq(src))
+               return;
+#endif
+
+       DBG("%p: %s: enable_irq: %d (src %d)\n", mpic, mpic->name, irq, src);
 
 	mpic_irq_write(src, MPIC_INFO(IRQ_VECTOR_PRI),
 		       mpic_irq_read(src, MPIC_INFO(IRQ_VECTOR_PRI)) &
@@ -689,7 +744,12 @@ void mpic_mask_irq(struct irq_data *d)
 	struct mpic *mpic = mpic_from_irq_data(d);
 	unsigned int src = irqd_to_hwirq(d);
 
-	DBG("%s: disable_irq: %d (src %d)\n", mpic->name, d->irq, src);
+#ifdef CONFIG_PPC_PASEMI_SB600
+       if (sb600_mask_irq(src))
+               return;
+#endif
+
+       DBG("%s: disable_irq: %d (src %d)\n", mpic->name, irq, src);
 
 	mpic_irq_write(src, MPIC_INFO(IRQ_VECTOR_PRI),
 		       mpic_irq_read(src, MPIC_INFO(IRQ_VECTOR_PRI)) |
@@ -708,6 +768,14 @@ void mpic_mask_irq(struct irq_data *d)
 void mpic_end_irq(struct irq_data *d)
 {
 	struct mpic *mpic = mpic_from_irq_data(d);
+
+#ifdef CONFIG_PPC_PASEMI_SB600
+       unsigned int src = irqd_to_hwirq(d);
+
+       if (src >= 212 && src <= 222)
+               return;
+#endif
+
 
 #ifdef DEBUG_IRQ
 	DBG("%s: end_irq: %d\n", mpic->name, d->irq);

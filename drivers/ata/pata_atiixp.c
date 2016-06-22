@@ -278,6 +278,11 @@ static int atiixp_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	};
 	const struct ata_port_info *ppi[] = { &info, &info };
 
+#ifdef CONFIG_PPC_PASEMI_SB600
+       // Second port not wired on SB600, and config bit cannot be set by BIOS
+       ppi[1] = &ata_dummy_port_info;
+#endif
+
 	return ata_pci_bmdma_init_one(pdev, ppi, &atiixp_sht, NULL,
 				      ATA_HOST_PARALLEL_SCAN);
 }

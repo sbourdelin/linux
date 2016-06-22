@@ -72,6 +72,13 @@ _GLOBAL(__start)
 	/* NOP this out unconditionally */
 BEGIN_FTR_SECTION
 	FIXUP_ENDIAN
+/* Hack for PWRficient platforms: Due to CFE(?) bug, the 64-bit
+ * word at 0x8 needs to be set to 0. Patch it up here once we're
+ * done executing it (we can be lazy and avoid invalidating
+ * icache)
+ */
+li     r0,0
+std    0,8(0)
 	b	__start_initialization_multiplatform
 END_FTR_SECTION(0, 1)
 

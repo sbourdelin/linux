@@ -368,7 +368,11 @@ static void pci_read_bridge_io(struct pci_bus *child)
 		limit |= ((unsigned long) io_limit_hi << 16);
 	}
 
-	if (base <= limit) {
+       if (base <= limit
+       #ifdef CONFIG_PPC_PASEMI_SB600
+               || child->busn_res.start == 5
+       #endif
+              ) {
 		res->flags = (io_base_lo & PCI_IO_RANGE_TYPE_MASK) | IORESOURCE_IO;
 		region.start = base;
 		region.end = limit + io_granularity - 1;
@@ -1836,6 +1840,8 @@ static int only_one_child(struct pci_bus *bus)
 
 	if (!parent || !pci_is_pcie(parent))
 		return 0;
+	#ifndef CONFIG_PPC_PASEMI_SB600
+	// SB600 has non-zero devices on non-root bus.
 	if (pci_pcie_type(parent) == PCI_EXP_TYPE_ROOT_PORT)
 		return 1;
 
@@ -1848,6 +1854,7 @@ static int only_one_child(struct pci_bus *bus)
 	if (parent->has_secondary_link &&
 	    !pci_has_flag(PCI_SCAN_ALL_PCIE_DEVS))
 		return 1;
+	#endif
 	return 0;
 }
 

@@ -242,6 +242,13 @@ static int cmos_read_alarm(struct device *dev, struct rtc_wkalrm *t)
 	}
 
 	rtc_control = CMOS_READ(RTC_CONTROL);
+
+#ifdef CONFIG_PPC_PASEMI_SB600
+       // Nemo BIOS does not init RTC
+       rtc_control = rtc_control | RTC_24H;
+       CMOS_WRITE(rtc_control, RTC_CONTROL);
+#endif
+
 	spin_unlock_irq(&rtc_lock);
 
 	if (!(rtc_control & RTC_DM_BINARY) || RTC_ALWAYS_BCD) {

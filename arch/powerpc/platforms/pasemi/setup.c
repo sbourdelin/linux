@@ -34,6 +34,7 @@
 #include <asm/prom.h>
 #include <asm/iommu.h>
 #include <asm/machdep.h>
+#include <asm/i8259.h>
 #include <asm/mpic.h>
 #include <asm/smp.h>
 #include <asm/time.h>
@@ -71,6 +72,17 @@ static void pas_restart(char *cmd)
 	while (1)
 		out_le32(reset_reg, 0x6000000);
 }
+
+#ifdef CONFIG_PPC_PASEMI_SB600
+void pas_shutdown(void)
+{
+       /* (added by DStevens 19/06/13)
+          Set the PLD bit that makes the SB600 think the power button is being pressed */
+       void __iomem *pld_map = ioremap(0xf5000000,4096);
+       while (1)
+               out_8(pld_map+7,0x01);
+}
+#endif
 
 #ifdef CONFIG_SMP
 static arch_spinlock_t timebase_lock;
@@ -183,6 +195,56 @@ static int __init pas_setup_mce_regs(void)
 }
 machine_device_initcall(pasemi, pas_setup_mce_regs);
 
+#ifdef CONFIG_PPC_PASEMI_SB600
+static unsigned sb600_irq_to_vector(int irq)
+{
+       switch(irq) {
+       case 3: return 216;
+       case 4: return 217;
+       case 5: return 218;
+       case 6: return 219;
+       case 7: return 220;
+       case 8: return 222;
+       case 9: return 212;
+       case 10: return 213;
+       case 11: return 214;
+       case 12: return 215;
+       case 14: return 221;
+       default: return 0;
+       }
+}
+
+static void sb600_8259_cascade(struct irq_desc *desc)
+{
+	   struct irq_chip *chip = irq_desc_get_chip(desc);       
+	   unsigned int cascade_irq = i8259_irq();
+       unsigned vector = sb600_irq_to_vector(cascade_irq);
+       if (vector > 0)
+               generic_handle_irq(vector);
+       outb(0x20, 0xA0);       /* Non-specific EOI */
+       outb(0x20, 0x20);       /* Non-specific EOI to cascade */
+       chip->irq_eoi(&desc->irq_data);		
+}
+extern void i8259_unmask_irq(struct irq_data *d);
+
+__init void sb600_8259_init(void)
+{
+       int gpio_virq;
+
+       // Connect legacy i8259 controller in SB600
+       printk("Init i8259\n");
+       i8259_init(NULL, 0);
+
+       gpio_virq = irq_create_mapping(NULL, 3);
+       irq_set_irq_type(gpio_virq, IRQ_TYPE_LEVEL_HIGH);
+       irq_set_chained_handler(gpio_virq, sb600_8259_cascade);
+       mpic_unmask_irq(irq_get_irq_data(gpio_virq));
+
+       // Initial mapping for RTC
+       irq_create_mapping(NULL, 222);
+}
+#endif
+
 static __init void pas_init_IRQ(void)
 {
 	struct device_node *np;
@@ -246,6 +308,12 @@ static __init void pas_init_IRQ(void)
 
 	of_node_put(mpic_node);
 	of_node_put(root);
+
+
+#ifdef CONFIG_PPC_PASEMI_SB600
+       sb600_8259_init();
+#endif
+
 }
 
 static void __init pas_progress(char *s, unsigned short hex)
@@ -403,12 +471,39 @@ static const struct of_device_id pasemi_bus_ids[] = {
 	{},
 };
 
-static int __init pasemi_publish_devices(void)
-{
-	pasemi_pcmcia_init();
+#ifdef CONFIG_PPC_PASEMI_SB600
 
-	/* Publish OF platform devices for SDC and other non-PCI devices */
-	of_platform_bus_probe(NULL, pasemi_bus_ids, NULL);
+/*
+ This should come from OF tree. See sysdev/rtc_cmos_setup for details. Need to get i8259 supported correctly first, so that
+ as the standard support hard-codes IRQ 8.
+ */
+
+
+static struct resource rtc_resource[] = {{
+       .name = "rtc",
+       .start = 0x70,
+       .end = 0x71,
+       .flags = IORESOURCE_IO,
+}, {
+       .name = "rtc",
+       .start = 222,
+       .end = 222,
+       .flags = IORESOURCE_IRQ,
+}};
+
+#endif
+
+
+ static int __init pasemi_publish_devices(void)
+ {
+        pasemi_pcmcia_init();
+
+        /* Publish OF platform devices for SDC and other non-PCI devices */
+        of_platform_bus_probe(NULL, pasemi_bus_ids, NULL);
+
+#ifdef CONFIG_PPC_PASEMI_SB600
+       platform_device_register_simple("rtc_cmos", -1, rtc_resource, 2);
+#endif
 
 	return 0;
 }
@@ -430,8 +525,12 @@ static int __init pas_probe(void)
 
 	alloc_iobmap_l2();
 
+#ifdef CONFIG_PPC_PASEMI_SB600
+       pm_power_off              = pas_shutdown;         // Varisys provided a way to turn us off
+#endif
 	return 1;
 }
+
 
 define_machine(pasemi) {
 	.name			= "PA Semi PWRficient",
@@ -445,4 +544,7 @@ define_machine(pasemi) {
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= pas_progress,
 	.machine_check_exception = pas_machine_check_handler,
+#if 0 // def CONFIG_PPC_PASEMI_SB600
+       .pci_probe_mode = sb600_pci_probe_mode,
+#endif
 };

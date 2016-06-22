@@ -14,6 +14,13 @@ config PPC_PASEMI
 menu "PA Semi PWRficient options"
 	depends on PPC_PASEMI
 
+config PPC_PASEMI_SB600
+       bool "Nemo SB600 South Bridge Support"
+       depends on PPC_PASEMI
+       select PPC_I8259
+       help
+       Workarounds for the SB600 South Bridge.
+
 config PPC_PASEMI_IOMMU
 	bool "PA Semi IOMMU support"
 	depends on PPC_PASEMI

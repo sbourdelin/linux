@@ -1,3 +1,9 @@
+/* This is a modified copy of
+* usr/src/linux-2.6.39.4/arch/powerpc/platforms/pasemi/iommu.c
+* The mod is on line 150
+* By Len Karpowicz <twotat2z@embarqmail.com
+*/
+
 /*
  * Copyright (C) 2005-2008, PA Semi, Inc
  *
@@ -147,8 +153,11 @@ static void iommu_table_iobmap_setup(void)
 	iommu_table_iobmap.it_page_shift = IOBMAP_PAGE_SHIFT;
 
 	/* it_size is in number of entries */
-	iommu_table_iobmap.it_size =
-		0x80000000 >> iommu_table_iobmap.it_page_shift;
+
+/* Note: changed 0x80000000 to 0x7FFFFFFF for SBLive! SB0220 */
+/* out of range problem on A-EON AmigaOne X1000 */
+       iommu_table_iobmap.it_size = 0x7FFFFFFF >> IOBMAP_PAGE_SHIFT;
+
 
 	/* Initialize the common IOMMU code */
 	iommu_table_iobmap.it_base = (unsigned long)iob_l2_base;

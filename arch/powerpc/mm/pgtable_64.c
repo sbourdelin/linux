@@ -94,24 +94,12 @@ unsigned long __pud_val_bits;
 EXPORT_SYMBOL(__pud_val_bits);
 unsigned long __pgd_val_bits;
 EXPORT_SYMBOL(__pgd_val_bits);
-unsigned long __kernel_virt_start;
-EXPORT_SYMBOL(__kernel_virt_start);
-unsigned long __kernel_virt_size;
-EXPORT_SYMBOL(__kernel_virt_size);
-unsigned long __vmalloc_start;
-EXPORT_SYMBOL(__vmalloc_start);
-unsigned long __vmalloc_end;
-EXPORT_SYMBOL(__vmalloc_end);
-struct page *vmemmap;
-EXPORT_SYMBOL(vmemmap);
 unsigned long __pte_frag_nr;
 EXPORT_SYMBOL(__pte_frag_nr);
 unsigned long __pte_frag_size_shift;
 EXPORT_SYMBOL(__pte_frag_size_shift);
-unsigned long ioremap_bot;
-#else /* !CONFIG_PPC_BOOK3S_64 */
+#endif /* !CONFIG_PPC_BOOK3S_64 */
 unsigned long ioremap_bot = IOREMAP_BASE;
-#endif
 
 /**
  * __ioremap_at - Low level function to establish the page tables

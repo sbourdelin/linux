@@ -108,6 +108,69 @@ static int workaround_5945(struct pci_bus *bus, unsigned int devfn,
 	return 1;
 }
 
+#ifdef CONFIG_PPC_PASEMI_SB600
+static int sb600_bus = 5;
+static void __iomem *iob_mapbase = NULL;
+
+static int pa_pxp_read_config(struct pci_bus *bus, unsigned int devfn,
+                             int offset, int len, u32 *val);
+
+static void sb600_set_flag(int bus)
+{
+    struct resource res;
+    struct device_node *dn;
+       struct pci_bus *busp;
+       u32 val;
+       int err;
+
+       if (sb600_bus == -1)
+       {
+               busp = pci_find_bus(0, 0);
+               pa_pxp_read_config(busp, PCI_DEVFN(17,0), PCI_SECONDARY_BUS, 1, &val);
+
+               sb600_bus = val;
+
+               printk(KERN_CRIT "NEMO SB600 on bus %d.\n",sb600_bus);
+       }
+
+       if (iob_mapbase == NULL)
+       {
+        dn = of_find_compatible_node(NULL, "io-bridge", "pasemi,1682m-iob");
+        if (!dn)
+        {
+               printk(KERN_CRIT "NEMO SB600 missing iob node\n");
+                       return;
+               }
+
+               err = of_address_to_resource(dn, 0, &res);
+        of_node_put(dn);
+
+               if (err)
+               {
+               printk(KERN_CRIT "NEMO SB600 missing resource\n");
+                       return;
+               }
+
+               printk(KERN_CRIT "NEMO SB600 IOB base %08lx\n",res.start);
+
+               iob_mapbase = ioremap(res.start + 0x100, 0x94);
+       }
+
+       if (iob_mapbase != NULL)
+       {
+               if (bus == sb600_bus)
+               {
+                       out_le32(iob_mapbase + 4, in_le32(iob_mapbase + 4) | 0x800);
+               }
+               else
+               {
+                       out_le32(iob_mapbase + 4, in_le32(iob_mapbase + 4) & ~0x800);
+               }
+       }
+}
+#endif
+
+
 static int pa_pxp_read_config(struct pci_bus *bus, unsigned int devfn,
 			      int offset, int len, u32 *val)
 {
@@ -125,6 +188,10 @@ static int pa_pxp_read_config(struct pci_bus *bus, unsigned int devfn,
 		return PCIBIOS_SUCCESSFUL;
 
 	addr = pa_pxp_cfg_addr(hose, bus->number, devfn, offset);
+
+#ifdef CONFIG_PPC_PASEMI_SB600
+       sb600_set_flag(bus->number);
+#endif
 
 	/*
 	 * Note: the caller has already checked that offset is

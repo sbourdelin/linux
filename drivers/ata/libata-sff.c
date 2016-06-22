@@ -2429,9 +2429,9 @@ int ata_pci_sff_activate_host(struct ata_host *host,
 	if ((pdev->class >> 8) == PCI_CLASS_STORAGE_IDE) {
 		u8 tmp8, mask;
 
-		/* TODO: What if one channel is in native mode ... */
+		/* Don't look at dummy ports in the mask */	
 		pci_read_config_byte(pdev, PCI_CLASS_PROG, &tmp8);
-		mask = (1 << 2) | (1 << 0);
+		mask = (! ata_port_is_dummy(host->ports[1]) << 2) | (! ata_port_is_dummy(host->ports[0]) << 0);	
 		if ((tmp8 & mask) != mask)
 			legacy_mode = 1;
 	}

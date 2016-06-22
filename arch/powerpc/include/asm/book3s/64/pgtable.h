@@ -218,18 +218,6 @@ extern unsigned long __pte_frag_size_shift;
 #define PUD_MASKED_BITS		0xc0000000000000ffUL
 /* Bits to mask out from a PGD to get to the PUD page */
 #define PGD_MASKED_BITS		0xc0000000000000ffUL
-
-extern unsigned long __vmalloc_start;
-extern unsigned long __vmalloc_end;
-#define VMALLOC_START	__vmalloc_start
-#define VMALLOC_END	__vmalloc_end
-
-extern unsigned long __kernel_virt_start;
-extern unsigned long __kernel_virt_size;
-#define KERN_VIRT_START __kernel_virt_start
-#define KERN_VIRT_SIZE  __kernel_virt_size
-extern struct page *vmemmap;
-extern unsigned long ioremap_bot;
 #endif /* __ASSEMBLY__ */
 
 #include <asm/book3s/64/hash.h>
@@ -242,6 +230,7 @@ extern unsigned long ioremap_bot;
 #endif
 
 #include <asm/barrier.h>
+
 /*
  * The second half of the kernel virtual space is used for IO mappings,
  * it's itself carved into the PIO region (ISA and PHB IO space) and
@@ -259,6 +248,8 @@ extern unsigned long ioremap_bot;
 #define  PHB_IO_END	(KERN_IO_START + FULL_IO_SIZE)
 #define IOREMAP_BASE	(PHB_IO_END)
 #define IOREMAP_END	(KERN_VIRT_START + KERN_VIRT_SIZE)
+
+#define vmmemap			((struct page *)VMEMMAP_BASE)
 
 /* Advertise special mapping type for AGP */
 #define HAVE_PAGE_AGP
