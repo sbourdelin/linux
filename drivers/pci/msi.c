@@ -108,7 +108,7 @@ int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
 {
 	struct msi_controller *chip = dev->bus->msi;
 	struct msi_desc *entry;
-	int ret;
+	int ret = 0;
 
 	if (chip && chip->setup_irqs)
 		return chip->setup_irqs(chip, dev, nvec, type);
@@ -121,9 +121,7 @@ int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
 
 	for_each_pci_msi_entry(entry, dev) {
 		ret = arch_setup_msi_irq(dev, entry);
-		if (ret < 0)
-			return ret;
-		if (ret > 0)
+		if (ret)
 			return -ENOSPC;
 	}
 
