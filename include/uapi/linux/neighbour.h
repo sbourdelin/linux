@@ -15,6 +15,13 @@ struct ndmsg {
 };
 
 enum {
+	NDA_6LOWPAN_802154_SHORT_ADDR,
+	__NDA_6LOWPAN_MAX
+};
+
+#define NDA_6LOWPAN_MAX (__NDA_6LOWPAN_MAX - 1)
+
+enum {
 	NDA_UNSPEC,
 	NDA_DST,
 	NDA_LLADDR,
@@ -26,6 +33,7 @@ enum {
 	NDA_IFINDEX,
 	NDA_MASTER,
 	NDA_LINK_NETNSID,
+	NDA_PRIVATE,
 	__NDA_MAX
 };
 

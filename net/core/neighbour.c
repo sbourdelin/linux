@@ -2153,6 +2153,7 @@ static int neigh_fill_info(struct sk_buff *skb, struct neighbour *neigh,
 	unsigned long now = jiffies;
 	struct nda_cacheinfo ci;
 	struct nlmsghdr *nlh;
+	struct nlattr *nest;
 	struct ndmsg *ndm;
 
 	nlh = nlmsg_put(skb, pid, seq, type, sizeof(*ndm), flags);
@@ -2180,6 +2181,17 @@ static int neigh_fill_info(struct sk_buff *skb, struct neighbour *neigh,
 			read_unlock_bh(&neigh->lock);
 			goto nla_put_failure;
 		}
+	}
+
+	if (neigh->dev->netdev_ops->ndo_neigh_fill_info) {
+		nest = nla_nest_start(skb, NDA_PRIVATE);
+		if (nest == NULL)
+			return -ENOBUFS;
+
+		if (neigh->dev->netdev_ops->ndo_neigh_fill_info(skb, neigh))
+			goto nla_put_failure;
+
+		nla_nest_end(skb, nest);
 	}
 
 	ci.ndm_used	 = jiffies_to_clock_t(now - neigh->used);
@@ -2824,13 +2836,14 @@ static const struct file_operations neigh_stat_seq_fops = {
 
 #endif /* CONFIG_PROC_FS */
 
-static inline size_t neigh_nlmsg_size(void)
+static inline size_t neigh_nlmsg_size(const struct net_device *dev)
 {
 	return NLMSG_ALIGN(sizeof(struct ndmsg))
 	       + nla_total_size(MAX_ADDR_LEN) /* NDA_DST */
 	       + nla_total_size(MAX_ADDR_LEN) /* NDA_LLADDR */
 	       + nla_total_size(sizeof(struct nda_cacheinfo))
-	       + nla_total_size(4); /* NDA_PROBES */
+	       + nla_total_size(4) /* NDA_PROBES */
+	       + nla_total_size(dev->neigh_priv_nlmsg_len);
 }
 
 static void __neigh_notify(struct neighbour *n, int type, int flags)
@@ -2839,7 +2852,7 @@ static void __neigh_notify(struct neighbour *n, int type, int flags)
 	struct sk_buff *skb;
 	int err = -ENOBUFS;
 
-	skb = nlmsg_new(neigh_nlmsg_size(), GFP_ATOMIC);
+	skb = nlmsg_new(neigh_nlmsg_size(n->dev), GFP_ATOMIC);
 	if (skb == NULL)
 		goto errout;
 

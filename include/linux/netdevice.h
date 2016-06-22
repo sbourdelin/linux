@@ -1211,6 +1211,8 @@ struct net_device_ops {
 						    netdev_features_t features);
 	int			(*ndo_neigh_construct)(struct neighbour *n);
 	void			(*ndo_neigh_destroy)(struct neighbour *n);
+	int			(*ndo_neigh_fill_info)(struct sk_buff *skb,
+						       struct neighbour *n);
 
 	int			(*ndo_fdb_add)(struct ndmsg *ndm,
 					       struct nlattr *tb[],
@@ -1685,6 +1687,7 @@ struct net_device {
 	unsigned char		addr_assign_type;
 	unsigned char		addr_len;
 	unsigned short		neigh_priv_len;
+	unsigned short		neigh_priv_nlmsg_len;
 	unsigned short          dev_id;
 	unsigned short          dev_port;
 	spinlock_t		addr_list_lock;
