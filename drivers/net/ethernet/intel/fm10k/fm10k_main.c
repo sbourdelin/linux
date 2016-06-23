@@ -1474,9 +1474,9 @@ static int fm10k_poll(struct napi_struct *napi, int budget)
 			clean_complete = false;
 	}
 
-	/* If all work not completed, return budget and keep polling */
+	/* If all work not completed, return work done and keep polling */
 	if (!clean_complete)
-		return budget;
+		return min(work_done, budget);
 
 	/* all work done, exit the polling mode */
 	napi_complete_done(napi, work_done);
