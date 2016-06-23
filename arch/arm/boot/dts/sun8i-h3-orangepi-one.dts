@@ -107,6 +107,45 @@
 	};
 };
 
+&cpu0 {
+	clocks = <&cpu>;
+	clock-latency = <244144>; /* 8 32k periods */
+	operating-points = <
+		/* kHz	  uV */
+		1296000	1300000
+		1200000	1300000
+		624000	1100000
+		480000	1100000
+		312000	1100000
+		240000	1100000
+		>;
+	#cooling-cells = <2>;
+	cooling-min-level = <0>;
+	cooling-max-level = <5>;
+	cpu0-supply = <&vdd_soc>;
+};
+
+&cpu_thermal {
+	cooling-maps {
+		map0 {
+			trip = <&cpu_alert0>;
+			cooling-device = <&cpu0 (-1) (-1)>;
+		};
+	};
+
+	trips {
+		cpu_alert0: cpu_alert0 {
+			temperature = <80000>;
+			hysteresis = <2000>;
+			type = "passive";
+		};
+
+		cpu_crit: cpu_crit {
+			temperature = <100000>;
+			hysteresis = <2000>;
+			type = "critical";
+		};
+	};
 };
 
 &ehci1 {
