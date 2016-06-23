@@ -224,7 +224,7 @@ void set_pgdat_percpu_threshold(pg_data_t *pgdat,
  * or when we know that preemption is disabled and that
  * particular counter cannot be updated from interrupt context.
  */
-void __mod_zone_page_state(struct zone *zone, enum zone_stat_item item,
+void __mod_zone_page_state_check(struct zone *zone, enum zone_stat_item item,
 			   long delta)
 {
 	struct per_cpu_pageset __percpu *pcp = zone->pageset;
@@ -242,9 +242,9 @@ void __mod_zone_page_state(struct zone *zone, enum zone_stat_item item,
 	}
 	__this_cpu_write(*p, x);
 }
-EXPORT_SYMBOL(__mod_zone_page_state);
+EXPORT_SYMBOL(__mod_zone_page_state_check);
 
-void __mod_node_page_state(struct pglist_data *pgdat, enum node_stat_item item,
+void __mod_node_page_state_check(struct pglist_data *pgdat, enum node_stat_item item,
 				long delta)
 {
 	struct per_cpu_nodestat __percpu *pcp = pgdat->per_cpu_nodestats;
@@ -262,7 +262,7 @@ void __mod_node_page_state(struct pglist_data *pgdat, enum node_stat_item item,
 	}
 	__this_cpu_write(*p, x);
 }
-EXPORT_SYMBOL(__mod_node_page_state);
+EXPORT_SYMBOL(__mod_node_page_state_check);
 
 /*
  * Optimized increment and decrement functions.
@@ -287,7 +287,7 @@ EXPORT_SYMBOL(__mod_node_page_state);
  * in between and therefore the atomicity vs. interrupt cannot be exploited
  * in a useful way here.
  */
-void __inc_zone_state(struct zone *zone, enum zone_stat_item item)
+void __inc_zone_state_check(struct zone *zone, enum zone_stat_item item)
 {
 	struct per_cpu_pageset __percpu *pcp = zone->pageset;
 	s8 __percpu *p = pcp->vm_stat_diff + item;
@@ -303,7 +303,7 @@ void __inc_zone_state(struct zone *zone, enum zone_stat_item item)
 	}
 }
 
-void __inc_node_state(struct pglist_data *pgdat, enum node_stat_item item)
+void __inc_node_state_check(struct pglist_data *pgdat, enum node_stat_item item)
 {
 	struct per_cpu_nodestat __percpu *pcp = pgdat->per_cpu_nodestats;
 	s8 __percpu *p = pcp->vm_node_stat_diff + item;
@@ -314,24 +314,24 @@ void __inc_node_state(struct pglist_data *pgdat, enum node_stat_item item)
 	if (unlikely(v > t)) {
 		s8 overstep = t >> 1;
 
-		node_page_state_add(v + overstep, pgdat, item);
+		node_page_state_add_check(v + overstep, pgdat, item);
 		__this_cpu_write(*p, -overstep);
 	}
 }
 
-void __inc_zone_page_state(struct page *page, enum zone_stat_item item)
+void __inc_zone_page_state_check(struct page *page, enum zone_stat_item item)
 {
-	__inc_zone_state(page_zone(page), item);
+	__inc_zone_state_check(page_zone(page), item);
 }
-EXPORT_SYMBOL(__inc_zone_page_state);
+EXPORT_SYMBOL(__inc_zone_page_state_check);
 
-void __inc_node_page_state(struct page *page, enum node_stat_item item)
+void __inc_node_page_state_check(struct page *page, enum node_stat_item item)
 {
-	__inc_node_state(page_pgdat(page), item);
+	__inc_node_state_check(page_pgdat(page), item);
 }
-EXPORT_SYMBOL(__inc_node_page_state);
+EXPORT_SYMBOL(__inc_node_page_state_check);
 
-void __dec_zone_state(struct zone *zone, enum zone_stat_item item)
+void __dec_zone_state_check(struct zone *zone, enum zone_stat_item item)
 {
 	struct per_cpu_pageset __percpu *pcp = zone->pageset;
 	s8 __percpu *p = pcp->vm_stat_diff + item;
@@ -342,12 +342,12 @@ void __dec_zone_state(struct zone *zone, enum zone_stat_item item)
 	if (unlikely(v < - t)) {
 		s8 overstep = t >> 1;
 
-		zone_page_state_add(v - overstep, zone, item);
+		zone_page_state_add_check(v - overstep, zone, item);
 		__this_cpu_write(*p, overstep);
 	}
 }
 
-void __dec_node_state(struct pglist_data *pgdat, enum node_stat_item item)
+void __dec_node_state_check(struct pglist_data *pgdat, enum node_stat_item item)
 {
 	struct per_cpu_nodestat __percpu *pcp = pgdat->per_cpu_nodestats;
 	s8 __percpu *p = pcp->vm_node_stat_diff + item;
@@ -358,22 +358,22 @@ void __dec_node_state(struct pglist_data *pgdat, enum node_stat_item item)
 	if (unlikely(v < - t)) {
 		s8 overstep = t >> 1;
 
-		node_page_state_add(v - overstep, pgdat, item);
+		node_page_state_add_check(v - overstep, pgdat, item);
 		__this_cpu_write(*p, overstep);
 	}
 }
 
-void __dec_zone_page_state(struct page *page, enum zone_stat_item item)
+void __dec_zone_page_state_check(struct page *page, enum zone_stat_item item)
 {
-	__dec_zone_state(page_zone(page), item);
+	__dec_zone_state_check(page_zone(page), item);
 }
-EXPORT_SYMBOL(__dec_zone_page_state);
+EXPORT_SYMBOL(__dec_zone_page_state_check);
 
-void __dec_node_page_state(struct page *page, enum node_stat_item item)
+void __dec_node_page_state_check(struct page *page, enum node_stat_item item)
 {
-	__dec_node_state(page_pgdat(page), item);
+	__dec_node_state_check(page_pgdat(page), item);
 }
-EXPORT_SYMBOL(__dec_node_page_state);
+EXPORT_SYMBOL(__dec_node_page_state_check);
 
 #ifdef CONFIG_HAVE_CMPXCHG_LOCAL
 /*
@@ -426,26 +426,26 @@ static inline void mod_zone_state(struct zone *zone,
 		zone_page_state_add(z, zone, item);
 }
 
-void mod_zone_page_state(struct zone *zone, enum zone_stat_item item,
+void mod_zone_page_state_check(struct zone *zone, enum zone_stat_item item,
 			 long delta)
 {
-	mod_zone_state(zone, item, delta, 0);
+	mod_zone_state_check(zone, item, delta, 0);
 }
-EXPORT_SYMBOL(mod_zone_page_state);
+EXPORT_SYMBOL(mod_zone_page_state_check);
 
-void inc_zone_page_state(struct page *page, enum zone_stat_item item)
+void inc_zone_page_state_check(struct page *page, enum zone_stat_item item)
 {
-	mod_zone_state(page_zone(page), item, 1, 1);
+	mod_zone_state_check(page_zone(page), item, 1, 1);
 }
-EXPORT_SYMBOL(inc_zone_page_state);
+EXPORT_SYMBOL(inc_zone_page_state_check);
 
-void dec_zone_page_state(struct page *page, enum zone_stat_item item)
+void dec_zone_page_state_check(struct page *page, enum zone_stat_item item)
 {
-	mod_zone_state(page_zone(page), item, -1, -1);
+	mod_zone_state_check(page_zone(page), item, -1, -1);
 }
-EXPORT_SYMBOL(dec_zone_page_state);
+EXPORT_SYMBOL(dec_zone_page_state_check);
 
-static inline void mod_node_state(struct pglist_data *pgdat,
+static inline void mod_node_state_check(struct pglist_data *pgdat,
        enum node_stat_item item, int delta, int overstep_mode)
 {
 	struct per_cpu_nodestat __percpu *pcp = pgdat->per_cpu_nodestats;
@@ -480,111 +480,111 @@ static inline void mod_node_state(struct pglist_data *pgdat,
 	} while (this_cpu_cmpxchg(*p, o, n) != o);
 
 	if (z)
-		node_page_state_add(z, pgdat, item);
+		node_page_state_add_check(z, pgdat, item);
 }
 
-void mod_node_page_state(struct pglist_data *pgdat, enum node_stat_item item,
+void mod_node_page_state_check(struct pglist_data *pgdat, enum node_stat_item item,
 					long delta)
 {
-	mod_node_state(pgdat, item, delta, 0);
+	mod_node_state_check(pgdat, item, delta, 0);
 }
-EXPORT_SYMBOL(mod_node_page_state);
+EXPORT_SYMBOL(mod_node_page_state_check);
 
-void inc_node_state(struct pglist_data *pgdat, enum node_stat_item item)
+void inc_node_state_check(struct pglist_data *pgdat, enum node_stat_item item)
 {
-	mod_node_state(pgdat, item, 1, 1);
+	mod_node_state_check(pgdat, item, 1, 1);
 }
 
-void inc_node_page_state(struct page *page, enum node_stat_item item)
+void inc_node_page_state_check(struct page *page, enum node_stat_item item)
 {
-	mod_node_state(page_pgdat(page), item, 1, 1);
+	mod_node_state_check(page_pgdat(page), item, 1, 1);
 }
-EXPORT_SYMBOL(inc_node_page_state);
+EXPORT_SYMBOL(inc_node_page_state_check);
 
-void dec_node_page_state(struct page *page, enum node_stat_item item)
+void dec_node_page_state_check(struct page *page, enum node_stat_item item)
 {
-	mod_node_state(page_pgdat(page), item, -1, -1);
+	mod_node_state_check(page_pgdat(page), item, -1, -1);
 }
-EXPORT_SYMBOL(dec_node_page_state);
+EXPORT_SYMBOL(dec_node_page_state_check);
 #else
 /*
  * Use interrupt disable to serialize counter updates
  */
-void mod_zone_page_state(struct zone *zone, enum zone_stat_item item,
+void mod_zone_page_state_check(struct zone *zone, enum zone_stat_item item,
 			 long delta)
 {
 	unsigned long flags;
 
 	local_irq_save(flags);
-	__mod_zone_page_state(zone, item, delta);
+	__mod_zone_page_state_check(zone, item, delta);
 	local_irq_restore(flags);
 }
-EXPORT_SYMBOL(mod_zone_page_state);
+EXPORT_SYMBOL(mod_zone_page_state_check);
 
-void inc_zone_page_state(struct page *page, enum zone_stat_item item)
+void inc_zone_page_state_check(struct page *page, enum zone_stat_item item)
 {
 	unsigned long flags;
 	struct zone *zone;
 
 	zone = page_zone(page);
 	local_irq_save(flags);
-	__inc_zone_state(zone, item);
+	__inc_zone_state_check(zone, item);
 	local_irq_restore(flags);
 }
-EXPORT_SYMBOL(inc_zone_page_state);
+EXPORT_SYMBOL(inc_zone_page_state_check);
 
-void dec_zone_page_state(struct page *page, enum zone_stat_item item)
+void dec_zone_page_state_check(struct page *page, enum zone_stat_item item)
 {
 	unsigned long flags;
 
 	local_irq_save(flags);
-	__dec_zone_page_state(page, item);
+	__dec_zone_page_state_check(page, item);
 	local_irq_restore(flags);
 }
-EXPORT_SYMBOL(dec_zone_page_state);
+EXPORT_SYMBOL(dec_zone_page_state_check);
 
-void inc_node_state(struct pglist_data *pgdat, enum node_stat_item item)
+void inc_node_state_check(struct pglist_data *pgdat, enum node_stat_item item)
 {
 	unsigned long flags;
 
 	local_irq_save(flags);
-	__inc_node_state(pgdat, item);
+	__inc_node_state_check(pgdat, item);
 	local_irq_restore(flags);
 }
-EXPORT_SYMBOL(inc_node_state);
+EXPORT_SYMBOL(inc_node_state_check);
 
-void mod_node_page_state(struct pglist_data *pgdat, enum node_stat_item item,
+void mod_node_page_state_check(struct pglist_data *pgdat, enum node_stat_item item,
 					long delta)
 {
 	unsigned long flags;
 
 	local_irq_save(flags);
-	__mod_node_page_state(pgdat, item, delta);
+	__mod_node_page_state_check(pgdat, item, delta);
 	local_irq_restore(flags);
 }
-EXPORT_SYMBOL(mod_node_page_state);
+EXPORT_SYMBOL(mod_node_page_state_check);
 
-void inc_node_page_state(struct page *page, enum node_stat_item item)
+void inc_node_page_state_check(struct page *page, enum node_stat_item item)
 {
 	unsigned long flags;
 	struct pglist_data *pgdat;
 
 	pgdat = page_pgdat(page);
 	local_irq_save(flags);
-	__inc_node_state(pgdat, item);
+	__inc_node_state_check(pgdat, item);
 	local_irq_restore(flags);
 }
-EXPORT_SYMBOL(inc_node_page_state);
+EXPORT_SYMBOL(inc_node_page_state_check);
 
-void dec_node_page_state(struct page *page, enum node_stat_item item)
+void dec_node_page_state_check(struct page *page, enum node_stat_item item)
 {
 	unsigned long flags;
 
 	local_irq_save(flags);
-	__dec_node_page_state(page, item);
+	__dec_node_page_state_check(page, item);
 	local_irq_restore(flags);
 }
-EXPORT_SYMBOL(dec_node_page_state);
+EXPORT_SYMBOL(dec_node_page_state_check);
 #endif
 
 /*
@@ -775,7 +775,7 @@ void drain_zonestat(struct zone *zone, struct per_cpu_pageset *pset)
  * is called frequently in a NUMA machine, so try to be as
  * frugal as possible.
  */
-unsigned long sum_zone_node_page_state(int node,
+unsigned long sum_zone_node_page_state_check(int node,
 				 enum zone_stat_item item)
 {
 	struct zone *zones = NODE_DATA(node)->node_zones;
@@ -791,7 +791,7 @@ unsigned long sum_zone_node_page_state(int node,
 /*
  * Determine the per node value of a stat item.
  */
-unsigned long node_page_state(struct pglist_data *pgdat,
+unsigned long node_page_state_check(struct pglist_data *pgdat,
 				enum node_stat_item item)
 {
 	long x = atomic_long_read(&pgdat->vm_stat[item]);
