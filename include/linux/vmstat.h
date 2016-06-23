@@ -116,6 +116,8 @@ static inline void zone_page_state_add(long x, struct zone *zone,
 	atomic_long_add(x, &zone->vm_stat[item]);
 	atomic_long_add(x, &vm_zone_stat[item]);
 }
+#define zone_page_state_add(x, zone, item) \
+	zone_page_state_add(x, zone, ((item) == (enum zone_stat_item )0) ? (item) : (item))
 
 static inline void node_page_state_add(long x, struct pglist_data *pgdat,
 				 enum node_stat_item item)
@@ -123,6 +125,8 @@ static inline void node_page_state_add(long x, struct pglist_data *pgdat,
 	atomic_long_add(x, &pgdat->vm_stat[item]);
 	atomic_long_add(x, &vm_node_stat[item]);
 }
+#define node_page_state_add(x, node, item) \
+	node_page_state_add(x, node, ((item) == (enum node_stat_item )0) ? (item) : (item))
 
 static inline unsigned long global_page_state(enum zone_stat_item item)
 {
@@ -133,6 +137,8 @@ static inline unsigned long global_page_state(enum zone_stat_item item)
 #endif
 	return x;
 }
+#define global_page_state(item) \
+	global_page_state(((item) == (enum zone_stat_item )0) ? (item) : (item))
 
 static inline unsigned long global_node_page_state(enum node_stat_item item)
 {
@@ -143,6 +149,8 @@ static inline unsigned long global_node_page_state(enum node_stat_item item)
 #endif
 	return x;
 }
+#define global_node_page_state(item) \
+	global_node_page_state(((item) == (enum node_stat_item )0) ? (item) : (item))
 
 static inline unsigned long zone_page_state(struct zone *zone,
 					enum zone_stat_item item)
@@ -154,6 +162,8 @@ static inline unsigned long zone_page_state(struct zone *zone,
 #endif
 	return x;
 }
+#define zone_page_state(zone, item) \
+	zone_page_state(zone, ((item) == (enum zone_stat_item )0) ? (item) : (item))
 
 /*
  * More accurate version that also considers the currently pending
@@ -176,6 +186,8 @@ static inline unsigned long zone_page_state_snapshot(struct zone *zone,
 #endif
 	return x;
 }
+#define zone_page_state_snapshot(zone, item) \
+	zone_page_state_snapshot(zone, ((item) == (enum zone_stat_item )0) ? (item) : (item))
 
 static inline unsigned long node_page_state_snapshot(pg_data_t *pgdat,
 					enum zone_stat_item item)
@@ -192,7 +204,8 @@ static inline unsigned long node_page_state_snapshot(pg_data_t *pgdat,
 #endif
 	return x;
 }
-
+#define node_page_state_snapshot(zone, item) \
+	node_page_state_snapshot(zone, ((item) == (enum node_stat_item )0) ? (item) : (item))
 
 #ifdef CONFIG_NUMA
 extern unsigned long sum_zone_node_page_state(int node,
@@ -340,6 +353,27 @@ static inline void quiet_vmstat(void) { }
 static inline void drain_zonestat(struct zone *zone,
 			struct per_cpu_pageset *pset) { }
 #endif		/* CONFIG_SMP */
+
+#define __mod_zone_page_state(zone, item, delta) \
+	__mod_zone_page_state(zone, ((item) == (enum zone_stat_item )0) ? (item) : (item), delta)
+#define __mod_node_page_state(pgdat, item, delta) \
+	__mod_node_page_state(pgdat, ((item) == (enum node_stat_item )0) ? (item) : (item), delta)
+#define __inc_zone_state(zone, item) \
+	__inc_zone_state(zone, ((item) == (enum zone_stat_item )0) ? (item) : (item))
+#define __inc_node_state(pgdat, item) \
+	__inc_node_state(pgdat, ((item) == (enum node_stat_item )0) ? (item) : (item))
+#define __dec_zone_state(zone, item) \
+	__dec_zone_state(zone, ((item) == (enum zone_stat_item )0) ? (item) : (item))
+#define __dec_node_state(pgdat, item) \
+	__dec_node_state(pgdat, ((item) == (enum node_stat_item )0) ? (item) : (item))
+#define __inc_zone_page_state(page, item) \
+	__inc_zone_page_state(page, ((item) == (enum zone_stat_item )0) ? (item) : (item))
+#define __inc_node_page_state(page, item) \
+	__inc_node_page_state(page, ((item) == (enum node_stat_item )0) ? (item) : (item))
+#define __dec_zone_page_state(page, item) \
+	__dec_zone_page_state(page, ((item) == (enum zone_stat_item )0) ? (item) : (item))
+#define __dec_node_page_state(page, item) \
+	__dec_node_page_state(page, ((item) == (enum node_stat_item )0) ? (item) : (item))
 
 static inline void __mod_zone_freepage_state(struct zone *zone, int nr_pages,
 					     int migratetype)
