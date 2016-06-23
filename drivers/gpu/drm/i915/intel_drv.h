@@ -688,6 +688,7 @@ struct intel_crtc {
 		union {
 			struct intel_pipe_wm ilk;
 			struct skl_pipe_wm skl;
+			struct vlv_wm_state vlv;
 		} active;
 
 		/* allow CxSR on this pipe */

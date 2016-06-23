@@ -1229,7 +1229,7 @@ static void vlv_pipe_set_fifo_size(struct intel_crtc *crtc)
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	int sprite0_start = 0, sprite1_start = 0, fifo_size = 0;
-	const struct vlv_wm_state *wm_state = &crtc->wm_state;
+	const struct vlv_wm_state *wm_state = &crtc->wm.active.vlv;
 
 
 	WARN_ON(wm_state->fifo_size[PLANE_CURSOR] != 63);
@@ -1311,7 +1311,7 @@ static void vlv_merge_wm(struct drm_device *dev,
 	wm->cxsr = true;
 
 	for_each_intel_crtc(dev, crtc) {
-		const struct vlv_wm_state *wm_state = &crtc->wm_state;
+		const struct vlv_wm_state *wm_state = &crtc->wm.active.vlv;
 
 		if (!crtc->active)
 			continue;
@@ -1330,7 +1330,7 @@ static void vlv_merge_wm(struct drm_device *dev,
 		wm->level = VLV_WM_LEVEL_PM2;
 
 	for_each_intel_crtc(dev, crtc) {
-		struct vlv_wm_state *wm_state = &crtc->wm_state;
+		struct vlv_wm_state *wm_state = &crtc->wm.active.vlv;
 		enum pipe pipe = crtc->pipe;
 
 		if (!crtc->active)
@@ -1357,7 +1357,7 @@ static void vlv_update_wm(struct drm_crtc *crtc)
 
 	vlv_compute_wm(intel_crtc->config);
 	mutex_lock(&dev_priv->wm.wm_mutex);
-	intel_crtc->wm_state = intel_crtc->config->wm.vlv.optimal;
+	intel_crtc->wm.active.vlv = intel_crtc->config->wm.vlv.optimal;
 	vlv_merge_wm(dev, &wm);
 	mutex_unlock(&dev_priv->wm.wm_mutex);
 
@@ -4372,7 +4372,7 @@ void vlv_wm_get_hw_state(struct drm_device *dev)
 		int i = wm_plane_id(plane);
 
 		crtc = to_intel_crtc(intel_get_crtc_for_pipe(dev, plane->pipe));
-		wm_state = &crtc->wm_state;
+		wm_state = &crtc->wm.active.vlv;
 
 		switch (plane->base.type) {
 		case DRM_PLANE_TYPE_CURSOR:
@@ -4426,7 +4426,7 @@ void vlv_wm_get_hw_state(struct drm_device *dev)
 	for_each_intel_crtc(dev, crtc) {
 		pipe = crtc->pipe;
 		to_intel_crtc_state(crtc->base.state)->wm.vlv.optimal
-			= crtc->wm_state;
+			= crtc->wm.active.vlv;
 
 		DRM_DEBUG_KMS("Initial watermarks: pipe %c, plane=%d, cursor=%d, sprite0=%d, sprite1=%d\n",
 			      pipe_name(pipe), wm->pipe[pipe].primary, wm->pipe[pipe].cursor,
