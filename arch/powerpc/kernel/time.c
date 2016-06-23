@@ -96,7 +96,8 @@ static struct clocksource clocksource_timebase = {
 	.read         = timebase_read,
 };
 
-#define DECREMENTER_MAX	0x7fffffff
+#define DECREMENTER_DEFAULT_MAX 0x7FFFFFFF
+u64 decrementer_max = DECREMENTER_DEFAULT_MAX;
 
 static int decrementer_set_next_event(unsigned long evt,
 				      struct clock_event_device *dev);
@@ -504,8 +505,8 @@ static void __timer_interrupt(void)
 		__this_cpu_inc(irq_stat.timer_irqs_event);
 	} else {
 		now = *next_tb - now;
-		if (now <= DECREMENTER_MAX)
-			set_dec((int)now);
+		if (now <= decrementer_max)
+			set_dec(now);
 		/* We may have raced with new irq work */
 		if (test_irq_work_pending())
 			set_dec(1);
@@ -535,7 +536,7 @@ void timer_interrupt(struct pt_regs * regs)
 	/* Ensure a positive value is written to the decrementer, or else
 	 * some CPUs will continue to take decrementer exceptions.
 	 */
-	set_dec(DECREMENTER_MAX);
+	set_dec(decrementer_max);
 
 	/* Some implementations of hotplug will get timer interrupts while
 	 * offline, just ignore these and we also need to set
@@ -583,9 +584,9 @@ static void generic_suspend_disable_irqs(void)
 	 * with suspending.
 	 */
 
-	set_dec(DECREMENTER_MAX);
+	set_dec(decrementer_max);
 	local_irq_disable();
-	set_dec(DECREMENTER_MAX);
+	set_dec(decrementer_max);
 }
 
 static void generic_suspend_enable_irqs(void)
@@ -866,7 +867,7 @@ static int decrementer_set_next_event(unsigned long evt,
 
 static int decrementer_shutdown(struct clock_event_device *dev)
 {
-	decrementer_set_next_event(DECREMENTER_MAX, dev);
+	decrementer_set_next_event(decrementer_max, dev);
 	return 0;
 }
 
@@ -892,6 +893,84 @@ static void register_decrementer_clockevent(int cpu)
 	clockevents_register_device(dec);
 }
 
+static inline void check_large_decrementer(void)
+{
+	u64 readback;
+
+	mtspr(SPRN_DEC, decrementer_max);
+
+	/*
+	 * The decrementer's down counting will change the low bits. ORing with
+	 * the default max ensure they are set.
+	 */
+	readback = mfspr(SPRN_DEC) | DECREMENTER_DEFAULT_MAX;
+
+	/*
+	 * If we fail a readback test we need to reset decrementer_max to the
+	 * 32 bit maximum. If the CPU has the LD disabled for whatever reason
+	 * leaving it at a larger value would cause us to write into the high
+	 * bit when handling decrementer exceptions, triggering another.
+	 */
+
+	pr_warn("time_init: readback got %llx, dec_max: %llx\n", readback, decrementer_max);
+
+	if (readback != decrementer_max) {
+		decrementer_max = DECREMENTER_DEFAULT_MAX;
+
+		pr_warn("time_init: large decrementer readback test failed on CPU %d, truncating to 32 bits\n",
+			smp_processor_id());
+	}
+}
+
+static void enable_large_decrementer(void)
+{
+	if (!cpu_has_feature(CPU_FTR_ARCH_300))
+		return;
+
+	if (decrementer_max <= DECREMENTER_DEFAULT_MAX)
+		return;
+
+	/*
+	 * If we're running as the hypervisor we need to enable the LD manually
+	 * otherwise firmware should have done it for us.
+	 */
+	if (cpu_has_feature(CPU_FTR_HVMODE))
+		mtspr(SPRN_LPCR, mfspr(SPRN_LPCR) | LPCR_LD);
+
+	check_large_decrementer();
+}
+
+static void __init set_decrementer_max(void)
+{
+	struct device_node *cpu;
+	const __be32 *fp;
+	u64 bits = 32;
+
+	/* Prior to ISAv3 the decrementer is always 32 bit */
+	if (!cpu_has_feature(CPU_FTR_ARCH_300))
+		return;
+
+	cpu = of_find_node_by_type(NULL, "cpu");
+	if (cpu)
+		fp = of_get_property(cpu, "ibm,dec-bits", NULL);
+
+	if (cpu && fp) {
+		bits = of_read_number(fp, 1);
+
+		if (bits > 64 || bits < 32) {
+			pr_warn("time_init: firmware supplied invalid ibm,dec-bits");
+			bits = 32;
+		}
+
+
+		/* calculate the signed maximum given this many bits */
+		decrementer_max = (1ul << (bits - 1)) - 1;
+	}
+
+	pr_info("time_init: %llu bit decrementer (max: %llx)\n",
+		bits, decrementer_max);
+}
+
 static void __init init_decrementer_clockevent(void)
 {
 	int cpu = smp_processor_id();
@@ -899,7 +978,7 @@ static void __init init_decrementer_clockevent(void)
 	clockevents_calc_mult_shift(&decrementer_clockevent, ppc_tb_freq, 4);
 
 	decrementer_clockevent.max_delta_ns =
-		clockevent_delta2ns(DECREMENTER_MAX, &decrementer_clockevent);
+		clockevent_delta2ns(decrementer_max, &decrementer_clockevent);
 	decrementer_clockevent.min_delta_ns =
 		clockevent_delta2ns(2, &decrementer_clockevent);
 
@@ -908,6 +987,9 @@ static void __init init_decrementer_clockevent(void)
 
 void secondary_cpu_time_init(void)
 {
+	/* Enable and test the large decrementer for this cpu */
+	enable_large_decrementer();
+
 	/* Start the decrementer on CPUs that have manual control
 	 * such as BookE
 	 */
@@ -972,6 +1054,10 @@ void __init time_init(void)
 
 	vdso_data->tb_update_count = 0;
 	vdso_data->tb_ticks_per_sec = tb_ticks_per_sec;
+
+	/* initialise and enable the large decrementer (if we have one) */
+	set_decrementer_max();
+	enable_large_decrementer();
 
 	/* Start the decrementer on CPUs that have manual control
 	 * such as BookE
