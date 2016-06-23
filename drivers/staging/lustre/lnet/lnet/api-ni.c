@@ -513,7 +513,7 @@ lnet_res_lh_initialize(struct lnet_res_container *rec, lnet_libhandle_t *lh)
 	unsigned int hash;
 
 	lh->lh_cookie = rec->rec_lh_cookie;
-	rec->rec_lh_cookie += 1 << ibits;
+	rec->rec_lh_cookie += (1ULL << ibits);
 
 	hash = (lh->lh_cookie >> ibits) & LNET_LH_HASH_MASK;
 
