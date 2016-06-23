@@ -91,6 +91,12 @@ static inline bool psci_has_ext_power_state(void)
 				PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK;
 }
 
+static inline bool psci_has_OS_initiated_mode_support(void)
+{
+	return psci_cpu_suspend_feature &
+			PSCI_1_0_FEATURES_CPU_SUSPEND_OS_INITIATED_MODE_MASK;
+}
+
 static inline bool psci_power_state_loses_context(u32 state)
 {
 	const u32 mask = psci_has_ext_power_state() ?
@@ -144,6 +150,14 @@ static int psci_to_linux_errno(int errno)
 	};
 
 	return -EINVAL;
+}
+static int psci_set_cpu_suspend_mode(bool suspend_mode)
+{
+	int err;
+
+	err = invoke_psci_fn(PSCI_FN_NATIVE(1_0, SUSPEND_MODE),
+						suspend_mode, 0, 0);
+	return psci_to_linux_errno(err);
 }
 
 static u32 psci_get_version(void)
@@ -397,8 +411,12 @@ static void __init psci_init_cpu_suspend(void)
 {
 	int feature = psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND]);
 
-	if (feature != PSCI_RET_NOT_SUPPORTED)
+	if (feature != PSCI_RET_NOT_SUPPORTED) {
 		psci_cpu_suspend_feature = feature;
+		if (psci_has_OS_initiated_mode_support())
+			psci_ops.set_cpu_suspend_mode =
+						psci_set_cpu_suspend_mode;
+	}
 }
 
 /*

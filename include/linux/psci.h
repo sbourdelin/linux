@@ -33,6 +33,7 @@ struct psci_operations {
 	int (*affinity_info)(unsigned long target_affinity,
 			unsigned long lowest_affinity_level);
 	int (*migrate_info_type)(void);
+	int (*set_cpu_suspend_mode)(bool);
 };
 
 extern struct psci_operations psci_ops;
