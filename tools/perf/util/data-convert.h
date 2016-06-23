@@ -3,6 +3,7 @@
 
 struct perf_data_convert_opts {
 	bool force;
+	bool non_sample;
 };
 
 #endif /* __DATA_CONVERT_H */
