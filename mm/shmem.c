@@ -576,8 +576,8 @@ static int shmem_add_to_page_cache(struct page *page,
 		mapping->nrpages += nr;
 		if (PageTransHuge(page))
 			__inc_zone_page_state(page, NR_SHMEM_THPS);
-		__mod_zone_page_state(page_zone(page), NR_FILE_PAGES, nr);
-		__mod_zone_page_state(page_zone(page), NR_SHMEM, nr);
+		__mod_node_page_state(page_pgdat(page), NR_FILE_PAGES, nr);
+		__mod_node_page_state(page_pgdat(page), NR_SHMEM, nr);
 		spin_unlock_irq(&mapping->tree_lock);
 	} else {
 		page->mapping = NULL;
