@@ -1428,6 +1428,10 @@ struct ib_srq {
 	} ext;
 };
 
+struct ib_qp_security {
+	void *q_security;
+};
+
 struct ib_qp {
 	struct ib_device       *device;
 	struct ib_pd	       *pd;
