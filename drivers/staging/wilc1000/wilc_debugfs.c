@@ -115,7 +115,7 @@ static int __init wilc_debugfs_init(void)
 
 	if (!wilc_dir) {
 		printk("ERR, debugfs create dir\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	for (i = 0; i < ARRAY_SIZE(debugfs_info); i++) {
@@ -129,7 +129,7 @@ static int __init wilc_debugfs_init(void)
 		if (!debugfs_files) {
 			printk("ERR fail to create the debugfs file, %s\n", info->name);
 			debugfs_remove_recursive(wilc_dir);
-			return -1;
+			return -EINVAL;
 		}
 	}
 	return 0;
