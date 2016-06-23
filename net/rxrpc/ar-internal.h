@@ -280,6 +280,7 @@ struct rxrpc_connection {
 	struct key		*key;		/* security for this connection (client) */
 	struct key		*server_key;	/* security for this service */
 	struct crypto_skcipher	*cipher;	/* encryption handle */
+	struct rxrpc_crypt	csum_iv_head;	/* leading block for csum_iv */
 	struct rxrpc_crypt	csum_iv;	/* packet checksum base */
 	unsigned long		events;
 #define RXRPC_CONN_CHALLENGE	0		/* send challenge packet */
