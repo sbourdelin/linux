@@ -29,3 +29,21 @@ void __bitmap_or(unsigned long *dst, const unsigned long *bitmap1,
 	for (k = 0; k < nr; k++)
 		dst[k] = bitmap1[k] | bitmap2[k];
 }
+
+/*
+ * bitmap_from_u64 - Check and swap words within u64.
+ *  @mask: source bitmap
+ *  @dst:  destination bitmap
+ *
+ * In 32 bit big endian userspace on a 64bit kernel, 'unsigned long' is 32 bits.
+ * When reading u64 using (u32 *)(&val)[0] and (u32 *)(&val)[1],
+ * we will get wrong value for the mask. That is "(u32 *)(&val)[0]"
+ * gets upper 32 bits of u64, but perf may expect lower 32bits of u64.
+ */
+void bitmap_from_u64(unsigned long *dst, u64 mask)
+{
+	dst[0] = mask & ULONG_MAX;
+
+	if (sizeof(mask) > sizeof(unsigned long))
+		dst[1] = mask >> 32;
+}
