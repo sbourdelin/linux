@@ -34,7 +34,10 @@ OPTIONS for 'convert'
 --verbose::
         Be more verbose (show counter open errors, etc).
 
-SEE ALSO
+--all::
+	Convert all events, including non-sample events (comm, fork, ...), to output.
+	Default is off, only convert samples.
+
 --------
 linkperf:perf[1]
 [1] Common Trace Format - http://www.efficios.com/ctf
