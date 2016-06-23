@@ -107,7 +107,7 @@ static int __init wilc_debugfs_init(void)
 	struct wilc_debugfs_info_t *info;
 
 	wilc_dir = debugfs_create_dir("wilc_wifi", NULL);
-	if (wilc_dir ==  ERR_PTR(-ENODEV)) {
+	if (PTR_ERR(wilc_dir) == -ENODEV) {
 		/* it's not error. the debugfs is just not being enabled. */
 		printk("ERR, kernel has built without debugfs support\n");
 		return 0;
