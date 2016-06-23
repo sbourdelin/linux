@@ -3248,6 +3248,7 @@ int hci_recv_frame(struct hci_dev *hdev, struct sk_buff *skb)
 	skb_queue_tail(&hdev->rx_q, skb);
 	queue_work(hdev->workqueue, &hdev->rx_work);
 
+	hci_leds_blink_oneshot(hdev->rx_led);
 	return 0;
 }
 EXPORT_SYMBOL(hci_recv_frame);
@@ -3325,6 +3326,8 @@ static void hci_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
 		BT_ERR("%s sending frame failed (%d)", hdev->name, err);
 		kfree_skb(skb);
 	}
+
+	hci_leds_blink_oneshot(hdev->tx_led);
 }
 
 /* Send HCI command */
