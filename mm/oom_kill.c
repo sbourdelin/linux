@@ -839,9 +839,13 @@ void oom_kill_process(struct oom_control *oc, struct task_struct *p,
 	 * its children or threads, just set TIF_MEMDIE so it can die quickly
 	 */
 	if (task_will_free_mem(p)) {
-		mark_oom_victim(p);
-		wake_oom_reaper(p);
-		put_task_struct(p);
+		p = find_lock_task_mm(p);
+		if (p) {
+			mark_oom_victim(p);
+			task_unlock(p);
+			wake_oom_reaper(p);
+		}
+		put_task_struct(victim);
 		return;
 	}
 
