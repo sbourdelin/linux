@@ -11,6 +11,7 @@ struct page;
 struct scatterlist;
 
 extern int swiotlb_force;
+extern int swiotlb_enabled;
 
 /*
  * Maximum allowable number of contiguous slabs to map,

@@ -403,7 +403,8 @@ static void __init free_unused_memmap(void)
  */
 void __init mem_init(void)
 {
-	swiotlb_init(1);
+	if (swiotlb_enabled)
+		swiotlb_init(1);
 
 	set_max_mapnr(pfn_to_page(max_pfn) - mem_map);
 

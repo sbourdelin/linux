@@ -3875,6 +3875,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			force -- force using of bounce buffers even if they
 			         wouldn't be automatically used by the kernel
 
+	swiotlb_sz= [KNL] enter swiotlb size.
+			Sets the swiotlb size for eg. swiotlb_sz=64M
+
 	switches=	[HW,M68k]
 
 	sysfs.deprecated=0|1 [KNL]

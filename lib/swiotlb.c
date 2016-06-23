@@ -54,6 +54,7 @@
 #define IO_TLB_MIN_SLABS ((1<<20) >> IO_TLB_SHIFT)
 
 int swiotlb_force;
+int swiotlb_enabled;
 
 /*
  * Used to do a quick range check in swiotlb_tbl_unmap_single and
@@ -96,6 +97,9 @@ static DEFINE_SPINLOCK(io_tlb_lock);
 
 static int late_alloc;
 
+unsigned long swiotlb_sz;
+unsigned int swiotlb_sz_shift;
+
 static int __init
 setup_io_tlb_npages(char *str)
 {
@@ -112,6 +116,24 @@ setup_io_tlb_npages(char *str)
 	return 0;
 }
 early_param("swiotlb", setup_io_tlb_npages);
+
+static int __init
+setup_io_tlb_size(char *str)
+{
+	int len = strlen(str);
+
+	if (str[len-1] == 'M')
+		swiotlb_sz_shift = 20;
+	else if (str[len-1] == 'K')
+		swiotlb_sz_shift = 10;
+	str[len-1] = '\0';
+	if (isdigit(*str))
+		swiotlb_sz = kstrtoul(str, &str, 0);
+
+	swiotlb_enabled = 1;
+	return 0;
+}
+early_param("swiotlb_sz", setup_io_tlb_size);
 /* make io_tlb_overflow tunable too? */
 
 unsigned long swiotlb_nr_tbl(void)
@@ -120,8 +142,9 @@ unsigned long swiotlb_nr_tbl(void)
 }
 EXPORT_SYMBOL_GPL(swiotlb_nr_tbl);
 
-/* default to 64MB */
-#define IO_TLB_DEFAULT_SIZE (64UL<<20)
+/* Pass from command line as swiotlb_sz=64M (for eg.)*/
+#define IO_TLB_DEFAULT_SIZE (swiotlb_sz<<swiotlb_sz_shift)
+
 unsigned long swiotlb_size_or_default(void)
 {
 	unsigned long size;
@@ -153,10 +176,12 @@ void swiotlb_print_info(void)
 	vstart = phys_to_virt(io_tlb_start);
 	vend = phys_to_virt(io_tlb_end);
 
-	printk(KERN_INFO "software IO TLB [mem %#010llx-%#010llx] (%luMB) mapped at [%p-%p]\n",
+	pr_info("software IO TLB [mem %#010llx-%#010llx] (%lu%cB) mapped at [%p-%p]\n",
 	       (unsigned long long)io_tlb_start,
 	       (unsigned long long)io_tlb_end,
-	       bytes >> 20, vstart, vend - 1);
+		bytes >> swiotlb_sz_shift,
+		swiotlb_sz_shift == 20 ? 'M' : 'K',
+		vstart, vend - 1);
 }
 
 int __init swiotlb_init_with_tbl(char *tlb, unsigned long nslabs, int verbose)
