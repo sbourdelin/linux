@@ -839,17 +839,6 @@ static void __acpi_pci_root_release_info(struct acpi_pci_root_info *info)
 
 static void acpi_pci_root_release_info(struct pci_host_bridge *bridge)
 {
-	struct resource *res;
-	struct resource_entry *entry;
-
-	resource_list_for_each_entry(entry, &bridge->windows) {
-		res = entry->res;
-		if (res->flags & IORESOURCE_IO)
-			pci_unmap_iospace(res);
-		if (res->parent &&
-		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
-			release_resource(res);
-	}
 	__acpi_pci_root_release_info(bridge->release_data);
 }
 

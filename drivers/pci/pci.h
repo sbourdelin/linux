@@ -11,7 +11,7 @@ extern const unsigned char pcie_link_speed[];
 bool pcie_cap_has_lnkctl(const struct pci_dev *dev);
 
 /* Functions internal to the PCI core code */
-
+void release_host_bridge_resources(struct pci_host_bridge *bridge);
 int pci_create_sysfs_dev_files(struct pci_dev *pdev);
 void pci_remove_sysfs_dev_files(struct pci_dev *pdev);
 #if !defined(CONFIG_DMI) && !defined(CONFIG_ACPI)

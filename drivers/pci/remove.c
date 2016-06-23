@@ -161,6 +161,7 @@ void pci_remove_root_bus(struct pci_bus *bus)
 	pci_remove_bus(bus);
 	host_bridge->bus = NULL;
 
+	release_host_bridge_resources(host_bridge);
 	/* remove the host bridge */
 	device_unregister(&host_bridge->dev);
 }

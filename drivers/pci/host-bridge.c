@@ -8,6 +8,21 @@
 
 #include "pci.h"
 
+void release_host_bridge_resources(struct pci_host_bridge *bridge)
+{
+	struct resource *res;
+	struct resource_entry *entry;
+
+	resource_list_for_each_entry(entry, &bridge->windows) {
+		res = entry->res;
+		if (res->flags & IORESOURCE_IO)
+			pci_unmap_iospace(res);
+		if (res->parent &&
+		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
+			release_resource(res);
+	}
+}
+
 static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
 {
 	while (bus->parent)
