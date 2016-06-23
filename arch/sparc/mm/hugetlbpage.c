@@ -131,23 +131,13 @@ pte_t *huge_pte_alloc(struct mm_struct *mm,
 {
 	pgd_t *pgd;
 	pud_t *pud;
-	pmd_t *pmd;
 	pte_t *pte = NULL;
-
-	/* We must align the address, because our caller will run
-	 * set_huge_pte_at() on whatever we return, which writes out
-	 * all of the sub-ptes for the hugepage range.  So we have
-	 * to give it the first such sub-pte.
-	 */
-	addr &= HPAGE_MASK;
 
 	pgd = pgd_offset(mm, addr);
 	pud = pud_alloc(mm, pgd, addr);
-	if (pud) {
-		pmd = pmd_alloc(mm, pud, addr);
-		if (pmd)
-			pte = pte_alloc_map(mm, pmd, addr);
-	}
+	if (pud)
+		pte = (pte_t *)pmd_alloc(mm, pud, addr);
+
 	return pte;
 }
 
@@ -155,19 +145,13 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
 {
 	pgd_t *pgd;
 	pud_t *pud;
-	pmd_t *pmd;
 	pte_t *pte = NULL;
-
-	addr &= HPAGE_MASK;
 
 	pgd = pgd_offset(mm, addr);
 	if (!pgd_none(*pgd)) {
 		pud = pud_offset(pgd, addr);
-		if (!pud_none(*pud)) {
-			pmd = pmd_offset(pud, addr);
-			if (!pmd_none(*pmd))
-				pte = pte_offset_map(pmd, addr);
-		}
+		if (!pud_none(*pud))
+			pte = (pte_t *)pmd_offset(pud, addr);
 	}
 	return pte;
 }
@@ -175,67 +159,43 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
 void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
 		     pte_t *ptep, pte_t entry)
 {
-	int i;
-	pte_t orig[2];
-	unsigned long nptes;
+	pte_t orig;
 
 	if (!pte_present(*ptep) && pte_present(entry))
 		mm->context.huge_pte_count++;
 
 	addr &= HPAGE_MASK;
-
-	nptes = 1 << HUGETLB_PAGE_ORDER;
-	orig[0] = *ptep;
-	orig[1] = *(ptep + nptes / 2);
-	for (i = 0; i < nptes; i++) {
-		*ptep = entry;
-		ptep++;
-		addr += PAGE_SIZE;
-		pte_val(entry) += PAGE_SIZE;
-	}
+	orig = *ptep;
+	*ptep = entry;
 
 	/* Issue TLB flush at REAL_HPAGE_SIZE boundaries */
-	addr -= REAL_HPAGE_SIZE;
-	ptep -= nptes / 2;
-	maybe_tlb_batch_add(mm, addr, ptep, orig[1], 0);
-	addr -= REAL_HPAGE_SIZE;
-	ptep -= nptes / 2;
-	maybe_tlb_batch_add(mm, addr, ptep, orig[0], 0);
+	maybe_tlb_batch_add(mm, addr, ptep, orig, 0);
+	maybe_tlb_batch_add(mm, addr + REAL_HPAGE_SIZE, ptep, orig, 0);
 }
 
 pte_t huge_ptep_get_and_clear(struct mm_struct *mm, unsigned long addr,
 			      pte_t *ptep)
 {
 	pte_t entry;
-	int i;
-	unsigned long nptes;
 
 	entry = *ptep;
 	if (pte_present(entry))
 		mm->context.huge_pte_count--;
 
 	addr &= HPAGE_MASK;
-	nptes = 1 << HUGETLB_PAGE_ORDER;
-	for (i = 0; i < nptes; i++) {
-		*ptep = __pte(0UL);
-		addr += PAGE_SIZE;
-		ptep++;
-	}
+	*ptep = __pte(0UL);
 
 	/* Issue TLB flush at REAL_HPAGE_SIZE boundaries */
-	addr -= REAL_HPAGE_SIZE;
-	ptep -= nptes / 2;
 	maybe_tlb_batch_add(mm, addr, ptep, entry, 0);
-	addr -= REAL_HPAGE_SIZE;
-	ptep -= nptes / 2;
-	maybe_tlb_batch_add(mm, addr, ptep, entry, 0);
+	maybe_tlb_batch_add(mm, addr + REAL_HPAGE_SIZE, ptep, entry, 0);
 
 	return entry;
 }
 
 int pmd_huge(pmd_t pmd)
 {
-	return 0;
+	return !pmd_none(pmd) &&
+		(pmd_val(pmd) & (_PAGE_VALID|_PAGE_PMD_HUGE)) != _PAGE_VALID;
 }
 
 int pud_huge(pud_t pud)
