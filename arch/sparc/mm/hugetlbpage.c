@@ -12,6 +12,7 @@
 
 #include <asm/mman.h>
 #include <asm/pgalloc.h>
+#include <asm/pgtable.h>
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
 #include <asm/cacheflush.h>
@@ -201,4 +202,101 @@ int pmd_huge(pmd_t pmd)
 int pud_huge(pud_t pud)
 {
 	return 0;
+}
+
+static void hugetlb_free_pte_range(struct mmu_gather *tlb, pmd_t *pmd,
+			   unsigned long addr)
+{
+	pgtable_t token = pmd_pgtable(*pmd);
+
+	pmd_clear(pmd);
+	pte_free_tlb(tlb, token, addr);
+	atomic_long_dec(&tlb->mm->nr_ptes);
+}
+
+static void hugetlb_free_pmd_range(struct mmu_gather *tlb, pud_t *pud,
+				   unsigned long addr, unsigned long end,
+				   unsigned long floor, unsigned long ceiling)
+{
+	pmd_t *pmd;
+	unsigned long next;
+	unsigned long start;
+
+	start = addr;
+	pmd = pmd_offset(pud, addr);
+	do {
+		next = pmd_addr_end(addr, end);
+		if (pmd_none(*pmd))
+			continue;
+		if (is_hugetlb_pmd(*pmd))
+			pmd_clear(pmd);
+		else
+			hugetlb_free_pte_range(tlb, pmd, addr);
+	} while (pmd++, addr = next, addr != end);
+
+	start &= PUD_MASK;
+	if (start < floor)
+		return;
+	if (ceiling) {
+		ceiling &= PUD_MASK;
+		if (!ceiling)
+			return;
+	}
+	if (end - 1 > ceiling - 1)
+		return;
+
+	pmd = pmd_offset(pud, start);
+	pud_clear(pud);
+	pmd_free_tlb(tlb, pmd, start);
+	mm_dec_nr_pmds(tlb->mm);
+}
+
+static void hugetlb_free_pud_range(struct mmu_gather *tlb, pgd_t *pgd,
+				   unsigned long addr, unsigned long end,
+				   unsigned long floor, unsigned long ceiling)
+{
+	pud_t *pud;
+	unsigned long next;
+	unsigned long start;
+
+	start = addr;
+	pud = pud_offset(pgd, addr);
+	do {
+		next = pud_addr_end(addr, end);
+		if (pud_none_or_clear_bad(pud))
+			continue;
+		hugetlb_free_pmd_range(tlb, pud, addr, next, floor,
+				       ceiling);
+	} while (pud++, addr = next, addr != end);
+
+	start &= PGDIR_MASK;
+	if (start < floor)
+		return;
+	if (ceiling) {
+		ceiling &= PGDIR_MASK;
+		if (!ceiling)
+			return;
+	}
+	if (end - 1 > ceiling - 1)
+		return;
+
+	pud = pud_offset(pgd, start);
+	pgd_clear(pgd);
+	pud_free_tlb(tlb, pud, start);
+}
+
+void hugetlb_free_pgd_range(struct mmu_gather *tlb,
+			    unsigned long addr, unsigned long end,
+			    unsigned long floor, unsigned long ceiling)
+{
+	pgd_t *pgd;
+	unsigned long next;
+
+	pgd = pgd_offset(tlb->mm, addr);
+	do {
+		next = pgd_addr_end(addr, end);
+		if (pgd_none_or_clear_bad(pgd))
+			continue;
+		hugetlb_free_pud_range(tlb, pgd, addr, next, floor, ceiling);
+	} while (pgd++, addr = next, addr != end);
 }
