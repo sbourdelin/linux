@@ -2079,7 +2079,7 @@ static void get_scan_count(struct lruvec *lruvec, struct mem_cgroup *memcg,
 		int z;
 		unsigned long total_high_wmark = 0;
 
-		pgdatfree = sum_zone_node_page_state(pgdat->node_id, NR_FREE_PAGES);
+		pgdatfree = global_page_state(NR_FREE_PAGES);
 		pgdatfile = node_page_state(pgdat, NR_ACTIVE_FILE) +
 			   node_page_state(pgdat, NR_INACTIVE_FILE);
 

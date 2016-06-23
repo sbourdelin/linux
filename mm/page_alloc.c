@@ -3484,9 +3484,10 @@ should_reclaim_retry(gfp_t gfp_mask, unsigned order,
 				unsigned long writeback;
 				unsigned long dirty;
 
-				writeback = zone_page_state_snapshot(zone,
+				writeback = node_page_state_snapshot(zone->zone_pgdat,
 								     NR_WRITEBACK);
-				dirty = zone_page_state_snapshot(zone, NR_FILE_DIRTY);
+				dirty = node_page_state_snapshot(zone->zone_pgdat,
+								 NR_FILE_DIRTY);
 
 				if (2*(writeback + dirty) > reclaimable) {
 					congestion_wait(BLK_RW_ASYNC, HZ/10);
@@ -4395,9 +4396,9 @@ void show_free_areas(unsigned int filter)
 			K(zone->present_pages),
 			K(zone->managed_pages),
 			K(zone_page_state(zone, NR_MLOCK)),
-			K(zone_page_state(zone, NR_FILE_DIRTY)),
-			K(zone_page_state(zone, NR_WRITEBACK)),
-			K(zone_page_state(zone, NR_SHMEM)),
+			K(node_page_state(zone->zone_pgdat, NR_FILE_DIRTY)),
+			K(node_page_state(zone, NR_WRITEBACK)),
+			K(node_page_state(zone, NR_SHMEM)),
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 			K(zone_page_state(zone, NR_SHMEM_THPS) * HPAGE_PMD_NR),
 			K(zone_page_state(zone, NR_SHMEM_PMDMAPPED)
@@ -4409,12 +4410,12 @@ void show_free_areas(unsigned int filter)
 			zone_page_state(zone, NR_KERNEL_STACK) *
 				THREAD_SIZE / 1024,
 			K(zone_page_state(zone, NR_PAGETABLE)),
-			K(zone_page_state(zone, NR_UNSTABLE_NFS)),
+			K(node_page_state(zone, NR_UNSTABLE_NFS)),
 			K(zone_page_state(zone, NR_BOUNCE)),
 			K(free_pcp),
 			K(this_cpu_read(zone->pageset->pcp.count)),
 			K(zone_page_state(zone, NR_FREE_CMA_PAGES)),
-			K(zone_page_state(zone, NR_WRITEBACK_TEMP)),
+			K(node_page_state(zone, NR_WRITEBACK_TEMP)),
 			K(node_page_state(zone->zone_pgdat, NR_PAGES_SCANNED)));
 		printk("lowmem_reserve[]:");
 		for (i = 0; i < MAX_NR_ZONES; i++)
