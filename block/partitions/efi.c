@@ -149,8 +149,8 @@ static u64 last_lba(struct block_device *bdev)
 {
 	if (!bdev || !bdev->bd_inode)
 		return 0;
-	return div_u64(bdev->bd_inode->i_size,
-		       bdev_logical_block_size(bdev)) - 1ULL;
+
+	return bdev_logical_block_count(bdev) - 1;
 }
 
 static inline int pmbr_part_valid(gpt_mbr_record *part)
