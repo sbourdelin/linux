@@ -1118,6 +1118,23 @@ writeback as follows.
 	total available memory and applied the same way as
 	vm.dirty[_background]_ratio.
 
+5-4. Capabilities
+
+The "capability" controller is used to monitor capability use in the
+cgroup. This can be used to discover a starting point for capability
+bounding sets, even when running a shell script under ambient
+capabilities, with only short-lived helper processes exercising the
+capabilities.
+
+
+5-4-1. Capability Interface Files
+
+  capability.used
+
+	A read-only file which exists on all cgroups.
+
+	This reports the combined value of capability use in the
+	current cgroup and all its children.
 
 6. Namespace
 

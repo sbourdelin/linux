@@ -17,6 +17,7 @@
 #include <linux/syscalls.h>
 #include <linux/pid_namespace.h>
 #include <linux/user_namespace.h>
+#include <linux/capability_cgroup.h>
 #include <asm/uaccess.h>
 
 /*
@@ -380,6 +381,7 @@ bool ns_capable(struct user_namespace *ns, int cap)
 	}
 
 	if (security_capable(current_cred(), ns, cap) == 0) {
+		capability_cgroup_update_used(cap);
 		current->flags |= PF_SUPERPRIV;
 		return true;
 	}
