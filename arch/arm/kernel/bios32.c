@@ -515,7 +515,9 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
 	list_for_each_entry(sys, &head, node) {
 		struct pci_bus *bus = sys->bus;
 
-		if (!pci_has_flag(PCI_PROBE_ONLY)) {
+		if (pci_has_flag(PCI_PROBE_ONLY)) {
+			pci_bus_claim_resources(bus);
+		} else {
 			struct pci_bus *child;
 
 			/*
