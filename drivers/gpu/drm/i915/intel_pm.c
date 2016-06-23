@@ -1008,10 +1008,10 @@ static uint16_t vlv_compute_wm_level(struct intel_plane *plane,
 	return min_t(int, wm, USHRT_MAX);
 }
 
-static void vlv_compute_fifo(struct intel_crtc_state *cstate)
+static void vlv_compute_fifo(struct intel_crtc_state *cstate,
+				struct vlv_wm_state *wm_state)
 {
 	struct intel_crtc *crtc = to_intel_crtc(cstate->base.crtc);
-	struct vlv_wm_state *wm_state = &crtc->wm_state;
 	struct drm_device *dev = crtc->base.dev;
 	struct intel_plane *plane;
 	unsigned int total_rate = 0;
@@ -1075,9 +1075,9 @@ static void vlv_compute_fifo(struct intel_crtc_state *cstate)
 	WARN_ON(fifo_left != 0);
 }
 
-static void vlv_invert_wms(struct intel_crtc *crtc)
+static void vlv_invert_wms(struct intel_crtc *crtc,
+			struct vlv_wm_state *wm_state)
 {
-	struct vlv_wm_state *wm_state = &crtc->wm_state;
 	int level;
 
 	for (level = 0; level < wm_state->num_levels; level++) {
@@ -1118,7 +1118,7 @@ static int vlv_compute_wm(struct intel_crtc_state *cstate)
 {
 	struct intel_crtc *crtc = to_intel_crtc(cstate->base.crtc);
 	struct drm_device *dev = crtc->base.dev;
-	struct vlv_wm_state *wm_state = &crtc->wm_state;
+	struct vlv_wm_state *wm_state = &cstate->wm.vlv.optimal;
 	struct intel_plane *plane;
 	int sr_fifo_size = INTEL_INFO(dev)->num_pipes * 512 - 1;
 	int level;
@@ -1130,7 +1130,7 @@ static int vlv_compute_wm(struct intel_crtc_state *cstate)
 
 	wm_state->num_active_planes = 0;
 
-	vlv_compute_fifo(cstate);
+	vlv_compute_fifo(cstate, wm_state);
 
 	if (wm_state->num_active_planes != 1)
 		wm_state->cxsr = false;
@@ -1216,7 +1216,7 @@ static int vlv_compute_wm(struct intel_crtc_state *cstate)
 		memset(&wm_state->sr[level], 0, sizeof(wm_state->sr[level]));
 	}
 
-	vlv_invert_wms(crtc);
+	vlv_invert_wms(crtc, wm_state);
 
 	return 0;
 }
@@ -1356,7 +1356,10 @@ static void vlv_update_wm(struct drm_crtc *crtc)
 	struct vlv_wm_values wm = {};
 
 	vlv_compute_wm(intel_crtc->config);
+	mutex_lock(&dev_priv->wm.wm_mutex);
+	intel_crtc->wm_state = intel_crtc->config->wm.vlv.optimal;
 	vlv_merge_wm(dev, &wm);
+	mutex_unlock(&dev_priv->wm.wm_mutex);
 
 	if (memcmp(&dev_priv->wm.vlv, &wm, sizeof(wm)) == 0) {
 		/* FIXME should be part of crtc atomic commit */
@@ -4420,10 +4423,15 @@ void vlv_wm_get_hw_state(struct drm_device *dev)
 		mutex_unlock(&dev_priv->rps.hw_lock);
 	}
 
-	for_each_pipe(dev_priv, pipe)
+	for_each_intel_crtc(dev, crtc) {
+		pipe = crtc->pipe;
+		to_intel_crtc_state(crtc->base.state)->wm.vlv.optimal
+			= crtc->wm_state;
+
 		DRM_DEBUG_KMS("Initial watermarks: pipe %c, plane=%d, cursor=%d, sprite0=%d, sprite1=%d\n",
 			      pipe_name(pipe), wm->pipe[pipe].primary, wm->pipe[pipe].cursor,
 			      wm->pipe[pipe].sprite[0], wm->pipe[pipe].sprite[1]);
+	}
 
 	DRM_DEBUG_KMS("Initial watermarks: SR plane=%d, SR cursor=%d level=%d cxsr=%d\n",
 		      wm->sr.plane, wm->sr.cursor, wm->level, wm->cxsr);
