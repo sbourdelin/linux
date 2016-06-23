@@ -192,14 +192,116 @@ static const struct file_operations vgem_driver_fops = {
 	.release	= drm_release,
 };
 
+static int vgem_prime_pin(struct drm_gem_object *obj)
+{
+	long n_pages = obj->size >> PAGE_SHIFT;
+	struct page **pages;
+
+	/* Flush the object from the CPU cache so that importers can rely
+	 * on coherent indirect access via the exported dma-address.
+	 */
+	pages = drm_gem_get_pages(obj);
+	if (IS_ERR(pages))
+		return PTR_ERR(pages);
+
+	drm_clflush_pages(pages, n_pages);
+	drm_gem_put_pages(obj, pages, true, false);
+
+	return 0;
+}
+
+static struct sg_table *vgem_prime_get_sg_table(struct drm_gem_object *obj)
+{
+	long n_pages = obj->size >> PAGE_SHIFT;
+	struct sg_table *st;
+	struct page **pages;
+	int ret;
+
+	st = kmalloc(sizeof(struct sg_table), GFP_KERNEL);
+	if (st == NULL)
+		return ERR_PTR(-ENOMEM);
+
+	pages = drm_gem_get_pages(obj);
+	if (IS_ERR(pages)) {
+		ret = PTR_ERR(pages);
+		goto err;
+	}
+
+	ret = sg_alloc_table_from_pages(st, pages, n_pages,
+					0, obj->size, GFP_KERNEL);
+	drm_gem_put_pages(obj, pages, false, false);
+	if (ret)
+		goto err;
+
+	return st;
+
+err:
+	kfree(st);
+	return ERR_PTR(ret);
+}
+
+static void *vgem_prime_vmap(struct drm_gem_object *obj)
+{
+	long n_pages = obj->size >> PAGE_SHIFT;
+	struct page **pages;
+	void *addr;
+
+	pages = drm_gem_get_pages(obj);
+	if (IS_ERR(pages))
+		return NULL;
+
+	addr = vmap(pages, n_pages, 0, pgprot_writecombine(PAGE_KERNEL_IO));
+	drm_gem_put_pages(obj, pages, false, false);
+
+	return addr;
+}
+
+static void vgem_prime_vunmap(struct drm_gem_object *obj, void *vaddr)
+{
+	vunmap(vaddr);
+}
+
+static int vgem_prime_mmap(struct drm_gem_object *obj,
+			   struct vm_area_struct *vma)
+{
+	int ret;
+
+	if (obj->size < vma->vm_end - vma->vm_start)
+		return -EINVAL;
+
+	if (!obj->filp)
+		return -ENODEV;
+
+	ret = obj->filp->f_op->mmap(obj->filp, vma);
+	if (ret)
+		return ret;
+
+	fput(vma->vm_file);
+	vma->vm_file = get_file(obj->filp);
+	vma->vm_flags |= VM_DONTEXPAND | VM_DONTDUMP;
+	vma->vm_page_prot = pgprot_writecombine(vm_get_page_prot(vma->vm_flags));
+
+	return 0;
+}
+
 static struct drm_driver vgem_driver = {
-	.driver_features		= DRIVER_GEM,
+	.driver_features		= DRIVER_GEM | DRIVER_PRIME,
 	.gem_free_object_unlocked	= vgem_gem_free_object,
 	.gem_vm_ops			= &vgem_gem_vm_ops,
 	.ioctls				= vgem_ioctls,
 	.fops				= &vgem_driver_fops,
+
 	.dumb_create			= vgem_gem_dumb_create,
 	.dumb_map_offset		= vgem_gem_dumb_map,
+
+	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
+	.gem_prime_pin = vgem_prime_pin,
+	.gem_prime_export = drm_gem_prime_export,
+	.gem_prime_get_sg_table = vgem_prime_get_sg_table,
+	.gem_prime_vmap = vgem_prime_vmap,
+	.gem_prime_vunmap = vgem_prime_vunmap,
+	.gem_prime_mmap = vgem_prime_mmap,
+
 	.name	= DRIVER_NAME,
 	.desc	= DRIVER_DESC,
 	.date	= DRIVER_DATE,
