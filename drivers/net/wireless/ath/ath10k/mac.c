@@ -3236,6 +3236,7 @@ ath10k_mac_tx_h_get_txmode(struct ath10k *ar,
 	 * mode though because AP don't sleep.
 	 */
 	if (ar->htt.target_version_major < 3 &&
+	    !ar->hw_params.fw.disable_null_func_workaround &&
 	    (ieee80211_is_nullfunc(fc) || ieee80211_is_qos_nullfunc(fc)) &&
 	    !test_bit(ATH10K_FW_FEATURE_HAS_WMI_MGMT_TX,
 		      ar->running_fw->fw_file.fw_features))

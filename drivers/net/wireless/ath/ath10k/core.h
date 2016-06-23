@@ -750,6 +750,12 @@ struct ath10k {
 			const char *board;
 			size_t board_size;
 			size_t board_ext_size;
+			/* Workaround of sending NULL data frames via
+			 * HTT mgmt TX and getting the proper ACK status does
+			 * not works for chipsets QCA99X0 and later, while
+			 * Tx data path reports the ACK status properly.
+			 */
+			bool disable_null_func_workaround;
 		} fw;
 	} hw_params;
 
