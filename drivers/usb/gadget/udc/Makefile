@@ -1,7 +1,9 @@
 #
 # USB peripheral controller drivers
 #
-obj-$(CONFIG_USB_GADGET)	+= udc-core.o
+obj-$(CONFIG_USB_GADGET)	+= udc_core.o
+udc_core-y			:= udc-core.o
+udc_core-$(CONFIG_USB_CHARGER)	+= charger.o
 obj-$(CONFIG_USB_DUMMY_HCD)	+= dummy_hcd.o
 obj-$(CONFIG_USB_NET2272)	+= net2272.o
 obj-$(CONFIG_USB_NET2280)	+= net2280.o
