@@ -586,6 +586,8 @@ int extcon_register_notifier(struct extcon_dev *edev, unsigned int id,
 		return -EINVAL;
 
 	idx = find_cable_index_by_id(edev, id);
+	if (idx < 0)
+		return idx;
 
 	spin_lock_irqsave(&edev->lock, flags);
 	ret = raw_notifier_chain_register(&edev->nh[idx], nb);
@@ -611,6 +613,8 @@ int extcon_unregister_notifier(struct extcon_dev *edev, unsigned int id,
 		return -EINVAL;
 
 	idx = find_cable_index_by_id(edev, id);
+	if (idx < 0)
+		return idx;
 
 	spin_lock_irqsave(&edev->lock, flags);
 	ret = raw_notifier_chain_unregister(&edev->nh[idx], nb);
