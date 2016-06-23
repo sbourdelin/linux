@@ -972,7 +972,7 @@ static void vlv_setup_wm_latency(struct drm_device *dev)
 }
 
 static uint16_t vlv_compute_wm_level(struct intel_plane *plane,
-				     struct intel_crtc *crtc,
+					const struct intel_crtc_state *cstate,
 				     const struct intel_plane_state *state,
 				     int level)
 {
@@ -986,9 +986,9 @@ static uint16_t vlv_compute_wm_level(struct intel_plane *plane,
 		return 0;
 
 	cpp = drm_format_plane_cpp(state->base.fb->pixel_format, 0);
-	clock = crtc->config->base.adjusted_mode.crtc_clock;
-	htotal = crtc->config->base.adjusted_mode.crtc_htotal;
-	width = crtc->config->pipe_src_w;
+	clock = cstate->base.adjusted_mode.crtc_clock;
+	htotal = cstate->base.adjusted_mode.crtc_htotal;
+	width = cstate->pipe_src_w;
 	if (WARN_ON(htotal == 0))
 		htotal = 1;
 
@@ -1008,8 +1008,9 @@ static uint16_t vlv_compute_wm_level(struct intel_plane *plane,
 	return min_t(int, wm, USHRT_MAX);
 }
 
-static void vlv_compute_fifo(struct intel_crtc *crtc)
+static void vlv_compute_fifo(struct intel_crtc_state *cstate)
 {
+	struct intel_crtc *crtc = to_intel_crtc(cstate->base.crtc);
 	struct vlv_wm_state *wm_state = &crtc->wm_state;
 	struct drm_device *dev = crtc->base.dev;
 	struct intel_plane *plane;
@@ -1113,8 +1114,9 @@ static void vlv_invert_wms(struct intel_crtc *crtc)
 	}
 }
 
-static int vlv_compute_wm(struct intel_crtc *crtc)
+static int vlv_compute_wm(struct intel_crtc_state *cstate)
 {
+	struct intel_crtc *crtc = to_intel_crtc(cstate->base.crtc);
 	struct drm_device *dev = crtc->base.dev;
 	struct vlv_wm_state *wm_state = &crtc->wm_state;
 	struct intel_plane *plane;
@@ -1128,7 +1130,7 @@ static int vlv_compute_wm(struct intel_crtc *crtc)
 
 	wm_state->num_active_planes = 0;
 
-	vlv_compute_fifo(crtc);
+	vlv_compute_fifo(cstate);
 
 	if (wm_state->num_active_planes != 1)
 		wm_state->cxsr = false;
@@ -1149,7 +1151,7 @@ static int vlv_compute_wm(struct intel_crtc *crtc)
 
 		/* normal watermarks */
 		for (level = 0; level < wm_state->num_levels; level++) {
-			int wm = vlv_compute_wm_level(plane, crtc, state, level);
+			int wm = vlv_compute_wm_level(plane, cstate, state, level);
 			int max_wm = plane->base.type == DRM_PLANE_TYPE_CURSOR ? 63 : 511;
 
 			if (level == 0 && wm > max_wm) {
@@ -1353,7 +1355,7 @@ static void vlv_update_wm(struct drm_crtc *crtc)
 	enum pipe pipe = intel_crtc->pipe;
 	struct vlv_wm_values wm = {};
 
-	vlv_compute_wm(intel_crtc);
+	vlv_compute_wm(intel_crtc->config);
 	vlv_merge_wm(dev, &wm);
 
 	if (memcmp(&dev_priv->wm.vlv, &wm, sizeof(wm)) == 0) {
