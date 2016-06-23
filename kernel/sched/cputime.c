@@ -46,8 +46,15 @@ DEFINE_PER_CPU(seqcount_t, irq_time_seq);
 /*
  * Called before incrementing preempt_count on {soft,}irq_enter
  * and before decrementing preempt_count on {soft,}irq_exit.
+ *
+ * There are six possible transitions:
+ * process -> softirq, softirq -> process
+ * process -> hardirq, hardirq -> process
+ * softirq -> hardirq, hardirq -> softirq
+ *
+ * When exiting hardirq or softirq time, account the elapsed time.
  */
-void irqtime_account_irq(struct task_struct *curr)
+void irqtime_account_irq(struct task_struct *curr, int irqtype)
 {
 	unsigned long flags;
 	s64 delta;

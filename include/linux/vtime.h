@@ -112,21 +112,21 @@ static inline void vtime_init_idle(struct task_struct *tsk, int cpu) { }
 #endif
 
 #ifdef CONFIG_IRQ_TIME_ACCOUNTING
-extern void irqtime_account_irq(struct task_struct *tsk);
+extern void irqtime_account_irq(struct task_struct *tsk, int irqtype);
 #else
-static inline void irqtime_account_irq(struct task_struct *tsk) { }
+static inline void irqtime_account_irq(struct task_struct *tsk, int irqtype) { }
 #endif
 
-static inline void account_irq_enter_time(struct task_struct *tsk)
+static inline void account_irq_enter_time(struct task_struct *tsk, int irqtype)
 {
 	vtime_account_irq_enter(tsk);
-	irqtime_account_irq(tsk);
+	irqtime_account_irq(tsk, irqtype);
 }
 
-static inline void account_irq_exit_time(struct task_struct *tsk)
+static inline void account_irq_exit_time(struct task_struct *tsk, int irqtype)
 {
 	vtime_account_irq_exit(tsk);
-	irqtime_account_irq(tsk);
+	irqtime_account_irq(tsk, irqtype);
 }
 
 #endif /* _LINUX_KERNEL_VTIME_H */
