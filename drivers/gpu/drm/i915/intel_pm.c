@@ -1152,9 +1152,14 @@ static int vlv_compute_wm(struct intel_crtc *crtc)
 			int wm = vlv_compute_wm_level(plane, crtc, state, level);
 			int max_wm = plane->base.type == DRM_PLANE_TYPE_CURSOR ? 63 : 511;
 
-			/* hack */
-			if (WARN_ON(level == 0 && wm > max_wm))
-				wm = max_wm;
+			if (level == 0 && wm > max_wm) {
+				DRM_DEBUG_KMS("Requested display configuration "
+				"exceeds system watermark limitations\n");
+				DRM_DEBUG_KMS("Plane %d.%d: blocks required = %u/%u\n",
+					crtc->pipe,
+					drm_plane_index(&plane->base), wm, max_wm);
+				return -EINVAL;
+			}
 
 			if (wm > wm_state->fifo_size[wm_plane_id(plane)])
 				break;
