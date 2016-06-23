@@ -98,6 +98,7 @@ int create_user_ns(struct cred *new)
 	atomic_set(&ns->count, 1);
 	/* Leave the new->user_ns reference with the new user namespace. */
 	ns->parent = parent_ns;
+	ns->opaque = ns;
 	ns->level = parent_ns->level + 1;
 	ns->owner = owner;
 	ns->group = group;
@@ -251,16 +252,44 @@ EXPORT_SYMBOL(make_kuid);
  *	Map @kuid into the user-namespace specified by @targ and
  *	return the resulting uid.
  *
+ *	This function is *not* appropriate for security checks because
+ *	if @targ is transparent, the mappings of an ancestor namespace
+ *	are used. If @targ isn't &init_user_ns and you intend to do
+ *	anything with the result apart from returning it to a process
+ *	in @targ, you might want to use from_kuid_opaque() instead.
+ *
  *	There is always a mapping into the initial user_namespace.
  *
- *	If @kuid has no mapping in @targ (uid_t)-1 is returned.
+ *	If @kuid is not visible in @targ (uid_t)-1 is returned.
  */
 uid_t from_kuid(struct user_namespace *targ, kuid_t kuid)
 {
 	/* Map the uid from a global kernel uid */
-	return map_id_up(&targ->uid_map, __kuid_val(kuid));
+	struct user_namespace *opaque = READ_ONCE(targ->opaque);
+
+	return map_id_up(&opaque->uid_map, __kuid_val(kuid));
 }
 EXPORT_SYMBOL(from_kuid);
+
+/**
+ *	from_kuid_opaque - Create a uid from a kuid user-namespace pair.
+ *	@targ: The user namespace we want a uid in.
+ *	@kuid: The kernel internal uid to start with.
+ *
+ *	Map @kuid into the user-namespace specified by @targ and
+ *	return the resulting uid. This ignores transparent user
+ *	namespaces and is therefore appropriate for security checks.
+ *
+ *	There is always a mapping into the initial user_namespace.
+ *
+ *	If @kuid has no mapping in @targ (uid_t)-1 is returned.
+ */
+uid_t from_kuid_opaque(struct user_namespace *targ, kuid_t kuid)
+{
+	/* Map the uid from a global kernel uid */
+	return map_id_up(&targ->uid_map, __kuid_val(kuid));
+}
+EXPORT_SYMBOL(from_kuid_opaque);
 
 /**
  *	from_kuid_munged - Create a uid from a kuid user-namespace pair.
@@ -319,16 +348,44 @@ EXPORT_SYMBOL(make_kgid);
  *	Map @kgid into the user-namespace specified by @targ and
  *	return the resulting gid.
  *
+ *	This function is *not* appropriate for security checks because
+ *	if @targ is transparent, the mappings of an ancestor namespace
+ *	are used. If @targ isn't &init_user_ns and you intend to do
+ *	anything with the result apart from returning it to a process
+ *	in @targ, you might want to use from_kgid_opaque() instead.
+ *
  *	There is always a mapping into the initial user_namespace.
  *
- *	If @kgid has no mapping in @targ (gid_t)-1 is returned.
+ *	If @kgid is not visible in @targ (gid_t)-1 is returned.
  */
 gid_t from_kgid(struct user_namespace *targ, kgid_t kgid)
 {
 	/* Map the gid from a global kernel gid */
-	return map_id_up(&targ->gid_map, __kgid_val(kgid));
+	struct user_namespace *opaque = READ_ONCE(targ->opaque);
+
+	return map_id_up(&opaque->gid_map, __kgid_val(kgid));
 }
 EXPORT_SYMBOL(from_kgid);
+
+/**
+ *	from_kgid_opaque - Create a gid from a kgid user-namespace pair.
+ *	@targ: The user namespace we want a gid in.
+ *	@kgid: The kernel internal gid to start with.
+ *
+ *	Map @kgid into the user-namespace specified by @targ and
+ *	return the resulting gid. This ignores transparent user
+ *	namespaces and is therefore appropriate for security checks.
+ *
+ *	There is always a mapping into the initial user_namespace.
+ *
+ *	If @kgid has no mapping in @targ (gid_t)-1 is returned.
+ */
+gid_t from_kgid_opaque(struct user_namespace *targ, kgid_t kgid)
+{
+	/* Map the gid from a global kernel gid */
+	return map_id_up(&targ->gid_map, __kgid_val(kgid));
+}
+EXPORT_SYMBOL(from_kgid_opaque);
 
 /**
  *	from_kgid_munged - Create a gid from a kgid user-namespace pair.
@@ -811,6 +868,18 @@ static bool new_idmap_permitted(const struct file *file,
 				struct uid_gid_map *new_map)
 {
 	const struct cred *cred = file->f_cred;
+	unsigned int idx;
+
+	/* Don't allow non-identity mappings in transparent namespaces. */
+	if (ns != ns->opaque) {
+		for (idx = 0; idx < new_map->nr_extents; idx++) {
+			struct uid_gid_extent *ext = &new_map->extent[idx];
+
+			if (ext->first != ext->lower_first)
+				return false;
+		}
+	}
+
 	/* Don't allow mappings that would allow anything that wouldn't
 	 * be allowed without the establishment of unprivileged mappings.
 	 */
@@ -909,6 +978,81 @@ ssize_t proc_setgroups_write(struct file *file, const char __user *buf,
 		if (ns->gid_map.nr_extents != 0)
 			goto out_unlock;
 		ns->flags &= ~USERNS_SETGROUPS_ALLOWED;
+	}
+	mutex_unlock(&userns_state_mutex);
+
+	/* Report a successful write */
+	*ppos = count;
+	ret = count;
+out:
+	return ret;
+out_unlock:
+	mutex_unlock(&userns_state_mutex);
+	goto out;
+}
+
+int proc_transparent_show(struct seq_file *seq, void *v)
+{
+	struct user_namespace *ns = seq->private;
+	struct user_namespace *opaque = READ_ONCE(ns->opaque);
+
+	seq_printf(seq, "%d\n", (ns == opaque) ? 0 : 1);
+	return 0;
+}
+
+ssize_t proc_transparent_write(struct file *file, const char __user *buf,
+			     size_t count, loff_t *ppos)
+{
+	struct seq_file *seq = file->private_data;
+	struct user_namespace *ns = seq->private;
+	char kbuf[8], *pos;
+	bool transparent;
+	ssize_t ret;
+
+	/* Only allow a very narrow range of strings to be written */
+	ret = -EINVAL;
+	if ((*ppos != 0) || (count >= sizeof(kbuf)))
+		goto out;
+
+	/* What was written? */
+	ret = -EFAULT;
+	if (copy_from_user(kbuf, buf, count))
+		goto out;
+	kbuf[count] = '\0';
+	pos = kbuf;
+
+	/* What is being requested? */
+	ret = -EINVAL;
+	if (pos[0] == '1') {
+		pos += 1;
+		transparent = true;
+	} else if (pos[0] == '0') {
+		pos += 1;
+		transparent = false;
+	} else
+		goto out;
+
+	/* Verify there is not trailing junk on the line */
+	pos = skip_spaces(pos);
+	if (*pos != '\0')
+		goto out;
+
+	ret = -EPERM;
+	mutex_lock(&userns_state_mutex);
+	/* Is the requested state different from the current one? */
+	if (transparent != (ns->opaque != ns)) {
+		/* You can't turn off transparent mode. */
+		if (!transparent)
+			goto out_unlock;
+		/* If there are existing mappings, they might be
+		 * non-identity mappings. Therefore, block transparent
+		 * mode. This also prevents making the init namespace
+		 * transparent (which wouldn't work).
+		 */
+		if (ns->uid_map.nr_extents != 0 || ns->gid_map.nr_extents != 0)
+			goto out_unlock;
+		/* Okay! Make the namespace transparent. */
+		ns->opaque = ns->parent->opaque;
 	}
 	mutex_unlock(&userns_state_mutex);
 

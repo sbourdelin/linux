@@ -124,17 +124,19 @@ extern kgid_t make_kgid(struct user_namespace *from, gid_t gid);
 
 extern uid_t from_kuid(struct user_namespace *to, kuid_t uid);
 extern gid_t from_kgid(struct user_namespace *to, kgid_t gid);
+extern uid_t from_kuid_opaque(struct user_namespace *to, kuid_t uid);
+extern gid_t from_kgid_opaque(struct user_namespace *to, kgid_t gid);
 extern uid_t from_kuid_munged(struct user_namespace *to, kuid_t uid);
 extern gid_t from_kgid_munged(struct user_namespace *to, kgid_t gid);
 
 static inline bool kuid_has_mapping(struct user_namespace *ns, kuid_t uid)
 {
-	return from_kuid(ns, uid) != (uid_t) -1;
+	return from_kuid_opaque(ns, uid) != (uid_t) -1;
 }
 
 static inline bool kgid_has_mapping(struct user_namespace *ns, kgid_t gid)
 {
-	return from_kgid(ns, gid) != (gid_t) -1;
+	return from_kgid_opaque(ns, gid) != (gid_t) -1;
 }
 
 #else
@@ -155,6 +157,16 @@ static inline uid_t from_kuid(struct user_namespace *to, kuid_t kuid)
 }
 
 static inline gid_t from_kgid(struct user_namespace *to, kgid_t kgid)
+{
+	return __kgid_val(kgid);
+}
+
+static inline uid_t from_kuid_opaque(struct user_namespace *to, kuid_t kuid)
+{
+	return __kuid_val(kuid);
+}
+
+static inline gid_t from_kgid_opaque(struct user_namespace *to, kgid_t kgid)
 {
 	return __kgid_val(kgid);
 }

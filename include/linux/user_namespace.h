@@ -28,6 +28,8 @@ struct user_namespace {
 	struct uid_gid_map	projid_map;
 	atomic_t		count;
 	struct user_namespace	*parent;
+	/* self for normal ns; first opaque parent for transparent ns */
+	struct user_namespace	*opaque;
 	int			level;
 	kuid_t			owner;
 	kgid_t			group;
@@ -71,6 +73,8 @@ extern ssize_t proc_gid_map_write(struct file *, const char __user *, size_t, lo
 extern ssize_t proc_projid_map_write(struct file *, const char __user *, size_t, loff_t *);
 extern ssize_t proc_setgroups_write(struct file *, const char __user *, size_t, loff_t *);
 extern int proc_setgroups_show(struct seq_file *m, void *v);
+extern ssize_t proc_transparent_write(struct file *, const char __user *, size_t, loff_t *);
+extern int proc_transparent_show(struct seq_file *m, void *v);
 extern bool userns_may_setgroups(const struct user_namespace *ns);
 #else
 

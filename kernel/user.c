@@ -48,6 +48,7 @@ struct user_namespace init_user_ns = {
 		},
 	},
 	.count = ATOMIC_INIT(3),
+	.opaque = &init_user_ns,
 	.owner = GLOBAL_ROOT_UID,
 	.group = GLOBAL_ROOT_GID,
 	.ns.inum = PROC_USER_INIT_INO,

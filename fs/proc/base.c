@@ -2744,7 +2744,8 @@ static const struct file_operations proc_projid_map_operations = {
 	.release	= proc_id_map_release,
 };
 
-static int proc_setgroups_open(struct inode *inode, struct file *file)
+static int proc_nsadmin_open(struct inode *inode, struct file *file,
+	int (*show)(struct seq_file *, void *))
 {
 	struct user_namespace *ns = NULL;
 	struct task_struct *task;
@@ -2767,7 +2768,7 @@ static int proc_setgroups_open(struct inode *inode, struct file *file)
 			goto err_put_ns;
 	}
 
-	ret = single_open(file, &proc_setgroups_show, ns);
+	ret = single_open(file, show, ns);
 	if (ret)
 		goto err_put_ns;
 
@@ -2778,7 +2779,7 @@ err:
 	return ret;
 }
 
-static int proc_setgroups_release(struct inode *inode, struct file *file)
+static int proc_nsadmin_release(struct inode *inode, struct file *file)
 {
 	struct seq_file *seq = file->private_data;
 	struct user_namespace *ns = seq->private;
@@ -2787,12 +2788,30 @@ static int proc_setgroups_release(struct inode *inode, struct file *file)
 	return ret;
 }
 
+static int proc_setgroups_open(struct inode *inode, struct file *file)
+{
+	return proc_nsadmin_open(inode, file, &proc_setgroups_show);
+}
+
 static const struct file_operations proc_setgroups_operations = {
 	.open		= proc_setgroups_open,
 	.write		= proc_setgroups_write,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
-	.release	= proc_setgroups_release,
+	.release	= proc_nsadmin_release,
+};
+
+static int proc_transparent_open(struct inode *inode, struct file *file)
+{
+	return proc_nsadmin_open(inode, file, &proc_transparent_show);
+}
+
+static const struct file_operations proc_transparent_operations = {
+	.open		= proc_transparent_open,
+	.write		= proc_transparent_write,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= proc_nsadmin_release,
 };
 #endif /* CONFIG_USER_NS */
 
@@ -2901,6 +2920,7 @@ static const struct pid_entry tgid_base_stuff[] = {
 	REG("gid_map",    S_IRUGO|S_IWUSR, proc_gid_map_operations),
 	REG("projid_map", S_IRUGO|S_IWUSR, proc_projid_map_operations),
 	REG("setgroups",  S_IRUGO|S_IWUSR, proc_setgroups_operations),
+	REG("transparent", S_IRUGO|S_IWUSR, proc_transparent_operations),
 #endif
 #ifdef CONFIG_CHECKPOINT_RESTORE
 	REG("timers",	  S_IRUGO, proc_timers_operations),
