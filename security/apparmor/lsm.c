@@ -479,6 +479,8 @@ static int apparmor_getprocattr(struct task_struct *task, char *name,
 
 	if (strcmp(name, "current") == 0)
 		profile = aa_get_newest_profile(cxt->profile);
+	else if (strcmp(name, "context") == 0)
+		profile = aa_get_newest_profile(cxt->profile);
 	else if (strcmp(name, "prev") == 0  && cxt->previous)
 		profile = aa_get_newest_profile(cxt->previous);
 	else if (strcmp(name, "exec") == 0 && cxt->onexec)
@@ -486,8 +488,29 @@ static int apparmor_getprocattr(struct task_struct *task, char *name,
 	else
 		error = -EINVAL;
 
-	if (profile)
-		error = aa_getprocattr(profile, value);
+	if (profile) {
+		if (strcmp(name, "context") == 0) {
+			char *vp;
+			char *np;
+
+			error = aa_getprocattr(profile, &vp);
+			if (error > 0) {
+				error += 12;
+				*value = kzalloc(error, GFP_KERNEL);
+				if (*value == NULL)
+					error = -ENOMEM;
+				else {
+					sprintf(*value, "apparmor='%s'", vp);
+					np = strchr(*value, '\n');
+					if (np != NULL) {
+						np[0] = '\'';
+						np[1] = '\0';
+					}
+				}
+			}
+		} else
+			error = aa_getprocattr(profile, value);
+	}
 
 	aa_put_profile(profile);
 	put_cred(cred);
@@ -530,7 +553,7 @@ static int apparmor_setprocattr(struct task_struct *task, char *name,
 		return -EINVAL;
 
 	arg_size = size - (args - (char *) value);
-	if (strcmp(name, "current") == 0) {
+	if (strcmp(name, "current") == 0 || strcmp(name, "context") == 0) {
 		if (strcmp(command, "changehat") == 0) {
 			error = aa_setprocattr_changehat(args, arg_size,
 							 !AA_DO_TEST);
@@ -552,7 +575,10 @@ static int apparmor_setprocattr(struct task_struct *task, char *name,
 		else
 			goto fail;
 	} else
-		/* only support the "current" and "exec" process attributes */
+		/*
+		 * only support the "current", context and "exec"
+		 * process attributes
+		 */
 		return -EINVAL;
 
 	if (!error)

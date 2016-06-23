@@ -3576,16 +3576,21 @@ static int smack_getprocattr(struct task_struct *p, char *name, char **value)
 	char *cp;
 	int slen;
 
-	if (strcmp(name, "current") != 0)
+	if (strcmp(name, "current") == 0) {
+		cp = kstrdup(skp->smk_known, GFP_KERNEL);
+		if (cp == NULL)
+			return -ENOMEM;
+	} else if (strcmp(name, "context") == 0) {
+		slen = strlen(skp->smk_known) + 9;
+		cp = kzalloc(slen, GFP_KERNEL);
+		if (cp == NULL)
+			return -ENOMEM;
+		sprintf(cp, "smack='%s'", skp->smk_known);
+	} else
 		return -EINVAL;
 
-	cp = kstrdup(skp->smk_known, GFP_KERNEL);
-	if (cp == NULL)
-		return -ENOMEM;
-
-	slen = strlen(cp);
 	*value = cp;
-	return slen;
+	return strlen(cp);
 }
 
 /**
@@ -3622,7 +3627,7 @@ static int smack_setprocattr(struct task_struct *p, char *name,
 	if (value == NULL || size == 0 || size >= SMK_LONGLABEL)
 		return -EINVAL;
 
-	if (strcmp(name, "current") != 0)
+	if (strcmp(name, "current") != 0 && strcmp(name, "context") != 0)
 		return -EINVAL;
 
 	skp = smk_import_entry(value, size);
