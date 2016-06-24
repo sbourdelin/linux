@@ -69,6 +69,8 @@ struct nbd_device {
 #if IS_ENABLED(CONFIG_DEBUG_FS)
 	struct dentry *dbg_dir;
 #endif
+	atomic_t users; /* Users that opened the block device */
+	struct block_device *bdev;
 };
 
 #if IS_ENABLED(CONFIG_DEBUG_FS)
@@ -658,9 +660,26 @@ out:
 	return ret;
 }
 
+static void nbd_bdev_reset(struct block_device *bdev)
+{
+	set_device_ro(bdev, false);
+	bdev->bd_inode->i_size = 0;
+	if (max_part > 0) {
+		blkdev_reread_part(bdev);
+		bdev->bd_invalidated = 1;
+	}
+}
+
 /* Reset all properties of an NBD device */
 static void nbd_reset(struct nbd_device *nbd)
 {
+	sock_shutdown(nbd);
+	nbd_clear_que(nbd);
+	if (nbd->bdev) {
+		kill_bdev(nbd->bdev);
+		nbd_bdev_reset(nbd->bdev);
+	}
+
 	nbd->disconnect = false;
 	nbd->timedout = false;
 	nbd->blksize = 1024;
@@ -670,16 +689,6 @@ static void nbd_reset(struct nbd_device *nbd)
 	nbd->xmit_timeout = 0;
 	queue_flag_clear_unlocked(QUEUE_FLAG_DISCARD, nbd->disk->queue);
 	del_timer_sync(&nbd->timeout_timer);
-}
-
-static void nbd_bdev_reset(struct block_device *bdev)
-{
-	set_device_ro(bdev, false);
-	bdev->bd_inode->i_size = 0;
-	if (max_part > 0) {
-		blkdev_reread_part(bdev);
-		bdev->bd_invalidated = 1;
-	}
 }
 
 static void nbd_parse_flags(struct nbd_device *nbd, struct block_device *bdev)
@@ -806,17 +815,10 @@ static int __nbd_ioctl(struct block_device *bdev, struct nbd_device *nbd,
 		mutex_lock(&nbd->tx_lock);
 		nbd->task_recv = NULL;
 
-		sock_shutdown(nbd);
-		nbd_clear_que(nbd);
-		kill_bdev(bdev);
-		nbd_bdev_reset(bdev);
-
 		if (nbd->disconnect) /* user requested, ignore socket errors */
 			error = 0;
 		if (nbd->timedout)
 			error = -ETIMEDOUT;
-
-		nbd_reset(nbd);
 
 		return error;
 	}
@@ -856,10 +858,35 @@ static int nbd_ioctl(struct block_device *bdev, fmode_t mode,
 	return error;
 }
 
+static int nbd_open(struct block_device *bdev, fmode_t mode)
+{
+	struct nbd_device *nbd = bdev->bd_disk->private_data;
+
+	atomic_inc(&nbd->users);
+
+	if (!nbd->bdev)
+		nbd->bdev = bdev;
+
+	return 0;
+}
+
+static void nbd_release(struct gendisk *disk, fmode_t mode)
+{
+	struct nbd_device *nbd = disk->private_data;
+
+	if (atomic_dec_and_test(&nbd->users)) {
+		mutex_lock(&nbd->tx_lock);
+		nbd_reset(nbd);
+		mutex_unlock(&nbd->tx_lock);
+	}
+}
+
 static const struct block_device_operations nbd_fops = {
 	.owner =	THIS_MODULE,
 	.ioctl =	nbd_ioctl,
 	.compat_ioctl =	nbd_ioctl,
+	.open =		nbd_open,
+	.release =	nbd_release,
 };
 
 #if IS_ENABLED(CONFIG_DEBUG_FS)
@@ -1090,6 +1117,7 @@ static int __init nbd_init(void)
 		disk->private_data = &nbd_dev[i];
 		sprintf(disk->disk_name, "nbd%d", i);
 		nbd_reset(&nbd_dev[i]);
+		atomic_set(&nbd_dev[i].users, 0);
 		add_disk(disk);
 	}
 
