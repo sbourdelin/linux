@@ -217,6 +217,14 @@
 	       VDDIO-supply = <&reg_3p3v>;
 	       clocks = <&clks VF610_CLK_SAI2>;
        };
+
+	touch: crtouch@49 {
+		compatible = "fsl,crtouch_ts";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_touchscreen>;
+		reg = <0x49>;
+		irq-gpio = <&gpio0 21 GPIO_ACTIVE_HIGH>;
+	};
 };
 
 &iomuxc {
@@ -362,6 +370,12 @@
 				VF610_PAD_PTA22__SAI2_RX_DATA		0x02ed
 				VF610_PAD_PTA23__SAI2_RX_SYNC		0x02ed
 				VF610_PAD_PTB18__EXT_AUDIO_MCLK		0x02ed
+			>;
+		};
+
+		pinctrl_touchscreen: touchscreengrp {
+			fsl,pins = <
+				VF610_PAD_PTA31__GPIO_21	0x219d
 			>;
 		};
 
