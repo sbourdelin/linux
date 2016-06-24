@@ -51,6 +51,7 @@ bool of_graph_port_type_is(struct device_node *port, char *type);
 bool of_graph_endpoint_type_is(struct device_node *ep, char *type);
 int of_graph_get_endpoint_count(const struct device_node *np, char *type);
 struct device_node *of_graph_get_port_by_id(struct device_node *node, u32 id);
+struct device_node *of_graph_get_top_port(struct device *dev);
 struct device_node *of_graph_get_next_endpoint(const struct device_node *parent,
 					struct device_node *previous);
 struct device_node *of_graph_get_endpoint_by_regs(
