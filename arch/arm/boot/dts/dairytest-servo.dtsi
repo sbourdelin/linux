@@ -1,0 +1,36 @@
+#include <dt-bindings/board/am335x-bbw-bbb-base.h>
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/pinctrl/am33xx.h>
+
+&am33xx_pinmux {
+    servo_power_pin: pinmux_servo_power_pin{
+        pinctrl-single,pins = <
+            BONE_P9_27 (PIN_OUTPUT| MUX_MODE7)  /* ZCZ(C13) - gpio3_19, OUTPUT | MODE7 */
+        >;
+    };
+
+    ehrpwm2_pin: pinmux_ehrpwm2_pin{
+        pinctrl-single,pins = <
+            BONE_P8_19 (PIN_OUTPUT | MUX_MODE4) /* ZCZ(R1) - ehrpwm2a, OUTPUT | MODE3 */
+        >;
+    };
+};
+
+/ {
+    servo_power {
+        status = "okay";
+        compatible = "pinctrl-single";
+        pinctrl-names = "default";
+        pinctrl-0 = <&servo_power_pin>;
+    };
+};
+
+&epwmss2 {
+    status = "okay";
+};
+
+&ehrpwm2 {
+    pinctrl-names = "default";
+    pinctrl-0 = <&ehrpwm2_pin>;
+    status = "okay";
+};
