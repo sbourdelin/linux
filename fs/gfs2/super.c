@@ -1667,6 +1667,18 @@ static void gfs2_destroy_inode(struct inode *inode)
 	call_rcu(&inode->i_rcu, gfs2_i_callback);
 }
 
+static long gfs2_prune_icache_sb(struct super_block *sb,
+				 struct shrink_control *sc)
+{
+	struct gfs2_sbd *sdp;
+
+	sdp = sb->s_fs_info;
+	spin_lock(&sdp->sd_shrinkspin);
+	sdp->sd_iprune = sc->nr_to_scan + 1;
+	spin_unlock(&sdp->sd_shrinkspin);
+	return 0;
+}
+
 const struct super_operations gfs2_super_ops = {
 	.alloc_inode		= gfs2_alloc_inode,
 	.destroy_inode		= gfs2_destroy_inode,
@@ -1681,5 +1693,6 @@ const struct super_operations gfs2_super_ops = {
 	.remount_fs		= gfs2_remount_fs,
 	.drop_inode		= gfs2_drop_inode,
 	.show_options		= gfs2_show_options,
+	.prune_icache_sb	= gfs2_prune_icache_sb,
 };
 

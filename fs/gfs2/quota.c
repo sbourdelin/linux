@@ -1528,14 +1528,39 @@ void gfs2_wake_up_statfs(struct gfs2_sbd *sdp) {
 int gfs2_quotad(void *data)
 {
 	struct gfs2_sbd *sdp = data;
+	struct super_block *sb = sdp->sd_vfs;
 	struct gfs2_tune *tune = &sdp->sd_tune;
 	unsigned long statfs_timeo = 0;
 	unsigned long quotad_timeo = 0;
 	unsigned long t = 0;
 	DEFINE_WAIT(wait);
 	int empty;
+	int rc;
+	struct shrink_control sc = {.gfp_mask = GFP_KERNEL, };
 
 	while (!kthread_should_stop()) {
+		/* TODO: Deal with shrinking of dcache */
+		/* Prune any inode cache intended by the shrinker. */
+		spin_lock(&sdp->sd_shrinkspin);
+		if (sdp->sd_iprune > 0) {
+			sc.nr_to_scan = sdp->sd_iprune;
+			if (sc.nr_to_scan > 1024)
+				sc.nr_to_scan = 1024;
+			sdp->sd_iprune -= sc.nr_to_scan;
+			spin_unlock(&sdp->sd_shrinkspin);
+			rc = prune_icache_sb(sb, &sc);
+			if (rc < 0) {
+				spin_lock(&sdp->sd_shrinkspin);
+				sdp->sd_iprune = 0;
+				spin_unlock(&sdp->sd_shrinkspin);
+			}
+			if (sdp->sd_iprune) {
+				cond_resched();
+				continue;
+			}
+		} else {
+			spin_unlock(&sdp->sd_shrinkspin);
+		}
 
 		/* Update the master statfs file */
 		if (sdp->sd_statfs_force_sync) {

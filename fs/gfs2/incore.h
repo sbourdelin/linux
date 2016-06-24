@@ -757,6 +757,8 @@ struct gfs2_sbd {
 
 	struct task_struct *sd_logd_process;
 	struct task_struct *sd_quotad_process;
+	int sd_iprune; /* inodes to prune */
+	spinlock_t sd_shrinkspin;
 
 	/* Quota stuff */
 
