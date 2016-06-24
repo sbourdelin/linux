@@ -2332,7 +2332,7 @@ static u8 hci_to_mgmt_reason(u8 err)
 static void hci_disconn_complete_evt(struct hci_dev *hdev, struct sk_buff *skb)
 {
 	struct hci_ev_disconn_complete *ev = (void *) skb->data;
-	u8 reason = hci_to_mgmt_reason(ev->reason);
+	u8 reason;
 	struct hci_conn_params *params;
 	struct hci_conn *conn;
 	bool mgmt_connected;
@@ -2355,6 +2355,12 @@ static void hci_disconn_complete_evt(struct hci_dev *hdev, struct sk_buff *skb)
 	conn->state = BT_CLOSED;
 
 	mgmt_connected = test_and_clear_bit(HCI_CONN_MGMT_CONNECTED, &conn->flags);
+
+	if (test_bit(HCI_CONN_AUTH_FAILURE, &conn->flags))
+		reason = MGMT_DEV_DISCONN_AUTH_FAILURE;
+	else
+		reason = hci_to_mgmt_reason(ev->reason);
+
 	mgmt_device_disconnected(hdev, &conn->dst, conn->type, conn->dst_type,
 				reason, mgmt_connected);
 
@@ -2613,6 +2619,9 @@ static void hci_encrypt_change_evt(struct hci_dev *hdev, struct sk_buff *skb)
 	clear_bit(HCI_CONN_ENCRYPT_PEND, &conn->flags);
 
 	if (ev->status && conn->state == BT_CONNECTED) {
+		if (ev->status == HCI_ERROR_PIN_OR_KEY_MISSING)
+			set_bit(HCI_CONN_AUTH_FAILURE, &conn->flags);
+
 		hci_disconnect(conn, HCI_ERROR_AUTH_FAILURE);
 		hci_conn_drop(conn);
 		goto unlock;
