@@ -33,6 +33,11 @@ limit in the hierarchy is followed).
 pids.current tracks all child cgroup hierarchies, so parent/pids.current is a
 superset of parent/child/pids.current.
 
+pids.events shows information about the number of failed forks in a particular
+cgroup, both overall (since the cgroup was created) and recently (since the
+last limit reset). Userspace is notified of each time a process failed to fork
+in a cgroup.
+
 Example
 -------
 
@@ -83,3 +88,16 @@ sh: fork: Resource temporary unavailable
 # /bin/echo "We can't even spawn a single process now."
 sh: fork: Resource temporary unavailable
 #
+
+We can also see how many times a particular cgroup has failed to fork. For an
+example cgroup:
+
+# cat /sys/fs/cgroup/pids/some_cgroup/pids.events
+since	1
+total	12
+#
+
+This cgroup has had 12 associated process fail to fork throughout its lifetime,
+and has had 1 process fail to fork since the limit was last set. On setting the
+limit, the since counter becomes 0 and userspace is notified (this is the only
+case where since will be 0 and userspace will get a notification).
