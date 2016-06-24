@@ -308,6 +308,30 @@ static int stripe_map(struct dm_target *ti, struct bio *bio)
 	return DM_MAPIO_REMAPPED;
 }
 
+static long stripe_direct_access(struct dm_target *ti, sector_t sector,
+		void __pmem **kaddr, pfn_t *pfn, long size)
+{
+	struct stripe_c *sc;
+	struct block_device *bdev;
+	uint32_t stripe;
+	struct blk_dax_ctl dax = {
+		.size = size,
+	};
+	long ret;
+
+	sc = ti->private;
+	stripe_map_sector(sc, sector, &stripe, &dax.sector);
+
+	dax.sector += sc->stripe[stripe].physical_start;
+	bdev = sc->stripe[stripe].dev->bdev;
+
+	ret = bdev_direct_access(bdev, &dax);
+	*kaddr = dax.addr;
+	*pfn = dax.pfn;
+
+	return ret;
+}
+
 /*
  * Stripe status:
  *
@@ -425,6 +449,7 @@ static struct target_type stripe_target = {
 	.status = stripe_status,
 	.iterate_devices = stripe_iterate_devices,
 	.io_hints = stripe_io_hints,
+	.direct_access = stripe_direct_access,
 };
 
 int __init dm_stripe_init(void)
