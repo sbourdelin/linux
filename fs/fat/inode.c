@@ -1583,6 +1583,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 	struct msdos_sb_info *sbi;
 	u16 logical_sector_size;
 	u32 total_sectors, total_clusters, fat_clusters, rootdir_sectors;
+	u64 device_sectors;
 	int debug;
 	long error;
 	char buf[50];
@@ -1737,6 +1738,15 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 	total_sectors = bpb.fat_sectors;
 	if (total_sectors == 0)
 		total_sectors = bpb.fat_total_sect;
+
+	device_sectors = sb->s_bdev->bd_inode->i_size >>
+			(ffs(logical_sector_size) - 1);
+	if (device_sectors && total_sectors > device_sectors) {
+		fat_msg(sb, KERN_ERR, "total sectors %u "
+			"exceeds size of device (%llu sectors)",
+			total_sectors, device_sectors);
+		goto out_invalid;
+	}
 
 	total_clusters = (total_sectors - sbi->data_start) / sbi->sec_per_clus;
 
