@@ -106,8 +106,8 @@ static inline bool compaction_failed(enum compact_result result)
 }
 
 /*
- * Compaction  has backed off for some reason. It might be throttling or
- * lock contention. Retrying is still worthwhile.
+ * Compaction has backed off because it cannot proceed until there is enough
+ * free memory. Retrying is still worthwhile after reclaim.
  */
 static inline bool compaction_withdrawn(enum compact_result result)
 {
@@ -116,30 +116,6 @@ static inline bool compaction_withdrawn(enum compact_result result)
 	 * so the regular reclaim has to try harder and reclaim something.
 	 */
 	if (result == COMPACT_SKIPPED)
-		return true;
-
-	/*
-	 * If compaction is deferred for high-order allocations, it is
-	 * because sync compaction recently failed. If this is the case
-	 * and the caller requested a THP allocation, we do not want
-	 * to heavily disrupt the system, so we fail the allocation
-	 * instead of entering direct reclaim.
-	 */
-	if (result == COMPACT_DEFERRED)
-		return true;
-
-	/*
-	 * If compaction in async mode encounters contention or blocks higher
-	 * priority task we back off early rather than cause stalls.
-	 */
-	if (result == COMPACT_CONTENDED)
-		return true;
-
-	/*
-	 * Page scanners have met but we haven't scanned full zones so this
-	 * is a back off in fact.
-	 */
-	if (result == COMPACT_PARTIAL_SKIPPED)
 		return true;
 
 	return false;

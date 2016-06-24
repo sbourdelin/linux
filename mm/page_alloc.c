@@ -3249,7 +3249,7 @@ static inline bool
 should_compact_retry(struct alloc_context *ac, int order, int alloc_flags,
 		     enum compact_result compact_result,
 		     enum compact_priority *compact_priority,
-		     int compaction_retries)
+		     int *compaction_retries)
 {
 	int max_retries = MAX_COMPACT_RETRIES;
 
@@ -3257,28 +3257,35 @@ should_compact_retry(struct alloc_context *ac, int order, int alloc_flags,
 		return false;
 
 	/*
-	 * compaction considers all the zone as desperately out of memory
-	 * so it doesn't really make much sense to retry except when the
-	 * failure could be caused by insufficient priority
-	 */
-	if (compaction_failed(compact_result)) {
-		if (*compact_priority > MIN_COMPACT_PRIORITY) {
-			(*compact_priority)--;
-			return true;
-		}
-		return false;
-	}
-
-	/*
-	 * make sure the compaction wasn't deferred or didn't bail out early
-	 * due to locks contention before we declare that we should give up.
-	 * But do not retry if the given zonelist is not suitable for
-	 * compaction.
+	 * Compaction backed off due to watermark checks for order-0
+	 * so the regular reclaim has to try harder and reclaim something
+	 * Retry only if it looks like reclaim might have a chance.
 	 */
 	if (compaction_withdrawn(compact_result))
 		return compaction_zonelist_suitable(ac, order, alloc_flags);
 
 	/*
+	 * Compaction could have withdrawn early or skip some zones or
+	 * pageblocks. We were asked to retry, which means the allocation
+	 * should try really hard, so increase the priority if possible.
+	 */
+	if (*compact_priority > MIN_COMPACT_PRIORITY) {
+		(*compact_priority)--;
+		return true;
+	}
+
+	/*
+	 * Compaction considers all the zones as unfixably fragmented and we
+	 * are on the highest priority, which means it can't be due to
+	 * heuristics and it doesn't really make much sense to retry.
+	 */
+	if (compaction_failed(compact_result))
+		return false;
+
+	/*
+	 * The remaining possibility is that compaction made progress and
+	 * created a high-order page, but it was allocated by somebody else.
+	 * To prevent thrashing, limit the number of retries in such case.
 	 * !costly requests are much more important than __GFP_REPEAT
 	 * costly ones because they are de facto nofail and invoke OOM
 	 * killer to move on while costly can fail and users are ready
@@ -3286,9 +3293,12 @@ should_compact_retry(struct alloc_context *ac, int order, int alloc_flags,
 	 * would need much more detailed feedback from compaction to
 	 * make a better decision.
 	 */
+	if (compaction_made_progress(compact_result))
+		(*compaction_retries)++;
+
 	if (order > PAGE_ALLOC_COSTLY_ORDER)
 		max_retries /= 4;
-	if (compaction_retries <= max_retries)
+	if (*compaction_retries <= max_retries)
 		return true;
 
 	return false;
@@ -3307,7 +3317,7 @@ static inline bool
 should_compact_retry(struct alloc_context *ac, unsigned int order, int alloc_flags,
 		     enum compact_result compact_result,
 		     enum compact_priority *compact_priority,
-		     int compaction_retries)
+		     int *compaction_retries)
 {
 	struct zone *zone;
 	struct zoneref *z;
@@ -3704,9 +3714,6 @@ retry:
 	if (page)
 		goto got_pg;
 
-	if (order && compaction_made_progress(compact_result))
-		compaction_retries++;
-
 	/* Do not loop if specifically requested */
 	if (gfp_mask & __GFP_NORETRY)
 		goto nopage;
@@ -3741,7 +3748,7 @@ retry:
 	if (did_some_progress > 0 &&
 			should_compact_retry(ac, order, alloc_flags,
 				compact_result, &compact_priority,
-				compaction_retries))
+				&compaction_retries))
 		goto retry;
 
 	/* Reclaim has failed us, start killing things */
