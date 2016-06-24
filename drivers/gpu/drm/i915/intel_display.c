@@ -10976,6 +10976,7 @@ void intel_mark_busy(struct drm_i915_private *dev_priv)
 		return;
 
 	intel_runtime_pm_get(dev_priv);
+	intel_enable_gt_powersave(dev_priv);
 	i915_update_gfx_val(dev_priv);
 	if (INTEL_GEN(dev_priv) >= 6)
 		gen6_rps_busy(dev_priv);
@@ -15545,7 +15546,6 @@ void intel_modeset_init_hw(struct drm_device *dev)
 	dev_priv->atomic_cdclk_freq = dev_priv->cdclk_freq;
 
 	intel_init_clock_gating(dev);
-	intel_enable_gt_powersave(dev_priv);
 }
 
 /*
@@ -16340,6 +16340,7 @@ void intel_modeset_cleanup(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
+	intel_suspend_gt_powersave(dev_priv);
 	intel_disable_gt_powersave(dev_priv);
 
 	/*
