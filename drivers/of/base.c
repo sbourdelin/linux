@@ -2384,3 +2384,49 @@ struct device_node *of_graph_get_remote_port(const struct device_node *node)
 	return of_get_next_parent(np);
 }
 EXPORT_SYMBOL(of_graph_get_remote_port);
+
+static bool of_graph_node_type_is(struct device_node *np, char *type)
+{
+	const char *prop = NULL;
+
+	of_property_read_string(np, "type", &prop);
+
+	if (prop &&
+	    strcmp(prop, type) == 0)
+		return true;
+
+	return false;
+}
+
+bool of_graph_port_type_is(struct device_node *port, char *type)
+{
+	struct device_node *ports;
+	bool ret;
+
+	/* try port side */
+	ret = of_graph_node_type_is(port, type);
+	if (ret)
+		return ret;
+
+	/* try ports side */
+	ports = of_get_next_parent(port);
+	if (ports && of_node_cmp(ports->name, "ports") == 0)
+		return of_graph_node_type_is(ports, type);
+
+	return false;
+}
+EXPORT_SYMBOL(of_graph_port_type_is);
+
+bool of_graph_endpoint_type_is(struct device_node *ep, char *type)
+{
+	bool ret;
+
+	/* try endpoint side */
+	ret = of_graph_node_type_is(ep, type);
+	if (ret)
+		return ret;
+
+	/* try port side */
+	return of_graph_port_type_is(of_get_parent(ep), type);
+}
+EXPORT_SYMBOL(of_graph_endpoint_type_is);
