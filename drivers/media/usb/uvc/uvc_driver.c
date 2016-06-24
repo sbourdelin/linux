@@ -1740,6 +1740,9 @@ static void uvc_unregister_video(struct uvc_device *dev)
 
 		video_unregister_device(&stream->vdev);
 
+		if (video_is_registered(&stream->meta.vdev))
+			video_unregister_device(&stream->meta.vdev);
+
 		uvc_debugfs_cleanup_stream(stream);
 	}
 
@@ -1799,6 +1802,13 @@ static int uvc_register_video(struct uvc_device *dev,
 			   ret);
 		return ret;
 	}
+
+	/*
+	 * Register a metadata node. TODO: shall this only be enabled for some
+	 * cameras?
+	 */
+	if (!(dev->quirks & UVC_QUIRK_BUILTIN_ISIGHT))
+		uvc_meta_register(stream);
 
 	if (stream->type == V4L2_BUF_TYPE_VIDEO_CAPTURE)
 		stream->chain->caps |= V4L2_CAP_VIDEO_CAPTURE;

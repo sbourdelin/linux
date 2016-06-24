@@ -572,7 +572,7 @@ static int uvc_ioctl_querycap(struct file *file, void *fh,
 	strlcpy(cap->card, vdev->name, sizeof(cap->card));
 	usb_make_path(stream->dev->udev, cap->bus_info, sizeof(cap->bus_info));
 	cap->capabilities = V4L2_CAP_DEVICE_CAPS | V4L2_CAP_STREAMING
-			  | chain->caps;
+			  | V4L2_CAP_META_CAPTURE | chain->caps;
 	if (stream->type == V4L2_BUF_TYPE_VIDEO_CAPTURE)
 		cap->device_caps = V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_STREAMING;
 	else
