@@ -218,10 +218,10 @@ int cpuidle_enter_state(struct cpuidle_device *dev, struct cpuidle_driver *drv,
 		local_irq_enable();
 
 	/*
-	 * local_clock() returns the time in nanosecond, let's shift
-	 * by 10 (divide by 1024) to have microsecond based time.
+	 * local_clock() returns the time in nanosecond, let's
+	 * divide by 1000 to have microsecond based time.
 	 */
-	diff = (time_end - time_start) >> 10;
+	diff = (time_end - time_start) / 1000;
 	if (diff > INT_MAX)
 		diff = INT_MAX;
 
