@@ -332,14 +332,16 @@ static const struct ieee80211_rate hwsim_rates[] = {
 
 #define OUI_QCA 0x001374
 #define QCA_NL80211_SUBCMD_TEST 1
+#define QCA_NL80211_SUBCMD_ECHO 2
 enum qca_nl80211_vendor_subcmds {
 	QCA_WLAN_VENDOR_ATTR_TEST = 8,
-	QCA_WLAN_VENDOR_ATTR_MAX = QCA_WLAN_VENDOR_ATTR_TEST
+	QCA_WLAN_VENDOR_ATTR_ECHO,
+	QCA_WLAN_VENDOR_ATTR_MAX = QCA_WLAN_VENDOR_ATTR_ECHO
 };
 
 static const struct nla_policy
 hwsim_vendor_test_policy[QCA_WLAN_VENDOR_ATTR_MAX + 1] = {
-	[QCA_WLAN_VENDOR_ATTR_MAX] = { .type = NLA_U32 },
+	[QCA_WLAN_VENDOR_ATTR_TEST] = { .type = NLA_U32 },
 };
 
 static int mac80211_hwsim_vendor_cmd_test(struct wiphy *wiphy,
@@ -393,12 +395,33 @@ static int mac80211_hwsim_vendor_cmd_test(struct wiphy *wiphy,
 	return cfg80211_vendor_cmd_reply(skb);
 }
 
+static int mac80211_hwsim_vendor_cmd_echo(struct wiphy *wiphy,
+					  struct wireless_dev *wdev,
+					  const void *data, int data_len)
+{
+	struct sk_buff *skb;
+
+	skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, data_len);
+	if (!skb)
+		return -ENOMEM;
+
+	nla_put(skb, QCA_WLAN_VENDOR_ATTR_ECHO, data_len, data);
+
+	return cfg80211_vendor_cmd_reply(skb);
+}
+
 static struct wiphy_vendor_command mac80211_hwsim_vendor_commands[] = {
 	{
 		.info = { .vendor_id = OUI_QCA,
 			  .subcmd = QCA_NL80211_SUBCMD_TEST },
 		.flags = WIPHY_VENDOR_CMD_NEED_NETDEV,
 		.doit = mac80211_hwsim_vendor_cmd_test,
+	},
+	{
+		.info = { .vendor_id = OUI_QCA,
+			  .subcmd = QCA_NL80211_SUBCMD_ECHO },
+		.flags = WIPHY_VENDOR_CMD_NEED_NETDEV,
+		.doit = mac80211_hwsim_vendor_cmd_echo,
 	}
 };
 
