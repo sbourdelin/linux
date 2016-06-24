@@ -70,7 +70,6 @@ extern int fragmentation_index(struct zone *zone, unsigned int order);
 extern enum compact_result try_to_compact_pages(gfp_t gfp_mask,
 		unsigned int order, unsigned int alloc_flags,
 		const struct alloc_context *ac, enum compact_priority prio);
-extern void compact_pgdat(pg_data_t *pgdat, int order);
 extern void reset_isolation_suitable(pg_data_t *pgdat);
 extern enum compact_result compaction_suitable(struct zone *zone, int order,
 		unsigned int alloc_flags, int classzone_idx);
@@ -164,10 +163,6 @@ static inline void __SetPageMovable(struct page *page,
 }
 
 static inline void __ClearPageMovable(struct page *page)
-{
-}
-
-static inline void compact_pgdat(pg_data_t *pgdat, int order)
 {
 }
 
