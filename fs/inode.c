@@ -771,6 +771,7 @@ long prune_icache_sb(struct super_block *sb, struct shrink_control *sc)
 	dispose_list(&freeable);
 	return freed;
 }
+EXPORT_SYMBOL(prune_icache_sb);
 
 static void __wait_on_freeing_inode(struct inode *inode);
 /*

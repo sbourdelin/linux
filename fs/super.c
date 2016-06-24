@@ -98,7 +98,10 @@ static unsigned long super_cache_scan(struct shrinker *shrink,
 	sc->nr_to_scan = dentries + 1;
 	freed = prune_dcache_sb(sb, sc);
 	sc->nr_to_scan = inodes + 1;
-	freed += prune_icache_sb(sb, sc);
+	if (sb->s_op->prune_icache_sb)
+		freed += sb->s_op->prune_icache_sb(sb, sc);
+	else
+		freed += prune_icache_sb(sb, sc);
 
 	if (fs_objects) {
 		sc->nr_to_scan = fs_objects + 1;

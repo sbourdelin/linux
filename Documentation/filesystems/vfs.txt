@@ -230,6 +230,7 @@ struct super_operations {
         ssize_t (*quota_write)(struct super_block *, int, const char *, size_t, loff_t);
 	int (*nr_cached_objects)(struct super_block *);
 	void (*free_cached_objects)(struct super_block *, int);
+	long (*prune_icache_sb)(struct super_block *, struct shrink_control *);
 };
 
 All methods are called without any locks being held, unless otherwise
@@ -318,6 +319,20 @@ or bottom half).
 	appropriate scan batch sizes without having to worry about whether
 	implementations will cause holdoff problems due to large scan batch
 	sizes.
+
+  prune_icache_sb: called by the sb cache shrinking function for the file
+	filesystem to reduce the number of inodes from slab. This is done to
+	accomodate file systems that may not be able to immediately remove
+	inodes from cache, but must queue them to be removed ASAP.
+
+	This can happen in GFS2, for example, where evicting an inode
+	may require an inter-node lock (glock) which makes a call into DLM
+	(distributed lock manager), which may block for any number of reasons.
+	For example, it may block because a customer node needs to be fenced,
+	so the lock cannot be granted until the fencing is complete.
+	The fencing, in turn, may be blocked for other reasons, such as
+	memory allocations that caused the shrinker to be called in the first
+	place. Optional. If not set, the default vfs prune_icache_sb is called.
 
 Whoever sets up the inode is responsible for filling in the "i_op" field. This
 is a pointer to a "struct inode_operations" which describes the methods that

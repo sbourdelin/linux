@@ -1797,6 +1797,8 @@ struct super_operations {
 				  struct shrink_control *);
 	long (*free_cached_objects)(struct super_block *,
 				    struct shrink_control *);
+	long (*prune_icache_sb)(struct super_block *sb,
+				struct shrink_control *sc);
 };
 
 /*
@@ -2714,6 +2716,7 @@ extern void lockdep_annotate_inode_mutex_key(struct inode *inode);
 static inline void lockdep_annotate_inode_mutex_key(struct inode *inode) { };
 #endif
 extern void unlock_new_inode(struct inode *);
+extern long prune_icache_sb(struct super_block *sb, struct shrink_control *sc);
 extern unsigned int get_next_ino(void);
 
 extern void __iget(struct inode * inode);
