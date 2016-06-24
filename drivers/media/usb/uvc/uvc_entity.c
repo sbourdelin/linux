@@ -88,6 +88,11 @@ static int uvc_mc_init_entity(struct uvc_video_chain *chain,
 		if (ret < 0)
 			return ret;
 
+		if (UVC_ENTITY_TYPE(entity) == UVC_ITT_CAMERA)
+			entity->subdev.entity.function = MEDIA_ENT_F_CAM_SENSOR;
+		else
+			entity->subdev.entity.function = MEDIA_ENT_F_IO_V4L;
+
 		ret = v4l2_device_register_subdev(&chain->dev->vdev,
 						  &entity->subdev);
 	} else if (entity->vdev != NULL) {
