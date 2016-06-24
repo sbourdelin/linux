@@ -20,6 +20,8 @@
 #include <regex.h>
 #include <pthread.h>
 #include <linux/bitops.h>
+#include <sys/utsname.h>
+#include "../arch/common.h"
 
 const char 	*disassembler_style;
 const char	*objdump_path;
@@ -27,6 +29,13 @@ static regex_t	 file_lineno;
 
 static struct ins *ins__find(const char *name);
 static int disasm_line__parse(char *line, char **namep, char **rawp);
+
+static struct arch_instructions {
+	const char *arch;
+	int	   nmemb;
+	struct ins *instructions;
+	struct ins *(*ins__find)(const char *);
+} arch_ins;
 
 static void ins__delete(struct ins_operands *ops)
 {
@@ -183,7 +192,7 @@ static int lock__parse(struct ins_operands *ops)
 	if (disasm_line__parse(ops->raw, &name, &ops->locked.ops->raw) < 0)
 		goto out_free_ops;
 
-	ops->locked.ins = ins__find(name);
+	ops->locked.ins = arch_ins.ins__find(name);
 	free(name);
 
 	if (ops->locked.ins == NULL)
@@ -354,26 +363,12 @@ static struct ins_ops nop_ops = {
 	.scnprintf = nop__scnprintf,
 };
 
-static struct ins instructions[] = {
+static struct ins instructions_x86[] = {
 	{ .name = "add",   .ops  = &mov_ops, },
 	{ .name = "addl",  .ops  = &mov_ops, },
 	{ .name = "addq",  .ops  = &mov_ops, },
 	{ .name = "addw",  .ops  = &mov_ops, },
 	{ .name = "and",   .ops  = &mov_ops, },
-#ifdef __arm__
-	{ .name = "b",     .ops  = &jump_ops, }, // might also be a call
-	{ .name = "bcc",   .ops  = &jump_ops, },
-	{ .name = "bcs",   .ops  = &jump_ops, },
-	{ .name = "beq",   .ops  = &jump_ops, },
-	{ .name = "bge",   .ops  = &jump_ops, },
-	{ .name = "bgt",   .ops  = &jump_ops, },
-	{ .name = "bhi",   .ops  = &jump_ops, },
-	{ .name = "bl",    .ops  = &call_ops, },
-	{ .name = "bls",   .ops  = &jump_ops, },
-	{ .name = "blt",   .ops  = &jump_ops, },
-	{ .name = "blx",   .ops  = &call_ops, },
-	{ .name = "bne",   .ops  = &jump_ops, },
-#endif
 	{ .name = "bts",   .ops  = &mov_ops, },
 	{ .name = "call",  .ops  = &call_ops, },
 	{ .name = "callq", .ops  = &call_ops, },
@@ -446,6 +441,21 @@ static struct ins instructions[] = {
 	{ .name = "xbeginq", .ops  = &jump_ops, },
 };
 
+static struct ins instructions_arm[] = {
+	{ .name = "b",     .ops  = &jump_ops, }, /* might also be a call */
+	{ .name = "bcc",   .ops  = &jump_ops, },
+	{ .name = "bcs",   .ops  = &jump_ops, },
+	{ .name = "beq",   .ops  = &jump_ops, },
+	{ .name = "bge",   .ops  = &jump_ops, },
+	{ .name = "bgt",   .ops  = &jump_ops, },
+	{ .name = "bhi",   .ops  = &jump_ops, },
+	{ .name = "bl",    .ops  = &call_ops, },
+	{ .name = "bls",   .ops  = &jump_ops, },
+	{ .name = "blt",   .ops  = &jump_ops, },
+	{ .name = "blx",   .ops  = &call_ops, },
+	{ .name = "bne",   .ops  = &jump_ops, },
+};
+
 static int ins__key_cmp(const void *name, const void *insp)
 {
 	const struct ins *ins = insp;
@@ -461,24 +471,69 @@ static int ins__cmp(const void *a, const void *b)
 	return strcmp(ia->name, ib->name);
 }
 
-static void ins__sort(void)
+static void ins__sort(struct ins *instructions, int nmemb)
 {
-	const int nmemb = ARRAY_SIZE(instructions);
-
 	qsort(instructions, nmemb, sizeof(struct ins), ins__cmp);
 }
 
 static struct ins *ins__find(const char *name)
 {
-	const int nmemb = ARRAY_SIZE(instructions);
-	static bool sorted;
+	return bsearch(name, arch_ins.instructions, arch_ins.nmemb,
+		       sizeof(struct ins), ins__key_cmp);
+}
 
-	if (!sorted) {
-		ins__sort();
-		sorted = true;
+static void __init_arch_ins(const char *arch, struct ins *instructions,
+			    int size, struct ins *(*func)(const char *))
+{
+	ins__sort(instructions, size);
+
+	arch_ins.arch = arch;
+	arch_ins.nmemb = size;
+	arch_ins.instructions = instructions;
+	arch_ins.ins__find = func;
+}
+
+static int _init_arch_ins(const char *norm_arch)
+{
+	if (!strcmp(norm_arch, PERF_ARCH_X86))
+		__init_arch_ins(norm_arch, instructions_x86,
+				ARRAY_SIZE(instructions_x86),
+				ins__find);
+	else if (!strcmp(norm_arch, PERF_ARCH_ARM))
+		__init_arch_ins(norm_arch, instructions_arm,
+				ARRAY_SIZE(instructions_arm),
+				ins__find);
+	else
+		return -1;
+
+	return 0;
+}
+
+static int init_arch_ins(char *target_arch)
+{
+	const char *norm_arch = NULL;
+	struct utsname uts;
+
+	if (!target_arch) { /* Assume we are annotating locally. */
+		if (uname(&uts) < 0) {
+			pr_err("Can not annotate. Could not determine architecture.");
+			return -1;
+		}
+		target_arch = uts.machine;
 	}
 
-	return bsearch(name, instructions, nmemb, sizeof(struct ins), ins__key_cmp);
+	norm_arch = normalize_arch(target_arch);
+
+	/* retuen if already initialized. */
+	if (arch_ins.arch && !strcmp(norm_arch, arch_ins.arch))
+		return 0;
+
+	if (_init_arch_ins(norm_arch)) {
+		pr_err("perf annotate not supported by %s arch\n", target_arch);
+		return -1;
+	}
+
+	return 0;
 }
 
 int symbol__annotate_init(struct map *map __maybe_unused, struct symbol *sym)
@@ -707,7 +762,7 @@ int hist_entry__inc_addr_samples(struct hist_entry *he, int evidx, u64 ip)
 
 static void disasm_line__init_ins(struct disasm_line *dl)
 {
-	dl->ins = ins__find(dl->name);
+	dl->ins = arch_ins.ins__find(dl->name);
 
 	if (dl->ins == NULL)
 		return;
@@ -1113,7 +1168,8 @@ static void delete_last_nop(struct symbol *sym)
 	}
 }
 
-int symbol__annotate(struct symbol *sym, struct map *map, size_t privsize)
+int symbol__annotate(struct symbol *sym, struct map *map, size_t privsize,
+		     char *target_arch)
 {
 	struct dso *dso = map->dso;
 	char *filename = dso__build_id_filename(dso, NULL, 0);
@@ -1258,6 +1314,9 @@ fallback:
 		goto out_remove_tmp;
 	}
 
+	if (init_arch_ins(target_arch) < 0)
+		goto out_arch_err;
+
 	nline = 0;
 	while (!feof(file)) {
 		if (symbol__parse_objdump_line(sym, map, file, privsize,
@@ -1269,6 +1328,7 @@ fallback:
 	if (nline == 0)
 		pr_err("No output from %s\n", command);
 
+out_arch_err:
 	/*
 	 * kallsyms does not have symbol sizes so there may a nop at the end.
 	 * Remove it.
@@ -1655,7 +1715,7 @@ int symbol__tty_annotate(struct symbol *sym, struct map *map,
 	struct rb_root source_line = RB_ROOT;
 	u64 len;
 
-	if (symbol__annotate(sym, map, 0) < 0)
+	if (symbol__annotate(sym, map, 0, perf_evsel__env_arch(evsel)) < 0)
 		return -1;
 
 	len = symbol__size(sym);

@@ -4,7 +4,6 @@
 #include "util/evsel.h"
 #include "ui/helpline.h"
 
-
 enum {
 	ANN_COL__PERCENT,
 	ANN_COL__OFFSET,
@@ -162,11 +161,14 @@ static int symbol__gtk_annotate(struct symbol *sym, struct map *map,
 	GtkWidget *notebook;
 	GtkWidget *scrolled_window;
 	GtkWidget *tab_label;
+	char *target_arch = NULL;
 
 	if (map->dso->annotate_warned)
 		return -1;
 
-	if (symbol__annotate(sym, map, 0) < 0) {
+	target_arch = perf_evsel__env_arch(evsel);
+
+	if (symbol__annotate(sym, map, 0, target_arch) < 0) {
 		ui__error("%s", ui_helpline__current);
 		return -1;
 	}

@@ -1030,6 +1030,7 @@ int symbol__tui_annotate(struct symbol *sym, struct map *map,
 	int ret = -1;
 	int nr_pcnt = 1;
 	size_t sizeof_bdl = sizeof(struct browser_disasm_line);
+	char *target_arch = NULL;
 
 	if (sym == NULL)
 		return -1;
@@ -1051,7 +1052,9 @@ int symbol__tui_annotate(struct symbol *sym, struct map *map,
 		  (nr_pcnt - 1);
 	}
 
-	if (symbol__annotate(sym, map, sizeof_bdl) < 0) {
+	target_arch = perf_evsel__env_arch(evsel);
+
+	if (symbol__annotate(sym, map, sizeof_bdl, target_arch) < 0) {
 		ui__error("%s", ui_helpline__last_msg);
 		goto out_free_offsets;
 	}
