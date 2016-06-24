@@ -20,6 +20,7 @@
 
 #include <linux/kernel.h>
 #include <linux/notifier.h>
+#include <linux/errno.h>
 
 /*
  * When a CPU goes to a low power state that turns off power to the CPU's
@@ -78,7 +79,7 @@ int cpu_cluster_pm_exit(void);
 
 static inline int cpu_pm_register_notifier(struct notifier_block *nb)
 {
-	return 0;
+	return -ENODEV;
 }
 
 static inline int cpu_pm_unregister_notifier(struct notifier_block *nb)
