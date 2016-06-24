@@ -26,9 +26,10 @@
  *
  * Copyright (C) 2015 Aleksa Sarai <cyphar@cyphar.com>
  *
- * This file is subject to the terms and conditions of version 2 of the GNU
- * General Public License.  See the file COPYING in the main directory of the
- * Linux distribution for more details.
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
  */
 
 #include <linux/kernel.h>
@@ -53,8 +54,11 @@ struct pids_cgroup {
 	/* Handle for "pids.events" */
 	struct cgroup_file		events_file;
 
-	/* Number of times fork failed because limit was hit. */
-	atomic64_t			events_limit;
+	/* Total number of times fork failed because limit was hit. */
+	atomic64_t			hits_total;
+
+	/* Number of times fork failed since limit was last set. */
+	atomic64_t			hits_since;
 };
 
 static struct pids_cgroup *css_pids(struct cgroup_subsys_state *css)
@@ -78,7 +82,8 @@ pids_css_alloc(struct cgroup_subsys_state *parent)
 
 	pids->limit = PIDS_MAX;
 	atomic64_set(&pids->counter, 0);
-	atomic64_set(&pids->events_limit, 0);
+	atomic64_set(&pids->hits_total, 0);
+	atomic64_set(&pids->hits_since, 0);
 	return &pids->css;
 }
 
@@ -226,8 +231,12 @@ static int pids_can_fork(struct task_struct *task)
 	pids = css_pids(css);
 	err = pids_try_charge(pids, 1);
 	if (err) {
-		/* Only log the first time events_limit is incremented. */
-		if (atomic64_inc_return(&pids->events_limit) == 1) {
+		/*
+		 * We only log the first time a fork fails after a limit has
+		 * been set. Resetting the limit will cause us to log again.
+		 */
+		atomic64_inc(&pids->hits_total);
+		if (atomic64_inc_return(&pids->hits_since) == 1) {
 			pr_info("cgroup: fork rejected by pids controller in ");
 			pr_cont_cgroup_path(task_cgroup(current, pids_cgrp_id));
 			pr_cont("\n");
@@ -281,6 +290,9 @@ set_limit:
 	 * critical that any racing fork()s follow the new limit.
 	 */
 	pids->limit = limit;
+	/* Reset the since counter and notify userspace. */
+	atomic64_set(&pids->hits_since, 0);
+	cgroup_file_notify(&pids->events_file);
 	return nbytes;
 }
 
@@ -310,7 +322,8 @@ static int pids_events_show(struct seq_file *sf, void *v)
 {
 	struct pids_cgroup *pids = css_pids(seq_css(sf));
 
-	seq_printf(sf, "max %lld\n", (s64)atomic64_read(&pids->events_limit));
+	seq_printf(sf, "since\t%lld\n", (s64)atomic64_read(&pids->hits_since));
+	seq_printf(sf, "total\t%lld\n", (s64)atomic64_read(&pids->hits_total));
 	return 0;
 }
 
