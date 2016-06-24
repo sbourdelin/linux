@@ -476,6 +476,8 @@ struct rt_rq {
 	int push_cpu;
 	struct irq_work push_work;
 	raw_spinlock_t push_lock;
+	/* Used to skip CPUs being processed in the rto_mask */
+	atomic_t ipi_count;
 #endif
 #endif /* CONFIG_SMP */
 	int rt_queued;

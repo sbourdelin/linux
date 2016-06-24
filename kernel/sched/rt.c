@@ -100,6 +100,7 @@ void init_rt_rq(struct rt_rq *rt_rq)
 	rt_rq->push_flags = 0;
 	rt_rq->push_cpu = nr_cpu_ids;
 	raw_spin_lock_init(&rt_rq->push_lock);
+	atomic_set(&rt_rq->ipi_count, 0);
 	init_irq_work(&rt_rq->push_work, push_irq_work_func);
 #endif
 #endif /* CONFIG_SMP */
@@ -1917,6 +1918,10 @@ static int find_next_push_cpu(struct rq *rq)
 			break;
 		next_rq = cpu_rq(cpu);
 
+		/* If pushing was already started, ignore */
+		if (atomic_read(&next_rq->rt.ipi_count))
+			continue;
+
 		/* Make sure the next rq can push to this rq */
 		if (next_rq->rt.highest_prio.next < rq->rt.highest_prio.curr)
 			break;
@@ -1955,6 +1960,7 @@ static void tell_cpu_to_push(struct rq *rq)
 		return;
 
 	rq->rt.push_flags = RT_PUSH_IPI_EXECUTING;
+	atomic_inc(&cpu_rq(cpu)->rt.ipi_count);
 
 	irq_work_queue_on(&rq->rt.push_work, cpu);
 }
@@ -1974,11 +1980,12 @@ static void try_to_push_tasks(void *arg)
 
 	rq = cpu_rq(this_cpu);
 	src_rq = rq_of_rt_rq(rt_rq);
+	WARN_ON_ONCE(!atomic_read(&rq->rt.ipi_count));
 
 again:
 	if (has_pushable_tasks(rq)) {
 		raw_spin_lock(&rq->lock);
-		push_rt_task(rq);
+		push_rt_tasks(rq);
 		raw_spin_unlock(&rq->lock);
 	}
 
@@ -2000,7 +2007,7 @@ again:
 	raw_spin_unlock(&rt_rq->push_lock);
 
 	if (cpu >= nr_cpu_ids)
-		return;
+		goto out;
 
 	/*
 	 * It is possible that a restart caused this CPU to be
@@ -2011,7 +2018,10 @@ again:
 		goto again;
 
 	/* Try the next RT overloaded CPU */
+	atomic_inc(&cpu_rq(cpu)->rt.ipi_count);
 	irq_work_queue_on(&rt_rq->push_work, cpu);
+out:
+	atomic_dec(&rq->rt.ipi_count);
 }
 
 static void push_irq_work_func(struct irq_work *work)
