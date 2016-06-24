@@ -1,0 +1,14 @@
+* Freescale CRTOUCH based touchscreen
+
+Required Properties:
+- compatible must be fsl,crtouch_ts
+- reg: I2C address of the touchscreen
+- irq-gpio: GPIO to use as event IRQ
+
+Example:
+
+	touch: crtouch@49 {
+		compatible = "fsl,crtouch_ts";
+		reg = <0x49>;
+		irq-gpio = <&gpio0 21 GPIO_ACTIVE_HIGH>;
+	};
