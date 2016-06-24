@@ -284,21 +284,12 @@ enum oom_scan_t oom_scan_process_thread(struct oom_control *oc,
 	/*
 	 * This task already has access to memory reserves and is being killed.
 	 * Don't allow any other task to have access to the reserves unless
-	 * the task has MMF_OOM_REAPED because chances that it would release
-	 * any memory is quite low.
+	 * the task has oom_ignore_victims which is set when we can't wait for
+	 * exit_oom_victim().
 	 */
-	if (!is_sysrq_oom(oc) && atomic_read(&task->signal->oom_victims)) {
-		struct task_struct *p = find_lock_task_mm(task);
-		enum oom_scan_t ret = OOM_SCAN_ABORT;
-
-		if (p) {
-			if (test_bit(MMF_OOM_REAPED, &p->mm->flags))
-				ret = OOM_SCAN_CONTINUE;
-			task_unlock(p);
-		}
-
-		return ret;
-	}
+	if (!is_sysrq_oom(oc) && atomic_read(&task->signal->oom_victims))
+		return task->signal->oom_ignore_victims ?
+			OOM_SCAN_CONTINUE : OOM_SCAN_ABORT;
 
 	/*
 	 * If task is allocating a lot of memory and has been marked to be
@@ -593,13 +584,13 @@ static void oom_reap_task(struct task_struct *tsk)
 	}
 
 	/*
-	 * Clear TIF_MEMDIE because the task shouldn't be sitting on a
-	 * reasonably reclaimable memory anymore or it is not a good candidate
-	 * for the oom victim right now because it cannot release its memory
-	 * itself nor by the oom reaper.
+	 * Let oom_scan_process_thread() ignore this task because the task
+	 * shouldn't be sitting on a reasonably reclaimable memory anymore or
+	 * it is not a good candidate for the oom victim right now because it
+	 * cannot release its memory itself nor by the oom reaper.
 	 */
 	tsk->oom_reaper_list = NULL;
-	exit_oom_victim(tsk);
+	tsk->signal->oom_ignore_victims = true;
 
 	/* Drop a reference taken by wake_oom_reaper */
 	put_task_struct(tsk);
@@ -930,6 +921,7 @@ void oom_kill_process(struct oom_control *oc, struct task_struct *p,
 			 */
 			can_oom_reap = false;
 			set_bit(MMF_OOM_REAPED, &mm->flags);
+			victim->signal->oom_ignore_victims = true;
 			pr_info("oom killer %d (%s) has mm pinned by %d (%s)\n",
 					task_pid_nr(victim), victim->comm,
 					task_pid_nr(p), p->comm);
