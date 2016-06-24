@@ -110,6 +110,32 @@ device-2 {
         };
 };
 
+port / endpoint type
+--------------------
+
+Each ports / port / endpoint can have its type if needed.
+child node can take over parent node type. below example indicates
+device0 type is "typeA" && "typeB",
+device1 type is "typeA" && "typeB" && "typeC".
+
+device {
+	ports {
+		type = "typeA";
+
+		port@0 {
+			type = "typeB";
+
+			device0: endpoint@0 {
+			};
+
+			device1: endpoint@1 {
+				type = "typeC";
+			};
+		};
+		...
+	};
+};
+
 
 Required properties
 -------------------
