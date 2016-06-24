@@ -278,7 +278,7 @@ static void tpm_del_char_device(struct tpm_chip *chip)
 
 static int tpm1_chip_register(struct tpm_chip *chip)
 {
-	if (chip->flags & TPM_CHIP_FLAG_TPM2)
+	if (chip->flags & (TPM_CHIP_FLAG_TPM2 | TPM_CHIP_FLAG_NO_SYSFS))
 		return 0;
 
 	tpm_sysfs_add_device(chip);

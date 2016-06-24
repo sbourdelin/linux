@@ -29,7 +29,8 @@ struct vtpm_proxy_new_dev {
 };
 
 /* above flags */
-#define VTPM_PROXY_FLAG_TPM2  1  /* emulator is TPM 2 */
+#define VTPM_PROXY_FLAG_TPM2      1  /* emulator is TPM 2 */
+#define VTPM_PROXY_FLAG_NO_SYSFS  2  /* no sysfs for vTPM proxy instance */
 
 #define VTPM_PROXY_IOC_NEW_DEV   _IOWR(0xa1, 0x00, struct vtpm_proxy_new_dev)
 

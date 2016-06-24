@@ -50,7 +50,7 @@ struct proxy_dev {
 };
 
 /* all supported flags */
-#define VTPM_PROXY_FLAGS_ALL  (VTPM_PROXY_FLAG_TPM2)
+#define VTPM_PROXY_FLAGS_ALL  (VTPM_PROXY_FLAG_TPM2 | VTPM_PROXY_FLAG_NO_SYSFS)
 
 static struct workqueue_struct *workqueue;
 
@@ -489,6 +489,9 @@ static struct file *vtpm_proxy_create_device(
 
 	if (proxy_dev->flags & VTPM_PROXY_FLAG_TPM2)
 		proxy_dev->chip->flags |= TPM_CHIP_FLAG_TPM2;
+
+	if (proxy_dev->flags & VTPM_PROXY_FLAG_NO_SYSFS)
+		proxy_dev->chip->flags |= TPM_CHIP_FLAG_NO_SYSFS;
 
 	vtpm_proxy_work_start(proxy_dev);
 
