@@ -13,12 +13,16 @@ Required properties:
 
 Optional properties:
 - clock-output-names : From common clock binding.
+- clock-flags : Additional flags to be used.
 
 Example:
+	#include <dt-bindings/clk/clk.h>
+
 	clock {
 		compatible = "fixed-factor-clock";
 		clocks = <&parentclk>;
 		#clock-cells = <0>;
 		clock-div = <2>;
 		clock-mult = <1>;
+		clock-flags = <CLK_SET_RATE_PARENT>;
 	};
