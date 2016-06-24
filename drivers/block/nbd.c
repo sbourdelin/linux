@@ -711,6 +711,18 @@ static void nbd_dev_dbg_close(struct nbd_device *nbd);
 static int __nbd_ioctl(struct block_device *bdev, struct nbd_device *nbd,
 		       unsigned int cmd, unsigned long arg)
 {
+	/*
+	 * After a disconnect was instructed, do not allow any further actions
+	 * on the block device that would lead to a new connected endpoint.
+	 * This condition stays until nbd_reset was called either because all
+	 * users closed the device or because of CLEAR_SOCK.
+	 */
+	if (nbd->disconnect &&
+	    cmd != NBD_CLEAR_SOCK && cmd != NBD_PRINT_DEBUG) {
+		dev_info(disk_to_dev(nbd->disk), "Device is still busy after instructing a disconnect\n");
+		return -EBUSY;
+	}
+
 	switch (cmd) {
 	case NBD_DISCONNECT: {
 		struct request sreq;
@@ -736,11 +748,15 @@ static int __nbd_ioctl(struct block_device *bdev, struct nbd_device *nbd,
 	}
 
 	case NBD_CLEAR_SOCK:
-		sock_shutdown(nbd);
-		nbd_clear_que(nbd);
-		BUG_ON(!list_empty(&nbd->queue_head));
-		BUG_ON(!list_empty(&nbd->waiting_queue));
-		kill_bdev(bdev);
+		if (nbd->disconnect) {
+			nbd_reset(nbd);
+		} else {
+			sock_shutdown(nbd);
+			nbd_clear_que(nbd);
+			BUG_ON(!list_empty(&nbd->queue_head));
+			BUG_ON(!list_empty(&nbd->waiting_queue));
+			kill_bdev(bdev);
+		}
 		return 0;
 
 	case NBD_SET_SOCK: {
@@ -815,8 +831,10 @@ static int __nbd_ioctl(struct block_device *bdev, struct nbd_device *nbd,
 		mutex_lock(&nbd->tx_lock);
 		nbd->task_recv = NULL;
 
-		if (nbd->disconnect) /* user requested, ignore socket errors */
+		if (nbd->disconnect) { /* user requested, ignore socket errors */
+			sock_shutdown(nbd);
 			error = 0;
+		}
 		if (nbd->timedout)
 			error = -ETIMEDOUT;
 
