@@ -222,12 +222,13 @@ void __init arm64_memblock_init(void)
 
 	/*
 	 * Apply the memory limit if it was set. Since the kernel may be loaded
-	 * high up in memory, add back the kernel region that must be accessible
-	 * via the linear mapping.
+	 * in the memory regions above the limit, so we need to clear the
+	 * MEMBLOCK_NOMAP flag of this region to make it can be accessible via
+	 * the linear mapping.
 	 */
 	if (memory_limit != (phys_addr_t)ULLONG_MAX) {
-		memblock_enforce_memory_limit(memory_limit);
-		memblock_add(__pa(_text), (u64)(_end - _text));
+		memblock_mem_limit_mark_nomap(memory_limit);
+		memblock_clear_nomap(__pa(_text), (u64)(_end - _text));
 	}
 
 	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
