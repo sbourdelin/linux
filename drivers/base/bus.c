@@ -199,6 +199,73 @@ static ssize_t unbind_store(struct device_driver *drv, const char *buf,
 }
 static DRIVER_ATTR_WO(unbind);
 
+#ifdef CONFIG_DRIVER_MATCH_OVERRIDE_BUSES
+
+/* nul separated "" terminated strings */
+static const char *driver_override_buses;
+
+static inline void init_overrides(void)
+{
+	const char *buses_str = CONFIG_DRIVER_MATCH_OVERRIDE_BUSES;
+	char *transcript;
+	int i, len = strlen(buses_str);
+
+	if (!len)
+		return;
+
+	transcript = kzalloc(len + 1, GFP_KERNEL);
+	if (!transcript)
+		return;
+	driver_override_buses = transcript;
+
+	for (i = 0; i < len; i++) {
+
+		while (buses_str[i] == ' ')
+			i++;
+
+		if (buses_str[i]) {
+			const char *name_start = buses_str + i;
+			const char *name_end = strchrnul(name_start, ' ');
+			int name_len = name_end - name_start;
+
+			strncpy(transcript, name_start, name_len);
+			i += name_len;
+			transcript += name_len;
+			transcript++;
+		}
+	}
+}
+
+static inline bool driver_match_override(struct device_driver *drv,
+					 struct device *dev)
+{
+	struct bus_type *bus = bus_get(drv->bus);
+	const char *cmp_name = driver_override_buses;
+
+	while (cmp_name && *cmp_name) {
+		if (!strcmp(bus->name, cmp_name)) {
+			pr_notice("Overriding id match on manual driver binding:\n bus: %s  driver: %s  device: %s\n",
+				  bus->name, drv->name, dev_name(dev));
+			return true;
+		}
+		cmp_name += strlen(cmp_name);
+		cmp_name++;
+	}
+
+	return false;
+}
+
+#else /*CONFIG_DRIVER_MATCH_OVERRIDE_BUSES*/
+
+static inline void init_overrides(void)
+{}
+
+static inline bool driver_match_override(struct device_driver *drv,
+					 struct device *dev)
+{ return false; }
+
+#endif
+
 /*
  * Manually attach a device to a driver.
  * Note: the driver must want to bind to the device,
@@ -212,7 +279,8 @@ static ssize_t bind_store(struct device_driver *drv, const char *buf,
 	int err = -ENODEV;
 
 	dev = bus_find_device_by_name(bus, NULL, buf);
-	if (dev && dev->driver == NULL && driver_match_device(drv, dev)) {
+	if (dev && dev->driver == NULL && (driver_match_device(drv, dev)
+	    || driver_match_override(drv, dev))) {
 		if (dev->parent)	/* Needed for USB */
 			device_lock(dev->parent);
 		device_lock(dev);
@@ -1279,6 +1347,8 @@ int __init buses_init(void)
 	system_kset = kset_create_and_add("system", NULL, &devices_kset->kobj);
 	if (!system_kset)
 		return -ENOMEM;
+
+	init_overrides();
 
 	return 0;
 }

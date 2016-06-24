@@ -2050,3 +2050,5 @@ config IO_STRICT_DEVMEM
 	  if the driver using a given range cannot be disabled.
 
 	  If in doubt, say Y.
+
+source drivers/base/Kconfig.debug

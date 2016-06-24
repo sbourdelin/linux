@@ -1,0 +1,14 @@
+menuconfig DRIVER_MATCH_OVERRIDE
+	bool "Allow manual driver binding to override id match (DANGEROUS)"
+	default n
+	help
+	  When binding a driver manually bypass the check of driver id table
+	  against device id in driver core. This can be useful for development
+	  or on buses that don't provide reliable device identification.
+
+config DRIVER_MATCH_OVERRIDE_BUSES
+	string "Specify buses for which id matching will be overridden"
+	default "spi"
+	depends on DRIVER_MATCH_OVERRIDE
+	help
+	  space separated bus names
