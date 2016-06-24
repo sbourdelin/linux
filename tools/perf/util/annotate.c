@@ -363,6 +363,15 @@ static struct ins_ops nop_ops = {
 	.scnprintf = nop__scnprintf,
 };
 
+static struct ins_ops ret_ops = {
+	.scnprintf = ins__raw_scnprintf,
+};
+
+bool ins__is_ret(const struct ins *ins)
+{
+	return ins->ops == &ret_ops;
+}
+
 static struct ins instructions_x86[] = {
 	{ .name = "add",   .ops  = &mov_ops, },
 	{ .name = "addl",  .ops  = &mov_ops, },
@@ -439,6 +448,7 @@ static struct ins instructions_x86[] = {
 	{ .name = "xadd",  .ops  = &mov_ops, },
 	{ .name = "xbeginl", .ops  = &jump_ops, },
 	{ .name = "xbeginq", .ops  = &jump_ops, },
+	{ .name = "retq",  .ops  = &ret_ops, },
 };
 
 static struct ins instructions_arm[] = {
