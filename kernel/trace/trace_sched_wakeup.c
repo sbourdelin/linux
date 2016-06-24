@@ -239,6 +239,12 @@ static int wakeup_graph_entry(struct ftrace_graph_ent *trace)
 	unsigned long flags;
 	int pc, ret = 0;
 
+	if (trace->depth < 0)
+		return 0;
+
+	if (ftrace_graph_notrace_addr(trace->func))
+		return 1;
+
 	if (!func_prolog_preempt_disable(tr, &data, &pc))
 		return 0;
 
