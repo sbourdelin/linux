@@ -24,15 +24,6 @@ static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
 		dev_dbg(dev, "CI_HDRC_CONTROLLER_RESET_EVENT received\n");
 		/* use AHB transactor, allow posted data writes */
 		hw_write_id_reg(ci, HS_PHY_AHB_MODE, 0xffffffff, 0x8);
-		usb_phy_init(ci->usb_phy);
-		break;
-	case CI_HDRC_CONTROLLER_STOPPED_EVENT:
-		dev_dbg(dev, "CI_HDRC_CONTROLLER_STOPPED_EVENT received\n");
-		/*
-		 * Put the phy in non-driving mode. Otherwise host
-		 * may not detect soft-disconnection.
-		 */
-		usb_phy_notify_disconnect(ci->usb_phy, USB_SPEED_UNKNOWN);
 		break;
 	default:
 		dev_dbg(dev, "unknown ci_hdrc event\n");
@@ -53,20 +44,8 @@ static struct ci_hdrc_platform_data ci_hdrc_msm_platdata = {
 static int ci_hdrc_msm_probe(struct platform_device *pdev)
 {
 	struct platform_device *plat_ci;
-	struct usb_phy *phy;
 
 	dev_dbg(&pdev->dev, "ci_hdrc_msm_probe\n");
-
-	/*
-	 * OTG(PHY) driver takes care of PHY initialization, clock management,
-	 * powering up VBUS, mapping of registers address space and power
-	 * management.
-	 */
-	phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
-	if (IS_ERR(phy))
-		return PTR_ERR(phy);
-
-	ci_hdrc_msm_platdata.usb_phy = phy;
 
 	plat_ci = ci_hdrc_add_device(&pdev->dev,
 				pdev->resource, pdev->num_resources,
