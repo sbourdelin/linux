@@ -226,6 +226,56 @@ ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
 	return tsize;
 }
 
+static ssize_t of_device_modalias_size(struct device *dev)
+{
+	const char *compat;
+	int cplen, i;
+	ssize_t csize;
+
+	if ((!dev) || (!dev->of_node))
+		return -ENODEV;
+
+	/* Name & Type */
+	csize = 5 + strlen(dev->of_node->name) + strlen(dev->of_node->type);
+
+	/* Get compatible property if any */
+	compat = of_get_property(dev->of_node, "compatible", &cplen);
+	if (!compat)
+		return csize;
+
+	/* Find true end (we tolerate multiple \0 at the end */
+	for (i = (cplen - 1); i >= 0 && !compat[i]; i--)
+		cplen--;
+	if (!cplen)
+		return csize;
+	cplen++;
+
+	/* Check space (need cplen+1 chars including final \0) */
+	return csize + cplen;
+}
+
+int of_device_request_module(struct device *dev)
+{
+	char *str;
+	ssize_t size;
+	int ret;
+
+	size = of_device_modalias_size(dev);
+	if (size < 0)
+		return size;
+
+	str = kmalloc(size + 1, GFP_KERNEL);
+	if (!str)
+		return -ENOMEM;
+
+	of_device_get_modalias(dev, str, size);
+	str[size] = '\0';
+	ret = request_module(str);
+	kfree(str);
+
+	return ret;
+}
+
 /**
  * of_device_uevent - Display OF related uevent information
  */
