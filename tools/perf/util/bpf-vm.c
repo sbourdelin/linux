@@ -4,13 +4,33 @@
 #include "bpf-vm.h"
 #include "debug.h"
 #include <linux/filter.h>
+#include "bpf/libbpf.h"
+#include <linux/bpf.h>
+
+#define BPF_R0	regs[BPF_REG_0]
+#define BPF_R1	regs[BPF_REG_1]
+#define BPF_R2	regs[BPF_REG_2]
+#define BPF_R3	regs[BPF_REG_3]
+#define BPF_R4	regs[BPF_REG_4]
+#define BPF_R5	regs[BPF_REG_5]
 
 #define DST	regs[insn->dst_reg]
 #define SRC	regs[insn->src_reg]
 
 static inline void
-bpf_vm_jmp_call_handler(u64 *regs __maybe_unused, void *ctx __maybe_unused,
-			const struct bpf_insn *insn __maybe_unused) {}
+bpf_vm_jmp_call_handler(u64 *regs, void *ctx __maybe_unused,
+			const struct bpf_insn *insn)
+{
+	const void *xfunc;
+	u64 (*func)(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5);
+
+	xfunc = libbpf_get_ubpf_func(insn->imm);
+	if (xfunc) {
+		func = xfunc;
+		BPF_R0 = func(BPF_R1, BPF_R2, BPF_R3,
+			      BPF_R4, BPF_R5);
+	}
+}
 
 static inline int
 bpf_vm_jmp_tail_call_handler(u64 *regs __maybe_unused,
