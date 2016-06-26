@@ -1,8 +1,6 @@
 #include <linux/types.h>
 #include <asm/byteorder.h>
-#include <asm/unaligned.h>
 #include <linux/byteorder/generic.h>
-#include <linux/ratelimit.h>
 #include <linux/compiler.h>
 #include <linux/export.h>
 #include <linux/filter.h>
@@ -10,6 +8,11 @@
 #include <linux/math64.h>
 #include <linux/frame.h>
 #include <linux/bpf.h>
+
+#ifndef UBPF_BUILD
+#include <asm/unaligned.h>
+#include <linux/ratelimit.h>
+#endif
 
 /* Registers */
 #define BPF_R0	regs[BPF_REG_0]
@@ -31,6 +34,49 @@
 #define ARG1	regs[BPF_REG_ARG1]
 #define CTX	regs[BPF_REG_CTX]
 #define IMM	insn->imm
+
+#ifndef UBPF_BUILD
+/* Function call scratches BPF_R1-BPF_R5 registers,
+ * preserves BPF_R6-BPF_R9, and stores return value
+ * into BPF_R0.
+ */
+#define bpf_vm_jmp_call_handler(regs, ctx, insn)			\
+	(BPF_R0 = (__bpf_call_base + insn->imm)(BPF_R1, BPF_R2, BPF_R3,	\
+						BPF_R4, BPF_R5))
+
+/* If we ever reach this, we have a bug somewhere. */
+#define bpf_vm_default_label_handler(ctx, insn)			\
+	WARN_RATELIMIT(1, "unknown opcode %02x\n", insn->code)
+
+static inline int bpf_vm_jmp_tail_call_handler(u64 *regs, u32 *p_tail_call_cnt,
+					       const struct bpf_insn **p_insn)
+{
+	struct bpf_map *map = (struct bpf_map *) (unsigned long) BPF_R2;
+	struct bpf_array *array = container_of(map, struct bpf_array, map);
+	struct bpf_prog *prog;
+	u64 index = BPF_R3;
+
+	if (unlikely(index >= array->map.max_entries))
+		return -1;
+
+	if (unlikely(*p_tail_call_cnt > MAX_TAIL_CALL_CNT))
+		return -1;
+
+	(*p_tail_call_cnt)++;
+
+	prog = READ_ONCE(array->ptrs[index]);
+	if (unlikely(!prog))
+		return -1;
+
+	/* ARG1 at this point is guaranteed to point to CTX from
+	 * the verifier side due to the fact that the tail call is
+	 * handeled like a helper, that is, bpf_tail_call_proto,
+	 * where arg1_type is ARG_PTR_TO_CTX.
+	 */
+	*p_insn = prog->insnsi;
+	return 0;
+}
+#endif /* UBPF_BUILD */
 
 unsigned int __bpf_prog_run(void *ctx, const struct bpf_insn *insn)
 {
@@ -270,42 +316,15 @@ select_insn:
 
 	/* CALL */
 	JMP_CALL:
-		/* Function call scratches BPF_R1-BPF_R5 registers,
-		 * preserves BPF_R6-BPF_R9, and stores return value
-		 * into BPF_R0.
-		 */
-		BPF_R0 = (__bpf_call_base + insn->imm)(BPF_R1, BPF_R2, BPF_R3,
-						       BPF_R4, BPF_R5);
+		bpf_vm_jmp_call_handler(regs, ctx, insn);
 		CONT;
 
-	JMP_TAIL_CALL: {
-		struct bpf_map *map = (struct bpf_map *) (unsigned long) BPF_R2;
-		struct bpf_array *array = container_of(map, struct bpf_array, map);
-		struct bpf_prog *prog;
-		u64 index = BPF_R3;
-
-		if (unlikely(index >= array->map.max_entries))
-			goto out;
-
-		if (unlikely(tail_call_cnt > MAX_TAIL_CALL_CNT))
-			goto out;
-
-		tail_call_cnt++;
-
-		prog = READ_ONCE(array->ptrs[index]);
-		if (unlikely(!prog))
-			goto out;
-
-		/* ARG1 at this point is guaranteed to point to CTX from
-		 * the verifier side due to the fact that the tail call is
-		 * handeled like a helper, that is, bpf_tail_call_proto,
-		 * where arg1_type is ARG_PTR_TO_CTX.
-		 */
-		insn = prog->insnsi;
-		goto select_insn;
-out:
-		CONT;
-	}
+	JMP_TAIL_CALL:
+		tmp = bpf_vm_jmp_tail_call_handler(regs, &tail_call_cnt, &insn);
+		if (tmp)
+			CONT;
+		else
+			goto select_insn;
 	/* JMP */
 	JMP_JA:
 		insn += insn->off;
@@ -485,8 +504,7 @@ load_byte:
 		goto load_byte;
 
 	default_label:
-		/* If we ever reach this, we have a bug somewhere. */
-		WARN_RATELIMIT(1, "unknown opcode %02x\n", insn->code);
+		bpf_vm_default_label_handler(ctx, insn);
 		return 0;
 }
 STACK_FRAME_NON_STANDARD(__bpf_prog_run); /* jump table */
