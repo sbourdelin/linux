@@ -119,6 +119,12 @@ config EXTCON_SM5502
 	  Silicon Mitus SM5502. The SM5502 is a USB port accessory
 	  detector and switch.
 
+config EXTCON_QCOM_SPMI_MISC
+	tristate "Qualcomm USB extcon support"
+	help
+	  Say Y here to enable SPMI PMIC based USB cable detection
+	  support on Qualcomm PMICs such as PM8941.
+
 config EXTCON_USB_GPIO
 	tristate "USB GPIO extcon support"
 	depends on GPIOLIB || COMPILE_TEST
