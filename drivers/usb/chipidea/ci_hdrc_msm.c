@@ -37,6 +37,7 @@ struct ci_hdrc_msm {
 	struct clk *core_clk;
 	struct clk *iface_clk;
 	struct extcon_dev *vbus_edev;
+	struct ci_hdrc_platform_data pdata;
 	bool secondary_phy;
 	bool hsic;
 	void __iomem *base;
@@ -78,16 +79,6 @@ static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
 		break;
 	}
 }
-
-static struct ci_hdrc_platform_data ci_hdrc_msm_platdata = {
-	.name			= "ci_hdrc_msm",
-	.capoffset		= DEF_CAPOFFSET,
-	.flags			= CI_HDRC_REGS_SHARED |
-				  CI_HDRC_DISABLE_STREAMING |
-				  CI_HDRC_OVERRIDE_AHB_BURST,
-
-	.notify_event		= ci_hdrc_msm_notify_event,
-};
 
 static int ci_hdrc_msm_mux_phy(struct ci_hdrc_msm *ci,
 			       struct platform_device *pdev)
@@ -151,6 +142,12 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	platform_set_drvdata(pdev, ci);
 
+	ci->pdata.name = "ci_hdrc_msm";
+	ci->pdata.capoffset = DEF_CAPOFFSET;
+	ci->pdata.flags	= CI_HDRC_REGS_SHARED | CI_HDRC_DISABLE_STREAMING |
+			  CI_HDRC_OVERRIDE_AHB_BURST;
+	ci->pdata.notify_event = ci_hdrc_msm_notify_event;
+
 	reset = devm_reset_control_get(&pdev->dev, "core");
 	if (IS_ERR(reset))
 		return PTR_ERR(reset);
@@ -204,7 +201,7 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
 	of_node_put(ulpi_node);
 
 	plat_ci = ci_hdrc_add_device(&pdev->dev, pdev->resource,
-				     pdev->num_resources, &ci_hdrc_msm_platdata);
+				     pdev->num_resources, &ci->pdata);
 	if (IS_ERR(plat_ci)) {
 		dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
 		ret = PTR_ERR(plat_ci);
