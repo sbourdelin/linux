@@ -80,6 +80,7 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
 
 	pm_runtime_no_callbacks(&pdev->dev);
 	pm_runtime_enable(&pdev->dev);
+	pm_runtime_get(&pdev->dev);
 
 	return 0;
 }
@@ -88,6 +89,7 @@ static int ci_hdrc_msm_remove(struct platform_device *pdev)
 {
 	struct platform_device *plat_ci = platform_get_drvdata(pdev);
 
+	pm_runtime_put(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
 	ci_hdrc_remove_device(plat_ci);
 
