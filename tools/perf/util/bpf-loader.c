@@ -305,6 +305,19 @@ config_bpf_program(struct bpf_program *prog)
 		return PTR_ERR(config_str);
 	}
 
+	if (strncmp(config_str, "UBPF;", 5) == 0) {
+		pr_debug("bpf: load a UBPF program %s\n", config_str);
+		err = bpf_program__set_ubpf(prog);
+		if (err) {
+			char errbuf[BUFSIZ];
+
+			libbpf_strerror(err, errbuf, sizeof(errbuf));
+			pr_warning("Set %s to ubpf failed: %s\n", config_str, errbuf);
+			return err;
+		}
+		return 0;
+	}
+
 	priv = calloc(sizeof(*priv), 1);
 	if (!priv) {
 		pr_debug("bpf: failed to alloc priv\n");
@@ -604,6 +617,9 @@ int bpf__probe(struct bpf_object *obj)
 		if (err)
 			goto out;
 
+		if (bpf_program__is_ubpf(prog))
+			continue;
+
 		priv = bpf_program__priv(prog);
 		if (IS_ERR(priv) || !priv) {
 			err = PTR_ERR(priv);
@@ -648,6 +664,9 @@ int bpf__unprobe(struct bpf_object *obj)
 	bpf_object__for_each_program(prog, obj) {
 		struct bpf_prog_priv *priv = bpf_program__priv(prog);
 		int i;
+
+		if (bpf_program__is_ubpf(prog))
+			continue;
 
 		if (IS_ERR(priv) || !priv)
 			continue;
@@ -704,6 +723,9 @@ int bpf__foreach_tev(struct bpf_object *obj,
 		struct probe_trace_event *tev;
 		struct perf_probe_event *pev;
 		int i, fd;
+
+		if (bpf_program__is_ubpf(prog))
+			continue;
 
 		if (IS_ERR(priv) || !priv) {
 			pr_debug("bpf: failed to get private field\n");
