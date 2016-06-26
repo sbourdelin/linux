@@ -16,6 +16,7 @@
 #include "util/parse-events.h"
 #include <subcmd/parse-options.h>
 #include "util/bpf-loader.h"
+#include "util/ubpf-helpers.h"
 #include "util/debug.h"
 #include <api/fs/fs.h>
 #include <api/fs/tracing_path.h>
@@ -593,6 +594,8 @@ int main(int argc, const char **argv)
 	pthread__block_sigwinch();
 
 	perf_debug_setup();
+
+	register_ubpf_helpers();
 
 	while (1) {
 		static int done_help;
