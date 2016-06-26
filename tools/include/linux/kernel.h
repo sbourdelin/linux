@@ -63,12 +63,7 @@
 #endif
 #endif
 
-/*
- * Both need more care to handle endianness
- * (Don't use bitmap_copy_le() for now)
- */
-#define cpu_to_le64(x)	(x)
-#define cpu_to_le32(x)	(x)
+#include <linux/byteorder/generic.h>
 
 static inline int
 vscnprintf(char *buf, size_t size, const char *fmt, va_list args)

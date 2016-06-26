@@ -40,11 +40,6 @@
 #define INTEL_BTS_ERR_NOINSN  5
 #define INTEL_BTS_ERR_LOST    9
 
-#if __BYTE_ORDER == __BIG_ENDIAN
-#define le64_to_cpu bswap_64
-#else
-#define le64_to_cpu
-#endif
 
 struct intel_bts {
 	struct auxtrace			auxtrace;
