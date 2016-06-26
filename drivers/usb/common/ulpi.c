@@ -197,25 +197,7 @@ static int ulpi_of_register(struct ulpi *ulpi)
 
 static int ulpi_register(struct device *dev, struct ulpi *ulpi)
 {
-	int ret;
-
-	/* Test the interface */
-	ret = ulpi_write(ulpi, ULPI_SCRATCH, 0xaa);
-	if (ret < 0)
-		return ret;
-
-	ret = ulpi_read(ulpi, ULPI_SCRATCH);
-	if (ret < 0)
-		return ret;
-
-	if (ret != 0xaa)
-		return -ENODEV;
-
-	ulpi->id.vendor = ulpi_read(ulpi, ULPI_VENDOR_ID_LOW);
-	ulpi->id.vendor |= ulpi_read(ulpi, ULPI_VENDOR_ID_HIGH) << 8;
-
-	ulpi->id.product = ulpi_read(ulpi, ULPI_PRODUCT_ID_LOW);
-	ulpi->id.product |= ulpi_read(ulpi, ULPI_PRODUCT_ID_HIGH) << 8;
+	int ret = -ENODEV;
 
 	ulpi->dev.parent = dev;
 	ulpi->dev.bus = &ulpi_bus;
@@ -228,6 +210,26 @@ static int ulpi_register(struct device *dev, struct ulpi *ulpi)
 		ret = ulpi_of_register(ulpi);
 		if (ret)
 			return ret;
+	}
+
+	if (ret) {
+		/* Test the interface */
+		ret = ulpi_write(ulpi, ULPI_SCRATCH, 0xaa);
+		if (ret < 0)
+			return ret;
+
+		ret = ulpi_read(ulpi, ULPI_SCRATCH);
+		if (ret < 0)
+			return ret;
+
+		if (ret != 0xaa)
+			return -ENODEV;
+
+		ulpi->id.vendor = ulpi_read(ulpi, ULPI_VENDOR_ID_LOW);
+		ulpi->id.vendor |= ulpi_read(ulpi, ULPI_VENDOR_ID_HIGH) << 8;
+
+		ulpi->id.product = ulpi_read(ulpi, ULPI_PRODUCT_ID_LOW);
+		ulpi->id.product |= ulpi_read(ulpi, ULPI_PRODUCT_ID_HIGH) << 8;
 	}
 
 	if (of_device_request_module(&ulpi->dev))
