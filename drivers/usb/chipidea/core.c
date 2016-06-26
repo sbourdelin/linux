@@ -359,7 +359,7 @@ static int _ci_usb_phy_init(struct ci_hdrc *ci)
  * interfaces
  * @ci: the controller
  */
-static void ci_usb_phy_exit(struct ci_hdrc *ci)
+void ci_usb_phy_exit(struct ci_hdrc *ci)
 {
 	if (ci->phy) {
 		phy_power_off(ci->phy);
@@ -412,9 +412,14 @@ static int ci_usb_phy_init(struct ci_hdrc *ci)
  * @ci: the controller
  *
  */
-void ci_platform_configure(struct ci_hdrc *ci)
+int ci_platform_configure(struct ci_hdrc *ci)
 {
 	bool is_device_mode, is_host_mode;
+	int ret;
+
+	ret = ci_usb_phy_init(ci);
+	if (ret)
+		return ret;
 
 	is_device_mode = hw_read(ci, OP_USBMODE, USBMODE_CM) == USBMODE_CM_DC;
 	is_host_mode = hw_read(ci, OP_USBMODE, USBMODE_CM) == USBMODE_CM_HC;
@@ -453,6 +458,8 @@ void ci_platform_configure(struct ci_hdrc *ci)
 			hw_write(ci, OP_BURSTSIZE, RX_BURST_MASK,
 				ci->platdata->rx_burst_size);
 	}
+
+	return 0;
 }
 
 /**
@@ -511,9 +518,7 @@ int hw_device_reset(struct ci_hdrc *ci)
 		return -ENODEV;
 	}
 
-	ci_platform_configure(ci);
-
-	return 0;
+	return ci_platform_configure(ci);
 }
 
 static irqreturn_t ci_irq(int irq, void *data)
@@ -917,12 +922,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 			ci->usb_phy = NULL;
 	}
 
-	ret = ci_usb_phy_init(ci);
-	if (ret) {
-		dev_err(dev, "unable to init phy: %d\n", ret);
-		return ret;
-	}
-
 	ci->hw_bank.phys = res->start;
 
 	ci->irq = platform_get_irq(pdev, 0);
@@ -1025,7 +1024,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 stop:
 	ci_role_destroy(ci);
 deinit_phy:
-	ci_usb_phy_exit(ci);
 
 	return ret;
 }
@@ -1044,7 +1042,6 @@ static int ci_hdrc_remove(struct platform_device *pdev)
 	ci_extcon_unregister(ci);
 	ci_role_destroy(ci);
 	ci_hdrc_enter_lpm(ci, true);
-	ci_usb_phy_exit(ci);
 
 	return 0;
 }

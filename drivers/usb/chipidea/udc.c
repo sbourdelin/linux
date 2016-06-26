@@ -1534,6 +1534,7 @@ static int ci_udc_vbus_session(struct usb_gadget *_gadget, int is_active)
 			if (ci->driver)
 				ci->driver->disconnect(&ci->gadget);
 			hw_device_state(ci, 0);
+			ci_usb_phy_exit(ci);
 			if (ci->platdata->notify_event)
 				ci->platdata->notify_event(ci,
 				CI_HDRC_CONTROLLER_STOPPED_EVENT);
@@ -1794,6 +1795,7 @@ static int ci_udc_stop(struct usb_gadget *gadget)
 			ci->platdata->notify_event(ci,
 			CI_HDRC_CONTROLLER_STOPPED_EVENT);
 		spin_unlock_irqrestore(&ci->lock, flags);
+		ci_usb_phy_exit(ci);
 		_gadget_stop_activity(&ci->gadget);
 		spin_lock_irqsave(&ci->lock, flags);
 		pm_runtime_put(&ci->gadget.dev);

@@ -87,9 +87,7 @@ static int ehci_ci_reset(struct usb_hcd *hcd)
 	if (ret)
 		return ret;
 
-	ci_platform_configure(ci);
-
-	return ret;
+	return ci_platform_configure(ci);
 }
 
 static const struct ehci_driver_overrides ehci_ci_overrides = {
@@ -186,6 +184,7 @@ static void host_stop(struct ci_hdrc *ci)
 	if (hcd) {
 		usb_remove_hcd(hcd);
 		usb_put_hcd(hcd);
+		ci_usb_phy_exit(ci);
 		if (ci->platdata->reg_vbus && !ci_otg_is_fsm_mode(ci) &&
 			(ci->platdata->flags & CI_HDRC_TURN_VBUS_EARLY_ON))
 				regulator_disable(ci->platdata->reg_vbus);
