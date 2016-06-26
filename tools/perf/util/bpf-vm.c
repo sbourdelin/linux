@@ -2,6 +2,11 @@
 #include "util.h"
 #include "tools/be_byteshift.h"
 #include "bpf-vm.h"
+#include "debug.h"
+#include <linux/filter.h>
+
+#define DST	regs[insn->dst_reg]
+#define SRC	regs[insn->src_reg]
 
 static inline void
 bpf_vm_jmp_call_handler(u64 *regs __maybe_unused, void *ctx __maybe_unused,
@@ -29,6 +34,36 @@ static inline void *bpf_load_pointer(const void *skb __maybe_unused,
 {
 	return NULL;
 }
+
+static bool
+bounds_check(void *addr, int size, void *ctx, size_t ctx_len, void *stack)
+{
+	if (ctx && (addr >= ctx && (addr + size) <= (ctx + ctx_len))) {
+		/* Context access */
+		return true;
+	} else if (addr >= stack && (addr + size) <= (stack + MAX_BPF_STACK)) {
+		/* Stack access */
+		return true;
+	}
+
+	pr_debug("bpf: bounds_check failed\n");
+	return false;
+}
+
+#define BOUNDS_CHECK_LOAD(size)						\
+	do {								\
+		if (!bounds_check((void *)SRC + insn->off, size,	\
+				  ctx, ctx_len, stack)) {		\
+			return -1;					\
+		}							\
+	} while (0)
+#define BOUNDS_CHECK_STORE(size)					\
+	do {								\
+		if (!bounds_check((void *)DST + insn->off, size,	\
+				  ctx, ctx_len, stack)) {		\
+			return -1;					\
+		}							\
+	} while (0)
 
 #define UBPF_BUILD
 #include <../../../kernel/bpf/vm.c>
