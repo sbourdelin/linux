@@ -95,3 +95,15 @@ struct bpf_engine uengine = {
 	.unload		= engine__unload,
 	.get_nth	= engine__get_nth,
 };
+
+int bpf_program__set_ubpf(struct bpf_program *prog)
+{
+	prog->engine = &uengine;
+
+	return 0;
+}
+
+bool bpf_program__is_ubpf(struct bpf_program *prog)
+{
+	return prog->engine == &uengine;
+}

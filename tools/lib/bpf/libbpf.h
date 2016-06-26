@@ -27,6 +27,7 @@ enum libbpf_errno {
 	LIBBPF_ERRNO__PROG2BIG,	/* Program too big */
 	LIBBPF_ERRNO__KVER,	/* Incorrect kernel version */
 	LIBBPF_ERRNO__LOADUBPF, /* Failed to load user space BPF program */
+	LIBBPF_ERRNO__NOUBPF,/* UBPF support is not compiled */
 	__LIBBPF_ERRNO__END,
 };
 
@@ -191,5 +192,21 @@ void *bpf_map__priv(struct bpf_map *map);
 struct ubpf_entry {
 	struct bpf_insn *insns;
 };
+
+#ifdef HAVE_UBPF_SUPPORT
+int bpf_program__set_ubpf(struct bpf_program *prog);
+bool bpf_program__is_ubpf(struct bpf_program *prog);
+#else
+static inline int
+bpf_program__set_ubpf(struct bpf_program *prog __maybe_unused)
+{
+	return -LIBBPF_ERRNO__NOUBPF;
+}
+static inline bool
+bpf_program__is_ubpf(struct bpf_program *prog __maybe_unused)
+{
+	return false;
+}
+#endif
 
 #endif
