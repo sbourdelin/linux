@@ -3296,6 +3296,40 @@ static inline void set_task_cpu(struct task_struct *p, unsigned int cpu)
 
 #endif /* CONFIG_SMP */
 
+#ifdef arch_vcpu_is_preempted
+static inline bool vcpu_is_preempted(int cpu)
+{
+	return arch_vcpu_is_preempted(cpu);
+}
+#else
+static inline bool vcpu_is_preempted(int cpu)
+{
+	return 0;
+}
+#endif
+
+#ifdef arch_vcpu_get_yield_count
+static inline unsigned int vcpu_get_yield_count(int cpu)
+{
+	return arch_vcpu_get_yield_count(cpu);
+}
+#else
+static inline unsigned int vcpu_get_yield_count(int cpu)
+{
+	return 0;
+}
+#endif
+
+static inline bool
+need_yield_to(int vcpu, unsigned int old_yield_count)
+{
+	/* if we find the vcpu is preempted,
+	* then we may want to kick it, IOW, yield to it
+	*/
+	return vcpu_is_preempted(vcpu) ||
+		(vcpu_get_yield_count(vcpu) != old_yield_count);
+}
+
 extern long sched_setaffinity(pid_t pid, const struct cpumask *new_mask);
 extern long sched_getaffinity(pid_t pid, struct cpumask *mask);
 
