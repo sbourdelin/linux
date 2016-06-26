@@ -90,6 +90,7 @@ libperf-$(CONFIG_BPF_PROLOGUE) += bpf-prologue.o
 libperf-$(CONFIG_LIBELF) += symbol-elf.o
 libperf-$(CONFIG_LIBELF) += probe-file.o
 libperf-$(CONFIG_LIBELF) += probe-event.o
+libperf-$(CONFIG_UBPF)   += bpf-vm.o
 
 ifndef CONFIG_LIBELF
 libperf-y += symbol-minimal.o
@@ -152,6 +153,7 @@ CFLAGS_rbtree.o        += -Wno-unused-parameter -DETC_PERFCONFIG="BUILD_STR($(ET
 CFLAGS_libstring.o     += -Wno-unused-parameter -DETC_PERFCONFIG="BUILD_STR($(ETC_PERFCONFIG_SQ))"
 CFLAGS_hweight.o       += -Wno-unused-parameter -DETC_PERFCONFIG="BUILD_STR($(ETC_PERFCONFIG_SQ))"
 CFLAGS_parse-events.o  += -Wno-redundant-decls
+CFLAGS_bpf-vm.o        += -Wno-override-init -Wno-switch-default -Wno-sign-compare
 
 $(OUTPUT)util/kallsyms.o: ../lib/symbol/kallsyms.c FORCE
 	$(call rule_mkdir)
