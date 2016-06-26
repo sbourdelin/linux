@@ -23,8 +23,7 @@
 
 #include "libbpf.h"
 #include "bpf.h"
-
-#define __printf(a, b)	__attribute__((format(printf, a, b)))
+#include "libbpf-internal.h"
 
 __printf(1, 2)
 static int __base_pr(const char *format, ...)
@@ -38,27 +37,17 @@ static int __base_pr(const char *format, ...)
 	return err;
 }
 
-static __printf(1, 2) libbpf_print_fn_t __pr_warning = __base_pr;
-static __printf(1, 2) libbpf_print_fn_t __pr_info = __base_pr;
-static __printf(1, 2) libbpf_print_fn_t __pr_debug;
-
-#define __pr(func, fmt, ...)	\
-do {				\
-	if ((func))		\
-		(func)("libbpf: " fmt, ##__VA_ARGS__); \
-} while (0)
-
-#define pr_warning(fmt, ...)	__pr(__pr_warning, fmt, ##__VA_ARGS__)
-#define pr_info(fmt, ...)	__pr(__pr_info, fmt, ##__VA_ARGS__)
-#define pr_debug(fmt, ...)	__pr(__pr_debug, fmt, ##__VA_ARGS__)
+__printf(1, 2) libbpf_print_fn_t __pr_bpf_warning = __base_pr;
+__printf(1, 2) libbpf_print_fn_t __pr_bpf_info = __base_pr;
+__printf(1, 2) libbpf_print_fn_t __pr_bpf_debug;
 
 void libbpf_set_print(libbpf_print_fn_t warn,
 		      libbpf_print_fn_t info,
 		      libbpf_print_fn_t debug)
 {
-	__pr_warning = warn;
-	__pr_info = info;
-	__pr_debug = debug;
+	__pr_bpf_warning = warn;
+	__pr_bpf_info = info;
+	__pr_bpf_debug = debug;
 }
 
 #define STRERR_BUFSIZE  128
@@ -114,54 +103,11 @@ int libbpf_strerror(int err, char *buf, size_t size)
 		goto out;		\
 } while(0)
 
-
-/* Copied from tools/perf/util/util.h */
-#ifndef zfree
-# define zfree(ptr) ({ free(*ptr); *ptr = NULL; })
-#endif
-
-#ifndef zclose
-# define zclose(fd) ({			\
-	int ___err = 0;			\
-	if ((fd) >= 0)			\
-		___err = close((fd));	\
-	fd = -1;			\
-	___err; })
-#endif
-
 #ifdef HAVE_LIBELF_MMAP_SUPPORT
 # define LIBBPF_ELF_C_READ_MMAP ELF_C_READ_MMAP
 #else
 # define LIBBPF_ELF_C_READ_MMAP ELF_C_READ
 #endif
-
-/*
- * bpf_prog should be a better name but it has been used in
- * linux/filter.h.
- */
-struct bpf_program {
-	/* Index in elf obj file, for relocation use. */
-	int idx;
-	char *section_name;
-	struct bpf_insn *insns;
-	size_t insns_cnt;
-
-	struct {
-		int insn_idx;
-		int map_idx;
-	} *reloc_desc;
-	int nr_reloc;
-
-	struct {
-		int nr;
-		void *entries;
-	} instances;
-	bpf_program_prep_t preprocessor;
-
-	struct bpf_object *obj;
-	void *priv;
-	bpf_program_clear_priv_t clear_priv;
-};
 
 struct bpf_map {
 	int fd;
