@@ -60,4 +60,14 @@ static inline int atomic_dec_and_test(atomic_t *v)
 	return __sync_sub_and_fetch(&v->counter, 1) == 0;
 }
 
+static inline void atomic_add(int i, atomic_t *v)
+{
+	__sync_add_and_fetch(&v->counter, i);
+}
+
+static inline void atomic64_add(long i, atomic64_t *v)
+{
+	__sync_add_and_fetch(&v->counter, i);
+}
+
 #endif /* __TOOLS_ASM_GENERIC_ATOMIC_H */

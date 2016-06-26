@@ -62,4 +62,32 @@ static inline int atomic_dec_and_test(atomic_t *v)
 	GEN_UNARY_RMWcc(LOCK_PREFIX "decl", v->counter, "%0", "e");
 }
 
+/**
+ * atomic_add - add integer to atomic variable
+ * @i: integer value to add
+ * @v: pointer of type atomic_t
+ *
+ * Atomically adds @i to @v.
+ */
+static __always_inline void atomic_add(int i, atomic_t *v)
+{
+	asm volatile(LOCK_PREFIX "addl %1,%0"
+		     : "+m" (v->counter)
+		     : "ir" (i));
+}
+
+/**
+ * atomic64_add - add integer to atomic64 variable
+ * @i: integer value to add
+ * @v: pointer to type atomic64_t
+ *
+ * Atomically adds @i to @v.
+ */
+static __always_inline void atomic64_add(long i, atomic64_t *v)
+{
+	asm volatile(LOCK_PREFIX "addq %1,%0"
+		     : "=m" (v->counter)
+		     : "er" (i), "m" (v->counter));
+}
+
 #endif /* _TOOLS_LINUX_ASM_X86_ATOMIC_H */
