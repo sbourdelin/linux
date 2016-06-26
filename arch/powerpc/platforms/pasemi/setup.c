@@ -61,6 +61,7 @@ static struct mce_regs mce_regs[MAX_MCE_REGS];
 static int num_mce_regs;
 static int nmi_virq = NO_IRQ;
 
+extern unsigned long pci_io_base;
 
 static void pas_restart(char *cmd)
 {
@@ -341,6 +342,10 @@ out:
 
 static void __init pas_init_early(void)
 {
+	/* Initialise the IO pointer so we don't crash on boot */
+
+	pci_io_base = (H_KERN_VIRT_START + (H_KERN_VIRT_SIZE >> 1));
+
 	iommu_init_early_pasemi();
 }
 
