@@ -48,6 +48,10 @@ static struct {
 		.desc = "Compile source for BPF relocation test",
 		.should_load_fail = true,
 	},
+	[LLVM_TESTCASE_BPF_UBPF] = {
+		.source = test_llvm__bpf_test_ubpf,
+		.desc = "Compile source for UBPF test",
+	},
 };
 
 int

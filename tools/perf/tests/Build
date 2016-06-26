@@ -32,6 +32,7 @@ perf-y += parse-no-sample-id-all.o
 perf-y += kmod-path.o
 perf-y += thread-map.o
 perf-y += llvm.o llvm-src-base.o llvm-src-kbuild.o llvm-src-prologue.o llvm-src-relocation.o
+perf-y += llvm-src-ubpf.o
 perf-y += bpf.o
 perf-y += topology.o
 perf-y += cpumap.o
@@ -65,6 +66,13 @@ $(OUTPUT)tests/llvm-src-relocation.c: tests/bpf-script-test-relocation.c tests/B
 	$(call rule_mkdir)
 	$(Q)echo '#include <tests/llvm.h>' > $@
 	$(Q)echo 'const char test_llvm__bpf_test_relocation[] =' >> $@
+	$(Q)sed -e 's/"/\\"/g' -e 's/\(.*\)/"\1\\n"/g' $< >> $@
+	$(Q)echo ';' >> $@
+
+$(OUTPUT)tests/llvm-src-ubpf.c: tests/bpf-script-test-ubpf.c tests/Build
+	$(call rule_mkdir)
+	$(Q)echo '#include <tests/llvm.h>' > $@
+	$(Q)echo 'const char test_llvm__bpf_test_ubpf[] =' >> $@
 	$(Q)sed -e 's/"/\\"/g' -e 's/\(.*\)/"\1\\n"/g' $< >> $@
 	$(Q)echo ';' >> $@
 

@@ -5,10 +5,13 @@
 #include <util/evlist.h>
 #include <linux/bpf.h>
 #include <linux/filter.h>
+#include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 #include "tests.h"
 #include "llvm.h"
 #include "debug.h"
+#include "ubpf-helpers.h"
+#include "ubpf-hooks.h"
 #define NR_ITERS       111
 
 #ifdef HAVE_LIBBPF_SUPPORT
@@ -46,6 +49,35 @@ static int llseek_loop(void)
 
 #endif
 
+union testcase_context {
+	void *ptr;
+	unsigned long num;
+};
+
+#ifdef HAVE_UBPF_SUPPORT
+static int __ubpf_report_val;
+
+static void test_report(int val)
+{
+	printf("test_report val = %d\n", val);
+	__ubpf_report_val = val;
+}
+
+static int ubpf_prepare(union testcase_context *ctx __maybe_unused)
+{
+	ubpf_hook_perf_record_start(0);
+	return 0;
+}
+
+static int ubpf_verify(union testcase_context *ctx __maybe_unused)
+{
+	ubpf_hook_perf_record_end(1234, 0);
+	if (__ubpf_report_val != 1234 + NR_ITERS + 1000)
+		return TEST_FAIL;
+	return TEST_OK;
+}
+#endif
+
 static struct {
 	enum test_llvm__testcase prog_id;
 	const char *desc;
@@ -54,6 +86,10 @@ static struct {
 	const char *msg_load_fail;
 	int (*target_func)(void);
 	int expect_result;
+
+	union testcase_context context;
+	int (*prepare)(union testcase_context *);
+	int (*verify)(union testcase_context *);
 } bpf_testcase_table[] = {
 	{
 		LLVM_TESTCASE_BASE,
@@ -63,6 +99,7 @@ static struct {
 		"load bpf object failed",
 		&epoll_pwait_loop,
 		(NR_ITERS + 1) / 2,
+		{0}, NULL, NULL
 	},
 #ifdef HAVE_BPF_PROLOGUE
 	{
@@ -73,6 +110,7 @@ static struct {
 		"check your vmlinux setting?",
 		&llseek_loop,
 		(NR_ITERS + 1) / 4,
+		{0}, NULL, NULL
 	},
 #endif
 	{
@@ -83,11 +121,27 @@ static struct {
 		"libbpf error when dealing with relocation",
 		NULL,
 		0,
+		{0}, NULL, NULL
 	},
+#ifdef HAVE_UBPF_SUPPORT
+	{
+		LLVM_TESTCASE_BPF_UBPF,
+		"Test UBPF support",
+		"[bpf_ubpf_test]",
+		"fix 'perf test LLVM' first",
+		"failed to load UBPF",
+		&epoll_pwait_loop,
+		0,
+		{0}, ubpf_prepare, ubpf_verify,
+	}
+#endif
 };
 
 static int do_test(struct bpf_object *obj, int (*func)(void),
-		   int expect)
+		   int expect,
+		   int (*prepare)(union testcase_context *),
+		   int (*verify)(union testcase_context *),
+		   union testcase_context *ctx)
 {
 	struct record_opts opts = {
 		.target = {
@@ -154,6 +208,14 @@ static int do_test(struct bpf_object *obj, int (*func)(void),
 		goto out_delete_evlist;
 	}
 
+	if (prepare) {
+		err = prepare(ctx);
+		if (err < 0) {
+			pr_debug("prepare fail\n");
+			goto out_delete_evlist;
+		}
+	}
+
 	perf_evlist__enable(evlist);
 	(*func)();
 	perf_evlist__disable(evlist);
@@ -176,6 +238,8 @@ static int do_test(struct bpf_object *obj, int (*func)(void),
 
 	ret = TEST_OK;
 
+	if (verify)
+		ret = verify(ctx);
 out_delete_evlist:
 	perf_evlist__delete(evlist);
 	return ret;
@@ -201,6 +265,13 @@ static int __test__bpf(int idx)
 	size_t obj_buf_sz;
 	struct bpf_object *obj;
 
+#ifdef HAVE_UBPF_SUPPORT
+	ret = libbpf_set_ubpf_func(63, "test_report", test_report);
+	if (ret) {
+		pr_debug("Unable to set UBPF helper function\n");
+		return TEST_FAIL;
+	}
+#endif
 	ret = test_llvm__fetch_bpf_obj(&obj_buf, &obj_buf_sz,
 				       bpf_testcase_table[idx].prog_id,
 				       true, NULL);
@@ -229,7 +300,10 @@ static int __test__bpf(int idx)
 	if (obj)
 		ret = do_test(obj,
 			      bpf_testcase_table[idx].target_func,
-			      bpf_testcase_table[idx].expect_result);
+			      bpf_testcase_table[idx].expect_result,
+			      bpf_testcase_table[idx].prepare,
+			      bpf_testcase_table[idx].verify,
+			      &bpf_testcase_table[idx].context);
 out:
 	bpf__clear();
 	return ret;
