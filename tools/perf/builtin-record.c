@@ -36,6 +36,7 @@
 #include "util/llvm-utils.h"
 #include "util/bpf-loader.h"
 #include "util/trigger.h"
+#include "util/ubpf-hooks.h"
 #include "asm/bug.h"
 
 #include <unistd.h>
@@ -893,6 +894,7 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 
 	trigger_ready(&auxtrace_snapshot_trigger);
 	trigger_ready(&switch_output_trigger);
+	ubpf_hook_perf_record_start(0);
 	for (;;) {
 		unsigned long long hits = rec->samples;
 
@@ -957,6 +959,8 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 			disabled = true;
 		}
 	}
+	ubpf_hook_perf_record_end(rec->samples, 0);
+
 	trigger_off(&auxtrace_snapshot_trigger);
 	trigger_off(&switch_output_trigger);
 
