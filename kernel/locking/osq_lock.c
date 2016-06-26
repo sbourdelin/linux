@@ -21,6 +21,11 @@ static inline int encode_cpu(int cpu_nr)
 	return cpu_nr + 1;
 }
 
+static inline int node_cpu(struct optimistic_spin_node *node)
+{
+	return node->cpu - 1;
+}
+
 static inline struct optimistic_spin_node *decode_cpu(int encoded_cpu_val)
 {
 	int cpu_nr = encoded_cpu_val - 1;
@@ -84,9 +89,10 @@ osq_wait_next(struct optimistic_spin_queue *lock,
 bool osq_lock(struct optimistic_spin_queue *lock)
 {
 	struct optimistic_spin_node *node = this_cpu_ptr(&osq_node);
-	struct optimistic_spin_node *prev, *next;
+	struct optimistic_spin_node *prev, *next, *prev_old;
 	int curr = encode_cpu(smp_processor_id());
 	int old;
+	unsigned int yield_count;
 
 	node->locked = 0;
 	node->next = NULL;
@@ -114,13 +120,19 @@ bool osq_lock(struct optimistic_spin_queue *lock)
 	 * guaranteed their existence -- this allows us to apply
 	 * cmpxchg in an attempt to undo our queueing.
 	 */
-
+	prev_old = prev;
+	yield_count = vcpu_get_yield_count(node_cpu(prev));
 	while (!READ_ONCE(node->locked)) {
 		/*
 		 * If we need to reschedule bail... so we can block.
 		 */
-		if (need_resched())
+		if (need_resched() ||
+			need_yield_to(node_cpu(prev), yield_count))
 			goto unqueue;
+
+		prev = READ_ONCE(node->prev);
+		if (prev != prev_old)
+			yield_count = vcpu_get_yield_count(node_cpu(prev));
 
 		cpu_relax_lowlatency();
 	}
