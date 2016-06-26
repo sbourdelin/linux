@@ -32,12 +32,9 @@
 #define IR_DEC_FRAME		0x14
 #define IR_DEC_STATUS		0x18
 #define IR_DEC_REG1		0x1c
+#define IR_DEC_REG2		0x20
 
 #define REG0_RATE_MASK		(BIT(11) - 1)
-
-#define REG1_MODE_MASK		(BIT(7) | BIT(8))
-#define REG1_MODE_NEC		(0 << 7)
-#define REG1_MODE_GENERAL	(2 << 7)
 
 #define REG1_TIME_IV_SHIFT	16
 #define REG1_TIME_IV_MASK	((BIT(13) - 1) << REG1_TIME_IV_SHIFT)
@@ -50,6 +47,20 @@
 
 #define REG1_RESET		BIT(0)
 #define REG1_ENABLE		BIT(15)
+
+#define REG2_DEC_MODE_SHIFT	0
+#define REG2_DEC_MODE_MASK	GENMASK(3, REG2_DEC_MODE_SHIFT)
+#define REG2_DEC_MODE_NEC	0x0
+#define REG2_DEC_MODE_RAW	0x2
+#define REG2_DEC_MODE_THOMSON	0x4
+#define REG2_DEC_MODE_TOSHIBA	0x5
+#define REG2_DEC_MODE_SONY	0x6
+#define REG2_DEC_MODE_RC5	0x7
+#define REG2_DEC_MODE_RC6	0x9
+#define REG2_DEC_MODE_RCMM	0xa
+#define REG2_DEC_MODE_DUOKAN	0xb
+#define REG2_DEC_MODE_COMCAST	0xe
+#define REG2_DEC_MODE_SANYO	0xf
 
 #define STATUS_IR_DEC_IN	BIT(8)
 
@@ -158,8 +169,9 @@ static int meson_ir_probe(struct platform_device *pdev)
 	/* Reset the decoder */
 	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_RESET, REG1_RESET);
 	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_RESET, 0);
-	/* Set general operation mode */
-	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_MODE_MASK, REG1_MODE_GENERAL);
+	/* Enable raw/soft-decode mode */
+	meson_ir_set_mask(ir, IR_DEC_REG2, REG2_DEC_MODE_MASK,
+			  REG2_DEC_MODE_RAW << REG2_DEC_MODE_SHIFT);
 	/* Set rate */
 	meson_ir_set_mask(ir, IR_DEC_REG0, REG0_RATE_MASK, MESON_TRATE - 1);
 	/* IRQ on rising and falling edges */
