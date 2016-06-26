@@ -76,9 +76,13 @@ static inline int bpf_vm_jmp_tail_call_handler(u64 *regs, u32 *p_tail_call_cnt,
 	*p_insn = prog->insnsi;
 	return 0;
 }
-#endif /* UBPF_BUILD */
-
+#define BOUNDS_CHECK_STORE(size)
+#define BOUNDS_CHECK_LOAD(size)
 unsigned int __bpf_prog_run(void *ctx, const struct bpf_insn *insn)
+#else
+unsigned int __bpf_prog_run(void *ctx, const struct bpf_insn *insn,
+			    size_t ctx_len)
+#endif /* UBPF_BUILD */
 {
 	u64 stack[MAX_BPF_STACK / sizeof(u64)];
 	u64 regs[MAX_BPF_REG], tmp;
@@ -419,12 +423,15 @@ select_insn:
 	/* STX and ST and LDX*/
 #define LDST(SIZEOP, SIZE)						\
 	STX_MEM_##SIZEOP:						\
+		BOUNDS_CHECK_STORE(sizeof(SIZE));			\
 		*(SIZE *)(unsigned long) (DST + insn->off) = SRC;	\
 		CONT;							\
 	ST_MEM_##SIZEOP:						\
+		BOUNDS_CHECK_STORE(sizeof(SIZE));			\
 		*(SIZE *)(unsigned long) (DST + insn->off) = IMM;	\
 		CONT;							\
 	LDX_MEM_##SIZEOP:						\
+		BOUNDS_CHECK_LOAD(sizeof(SIZE));			\
 		DST = *(SIZE *)(unsigned long) (SRC + insn->off);	\
 		CONT;
 
