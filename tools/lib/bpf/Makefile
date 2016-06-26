@@ -120,6 +120,10 @@ ifeq ($(feature-libelf-getphdrnum), 1)
   override CFLAGS += -DHAVE_ELF_GETPHDRNUM_SUPPORT
 endif
 
+ifdef UBPF
+    override CFLAGS += -DHAVE_UBPF_SUPPORT
+endif
+
 # Append required CFLAGS
 override CFLAGS += $(EXTRA_WARNINGS)
 override CFLAGS += -Werror -Wall

@@ -329,6 +329,10 @@ ifndef NO_LIBELF
     ifeq ($(feature-bpf), 1)
       CFLAGS += -DHAVE_LIBBPF_SUPPORT
       $(call detected,CONFIG_LIBBPF)
+      ifdef UBPF
+        CFLAGS += -DHAVE_UBPF_SUPPORT
+        $(call detected,CONFIG_UBPF)
+      endif
     endif
 
     ifndef NO_DWARF

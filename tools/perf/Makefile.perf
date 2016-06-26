@@ -81,6 +81,8 @@ include ../scripts/utilities.mak
 #
 # Define NO_LIBBPF if you do not want BPF support
 #
+# Define UBPF if you DO want user space BPF support
+#
 # Define FEATURES_DUMP to provide features detection dump file
 # and bypass the feature detection
 
