@@ -26,6 +26,7 @@ enum libbpf_errno {
 	LIBBPF_ERRNO__VERIFY,	/* Kernel verifier blocks program loading */
 	LIBBPF_ERRNO__PROG2BIG,	/* Program too big */
 	LIBBPF_ERRNO__KVER,	/* Incorrect kernel version */
+	LIBBPF_ERRNO__LOADUBPF, /* Failed to load user space BPF program */
 	__LIBBPF_ERRNO__END,
 };
 
@@ -184,5 +185,10 @@ typedef void (*bpf_map_clear_priv_t)(struct bpf_map *, void *);
 int bpf_map__set_priv(struct bpf_map *map, void *priv,
 		      bpf_map_clear_priv_t clear_priv);
 void *bpf_map__priv(struct bpf_map *map);
+
+/* The entity of ubpf program */
+struct ubpf_entry {
+	struct bpf_insn *insns;
+};
 
 #endif

@@ -66,6 +66,7 @@ static const char *libbpf_strerror_table[NR_ERRNO] = {
 	[ERRCODE_OFFSET(VERIFY)]	= "Kernel verifier blocks program loading",
 	[ERRCODE_OFFSET(PROG2BIG)]	= "Program too big",
 	[ERRCODE_OFFSET(KVER)]		= "Incorrect kernel version",
+	[ERRCODE_OFFSET(LOADUBPF)]	= "Failed to load user space BPF program",
 };
 
 int libbpf_strerror(int err, char *buf, size_t size)
