@@ -8,12 +8,25 @@
 #include <asm/bug.h>
 #include <ubpf.h>
 #include "ubpf-hooks.h"
+#include "bpf-vm.h"
 #include "debug.h"
 
-static int run_ubpf_program(struct bpf_program *prog __maybe_unused,
-			    void *mem __maybe_unused, size_t len __maybe_unused)
+static int
+run_ubpf_program(struct bpf_program *prog, void *mem, size_t len)
 {
-	return 0;
+	struct ubpf_entry *entry;
+	int ret;
+
+	entry = bpf_program__vm(prog);
+	if (!entry) {
+		WARN_ONCE(!entry, "Unable to fetch entry from UBPF program\n");
+		return -EINVAL;
+	}
+
+	ret = __bpf_prog_run(mem, entry->insns, len);
+	pr_debug("program %s returns %d\n",
+		 bpf_program__title(prog, false), ret);
+	return ret;
 }
 
 static int
