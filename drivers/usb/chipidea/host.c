@@ -87,6 +87,9 @@ static int ehci_ci_reset(struct usb_hcd *hcd)
 	if (ret)
 		return ret;
 
+	if (ci->platdata->notify_event)
+		ci->platdata->notify_event(ci, CI_HDRC_CONTROLLER_RESET_EVENT);
+
 	return ci_platform_configure(ci);
 }
 
