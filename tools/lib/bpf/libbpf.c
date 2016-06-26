@@ -1132,6 +1132,20 @@ int bpf_program__fd(struct bpf_program *prog)
 	return bpf_program__nth_fd(prog, 0);
 }
 
+static void *bpf_program__nth_vm(struct bpf_program *prog, int n)
+{
+	void *ret;
+
+	prog->engine->get_nth(prog, n, &ret);
+
+	return ret;
+}
+
+void *bpf_program__vm(struct bpf_program *prog)
+{
+	return bpf_program__nth_vm(prog, 0);
+}
+
 int bpf_program__set_prep(struct bpf_program *prog, int nr_instances,
 			  bpf_program_prep_t prep)
 {

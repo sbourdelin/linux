@@ -87,6 +87,7 @@ void *bpf_program__priv(struct bpf_program *prog);
 const char *bpf_program__title(struct bpf_program *prog, bool needs_copy);
 
 int bpf_program__fd(struct bpf_program *prog);
+void *bpf_program__vm(struct bpf_program *prog);
 
 struct bpf_insn;
 
