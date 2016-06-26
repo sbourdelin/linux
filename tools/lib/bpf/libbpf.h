@@ -188,6 +188,8 @@ int bpf_map__set_priv(struct bpf_map *map, void *priv,
 		      bpf_map_clear_priv_t clear_priv);
 void *bpf_map__priv(struct bpf_map *map);
 
+#define MAX_UBPF_FUNC	64
+
 /* The entity of ubpf program */
 struct ubpf_entry {
 	struct bpf_insn *insns;
@@ -196,6 +198,8 @@ struct ubpf_entry {
 #ifdef HAVE_UBPF_SUPPORT
 int bpf_program__set_ubpf(struct bpf_program *prog);
 bool bpf_program__is_ubpf(struct bpf_program *prog);
+const void *libbpf_get_ubpf_func(unsigned int func_id);
+int libbpf_set_ubpf_func(unsigned int idx, const char *name, void *func);
 #else
 static inline int
 bpf_program__set_ubpf(struct bpf_program *prog __maybe_unused)
@@ -206,6 +210,18 @@ static inline bool
 bpf_program__is_ubpf(struct bpf_program *prog __maybe_unused)
 {
 	return false;
+}
+static inline
+const void *libbpf_get_ubpf_func(unsigned int func_id __maybe_unused)
+{
+	return NULL;
+}
+static inline int
+libbpf_set_ubpf_func(unsigned int idx __maybe_unused,
+		     const char *name __maybe_unused,
+		     void *func __maybe_unused)
+{
+	return -LIBBPF_ERRNO__NOUBPF;
 }
 #endif
 

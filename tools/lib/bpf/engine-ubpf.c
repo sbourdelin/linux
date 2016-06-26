@@ -7,6 +7,31 @@
 #include "bpf.h"
 #include "libbpf-internal.h"
 
+static struct {
+	const char *name;
+	void *func;
+} ubpf_funcs[MAX_UBPF_FUNC];
+
+const void *libbpf_get_ubpf_func(unsigned int func_id)
+{
+	if (func_id >= MAX_UBPF_FUNC)
+		return NULL;
+
+	return ubpf_funcs[func_id].func;
+}
+
+int libbpf_set_ubpf_func(unsigned int idx, const char *name, void *func)
+{
+	if (idx >= MAX_UBPF_FUNC)
+		return -E2BIG;
+	if (!func)
+		return -EINVAL;
+
+	ubpf_funcs[idx].name = name;
+	ubpf_funcs[idx].func = func;
+	return 0;
+}
+
 static int engine__init(struct bpf_program *prog)
 {
 	struct ubpf_entry *instances_entries;
