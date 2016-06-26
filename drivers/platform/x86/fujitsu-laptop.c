@@ -1060,6 +1060,15 @@ static void acpi_fujitsu_hotkey_notify(struct acpi_device *device, u32 event)
 			}
 		}
 
+		if ((fujitsu_hotkey->rfkill_supported & BIT(26)) &&
+		    (call_fext_func(FUNC_RFKILL, 0x1, 0x0, 0x0) & BIT(26))) {
+			keycode = KEY_TOUCHPAD_TOGGLE;
+			input_report_key(input, keycode, 1);
+			input_sync(input);
+			input_report_key(input, keycode, 0);
+			input_sync(input);
+		}
+
 		break;
 	default:
 		keycode = KEY_UNKNOWN;
