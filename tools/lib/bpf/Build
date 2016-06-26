@@ -1,1 +1,2 @@
 libbpf-y := libbpf.o bpf.o
+libbpf-y += engine-kbpf.o

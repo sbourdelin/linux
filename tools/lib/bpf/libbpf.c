@@ -172,7 +172,7 @@ static void bpf_program__unload(struct bpf_program *prog)
 	 */
 	if (prog->instances.nr > 0) {
 		for (i = 0; i < prog->instances.nr; i++)
-			zclose(((int *)prog->instances.entries)[i]);
+			prog->engine->unload(prog, i);
 	} else if (prog->instances.nr != -1) {
 		pr_warning("Internal error: instances.nr is %d\n",
 			   prog->instances.nr);
@@ -230,6 +230,7 @@ bpf_program__init(void *data, size_t size, char *name, int idx,
 	memcpy(prog->insns, data,
 	       prog->insns_cnt * sizeof(struct bpf_insn));
 	prog->idx = idx;
+	prog->engine = &kengine;
 	prog->instances.entries = NULL;
 	prog->instances.nr = -1;
 
@@ -827,58 +828,10 @@ static int bpf_object__collect_reloc(struct bpf_object *obj)
 }
 
 static int
-load_program(struct bpf_insn *insns, int insns_cnt,
-	     char *license, u32 kern_version, int *pfd)
-{
-	int ret;
-	char *log_buf;
-
-	if (!insns || !insns_cnt)
-		return -EINVAL;
-
-	log_buf = malloc(BPF_LOG_BUF_SIZE);
-	if (!log_buf)
-		pr_warning("Alloc log buffer for bpf loader error, continue without log\n");
-
-	ret = bpf_load_program(BPF_PROG_TYPE_KPROBE, insns,
-			       insns_cnt, license, kern_version,
-			       log_buf, BPF_LOG_BUF_SIZE);
-
-	if (ret >= 0) {
-		*pfd = ret;
-		ret = 0;
-		goto out;
-	}
-
-	ret = -LIBBPF_ERRNO__LOAD;
-	pr_warning("load bpf program failed: %s\n", strerror(errno));
-
-	if (log_buf && log_buf[0] != '\0') {
-		ret = -LIBBPF_ERRNO__VERIFY;
-		pr_warning("-- BEGIN DUMP LOG ---\n");
-		pr_warning("\n%s\n", log_buf);
-		pr_warning("-- END LOG --\n");
-	} else {
-		if (insns_cnt >= BPF_MAXINSNS) {
-			pr_warning("Program too large (%d insns), at most %d insns\n",
-				   insns_cnt, BPF_MAXINSNS);
-			ret = -LIBBPF_ERRNO__PROG2BIG;
-		} else if (log_buf) {
-			pr_warning("log buffer is empty\n");
-			ret = -LIBBPF_ERRNO__KVER;
-		}
-	}
-
-out:
-	free(log_buf);
-	return ret;
-}
-
-static int
 bpf_program__load(struct bpf_program *prog,
 		  char *license, u32 kern_version)
 {
-	int err = 0, fd, i;
+	int err = 0, i;
 
 	if (prog->instances.nr < 0 || !prog->instances.entries) {
 		if (prog->preprocessor) {
@@ -887,14 +840,8 @@ bpf_program__load(struct bpf_program *prog,
 			return -LIBBPF_ERRNO__INTERNAL;
 		}
 
-		prog->instances.entries = malloc(sizeof(int));
-		if (!prog->instances.entries) {
-			pr_warning("Not enough memory for BPF entries\n");
-			return -ENOMEM;
-		}
-
 		prog->instances.nr = 1;
-		((int *)prog->instances.entries)[0] = -1;
+		prog->engine->init(prog);
 	}
 
 	if (!prog->preprocessor) {
@@ -902,10 +849,8 @@ bpf_program__load(struct bpf_program *prog,
 			pr_warning("Program '%s' is inconsistent: nr(%d) != 1\n",
 				   prog->section_name, prog->instances.nr);
 		}
-		err = load_program(prog->insns, prog->insns_cnt,
-				   license, kern_version, &fd);
-		if (!err)
-			((int *)prog->instances.entries)[0] = fd;
+		prog->engine->load(prog, prog->insns, prog->insns_cnt,
+				   license, kern_version, 0);
 		goto out;
 	}
 
@@ -922,24 +867,11 @@ bpf_program__load(struct bpf_program *prog,
 			goto out;
 		}
 
-		if (!result.new_insn_ptr || !result.new_insn_cnt) {
-			pr_debug("Skip loading the %dth instance of program '%s'\n",
-				 i, prog->section_name);
-			((int *)prog->instances.entries)[i] = -1;
-			continue;
-		}
-
-		err = load_program(result.new_insn_ptr,
-				   result.new_insn_cnt,
-				   license, kern_version, &fd);
-
-		if (err) {
-			pr_warning("Loading the %dth instance of program '%s' failed\n",
-					i, prog->section_name);
+		err = prog->engine->load(prog, result.new_insn_ptr,
+					 result.new_insn_cnt, license,
+					 kern_version, i);
+		if (err)
 			goto out;
-		}
-
-		((int *)prog->instances.entries)[i] = fd;
 	}
 out:
 	if (err)
@@ -1201,8 +1133,6 @@ int bpf_program__fd(struct bpf_program *prog)
 int bpf_program__set_prep(struct bpf_program *prog, int nr_instances,
 			  bpf_program_prep_t prep)
 {
-	int *instances_entries;
-
 	if (nr_instances <= 0 || !prep)
 		return -EINVAL;
 
@@ -1211,17 +1141,9 @@ int bpf_program__set_prep(struct bpf_program *prog, int nr_instances,
 		return -EINVAL;
 	}
 
-	instances_entries = malloc(sizeof(int) * nr_instances);
-	if (!instances_entries) {
-		pr_warning("alloc memory failed for entries\n");
-		return -ENOMEM;
-	}
-
-	/* fill all fd with -1 */
-	memset(instances_entries, -1, sizeof(int) * nr_instances);
-
 	prog->instances.nr = nr_instances;
-	prog->instances.entries = instances_entries;
+	prog->engine->init(prog);
+
 	prog->preprocessor = prep;
 	return 0;
 }
@@ -1230,18 +1152,7 @@ int bpf_program__nth_fd(struct bpf_program *prog, int n)
 {
 	int fd;
 
-	if (n >= prog->instances.nr || n < 0) {
-		pr_warning("Can't get the %dth fd from program %s: only %d instances\n",
-			   n, prog->section_name, prog->instances.nr);
-		return -EINVAL;
-	}
-
-	fd = ((int *)prog->instances.entries)[n];
-	if (fd < 0) {
-		pr_warning("%dth instance of program '%s' is invalid\n",
-			   n, prog->section_name);
-		return -ENOENT;
-	}
+	prog->engine->get_nth(prog, n, &fd);
 
 	return fd;
 }

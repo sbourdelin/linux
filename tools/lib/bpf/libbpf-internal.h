@@ -62,4 +62,15 @@ struct bpf_program {
 	bpf_program_clear_priv_t clear_priv;
 };
 
+struct bpf_engine {
+	int (*init)(struct bpf_program *prog);
+	int (*load)(struct bpf_program *prog, struct bpf_insn *insns,
+		    int insns_cnt, char *license,
+		    u32 kern_version, int index);
+	void (*unload)(struct bpf_program *prog, int index);
+	int (*get_nth)(struct bpf_program *prog, int index, void *ret);
+};
+
+extern struct bpf_engine kengine;
+
 #endif /* _LIBBPF_INTERNAL_H */
