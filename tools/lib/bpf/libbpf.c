@@ -443,7 +443,7 @@ bpf_object__init_maps(struct bpf_object *obj, void *data,
 		      size_t size)
 {
 	size_t nr_maps;
-	int i;
+	unsigned int i;
 
 	nr_maps = size / sizeof(struct bpf_map_def);
 	if (!data || !nr_maps) {
@@ -480,7 +480,7 @@ bpf_object__init_maps(struct bpf_object *obj, void *data,
 static int
 bpf_object__init_maps_name(struct bpf_object *obj)
 {
-	int i;
+	unsigned int i;
 	Elf_Data *symbols = obj->efile.symbols;
 
 	if (!symbols || obj->efile.maps_shndx < 0)
@@ -521,7 +521,8 @@ static int bpf_object__elf_collect(struct bpf_object *obj)
 	Elf *elf = obj->efile.elf;
 	GElf_Ehdr *ep = &obj->efile.ehdr;
 	Elf_Scn *scn = NULL;
-	int idx = 0, err = 0;
+	unsigned int idx = 0;
+	int err = 0;
 
 	/* Elf is corrupted/truncated, avoid calling elf_strptr. */
 	if (!elf_rawdata(elf_getscn(elf, ep->e_shstrndx), NULL)) {
