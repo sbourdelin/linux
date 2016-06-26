@@ -125,9 +125,6 @@ struct bpf_prog_prep_result {
 	 */
 	struct bpf_insn *new_insn_ptr;
 	int new_insn_cnt;
-
-	/* If not NULL, result fd is set to it */
-	int *pfd;
 };
 
 /*

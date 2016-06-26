@@ -979,8 +979,6 @@ bpf_program__load(struct bpf_program *prog,
 			pr_debug("Skip loading the %dth instance of program '%s'\n",
 				 i, prog->section_name);
 			prog->instances.fds[i] = -1;
-			if (result.pfd)
-				*result.pfd = -1;
 			continue;
 		}
 
@@ -994,8 +992,6 @@ bpf_program__load(struct bpf_program *prog,
 			goto out;
 		}
 
-		if (result.pfd)
-			*result.pfd = fd;
 		prog->instances.fds[i] = fd;
 	}
 out:
