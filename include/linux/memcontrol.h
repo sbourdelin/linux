@@ -374,6 +374,8 @@ struct mem_cgroup *mem_cgroup_iter(struct mem_cgroup *,
 				   struct mem_cgroup *,
 				   struct mem_cgroup_reclaim_cookie *);
 void mem_cgroup_iter_break(struct mem_cgroup *, struct mem_cgroup *);
+int mem_cgroup_scan_tasks(struct mem_cgroup *,
+			  int (*)(struct task_struct *, void *), void *);
 
 static inline unsigned short mem_cgroup_id(struct mem_cgroup *memcg)
 {
@@ -453,6 +455,8 @@ unsigned long mem_cgroup_get_lru_size(struct lruvec *lruvec, enum lru_list lru)
 }
 
 void mem_cgroup_handle_over_high(void);
+
+unsigned long mem_cgroup_get_limit(struct mem_cgroup *memcg);
 
 void mem_cgroup_print_oom_info(struct mem_cgroup *memcg,
 				struct task_struct *p);
@@ -647,6 +651,12 @@ static inline void mem_cgroup_iter_break(struct mem_cgroup *root,
 {
 }
 
+static inline int mem_cgroup_scan_tasks(struct mem_cgroup *memcg,
+		int (*fn)(struct task_struct *, void *), void *arg)
+{
+	return 0;
+}
+
 static inline unsigned short mem_cgroup_id(struct mem_cgroup *memcg)
 {
 	return 0;
@@ -673,6 +683,11 @@ mem_cgroup_get_lru_size(struct lruvec *lruvec, enum lru_list lru)
 static inline unsigned long
 mem_cgroup_node_nr_lru_pages(struct mem_cgroup *memcg,
 			     int nid, unsigned int lru_mask)
+{
+	return 0;
+}
+
+static inline unsigned long mem_cgroup_get_limit(struct mem_cgroup *memcg)
 {
 	return 0;
 }
