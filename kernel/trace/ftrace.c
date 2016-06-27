@@ -2690,6 +2690,36 @@ static int ftrace_startup(struct ftrace_ops *ops, int command)
 	return 0;
 }
 
+/*
+ * Dynamic ops may be freed, we must make sure that all callers are done
+ * before leaving this function. The same goes for freeing the per_cpu
+ * data of the per_cpu ops.
+ *
+ * Again, normal synchronize_sched() is not good enough. We need to do
+ * a hard force of sched synchronization. This is because we use
+ * preempt_disable() to do RCU, but the function tracers can be called
+ * where RCU is not watching (like before user_exit()). We can not rely
+ * on the RCU infrastructure to do the synchronization, thus we must do
+ * it ourselves.
+ *
+ * The synchronization is not needed when the function tracing is not
+ * active at the moment.
+ */
+static void ftrace_ops_free(struct ftrace_ops *ops, bool sync)
+{
+	if (!(ops->flags & (FTRACE_OPS_FL_DYNAMIC | FTRACE_OPS_FL_PER_CPU)))
+		return;
+
+	if (sync)
+		schedule_on_each_cpu(ftrace_sync);
+
+	if (ops->flags & FTRACE_OPS_FL_DYNAMIC)
+		arch_ftrace_trampoline_free(ops);
+
+	if (ops->flags & FTRACE_OPS_FL_PER_CPU)
+		per_cpu_ops_free(ops);
+}
+
 static int ftrace_shutdown(struct ftrace_ops *ops, int command)
 {
 	int ret;
@@ -2723,14 +2753,7 @@ static int ftrace_shutdown(struct ftrace_ops *ops, int command)
 	}
 
 	if (!command || !ftrace_enabled) {
-		/*
-		 * If these are per_cpu ops, they still need their
-		 * per_cpu field freed. Since, function tracing is
-		 * not currently active, we can just free them
-		 * without synchronizing all CPUs.
-		 */
-		if (ops->flags & FTRACE_OPS_FL_PER_CPU)
-			per_cpu_ops_free(ops);
+		ftrace_ops_free(ops, false);
 		return 0;
 	}
 
@@ -2768,28 +2791,7 @@ static int ftrace_shutdown(struct ftrace_ops *ops, int command)
 	removed_ops = NULL;
 	ops->flags &= ~FTRACE_OPS_FL_REMOVING;
 
-	/*
-	 * Dynamic ops may be freed, we must make sure that all
-	 * callers are done before leaving this function.
-	 * The same goes for freeing the per_cpu data of the per_cpu
-	 * ops.
-	 *
-	 * Again, normal synchronize_sched() is not good enough.
-	 * We need to do a hard force of sched synchronization.
-	 * This is because we use preempt_disable() to do RCU, but
-	 * the function tracers can be called where RCU is not watching
-	 * (like before user_exit()). We can not rely on the RCU
-	 * infrastructure to do the synchronization, thus we must do it
-	 * ourselves.
-	 */
-	if (ops->flags & (FTRACE_OPS_FL_DYNAMIC | FTRACE_OPS_FL_PER_CPU)) {
-		schedule_on_each_cpu(ftrace_sync);
-
-		arch_ftrace_trampoline_free(ops);
-
-		if (ops->flags & FTRACE_OPS_FL_PER_CPU)
-			per_cpu_ops_free(ops);
-	}
+	ftrace_ops_free(ops, true);
 
 	return 0;
 }
