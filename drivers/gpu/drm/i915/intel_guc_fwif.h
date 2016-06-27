@@ -418,15 +418,62 @@ struct guc_ads {
 	u32 reserved2[4];
 } __packed;
 
+/* GuC logging structures */
+
+enum guc_log_buffer_type {
+	GUC_ISR_LOG_BUFFER,
+	GUC_DPC_LOG_BUFFER,
+	GUC_CRASH_DUMP_LOG_BUFFER,
+	GUC_MAX_LOG_BUFFER
+};
+
+/*
+ * Below state is used for coordination of retrival of GuC logs
+ * by i915. read_ptr is where i915 read last. GuC keeps incrementing
+ * write_ptr on each log entry. When buffer gets half filled and i915
+ * has requested interrupt, GuC will set flush_to_file field and raise the
+ * interrupt. i915 should read the buffer and clear flush_to_file field.
+ * i915 should also update the read_ptr.
+*/
+struct guc_log_buffer_state {
+	u32 marker[2];
+	u32 read_ptr;
+	u32 write_ptr;
+	u32 size;
+	u32 sampled_write_ptr;
+	union {
+		struct {
+			u32 flush_to_file:1;
+			u32 buffer_full_cnt:4;
+			u32 reserved:27;
+		};
+		u32 flags;
+	};
+	u32 version;
+} __packed;
+
+union guc_log_control {
+	struct {
+		u32 logging_enabled:1;
+		u32 reserved1:3;
+		u32 verbosity:4;
+		u32 reserved2:24;
+	};
+	u32 value;
+} __packed;
+
 /* This Action will be programmed in C180 - SOFT_SCRATCH_O_REG */
 enum host2guc_action {
 	HOST2GUC_ACTION_DEFAULT = 0x0,
 	HOST2GUC_ACTION_SAMPLE_FORCEWAKE = 0x6,
 	HOST2GUC_ACTION_ALLOCATE_DOORBELL = 0x10,
 	HOST2GUC_ACTION_DEALLOCATE_DOORBELL = 0x20,
+	HOST2GUC_ACTION_LOG_BUFFER_FILE_FLUSH_COMPLETE = 0x30,
+	HOST2GUC_ACTION_FORCE_LOGBUFFERFLUSH = 0x302,
 	HOST2GUC_ACTION_ENTER_S_STATE = 0x501,
 	HOST2GUC_ACTION_EXIT_S_STATE = 0x502,
 	HOST2GUC_ACTION_SLPC_REQUEST = 0x3003,
+	HOST2GUC_ACTION_UK_LOG_ENABLE_LOGGING = 0x0E000,
 	HOST2GUC_ACTION_LIMIT
 };
 
@@ -446,6 +493,12 @@ enum guc2host_status {
 	GUC2HOST_STATUS_ALLOCATE_DOORBELL_FAIL = GUC2HOST_STATUS(0x10),
 	GUC2HOST_STATUS_DEALLOCATE_DOORBELL_FAIL = GUC2HOST_STATUS(0x20),
 	GUC2HOST_STATUS_GENERIC_FAIL = GUC2HOST_STATUS(0x0000F000)
+};
+
+/* This action will be programmed in C1BC - SOFT_SCRATCH_15_REG */
+enum guc2host_message {
+	GUC2HOST_MSG_CRASH_DUMP_POSTED = (1 << 1),
+	GUC2HOST_MSG_FLUSH_LOG_BUFFER = (1 << 3)
 };
 
 #endif
