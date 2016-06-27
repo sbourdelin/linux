@@ -975,6 +975,11 @@ void tick_nohz_irq_exit(void)
 ktime_t tick_nohz_get_sleep_length(void)
 {
 	struct tick_sched *ts = this_cpu_ptr(&tick_cpu_sched);
+	struct clock_event_device *dev = __this_cpu_read(tick_cpu_device.evtdev);
+	ktime_t now;
+
+	now = ktime_get();
+	ts->sleep_length = ktime_sub(dev->next_event, now);
 
 	return ts->sleep_length;
 }
