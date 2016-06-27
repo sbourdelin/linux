@@ -272,7 +272,7 @@ static int trace_selftest_ops(struct trace_array *tr, int cnt)
 		goto out_free;
 	if (cnt > 1) {
 		if (trace_selftest_test_global_cnt == 0)
-			goto out;
+			goto out_free;
 	}
 	if (trace_selftest_test_dyn_cnt == 0)
 		goto out_free;
@@ -298,9 +298,10 @@ static int trace_selftest_ops(struct trace_array *tr, int cnt)
 	unregister_ftrace_function(&test_probe1);
 	unregister_ftrace_function(&test_probe2);
 	unregister_ftrace_function(&test_probe3);
-	if (cnt > 1)
+	if (cnt > 1) {
 		unregister_ftrace_function(tr->ops);
-	ftrace_reset_array_ops(tr);
+		ftrace_reset_array_ops(tr);
+	}
 
 	/* Make sure everything is off */
 	reset_counts();
