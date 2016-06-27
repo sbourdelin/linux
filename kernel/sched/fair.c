@@ -3078,7 +3078,8 @@ static inline void update_load_avg(struct sched_entity *se, int not_used)
 	struct cfs_rq *cfs_rq = cfs_rq_of(se);
 	struct rq *rq = rq_of(cfs_rq);
 
-	cpufreq_trigger_update(rq_clock(rq));
+	if (&rq->cfs == cfs_rq)
+		cpufreq_trigger_update(rq_clock(rq));
 }
 
 static inline void
