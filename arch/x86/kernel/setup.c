@@ -1157,6 +1157,9 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	acpi_boot_table_init();
 
+	/*
+	 * AMD NUMA support need get boot_cpu_id earlier.
+	 */
 	early_acpi_boot_init();
 
 	initmem_init();
