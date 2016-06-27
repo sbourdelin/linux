@@ -3442,6 +3442,9 @@ static void __init pnv_pci_init_ioda_phb(struct device_node *np,
 	void *aux;
 	long rc;
 
+	if (!of_device_is_available(np))
+		return;
+
 	pr_info("Initializing IODA%d OPAL PHB %s\n", ioda_type, np->full_name);
 
 	prop64 = of_get_property(np, "ibm,opal-phbid", NULL);
