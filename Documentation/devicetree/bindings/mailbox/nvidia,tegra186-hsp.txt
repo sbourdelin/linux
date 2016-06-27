@@ -1,0 +1,42 @@
+NVIDIA Tegra Hardware Synchronization Primitives (HSP)
+
+The HSP modules are used for the processors to share resources and communicate
+together. It provides a set of hardware synchronization primitives for
+interprocessor communication. So the interprocessor communication (IPC)
+protocols can use hardware synchronization primitives, when operating between
+two processors not in an SMP relationship.
+
+The features that HSP supported are shared mailboxes, shared semaphores,
+arbitrated semaphores and doorbells.
+
+Required properties:
+- name : Should be hsp
+- compatible : Should be "nvidia,tegra<chip>-hsp"
+- reg : Offset and length of the register set for the device
+- interrupts : Should contain the HSP interrupts
+- interrupt-names: Should contain the names of the HSP interrupts that the
+		   client are using.
+		   "doorbell"
+- nvidia,hsp-function : Specifies one of the HSP functions that the HSP unit
+			will be supported. The function ID can be found in the
+			header file <dt-bindings/mailbox/tegra-hsp.h>.
+- #mbox-cells : Should be 1. Specifies the HSP master that will be enabled of
+		the HSP client. The master ID constants can be found in the
+		header file <dt-bindings/mailbox/tegra-hsp.h>.
+
+Example:
+
+hsp_top: hsp@3c00000 {
+	compatible = "nvidia,tegra186-hsp";
+	reg = <0x0 0x03c00000 0x0 0xa0000>;
+	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
+	interrupt-names = "doorbell";
+	nvidia,hsp-function = <HSP_DOORBELL>;
+	#mbox-cells = <1>;
+};
+
+bpmp@d0000000 {
+	...
+	mboxes = <&hsp_top HSP_DB_MASTER_BPMP>;
+	...
+};
