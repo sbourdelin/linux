@@ -233,7 +233,8 @@ static int update_ftrace_func(unsigned long ip, void *new)
 	unsigned char old[MCOUNT_INSN_SIZE];
 	int ret;
 
-	memcpy(old, (void *)ip, MCOUNT_INSN_SIZE);
+	if (probe_kernel_read(old, (void *)ip, MCOUNT_INSN_SIZE))
+		return -EFAULT;
 
 	/*
 	 * Make sure that we replace 5-byte instruction that
