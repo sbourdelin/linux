@@ -168,6 +168,16 @@ static int host2guc_sample_forcewake(struct intel_guc *guc,
 	return host2guc_action(guc, data, ARRAY_SIZE(data));
 }
 
+static int host2guc_force_logbuffer_flush(struct intel_guc *guc)
+{
+	u32 data[2];
+
+	data[0] = HOST2GUC_ACTION_FORCE_LOGBUFFERFLUSH;
+	data[1] = 0;
+
+	return host2guc_action(guc, data, 2);
+}
+
 /*
  * Initialise, update, or clear doorbell data shared with the GuC
  *
@@ -1280,4 +1290,19 @@ void i915_guc_capture_logs(struct drm_device *dev)
 	data[0] = HOST2GUC_ACTION_LOG_BUFFER_FILE_FLUSH_COMPLETE;
 	if (host2guc_action(guc, data, 1))
 		DRM_ERROR("Failed\n");
+}
+
+void i915_guc_capture_logs_on_reset(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_guc *guc = &dev_priv->guc;
+
+	/* First disable the interrupts, will be renabled after reset */
+	gen9_disable_guc_interrupts(dev_priv);
+
+	/* Ask GuC to update the log buffer state */
+	host2guc_force_logbuffer_flush(guc);
+
+	/* GuC would have updated the log buffer by now, so capture it */
+	i915_guc_capture_logs(dev);
 }

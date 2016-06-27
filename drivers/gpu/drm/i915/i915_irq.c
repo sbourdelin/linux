@@ -2689,6 +2689,8 @@ static void i915_reset_and_wakeup(struct drm_i915_private *dev_priv)
 		 */
 		intel_runtime_pm_get(dev_priv);
 
+		i915_guc_capture_logs_on_reset(dev_priv->dev);
+
 		intel_prepare_reset(dev_priv);
 
 		/*
