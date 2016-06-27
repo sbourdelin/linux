@@ -3017,8 +3017,10 @@ int intel_init_render_ring_buffer(struct drm_device *dev)
 					drm_gem_object_unreference(&obj->base);
 					DRM_ERROR("Failed to pin semaphore bo. Disabling semaphores\n");
 					i915.semaphores = 0;
-				} else
+				} else {
 					dev_priv->semaphore_obj = obj;
+					engine->semaphore.signal = gen8_rcs_signal;
+				}
 			}
 		}
 
@@ -3026,10 +3028,6 @@ int intel_init_render_ring_buffer(struct drm_device *dev)
 		engine->add_request = gen8_render_add_request;
 		engine->flush = gen8_render_ring_flush;
 		engine->irq_enable_mask = GT_RENDER_USER_INTERRUPT;
-		if (i915_semaphore_is_enabled(dev_priv)) {
-			WARN_ON(!dev_priv->semaphore_obj);
-			engine->semaphore.signal = gen8_rcs_signal;
-		}
 	} else if (INTEL_GEN(dev_priv) >= 6) {
 		engine->init_context = intel_rcs_ctx_init;
 		engine->flush = gen7_render_ring_flush;
