@@ -866,8 +866,7 @@ static void guc_read_update_log_buffer(struct drm_device *dev)
 	if (!guc->log_obj)
 		return;
 
-	log_buffer_state = src_ptr =
-		kmap_atomic(i915_gem_object_get_page(guc->log_obj, 0));
+	log_buffer_state = src_ptr = guc->log_buf_addr;
 
 	/* Get the pointer to local buffer to store the logs */
 	dst_ptr = log_buffer_copy_state = guc_get_write_buffer(guc);
@@ -897,14 +896,11 @@ static void guc_read_update_log_buffer(struct drm_device *dev)
 		log_buffer_copy_state++;
 	}
 
-	kunmap_atomic(src_ptr);
-
 	/* Now copy the actual logs */
 	for (i=1; (i < guc->log_obj->base.size / PAGE_SIZE) && dst_ptr; i++) {
 		dst_ptr += PAGE_SIZE;
-		src_ptr = kmap_atomic(i915_gem_object_get_page(guc->log_obj, i));
+		src_ptr += PAGE_SIZE;
 		memcpy(dst_ptr, src_ptr, PAGE_SIZE);
-		kunmap_atomic(src_ptr);
 	}
 }
 
@@ -1019,10 +1015,31 @@ static void guc_create_log_relay_file(struct intel_guc *guc)
 static void guc_logging_fini(struct intel_guc *guc)
 {
         guc_remove_log_relay_file(guc);
+
+	if (guc->log_obj)
+		i915_gem_object_unpin_map(guc->log_obj);
+	guc->log_buf_addr = NULL;
 }
 
 static void guc_logging_init(struct intel_guc *guc)
 {
+	void *vaddr;
+
+	/* Create a WC (Uncached for read) mapping so that we can
+	 * directly get the data (up-to-date) from system memory.
+	 */
+	vaddr = i915_gem_object_pin_map(guc->log_obj, true);
+	if (IS_ERR(vaddr)) {
+		DRM_DEBUG_DRIVER("Couldn't map log buffer pages(%ld)\n",
+			PTR_ERR(vaddr));
+		i915.guc_log_level = -1;
+		gem_release_guc_obj(guc->log_obj);
+		guc->log_obj = NULL;
+		return;
+	}
+
+	guc->log_buf_addr = vaddr;
+
 	guc_create_log_relay_file(guc);
 }
 
