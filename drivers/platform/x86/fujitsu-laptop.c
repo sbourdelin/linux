@@ -856,6 +856,7 @@ static int acpi_fujitsu_hotkey_add(struct acpi_device *device)
 	set_bit(fujitsu->keycode3, input->keybit);
 	set_bit(fujitsu->keycode4, input->keybit);
 	set_bit(fujitsu->keycode5, input->keybit);
+	set_bit(KEY_TOUCHPAD_TOGGLE, input->keybit);
 	set_bit(KEY_UNKNOWN, input->keybit);
 
 	error = input_register_device(input);
