@@ -819,6 +819,65 @@ err:
 	return NULL;
 }
 
+static void* guc_get_write_buffer(struct intel_guc *guc)
+{
+	return NULL;
+}
+
+static void guc_read_update_log_buffer(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_guc *guc = &dev_priv->guc;
+	struct guc_log_buffer_state *log_buffer_state;
+	struct guc_log_buffer_state *log_buffer_copy_state;
+	void *src_ptr, *dst_ptr;
+	int i;
+
+	if (!guc->log_obj)
+		return;
+
+	log_buffer_state = src_ptr =
+		kmap_atomic(i915_gem_object_get_page(guc->log_obj, 0));
+
+	/* Get the pointer to local buffer to store the logs */
+	dst_ptr = log_buffer_copy_state = guc_get_write_buffer(guc);
+	if (log_buffer_copy_state)
+		memcpy(log_buffer_copy_state, log_buffer_state, PAGE_SIZE);
+
+	for (i = 0; i < GUC_MAX_LOG_BUFFER; i++) {
+		/* Update the read pointer in the shared log buffer */
+		log_buffer_state->read_ptr =
+			log_buffer_state->sampled_write_ptr;
+
+		/* Clear the 'flush to file' flag */
+		log_buffer_state->flush_to_file = 0;
+		log_buffer_state++;
+
+		if (!log_buffer_copy_state)
+			continue;
+
+		/* The write pointer could have been updated by the GuC firmware,
+		 * after sending the flush interrupt to Host, for consistency
+		 * set the write pointer value to same value of sampled_write_ptr
+		 * in the snapshot buffer.
+		 */
+		log_buffer_copy_state->write_ptr =
+			log_buffer_copy_state->sampled_write_ptr;
+
+		log_buffer_copy_state++;
+	}
+
+	kunmap_atomic(src_ptr);
+
+	/* Now copy the actual logs */
+	for (i=1; (i < guc->log_obj->base.size / PAGE_SIZE) && dst_ptr; i++) {
+		dst_ptr += PAGE_SIZE;
+		src_ptr = kmap_atomic(i915_gem_object_get_page(guc->log_obj, i));
+		memcpy(dst_ptr, src_ptr, PAGE_SIZE);
+		kunmap_atomic(src_ptr);
+	}
+}
+
 static void guc_create_log(struct intel_guc *guc)
 {
 	struct drm_i915_private *dev_priv = guc_to_i915(guc);
@@ -1077,4 +1136,17 @@ int intel_guc_resume(struct drm_device *dev)
 	data[2] = i915_gem_obj_ggtt_offset(ctx->engine[RCS].state);
 
 	return host2guc_action(guc, data, ARRAY_SIZE(data));
+}
+
+void i915_guc_capture_logs(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_guc *guc = &dev_priv->guc;
+	u32 data[1];
+
+	guc_read_update_log_buffer(dev);
+
+	data[0] = HOST2GUC_ACTION_LOG_BUFFER_FILE_FLUSH_COMPLETE;
+	if (host2guc_action(guc, data, 1))
+		DRM_ERROR("Failed\n");
 }

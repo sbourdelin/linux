@@ -1237,6 +1237,7 @@ static void gen9_guc2host_events_work(struct work_struct *work)
 {
 	struct drm_i915_private *dev_priv =
 		container_of(work, struct drm_i915_private, guc.events_work);
+	u32 msg;
 
 	spin_lock_irq(&dev_priv->irq_lock);
 	/* Speed up work cancelation during disabling guc interrupts. */
@@ -1256,7 +1257,23 @@ static void gen9_guc2host_events_work(struct work_struct *work)
 	gen6_enable_pm_irq(dev_priv, GEN9_GUC_TO_HOST_INT_EVENT);
 	spin_unlock_irq(&dev_priv->irq_lock);
 
-	/* TODO: Handle the events for which GuC interrupted host */
+	/* Determine why GuC interrupted host and process */
+	msg = I915_READ(SOFT_SCRATCH(15));
+	if (msg & (GUC2HOST_MSG_CRASH_DUMP_POSTED |
+		   GUC2HOST_MSG_FLUSH_LOG_BUFFER)) {
+		i915_guc_capture_logs(dev_priv->dev);
+
+		/* Clear GuC to Host msg bits that are handled */
+		if (msg & GUC2HOST_MSG_FLUSH_LOG_BUFFER)
+			I915_WRITE(SOFT_SCRATCH(15),
+				I915_READ(SOFT_SCRATCH(15)) &
+				~GUC2HOST_MSG_FLUSH_LOG_BUFFER);
+
+		if (msg & GUC2HOST_MSG_CRASH_DUMP_POSTED)
+			I915_WRITE(SOFT_SCRATCH(15),
+				I915_READ(SOFT_SCRATCH(15)) &
+				~GUC2HOST_MSG_CRASH_DUMP_POSTED);
+	}
 
 	intel_runtime_pm_put(dev_priv);
 }
