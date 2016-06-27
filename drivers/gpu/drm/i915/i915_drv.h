@@ -1808,6 +1808,7 @@ struct drm_i915_private {
 	u32 pm_irq_mask;
 	u32 pm_ier_mask;
 	u32 pm_rps_events;
+	u32 guc_events;
 	u32 pipestat_irq_mask[I915_MAX_PIPES];
 
 	struct i915_hotplug hotplug;

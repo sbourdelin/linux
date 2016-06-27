@@ -126,6 +126,11 @@ struct intel_guc {
 	struct intel_guc_fw guc_fw;
 	uint32_t log_flags;
 	struct drm_i915_gem_object *log_obj;
+	/*
+	 * work, interrupts_enabled are protected by dev_priv->irq_lock
+	 */
+	struct work_struct events_work;
+	bool interrupts_enabled;
 
 	struct drm_i915_gem_object *ads_obj;
 
