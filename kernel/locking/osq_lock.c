@@ -21,6 +21,11 @@ static inline int encode_cpu(int cpu_nr)
 	return cpu_nr + 1;
 }
 
+static inline int node_cpu(struct optimistic_spin_node *node)
+{
+	return node->cpu - 1;
+}
+
 static inline struct optimistic_spin_node *decode_cpu(int encoded_cpu_val)
 {
 	int cpu_nr = encoded_cpu_val - 1;
@@ -118,8 +123,17 @@ bool osq_lock(struct optimistic_spin_queue *lock)
 	while (!READ_ONCE(node->locked)) {
 		/*
 		 * If we need to reschedule bail... so we can block.
+		 * An over-committed guest with more vCPUs than pCPUs
+		 * might fall in this loop and cause a huge overload.
+		 * This is because vCPU A(prev) hold the osq lock and yield out
+		 * vCPU B(node) wait ->locked to be set, IOW, it wait utill
+		 * vCPU A run and unlock the osq lock. Such spin is meaningless
+		 * use vcpu_is_preempted to detech such case. IF arch does not
+		 * support vcpu preempted check, vcpu_is_preempted is a macro
+		 * defined by false.
 		 */
-		if (need_resched())
+		if (need_resched() ||
+			vcpu_is_preempted(node_cpu(node->prev)))
 			goto unqueue;
 
 		cpu_relax_lowlatency();
