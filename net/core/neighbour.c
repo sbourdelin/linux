@@ -1293,15 +1293,19 @@ int neigh_resolve_output(struct neighbour *neigh, struct sk_buff *skb)
 	int rc = 0;
 
 	if (!neigh_event_send(neigh, skb)) {
-		int err;
+		int err, offset;
 		struct net_device *dev = neigh->dev;
+		unsigned char *data;
 		unsigned int seq;
 
 		if (dev->header_ops->cache && !neigh->hh.hh_len)
 			neigh_hh_init(neigh);
 
+		data = skb->data;
+
 		do {
-			__skb_pull(skb, skb_network_offset(skb));
+			offset = data - skb->data;
+			__skb_pull(skb, offset);
 			seq = read_seqbegin(&neigh->ha_lock);
 			err = dev_hard_header(skb, dev, ntohs(skb->protocol),
 					      neigh->ha, NULL, skb->len);
@@ -1326,11 +1330,15 @@ EXPORT_SYMBOL(neigh_resolve_output);
 int neigh_connected_output(struct neighbour *neigh, struct sk_buff *skb)
 {
 	struct net_device *dev = neigh->dev;
+	unsigned char *data;
 	unsigned int seq;
-	int err;
+	int err, offset;
+
+	data = skb->data;
 
 	do {
-		__skb_pull(skb, skb_network_offset(skb));
+		offset = data - skb->data;
+		__skb_pull(skb, offset);
 		seq = read_seqbegin(&neigh->ha_lock);
 		err = dev_hard_header(skb, dev, ntohs(skb->protocol),
 				      neigh->ha, NULL, skb->len);
