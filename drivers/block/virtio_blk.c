@@ -393,11 +393,10 @@ static int init_vq(struct virtio_blk *vblk)
 	if (err)
 		num_vqs = 1;
 
+	err = -ENOMEM;
 	vblk->vqs = kmalloc(sizeof(*vblk->vqs) * num_vqs, GFP_KERNEL);
-	if (!vblk->vqs) {
-		err = -ENOMEM;
+	if (!vblk->vqs)
 		goto out;
-	}
 
 	names = kmalloc(sizeof(*names) * num_vqs, GFP_KERNEL);
 	if (!names)
