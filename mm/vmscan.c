@@ -357,8 +357,8 @@ static unsigned long do_shrink_slab(struct shrink_control *shrinkctl,
 	 * manner that handles concurrent updates. If we exhausted the
 	 * scan, there is no need to do an update.
 	 */
-	if (total_scan > 0)
-		new_nr = atomic_long_add_return(total_scan,
+	if (freeable - freed > 0)
+		new_nr = atomic_long_add_return(freeable - freed,
 						&shrinker->nr_deferred[nid]);
 	else
 		new_nr = atomic_long_read(&shrinker->nr_deferred[nid]);
