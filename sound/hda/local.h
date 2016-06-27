@@ -8,6 +8,16 @@
 #define get_wcaps(codec, nid) \
 	snd_hdac_read_parm(codec, nid, AC_PAR_AUDIO_WIDGET_CAP)
 
+#define get_pcaps(codec, nid) \
+	snd_hdac_read_parm(codec, nid, AC_PAR_PIN_CAP)
+
+static inline int is_input_pin(struct hdac_device *codec, hda_nid_t nid)
+{
+	unsigned int pincap = get_pcaps(codec, nid);
+
+	return (pincap & AC_PINCAP_IN) != 0;
+}
+
 /* get the widget type from widget capability bits */
 static inline int get_wcaps_type(unsigned int wcaps)
 {
