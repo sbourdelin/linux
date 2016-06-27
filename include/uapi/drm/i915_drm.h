@@ -361,6 +361,7 @@ typedef struct drm_i915_irq_wait {
 #define I915_PARAM_HAS_GPU_RESET	 35
 #define I915_PARAM_HAS_RESOURCE_STREAMER 36
 #define I915_PARAM_HAS_EXEC_SOFTPIN	 37
+#define I915_PARAM_HAS_FENCE_FD		 38
 
 typedef struct drm_i915_getparam {
 	__s32 param;
@@ -742,7 +743,17 @@ struct drm_i915_gem_execbuffer2 {
 #define I915_EXEC_CONSTANTS_ABSOLUTE 	(1<<6)
 #define I915_EXEC_CONSTANTS_REL_SURFACE (2<<6) /* gen4/5 only */
 	__u64 flags;
-	__u64 rsvd1; /* now used for context info */
+
+	/* The low word (bits 0:31) contains the context id.
+	 *
+	 * The high word (bits 32:63) contains an optional fence fd.  If flag
+	 * I915_EXEC_FENCE_FD_IN is set, then the high word is an input fence
+	 * fd.  The batch will not begin execution before the input fence
+	 * signals.  If flag I915_EXEC_FENCE_FD_OUT is set, then an output
+	 * fence fd is returned in the high word. The output fence will signal
+	 * after the batch completes execution. It is legal to set both flags.
+	 */
+	__u64 rsvd1;
 	__u64 rsvd2;
 };
 
@@ -788,13 +799,22 @@ struct drm_i915_gem_execbuffer2 {
  */
 #define I915_EXEC_RESOURCE_STREAMER     (1<<15)
 
-#define __I915_EXEC_UNKNOWN_FLAGS -(I915_EXEC_RESOURCE_STREAMER<<1)
+#define I915_EXEC_FENCE_FD_IN		(1<<16)
+#define I915_EXEC_FENCE_FD_OUT		(1<<17)
+
+#define __I915_EXEC_UNKNOWN_FLAGS -(I915_EXEC_FENCE_FD_OUT<<1)
 
 #define I915_EXEC_CONTEXT_ID_MASK	(0xffffffff)
 #define i915_execbuffer2_set_context_id(eb2, context) \
 	(eb2).rsvd1 = context & I915_EXEC_CONTEXT_ID_MASK
 #define i915_execbuffer2_get_context_id(eb2) \
 	((eb2).rsvd1 & I915_EXEC_CONTEXT_ID_MASK)
+
+#define I915_EXEC_FENCE_FD_MASK		(0xffffffff00000000)
+#define i915_execbuffer2_set_fence_fd(eb2, fence_fd) \
+	((eb2).rsvd2 = (fence_fd) & I915_EXEC_FENCE_MASK)
+#define i915_execbuffer2_get_fence_fd(eb2, fence_fd) \
+	((eb2).rsvd2 & I915_EXEC_FENCE_FD_MASK)
 
 struct drm_i915_gem_pin {
 	/** Handle of the buffer to be pinned. */
