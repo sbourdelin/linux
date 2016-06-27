@@ -1462,13 +1462,10 @@ phys_addr_t __init_memblock memblock_end_of_DRAM(void)
 	return (memblock.memory.regions[idx].base + memblock.memory.regions[idx].size);
 }
 
-void __init memblock_enforce_memory_limit(phys_addr_t limit)
+static phys_addr_t __init_memblock __find_max_addr(phys_addr_t limit)
 {
 	phys_addr_t max_addr = (phys_addr_t)ULLONG_MAX;
 	struct memblock_region *r;
-
-	if (!limit)
-		return;
 
 	/* find out max address */
 	for_each_memblock(memory, r) {
@@ -1479,11 +1476,51 @@ void __init memblock_enforce_memory_limit(phys_addr_t limit)
 		limit -= r->size;
 	}
 
+	return max_addr;
+}
+
+void __init memblock_enforce_memory_limit(phys_addr_t limit)
+{
+	phys_addr_t max_addr;
+
+	if (!limit)
+		return;
+
+	max_addr = __find_max_addr(limit);
+	if (max_addr == (phys_addr_t)ULLONG_MAX)
+		return;
+
 	/* truncate both memory and reserved regions */
 	memblock_remove_range(&memblock.memory, max_addr,
 			      (phys_addr_t)ULLONG_MAX);
 	memblock_remove_range(&memblock.reserved, max_addr,
 			      (phys_addr_t)ULLONG_MAX);
+}
+
+void __init memblock_mem_limit_remove_map(phys_addr_t limit)
+{
+	struct memblock_type *type = &memblock.memory;
+	phys_addr_t max_addr;
+	int i, ret, start_rgn, end_rgn;
+
+	if (!limit)
+		return;
+
+	max_addr = __find_max_addr(limit);
+	if (max_addr == (phys_addr_t)ULLONG_MAX)
+		return;
+
+	ret = memblock_isolate_range(type, max_addr, (phys_addr_t)ULLONG_MAX,
+					&start_rgn, &end_rgn);
+	if (ret) {
+		WARN_ONCE(1, "Mem limit failed, will not be applied!\n");
+		return;
+	}
+
+	for (i = end_rgn - 1; i >= start_rgn; i--) {
+		if (!memblock_is_nomap(&type->regions[i]))
+			memblock_remove_region(type, i);
+	}
 }
 
 static int __init_memblock memblock_search(struct memblock_type *type, phys_addr_t addr)
@@ -1674,13 +1711,15 @@ static int memblock_debug_show(struct seq_file *m, void *private)
 		reg = &type->regions[i];
 		seq_printf(m, "%4d: ", i);
 		if (sizeof(phys_addr_t) == 4)
-			seq_printf(m, "0x%08lx..0x%08lx\n",
+			seq_printf(m, "0x%08lx..0x%08lx  0x%08lx  0x%lx\n",
 				   (unsigned long)reg->base,
-				   (unsigned long)(reg->base + reg->size - 1));
+				   (unsigned long)(reg->base + reg->size - 1),
+				   (unsigned long)reg->size, reg->flags);
 		else
-			seq_printf(m, "0x%016llx..0x%016llx\n",
+			seq_printf(m, "0x%016llx..0x%016llx  0x%016llx  0x%lx\n",
 				   (unsigned long long)reg->base,
-				   (unsigned long long)(reg->base + reg->size - 1));
+				   (unsigned long long)(reg->base + reg->size - 1),
+				   (unsigned long long)reg->size, reg->flags);
 
 	}
 	return 0;
