@@ -140,6 +140,11 @@ int snd_soc_dai_digital_mute(struct snd_soc_dai *dai, int mute,
 
 int snd_soc_dai_is_dummy(struct snd_soc_dai *dai);
 
+
+/* Stream tag programming for codec and cpu dai */
+int snd_soc_dai_program_stream_tag(struct snd_soc_pcm_runtime *rtd,
+						int stream_tag);
+
 struct snd_soc_dai_ops {
 	/*
 	 * DAI clocking configuration, all optional.
@@ -173,6 +178,13 @@ struct snd_soc_dai_ops {
 	 */
 	int (*digital_mute)(struct snd_soc_dai *dai, int mute);
 	int (*mute_stream)(struct snd_soc_dai *dai, int mute, int stream);
+
+	/*
+	 * stream_tag - optional
+	 * Can be used by to program same stream tag for both cpu dai
+	 * and codec dai.
+	 */
+	int (*program_stream_tag)(struct snd_soc_dai *, int);
 
 	/*
 	 * ALSA PCM audio operations - all optional.

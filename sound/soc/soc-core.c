@@ -2540,6 +2540,41 @@ int snd_soc_dai_set_tdm_slot(struct snd_soc_dai *dai,
 EXPORT_SYMBOL_GPL(snd_soc_dai_set_tdm_slot);
 
 /**
+ * snd_soc_dai_program_stream_tag - used to program same stream tag for both
+ *				cpu dai and codec dai.
+ * @rtd: The runtime for which the DAI link format should be changed
+ * @stream_tag: Stream tag to be programmed.
+ *
+ * Returns 0 on success, otherwise a negative error code.
+ */
+int snd_soc_dai_program_stream_tag(struct snd_soc_pcm_runtime *rtd,
+						int stream_tag)
+{
+	int i;
+	const struct snd_soc_dai_ops *codec_dai_ops;
+	struct snd_soc_dai *codec_dai;
+	int ret = 0;
+
+	for (i = 0; i < rtd->num_codecs; i++) {
+		codec_dai = rtd->codec_dais[i];
+		if (!codec_dai->driver)
+			continue;
+
+		codec_dai_ops = codec_dai->driver->ops;
+		if (codec_dai_ops->program_stream_tag) {
+			ret = codec_dai_ops->program_stream_tag(
+					codec_dai, stream_tag);
+			if (ret)
+				return ret;
+		}
+	}
+
+	return ret;
+
+}
+EXPORT_SYMBOL_GPL(snd_soc_dai_program_stream_tag);
+
+/**
  * snd_soc_dai_set_channel_map - configure DAI audio channel map
  * @dai: DAI
  * @tx_num: how many TX channels
