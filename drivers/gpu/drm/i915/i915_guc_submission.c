@@ -168,6 +168,16 @@ static int host2guc_sample_forcewake(struct intel_guc *guc,
 	return host2guc_action(guc, data, ARRAY_SIZE(data));
 }
 
+static int host2guc_logging_control(struct intel_guc *guc, u32 control_val)
+{
+	u32 data[2];
+
+	data[0] = HOST2GUC_ACTION_UK_LOG_ENABLE_LOGGING;
+	data[1] = control_val;
+
+	return host2guc_action(guc, data, 2);
+}
+
 static int host2guc_force_logbuffer_flush(struct intel_guc *guc)
 {
 	u32 data[2];
@@ -1305,4 +1315,46 @@ void i915_guc_capture_logs_on_reset(struct drm_device *dev)
 
 	/* GuC would have updated the log buffer by now, so capture it */
 	i915_guc_capture_logs(dev);
+}
+
+int i915_guc_log_control(struct drm_device *dev, uint64_t control_val)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_guc *guc = &dev_priv->guc;
+	union guc_log_control log_param;
+
+	log_param.logging_enabled = control_val & 0x1;
+	log_param.verbosity = (control_val >> 4) & 0xF;
+
+	if (log_param.verbosity < GUC_LOG_VERBOSITY_MIN ||
+	    log_param.verbosity > GUC_LOG_VERBOSITY_MAX)
+		return -EINVAL;
+
+	if (!host2guc_logging_control(guc, log_param.value)) {
+		/* If log_level was set as -1 at boot time, then interrupt would
+		 * not have been enabled. Can keep the interrupt on even when
+		 * logging is being disabled at runtime, as GuC itself won't
+		 * generate an interrupt in that case.
+		 */
+		if (i915.guc_log_level < 0)
+			gen9_enable_guc_interrupts(dev_priv);
+
+		/* Once logging is disabled, GuC won't generate logs & send an
+		 * interrupt. But there could be some data in the log buffer
+		 * which is yet to be captured. So request GuC to update the log
+		 * buffer state and send the flush interrupt so that Host can
+		 * collect the left over logs also.
+		 */
+		if (!log_param.logging_enabled) {
+			flush_work(&guc->events_work);
+			host2guc_force_logbuffer_flush(guc);
+		}
+
+		i915.guc_log_level = log_param.verbosity;
+	} else {
+		DRM_ERROR("Failed\n");
+		return -EINVAL;
+	}
+
+	return 0;
 }

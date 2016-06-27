@@ -171,5 +171,6 @@ void i915_guc_submission_disable(struct drm_i915_private *dev_priv);
 void i915_guc_submission_fini(struct drm_i915_private *dev_priv);
 void i915_guc_capture_logs(struct drm_device *dev);
 void i915_guc_capture_logs_on_reset(struct drm_device *dev);
+int i915_guc_log_control(struct drm_device *dev, uint64_t control_val);
 
 #endif

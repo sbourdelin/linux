@@ -2629,6 +2629,38 @@ static int i915_guc_log_dump(struct seq_file *m, void *data)
 	return 0;
 }
 
+static int
+i915_guc_log_control_set(void *data, u64 val)
+{
+	struct drm_device *dev = data;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_guc_fw *guc_fw = &dev_priv->guc.guc_fw;
+	struct intel_guc *guc = &dev_priv->guc;
+	int ret;
+
+	if (!HAS_GUC_UCODE(dev))
+		return -EINVAL;
+
+	if (!i915.enable_guc_submission)
+		return -EINVAL;
+
+	if (guc_fw->guc_fw_load_status != GUC_FIRMWARE_SUCCESS)
+		return -EINVAL;
+
+	if (!guc->log_obj || !guc->log_relay_chan)
+		return -EINVAL;
+
+	intel_runtime_pm_get(dev_priv);
+	ret = i915_guc_log_control(dev, val);
+	intel_runtime_pm_put(dev_priv);
+
+	return ret;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(i915_guc_log_control_fops,
+			NULL, i915_guc_log_control_set,
+			"0x%08llx\n");
+
 static int i915_edp_psr_status(struct seq_file *m, void *data)
 {
 	struct drm_info_node *node = m->private;
@@ -5491,7 +5523,8 @@ static const struct i915_debugfs_files {
 	{"i915_fbc_false_color", &i915_fbc_fc_fops},
 	{"i915_dp_test_data", &i915_displayport_test_data_fops},
 	{"i915_dp_test_type", &i915_displayport_test_type_fops},
-	{"i915_dp_test_active", &i915_displayport_test_active_fops}
+	{"i915_dp_test_active", &i915_displayport_test_active_fops},
+	{"i915_guc_log_control", &i915_guc_log_control_fops}
 };
 
 void intel_display_crc_init(struct drm_device *dev)
