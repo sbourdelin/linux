@@ -3293,6 +3293,15 @@ static inline void set_task_cpu(struct task_struct *p, unsigned int cpu)
 
 #endif /* CONFIG_SMP */
 
+#ifdef arch_vcpu_is_preempted
+static inline bool vcpu_is_preempted(int cpu)
+{
+	return arch_vcpu_is_preempted(cpu);
+}
+#else
+#define vcpu_is_preempted(cpu)	false
+#endif
+
 extern long sched_setaffinity(pid_t pid, const struct cpumask *new_mask);
 extern long sched_getaffinity(pid_t pid, struct cpumask *mask);
 
