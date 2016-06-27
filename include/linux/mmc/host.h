@@ -187,6 +187,21 @@ struct mmc_slot {
 };
 
 /**
+ * mmc_cmdq_context_info - describes the contexts of cmdq
+ * @active_reqs		requests being processed
+ * @curr_state		state of cmdq engine
+ * @req_starved		completion should invoke the request_fn since
+ *			no tags were available
+ */
+struct mmc_cmdq_context_info {
+	unsigned long	active_reqs; /* in-flight requests */
+	unsigned long	curr_state;
+#define	CMDQ_STATE_ERR 0
+	/* no free tag available */
+	unsigned long	req_starved;
+};
+
+/**
  * mmc_context_info - synchronization details for mmc context
  * @is_done_rcv		wake up reason was done request
  * @is_new_req		wake up reason was new request
@@ -302,6 +317,7 @@ struct mmc_host {
 #define MMC_CAP2_SDIO_IRQ_NOTHREAD (1 << 17)
 #define MMC_CAP2_NO_WRITE_PROTECT (1 << 18)	/* No physical write protect pin, assume that card is always read-write */
 #define MMC_CAP2_NO_SDIO	(1 << 19)	/* Do not send SDIO commands during initialization */
+#define MMC_CAP2_CMD_QUEUE	(1 << 20)	/* support eMMC command queue */
 
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 
@@ -384,6 +400,7 @@ struct mmc_host {
 	int			dsr_req;	/* DSR value is valid */
 	u32			dsr;	/* optional driver stage (DSR) value */
 
+	struct mmc_cmdq_context_info	cmdq_ctx;
 	unsigned long		private[0] ____cacheline_aligned;
 };
 

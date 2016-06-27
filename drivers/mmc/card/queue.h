@@ -52,16 +52,20 @@ struct mmc_queue {
 #define MMC_QUEUE_SUSPENDED	(1 << 0)
 #define MMC_QUEUE_NEW_REQUEST	(1 << 1)
 
-	int			(*issue_fn)(struct mmc_queue *, struct request *);
+	int (*issue_fn)(struct mmc_queue *, struct request *);
+	int (*cmdq_issue_fn)(struct mmc_queue *,
+			     struct request *);
+	void (*cmdq_complete_fn)(struct request *);
 	void			*data;
 	struct request_queue	*queue;
 	struct mmc_queue_req	mqrq[2];
 	struct mmc_queue_req	*mqrq_cur;
 	struct mmc_queue_req	*mqrq_prev;
+	struct mmc_queue_req	*mqrq_cmdq;
 };
 
 extern int mmc_init_queue(struct mmc_queue *, struct mmc_card *, spinlock_t *,
-			  const char *);
+			  const char *, int);
 extern void mmc_cleanup_queue(struct mmc_queue *);
 extern void mmc_queue_suspend(struct mmc_queue *);
 extern void mmc_queue_resume(struct mmc_queue *);
@@ -76,4 +80,5 @@ extern void mmc_packed_clean(struct mmc_queue *);
 
 extern int mmc_access_rpmb(struct mmc_queue *);
 
+extern void mmc_cmdq_clean(struct mmc_queue *mq, struct mmc_card *card);
 #endif
