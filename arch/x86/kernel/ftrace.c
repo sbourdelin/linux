@@ -235,6 +235,15 @@ static int update_ftrace_func(unsigned long ip, void *new)
 
 	memcpy(old, (void *)ip, MCOUNT_INSN_SIZE);
 
+	/*
+	 * Make sure that we replace 5-byte instruction that
+	 * is either a call or a jump.
+	 */
+	if (old[0] != 0xe8 && old[0] != 0xe9) {
+		pr_warn("Expected e8 or e9, got %x\n", old[0]);
+		return -EINVAL;
+	}
+
 	ftrace_update_func = ip;
 	/* Make sure the breakpoints see the ftrace_update_func update */
 	smp_wmb();
