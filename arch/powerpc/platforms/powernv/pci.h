@@ -7,6 +7,7 @@ enum pnv_phb_type {
 	PNV_PHB_IODA1	= 0,
 	PNV_PHB_IODA2	= 1,
 	PNV_PHB_NPU	= 2,
+	PNV_PHB_IODA3	= 3,
 };
 
 /* Precise PHB model for error management */
@@ -202,6 +203,7 @@ extern void pnv_pci_setup_iommu_table(struct iommu_table *tbl,
 				      u64 dma_offset, unsigned page_shift);
 extern void pnv_pci_init_ioda_hub(struct device_node *np);
 extern void pnv_pci_init_ioda2_phb(struct device_node *np);
+extern void pnv_pci_init_ioda3_phb(struct device_node *np);
 extern void pnv_pci_init_npu_phb(struct device_node *np);
 extern void pnv_pci_ioda_tce_invalidate(struct iommu_table *tbl,
 					__be64 *startp, __be64 *endp, bool rm);
