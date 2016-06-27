@@ -199,6 +199,28 @@ static ssize_t unbind_store(struct device_driver *drv, const char *buf,
 }
 static DRIVER_ATTR_WO(unbind);
 
+static const char *driver_override_buses[] = {
+	"spi",
+	NULL
+};
+
+static inline bool driver_match_override(struct device_driver *drv,
+					 struct device *dev)
+{
+	struct bus_type *bus = bus_get(drv->bus);
+	int i;
+
+	for (i = 0; driver_override_buses[i]; i++) {
+		if (!strcmp(bus->name, driver_override_buses[i])) {
+			pr_notice("Overriding id match on manual driver binding:\n bus: %s  driver: %s  device: %s\n",
+				  bus->name, drv->name, dev_name(dev));
+			return true;
+		}
+	}
+
+	return false;
+}
+
 /*
  * Manually attach a device to a driver.
  * Note: the driver must want to bind to the device,
@@ -212,7 +234,8 @@ static ssize_t bind_store(struct device_driver *drv, const char *buf,
 	int err = -ENODEV;
 
 	dev = bus_find_device_by_name(bus, NULL, buf);
-	if (dev && dev->driver == NULL && driver_match_device(drv, dev)) {
+	if (dev && dev->driver == NULL && (driver_match_device(drv, dev)
+	    || driver_match_override(drv, dev))) {
 		if (dev->parent)	/* Needed for USB */
 			device_lock(dev->parent);
 		device_lock(dev);
