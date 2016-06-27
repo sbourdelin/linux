@@ -111,10 +111,16 @@ extern struct lppaca lppaca[];
  * we will have to transition to something better.
  */
 #define LPPACA_OLD_SHARED_PROC		2
+#define LPPACA_OLD_DEDICATED_PROC      (1 << 6)
 
 static inline bool lppaca_shared_proc(struct lppaca *l)
 {
 	return !!(l->__old_status & LPPACA_OLD_SHARED_PROC);
+}
+
+static inline bool lppaca_dedicated_proc(struct lppaca *l)
+{
+	return !!(l->__old_status & LPPACA_OLD_DEDICATED_PROC);
 }
 
 /*

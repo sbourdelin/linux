@@ -52,6 +52,21 @@
 #define SYNC_IO
 #endif
 
+/* For fixing some spinning issues in a guest.
+ * kernel would check if vcpu is preempted during a spin loop.
+ * we support that.
+ */
+#define arch_vcpu_is_preempted arch_vcpu_is_preempted
+static inline bool arch_vcpu_is_preempted(int cpu)
+{
+	struct lppaca *lp = &lppaca_of(cpu);
+
+	if (unlikely(!(lppaca_shared_proc(lp) ||
+			lppaca_dedicated_proc(lp))))
+		return false;
+	return !!(be32_to_cpu(lp->yield_count) & 1);
+}
+
 static __always_inline int arch_spin_value_unlocked(arch_spinlock_t lock)
 {
 	return lock.slock == 0;
