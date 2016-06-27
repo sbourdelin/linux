@@ -1362,23 +1362,6 @@ config BIG_LITTLE
 	  This option enables support selections for the big.LITTLE
 	  system architecture.
 
-config BL_SWITCHER
-	bool "big.LITTLE switcher support"
-	depends on BIG_LITTLE && MCPM && HOTPLUG_CPU && ARM_GIC
-	select CPU_PM
-	help
-	  The big.LITTLE "switcher" provides the core functionality to
-	  transparently handle transition between a cluster of A15's
-	  and a cluster of A7's in a big.LITTLE system.
-
-config BL_SWITCHER_DUMMY_IF
-	tristate "Simple big.LITTLE switcher user interface"
-	depends on BL_SWITCHER && DEBUG_KERNEL
-	help
-	  This is a simple and dummy char dev interface to control
-	  the big.LITTLE switcher core code.  It is meant for
-	  debugging purposes only.
-
 choice
 	prompt "Memory split"
 	depends on MMU
@@ -2138,7 +2121,7 @@ config ARCH_SUSPEND_POSSIBLE
 	def_bool y
 
 config ARM_CPU_SUSPEND
-	def_bool PM_SLEEP || BL_SWITCHER || ARM_PSCI_FW
+	def_bool PM_SLEEP || ARM_PSCI_FW
 	depends on ARCH_SUSPEND_POSSIBLE
 
 config ARCH_HIBERNATION_POSSIBLE
