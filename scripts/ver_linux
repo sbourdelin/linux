@@ -20,13 +20,7 @@ BEGIN {
 	printversion("Module-init-tools", version("depmod -V  2>&1"))
 	printversion("E2fsprogs", version("tune2fs 2>&1"))
 	printversion("Jfsutils", version("fsck.jfs -V 2>&1"))
-
-reiserfsck -V 2>&1 |
-awk '/^reiserfsck/{
-	match($0, /[0-9]+([.]?[0-9]+)+/)
-	printf("Reiserfsprogs\t\t%s\n",
-	substr($0,RSTART,RLENGTH))
-}'
+	printversion("Reiserfsprogs", version("reiserfsck -V 2>&1"))
 
 fsck.reiser4 -V 2>&1 | grep ^fsck.reiser4 | awk \
 'NR==1{print "reiser4progs          ", $2}'
