@@ -21,6 +21,7 @@
 #include <linux/pci.h>
 #include <linux/i2c-gpio.h>
 #include <linux/slab.h>
+#include <linux/of.h>
 
 #include <linux/sm501.h>
 #include <linux/sm501-regs.h>
@@ -1377,6 +1378,8 @@ static int sm501_plat_probe(struct platform_device *dev)
 {
 	struct sm501_devdata *sm;
 	int ret;
+	struct sm501_platdata private_platdata;
+	struct sm501_initdata private_initdata;
 
 	sm = kzalloc(sizeof(struct sm501_devdata), GFP_KERNEL);
 	if (sm == NULL) {
@@ -1388,6 +1391,12 @@ static int sm501_plat_probe(struct platform_device *dev)
 	sm->dev = &dev->dev;
 	sm->pdev_id = dev->id;
 	sm->platdata = dev_get_platdata(&dev->dev);
+	if (!sm->platdata) {
+		of_property_read_u32(dev->dev.of_node, "smi,devices",
+				     (u32 *)&private_initdata.devices);
+		private_platdata.init = &private_initdata;
+		sm->platdata = &private_platdata;
+	}
 
 	ret = platform_get_irq(dev, 0);
 	if (ret < 0) {
