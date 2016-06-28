@@ -780,7 +780,7 @@ void intel_fbdev_set_suspend(struct drm_device *dev, int state, bool synchronous
 	struct intel_fbdev *ifbdev = dev_priv->fbdev;
 	struct fb_info *info;
 
-	if (!ifbdev)
+	if (!ifbdev || !ifbdev->fb)
 		return;
 
 	info = ifbdev->helper.fbdev;
