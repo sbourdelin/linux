@@ -459,6 +459,10 @@ struct drm_i915_fence_reg {
 	int pin_count;
 };
 
+#define for_each_fence_reg(dev_priv, reg, index) \
+	for ((index) = 0, (reg) = &dev_priv->fence_regs[index]; \
+	     (index) < dev_priv->num_fence_regs; (index)++, (reg)++)
+
 struct sdvo_device_mapping {
 	u8 initialized;
 	u8 dvo_port;

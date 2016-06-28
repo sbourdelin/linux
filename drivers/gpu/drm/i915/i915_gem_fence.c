@@ -317,8 +317,7 @@ i915_find_fence_reg(struct drm_device *dev)
 
 	/* First try to find a free reg */
 	avail = NULL;
-	for (i = 0; i < dev_priv->num_fence_regs; i++) {
-		reg = &dev_priv->fence_regs[i];
+	for_each_fence_reg(dev_priv, reg, i) {
 		if (!reg->obj)
 			return reg;
 
@@ -473,11 +472,10 @@ i915_gem_object_unpin_fence(struct drm_i915_gem_object *obj)
 void i915_gem_restore_fences(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_i915_fence_reg *reg;
 	int i;
 
-	for (i = 0; i < dev_priv->num_fence_regs; i++) {
-		struct drm_i915_fence_reg *reg = &dev_priv->fence_regs[i];
-
+	for_each_fence_reg(dev_priv, reg, i) {
 		/*
 		 * Commit delayed tiling changes if we have an object still
 		 * attached to the fence, otherwise just clear the fence.
