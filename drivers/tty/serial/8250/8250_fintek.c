@@ -212,8 +212,8 @@ int fintek_8250_probe(struct uart_8250_port *uart)
 {
 	struct fintek_8250 *pdata;
 	struct fintek_8250 probe_data;
-	struct irq_data *irq_data = irq_get_irq_data(uart->port.irq);
-	bool level_mode = irqd_is_level_type(irq_data);
+	struct irq_data *irq_data;
+	bool level_mode = false; /* Default to Edge/High */
 
 	if (find_base_port(&probe_data, uart->port.iobase))
 		return -ENODEV;
@@ -225,6 +225,15 @@ int fintek_8250_probe(struct uart_8250_port *uart)
 	memcpy(pdata, &probe_data, sizeof(probe_data));
 	uart->port.rs485_config = fintek_8250_rs485_config;
 	uart->port.private_data = pdata;
+
+	irq_data = irq_get_irq_data(uart->port.irq);
+	if (irq_data) {
+		level_mode = irqd_is_level_type(irq_data);
+	} else {
+		dev_warn(uart->port.dev,
+			 "%s: Can't get irq_data, set this port to Edge/High",
+			 __func__);
+	}
 
 	return fintek_8250_set_irq_mode(pdata, level_mode);
 }
