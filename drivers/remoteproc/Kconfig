@@ -90,6 +90,16 @@ config QCOM_Q6V5_PIL
 	  Say y here to support the Qualcomm Peripherial Image Loader for the
 	  Hexagon V5 based remote processors.
 
+config QCOM_WCNSS_PIL
+	tristate "Qualcomm WCNSS Peripheral Image Loader"
+	depends on OF && ARCH_QCOM
+	select QCOM_MDT_LOADER
+	select QCOM_SCM
+	select REMOTEPROC
+	help
+	  Say y here to support the Peripherial Image Loader for the Qualcomm
+	  Wireless Connectivity Subsystem.
+
 config ST_REMOTEPROC
 	tristate "ST remoteproc support"
 	depends on ARCH_STI
