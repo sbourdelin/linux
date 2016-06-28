@@ -103,6 +103,16 @@
 #define wait_for_atomic(COND, MS)	_wait_for_atomic((COND), (MS) * 1000)
 #define wait_for_atomic_us(COND, US)	_wait_for_atomic((COND), (US))
 
+/* Hybrid wait:
+ * 	first spin-wait for up to <US> microseconds,
+ * 	if <COND> still not true, sleep-wait for MS milliseconds
+ */
+#define	wait_for_hybrid(COND, US, MS)	({				\
+		int ret__ = wait_for_atomic_us(COND, US);		\
+		if (ret__) ret__ = wait_for(COND, MS);			\
+		ret__;							\
+	})
+
 #define KHz(x) (1000 * (x))
 #define MHz(x) KHz(1000 * (x))
 

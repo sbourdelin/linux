@@ -98,7 +98,7 @@ static int host2guc_action(struct intel_guc *guc, u32 *data, u32 len)
 	I915_WRITE(HOST2GUC_INTERRUPT, HOST2GUC_TRIGGER);
 
 	/* No HOST2GUC command should take longer than 10ms */
-	ret = wait_for_atomic(host2guc_action_response(dev_priv, &status), 10);
+	ret = wait_for_hybrid(host2guc_action_response(dev_priv, &status), 10, 10);
 	if (status != GUC2HOST_STATUS_SUCCESS) {
 		/*
 		 * Either the GuC explicitly returned an error (which
