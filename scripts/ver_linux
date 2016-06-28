@@ -25,13 +25,7 @@ BEGIN {
 	printversion("Xfsprogs", version("xfs_db -V 2>&1"))
 	printversion("Pcmciautils", version("pccardctl -V 2>&1"))
 	printversion("Pcmcia-cs", version("cardmgr -V 2>&1"))
-
-quota -V 2>&1 |
-awk '/version/{
-	match($0, /[0-9]+([.]?[0-9]+)+/)
-	printf("Quota-tools\t\t%s\n",
-	substr($0,RSTART,RLENGTH))
-}'
+	printversion("Quota-tools", version("quota -V 2>&1"))
 
 pppd --version 2>&1 |
 awk '/version/{
