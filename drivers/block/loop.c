@@ -78,7 +78,7 @@
 #include <linux/uio.h>
 #include "loop.h"
 
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 
 static DEFINE_IDR(loop_index_idr);
 static DEFINE_MUTEX(loop_index_mutex);
@@ -87,8 +87,8 @@ static int max_part;
 static int part_shift;
 
 static int transfer_xor(struct loop_device *lo, int cmd,
-			struct page *raw_page, unsigned raw_off,
-			struct page *loop_page, unsigned loop_off,
+			struct page *raw_page, unsigned int raw_off,
+			struct page *loop_page, unsigned int loop_off,
 			int size, sector_t real_block)
 {
 	char *raw_buf = kmap_atomic(raw_page) + raw_off;
@@ -124,13 +124,13 @@ static int xor_init(struct loop_device *lo, const struct loop_info64 *info)
 
 static struct loop_func_table none_funcs = {
 	.number = LO_CRYPT_NONE,
-}; 
+};
 
 static struct loop_func_table xor_funcs = {
 	.number = LO_CRYPT_XOR,
 	.transfer = transfer_xor,
 	.init = xor_init
-}; 
+};
 
 /* xfer_funcs[0] is special - its release function is never called */
 static struct loop_func_table *xfer_funcs[MAX_LO_CRYPT] = {
@@ -170,7 +170,7 @@ static void __loop_update_dio(struct loop_device *lo, bool dio)
 	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
 	unsigned short sb_bsize = 0;
-	unsigned dio_align = 0;
+	unsigned int dio_align = 0;
 	bool use_dio;
 
 	if (inode->i_sb->s_bdev) {
@@ -242,8 +242,8 @@ figure_loop_size(struct loop_device *lo, loff_t offset, loff_t sizelimit)
 
 static inline int
 lo_do_transfer(struct loop_device *lo, int cmd,
-	       struct page *rpage, unsigned roffs,
-	       struct page *lpage, unsigned loffs,
+	       struct page *rpage, unsigned int roffs,
+	       struct page *lpage, unsigned int loffs,
 	       int size, sector_t rblock)
 {
 	int ret;
@@ -439,6 +439,7 @@ static int lo_req_flush(struct loop_device *lo, struct request *rq)
 {
 	struct file *file = lo->lo_backing_file;
 	int ret = vfs_fsync(file, 0);
+
 	if (unlikely(ret && ret != -EINVAL))
 		ret = -EIO;
 
@@ -731,7 +732,7 @@ static ssize_t loop_attr_do_show_##_name(struct device *d,		\
 	return loop_attr_show(d, b, loop_attr_##_name##_show);		\
 }									\
 static struct device_attribute loop_attr_##_name =			\
-	__ATTR(_name, S_IRUGO, loop_attr_do_show_##_name, NULL);
+	__ATTR(_name, S_IRUGO, loop_attr_do_show_##_name, NULL)
 
 static ssize_t loop_attr_backing_file_show(struct loop_device *lo, char *buf)
 {
@@ -805,7 +806,7 @@ static struct attribute *loop_attrs[] = {
 
 static struct attribute_group loop_attribute_group = {
 	.name = "loop",
-	.attrs= loop_attrs,
+	.attrs = loop_attrs,
 };
 
 static int loop_sysfs_init(struct loop_device *lo)
@@ -872,7 +873,7 @@ static int loop_set_fd(struct loop_device *lo, fmode_t mode,
 	struct file	*file, *f;
 	struct inode	*inode;
 	struct address_space *mapping;
-	unsigned lo_blocksize;
+	unsigned int lo_blocksize;
 	int		lo_flags = 0;
 	int		error;
 	loff_t		size;
@@ -1260,7 +1261,7 @@ loop_set_status_old(struct loop_device *lo, const struct loop_info __user *arg)
 	struct loop_info info;
 	struct loop_info64 info64;
 
-	if (copy_from_user(&info, arg, sizeof (struct loop_info)))
+	if (copy_from_user(&info, arg, sizeof(struct loop_info)))
 		return -EFAULT;
 	loop_info64_from_old(&info, &info64);
 	return loop_set_status(lo, &info64);
@@ -1271,7 +1272,7 @@ loop_set_status64(struct loop_device *lo, const struct loop_info64 __user *arg)
 {
 	struct loop_info64 info64;
 
-	if (copy_from_user(&info64, arg, sizeof (struct loop_info64)))
+	if (copy_from_user(&info64, arg, sizeof(struct loop_info64)))
 		return -EFAULT;
 	return loop_set_status(lo, &info64);
 }
@@ -1320,6 +1321,7 @@ static int loop_set_capacity(struct loop_device *lo, struct block_device *bdev)
 static int loop_set_dio(struct loop_device *lo, unsigned long arg)
 {
 	int error = -ENXIO;
+
 	if (lo->lo_state != Lo_bound)
 		goto out;
 
@@ -1513,7 +1515,7 @@ static int lo_compat_ioctl(struct block_device *bdev, fmode_t mode,
 	struct loop_device *lo = bdev->bd_disk->private_data;
 	int err;
 
-	switch(cmd) {
+	switch (cmd) {
 	case LOOP_SET_STATUS:
 		mutex_lock(&lo->lo_ctl_mutex);
 		err = loop_set_status_compat(
@@ -2050,7 +2052,7 @@ module_exit(loop_exit);
 #ifndef MODULE
 static int __init max_loop_setup(char *str)
 {
-	max_loop = simple_strtol(str, NULL, 0);
+	max_loop = kstrtol(str, NULL, 0);
 	return 1;
 }
 
