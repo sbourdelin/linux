@@ -224,7 +224,6 @@ struct g2d_data {
 	struct clk			*gate_clk;
 	void __iomem			*regs;
 	int				irq;
-	struct workqueue_struct		*g2d_workq;
 	struct work_struct		runqueue_work;
 	struct exynos_drm_subdrv	subdrv;
 	bool				suspended;
@@ -924,7 +923,7 @@ static irqreturn_t g2d_irq_handler(int irq, void *dev_id)
 	}
 
 	if (pending & G2D_INTP_ACMD_FIN)
-		queue_work(g2d->g2d_workq, &g2d->runqueue_work);
+		schedule_work(&g2d->runqueue_work);
 
 	return IRQ_HANDLED;
 }
@@ -1397,13 +1396,6 @@ static int g2d_probe(struct platform_device *pdev)
 
 	g2d->dev = dev;
 
-	g2d->g2d_workq = create_singlethread_workqueue("g2d");
-	if (!g2d->g2d_workq) {
-		dev_err(dev, "failed to create workqueue\n");
-		ret = -EINVAL;
-		goto err_destroy_slab;
-	}
-
 	INIT_WORK(&g2d->runqueue_work, g2d_runqueue_worker);
 	INIT_LIST_HEAD(&g2d->free_cmdlist);
 	INIT_LIST_HEAD(&g2d->runqueue);
@@ -1415,7 +1407,7 @@ static int g2d_probe(struct platform_device *pdev)
 	if (IS_ERR(g2d->gate_clk)) {
 		dev_err(dev, "failed to get gate clock\n");
 		ret = PTR_ERR(g2d->gate_clk);
-		goto err_destroy_workqueue;
+		goto err_destroy_slab;
 	}
 
 	pm_runtime_enable(dev);
@@ -1466,8 +1458,6 @@ static int g2d_probe(struct platform_device *pdev)
 
 err_put_clk:
 	pm_runtime_disable(dev);
-err_destroy_workqueue:
-	destroy_workqueue(g2d->g2d_workq);
 err_destroy_slab:
 	kmem_cache_destroy(g2d->runqueue_slab);
 	return ret;
@@ -1488,7 +1478,7 @@ static int g2d_remove(struct platform_device *pdev)
 	pm_runtime_disable(&pdev->dev);
 
 	g2d_fini_cmdlist(g2d);
-	destroy_workqueue(g2d->g2d_workq);
+	flush_work(&g2d->runqueue_work);
 	kmem_cache_destroy(g2d->runqueue_slab);
 
 	return 0;
