@@ -495,8 +495,12 @@ static int tbf_graft(struct Qdisc *sch, unsigned long arg, struct Qdisc *new,
 {
 	struct tbf_sched_data *q = qdisc_priv(sch);
 
-	if (new == NULL)
-		new = &noop_qdisc;
+	if (new == NULL) {
+		/* reset to default qdisc */
+		new = qdisc_create_dflt(sch->dev_queue, &bfifo_qdisc_ops, sch->parent);
+		if (!new)
+			return -ENOBUFS;
+	}
 
 	*old = qdisc_replace(sch, new, &q->qdisc);
 	return 0;
