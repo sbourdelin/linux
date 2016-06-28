@@ -56,6 +56,14 @@
 	status = "okay";
 };
 
+&gmac0 {
+	status = "okay";
+};
+
+&gmac1 {
+	status = "okay";
+};
+
 &pcie0 {
 	status = "okay";
 };

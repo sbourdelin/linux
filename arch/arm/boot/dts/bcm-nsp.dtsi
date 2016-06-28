@@ -192,6 +192,22 @@
 			status = "disabled";
 		};
 
+		gmac0: enet@22000 {
+			compatible = "brcm,bgmac-enet";
+			reg = <0x022000 0x1000>,
+			      <0x110000 0x1000>;
+			interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
+			status = "disabled";
+		};
+
+		gmac1: enet@23000 {
+			compatible = "brcm,bgmac-enet";
+			reg = <0x023000 0x1000>,
+			      <0x111000 0x1000>;
+			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
+			status = "disabled";
+		};
+
 		nand: nand@26000 {
 			compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1";
 			reg = <0x026000 0x600>,
