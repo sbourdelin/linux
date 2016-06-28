@@ -21,6 +21,9 @@ Required properties:
 Optional properties:
 - ti,no_idle_on_suspend: When present, it prevents the PM to idle the module
   during suspend.
+- ti,hwmod-disabled: When present, it will not try to initialize the module.
+  This is necessary if e.g. the rtc is not powered at all and the registers
+  are not accessible.
 - ti,no-reset-on-init: When present, the module should not be reset at init
 - ti,no-idle-on-init: When present, the module should not be idled at init
 - ti,no-idle: When present, the module is never allowed to idle.
