@@ -28,9 +28,7 @@ BEGIN {
 	printversion("Quota-tools", version("quota -V 2>&1"))
 	printversion("PPP", version("pppd --version 2>&1"))
 	printversion("Isdn4k-utils", version("isdnctrl 2>&1"))
-
-showmount --version 2>&1 | grep nfs-utils | awk \
-'NR==1{print "nfs-utils             ", $NF}'
+	printversion("Nfs-utils", version("showmount --version 2>&1"))
 
 test -r /proc/self/maps &&
 sed '
