@@ -159,7 +159,8 @@ void mesh_sta_cleanup(struct sta_info *sta)
 	if (!sdata->u.mesh.user_mpm) {
 		changed |= mesh_plink_deactivate(sta);
 		del_timer_sync(&sta->mesh->plink_timer);
-	}
+	} else
+		mesh_path_flush_by_nexthop(sta);
 
 	/* make sure no readers can access nexthop sta from here on */
 	mesh_path_flush_by_nexthop(sta);
