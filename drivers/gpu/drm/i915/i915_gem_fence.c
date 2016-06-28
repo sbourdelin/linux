@@ -313,7 +313,7 @@ i915_find_fence_reg(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct drm_i915_fence_reg *reg, *avail;
-	int i;
+	int i, ret;
 
 	/* First try to find a free reg */
 	avail = NULL;
@@ -333,6 +333,15 @@ i915_find_fence_reg(struct drm_device *dev)
 		if (reg->pin_count)
 			continue;
 
+		if (reg->obj) {
+			struct drm_i915_gem_object *old = reg->obj;
+
+			ret = i915_gem_object_wait_fence(old);
+			if (ret)
+				return ERR_PTR(ret);
+
+			i915_gem_object_fence_lost(old);
+		}
 		return reg;
 	}
 
@@ -395,16 +404,6 @@ i915_gem_object_get_fence(struct drm_i915_gem_object *obj)
 		reg = i915_find_fence_reg(dev);
 		if (IS_ERR(reg))
 			return PTR_ERR(reg);
-
-		if (reg->obj) {
-			struct drm_i915_gem_object *old = reg->obj;
-
-			ret = i915_gem_object_wait_fence(old);
-			if (ret)
-				return ret;
-
-			i915_gem_object_fence_lost(old);
-		}
 	} else
 		return 0;
 
