@@ -52,6 +52,24 @@
 #define SYNC_IO
 #endif
 
+/*
+ * This support kernel to check if one cpu is preempted or not.
+ * Then we can fix some lock holder preemption issue.
+ */
+#ifdef CONFIG_PPC_PSERIES
+#define vcpu_is_preempted vcpu_is_preempted
+static inline bool vcpu_is_preempted(int cpu)
+{
+	/*
+	 * pSeries and powerNV can be built into same kernel image. In
+	 * principle we need return false directly if we are running as
+	 * powerNV. However the yield_count is always zero on powerNV, So
+	 * skip such machine type check
+	 */
+	return !!(be32_to_cpu(lppaca_of(cpu).yield_count) & 1);
+}
+#endif
+
 static __always_inline int arch_spin_value_unlocked(arch_spinlock_t lock)
 {
 	return lock.slock == 0;
