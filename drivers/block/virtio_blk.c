@@ -567,6 +567,7 @@ static int virtblk_probe(struct virtio_device *vdev)
 {
 	struct virtio_blk *vblk;
 	struct request_queue *q;
+	struct device *ddev;
 	int err, index;
 
 	u64 cap;
@@ -746,6 +747,8 @@ static int virtblk_probe(struct virtio_device *vdev)
 					 &dev_attr_cache_type_ro);
 	if (err)
 		goto out_del_disk;
+	ddev = disk_to_dev(vblk->disk);
+	kobject_uevent(&ddev->kobj, KOBJ_CHANGE);
 	return 0;
 
 out_del_disk:
