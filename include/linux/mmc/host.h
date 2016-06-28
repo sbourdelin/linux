@@ -303,6 +303,12 @@ struct mmc_host {
 #define MMC_CAP2_NO_WRITE_PROTECT (1 << 18)	/* No physical write protect pin, assume that card is always read-write */
 #define MMC_CAP2_NO_SDIO	(1 << 19)	/* Do not send SDIO commands during initialization */
 
+/*
+ * For the host which needs to config its power control
+ * register even it has regulators
+ */
+#define MMC_CAP2_FORCE_SET_PWR_CTRL	(1 << 20)
+
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 
 	/* host specific block data */

@@ -275,7 +275,8 @@ static const struct sdhci_acpi_slot sdhci_acpi_slot_int_emmc = {
 	.caps    = MMC_CAP_8_BIT_DATA | MMC_CAP_NONREMOVABLE |
 		   MMC_CAP_HW_RESET | MMC_CAP_1_8V_DDR |
 		   MMC_CAP_WAIT_WHILE_BUSY,
-	.caps2   = MMC_CAP2_HC_ERASE_SZ,
+	.caps2   = MMC_CAP2_HC_ERASE_SZ |
+		   MMC_CAP2_FORCE_SET_PWR_CTRL,
 	.flags   = SDHCI_ACPI_RUNTIME_PM,
 	.quirks  = SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC,
 	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
@@ -290,6 +291,7 @@ static const struct sdhci_acpi_slot sdhci_acpi_slot_int_sdio = {
 	.quirks2 = SDHCI_QUIRK2_HOST_OFF_CARD_ON,
 	.caps    = MMC_CAP_NONREMOVABLE | MMC_CAP_POWER_OFF_CARD |
 		   MMC_CAP_WAIT_WHILE_BUSY,
+	.caps2	 = MMC_CAP2_FORCE_SET_PWR_CTRL,
 	.flags   = SDHCI_ACPI_RUNTIME_PM,
 	.pm_caps = MMC_PM_KEEP_POWER,
 	.probe_slot	= sdhci_acpi_sdio_probe_slot,
@@ -302,6 +304,7 @@ static const struct sdhci_acpi_slot sdhci_acpi_slot_int_sd = {
 	.quirks2 = SDHCI_QUIRK2_CARD_ON_NEEDS_BUS_ON |
 		   SDHCI_QUIRK2_STOP_WITH_TC,
 	.caps    = MMC_CAP_WAIT_WHILE_BUSY,
+	.caps2	 = MMC_CAP2_FORCE_SET_PWR_CTRL,
 	.probe_slot	= sdhci_acpi_sd_probe_slot,
 };
 

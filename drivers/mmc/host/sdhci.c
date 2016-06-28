@@ -1268,10 +1268,12 @@ static void sdhci_set_power_reg(struct sdhci_host *host, unsigned char mode,
 	mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
 	spin_lock_irq(&host->lock);
 
-	if (mode != MMC_POWER_OFF)
-		sdhci_writeb(host, SDHCI_POWER_ON, SDHCI_POWER_CONTROL);
-	else
-		sdhci_writeb(host, 0, SDHCI_POWER_CONTROL);
+	if (!(mmc->caps2 & MMC_CAP2_FORCE_SET_PWR_CTRL)) {
+		if (mode != MMC_POWER_OFF)
+			sdhci_writeb(host, SDHCI_POWER_ON, SDHCI_POWER_CONTROL);
+		else
+			sdhci_writeb(host, 0, SDHCI_POWER_CONTROL);
+	}
 }
 
 void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
