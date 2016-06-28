@@ -668,8 +668,8 @@ static void test_mb_ahash_speed(const char *algo, unsigned int sec,
 		}
 
 		printk("\nBlock: %lld cycles (%lld cycles/byte), %d bytes\n",
-			(s64) (end[7]-start[0])/1,
-			(s64) (end[7]-start[0])/(8*speed[i].blen),
+			(s64) (end[7]-start[0]),
+			(s64) div64_s64(end[7]-start[0], 8*speed[i].blen),
 			8*speed[i].blen);
 	}
 	ret = 0;
