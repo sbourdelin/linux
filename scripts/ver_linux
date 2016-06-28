@@ -61,16 +61,11 @@ BEGIN {
 	printversion("Udev", version("udevadm --version 2>&1"))
 	printversion("Wireless-tools", version("iwconfig --version 2>&1"))
 
-test -e /proc/modules &&
-sort /proc/modules |
-sed '
-	s/ .*//
-	H
-${
-	g
-	s/^\n/Modules Loaded\t\t/
-	y/\n/ /
-	q
+	if (system("test -r /proc/modules") == 0) {
+		while ("sort /proc/modules" | getline > 0) {
+			mods = mods sep $1
+			sep = " "
+		}
+		printversion("Modules Loaded", mods)
+	}
 }
-	d
-'
