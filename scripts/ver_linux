@@ -41,12 +41,7 @@ BEGIN {
 		}
 	}
 
-ldd --version 2>&1 |
-awk '/^ldd/{
-	match($0, /[0-9]+([.]?[0-9]+)+/)
-	printf("Dynamic linker (ldd)\t%s\n",
-	substr($0,RSTART,RLENGTH))
-}'
+	printversion("Dynamic linker (ldd)", version("ldd --version 2>&1"))
 
 libcpp=`ldconfig -p 2>/dev/null |
 	awk '/(libg|stdc)[+]+\.so/ {
