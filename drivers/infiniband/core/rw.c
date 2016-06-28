@@ -58,13 +58,6 @@ static inline bool rdma_rw_io_needs_mr(struct ib_device *dev, u8 port_num,
 	return false;
 }
 
-static inline u32 rdma_rw_max_sge(struct ib_device *dev,
-		enum dma_data_direction dir)
-{
-	return dir == DMA_TO_DEVICE ?
-		dev->attrs.max_sge : dev->attrs.max_sge_rd;
-}
-
 static inline u32 rdma_rw_fr_page_list_len(struct ib_device *dev)
 {
 	/* arbitrary limit to avoid allocating gigantic resources */
@@ -183,10 +176,10 @@ out:
 
 static int rdma_rw_init_map_wrs(struct rdma_rw_ctx *ctx, struct ib_qp *qp,
 		struct scatterlist *sg, u32 sg_cnt, u32 offset,
-		u64 remote_addr, u32 rkey, enum dma_data_direction dir)
+		u64 remote_addr, u32 rkey, enum dma_data_direction dir,
+		u32 max_sge)
 {
 	struct ib_device *dev = qp->pd->device;
-	u32 max_sge = rdma_rw_max_sge(dev, dir);
 	struct ib_sge *sge;
 	u32 total_len = 0, i, j;
 
@@ -275,13 +268,15 @@ static int rdma_rw_init_single_wr(struct rdma_rw_ctx *ctx, struct ib_qp *qp,
  * @remote_addr:remote address to read/write (relative to @rkey)
  * @rkey:	remote key to operate on
  * @dir:	%DMA_TO_DEVICE for RDMA WRITE, %DMA_FROM_DEVICE for RDMA READ
+ * @max_sge:    maximum number of SG elements per work request
  *
  * Returns the number of WQEs that will be needed on the workqueue if
  * successful, or a negative error code.
  */
 int rdma_rw_ctx_init(struct rdma_rw_ctx *ctx, struct ib_qp *qp, u8 port_num,
 		struct scatterlist *sg, u32 sg_cnt, u32 sg_offset,
-		u64 remote_addr, u32 rkey, enum dma_data_direction dir)
+		u64 remote_addr, u32 rkey, enum dma_data_direction dir,
+		u32 max_sge)
 {
 	struct ib_device *dev = qp->pd->device;
 	int ret;
@@ -314,7 +309,7 @@ int rdma_rw_ctx_init(struct rdma_rw_ctx *ctx, struct ib_qp *qp, u8 port_num,
 				sg_offset, remote_addr, rkey, dir);
 	} else if (sg_cnt > 1) {
 		ret = rdma_rw_init_map_wrs(ctx, qp, sg, sg_cnt, sg_offset,
-				remote_addr, rkey, dir);
+				remote_addr, rkey, dir, max_sge);
 	} else {
 		ret = rdma_rw_init_single_wr(ctx, qp, sg, sg_offset,
 				remote_addr, rkey, dir);

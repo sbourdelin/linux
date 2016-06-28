@@ -61,7 +61,8 @@ struct rdma_rw_ctx {
 
 int rdma_rw_ctx_init(struct rdma_rw_ctx *ctx, struct ib_qp *qp, u8 port_num,
 		struct scatterlist *sg, u32 sg_cnt, u32 sg_offset,
-		u64 remote_addr, u32 rkey, enum dma_data_direction dir);
+		u64 remote_addr, u32 rkey, enum dma_data_direction dir,
+		u32 max_sge);
 void rdma_rw_ctx_destroy(struct rdma_rw_ctx *ctx, struct ib_qp *qp, u8 port_num,
 		struct scatterlist *sg, u32 sg_cnt,
 		enum dma_data_direction dir);

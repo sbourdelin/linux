@@ -2075,21 +2075,24 @@ static int
 isert_rdma_rw_ctx_post(struct isert_cmd *cmd, struct isert_conn *conn,
 		struct ib_cqe *cqe, struct ib_send_wr *chain_wr)
 {
+	struct ib_device *dev = conn->device->ib_device;
 	struct se_cmd *se_cmd = &cmd->iscsi_cmd->se_cmd;
 	enum dma_data_direction dir = target_reverse_dma_direction(se_cmd);
 	u8 port_num = conn->cm_id->port_num;
 	u64 addr;
-	u32 rkey, offset;
+	u32 rkey, offset, max_sge;
 	int ret;
 
 	if (dir == DMA_FROM_DEVICE) {
 		addr = cmd->write_va;
 		rkey = cmd->write_stag;
 		offset = cmd->iscsi_cmd->write_data_done;
+		max_sge = dev->attrs.max_sge_rd;
 	} else {
 		addr = cmd->read_va;
 		rkey = cmd->read_stag;
 		offset = 0;
+		max_sge = dev->attrs.max_sge;
 	}
 
 	if (isert_prot_cmd(conn, se_cmd)) {
@@ -2107,7 +2110,7 @@ isert_rdma_rw_ctx_post(struct isert_cmd *cmd, struct isert_conn *conn,
 	} else {
 		ret = rdma_rw_ctx_init(&cmd->rw, conn->qp, port_num,
 				se_cmd->t_data_sg, se_cmd->t_data_nents,
-				offset, addr, rkey, dir);
+				offset, addr, rkey, dir, max_sge);
 	}
 	if (ret < 0) {
 		isert_err("Cmd: %p failed to prepare RDMA res\n", cmd);

@@ -803,7 +803,9 @@ static int srpt_alloc_rw_ctxs(struct srpt_send_ioctx *ioctx,
 {
 	enum dma_data_direction dir = target_reverse_dma_direction(&ioctx->cmd);
 	struct srpt_rdma_ch *ch = ioctx->ch;
+	struct ib_device *dev = ch->qp->pd->device;
 	struct scatterlist *prev = NULL;
+	u32 max_sge;
 	unsigned prev_nents;
 	int ret, i;
 
@@ -815,6 +817,9 @@ static int srpt_alloc_rw_ctxs(struct srpt_send_ioctx *ioctx,
 		if (!ioctx->rw_ctxs)
 			return -ENOMEM;
 	}
+
+	max_sge = dir == DMA_TO_DEVICE ? dev->attrs.max_sge :
+		dev->attrs.max_sge_rd;
 
 	for (i = ioctx->n_rw_ctx; i < nbufs; i++, db++) {
 		struct srpt_rw_ctx *ctx = &ioctx->rw_ctxs[i];
@@ -828,7 +833,8 @@ static int srpt_alloc_rw_ctxs(struct srpt_send_ioctx *ioctx,
 			goto unwind;
 
 		ret = rdma_rw_ctx_init(&ctx->rw, ch->qp, ch->sport->port,
-				ctx->sg, ctx->nents, 0, remote_addr, rkey, dir);
+				ctx->sg, ctx->nents, 0, remote_addr, rkey, dir,
+				max_sge);
 		if (ret < 0) {
 			target_free_sgl(ctx->sg, ctx->nents);
 			goto unwind;
