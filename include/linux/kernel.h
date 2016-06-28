@@ -623,6 +623,31 @@ do {							\
 		trace_puts(fmt);			\
 } while (0)
 
+/**
+ * trace_printk_ptr - unoptimized version of trace_printk
+ * @fmt: the printf format for printing
+ *
+ * This is the same as trace_printk() above, but it does no optimization.
+ * It passes the @fmt and arguments as is to the __trace_printk() that
+ * will process the print at the time it is called, whereas __trace_printk(),
+ * will call the bprintk() version that will simply copy the format as
+ * is, along with arguments into the trace buffer, and it will created the
+ * printf() string and do the conversions on print.
+ *
+ * Use this function if any of the parameters are being derefenced.
+ * For example, ("mask=%pb\m", cpumask). It is possible that the cpumask
+ * may be freed between the time trace_printk() is called, and the time
+ * the ring buffer is read, and this can cause the function to fault.
+ * trace_printk_ptr() will do the processing to copy the cpumask into
+ * a string format that can be read any time later, regardless of the
+ * status of the cpumask variable.
+ */
+
+#define trace_printk_ptr(fmt, ...)			\
+do {							\
+	__trace_printk(_THIS_IP_, fmt, ##__VA_ARGS__);	\
+} while (0)
+
 #define do_trace_printk(fmt, args...)					\
 do {									\
 	static const char *trace_printk_fmt __used			\
