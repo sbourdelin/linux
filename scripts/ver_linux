@@ -56,9 +56,7 @@ BEGIN {
 	printversion("Net-tools", version("ifconfig --version 2>&1"))
 	printversion("Kbd", version("loadkeys -V 2>&1"))
 	printversion("Console-tools", version("loadkeys -V 2>&1"))
-
-oprofiled --version 2>&1 | awk \
-'(NR==1 && ($2 == "oprofile")) {print "oprofile              ", $3}'
+	printversion("Oprofile", version("oprofiled --version 2>&1"))
 
 expr --v 2>&1 |
 awk '/^expr/{
