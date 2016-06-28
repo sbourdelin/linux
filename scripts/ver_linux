@@ -30,12 +30,16 @@ BEGIN {
 	printversion("Isdn4k-utils", version("isdnctrl 2>&1"))
 	printversion("Nfs-utils", version("showmount --version 2>&1"))
 
-test -r /proc/self/maps &&
-sed '
-	/.*libc-\(.*\)\.so$/!d
-	s//Linux C Library\t\t\1/
-	q
-' /proc/self/maps
+	if (system("test -r /proc/self/maps") == 0) {
+		while (getline <"/proc/self/maps" > 0) {
+			n = split($0, procmaps, "/")
+			if (/libc.*so$/ && match(procmaps[n], /[0-9]+([.]?[0-9]+)+/)) {
+				ver = substr(procmaps[n], RSTART, RLENGTH)
+				printversion("Linux C Library", ver)
+				break
+			}
+		}
+	}
 
 ldd --version 2>&1 |
 awk '/^ldd/{
