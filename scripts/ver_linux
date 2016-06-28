@@ -52,12 +52,7 @@ BEGIN {
 	if (system("test -r " libcpp) == 0)
 		printversion("Linux C++ Library", version("readlink " libcpp))
 
-ps --version 2>&1 |
-awk '/version/{
-	match($0, /[0-9]+([.]?[0-9]+)+/)
-	printf("Procps\t\t\t%s\n",
-	substr($0,RSTART,RLENGTH))
-}'
+	printversion("Procps", version("ps --version 2>&1"))
 
 ifconfig --version 2>&1 |
 awk '/tools/{
