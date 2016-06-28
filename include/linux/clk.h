@@ -20,8 +20,6 @@ struct device;
 
 struct clk;
 
-#ifdef CONFIG_COMMON_CLK
-
 /**
  * DOC: clk notifier callback types
  *
@@ -60,6 +58,8 @@ struct clk_notifier {
 	struct srcu_notifier_head	notifier_head;
 	struct list_head		node;
 };
+
+#ifdef CONFIG_COMMON_CLK
 
 /**
  * struct clk_notifier_data - rate data to pass to the notifier callback
@@ -139,6 +139,18 @@ int clk_get_phase(struct clk *clk);
 bool clk_is_match(const struct clk *p, const struct clk *q);
 
 #else
+
+static inline int clk_notifier_register(struct clk *clk,
+					struct notifier_block *nb)
+{
+	return -ENOTSUPP;
+}
+
+static inline int clk_notifier_unregister(struct clk *clk,
+					  struct notifier_block *nb)
+{
+	return -ENOTSUPP;
+}
 
 static inline long clk_get_accuracy(struct clk *clk)
 {
