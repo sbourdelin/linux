@@ -18,13 +18,7 @@ BEGIN {
 	printversion("Util-linux", version("mount --version 2>&1"))
 	printversion("Mount", version("mount --version 2>&1"))
 	printversion("Module-init-tools", version("depmod -V  2>&1"))
-
-tune2fs 2>&1 |
-awk '/^tune2fs/{
-	match($0, /[0-9]+([.]?[0-9]+)+/)
-	printf("E2fsprogs\t\t%s\n",
-	substr($0,RSTART,RLENGTH))
-}'
+	printversion("E2fsprogs", version("tune2fs 2>&1"))
 
 fsck.jfs -V 2>&1 |
 awk '/version/{
