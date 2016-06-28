@@ -403,6 +403,10 @@ struct opal_msg {
 	__be64 params[8];
 };
 
+#define GET_OPAL_MSG_ASYNC_COMP_RC(msg)	(msg.msg_type == OPAL_MSG_ASYNC_COMP ? \
+					be64_to_cpu(msg.params[1]) : \
+					OPAL_PARAMETER)
+
 /* System parameter permission */
 enum OpalSysparamPerm {
 	OPAL_SYSPARAM_READ  = 0x1,

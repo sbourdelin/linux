@@ -134,7 +134,7 @@ static int opal_get_tpo_time(struct device *dev, struct rtc_wkalrm *alarm)
 		goto exit;
 	}
 
-	rc = be64_to_cpu(msg.params[1]);
+	rc = GET_OPAL_MSG_ASYNC_COMP_RC(msg);
 	if (rc != OPAL_SUCCESS) {
 		rc = -EIO;
 		goto exit;
@@ -181,7 +181,7 @@ static int opal_set_tpo_time(struct device *dev, struct rtc_wkalrm *alarm)
 		goto exit;
 	}
 
-	rc = be64_to_cpu(msg.params[1]);
+	rc = GET_OPAL_MSG_ASYNC_COMP_RC(msg);
 	if (rc != OPAL_SUCCESS)
 		rc = -EIO;
 
