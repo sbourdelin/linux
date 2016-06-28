@@ -26,13 +26,7 @@ BEGIN {
 	printversion("Pcmciautils", version("pccardctl -V 2>&1"))
 	printversion("Pcmcia-cs", version("cardmgr -V 2>&1"))
 	printversion("Quota-tools", version("quota -V 2>&1"))
-
-pppd --version 2>&1 |
-awk '/version/{
-	match($0, /[0-9]+([.]?[0-9]+)+/)
-	printf("PPP\t\t\t%s\n",
-	substr($0,RSTART,RLENGTH))
-}'
+	printversion("PPP", version("pppd --version 2>&1"))
 
 isdnctrl 2>&1 | grep version | awk \
 'NR==1{print "isdn4k-utils          ", $NF}'
