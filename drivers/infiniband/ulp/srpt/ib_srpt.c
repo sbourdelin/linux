@@ -803,7 +803,6 @@ static int srpt_alloc_rw_ctxs(struct srpt_send_ioctx *ioctx,
 {
 	enum dma_data_direction dir = target_reverse_dma_direction(&ioctx->cmd);
 	struct srpt_rdma_ch *ch = ioctx->ch;
-	struct ib_device *dev = ch->qp->pd->device;
 	struct scatterlist *prev = NULL;
 	u32 max_sge;
 	unsigned prev_nents;
@@ -818,8 +817,7 @@ static int srpt_alloc_rw_ctxs(struct srpt_send_ioctx *ioctx,
 			return -ENOMEM;
 	}
 
-	max_sge = dir == DMA_TO_DEVICE ? dev->attrs.max_sge :
-		dev->attrs.max_sge_rd;
+	max_sge = dir == DMA_TO_DEVICE ? ch->max_send_sge : ch->max_recv_sge;
 
 	for (i = ioctx->n_rw_ctx; i < nbufs; i++, db++) {
 		struct srpt_rw_ctx *ctx = &ioctx->rw_ctxs[i];
@@ -1607,6 +1605,7 @@ static int srpt_create_ch_ib(struct srpt_rdma_ch *ch)
 	struct ib_qp_init_attr *qp_init;
 	struct srpt_port *sport = ch->sport;
 	struct srpt_device *sdev = sport->sdev;
+	const struct ib_device_attr *attrs = &sdev->device->attrs;
 	u32 srp_sq_size = sport->port_attrib.srp_sq_size;
 	int ret;
 
@@ -1644,7 +1643,7 @@ retry:
 	 */
 	qp_init->cap.max_send_wr = srp_sq_size / 2;
 	qp_init->cap.max_rdma_ctxs = srp_sq_size / 2;
-	qp_init->cap.max_send_sge = SRPT_DEF_SG_PER_WQE;
+	qp_init->cap.max_send_sge = min(attrs->max_sge, SRPT_MAX_SG_PER_WQE);
 	qp_init->port_num = ch->sport->port;
 
 	ch->qp = ib_create_qp(sdev->pd, qp_init);
@@ -1663,8 +1662,14 @@ retry:
 
 	atomic_set(&ch->sq_wr_avail, qp_init->cap.max_send_wr);
 
-	pr_debug("%s: max_cqe= %d max_sge= %d sq_size = %d cm_id= %p\n",
-		 __func__, ch->cq->cqe, qp_init->cap.max_send_sge,
+	/*
+	 * qp_init->cap.max_recv_sge is not relevant for SRQ so use
+	 * max_send_sge instead for SRQ.
+	 */
+	ch->max_send_sge = qp_init->cap.max_send_sge;
+	ch->max_recv_sge = qp_init->cap.max_send_sge;
+	pr_debug("%s: max_cqe= %d max_sge= %d w %d r sq_size = %d cm_id= %p\n",
+		 __func__, ch->cq->cqe, ch->max_send_sge, ch->max_recv_sge,
 		 qp_init->cap.max_send_wr, ch->cm_id);
 
 	ret = srpt_init_ch_qp(ch, ch->qp);

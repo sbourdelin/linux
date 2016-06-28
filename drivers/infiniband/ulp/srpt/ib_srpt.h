@@ -106,7 +106,7 @@ enum {
 	SRP_LOGIN_RSP_MULTICHAN_MAINTAINED = 0x2,
 
 	SRPT_DEF_SG_TABLESIZE = 128,
-	SRPT_DEF_SG_PER_WQE = 16,
+	SRPT_MAX_SG_PER_WQE = 16,
 
 	MIN_SRPT_SQ_SIZE = 16,
 	DEF_SRPT_SQ_SIZE = 4096,
@@ -235,6 +235,8 @@ enum rdma_ch_state {
  * @cq:            IB completion queue for this channel.
  * @rq_size:       IB receive queue size.
  * @rsp_size	   IB response message size in bytes.
+ * @max_send_sge:  Maximum SG elements per WR for send requests posted on @qp.
+ * @max_recv_sge:  Maximum SG elements per WR for recv requests posted on @qp.
  * @sq_wr_avail:   number of work requests available in the send queue.
  * @sport:         pointer to the information of the HCA port used by this
  *                 channel.
@@ -265,6 +267,8 @@ struct srpt_rdma_ch {
 	struct kref		kref;
 	int			rq_size;
 	u32			rsp_size;
+	int			max_send_sge;
+	int			max_recv_sge;
 	atomic_t		sq_wr_avail;
 	struct srpt_port	*sport;
 	u8			i_port_id[16];
