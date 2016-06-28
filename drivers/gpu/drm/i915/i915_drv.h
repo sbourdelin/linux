@@ -457,11 +457,13 @@ struct drm_i915_fence_reg {
 	struct list_head lru_list;
 	struct drm_i915_gem_object *obj;
 	int pin_count;
+	bool client_managed;
 };
 
 #define for_each_fence_reg(dev_priv, reg, index) \
 	for ((index) = 0, (reg) = &dev_priv->fence_regs[index]; \
-	     (index) < dev_priv->num_fence_regs; (index)++, (reg)++)
+	     (index) < dev_priv->num_fence_regs; (index)++, (reg)++) \
+		for_each_if (!reg->client_managed)
 
 struct sdvo_device_mapping {
 	u8 initialized;
