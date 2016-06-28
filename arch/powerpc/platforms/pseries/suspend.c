@@ -112,12 +112,12 @@ static int pseries_suspend_enter(suspend_state_t state)
 }
 
 /**
- * pseries_prepare_late - Prepare to suspend all other CPUs
+ * pseries_prepare_noirq - Prepare to suspend all other CPUs
  *
  * Return value:
  * 	0 on success / other on failure
  **/
-static int pseries_prepare_late(void)
+static int pseries_prepare_noirq(void)
 {
 	atomic_set(&suspending, 1);
 	atomic_set(&suspend_data.working, 0);
@@ -225,7 +225,7 @@ static struct bus_type suspend_subsys = {
 static const struct platform_suspend_ops pseries_suspend_ops = {
 	.valid		= suspend_valid_only_mem,
 	.begin		= pseries_suspend_begin,
-	.prepare_late	= pseries_prepare_late,
+	.prepare_noirq	= pseries_prepare_noirq,
 	.enter		= pseries_suspend_enter,
 };
 

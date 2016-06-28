@@ -185,14 +185,14 @@ static int platform_suspend_prepare_late(suspend_state_t state)
 
 static int platform_suspend_prepare_noirq(suspend_state_t state)
 {
-	return state != PM_SUSPEND_FREEZE && suspend_ops->prepare_late ?
-		suspend_ops->prepare_late() : 0;
+	return state != PM_SUSPEND_FREEZE && suspend_ops->prepare_noirq ?
+		suspend_ops->prepare_noirq() : 0;
 }
 
 static void platform_resume_noirq(suspend_state_t state)
 {
-	if (state != PM_SUSPEND_FREEZE && suspend_ops->wake)
-		suspend_ops->wake();
+	if (state != PM_SUSPEND_FREEZE && suspend_ops->finish_noirq)
+		suspend_ops->finish_noirq();
 }
 
 static void platform_resume_early(suspend_state_t state)
