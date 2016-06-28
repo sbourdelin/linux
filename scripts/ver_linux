@@ -80,3 +80,10 @@ function version(cmd,    ver) {
 	close(cmd)
 	return ver
 }
+
+function printversion(name, value,  ofmt) {
+	if (value != "") {
+		ofmt = "%-20s\t%s\n"
+		printf(ofmt, name, value)
+	}
+}
