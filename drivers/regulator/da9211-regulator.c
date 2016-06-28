@@ -1,5 +1,6 @@
 /*
- * da9211-regulator.c - Regulator device driver for DA9211/DA9213/DA9215
+ * da9211-regulator.c - Regulator device driver for DA9211/DA9212
+ * /DA9213/DA9214/DA9215
  * Copyright (C) 2015  Dialog Semiconductor Ltd.
  *
  * This library is free software; you can redistribute it and/or
@@ -521,5 +522,5 @@ static struct i2c_driver da9211_regulator_driver = {
 module_i2c_driver(da9211_regulator_driver);
 
 MODULE_AUTHOR("James Ban <James.Ban.opensource@diasemi.com>");
-MODULE_DESCRIPTION("Regulator device driver for Dialog DA9211/DA9213/DA9215");
+MODULE_DESCRIPTION("DA9211/DA9212/DA9213/DA9214/DA9215 regulator driver");
 MODULE_LICENSE("GPL");
