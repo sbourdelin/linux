@@ -19,13 +19,7 @@ BEGIN {
 	printversion("Mount", version("mount --version 2>&1"))
 	printversion("Module-init-tools", version("depmod -V  2>&1"))
 	printversion("E2fsprogs", version("tune2fs 2>&1"))
-
-fsck.jfs -V 2>&1 |
-awk '/version/{
-	match($0, /[0-9]+([.]?[0-9]+)+/)
-	printf("Jfsutils\t\t%s\n",
-	substr($0,RSTART,RLENGTH))
-}'
+	printversion("Jfsutils", version("fsck.jfs -V 2>&1"))
 
 reiserfsck -V 2>&1 |
 awk '/^reiserfsck/{
