@@ -14,13 +14,7 @@ BEGIN {
 
 	printversion("GNU C", version("gcc -dumpversion 2>&1"))
 	printversion("GNU Make", version("make --version 2>&1"))
-
-ld -v 2>&1 |
-awk '/[0-9]+([.]?[0-9]+)+/ && !/not found$/{
-	match($0, /[0-9]+([.]?[0-9]+)+/)
-	printf("Binutils\t\t%s\n",
-	substr($0,RSTART,RLENGTH))
-}'
+	printversion("Binutils", version("ld -v 2>&1"))
 
 mount --version 2>&1 |
 awk '/[0-9]+([.]?[0-9]+)+/ && !/not found$/{
