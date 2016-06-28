@@ -61,6 +61,18 @@ static int otg_set_protocol(struct otg_fsm *fsm, int protocol)
 	return 0;
 }
 
+static void otg_stop_hnp_polling(struct otg_fsm *fsm)
+{
+	/*
+	 * The memory of host_req_flag should be allocated by
+	 * controller driver, otherwise, hnp polling is not started.
+	 */
+	if (!fsm->host_req_flag)
+		return;
+
+	cancel_delayed_work_sync(&fsm->hnp_polling_work);
+}
+
 /* Called when leaving a state.  Do state clean up jobs here */
 static void otg_leave_state(struct otg_fsm *fsm, enum usb_otg_state old_state)
 {
@@ -84,6 +96,7 @@ static void otg_leave_state(struct otg_fsm *fsm, enum usb_otg_state old_state)
 		fsm->b_ase0_brst_tmout = 0;
 		break;
 	case OTG_STATE_B_HOST:
+		otg_stop_hnp_polling(fsm);
 		break;
 	case OTG_STATE_A_IDLE:
 		fsm->adp_prb = 0;
@@ -97,6 +110,7 @@ static void otg_leave_state(struct otg_fsm *fsm, enum usb_otg_state old_state)
 		fsm->a_wait_bcon_tmout = 0;
 		break;
 	case OTG_STATE_A_HOST:
+		otg_stop_hnp_polling(fsm);
 		otg_del_timer(fsm, A_WAIT_ENUM);
 		break;
 	case OTG_STATE_A_SUSPEND:
