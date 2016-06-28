@@ -6433,7 +6433,7 @@ static __init int hardware_setup(void)
 	vmx_disable_intercept_msr_write_x2apic(0x83f);
 
 	if (enable_ept) {
-		kvm_mmu_set_mask_ptes(0ull,
+		kvm_mmu_set_mask_ptes(PT_PRESENT_MASK,
 			(enable_ept_ad_bits) ? VMX_EPT_ACCESS_BIT : 0ull,
 			(enable_ept_ad_bits) ? VMX_EPT_DIRTY_BIT : 0ull,
 			0ull, VMX_EPT_EXECUTABLE_MASK);

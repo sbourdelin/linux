@@ -2516,13 +2516,17 @@ static int set_spte(struct kvm_vcpu *vcpu, u64 *sptep,
 		    gfn_t gfn, kvm_pfn_t pfn, bool speculative,
 		    bool can_unsync, bool host_writable)
 {
-	u64 spte;
+	u64 spte = 0;
 	int ret = 0;
+	struct kvm_mmu *context = &vcpu->arch.mmu;
+	bool execonly = !(context->guest_rsvd_check.bad_mt_xwr &
+			  (1ull << VMX_EPT_EXECUTABLE_MASK));
 
 	if (set_mmio_spte(vcpu, sptep, gfn, pfn, pte_access))
 		return 0;
 
-	spte = PT_PRESENT_MASK;
+	if (!execonly)
+		spte |= PT_PRESENT_MASK;
 	if (!speculative)
 		spte |= shadow_accessed_mask;
 
@@ -2531,6 +2535,7 @@ static int set_spte(struct kvm_vcpu *vcpu, u64 *sptep,
 	else
 		spte |= shadow_nx_mask;
 
+	/* In the EPT case, shadow_user_mask is PT_PRESENT_MASK */
 	if (pte_access & ACC_USER_MASK)
 		spte |= shadow_user_mask;
 
