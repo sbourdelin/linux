@@ -525,20 +525,6 @@ void __init rockchip_clk_register_armclk(struct rockchip_clk_provider *ctx,
 	rockchip_clk_add_lookup(ctx, clk, lookup_id);
 }
 
-void __init rockchip_clk_protect_critical(const char *const clocks[],
-					  int nclocks)
-{
-	int i;
-
-	/* Protect the clocks that needs to stay on */
-	for (i = 0; i < nclocks; i++) {
-		struct clk *clk = __clk_lookup(clocks[i]);
-
-		if (clk)
-			clk_prepare_enable(clk);
-	}
-}
-
 static void __iomem *rst_base;
 static unsigned int reg_restart;
 static void (*cb_restart)(void);
