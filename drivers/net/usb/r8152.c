@@ -622,6 +622,7 @@ struct r8152 {
 		void (*aldps_enable)(struct r8152 *tp, bool enable);
 		void (*u1u2_enable)(struct r8152 *tp, bool enable);
 		void (*hw_phy_cfg)(struct r8152 *);
+		void (*power_cut_en)(struct r8152 *tp, bool enable);
 	} rtl_ops;
 
 	int intr_interval;
@@ -2391,6 +2392,13 @@ static void r8153_power_cut_en(struct r8152 *tp, bool enable)
 	else
 		ocp_data &= ~(PWR_EN | PHASE2_EN);
 	ocp_write_word(tp, MCU_TYPE_USB, USB_POWER_CUT, ocp_data);
+}
+
+static void r8153A_power_cut_en(struct r8152 *tp, bool enable)
+{
+	u32 ocp_data;
+
+	r8153_power_cut_en(tp, enable);
 
 	ocp_data = ocp_read_word(tp, MCU_TYPE_USB, USB_MISC_0);
 	ocp_data &= ~PCUT_STATUS;
@@ -2941,7 +2949,7 @@ static void rtl8153_down(struct r8152 *tp)
 
 	tp->rtl_ops.u1u2_enable(tp, false);
 	r8153_u2p3en(tp, false);
-	r8153_power_cut_en(tp, false);
+	tp->rtl_ops.power_cut_en(tp, false);
 	tp->rtl_ops.aldps_enable(tp, false);
 	r8153_enter_oob(tp);
 	tp->rtl_ops.aldps_enable(tp, true);
@@ -3397,7 +3405,7 @@ static void r8153_init(struct r8152 *tp)
 
 	ocp_write_word(tp, MCU_TYPE_USB, USB_CONNECT_TIMER, 0x0001);
 
-	r8153_power_cut_en(tp, false);
+	r8153A_power_cut_en(tp, false);
 	r8153_u1u2en(tp, true);
 
 	ocp_write_word(tp, MCU_TYPE_PLA, PLA_MAC_PWR_CTRL, ALDPS_SPDWN_RATIO);
@@ -4122,7 +4130,7 @@ static void rtl8153_unload(struct r8152 *tp)
 	if (test_bit(RTL8152_UNPLUG, &tp->flags))
 		return;
 
-	r8153_power_cut_en(tp, false);
+	tp->rtl_ops.power_cut_en(tp, false);
 }
 
 static int rtl_ops_init(struct r8152 *tp)
@@ -4145,6 +4153,7 @@ static int rtl_ops_init(struct r8152 *tp)
 		ops->aldps_enable	= r8152_aldps_en;
 		ops->u1u2_enable	= r8153_u1u2en;
 		ops->hw_phy_cfg		= r8152b_hw_phy_cfg;
+		ops->power_cut_en	= r8152_power_cut_en;
 		break;
 
 	case RTL_VER_03:
@@ -4163,6 +4172,7 @@ static int rtl_ops_init(struct r8152 *tp)
 		ops->aldps_enable	= r8153_aldps_en;
 		ops->u1u2_enable	= r8153_u1u2en;
 		ops->hw_phy_cfg		= r8153_hw_phy_cfg;
+		ops->power_cut_en	= r8153A_power_cut_en;
 		break;
 
 	default:
