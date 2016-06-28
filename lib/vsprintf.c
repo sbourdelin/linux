@@ -388,7 +388,8 @@ enum format_type {
 struct printf_spec {
 	unsigned int	type:8;		/* format_type enum */
 	signed int	field_width:24;	/* width of output field */
-	unsigned int	flags:8;	/* flags to number() */
+	unsigned int	flags:7;	/* flags to number() */
+	unsigned int	cpumask:1;	/* pointer to cpumask flag */
 	unsigned int	base:8;		/* number base, 8, 10 or 16 only */
 	signed int	precision:16;	/* # of digits/chars */
 } __packed;
@@ -1864,6 +1865,7 @@ qualifier:
 
 	case 'p':
 		spec->type = FORMAT_TYPE_PTR;
+		spec->cpumask = fmt[1] == 'b';
 		return ++fmt - start;
 
 	case '%':
@@ -2338,7 +2340,23 @@ do {									\
 		}
 
 		case FORMAT_TYPE_PTR:
-			save_arg(void *);
+			if (spec.cpumask) {
+				/*
+				 * Store entire cpumask directly to buffer
+				 * instead of storing just a pointer.
+				 */
+				struct cpumask *mask = va_arg(args, void *);
+
+				str = PTR_ALIGN(str, sizeof(u32));
+
+				if (str + sizeof(*mask) <= end)
+					cpumask_copy((struct cpumask *) str, mask);
+
+				str += sizeof(*mask);
+			} else {
+				save_arg(void *);
+			}
+
 			/* skip all alphanumeric pointer suffixes */
 			while (isalnum(*fmt))
 				fmt++;
@@ -2490,12 +2508,25 @@ int bstr_printf(char *buf, size_t size, const char *fmt, const u32 *bin_buf)
 			break;
 		}
 
-		case FORMAT_TYPE_PTR:
-			str = pointer(fmt, str, end, get_arg(void *), spec);
+		case FORMAT_TYPE_PTR: {
+			void *ptr;
+
+			if (spec.cpumask) {
+				/*
+				 * Load cpumask directly from buffer.
+				 */
+				args  = PTR_ALIGN(args, sizeof(u32));
+				ptr   = (void *) args;
+				args += sizeof(struct cpumask);
+			} else {
+				ptr = get_arg(void *);
+			}
+
+			str = pointer(fmt, str, end, ptr, spec);
 			while (isalnum(*fmt))
 				fmt++;
 			break;
-
+		}
 		case FORMAT_TYPE_PERCENT_CHAR:
 			if (str < end)
 				*str = '%';
