@@ -1562,6 +1562,8 @@ static int __init tegra_pmc_early_init(void)
 			value &= ~PMC_CNTRL_INTR_POLARITY;
 
 		tegra_pmc_writel(value, PMC_CNTRL);
+
+		of_node_put(np);
 	}
 
 	return 0;
