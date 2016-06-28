@@ -115,14 +115,24 @@ static inline void dpm_save_failed_step(enum suspend_stat_step step)
  *	This callback is optional.  However, if it is implemented, the argument
  *	passed to @enter() is redundant and should be ignored.
  *
- * @prepare: Prepare the platform for entering the system sleep state indicated
- *	by @begin().
+ * @prepare: Early preparing the platform for entering the system sleep state
+ *	indicated by @begin().
  *	@prepare() is called right after devices have been suspended (ie. the
  *	appropriate .suspend() method has been executed for each device) and
  *	before device drivers' late suspend callbacks are executed.  It returns
  *	0 on success or a negative error code otherwise, in which case the
- *	system cannot enter the desired sleep state (@prepare_noirq(), @enter(),
- *	and @finish_noirq() will not be called in that case).
+ *	system cannot enter the desired sleep state (@prepare_late,
+ *	@prepare_noirq(), @enter(), and @finish_noirq() will not be called in
+ *	that case).
+ *
+ * @prepare_late: Late preparing the platform for entering the system sleep
+ *	state indicated by @begin().
+ *	@prepare_late() is called right after device drivers' late suspend
+ *	callbacks have been executed and before device drivers' noirq suspend
+ *	callbacks are executed.  It returns 0 on success or a negative error
+ *	code otherwise, in which case the system cannot enter the desired sleep
+ *	state (@prepare_noirq(), @enter(), and @finish_noirq() will not be
+ *	called in that case).
  *
  * @prepare_noirq: Finish preparing the platform for entering the system sleep
  *	state indicated by @begin().
@@ -145,13 +155,21 @@ static inline void dpm_save_failed_step(enum suspend_stat_step step)
  *	that implement @prepare_noirq().  If implemented, it is always called
  *	after @prepare_noirq and @enter(), even if one of them fails.
  *
- * @finish: Finish wake-up of the platform.
+ * @finish_early: Early finishing wake-up of the platform.
+ *	@finish_early is called right prior to calling device drivers' resume
+ *	early callbacks.
+ *	This callback is optional, but should be implemented by the platforms
+ *	that implement @prepare_late().  If implemented, it is always called
+ *	after @enter() and @finish_noirq(), even if any of them fails.  It is
+ *	executed after a failing @prepare_late.
+ *
+ * @finish: Late finishing wake-up of the platform.
  *	@finish is called right prior to calling device drivers' regular suspend
  *	callbacks.
  *	This callback is optional, but should be implemented by the platforms
  *	that implement @prepare().  If implemented, it is always called after
- *	@enter() and @finish_noirq(), even if any of them fails.  It is executed
- *	after a failing @prepare.
+ *	@enter(), @finish_noirq() and @finish_early, even if any of them fails.
+ *	It is executed after a failing @prepare.
  *
  * @suspend_again: Returns whether the system should suspend again (true) or
  *	not (false). If the platform wants to poll sensors or execute some
@@ -177,9 +195,11 @@ struct platform_suspend_ops {
 	int (*valid)(suspend_state_t state);
 	int (*begin)(suspend_state_t state);
 	int (*prepare)(void);
+	int (*prepare_late)(void);
 	int (*prepare_noirq)(void);
 	int (*enter)(suspend_state_t state);
 	void (*finish_noirq)(void);
+	void (*finish_early)(void);
 	void (*finish)(void);
 	bool (*suspend_again)(void);
 	void (*end)(void);
