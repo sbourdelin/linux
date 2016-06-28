@@ -1,0 +1,21 @@
+Broadcom GMAC Ethernet Controller Device Tree Bindings
+-------------------------------------------------------------
+
+Required properties:
+ - compatible:	"brcm,bgmac-enet"
+ - reg:		Address and length of the GMAC registers,
+		Address and length of the GMAC IDM registers
+ - interrupts:	Interrupt number
+
+Optional properties:
+- mac-address:	mac address to be assigned to the device
+
+Examples:
+
+gmac0: enet@18022000 {
+	compatible = "brcm,bgmac-enet";
+	reg = <0x18022000 0x1000>,
+	      <0x18110000 0x1000>;
+	interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
+	status = "disabled";
+};
