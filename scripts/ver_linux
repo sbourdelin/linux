@@ -59,13 +59,7 @@ BEGIN {
 	printversion("Oprofile", version("oprofiled --version 2>&1"))
 	printversion("Sh-utils", version("expr --v 2>&1"))
 	printversion("Udev", version("udevadm --version 2>&1"))
-
-iwconfig --version 2>&1 |
-awk '/version/{
-	match($0, /[0-9]+([.]?[0-9]+)+/)
-	printf("Wireless-tools\t\t%s\n",
-	substr($0,RSTART,RLENGTH))
-}'
+	printversion("Wireless-tools", version("iwconfig --version 2>&1"))
 
 test -e /proc/modules &&
 sort /proc/modules |
