@@ -595,9 +595,10 @@ static int acpi_suspend_state_valid(suspend_state_t pm_state)
 static const struct platform_suspend_ops acpi_suspend_ops = {
 	.valid = acpi_suspend_state_valid,
 	.begin = acpi_suspend_begin,
-	.prepare_noirq = acpi_pm_prepare,
+	.prepare_late = __acpi_pm_prepare,
+	.prepare_noirq = acpi_pm_pre_suspend,
 	.enter = acpi_suspend_enter,
-	.finish_noirq = acpi_pm_finish,
+	.finish_early = acpi_pm_finish,
 	.end = acpi_pm_end,
 };
 
