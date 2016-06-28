@@ -57,13 +57,7 @@ BEGIN {
 	printversion("Kbd", version("loadkeys -V 2>&1"))
 	printversion("Console-tools", version("loadkeys -V 2>&1"))
 	printversion("Oprofile", version("oprofiled --version 2>&1"))
-
-expr --v 2>&1 |
-awk '/^expr/{
-	match($0, /[0-9]+([.]?[0-9]+)+/)
-	printf("Sh-utils\t\t%s\n",
-	substr($0,RSTART,RLENGTH))
-}'
+	printversion("Sh-utils", version("expr --v 2>&1"))
 
 udevadm --version 2>&1 |
 awk '/[0-9]+([.]?[0-9]+)+/ && !/not found$/{
