@@ -137,8 +137,6 @@ isert_create_qp(struct isert_conn *isert_conn,
 	attr.cap.max_recv_wr = ISERT_QP_MAX_RECV_DTOS + 1;
 	attr.cap.max_rdma_ctxs = ISCSI_DEF_XMIT_CMDS_MAX;
 	attr.cap.max_send_sge = device->ib_device->attrs.max_sge;
-	isert_conn->max_sge = min(device->ib_device->attrs.max_sge,
-				  device->ib_device->attrs.max_sge_rd);
 	attr.cap.max_recv_sge = 1;
 	attr.sq_sig_type = IB_SIGNAL_REQ_WR;
 	attr.qp_type = IB_QPT_RC;
@@ -150,6 +148,9 @@ isert_create_qp(struct isert_conn *isert_conn,
 		isert_err("rdma_create_qp failed for cma_id %d\n", ret);
 		return ERR_PTR(ret);
 	}
+
+	isert_conn->max_send_sge = attr.cap.max_send_sge;
+	isert_conn->max_recv_sge = attr.cap.max_recv_sge;
 
 	return cma_id->qp;
 }
@@ -2075,7 +2076,6 @@ static int
 isert_rdma_rw_ctx_post(struct isert_cmd *cmd, struct isert_conn *conn,
 		struct ib_cqe *cqe, struct ib_send_wr *chain_wr)
 {
-	struct ib_device *dev = conn->device->ib_device;
 	struct se_cmd *se_cmd = &cmd->iscsi_cmd->se_cmd;
 	enum dma_data_direction dir = target_reverse_dma_direction(se_cmd);
 	u8 port_num = conn->cm_id->port_num;
@@ -2087,12 +2087,12 @@ isert_rdma_rw_ctx_post(struct isert_cmd *cmd, struct isert_conn *conn,
 		addr = cmd->write_va;
 		rkey = cmd->write_stag;
 		offset = cmd->iscsi_cmd->write_data_done;
-		max_sge = dev->attrs.max_sge_rd;
+		max_sge = conn->max_recv_sge;
 	} else {
 		addr = cmd->read_va;
 		rkey = cmd->read_stag;
 		offset = 0;
-		max_sge = dev->attrs.max_sge;
+		max_sge = conn->max_send_sge;
 	}
 
 	if (isert_prot_cmd(conn, se_cmd)) {
