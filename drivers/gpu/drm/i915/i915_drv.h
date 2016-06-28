@@ -3472,6 +3472,8 @@ bool i915_gem_object_pin_fence(struct drm_i915_gem_object *obj);
 void i915_gem_object_unpin_fence(struct drm_i915_gem_object *obj);
 
 void i915_gem_restore_fences(struct drm_device *dev);
+struct drm_i915_fence_reg *
+i915_request_fence_reg(struct drm_device *dev);
 
 void i915_gem_detect_bit_6_swizzle(struct drm_device *dev);
 void i915_gem_object_do_bit_17_swizzle(struct drm_i915_gem_object *obj);

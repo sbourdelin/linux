@@ -308,8 +308,16 @@ i915_gem_object_put_fence(struct drm_i915_gem_object *obj)
 	return 0;
 }
 
-static struct drm_i915_fence_reg *
-i915_find_fence_reg(struct drm_device *dev)
+/**
+ * i915_request_fence_reg - find a free or unpinned fence register
+ * @dev: drm device
+ *
+ * Returns:
+ *
+ * pointer to fence register on success, error code in pointer on failure.
+ */
+struct drm_i915_fence_reg *
+i915_request_fence_reg(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct drm_i915_fence_reg *reg, *avail;
@@ -401,7 +409,7 @@ i915_gem_object_get_fence(struct drm_i915_gem_object *obj)
 		if (WARN_ON(!obj->map_and_fenceable))
 			return -EINVAL;
 
-		reg = i915_find_fence_reg(dev);
+		reg = i915_request_fence_reg(dev);
 		if (IS_ERR(reg))
 			return PTR_ERR(reg);
 	} else
