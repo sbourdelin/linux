@@ -21,9 +21,7 @@ BEGIN {
 	printversion("E2fsprogs", version("tune2fs 2>&1"))
 	printversion("Jfsutils", version("fsck.jfs -V 2>&1"))
 	printversion("Reiserfsprogs", version("reiserfsck -V 2>&1"))
-
-fsck.reiser4 -V 2>&1 | grep ^fsck.reiser4 | awk \
-'NR==1{print "reiser4progs          ", $2}'
+	printversion("Reiser4fsprogs", version("fsck.reiser4 -V 2>&1"))
 
 xfs_db -V 2>&1 |
 awk '/version/{
