@@ -34,20 +34,6 @@
 #define TPS65218_PASSWORD_REGS_UNLOCK   0x7D
 
 /**
- * tps65218_reg_read: Read a single tps65218 register.
- *
- * @tps: Device to read from.
- * @reg: Register to read.
- * @val: Contians the value
- */
-int tps65218_reg_read(struct tps65218 *tps, unsigned int reg,
-			unsigned int *val)
-{
-	return regmap_read(tps->regmap, reg, val);
-}
-EXPORT_SYMBOL_GPL(tps65218_reg_read);
-
-/**
  * tps65218_reg_write: Write a single tps65218 register.
  *
  * @tps65218: Device to write to.
@@ -93,7 +79,7 @@ static int tps65218_update_bits(struct tps65218 *tps, unsigned int reg,
 	int ret;
 	unsigned int data;
 
-	ret = tps65218_reg_read(tps, reg, &data);
+	ret = regmap_read(tps->regmap, reg, &data);
 	if (ret) {
 		dev_err(tps->dev, "Read from reg 0x%x failed\n", reg);
 		return ret;
