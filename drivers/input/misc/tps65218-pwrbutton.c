@@ -22,6 +22,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
+#include <linux/regmap.h>
 #include <linux/slab.h>
 
 struct tps65218_pwrbutton {
@@ -36,7 +37,7 @@ static irqreturn_t tps65218_pwr_irq(int irq, void *_pwr)
 	unsigned int reg;
 	int error;
 
-	error = tps65218_reg_read(pwr->tps, TPS65218_REG_STATUS, &reg);
+	error = regmap_read(pwr->tps->regmap, TPS65218_REG_STATUS, &reg);
 	if (error) {
 		dev_err(pwr->dev, "can't read register: %d\n", error);
 		goto out;
