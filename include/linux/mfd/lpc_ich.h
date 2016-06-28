@@ -43,4 +43,11 @@ struct lpc_ich_info {
 	u8 use_gpio;
 };
 
+#if defined(CONFIG_X86_INTEL_APL)
+int lpc_ich_misc(struct pci_dev *dev);
+#else
+static inline int lpc_ich_misc(struct pci_dev *dev)
+{ return -ENODEV; }
+#endif
+
 #endif

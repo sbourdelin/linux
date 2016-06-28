@@ -498,6 +498,15 @@ config X86_GOLDFISH
 	 for Android development. Unless you are building for the Android
 	 Goldfish emulator say N here.
 
+config X86_INTEL_APL
+	bool "Non-ACPI support for Intel Apollo Lake platforms"
+	select PINCTRL
+	---help---
+	  Select this option to enable MMIO BAR access over the P2SB for
+	  non-ACPI Intel Apollo Lake SoC platforms. This driver uses the P2SB
+	  hide/unhide mechanism cooperatively to pass the PCI BAR address to
+	  the platform driver, currently GPIO.
+
 config X86_INTEL_CE
 	bool "CE4100 TV platform"
 	depends on PCI
