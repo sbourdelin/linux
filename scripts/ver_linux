@@ -27,9 +27,7 @@ BEGIN {
 	printversion("Pcmcia-cs", version("cardmgr -V 2>&1"))
 	printversion("Quota-tools", version("quota -V 2>&1"))
 	printversion("PPP", version("pppd --version 2>&1"))
-
-isdnctrl 2>&1 | grep version | awk \
-'NR==1{print "isdn4k-utils          ", $NF}'
+	printversion("Isdn4k-utils", version("isdnctrl 2>&1"))
 
 showmount --version 2>&1 | grep nfs-utils | awk \
 'NR==1{print "nfs-utils             ", $NF}'
