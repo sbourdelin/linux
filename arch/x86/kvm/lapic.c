@@ -1454,11 +1454,18 @@ static void start_apic_timer(struct kvm_lapic *apic)
 		/* lapic timer in tsc deadline mode */
 		u64 tscdeadline = apic->lapic_timer.tscdeadline;
 
-		if (kvm_x86_ops->set_hv_timer &&
-		    !kvm_x86_ops->set_hv_timer(apic->vcpu, tscdeadline)) {
-			apic->lapic_timer.hv_timer_in_use = true;
-			trace_kvm_hv_timer_state(apic->vcpu->vcpu_id,
+		if (kvm_x86_ops->set_hv_timer) {
+			if (kvm_x86_ops->set_hv_timer(apic->vcpu, tscdeadline)) {
+				if (apic->lapic_timer.hv_timer_in_use) {
+					kvm_x86_ops->cancel_hv_timer(apic->vcpu);
+					apic->lapic_timer.hv_timer_in_use = false;
+				}
+				start_sw_tscdeadline(apic);
+			} else {
+				apic->lapic_timer.hv_timer_in_use = true;
+				trace_kvm_hv_timer_state(apic->vcpu->vcpu_id,
 					apic->lapic_timer.hv_timer_in_use);
+			}
 		} else
 			start_sw_tscdeadline(apic);
 	}
