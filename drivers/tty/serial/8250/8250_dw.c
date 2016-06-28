@@ -301,8 +301,11 @@ static void dw8250_quirks(struct uart_port *p, struct dw8250_data *data)
 		p->iotype = UPIO_MEM32;
 		p->regshift = 2;
 		p->serial_in = dw8250_serial_in32;
-		/* So far none of there implement the Busy Functionality */
-		data->uart_16550_compatible = true;
+		p->serial_out = dw8250_serial_out32;
+
+		/* Hisilicon 8250 dw uart is not 16550 compatible */
+		if (!acpi_dev_found("HISI0031"))
+			data->uart_16550_compatible = true;
 	}
 
 	/* Platforms with iDMA */
@@ -618,6 +621,7 @@ static const struct acpi_device_id dw8250_acpi_match[] = {
 	{ "APMC0D08", 0},
 	{ "AMD0020", 0 },
 	{ "AMDI0020", 0 },
+	{ "HISI0031", 0 },
 	{ },
 };
 MODULE_DEVICE_TABLE(acpi, dw8250_acpi_match);
