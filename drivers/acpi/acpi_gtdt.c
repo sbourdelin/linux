@@ -16,6 +16,8 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 
+#include <clocksource/arm_arch_timer.h>
+
 #undef pr_fmt
 #define pr_fmt(fmt) "GTDT: " fmt
 
@@ -82,4 +84,72 @@ static int __init acpi_gtdt_desc_init(struct acpi_table_header *table)
 	}
 
 	return gtdt->platform_timer_count;
+}
+
+static int __init map_generic_timer_interrupt(u32 interrupt, u32 flags)
+{
+	int trigger, polarity;
+
+	if (!interrupt)
+		return 0;
+
+	trigger = (flags & ACPI_GTDT_INTERRUPT_MODE) ? ACPI_EDGE_SENSITIVE
+			: ACPI_LEVEL_SENSITIVE;
+
+	polarity = (flags & ACPI_GTDT_INTERRUPT_POLARITY) ? ACPI_ACTIVE_LOW
+			: ACPI_ACTIVE_HIGH;
+
+	return acpi_register_gsi(NULL, interrupt, trigger, polarity);
+}
+
+/*
+ * Map the PPIs of per-cpu arch_timer.
+ * @type: the type of PPI
+ * Returns 0 if error.
+ */
+int __init acpi_gtdt_map_ppi(int type)
+{
+	struct acpi_table_gtdt *gtdt = acpi_gtdt_desc.gtdt;
+
+	switch (type) {
+	case PHYS_SECURE_PPI:
+		return map_generic_timer_interrupt(gtdt->secure_el1_interrupt,
+						   gtdt->secure_el1_flags);
+	case PHYS_NONSECURE_PPI:
+		return map_generic_timer_interrupt(gtdt->non_secure_el1_interrupt,
+						   gtdt->non_secure_el1_flags);
+	case VIRT_PPI:
+		return map_generic_timer_interrupt(gtdt->virtual_timer_interrupt,
+						   gtdt->virtual_timer_flags);
+
+	case HYP_PPI:
+		return map_generic_timer_interrupt(gtdt->non_secure_el2_interrupt,
+						   gtdt->non_secure_el2_flags);
+	default:
+		pr_err("ppi type error.\n");
+	}
+
+	return 0;
+}
+
+/*
+ * acpi_gtdt_c3stop - got c3stop info from GTDT
+ *
+ * Returns 1 if the timer is powered in deep idle state, 0 otherwise.
+ */
+int __init acpi_gtdt_c3stop(void)
+{
+	struct acpi_table_gtdt *gtdt = acpi_gtdt_desc.gtdt;
+
+	return !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
+}
+
+int __init gtdt_arch_timer_init(struct acpi_table_header *table)
+{
+	if (table)
+		return acpi_gtdt_desc_init(table);
+
+	pr_err("table pointer error.\n");
+
+	return -EINVAL;
 }
