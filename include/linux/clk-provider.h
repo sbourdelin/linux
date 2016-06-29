@@ -72,9 +72,33 @@ struct clk_rate_request {
  *		do any initialisation that may sleep. Called with
  *		prepare_lock held.
  *
+ * @prepare_hw:	Prepare the clock hw for enabling. This callback is intended
+ *		to do the hw part initialization of prepare work. It should
+ *		cooperate with @prepare_done callback to do the whole prepare
+ *		work. The clock core will check @prepare_done in sleep or
+ *		polling way according to system state to decide whether the
+ *		whole prepare work is done. Optional if @prepare is used.
+ *		This function must not sleep.
+ *
+ * @prepare_done: Queries the hardware to determine if the clock hw is prepared.
+ *		Optional, if this op is not set then the prepare simply return.
+ *		This function must not sleep.
+ *
  * @unprepare:	Release the clock from its prepared state. This will typically
  *		undo any work done in the @prepare callback. Called with
  *		prepare_lock held.
+ *
+ * @unprepare_hw: Release the clock from its prepared hw state. This will
+ *		typically undo any work done in the @prepare_hw callback.
+ *		It should cooperate with @unprepare_done callback to
+ *		do the whole unprepare work. The clock core will check
+ *		@unprepare_done in either sleep or polling way according to
+ *		system state to decide whether the whole unprepare work is done.
+ *		Optional if @prepare is used. This function must not sleep.
+ *
+ * @unprepare_done: Queries the hardware to determine if the clock hw
+ *		is unprepared. Optional, if this op is not set then the
+ *		unprepare simply return. This function must not sleep.
  *
  * @is_prepared: Queries the hardware to determine if the clock is prepared.
  *		This function is allowed to sleep. Optional, if this op is not
@@ -189,7 +213,11 @@ struct clk_rate_request {
  */
 struct clk_ops {
 	int		(*prepare)(struct clk_hw *hw);
+	int		(*prepare_hw)(struct clk_hw *hw);
+	int		(*prepare_done)(struct clk_hw *hw);
 	void		(*unprepare)(struct clk_hw *hw);
+	void		(*unprepare_hw)(struct clk_hw *hw);
+	int		(*unprepare_done)(struct clk_hw *hw);
 	int		(*is_prepared)(struct clk_hw *hw);
 	void		(*unprepare_unused)(struct clk_hw *hw);
 	int		(*enable)(struct clk_hw *hw);
@@ -226,6 +254,8 @@ struct clk_ops {
  * @parent_names: array of string names for all possible parents
  * @num_parents: number of possible parents
  * @flags: framework-level hints and quirks
+ * @delay_min: min delays in us for clock hw prepare
+ * @delay_max: max delays in us for clock hw prepare
  */
 struct clk_init_data {
 	const char		*name;
@@ -233,6 +263,8 @@ struct clk_init_data {
 	const char		* const *parent_names;
 	u8			num_parents;
 	unsigned long		flags;
+	unsigned int		delay_min;
+	unsigned int		delay_max;
 };
 
 /**

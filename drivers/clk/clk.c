@@ -12,6 +12,7 @@
 #include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/clk/clk-conf.h>
+#include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
@@ -60,6 +61,8 @@ struct clk_core {
 	bool			orphan;
 	unsigned int		enable_count;
 	unsigned int		prepare_count;
+	unsigned long		delay_min;
+	unsigned long		delay_max;
 	unsigned long		min_rate;
 	unsigned long		max_rate;
 	unsigned long		accuracy;
@@ -566,6 +569,8 @@ EXPORT_SYMBOL_GPL(__clk_mux_determine_rate_closest);
 
 static void clk_core_unprepare(struct clk_core *core)
 {
+	unsigned long timeout;
+
 	lockdep_assert_held(&prepare_lock);
 
 	if (!core)
@@ -584,8 +589,30 @@ static void clk_core_unprepare(struct clk_core *core)
 
 	trace_clk_unprepare(core);
 
-	if (core->ops->unprepare)
+	if (core->ops->unprepare) {
 		core->ops->unprepare(core->hw);
+	} else if (core->ops->unprepare_hw) {
+		core->ops->unprepare_hw(core->hw);
+		if (core->ops->unprepare_done) {
+			timeout = jiffies + msecs_to_jiffies(10);
+			while (!core->ops->unprepare_done(core->hw)) {
+				if (time_after(jiffies, timeout)) {
+					pr_err("%s: clock %s unprepare timeout\n",
+						__func__, core->name);
+					break;
+				}
+				if (system_state == SYSTEM_BOOTING)
+					/*
+					 * Busy loop as we can't schedule in
+					 * early boot
+					 */
+					continue;
+				else
+					usleep_range(core->delay_min,
+						     core->delay_max);
+			}
+		}
+	}
 
 	trace_clk_unprepare_complete(core);
 	clk_core_unprepare(core->parent);
@@ -615,6 +642,7 @@ EXPORT_SYMBOL_GPL(clk_unprepare);
 
 static int clk_core_prepare(struct clk_core *core)
 {
+	unsigned long timeout;
 	int ret = 0;
 
 	lockdep_assert_held(&prepare_lock);
@@ -629,8 +657,31 @@ static int clk_core_prepare(struct clk_core *core)
 
 		trace_clk_prepare(core);
 
-		if (core->ops->prepare)
+		if (core->ops->prepare) {
 			ret = core->ops->prepare(core->hw);
+		} else if (core->ops->prepare_hw) {
+			ret = core->ops->prepare_hw(core->hw);
+			if (!ret && core->ops->prepare_done) {
+				timeout = jiffies + msecs_to_jiffies(10);
+				while (!core->ops->prepare_done(core->hw)) {
+					if (time_after(jiffies, timeout)) {
+						pr_err("%s: clock %s prepare timeout\n",
+							__func__, core->name);
+						ret = -ETIMEDOUT;
+						break;
+					}
+					if (system_state == SYSTEM_BOOTING)
+						/*
+						 * Busy loop as we can't
+						 * schedule in early boot
+						 */
+						continue;
+					else
+						usleep_range(core->delay_min,
+							     core->delay_max);
+				}
+			}
+		}
 
 		trace_clk_prepare_complete(core);
 
@@ -2487,6 +2538,8 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
 	core->hw = hw;
 	core->flags = hw->init->flags;
 	core->num_parents = hw->init->num_parents;
+	core->delay_min = hw->init->delay_min;
+	core->delay_max = hw->init->delay_max;
 	core->min_rate = 0;
 	core->max_rate = ULONG_MAX;
 	hw->core = core;
