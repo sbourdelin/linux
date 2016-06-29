@@ -110,6 +110,27 @@ device-2 {
         };
 };
 
+port / endpoint type
+--------------------
+
+Each port can have its type if needed.
+For example HDMI case, it has video port and sound port.
+Below example indicates that port@0 is HDMI-video port,
+and port@1 is HDMI-sound port.
+
+HDMI {
+	port@0 {
+		type = "video";
+		endpoint {
+		};
+	};
+	port@1 {
+		type = "sound";
+		endpoint {
+		};
+	};
+};
+
 
 Required properties
 -------------------
