@@ -1345,10 +1345,18 @@ EXPORT_SYMBOL_GPL(nau8825_enable_jack_detect);
 
 static bool nau8825_is_jack_inserted(struct regmap *regmap)
 {
-	int status;
+	int status, jkdet, res;
 
 	regmap_read(regmap, NAU8825_REG_I2C_DEVICE_ID, &status);
-	return !(status & NAU8825_GPIO2JD1);
+	regmap_read(regmap, NAU8825_REG_JACK_DET_CTRL, &jkdet);
+
+	/* return jack connection status according to jack insertion logic
+	 * active high or active low.
+	 */
+	res = !(status & NAU8825_GPIO2JD1) * !(jkdet & NAU8825_JACK_POLARITY) +
+		(status & NAU8825_GPIO2JD1) * (jkdet & NAU8825_JACK_POLARITY);
+
+	return res ? true : false;
 }
 
 static void nau8825_restart_jack_detection(struct regmap *regmap)
