@@ -207,6 +207,7 @@ config ARM_SBSA_WATCHDOG
 	depends on ARM64
 	depends on ARM_ARCH_TIMER
 	select WATCHDOG_CORE
+	select ACPI_GTDT if ACPI
 	help
 	  ARM SBSA Generic Watchdog has two stage timeouts:
 	  the first signal (WS0) is for alerting the system by interrupt,
