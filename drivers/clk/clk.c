@@ -1469,8 +1469,10 @@ static void clk_change_rate(struct clk_core *core)
 	struct hlist_node *tmp;
 	unsigned long old_rate;
 	unsigned long best_parent_rate = 0;
+	unsigned long timeout;
 	bool skip_set_rate = false;
 	struct clk_core *old_parent;
+	int ret;
 
 	old_rate = core->rate;
 
@@ -1507,8 +1509,34 @@ static void clk_change_rate(struct clk_core *core)
 
 	trace_clk_set_rate(core, core->new_rate);
 
-	if (!skip_set_rate && core->ops->set_rate)
-		core->ops->set_rate(core->hw, core->new_rate, best_parent_rate);
+	if (!skip_set_rate) {
+		if (core->ops->set_rate) {
+			core->ops->set_rate(core->hw, core->new_rate,
+					    best_parent_rate);
+		} else if (core->ops->set_rate_hw) {
+			ret = core->ops->set_rate_hw(core->hw, core->new_rate,
+						     best_parent_rate);
+			if (!ret && core->ops->set_rate_done) {
+				timeout = jiffies + msecs_to_jiffies(10);
+				while (!core->ops->set_rate_done(core->hw)) {
+					if (time_after(jiffies, timeout)) {
+						pr_err("%s: clock %s set rate timeout\n",
+							__func__, core->name);
+						break;
+					}
+					if (system_state == SYSTEM_BOOTING)
+						/*
+						 * Busy loop as we can't
+						 * schedule in early boot
+						 */
+						continue;
+					else
+						usleep_range(core->delay_min,
+							     core->delay_max);
+				}
+			}
+		}
+	}
 
 	trace_clk_set_rate_complete(core, core->new_rate);
 

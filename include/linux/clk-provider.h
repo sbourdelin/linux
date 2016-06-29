@@ -162,6 +162,18 @@ struct clk_rate_request {
  *		which is likely helpful for most .set_rate implementation.
  *		Returns 0 on success, -EERROR otherwise.
  *
+ * @set_rate_hw: Change the rate of this clock hw. This callback is intended
+ *		to do the hw part setting of @set_rate work. It should
+ *		cooperate with @set_rate_done callback to do the whole
+ *		set rate work. The clock core will check @set_rate_done in
+ *		either sleep or polling way according to system state to
+ *		decide whether the whole set rate work is done. Optional
+ *		if @set_rate is used. This function must not sleep.
+ *
+ * @set_rate_done: Queries the hardware to determine if the clock hw is
+ *		prepared. Optional, if this op is not set then the set rate
+ *		simply return. This function must not sleep.
+ *
  * @set_rate_and_parent: Change the rate and the parent of this clock. The
  *		requested rate is specified by the second argument, which
  *		should typically be the return of .round_rate call.  The
@@ -234,6 +246,9 @@ struct clk_ops {
 	u8		(*get_parent)(struct clk_hw *hw);
 	int		(*set_rate)(struct clk_hw *hw, unsigned long rate,
 				    unsigned long parent_rate);
+	int		(*set_rate_hw)(struct clk_hw *hw, unsigned long rate,
+				    unsigned long parent_rate);
+	int		(*set_rate_done)(struct clk_hw *hw);
 	int		(*set_rate_and_parent)(struct clk_hw *hw,
 				    unsigned long rate,
 				    unsigned long parent_rate, u8 index);
