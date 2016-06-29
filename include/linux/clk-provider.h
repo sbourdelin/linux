@@ -146,6 +146,18 @@ struct clk_rate_request {
  *		array index into the value programmed into the hardware.
  *		Returns 0 on success, -EERROR otherwise.
  *
+ * @set_parent_hw: Change the input source of this clock hw;  This callback
+ *		is intended to do the hw part setting of @set_parent work. It
+ *		should cooperate with @set_parent_done callback to do the whole
+ *		set parent work. The clock core will check @set_parent_done
+ *		in either sleep or polling way according to system state to
+ *		decide whether the whole set rate work is done. Optional
+ *		if @set_parent is used. This function must not sleep.
+ *
+ * @set_parent_done: Queries the hardware to determine if the set parent is
+ *		done. Optional, if this op is not set then the set parent
+ *		simply return. This function must not sleep.
+ *
  * @get_parent:	Queries the hardware to determine the parent of a clock.  The
  *		return value is a u8 which specifies the index corresponding to
  *		the parent clock.  This index can be applied to either the
@@ -243,6 +255,8 @@ struct clk_ops {
 	int		(*determine_rate)(struct clk_hw *hw,
 					  struct clk_rate_request *req);
 	int		(*set_parent)(struct clk_hw *hw, u8 index);
+	int		(*set_parent_hw)(struct clk_hw *hw, u8 index);
+	int		(*set_parent_done)(struct clk_hw *hw);
 	u8		(*get_parent)(struct clk_hw *hw);
 	int		(*set_rate)(struct clk_hw *hw, unsigned long rate,
 				    unsigned long parent_rate);

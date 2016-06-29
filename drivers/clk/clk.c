@@ -1234,14 +1234,38 @@ static int __clk_set_parent(struct clk_core *core, struct clk_core *parent,
 	unsigned long flags;
 	int ret = 0;
 	struct clk_core *old_parent;
+	unsigned long timeout;
 
 	old_parent = __clk_set_parent_before(core, parent);
 
 	trace_clk_set_parent(core, parent);
 
 	/* change clock input source */
-	if (parent && core->ops->set_parent)
+	if (parent && core->ops->set_parent) {
 		ret = core->ops->set_parent(core->hw, p_index);
+	} else if (parent && core->ops->set_parent_hw) {
+		ret = core->ops->set_parent_hw(core->hw, p_index);
+		if (!ret && core->ops->set_parent_done) {
+			timeout = jiffies + msecs_to_jiffies(10);
+			while (!core->ops->set_parent_done(core->hw)) {
+				if (time_after(jiffies, timeout)) {
+					pr_err("%s: clock %s set parent timeout\n",
+						__func__, core->name);
+					ret = -ETIMEDOUT;
+					break;
+				}
+				if (system_state == SYSTEM_BOOTING)
+					/*
+					 * Busy loop as we can't
+					 * schedule in early boot
+					 */
+					continue;
+				else
+					usleep_range(core->delay_min,
+						     core->delay_max);
+			}
+		}
+	}
 
 	trace_clk_set_parent_complete(core, parent);
 
