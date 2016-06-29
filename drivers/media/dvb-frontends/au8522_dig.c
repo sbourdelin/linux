@@ -787,15 +787,6 @@ static void au8522_get_stats(struct dvb_frontend *fe, enum fe_status status)
 	c->block_error.stat[0].scale = FE_SCALE_COUNTER;
 	c->block_error.stat[0].uvalue = state->ucblocks;
 }
-static int au8522_read_signal_strength(struct dvb_frontend *fe,
-				       u16 *signal_strength)
-{
-	struct au8522_state *state = fe->demodulator_priv;
-
-	*signal_strength = state->strength;
-
-	return 0;
-}
 
 static int au8522_read_status(struct dvb_frontend *fe, enum fe_status *status)
 {
@@ -857,21 +848,21 @@ static int au8522_read_status(struct dvb_frontend *fe, enum fe_status *status)
 	return 0;
 }
 
+static int au8522_read_signal_strength(struct dvb_frontend *fe,
+				       u16 *signal_strength)
+{
+	struct au8522_state *state = fe->demodulator_priv;
+
+	*signal_strength = state->strength;
+
+	return 0;
+}
+
 static int au8522_read_ucblocks(struct dvb_frontend *fe, u32 *ucblocks)
 {
 	struct au8522_state *state = fe->demodulator_priv;
 
 	*ucblocks = state->ucblocks;
-
-	return 0;
-}
-
-static int au8522_read_ber(struct dvb_frontend *fe, u32 *ber)
-{
-	struct au8522_state *state = fe->demodulator_priv;
-
-	/* FIXME: This is so wrong! */
-	*ber = state->ucblocks;
 
 	return 0;
 }
@@ -987,7 +978,6 @@ static struct dvb_frontend_ops au8522_ops = {
 	.get_frontend         = au8522_get_frontend,
 	.get_tune_settings    = au8522_get_tune_settings,
 	.read_status          = au8522_read_status,
-	.read_ber             = au8522_read_ber,
 	.read_signal_strength = au8522_read_signal_strength,
 	.read_snr             = au8522_read_snr,
 	.read_ucblocks        = au8522_read_ucblocks,
