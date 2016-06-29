@@ -831,15 +831,6 @@ char *file_path(struct file *filp, char *buf, int buflen)
 }
 EXPORT_SYMBOL(file_path);
 
-static struct dentry *open_select_dentry(struct dentry *dentry,
-					 unsigned int open_flags)
-{
-	if (unlikely(dentry->d_flags & DCACHE_OP_REAL))
-		return dentry->d_op->d_real(dentry, NULL, open_flags);
-	else
-		return dentry;
-}
-
 /**
  * vfs_open - open the file at the given path
  * @path: path to open
@@ -849,7 +840,7 @@ static struct dentry *open_select_dentry(struct dentry *dentry,
 int vfs_open(const struct path *path, struct file *file,
 	     const struct cred *cred)
 {
-	struct dentry *dentry = open_select_dentry(path->dentry, file->f_flags);
+	struct dentry *dentry = d_real(path->dentry, NULL, file->f_flags);
 
 	if (IS_ERR(dentry))
 		return PTR_ERR(dentry);

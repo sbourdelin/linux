@@ -930,7 +930,7 @@ struct dentry_operations {
 	char *(*d_dname)(struct dentry *, char *, int);
 	struct vfsmount *(*d_automount)(struct path *);
 	int (*d_manage)(struct dentry *, bool);
-	struct dentry *(*d_real)(struct dentry *, struct inode *, unsigned int);
+	struct dentry *(*d_real)(struct dentry *, const struct inode *, unsigned int);
 };
 
   d_revalidate: called when the VFS needs to revalidate a dentry. This

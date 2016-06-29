@@ -304,7 +304,8 @@ static void ovl_dentry_release(struct dentry *dentry)
 	}
 }
 
-static struct dentry *ovl_d_real(struct dentry *dentry, struct inode *inode,
+static struct dentry *ovl_d_real(struct dentry *dentry,
+				 const struct inode *inode,
 				 unsigned int open_flags)
 {
 	struct dentry *real;
@@ -337,9 +338,7 @@ static struct dentry *ovl_d_real(struct dentry *dentry, struct inode *inode,
 		return real;
 
 	/* Handle recursion */
-	if (real->d_flags & DCACHE_OP_REAL)
-		return real->d_op->d_real(real, inode, open_flags);
-
+	return d_real(real, inode, open_flags);
 bug:
 	WARN(1, "ovl_d_real(%pd4, %s:%lu\n): real dentry not found\n", dentry,
 	     inode ? inode->i_sb->s_id : "NULL", inode ? inode->i_ino : 0);
