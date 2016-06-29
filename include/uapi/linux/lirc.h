@@ -106,6 +106,7 @@
 
 /* code length in bits, currently only for LIRC_MODE_LIRCCODE */
 #define LIRC_GET_LENGTH                _IOR('i', 0x0000000f, __u32)
+#define LIRC_SET_LENGTH                _IOW('i', 0x00000010, __u32)
 
 #define LIRC_SET_SEND_MODE             _IOW('i', 0x00000011, __u32)
 #define LIRC_SET_REC_MODE              _IOW('i', 0x00000012, __u32)
@@ -164,5 +165,8 @@
 #define LIRC_SETUP_END                 _IO('i', 0x00000022)
 
 #define LIRC_SET_WIDEBAND_RECEIVER     _IOW('i', 0x00000023, __u32)
+
+#define LIRC_GET_FREQUENCY             _IOR('i', 0x00000024, __u32)
+#define LIRC_SET_FREQUENCY             _IOW('i', 0x00000025, __u32)
 
 #endif
