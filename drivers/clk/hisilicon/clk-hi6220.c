@@ -12,6 +12,7 @@
 
 #include <linux/kernel.h>
 #include <linux/clk-provider.h>
+#include <linux/clk.h>
 #include <linux/clkdev.h>
 #include <linux/io.h>
 #include <linux/of.h>
@@ -192,6 +193,9 @@ static void __init hi6220_clk_sys_init(struct device_node *np)
 
 	hi6220_clk_register_divider(hi6220_div_clks_sys,
 			ARRAY_SIZE(hi6220_div_clks_sys), clk_data);
+
+	if (clk_set_rate(clk_data->clk_data.clks[HI6220_UART1_SRC], 150000000))
+		pr_err("failed to set uart1 clock rate\n");
 }
 CLK_OF_DECLARE(hi6220_clk_sys, "hisilicon,hi6220-sysctrl", hi6220_clk_sys_init);
 
