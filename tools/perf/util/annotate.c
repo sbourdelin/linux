@@ -461,6 +461,11 @@ static struct ins instructions_arm[] = {
 	{ .name = "bne",   .ops  = &jump_ops, },
 };
 
+struct instructions_powerpc {
+	struct ins *ins;
+	struct list_head list;
+};
+
 static int ins__key_cmp(const void *name, const void *insp)
 {
 	const struct ins *ins = insp;
@@ -474,6 +479,120 @@ static int ins__cmp(const void *a, const void *b)
 	const struct ins *ib = b;
 
 	return strcmp(ia->name, ib->name);
+}
+
+static int list_add__ins_powerpc(struct instructions_powerpc *head,
+				 struct ins *ins)
+{
+	struct instructions_powerpc *ins_powerpc;
+
+	ins_powerpc = zalloc(sizeof(struct instructions_powerpc));
+	if (!ins_powerpc)
+		return -1;
+
+	ins_powerpc->ins = ins;
+	list_add_tail(&(ins_powerpc->list), &(head->list));
+
+	return 0;
+}
+
+static struct ins *list_search__ins_powerpc(struct instructions_powerpc *head,
+					    const char *name)
+{
+	struct instructions_powerpc *pos;
+
+	list_for_each_entry(pos, &head->list, list) {
+		if (!strcmp(pos->ins->name, name))
+			return pos->ins;
+	}
+	return NULL;
+}
+
+static struct ins *ins__find_powerpc(const char *name)
+{
+	int i;
+	struct ins *ins;
+	static struct instructions_powerpc head;
+	static bool list_initialized;
+
+	if (!list_initialized) {
+		INIT_LIST_HEAD(&head.list);
+		list_initialized = true;
+	}
+
+	/*
+	 * Search if we already created object of 'struct ins'
+	 * for this instruction
+	 */
+	ins = list_search__ins_powerpc(&head, name);
+	if (ins)
+		return ins;
+
+	ins = zalloc(sizeof(struct ins));
+	if (!ins)
+		return NULL;
+
+	ins->name = strdup(name);
+	if (!ins->name)
+		goto err;
+
+	if (name[0] == 'b') {
+		/* branch instructions */
+		ins->ops = &jump_ops;
+
+		/*
+		 * - Few start with 'b', but aren't branch instructions.
+		 * - Let's also ignore instructions involving 'ctr' and
+		 *   'tar' since target branch addresses for those can't
+		 *   be determined statically.
+		 */
+		if (!strncmp(name, "bcd", 3)   ||
+		    !strncmp(name, "brinc", 5) ||
+		    !strncmp(name, "bper", 4)  ||
+		    strstr(name, "ctr")        ||
+		    strstr(name, "tar"))
+			goto err;
+
+		i = strlen(name) - 1;
+		if (i < 0)
+			goto err;
+
+		/* ignore optional hints at the end of the instructions */
+		if (name[i] == '+' || name[i] == '-')
+			i--;
+
+		if (name[i] == 'l' || (name[i] == 'a' && name[i-1] == 'l')) {
+			/*
+			 * if the instruction ends up with 'l' or 'la', then
+			 * those are considered 'calls' since they update LR.
+			 * ... except for 'bnl' which is branch if not less than
+			 * and the absolute form of the same.
+			 */
+			if (strcmp(name, "bnl") && strcmp(name, "bnl+") &&
+			    strcmp(name, "bnl-") && strcmp(name, "bnla") &&
+			    strcmp(name, "bnla+") && strcmp(name, "bnla-"))
+				ins->ops = &call_ops;
+		}
+		if (name[i] == 'r' && name[i-1] == 'l')
+			/*
+			 * instructions ending with 'lr' are considered to be
+			 * return instructions
+			 */
+			ins->ops = &ret_ops;
+
+		/*
+		 * Add instruction to list so next time no need to
+		 * allocate memory for it.
+		 */
+		if (list_add__ins_powerpc(&head, ins) < 0)
+			goto err;
+
+		return ins;
+	}
+
+err:
+	zfree(&ins);
+	return NULL;
 }
 
 static void ins__sort(struct ins *instructions, int nmemb)
@@ -511,6 +630,8 @@ static struct ins *ins__find(const char *name, const char *norm_arch)
 	} else if (!strcmp(norm_arch, "arm")) {
 		instructions = instructions_arm;
 		nmemb = ARRAY_SIZE(instructions_arm);
+	} else if (!strcmp(norm_arch, "powerpc")) {
+		return ins__find_powerpc(name);
 	} else {
 		pr_err("perf annotate not supported by %s arch\n", norm_arch);
 		return NULL;
