@@ -569,24 +569,18 @@ static int xc_get_totalgain(struct xc5000_priv *priv, u16 *totalgain)
 	return xc5000_readreg(priv, XREG_TOTALGAIN, totalgain);
 }
 
-static int xc5000_get_rf_strength(struct dvb_frontend *fe, u16 *strength)
+static s32 xc5000_get_rf_attenuation(struct dvb_frontend *fe)
 {
 	struct xc5000_priv *priv = fe->tuner_priv;
 	int ret;
-	u16 gain = 0;
-
-	*strength = 0;
+	u16 gain = 65535;
 
 	ret = xc_get_totalgain(priv, &gain);
 	if (ret < 0)
-		return ret;
+		return 256000;
 
-	*strength = 65535 - gain;
-
-	dprintk(1, "Signal strength = 0x%04x (gain = 0x%04x)\n",
-		*strength, gain);
-
-	return 0;
+	/* In theory, it will range from 256 dB to 0 dB */
+	return (1000 * gain) / 256;
 }
 
 static u16 wait_for_lock(struct xc5000_priv *priv)
@@ -1399,20 +1393,20 @@ static const struct dvb_tuner_ops xc5000_tuner_ops = {
 		.frequency_step =      50000,
 	},
 
-	.release	   = xc5000_release,
-	.init		   = xc5000_init,
-	.sleep		   = xc5000_sleep,
-	.suspend	   = xc5000_suspend,
-	.resume		   = xc5000_resume,
+	.release	    = xc5000_release,
+	.init		    = xc5000_init,
+	.sleep		    = xc5000_sleep,
+	.suspend	    = xc5000_suspend,
+	.resume		    = xc5000_resume,
 
-	.set_config	   = xc5000_set_config,
-	.set_params	   = xc5000_set_digital_params,
-	.set_analog_params = xc5000_set_analog_params,
-	.get_frequency	   = xc5000_get_frequency,
-	.get_if_frequency  = xc5000_get_if_frequency,
-	.get_bandwidth	   = xc5000_get_bandwidth,
-	.get_status	   = xc5000_get_status,
-	.get_rf_strength   = xc5000_get_rf_strength
+	.set_config	    = xc5000_set_config,
+	.set_params	    = xc5000_set_digital_params,
+	.set_analog_params  = xc5000_set_analog_params,
+	.get_frequency	    = xc5000_get_frequency,
+	.get_if_frequency   = xc5000_get_if_frequency,
+	.get_bandwidth	    = xc5000_get_bandwidth,
+	.get_status	    = xc5000_get_status,
+	.get_rf_attenuation = xc5000_get_rf_attenuation,
 };
 
 struct dvb_frontend *xc5000_attach(struct dvb_frontend *fe,

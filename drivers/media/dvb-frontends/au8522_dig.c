@@ -734,27 +734,29 @@ static void au8522_get_stats(struct dvb_frontend *fe, enum fe_status status)
 	}
 
 	/* Get (or estimate) RF strength */
-	if (fe->ops.tuner_ops.get_rf_strength) {
-		/* If the tuner has RF strength, use it */
+	if (fe->ops.tuner_ops.get_rf_attenuation) {
+		s32 strength;
 
+		/* If the tuner has RF strength, use it */
 		if (fe->ops.i2c_gate_ctrl)
 			fe->ops.i2c_gate_ctrl(fe, 1);
-		ret = fe->ops.tuner_ops.get_rf_strength(fe, &state->strength);
+		strength = fe->ops.tuner_ops.get_rf_attenuation(fe);
 		if (fe->ops.i2c_gate_ctrl)
 			fe->ops.i2c_gate_ctrl(fe, 0);
-		if (ret < 0)
-			state->strength = 0;
 
-		/*
-		 * FIXME: As this frontend is used only with au0828, and,
-		 * currently, the tuner is eiter xc5000 or tda18271, and
-		 * only the first implements get_rf_strength(), we'll assume
-		 * that the strength will be returned in dB.
-		 */
-		c->strength.stat[0].svalue = 35000 - 1000 * (65535 - state->strength) / 256;
 		c->strength.stat[0].scale = FE_SCALE_DECIBEL;
+		c->strength.stat[0].svalue = 35000 - strength;
+
+		dprintk("Signal strength = %d.%02d dBm\n",
+	                strength / 1000, (strength % 1000) / 10);
+
+
+		/* For DVBv3 legacy support, adjust scale */
+		strength = 65535 - strength;
+		state->strength = (strength < 0) ? 0 : strength;
 	} else {
 		u32 tmp;
+
 		/*
 		 * If it doen't, estimate from SNR
 		 * (borrowed from lgdt330x.c)
