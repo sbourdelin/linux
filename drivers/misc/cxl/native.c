@@ -21,10 +21,10 @@
 #include "cxl.h"
 #include "trace.h"
 
-static int afu_control(struct cxl_afu *afu, u64 command,
+static int afu_control(struct cxl_afu *afu, u64 command, u64 clear,
 		       u64 result, u64 mask, bool enabled)
 {
-	u64 AFU_Cntl = cxl_p2n_read(afu, CXL_AFU_Cntl_An);
+	u64 AFU_Cntl;
 	unsigned long timeout = jiffies + (HZ * CXL_TIMEOUT);
 	int rc = 0;
 
@@ -33,7 +33,8 @@ static int afu_control(struct cxl_afu *afu, u64 command,
 
 	trace_cxl_afu_ctrl(afu, command);
 
-	cxl_p2n_write(afu, CXL_AFU_Cntl_An, AFU_Cntl | command);
+	AFU_Cntl = cxl_p2n_read(afu, CXL_AFU_Cntl_An);
+	cxl_p2n_write(afu, CXL_AFU_Cntl_An, (AFU_Cntl & ~clear) | command);
 
 	AFU_Cntl = cxl_p2n_read(afu, CXL_AFU_Cntl_An);
 	while ((AFU_Cntl & mask) != result) {
@@ -67,7 +68,7 @@ static int afu_enable(struct cxl_afu *afu)
 {
 	pr_devel("AFU enable request\n");
 
-	return afu_control(afu, CXL_AFU_Cntl_An_E,
+	return afu_control(afu, CXL_AFU_Cntl_An_E, 0,
 			   CXL_AFU_Cntl_An_ES_Enabled,
 			   CXL_AFU_Cntl_An_ES_MASK, true);
 }
@@ -76,7 +77,8 @@ int cxl_afu_disable(struct cxl_afu *afu)
 {
 	pr_devel("AFU disable request\n");
 
-	return afu_control(afu, 0, CXL_AFU_Cntl_An_ES_Disabled,
+	return afu_control(afu, 0, CXL_AFU_Cntl_An_E,
+			   CXL_AFU_Cntl_An_ES_Disabled,
 			   CXL_AFU_Cntl_An_ES_MASK, false);
 }
 
@@ -85,7 +87,7 @@ static int native_afu_reset(struct cxl_afu *afu)
 {
 	pr_devel("AFU reset request\n");
 
-	return afu_control(afu, CXL_AFU_Cntl_An_RA,
+	return afu_control(afu, CXL_AFU_Cntl_An_RA, 0,
 			   CXL_AFU_Cntl_An_RS_Complete | CXL_AFU_Cntl_An_ES_Disabled,
 			   CXL_AFU_Cntl_An_RS_MASK | CXL_AFU_Cntl_An_ES_MASK,
 			   false);
@@ -595,7 +597,16 @@ static int deactivate_afu_directed(struct cxl_afu *afu)
 	cxl_sysfs_afu_m_remove(afu);
 	cxl_chardev_afu_remove(afu);
 
-	cxl_ops->afu_reset(afu);
+	if (afu->adapter->native->sl_ops->needs_reset_before_disable) {
+		/*
+		 * XXX: We may be able to do away with this entirely - it is
+		 * possible that this was only ever needed due to a bug where
+		 * the disable operation did not clear the enable bit, however
+		 * I will only consider dropping this after more regression
+		 * testing on earlier PSL images.
+		 */
+		cxl_ops->afu_reset(afu);
+	}
 	cxl_afu_disable(afu);
 	cxl_psl_purge(afu);
 
@@ -735,7 +746,16 @@ static int native_attach_process(struct cxl_context *ctx, bool kernel,
 
 static inline int detach_process_native_dedicated(struct cxl_context *ctx)
 {
-	cxl_ops->afu_reset(ctx->afu);
+	if (ctx->afu->adapter->native->sl_ops->needs_reset_before_disable) {
+		/*
+		 * XXX: We may be able to do away with this entirely - it is
+		 * possible that this was only ever needed due to a bug where
+		 * the disable operation did not clear the enable bit, however
+		 * I will only consider dropping this after more regression
+		 * testing on earlier PSL images.
+		 */
+		cxl_ops->afu_reset(ctx->afu);
+	}
 	cxl_afu_disable(ctx->afu);
 	cxl_psl_purge(ctx->afu);
 	return 0;
