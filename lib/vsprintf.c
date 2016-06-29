@@ -2257,6 +2257,62 @@ EXPORT_SYMBOL(sprintf);
  * bstr_printf() - Binary data to text string
  */
 
+/*
+ * As vbin_printf() is not the same as a normal printf(), as it is broken
+ * into two parts:
+ *   The recording of the pointer information.
+ *   The printing of the information.
+ * As the pointer may change, or even worse no longer exist, then dereferenced
+ * pointers must not be used with this utility unless it is supported.
+ */
+
+static bool supported_bin_ptr(const char *fmt)
+{
+	bool supported = false;
+
+	switch (fmt[0]) {
+	case 'F':
+	case 'f':
+		/* Some archs dereference function pointers */
+		if (vbin_printf == 
+		    dereference_function_descriptor(vbin_printf)) {
+			supported = true;
+			break;
+		}
+		/* Fall through */
+	case 'R':
+	case 'r':
+	case 'b':
+	case 'M':
+	case 'm':
+	case 'I':
+	case 'i':
+	case 'E':
+	case 'U':
+	case 'V':
+		break;
+	case 'N':
+		if (fmt[1] != 'F') {
+			supported = true;
+			break;
+		}
+		/* fall through */
+	case 'a':
+	case 'd':
+	case 'C':
+	case 'D':
+	case 'g':
+	case 'G':
+		break;
+	default:
+		supported = true;
+	}
+
+	return supported;
+}
+
+const static char unsupported_str[] = "Unsupported type:%p";
+
 /**
  * vbin_printf - Parse a format string and place args' binary value in a buffer
  * @bin_buf: The buffer to place args' binary value
@@ -2490,12 +2546,30 @@ int bstr_printf(char *buf, size_t size, const char *fmt, const u32 *bin_buf)
 			break;
 		}
 
-		case FORMAT_TYPE_PTR:
-			str = pointer(fmt, str, end, get_arg(void *), spec);
+		case FORMAT_TYPE_PTR: {
+			const char *_fmt = fmt;
+
+			if (!supported_bin_ptr(fmt)) {
+				int len = sizeof(unsupported_str) + 1;
+
+				if (str + len <= end) {
+					strcpy(str, unsupported_str);
+					str += sizeof(unsupported_str) - 1;
+					str[0] = fmt[0];
+					str[1] = ':';
+					str += 2;
+				} else
+					str += len;
+				/* Just show the pointer itself */
+				_fmt = "";
+				spec.field_width = -1;
+			}
+			str = pointer(_fmt, str, end, get_arg(void *), spec);
+
 			while (isalnum(*fmt))
 				fmt++;
 			break;
-
+		}
 		case FORMAT_TYPE_PERCENT_CHAR:
 			if (str < end)
 				*str = '%';
