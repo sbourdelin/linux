@@ -211,11 +211,15 @@ int xvtc_generator_start(struct xvtc_device *xvtc,
 	xvtc_gen_write(xvtc, XVTC_HSYNC,
 		       (config->hsync_end << XVTC_HSYNC_END_SHIFT) |
 		       (config->hsync_start << XVTC_HSYNC_START_SHIFT));
-	xvtc_gen_write(xvtc, XVTC_F0_VBLANK_H, 0);
+	xvtc_gen_write(xvtc, XVTC_F0_VBLANK_H,
+		       (config->hsync_start << XVTC_F0_VBLANK_HEND_SHIFT) |
+		       (config->hsync_start << XVTC_F0_VBLANK_HSTART_SHIFT));
 	xvtc_gen_write(xvtc, XVTC_F0_VSYNC_V,
 		       (config->vsync_end << XVTC_F0_VSYNC_VEND_SHIFT) |
 		       (config->vsync_start << XVTC_F0_VSYNC_VSTART_SHIFT));
-	xvtc_gen_write(xvtc, XVTC_F0_VSYNC_H, 0);
+	xvtc_gen_write(xvtc, XVTC_F0_VSYNC_H,
+		       (config->hsync_start << XVTC_F0_VSYNC_HEND_SHIFT) |
+		       (config->hsync_start << XVTC_F0_VSYNC_HSTART_SHIFT));
 
 	/* Enable the generator. Set the source of all generator parameters to
 	 * generator registers.
