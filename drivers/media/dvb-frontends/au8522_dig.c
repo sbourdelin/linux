@@ -767,16 +767,30 @@ static int au8522_read_snr(struct dvb_frontend *fe, u16 *snr)
 static int au8522_read_signal_strength(struct dvb_frontend *fe,
 				       u16 *signal_strength)
 {
-	/* borrowed from lgdt330x.c
+	u16 snr;
+	u32 tmp;
+	int ret;
+
+	/* If the tuner has RF strength, use it */
+	if (fe->ops.tuner_ops.get_rf_strength) {
+		if (fe->ops.i2c_gate_ctrl)
+			fe->ops.i2c_gate_ctrl(fe, 1);
+		ret = fe->ops.tuner_ops.get_rf_strength(fe, signal_strength);
+		if (fe->ops.i2c_gate_ctrl)
+			fe->ops.i2c_gate_ctrl(fe, 0);
+		return ret;
+	}
+
+	/*
+	 * If it doen't, estimate from SNR
+	 * (borrowed from lgdt330x.c)
 	 *
 	 * Calculate strength from SNR up to 35dB
 	 * Even though the SNR can go higher than 35dB,
 	 * there is some comfort factor in having a range of
 	 * strong signals that can show at 100%
 	 */
-	u16 snr;
-	u32 tmp;
-	int ret = au8522_read_snr(fe, &snr);
+	ret = au8522_read_snr(fe, &snr);
 
 	*signal_strength = 0;
 
