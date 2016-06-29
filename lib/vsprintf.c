@@ -2273,7 +2273,6 @@ static bool supported_bin_ptr(const char *fmt)
 	switch (fmt[0]) {
 	case 'R':
 	case 'r':
-	case 'b':
 	case 'M':
 	case 'm':
 	case 'I':
@@ -2395,6 +2394,16 @@ do {									\
 				if (str + sizeof(ptr) <= end)
 					*(void **)str = ptr;
 				str += sizeof(ptr);
+				break;
+			}
+			case 'b': {
+				unsigned long *mask = va_arg(args, void *);
+				int len = BITS_TO_LONGS(spec.field_width);
+
+				str = PTR_ALIGN(str, sizeof(u32));
+				if (str + len <= end)
+					memcpy(str, mask, len);
+				str += len;
 				break;
 			}
 			default:
@@ -2552,11 +2561,18 @@ int bstr_printf(char *buf, size_t size, const char *fmt, const u32 *bin_buf)
 		}
 
 		case FORMAT_TYPE_PTR: {
+			unsigned long *tmp_ptr;
+			unsigned long *ptr;
 			const char *_fmt = fmt;
 			char tmp_fmt[2];
 
 			if (supported_bin_ptr(fmt)) {
 				switch (fmt[0]) {
+				case 'b': {
+					tmp_ptr = get_arg(void *);
+					ptr = (void *)&tmp_ptr;
+					break;
+				}
 				case 'F':
 				case 'f':
 					/*
@@ -2567,7 +2583,9 @@ int bstr_printf(char *buf, size_t size, const char *fmt, const u32 *bin_buf)
 					tmp_fmt[0] = 's' - ('f' - fmt[0]);
 					tmp_fmt[1] = 0;
 					_fmt = tmp_fmt;
-					break;
+					/* Fall through */
+				default:
+					ptr = get_arg(void *);
 				}
 			} else {
 				int len = sizeof(unsupported_str) + 1;
@@ -2583,8 +2601,10 @@ int bstr_printf(char *buf, size_t size, const char *fmt, const u32 *bin_buf)
 				/* Just show the pointer itself */
 				_fmt = "";
 				spec.field_width = -1;
+				ptr = get_arg(void *);
 			}
-			str = pointer(_fmt, str, end, get_arg(void *), spec);
+
+			str = pointer(_fmt, str, end, ptr, spec);
 
 			while (isalnum(*fmt))
 				fmt++;
