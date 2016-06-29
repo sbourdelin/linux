@@ -199,6 +199,7 @@ static void kblamps_set(struct led_classdev *cdev,
 
 static struct led_classdev kblamps_led = {
  .name = "fujitsu::kblamps",
+ .max_brightness = 1,
  .brightness_get = kblamps_get,
  .brightness_set = kblamps_set
 };
@@ -209,6 +210,7 @@ static void radio_led_set(struct led_classdev *cdev,
 
 static struct led_classdev radio_led = {
  .name = "fujitsu::radio_led",
+ .max_brightness = 1,
  .brightness_get = radio_led_get,
  .brightness_set = radio_led_set
 };
@@ -281,7 +283,7 @@ static void logolamp_set(struct led_classdev *cdev,
 static void kblamps_set(struct led_classdev *cdev,
 			       enum led_brightness brightness)
 {
-	if (brightness >= LED_FULL)
+	if (brightness)
 		call_fext_func(FUNC_LEDS, 0x1, KEYBOARD_LAMPS, FUNC_LED_ON);
 	else
 		call_fext_func(FUNC_LEDS, 0x1, KEYBOARD_LAMPS, FUNC_LED_OFF);
@@ -290,7 +292,7 @@ static void kblamps_set(struct led_classdev *cdev,
 static void radio_led_set(struct led_classdev *cdev,
 				enum led_brightness brightness)
 {
-	if (brightness >= LED_FULL)
+	if (brightness)
 		call_fext_func(FUNC_RFKILL, 0x5, RADIO_LED_ON, RADIO_LED_ON);
 	else
 		call_fext_func(FUNC_RFKILL, 0x5, RADIO_LED_ON, 0x0);
@@ -316,7 +318,7 @@ static enum led_brightness kblamps_get(struct led_classdev *cdev)
 	enum led_brightness brightness = LED_OFF;
 
 	if (call_fext_func(FUNC_LEDS, 0x2, KEYBOARD_LAMPS, 0x0) == FUNC_LED_ON)
-		brightness = LED_FULL;
+		brightness = cdev->max_brightness;
 
 	return brightness;
 }
@@ -326,7 +328,7 @@ static enum led_brightness radio_led_get(struct led_classdev *cdev)
 	enum led_brightness brightness = LED_OFF;
 
 	if (call_fext_func(FUNC_RFKILL, 0x4, 0x0, 0x0) & RADIO_LED_ON)
-		brightness = LED_FULL;
+		brightness = cdev->max_brightness;
 
 	return brightness;
 }
