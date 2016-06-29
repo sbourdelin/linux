@@ -601,7 +601,6 @@ befs_nls2utf(struct super_block *sb, const char *in,
 
 	*out = result = kmalloc(maxlen, GFP_NOFS);
 	if (!*out) {
-		*out_len = 0;
 		return -ENOMEM;
 	}
 
