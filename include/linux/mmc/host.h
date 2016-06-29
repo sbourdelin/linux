@@ -174,6 +174,7 @@ struct mmc_async_req {
 	 * Returns 0 if success otherwise non zero.
 	 */
 	int (*err_check) (struct mmc_card *, struct mmc_async_req *);
+	bool pre_req_done;
 };
 
 /**

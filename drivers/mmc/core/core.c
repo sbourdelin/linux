@@ -657,8 +657,10 @@ struct mmc_async_req *mmc_start_req(struct mmc_host *host,
 	struct mmc_async_req *data = host->areq;
 
 	/* Prepare a new request */
-	if (areq)
+	if (areq && !areq->pre_req_done) {
+		areq->pre_req_done = true;
 		mmc_pre_req(host, areq->mrq, !host->areq);
+	}
 
 	if (host->areq) {
 		err = mmc_wait_for_data_req_done(host, host->areq->mrq,	areq);
@@ -694,12 +696,16 @@ struct mmc_async_req *mmc_start_req(struct mmc_host *host,
 	if (!err && areq)
 		start_err = __mmc_start_data_req(host, areq->mrq);
 
-	if (host->areq)
+	if (host->areq) {
+		host->areq->pre_req_done = false;
 		mmc_post_req(host, host->areq->mrq, 0);
+	}
 
 	 /* Cancel a prepared request if it was not started. */
-	if ((err || start_err) && areq)
+	if ((err || start_err) && areq) {
+		areq->pre_req_done = false;
 		mmc_post_req(host, areq->mrq, -EINVAL);
+	}
 
 	if (err)
 		host->areq = NULL;
