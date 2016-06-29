@@ -220,6 +220,7 @@ enum mmc_blk_status {
 	MMC_BLK_ECC_ERR,
 	MMC_BLK_NOMEDIUM,
 	MMC_BLK_NEW_REQUEST,
+	MMC_BLK_SUCCESS_ERR, /* Success but prevent starting another request */
 };
 
 /* The number of MMC physical partitions.  These consist of:
