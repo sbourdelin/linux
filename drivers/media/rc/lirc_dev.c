@@ -103,12 +103,11 @@ static int lirc_add_to_buf(struct irctl *ir)
 		 * service the device as long as it is returning
 		 * data and we have space
 		 */
-get_data:
-		res = ir->d.add_to_buf(ir->d.data, ir->buf);
-		if (res == 0) {
-			got_data++;
-			goto get_data;
-		}
+		do {
+			res = ir->d.add_to_buf(ir->d.data, ir->buf);
+			if (!res)
+				got_data++;
+		} while (!res);
 
 		if (res == -ENODEV)
 			kthread_stop(ir->task);
