@@ -48,38 +48,26 @@ unsigned int _parse_integer(const char *s, unsigned int base, unsigned long long
 {
 	unsigned long long res;
 	unsigned int rv;
-	int overflow;
+	unsigned int overflow;
+	unsigned int val;
 
 	res = 0;
 	rv = 0;
 	overflow = 0;
-	while (*s) {
-		unsigned int val;
-
-		if ('0' <= *s && *s <= '9')
-			val = *s - '0';
-		else if ('a' <= _tolower(*s) && _tolower(*s) <= 'f')
-			val = _tolower(*s) - 'a' + 10;
-		else
-			break;
-
-		if (val >= base)
-			break;
+	while ((val = hex_to_bin(*s++)) < base) {
 		/*
 		 * Check for overflow only if we are within range of
 		 * it in the max base we support (16)
 		 */
 		if (unlikely(res & (~0ull << 60))) {
 			if (res > div_u64(ULLONG_MAX - val, base))
-				overflow = 1;
+				overflow = KSTRTOX_OVERFLOW;
 		}
 		res = res * base + val;
 		rv++;
-		s++;
 	}
 	*p = res;
-	if (overflow)
-		rv |= KSTRTOX_OVERFLOW;
+	rv |= overflow;
 	return rv;
 }
 
