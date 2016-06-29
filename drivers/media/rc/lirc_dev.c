@@ -95,27 +95,26 @@ static void lirc_irctl_cleanup(struct irctl *ir)
  */
 static int lirc_add_to_buf(struct irctl *ir)
 {
-	if (ir->d.add_to_buf) {
-		int res = -ENODATA;
-		int got_data = 0;
+	int res;
+	int got_data = 0;
 
-		/*
-		 * service the device as long as it is returning
-		 * data and we have space
-		 */
-		do {
-			res = ir->d.add_to_buf(ir->d.data, ir->buf);
-			if (!res)
-				got_data++;
-		} while (!res);
+	if (!ir->d.add_to_buf)
+		return 0;
 
-		if (res == -ENODEV)
-			kthread_stop(ir->task);
+	/*
+	 * service the device as long as it is returning
+	 * data and we have space
+	 */
+	do {
+		res = ir->d.add_to_buf(ir->d.data, ir->buf);
+		if (!res)
+			got_data++;
+	} while (!res);
 
-		return got_data ? 0 : res;
-	}
+	if (res == -ENODEV)
+		kthread_stop(ir->task);
 
-	return 0;
+	return got_data ? 0 : res;
 }
 
 /* main function of the polling thread
