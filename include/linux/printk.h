@@ -171,6 +171,12 @@ extern bool printk_timed_ratelimit(unsigned long *caller_jiffies,
 extern int printk_delay_msec;
 extern int dmesg_restrict;
 extern int kptr_restrict;
+extern unsigned int devkmsg_log;
+
+struct ctl_table;
+
+int devkmsg_sysctl_set_loglvl(struct ctl_table *table, int write,
+			      void __user *buffer, size_t *lenp, loff_t *ppos);
 
 extern void wake_up_klogd(void);
 

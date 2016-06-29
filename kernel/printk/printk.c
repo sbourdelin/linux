@@ -86,6 +86,48 @@ static struct lockdep_map console_lock_dep_map = {
 };
 #endif
 
+#define DEVKMSG_LOG_RATELIMIT		0
+#define DEVKMSG_LOG_ON			1
+#define DEVKMSG_LOG_OFF			2
+#define DEVKMSG_LOCK			(1 << 8)
+#define DEVKMSG_LOG_MASK		(DEVKMSG_LOCK - 1)
+#define DEVKMSG_LOCKED_MASK		~DEVKMSG_LOG_MASK
+
+/* DEVKMSG_LOG_RATELIMIT by default */
+unsigned int __read_mostly devkmsg_log;
+static int __init control_devkmsg(char *str)
+{
+	if (!str)
+		return -EINVAL;
+
+	if (!strncmp(str, "on", 2))
+		devkmsg_log = DEVKMSG_LOG_ON;
+	else if (!strncmp(str, "off", 3))
+		devkmsg_log = DEVKMSG_LOG_OFF;
+	else if (!strncmp(str, "ratelimit", 9))
+		devkmsg_log = DEVKMSG_LOG_RATELIMIT;
+	else
+		return -EINVAL;
+
+	/* Sysctl cannot change it anymore. */
+	devkmsg_log |= DEVKMSG_LOCK;
+
+	return 0;
+}
+__setup("printk.kmsg=", control_devkmsg);
+
+
+int devkmsg_sysctl_set_loglvl(struct ctl_table *table, int write,
+			      void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	if (devkmsg_log & DEVKMSG_LOCKED_MASK) {
+		if (write)
+			return -EINVAL;
+	}
+
+	return proc_dointvec_minmax(table, write, buffer, lenp, ppos);
+}
+
 /*
  * Number of registered extended console drivers.
  *
@@ -614,6 +656,7 @@ struct devkmsg_user {
 	u64 seq;
 	u32 idx;
 	enum log_flags prev;
+	struct ratelimit_state rs;
 	struct mutex lock;
 	char buf[CONSOLE_EXT_LOG_MAX];
 };
@@ -623,11 +666,25 @@ static ssize_t devkmsg_write(struct kiocb *iocb, struct iov_iter *from)
 	char *buf, *line;
 	int level = default_message_loglevel;
 	int facility = 1;	/* LOG_USER */
+	struct file *file = iocb->ki_filp;
+	struct devkmsg_user *user = file->private_data;
 	size_t len = iov_iter_count(from);
 	ssize_t ret = len;
 
-	if (len > LOG_LINE_MAX)
+	if (!user || len > LOG_LINE_MAX)
 		return -EINVAL;
+
+	/* Ignore when user logging is disabled. */
+	if ((devkmsg_log & DEVKMSG_LOG_MASK) == DEVKMSG_LOG_OFF)
+		return len;
+
+	/* Ratelimit when not explicitly enabled or when we're not booting. */
+	if ((system_state != SYSTEM_BOOTING) &&
+	    ((devkmsg_log & DEVKMSG_LOG_MASK) != DEVKMSG_LOG_ON)) {
+		if (!___ratelimit(&user->rs, current->comm))
+			return ret;
+	}
+
 	buf = kmalloc(len+1, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
@@ -801,17 +858,19 @@ static int devkmsg_open(struct inode *inode, struct file *file)
 	int err;
 
 	/* write-only does not need any file context */
-	if ((file->f_flags & O_ACCMODE) == O_WRONLY)
-		return 0;
-
-	err = check_syslog_permissions(SYSLOG_ACTION_READ_ALL,
-				       SYSLOG_FROM_READER);
-	if (err)
-		return err;
+	if ((file->f_flags & O_ACCMODE) != O_WRONLY) {
+		err = check_syslog_permissions(SYSLOG_ACTION_READ_ALL,
+					       SYSLOG_FROM_READER);
+		if (err)
+			return err;
+	}
 
 	user = kmalloc(sizeof(struct devkmsg_user), GFP_KERNEL);
 	if (!user)
 		return -ENOMEM;
+
+	ratelimit_default_init(&user->rs);
+	ratelimit_set_flags(&user->rs, RATELIMIT_MSG_ON_RELEASE);
 
 	mutex_init(&user->lock);
 
@@ -830,6 +889,8 @@ static int devkmsg_release(struct inode *inode, struct file *file)
 
 	if (!user)
 		return 0;
+
+	ratelimit_state_exit(&user->rs);
 
 	mutex_destroy(&user->lock);
 	kfree(user);
