@@ -744,6 +744,15 @@ static void au8522_get_stats(struct dvb_frontend *fe, enum fe_status status)
 			fe->ops.i2c_gate_ctrl(fe, 0);
 		if (ret < 0)
 			state->strength = 0;
+
+		/*
+		 * FIXME: As this frontend is used only with au0828, and,
+		 * currently, the tuner is eiter xc5000 or tda18271, and
+		 * only the first implements get_rf_strength(), we'll assume
+		 * that the strength will be returned in dB.
+		 */
+		c->strength.stat[0].svalue = 35000 - 1000 * (65535 - state->strength) / 256;
+		c->strength.stat[0].scale = FE_SCALE_DECIBEL;
 	} else {
 		u32 tmp;
 		/*
@@ -769,9 +778,9 @@ static void au8522_get_stats(struct dvb_frontend *fe, enum fe_status status)
 			state->strength = 0xffff;
 		else
 			state->strength = tmp / 8960;
+		c->strength.stat[0].uvalue = state->strength;
+		c->strength.stat[0].scale = FE_SCALE_RELATIVE;
 	}
-	c->strength.stat[0].scale = FE_SCALE_RELATIVE;
-	c->strength.stat[0].uvalue = state->strength;
 
 	/* Read UCB blocks */
 	if (!(status & FE_HAS_LOCK)) {
