@@ -811,6 +811,7 @@ static int lgdt3306a_fe_sleep(struct dvb_frontend *fe)
 static int lgdt3306a_init(struct dvb_frontend *fe)
 {
 	struct lgdt3306a_state *state = fe->demodulator_priv;
+	struct dtv_frontend_properties *p = &fe->dtv_property_cache;
 	u8 val;
 	int ret;
 
@@ -962,6 +963,13 @@ static int lgdt3306a_init(struct dvb_frontend *fe)
 	ret = lgdt3306a_sleep(state);
 	lg_chkerr(ret);
 
+	/* Initialize DVBv5 statistics */
+	p->strength.stat[0].scale = FE_SCALE_RELATIVE;
+	p->strength.stat[0].uvalue = 0;
+	p->strength.len = 1;
+	p->cnr.stat[0].scale = FE_SCALE_NOT_AVAILABLE;
+	p->cnr.len = 1;
+
 fail:
 	return ret;
 }
@@ -1031,6 +1039,11 @@ static int lgdt3306a_set_parameters(struct dvb_frontend *fe)
 	ret = lgdt3306a_soft_reset(state);
 	if (lg_chkerr(ret))
 		goto fail;
+
+	/* Reset DVBv5 stats */
+	p->strength.stat[0].scale = FE_SCALE_RELATIVE;
+	p->strength.stat[0].uvalue = 0;
+	p->cnr.stat[0].scale = FE_SCALE_NOT_AVAILABLE;
 
 #ifdef DBG_DUMP
 	lgdt3306a_DumpAllRegs(state);
@@ -1497,6 +1510,8 @@ static u32 lgdt3306a_calculate_snr_x100(struct lgdt3306a_state *state)
 	snr_x100 = log10_x1000((pwr * 10000) / mse) - 3000;
 	dbg_info("mse=%u, pwr=%u, snr_x100=%d\n", mse, pwr, snr_x100);
 
+	state->snr = snr_x100;
+
 	return snr_x100;
 }
 
@@ -1558,6 +1573,18 @@ lgdt3306a_qam_lock_poll(struct lgdt3306a_state *state)
 	return LG3306_UNLOCK;
 }
 
+static void lgdt3306a_get_stats(struct dvb_frontend *fe, enum fe_status status)
+{
+	struct dtv_frontend_properties *p = &fe->dtv_property_cache;
+	struct lgdt3306a_state *state = fe->demodulator_priv;
+
+	if (!(status & FE_HAS_LOCK))
+		return;
+
+	p->cnr.stat[0].scale = FE_SCALE_DECIBEL;
+	p->cnr.stat[0].svalue = state->snr * 10;
+}
+
 static int lgdt3306a_read_status(struct dvb_frontend *fe,
 				 enum fe_status *status)
 {
@@ -1599,9 +1626,16 @@ static int lgdt3306a_read_status(struct dvb_frontend *fe,
 			}
 			break;
 		default:
+			state->snr = 0;
 			ret = -EINVAL;
 		}
+	} else {
+		state->snr = 0;
 	}
+
+
+	lgdt3306a_get_stats(fe, *status);
+
 	return ret;
 }
 
@@ -1610,8 +1644,6 @@ static int lgdt3306a_read_snr(struct dvb_frontend *fe, u16 *snr)
 {
 	struct lgdt3306a_state *state = fe->demodulator_priv;
 
-	state->snr = lgdt3306a_calculate_snr_x100(state);
-	/* report SNR in dB * 10 */
 	*snr = state->snr/10;
 
 	return 0;
