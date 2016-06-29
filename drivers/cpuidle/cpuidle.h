@@ -68,4 +68,27 @@ static inline void cpuidle_coupled_unregister_device(struct cpuidle_device *dev)
 }
 #endif
 
+/*
+ * Used for calculating last_residency in usec. Optimized for case
+ * where last_residency in nsecs is < INT_MAX/2 by using faster
+ * approximation. Approximated value has less than 1% error.
+ */
+static inline int convert_nsec_to_usec(u64 nsec)
+{
+	if (likely(nsec < INT_MAX / 2)) {
+		int usec = (int)nsec;
+
+		usec += usec >> 5;
+		usec = usec >> 10;
+		return usec;
+	} else {
+		u64 usec = div_u64(nsec, 1000);
+
+		if (usec > INT_MAX)
+			usec = INT_MAX;
+		return (int)usec;
+	}
+}
+
+
 #endif /* __DRIVER_CPUIDLE_H */
