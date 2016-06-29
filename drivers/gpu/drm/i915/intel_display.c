@@ -14456,6 +14456,132 @@ intel_update_cursor_plane(struct drm_plane *plane,
 	intel_crtc_update_cursor(crtc, state);
 }
 
+static void
+intel_update_chv_pipe_c_cursor_plane(struct drm_plane *plane,
+		const struct intel_crtc_state *crtc_state,
+		const struct intel_plane_state *state)
+{
+	struct drm_crtc *crtc = crtc_state->base.crtc;
+	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+	struct drm_device *dev = plane->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_i915_gem_object *obj = intel_fb_obj(state->base.fb);
+	struct drm_i915_gem_object *cur_obj = NULL, *use_obj = NULL;
+	uint32_t addr;
+	struct intel_plane_state *cursor_state = dev_priv->cursor_state;
+	const struct intel_plane_state *use_state;
+	char __iomem *src, *dst;
+	bool pinned = true;
+
+	if (state->visible && state->base.crtc_x < 0) {
+		int bytes_per_pixel = state->base.fb->bits_per_pixel / 8;
+		int x = state->base.crtc_x;
+		int width = state->base.crtc_w;
+		int height = state->base.crtc_h;
+		struct drm_mode_fb_cmd2 mode_cmd = { 0 };
+		int i;
+
+		if (!cursor_state) {
+			cursor_state = kzalloc(sizeof(*cursor_state), GFP_KERNEL);
+			if (!cursor_state) {
+				use_state = state;
+				use_obj = obj;
+				goto update;
+			}
+
+			memcpy(cursor_state, state, sizeof(*state));
+
+			/* Allocate new gem object */
+			cur_obj = i915_gem_object_create(dev, obj->base.size);
+			if (IS_ERR(cur_obj))
+				goto gem_err;
+
+			mode_cmd.width = cursor_state->base.fb->width;
+			mode_cmd.height = cursor_state->base.fb->height;
+			mode_cmd.pitches[0] = cursor_state->base.fb->pitches[0];
+			mode_cmd.pixel_format = cursor_state->base.fb->pixel_format;
+
+			cursor_state->base.fb = intel_framebuffer_create(dev, &mode_cmd, cur_obj);
+			if (IS_ERR(cursor_state->base.fb)) {
+				drm_gem_object_unreference_unlocked(&cur_obj->base);
+				goto gem_err;
+			}
+
+			if (i915_gem_obj_ggtt_pin(cur_obj, 0, 0) < 0) {
+				drm_gem_object_unreference_unlocked(&cur_obj->base);
+				pinned = false;
+				goto cleanup;
+			}
+
+			dev_priv->cursor_state = cursor_state;
+		} else
+			cur_obj = intel_fb_obj(cursor_state->base.fb);
+
+		src = ioremap_wc(dev_priv->ggtt.mappable_base +
+				i915_gem_obj_ggtt_offset(obj),
+				obj->base.size);
+
+		dst = ioremap_wc(dev_priv->ggtt.mappable_base +
+				i915_gem_obj_ggtt_offset(cur_obj),
+				cur_obj->base.size);
+
+		/* shift the original cusrsor in to copy buffer offsetting -ive pos */
+		x = -x;
+		for (i = 0; i < height; i++) {
+			src += x * bytes_per_pixel;
+			memcpy(dst, src, (width - x) * bytes_per_pixel);
+			dst += (width - x) * bytes_per_pixel;
+			memset(dst, 0, x * bytes_per_pixel);
+			dst += x * bytes_per_pixel;
+			src += (width -x) * bytes_per_pixel;
+		}
+
+		iounmap(src);
+		iounmap(dst);
+
+		cursor_state->base.crtc_x = 0;
+		use_obj = cur_obj;
+		use_state = cursor_state;
+
+		goto update;
+	}
+
+cleanup:
+	if (cursor_state) {
+		struct intel_framebuffer *intel_fb = to_intel_framebuffer(cursor_state->base.fb);
+
+		if (pinned)
+			i915_gem_object_ggtt_unpin(cur_obj);
+
+		drm_framebuffer_cleanup(cursor_state->base.fb);
+		mutex_lock(&dev->struct_mutex);
+		drm_gem_object_unreference(&intel_fb->obj->base);
+		mutex_unlock(&dev->struct_mutex);
+		kfree(intel_fb);
+	}
+
+gem_err:
+	if (dev_priv->cursor_state) {
+		kfree(dev_priv->cursor_state);
+		dev_priv->cursor_state = NULL;
+	}
+
+	use_state = state;
+	use_obj = obj;
+
+update:
+	if (!use_obj)
+		addr = 0;
+	else if (!INTEL_INFO(dev)->cursor_needs_physical)
+		addr = i915_gem_obj_ggtt_offset(use_obj);
+	else
+		addr = use_obj->phys_handle->busaddr;
+
+	intel_crtc->cursor_addr = addr;
+
+	intel_crtc_update_cursor(crtc, use_state);
+}
+
 static struct drm_plane *intel_cursor_plane_create(struct drm_device *dev,
 						   int pipe)
 {
@@ -14478,7 +14604,10 @@ static struct drm_plane *intel_cursor_plane_create(struct drm_device *dev,
 	cursor->plane = pipe;
 	cursor->frontbuffer_bit = INTEL_FRONTBUFFER_CURSOR(pipe);
 	cursor->check_plane = intel_check_cursor_plane;
-	cursor->update_plane = intel_update_cursor_plane;
+	if (IS_CHERRYVIEW(dev) && pipe == PIPE_C)
+		cursor->update_plane = intel_update_chv_pipe_c_cursor_plane;
+	else
+		cursor->update_plane = intel_update_cursor_plane;
 	cursor->disable_plane = intel_disable_cursor_plane;
 
 	ret = drm_universal_plane_init(dev, &cursor->base, 0,

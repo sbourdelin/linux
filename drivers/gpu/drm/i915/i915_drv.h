@@ -2041,6 +2041,13 @@ struct drm_i915_private {
 	struct intel_encoder *dig_port_map[I915_MAX_PORTS];
 
 	/*
+	* Temporary copy of cursor plane state for CHV PIPE_C
+	* Will be initialized only when crtc_x < 0 as there is a
+	* HW bug causing pipe underrun
+	*/
+	struct intel_plane_state *cursor_state;
+
+	/*
 	 * NOTE: This is the dri1/ums dungeon, don't add stuff here. Your patch
 	 * will be rejected. Instead look for a better place.
 	 */
