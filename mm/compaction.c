@@ -47,10 +47,16 @@ static inline void count_compact_events(enum vm_event_item item, long delta)
 #define pageblock_start_pfn(pfn)	block_start_pfn(pfn, pageblock_order)
 #define pageblock_end_pfn(pfn)		block_end_pfn(pfn, pageblock_order)
 
+/*
+ * Releases isolated free pages back to the buddy allocator.  Returns the pfn
+ * that should be cached for the next compaction of this zone, depending on how
+ * much memory the free pages span.
+ */
 static unsigned long release_freepages(struct list_head *freelist)
 {
 	struct page *page, *next;
 	unsigned long high_pfn = 0;
+	unsigned long low_pfn = -1UL;
 
 	list_for_each_entry_safe(page, next, freelist, lru) {
 		unsigned long pfn = page_to_pfn(page);
@@ -58,7 +64,17 @@ static unsigned long release_freepages(struct list_head *freelist)
 		__free_page(page);
 		if (pfn > high_pfn)
 			high_pfn = pfn;
+		if (pfn < low_pfn)
+			low_pfn = pfn;
 	}
+
+	/*
+	 * If the list of freepages spans too much memory, the cached position
+	 * should be updated to the lowest pfn to prevent the freeing scanner
+	 * from becoming too expensive.
+	 */
+	if ((high_pfn - low_pfn) > (COMPACT_CLUSTER_MAX << PAGE_SHIFT))
+		return low_pfn;
 
 	return high_pfn;
 }
