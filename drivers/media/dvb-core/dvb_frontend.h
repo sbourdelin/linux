@@ -227,8 +227,17 @@ enum dvbfe_search {
  * 			should return 0.
  * @get_status:		returns the frontend lock status
  * @get_rf_strength:	returns the RF signal strengh. Used mostly to support
- *			analog TV and radio. Digital TV should report, instead,
- *			via DVBv5 API (@dvb_frontend.dtv_property_cache;).
+ *			analog TV and radio. This is deprecated, in favor of
+ *			@get_rf_attenuation.
+ * @get_rf_attenuation:	returns the RF signal attenuation, relative to the
+ *			maximum supported gain, in 1/1000 dB steps. Please
+ *			notice that 0 means that the tuner is using its maximum
+ *			gain. So, a value of 10000, for example, means a 10dB
+ *			attenuation. This is ops is meant to be used by
+ *			demodulator drivers to estimate the maximum signal
+ *			strength. For that, it will add an offset, in order to
+ *			expose the signal strength to userspace via dvbv5
+ *			stats, in dBm.
  * @get_afc:		Used only by analog TV core. Reports the frequency
  *			drift due to AFC.
  * @calc_regs:		callback function used to pass register data settings
@@ -264,6 +273,7 @@ struct dvb_tuner_ops {
 #define TUNER_STATUS_STEREO 2
 	int (*get_status)(struct dvb_frontend *fe, u32 *status);
 	int (*get_rf_strength)(struct dvb_frontend *fe, u16 *strength);
+	s32 (*get_rf_attenuation)(struct dvb_frontend *fe);
 	int (*get_afc)(struct dvb_frontend *fe, s32 *afc);
 
 	/*
