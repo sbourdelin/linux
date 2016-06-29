@@ -252,7 +252,7 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
 			RK2928_CLKGATE_CON(0), 1, GFLAGS),
 	COMPOSITE_NOGATE(0, "aclk_cpu_src", mux_aclk_cpu_src_p, 0,
 			RK2928_CLKSEL_CON(0), 13, 2, MFLAGS, 8, 5, DFLAGS),
-	GATE(ARMCLK, "aclk_cpu", "aclk_cpu_src", 0,
+	GATE(ARMCLK, "aclk_cpu", "aclk_cpu_src", CLK_IS_CRITICAL,
 			RK2928_CLKGATE_CON(6), 0, GFLAGS),
 	COMPOSITE_NOMUX(0, "hclk_cpu", "aclk_cpu_src", 0,
 			RK2928_CLKSEL_CON(1), 8, 2, DFLAGS,
@@ -332,13 +332,13 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
 			RK2928_CLKGATE_CON(2), 0, GFLAGS),
 	COMPOSITE_NOGATE(0, "aclk_peri_src", mux_aclk_peri_src_p, 0,
 			RK2928_CLKSEL_CON(10), 10, 2, MFLAGS, 0, 5, DFLAGS),
-	COMPOSITE_NOMUX(PCLK_PERI, "pclk_peri", "aclk_peri_src", 0,
+	COMPOSITE_NOMUX(PCLK_PERI, "pclk_peri", "aclk_peri_src", CLK_IS_CRITICAL,
 			RK2928_CLKSEL_CON(10), 12, 3, DFLAGS,
 			RK2928_CLKGATE_CON(5), 2, GFLAGS),
-	COMPOSITE_NOMUX(HCLK_PERI, "hclk_peri", "aclk_peri_src", 0,
+	COMPOSITE_NOMUX(HCLK_PERI, "hclk_peri", "aclk_peri_src", CLK_IS_CRITICAL,
 			RK2928_CLKSEL_CON(10), 8, 2, DFLAGS,
 			RK2928_CLKGATE_CON(5), 1, GFLAGS),
-	GATE(ACLK_PERI, "aclk_peri", "aclk_peri_src", 0,
+	GATE(ACLK_PERI, "aclk_peri", "aclk_peri_src", CLK_IS_CRITICAL,
 			RK2928_CLKGATE_CON(5), 0, GFLAGS),
 
 	GATE(SCLK_TIMER0, "sclk_timer0", "xin24m", 0,
@@ -642,13 +642,6 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
 	MMC(SCLK_EMMC_SAMPLE,  "emmc_sample",  "sclk_emmc",  RK3228_EMMC_CON1,  0),
 };
 
-static const char *const rk3228_critical_clocks[] __initconst = {
-	"aclk_cpu",
-	"aclk_peri",
-	"hclk_peri",
-	"pclk_peri",
-};
-
 static void __init rk3228_clk_init(struct device_node *np)
 {
 	struct rockchip_clk_provider *ctx;
@@ -672,8 +665,6 @@ static void __init rk3228_clk_init(struct device_node *np)
 				   RK3228_GRF_SOC_STATUS0);
 	rockchip_clk_register_branches(ctx, rk3228_clk_branches,
 				  ARRAY_SIZE(rk3228_clk_branches));
-	rockchip_clk_protect_critical(rk3228_critical_clocks,
-				      ARRAY_SIZE(rk3228_critical_clocks));
 
 	rockchip_clk_register_armclk(ctx, ARMCLK, "armclk",
 			mux_armclk_p, ARRAY_SIZE(mux_armclk_p),
