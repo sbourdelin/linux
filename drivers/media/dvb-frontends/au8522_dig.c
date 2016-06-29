@@ -641,8 +641,16 @@ static int au8522_set_frontend(struct dvb_frontend *fe)
 
 	state->current_frequency = c->frequency;
 
+	/* Reset DVBv5 stats */
+	c->strength.stat[0].scale = FE_SCALE_RELATIVE;
+	c->strength.stat[0].uvalue = 0;
+	c->cnr.stat[0].scale = FE_SCALE_NOT_AVAILABLE;
+	c->block_error.stat[0].scale = FE_SCALE_NOT_AVAILABLE;
+
 	return 0;
 }
+
+static void au8522_get_stats(struct dvb_frontend *fe, enum fe_status status);
 
 static int au8522_read_status(struct dvb_frontend *fe, enum fe_status *status)
 {
@@ -698,6 +706,8 @@ static int au8522_read_status(struct dvb_frontend *fe, enum fe_status *status)
 		au8522_led_ctrl(state, 0);
 
 	dprintk("%s() status 0x%08x\n", __func__, *status);
+
+	au8522_get_stats(fe, *status);
 
 	return 0;
 }
@@ -764,70 +774,108 @@ static int au8522_read_snr(struct dvb_frontend *fe, u16 *snr)
 	return ret;
 }
 
+static void au8522_get_stats(struct dvb_frontend *fe, enum fe_status status)
+{
+	struct dtv_frontend_properties *c = &fe->dtv_property_cache;
+	struct au8522_state *state = fe->demodulator_priv;
+	int ret;
+
+	/* Get S/N ratio */
+	if (status & FE_HAS_LOCK) {
+		ret = au8522_read_snr(fe, &state->snr);
+		if (ret < 0) {
+			state->snr = 0;
+			c->cnr.stat[0].scale = FE_SCALE_NOT_AVAILABLE;
+		} else {
+			c->cnr.stat[0].scale = FE_SCALE_DECIBEL;
+			c->cnr.stat[0].svalue = state->snr * 100;
+		}
+	} else {
+		state->snr = 0;
+		c->cnr.stat[0].scale = FE_SCALE_NOT_AVAILABLE;
+	}
+
+	/* Get (or estimate) RF strength */
+	if (fe->ops.tuner_ops.get_rf_strength) {
+		/* If the tuner has RF strength, use it */
+
+		if (fe->ops.i2c_gate_ctrl)
+			fe->ops.i2c_gate_ctrl(fe, 1);
+		ret = fe->ops.tuner_ops.get_rf_strength(fe, &state->strength);
+		if (fe->ops.i2c_gate_ctrl)
+			fe->ops.i2c_gate_ctrl(fe, 0);
+		if (ret < 0)
+			state->strength = 0;
+	} else {
+		u32 tmp;
+		/*
+		 * If it doen't, estimate from SNR
+		 * (borrowed from lgdt330x.c)
+		 *
+		 * Calculate strength from SNR up to 35dB
+		 * Even though the SNR can go higher than 35dB,
+		 * there is some comfort factor in having a range of
+		 * strong signals that can show at 100%
+		 *
+		 * The following calculation method was chosen
+		 * purely for the sake of code re-use from the
+		 * other demod drivers that use this method
+		 */
+
+		/* Convert from SNR in dB * 10 to 8.24 fixed-point */
+		tmp = (state->snr * ((1 << 24) / 10));
+
+		/* Convert from 8.24 fixed-point to
+		* scale the range 0 - 35*2^24 into 0 - 65535*/
+		if (tmp >= 8960 * 0x10000)
+			state->strength = 0xffff;
+		else
+			state->strength = tmp / 8960;
+	}
+	c->strength.stat[0].scale = FE_SCALE_RELATIVE;
+	c->strength.stat[0].uvalue = state->strength;
+
+	/* Read UCB blocks */
+	if (!(status & FE_HAS_LOCK)) {
+		c->block_error.stat[0].scale = FE_SCALE_NOT_AVAILABLE;
+		return;
+	}
+
+	if (state->current_modulation == VSB_8)
+		state->ucblocks = au8522_readreg(state, 0x4087);
+	else
+		state->ucblocks = au8522_readreg(state, 0x4543);
+
+	c->block_error.stat[0].scale = FE_SCALE_COUNTER;
+	c->block_error.stat[0].uvalue = state->ucblocks;
+}
 static int au8522_read_signal_strength(struct dvb_frontend *fe,
 				       u16 *signal_strength)
 {
-	u16 snr;
-	u32 tmp;
-	int ret;
+	struct au8522_state *state = fe->demodulator_priv;
 
-	/* If the tuner has RF strength, use it */
-	if (fe->ops.tuner_ops.get_rf_strength) {
-		if (fe->ops.i2c_gate_ctrl)
-			fe->ops.i2c_gate_ctrl(fe, 1);
-		ret = fe->ops.tuner_ops.get_rf_strength(fe, signal_strength);
-		if (fe->ops.i2c_gate_ctrl)
-			fe->ops.i2c_gate_ctrl(fe, 0);
-		return ret;
-	}
+	*signal_strength = state->strength;
 
-	/*
-	 * If it doen't, estimate from SNR
-	 * (borrowed from lgdt330x.c)
-	 *
-	 * Calculate strength from SNR up to 35dB
-	 * Even though the SNR can go higher than 35dB,
-	 * there is some comfort factor in having a range of
-	 * strong signals that can show at 100%
-	 */
-	ret = au8522_read_snr(fe, &snr);
-
-	*signal_strength = 0;
-
-	if (0 == ret) {
-		/* The following calculation method was chosen
-		 * purely for the sake of code re-use from the
-		 * other demod drivers that use this method */
-
-		/* Convert from SNR in dB * 10 to 8.24 fixed-point */
-		tmp = (snr * ((1 << 24) / 10));
-
-		/* Convert from 8.24 fixed-point to
-		 * scale the range 0 - 35*2^24 into 0 - 65535*/
-		if (tmp >= 8960 * 0x10000)
-			*signal_strength = 0xffff;
-		else
-			*signal_strength = tmp / 8960;
-	}
-
-	return ret;
+	return 0;
 }
 
 static int au8522_read_ucblocks(struct dvb_frontend *fe, u32 *ucblocks)
 {
 	struct au8522_state *state = fe->demodulator_priv;
 
-	if (state->current_modulation == VSB_8)
-		*ucblocks = au8522_readreg(state, 0x4087);
-	else
-		*ucblocks = au8522_readreg(state, 0x4543);
+	*ucblocks = state->ucblocks;
 
 	return 0;
 }
 
 static int au8522_read_ber(struct dvb_frontend *fe, u32 *ber)
 {
-	return au8522_read_ucblocks(fe, ber);
+	struct au8522_state *state = fe->demodulator_priv;
+
+	/* FIXME: This is so wrong! */
+	*ber = state->ucblocks;
+
+	return 0;
 }
 
 static int au8522_get_frontend(struct dvb_frontend *fe,
@@ -908,6 +956,22 @@ error:
 }
 EXPORT_SYMBOL(au8522_attach);
 
+static int au8522_dvb_init(struct dvb_frontend *fe)
+{
+	struct dtv_frontend_properties *c = &fe->dtv_property_cache;
+
+	/* Initialize DVBv5 statistics */
+	c->strength.stat[0].scale = FE_SCALE_RELATIVE;
+	c->strength.stat[0].uvalue = 0;
+	c->strength.len = 1;
+	c->cnr.stat[0].scale = FE_SCALE_NOT_AVAILABLE;
+	c->cnr.len = 1;
+	c->block_error.stat[0].scale = FE_SCALE_NOT_AVAILABLE;
+	c->block_error.len = 1;
+
+	return au8522_init(fe);
+}
+
 static struct dvb_frontend_ops au8522_ops = {
 	.delsys = { SYS_ATSC, SYS_DVBC_ANNEX_B },
 	.info = {
@@ -918,7 +982,7 @@ static struct dvb_frontend_ops au8522_ops = {
 		.caps = FE_CAN_QAM_64 | FE_CAN_QAM_256 | FE_CAN_8VSB
 	},
 
-	.init                 = au8522_init,
+	.init                 = au8522_dvb_init,
 	.sleep                = au8522_sleep,
 	.i2c_gate_ctrl        = au8522_i2c_gate_ctrl,
 	.set_frontend         = au8522_set_frontend,
