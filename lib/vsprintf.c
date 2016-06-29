@@ -2271,15 +2271,6 @@ static bool supported_bin_ptr(const char *fmt)
 	bool supported = false;
 
 	switch (fmt[0]) {
-	case 'F':
-	case 'f':
-		/* Some archs dereference function pointers */
-		if (vbin_printf == 
-		    dereference_function_descriptor(vbin_printf)) {
-			supported = true;
-			break;
-		}
-		/* Fall through */
 	case 'R':
 	case 'r':
 	case 'b':
@@ -2394,7 +2385,21 @@ do {									\
 		}
 
 		case FORMAT_TYPE_PTR:
-			save_arg(void *);
+			switch (fmt[0]) {
+			case 'F':
+			case 'f': {
+				void *ptr = va_arg(args, void *);
+
+				ptr = dereference_function_descriptor(ptr);
+				str = PTR_ALIGN(str, sizeof(u32));
+				if (str + sizeof(ptr) <= end)
+					*(void **)str = ptr;
+				str += sizeof(ptr);
+				break;
+			}
+			default:
+				save_arg(void *);
+			}
 			/* skip all alphanumeric pointer suffixes */
 			while (isalnum(*fmt))
 				fmt++;
@@ -2548,8 +2553,23 @@ int bstr_printf(char *buf, size_t size, const char *fmt, const u32 *bin_buf)
 
 		case FORMAT_TYPE_PTR: {
 			const char *_fmt = fmt;
+			char tmp_fmt[2];
 
-			if (!supported_bin_ptr(fmt)) {
+			if (supported_bin_ptr(fmt)) {
+				switch (fmt[0]) {
+				case 'F':
+				case 'f':
+					/*
+					 * The saved pointer has already
+					 * been derefenced. Convert the
+					 * 'f' to 's' or 'F' to 'S'.
+					 */
+					tmp_fmt[0] = 's' - ('f' - fmt[0]);
+					tmp_fmt[1] = 0;
+					_fmt = tmp_fmt;
+					break;
+				}
+			} else {
 				int len = sizeof(unsupported_str) + 1;
 
 				if (str + len <= end) {
