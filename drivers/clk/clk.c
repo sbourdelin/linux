@@ -601,7 +601,8 @@ static void clk_core_unprepare(struct clk_core *core)
 						__func__, core->name);
 					break;
 				}
-				if (system_state == SYSTEM_BOOTING)
+				if (system_state == SYSTEM_BOOTING ||
+				    system_state == SYSTEM_SUSPEND)
 					/*
 					 * Busy loop as we can't schedule in
 					 * early boot
@@ -670,7 +671,8 @@ static int clk_core_prepare(struct clk_core *core)
 						ret = -ETIMEDOUT;
 						break;
 					}
-					if (system_state == SYSTEM_BOOTING)
+					if (system_state == SYSTEM_BOOTING ||
+					    system_state == SYSTEM_SUSPEND)
 						/*
 						 * Busy loop as we can't
 						 * schedule in early boot
@@ -1254,7 +1256,8 @@ static int __clk_set_parent(struct clk_core *core, struct clk_core *parent,
 					ret = -ETIMEDOUT;
 					break;
 				}
-				if (system_state == SYSTEM_BOOTING)
+				if (system_state == SYSTEM_BOOTING ||
+				    system_state == SYSTEM_SUSPEND)
 					/*
 					 * Busy loop as we can't
 					 * schedule in early boot
@@ -1548,7 +1551,8 @@ static void clk_change_rate(struct clk_core *core)
 							__func__, core->name);
 						break;
 					}
-					if (system_state == SYSTEM_BOOTING)
+					if (system_state == SYSTEM_BOOTING ||
+					    system_state == SYSTEM_SUSPEND)
 						/*
 						 * Busy loop as we can't
 						 * schedule in early boot
