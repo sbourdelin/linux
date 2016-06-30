@@ -1142,7 +1142,7 @@ static int cluster_pages_for_defrag(struct inode *inode,
 
 	ret = btrfs_delalloc_reserve_space(inode,
 			start_index << PAGE_SHIFT,
-			page_cnt << PAGE_SHIFT);
+			page_cnt << PAGE_SHIFT, 0);
 	if (ret)
 		return ret;
 	i_done = 0;
@@ -1233,7 +1233,7 @@ again:
 		spin_unlock(&BTRFS_I(inode)->lock);
 		btrfs_delalloc_release_space(inode,
 				start_index << PAGE_SHIFT,
-				(page_cnt - i_done) << PAGE_SHIFT);
+				(page_cnt - i_done) << PAGE_SHIFT, 0);
 	}
 
 	btrfs_set_extent_defrag(inode, page_start,
@@ -1258,7 +1258,7 @@ out:
 	}
 	btrfs_delalloc_release_space(inode,
 			start_index << PAGE_SHIFT,
-			page_cnt << PAGE_SHIFT);
+			page_cnt << PAGE_SHIFT, 0);
 	return ret;
 
 }

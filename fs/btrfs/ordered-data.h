@@ -75,6 +75,7 @@ struct btrfs_ordered_sum {
 				 * in the logging code. */
 #define BTRFS_ORDERED_PENDING 11 /* We are waiting for this ordered extent to
 				  * complete in the current transaction. */
+
 struct btrfs_ordered_extent {
 	/* logical offset in the file */
 	u64 file_offset;

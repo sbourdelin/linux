@@ -488,14 +488,14 @@ again:
 	/* Just to make sure we have enough space */
 	prealloc += 8 * PAGE_SIZE;
 
-	ret = btrfs_delalloc_reserve_space(inode, 0, prealloc);
+	ret = btrfs_delalloc_reserve_space(inode, 0, prealloc, 0);
 	if (ret)
 		goto out_put;
 
 	ret = btrfs_prealloc_file_range_trans(inode, trans, 0, 0, prealloc,
 					      prealloc, prealloc, &alloc_hint);
 	if (ret) {
-		btrfs_delalloc_release_space(inode, 0, prealloc);
+		btrfs_delalloc_release_space(inode, 0, prealloc, 0);
 		goto out_put;
 	}
 	btrfs_free_reserved_data_space(inode, 0, prealloc);

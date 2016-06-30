@@ -20,6 +20,7 @@
 #include "locking.h"
 #include "rcu-string.h"
 #include "backref.h"
+#include "dedupe.h"
 
 static struct kmem_cache *extent_state_cache;
 static struct kmem_cache *extent_buffer_cache;
@@ -605,7 +606,7 @@ static int __clear_extent_bit(struct extent_io_tree *tree, u64 start, u64 end,
 	btrfs_debug_check_extent_io_range(tree, start, end);
 
 	if (bits & EXTENT_DELALLOC)
-		bits |= EXTENT_NORESERVE;
+		bits |= EXTENT_NORESERVE | EXTENT_DEDUPE;
 
 	if (delete)
 		bits |= ~EXTENT_CTLBITS;
@@ -1491,6 +1492,61 @@ out:
 	return ret;
 }
 
+static void adjust_one_outstanding_extent(struct inode *inode, u64 len)
+{
+	struct btrfs_fs_info *fs_info = BTRFS_I(inode)->root->fs_info;
+	u64 dedupe_blocksize = fs_info->dedupe_info->blocksize;
+	unsigned old_extents, new_extents;
+
+	old_extents = div64_u64(len + dedupe_blocksize - 1, dedupe_blocksize);
+	new_extents = div64_u64(len + BTRFS_MAX_EXTENT_SIZE - 1,
+				BTRFS_MAX_EXTENT_SIZE);
+	if (old_extents <= new_extents)
+		return;
+
+	spin_lock(&BTRFS_I(inode)->lock);
+	BTRFS_I(inode)->outstanding_extents -= old_extents - new_extents;
+	spin_unlock(&BTRFS_I(inode)->lock);
+}
+
+/*
+ * For a extent with EXTENT_DEDUPE flag, if later it does not go through
+ * in-band dedupe, we need to adjust the number of outstanding_extents.
+ * It's because for extent with EXTENT_DEDUPE flag, its number of outstanding
+ * extents is calculated by in-band dedupe blocksize, so here we need to
+ * adjust it.
+ */
+void adjust_buffered_io_outstanding_extents(struct extent_io_tree *tree,
+					    u64 start, u64 end)
+{
+	struct inode *inode = tree->mapping->host;
+	struct rb_node *node;
+	struct extent_state *state;
+
+	spin_lock(&tree->lock);
+	node = tree_search(tree, start);
+	if (!node)
+		goto out;
+
+	while (1) {
+		state = rb_entry(node, struct extent_state, rb_node);
+		if (state->start > end)
+			goto out;
+		/*
+		 * The whole range is locked, so we can safely clear
+		 * EXTENT_DEDUPE flag.
+		 */
+		state->state &= ~EXTENT_DEDUPE;
+		adjust_one_outstanding_extent(inode,
+				state->end - state->start + 1);
+		node = rb_next(node);
+		if (!node)
+			break;
+	}
+out:
+	spin_unlock(&tree->lock);
+}
+
 /*
  * find a contiguous range of bytes in the file marked as delalloc, not
  * more than 'max_bytes'.  start and end are used to return the range,
@@ -1506,6 +1562,7 @@ static noinline u64 find_delalloc_range(struct extent_io_tree *tree,
 	u64 cur_start = *start;
 	u64 found = 0;
 	u64 total_bytes = 0;
+	unsigned pre_state;
 
 	spin_lock(&tree->lock);
 
@@ -1523,7 +1580,8 @@ static noinline u64 find_delalloc_range(struct extent_io_tree *tree,
 	while (1) {
 		state = rb_entry(node, struct extent_state, rb_node);
 		if (found && (state->start != cur_start ||
-			      (state->state & EXTENT_BOUNDARY))) {
+		    (state->state & EXTENT_BOUNDARY) ||
+		    (state->state ^ pre_state) & EXTENT_DEDUPE)) {
 			goto out;
 		}
 		if (!(state->state & EXTENT_DELALLOC)) {
@@ -1539,6 +1597,7 @@ static noinline u64 find_delalloc_range(struct extent_io_tree *tree,
 		found++;
 		*end = state->end;
 		cur_start = state->end + 1;
+		pre_state = state->state;
 		node = rb_next(node);
 		total_bytes += state->end - state->start + 1;
 		if (total_bytes >= max_bytes)
