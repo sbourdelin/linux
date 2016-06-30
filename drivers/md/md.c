@@ -3933,6 +3933,8 @@ array_state_store(struct mddev *mddev, const char *buf, size_t len)
 			} else
 				err = -EBUSY;
 		}
+		if (!err)
+			sysfs_notify_dirent_safe(mddev->sysfs_state);
 		spin_unlock(&mddev->lock);
 		return err ?: len;
 	}
