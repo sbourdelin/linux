@@ -2988,20 +2988,14 @@ void i915_gem_request_free(struct kref *req_ref)
 	kmem_cache_free(req->i915->requests, req);
 }
 
-static inline int
+static inline struct drm_i915_gem_request *
 __i915_gem_request_alloc(struct intel_engine_cs *engine,
-			 struct i915_gem_context *ctx,
-			 struct drm_i915_gem_request **req_out)
+			 struct i915_gem_context *ctx)
 {
 	struct drm_i915_private *dev_priv = engine->i915;
 	unsigned reset_counter = i915_reset_counter(&dev_priv->gpu_error);
 	struct drm_i915_gem_request *req;
 	int ret;
-
-	if (!req_out)
-		return -EINVAL;
-
-	*req_out = NULL;
 
 	/* ABI: Before userspace accesses the GPU (e.g. execbuffer), report
 	 * EIO if the GPU is already wedged, or EAGAIN to drop the struct_mutex
@@ -3009,11 +3003,11 @@ __i915_gem_request_alloc(struct intel_engine_cs *engine,
 	 */
 	ret = i915_gem_check_wedge(reset_counter, dev_priv->mm.interruptible);
 	if (ret)
-		return ret;
+		return ERR_PTR(ret);
 
 	req = kmem_cache_zalloc(dev_priv->requests, GFP_KERNEL);
 	if (req == NULL)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 
 	ret = i915_gem_get_seqno(engine->i915, &req->seqno);
 	if (ret)
@@ -3041,14 +3035,13 @@ __i915_gem_request_alloc(struct intel_engine_cs *engine,
 	if (ret)
 		goto err_ctx;
 
-	*req_out = req;
-	return 0;
+	return req;
 
 err_ctx:
 	i915_gem_context_unreference(ctx);
 err:
 	kmem_cache_free(dev_priv->requests, req);
-	return ret;
+	return ERR_PTR(ret);
 }
 
 /**
@@ -3067,13 +3060,9 @@ struct drm_i915_gem_request *
 i915_gem_request_alloc(struct intel_engine_cs *engine,
 		       struct i915_gem_context *ctx)
 {
-	struct drm_i915_gem_request *req;
-	int err;
-
 	if (ctx == NULL)
 		ctx = engine->i915->kernel_context;
-	err = __i915_gem_request_alloc(engine, ctx, &req);
-	return err ? ERR_PTR(err) : req;
+	return __i915_gem_request_alloc(engine, ctx);
 }
 
 struct drm_i915_gem_request *
