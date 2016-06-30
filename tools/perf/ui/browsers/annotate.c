@@ -1050,7 +1050,8 @@ int symbol__tui_annotate(struct symbol *sym, struct map *map,
 		  (nr_pcnt - 1);
 	}
 
-	if (symbol__annotate(sym, map, sizeof_bdl) < 0) {
+	if (symbol__annotate(sym, map, sizeof_bdl,
+			     perf_evsel__env_arch(evsel)) < 0) {
 		ui__error("%s", ui_helpline__last_msg);
 		goto out_free_offsets;
 	}
