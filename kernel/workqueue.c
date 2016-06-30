@@ -4369,8 +4369,8 @@ static void show_pwq(struct pool_workqueue *pwq)
 /**
  * show_workqueue_state - dump workqueue state
  *
- * Called from a sysrq handler and prints out all busy workqueues and
- * pools.
+ * Called from a sysrq handler or try_to_freeze_tasks() and prints out
+ * all busy workqueues and pools.
  */
 void show_workqueue_state(void)
 {
@@ -4395,6 +4395,9 @@ void show_workqueue_state(void)
 		}
 		if (idle)
 			continue;
+
+		if (wq->flags & WQ_FREEZABLE)
+			pr_info("freezable ");
 
 		pr_info("workqueue %s: flags=0x%x\n", wq->name, wq->flags);
 
