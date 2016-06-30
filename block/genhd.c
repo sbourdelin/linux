@@ -506,12 +506,10 @@ static int exact_lock(dev_t devt, void *data)
 	return 0;
 }
 
-static void register_disk(struct gendisk *disk)
+static void register_disk(struct gendisk *disk, bool gen_uevent)
 {
 	struct device *ddev = disk_to_dev(disk);
 	struct block_device *bdev;
-	struct disk_part_iter piter;
-	struct hd_struct *part;
 	int err;
 
 	ddev->parent = disk->driverfs_dev;
@@ -563,6 +561,22 @@ static void register_disk(struct gendisk *disk)
 exit:
 	/* announce disk after possible partitions are created */
 	dev_set_uevent_suppress(ddev, 0);
+	if (gen_uevent)
+		disk_gen_uevents(disk);
+}
+
+/**
+ * disk_gen_uevents
+ * @disk - the disk to generate uevent
+ *
+ * Generate KOBJ_ADD uevents on the disk and partitions.
+ */
+void disk_gen_uevents(struct gendisk *disk)
+{
+	struct device *ddev = disk_to_dev(disk);
+	struct disk_part_iter piter;
+	struct hd_struct *part;
+
 	kobject_uevent(&ddev->kobj, KOBJ_ADD);
 
 	/* announce possible partitions */
@@ -571,6 +585,7 @@ exit:
 		kobject_uevent(&part_to_dev(part)->kobj, KOBJ_ADD);
 	disk_part_iter_exit(&piter);
 }
+EXPORT_SYMBOL(disk_gen_uevents);
 
 /**
  * add_disk - add partitioning information to kernel list
@@ -618,7 +633,7 @@ void add_disk(struct gendisk *disk, bool gen_uevent)
 
 	blk_register_region(disk_devt(disk), disk->minors, NULL,
 			    exact_match, exact_lock, disk);
-	register_disk(disk);
+	register_disk(disk, gen_uevent);
 	blk_register_queue(disk);
 
 	/*
