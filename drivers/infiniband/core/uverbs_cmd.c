@@ -41,12 +41,8 @@
 #include <asm/uaccess.h>
 
 #include "uverbs.h"
+#include "uobject.h"
 #include "core_priv.h"
-
-struct uverbs_lock_class {
-	struct lock_class_key	key;
-	char			name[16];
-};
 
 static struct uverbs_lock_class pd_lock_class	= { .name = "PD-uobj" };
 static struct uverbs_lock_class mr_lock_class	= { .name = "MR-uobj" };
@@ -57,66 +53,6 @@ static struct uverbs_lock_class ah_lock_class	= { .name = "AH-uobj" };
 static struct uverbs_lock_class srq_lock_class	= { .name = "SRQ-uobj" };
 static struct uverbs_lock_class xrcd_lock_class = { .name = "XRCD-uobj" };
 static struct uverbs_lock_class rule_lock_class = { .name = "RULE-uobj" };
-
-/*
- * The ib_uobject locking scheme is as follows:
- *
- * - ib_uverbs_idr_lock protects the uverbs idrs themselves, so it
- *   needs to be held during all idr write operations.  When an object is
- *   looked up, a reference must be taken on the object's kref before
- *   dropping this lock.  For read operations, the rcu_read_lock()
- *   and rcu_write_lock() but similarly the kref reference is grabbed
- *   before the rcu_read_unlock().
- *
- * - Each object also has an rwsem.  This rwsem must be held for
- *   reading while an operation that uses the object is performed.
- *   For example, while registering an MR, the associated PD's
- *   uobject.mutex must be held for reading.  The rwsem must be held
- *   for writing while initializing or destroying an object.
- *
- * - In addition, each object has a "live" flag.  If this flag is not
- *   set, then lookups of the object will fail even if it is found in
- *   the idr.  This handles a reader that blocks and does not acquire
- *   the rwsem until after the object is destroyed.  The destroy
- *   operation will set the live flag to 0 and then drop the rwsem;
- *   this will allow the reader to acquire the rwsem, see that the
- *   live flag is 0, and then drop the rwsem and its reference to
- *   object.  The underlying storage will not be freed until the last
- *   reference to the object is dropped.
- */
-
-static void init_uobj(struct ib_uobject *uobj, u64 user_handle,
-		      struct ib_ucontext *context, struct uverbs_lock_class *c)
-{
-	uobj->user_handle = user_handle;
-	uobj->context     = context;
-	kref_init(&uobj->ref);
-	init_rwsem(&uobj->mutex);
-	lockdep_set_class_and_name(&uobj->mutex, &c->key, c->name);
-	uobj->live        = 0;
-}
-
-static void release_uobj(struct kref *kref)
-{
-	kfree_rcu(container_of(kref, struct ib_uobject, ref), rcu);
-}
-
-static void put_uobj(struct ib_uobject *uobj)
-{
-	kref_put(&uobj->ref, release_uobj);
-}
-
-static void put_uobj_read(struct ib_uobject *uobj)
-{
-	up_read(&uobj->mutex);
-	put_uobj(uobj);
-}
-
-static void put_uobj_write(struct ib_uobject *uobj)
-{
-	up_write(&uobj->mutex);
-	put_uobj(uobj);
-}
 
 static int idr_add_uobj(struct idr *idr, struct ib_uobject *uobj)
 {
@@ -213,29 +149,14 @@ static struct ib_pd *idr_read_pd(int pd_handle, struct ib_ucontext *context)
 	return idr_read_obj(&ib_uverbs_pd_idr, pd_handle, context, 0);
 }
 
-static void put_pd_read(struct ib_pd *pd)
-{
-	put_uobj_read(pd->uobject);
-}
-
 static struct ib_cq *idr_read_cq(int cq_handle, struct ib_ucontext *context, int nested)
 {
 	return idr_read_obj(&ib_uverbs_cq_idr, cq_handle, context, nested);
 }
 
-static void put_cq_read(struct ib_cq *cq)
-{
-	put_uobj_read(cq->uobject);
-}
-
 static struct ib_ah *idr_read_ah(int ah_handle, struct ib_ucontext *context)
 {
 	return idr_read_obj(&ib_uverbs_ah_idr, ah_handle, context, 0);
-}
-
-static void put_ah_read(struct ib_ah *ah)
-{
-	put_uobj_read(ah->uobject);
 }
 
 static struct ib_qp *idr_read_qp(int qp_handle, struct ib_ucontext *context)
@@ -251,24 +172,9 @@ static struct ib_qp *idr_write_qp(int qp_handle, struct ib_ucontext *context)
 	return uobj ? uobj->object : NULL;
 }
 
-static void put_qp_read(struct ib_qp *qp)
-{
-	put_uobj_read(qp->uobject);
-}
-
-static void put_qp_write(struct ib_qp *qp)
-{
-	put_uobj_write(qp->uobject);
-}
-
 static struct ib_srq *idr_read_srq(int srq_handle, struct ib_ucontext *context)
 {
 	return idr_read_obj(&ib_uverbs_srq_idr, srq_handle, context, 0);
-}
-
-static void put_srq_read(struct ib_srq *srq)
-{
-	put_uobj_read(srq->uobject);
 }
 
 static struct ib_xrcd *idr_read_xrcd(int xrcd_handle, struct ib_ucontext *context,
@@ -276,11 +182,6 @@ static struct ib_xrcd *idr_read_xrcd(int xrcd_handle, struct ib_ucontext *contex
 {
 	*uobj = idr_read_uobj(&ib_uverbs_xrcd_idr, xrcd_handle, context, 0);
 	return *uobj ? (*uobj)->object : NULL;
-}
-
-static void put_xrcd_read(struct ib_uobject *uobj)
-{
-	put_uobj_read(uobj);
 }
 
 ssize_t ib_uverbs_get_context(struct ib_uverbs_file *file,
