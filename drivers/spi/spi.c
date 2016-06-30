@@ -971,6 +971,9 @@ static int spi_transfer_one_message(struct spi_master *master,
 		spi_reset_cs_wake_timer(msg->spi);
 	}
 
+	if (msg->spi->xfer_delay)
+		mdelay(msg->spi->xfer_delay);
+
 	spi_set_cs(msg->spi, true);
 
 	SPI_STATISTICS_INCREMENT_FIELD(statm, messages);

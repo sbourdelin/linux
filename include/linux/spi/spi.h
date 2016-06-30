@@ -137,6 +137,8 @@ void spi_statistics_add_transfer_stats(struct spi_statistics *stats,
  * @cs_wake_timer: Timer measuring the delay before the device goes to
  *	sleep after the last SPI transaction.
  *
+ * @xfer_delay: Delay between SPI transactions (msec).
+ *
  * @statistics: statistics for the spi_device
  *
  * A @spi_device is used to interchange data between an SPI slave
@@ -182,6 +184,8 @@ struct spi_device {
 	unsigned long		cs_wake_duration;
 	bool			cs_wake_needed;
 	struct timer_list	cs_wake_timer;
+
+	u32			xfer_delay;
 
 	/* the statistics */
 	struct spi_statistics	statistics;
