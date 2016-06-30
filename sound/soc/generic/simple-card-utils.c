@@ -52,3 +52,33 @@ int asoc_simple_card_parse_daifmt(struct device *dev,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(asoc_simple_card_parse_daifmt);
+
+int asoc_simple_card_parse_dailink_name(struct device *dev,
+					struct snd_soc_dai_link *dai_link)
+{
+	char *name = NULL;
+	int ret = -ENOMEM;
+
+	if (dai_link->dynamic && dai_link->cpu_dai_name)
+		name = devm_kasprintf(dev, GFP_KERNEL,
+				      "fe.%s", dai_link->cpu_dai_name);
+
+	else if (dai_link->no_pcm && dai_link->codec_dai_name)
+		name = devm_kasprintf(dev, GFP_KERNEL,
+				      "be.%s", dai_link->codec_dai_name);
+	else if (dai_link->cpu_dai_name && dai_link->codec_dai_name)
+		name = devm_kasprintf(dev, GFP_KERNEL,
+				      "%s-%s",
+				      dai_link->cpu_dai_name,
+				      dai_link->codec_dai_name);
+
+	if (name) {
+		ret = 0;
+
+		dai_link->name =
+		dai_link->stream_name = name;
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(asoc_simple_card_parse_dailink_name);
