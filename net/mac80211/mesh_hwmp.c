@@ -322,19 +322,28 @@ static u32 airtime_link_metric_get(struct ieee80211_local *local,
 	int device_constant = 1 << ARITH_SHIFT;
 	int test_frame_len = TEST_FRAME_LEN << ARITH_SHIFT;
 	int s_unit = 1 << ARITH_SHIFT;
-	int rate, err;
+	int rate = 0, err = 0;
 	u32 tx_time, estimated_retx;
 	u64 result;
 
-	if (sta->mesh->fail_avg >= 100)
-		return MAX_METRIC;
+	/* Try to get rate based on HW/SW RC algorithm.
+	 * Rate is returned in units of Kbps, correct this
+	 * to comply with airtime calculation units
+	 */
+	rate = sta_get_expected_throughput(sta) / 100;
 
-	sta_set_rate_info_tx(sta, &sta->tx_stats.last_rate, &rinfo);
-	rate = cfg80211_calculate_bitrate(&rinfo);
-	if (WARN_ON(!rate))
-		return MAX_METRIC;
+	/* if we did not get a rate */
+	if (!rate) {
+		if (sta->mesh->fail_avg >= 100)
+			return MAX_METRIC;
 
-	err = (sta->mesh->fail_avg << ARITH_SHIFT) / 100;
+		sta_set_rate_info_tx(sta, &sta->tx_stats.last_rate, &rinfo);
+		rate = cfg80211_calculate_bitrate(&rinfo);
+		if (WARN_ON(!rate))
+			return MAX_METRIC;
+
+		err = (sta->mesh->fail_avg << ARITH_SHIFT) / 100;
+	}
 
 	/* bitrate is in units of 100 Kbps, while we need rate in units of
 	 * 1Mbps. This will be corrected on tx_time computation.
