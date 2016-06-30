@@ -2,6 +2,7 @@
 CFLAGS_trace.o			:= -I$(src)
 
 udc-core-y			:= core.o trace.o
+udc-core-$(CONFIG_USB_CHARGER)	+= charger.o
 
 #
 # USB peripheral controller drivers
