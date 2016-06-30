@@ -18,6 +18,15 @@
 # error "<asm/smp.h> included in non-SMP build"
 #endif
 
+/*
+ * Identify which IPIs are safe for the irqchip to handle using FIQ.
+ *
+ * This information is advisory. The interrupt controller may not be capable
+ * of routing these IPIs to FIQ and the kernel will continue to work if they
+ * are routed to IRQ as normal.
+ */
+#define SMP_IPI_FIQ_MASK 0x80
+
 #define raw_smp_processor_id() (current_thread_info()->cpu)
 
 struct seq_file;
