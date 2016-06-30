@@ -233,9 +233,6 @@ void bch_cache_accounting_init(struct cache_accounting *acc,
 	kobject_init(&acc->day.kobj,		&bch_stats_ktype);
 
 	closure_init(&acc->cl, parent);
-	init_timer(&acc->timer);
-	acc->timer.expires	= jiffies + accounting_delay;
-	acc->timer.data		= (unsigned long) acc;
-	acc->timer.function	= scale_accounting;
-	add_timer(&acc->timer);
+	setup_timer(&acc->timer, scale_accounting, (unsigned long) acc);
+	mod_timer(&acc->timer, jiffies + accounting_delay);
 }
