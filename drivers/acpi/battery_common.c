@@ -141,6 +141,7 @@ struct acpi_battery {
 	int state;
 	int power_unit;
 	unsigned long flags;
+	bool power_supply_register;
 };
 
 #define to_acpi_battery(x) power_supply_get_drvdata(x)
@@ -1190,7 +1191,7 @@ static int acpi_battery_update_retry(struct acpi_battery *battery)
 	return ret;
 }
 
-int acpi_battery_common_add(struct acpi_device *device)
+int acpi_battery_common_add(struct acpi_device *device, bool power_supply_register)
 {
 	int result = 0;
 	struct acpi_battery *battery = NULL;
@@ -1212,18 +1213,22 @@ int acpi_battery_common_add(struct acpi_device *device)
 	mutex_init(&battery->sysfs_lock);
 	if (acpi_has_method(battery->device->handle, "_BIX"))
 		set_bit(ACPI_BATTERY_XINFO_PRESENT, &battery->flags);
-	result = acpi_battery_update_retry(battery);
-	if (result)
-		goto fail;
+
+	battery->power_supply_register = power_supply_register;
+	if (power_supply_register) {
+		result = acpi_battery_update_retry(battery);
+		if (result)
+			goto fail;
 
 #ifdef CONFIG_ACPI_PROCFS_POWER
-	result = acpi_battery_add_fs(device);
+		result = acpi_battery_add_fs(device);
 #endif
-	if (result) {
+		if (result) {
 #ifdef CONFIG_ACPI_PROCFS_POWER
-		acpi_battery_remove_fs(device);
+			acpi_battery_remove_fs(device);
 #endif
-		goto fail;
+			goto fail;
+		}
 	}
 	pr_info(PREFIX "%s Slot [%s] (battery %s)\n",
 		ACPI_BATTERY_DEVICE_NAME, acpi_device_bid(device),
@@ -1254,10 +1259,12 @@ int acpi_battery_common_remove(struct acpi_device *device)
 	device_init_wakeup(&device->dev, 0);
 	battery = acpi_driver_data(device);
 	unregister_pm_notifier(&battery->pm_nb);
+	if (battery->power_supply_register) {
 #ifdef CONFIG_ACPI_PROCFS_POWER
-	acpi_battery_remove_fs(device);
+		acpi_battery_remove_fs(device);
 #endif
-	sysfs_remove_battery(battery);
+		sysfs_remove_battery(battery);
+	}
 	mutex_destroy(&battery->lock);
 	mutex_destroy(&battery->sysfs_lock);
 	kfree(battery);

@@ -85,13 +85,18 @@ static const struct dmi_system_id bat_dmi_table[] __initconst = {
 
 static SIMPLE_DEV_PM_OPS(acpi_battery_pm, NULL, acpi_battery_common_resume);
 
+static int acpi_battery_add(struct acpi_device *device)
+{
+	return acpi_battery_common_add(device, true);
+}
+
 static struct acpi_driver acpi_battery_driver = {
 	.name = "battery",
 	.class = ACPI_BATTERY_CLASS,
 	.ids = battery_device_ids,
 	.flags = ACPI_DRIVER_ALL_NOTIFY_EVENTS,
 	.ops = {
-		.add = acpi_battery_common_add,
+		.add = acpi_battery_add,
 		.remove = acpi_battery_common_remove,
 		.notify = acpi_battery_common_notify,
 		},
