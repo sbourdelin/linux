@@ -1829,6 +1829,9 @@ enum nl80211_commands {
  *	%NL80211_ATTR_EXT_CAPA_MASK, to specify the extended capabilities per
  *	interface type.
  *
+ * @NL80211_ATTR_MESH_PEER_AID: Association ID for the mesh peer (u16). This is
+ *	used to pull the stored data for mesh peer in power save state.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2212,6 +2215,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_PAD,
 
 	NL80211_ATTR_IFTYPE_EXT_CAPA,
+
+	NL80211_ATTR_MESH_PEER_AID,
 
 	/* add attributes here, update the policy in nl80211.c */
 
