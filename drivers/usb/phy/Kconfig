@@ -45,7 +45,7 @@ config ISP1301_OMAP
 config KEYSTONE_USB_PHY
 	tristate "Keystone USB PHY Driver"
 	depends on ARCH_KEYSTONE || COMPILE_TEST
-	depends on NOP_USB_XCEIV
+	select NOP_USB_XCEIV
 	help
 	  Enable this to support Keystone USB phy. This driver provides
 	  interface to interact with USB 2.0 and USB 3.0 PHY that is part
@@ -53,7 +53,6 @@ config KEYSTONE_USB_PHY
 
 config NOP_USB_XCEIV
 	tristate "NOP USB Transceiver Driver"
-	depends on USB_GADGET || !USB_GADGET # if USB_GADGET=m, NOP can't be built-in
 	select USB_PHY
 	help
 	  This driver is to be used by all the usb transceiver which are either
@@ -66,7 +65,7 @@ config AM335X_CONTROL_USB
 config AM335X_PHY_USB
 	tristate "AM335x USB PHY Driver"
 	depends on ARM || COMPILE_TEST
-	depends on NOP_USB_XCEIV
+	select NOP_USB_XCEIV
 	select USB_PHY
 	select AM335X_CONTROL_USB
 	select USB_COMMON

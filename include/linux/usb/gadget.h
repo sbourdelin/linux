@@ -508,14 +508,50 @@ static inline int gadget_is_otg(struct usb_gadget *g)
 
 /*-------------------------------------------------------------------------*/
 
+/**
+ * usb_gadget_vbus_connect - Notify controller that VBUS is powered
+ * @gadget:The device which now has VBUS power.
+ * Context: can sleep
+ *
+ * This call is used by a driver for an external transceiver (or GPIO)
+ * that detects a VBUS power session starting.  Common responses include
+ * resuming the controller, activating the D+ (or D-) pullup to let the
+ * host detect that a USB device is attached, and starting to draw power
+ * (8mA or possibly more, especially after SET_CONFIGURATION).
+ *
+ * Returns zero on success, else negative errno.
+ */
+static inline int usb_gadget_vbus_connect(struct usb_gadget *gadget)
+{
+	if (!gadget->ops->vbus_session)
+		return -EOPNOTSUPP;
+	return gadget->ops->vbus_session(gadget, 1);
+}
+
+/**
+ * usb_gadget_vbus_disconnect - notify controller about VBUS session end
+ * @gadget:the device whose VBUS supply is being described
+ * Context: can sleep
+ *
+ * This call is used by a driver for an external transceiver (or GPIO)
+ * that detects a VBUS power session ending.  Common responses include
+ * reversing everything done in usb_gadget_vbus_connect().
+ *
+ * Returns zero on success, else negative errno.
+ */
+static inline int usb_gadget_vbus_disconnect(struct usb_gadget *gadget)
+{
+	if (!gadget->ops->vbus_session)
+		return -EOPNOTSUPP;
+	return gadget->ops->vbus_session(gadget, 0);
+}
+
 #if IS_ENABLED(CONFIG_USB_GADGET)
 int usb_gadget_frame_number(struct usb_gadget *gadget);
 int usb_gadget_wakeup(struct usb_gadget *gadget);
 int usb_gadget_set_selfpowered(struct usb_gadget *gadget);
 int usb_gadget_clear_selfpowered(struct usb_gadget *gadget);
-int usb_gadget_vbus_connect(struct usb_gadget *gadget);
 int usb_gadget_vbus_draw(struct usb_gadget *gadget, unsigned mA);
-int usb_gadget_vbus_disconnect(struct usb_gadget *gadget);
 int usb_gadget_connect(struct usb_gadget *gadget);
 int usb_gadget_disconnect(struct usb_gadget *gadget);
 int usb_gadget_deactivate(struct usb_gadget *gadget);
@@ -529,11 +565,7 @@ static inline int usb_gadget_set_selfpowered(struct usb_gadget *gadget)
 { return 0; }
 static inline int usb_gadget_clear_selfpowered(struct usb_gadget *gadget)
 { return 0; }
-static inline int usb_gadget_vbus_connect(struct usb_gadget *gadget)
-{ return 0; }
 static inline int usb_gadget_vbus_draw(struct usb_gadget *gadget, unsigned mA)
-{ return 0; }
-static inline int usb_gadget_vbus_disconnect(struct usb_gadget *gadget)
 { return 0; }
 static inline int usb_gadget_connect(struct usb_gadget *gadget)
 { return 0; }
