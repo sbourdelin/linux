@@ -805,6 +805,33 @@ static int snd_ctl_elem_list(struct snd_card *card,
 	return 0;
 }
 
+static bool validate_dimension(struct snd_ctl_elem_info *info)
+{
+	unsigned int elements;
+	unsigned int i;
+
+	/*
+	 * When drivers don't use dimen field, this value is zero and pass the
+	 * validation. Else, calculated number of elements is validated.
+	 */
+	elements = info->dimen.d[0];
+	for (i = 1; i < ARRAY_SIZE(info->dimen.d); ++i) {
+		if (info->dimen.d[i] == 0)
+			break;
+		if (info->dimen.d[i] < 0)
+			return false;
+		elements *= info->dimen.d[i];
+	}
+
+	/* The rest of level should be zero. */
+	for (++i; i < ARRAY_SIZE(info->dimen.d); ++i) {
+		if (info->dimen.d[i] != 0)
+			return false;
+	}
+
+	return elements <= info->count;
+}
+
 static int snd_ctl_elem_info(struct snd_ctl_file *ctl,
 			     struct snd_ctl_elem_info *info)
 {
@@ -1271,6 +1298,8 @@ static int snd_ctl_elem_add(struct snd_ctl_file *file,
 		return -EINVAL;
 	if (info->count < 1 ||
 	    info->count > max_value_counts[info->type])
+		return -EINVAL;
+	if (!validate_dimension(info))
 		return -EINVAL;
 	private_size = value_sizes[info->type] * info->count;
 
