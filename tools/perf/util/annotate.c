@@ -68,7 +68,7 @@ static int call__parse(struct ins_operands *ops,
 
 	name++;
 
-	if (!strcmp(norm_arch, "arm") && strchr(name, '+'))
+	if (!strcmp(norm_arch, NORM_ARM) && strchr(name, '+'))
 		return -1;
 
 	tok = strchr(name, '>');
@@ -255,7 +255,7 @@ static int mov__parse(struct ins_operands *ops,
 
 	target = ++s;
 
-	if (!strcmp(norm_arch, "arm"))
+	if (!strcmp(norm_arch, NORM_ARM))
 		comment = strchr(s, ';');
 	else
 		comment = strchr(s, '#');
@@ -629,13 +629,13 @@ static struct ins *ins__find(const char *name, const char *norm_arch)
 		sorted = true;
 	}
 
-	if (!strcmp(norm_arch, "x86")) {
+	if (!strcmp(norm_arch, NORM_X86)) {
 		instructions = instructions_x86;
 		nmemb = ARRAY_SIZE(instructions_x86);
-	} else if (!strcmp(norm_arch, "arm")) {
+	} else if (!strcmp(norm_arch, NORM_ARM)) {
 		instructions = instructions_arm;
 		nmemb = ARRAY_SIZE(instructions_arm);
-	} else if (!strcmp(norm_arch, "powerpc")) {
+	} else if (!strcmp(norm_arch, NORM_POWERPC)) {
 		return ins__find_powerpc(name);
 	} else {
 		pr_err("perf annotate not supported by %s arch\n", norm_arch);
