@@ -368,6 +368,14 @@ struct ib_uverbs_ex_create_cq {
 	__u32 reserved;
 };
 
+struct rdma_create_cq {
+	__u64 user_handle;
+	__u32 cqe;
+	__u32 comp_vector;
+	__s32 comp_channel;
+	__u32 flags;
+};
+
 struct ib_uverbs_create_cq_resp {
 	__u32 cq_handle;
 	__u32 cqe;
@@ -516,6 +524,17 @@ struct ib_uverbs_create_qp {
 	__u8  is_srq;
 	__u8  reserved;
 	__u64 driver_data[0];
+};
+
+struct rdma_ioctl_create_qp
+{
+	__u32 max_send_wr;
+	__u32 max_recv_wr;
+	__u32 max_send_sge;
+	__u32 max_recv_sge;
+	__u32 max_inline_data;
+	__u8  sq_sig_all;
+	__u8  qp_type;
 };
 
 struct ib_uverbs_ex_create_qp {

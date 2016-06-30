@@ -31,6 +31,7 @@
  */
 
 #include <rdma/uverbs_ioctl_cmd.h>
+#include <rdma/ib_user_verbs.h>
 #include <linux/bug.h>
 
 #define IB_UVERBS_VENDOR_FLAG	0x8000
@@ -54,4 +55,43 @@ int uverbs_action_std_handle(struct ib_device *ib_dev,
 	WARN_ON(num != 2);
 
 	return priv->handler(ib_dev, ucontext, &ctx[0], &ctx[1], priv->priv);
+}
+
+DECLARE_UVERBS_ATTR_CHAIN_SPEC(
+	uverbs_create_qp_spec,
+	UVERBS_ATTR_PTR_IN(CREATE_QP_CMD, sizeof(struct rdma_ioctl_create_qp)),
+	UVERBS_ATTR_PTR_OUT(CREATE_QP_RESP, sizeof(struct ib_uverbs_create_qp_resp)),
+	UVERBS_ATTR_IDR_IN(CREATE_QP_QP, UVERBS_TYPE_QP,
+			   UVERBS_IDR_ACCESS_NEW),
+	UVERBS_ATTR_IDR_IN(CREATE_QP_PD, UVERBS_TYPE_PD,
+			   UVERBS_IDR_ACCESS_READ),
+	UVERBS_ATTR_IDR_IN(CREATE_QP_RECV_CQ, UVERBS_TYPE_CQ,
+			   UVERBS_IDR_ACCESS_READ),
+	UVERBS_ATTR_IDR_IN(CREATE_QP_SEND_CQ, UVERBS_TYPE_CQ,
+			   UVERBS_IDR_ACCESS_READ));
+
+DECLARE_UVERBS_ATTR_CHAIN_SPEC(
+	uverbs_destroy_qp_spec,
+	UVERBS_ATTR_PTR_OUT(DESTROY_QP_RESP, sizeof(struct ib_uverbs_destroy_qp_resp)),
+	UVERBS_ATTR_IDR_IN(DESTROY_QP_QP, UVERBS_TYPE_QP,
+			   UVERBS_IDR_ACCESS_DESTROY));
+
+DECLARE_UVERBS_ATTR_CHAIN_SPEC(
+	uverbs_create_cq_spec,
+	UVERBS_ATTR_PTR_IN(CREATE_CQ_CMD, sizeof(struct rdma_create_cq)),
+	UVERBS_ATTR_PTR_OUT(CREATE_CQ_RESP, sizeof(struct ib_uverbs_create_cq_resp)));
+
+
+int uverbs_destroy_qp_handler(struct ib_device *ib_dev,
+			      struct ib_ucontext *ucontext,
+			      struct uverbs_attr_array *common,
+			      struct uverbs_attr_array *vendor,
+			      void *priv)
+{
+	/*
+	 * Implementation:
+	 * 1. Serialize to kAPI
+	 * 2. Call ib_dev with @vendor as vendor specific data
+	 */
+	return 0;
 }

@@ -49,5 +49,40 @@ struct uverbs_action_std_handler {
 		       void *priv);
 	void *priv;
 };
+
+enum uverbs_common_types {
+	UVERBS_TYPE_PD,
+	UVERBS_TYPE_CQ,
+	UVERBS_TYPE_QP,
+};
+
+enum uverbs_create_qp_cmd_attr {
+	CREATE_QP_CMD,
+	CREATE_QP_RESP,
+	CREATE_QP_QP,
+	CREATE_QP_PD,
+	CREATE_QP_RECV_CQ,
+	CREATE_QP_SEND_CQ,
+};
+
+enum uverbs_destroy_qp_cmd_attr {
+	DESTROY_QP_RESP,
+	DESTROY_QP_QP,
+};
+
+enum uverbs_create_cq_cmd_attr {
+	CREATE_CQ_CMD,
+	CREATE_CQ_RESP,
+};
+
+extern const struct uverbs_attr_chain_spec uverbs_create_qp_spec;
+extern const struct uverbs_attr_chain_spec uverbs_destroy_qp_spec;
+extern const struct uverbs_attr_chain_spec uverbs_create_cq_spec;
+
+int uverbs_destroy_qp_handler(struct ib_device *ib_dev,
+			      struct ib_ucontext *ucontext,
+			      struct uverbs_attr_array *common,
+			      struct uverbs_attr_array *vendor,
+			      void *priv);
 #endif
 
