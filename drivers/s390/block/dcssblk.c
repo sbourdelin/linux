@@ -655,7 +655,7 @@ dcssblk_add_store(struct device *dev, struct device_attribute *attr, const char 
 		goto put_dev;
 
 	get_device(&dev_info->dev);
-	add_disk(dev_info->gd);
+	add_disk(dev_info->gd, true);
 
 	switch (dev_info->segment_type) {
 		case SEG_TYPE_SR:

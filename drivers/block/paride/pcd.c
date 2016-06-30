@@ -970,7 +970,7 @@ static int __init pcd_init(void)
 			register_cdrom(&cd->info);
 			cd->disk->private_data = cd;
 			cd->disk->queue = pcd_queue;
-			add_disk(cd->disk);
+			add_disk(cd->disk, true);
 		}
 	}
 

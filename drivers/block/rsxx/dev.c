@@ -230,7 +230,7 @@ int rsxx_attach_dev(struct rsxx_cardinfo *card)
 			set_capacity(card->gendisk, card->size8 >> 9);
 		else
 			set_capacity(card->gendisk, 0);
-		add_disk(card->gendisk);
+		add_disk(card->gendisk, true);
 
 		card->bdev_attached = 1;
 	}

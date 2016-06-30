@@ -377,7 +377,7 @@ static int __init xpram_setup_blkdev(void)
 		disk->queue = xpram_queues[i];
 		sprintf(disk->disk_name, "slram%d", i);
 		set_capacity(disk, xpram_sizes[i] << 1);
-		add_disk(disk);
+		add_disk(disk, true);
 	}
 
 	return 0;

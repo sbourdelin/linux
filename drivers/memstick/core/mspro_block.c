@@ -1255,7 +1255,7 @@ static int mspro_block_init_disk(struct memstick_dev *card)
 	set_capacity(msb->disk, capacity);
 	dev_dbg(&card->dev, "capacity set %ld\n", capacity);
 
-	add_disk(msb->disk);
+	add_disk(msb->disk, true);
 	msb->active = 1;
 	return 0;
 

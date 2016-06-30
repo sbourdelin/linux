@@ -499,7 +499,7 @@ static int ps3disk_probe(struct ps3_system_bus_device *_dev)
 		 gendisk->disk_name, priv->model, priv->raw_capacity >> 11,
 		 get_capacity(gendisk) >> 11);
 
-	add_disk(gendisk);
+	add_disk(gendisk, true);
 	return 0;
 
 fail_cleanup_queue:

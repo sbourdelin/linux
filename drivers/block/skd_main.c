@@ -4693,7 +4693,7 @@ static int skd_bdev_getgeo(struct block_device *bdev, struct hd_geometry *geo)
 static int skd_bdev_attach(struct skd_device *skdev)
 {
 	pr_debug("%s:%s:%d add_disk\n", skdev->name, __func__, __LINE__);
-	add_disk(skdev->disk);
+	add_disk(skdev->disk, true);
 	return 0;
 }
 

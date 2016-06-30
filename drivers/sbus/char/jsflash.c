@@ -590,7 +590,7 @@ static int jsfd_init(void)
 		set_capacity(disk, jdp->dsize >> 9);
 		disk->private_data = jdp;
 		disk->queue = jsf_queue;
-		add_disk(disk);
+		add_disk(disk, true);
 		set_disk_ro(disk, 1);
 	}
 	return 0;

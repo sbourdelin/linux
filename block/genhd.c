@@ -575,13 +575,14 @@ exit:
 /**
  * add_disk - add partitioning information to kernel list
  * @disk: per-device partitioning information
+ * @gen_uevent: whether to generate the KOBJ_ADD uevent
  *
  * This function registers the partitioning information in @disk
  * with the kernel.
  *
  * FIXME: error handling
  */
-void add_disk(struct gendisk *disk)
+void add_disk(struct gendisk *disk, bool gen_uevent)
 {
 	struct backing_dev_info *bdi;
 	dev_t devt;

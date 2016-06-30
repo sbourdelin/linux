@@ -835,7 +835,7 @@ static int __init lloop_init(void)
 
 	/* We cannot fail after we call this, so another loop!*/
 	for (i = 0; i < max_loop; i++)
-		add_disk(disks[i]);
+		add_disk(disks[i], true);
 	return 0;
 
 out_mem4:

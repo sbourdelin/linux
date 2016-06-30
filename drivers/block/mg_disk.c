@@ -1006,7 +1006,7 @@ static int mg_probe(struct platform_device *plat_dev)
 
 	set_capacity(host->gd, host->n_sectors);
 
-	add_disk(host->gd);
+	add_disk(host->gd, true);
 
 	return err;
 

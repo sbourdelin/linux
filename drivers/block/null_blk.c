@@ -740,7 +740,7 @@ static int null_add_dev(void)
 	disk->queue		= nullb->q;
 	strncpy(disk->disk_name, nullb->disk_name, DISK_NAME_LEN);
 
-	add_disk(disk);
+	add_disk(disk, true);
 
 done:
 	mutex_lock(&lock);

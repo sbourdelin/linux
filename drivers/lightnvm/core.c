@@ -843,7 +843,7 @@ static int nvm_create_target(struct nvm_dev *dev,
 	blk_queue_max_hw_sectors(tqueue, 8 * dev->ops->max_phys_sect);
 
 	set_capacity(tdisk, tt->capacity(targetdata));
-	add_disk(tdisk);
+	add_disk(tdisk, true);
 
 	t->type = tt;
 	t->disk = tdisk;

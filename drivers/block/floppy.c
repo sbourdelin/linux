@@ -4351,7 +4351,7 @@ static int __init do_floppy_init(void)
 		disks[drive]->private_data = (void *)(long)drive;
 		disks[drive]->flags |= GENHD_FL_REMOVABLE;
 		disks[drive]->driverfs_dev = &floppy_device[drive].dev;
-		add_disk(disks[drive]);
+		add_disk(disks[drive], true);
 	}
 
 	return 0;

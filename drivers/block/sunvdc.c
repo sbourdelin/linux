@@ -835,7 +835,7 @@ static int probe_disk(struct vdc_port *port)
 	       port->vdisk_size, (port->vdisk_size >> (20 - 9)),
 	       port->vio.ver.major, port->vio.ver.minor);
 
-	add_disk(g);
+	add_disk(g, true);
 
 	return 0;
 }

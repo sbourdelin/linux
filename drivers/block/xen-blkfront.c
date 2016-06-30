@@ -2463,7 +2463,7 @@ static void blkfront_connect(struct blkfront_info *info)
 	for (i = 0; i < info->nr_rings; i++)
 		kick_pending_request_queues(&info->rinfo[i]);
 
-	add_disk(info->gd);
+	add_disk(info->gd, true);
 
 	info->is_ready = 1;
 }

@@ -4042,7 +4042,7 @@ skip_create_disk:
 	set_capacity(dd->disk, capacity);
 
 	/* Enable the block device and add it to /dev */
-	add_disk(dd->disk);
+	add_disk(dd->disk, true);
 
 	dd->bdev = bdget_disk(dd->disk, 0);
 	/*

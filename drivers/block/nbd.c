@@ -1089,7 +1089,7 @@ static int __init nbd_init(void)
 		disk->private_data = &nbd_dev[i];
 		sprintf(disk->disk_name, "nbd%d", i);
 		nbd_reset(&nbd_dev[i]);
-		add_disk(disk);
+		add_disk(disk, true);
 	}
 
 	return 0;

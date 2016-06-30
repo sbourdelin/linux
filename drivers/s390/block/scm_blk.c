@@ -531,7 +531,7 @@ int scm_blk_dev_setup(struct scm_blk_dev *bdev, struct scm_device *scmdev)
 
 	/* 512 byte sectors */
 	set_capacity(bdev->gendisk, scmdev->size >> 9);
-	add_disk(bdev->gendisk);
+	add_disk(bdev->gendisk, true);
 	return 0;
 
 out_queue:

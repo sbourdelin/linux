@@ -828,7 +828,7 @@ static int ubd_disk_register(int major, u64 size, int unit,
 
 	disk->private_data = &ubd_devs[unit];
 	disk->queue = ubd_devs[unit].queue;
-	add_disk(disk);
+	add_disk(disk, true);
 
 	*disk_out = disk;
 	return 0;

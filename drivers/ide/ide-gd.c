@@ -417,7 +417,7 @@ static int ide_gd_probe(ide_drive_t *drive)
 	if (drive->dev_flags & IDE_DFLAG_REMOVABLE)
 		g->flags = GENHD_FL_REMOVABLE;
 	g->fops = &ide_gd_ops;
-	add_disk(g);
+	add_disk(g, true);
 	return 0;
 
 out_free_disk:
