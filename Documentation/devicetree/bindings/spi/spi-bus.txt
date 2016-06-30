@@ -70,6 +70,8 @@ contain the following properties.
 		sleep if there was no SPI activity (msec).
 - cs-wake-duration - (optional) Time it takes the device to wake up after
 		toggling CS if it went to sleep (msec).
+- xfer-delay      - (optional) Delay to insert between SPI transactions
+		to guarantee that CS is deasserted at least for some time.
 
 Some SPI controllers and devices support Dual and Quad SPI transfer mode.
 It allows data in the SPI system to be transferred in 2 wires(DUAL) or 4 wires(QUAD).
