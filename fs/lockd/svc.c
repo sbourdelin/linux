@@ -335,12 +335,17 @@ static struct notifier_block lockd_inet6addr_notifier = {
 };
 #endif
 
-static void lockd_svc_exit_thread(void)
+static void lockd_unregister_notifiers(void)
 {
 	unregister_inetaddr_notifier(&lockd_inetaddr_notifier);
 #if IS_ENABLED(CONFIG_IPV6)
 	unregister_inet6addr_notifier(&lockd_inet6addr_notifier);
 #endif
+}
+
+static void lockd_svc_exit_thread(void)
+{
+	lockd_unregister_notifiers();
 	svc_exit_thread(nlmsvc_rqst);
 }
 
@@ -450,12 +455,16 @@ int lockd_up(struct net *net)
 	}
 
 	error = lockd_up_net(serv, net);
-	if (error < 0)
+	if (error < 0) {
+		lockd_unregister_notifiers();
 		goto err_net;
+	}
 
 	error = lockd_start_svc(serv);
-	if (error < 0)
+	if (error < 0) {
+		lockd_unregister_notifiers();
 		goto err_start;
+	}
 
 	nlmsvc_users++;
 	/*
