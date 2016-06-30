@@ -151,9 +151,14 @@ config ACPI_AC
 	  To compile this driver as a module, choose M here:
 	  the module will be called ac.
 
+config ACPI_BATTERY_COMMON
+	bool
+	default n
+
 config ACPI_BATTERY
 	tristate "Battery"
 	depends on X86
+	select ACPI_BATTERY_COMMON
 	select POWER_SUPPLY
 	default y
 	help
