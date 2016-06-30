@@ -39,9 +39,6 @@
 #include <linux/uaccess.h>
 #endif
 
-#include <linux/acpi.h>
-#include <linux/power_supply.h>
-
 #include "battery.h"
 
 #define PREFIX "ACPI: "
@@ -105,43 +102,6 @@ enum {
 	 * available for the 2010 models.
 	 */
 	ACPI_BATTERY_QUIRK_THINKPAD_MAH,
-};
-
-struct acpi_battery {
-	struct mutex lock;
-	struct mutex sysfs_lock;
-	struct power_supply *bat;
-	struct power_supply_desc bat_desc;
-	struct acpi_device *device;
-	struct notifier_block pm_nb;
-	unsigned long update_time;
-	int revision;
-	int rate_now;
-	int capacity_now;
-	int voltage_now;
-	int design_capacity;
-	int full_charge_capacity;
-	int technology;
-	int design_voltage;
-	int design_capacity_warning;
-	int design_capacity_low;
-	int cycle_count;
-	int measurement_accuracy;
-	int max_sampling_time;
-	int min_sampling_time;
-	int max_averaging_interval;
-	int min_averaging_interval;
-	int capacity_granularity_1;
-	int capacity_granularity_2;
-	int alarm;
-	char model_number[32];
-	char serial_number[32];
-	char type[32];
-	char oem_info[32];
-	int state;
-	int power_unit;
-	unsigned long flags;
-	bool power_supply_register;
 };
 
 #define to_acpi_battery(x) power_supply_get_drvdata(x)
@@ -723,7 +683,7 @@ static void acpi_battery_quirks(struct acpi_battery *battery)
 	}
 }
 
-static int acpi_battery_update(struct acpi_battery *battery, bool resume)
+int acpi_battery_update(struct acpi_battery *battery, bool resume)
 {
 	int result, old_present = acpi_battery_present(battery);
 
@@ -768,6 +728,7 @@ static int acpi_battery_update(struct acpi_battery *battery, bool resume)
 
 	return result;
 }
+EXPORT_SYMBOL_GPL(acpi_battery_update);
 
 static void acpi_battery_refresh(struct acpi_battery *battery)
 {

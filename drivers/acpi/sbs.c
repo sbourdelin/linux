@@ -34,7 +34,6 @@
 #include <linux/dmi.h>
 
 #include "sbshc.h"
-#include "battery.h"
 
 #define PREFIX "ACPI: "
 
