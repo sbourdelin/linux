@@ -58,6 +58,11 @@ struct uverbs_uobject_list {
 	struct list_head		type_list;
 };
 
+int ib_uverbs_uobject_add(struct ib_uobject *uobject,
+			  struct uverbs_uobject_type *uobject_type);
+void ib_uverbs_uobject_remove(struct ib_uobject *uobject);
+void ib_uverbs_uobject_enable(struct ib_uobject *uobject);
+
 void init_uobj(struct ib_uobject *uobj, u64 user_handle,
 	       struct ib_ucontext *context, struct uverbs_lock_class *c);
 

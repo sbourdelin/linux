@@ -118,6 +118,39 @@ err:
 	return err;
 }
 
+int ib_uverbs_uobject_add(struct ib_uobject *uobject,
+			  struct uverbs_uobject_type *uobject_type)
+{
+	int ret = -EINVAL;
+	struct uverbs_uobject_list *type;
+
+	/* TODO: add locking */
+	list_for_each_entry(type, &uobject->context->uobjects_lists, type_list)
+		if (type->type == uobject_type) {
+			uobject->type = type;
+			ret = idr_add_uobj(uobject);
+			return ret;
+		}
+
+	return ret;
+}
+
+void ib_uverbs_uobject_remove(struct ib_uobject *uobject)
+{
+	spin_lock(&uobject->context->device->idr_lock);
+	list_del(&uobject->idr_list);
+	spin_unlock(&uobject->context->device->idr_lock);
+	idr_remove_uobj(uobject);
+}
+
+void ib_uverbs_uobject_enable(struct ib_uobject *uobject)
+{
+	spin_lock(&uobject->context->device->idr_lock);
+	list_add(&uobject->idr_list, &uobject->type->list);
+	spin_unlock(&uobject->context->device->idr_lock);
+	uobject->live = 1;
+}
+
 /*
  * The ib_uobject locking scheme is as follows:
  *
