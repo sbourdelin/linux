@@ -1403,15 +1403,30 @@ static inline void loaded_vmcs_init(struct loaded_vmcs *loaded_vmcs)
 	loaded_vmcs->launched = 0;
 }
 
-static void vmcs_load(struct vmcs *vmcs)
+static inline u64 __vmptrst(void)
 {
-	u64 phys_addr = __pa(vmcs);
+	u64 phys_addr;
+
+	asm volatile (__ex(ASM_VMX_VMPTRST_RAX)
+			: : "a"(&phys_addr) : "cc", "memory");
+	return phys_addr;
+}
+
+static inline u8 __vmptrld(u64 phys_addr)
+{
 	u8 error;
 
 	asm volatile (__ex(ASM_VMX_VMPTRLD_RAX) "; setna %0"
 			: "=qm"(error) : "a"(&phys_addr), "m"(phys_addr)
 			: "cc", "memory");
-	if (error)
+	return error;
+}
+
+static void vmcs_load(struct vmcs *vmcs)
+{
+	u64 phys_addr = __pa(vmcs);
+
+	if (__vmptrld(phys_addr))
 		printk(KERN_ERR "kvm: vmptrld %p/%llx failed\n",
 		       vmcs, phys_addr);
 }
@@ -7214,12 +7229,14 @@ static void copy_shadow_to_vmcs12(struct vcpu_vmx *vmx)
 	int i;
 	unsigned long field;
 	u64 field_value;
+	u64 current_vmcs_pa;
 	struct vmcs *shadow_vmcs = vmx->nested.current_shadow_vmcs;
 	const unsigned long *fields = shadow_read_write_fields;
 	const int num_fields = max_shadow_read_write_fields;
 
 	preempt_disable();
 
+	current_vmcs_pa = __vmptrst();
 	vmcs_load(shadow_vmcs);
 
 	for (i = 0; i < num_fields; i++) {
@@ -7245,7 +7262,9 @@ static void copy_shadow_to_vmcs12(struct vcpu_vmx *vmx)
 	}
 
 	vmcs_clear(shadow_vmcs);
-	vmcs_load(vmx->loaded_vmcs->vmcs);
+	if (current_vmcs_pa != -1ull)
+		__vmptrld(current_vmcs_pa);
+
 
 	preempt_enable();
 }
