@@ -68,4 +68,42 @@ static inline void cpuidle_coupled_unregister_device(struct cpuidle_device *dev)
 }
 #endif
 
+/*
+ * To ensure that there is no overflow while approximation
+ * for dividing val by 1000, we must respect -
+ * val + (val >> 5) <= 0xFFFFFFFF
+ * val + val/32 <= 0xFFFFFFFF
+ * val <= (0xFFFFFFFF * 32) / 33
+ * val <= 0xF83E0F82
+ * Hence the threshold for val below which we can use the
+ * approximation is 0xF83E0F82
+ */
+#define DIV_APPROXIMATION_THRESHOLD 0xF83E0F82UL
+
+/*
+ * Used for calculating last_residency in usec. Optimized for case
+ * where last_residency in nsecs is < DIV_APPROXIMATION_THRESHOLD
+ * Approximated value has less than 1% error.
+ */
+static inline int convert_nsec_to_usec(u64 nsec)
+{
+	if (likely(nsec < DIV_APPROXIMATION_THRESHOLD)) {
+		u32 usec = nsec;
+
+		usec += usec >> 5;
+		usec = usec >> 10;
+
+		/* Can safely cast to int since usec is < INT_MAX */
+		return usec;
+	} else {
+		u64 usec = div_u64(nsec, 1000);
+
+		if (usec > INT_MAX)
+			usec = INT_MAX;
+
+		/* Can safely cast to int since usec is < INT_MAX */
+		return usec;
+	}
+}
+
 #endif /* __DRIVER_CPUIDLE_H */
