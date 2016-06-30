@@ -1530,15 +1530,17 @@ static int ironlake_do_reset(struct drm_i915_private *dev_priv,
 
 	I915_WRITE(ILK_GDSR,
 		   ILK_GRDOM_RENDER | ILK_GRDOM_RESET_ENABLE);
-	ret = wait_for((I915_READ(ILK_GDSR) &
-			ILK_GRDOM_RESET_ENABLE) == 0, 500);
+	ret = intel_wait_for_register(dev_priv,
+				      ILK_GDSR, ILK_GRDOM_RESET_ENABLE, 0,
+				      500);
 	if (ret)
 		return ret;
 
 	I915_WRITE(ILK_GDSR,
 		   ILK_GRDOM_MEDIA | ILK_GRDOM_RESET_ENABLE);
-	ret = wait_for((I915_READ(ILK_GDSR) &
-			ILK_GRDOM_RESET_ENABLE) == 0, 500);
+	ret = intel_wait_for_register(dev_priv,
+				      ILK_GDSR, ILK_GRDOM_RESET_ENABLE, 0,
+				      500);
 	if (ret)
 		return ret;
 
@@ -1551,20 +1553,16 @@ static int ironlake_do_reset(struct drm_i915_private *dev_priv,
 static int gen6_hw_domain_reset(struct drm_i915_private *dev_priv,
 				u32 hw_domain_mask)
 {
-	int ret;
-
 	/* GEN6_GDRST is not in the gt power well, no need to check
 	 * for fifo space for the write or forcewake the chip for
 	 * the read
 	 */
 	__raw_i915_write32(dev_priv, GEN6_GDRST, hw_domain_mask);
 
-#define ACKED ((__raw_i915_read32(dev_priv, GEN6_GDRST) & hw_domain_mask) == 0)
 	/* Spin waiting for the device to ack the reset requests */
-	ret = wait_for(ACKED, 500);
-#undef ACKED
-
-	return ret;
+	return intel_wait_for_register_fw(dev_priv,
+					  GEN6_GDRST, hw_domain_mask, 0,
+					  500);
 }
 
 /**

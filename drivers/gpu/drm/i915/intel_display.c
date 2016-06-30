@@ -1124,8 +1124,9 @@ static void intel_wait_for_pipe_off(struct intel_crtc *crtc)
 		i915_reg_t reg = PIPECONF(cpu_transcoder);
 
 		/* Wait for the Pipe State to go off */
-		if (wait_for((I915_READ(reg) & I965_PIPECONF_ACTIVE) == 0,
-			     100))
+		if (intel_wait_for_register(dev_priv,
+					    reg, I965_PIPECONF_ACTIVE, 0,
+					    100))
 			WARN(1, "pipe_off wait timed out\n");
 	} else {
 		/* Wait for the display line to settle */
@@ -1544,7 +1545,11 @@ static void _vlv_enable_pll(struct intel_crtc *crtc,
 	POSTING_READ(DPLL(pipe));
 	udelay(150);
 
-	if (wait_for(((I915_READ(DPLL(pipe)) & DPLL_LOCK_VLV) == DPLL_LOCK_VLV), 1))
+	if (intel_wait_for_register(dev_priv,
+				    DPLL(pipe),
+				    DPLL_LOCK_VLV,
+				    DPLL_LOCK_VLV,
+				    1))
 		DRM_ERROR("DPLL %d failed to lock\n", pipe);
 }
 
@@ -1593,7 +1598,9 @@ static void _chv_enable_pll(struct intel_crtc *crtc,
 	I915_WRITE(DPLL(pipe), pipe_config->dpll_hw_state.dpll);
 
 	/* Check PLL is locked */
-	if (wait_for(((I915_READ(DPLL(pipe)) & DPLL_LOCK_VLV) == DPLL_LOCK_VLV), 1))
+	if (intel_wait_for_register(dev_priv,
+				    DPLL(pipe), DPLL_LOCK_VLV, DPLL_LOCK_VLV,
+				    1))
 		DRM_ERROR("PLL %d failed to lock\n", pipe);
 }
 
@@ -1813,7 +1820,9 @@ void vlv_wait_port_ready(struct drm_i915_private *dev_priv,
 		BUG();
 	}
 
-	if (wait_for((I915_READ(dpll_reg) & port_mask) == expected_mask, 1000))
+	if (intel_wait_for_register(dev_priv,
+				    dpll_reg, port_mask, expected_mask,
+				    1000))
 		WARN(1, "timed out waiting for port %c ready: got 0x%x, expected 0x%x\n",
 		     port_name(dport->port), I915_READ(dpll_reg) & port_mask, expected_mask);
 }
@@ -1871,7 +1880,9 @@ static void ironlake_enable_pch_transcoder(struct drm_i915_private *dev_priv,
 		val |= TRANS_PROGRESSIVE;
 
 	I915_WRITE(reg, val | TRANS_ENABLE);
-	if (wait_for(I915_READ(reg) & TRANS_STATE_ENABLE, 100))
+	if (intel_wait_for_register(dev_priv,
+				    reg, TRANS_STATE_ENABLE, TRANS_STATE_ENABLE,
+				    100))
 		DRM_ERROR("failed to enable transcoder %c\n", pipe_name(pipe));
 }
 
@@ -1899,7 +1910,11 @@ static void lpt_enable_pch_transcoder(struct drm_i915_private *dev_priv,
 		val |= TRANS_PROGRESSIVE;
 
 	I915_WRITE(LPT_TRANSCONF, val);
-	if (wait_for(I915_READ(LPT_TRANSCONF) & TRANS_STATE_ENABLE, 100))
+	if (intel_wait_for_register(dev_priv,
+				    LPT_TRANSCONF,
+				    TRANS_STATE_ENABLE,
+				    TRANS_STATE_ENABLE,
+				    100))
 		DRM_ERROR("Failed to enable PCH transcoder\n");
 }
 
@@ -1922,7 +1937,9 @@ static void ironlake_disable_pch_transcoder(struct drm_i915_private *dev_priv,
 	val &= ~TRANS_ENABLE;
 	I915_WRITE(reg, val);
 	/* wait for PCH transcoder off, transcoder state */
-	if (wait_for((I915_READ(reg) & TRANS_STATE_ENABLE) == 0, 50))
+	if (intel_wait_for_register(dev_priv,
+				    reg, TRANS_STATE_ENABLE, 0,
+				    50))
 		DRM_ERROR("failed to disable transcoder %c\n", pipe_name(pipe));
 
 	if (HAS_PCH_CPT(dev)) {
@@ -1942,7 +1959,9 @@ static void lpt_disable_pch_transcoder(struct drm_i915_private *dev_priv)
 	val &= ~TRANS_ENABLE;
 	I915_WRITE(LPT_TRANSCONF, val);
 	/* wait for PCH transcoder off, transcoder state */
-	if (wait_for((I915_READ(LPT_TRANSCONF) & TRANS_STATE_ENABLE) == 0, 50))
+	if (intel_wait_for_register(dev_priv,
+				    LPT_TRANSCONF, TRANS_STATE_ENABLE, 0,
+				    50))
 		DRM_ERROR("Failed to disable PCH transcoder\n");
 
 	/* Workaround: clear timing override bit. */
@@ -4446,7 +4465,9 @@ void hsw_enable_ips(struct intel_crtc *crtc)
 		 * and don't wait for vblanks until the end of crtc_enable, then
 		 * the HW state readout code will complain that the expected
 		 * IPS_CTL value is not the one we read. */
-		if (wait_for(I915_READ_NOTRACE(IPS_CTL) & IPS_ENABLE, 50))
+		if (intel_wait_for_register(dev_priv,
+					    IPS_CTL, IPS_ENABLE, IPS_ENABLE,
+					    50))
 			DRM_ERROR("Timed out waiting for IPS enable\n");
 	}
 }
@@ -4465,7 +4486,9 @@ void hsw_disable_ips(struct intel_crtc *crtc)
 		WARN_ON(sandybridge_pcode_write(dev_priv, DISPLAY_IPS_CONTROL, 0));
 		mutex_unlock(&dev_priv->rps.hw_lock);
 		/* wait for pcode to finish disabling IPS, which may take up to 42ms */
-		if (wait_for((I915_READ(IPS_CTL) & IPS_ENABLE) == 0, 42))
+		if (intel_wait_for_register(dev_priv,
+					    IPS_CTL, IPS_ENABLE, 0,
+					    42))
 			DRM_ERROR("Timed out waiting for IPS disable\n");
 	} else {
 		I915_WRITE(IPS_CTL, 0);
@@ -5395,7 +5418,9 @@ static void bxt_de_pll_disable(struct drm_i915_private *dev_priv)
 	I915_WRITE(BXT_DE_PLL_ENABLE, 0);
 
 	/* Timeout 200us */
-	if (wait_for((I915_READ(BXT_DE_PLL_ENABLE) & BXT_DE_PLL_LOCK) == 0, 1))
+	if (intel_wait_for_register(dev_priv,
+				    BXT_DE_PLL_ENABLE, BXT_DE_PLL_LOCK, 0,
+				    1))
 		DRM_ERROR("timeout waiting for DE PLL unlock\n");
 
 	dev_priv->cdclk_pll.vco = 0;
@@ -5414,7 +5439,11 @@ static void bxt_de_pll_enable(struct drm_i915_private *dev_priv, int vco)
 	I915_WRITE(BXT_DE_PLL_ENABLE, BXT_DE_PLL_PLL_ENABLE);
 
 	/* Timeout 200us */
-	if (wait_for((I915_READ(BXT_DE_PLL_ENABLE) & BXT_DE_PLL_LOCK) != 0, 1))
+	if (intel_wait_for_register(dev_priv,
+				    BXT_DE_PLL_ENABLE,
+				    BXT_DE_PLL_LOCK,
+				    BXT_DE_PLL_LOCK,
+				    1))
 		DRM_ERROR("timeout waiting for DE PLL lock\n");
 
 	dev_priv->cdclk_pll.vco = vco;
@@ -5677,7 +5706,9 @@ skl_dpll0_enable(struct drm_i915_private *dev_priv, int vco)
 
 	I915_WRITE(LCPLL1_CTL, I915_READ(LCPLL1_CTL) | LCPLL_PLL_ENABLE);
 
-	if (wait_for(I915_READ(LCPLL1_CTL) & LCPLL_PLL_LOCK, 5))
+	if (intel_wait_for_register(dev_priv,
+				    LCPLL1_CTL, LCPLL_PLL_LOCK, LCPLL_PLL_LOCK,
+				    5))
 		DRM_ERROR("DPLL0 not locked\n");
 
 	dev_priv->cdclk_pll.vco = vco;
@@ -5690,7 +5721,9 @@ static void
 skl_dpll0_disable(struct drm_i915_private *dev_priv)
 {
 	I915_WRITE(LCPLL1_CTL, I915_READ(LCPLL1_CTL) & ~LCPLL_PLL_ENABLE);
-	if (wait_for(!(I915_READ(LCPLL1_CTL) & LCPLL_PLL_LOCK), 1))
+	if (intel_wait_for_register(dev_priv,
+				   LCPLL1_CTL, LCPLL_PLL_LOCK, 0,
+				   1))
 		DRM_ERROR("Couldn't disable DPLL0\n");
 
 	dev_priv->cdclk_pll.vco = 0;
@@ -9545,7 +9578,7 @@ static void hsw_disable_lcpll(struct drm_i915_private *dev_priv,
 	I915_WRITE(LCPLL_CTL, val);
 	POSTING_READ(LCPLL_CTL);
 
-	if (wait_for((I915_READ(LCPLL_CTL) & LCPLL_PLL_LOCK) == 0, 1))
+	if (intel_wait_for_register(dev_priv, LCPLL_CTL, LCPLL_PLL_LOCK, 0, 1))
 		DRM_ERROR("LCPLL still locked\n");
 
 	val = hsw_read_dcomp(dev_priv);
@@ -9600,7 +9633,9 @@ static void hsw_restore_lcpll(struct drm_i915_private *dev_priv)
 	val &= ~LCPLL_PLL_DISABLE;
 	I915_WRITE(LCPLL_CTL, val);
 
-	if (wait_for(I915_READ(LCPLL_CTL) & LCPLL_PLL_LOCK, 5))
+	if (intel_wait_for_register(dev_priv,
+				    LCPLL_CTL, LCPLL_PLL_LOCK, LCPLL_PLL_LOCK,
+				    5))
 		DRM_ERROR("LCPLL not locked yet\n");
 
 	if (val & LCPLL_CD_SOURCE_FCLK) {
