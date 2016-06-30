@@ -44,6 +44,7 @@
 #include <rdma/ib_cache.h>
 
 #include "core_priv.h"
+#include "uidr.h"
 
 MODULE_AUTHOR("Roland Dreier");
 MODULE_DESCRIPTION("core kernel InfiniBand API");
@@ -311,6 +312,18 @@ static int read_port_immutable(struct ib_device *device)
 	return 0;
 }
 
+static int ib_device_allocate_idrs(struct ib_device *device)
+{
+	spin_lock_init(&device->idr_lock);
+	idr_init(&device->idr);
+	return 0;
+}
+
+static void ib_device_destroy_idrs(struct ib_device *device)
+{
+	idr_destroy(&device->idr);
+}
+
 /**
  * ib_register_device - Register an IB device with IB core
  * @device:Device to register
@@ -370,6 +383,14 @@ int ib_register_device(struct ib_device *device,
 		goto out;
 	}
 
+	ret = ib_device_allocate_idrs(device);
+	if (ret) {
+		pr_warn("Couldn't allocate IDRs device %s with driver model\n",
+			device->name);
+		ib_cache_cleanup_one(device);
+		goto out;
+	}
+
 	device->reg_state = IB_DEV_REGISTERED;
 
 	list_for_each_entry(client, &client_list, list)
@@ -416,6 +437,7 @@ void ib_unregister_device(struct ib_device *device)
 	mutex_unlock(&device_mutex);
 
 	ib_device_unregister_sysfs(device);
+	ib_device_destroy_idrs(device);
 	ib_cache_cleanup_one(device);
 
 	down_write(&lists_rwsem);

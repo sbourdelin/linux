@@ -33,6 +33,7 @@
 #include <rdma/ib_verbs.h>
 
 #include "uobject.h"
+#include "uidr.h"
 
 /*
  * The ib_uobject locking scheme is as follows:
