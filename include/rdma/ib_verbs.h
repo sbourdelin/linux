@@ -1346,6 +1346,8 @@ struct ib_ucontext {
 #endif
 };
 
+struct uverbs_object_list;
+
 struct ib_uobject {
 	u64			user_handle;	/* handle given to us by userspace */
 	struct ib_ucontext     *context;	/* associated user context */
@@ -1353,6 +1355,7 @@ struct ib_uobject {
 	struct list_head	list;		/* link to context's list */
 	int			id;		/* index into kernel idr */
 	struct kref		ref;
+	atomic_t		usecnt;
 	struct rw_semaphore	mutex;		/* protects .live */
 	struct rcu_head		rcu;		/* kfree_rcu() overhead */
 	int			live;
@@ -1967,6 +1970,7 @@ struct ib_device {
 	int (*get_port_immutable)(struct ib_device *, u8, struct ib_port_immutable *);
 	struct list_head type_list;
 
+	u16				driver_id;
 	const struct uverbs_types	*types;
 };
 

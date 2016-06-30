@@ -31,7 +31,7 @@
  */
 
 #include <rdma/ib_verbs.h>
-
+#include <rdma/uverbs_ioctl.h>
 #include "uobject.h"
 #include "uidr.h"
 

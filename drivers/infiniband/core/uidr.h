@@ -38,7 +38,20 @@
 #define UIDR_H
 
 #include <linux/idr.h>
+#include <rdma/uverbs_ioctl.h>
 
+struct uverbs_uobject_type *uverbs_get_type(struct ib_device *ibdev,
+					    uint16_t type);
+struct ib_uobject *uverbs_get_type_from_idr(struct uverbs_uobject_type *type,
+					    struct ib_ucontext *ucontext,
+					    int access,
+					    uint32_t idr);
+void ib_uverbs_uobject_remove(struct ib_uobject *uobject);
+void ib_uverbs_uobject_enable(struct ib_uobject *uobject);
+void uverbs_unlock_objects(struct uverbs_attr_array *attr_array,
+			   size_t num,
+			   const struct action_spec *chain,
+			   bool success);
 int idr_add_uobj(struct ib_uobject *uobj);
 void idr_remove_uobj(struct ib_uobject *uobj);
 struct ib_uobject *idr_write_uobj(int id, struct ib_ucontext *context);

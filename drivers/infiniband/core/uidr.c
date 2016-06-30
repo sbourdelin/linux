@@ -31,8 +31,137 @@
  */
 
 #include <rdma/ib_verbs.h>
+#include <rdma/uverbs_ioctl.h>
 #include "uidr.h"
 #include "uobject.h"
+
+struct uverbs_uobject_type *uverbs_get_type(struct ib_device *ibdev,
+					    uint16_t type)
+{
+	struct uverbs_uobject_type *uobj_type;
+
+	list_for_each_entry(uobj_type, &ibdev->type_list, type_list) {
+		if (uobj_type->obj_type == type)
+			return uobj_type;
+	}
+
+	return NULL;
+}
+
+static int uverbs_lock_object(struct ib_uobject *uobj, int access)
+{
+	if (access == UVERBS_IDR_ACCESS_READ)
+		return __atomic_add_unless(&uobj->usecnt, 1, -1) == -1 ?
+			-EBUSY : 0;
+	else
+		/* lock is either WRITE or DESTROY - should be exclusive */
+		return atomic_cmpxchg(&uobj->usecnt, 0, -1) == 0 ? 0 : -EBUSY;
+}
+
+static struct ib_uobject *get_uobject_from_context(struct ib_ucontext *ucontext,
+						   const struct uverbs_uobject_type *type,
+						   uint32_t idr)
+{
+	struct uverbs_uobject_list *iter;
+	struct ib_uobject *uobj;
+
+	/* TODO: use something smarter.... hash? */
+	list_for_each_entry(iter, &ucontext->uobjects_lists, type_list)
+		if (iter->type == type)
+			list_for_each_entry(uobj, &iter->list, idr_list)
+				if (uobj->id == idr)
+					return uobj;
+
+	return NULL;
+}
+
+struct ib_uobject *uverbs_get_type_from_idr(struct uverbs_uobject_type *type,
+					    struct ib_ucontext *ucontext,
+					    int access,
+					    uint32_t idr)
+{
+	struct ib_uobject *uobj;
+	int ret;
+
+	if (access == UVERBS_IDR_ACCESS_NEW) {
+		uobj = kmalloc(sizeof(*uobj), GFP_KERNEL);
+		if (!uobj)
+			return ERR_PTR(-ENOMEM);
+
+		init_uobj(uobj, 0, ucontext, &type->lock_class);
+
+		/* lock idr */
+		ret = ib_uverbs_uobject_add(uobj, type);
+		if (ret)
+			goto free_uobj;
+
+		ret = uverbs_lock_object(uobj, access);
+		if (ret)
+			goto remove_uobj;
+	} else {
+		uobj = get_uobject_from_context(ucontext, type, idr);
+
+		if (uobj) {
+			ret = uverbs_lock_object(uobj, access);
+			if (ret)
+				return ERR_PTR(ret);
+			return uobj;
+		}
+
+		return ERR_PTR(-ENOENT);
+	}
+remove_uobj:
+	ib_uverbs_uobject_remove(uobj);
+free_uobj:
+	kfree(uobj);
+	return ERR_PTR(ret);
+}
+
+static void uverbs_unlock_object(struct ib_uobject *uobj, int access)
+{
+	if (access == UVERBS_IDR_ACCESS_READ) {
+		atomic_dec(&uobj->usecnt);
+	} else {
+		if (access == UVERBS_IDR_ACCESS_NEW)
+			ib_uverbs_uobject_enable(uobj);
+
+		if (access == UVERBS_IDR_ACCESS_WRITE ||
+		    access == UVERBS_IDR_ACCESS_NEW)
+			atomic_set(&uobj->usecnt, 0);
+
+		if (access == UVERBS_IDR_ACCESS_DESTROY)
+			ib_uverbs_uobject_remove(uobj);
+	}
+}
+
+void uverbs_unlock_objects(struct uverbs_attr_array *attr_array,
+			   size_t num,
+			   const struct action_spec *chain,
+			   bool success)
+{
+	unsigned int i;
+
+	for (i = 0; i < num; i++) {
+		struct uverbs_attr_array *attr_spec_array = &attr_array[i];
+		const struct uverbs_attr_chain_spec *chain_spec =
+			chain->validator_chains[i];
+		unsigned int j;
+
+		for (j = 0; j < attr_spec_array->num_attrs; j++) {
+			struct uverbs_attr *attr = &attr_spec_array->attrs[j];
+			struct uverbs_attr_spec *spec = &chain_spec->attrs[j];
+
+			if (spec->type != UVERBS_ATTR_TYPE_IDR || !attr->valid)
+				continue;
+
+			/* TODO: if (!success) -> reduce refcount, otherwise
+			 * fetching from idr already increased the refcount
+			 */
+			uverbs_unlock_object(attr->obj_attr.uobject,
+					     spec->idr.access);
+		}
+	}
+}
 
 int idr_add_uobj(struct ib_uobject *uobj)
 {

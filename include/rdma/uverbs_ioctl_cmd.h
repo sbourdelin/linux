@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Mellanox Technologies, LTD. All rights reserved.
+ * Copyright (c) 2016, Mellanox Technologies inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -30,49 +30,24 @@
  * SOFTWARE.
  */
 
-#ifndef IB_USER_IOCTL_H
-#define IB_USER_IOCTL_H
+#ifndef _UVERBS_IOCTL_CMD_
+#define _UVERBS_IOCTL_CMD_
 
-#include <linux/types.h>
-#include <linux/ioctl.h>
+#include <rdma/uverbs_ioctl.h>
 
-#define IB_IOCTL_MAGIC		0x1b
+/* common validators */
 
-#define IB_USER_VERBS_IOCTL_COMMAND \
-	_IOWR(IB_IOCTL_MAGIC, 1, struct ib_uverbs_ioctl_hdr)
+int uverbs_action_std_handle(struct ib_device *ib_dev,
+			     struct ib_ucontext *ucontext,
+			     struct uverbs_attr_array *ctx, size_t num,
+			     void *_priv);
 
-#define IB_USER_DIRECT_IOCTL_COMMAND \
-	_IOWR(IB_IOCTL_MAGIC, 2, struct ib_uverbs_ioctl_hdr)
-
-struct ib_uverbs_attr {
-	__u16 attr_id;		/* command specific type attribute */
-	__u16 len;		/* NA for idr */
-	__u32 reserved;
-	 __u64 ptr_idr;		/* ptr typeo command/idr handle */
+struct uverbs_action_std_handler {
+	int (*handler)(struct ib_device *ib_dev, struct ib_ucontext *ucontext,
+		       struct uverbs_attr_array *common,
+		       struct uverbs_attr_array *vendor,
+		       void *priv);
+	void *priv;
 };
+#endif
 
-struct ib_uverbs_ioctl_hdr {
-	__u16 length;
-	__u16 flags;
-	__u16 object_type;
-	__u16 driver_id;
-	__u16 action;
-	__u16 num_attrs;
-	struct ib_uverbs_attr  attrs[0];
-};
-
-/* Legacy part
- * !!!! NOTE: It uses the same command index as VERBS
- */
-#include <rdma/ib_user_mad.h>
-#define IB_USER_MAD_REGISTER_AGENT	_IOWR(IB_IOCTL_MAGIC, 1, \
-					      struct ib_user_mad_reg_req)
-
-#define IB_USER_MAD_UNREGISTER_AGENT	_IOW(IB_IOCTL_MAGIC, 2, __u32)
-
-#define IB_USER_MAD_ENABLE_PKEY		_IO(IB_IOCTL_MAGIC, 3)
-
-#define IB_USER_MAD_REGISTER_AGENT2     _IOWR(IB_IOCTL_MAGIC, 4, \
-					      struct ib_user_mad_reg_req2)
-
-#endif /* IB_USER_IOCTL_H */
