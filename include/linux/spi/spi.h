@@ -126,6 +126,17 @@ void spi_statistics_add_transfer_stats(struct spi_statistics *stats,
  * @cs_gpio: gpio number of the chipselect line (optional, -ENOENT when
  *	when not using a GPIO line)
  *
+ * @cs_wake_after_sleep: Briefly toggle CS before talking to a device
+ *	if it could go to sleep.
+ * @cs_sleep_jiffies: Delay after which a device may go to sleep if there
+ *	was no SPI activity for it (jiffies).
+ * @cs_wake_duration: Delay after waking the device by toggling CS before
+ *	it is ready (msec).
+ * @cs_wake_needed: Is the wake needed (cs_sleep_jiffies passed since
+ *	the last SPI transaction).
+ * @cs_wake_timer: Timer measuring the delay before the device goes to
+ *	sleep after the last SPI transaction.
+ *
  * @statistics: statistics for the spi_device
  *
  * A @spi_device is used to interchange data between an SPI slave
@@ -165,6 +176,12 @@ struct spi_device {
 	void			*controller_data;
 	char			modalias[SPI_NAME_SIZE];
 	int			cs_gpio;	/* chip select gpio */
+
+	bool			cs_wake_after_sleep;
+	unsigned long		cs_sleep_jiffies;
+	unsigned long		cs_wake_duration;
+	bool			cs_wake_needed;
+	struct timer_list	cs_wake_timer;
 
 	/* the statistics */
 	struct spi_statistics	statistics;

@@ -700,6 +700,20 @@ static void spi_set_cs(struct spi_device *spi, bool enable)
 		spi->master->set_cs(spi, !enable);
 }
 
+static void spi_cs_wake_timer_func(unsigned long arg)
+{
+	struct spi_device *spi = (struct spi_device *)arg;
+
+	spi->cs_wake_needed = true;
+}
+
+static void spi_reset_cs_wake_timer(struct spi_device *spi)
+{
+	spi->cs_wake_needed = false;
+	mod_timer(&spi->cs_wake_timer,
+		  jiffies + spi->cs_sleep_jiffies);
+}
+
 #ifdef CONFIG_HAS_DMA
 static int spi_map_buf(struct spi_master *master, struct device *dev,
 		       struct sg_table *sgt, void *buf, size_t len,
@@ -948,6 +962,15 @@ static int spi_transfer_one_message(struct spi_master *master,
 	struct spi_statistics *statm = &master->statistics;
 	struct spi_statistics *stats = &msg->spi->statistics;
 
+	if (msg->spi->cs_wake_after_sleep && msg->spi->cs_wake_needed) {
+		dev_info(&msg->spi->dev, "waking after possible sleep\n");
+		spi_set_cs(msg->spi, true);
+		mdelay(1);
+		spi_set_cs(msg->spi, false);
+		msleep(msg->spi->cs_wake_duration);
+		spi_reset_cs_wake_timer(msg->spi);
+	}
+
 	spi_set_cs(msg->spi, true);
 
 	SPI_STATISTICS_INCREMENT_FIELD(statm, messages);
@@ -1023,6 +1046,9 @@ static int spi_transfer_one_message(struct spi_master *master,
 out:
 	if (ret != 0 || !keep_cs)
 		spi_set_cs(msg->spi, false);
+
+	if (msg->spi->cs_wake_after_sleep && !ret)
+		spi_reset_cs_wake_timer(msg->spi);
 
 	if (msg->status == -EINPROGRESS)
 		msg->status = ret;
@@ -1550,6 +1576,45 @@ of_register_spi_device(struct spi_master *master, struct device_node *nc)
 		goto err_out;
 	}
 	spi->max_speed_hz = value;
+
+	/* Do we need to assert CS to wake the device after sleep */
+	spi->cs_wake_after_sleep =
+		of_property_read_bool(nc, "cs-wake-after-sleep");
+	if (spi->cs_wake_after_sleep) {
+		dev_info(&master->dev, "cs-wake-after-sleep enabled\n");
+
+		/* After what delay device goes to sleep */
+		rc = of_property_read_u32(nc, "cs-sleep-delay", &value);
+		if (rc) {
+			dev_err(&master->dev,
+				"%s has no valid 'cs-sleep-delay' property (%d)\n",
+				nc->full_name, rc);
+			goto err_out;
+		}
+		spi->cs_sleep_jiffies = value * HZ / 1000; /* jiffies */
+
+		/* How long to wait after waking */
+		rc = of_property_read_u32(nc, "cs-wake-duration", &value);
+		if (rc) {
+			dev_err(&master->dev,
+				"%s has no valid 'cs-wake-duration' property (%d)\n",
+				nc->full_name, rc);
+			goto err_out;
+		}
+		spi->cs_wake_duration = value; /* msec */
+
+		/* Wake before accessing for the 1st time */
+		spi->cs_wake_needed = true;
+		init_timer(&spi->cs_wake_timer);
+		spi->cs_wake_timer.data = (unsigned long)spi;
+		spi->cs_wake_timer.function = spi_cs_wake_timer_func;
+	}
+
+	/* Should there be a delay before each transfer */
+	spi->xfer_delay = 0;
+	of_property_read_u32(nc, "xfer-delay", &spi->xfer_delay);
+	if (spi->xfer_delay)
+		dev_info(&master->dev, "xfer-delay = %u\n", spi->xfer_delay);
 
 	/* Store a pointer to the node in the device structure */
 	of_node_get(nc);
