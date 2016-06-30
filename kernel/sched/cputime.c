@@ -26,7 +26,9 @@
 DEFINE_PER_CPU(u64, cpu_hardirq_time);
 DEFINE_PER_CPU(u64, cpu_softirq_time);
 
-static DEFINE_PER_CPU(u64, irq_start_time);
+static DEFINE_PER_CPU(u64, hardirq_start_time);
+static DEFINE_PER_CPU(u64, softirq_start_time);
+static DEFINE_PER_CPU(u64, prev_hardirq_time);
 static int sched_clock_irqtime;
 
 void enable_sched_clock_irqtime(void)
@@ -41,6 +43,7 @@ void disable_sched_clock_irqtime(void)
 
 #ifndef CONFIG_64BIT
 DEFINE_PER_CPU(seqcount_t, irq_time_seq);
+DEFINE_PER_CPU(seqcount_t, softirq_time_seq);
 #endif /* CONFIG_64BIT */
 
 /*
@@ -53,36 +56,79 @@ DEFINE_PER_CPU(seqcount_t, irq_time_seq);
  * softirq -> hardirq, hardirq -> softirq
  *
  * When exiting hardirq or softirq time, account the elapsed time.
+ *
+ * When exiting softirq time, subtract the amount of hardirq time that
+ * interrupted this softirq run, to avoid double accounting of that time.
  */
 void irqtime_account_irq(struct task_struct *curr, int irqtype)
 {
-	unsigned long flags;
+	u64 prev_softirq_start;
+	bool leaving_softirq;
+	u64 prev_hardirq;
+	u64 hardirq_time;
 	s64 delta;
 	int cpu;
 
 	if (!sched_clock_irqtime)
 		return;
 
-	local_irq_save(flags);
-
 	cpu = smp_processor_id();
-	delta = sched_clock_cpu(cpu) - __this_cpu_read(irq_start_time);
-	__this_cpu_add(irq_start_time, delta);
 
-	irq_time_write_begin();
+	/*
+	 * Hardirq time accounting is pretty straightforward. If not in
+	 * hardirq context yet (entering hardirq), set the start time.
+	 * If already in hardirq context (leaving), account the elapsed time.
+	 */
+	if (irqtype == HARDIRQ_OFFSET) {
+		bool leaving_hardirq = hardirq_count();
+		delta = sched_clock_cpu(cpu) - __this_cpu_read(hardirq_start_time);
+		__this_cpu_add(hardirq_start_time, delta);
+		if (leaving_hardirq) {
+			hardirq_time_write_begin();
+			__this_cpu_add(cpu_hardirq_time, delta);
+			hardirq_time_write_end();
+		}
+		return;
+	}
+
+	/*
+	 * Softirq context may get interrupted by hardirq context, on the
+	 * same CPU. At softirq entry time the amount of time this CPU spent
+	 * in hardirq context is stored. At softirq exit time, the time spent
+	 * in hardirq context during the softirq is subtracted.
+	 */
+	prev_softirq_start = __this_cpu_read(softirq_start_time);
+	prev_hardirq = __this_cpu_read(prev_hardirq_time);
+	leaving_softirq = in_serving_softirq();
+
+	do {
+		u64 now = sched_clock_cpu(cpu);
+
+		hardirq_time = READ_ONCE(per_cpu(cpu_hardirq_time, cpu));
+		__this_cpu_write(softirq_start_time, now);
+		__this_cpu_write(prev_hardirq_time, hardirq_time);
+
+		if (leaving_softirq) {
+			/*
+			 * Subtract hardirq time that happened during this
+			 * softirq.
+			 */
+			s64 hi_delta = hardirq_time - prev_hardirq;
+			delta = now - prev_softirq_start - hi_delta;
+		}
+		/* Loop around if interrupted by a hardirq. */
+	} while (hardirq_time != READ_ONCE(per_cpu(cpu_hardirq_time, cpu)));
+
 	/*
 	 * We do not account for softirq time from ksoftirqd here.
 	 * We want to continue accounting softirq time to ksoftirqd thread
 	 * in that case, so as not to confuse scheduler with a special task
 	 * that do not consume any time, but still wants to run.
 	 */
-	if (hardirq_count())
-		__this_cpu_add(cpu_hardirq_time, delta);
-	else if (in_serving_softirq() && curr != this_cpu_ksoftirqd())
+	softirq_time_write_begin();
+	if (leaving_softirq && curr != this_cpu_ksoftirqd())
 		__this_cpu_add(cpu_softirq_time, delta);
-
-	irq_time_write_end();
-	local_irq_restore(flags);
+	softirq_time_write_end();
 }
 EXPORT_SYMBOL_GPL(irqtime_account_irq);
 
