@@ -4042,7 +4042,7 @@ skip_create_disk:
 	set_capacity(dd->disk, capacity);
 
 	/* Enable the block device and add it to /dev */
-	add_disk(dd->disk, true);
+	add_disk(dd->disk, false);
 
 	dd->bdev = bdget_disk(dd->disk, 0);
 	/*
@@ -4054,6 +4054,7 @@ skip_create_disk:
 		mtip_hw_sysfs_init(dd, kobj);
 		kobject_put(kobj);
 	}
+	disk_gen_uevents(dd->disk);
 
 	if (dd->mtip_svc_handler) {
 		set_bit(MTIP_DDF_INIT_DONE_BIT, &dd->dd_flag);
