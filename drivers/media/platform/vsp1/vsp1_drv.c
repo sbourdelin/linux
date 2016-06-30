@@ -491,8 +491,7 @@ void vsp1_device_put(struct vsp1_device *vsp1)
  * Power Management
  */
 
-#ifdef CONFIG_PM_SLEEP
-static int vsp1_pm_suspend(struct device *dev)
+static int __maybe_unused vsp1_pm_suspend(struct device *dev)
 {
 	struct vsp1_device *vsp1 = dev_get_drvdata(dev);
 
@@ -502,7 +501,7 @@ static int vsp1_pm_suspend(struct device *dev)
 	return 0;
 }
 
-static int vsp1_pm_resume(struct device *dev)
+static int __maybe_unused vsp1_pm_resume(struct device *dev)
 {
 	struct vsp1_device *vsp1 = dev_get_drvdata(dev);
 
@@ -511,9 +510,8 @@ static int vsp1_pm_resume(struct device *dev)
 
 	return 0;
 }
-#endif
 
-static int vsp1_pm_runtime_suspend(struct device *dev)
+static int __maybe_unused vsp1_pm_runtime_suspend(struct device *dev)
 {
 	struct vsp1_device *vsp1 = dev_get_drvdata(dev);
 
@@ -522,7 +520,7 @@ static int vsp1_pm_runtime_suspend(struct device *dev)
 	return 0;
 }
 
-static int vsp1_pm_runtime_resume(struct device *dev)
+static int __maybe_unused vsp1_pm_runtime_resume(struct device *dev)
 {
 	struct vsp1_device *vsp1 = dev_get_drvdata(dev);
 	int ret;
