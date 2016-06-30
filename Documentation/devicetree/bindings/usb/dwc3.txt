@@ -42,6 +42,10 @@ Optional properties:
  - snps,dis_u2_freeclk_exists_quirk: when set, clear the u2_freeclk_exists
 			in GUSB2PHYCFG, specify that USB2 PHY doesn't provide
 			a free-running PHY clock.
+ - snps,phyif_utmi_quirk: when set core will set phyif UTMI+ interface.
+ - snps,phyif_utmi: the value to configure the core to support a UTMI+ PHY
+			with an 8- or 16-bit interface. Value 0 select 8-bit
+			interface, value 1 select 16-bit interface.
  - snps,is-utmi-l1-suspend: true when DWC3 asserts output signal
 			utmi_l1_suspend_n, false when asserts utmi_sleep_n
  - snps,hird-threshold: HIRD threshold
