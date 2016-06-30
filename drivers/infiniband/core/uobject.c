@@ -179,13 +179,11 @@ void ib_uverbs_uobject_enable(struct ib_uobject *uobject)
  */
 
 void init_uobj(struct ib_uobject *uobj, u64 user_handle,
-	       struct ib_ucontext *context, struct uverbs_lock_class *c)
+	       struct ib_ucontext *context)
 {
 	uobj->user_handle = user_handle;
 	uobj->context     = context;
 	kref_init(&uobj->ref);
-	init_rwsem(&uobj->mutex);
-	lockdep_set_class_and_name(&uobj->mutex, &c->key, c->name);
 	uobj->live        = 0;
 }
 
@@ -201,12 +199,10 @@ void put_uobj(struct ib_uobject *uobj)
 
 void put_uobj_read(struct ib_uobject *uobj)
 {
-	up_read(&uobj->mutex);
 	put_uobj(uobj);
 }
 
 void put_uobj_write(struct ib_uobject *uobj)
 {
-	up_write(&uobj->mutex);
 	put_uobj(uobj);
 }

@@ -88,7 +88,7 @@ struct ib_uobject *uverbs_get_type_from_idr(struct uverbs_uobject_type *type,
 		if (!uobj)
 			return ERR_PTR(-ENOMEM);
 
-		init_uobj(uobj, 0, ucontext, &type->lock_class);
+		init_uobj(uobj, 0, ucontext);
 
 		/* lock idr */
 		ret = ib_uverbs_uobject_add(uobj, type);
@@ -213,10 +213,6 @@ static struct ib_uobject *idr_read_uobj(int id, struct ib_ucontext *context,
 	if (!uobj)
 		return NULL;
 
-	if (nested)
-		down_read_nested(&uobj->mutex, SINGLE_DEPTH_NESTING);
-	else
-		down_read(&uobj->mutex);
 	if (!uobj->live) {
 		put_uobj_read(uobj);
 		return NULL;
@@ -233,11 +229,8 @@ struct ib_uobject *idr_write_uobj(int id, struct ib_ucontext *context)
 	if (!uobj)
 		return NULL;
 
-	down_write(&uobj->mutex);
-	if (!uobj->live) {
-		put_uobj_write(uobj);
+	if (!uobj->live)
 		return NULL;
-	}
 
 	return uobj;
 }

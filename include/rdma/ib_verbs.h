@@ -1356,7 +1356,6 @@ struct ib_uobject {
 	int			id;		/* index into kernel idr */
 	struct kref		ref;
 	atomic_t		usecnt;
-	struct rw_semaphore	mutex;		/* protects .live */
 	struct rcu_head		rcu;		/* kfree_rcu() overhead */
 	int			live;
 	/* List of object under uverbs_object_type */

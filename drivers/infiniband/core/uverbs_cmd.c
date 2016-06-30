@@ -46,16 +46,6 @@
 
 #include "core_priv.h"
 
-static struct uverbs_lock_class pd_lock_class	= { .name = "PD-uobj" };
-static struct uverbs_lock_class mr_lock_class	= { .name = "MR-uobj" };
-static struct uverbs_lock_class mw_lock_class	= { .name = "MW-uobj" };
-static struct uverbs_lock_class cq_lock_class	= { .name = "CQ-uobj" };
-static struct uverbs_lock_class qp_lock_class	= { .name = "QP-uobj" };
-static struct uverbs_lock_class ah_lock_class	= { .name = "AH-uobj" };
-static struct uverbs_lock_class srq_lock_class	= { .name = "SRQ-uobj" };
-static struct uverbs_lock_class xrcd_lock_class = { .name = "XRCD-uobj" };
-static struct uverbs_lock_class rule_lock_class = { .name = "RULE-uobj" };
-
 ssize_t ib_uverbs_get_context(struct ib_uverbs_file *file,
 			      struct ib_device *ib_dev,
 			      const char __user *buf,
@@ -308,8 +298,8 @@ ssize_t ib_uverbs_alloc_pd(struct ib_uverbs_file *file,
 	if (!uobj)
 		return -ENOMEM;
 
-	init_uobj(uobj, 0, file->ucontext, &pd_lock_class);
-	down_write(&uobj->mutex);
+	down_read(&file->close_sem);
+	init_uobj(uobj, 0, file->ucontext);
 
 	pd = ib_dev->alloc_pd(ib_dev, file->ucontext, &udata);
 	if (IS_ERR(pd)) {
@@ -342,7 +332,7 @@ ssize_t ib_uverbs_alloc_pd(struct ib_uverbs_file *file,
 
 	uobj->live = 1;
 
-	up_write(&uobj->mutex);
+	up_read(&file->close_sem);
 
 	return in_len;
 
@@ -543,9 +533,8 @@ ssize_t ib_uverbs_open_xrcd(struct ib_uverbs_file *file,
 		goto err_tree_mutex_unlock;
 	}
 
-	init_uobj(&obj->uobject, 0, file->ucontext, &xrcd_lock_class);
-
-	down_write(&obj->uobject.mutex);
+	down_read(&file->close_sem);
+	init_uobj(&obj->uobject, 0, file->ucontext);
 
 	if (!xrcd) {
 		xrcd = ib_dev->alloc_xrcd(ib_dev, file->ucontext, &udata);
@@ -595,7 +584,7 @@ ssize_t ib_uverbs_open_xrcd(struct ib_uverbs_file *file,
 	mutex_unlock(&file->mutex);
 
 	obj->uobject.live = 1;
-	up_write(&obj->uobject.mutex);
+	up_read(&file->close_sem);
 
 	mutex_unlock(&file->device->xrcd_tree_mutex);
 	return in_len;
@@ -737,8 +726,8 @@ ssize_t ib_uverbs_reg_mr(struct ib_uverbs_file *file,
 	if (!uobj)
 		return -ENOMEM;
 
-	init_uobj(uobj, 0, file->ucontext, &mr_lock_class);
-	down_write(&uobj->mutex);
+	down_read(&file->close_sem);
+	init_uobj(uobj, 0, file->ucontext);
 
 	pd = idr_read_pd(cmd.pd_handle, file->ucontext);
 	if (!pd) {
@@ -791,7 +780,7 @@ ssize_t ib_uverbs_reg_mr(struct ib_uverbs_file *file,
 
 	uobj->live = 1;
 
-	up_write(&uobj->mutex);
+	up_read(&file->close_sem);
 
 	return in_len;
 
@@ -959,8 +948,8 @@ ssize_t ib_uverbs_alloc_mw(struct ib_uverbs_file *file,
 	if (!uobj)
 		return -ENOMEM;
 
-	init_uobj(uobj, 0, file->ucontext, &mw_lock_class);
-	down_write(&uobj->mutex);
+	down_read(&file->close_sem);
+	init_uobj(uobj, 0, file->ucontext);
 
 	pd = idr_read_pd(cmd.pd_handle, file->ucontext);
 	if (!pd) {
@@ -1007,7 +996,7 @@ ssize_t ib_uverbs_alloc_mw(struct ib_uverbs_file *file,
 
 	uobj->live = 1;
 
-	up_write(&uobj->mutex);
+	up_read(&file->close_sem);
 
 	return in_len;
 
@@ -1129,8 +1118,8 @@ static struct ib_ucq_object *create_cq(struct ib_uverbs_file *file,
 	if (!obj)
 		return ERR_PTR(-ENOMEM);
 
-	init_uobj(&obj->uobject, cmd->user_handle, file->ucontext, &cq_lock_class);
-	down_write(&obj->uobject.mutex);
+	down_read(&file->close_sem);
+	init_uobj(&obj->uobject, cmd->user_handle, file->ucontext);
 
 	if (cmd->comp_channel >= 0) {
 		ev_file = ib_uverbs_lookup_comp_file(cmd->comp_channel);
@@ -1188,7 +1177,7 @@ static struct ib_ucq_object *create_cq(struct ib_uverbs_file *file,
 
 	obj->uobject.live = 1;
 
-	up_write(&obj->uobject.mutex);
+	up_read(&file->close_sem);
 
 	return obj;
 
@@ -1530,9 +1519,8 @@ static int create_qp(struct ib_uverbs_file *file,
 	if (!obj)
 		return -ENOMEM;
 
-	init_uobj(&obj->uevent.uobject, cmd->user_handle, file->ucontext,
-		  &qp_lock_class);
-	down_write(&obj->uevent.uobject.mutex);
+	down_read(&file->close_sem);
+	init_uobj(&obj->uevent.uobject, cmd->user_handle, file->ucontext);
 
 	if (cmd->qp_type == IB_QPT_XRC_TGT) {
 		xrcd = idr_read_xrcd(cmd->pd_handle, file->ucontext,
@@ -1692,7 +1680,7 @@ static int create_qp(struct ib_uverbs_file *file,
 
 	obj->uevent.uobject.live = 1;
 
-	up_write(&obj->uevent.uobject.mutex);
+	up_read(&file->close_sem);
 
 	return 0;
 err_cb:
@@ -1853,8 +1841,8 @@ ssize_t ib_uverbs_open_qp(struct ib_uverbs_file *file,
 	if (!obj)
 		return -ENOMEM;
 
-	init_uobj(&obj->uevent.uobject, cmd.user_handle, file->ucontext, &qp_lock_class);
-	down_write(&obj->uevent.uobject.mutex);
+	down_read(&file->close_sem);
+	init_uobj(&obj->uevent.uobject, cmd.user_handle, file->ucontext);
 
 	xrcd = idr_read_xrcd(cmd.pd_handle, file->ucontext, &xrcd_uobj);
 	if (!xrcd) {
@@ -1904,7 +1892,7 @@ ssize_t ib_uverbs_open_qp(struct ib_uverbs_file *file,
 
 	obj->uevent.uobject.live = 1;
 
-	up_write(&obj->uevent.uobject.mutex);
+	up_read(&file->close_sem);
 
 	return in_len;
 
@@ -2593,8 +2581,8 @@ ssize_t ib_uverbs_create_ah(struct ib_uverbs_file *file,
 	if (!uobj)
 		return -ENOMEM;
 
-	init_uobj(uobj, cmd.user_handle, file->ucontext, &ah_lock_class);
-	down_write(&uobj->mutex);
+	down_read(&file->close_sem);
+	init_uobj(uobj, cmd.user_handle, file->ucontext);
 
 	pd = idr_read_pd(cmd.pd_handle, file->ucontext);
 	if (!pd) {
@@ -2644,7 +2632,7 @@ ssize_t ib_uverbs_create_ah(struct ib_uverbs_file *file,
 
 	uobj->live = 1;
 
-	up_write(&uobj->mutex);
+	up_read(&file->close_sem);
 
 	return in_len;
 
@@ -2904,8 +2892,8 @@ int ib_uverbs_ex_create_flow(struct ib_uverbs_file *file,
 		err = -ENOMEM;
 		goto err_free_attr;
 	}
-	init_uobj(uobj, 0, file->ucontext, &rule_lock_class);
-	down_write(&uobj->mutex);
+	down_read(&file->close_sem);
+	init_uobj(uobj, 0, file->ucontext);
 
 	qp = idr_read_qp(cmd.qp_handle, file->ucontext);
 	if (!qp) {
@@ -2975,7 +2963,7 @@ int ib_uverbs_ex_create_flow(struct ib_uverbs_file *file,
 
 	uobj->live = 1;
 
-	up_write(&uobj->mutex);
+	up_read(&file->close_sem);
 	kfree(flow_attr);
 	if (cmd.flow_attr.num_of_specs)
 		kfree(kern_flow_attr);
@@ -3055,8 +3043,8 @@ static int __uverbs_create_xsrq(struct ib_uverbs_file *file,
 	if (!obj)
 		return -ENOMEM;
 
-	init_uobj(&obj->uevent.uobject, cmd->user_handle, file->ucontext, &srq_lock_class);
-	down_write(&obj->uevent.uobject.mutex);
+	down_read(&file->close_sem);
+	init_uobj(&obj->uevent.uobject, cmd->user_handle, file->ucontext);
 
 	if (cmd->srq_type == IB_SRQT_XRC) {
 		attr.ext.xrc.xrcd  = idr_read_xrcd(cmd->xrcd_handle, file->ucontext, &xrcd_uobj);
@@ -3144,7 +3132,7 @@ static int __uverbs_create_xsrq(struct ib_uverbs_file *file,
 
 	obj->uevent.uobject.live = 1;
 
-	up_write(&obj->uevent.uobject.mutex);
+	up_read(&file->close_sem);
 
 	return 0;
 

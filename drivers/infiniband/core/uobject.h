@@ -48,12 +48,12 @@ struct uverbs_uobject_type {
 		     struct ib_uobject *uobject,
 		     struct ib_ucontext *ucontext);
 	u16			obj_type;
-	struct uverbs_lock_class lock_class;
 };
 
 /* embed in ucontext per type */
 struct uverbs_uobject_list {
 	struct uverbs_uobject_type	*type;
+	/* TODO: replace with hash for faster access */
 	struct list_head		list;
 	struct list_head		type_list;
 };
@@ -64,7 +64,7 @@ void ib_uverbs_uobject_remove(struct ib_uobject *uobject);
 void ib_uverbs_uobject_enable(struct ib_uobject *uobject);
 
 void init_uobj(struct ib_uobject *uobj, u64 user_handle,
-	       struct ib_ucontext *context, struct uverbs_lock_class *c);
+	       struct ib_ucontext *context);
 
 void release_uobj(struct kref *kref);
 void put_uobj(struct ib_uobject *uobj);
