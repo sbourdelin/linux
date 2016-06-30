@@ -60,6 +60,9 @@
 #include "sdio.h"
 
 extern const char driver_version[];
+extern bool mfg_mode;
+extern char *mfg_firmware;
+
 
 struct mwifiex_adapter;
 struct mwifiex_private;
@@ -993,6 +996,7 @@ struct mwifiex_adapter {
 	u32 drv_info_size;
 	bool scan_chan_gap_enabled;
 	struct sk_buff_head rx_data_q;
+	bool mfg_mode;
 	struct mwifiex_chan_stats *chan_stats;
 	u32 num_in_chan_stats;
 	int survey_idx;
