@@ -48,6 +48,8 @@
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
 #include <linux/of_irq.h>
+#include <linux/wireless.h>
+#include <net/iw_handler.h>
 
 #include "decl.h"
 #include "ioctl.h"
@@ -156,6 +158,9 @@ enum {
 
 /* Threshold for tx_timeout_cnt before we trigger a card reset */
 #define TX_TIMEOUT_THRESHOLD	6
+
+/* IOCTL number used for hostcmd process*/
+#define MWIFIEX_HOSTCMD_IOCTL (SIOCIWFIRSTPRIV + 17)
 
 #define MWIFIEX_DRV_INFO_SIZE_MAX 0x40000
 
@@ -890,6 +895,7 @@ struct mwifiex_adapter {
 	u8 event_received;
 	u8 data_received;
 	u16 seq_num;
+	struct mwifiex_ds_misc_cmd hostcmd_resp_data;
 	struct cmd_ctrl_node *cmd_pool;
 	struct cmd_ctrl_node *curr_cmd;
 	/* spin lock for command */
@@ -1551,7 +1557,8 @@ bool mwifiex_is_bss_in_11ac_mode(struct mwifiex_private *priv);
 u8 mwifiex_get_center_freq_index(struct mwifiex_private *priv, u8 band,
 				 u32 pri_chan, u8 chan_bw);
 int mwifiex_init_channel_scan_gap(struct mwifiex_adapter *adapter);
-
+int mwifiex_process_host_command(struct mwifiex_private *priv,
+				 struct iwreq *wrq);
 int mwifiex_tdls_check_tx(struct mwifiex_private *priv, struct sk_buff *skb);
 void mwifiex_flush_auto_tdls_list(struct mwifiex_private *priv);
 void mwifiex_auto_tdls_update_peer_status(struct mwifiex_private *priv,
