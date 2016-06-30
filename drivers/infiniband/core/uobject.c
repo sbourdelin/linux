@@ -35,6 +35,89 @@
 #include "uobject.h"
 #include "uidr.h"
 
+int ib_uverbs_uobject_type_add(struct list_head	*head,
+			       void (*free)(struct uverbs_uobject_type *uobject_type,
+					    struct ib_uobject *uobject,
+					    struct ib_ucontext *ucontext),
+			       uint16_t	obj_type)
+{
+	/*
+	 * Allocate a new object type for the vendor, this should be done when a
+	 * vendor is initialized.
+	 */
+	struct uverbs_uobject_type *uobject_type;
+
+	uobject_type = kzalloc(sizeof(*uobject_type), GFP_KERNEL);
+	if (!uobject_type)
+		return -ENOMEM;
+
+	uobject_type->free = free;
+	uobject_type->obj_type = obj_type;
+	list_add_tail(&uobject_type->type_list, head);
+	return 0;
+}
+
+void ib_uverbs_uobject_type_remove(struct uverbs_uobject_type *uobject_type)
+{
+	/*
+	 * Allocate a new object type for the vendor, this should be done when a
+	 * vendor is initialized.
+	 */
+	WARN_ON(list_empty(&uobject_type->type_list));
+	list_del(&uobject_type->type_list);
+	kfree(uobject_type);
+}
+
+void ib_uverbs_uobject_type_cleanup_ucontext(struct ib_ucontext *ucontext)
+{
+	struct uverbs_uobject_list *uobject_list, *next_list;
+
+	list_for_each_entry_safe(uobject_list, next_list,
+				 &ucontext->uobjects_lists, type_list) {
+		struct uverbs_uobject_type *type = uobject_list->type;
+		struct ib_uobject *obj, *next_obj;
+
+		list_for_each_entry_safe(obj, next_obj, &uobject_list->list,
+					 idr_list) {
+			/* TODO */
+			type->free(type, obj, ucontext);
+			list_del(&obj->idr_list);
+		}
+
+		list_del(&uobject_list->type_list);
+	}
+}
+
+int ib_uverbs_uobject_type_initialize_ucontext(struct ib_ucontext *ucontext,
+					       struct list_head *type_list)
+{
+	/* create typed list in ucontext */
+	struct uverbs_uobject_type *type;
+	int err;
+
+	INIT_LIST_HEAD(&ucontext->uobjects_lists);
+
+	list_for_each_entry(type, type_list, type_list) {
+		struct uverbs_uobject_list *cur;
+
+		cur = kzalloc(sizeof(*cur), GFP_KERNEL);
+		if (!cur) {
+			err = -ENOMEM;
+			goto err;
+		}
+
+		cur->type = type;
+		INIT_LIST_HEAD(&cur->list);
+		list_add_tail(&cur->type_list, &ucontext->uobjects_lists);
+	}
+
+	return 0;
+
+err:
+	ib_uverbs_uobject_type_cleanup_ucontext(ucontext);
+	return err;
+}
+
 /*
  * The ib_uobject locking scheme is as follows:
  *

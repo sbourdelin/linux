@@ -42,6 +42,22 @@ struct uverbs_lock_class {
 	char			name[16];
 };
 
+struct uverbs_uobject_type {
+	struct list_head	type_list;
+	void (*free)(struct uverbs_uobject_type *uobject_type,
+		     struct ib_uobject *uobject,
+		     struct ib_ucontext *ucontext);
+	u16			obj_type;
+	struct uverbs_lock_class lock_class;
+};
+
+/* embed in ucontext per type */
+struct uverbs_uobject_list {
+	struct uverbs_uobject_type	*type;
+	struct list_head		list;
+	struct list_head		type_list;
+};
+
 void init_uobj(struct ib_uobject *uobj, u64 user_handle,
 	       struct ib_ucontext *context, struct uverbs_lock_class *c);
 
