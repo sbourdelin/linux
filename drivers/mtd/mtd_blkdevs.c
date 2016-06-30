@@ -436,13 +436,14 @@ int add_mtd_blktrans_dev(struct mtd_blktrans_dev *new)
 	if (new->readonly)
 		set_disk_ro(gd, 1);
 
-	add_disk(gd, true);
+	add_disk(gd, false);
 
 	if (new->disk_attributes) {
 		ret = sysfs_create_group(&disk_to_dev(gd)->kobj,
 					new->disk_attributes);
 		WARN_ON(ret);
 	}
+	disk_gen_uevents(gd);
 	return 0;
 error4:
 	blk_cleanup_queue(new->rq);
