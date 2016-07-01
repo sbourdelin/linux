@@ -46,10 +46,8 @@ struct mcb_bus {
 /**
  * struct mcb_device - MEN Chameleon Bus device
  *
- * @bus_list: internal list handling for bus code
  * @dev: device in kernel representation
  * @bus: mcb bus the device is plugged to
- * @subordinate: subordinate MCBus in case of bridge
  * @is_added: flag to check if device is added to bus
  * @driver: associated mcb_driver
  * @id: mcb device id
@@ -62,10 +60,8 @@ struct mcb_bus {
  * @memory: memory resource
  */
 struct mcb_device {
-	struct list_head bus_list;
 	struct device dev;
 	struct mcb_bus *bus;
-	struct mcb_bus *subordinate;
 	bool is_added;
 	struct mcb_driver *driver;
 	u16 id;
