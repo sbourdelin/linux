@@ -5119,13 +5119,13 @@ static int gfx_v8_0_set_powergating_state(void *handle,
 	case CHIP_POLARIS11:
 		if (adev->pg_flags & AMD_PG_SUPPORT_GFX_SMG)
 			polaris11_enable_gfx_static_mg_power_gating(adev,
-					state == AMD_PG_STATE_GATE ? true : false);
+					state == AMD_PG_STATE_GATE);
 		else if (adev->pg_flags & AMD_PG_SUPPORT_GFX_DMG)
 			polaris11_enable_gfx_dynamic_mg_power_gating(adev,
-					state == AMD_PG_STATE_GATE ? true : false);
+					state == AMD_PG_STATE_GATE);
 		else
 			polaris11_enable_gfx_quick_mg_power_gating(adev,
-					state == AMD_PG_STATE_GATE ? true : false);
+					state == AMD_PG_STATE_GATE);
 		break;
 	default:
 		break;
@@ -5558,7 +5558,7 @@ static int gfx_v8_0_set_clockgating_state(void *handle,
 	case CHIP_CARRIZO:
 	case CHIP_STONEY:
 		gfx_v8_0_update_gfx_clock_gating(adev,
-						 state == AMD_CG_STATE_GATE ? true : false);
+						 state == AMD_CG_STATE_GATE);
 		break;
 	default:
 		break;
