@@ -57,6 +57,7 @@ struct mmu_gather {
 	unsigned int		nr;
 	unsigned int		max;
 	unsigned char		fullmm;		/* non-zero means full mm flush */
+	unsigned int		force_batch_flush; /* stop batching and flush */
 	unsigned char		need_flush;	/* really unmapped some PTEs? */
 	unsigned long		start, end;
 	unsigned long		start_addr;

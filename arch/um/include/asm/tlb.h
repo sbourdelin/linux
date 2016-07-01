@@ -20,6 +20,7 @@ struct mmu_gather {
 	unsigned long		start;
 	unsigned long		end;
 	unsigned int		fullmm; /* non-zero means full mm flush */
+	unsigned int		force_batch_flush; /* stop batching and flush */
 };
 
 static inline void __tlb_remove_tlb_entry(struct mmu_gather *tlb, pte_t *ptep,

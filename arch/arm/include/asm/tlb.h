@@ -69,6 +69,7 @@ struct mmu_gather {
 	unsigned int		need_flush;
 #endif
 	unsigned int		fullmm;
+	unsigned int		force_batch_flush;
 	struct vm_area_struct	*vma;
 	unsigned long		start, end;
 	unsigned long		range_start;

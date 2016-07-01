@@ -21,6 +21,7 @@
 struct mmu_gather {
 	struct mm_struct	*mm;
 	unsigned int		fullmm;
+	unsigned int		force_batch_flush; /* stop batching and flush */
 	unsigned long		start, end;
 };
 

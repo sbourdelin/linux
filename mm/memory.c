@@ -225,6 +225,7 @@ void tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm, unsigned long 
 	tlb->fullmm		= !(start | (end+1));
 	tlb->need_flush_all	= 0;
 	tlb->saw_unset_a_or_d	= 0;
+	tlb->force_batch_flush	= 0;
 
 	tlb->local.next = NULL;
 	tlb->local.nr   = 0;
@@ -1105,7 +1106,6 @@ static unsigned long zap_pte_range(struct mmu_gather *tlb,
 				struct zap_details *details)
 {
 	struct mm_struct *mm = tlb->mm;
-	int force_flush = 0;
 	int rss[NR_MM_COUNTERS];
 	spinlock_t *ptl;
 	pte_t *start_pte;
@@ -1151,7 +1151,7 @@ again:
 					 */
 					if (unlikely(details && details->ignore_dirty))
 						continue;
-					force_flush = 1;
+					tlb->force_batch_flush = 1;
 					set_page_dirty(page);
 				}
 				if (pte_young(ptent) &&
@@ -1163,7 +1163,7 @@ again:
 			if (unlikely(page_mapcount(page) < 0))
 				print_bad_pte(vma, addr, ptent, page);
 			if (unlikely(!__tlb_remove_page(tlb, page))) {
-				force_flush = 1;
+				tlb->force_batch_flush = 1;
 				addr += PAGE_SIZE;
 				break;
 			}
@@ -1191,18 +1191,20 @@ again:
 	arch_leave_lazy_mmu_mode();
 
 	/* Do the actual TLB flush before dropping ptl */
-	if (force_flush)
+	if (tlb->force_batch_flush)
 		tlb_flush_mmu_tlbonly(tlb);
 	pte_unmap_unlock(start_pte, ptl);
 
 	/*
-	 * If we forced a TLB flush (either due to running out of
-	 * batch buffers or because we needed to flush dirty TLB
-	 * entries before releasing the ptl), free the batched
-	 * memory too. Restart if we didn't do everything.
+	 * If we forced a TLB flush, free the batched
+	 * memory too.  Restart if we didn't do everything.
+	 *
+	 * We force this due to running out of batch buffers,
+	 * needing to flush dirty TLB entries before releasing
+	 * the ptl, or for arch-specific reasons.
 	 */
-	if (force_flush) {
-		force_flush = 0;
+	if (tlb->force_batch_flush) {
+		tlb->force_batch_flush = 0;
 		tlb_flush_mmu_free(tlb);
 
 		if (addr != end)

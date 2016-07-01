@@ -102,6 +102,9 @@ struct mmu_gather {
 	/* we have performed an operation which
 	 * requires a complete flush of the tlb */
 				need_flush_all : 1,
+	/* need to flush the tlb and stop batching
+	 * before we release ptl */
+				force_batch_flush : 1,
 	/* we cleared a PTE bit which may potentially
 	 * get set by hardware */
 				saw_unset_a_or_d: 1;
