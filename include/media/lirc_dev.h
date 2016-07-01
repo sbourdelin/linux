@@ -214,6 +214,18 @@ struct lirc_driver {
  */
 extern int lirc_register_driver(struct lirc_driver *d);
 
+/* int lirc_register_bufferless_driver - allocates a lirc bufferless driver
+ * @d: reference to the lirc_driver to initialize
+ *
+ * The difference between lirc_register_driver and
+ * lirc_register_bufferless_driver is that the latter doesn't allocate any
+ * buffer, which means that the driver using the lirc_driver should take care of
+ * it by itself.
+ *
+ * returns 0 on success or a the negative errno number in case of failure.
+ */
+extern int lirc_register_bufferless_driver(struct lirc_driver *d);
+
 /* returns negative value on error or 0 if success
 */
 extern int lirc_unregister_driver(int minor);
