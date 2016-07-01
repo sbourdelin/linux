@@ -1,0 +1,276 @@
+Crossrelease lock dependency check
+==================================
+
+Started by Byungchul Park <byungchul.park@lge.com>
+
+Contents:
+
+ (*) What is a problem?
+
+     - Original lockdep's assumptions.
+     - Original lockdep's limitation.
+
+ (*) How to solve the problem.
+
+     - What causes deadlock?
+     - Relax the assumptions.
+     - Introduce "crosslock".
+     - Introduce "commit" stage.
+     - Acquire vs commit vs release
+
+ (*) Implementation.
+
+     - Data structures.
+     - Optimizations.
+
+
+=================
+What is a problem
+=================
+
+Can we detect deadlocks descriped below with original lockdep?
+No.
+
+Example 1)
+
+	PROCESS X	PROCESS Y
+	--------------	--------------
+	mutext_lock A
+			lock_page B
+	lock_page B
+			mutext_lock A // DEADLOCK
+	unlock_page B
+			mutext_unlock A
+	mutex_unlock A
+			unlock_page B
+
+We are currently not checking lock dependency for lock_page(), which is
+for exclusive access to pages.
+
+Example 2)
+
+	PROCESS X	PROCESS Y	PROCESS Z
+	--------------	--------------	--------------
+			mutex_lock A
+	lock_page B
+			lock_page B
+					mutext_lock A // DEADLOCK
+					mutext_unlock A
+					unlock_page B
+					(B was held by PROCESS X)
+			unlock_page B
+			mutex_unlock A
+
+We cannot detect this kind of deadlock with original lockdep, even
+though we enable lock dependency check on lock_page().
+
+Example 3)
+
+	PROCESS X	PROCESS Y
+	--------------	--------------
+			mutex_lock A
+	mutex_lock A
+	mutex_unlock A
+			wait_for_complete B // DEADLOCK
+	complete B
+			mutex_unlock A
+
+wait_for_complete() and complete() also can cause a deadlock, however
+we cannot detect it with original lockdep, either.
+
+
+Original lockdep's assumptions
+------------------------------
+
+Original lockdep (not crossrelease featured lockdep) assumes that,
+
+1. A lock will be unlocked within the context holding the lock.
+2. A lock has dependency with all locks already held in held_locks.
+2. Acquiring is more important than releasing, to check its dependency.
+
+
+Original lockdep's limitation
+-----------------------------
+
+Therefore, the original lockdep has limitations. It can be applied only
+to typical lock operations, e.g. spin_lock, mutex, semaphore and the
+like. Even though lock_page() can be considered as a lock, it cannot be
+used with lockdep because it violates assumptions of original lockdep.
+In the view point of original lockdep, a lock must be released within
+the context having held the lock, however, a lock using lock_page() can
+be released by different context from the context having held the lock.
+wait_for_complete() is also the case by nature, in which original
+lockdep cannot deal with it.
+
+
+========================
+How to solve the problem
+========================
+
+What causes deadlock
+--------------------
+
+Not only lock operations, but also any operations causing to wait or
+spin it e.g. all wait operations for an event, lock_page() and so on
+can cause deadlock unless it's eventually released by someone. The most
+important point here is that the waiting or spinning must be *released*
+by someone. In other words, we have to focus whether the waiting and
+spinning can be *released* or not to avoid deadlock, rather than
+waiting or spinning it itself.
+
+
+Relax the assumptions
+---------------------
+
+We can relax the assumtions the original lockdep has, which is not
+necessary to check dependency and detect a deadlock.
+
+1. A lock can be unlocked in any context, unless the context itself
+   causes a deadlock e.g. acquiring a lock in irq-safe context before
+   releasing the lock in irq-unsafe context.
+
+2. A lock has dependency with all locks in the releasing context, having
+   been held since the lock was held. Thus we can check the dependency
+   only after we identify the releasing context at first. Of course,
+   if we consider only typical lock e.g. spin lock, mutex, semaphore
+   and so on, then we can identify the releasing context at the time
+   acquiring a lock because the releasing context is same as the
+   releasing context for the typical lock. However, generally we have to
+   wait until the lock having been held will be eventually released to
+   identify the releasing context. We can say that the original lockdep
+   is a special case among all cases this crossrelease feature can deal
+   with.
+
+3. Releasing is more important than acquiring to check its dependency.
+   Compare to the third assumption of original lockdep.
+
+
+Introduce "crosslock"
+---------------------
+
+Crossrelease feature names a lock "crosslock" if it is releasable by a
+different context from the context having acquired the lock. All locks
+having been held in the context unlocking the crosslock until
+eventually the crosslock will be unlocked, have dependency with the
+crosslock. That's the key idea to implement crossrelease feature.
+
+
+Introduce "commit" stage
+------------------------
+
+Crossrelease feature names it "commit", to check dependency and build
+the dependency tree and chain. That is, the original lockdep is already
+doing the so-called commit, when acquiring it. In the strict sense, the
+checking and building must be done in the releasing context, as
+described in the "What causes a deadlock" subsection above. However, it
+will work no matter which context is used for typical lock, since it's
+guarrented that the acquiring context is same as the releasing context
+as described above. So we can commit it in the acquiring context for
+typical lock.
+
+How the original lockdep works:
+
+	acquire (including commit operation) -> release
+
+What if we consider a crosslock? For crosslock, the way lockdep works
+must be changed so that the releasing context is considered instead.
+Again, the releasing context is more important than the acquiring
+context, to check dependency and detect a deadlock. Thus checking
+dependency and building the dependency tree and chain, namely commit
+must be done in the releasing context, especially for crosslock.
+
+How the crossrelease lockdep works for crosslock:
+
+	acquire -> (context may be changed) -> commit -> release
+
+
+Acquire vs commit vs release
+----------------------------
+
+The things to do when acquiring and releasing a lock will be slightly
+changed in other to make lockdep can work even for crosslock. And an
+additional stage, commit, is placed between acquire and release.
+
+1. Acquire
+
+	1) For typical lock
+
+		The lock will be added not only to held_locks of the
+		current's task_struct, but also to additional structure
+		so that the commit stage can check dependency and build
+		the dependency tree and chain with that later.
+
+	2) For crosslock
+
+		The lock will be added to a global linked list so that
+		the commit stage can check dependency and build the
+		dependency tree and chain with that later.
+
+2. Commit
+
+	1) For typical lock
+
+		N/A.
+
+	2) For crosslock
+
+		It checks dependency and builds the dependency tree and
+		chain with data saved in the acquire stage. Here, we
+		establish dependency between the crosslock we are
+		unlocking now and all locks in the context unlocking it,
+		having been held since the lock was held. Of course,
+		it avoids unnecessary checking and building as far as
+		possible.
+
+3. Release
+
+	1) For typical lock
+
+		No change.
+
+	2) For crosslock
+
+		Just Remove the target crosslock from the global linked
+		list, to which the crosslock was added at acquire stage.
+		Release operation should be used with commit operation
+		together for crosslock, in order to build a dependency
+		chain properly.
+
+
+==============
+Implementation
+==============
+
+Data structures
+---------------
+
+Crossrelease feature introduces two new data structures.
+
+1. pend_lock (== plock)
+
+	This is for keeping locks waiting to be committed so that the
+	actual dependency tree and chain is built in the commit stage.
+	Every task_struct has an pend_lock array to keep those locks.
+	pend_lock entry will be consumed and filled whenever
+	lock_acquire() is called for typical lock and will be flushed,
+	namely committed at proper time.
+
+2. cross_lock (== xlock)
+
+	This keeps some additional data only for crosslock. One
+	cross_lock exists per one lockdep_map.
+	lockdep_init_map_crosslock() should be used instead of
+	lockdep_init_map() to use a lock as a crosslock.
+
+
+Optimizations
+-------------
+
+Adding a pend_lock is an operation very frequently happened because it
+happens whenever a typical lock is acquired. So the operation is
+implemented locklessly using rcu mechanism unless the xlock instance
+can be freed or destroyed unpredictably e.g. the instance is on stack.
+
+And chain cache for crosslock is also used to avoid unnecessary checking
+and building dependency, like how the original lockdep is doing for that
+purpose.
