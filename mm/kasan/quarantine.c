@@ -255,7 +255,7 @@ static void qlist_move_cache(struct qlist_head *from,
 			} else
 				prev->next = curr->next;
 			if (unlikely(from->tail == qlink))
-				from->tail = curr->next;
+				from->tail = prev;
 			from->bytes -= cache->size;
 			qlist_put(to, qlink, cache->size);
 		} else {
