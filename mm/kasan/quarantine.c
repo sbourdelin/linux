@@ -238,30 +238,24 @@ static void qlist_move_cache(struct qlist_head *from,
 				   struct qlist_head *to,
 				   struct kmem_cache *cache)
 {
-	struct qlist_node *prev = NULL, *curr;
+	struct qlist_node *curr;
+	struct qlist_node *head = NULL, *tail = NULL;
 
 	if (unlikely(qlist_empty(from)))
 		return;
 
 	curr = from->head;
+	qlist_init(from);
 	while (curr) {
 		struct qlist_node *qlink = curr;
 		struct kmem_cache *obj_cache = qlink_to_cache(qlink);
 
-		if (obj_cache == cache) {
-			if (unlikely(from->head == qlink)) {
-				from->head = curr->next;
-				prev = curr;
-			} else
-				prev->next = curr->next;
-			if (unlikely(from->tail == qlink))
-				from->tail = curr->next;
-			from->bytes -= cache->size;
-			qlist_put(to, qlink, cache->size);
-		} else {
-			prev = curr;
-		}
 		curr = curr->next;
+
+		if (obj_cache == cache)
+			qlist_put(to, qlink, cache->size);
+		else
+			qlist_put(from, qlink, cache->size);
 	}
 }
 
