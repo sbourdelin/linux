@@ -549,7 +549,7 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 		unsigned long	flags;
 
 		spin_lock_irqsave(&dev->lock, flags);
-		if (dev->port_usb)
+		if (dev->port_usb && skb)
 			skb = dev->wrap(dev->port_usb, skb);
 		spin_unlock_irqrestore(&dev->lock, flags);
 		if (!skb) {
