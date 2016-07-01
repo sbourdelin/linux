@@ -509,7 +509,11 @@ int main(int argc, const char **argv)
 
 	/* The page_size is placed in util object. */
 	page_size = sysconf(_SC_PAGE_SIZE);
+#ifdef _SC_LEVEL1_DCACHE_LINESIZE
 	cacheline_size = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
+#else
+	cacheline_size = 0;
+#endif
 
 	if (sysctl__read_int("kernel/perf_event_max_stack", &value) == 0)
 		sysctl_perf_event_max_stack = value;
