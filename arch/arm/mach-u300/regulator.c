@@ -71,19 +71,21 @@ static int __init __u300_init_boardpower(struct platform_device *pdev)
 	regmap = syscon_node_to_regmap(syscon_np);
 	if (IS_ERR(regmap)) {
 		pr_crit("U300: could not locate syscon regmap\n");
-		return PTR_ERR(regmap);
+		err = PTR_ERR(regmap);
+		goto error;
 	}
 
 	main_power_15 = regulator_get(&pdev->dev, "vana15");
 
 	if (IS_ERR(main_power_15)) {
 		pr_err("could not get vana15");
-		return PTR_ERR(main_power_15);
+		err = PTR_ERR(main_power_15);
+		goto error;
 	}
 	err = regulator_enable(main_power_15);
 	if (err) {
 		pr_err("could not enable vana15\n");
-		return err;
+		goto error;
 	}
 
 	/*
@@ -99,8 +101,12 @@ static int __init __u300_init_boardpower(struct platform_device *pdev)
 
 	/* Register globally exported PM poweroff hook */
 	pm_power_off = u300_pm_poweroff;
+	of_node_put(syscon_np);
 
 	return 0;
+error:
+	of_node_put(syscon_np);
+	return err;
 }
 
 static int __init s365_board_probe(struct platform_device *pdev)
