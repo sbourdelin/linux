@@ -264,6 +264,7 @@ tlb_remove_pmd_tlb_entry(struct mmu_gather *tlb, pmd_t *pmdp, unsigned long addr
 #define pud_free_tlb(tlb, pudp, addr)	pud_free((tlb)->mm, pudp)
 
 #define tlb_migrate_finish(mm)		do { } while (0)
+#define __tlb_cleanup_pte_range(tlb, start_ptep, end_ptep) do {} while (0)
 
 #endif /* CONFIG_MMU */
 #endif

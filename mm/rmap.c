@@ -633,6 +633,10 @@ static bool should_defer_flush(struct mm_struct *mm, enum ttu_flags flags)
 {
 	bool should_defer = false;
 
+	/* x86 may need an immediate flush after a pte clear */
+	if (arch_disable_deferred_flush())
+		return false;
+
 	if (!(flags & TTU_BATCH_FLUSH))
 		return false;
 

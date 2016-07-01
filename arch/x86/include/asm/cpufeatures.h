@@ -310,5 +310,6 @@
 #endif
 #define X86_BUG_NULL_SEG	X86_BUG(10) /* Nulling a selector preserves the base */
 #define X86_BUG_SWAPGS_FENCE	X86_BUG(11) /* SWAPGS without input dep on GS */
+#define X86_BUG_PTE_LEAK	X86_BUG(12) /* PTE may leak A/D bits after clear */
 
 #endif /* _ASM_X86_CPUFEATURES_H */

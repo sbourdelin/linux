@@ -24,6 +24,7 @@
 #include <linux/mm-arch-hooks.h>
 
 #include <asm/cacheflush.h>
+#include <asm/tlb.h>
 #include <asm/tlbflush.h>
 
 #include "internal.h"
@@ -144,10 +145,14 @@ static void move_ptes(struct vm_area_struct *vma, pmd_t *old_pmd,
 
 	for (; old_addr < old_end; old_pte++, old_addr += PAGE_SIZE,
 				   new_pte++, new_addr += PAGE_SIZE) {
+		pte_t old_ptent;
+
 		if (pte_none(*old_pte))
 			continue;
-		pte = ptep_get_and_clear(mm, old_addr, old_pte);
-		pte = move_pte(pte, new_vma->vm_page_prot, old_addr, new_addr);
+		old_ptent = ptep_get_and_clear(mm, old_addr, old_pte);
+		pte = move_pte(old_ptent, new_vma->vm_page_prot,
+				old_addr, new_addr);
+		arch_fix_pte_leak(mm, old_addr, old_pte);
 		pte = move_soft_dirty_pte(pte);
 		set_pte_at(mm, new_addr, new_pte, pte);
 	}

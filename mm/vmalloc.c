@@ -66,6 +66,7 @@ static void vunmap_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end)
 	pte = pte_offset_kernel(pmd, addr);
 	do {
 		pte_t ptent = ptep_get_and_clear(&init_mm, addr, pte);
+		arch_fix_pte_leak(&init_mm, addr, pte);
 		WARN_ON(!pte_none(ptent) && !pte_present(ptent));
 	} while (pte++, addr += PAGE_SIZE, addr != end);
 }

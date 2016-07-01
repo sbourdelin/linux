@@ -794,6 +794,12 @@ extern int ptep_test_and_clear_young(struct vm_area_struct *vma,
 extern int ptep_clear_flush_young(struct vm_area_struct *vma,
 				  unsigned long address, pte_t *ptep);
 
+#ifdef CONFIG_CPU_SUP_INTEL
+#define __HAVE_ARCH_PTEP_CLEAR_FLUSH
+extern pte_t ptep_clear_flush(struct vm_area_struct *vma,
+			      unsigned long address, pte_t *ptep);
+#endif
+
 #define __HAVE_ARCH_PTEP_GET_AND_CLEAR
 static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr,
 				       pte_t *ptep)
@@ -955,6 +961,32 @@ static inline u16 pte_flags_pkey(unsigned long pte_flags)
 	return 0;
 #endif
 }
+
+#ifdef CONFIG_CPU_SUP_INTEL
+/*
+ * These are all specific to working around an Intel-specific
+ * bug and the out-of-line code is all defined in intel.c.
+ */
+extern void fix_pte_leak(struct mm_struct *mm, unsigned long addr,
+			 pte_t *ptep);
+#define ARCH_HAS_FIX_PTE_LEAK 1
+static inline void arch_fix_pte_leak(struct mm_struct *mm, unsigned long addr,
+				     pte_t *ptep)
+{
+	if (static_cpu_has_bug(X86_BUG_PTE_LEAK))
+		fix_pte_leak(mm, addr, ptep);
+}
+#define ARCH_HAS_NEEDS_SWAP_PTL 1
+static inline bool arch_needs_swap_ptl(void)
+{
+	return static_cpu_has_bug(X86_BUG_PTE_LEAK);
+}
+#define ARCH_DISABLE_DEFERRED_FLUSH 1
+static inline bool arch_disable_deferred_flush(void)
+{
+	return static_cpu_has_bug(X86_BUG_PTE_LEAK);
+}
+#endif /* CONFIG_CPU_SUP_INTEL */
 
 #include <asm-generic/pgtable.h>
 #endif	/* __ASSEMBLY__ */

@@ -1141,6 +1141,7 @@ again:
 			ptent = ptep_get_and_clear_full(mm, addr, pte,
 							tlb->fullmm);
 			tlb_remove_tlb_entry(tlb, pte, addr);
+			arch_flush_cleared_pte(tlb, ptent);
 			if (unlikely(!page))
 				continue;
 
@@ -1166,6 +1167,7 @@ again:
 			if (unlikely(!__tlb_remove_page(tlb, page))) {
 				tlb->force_batch_flush = 1;
 				addr += PAGE_SIZE;
+				pte++;
 				break;
 			}
 			continue;
@@ -1192,8 +1194,11 @@ again:
 	arch_leave_lazy_mmu_mode();
 
 	/* Do the actual TLB flush before dropping ptl */
-	if (tlb->force_batch_flush)
-		tlb_flush_mmu_tlbonly(tlb);
+	if (tlb->force_batch_flush) {
+		bool did_flush = tlb_flush_mmu_tlbonly(tlb);
+		if (did_flush)
+			__tlb_cleanup_pte_range(tlb, start_pte, pte);
+	}
 	pte_unmap_unlock(start_pte, ptl);
 
 	/*
@@ -1965,7 +1970,8 @@ static inline int pte_unmap_same(struct mm_struct *mm, pmd_t *pmd,
 {
 	int same = 1;
 #if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
-	if (sizeof(pte_t) > sizeof(unsigned long)) {
+	if (unlikely(arch_needs_swap_ptl() ||
+	    sizeof(pte_t) > sizeof(unsigned long))) {
 		spinlock_t *ptl = pte_lockptr(mm, pmd);
 		spin_lock(ptl);
 		same = pte_same(*page_table, orig_pte);

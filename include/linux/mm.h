@@ -2404,6 +2404,23 @@ static inline bool debug_guardpage_enabled(void) { return false; }
 static inline bool page_is_guard(struct page *page) { return false; }
 #endif /* CONFIG_DEBUG_PAGEALLOC */
 
+#ifndef ARCH_HAS_NEEDS_SWAP_PTL
+static inline bool arch_needs_swap_ptl(void) { return false; }
+#endif
+
+#ifndef ARCH_HAS_FIX_PTE_LEAK
+static inline void arch_fix_pte_leak(struct mm_struct *mm, unsigned long addr,
+				     pte_t *ptep) {}
+#endif
+
+#ifndef ARCH_DISABLE_DEFERRED_FLUSH
+static inline bool arch_disable_deferred_flush(void) { return false; }
+#endif
+
+#ifndef ARCH_FLUSH_CLEARED_PTE
+static inline void arch_flush_cleared_pte(struct mmu_gather *tlb, pte_t ptent) {}
+#endif
+
 #if MAX_NUMNODES > 1
 void __init setup_nr_node_ids(void);
 #else

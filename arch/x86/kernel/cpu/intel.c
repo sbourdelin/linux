@@ -9,10 +9,14 @@
 #include <linux/uaccess.h>
 
 #include <asm/cpufeature.h>
+#include <asm/intel-family.h>
 #include <asm/pgtable.h>
 #include <asm/msr.h>
 #include <asm/bugs.h>
 #include <asm/cpu.h>
+#include <asm/tlb.h>
+
+#include <trace/events/tlb.h>
 
 #ifdef CONFIG_X86_64
 #include <linux/topology.h>
@@ -179,6 +183,11 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 			setup_clear_cpu_cap(X86_FEATURE_REP_GOOD);
 			setup_clear_cpu_cap(X86_FEATURE_ERMS);
 		}
+	}
+
+	if (c->x86_model == INTEL_FAM6_XEON_PHI_KNL) {
+		pr_info_once("x86/intel: Enabling PTE leaking workaround\n");
+		set_cpu_bug(c, X86_BUG_PTE_LEAK);
 	}
 
 	/*
@@ -821,3 +830,107 @@ static const struct cpu_dev intel_cpu_dev = {
 
 cpu_dev_register(intel_cpu_dev);
 
+/*
+ * Workaround for KNL issue:
+ *
+ * A thread that is going to page fault due to P=0, may still
+ * non atomically set A or D bits, which could corrupt swap entries.
+ * Always flush the other CPUs and clear the PTE again to avoid
+ * this leakage. We are excluded using the pagetable lock.
+ *
+ * This only needs to be called on processors that might "leak"
+ * A or D bits and have X86_BUG_PTE_LEAK set.
+ */
+void fix_pte_leak(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
+{
+	if (cpumask_any_but(mm_cpumask(mm), smp_processor_id()) < nr_cpu_ids) {
+		flush_tlb_others(mm_cpumask(mm), mm, addr,
+				 addr + PAGE_SIZE);
+		set_pte(ptep, __pte(0));
+	}
+}
+
+/*
+ * We batched a bunch of PTE clears up.  After the TLB has been
+ * flushed for the whole batch, we might have had some leaked
+ * A or D bits and need to clear them here.
+ *
+ * This should be called with the page table lock still held.
+ *
+ * This only needs to be called on processors that might "leak"
+ * A or D bits and have X86_BUG_PTE_LEAK set.
+ */
+void intel_cleanup_pte_range(struct mmu_gather *tlb, pte_t *start_ptep,
+		pte_t *end_ptep)
+{
+	pte_t *pte;
+
+	/*
+	 * fullmm means nobody will care that we have leaked bits
+	 * laying around.  We also skip TLB flushes when doing
+	 * fullmm teardown, so the additional pte clearing would
+	 * not help the issue.
+	 */
+	if (tlb->fullmm)
+		return;
+
+	/*
+	 * If none of the PTEs hit inside intel_detect_leaked_pte(),
+	 * then we have nothing that might have been leaked and
+	 * nothing to clear.
+	 */
+	if (!tlb->saw_unset_a_or_d)
+		return;
+
+	/*
+	 * Contexts calling us with NULL ptep's do not have any
+	 * PTEs for us to go clear because they did not do any
+	 * actual TLB invalidation.
+	 */
+	if (!start_ptep || !end_ptep)
+		return;
+
+	/*
+	 * Mark that the workaround is no longer needed for
+	 * this batch.
+	 */
+	tlb->saw_unset_a_or_d = 0;
+
+	/*
+	 * Ensure that the compiler orders our set_pte()
+	 * after the preceding TLB flush no matter what.
+	 */
+	barrier();
+
+	/*
+	 * Re-clear out all the PTEs into which the hardware
+	 * may have leaked Accessed or Dirty bits.
+	 */
+	for (pte = start_ptep; pte < end_ptep; pte++)
+		set_pte(pte, __pte(0));
+}
+
+/*
+ * Kinda weird to define this in here, but we only use it for
+ * an Intel-specific issue.  This will get used on all
+ * processors (even non-Intel) if CONFIG_CPU_SUP_INTEL=y.
+ */
+pte_t ptep_clear_flush(struct vm_area_struct *vma, unsigned long address,
+		       pte_t *ptep)
+{
+	struct mm_struct *mm = vma->vm_mm;
+	pte_t pte;
+
+	pte = ptep_get_and_clear(mm, address, ptep);
+	if (pte_accessible(mm, pte)) {
+		flush_tlb_page(vma, address);
+		/*
+		 * Ensure that the compiler orders our set_pte()
+		 * after the flush_tlb_page() no matter what.
+		 */
+		barrier();
+		if (static_cpu_has_bug(X86_BUG_PTE_LEAK))
+			set_pte(ptep, __pte(0));
+	}
+	return pte;
+}

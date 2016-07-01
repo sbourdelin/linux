@@ -226,4 +226,8 @@ static inline void __tlb_reset_range(struct mmu_gather *tlb)
 
 #define tlb_migrate_finish(mm) do {} while (0)
 
+#ifndef __tlb_cleanup_pte_range
+#define __tlb_cleanup_pte_range(tlb, start_ptep, end_ptep) do {} while (0)
+#endif
+
 #endif /* _ASM_GENERIC__TLB_H */

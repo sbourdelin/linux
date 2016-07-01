@@ -133,4 +133,6 @@ static inline void tlb_remove_page(struct mmu_gather *tlb, struct page *page)
 
 #define tlb_migrate_finish(mm) do {} while (0)
 
+#define __tlb_cleanup_pte_range(tlb, start_ptep, end_ptep) do {} while (0)
+
 #endif

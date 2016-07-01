@@ -116,6 +116,7 @@ static inline void tlb_remove_page(struct mmu_gather *tlb, struct page *page)
 #define pud_free_tlb(tlb, pudp, addr)	pud_free((tlb)->mm, pudp)
 
 #define tlb_migrate_finish(mm)		do { } while (0)
+#define __tlb_cleanup_pte_range(tlb, start_ptep, end_ptep) do {} while (0)
 
 #if defined(CONFIG_CPU_SH4) || defined(CONFIG_SUPERH64)
 extern void tlb_wire_entry(struct vm_area_struct *, unsigned long, pte_t);

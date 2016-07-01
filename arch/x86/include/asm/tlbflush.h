@@ -324,4 +324,41 @@ static inline void reset_lazy_tlbstate(void)
 	native_flush_tlb_others(mask, mm, start, end)
 #endif
 
+static inline bool intel_detect_leaked_pte(pte_t ptent)
+{
+	/*
+	 * Hardware sets the dirty bit only on writable ptes and
+	 * only on ptes where dirty is unset.
+	 */
+	if (pte_write(ptent) && !pte_dirty(ptent))
+		return true;
+	/*
+	 * The leak occurs when the hardware sees a unset A/D bit
+	 * and tries to set it.  If the PTE has both A/D bits
+	 * set, then the hardware will not be going to try to set
+	 * it and we have no chance for a leak.
+	 */
+	if (!pte_young(ptent))
+		return true;
+
+	return false;
+}
+
+#ifdef CONFIG_CPU_SUP_INTEL
+void intel_cleanup_pte_range(struct mmu_gather *tlb, pte_t *start_ptep,
+		pte_t *end_ptep);
+#define __tlb_cleanup_pte_range(tlb, start_ptep, end_ptep) do {		\
+	if (static_cpu_has_bug(X86_BUG_PTE_LEAK))			\
+		intel_cleanup_pte_range(tlb, start_ptep, end_ptep);	\
+} while (0)
+#define ARCH_FLUSH_CLEARED_PTE 1
+#define arch_flush_cleared_pte(tlb, ptent) do {				\
+	if (static_cpu_has_bug(X86_BUG_PTE_LEAK) &&			\
+	    intel_detect_leaked_pte(ptent)) {				\
+		tlb->saw_unset_a_or_d = 1;				\
+		tlb->force_batch_flush = 1;				\
+	}								\
+} while (0)
+#endif /* CONFIG_CPU_SUP_INTEL */
+
 #endif /* _ASM_X86_TLBFLUSH_H */
