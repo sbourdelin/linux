@@ -101,7 +101,12 @@ struct mmu_gather {
 	unsigned int		fullmm : 1,
 	/* we have performed an operation which
 	 * requires a complete flush of the tlb */
-				need_flush_all : 1;
+				need_flush_all : 1,
+	/* we cleared a PTE bit which may potentially
+	 * get set by hardware */
+				saw_unset_a_or_d: 1;
+
+
 
 	struct mmu_gather_batch *active;
 	struct mmu_gather_batch	local;
