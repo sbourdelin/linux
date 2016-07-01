@@ -145,7 +145,7 @@ static void tw686x_memcpy_buf_refill(struct tw686x_video_channel *vc,
 	vc->curr_bufs[pb] = NULL;
 }
 
-const struct tw686x_dma_ops memcpy_dma_ops = {
+static const struct tw686x_dma_ops memcpy_dma_ops = {
 	.alloc		= tw686x_memcpy_dma_alloc,
 	.free		= tw686x_memcpy_dma_free,
 	.buf_refill	= tw686x_memcpy_buf_refill,
@@ -192,7 +192,7 @@ static int tw686x_contig_setup(struct tw686x_dev *dev)
 	return 0;
 }
 
-const struct tw686x_dma_ops contig_dma_ops = {
+static const struct tw686x_dma_ops contig_dma_ops = {
 	.setup		= tw686x_contig_setup,
 	.cleanup	= tw686x_contig_cleanup,
 	.buf_refill	= tw686x_contig_buf_refill,
@@ -358,7 +358,7 @@ static int tw686x_sg_setup(struct tw686x_dev *dev)
 	return 0;
 }
 
-const struct tw686x_dma_ops sg_dma_ops = {
+static const struct tw686x_dma_ops sg_dma_ops = {
 	.setup		= tw686x_sg_setup,
 	.cleanup	= tw686x_sg_cleanup,
 	.alloc		= tw686x_sg_dma_alloc,
