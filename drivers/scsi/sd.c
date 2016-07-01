@@ -3131,6 +3131,7 @@ static int sd_remove(struct device *dev)
 {
 	struct scsi_disk *sdkp;
 	dev_t devt;
+	struct block_device *bdev;
 
 	sdkp = dev_get_drvdata(dev);
 	devt = disk_devt(sdkp->disk);
@@ -3139,7 +3140,13 @@ static int sd_remove(struct device *dev)
 	async_synchronize_full_domain(&scsi_sd_pm_domain);
 	async_synchronize_full_domain(&scsi_sd_probe_domain);
 	device_del(&sdkp->dev);
+
+	bdev = bdget_disk(sdkp->disk, 0);
+	mutex_lock(&bdev->bd_mutex);
 	del_gendisk(sdkp->disk);
+	mutex_unlock(&bdev->bd_mutex);
+	bdput(bdev);
+
 	sd_shutdown(dev);
 
 	blk_register_region(devt, SD_MINORS, NULL,
