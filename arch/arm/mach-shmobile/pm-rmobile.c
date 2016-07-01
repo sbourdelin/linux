@@ -209,6 +209,7 @@ static void __init add_special_pd(struct device_node *np, enum pd_types type)
 	special_pds[num_special_pds].pd = pd;
 	special_pds[num_special_pds].type = type;
 	num_special_pds++;
+	of_node_put(pd);
 }
 
 static void __init get_special_pds(void)
