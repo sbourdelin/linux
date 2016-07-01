@@ -937,9 +937,6 @@ static int perf_evsel__alloc_fd(struct perf_evsel *evsel, int ncpus, int nthread
 {
 	int cpu, thread;
 
-	if (evsel->system_wide)
-		nthreads = 1;
-
 	evsel->fd = xyarray__new(ncpus, nthreads, sizeof(int));
 
 	if (evsel->fd) {
