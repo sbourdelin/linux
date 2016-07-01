@@ -10,6 +10,8 @@
 #ifndef _MACB_H
 #define _MACB_H
 
+#include <linux/xilinx_gmii2rgmii.h>
+
 #define MACB_GREGS_NBR 16
 #define MACB_GREGS_VERSION 2
 #define MACB_MAX_QUEUES 8
@@ -846,6 +848,7 @@ struct macb {
 	unsigned int		jumbo_max_len;
 
 	u32			wol;
+	struct	gmii2rgmii	converter_phy;
 };
 
 static inline bool macb_is_gem(struct macb *bp)

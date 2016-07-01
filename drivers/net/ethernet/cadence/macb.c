@@ -257,6 +257,14 @@ static int macb_mdio_write(struct mii_bus *bus, int mii_id, int regnum,
 	return 0;
 }
 
+static inline void macb_hw_fix_mac_speed(struct macb *bp,
+					 struct phy_device *phydev)
+{
+	if (likely(bp->converter_phy.fix_mac_speed))
+		bp->converter_phy.fix_mac_speed(&bp->converter_phy,
+						phydev->speed);
+}
+
 /**
  * macb_set_tx_clk() - Set a clock to a new frequency
  * @clk		Pointer to the clock to change
@@ -329,6 +337,7 @@ static void macb_handle_link_change(struct net_device *dev)
 				reg |= GEM_BIT(GBE);
 
 			macb_or_gem_writel(bp, NCFGR, reg);
+			macb_hw_fix_mac_speed(bp, phydev);
 
 			bp->speed = phydev->speed;
 			bp->duplex = phydev->duplex;
@@ -2884,7 +2893,7 @@ static int macb_probe(struct platform_device *pdev)
 			struct clk **, struct clk **)
 					      = macb_clk_init;
 	int (*init)(struct platform_device *) = macb_init;
-	struct device_node *np = pdev->dev.of_node;
+	struct device_node *np = pdev->dev.of_node, *np1, *np11;
 	struct device_node *phy_node;
 	const struct macb_config *macb_config = NULL;
 	struct clk *pclk, *hclk = NULL, *tx_clk = NULL;
@@ -3011,6 +3020,16 @@ static int macb_probe(struct platform_device *pdev)
 		goto err_out_free_netdev;
 
 	phydev = bp->phy_dev;
+	np1 = of_get_next_child(np, NULL);
+	for_each_child_of_node(np1, np11) {
+		if (of_device_is_compatible(np11, "xlnx,gmiitorgmii")) {
+			bp->converter_phy.dev = dev;
+			bp->converter_phy.mii_bus = bp->mii_bus;
+			bp->converter_phy.mdio_write = macb_mdio_write;
+			bp->converter_phy.platform_data = bp->pdev->dev.of_node;
+			gmii2rgmii_phyprobe(&bp->converter_phy);
+		}
+	}
 
 	netif_carrier_off(dev);
 
