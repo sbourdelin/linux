@@ -361,7 +361,7 @@ static int mcp4725_probe(struct i2c_client *client,
 		return err;
 	}
 	pd = (inbuf[0] >> 1) & 0x3;
-	data->powerdown = pd > 0 ? true : false;
+	data->powerdown = pd > 0;
 	data->powerdown_mode = pd ? pd - 1 : 2; /* largest register to gnd */
 	data->dac_value = (inbuf[1] << 4) | (inbuf[2] >> 4);
 
