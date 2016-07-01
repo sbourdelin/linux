@@ -240,10 +240,10 @@ void tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm, unsigned long 
 	__tlb_reset_range(tlb);
 }
 
-static void tlb_flush_mmu_tlbonly(struct mmu_gather *tlb)
+static bool tlb_flush_mmu_tlbonly(struct mmu_gather *tlb)
 {
 	if (!tlb->end)
-		return;
+		return false;
 
 	tlb_flush(tlb);
 	mmu_notifier_invalidate_range(tlb->mm, tlb->start, tlb->end);
@@ -251,6 +251,7 @@ static void tlb_flush_mmu_tlbonly(struct mmu_gather *tlb)
 	tlb_table_flush(tlb);
 #endif
 	__tlb_reset_range(tlb);
+	return true;
 }
 
 static void tlb_flush_mmu_free(struct mmu_gather *tlb)

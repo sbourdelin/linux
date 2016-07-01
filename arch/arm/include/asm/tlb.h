@@ -126,12 +126,13 @@ static inline void __tlb_alloc_page(struct mmu_gather *tlb)
 	}
 }
 
-static inline void tlb_flush_mmu_tlbonly(struct mmu_gather *tlb)
+static inline bool tlb_flush_mmu_tlbonly(struct mmu_gather *tlb)
 {
 	tlb_flush(tlb);
 #ifdef CONFIG_HAVE_RCU_TABLE_FREE
 	tlb_table_flush(tlb);
 #endif
+	return true;
 }
 
 static inline void tlb_flush_mmu_free(struct mmu_gather *tlb)

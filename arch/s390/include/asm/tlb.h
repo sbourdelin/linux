@@ -60,9 +60,10 @@ static inline void tlb_gather_mmu(struct mmu_gather *tlb,
 	tlb->batch = NULL;
 }
 
-static inline void tlb_flush_mmu_tlbonly(struct mmu_gather *tlb)
+static inline bool tlb_flush_mmu_tlbonly(struct mmu_gather *tlb)
 {
 	__tlb_flush_mm_lazy(tlb->mm);
+	return true;
 }
 
 static inline void tlb_flush_mmu_free(struct mmu_gather *tlb)

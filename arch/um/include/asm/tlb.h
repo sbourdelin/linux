@@ -59,10 +59,11 @@ tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm, unsigned long start
 extern void flush_tlb_mm_range(struct mm_struct *mm, unsigned long start,
 			       unsigned long end);
 
-static inline void
+static inline bool
 tlb_flush_mmu_tlbonly(struct mmu_gather *tlb)
 {
 	flush_tlb_mm_range(tlb->mm, tlb->start, tlb->end);
+	return true;
 }
 
 static inline void

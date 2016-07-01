@@ -219,9 +219,10 @@ static inline int __tlb_remove_page(struct mmu_gather *tlb, struct page *page)
 	return tlb->max - tlb->nr;
 }
 
-static inline void tlb_flush_mmu_tlbonly(struct mmu_gather *tlb)
+static inline bool tlb_flush_mmu_tlbonly(struct mmu_gather *tlb)
 {
 	ia64_tlb_flush_mmu_tlbonly(tlb, tlb->start_addr, tlb->end_addr);
+	return true;
 }
 
 static inline void tlb_flush_mmu_free(struct mmu_gather *tlb)
