@@ -1269,6 +1269,7 @@ out_free_desc:
 	irq_free_descs(virq, nr_irqs);
 	return ret;
 }
+EXPORT_SYMBOL_GPL(__irq_domain_alloc_irqs);
 
 /**
  * irq_domain_free_irqs - Free IRQ number and associated data structures
@@ -1293,6 +1294,7 @@ void irq_domain_free_irqs(unsigned int virq, unsigned int nr_irqs)
 	irq_domain_free_irq_data(virq, nr_irqs);
 	irq_free_descs(virq, nr_irqs);
 }
+EXPORT_SYMBOL_GPL(irq_domain_free_irqs);
 
 /**
  * irq_domain_alloc_irqs_parent - Allocate interrupts from parent domain
