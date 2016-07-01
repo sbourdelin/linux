@@ -845,28 +845,44 @@ static int snd_ctl_elem_info(struct snd_ctl_file *ctl,
 	down_read(&card->controls_rwsem);
 	kctl = snd_ctl_find_id(card, &info->id);
 	if (kctl == NULL) {
-		up_read(&card->controls_rwsem);
-		return -ENOENT;
+		result = -ENOENT;
+		goto end;
 	}
 #ifdef CONFIG_SND_DEBUG
 	info->access = 0;
 #endif
 	result = kctl->info(kctl, info);
-	if (result >= 0) {
-		snd_BUG_ON(info->access);
-		index_offset = snd_ctl_get_ioff(kctl, &info->id);
-		vd = &kctl->vd[index_offset];
-		snd_ctl_build_ioff(&info->id, kctl, index_offset);
-		info->access = vd->access;
-		if (vd->owner) {
-			info->access |= SNDRV_CTL_ELEM_ACCESS_LOCK;
-			if (vd->owner == ctl)
-				info->access |= SNDRV_CTL_ELEM_ACCESS_OWNER;
-			info->owner = pid_vnr(vd->owner->pid);
-		} else {
-			info->owner = -1;
-		}
+	if (result < 0)
+		goto end;
+
+	snd_BUG_ON(info->access);
+
+	/* This is a driver bug. */
+	if (!validate_element_member_dimension(info)) {
+		dev_err(card->dev,
+			"This module has a bug of invalid dimention info.\n");
+		result = -ENODATA;
+		goto end;
 	}
+
+	index_offset = snd_ctl_get_ioff(kctl, &info->id);
+	vd = &kctl->vd[index_offset];
+	snd_ctl_build_ioff(&info->id, kctl, index_offset);
+	info->access = vd->access;
+
+	/* This element is not locked by any processes. */
+	if (vd->owner == NULL) {
+		info->owner = -1;
+		goto end;
+	}
+
+	info->owner = pid_vnr(vd->owner->pid);
+	info->access |= SNDRV_CTL_ELEM_ACCESS_LOCK;
+
+	/* This element is locked by this process. */
+	if (vd->owner == ctl)
+		info->access |= SNDRV_CTL_ELEM_ACCESS_OWNER;
+end:
 	up_read(&card->controls_rwsem);
 	return result;
 }
