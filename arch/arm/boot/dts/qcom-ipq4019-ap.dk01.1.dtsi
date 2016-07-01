@@ -91,6 +91,14 @@
 			};
 		};
 
+		wifi0: wifi@a000000 {
+			btcoex_support = <0x1>;
+		}
+
+		wifi1: wifi@a800000 {
+			btcoex_support = <0x0>;
+		}
+
 		serial@78af000 {
 			pinctrl-0 = <&serial_pins>;
 			pinctrl-names = "default";
