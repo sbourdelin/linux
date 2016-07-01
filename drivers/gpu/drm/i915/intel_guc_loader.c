@@ -568,7 +568,7 @@ static void guc_fw_fetch(struct drm_device *dev, struct intel_guc_fw *guc_fw)
 
 	/* Check the size of the blob before examining buffer contents */
 	if (fw->size < sizeof(struct guc_css_header)) {
-		DRM_ERROR("Firmware header is missing\n");
+		DRM_DEBUG_DRIVER("Firmware header is missing\n");
 		goto fail;
 	}
 
@@ -580,7 +580,7 @@ static void guc_fw_fetch(struct drm_device *dev, struct intel_guc_fw *guc_fw)
 		css->key_size_dw - css->exponent_size_dw) * sizeof(u32);
 
 	if (guc_fw->header_size != sizeof(struct guc_css_header)) {
-		DRM_ERROR("CSS header definition mismatch\n");
+		DRM_DEBUG_DRIVER("CSS header definition mismatch\n");
 		goto fail;
 	}
 
@@ -590,7 +590,7 @@ static void guc_fw_fetch(struct drm_device *dev, struct intel_guc_fw *guc_fw)
 
 	/* now RSA */
 	if (css->key_size_dw != UOS_RSA_SCRATCH_MAX_COUNT) {
-		DRM_ERROR("RSA key size is bad\n");
+		DRM_DEBUG_DRIVER("RSA key size is bad\n");
 		goto fail;
 	}
 	guc_fw->rsa_offset = guc_fw->ucode_offset + guc_fw->ucode_size;
@@ -599,14 +599,14 @@ static void guc_fw_fetch(struct drm_device *dev, struct intel_guc_fw *guc_fw)
 	/* At least, it should have header, uCode and RSA. Size of all three. */
 	size = guc_fw->header_size + guc_fw->ucode_size + guc_fw->rsa_size;
 	if (fw->size < size) {
-		DRM_ERROR("Missing firmware components\n");
+		DRM_DEBUG_DRIVER("Missing firmware components\n");
 		goto fail;
 	}
 
 	/* Header and uCode will be loaded to WOPCM. Size of the two. */
 	size = guc_fw->header_size + guc_fw->ucode_size;
 	if (size > guc_wopcm_size(dev->dev_private)) {
-		DRM_ERROR("Firmware is too large to fit in WOPCM\n");
+		DRM_DEBUG_DRIVER("Firmware is too large to fit in WOPCM\n");
 		goto fail;
 	}
 
@@ -621,7 +621,7 @@ static void guc_fw_fetch(struct drm_device *dev, struct intel_guc_fw *guc_fw)
 
 	if (guc_fw->guc_fw_major_found != guc_fw->guc_fw_major_wanted ||
 	    guc_fw->guc_fw_minor_found < guc_fw->guc_fw_minor_wanted) {
-		DRM_ERROR("GuC firmware version %d.%d, required %d.%d\n",
+		DRM_DEBUG_DRIVER("GuC firmware version %d.%d, required %d.%d\n",
 			guc_fw->guc_fw_major_found, guc_fw->guc_fw_minor_found,
 			guc_fw->guc_fw_major_wanted, guc_fw->guc_fw_minor_wanted);
 		err = -ENOEXEC;
@@ -653,8 +653,6 @@ static void guc_fw_fetch(struct drm_device *dev, struct intel_guc_fw *guc_fw)
 fail:
 	DRM_DEBUG_DRIVER("GuC fw fetch status FAIL; err %d, fw %p, obj %p\n",
 		err, fw, guc_fw->guc_fw_obj);
-	DRM_ERROR("Failed to fetch GuC firmware from %s (error %d)\n",
-		  guc_fw->guc_fw_path, err);
 
 	mutex_lock(&dev->struct_mutex);
 	obj = guc_fw->guc_fw_obj;
