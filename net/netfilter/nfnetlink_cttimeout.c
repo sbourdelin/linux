@@ -303,16 +303,26 @@ static void ctnl_untimeout(struct net *net, struct ctnl_timeout *timeout)
 {
 	struct nf_conntrack_tuple_hash *h;
 	const struct hlist_nulls_node *nn;
+	unsigned int sequence;
+	spinlock_t *lock;
 	int i;
 
 	local_bh_disable();
+restart:
+	sequence = read_seqcount_begin(&nf_conntrack_generation);
 	for (i = 0; i < nf_conntrack_htable_size; i++) {
-		nf_conntrack_lock(&nf_conntrack_locks[i % CONNTRACK_LOCKS]);
+		lock = &nf_conntrack_locks[i % CONNTRACK_LOCKS];
+		nf_conntrack_lock(lock);
+		if (read_seqcount_retry(&nf_conntrack_generation, sequence)) {
+			spin_unlock(lock);
+			goto restart;
+		}
+
 		if (i < nf_conntrack_htable_size) {
 			hlist_nulls_for_each_entry(h, nn, &nf_conntrack_hash[i], hnnode)
 				untimeout(h, timeout);
 		}
-		spin_unlock(&nf_conntrack_locks[i % CONNTRACK_LOCKS]);
+		spin_unlock(lock);
 	}
 	local_bh_enable();
 }
