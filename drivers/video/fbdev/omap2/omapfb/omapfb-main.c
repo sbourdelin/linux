@@ -1693,28 +1693,13 @@ static void omapfb_auto_update_work(struct work_struct *work)
 	freq = auto_update_freq;
 	if (freq == 0)
 		freq = 20;
-	queue_delayed_work(fbdev->auto_update_wq,
-			&d->auto_update_work, HZ / freq);
+	queue_delayed_work(system_long_wq, &d->auto_update_work, HZ / freq);
 }
 
 void omapfb_start_auto_update(struct omapfb2_device *fbdev,
 		struct omap_dss_device *display)
 {
 	struct omapfb_display_data *d;
-
-	if (fbdev->auto_update_wq == NULL) {
-		struct workqueue_struct *wq;
-
-		wq = create_singlethread_workqueue("omapfb_auto_update");
-
-		if (wq == NULL) {
-			dev_err(fbdev->dev, "Failed to create workqueue for "
-					"auto-update\n");
-			return;
-		}
-
-		fbdev->auto_update_wq = wq;
-	}
 
 	d = get_display_data(fbdev, display);
 
@@ -1865,12 +1850,6 @@ static void omapfb_free_resources(struct omapfb2_device *fbdev)
 		dssdev->driver->disconnect(dssdev);
 
 		omap_dss_put_device(dssdev);
-	}
-
-	if (fbdev->auto_update_wq != NULL) {
-		flush_workqueue(fbdev->auto_update_wq);
-		destroy_workqueue(fbdev->auto_update_wq);
-		fbdev->auto_update_wq = NULL;
 	}
 
 	dev_set_drvdata(fbdev->dev, NULL);

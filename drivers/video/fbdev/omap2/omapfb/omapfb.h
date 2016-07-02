@@ -106,7 +106,6 @@ struct omapfb2_device {
 	unsigned num_managers;
 	struct omap_overlay_manager *managers[10];
 
-	struct workqueue_struct *auto_update_wq;
 };
 
 struct omapfb_colormode {
