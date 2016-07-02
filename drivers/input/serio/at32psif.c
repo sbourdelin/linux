@@ -210,15 +210,13 @@ static int __init psif_probe(struct platform_device *pdev)
 	int ret;
 
 	psif = kzalloc(sizeof(struct psif), GFP_KERNEL);
-	if (!psif) {
-		dev_dbg(&pdev->dev, "out of memory\n");
+	if (!psif)
 		return -ENOMEM;
-	}
+
 	psif->pdev = pdev;
 
 	io = kzalloc(sizeof(struct serio), GFP_KERNEL);
 	if (!io) {
-		dev_dbg(&pdev->dev, "out of memory\n");
 		ret = -ENOMEM;
 		goto out_free_psif;
 	}
