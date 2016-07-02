@@ -1,0 +1,42 @@
+Properties for Jedec JC-42.4 compatible temperature sensors
+
+Required properties:
+- compatible: May include a device-specific string consisting of the
+	      manufacturer and the name of the chip. A list of supported
+	      chip names follows.
+	      Must include "jedec,jc-42-4" for any Jedec JC-42.4 compatible
+	      temperature sensor.
+
+	      Supported chip names:
+		adt7408
+		at30ts00
+		at30tse004
+		cat6095
+		cat34ts02
+		max6604
+		mcp9804
+		mcp9805
+		mcp9808
+		mcp98243
+		mcp98244
+		mcp9843
+		se97
+		se98
+		stts2002
+		stts2004
+		stts3000
+		stts424
+		stts424e
+		tse2002
+		tse2004
+		ts3000
+		ts3001
+
+- reg: I2C address
+
+Example:
+
+temp-sensor@1a {
+	compatible = "jedec,jc-42-4";
+	reg = <0x18>;
+};
