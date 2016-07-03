@@ -1,6 +1,8 @@
 /*
  * Tegra ACONNECT Bus Driver
  *
+ * Author: Jon Hunter <jonathanh@nvidia.com>
+ *
  * Copyright (C) 2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This file is subject to the terms and conditions of the GNU General Public
@@ -9,7 +11,7 @@
  */
 
 #include <linux/clk.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/pm_clock.h>
@@ -66,15 +68,6 @@ clk_destroy:
 	return ret;
 }
 
-static int tegra_aconnect_remove(struct platform_device *pdev)
-{
-	pm_runtime_disable(&pdev->dev);
-
-	pm_clk_destroy(&pdev->dev);
-
-	return 0;
-}
-
 static int tegra_aconnect_runtime_resume(struct device *dev)
 {
 	return pm_clk_resume(dev);
@@ -94,19 +87,14 @@ static const struct of_device_id tegra_aconnect_of_match[] = {
 	{ .compatible = "nvidia,tegra210-aconnect", },
 	{ }
 };
-MODULE_DEVICE_TABLE(of, tegra_aconnect_of_match);
 
 static struct platform_driver tegra_aconnect_driver = {
 	.probe = tegra_aconnect_probe,
-	.remove = tegra_aconnect_remove,
 	.driver = {
 		.name = "tegra-aconnect",
+		.suppress_bind_attrs = true,
 		.of_match_table = tegra_aconnect_of_match,
 		.pm = &tegra_aconnect_pm_ops,
 	},
 };
-module_platform_driver(tegra_aconnect_driver);
-
-MODULE_DESCRIPTION("NVIDIA Tegra ACONNECT Bus Driver");
-MODULE_AUTHOR("Jon Hunter <jonathanh@nvidia.com>");
-MODULE_LICENSE("GPL v2");
+builtin_platform_driver(tegra_aconnect_driver);
