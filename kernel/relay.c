@@ -451,6 +451,16 @@ static struct rchan_buf *relay_open_buf(struct rchan *chan, unsigned int cpu)
 		if (!dentry)
 			goto free_buf;
 		relay_set_buf_dentry(buf, dentry);
+	} else {
+		dentry = chan->cb->create_buf_file(NULL, NULL,
+					S_IRUSR, buf,
+					&chan->is_global);
+		/* We did not expected the client to return a valid dentry,
+		 * was now just looking for the global info from the client.
+		 * Now onus is on client only to release this dentry pointer.
+		 */
+		if (WARN_ON(dentry))
+			goto free_buf;
 	}
 
  	buf->cpu = cpu;
@@ -666,6 +676,27 @@ int relay_late_setup_files(struct rchan *chan,
 	}
 	chan->has_base_filename = 1;
 	chan->parent = parent;
+
+	if (chan->is_global) {
+		if (unlikely(!chan->buf[0])) {
+			WARN_ONCE(1, KERN_ERR "CPU 0 has no buffer!\n");
+			mutex_unlock(&relay_channels_mutex);
+			return -EINVAL;
+                }
+
+		dentry = relay_create_buf_file(chan, chan->buf[0], 0);
+
+		if (unlikely(!dentry))
+			err = -EINVAL;
+		else if (WARN_ON(!chan->is_global))
+			err = -EINVAL;
+		else
+			relay_set_buf_dentry(chan->buf[0], dentry);
+
+		mutex_unlock(&relay_channels_mutex);
+		return err;
+	}
+
 	curr_cpu = get_cpu();
 	/*
 	 * The CPU hotplug notifier ran before us and created buffers with
@@ -706,6 +737,7 @@ int relay_late_setup_files(struct rchan *chan,
 
 	return err;
 }
+EXPORT_SYMBOL_GPL(relay_late_setup_files);
 
 /**
  *	relay_switch_subbuf - switch to a new sub-buffer
