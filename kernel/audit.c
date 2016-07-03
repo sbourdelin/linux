@@ -54,6 +54,7 @@
 #include <linux/kthread.h>
 #include <linux/kernel.h>
 #include <linux/syscalls.h>
+#include <linux/cgroup.h>
 
 #include <linux/audit.h>
 
@@ -1707,6 +1708,27 @@ static void audit_log_fcaps(struct audit_buffer *ab, struct audit_names *name)
 	if (log)
 		audit_log_format(ab, " cap_fe=%d cap_fver=%x",
 				 name->fcap.fE, name->fcap_ver);
+}
+
+void audit_log_cap_use(int cap)
+{
+	struct audit_context *context = current->audit_context;
+	struct audit_buffer *ab;
+	kuid_t uid;
+	kgid_t gid;
+
+	ab = audit_log_start(context, GFP_KERNEL, AUDIT_CAPABILITY);
+	audit_log_format(ab, "cap_used=%d", cap);
+	current_uid_gid(&uid, &gid);
+	audit_log_format(ab, " pid=%d auid=%u uid=%u gid=%u ses=%u",
+			 task_pid_nr(current),
+			 from_kuid(&init_user_ns, audit_get_loginuid(current)),
+			 from_kuid(&init_user_ns, uid),
+			 from_kgid(&init_user_ns, gid),
+			 audit_get_sessionid(current));
+	audit_log_format(ab, " cgroups=");
+	audit_cgroup_list(ab);
+	audit_log_end(ab);
 }
 
 static inline int audit_copy_fcaps(struct audit_names *name,

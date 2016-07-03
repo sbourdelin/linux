@@ -366,8 +366,8 @@ bool has_capability_noaudit(struct task_struct *t, int cap)
  * @ns:  The usernamespace we want the capability in
  * @cap: The capability to be tested for
  *
- * Return true if the current task has the given superior capability currently
- * available for use, false if not.
+ * Return true if the current task has the given superior capability
+ * currently available for use, false if not. Write an audit message.
  *
  * This sets PF_SUPERPRIV on the task if the capability is available on the
  * assumption that it's about to be used.
@@ -380,6 +380,7 @@ bool ns_capable(struct user_namespace *ns, int cap)
 	}
 
 	if (security_capable(current_cred(), ns, cap) == 0) {
+		audit_log_cap_use(cap);
 		current->flags |= PF_SUPERPRIV;
 		return true;
 	}
