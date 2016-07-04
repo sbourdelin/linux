@@ -3082,10 +3082,20 @@ enqueue_entity_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *se)
 static inline void
 dequeue_entity_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *se)
 {
+	unsigned long load_avg = 0;
+
 	update_load_avg(se, 1);
 
-	cfs_rq->runnable_load_avg =
-		max_t(long, cfs_rq->runnable_load_avg - se->avg.load_avg, 0);
+	/*
+	 * If we're about to dequeue the last runnable entity we can
+	 * reset the runnable load average to zero instead of waiting
+	 * for it to decay naturally. This gives the load balancer a
+	 * more timely and accurate view of how busy this cpu is.
+	 */
+	if (cfs_rq->nr_running > 1)
+		load_avg = max_t(long, cfs_rq->runnable_load_avg - se->avg.load_avg, 0);
+
+	cfs_rq->runnable_load_avg = load_avg;
 	cfs_rq->runnable_load_sum =
 		max_t(s64,  cfs_rq->runnable_load_sum - se->avg.load_sum, 0);
 }
