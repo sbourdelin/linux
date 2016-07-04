@@ -19,6 +19,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/dmi.h>
 #include <linux/fs.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
@@ -131,6 +132,8 @@ static struct sst_platform_info chv_platform_data = {
 	.platform = "sst-mfld-platform",
 };
 
+static const struct dmi_system_id dmi_platform_quirk_table[];
+
 static int sst_platform_get_resources(struct intel_sst_drv *ctx)
 {
 	struct resource *rsrc;
@@ -224,6 +227,7 @@ static int sst_acpi_probe(struct platform_device *pdev)
 	struct platform_device *mdev;
 	struct platform_device *plat_dev;
 	struct sst_platform_info *pdata;
+	const struct dmi_system_id *dmi_match;
 	unsigned int dev_id;
 
 	id = acpi_match_device(dev->driver->acpi_match_table, dev);
@@ -231,7 +235,13 @@ static int sst_acpi_probe(struct platform_device *pdev)
 		return -ENODEV;
 	dev_dbg(dev, "for %s", id->id);
 
-	mach = (struct sst_acpi_mach *)id->driver_data;
+	/* check for quirk when getting driver_data */
+	dmi_match = dmi_first_match(dmi_platform_quirk_table);
+	if (dmi_match)
+		mach = (struct sst_acpi_mach *)dmi_match->driver_data;
+	else
+		mach = (struct sst_acpi_mach *)id->driver_data;
+
 	mach = sst_acpi_find_machine(mach);
 	if (mach == NULL) {
 		dev_err(dev, "No matching machine driver found\n");
@@ -345,7 +355,24 @@ static struct sst_acpi_mach sst_acpi_chv[] = {
 	/* some CHT-T platforms rely on RT5640, use Baytrail machine driver */
 	{"10EC5640", "bytcr_rt5640", "intel/fw_sst_22a8.bin", "bytcr_rt5640", NULL,
 						&chv_platform_data },
+	{},
+};
 
+static struct sst_acpi_mach sst_acpi_chv_quirk[] = {
+	/* some CHT-T platforms rely on RT5645 but use the ID from RT5640 */
+	{"10EC5640", "cht-bsw-rt5645", "intel/fw_sst_22a8.bin", "cht-bsw", NULL,
+						&chv_platform_data },
+	{},
+};
+
+static const struct dmi_system_id dmi_platform_quirk_table[] = {
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Microsoft Corporation"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Surface 3"),
+		},
+		.driver_data = (unsigned long *) &sst_acpi_chv_quirk,
+	},
 	{},
 };
 
