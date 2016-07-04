@@ -1770,6 +1770,7 @@ long _do_fork(unsigned long clone_flags,
 		struct pid *pid;
 
 		trace_sched_process_fork(current, p);
+		trace_sched_prio_update(p);
 
 		pid = get_task_pid(p, PIDTYPE_PID);
 		nr = pid_vnr(pid);
