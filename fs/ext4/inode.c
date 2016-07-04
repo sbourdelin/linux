@@ -5165,7 +5165,7 @@ int ext4_setattr(struct dentry *dentry, struct iattr *attr)
 		 * in data=journal mode to make pages freeable.
 		 */
 		truncate_pagecache(inode, inode->i_size);
-		if (shrink)
+		if (shrink && (inode->i_blocks || ext4_has_inline_data(inode)))
 			ext4_truncate(inode);
 		up_write(&EXT4_I(inode)->i_mmap_sem);
 	}
