@@ -71,6 +71,8 @@ void dump_trace(struct task_struct *task, struct pt_regs *regs,
 		context = task_thread_info(task);
 		bp = ops->walk_stack(context, stack, bp, ops, data,
 				     end_stack, &graph);
+		if (ops->end_walk && ops->end_walk(data))
+			break;
 
 		/* Stop if not on irq stack */
 		if (!end_stack)

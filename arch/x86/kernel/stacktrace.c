@@ -43,10 +43,17 @@ save_stack_address_nosched(void *data, unsigned long addr, int reliable)
 	return __save_stack_address(data, addr, reliable, true);
 }
 
+static int save_stack_end(void *data)
+{
+	struct stack_trace *trace = data;
+	return trace->nr_entries >= trace->max_entries;
+}
+
 static const struct stacktrace_ops save_stack_ops = {
 	.stack		= save_stack_stack,
 	.address	= save_stack_address,
 	.walk_stack	= print_context_stack,
+	.end_walk	= save_stack_end,
 };
 
 static const struct stacktrace_ops save_stack_ops_nosched = {

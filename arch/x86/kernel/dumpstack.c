@@ -115,6 +115,8 @@ print_context_stack(struct thread_info *tinfo,
 			print_ftrace_graph_addr(addr, data, ops, tinfo, graph);
 		}
 		stack++;
+		if (ops->end_walk && ops->end_walk(data))
+			break;
 	}
 	return bp;
 }
@@ -139,6 +141,8 @@ print_context_stack_bp(struct thread_info *tinfo,
 		frame = frame->next_frame;
 		ret_addr = &frame->return_address;
 		print_ftrace_graph_addr(addr, data, ops, tinfo, graph);
+		if (ops->end_walk && ops->end_walk(data))
+			break;
 	}
 
 	return (unsigned long)frame;

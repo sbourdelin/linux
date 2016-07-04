@@ -41,6 +41,7 @@ struct stacktrace_ops {
 	/* On negative return stop dumping */
 	int (*stack)(void *data, char *name);
 	walk_stack_t	walk_stack;
+	int (*end_walk)(void *data);
 };
 
 void dump_trace(struct task_struct *tsk, struct pt_regs *regs,
