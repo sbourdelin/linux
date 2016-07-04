@@ -49,10 +49,21 @@ static int save_stack_end(void *data)
 	return trace->nr_entries >= trace->max_entries;
 }
 
+/*
+ * This operation should be used in the oops case where
+ * stack might be broken.
+ */
 static const struct stacktrace_ops save_stack_ops = {
 	.stack		= save_stack_stack,
 	.address	= save_stack_address,
 	.walk_stack	= print_context_stack,
+	.end_walk	= save_stack_end,
+};
+
+static const struct stacktrace_ops save_stack_ops_norm = {
+	.stack		= save_stack_stack,
+	.address	= save_stack_address,
+	.walk_stack	= print_context_stack_bp,
 	.end_walk	= save_stack_end,
 };
 
@@ -64,6 +75,7 @@ static const struct stacktrace_ops save_stack_ops_nosched = {
 
 /*
  * Save stack-backtrace addresses into a stack_trace buffer.
+ * It works even in oops.
  */
 void save_stack_trace(struct stack_trace *trace)
 {
@@ -72,6 +84,19 @@ void save_stack_trace(struct stack_trace *trace)
 		trace->entries[trace->nr_entries++] = ULONG_MAX;
 }
 EXPORT_SYMBOL_GPL(save_stack_trace);
+
+/*
+ * Save stack-backtrace addresses into a stack_trace buffer.
+ * This is perfered in normal case where we expect the stack is
+ * reliable.
+ */
+void save_stack_trace_norm(struct stack_trace *trace)
+{
+	dump_trace(current, NULL, NULL, 0, &save_stack_ops_norm, trace);
+	if (trace->nr_entries < trace->max_entries)
+		trace->entries[trace->nr_entries++] = ULONG_MAX;
+}
+EXPORT_SYMBOL_GPL(save_stack_trace_norm);
 
 void save_stack_trace_regs(struct pt_regs *regs, struct stack_trace *trace)
 {
