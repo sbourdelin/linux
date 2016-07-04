@@ -823,14 +823,12 @@ static void sd_stopN(struct gspca_dev *gspca_dev)
 		msleep(20);
 		reg_w(gspca_dev, 0x0309);
 	}
-#if IS_ENABLED(CONFIG_INPUT)
 	/* If the last button state is pressed, release it now! */
-	if (sd->button_pressed) {
+	if (IS_ENABLED(CONFIG_INPUT) && sd->button_pressed) {
 		input_report_key(gspca_dev->input_dev, KEY_CAMERA, 0);
 		input_sync(gspca_dev->input_dev);
 		sd->button_pressed = 0;
 	}
-#endif
 }
 
 static void sd_pkt_scan(struct gspca_dev *gspca_dev,
@@ -841,8 +839,7 @@ static void sd_pkt_scan(struct gspca_dev *gspca_dev,
 	int pkt_type;
 
 	if (data[0] == 0x5a) {
-#if IS_ENABLED(CONFIG_INPUT)
-		if (len > 20) {
+		if (IS_ENABLED(CONFIG_INPUT) && len > 20) {
 			u8 state = (data[20] & 0x80) ? 1 : 0;
 			if (sd->button_pressed != state) {
 				input_report_key(gspca_dev->input_dev,
@@ -851,7 +848,6 @@ static void sd_pkt_scan(struct gspca_dev *gspca_dev,
 				sd->button_pressed = state;
 			}
 		}
-#endif
 		/* Control Packet, after this came the header again,
 		 * but extra bytes came in the packet before this,
 		 * sometimes an EOF arrives, sometimes not... */

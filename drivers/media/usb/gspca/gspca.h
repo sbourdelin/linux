@@ -149,8 +149,8 @@ struct gspca_dev {
 	struct usb_device *dev;
 	struct file *capt_file;		/* file doing video capture */
 					/* protected by queue_lock */
-#if IS_ENABLED(CONFIG_INPUT)
 	struct input_dev *input_dev;
+#if IS_ENABLED(CONFIG_INPUT)
 	char phys[64];			/* physical device path */
 #endif
 

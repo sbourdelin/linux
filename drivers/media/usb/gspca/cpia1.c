@@ -540,10 +540,11 @@ static int do_command(struct gspca_dev *gspca_dev, u16 command,
 		/* test button press */
 		a = ((gspca_dev->usb_buf[1] & 0x02) == 0);
 		if (a != sd->params.qx3.button) {
-#if IS_ENABLED(CONFIG_INPUT)
-			input_report_key(gspca_dev->input_dev, KEY_CAMERA, a);
-			input_sync(gspca_dev->input_dev);
-#endif
+			if (IS_ENABLED(CONFIG_INPUT)) {
+				input_report_key(gspca_dev->input_dev,
+						 KEY_CAMERA, a);
+				input_sync(gspca_dev->input_dev);
+			}
 	        	sd->params.qx3.button = a;
 		}
 		if (sd->params.qx3.button) {
@@ -1637,16 +1638,14 @@ static void sd_stopN(struct gspca_dev *gspca_dev)
 	/* Update the camera status */
 	do_command(gspca_dev, CPIA_COMMAND_GetCameraStatus, 0, 0, 0, 0);
 
-#if IS_ENABLED(CONFIG_INPUT)
 	/* If the last button state is pressed, release it now! */
-	if (sd->params.qx3.button) {
+	if (IS_ENABLED(CONFIG_INPUT) && sd->params.qx3.button) {
 		/* The camera latch will hold the pressed state until we reset
 		   the latch, so we do not reset sd->params.qx3.button now, to
 		   avoid a false keypress being reported the next sd_start */
 		input_report_key(gspca_dev->input_dev, KEY_CAMERA, 0);
 		input_sync(gspca_dev->input_dev);
 	}
-#endif
 }
 
 /* this function is called at probe and resume time */

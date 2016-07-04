@@ -246,15 +246,13 @@ static void sd_stopN(struct gspca_dev *gspca_dev)
 	struct sd *sd = (struct sd *) gspca_dev;
 
 	konica_stream_off(gspca_dev);
-#if IS_ENABLED(CONFIG_INPUT)
 	/* Don't keep the button in the pressed state "forever" if it was
 	   pressed when streaming is stopped */
-	if (sd->snapshot_pressed) {
+	if (IS_ENABLED(CONFIG_INPUT) && sd->snapshot_pressed) {
 		input_report_key(gspca_dev->input_dev, KEY_CAMERA, 0);
 		input_sync(gspca_dev->input_dev);
 		sd->snapshot_pressed = 0;
 	}
-#endif
 }
 
 /* reception of an URB */
@@ -341,8 +339,7 @@ static void sd_isoc_irq(struct urb *urb)
 		if (st & 0x80) {
 			gspca_frame_add(gspca_dev, LAST_PACKET, NULL, 0);
 			gspca_frame_add(gspca_dev, FIRST_PACKET, NULL, 0);
-		} else {
-#if IS_ENABLED(CONFIG_INPUT)
+		} else if (IS_ENABLED(CONFIG_INPUT)) {
 			u8 button_state = st & 0x40 ? 1 : 0;
 			if (sd->snapshot_pressed != button_state) {
 				input_report_key(gspca_dev->input_dev,
@@ -351,7 +348,6 @@ static void sd_isoc_irq(struct urb *urb)
 				input_sync(gspca_dev->input_dev);
 				sd->snapshot_pressed = button_state;
 			}
-#endif
 			if (st & 0x01)
 				continue;
 		}
