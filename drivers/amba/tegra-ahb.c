@@ -1,4 +1,6 @@
 /*
+ * Tegra AHB driver
+ *
  * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
  * Copyright (C) 2011 Google, Inc.
  *
@@ -22,7 +24,7 @@
 
 #include <linux/err.h>
 #include <linux/kernel.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/of.h>
@@ -301,9 +303,4 @@ static struct platform_driver tegra_ahb_driver = {
 		.pm = &tegra_ahb_pm,
 	},
 };
-module_platform_driver(tegra_ahb_driver);
-
-MODULE_AUTHOR("Hiroshi DOYU <hdoyu@nvidia.com>");
-MODULE_DESCRIPTION("Tegra AHB driver");
-MODULE_LICENSE("GPL v2");
-MODULE_ALIAS("platform:" DRV_NAME);
+builtin_platform_driver(tegra_ahb_driver);
