@@ -82,6 +82,10 @@ def parse_options():
                       default=False,
                       help="Reset current Git tree even when it's dirty.")
 
+    parser.add_option('', '--no-color', dest='no_color', action='store_true',
+                      default=False,
+                      help="Don't print colored output.")
+
     (opts, _) = parser.parse_args()
 
     if opts.commit and opts.diff:
@@ -115,6 +119,9 @@ def parse_options():
 def main():
     """Main function of this module."""
     opts = parse_options()
+
+    global no_color
+    no_color = opts.no_color
 
     if opts.sim and not opts.commit and not opts.diff:
         sims = find_sims(opts.sim, opts.ignore)
@@ -202,14 +209,14 @@ def yel(string):
     """
     Color %string yellow.
     """
-    return "\033[33m%s\033[0m" % string
+    return string if no_color else "\033[33m%s\033[0m" % string
 
 
 def red(string):
     """
     Color %string red.
     """
-    return "\033[31m%s\033[0m" % string
+    return string if no_color else "\033[31m%s\033[0m" % string
 
 
 def execute(cmd):
