@@ -531,6 +531,7 @@
 	MEM_DISCARD(init.data)						\
 	KERNEL_CTORS()							\
 	MCOUNT_REC()							\
+	*(.init.rodata.str)						\
 	*(.init.rodata)							\
 	FTRACE_EVENTS()							\
 	TRACE_SYSCALLS()						\
@@ -555,6 +556,7 @@
 #define EXIT_DATA							\
 	*(.exit.data)							\
 	MEM_DISCARD(exit.data)						\
+	*(.exit.rodata.str)						\
 	MEM_DISCARD(exit.rodata)
 
 #define EXIT_TEXT							\
