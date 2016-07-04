@@ -383,7 +383,7 @@ void __init_refok note_bootable_part(dev_t dev, int part, int goodness)
 }
 
 #ifdef CONFIG_ADB_CUDA
-static void cuda_restart(void)
+static void __noreturn cuda_restart(void)
 {
 	struct adb_request req;
 
@@ -392,7 +392,7 @@ static void cuda_restart(void)
 		cuda_poll();
 }
 
-static void cuda_shutdown(void)
+static void __noreturn cuda_shutdown(void)
 {
 	struct adb_request req;
 
@@ -416,7 +416,7 @@ static void cuda_shutdown(void)
 #define smu_shutdown()
 #endif
 
-static void pmac_restart(char *cmd)
+static void __noreturn pmac_restart(char *cmd)
 {
 	switch (sys_ctrler) {
 	case SYS_CTRLER_CUDA:
@@ -432,7 +432,7 @@ static void pmac_restart(char *cmd)
 	}
 }
 
-static void pmac_power_off(void)
+static void __noreturn pmac_power_off(void)
 {
 	switch (sys_ctrler) {
 	case SYS_CTRLER_CUDA:
@@ -448,7 +448,7 @@ static void pmac_power_off(void)
 	}
 }
 
-static void
+static void __noreturn
 pmac_halt(void)
 {
 	pmac_power_off();
