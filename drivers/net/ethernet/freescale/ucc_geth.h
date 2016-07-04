@@ -1,5 +1,5 @@
 /*
- * Copyright (C) Freescale Semicondutor, Inc. 2006-2009. All rights reserved.
+ * Copyright (C) Freescale Semiconductor, Inc. 2006-2009. All rights reserved.
  *
  * Author: Shlomi Gridish <gridish@freescale.com>
  *

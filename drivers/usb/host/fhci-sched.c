@@ -1,7 +1,7 @@
 /*
  * Freescale QUICC Engine USB Host Controller Driver
  *
- * Copyright (c) Freescale Semicondutor, Inc. 2006, 2011.
+ * Copyright (c) Freescale Semiconductor, Inc. 2006, 2011.
  *               Shlomi Gridish <gridish@freescale.com>
  *               Jerry Huang <Chang-Ming.Huang@freescale.com>
  * Copyright (c) Logic Product Development, Inc. 2007

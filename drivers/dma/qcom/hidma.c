@@ -14,7 +14,7 @@
  */
 
 /*
- * Copyright (C) Freescale Semicondutor, Inc. 2007, 2008.
+ * Copyright (C) Freescale Semiconductor, Inc. 2007, 2008.
  * Copyright (C) Semihalf 2009
  * Copyright (C) Ilya Yanok, Emcraft Systems 2010
  * Copyright (C) Alexander Popov, Promcontroller 2014
