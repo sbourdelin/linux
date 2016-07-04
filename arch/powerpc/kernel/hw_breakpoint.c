@@ -264,7 +264,7 @@ int __kprobes hw_breakpoint_handler(struct die_args *args)
 
 	stepped = 0;
 	instr = 0;
-	if (!__get_user_inatomic(instr, (unsigned int *) regs->nip))
+	if (!__get_user_inatomic(instr, (unsigned int __user *) regs->nip))
 		stepped = emulate_step(regs, instr);
 
 	/*
