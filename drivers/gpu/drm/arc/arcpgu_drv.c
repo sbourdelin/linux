@@ -155,6 +155,7 @@ static int arcpgu_load(struct drm_device *drm)
 	}
 
 	ret = arcpgu_drm_hdmi_init(drm, encoder_node);
+	of_node_put(encoder_node);
 	if (ret < 0)
 		return ret;
 
