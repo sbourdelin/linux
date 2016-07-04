@@ -284,6 +284,7 @@ static int msm_init_vram(struct drm_device *dev)
 	if (node) {
 		struct resource r;
 		ret = of_address_to_resource(node, 0, &r);
+		of_node_put(node);
 		if (ret)
 			return ret;
 		size = r.end - r.start;
@@ -819,6 +820,7 @@ static int add_components(struct device *dev, struct component_match **matchptr,
 			break;
 
 		component_match_add(dev, matchptr, compare_of, node);
+		of_node_put(node);
 	}
 
 	return 0;
