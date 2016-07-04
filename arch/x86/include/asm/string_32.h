@@ -6,28 +6,29 @@
 /* Let gcc decide whether to inline or use the out of line functions */
 
 #define __HAVE_ARCH_STRCPY
-extern char *strcpy(char *dest, const char *src);
+extern char *strcpy(char *dest, const char *src) __nocapture(2);
 
 #define __HAVE_ARCH_STRNCPY
-extern char *strncpy(char *dest, const char *src, size_t count);
+extern char *strncpy(char *dest, const char *src, size_t count) __nocapture(2);
 
 #define __HAVE_ARCH_STRCAT
-extern char *strcat(char *dest, const char *src);
+extern char *strcat(char *dest, const char *src) __nocapture(2);
 
 #define __HAVE_ARCH_STRNCAT
-extern char *strncat(char *dest, const char *src, size_t count);
+extern char *strncat(char *dest, const char *src, size_t count) __nocapture(2);
 
 #define __HAVE_ARCH_STRCMP
-extern int strcmp(const char *cs, const char *ct);
+extern int strcmp(const char *cs, const char *ct) __nocapture(1, 2);
 
 #define __HAVE_ARCH_STRNCMP
-extern int strncmp(const char *cs, const char *ct, size_t count);
+extern int
+strncmp(const char *cs, const char *ct, size_t count) __nocapture(1, 2);
 
 #define __HAVE_ARCH_STRCHR
 extern char *strchr(const char *s, int c);
 
 #define __HAVE_ARCH_STRLEN
-extern size_t strlen(const char *s);
+extern size_t strlen(const char *s) __nocapture(1);
 
 static __always_inline void *__memcpy(void *to, const void *from, size_t n)
 {
@@ -197,7 +198,7 @@ static inline void *__memcpy3d(void *to, const void *from, size_t len)
 #endif
 
 #define __HAVE_ARCH_MEMMOVE
-void *memmove(void *dest, const void *src, size_t n);
+void *memmove(void *dest, const void *src, size_t n) __nocapture(2);
 
 #define memcmp __builtin_memcmp
 
@@ -243,11 +244,11 @@ void *__constant_c_memset(void *s, unsigned long c, size_t count)
 
 /* Added by Gertjan van Wingerde to make minix and sysv module work */
 #define __HAVE_ARCH_STRNLEN
-extern size_t strnlen(const char *s, size_t count);
+extern size_t strnlen(const char *s, size_t count) __nocapture(1);
 /* end of additional stuff */
 
 #define __HAVE_ARCH_STRSTR
-extern char *strstr(const char *cs, const char *ct);
+extern char *strstr(const char *cs, const char *ct) __nocapture(2);
 
 /*
  * This looks horribly ugly, but the compiler can optimize it totally,

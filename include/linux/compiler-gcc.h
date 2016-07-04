@@ -116,8 +116,10 @@
  */
 #define __pure			__attribute__((pure))
 #define __aligned(x)		__attribute__((aligned(x)))
-#define __printf(a, b)		__attribute__((format(printf, a, b)))
-#define __scanf(a, b)		__attribute__((format(scanf, a, b)))
+#define __printf(a, b)		__attribute__((format(printf, a, b))) \
+				__nocapture(a, b)
+#define __scanf(a, b)		__attribute__((format(scanf, a, b))) \
+				__nocapture(a, b)
 #define __attribute_const__	__attribute__((__const__))
 #define __maybe_unused		__attribute__((unused))
 #define __always_unused		__attribute__((unused))
@@ -191,6 +193,10 @@
 
 #if !defined(__CHECKER__) && defined(LATENT_ENTROPY_PLUGIN)
 # define __latent_entropy	__attribute__((latent_entropy))
+#endif
+
+#ifdef INITIFY_PLUGIN
+#define __nocapture(...) __attribute__((nocapture(__VA_ARGS__)))
 #endif
 
 /*
