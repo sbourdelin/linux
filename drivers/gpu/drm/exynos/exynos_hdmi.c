@@ -1828,6 +1828,7 @@ static int hdmi_probe(struct platform_device *pdev)
 		DRM_ERROR("Failed to find ddc node in device tree\n");
 		return -ENODEV;
 	}
+	of_node_put(dev->of_node);
 
 out_get_ddc_adpt:
 	hdata->ddc_adpt = of_find_i2c_adapter_by_node(ddc_node);
@@ -1846,6 +1847,7 @@ out_get_ddc_adpt:
 		ret = -ENODEV;
 		goto err_ddc;
 	}
+	of_node_put(dev->of_node);
 
 out_get_phy_port:
 	if (hdata->drv_data->is_apb_phy) {
