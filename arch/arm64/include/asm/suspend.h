@@ -47,4 +47,8 @@ int swsusp_arch_resume(void);
 int arch_hibernation_header_save(void *addr, unsigned int max_size);
 int arch_hibernation_header_restore(void *addr);
 
+/* Used to resume on the CPU we hibernated on */
+int _arch_hibernation_disable_cpus(bool suspend);
+#define arch_hibernation_disable_cpus(x) _arch_hibernation_disable_cpus(x)
+
 #endif
