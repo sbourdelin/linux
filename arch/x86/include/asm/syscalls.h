@@ -17,7 +17,7 @@
 
 /* Common in X86_32 and X86_64 */
 /* kernel/ioport.c */
-asmlinkage long sys_ioperm(unsigned long, unsigned long, int);
+asmlinkage long sys_ioperm(unsigned long, unsigned long, unsigned long);
 asmlinkage long sys_iopl(unsigned int);
 
 /* kernel/ldt.c */
@@ -45,7 +45,7 @@ asmlinkage long sys_vm86(unsigned long, unsigned long);
 
 /* X86_64 only */
 /* kernel/process_64.c */
-asmlinkage long sys_arch_prctl(int, unsigned long);
+asmlinkage long sys_arch_prctl(unsigned long, unsigned long);
 
 /* kernel/sys_x86_64.c */
 asmlinkage long sys_mmap(unsigned long, unsigned long, unsigned long,

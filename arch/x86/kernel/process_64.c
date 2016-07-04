@@ -586,7 +586,7 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 	return ret;
 }
 
-long sys_arch_prctl(int code, unsigned long addr)
+long sys_arch_prctl(unsigned long code, unsigned long addr)
 {
 	return do_arch_prctl(current, code, addr);
 }

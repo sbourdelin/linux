@@ -20,7 +20,7 @@
 /*
  * this changes the io permissions bitmap in the current task.
  */
-asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
+asmlinkage long sys_ioperm(unsigned long from, unsigned long num, unsigned long turn_on)
 {
 	struct thread_struct *t = &current->thread;
 	struct tss_struct *tss;
