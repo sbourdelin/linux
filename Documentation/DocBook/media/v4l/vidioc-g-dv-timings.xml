@@ -186,6 +186,13 @@ bit 0 (V4L2_DV_VSYNC_POS_POL) is for vertical sync polarity and bit 1 (V4L2_DV_H
 	    See <xref linkend="dv-bt-flags"/> for a description of the flags.
 	    </entry>
 	  </row>
+	  <row>
+	    <entry>__u32</entry>
+	    <entry><structfield>reserved</structfield>[14]</entry>
+	    <entry>Reserved for future extensions. Drivers and applications must set
+	    the array to zero.
+	    </entry>
+	  </row>
 	</tbody>
       </tgroup>
     </table>
