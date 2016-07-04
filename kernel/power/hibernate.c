@@ -31,8 +31,16 @@
 #include <linux/ktime.h>
 #include <trace/events/power.h>
 
+#ifdef CONFIG_ARCH_HIBERNATION_CPU_HOOKS
+/* Arch definition of the arch_hibernation_disable_cpus() macros? */
+#include <asm/suspend.h>
+#endif
+
 #include "power.h"
 
+#ifndef arch_hibernation_disable_cpus
+#define arch_hibernation_disable_cpus(x) disable_nonboot_cpus()
+#endif
 
 static int nocompress;
 static int noresume;
@@ -279,7 +287,7 @@ static int create_image(int platform_mode)
 	if (error || hibernation_test(TEST_PLATFORM))
 		goto Platform_finish;
 
-	error = disable_nonboot_cpus();
+	error = arch_hibernation_disable_cpus(true);
 	if (error || hibernation_test(TEST_CPUS))
 		goto Enable_cpus;
 
@@ -433,7 +441,7 @@ static int resume_target_kernel(bool platform_mode)
 	if (error)
 		goto Cleanup;
 
-	error = disable_nonboot_cpus();
+	error = arch_hibernation_disable_cpus(false);
 	if (error)
 		goto Enable_cpus;
 
@@ -551,7 +559,7 @@ int hibernation_platform_enter(void)
 	if (error)
 		goto Platform_finish;
 
-	error = disable_nonboot_cpus();
+	error = arch_hibernation_disable_cpus(true);
 	if (error)
 		goto Enable_cpus;
 
