@@ -190,6 +190,7 @@ void blk_queue_split(struct request_queue *q, struct bio **bio,
 
 		bio_chain(split, *bio);
 		trace_block_split(q, split, (*bio)->bi_iter.bi_sector);
+		bio_set_flag(*bio, BIO_SPLITED);
 		generic_make_request(*bio);
 		*bio = split;
 	}
