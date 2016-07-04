@@ -317,6 +317,15 @@ int htab_remove_mapping(unsigned long vstart, unsigned long vend,
 	return ret;
 }
 
+static bool no_tb_segs = false;
+
+static int __init parse_no_tb_segs(char *p)
+{
+	no_tb_segs = true;
+	return 0;
+}
+early_param("no_tb_segs", parse_no_tb_segs);
+
 static int __init htab_dt_scan_seg_sizes(unsigned long node,
 					 const char *uname, int depth,
 					 void *data)
@@ -335,6 +344,12 @@ static int __init htab_dt_scan_seg_sizes(unsigned long node,
 	for (; size >= 4; size -= 4, ++prop) {
 		if (be32_to_cpu(prop[0]) == 40) {
 			DBG("1T segment support detected\n");
+
+			if (no_tb_segs) {
+				DBG("Forcing 256MB segments\n");
+				break;
+			}
+
 			cur_cpu_spec->mmu_features |= MMU_FTR_1T_SEGMENT;
 			return 1;
 		}
