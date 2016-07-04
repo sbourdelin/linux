@@ -23,6 +23,10 @@ Required properties:
 	Optional elements: 'tx_clk'
 - clocks: Phandles to input clocks.
 
+Optional properties:
+- gmii2rgmii-phy-handle: phy-handle for gmiitorgmii converter.
+			 See xilinx_gmii2rgmii.txt file in the same directory.
+
 Optional properties for PHY child node:
 - reset-gpios : Should specify the gpio for phy reset
 - magic-packet : If present, indicates that the hardware supports waking
