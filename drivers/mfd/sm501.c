@@ -21,6 +21,7 @@
 #include <linux/pci.h>
 #include <linux/i2c-gpio.h>
 #include <linux/slab.h>
+#include <linux/of.h>
 
 #include <linux/sm501.h>
 #include <linux/sm501-regs.h>
@@ -1297,7 +1298,7 @@ static unsigned int sm501_mem_local[] = {
  * Common init code for an SM501
 */
 
-static int sm501_init_dev(struct sm501_devdata *sm)
+static int sm501_init_dev(struct sm501_devdata *sm, unsigned int devices)
 {
 	struct sm501_initdata *idata;
 	struct sm501_platdata *pdata;
@@ -1342,16 +1343,15 @@ static int sm501_init_dev(struct sm501_devdata *sm)
 	pdata = sm->platdata;
 	idata = pdata ? pdata->init : NULL;
 
-	if (idata) {
+	if (idata)
 		sm501_init_regs(sm, idata);
 
-		if (idata->devices & SM501_USE_USB_HOST)
-			sm501_register_usbhost(sm, &mem_avail);
-		if (idata->devices & (SM501_USE_UART0 | SM501_USE_UART1))
-			sm501_register_uart(sm, idata->devices);
-		if (idata->devices & SM501_USE_GPIO)
-			sm501_register_gpio(sm);
-	}
+	if (devices & SM501_USE_USB_HOST)
+		sm501_register_usbhost(sm, &mem_avail);
+	if (devices & (SM501_USE_UART0 | SM501_USE_UART1))
+		sm501_register_uart(sm, devices);
+	if (devices & SM501_USE_GPIO)
+		sm501_register_gpio(sm);
 
 	if (pdata && pdata->gpio_i2c != NULL && pdata->gpio_i2c_nr > 0) {
 		if (!sm501_gpio_isregistered(sm))
@@ -1377,6 +1377,7 @@ static int sm501_plat_probe(struct platform_device *dev)
 {
 	struct sm501_devdata *sm;
 	int ret;
+	unsigned int devices = 0;
 
 	sm = kzalloc(sizeof(struct sm501_devdata), GFP_KERNEL);
 	if (sm == NULL) {
@@ -1415,6 +1416,11 @@ static int sm501_plat_probe(struct platform_device *dev)
 	}
 
 	platform_set_drvdata(dev, sm);
+	if (sm->platdata)
+		devices = sm->platdata->init->devices;
+	if (dev->dev.of_node)
+		of_property_read_u32(dev->dev.of_node, "smi,devices",
+				     &devices);
 
 	sm->regs = ioremap(sm->io_res->start, resource_size(sm->io_res));
 
@@ -1424,7 +1430,7 @@ static int sm501_plat_probe(struct platform_device *dev)
 		goto err_claim;
 	}
 
-	return sm501_init_dev(sm);
+	return sm501_init_dev(sm, devices);
 
  err_claim:
 	release_resource(sm->regs_claim);
@@ -1635,7 +1641,7 @@ static int sm501_pci_probe(struct pci_dev *dev,
 		goto err4;
 	}
 
-	sm501_init_dev(sm);
+	sm501_init_dev(sm, sm->platdata->init->devices);
 	return 0;
 
  err4:
