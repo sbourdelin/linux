@@ -37,6 +37,10 @@ struct perf_mmap {
 
 struct perf_evlist {
 	struct list_head entries;
+	union {
+		struct list_head children;
+		struct list_head list;
+	};
 	struct hlist_head heads[PERF_EVLIST__HLIST_SIZE];
 	int		 nr_entries;
 	int		 nr_groups;
@@ -60,7 +64,13 @@ struct perf_evlist {
 	struct perf_evsel *selected;
 	struct events_stats stats;
 	struct perf_env	*env;
+	struct perf_evlist *parent;
 };
+
+static inline bool perf_evlist__is_aux(struct perf_evlist *evlist)
+{
+	return evlist->parent != evlist;
+}
 
 struct perf_evsel_str_handler {
 	const char *name;
@@ -70,6 +80,8 @@ struct perf_evsel_str_handler {
 struct perf_evlist *perf_evlist__new(void);
 struct perf_evlist *perf_evlist__new_default(void);
 struct perf_evlist *perf_evlist__new_dummy(void);
+struct perf_evlist *perf_evlist__new_aux(struct perf_evlist *);
+
 void perf_evlist__init(struct perf_evlist *evlist, struct cpu_map *cpus,
 		       struct thread_map *threads);
 void perf_evlist__exit(struct perf_evlist *evlist);
