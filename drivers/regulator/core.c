@@ -4166,7 +4166,7 @@ EXPORT_SYMBOL_GPL(regulator_suspend_finish);
  */
 void regulator_has_full_constraints(void)
 {
-	has_full_constraints = 1;
+	has_full_constraints = true;
 }
 EXPORT_SYMBOL_GPL(regulator_has_full_constraints);
 
