@@ -15,7 +15,7 @@
 #include <linux/clk-provider.h>
 #include <linux/of_address.h>
 #include <linux/syscore_ops.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/platform_device.h>
 
 #include <dt-bindings/clock/exynos-audss-clk.h>
@@ -278,14 +278,3 @@ static int __init exynos_audss_clk_init(void)
 	return platform_driver_register(&exynos_audss_clk_driver);
 }
 core_initcall(exynos_audss_clk_init);
-
-static void __exit exynos_audss_clk_exit(void)
-{
-	platform_driver_unregister(&exynos_audss_clk_driver);
-}
-module_exit(exynos_audss_clk_exit);
-
-MODULE_AUTHOR("Padmavathi Venna <padma.v@samsung.com>");
-MODULE_DESCRIPTION("Exynos Audio Subsystem Clock Controller");
-MODULE_LICENSE("GPL v2");
-MODULE_ALIAS("platform:exynos-audss-clk");
