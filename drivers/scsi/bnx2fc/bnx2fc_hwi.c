@@ -14,8 +14,6 @@
 
 #include "bnx2fc.h"
 
-DECLARE_PER_CPU(struct bnx2fc_percpu_s, bnx2fc_percpu);
-
 static void bnx2fc_fastpath_notification(struct bnx2fc_hba *hba,
 					struct fcoe_kcqe *new_cqe_kcqe);
 static void bnx2fc_process_ofld_cmpl(struct bnx2fc_hba *hba,
@@ -980,7 +978,7 @@ void bnx2fc_process_cq_compl(struct bnx2fc_rport *tgt, u16 wqe)
 	spin_unlock_bh(&tgt->tgt_lock);
 }
 
-void bnx2fc_arm_cq(struct bnx2fc_rport *tgt)
+static void bnx2fc_arm_cq(struct bnx2fc_rport *tgt)
 {
 	struct b577xx_fcoe_rx_doorbell *rx_db = &tgt->rx_db;
 	u32 msg;
@@ -994,7 +992,7 @@ void bnx2fc_arm_cq(struct bnx2fc_rport *tgt)
 
 }
 
-struct bnx2fc_work *bnx2fc_alloc_work(struct bnx2fc_rport *tgt, u16 wqe)
+static struct bnx2fc_work *bnx2fc_alloc_work(struct bnx2fc_rport *tgt, u16 wqe)
 {
 	struct bnx2fc_work *work;
 	work = kzalloc(sizeof(struct bnx2fc_work), GFP_ATOMIC);
@@ -1007,7 +1005,7 @@ struct bnx2fc_work *bnx2fc_alloc_work(struct bnx2fc_rport *tgt, u16 wqe)
 	return work;
 }
 
-int bnx2fc_process_new_cqes(struct bnx2fc_rport *tgt)
+static int bnx2fc_process_new_cqes(struct bnx2fc_rport *tgt)
 {
 	struct fcoe_cqe *cq;
 	u32 cq_cons;
