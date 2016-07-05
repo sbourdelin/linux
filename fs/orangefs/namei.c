@@ -73,6 +73,7 @@ static int orangefs_create(struct inode *dir,
 	d_instantiate(dentry, inode);
 	unlock_new_inode(inode);
 	dentry->d_time = jiffies + HZ;
+	ORANGEFS_I(inode)->getattr_time = 0;
 
 	gossip_debug(GOSSIP_NAME_DEBUG,
 		     "%s: dentry instantiated for %s\n",
@@ -191,6 +192,8 @@ static struct dentry *orangefs_lookup(struct inode *dir, struct dentry *dentry,
 		res = ERR_CAST(inode);
 		goto out;
 	}
+
+	ORANGEFS_I(inode)->getattr_time = 0;
 
 	gossip_debug(GOSSIP_NAME_DEBUG,
 		     "%s:%s:%d "
@@ -320,6 +323,7 @@ static int orangefs_symlink(struct inode *dir,
 	d_instantiate(dentry, inode);
 	unlock_new_inode(inode);
 	dentry->d_time = jiffies + HZ;
+	ORANGEFS_I(inode)->getattr_time = 0;
 
 	gossip_debug(GOSSIP_NAME_DEBUG,
 		     "Inode (Symlink) %pU -> %s\n",
@@ -383,6 +387,7 @@ static int orangefs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode
 	d_instantiate(dentry, inode);
 	unlock_new_inode(inode);
 	dentry->d_time = jiffies + HZ;
+	ORANGEFS_I(inode)->getattr_time = 0;
 
 	gossip_debug(GOSSIP_NAME_DEBUG,
 		     "Inode (Directory) %pU -> %s\n",
@@ -416,6 +421,8 @@ static int orangefs_rename(struct inode *old_dir,
 		     new_dentry->d_parent->d_name.name,
 		     new_dentry->d_name.name,
 		     d_count(new_dentry));
+
+	ORANGEFS_I(new_dentry->d_parent->d_inode)->getattr_time = 0;
 
 	new_op = op_alloc(ORANGEFS_VFS_OP_RENAME);
 	if (!new_op)
