@@ -116,6 +116,8 @@ extern void * memchr(const void *,int,__kernel_size_t);
 #endif
 void *memchr_inv(const void *s, int c, size_t n);
 char *strreplace(char *s, char old, char new);
+char *strncpytoupper(char *dst, const char *src, size_t len);
+char *strncpytolower(char *dst, const char *src, size_t len);
 
 extern void kfree_const(const void *x);
 
@@ -167,6 +169,52 @@ static inline const char *kbasename(const char *path)
 {
 	const char *tail = strrchr(path, '/');
 	return tail ? tail + 1 : path;
+}
+
+/**
+ * strcpytoupper - Copy string and convert to uppercase.
+ * @dst: The buffer to store the result.
+ * @src: The string to convert to uppercase.
+ *
+ * Returns pointer to terminating '\0' in @dst.
+ */
+static inline char *strcpytoupper(char *dst, const char *src)
+{
+	return strncpytoupper(dst, src, 0);
+}
+
+/**
+ * strcpytolower - Copy string and convert to lowercase.
+ * @dst: The buffer to store the result.
+ * @src: The string to convert to lowercase.
+ *
+ * Returns pointer to terminating '\0' in @dst.
+ */
+static inline char *strcpytolower(char *dst, const char *src)
+{
+	return strncpytolower(dst, src, 0);
+}
+
+/**
+ * strtoupper - Convert string to uppercase.
+ * @s: The string to operate on.
+ *
+ * Returns pointer to terminating '\0' in @s.
+ */
+static inline char *strtoupper(char *s)
+{
+	return strncpytoupper(s, s, 0);
+}
+
+/**
+ * strtolower - Convert string to lowercase.
+ * @s: The string to operate on.
+ *
+ * Returns pointer to terminating '\0' in @s.
+ */
+static inline char *strtolower(char *s)
+{
+	return strncpytolower(s, s, 0);
 }
 
 #endif /* _LINUX_STRING_H_ */
