@@ -227,7 +227,9 @@ void remove_dev_pci_data(struct pci_dev *pdev)
 #ifdef CONFIG_PCI_IOV
 	struct pci_dn *parent;
 	struct pci_dn *pdn, *tmp;
+#ifdef CONFIG_EEH
 	struct eeh_dev *edev;
+#endif
 	int i;
 
 	/*
