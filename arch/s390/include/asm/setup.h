@@ -30,6 +30,7 @@
 #define MACHINE_FLAG_TLB_LC	_BITUL(12)
 #define MACHINE_FLAG_VX		_BITUL(13)
 #define MACHINE_FLAG_CAD	_BITUL(14)
+#define MACHINE_FLAG_IPTE_RANGE	_BITUL(15)
 
 #define LPP_MAGIC		_BITUL(31)
 #define LPP_PFAULT_PID_MASK	_AC(0xffffffff, UL)
@@ -71,6 +72,7 @@ extern void detect_memory_memblock(void);
 #define MACHINE_HAS_TLB_LC	(S390_lowcore.machine_flags & MACHINE_FLAG_TLB_LC)
 #define MACHINE_HAS_VX		(S390_lowcore.machine_flags & MACHINE_FLAG_VX)
 #define MACHINE_HAS_CAD		(S390_lowcore.machine_flags & MACHINE_FLAG_CAD)
+#define MACHINE_HAS_IPTE_RANGE	(S390_lowcore.machine_flags & MACHINE_FLAG_IPTE_RANGE)
 
 /*
  * Console mode. Override with conmode=

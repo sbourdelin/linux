@@ -283,6 +283,23 @@ void ptep_modify_prot_commit(struct mm_struct *mm, unsigned long addr,
 }
 EXPORT_SYMBOL(ptep_modify_prot_commit);
 
+void ptep_invalidate_range(struct mm_struct *mm, unsigned long start,
+			   unsigned long end, pte_t *ptep)
+{
+	unsigned long nr;
+
+	if (!MACHINE_HAS_IPTE_RANGE || mm_has_pgste(mm))
+		return;
+	preempt_disable();
+	nr = (end - start) >> PAGE_SHIFT;
+	/* If the flush is likely to be local skip the ipte range */
+	if (nr && !cpumask_equal(mm_cpumask(mm),
+				 cpumask_of(smp_processor_id())))
+		__ptep_ipte_range(start, nr - 1, ptep);
+	preempt_enable();
+}
+EXPORT_SYMBOL(ptep_invalidate_range);
+
 static inline pmd_t pmdp_flush_direct(struct mm_struct *mm,
 				      unsigned long addr, pmd_t *pmdp)
 {

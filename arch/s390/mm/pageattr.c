@@ -306,7 +306,7 @@ static void ipte_range(pte_t *pte, unsigned long address, int nr)
 {
 	int i;
 
-	if (test_facility(13)) {
+	if (MACHINE_HAS_IPTE_RANGE) {
 		__ptep_ipte_range(address, nr - 1, pte);
 		return;
 	}

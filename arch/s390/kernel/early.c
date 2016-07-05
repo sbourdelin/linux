@@ -339,6 +339,8 @@ static __init void detect_machine_facilities(void)
 		S390_lowcore.machine_flags |= MACHINE_FLAG_EDAT1;
 		__ctl_set_bit(0, 23);
 	}
+	if (test_facility(13))
+		S390_lowcore.machine_flags |= MACHINE_FLAG_IPTE_RANGE;
 	if (test_facility(78))
 		S390_lowcore.machine_flags |= MACHINE_FLAG_EDAT2;
 	if (test_facility(3))

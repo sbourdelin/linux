@@ -997,6 +997,31 @@ static inline int ptep_set_access_flags(struct vm_area_struct *vma,
 	return 1;
 }
 
+void ptep_invalidate_range(struct mm_struct *mm, unsigned long start,
+			   unsigned long end, pte_t *ptep);
+
+static inline void ptep_prepare_range(struct mm_struct *mm,
+				      unsigned long start,
+				      unsigned long end,
+				      pte_t *ptep, int full)
+{
+	if (!full)
+		ptep_invalidate_range(mm, start, end, ptep);
+}
+#define ptep_prepare_range ptep_prepare_range
+
+#define __HAVE_ARCH_MOVE_PTE
+static inline pte_t move_pte(pte_t pte, pgprot_t prot,
+			     unsigned long old_addr,
+			     unsigned long new_addr)
+{
+	if ((pte_val(pte) & _PAGE_PRESENT) &&
+	    (pte_val(pte) & _PAGE_READ) &&
+	    (pte_val(pte) & _PAGE_YOUNG))
+		pte_val(pte) &= ~_PAGE_INVALID;
+	return pte;
+}
+
 /*
  * Additional functions to handle KVM guest page tables
  */
