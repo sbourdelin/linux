@@ -133,6 +133,8 @@ static inline void __flush_icache_all(void)
  */
 #define flush_icache_page(vma,page)	do { } while (0)
 
+#define mmio_flush_range(addr, size)	__flush_dcache_area(addr, size)
+
 /*
  * Not required on AArch64 (PIPT or VIPT non-aliasing D-cache).
  */
