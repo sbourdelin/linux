@@ -1326,15 +1326,17 @@ put_rpm:
 }
 
 static int
-i915_gem_check_wedge(unsigned reset_counter, bool interruptible)
+i915_gem_check_wedge(struct drm_i915_private *dev_priv)
 {
-	if (__i915_terminally_wedged(reset_counter))
+	struct i915_gpu_error *error = &dev_priv->gpu_error;
+
+	if (i915_terminally_wedged(error))
 		return -EIO;
 
-	if (__i915_reset_in_progress(reset_counter)) {
+	if (i915_reset_in_progress(error)) {
 		/* Non-interruptible callers can't handle -EAGAIN, hence return
 		 * -EIO unconditionally for these. */
-		if (!interruptible)
+		if (!dev_priv->mm.interruptible)
 			return -EIO;
 
 		return -EAGAIN;
@@ -3000,7 +3002,6 @@ __i915_gem_request_alloc(struct intel_engine_cs *engine,
 			 struct drm_i915_gem_request **req_out)
 {
 	struct drm_i915_private *dev_priv = engine->i915;
-	unsigned reset_counter = i915_reset_counter(&dev_priv->gpu_error);
 	struct drm_i915_gem_request *req;
 	int ret;
 
@@ -3013,7 +3014,7 @@ __i915_gem_request_alloc(struct intel_engine_cs *engine,
 	 * EIO if the GPU is already wedged, or EAGAIN to drop the struct_mutex
 	 * and restart.
 	 */
-	ret = i915_gem_check_wedge(reset_counter, dev_priv->mm.interruptible);
+	ret = i915_gem_check_wedge(dev_priv);
 	if (ret)
 		return ret;
 
@@ -5221,7 +5222,7 @@ int i915_gem_init(struct drm_device *dev)
 		 * for all other failure, such as an allocation failure, bail.
 		 */
 		DRM_ERROR("Failed to initialize GPU, declaring it wedged\n");
-		atomic_or(I915_WEDGED, &dev_priv->gpu_error.reset_counter);
+		__set_bit(I915_WEDGED, &dev_priv->gpu_error.flags);
 		ret = 0;
 	}
 
