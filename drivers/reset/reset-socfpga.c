@@ -44,8 +44,8 @@ static int socfpga_reset_assert(struct reset_controller_dev *rcdev,
 
 	spin_lock_irqsave(&data->lock, flags);
 
-	reg = readl(data->membase + (bank * NR_BANKS));
-	writel(reg | BIT(offset), data->membase + (bank * NR_BANKS));
+	reg = readl_relaxed(data->membase + (bank * NR_BANKS));
+	writel_relaxed(reg | BIT(offset), data->membase + (bank * NR_BANKS));
 	spin_unlock_irqrestore(&data->lock, flags);
 
 	return 0;
@@ -65,8 +65,8 @@ static int socfpga_reset_deassert(struct reset_controller_dev *rcdev,
 
 	spin_lock_irqsave(&data->lock, flags);
 
-	reg = readl(data->membase + (bank * NR_BANKS));
-	writel(reg & ~BIT(offset), data->membase + (bank * NR_BANKS));
+	reg = readl_relaxed(data->membase + (bank * NR_BANKS));
+	writel_relaxed(reg & ~BIT(offset), data->membase + (bank * NR_BANKS));
 
 	spin_unlock_irqrestore(&data->lock, flags);
 
