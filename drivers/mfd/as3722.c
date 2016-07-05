@@ -27,7 +27,7 @@
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/kernel.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/mfd/core.h>
 #include <linux/mfd/as3722.h>
 #include <linux/of.h>
@@ -439,13 +439,11 @@ static const struct of_device_id as3722_of_match[] = {
 	{ .compatible = "ams,as3722", },
 	{},
 };
-MODULE_DEVICE_TABLE(of, as3722_of_match);
 
 static const struct i2c_device_id as3722_i2c_id[] = {
 	{ "as3722", 0 },
 	{},
 };
-MODULE_DEVICE_TABLE(i2c, as3722_i2c_id);
 
 static const struct dev_pm_ops as3722_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(as3722_i2c_suspend, as3722_i2c_resume)
@@ -460,10 +458,4 @@ static struct i2c_driver as3722_i2c_driver = {
 	.probe = as3722_i2c_probe,
 	.id_table = as3722_i2c_id,
 };
-
-module_i2c_driver(as3722_i2c_driver);
-
-MODULE_DESCRIPTION("I2C support for AS3722 PMICs");
-MODULE_AUTHOR("Florian Lobmaier <florian.lobmaier@ams.com>");
-MODULE_AUTHOR("Laxman Dewangan <ldewangan@nvidia.com>");
-MODULE_LICENSE("GPL");
+builtin_i2c_driver(as3722_i2c_driver);
