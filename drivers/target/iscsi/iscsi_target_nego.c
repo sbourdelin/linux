@@ -987,21 +987,6 @@ static int iscsi_target_do_login(struct iscsi_conn *conn, struct iscsi_login *lo
 	return 0;
 }
 
-static void iscsi_initiatorname_tolower(
-	char *param_buf)
-{
-	char *c;
-	u32 iqn_size = strlen(param_buf), i;
-
-	for (i = 0; i < iqn_size; i++) {
-		c = &param_buf[i];
-		if (!isupper(*c))
-			continue;
-
-		*c = tolower(*c);
-	}
-}
-
 /*
  * Processes the first Login Request..
  */
@@ -1075,7 +1060,7 @@ int iscsi_target_locate_portal(
 	 * RFC-3720 3.2.6.1. section c) that says that iSCSI IQNs
 	 * are NOT case sensitive.
 	 */
-	iscsi_initiatorname_tolower(i_buf);
+	strtolower(i_buf);
 
 	if (!s_buf) {
 		if (!login->leading_connection)
