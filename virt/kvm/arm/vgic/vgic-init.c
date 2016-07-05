@@ -23,40 +23,12 @@
 #include "vgic.h"
 
 /*
- * Initialization rules: there are multiple stages to the vgic
- * initialization, both for the distributor and the CPU interfaces.
- *
- * Distributor:
- *
- * - kvm_vgic_early_init(): initialization of static data that doesn't
- *   depend on any sizing information or emulation type. No allocation
- *   is allowed there.
- *
+ * Initialization rules for the distributor:
  * - vgic_init(): allocation and initialization of the generic data
  *   structures that depend on sizing information (number of CPUs,
  *   number of interrupts). Also initializes the vcpu specific data
  *   structures. Can be executed lazily for GICv2.
- *
- * CPU Interface:
- *
- * - kvm_vgic_cpu_early_init(): initialization of static data that
- *   doesn't depend on any sizing information or emulation type. No
- *   allocation is allowed there.
  */
-
-/* EARLY INIT */
-
-/*
- * Those 2 functions should not be needed anymore but they
- * still are called from arm.c
- */
-void kvm_vgic_early_init(struct kvm *kvm)
-{
-}
-
-void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu)
-{
-}
 
 /* CREATION */
 
