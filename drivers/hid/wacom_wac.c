@@ -2764,6 +2764,31 @@ static void wacom_setup_numbered_buttons(struct input_dev *input_dev,
 		__set_bit(BTN_BASE + (i-16), input_dev->keybit);
 }
 
+static void wacom_24hd_update_leds(struct wacom *wacom, int mask, int group)
+{
+	struct wacom_led *led;
+	int i;
+	bool updated = false;
+
+	if (group > 0)
+		mask >>= 8;
+
+	for (i = 0; i < 3; i++) {
+		led = wacom_led_find(wacom, group, i);
+		if (!led) {
+			hid_err(wacom->hdev, "can't find LED %d in group %d\n",
+				i, group);
+			continue;
+		}
+		if (!updated && mask & BIT(i)) {
+			led->held = true;
+			led_trigger_event(&led->trigger, LED_FULL);
+		} else {
+			led->held = false;
+		}
+	}
+}
+
 static bool wacom_is_led_toggled(struct wacom *wacom, int button_count,
 				 int mask, int group)
 {
@@ -2781,7 +2806,11 @@ static void wacom_update_led(struct wacom *wacom, int button_count, int mask,
 	int cur;
 	bool pressed;
 
+	if (wacom->wacom_wac.features.type == WACOM_24HD)
+		return wacom_24hd_update_leds(wacom, mask, group);
+
 	pressed = wacom_is_led_toggled(wacom, button_count, mask, group);
+
 	cur = wacom->led.groups[group].select;
 
 	led = wacom_led_find(wacom, group, cur);
@@ -2807,6 +2836,13 @@ static void wacom_update_led(struct wacom *wacom, int button_count, int mask,
 	}
 	if (next_led == led)
 		return;
+
+	pr_err("%s group: %d led: (%d -> %d) t: %s %s:%d\n", __func__,
+		led->group,
+		led->id,
+		next_led->id,
+		next_led->trigger.name,
+		__FILE__, __LINE__);
 
 	next_led->held = true;
 	led_trigger_event(&next_led->trigger,
