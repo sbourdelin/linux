@@ -127,13 +127,6 @@ module_param_named(log_fka, bnx2fc_log_fka, uint, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(log_fka, " Print message to kernel log when fcoe is "
 	"initiating a FIP keep alive when debug logging is enabled.");
 
-static int bnx2fc_cpu_callback(struct notifier_block *nfb,
-			     unsigned long action, void *hcpu);
-/* notification function for CPU hotplug events */
-static struct notifier_block bnx2fc_cpu_notifier = {
-	.notifier_call = bnx2fc_cpu_callback,
-};
-
 static inline struct net_device *bnx2fc_netdev(const struct fc_lport *lport)
 {
 	return ((struct bnx2fc_interface *)
@@ -621,39 +614,32 @@ static void bnx2fc_recv_frame(struct sk_buff *skb)
 }
 
 /**
- * bnx2fc_percpu_io_thread - thread per cpu for ios
+ * bnx2fc_percpu_io_work - work per cpu for ios
  *
- * @arg:	ptr to bnx2fc_percpu_info structure
+ * @work_s:	The work struct
  */
-int bnx2fc_percpu_io_thread(void *arg)
+static void bnx2fc_percpu_io_work(struct work_struct *work_s)
 {
-	struct bnx2fc_percpu_s *p = arg;
+	struct bnx2fc_percpu_s *p;
 	struct bnx2fc_work *work, *tmp;
 	LIST_HEAD(work_list);
 
-	set_user_nice(current, MIN_NICE);
-	set_current_state(TASK_INTERRUPTIBLE);
-	while (!kthread_should_stop()) {
-		schedule();
-		spin_lock_bh(&p->fp_work_lock);
-		while (!list_empty(&p->work_list)) {
-			list_splice_init(&p->work_list, &work_list);
-			spin_unlock_bh(&p->fp_work_lock);
+	p = container_of(work_s, struct bnx2fc_percpu_s, work);
 
-			list_for_each_entry_safe(work, tmp, &work_list, list) {
-				list_del_init(&work->list);
-				bnx2fc_process_cq_compl(work->tgt, work->wqe);
-				kfree(work);
-			}
-
-			spin_lock_bh(&p->fp_work_lock);
-		}
-		__set_current_state(TASK_INTERRUPTIBLE);
+	spin_lock_bh(&p->fp_work_lock);
+	while (!list_empty(&p->work_list)) {
+		list_splice_init(&p->work_list, &work_list);
 		spin_unlock_bh(&p->fp_work_lock);
-	}
-	__set_current_state(TASK_RUNNING);
 
-	return 0;
+		list_for_each_entry_safe(work, tmp, &work_list, list) {
+			list_del_init(&work->list);
+			bnx2fc_process_cq_compl(work->tgt, work->wqe);
+			kfree(work);
+		}
+
+		spin_lock_bh(&p->fp_work_lock);
+	}
+	spin_unlock_bh(&p->fp_work_lock);
 }
 
 static struct fc_host_statistics *bnx2fc_get_host_stats(struct Scsi_Host *shost)
@@ -2570,91 +2556,6 @@ static struct fcoe_transport bnx2fc_transport = {
 	.disable = bnx2fc_disable,
 };
 
-/**
- * bnx2fc_percpu_thread_create - Create a receive thread for an
- *				 online CPU
- *
- * @cpu: cpu index for the online cpu
- */
-static void bnx2fc_percpu_thread_create(unsigned int cpu)
-{
-	struct bnx2fc_percpu_s *p;
-	struct task_struct *thread;
-
-	p = &per_cpu(bnx2fc_percpu, cpu);
-
-	thread = kthread_create_on_node(bnx2fc_percpu_io_thread,
-					(void *)p, cpu_to_node(cpu),
-					"bnx2fc_thread/%d", cpu);
-	/* bind thread to the cpu */
-	if (likely(!IS_ERR(thread))) {
-		kthread_bind(thread, cpu);
-		p->iothread = thread;
-		wake_up_process(thread);
-	}
-}
-
-static void bnx2fc_percpu_thread_destroy(unsigned int cpu)
-{
-	struct bnx2fc_percpu_s *p;
-	struct task_struct *thread;
-	struct bnx2fc_work *work, *tmp;
-
-	BNX2FC_MISC_DBG("destroying io thread for CPU %d\n", cpu);
-
-	/* Prevent any new work from being queued for this CPU */
-	p = &per_cpu(bnx2fc_percpu, cpu);
-	spin_lock_bh(&p->fp_work_lock);
-	thread = p->iothread;
-	p->iothread = NULL;
-
-
-	/* Free all work in the list */
-	list_for_each_entry_safe(work, tmp, &p->work_list, list) {
-		list_del_init(&work->list);
-		bnx2fc_process_cq_compl(work->tgt, work->wqe);
-		kfree(work);
-	}
-
-	spin_unlock_bh(&p->fp_work_lock);
-
-	if (thread)
-		kthread_stop(thread);
-}
-
-/**
- * bnx2fc_cpu_callback - Handler for CPU hotplug events
- *
- * @nfb:    The callback data block
- * @action: The event triggering the callback
- * @hcpu:   The index of the CPU that the event is for
- *
- * This creates or destroys per-CPU data for fcoe
- *
- * Returns NOTIFY_OK always.
- */
-static int bnx2fc_cpu_callback(struct notifier_block *nfb,
-			     unsigned long action, void *hcpu)
-{
-	unsigned cpu = (unsigned long)hcpu;
-
-	switch (action) {
-	case CPU_ONLINE:
-	case CPU_ONLINE_FROZEN:
-		printk(PFX "CPU %x online: Create Rx thread\n", cpu);
-		bnx2fc_percpu_thread_create(cpu);
-		break;
-	case CPU_DEAD:
-	case CPU_DEAD_FROZEN:
-		printk(PFX "CPU %x offline: Remove Rx thread\n", cpu);
-		bnx2fc_percpu_thread_destroy(cpu);
-		break;
-	default:
-		break;
-	}
-	return NOTIFY_OK;
-}
-
 static int bnx2fc_slave_configure(struct scsi_device *sdev)
 {
 	if (!bnx2fc_queue_depth)
@@ -2722,18 +2623,8 @@ static int __init bnx2fc_mod_init(void)
 		p = &per_cpu(bnx2fc_percpu, cpu);
 		INIT_LIST_HEAD(&p->work_list);
 		spin_lock_init(&p->fp_work_lock);
+		INIT_WORK(&p->work, bnx2fc_percpu_io_work);
 	}
-
-	cpu_notifier_register_begin();
-
-	for_each_online_cpu(cpu) {
-		bnx2fc_percpu_thread_create(cpu);
-	}
-
-	/* Initialize per CPU interrupt thread */
-	__register_hotcpu_notifier(&bnx2fc_cpu_notifier);
-
-	cpu_notifier_register_done();
 
 	cnic_register_driver(CNIC_ULP_FCOE, &bnx2fc_cnic_cb);
 
@@ -2798,16 +2689,12 @@ static void __exit bnx2fc_mod_exit(void)
 	if (l2_thread)
 		kthread_stop(l2_thread);
 
-	cpu_notifier_register_begin();
+	for_each_possible_cpu(cpu) {
+		struct bnx2fc_percpu_s *p;
 
-	/* Destroy per cpu threads */
-	for_each_online_cpu(cpu) {
-		bnx2fc_percpu_thread_destroy(cpu);
+		p = per_cpu_ptr(&bnx2fc_percpu, cpu);
+		flush_work(&p->work);
 	}
-
-	__unregister_hotcpu_notifier(&bnx2fc_cpu_notifier);
-
-	cpu_notifier_register_done();
 
 	destroy_workqueue(bnx2fc_wq);
 	/*
