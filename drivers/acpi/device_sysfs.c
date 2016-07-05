@@ -200,12 +200,10 @@ static int create_of_modalias(struct acpi_device *acpi_dev, char *modalias,
 	const union acpi_object *of_compatible, *obj;
 	int len, count;
 	int i, nval;
-	char *c;
 
 	acpi_get_name(acpi_dev->handle, ACPI_SINGLE_NAME, &buf);
 	/* DT strings are all in lower case */
-	for (c = buf.pointer; *c != '\0'; c++)
-		*c = tolower(*c);
+	strtolower(buf.pointer);
 
 	len = snprintf(modalias, size, "of:N%sT", (char *)buf.pointer);
 	ACPI_FREE(buf.pointer);
