@@ -50,7 +50,6 @@ void synth_insert_next_index(int sent_num);
 void spk_reset_index_count(int sc);
 void spk_get_index_count(int *linecount, int *sentcount);
 int spk_set_key_info(const u_char *key_info, u_char *k_buffer);
-char *spk_strlwr(char *s);
 char *spk_s2uchar(char *start, char *dest);
 int speakup_kobj_init(void);
 void speakup_kobj_exit(void);

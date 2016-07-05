@@ -2314,7 +2314,8 @@ static int __init speakup_init(void)
 	spk_initialize_msgs();	/* Initialize arrays for i18n. */
 	spk_reset_default_chars();
 	spk_reset_default_chartab();
-	spk_strlwr(synth_name);
+	if (synth_name)
+		strtolower(synth_name);
 	spk_vars[0].u.n.high = vc->vc_cols;
 	for (var = spk_vars; var->var_id != MAXVARS; var++)
 		speakup_register_var(var);
