@@ -935,6 +935,7 @@ again:
 	orig_src_pte = src_pte;
 	orig_dst_pte = dst_pte;
 	arch_enter_lazy_mmu_mode();
+	ptep_prepare_range(src_mm, addr, end, src_pte, 0);
 
 	do {
 		/*
@@ -1115,6 +1116,7 @@ again:
 	start_pte = pte_offset_map_lock(mm, pmd, addr, &ptl);
 	pte = start_pte;
 	arch_enter_lazy_mmu_mode();
+	ptep_prepare_range(mm, addr, end, pte, tlb->fullmm);
 	do {
 		pte_t ptent = *pte;
 		if (pte_none(ptent)) {

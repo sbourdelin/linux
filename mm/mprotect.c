@@ -74,6 +74,7 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 		return 0;
 
 	arch_enter_lazy_mmu_mode();
+	ptep_prepare_range(mm, addr, end, pte, 0);
 	do {
 		oldpte = *pte;
 		if (pte_present(oldpte)) {
