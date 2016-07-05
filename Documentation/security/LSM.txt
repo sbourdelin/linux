@@ -36,6 +36,14 @@ for SELinux would be in /proc/.../attr/selinux. Using the files
 found directly in /proc/.../attr (e.g. current) should be avoided.
 These files remain as legacy interfaces.
 
+The files named "context" in the attr directories contain the
+same information as the "current" files, but formatted to
+identify the module it comes from.
+
+if selinux is the active security module:
+	/proc/self/attr/context could contain selinux='unconfined_t'
+	/proc/self/attr/selinux/context could contain selinux='unconfined_t'
+
 Based on https://lkml.org/lkml/2007/10/26/215,
 a new LSM is accepted into the kernel when its intent (a description of
 what it tries to protect against and in what cases one would expect to
