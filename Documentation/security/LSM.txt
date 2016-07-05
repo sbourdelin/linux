@@ -16,11 +16,10 @@ MAC extensions, other extensions can be built using the LSM to provide
 specific changes to system operation when these tweaks are not available
 in the core functionality of Linux itself.
 
-Without a specific LSM built into the kernel, the default LSM will be the
-Linux capabilities system. Most LSMs choose to extend the capabilities
-system, building their checks on top of the defined capability hooks.
-For more details on capabilities, see capabilities(7) in the Linux
-man-pages project.
+The Linux capabilities modules will always be included. For more details
+on capabilities, see capabilities(7) in the Linux man-pages project.
+This may be followed by any number of "minor" modules and at most one
+"major" module.
 
 A list of the active security modules can be found by reading
 /sys/kernel/security/lsm. This is a comma separated list, and
@@ -28,6 +27,14 @@ will always include the capability module. The list reflects the
 order in which checks are made. The capability module will always
 be first, followed by any "minor" modules (e.g. Yama) and then
 the one "major" module (e.g. SELinux) if there is one configured.
+
+Process attributes associated with "major" security modules should
+be accessed and maintained using the special files in the module
+specific subdirectories in /proc/.../attr. The attributes related
+to Smack would be found in /proc/.../attr/smack while the attributes
+for SELinux would be in /proc/.../attr/selinux. Using the files
+found directly in /proc/.../attr (e.g. current) should be avoided.
+These files remain as legacy interfaces.
 
 Based on https://lkml.org/lkml/2007/10/26/215,
 a new LSM is accepted into the kernel when its intent (a description of
@@ -38,4 +45,4 @@ that end users and distros can make a more informed decision about which
 LSMs suit their requirements.
 
 For extensive documentation on the available LSM hook interfaces, please
-see include/linux/security.h.
+see include/linux/lsm_hooks.h.

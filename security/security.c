@@ -1182,14 +1182,37 @@ void security_d_instantiate(struct dentry *dentry, struct inode *inode)
 }
 EXPORT_SYMBOL(security_d_instantiate);
 
-int security_getprocattr(struct task_struct *p, char *name, char **value)
+int security_getprocattr(struct task_struct *p, const char *lsm, char *name,
+				char **value)
 {
-	return call_int_hook(getprocattr, -EINVAL, p, name, value);
+	struct security_hook_list *hp;
+	int rc = -EINVAL;
+
+
+	list_for_each_entry(hp, &security_hook_heads.getprocattr, list) {
+		if (lsm != NULL && strcmp(lsm, hp->lsm))
+			continue;
+		rc = hp->hook.getprocattr(p, name, value);
+		if (rc != -ENOENT)
+			return rc;
+	}
+	return -EINVAL;
 }
 
-int security_setprocattr(struct task_struct *p, char *name, void *value, size_t size)
+int security_setprocattr(struct task_struct *p, const char *lsm, char *name,
+				void *value, size_t size)
 {
-	return call_int_hook(setprocattr, -EINVAL, p, name, value, size);
+	struct security_hook_list *hp;
+	int rc = -EINVAL;
+
+	list_for_each_entry(hp, &security_hook_heads.setprocattr, list) {
+		if (lsm != NULL && strcmp(lsm, hp->lsm))
+			continue;
+		rc = hp->hook.setprocattr(p, name, value, size);
+		if (rc != -ENOENT)
+			break;
+	}
+	return rc;
 }
 
 int security_netlink_send(struct sock *sk, struct sk_buff *skb)
