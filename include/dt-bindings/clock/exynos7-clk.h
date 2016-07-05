@@ -32,7 +32,8 @@
 #define SCLK_CC_PLL_A			19
 #define ACLK_CCORE_133			20
 #define ACLK_PERIS_66			21
-#define TOPC_NR_CLK			22
+#define SCLK_BUS0_PLL_ATLAS		22
+#define TOPC_NR_CLK			23
 
 /* TOP0 */
 #define DOUT_ACLK_PERIC1		1
@@ -72,6 +73,24 @@
 #define DOUT_SCLK_PHY_FSYS1		16
 #define DOUT_SCLK_PHY_FSYS1_26M		17
 #define TOP1_NR_CLK			18
+
+/* ATLAS */
+#define FOUT_ATLAS_PLL			1
+#define MOUT_ATLAS_PLL			2
+#define MOUT_SCLK_BUS0_PLL_ATLAS_USER	3
+#define MOUT_ATLAS			4
+#define DOUT_PCLK_DBG_CLK_ATLAS		5
+#define DOUT_ATCLK_ATLAS		6
+#define DOUT_PCLK_ATLAS			7
+#define DOUT_ACLK_ATLAS			8
+#define DOUT_ATLAS2			9
+#define DOUT_ATLAS1			10
+#define DOUT_CNTCLK_ATLAS		11
+#define CLK_ATLAS			12
+#define DOUT_SCLK_HPM_ATLAS		13
+#define DOUT_ATLAS_PLL			14
+#define CLK_ATLAS_CLK			15
+#define ATLAS_NR_CLK			16
 
 /* CCORE */
 #define PCLK_RTC			1
