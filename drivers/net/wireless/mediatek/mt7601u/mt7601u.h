@@ -15,6 +15,7 @@
 #ifndef MT7601U_H
 #define MT7601U_H
 
+#include <linux/bitfield.h>
 #include <linux/kernel.h>
 #include <linux/device.h>
 #include <linux/mutex.h>
@@ -24,7 +25,6 @@
 #include <linux/debugfs.h>
 
 #include "regs.h"
-#include "util.h"
 
 #define MT_CALIBRATE_INTERVAL		(4 * HZ)
 
@@ -281,6 +281,9 @@ struct mt76_reg_pair {
 struct mt7601u_rxwi;
 
 extern const struct ieee80211_ops mt7601u_ops;
+
+#define MT76_SET	FIELD_PUT
+#define MT76_GET	FIELD_GET
 
 void mt7601u_init_debugfs(struct mt7601u_dev *dev);
 
