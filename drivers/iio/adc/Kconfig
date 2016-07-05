@@ -315,6 +315,19 @@ config MEN_Z188_ADC
 	  This driver can also be built as a module. If so, the module will be
 	  called men_z188_adc.
 
+config MEDIATEK_MT65XX_AUXADC
+	tristate "MediaTek AUXADC driver"
+	depends on ARCH_MEDIATEK || COMPILE_TEST
+	depends on HAS_IOMEM
+	help
+	  Say yes here to enable support for MediaTek mt65xx AUXADC.
+
+	  The driver supports immediate mode operation to read from one of sixteen
+	  channels (external or internal).
+
+	  This driver can also be built as a module. If so, the module will be
+	  called mt6577_auxadc.
+
 config MXS_LRADC
         tristate "Freescale i.MX23/i.MX28 LRADC"
         depends on (ARCH_MXS || COMPILE_TEST) && HAS_IOMEM
