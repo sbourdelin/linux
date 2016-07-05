@@ -984,7 +984,7 @@ static int wacom_devm_sysfs_create_group(struct wacom *wacom,
 					       group);
 }
 
-static enum led_brightness wacom_leds_brightness_get(struct wacom_led *led)
+enum led_brightness wacom_leds_brightness_get(struct wacom_led *led)
 {
 	struct wacom *wacom = led->wacom;
 
@@ -1057,6 +1057,17 @@ static int wacom_led_register_one(struct device *dev, struct wacom *wacom,
 	if (!name)
 		return -ENOMEM;
 
+	if (!read_only) {
+		led->trigger.name = name;
+		error = devm_led_trigger_register(dev, &led->trigger);
+		if (error) {
+			hid_err(wacom->hdev,
+				"failed to register LED trigger %s: %d\n",
+				led->cdev.name, error);
+			return error;
+		}
+	}
+
 	led->group = group;
 	led->id = id;
 	led->wacom = wacom;
@@ -1065,10 +1076,12 @@ static int wacom_led_register_one(struct device *dev, struct wacom *wacom,
 	led->cdev.name = name;
 	led->cdev.max_brightness = LED_FULL;
 	led->cdev.brightness_get = __wacom_led_brightness_get;
-	if (!read_only)
+	if (!read_only) {
 		led->cdev.brightness_set_blocking = wacom_led_brightness_set;
-	else
+		led->cdev.default_trigger = led->cdev.name;
+	} else {
 		led->cdev.brightness_set = wacom_led_readonly_brightness_set;
+	}
 
 	error = devm_led_classdev_register(dev, &led->cdev);
 	if (error) {
@@ -1143,6 +1156,50 @@ static int wacom_led_groups_alloc_and_register_one(struct device *dev,
 err:
 	devres_release_group(dev, &wacom->led.groups[group_id]);
 	return error;
+}
+
+struct wacom_led *wacom_led_find(struct wacom *wacom, unsigned int group_id,
+				 unsigned int id)
+{
+	struct wacom_group_leds *group;
+
+	if (group_id >= wacom->led.count)
+		return NULL;
+
+	group = &wacom->led.groups[group_id];
+
+	if (!group->leds)
+		return NULL;
+
+	id %= group->count;
+
+	return &group->leds[id];
+}
+
+/**
+ * wacom_led_next: gives the next available led with a wacom trigger.
+ *
+ * returns the next available struct wacom_led which has its default trigger
+ * or the current one if none is available.
+ */
+struct wacom_led *wacom_led_next(struct wacom *wacom, struct wacom_led *cur)
+{
+	struct wacom_led *next_led;
+	int group, next;
+
+	if (!wacom || !cur)
+		return NULL;
+
+	group = cur->group;
+	next = cur->id;
+
+	do {
+		next_led = wacom_led_find(wacom, group, ++next);
+		if (!next_led || next_led == cur)
+			return next_led;
+	} while (next_led->cdev.trigger != &next_led->trigger);
+
+	return next_led;
 }
 
 static void wacom_led_groups_release(void *data)
