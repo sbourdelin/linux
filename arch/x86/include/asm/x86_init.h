@@ -7,6 +7,7 @@ struct mpc_bus;
 struct mpc_cpu;
 struct mpc_table;
 struct cpuinfo_x86;
+struct clock_event_device;
 
 /**
  * struct x86_init_mpparse - platform specific mpparse ops
@@ -84,11 +85,15 @@ struct x86_init_paging {
  *				boot cpu
  * @timer_init:			initialize the platform timer (default PIT/HPET)
  * @wallclock_init:		init the wallclock device
+ * @setup_APIC_clockev:         tweak the clock_event_device for the LAPIC timer,
+ *                              if setup_boot_APIC_clock and/or
+ *                              setup_secondary_APIC_clock are in use
  */
 struct x86_init_timers {
 	void (*setup_percpu_clockev)(void);
 	void (*timer_init)(void);
 	void (*wallclock_init)(void);
+	void (*setup_APIC_clockev)(struct clock_event_device *levt);
 };
 
 /**

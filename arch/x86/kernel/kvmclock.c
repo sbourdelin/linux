@@ -17,6 +17,7 @@
 */
 
 #include <linux/clocksource.h>
+#include <linux/clockchips.h>
 #include <linux/kvm_para.h>
 #include <asm/pvclock.h>
 #include <asm/msr.h>
@@ -245,6 +246,82 @@ static void kvm_shutdown(void)
 	native_machine_shutdown();
 }
 
+/*
+ * We already have the inverse of the (mult,shift) pair, though this means
+ * we need a division.  To avoid it we could compute a multiplicative inverse
+ * every time src->version changes.
+ */
+#define KVMCLOCK_TSC_DEADLINE_MAX_BITS	38
+#define KVMCLOCK_TSC_DEADLINE_MAX	((1ull << KVMCLOCK_TSC_DEADLINE_MAX_BITS) - 1)
+
+static int lapic_next_ktime(ktime_t expires,
+			    struct clock_event_device *evt)
+{
+	u64 ns, tsc;
+	u32 version;
+	int cpu;
+	struct pvclock_vcpu_time_info *src;
+
+	cpu = smp_processor_id();
+	src = &hv_clock[cpu].pvti;
+	ns = ktime_to_ns(expires);
+	do {
+		u64 delta_ns;
+		int shift;
+
+		version = src->version;
+		virt_rmb();
+		if (unlikely(ns < src->system_time)) {
+			tsc = src->tsc_timestamp;
+			virt_rmb();
+			continue;
+		}
+
+		delta_ns = ns - src->system_time;
+
+		/* Cap the wait to avoid overflow.  */
+		if (unlikely(delta_ns > KVMCLOCK_TSC_DEADLINE_MAX))
+			delta_ns = KVMCLOCK_TSC_DEADLINE_MAX;
+
+		/*
+		 * delta_tsc = delta_ns << (32-tsc_shift) / tsc_to_system_mul.
+		 * The shift is split in two steps so that a 38 bits (275 s)
+		 * deadline fits into the 64-bit dividend.
+		 */
+		shift = 32 - src->tsc_shift;
+		
+		/* First shift step... */
+		delta_ns <<= 64 - KVMCLOCK_TSC_DEADLINE_MAX_BITS;
+		shift -= 64 - KVMCLOCK_TSC_DEADLINE_MAX_BITS;
+
+		/* ... division... */
+		tsc = div_u64(delta_ns, src->tsc_to_system_mul);
+
+		/* ... and second shift step for the remaining bits.  */
+		if (shift >= 0)
+			tsc <<= shift;
+		else
+			tsc >>= -shift;
+
+		tsc += src->tsc_timestamp;
+		virt_rmb();
+	} while((src->version & 1) || version != src->version);
+
+	wrmsrl(MSR_IA32_TSC_DEADLINE, tsc);
+	return 0;
+}
+
+
+static void kvm_setup_tsc_deadline_timer(struct clock_event_device *levt)
+{
+	if (this_cpu_has(X86_FEATURE_TSC_DEADLINE_TIMER)) {
+		levt->features &= ~(CLOCK_EVT_FEAT_PERIODIC |
+				        CLOCK_EVT_FEAT_DUMMY);
+		levt->features |= CLOCK_EVT_FEAT_KTIME;
+		levt->set_next_ktime = lapic_next_ktime;
+	}
+}
+
 void __init kvmclock_init(void)
 {
 	struct pvclock_vcpu_time_info *vcpu_time;
@@ -288,6 +365,7 @@ void __init kvmclock_init(void)
 	kvm_sched_clock_init(flags & PVCLOCK_TSC_STABLE_BIT);
 	put_cpu();
 
+	x86_init.timers.setup_APIC_clockev = kvm_setup_tsc_deadline_timer;
 	x86_platform.calibrate_tsc = kvm_get_tsc_khz;
 	x86_platform.get_wallclock = kvm_get_wallclock;
 	x86_platform.set_wallclock = kvm_set_wallclock;

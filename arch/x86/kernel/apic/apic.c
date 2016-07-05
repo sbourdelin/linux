@@ -558,15 +558,20 @@ static void setup_APIC_timer(void)
 	memcpy(levt, &lapic_clockevent, sizeof(*levt));
 	levt->cpumask = cpumask_of(smp_processor_id());
 
+	x86_init.timers.setup_APIC_clockev(levt);
+	clockevents_register_device(levt);
+}
+
+void setup_APIC_clockev(struct clock_event_device *levt)
+{
 	if (this_cpu_has(X86_FEATURE_TSC_DEADLINE_TIMER)) {
 		levt->features &= ~(CLOCK_EVT_FEAT_PERIODIC |
 				    CLOCK_EVT_FEAT_DUMMY);
+		levt->min_delta_ticks = 0xF;
+		levt->max_delta_ticks = ~0UL;
 		levt->set_next_event = lapic_next_deadline;
-		clockevents_config_and_register(levt,
-						(tsc_khz / TSC_DIVISOR) * 1000,
-						0xF, ~0UL);
-	} else
-		clockevents_register_device(levt);
+		clockevents_config(levt, (tsc_khz / TSC_DIVISOR) * 1000);
+	}
 }
 
 /*
