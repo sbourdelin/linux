@@ -322,7 +322,10 @@ static int exynos5433_cpuclk_pre_rate_change(struct clk_notifier_data *ndata,
 	/* select the alternate parent */
 	mux_reg = readl(base + E5433_MUX_SEL2);
 	writel(mux_reg | 1, base + E5433_MUX_SEL2);
-	wait_until_mux_stable(base + E5433_MUX_STAT2, 0, 2);
+	if (cpuclk->flags & CLK_CPU_HAS_MODIFIED_MUX_STAT)
+		wait_until_mux_stable(base + E5433_MUX_STAT2, 0, 1);
+	else
+		wait_until_mux_stable(base + E5433_MUX_STAT2, 0, 2);
 
 	/* alternate parent is active now. set the dividers */
 	writel(div0, base + E5433_DIV_CPU0);
@@ -348,7 +351,10 @@ static int exynos5433_cpuclk_post_rate_change(struct clk_notifier_data *ndata,
 	/* select apll as the alternate parent */
 	mux_reg = readl(base + E5433_MUX_SEL2);
 	writel(mux_reg & ~1, base + E5433_MUX_SEL2);
-	wait_until_mux_stable(base + E5433_MUX_STAT2, 0, 1);
+	if (cpuclk->flags & CLK_CPU_HAS_MODIFIED_MUX_STAT)
+		wait_until_mux_stable(base + E5433_MUX_STAT2, 0, 0);
+	else
+		wait_until_mux_stable(base + E5433_MUX_STAT2, 0, 1);
 
 	exynos5433_set_safe_div(base, div, div_mask);
 	spin_unlock_irqrestore(cpuclk->lock, flags);

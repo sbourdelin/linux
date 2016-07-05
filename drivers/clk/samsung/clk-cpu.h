@@ -63,6 +63,8 @@ struct exynos_cpuclk {
 #define CLK_CPU_NEEDS_DEBUG_ALT_DIV	(1 << 1)
 /* The CPU clock registers have Exynos5433-compatible layout */
 #define CLK_CPU_HAS_E5433_REGS_LAYOUT	(1 << 2)
+/* Exynos5433-compatible layout with different MUX_STAT register bits */
+#define CLK_CPU_HAS_MODIFIED_MUX_STAT	(1 << 3)
 };
 
 extern int __init exynos_register_cpu_clock(struct samsung_clk_provider *ctx,
