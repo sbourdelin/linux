@@ -300,6 +300,7 @@ static int sun4i_drv_probe(struct platform_device *pdev)
 
 		count += sun4i_drv_add_endpoints(&pdev->dev, &match,
 						pipeline);
+		of_node_put(pipeline);
 
 		DRM_DEBUG_DRIVER("Queued %d outputs on pipeline %d\n",
 				 count, i);
