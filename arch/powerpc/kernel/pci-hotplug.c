@@ -21,6 +21,9 @@
 #include <asm/firmware.h>
 #include <asm/eeh.h>
 
+extern spinlock_t hose_spinlock;
+extern struct list_head hose_list;
+
 static struct pci_bus *find_bus_among_children(struct pci_bus *bus,
 					       struct device_node *dn)
 {
@@ -58,12 +61,27 @@ EXPORT_SYMBOL_GPL(pci_find_bus_by_node);
  */
 void pcibios_release_device(struct pci_dev *dev)
 {
-	struct pci_controller *phb = pci_bus_to_host(dev->bus);
+	struct pci_controller *phb = pci_bus_to_host(dev->bus), *e;
+	int found = 0;
 
 	eeh_remove_device(dev);
 
-	if (phb->controller_ops.release_device)
+	/*
+	 * Only access phb if it's still in hose_list; otherwise
+	 * it's been freed and may contain corrupt data and oops.
+	 */
+	spin_lock(&hose_spinlock);
+	list_for_each_entry(e, &hose_list, list_node) {
+		if (e == phb) {
+			found = 1;
+			break;
+		}
+	}
+
+	if (found && phb->controller_ops.release_device)
 		phb->controller_ops.release_device(dev);
+
+	spin_unlock(&hose_spinlock);
 }
 
 /**

@@ -41,7 +41,7 @@
 #include <asm/ppc-pci.h>
 #include <asm/eeh.h>
 
-static DEFINE_SPINLOCK(hose_spinlock);
+DEFINE_SPINLOCK(hose_spinlock);
 LIST_HEAD(hose_list);
 
 /* XXX kill that some day ... */
@@ -95,10 +95,11 @@ void pcibios_free_controller(struct pci_controller *phb)
 {
 	spin_lock(&hose_spinlock);
 	list_del(&phb->list_node);
-	spin_unlock(&hose_spinlock);
 
 	if (phb->is_dynamic)
 		kfree(phb);
+
+	spin_unlock(&hose_spinlock);
 }
 EXPORT_SYMBOL_GPL(pcibios_free_controller);
 
