@@ -1344,7 +1344,7 @@ static void zs_unregister_cpu_notifier(void)
 	cpu_notifier_register_done();
 }
 
-static void init_zs_size_classes(void)
+static void __init init_zs_size_classes(void)
 {
 	int nr;
 
@@ -1887,7 +1887,7 @@ static struct file_system_type zsmalloc_fs = {
 	.kill_sb	= kill_anon_super,
 };
 
-static int zsmalloc_mount(void)
+static int __init zsmalloc_mount(void)
 {
 	int ret = 0;
 
@@ -1898,7 +1898,7 @@ static int zsmalloc_mount(void)
 	return ret;
 }
 
-static void zsmalloc_unmount(void)
+static void __exit zsmalloc_unmount(void)
 {
 	kern_unmount(zsmalloc_mnt);
 }
