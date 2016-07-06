@@ -68,11 +68,9 @@
 		compatible = "rockchip,rk3288-io-voltage-domain";
 		rockchip,grf = <&grf>;
 
-		audio-supply = <&vcca_33>;
 		bb-supply = <&vcc_io>;
 		dvp-supply = <&dovdd_1v8>;
 		flash0-supply = <&vcc_flash>;
-		flash1-supply = <&vcc_lan>;
 		gpio30-supply = <&vcc_io>;
 		gpio1830-supply = <&vcc_io>;
 		lcdc-supply = <&vcc_io>;
@@ -225,7 +223,6 @@
 	clock_in_out = "input";
 	pinctrl-names = "default";
 	pinctrl-0 = <&rgmii_pins>, <&phy_rst>, <&phy_pmeb>, <&phy_int>;
-	phy-supply = <&vcc_lan>;
 	phy-mode = "rgmii";
 	snps,reset-active-low;
 	snps,reset-delays-us = <0 10000 1000000>;
@@ -296,7 +293,7 @@
 		inl2-supply = <&vcc_sys>;
 		inl3-supply = <&vcc_20>;
 
-		regulators {
+		regulators: regulators {
 			vcc_ddr: REG1 {
 				regulator-name = "vcc_ddr";
 				regulator-min-microvolt = <1200000>;
@@ -339,23 +336,26 @@
 				regulator-always-on;
 			};
 
-			vcca_18: REG7 {
+			REG7  {
 				regulator-name = "vcca_18";
 				regulator-min-microvolt = <1800000>;
 				regulator-max-microvolt = <1800000>;
 			};
 
-			vcca_33: REG8 {
+
+			REG8 {
 				regulator-name = "vcca_33";
 				regulator-min-microvolt = <3300000>;
 				regulator-max-microvolt = <3300000>;
+				regulator-always-on;
 			};
 
-			vcc_lan: REG9 {
+			REG9 {
 				regulator-name = "vcc_lan";
 				regulator-min-microvolt = <3300000>;
 				regulator-max-microvolt = <3300000>;
 			};
+
 
 			vdd_10: REG10 {
 				regulator-name = "vdd_10";

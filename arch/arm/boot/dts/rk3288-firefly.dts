@@ -69,3 +69,33 @@
 &pwm1 {
 	status = "okay";
 };
+
+&gmac {
+	phy-supply = <&vcc_lan>;
+};
+
+&io_domains {
+		audio-supply = <&vcca_33>;
+		flash1-supply = <&vcc_lan>;
+};
+
+&regulators {
+	vcca_18: REG7  {
+		regulator-name = "vcca_18";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+	};
+
+	vcca_33: REG8 {
+		regulator-name = "vcca_33";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-always-on;
+	};
+
+	vcc_lan: REG9 {
+		regulator-name = "vcc_lan";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+	};
+};
