@@ -26,6 +26,7 @@
 #include <linux/i2c.h>
 #include <linux/slab.h>
 #include <linux/of.h>
+#include <linux/gpio/consumer.h>
 #include <media/v4l2-ioctl.h>
 #include <linux/videodev2.h>
 #include <media/v4l2-device.h>
@@ -191,6 +192,7 @@ struct adv7180_state {
 	struct media_pad	pad;
 	struct mutex		mutex; /* mutual excl. when accessing chip */
 	int			irq;
+	struct gpio_desc	*pwdn_gpio;
 	v4l2_std_id		curr_norm;
 	bool			autodetect;
 	bool			powered;
@@ -441,6 +443,19 @@ static int adv7180_g_std(struct v4l2_subdev *sd, v4l2_std_id *norm)
 	*norm = state->curr_norm;
 
 	return 0;
+}
+
+static void adv7180_set_power_pin(struct adv7180_state *state, bool on)
+{
+	if (!state->pwdn_gpio)
+		return;
+
+	if (on) {
+		gpiod_set_value_cansleep(state->pwdn_gpio, 0);
+		usleep_range(5000, 10000);
+	} else {
+		gpiod_set_value_cansleep(state->pwdn_gpio, 1);
+	}
 }
 
 static int adv7180_set_power(struct adv7180_state *state, bool on)
@@ -1143,6 +1158,8 @@ static int init_device(struct adv7180_state *state)
 
 	mutex_lock(&state->mutex);
 
+	adv7180_set_power_pin(state, true);
+
 	adv7180_write(state, ADV7180_REG_PWR_MAN, ADV7180_PWR_MAN_RES);
 	usleep_range(5000, 10000);
 
@@ -1190,6 +1207,20 @@ out_unlock:
 	return ret;
 }
 
+static int adv7180_of_parse(struct adv7180_state *state)
+{
+	struct i2c_client *client = state->client;
+
+	state->pwdn_gpio = devm_gpiod_get_optional(&client->dev, "pwdn",
+						   GPIOD_OUT_HIGH);
+	if (IS_ERR(state->pwdn_gpio)) {
+		v4l_err(client, "request for power pin failed\n");
+		return PTR_ERR(state->pwdn_gpio);
+	}
+
+	return 0;
+}
+
 static int adv7180_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
@@ -1211,6 +1242,10 @@ static int adv7180_probe(struct i2c_client *client,
 	state->client = client;
 	state->field = V4L2_FIELD_INTERLACED;
 	state->chip_info = (struct adv7180_chip_info *)id->driver_data;
+
+	ret = adv7180_of_parse(state);
+	if (ret)
+		return ret;
 
 	if (state->chip_info->flags & ADV7180_FLAG_MIPI_CSI2) {
 		state->csi_client = i2c_new_dummy(client->adapter,
@@ -1302,6 +1337,8 @@ static int adv7180_remove(struct i2c_client *client)
 		i2c_unregister_device(state->vpp_client);
 	if (state->chip_info->flags & ADV7180_FLAG_MIPI_CSI2)
 		i2c_unregister_device(state->csi_client);
+
+	adv7180_set_power_pin(state, false);
 
 	mutex_destroy(&state->mutex);
 
