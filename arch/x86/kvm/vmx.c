@@ -10203,6 +10203,9 @@ static int nested_vmx_run(struct kvm_vcpu *vcpu, bool launch)
 	if (!vmcs02)
 		return -ENOMEM;
 
+	if (kvm_lapic_hv_timer_in_use(vcpu))
+		kvm_lapic_switch_to_sw_timer(vcpu);
+
 	enter_guest_mode(vcpu);
 
 	vmx->nested.vmcs01_tsc_offset = vmcs_read64(TSC_OFFSET);
@@ -10227,6 +10230,7 @@ static int nested_vmx_run(struct kvm_vcpu *vcpu, bool launch)
 	if (msr_entry_idx) {
 		leave_guest_mode(vcpu);
 		vmx_load_vmcs01(vcpu);
+		kvm_lapic_switch_to_hv_timer(vcpu);
 		nested_vmx_entry_failure(vcpu, vmcs12,
 				EXIT_REASON_MSR_LOAD_FAIL, msr_entry_idx);
 		return 1;
@@ -10700,6 +10704,7 @@ static void nested_vmx_vmexit(struct kvm_vcpu *vcpu, u32 exit_reason,
 		nested_vmx_abort(vcpu, VMX_ABORT_SAVE_GUEST_MSR_FAIL);
 
 	vmx_load_vmcs01(vcpu);
+	kvm_lapic_switch_to_hv_timer(vcpu);
 
 	if ((exit_reason == EXIT_REASON_EXTERNAL_INTERRUPT)
 	    && nested_exit_intr_ack_set(vcpu)) {
