@@ -554,6 +554,20 @@ static int rvin_dv_timings_cap(struct file *file, void *priv_fh,
 	return ret;
 }
 
+static int rvin_g_edid(struct file *file, void *fh, struct v4l2_edid *edid)
+{
+	struct rvin_dev *vin = video_drvdata(file);
+
+	return rvin_subdev_call(vin, pad, get_edid, edid);
+}
+
+static int rvin_s_edid(struct file *file, void *fh, struct v4l2_edid *edid)
+{
+	struct rvin_dev *vin = video_drvdata(file);
+
+	return rvin_subdev_call(vin, pad, set_edid, edid);
+}
+
 static const struct v4l2_ioctl_ops rvin_ioctl_ops = {
 	.vidioc_querycap		= rvin_querycap,
 	.vidioc_try_fmt_vid_cap		= rvin_try_fmt_vid_cap,
@@ -575,6 +589,9 @@ static const struct v4l2_ioctl_ops rvin_ioctl_ops = {
 	.vidioc_g_dv_timings		= rvin_g_dv_timings,
 	.vidioc_s_dv_timings		= rvin_s_dv_timings,
 	.vidioc_query_dv_timings	= rvin_query_dv_timings,
+
+	.vidioc_g_edid			= rvin_g_edid,
+	.vidioc_s_edid			= rvin_s_edid,
 
 	.vidioc_querystd		= rvin_querystd,
 	.vidioc_g_std			= rvin_g_std,
