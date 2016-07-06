@@ -467,7 +467,7 @@ static int ila_nl_cmd_get_mapping(struct sk_buff *skb, struct genl_info *info)
 	if (ret < 0)
 		goto out_free;
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 
 out_free:
 	nlmsg_free(msg);

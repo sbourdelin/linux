@@ -685,7 +685,7 @@ static int nl802154_get_wpan_phy(struct sk_buff *skb, struct genl_info *info)
 		return -ENOBUFS;
 	}
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 }
 
 static inline u64 wpan_dev_id(struct wpan_dev *wpan_dev)
@@ -923,7 +923,7 @@ static int nl802154_get_interface(struct sk_buff *skb, struct genl_info *info)
 		return -ENOBUFS;
 	}
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 }
 
 static int nl802154_new_interface(struct sk_buff *skb, struct genl_info *info)

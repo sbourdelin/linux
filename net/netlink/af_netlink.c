@@ -1227,7 +1227,7 @@ int netlink_unicast(struct sock *ssk, struct sk_buff *skb, u32 portid,
 	int err;
 	long timeo;
 
-	skb = netlink_trim(skb, allocation ? allocation : gfp_any());
+	skb = netlink_trim(skb, allocation);
 
 	timeo = sock_sndtimeo(ssk, nonblock);
 retry:

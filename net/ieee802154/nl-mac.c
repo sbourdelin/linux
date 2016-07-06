@@ -435,7 +435,7 @@ int ieee802154_list_iface(struct sk_buff *skb, struct genl_info *info)
 
 	dev_put(dev);
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 out_free:
 	nlmsg_free(msg);
 out_dev:
@@ -692,7 +692,7 @@ int ieee802154_llsec_getparams(struct sk_buff *skb, struct genl_info *info)
 
 	dev_put(dev);
 
-	return ieee802154_nl_reply(msg, info);
+	return ieee802154_nl_reply(msg, info, GFP_KERNEL);
 out_free:
 	nlmsg_free(msg);
 out_dev:

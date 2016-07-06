@@ -874,7 +874,7 @@ static int netlbl_unlabel_list(struct sk_buff *skb, struct genl_info *info)
 		goto list_failure;
 
 	genlmsg_end(ans_skb, data);
-	return genlmsg_reply(ans_skb, info);
+	return genlmsg_reply(ans_skb, info, GFP_KERNEL);
 
 list_failure:
 	kfree_skb(ans_skb);

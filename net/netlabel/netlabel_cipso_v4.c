@@ -590,7 +590,7 @@ list_start:
 	rcu_read_unlock();
 
 	genlmsg_end(ans_skb, data);
-	return genlmsg_reply(ans_skb, info);
+	return genlmsg_reply(ans_skb, info, GFP_KERNEL);
 
 list_retry:
 	/* XXX - this limit is a guesstimate */

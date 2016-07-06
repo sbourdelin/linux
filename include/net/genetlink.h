@@ -343,10 +343,13 @@ static inline int genlmsg_unicast(struct net *net, struct sk_buff *skb,
  * genlmsg_reply - reply to a request
  * @skb: netlink message to be sent back
  * @info: receiver information
+ * @flags: allocation flags
  */
-static inline int genlmsg_reply(struct sk_buff *skb, struct genl_info *info)
+static inline int genlmsg_reply(struct sk_buff *skb, struct genl_info *info,
+				gfp_t flags)
 {
-	return genlmsg_unicast(genl_info_net(info), skb, info->snd_portid, 0);
+	return genlmsg_unicast(genl_info_net(info), skb, info->snd_portid,
+			       flags);
 }
 
 /**

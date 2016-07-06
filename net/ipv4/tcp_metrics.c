@@ -1024,7 +1024,7 @@ static int tcp_metrics_nl_cmd_get(struct sk_buff *skb, struct genl_info *info)
 		goto out_free;
 
 	genlmsg_end(msg, reply);
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 
 nla_put_failure:
 	ret = -EMSGSIZE;

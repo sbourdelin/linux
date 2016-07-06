@@ -1274,7 +1274,7 @@ static int ovs_flow_cmd_get(struct sk_buff *skb, struct genl_info *info)
 	}
 
 	ovs_unlock();
-	return genlmsg_reply(reply, info);
+	return genlmsg_reply(reply, info, GFP_KERNEL);
 unlock:
 	ovs_unlock();
 	return err;
@@ -1760,7 +1760,7 @@ static int ovs_dp_cmd_get(struct sk_buff *skb, struct genl_info *info)
 	BUG_ON(err < 0);
 	ovs_unlock();
 
-	return genlmsg_reply(reply, info);
+	return genlmsg_reply(reply, info, GFP_KERNEL);
 
 err_unlock_free:
 	ovs_unlock();
@@ -2163,7 +2163,7 @@ static int ovs_vport_cmd_get(struct sk_buff *skb, struct genl_info *info)
 	BUG_ON(err < 0);
 	rcu_read_unlock();
 
-	return genlmsg_reply(reply, info);
+	return genlmsg_reply(reply, info, GFP_KERNEL);
 
 exit_unlock_free:
 	rcu_read_unlock();

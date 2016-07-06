@@ -100,7 +100,7 @@ static char *drbd_m_holder = "Hands off! this is DRBD's meta data device.";
 static void drbd_adm_send_reply(struct sk_buff *skb, struct genl_info *info)
 {
 	genlmsg_end(skb, genlmsg_data(nlmsg_data(nlmsg_hdr(skb))));
-	if (genlmsg_reply(skb, info))
+	if (genlmsg_reply(skb, info, GFP_KERNEL))
 		pr_err("error sending genl reply\n");
 }
 

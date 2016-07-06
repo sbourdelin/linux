@@ -933,7 +933,7 @@ static int ctrl_getfamily(struct sk_buff *skb, struct genl_info *info)
 	if (IS_ERR(msg))
 		return PTR_ERR(msg);
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 }
 
 static int genl_ctrl_event(int event, struct genl_family *family,

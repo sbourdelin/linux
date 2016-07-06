@@ -116,7 +116,7 @@ static int irda_nl_get_mode(struct sk_buff *skb, struct genl_info *info)
 
 	genlmsg_end(msg, hdr);
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 
  err_out:
 	nlmsg_free(msg);

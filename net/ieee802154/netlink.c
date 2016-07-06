@@ -87,14 +87,15 @@ struct sk_buff *ieee802154_nl_new_reply(struct genl_info *info,
 	return msg;
 }
 
-int ieee802154_nl_reply(struct sk_buff *msg, struct genl_info *info)
+int ieee802154_nl_reply(struct sk_buff *msg, struct genl_info *info,
+			gfp_t flags)
 {
 	struct nlmsghdr *nlh = nlmsg_hdr(msg);
 	void *hdr = genlmsg_data(nlmsg_data(nlh));
 
 	genlmsg_end(msg, hdr);
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, flags);
 }
 
 static const struct genl_ops ieee8021154_ops[] = {

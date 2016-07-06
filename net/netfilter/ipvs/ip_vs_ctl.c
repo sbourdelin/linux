@@ -3760,7 +3760,7 @@ static int ip_vs_genl_get_cmd(struct sk_buff *skb, struct genl_info *info)
 	}
 
 	genlmsg_end(msg, reply);
-	ret = genlmsg_reply(msg, info);
+	ret = genlmsg_reply(msg, info, GFP_KERNEL);
 	goto out;
 
 nla_put_failure:

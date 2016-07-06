@@ -1774,7 +1774,7 @@ int tipc_nl_node_get_link(struct sk_buff *skb, struct genl_info *info)
 		}
 	}
 
-	return genlmsg_reply(msg.skb, info);
+	return genlmsg_reply(msg.skb, info, GFP_KERNEL);
 }
 
 int tipc_nl_node_reset_link_stats(struct sk_buff *skb, struct genl_info *info)

@@ -1948,7 +1948,7 @@ static int nl80211_get_wiphy(struct sk_buff *skb, struct genl_info *info)
 		return -ENOBUFS;
 	}
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 }
 
 static const struct nla_policy txq_params_policy[NL80211_TXQ_ATTR_MAX + 1] = {
@@ -2574,7 +2574,7 @@ static int nl80211_get_interface(struct sk_buff *skb, struct genl_info *info)
 		return -ENOBUFS;
 	}
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 }
 
 static const struct nla_policy mntr_flags_policy[NL80211_MNTR_FLAG_MAX + 1] = {
@@ -2833,7 +2833,7 @@ static int nl80211_new_interface(struct sk_buff *skb, struct genl_info *info)
 	}
 
 out:
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 }
 
 static int nl80211_del_interface(struct sk_buff *skb, struct genl_info *info)
@@ -3007,7 +3007,7 @@ static int nl80211_get_key(struct sk_buff *skb, struct genl_info *info)
 		goto nla_put_failure;
 
 	genlmsg_end(msg, hdr);
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 
  nla_put_failure:
 	err = -ENOBUFS;
@@ -4050,7 +4050,7 @@ static int nl80211_get_station(struct sk_buff *skb, struct genl_info *info)
 		return -ENOBUFS;
 	}
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 }
 
 int cfg80211_check_station_change(struct wiphy *wiphy,
@@ -4852,7 +4852,7 @@ static int nl80211_get_mpath(struct sk_buff *skb, struct genl_info *info)
 		return -ENOBUFS;
 	}
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 }
 
 static int nl80211_set_mpath(struct sk_buff *skb, struct genl_info *info)
@@ -4957,7 +4957,7 @@ static int nl80211_get_mpp(struct sk_buff *skb, struct genl_info *info)
 		return -ENOBUFS;
 	}
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 }
 
 static int nl80211_dump_mpp(struct sk_buff *skb,
@@ -5234,7 +5234,7 @@ static int nl80211_get_mesh_config(struct sk_buff *skb,
 		goto nla_put_failure;
 	nla_nest_end(msg, pinfoattr);
 	genlmsg_end(msg, hdr);
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 
  nla_put_failure:
 	genlmsg_cancel(msg, hdr);
@@ -5672,7 +5672,7 @@ static int nl80211_get_reg_do(struct sk_buff *skb, struct genl_info *info)
 	rcu_read_unlock();
 
 	genlmsg_end(msg, hdr);
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 
 nla_put_failure_rcu:
 	rcu_read_unlock();
@@ -8485,7 +8485,7 @@ static int nl80211_remain_on_channel(struct sk_buff *skb,
 
 	genlmsg_end(msg, hdr);
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 
  nla_put_failure:
 	err = -ENOBUFS;
@@ -8897,7 +8897,7 @@ static int nl80211_tx_mgmt(struct sk_buff *skb, struct genl_info *info)
 			goto nla_put_failure;
 
 		genlmsg_end(msg, hdr);
-		return genlmsg_reply(msg, info);
+		return genlmsg_reply(msg, info, GFP_KERNEL);
 	}
 
 	return 0;
@@ -9007,7 +9007,7 @@ static int nl80211_get_power_save(struct sk_buff *skb, struct genl_info *info)
 		goto nla_put_failure;
 
 	genlmsg_end(msg, hdr);
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 
  nla_put_failure:
 	err = -ENOBUFS;
@@ -9428,7 +9428,7 @@ static int nl80211_get_wowlan(struct sk_buff *skb, struct genl_info *info)
 	}
 
 	genlmsg_end(msg, hdr);
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 
 nla_put_failure:
 	nlmsg_free(msg);
@@ -9892,7 +9892,7 @@ static int nl80211_get_coalesce(struct sk_buff *skb, struct genl_info *info)
 		goto nla_put_failure;
 
 	genlmsg_end(msg, hdr);
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 
 nla_put_failure:
 	nlmsg_free(msg);
@@ -10185,7 +10185,7 @@ static int nl80211_probe_client(struct sk_buff *skb,
 
 	genlmsg_end(msg, hdr);
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 
  nla_put_failure:
 	err = -ENOBUFS;
@@ -10292,7 +10292,7 @@ static int nl80211_get_protocol_features(struct sk_buff *skb,
 		goto nla_put_failure;
 
 	genlmsg_end(msg, hdr);
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 
  nla_put_failure:
 	kfree_skb(msg);
@@ -10672,7 +10672,7 @@ int cfg80211_vendor_cmd_reply(struct sk_buff *skb)
 
 	nla_nest_end(skb, data);
 	genlmsg_end(skb, hdr);
-	return genlmsg_reply(skb, rdev->cur_cmd_info);
+	return genlmsg_reply(skb, rdev->cur_cmd_info, gfp_any());
 }
 EXPORT_SYMBOL_GPL(cfg80211_vendor_cmd_reply);
 

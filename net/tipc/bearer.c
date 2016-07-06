@@ -763,7 +763,7 @@ int tipc_nl_bearer_get(struct sk_buff *skb, struct genl_info *info)
 		goto err_out;
 	rtnl_unlock();
 
-	return genlmsg_reply(rep, info);
+	return genlmsg_reply(rep, info, GFP_KERNEL);
 err_out:
 	rtnl_unlock();
 	nlmsg_free(rep);
@@ -1022,7 +1022,7 @@ int tipc_nl_media_get(struct sk_buff *skb, struct genl_info *info)
 		goto err_out;
 	rtnl_unlock();
 
-	return genlmsg_reply(rep, info);
+	return genlmsg_reply(rep, info, GFP_KERNEL);
 err_out:
 	rtnl_unlock();
 	nlmsg_free(rep);

@@ -772,7 +772,7 @@ static int nfc_genl_get_device(struct sk_buff *skb, struct genl_info *info)
 
 	nfc_put_device(dev);
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 
 out_free:
 	nlmsg_free(msg);
@@ -1056,7 +1056,7 @@ exit:
 		return rc;
 	}
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 }
 
 static int nfc_genl_llc_set_params(struct sk_buff *skb, struct genl_info *info)
@@ -1653,7 +1653,7 @@ int nfc_vendor_cmd_reply(struct sk_buff *skb)
 	}
 
 	genlmsg_end(skb, hdr);
-	return genlmsg_reply(skb, dev->cur_cmd_info);
+	return genlmsg_reply(skb, dev->cur_cmd_info, gfp_any());
 }
 EXPORT_SYMBOL(nfc_vendor_cmd_reply);
 

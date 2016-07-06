@@ -114,7 +114,7 @@ static int send_reply(struct sk_buff *skb, struct genl_info *info)
 
 	genlmsg_end(skb, reply);
 
-	return genlmsg_reply(skb, info);
+	return genlmsg_reply(skb, info, GFP_KERNEL);
 }
 
 /*

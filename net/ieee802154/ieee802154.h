@@ -40,7 +40,8 @@ struct sk_buff *ieee802154_nl_create(int flags, u8 req);
 int ieee802154_nl_mcast(struct sk_buff *msg, unsigned int group);
 struct sk_buff *ieee802154_nl_new_reply(struct genl_info *info,
 					int flags, u8 req);
-int ieee802154_nl_reply(struct sk_buff *msg, struct genl_info *info);
+int ieee802154_nl_reply(struct sk_buff *msg, struct genl_info *info,
+			gfp_t flags);
 
 extern struct genl_family nl802154_family;
 

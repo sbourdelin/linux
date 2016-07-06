@@ -110,7 +110,7 @@ int ieee802154_list_phy(struct sk_buff *skb, struct genl_info *info)
 
 	wpan_phy_put(phy);
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 out_free:
 	nlmsg_free(msg);
 out_dev:
@@ -255,7 +255,7 @@ int ieee802154_add_iface(struct sk_buff *skb, struct genl_info *info)
 
 	wpan_phy_put(phy);
 
-	return ieee802154_nl_reply(msg, info);
+	return ieee802154_nl_reply(msg, info, GFP_ATOMIC);
 
 dev_unregister:
 	rtnl_lock(); /* del_iface must be called with RTNL lock */
@@ -336,7 +336,7 @@ int ieee802154_del_iface(struct sk_buff *skb, struct genl_info *info)
 		goto nla_put_failure;
 	wpan_phy_put(phy);
 
-	return ieee802154_nl_reply(msg, info);
+	return ieee802154_nl_reply(msg, info, GFP_ATOMIC);
 
 nla_put_failure:
 	nlmsg_free(msg);

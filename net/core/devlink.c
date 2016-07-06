@@ -501,7 +501,7 @@ static int devlink_nl_cmd_get_doit(struct sk_buff *skb, struct genl_info *info)
 		return err;
 	}
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 }
 
 static int devlink_nl_cmd_get_dumpit(struct sk_buff *msg,
@@ -554,7 +554,7 @@ static int devlink_nl_cmd_port_get_doit(struct sk_buff *skb,
 		return err;
 	}
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 }
 
 static int devlink_nl_cmd_port_get_dumpit(struct sk_buff *msg,
@@ -736,7 +736,7 @@ static int devlink_nl_cmd_sb_get_doit(struct sk_buff *skb,
 		return err;
 	}
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 }
 
 static int devlink_nl_cmd_sb_get_dumpit(struct sk_buff *msg,
@@ -843,7 +843,7 @@ static int devlink_nl_cmd_sb_pool_get_doit(struct sk_buff *skb,
 		return err;
 	}
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 }
 
 static int __sb_pool_get_dumpit(struct sk_buff *msg, int start, int *p_idx,
@@ -1030,7 +1030,7 @@ static int devlink_nl_cmd_sb_port_pool_get_doit(struct sk_buff *skb,
 		return err;
 	}
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 }
 
 static int __sb_port_pool_get_dumpit(struct sk_buff *msg, int start, int *p_idx,
@@ -1233,7 +1233,7 @@ static int devlink_nl_cmd_sb_tc_pool_bind_get_doit(struct sk_buff *skb,
 		return err;
 	}
 
-	return genlmsg_reply(msg, info);
+	return genlmsg_reply(msg, info, GFP_KERNEL);
 }
 
 static int __sb_tc_pool_bind_get_dumpit(struct sk_buff *msg,
