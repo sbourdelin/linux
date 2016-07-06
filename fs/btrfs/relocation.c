@@ -3030,34 +3030,37 @@ int prealloc_file_extent_cluster(struct inode *inode,
 	u64 num_bytes;
 	int nr = 0;
 	int ret = 0;
+	u64 prealloc_start, prealloc_end;
 
 	BUG_ON(cluster->start != cluster->boundary[0]);
 	inode_lock(inode);
 
-	ret = btrfs_check_data_free_space(inode, cluster->start,
-					  cluster->end + 1 - cluster->start);
+	start = cluster->start - offset;
+	end = cluster->end - offset;
+	ret = btrfs_check_data_free_space(inode, start, end + 1 - start);
 	if (ret)
 		goto out;
 
 	while (nr < cluster->nr) {
-		start = cluster->boundary[nr] - offset;
+		prealloc_start = cluster->boundary[nr] - offset;
 		if (nr + 1 < cluster->nr)
-			end = cluster->boundary[nr + 1] - 1 - offset;
+			prealloc_end = cluster->boundary[nr + 1] - 1 - offset;
 		else
-			end = cluster->end - offset;
+			prealloc_end = cluster->end - offset;
 
-		lock_extent(&BTRFS_I(inode)->io_tree, start, end);
-		num_bytes = end + 1 - start;
-		ret = btrfs_prealloc_file_range(inode, 0, start,
+		lock_extent(&BTRFS_I(inode)->io_tree, prealloc_start,
+			    prealloc_end);
+		num_bytes = prealloc_end + 1 - prealloc_start;
+		ret = btrfs_prealloc_file_range(inode, 0, prealloc_start,
 						num_bytes, num_bytes,
-						end + 1, &alloc_hint);
-		unlock_extent(&BTRFS_I(inode)->io_tree, start, end);
+						prealloc_end + 1, &alloc_hint);
+		unlock_extent(&BTRFS_I(inode)->io_tree, prealloc_start,
+			      prealloc_end);
 		if (ret)
 			break;
 		nr++;
 	}
-	btrfs_free_reserved_data_space(inode, cluster->start,
-				       cluster->end + 1 - cluster->start);
+	btrfs_free_reserved_data_space(inode, start, end + 1 - start);
 out:
 	inode_unlock(inode);
 	return ret;
