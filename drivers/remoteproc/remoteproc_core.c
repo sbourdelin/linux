@@ -801,8 +801,12 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	struct resource_table *table, *loaded_table;
 	int ret, tablesz;
 
+	/*
+	 * This can happen when built-in if initial async fw load fails.
+	 * However we now have firmware available so retry.
+	 */
 	if (!rproc->table_ptr)
-		return -ENOMEM;
+		rproc_fw_config_virtio(fw, rproc);
 
 	ret = rproc_fw_sanity_check(rproc, fw);
 	if (ret)
@@ -895,9 +899,20 @@ clean_up:
  * to unregister the device. one other option is just to use kref here,
  * that might be cleaner).
  */
-static void rproc_fw_config_virtio(const struct firmware *fw, void *context)
+
+static void rproc_fw_config_virtio_cb(const struct firmware *fw, void *context)
 {
 	struct rproc *rproc = context;
+
+	rproc_fw_config_virtio(fw, rproc);
+
+	release_firmware(fw);
+	/* allow rproc_del() contexts, if any, to proceed */
+	complete_all(&rproc->firmware_loading_complete);
+}
+
+static void rproc_fw_config_virtio(const struct firmware *fw, struct rproc *rproc)
+{
 	struct resource_table *table;
 	int ret, tablesz;
 
@@ -934,9 +949,7 @@ static void rproc_fw_config_virtio(const struct firmware *fw, void *context)
 	ret = rproc_handle_resources(rproc, tablesz, rproc_vdev_handler);
 
 out:
-	release_firmware(fw);
-	/* allow rproc_del() contexts, if any, to proceed */
-	complete_all(&rproc->firmware_loading_complete);
+	return;
 }
 
 static int rproc_add_virtio_devices(struct rproc *rproc)
@@ -956,7 +969,7 @@ static int rproc_add_virtio_devices(struct rproc *rproc)
 	 */
 	ret = request_firmware_nowait(THIS_MODULE, FW_ACTION_HOTPLUG,
 				      rproc->firmware, &rproc->dev, GFP_KERNEL,
-				      rproc, rproc_fw_config_virtio);
+				      rproc, rproc_fw_config_virtio_cb);
 	if (ret < 0) {
 		dev_err(&rproc->dev, "request_firmware_nowait err: %d\n", ret);
 		complete_all(&rproc->firmware_loading_complete);
