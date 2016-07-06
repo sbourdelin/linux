@@ -279,7 +279,7 @@ static int cttimeout_get_timeout(struct net *net, struct sock *ctnl,
 			break;
 		}
 		ret = netlink_unicast(ctnl, skb2, NETLINK_CB(skb).portid,
-					MSG_DONTWAIT);
+				      MSG_DONTWAIT, GFP_KERNEL);
 		if (ret > 0)
 			ret = 0;
 
@@ -496,7 +496,8 @@ static int cttimeout_default_get(struct net *net, struct sock *ctnl,
 		err = -ENOMEM;
 		goto err;
 	}
-	ret = netlink_unicast(ctnl, skb2, NETLINK_CB(skb).portid, MSG_DONTWAIT);
+	ret = netlink_unicast(ctnl, skb2, NETLINK_CB(skb).portid,
+			      MSG_DONTWAIT, GFP_KERNEL);
 	if (ret > 0)
 		ret = 0;
 

@@ -1224,7 +1224,8 @@ static int ctnetlink_get_conntrack(struct net *net, struct sock *ctnl,
 	if (err <= 0)
 		goto free;
 
-	err = netlink_unicast(ctnl, skb2, NETLINK_CB(skb).portid, MSG_DONTWAIT);
+	err = netlink_unicast(ctnl, skb2, NETLINK_CB(skb).portid, MSG_DONTWAIT,
+			      GFP_KERNEL);
 	if (err < 0)
 		goto out;
 
@@ -2083,7 +2084,8 @@ static int ctnetlink_stat_ct(struct net *net, struct sock *ctnl,
 	if (err <= 0)
 		goto free;
 
-	err = netlink_unicast(ctnl, skb2, NETLINK_CB(skb).portid, MSG_DONTWAIT);
+	err = netlink_unicast(ctnl, skb2, NETLINK_CB(skb).portid, MSG_DONTWAIT,
+			      GFP_KERNEL);
 	if (err < 0)
 		goto out;
 
@@ -2821,7 +2823,8 @@ static int ctnetlink_get_expect(struct net *net, struct sock *ctnl,
 	if (err <= 0)
 		goto free;
 
-	err = netlink_unicast(ctnl, skb2, NETLINK_CB(skb).portid, MSG_DONTWAIT);
+	err = netlink_unicast(ctnl, skb2, NETLINK_CB(skb).portid, MSG_DONTWAIT,
+			      GFP_KERNEL);
 	if (err < 0)
 		goto out;
 

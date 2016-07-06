@@ -311,7 +311,7 @@ static int nfnl_acct_get(struct net *net, struct sock *nfnl,
 			break;
 		}
 		ret = netlink_unicast(nfnl, skb2, NETLINK_CB(skb).portid,
-					MSG_DONTWAIT);
+				      MSG_DONTWAIT, GFP_KERNEL);
 		if (ret > 0)
 			ret = 0;
 

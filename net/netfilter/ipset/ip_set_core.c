@@ -1510,7 +1510,7 @@ call_ad(struct sock *ctnl, struct sk_buff *skb, struct ip_set *set,
 		*errline = lineno;
 
 		netlink_unicast(ctnl, skb2, NETLINK_CB(skb).portid,
-				MSG_DONTWAIT);
+				MSG_DONTWAIT, GFP_KERNEL);
 		/* Signal netlink not to send its ACK/errmsg.  */
 		return -EINTR;
 	}
@@ -1695,7 +1695,8 @@ static int ip_set_header(struct net *net, struct sock *ctnl,
 		goto nla_put_failure;
 	nlmsg_end(skb2, nlh2);
 
-	ret = netlink_unicast(ctnl, skb2, NETLINK_CB(skb).portid, MSG_DONTWAIT);
+	ret = netlink_unicast(ctnl, skb2, NETLINK_CB(skb).portid, MSG_DONTWAIT,
+			      GFP_KERNEL);
 	if (ret < 0)
 		return ret;
 
@@ -1755,7 +1756,8 @@ static int ip_set_type(struct net *net, struct sock *ctnl, struct sk_buff *skb,
 	nlmsg_end(skb2, nlh2);
 
 	pr_debug("Send TYPE, nlmsg_len: %u\n", nlh2->nlmsg_len);
-	ret = netlink_unicast(ctnl, skb2, NETLINK_CB(skb).portid, MSG_DONTWAIT);
+	ret = netlink_unicast(ctnl, skb2, NETLINK_CB(skb).portid, MSG_DONTWAIT,
+			      GFP_KERNEL);
 	if (ret < 0)
 		return ret;
 
@@ -1798,7 +1800,8 @@ static int ip_set_protocol(struct net *net, struct sock *ctnl,
 		goto nla_put_failure;
 	nlmsg_end(skb2, nlh2);
 
-	ret = netlink_unicast(ctnl, skb2, NETLINK_CB(skb).portid, MSG_DONTWAIT);
+	ret = netlink_unicast(ctnl, skb2, NETLINK_CB(skb).portid, MSG_DONTWAIT,
+			      GFP_KERNEL);
 	if (ret < 0)
 		return ret;
 

@@ -441,7 +441,7 @@ int inet_diag_dump_one_icsk(struct inet_hashinfo *hashinfo,
 		goto out;
 	}
 	err = netlink_unicast(net->diag_nlsk, rep, NETLINK_CB(in_skb).portid,
-			      MSG_DONTWAIT);
+			      MSG_DONTWAIT, GFP_KERNEL);
 	if (err > 0)
 		err = 0;
 

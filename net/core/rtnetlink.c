@@ -649,7 +649,7 @@ int rtnetlink_send(struct sk_buff *skb, struct net *net, u32 pid, unsigned int g
 		atomic_inc(&skb->users);
 	netlink_broadcast(rtnl, skb, pid, group, GFP_KERNEL);
 	if (echo)
-		err = netlink_unicast(rtnl, skb, pid, MSG_DONTWAIT);
+		err = netlink_unicast(rtnl, skb, pid, MSG_DONTWAIT, GFP_KERNEL);
 	return err;
 }
 

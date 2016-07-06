@@ -590,7 +590,7 @@ static inline int nlmsg_unicast(struct sock *sk, struct sk_buff *skb, u32 portid
 {
 	int err;
 
-	err = netlink_unicast(sk, skb, portid, MSG_DONTWAIT);
+	err = netlink_unicast(sk, skb, portid, MSG_DONTWAIT, 0);
 	if (err > 0)
 		err = 0;
 

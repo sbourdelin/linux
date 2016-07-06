@@ -411,7 +411,7 @@ static void kauditd_send_skb(struct sk_buff *skb)
 restart:
 	/* take a reference in case we can't send it and we want to hold it */
 	skb_get(skb);
-	err = netlink_unicast(audit_sock, skb, audit_nlk_portid, 0);
+	err = netlink_unicast(audit_sock, skb, audit_nlk_portid, 0, gfp_any());
 	if (err < 0) {
 		pr_err("netlink_unicast sending to audit_pid=%d returned error: %d\n",
 		       audit_pid, err);
@@ -547,7 +547,7 @@ int audit_send_list(void *_dest)
 	mutex_unlock(&audit_cmd_mutex);
 
 	while ((skb = __skb_dequeue(&dest->q)) != NULL)
-		netlink_unicast(aunet->nlsk, skb, dest->portid, 0);
+		netlink_unicast(aunet->nlsk, skb, dest->portid, 0, gfp_any());
 
 	put_net(net);
 	kfree(dest);
@@ -591,7 +591,7 @@ static int audit_send_reply_thread(void *arg)
 
 	/* Ignore failure. It'll only happen if the sender goes away,
 	   because our timeout is set to infinite. */
-	netlink_unicast(aunet->nlsk , reply->skb, reply->portid, 0);
+	netlink_unicast(aunet->nlsk , reply->skb, reply->portid, 0, gfp_any());
 	put_net(net);
 	kfree(reply);
 	return 0;
@@ -814,7 +814,8 @@ static int audit_replace(pid_t pid)
 
 	if (!skb)
 		return -ENOMEM;
-	return netlink_unicast(audit_sock, skb, audit_nlk_portid, 0);
+	return netlink_unicast(audit_sock, skb, audit_nlk_portid, 0,
+			       GFP_KERNEL);
 }
 
 static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)

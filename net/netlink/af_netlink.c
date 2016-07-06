@@ -1220,14 +1220,14 @@ static int netlink_unicast_kernel(struct sock *sk, struct sk_buff *skb,
 	return ret;
 }
 
-int netlink_unicast(struct sock *ssk, struct sk_buff *skb,
-		    u32 portid, int nonblock)
+int netlink_unicast(struct sock *ssk, struct sk_buff *skb, u32 portid,
+		    int nonblock, gfp_t allocation)
 {
 	struct sock *sk;
 	int err;
 	long timeo;
 
-	skb = netlink_trim(skb, gfp_any());
+	skb = netlink_trim(skb, allocation ? allocation : gfp_any());
 
 	timeo = sock_sndtimeo(ssk, nonblock);
 retry:
@@ -1783,7 +1783,8 @@ static int netlink_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 		atomic_inc(&skb->users);
 		netlink_broadcast(sk, skb, dst_portid, dst_group, GFP_KERNEL);
 	}
-	err = netlink_unicast(sk, skb, dst_portid, msg->msg_flags&MSG_DONTWAIT);
+	err = netlink_unicast(sk, skb, dst_portid,
+			      msg->msg_flags & MSG_DONTWAIT, GFP_KERNEL);
 
 out:
 	scm_destroy(&scm);
@@ -2250,7 +2251,8 @@ void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err)
 	errmsg = nlmsg_data(rep);
 	errmsg->error = err;
 	memcpy(&errmsg->msg, nlh, payload > sizeof(*errmsg) ? nlh->nlmsg_len : sizeof(*nlh));
-	netlink_unicast(in_skb->sk, skb, NETLINK_CB(in_skb).portid, MSG_DONTWAIT);
+	netlink_unicast(in_skb->sk, skb, NETLINK_CB(in_skb).portid,
+			MSG_DONTWAIT, GFP_KERNEL);
 }
 EXPORT_SYMBOL(netlink_ack);
 

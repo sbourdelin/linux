@@ -116,7 +116,7 @@ static int cn_test_want_notify(void)
 
 	NETLINK_CB(skb).dst_group = ctl->group;
 	//netlink_broadcast(nls, skb, 0, ctl->group, GFP_ATOMIC);
-	netlink_unicast(nls, skb, 0, 0);
+	netlink_unicast(nls, skb, 0, 0, GFP_ATOMIC);
 
 	pr_info("request was sent: group=0x%x\n", ctl->group);
 
