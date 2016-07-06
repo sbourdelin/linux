@@ -142,13 +142,25 @@ static ssize_t i2cdev_read(struct file *file, char __user *buf, size_t count,
 	int ret;
 
 	struct i2c_client *client = file->private_data;
+	struct i2c_adapter *adap;
+
+	adap = i2c_get_adapter(client->adapter_nr);
+	if (!adap)
+		return -ENODEV;
+
+	if (adap != client->adapter) {
+		ret = -EINVAL;
+		goto put_adapter;
+	}
 
 	if (count > 8192)
 		count = 8192;
 
 	tmp = kmalloc(count, GFP_KERNEL);
-	if (tmp == NULL)
-		return -ENOMEM;
+	if (tmp == NULL) {
+		ret = -ENOMEM;
+		goto put_adapter;
+	}
 
 	pr_debug("i2c-dev: i2c-%d reading %zu bytes.\n",
 		iminor(file_inode(file)), count);
@@ -157,6 +169,9 @@ static ssize_t i2cdev_read(struct file *file, char __user *buf, size_t count,
 	if (ret >= 0)
 		ret = copy_to_user(buf, tmp, count) ? -EFAULT : ret;
 	kfree(tmp);
+
+put_adapter:
+	i2c_put_adapter(adap);
 	return ret;
 }
 
@@ -166,19 +181,34 @@ static ssize_t i2cdev_write(struct file *file, const char __user *buf,
 	int ret;
 	char *tmp;
 	struct i2c_client *client = file->private_data;
+	struct i2c_adapter *adap;
+
+	adap = i2c_get_adapter(client->adapter_nr);
+	if (!adap)
+		return -ENODEV;
+
+	if (adap != client->adapter) {
+		ret = -EINVAL;
+		goto put_adapter;
+	}
 
 	if (count > 8192)
 		count = 8192;
 
 	tmp = memdup_user(buf, count);
-	if (IS_ERR(tmp))
-		return PTR_ERR(tmp);
+	if (IS_ERR(tmp)) {
+		ret = PTR_ERR(tmp);
+		goto put_adapter;
+	}
 
 	pr_debug("i2c-dev: i2c-%d writing %zu bytes.\n",
 		iminor(file_inode(file)), count);
 
 	ret = i2c_master_send(client, tmp, count);
 	kfree(tmp);
+
+put_adapter:
+	i2c_put_adapter(adap);
 	return ret;
 }
 
@@ -412,9 +442,9 @@ static noinline int i2cdev_ioctl_smbus(struct i2c_client *client,
 	return res;
 }
 
-static long i2cdev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+static long __i2cdev_ioctl(struct i2c_client *client, unsigned int cmd,
+			   unsigned long arg)
 {
-	struct i2c_client *client = file->private_data;
 	unsigned long funcs;
 
 	dev_dbg(&client->adapter->dev, "ioctl, cmd=0x%02x, arg=0x%02lx\n",
@@ -480,6 +510,28 @@ static long i2cdev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	return 0;
 }
 
+static long i2cdev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	struct i2c_client *client = file->private_data;
+	struct i2c_adapter *adap;
+	unsigned long ret;
+
+	adap = i2c_get_adapter(client->adapter_nr);
+	if (!adap)
+		return -ENODEV;
+
+	if (adap != client->adapter) {
+		ret = -EINVAL;
+		goto put_adapter;
+	}
+
+	ret = __i2cdev_ioctl(client, cmd, arg);
+
+put_adapter:
+	i2c_put_adapter(adap);
+	return ret;
+}
+
 static int i2cdev_open(struct inode *inode, struct file *file)
 {
 	unsigned int minor = iminor(inode);
@@ -504,8 +556,15 @@ static int i2cdev_open(struct inode *inode, struct file *file)
 	}
 	snprintf(client->name, I2C_NAME_SIZE, "i2c-dev %d", adap->nr);
 
+	client->adapter_nr = minor;
 	client->adapter = adap;
 	file->private_data = client;
+
+	/*
+	 * Allow the adapter to unregister while userspace has opened the i2c
+	 * device.
+	 */
+	i2c_put_adapter(client->adapter);
 
 	return 0;
 }
@@ -514,7 +573,6 @@ static int i2cdev_release(struct inode *inode, struct file *file)
 {
 	struct i2c_client *client = file->private_data;
 
-	i2c_put_adapter(client->adapter);
 	kfree(client);
 	file->private_data = NULL;
 
