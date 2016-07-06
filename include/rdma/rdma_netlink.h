@@ -61,10 +61,11 @@ int ibnl_put_attr(struct sk_buff *skb, struct nlmsghdr *nlh,
  * @skb: The netlink skb
  * @nlh: Header of the netlink message to send
  * @pid: Userspace netlink process ID
+ * @flags: allocation flags
  * Returns 0 on success or a negative error code.
  */
 int ibnl_unicast(struct sk_buff *skb, struct nlmsghdr *nlh,
-			__u32 pid);
+			__u32 pid, gfp_t flags);
 
 /**
  * Send the supplied skb to a netlink group.

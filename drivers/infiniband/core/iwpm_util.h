@@ -46,6 +46,7 @@
 #include <linux/jhash.h>
 #include <linux/kref.h>
 #include <net/netlink.h>
+#include <net/sock.h>
 #include <linux/errno.h>
 #include <rdma/iw_portmap.h>
 #include <rdma/rdma_netlink.h>
