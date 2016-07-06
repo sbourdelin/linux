@@ -1917,7 +1917,7 @@ static int inet_netconf_get_devconf(struct sk_buff *in_skb,
 		kfree_skb(skb);
 		goto errout;
 	}
-	err = rtnl_unicast(skb, net, NETLINK_CB(in_skb).portid);
+	err = rtnl_unicast(skb, net, NETLINK_CB(in_skb).portid, GFP_ATOMIC);
 errout:
 	return err;
 }

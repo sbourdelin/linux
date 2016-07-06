@@ -737,7 +737,7 @@ act_get_notify(struct net *net, u32 portid, struct nlmsghdr *n,
 		return -EINVAL;
 	}
 
-	return rtnl_unicast(skb, net, portid);
+	return rtnl_unicast(skb, net, portid, GFP_KERNEL);
 }
 
 static struct tc_action *create_a(int i)

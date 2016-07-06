@@ -654,7 +654,8 @@ static void ipmr_destroy_unres(struct mr_table *mrt, struct mfc_cache *c)
 			e->error = -ETIMEDOUT;
 			memset(&e->msg, 0, sizeof(e->msg));
 
-			rtnl_unicast(skb, net, NETLINK_CB(skb).portid);
+			rtnl_unicast(skb, net, NETLINK_CB(skb).portid,
+				     gfp_any());
 		} else {
 			kfree_skb(skb);
 		}
@@ -933,7 +934,8 @@ static void ipmr_cache_resolve(struct net *net, struct mr_table *mrt,
 				memset(&e->msg, 0, sizeof(e->msg));
 			}
 
-			rtnl_unicast(skb, net, NETLINK_CB(skb).portid);
+			rtnl_unicast(skb, net, NETLINK_CB(skb).portid,
+				     gfp_any());
 		} else {
 			ip_mr_forward(net, mrt, skb, c, 0);
 		}

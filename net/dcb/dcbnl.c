@@ -1749,7 +1749,7 @@ static int dcb_doit(struct sk_buff *skb, struct nlmsghdr *nlh)
 
 	nlmsg_end(reply_skb, reply_nlh);
 
-	ret = rtnl_unicast(reply_skb, net, portid);
+	ret = rtnl_unicast(reply_skb, net, portid, GFP_KERNEL);
 out:
 	return ret;
 }

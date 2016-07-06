@@ -653,11 +653,11 @@ int rtnetlink_send(struct sk_buff *skb, struct net *net, u32 pid, unsigned int g
 	return err;
 }
 
-int rtnl_unicast(struct sk_buff *skb, struct net *net, u32 pid)
+int rtnl_unicast(struct sk_buff *skb, struct net *net, u32 pid, gfp_t flags)
 {
 	struct sock *rtnl = net->rtnl;
 
-	return nlmsg_unicast(rtnl, skb, pid, gfp_any());
+	return nlmsg_unicast(rtnl, skb, pid, flags);
 }
 EXPORT_SYMBOL(rtnl_unicast);
 
@@ -2573,7 +2573,8 @@ static int rtnl_getlink(struct sk_buff *skb, struct nlmsghdr* nlh)
 		WARN_ON(err == -EMSGSIZE);
 		kfree_skb(nskb);
 	} else
-		err = rtnl_unicast(nskb, net, NETLINK_CB(skb).portid);
+		err = rtnl_unicast(nskb, net, NETLINK_CB(skb).portid,
+				   GFP_KERNEL);
 
 	return err;
 }
@@ -3655,7 +3656,8 @@ static int rtnl_stats_get(struct sk_buff *skb, struct nlmsghdr *nlh)
 		WARN_ON(err == -EMSGSIZE);
 		kfree_skb(nskb);
 	} else {
-		err = rtnl_unicast(nskb, net, NETLINK_CB(skb).portid);
+		err = rtnl_unicast(nskb, net, NETLINK_CB(skb).portid,
+				   GFP_KERNEL);
 	}
 
 	return err;

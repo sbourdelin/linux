@@ -646,7 +646,7 @@ static int rtnl_net_getid(struct sk_buff *skb, struct nlmsghdr *nlh)
 	if (err < 0)
 		goto err_out;
 
-	err = rtnl_unicast(msg, net, NETLINK_CB(skb).portid);
+	err = rtnl_unicast(msg, net, NETLINK_CB(skb).portid, GFP_KERNEL);
 	goto out;
 
 err_out:
