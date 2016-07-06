@@ -58,7 +58,7 @@
 
 #define ADV7180_REG_OUTPUT_CONTROL			0x0003
 #define ADV7180_REG_EXTENDED_OUTPUT_CONTROL		0x0004
-#define ADV7180_EXTENDED_OUTPUT_CONTROL_NTSCDIS		0xC5
+#define ADV7180_EXTENDED_OUTPUT_CONTROL_BT656_4		0x80
 
 #define ADV7180_REG_AUTODETECT_ENABLE			0x0007
 #define ADV7180_AUTODETECT_DEFAULT			0x7f
@@ -216,6 +216,7 @@ struct adv7180_state {
 	struct gpio_desc	*pwdn_gpio;
 	v4l2_std_id		curr_norm;
 	bool			autodetect;
+	bool			bt656_4; /* use bt.656-4 standard for NTSC */
 	bool			powered;
 	u8			input;
 
@@ -1281,6 +1282,17 @@ static int init_device(struct adv7180_state *state)
 	if (ret)
 		goto out_unlock;
 
+	if (state->bt656_4) {
+		ret = adv7180_read(state, ADV7180_REG_EXTENDED_OUTPUT_CONTROL);
+		if (ret < 0)
+			goto out_unlock;
+		ret |= ADV7180_EXTENDED_OUTPUT_CONTROL_BT656_4;
+		ret = adv7180_write(state, ADV7180_REG_EXTENDED_OUTPUT_CONTROL,
+				    ret);
+		if (ret < 0)
+			goto out_unlock;
+	}
+
 	ret = adv7180_program_std(state);
 	if (ret)
 		goto out_unlock;
@@ -1331,6 +1343,10 @@ static int adv7180_of_parse(struct adv7180_state *state)
 		v4l_err(client, "request for power pin failed\n");
 		return PTR_ERR(state->pwdn_gpio);
 	}
+
+	/* select ITU-R BT.656-4 compatible? */
+	if (of_property_read_bool(client->dev.of_node, "bt656-4"))
+		state->bt656_4 = true;
 
 	return 0;
 }
