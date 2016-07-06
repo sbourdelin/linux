@@ -85,6 +85,17 @@ const char *intel_uc_fw_status_repr(enum intel_uc_fw_status status)
 	}
 };
 
+u32 guc_wopcm_size(struct drm_i915_private *dev_priv)
+{
+	u32 wopcm_size = GUC_WOPCM_TOP;
+
+	/* On BXT, the top of WOPCM is reserved for RC6 context */
+	if (IS_BROXTON(dev_priv))
+		wopcm_size -= BXT_GUC_WOPCM_RC6_RESERVED;
+
+	return wopcm_size;
+}
+
 static void direct_interrupts_to_host(struct drm_i915_private *dev_priv)
 {
 	struct intel_engine_cs *engine;
@@ -272,7 +283,8 @@ static int guc_ucode_xfer_dma(struct drm_i915_private *dev_priv)
 	I915_WRITE(DMA_ADDR_1_HIGH, DMA_ADDRESS_SPACE_WOPCM);
 
 	/* Finally start the DMA */
-	I915_WRITE(DMA_CTRL, _MASKED_BIT_ENABLE(UOS_MOVE | START_DMA));
+	I915_WRITE(DMA_CTRL, _MASKED_BIT_ENABLE(UOS_MOVE | START_DMA) |
+			_MASKED_BIT_DISABLE(HUC_UKERNEL));
 
 	/*
 	 * Wait for the DMA to complete & the GuC to start up.
@@ -295,17 +307,6 @@ static int guc_ucode_xfer_dma(struct drm_i915_private *dev_priv)
 	DRM_DEBUG_DRIVER("returning %d\n", ret);
 
 	return ret;
-}
-
-static u32 guc_wopcm_size(struct drm_i915_private *dev_priv)
-{
-	u32 wopcm_size = GUC_WOPCM_TOP;
-
-	/* On BXT, the top of WOPCM is reserved for RC6 context */
-	if (IS_BROXTON(dev_priv))
-		wopcm_size -= BXT_GUC_WOPCM_RC6_RESERVED;
-
-	return wopcm_size;
 }
 
 /*
@@ -476,6 +477,7 @@ int intel_guc_setup(struct drm_device *dev)
 			goto fail;
 		}
 
+		intel_huc_load(dev);
 		err = guc_ucode_xfer(dev_priv);
 		if (!err)
 			break;
