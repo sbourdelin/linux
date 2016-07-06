@@ -216,6 +216,7 @@ struct adv7180_state {
 	int			irq;
 	struct gpio_desc	*pwdn_gpio;
 	v4l2_std_id		curr_norm;
+	u32			curr_status; /* lock status */
 	bool			autodetect;
 	bool			bt656_4; /* use bt.656-4 standard for NTSC */
 	bool			powered;
@@ -422,7 +423,12 @@ static int adv7180_g_input_status(struct v4l2_subdev *sd, u32 *status)
 	if (ret)
 		return ret;
 
-	ret = __adv7180_status(state, status, NULL);
+	/* when we are interrupt driven we know the input lock status */
+	if (!state->autodetect || state->irq > 0)
+		*status = state->curr_status;
+	else
+		ret = __adv7180_status(state, status, NULL);
+
 	mutex_unlock(&state->mutex);
 	return ret;
 }
@@ -437,7 +443,7 @@ static int adv7180_program_std(struct adv7180_state *state)
 		if (ret < 0)
 			return ret;
 
-		__adv7180_status(state, NULL, &state->curr_norm);
+		__adv7180_status(state, &state->curr_status, &state->curr_norm);
 	} else {
 		ret = v4l2_std_to_adv7180(state->curr_norm);
 		if (ret < 0)
@@ -872,23 +878,34 @@ static const struct v4l2_subdev_ops adv7180_ops = {
 static irqreturn_t adv7180_irq(int irq, void *devid)
 {
 	struct adv7180_state *state = devid;
-	u8 isr3;
+	u8 isr1, isr3;
 
 	mutex_lock(&state->mutex);
+	isr1 = adv7180_read(state, ADV7180_REG_ISR1);
 	isr3 = adv7180_read(state, ADV7180_REG_ISR3);
 	/* clear */
+	adv7180_write(state, ADV7180_REG_ICR1, isr1);
 	adv7180_write(state, ADV7180_REG_ICR3, isr3);
 
-	if (isr3 & ADV7180_IRQ3_AD_CHANGE) {
-		static const struct v4l2_event src_ch = {
+	if ((isr3 & ADV7180_IRQ3_AD_CHANGE) ||
+	    (isr1 & (ADV7180_IRQ1_LOCK | ADV7180_IRQ1_UNLOCK))) {
+		static struct v4l2_event src_ch = {
 			.type = V4L2_EVENT_SOURCE_CHANGE,
-			.u.src_change.changes = V4L2_EVENT_SRC_CH_RESOLUTION,
 		};
+
+		if (isr3 & ADV7180_IRQ3_AD_CHANGE)
+			src_ch.u.src_change.changes |=
+				V4L2_EVENT_SRC_CH_RESOLUTION;
+
+		if (isr1 & (ADV7180_IRQ1_LOCK | ADV7180_IRQ1_UNLOCK))
+			src_ch.u.src_change.changes |=
+				V4L2_EVENT_SRC_CH_LOCK_STATUS;
 
 		v4l2_subdev_notify_event(&state->sd, &src_ch);
 
 		if (state->autodetect)
-			__adv7180_status(state, NULL, &state->curr_norm);
+			__adv7180_status(state, &state->curr_status,
+					 &state->curr_norm);
 	}
 
 	mutex_unlock(&state->mutex);
@@ -1335,7 +1352,9 @@ static int init_device(struct adv7180_state *state)
 		if (ret < 0)
 			goto out_unlock;
 
-		ret = adv7180_write(state, ADV7180_REG_IMR1, 0);
+		/* enable lock/unlock interrupts */
+		ret = adv7180_write(state, ADV7180_REG_IMR1,
+				    ADV7180_IRQ1_LOCK | ADV7180_IRQ1_UNLOCK);
 		if (ret < 0)
 			goto out_unlock;
 
