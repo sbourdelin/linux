@@ -351,7 +351,8 @@ static int hsr_get_node_status(struct sk_buff *skb_in, struct genl_info *info)
 		goto nla_put_failure;
 
 	genlmsg_end(skb_out, msg_head);
-	genlmsg_unicast(genl_info_net(info), skb_out, info->snd_portid);
+	genlmsg_unicast(genl_info_net(info), skb_out, info->snd_portid,
+			GFP_KERNEL);
 
 	return 0;
 
@@ -433,7 +434,8 @@ static int hsr_get_node_list(struct sk_buff *skb_in, struct genl_info *info)
 	rcu_read_unlock();
 
 	genlmsg_end(skb_out, msg_head);
-	genlmsg_unicast(genl_info_net(info), skb_out, info->snd_portid);
+	genlmsg_unicast(genl_info_net(info), skb_out, info->snd_portid,
+			GFP_KERNEL);
 
 	return 0;
 

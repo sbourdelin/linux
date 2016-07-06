@@ -12648,7 +12648,7 @@ static bool __nl80211_unexpected_frame(struct net_device *dev, u8 cmd,
 		goto nla_put_failure;
 
 	genlmsg_end(msg, hdr);
-	genlmsg_unicast(wiphy_net(&rdev->wiphy), msg, nlportid);
+	genlmsg_unicast(wiphy_net(&rdev->wiphy), msg, nlportid, gfp);
 	return true;
 
  nla_put_failure:
@@ -12733,7 +12733,7 @@ int nl80211_send_mgmt(struct cfg80211_registered_device *rdev,
 
 	genlmsg_end(msg, hdr);
 
-	return genlmsg_unicast(wiphy_net(&rdev->wiphy), msg, nlportid);
+	return genlmsg_unicast(wiphy_net(&rdev->wiphy), msg, nlportid, gfp);
 
  nla_put_failure:
 	genlmsg_cancel(msg, hdr);
@@ -13245,7 +13245,8 @@ void cfg80211_report_obss_beacon(struct wiphy *wiphy,
 
 		genlmsg_end(msg, hdr);
 
-		genlmsg_unicast(wiphy_net(&rdev->wiphy), msg, reg->nlportid);
+		genlmsg_unicast(wiphy_net(&rdev->wiphy), msg, reg->nlportid,
+				GFP_ATOMIC);
 	}
 	spin_unlock_bh(&rdev->beacon_registrations_lock);
 	return;
@@ -13623,7 +13624,7 @@ void cfg80211_crit_proto_stopped(struct wireless_dev *wdev, gfp_t gfp)
 
 	genlmsg_end(msg, hdr);
 
-	genlmsg_unicast(wiphy_net(&rdev->wiphy), msg, nlportid);
+	genlmsg_unicast(wiphy_net(&rdev->wiphy), msg, nlportid, gfp);
 	return;
 
  nla_put_failure:

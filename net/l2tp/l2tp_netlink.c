@@ -100,7 +100,8 @@ static int l2tp_nl_cmd_noop(struct sk_buff *skb, struct genl_info *info)
 
 	genlmsg_end(msg, hdr);
 
-	return genlmsg_unicast(genl_info_net(info), msg, info->snd_portid);
+	return genlmsg_unicast(genl_info_net(info), msg, info->snd_portid,
+			       GFP_KERNEL);
 
 err_out:
 	nlmsg_free(msg);
@@ -450,7 +451,7 @@ static int l2tp_nl_cmd_tunnel_get(struct sk_buff *skb, struct genl_info *info)
 	if (ret < 0)
 		goto err_out;
 
-	return genlmsg_unicast(net, msg, info->snd_portid);
+	return genlmsg_unicast(net, msg, info->snd_portid, GFP_KERNEL);
 
 err_out:
 	nlmsg_free(msg);
@@ -820,7 +821,8 @@ static int l2tp_nl_cmd_session_get(struct sk_buff *skb, struct genl_info *info)
 	if (ret < 0)
 		goto err_out;
 
-	return genlmsg_unicast(genl_info_net(info), msg, info->snd_portid);
+	return genlmsg_unicast(genl_info_net(info), msg, info->snd_portid,
+			       GFP_KERNEL);
 
 err_out:
 	nlmsg_free(msg);

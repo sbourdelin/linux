@@ -1210,7 +1210,7 @@ send:
 	rep_nlh = nlmsg_hdr(msg.rep);
 	memcpy(rep_nlh, info->nlhdr, len);
 	rep_nlh->nlmsg_len = msg.rep->len;
-	genlmsg_unicast(msg.net, msg.rep, NETLINK_CB(skb).portid);
+	genlmsg_unicast(msg.net, msg.rep, NETLINK_CB(skb).portid, GFP_KERNEL);
 
 	return err;
 }

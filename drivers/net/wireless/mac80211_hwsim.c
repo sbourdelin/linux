@@ -1008,7 +1008,7 @@ static int hwsim_unicast_netgroup(struct mac80211_hwsim_data *data,
 	rcu_read_lock();
 	for_each_net_rcu(net) {
 		if (data->netgroup == hwsim_net_get_netgroup(net)) {
-			res = genlmsg_unicast(net, skb, portid);
+			res = genlmsg_unicast(net, skb, portid, GFP_ATOMIC);
 			found = true;
 			break;
 		}

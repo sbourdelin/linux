@@ -1210,7 +1210,8 @@ static int gtp_genl_get_pdp(struct sk_buff *skb, struct genl_info *info)
 		goto err_unlock_free;
 
 	rcu_read_unlock();
-	return genlmsg_unicast(genl_info_net(info), skb2, info->snd_portid);
+	return genlmsg_unicast(genl_info_net(info), skb2, info->snd_portid,
+			       GFP_ATOMIC);
 
 err_unlock_free:
 	kfree_skb(skb2);

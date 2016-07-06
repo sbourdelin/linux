@@ -2194,7 +2194,8 @@ static int team_nl_cmd_noop(struct sk_buff *skb, struct genl_info *info)
 
 	genlmsg_end(msg, hdr);
 
-	return genlmsg_unicast(genl_info_net(info), msg, info->snd_portid);
+	return genlmsg_unicast(genl_info_net(info), msg, info->snd_portid,
+			       GFP_KERNEL);
 
 err_msg_put:
 	nlmsg_free(msg);
@@ -2240,7 +2241,7 @@ typedef int team_nl_send_func_t(struct sk_buff *skb,
 
 static int team_nl_send_unicast(struct sk_buff *skb, struct team *team, u32 portid)
 {
-	return genlmsg_unicast(dev_net(team->dev), skb, portid);
+	return genlmsg_unicast(dev_net(team->dev), skb, portid, gfp_any());
 }
 
 static int team_nl_fill_one_option_get(struct sk_buff *skb, struct team *team,

@@ -331,10 +331,12 @@ int genlmsg_multicast_allns(struct genl_family *family,
  * genlmsg_unicast - unicast a netlink message
  * @skb: netlink message as socket buffer
  * @portid: netlink portid of the destination socket
+ * @flags: allocation flags
  */
-static inline int genlmsg_unicast(struct net *net, struct sk_buff *skb, u32 portid)
+static inline int genlmsg_unicast(struct net *net, struct sk_buff *skb,
+				  u32 portid, gfp_t flags)
 {
-	return nlmsg_unicast(net->genl_sock, skb, portid, 0);
+	return nlmsg_unicast(net->genl_sock, skb, portid, flags);
 }
 
 /**
@@ -344,7 +346,7 @@ static inline int genlmsg_unicast(struct net *net, struct sk_buff *skb, u32 port
  */
 static inline int genlmsg_reply(struct sk_buff *skb, struct genl_info *info)
 {
-	return genlmsg_unicast(genl_info_net(info), skb, info->snd_portid);
+	return genlmsg_unicast(genl_info_net(info), skb, info->snd_portid, 0);
 }
 
 /**

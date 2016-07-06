@@ -140,7 +140,7 @@ static void send_cpu_listeners(struct sk_buff *skb,
 			if (!skb_next)
 				break;
 		}
-		rc = genlmsg_unicast(&init_net, skb_cur, s->pid);
+		rc = genlmsg_unicast(&init_net, skb_cur, s->pid, GFP_KERNEL);
 		if (rc == -ECONNREFUSED) {
 			s->valid = 0;
 			delcount++;

@@ -59,7 +59,7 @@ static int send_data(struct sk_buff *skb)
 
 	genlmsg_end(skb, data);
 
-	return genlmsg_unicast(&init_net, skb, listener_nlportid);
+	return genlmsg_unicast(&init_net, skb, listener_nlportid, GFP_NOFS);
 }
 
 static int user_cmd(struct sk_buff *skb, struct genl_info *info)
