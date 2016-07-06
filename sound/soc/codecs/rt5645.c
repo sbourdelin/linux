@@ -808,6 +808,10 @@ static const struct snd_kcontrol_new rt5645_snd_controls[] = {
 	SOC_SINGLE("I2S2 Func Switch", RT5645_GPIO_CTRL1, RT5645_I2S2_SEL_SFT,
 		1, 1),
 	RT5645_HWEQ("Speaker HWEQ"),
+
+	/* Digiatl Soft Volume Control */
+	SOC_SINGLE("DAC1 Digital Volume Control Func",
+		RT5645_PR_BASE, RT5645_DA1_ZDET_SFT, 3, 0),
 };
 
 /**
