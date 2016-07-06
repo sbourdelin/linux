@@ -869,10 +869,22 @@ static struct platform_driver st_fdma_platform_driver = {
 		.name = "st-fdma",
 		.of_match_table = st_fdma_match,
 	},
-	.probe = st_fdma_probe,
-	.remove = st_fdma_remove,
 };
-module_platform_driver(st_fdma_platform_driver);
+
+static int __init fdma_init(void)
+{
+	return platform_driver_probe(&st_fdma_platform_driver, st_fdma_probe);
+}
+
+static void __exit fdma_exit(void)
+{
+	platform_driver_unregister(&st_fdma_platform_driver);
+}
+
+/* attempt to load late, helps when built-in */
+
+late_initcall_sync(fdma_init);
+module_exit(fdma_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("STMicroelectronics FDMA engine driver");
