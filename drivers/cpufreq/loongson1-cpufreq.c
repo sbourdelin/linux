@@ -162,18 +162,18 @@ static int ls1x_cpufreq_probe(struct platform_device *pdev)
 	cpufreq->clk = clk;
 
 	clk = clk_get_parent(clk);
-	if (IS_ERR(clk)) {
+	if (!clk) {
 		dev_err(&pdev->dev, "unable to get parent of %s clock\n",
 			__clk_get_name(cpufreq->clk));
-		return PTR_ERR(clk);
+		return -ENODEV;
 	}
 	cpufreq->mux_clk = clk;
 
 	clk = clk_get_parent(clk);
-	if (IS_ERR(clk)) {
+	if (!clk) {
 		dev_err(&pdev->dev, "unable to get parent of %s clock\n",
 			__clk_get_name(cpufreq->mux_clk));
-		return PTR_ERR(clk);
+		return -ENODEV;
 	}
 	cpufreq->pll_clk = clk;
 
