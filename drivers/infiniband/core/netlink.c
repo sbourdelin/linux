@@ -229,7 +229,7 @@ static void ibnl_rcv(struct sk_buff *skb)
 int ibnl_unicast(struct sk_buff *skb, struct nlmsghdr *nlh,
 			__u32 pid)
 {
-	return nlmsg_unicast(nls, skb, pid);
+	return nlmsg_unicast(nls, skb, pid, gfp_any());
 }
 EXPORT_SYMBOL(ibnl_unicast);
 

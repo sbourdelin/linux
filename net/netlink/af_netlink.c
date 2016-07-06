@@ -2328,7 +2328,7 @@ int nlmsg_notify(struct sock *sk, struct sk_buff *skb, u32 portid,
 	if (report) {
 		int err2;
 
-		err2 = nlmsg_unicast(sk, skb, portid);
+		err2 = nlmsg_unicast(sk, skb, portid, flags);
 		if (!err || err == -ESRCH)
 			err = err2;
 	}

@@ -269,7 +269,8 @@ drop_alg:
 	if (err)
 		return err;
 
-	return nlmsg_unicast(crypto_nlsk, skb, NETLINK_CB(in_skb).portid);
+	return nlmsg_unicast(crypto_nlsk, skb, NETLINK_CB(in_skb).portid,
+			     GFP_ATOMIC);
 }
 
 static int crypto_dump_report(struct sk_buff *skb, struct netlink_callback *cb)

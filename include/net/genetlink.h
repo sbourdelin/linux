@@ -334,7 +334,7 @@ int genlmsg_multicast_allns(struct genl_family *family,
  */
 static inline int genlmsg_unicast(struct net *net, struct sk_buff *skb, u32 portid)
 {
-	return nlmsg_unicast(net->genl_sock, skb, portid);
+	return nlmsg_unicast(net->genl_sock, skb, portid, 0);
 }
 
 /**

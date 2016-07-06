@@ -585,12 +585,14 @@ static inline int nlmsg_multicast(struct sock *sk, struct sk_buff *skb,
  * @sk: netlink socket to spread message to
  * @skb: netlink message as socket buffer
  * @portid: netlink portid of the destination socket
+ * @flags: allocation flags
  */
-static inline int nlmsg_unicast(struct sock *sk, struct sk_buff *skb, u32 portid)
+static inline int nlmsg_unicast(struct sock *sk, struct sk_buff *skb,
+				u32 portid, gfp_t flags)
 {
 	int err;
 
-	err = netlink_unicast(sk, skb, portid, MSG_DONTWAIT, 0);
+	err = netlink_unicast(sk, skb, portid, MSG_DONTWAIT, flags);
 	if (err > 0)
 		err = 0;
 

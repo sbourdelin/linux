@@ -581,7 +581,7 @@ static int nf_tables_gettable(struct net *net, struct sock *nlsk,
 	if (err < 0)
 		goto err;
 
-	return nlmsg_unicast(nlsk, skb2, NETLINK_CB(skb).portid);
+	return nlmsg_unicast(nlsk, skb2, NETLINK_CB(skb).portid, GFP_KERNEL);
 
 err:
 	kfree_skb(skb2);
@@ -1144,7 +1144,7 @@ static int nf_tables_getchain(struct net *net, struct sock *nlsk,
 	if (err < 0)
 		goto err;
 
-	return nlmsg_unicast(nlsk, skb2, NETLINK_CB(skb).portid);
+	return nlmsg_unicast(nlsk, skb2, NETLINK_CB(skb).portid, GFP_KERNEL);
 
 err:
 	kfree_skb(skb2);
@@ -1976,7 +1976,7 @@ static int nf_tables_getrule(struct net *net, struct sock *nlsk,
 	if (err < 0)
 		goto err;
 
-	return nlmsg_unicast(nlsk, skb2, NETLINK_CB(skb).portid);
+	return nlmsg_unicast(nlsk, skb2, NETLINK_CB(skb).portid, GFP_KERNEL);
 
 err:
 	kfree_skb(skb2);
@@ -2664,7 +2664,7 @@ static int nf_tables_getset(struct net *net, struct sock *nlsk,
 	if (err < 0)
 		goto err;
 
-	return nlmsg_unicast(nlsk, skb2, NETLINK_CB(skb).portid);
+	return nlmsg_unicast(nlsk, skb2, NETLINK_CB(skb).portid, GFP_KERNEL);
 
 err:
 	kfree_skb(skb2);
@@ -3798,7 +3798,7 @@ static int nf_tables_getgen(struct net *net, struct sock *nlsk,
 	if (err < 0)
 		goto err;
 
-	return nlmsg_unicast(nlsk, skb2, NETLINK_CB(skb).portid);
+	return nlmsg_unicast(nlsk, skb2, NETLINK_CB(skb).portid, GFP_KERNEL);
 err:
 	kfree_skb(skb2);
 	return err;
