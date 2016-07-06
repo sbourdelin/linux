@@ -743,10 +743,17 @@ static int adv7180_set_pad_format(struct v4l2_subdev *sd,
 	switch (format->format.field) {
 	case V4L2_FIELD_NONE:
 		if (!(state->chip_info->flags & ADV7180_FLAG_I2P))
-			format->format.field = V4L2_FIELD_INTERLACED;
+			format->format.field =
+				(state->curr_norm & V4L2_STD_525_60) ?
+				V4L2_FIELD_SEQ_TB : V4L2_FIELD_SEQ_BT;
 		break;
 	default:
-		format->format.field = V4L2_FIELD_INTERLACED;
+		if (state->chip_info->flags & ADV7180_FLAG_I2P)
+			format->format.field = V4L2_FIELD_INTERLACED;
+		else
+			format->format.field =
+				(state->curr_norm & V4L2_STD_525_60) ?
+				V4L2_FIELD_SEQ_TB : V4L2_FIELD_SEQ_BT;
 		break;
 	}
 
@@ -1416,8 +1423,13 @@ static int adv7180_probe(struct i2c_client *client,
 		return -ENOMEM;
 
 	state->client = client;
-	state->field = V4L2_FIELD_INTERLACED;
 	state->chip_info = (struct adv7180_chip_info *)id->driver_data;
+
+	if (state->chip_info->flags & ADV7180_FLAG_I2P)
+		state->field = V4L2_FIELD_INTERLACED;
+	else
+		state->field = (state->curr_norm & V4L2_STD_525_60) ?
+			V4L2_FIELD_SEQ_TB : V4L2_FIELD_SEQ_BT;
 
 	ret = adv7180_of_parse(state);
 	if (ret)
