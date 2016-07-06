@@ -3473,7 +3473,6 @@ again:
 		dcs = BTRFS_DC_SETUP;
 	else if (ret == -ENOSPC)
 		set_bit(BTRFS_TRANS_CACHE_ENOSPC, &trans->transaction->flags);
-	btrfs_free_reserved_data_space(inode, 0, num_pages);
 
 out_put:
 	iput(inode);

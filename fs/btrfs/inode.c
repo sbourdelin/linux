@@ -10247,6 +10247,7 @@ static int __btrfs_prealloc_file_range(struct inode *inode, int mode,
 	u64 last_alloc = (u64)-1;
 	int ret = 0;
 	bool own_trans = true;
+	u64 end = start + num_bytes - 1;
 
 	if (trans)
 		own_trans = false;
@@ -10325,6 +10326,7 @@ static int __btrfs_prealloc_file_range(struct inode *inode, int mode,
 		}
 		free_extent_map(em);
 next:
+		btrfs_free_reserved_data_space(inode, cur_offset, ins.offset);
 		num_bytes -= ins.offset;
 		cur_offset += ins.offset;
 		*alloc_hint = ins.objectid + ins.offset;
@@ -10355,9 +10357,18 @@ next:
 		if (own_trans)
 			btrfs_end_transaction(trans, root);
 	}
+
+	if (cur_offset < end)
+		btrfs_free_reserved_data_space(inode, cur_offset,
+			end - cur_offset + 1);
 	return ret;
 }
 
+/*
+ * __btrfs_prealloc_file_range() will call btrfs_free_reserved_data_space()
+ * internally for both sucessful and failed path, btrfs_prealloc_file_range()'s
+ * callers does not need to call btrfs_free_reserved_data_space() any more.
+ */
 int btrfs_prealloc_file_range(struct inode *inode, int mode,
 			      u64 start, u64 num_bytes, u64 min_size,
 			      loff_t actual_len, u64 *alloc_hint)
@@ -10367,6 +10378,7 @@ int btrfs_prealloc_file_range(struct inode *inode, int mode,
 					   NULL);
 }
 
+/* Please see same comments in btrfs_prealloc_file_range() */
 int btrfs_prealloc_file_range_trans(struct inode *inode,
 				    struct btrfs_trans_handle *trans, int mode,
 				    u64 start, u64 num_bytes, u64 min_size,
