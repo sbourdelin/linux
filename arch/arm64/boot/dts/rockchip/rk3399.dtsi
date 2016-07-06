@@ -101,6 +101,18 @@
 			};
 		};
 
+		idle-states {
+			entry-method = "psci";
+			cpu_sleep: cpu-sleep-0 {
+				compatible = "arm,idle-state";
+				local-timer-stop;
+				arm,psci-suspend-param = <0x0010000>;
+				entry-latency-us = <350>;
+				exit-latency-us = <600>;
+				min-residency-us = <1150>;
+			};
+		};
+
 		cpu_l0: cpu@0 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a53", "arm,armv8";
@@ -108,6 +120,7 @@
 			enable-method = "psci";
 			#cooling-cells = <2>; /* min followed by max */
 			clocks = <&cru ARMCLKL>;
+			cpu-idle-states = <&cpu_sleep>;
 		};
 
 		cpu_l1: cpu@1 {
@@ -116,6 +129,7 @@
 			reg = <0x0 0x1>;
 			enable-method = "psci";
 			clocks = <&cru ARMCLKL>;
+			cpu-idle-states = <&cpu_sleep>;
 		};
 
 		cpu_l2: cpu@2 {
@@ -124,6 +138,7 @@
 			reg = <0x0 0x2>;
 			enable-method = "psci";
 			clocks = <&cru ARMCLKL>;
+			cpu-idle-states = <&cpu_sleep>;
 		};
 
 		cpu_l3: cpu@3 {
@@ -132,6 +147,7 @@
 			reg = <0x0 0x3>;
 			enable-method = "psci";
 			clocks = <&cru ARMCLKL>;
+			cpu-idle-states = <&cpu_sleep>;
 		};
 
 		cpu_b0: cpu@100 {
@@ -141,6 +157,7 @@
 			enable-method = "psci";
 			#cooling-cells = <2>; /* min followed by max */
 			clocks = <&cru ARMCLKB>;
+			cpu-idle-states = <&cpu_sleep>;
 		};
 
 		cpu_b1: cpu@101 {
@@ -149,6 +166,7 @@
 			reg = <0x0 0x101>;
 			enable-method = "psci";
 			clocks = <&cru ARMCLKB>;
+			cpu-idle-states = <&cpu_sleep>;
 		};
 	};
 
