@@ -256,7 +256,13 @@ static int __cmd_annotate(struct perf_annotate *ann)
 	}
 
 	if (total_nr_samples == 0) {
-		ui__error("The %s file has no samples!\n", session->file->path);
+		if (ann->sym_hist_filter) {
+			ui__error("The %s symbol has no samples!\n",
+				  ann->sym_hist_filter);
+		} else {
+			ui__error("The %s file has no samples!\n",
+				  session->file->path);
+		}
 		goto out;
 	}
 
