@@ -14,6 +14,7 @@
  *  GNU General Public License for more details.
  */
 
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/platform_device.h>
@@ -3355,4 +3356,5 @@ static struct platform_driver udc_driver = {
 	},
 };
 
-builtin_platform_driver(udc_driver);
+module_platform_driver(udc_driver);
+MODULE_LICENSE("GPL");
