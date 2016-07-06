@@ -141,9 +141,9 @@ int nfnetlink_set_err(struct net *net, u32 portid, u32 group, int error)
 EXPORT_SYMBOL_GPL(nfnetlink_set_err);
 
 int nfnetlink_unicast(struct sk_buff *skb, struct net *net, u32 portid,
-		      int flags)
+		      int flags, gfp_t allocation)
 {
-	return netlink_unicast(net->nfnl, skb, portid, flags, 0);
+	return netlink_unicast(net->nfnl, skb, portid, flags, allocation);
 }
 EXPORT_SYMBOL_GPL(nfnetlink_unicast);
 
