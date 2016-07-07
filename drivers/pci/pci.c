@@ -2180,7 +2180,7 @@ void pci_config_pm_runtime_put(struct pci_dev *pdev)
  * This function checks if it is possible to move the bridge to D3.
  * Currently we only allow D3 for recent enough PCIe ports.
  */
-static bool pci_bridge_d3_possible(struct pci_dev *bridge)
+bool pci_bridge_d3_possible(struct pci_dev *bridge)
 {
 	unsigned int year;
 
@@ -2209,6 +2209,7 @@ static bool pci_bridge_d3_possible(struct pci_dev *bridge)
 
 	return false;
 }
+EXPORT_SYMBOL_GPL(pci_bridge_d3_possible);
 
 static int pci_dev_check_d3cold(struct pci_dev *dev, void *data)
 {
