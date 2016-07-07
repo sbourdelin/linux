@@ -133,6 +133,9 @@ static inline void imcr_apic_to_pic(void)
 }
 #endif
 
+/* Local APIC is disabled by the kernel for crash or reboot path */
+static int disabled_local_apic;
+
 /*
  * Knob to control our willingness to enable the local APIC.
  *
@@ -1097,8 +1100,14 @@ void lapic_shutdown(void)
 #endif
 		disable_local_APIC();
 
+	disabled_local_apic = 1;
 
 	local_irq_restore(flags);
+}
+
+int lapic_disabled(void)
+{
+	return disabled_local_apic;
 }
 
 /**
