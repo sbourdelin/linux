@@ -43,6 +43,33 @@
 #include <sys/mman.h>
 #include <asm/bug.h>
 
+/*
+ * State machine of overwrite_evt_state:
+ *
+ *                   .________________(forbid)_____________.
+ *                   |                                     V
+ * NOTREADY -(0)-> RUNNING --(1)--> DATA_PENDING --(2)--> EMPTY
+ *                   ^  ^              |   ^               |
+ *                   |  |__(forbid)____/   |___(forbid)___/|
+ *                   |                                     |
+ *                    \_________________(3)_______________/
+ *
+ * NOTREADY     : Overwritable evlist is not ready
+ * RUNNING      : Overwritable ring buffers are recording
+ * DATA_PENDING : We are required to collect overwritable ring buffers
+ * EMPTY        : We have collected data from those ring buffers.
+ *
+ * (0): Create overwritable evlist
+ * (1): Pause ring buffers for reading
+ * (2): Read from ring buffers
+ * (3): Resume ring buffers for recording
+ */
+enum overwrite_evt_state {
+	OVERWRITE_EVT_NOTREADY,
+	OVERWRITE_EVT_RUNNING,
+	OVERWRITE_EVT_DATA_PENDING,
+	OVERWRITE_EVT_EMPTY,
+};
 
 struct record {
 	struct perf_tool	tool;
@@ -62,6 +89,7 @@ struct record {
 	bool			buildid_all;
 	bool			timestamp_filename;
 	bool			switch_output;
+	enum overwrite_evt_state overwrite_evt_state;
 	unsigned long long	samples;
 };
 
@@ -343,6 +371,96 @@ int auxtrace_record__snapshot_start(struct auxtrace_record *itr __maybe_unused)
 
 #endif
 
+static void
+record__toggle_overwrite_evlist(struct record *rec,
+				enum overwrite_evt_state state)
+{
+	struct perf_evlist *evlist = rec->overwrite_evlist;
+	enum overwrite_evt_state old_state = rec->overwrite_evt_state;
+	enum action {
+		NONE,
+		PAUSE,
+		RESUME,
+	} action = NONE;
+
+	if (!evlist)
+		return;
+
+	switch (old_state) {
+	case OVERWRITE_EVT_RUNNING: {
+		switch (state) {
+		case OVERWRITE_EVT_DATA_PENDING:
+			action = PAUSE;
+			break;
+		case OVERWRITE_EVT_RUNNING:
+		case OVERWRITE_EVT_EMPTY:
+		case OVERWRITE_EVT_NOTREADY:
+		default:
+			goto state_err;
+		}
+		break;
+	}
+	case OVERWRITE_EVT_DATA_PENDING: {
+		switch (state) {
+		case OVERWRITE_EVT_EMPTY:
+			break;
+		case OVERWRITE_EVT_RUNNING:
+		case OVERWRITE_EVT_DATA_PENDING:
+		case OVERWRITE_EVT_NOTREADY:
+		default:
+			goto state_err;
+		}
+		break;
+	}
+	case OVERWRITE_EVT_EMPTY: {
+		switch (state) {
+		case OVERWRITE_EVT_RUNNING:
+			action = RESUME;
+			break;
+		case OVERWRITE_EVT_EMPTY:
+		case OVERWRITE_EVT_DATA_PENDING:
+		case OVERWRITE_EVT_NOTREADY:
+		default:
+			goto state_err;
+		}
+		break;
+	}
+	case OVERWRITE_EVT_NOTREADY: {
+		switch (state) {
+		case OVERWRITE_EVT_RUNNING:
+			if (rec->overwrite_evlist)
+				break;
+			/* Fall through */
+		case OVERWRITE_EVT_DATA_PENDING:
+		case OVERWRITE_EVT_EMPTY:
+		case OVERWRITE_EVT_NOTREADY:
+		default:
+			goto state_err;
+		}
+		break;
+	}
+	default:
+		WARN_ONCE(1, "Shouldn't get there\n");
+	}
+
+	rec->overwrite_evt_state = state;
+
+	switch (action) {
+	case PAUSE:
+		perf_evlist__pause(evlist);
+		break;
+	case RESUME:
+		perf_evlist__resume(evlist);
+		break;
+	case NONE:
+	default:
+		break;
+	}
+
+state_err:
+	return;
+}
+
 static int record__create_overwrite_evlist(struct record *rec)
 {
 	struct perf_evlist *evlist = rec->evlist;
@@ -357,6 +475,7 @@ static int record__create_overwrite_evlist(struct record *rec)
 			if (rec->overwrite_evlist) {
 				rec->overwrite_evlist->backward = true;
 				rec->overwrite_evlist->overwrite = true;
+				record__toggle_overwrite_evlist(rec, OVERWRITE_EVT_RUNNING);
 				return 0;
 			} else
 				return -ENOMEM;
@@ -463,6 +582,7 @@ try_again:
 
 	session->evlist = evlist;
 	perf_session__set_id_hdr_size(session);
+	rec->overwrite_evt_state = OVERWRITE_EVT_NOTREADY;
 out:
 	return rc;
 }
@@ -588,7 +708,13 @@ static int record__mmap_read_all(struct record *rec)
 	if (err)
 		return err;
 
-	return err;
+	if (rec->overwrite_evt_state == OVERWRITE_EVT_DATA_PENDING) {
+		err = record__mmap_read_evlist(rec, rec->overwrite_evlist);
+		if (err)
+			return err;
+		record__toggle_overwrite_evlist(rec, OVERWRITE_EVT_EMPTY);
+	}
+	return 0;
 }
 
 static void record__init_features(struct record *rec)
@@ -987,6 +1113,17 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 	for (;;) {
 		unsigned long long hits = rec->samples;
 
+		/*
+		 * rec->overwrite_evt_state is possible to be
+		 * OVERWRITE_EVT_EMPTY here: when done == true and
+		 * hits != rec->samples in previous round.
+		 *
+		 * record__toggle_overwrite_evlist ensure we never
+		 * convert OVERWRITE_EVT_EMPTY to OVERWRITE_EVT_DATA_PENDING.
+		 */
+		if (trigger_is_hit(&switch_output_trigger) || done || draining)
+			record__toggle_overwrite_evlist(rec, OVERWRITE_EVT_DATA_PENDING);
+
 		if (record__mmap_read_all(rec) < 0) {
 			trigger_error(&auxtrace_snapshot_trigger);
 			trigger_error(&switch_output_trigger);
@@ -1006,7 +1143,26 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 		}
 
 		if (trigger_is_hit(&switch_output_trigger)) {
+			/*
+			 * If switch_output_trigger is hit, the data in
+			 * overwritable ring buffer should have been collected,
+			 * so overwrite_evt_state should be set to
+			 * OVERWRITE_EVT_EMPTY.
+			 *
+			 * If SIGUSR2 raise after or during record__mmap_read_all(),
+			 * record__mmap_read_all() didn't collect data from
+			 * overwritable ring buffer. Read again.
+			 */
+			if (rec->overwrite_evt_state == OVERWRITE_EVT_RUNNING)
+				continue;
 			trigger_ready(&switch_output_trigger);
+
+			/*
+			 * Reenable events in overwrite ring buffer after
+			 * record__mmap_read_all(): we should have collected
+			 * data from it.
+			 */
+			record__toggle_overwrite_evlist(rec, OVERWRITE_EVT_RUNNING);
 
 			if (!quiet)
 				fprintf(stderr, "[ perf record: dump data: Woken up %ld times ]\n",
