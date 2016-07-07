@@ -1479,6 +1479,7 @@ static inline void cec_ops_report_short_audio_descriptor(const struct cec_msg *m
 
 static inline void cec_msg_request_short_audio_descriptor(struct cec_msg *msg,
 					__u8 num_descriptors,
+					bool reply,
 					const __u8 *audio_format_id,
 					const __u8 *audio_format_code)
 {
@@ -1488,6 +1489,7 @@ static inline void cec_msg_request_short_audio_descriptor(struct cec_msg *msg,
 		num_descriptors = 4;
 	msg->len = 2 + num_descriptors;
 	msg->msg[1] = CEC_MSG_REQUEST_SHORT_AUDIO_DESCRIPTOR;
+	msg->reply = reply ? CEC_MSG_REPORT_SHORT_AUDIO_DESCRIPTOR : 0;
 	for (i = 0; i < num_descriptors; i++)
 		msg->msg[2 + i] = (audio_format_id[i] << 6) |
 				  (audio_format_code[i] & 0x3f);
