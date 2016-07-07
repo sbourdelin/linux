@@ -2271,6 +2271,10 @@ extern ext4_grpblk_t ext4_block_group_offset(struct super_block *sb,
 extern int ext4_bg_has_super(struct super_block *sb, ext4_group_t group);
 extern unsigned long ext4_bg_num_gdb(struct super_block *sb,
 			ext4_group_t group);
+extern unsigned ext4_num_base_meta_clusters(struct super_block *sb,
+					    ext4_group_t block_group);
+extern unsigned int ext4_num_clusters_in_group(struct super_block *sb,
+					       ext4_group_t block_group);
 extern ext4_fsblk_t ext4_new_meta_blocks(handle_t *handle, struct inode *inode,
 					 ext4_fsblk_t goal,
 					 unsigned int flags,

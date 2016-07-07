@@ -3642,6 +3642,25 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 		goto failed_mount;
 	}
 	sbi->s_groups_count = blocks_count;
+
+	for (i = 0; i < sbi->s_groups_count; ++i) {
+		int bit_max;
+
+		bit_max = ext4_num_base_meta_clusters(sb, i);
+		if ((bit_max >> 3) >= sb->s_blocksize) {
+			ext4_msg(sb, KERN_WARNING, "meta cluster base for "
+				"group %u exceeds block size", i);
+			goto failed_mount;
+		}
+
+		bit_max = ext4_num_clusters_in_group(sb, i);
+		if ((bit_max >> 3) >= sb->s_blocksize) {
+			ext4_msg(sb, KERN_WARNING, "clusters in "
+				"group %u exceeds block size", i);
+			goto failed_mount;
+		}
+	}
+
 	sbi->s_blockfile_groups = min_t(ext4_group_t, sbi->s_groups_count,
 			(EXT4_MAX_BLOCK_FILE_PHYS / EXT4_BLOCKS_PER_GROUP(sb)));
 	db_count = (sbi->s_groups_count + EXT4_DESC_PER_BLOCK(sb) - 1) /
