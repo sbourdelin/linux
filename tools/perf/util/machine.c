@@ -1093,12 +1093,18 @@ static int machine__set_modules_path(struct machine *machine)
 
 	return map_groups__set_modules_path_dir(&machine->kmaps, modules_path, 0);
 }
+int __weak arch__fix_module_baseaddr(struct machine *machine __maybe_unused,
+				u64 *start __maybe_unused, const char *name __maybe_unused)
+{
+	return 0;
+}
 
 static int machine__create_module(void *arg, const char *name, u64 start)
 {
 	struct machine *machine = arg;
 	struct map *map;
 
+	arch__fix_module_baseaddr(machine, &start, name);
 	map = machine__findnew_module_map(machine, start, name);
 	if (map == NULL)
 		return -1;
