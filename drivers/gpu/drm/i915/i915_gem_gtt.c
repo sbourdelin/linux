@@ -2125,6 +2125,7 @@ static void i915_address_space_init(struct i915_address_space *vm,
 	vm->dev = &dev_priv->drm;
 	INIT_LIST_HEAD(&vm->active_list);
 	INIT_LIST_HEAD(&vm->inactive_list);
+	INIT_LIST_HEAD(&vm->unbound_list);
 	list_add_tail(&vm->global_link, &dev_priv->vm_list);
 }
 
@@ -2217,9 +2218,10 @@ void  i915_ppgtt_release(struct kref *kref)
 
 	trace_i915_ppgtt_release(&ppgtt->base);
 
-	/* vmas should already be unbound */
+	/* vmas should already be unbound and destroyed */
 	WARN_ON(!list_empty(&ppgtt->base.active_list));
 	WARN_ON(!list_empty(&ppgtt->base.inactive_list));
+	WARN_ON(!list_empty(&ppgtt->base.unbound_list));
 
 	list_del(&ppgtt->base.global_link);
 	drm_mm_takedown(&ppgtt->base.mm);
@@ -3375,6 +3377,8 @@ __i915_gem_vma_create(struct drm_i915_gem_object *obj,
 	struct i915_vma *vma;
 	int i;
 
+	GEM_BUG_ON(vm->closed);
+
 	if (WARN_ON(i915_is_ggtt(vm) != !!ggtt_view))
 		return ERR_PTR(-EINVAL);
 
@@ -3382,11 +3386,11 @@ __i915_gem_vma_create(struct drm_i915_gem_object *obj,
 	if (vma == NULL)
 		return ERR_PTR(-ENOMEM);
 
-	INIT_LIST_HEAD(&vma->vm_link);
 	INIT_LIST_HEAD(&vma->obj_link);
 	INIT_LIST_HEAD(&vma->exec_list);
 	for (i = 0; i < ARRAY_SIZE(vma->last_read); i++)
 		init_request_active(&vma->last_read[i], i915_vma_retire);
+	list_add(&vma->vm_link, &vm->unbound_list);
 	vma->vm = vm;
 	vma->obj = obj;
 	vma->is_ggtt = i915_is_ggtt(vm);
@@ -3427,6 +3431,7 @@ i915_gem_obj_lookup_or_create_ggtt_vma(struct drm_i915_gem_object *obj,
 	if (!vma)
 		vma = __i915_gem_vma_create(obj, &ggtt->base, view);
 
+	GEM_BUG_ON(vma->closed);
 	return vma;
 
 }
