@@ -260,7 +260,7 @@ int i915_gem_render_state_init(struct drm_i915_gem_request *req)
 			goto out;
 	}
 
-	i915_vma_move_to_active(i915_gem_obj_to_ggtt(so.obj), req);
+	i915_vma_move_to_active(i915_gem_obj_to_ggtt(so.obj), req, 0);
 out:
 	render_state_fini(&so);
 	return ret;
