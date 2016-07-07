@@ -328,7 +328,7 @@ static int f_midi_start_ep(struct f_midi *midi,
 static int f_midi_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 {
 	struct f_midi *midi = func_to_midi(f);
-	unsigned i;
+	unsigned i, length;
 	int err;
 
 	/* we only set alt for MIDIStreaming interface */
@@ -345,9 +345,11 @@ static int f_midi_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 
 	/* pre-allocate write usb requests to use on f_midi_transmit. */
 	while (kfifo_avail(&midi->in_req_fifo)) {
-		struct usb_request *req =
-			midi_alloc_ep_req(midi->in_ep, midi->buflen);
+		struct usb_request *req;
 
+		length = usb_ep_align_maybe(midi->gadget, midi->in_ep,
+					    midi->buflen);
+		req = midi_alloc_ep_req(midi->in_ep, length);
 		if (req == NULL)
 			return -ENOMEM;
 
@@ -359,10 +361,12 @@ static int f_midi_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 
 	/* allocate a bunch of read buffers and queue them all at once. */
 	for (i = 0; i < midi->qlen && err == 0; i++) {
-		struct usb_request *req =
-			midi_alloc_ep_req(midi->out_ep,
-				max_t(unsigned, midi->buflen,
-					bulk_out_desc.wMaxPacketSize));
+		struct usb_request *req;
+
+		length = usb_ep_align_maybe(midi->gadget, midi->out_ep,
+					    midi->buflen);
+		req = midi_alloc_ep_req(midi->out_ep,
+			max_t(unsigned, length, bulk_out_desc.wMaxPacketSize));
 		if (req == NULL)
 			return -ENOMEM;
 
