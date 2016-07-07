@@ -460,6 +460,8 @@ static int i2c_imx_acked(struct imx_i2c_struct *i2c_imx)
 {
 	if (imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR) & I2SR_RXAK) {
 		dev_dbg(&i2c_imx->adapter.dev, "<%s> No ACK\n", __func__);
+		if (i2c_imx->adapter.retries)
+			return -EAGAIN;
 		return -ENXIO;  /* No ACK */
 	}
 
@@ -1067,6 +1069,16 @@ static int i2c_imx_probe(struct platform_device *pdev)
 	i2c_imx->adapter.nr		= pdev->id;
 	i2c_imx->adapter.dev.of_node	= pdev->dev.of_node;
 	i2c_imx->base			= base;
+
+	/*
+	 * The Gateworks Ventana has an i2c based system controller on i2c-0
+	 * which emulates several standard i2c devices with existing drivers.
+	 * That device can NAK when its in an ADC loop. Add bus retries.
+	 */
+	if (of_machine_is_compatible("gw,ventana") && phy_addr == 0x021a0000) {
+		dev_info(&pdev->dev, "Adding retries for Ventana GSC\n");
+		i2c_imx->adapter.retries = 3;
+	}
 
 	/* Get I2C clock */
 	i2c_imx->clk = devm_clk_get(&pdev->dev, NULL);
