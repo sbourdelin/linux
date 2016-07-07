@@ -1383,8 +1383,10 @@ struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry, unsigned in
 	/*
 	 * If we're doing an exclusive create, optimize away the lookup
 	 * but don't hash the dentry.
+	 * This optimization only works if we can write in the parent.
 	 */
-	if (nfs_is_exclusive_create(dir, flags))
+	if (nfs_is_exclusive_create(dir, flags) &&
+	    (inode_permission(dir, MAY_WRITE | MAY_READ | MAY_EXEC) == 0))
 		return NULL;
 
 	res = ERR_PTR(-ENOMEM);
