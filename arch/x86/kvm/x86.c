@@ -2743,8 +2743,9 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 			mark_tsc_unstable("KVM discovered backwards TSC");
 
 		if (kvm_lapic_hv_timer_in_use(vcpu) &&
+			(is_guest_mode(vcpu) ||
 				kvm_x86_ops->set_hv_timer(vcpu,
-					kvm_get_lapic_tscdeadline_msr(vcpu)))
+					kvm_get_lapic_tscdeadline_msr(vcpu))))
 			kvm_lapic_switch_to_sw_timer(vcpu);
 		if (check_tsc_unstable()) {
 			u64 offset = kvm_compute_tsc_offset(vcpu,
