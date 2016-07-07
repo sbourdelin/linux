@@ -408,6 +408,7 @@ static void dwc3_cache_hwparams(struct dwc3 *dwc)
 static int dwc3_phy_setup(struct dwc3 *dwc)
 {
 	u32 reg;
+	u32 usbtrdtim;
 	int ret;
 
 	reg = dwc3_readl(dwc->regs, DWC3_GUSB3PIPECTL(0));
@@ -502,6 +503,15 @@ static int dwc3_phy_setup(struct dwc3 *dwc)
 
 	if (dwc->dis_u2_freeclk_exists_quirk)
 		reg &= ~DWC3_GUSB2PHYCFG_U2_FREECLK_EXISTS;
+
+	if (dwc->phyif_utmi_quirk) {
+		reg &= ~(DWC3_GUSB2PHYCFG_PHYIF_MASK |
+		       DWC3_GUSB2PHYCFG_USBTRDTIM_MASK);
+		usbtrdtim = dwc->phyif_utmi ? USBTRDTIM_UTMI_16_BIT :
+			    USBTRDTIM_UTMI_8_BIT;
+		reg |= DWC3_GUSB2PHYCFG_PHYIF(dwc->phyif_utmi) |
+		       DWC3_GUSB2PHYCFG_USBTRDTIM(usbtrdtim);
+	}
 
 	dwc3_writel(dwc->regs, DWC3_GUSB2PHYCFG(0), reg);
 
@@ -834,6 +844,7 @@ static int dwc3_probe(struct platform_device *pdev)
 	struct resource		*res;
 	struct dwc3		*dwc;
 	u8			lpm_nyet_threshold;
+	u8			phyif_utmi;
 	u8			tx_de_emphasis;
 	u8			hird_threshold;
 
@@ -879,6 +890,9 @@ static int dwc3_probe(struct platform_device *pdev)
 
 	/* default to highest possible threshold */
 	lpm_nyet_threshold = 0xff;
+
+	/* default to UTMI+ 8-bit interface */
+	phyif_utmi = 0;
 
 	/* default to -3.5dB de-emphasis */
 	tx_de_emphasis = 1;
@@ -929,6 +943,10 @@ static int dwc3_probe(struct platform_device *pdev)
 				"snps,dis_rxdet_inp3_quirk");
 	dwc->dis_u2_freeclk_exists_quirk = device_property_read_bool(dev,
 				"snps,dis-u2-freeclk-exists-quirk");
+	dwc->phyif_utmi_quirk = device_property_read_bool(dev,
+				"snps,phyif-utmi-quirk");
+	 device_property_read_u8(dev, "snps,phyif-utmi",
+				 &phyif_utmi);
 
 	dwc->tx_de_emphasis_quirk = device_property_read_bool(dev,
 				"snps,tx_de_emphasis_quirk");
@@ -940,6 +958,7 @@ static int dwc3_probe(struct platform_device *pdev)
 				 &dwc->fladj);
 
 	dwc->lpm_nyet_threshold = lpm_nyet_threshold;
+	dwc->phyif_utmi = phyif_utmi;
 	dwc->tx_de_emphasis = tx_de_emphasis;
 
 	dwc->hird_threshold = hird_threshold
