@@ -269,14 +269,13 @@ void machine_kexec(struct kimage *image)
 	local_irq_disable();
 	hw_breakpoint_disable();
 
-	if (image->preserve_context) {
+	if (image->preserve_context || lapic_disabled()) {
 #ifdef CONFIG_X86_IO_APIC
 		/*
 		 * We need to put APICs in legacy mode so that we can
 		 * get timer interrupts in second kernel. kexec/kdump
 		 * paths already have calls to disable_IO_APIC() in
-		 * one form or other. kexec jump path also need
-		 * one.
+		 * one form or other. kexec jump path also need one.
 		 */
 		disable_IO_APIC();
 #endif
