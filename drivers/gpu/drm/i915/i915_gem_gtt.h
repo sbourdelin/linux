@@ -189,6 +189,7 @@ struct i915_vma {
 	unsigned int bound : 4;
 	unsigned int active : I915_NUM_ENGINES;
 	bool is_ggtt : 1;
+	bool closed : 1;
 
 	/**
 	 * Support different GGTT views into the same object.
