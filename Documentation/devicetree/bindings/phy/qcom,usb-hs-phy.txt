@@ -1,0 +1,83 @@
+Qualcomm's USB HS PHY
+
+PROPERTIES
+
+- compatible:
+    Usage: required
+    Value type: <string>
+    Definition: Should contain "qcom,usb-hs-phy"
+
+- ulpi-vendor:
+    Usage: required
+    Value type: <u16>
+    Definition: Should be 0x05c6
+
+- ulpi-product:
+    Usage: required
+    Value type: <u16>
+    Definition: Should be 0x0000
+
+- #phy-cells:
+    Usage: required
+    Value type: <u32>
+    Definition: Should contain 0
+
+- clocks:
+    Usage: required
+    Value type: <prop-encoded-array>
+    Definition: Should contain clock specifier for the reference and sleep
+                clocks
+
+- clock-names:
+    Usage: required
+    Value type: <stringlist>
+    Definition: Should contain "ref" and "sleep" for the reference and sleep
+                clocks respectively
+
+- resets:
+    Usage: required
+    Value type: <prop-encoded-array>
+    Definition: Should contain the phy and POR resets
+
+- reset-names:
+    Usage: required
+    Value type: <stringlist>
+    Definition: Should contain "phy" and "por" for the phy and POR resets
+                respectively
+
+- v3p3-supply:
+    Usage: required
+    Value type: <phandle>
+    Definition: Should contain a reference to the 3.3V supply
+
+- v1p8-supply:
+    Usage: required
+    Value type: <phandle>
+    Definition: Should contain a reference to the 1.8V supply
+
+- qcom,init-seq:
+    Usage: optional
+    Value type: <u8 array>
+    Definition: Should contain a sequence of ULPI register and address pairs to
+                program into the ULPI_EXT_VENDOR_SPECIFIC area. This is related
+                to Device Mode Eye Diagram test.
+
+EXAMPLE
+
+otg: usb-controller {
+	ulpi {
+		phy {
+			compatible = "qcom,usb-hs-phy";
+			ulpi-vendor = /bits/ 16 <0x05c6>;
+			ulpi-product = /bits/ 16 <0x0000>;
+			#phy-cells = <0>;
+			clocks = <&xo_board>, <&gcc GCC_USB2A_PHY_SLEEP_CLK>;
+			clock-names = "ref", "sleep";
+			resets = <&gcc GCC_USB2A_PHY_BCR>, <&otg 0>;
+			reset-names = "phy", "por";
+			v3p3-supply = <&pm8941_l24>;
+			v1p8-supply = <&pm8941_l6>;
+			qcom,init-seq = /bits/ 8 <0x81 0x63>;
+		};
+	};
+};
