@@ -18,6 +18,7 @@
 #include <linux/blk-mq.h>
 #include <linux/cpu.h>
 #include <linux/delay.h>
+#include <linux/dma-attrs.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/genhd.h>
@@ -64,6 +65,8 @@ module_param(use_cmb_sqes, bool, 0644);
 MODULE_PARM_DESC(use_cmb_sqes, "use controller's memory buffer for I/O SQes");
 
 static struct workqueue_struct *nvme_workq;
+
+static DEFINE_DMA_ATTRS(nvme_dma_attrs);
 
 struct nvme_dev;
 struct nvme_queue;
@@ -498,7 +501,8 @@ static int nvme_map_data(struct nvme_dev *dev, struct request *req,
 		goto out;
 
 	ret = BLK_MQ_RQ_QUEUE_BUSY;
-	if (!dma_map_sg(dev->dev, iod->sg, iod->nents, dma_dir))
+	if (!dma_map_sg_attrs(dev->dev, iod->sg, iod->nents, dma_dir,
+				&nvme_dma_attrs))
 		goto out;
 
 	if (!nvme_setup_prps(dev, req, size))
@@ -516,7 +520,8 @@ static int nvme_map_data(struct nvme_dev *dev, struct request *req,
 		if (rq_data_dir(req))
 			nvme_dif_remap(req, nvme_dif_prep);
 
-		if (!dma_map_sg(dev->dev, &iod->meta_sg, 1, dma_dir))
+		if (!dma_map_sg_attrs(dev->dev, &iod->meta_sg, 1, dma_dir,
+					&nvme_dma_attrs))
 			goto out_unmap;
 	}
 
@@ -2123,6 +2128,9 @@ static int __init nvme_init(void)
 	result = pci_register_driver(&nvme_driver);
 	if (result)
 		destroy_workqueue(nvme_workq);
+
+	dma_set_attr(DMA_ATTR_NO_WARN, &nvme_dma_attrs);
+
 	return result;
 }
 
