@@ -2802,7 +2802,7 @@ static void __i915_vma_iounmap(struct i915_vma *vma)
 	vma->iomap = NULL;
 }
 
-static int __i915_vma_unbind(struct i915_vma *vma, bool wait)
+int i915_vma_unbind(struct i915_vma *vma)
 {
 	struct drm_i915_gem_object *obj = vma->obj;
 	unsigned long active;
@@ -2812,7 +2812,7 @@ static int __i915_vma_unbind(struct i915_vma *vma, bool wait)
 	 * have side-effects such as unpinning or even unbinding this vma.
 	 */
 	active = vma->active;
-	if (active && wait) {
+	if (active) {
 		int idx;
 
 		/* When a closed VMA is retired, it is unbound - eek.
@@ -2892,16 +2892,6 @@ destroy:
 		i915_vma_destroy(vma);
 
 	return 0;
-}
-
-int i915_vma_unbind(struct i915_vma *vma)
-{
-	return __i915_vma_unbind(vma, true);
-}
-
-int __i915_vma_unbind_no_wait(struct i915_vma *vma)
-{
-	return __i915_vma_unbind(vma, false);
 }
 
 int i915_gem_wait_for_idle(struct drm_i915_private *dev_priv)
