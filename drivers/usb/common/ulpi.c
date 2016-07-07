@@ -16,6 +16,9 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/acpi.h>
+#include <linux/of.h>
+#include <linux/of_device.h>
+#include <linux/clk/clk-conf.h>
 
 /* -------------------------------------------------------------------------- */
 
@@ -39,6 +42,10 @@ static int ulpi_match(struct device *dev, struct device_driver *driver)
 	struct ulpi *ulpi = to_ulpi_dev(dev);
 	const struct ulpi_device_id *id;
 
+	/* Some ULPI devices don't have a product id so rely on OF match */
+	if (ulpi->id.product == 0)
+		return of_driver_match_device(dev, driver);
+
 	for (id = drv->id_table; id->vendor; id++)
 		if (id->vendor == ulpi->id.vendor &&
 		    id->product == ulpi->id.product)
@@ -50,6 +57,11 @@ static int ulpi_match(struct device *dev, struct device_driver *driver)
 static int ulpi_uevent(struct device *dev, struct kobj_uevent_env *env)
 {
 	struct ulpi *ulpi = to_ulpi_dev(dev);
+	int ret;
+
+	ret = of_device_uevent_modalias(dev, env);
+	if (ret != -ENODEV)
+		return ret;
 
 	if (add_uevent_var(env, "MODALIAS=ulpi:v%04xp%04x",
 			   ulpi->id.vendor, ulpi->id.product))
@@ -60,6 +72,11 @@ static int ulpi_uevent(struct device *dev, struct kobj_uevent_env *env)
 static int ulpi_probe(struct device *dev)
 {
 	struct ulpi_driver *drv = to_ulpi_driver(dev->driver);
+	int ret;
+
+	ret = of_clk_set_defaults(dev->of_node, false);
+	if (ret < 0)
+		return ret;
 
 	return drv->probe(to_ulpi_dev(dev));
 }
@@ -87,7 +104,12 @@ static struct bus_type ulpi_bus = {
 static ssize_t modalias_show(struct device *dev, struct device_attribute *attr,
 			     char *buf)
 {
+	int len;
 	struct ulpi *ulpi = to_ulpi_dev(dev);
+
+	len = of_device_get_modalias(dev, buf, PAGE_SIZE - 1);
+	if (len != -ENODEV)
+		return len;
 
 	return sprintf(buf, "ulpi:v%04xp%04x\n",
 		       ulpi->id.vendor, ulpi->id.product);
@@ -152,7 +174,29 @@ EXPORT_SYMBOL_GPL(ulpi_unregister_driver);
 
 /* -------------------------------------------------------------------------- */
 
-static int ulpi_register(struct device *dev, struct ulpi *ulpi)
+static int ulpi_of_register(struct ulpi *ulpi)
+{
+	struct device_node *np = NULL, *child;
+
+	/* Find a ulpi bus underneath the parent or the parent of the parent */
+	if (ulpi->dev.parent->of_node)
+		np = of_find_node_by_name(ulpi->dev.parent->of_node, "ulpi");
+	else if (ulpi->dev.parent->parent && ulpi->dev.parent->parent->of_node)
+		np = of_find_node_by_name(ulpi->dev.parent->parent->of_node,
+					  "ulpi");
+	if (!np)
+		return 0;
+
+	child = of_get_next_available_child(np, NULL);
+	if (!child)
+		return -EINVAL;
+
+	ulpi->dev.of_node = child;
+
+	return 0;
+}
+
+static int ulpi_read_id(struct ulpi *ulpi)
 {
 	int ret;
 
@@ -174,14 +218,39 @@ static int ulpi_register(struct device *dev, struct ulpi *ulpi)
 	ulpi->id.product = ulpi_read(ulpi, ULPI_PRODUCT_ID_LOW);
 	ulpi->id.product |= ulpi_read(ulpi, ULPI_PRODUCT_ID_HIGH) << 8;
 
+	return 0;
+}
+
+static int ulpi_register(struct device *dev, struct ulpi *ulpi)
+{
+	int ret;
+
 	ulpi->dev.parent = dev;
 	ulpi->dev.bus = &ulpi_bus;
 	ulpi->dev.type = &ulpi_dev_type;
 	dev_set_name(&ulpi->dev, "%s.ulpi", dev_name(dev));
 
+	if (IS_ENABLED(CONFIG_OF)) {
+		ret = ulpi_of_register(ulpi);
+		if (ret)
+			return ret;
+	}
+
 	ACPI_COMPANION_SET(&ulpi->dev, ACPI_COMPANION(dev));
 
-	request_module("ulpi:v%04xp%04x", ulpi->id.vendor, ulpi->id.product);
+	ret = device_property_read_u16(&ulpi->dev, "ulpi-vendor",
+				       &ulpi->id.vendor);
+	ret |= device_property_read_u16(&ulpi->dev, "ulpi-product",
+					&ulpi->id.product);
+	if (ret) {
+		ret = ulpi_read_id(ulpi);
+		if (ret)
+			return ret;
+	}
+
+	if (of_device_request_module(&ulpi->dev))
+		request_module("ulpi:v%04xp%04x", ulpi->id.vendor,
+			       ulpi->id.product);
 
 	ret = device_register(&ulpi->dev);
 	if (ret)
@@ -232,6 +301,7 @@ EXPORT_SYMBOL_GPL(ulpi_register_interface);
  */
 void ulpi_unregister_interface(struct ulpi *ulpi)
 {
+	of_node_put(ulpi->dev.of_node);
 	device_unregister(&ulpi->dev);
 }
 EXPORT_SYMBOL_GPL(ulpi_unregister_interface);

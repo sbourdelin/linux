@@ -1,0 +1,35 @@
+ULPI bus binding
+----------------
+
+Phys that are behind a ULPI connection can be described with the following
+binding. The host controller shall have a "ulpi" named node as a child, and
+that node shall have one enabled node underneath it representing the ulpi
+device on the bus.
+
+PROPERTIES
+----------
+
+- ulpi-vendor:
+    Usage: optional
+    Value type: <u16>
+    Definition: The USB-IF assigned vendor id for this device
+
+- ulpi-product:
+    Usage: required if ulpi-vendor is present
+    Value type: <u16>
+    Definition: The vendor assigned product id for this device
+
+EXAMPLE
+-------
+
+usb {
+	compatible = "vendor,usb-controller";
+
+	ulpi {
+		phy {
+			compatible = "vendor,phy";
+			ulpi-vendor = /bits/ 16 <0x1d6b>;
+			ulpi-product = /bits/ 16 <0x0002>;
+		};
+	};
+};
