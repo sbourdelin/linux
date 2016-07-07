@@ -468,13 +468,10 @@ void __i915_add_request(struct drm_i915_gem_request *request,
 	 */
 	request->postfix = intel_ring_get_tail(ring);
 
-	if (i915.enable_execlists) {
+	if (i915.enable_execlists)
 		ret = engine->emit_request(request);
-	} else {
+	else
 		ret = engine->add_request(request);
-
-		request->tail = intel_ring_get_tail(ring);
-	}
 	/* Not allowed to fail! */
 	WARN(ret, "emit|add_request failed: %d!\n", ret);
 	/* Sanity check that the reserved size was large enough. */
