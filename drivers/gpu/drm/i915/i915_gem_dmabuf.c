@@ -335,6 +335,8 @@ struct drm_gem_object *i915_gem_prime_import(struct drm_device *dev,
 	drm_gem_private_object_init(dev, &obj->base, dma_buf->size);
 	i915_gem_object_init(obj, &i915_gem_object_dmabuf_ops);
 	obj->base.import_attach = attach;
+	obj->base.read_domains = I915_GEM_DOMAIN_GTT;
+	obj->base.write_domain = 0;
 
 	return &obj->base;
 
