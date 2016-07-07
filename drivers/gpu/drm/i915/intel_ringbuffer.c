@@ -1418,24 +1418,17 @@ static int gen6_signal(struct drm_i915_gem_request *signaller_req)
 	return 0;
 }
 
-/**
- * gen6_emit_request - Update the semaphore mailbox registers
- *
- * @request - request to write to the ring
- *
- * Update the mailbox registers in the *other* rings with the current seqno.
- * This acts like a signal in the canonical semaphore.
- */
-static int gen6_emit_request(struct drm_i915_gem_request *req)
+static void i9xx_submit_request(struct drm_i915_gem_request *request)
+{
+	struct drm_i915_private *dev_priv = request->i915;
+
+	I915_WRITE_TAIL(request->engine, request->tail);
+}
+
+static int i9xx_emit_request(struct drm_i915_gem_request *req)
 {
 	struct intel_ring *ring = req->ring;
 	int ret;
-
-	if (req->engine->semaphore.signal) {
-		ret = req->engine->semaphore.signal(req);
-		if (ret)
-			return ret;
-	}
 
 	ret = intel_ring_begin(req, 4);
 	if (ret)
@@ -1450,6 +1443,27 @@ static int gen6_emit_request(struct drm_i915_gem_request *req)
 	req->tail = intel_ring_get_tail(ring);
 
 	return 0;
+}
+
+/**
+ * gen6_emit_request - Update the semaphore mailbox registers
+ *
+ * @request - request to write to the ring
+ *
+ * Update the mailbox registers in the *other* rings with the current seqno.
+ * This acts like a signal in the canonical semaphore.
+ */
+static int gen6_emit_request(struct drm_i915_gem_request *req)
+{
+	if (req->engine->semaphore.signal) {
+		int ret;
+
+		ret = req->engine->semaphore.signal(req);
+		if (ret)
+			return ret;
+	}
+
+	return i9xx_emit_request(req);
 }
 
 static int gen8_render_emit_request(struct drm_i915_gem_request *req)
@@ -1684,33 +1698,6 @@ bsd_ring_flush(struct drm_i915_gem_request *req,
 	intel_ring_emit(ring, MI_NOOP);
 	intel_ring_advance(ring);
 	return 0;
-}
-
-static int i9xx_emit_request(struct drm_i915_gem_request *req)
-{
-	struct intel_ring *ring = req->ring;
-	int ret;
-
-	ret = intel_ring_begin(req, 4);
-	if (ret)
-		return ret;
-
-	intel_ring_emit(ring, MI_STORE_DWORD_INDEX);
-	intel_ring_emit(ring, I915_GEM_HWS_INDEX << MI_STORE_DWORD_INDEX_SHIFT);
-	intel_ring_emit(ring, req->fence.seqno);
-	intel_ring_emit(ring, MI_USER_INTERRUPT);
-	intel_ring_advance(ring);
-
-	req->tail = intel_ring_get_tail(ring);
-
-	return 0;
-}
-
-static void i9xx_submit_request(struct drm_i915_gem_request *request)
-{
-	struct drm_i915_private *dev_priv = request->i915;
-
-	I915_WRITE_TAIL(request->engine, request->tail);
 }
 
 static void
