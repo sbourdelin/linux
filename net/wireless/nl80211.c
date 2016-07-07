@@ -2877,7 +2877,17 @@ static int nl80211_del_interface(struct sk_buff *skb, struct genl_info *info)
 	if (!rdev->ops->del_virtual_intf)
 		return -EOPNOTSUPP;
 
-	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	/*
+	 * For wdevs which have no associated netdev object (e.g. of type
+	 * NL80211_IFTYPE_P2P_DEVICE), emit the DEL_INTERFACE event here.
+	 * For all other types, the event will be generated from the
+	 * netdev notifier
+	 */
+	if (!wdev->netdev)
+		msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	else
+		msg = NULL;
+
 	if (msg && nl80211_send_iface(msg, 0, 0, 0, rdev, wdev, true) < 0) {
 		nlmsg_free(msg);
 		msg = NULL;
