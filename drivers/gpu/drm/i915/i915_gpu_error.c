@@ -1163,7 +1163,7 @@ static void i915_gem_record_rings(struct drm_i915_private *dev_priv,
 		i915_gem_record_active_context(engine, error, &error->ring[i]);
 
 		count = 0;
-		list_for_each_entry(request, &engine->request_list, list)
+		list_for_each_entry(request, &engine->request_list, link)
 			count++;
 
 		error->ring[i].num_requests = count;
@@ -1176,7 +1176,7 @@ static void i915_gem_record_rings(struct drm_i915_private *dev_priv,
 		}
 
 		count = 0;
-		list_for_each_entry(request, &engine->request_list, list) {
+		list_for_each_entry(request, &engine->request_list, link) {
 			struct drm_i915_error_request *erq;
 
 			if (count >= error->ring[i].num_requests) {
