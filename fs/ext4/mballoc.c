@@ -4517,18 +4517,7 @@ repeat:
 	}
 	if (likely(ac->ac_status == AC_STATUS_FOUND)) {
 		*errp = ext4_mb_mark_diskspace_used(ac, handle, reserv_clstrs);
-		if (*errp == -EAGAIN) {
-			/*
-			 * drop the reference that we took
-			 * in ext4_mb_use_best_found
-			 */
-			ext4_mb_release_context(ac);
-			ac->ac_b_ex.fe_group = 0;
-			ac->ac_b_ex.fe_start = 0;
-			ac->ac_b_ex.fe_len = 0;
-			ac->ac_status = AC_STATUS_CONTINUE;
-			goto repeat;
-		} else if (*errp) {
+		if (*errp) {
 			ext4_discard_allocated_blocks(ac);
 			goto errout;
 		} else {
