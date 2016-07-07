@@ -90,4 +90,26 @@ int unpin_extent_cache(struct extent_map_tree *tree, u64 start, u64 len, u64 gen
 void clear_em_logging(struct extent_map_tree *tree, struct extent_map *em);
 struct extent_map *search_extent_mapping(struct extent_map_tree *tree,
 					 u64 start, u64 len);
+
+static inline struct extent_map *
+first_extent_mapping(struct extent_map_tree *tree)
+{
+	struct rb_node *node;
+
+	node = rb_first(&tree->map);
+	if (!node)
+		return NULL;
+	return rb_entry(node, struct extent_map, rb_node);
+}
+
+static inline struct extent_map *
+next_extent_mapping(struct extent_map *map)
+{
+	struct rb_node *node;
+
+	node = rb_next(&map->rb_node);
+	if (!node)
+		return NULL;
+	return rb_entry(node, struct extent_map, rb_node);
+}
 #endif
