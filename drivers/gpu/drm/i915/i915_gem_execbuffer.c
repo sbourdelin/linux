@@ -26,13 +26,17 @@
  *
  */
 
+#include <linux/dma_remapping.h>
+#include <linux/reservation.h>
+#include <linux/uaccess.h>
+
 #include <drm/drmP.h>
 #include <drm/i915_drm.h>
+
 #include "i915_drv.h"
+#include "i915_gem_dmabuf.h"
 #include "i915_trace.h"
 #include "intel_drv.h"
-#include <linux/dma_remapping.h>
-#include <linux/uaccess.h>
 
 #define  __EXEC_OBJECT_HAS_PIN (1<<31)
 #define  __EXEC_OBJECT_HAS_FENCE (1<<30)
@@ -1086,6 +1090,27 @@ i915_gem_validate_context(struct drm_device *dev, struct drm_file *file,
 	return ctx;
 }
 
+static void eb_export_fence(struct drm_i915_gem_object *obj,
+			    struct drm_i915_gem_request *req)
+{
+	struct reservation_object *resv;
+
+	resv = i915_gem_object_get_dmabuf_resv(obj);
+	if (!resv)
+		return;
+
+	/* Ignore errors from failing to allocate the new fence, we can't
+	 * handle an error right now. Worst case should be missed
+	 * synchronisation leading to rendering corruption.
+	 */
+	mutex_lock(&resv->lock.base);
+	if (obj->base.write_domain)
+		reservation_object_add_excl_fence(resv, &req->fence);
+	else if (reservation_object_reserve_shared(resv) == 0)
+		reservation_object_add_shared_fence(resv, &req->fence);
+	mutex_unlock(&resv->lock.base);
+}
+
 void
 i915_gem_execbuffer_move_to_active(struct list_head *vmas,
 				   struct drm_i915_gem_request *req)
@@ -1106,6 +1131,7 @@ i915_gem_execbuffer_move_to_active(struct list_head *vmas,
 		obj->base.read_domains = obj->base.pending_read_domains;
 
 		i915_vma_move_to_active(vma, req);
+		eb_export_fence(obj, req);
 		if (obj->base.write_domain) {
 			i915_gem_request_assign(&obj->last_write_req, req);
 
