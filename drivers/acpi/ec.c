@@ -1331,7 +1331,12 @@ static int ec_install_handlers(struct acpi_ec *ec)
 
 static void ec_remove_handlers(struct acpi_ec *ec)
 {
-	acpi_ec_stop(ec, false);
+	if (test_bit(EC_FLAGS_GPE_HANDLER_INSTALLED, &ec->flags)) {
+		if (ACPI_FAILURE(acpi_remove_gpe_handler(NULL, ec->gpe,
+					&acpi_ec_gpe_handler)))
+			pr_err("failed to remove gpe handler\n");
+		clear_bit(EC_FLAGS_GPE_HANDLER_INSTALLED, &ec->flags);
+	}
 
 	if (test_bit(EC_FLAGS_EC_HANDLER_INSTALLED, &ec->flags)) {
 		if (ACPI_FAILURE(acpi_remove_address_space_handler(ec->handle,
@@ -1340,12 +1345,7 @@ static void ec_remove_handlers(struct acpi_ec *ec)
 		clear_bit(EC_FLAGS_EC_HANDLER_INSTALLED, &ec->flags);
 	}
 
-	if (test_bit(EC_FLAGS_GPE_HANDLER_INSTALLED, &ec->flags)) {
-		if (ACPI_FAILURE(acpi_remove_gpe_handler(NULL, ec->gpe,
-					&acpi_ec_gpe_handler)))
-			pr_err("failed to remove gpe handler\n");
-		clear_bit(EC_FLAGS_GPE_HANDLER_INSTALLED, &ec->flags);
-	}
+	acpi_ec_stop(ec, false);
 }
 
 static struct acpi_ec *acpi_ec_alloc(void)
