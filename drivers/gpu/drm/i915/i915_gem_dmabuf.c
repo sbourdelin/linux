@@ -227,13 +227,15 @@ static void export_fences(struct drm_i915_gem_object *obj,
 {
 	struct reservation_object *resv = dma_buf->resv;
 	struct drm_i915_gem_request *req;
+	unsigned long active;
 	int idx;
 
 	mutex_lock(&obj->base.dev->struct_mutex);
 	mutex_lock(&resv->lock.base);
 
-	for (idx = 0; idx < ARRAY_SIZE(obj->last_read_req); idx++) {
-		req = obj->last_read_req[idx];
+	active = obj->active;
+	for_each_active(active, idx) {
+		req = obj->last_read[idx].request;
 		if (!req)
 			continue;
 
@@ -241,7 +243,7 @@ static void export_fences(struct drm_i915_gem_object *obj,
 			reservation_object_add_shared_fence(resv, &req->fence);
 	}
 
-	req = obj->last_write_req;
+	req = obj->last_write.request;
 	if (req)
 		reservation_object_add_excl_fence(resv, &req->fence);
 
