@@ -1,0 +1,72 @@
+Qualcomm's USB HSIC PHY
+
+PROPERTIES
+
+- compatible:
+    Usage: required
+    Value type: <string>
+    Definition: Should contain "qcom,usb-hsic-phy"
+
+- ulpi-vendor:
+    Usage: required
+    Value type: <u16>
+    Definition: Should be 0x05c6
+
+- ulpi-product:
+    Usage: required
+    Value type: <u16>
+    Definition: Should be 0x0000
+
+- #phy-cells:
+    Usage: required
+    Value type: <u32>
+    Definition: Should contain 0
+
+- clocks:
+    Usage: required
+    Value type: <prop-encoded-array>
+    Definition: Should contain clock specifier for phy, calibration and
+                a calibration sleep clock
+
+- clock-names:
+    Usage: required
+    Value type: <stringlist>
+    Definition: Should contain "phy, "cal" and "cal_sleep"
+
+- pinctrl-names:
+    Usage: required
+    Value type: <stringlist>
+    Definition: Should contain "init" and "default" in that order
+
+- pinctrl-0:
+    Usage: required
+    Value type: <prop-encoded-array>
+    Definition: List of pinctrl settings to apply to keep HSIC pins in a glitch
+                free state
+
+- pinctrl-1:
+    Usage: required
+    Value type: <prop-encoded-array>
+    Definition: List of pinctrl settings to apply to mux out the HSIC pins
+
+EXAMPLE
+
+usb-controller {
+	ulpi {
+		phy {
+			compatible = "qcom,usb-hsic-phy";
+			ulpi-vendor = /bits/ 16 <0x05c6>;
+			ulpi-product = /bits/ 16 <0x0000>;
+			#phy-cells = <0>;
+			pinctrl-names = "init", "default";
+			pinctrl-0 = <&hsic_sleep>;
+			pinctrl-1 = <&hsic_default>;
+			clocks = <&gcc GCC_USB_HSIC_CLK>,
+				 <&gcc GCC_USB_HSIC_IO_CAL_CLK>,
+				 <&gcc GCC_USB_HSIC_IO_CAL_SLEEP_CLK>;
+			clock-names = "phy", "cal", "cal_sleep";
+			assigned-clocks = <&gcc GCC_USB_HSIC_IO_CAL_CLK>;
+			assigned-clock-rates = <960000>;
+		};
+	};
+};
