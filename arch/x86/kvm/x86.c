@@ -2576,6 +2576,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 	case KVM_CAP_DISABLE_QUIRKS:
 	case KVM_CAP_SET_BOOT_CPU_ID:
  	case KVM_CAP_SPLIT_IRQCHIP:
+	case KVM_CAP_X2APIC_API:
 #ifdef CONFIG_KVM_DEVICE_ASSIGNMENT
 	case KVM_CAP_ASSIGN_DEV_IRQ:
 	case KVM_CAP_PCI_2_3:
@@ -3799,6 +3800,10 @@ split_irqchip_unlock:
 		mutex_unlock(&kvm->lock);
 		break;
 	}
+	case KVM_CAP_X2APIC_API:
+		kvm->arch.x2apic_api = true;
+		r = 0;
+		break;
 	default:
 		r = -EINVAL;
 		break;
