@@ -2174,8 +2174,8 @@ static void intel_ring_context_unpin(struct i915_gem_context *ctx,
 	i915_gem_context_put(ctx);
 }
 
-static int intel_init_ring_buffer(struct drm_device *dev,
-				  struct intel_engine_cs *engine)
+static int intel_init_engine(struct drm_device *dev,
+			     struct intel_engine_cs *engine)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_ringbuffer *ringbuf;
@@ -2887,7 +2887,7 @@ int intel_init_render_ring_buffer(struct drm_device *dev)
 	engine->init_hw = init_render_ring;
 	engine->cleanup = render_ring_cleanup;
 
-	ret = intel_init_ring_buffer(dev, engine);
+	ret = intel_init_engine(dev, engine);
 	if (ret)
 		return ret;
 
@@ -2936,7 +2936,7 @@ int intel_init_bsd_ring_buffer(struct drm_device *dev)
 			engine->irq_enable_mask = I915_BSD_USER_INTERRUPT;
 	}
 
-	return intel_init_ring_buffer(dev, engine);
+	return intel_init_engine(dev, engine);
 }
 
 /**
@@ -2959,7 +2959,7 @@ int intel_init_bsd2_ring_buffer(struct drm_device *dev)
 	engine->irq_enable_mask =
 			GT_RENDER_USER_INTERRUPT << GEN8_VCS2_IRQ_SHIFT;
 
-	return intel_init_ring_buffer(dev, engine);
+	return intel_init_engine(dev, engine);
 }
 
 int intel_init_blt_ring_buffer(struct drm_device *dev)
@@ -2982,7 +2982,7 @@ int intel_init_blt_ring_buffer(struct drm_device *dev)
 	else
 		engine->irq_enable_mask = GT_BLT_USER_INTERRUPT;
 
-	return intel_init_ring_buffer(dev, engine);
+	return intel_init_engine(dev, engine);
 }
 
 int intel_init_vebox_ring_buffer(struct drm_device *dev)
@@ -3009,7 +3009,7 @@ int intel_init_vebox_ring_buffer(struct drm_device *dev)
 		engine->irq_disable = hsw_vebox_irq_disable;
 	}
 
-	return intel_init_ring_buffer(dev, engine);
+	return intel_init_engine(dev, engine);
 }
 
 int
