@@ -52,6 +52,7 @@ enum {
 #ifdef CONFIG_SUSPEND
 	HIBERNATION_SUSPEND,
 #endif
+	HIBERNATION_SNAPSHOT,
 	/* keep last */
 	__HIBERNATION_AFTER_LAST
 };
@@ -631,6 +632,9 @@ static void power_down(void)
 			                "Try swapon -a.\n");
 		return;
 #endif
+	case HIBERNATION_SNAPSHOT:
+		/* Do nothing. */
+		return;
 	}
 	kernel_halt();
 	/*
@@ -878,6 +882,7 @@ static const char * const hibernation_modes[] = {
 #ifdef CONFIG_SUSPEND
 	[HIBERNATION_SUSPEND]	= "suspend",
 #endif
+	[HIBERNATION_SNAPSHOT]	= "snapshot",
 };
 
 /*
@@ -924,6 +929,7 @@ static ssize_t disk_show(struct kobject *kobj, struct kobj_attribute *attr,
 #ifdef CONFIG_SUSPEND
 		case HIBERNATION_SUSPEND:
 #endif
+		case HIBERNATION_SNAPSHOT:
 			break;
 		case HIBERNATION_PLATFORM:
 			if (hibernation_ops)
@@ -970,6 +976,7 @@ static ssize_t disk_store(struct kobject *kobj, struct kobj_attribute *attr,
 #ifdef CONFIG_SUSPEND
 		case HIBERNATION_SUSPEND:
 #endif
+		case HIBERNATION_SNAPSHOT:
 			hibernation_mode = mode;
 			break;
 		case HIBERNATION_PLATFORM:
