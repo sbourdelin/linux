@@ -356,7 +356,7 @@ static int per_file_stats(int id, void *ptr, void *data)
 				= container_of(vma->vm,
 					       struct i915_hw_ppgtt,
 					       base);
-			if (ppgtt->file_priv != stats->file_priv)
+			if (ppgtt->base.file != stats->file_priv)
 				continue;
 		}
 
