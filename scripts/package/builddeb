@@ -26,6 +26,11 @@ create_package() {
 	# Fix ownership and permissions
 	chown -R root:root "$pdir"
 	chmod -R go-w "$pdir"
+	# in case we are in a restrictive umask environment like 0077
+	# set permissions for dirs and derive "go"-"rx" permissions from "u"
+	find $pdir -type d -exec chmod 0755 {} +
+	find $pdir -type f -perm -u+r -exec chmod go+r {} +
+	find $pdir -type f -perm -u+x -exec chmod go+x {} +
 
 	# Create the package
 	dpkg-gencontrol $forcearch -Vkernel:debarch="${debarch}" -p$pname -P"$pdir"
