@@ -1755,6 +1755,54 @@ long arch_ptrace(struct task_struct *child, long request,
 					     REGSET_SPE, 0, 35 * sizeof(u32),
 					     datavp);
 #endif
+	case PPC_PTRACE_GET_REGS_USAGE:
+		{
+			u64 *u64_datap = (u64 *)datavp;
+			u64 reg_usage = 0;
+
+			if (addr != sizeof(u64))
+				return -EINVAL;
+
+#ifdef CONFIG_ALTIVEC
+			if (child->thread.used_vr)
+				reg_usage |= PPC_PTRACE_REGS_USAGE_VR_BIT;
+#endif
+#ifdef CONFIG_VSX
+			if (child->thread.used_vsr)
+				reg_usage |= PPC_PTRACE_REGS_USAGE_VSR_BIT;
+#endif
+			ret =  copy_to_user(u64_datap,
+					&reg_usage,
+					sizeof(reg_usage)) ?
+				-EFAULT : 0;
+			break;
+		}
+
+	case PPC_PTRACE_SET_REGS_USAGE:
+		{
+			u64 *u64_datap = (u64 *)datavp;
+			u64 reg_usage = 0;
+
+			if (addr != sizeof(u64))
+				return -EINVAL;
+
+			ret = copy_from_user(&reg_usage,
+					u64_datap,
+					sizeof(reg_usage)) ?
+				-EFAULT : 0;
+
+			if (ret)
+				return ret;
+#ifdef CONFIG_ALTIVEC
+			child->thread.used_vr =
+				!!(reg_usage & PPC_PTRACE_REGS_USAGE_VR_BIT);
+#endif
+#ifdef CONFIG_VSX
+			child->thread.used_vsr =
+				!!(reg_usage & PPC_PTRACE_REGS_USAGE_VSR_BIT);
+#endif
+			break;
+		}
 
 	default:
 		ret = ptrace_request(child, request, addr, data);
