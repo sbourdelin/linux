@@ -1,0 +1,62 @@
+Usage Model of the ACPI Control Method Lid Device
+
+Copyright (C) 2016, Intel Corporation
+Author: Lv Zheng <lv.zheng@intel.com>
+
+
+Abstract:
+
+Platforms containing lids convey lid state (open/close) to OSPMs using a
+control method lid device. To implement this, the AML tables issue
+Notify(lid_device, 0x80) to notify the OSPMs whenever the lid state has
+changed. The _LID control method for the lid device must be implemented to
+report the "current" state of the lid as either "opened" or "closed".
+
+This document describes the restrictions and the expections of the Linux
+ACPI lid device driver.
+
+
+1. Restrictions of the returning value of the _LID control method
+
+The _LID control method is described to return the "current" lid state.
+However the word of "current" has ambiguity, many AML tables return the lid
+state upon the last lid notification instead of returning the lid state
+upon the last _LID evaluation. There won't be difference when the _LID
+control method is evaluated during the runtime, the problem is its initial
+returning value. When the AML tables implement this control method with
+cached value, the initial returning value is likely not reliable. There are
+simply so many examples always retuning "closed" as initial lid state.
+
+2. Restrictions of the lid state change notifications
+
+There are many AML tables never notifying when the lid device state is
+changed to "opened". But it is ensured that the AML tables always notify
+"closed" when the lid state is changed to "closed". This is normally used
+to trigger some system power saving operations on Windows. Since it is
+fully tested, this notification is reliable for all AML tables.
+
+3. Expections for the userspace users of the ACPI lid device driver
+
+The userspace programs should stop relying on
+/proc/acpi/button/lid/LID0/state to obtain the lid state. This file is only
+used for the validation purpose.
+
+New userspace programs should rely on the lid "closed" notification to
+trigger some power saving operations and may stop taking actions according
+to the lid "opened" notification. A new input switch event - SW_ACPI_LID is
+prepared for the new userspace to implement this ACPI control method lid
+device specific logics.
+
+During the period the userspace hasn't been switched to use the new
+SW_ACPI_LID event, Linux users can use the following boot parameter to
+handle possible issues:
+  button.lid_init_state=method:
+   This is the default behavior of the Linux ACPI lid driver, Linux kernel
+   reports the initial lid state using the returning value of the _LID
+   control method.
+   This can be used to fix some platforms if the _LID control method's
+   returning value is reliable.
+  button.lid_init_state=open:
+   Linux kernel always reports the initial lid state as "opened".
+   This may fix some platforms if the returning value of the _LID control
+   method is not reliable.
