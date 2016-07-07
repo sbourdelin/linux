@@ -1184,10 +1184,10 @@ enum {
 	Opt_journal_path, Opt_journal_checksum, Opt_journal_async_commit,
 	Opt_abort, Opt_data_journal, Opt_data_ordered, Opt_data_writeback,
 	Opt_data_err_abort, Opt_data_err_ignore, Opt_test_dummy_encryption,
-	Opt_usrjquota, Opt_grpjquota, Opt_offusrjquota, Opt_offgrpjquota,
-	Opt_jqfmt_vfsold, Opt_jqfmt_vfsv0, Opt_jqfmt_vfsv1, Opt_quota,
-	Opt_noquota, Opt_barrier, Opt_nobarrier, Opt_err,
-	Opt_usrquota, Opt_grpquota, Opt_i_version, Opt_dax,
+	Opt_usrjquota, Opt_grpjquota, Opt_prjjquota, Opt_offusrjquota,
+	Opt_offgrpjquota, Opt_offprjjquota, Opt_jqfmt_vfsold, Opt_jqfmt_vfsv0,
+	 Opt_jqfmt_vfsv1, Opt_quota, Opt_noquota, Opt_barrier, Opt_nobarrier,
+	Opt_err, Opt_usrquota, Opt_grpquota, Opt_prjquota, Opt_i_version, Opt_dax,
 	Opt_stripe, Opt_delalloc, Opt_nodelalloc, Opt_mblk_io_submit,
 	Opt_lazytime, Opt_nolazytime,
 	Opt_nomblk_io_submit, Opt_block_validity, Opt_noblock_validity,
@@ -1240,6 +1240,8 @@ static const match_table_t tokens = {
 	{Opt_usrjquota, "usrjquota=%s"},
 	{Opt_offgrpjquota, "grpjquota="},
 	{Opt_grpjquota, "grpjquota=%s"},
+	{Opt_prjjquota, "prjjquota=%s"},
+	{Opt_offprjjquota, "prjjquota="},
 	{Opt_jqfmt_vfsold, "jqfmt=vfsold"},
 	{Opt_jqfmt_vfsv0, "jqfmt=vfsv0"},
 	{Opt_jqfmt_vfsv1, "jqfmt=vfsv1"},
@@ -1250,6 +1252,7 @@ static const match_table_t tokens = {
 	{Opt_barrier, "barrier=%u"},
 	{Opt_barrier, "barrier"},
 	{Opt_nobarrier, "nobarrier"},
+	{Opt_prjquota, "prjquota"},
 	{Opt_i_version, "i_version"},
 	{Opt_dax, "dax"},
 	{Opt_stripe, "stripe=%u"},
@@ -1466,12 +1469,17 @@ static const struct mount_opts {
 							MOPT_SET | MOPT_Q},
 	{Opt_grpquota, EXT4_MOUNT_QUOTA | EXT4_MOUNT_GRPQUOTA,
 							MOPT_SET | MOPT_Q},
+	{Opt_prjquota, EXT4_MOUNT_QUOTA | EXT4_MOUNT_PRJQUOTA,
+							MOPT_SET | MOPT_Q},
 	{Opt_noquota, (EXT4_MOUNT_QUOTA | EXT4_MOUNT_USRQUOTA |
-		       EXT4_MOUNT_GRPQUOTA), MOPT_CLEAR | MOPT_Q},
+		       EXT4_MOUNT_GRPQUOTA | EXT4_MOUNT_PRJQUOTA),
+		       MOPT_CLEAR | MOPT_Q},
 	{Opt_usrjquota, 0, MOPT_Q},
 	{Opt_grpjquota, 0, MOPT_Q},
+	{Opt_prjjquota, 0, MOPT_Q},
 	{Opt_offusrjquota, 0, MOPT_Q},
 	{Opt_offgrpjquota, 0, MOPT_Q},
+	{Opt_offprjjquota, 0, MOPT_Q},
 	{Opt_jqfmt_vfsold, QFMT_VFS_OLD, MOPT_QFMT},
 	{Opt_jqfmt_vfsv0, QFMT_VFS_V0, MOPT_QFMT},
 	{Opt_jqfmt_vfsv1, QFMT_VFS_V1, MOPT_QFMT},
@@ -1495,10 +1503,14 @@ static int handle_mount_opt(struct super_block *sb, char *opt, int token,
 		return set_qf_name(sb, USRQUOTA, &args[0]);
 	else if (token == Opt_grpjquota)
 		return set_qf_name(sb, GRPQUOTA, &args[0]);
+	else if (token == Opt_prjjquota)
+		return set_qf_name(sb, PRJQUOTA, &args[0]);
 	else if (token == Opt_offusrjquota)
 		return clear_qf_name(sb, USRQUOTA);
 	else if (token == Opt_offgrpjquota)
 		return clear_qf_name(sb, GRPQUOTA);
+	else if (token == Opt_offprjjquota)
+		return clear_qf_name(sb, PRJQUOTA);
 #endif
 	switch (token) {
 	case Opt_noacl:
@@ -1757,19 +1769,26 @@ static int parse_options(char *options, struct super_block *sb,
 	}
 #ifdef CONFIG_QUOTA
 	if (ext4_has_feature_quota(sb) &&
-	    (test_opt(sb, USRQUOTA) || test_opt(sb, GRPQUOTA))) {
-		ext4_msg(sb, KERN_INFO, "Quota feature enabled, usrquota and grpquota "
+	    (test_opt(sb, USRQUOTA) || test_opt(sb, GRPQUOTA) ||
+	     test_opt(sb, PRJQUOTA))) {
+		ext4_msg(sb, KERN_INFO, "Quota feature enabled, usrquota,grpquota,prjquota "
 			 "mount options ignored.");
 		clear_opt(sb, USRQUOTA);
 		clear_opt(sb, GRPQUOTA);
-	} else if (sbi->s_qf_names[USRQUOTA] || sbi->s_qf_names[GRPQUOTA]) {
+		clear_opt(sb, PRJQUOTA);
+	} else if (sbi->s_qf_names[USRQUOTA] || sbi->s_qf_names[GRPQUOTA] ||
+		   sbi->s_qf_names[PRJQUOTA]) {
 		if (test_opt(sb, USRQUOTA) && sbi->s_qf_names[USRQUOTA])
 			clear_opt(sb, USRQUOTA);
 
 		if (test_opt(sb, GRPQUOTA) && sbi->s_qf_names[GRPQUOTA])
 			clear_opt(sb, GRPQUOTA);
 
-		if (test_opt(sb, GRPQUOTA) || test_opt(sb, USRQUOTA)) {
+		if (test_opt(sb, PRJQUOTA) && sbi->s_qf_names[PRJQUOTA])
+			clear_opt(sb, GRPQUOTA);
+
+		if (test_opt(sb, GRPQUOTA) || test_opt(sb, USRQUOTA) ||
+		    test_opt(sb, PRJQUOTA)) {
 			ext4_msg(sb, KERN_ERR, "old and new quota "
 					"format mixing");
 			return 0;
@@ -1829,6 +1848,9 @@ static inline void ext4_show_quota_options(struct seq_file *seq,
 
 	if (sbi->s_qf_names[GRPQUOTA])
 		seq_show_option(seq, "grpjquota", sbi->s_qf_names[GRPQUOTA]);
+
+	if (sbi->s_qf_names[PRJQUOTA])
+		seq_show_option(seq, "prjjquota", sbi->s_qf_names[PRJQUOTA]);
 #endif
 }
 
@@ -5001,7 +5023,8 @@ static int ext4_mark_dquot_dirty(struct dquot *dquot)
 
 	/* Are we journaling quotas? */
 	if (ext4_has_feature_quota(sb) ||
-	    sbi->s_qf_names[USRQUOTA] || sbi->s_qf_names[GRPQUOTA]) {
+	    sbi->s_qf_names[USRQUOTA] || sbi->s_qf_names[GRPQUOTA] ||
+	    sbi->s_qf_names[PRJQUOTA]) {
 		dquot_mark_dquot_dirty(dquot);
 		return ext4_write_dquot(dquot);
 	} else {
