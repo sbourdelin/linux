@@ -3346,6 +3346,63 @@ invalid_opcode:
 	return 1;
 }
 
+static unsigned int ata_scsi_sanitize_xlat(struct ata_queued_cmd *qc) {
+	struct ata_taskfile *tf = &qc->tf;
+	struct scsi_cmnd *scmd = qc->scsicmd;
+	struct ata_device *dev = qc->dev;
+	const u8 *cdb = scmd->cmnd;
+	u16 fp;
+	u8 bp = 0xff;
+
+	/* for now we only support SANITIZE with IMMED bit set */
+	if (unlikely(!(cdb[1] & 0x80))) {
+		fp = 1;
+		bp = 7;
+		goto invalid_fld;
+	}
+
+	tf->protocol = ATA_PROT_NODATA;
+	tf->command = ATA_CMD_SANITIZE_DEVICE;
+	tf->hob_nsect |= (cdb[1] & 0x40) << 1;
+	tf->nsect |= (cdb[1] & 0x20) >> 1;
+	tf->flags |= ATA_TFLAG_LBA48 | ATA_TFLAG_ISADDR;
+
+	switch (cdb[1] & 0x1f) {
+	/* TODO: add support for OVERWRITE */
+	case 0x2: /* BLOCK ERASE */
+		tf->hob_feature = 0x0;
+		tf->feature = 0x12;
+		tf->hob_lbal = 0x42;
+		tf->lbah = 0x6b;
+		tf->lbam = 0x45;
+		tf->lbal = 0x72;
+		break;
+	case 0x3: /* CRYPTOGRAPHIC ERASE */
+		tf->hob_feature = 0x0;
+		tf->feature = 0x11;
+		tf->hob_lbal = 0x43;
+		tf->lbah = 0x72;
+		tf->lbam = 0x79;
+		tf->lbal = 0x70;
+		break;
+	case 0x1f: /* EXIT FAILURE MODE */
+		tf->hob_feature = 0x0;
+		tf->feature = 0x0;
+		tf->nsect |= 0x1;
+		break;
+	default:
+		fp = 1;
+		bp = 4;
+		goto invalid_fld;
+	}
+
+	return 0;
+
+invalid_fld:
+	ata_scsi_set_invalid_field(dev, scmd, fp, bp);
+	return 1;
+}
+
 /**
  *	ata_scsi_report_zones_complete - convert ATA output
  *	@qc: command structure returning the data
@@ -3868,6 +3925,9 @@ static inline ata_xlat_func_t ata_get_xlat_func(struct ata_device *dev, u8 cmd)
 
 	case WRITE_SAME_16:
 		return ata_scsi_write_same_xlat;
+
+	case SANITIZE:
+		return ata_scsi_sanitize_xlat;
 
 	case SYNCHRONIZE_CACHE:
 		if (ata_try_flush_cache(dev))
