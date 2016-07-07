@@ -69,8 +69,6 @@ void intel_logical_ring_stop(struct intel_engine_cs *engine);
 void intel_logical_ring_cleanup(struct intel_engine_cs *engine);
 int intel_logical_rings_init(struct drm_device *dev);
 
-int logical_ring_flush_all_caches(struct drm_i915_gem_request *req);
-
 /* Logical Ring Contexts */
 
 /* One extra page is added before LRC for GuC as shared data */
