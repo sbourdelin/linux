@@ -136,6 +136,7 @@ static inline int nvmem_device_write(struct nvmem_device *nvmem,
 #endif /* CONFIG_NVMEM */
 
 #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
+struct nvmem_cell *of_nvmem_cell_get_direct(struct device_node *cell_np);
 struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
 				     const char *name);
 struct nvmem_device *of_nvmem_device_get(struct device_node *np,
