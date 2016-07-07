@@ -2143,7 +2143,6 @@ static int intel_init_engine(struct drm_device *dev,
 
 	engine->i915 = dev_priv;
 	engine->fence_context = fence_context_alloc(1);
-	INIT_LIST_HEAD(&engine->active_list);
 	INIT_LIST_HEAD(&engine->request_list);
 	INIT_LIST_HEAD(&engine->execlist_queue);
 	INIT_LIST_HEAD(&engine->buffers);

@@ -1944,7 +1944,6 @@ logical_ring_setup(struct drm_i915_private *dev_priv, enum intel_engine_id id)
 
 	engine->fw_domains = fw_domains;
 
-	INIT_LIST_HEAD(&engine->active_list);
 	INIT_LIST_HEAD(&engine->request_list);
 	INIT_LIST_HEAD(&engine->buffers);
 	INIT_LIST_HEAD(&engine->execlist_queue);
