@@ -984,16 +984,23 @@ static int __perf_evlist__mmap(struct perf_evlist *evlist, int idx,
 }
 
 static int perf_evlist__mmap_per_evsel(struct perf_evlist *evlist, int idx,
-				       struct mmap_params *mp, int cpu,
+				       struct mmap_params *mp, int cpu_idx,
 				       int thread, int *output)
 {
 	struct perf_evsel *evsel;
+	int evlist_cpu = cpu_map__cpu(evlist->cpus, cpu_idx);
 
 	evlist__for_each(evlist, evsel) {
 		int fd;
+		int cpu;
 
 		if (evsel->system_wide && thread)
 			continue;
+
+		if (!cpu_map__has(evsel->cpus, evlist_cpu))
+			continue;
+
+		cpu = cpu_map__idx(evsel->cpus, evlist_cpu);
 
 		fd = FD(evsel, cpu, thread);
 
