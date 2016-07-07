@@ -479,6 +479,8 @@ static struct usb_composite_driver eth_driver = {
 	.unbind		= eth_unbind,
 };
 
+USB_GADGET_COMPOSITE_UDC_NAME(eth_driver);
+
 module_usb_composite_driver(eth_driver);
 
 MODULE_DESCRIPTION(PREFIX DRIVER_DESC);

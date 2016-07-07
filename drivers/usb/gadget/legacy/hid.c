@@ -264,6 +264,8 @@ static struct usb_composite_driver hidg_driver = {
 	.unbind		= hid_unbind,
 };
 
+USB_GADGET_COMPOSITE_UDC_NAME(hidg_driver);
+
 static struct platform_driver hidg_plat_driver = {
 	.remove		= hidg_plat_driver_remove,
 	.driver		= {

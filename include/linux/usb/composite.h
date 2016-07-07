@@ -344,6 +344,7 @@ enum {
 /**
  * struct usb_composite_driver - groups configurations into a gadget
  * @name: For diagnostics, identifies the driver.
+ * @udc_name: Name of UDC to which this gadget should be bound
  * @dev: Template descriptor for the device, including default device
  *	identifiers.
  * @strings: tables of strings, keyed by identifiers assigned during @bind
@@ -379,6 +380,7 @@ enum {
  */
 struct usb_composite_driver {
 	const char				*name;
+	char				        *udc_name;
 	const struct usb_device_descriptor	*dev;
 	struct usb_gadget_strings		**strings;
 	enum usb_device_speed			max_speed;
@@ -555,6 +557,11 @@ struct usb_composite_overwrite {
 									\
 	module_param_named(iProduct, coverwrite.product, charp, S_IRUGO); \
 	MODULE_PARM_DESC(iProduct, "USB Product string")
+
+#define USB_GADGET_COMPOSITE_UDC_NAME(__composite_driver)              \
+	module_param_named(udc, __composite_driver.udc_name, charp,    \
+			   S_IRUGO);				       \
+	MODULE_PARM_DESC(udc, "USB Device Controller Name")
 
 void usb_composite_overwrite_options(struct usb_composite_dev *cdev,
 		struct usb_composite_overwrite *covr);

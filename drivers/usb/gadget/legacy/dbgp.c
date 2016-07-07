@@ -406,6 +406,9 @@ static struct usb_gadget_driver dbgp_driver = {
 	},
 };
 
+module_param_named(udc, dbgp_driver.udc_name, charp, S_IRUGO);
+MODULE_PARM_DESC(udc, "USB Device Controller Name");
+
 static int __init dbgp_init(void)
 {
 	return usb_gadget_probe_driver(&dbgp_driver);

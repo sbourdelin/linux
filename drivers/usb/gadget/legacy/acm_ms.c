@@ -260,6 +260,8 @@ static struct usb_composite_driver acm_ms_driver = {
 	.unbind		= acm_ms_unbind,
 };
 
+USB_GADGET_COMPOSITE_UDC_NAME(acm_ms_driver);
+
 module_usb_composite_driver(acm_ms_driver);
 
 MODULE_DESCRIPTION(DRIVER_DESC);

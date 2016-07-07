@@ -243,6 +243,8 @@ static struct usb_composite_driver gserial_driver = {
 	.unbind		= gs_unbind,
 };
 
+USB_GADGET_COMPOSITE_UDC_NAME(gserial_driver);
+
 static int __init init(void)
 {
 	/* We *could* export two configs; that'd be much cleaner...

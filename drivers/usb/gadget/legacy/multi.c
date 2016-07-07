@@ -492,4 +492,6 @@ static struct usb_composite_driver multi_driver = {
 	.needs_serial	= 1,
 };
 
+USB_GADGET_COMPOSITE_UDC_NAME(multi_driver);
+
 module_usb_composite_driver(multi_driver);

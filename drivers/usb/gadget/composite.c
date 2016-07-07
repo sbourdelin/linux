@@ -2313,6 +2313,7 @@ int usb_composite_probe(struct usb_composite_driver *driver)
 		driver->name = "composite";
 
 	driver->gadget_driver = composite_driver_template;
+	driver->gadget_driver.udc_name = driver->udc_name;
 	gadget_driver = &driver->gadget_driver;
 
 	gadget_driver->function =  (char *) driver->name;

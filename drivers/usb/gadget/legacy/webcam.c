@@ -431,6 +431,8 @@ static struct usb_composite_driver webcam_driver = {
 	.unbind		= webcam_unbind,
 };
 
+USB_GADGET_COMPOSITE_UDC_NAME(webcam_driver);
+
 module_usb_composite_driver(webcam_driver);
 
 MODULE_AUTHOR("Laurent Pinchart");

@@ -208,6 +208,8 @@ static struct usb_composite_driver ncm_driver = {
 	.unbind		= gncm_unbind,
 };
 
+USB_GADGET_COMPOSITE_UDC_NAME(ncm_driver);
+
 module_usb_composite_driver(ncm_driver);
 
 MODULE_DESCRIPTION(DRIVER_DESC);

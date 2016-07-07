@@ -184,4 +184,6 @@ static struct usb_composite_driver midi_driver = {
 	.unbind		= midi_unbind,
 };
 
+USB_GADGET_COMPOSITE_UDC_NAME(midi_driver);
+
 module_usb_composite_driver(midi_driver);

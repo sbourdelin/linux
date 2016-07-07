@@ -217,6 +217,8 @@ static struct usb_composite_driver printer_driver = {
 	.unbind		= printer_unbind,
 };
 
+USB_GADGET_COMPOSITE_UDC_NAME(printer_driver);
+
 module_usb_composite_driver(printer_driver);
 
 MODULE_DESCRIPTION(DRIVER_DESC);

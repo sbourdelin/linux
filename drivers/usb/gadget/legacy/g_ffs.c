@@ -158,6 +158,8 @@ static struct usb_composite_driver gfs_driver = {
 	.unbind		= gfs_unbind,
 };
 
+USB_GADGET_COMPOSITE_UDC_NAME(gfs_driver);
+
 static unsigned int missing_funcs;
 static bool gfs_registered;
 static bool gfs_single_func;

@@ -424,6 +424,8 @@ static struct usb_composite_driver zero_driver = {
 	.resume		= zero_resume,
 };
 
+USB_GADGET_COMPOSITE_UDC_NAME(zero_driver);
+
 module_usb_composite_driver(zero_driver);
 
 MODULE_AUTHOR("David Brownell");

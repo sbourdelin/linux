@@ -433,4 +433,6 @@ static struct usb_composite_driver nokia_driver = {
 	.unbind		= nokia_unbind,
 };
 
+USB_GADGET_COMPOSITE_UDC_NAME(nokia_driver);
+
 module_usb_composite_driver(nokia_driver);

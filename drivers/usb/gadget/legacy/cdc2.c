@@ -234,6 +234,8 @@ static struct usb_composite_driver cdc_driver = {
 	.unbind		= cdc_unbind,
 };
 
+USB_GADGET_COMPOSITE_UDC_NAME(cdc_driver);
+
 module_usb_composite_driver(cdc_driver);
 
 MODULE_DESCRIPTION(DRIVER_DESC);

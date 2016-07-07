@@ -127,6 +127,8 @@ static struct usb_composite_driver usbg_driver = {
 	.unbind         = guas_unbind,
 };
 
+USB_GADGET_COMPOSITE_UDC_NAME(usbg_driver);
+
 static int usbg_attach(struct usb_function_instance *f)
 {
 	return usb_composite_probe(&usbg_driver);

@@ -304,6 +304,8 @@ static struct usb_composite_driver audio_driver = {
 	.unbind		= audio_unbind,
 };
 
+USB_GADGET_COMPOSITE_UDC_NAME(audio_driver);
+
 module_usb_composite_driver(audio_driver);
 
 MODULE_DESCRIPTION(DRIVER_DESC);
