@@ -1,0 +1,56 @@
+The AML Debugger
+
+Copyright (C) 2016, Intel Corporation
+Author: Lv Zheng <lv.zheng@intel.com>
+
+
+Abstract:
+
+This document describes the usage of the AML debugger embedded in the Linux
+kernel.
+
+1. Build the debugger
+
+   The following kernel configuration items are required to enable the AML
+   debugger interface from the Linux kernel:
+   CONFIG_ACPI_DEBUGGER=y
+   CONFIG_ACPI_DEBUGGER_USER=m
+   The userspace utlities can be built from the kernel source tree using
+   the following commands:
+   # cd tools
+   # make acpi
+   The built userspace tool can be found at:
+     tools/acpi/power/acpi/acpidbg/acpidbg
+   You can install it to the system directories using the following
+   command:
+   # make install
+
+2. Start the userspace debugger interface
+
+   After booting the kernel with the debugger built-in, developers can
+   start the debugger with the following commands:
+   # mount -t debugfs none /sys/kernel/debug
+   # modprobe acpi_dbg
+   # tools/acpi/power/acpi/acpidbg/acpidbg
+   Now you have entered the interactive AML debugger environment, where
+   you can execute the debugger functionalities by typing the debugger
+   commands.
+   You can start to use it from typing "help" command and can download
+   <ACPICA Overview and Programmer Reference> from the following site:
+     https://acpica.org/documentation
+   And find detailed command reference in "Chapter 12. ACPICA Debugger
+   Reference".
+
+3. Stop the userspace debugger interface
+
+   You can type the Ctrl+C, quit, exit to end the interactive debugger
+   interface. And unload the module with the following commands:
+   # rmmod acpi_dbg
+   The module unloading may fail if there is an acpidbg instance running.
+
+4. Run the debugger in a script
+
+   It will be very useful to have the ability to run the AML debugger in
+   a test script. "acpidbg" supports this in a special "batch" mode. For
+   example, the following command outputs the entire ACPI namespace:
+   # acpidbg -b "namespace"
