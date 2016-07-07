@@ -1014,7 +1014,8 @@ int ocfs2_ioctl_move_extents(struct file *filp, void __user *argp)
 		goto out_free;
 	}
 
-	if (range.me_start > i_size_read(inode)) {
+	if (range.me_start > i_size_read(inode) ||
+	    range.me_len > i_size_read(inode)) {
 		status = -EINVAL;
 		goto out_free;
 	}
