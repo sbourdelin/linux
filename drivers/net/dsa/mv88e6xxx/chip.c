@@ -3094,9 +3094,39 @@ static int mv88e6xxx_g1_setup(struct mv88e6xxx_chip *chip)
 	return 0;
 }
 
+static int mv88e6xxx_g2_device_mapping_write(struct mv88e6xxx_chip *chip,
+					     int target, int port)
+{
+	u16 val = GLOBAL2_DEVICE_MAPPING_UPDATE | (target << 8) | (port & 0xf);
+
+	return mv88e6xxx_write(chip, REG_GLOBAL2, GLOBAL2_DEVICE_MAPPING, val);
+}
+
+static int mv88e6xxx_g2_set_device_mapping(struct mv88e6xxx_chip *chip)
+{
+	int target, port;
+	int err;
+
+	/* Initialize the routing port to the 32 possible target devices */
+	for (target = 0; target < 32; ++target) {
+		port = 0xf;
+
+		if (target < DSA_MAX_SWITCHES) {
+			port = chip->ds->rtable[target];
+			if (port == DSA_RTABLE_NONE)
+				port = 0xf;
+		}
+
+		err = mv88e6xxx_g2_device_mapping_write(chip, target, port);
+		if (err)
+			break;
+	}
+
+	return err;
+}
+
 static int mv88e6xxx_g2_setup(struct mv88e6xxx_chip *chip)
 {
-	struct dsa_switch *ds = chip->ds;
 	int err;
 	int i;
 
@@ -3120,20 +3150,9 @@ static int mv88e6xxx_g2_setup(struct mv88e6xxx_chip *chip)
 		return err;
 
 	/* Program the DSA routing table. */
-	for (i = 0; i < 32; i++) {
-		int nexthop = 0x1f;
-
-		if (i != ds->index && i < DSA_MAX_SWITCHES)
-			nexthop = ds->rtable[i] & 0x1f;
-
-		err = _mv88e6xxx_reg_write(
-			chip, REG_GLOBAL2,
-			GLOBAL2_DEVICE_MAPPING,
-			GLOBAL2_DEVICE_MAPPING_UPDATE |
-			(i << GLOBAL2_DEVICE_MAPPING_TARGET_SHIFT) | nexthop);
-		if (err)
-			return err;
-	}
+	err = mv88e6xxx_g2_set_device_mapping(chip);
+	if (err)
+		return err;
 
 	/* Clear all trunk masks. */
 	for (i = 0; i < 8; i++) {
