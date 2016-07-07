@@ -776,12 +776,6 @@ intel_logical_ring_advance_and_submit(struct drm_i915_gem_request *request)
 	 */
 	request->previous_context = engine->last_context;
 	engine->last_context = request->ctx;
-
-	if (i915.enable_guc_submission)
-		i915_guc_submit(request);
-	else
-		execlists_context_queue(request);
-
 	return 0;
 }
 
@@ -1905,8 +1899,10 @@ logical_ring_default_vfuncs(struct intel_engine_cs *engine)
 {
 	/* Default vfuncs which can be overriden by each engine. */
 	engine->init_hw = gen8_init_common_ring;
-	engine->emit_request = gen8_emit_request;
 	engine->emit_flush = gen8_emit_flush;
+	engine->emit_request = gen8_emit_request;
+	engine->submit_request = execlists_context_queue;
+
 	engine->irq_enable = gen8_logical_ring_enable_irq;
 	engine->irq_disable = gen8_logical_ring_disable_irq;
 	engine->emit_bb_start = gen8_emit_bb_start;

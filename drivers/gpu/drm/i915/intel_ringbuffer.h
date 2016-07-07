@@ -203,7 +203,17 @@ struct intel_engine_cs {
 
 	int		(*init_context)(struct drm_i915_gem_request *req);
 
-	int		(*add_request)(struct drm_i915_gem_request *req);
+	int		(*emit_flush)(struct drm_i915_gem_request *request,
+				      u32 invalidate_domains,
+				      u32 flush_domains);
+	int		(*emit_bb_start)(struct drm_i915_gem_request *req,
+					 u64 offset, u32 length,
+					 unsigned int dispatch_flags);
+#define I915_DISPATCH_SECURE 0x1
+#define I915_DISPATCH_PINNED 0x2
+#define I915_DISPATCH_RS     0x4
+	int		(*emit_request)(struct drm_i915_gem_request *req);
+	void		(*submit_request)(struct drm_i915_gem_request *req);
 	/* Some chipsets are not quite as coherent as advertised and need
 	 * an expensive kick to force a true read of the up-to-date seqno.
 	 * However, the up-to-date seqno is not always required and the last
@@ -281,17 +291,6 @@ struct intel_engine_cs {
 	unsigned int idle_lite_restore_wa;
 	bool disable_lite_restore_wa;
 	u32 ctx_desc_template;
-	int		(*emit_request)(struct drm_i915_gem_request *request);
-	int		(*emit_flush)(struct drm_i915_gem_request *request,
-				      u32 invalidate_domains,
-				      u32 flush_domains);
-	int		(*emit_bb_start)(struct drm_i915_gem_request *req,
-					 u64 offset, u32 length,
-					 unsigned int dispatch_flags);
-#define I915_DISPATCH_SECURE 0x1
-#define I915_DISPATCH_PINNED 0x2
-#define I915_DISPATCH_RS     0x4
-	void		(*submit_request)(struct drm_i915_gem_request *req);
 
 	/**
 	 * List of objects currently involved in rendering from the
