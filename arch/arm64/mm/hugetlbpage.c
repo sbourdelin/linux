@@ -201,6 +201,7 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
 			      unsigned long addr, pte_t *ptep)
 {
 	pte_t pte;
+	struct page *page;
 
 	if (pte_cont(*ptep)) {
 		int ncontig, i;
@@ -222,12 +223,21 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
 			if (pte_dirty(ptep_get_and_clear(mm, addr, cpte)))
 				is_dirty = true;
 		}
-		if (is_dirty)
-			return pte_mkdirty(pte);
-		else
-			return pte;
+		if (is_dirty) {
+			pte = pte_mkdirty(pte);
+			page = pte_page(pte);
+			clear_bit(PG_dcache_clean, &page->flags);
+		}
+
+		return pte;
 	} else {
-		return ptep_get_and_clear(mm, addr, ptep);
+		pte = ptep_get_and_clear(mm, addr, ptep);
+		if (huge_pte_dirty(pte)) {
+			page = pte_page(pte);
+			clear_bit(PG_dcache_clean, &page->flags);
+		}
+
+		return pte;
 	}
 }
 
