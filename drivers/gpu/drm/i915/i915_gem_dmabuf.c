@@ -235,7 +235,8 @@ static void export_fences(struct drm_i915_gem_object *obj,
 
 	active = obj->active;
 	for_each_active(active, idx) {
-		req = i915_gem_active_peek(&obj->last_read[idx]);
+		req = i915_gem_active_peek(&obj->last_read[idx],
+					   &obj->base.dev->struct_mutex);
 		if (!req)
 			continue;
 
@@ -243,7 +244,8 @@ static void export_fences(struct drm_i915_gem_object *obj,
 			reservation_object_add_shared_fence(resv, &req->fence);
 	}
 
-	req = i915_gem_active_peek(&obj->last_write);
+	req = i915_gem_active_peek(&obj->last_write,
+				   &obj->base.dev->struct_mutex);
 	if (req)
 		reservation_object_add_excl_fence(resv, &req->fence);
 
