@@ -1312,10 +1312,8 @@ static void render_ring_cleanup(struct intel_engine_cs *engine)
 	intel_fini_pipe_control(engine);
 }
 
-static int gen8_rcs_signal(struct drm_i915_gem_request *signaller_req,
-			   unsigned int num_dwords)
+static int gen8_rcs_signal(struct drm_i915_gem_request *signaller_req)
 {
-#define MBOX_UPDATE_DWORDS 8
 	struct intel_ring *signaller = signaller_req->ring;
 	struct drm_i915_private *dev_priv = signaller_req->i915;
 	struct intel_engine_cs *waiter;
@@ -1323,10 +1321,7 @@ static int gen8_rcs_signal(struct drm_i915_gem_request *signaller_req,
 	int ret, num_rings;
 
 	num_rings = hweight32(INTEL_INFO(dev_priv)->ring_mask);
-	num_dwords += (num_rings-1) * MBOX_UPDATE_DWORDS;
-#undef MBOX_UPDATE_DWORDS
-
-	ret = intel_ring_begin(signaller_req, num_dwords);
+	ret = intel_ring_begin(signaller_req, (num_rings-1) * 8);
 	if (ret)
 		return ret;
 
@@ -1350,14 +1345,13 @@ static int gen8_rcs_signal(struct drm_i915_gem_request *signaller_req,
 				MI_SEMAPHORE_TARGET(waiter->hw_id));
 		intel_ring_emit(signaller, 0);
 	}
+	intel_ring_advance(signaller);
 
 	return 0;
 }
 
-static int gen8_xcs_signal(struct drm_i915_gem_request *signaller_req,
-			   unsigned int num_dwords)
+static int gen8_xcs_signal(struct drm_i915_gem_request *signaller_req)
 {
-#define MBOX_UPDATE_DWORDS 6
 	struct intel_ring *signaller = signaller_req->ring;
 	struct drm_i915_private *dev_priv = signaller_req->i915;
 	struct intel_engine_cs *waiter;
@@ -1365,10 +1359,7 @@ static int gen8_xcs_signal(struct drm_i915_gem_request *signaller_req,
 	int ret, num_rings;
 
 	num_rings = hweight32(INTEL_INFO(dev_priv)->ring_mask);
-	num_dwords += (num_rings-1) * MBOX_UPDATE_DWORDS;
-#undef MBOX_UPDATE_DWORDS
-
-	ret = intel_ring_begin(signaller_req, num_dwords);
+	ret = intel_ring_begin(signaller_req, (num_rings-1) * 6);
 	if (ret)
 		return ret;
 
@@ -1390,12 +1381,12 @@ static int gen8_xcs_signal(struct drm_i915_gem_request *signaller_req,
 				MI_SEMAPHORE_TARGET(waiter->hw_id));
 		intel_ring_emit(signaller, 0);
 	}
+	intel_ring_advance(signaller);
 
 	return 0;
 }
 
-static int gen6_signal(struct drm_i915_gem_request *signaller_req,
-		       unsigned int num_dwords)
+static int gen6_signal(struct drm_i915_gem_request *signaller_req)
 {
 	struct intel_ring *signaller = signaller_req->ring;
 	struct drm_i915_private *dev_priv = signaller_req->i915;
@@ -1403,12 +1394,8 @@ static int gen6_signal(struct drm_i915_gem_request *signaller_req,
 	enum intel_engine_id id;
 	int ret, num_rings;
 
-#define MBOX_UPDATE_DWORDS 3
 	num_rings = hweight32(INTEL_INFO(dev_priv)->ring_mask);
-	num_dwords += round_up((num_rings-1) * MBOX_UPDATE_DWORDS, 2);
-#undef MBOX_UPDATE_DWORDS
-
-	ret = intel_ring_begin(signaller_req, num_dwords);
+	ret = intel_ring_begin(signaller_req, round_up((num_rings-1) * 3, 2));
 	if (ret)
 		return ret;
 
@@ -1426,6 +1413,7 @@ static int gen6_signal(struct drm_i915_gem_request *signaller_req,
 	/* If num_dwords was rounded, make sure the tail pointer is correct */
 	if (num_rings % 2 == 0)
 		intel_ring_emit(signaller, MI_NOOP);
+	intel_ring_advance(signaller);
 
 	return 0;
 }
@@ -1443,11 +1431,13 @@ static int gen6_emit_request(struct drm_i915_gem_request *req)
 	struct intel_ring *ring = req->ring;
 	int ret;
 
-	if (req->engine->semaphore.signal)
-		ret = req->engine->semaphore.signal(req, 4);
-	else
-		ret = intel_ring_begin(req, 4);
+	if (req->engine->semaphore.signal) {
+		ret = req->engine->semaphore.signal(req);
+		if (ret)
+			return ret;
+	}
 
+	ret = intel_ring_begin(req, 4);
 	if (ret)
 		return ret;
 
@@ -1468,10 +1458,13 @@ static int gen8_render_emit_request(struct drm_i915_gem_request *req)
 	struct intel_ring *ring = req->ring;
 	int ret;
 
-	if (engine->semaphore.signal)
-		ret = engine->semaphore.signal(req, 8);
-	else
-		ret = intel_ring_begin(req, 8);
+	if (engine->semaphore.signal) {
+		ret = engine->semaphore.signal(req);
+		if (ret)
+			return ret;
+	}
+
+	ret = intel_ring_begin(req, 8);
 	if (ret)
 		return ret;
 
