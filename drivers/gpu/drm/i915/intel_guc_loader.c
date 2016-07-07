@@ -662,7 +662,7 @@ fail:
 	mutex_lock(&dev->struct_mutex);
 	obj = guc_fw->guc_fw_obj;
 	if (obj)
-		drm_gem_object_unreference(&obj->base);
+		i915_gem_object_put(obj);
 	guc_fw->guc_fw_obj = NULL;
 	mutex_unlock(&dev->struct_mutex);
 
@@ -737,13 +737,15 @@ void intel_guc_fini(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_guc_fw *guc_fw = &dev_priv->guc.guc_fw;
 
+	if (!guc_fw->guc_fw_obj)
+		return;
+
 	mutex_lock(&dev->struct_mutex);
 	direct_interrupts_to_host(dev_priv);
 	i915_guc_submission_disable(dev_priv);
 	i915_guc_submission_fini(dev_priv);
 
-	if (guc_fw->guc_fw_obj)
-		drm_gem_object_unreference(&guc_fw->guc_fw_obj->base);
+	i915_gem_object_put(guc_fw->guc_fw_obj);
 	guc_fw->guc_fw_obj = NULL;
 	mutex_unlock(&dev->struct_mutex);
 
