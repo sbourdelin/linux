@@ -94,7 +94,7 @@ void __page_owner_free_pages(struct page *page, unsigned int order)
 		page_ext = lookup_page_ext(page + i);
 		if (unlikely(!page_ext))
 			continue;
-		__clear_bit(PAGE_EXT_OWNER, &page_ext->flags);
+		__clear_bit(PAGE_EXT_OWNER_ALLOC, &page_ext->flags);
 	}
 }
 
@@ -160,7 +160,7 @@ noinline void __page_owner_alloc_pages(struct page *page, unsigned int order,
 	page_ext->gfp_mask = gfp_mask;
 	page_ext->last_migrate_reason = -1;
 
-	__set_bit(PAGE_EXT_OWNER, &page_ext->flags);
+	__set_bit(PAGE_EXT_OWNER_ALLOC, &page_ext->flags);
 }
 
 void __set_page_owner_migrate_reason(struct page *page, int reason)
@@ -207,7 +207,7 @@ void __copy_page_owner(struct page *oldpage, struct page *newpage)
 	 * in that case we also don't need to explicitly clear the info from
 	 * the new page, which will be freed.
 	 */
-	__set_bit(PAGE_EXT_OWNER, &new_ext->flags);
+	__set_bit(PAGE_EXT_OWNER_ALLOC, &new_ext->flags);
 }
 
 static ssize_t
@@ -301,7 +301,7 @@ void __dump_page_owner(struct page *page)
 	gfp_mask = page_ext->gfp_mask;
 	mt = gfpflags_to_migratetype(gfp_mask);
 
-	if (!test_bit(PAGE_EXT_OWNER, &page_ext->flags)) {
+	if (!test_bit(PAGE_EXT_OWNER_ALLOC, &page_ext->flags)) {
 		pr_alert("page_owner info is not active (free page?)\n");
 		return;
 	}
@@ -374,7 +374,7 @@ read_page_owner(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 		 * Some pages could be missed by concurrent allocation or free,
 		 * because we don't hold the zone lock.
 		 */
-		if (!test_bit(PAGE_EXT_OWNER, &page_ext->flags))
+		if (!test_bit(PAGE_EXT_OWNER_ALLOC, &page_ext->flags))
 			continue;
 
 		/*
@@ -448,7 +448,7 @@ static void init_pages_in_zone(pg_data_t *pgdat, struct zone *zone)
 				continue;
 
 			/* Maybe overraping zone */
-			if (test_bit(PAGE_EXT_OWNER, &page_ext->flags))
+			if (test_bit(PAGE_EXT_OWNER_ALLOC, &page_ext->flags))
 				continue;
 
 			/* Found early allocated page */
