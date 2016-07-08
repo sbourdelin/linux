@@ -3,8 +3,8 @@
  *
  * Copyright (c) 2013 ELAN Microelectronics Corp.
  *
- * Author: 林政維 (Duson Lin) <dusonlin@emc.com.tw>
- * Version: 1.6.0
+ * Author: KT Liao <kt.liao@emc.com.tw>
+ * Version: 1.6.2
  *
  * Based on cyapa driver:
  * copyright (c) 2011-2012 Cypress Semiconductor, Inc.
@@ -40,7 +40,7 @@
 #include "elan_i2c.h"
 
 #define DRIVER_NAME		"elan_i2c"
-#define ELAN_DRIVER_VERSION	"1.6.1"
+#define ELAN_DRIVER_VERSION	"1.6.2"
 #define ELAN_VENDOR_ID		0x04f3
 #define ETP_MAX_PRESSURE	255
 #define ETP_FWIDTH_REDUCE	90
@@ -94,6 +94,8 @@ struct elan_tp_data {
 	u8			max_baseline;
 	bool			baseline_ready;
 };
+
+static int check_ASUS_special_fw(struct elan_tp_data *data);
 
 static int elan_get_fwinfo(u8 iap_version, u16 *validpage_count,
 			   u16 *signature_address)
@@ -210,21 +212,40 @@ static int __elan_initialize(struct elan_tp_data *data)
 		return error;
 	}
 
-	data->mode |= ETP_ENABLE_ABS;
-	error = data->ops->set_mode(client, data->mode);
-	if (error) {
-		dev_err(&client->dev,
-			"failed to switch to absolute mode: %d\n", error);
-		return error;
-	}
+	/* If it's the special FW, it need a different flow for mode change.*/
+	if (check_ASUS_special_fw(data)) {
+		error = data->ops->sleep_control(client, false);
+		if (error) {
+			dev_err(&client->dev,
+				"failed to wake device up: %d\n", error);
+			return error;
+		}
 
-	error = data->ops->sleep_control(client, false);
-	if (error) {
-		dev_err(&client->dev,
-			"failed to wake device up: %d\n", error);
-		return error;
-	}
+		msleep(200);
 
+		data->mode |= ETP_ENABLE_ABS;
+		error = data->ops->set_mode(client, data->mode);
+		if (error) {
+			dev_err(&client->dev,
+				"failed to switch to absolute mode: %d\n", error);
+			return error;
+		}
+	} else {
+		data->mode |= ETP_ENABLE_ABS;
+		error = data->ops->set_mode(client, data->mode);
+		if (error) {
+			dev_err(&client->dev,
+				"failed to switch to absolute mode: %d\n", error);
+			return error;
+		}
+
+		error = data->ops->sleep_control(client, false);
+		if (error) {
+			dev_err(&client->dev,
+				"failed to wake device up: %d\n", error);
+			return error;
+		}
+	}
 	return 0;
 }
 
@@ -757,6 +778,34 @@ out:
 	return retval;
 }
 
+static int check_ASUS_special_fw(struct elan_tp_data *data)
+{
+	struct i2c_client *client = data->client;
+	int error;
+
+	error = data->ops->get_product_id(client, &data->product_id);
+	if (error)
+		return false;
+
+	error = data->ops->get_sm_version(client, &data->ic_type,
+					  &data->sm_version);
+	if (error)
+		return false;
+
+	if (data->ic_type == 0x0E) {
+		switch (data->product_id) {
+		case 0x05:
+		case 0x06:
+		case 0x07:
+		case 0x09:
+		case 0x13:
+			return true;
+		default:
+			return false;
+		}
+	}
+	return false;
+}
 
 static DEVICE_ATTR_WO(acquire);
 static DEVICE_ATTR_RO(min);
