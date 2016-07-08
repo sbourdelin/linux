@@ -85,7 +85,7 @@ struct page_ext_operations page_owner_ops = {
 	.init = init_page_owner,
 };
 
-void __reset_page_owner(struct page *page, unsigned int order)
+void __page_owner_free_pages(struct page *page, unsigned int order)
 {
 	int i;
 	struct page_ext *page_ext;
@@ -147,7 +147,7 @@ static noinline depot_stack_handle_t save_stack(gfp_t flags)
 	return handle;
 }
 
-noinline void __set_page_owner(struct page *page, unsigned int order,
+noinline void __page_owner_alloc_pages(struct page *page, unsigned int order,
 					gfp_t gfp_mask)
 {
 	struct page_ext *page_ext = lookup_page_ext(page);
@@ -452,7 +452,7 @@ static void init_pages_in_zone(pg_data_t *pgdat, struct zone *zone)
 				continue;
 
 			/* Found early allocated page */
-			set_page_owner(page, 0, 0);
+			__page_owner_alloc_pages(page, 0, 0);
 			count++;
 		}
 	}

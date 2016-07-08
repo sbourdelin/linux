@@ -7,25 +7,25 @@
 extern struct static_key_false page_owner_inited;
 extern struct page_ext_operations page_owner_ops;
 
-extern void __reset_page_owner(struct page *page, unsigned int order);
-extern void __set_page_owner(struct page *page,
+extern void __page_owner_free_pages(struct page *page, unsigned int order);
+extern void __page_owner_alloc_pages(struct page *page,
 			unsigned int order, gfp_t gfp_mask);
 extern void __split_page_owner(struct page *page, unsigned int order);
 extern void __copy_page_owner(struct page *oldpage, struct page *newpage);
 extern void __set_page_owner_migrate_reason(struct page *page, int reason);
 extern void __dump_page_owner(struct page *page);
 
-static inline void reset_page_owner(struct page *page, unsigned int order)
+static inline void page_owner_free_pages(struct page *page, unsigned int order)
 {
 	if (static_branch_unlikely(&page_owner_inited))
-		__reset_page_owner(page, order);
+		__page_owner_free_pages(page, order);
 }
 
-static inline void set_page_owner(struct page *page,
+static inline void page_owner_alloc_pages(struct page *page,
 			unsigned int order, gfp_t gfp_mask)
 {
 	if (static_branch_unlikely(&page_owner_inited))
-		__set_page_owner(page, order, gfp_mask);
+		__page_owner_alloc_pages(page, order, gfp_mask);
 }
 
 static inline void split_page_owner(struct page *page, unsigned int order)
@@ -49,10 +49,10 @@ static inline void dump_page_owner(struct page *page)
 		__dump_page_owner(page);
 }
 #else
-static inline void reset_page_owner(struct page *page, unsigned int order)
+static inline void page_owner_free_pages(struct page *page, unsigned int order)
 {
 }
-static inline void set_page_owner(struct page *page,
+static inline void page_owner_alloc_pages(struct page *page,
 			unsigned int order, gfp_t gfp_mask)
 {
 }
