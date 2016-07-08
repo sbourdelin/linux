@@ -88,6 +88,22 @@ LIST_HEAD(ioapic_map);
 LIST_HEAD(hpet_map);
 LIST_HEAD(acpihid_map);
 
+#define FLUSH_QUEUE_SIZE 256
+
+struct flush_queue_entry {
+	unsigned long iova_pfn;
+	unsigned long pages;
+	struct dma_ops_domain *dma_dom;
+};
+
+struct flush_queue {
+	spinlock_t lock;
+	unsigned next;
+	struct flush_queue_entry *entries;
+};
+
+DEFINE_PER_CPU(struct flush_queue, flush_queue);
+
 /*
  * Domain for untranslated devices - only allocated
  * if iommu=pt passed on kernel cmd line.
@@ -2516,7 +2532,7 @@ static int init_reserved_iova_ranges(void)
 
 int __init amd_iommu_init_api(void)
 {
-	int ret, err = 0;
+	int ret, cpu, err = 0;
 
 	ret = iova_cache_get();
 	if (ret)
@@ -2525,6 +2541,18 @@ int __init amd_iommu_init_api(void)
 	ret = init_reserved_iova_ranges();
 	if (ret)
 		return ret;
+
+	for_each_possible_cpu(cpu) {
+		struct flush_queue *queue = per_cpu_ptr(&flush_queue, cpu);
+
+		queue->entries = kzalloc(FLUSH_QUEUE_SIZE *
+					 sizeof(*queue->entries),
+					 GFP_KERNEL);
+		if (!queue->entries)
+			goto out_put_iova;
+
+		spin_lock_init(&queue->lock);
+	}
 
 	err = bus_set_iommu(&pci_bus_type, &amd_iommu_ops);
 	if (err)
@@ -2535,6 +2563,15 @@ int __init amd_iommu_init_api(void)
 		return err;
 #endif
 	return 0;
+
+out_put_iova:
+	for_each_possible_cpu(cpu) {
+		struct flush_queue *queue = per_cpu_ptr(&flush_queue, cpu);
+
+		kfree(queue->entries);
+	}
+
+	return -ENOMEM;
 }
 
 int __init amd_iommu_init_dma_ops(void)
@@ -2557,6 +2594,7 @@ int __init amd_iommu_init_dma_ops(void)
 		pr_info("AMD-Vi: Lazy IO/TLB flushing enabled\n");
 
 	return 0;
+
 }
 
 /*****************************************************************************
