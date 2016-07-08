@@ -20,12 +20,14 @@
 #include <regex.h>
 #include <pthread.h>
 #include <linux/bitops.h>
+#include <sys/utsname.h>
+#include "../arch/common.h"
 
 const char 	*disassembler_style;
 const char	*objdump_path;
 static regex_t	 file_lineno;
 
-static struct ins *ins__find(const char *name);
+static struct ins *ins__find(const char *name, const char *norm_arch);
 static int disasm_line__parse(char *line, char **namep, char **rawp);
 
 static void ins__delete(struct ins_operands *ops)
@@ -53,7 +55,7 @@ int ins__scnprintf(struct ins *ins, char *bf, size_t size,
 	return ins__raw_scnprintf(ins, bf, size, ops);
 }
 
-static int call__parse(struct ins_operands *ops)
+static int call__parse(struct ins_operands *ops, const char *norm_arch)
 {
 	char *endptr, *tok, *name;
 
@@ -65,10 +67,8 @@ static int call__parse(struct ins_operands *ops)
 
 	name++;
 
-#ifdef __arm__
-	if (strchr(name, '+'))
+	if (!strcmp(norm_arch, NORM_ARM) && strchr(name, '+'))
 		return -1;
-#endif
 
 	tok = strchr(name, '>');
 	if (tok == NULL)
@@ -117,7 +117,8 @@ bool ins__is_call(const struct ins *ins)
 	return ins->ops == &call_ops;
 }
 
-static int jump__parse(struct ins_operands *ops)
+static int jump__parse(struct ins_operands *ops,
+		       const char *norm_arch __maybe_unused)
 {
 	const char *s = strchr(ops->raw, '+');
 
@@ -172,7 +173,7 @@ static int comment__symbol(char *raw, char *comment, u64 *addrp, char **namep)
 	return 0;
 }
 
-static int lock__parse(struct ins_operands *ops)
+static int lock__parse(struct ins_operands *ops, const char *norm_arch)
 {
 	char *name;
 
@@ -183,7 +184,7 @@ static int lock__parse(struct ins_operands *ops)
 	if (disasm_line__parse(ops->raw, &name, &ops->locked.ops->raw) < 0)
 		goto out_free_ops;
 
-	ops->locked.ins = ins__find(name);
+	ops->locked.ins = ins__find(name, norm_arch);
 	free(name);
 
 	if (ops->locked.ins == NULL)
@@ -193,7 +194,7 @@ static int lock__parse(struct ins_operands *ops)
 		return 0;
 
 	if (ops->locked.ins->ops->parse &&
-	    ops->locked.ins->ops->parse(ops->locked.ops) < 0)
+	    ops->locked.ins->ops->parse(ops->locked.ops, norm_arch) < 0)
 		goto out_free_ops;
 
 	return 0;
@@ -236,7 +237,7 @@ static struct ins_ops lock_ops = {
 	.scnprintf = lock__scnprintf,
 };
 
-static int mov__parse(struct ins_operands *ops)
+static int mov__parse(struct ins_operands *ops, const char *norm_arch)
 {
 	char *s = strchr(ops->raw, ','), *target, *comment, prev;
 
@@ -251,11 +252,11 @@ static int mov__parse(struct ins_operands *ops)
 		return -1;
 
 	target = ++s;
-#ifdef __arm__
-	comment = strchr(s, ';');
-#else
-	comment = strchr(s, '#');
-#endif
+
+	if (!strcmp(norm_arch, NORM_ARM))
+		comment = strchr(s, ';');
+	else
+		comment = strchr(s, '#');
 
 	if (comment != NULL)
 		s = comment - 1;
@@ -303,7 +304,8 @@ static struct ins_ops mov_ops = {
 	.scnprintf = mov__scnprintf,
 };
 
-static int dec__parse(struct ins_operands *ops)
+static int dec__parse(struct ins_operands *ops,
+		      const char *norm_arch __maybe_unused)
 {
 	char *target, *comment, *s, prev;
 
@@ -363,26 +365,12 @@ bool ins__is_ret(const struct ins *ins)
 	return ins->ops == &ret_ops;
 }
 
-static struct ins instructions[] = {
+static struct ins instructions_x86[] = {
 	{ .name = "add",   .ops  = &mov_ops, },
 	{ .name = "addl",  .ops  = &mov_ops, },
 	{ .name = "addq",  .ops  = &mov_ops, },
 	{ .name = "addw",  .ops  = &mov_ops, },
 	{ .name = "and",   .ops  = &mov_ops, },
-#ifdef __arm__
-	{ .name = "b",     .ops  = &jump_ops, }, // might also be a call
-	{ .name = "bcc",   .ops  = &jump_ops, },
-	{ .name = "bcs",   .ops  = &jump_ops, },
-	{ .name = "beq",   .ops  = &jump_ops, },
-	{ .name = "bge",   .ops  = &jump_ops, },
-	{ .name = "bgt",   .ops  = &jump_ops, },
-	{ .name = "bhi",   .ops  = &jump_ops, },
-	{ .name = "bl",    .ops  = &call_ops, },
-	{ .name = "bls",   .ops  = &jump_ops, },
-	{ .name = "blt",   .ops  = &jump_ops, },
-	{ .name = "blx",   .ops  = &call_ops, },
-	{ .name = "bne",   .ops  = &jump_ops, },
-#endif
 	{ .name = "bts",   .ops  = &mov_ops, },
 	{ .name = "call",  .ops  = &call_ops, },
 	{ .name = "callq", .ops  = &call_ops, },
@@ -456,6 +444,21 @@ static struct ins instructions[] = {
 	{ .name = "retq",  .ops  = &ret_ops, },
 };
 
+static struct ins instructions_arm[] = {
+	{ .name = "b",     .ops  = &jump_ops, }, /* might also be a call */
+	{ .name = "bcc",   .ops  = &jump_ops, },
+	{ .name = "bcs",   .ops  = &jump_ops, },
+	{ .name = "beq",   .ops  = &jump_ops, },
+	{ .name = "bge",   .ops  = &jump_ops, },
+	{ .name = "bgt",   .ops  = &jump_ops, },
+	{ .name = "bhi",   .ops  = &jump_ops, },
+	{ .name = "bl",    .ops  = &call_ops, },
+	{ .name = "bls",   .ops  = &jump_ops, },
+	{ .name = "blt",   .ops  = &jump_ops, },
+	{ .name = "blx",   .ops  = &call_ops, },
+	{ .name = "bne",   .ops  = &jump_ops, },
+};
+
 static int ins__key_cmp(const void *name, const void *insp)
 {
 	const struct ins *ins = insp;
@@ -471,24 +474,48 @@ static int ins__cmp(const void *a, const void *b)
 	return strcmp(ia->name, ib->name);
 }
 
-static void ins__sort(void)
+static void ins__sort(struct ins *instructions, int nmemb)
 {
-	const int nmemb = ARRAY_SIZE(instructions);
-
 	qsort(instructions, nmemb, sizeof(struct ins), ins__cmp);
 }
 
-static struct ins *ins__find(const char *name)
+static const char *annotate__norm_arch(char *arch)
 {
-	const int nmemb = ARRAY_SIZE(instructions);
+	struct utsname uts;
+
+	if (!arch) { /* Assume we are annotating locally. */
+		if (uname(&uts) < 0)
+			return NULL;
+		arch = uts.machine;
+	}
+	return normalize_arch(arch);
+}
+
+static struct ins *ins__find(const char *name, const char *norm_arch)
+{
 	static bool sorted;
+	struct ins *instructions;
+	int nmemb;
 
 	if (!sorted) {
-		ins__sort();
+		ins__sort(instructions_x86, ARRAY_SIZE(instructions_x86));
+		ins__sort(instructions_arm, ARRAY_SIZE(instructions_arm));
 		sorted = true;
 	}
 
-	return bsearch(name, instructions, nmemb, sizeof(struct ins), ins__key_cmp);
+	if (!strcmp(norm_arch, NORM_X86)) {
+		instructions = instructions_x86;
+		nmemb = ARRAY_SIZE(instructions_x86);
+	} else if (!strcmp(norm_arch, NORM_ARM)) {
+		instructions = instructions_arm;
+		nmemb = ARRAY_SIZE(instructions_arm);
+	} else {
+		pr_err("perf annotate not supported by %s arch\n", norm_arch);
+		return NULL;
+	}
+
+	return bsearch(name, instructions, nmemb, sizeof(struct ins),
+			ins__key_cmp);
 }
 
 int symbol__annotate_init(struct map *map __maybe_unused, struct symbol *sym)
@@ -715,9 +742,16 @@ int hist_entry__inc_addr_samples(struct hist_entry *he, int evidx, u64 ip)
 	return symbol__inc_addr_samples(he->ms.sym, he->ms.map, evidx, ip);
 }
 
-static void disasm_line__init_ins(struct disasm_line *dl)
+static void disasm_line__init_ins(struct disasm_line *dl, char *arch)
 {
-	dl->ins = ins__find(dl->name);
+	const char *norm_arch = annotate__norm_arch(arch);
+
+	if (!norm_arch) {
+		pr_err("Can not annotate. Could not determine architecture.");
+		return;
+	}
+
+	dl->ins = ins__find(dl->name, norm_arch);
 
 	if (dl->ins == NULL)
 		return;
@@ -725,7 +759,8 @@ static void disasm_line__init_ins(struct disasm_line *dl)
 	if (!dl->ins->ops)
 		return;
 
-	if (dl->ins->ops->parse && dl->ins->ops->parse(&dl->ops) < 0)
+	if (dl->ins->ops->parse &&
+	    dl->ins->ops->parse(&dl->ops, norm_arch) < 0)
 		dl->ins = NULL;
 }
 
@@ -767,7 +802,8 @@ out_free_name:
 }
 
 static struct disasm_line *disasm_line__new(s64 offset, char *line,
-					size_t privsize, int line_nr)
+					size_t privsize, int line_nr,
+					char *arch)
 {
 	struct disasm_line *dl = zalloc(sizeof(*dl) + privsize);
 
@@ -782,7 +818,7 @@ static struct disasm_line *disasm_line__new(s64 offset, char *line,
 			if (disasm_line__parse(dl->line, &dl->name, &dl->ops.raw) < 0)
 				goto out_free_line;
 
-			disasm_line__init_ins(dl);
+			disasm_line__init_ins(dl, arch);
 		}
 	}
 
@@ -1005,7 +1041,7 @@ static int disasm_line__print(struct disasm_line *dl, struct symbol *sym, u64 st
  */
 static int symbol__parse_objdump_line(struct symbol *sym, struct map *map,
 				      FILE *file, size_t privsize,
-				      int *line_nr)
+				      int *line_nr, char *arch)
 {
 	struct annotation *notes = symbol__annotation(sym);
 	struct disasm_line *dl;
@@ -1066,7 +1102,8 @@ static int symbol__parse_objdump_line(struct symbol *sym, struct map *map,
 			parsed_line = tmp2 + 1;
 	}
 
-	dl = disasm_line__new(offset, parsed_line, privsize, *line_nr);
+	dl = disasm_line__new(offset, parsed_line, privsize,
+				*line_nr, arch);
 	free(line);
 	(*line_nr)++;
 
@@ -1123,7 +1160,8 @@ static void delete_last_nop(struct symbol *sym)
 	}
 }
 
-int symbol__annotate(struct symbol *sym, struct map *map, size_t privsize)
+int symbol__annotate(struct symbol *sym, struct map *map, size_t privsize,
+		     char *arch)
 {
 	struct dso *dso = map->dso;
 	char *filename = dso__build_id_filename(dso, NULL, 0);
@@ -1271,7 +1309,7 @@ fallback:
 	nline = 0;
 	while (!feof(file)) {
 		if (symbol__parse_objdump_line(sym, map, file, privsize,
-			    &lineno) < 0)
+			    &lineno, arch) < 0)
 			break;
 		nline++;
 	}
@@ -1663,7 +1701,7 @@ int symbol__tty_annotate(struct symbol *sym, struct map *map,
 	struct rb_root source_line = RB_ROOT;
 	u64 len;
 
-	if (symbol__annotate(sym, map, 0) < 0)
+	if (symbol__annotate(sym, map, 0, perf_evsel__env_arch(evsel)) < 0)
 		return -1;
 
 	len = symbol__size(sym);
