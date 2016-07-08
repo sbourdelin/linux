@@ -15,6 +15,14 @@
 
 #include <linux/types.h>
 
+#ifdef __GNUC__
+#define __packed __attribute__((packed))
+#else
+#define __packed
+#endif
+
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(arr)[0])
+
 struct nd_cmd_smart {
 	__u32 status;
 	__u8 data[128];
