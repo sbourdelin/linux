@@ -42,6 +42,12 @@ extern int icp_hv_init(void);
 static inline int icp_hv_init(void) { return -ENODEV; }
 #endif
 
+#ifdef CONFIG_PPC_POWERNV
+extern int icp_opal_init(void);
+#else
+static inline int icp_opal_init(void) { return -ENODEV; }
+#endif
+
 /* ICP ops */
 struct icp_ops {
 	unsigned int (*get_irq)(void);
@@ -135,7 +141,7 @@ static inline void xics_set_base_cppr(unsigned char cppr)
 static inline unsigned char xics_cppr_top(void)
 {
 	struct xics_cppr *os_cppr = this_cpu_ptr(&xics_cppr);
-	
+
 	return os_cppr->stack[os_cppr->index];
 }
 
