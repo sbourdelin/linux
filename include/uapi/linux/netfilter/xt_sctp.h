@@ -3,6 +3,8 @@
 
 #include <linux/types.h>
 
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(arr)[0])
+
 #define XT_SCTP_SRC_PORTS	        0x01
 #define XT_SCTP_DEST_PORTS	        0x02
 #define XT_SCTP_CHUNK_TYPES		0x04
