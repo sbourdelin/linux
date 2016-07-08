@@ -55,6 +55,7 @@
 #include <linux/types.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/clk/clk-conf.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/sizes.h>
 #include <linux/io.h>
@@ -2471,6 +2472,10 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
 	uap->clk = devm_clk_get(&dev->dev, NULL);
 	if (IS_ERR(uap->clk))
 		return PTR_ERR(uap->clk);
+
+	ret = of_clk_set_defaults(dev->dev.of_node, false);
+	if (ret < 0)
+		return ret;
 
 	uap->reg_offset = vendor->reg_offset;
 	uap->vendor = vendor;
