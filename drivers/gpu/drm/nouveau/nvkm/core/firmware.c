@@ -36,16 +36,9 @@ nvkm_firmware_get(struct nvkm_device *device, const char *fwname,
 {
 	char f[64];
 	char cname[16];
-	int i;
 
 	/* Convert device name to lowercase */
-	strncpy(cname, device->chip->name, sizeof(cname));
-	cname[sizeof(cname) - 1] = '\0';
-	i = strlen(cname);
-	while (i) {
-		--i;
-		cname[i] = tolower(cname[i]);
-	}
+	strlcpytolower(cname, device->chip->name, sizeof(cname));
 
 	snprintf(f, sizeof(f), "nvidia/%s/%s.bin", cname, fwname);
 	return request_firmware(fw, f, device->dev);
