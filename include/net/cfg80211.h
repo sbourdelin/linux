@@ -3292,6 +3292,9 @@ struct wiphy_iftype_ext_capab {
  * @bss_select_support: bitmask indicating the BSS selection criteria supported
  *	by the driver in the .connect() callback. The bit position maps to the
  *	attribute indices defined in &enum nl80211_bss_select_attr.
+ * @support_different_beacon_interval: support of different beacon_interval on
+ *	virtual interfaces. This should be set if driver wishes to advertise
+ *	support for different beacon_interval.
  */
 struct wiphy {
 	/* assign these fields before you register the wiphy */
@@ -3420,6 +3423,8 @@ struct wiphy {
 	u8 max_adj_channel_rssi_comp;
 
 	u32 bss_select_support;
+
+	bool support_different_beacon_interval;
 
 	char priv[0] __aligned(NETDEV_ALIGN);
 };
