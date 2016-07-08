@@ -952,3 +952,41 @@ char *strreplace(char *s, char old, char new)
 	return s;
 }
 EXPORT_SYMBOL(strreplace);
+
+/**
+ * strlcpytoupper - Copy a length-limited string and convert to uppercase.
+ * @dst: The buffer to store the result.
+ * @src: The string to convert to uppercase.
+ * @len: Maximum string length. May be SIZE_MAX (-1) to set no limit.
+ */
+void strlcpytoupper(char *dst, const char *src, size_t len)
+{
+	size_t i;
+
+	if (!len)
+		return;
+
+	for (i = 0; i < len && src[i]; ++i)
+		dst[i] = toupper(src[i]);
+	dst[i < len ? i : i - 1] = '\0';
+}
+EXPORT_SYMBOL(strlcpytoupper);
+
+/**
+ * strlcpytolower - Copy a length-limited string and convert to lowercase.
+ * @dst: The buffer to store the result.
+ * @src: The string to convert to lowercase.
+ * @len: Maximum string length. May be SIZE_MAX (-1) to set no limit.
+ */
+void strlcpytolower(char *dst, const char *src, size_t len)
+{
+	size_t i;
+
+	if (!len)
+		return;
+
+	for (i = 0; i < len && src[i]; ++i)
+		dst[i] = tolower(src[i]);
+	dst[i < len ? i : i - 1] = '\0';
+}
+EXPORT_SYMBOL(strlcpytolower);
