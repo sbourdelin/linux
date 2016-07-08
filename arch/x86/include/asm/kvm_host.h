@@ -485,6 +485,14 @@ struct kvm_vcpu_arch {
 	u64 ia32_xss;
 
 	/*
+	 * Only bits masked by msr_ia32_feature_control_valid_bits can be set in
+	 * msr_ia32_feature_control. FEATURE_CONTROL_LOCKED is always included
+	 * in msr_ia32_feature_control_valid_bits.
+	 */
+	u64 msr_ia32_feature_control;
+	u64 msr_ia32_feature_control_valid_bits;
+
+	/*
 	 * Paging state of the vcpu
 	 *
 	 * If the vcpu runs in guest mode with two level paging this still saves

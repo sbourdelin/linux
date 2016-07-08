@@ -157,6 +157,14 @@ static inline bool kvm_check_has_quirk(struct kvm *kvm, u64 quirk)
 	return !(kvm->arch.disabled_quirks & quirk);
 }
 
+static inline bool feature_control_msr_valid(struct kvm_vcpu *vcpu,
+						 uint64_t val)
+{
+	uint64_t valid_bits = vcpu->arch.msr_ia32_feature_control_valid_bits;
+
+	return !(val & ~valid_bits);
+}
+
 void kvm_before_handle_nmi(struct kvm_vcpu *vcpu);
 void kvm_after_handle_nmi(struct kvm_vcpu *vcpu);
 void kvm_set_pending_timer(struct kvm_vcpu *vcpu);

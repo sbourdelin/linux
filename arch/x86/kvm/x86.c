@@ -2097,6 +2097,13 @@ int kvm_set_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 	case MSR_IA32_TSCDEADLINE:
 		kvm_set_lapic_tscdeadline_msr(vcpu, data);
 		break;
+	case MSR_IA32_FEATURE_CONTROL:
+		if (!feature_control_msr_valid(vcpu, data) ||
+		    (vcpu->arch.msr_ia32_feature_control &
+		     FEATURE_CONTROL_LOCKED && !msr_info->host_initiated))
+			return 1;
+		vcpu->arch.msr_ia32_feature_control = data;
+		break;
 	case MSR_IA32_TSC_ADJUST:
 		if (guest_cpuid_has_tsc_adjust(vcpu)) {
 			if (!msr_info->host_initiated) {
@@ -2363,6 +2370,9 @@ int kvm_get_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		break;
 	case MSR_IA32_TSC_ADJUST:
 		msr_info->data = (u64)vcpu->arch.ia32_tsc_adjust_msr;
+		break;
+	case MSR_IA32_FEATURE_CONTROL:
+		msr_info->data = vcpu->arch.msr_ia32_feature_control;
 		break;
 	case MSR_IA32_MISC_ENABLE:
 		msr_info->data = vcpu->arch.ia32_misc_enable_msr;
@@ -7698,6 +7708,7 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
 
 	vcpu->arch.ia32_tsc_adjust_msr = 0x0;
 	vcpu->arch.pv_time_enabled = false;
+	vcpu->arch.msr_ia32_feature_control_valid_bits = FEATURE_CONTROL_LOCKED;
 
 	vcpu->arch.guest_supported_xcr0 = 0;
 	vcpu->arch.guest_xstate_size = XSAVE_HDR_SIZE + XSAVE_HDR_OFFSET;
