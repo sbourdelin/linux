@@ -1,5 +1,5 @@
 /*
- * cxgb4_ppm.c: Chelsio common library for T4/T5 iSCSI PagePod Manager
+ * libcxgb_ppm.c: Chelsio common library for T3/T4/T5 iSCSI PagePod Manager
  *
  * Copyright (c) 2016 Chelsio Communications, Inc. All rights reserved.
  *
@@ -9,6 +9,10 @@
  *
  * Written by: Karen Xie (kxie@chelsio.com)
  */
+
+#define DRV_NAME "libcxgb"
+#define DRV_VERSION "1.0.0-ko"
+#define pr_fmt(fmt) DRV_NAME ": " fmt
 
 #include <linux/kernel.h>
 #include <linux/version.h>
@@ -22,7 +26,7 @@
 #include <linux/pci.h>
 #include <linux/scatterlist.h>
 
-#include "cxgb4_ppm.h"
+#include "libcxgb_ppm.h"
 
 /* Direct Data Placement -
  * Directly place the iSCSI Data-In or Data-Out PDU's payload into
@@ -462,3 +466,20 @@ unsigned int cxgbi_tagmask_set(unsigned int ppmax)
 
 	return 1 << (bits + PPOD_IDX_SHIFT);
 }
+
+static int __init libcxgb_init(void)
+{
+	return 0;
+}
+
+static void __exit libcxgb_exit(void)
+{
+}
+
+module_init(libcxgb_init);
+module_exit(libcxgb_exit);
+
+MODULE_AUTHOR("Chelsio Communications");
+MODULE_DESCRIPTION("Chelsio common library");
+MODULE_VERSION(DRV_VERSION);
+MODULE_LICENSE("GPL");

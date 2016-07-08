@@ -1,5 +1,5 @@
 /*
- * cxgb4_ppm.h: Chelsio common library for T4/T5 iSCSI ddp operation
+ * libcxgb_ppm.h: Chelsio common library for T3/T4/T5 iSCSI ddp operation
  *
  * Copyright (c) 2016 Chelsio Communications, Inc. All rights reserved.
  *
@@ -10,8 +10,8 @@
  * Written by: Karen Xie (kxie@chelsio.com)
  */
 
-#ifndef	__CXGB4PPM_H__
-#define	__CXGB4PPM_H__
+#ifndef	__LIBCXGB_PPM_H__
+#define	__LIBCXGB_PPM_H__
 
 #include <linux/kernel.h>
 #include <linux/errno.h>
@@ -307,4 +307,4 @@ int cxgbi_ppm_release(struct cxgbi_ppm *ppm);
 void cxgbi_tagmask_check(unsigned int tagmask, struct cxgbi_tag_format *);
 unsigned int cxgbi_tagmask_set(unsigned int ppmax);
 
-#endif	/*__CXGB4PPM_H__*/
+#endif	/*__LIBCXGB_PPM_H__*/
