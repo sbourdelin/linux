@@ -139,6 +139,9 @@
 					 ((Op2) << ESR_ELx_SYS64_ISS_Op2_SHIFT) | \
 					 ((CRn) << ESR_ELx_SYS64_ISS_CRn_SHIFT) | \
 					 ((CRm) << ESR_ELx_SYS64_ISS_CRm_SHIFT))
+
+#define ESR_ELx_SYS64_ISS_SYS_OP_MASK	(ESR_ELx_SYS64_ISS_SYS_MASK | \
+					 ESR_ELx_SYS64_ISS_DIR_MASK)
 /*
  * User space cache operations have the following sysreg encoding
  * in System instructions.
@@ -157,6 +160,11 @@
 #define ESR_ELx_SYS64_ISS_U_CACHE_OP_VAL \
 				(ESR_ELx_SYS64_ISS_SYS_VAL(1, 3, 1, 7, 0) | \
 				 ESR_ELx_SYS64_ISS_DIR_WRITE)
+
+#define ESR_ELx_SYS64_ISS_SYS_CTR	ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 1, 0, 0)
+#define ESR_ELx_SYS64_ISS_SYS_CTR_READ	(ESR_ELx_SYS64_ISS_SYS_CTR | \
+					 ESR_ELx_SYS64_ISS_DIR_READ)
+
 #ifndef __ASSEMBLY__
 #include <asm/types.h>
 
