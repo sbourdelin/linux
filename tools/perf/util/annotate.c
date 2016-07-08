@@ -55,9 +55,14 @@ int ins__scnprintf(struct ins *ins, char *bf, size_t size,
 	return ins__raw_scnprintf(ins, bf, size, ops);
 }
 
-static int call__parse(struct ins_operands *ops, const char *norm_arch)
+static int call__parse(char *ins_name, struct ins_operands *ops,
+		       const char *norm_arch)
 {
 	char *endptr, *tok, *name;
+
+	/* Special case for powerpc */
+	if (!strcmp(norm_arch, NORM_POWERPC) && strstr(ins_name, "ctr"))
+		return 0;
 
 	ops->target.addr = strtoull(ops->raw, &endptr, 16);
 
@@ -117,7 +122,7 @@ bool ins__is_call(const struct ins *ins)
 	return ins->ops == &call_ops;
 }
 
-static int jump__parse(struct ins_operands *ops,
+static int jump__parse(char *ins_name __maybe_unused, struct ins_operands *ops,
 		       const char *norm_arch __maybe_unused)
 {
 	const char *s = strchr(ops->raw, '+');
@@ -135,6 +140,13 @@ static int jump__parse(struct ins_operands *ops,
 static int jump__scnprintf(struct ins *ins, char *bf, size_t size,
 			   struct ins_operands *ops)
 {
+	/*
+	 * Instructions that does not include target address in operand
+	 * like 'bctr' for powerpc.
+	 */
+	if (!ops->target.addr)
+		return scnprintf(bf, size, "%-6.6s", ins->name);
+
 	return scnprintf(bf, size, "%-6.6s %" PRIx64, ins->name, ops->target.offset);
 }
 
@@ -173,7 +185,8 @@ static int comment__symbol(char *raw, char *comment, u64 *addrp, char **namep)
 	return 0;
 }
 
-static int lock__parse(struct ins_operands *ops, const char *norm_arch)
+static int lock__parse(char *ins_name, struct ins_operands *ops,
+		       const char *norm_arch)
 {
 	char *name;
 
@@ -194,7 +207,8 @@ static int lock__parse(struct ins_operands *ops, const char *norm_arch)
 		return 0;
 
 	if (ops->locked.ins->ops->parse &&
-	    ops->locked.ins->ops->parse(ops->locked.ops, norm_arch) < 0)
+	    ops->locked.ins->ops->parse(ins_name,
+			ops->locked.ops, norm_arch) < 0)
 		goto out_free_ops;
 
 	return 0;
@@ -237,7 +251,8 @@ static struct ins_ops lock_ops = {
 	.scnprintf = lock__scnprintf,
 };
 
-static int mov__parse(struct ins_operands *ops, const char *norm_arch)
+static int mov__parse(char *ins_name __maybe_unused, struct ins_operands *ops,
+		      const char *norm_arch)
 {
 	char *s = strchr(ops->raw, ','), *target, *comment, prev;
 
@@ -304,7 +319,7 @@ static struct ins_ops mov_ops = {
 	.scnprintf = mov__scnprintf,
 };
 
-static int dec__parse(struct ins_operands *ops,
+static int dec__parse(char *ins_name __maybe_unused, struct ins_operands *ops,
 		      const char *norm_arch __maybe_unused)
 {
 	char *target, *comment, *s, prev;
@@ -459,6 +474,11 @@ static struct ins instructions_arm[] = {
 	{ .name = "bne",   .ops  = &jump_ops, },
 };
 
+struct instructions_powerpc {
+	struct ins *ins;
+	struct list_head list;
+};
+
 static int ins__key_cmp(const void *name, const void *insp)
 {
 	const struct ins *ins = insp;
@@ -472,6 +492,125 @@ static int ins__cmp(const void *a, const void *b)
 	const struct ins *ib = b;
 
 	return strcmp(ia->name, ib->name);
+}
+
+static struct ins *list_add__ins_powerpc(struct instructions_powerpc *head,
+					 const char *name, struct ins_ops *ops)
+{
+	struct instructions_powerpc *ins_powerpc;
+	struct ins *ins;
+
+	ins = zalloc(sizeof(struct ins));
+	if (!ins)
+		return NULL;
+
+	ins_powerpc = zalloc(sizeof(struct instructions_powerpc));
+	if (!ins_powerpc)
+		goto out_free_ins;
+
+	ins->name = strdup(name);
+	if (!ins->name)
+		goto out_free_ins_power;
+
+	ins->ops = ops;
+	ins_powerpc->ins = ins;
+	list_add_tail(&(ins_powerpc->list), &(head->list));
+
+	return ins;
+
+out_free_ins_power:
+	zfree(&ins_powerpc);
+out_free_ins:
+	zfree(&ins);
+	return NULL;
+}
+
+static struct ins *list_search__ins_powerpc(struct instructions_powerpc *head,
+					    const char *name)
+{
+	struct instructions_powerpc *pos;
+
+	list_for_each_entry(pos, &head->list, list) {
+		if (!strcmp(pos->ins->name, name))
+			return pos->ins;
+	}
+	return NULL;
+}
+
+static struct ins *ins__find_powerpc(const char *name)
+{
+	int i;
+	struct ins *ins;
+	struct ins_ops *ops;
+	static struct instructions_powerpc head;
+	static bool list_initialized;
+
+	/*
+	 * - Interested only if instruction starts with 'b'.
+	 * - Few start with 'b', but aren't branch instructions.
+	 * - Let's also ignore instructions involving 'tar' since target
+	 *   branch addresses for those can't be determined statically.
+	 *   (same for instruction involving 'ctr'. But they are very
+	 *    common so not filtering them.)
+	 */
+
+	if (name[0] != 'b'             ||
+	    !strncmp(name, "bcd", 3)   ||
+	    !strncmp(name, "brinc", 5) ||
+	    !strncmp(name, "bper", 4)  ||
+	    strstr(name, "tar"))
+		return NULL;
+
+	if (!list_initialized) {
+		INIT_LIST_HEAD(&head.list);
+		list_initialized = true;
+	}
+
+	/*
+	 * Return if we already have object of 'struct ins' for this instruction
+	 */
+	ins = list_search__ins_powerpc(&head, name);
+	if (ins)
+		return ins;
+
+	ops = &jump_ops;
+
+	i = strlen(name) - 1;
+	if (i < 0)
+		return NULL;
+
+	/* ignore optional hints at the end of the instructions */
+	if (name[i] == '+' || name[i] == '-')
+		i--;
+
+	if (name[i] == 'l' || (name[i] == 'a' && name[i-1] == 'l')) {
+		/*
+		 * if the instruction ends up with 'l' or 'la', then
+		 * those are considered 'calls' since they update LR.
+		 * ... except for 'bnl' which is branch if not less than
+		 * and the absolute form of the same.
+		 */
+		if (strcmp(name, "bnl") && strcmp(name, "bnl+") &&
+		    strcmp(name, "bnl-") && strcmp(name, "bnla") &&
+		    strcmp(name, "bnla+") && strcmp(name, "bnla-"))
+			ops = &call_ops;
+	}
+	if (name[i] == 'r' && name[i-1] == 'l')
+		/*
+		 * instructions ending with 'lr' are considered to be
+		 * return instructions
+		 */
+		ops = &ret_ops;
+
+	/*
+	 * Add instruction to list so next time no need to
+	 * allocate memory for it.
+	 */
+	ins = list_add__ins_powerpc(&head, name, ops);
+	if (ins)
+		return ins;
+
+	return NULL;
 }
 
 static void ins__sort(struct ins *instructions, int nmemb)
@@ -509,6 +648,8 @@ static struct ins *ins__find(const char *name, const char *norm_arch)
 	} else if (!strcmp(norm_arch, NORM_ARM)) {
 		instructions = instructions_arm;
 		nmemb = ARRAY_SIZE(instructions_arm);
+	} else if (!strcmp(norm_arch, NORM_POWERPC)) {
+		return ins__find_powerpc(name);
 	} else {
 		pr_err("perf annotate not supported by %s arch\n", norm_arch);
 		return NULL;
@@ -760,7 +901,7 @@ static void disasm_line__init_ins(struct disasm_line *dl, char *arch)
 		return;
 
 	if (dl->ins->ops->parse &&
-	    dl->ins->ops->parse(&dl->ops, norm_arch) < 0)
+	    dl->ins->ops->parse(dl->name, &dl->ops, norm_arch) < 0)
 		dl->ins = NULL;
 }
 
