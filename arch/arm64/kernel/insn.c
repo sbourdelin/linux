@@ -1175,6 +1175,29 @@ u32 aarch64_set_branch_offset(u32 insn, s32 offset)
 	BUG();
 }
 
+s32 aarch64_get_addr_offset(u32 insn)
+{
+	if (aarch64_insn_is_adr(insn))
+		return aarch64_insn_decode_immediate(AARCH64_INSN_IMM_ADR, insn);
+	if (aarch64_insn_is_adrp(insn))
+		return aarch64_insn_decode_immediate(AARCH64_INSN_IMM_ADR, insn) << 12;
+
+	/* Unhandled instruction */
+	BUG();
+}
+
+u32 aarch64_set_addr_offset(u32 insn, s32 offset)
+{
+	if (aarch64_insn_is_adr(insn))
+		return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_ADR, insn,
+									offset);
+	if (aarch64_insn_is_adrp(insn))
+		return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_ADR, insn,
+									offset >> 12);
+	/* Unhandled instruction */
+	BUG();
+}
+
 bool aarch32_insn_is_wide(u32 insn)
 {
 	return insn >= 0xe800;

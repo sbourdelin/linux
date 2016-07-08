@@ -277,6 +277,8 @@ __AARCH64_INSN_FUNCS(hint,	0xFFFFF01F, 0xD503201F)
 __AARCH64_INSN_FUNCS(br,	0xFFFFFC1F, 0xD61F0000)
 __AARCH64_INSN_FUNCS(blr,	0xFFFFFC1F, 0xD63F0000)
 __AARCH64_INSN_FUNCS(ret,	0xFFFFFC1F, 0xD65F0000)
+__AARCH64_INSN_FUNCS(adrp,	0x9F000000, 0x90000000)
+__AARCH64_INSN_FUNCS(adr,	0x9F000000, 0x10000000)
 
 #undef	__AARCH64_INSN_FUNCS
 
@@ -354,6 +356,9 @@ u32 aarch64_insn_gen_logical_shifted_reg(enum aarch64_insn_register dst,
 					 enum aarch64_insn_logic_type type);
 s32 aarch64_get_branch_offset(u32 insn);
 u32 aarch64_set_branch_offset(u32 insn, s32 offset);
+
+s32 aarch64_get_addr_offset(u32 insn);
+u32 aarch64_set_addr_offset(u32 insn, s32 offset);
 
 bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
 
