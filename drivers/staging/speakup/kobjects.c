@@ -387,11 +387,10 @@ static ssize_t synth_store(struct kobject *kobj, struct kobj_attribute *attr,
 	len = strlen(buf);
 	if (len < 2 || len > 9)
 		return -EINVAL;
-	strncpy(new_synth_name, buf, len);
+	strlcpytolower(new_synth_name, buf, sizeof(new_synth_name));
 	if (new_synth_name[len - 1] == '\n')
 		len--;
 	new_synth_name[len] = '\0';
-	spk_strlwr(new_synth_name);
 	if ((synth != NULL) && (!strcmp(new_synth_name, synth->name))) {
 		pr_warn("%s already in use\n", new_synth_name);
 	} else if (synth_init(new_synth_name) != 0) {
