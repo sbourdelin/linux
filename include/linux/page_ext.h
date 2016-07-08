@@ -27,11 +27,20 @@ enum page_ext_flags {
 	PAGE_EXT_DEBUG_POISON,		/* Page is poisoned */
 	PAGE_EXT_DEBUG_GUARD,
 	PAGE_EXT_OWNER_ALLOC,
+	PAGE_EXT_OWNER_FREE,
 #if defined(CONFIG_IDLE_PAGE_TRACKING) && !defined(CONFIG_64BIT)
 	PAGE_EXT_YOUNG,
 	PAGE_EXT_IDLE,
 #endif
 };
+
+#ifdef CONFIG_PAGE_OWNER
+enum page_owner_handles {
+	PAGE_OWNER_HANDLE_ALLOC,
+	PAGE_OWNER_HANDLE_FREE,
+	PAGE_OWNER_HANDLE_MAX
+};
+#endif
 
 /*
  * Page Extension can be considered as an extended mem_map.
@@ -46,7 +55,7 @@ struct page_ext {
 	unsigned int order;
 	gfp_t gfp_mask;
 	int last_migrate_reason;
-	depot_stack_handle_t handle;
+	depot_stack_handle_t handles[PAGE_OWNER_HANDLE_MAX];
 #endif
 };
 

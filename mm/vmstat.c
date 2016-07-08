@@ -1073,6 +1073,9 @@ static void pagetypeinfo_showmixedcount_print(struct seq_file *m,
 			if (!test_bit(PAGE_EXT_OWNER_ALLOC, &page_ext->flags))
 				continue;
 
+			if (!test_bit(PAGE_EXT_OWNER_FREE, &page_ext->flags))
+				continue;
+
 			page_mt = gfpflags_to_migratetype(page_ext->gfp_mask);
 			if (pageblock_mt != page_mt) {
 				if (is_migrate_cma(pageblock_mt))

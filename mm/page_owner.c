@@ -13,6 +13,11 @@
 
 #define PAGE_OWNER_STACK_DEPTH (16)
 
+static const char *page_owner_handles_names[PAGE_OWNER_HANDLE_MAX] = {
+	"page allocated",
+	"page freed, was allocated",
+};
+
 static bool page_owner_disabled = true;
 DEFINE_STATIC_KEY_FALSE(page_owner_inited);
 
@@ -85,19 +90,6 @@ struct page_ext_operations page_owner_ops = {
 	.init = init_page_owner,
 };
 
-void __page_owner_free_pages(struct page *page, unsigned int order)
-{
-	int i;
-	struct page_ext *page_ext;
-
-	for (i = 0; i < (1 << order); i++) {
-		page_ext = lookup_page_ext(page + i);
-		if (unlikely(!page_ext))
-			continue;
-		__clear_bit(PAGE_EXT_OWNER_ALLOC, &page_ext->flags);
-	}
-}
-
 static inline bool check_recursive_alloc(struct stack_trace *trace,
 					unsigned long ip)
 {
@@ -147,6 +139,23 @@ static noinline depot_stack_handle_t save_stack(gfp_t flags)
 	return handle;
 }
 
+void __page_owner_free_pages(struct page *page, unsigned int order)
+{
+	int i;
+	depot_stack_handle_t handle = save_stack(0);
+
+	for (i = 0; i < (1 << order); i++) {
+		struct page_ext *page_ext = lookup_page_ext(page + i);
+
+		if (unlikely(!page_ext))
+			continue;
+
+		page_ext->handles[PAGE_OWNER_HANDLE_FREE] = handle;
+		__set_bit(PAGE_EXT_OWNER_FREE, &page_ext->flags);
+		__clear_bit(PAGE_EXT_OWNER_ALLOC, &page_ext->flags);
+	}
+}
+
 noinline void __page_owner_alloc_pages(struct page *page, unsigned int order,
 					gfp_t gfp_mask)
 {
@@ -155,7 +164,7 @@ noinline void __page_owner_alloc_pages(struct page *page, unsigned int order,
 	if (unlikely(!page_ext))
 		return;
 
-	page_ext->handle = save_stack(gfp_mask);
+	page_ext->handles[PAGE_OWNER_HANDLE_ALLOC] = save_stack(gfp_mask);
 	page_ext->order = order;
 	page_ext->gfp_mask = gfp_mask;
 	page_ext->last_migrate_reason = -1;
@@ -189,6 +198,7 @@ void __copy_page_owner(struct page *oldpage, struct page *newpage)
 {
 	struct page_ext *old_ext = lookup_page_ext(oldpage);
 	struct page_ext *new_ext = lookup_page_ext(newpage);
+	int i;
 
 	if (unlikely(!old_ext || !new_ext))
 		return;
@@ -196,7 +206,9 @@ void __copy_page_owner(struct page *oldpage, struct page *newpage)
 	new_ext->order = old_ext->order;
 	new_ext->gfp_mask = old_ext->gfp_mask;
 	new_ext->last_migrate_reason = old_ext->last_migrate_reason;
-	new_ext->handle = old_ext->handle;
+
+	for (i = 0; i < PAGE_OWNER_HANDLE_MAX; i++)
+		new_ext->handles[i] = old_ext->handles[i];
 
 	/*
 	 * We don't clear the bit on the oldpage as it's going to be freed
@@ -292,7 +304,7 @@ void __dump_page_owner(struct page *page)
 	};
 	depot_stack_handle_t handle;
 	gfp_t gfp_mask;
-	int mt;
+	int mt, i;
 
 	if (unlikely(!page_ext)) {
 		pr_alert("There is not page extension available.\n");
@@ -301,25 +313,31 @@ void __dump_page_owner(struct page *page)
 	gfp_mask = page_ext->gfp_mask;
 	mt = gfpflags_to_migratetype(gfp_mask);
 
-	if (!test_bit(PAGE_EXT_OWNER_ALLOC, &page_ext->flags)) {
+	if (!test_bit(PAGE_EXT_OWNER_ALLOC, &page_ext->flags) &&
+			!test_bit(PAGE_EXT_OWNER_FREE, &page_ext->flags)) {
 		pr_alert("page_owner info is not active (free page?)\n");
 		return;
 	}
 
-	handle = READ_ONCE(page_ext->handle);
-	if (!handle) {
-		pr_alert("page_owner info is not active (free page?)\n");
-		return;
-	}
+	for (i = 0; i < PAGE_OWNER_HANDLE_MAX; i++) {
+		handle = READ_ONCE(page_ext->handles[i]);
+		if (!handle) {
+			pr_alert("page_owner info is not active for `%s'\n",
+					page_owner_handles_names[i]);
+			continue;
+		}
 
-	depot_fetch_stack(handle, &trace);
-	pr_alert("page allocated via order %u, migratetype %s, gfp_mask %#x(%pGg)\n",
-		 page_ext->order, migratetype_names[mt], gfp_mask, &gfp_mask);
-	print_stack_trace(&trace, 0);
+		depot_fetch_stack(handle, &trace);
+		pr_alert("%s via order %u, migratetype %s, gfp_mask %#x(%pGg)\n",
+				page_owner_handles_names[i], page_ext->order,
+				migratetype_names[mt], gfp_mask, &gfp_mask);
+		print_stack_trace(&trace, 0);
 
-	if (page_ext->last_migrate_reason != -1)
+		if (page_ext->last_migrate_reason == -1)
+			continue;
 		pr_alert("page has been migrated, last migrate reason: %s\n",
 			migrate_reason_names[page_ext->last_migrate_reason]);
+	}
 }
 
 static ssize_t
@@ -381,7 +399,7 @@ read_page_owner(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 		 * Access to page_ext->handle isn't synchronous so we should
 		 * be careful to access it.
 		 */
-		handle = READ_ONCE(page_ext->handle);
+		handle = READ_ONCE(page_ext->handles[PAGE_OWNER_HANDLE_ALLOC]);
 		if (!handle)
 			continue;
 
