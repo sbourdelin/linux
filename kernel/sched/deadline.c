@@ -346,11 +346,12 @@ static void check_preempt_curr_dl(struct rq *rq, struct task_struct *p,
  * one, and to (try to!) reconcile itself with its own scheduling
  * parameters.
  */
-static inline void setup_new_dl_entity(struct sched_dl_entity *dl_se,
-				       struct sched_dl_entity *pi_se)
+static inline void setup_new_dl_entity(struct sched_dl_entity *dl_se)
 {
 	struct dl_rq *dl_rq = dl_rq_of_se(dl_se);
 	struct rq *rq = rq_of_dl_rq(dl_rq);
+	struct task_struct *pi_task;
+	struct sched_dl_entity *pi_se = dl_se;
 
 	WARN_ON(dl_time_before(rq_clock(rq), dl_se->deadline));
 
@@ -361,6 +362,15 @@ static inline void setup_new_dl_entity(struct sched_dl_entity *dl_se,
 	 */
 	if (dl_se->dl_throttled)
 		return;
+
+	/*
+	 * Use the scheduling parameters of the top pi-waiter task,
+	 * if we have one from which we can inherit a deadline.
+	 */
+	if (dl_se->dl_boosted &&
+	    (pi_task = rt_mutex_get_top_task(dl_task_of(dl_se))) &&
+	    dl_prio(pi_task->normal_prio))
+		pi_se = &pi_task->dl;
 
 	/*
 	 * We use the regular wall clock time to set deadlines in the
@@ -1721,7 +1731,7 @@ static void switched_from_dl(struct rq *rq, struct task_struct *p)
 static void switched_to_dl(struct rq *rq, struct task_struct *p)
 {
 	if (dl_time_before(p->dl.deadline, rq_clock(rq)))
-		setup_new_dl_entity(&p->dl, &p->dl);
+		setup_new_dl_entity(&p->dl);
 
 	if (task_on_rq_queued(p) && rq->curr != p) {
 #ifdef CONFIG_SMP
