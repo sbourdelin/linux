@@ -235,7 +235,8 @@ struct nft_expr;
  *	@features: features supported by the implementation
  */
 struct nft_set_ops {
-	bool				(*lookup)(const struct nft_set *set,
+	bool				(*lookup)(const struct net *net,
+						  const struct nft_set *set,
 						  const u32 *key,
 						  const struct nft_set_ext **ext);
 	bool				(*update)(struct nft_set *set,
@@ -247,11 +248,14 @@ struct nft_set_ops {
 						  struct nft_regs *regs,
 						  const struct nft_set_ext **ext);
 
-	int				(*insert)(const struct nft_set *set,
+	int				(*insert)(const struct net *net,
+						  const struct nft_set *set,
 						  const struct nft_set_elem *elem);
-	void				(*activate)(const struct nft_set *set,
+	void				(*activate)(const struct net *net,
+						    const struct nft_set *set,
 						    const struct nft_set_elem *elem);
-	void *				(*deactivate)(const struct nft_set *set,
+	void *				(*deactivate)(const struct net *net,
+						      const struct nft_set *set,
 						      const struct nft_set_elem *elem);
 	void				(*remove)(const struct nft_set *set,
 						  const struct nft_set_elem *elem);
@@ -294,7 +298,6 @@ void nft_unregister_set(struct nft_set_ops *ops);
  *	@udlen: user data length
  *	@udata: user data
  * 	@ops: set ops
- * 	@pnet: network namespace
  * 	@flags: set flags
  *	@genmask: generation mask
  * 	@klen: key length
@@ -317,7 +320,6 @@ struct nft_set {
 	unsigned char			*udata;
 	/* runtime data below here */
 	const struct nft_set_ops	*ops ____cacheline_aligned;
-	possible_net_t			pnet;
 	u16				flags:14,
 					genmask:2;
 	u8				klen;
@@ -803,7 +805,6 @@ struct nft_stats {
  *	struct nft_base_chain - nf_tables base chain
  *
  *	@ops: netfilter hook ops
- *	@pnet: net namespace that this chain belongs to
  *	@type: chain type
  *	@policy: default policy
  *	@stats: per-cpu chain stats
@@ -812,7 +813,6 @@ struct nft_stats {
  */
 struct nft_base_chain {
 	struct nf_hook_ops		ops[NFT_HOOK_OPS_MAX];
-	possible_net_t			pnet;
 	const struct nf_chain_type	*type;
 	u8				policy;
 	u8				flags;
@@ -1008,10 +1008,11 @@ static inline bool nft_set_elem_active(const struct nft_set_ext *ext,
 	return !(ext->genmask & genmask);
 }
 
-static inline void nft_set_elem_change_active(const struct nft_set *set,
+static inline void nft_set_elem_change_active(const struct net *net,
+					      const struct nft_set *set,
 					      struct nft_set_ext *ext)
 {
-	ext->genmask ^= nft_genmask_next(read_pnet(&set->pnet));
+	ext->genmask ^= nft_genmask_next(net);
 }
 
 /*
