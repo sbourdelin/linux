@@ -132,6 +132,9 @@ __must_check reset_control_get_exclusive(struct device *dev, const char *id)
 static inline struct reset_control *reset_control_get_shared(
 					struct device *dev, const char *id)
 {
+#ifndef CONFIG_RESET_CONTROLLER
+	WARN_ON(1);
+#endif
 	return __of_reset_control_get(dev ? dev->of_node : NULL, id, 0, 1);
 }
 
@@ -160,6 +163,9 @@ static inline struct reset_control *reset_control_get_optional_shared(
 static inline struct reset_control *of_reset_control_get_exclusive(
 				struct device_node *node, const char *id)
 {
+#ifndef CONFIG_RESET_CONTROLLER
+	WARN_ON(1);
+#endif
 	return __of_reset_control_get(node, id, 0, 0);
 }
 
@@ -185,6 +191,9 @@ static inline struct reset_control *of_reset_control_get_exclusive(
 static inline struct reset_control *of_reset_control_get_shared(
 				struct device_node *node, const char *id)
 {
+#ifndef CONFIG_RESET_CONTROLLER
+	WARN_ON(1);
+#endif
 	return __of_reset_control_get(node, id, 0, 1);
 }
 
@@ -202,6 +211,9 @@ static inline struct reset_control *of_reset_control_get_shared(
 static inline struct reset_control *of_reset_control_get_exclusive_by_index(
 					struct device_node *node, int index)
 {
+#ifndef CONFIG_RESET_CONTROLLER
+	WARN_ON(1);
+#endif
 	return __of_reset_control_get(node, NULL, index, 0);
 }
 
@@ -230,6 +242,9 @@ static inline struct reset_control *of_reset_control_get_exclusive_by_index(
 static inline struct reset_control *of_reset_control_get_shared_by_index(
 					struct device_node *node, int index)
 {
+#ifndef CONFIG_RESET_CONTROLLER
+	WARN_ON(1);
+#endif
 	return __of_reset_control_get(node, NULL, index, 1);
 }
 
@@ -267,6 +282,9 @@ __must_check devm_reset_control_get_exclusive(struct device *dev,
 static inline struct reset_control *devm_reset_control_get_shared(
 					struct device *dev, const char *id)
 {
+#ifndef CONFIG_RESET_CONTROLLER
+	WARN_ON(1);
+#endif
 	return __devm_reset_control_get(dev, id, 0, 1);
 }
 
@@ -297,6 +315,9 @@ static inline struct reset_control *devm_reset_control_get_optional_shared(
 static inline struct reset_control *
 devm_reset_control_get_exclusive_by_index(struct device *dev, int index)
 {
+#ifndef CONFIG_RESET_CONTROLLER
+	WARN_ON(1);
+#endif
 	return __devm_reset_control_get(dev, NULL, index, 0);
 }
 
@@ -313,6 +334,9 @@ devm_reset_control_get_exclusive_by_index(struct device *dev, int index)
 static inline struct reset_control *
 devm_reset_control_get_shared_by_index(struct device *dev, int index)
 {
+#ifndef CONFIG_RESET_CONTROLLER
+	WARN_ON(1);
+#endif
 	return __devm_reset_control_get(dev, NULL, index, 1);
 }
 
