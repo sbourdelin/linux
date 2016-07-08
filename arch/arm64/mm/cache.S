@@ -91,6 +91,24 @@ ENTRY(__flush_dcache_area)
 ENDPIPROC(__flush_dcache_area)
 
 /*
+ *	__clean_dcache_area(kaddr, size)
+ *
+ * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
+ * 	are cleaned to the PoC.
+ *
+ *	- kaddr   - kernel address
+ *	- size    - size in question
+ */
+ENTRY(__clean_dcache_area)
+alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
+	dcache_by_line_op cvac, sy, x0, x1, x2, x3
+alternative_else
+	dcache_by_line_op civac, sy, x0, x1, x2, x3
+alternative_endif
+	ret
+ENDPROC(__clean_dcache_area)
+
+/*
  *	__clean_dcache_area_pou(kaddr, size)
  *
  * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
