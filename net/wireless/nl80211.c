@@ -409,6 +409,7 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 		.len = VHT_MUMIMO_GROUPS_DATA_LEN
 	},
 	[NL80211_ATTR_MU_MIMO_FOLLOW_MAC_ADDR] = { .len = ETH_ALEN },
+	[NL80211_ATTR_BEACON_TXRATE] = { .type = NLA_U32 },
 };
 
 /* policy for the key attributes */
@@ -3567,6 +3568,10 @@ static int nl80211_start_ap(struct sk_buff *skb, struct genl_info *info)
 	} else {
 		params.smps_mode = NL80211_SMPS_OFF;
 	}
+
+	if (info->attrs[NL80211_ATTR_BEACON_TXRATE])
+		params.beacon_txrate =
+			nla_get_u32(info->attrs[NL80211_ATTR_BEACON_TXRATE]);
 
 	if (info->attrs[NL80211_ATTR_ACL_POLICY]) {
 		params.acl = parse_acl_data(&rdev->wiphy, info);
