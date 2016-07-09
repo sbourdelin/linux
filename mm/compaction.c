@@ -95,19 +95,16 @@ static inline bool migrate_async_suitable(int migratetype)
 
 #ifdef CONFIG_COMPACTION
 
-int PageMovable(struct page *page)
+bool PageMovable(struct page *page)
 {
 	struct address_space *mapping;
 
 	VM_BUG_ON_PAGE(!PageLocked(page), page);
 	if (!__PageMovable(page))
-		return 0;
+		return false;
 
 	mapping = page_mapping(page);
-	if (mapping && mapping->a_ops && mapping->a_ops->isolate_page)
-		return 1;
-
-	return 0;
+	return mapping && mapping->a_ops && mapping->a_ops->isolate_page;
 }
 EXPORT_SYMBOL(PageMovable);
 
