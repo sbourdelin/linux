@@ -612,10 +612,23 @@
 			};
 		};
 
+		usbphy0: usbphy@8600000 {
+			compatible = "fsl,qoriq-usb2-phy",
+				     "fsl,qoriq-usb2-phy-v1.0";
+			reg = <0x0 0x8600000 0x0 0x1000>;
+			#phy-cells = <0>;
+			phy_type = "ulpi";
+		};
+
 		usb@8600000 {
-			compatible = "fsl-usb2-dr-v2.5", "fsl-usb2-dr";
+			compatible =  "fsl,ci-qoriq-usb2",
+				      "fsl,ci-qoriq-usb2-v2.5";
 			reg = <0x0 0x8600000 0x0 0x1000>;
 			interrupts = <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>;
+			phy-names = "usb2-phy";
+			phys = <&usbphy0>;
+			clock-names = "usb2-clock";
+			clocks = <&platform_clk 1>;
 			dr_mode = "host";
 			phy_type = "ulpi";
 		};
