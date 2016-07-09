@@ -189,6 +189,7 @@ TRACE_EVENT(mm_shrink_slab_start,
 		cache_items, delta, total_scan),
 
 	TP_STRUCT__entry(
+		__field(char *, name)
 		__field(struct shrinker *, shr)
 		__field(void *, shrink)
 		__field(int, nid)
@@ -202,6 +203,7 @@ TRACE_EVENT(mm_shrink_slab_start,
 	),
 
 	TP_fast_assign(
+		__entry->name = shr->name;
 		__entry->shr = shr;
 		__entry->shrink = shr->scan_objects;
 		__entry->nid = sc->nid;
@@ -214,7 +216,8 @@ TRACE_EVENT(mm_shrink_slab_start,
 		__entry->total_scan = total_scan;
 	),
 
-	TP_printk("%pF %p: nid: %d objects to shrink %ld gfp_flags %s pgs_scanned %ld lru_pgs %ld cache items %ld delta %lld total_scan %ld",
+	TP_printk("name: %s %pF %p: nid: %d objects to shrink %ld gfp_flags %s pgs_scanned %ld lru_pgs %ld cache items %ld delta %lld total_scan %ld",
+		__entry->name,
 		__entry->shrink,
 		__entry->shr,
 		__entry->nid,
@@ -235,6 +238,7 @@ TRACE_EVENT(mm_shrink_slab_end,
 		total_scan),
 
 	TP_STRUCT__entry(
+		__field(char *, name)
 		__field(struct shrinker *, shr)
 		__field(int, nid)
 		__field(void *, shrink)
@@ -245,6 +249,7 @@ TRACE_EVENT(mm_shrink_slab_end,
 	),
 
 	TP_fast_assign(
+		__entry->name = shr->name;
 		__entry->shr = shr;
 		__entry->nid = nid;
 		__entry->shrink = shr->scan_objects;
@@ -254,7 +259,8 @@ TRACE_EVENT(mm_shrink_slab_end,
 		__entry->total_scan = total_scan;
 	),
 
-	TP_printk("%pF %p: nid: %d unused scan count %ld new scan count %ld total_scan %ld last shrinker return val %d",
+	TP_printk("name: %s %pF %p: nid: %d unused scan count %ld new scan count %ld total_scan %ld last shrinker return val %d",
+		__entry->name,
 		__entry->shrink,
 		__entry->shr,
 		__entry->nid,
