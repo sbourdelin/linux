@@ -276,9 +276,9 @@ static int qspi_write_msg(struct ti_qspi *qspi, struct spi_transfer *t,
 				cmd |= QSPI_WLEN(QSPI_WLEN_MAX_BITS);
 			} else {
 				writeb(*txbuf, qspi->base + QSPI_SPI_DATA_REG);
-				cmd = qspi->cmd | QSPI_WR_SNGL;
 				xfer_len = wlen;
-				cmd |= QSPI_WLEN(wlen);
+				cmd = ((qspi->cmd & ~QSPI_WLEN_MASK) |
+					     QSPI_WLEN(wlen));
 			}
 			break;
 		case 2:
