@@ -1,0 +1,22 @@
+QorIQ SoC USB 2.0 PHY
+
+Required properties:
+ - compatible: should be "fsl,qoriq-usb2-phy",
+   Wherever applicable, the version of the USB PHY should
+   also be mentioned (for eg. fsl,qoriq-usb2-phy-vX.Y).
+   where, X = Phy vendor(Legacy = 1, NXP = 2) and Y = PHY version
+ - reg : Address and length of the usb phy control register set.
+ - phy_type : For multi port host USB controllers, should be one of
+   "ulpi", or "serial". For dual role USB controllers, should be
+   one of "ulpi", "utmi", "utmi_wide", or "serial".
+
+The main purpose of this PHY driver is to enable the USB PHY reference clock
+gate on the QorIQ SOC for USB2 PHY OR implement errata workaround in
+future. Otherwise it is just an NOP PHY driver.
+
+usbphy0: usbphy@8600000 {
+        compatible = "fsl,qoriq-usb2-phy" "fsl,qoriq-usb2-phy-vX.Y";
+        reg = <0x0 0x8600000 0x0 0x1000>;
+        #phy-cells = <0>;
+        phy_type = "ulpi";
+};
