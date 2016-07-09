@@ -600,6 +600,8 @@ static void i915_audio_component_codec_wake_override(struct device *dev,
 	if (!IS_SKYLAKE(dev_priv) && !IS_KABYLAKE(dev_priv))
 		return;
 
+	intel_runtime_pm_get(dev_priv);
+
 	/*
 	 * Enable/disable generating the codec wake signal, overriding the
 	 * internal logic to generate the codec wake to controller.
@@ -615,6 +617,8 @@ static void i915_audio_component_codec_wake_override(struct device *dev,
 		I915_WRITE(HSW_AUD_CHICKENBIT, tmp);
 		usleep_range(1000, 1500);
 	}
+
+	intel_runtime_pm_put(dev_priv);
 }
 
 /* Get CDCLK in kHz  */
@@ -647,6 +651,8 @@ static int i915_audio_component_sync_audio_rate(struct device *dev,
 	    !IS_BROADWELL(dev_priv) &&
 	    !IS_HASWELL(dev_priv))
 		return 0;
+
+	intel_runtime_pm_get(dev_priv);
 
 	mutex_lock(&dev_priv->av_mutex);
 	/* 1. get the pipe */
@@ -698,6 +704,7 @@ static int i915_audio_component_sync_audio_rate(struct device *dev,
 
  unlock:
 	mutex_unlock(&dev_priv->av_mutex);
+	intel_runtime_pm_put(dev_priv);
 	return err;
 }
 
