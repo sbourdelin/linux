@@ -1749,7 +1749,6 @@ struct page *follow_page_mask(struct vm_area_struct *vma,
 			      unsigned long address, unsigned int flags,
 			      unsigned int *page_mask)
 {
-	*page_mask = 0;
 	return NULL;
 }
 
