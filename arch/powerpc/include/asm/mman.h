@@ -31,13 +31,11 @@ static inline pgprot_t arch_vm_get_page_prot(unsigned long vm_flags)
 }
 #define arch_vm_get_page_prot(vm_flags) arch_vm_get_page_prot(vm_flags)
 
-static inline int arch_validate_prot(unsigned long prot)
+static inline bool arch_validate_prot(unsigned long prot)
 {
 	if (prot & ~(PROT_READ | PROT_WRITE | PROT_EXEC | PROT_SEM | PROT_SAO))
-		return 0;
-	if ((prot & PROT_SAO) && !cpu_has_feature(CPU_FTR_SAO))
-		return 0;
-	return 1;
+		return false;
+	return (prot & PROT_SAO) == 0 || cpu_has_feature(CPU_FTR_SAO);
 }
 #define arch_validate_prot(prot) arch_validate_prot(prot)
 
