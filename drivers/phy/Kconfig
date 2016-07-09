@@ -444,4 +444,12 @@ config PHY_CYGNUS_PCIE
 
 source "drivers/phy/tegra/Kconfig"
 
+config PHY_QORIQ_USB2
+	tristate "QorIQ USB 2.0 PHY driver"
+	depends on ARCH_MXC || ARCH_LAYERSCAPE
+	depends on OF
+	select GENERIC_PHY
+	help
+	  Enable this to support the USB2.0 PHY on the QorIQ SoC.
+
 endmenu
