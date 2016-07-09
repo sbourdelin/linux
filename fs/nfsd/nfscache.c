@@ -69,6 +69,7 @@ static unsigned long nfsd_reply_cache_scan(struct shrinker *shrink,
 					   struct shrink_control *sc);
 
 static struct shrinker nfsd_reply_cache_shrinker = {
+	.name = "nfsd_reply_cache_shrinker",
 	.scan_objects = nfsd_reply_cache_scan,
 	.count_objects = nfsd_reply_cache_count,
 	.seeks	= 1,

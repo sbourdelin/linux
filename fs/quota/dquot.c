@@ -730,6 +730,7 @@ dqcache_shrink_count(struct shrinker *shrink, struct shrink_control *sc)
 }
 
 static struct shrinker dqcache_shrinker = {
+	.name = "dqcache_shrinker",
 	.count_objects = dqcache_shrink_count,
 	.scan_objects = dqcache_shrink_scan,
 	.seeks = DEFAULT_SEEKS,

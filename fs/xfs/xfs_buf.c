@@ -1691,6 +1691,7 @@ xfs_alloc_buftarg(
 	if (list_lru_init(&btp->bt_lru))
 		goto error;
 
+	btp->bt_shrinker.name = "xfs_buftarg_shrinker";
 	btp->bt_shrinker.count_objects = xfs_buftarg_shrink_count;
 	btp->bt_shrinker.scan_objects = xfs_buftarg_shrink_scan;
 	btp->bt_shrinker.seeks = DEFAULT_SEEKS;

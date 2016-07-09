@@ -687,6 +687,7 @@ xfs_qm_init_quotainfo(
 	if (XFS_IS_PQUOTA_RUNNING(mp))
 		xfs_qm_set_defquota(mp, XFS_DQ_PROJ, qinf);
 
+	qinf->qi_shrinker.name = "xfs_qm_shrinker";
 	qinf->qi_shrinker.count_objects = xfs_qm_shrink_count;
 	qinf->qi_shrinker.scan_objects = xfs_qm_shrink_scan;
 	qinf->qi_shrinker.seeks = DEFAULT_SEEKS;

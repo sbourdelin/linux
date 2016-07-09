@@ -1705,6 +1705,7 @@ struct dm_bufio_client *dm_bufio_client_create(struct block_device *bdev, unsign
 	__cache_size_refresh();
 	mutex_unlock(&dm_bufio_clients_lock);
 
+	c->shrinker.name = "dm_bufio_shrinker";
 	c->shrinker.count_objects = dm_bufio_shrink_count;
 	c->shrinker.scan_objects = dm_bufio_shrink_scan;
 	c->shrinker.seeks = 1;

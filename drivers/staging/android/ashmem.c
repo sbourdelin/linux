@@ -487,6 +487,7 @@ ashmem_shrink_count(struct shrinker *shrink, struct shrink_control *sc)
 }
 
 static struct shrinker ashmem_shrinker = {
+	.name = "ashmem_shrinker",
 	.count_objects = ashmem_shrink_count,
 	.scan_objects = ashmem_shrink_scan,
 	/*

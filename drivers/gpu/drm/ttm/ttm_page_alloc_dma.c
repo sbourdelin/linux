@@ -1066,6 +1066,7 @@ ttm_dma_pool_shrink_count(struct shrinker *shrink, struct shrink_control *sc)
 
 static void ttm_dma_pool_mm_shrink_init(struct ttm_pool_manager *manager)
 {
+	manager->mm_shrink.name = "ttm_dma_pool_shrinker";
 	manager->mm_shrink.count_objects = ttm_dma_pool_shrink_count;
 	manager->mm_shrink.scan_objects = &ttm_dma_pool_shrink_scan;
 	manager->mm_shrink.seeks = 1;

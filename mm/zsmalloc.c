@@ -1864,6 +1864,7 @@ static void zs_unregister_shrinker(struct zs_pool *pool)
 
 static int zs_register_shrinker(struct zs_pool *pool)
 {
+	pool->shrinker.name = "zs_shrinker";
 	pool->shrinker.scan_objects = zs_shrinker_scan;
 	pool->shrinker.count_objects = zs_shrinker_count;
 	pool->shrinker.batch = 0;

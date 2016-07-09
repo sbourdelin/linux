@@ -411,6 +411,7 @@ i915_gem_shrinker_vmap(struct notifier_block *nb, unsigned long event, void *ptr
  */
 void i915_gem_shrinker_init(struct drm_i915_private *dev_priv)
 {
+	dev_priv->mm.shrinker.name = "i915_gem_shrinker";
 	dev_priv->mm.shrinker.scan_objects = i915_gem_shrinker_scan;
 	dev_priv->mm.shrinker.count_objects = i915_gem_shrinker_count;
 	dev_priv->mm.shrinker.seeks = DEFAULT_SEEKS;

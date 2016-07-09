@@ -803,6 +803,7 @@ int bch_btree_cache_alloc(struct cache_set *c)
 		c->verify_data = NULL;
 #endif
 
+	c->shrink.name = "bch_btree_shrinker";
 	c->shrink.count_objects = bch_mca_count;
 	c->shrink.scan_objects = bch_mca_scan;
 	c->shrink.seeks = 4;

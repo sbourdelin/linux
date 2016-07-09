@@ -1077,6 +1077,7 @@ static void ldlm_pools_thread_stop(void)
 }
 
 static struct shrinker ldlm_pools_cli_shrinker = {
+	.name		= "ldlm_pools_cli_shrinker",
 	.count_objects	= ldlm_pools_cli_count,
 	.scan_objects	= ldlm_pools_cli_scan,
 	.seeks		= DEFAULT_SEEKS,

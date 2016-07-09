@@ -263,6 +263,7 @@ static unsigned long shrink_huge_zero_page_scan(struct shrinker *shrink,
 }
 
 static struct shrinker huge_zero_page_shrinker = {
+	.name = "huge_zero_page_shrinker",
 	.count_objects = shrink_huge_zero_page_count,
 	.scan_objects = shrink_huge_zero_page_scan,
 	.seeks = DEFAULT_SEEKS,
@@ -3471,6 +3472,7 @@ static unsigned long deferred_split_scan(struct shrinker *shrink,
 }
 
 static struct shrinker deferred_split_shrinker = {
+	.name = "deferred_split_shrinker",
 	.count_objects = deferred_split_count,
 	.scan_objects = deferred_split_scan,
 	.seeks = DEFAULT_SEEKS,

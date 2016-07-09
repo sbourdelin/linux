@@ -861,6 +861,7 @@ rpcauth_uptodatecred(struct rpc_task *task)
 }
 
 static struct shrinker rpc_cred_shrinker = {
+	.name = "rpc_cred_shrinker",
 	.count_objects = rpcauth_cache_shrink_count,
 	.scan_objects = rpcauth_cache_shrink_scan,
 	.seeks = DEFAULT_SEEKS,

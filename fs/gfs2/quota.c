@@ -187,6 +187,7 @@ static unsigned long gfs2_qd_shrink_count(struct shrinker *shrink,
 }
 
 struct shrinker gfs2_qd_shrinker = {
+	.name = "gfs2_qd_shrinker",
 	.count_objects = gfs2_qd_shrink_count,
 	.scan_objects = gfs2_qd_shrink_scan,
 	.seeks = DEFAULT_SEEKS,

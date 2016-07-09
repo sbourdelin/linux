@@ -368,6 +368,7 @@ static inline void enc_pools_free(void)
 }
 
 static struct shrinker pools_shrinker = {
+	.name		= "ptlrpc_pools_shrinker",
 	.count_objects	= enc_pools_shrink_count,
 	.scan_objects	= enc_pools_shrink_scan,
 	.seeks		= DEFAULT_SEEKS,

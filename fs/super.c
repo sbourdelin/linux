@@ -241,6 +241,7 @@ static struct super_block *alloc_super(struct file_system_type *type, int flags)
 	s->s_time_gran = 1000000000;
 	s->cleancache_poolid = CLEANCACHE_NO_POOL;
 
+	s->s_shrink.name = "super_cache_shrinker";
 	s->s_shrink.seeks = DEFAULT_SEEKS;
 	s->s_shrink.scan_objects = super_cache_scan;
 	s->s_shrink.count_objects = super_cache_count;

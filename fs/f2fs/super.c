@@ -65,6 +65,7 @@ static void f2fs_build_fault_attr(unsigned int rate)
 
 /* f2fs-wide shrinker description */
 static struct shrinker f2fs_shrinker_info = {
+	.name = "f2fs_shrinker",
 	.scan_objects = f2fs_shrink_scan,
 	.count_objects = f2fs_shrink_count,
 	.seeks = DEFAULT_SEEKS,

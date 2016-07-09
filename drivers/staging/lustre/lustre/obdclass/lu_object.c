@@ -1799,6 +1799,7 @@ static unsigned long lu_cache_shrink_scan(struct shrinker *sk,
  * Debugging printer function using printk().
  */
 static struct shrinker lu_site_shrinker = {
+	.name		= "lu_site_shrinker",
 	.count_objects	= lu_cache_shrink_count,
 	.scan_objects	= lu_cache_shrink_scan,
 	.seeks 		= DEFAULT_SEEKS,

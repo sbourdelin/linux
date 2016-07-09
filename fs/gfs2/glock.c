@@ -1416,6 +1416,7 @@ static unsigned long gfs2_glock_shrink_count(struct shrinker *shrink,
 }
 
 static struct shrinker glock_shrinker = {
+	.name = "glock_shrinker",
 	.seeks = DEFAULT_SEEKS,
 	.count_objects = gfs2_glock_shrink_count,
 	.scan_objects = gfs2_glock_shrink_scan,

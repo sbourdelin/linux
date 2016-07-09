@@ -5025,6 +5025,7 @@ mmu_shrink_count(struct shrinker *shrink, struct shrink_control *sc)
 }
 
 static struct shrinker mmu_shrinker = {
+	.name = "mmu_shrinker",
 	.count_objects = mmu_shrink_count,
 	.scan_objects = mmu_shrink_scan,
 	.seeks = DEFAULT_SEEKS * 10,

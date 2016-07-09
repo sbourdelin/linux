@@ -6632,6 +6632,7 @@ static struct r5conf *setup_conf(struct mddev *mddev)
 	 * it reduces the queue depth and so can hurt throughput.
 	 * So set it rather large, scaled by number of devices.
 	 */
+	conf->shrinker.name = "raid5_shrinker";
 	conf->shrinker.seeks = DEFAULT_SEEKS * conf->raid_disks * 4;
 	conf->shrinker.scan_objects = raid5_cache_scan;
 	conf->shrinker.count_objects = raid5_cache_count;
