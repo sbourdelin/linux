@@ -896,7 +896,8 @@ static void guc_read_update_log_buffer(struct drm_device *dev)
 	struct guc_log_buffer_state *log_buffer_state, *log_buffer_copy_state;
 	struct guc_log_buffer_state log_buffer_state_local;
 	void *src_data_ptr, *dst_data_ptr;
-	u32 i, buffer_size;
+	bool new_overflow;
+	u32 i, buffer_size, read_offset, write_offset, bytes_to_copy;
 
 	if (!guc->log.obj || !guc->log.buf_addr)
 		return;
@@ -913,14 +914,18 @@ static void guc_read_update_log_buffer(struct drm_device *dev)
 	for (i = 0; i < GUC_MAX_LOG_BUFFER; i++) {
 		log_buffer_state_local = *log_buffer_state;
 		buffer_size = log_buffer_state_local.size;
+		read_offset = log_buffer_state_local.read_ptr;
+		write_offset = log_buffer_state_local.sampled_write_ptr;
 
 		guc->log.flush_count[i] += log_buffer_state_local.flush_to_file;
 		if (log_buffer_state_local.buffer_full_cnt !=
 					guc->log.prev_overflow_count[i]) {
+			new_overflow = 1;
 			guc->log.prev_overflow_count[i] =
 					log_buffer_state_local.buffer_full_cnt;
 			guc->log.total_overflow_count[i]++;
-		}
+		} else
+			new_overflow = 0;
 
 		if (log_buffer_copy_state) {
 			/* First copy the state structure */
@@ -932,21 +937,43 @@ static void guc_read_update_log_buffer(struct drm_device *dev)
 			 * for consistency set the write pointer value to same
 			 * value of sampled_write_ptr in the snapshot buffer.
 			 */
-			log_buffer_copy_state->write_ptr =
-				log_buffer_copy_state->sampled_write_ptr;
+			log_buffer_copy_state->write_ptr = write_offset;
 
 			log_buffer_copy_state++;
 
 			/* Now copy the actual logs */
-			memcpy(dst_data_ptr, src_data_ptr, buffer_size);
+			if (unlikely(new_overflow)) {
+				/* copy the whole buffer in case of overflow */
+				read_offset = 0;
+				write_offset = buffer_size;
+			} else if (unlikely((read_offset > buffer_size) ||
+					    (write_offset > buffer_size))) {
+				DRM_ERROR("invalid log buffer state\n");
+				/* copy whole buffer as offsets are unreliable */
+				read_offset = 0;
+				write_offset = buffer_size;
+			}
+
+			/* Just copy the new data */
+			if (read_offset <= write_offset) {
+				bytes_to_copy = write_offset - read_offset;
+				memcpy(dst_data_ptr + read_offset,
+				     src_data_ptr + read_offset, bytes_to_copy);
+			} else {
+				bytes_to_copy = buffer_size - read_offset;
+				memcpy(dst_data_ptr + read_offset,
+				     src_data_ptr + read_offset, bytes_to_copy);
+
+				bytes_to_copy = write_offset;
+				memcpy(dst_data_ptr, src_data_ptr, bytes_to_copy);
+			}
 
 			src_data_ptr += buffer_size;
 			dst_data_ptr += buffer_size;
 		}
 
 		/* Update the read pointer in the shared log buffer */
-		log_buffer_state->read_ptr =
-			log_buffer_state_local.sampled_write_ptr;
+		log_buffer_state->read_ptr = write_offset;
 
 		/* Clear the 'flush to file' flag */
 		log_buffer_state->flush_to_file = 0;
