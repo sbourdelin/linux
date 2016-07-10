@@ -48,6 +48,7 @@ struct i915_params {
 	int enable_guc_loading;
 	int enable_guc_submission;
 	int guc_log_level;
+	int guc_log_buffer_nr;
 	int use_mmio_flip;
 	int mmio_debug;
 	int edp_vswing;

@@ -1046,8 +1046,7 @@ static int guc_create_log_relay_file(struct intel_guc *guc)
 
 	/* Keep the size of sub buffers same as shared log buffer */
 	subbuf_size = guc->log.obj->base.size;
-	/* TODO: Decide based on the User's input */
-	n_subbufs = 4;
+	n_subbufs = i915.guc_log_buffer_nr;
 
 	guc_log_relay_chan = relay_open("guc_log", log_dir,
 			subbuf_size, n_subbufs, &relay_callbacks, dev);

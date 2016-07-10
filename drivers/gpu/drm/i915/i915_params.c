@@ -57,6 +57,7 @@ struct i915_params i915 __read_mostly = {
 	.enable_guc_loading = -1,
 	.enable_guc_submission = -1,
 	.guc_log_level = -1,
+	.guc_log_buffer_nr = 4,
 	.enable_dp_mst = true,
 	.inject_load_failure = 0,
 	.enable_dpcd_backlight = false,
@@ -213,6 +214,10 @@ MODULE_PARM_DESC(enable_guc_submission,
 module_param_named(guc_log_level, i915.guc_log_level, int, 0400);
 MODULE_PARM_DESC(guc_log_level,
 	"GuC firmware logging level (-1:disabled (default), 0-3:enabled)");
+
+module_param_named(guc_log_buffer_nr, i915.guc_log_buffer_nr, int, 0400);
+MODULE_PARM_DESC(guc_log_buffer_nr,
+	"Number of sub buffers to store GuC firmware logs (default: 4)");
 
 module_param_named_unsafe(enable_dp_mst, i915.enable_dp_mst, bool, 0600);
 MODULE_PARM_DESC(enable_dp_mst,
