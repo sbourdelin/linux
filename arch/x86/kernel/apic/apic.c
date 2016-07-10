@@ -311,7 +311,7 @@ int lapic_get_maxlvt(void)
 
 /* Clock divisor */
 #define APIC_DIVISOR 16
-#define TSC_DIVISOR  32
+#define TSC_DIVISOR  2
 
 /*
  * This function sets up the local APIC timer, with a timeout of
