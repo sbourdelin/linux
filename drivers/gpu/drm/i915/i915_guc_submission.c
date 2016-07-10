@@ -934,8 +934,6 @@ static void guc_read_update_log_buffer(struct drm_device *dev)
 			dst_data_ptr += buffer_size;
 		}
 
-		/* FIXME: invalidate/flush for log buffer needed */
-
 		/* Update the read pointer in the shared log buffer */
 		log_buffer_state->read_ptr =
 			log_buffer_state_local.sampled_write_ptr;
@@ -1095,8 +1093,11 @@ static int guc_create_log_extras(struct intel_guc *guc)
 		return 0;
 
 	if (!guc->log.buf_addr) {
-		/* Create a vmalloc mapping of log buffer pages */
-		vaddr = i915_gem_object_pin_map(guc->log.obj, false);
+		/* Create a WC (Uncached for read) vmalloc mapping of log
+		 * buffer pages, so that we can directly get the data
+		 * (up-to-date) from memory.
+		 */
+		vaddr = i915_gem_object_pin_map(guc->log.obj, true);
 		if (IS_ERR(vaddr)) {
 			ret = PTR_ERR(vaddr);
 			DRM_ERROR("Couldn't map log buffer pages %d\n", ret);
