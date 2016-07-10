@@ -2093,6 +2093,21 @@ static struct dentry *cgroup_mount(struct file_system_type *fs_type,
 		return ERR_PTR(-EPERM);
 	}
 
+	/* First find the desired set of subsystems */
+	ret = parse_cgroupfs_options(data, &opts);
+	if (ret)
+		goto out_free;
+
+	/*
+	 * We know this subsystem has not yet been bound.  Users in a non-init
+	 * user namespace may only mount hierarchies with no bound subsystems,
+	 * i.e. 'none,name=user1'
+	 */
+	if (!opts.none && !capable(CAP_SYS_ADMIN)) {
+		ret = -EPERM;
+		goto out_free;
+	}
+
 	/*
 	 * The first time anyone tries to mount a cgroup, enable the list
 	 * linking each css_set to its tasks and fix up all existing tasks.
@@ -2113,11 +2128,6 @@ static struct dentry *cgroup_mount(struct file_system_type *fs_type,
 	}
 
 	cgroup_lock_and_drain_offline(&cgrp_dfl_root.cgrp);
-
-	/* First find the desired set of subsystems */
-	ret = parse_cgroupfs_options(data, &opts);
-	if (ret)
-		goto out_unlock;
 
 	/*
 	 * Destruction of cgroup root is asynchronous, so subsystems may
@@ -2206,16 +2216,6 @@ static struct dentry *cgroup_mount(struct file_system_type *fs_type,
 	 */
 	if (!opts.subsys_mask && !opts.none) {
 		ret = -EINVAL;
-		goto out_unlock;
-	}
-
-	/*
-	 * We know this subsystem has not yet been bound.  Users in a non-init
-	 * user namespace may only mount hierarchies with no bound subsystems,
-	 * i.e. 'none,name=user1'
-	 */
-	if (!opts.none && !capable(CAP_SYS_ADMIN)) {
-		ret = -EPERM;
 		goto out_unlock;
 	}
 
