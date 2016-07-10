@@ -1096,7 +1096,7 @@ static int guc_create_log_extras(struct intel_guc *guc)
 
 	if (!guc->log.buf_addr) {
 		/* Create a vmalloc mapping of log buffer pages */
-		vaddr = i915_gem_object_pin_map(guc->log.obj);
+		vaddr = i915_gem_object_pin_map(guc->log.obj, false);
 		if (IS_ERR(vaddr)) {
 			ret = PTR_ERR(vaddr);
 			DRM_ERROR("Couldn't map log buffer pages %d\n", ret);

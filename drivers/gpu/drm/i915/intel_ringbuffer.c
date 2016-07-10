@@ -2007,7 +2007,7 @@ int intel_pin_and_map_ringbuffer_obj(struct drm_i915_private *dev_priv,
 		if (ret)
 			goto err_unpin;
 
-		addr = i915_gem_object_pin_map(obj);
+		addr = i915_gem_object_pin_map(obj, false);
 		if (IS_ERR(addr)) {
 			ret = PTR_ERR(addr);
 			goto err_unpin;

@@ -3248,6 +3248,7 @@ static inline void i915_gem_object_unpin_pages(struct drm_i915_gem_object *obj)
 /**
  * i915_gem_object_pin_map - return a contiguous mapping of the entire object
  * @obj - the object to map into kernel address space
+ * @use_wc - whether the mapping should be using WC or WB pgprot_t
  *
  * Calls i915_gem_object_pin_pages() to prevent reaping of the object's
  * pages and then returns a contiguous mapping of the backing storage into
@@ -3259,7 +3260,8 @@ static inline void i915_gem_object_unpin_pages(struct drm_i915_gem_object *obj)
  * Returns the pointer through which to access the mapped object, or an
  * ERR_PTR() on error.
  */
-void *__must_check i915_gem_object_pin_map(struct drm_i915_gem_object *obj);
+void *__must_check i915_gem_object_pin_map(struct drm_i915_gem_object *obj,
+					 bool use_wc);
 
 /**
  * i915_gem_object_unpin_map - releases an earlier mapping

@@ -2471,10 +2471,11 @@ i915_gem_object_put_pages(struct drm_i915_gem_object *obj)
 	list_del(&obj->global_list);
 
 	if (obj->mapping) {
-		if (is_vmalloc_addr(obj->mapping))
-			vunmap(obj->mapping);
+		void *ptr = (void *)((uintptr_t)obj->mapping & ~1);
+		if (is_vmalloc_addr(ptr))
+			vunmap(ptr);
 		else
-			kunmap(kmap_to_page(obj->mapping));
+			kunmap(kmap_to_page(ptr));
 		obj->mapping = NULL;
 	}
 
@@ -2647,7 +2648,8 @@ i915_gem_object_get_pages(struct drm_i915_gem_object *obj)
 }
 
 /* The 'mapping' part of i915_gem_object_pin_map() below */
-static void *i915_gem_object_map(const struct drm_i915_gem_object *obj)
+static void *i915_gem_object_map(const struct drm_i915_gem_object *obj,
+				bool use_wc)
 {
 	unsigned long n_pages = obj->base.size >> PAGE_SHIFT;
 	struct sg_table *sgt = obj->pages;
@@ -2659,7 +2661,7 @@ static void *i915_gem_object_map(const struct drm_i915_gem_object *obj)
 	void *addr;
 
 	/* A single page can always be kmapped */
-	if (n_pages == 1)
+	if (n_pages == 1 && !use_wc)
 		return kmap(sg_page(sgt->sgl));
 
 	if (n_pages > ARRAY_SIZE(stack_pages)) {
@@ -2675,7 +2677,8 @@ static void *i915_gem_object_map(const struct drm_i915_gem_object *obj)
 	/* Check that we have the expected number of pages */
 	GEM_BUG_ON(i != n_pages);
 
-	addr = vmap(pages, n_pages, 0, PAGE_KERNEL);
+	addr = vmap(pages, n_pages, VM_NO_GUARD,
+		    use_wc ? pgprot_writecombine(PAGE_KERNEL_IO) : PAGE_KERNEL);
 
 	if (pages != stack_pages)
 		drm_free_large(pages);
@@ -2684,27 +2687,55 @@ static void *i915_gem_object_map(const struct drm_i915_gem_object *obj)
 }
 
 /* get, pin, and map the pages of the object into kernel space */
-void *i915_gem_object_pin_map(struct drm_i915_gem_object *obj)
+void *i915_gem_object_pin_map(struct drm_i915_gem_object *obj, bool use_wc)
 {
+	void *ptr;
+	bool has_wc;
+	bool pinned;
 	int ret;
 
 	lockdep_assert_held(&obj->base.dev->struct_mutex);
+	GEM_BUG_ON((obj->ops->flags & I915_GEM_OBJECT_HAS_STRUCT_PAGE) == 0);
 
 	ret = i915_gem_object_get_pages(obj);
 	if (ret)
 		return ERR_PTR(ret);
 
+	GEM_BUG_ON(obj->pages == NULL);
 	i915_gem_object_pin_pages(obj);
 
-	if (!obj->mapping) {
-		obj->mapping = i915_gem_object_map(obj);
-		if (!obj->mapping) {
-			i915_gem_object_unpin_pages(obj);
-			return ERR_PTR(-ENOMEM);
+	pinned = obj->pages_pin_count > 1;
+	ptr = (void *)((uintptr_t)obj->mapping & ~1);
+	has_wc = (uintptr_t)obj->mapping & 1;
+
+	if (ptr && has_wc != use_wc) {
+		if (pinned) {
+			ret = -EBUSY;
+			goto err;
 		}
+
+		if (is_vmalloc_addr(ptr))
+			vunmap(ptr);
+		else
+			kunmap(kmap_to_page(ptr));
+		ptr = obj->mapping = NULL;
 	}
 
-	return obj->mapping;
+	if (!ptr) {
+		ptr = i915_gem_object_map(obj, use_wc);
+		if (!ptr) {
+			ret = -ENOMEM;
+			goto err;
+		}
+
+		obj->mapping = (void *)((uintptr_t)ptr | use_wc);
+	}
+
+	return ptr;
+
+err:
+	i915_gem_object_unpin_pages(obj);
+	return ERR_PTR(ret);
 }
 
 void i915_vma_move_to_active(struct i915_vma *vma,
