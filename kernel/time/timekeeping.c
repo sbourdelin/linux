@@ -23,6 +23,7 @@
 #include <linux/stop_machine.h>
 #include <linux/pvclock_gtod.h>
 #include <linux/compiler.h>
+#include <asm/div64.h>
 
 #include "tick-internal.h"
 #include "ntp_internal.h"
@@ -2117,6 +2118,64 @@ out:
 	if (clock_set)
 		/* Have to call _delayed version, since in irq context*/
 		clock_was_set_delayed();
+}
+
+/**
+ * timekeeper_mono_interval_to_raw - Convert mono interval to raw's perception.
+ * @interval: Time interval as measured by the mono clock.
+ *
+ * Converts the given time interval as measured by the monotonic clock to
+ * what would have been measured by the raw monotonic clock in the meanwhile.
+ * The monotonic clock's frequency gets dynamically adjusted every now and then
+ * in order to compensate for the differences to NTP. OTOH, the clockevents
+ * devices are not affected by this adjustment, i.e. they keep ticking at some
+ * fixed hardware frequency which may be assumed to have a constant ratio to
+ * the fixed raw monotonic clock's frequency. This function provides a means
+ * to convert time intervals from the dynamic frequency monotonic clock to
+ * the fixed frequency hardware world.
+ *
+ * If interval < 0, zero is returned. If an overflow happens during the
+ * calculation, KTIME_MAX is returned.
+ */
+s64 timekeeping_mono_interval_to_raw(s64 interval)
+{
+	struct timekeeper *tk = &tk_core.timekeeper;
+	u32 raw_mult = tk->tkr_raw.mult, mono_mult = tk->tkr_mono.mult;
+	u64 raw, tmp;
+
+	/* The overflow checks below can't deal with negative intervals. */
+	if (interval <= 0)
+		return 0;
+
+	/*
+	 * Calculate
+	 *   raw = f_mono / f_raw * interval
+	 *       = (raw_mult / 2^raw_shift) / (mono_mult / 2^mono_shift)
+	 *            * interval
+	 * where f_mono and f_raw denote the frequencies of the monotonic
+	 * and raw clock respectively.
+	 *
+	 * Note that the monotonic and raw clocks' shifts are equal and fixed,
+	 * that is they cancel.
+	 */
+
+	/* First, calculate interval * raw_mult while checking for overflow. */
+	raw = ((u64)interval >> 32) * raw_mult; /* Upper half of interval */
+	if (raw >> 32)
+		return KTIME_MAX;
+	raw <<= 32;
+	tmp = ((u64)interval & U32_MAX) * raw_mult; /* Lower half of interval */
+	if (U64_MAX - raw < tmp)
+		return KTIME_MAX;
+	raw += tmp;
+
+	/* Finally, do raw /= mono_mult with proper rounding. */
+	if (U64_MAX - raw < mono_mult / 2)
+		return KTIME_MAX;
+	raw += mono_mult / 2;
+	do_div(raw, mono_mult);
+
+	return (s64)raw;
 }
 
 /**

@@ -18,6 +18,7 @@ extern void timekeeping_resume(void);
 
 extern void do_timer(unsigned long ticks);
 extern void update_wall_time(void);
+extern s64 timekeeping_mono_interval_to_raw(s64 interval);
 
 extern seqlock_t jiffies_lock;
 
