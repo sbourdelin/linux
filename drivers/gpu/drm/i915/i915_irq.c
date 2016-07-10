@@ -1221,7 +1221,7 @@ static void gen9_guc2host_events_work(struct work_struct *work)
 	}
 	spin_unlock_irq(&dev_priv->irq_lock);
 
-	/* TODO: Handle the events for which GuC interrupted host */
+	i915_guc_capture_logs(&dev_priv->drm);
 }
 
 /**
@@ -1707,7 +1707,8 @@ static void gen9_guc_irq_handler(struct drm_i915_private *dev_priv, u32 gt_iir)
 					I915_READ(SOFT_SCRATCH(15)) & ~msg);
 
 				/* Handle flush interrupt event in bottom half */
-				queue_work(dev_priv->wq, &dev_priv->guc.events_work);
+				queue_work(dev_priv->guc.log.wq,
+						&dev_priv->guc.events_work);
 			}
 		}
 		spin_unlock(&dev_priv->irq_lock);

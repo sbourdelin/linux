@@ -172,6 +172,15 @@ static int host2guc_sample_forcewake(struct intel_guc *guc,
 	return host2guc_action(guc, data, ARRAY_SIZE(data));
 }
 
+static int host2guc_logbuffer_flush_complete(struct intel_guc *guc)
+{
+	u32 data[1];
+
+	data[0] = HOST2GUC_ACTION_LOG_BUFFER_FILE_FLUSH_COMPLETE;
+
+	return host2guc_action(guc, data, 1);
+}
+
 /*
  * Initialise, update, or clear doorbell data shared with the GuC
  *
@@ -825,6 +834,123 @@ err:
 	return NULL;
 }
 
+static void guc_move_to_next_buf(struct intel_guc *guc)
+{
+	return;
+}
+
+static void* guc_get_write_buffer(struct intel_guc *guc)
+{
+	return NULL;
+}
+
+static void guc_read_update_log_buffer(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_guc *guc = &dev_priv->guc;
+	struct guc_log_buffer_state *log_buffer_state, *log_buffer_copy_state;
+	struct guc_log_buffer_state log_buffer_state_local;
+	void *src_data_ptr, *dst_data_ptr;
+	u32 i, buffer_size;
+
+	if (!guc->log.obj || !guc->log.buf_addr)
+		return;
+
+	log_buffer_state = src_data_ptr = guc->log.buf_addr;
+
+	/* Get the pointer to local buffer to store the logs */
+	dst_data_ptr = log_buffer_copy_state = guc_get_write_buffer(guc);
+
+	/* Actual logs are present from the 2nd page */
+	src_data_ptr += PAGE_SIZE;
+	dst_data_ptr += PAGE_SIZE;
+
+	for (i = 0; i < GUC_MAX_LOG_BUFFER; i++) {
+		log_buffer_state_local = *log_buffer_state;
+		buffer_size = log_buffer_state_local.size;
+
+		if (log_buffer_copy_state) {
+			/* First copy the state structure */
+			memcpy(log_buffer_copy_state, &log_buffer_state_local,
+					sizeof(struct guc_log_buffer_state));
+
+			/* The write pointer could have been updated by the GuC
+			 * firmware, after sending the flush interrupt to Host,
+			 * for consistency set the write pointer value to same
+			 * value of sampled_write_ptr in the snapshot buffer.
+			 */
+			log_buffer_copy_state->write_ptr =
+				log_buffer_copy_state->sampled_write_ptr;
+
+			log_buffer_copy_state++;
+
+			/* Now copy the actual logs */
+			memcpy(dst_data_ptr, src_data_ptr, buffer_size);
+
+			src_data_ptr += buffer_size;
+			dst_data_ptr += buffer_size;
+		}
+
+		/* FIXME: invalidate/flush for log buffer needed */
+
+		/* Update the read pointer in the shared log buffer */
+		log_buffer_state->read_ptr =
+			log_buffer_state_local.sampled_write_ptr;
+
+		/* Clear the 'flush to file' flag */
+		log_buffer_state->flush_to_file = 0;
+		log_buffer_state++;
+	}
+
+	if (log_buffer_copy_state)
+		guc_move_to_next_buf(guc);
+}
+
+static void guc_log_cleanup(struct drm_i915_private *dev_priv)
+{
+	struct intel_guc *guc = &dev_priv->guc;
+
+	lockdep_assert_held(&dev_priv->drm.struct_mutex);
+
+	if (i915.guc_log_level < 0)
+		return;
+
+	/* First disable the flush interrupt */
+	gen9_disable_guc_interrupts(dev_priv);
+
+	if (guc->log.buf_addr)
+		i915_gem_object_unpin_map(guc->log.obj);
+
+	guc->log.buf_addr = NULL;
+}
+
+static int guc_create_log_extras(struct intel_guc *guc)
+{
+	struct drm_i915_private *dev_priv = guc_to_i915(guc);
+	void *vaddr;
+	int ret;
+
+	lockdep_assert_held(&dev_priv->drm.struct_mutex);
+
+	/* Nothing to do */
+	if (i915.guc_log_level < 0)
+		return 0;
+
+	if (!guc->log.buf_addr) {
+		/* Create a vmalloc mapping of log buffer pages */
+		vaddr = i915_gem_object_pin_map(guc->log.obj);
+		if (IS_ERR(vaddr)) {
+			ret = PTR_ERR(vaddr);
+			DRM_ERROR("Couldn't map log buffer pages %d\n", ret);
+			return ret;
+		}
+
+		guc->log.buf_addr = vaddr;
+	}
+
+	return 0;
+}
+
 static void guc_create_log(struct intel_guc *guc)
 {
 	struct drm_i915_private *dev_priv = guc_to_i915(guc);
@@ -851,6 +977,13 @@ static void guc_create_log(struct intel_guc *guc)
 		}
 
 		guc->log.obj = obj;
+
+		if (guc_create_log_extras(guc)) {
+			gem_release_guc_obj(guc->log.obj);
+			guc->log.obj = NULL;
+			i915.guc_log_level = -1;
+			return;
+		}
 	}
 
 	/* each allocated unit is a page */
@@ -1021,6 +1154,7 @@ void i915_guc_submission_fini(struct drm_i915_private *dev_priv)
 	gem_release_guc_obj(dev_priv->guc.ads_obj);
 	guc->ads_obj = NULL;
 
+	guc_log_cleanup(dev_priv);
 	gem_release_guc_obj(dev_priv->guc.log.obj);
 	guc->log.obj = NULL;
 
@@ -1083,4 +1217,18 @@ int intel_guc_resume(struct drm_device *dev)
 	data[2] = i915_gem_obj_ggtt_offset(ctx->engine[RCS].state);
 
 	return host2guc_action(guc, data, ARRAY_SIZE(data));
+}
+
+void i915_guc_capture_logs(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	guc_read_update_log_buffer(dev);
+
+	/* Generally device is expected to be active only at this
+	 * time, so get/put should be really quick.
+	 */
+	intel_runtime_pm_get(dev_priv);
+	host2guc_logbuffer_flush_complete(&dev_priv->guc);
+	intel_runtime_pm_put(dev_priv);
 }

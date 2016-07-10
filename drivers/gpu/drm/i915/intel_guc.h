@@ -125,6 +125,8 @@ struct intel_guc_fw {
 struct intel_guc_log {
 	uint32_t flags;
 	struct drm_i915_gem_object *obj;
+	struct workqueue_struct *wq;
+	void *buf_addr;
 };
 
 struct intel_guc {
@@ -171,5 +173,6 @@ int i915_guc_wq_check_space(struct drm_i915_gem_request *rq);
 int i915_guc_submit(struct drm_i915_gem_request *rq);
 void i915_guc_submission_disable(struct drm_i915_private *dev_priv);
 void i915_guc_submission_fini(struct drm_i915_private *dev_priv);
+void i915_guc_capture_logs(struct drm_device *dev);
 
 #endif

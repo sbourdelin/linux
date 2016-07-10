@@ -791,8 +791,20 @@ static int i915_workqueues_init(struct drm_i915_private *dev_priv)
 	if (dev_priv->hotplug.dp_wq == NULL)
 		goto out_free_wq;
 
+	if (HAS_GUC_SCHED(dev_priv)) {
+		/* Need a dedicated wq to process log buffer flush interrupts
+		 * from GuC without much delay so as to avoid any loss of logs.
+		 */
+		dev_priv->guc.log.wq =
+			alloc_ordered_workqueue("i915-guc_log", 0);
+		if (dev_priv->guc.log.wq == NULL)
+			goto out_free_hotplug_dp_wq;
+	}
+
 	return 0;
 
+out_free_hotplug_dp_wq:
+	destroy_workqueue(dev_priv->hotplug.dp_wq);
 out_free_wq:
 	destroy_workqueue(dev_priv->wq);
 out_err:
@@ -803,6 +815,7 @@ out_err:
 
 static void i915_workqueues_cleanup(struct drm_i915_private *dev_priv)
 {
+	destroy_workqueue(dev_priv->guc.log.wq);
 	destroy_workqueue(dev_priv->hotplug.dp_wq);
 	destroy_workqueue(dev_priv->wq);
 }
