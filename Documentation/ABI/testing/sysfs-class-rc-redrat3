@@ -1,0 +1,33 @@
+What:		/sys/class/rc/rcN/length_fuzz
+Date:		Jul 2016
+KernelVersion:	4.8
+Contact:	Mauro Carvalho Chehab <m.chehab@samsung.com>
+Description:
+		The redrat3 encodes an IR signal as set of different lengths
+		and a set of indices into those lengths. Writing this file
+		sets how much two lengths must differ before they are
+		considered distinct, the value is specified in microseconds.
+		Default 5, value 0 to 127.
+
+What:		/sys/class/rc/rcN/min_pause
+Date:		Jul 2016
+KernelVersion:	4.8
+Contact:	Mauro Carvalho Chehab <m.chehab@samsung.com>
+Description:
+		When receiving a continuous ir stream (for example when a user
+		is holding a button down on a remote), this specifies the
+		minimum size of a space when the redrat3 sends a irdata packet
+		to the host. Specified in miliseconds. Default value 18ms.
+		The value can be between 2 and 30 inclusive.
+
+What:		/sys/class/rc/rcN/periods_measure_carrier
+Date:		Jul 2016
+KernelVersion:	4.8
+Contact:	Mauro Carvalho Chehab <m.chehab@samsung.com>
+Description:
+		The carrier frequency is measured during the first pulse of
+		the IR signal. The larger the number of periods used To
+		measure, the more accurate the result is likely to be, however
+		some signals have short initial pulses, so in some case it
+		may be necessary for applications to reduce this value.
+		Default 8, value 1 to 255.
