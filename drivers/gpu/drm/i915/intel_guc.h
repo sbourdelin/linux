@@ -131,6 +131,10 @@ struct intel_guc {
 	struct intel_guc_fw guc_fw;
 	struct intel_guc_log log;
 
+	/* GuC2Host interrupt related state */
+	struct work_struct events_work;
+	bool interrupts_enabled;
+
 	struct drm_i915_gem_object *ads_obj;
 
 	struct drm_i915_gem_object *ctx_pool_obj;
