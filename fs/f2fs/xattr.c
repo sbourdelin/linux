@@ -364,7 +364,7 @@ int f2fs_getxattr(struct inode *inode, int index, const char *name,
 
 	len = strlen(name);
 	if (len > F2FS_NAME_LEN)
-		return -ERANGE;
+		return -ENAMETOOLONG;
 
 	base_addr = read_all_xattrs(inode, ipage);
 	if (!base_addr)
@@ -458,7 +458,7 @@ static int __f2fs_setxattr(struct inode *inode, int index,
 	len = strlen(name);
 
 	if (len > F2FS_NAME_LEN)
-		return -ERANGE;
+		return -ENAMETOOLONG;
 
 	if (size > MAX_VALUE_LEN(inode))
 		return -E2BIG;
