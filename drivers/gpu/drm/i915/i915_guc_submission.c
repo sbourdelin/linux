@@ -23,6 +23,8 @@
  */
 #include <linux/firmware.h>
 #include <linux/circ_buf.h>
+#include <linux/debugfs.h>
+#include <linux/relay.h>
 #include "i915_drv.h"
 #include "intel_guc.h"
 
@@ -836,12 +838,33 @@ err:
 
 static void guc_move_to_next_buf(struct intel_guc *guc)
 {
-	return;
+	/* Make sure our updates are in the sub buffer are visible when
+	 * Consumer sees a newly produced sub buffer.
+	 */
+	smp_wmb();
+
+	/* All data has been written, so now move the offset of sub buffer. */
+	relay_reserve(guc->log.relay_chan, guc->log.obj->base.size);
+
+	/* Switch to the next sub buffer */
+	relay_flush(guc->log.relay_chan);
 }
 
 static void* guc_get_write_buffer(struct intel_guc *guc)
 {
-	return NULL;
+	/* FIXME: Cover the check under a lock ? */
+	if (!guc->log.relay_chan)
+		return NULL;
+
+	/* Just get the base address of a new sub buffer and copy data into it
+	 * ourselves. NULL will be returned in no-overwrite mode, if all sub
+	 * buffers are full. Could have used the relay_write() to indirectly
+	 * copy the data, but that would have been bit convoluted, as we need to
+	 * write to only certain locations inside a sub buffer which cannot be
+	 * done without using relay_reserve() along with relay_write(). So its
+	 * better to use relay_reserve() alone.
+	 */
+	return relay_reserve(guc->log.relay_chan, 0);
 }
 
 static void guc_read_update_log_buffer(struct drm_device *dev)
@@ -906,6 +929,119 @@ static void guc_read_update_log_buffer(struct drm_device *dev)
 		guc_move_to_next_buf(guc);
 }
 
+/*
+ * Sub buffer switch callback. Called whenever relay has to switch to a new
+ * sub buffer, relay stays on the same sub buffer if 0 is returned.
+ */
+static int subbuf_start_callback(struct rchan_buf *buf,
+				 void *subbuf,
+				 void *prev_subbuf,
+				 size_t prev_padding)
+{
+	/* Use no-overwrite mode by default, where relay will stop accepting
+	 * new data if there are no empty sub buffers left.
+	 * There is no strict synchronization enforced by relay between Consumer
+	 * and Producer. In overwrite mode, there is a possibility of getting
+	 * inconsistent/garbled data, the producer could be writing on to the
+	 * same sub buffer from which Consumer is reading. This can't be avoided
+	 * unless Consumer is fast enough and can always run in tandem with
+	 * Producer.
+	 */
+	if (relay_buf_full(buf))
+		return 0;
+
+	return 1;
+}
+
+/*
+ * file_create() callback. Creates relay file in debugfs.
+ */
+static struct dentry *create_buf_file_callback(const char *filename,
+					       struct dentry *parent,
+					       umode_t mode,
+					       struct rchan_buf *buf,
+					       int *is_global)
+{
+	/*
+	 * Not using the channel filename passed as an argument, since for each
+	 * channel relay appends the corresponding CPU number to the filename
+	 * passed in relay_open(). This should be fine as relay just needs a
+	 * dentry of the file associated with the channel buffer and that file's
+	 * name need not be same as the filename passed as an argument.
+	 */
+	struct dentry *buf_file = debugfs_create_file("guc_log", mode,
+			parent, buf, &relay_file_operations);
+
+	/* This to enable the use of a single buffer for the relay channel and
+	 * correspondingly have a single file exposed to User, through which
+	 * it can collect the logs inorder without any post-processing.
+	 */
+	*is_global = 1;
+
+	return buf_file;
+}
+
+/*
+ * file_remove() default callback. Removes relay file in debugfs.
+ */
+static int remove_buf_file_callback(struct dentry *dentry)
+{
+	debugfs_remove(dentry);
+	return 0;
+}
+
+/* relay channel callbacks */
+static struct rchan_callbacks relay_callbacks = {
+	.subbuf_start = subbuf_start_callback,
+	.create_buf_file = create_buf_file_callback,
+	.remove_buf_file = remove_buf_file_callback,
+};
+
+static void guc_remove_log_relay_file(struct intel_guc *guc)
+{
+	if (guc->log.relay_chan)
+		relay_close(guc->log.relay_chan);
+}
+
+static int guc_create_log_relay_file(struct intel_guc *guc)
+{
+	struct drm_i915_private *dev_priv = guc_to_i915(guc);
+	struct drm_device *dev = &dev_priv->drm;
+	struct dentry *log_dir;
+	struct rchan *guc_log_relay_chan;
+	size_t n_subbufs, subbuf_size;
+
+	if (guc->log.relay_chan)
+		return 0;
+
+	/* If /sys/kernel/debug/dri/0 location do not exist, then debugfs is
+	 * not mounted and so can't create the relay file.
+	 * The relay API seems to fit well with debugfs only.
+	 */
+	if (!dev->primary->debugfs_root)
+		return -ENODEV;
+
+	/* For now create the log file in /sys/kernel/debug/dri/0 dir */
+	log_dir = dev->primary->debugfs_root;
+
+	/* Keep the size of sub buffers same as shared log buffer */
+	subbuf_size = guc->log.obj->base.size;
+	/* TODO: Decide based on the User's input */
+	n_subbufs = 4;
+
+	guc_log_relay_chan = relay_open("guc_log", log_dir,
+			subbuf_size, n_subbufs, &relay_callbacks, dev);
+
+	if (!guc_log_relay_chan) {
+		DRM_DEBUG_DRIVER("Couldn't create relay chan for guc logs\n");
+		return -ENOMEM;
+	}
+
+	/* FIXME: Cover the update under a lock ? */
+	guc->log.relay_chan = guc_log_relay_chan;
+	return 0;
+}
+
 static void guc_log_cleanup(struct drm_i915_private *dev_priv)
 {
 	struct intel_guc *guc = &dev_priv->guc;
@@ -917,6 +1053,9 @@ static void guc_log_cleanup(struct drm_i915_private *dev_priv)
 
 	/* First disable the flush interrupt */
 	gen9_disable_guc_interrupts(dev_priv);
+
+	guc_remove_log_relay_file(guc);
+	guc->log.relay_chan = NULL;
 
 	if (guc->log.buf_addr)
 		i915_gem_object_unpin_map(guc->log.obj);
@@ -994,6 +1133,39 @@ static void guc_create_log(struct intel_guc *guc)
 
 	offset = i915_gem_obj_ggtt_offset(obj) >> PAGE_SHIFT; /* in pages */
 	guc->log.flags = (offset << GUC_LOG_BUF_ADDR_SHIFT) | flags;
+}
+
+static int guc_log_late_setup(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_guc *guc = &dev_priv->guc;
+	int ret;
+
+	lockdep_assert_held(&dev->struct_mutex);
+
+	if (i915.guc_log_level < 0)
+		return -EINVAL;
+
+	if (WARN_ON(guc->log.relay_chan))
+		return -EINVAL;
+
+	/* If log_level was set as -1 at boot time, then vmalloc mapping would
+	 * not have been created for the log buffer, so create one now.
+	 */
+	ret = guc_create_log_extras(guc);
+	if (ret)
+		goto err;
+
+	ret = guc_create_log_relay_file(guc);
+	if (ret)
+		goto err;
+
+	return 0;
+err:
+	guc_log_cleanup(dev_priv);
+	/* logging will remain off */
+	i915.guc_log_level = -1;
+	return ret;
 }
 
 static void init_guc_policies(struct guc_policies *policies)
@@ -1154,7 +1326,6 @@ void i915_guc_submission_fini(struct drm_i915_private *dev_priv)
 	gem_release_guc_obj(dev_priv->guc.ads_obj);
 	guc->ads_obj = NULL;
 
-	guc_log_cleanup(dev_priv);
 	gem_release_guc_obj(dev_priv->guc.log.obj);
 	guc->log.obj = NULL;
 
@@ -1231,4 +1402,24 @@ void i915_guc_capture_logs(struct drm_device *dev)
 	intel_runtime_pm_get(dev_priv);
 	host2guc_logbuffer_flush_complete(&dev_priv->guc);
 	intel_runtime_pm_put(dev_priv);
+}
+
+void i915_guc_unregister(struct drm_device *dev)
+{
+	if (!i915.enable_guc_submission)
+		return;
+
+	mutex_lock(&dev->struct_mutex);
+	guc_log_cleanup(dev->dev_private);
+	mutex_unlock(&dev->struct_mutex);
+}
+
+void i915_guc_register(struct drm_device *dev)
+{
+	if (!i915.enable_guc_submission)
+		return;
+
+	mutex_lock(&dev->struct_mutex);
+	guc_log_late_setup(dev);
+	mutex_unlock(&dev->struct_mutex);
 }

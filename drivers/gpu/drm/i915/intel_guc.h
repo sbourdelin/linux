@@ -127,6 +127,7 @@ struct intel_guc_log {
 	struct drm_i915_gem_object *obj;
 	struct workqueue_struct *wq;
 	void *buf_addr;
+	struct rchan *relay_chan;
 };
 
 struct intel_guc {
@@ -174,5 +175,7 @@ int i915_guc_submit(struct drm_i915_gem_request *rq);
 void i915_guc_submission_disable(struct drm_i915_private *dev_priv);
 void i915_guc_submission_fini(struct drm_i915_private *dev_priv);
 void i915_guc_capture_logs(struct drm_device *dev);
+void i915_guc_register(struct drm_device *dev);
+void i915_guc_unregister(struct drm_device *dev);
 
 #endif
