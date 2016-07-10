@@ -31,7 +31,7 @@
 
 struct hdc100x_data {
 	struct i2c_client *client;
-	struct mutex lock;
+	struct mutex lock;  /* protect config updates & raw measurements */
 	u16 config;
 
 	/* integration time of the sensor */
@@ -108,10 +108,12 @@ static int hdc100x_update_config(struct hdc100x_data *data, int mask, int val)
 	int tmp = (~mask & data->config) | val;
 	int ret;
 
+	mutex_lock(&data->lock);
 	ret = i2c_smbus_write_word_swapped(data->client,
 						HDC100X_REG_CONFIG, tmp);
 	if (!ret)
 		data->config = tmp;
+	mutex_unlock(&data->lock);
 
 	return ret;
 }
@@ -234,26 +236,20 @@ static int hdc100x_write_raw(struct iio_dev *indio_dev,
 			     int val, int val2, long mask)
 {
 	struct hdc100x_data *data = iio_priv(indio_dev);
-	int ret = -EINVAL;
 
 	switch (mask) {
 	case IIO_CHAN_INFO_INT_TIME:
 		if (val != 0)
 			return -EINVAL;
 
-		mutex_lock(&data->lock);
-		ret = hdc100x_set_it_time(data, chan->address, val2);
-		mutex_unlock(&data->lock);
-		return ret;
+		return hdc100x_set_it_time(data, chan->address, val2);
+
 	case IIO_CHAN_INFO_RAW:
 		if (chan->type != IIO_CURRENT || val2 != 0)
 			return -EINVAL;
 
-		mutex_lock(&data->lock);
-		ret = hdc100x_update_config(data, HDC100X_REG_CONFIG_HEATER_EN,
+		return hdc100x_update_config(data, HDC100X_REG_CONFIG_HEATER_EN,
 					val ? HDC100X_REG_CONFIG_HEATER_EN : 0);
-		mutex_unlock(&data->lock);
-		return ret;
 	default:
 		return -EINVAL;
 	}
