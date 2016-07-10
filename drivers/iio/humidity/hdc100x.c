@@ -193,18 +193,18 @@ static int hdc100x_read_raw(struct iio_dev *indio_dev,
 	case IIO_CHAN_INFO_RAW: {
 		int ret;
 
-		mutex_lock(&data->lock);
 		if (chan->type == IIO_CURRENT) {
 			*val = hdc100x_get_heater_status(data);
 			ret = IIO_VAL_INT;
 		} else {
+			mutex_lock(&data->lock);
 			ret = hdc100x_get_measurement(data, chan);
+			mutex_unlock(&data->lock);
 			if (ret >= 0) {
 				*val = ret;
 				ret = IIO_VAL_INT;
 			}
 		}
-		mutex_unlock(&data->lock);
 		return ret;
 	}
 	case IIO_CHAN_INFO_INT_TIME:
