@@ -2120,6 +2120,56 @@ out:
 }
 
 /**
+ * timekeeper_mono_interval_to_raw - Convert mono interval to raw's perception.
+ * @interval: Time interval as measured by the mono clock.
+ *
+ * Converts the given time interval as measured by the monotonic clock to
+ * what would have been measured by the raw monotonic clock in the meanwhile.
+ * The monotonic clock's frequency gets dynamically adjusted every now and then
+ * in order to compensate for the differences to NTP. OTOH, the clockevents
+ * devices are not affected by this adjustment, i.e. they keep ticking at some
+ * fixed hardware frequency which may be assumed to have a constant ratio to
+ * the fixed raw monotonic clock's frequency. This function provides a means
+ * to convert time intervals from the dynamic frequency monotonic clock to
+ * the fixed frequency hardware world.
+ *
+ * The returned value is clamped to [0, KTIME_MAX]. In particular,
+ * KTIME_MAX is returned on overflow and zero for negative values of interval.
+ */
+s64 timekeeping_mono_interval_to_raw(s64 interval)
+{
+	struct timekeeper *tk = &tk_core.timekeeper;
+	u32 raw_mult = tk->tkr_raw.mult, mono_mult = tk->tkr_mono.mult;
+	s64 raw;
+
+	/* The overflow checks below can't deal with negative intervals. */
+	if (interval <= 0)
+		return interval;
+
+	/*
+	 * Calculate
+	 *   raw = f_mono / f_raw * interval
+	 *       = (raw_mult / 2^raw_shift) / (mono_mult / 2^mono_shift)
+	 *            * interval
+	 * where f_mono and f_raw denote the frequencies of the monotonic
+	 * and raw clock respectively.
+	 *
+	 * Note that the monotonic and raw clock shifts' are equal and fixed,
+	 * that is they cancel.
+	 */
+	if (KTIME_MAX / raw_mult < interval)
+		return KTIME_MAX;
+	raw = interval * raw_mult;
+
+	if (KTIME_MAX - mono_mult / 2 < raw)
+		return KTIME_MAX;
+	raw += mono_mult / 2; /* round properly */
+	raw /= mono_mult;
+
+	return raw;
+}
+
+/**
  * getboottime64 - Return the real time of system boot.
  * @ts:		pointer to the timespec64 to be set
  *

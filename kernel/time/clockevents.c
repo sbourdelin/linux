@@ -329,6 +329,7 @@ int clockevents_program_event(struct clock_event_device *dev, ktime_t expires,
 		return dev->set_next_ktime(expires, dev);
 
 	delta = ktime_to_ns(ktime_sub(expires, ktime_get()));
+	delta = timekeeping_mono_interval_to_raw(delta);
 	if (delta <= 0)
 		return force ? clockevents_program_min_delta(dev) : -ETIME;
 
