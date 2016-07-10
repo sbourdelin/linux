@@ -175,6 +175,7 @@ int i915_guc_submit(struct drm_i915_gem_request *rq);
 void i915_guc_submission_disable(struct drm_i915_private *dev_priv);
 void i915_guc_submission_fini(struct drm_i915_private *dev_priv);
 void i915_guc_capture_logs(struct drm_device *dev);
+void i915_guc_capture_logs_on_reset(struct drm_device *dev);
 void i915_guc_register(struct drm_device *dev);
 void i915_guc_unregister(struct drm_device *dev);
 
