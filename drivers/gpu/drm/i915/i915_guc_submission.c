@@ -841,7 +841,7 @@ static void guc_create_log(struct intel_guc *guc)
 		GUC_LOG_ISR_PAGES + 1 +
 		GUC_LOG_CRASH_PAGES + 1) << PAGE_SHIFT;
 
-	obj = guc->log_obj;
+	obj = guc->log.obj;
 	if (!obj) {
 		obj = gem_allocate_guc_obj(dev_priv, size);
 		if (!obj) {
@@ -850,7 +850,7 @@ static void guc_create_log(struct intel_guc *guc)
 			return;
 		}
 
-		guc->log_obj = obj;
+		guc->log.obj = obj;
 	}
 
 	/* each allocated unit is a page */
@@ -860,7 +860,7 @@ static void guc_create_log(struct intel_guc *guc)
 		(GUC_LOG_CRASH_PAGES << GUC_LOG_CRASH_SHIFT);
 
 	offset = i915_gem_obj_ggtt_offset(obj) >> PAGE_SHIFT; /* in pages */
-	guc->log_flags = (offset << GUC_LOG_BUF_ADDR_SHIFT) | flags;
+	guc->log.flags = (offset << GUC_LOG_BUF_ADDR_SHIFT) | flags;
 }
 
 static void init_guc_policies(struct guc_policies *policies)
@@ -1021,8 +1021,8 @@ void i915_guc_submission_fini(struct drm_i915_private *dev_priv)
 	gem_release_guc_obj(dev_priv->guc.ads_obj);
 	guc->ads_obj = NULL;
 
-	gem_release_guc_obj(dev_priv->guc.log_obj);
-	guc->log_obj = NULL;
+	gem_release_guc_obj(dev_priv->guc.log.obj);
+	guc->log.obj = NULL;
 
 	if (guc->ctx_pool_obj)
 		ida_destroy(&guc->ctx_ids);

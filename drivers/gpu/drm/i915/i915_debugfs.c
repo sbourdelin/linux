@@ -2621,7 +2621,7 @@ static int i915_guc_log_dump(struct seq_file *m, void *data)
 	struct drm_info_node *node = m->private;
 	struct drm_device *dev = node->minor->dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
-	struct drm_i915_gem_object *log_obj = dev_priv->guc.log_obj;
+	struct drm_i915_gem_object *log_obj = dev_priv->guc.log.obj;
 	u32 *log;
 	int i = 0, pg;
 

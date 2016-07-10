@@ -122,10 +122,14 @@ struct intel_guc_fw {
 	uint32_t ucode_offset;
 };
 
+struct intel_guc_log {
+	uint32_t flags;
+	struct drm_i915_gem_object *obj;
+};
+
 struct intel_guc {
 	struct intel_guc_fw guc_fw;
-	uint32_t log_flags;
-	struct drm_i915_gem_object *log_obj;
+	struct intel_guc_log log;
 
 	struct drm_i915_gem_object *ads_obj;
 
