@@ -193,6 +193,16 @@ static int host2guc_force_logbuffer_flush(struct intel_guc *guc)
 	return host2guc_action(guc, data, 2);
 }
 
+static int host2guc_logging_control(struct intel_guc *guc, u32 control_val)
+{
+	u32 data[2];
+
+	data[0] = HOST2GUC_ACTION_UK_LOG_ENABLE_LOGGING;
+	data[1] = control_val;
+
+	return host2guc_action(guc, data, 2);
+}
+
 /*
  * Initialise, update, or clear doorbell data shared with the GuC
  *
@@ -1454,4 +1464,51 @@ void i915_guc_register(struct drm_device *dev)
 	mutex_lock(&dev->struct_mutex);
 	guc_log_late_setup(dev);
 	mutex_unlock(&dev->struct_mutex);
+}
+
+int i915_guc_log_control(struct drm_device *dev, uint64_t control_val)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	union guc_log_control log_param;
+	int ret;
+
+	log_param.logging_enabled = control_val & 0x1;
+	log_param.verbosity = (control_val >> 4) & 0xF;
+
+	if (log_param.verbosity < GUC_LOG_VERBOSITY_MIN ||
+	    log_param.verbosity > GUC_LOG_VERBOSITY_MAX)
+		return -EINVAL;
+
+	/* This combination doesn't make sense & won't have any effect */
+	if (!log_param.logging_enabled && (i915.guc_log_level < 0))
+		return -EINVAL;
+
+	ret = host2guc_logging_control(&dev_priv->guc, log_param.value);
+	if (ret < 0) {
+		DRM_DEBUG_DRIVER("host2guc action failed\n");
+		return ret;
+	}
+
+	i915.guc_log_level = log_param.verbosity;
+
+	/* If log_level was set as -1 at boot time, then the relay channel file
+	 * wouldn't have been created by now and interrupts also would not have
+	 * been enabled.
+	 */
+	if (!dev_priv->guc.log.relay_chan) {
+		ret = guc_log_late_setup(dev);
+		if (!ret)
+			gen9_enable_guc_interrupts(dev_priv);
+	} else if (!log_param.logging_enabled) {
+		/* Once logging is disabled, GuC won't generate logs & send an
+		 * interrupt. But there could be some data in the log buffer
+		 * which is yet to be captured. So request GuC to update the log
+		 * buffer state and send the flush interrupt so that Host can
+		 * collect the left over logs also.
+		 */
+		flush_work(&dev_priv->guc.events_work);
+		host2guc_force_logbuffer_flush(&dev_priv->guc);
+	}
+
+	return ret;
 }

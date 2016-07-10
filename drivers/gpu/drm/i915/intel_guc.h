@@ -178,5 +178,6 @@ void i915_guc_capture_logs(struct drm_device *dev);
 void i915_guc_capture_logs_on_reset(struct drm_device *dev);
 void i915_guc_register(struct drm_device *dev);
 void i915_guc_unregister(struct drm_device *dev);
+int i915_guc_log_control(struct drm_device *dev, uint64_t control_val);
 
 #endif
