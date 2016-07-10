@@ -88,6 +88,7 @@ static int host2guc_action(struct intel_guc *guc, u32 *data, u32 len)
 		return -EINVAL;
 
 	intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
+	spin_lock(&guc->action_lock);
 
 	dev_priv->guc.action_count += 1;
 	dev_priv->guc.action_cmd = data[0];
@@ -126,6 +127,7 @@ static int host2guc_action(struct intel_guc *guc, u32 *data, u32 len)
 	}
 	dev_priv->guc.action_status = status;
 
+	spin_unlock(&guc->action_lock);
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
 
 	return ret;
@@ -1304,6 +1306,7 @@ int i915_guc_submission_init(struct drm_i915_private *dev_priv)
 		return -ENOMEM;
 
 	ida_init(&guc->ctx_ids);
+	spin_lock_init(&guc->action_lock);
 	guc_create_log(guc);
 	guc_create_ads(guc);
 
