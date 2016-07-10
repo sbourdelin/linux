@@ -2538,6 +2538,30 @@ static int i915_guc_load_status_info(struct seq_file *m, void *data)
 	return 0;
 }
 
+static void i915_guc_log_info(struct seq_file *m,
+				 struct drm_i915_private *dev_priv)
+{
+	struct intel_guc *guc = &dev_priv->guc;
+
+	seq_printf(m, "\nGuC logging stats:\n");
+
+	seq_printf(m, "\tISR:   flush count %10u, overflow count %8u\n",
+		guc->log.flush_count[GUC_ISR_LOG_BUFFER],
+		guc->log.total_overflow_count[GUC_ISR_LOG_BUFFER]);
+
+	seq_printf(m, "\tDPC:   flush count %10u, overflow count %8u\n",
+		guc->log.flush_count[GUC_DPC_LOG_BUFFER],
+		guc->log.total_overflow_count[GUC_DPC_LOG_BUFFER]);
+
+	seq_printf(m, "\tCRASH: flush count %10u, overflow count %8u\n",
+		guc->log.flush_count[GUC_CRASH_DUMP_LOG_BUFFER],
+		guc->log.total_overflow_count[GUC_CRASH_DUMP_LOG_BUFFER]);
+
+	seq_printf(m, "\tTotal flush interrupt count: %u\n",
+			guc->log.flush_interrupt_count);
+
+}
+
 static void i915_guc_client_info(struct seq_file *m,
 				 struct drm_i915_private *dev_priv,
 				 struct i915_guc_client *client)
@@ -2610,6 +2634,8 @@ static int i915_guc_info(struct seq_file *m, void *data)
 
 	seq_printf(m, "\nGuC execbuf client @ %p:\n", guc.execbuf_client);
 	i915_guc_client_info(m, dev_priv, &client);
+
+	i915_guc_log_info(m, dev_priv);
 
 	/* Add more as required ... */
 

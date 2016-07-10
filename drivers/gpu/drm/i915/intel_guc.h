@@ -128,6 +128,12 @@ struct intel_guc_log {
 	struct workqueue_struct *wq;
 	void *buf_addr;
 	struct rchan *relay_chan;
+
+	/* logging related stats */
+	u32 flush_interrupt_count;
+	u32 prev_overflow_count[GUC_MAX_LOG_BUFFER];
+	u32 total_overflow_count[GUC_MAX_LOG_BUFFER];
+	u32 flush_count[GUC_MAX_LOG_BUFFER];
 };
 
 struct intel_guc {

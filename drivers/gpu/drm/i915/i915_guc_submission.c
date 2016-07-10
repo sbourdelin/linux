@@ -914,6 +914,14 @@ static void guc_read_update_log_buffer(struct drm_device *dev)
 		log_buffer_state_local = *log_buffer_state;
 		buffer_size = log_buffer_state_local.size;
 
+		guc->log.flush_count[i] += log_buffer_state_local.flush_to_file;
+		if (log_buffer_state_local.buffer_full_cnt !=
+					guc->log.prev_overflow_count[i]) {
+			guc->log.prev_overflow_count[i] =
+					log_buffer_state_local.buffer_full_cnt;
+			guc->log.total_overflow_count[i]++;
+		}
+
 		if (log_buffer_copy_state) {
 			/* First copy the state structure */
 			memcpy(log_buffer_copy_state, &log_buffer_state_local,
