@@ -125,9 +125,11 @@ struct intel_guc_fw {
 struct intel_guc_log {
 	uint32_t flags;
 	struct drm_i915_gem_object *obj;
-	struct workqueue_struct *wq;
 	void *buf_addr;
 	struct rchan *relay_chan;
+	struct task_struct *flush_task;
+	struct completion flush_completion;
+	bool flush_signal;
 
 	/* logging related stats */
 	u32 flush_interrupt_count;
@@ -141,7 +143,6 @@ struct intel_guc {
 	struct intel_guc_log log;
 
 	/* GuC2Host interrupt related state */
-	struct work_struct events_work;
 	bool interrupts_enabled;
 
 	struct drm_i915_gem_object *ads_obj;

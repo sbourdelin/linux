@@ -21,6 +21,7 @@
  * IN THE SOFTWARE.
  *
  */
+#include <linux/kthread.h>
 #include <linux/firmware.h>
 #include <linux/circ_buf.h>
 #include <linux/debugfs.h>
@@ -1096,6 +1097,48 @@ static int guc_create_log_relay_file(struct intel_guc *guc)
 	return 0;
 }
 
+void guc_cancel_log_flush_work_sync(struct drm_i915_private *dev_priv)
+{
+	spin_lock_irq(&dev_priv->irq_lock);
+	dev_priv->guc.log.flush_signal = false;
+	spin_unlock_irq(&dev_priv->irq_lock);
+
+	if (dev_priv->guc.log.flush_task)
+		wait_for_completion(&dev_priv->guc.log.flush_completion);
+}
+
+static int guc_log_flush_worker(void *arg)
+{
+	struct drm_i915_private *dev_priv = arg;
+	struct intel_guc *guc = &dev_priv->guc;
+
+	/* Install ourselves with high priority to reduce signalling latency */
+	struct sched_param param = { .sched_priority = 1 };
+	sched_setscheduler_nocheck(current, SCHED_FIFO, &param);
+
+	do {
+		set_current_state(TASK_INTERRUPTIBLE);
+
+		spin_lock_irq(&dev_priv->irq_lock);
+		if (guc->log.flush_signal) {
+			guc->log.flush_signal = false;
+			reinit_completion(&guc->log.flush_completion);
+			spin_unlock_irq(&dev_priv->irq_lock);
+			i915_guc_capture_logs(&dev_priv->drm);
+			complete_all(&guc->log.flush_completion);
+		} else {
+			spin_unlock_irq(&dev_priv->irq_lock);
+			if (kthread_should_stop())
+				break;
+
+			schedule();
+		}
+	} while (1);
+	__set_current_state(TASK_RUNNING);
+
+	return 0;
+}
+
 static void guc_log_cleanup(struct drm_i915_private *dev_priv)
 {
 	struct intel_guc *guc = &dev_priv->guc;
@@ -1107,6 +1150,11 @@ static void guc_log_cleanup(struct drm_i915_private *dev_priv)
 
 	/* First disable the flush interrupt */
 	gen9_disable_guc_interrupts(dev_priv);
+
+	if (guc->log.flush_task)
+		kthread_stop(guc->log.flush_task);
+
+	guc->log.flush_task = NULL;
 
 	guc_remove_log_relay_file(guc);
 	guc->log.relay_chan = NULL;
@@ -1120,6 +1168,7 @@ static void guc_log_cleanup(struct drm_i915_private *dev_priv)
 static int guc_create_log_extras(struct intel_guc *guc)
 {
 	struct drm_i915_private *dev_priv = guc_to_i915(guc);
+	struct task_struct *tsk;
 	void *vaddr;
 	int ret;
 
@@ -1142,6 +1191,23 @@ static int guc_create_log_extras(struct intel_guc *guc)
 		}
 
 		guc->log.buf_addr = vaddr;
+	}
+
+	if (!guc->log.flush_task) {
+		init_completion(&guc->log.flush_completion);
+		/* Spawn a thread to provide a fast bottom-half for handling log
+		 * buffer flush interrupts.
+		 */
+		tsk = kthread_run(guc_log_flush_worker, dev_priv,
+					"i915/guc_log_flushd");
+		if (IS_ERR(tsk)) {
+			ret = PTR_ERR(tsk);
+			DRM_ERROR("creation of log flush task failed %d\n", ret);
+			guc_log_cleanup(dev_priv);
+			return ret;
+		}
+
+		guc->log.flush_task = tsk;
 	}
 
 	return 0;
@@ -1206,8 +1272,9 @@ static int guc_log_late_setup(struct drm_device *dev)
 	if (WARN_ON(guc->log.relay_chan))
 		return -EINVAL;
 
-	/* If log_level was set as -1 at boot time, then vmalloc mapping would
-	 * not have been created for the log buffer, so create one now.
+	/* If log_level was set as -1 at boot time, then vmalloc mapping and
+	 * flush daemon would not have been created for the log buffer, so
+	 * create one now.
 	 */
 	ret = guc_create_log_extras(guc);
 	if (ret)
@@ -1474,6 +1541,9 @@ void i915_guc_capture_logs_on_reset(struct drm_device *dev)
 	/* First disable the interrupts, will be renabled after reset */
 	gen9_disable_guc_interrupts(dev_priv);
 
+	/* Wait for the ongoing flush, if any, to complete */
+	guc_cancel_log_flush_work_sync(dev_priv);
+
 	/* Ask GuC to update the log buffer state */
 	host2guc_force_logbuffer_flush(&dev_priv->guc);
 
@@ -1544,7 +1614,7 @@ int i915_guc_log_control(struct drm_device *dev, uint64_t control_val)
 		 * buffer state and send the flush interrupt so that Host can
 		 * collect the left over logs also.
 		 */
-		flush_work(&dev_priv->guc.events_work);
+		guc_cancel_log_flush_work_sync(dev_priv);
 		host2guc_force_logbuffer_flush(&dev_priv->guc);
 	}
 

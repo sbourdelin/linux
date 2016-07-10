@@ -435,13 +435,14 @@ void gen9_disable_guc_interrupts(struct drm_i915_private *dev_priv)
 {
 	spin_lock_irq(&dev_priv->irq_lock);
 	dev_priv->guc.interrupts_enabled = false;
+	/* Speed up cancellation after disabling interrupts */
+	dev_priv->guc.log.flush_signal = false;
 
 	gen6_disable_pm_irq(dev_priv, dev_priv->pm_guc_events);
 
 	spin_unlock_irq(&dev_priv->irq_lock);
 	synchronize_irq(dev_priv->drm.irq);
 
-	cancel_work_sync(&dev_priv->guc.events_work);
 	gen9_reset_guc_interrupts(dev_priv);
 }
 
@@ -1208,22 +1209,6 @@ static void gen6_pm_rps_work(struct work_struct *work)
 	mutex_unlock(&dev_priv->rps.hw_lock);
 }
 
-static void gen9_guc2host_events_work(struct work_struct *work)
-{
-	struct drm_i915_private *dev_priv =
-		container_of(work, struct drm_i915_private, guc.events_work);
-
-	spin_lock_irq(&dev_priv->irq_lock);
-	/* Speed up work cancellation during disabling guc interrupts. */
-	if (!dev_priv->guc.interrupts_enabled) {
-		spin_unlock_irq(&dev_priv->irq_lock);
-		return;
-	}
-	spin_unlock_irq(&dev_priv->irq_lock);
-
-	i915_guc_capture_logs(&dev_priv->drm);
-}
-
 /**
  * ivybridge_parity_work - Workqueue called when a parity error interrupt
  * occurred.
@@ -1707,8 +1692,8 @@ static void gen9_guc_irq_handler(struct drm_i915_private *dev_priv, u32 gt_iir)
 					I915_READ(SOFT_SCRATCH(15)) & ~msg);
 
 				/* Handle flush interrupt event in bottom half */
-				queue_work(dev_priv->guc.log.wq,
-						&dev_priv->guc.events_work);
+				smp_store_mb(dev_priv->guc.log.flush_signal, 1);
+				wake_up_process(dev_priv->guc.log.flush_task);
 			}
 		}
 		dev_priv->guc.log.flush_interrupt_count++;
@@ -4629,7 +4614,6 @@ void intel_irq_init(struct drm_i915_private *dev_priv)
 
 	INIT_WORK(&dev_priv->rps.work, gen6_pm_rps_work);
 	INIT_WORK(&dev_priv->l3_parity.error_work, ivybridge_parity_work);
-	INIT_WORK(&dev_priv->guc.events_work, gen9_guc2host_events_work);
 
 	if (HAS_GUC_UCODE(dev))
 		dev_priv->pm_guc_events = GEN9_GUC_TO_HOST_INT_EVENT;
