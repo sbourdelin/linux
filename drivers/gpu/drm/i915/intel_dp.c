@@ -3862,35 +3862,33 @@ go_again:
 	return -EINVAL;
 }
 
-static void
-intel_dp_check_link_status(struct intel_dp *intel_dp)
+static bool
+intel_dp_link_is_valid(struct intel_dp *intel_dp)
 {
-	struct intel_encoder *intel_encoder = &dp_to_dig_port(intel_dp)->base;
 	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	u8 link_status[DP_LINK_STATUS_SIZE];
 
 	WARN_ON(!drm_modeset_is_locked(&dev->mode_config.connection_mutex));
 
 	if (!intel_dp_get_link_status(intel_dp, link_status)) {
-		DRM_ERROR("Failed to get link status\n");
-		return;
+		DRM_DEBUG_KMS("Failed to get link status\n");
+		return false;
 	}
 
-	if (!intel_encoder->base.crtc)
-		return;
-
-	if (!to_intel_crtc(intel_encoder->base.crtc)->active)
-		return;
-
-	/* if link training is requested we should perform it always */
-	if ((intel_dp->compliance_test_type == DP_TEST_LINK_TRAINING) ||
-	    (!drm_dp_channel_eq_ok(link_status, intel_dp->lane_count))) {
-		DRM_DEBUG_KMS("%s: channel EQ not ok, retraining\n",
-			      intel_encoder->base.name);
-		intel_dp_start_link_train(intel_dp);
-		intel_dp_stop_link_train(intel_dp);
+	/* Check if the link is valid by reading the bits of Link status
+	 * registers
+	 */
+	if (!drm_dp_channel_eq_ok(link_status, intel_dp->lane_count) ||
+	    !drm_dp_clock_recovery_ok(link_status, intel_dp->lane_count)) {
+		DRM_DEBUG_KMS("Channel EQ or CR not ok, need to retrain\n");
+		return false;
 	}
+
+	DRM_DEBUG_KMS("Link is good, no need to retrain\n");
+	return true;
+
 }
+
 
 /*
  * According to DP spec
@@ -3949,7 +3947,11 @@ intel_dp_short_pulse(struct intel_dp *intel_dp)
 	}
 
 	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
-	intel_dp_check_link_status(intel_dp);
+	if (!intel_dp_link_is_valid(intel_dp) ||
+	    intel_dp->compliance_test_type == DP_TEST_LINK_TRAINING) {
+		intel_dp_start_link_train(intel_dp);
+		intel_dp_stop_link_train(intel_dp);
+	}
 	drm_modeset_unlock(&dev->mode_config.connection_mutex);
 
 	return true;
@@ -4270,7 +4272,11 @@ intel_dp_long_pulse(struct intel_connector *intel_connector)
 		 * link loss triggerring long pulse!!!!
 		 */
 		drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
-		intel_dp_check_link_status(intel_dp);
+		if (!intel_dp_link_is_valid(intel_dp) ||
+		    intel_dp->compliance_test_type == DP_TEST_LINK_TRAINING) {
+			intel_dp_start_link_train(intel_dp);
+			intel_dp_stop_link_train(intel_dp);
+		}
 		drm_modeset_unlock(&dev->mode_config.connection_mutex);
 		goto out;
 	}
