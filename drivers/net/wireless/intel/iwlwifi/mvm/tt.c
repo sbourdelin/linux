@@ -634,11 +634,6 @@ static int iwl_mvm_tzone_get_temp(struct thermal_zone_device *device,
 
 	mutex_lock(&mvm->mutex);
 
-	if (!mvm->ucode_loaded || !(mvm->cur_ucode == IWL_UCODE_REGULAR)) {
-		ret = -EIO;
-		goto out;
-	}
-
 	ret = iwl_mvm_get_temp(mvm, &temp);
 	if (ret)
 		goto out;
@@ -683,11 +678,6 @@ static int iwl_mvm_tzone_set_trip_temp(struct thermal_zone_device *device,
 	s16 temperature;
 
 	mutex_lock(&mvm->mutex);
-
-	if (!mvm->ucode_loaded || !(mvm->cur_ucode == IWL_UCODE_REGULAR)) {
-		ret = -EIO;
-		goto out;
-	}
 
 	if (trip < 0 || trip >= IWL_MAX_DTS_TRIPS) {
 		ret = -EINVAL;
@@ -749,6 +739,9 @@ static void iwl_mvm_thermal_zone_register(struct iwl_mvm *mvm)
 
 		return;
 	}
+
+	if (!mvm->ucode_loaded || !(mvm->cur_ucode == IWL_UCODE_REGULAR))
+		return;
 
 	BUILD_BUG_ON(ARRAY_SIZE(name) >= THERMAL_NAME_LENGTH);
 
