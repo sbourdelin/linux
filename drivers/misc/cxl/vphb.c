@@ -40,11 +40,28 @@ static void cxl_teardown_msi_irqs(struct pci_dev *pdev)
 	 */
 }
 
+bool _cxl_pci_associate_default_context(struct pci_dev *dev, struct cxl_afu *afu)
+{
+	struct cxl_context *ctx;
+
+	/*
+	 * Allocate a context to do cxl things too. This is used for interrupts
+	 * in the peer model using a real phb, and if we eventually do DMA ops
+	 * in the virtual phb, we'll need a default context to attach them to.
+	 */
+	ctx = cxl_dev_context_init(dev);
+	if (!ctx)
+		return false;
+	dev->dev.archdata.cxl_ctx = ctx;
+
+	return (cxl_ops->afu_check_and_enable(afu) == 0);
+}
+/* exported via cxl_base */
+
 static bool cxl_pci_enable_device_hook(struct pci_dev *dev)
 {
 	struct pci_controller *phb;
 	struct cxl_afu *afu;
-	struct cxl_context *ctx;
 
 	phb = pci_bus_to_host(dev->bus);
 	afu = (struct cxl_afu *)phb->private_data;
@@ -57,19 +74,10 @@ static bool cxl_pci_enable_device_hook(struct pci_dev *dev)
 	set_dma_ops(&dev->dev, &dma_direct_ops);
 	set_dma_offset(&dev->dev, PAGE_OFFSET);
 
-	/*
-	 * Allocate a context to do cxl things too.  If we eventually do real
-	 * DMA ops, we'll need a default context to attach them to
-	 */
-	ctx = cxl_dev_context_init(dev);
-	if (!ctx)
-		return false;
-	dev->dev.archdata.cxl_ctx = ctx;
-
-	return (cxl_ops->afu_check_and_enable(afu) == 0);
+	return _cxl_pci_associate_default_context(dev, afu);
 }
 
-static void cxl_pci_disable_device(struct pci_dev *dev)
+void _cxl_pci_disable_device(struct pci_dev *dev)
 {
 	struct cxl_context *ctx = cxl_get_context(dev);
 
@@ -82,6 +90,7 @@ static void cxl_pci_disable_device(struct pci_dev *dev)
 		cxl_release_context(ctx);
 	}
 }
+/* exported via cxl_base */
 
 static resource_size_t cxl_pci_window_alignment(struct pci_bus *bus,
 						unsigned long type)
@@ -197,8 +206,8 @@ static struct pci_controller_ops cxl_pci_controller_ops =
 {
 	.probe_mode = cxl_pci_probe_mode,
 	.enable_device_hook = cxl_pci_enable_device_hook,
-	.disable_device = cxl_pci_disable_device,
-	.release_device = cxl_pci_disable_device,
+	.disable_device = _cxl_pci_disable_device,
+	.release_device = _cxl_pci_disable_device,
 	.window_alignment = cxl_pci_window_alignment,
 	.reset_secondary_bus = cxl_pci_reset_secondary_bus,
 	.setup_msi_irqs = cxl_setup_msi_irqs,
