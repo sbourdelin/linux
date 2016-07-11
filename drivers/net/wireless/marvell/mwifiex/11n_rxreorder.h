@@ -43,6 +43,9 @@
 #define BA_SETUP_MAX_PACKET_THRESHOLD	16
 #define BA_SETUP_PACKET_OFFSET		16
 
+/* Indicate packet has been dropped in FW */
+#define MWIFIEX_RX_PKT_DROPPED_IN_FW             0xffffffff
+
 enum mwifiex_rxreor_flags {
 	RXREOR_FORCE_NO_DROP		= 1<<0,
 	RXREOR_INIT_WINDOW_SHIFT	= 1<<1,
@@ -81,5 +84,6 @@ struct mwifiex_rx_reorder_tbl *
 mwifiex_11n_get_rx_reorder_tbl(struct mwifiex_private *priv, int tid, u8 *ta);
 void mwifiex_11n_del_rx_reorder_tbl_by_ta(struct mwifiex_private *priv, u8 *ta);
 void mwifiex_update_rxreor_flags(struct mwifiex_adapter *adapter, u8 flags);
-
+void mwifiex_11n_rxba_sync_event(struct mwifiex_private *priv,
+				 u8 *event_buf, u16 len);
 #endif /* _MWIFIEX_11N_RXREORDER_H_ */
