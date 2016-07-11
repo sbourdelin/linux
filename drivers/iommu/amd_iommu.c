@@ -742,14 +742,101 @@ static void iommu_poll_ppr_log(struct amd_iommu *iommu)
 	}
 }
 
+#ifdef CONFIG_IRQ_REMAP
+static int (*iommu_ga_log_notifier)(int, int, int);
+
+int amd_iommu_register_ga_log_notifier(int (*notifier)(int, int, int))
+{
+	iommu_ga_log_notifier = notifier;
+
+	return 0;
+}
+EXPORT_SYMBOL(amd_iommu_register_ga_log_notifier);
+
+static void iommu_handle_ga_guest_nr_entry(struct amd_iommu *iommu,
+					   u16 devid, u32 ga_tag)
+{
+	struct amd_ir_data *ir_data;
+	unsigned long flags;
+	int vec = 0;
+
+	if (!iommu_ga_log_notifier)
+		return;
+
+	spin_lock_irqsave(&iommu->ga_hash_lock, flags);
+	hash_for_each_possible(iommu->ga_hash, ir_data, hnode, ga_tag) {
+		struct irte_ga *entry = (struct irte_ga *)ir_data->entry;
+
+		vec = entry->hi.fields.vector;
+		break;
+	}
+	spin_unlock_irqrestore(&iommu->ga_hash_lock, flags);
+
+	if (vec) {
+		pr_debug("AMD-Vi: %s: devid=%#x, ga_tag=%#x\n",
+			 __func__, devid, ga_tag);
+
+		if (iommu_ga_log_notifier(GATAG_TO_AVICTAG(ga_tag),
+					  GATAG_TO_VCPUID(ga_tag), vec) != 0)
+			pr_err("AMD-Vi: GA log notifier failed.\n");
+	}
+}
+
+static void iommu_poll_ga_log(struct amd_iommu *iommu)
+{
+	u32 head, tail, cnt = 0;
+
+	if (iommu->ga_log == NULL)
+		return;
+
+	head = readl(iommu->mmio_base + MMIO_GA_HEAD_OFFSET);
+	tail = readl(iommu->mmio_base + MMIO_GA_TAIL_OFFSET);
+
+	while (head != tail) {
+		volatile u64 *raw;
+		u64 entry;
+
+		raw = (u64 *)(iommu->ga_log + head);
+		cnt++;
+
+		/* Avoid memcpy function-call overhead */
+		entry = *raw;
+
+		/* Update head pointer of hardware ring-buffer */
+		head = (head + GA_ENTRY_SIZE) % GA_LOG_SIZE;
+		writel(head, iommu->mmio_base + MMIO_GA_HEAD_OFFSET);
+
+		/* Handle GA entry */
+		switch (GA_REQ_TYPE(entry)) {
+		case GA_GUEST_NR:
+			iommu_handle_ga_guest_nr_entry(iommu,
+							GA_DEVID(entry),
+							GA_TAG(entry));
+			break;
+		default:
+			break;
+		}
+
+		/* Refresh ring-buffer information */
+		head = readl(iommu->mmio_base + MMIO_GA_HEAD_OFFSET);
+		tail = readl(iommu->mmio_base + MMIO_GA_TAIL_OFFSET);
+	}
+}
+#endif /* CONFIG_IRQ_REMAP */
+
+#define AMD_IOMMU_INT_MASK	\
+	(MMIO_STATUS_EVT_INT_MASK | \
+	 MMIO_STATUS_PPR_INT_MASK | \
+	 MMIO_STATUS_GALOG_INT_MASK)
+
 irqreturn_t amd_iommu_int_thread(int irq, void *data)
 {
 	struct amd_iommu *iommu = (struct amd_iommu *) data;
 	u32 status = readl(iommu->mmio_base + MMIO_STATUS_OFFSET);
 
-	while (status & (MMIO_STATUS_EVT_INT_MASK | MMIO_STATUS_PPR_INT_MASK)) {
-		/* Enable EVT and PPR interrupts again */
-		writel((MMIO_STATUS_EVT_INT_MASK | MMIO_STATUS_PPR_INT_MASK),
+	while (status & AMD_IOMMU_INT_MASK) {
+		/* Enable EVT and PPR and GA interrupts again */
+		writel(AMD_IOMMU_INT_MASK,
 			iommu->mmio_base + MMIO_STATUS_OFFSET);
 
 		if (status & MMIO_STATUS_EVT_INT_MASK) {
@@ -761,6 +848,13 @@ irqreturn_t amd_iommu_int_thread(int irq, void *data)
 			pr_devel("AMD-Vi: Processing IOMMU PPR Log\n");
 			iommu_poll_ppr_log(iommu);
 		}
+
+#ifdef CONFIG_IRQ_REMAP
+		if (status & MMIO_STATUS_GALOG_INT_MASK) {
+			pr_devel("AMD-Vi: Processing IOMMU GA Log\n");
+			iommu_poll_ga_log(iommu);
+		}
+#endif
 
 		/*
 		 * Hardware bug: ERBT1312
