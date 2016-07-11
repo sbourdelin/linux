@@ -3455,7 +3455,7 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
 	struct usb_hub	*hub = usb_hub_to_struct_hub(udev->parent);
 	struct usb_port *port_dev = hub->ports[udev->portnum  - 1];
 	int		port1 = udev->portnum;
-	int		status;
+	int		status, retval;
 	u16		portchange, portstatus;
 
 	if (!test_and_set_bit(port1, hub->child_usage_bits)) {
@@ -3511,6 +3511,10 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
 						USB_PORT_FEAT_C_SUSPEND);
 		}
 	}
+
+	retval = hub_port_reset(hub, port1, udev, HUB_ROOT_RESET_TIME, false);
+	if (retval < 0)
+		hub_port_disable(hub, port1, 0);
 
 	if (udev->persist_enabled)
 		status = wait_for_connected(udev, hub, &port1, &portchange,
