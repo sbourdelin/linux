@@ -57,6 +57,28 @@ DEFINE_MUTEX(hci_cb_list_lock);
 /* HCI ID Numbering */
 static DEFINE_IDA(hci_index_ida);
 
+/* HCI device notifier list */
+static RAW_NOTIFIER_HEAD(hci_dev_chain);
+
+/* ---- HCI notifiers functions ---- */
+
+int register_hci_dev_notifier(struct notifier_block *nb)
+{
+	return raw_notifier_chain_register(&hci_dev_chain, nb);
+}
+EXPORT_SYMBOL(register_hci_dev_notifier);
+
+void unregister_hci_dev_notifier(struct notifier_block *nb)
+{
+	raw_notifier_chain_unregister(&hci_dev_chain, nb);
+}
+EXPORT_SYMBOL(unregister_hci_dev_notifier);
+
+int call_hci_dev_notifiers(unsigned long val, struct hci_dev *hdev)
+{
+	return raw_notifier_call_chain(&hci_dev_chain, val, hdev);
+}
+
 /* ---- HCI debugfs entries ---- */
 
 static ssize_t dut_mode_read(struct file *file, char __user *user_buf,

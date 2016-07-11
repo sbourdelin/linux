@@ -902,6 +902,10 @@ void hci_conn_enter_active_mode(struct hci_conn *conn, __u8 force_active);
 
 void hci_le_conn_failed(struct hci_conn *conn, u8 status);
 
+int register_hci_dev_notifier(struct notifier_block *nb);
+void unregister_hci_dev_notifier(struct notifier_block *nb);
+int call_hci_dev_notifiers(unsigned long val, struct hci_dev *hdev);
+
 /*
  * hci_conn_get() and hci_conn_put() are used to control the life-time of an
  * "hci_conn" object. They do not guarantee that the hci_conn object is running,

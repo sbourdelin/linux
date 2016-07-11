@@ -529,6 +529,8 @@ void hci_sock_dev_event(struct hci_dev *hdev, int event)
 		}
 		read_unlock(&hci_sk_list.lock);
 	}
+
+	call_hci_dev_notifiers(event, hdev);
 }
 
 static struct hci_mgmt_chan *__hci_mgmt_chan_find(unsigned short channel)
