@@ -245,8 +245,7 @@ static int isl12057_rtc_update_alarm(struct device *dev, int enable)
 static int isl12057_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 {
 	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
-	struct rtc_time rtc_tm, *alarm_tm = &alarm->time;
-	unsigned long rtc_secs, alarm_secs;
+	struct rtc_time *alarm_tm = &alarm->time;
 	u8 regs[ISL12057_A1_SEC_LEN];
 	unsigned int ir;
 	int ret;
