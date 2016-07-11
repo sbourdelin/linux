@@ -133,6 +133,18 @@ lowpan_iphc_ctx_is_compression(const struct lowpan_iphc_ctx *ctx)
 	return test_bit(LOWPAN_IPHC_CTX_FLAG_COMPRESSION, &ctx->flags);
 }
 
+struct lowpan_addr_info {
+	unsigned char daddr[EUI64_ADDR_LEN];
+	unsigned char saddr[EUI64_ADDR_LEN];
+};
+
+static inline struct
+lowpan_addr_info *lowpan_addr_info(const struct sk_buff *skb)
+{
+	return (struct lowpan_addr_info *)(skb->data -
+					   sizeof(struct lowpan_addr_info));
+}
+
 struct lowpan_dev {
 	enum lowpan_lltypes lltype;
 	struct dentry *iface_debugfs;

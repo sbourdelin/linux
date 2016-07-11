@@ -48,9 +48,6 @@ int lowpan_net_frag_init(void);
 void lowpan_rx_init(void);
 void lowpan_rx_exit(void);
 
-int lowpan_header_create(struct sk_buff *skb, struct net_device *dev,
-			 unsigned short type, const void *_daddr,
-			 const void *_saddr, unsigned int len);
 netdev_tx_t lowpan_xmit(struct sk_buff *skb, struct net_device *dev);
 
 int lowpan_iphc_decompress(struct sk_buff *skb);

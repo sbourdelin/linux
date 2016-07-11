@@ -18,48 +18,23 @@
 #define LOWPAN_FRAG1_HEAD_SIZE	0x4
 #define LOWPAN_FRAGN_HEAD_SIZE	0x5
 
-struct lowpan_addr_info {
-	struct ieee802154_addr daddr;
-	struct ieee802154_addr saddr;
-};
-
-static inline struct
-lowpan_addr_info *lowpan_skb_priv(const struct sk_buff *skb)
-{
-	return (struct lowpan_addr_info *)(skb->data -
-			sizeof(struct lowpan_addr_info));
-}
-
-/* This callback will be called from AF_PACKET and IPv6 stack, the AF_PACKET
- * sockets gives an 8 byte array for addresses only!
- *
- * TODO I think AF_PACKET DGRAM (sending/receiving) RAW (sending) makes no
- * sense here. We should disable it, the right use-case would be AF_INET6
- * RAW/DGRAM sockets.
- */
-int lowpan_header_create(struct sk_buff *skb, struct net_device *ldev,
-			 unsigned short type, const void *daddr,
-			 const void *saddr, unsigned int len)
+static void lowpan_addr_lookup(struct net_device *ldev, struct sk_buff *skb,
+			       struct ieee802154_addr *daddr,
+			       struct ieee802154_addr *saddr)
 {
 	struct wpan_dev *wpan_dev = lowpan_802154_dev(ldev)->wdev->ieee802154_ptr;
-	struct lowpan_addr_info *info = lowpan_skb_priv(skb);
+	struct lowpan_addr_info *info = lowpan_addr_info(skb);
 	struct lowpan_802154_neigh *llneigh = NULL;
 	const struct ipv6hdr *hdr = ipv6_hdr(skb);
 	struct neighbour *n;
 
-	/* TODO:
-	 * if this package isn't ipv6 one, where should it be routed?
-	 */
-	if (type != ETH_P_IPV6)
-		return 0;
-
 	/* intra-pan communication */
-	info->saddr.pan_id = wpan_dev->pan_id;
-	info->daddr.pan_id = info->saddr.pan_id;
+	saddr->pan_id = wpan_dev->pan_id;
+	daddr->pan_id = saddr->pan_id;
 
-	if (!memcmp(daddr, ldev->broadcast, EUI64_ADDR_LEN)) {
-		info->daddr.short_addr = cpu_to_le16(IEEE802154_ADDR_BROADCAST);
-		info->daddr.mode = IEEE802154_ADDR_SHORT;
+	if (!memcmp(info->daddr, ldev->broadcast, EUI64_ADDR_LEN)) {
+		daddr->short_addr = cpu_to_le16(IEEE802154_ADDR_BROADCAST);
+		daddr->mode = IEEE802154_ADDR_SHORT;
 	} else {
 		__le16 short_addr = cpu_to_le16(IEEE802154_ADDR_SHORT_UNSPEC);
 
@@ -73,32 +48,25 @@ int lowpan_header_create(struct sk_buff *skb, struct net_device *ldev,
 
 		if (llneigh &&
 		    lowpan_802154_is_valid_src_short_addr(short_addr)) {
-			info->daddr.short_addr = short_addr;
-			info->daddr.mode = IEEE802154_ADDR_SHORT;
+			daddr->short_addr = short_addr;
+			daddr->mode = IEEE802154_ADDR_SHORT;
 		} else {
-			info->daddr.mode = IEEE802154_ADDR_LONG;
-			ieee802154_be64_to_le64(&info->daddr.extended_addr,
-						daddr);
+			daddr->mode = IEEE802154_ADDR_LONG;
+			ieee802154_be64_to_le64(&daddr->extended_addr,
+						info->daddr);
 		}
 
 		if (n)
 			neigh_release(n);
 	}
 
-	if (!saddr) {
-		if (lowpan_802154_is_valid_src_short_addr(wpan_dev->short_addr)) {
-			info->saddr.mode = IEEE802154_ADDR_SHORT;
-			info->saddr.short_addr = wpan_dev->short_addr;
-		} else {
-			info->saddr.mode = IEEE802154_ADDR_LONG;
-			info->saddr.extended_addr = wpan_dev->extended_addr;
-		}
+	if (lowpan_802154_is_valid_src_short_addr(wpan_dev->short_addr)) {
+		saddr->mode = IEEE802154_ADDR_SHORT;
+		saddr->short_addr = wpan_dev->short_addr;
 	} else {
-		info->saddr.mode = IEEE802154_ADDR_LONG;
-		ieee802154_be64_to_le64(&info->saddr.extended_addr, saddr);
+		saddr->mode = IEEE802154_ADDR_LONG;
+		ieee802154_be64_to_le64(&saddr->extended_addr, info->saddr);
 	}
-
-	return 0;
 }
 
 static struct sk_buff*
@@ -227,33 +195,33 @@ err:
 }
 
 static int lowpan_header(struct sk_buff *skb, struct net_device *ldev,
-			 u16 *dgram_size, u16 *dgram_offset)
+			 u16 *dgram_size, u16 *dgram_offset,
+			 const struct ieee802154_addr *daddr,
+			 const struct ieee802154_addr *saddr)
 {
 	struct wpan_dev *wpan_dev = lowpan_802154_dev(ldev)->wdev->ieee802154_ptr;
 	struct ieee802154_mac_cb *cb = mac_cb_init(skb);
-	struct lowpan_addr_info info;
-
-	memcpy(&info, lowpan_skb_priv(skb), sizeof(info));
 
 	*dgram_size = skb->len;
-	lowpan_header_compress(skb, ldev, &info.daddr, &info.saddr);
+	lowpan_header_compress(skb, ldev, daddr, saddr);
 	/* dgram_offset = (saved bytes after compression) + lowpan header len */
 	*dgram_offset = (*dgram_size - skb->len) + skb_network_header_len(skb);
 
 	cb->type = IEEE802154_FC_TYPE_DATA;
 
-	if (info.daddr.mode == IEEE802154_ADDR_SHORT &&
-	    ieee802154_is_broadcast_short_addr(info.daddr.short_addr))
+	if (daddr->mode == IEEE802154_ADDR_SHORT &&
+	    ieee802154_is_broadcast_short_addr(daddr->short_addr))
 		cb->ackreq = false;
 	else
 		cb->ackreq = wpan_dev->ackreq;
 
-	return wpan_dev_hard_header(skb, lowpan_802154_dev(ldev)->wdev,
-				    &info.daddr, &info.saddr, 0);
+	return wpan_dev_hard_header(skb, lowpan_802154_dev(ldev)->wdev, daddr,
+				    saddr, 0);
 }
 
 netdev_tx_t lowpan_xmit(struct sk_buff *skb, struct net_device *ldev)
 {
+	struct ieee802154_addr daddr, saddr;
 	struct ieee802154_hdr wpan_hdr;
 	int max_single, ret;
 	u16 dgram_size, dgram_offset;
@@ -262,6 +230,8 @@ netdev_tx_t lowpan_xmit(struct sk_buff *skb, struct net_device *ldev)
 
 	WARN_ON_ONCE(skb->len > IPV6_MIN_MTU);
 
+	lowpan_addr_lookup(ldev, skb, &daddr, &saddr);
+
 	/* We must take a copy of the skb before we modify/replace the ipv6
 	 * header as the header could be used elsewhere
 	 */
@@ -269,7 +239,8 @@ netdev_tx_t lowpan_xmit(struct sk_buff *skb, struct net_device *ldev)
 	if (!skb)
 		return NET_XMIT_DROP;
 
-	ret = lowpan_header(skb, ldev, &dgram_size, &dgram_offset);
+	ret = lowpan_header(skb, ldev, &dgram_size, &dgram_offset, &daddr,
+			    &saddr);
 	if (ret < 0) {
 		kfree_skb(skb);
 		return NET_XMIT_DROP;
