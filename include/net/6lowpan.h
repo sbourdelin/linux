@@ -178,7 +178,6 @@ struct lowpan_802154_cb {
 static inline
 struct lowpan_802154_cb *lowpan_802154_cb(const struct sk_buff *skb)
 {
-	BUILD_BUG_ON(sizeof(struct lowpan_802154_cb) > sizeof(skb->cb));
 	return (struct lowpan_802154_cb *)skb->cb;
 }
 
