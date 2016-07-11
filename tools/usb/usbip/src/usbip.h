@@ -37,4 +37,7 @@ void usbip_list_usage(void);
 void usbip_bind_usage(void);
 void usbip_unbind_usage(void);
 
+int usbip_bind_device(char *busid);
+int usbip_unbind_device(char *busid);
+
 #endif /* __USBIP_H */
