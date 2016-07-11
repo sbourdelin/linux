@@ -94,6 +94,21 @@ static struct lowpan_nhc *lowpan_nhc_by_nhcid(const struct sk_buff *skb)
 	return NULL;
 }
 
+/* TODO remove this and do everything in compress callback,
+ * this means, setting NHC bit in IPHC, check if compression
+ * make sense and doing compression. We will hit the issue
+ * when having two bytes long NHC ID's that the IPHC compression
+ * could be have more bytes than using raw next header, this
+ * will break btle 6lowpan.
+ *
+ * Marcel told to look into skb frag and linearlize functionality.
+ * This way is very ugly.
+ * Additonal change handling that sending compressed on transmit
+ * is default disabled. Use a compression flag e.g. RFC6775
+ *
+ * I see nhc in a bad state currently, this need to be fixed
+ * before adding new nhc's.
+ */
 int lowpan_nhc_check_compression(struct sk_buff *skb,
 				 const struct ipv6hdr *hdr, u8 **hc_ptr)
 {
