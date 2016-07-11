@@ -152,11 +152,9 @@ static int lowpan_newlink(struct net *src_net, struct net_device *ldev,
 	/* We need headroom for possible wpan_dev_hard_header call and tailroom
 	 * for encryption/fcs handling. The lowpan interface will replace
 	 * the IPv6 header with 6LoWPAN header. At worst case the 6LoWPAN
-	 * header has LOWPAN_IPHC_MAX_HEADER_LEN more bytes than the IPv6
-	 * header.
+	 * header has one byte more for possible raw IPv6 dispatch.
 	 */
-	ldev->needed_headroom = LOWPAN_IPHC_MAX_HEADER_LEN +
-				wdev->needed_headroom;
+	ldev->needed_headroom = 1 + wdev->needed_headroom;
 	ldev->needed_tailroom = wdev->needed_tailroom;
 
 	ldev->neigh_priv_len = sizeof(struct lowpan_802154_neigh);
