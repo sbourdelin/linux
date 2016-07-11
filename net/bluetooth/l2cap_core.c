@@ -7041,20 +7041,16 @@ static bool is_valid_psm(u16 psm, u8 dst_type) {
 	return ((psm & 0x0101) == 0x0001);
 }
 
-int l2cap_chan_connect(struct l2cap_chan *chan, __le16 psm, u16 cid,
-		       bdaddr_t *dst, u8 dst_type)
+int l2cap_hdev_chan_connect(struct hci_dev *hdev,
+			    struct l2cap_chan *chan, __le16 psm, u16 cid,
+			    bdaddr_t *dst, u8 dst_type)
 {
 	struct l2cap_conn *conn;
 	struct hci_conn *hcon;
-	struct hci_dev *hdev;
 	int err;
 
 	BT_DBG("%pMR -> %pMR (type %u) psm 0x%2.2x", &chan->src, dst,
 	       dst_type, __le16_to_cpu(psm));
-
-	hdev = hci_get_route(dst, &chan->src);
-	if (!hdev)
-		return -EHOSTUNREACH;
 
 	hci_dev_lock(hdev);
 
@@ -7199,7 +7195,25 @@ chan_unlock:
 	mutex_unlock(&conn->chan_lock);
 done:
 	hci_dev_unlock(hdev);
+	return err;
+}
+EXPORT_SYMBOL_GPL(l2cap_hdev_chan_connect);
+
+int l2cap_chan_connect(struct l2cap_chan *chan, __le16 psm, u16 cid,
+		       bdaddr_t *dst, u8 dst_type)
+{
+	struct hci_dev *hdev;
+	int err = -EHOSTUNREACH;
+
+	hdev = hci_get_route(dst, &chan->src);
+	if (!hdev)
+		goto done;
+
+	err = l2cap_hdev_chan_connect(hdev, chan, psm, cid, dst, dst_type);
+
 	hci_dev_put(hdev);
+
+done:
 	return err;
 }
 EXPORT_SYMBOL_GPL(l2cap_chan_connect);
