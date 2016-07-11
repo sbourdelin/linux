@@ -14,6 +14,7 @@
 #include <linux/gfp.h>
 #include <linux/reboot.h>
 #include <linux/numa.h>
+#include <linux/hugetlb.h>
 #include <linux/ftrace.h>
 #include <linux/io.h>
 #include <linux/suspend.h>
@@ -33,6 +34,17 @@ static struct kexec_file_ops *kexec_file_loaders[] = {
 		&kexec_bzImage64_ops,
 };
 #endif
+
+static void split_pmd(pmd_t *pmd, pte_t *pte)
+{
+	unsigned long pfn = pmd_pfn(*pmd);
+	int i = 0;
+
+	do {
+		set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
+		pfn++;
+	} while (pte++, i++, i < PTRS_PER_PTE);
+}
 
 static void free_transition_pgtable(struct kimage *image)
 {
@@ -68,15 +80,19 @@ static int init_transition_pgtable(struct kimage *image, pgd_t *pgd)
 		set_pud(pud, __pud(__pa(pmd) | _KERNPG_TABLE));
 	}
 	pmd = pmd_offset(pud, vaddr);
-	if (!pmd_present(*pmd)) {
+	if (!pmd_present(*pmd) || pmd_huge(*pmd)) {
 		pte = (pte_t *)get_zeroed_page(GFP_KERNEL);
 		if (!pte)
 			goto err;
 		image->arch.pte = pte;
-		set_pmd(pmd, __pmd(__pa(pte) | _KERNPG_TABLE));
+		if (pmd_huge(*pmd))
+			split_pmd(pmd, pte);
+		else
+			set_pmd(pmd, __pmd(__pa(pte) | _KERNPG_TABLE));
 	}
 	pte = pte_offset_kernel(pmd, vaddr);
 	set_pte(pte, pfn_pte(paddr >> PAGE_SHIFT, PAGE_KERNEL_EXEC));
+
 	return 0;
 err:
 	free_transition_pgtable(image);
