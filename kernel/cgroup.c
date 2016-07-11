@@ -63,6 +63,7 @@
 #include <linux/nsproxy.h>
 #include <linux/proc_ns.h>
 #include <net/sock.h>
+#include <linux/audit.h>
 
 /*
  * pidlists linger the following amount before being destroyed.  The goal
@@ -5783,6 +5784,67 @@ out_unlock:
 	kfree(buf);
 out:
 	return retval;
+}
+
+/*
+ * audit_cgroup_list()
+ *  - Print task's cgroup paths with audit_log_format()
+ *  - Used for capability audit logging
+ *  - Otherwise very similar to proc_cgroup_show().
+ */
+void audit_cgroup_list(struct audit_buffer *ab)
+{
+	char *buf, *path;
+	struct cgroup_root *root;
+
+	buf = kmalloc(PATH_MAX, GFP_NOFS);
+	if (!buf)
+		return;
+
+	mutex_lock(&cgroup_mutex);
+	spin_lock_irq(&css_set_lock);
+
+	for_each_root(root) {
+		struct cgroup_subsys *ss;
+		struct cgroup *cgrp;
+		int ssid, count = 0;
+
+		if (root == &cgrp_dfl_root && !cgrp_dfl_visible)
+			continue;
+
+		if (root != &cgrp_dfl_root)
+			for_each_subsys(ss, ssid)
+				if (root->subsys_mask & (1 << ssid))
+					audit_log_format(ab, "%s%s",
+							 count++ ? "," : "",
+							 ss->legacy_name);
+		if (strlen(root->name))
+			audit_log_format(ab, "%sname=%s", count ? "," : "",
+					 root->name);
+		audit_log_format(ab, ":");
+
+		cgrp = task_cgroup_from_root(current, root);
+
+		if (cgroup_on_dfl(cgrp) || !(current->flags & PF_EXITING)) {
+			path = cgroup_path_ns_locked(cgrp, buf, PATH_MAX,
+						current->nsproxy->cgroup_ns);
+			if (!path)
+				goto out_unlock;
+		} else
+			path = "/";
+
+		audit_log_format(ab, "%s", path);
+
+		if (cgroup_on_dfl(cgrp) && cgroup_is_dead(cgrp))
+			audit_log_format(ab, " (deleted);");
+		else
+			audit_log_format(ab, ";");
+	}
+
+out_unlock:
+	spin_unlock_irq(&css_set_lock);
+	mutex_unlock(&cgroup_mutex);
+	kfree(buf);
 }
 
 /* Display information about each subsystem and each hierarchy */

@@ -201,6 +201,7 @@ struct audit_context {
 	};
 	int fds[2];
 	struct audit_proctitle proctitle;
+	kernel_cap_t cap_used;
 };
 
 extern u32 audit_ever_enabled;

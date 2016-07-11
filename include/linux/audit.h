@@ -436,6 +436,8 @@ static inline void audit_mmap_fd(int fd, int flags)
 		__audit_mmap_fd(fd, flags);
 }
 
+extern void audit_log_cap_use(int cap);
+
 extern int audit_n_rules;
 extern int audit_signals;
 #else /* CONFIG_AUDITSYSCALL */
@@ -542,6 +544,8 @@ static inline void audit_log_capset(const struct cred *new,
 static inline void audit_mmap_fd(int fd, int flags)
 { }
 static inline void audit_ptrace(struct task_struct *t)
+{ }
+static inline void audit_log_cap_use(int cap)
 { }
 #define audit_n_rules 0
 #define audit_signals 0

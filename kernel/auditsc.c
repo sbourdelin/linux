@@ -198,7 +198,6 @@ static int audit_match_filetype(struct audit_context *ctx, int val)
  * References in it _are_ dropped - at the same time we free/drop aux stuff.
  */
 
-#ifdef CONFIG_AUDIT_TREE
 static void audit_set_auditable(struct audit_context *ctx)
 {
 	if (!ctx->prio) {
@@ -207,6 +206,7 @@ static void audit_set_auditable(struct audit_context *ctx)
 	}
 }
 
+#ifdef CONFIG_AUDIT_TREE
 static int put_tree_ref(struct audit_context *ctx, struct audit_chunk *chunk)
 {
 	struct audit_tree_refs *p = ctx->trees;
@@ -1444,6 +1444,18 @@ static void audit_log_exit(struct audit_context *context, struct task_struct *ts
 
 	audit_log_proctitle(tsk, context);
 
+	ab = audit_log_start(context, GFP_KERNEL, AUDIT_CAPABILITY);
+	if (ab) {
+		audit_log_cap(ab, "cap_used", &context->cap_used);
+		audit_log_end(ab);
+	}
+	ab = audit_log_start(context, GFP_KERNEL, AUDIT_CGROUP);
+	if (ab) {
+		audit_log_format(ab, "cgroups=");
+		audit_cgroup_list(ab);
+		audit_log_end(ab);
+	}
+
 	/* Send end of event record to help user space know we are finished */
 	ab = audit_log_start(context, GFP_KERNEL, AUDIT_EOE);
 	if (ab)
@@ -2427,4 +2439,18 @@ struct list_head *audit_killed_trees(void)
 	if (likely(!ctx || !ctx->in_syscall))
 		return NULL;
 	return &ctx->killed_trees;
+}
+
+void audit_log_cap_use(int cap)
+{
+	struct audit_context *context = current->audit_context;
+
+	if (context) {
+		cap_raise(context->cap_used, cap);
+		audit_set_auditable(context);
+	} else {
+		audit_log(NULL, GFP_NOFS, AUDIT_CAPABILITY,
+			  "cap_used=%d pid=%d no audit_context",
+			  cap, task_pid_nr(current));
+	}
 }

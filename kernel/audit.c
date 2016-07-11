@@ -54,6 +54,7 @@
 #include <linux/kthread.h>
 #include <linux/kernel.h>
 #include <linux/syscalls.h>
+#include <linux/cgroup.h>
 
 #include <linux/audit.h>
 
@@ -1685,7 +1686,7 @@ void audit_log_cap(struct audit_buffer *ab, char *prefix, kernel_cap_t *cap)
 {
 	int i;
 
-	audit_log_format(ab, " %s=", prefix);
+	audit_log_format(ab, "%s=", prefix);
 	CAP_FOR_EACH_U32(i) {
 		audit_log_format(ab, "%08x",
 				 cap->cap[CAP_LAST_U32 - i]);
@@ -1699,11 +1700,11 @@ static void audit_log_fcaps(struct audit_buffer *ab, struct audit_names *name)
 	int log = 0;
 
 	if (!cap_isclear(*perm)) {
-		audit_log_cap(ab, "cap_fp", perm);
+		audit_log_cap(ab, " cap_fp", perm);
 		log = 1;
 	}
 	if (!cap_isclear(*inh)) {
-		audit_log_cap(ab, "cap_fi", inh);
+		audit_log_cap(ab, " cap_fi", inh);
 		log = 1;
 	}
 
