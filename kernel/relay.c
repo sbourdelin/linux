@@ -451,6 +451,13 @@ static struct rchan_buf *relay_open_buf(struct rchan *chan, unsigned int cpu)
 		if (!dentry)
 			goto free_buf;
 		relay_set_buf_dentry(buf, dentry);
+	} else {
+		/* Only retrieve global info, nothing more, nothing less */
+		dentry = chan->cb->create_buf_file(NULL, NULL,
+						   S_IRUSR, buf,
+						   &chan->is_global);
+		if (WARN_ON(dentry))
+			goto free_buf;
 	}
 
  	buf->cpu = cpu;
@@ -666,6 +673,20 @@ int relay_late_setup_files(struct rchan *chan,
 	}
 	chan->has_base_filename = 1;
 	chan->parent = parent;
+
+	if (chan->is_global) {
+		err = -EINVAL;
+		if (!WARN_ON_ONCE(!chan->buf[0])) {
+			dentry = relay_create_buf_file(chan, chan->buf[0], 0);
+			if (dentry && !WARN_ON_ONCE(!chan->is_global)) {
+				relay_set_buf_dentry(chan->buf[0], dentry);
+				err = 0;
+			}
+		}
+		mutex_unlock(&relay_channels_mutex);
+		return err;
+	}
+
 	curr_cpu = get_cpu();
 	/*
 	 * The CPU hotplug notifier ran before us and created buffers with
@@ -706,6 +727,7 @@ int relay_late_setup_files(struct rchan *chan,
 
 	return err;
 }
+EXPORT_SYMBOL_GPL(relay_late_setup_files);
 
 /**
  *	relay_switch_subbuf - switch to a new sub-buffer
