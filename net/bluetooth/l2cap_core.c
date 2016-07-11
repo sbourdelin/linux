@@ -484,6 +484,7 @@ void l2cap_chan_hold(struct l2cap_chan *c)
 
 	kref_get(&c->kref);
 }
+EXPORT_SYMBOL(l2cap_chan_hold);
 
 void l2cap_chan_put(struct l2cap_chan *c)
 {
