@@ -393,6 +393,34 @@ static struct snd_pcm_hardware azx_pcm_hw = {
 	.fifo_size =		0,
 };
 
+void azx_parse_capabilities(struct azx *chip)
+{
+	unsigned int cur_cap;
+	unsigned int offset;
+
+	offset = azx_readl(chip, LLCH);
+
+	/* Lets walk the linked capabilities list */
+	do {
+		cur_cap = _snd_hdac_chip_read(l, azx_bus(chip), offset);
+
+		switch ((cur_cap & CAP_HDR_ID_MASK) >> CAP_HDR_ID_OFF) {
+		case GTS_CAP_ID:
+			dev_dbg(chip->card->dev, "Found GTS capability");
+			chip->gts_present = 1;
+			break;
+
+		default:
+			break;
+		}
+
+		/* read the offset of next capabiity */
+		offset = cur_cap & CAP_HDR_NXT_PTR_MASK;
+	} while (offset);
+
+}
+EXPORT_SYMBOL_GPL(azx_parse_capabilities);
+
 static int azx_pcm_open(struct snd_pcm_substream *substream)
 {
 	struct azx_pcm *apcm = snd_pcm_substream_chip(substream);
@@ -412,6 +440,11 @@ static int azx_pcm_open(struct snd_pcm_substream *substream)
 		goto unlock;
 	}
 	runtime->private_data = azx_dev;
+
+	/* CPU must have ART for reporting link synchronized time */
+	if (chip->gts_present && boot_cpu_has(X86_FEATURE_ART))
+		azx_pcm_hw.info = azx_pcm_hw.info |
+			SNDRV_PCM_INFO_HAS_LINK_SYNCHRONIZED_ATIME;
 	runtime->hw = azx_pcm_hw;
 	runtime->hw.channels_min = hinfo->channels_min;
 	runtime->hw.channels_max = hinfo->channels_max;

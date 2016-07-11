@@ -1652,6 +1652,7 @@ static int azx_first_init(struct azx *chip)
 		return -ENXIO;
 	}
 
+	azx_parse_capabilities(chip);
 	if (chip->msi) {
 		if (chip->driver_caps & AZX_DCAPS_NO_MSI64) {
 			dev_dbg(card->dev, "Disabling 64bit MSI\n");

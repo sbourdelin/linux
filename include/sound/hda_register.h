@@ -242,6 +242,29 @@ enum { SDI0, SDI1, SDI2, SDI3, SDO0, SDO1, SDO2, SDO3 };
 /* Interval used to calculate the iterating register offset */
 #define AZX_DRSM_INTERVAL		0x08
 
+/* Global time synchronization registers */
+#define GTSCC_TSCCD_MASK		0x80000000
+#define GTSCC_TSCCD_SHIFT		31
+#define GTSCC_TSCCI_MASK		0x20
+#define GTSCC_CDMAS_DMA_DIR_SHIFT	4
+
+#define WALFCC_CIF_MASK			0x1FF
+#define WALFCC_FN_SHIFT			9
+#define HDA_CLK_CYCLES_PER_FRAME	512
+
+/*
+ * An error occurs near frame "rollover". The clocks in frame value indicates
+ * whether this error may have occurred. Here we use the value of 10. Please
+ * see the errata for the right number [<10]
+ */
+#define HDA_MAX_CYCLE_VALUE		499
+#define HDA_MAX_CYCLE_OFFSET		10
+#define HDA_MAX_CYCLE_READ_RETRY	10
+
+#define TSCCU_CCU_SHIFT			32
+#define LLPC_CCU_SHIFT			32
+
+
 /*
  * helpers to read the stream position
  */

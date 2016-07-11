@@ -159,9 +159,14 @@ struct azx {
 	unsigned int region_requested:1;
 	unsigned int disabled:1; /* disabled by vga_switcheroo */
 
+	/* GTS present */
+	unsigned int gts_present:1;
+
 #ifdef CONFIG_SND_HDA_DSP_LOADER
 	struct azx_dev saved_azx_dev;
 #endif
+	unsigned int link_count;
+	unsigned int mlcap_offset;
 };
 
 #define azx_bus(chip)	(&(chip)->bus.core)
@@ -172,6 +177,27 @@ struct azx {
 #else
 #define azx_snoop(chip)		true
 #endif
+
+#define AZX_REG_LLCH 0x14
+
+#define AZX_REG_GTS_BASE 0x520
+
+#define AZX_REG_GTSCC	(AZX_REG_GTS_BASE + 0x00)
+#define AZX_REG_WALFCC	(AZX_REG_GTS_BASE + 0x04)
+#define AZX_REG_TSCCL	(AZX_REG_GTS_BASE + 0x08)
+#define AZX_REG_TSCCU	(AZX_REG_GTS_BASE + 0x0C)
+#define AZX_REG_LLPFOC	(AZX_REG_GTS_BASE + 0x14)
+#define AZX_REG_LLPCL	(AZX_REG_GTS_BASE + 0x18)
+#define AZX_REG_LLPCU	(AZX_REG_GTS_BASE + 0x1C)
+
+#define CAP_HDR_VER_OFF                 28
+#define CAP_HDR_VER_MASK                (0xF << CAP_HDR_VER_OFF)
+
+#define CAP_HDR_ID_OFF                  16
+#define CAP_HDR_ID_MASK                 (0xFFF << CAP_HDR_ID_OFF)
+
+#define GTS_CAP_ID                 0x1
+#define CAP_HDR_NXT_PTR_MASK    0xFFFF
 
 /*
  * macros for easy use
@@ -201,6 +227,7 @@ static inline struct azx_dev *get_azx_dev(struct snd_pcm_substream *substream)
 unsigned int azx_get_position(struct azx *chip, struct azx_dev *azx_dev);
 unsigned int azx_get_pos_lpib(struct azx *chip, struct azx_dev *azx_dev);
 unsigned int azx_get_pos_posbuf(struct azx *chip, struct azx_dev *azx_dev);
+void azx_parse_capabilities(struct azx *chip);
 
 /* Stream control. */
 void azx_stop_all_streams(struct azx *chip);
