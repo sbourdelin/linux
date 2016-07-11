@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2011 matt mooney <mfm@muteddisk.com>
+ * Copyright (C) 2015 Nobuo Iwata
+ *               2011 matt mooney <mfm@muteddisk.com>
  *               2005-2007 Takahiro Hirofuchi
  * Copyright (C) 2015-2016 Samsung Electronics
  *               Igor Kotrasinski <i.kotrasinsk@samsung.com>
@@ -26,7 +27,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <fcntl.h>
 #include <getopt.h>
 #include <unistd.h>
 #include <errno.h>
@@ -45,49 +45,6 @@ static const char usbip_attach_usage_string[] =
 void usbip_attach_usage(void)
 {
 	printf("usage: %s", usbip_attach_usage_string);
-}
-
-#define MAX_BUFF 100
-static int record_connection(char *host, char *port, char *busid, int rhport)
-{
-	int fd;
-	char path[PATH_MAX+1];
-	char buff[MAX_BUFF+1];
-	int ret;
-
-	ret = mkdir(VHCI_STATE_PATH, 0700);
-	if (ret < 0) {
-		/* if VHCI_STATE_PATH exists, then it better be a directory */
-		if (errno == EEXIST) {
-			struct stat s;
-
-			ret = stat(VHCI_STATE_PATH, &s);
-			if (ret < 0)
-				return -1;
-			if (!(s.st_mode & S_IFDIR))
-				return -1;
-		} else
-			return -1;
-	}
-
-	snprintf(path, PATH_MAX, VHCI_STATE_PATH"/port%d", rhport);
-
-	fd = open(path, O_WRONLY|O_CREAT|O_TRUNC, S_IRWXU);
-	if (fd < 0)
-		return -1;
-
-	snprintf(buff, MAX_BUFF, "%s %s %s\n",
-			host, port, busid);
-
-	ret = write(fd, buff, strlen(buff));
-	if (ret != (ssize_t) strlen(buff)) {
-		close(fd);
-		return -1;
-	}
-
-	close(fd);
-
-	return 0;
 }
 
 static int import_device(int sockfd, struct usbip_usb_device *udev)
@@ -188,12 +145,13 @@ static int attach_device(char *host, char *busid)
 	rhport = query_import_device(sockfd, busid);
 	if (rhport < 0) {
 		err("query");
+		close(sockfd);
 		return -1;
 	}
 
 	close(sockfd);
 
-	rc = record_connection(host, usbip_port_string, busid, rhport);
+	rc = usbip_vhci_create_record(host, usbip_port_string, busid, rhport);
 	if (rc < 0) {
 		err("record connection");
 		return -1;
