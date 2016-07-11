@@ -26,7 +26,6 @@ struct lowpan_addr_info {
 static inline struct
 lowpan_addr_info *lowpan_skb_priv(const struct sk_buff *skb)
 {
-	WARN_ON_ONCE(skb_headroom(skb) < sizeof(struct lowpan_addr_info));
 	return (struct lowpan_addr_info *)(skb->data -
 			sizeof(struct lowpan_addr_info));
 }
