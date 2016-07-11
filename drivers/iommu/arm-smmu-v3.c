@@ -2531,6 +2531,17 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
 	smmu->ssid_bits = reg >> IDR1_SSID_SHIFT & IDR1_SSID_MASK;
 	smmu->sid_bits = reg >> IDR1_SID_SHIFT & IDR1_SID_MASK;
 
+	/*
+	 * If the SMMU supports fewer bits than would fill a single L2 stream
+	 * table, use a linear table instead.
+	 */
+	if (smmu->sid_bits <= STRTAB_SPLIT &&
+	    smmu->features & ARM_SMMU_FEAT_2_LVL_STRTAB) {
+		smmu->features &= ~ARM_SMMU_FEAT_2_LVL_STRTAB;
+		dev_info(smmu->dev, "SIDSIZE (%d) <= STRTAB_SPLIT (%d) : disabling 2-level stream tables\n",
+			 smmu->sid_bits, STRTAB_SPLIT);
+	}
+
 	/* IDR5 */
 	reg = readl_relaxed(smmu->base + ARM_SMMU_IDR5);
 
