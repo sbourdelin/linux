@@ -54,13 +54,6 @@
 
 static int open_count;
 
-static int lowpan_dev_init(struct net_device *ldev)
-{
-	netdev_lockdep_set_classes(ldev);
-
-	return 0;
-}
-
 static int lowpan_open(struct net_device *dev)
 {
 	if (!open_count)

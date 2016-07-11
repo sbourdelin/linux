@@ -286,6 +286,8 @@ int lowpan_register_netdev(struct net_device *dev,
 void lowpan_unregister_netdevice(struct net_device *dev);
 void lowpan_unregister_netdev(struct net_device *dev);
 
+int lowpan_dev_init(struct net_device *dev);
+
 /**
  * lowpan_header_decompress - replace 6LoWPAN header with IPv6 header
  *
