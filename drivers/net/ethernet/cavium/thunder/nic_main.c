@@ -174,7 +174,7 @@ static void nic_mbx_send_ready(struct nicpf *nic, int vf)
 
 	mbx.nic_cfg.tns_mode = NIC_TNS_BYPASS_MODE;
 
-	if (vf < MAX_LMAC) {
+	if (vf < nic->num_vf_en) {
 		bgx_idx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
 		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
 
