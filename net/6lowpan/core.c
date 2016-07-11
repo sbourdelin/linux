@@ -62,6 +62,7 @@ int lowpan_register_netdevice(struct net_device *dev,
 	dev->type = ARPHRD_6LOWPAN;
 	dev->mtu = IPV6_MIN_MTU;
 	dev->priv_flags |= IFF_NO_QUEUE;
+	dev->flags = IFF_BROADCAST | IFF_MULTICAST;
 
 	dev->header_ops = &header_ops;
 
