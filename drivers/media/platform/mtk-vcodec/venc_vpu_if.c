@@ -37,7 +37,7 @@ static void handle_enc_encode_msg(struct venc_vpu_inst *vpu, void *data)
 static void vpu_enc_ipi_handler(void *data, unsigned int len, void *priv)
 {
 	struct venc_vpu_ipi_msg_common *msg = data;
-	struct venc_vpu_inst *vpu = (struct venc_vpu_inst *)msg->venc_inst;
+	struct venc_vpu_inst *vpu = (struct venc_vpu_inst *)(uintptr_t)msg->venc_inst;
 
 	mtk_vcodec_debug(vpu, "msg_id %x inst %p status %d",
 			 msg->msg_id, vpu, msg->status);
@@ -112,7 +112,7 @@ int vpu_enc_init(struct venc_vpu_inst *vpu)
 
 	memset(&out, 0, sizeof(out));
 	out.msg_id = AP_IPIMSG_ENC_INIT;
-	out.venc_inst = (unsigned long)vpu;
+	out.venc_inst = (uintptr_t)vpu;
 	if (vpu_enc_send_msg(vpu, &out, sizeof(out))) {
 		mtk_vcodec_err(vpu, "AP_IPIMSG_ENC_INIT fail");
 		return -EINVAL;

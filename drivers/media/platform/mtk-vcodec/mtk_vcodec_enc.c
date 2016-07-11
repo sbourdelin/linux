@@ -1028,15 +1028,15 @@ static void mtk_venc_worker(struct work_struct *work)
 	bs_buf.size = (size_t)dst_buf->planes[0].length;
 
 	mtk_v4l2_debug(2,
-			"Framebuf VA=%p PA=%llx Size=0x%lx;VA=%p PA=0x%llx Size=0x%lx;VA=%p PA=0x%llx Size=%zu",
+			"Framebuf VA=%p PA=%pad Size=0x%zx;VA=%p PA=%pad Size=0x%zx;VA=%p PA=%pad Size=0x%zx",
 			frm_buf.fb_addr[0].va,
-			(u64)frm_buf.fb_addr[0].dma_addr,
+			&frm_buf.fb_addr[0].dma_addr,
 			frm_buf.fb_addr[0].size,
 			frm_buf.fb_addr[1].va,
-			(u64)frm_buf.fb_addr[1].dma_addr,
+			&frm_buf.fb_addr[1].dma_addr,
 			frm_buf.fb_addr[1].size,
 			frm_buf.fb_addr[2].va,
-			(u64)frm_buf.fb_addr[2].dma_addr,
+			&frm_buf.fb_addr[2].dma_addr,
 			frm_buf.fb_addr[2].size);
 
 	ret = venc_if_encode(ctx, VENC_START_OPT_ENCODE_FRAME,
