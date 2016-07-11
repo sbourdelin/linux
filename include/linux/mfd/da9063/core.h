@@ -3,8 +3,8 @@
  *
  * Copyright 2012 Dialog Semiconductor Ltd.
  *
- * Author: Michal Hajduk <michal.hajduk@diasemi.com>
- *	   Krystian Garbaciak <krystian.garbaciak@diasemi.com>
+ * Author: Michal Hajduk
+ * Author: Krystian Garbaciak
  *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
