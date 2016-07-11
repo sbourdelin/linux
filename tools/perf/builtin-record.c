@@ -51,6 +51,7 @@ struct record {
 	struct perf_data_file	file;
 	struct auxtrace_record	*itr;
 	struct perf_evlist	*evlist;
+	struct perf_evlist	*overwrite_evlist;
 	struct perf_session	*session;
 	const char		*progname;
 	int			realtime_prio;
@@ -342,13 +343,41 @@ int auxtrace_record__snapshot_start(struct auxtrace_record *itr __maybe_unused)
 
 #endif
 
+static int record__create_overwrite_evlist(struct record *rec)
+{
+	struct perf_evlist *evlist = rec->evlist;
+	struct perf_evsel *pos;
+
+	evlist__for_each_entry(evlist, pos) {
+		if (!pos->attr.write_backward)
+			continue;
+
+		if (!rec->overwrite_evlist) {
+			rec->overwrite_evlist = perf_evlist__new_aux(evlist);
+			if (rec->overwrite_evlist) {
+				rec->overwrite_evlist->backward = true;
+				rec->overwrite_evlist->overwrite = true;
+				return 0;
+			} else
+				return -ENOMEM;
+		}
+	}
+	return 0;
+}
+
 static int record__mmap_evlist(struct record *rec,
-			       struct perf_evlist *evlist)
+			       struct perf_evlist *evlist,
+			       bool overwrite)
 {
 	struct record_opts *opts = &rec->opts;
 	char msg[512];
 
-	if (perf_evlist__mmap_ex(evlist, opts->mmap_pages, false,
+	/*
+	 * Don't use evlist->overwrite because it is logically an
+	 * internal attribute and is set by perf_evlist__mmap_ex().
+	 * Avoid circular dependency.
+	 */
+	if (perf_evlist__mmap_ex(evlist, opts->mmap_pages, overwrite,
 				 opts->auxtrace_mmap_pages,
 				 opts->auxtrace_snapshot_mode) < 0) {
 		if (errno == EPERM) {
@@ -373,7 +402,20 @@ static int record__mmap_evlist(struct record *rec,
 
 static int record__mmap(struct record *rec)
 {
-	return record__mmap_evlist(rec, rec->evlist);
+	int err;
+
+	err = record__create_overwrite_evlist(rec);
+	if (err)
+		return err;
+
+	err = record__mmap_evlist(rec, rec->evlist, false);
+	if (err)
+		return err;
+
+	if (!rec->overwrite_evlist)
+		return 0;
+
+	return record__mmap_evlist(rec, rec->overwrite_evlist, true);
 }
 
 static int record__open(struct record *rec)
@@ -698,10 +740,11 @@ static const struct perf_event_mmap_page *record__pick_pc(struct record *rec)
 {
 	const struct perf_event_mmap_page *pc;
 
+	/* Change it to a loop if a new aux evlist is added */
 	pc = perf_evlist__pick_pc(rec->evlist);
 	if (pc)
 		return pc;
-	return NULL;
+	return perf_evlist__pick_pc(rec->overwrite_evlist);
 }
 
 static int record__synthesize(struct record *rec)
@@ -1311,6 +1354,7 @@ static struct record record = {
 		.mmap2		= perf_event__process_mmap2,
 		.ordered_events	= true,
 	},
+	.overwrite_evlist = NULL,
 };
 
 const char record_callchain_help[] = CALLCHAIN_RECORD_HELP
@@ -1614,6 +1658,8 @@ int cmd_record(int argc, const char **argv, const char *prefix __maybe_unused)
 	err = __cmd_record(&record, argc, argv);
 out_symbol_exit:
 	perf_evlist__delete(rec->evlist);
+	if (rec->overwrite_evlist)
+		perf_evlist__delete(rec->overwrite_evlist);
 	symbol__exit();
 	auxtrace_record__free(rec->itr);
 	return err;
