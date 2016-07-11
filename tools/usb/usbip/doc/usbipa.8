@@ -1,15 +1,13 @@
-.TH USBIP "8" "February 2009" "usbip" "System Administration Utilities"
+.TH USBIP "8" "March 2015" "usbip" "System Administration Utilities"
 .SH NAME
-usbipd \- USB/IP device side daemon
+usbipa \- USB/IP application side daemon
 .SH SYNOPSIS
-.B usbipd
+.B usbipa
 [\fIoptions\fR]
 
 .SH DESCRIPTION
-.B usbipd
-runs on a divice side computer and provides USB/IP access from remote computers.
-
-To make devices accessible from remote computers, they must be made importable using \fBusbip bind\fR.
+.B usbipa
+runs on an application side computer and make remote USB devices connected using \fBusbip connect\fR at remote computers accessible on the application side computer.
 
 .SH OPTIONS
 .HP
@@ -51,12 +49,6 @@ Listen on TCP/IP port PORT. Default is 3240.
 .PP
 
 .HP
-\fB\-e\fR, \fB\-\-device\fR
-.IP
-Run with with an alternate driver, e.g. vUDC.
-.PP
-
-.HP
 \fB\-h\fR, \fB\-\-help\fR
 .IP
 Print the program help message and exit.
@@ -70,28 +62,17 @@ Show version.
 
 .SH LIMITATIONS
 
-.B usbipd
+.B usbipa
 offers no authentication or authorization for USB/IP. Any
 USB/IP client can connect and use exported devices.
 
 .SH EXAMPLES
 
-    dev:# modprobe usbip-host
+    app:# modprobe vhci-hcd
 
-    dev:# usbipd -D
+    app:# usbipa -D
         - Start usbip daemon.
-
-    dev:# usbip list --local
-        - List driver assignments for usb devices.
-
-    dev:# usbip bind --busid 1-2
-        - Bind usbip-host.ko to the device of busid 1-2.
-        - USB device 1-2 is now importable from other computer!
-
-    dev:# usbip unbind --busid 1-2
-        - Unind usbip-host.ko from the device of busid 1-2.
-        - USB device 1-2 is not importable from other computer.
 
 .SH "SEE ALSO"
 \fBusbip\fP\fB(8)\fB\fP
-\fBusbipa\fP\fB(8)\fB\fP
+\fBusbipd\fP\fB(8)\fB\fP
