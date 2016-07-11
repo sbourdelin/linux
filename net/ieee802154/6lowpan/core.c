@@ -134,6 +134,7 @@ static int lowpan_newlink(struct net *src_net, struct net_device *ldev,
 	}
 
 	lowpan_802154_dev(ldev)->wdev = wdev;
+	ldev->addr_len = IEEE802154_ADDR_LEN;
 	/* Set the lowpan hardware address to the wpan hardware address. */
 	memcpy(ldev->dev_addr, wdev->dev_addr, IEEE802154_ADDR_LEN);
 	/* We need headroom for possible wpan_dev_hard_header call and tailroom
