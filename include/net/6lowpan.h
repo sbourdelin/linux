@@ -80,6 +80,12 @@
 
 #define LOWPAN_IFNAME_TEMPLATE "6lo%d"
 
+typedef unsigned __bitwise__ lowpan_rx_result;
+#define RX_CONTINUE		((__force lowpan_rx_result) 0u)
+#define RX_DROP_UNUSABLE	((__force lowpan_rx_result) 1u)
+#define RX_DROP			((__force lowpan_rx_result) 2u)
+#define RX_QUEUED		((__force lowpan_rx_result) 3u)
+
 static inline bool lowpan_is_ipv6(u8 dispatch)
 {
 	return dispatch == LOWPAN_DISPATCH_IPV6;
