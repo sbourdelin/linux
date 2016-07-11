@@ -130,9 +130,10 @@ static struct platform_device *gmac_controller2_init(void *gmac0_addr)
 	return &xlr_net_dev1;
 }
 
-static void xls_gmac_init(void)
+static int xls_gmac_init(void)
 {
 	int mac;
+	int ret;
 	struct platform_device *xlr_net_dev1;
 	void __iomem *gmac0_addr = ioremap(CPHYSADDR(
 		nlm_mmio_base(NETLOGIC_IO_GMAC_0_OFFSET)), 0xfff);
@@ -171,7 +172,7 @@ static void xls_gmac_init(void)
 
 		xlr_resource_init(&xlr_net0_res[0], xlr_gmac_offsets[0],
 				  xlr_gmac_irqs[0]);
-		platform_device_register(&xlr_net_dev0);
+		ret = platform_device_register(&xlr_net_dev0);
 
 		/* second block is XAUI, not supported yet */
 		break;
@@ -187,14 +188,20 @@ static void xls_gmac_init(void)
 					xlr_gmac_irqs[mac]);
 		}
 		xlr_net_dev0.num_resources = 8;
-		platform_device_register(&xlr_net_dev0);
+		ret = platform_device_register(&xlr_net_dev0);
 
 		xlr_net_dev1 = gmac_controller2_init(gmac0_addr);
-		platform_device_register(xlr_net_dev1);
+		if (ret == 0) {
+			ret = platform_device_register(xlr_net_dev1);
+			if (ret)
+				platform_driver_unregister(&xlr_net_dev0);
+		}
+
 	}
+	return ret;
 }
 
-static void xlr_gmac_init(void)
+static int xlr_gmac_init(void)
 {
 	int mac;
 
@@ -228,17 +235,18 @@ static void xlr_gmac_init(void)
 	xlr_net_dev0.num_resources = 8;
 	xlr_net_dev0.resource = xlr_net0_res;
 
-	platform_device_register(&xlr_net_dev0);
+	return platform_device_register(&xlr_net_dev0);
 }
 
 static int __init xlr_net_init(void)
 {
+	int ret;
 	if (nlm_chip_is_xls())
-		xls_gmac_init();
+		ret = xls_gmac_init();
 	else
-		xlr_gmac_init();
+		ret = xlr_gmac_init();
 
-	return 0;
+	return ret;
 }
 
 arch_initcall(xlr_net_init);
