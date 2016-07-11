@@ -179,10 +179,19 @@ static inline int amd_iommu_detect(void) { return -ENODEV; }
 /* IOMMU AVIC Function */
 extern int amd_iommu_register_ga_log_notifier(int (*notifier)(int, int, int));
 
+extern int
+amd_iommu_update_ga(u32 vcpu_id, u32 cpu, u32 ga_tag, u64 base, bool is_run);
+
 #else /* defined(CONFIG_AMD_IOMMU) && defined(CONFIG_IRQ_REMAP) */
 
 static inline int
 amd_iommu_register_ga_log_notifier(int (*notifier)(int, int, int))
+{
+	return 0;
+}
+
+static inline int
+amd_iommu_update_ga(u32 vcpu_id, u32 cpu, u32 ga_tag, u64 base, bool is_run)
 {
 	return 0;
 }
