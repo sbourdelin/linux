@@ -792,7 +792,6 @@ struct amd_irte_ops {
 
 struct amd_ir_data {
 	struct irq_2_irte irq_2_irte;
-	union irte irte_entry;
 	void *entry;
 	union {
 		struct msi_msg msi_entry;
