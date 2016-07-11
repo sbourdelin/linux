@@ -5,7 +5,7 @@
 
 struct buffer_head *befs_read_datastream(struct super_block *sb,
 					 const befs_data_stream *ds,
-					 befs_off_t pos, uint * off);
+					 befs_off_t pos);
 
 int befs_fblock2brun(struct super_block *sb, const befs_data_stream *data,
 		     befs_blocknr_t fblock, befs_block_run * run);

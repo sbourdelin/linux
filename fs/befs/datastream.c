@@ -39,14 +39,12 @@ static int befs_find_brun_dblindirect(struct super_block *sb,
  * @sb: Filesystem superblock
  * @ds: datastrem to find data with
  * @pos: start of data
- * @off: offset of data in buffer_head->b_data
  *
- * Returns pointer to buffer_head containing data starting with offset @off,
- * if you don't need to know offset just set @off = NULL.
+ * Returns pointer to buffer_head containing data starting from pos.
  */
 struct buffer_head *
 befs_read_datastream(struct super_block *sb, const befs_data_stream *ds,
-		     befs_off_t pos, uint * off)
+		     befs_off_t pos)
 {
 	struct buffer_head *bh;
 	befs_block_run run;
@@ -54,8 +52,6 @@ befs_read_datastream(struct super_block *sb, const befs_data_stream *ds,
 
 	befs_debug(sb, "---> %s %llu", __func__, pos);
 	block = pos >> BEFS_SB(sb)->block_shift;
-	if (off)
-		*off = pos - (block << BEFS_SB(sb)->block_shift);
 
 	if (befs_fblock2brun(sb, ds, block, &run) != BEFS_OK) {
 		befs_error(sb, "BeFS: Error finding disk addr of block %lu",
@@ -131,7 +127,7 @@ befs_read_lsymlink(struct super_block *sb, const befs_data_stream *ds,
 	befs_debug(sb, "---> %s length: %llu", __func__, len);
 
 	while (bytes_read < len) {
-		bh = befs_read_datastream(sb, ds, bytes_read, NULL);
+		bh = befs_read_datastream(sb, ds, bytes_read);
 		if (!bh) {
 			befs_error(sb, "BeFS: Error reading datastream block "
 				   "starting from %llu", bytes_read);

@@ -142,7 +142,7 @@ befs_bt_read_super(struct super_block *sb, const befs_data_stream *ds,
 
 	befs_debug(sb, "---> %s", __func__);
 
-	bh = befs_read_datastream(sb, ds, 0, NULL);
+	bh = befs_read_datastream(sb, ds, 0);
 
 	if (!bh) {
 		befs_error(sb, "Couldn't read index header.");
@@ -196,14 +196,12 @@ static int
 befs_bt_read_node(struct super_block *sb, const befs_data_stream *ds,
 		  struct befs_btree_node *node, befs_off_t node_off)
 {
-	uint off = 0;
-
 	befs_debug(sb, "---> %s", __func__);
 
 	if (node->bh)
 		brelse(node->bh);
 
-	node->bh = befs_read_datastream(sb, ds, node_off, &off);
+	node->bh = befs_read_datastream(sb, ds, node_off);
 	if (!node->bh) {
 		befs_error(sb, "%s failed to read "
 			   "node at %llu", __func__, node_off);
@@ -212,7 +210,7 @@ befs_bt_read_node(struct super_block *sb, const befs_data_stream *ds,
 		return BEFS_ERR;
 	}
 	node->od_node =
-	    (befs_btree_nodehead *) ((void *) node->bh->b_data + off);
+	    (befs_btree_nodehead *) ((void *) node->bh->b_data + node_off);
 
 	befs_dump_index_node(sb, node->od_node);
 
