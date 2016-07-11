@@ -399,6 +399,16 @@ struct hci_dev {
 
 	struct led_trigger	*power_led;
 
+#if IS_ENABLED(CONFIG_BT_6LOWPAN)
+	/* TODO for netns support this need to be a list
+	 * variables are protected by RTNL here
+	 */
+	struct net_device *ldev;
+	bool lowpan_enable;
+	/* delete lowpan iface via debugfs workaround */
+	bool pending_deletion;
+#endif
+
 	int (*open)(struct hci_dev *hdev);
 	int (*close)(struct hci_dev *hdev);
 	int (*flush)(struct hci_dev *hdev);
