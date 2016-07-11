@@ -325,6 +325,14 @@ static void nic_set_lmac_vf_mapping(struct nicpf *nic)
 			nic_reg_write(nic,
 				      NIC_PF_LMAC_0_7_CREDIT + (lmac * 8),
 				      lmac_credit);
+
+		/* On CN81XX there are only 8 VFs but max possible no of
+		 * interfaces are 9.
+		 */
+		if (nic->num_vf_en >= pci_sriov_get_totalvfs(nic->pdev)) {
+			nic->num_vf_en = pci_sriov_get_totalvfs(nic->pdev);
+			break;
+		}
 	}
 }
 
@@ -444,16 +452,25 @@ static void nic_config_cpi(struct nicpf *nic, struct cpi_cfg_msg *cfg)
 	u32 padd, cpi_count = 0;
 	u64 cpi_base, cpi, rssi_base, rssi;
 	u8  qset, rq_idx = 0;
+	u16 sdevid;
+
+	pci_read_config_word(nic->pdev, PCI_SUBSYSTEM_ID, &sdevid);
 
 	vnic = cfg->vf_id;
 	bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vnic]);
 	lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vnic]);
 
 	chan = (lmac * hw->chans_per_lmac) + (bgx * hw->chans_per_bgx);
-	cpi_base = (lmac * NIC_MAX_CPI_PER_LMAC) +
-		   (bgx * (hw->cpi_cnt / hw->bgx_cnt));
-	rssi_base = (lmac * hw->rss_ind_tbl_size) +
-		    (bgx * (hw->rssi_cnt / hw->bgx_cnt));
+	/* Check for RGX interface on CN81XX */
+	if ((sdevid == PCI_SUBSYS_DEVID_81XX_NIC_PF) && (bgx == 2)) {
+		cpi_base = (3 * NIC_MAX_CPI_PER_LMAC) + (hw->cpi_cnt / 2);
+		rssi_base = (3 * hw->rss_ind_tbl_size) + (hw->rssi_cnt / 2);
+	} else {
+		cpi_base = (lmac * NIC_MAX_CPI_PER_LMAC) +
+			   (bgx * (hw->cpi_cnt / hw->bgx_cnt));
+		rssi_base = (lmac * hw->rss_ind_tbl_size) +
+			    (bgx * (hw->rssi_cnt / hw->bgx_cnt));
+	}
 
 	/* Rx channel configuration */
 	nic_reg_write(nic, NIC_PF_CHAN_0_255_RX_BP_CFG | (chan << 3),
@@ -592,6 +609,9 @@ static void nic_tx_channel_cfg(struct nicpf *nic, u8 vnic,
 	u8 sq_idx = sq->sq_num;
 	u8 pqs_vnic;
 	int svf;
+	u16 sdevid;
+
+	pci_read_config_word(nic->pdev, PCI_SUBSYSTEM_ID, &sdevid);
 
 	if (sq->sqs_mode)
 		pqs_vnic = nic->pqs_vf[vnic];
@@ -608,7 +628,12 @@ static void nic_tx_channel_cfg(struct nicpf *nic, u8 vnic,
 	 * 512-1023 TL4s transmit via BGX1.
 	 */
 	if (hw->tl1_per_bgx) {
-		tl4 = bgx * (hw->tl4_cnt / hw->bgx_cnt);
+		/* Check for RGX interface on CN81XX */
+		if ((sdevid == PCI_SUBSYS_DEVID_81XX_NIC_PF) && (bgx == 2))
+			tl4 = (MAX_QUEUES_PER_QSET * 3) + (hw->tl4_cnt / 2);
+		else
+			tl4 = bgx * (hw->tl4_cnt / hw->bgx_cnt);
+
 		if (!sq->sqs_mode) {
 			tl4 += (lmac * MAX_QUEUES_PER_QSET);
 		} else {
