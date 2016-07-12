@@ -1416,8 +1416,8 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
 	ret = mmc_regulator_set_vqmmc(mmc, ios);
 	if (ret) {
 		dev_err(&mmc->class_dev,
-				 "Regulator set error %d - %s V\n",
-				 ret, uhs & v18 ? "1.8" : "3.3");
+				 "Regulator set error %d - %s\n",
+				 ret, mmc_voltage_to_str(ios));
 		return ret;
 	}
 
