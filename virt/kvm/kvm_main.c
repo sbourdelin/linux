@@ -49,6 +49,7 @@
 #include <linux/slab.h>
 #include <linux/sort.h>
 #include <linux/bsearch.h>
+#include <linux/syscalls.h>
 
 #include <asm/processor.h>
 #include <asm/io.h>
@@ -3123,6 +3124,7 @@ static int kvm_dev_ioctl_create_vm(unsigned long type)
 
 	if (kvm_create_vm_debugfs(kvm, r) < 0) {
 		kvm_put_kvm(kvm);
+		sys_close(r);
 		return -ENOMEM;
 	}
 
