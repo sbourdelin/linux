@@ -139,7 +139,7 @@ static void sd_set_flush_flag(struct scsi_disk *sdkp)
 {
 	bool wc = false, fua = false;
 
-	if (sdkp->WCE) {
+	if (sdkp->WCE || sdkp->device->always_sync) {
 		wc = true;
 		if (sdkp->DPOFUA)
 			fua = true;
@@ -3228,7 +3228,7 @@ static void sd_shutdown(struct device *dev)
 	if (pm_runtime_suspended(dev))
 		return;
 
-	if (sdkp->WCE && sdkp->media_present) {
+	if ((sdkp->WCE || sdkp->device->always_sync) && sdkp->media_present)  {
 		sd_printk(KERN_NOTICE, sdkp, "Synchronizing SCSI cache\n");
 		sd_sync_cache(sdkp);
 	}
@@ -3247,7 +3247,7 @@ static int sd_suspend_common(struct device *dev, bool ignore_stop_errors)
 	if (!sdkp)	/* E.g.: runtime suspend following sd_remove() */
 		return 0;
 
-	if (sdkp->WCE && sdkp->media_present) {
+	if ((sdkp->WCE || sdkp->device->always_sync) && sdkp->media_present) {
 		sd_printk(KERN_NOTICE, sdkp, "Synchronizing SCSI cache\n");
 		ret = sd_sync_cache(sdkp);
 		if (ret) {
