@@ -28,6 +28,7 @@
 #include <linux/usb/ohci_pdriver.h>
 #include <linux/usb.h>
 #include <linux/usb/hcd.h>
+#include <linux/usb/provider.h>
 
 #include "ohci.h"
 
@@ -40,6 +41,7 @@ struct ohci_platform_priv {
 	struct clk *clks[OHCI_MAX_CLKS];
 	struct reset_control *resets[OHCI_MAX_RESETS];
 	struct phy **phys;
+	struct hcd_provider *hcd_provider;
 	int num_phys;
 };
 
@@ -258,6 +260,11 @@ static int ohci_platform_probe(struct platform_device *dev)
 	if (err)
 		goto err_power;
 
+	if (dev->dev.of_node)
+		priv->hcd_provider = of_hcd_provider_register(dev->dev.of_node,
+							      of_hcd_xlate_simple,
+							      hcd);
+
 	device_wakeup_enable(hcd->self.controller);
 
 	platform_set_drvdata(dev, hcd);
@@ -288,6 +295,8 @@ static int ohci_platform_remove(struct platform_device *dev)
 	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
 	struct ohci_platform_priv *priv = hcd_to_ohci_priv(hcd);
 	int clk, rst;
+
+	of_hcd_provider_unregister(priv->hcd_provider);
 
 	usb_remove_hcd(hcd);
 
