@@ -255,9 +255,6 @@ struct kimage *do_kimage_alloc_init(void)
 	/* Initialize the list of destination pages */
 	INIT_LIST_HEAD(&image->dest_pages);
 
-	/* Initialize the list of unusable pages */
-	INIT_LIST_HEAD(&image->unusable_pages);
-
 	return image;
 }
 
@@ -515,10 +512,6 @@ static void kimage_free_extra_pages(struct kimage *image)
 {
 	/* Walk through and free any extra destination pages I may have */
 	kimage_free_page_list(&image->dest_pages);
-
-	/* Walk through and free any unusable pages I have cached */
-	kimage_free_page_list(&image->unusable_pages);
-
 }
 void kimage_terminate(struct kimage *image)
 {
@@ -645,12 +638,6 @@ static struct page *kimage_alloc_page(struct kimage *image,
 		page = kimage_alloc_pages(gfp_mask, 0);
 		if (!page)
 			return NULL;
-		/* If the page cannot be used file it away */
-		if (page_to_pfn(page) >
-				(KEXEC_SOURCE_MEMORY_LIMIT >> PAGE_SHIFT)) {
-			list_add(&page->lru, &image->unusable_pages);
-			continue;
-		}
 		addr = page_to_pfn(page) << PAGE_SHIFT;
 
 		/* If it is the destination page we want use it */
