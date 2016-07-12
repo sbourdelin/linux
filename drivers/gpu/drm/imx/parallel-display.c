@@ -35,6 +35,7 @@ struct imx_parallel_display {
 	void *edid;
 	int edid_len;
 	u32 bus_format;
+	u32 bus_flags;
 	struct drm_display_mode mode;
 	struct drm_panel *panel;
 };
@@ -56,8 +57,10 @@ static int imx_pd_connector_get_modes(struct drm_connector *connector)
 		struct drm_display_info *di = &connector->display_info;
 
 		num_modes = imxpd->panel->funcs->get_modes(imxpd->panel);
-		if (!imxpd->bus_format && di->num_bus_formats)
+		if (!imxpd->bus_format && di->num_bus_formats) {
 			imxpd->bus_format = di->bus_formats[0];
+			imxpd->bus_flags = di->bus_flags;
+		}
 		if (num_modes > 0)
 			return num_modes;
 	}
@@ -75,6 +78,7 @@ static int imx_pd_connector_get_modes(struct drm_connector *connector)
 			return -EINVAL;
 
 		ret = of_get_drm_display_mode(np, &imxpd->mode,
+					      &imxpd->bus_flags,
 					      OF_USE_NATIVE_MODE);
 		if (ret)
 			return ret;
@@ -110,7 +114,7 @@ static void imx_pd_encoder_prepare(struct drm_encoder *encoder)
 {
 	struct imx_parallel_display *imxpd = enc_to_imxpd(encoder);
 	imx_drm_set_bus_config(encoder, imxpd->bus_format, 2, 3,
-			       imxpd->connector.display_info.bus_flags);
+			       imxpd->bus_flags);
 }
 
 static void imx_pd_encoder_commit(struct drm_encoder *encoder)

@@ -66,7 +66,8 @@ struct imx_ldb_channel {
 	int edid_len;
 	struct drm_display_mode mode;
 	int mode_valid;
-	int bus_format;
+	u32 bus_format;
+	u32 bus_flags;
 };
 
 struct bus_mux {
@@ -103,8 +104,10 @@ static int imx_ldb_connector_get_modes(struct drm_connector *connector)
 		struct drm_display_info *di = &connector->display_info;
 
 		num_modes = imx_ldb_ch->panel->funcs->get_modes(imx_ldb_ch->panel);
-		if (!imx_ldb_ch->bus_format && di->num_bus_formats)
+		if (!imx_ldb_ch->bus_format && di->num_bus_formats) {
 			imx_ldb_ch->bus_format = di->bus_formats[0];
+			imx_ldb_ch->bus_flags = di->bus_flags;
+		}
 		if (num_modes > 0)
 			return num_modes;
 	}
@@ -206,7 +209,8 @@ static void imx_ldb_encoder_prepare(struct drm_encoder *encoder)
 		break;
 	}
 
-	imx_drm_set_bus_format(encoder, bus_format);
+	imx_drm_set_bus_config(encoder, bus_format, 2, 3,
+			imx_ldb_ch->bus_flags);
 }
 
 static void imx_ldb_encoder_commit(struct drm_encoder *encoder)
@@ -626,6 +630,7 @@ static int imx_ldb_bind(struct device *dev, struct device *master, void *data)
 				/* fallback to display-timings node */
 				ret = of_get_drm_display_mode(child,
 							      &channel->mode,
+							      &channel->bus_flags,
 							      OF_USE_NATIVE_MODE);
 				if (!ret)
 					channel->mode_valid = 1;
