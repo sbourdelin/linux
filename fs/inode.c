@@ -607,7 +607,12 @@ again:
 			continue;
 
 		spin_lock(&inode->i_lock);
-		if (inode->i_state & (I_NEW | I_FREEING | I_WILL_FREE)) {
+		/*
+		 * check i_count again with lock, because iput might re-add
+		 * it when lazytime is on.
+		 */
+		if (atomic_read(&inode->i_count) ||
+		    (inode->i_state & (I_NEW | I_FREEING | I_WILL_FREE))) {
 			spin_unlock(&inode->i_lock);
 			continue;
 		}
