@@ -56,6 +56,7 @@
 
 #define MX6_BM_NON_BURST_SETTING	BIT(1)
 #define MX6_BM_OVER_CUR_DIS		BIT(7)
+#define MX6_BM_OVER_CUR_POLARITY	BIT(8)
 #define MX6_BM_WAKEUP_ENABLE		BIT(10)
 #define MX6_BM_ID_WAKEUP		BIT(16)
 #define MX6_BM_VBUS_WAKEUP		BIT(17)
@@ -266,9 +267,14 @@ static int usbmisc_imx6q_init(struct imx_usbmisc_data *data)
 
 	spin_lock_irqsave(&usbmisc->lock, flags);
 
+	reg = readl(usbmisc->base + data->index * 4);
 	if (data->disable_oc) {
-		reg = readl(usbmisc->base + data->index * 4);
 		writel(reg | MX6_BM_OVER_CUR_DIS,
+			usbmisc->base + data->index * 4);
+	} else {
+		reg &= ~MX6_BM_OVER_CUR_DIS;
+		/* OC flag is active low */
+		writel(reg | MX6_BM_OVER_CUR_POLARITY,
 			usbmisc->base + data->index * 4);
 	}
 
@@ -365,9 +371,13 @@ static int usbmisc_imx7d_init(struct imx_usbmisc_data *data)
 		return -EINVAL;
 
 	spin_lock_irqsave(&usbmisc->lock, flags);
+	reg = readl(usbmisc->base);
 	if (data->disable_oc) {
-		reg = readl(usbmisc->base);
 		writel(reg | MX6_BM_OVER_CUR_DIS, usbmisc->base);
+	} else {
+		reg &= ~MX6_BM_OVER_CUR_DIS;
+		/* OC flag is active low */
+		writel(reg | MX6_BM_OVER_CUR_POLARITY, usbmisc->base);
 	}
 
 	reg = readl(usbmisc->base + MX7D_USBNC_USB_CTRL2);
@@ -491,6 +501,10 @@ static const struct of_device_id usbmisc_imx_dt_ids[] = {
 	{
 		.compatible = "fsl,imx6ul-usbmisc",
 		.data = &imx6sx_usbmisc_ops,
+	},
+	{
+		.compatible = "fsl,imx7d-usbmisc",
+		.data = &imx7d_usbmisc_ops,
 	},
 	{ /* sentinel */ }
 };
