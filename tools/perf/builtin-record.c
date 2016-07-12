@@ -119,11 +119,10 @@ backward_rb_find_range(void *buf, int mask, u64 head, u64 *start, u64 *end)
 }
 
 static int
-rb_find_range(struct perf_evlist *evlist,
-	      void *data, int mask, u64 head, u64 old,
-	      u64 *start, u64 *end)
+rb_find_range(void *data, int mask, u64 head, u64 old,
+	      u64 *start, u64 *end, bool backward)
 {
-	if (!evlist->backward) {
+	if (!backward) {
 		*start = old;
 		*end = head;
 		return 0;
@@ -143,8 +142,8 @@ static int record__mmap_read(struct record *rec, struct perf_evlist *evlist, int
 	void *buf;
 	int rc = 0;
 
-	if (rb_find_range(evlist, data, md->mask, head,
-			  old, &start, &end))
+	if (rb_find_range(data, md->mask, head,
+			  old, &start, &end, false))
 		return -1;
 
 	if (start == end)
