@@ -302,8 +302,6 @@ static int mb86a20s_read_status(struct dvb_frontend *fe, enum fe_status *status)
 	*status = 0;
 
 	val = mb86a20s_readreg(state, 0x0a) & 0xf;
-	if (val < 0)
-		return val;
 
 	if (val >= 2)
 		*status |= FE_HAS_SIGNAL;
