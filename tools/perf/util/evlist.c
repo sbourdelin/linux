@@ -123,6 +123,7 @@ static void perf_evlist__purge(struct perf_evlist *evlist)
 void perf_evlist__exit(struct perf_evlist *evlist)
 {
 	zfree(&evlist->mmap);
+	zfree(&evlist->backward_mmap);
 	fdarray__exit(&evlist->pollfd);
 }
 
@@ -962,17 +963,20 @@ static void perf_evlist__munmap_nofree(struct perf_evlist *evlist)
 {
 	int i;
 
-	if (evlist->mmap == NULL)
-		return;
+	if (evlist->mmap)
+		for (i = 0; i < evlist->nr_mmaps; i++)
+			perf_mmap__munmap(&evlist->mmap[i]);
 
-	for (i = 0; i < evlist->nr_mmaps; i++)
-		perf_mmap__munmap(&evlist->mmap[i]);
+	if (evlist->backward_mmap)
+		for (i = 0; i < evlist->nr_mmaps; i++)
+			perf_mmap__munmap(&evlist->backward_mmap[i]);
 }
 
 void perf_evlist__munmap(struct perf_evlist *evlist)
 {
 	perf_evlist__munmap_nofree(evlist);
 	zfree(&evlist->mmap);
+	zfree(&evlist->backward_mmap);
 }
 
 static struct perf_mmap *perf_evlist__alloc_mmap(struct perf_evlist *evlist)
@@ -1289,8 +1293,12 @@ int perf_evlist__mmap_ex(struct perf_evlist *evlist, unsigned int pages,
 
 	if (!evlist->mmap)
 		evlist->mmap = perf_evlist__alloc_mmap(evlist);
-	if (!evlist->mmap)
+	if (!evlist->backward_mmap)
+		evlist->backward_mmap = perf_evlist__alloc_mmap(evlist);
+	if (!evlist->mmap || !evlist->backward_mmap) {
+		perf_evlist__munmap(evlist);
 		return -ENOMEM;
+	}
 
 	if (evlist->pollfd.entries == NULL && perf_evlist__alloc_pollfd(evlist) < 0)
 		return -ENOMEM;
