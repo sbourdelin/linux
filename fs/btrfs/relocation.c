@@ -1135,6 +1135,8 @@ out:
 	btrfs_free_path(path1);
 	btrfs_free_path(path2);
 	if (err) {
+		int orig_free = 0;
+
 		while (!list_empty(&useless)) {
 			lower = list_entry(useless.next,
 					   struct backref_node, list);
@@ -1171,8 +1173,13 @@ out:
 			lower = list_entry(useless.next,
 					   struct backref_node, list);
 			list_del_init(&lower->list);
+			if (lower == node)
+				orig_free = 1;
 			free_backref_node(cache, lower);
 		}
+
+		if (!orig_free)
+			free_backref_node(cache, node);
 		return ERR_PTR(err);
 	}
 	ASSERT(!node || !node->detached);
