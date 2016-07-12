@@ -469,3 +469,16 @@ void mmc_free_host(struct mmc_host *host)
 }
 
 EXPORT_SYMBOL(mmc_free_host);
+
+const char *mmc_voltage_to_str(struct mmc_ios *ios)
+{
+	static const char * const voltages[] = {
+		[MMC_SIGNAL_VOLTAGE_330] = "3.30 V",
+		[MMC_SIGNAL_VOLTAGE_180] = "1.80 V",
+		[MMC_SIGNAL_VOLTAGE_120] = "1.20 V",
+	};
+
+	if (ios->signal_voltage <= MMC_SIGNAL_VOLTAGE_120)
+		return voltages[ios->signal_voltage];
+	return "invalid";
+}

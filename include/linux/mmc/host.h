@@ -544,4 +544,6 @@ static inline void mmc_retune_recheck(struct mmc_host *host)
 void mmc_retune_pause(struct mmc_host *host);
 void mmc_retune_unpause(struct mmc_host *host);
 
+const char *mmc_voltage_to_str(struct mmc_ios *ios);
+
 #endif /* LINUX_MMC_HOST_H */
