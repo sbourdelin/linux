@@ -27,7 +27,6 @@
 #include <linux/log2.h>
 #include <linux/err.h>
 
-static void perf_evlist__mmap_put(struct perf_evlist *evlist, int idx);
 static void perf_mmap__munmap(struct perf_mmap *map);
 static void perf_mmap__put(struct perf_mmap *map);
 
@@ -693,7 +692,7 @@ static int perf_evlist__set_paused(struct perf_evlist *evlist, bool value)
 	int i;
 
 	for (i = 0; i < evlist->nr_mmaps; i++) {
-		int fd = evlist->mmap[i].fd;
+		int fd = evlist->backward_mmap[i].fd;
 		int err;
 
 		if (fd < 0)
@@ -893,16 +892,6 @@ static void perf_mmap__put(struct perf_mmap *md)
 		perf_mmap__munmap(md);
 }
 
-static void perf_evlist__mmap_get(struct perf_evlist *evlist, int idx)
-{
-	perf_mmap__get(&evlist->mmap[idx]);
-}
-
-static void perf_evlist__mmap_put(struct perf_evlist *evlist, int idx)
-{
-	perf_mmap__put(&evlist->mmap[idx]);
-}
-
 void perf_mmap__consume(struct perf_mmap *md, bool overwrite)
 {
 	if (!overwrite) {
@@ -1038,12 +1027,6 @@ static int perf_mmap__mmap(struct perf_mmap *map,
 	return 0;
 }
 
-static int __perf_evlist__mmap(struct perf_evlist *evlist, int idx,
-			       struct mmap_params *mp, int fd)
-{
-	return perf_mmap__mmap(&evlist->mmap[idx], mp, fd);
-}
-
 static bool
 perf_evlist__should_poll(struct perf_evlist *evlist __maybe_unused,
 			 struct perf_evsel *evsel)
@@ -1055,16 +1038,20 @@ perf_evlist__should_poll(struct perf_evlist *evlist __maybe_unused,
 
 static int perf_evlist__mmap_per_evsel(struct perf_evlist *evlist, int idx,
 				       struct mmap_params *mp, int cpu,
-				       int thread, int *output)
+				       int thread, int *_output, int *_output2)
 {
 	struct perf_evsel *evsel;
 	int revent;
 
 	evlist__for_each_entry(evlist, evsel) {
+		struct perf_mmap *maps = evlist->mmap;
+		int *output = _output;
 		int fd;
 
-		if (!!evsel->attr.write_backward != (evlist->overwrite && evlist->backward))
-			continue;
+		if (evsel->attr.write_backward) {
+			output = _output2;
+			maps = evlist->backward_mmap;
+		}
 
 		if (evsel->system_wide && thread)
 			continue;
@@ -1073,13 +1060,14 @@ static int perf_evlist__mmap_per_evsel(struct perf_evlist *evlist, int idx,
 
 		if (*output == -1) {
 			*output = fd;
-			if (__perf_evlist__mmap(evlist, idx, mp, *output) < 0)
+
+			if (perf_mmap__mmap(&maps[idx], mp, *output)  < 0)
 				return -1;
 		} else {
 			if (ioctl(fd, PERF_EVENT_IOC_SET_OUTPUT, *output) != 0)
 				return -1;
 
-			perf_evlist__mmap_get(evlist, idx);
+			perf_mmap__get(&maps[idx]);
 		}
 
 		revent = perf_evlist__should_poll(evlist, evsel) ? POLLIN : 0;
@@ -1092,8 +1080,8 @@ static int perf_evlist__mmap_per_evsel(struct perf_evlist *evlist, int idx,
 		 * Therefore don't add it for polling.
 		 */
 		if (!evsel->system_wide &&
-		    __perf_evlist__add_pollfd(evlist, fd, &evlist->mmap[idx], revent) < 0) {
-			perf_evlist__mmap_put(evlist, idx);
+		    __perf_evlist__add_pollfd(evlist, fd, &maps[idx], revent) < 0) {
+			perf_mmap__put(&maps[idx]);
 			return -1;
 		}
 
@@ -1119,13 +1107,14 @@ static int perf_evlist__mmap_per_cpu(struct perf_evlist *evlist,
 	pr_debug2("perf event ring buffer mmapped per cpu\n");
 	for (cpu = 0; cpu < nr_cpus; cpu++) {
 		int output = -1;
+		int output2 = -1;
 
 		auxtrace_mmap_params__set_idx(&mp->auxtrace_mp, evlist, cpu,
 					      true);
 
 		for (thread = 0; thread < nr_threads; thread++) {
 			if (perf_evlist__mmap_per_evsel(evlist, cpu, mp, cpu,
-							thread, &output))
+							thread, &output, &output2))
 				goto out_unmap;
 		}
 	}
@@ -1146,12 +1135,13 @@ static int perf_evlist__mmap_per_thread(struct perf_evlist *evlist,
 	pr_debug2("perf event ring buffer mmapped per thread\n");
 	for (thread = 0; thread < nr_threads; thread++) {
 		int output = -1;
+		int output2 = -1;
 
 		auxtrace_mmap_params__set_idx(&mp->auxtrace_mp, evlist, thread,
 					      false);
 
 		if (perf_evlist__mmap_per_evsel(evlist, thread, mp, 0, thread,
-						&output))
+						&output, &output2))
 			goto out_unmap;
 	}
 
