@@ -176,7 +176,7 @@ void icp_native_cause_ipi_rm(int cpu)
 	 * causing the IPI.
 	 */
 	xics_phys = paca[cpu].kvm_hstate.xics_phys;
-	out_rm8((u8 *)(xics_phys + XICS_MFRR), IPI_PRIORITY);
+	out_rm8((u8 __iomem *)(xics_phys + XICS_MFRR), IPI_PRIORITY);
 }
 #endif
 
