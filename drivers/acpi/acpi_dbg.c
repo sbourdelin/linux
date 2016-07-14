@@ -46,6 +46,8 @@
 #define ACPI_AML_KERN		(ACPI_AML_IN_KERN | ACPI_AML_OUT_KERN)
 #define ACPI_AML_BUSY		(ACPI_AML_USER | ACPI_AML_KERN)
 #define ACPI_AML_OPEN		(ACPI_AML_OPENED | ACPI_AML_CLOSED)
+#define ACPI_AML_FLUSHING_LOG	0x0040 /* flushing log output */
+#define ACPI_AML_WAITING_CMD	0x0080 /* waiting for cmd input */
 
 struct acpi_aml_io {
 	wait_queue_head_t wait;
@@ -120,6 +122,20 @@ static inline bool __acpi_aml_busy(void)
 	return false;
 }
 
+static inline bool __acpi_aml_waiting_cmd(void)
+{
+	if (acpi_aml_io.flags & ACPI_AML_WAITING_CMD)
+		return true;
+	return false;
+}
+
+static inline bool __acpi_aml_flushing_log(void)
+{
+	if (acpi_aml_io.flags & ACPI_AML_FLUSHING_LOG)
+		return true;
+	return false;
+}
+
 static inline bool __acpi_aml_opened(void)
 {
 	if (acpi_aml_io.flags & ACPI_AML_OPEN)
@@ -148,6 +164,26 @@ static bool acpi_aml_busy(void)
 
 	mutex_lock(&acpi_aml_io.lock);
 	ret = __acpi_aml_busy();
+	mutex_unlock(&acpi_aml_io.lock);
+	return ret;
+}
+
+static inline bool acpi_aml_waiting_cmd(void)
+{
+	bool ret;
+
+	mutex_lock(&acpi_aml_io.lock);
+	ret = __acpi_aml_waiting_cmd();
+	mutex_unlock(&acpi_aml_io.lock);
+	return ret;
+}
+
+static inline bool acpi_aml_flushing_log(void)
+{
+	bool ret;
+
+	mutex_lock(&acpi_aml_io.lock);
+	ret = __acpi_aml_flushing_log();
 	mutex_unlock(&acpi_aml_io.lock);
 	return ret;
 }
@@ -183,7 +219,8 @@ static bool acpi_aml_kern_writable(void)
 
 	mutex_lock(&acpi_aml_io.lock);
 	ret = !__acpi_aml_access_ok(ACPI_AML_OUT_KERN) ||
-	      __acpi_aml_writable(&acpi_aml_io.out_crc, ACPI_AML_OUT_KERN);
+	      __acpi_aml_writable(&acpi_aml_io.out_crc, ACPI_AML_OUT_KERN) ||
+	      __acpi_aml_flushing_log();
 	mutex_unlock(&acpi_aml_io.lock);
 	return ret;
 }
@@ -263,6 +300,9 @@ static int acpi_aml_write_kern(const char *buf, int len)
 	struct circ_buf *crc = &acpi_aml_io.out_crc;
 	int n;
 	char *p;
+
+	if (acpi_aml_flushing_log())
+		return len;
 
 	ret = acpi_aml_lock_write(crc, ACPI_AML_OUT_KERN);
 	if (ret < 0)
@@ -458,9 +498,18 @@ static int acpi_aml_wait_command_ready(bool single_step,
 	else
 		acpi_os_printf("\n%1c ", ACPI_DEBUGGER_COMMAND_PROMPT);
 
+	mutex_lock(&acpi_aml_io.lock);
+	acpi_aml_io.flags |= ACPI_AML_WAITING_CMD;
+	wake_up_interruptible(&acpi_aml_io.wait);
+	mutex_unlock(&acpi_aml_io.lock);
+
 	status = acpi_os_get_line(buffer, length, NULL);
 	if (ACPI_FAILURE(status))
 		return -EINVAL;
+
+	mutex_lock(&acpi_aml_io.lock);
+	acpi_aml_io.flags &= ~ACPI_AML_WAITING_CMD;
+	mutex_unlock(&acpi_aml_io.lock);
 	return 0;
 }
 
@@ -593,9 +642,11 @@ static int acpi_aml_read_user(char __user *buf, int len)
 	smp_rmb();
 	p = &crc->buf[crc->tail];
 	n = min(len, circ_count_to_end(crc));
-	if (copy_to_user(buf, p, n)) {
-		ret = -EFAULT;
-		goto out;
+	if (!acpi_aml_flushing_log()) {
+		if (copy_to_user(buf, p, n)) {
+			ret = -EFAULT;
+			goto out;
+		}
 	}
 	/* sync tail after removing logs */
 	smp_mb();
@@ -731,10 +782,45 @@ static unsigned int acpi_aml_poll(struct file *file, poll_table *wait)
 	return masks;
 }
 
+static int acpi_aml_flush(void)
+{
+	int ret;
+
+	/*
+	 * Discard output buffer and put the driver into a state waiting
+	 * for the new user input.
+	 */
+	mutex_lock(&acpi_aml_io.lock);
+	acpi_aml_io.flags |= ACPI_AML_FLUSHING_LOG;
+	mutex_unlock(&acpi_aml_io.lock);
+
+	ret = wait_event_interruptible(acpi_aml_io.wait,
+		acpi_aml_waiting_cmd());
+	(void)acpi_aml_read_user(NULL, ACPI_AML_BUF_SIZE);
+
+	mutex_lock(&acpi_aml_io.lock);
+	acpi_aml_io.flags &= ~ACPI_AML_FLUSHING_LOG;
+	mutex_unlock(&acpi_aml_io.lock);
+	return ret;
+}
+
+static int acpi_aml_fsync(struct file *file,
+			  loff_t start, loff_t end, int datasync)
+{
+	struct inode *inode = file_inode(file);
+	int ret;
+
+	inode_lock(inode);
+	ret = acpi_aml_flush();
+	inode_unlock(inode);
+	return ret;
+}
+
 static const struct file_operations acpi_aml_operations = {
 	.read		= acpi_aml_read,
 	.write		= acpi_aml_write,
 	.poll		= acpi_aml_poll,
+	.fsync		= acpi_aml_fsync,
 	.open		= acpi_aml_open,
 	.release	= acpi_aml_release,
 	.llseek		= generic_file_llseek,
