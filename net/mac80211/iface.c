@@ -1323,6 +1323,27 @@ static int ieee80211_iface_work_handle_frame_control(struct sk_buff *skb,
 	return 0;
 }
 
+static void ieee80211_iface_work_handle_vif_type(struct sk_buff *skb,
+					 struct ieee80211_sub_if_data *sdata)
+{
+	switch (sdata->vif.type) {
+	case NL80211_IFTYPE_STATION:
+		ieee80211_sta_rx_queued_mgmt(sdata, skb);
+		break;
+	case NL80211_IFTYPE_ADHOC:
+		ieee80211_ibss_rx_queued_mgmt(sdata, skb);
+		break;
+	case NL80211_IFTYPE_MESH_POINT:
+		if (!ieee80211_vif_is_mesh(&sdata->vif))
+			break;
+		ieee80211_mesh_rx_queued_mgmt(sdata, skb);
+		break;
+	default:
+		WARN(1, "frame for unexpected interface type");
+		break;
+	}
+}
+
 static void ieee80211_iface_work(struct work_struct *work)
 {
 	struct ieee80211_sub_if_data *sdata =
@@ -1341,28 +1362,11 @@ static void ieee80211_iface_work(struct work_struct *work)
 
 	/* first process frames */
 	while ((skb = skb_dequeue(&sdata->skb_queue))) {
-		if (!ieee80211_iface_work_handle_pkt_type(skb, sdata)) {
-			goto free_skb;
-		} else if (!ieee80211_iface_work_handle_frame_control(skb, sdata)) {
-			goto free_skb;
-		} else switch (sdata->vif.type) {
-		case NL80211_IFTYPE_STATION:
-			ieee80211_sta_rx_queued_mgmt(sdata, skb);
-			break;
-		case NL80211_IFTYPE_ADHOC:
-			ieee80211_ibss_rx_queued_mgmt(sdata, skb);
-			break;
-		case NL80211_IFTYPE_MESH_POINT:
-			if (!ieee80211_vif_is_mesh(&sdata->vif))
-				break;
-			ieee80211_mesh_rx_queued_mgmt(sdata, skb);
-			break;
-		default:
-			WARN(1, "frame for unexpected interface type");
-			break;
+		if (ieee80211_iface_work_handle_pkt_type(skb, sdata) ||
+		    ieee80211_iface_work_handle_frame_control(skb, sdata)) {
+			ieee80211_iface_work_handle_vif_type(skb, sdata);
 		}
 
-free_skb:
 		kfree_skb(skb);
 	}
 
