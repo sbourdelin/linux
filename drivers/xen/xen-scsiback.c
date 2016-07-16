@@ -601,7 +601,7 @@ static void scsiback_device_action(struct vscsibk_pend *pending_req,
 	struct se_cmd *se_cmd = &pending_req->se_cmd;
 	struct scsiback_tmr *tmr;
 	u64 unpacked_lun = pending_req->v2p->lun;
-	int rc, err = FAILED;
+	int rc, err;
 
 	tmr = kzalloc(sizeof(struct scsiback_tmr), GFP_KERNEL);
 	if (!tmr) {
@@ -629,7 +629,7 @@ static void scsiback_device_action(struct vscsibk_pend *pending_req,
 free_tmr:
 	kfree(tmr);
 do_resp:
-	scsiback_do_resp_with_sense(NULL, err, 0, pending_req);
+	scsiback_do_resp_with_sense(NULL, FAILED, 0, pending_req);
 }
 
 /*
