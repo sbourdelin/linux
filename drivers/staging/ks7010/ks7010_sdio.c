@@ -323,14 +323,14 @@ static void tx_device_task(void *dev)
 {
 	struct ks_wlan_private *priv = (struct ks_wlan_private *)dev;
 	struct tx_device_buffer *sp;
-	int rc = 0;
 
 	DPRINTK(4, "\n");
 	if (cnt_txqbody(priv) > 0
 	    && atomic_read(&priv->psstatus.status) != PS_SNOOZE) {
 		sp = &priv->tx_dev.tx_dev_buff[priv->tx_dev.qhead];
 		if (priv->dev_state >= DEVICE_STATE_BOOT) {
-			rc = write_to_device(priv, sp->sendp, sp->size);
+			int rc = write_to_device(priv, sp->sendp, sp->size);
+
 			if (rc) {
 				DPRINTK(1, "write_to_device error !!(%d)\n",
 					rc);
@@ -358,7 +358,7 @@ int ks_wlan_hw_tx(struct ks_wlan_private *priv, void *p, unsigned long size,
 		  void (*complete_handler) (void *arg1, void *arg2),
 		  void *arg1, void *arg2)
 {
-	int result = 0;
+	int result;
 	struct hostif_hdr *hdr;
 	hdr = (struct hostif_hdr *)p;
 
@@ -737,7 +737,7 @@ free_buf:
 static int ks7010_upload_firmware(struct ks_wlan_private *priv,
 				  struct ks_sdio_card *card)
 {
-	unsigned int size, offset, n = 0;
+	unsigned int size, offset, n;
 	unsigned char *rom_buf;
 	unsigned char rw_data = 0;
 	int retval, rc = 0;
