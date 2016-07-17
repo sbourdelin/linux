@@ -48,6 +48,7 @@ struct pids_cgroup {
 	 * %PIDS_MAX = (%PID_MAX_LIMIT + 1).
 	 */
 	atomic64_t			counter;
+	atomic64_t			highwater_mark;
 	int64_t				limit;
 };
 
@@ -72,12 +73,32 @@ pids_css_alloc(struct cgroup_subsys_state *parent)
 
 	pids->limit = PIDS_MAX;
 	atomic64_set(&pids->counter, 0);
+	atomic64_set(&pids->highwater_mark, 0);
 	return &pids->css;
 }
 
 static void pids_css_free(struct cgroup_subsys_state *css)
 {
 	kfree(css_pids(css));
+}
+
+static void pids_update_highwater_mark(struct pids_cgroup *p)
+{
+	while (1) {
+		int64_t old_mark, new_mark, cur_mark;
+
+		old_mark = atomic64_read(&p->highwater_mark);
+		new_mark = atomic64_read(&p->counter);
+		if (old_mark >= new_mark)
+			return;
+		cur_mark = atomic64_cmpxchg(&p->highwater_mark, old_mark,
+					    new_mark);
+
+		/* It's OK if the counter was decreased meanwhile */
+		if (cur_mark == old_mark &&
+		    atomic64_read(&p->counter) <= new_mark)
+			return;
+	}
 }
 
 /**
@@ -106,8 +127,10 @@ static void pids_uncharge(struct pids_cgroup *pids, int num)
 {
 	struct pids_cgroup *p;
 
-	for (p = pids; parent_pids(p); p = parent_pids(p))
+	for (p = pids; parent_pids(p); p = parent_pids(p)) {
 		pids_cancel(p, num);
+		pids_update_highwater_mark(p);
+	}
 }
 
 /**
@@ -123,8 +146,10 @@ static void pids_charge(struct pids_cgroup *pids, int num)
 {
 	struct pids_cgroup *p;
 
-	for (p = pids; parent_pids(p); p = parent_pids(p))
+	for (p = pids; parent_pids(p); p = parent_pids(p)) {
 		atomic64_add(num, &p->counter);
+		pids_update_highwater_mark(p);
+	}
 }
 
 /**
@@ -152,6 +177,7 @@ static int pids_try_charge(struct pids_cgroup *pids, int num)
 			goto revert;
 	}
 
+	pids_update_highwater_mark(p);
 	return 0;
 
 revert:
@@ -236,6 +262,13 @@ static void pids_free(struct task_struct *task)
 	pids_uncharge(pids, 1);
 }
 
+static void pids_fork(struct task_struct *task)
+{
+	struct pids_cgroup *pids = css_pids(task_css(task, pids_cgrp_id));
+
+	pids_update_highwater_mark(pids);
+}
+
 static ssize_t pids_max_write(struct kernfs_open_file *of, char *buf,
 			      size_t nbytes, loff_t off)
 {
@@ -288,6 +321,14 @@ static s64 pids_current_read(struct cgroup_subsys_state *css,
 	return atomic64_read(&pids->counter);
 }
 
+static s64 pids_highwater_mark_read(struct cgroup_subsys_state *css,
+				    struct cftype *cft)
+{
+	struct pids_cgroup *pids = css_pids(css);
+
+	return atomic64_read(&pids->highwater_mark);
+}
+
 static struct cftype pids_files[] = {
 	{
 		.name = "max",
@@ -298,6 +339,11 @@ static struct cftype pids_files[] = {
 	{
 		.name = "current",
 		.read_s64 = pids_current_read,
+		.flags = CFTYPE_NOT_ON_ROOT,
+	},
+	{
+		.name = "highwater_mark",
+		.read_s64 = pids_highwater_mark_read,
 		.flags = CFTYPE_NOT_ON_ROOT,
 	},
 	{ }	/* terminate */
@@ -313,4 +359,5 @@ struct cgroup_subsys pids_cgrp_subsys = {
 	.free		= pids_free,
 	.legacy_cftypes	= pids_files,
 	.dfl_cftypes	= pids_files,
+	.fork		= pids_fork,
 };
