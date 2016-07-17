@@ -48,6 +48,7 @@ struct dev_exception_item {
 struct dev_cgroup {
 	struct cgroup_subsys_state css;
 	struct list_head exceptions;
+	struct list_head accessed;
 	enum devcg_behavior behavior;
 };
 
@@ -90,18 +91,15 @@ free_and_exit:
 /*
  * called under devcgroup_mutex
  */
-static int dev_exception_add(struct dev_cgroup *dev_cgroup,
-			     struct dev_exception_item *ex)
+static int dev_list_add(struct list_head *exceptions,
+			struct dev_exception_item *ex)
 {
 	struct dev_exception_item *excopy, *walk;
+	bool found = false;
 
 	lockdep_assert_held(&devcgroup_mutex);
 
-	excopy = kmemdup(ex, sizeof(*ex), GFP_KERNEL);
-	if (!excopy)
-		return -ENOMEM;
-
-	list_for_each_entry(walk, &dev_cgroup->exceptions, list) {
+	list_for_each_entry(walk, exceptions, list) {
 		if (walk->type != ex->type)
 			continue;
 		if (walk->major != ex->major)
@@ -110,12 +108,15 @@ static int dev_exception_add(struct dev_cgroup *dev_cgroup,
 			continue;
 
 		walk->access |= ex->access;
-		kfree(excopy);
-		excopy = NULL;
+		found = true;
 	}
 
-	if (excopy != NULL)
-		list_add_tail_rcu(&excopy->list, &dev_cgroup->exceptions);
+	if (!found) {
+		excopy = kmemdup(ex, sizeof(*ex), GFP_KERNEL);
+		if (!excopy)
+			return -ENOMEM;
+		list_add_tail_rcu(&excopy->list, exceptions);
+	}
 	return 0;
 }
 
@@ -150,6 +151,16 @@ static void __dev_exception_clean(struct dev_cgroup *dev_cgroup)
 	struct dev_exception_item *ex, *tmp;
 
 	list_for_each_entry_safe(ex, tmp, &dev_cgroup->exceptions, list) {
+		list_del_rcu(&ex->list);
+		kfree_rcu(ex, rcu);
+	}
+}
+
+static void dev_accessed_clean(struct dev_cgroup *dev_cgroup)
+{
+	struct dev_exception_item *ex, *tmp;
+
+	list_for_each_entry_safe(ex, tmp, &dev_cgroup->accessed, list) {
 		list_del_rcu(&ex->list);
 		kfree_rcu(ex, rcu);
 	}
@@ -221,6 +232,7 @@ devcgroup_css_alloc(struct cgroup_subsys_state *parent_css)
 	if (!dev_cgroup)
 		return ERR_PTR(-ENOMEM);
 	INIT_LIST_HEAD(&dev_cgroup->exceptions);
+	INIT_LIST_HEAD(&dev_cgroup->accessed);
 	dev_cgroup->behavior = DEVCG_DEFAULT_NONE;
 
 	return &dev_cgroup->css;
@@ -231,6 +243,7 @@ static void devcgroup_css_free(struct cgroup_subsys_state *css)
 	struct dev_cgroup *dev_cgroup = css_to_devcgroup(css);
 
 	__dev_exception_clean(dev_cgroup);
+	dev_accessed_clean(dev_cgroup);
 	kfree(dev_cgroup);
 }
 
@@ -272,9 +285,9 @@ static void set_majmin(char *str, unsigned m)
 		sprintf(str, "%u", m);
 }
 
-static int devcgroup_seq_show(struct seq_file *m, void *v)
+static int devcgroup_seq_show_list(struct seq_file *m, struct dev_cgroup *devcgroup,
+				   struct list_head *exceptions, bool allow)
 {
-	struct dev_cgroup *devcgroup = css_to_devcgroup(seq_css(m));
 	struct dev_exception_item *ex;
 	char maj[MAJMINLEN], min[MAJMINLEN], acc[ACCLEN];
 
@@ -285,14 +298,14 @@ static int devcgroup_seq_show(struct seq_file *m, void *v)
 	 * - List the exceptions in case the default policy is to deny
 	 * This way, the file remains as a "whitelist of devices"
 	 */
-	if (devcgroup->behavior == DEVCG_DEFAULT_ALLOW) {
+	if (allow) {
 		set_access(acc, ACC_MASK);
 		set_majmin(maj, ~0);
 		set_majmin(min, ~0);
 		seq_printf(m, "%c %s:%s %s\n", type_to_char(DEV_ALL),
 			   maj, min, acc);
 	} else {
-		list_for_each_entry_rcu(ex, &devcgroup->exceptions, list) {
+		list_for_each_entry_rcu(ex, exceptions, list) {
 			set_access(acc, ex->access);
 			set_majmin(maj, ex->major);
 			set_majmin(min, ex->minor);
@@ -303,6 +316,36 @@ static int devcgroup_seq_show(struct seq_file *m, void *v)
 	rcu_read_unlock();
 
 	return 0;
+}
+
+static int devcgroup_seq_show(struct seq_file *m, void *v)
+{
+	struct dev_cgroup *devcgroup = css_to_devcgroup(seq_css(m));
+
+	return devcgroup_seq_show_list(m, devcgroup, &devcgroup->exceptions,
+				       devcgroup->behavior == DEVCG_DEFAULT_ALLOW);
+}
+
+static int devcgroup_seq_show_accessed(struct seq_file *m, void *v)
+{
+	struct dev_cgroup *devcgroup = css_to_devcgroup(seq_css(m));
+
+	return devcgroup_seq_show_list(m, devcgroup, &devcgroup->accessed, false);
+}
+
+static void devcgroup_add_accessed(struct dev_cgroup *dev_cgroup, short type,
+				   u32 major, u32 minor, short access)
+{
+	struct dev_exception_item ex;
+
+	ex.type = type;
+	ex.major = major;
+	ex.minor = minor;
+	ex.access = access;
+
+	mutex_lock(&devcgroup_mutex);
+	dev_list_add(&dev_cgroup->accessed, &ex);
+	mutex_unlock(&devcgroup_mutex);
 }
 
 /**
@@ -566,7 +609,7 @@ static int propagate_exception(struct dev_cgroup *devcg_root,
 		 */
 		if (devcg_root->behavior == DEVCG_DEFAULT_ALLOW &&
 		    devcg->behavior == DEVCG_DEFAULT_ALLOW) {
-			rc = dev_exception_add(devcg, ex);
+			rc = dev_list_add(&devcg->exceptions, ex);
 			if (rc)
 				break;
 		} else {
@@ -736,7 +779,7 @@ static int devcgroup_update_access(struct dev_cgroup *devcgroup,
 
 		if (!parent_has_perm(devcgroup, &ex))
 			return -EPERM;
-		rc = dev_exception_add(devcgroup, &ex);
+		rc = dev_list_add(&devcgroup->exceptions, &ex);
 		break;
 	case DEVCG_DENY:
 		/*
@@ -747,7 +790,7 @@ static int devcgroup_update_access(struct dev_cgroup *devcgroup,
 		if (devcgroup->behavior == DEVCG_DEFAULT_DENY)
 			dev_exception_rm(devcgroup, &ex);
 		else
-			rc = dev_exception_add(devcgroup, &ex);
+			rc = dev_list_add(&devcgroup->exceptions, &ex);
 
 		if (rc)
 			break;
@@ -786,6 +829,11 @@ static struct cftype dev_cgroup_files[] = {
 	{
 		.name = "list",
 		.seq_show = devcgroup_seq_show,
+		.private = DEVCG_LIST,
+	},
+	{
+		.name = "accessed",
+		.seq_show = devcgroup_seq_show_accessed,
 		.private = DEVCG_LIST,
 	},
 	{ }	/* terminate */
@@ -829,6 +877,8 @@ static int __devcgroup_check_permission(short type, u32 major, u32 minor,
 
 	if (!rc)
 		return -EPERM;
+
+	devcgroup_add_accessed(dev_cgroup, type, major, minor, access);
 
 	return 0;
 }
