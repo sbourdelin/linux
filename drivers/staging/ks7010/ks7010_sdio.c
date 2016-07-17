@@ -987,11 +987,11 @@ static int ks7010_sdio_probe(struct sdio_func *func,
 	/* private memory allocate */
 	netdev = alloc_etherdev(sizeof(*priv));
 	if (netdev == NULL) {
-		printk(KERN_ERR "ks7010 : Unable to alloc new net device\n");
+		pr_err("ks7010: Unable to alloc new net device\n");
 		goto release_irq;
 	}
 	if (dev_alloc_name(netdev, "wlan%d") < 0) {
-		printk(KERN_ERR "ks7010 :  Couldn't get name!\n");
+		pr_err("ks7010: Couldn't get name!\n");
 		goto free_dev;
 	}
 
@@ -1031,8 +1031,7 @@ static int ks7010_sdio_probe(struct sdio_func *func,
 	/* Upload firmware */
 	ret = ks7010_upload_firmware(priv, card);	/* firmware load */
 	if (ret) {
-		printk(KERN_ERR
-		       "ks7010: firmware load failed !! retern code = %d\n",
+		pr_err("ks7010: firmware load failed! return code = %d\n",
 		       ret);
 		goto free_buf;
 	}
