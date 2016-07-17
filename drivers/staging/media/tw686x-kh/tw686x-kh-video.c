@@ -643,8 +643,7 @@ void tw686x_kh_video_free(struct tw686x_dev *dev)
 		struct tw686x_video_channel *vc = &dev->video_channels[ch];
 
 		v4l2_ctrl_handler_free(&vc->ctrl_handler);
-		if (vc->device)
-			video_unregister_device(vc->device);
+		video_unregister_device(vc->device);
 		vb2_dma_sg_cleanup_ctx(vc->alloc_ctx);
 		for (n = 0; n < 2; n++) {
 			struct dma_desc *descs = &vc->sg_tables[n];
