@@ -713,10 +713,8 @@ static int ks7010_sdio_update_index(struct ks_wlan_private *priv, u32 index)
 	unsigned char *data_buf;
 
 	data_buf = kmalloc(sizeof(u32), GFP_KERNEL);
-	if (!data_buf) {
-		rc = 1;
-		goto error_out;
-	}
+	if (!data_buf)
+		return 1;
 
 	memcpy(data_buf, &index, sizeof(index));
 	retval = ks7010_sdio_write(priv, WRITE_INDEX, data_buf, sizeof(index));
@@ -744,10 +742,9 @@ static int ks7010_sdio_data_compare(struct ks_wlan_private *priv, u32 address,
 	unsigned char *read_buf;
 
 	read_buf = kmalloc(ROM_BUFF_SIZE, GFP_KERNEL);
-	if (!read_buf) {
-		rc = 1;
-		goto error_out;
-	}
+	if (!read_buf)
+		return 1;
+
 	retval = ks7010_sdio_read(priv, address, read_buf, size);
 	if (retval) {
 		rc = 2;
@@ -777,10 +774,8 @@ static int ks7010_upload_firmware(struct ks_wlan_private *priv,
 
 	/* buffer allocate */
 	rom_buf = kmalloc(ROM_BUFF_SIZE, GFP_KERNEL);
-	if (!rom_buf) {
-		rc = 3;
-		goto error_out0;
-	}
+	if (!rom_buf)
+		return 3;
 
 	sdio_claim_host(card->func);
 
