@@ -130,6 +130,18 @@ static inline int mutex_is_locked(struct mutex *lock)
 	return atomic_read(&lock->count) != 1;
 }
 
+#if defined(CONFIG_DEBUG_MUTEXES) || defined(CONFIG_MUTEX_SPIN_ON_OWNER)
+static inline struct task_struct *mutex_owner(struct mutex *lock)
+{
+	return READ_ONCE(lock->owner);
+}
+#else
+static inline struct task_struct *mutex_owner(struct mutex *lock)
+{
+	return NULL;
+}
+#endif
+
 /*
  * See kernel/locking/mutex.c for detailed documentation of these APIs.
  * Also see Documentation/locking/mutex-design.txt.
