@@ -53,6 +53,7 @@ struct vsp1_uds;
 
 struct vsp1_device_info {
 	u32 version;
+	const char *model;
 	unsigned int gen;
 	unsigned int features;
 	unsigned int rpf_count;
