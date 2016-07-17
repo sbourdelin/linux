@@ -2639,6 +2639,13 @@ static void __init fixup_device_tree_efika(void)
 #else
 #define fixup_device_tree_efika()
 #endif
+#ifdef CONFIG_PPC_PASEMI
+static void __init fixup_device_tree_pasemi(void)
+{
+}
+#else
+#define fixup_device_tree_pasemi()
+#endif
 
 static void __init fixup_device_tree(void)
 {
@@ -2647,6 +2654,7 @@ static void __init fixup_device_tree(void)
 	fixup_device_tree_chrp();
 	fixup_device_tree_pmac();
 	fixup_device_tree_efika();
+	fixup_device_tree_pasemi();
 }
 
 static void __init prom_find_boot_cpu(void)
