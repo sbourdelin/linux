@@ -81,6 +81,8 @@ i.mx specific properties
 - fsl,usbmisc: phandler of non-core register device, with one
   argument that indicate usb controller index
 - disable-over-current: disable over current detect
+- over-current-polarity: 0 if the over current signal polarity is low active,
+  1 if the over current signal polarity is high active.
 - external-vbus-divider: enables off-chip resistor divider for Vbus
 
 Example:
