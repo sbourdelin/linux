@@ -287,7 +287,9 @@
 
 &usbotg2 {
 	vbus-supply = <&reg_usb_otg2_vbus>;
+	pinctrl-0 = <&pinctrl_usbotg2>;
 	dr_mode = "host";
+	over-current-polarity = <0>;
 	status = "okay";
 };
 
@@ -412,6 +414,12 @@
 				MX7D_PAD_ECSPI1_SCLK__UART6_DCE_RX	0x79
 				MX7D_PAD_ECSPI1_SS0__UART6_DCE_CTS	0x79
 				MX7D_PAD_ECSPI1_MISO__UART6_DCE_RTS	0x79
+			>;
+		};
+
+		pinctrl_usbotg2: usbotg2grp {
+			fsl,pins = <
+				MX7D_PAD_GPIO1_IO06__USB_OTG2_OC	0x59
 			>;
 		};
 
