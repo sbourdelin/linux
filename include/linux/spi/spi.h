@@ -178,6 +178,20 @@ struct spi_device {
 	 *  - chipselect delays
 	 *  - ...
 	 */
+
+	/* spidev stuff */
+#if config_enabled(CONFIG_SPI_SPIDEV)
+	dev_t                   spidev_devt;
+	struct device *		spidev;
+	spinlock_t              spidev_lock;
+
+	/* TX/RX buffers are NULL unless this device is open (users > 0) */
+	struct mutex            buf_lock;
+	unsigned                spidev_users;
+	u8                      *tx_buffer;
+	u8                      *rx_buffer;
+	u32                     spidev_speed_hz;
+#endif /*CONFIG_SPI_SPIDEV*/
 };
 
 static inline struct spi_device *to_spi_device(struct device *dev)

@@ -41,6 +41,8 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/spi.h>
 
+#include "spidev.h"
+
 static void spidev_release(struct device *dev)
 {
 	struct spi_device	*spi = to_spi_device(dev);
@@ -544,11 +546,15 @@ int spi_add_device(struct spi_device *spi)
 
 	/* Device may be bound to an active driver when this returns */
 	status = device_add(&spi->dev);
-	if (status < 0)
+	if (status < 0) {
 		dev_err(dev, "can't add %s, status %d\n",
 				dev_name(&spi->dev), status);
-	else
-		dev_dbg(dev, "registered child %s\n", dev_name(&spi->dev));
+		goto done;
+	}
+	dev_dbg(dev, "registered child %s\n", dev_name(&spi->dev));
+
+	if (IS_ENABLED(CONFIG_SPI_SPIDEV))
+		spi_attach_spidev(spi);
 
 done:
 	mutex_unlock(&spi_add_lock);
@@ -622,6 +628,10 @@ void spi_unregister_device(struct spi_device *spi)
 
 	if (spi->dev.of_node)
 		of_node_clear_flag(spi->dev.of_node, OF_POPULATED);
+
+	if (IS_ENABLED(CONFIG_SPI_SPIDEV))
+		spi_detach_spidev(spi);
+
 	device_unregister(&spi->dev);
 }
 EXPORT_SYMBOL_GPL(spi_unregister_device);
@@ -3127,6 +3137,9 @@ static int __init spi_init(void)
 
 	if (IS_ENABLED(CONFIG_OF_DYNAMIC))
 		WARN_ON(of_reconfig_notifier_register(&spi_of_notifier));
+
+	if (IS_ENABLED(CONFIG_SPI_SPIDEV))
+		WARN_ON(spidev_init());
 
 	return 0;
 
