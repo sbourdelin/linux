@@ -1409,8 +1409,10 @@ static struct emif_data * __init_or_module of_get_memory_device_details(
 	goto out;
 
 error:
+	of_node_put(np_ddr);
 	return NULL;
 out:
+	of_node_put(np_ddr);
 	return emif;
 }
 
