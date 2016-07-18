@@ -310,7 +310,8 @@ EXPORT_SYMBOL(mempool_resize);
  */
 void *mempool_alloc(mempool_t *pool, gfp_t gfp_mask)
 {
-	void *element;
+	unsigned int pflags = current->flags;
+	void *element = NULL;
 	unsigned long flags;
 	wait_queue_t wait;
 	gfp_t gfp_temp;
@@ -328,6 +329,12 @@ void *mempool_alloc(mempool_t *pool, gfp_t gfp_mask)
 
 	gfp_temp = gfp_mask & ~(__GFP_DIRECT_RECLAIM|__GFP_IO);
 
+	/*
+	 * Make sure that the allocation doesn't get throttled during the
+	 * reclaim
+	 */
+	if (gfpflags_allow_blocking(gfp_mask))
+		current->flags |= PF_LESS_THROTTLE;
 repeat_alloc:
 	/*
 	 * Make sure that the OOM victim will get access to memory reserves
@@ -339,7 +346,7 @@ repeat_alloc:
 
 	element = pool->alloc(gfp_temp, pool->pool_data);
 	if (likely(element != NULL))
-		return element;
+		goto out;
 
 	spin_lock_irqsave(&pool->lock, flags);
 	if (likely(pool->curr_nr)) {
@@ -352,7 +359,7 @@ repeat_alloc:
 		 * for debugging.
 		 */
 		kmemleak_update_trace(element);
-		return element;
+		goto out;
 	}
 
 	/*
@@ -369,7 +376,7 @@ repeat_alloc:
 	/* We must not sleep if !__GFP_DIRECT_RECLAIM */
 	if (!(gfp_mask & __GFP_DIRECT_RECLAIM)) {
 		spin_unlock_irqrestore(&pool->lock, flags);
-		return NULL;
+		goto out;
 	}
 
 	/* Let's wait for someone else to return an element to @pool */
@@ -386,6 +393,10 @@ repeat_alloc:
 
 	finish_wait(&pool->wait, &wait);
 	goto repeat_alloc;
+out:
+	if (gfpflags_allow_blocking(gfp_mask))
+		tsk_restore_flags(current, pflags, PF_LESS_THROTTLE);
+	return element;
 }
 EXPORT_SYMBOL(mempool_alloc);
 

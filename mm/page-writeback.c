@@ -1945,6 +1945,9 @@ void throttle_vm_writeout(gfp_t gfp_mask)
 	unsigned long background_thresh;
 	unsigned long dirty_thresh;
 
+	if (current->flags & PF_LESS_THROTTLE)
+		return;
+
         for ( ; ; ) {
 		global_dirty_limits(&background_thresh, &dirty_thresh);
 		dirty_thresh = hard_dirty_limit(&global_wb_domain, dirty_thresh);
