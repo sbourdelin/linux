@@ -1489,9 +1489,8 @@ of_register_spi_device(struct spi_master *master, struct device_node *nc)
 	rc = of_modalias_node(nc, spi->modalias,
 				sizeof(spi->modalias));
 	if (rc < 0) {
-		dev_err(&master->dev, "cannot find modalias for %s\n",
+		dev_warn(&master->dev, "cannot find modalias for %s\n",
 			nc->full_name);
-		goto err_out;
 	}
 
 	/* Device address */
