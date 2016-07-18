@@ -1,8 +1,5 @@
 ifndef CROSS_COMPILE
-# List of programs to build
-hostprogs-$(CONFIG_X86) := disable-tsc-ctxt-sw-stress-test disable-tsc-on-off-stress-test disable-tsc-test
-# Tell kbuild to always build the programs
-always := $(hostprogs-y)
+obj-$(CONFIG_SAMPLES_PRCTL) := disable-tsc-ctxt-sw-stress-test.o disable-tsc-on-off-stress-test.o disable-tsc-test.o
 
 HOSTCFLAGS_disable-tsc-ctxt-sw-stress-test.o += -I$(objtree)/usr/include
 HOSTCFLAGS_disable-tsc-on-off-stress-test.o += -I$(objtree)/usr/include
