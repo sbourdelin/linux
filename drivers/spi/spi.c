@@ -1554,11 +1554,11 @@ of_register_spi_device(struct spi_master *master, struct device_node *nc)
 	/* Device speed */
 	rc = of_property_read_u32(nc, "spi-max-frequency", &value);
 	if (rc) {
-		dev_err(&master->dev, "%s has no valid 'spi-max-frequency' property (%d)\n",
+		dev_warn(&master->dev, "%s has no valid 'spi-max-frequency' property (%d)\n",
 			nc->full_name, rc);
-		goto err_out;
+	} else {
+		spi->max_speed_hz = value;
 	}
-	spi->max_speed_hz = value;
 
 	/* Store a pointer to the node in the device structure */
 	of_node_get(nc);
