@@ -140,6 +140,15 @@ static struct imx_usbmisc_data *usbmisc_get_init_data(struct device *dev)
 	if (of_find_property(np, "disable-over-current", NULL))
 		data->disable_oc = 1;
 
+	if (!of_property_read_u32(np, "over-current-polarity", &ret))
+		data->oc_polarity = ret ? 1 : 0;
+	else
+		/*
+		 * Keep the oc polarity setting of legacy
+		 * platforms unchanged.
+		 */
+		data->oc_polarity = 1;
+
 	if (of_find_property(np, "external-vbus-divider", NULL))
 		data->evdo = 1;
 
