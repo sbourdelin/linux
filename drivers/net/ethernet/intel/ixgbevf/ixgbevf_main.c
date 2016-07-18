@@ -2792,8 +2792,13 @@ static void ixgbevf_reset_subtask(struct ixgbevf_adapter *adapter)
 static void ixgbevf_check_hang_subtask(struct ixgbevf_adapter *adapter)
 {
 	struct ixgbe_hw *hw = &adapter->hw;
+	struct ixgbe_mbx_info *mbx = &hw->mbx;
 	u32 eics = 0;
 	int i;
+
+	/* When performing hardware reset, unnecessary to check hang. */
+	if (mbx->ops.check_for_rst(hw))
+		return;
 
 	/* If we're down or resetting, just bail */
 	if (test_bit(__IXGBEVF_DOWN, &adapter->state) ||
