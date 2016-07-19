@@ -895,23 +895,6 @@ static int tpm2_do_selftest(struct tpm_chip *chip)
 }
 
 /**
- * tpm2_gen_interrupt() - generate an interrupt
- * @chip: TPM chip to use
- *
- * 0 is returned when the operation is successful. If a negative number is
- * returned it remarks a POSIX error code. If a positive number is returned
- * it remarks a TPM error.
- */
-int tpm2_gen_interrupt(struct tpm_chip *chip)
-{
-	u32 dummy;
-
-	return tpm2_get_tpm_pt(chip, 0x100, &dummy,
-			       "attempting to generate an interrupt");
-}
-EXPORT_SYMBOL_GPL(tpm2_gen_interrupt);
-
-/**
  * tpm2_probe() - probe TPM 2.0
  * @chip: TPM chip to use
  *
