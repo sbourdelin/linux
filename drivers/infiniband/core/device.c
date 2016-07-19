@@ -243,6 +243,7 @@ struct ib_device *ib_alloc_device(size_t size)
 	spin_lock_init(&device->client_data_lock);
 	INIT_LIST_HEAD(&device->client_data_list);
 	INIT_LIST_HEAD(&device->port_list);
+	INIT_LIST_HEAD(&device->type_list);
 
 	return device;
 }

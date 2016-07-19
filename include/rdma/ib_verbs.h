@@ -1325,6 +1325,8 @@ struct ib_ucontext {
 	struct list_head	rule_list;
 	int			closing;
 
+	struct list_head	uobjects_lists;
+
 	struct pid             *tgid;
 #ifdef CONFIG_INFINIBAND_ON_DEMAND_PAGING
 	struct rb_root      umem_tree;
@@ -1960,6 +1962,9 @@ struct ib_device {
 	 * in fast paths.
 	 */
 	int (*get_port_immutable)(struct ib_device *, u8, struct ib_port_immutable *);
+	struct list_head type_list;
+
+	const struct uverbs_types	*types;
 };
 
 struct ib_client {
