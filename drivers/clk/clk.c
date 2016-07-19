@@ -3178,7 +3178,7 @@ __of_clk_get_hw_from_provider(struct of_clk_provider *provider,
 			hw = ERR_CAST(clk);
 	}
 
-	return hw;
+	return hw ?: ERR_PTR(-ENOENT);
 }
 
 struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec,
