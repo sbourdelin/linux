@@ -1600,8 +1600,7 @@ static int __of_parse_phandle_with_args(const struct device_node *np,
 	 */
 
  err:
-	if (it.node)
-		of_node_put(it.node);
+	of_node_put(it.node);
 	return rc;
 }
 
