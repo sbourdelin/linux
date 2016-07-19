@@ -3099,15 +3099,24 @@ int of_clk_add_provider(struct device_node *np,
 	struct of_clk_provider *cp;
 	int ret;
 
+	mutex_lock(&of_clk_mutex);
+
+	cp = __of_clk_find_provider(np);
+	if (cp) {
+		mutex_unlock(&of_clk_mutex);
+		return -EEXIST;
+	}
+
 	cp = kzalloc(sizeof(struct of_clk_provider), GFP_KERNEL);
-	if (!cp)
+	if (!cp) {
+		mutex_unlock(&of_clk_mutex);
 		return -ENOMEM;
+	}
 
 	cp->node = of_node_get(np);
 	cp->data = data;
 	cp->get = clk_src_get;
 
-	mutex_lock(&of_clk_mutex);
 	list_add(&cp->link, &of_clk_providers);
 	mutex_unlock(&of_clk_mutex);
 	pr_debug("Added clock from %s\n", np->full_name);
@@ -3134,15 +3143,24 @@ int of_clk_add_hw_provider(struct device_node *np,
 	struct of_clk_provider *cp;
 	int ret;
 
+	mutex_lock(&of_clk_mutex);
+
+	cp = __of_clk_find_provider(np);
+	if (cp) {
+		mutex_unlock(&of_clk_mutex);
+		return -EEXIST;
+	}
+
 	cp = kzalloc(sizeof(*cp), GFP_KERNEL);
-	if (!cp)
+	if (!cp) {
+		mutex_unlock(&of_clk_mutex);
 		return -ENOMEM;
+	}
 
 	cp->node = of_node_get(np);
 	cp->data = data;
 	cp->get_hw = get;
 
-	mutex_lock(&of_clk_mutex);
 	list_add(&cp->link, &of_clk_providers);
 	mutex_unlock(&of_clk_mutex);
 	pr_debug("Added clk_hw provider from %s\n", np->full_name);
