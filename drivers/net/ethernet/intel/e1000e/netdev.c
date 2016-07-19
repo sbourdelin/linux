@@ -4335,7 +4335,10 @@ static cycle_t e1000e_cyclecounter_read(const struct cyclecounter *cc)
 	systim = (cycle_t)systimel;
 	systim |= (cycle_t)systimeh << 32;
 
-	if ((hw->mac.type == e1000_82574) || (hw->mac.type == e1000_82583)) {
+	switch (hw->mac.type) {
+	case e1000_82574:
+	case e1000_82583:
+	case e1000_pch_lpt:
 		u64 time_delta, rem, temp;
 		u32 incvalue;
 		int i;
@@ -4360,6 +4363,9 @@ static cycle_t e1000e_cyclecounter_read(const struct cyclecounter *cc)
 			    (rem == 0))
 				break;
 		}
+		break;
+	default:
+		break;
 	}
 	return systim;
 }
