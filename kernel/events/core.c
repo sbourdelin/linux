@@ -51,6 +51,9 @@
 
 #include <asm/irq_regs.h>
 
+#define CREATE_TRACE_POINTS
+#include <trace/events/perf.h>
+
 typedef int (*remote_function_f)(void *);
 
 struct remote_function_call {
@@ -8035,6 +8038,8 @@ static enum hrtimer_restart perf_swevent_hrtimer(struct hrtimer *hrtimer)
 
 	perf_sample_data_init(&data, 0, event->hw.last_period);
 	regs = get_irq_regs();
+
+	trace_perf_hrtimer(regs, event);
 
 	if (regs && !perf_exclude_event(event, regs)) {
 		if (!(event->attr.exclude_idle && is_idle_task(current)))
