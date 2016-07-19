@@ -3197,7 +3197,7 @@ __of_clk_get_hw_from_provider(struct of_clk_provider *provider,
 			      struct of_phandle_args *clkspec)
 {
 	struct clk *clk;
-	struct clk_hw *hw = ERR_PTR(-EPROBE_DEFER);
+	struct clk_hw *hw = ERR_PTR(-EINVAL);
 
 	if (provider->get_hw) {
 		hw = provider->get_hw(clkspec, provider->data);
