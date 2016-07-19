@@ -414,8 +414,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 
 			if (e->robj->tbo.ttm->state != tt_bound &&
 			    !e->user_pages) {
-				list_del(&e->tv.head);
-				list_add(&e->tv.head, &need_pages);
+				list_move(&e->tv.head, &need_pages);
 
 				amdgpu_bo_unreserve(e->robj);
 			}
