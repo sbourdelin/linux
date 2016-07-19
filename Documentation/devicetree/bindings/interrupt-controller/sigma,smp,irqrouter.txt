@@ -1,0 +1,135 @@
+* Sigma Designs Interrupt Router
+
+This module can route X IRQ inputs and Y SW IRQ inputs into Z IRQ outputs,
+with X+Y>Z.
+For instance X=128, Y=16, Z=24.
+
+Note however that the HW does not latch the IRQ lines, so devices
+connecting to the router are expected to latch their IRQ line by themselves.
+
+SW IRQs can be used by firmware running on different parts of the SoC to
+communicate with the CPU.
+They can be registered by specific drivers, and any entity capable of writing
+to the Interrupt Router registers can trigger and clear these interrupts.
+
+A single node in the device tree is used to describe the Interrupt Router.
+Since X+Y>Z, some IRQ inputs may need to be routed to the same IRQ output,
+thus "sharing the IRQ line".
+
+There are two ways of defining such sharing, either by specifying the number
+of IRQ groups, either by listing the IRQ groups and their contents.
+In the former case the groups are created and named "implicitly", in the
+later case the groups are created "explicitly" by grouping IRQs.
+An IRQ group will share an IRQ output, thus all input IRQs falling into that
+group will share a given IRQ line.
+
+If SW IRQs are enabled ("swirq-count" != 0), they will *ALL* be grouped
+together.
+
+Required properties:
+- compatible: Should be "sigma,smp,irqrouter".
+- interrupt-controller: Identifies the node as an interrupt controller.
+- inputs: The number of IRQ lines entering the router
+- outputs: The number of IRQ lines exiting the router
+- swirq-count: The number of SW IRQs supported. If 0, none is supported.
+- reg: Base address and size of interrupt router registers.
+- #interrupt-cells: Should be <3>. Defines how other nodes will be able to
+interact with this node. The meaning of the cells are
+	* First Cell: SIGMA_HWIRQ, SIGMA_SWIRQ, [SIGMA_IRQGROUP_1, ...,
+SIGMA_IRQGROUP_15].
+	* Second Cell: IRQ ID
+	* Third Cell: IRQ polarity (level high or low).
+
+Optional properties:
+- irq-groups: The number of IRQ groups used.
+NOTE: if present, it forces implicit group definition.
+- irq-group{i}: if 'irq-groups' is not present, then explicit group declaration
+may be required, and can be done by creating child nodes of the form:
+   irq-group0: {
+      shared-irqs = <1 38 56>;
+   };
+NOTE: the number of groups cannot exceed the number of outputs.
+NOTE2: SW IRQs have their own group so the number of total groups is
+'irq-groups'+1.
+- interrupt-parent: pHandle of the parent interrupt controller, if not
+  inherited from the parent node. It should be the GIC.
+
+
+Example:
+
+See Documentation/devicetree/bindings/interrupt-controller/interrupts.txt and
+Documentation/devicetree/bindings/arm/gic.txt for further details.
+
+The following example declares a irqrouter with 128 inputs, 24 outputs, 16
+SW IRQs, declaring 4 implicit IRQ groups, with registers @ 0x6F800 and
+connected to the GIC.
+
+		irqrouter: irqrouter@6f800 {
+			 compatible = "sigma,smp,irqrouter";
+			 reg = <0x6f800 0x800>;
+			 interrupt-controller;
+			 interrupt-parent = <&gic>;
+
+			 #interrupt-cells = <3>;
+
+			 inputs = <128>;
+			 outputs = <24>;
+			 swirq-count = <16>;
+
+			 irq-groups = <4>;
+		};
+
+Devices can then request IRQs using:
+
+a) interrupts = <SIGMA_SWIRQ      10 IRQ_TYPE_LEVEL_HIGH>;
+b) interrupts = <SIGMA_HWIRQ      10 IRQ_TYPE_LEVEL_HIGH>;
+c) interrupts = <SIGMA_IRQGROUP_2 10 IRQ_TYPE_LEVEL_HIGH>;
+
+Case a) is for SWIRQs: requests SW IRQ 10
+Case b) is for non-shared HW IRQs: requests HW IRQ 10, the irqrouter will
+assign a direct route from input (10) to a free output reserving an IRQ line on
+the parent Interrupt controller.
+Case c) is for shared HW IRQs: indeed, SIGMA_IRQGROUP_2 is used as ID, thus the
+irqrouter will then route this input (10) to the output assigned to IRQ group 2.
+
+NOTE: SW IRQ 10 and HW IRQ 10 are not the same.
+
+The following example declares the same irqrouter as the preceding example
+but using explicit IRQ group declaration.
+
+		irqrouter: irqrouter@6f800 {
+			 compatible = "sigma,smp,irqrouter";
+			 reg = <0x6f800 0x800>;
+			 interrupt-controller;
+			 interrupt-parent = <&gic>;
+
+			 #interrupt-cells = <3>;
+
+			 inputs = <128>;
+			 outputs = <24>;
+			 swirq-count = <16>;
+
+			 irq-group0 {
+			       shared-irqs = <1 38 56 11>;
+			 };
+
+			 irq-group1 {
+			       shared-irqs = <67 68>;
+			 };
+		};
+
+Devices can then request IRQs using:
+
+d) interrupts = <SIGMA_SWIRQ 10 IRQ_TYPE_LEVEL_HIGH>;
+e) interrupts = <SIGMA_HWIRQ 10 IRQ_TYPE_LEVEL_HIGH>;
+f) interrupts = <SIGMA_HWIRQ 11 IRQ_TYPE_LEVEL_HIGH>;
+
+Case d) is for SWIRQs: requests SW IRQ 10
+Case e) is for non-shared HW IRQs: requests HW IRQ 10, the irqrouter will
+assign a direct route from input (10) to a free output reserving an IRQ line on
+the parent Interrupt controller.
+Case f) is for a shared HW IRQ: indeed, 'irq-group0' lists IRQ 11 as belonging
+to a group ('irq-group0' but it is not really important), thus the irqrouter
+will route this input (11) to the output assigned to IRQ group 'irq-group0'.
+
+NOTE: SW IRQ 10 and HW IRQ 10 are not the same.
