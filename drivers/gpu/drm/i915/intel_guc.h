@@ -132,7 +132,7 @@ struct intel_guc {
 	struct drm_i915_gem_object *ctx_pool_obj;
 	struct ida ctx_ids;
 
-	struct i915_guc_client *execbuf_client;
+	struct i915_guc_client *exec_clients[I915_NUM_ENGINES];
 
 	DECLARE_BITMAP(doorbell_bitmap, GUC_MAX_DOORBELLS);
 	uint32_t db_cacheline;		/* Cyclic counter mod pagesize	*/

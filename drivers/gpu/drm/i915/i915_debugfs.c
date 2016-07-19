@@ -2572,20 +2572,26 @@ static int i915_guc_info(struct seq_file *m, void *data)
 	struct drm_device *dev = node->minor->dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_guc guc;
-	struct i915_guc_client client = {};
+	struct i915_guc_client *clients;
 	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
 	u64 total = 0;
 
 	if (!HAS_GUC_SCHED(dev_priv))
 		return 0;
 
+	clients = kcalloc(I915_NUM_ENGINES, sizeof(*clients), GFP_KERNEL);
+	if (clients == NULL)
+		return -ENOMEM;
+
 	if (mutex_lock_interruptible(&dev->struct_mutex))
-		return 0;
+		goto done;
 
 	/* Take a local copy of the GuC data, so we can dump it at leisure */
 	guc = dev_priv->guc;
-	if (guc.execbuf_client)
-		client = *guc.execbuf_client;
+	for_each_engine_id(engine, dev_priv, id)
+		if (guc.exec_clients[id])
+			clients[id] = *guc.exec_clients[id];
 
 	mutex_unlock(&dev->struct_mutex);
 
@@ -2608,10 +2614,17 @@ static int i915_guc_info(struct seq_file *m, void *data)
 	}
 	seq_printf(m, "\t%s: %llu\n", "Total", total);
 
-	seq_printf(m, "\nGuC execbuf client @ %p:\n", guc.execbuf_client);
-	i915_guc_client_info(m, dev_priv, &client);
+	for_each_engine_id(engine, dev_priv, id) {
+		seq_printf(m, "\nGuC exec_client[%d] @ %p:\n",
+				id, guc.exec_clients[id]);
+		if (guc.exec_clients[id])
+			i915_guc_client_info(m, dev_priv, &clients[id]);
+	}
 
 	/* Add more as required ... */
+
+done:
+	kfree(clients);
 
 	return 0;
 }

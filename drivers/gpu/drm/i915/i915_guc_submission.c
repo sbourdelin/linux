@@ -434,7 +434,9 @@ static void guc_fini_ctx_desc(struct intel_guc *guc,
 int i915_guc_wq_check_space(struct drm_i915_gem_request *request)
 {
 	const size_t wqi_size = sizeof(struct guc_wq_item);
-	struct i915_guc_client *gc = request->i915->guc.execbuf_client;
+	enum intel_engine_id engine_id = request->engine->id;
+	struct intel_guc *guc = &request->i915->guc;
+	struct i915_guc_client *gc = guc->exec_clients[engine_id];
 	struct guc_process_desc *desc;
 	u32 freespace;
 
@@ -589,7 +591,7 @@ int i915_guc_submit(struct drm_i915_gem_request *rq)
 {
 	unsigned int engine_id = rq->engine->id;
 	struct intel_guc *guc = &rq->i915->guc;
-	struct i915_guc_client *client = guc->execbuf_client;
+	struct i915_guc_client *client = guc->exec_clients[engine_id];
 	int b_ret;
 
 	guc_add_workqueue_item(client, rq);
@@ -723,7 +725,7 @@ static bool guc_doorbell_check(struct intel_guc *guc, uint16_t db_id)
  */
 static void guc_init_doorbell_hw(struct intel_guc *guc)
 {
-	struct i915_guc_client *client = guc->execbuf_client;
+	struct i915_guc_client *client = guc->exec_clients[RCS];
 	uint16_t db_id;
 	int i, err;
 
@@ -1004,17 +1006,21 @@ int i915_guc_submission_enable(struct drm_i915_private *dev_priv)
 {
 	struct intel_guc *guc = &dev_priv->guc;
 	struct i915_guc_client *client;
+	struct intel_engine_cs *engine;
 
-	/* client for execbuf submission */
-	client = guc_client_alloc(dev_priv,
-				  GUC_CTX_PRIORITY_KMD_NORMAL,
-				  dev_priv->kernel_context);
-	if (!client) {
-		DRM_ERROR("Failed to create execbuf guc_client\n");
-		return -ENOMEM;
+	for_each_engine(engine, dev_priv) {
+		/* client for execbuf submission */
+		client = guc_client_alloc(dev_priv,
+					  GUC_CTX_PRIORITY_KMD_NORMAL,
+					  dev_priv->kernel_context);
+		if (!client) {
+			DRM_ERROR("Failed to create GuC client(s)\n");
+			return -ENOMEM;
+		}
+
+		guc->exec_clients[engine->id] = client;
 	}
 
-	guc->execbuf_client = client;
 	host2guc_sample_forcewake(guc, client);
 	guc_init_doorbell_hw(guc);
 
@@ -1024,9 +1030,12 @@ int i915_guc_submission_enable(struct drm_i915_private *dev_priv)
 void i915_guc_submission_disable(struct drm_i915_private *dev_priv)
 {
 	struct intel_guc *guc = &dev_priv->guc;
+	struct intel_engine_cs *engine;
 
-	guc_client_free(dev_priv, guc->execbuf_client);
-	guc->execbuf_client = NULL;
+	for_each_engine(engine, dev_priv) {
+		guc_client_free(dev_priv, guc->exec_clients[engine->id]);
+		guc->exec_clients[engine->id] = NULL;
+	}
 }
 
 void i915_guc_submission_fini(struct drm_i915_private *dev_priv)
