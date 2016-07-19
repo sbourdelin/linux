@@ -3071,6 +3071,21 @@ of_clk_hw_onecell_get(struct of_phandle_args *clkspec, void *data)
 EXPORT_SYMBOL_GPL(of_clk_hw_onecell_get);
 
 /**
+ * __of_clk_find_provider - Find a clock provider associated with a device node
+ * @np: device node to obtain the clock provider for
+ */
+static struct of_clk_provider *__of_clk_find_provider(struct device_node *np)
+{
+	struct of_clk_provider *cp;
+
+	list_for_each_entry(cp, &of_clk_providers, link)
+		if (cp->node == np)
+			return cp;
+
+	return NULL;
+}
+
+/**
  * of_clk_add_provider() - Register a clock provider for a node
  * @np: Device node pointer associated with clock provider
  * @clk_src_get: callback for decoding clock
