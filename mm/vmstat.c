@@ -1497,11 +1497,9 @@ static void zoneinfo_show_print(struct seq_file *m, pg_data_t *pgdat,
 	}
 	seq_printf(m,
 		   "\n  node_unreclaimable:  %u"
-		   "\n  start_pfn:           %lu"
-		   "\n  node_inactive_ratio: %u",
+		   "\n  start_pfn:           %lu",
 		   !pgdat_reclaimable(zone->zone_pgdat),
-		   zone->zone_start_pfn,
-		   zone->zone_pgdat->inactive_ratio);
+		   zone->zone_start_pfn);
 	seq_putc(m, '\n');
 }
 
