@@ -245,6 +245,9 @@ struct ib_device *ib_alloc_device(size_t size)
 	INIT_LIST_HEAD(&device->port_list);
 	INIT_LIST_HEAD(&device->type_list);
 
+	/* TODO: don't forget to initialize device->driver_id, so verbs handshake between
+	 * user space<->kernel space will work for other values than driver_id == 0.
+	 */
 	return device;
 }
 EXPORT_SYMBOL(ib_alloc_device);
