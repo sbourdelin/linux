@@ -121,17 +121,6 @@ static ssize_t ir_lirc_transmit_ir(struct file *file, const char __user *buf,
 	if (!lirc)
 		return -EFAULT;
 
-	if (n < sizeof(unsigned) || n % sizeof(unsigned))
-		return -EINVAL;
-
-	count = n / sizeof(unsigned);
-	if (count > LIRCBUF_SIZE || count % 2 == 0)
-		return -EINVAL;
-
-	txbuf = memdup_user(buf, n);
-	if (IS_ERR(txbuf))
-		return PTR_ERR(txbuf);
-
 	dev = lirc->dev;
 	if (!dev) {
 		ret = -EFAULT;
@@ -142,6 +131,25 @@ static ssize_t ir_lirc_transmit_ir(struct file *file, const char __user *buf,
 		ret = -ENOSYS;
 		goto out;
 	}
+
+	if (dev->driver_type == RC_DRIVER_IR_RAW_TX) {
+		txbuf = memdup_user(buf, n);
+		if (IS_ERR(txbuf))
+			return PTR_ERR(txbuf);
+
+		return dev->tx_ir(dev, txbuf, n);
+	}
+
+	if (n < sizeof(unsigned) || n % sizeof(unsigned))
+		return -EINVAL;
+
+	count = n / sizeof(unsigned);
+	if (count > LIRCBUF_SIZE || count % 2 == 0)
+		return -EINVAL;
+
+	txbuf = memdup_user(buf, n);
+	if (IS_ERR(txbuf))
+		return PTR_ERR(txbuf);
 
 	for (i = 0; i < count; i++) {
 		if (txbuf[i] > IR_MAX_DURATION / 1000 - duration || !txbuf[i]) {
