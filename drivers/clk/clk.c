@@ -3182,13 +3182,11 @@ void of_clk_del_provider(struct device_node *np)
 	struct of_clk_provider *cp;
 
 	mutex_lock(&of_clk_mutex);
-	list_for_each_entry(cp, &of_clk_providers, link) {
-		if (cp->node == np) {
-			list_del(&cp->link);
-			of_node_put(cp->node);
-			kfree(cp);
-			break;
-		}
+	cp = __of_clk_find_provider(np);
+	if (cp) {
+		list_del(&cp->link);
+		of_node_put(cp->node);
+		kfree(cp);
 	}
 	mutex_unlock(&of_clk_mutex);
 }
