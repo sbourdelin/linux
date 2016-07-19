@@ -487,7 +487,6 @@ struct rproc_vdev {
 	u32 rsc_offset;
 };
 
-struct rproc *rproc_get_by_phandle(phandle phandle);
 struct rproc *rproc_alloc(struct device *dev, const char *name,
 				const struct rproc_ops *ops,
 				const char *firmware, int len);
@@ -510,5 +509,29 @@ static inline struct rproc *vdev_to_rproc(struct virtio_device *vdev)
 
 	return rvdev->rproc;
 }
+
+#ifdef CONFIG_OF
+extern struct rproc *of_get_rproc_by_index(struct device_node *np,
+					   int index);
+extern struct rproc *of_get_rproc_by_name(struct device_node *np,
+					  const char *name);
+extern struct rproc *rproc_get_by_phandle(phandle phandle);
+#else
+static inline
+struct rproc *of_get_rproc_by_index(struct device_node *np, int index)
+{
+	return NULL;
+}
+static inline
+struct rproc *of_get_rproc_by_name(struct device_node *np, const char *name)
+{
+	return NULL;
+}
+static inline
+struct rproc *rproc_get_by_phandle(phandle phandle)
+{
+	return NULL;
+}
+#endif /* CONFIG_OF */
 
 #endif /* REMOTEPROC_H */
