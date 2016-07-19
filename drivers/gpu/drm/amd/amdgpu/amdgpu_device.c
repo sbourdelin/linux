@@ -2530,12 +2530,12 @@ static int amdgpu_debugfs_regs_init(struct amdgpu_device *adev)
 		ent = debugfs_create_file(debugfs_regs_names[i],
 					  S_IFREG | S_IRUGO, root,
 					  adev, debugfs_regs[i]);
-		if (IS_ERR(ent)) {
+		if (!ent) {
 			for (j = 0; j < i; j++) {
 				debugfs_remove(adev->debugfs_regs[i]);
 				adev->debugfs_regs[i] = NULL;
 			}
-			return PTR_ERR(ent);
+			return -ENOMEM;
 		}
 
 		if (!i)
