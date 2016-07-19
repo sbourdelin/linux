@@ -132,12 +132,14 @@ enum flag_idn {
 	QUERY_FLAG_IDN_FDEVICEINIT      = 0x01,
 	QUERY_FLAG_IDN_PWR_ON_WPE	= 0x03,
 	QUERY_FLAG_IDN_BKOPS_EN         = 0x04,
+	QUERY_FLAG_IDN_PURGE_EN         = 0x06,
 };
 
 /* Attribute idn for Query requests */
 enum attr_idn {
 	QUERY_ATTR_IDN_ACTIVE_ICC_LVL	= 0x03,
 	QUERY_ATTR_IDN_BKOPS_STATUS	= 0x05,
+	QUERY_ATTR_IDN_PURGE_STATUS	= 0x06,
 	QUERY_ATTR_IDN_EE_CONTROL	= 0x0D,
 	QUERY_ATTR_IDN_EE_STATUS	= 0x0E,
 };
@@ -247,6 +249,13 @@ enum {
 	UFSHCD_AMP		= 3,
 };
 
+/* Provisioning type, see UFS 2.0 documentation (JESD220B), section 12.2.3.5 */
+enum unit_desc_param_bProvisioningType {
+	THIN_PROVISIONING_DISABLED		= 0x00,
+	THIN_PROVISIONING_ENABLED_TPRZ_0	= 0x02,
+	THIN_PROVISIONING_ENABLED_TPRZ_1	= 0x03,
+};
+
 #define POWER_DESC_MAX_SIZE			0x62
 #define POWER_DESC_MAX_ACTV_ICC_LVLS		16
 
@@ -277,6 +286,16 @@ enum bkops_status {
 	BKOPS_STATUS_PERF_IMPACT         = 0x2,
 	BKOPS_STATUS_CRITICAL            = 0x3,
 	BKOPS_STATUS_MAX		 = BKOPS_STATUS_CRITICAL,
+};
+
+/* Purge operation status */
+enum purge_status {
+	PURGE_STATUS_IDLE             = 0x0,
+	PURGE_STATUS_IN_PROGRESS      = 0x1,
+	PURGE_STATUS_STOP_BY_HOST     = 0x2,
+	PURGE_STATUS_SUCCESS          = 0x3,
+	PURGE_STATUS_QUEUE_NOT_EMPTY  = 0x4,
+	PURGE_STATUS_GENERAL_FAIL     = 0x5
 };
 
 /* UTP QUERY Transaction Specific Fields OpCode */
