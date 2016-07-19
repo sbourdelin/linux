@@ -188,7 +188,7 @@ struct rc_dev {
  * Remote Controller, at sys/class/rc.
  */
 
-struct rc_dev *rc_allocate_device(void);
+struct rc_dev *rc_allocate_device(enum rc_driver_type);
 void rc_free_device(struct rc_dev *dev);
 int rc_register_device(struct rc_dev *dev);
 void rc_unregister_device(struct rc_dev *dev);
