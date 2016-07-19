@@ -521,4 +521,9 @@ config XPOWER_PMIC_OPREGION
 
 endif
 
+if ARM64
+source "drivers/acpi/arm64/Kconfig"
+
+endif
+
 endif	# ACPI
