@@ -45,6 +45,7 @@
 #include <rdma/ib_user_verbs.h>
 #include <rdma/ib_addr.h>
 #include <rdma/ib_cache.h>
+#include <rdma/uverbs_ioctl_cmd.h>
 #include <linux/mlx5/port.h>
 #include <linux/mlx5/vport.h>
 #include <rdma/ib_smi.h>
@@ -2475,9 +2476,15 @@ static void *mlx5_ib_add(struct mlx5_core_dev *mdev)
 	if (err)
 		goto err_rsrc;
 
-	err = ib_register_device(&dev->ib_dev, NULL);
+	err = rdma_initialize_common_types(&dev->ib_dev, UVERBS_COMMON_TYPES);
 	if (err)
 		goto err_odp;
+
+	dev->ib_dev.types = &mlx5_types;
+
+	err = ib_register_device(&dev->ib_dev, NULL);
+	if (err)
+		goto err_remove_common_types;
 
 	err = create_umr_res(dev);
 	if (err)
@@ -2499,7 +2506,8 @@ err_umrc:
 
 err_dev:
 	ib_unregister_device(&dev->ib_dev);
-
+err_remove_common_types:
+	ib_uverbs_uobject_types_remove(&dev->ib_dev);
 err_odp:
 	mlx5_ib_odp_remove_one(dev);
 

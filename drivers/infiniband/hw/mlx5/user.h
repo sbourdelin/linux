@@ -194,4 +194,7 @@ static inline int get_srq_user_index(struct mlx5_ib_ucontext *ucontext,
 
 	return verify_assign_uidx(cqe_version, ucmd->uidx, user_index);
 }
+
+extern struct uverbs_types mlx5_types;
+
 #endif /* MLX5_IB_USER_H */
