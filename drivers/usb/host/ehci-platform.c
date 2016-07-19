@@ -234,7 +234,7 @@ static int ehci_platform_probe(struct platform_device *dev)
 		}
 	}
 
-	priv->rst = devm_reset_control_get_optional(&dev->dev, NULL);
+	priv->rst = devm_reset_control_get_optional_shared(&dev->dev, NULL);
 	if (IS_ERR(priv->rst)) {
 		err = PTR_ERR(priv->rst);
 		if (err == -EPROBE_DEFER)
