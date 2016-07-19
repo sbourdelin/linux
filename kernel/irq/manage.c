@@ -662,7 +662,7 @@ int __irq_set_trigger(struct irq_desc *desc, unsigned long flags)
 			unmask = 1;
 	}
 
-	/* caller masked out all except trigger mode flags */
+	/* all flags except trigger mode flags are masked */
 	ret = chip->irq_set_type(&desc->irq_data, flags);
 
 	switch (ret) {
@@ -1730,8 +1730,7 @@ void enable_percpu_irq(unsigned int irq, unsigned int type)
 	if (!desc)
 		return;
 
-	type &= IRQ_TYPE_SENSE_MASK;
-	if (type != IRQ_TYPE_NONE) {
+	if (type & IRQ_TYPE_SENSE_MASK) {
 		int ret;
 
 		ret = __irq_set_trigger(desc, type);
