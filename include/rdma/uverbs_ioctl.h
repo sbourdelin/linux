@@ -106,6 +106,85 @@ struct uverbs_types {
 	const struct uverbs_type_actions	**types;
 };
 
+#define UVERBS_ATTR(_id, _len, _type)					\
+	[_id] = {.len = _len, .type = _type}
+#define UVERBS_ATTR_PTR_IN(_id, _len)					\
+	UVERBS_ATTR(_id, _len, UVERBS_ATTR_TYPE_PTR_IN)
+#define UVERBS_ATTR_PTR_OUT(_id, _len)					\
+	UVERBS_ATTR(_id, _len, UVERBS_ATTR_TYPE_PTR_OUT)
+#define UVERBS_ATTR_IDR_SZ_IN(_id, _idr_type, _access, _new_sz)		\
+	[_id] = {.type = UVERBS_ATTR_TYPE_IDR,				\
+		 .idr = {.idr_type = _idr_type,				\
+			 .access = _access,				\
+			 .new_size = _new_sz} }
+#define UVERBS_ATTR_IDR_IN(_id, _idr_type, _access)			\
+	UVERBS_ATTR_IDR_SZ_IN(_id, _idr_type, _access, sizeof(struct ib_uobject))
+#define UVERBS_ATTR_CHAIN_SPEC_SZ(...)					\
+	(sizeof((const struct uverbs_attr_spec[]){__VA_ARGS__}) /	\
+	 sizeof(const struct uverbs_attr_spec))
+#define UVERBS_ATTR_CHAIN_SPEC(...)					\
+	(const struct uverbs_attr_chain_spec)				\
+	{.attrs = (struct uverbs_attr_spec[]){__VA_ARGS__},		\
+	 .num_attrs = UVERBS_ATTR_CHAIN_SPEC_SZ(__VA_ARGS__)}
+#define DECLARE_UVERBS_ATTR_CHAIN_SPEC(name, ...)			\
+	const struct uverbs_attr_chain_spec name =			\
+		UVERBS_ATTR_CHAIN_SPEC(__VA_ARGS__)
+#define UVERBS_ATTR_ACTION_SPEC_SZ(...)					  \
+	(sizeof((const struct uverbs_attr_chain_spec *[]){__VA_ARGS__}) / \
+				 sizeof(const struct uverbs_attr_chain_spec *))
+#define UVERBS_ATTR_ACTION_SPEC(_distfn, _priv, ...)			\
+	{.dist = _distfn,						\
+	 .priv = _priv,							\
+	 .num_chains =	UVERBS_ATTR_ACTION_SPEC_SZ(__VA_ARGS__),	\
+	 .validator_chains = (const struct uverbs_attr_chain_spec *[]){__VA_ARGS__} }
+#define UVERBS_STD_ACTION_SPEC(...)						\
+	UVERBS_ATTR_ACTION_SPEC(ib_uverbs_std_dist,				\
+				(void *)UVERBS_ATTR_ACTION_SPEC_SZ(__VA_ARGS__),\
+				__VA_ARGS__)
+#define UVERBS_STD_ACTION(_handler, _priv, ...)				\
+	{								\
+		.priv = &(struct uverbs_action_std_handler)		\
+			{.handler = _handler,				\
+			 .priv = _priv},				\
+		.handler = uverbs_action_std_handle,			\
+		.chain = UVERBS_STD_ACTION_SPEC(__VA_ARGS__)}
+#define UVERBS_STD_CTX_ACTION(_handler, _priv, ...)			\
+	{								\
+		.priv = &(struct uverbs_action_std_ctx_handler)		\
+			{.handler = _handler,				\
+			 .priv = _priv},				\
+		.handler = uverbs_action_std_ctx_handle,		\
+		.chain = UVERBS_STD_ACTION_SPEC(__VA_ARGS__)}
+#define UVERBS_ACTIONS_SZ(...)					\
+	(sizeof((const struct uverbs_action []){__VA_ARGS__}) /		\
+	 sizeof(const struct uverbs_action))
+#define UVERBS_ACTION(action_idx, _handler, _priv,  ...)		\
+	[action_idx] = UVERBS_STD_ACTION(_handler, _priv, __VA_ARGS__)
+#define UVERBS_CTX_ACTION(action_idx, _handler, _priv,  ...)		\
+	[action_idx] = UVERBS_STD_CTX_ACTION(_handler, _priv, __VA_ARGS__)
+#define UVERBS_ACTIONS(...)					\
+	((const struct uverbs_type_actions)				\
+	  {.num_actions = UVERBS_ACTIONS_SZ(__VA_ARGS__),		\
+	   .actions = (const struct uverbs_action[]){__VA_ARGS__} })
+#define DECLARE_UVERBS_TYPE(name, ...)					\
+	const struct uverbs_type_actions name = UVERBS_ACTIONS(__VA_ARGS__)
+#define UVERBS_TYPES_SZ(...)						\
+	(sizeof((const struct uverbs_type_actions *[]){__VA_ARGS__}) /	\
+	 sizeof(const struct uverbs_type_actions *))
+#define UVERBS_TYPE_ACTIONS(type_idx, ...)				\
+	[type_idx] = &UVERBS_ACTIONS(__VA_ARGS__)
+#define UVERBS_TYPE(type_idx, type_ptr)					\
+	[type_idx] = ((const struct uverbs_type_actions * const)&type_ptr)
+#define UVERBS_TYPES(...)						\
+	{.num_types = UVERBS_TYPES_SZ(__VA_ARGS__),			\
+	 .types = (const struct uverbs_type_actions *[]){__VA_ARGS__} }
+
+#define UVERBS_COPY_TO(attr_array, idx, from)				\
+	((attr_array)->attrs[idx].valid ?				\
+	 (copy_to_user((attr_array)->attrs[idx].cmd_attr.ptr, (from),	\
+		       (attr_array)->attrs[idx].cmd_attr.len) ?		\
+	  -EFAULT : 0) : -ENOENT)
+
 /* =================================================
  *              Parsing infrastructure
  * =================================================
