@@ -1314,6 +1314,7 @@ struct ib_umem;
 
 struct ib_ucontext {
 	struct ib_device       *device;
+	struct ib_uverbs_file  *ufile;
 	struct list_head	pd_list;
 	struct list_head	mr_list;
 	struct list_head	mw_list;
@@ -1976,6 +1977,7 @@ struct ib_device {
 	int (*get_port_immutable)(struct ib_device *, u8, struct ib_port_immutable *);
 	struct list_head type_list;
 
+	u16				driver_id;
 	const struct uverbs_types	*types;
 };
 
