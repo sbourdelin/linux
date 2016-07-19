@@ -459,18 +459,23 @@ ssize_t tpm_getcap(struct tpm_chip *chip, __be32 subcap_id, cap_t *cap,
 	return rc;
 }
 
+/**
+ * tpm_gen_interrupt -- generate an interrupt by issuing an idempotent command
+ * @chip: TPM chip to use
+ *
+ * Returns 0 on success, < 0 in case of fatal error or a value > 0 representing
+ * a TPM error code.
+ */
 void tpm_gen_interrupt(struct tpm_chip *chip)
 {
-	struct	tpm_cmd_t tpm_cmd;
-	ssize_t rc;
+	const char *desc = "attempting to generate an interrupt";
+	u32 cap2;
+	cap_t cap;
 
-	tpm_cmd.header.in = tpm_getcap_header;
-	tpm_cmd.params.getcap_in.cap = TPM_CAP_PROP;
-	tpm_cmd.params.getcap_in.subcap_size = cpu_to_be32(4);
-	tpm_cmd.params.getcap_in.subcap = TPM_CAP_PROP_TIS_TIMEOUT;
-
-	rc = tpm_transmit_cmd(chip, &tpm_cmd, TPM_INTERNAL_RESULT_SIZE,
-			      "attempting to determine the timeouts");
+	if (chip->flags & TPM_CHIP_FLAG_TPM2)
+		tpm2_get_tpm_pt(chip, 0x100, &cap2, desc);
+	else
+		tpm_getcap(chip, TPM_CAP_PROP_TIS_TIMEOUT, &cap, desc);
 }
 EXPORT_SYMBOL_GPL(tpm_gen_interrupt);
 
