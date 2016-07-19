@@ -1449,6 +1449,7 @@ struct ib_qp {
 	void                  (*event_handler)(struct ib_event *, void *);
 	void		       *qp_context;
 	u32			qp_num;
+	u32			max_send_sge;
 	enum ib_qp_type		qp_type;
 };
 

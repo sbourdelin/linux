@@ -814,6 +814,8 @@ struct ib_qp *ib_create_qp(struct ib_pd *pd,
 		}
 	}
 
+	qp->max_send_sge = qp_init_attr->cap.max_send_sge;
+
 	return qp;
 }
 EXPORT_SYMBOL(ib_create_qp);
