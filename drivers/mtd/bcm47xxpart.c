@@ -42,7 +42,6 @@
 #define ML_MAGIC2			0x26594131
 #define TRX_MAGIC			0x30524448
 #define SHSQ_MAGIC			0x71736873	/* shsq (weird ZTE H218N endianness) */
-#define UBI_EC_MAGIC			0x23494255	/* UBI# */
 
 struct trx_header {
 	uint32_t magic;
@@ -59,28 +58,6 @@ static void bcm47xxpart_add_part(struct mtd_partition *part, const char *name,
 	part->name = name;
 	part->offset = offset;
 	part->mask_flags = mask_flags;
-}
-
-static const char *bcm47xxpart_trx_data_part_name(struct mtd_info *master,
-						  size_t offset)
-{
-	uint32_t buf;
-	size_t bytes_read;
-	int err;
-
-	err  = mtd_read(master, offset, sizeof(buf), &bytes_read,
-			(uint8_t *)&buf);
-	if (err && !mtd_is_bitflip(err)) {
-		pr_err("mtd_read error while parsing (offset: 0x%X): %d\n",
-			offset, err);
-		goto out_default;
-	}
-
-	if (buf == UBI_EC_MAGIC)
-		return "ubi";
-
-out_default:
-	return "rootfs";
 }
 
 static int bcm47xxpart_parse(struct mtd_info *master,
@@ -190,44 +167,10 @@ static int bcm47xxpart_parse(struct mtd_info *master,
 			trx = (struct trx_header *)buf;
 
 			trx_part = curr_part;
-			bcm47xxpart_add_part(&parts[curr_part++], "firmware",
+			bcm47xxpart_add_part(&parts[curr_part], "firmware",
 					     offset, 0);
-
-			i = 0;
-			/* We have LZMA loader if offset[2] points to sth */
-			if (trx->offset[2]) {
-				bcm47xxpart_add_part(&parts[curr_part++],
-						     "loader",
-						     offset + trx->offset[i],
-						     0);
-				i++;
-			}
-
-			if (trx->offset[i]) {
-				bcm47xxpart_add_part(&parts[curr_part++],
-						     "linux",
-						     offset + trx->offset[i],
-						     0);
-				i++;
-			}
-
-			/*
-			 * Pure rootfs size is known and can be calculated as:
-			 * trx->length - trx->offset[i]. We don't fill it as
-			 * we want to have jffs2 (overlay) in the same mtd.
-			 */
-			if (trx->offset[i]) {
-				const char *name;
-
-				name = bcm47xxpart_trx_data_part_name(master, offset + trx->offset[i]);
-				bcm47xxpart_add_part(&parts[curr_part++],
-						     name,
-						     offset + trx->offset[i],
-						     0);
-				i++;
-			}
-
-			last_trx_part = curr_part - 1;
+			parts[curr_part].parser = "trx";
+			curr_part++;
 
 			/*
 			 * We have whole TRX scanned, skip to the next part. Use
