@@ -66,7 +66,7 @@ static int rmi_f12_read_sensor_tuning(struct f12_data *f12)
 	struct rmi_device *rmi_dev = fn->rmi_dev;
 	int ret;
 	int offset;
-	u8 buf[14];
+	u8 buf[15];
 	int pitch_x = 0;
 	int pitch_y = 0;
 	int clip_x_low = 0;
@@ -86,8 +86,9 @@ static int rmi_f12_read_sensor_tuning(struct f12_data *f12)
 
 	offset = rmi_register_desc_calc_reg_offset(&f12->control_reg_desc, 8);
 
-	if (item->reg_size > 14) {
-		dev_err(&fn->dev, "F12 control8 should be 14 bytes, not: %ld\n",
+	if (item->reg_size > 15) {
+		dev_err(&fn->dev,
+			"F12 control8 should be a maximum of 15 bytes, not: %ld\n",
 			item->reg_size);
 		return -ENODEV;
 	}
