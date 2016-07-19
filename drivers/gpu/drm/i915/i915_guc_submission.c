@@ -699,7 +699,7 @@ guc_client_free(struct drm_i915_private *dev_priv,
 }
 
 /*
- * Borrow the first client to set up & tear down every doorbell
+ * Borrow the first client to set up & tear down each unused doorbell
  * in turn, to ensure that all doorbell h/w is (re)initialised.
  */
 static void guc_init_doorbell_hw(struct intel_guc *guc)
@@ -714,6 +714,9 @@ static void guc_init_doorbell_hw(struct intel_guc *guc)
 	for (i = 0; i < GUC_MAX_DOORBELLS; ++i) {
 		i915_reg_t drbreg = GEN8_DRBREGL(i);
 		u32 value = I915_READ(drbreg);
+
+		if (test_bit(i, guc->doorbell_bitmap))
+			continue;
 
 		err = guc_update_doorbell_id(guc, client, i);
 
@@ -732,6 +735,9 @@ static void guc_init_doorbell_hw(struct intel_guc *guc)
 	for (i = 0; i < GUC_MAX_DOORBELLS; ++i) {
 		i915_reg_t drbreg = GEN8_DRBREGL(i);
 		u32 value = I915_READ(drbreg);
+
+		if (test_bit(i, guc->doorbell_bitmap))
+			continue;
 
 		if (i != db_id && (value & GUC_DOORBELL_ENABLED))
 			DRM_DEBUG_DRIVER("Doorbell %d (reg 0x%x) finally 0x%x\n",
