@@ -1813,6 +1813,48 @@ int cxgb4_ofld_send(struct net_device *dev, struct sk_buff *skb)
 }
 EXPORT_SYMBOL(cxgb4_ofld_send);
 
+static inline int crypto_send(struct adapter *adap, struct sk_buff *skb)
+{
+	unsigned int idx = skb_txq(skb);
+
+	if (unlikely(is_ctrl_pkt(skb)))
+		return ctrl_xmit(&adap->sge.ctrlq[idx], skb);
+	return ofld_xmit(&adap->sge.cryptotxq[idx], skb);
+}
+
+int t4_crypto_send(struct adapter *adap, struct sk_buff *skb)
+{
+	int ret;
+
+	local_bh_disable();
+	ret = crypto_send(adap, skb);
+	local_bh_enable();
+	return ret;
+}
+
+int cxgb4_crypto_send(struct net_device *dev, struct sk_buff *skb)
+{
+	return t4_crypto_send(netdev2adap(dev), skb);
+}
+EXPORT_SYMBOL(cxgb4_crypto_send);
+
+int cxgb4_is_crypto_q_full(struct net_device *dev, unsigned int idx)
+{
+	int ret = 0;
+	struct sge_ofld_txq *q;
+	struct adapter *adap = netdev2adap(dev);
+
+	local_bh_disable();
+	q = &adap->sge.cryptotxq[idx];
+	spin_lock(&q->sendq.lock);
+	if (q->full)
+		ret = -1;
+	spin_unlock(&q->sendq.lock);
+	local_bh_enable();
+	return ret;
+}
+EXPORT_SYMBOL(cxgb4_is_crypto_q_full);
+
 static inline void copy_frags(struct sk_buff *skb,
 			      const struct pkt_gl *gl, unsigned int offset)
 {
@@ -3019,6 +3061,7 @@ void t4_free_sge_resources(struct adapter *adap)
 	t4_free_ofld_rxqs(adap, adap->sge.niscsitq, adap->sge.iscsitrxq);
 	t4_free_ofld_rxqs(adap, adap->sge.rdmaqs, adap->sge.rdmarxq);
 	t4_free_ofld_rxqs(adap, adap->sge.rdmaciqs, adap->sge.rdmaciq);
+	t4_free_ofld_rxqs(adap, adap->sge.ncryptoq, adap->sge.cryptorxq);
 
 	/* clean up offload Tx queues */
 	for (i = 0; i < ARRAY_SIZE(adap->sge.ofldtxq); i++) {
@@ -3028,6 +3071,21 @@ void t4_free_sge_resources(struct adapter *adap)
 			tasklet_kill(&q->qresume_tsk);
 			t4_ofld_eq_free(adap, adap->mbox, adap->pf, 0,
 					q->q.cntxt_id);
+			free_tx_desc(adap, &q->q, q->q.in_use, false);
+			kfree(q->q.sdesc);
+			__skb_queue_purge(&q->sendq);
+			free_txq(adap, &q->q);
+		}
+	}
+
+	/* clean up crypto queues */
+	for (i = 0; i < ARRAY_SIZE(adap->sge.cryptotxq); i++) {
+		struct sge_ofld_txq *q = &adap->sge.cryptotxq[i];
+
+		if (q->q.desc) {
+			tasklet_kill(&q->qresume_tsk);
+			t4_ctrl_eq_free(adap, adap->mbox, adap->pf,
+					0, q->q.cntxt_id);
 			free_tx_desc(adap, &q->q, q->q.in_use, false);
 			kfree(q->q.sdesc);
 			__skb_queue_purge(&q->sendq);
@@ -3089,6 +3147,12 @@ void t4_sge_stop(struct adapter *adap)
 
 	for (i = 0; i < ARRAY_SIZE(s->ofldtxq); i++) {
 		struct sge_ofld_txq *q = &s->ofldtxq[i];
+
+		if (q->q.desc)
+			tasklet_kill(&q->qresume_tsk);
+	}
+	for (i = 0; i < ARRAY_SIZE(s->cryptotxq); i++)  {
+		struct sge_ofld_txq *q = &s->cryptotxq[i];
 
 		if (q->q.desc)
 			tasklet_kill(&q->qresume_tsk);

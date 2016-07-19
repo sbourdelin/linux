@@ -229,7 +229,7 @@ static DEFINE_MUTEX(uld_mutex);
 static LIST_HEAD(adap_rcu_list);
 static DEFINE_SPINLOCK(adap_rcu_lock);
 static struct cxgb4_uld_info ulds[CXGB4_ULD_MAX];
-static const char *const uld_str[] = { "RDMA", "iSCSI", "iSCSIT" };
+static const char *const uld_str[] = { "RDMA", "iSCSI", "iSCSIT", "CRYPTO" };
 
 static void link_report(struct net_device *dev)
 {
@@ -795,13 +795,17 @@ static void name_msix_vecs(struct adapter *adap)
 	for_each_rdmaciq(&adap->sge, i)
 		snprintf(adap->msix_info[msi_idx++].desc, n, "%s-rdma-ciq%d",
 			 adap->port[0]->name, i);
+
+	for_each_cryptorxq(&adap->sge, i)
+		snprintf(adap->msix_info[msi_idx++].desc, n, "%s-crypto%d",
+			 adap->port[0]->name, i);
 }
 
 static int request_msix_queue_irqs(struct adapter *adap)
 {
 	struct sge *s = &adap->sge;
 	int err, ethqidx, iscsiqidx = 0, rdmaqidx = 0, rdmaciqqidx = 0;
-	int iscsitqidx = 0;
+	int iscsitqidx = 0, cryptoqidx = 0;
 	int msi_index = 2;
 
 	err = request_irq(adap->msix_info[1].vec, t4_sge_intr_msix, 0,
@@ -854,9 +858,20 @@ static int request_msix_queue_irqs(struct adapter *adap)
 			goto unwind;
 		msi_index++;
 	}
+	for_each_cryptorxq(s, cryptoqidx) {
+		err = request_irq(adap->msix_info[msi_index].vec,
+				  t4_sge_intr_msix, 0,
+				  adap->msix_info[msi_index].desc,
+				  &s->cryptorxq[cryptoqidx].rspq);
+		if (err)
+			goto unwind;
+		msi_index++;
+	}
 	return 0;
-
 unwind:
+	while (--cryptoqidx >= 0)
+		free_irq(adap->msix_info[--msi_index].vec,
+			 &s->cryptorxq[cryptoqidx].rspq);
 	while (--rdmaciqqidx >= 0)
 		free_irq(adap->msix_info[--msi_index].vec,
 			 &s->rdmaciq[rdmaciqqidx].rspq);
@@ -880,7 +895,6 @@ static void free_msix_queue_irqs(struct adapter *adap)
 {
 	int i, msi_index = 2;
 	struct sge *s = &adap->sge;
-
 	free_irq(adap->msix_info[1].vec, &s->fw_evtq);
 	for_each_ethrxq(s, i)
 		free_irq(adap->msix_info[msi_index++].vec, &s->ethrxq[i].rspq);
@@ -894,6 +908,9 @@ static void free_msix_queue_irqs(struct adapter *adap)
 		free_irq(adap->msix_info[msi_index++].vec, &s->rdmarxq[i].rspq);
 	for_each_rdmaciq(s, i)
 		free_irq(adap->msix_info[msi_index++].vec, &s->rdmaciq[i].rspq);
+	for_each_cryptorxq(s, i)
+		free_irq(adap->msix_info[msi_index++].vec,
+			 &s->cryptorxq[i].rspq);
 }
 
 /**
@@ -1153,6 +1170,8 @@ freeout:	t4_free_sge_resources(adap);
 	ALLOC_OFLD_RXQS(s->rdmarxq, s->rdmaqs, 1, s->rdma_rxq, false);
 	j = s->rdmaciqs / adap->params.nports; /* rdmaq queues per channel */
 	ALLOC_OFLD_RXQS(s->rdmaciq, s->rdmaciqs, j, s->rdma_ciq, false);
+	j = s->ncryptoq / adap->params.nports;
+	ALLOC_OFLD_RXQS(s->cryptorxq, s->ncryptoq, j, s->crypto_rxq, 0);
 
 #undef ALLOC_OFLD_RXQS
 
@@ -1164,6 +1183,18 @@ freeout:	t4_free_sge_resources(adap);
 		err = t4_sge_alloc_ctrl_txq(adap, &s->ctrlq[i], adap->port[i],
 					    s->fw_evtq.cntxt_id,
 					    s->rdmarxq[i].rspq.cntxt_id);
+		if (err)
+			goto freeout;
+	}
+
+	j = s->ncryptoq / adap->params.nports;
+	for_each_cryptorxq(s, i) {
+		struct sge_eth_txq *t;
+
+		t = (struct sge_eth_txq *)&s->cryptotxq[i];
+		err = t4_sge_alloc_ofld_txq(adap, &s->cryptotxq[i],
+					    adap->port[i / j],
+					    s->fw_evtq.cntxt_id);
 		if (err)
 			goto freeout;
 	}
@@ -2487,6 +2518,9 @@ static void uld_attach(struct adapter *adap, unsigned int uld)
 	} else if (uld == CXGB4_ULD_ISCSIT) {
 		lli.rxq_ids = adap->sge.iscsit_rxq;
 		lli.nrxq = adap->sge.niscsitq;
+	} else if (uld == CXGB4_ULD_CRYPTO) {
+		lli.rxq_ids = adap->sge.crypto_rxq;
+		lli.nrxq = adap->sge.ncryptoq;
 	}
 	lli.ntxq = adap->sge.iscsiqsets;
 	lli.nchan = adap->params.nports;
@@ -2516,6 +2550,7 @@ static void uld_attach(struct adapter *adap, unsigned int uld)
 	lli.max_ordird_qp = adap->params.max_ordird_qp;
 	lli.max_ird_adapter = adap->params.max_ird_adapter;
 	lli.ulptx_memwrite_dsgl = adap->params.ulptx_memwrite_dsgl;
+	lli.ulp_crypto = adap->params.ulp_crypto_lookaside;
 	lli.nodeid = dev_to_node(adap->pdev_dev);
 
 	handle = ulds[uld].add(&lli);
@@ -2599,7 +2634,7 @@ static void notify_ulds(struct adapter *adap, enum cxgb4_state new_state)
 int cxgb4_register_uld(enum cxgb4_uld type, const struct cxgb4_uld_info *p)
 {
 	int ret = 0;
-	struct adapter *adap;
+	struct adapter *adap = NULL;
 
 	if (type >= CXGB4_ULD_MAX)
 		return -EINVAL;
@@ -4130,6 +4165,8 @@ static int adap_init0(struct adapter *adap)
 		adap->vres.iscsi.start = val[0];
 		adap->vres.iscsi.size = val[1] - val[0] + 1;
 	}
+	if (caps_cmd.cryptocaps)
+		adap->params.ulp_crypto_lookaside |= ULP_CRYPTO_LOOKASIDE;
 #undef FW_PARAM_PFVF
 #undef FW_PARAM_DEV
 
@@ -4410,6 +4447,12 @@ static void cfg_queues(struct adapter *adap)
 		if (!is_t4(adap->params.chip))
 			s->niscsitq = s->iscsiqsets;
 	}
+	if (adap->params.ulp_crypto_lookaside & ULP_CRYPTO_LOOKASIDE) {
+		s->ncryptoq = min_t(int, MAX_CRYPTO_QUEUES, num_online_cpus());
+		s->ncryptoq = (s->ncryptoq / adap->params.nports) *
+			adap->params.nports;
+		s->ncryptoq = max_t(int, s->ncryptoq, adap->params.nports);
+	}
 
 	for (i = 0; i < ARRAY_SIZE(s->ethrxq); i++) {
 		struct sge_eth_rxq *r = &s->ethrxq[i];
@@ -4423,6 +4466,9 @@ static void cfg_queues(struct adapter *adap)
 
 	for (i = 0; i < ARRAY_SIZE(s->ctrlq); i++)
 		s->ctrlq[i].q.size = 512;
+
+	for (i = 0; i < ARRAY_SIZE(s->cryptotxq); i++)
+		s->cryptotxq[i].q.size = 1024;
 
 	for (i = 0; i < ARRAY_SIZE(s->ofldtxq); i++)
 		s->ofldtxq[i].q.size = 1024;
@@ -4464,6 +4510,14 @@ static void cfg_queues(struct adapter *adap)
 
 		init_rspq(adap, &r->rspq, 5, 1, ciq_size, 64);
 		r->rspq.uld = CXGB4_ULD_RDMA;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(s->cryptorxq); i++) {
+		struct sge_ofld_rxq *r = &s->cryptorxq[i];
+
+		init_rspq(adap, &r->rspq, 5, 1, 1024, 64);
+		r->rspq.uld = CXGB4_ULD_CRYPTO;
+		r->fl.size = 72;
 	}
 
 	init_rspq(adap, &s->fw_evtq, 0, 1, 1024, 64);
@@ -4524,9 +4578,14 @@ static int enable_msix(struct adapter *adap)
 		/* need nchan for each possible ULD */
 		if (is_t4(adap->params.chip))
 			ofld_need = 3 * nchan;
+		else if (is_t6(adap->params.chip))
+			ofld_need = 5 * nchan;
 		else
 			ofld_need = 4 * nchan;
 	}
+	if (adap->params.ulp_crypto_lookaside & ULP_CRYPTO_LOOKASIDE)
+		want += s->ncryptoq;
+
 #ifdef CONFIG_CHELSIO_T4_DCB
 	/* For Data Center Bridging we need 8 Ethernet TX Priority Queues for
 	 * each port.
@@ -4553,6 +4612,10 @@ static int enable_msix(struct adapter *adap)
 		if (i < s->ethqsets)
 			reduce_ethqs(adap, i);
 	}
+	if (adap->params.ulp_crypto_lookaside & ULP_CRYPTO_LOOKASIDE) {
+		if (allocated < want)
+			s->ncryptoq = nchan;
+	}
 	if (is_offload(adap)) {
 		if (allocated < want) {
 			s->rdmaqs = nchan;
@@ -4565,8 +4628,11 @@ static int enable_msix(struct adapter *adap)
 		/* leftovers go to OFLD */
 		i = allocated - EXTRA_VECS - s->max_ethqsets -
 		    s->rdmaqs - s->rdmaciqs - s->niscsitq;
-		s->iscsiqsets = (i / nchan) * nchan;  /* round down */
 
+		if (adap->params.ulp_crypto_lookaside & ULP_CRYPTO_LOOKASIDE)
+			i -= s->ncryptoq;
+
+		s->iscsiqsets = (i / nchan) * nchan;  /* round down */
 	}
 	for (i = 0; i < allocated; ++i)
 		adap->msix_info[i].vec = entries[i].vector;
@@ -4574,6 +4640,8 @@ static int enable_msix(struct adapter *adap)
 		 "nic %d iscsi %d rdma cpl %d rdma ciq %d\n",
 		 allocated, s->max_ethqsets, s->iscsiqsets, s->rdmaqs,
 		 s->rdmaciqs);
+	if (adap->params.ulp_crypto_lookaside & ULP_CRYPTO_LOOKASIDE)
+		dev_info(adap->pdev_dev, " crypto %d\n", s->ncryptoq);
 
 	kfree(entries);
 	return 0;

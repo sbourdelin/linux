@@ -2436,13 +2436,15 @@ static int sge_qinfo_show(struct seq_file *seq, void *v)
 	int iscsit_entries = DIV_ROUND_UP(adap->sge.niscsitq, 4);
 	int rdma_entries = DIV_ROUND_UP(adap->sge.rdmaqs, 4);
 	int ciq_entries = DIV_ROUND_UP(adap->sge.rdmaciqs, 4);
+	int crypto_entries = DIV_ROUND_UP(adap->sge.ncryptoq, 4);
 	int ctrl_entries = DIV_ROUND_UP(MAX_CTRL_QUEUES, 4);
 	int i, r = (uintptr_t)v - 1;
 	int iscsi_idx = r - eth_entries;
 	int iscsit_idx = iscsi_idx - iscsi_entries;
 	int rdma_idx = iscsit_idx - iscsit_entries;
 	int ciq_idx = rdma_idx - rdma_entries;
-	int ctrl_idx =  ciq_idx - ciq_entries;
+	int crypto_idx = ciq_idx - ciq_entries;
+	int ctrl_idx =  crypto_idx - crypto_entries;
 	int fq_idx =  ctrl_idx - ctrl_entries;
 
 	if (r)
@@ -2632,6 +2634,42 @@ do { \
 		RL("RxAN:", stats.an);
 		RL("RxNoMem:", stats.nomem);
 
+	} else if (crypto_idx < crypto_entries) {
+		const struct sge_ofld_rxq *rx =
+			&adap->sge.cryptorxq[crypto_idx * 4];
+		const struct sge_ofld_txq *tx =
+			&adap->sge.cryptotxq[crypto_idx * 4];
+		int n = min(4, adap->sge.ncryptoq - 4 * crypto_idx);
+
+		S("QType:", "Crypto");
+		T("TxQ ID:", q.cntxt_id);
+		T("TxQ size:", q.size);
+		T("TxQ inuse:", q.in_use);
+		T("TxQ CIDX:", q.cidx);
+		T("TxQ PIDX:", q.pidx);
+		R("RspQ ID:", rspq.abs_id);
+		R("RspQ size:", rspq.size);
+		R("RspQE size:", rspq.iqe_len);
+		R("RspQ CIDX:", rspq.cidx);
+		R("RspQ Gen:", rspq.gen);
+		S3("u", "Intr delay:", qtimer_val(adap, &rx[i].rspq));
+		S3("u", "Intr pktcnt:",
+		   adap->sge.counter_val[rx[i].rspq.pktcnt_idx]);
+		R("FL ID:", fl.cntxt_id);
+		R("FL size:", fl.size - 8);
+		R("FL pend:", fl.pend_cred);
+		R("FL avail:", fl.avail);
+		R("FL PIDX:", fl.pidx);
+		R("FL CIDX:", fl.cidx);
+		RL("RxPackets:", stats.pkts);
+		RL("RxImmPkts:", stats.imm);
+		RL("RxNoMem:", stats.nomem);
+		RL("FLAllocErr:", fl.alloc_failed);
+		RL("FLLrgAlcErr:", fl.large_alloc_failed);
+		RL("FLMapErr:", fl.mapping_err);
+		RL("FLLow:", fl.low);
+		RL("FLStarving:", fl.starving);
+
 	} else if (ctrl_idx < ctrl_entries) {
 		const struct sge_ctrl_txq *tx = &adap->sge.ctrlq[ctrl_idx * 4];
 		int n = min(4, adap->params.nports - 4 * ctrl_idx);
@@ -2676,6 +2714,7 @@ static int sge_queue_entries(const struct adapter *adap)
 	       DIV_ROUND_UP(adap->sge.niscsitq, 4) +
 	       DIV_ROUND_UP(adap->sge.rdmaqs, 4) +
 	       DIV_ROUND_UP(adap->sge.rdmaciqs, 4) +
+	       DIV_ROUND_UP(adap->sge.ncryptoq, 4) +
 	       DIV_ROUND_UP(MAX_CTRL_QUEUES, 4) + 1;
 }
 

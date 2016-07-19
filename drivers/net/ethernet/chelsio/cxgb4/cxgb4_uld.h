@@ -40,6 +40,7 @@
 #include <linux/skbuff.h>
 #include <linux/inetdevice.h>
 #include <linux/atomic.h>
+#include <linux/pci.h>
 #include "cxgb4.h"
 
 /* CPL message priority levels */
@@ -192,6 +193,7 @@ enum cxgb4_uld {
 	CXGB4_ULD_RDMA,
 	CXGB4_ULD_ISCSI,
 	CXGB4_ULD_ISCSIT,
+	CXGB4_ULD_CRYPTO,
 	CXGB4_ULD_MAX
 };
 
@@ -280,6 +282,11 @@ struct cxgb4_lld_info {
 	unsigned int iscsi_llimit;	     /* chip's iscsi region llimit */
 	void **iscsi_ppm;		     /* iscsi page pod manager */
 	int nodeid;			     /* device numa node id */
+	unsigned int ulp_crypto;	     /* crypto lookaside support */
+};
+
+enum {
+	ULD_CRYPTO_LOOKASIDE = 1 << 0,
 };
 
 struct cxgb4_uld_info {
@@ -321,6 +328,9 @@ int cxgb4_sync_txq_pidx(struct net_device *dev, u16 qid, u16 pidx, u16 size);
 int cxgb4_flush_eq_cache(struct net_device *dev);
 int cxgb4_read_tpte(struct net_device *dev, u32 stag, __be32 *tpte);
 u64 cxgb4_read_sge_timestamp(struct net_device *dev);
+
+int cxgb4_is_crypto_q_full(struct net_device *dev, unsigned int idx);
+int cxgb4_crypto_send(struct net_device *dev, struct sk_buff *skb);
 
 enum cxgb4_bar2_qtype { CXGB4_BAR2_QTYPE_EGRESS, CXGB4_BAR2_QTYPE_INGRESS };
 int cxgb4_bar2_sge_qregs(struct net_device *dev,
