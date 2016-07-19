@@ -318,6 +318,7 @@ static int vfio_pci_open(void *device_data)
 		return -ENODEV;
 
 	mutex_lock(&driver_lock);
+	init_completion(&vdev->aer_error_completion);
 
 	if (!vdev->refcnt) {
 		ret = vfio_pci_enable(vdev);
@@ -571,6 +572,16 @@ static long vfio_pci_ioctl(void *device_data,
 	struct vfio_pci_device *vdev = device_data;
 	unsigned long minsz;
 
+	if (vdev->aer_error_in_progress && (cmd == VFIO_DEVICE_SET_IRQS ||
+	    cmd == VFIO_DEVICE_RESET || cmd == VFIO_DEVICE_PCI_HOT_RESET)) {
+		int ret;
+		ret = wait_for_completion_interruptible(
+			&vdev->aer_error_completion);
+		if (ret) {
+			return ret;
+		}
+	}
+
 	if (cmd == VFIO_DEVICE_GET_INFO) {
 		struct vfio_device_info info;
 
@@ -586,6 +597,10 @@ static long vfio_pci_ioctl(void *device_data,
 
 		if (vdev->reset_works)
 			info.flags |= VFIO_DEVICE_FLAGS_RESET;
+
+		info.flags |= VFIO_DEVICE_FLAGS_AERPROCESS;
+		if (vdev->aer_error_in_progress)
+			info.flags |= VFIO_DEVICE_FLAGS_INAERPROCESS;
 
 		info.num_regions = VFIO_PCI_NUM_REGIONS + vdev->num_regions;
 		info.num_irqs = VFIO_PCI_NUM_IRQS;
@@ -996,6 +1011,14 @@ static ssize_t vfio_pci_rw(void *device_data, char __user *buf,
 
 	switch (index) {
 	case VFIO_PCI_CONFIG_REGION_INDEX:
+		if (vdev->aer_error_in_progress && iswrite) {
+			int ret;
+			ret = wait_for_completion_interruptible(
+				&vdev->aer_error_completion);
+			if (ret) {
+				return ret;
+			}
+		}
 		return vfio_pci_config_rw(vdev, buf, count, ppos, iswrite);
 
 	case VFIO_PCI_ROM_REGION_INDEX:
@@ -1226,6 +1249,10 @@ static pci_ers_result_t vfio_pci_aer_err_detected(struct pci_dev *pdev,
 
 	mutex_lock(&vdev->igate);
 
+	vdev->aer_error_in_progress = true;
+	vfio_pci_set_irqs_ioctl(vdev, VFIO_IRQ_SET_DATA_NONE |
+				VFIO_IRQ_SET_ACTION_TRIGGER,
+				vdev->irq_type, 0, 0, NULL);
 	if (vdev->err_trigger)
 		eventfd_signal(vdev->err_trigger, 1);
 
@@ -1252,6 +1279,9 @@ static void vfio_pci_aer_resume(struct pci_dev *pdev)
 	}
 
 	mutex_lock(&vdev->igate);
+
+	vdev->aer_error_in_progress = false;
+	complete_all(&vdev->aer_error_completion);
 	if (vdev->resume_trigger)
 		eventfd_signal(vdev->resume_trigger, 1);
 
