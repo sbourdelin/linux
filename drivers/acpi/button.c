@@ -104,12 +104,18 @@ struct acpi_button {
 	struct input_dev *input;
 	char phys[32];			/* for input device */
 	unsigned long pushed;
+	int last_state;
+	unsigned long timestamp;
 	bool suspended;
 };
 
 static BLOCKING_NOTIFIER_HEAD(acpi_lid_notifier);
 static struct acpi_device *lid_device;
 static u8 lid_init_state = ACPI_BUTTON_LID_INIT_METHOD;
+
+static unsigned long lid_report_interval __read_mostly = 500;
+module_param(lid_report_interval, ulong, 0644);
+MODULE_PARM_DESC(lid_report_interval, "Interval (ms) between lid key events");
 
 /* --------------------------------------------------------------------------
                               FS Interface (/proc)
@@ -133,11 +139,33 @@ static int acpi_lid_evaluate_state(struct acpi_device *device)
 static int acpi_lid_notify_state(struct acpi_device *device, int state)
 {
 	struct acpi_button *button = acpi_driver_data(device);
+	int keycode;
+	unsigned long timeout;
 	int ret;
 
-	/* input layer checks if event is redundant */
+	/*
+	 * Send the switch event.
+	 * The input layer checks if the event is redundant.
+	 */
 	input_report_switch(button->input, SW_LID, !state);
 	input_sync(button->input);
+
+	/*
+	 * Send the key event.
+	 * The input layer doesn't check if the event is redundant.
+	 */
+	timeout = button->timestamp +
+		  msecs_to_jiffies(lid_report_interval);
+	if (button->last_state != !!state ||
+	    time_after(jiffies, timeout)) {
+		keycode = state ? KEY_LID_OPEN : KEY_LID_CLOSE;
+		input_report_key(button->input, keycode, 1);
+		input_sync(button->input);
+		input_report_key(button->input, keycode, 0);
+		input_sync(button->input);
+		button->last_state = !!state;
+		button->timestamp = jiffies;
+	}
 
 	if (state)
 		pm_wakeup_event(&device->dev, 0);
@@ -407,6 +435,8 @@ static int acpi_button_add(struct acpi_device *device)
 		strcpy(name, ACPI_BUTTON_DEVICE_NAME_LID);
 		sprintf(class, "%s/%s",
 			ACPI_BUTTON_CLASS, ACPI_BUTTON_SUBCLASS_LID);
+		button->last_state = !!acpi_lid_evaluate_state(device);
+		button->timestamp = jiffies;
 	} else {
 		printk(KERN_ERR PREFIX "Unsupported hid [%s]\n", hid);
 		error = -ENODEV;
@@ -436,6 +466,8 @@ static int acpi_button_add(struct acpi_device *device)
 
 	case ACPI_BUTTON_TYPE_LID:
 		input_set_capability(input, EV_SW, SW_LID);
+		input_set_capability(input, EV_KEY, KEY_LID_OPEN);
+		input_set_capability(input, EV_KEY, KEY_LID_CLOSE);
 		break;
 	}
 
