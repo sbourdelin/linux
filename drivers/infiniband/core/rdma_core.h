@@ -37,16 +37,32 @@
 #ifndef UOBJECT_H
 #define UOBJECT_H
 
+#include <linux/idr.h>
+#include <rdma/uverbs_ioctl.h>
 #include <rdma/ib_verbs.h>
 #include <linux/mutex.h>
 
 struct uverbs_uobject_type *uverbs_get_type(struct ib_device *ibdev,
 					    uint16_t type);
+struct ib_uobject *uverbs_get_type_from_idr(struct uverbs_uobject_type *type,
+					    struct ib_ucontext *ucontext,
+					    enum uverbs_idr_access access,
+					    uint32_t idr);
 int ib_uverbs_uobject_type_add(struct list_head	*head,
 			       void (*free)(struct uverbs_uobject_type *uobject_type,
 					    struct ib_uobject *uobject,
 					    struct ib_ucontext *ucontext),
 			       uint16_t	obj_type);
+void ib_uverbs_uobject_types_remove(struct ib_device *ib_dev);
+void ib_uverbs_uobject_remove(struct ib_uobject *uobject);
+void ib_uverbs_uobject_enable(struct ib_uobject *uobject);
+void uverbs_unlock_objects(struct uverbs_attr_array *attr_array,
+			   size_t num,
+			   const struct action_spec *chain,
+			   bool success);
+
+int ib_uverbs_uobject_type_initialize_ucontext(struct ib_ucontext *ucontext,
+					       struct list_head *type_list);
 
 struct uverbs_uobject_type {
 	struct list_head	type_list;
@@ -65,5 +81,10 @@ struct uverbs_uobject_list {
 	struct list_head		list;
 	struct list_head		type_list;
 };
+
+int ib_uverbs_uobject_add(struct ib_uobject *uobject,
+			  struct uverbs_uobject_type *uobject_type);
+void ib_uverbs_uobject_remove(struct ib_uobject *uobject);
+void ib_uverbs_uobject_enable(struct ib_uobject *uobject);
 
 #endif /* UIDR_H */
