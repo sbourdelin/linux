@@ -363,7 +363,8 @@ static int vfio_pci_get_irq_count(struct vfio_pci_device *vdev, int irq_type)
 
 			return (flags & PCI_MSIX_FLAGS_QSIZE) + 1;
 		}
-	} else if (irq_type == VFIO_PCI_ERR_IRQ_INDEX) {
+	} else if (irq_type == VFIO_PCI_ERR_IRQ_INDEX ||
+		   irq_type == VFIO_PCI_RESUME_IRQ_INDEX) {
 		if (pci_is_pcie(vdev->pdev))
 			return 1;
 	} else if (irq_type == VFIO_PCI_REQ_IRQ_INDEX) {
@@ -731,6 +732,7 @@ static long vfio_pci_ioctl(void *device_data,
 		case VFIO_PCI_REQ_IRQ_INDEX:
 			break;
 		case VFIO_PCI_ERR_IRQ_INDEX:
+		case VFIO_PCI_RESUME_IRQ_INDEX:
 			if (pci_is_pcie(vdev->pdev))
 				break;
 		/* pass thru to return error */
@@ -1234,8 +1236,32 @@ static pci_ers_result_t vfio_pci_aer_err_detected(struct pci_dev *pdev,
 	return PCI_ERS_RESULT_CAN_RECOVER;
 }
 
+static void vfio_pci_aer_resume(struct pci_dev *pdev)
+{
+	struct vfio_pci_device *vdev;
+	struct vfio_device *device;
+
+	device = vfio_device_get_from_dev(&pdev->dev);
+	if (device == NULL)
+		return;
+
+	vdev = vfio_device_data(device);
+	if (vdev == NULL) {
+		vfio_device_put(device);
+		return;
+	}
+
+	mutex_lock(&vdev->igate);
+	if (vdev->resume_trigger)
+		eventfd_signal(vdev->resume_trigger, 1);
+
+	mutex_unlock(&vdev->igate);
+	vfio_device_put(device);
+}
+
 static const struct pci_error_handlers vfio_err_handlers = {
 	.error_detected = vfio_pci_aer_err_detected,
+	.resume         = vfio_pci_aer_resume,
 };
 
 static struct pci_driver vfio_pci_driver = {
