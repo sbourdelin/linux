@@ -59,7 +59,7 @@ MODULE_PARM_DESC(base, "Apex Embedded Systems STX104 base addresses");
  */
 struct stx104_iio {
 	unsigned int chan_out_states[STX104_NUM_OUT_CHAN];
-	unsigned base;
+	unsigned int base;
 };
 
 /**
