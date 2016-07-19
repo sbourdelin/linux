@@ -1346,16 +1346,28 @@ struct ib_ucontext {
 #endif
 };
 
+struct uverbs_object_list;
+
+#define OLD_ABI_COMPAT
+
 struct ib_uobject {
 	u64			user_handle;	/* handle given to us by userspace */
 	struct ib_ucontext     *context;	/* associated user context */
 	void		       *object;		/* containing object */
 	struct list_head	list;		/* link to context's list */
 	int			id;		/* index into kernel idr */
-	struct kref		ref;
-	struct rw_semaphore	mutex;		/* protects .live */
+#ifdef OLD_ABI_COMPAT
+	struct kref             ref;
+#endif
+	atomic_t		usecnt;
+#ifdef OLD_ABI_COMPAT
+	struct rw_semaphore     mutex;          /* protects .live */
+#endif
 	struct rcu_head		rcu;		/* kfree_rcu() overhead */
 	int			live;
+	/* List of object under uverbs_object_type */
+	struct list_head	idr_list;
+	struct uverbs_uobject_list *type;	/* ptr to ucontext type */
 };
 
 struct ib_udata {
