@@ -92,6 +92,9 @@ static s32 ixgbevf_reset_hw_vf(struct ixgbe_hw *hw)
 	s32 ret_val = IXGBE_ERR_INVALID_MAC_ADDR;
 	u32 msgbuf[IXGBE_VF_PERMADDR_MSG_LEN];
 	u8 *addr = (u8 *)(&msgbuf[1]);
+	struct ixgbevf_adapter *adapter = hw->back;
+
+	set_bit(__IXGBEVF_HW_RESETTING, &adapter->state);
 
 	/* Call adapter stop to disable tx/rx and clear interrupts */
 	hw->mac.ops.stop_adapter(hw);
@@ -139,6 +142,8 @@ static s32 ixgbevf_reset_hw_vf(struct ixgbe_hw *hw)
 		ether_addr_copy(hw->mac.perm_addr, addr);
 
 	hw->mac.mc_filter_type = msgbuf[IXGBE_VF_MC_TYPE_WORD];
+
+	clear_bit(__IXGBEVF_HW_RESETTING, &adapter->state);
 
 	return 0;
 }

@@ -2803,9 +2803,10 @@ static void ixgbevf_check_hang_subtask(struct ixgbevf_adapter *adapter)
 	u32 eics = 0;
 	int i;
 
-	/* If we're down or resetting, just bail */
+	/* If we're down, resetting or hw resetting, just bail */
 	if (test_bit(__IXGBEVF_DOWN, &adapter->state) ||
-	    test_bit(__IXGBEVF_RESETTING, &adapter->state))
+	    test_bit(__IXGBEVF_RESETTING, &adapter->state) ||
+	    test_bit(__IXGBEVF_HW_RESETTING, &adapter->state))
 		return;
 
 	/* Force detection of hung controller */
