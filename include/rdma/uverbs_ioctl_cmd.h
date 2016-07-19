@@ -79,5 +79,56 @@ enum uverbs_common_types {
 	UVERBS_TYPE_XRCD,
 };
 
+#define UVERBS_COMMON_TYPES						       \
+	(UVERBS_TYPE_PD | UVERBS_TYPE_CQ | UVERBS_TYPE_QP | UVERBS_TYPE_SRQ |  \
+	 UVERBS_TYPE_AH | UVERBS_TYPE_MR | UVERBS_TYPE_MW | UVERBS_TYPE_FLOW | \
+	 UVERBS_TYPE_XRCD)
+
+enum uverbs_create_qp_cmd_attr {
+	CREATE_QP_CMD,
+	CREATE_QP_RESP,
+	CREATE_QP_QP,
+	CREATE_QP_PD,
+	CREATE_QP_RECV_CQ,
+	CREATE_QP_SEND_CQ,
+};
+
+enum uverbs_destroy_qp_cmd_attr {
+	DESTROY_QP_RESP,
+	DESTROY_QP_QP,
+};
+
+enum uverbs_create_cq_cmd_attr {
+	CREATE_CQ_CMD,
+	CREATE_CQ_RESP,
+};
+
+enum uverbs_get_context {
+	GET_CONTEXT_RESP,
+};
+
+enum uverbs_query_device {
+	QUERY_DEVICE_RESP,
+	QUERY_DEVICE_ODP,
+	QUERY_DEVICE_TIMESTAMP_MASK,
+	QUERY_DEVICE_HCA_CORE_CLOCK,
+	QUERY_DEVICE_CAP_FLAGS,
+};
+
+extern const struct uverbs_attr_chain_spec uverbs_get_context_spec;
+extern const struct uverbs_attr_chain_spec uverbs_query_device_spec;
+
+int uverbs_get_context(struct ib_device *ib_dev,
+		       struct ib_uverbs_file *file,
+		       struct uverbs_attr_array *common,
+		       struct uverbs_attr_array *vendor,
+		       void *priv);
+
+int uverbs_query_device_handler(struct ib_device *ib_dev,
+				struct ib_ucontext *ucontext,
+				struct uverbs_attr_array *common,
+				struct uverbs_attr_array *vendor,
+				void *priv);
+
 #endif
 
