@@ -2179,18 +2179,15 @@ static int nand_read_oob(struct mtd_info *mtd, loff_t from,
 	case MTD_OPS_PLACE_OOB:
 	case MTD_OPS_AUTO_OOB:
 	case MTD_OPS_RAW:
+		if (!ops->datbuf)
+			ret = nand_do_read_oob(mtd, from, ops);
+		else
+			ret = nand_do_read_ops(mtd, from, ops);
 		break;
-
 	default:
-		goto out;
+		break;
 	}
 
-	if (!ops->datbuf)
-		ret = nand_do_read_oob(mtd, from, ops);
-	else
-		ret = nand_do_read_ops(mtd, from, ops);
-
-out:
 	nand_release_device(mtd);
 	return ret;
 }
