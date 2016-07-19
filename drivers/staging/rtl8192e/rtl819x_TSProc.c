@@ -323,7 +323,7 @@ bool GetTs(struct rtllib_device *ieee, struct ts_common_info **ppTS,
 	if (ieee->current_network.qos_data.supported == 0) {
 		UP = 0;
 	} else {
-		if (!IsACValid(TID)) {
+		if (!IsACValid((s8)TID)) {
 			netdev_warn(ieee->dev, "%s(): TID(%d) is not valid\n",
 				    __func__, TID);
 			return false;
