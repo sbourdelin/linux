@@ -20,6 +20,10 @@
  *
  * For each partition, these fields are available:
  * name: string that will be used to label the partition's MTD device.
+ * parser: some partitions may require specific handling like splitting them
+ *	into subpartitions (e.g. firmware partition may contain partitions
+ *	table, kernel image and rootfs). This field may contain a name of parser
+ *	than can handle specific type.
  * size: the partition size; if defined as MTDPART_SIZ_FULL, the partition
  * 	will extend to the end of the master MTD device.
  * offset: absolute starting position within the master MTD device; if
@@ -38,6 +42,7 @@
 
 struct mtd_partition {
 	const char *name;		/* identifier string */
+	const char *parser;		/* parser name */
 	uint64_t size;			/* partition size */
 	uint64_t offset;		/* offset within the master MTD space */
 	uint32_t mask_flags;		/* master MTD flags to mask out for this partition */

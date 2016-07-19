@@ -663,6 +663,34 @@ int mtd_del_partition(struct mtd_info *master, int partno)
 }
 EXPORT_SYMBOL_GPL(mtd_del_partition);
 
+static int mtd_parse_part(struct mtd_part *slave, const char *parser)
+{
+	static const char *probes[2] = { NULL, NULL };
+	struct mtd_partitions parsed = { 0 };
+	int i;
+	int err;
+
+	probes[0] = parser;
+	err = parse_mtd_partitions(&slave->mtd, probes, &parsed, NULL);
+
+	if (err)
+		return err;
+	else if (!parsed.nr_parts)
+		return -ENOENT;
+
+	for (i = 0; i < parsed.nr_parts; i++) {
+		struct mtd_partition *part;
+
+		part = (struct mtd_partition *)&parsed.parts[i];
+		part->offset += slave->offset;
+	}
+	err = add_mtd_partitions(slave->master, parsed.parts, parsed.nr_parts);
+
+	if (parsed.parser)
+		kfree(parsed.parts);
+	return err;
+}
+
 /*
  * This function, given a master MTD object and a partition table, creates
  * and registers slave MTD objects which are bound to the master according to
@@ -683,7 +711,9 @@ int add_mtd_partitions(struct mtd_info *master,
 	printk(KERN_NOTICE "Creating %d MTD partitions on \"%s\":\n", nbparts, master->name);
 
 	for (i = 0; i < nbparts; i++) {
-		slave = allocate_partition(master, parts + i, i, cur_offset);
+		const struct mtd_partition *part = parts + i;
+
+		slave = allocate_partition(master, part, i, cur_offset);
 		if (IS_ERR(slave)) {
 			del_mtd_partitions(master);
 			return PTR_ERR(slave);
@@ -695,6 +725,8 @@ int add_mtd_partitions(struct mtd_info *master,
 
 		add_mtd_device(&slave->mtd);
 		mtd_add_partition_attrs(slave);
+		if (part->parser)
+			mtd_parse_part(slave, part->parser);
 
 		cur_offset = slave->offset + slave->mtd.size;
 	}
