@@ -1,5 +1,5 @@
 /*
- * DAC driver for the Apex Embedded Systems STX104
+ * IIO driver for the Apex Embedded Systems STX104
  * Copyright (C) 2016 William Breathitt Gray
  *
  * This program is free software; you can redistribute it and/or modify
@@ -20,21 +20,32 @@
 #include <linux/io.h>
 #include <linux/ioport.h>
 #include <linux/isa.h>
+#include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/spinlock.h>
 
-#define STX104_NUM_CHAN 2
+#define STX104_EXTENT 16
 
-#define STX104_CHAN(chan) {				\
+#define STX104_IO_CHAN(chan, dir) {			\
 	.type = IIO_VOLTAGE,				\
 	.channel = chan,				\
 	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),	\
 	.indexed = 1,					\
-	.output = 1					\
+	.output = dir					\
 }
+#define STX104_GAIN_CHAN {					\
+	.type = IIO_VOLTAGE,					\
+	.info_mask_separate = BIT(IIO_CHAN_INFO_HARDWAREGAIN),	\
+	.output = 1						\
+}
+#define STX104_OUT_CHAN(chan) STX104_IO_CHAN(chan, 1)
+#define STX104_IN_CHAN(chan) STX104_IO_CHAN(chan, 0)
 
-#define STX104_EXTENT 16
+#define STX104_NUM_OUT_CHAN 2
+#define STX104_NUM_GAIN_CHAN 1
+#define STX104_NUM_IN_CHAN 16
+#define STX104_IN_CHAN_OFFSET (STX104_NUM_OUT_CHAN + STX104_NUM_GAIN_CHAN)
 
 static unsigned int base[max_num_isa_dev(STX104_EXTENT)];
 static unsigned int num_stx104;
@@ -47,7 +58,7 @@ MODULE_PARM_DESC(base, "Apex Embedded Systems STX104 base addresses");
  * @base:		base port address of the IIO device
  */
 struct stx104_iio {
-	unsigned chan_out_states[STX104_NUM_CHAN];
+	unsigned int chan_out_states[STX104_NUM_OUT_CHAN];
 	unsigned base;
 };
 
@@ -79,39 +90,123 @@ static int stx104_read_raw(struct iio_dev *indio_dev,
 	struct iio_chan_spec const *chan, int *val, int *val2, long mask)
 {
 	struct stx104_iio *const priv = iio_priv(indio_dev);
+	long adc_sample;
+	unsigned int adc_config;
+	long adbu;
+	unsigned int gain;
+
+	/* handle output channels */
+	if (chan->output) {
+		switch (mask) {
+		case IIO_CHAN_INFO_RAW:
+			*val = priv->chan_out_states[chan->channel];
+			return IIO_VAL_INT;
+		case IIO_CHAN_INFO_HARDWAREGAIN:
+			*val = 1 << (inb(priv->base + 11) & 0x3);
+			return IIO_VAL_INT;
+		default:
+			return -EINVAL;
+		}
+	}
 
 	if (mask != IIO_CHAN_INFO_RAW)
 		return -EINVAL;
 
-	*val = priv->chan_out_states[chan->channel];
+	/* select ADC channel */
+	outb(chan->channel | (chan->channel << 4), priv->base + 2);
 
-	return IIO_VAL_INT;
+	/* trigger ADC sample capture and wait for completion */
+	outb(0, priv->base);
+	while (inb(priv->base + 8) & BIT(7));
+
+	adc_sample = inw(priv->base);
+
+	/* get ADC bipolar/unipolar and gain configuration */
+	adc_config = inb(priv->base + 11);
+	adbu = !(adc_config & BIT(2));
+	gain = adc_config & 0x3;
+
+	/* Value conversion math:
+	 * ----------------------
+	 * scale = adc_sample / 65536
+	 * range = 10 / (1 << gain)
+	 * voltage = scale * (range + adbu * range) - adbu * range
+	 *
+	 * Simplified:
+	 * -----------
+	 * voltage = 5 * (adc_sample * (1 + adbu) - adbu * 65536) /
+	 *	(1 << (15 + gain))
+	 *
+	 * Portability Caution:
+	 * --------------------
+	 * *val will be set to a value between -327680 and 327675; in order to
+	 * prevent integer underflow/overflow, the int data type of the
+	 * implementation should be capable of representing this value range.
+	 */
+	*val = 5 * (adc_sample * (1 + adbu) - adbu * 65536);
+	*val2 = 15 + gain;
+
+	return IIO_VAL_FRACTIONAL_LOG2;
 }
 
 static int stx104_write_raw(struct iio_dev *indio_dev,
 	struct iio_chan_spec const *chan, int val, int val2, long mask)
 {
 	struct stx104_iio *const priv = iio_priv(indio_dev);
-	const unsigned chan_addr_offset = 2 * chan->channel;
 
-	if (mask != IIO_CHAN_INFO_RAW)
-		return -EINVAL;
+	switch (mask) {
+	case IIO_CHAN_INFO_RAW:
+		/* DAC can only accept up to a 16-bit value */
+		if ((unsigned int)val > 65535)
+			return -EINVAL;
 
-	priv->chan_out_states[chan->channel] = val;
-	outw(val, priv->base + 4 + chan_addr_offset);
+		priv->chan_out_states[chan->channel] = val;
+		outw(val, priv->base + 4 + 2 * chan->channel);
 
-	return 0;
+		return 0;
+	case IIO_CHAN_INFO_HARDWAREGAIN:
+		/* Only four gain states (x1, x2, x4, x8) */
+		switch (val) {
+		case 1:
+			outb(0, priv->base + 11);
+			break;
+		case 2:
+			outb(1, priv->base + 11);
+			break;
+		case 4:
+			outb(2, priv->base + 11);
+			break;
+		case 8:
+			outb(3, priv->base + 11);
+			break;
+		default:
+			return -EINVAL;
+		}
+
+		return 0;
+	}
+
+	return -EINVAL;
 }
 
 static const struct iio_info stx104_info = {
 	.driver_module = THIS_MODULE,
 	.read_raw = stx104_read_raw,
-	.write_raw = stx104_write_raw
+	.write_raw = stx104_write_raw,
 };
 
-static const struct iio_chan_spec stx104_channels[STX104_NUM_CHAN] = {
-	STX104_CHAN(0),
-	STX104_CHAN(1)
+/* stx104_channels is not const in order to allow for the configuration of
+ * differential channels in the probe callback if a device is setup for such
+ */
+static struct iio_chan_spec stx104_channels[] = {
+	STX104_OUT_CHAN(0), STX104_OUT_CHAN(1),
+	STX104_GAIN_CHAN,
+	STX104_IN_CHAN(0), STX104_IN_CHAN(1), STX104_IN_CHAN(2),
+	STX104_IN_CHAN(3), STX104_IN_CHAN(4), STX104_IN_CHAN(5),
+	STX104_IN_CHAN(6), STX104_IN_CHAN(7), STX104_IN_CHAN(8),
+	STX104_IN_CHAN(9), STX104_IN_CHAN(10), STX104_IN_CHAN(11),
+	STX104_IN_CHAN(12), STX104_IN_CHAN(13), STX104_IN_CHAN(14),
+	STX104_IN_CHAN(15)
 };
 
 static int stx104_gpio_get_direction(struct gpio_chip *chip,
@@ -181,6 +276,8 @@ static int stx104_probe(struct device *dev, unsigned int id)
 	struct stx104_iio *priv;
 	struct stx104_gpio *stx104gpio;
 	struct stx104_dev *stx104dev;
+	struct iio_chan_spec *input_channel;
+	int i;
 	int err;
 
 	indio_dev = devm_iio_device_alloc(dev, sizeof(*priv));
@@ -204,12 +301,30 @@ static int stx104_probe(struct device *dev, unsigned int id)
 
 	indio_dev->info = &stx104_info;
 	indio_dev->modes = INDIO_DIRECT_MODE;
+	indio_dev->num_channels = ARRAY_SIZE(stx104_channels);
+
+	/* determine if differential inputs */
+	if (inb(base[id] + 8) & BIT(5)) {
+		indio_dev->num_channels -= STX104_NUM_IN_CHAN / 2;
+
+		input_channel = stx104_channels + STX104_IN_CHAN_OFFSET;
+		for (i = 0; i < STX104_NUM_IN_CHAN / 2; input_channel++) {
+			input_channel->differential = 1;
+			input_channel->channel2 = i;
+		}
+	}
+
 	indio_dev->channels = stx104_channels;
-	indio_dev->num_channels = STX104_NUM_CHAN;
 	indio_dev->name = dev_name(dev);
 
 	priv = iio_priv(indio_dev);
 	priv->base = base[id];
+
+	/* configure device for software trigger operation */
+	outb(0, base[id] + 9);
+
+	/* initialize gain setting to x1 */
+	outb(0, base[id] + 11);
 
 	/* initialize DAC output to 0V */
 	outw(0, base[id] + 4);
@@ -271,5 +386,5 @@ static struct isa_driver stx104_driver = {
 module_isa_driver(stx104_driver, num_stx104);
 
 MODULE_AUTHOR("William Breathitt Gray <vilhelm.gray@gmail.com>");
-MODULE_DESCRIPTION("Apex Embedded Systems STX104 DAC driver");
+MODULE_DESCRIPTION("Apex Embedded Systems STX104 IIO driver");
 MODULE_LICENSE("GPL v2");
