@@ -64,5 +64,20 @@ struct uverbs_action_std_ctx_handler {
 	void *priv;
 };
 
+int rdma_initialize_common_types(struct ib_device *ib_dev, unsigned int types);
+
+enum uverbs_common_types {
+	UVERBS_TYPE_DEVICE, /* Don't use IDRs here */
+	UVERBS_TYPE_PD,
+	UVERBS_TYPE_CQ,
+	UVERBS_TYPE_QP,
+	UVERBS_TYPE_SRQ,
+	UVERBS_TYPE_AH,
+	UVERBS_TYPE_MR,
+	UVERBS_TYPE_MW,
+	UVERBS_TYPE_FLOW,
+	UVERBS_TYPE_XRCD,
+};
+
 #endif
 
