@@ -365,6 +365,17 @@ enum bpf_func_id {
 	 */
 	BPF_FUNC_get_current_task,
 
+	/**
+	 * copy_to_user(to, from, len) - Copy a block of data into user space.
+	 * @to: destination address in userspace
+	 * @from: source address on stack
+	 * @len: number of bytes to copy
+	 * Return:
+	 *   Returns number of bytes that could not be copied.
+	 *   On success, this will be zero
+	 */
+	BPF_FUNC_copy_to_user,
+
 	__BPF_FUNC_MAX_ID,
 };
 
