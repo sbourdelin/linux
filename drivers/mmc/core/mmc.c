@@ -1962,6 +1962,7 @@ static int mmc_suspend(struct mmc_host *host)
 static int _mmc_resume(struct mmc_host *host)
 {
 	int err = 0;
+	int i;
 
 	BUG_ON(!host);
 	BUG_ON(!host->card);
@@ -1971,8 +1972,25 @@ static int _mmc_resume(struct mmc_host *host)
 	if (!mmc_card_suspended(host->card))
 		goto out;
 
-	mmc_power_up(host, host->card->ocr);
-	err = mmc_init_card(host, host->card->ocr, host->card);
+	/*
+	 * Let's try to fallback the host->f_init
+	 * if failing to init card after resume.
+	 */
+
+	for (i = 0; i < ARRAY_SIZE(freqs); i++) {
+		if (host->f_init < freqs[i])
+			continue;
+		else
+			host->f_init = freqs[i];
+
+		mmc_power_up(host, host->card->ocr);
+		err = mmc_init_card(host, host->card->ocr, host->card);
+		if (!err)
+			break;
+
+		mmc_power_off(host);
+	}
+
 	mmc_card_clr_suspended(host->card);
 
 out:
