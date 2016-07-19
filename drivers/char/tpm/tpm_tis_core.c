@@ -575,7 +575,9 @@ static int tpm_tis_probe_irq_single(struct tpm_chip *chip, u32 intmask,
 	/* Generate an interrupt by having the core call through to
 	 * tpm_tis_send
 	 */
-	tpm_gen_interrupt(chip);
+	rc = tpm_gen_interrupt(chip);
+	if (rc < 0)
+		return rc;
 
 	/* tpm_tis_send will either confirm the interrupt is working or it
 	 * will call disable_irq which undoes all of the above.

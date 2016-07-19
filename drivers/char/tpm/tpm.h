@@ -483,7 +483,7 @@ ssize_t tpm_transmit(struct tpm_chip *chip, const char *buf,
 ssize_t tpm_transmit_cmd(struct tpm_chip *chip, void *cmd, int len,
 			 const char *desc);
 int tpm_get_timeouts(struct tpm_chip *chip);
-void tpm_gen_interrupt(struct tpm_chip *chip);
+int tpm_gen_interrupt(struct tpm_chip *chip);
 int tpm1_auto_startup(struct tpm_chip *chip);
 int tpm_do_selftest(struct tpm_chip *chip);
 unsigned long tpm_calc_ordinal_duration(struct tpm_chip *chip, u32 ordinal);

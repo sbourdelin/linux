@@ -466,16 +466,16 @@ ssize_t tpm_getcap(struct tpm_chip *chip, __be32 subcap_id, cap_t *cap,
  * Returns 0 on success, < 0 in case of fatal error or a value > 0 representing
  * a TPM error code.
  */
-void tpm_gen_interrupt(struct tpm_chip *chip)
+int tpm_gen_interrupt(struct tpm_chip *chip)
 {
 	const char *desc = "attempting to generate an interrupt";
 	u32 cap2;
 	cap_t cap;
 
 	if (chip->flags & TPM_CHIP_FLAG_TPM2)
-		tpm2_get_tpm_pt(chip, 0x100, &cap2, desc);
+		return tpm2_get_tpm_pt(chip, 0x100, &cap2, desc);
 	else
-		tpm_getcap(chip, TPM_CAP_PROP_TIS_TIMEOUT, &cap, desc);
+		return tpm_getcap(chip, TPM_CAP_PROP_TIS_TIMEOUT, &cap, desc);
 }
 EXPORT_SYMBOL_GPL(tpm_gen_interrupt);
 
