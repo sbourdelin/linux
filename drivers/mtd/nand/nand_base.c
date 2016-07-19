@@ -3162,8 +3162,10 @@ static void nand_set_defaults(struct nand_chip *chip, int busw)
 	if (chip->waitfunc == NULL)
 		chip->waitfunc = nand_wait;
 
-	if (!chip->select_chip)
+	if (!chip->select_chip) {
+		BUG_ON(!chip->cmd_ctrl);
 		chip->select_chip = nand_select_chip;
+	}
 
 	/* set for ONFI nand */
 	if (!chip->onfi_set_features)
