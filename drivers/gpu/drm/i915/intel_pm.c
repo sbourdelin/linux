@@ -1148,7 +1148,7 @@ static void vlv_compute_wm(struct intel_crtc *crtc)
 			}
 		}
 
-		wm_state->num_levels = level;
+		wm_state->num_levels = level + 1;
 
 		if (!wm_state->cxsr)
 			continue;
