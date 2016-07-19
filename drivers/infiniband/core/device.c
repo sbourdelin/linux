@@ -168,11 +168,23 @@ static int alloc_name(char *name)
 	return 0;
 }
 
+static void ib_device_allocate_idrs(struct ib_device *device)
+{
+	spin_lock_init(&device->idr_lock);
+	idr_init(&device->idr);
+}
+
+static void ib_device_destroy_idrs(struct ib_device *device)
+{
+	idr_destroy(&device->idr);
+}
+
 static void ib_device_release(struct device *device)
 {
 	struct ib_device *dev = container_of(device, struct ib_device, dev);
 
 	ib_cache_release_one(dev);
+	ib_device_destroy_idrs(dev);
 	kfree(dev->port_immutable);
 	kfree(dev);
 }
@@ -218,6 +230,8 @@ struct ib_device *ib_alloc_device(size_t size)
 	device = kzalloc(size, GFP_KERNEL);
 	if (!device)
 		return NULL;
+
+	ib_device_allocate_idrs(device);
 
 	device->dev.class = &ib_class;
 	device_initialize(&device->dev);
