@@ -20,6 +20,7 @@
 #define EXTENT_DAMAGED		(1U << 14)
 #define EXTENT_NORESERVE	(1U << 15)
 #define EXTENT_QGROUP_RESERVED	(1U << 16)
+#define EXTENT_DEDUPE		(1U << 17)
 #define EXTENT_IOBITS		(EXTENT_LOCKED | EXTENT_WRITEBACK)
 #define EXTENT_CTLBITS		(EXTENT_DO_ACCOUNTING | EXTENT_FIRST_DELALLOC)
 
@@ -250,6 +251,8 @@ static inline int clear_extent_bits(struct extent_io_tree *tree, u64 start,
 			GFP_NOFS);
 }
 
+void adjust_buffered_io_outstanding_extents(struct extent_io_tree *tree,
+					    u64 start, u64 end);
 int set_record_extent_bits(struct extent_io_tree *tree, u64 start, u64 end,
 			   unsigned bits, struct extent_changeset *changeset);
 int set_extent_bit(struct extent_io_tree *tree, u64 start, u64 end,
@@ -289,10 +292,16 @@ int convert_extent_bit(struct extent_io_tree *tree, u64 start, u64 end,
 		       struct extent_state **cached_state);
 
 static inline int set_extent_delalloc(struct extent_io_tree *tree, u64 start,
-		u64 end, struct extent_state **cached_state)
+		u64 end, struct extent_state **cached_state, int dedupe)
 {
-	return set_extent_bit(tree, start, end,
-			      EXTENT_DELALLOC | EXTENT_UPTODATE,
+	unsigned bits;
+
+	if (dedupe)
+		bits = EXTENT_DELALLOC | EXTENT_UPTODATE | EXTENT_DEDUPE;
+	else
+		bits = EXTENT_DELALLOC | EXTENT_UPTODATE;
+
+	return set_extent_bit(tree, start, end, bits,
 			      NULL, cached_state, GFP_NOFS);
 }
 

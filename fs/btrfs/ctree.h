@@ -2680,10 +2680,14 @@ int btrfs_subvolume_reserve_metadata(struct btrfs_root *root,
 void btrfs_subvolume_release_metadata(struct btrfs_root *root,
 				      struct btrfs_block_rsv *rsv,
 				      u64 qgroup_reserved);
-int btrfs_delalloc_reserve_metadata(struct inode *inode, u64 num_bytes);
-void btrfs_delalloc_release_metadata(struct inode *inode, u64 num_bytes);
-int btrfs_delalloc_reserve_space(struct inode *inode, u64 start, u64 len);
-void btrfs_delalloc_release_space(struct inode *inode, u64 start, u64 len);
+int btrfs_delalloc_reserve_metadata(struct inode *inode, u64 num_bytes,
+				    u32 max_extent_size);
+void btrfs_delalloc_release_metadata(struct inode *inode, u64 num_bytes,
+				     u32 max_extent_size);
+int btrfs_delalloc_reserve_space(struct inode *inode, u64 start, u64 len,
+				 u32 max_extent_size);
+void btrfs_delalloc_release_space(struct inode *inode, u64 start, u64 len,
+				  u32 max_extent_size);
 void btrfs_init_block_rsv(struct btrfs_block_rsv *rsv, unsigned short type);
 struct btrfs_block_rsv *btrfs_alloc_block_rsv(struct btrfs_root *root,
 					      unsigned short type);
@@ -3215,7 +3219,7 @@ int btrfs_release_file(struct inode *inode, struct file *file);
 int btrfs_dirty_pages(struct btrfs_root *root, struct inode *inode,
 		      struct page **pages, size_t num_pages,
 		      loff_t pos, size_t write_bytes,
-		      struct extent_state **cached);
+		      struct extent_state **cached, int dedupe);
 int btrfs_fdatawrite_range(struct inode *inode, loff_t start, loff_t end);
 ssize_t btrfs_copy_file_range(struct file *file_in, loff_t pos_in,
 			      struct file *file_out, loff_t pos_out,
