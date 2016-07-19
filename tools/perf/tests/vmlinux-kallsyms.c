@@ -28,6 +28,7 @@ int test__vmlinux_matches_kallsyms(int subtest __maybe_unused)
 	enum map_type type = MAP__FUNCTION;
 	struct maps *maps = &vmlinux.kmaps.maps[type];
 	u64 mem_start, mem_end;
+	u64 kernel_start;
 
 	/*
 	 * Step 1:
@@ -75,6 +76,7 @@ int test__vmlinux_matches_kallsyms(int subtest __maybe_unused)
 	 * same value in the vmlinux file we load.
 	 */
 	kallsyms_map = machine__kernel_map(&kallsyms);
+	kernel_start = kallsyms_map->start;
 
 	/*
 	 * Step 5:
@@ -119,7 +121,7 @@ int test__vmlinux_matches_kallsyms(int subtest __maybe_unused)
 
 		sym  = rb_entry(nd, struct symbol, rb_node);
 
-		if (sym->start == sym->end)
+		if (sym->start == sym->end || sym->start < kernel_start)
 			continue;
 
 		mem_start = vmlinux_map->unmap_ip(vmlinux_map, sym->start);
