@@ -1623,15 +1623,6 @@ static int update_time(struct inode *inode, struct timespec *time, int flags)
 	return update_time(inode, time, flags);
 }
 
-/**
- *	touch_atime	-	update the access time
- *	@path: the &struct path to update
- *	@inode: inode to update
- *
- *	Update the accessed time on an inode and mark it for writeback.
- *	This function automatically handles read only file systems and media,
- *	as well as the "noatime" flag and inode specific "noatime" markers.
- */
 static bool __atime_needs_update(const struct path *path, struct inode *inode,
 				 bool rcu)
 {
@@ -1673,6 +1664,14 @@ bool atime_needs_update(const struct path *path, struct inode *inode)
 	return __atime_needs_update(path, inode, true);
 }
 
+/**
+ *	touch_atime	-	update the access time
+ *	@path: the &struct path to update
+ *
+ *	Update the accessed time on an a path's inode and mark it for writeback.
+ *	This function automatically handles read only file systems and media,
+ *	as well as the "noatime" flag and inode specific "noatime" markers.
+ */
 void touch_atime(const struct path *path)
 {
 	struct vfsmount *mnt = path->mnt;
