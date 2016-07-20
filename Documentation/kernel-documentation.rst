@@ -372,10 +372,14 @@ To cross-reference the functions and types defined in the kernel-doc comments
 from reStructuredText documents, please use the `Sphinx C Domain`_
 references. For example::
 
+.. code-block:: none
+
   See function :c:func:`foo` and struct/union/enum/typedef :c:type:`bar`.
 
 While the type reference works with just the type name, without the
 struct/union/enum/typedef part in front, you may want to use::
+
+.. code-block:: none
 
   See :c:type:`struct foo <foo>`.
   See :c:type:`union bar <bar>`.
@@ -578,6 +582,8 @@ Over time, we expect all of the documents under ``Documentation/DocBook`` to be
 converted to Sphinx and reStructuredText. For most DocBook XML documents, a good
 enough solution is to use the simple ``Documentation/sphinx/tmplcvt`` script,
 which uses ``pandoc`` under the hood. For example::
+
+.. code-block:: none
 
   $ cd Documentation/sphinx
   $ ./tmplcvt ../DocBook/in.tmpl ../out.rst
