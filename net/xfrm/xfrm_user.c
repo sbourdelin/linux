@@ -2146,7 +2146,7 @@ static int xfrm_add_acquire(struct sk_buff *skb, struct nlmsghdr *nlh,
 	return 0;
 
 bad_policy:
-	WARN(1, "BAD policy passed\n");
+	printk(KERN_WARNING "xfrm_user: bad policy passed\n");
 free_state:
 	kfree(x);
 nomem:
