@@ -31,6 +31,7 @@
 #include <media/v4l2-event.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-ctrls.h>
+#include <media/v4l2-of.h>
 #include <linux/mutex.h>
 #include <linux/delay.h>
 
@@ -106,6 +107,7 @@
 #define ADV7180_REG_SHAP_FILTER_CTL_1	0x0017
 #define ADV7180_REG_CTRL_2		0x001d
 #define ADV7180_REG_VSYNC_FIELD_CTL_1	0x0031
+#define ADV7180_VSYNC_FIELD_CTL_1_NEWAVMODE 0x02
 #define ADV7180_REG_MANUAL_WIN_CTL_1	0x003d
 #define ADV7180_REG_MANUAL_WIN_CTL_2	0x003e
 #define ADV7180_REG_MANUAL_WIN_CTL_3	0x003f
@@ -214,6 +216,7 @@ struct adv7180_state {
 	struct mutex		mutex; /* mutual excl. when accessing chip */
 	int			irq;
 	v4l2_std_id		curr_norm;
+	bool			newavmode;
 	bool			powered;
 	bool			streaming;
 	u8			input;
@@ -740,6 +743,8 @@ static int adv7180_g_mbus_config(struct v4l2_subdev *sd,
 		 */
 		cfg->flags = V4L2_MBUS_MASTER | V4L2_MBUS_PCLK_SAMPLE_RISING |
 				 V4L2_MBUS_DATA_ACTIVE_HIGH;
+		if (state->newavmode)
+			cfg->flags |= V4L2_MBUS_NEWAVMODE;
 		cfg->type = V4L2_MBUS_BT656;
 	}
 
@@ -864,9 +869,15 @@ static int adv7180_init(struct adv7180_state *state)
 	if (ret < 0)
 		return ret;
 
-	/* Manually set V bit end position in NTSC mode */
-	return adv7180_write(state, ADV7180_REG_NTSC_V_BIT_END,
-					ADV7180_NTSC_V_BIT_END_MANUAL_NVEND);
+	if (!state->newavmode) {
+		/* Manually set V bit end position in NTSC mode */
+		ret = adv7180_write(state, ADV7180_REG_NTSC_V_BIT_END,
+				    ADV7180_NTSC_V_BIT_END_MANUAL_NVEND);
+		if (ret < 0)
+			return ret;
+	}
+
+	return 0;
 }
 
 static int adv7180_set_std(struct adv7180_state *state, unsigned int std)
@@ -1217,6 +1228,13 @@ static int init_device(struct adv7180_state *state)
 	if (ret)
 		goto out_unlock;
 
+	if (state->newavmode) {
+		ret = adv7180_write(state, ADV7180_REG_VSYNC_FIELD_CTL_1,
+				    ADV7180_VSYNC_FIELD_CTL_1_NEWAVMODE);
+		if (ret < 0)
+			goto out_unlock;
+	}
+
 	ret = adv7180_program_std(state);
 	if (ret)
 		goto out_unlock;
@@ -1257,6 +1275,27 @@ out_unlock:
 	return ret;
 }
 
+static void adv7180_of_parse(struct adv7180_state *state)
+{
+	struct i2c_client *client = state->client;
+	struct device_node *np = client->dev.of_node;
+	struct device_node *endpoint;
+	struct v4l2_of_endpoint	ep;
+
+	endpoint = of_graph_get_next_endpoint(np, NULL);
+	if (!endpoint) {
+		v4l_warn(client, "endpoint node not found\n");
+		return;
+	}
+
+	v4l2_of_parse_endpoint(endpoint, &ep);
+	of_node_put(endpoint);
+
+	if (ep.bus_type == V4L2_MBUS_BT656 &&
+	    ep.bus.parallel.flags & V4L2_MBUS_NEWAVMODE)
+		state->newavmode = true;
+}
+
 static int adv7180_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
@@ -1278,6 +1317,8 @@ static int adv7180_probe(struct i2c_client *client,
 	state->client = client;
 	state->field = V4L2_FIELD_INTERLACED;
 	state->chip_info = (struct adv7180_chip_info *)id->driver_data;
+
+	adv7180_of_parse(state);
 
 	if (state->chip_info->flags & ADV7180_FLAG_MIPI_CSI2) {
 		state->csi_client = i2c_new_dummy(client->adapter,
