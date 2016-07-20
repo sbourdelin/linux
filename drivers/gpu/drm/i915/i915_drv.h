@@ -781,6 +781,7 @@ struct intel_csr {
 	func(has_rc6) sep \
 	func(has_rc6p) sep \
 	func(has_dp_mst) sep \
+	func(has_aux_irq) sep \
 	func(has_resource_streamer) sep \
 	func(has_pipe_cxsr) sep \
 	func(has_hotplug) sep \
@@ -2838,7 +2839,7 @@ struct drm_i915_cmd_table {
  * legacy irq no. is shared with another device. The kernel then disables that
  * interrupt source and so prevents the other device from working properly.
  */
-#define HAS_AUX_IRQ(dev) (INTEL_INFO(dev)->gen >= 5)
+#define HAS_AUX_IRQ(dev) (INTEL_INFO(dev)->has_aux_irq)
 #define HAS_GMBUS_IRQ(dev) (INTEL_INFO(dev)->gen >= 5)
 
 /* With the 945 and later, Y tiling got adjusted so that it was 32 128-byte
