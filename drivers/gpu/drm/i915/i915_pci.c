@@ -324,22 +324,26 @@ static const struct intel_device_info intel_cherryview_info = {
 	CHV_COLORS,
 };
 
+#define GEN9_FEATURES  \
+	.gen = 9, \
+	.has_csr = 1
+
 static const struct intel_device_info intel_skylake_info = {
 	BDW_FEATURES,
+	GEN9_FEATURES,
 	.is_skylake = 1,
-	.gen = 9,
 };
 
 static const struct intel_device_info intel_skylake_gt3_info = {
 	BDW_FEATURES,
+	GEN9_FEATURES,
 	.is_skylake = 1,
-	.gen = 9,
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING | VEBOX_RING | BSD2_RING,
 };
 
 static const struct intel_device_info intel_broxton_info = {
+	GEN9_FEATURES,
 	.is_broxton = 1,
-	.gen = 9,
 	.need_gfx_hws = 1, .has_hotplug = 1,
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING | VEBOX_RING,
 	.num_pipes = 3,
@@ -355,14 +359,14 @@ static const struct intel_device_info intel_broxton_info = {
 
 static const struct intel_device_info intel_kabylake_info = {
 	BDW_FEATURES,
+	GEN9_FEATURES,
 	.is_kabylake = 1,
-	.gen = 9,
 };
 
 static const struct intel_device_info intel_kabylake_gt3_info = {
 	BDW_FEATURES,
+	GEN9_FEATURES,
 	.is_kabylake = 1,
-	.gen = 9,
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING | VEBOX_RING | BSD2_RING,
 };
 
