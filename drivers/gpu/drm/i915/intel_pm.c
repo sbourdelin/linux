@@ -3809,6 +3809,12 @@ static void skl_flush_wm_values(struct drm_i915_private *dev_priv,
 	new_ddb = &new_values->ddb;
 	cur_ddb = &dev_priv->wm.skl_hw.ddb;
 
+	/* We only ever need to flush when the ddb allocations change */
+	if (!new_values->ddb_changed)
+		return;
+
+	new_values->ddb_changed = false;
+
 	/*
 	 * First pass: flush the pipes with the new allocation contained into
 	 * the old space.
@@ -3926,6 +3932,22 @@ pipes_modified(struct drm_atomic_state *state)
 	return ret;
 }
 
+static bool
+skl_pipe_ddb_changed(struct skl_ddb_allocation *old,
+		     struct skl_ddb_allocation *new,
+		     enum pipe pipe)
+{
+	if (memcmp(&old->pipe[pipe], &new->pipe[pipe],
+		   sizeof(old->pipe[pipe])) != 0 ||
+	    memcmp(&old->plane[pipe], &new->plane[pipe],
+		   sizeof(old->plane[pipe])) != 0 ||
+	    memcmp(&old->y_plane[pipe], &new->y_plane[pipe],
+		   sizeof(old->y_plane[pipe])) != 0)
+		return true;
+
+	return false;
+}
+
 static int
 skl_compute_ddb(struct drm_atomic_state *state)
 {
@@ -3933,7 +3955,8 @@ skl_compute_ddb(struct drm_atomic_state *state)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_atomic_state *intel_state = to_intel_atomic_state(state);
 	struct intel_crtc *intel_crtc;
-	struct skl_ddb_allocation *ddb = &intel_state->wm_results.ddb;
+	struct skl_ddb_allocation *new_ddb = &intel_state->wm_results.ddb;
+	struct skl_ddb_allocation *old_ddb = &dev_priv->wm.skl_hw.ddb;
 	uint32_t realloc_pipes = pipes_modified(state);
 	int ret;
 
@@ -3971,9 +3994,13 @@ skl_compute_ddb(struct drm_atomic_state *state)
 		if (IS_ERR(cstate))
 			return PTR_ERR(cstate);
 
-		ret = skl_allocate_pipe_ddb(cstate, ddb);
+		ret = skl_allocate_pipe_ddb(cstate, new_ddb);
 		if (ret)
 			return ret;
+
+		if (!intel_state->wm_results.ddb_changed &&
+		    skl_pipe_ddb_changed(old_ddb, new_ddb, intel_crtc->pipe))
+			intel_state->wm_results.ddb_changed = true;
 	}
 
 	return 0;
