@@ -783,6 +783,7 @@ struct intel_csr {
 	func(has_dp_mst) sep \
 	func(has_aux_irq) sep \
 	func(has_gmbus_irq) sep \
+	func(has_fw_blc) sep \
 	func(has_resource_streamer) sep \
 	func(has_pipe_cxsr) sep \
 	func(has_hotplug) sep \
@@ -2851,7 +2852,7 @@ struct drm_i915_cmd_table {
 #define SUPPORTS_TV(dev)		(INTEL_INFO(dev)->supports_tv)
 #define I915_HAS_HOTPLUG(dev)		 (INTEL_INFO(dev)->has_hotplug)
 
-#define HAS_FW_BLC(dev) (INTEL_INFO(dev)->gen > 2)
+#define HAS_FW_BLC(dev) (INTEL_INFO(dev)->has_fw_blc)
 #define HAS_PIPE_CXSR(dev) (INTEL_INFO(dev)->has_pipe_cxsr)
 #define HAS_FBC(dev) (INTEL_INFO(dev)->has_fbc)
 
