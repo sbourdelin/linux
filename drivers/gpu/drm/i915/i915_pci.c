@@ -240,7 +240,8 @@ static const struct intel_device_info intel_sandybridge_m_info = {
 	IVB_CURSOR_OFFSETS
 
 #define IVB_FEATURES  \
-	.has_rc6p = 1
+	.has_rc6p = 1, \
+	.has_l3_dpf = 1
 
 static const struct intel_device_info intel_ivybridge_d_info = {
 	GEN7_FEATURES,
@@ -296,7 +297,8 @@ static const struct intel_device_info intel_valleyview_d_info = {
 	.has_psr = 1, \
 	.has_runtime_pm = 1, \
 	.has_resource_streamer = 1, \
-	.has_dp_mst = 1
+	.has_dp_mst = 1, \
+	.has_l3_dpf = 1
 
 static const struct intel_device_info intel_haswell_d_info = {
 	HSW_FEATURES,
