@@ -490,8 +490,7 @@ int cxl_of_probe(struct platform_device *pdev)
 		adapter->slices = 0;
 	}
 
-	if (afu_np)
-		of_node_put(afu_np);
+	of_node_put(afu_np);
 	return 0;
 }
 
