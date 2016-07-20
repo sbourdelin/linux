@@ -244,9 +244,11 @@ struct dsa_switch_driver {
 	/*
 	 * Probing and setup.
 	 */
+#ifdef CONFIG_NET_DSA_LEGACY
 	const char	*(*probe)(struct device *dsa_dev,
 				  struct device *host_dev, int sw_addr,
 				  void **priv);
+#endif /* CONFIG_NET_DSA_LEGACY */
 	int	(*setup)(struct dsa_switch *ds);
 	int	(*set_addr)(struct dsa_switch *ds, u8 *addr);
 	u32	(*get_phy_flags)(struct dsa_switch *ds, int port);
@@ -370,9 +372,11 @@ struct dsa_switch_driver {
 				 int (*cb)(struct switchdev_obj *obj));
 };
 
+#ifdef CONFIG_NET_DSA_LEGACY
 void register_switch_driver(struct dsa_switch_driver *type);
 void unregister_switch_driver(struct dsa_switch_driver *type);
 struct mii_bus *dsa_host_dev_to_mii_bus(struct device *dev);
+#endif /* CONFIG_NET_DSA_LEGACY */
 
 static inline void *ds_to_priv(struct dsa_switch *ds)
 {

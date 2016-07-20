@@ -3,7 +3,7 @@ menu "Distributed Switch Architecture drivers"
 
 config NET_DSA_MV88E6060
 	tristate "Marvell 88E6060 ethernet switch chip support"
-	depends on NET_DSA
+	depends on NET_DSA_LEGACY
 	select NET_DSA_TAG_TRAILER
 	---help---
 	  This enables support for the Marvell 88E6060 ethernet switch
@@ -11,7 +11,7 @@ config NET_DSA_MV88E6060
 
 config NET_DSA_BCM_SF2
 	tristate "Broadcom Starfighter 2 Ethernet switch support"
-	depends on HAS_IOMEM && NET_DSA
+	depends on HAS_IOMEM && NET_DSA_LEGACY
 	select NET_DSA_TAG_BRCM
 	select FIXED_PHY
 	select BCM7XXX_PHY

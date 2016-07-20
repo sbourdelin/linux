@@ -3891,6 +3891,7 @@ static int mv88e6xxx_smi_init(struct mv88e6xxx_chip *chip,
 	return 0;
 }
 
+#ifdef CONFIG_NET_DSA_LEGACY
 static const char *mv88e6xxx_drv_probe(struct device *dsa_dev,
 				       struct device *host_dev, int sw_addr,
 				       void **priv)
@@ -3930,10 +3931,13 @@ free:
 
 	return NULL;
 }
+#endif /* CONFIG_NET_DSA_LEGACY */
 
 static struct dsa_switch_driver mv88e6xxx_switch_driver = {
 	.tag_protocol		= DSA_TAG_PROTO_EDSA,
+#ifdef CONFIG_NET_DSA_LEGACY
 	.probe			= mv88e6xxx_drv_probe,
+#endif /* CONFIG_NET_DSA_LEGACY */
 	.setup			= mv88e6xxx_setup,
 	.set_addr		= mv88e6xxx_set_addr,
 	.adjust_link		= mv88e6xxx_adjust_link,
@@ -4068,6 +4072,7 @@ static struct mdio_driver mv88e6xxx_driver = {
 	},
 };
 
+#ifdef CONFIG_NET_DSA_LEGACY
 static int __init mv88e6xxx_init(void)
 {
 	register_switch_driver(&mv88e6xxx_switch_driver);
@@ -4081,6 +4086,9 @@ static void __exit mv88e6xxx_cleanup(void)
 	unregister_switch_driver(&mv88e6xxx_switch_driver);
 }
 module_exit(mv88e6xxx_cleanup);
+#else
+mdio_module_driver(mv88e6xxx_driver);
+#endif /* CONFIG_NET_DSA_LEGACY */
 
 MODULE_AUTHOR("Lennert Buytenhek <buytenh@wantstofly.org>");
 MODULE_DESCRIPTION("Driver for Marvell 88E6XXX ethernet switch chips");
