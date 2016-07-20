@@ -137,18 +137,20 @@ static int aqm_open(struct inode *inode, struct file *file)
 	len += scnprintf(info->buf + len,
 			 info->size - len,
 			 "* vif\n"
-			 "ifname addr ac backlog-bytes backlog-packets flows overlimit collisions tx-bytes tx-packets\n");
+			 "ifname addr ac backlog-bytes backlog-packets flows drops marks overlimit collisions tx-bytes tx-packets\n");
 
 	list_for_each_entry_rcu(sdata, &local->interfaces, list) {
 		txqi = to_txq_info(sdata->vif.txq);
 		len += scnprintf(info->buf + len, info->size - len,
-				 "%s %pM %u %u %u %u %u %u %u %u\n",
+				 "%s %pM %u %u %u %u %u %u %u %u %u %u\n",
 				 sdata->name,
 				 sdata->vif.addr,
 				 txqi->txq.ac,
 				 txqi->tin.backlog_bytes,
 				 txqi->tin.backlog_packets,
 				 txqi->tin.flows,
+				 txqi->cstats.drop_count,
+				 txqi->cstats.ecn_mark,
 				 txqi->tin.overlimit,
 				 txqi->tin.collisions,
 				 txqi->tin.tx_bytes,
@@ -158,14 +160,14 @@ static int aqm_open(struct inode *inode, struct file *file)
 	len += scnprintf(info->buf + len,
 			 info->size - len,
 			 "* sta\n"
-			 "ifname addr tid ac backlog-bytes backlog-packets flows overlimit collisions tx-bytes tx-packets\n");
+			 "ifname addr tid ac backlog-bytes backlog-packets flows drops marks overlimit collisions tx-bytes tx-packets\n");
 
 	list_for_each_entry_rcu(sta, &local->sta_list, list) {
 		sdata = sta->sdata;
 		for (i = 0; i < ARRAY_SIZE(sta->sta.txq); i++) {
 			txqi = to_txq_info(sta->sta.txq[i]);
 			len += scnprintf(info->buf + len, info->size - len,
-					 "%s %pM %d %d %u %u %u %u %u %u %u\n",
+					 "%s %pM %d %d %u %u %u %u %u %u %u %u %u\n",
 					 sdata->name,
 					 sta->sta.addr,
 					 txqi->txq.tid,
@@ -173,6 +175,8 @@ static int aqm_open(struct inode *inode, struct file *file)
 					 txqi->tin.backlog_bytes,
 					 txqi->tin.backlog_packets,
 					 txqi->tin.flows,
+					 txqi->cstats.drop_count,
+					 txqi->cstats.ecn_mark,
 					 txqi->tin.overlimit,
 					 txqi->tin.collisions,
 					 txqi->tin.tx_bytes,
