@@ -209,6 +209,18 @@ int sanity_check_segment_list(struct kimage *image)
 			return result;
 	}
 
+
+	/* Verity all segment size donnot exceed the specified size.
+ 	 * if segment size from user space is too large,  a large 
+ 	 * amount of time will be wasted when allocating page. so,
+ 	 * softlockup may be come up.
+ 	 */
+	for (i = 0; i< nr_segments; i++) {
+		if (image->segment[i].memsz > KEXEC_MAX_SEGMENT_SIZE)
+			return result;
+	}
+
+
 	/*
 	 * Verify we have good destination addresses.  Normally
 	 * the caller is responsible for making certain we don't
