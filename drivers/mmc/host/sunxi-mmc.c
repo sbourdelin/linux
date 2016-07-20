@@ -64,6 +64,7 @@
 #define SDXC_REG_CBCR	(0x48) /* SMC CIU Byte Count Register */
 #define SDXC_REG_BBCR	(0x4C) /* SMC BIU Byte Count Register */
 #define SDXC_REG_DBGC	(0x50) /* SMC Debug Enable Register */
+#define SDXC_REG_NTSR	(0x5c) /* SMC NewTiming Set Register */
 #define SDXC_REG_HWRST	(0x78) /* SMC Card Hardware Reset for Register */
 #define SDXC_REG_DMAC	(0x80) /* SMC IDMAC Control Register */
 #define SDXC_REG_DLBA	(0x84) /* SMC IDMAC Descriptor List Base Addre */
@@ -170,6 +171,9 @@
 #define SDXC_SEND_CCSD			BIT(8)
 #define SDXC_SEND_AUTO_STOPCCSD		BIT(9)
 #define SDXC_CEATA_DEV_IRQ_ENABLE	BIT(10)
+
+/* NewTiming Set Register */
+#define SDXC_NEWMODE_ENABLE		BIT(31)
 
 /* IDMA controller bus mod bit field */
 #define SDXC_IDMAC_SOFT_RESET		BIT(0)
@@ -661,10 +665,20 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
 	u32 clock = ios->clock;
 	int ret;
 
-	/* 8 bit DDR requires a higher module clock */
-	if (ios->timing == MMC_TIMING_MMC_DDR52 &&
-	    ios->bus_width == MMC_BUS_WIDTH_8)
-		clock <<= 1;
+	/*
+	 * 8 bit DDR requires a higher module clock
+	 * and the 'new mode'
+	 */
+	if (ios->bus_width == MMC_BUS_WIDTH_8) {	/* eMMC */
+		rval = mmc_readl(host, REG_NTSR);
+		if (ios->timing == MMC_TIMING_MMC_DDR52) {
+			clock <<= 1;
+			rval |= SDXC_NEWMODE_ENABLE;
+		} else {
+			rval &= ~SDXC_NEWMODE_ENABLE;
+		}
+		mmc_writel(host, REG_NTSR, rval);
+	}
 
 	rate = clk_round_rate(host->clk_mmc, clock);
 	if (rate < 0) {
