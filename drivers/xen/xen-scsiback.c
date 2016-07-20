@@ -604,10 +604,8 @@ static void scsiback_device_action(struct vscsibk_pend *pending_req,
 	int rc, err = FAILED;
 
 	tmr = kzalloc(sizeof(struct scsiback_tmr), GFP_KERNEL);
-	if (!tmr) {
-		target_put_sess_cmd(se_cmd);
-		goto err;
-	}
+	if (!tmr)
+		goto put_cmd;
 
 	init_waitqueue_head(&tmr->tmr_wait);
 
@@ -616,7 +614,7 @@ static void scsiback_device_action(struct vscsibk_pend *pending_req,
 			       unpacked_lun, tmr, act, GFP_KERNEL,
 			       tag, TARGET_SCF_ACK_KREF);
 	if (rc)
-		goto err;
+		goto free_tmr;
 
 	wait_event(tmr->tmr_wait, atomic_read(&tmr->tmr_complete));
 
@@ -626,7 +624,9 @@ static void scsiback_device_action(struct vscsibk_pend *pending_req,
 	scsiback_do_resp_with_sense(NULL, err, 0, pending_req);
 	transport_generic_free_cmd(&pending_req->se_cmd, 1);
 	return;
-err:
+put_cmd:
+	target_put_sess_cmd(se_cmd);
+free_tmr:
 	kfree(tmr);
 	scsiback_do_resp_with_sense(NULL, err, 0, pending_req);
 }
