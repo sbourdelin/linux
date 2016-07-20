@@ -630,7 +630,8 @@ void __init fpu__init_system_xstate(void)
 
 	if ((xfeatures_mask & XFEATURE_MASK_FPSSE) != XFEATURE_MASK_FPSSE) {
 		pr_err("x86/fpu: FP/SSE not present amongst the CPU's xstate features: 0x%llx.\n", xfeatures_mask);
-		BUG();
+		fpu__init_disable_system_xstate();
+		return;
 	}
 
 	xfeatures_mask &= fpu__get_supported_xfeatures_mask();
