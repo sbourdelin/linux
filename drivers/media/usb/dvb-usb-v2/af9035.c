@@ -475,7 +475,8 @@ static struct i2c_algorithm af9035_i2c_algo = {
 static int af9035_identify_state(struct dvb_usb_device *d, const char **name)
 {
 	struct state *state = d_to_priv(d);
-	int ret;
+	int ret, ts_mode_invalid;
+	u8 tmp;
 	u8 wbuf[1] = { 1 };
 	u8 rbuf[4];
 	struct usb_req req = { CMD_FW_QUERYINFO, 0, sizeof(wbuf), wbuf,
@@ -510,6 +511,38 @@ static int af9035_identify_state(struct dvb_usb_device *d, const char **name)
 		*name = AF9035_FIRMWARE_AF9035;
 		state->eeprom_addr = EEPROM_BASE_AF9035;
 	}
+
+
+	/* check for dual tuner mode */
+	ret = af9035_rd_reg(d, state->eeprom_addr + EEPROM_TS_MODE, &tmp);
+	if (ret < 0)
+		goto err;
+
+	ts_mode_invalid = 0;
+	switch (tmp) {
+	case 0:
+		break;
+	case 1:
+	case 3:
+		state->dual_mode = true;
+		break;
+	case 5:
+		if (state->chip_type != 0x9135 && state->chip_type != 0x9306)
+			state->dual_mode = true;	/* AF9035 */
+		else
+			ts_mode_invalid = 1;
+		break;
+	default:
+		ts_mode_invalid = 1;
+	}
+
+	dev_dbg(&d->udev->dev, "%s: ts mode=%d dual mode=%d\n",
+			__func__, tmp, state->dual_mode);
+
+	if (ts_mode_invalid)
+		dev_info(&d->udev->dev, "%s: ts mode=%d not supported, defaulting to single tuner mode!",
+				__func__, tmp);
+
 
 	ret = af9035_ctrl_msg(d, &req);
 	if (ret < 0)
@@ -680,11 +713,7 @@ static int af9035_download_firmware(struct dvb_usb_device *d,
 	 * which is done by master demod.
 	 * Master feeds also clock and controls power via GPIO.
 	 */
-	ret = af9035_rd_reg(d, state->eeprom_addr + EEPROM_TS_MODE, &tmp);
-	if (ret < 0)
-		goto err;
-
-	if (tmp == 1 || tmp == 3 || tmp == 5) {
+	if (state->dual_mode) {
 		/* configure gpioh1, reset & power slave demod */
 		ret = af9035_wr_reg_mask(d, 0x00d8b0, 0x01, 0x01);
 		if (ret < 0)
@@ -816,18 +845,6 @@ static int af9035_read_config(struct dvb_usb_device *d)
 		return 0;
 	}
 
-
-
-	/* check if there is dual tuners */
-	ret = af9035_rd_reg(d, state->eeprom_addr + EEPROM_TS_MODE, &tmp);
-	if (ret < 0)
-		goto err;
-
-	if (tmp == 1 || tmp == 3 || tmp == 5)
-		state->dual_mode = true;
-
-	dev_dbg(&d->udev->dev, "%s: ts mode=%d dual mode=%d\n", __func__,
-			tmp, state->dual_mode);
 
 	if (state->dual_mode) {
 		/* read 2nd demodulator I2C address */
