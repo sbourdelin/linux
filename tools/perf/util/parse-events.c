@@ -303,7 +303,8 @@ static struct perf_evsel *
 __add_event(struct list_head *list, int *idx,
 	    struct perf_event_attr *attr,
 	    char *name, struct cpu_map *cpus,
-	    struct list_head *config_terms)
+	    struct list_head *config_terms,
+	    struct list_head *drv_config_terms)
 {
 	struct perf_evsel *evsel;
 
@@ -322,6 +323,10 @@ __add_event(struct list_head *list, int *idx,
 	if (config_terms)
 		list_splice(config_terms, &evsel->config_terms);
 
+	if (drv_config_terms)
+		list_splice(drv_config_terms, &evsel->drv_config_terms);
+
+
 	list_add_tail(&evsel->node, list);
 	return evsel;
 }
@@ -330,7 +335,8 @@ static int add_event(struct list_head *list, int *idx,
 		     struct perf_event_attr *attr, char *name,
 		     struct list_head *config_terms)
 {
-	return __add_event(list, idx, attr, name, NULL, config_terms) ? 0 : -ENOMEM;
+	return __add_event(list, idx, attr, name,
+			   NULL, config_terms, NULL) ? 0 : -ENOMEM;
 }
 
 static int parse_aliases(char *str, const char *names[][PERF_EVSEL__MAX_ALIASES], int size)
@@ -904,6 +910,7 @@ static const char *config_term_names[__PARSE_EVENTS__TERM_TYPE_NR] = {
 	[PARSE_EVENTS__TERM_TYPE_MAX_STACK]		= "max-stack",
 	[PARSE_EVENTS__TERM_TYPE_OVERWRITE]		= "overwrite",
 	[PARSE_EVENTS__TERM_TYPE_NOOVERWRITE]		= "no-overwrite",
+	[PARSE_EVENTS__TERM_TYPE_DRV_CFG]		= "driver-config",
 };
 
 static bool config_term_shrinked;
@@ -1034,7 +1041,8 @@ static int config_term_pmu(struct perf_event_attr *attr,
 			   struct parse_events_term *term,
 			   struct parse_events_error *err)
 {
-	if (term->type_term == PARSE_EVENTS__TERM_TYPE_USER)
+	if (term->type_term == PARSE_EVENTS__TERM_TYPE_USER ||
+	    term->type_term == PARSE_EVENTS__TERM_TYPE_DRV_CFG)
 		/*
 		 * Always succeed for sysfs terms, as we dont know
 		 * at this point what type they need to have.
@@ -1083,10 +1091,7 @@ static int config_attr(struct perf_event_attr *attr,
 	return 0;
 }
 
-static int get_config_terms(struct list_head *head_config,
-			    struct list_head *head_terms __maybe_unused)
-{
-#define ADD_CONFIG_TERM(__type, __name, __val)			\
+#define ADD_CONFIG_TERM(__type, __name, __val, __head_terms)	\
 do {								\
 	struct perf_evsel_config_term *__t;			\
 								\
@@ -1097,48 +1102,74 @@ do {								\
 	INIT_LIST_HEAD(&__t->list);				\
 	__t->type       = PERF_EVSEL__CONFIG_TERM_ ## __type;	\
 	__t->val.__name = __val;				\
-	list_add_tail(&__t->list, head_terms);			\
+	list_add_tail(&__t->list, __head_terms);		\
 } while (0)
 
+static int get_config_terms(struct list_head *head_config,
+			    struct list_head *head_terms)
+{
 	struct parse_events_term *term;
 
 	list_for_each_entry(term, head_config, list) {
 		switch (term->type_term) {
 		case PARSE_EVENTS__TERM_TYPE_SAMPLE_PERIOD:
-			ADD_CONFIG_TERM(PERIOD, period, term->val.num);
+			ADD_CONFIG_TERM(PERIOD, period,
+					term->val.num, head_terms);
 			break;
 		case PARSE_EVENTS__TERM_TYPE_SAMPLE_FREQ:
-			ADD_CONFIG_TERM(FREQ, freq, term->val.num);
+			ADD_CONFIG_TERM(FREQ, freq, term->val.num, head_terms);
 			break;
 		case PARSE_EVENTS__TERM_TYPE_TIME:
-			ADD_CONFIG_TERM(TIME, time, term->val.num);
+			ADD_CONFIG_TERM(TIME, time, term->val.num, head_terms);
 			break;
 		case PARSE_EVENTS__TERM_TYPE_CALLGRAPH:
-			ADD_CONFIG_TERM(CALLGRAPH, callgraph, term->val.str);
+			ADD_CONFIG_TERM(CALLGRAPH, callgraph,
+					term->val.str, head_terms);
 			break;
 		case PARSE_EVENTS__TERM_TYPE_STACKSIZE:
-			ADD_CONFIG_TERM(STACK_USER, stack_user, term->val.num);
+			ADD_CONFIG_TERM(STACK_USER, stack_user,
+					term->val.num, head_terms);
 			break;
 		case PARSE_EVENTS__TERM_TYPE_INHERIT:
-			ADD_CONFIG_TERM(INHERIT, inherit, term->val.num ? 1 : 0);
+			ADD_CONFIG_TERM(INHERIT, inherit,
+					term->val.num ? 1 : 0, head_terms);
 			break;
 		case PARSE_EVENTS__TERM_TYPE_NOINHERIT:
-			ADD_CONFIG_TERM(INHERIT, inherit, term->val.num ? 0 : 1);
+			ADD_CONFIG_TERM(INHERIT, inherit,
+					term->val.num ? 0 : 1, head_terms);
 			break;
 		case PARSE_EVENTS__TERM_TYPE_MAX_STACK:
-			ADD_CONFIG_TERM(MAX_STACK, max_stack, term->val.num);
+			ADD_CONFIG_TERM(MAX_STACK, max_stack,
+					term->val.num, head_terms);
 			break;
 		case PARSE_EVENTS__TERM_TYPE_OVERWRITE:
-			ADD_CONFIG_TERM(OVERWRITE, overwrite, term->val.num ? 1 : 0);
+			ADD_CONFIG_TERM(OVERWRITE, overwrite,
+					term->val.num ? 1 : 0, head_terms);
 			break;
 		case PARSE_EVENTS__TERM_TYPE_NOOVERWRITE:
-			ADD_CONFIG_TERM(OVERWRITE, overwrite, term->val.num ? 0 : 1);
+			ADD_CONFIG_TERM(OVERWRITE, overwrite,
+					term->val.num ? 0 : 1, head_terms);
 			break;
 		default:
 			break;
 		}
 	}
 #undef ADD_EVSEL_CONFIG
+	return 0;
+}
+
+static int get_drv_config_terms(struct list_head *head_config,
+				struct list_head *head_terms)
+{
+	struct parse_events_term *term;
+
+	list_for_each_entry(term, head_config, list) {
+		if (term->type_term != PARSE_EVENTS__TERM_TYPE_DRV_CFG)
+			continue;
+
+		ADD_CONFIG_TERM(DRV_CFG, drv_cfg, term->val.str, head_terms);
+	}
+
 	return 0;
 }
 
@@ -1197,6 +1228,7 @@ int parse_events_add_pmu(struct parse_events_evlist *data,
 	struct perf_pmu *pmu;
 	struct perf_evsel *evsel;
 	LIST_HEAD(config_terms);
+	LIST_HEAD(drv_config_terms);
 
 	pmu = perf_pmu__find(name);
 	if (!pmu)
@@ -1211,7 +1243,8 @@ int parse_events_add_pmu(struct parse_events_evlist *data,
 
 	if (!head_config) {
 		attr.type = pmu->type;
-		evsel = __add_event(list, &data->idx, &attr, NULL, pmu->cpus, NULL);
+		evsel = __add_event(list, &data->idx, &attr,
+				    NULL, pmu->cpus, NULL, NULL);
 		return evsel ? 0 : -ENOMEM;
 	}
 
@@ -1228,12 +1261,15 @@ int parse_events_add_pmu(struct parse_events_evlist *data,
 	if (get_config_terms(head_config, &config_terms))
 		return -ENOMEM;
 
+	if (get_drv_config_terms(head_config, &drv_config_terms))
+		return -ENOMEM;
+
 	if (perf_pmu__config(pmu, &attr, head_config, data->error))
 		return -EINVAL;
 
 	evsel = __add_event(list, &data->idx, &attr,
 			    get_config_name(head_config), pmu->cpus,
-			    &config_terms);
+			    &config_terms, &drv_config_terms);
 	if (evsel) {
 		evsel->unit = info.unit;
 		evsel->scale = info.scale;
