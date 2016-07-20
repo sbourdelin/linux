@@ -232,8 +232,7 @@ static int fsl_dcu_drm_pm_suspend(struct device *dev)
 	drm_kms_helper_poll_disable(fsl_dev->drm);
 	regcache_cache_only(fsl_dev->regmap, true);
 	regcache_mark_dirty(fsl_dev->regmap);
-	clk_disable(fsl_dev->clk);
-	clk_unprepare(fsl_dev->clk);
+	clk_disable_unprepare(fsl_dev->clk);
 
 	return 0;
 }
