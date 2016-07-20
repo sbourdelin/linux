@@ -1934,13 +1934,14 @@ static void __init connect_bsp_APIC(void)
 }
 
 /**
- * disconnect_bsp_APIC - detach the APIC from the interrupt system
- * @virt_wire_setup:	indicates, whether virtual wire mode is selected
+ * lapic_set_legacy_irq_mode - switch Local APIC back to be legacy irq mode.
+ * @virt_wire_setup:   indicates, whether virtual wire mode is selected
  *
- * Virtual wire mode is necessary to deliver legacy interrupts even when the
- * APIC is disabled.
+ * If PIC mode is available, LAPIC need be disconnected with CPU. Otherwise
+ * enable LAPIC and set it to be virtual wire mode. However if IO-APIC has
+ * been virtual wire mode, LVT0 of LAPIC need be masked.
  */
-void disconnect_bsp_APIC(int virt_wire_setup)
+void lapic_set_legacy_irq_mode(int virt_wire_setup)
 {
 	unsigned int value;
 
