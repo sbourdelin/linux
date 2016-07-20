@@ -201,6 +201,7 @@ static const struct intel_device_info intel_ironlake_m_info = {
 	.has_runtime_pm = 1, \
 	.has_core_ring_freq = 1, \
 	.has_rc6 = 1, \
+	.has_rc6p = 1, \
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING, \
 	.has_llc = 1, \
 	GEN_DEFAULT_PIPEOFFSETS, \
@@ -226,19 +227,25 @@ static const struct intel_device_info intel_sandybridge_m_info = {
 	GEN_DEFAULT_PIPEOFFSETS, \
 	IVB_CURSOR_OFFSETS
 
+#define IVB_FEATURES  \
+	.has_rc6p = 1
+
 static const struct intel_device_info intel_ivybridge_d_info = {
 	GEN7_FEATURES,
+	IVB_FEATURES,
 	.is_ivybridge = 1,
 };
 
 static const struct intel_device_info intel_ivybridge_m_info = {
 	GEN7_FEATURES,
+	IVB_FEATURES,
 	.is_ivybridge = 1,
 	.is_mobile = 1,
 };
 
 static const struct intel_device_info intel_ivybridge_q_info = {
 	GEN7_FEATURES,
+	IVB_FEATURES,
 	.is_ivybridge = 1,
 	.num_pipes = 0, /* legal, last one wins */
 };
