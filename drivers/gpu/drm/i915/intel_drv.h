@@ -1716,6 +1716,8 @@ void ilk_wm_get_hw_state(struct drm_device *dev);
 void skl_wm_get_hw_state(struct drm_device *dev);
 void skl_ddb_get_hw_state(struct drm_i915_private *dev_priv,
 			  struct skl_ddb_allocation *ddb /* out */);
+void skl_write_cursor_wm(struct intel_crtc *intel_crtc);
+void skl_write_plane_wm(struct intel_crtc *intel_crtc, int plane);
 uint32_t ilk_pipe_pixel_rate(const struct intel_crtc_state *pipe_config);
 bool ilk_disable_lp_wm(struct drm_device *dev);
 int sanitize_rc6_option(struct drm_i915_private *dev_priv, int enable_rc6);

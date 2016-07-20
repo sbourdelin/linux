@@ -3031,6 +3031,8 @@ static void skylake_update_primary_plane(struct drm_plane *plane,
 	intel_crtc->adjusted_x = x_offset;
 	intel_crtc->adjusted_y = y_offset;
 
+	skl_write_plane_wm(intel_crtc, 0);
+
 	I915_WRITE(PLANE_CTL(pipe, 0), plane_ctl);
 	I915_WRITE(PLANE_OFFSET(pipe, 0), plane_offset);
 	I915_WRITE(PLANE_SIZE(pipe, 0), plane_size);
@@ -10241,6 +10243,9 @@ static void i9xx_update_cursor(struct drm_crtc *crtc, u32 base,
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 	int pipe = intel_crtc->pipe;
 	uint32_t cntl = 0;
+
+	if (IS_SKYLAKE(dev_priv))
+		skl_write_cursor_wm(intel_crtc);
 
 	if (plane_state && plane_state->visible) {
 		cntl = MCURSOR_GAMMA_ENABLE;

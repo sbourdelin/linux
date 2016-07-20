@@ -238,6 +238,8 @@ skl_update_plane(struct drm_plane *drm_plane,
 	crtc_w--;
 	crtc_h--;
 
+	skl_write_plane_wm(to_intel_crtc(crtc_state->base.crtc), plane);
+
 	if (key->flags) {
 		I915_WRITE(PLANE_KEYVAL(pipe, plane), key->min_value);
 		I915_WRITE(PLANE_KEYMAX(pipe, plane), key->max_value);
