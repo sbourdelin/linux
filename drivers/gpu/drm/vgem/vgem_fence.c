@@ -107,7 +107,8 @@ static struct fence *vgem_fence_create(struct vgem_file *vfile,
 	setup_timer(&fence->timer, vgem_fence_timeout, (unsigned long)fence);
 
 	/* We force the fence to expire within 10s to prevent driver hangs */
-	mod_timer(&fence->timer, jiffies + VGEM_FENCE_TIMEOUT);
+	if ((flags & VGEM_FENCE_NOTIMEOUT) == 0)
+		mod_timer(&fence->timer, jiffies + VGEM_FENCE_TIMEOUT);
 
 	return &fence->base;
 }
@@ -160,8 +161,17 @@ int vgem_fence_attach_ioctl(struct drm_device *dev,
 	struct fence *fence;
 	int ret;
 
-	if (arg->flags & ~VGEM_FENCE_WRITE)
+	if (arg->flags & ~(VGEM_FENCE_WRITE | VGEM_FENCE_NOTIMEOUT))
 		return -EINVAL;
+
+	if (arg->flags & VGEM_FENCE_NOTIMEOUT) {
+		if (config_enabled(CONFIG_DRM_VGEM_FENCE_HANG)) {
+			if (!capable(CAP_SYS_ADMIN))
+				return -EPERM;
+		} else {
+			return -EINVAL;
+		}
+	}
 
 	if (arg->pad)
 		return -EINVAL;

@@ -46,6 +46,7 @@ struct drm_vgem_fence_attach {
 	__u32 handle;
 	__u32 flags;
 #define VGEM_FENCE_WRITE	0x1
+#define VGEM_FENCE_NOTIMEOUT	0x2
 	__u32 out_fence;
 	__u32 pad;
 };

@@ -228,6 +228,19 @@ config DRM_VGEM
 	  as used by Mesa's software renderer for enhanced performance.
 	  If M is selected the module will be called vgem.
 
+config DRM_VGEM_FENCE_HANG
+	bool "Enable fence hang testing (DANGEROUS)"
+	depends on DRM_VGEM
+	depends on EXPERT
+	depends on !COMPILE_TEST
+	default n
+	help
+	  Enables support for root to use indefinite fences.
+	  Do not enable this unless you are testing DRM drivers.
+
+	  Recommended for driver developers only.
+
+	  If in doubt, say "N".
 
 source "drivers/gpu/drm/exynos/Kconfig"
 
