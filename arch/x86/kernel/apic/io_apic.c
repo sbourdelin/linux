@@ -2054,6 +2054,7 @@ static inline void __init check_timer(void)
 	int apic1, pin1, apic2, pin2;
 	unsigned long flags;
 	int no_pin1 = 0;
+	unsigned int value;
 
 	local_irq_save(flags);
 
@@ -2071,7 +2072,8 @@ static inline void __init check_timer(void)
 	 * The AEOI mode will finish them in the 8259A
 	 * automatically.
 	 */
-	apic_write(APIC_LVT0, APIC_LVT_MASKED | APIC_DM_EXTINT);
+	value = SET_APIC_DELIVERY_MODE(0, APIC_MODE_EXTINT);
+	apic_write(APIC_LVT0, APIC_LVT_MASKED | value);
 	legacy_pic->init(1);
 
 	pin1  = find_isa_irq_pin(0, mp_INT);
@@ -2172,7 +2174,8 @@ static inline void __init check_timer(void)
 
 	legacy_pic->init(0);
 	legacy_pic->make_irq(0);
-	apic_write(APIC_LVT0, APIC_DM_EXTINT);
+	value = SET_APIC_DELIVERY_MODE(0, APIC_MODE_EXTINT);
+	apic_write(APIC_LVT0, value);
 
 	unlock_ExtINT_logic();
 
