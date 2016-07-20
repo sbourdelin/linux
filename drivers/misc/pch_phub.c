@@ -711,6 +711,12 @@ static int pch_phub_probe(struct pci_dev *pdev,
 
 	if (id->driver_data == 1) { /* EG20T PCH */
 		const char *board_name;
+		unsigned int prefetch = 0x000affaa;
+
+		if (pdev->dev.of_node)
+			of_property_read_u32(pdev->dev.of_node,
+						  "intel,eg20t-prefetch",
+						  &prefetch);
 
 		ret = sysfs_create_file(&pdev->dev.kobj,
 					&dev_attr_pch_mac.attr);
@@ -736,7 +742,7 @@ static int pch_phub_probe(struct pci_dev *pdev,
 						CLKCFG_UART_MASK);
 
 		/* set the prefech value */
-		iowrite32(0x000affaa, chip->pch_phub_base_address + 0x14);
+		iowrite32(prefetch, chip->pch_phub_base_address + 0x14);
 		/* set the interrupt delay value */
 		iowrite32(0x25, chip->pch_phub_base_address + 0x44);
 		chip->pch_opt_rom_start_address = PCH_PHUB_ROM_START_ADDR_EG20T;
