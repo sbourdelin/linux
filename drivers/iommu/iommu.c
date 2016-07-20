@@ -418,13 +418,18 @@ rename:
 
 	dev->iommu_group = group;
 
-	iommu_group_create_direct_mappings(group, dev);
-
 	mutex_lock(&group->mutex);
 	list_add_tail(&device->list, &group->devices);
 	if (group->domain)
 		__iommu_attach_device(group->domain, dev);
 	mutex_unlock(&group->mutex);
+
+	/*
+	 * For some iommu driver like mtk iommu, the map callback was assigned
+	 * after device attached. The direct_mappings would call iommu map and
+	 * dereference NULL if it's called earlier than attach_device.
+	 */
+	iommu_group_create_direct_mappings(group, dev);
 
 	/* Notify any listeners about change to group. */
 	blocking_notifier_call_chain(&group->notifier,
