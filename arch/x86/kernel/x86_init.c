@@ -139,5 +139,5 @@ void arch_restore_msi_irqs(struct pci_dev *dev)
 
 struct x86_io_apic_ops x86_io_apic_ops = {
 	.read			= native_io_apic_read,
-	.disable		= native_disable_io_apic,
+	.disable		= switch_to_legacy_irq_mode,
 };

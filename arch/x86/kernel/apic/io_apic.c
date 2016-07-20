@@ -1431,7 +1431,7 @@ void __init enable_IO_APIC(void)
 	clear_IO_APIC();
 }
 
-void native_disable_io_apic(void)
+static void ioapic_set_virtual_wire_mode(void)
 {
 	/*
 	 * If the i8259 is routed through an IOAPIC
@@ -1454,21 +1454,24 @@ void native_disable_io_apic(void)
 		 */
 		ioapic_write_entry(ioapic_i8259.apic, ioapic_i8259.pin, entry);
 	}
-
-	if (boot_cpu_has(X86_FEATURE_APIC) || apic_from_smp_config())
-		disconnect_bsp_APIC(ioapic_i8259.pin != -1);
 }
 
 /*
- * Not an __init, needed by kexec/kdump code.
- * For safety IO-APIC and Local APIC need be cleared before this.
+ * In legacy irq mode, full DOS compatibility with the uniprocessor PC/AT is
+ * provided by using the APICs in conjunction with standard 8259A-equivalent
+ * programmable interrupt controllers (PICs). It's necessary to deliver legacy
+ * interrupts even when APIC mode is not enabled. This is required by kexec/
+ * kdump before enter into the 2nd kernel.
  */
 void switch_to_legacy_irq_mode(void)
 {
 	if (!nr_legacy_irqs())
 		return;
 
-	x86_io_apic_ops.disable();
+	ioapic_set_virtual_wire_mode();
+
+	if (boot_cpu_has(X86_FEATURE_APIC) || apic_from_smp_config())
+		lapic_set_legacy_irq_mode(ioapic_i8259.pin != -1);
 }
 
 #ifdef CONFIG_X86_32

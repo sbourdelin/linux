@@ -37,7 +37,7 @@ static void irq_remapping_disable_io_apic(void)
 	 * now.
 	 */
 	if (boot_cpu_has(X86_FEATURE_APIC) || apic_from_smp_config())
-		disconnect_bsp_APIC(0);
+		lapic_set_legacy_irq_mode(0);
 }
 
 static void __init irq_remapping_modify_x86_ops(void)
