@@ -279,7 +279,8 @@ static const struct intel_device_info intel_valleyview_d_info = {
 	.has_fpga_dbg = 1, \
 	.has_psr = 1, \
 	.has_runtime_pm = 1, \
-	.has_resource_streamer = 1
+	.has_resource_streamer = 1, \
+	.has_dp_mst = 1
 
 static const struct intel_device_info intel_haswell_d_info = {
 	HSW_FEATURES,
@@ -331,6 +332,7 @@ static const struct intel_device_info intel_cherryview_info = {
 	.has_runtime_pm = 1,
 	.has_resource_streamer = 1,
 	.has_rc6 = 1,
+	.has_dp_mst = 1,
 	.display_mmio_offset = VLV_DISPLAY_BASE,
 	GEN_CHV_PIPEOFFSETS,
 	CURSOR_OFFSETS,
