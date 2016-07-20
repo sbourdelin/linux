@@ -1163,7 +1163,8 @@ void __init init_bsp_APIC(void)
 	/*
 	 * Set up the virtual wire mode.
 	 */
-	apic_write(APIC_LVT0, APIC_DM_EXTINT);
+	value = SET_APIC_DELIVERY_MODE(0, APIC_MODE_EXTINT);
+	apic_write(APIC_LVT0, value);
 	value = APIC_DM_NMI;
 	if (!lapic_is_integrated())		/* 82489DX */
 		value |= APIC_LVT_LEVEL_TRIGGER;
@@ -1377,10 +1378,11 @@ void setup_local_APIC(void)
 	 */
 	value = apic_read(APIC_LVT0) & APIC_LVT_MASKED;
 	if (!cpu && (pic_mode || !value)) {
-		value = APIC_DM_EXTINT;
+		value = SET_APIC_DELIVERY_MODE(0, APIC_MODE_EXTINT);
 		apic_printk(APIC_VERBOSE, "enabled ExtINT on CPU#%d\n", cpu);
 	} else {
-		value = APIC_DM_EXTINT | APIC_LVT_MASKED;
+		value = SET_APIC_DELIVERY_MODE(0, APIC_MODE_EXTINT);
+		value = value | APIC_LVT_MASKED;
 		apic_printk(APIC_VERBOSE, "masked ExtINT on CPU#%d\n", cpu);
 	}
 	apic_write(APIC_LVT0, value);
