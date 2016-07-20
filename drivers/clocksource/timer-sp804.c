@@ -57,8 +57,7 @@ static long __init sp804_get_clock_rate(struct clk *clk)
 	rate = clk_get_rate(clk);
 	if (rate < 0) {
 		pr_err("sp804: clock failed to get rate: %ld\n", rate);
-		clk_disable(clk);
-		clk_unprepare(clk);
+		clk_disable_unprepare(clk);
 		clk_put(clk);
 	}
 
