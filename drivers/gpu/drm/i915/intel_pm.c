@@ -3859,8 +3859,11 @@ static void skl_flush_wm_values(struct drm_i915_private *dev_priv,
 	/*
 	 * Third pass: flush the pipes that got more space allocated.
 	 *
-	 * We don't need to actively wait for the update here, next vblank
-	 * will just get more DDB space with the correct WM values.
+	 * While the hardware doesn't require to wait for the next vblank here,
+	 * continuing before the pipe finishes updating could result in us
+	 * trying to update the wm values again before the pipe finishes
+	 * updating, which results in the hardware using intermediate wm values
+	 * and subsequently underrunning pipes.
 	 */
 	for_each_intel_crtc(dev, crtc) {
 		if (!crtc->active)
@@ -3876,6 +3879,16 @@ static void skl_flush_wm_values(struct drm_i915_private *dev_priv,
 			continue;
 
 		skl_wm_flush_pipe(dev_priv, pipe, 3);
+
+		/*
+		 * The only time we can get away with not waiting for an update
+		 * is when we just enabled the pipe, e.g. when it doesn't have
+		 * vblanks enabled anyway.
+		 */
+		if (drm_crtc_vblank_get(&crtc->base) == 0) {
+			intel_wait_for_vblank(dev, pipe);
+			drm_crtc_vblank_put(&crtc->base);
+		}
 	}
 }
 
