@@ -3987,10 +3987,13 @@ skl_copy_wm_for_pipe(struct skl_wm_values *dst,
 static int
 skl_compute_wm(struct drm_atomic_state *state)
 {
+	struct drm_device *dev = state->dev;
+	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *cstate;
 	struct intel_atomic_state *intel_state = to_intel_atomic_state(state);
 	struct skl_wm_values *results = &intel_state->wm_results;
+	struct skl_wm_values *hw_wm = &dev_priv->wm.skl_hw;
 	struct skl_pipe_wm *pipe_wm;
 	bool changed = false;
 	int ret, i;
@@ -4039,12 +4042,14 @@ skl_compute_wm(struct drm_atomic_state *state)
 		if (changed)
 			results->dirty_pipes |= drm_crtc_mask(crtc);
 
-		if ((results->dirty_pipes & drm_crtc_mask(crtc)) == 0)
+		if ((results->dirty_pipes & drm_crtc_mask(crtc)) == 0) {
 			/* This pipe's WM's did not change */
+			skl_copy_wm_for_pipe(results, hw_wm, intel_crtc->pipe);
 			continue;
+		}
 
 		intel_cstate->update_wm_pre = true;
-		skl_compute_wm_results(crtc->dev, pipe_wm, results, intel_crtc);
+		skl_compute_wm_results(dev, pipe_wm, results, intel_crtc);
 	}
 
 	return 0;
