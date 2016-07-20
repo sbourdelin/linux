@@ -831,8 +831,7 @@ static void __sa1111_remove(struct sa1111 *sachip)
 	sa1111_writel(0, irqbase + SA1111_WAKEEN0);
 	sa1111_writel(0, irqbase + SA1111_WAKEEN1);
 
-	clk_disable(sachip->clk);
-	clk_unprepare(sachip->clk);
+	clk_disable_unprepare(sachip->clk);
 
 	if (sachip->irq != NO_IRQ) {
 		irq_set_chained_handler_and_data(sachip->irq, NULL, NULL);
