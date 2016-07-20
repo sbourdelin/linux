@@ -293,13 +293,3 @@ void mm_iommu_init(mm_context_t *ctx)
 {
 	INIT_LIST_HEAD_RCU(&ctx->iommu_group_mem_list);
 }
-
-void mm_iommu_cleanup(mm_context_t *ctx)
-{
-	struct mm_iommu_table_group_mem_t *mem, *tmp;
-
-	list_for_each_entry_safe(mem, tmp, &ctx->iommu_group_mem_list, next) {
-		list_del_rcu(&mem->next);
-		mm_iommu_do_free(mem);
-	}
-}
