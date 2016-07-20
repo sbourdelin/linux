@@ -9,6 +9,13 @@ Required properties:
 	- ti,fifo-depth - Transmitt FIFO depth- see dt-bindings/net/ti-dp83867.h
 		for applicable values
 
+Optional property:
+	- ti,impedance-control - MAC Interface Impedance control to vary the
+				 output impedance with an approximate range
+				 from 35-70 ohms in 32 steps. Value range can
+				 be 0x0 to 0x1f. Lowest impedance value is
+				 0x1f and highest impedance being 0x0.
+
 Default child nodes are standard Ethernet PHY device
 nodes as described in Documentation/devicetree/bindings/net/phy.txt
 
