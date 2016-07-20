@@ -327,7 +327,8 @@ static const struct intel_device_info intel_cherryview_info = {
 #define GEN9_FEATURES  \
 	.gen = 9, \
 	.has_csr = 1, \
-	.has_guc = 1
+	.has_guc = 1, \
+	.has_guc_ucode = 1
 
 static const struct intel_device_info intel_skylake_info = {
 	BDW_FEATURES,
