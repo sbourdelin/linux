@@ -1204,7 +1204,7 @@ static void drop_large_spte(struct kvm_vcpu *vcpu, u64 *sptep)
  *
  * Return true if tlb need be flushed.
  */
-static bool spte_write_protect(struct kvm *kvm, u64 *sptep, bool pt_protect)
+static bool spte_write_protect(u64 *sptep, bool pt_protect)
 {
 	u64 spte = *sptep;
 
@@ -1230,7 +1230,7 @@ static bool __rmap_write_protect(struct kvm *kvm,
 	bool flush = false;
 
 	for_each_rmap_spte(rmap_head, &iter, sptep)
-		flush |= spte_write_protect(kvm, sptep, pt_protect);
+		flush |= spte_write_protect(sptep, pt_protect);
 
 	return flush;
 }
