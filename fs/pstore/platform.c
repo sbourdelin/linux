@@ -467,13 +467,14 @@ int pstore_register(struct pstore_info *psi)
 	if (pstore_is_mounted())
 		pstore_get_records(0);
 
-	pstore_register_kmsg();
-
-	if ((psi->flags & PSTORE_FLAGS_FRAGILE) == 0) {
+	if (psi->flags & PSTORE_FLAGS_DMESG)
+		pstore_register_kmsg();
+	if (psi->flags & PSTORE_FLAGS_CONSOLE)
 		pstore_register_console();
+	if (psi->flags & PSTORE_FLAGS_FTRACE)
 		pstore_register_ftrace();
+	if (psi->flags & PSTORE_FLAGS_PMSG)
 		pstore_register_pmsg();
-	}
 
 	if (pstore_update_ms >= 0) {
 		pstore_timer.expires = jiffies +
