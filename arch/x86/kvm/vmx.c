@@ -2854,7 +2854,6 @@ static int vmx_get_vmx_msr(struct kvm_vcpu *vcpu, u32 msr_index, u64 *pdata)
 			vmx->nested.nested_vmx_secondary_ctls_high);
 		break;
 	case MSR_IA32_VMX_EPT_VPID_CAP:
-		/* Currently, no nested vpid support */
 		*pdata = vmx->nested.nested_vmx_ept_caps |
 			((u64)vmx->nested.nested_vmx_vpid_caps << 32);
 		break;
@@ -7462,7 +7461,7 @@ static int handle_invept(struct kvm_vcpu *vcpu)
 		break;
 	default:
 		/* Trap single context invalidation invept calls */
-		BUG_ON(1);
+		WARN_ON(1);
 		break;
 	}
 
@@ -7525,7 +7524,7 @@ static int handle_invvpid(struct kvm_vcpu *vcpu)
 		break;
 	default:
 		/* Trap individual address invalidation invvpid calls */
-		BUG_ON(1);
+		WARN_ON(1);
 		break;
 	}
 
