@@ -9924,6 +9924,10 @@ static int nested_vmx_run(struct kvm_vcpu *vcpu, bool launch)
 
 	skip_emulated_instruction(vcpu);
 	vmcs12 = get_vmcs12(vcpu);
+	if ((vmcs12->revision_id >> 31) & 1u) {
+		nested_vmx_failInvalid(vcpu);
+		return 1;
+	}
 
 	if (enable_shadow_vmcs)
 		copy_shadow_to_vmcs12(vmx);
