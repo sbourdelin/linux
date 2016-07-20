@@ -3837,7 +3837,6 @@ static void skl_flush_wm_values(struct drm_i915_private *dev_priv,
 		reallocated[pipe] = true;
 	}
 
-
 	/*
 	 * Second pass: flush the pipes that are having their allocation
 	 * reduced, but overlapping with a previous allocation.
