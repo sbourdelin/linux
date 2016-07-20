@@ -88,6 +88,8 @@ Optional endpoint properties
 - field-even-active: field signal level during the even field data transmission.
 - pclk-sample: sample data on rising (1) or falling (0) edge of the pixel clock
   signal.
+- newavmode: a boolean property to indicate an Analog Devices decoder is
+  operating in NEWAVMODE. Valid for BT.656 busses only.
 - sync-on-green-active: active state of Sync-on-green (SoG) signal, 0/1 for
   LOW/HIGH respectively.
 - data-lanes: an array of physical data lane indexes. Position of an entry

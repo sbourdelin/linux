@@ -43,6 +43,11 @@
 /* Active state of Sync-on-green (SoG) signal, 0/1 for LOW/HIGH respectively. */
 #define V4L2_MBUS_VIDEO_SOG_ACTIVE_HIGH	(1 << 12)
 #define V4L2_MBUS_VIDEO_SOG_ACTIVE_LOW		(1 << 13)
+/*
+ * BT.656 specific flags
+ */
+/* Analog Device's NEWAVMODE */
+#define V4L2_MBUS_NEWAVMODE			(1 << 14)
 
 /* Serial flags */
 /* How many lanes the client can use */

@@ -109,6 +109,10 @@ static void v4l2_of_parse_parallel_bus(const struct device_node *node,
 		flags |= v ? V4L2_MBUS_DATA_ACTIVE_HIGH :
 			V4L2_MBUS_DATA_ACTIVE_LOW;
 
+	if (endpoint->bus_type == V4L2_MBUS_BT656 &&
+	    of_get_property(node, "newavmode", &v))
+		flags |= V4L2_MBUS_NEWAVMODE;
+
 	if (of_get_property(node, "slave-mode", &v))
 		flags |= V4L2_MBUS_SLAVE;
 	else
