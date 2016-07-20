@@ -3148,22 +3148,30 @@ static void nand_shutdown(struct mtd_info *mtd)
 }
 
 /* Set default functions */
-static void nand_set_defaults(struct nand_chip *chip, int busw)
+static int nand_set_defaults(struct nand_chip *chip, int busw)
 {
 	/* check for proper chip_delay setup, set 20us if not */
 	if (!chip->chip_delay)
 		chip->chip_delay = 20;
 
 	/* check, if a user supplied command function given */
-	if (chip->cmdfunc == NULL)
+	if (chip->cmdfunc == NULL) {
+		if (!chip->cmd_ctrl)
+			goto no_cmd_ctrl;
+
 		chip->cmdfunc = nand_command;
+	}
 
 	/* check, if a user supplied wait function given */
 	if (chip->waitfunc == NULL)
 		chip->waitfunc = nand_wait;
 
-	if (!chip->select_chip)
+	if (!chip->select_chip) {
+		if (!chip->cmd_ctrl)
+			goto no_cmd_ctrl;
+
 		chip->select_chip = nand_select_chip;
+	}
 
 	/* set for ONFI nand */
 	if (!chip->onfi_set_features)
@@ -3195,6 +3203,11 @@ static void nand_set_defaults(struct nand_chip *chip, int busw)
 		init_waitqueue_head(&chip->controller->wq);
 	}
 
+	return 0;
+
+no_cmd_ctrl:
+	pr_err("chip.cmd_ctrl() callback is not provided\n");
+	return -EINVAL;
 }
 
 /* Sanitize ONFI strings so we can safely print them */
@@ -3912,9 +3925,13 @@ ident_done:
 	}
 
 	if (chip->options & NAND_BUSWIDTH_AUTO) {
+		int ret;
+
 		WARN_ON(chip->options & NAND_BUSWIDTH_16);
 		chip->options |= busw;
-		nand_set_defaults(chip, busw);
+		ret = nand_set_defaults(chip, busw);
+		if (ret < 0)
+			return ERR_PTR(ret);
 	} else if (busw != (chip->options & NAND_BUSWIDTH_16)) {
 		/*
 		 * Check, if buswidth is correct. Hardware drivers should set
@@ -4142,7 +4159,9 @@ int nand_scan_ident(struct mtd_info *mtd, int maxchips,
 		mtd->name = dev_name(mtd->dev.parent);
 
 	/* Set the default functions */
-	nand_set_defaults(chip, chip->options & NAND_BUSWIDTH_16);
+	ret = nand_set_defaults(chip, chip->options & NAND_BUSWIDTH_16);
+	if (ret < 0)
+		return ret;
 
 	/* Read the flash type */
 	type = nand_get_flash_type(mtd, chip, &nand_maf_id,
