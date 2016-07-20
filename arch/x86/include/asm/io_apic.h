@@ -191,7 +191,8 @@ static inline unsigned int io_apic_read(unsigned int apic, unsigned int reg)
 
 extern void setup_IO_APIC(void);
 extern void enable_IO_APIC(void);
-extern void disable_IO_APIC(void);
+extern void clear_IO_APIC (void);
+extern void switch_to_legacy_irq_mode(void);
 extern void setup_ioapic_dest(void);
 extern int IO_APIC_get_PCI_irq_vector(int bus, int devfn, int pin);
 extern void print_IO_APICs(void);
