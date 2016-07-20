@@ -784,6 +784,7 @@ struct intel_csr {
 	func(has_aux_irq) sep \
 	func(has_gmbus_irq) sep \
 	func(has_fw_blc) sep \
+	func(has_hw_contexts) sep \
 	func(has_resource_streamer) sep \
 	func(has_pipe_cxsr) sep \
 	func(has_hotplug) sep \
@@ -2817,7 +2818,7 @@ struct drm_i915_cmd_table {
 				 HAS_EDRAM(dev))
 #define I915_NEED_GFX_HWS(dev)	(INTEL_INFO(dev)->need_gfx_hws)
 
-#define HAS_HW_CONTEXTS(dev)	(INTEL_INFO(dev)->gen >= 6)
+#define HAS_HW_CONTEXTS(dev)	(INTEL_INFO(dev)->has_hw_contexts)
 #define HAS_LOGICAL_RING_CONTEXTS(dev)	(INTEL_INFO(dev)->gen >= 8)
 #define USES_PPGTT(dev)		(i915.enable_ppgtt)
 #define USES_FULL_PPGTT(dev)	(i915.enable_ppgtt >= 2)
