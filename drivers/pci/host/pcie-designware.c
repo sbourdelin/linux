@@ -34,6 +34,10 @@
 #define LINK_WAIT_IATU_MIN		9000
 #define LINK_WAIT_IATU_MAX		10000
 
+/* Core version (available from core 4.70) */
+#define PCIE_CORE_VERSION		0x8F8
+#define PCIE_CORE_VERSION_480A		0x3438302a
+
 /* Synopsys specific PCIE configuration registers */
 #define PCIE_PORT_LINK_CONTROL		0x710
 #define PORT_LINK_MODE_MASK		(0x3f << 16)
