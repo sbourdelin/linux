@@ -1127,10 +1127,8 @@ resolve_normal_ct(struct net *net, struct nf_conn *tmpl,
 	if (!h) {
 		h = init_conntrack(net, tmpl, &tuple, l3proto, l4proto,
 				   skb, dataoff, hash);
-		if (!h)
-			return NULL;
-		if (IS_ERR(h))
-			return (void *)h;
+		if (IS_ERR_OR_NULL(h))
+			return ERR_CAST(h);
 	}
 	ct = nf_ct_tuplehash_to_ctrack(h);
 
