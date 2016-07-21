@@ -62,10 +62,12 @@ void __init reserve_ebda_region(void)
 	if (lowmem < INSANE_CUTOFF)
 		lowmem = LOWMEM_CAP;
 
-	/* Use the lower of the lowmem and EBDA markers as the cutoff */
-	lowmem = min(lowmem, ebda_addr);
 	lowmem = min(lowmem, LOWMEM_CAP); /* Absolute cap */
 
 	/* reserve all memory between lowmem and the 1MB mark */
 	memblock_reserve(lowmem, 0x100000 - lowmem);
+
+	/* if the EBDA is in lowmem, reserve it separately. */
+	if (ebda_addr < lowmem)
+		memblock_reserve(ebda_addr, 4096);
 }
