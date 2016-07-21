@@ -371,6 +371,7 @@ struct mlx4_port {
 	struct attribute_group gid_group;
 	struct device_attribute	enable_smi_admin;
 	struct device_attribute	smi_enabled;
+	struct device_attribute	node_guid;
 	int		       slave;
 	u8                     port_num;
 };
@@ -620,6 +621,7 @@ static int add_vf_smi_entries(struct mlx4_port *p)
 		sysfs_remove_file(&p->kobj, &p->smi_enabled.attr);
 		return ret;
 	}
+
 	return 0;
 }
 
@@ -633,6 +635,69 @@ static void remove_vf_smi_entries(struct mlx4_port *p)
 
 	sysfs_remove_file(&p->kobj, &p->smi_enabled.attr);
 	sysfs_remove_file(&p->kobj, &p->enable_smi_admin.attr);
+}
+
+static ssize_t sysfs_show_node_guid(struct device *dev,
+				    struct device_attribute *attr,
+				    char *buf)
+{
+	struct mlx4_port *p = container_of(attr, struct mlx4_port, node_guid);
+	ssize_t len = 0;
+	__be64 guid = mlx4_get_slave_node_guid(p->dev->dev, p->slave);
+
+	len = sprintf(buf, "slave %d 0x%llx\n", p->slave, be64_to_cpu(guid));
+
+	return len;
+}
+
+static ssize_t sysfs_store_node_guid(struct device *dev,
+				     struct device_attribute *attr,
+				     const char *buf, size_t count)
+{
+	struct mlx4_port *p = container_of(attr, struct mlx4_port, node_guid);
+	__be64 guid;
+
+	if (sscanf(buf, "0x%llx", &guid) != 1)
+		return -EINVAL;
+
+	mlx4_put_slave_node_guid(p->dev->dev, p->slave, cpu_to_be64(guid));
+
+	return count;
+}
+
+static int add_vf_admin_guid_entry(struct mlx4_port *p)
+{
+	int is_eth = rdma_port_get_link_layer(&p->dev->ib_dev, p->port_num) ==
+		     IB_LINK_LAYER_ETHERNET;
+	int ret;
+
+	/* do not display entries if eth transport, or if master */
+	if (is_eth || p->slave == mlx4_master_func_num(p->dev->dev))
+		return 0;
+
+	sysfs_attr_init(&p->node_guid.attr);
+	p->node_guid.show = sysfs_show_node_guid;
+	p->node_guid.store = sysfs_store_node_guid;
+	p->node_guid.attr.name = "node_guid";
+	p->node_guid.attr.mode = 0644;
+	ret = sysfs_create_file(&p->kobj, &p->node_guid.attr);
+	if (ret) {
+		pr_err("failed to create sysfs entry for node_guid\n");
+		return ret;
+	}
+
+	return 0;
+}
+
+static void remove_vf_node_guid_entry(struct mlx4_port *p)
+{
+	int is_eth = rdma_port_get_link_layer(&p->dev->ib_dev, p->port_num) ==
+			IB_LINK_LAYER_ETHERNET;
+
+	if (is_eth || p->slave == mlx4_master_func_num(p->dev->dev))
+		return;
+
+	sysfs_remove_file(&p->kobj, &p->node_guid.attr);
 }
 
 static int add_port(struct mlx4_ib_dev *dev, int port_num, int slave)
@@ -683,6 +748,10 @@ static int add_port(struct mlx4_ib_dev *dev, int port_num, int slave)
 		goto err_free_gid;
 
 	ret = add_vf_smi_entries(p);
+	if (ret)
+		goto err_free_gid;
+
+	ret = add_vf_admin_guid_entry(p);
 	if (ret)
 		goto err_free_gid;
 
@@ -743,6 +812,7 @@ static int register_one_pkey_tree(struct mlx4_ib_dev *dev, int slave)
 		if (err)
 			goto err_add;
 	}
+
 	return 0;
 
 err_add:
@@ -754,6 +824,7 @@ err_add:
 		sysfs_remove_group(p, &mport->pkey_group);
 		sysfs_remove_group(p, &mport->gid_group);
 		remove_vf_smi_entries(mport);
+		remove_vf_node_guid_entry(mport);
 		kobject_put(p);
 	}
 	kobject_put(dev->dev_ports_parent[slave]);
@@ -799,6 +870,7 @@ static void unregister_pkey_tree(struct mlx4_ib_dev *device)
 			sysfs_remove_group(p, &port->pkey_group);
 			sysfs_remove_group(p, &port->gid_group);
 			remove_vf_smi_entries(port);
+			remove_vf_node_guid_entry(port);
 			kobject_put(p);
 			kobject_put(device->dev_ports_parent[slave]);
 		}
