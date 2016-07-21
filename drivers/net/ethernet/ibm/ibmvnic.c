@@ -203,7 +203,8 @@ static void free_long_term_buff(struct ibmvnic_adapter *adapter,
 	struct device *dev = &adapter->vdev->dev;
 
 	dma_free_coherent(dev, ltb->size, ltb->buff, ltb->addr);
-	send_request_unmap(adapter, ltb->map_id);
+	if (!adapter->failover)
+		send_request_unmap(adapter, ltb->map_id);
 }
 
 static int alloc_rx_pool(struct ibmvnic_adapter *adapter,
@@ -471,7 +472,10 @@ static int ibmvnic_open(struct net_device *netdev)
 	crq.logical_link_state.link_state = IBMVNIC_LOGICAL_LNK_UP;
 	ibmvnic_send_crq(adapter, &crq);
 
-	netif_tx_start_all_queues(netdev);
+	if (!adapter->failover)
+		netif_tx_start_all_queues(netdev);
+	else
+		netif_tx_wake_all_queues(netdev);
 
 	return 0;
 
@@ -522,7 +526,10 @@ static int ibmvnic_close(struct net_device *netdev)
 	for (i = 0; i < adapter->req_rx_queues; i++)
 		napi_disable(&adapter->napi[i]);
 
-	netif_tx_stop_all_queues(netdev);
+	if (!adapter->failover)
+		netif_tx_stop_all_queues(netdev);
+	else
+		netif_tx_disable(netdev);
 
 	if (adapter->bounce_buffer) {
 		if (!dma_mapping_error(dev, adapter->bounce_buffer_dma)) {
@@ -3280,6 +3287,10 @@ static void ibmvnic_handle_crq(union ibmvnic_crq *crq,
 			rc = ibmvnic_send_crq_init(adapter);
 			if (rc)
 				dev_err(dev, "Error sending init rc=%ld\n", rc);
+		} else if (gen_crq->cmd == IBMVNIC_DEVICE_FAILOVER) {
+			dev_info(dev, "Backing device failover detected\n");
+			netif_carrier_off(netdev);
+			adapter->failover = true;
 		} else {
 			/* The adapter lost the connection */
 			dev_err(dev, "Virtual Adapter failed (rc=%d)\n",
@@ -3615,7 +3626,16 @@ static void handle_crq_init_rsp(struct work_struct *work)
 	struct device *dev = &adapter->vdev->dev;
 	struct net_device *netdev = adapter->netdev;
 	unsigned long timeout = msecs_to_jiffies(30000);
+	bool restart = false;
 	int rc;
+
+	if (adapter->failover) {
+		release_sub_crqs(adapter);
+		if (netif_running(netdev)) {
+			ibmvnic_close(netdev);
+			restart = true;
+		}
+	}
 
 	send_version_xchg(adapter);
 	reinit_completion(&adapter->init_done);
@@ -3644,6 +3664,14 @@ static void handle_crq_init_rsp(struct work_struct *work)
 		goto task_failed;
 
 	netdev->real_num_tx_queues = adapter->req_tx_queues;
+
+	if (adapter->failover) {
+		if (restart)
+			ibmvnic_open(netdev);
+		netif_carrier_on(netdev);
+		adapter->failover = false;
+		return;
+	}
 
 	rc = register_netdev(netdev);
 	if (rc) {
@@ -3692,6 +3720,7 @@ static int ibmvnic_probe(struct vio_dev *dev, const struct vio_device_id *id)
 	dev_set_drvdata(&dev->dev, netdev);
 	adapter->vdev = dev;
 	adapter->netdev = netdev;
+	adapter->failover = false;
 
 	ether_addr_copy(adapter->mac_addr, mac_addr_p);
 	ether_addr_copy(netdev->dev_addr, adapter->mac_addr);
