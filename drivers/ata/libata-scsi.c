@@ -3634,7 +3634,7 @@ static int ata_mselect_caching(struct ata_queued_cmd *qc,
 		/* Check the first byte */
 		if (i == 0) {
 			/* except the WCE bit */
-			if (mpage[i + 2] & 0xfb != buf[i] & 0xfb) {
+			if ((mpage[i + 2] & 0xfb) != (buf[i] & 0xfb)) {
 				*fp = i;
 				return -EINVAL;
 			} else {
@@ -3699,7 +3699,7 @@ static int ata_mselect_control(struct ata_queued_cmd *qc,
 		/* Check the first byte */
 		if (i == 0) {
 			/* except the D_SENSE bit */
-			if (mpage[i + 2] & 0xfb != buf[i] & 0xfb) {
+			if ((mpage[i + 2] & 0xfb) != (buf[i] & 0xfb)) {
 				*fp = i;
 				return -EINVAL;
 			} else {
