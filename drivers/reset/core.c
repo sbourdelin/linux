@@ -257,6 +257,30 @@ static void __reset_control_put(struct reset_control *rstc)
 	kfree(rstc);
 }
 
+/**
+ * __of_reset_control_get - Lookup and obtain a reference to a reset controller.
+ * @node: device to be reset by the controller
+ * @id: optional reset line name
+ * @index: index of the reset line (valid iif @id is NULL)
+ * @shared: shareability of reset control
+ *
+ * Returns a struct reset_control or IS_ERR() condition containing errno.
+ * The target reset line can be specified by either @id or @index.
+ *
+ * Set the @shared flag for use with reset-controls which are shared between
+ * multiple hardware blocks. When a reset-control is shared, the behavior of
+ * reset_control_assert / deassert is changed; the reset-core will keep track
+ * of a deassert_count and only (re-)assert the reset after reset_control_assert
+ * has been called as many times as reset_control_deassert was called. Calling
+ * reset_control_assert without first calling reset_control_deassert is not
+ * allowed on a shared reset control. Calling reset_control_reset is also not
+ * allowed on a shared reset control. Also see the remark about shared reset
+ * controls in the reset_control_assert docs.
+ *
+ * If the @shared flag is not set, this function gets an exclusive reference to
+ * a reset controller; if this function is called more then once for the same
+ * reset_control it will return -EBUSY.
+ */
 struct reset_control *__of_reset_control_get(struct device_node *node,
 				     const char *id, int index, int shared)
 {
@@ -337,6 +361,18 @@ static void devm_reset_control_release(struct device *dev, void *res)
 	reset_control_put(*(struct reset_control **)res);
 }
 
+/**
+ * __devm_reset_control_get - resource managed __of_reset_control_get()
+ * @dev: device to be reset by the controller
+ * @id: optional reset line name
+ * @index: index of the reset line (valid iif @id is NULL)
+ * @shared: shareability of reset control
+ *
+ * Managed __of_reset_control_get(). For reset controllers returned from this
+ * function, reset_control_put() is called automatically on driver detach.
+ *
+ * See __of_reset_control_get() for more information.
+ */
 struct reset_control *__devm_reset_control_get(struct device *dev,
 				     const char *id, int index, int shared)
 {
