@@ -1152,7 +1152,7 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 		} else {
 			if (lladdr == neigh->ha && new == NUD_STALE &&
 			    ((flags & NEIGH_UPDATE_F_WEAK_OVERRIDE) ||
-			     (old & NUD_CONNECTED))
+			     (old & (NUD_CONNECTED | NUD_DELAY)))
 			    )
 				new = old;
 		}
