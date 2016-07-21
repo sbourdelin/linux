@@ -141,6 +141,11 @@ static void *vb2_dc_alloc(struct device *dev, const struct dma_attrs *attrs,
 {
 	struct vb2_dc_buf *buf;
 
+	if (WARN_ON(!dev)) {
+		pr_debug("dev is NULL\n");
+		return ERR_PTR(-EINVAL);
+	}
+
 	buf = kzalloc(sizeof *buf, GFP_KERNEL);
 	if (!buf)
 		return ERR_PTR(-ENOMEM);
@@ -499,6 +504,11 @@ static void *vb2_dc_get_userptr(struct device *dev, unsigned long vaddr,
 		return ERR_PTR(-EINVAL);
 	}
 
+	if (WARN_ON(!dev)) {
+		pr_debug("dev is NULL\n");
+		return ERR_PTR(-EINVAL);
+	}
+
 	buf = kzalloc(sizeof *buf, GFP_KERNEL);
 	if (!buf)
 		return ERR_PTR(-ENOMEM);
@@ -678,6 +688,11 @@ static void *vb2_dc_attach_dmabuf(struct device *dev, struct dma_buf *dbuf,
 
 	if (dbuf->size < size)
 		return ERR_PTR(-EFAULT);
+
+	if (WARN_ON(!dev)) {
+		pr_debug("dev is NULL\n");
+		return ERR_PTR(-EINVAL);
+	}
 
 	buf = kzalloc(sizeof(*buf), GFP_KERNEL);
 	if (!buf)
