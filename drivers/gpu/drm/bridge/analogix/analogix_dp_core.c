@@ -961,6 +961,14 @@ analogix_dp_detect(struct drm_connector *connector, bool force)
 {
 	struct analogix_dp_device *dp = to_dp(connector);
 
+	/*
+	 * Panle would prepare for several times here, but don't worry it
+	 * would only enable the hardware at the first prepare time.
+	 */
+	if (dp->plat_data->panel)
+		if (drm_panel_prepare(dp->plat_data->panel))
+			DRM_ERROR("failed to setup the panel\n");
+
 	if (analogix_dp_detect_hpd(dp))
 		return connector_status_disconnected;
 
@@ -1076,6 +1084,13 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
 		dp->plat_data->power_off(dp->plat_data);
 
 	pm_runtime_put_sync(dp->dev);
+
+	if (dp->plat_data->panel) {
+		if (drm_panel_unprepare(dp->plat_data->panel)) {
+			DRM_ERROR("failed to turnoff the panel\n");
+			return;
+		}
+	}
 
 	dp->dpms_mode = DRM_MODE_DPMS_OFF;
 }
@@ -1332,13 +1347,6 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
 	pm_runtime_enable(dev);
 
 	phy_power_on(dp->phy);
-
-	if (dp->plat_data->panel) {
-		if (drm_panel_prepare(dp->plat_data->panel)) {
-			DRM_ERROR("failed to setup the panel\n");
-			return -EBUSY;
-		}
-	}
 
 	analogix_dp_init_dp(dp);
 
