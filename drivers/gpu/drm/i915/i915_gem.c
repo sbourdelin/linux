@@ -3325,10 +3325,9 @@ i915_gem_idle_work_handler(struct work_struct *work)
 	rearm_hangcheck = false;
 
 	stuck_engines = intel_kick_waiters(dev_priv);
-	if (unlikely(stuck_engines)) {
-		DRM_DEBUG_DRIVER("kicked stuck waiters...missed irq\n");
-		dev_priv->gpu_error.missed_irq_rings |= stuck_engines;
-	}
+	if (unlikely(stuck_engines))
+		DRM_DEBUG_DRIVER("kicked stuck waiters (%x)...missed irq?\n",
+				 stuck_engines);
 
 	if (INTEL_GEN(dev_priv) >= 6)
 		gen6_rps_idle(dev_priv);
