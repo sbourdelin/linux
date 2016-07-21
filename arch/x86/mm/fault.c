@@ -20,6 +20,7 @@
 #include <asm/pgalloc.h>		/* pgd_*(), ...			*/
 #include <asm/kmemcheck.h>		/* kmemcheck_*(), ...		*/
 #include <asm/fixmap.h>			/* VSYSCALL_ADDR		*/
+#include <asm/fpu/internal.h>		/* for use_eager_fpu() checks	*/
 #include <asm/vsyscall.h>		/* emulate_vsyscall		*/
 #include <asm/vm86.h>			/* struct vm86			*/
 #include <asm/mmu_context.h>		/* vma_pkey()			*/
@@ -76,6 +77,52 @@ static nokprobe_inline int kprobes_fault(struct pt_regs *regs)
 }
 
 /*
+ * Memory protection keys only affect data access.  They do not
+ * affect instruction fetches.  So, an instruction may not be
+ * readable, while it *is* executable.  This makes the
+ * instruction temporarily readable so that we can do a data
+ * access and peek at its opcode.
+ */
+static
+int probe_insn_opcode(void *insn_address, unsigned char *ret_opcode)
+{
+	int ret;
+	u32 saved_pkru = read_pkru();
+
+	/*
+	 * Clear out all of the access/write-disable bits in
+	 * PKRU.  This ensures that pkeys will not block access
+	 * to @insn_address.  If no keys are access-disabled
+	 * (saved_pkru==0) avoid the cost of the PKRU writes
+	 * and the continued cost of having taken it out of its
+	 * (XSAVE) init state.
+	 *
+	 * Note also that this only affect access to user
+	 * addresses.  Kernel (supervisor) mappings are not
+	 * affected by this register.
+	 */
+	if (saved_pkru)
+		write_pkru(0);
+	/*
+	 * We normally have to be very careful with FPU registers
+	 * and preempt.  But, PKRU is different.  It is never
+	 * lazily saved/restored, so we don't have to be as
+	 * careful with this as normal FPU state.  Enforce this
+	 * assumption with the WARN_ON().
+	 */
+	if (cpu_feature_enabled(X86_FEATURE_OSPKE))
+		WARN_ON_ONCE(!use_eager_fpu());
+	ret = probe_kernel_address(insn_address, *ret_opcode);
+	/*
+	 * Restore PKRU to what it was.  We a
+	 */
+	if (saved_pkru)
+		write_pkru(saved_pkru);
+
+	return ret;
+}
+
+/*
  * Prefetch quirks:
  *
  * 32-bit mode:
@@ -126,7 +173,7 @@ check_prefetch_opcode(struct pt_regs *regs, unsigned char *instr,
 		return !instr_lo || (instr_lo>>1) == 1;
 	case 0x00:
 		/* Prefetch instruction is 0x0F0D or 0x0F18 */
-		if (probe_kernel_address(instr, opcode))
+		if (probe_insn_opcode(instr, &opcode))
 			return 0;
 
 		*prefetch = (instr_lo == 0xF) &&
@@ -160,7 +207,7 @@ is_prefetch(struct pt_regs *regs, unsigned long error_code, unsigned long addr)
 	while (instr < max_instr) {
 		unsigned char opcode;
 
-		if (probe_kernel_address(instr, opcode))
+		if (probe_insn_opcode(instr, &opcode))
 			break;
 
 		instr++;
