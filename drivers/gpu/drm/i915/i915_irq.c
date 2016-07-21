@@ -3059,7 +3059,9 @@ static unsigned long kick_waiters(struct intel_engine_cs *engine)
 	struct drm_i915_private *i915 = engine->i915;
 	unsigned long irq_count = READ_ONCE(engine->breadcrumbs.irq_wakeups);
 
-	if (engine->hangcheck.user_interrupts == irq_count &&
+	rcu_read_lock();
+	if (intel_engine_wakeup(engine) &&
+	    engine->hangcheck.user_interrupts == irq_count &&
 	    !test_and_set_bit(engine->id, &i915->gpu_error.missed_irq_rings)) {
 		if (!test_bit(engine->id, &i915->gpu_error.test_irq_rings))
 			DRM_ERROR("Hangcheck timer elapsed... %s idle\n",
@@ -3067,6 +3069,7 @@ static unsigned long kick_waiters(struct intel_engine_cs *engine)
 
 		intel_engine_enable_fake_irq(engine);
 	}
+	rcu_read_unlock();
 
 	return irq_count;
 }
