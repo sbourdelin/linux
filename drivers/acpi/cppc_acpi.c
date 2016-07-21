@@ -191,7 +191,11 @@ static int send_pcc_cmd(u16 cmd)
 			last_cmd_cmpl_time = ktime_get();
 	}
 
-	mbox_client_txdone(pcc_channel, ret);
+	if (pcc_channel->mbox->txdone_irq)
+		mbox_chan_txdone(pcc_channel, ret);
+	else
+		mbox_client_txdone(pcc_channel, ret);
+
 	return ret;
 }
 
