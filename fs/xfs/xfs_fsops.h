@@ -26,4 +26,10 @@ extern int xfs_reserve_blocks(xfs_mount_t *mp, __uint64_t *inval,
 				xfs_fsop_resblks_t *outval);
 extern int xfs_fs_goingdown(xfs_mount_t *mp, __uint32_t inflags);
 
+/* fsmap to userspace formatter - copy to user & advance pointer */
+typedef int (*xfs_fsmap_format_t)(struct getfsmap *, void *);
+
+int	xfs_getfsmap(struct xfs_mount *mp, struct getfsmap *fmv,
+		xfs_fsmap_format_t formatter, void *arg);
+
 #endif	/* __XFS_FSOPS_H__ */
