@@ -45,21 +45,50 @@ int dso__read_binary_type_filename(const struct dso *dso,
 
 	switch (type) {
 	case DSO_BINARY_TYPE__DEBUGLINK: {
-		char *debuglink;
+		/* gdb interprets the content of the debuglink section as
+		 * path relative to
+		 *  - the binary's directory
+		 *  - .debug/ in the binary's directory
+		 *  - /usr/lib/debug
+		 *  and uses the first one that exists.
+		 */
+		char debuglink[512];
+		char *pathbase;
 
 		len = __symbol__join_symfs(filename, size, dso->long_name);
-		debuglink = filename + len;
-		while (debuglink != filename && *debuglink != '/')
-			debuglink--;
-		if (*debuglink == '/')
-			debuglink++;
+		if (!is_regular_file(filename)) {
+			ret = -1;
+			break;
+		}
 
-		ret = -1;
-		if (!is_regular_file(filename))
+		ret = filename__read_debuglink(filename,
+					       debuglink, sizeof(debuglink));
+		if (ret < 0)
 			break;
 
-		ret = filename__read_debuglink(filename, debuglink,
-					       size - (debuglink - filename));
+		pathbase = filename + len;
+		while (pathbase != filename && *pathbase != '/')
+			pathbase--;
+		if (*pathbase == '/')
+			pathbase++;
+
+		snprintf(pathbase, size - (pathbase - filename),
+			 "%s", debuglink);
+		if (is_regular_file(filename))
+			break;
+
+		snprintf(pathbase, size - (pathbase - filename),
+			 ".debug/%s", debuglink);
+		if (is_regular_file(filename))
+			break;
+
+		len = __symbol__join_symfs(filename, size, "/usr/lib/debug");
+		snprintf(filename + len, size - len, "%s", debuglink);
+
+		if (is_regular_file(filename))
+			break;
+
+		ret = -1;
 		}
 		break;
 	case DSO_BINARY_TYPE__BUILD_ID_CACHE:
