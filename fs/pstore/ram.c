@@ -539,7 +539,13 @@ static int ramoops_probe(struct platform_device *pdev)
 		goto fail_clear;
 	}
 
-	cxt->pstore.flags = PSTORE_FLAGS_ALL;
+	cxt->pstore.flags = PSTORE_FLAGS_DMESG;
+	if (ctx->console_size)
+		cxt->pstore.flags |= PSTORE_FLAGS_CONOLE;
+	if (ctx->ftrace_size)
+		cxt->pstore.flags |= PSTORE_FLAGS_FTRACE;
+	if (ctx->pmsg_size)
+		cxt->pstore.flags |= PSTORE_FLAGS_PMSG;
 
 	err = pstore_register(&cxt->pstore);
 	if (err) {
