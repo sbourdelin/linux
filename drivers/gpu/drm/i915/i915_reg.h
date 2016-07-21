@@ -5385,6 +5385,12 @@ enum {
 #define _SPATILEOFF		(VLV_DISPLAY_BASE + 0x721a4)
 #define _SPACONSTALPHA		(VLV_DISPLAY_BASE + 0x721a8)
 #define   SP_CONST_ALPHA_ENABLE		(1<<31)
+#define _SPACLRC0		(VLV_DISPLAY_BASE + 0x721d0)
+#define   SP_CONTRAST(x)		((x) << 18) /* u3.6 */
+#define   SP_BRIGHTNESS(x)		((x) & 0xff) /* s8 */
+#define _SPACLRC1		(VLV_DISPLAY_BASE + 0x721d4)
+#define   SP_SH_SIN(x)			(((x) & 0x7ff) << 16) /* s4.7 */
+#define   SP_SH_COS(x)			(x) /* u3.7 */
 #define _SPAGAMC		(VLV_DISPLAY_BASE + 0x721f4)
 
 #define _SPBCNTR		(VLV_DISPLAY_BASE + 0x72280)
@@ -5398,6 +5404,8 @@ enum {
 #define _SPBKEYMAXVAL		(VLV_DISPLAY_BASE + 0x722a0)
 #define _SPBTILEOFF		(VLV_DISPLAY_BASE + 0x722a4)
 #define _SPBCONSTALPHA		(VLV_DISPLAY_BASE + 0x722a8)
+#define _SPBCLRC0		(VLV_DISPLAY_BASE + 0x722d0)
+#define _SPBCLRC1		(VLV_DISPLAY_BASE + 0x722d4)
 #define _SPBGAMC		(VLV_DISPLAY_BASE + 0x722f4)
 
 #define SPCNTR(pipe, plane) _MMIO_PIPE((pipe) * 2 + (plane), _SPACNTR, _SPBCNTR)
@@ -5411,6 +5419,8 @@ enum {
 #define SPKEYMAXVAL(pipe, plane) _MMIO_PIPE((pipe) * 2 + (plane), _SPAKEYMAXVAL, _SPBKEYMAXVAL)
 #define SPTILEOFF(pipe, plane) _MMIO_PIPE((pipe) * 2 + (plane), _SPATILEOFF, _SPBTILEOFF)
 #define SPCONSTALPHA(pipe, plane) _MMIO_PIPE((pipe) * 2 + (plane), _SPACONSTALPHA, _SPBCONSTALPHA)
+#define SPCLRC0(pipe, plane) _MMIO_PIPE((pipe) * 2 + (plane), _SPACLRC0, _SPBCLRC0)
+#define SPCLRC1(pipe, plane) _MMIO_PIPE((pipe) * 2 + (plane), _SPACLRC1, _SPBCLRC1)
 #define SPGAMC(pipe, plane) _MMIO_PIPE((pipe) * 2 + (plane), _SPAGAMC, _SPBGAMC)
 
 /*
