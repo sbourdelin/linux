@@ -606,6 +606,7 @@ static inline pte_t maybe_mkwrite(pte_t pte, struct vm_area_struct *vma)
 
 void do_set_pte(struct vm_area_struct *vma, unsigned long address,
 		struct page *page, pte_t *pte, bool write, bool anon);
+int finish_fault(struct vm_area_struct *vma, struct vm_fault *vmf);
 #endif
 
 /*

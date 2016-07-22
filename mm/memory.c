@@ -2890,6 +2890,49 @@ void do_set_pte(struct vm_area_struct *vma, unsigned long address,
 	update_mmu_cache(vma, address, pte);
 }
 
+/**
+ * finish_fault - finish page fault once we have prepared the page to fault
+ *
+ * @vma: virtual memory area
+ * @vmf: structure describing the fault
+ *
+ * This function handles all that is needed to finish a page fault once the
+ * page to fault in is prepared. It handles locking of PTEs, inserts PTE for
+ * given page, adds reverse page mapping, handles memcg charges and LRU
+ * addition. The function returns 0 on success, error in case page could not
+ * be inserted into page tables.
+ *
+ * The function expects the page to be locked.
+ */
+int finish_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+	unsigned long address = (unsigned long)vmf->virtual_address;
+	struct page *page = vmf->page;
+	bool anon = false;
+	spinlock_t *ptl;
+	pte_t *pte;
+
+	if (vmf->cow_page) {
+		page = vmf->cow_page;
+		anon = true;
+	}
+
+	pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, address, &ptl);
+	if (unlikely(!pte_same(*pte, vmf->orig_pte))) {
+		pte_unmap_unlock(pte, ptl);
+		return -EBUSY;
+	}
+	do_set_pte(vma, address, page, pte, vmf->flags & FAULT_FLAG_WRITE,
+		   anon);
+	if (anon) {
+		mem_cgroup_commit_charge(page, vmf->memcg, false, false);
+		lru_cache_add_active_or_unevictable(page, vma);
+	}
+	pte_unmap_unlock(pte, ptl);
+
+	return 0;
+}
+
 static unsigned long fault_around_bytes __read_mostly =
 	rounddown_pow_of_two(65536);
 
@@ -3022,15 +3065,13 @@ static int do_read_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (unlikely(ret & (VM_FAULT_ERROR | VM_FAULT_NOPAGE | VM_FAULT_RETRY)))
 		return ret;
 
-	pte = pte_offset_map_lock(mm, vmf->pmd, address, &ptl);
-	if (unlikely(!pte_same(*pte, vmf->orig_pte))) {
-		pte_unmap_unlock(pte, ptl);
+	if (unlikely(finish_fault(vma, vmf) < 0)) {
 		unlock_page(vmf->page);
 		put_page(vmf->page);
 		return ret;
 	}
-	do_set_pte(vma, address, vmf->page, pte, false, false);
 	unlock_page(vmf->page);
+	return ret;
 unlock_out:
 	pte_unmap_unlock(pte, ptl);
 	return ret;
@@ -3041,8 +3082,6 @@ static int do_cow_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 {
 	struct page *new_page;
 	struct mem_cgroup *memcg;
-	spinlock_t *ptl;
-	pte_t *pte;
 	int ret;
 	unsigned long address = (unsigned long)vmf->virtual_address;
 
@@ -3070,9 +3109,7 @@ static int do_cow_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 		copy_user_highpage(new_page, vmf->page, address, vma);
 	__SetPageUptodate(new_page);
 
-	pte = pte_offset_map_lock(mm, vmf->pmd, address, &ptl);
-	if (unlikely(!pte_same(*pte, vmf->orig_pte))) {
-		pte_unmap_unlock(pte, ptl);
+	if (unlikely(finish_fault(vma, vmf) < 0)) {
 		if (!(ret & VM_FAULT_DAX_LOCKED)) {
 			unlock_page(vmf->page);
 			put_page(vmf->page);
@@ -3082,10 +3119,6 @@ static int do_cow_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 		}
 		goto uncharge_out;
 	}
-	do_set_pte(vma, address, new_page, pte, true, true);
-	mem_cgroup_commit_charge(new_page, memcg, false, false);
-	lru_cache_add_active_or_unevictable(new_page, vma);
-	pte_unmap_unlock(pte, ptl);
 	if (!(ret & VM_FAULT_DAX_LOCKED)) {
 		unlock_page(vmf->page);
 		put_page(vmf->page);
@@ -3104,8 +3137,6 @@ static int do_shared_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 {
 	struct address_space *mapping;
 	unsigned long address = (unsigned long)vmf->virtual_address;
-	spinlock_t *ptl;
-	pte_t *pte;
 	int dirtied = 0;
 	int ret, tmp;
 
@@ -3128,15 +3159,11 @@ static int do_shared_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 		}
 	}
 
-	pte = pte_offset_map_lock(mm, vmf->pmd, address, &ptl);
-	if (unlikely(!pte_same(*pte, vmf->orig_pte))) {
-		pte_unmap_unlock(pte, ptl);
+	if (unlikely(finish_fault(vma, vmf) < 0)) {
 		unlock_page(vmf->page);
 		put_page(vmf->page);
 		return ret;
 	}
-	do_set_pte(vma, address, vmf->page, pte, true, false);
-	pte_unmap_unlock(pte, ptl);
 
 	if (set_page_dirty(vmf->page))
 		dirtied = 1;
