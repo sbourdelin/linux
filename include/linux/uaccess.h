@@ -106,6 +106,14 @@ extern long strncpy_from_unsafe(char *dst, const void *unsafe_addr, long count);
  * @addr: address to read from
  * @retval: read into this variable
  *
+ * This is safe to call on both userspace and kernel addresses.
+ * Kernel faults (like vmalloc faults) may be handled but do not
+ * sleep.
+ *
+ * If access to @addr is a userspace address and faults, we will
+ * enter the page fault handler, not *handling* the fault in any
+ * way and returning -EFAULT.
+ *
  * Returns 0 on success, or -EFAULT.
  */
 #define probe_kernel_address(addr, retval)		\
