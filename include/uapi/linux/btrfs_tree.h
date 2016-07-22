@@ -707,8 +707,10 @@ struct btrfs_disk_balance_args {
 	 */
 	__le32 stripes_min;
 	__le32 stripes_max;
+	__le32 sz_stripe;
 
-	__le64 unused[6];
+	/* pad to 128 bytes */
+	__le32 unused[9];
 } __attribute__ ((__packed__));
 
 /*
@@ -721,9 +723,11 @@ struct btrfs_balance_item {
 
 	struct btrfs_disk_balance_args data;
 	struct btrfs_disk_balance_args meta;
+	struct btrfs_disk_balance_args raid;
 	struct btrfs_disk_balance_args sys;
 
-	__le64 unused[4];
+	/* pad to 1K bytes */
+	__u32 unused[(1024 - ((sizeof(struct btrfs_balance_args) * 4) + 8)) / 4];
 } __attribute__ ((__packed__));
 
 #define BTRFS_FILE_EXTENT_INLINE 0
@@ -823,6 +827,7 @@ struct btrfs_dev_replace_item {
 #define BTRFS_BLOCK_GROUP_DATA		(1ULL << 0)
 #define BTRFS_BLOCK_GROUP_SYSTEM	(1ULL << 1)
 #define BTRFS_BLOCK_GROUP_METADATA	(1ULL << 2)
+#define BTRFS_BLOCK_GROUP_RAID		(1ULL << 9)
 #define BTRFS_BLOCK_GROUP_RAID0		(1ULL << 3)
 #define BTRFS_BLOCK_GROUP_RAID1		(1ULL << 4)
 #define BTRFS_BLOCK_GROUP_DUP		(1ULL << 5)
@@ -844,6 +849,7 @@ enum btrfs_raid_types {
 };
 
 #define BTRFS_BLOCK_GROUP_TYPE_MASK	(BTRFS_BLOCK_GROUP_DATA |    \
+					 BTRFS_BLOCK_GROUP_RAID |    \
 					 BTRFS_BLOCK_GROUP_SYSTEM |  \
 					 BTRFS_BLOCK_GROUP_METADATA)
 

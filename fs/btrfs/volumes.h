@@ -26,8 +26,6 @@
 
 extern struct mutex uuid_mutex;
 
-#define BTRFS_STRIPE_LEN	SZ_64K
-
 struct buffer_head;
 struct btrfs_pending_bios {
 	struct bio *head;
@@ -364,6 +362,7 @@ struct btrfs_balance_control {
 
 	struct btrfs_balance_args data;
 	struct btrfs_balance_args meta;
+	struct btrfs_balance_args raid;
 	struct btrfs_balance_args sys;
 
 	u64 flags;

@@ -3838,11 +3838,13 @@ int btrfs_scrub_dev(struct btrfs_fs_info *fs_info, u64 devid, u64 start,
 	int ret;
 	struct btrfs_device *dev;
 	struct rcu_string *name;
+	extern u32 sz_stripe;
+	extern u32 stripe_width;
 
 	if (btrfs_fs_closing(fs_info))
 		return -EINVAL;
 
-	if (fs_info->chunk_root->nodesize > BTRFS_STRIPE_LEN) {
+	if (fs_info->chunk_root->nodesize > ((sz_stripe) * (stripe_width))) {
 		/*
 		 * in this case scrub is unable to calculate the checksum
 		 * the way scrub is implemented. Do not handle this
@@ -3850,7 +3852,7 @@ int btrfs_scrub_dev(struct btrfs_fs_info *fs_info, u64 devid, u64 start,
 		 */
 		btrfs_err(fs_info,
 			   "scrub: size assumption nodesize <= BTRFS_STRIPE_LEN (%d <= %d) fails",
-		       fs_info->chunk_root->nodesize, BTRFS_STRIPE_LEN);
+		       fs_info->chunk_root->nodesize, ((sz_stripe) * (stripe_width)));
 		return -EINVAL;
 	}
 

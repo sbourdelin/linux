@@ -316,8 +316,10 @@ struct btrfs_balance_args {
 	 */
 	__le32 stripes_min;
 	__le32 stripes_max;
+	__le32 sz_stripes;
 
-	__u64 unused[6];
+	/* pad to 128 bytes */
+	__u32 unused[9];
 } __attribute__ ((__packed__));
 
 /* report balance progress to userspace */
@@ -340,8 +342,10 @@ struct btrfs_balance_progress {
 #define BTRFS_BALANCE_DATA		(1ULL << 0)
 #define BTRFS_BALANCE_SYSTEM		(1ULL << 1)
 #define BTRFS_BALANCE_METADATA		(1ULL << 2)
+#define BTRFS_BALANCE_RAID		(1ULL << 5)
 
 #define BTRFS_BALANCE_TYPE_MASK		(BTRFS_BALANCE_DATA |	    \
+					 BTRFS_BALANCE_RAID |	    \
 					 BTRFS_BALANCE_SYSTEM |	    \
 					 BTRFS_BALANCE_METADATA)
 
@@ -365,6 +369,7 @@ struct btrfs_balance_progress {
 #define BTRFS_BALANCE_ARGS_LIMIT_RANGE	(1ULL << 6)
 #define BTRFS_BALANCE_ARGS_STRIPES_RANGE (1ULL << 7)
 #define BTRFS_BALANCE_ARGS_USAGE_RANGE	(1ULL << 10)
+#define BTRFS_BALANCE_ARGS_STRIPESIZE (1ULL << 11)
 
 #define BTRFS_BALANCE_ARGS_MASK			\
 	(BTRFS_BALANCE_ARGS_PROFILES |		\
@@ -375,6 +380,7 @@ struct btrfs_balance_progress {
 	 BTRFS_BALANCE_ARGS_LIMIT |		\
 	 BTRFS_BALANCE_ARGS_LIMIT_RANGE |	\
 	 BTRFS_BALANCE_ARGS_STRIPES_RANGE |	\
+	 BTRFS_BALANCE_ARGS_STRIPESIZE |	\
 	 BTRFS_BALANCE_ARGS_USAGE_RANGE)
 
 /*
@@ -402,11 +408,14 @@ struct btrfs_ioctl_balance_args {
 
 	struct btrfs_balance_args data;		/* in/out */
 	struct btrfs_balance_args meta;		/* in/out */
+	struct btrfs_balance_args raid;		/* in/out */
 	struct btrfs_balance_args sys;		/* in/out */
 
 	struct btrfs_balance_progress stat;	/* out */
 
-	__u64 unused[72];			/* pad to 1k */
+	/* pad to 1K bytes */
+	__u32 unused[(1024 - ((sizeof(struct btrfs_balance_args) * 4) + \
+			      (sizeof(struct btrfs_balance_progress)) + 16)) / 4];
 };
 
 #define BTRFS_INO_LOOKUP_PATH_MAX 4080

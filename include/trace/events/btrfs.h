@@ -56,6 +56,7 @@ struct btrfs_qgroup_extent_record;
 
 #define BTRFS_GROUP_FLAGS	\
 	{ BTRFS_BLOCK_GROUP_DATA,	"DATA"},	\
+	{ BTRFS_BLOCK_GROUP_RAID,	"RAID"},	\
 	{ BTRFS_BLOCK_GROUP_SYSTEM,	"SYSTEM"},	\
 	{ BTRFS_BLOCK_GROUP_METADATA,	"METADATA"},	\
 	{ BTRFS_BLOCK_GROUP_RAID0,	"RAID0"}, 	\
@@ -662,6 +663,7 @@ DEFINE_EVENT(btrfs_delayed_ref_head,  run_delayed_ref_head,
 #define show_chunk_type(type)					\
 	__print_flags(type, "|",				\
 		{ BTRFS_BLOCK_GROUP_DATA, 	"DATA"	},	\
+		{ BTRFS_BLOCK_GROUP_RAID, 	"RAID"},	\
 		{ BTRFS_BLOCK_GROUP_SYSTEM, 	"SYSTEM"},	\
 		{ BTRFS_BLOCK_GROUP_METADATA, 	"METADATA"},	\
 		{ BTRFS_BLOCK_GROUP_RAID0, 	"RAID0" },	\

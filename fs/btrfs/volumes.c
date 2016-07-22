@@ -3020,6 +3020,8 @@ static int insert_balance_item(struct btrfs_root *root,
 	btrfs_set_balance_data(leaf, item, &disk_bargs);
 	btrfs_cpu_balance_args_to_disk(&disk_bargs, &bctl->meta);
 	btrfs_set_balance_meta(leaf, item, &disk_bargs);
+	btrfs_cpu_balance_args_to_disk(&disk_bargs, &bctl->raid);
+	btrfs_set_balance_raid(leaf, item, &disk_bargs);
 	btrfs_cpu_balance_args_to_disk(&disk_bargs, &bctl->sys);
 	btrfs_set_balance_sys(leaf, item, &disk_bargs);
 
@@ -3083,6 +3085,8 @@ static void update_balance_args(struct btrfs_balance_control *bctl)
 	 */
 	if (bctl->data.flags & BTRFS_BALANCE_ARGS_CONVERT)
 		bctl->data.flags |= BTRFS_BALANCE_ARGS_SOFT;
+	if (bctl->raid.flags & BTRFS_BALANCE_ARGS_CONVERT)
+		bctl->raid.flags |= BTRFS_BALANCE_ARGS_SOFT;
 	if (bctl->sys.flags & BTRFS_BALANCE_ARGS_CONVERT)
 		bctl->sys.flags |= BTRFS_BALANCE_ARGS_SOFT;
 	if (bctl->meta.flags & BTRFS_BALANCE_ARGS_CONVERT)
@@ -3100,6 +3104,12 @@ static void update_balance_args(struct btrfs_balance_control *bctl)
 	    !(bctl->data.flags & BTRFS_BALANCE_ARGS_CONVERT)) {
 		bctl->data.flags |= BTRFS_BALANCE_ARGS_USAGE;
 		bctl->data.usage = 90;
+	}
+	if (!(bctl->raid.flags & BTRFS_BALANCE_ARGS_USAGE) &&
+	    !(bctl->raid.flags & BTRFS_BALANCE_ARGS_USAGE_RANGE) &&
+	    !(bctl->raid.flags & BTRFS_BALANCE_ARGS_CONVERT)) {
+		bctl->raid.flags |= BTRFS_BALANCE_ARGS_USAGE;
+		bctl->raid.usage = 90;
 	}
 	if (!(bctl->sys.flags & BTRFS_BALANCE_ARGS_USAGE) &&
 	    !(bctl->sys.flags & BTRFS_BALANCE_ARGS_USAGE_RANGE) &&
@@ -3337,6 +3347,8 @@ static int should_balance_chunk(struct btrfs_root *root,
 
 	if (chunk_type & BTRFS_BLOCK_GROUP_DATA)
 		bargs = &bctl->data;
+	else if (chunk_type & BTRFS_BLOCK_GROUP_RAID)
+		bargs = &bctl->raid;
 	else if (chunk_type & BTRFS_BLOCK_GROUP_SYSTEM)
 		bargs = &bctl->sys;
 	else if (chunk_type & BTRFS_BLOCK_GROUP_METADATA)
@@ -3433,9 +3445,11 @@ static int __btrfs_balance(struct btrfs_fs_info *fs_info)
 	/* The single value limit and min/max limits use the same bytes in the */
 	u64 limit_data = bctl->data.limit;
 	u64 limit_meta = bctl->meta.limit;
+	u64 limit_raid = bctl->raid.limit;
 	u64 limit_sys = bctl->sys.limit;
 	u32 count_data = 0;
 	u32 count_meta = 0;
+	u32 count_raid = 0;
 	u32 count_sys = 0;
 	int chunk_reserved = 0;
 	u64 bytes_used = 0;
@@ -3485,6 +3499,7 @@ again:
 		 */
 		bctl->data.limit = limit_data;
 		bctl->meta.limit = limit_meta;
+		bctl->raid.limit = limit_raid;
 		bctl->sys.limit = limit_sys;
 	}
 	key.objectid = BTRFS_FIRST_CHUNK_TREE_OBJECTID;
@@ -3555,6 +3570,8 @@ again:
 
 			if (chunk_type & BTRFS_BLOCK_GROUP_DATA)
 				count_data++;
+			else if (chunk_type & BTRFS_BLOCK_GROUP_RAID)
+				count_raid++;
 			else if (chunk_type & BTRFS_BLOCK_GROUP_SYSTEM)
 				count_sys++;
 			else if (chunk_type & BTRFS_BLOCK_GROUP_METADATA)
@@ -3571,6 +3588,8 @@ again:
 					count_data < bctl->data.limit_min)
 				|| ((chunk_type & BTRFS_BLOCK_GROUP_METADATA) &&
 					count_meta < bctl->meta.limit_min)
+				|| ((chunk_type & BTRFS_BLOCK_GROUP_RAID) &&
+					count_raid < bctl->raid.limit_min)
 				|| ((chunk_type & BTRFS_BLOCK_GROUP_SYSTEM) &&
 					count_sys < bctl->sys.limit_min)) {
 			mutex_unlock(&fs_info->delete_unused_bgs_mutex);
@@ -3758,6 +3777,13 @@ int btrfs_balance(struct btrfs_balance_control *bctl,
 		ret = -EINVAL;
 		goto out;
 	}
+	if (validate_convert_profile(&bctl->raid, allowed)) {
+		btrfs_err(fs_info,
+			   "unable to start balance with target RAID profile %llu",
+		       bctl->raid.target);
+		ret = -EINVAL;
+		goto out;
+	}
 	if (validate_convert_profile(&bctl->sys, allowed)) {
 		btrfs_err(fs_info,
 			   "unable to start balance with target system profile %llu",
@@ -3937,6 +3963,8 @@ int btrfs_recover_balance(struct btrfs_fs_info *fs_info)
 	btrfs_disk_balance_args_to_cpu(&bctl->data, &disk_bargs);
 	btrfs_balance_meta(leaf, item, &disk_bargs);
 	btrfs_disk_balance_args_to_cpu(&bctl->meta, &disk_bargs);
+	btrfs_balance_raid(leaf, item, &disk_bargs);
+	btrfs_disk_balance_args_to_cpu(&bctl->raid, &disk_bargs);
 	btrfs_balance_sys(leaf, item, &disk_bargs);
 	btrfs_disk_balance_args_to_cpu(&bctl->sys, &disk_bargs);
 
@@ -4550,7 +4578,9 @@ static int __btrfs_alloc_chunk(struct btrfs_trans_handle *trans,
 	u64 max_chunk_size;
 	u64 stripe_size;
 	u64 num_bytes;
-	u64 raid_stripe_len = BTRFS_STRIPE_LEN;
+	extern u32 sz_stripe;
+	extern u32 stripe_width;
+	u64 raid_stripe_len = ((sz_stripe) * (stripe_width));
 	int ndevs;
 	int i;
 	int j;
@@ -4648,7 +4678,7 @@ static int __btrfs_alloc_chunk(struct btrfs_trans_handle *trans,
 		if (ret == 0)
 			max_avail = max_stripe_size * dev_stripes;
 
-		if (max_avail < BTRFS_STRIPE_LEN * dev_stripes)
+		if (max_avail < ((sz_stripe) * (stripe_width)) * dev_stripes)
 			continue;
 
 		if (ndevs == fs_devices->rw_devices) {
@@ -4693,13 +4723,11 @@ static int __btrfs_alloc_chunk(struct btrfs_trans_handle *trans,
 	data_stripes = num_stripes / ncopies;
 
 	if (type & BTRFS_BLOCK_GROUP_RAID5) {
-		raid_stripe_len = find_raid56_stripe_len(ndevs - 1,
-						extent_root->stripesize);
+		raid_stripe_len = find_raid56_stripe_len(ndevs - 1, sz_stripe);
 		data_stripes = num_stripes - 1;
 	}
 	if (type & BTRFS_BLOCK_GROUP_RAID6) {
-		raid_stripe_len = find_raid56_stripe_len(ndevs - 2,
-						extent_root->stripesize);
+		raid_stripe_len = find_raid56_stripe_len(ndevs - 2, sz_stripe);
 		data_stripes = num_stripes - 2;
 	}
 
@@ -6269,6 +6297,8 @@ static int btrfs_check_chunk_valid(struct btrfs_root *root,
 	u16 num_stripes;
 	u16 sub_stripes;
 	u64 type;
+	extern u32 sz_stripe;
+	extern u32 stripe_width;
 
 	length = btrfs_chunk_length(leaf, chunk);
 	stripe_len = btrfs_chunk_stripe_len(leaf, chunk);
@@ -6296,7 +6326,7 @@ static int btrfs_check_chunk_valid(struct btrfs_root *root,
 			"invalid chunk length %llu", length);
 		return -EIO;
 	}
-	if (!is_power_of_2(stripe_len) || stripe_len != BTRFS_STRIPE_LEN) {
+	if (!is_power_of_2(stripe_len) || stripe_len != ((sz_stripe) * (stripe_width))) {
 		btrfs_err(root->fs_info, "invalid chunk stripe length: %llu",
 			  stripe_len);
 		return -EIO;

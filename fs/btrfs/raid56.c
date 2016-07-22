@@ -44,6 +44,25 @@
 #include "check-integrity.h"
 #include "rcu-string.h"
 
+/*
+ * The BTRFS_STRIPE_LEN is replaced by the following two variables. These two
+ * options are multiplied by each other to obtain the BTRFS_STRIPE_LEN.
+ *
+ * This allows the stripe size and stripe superblock to be user-configurable.
+ * These options can be configured by using the BTrFS RAID stripe size balance
+ * option. After this configuration is used and changed, a data re-balance
+ * needs to be done to spread the stripe blocks over the drives according to
+ * the new stripe size.
+ *
+ * This variable will be the definitive means of manipulating stripe size of
+ * the RAID setup.
+ *
+ * The calculation to ensure that only a reasonable value is used will be done
+ * in userspace, before making the mkfs or balance ioctl.
+ */
+u32 sz_stripe = 4096;
+u32 stripe_width = (16 * 1024);
+
 /* set when additional merges to this rbio are not allowed */
 #define RBIO_RMW_LOCKED_BIT	1
 

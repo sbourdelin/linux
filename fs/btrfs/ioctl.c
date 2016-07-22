@@ -4614,6 +4614,7 @@ void update_ioctl_balance_args(struct btrfs_fs_info *fs_info, int lock,
 
 	memcpy(&bargs->data, &bctl->data, sizeof(bargs->data));
 	memcpy(&bargs->meta, &bctl->meta, sizeof(bargs->meta));
+	memcpy(&bargs->raid, &bctl->raid, sizeof(bargs->raid));
 	memcpy(&bargs->sys, &bctl->sys, sizeof(bargs->sys));
 
 	if (lock) {
@@ -4729,6 +4730,7 @@ locked:
 	if (arg) {
 		memcpy(&bctl->data, &bargs->data, sizeof(bctl->data));
 		memcpy(&bctl->meta, &bargs->meta, sizeof(bctl->meta));
+		memcpy(&bctl->raid, &bargs->raid, sizeof(bctl->raid));
 		memcpy(&bctl->sys, &bargs->sys, sizeof(bctl->sys));
 
 		bctl->flags = bargs->flags;

@@ -1874,6 +1874,8 @@ static int btrfs_calc_avail_data_space(struct btrfs_root *root, u64 *free_bytes)
 	u64 avail_space;
 	u64 used_space;
 	u64 min_stripe_size;
+	extern u32 sz_stripe;
+	extern u32 stripe_width;
 	int min_stripes = 1, num_stripes = 1;
 	int i = 0, nr_devices;
 	int ret;
@@ -1912,9 +1914,9 @@ static int btrfs_calc_avail_data_space(struct btrfs_root *root, u64 *free_bytes)
 	}
 
 	if (type & BTRFS_BLOCK_GROUP_DUP)
-		min_stripe_size = 2 * BTRFS_STRIPE_LEN;
+		min_stripe_size = 2 * ((sz_stripe) * (stripe_width));
 	else
-		min_stripe_size = BTRFS_STRIPE_LEN;
+		min_stripe_size = ((sz_stripe) * (stripe_width));
 
 	if (fs_info->alloc_start)
 		mutex_lock(&fs_devices->device_list_mutex);
@@ -1930,8 +1932,8 @@ static int btrfs_calc_avail_data_space(struct btrfs_root *root, u64 *free_bytes)
 		avail_space = device->total_bytes - device->bytes_used;
 
 		/* align with stripe_len */
-		avail_space = div_u64(avail_space, BTRFS_STRIPE_LEN);
-		avail_space *= BTRFS_STRIPE_LEN;
+		avail_space = div_u64(avail_space, ((sz_stripe) * (stripe_width)));
+		avail_space *= ((sz_stripe) * (stripe_width));
 
 		/*
 		 * In order to avoid overwriting the superblock on the drive,
@@ -1942,7 +1944,7 @@ static int btrfs_calc_avail_data_space(struct btrfs_root *root, u64 *free_bytes)
 
 		/* user can set the offset in fs_info->alloc_start. */
 		if (fs_info->alloc_start &&
-		    fs_info->alloc_start + BTRFS_STRIPE_LEN <=
+		    fs_info->alloc_start + ((sz_stripe) * (stripe_width)) <=
 		    device->total_bytes) {
 			rcu_read_unlock();
 			skip_space = max(fs_info->alloc_start, skip_space);
