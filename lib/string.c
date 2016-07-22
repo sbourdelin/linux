@@ -952,3 +952,49 @@ char *strreplace(char *s, char old, char new)
 	return s;
 }
 EXPORT_SYMBOL(strreplace);
+
+/**
+ * strlcpytoupper - Copy a length-limited string and convert to uppercase.
+ * @dst: The buffer to store the result.
+ * @src: The string to convert to uppercase.
+ * @len: Maximum string length. May be SIZE_MAX to set no limit.
+ *
+ * Returns the number of characters copied or -E2BIG if @dst wasn't big enough.
+ */
+int strlcpytoupper(char *dst, const char *src, size_t len)
+{
+	size_t i;
+
+	if (!len)
+		return -E2BIG;
+
+	for (i = 0; i < len && src[i]; ++i)
+		dst[i] = toupper(src[i]);
+	dst[i < len ? i : i - 1] = '\0';
+
+	return (i < len) ? i : -E2BIG;
+}
+EXPORT_SYMBOL(strlcpytoupper);
+
+/**
+ * strlcpytolower - Copy a length-limited string and convert to lowercase.
+ * @dst: The buffer to store the result.
+ * @src: The string to convert to lowercase.
+ * @len: Maximum string length. May be SIZE_MAX to set no limit.
+ *
+ * Returns the number of characters copied or -E2BIG if @dst wasn't big enough.
+ */
+int strlcpytolower(char *dst, const char *src, size_t len)
+{
+	size_t i;
+
+	if (!len)
+		return -E2BIG;
+
+	for (i = 0; i < len && src[i]; ++i)
+		dst[i] = tolower(src[i]);
+	dst[i < len ? i : i - 1] = '\0';
+
+	return (i < len) ? i : -E2BIG;
+}
+EXPORT_SYMBOL(strlcpytolower);
