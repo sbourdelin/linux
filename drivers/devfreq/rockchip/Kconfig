@@ -1,0 +1,15 @@
+config ARM_ROCKCHIP_DMC_DEVFREQ
+	bool "ARM ROCKCHIP DMC DEVFREQ Driver"
+	depends on ARCH_ROCKCHIP
+	help
+	  This adds the DEVFREQ driver framework for the rockchip dmc.
+
+config ARM_RK3399_DMC_DEVFREQ
+	bool "ARM RK3399 DMC DEVFREQ Driver"
+	depends on ARM_ROCKCHIP_DMC_DEVFREQ
+	select PM_OPP
+	select DEVFREQ_GOV_SIMPLE_ONDEMAND
+	help
+          This adds the DEVFREQ driver for the RK3399 dmc. It sets the frequency
+          for the memory controller and reads the usage counts from hardware.
+
