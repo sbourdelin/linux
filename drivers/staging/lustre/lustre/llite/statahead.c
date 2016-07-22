@@ -1140,7 +1140,7 @@ interpret_it:
 				ll_post_statahead(sai);
 
 			if (unlikely(!thread_is_running(thread))) {
-				ll_release_page(dir, page, 0);
+				ll_release_page(dir, page, false);
 				rc = 0;
 				goto out;
 			}
@@ -1164,7 +1164,7 @@ interpret_it:
 
 					if (unlikely(
 						!thread_is_running(thread))) {
-						ll_release_page(dir, page, 0);
+						ll_release_page(dir, page, false);
 						rc = 0;
 						goto out;
 					}
@@ -1187,7 +1187,7 @@ do_it:
 			/*
 			 * End of directory reached.
 			 */
-			ll_release_page(dir, page, 0);
+			ll_release_page(dir, page, false);
 			while (1) {
 				l_wait_event(thread->t_ctl_waitq,
 					     !list_empty(&sai->sai_entries_received) ||
@@ -1426,7 +1426,7 @@ static int is_first_dirent(struct inode *dir, struct dentry *dentry)
 			else
 				rc = LS_FIRST_DOT_DE;
 
-			ll_release_page(dir, page, 0);
+			ll_release_page(dir, page, false);
 			goto out;
 		}
 		pos = le64_to_cpu(dp->ldp_hash_end);
@@ -1434,7 +1434,7 @@ static int is_first_dirent(struct inode *dir, struct dentry *dentry)
 			/*
 			 * End of directory reached.
 			 */
-			ll_release_page(dir, page, 0);
+			ll_release_page(dir, page, false);
 			goto out;
 		} else {
 			/*
