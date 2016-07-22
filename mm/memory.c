@@ -2033,17 +2033,12 @@ static void init_vmf(struct vm_fault *vmf, struct vm_area_struct *vma,
  *
  * We do this without the lock held, so that it can sleep if it needs to.
  */
-static int do_page_mkwrite(struct vm_area_struct *vma, struct page *page,
-	       unsigned long address, pmd_t *pmd, pte_t orig_pte)
+static int do_page_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
-	struct vm_fault vmf;
 	int ret;
+	struct page *page = vmf->page;
 
-	init_vmf(&vmf, vma, address, pmd, page->index,
-		 FAULT_FLAG_WRITE|FAULT_FLAG_MKWRITE, orig_pte);
-	vmf.page = page;
-
-	ret = vma->vm_ops->page_mkwrite(vma, &vmf);
+	ret = vma->vm_ops->page_mkwrite(vma, vmf);
 	if (unlikely(ret & (VM_FAULT_ERROR | VM_FAULT_NOPAGE)))
 		return ret;
 	if (unlikely(!(ret & VM_FAULT_LOCKED))) {
@@ -2311,9 +2306,14 @@ static int wp_page_shared(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	if (vma->vm_ops->page_mkwrite) {
 		int tmp;
+		struct vm_fault vmf;
 
 		pte_unmap_unlock(page_table, ptl);
-		tmp = do_page_mkwrite(vma, old_page, address, pmd, orig_pte);
+
+		init_vmf(&vmf, vma, address, pmd, old_page->index,
+			 FAULT_FLAG_WRITE|FAULT_FLAG_MKWRITE, orig_pte);
+		vmf.page = old_page;
+		tmp = do_page_mkwrite(vma, &vmf);
 		if (unlikely(!tmp || (tmp &
 				      (VM_FAULT_ERROR | VM_FAULT_NOPAGE)))) {
 			put_page(old_page);
@@ -3137,7 +3137,6 @@ uncharge_out:
 static int do_shared_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 		struct vm_fault *vmf)
 {
-	unsigned long address = (unsigned long)vmf->virtual_address;
 	int ret, tmp;
 
 	ret = __do_fault(vma, vmf);
@@ -3150,8 +3149,8 @@ static int do_shared_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 	 */
 	if (vma->vm_ops->page_mkwrite) {
 		unlock_page(vmf->page);
-		tmp = do_page_mkwrite(vma, vmf->page, address, vmf->pmd,
-				      vmf->orig_pte);
+		vmf->flags = FAULT_FLAG_WRITE | FAULT_FLAG_MKWRITE;
+		tmp = do_page_mkwrite(vma, vmf);
 		if (unlikely(!tmp ||
 				(tmp & (VM_FAULT_ERROR | VM_FAULT_NOPAGE)))) {
 			put_page(vmf->page);
