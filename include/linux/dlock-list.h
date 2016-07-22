@@ -127,7 +127,7 @@ static inline void dlock_list_relock(struct dlock_list_iter *iter)
 /*
  * Allocation and freeing of dlock list
  */
-extern int  alloc_dlock_list_head(struct dlock_list_head *dlist);
+extern int alloc_dlock_list_head(struct dlock_list_head *dlist, int align);
 extern void free_dlock_list_head(struct dlock_list_head *dlist);
 
 /*

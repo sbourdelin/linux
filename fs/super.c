@@ -206,7 +206,7 @@ static struct super_block *alloc_super(struct file_system_type *type, int flags)
 	INIT_HLIST_BL_HEAD(&s->s_anon);
 	mutex_init(&s->s_sync_lock);
 
-	if (alloc_dlock_list_head(&s->s_inodes))
+	if (alloc_dlock_list_head(&s->s_inodes, 1))
 		goto fail;
 	if (list_lru_init_memcg(&s->s_dentry_lru))
 		goto fail;
