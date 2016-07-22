@@ -332,10 +332,7 @@ gk104_fifo_intr_fault(struct gk104_fifo *fifo, int unit)
 		enum nvkm_devidx engidx = nvkm_top_fault(device->top, unit);
 		if (engidx < NVKM_SUBDEV_NR) {
 			const char *src = nvkm_subdev_name[engidx];
-			char *dst = en;
-			do {
-				*dst++ = toupper(*src++);
-			} while(*src);
+			strcpytoupper(en, src);
 			engine = nvkm_device_engine(device, engidx);
 		}
 	} else {
