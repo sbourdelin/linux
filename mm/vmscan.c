@@ -2405,6 +2405,11 @@ static bool shrink_zone(struct zone *zone, struct scan_control *sc,
 					    memcg, sc->nr_scanned - scanned,
 					    lru_pages);
 
+			if (!global_reclaim(sc) && reclaim_state) {
+				sc->nr_reclaimed += reclaim_state->reclaimed_slab;
+				reclaim_state->reclaimed_slab = 0;
+			}
+
 			/* Record the group's reclaim efficiency */
 			vmpressure(sc->gfp_mask, memcg, false,
 				   sc->nr_scanned - scanned,
