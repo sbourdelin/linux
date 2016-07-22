@@ -640,6 +640,7 @@ static struct drm_gem_object *__etnaviv_gem_new(struct drm_device *dev,
 		u32 size, u32 flags)
 {
 	struct drm_gem_object *obj = NULL;
+	struct address_space *mapping;
 	int ret;
 
 	size = PAGE_ALIGN(size);
@@ -650,22 +651,18 @@ static struct drm_gem_object *__etnaviv_gem_new(struct drm_device *dev,
 		goto fail;
 
 	ret = drm_gem_object_init(dev, obj, size);
-	if (ret == 0) {
-		struct address_space *mapping;
-
-		/*
-		 * Our buffers are kept pinned, so allocating them
-		 * from the MOVABLE zone is a really bad idea, and
-		 * conflicts with CMA.  See coments above new_inode()
-		 * why this is required _and_ expected if you're
-		 * going to pin these pages.
-		 */
-		mapping = file_inode(obj->filp)->i_mapping;
-		mapping_set_gfp_mask(mapping, GFP_HIGHUSER);
-	}
-
 	if (ret)
 		goto fail;
+
+	/*
+	 * Our buffers are kept pinned, so allocating them
+	 * from the MOVABLE zone is a really bad idea, and
+	 * conflicts with CMA.  See coments above new_inode()
+	 * why this is required _and_ expected if you're
+	 * going to pin these pages.
+	 */
+	mapping = file_inode(obj->filp)->i_mapping;
+	mapping_set_gfp_mask(mapping, GFP_HIGHUSER);
 
 	return obj;
 
