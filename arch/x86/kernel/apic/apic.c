@@ -1124,6 +1124,53 @@ void __init sync_Arb_IDs(void)
 }
 
 /*
+ * Return false means the virtual wire mode through-local-apic is inactive
+ */
+static bool virtual_wire_via_lapic(void)
+{
+	unsigned int value;
+
+	/* Check the APIC global enable/disable flag firstly */
+	if (boot_cpu_data.x86 >= 6) {
+		u32 h, l;
+
+		rdmsr(MSR_IA32_APICBASE, l, h);
+		/*
+		 * If local APIC is disabled by BIOS
+		 * do nothing, but return true
+		 */
+		if (!(l & MSR_IA32_APICBASE_ENABLE))
+			return true;
+	}
+
+	/* Check the software enable/disable flag */
+	value = apic_read(APIC_SPIV);
+	if (!(value & APIC_SPIV_APIC_ENABLED))
+		return false;
+
+	/*
+	 * Virtual wire mode via local APIC requests
+	 * APIC to enable the LINT0 for edge-trggered ExtINT delivery mode
+	 * and LINT1 for level-triggered NMI delivery mode
+	 */
+	value = apic_read(APIC_LVT0);
+	if (GET_APIC_DELIVERY_MODE(value) != APIC_MODE_EXTINT)
+		return false;
+
+	value = apic_read(APIC_LVT1);
+	if (GET_APIC_DELIVERY_MODE(value) != APIC_MODE_NMI)
+		return false;
+
+	return true;
+}
+
+static bool check_virtual_wire_mode(void)
+{
+	/* Neither of virtual wire mode is active, return false */
+	return  virtual_wire_via_lapic() || virtual_wire_via_ioapic();
+}
+
+/*
  * An initial setup of the virtual wire mode.
  */
 void __init init_bsp_APIC(void)
@@ -1133,8 +1180,14 @@ void __init init_bsp_APIC(void)
 	/*
 	 * Don't do the setup now if we have a SMP BIOS as the
 	 * through-I/O-APIC virtual wire mode might be active.
+	 *
+	 * It's better to do further check if either through-I/O-APIC
+	 * or through-local-APIC is active.
+	 * the worst case is that both of them are inactive,
+	 * If so, We need to enable the virtual wire mode via through-local-APIC
 	 */
-	if (smp_found_config || !boot_cpu_has(X86_FEATURE_APIC))
+	if ((smp_found_config && check_virtual_wire_mode()) ||
+		!boot_cpu_has(X86_FEATURE_APIC))
 		return;
 
 	/*
