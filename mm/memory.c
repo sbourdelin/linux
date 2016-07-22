@@ -2101,11 +2101,10 @@ static void fault_dirty_shared_page(struct vm_area_struct *vma,
  * case, all we need to do here is to mark the page as writable and update
  * any related book-keeping.
  */
-static inline int wp_page_reuse(struct mm_struct *mm,
+static inline void wp_page_reuse(struct mm_struct *mm,
 			struct vm_area_struct *vma, unsigned long address,
 			pte_t *page_table, spinlock_t *ptl, pte_t orig_pte,
-			struct page *page, int page_mkwrite,
-			int dirty_shared)
+			struct page *page)
 	__releases(ptl)
 {
 	pte_t entry;
@@ -2123,16 +2122,6 @@ static inline int wp_page_reuse(struct mm_struct *mm,
 	if (ptep_set_access_flags(vma, address, page_table, entry, 1))
 		update_mmu_cache(vma, address, page_table);
 	pte_unmap_unlock(page_table, ptl);
-
-	if (dirty_shared) {
-		if (!page_mkwrite)
-			lock_page(page);
-
-		fault_dirty_shared_page(vma, page);
-		put_page(page);
-	}
-
-	return VM_FAULT_WRITE;
 }
 
 /*
@@ -2308,8 +2297,8 @@ static int wp_pfn_shared(struct mm_struct *mm,
 			return 0;
 		}
 	}
-	return wp_page_reuse(mm, vma, address, page_table, ptl, orig_pte,
-			     NULL, 0, 0);
+	wp_page_reuse(mm, vma, address, page_table, ptl, orig_pte, NULL);
+	return VM_FAULT_WRITE;
 }
 
 static int wp_page_shared(struct mm_struct *mm, struct vm_area_struct *vma,
@@ -2318,8 +2307,6 @@ static int wp_page_shared(struct mm_struct *mm, struct vm_area_struct *vma,
 			  struct page *old_page)
 	__releases(ptl)
 {
-	int page_mkwrite = 0;
-
 	get_page(old_page);
 
 	if (vma->vm_ops->page_mkwrite) {
@@ -2346,11 +2333,17 @@ static int wp_page_shared(struct mm_struct *mm, struct vm_area_struct *vma,
 			put_page(old_page);
 			return 0;
 		}
-		page_mkwrite = 1;
+		wp_page_reuse(mm, vma, address, page_table, ptl, orig_pte,
+			      old_page);
+	} else {
+		wp_page_reuse(mm, vma, address, page_table, ptl, orig_pte,
+			      old_page);
+		lock_page(old_page);
 	}
 
-	return wp_page_reuse(mm, vma, address, page_table, ptl,
-			     orig_pte, old_page, page_mkwrite, 1);
+	fault_dirty_shared_page(vma, old_page);
+	put_page(old_page);
+	return VM_FAULT_WRITE;
 }
 
 /*
@@ -2429,8 +2422,9 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct *vma,
 				page_move_anon_rmap(old_page, vma);
 			}
 			unlock_page(old_page);
-			return wp_page_reuse(mm, vma, address, page_table, ptl,
-					     orig_pte, old_page, 0, 0);
+			wp_page_reuse(mm, vma, address, page_table, ptl,
+				      orig_pte, old_page);
+			return VM_FAULT_WRITE;
 		}
 		unlock_page(old_page);
 	} else if (unlikely((vma->vm_flags & (VM_WRITE|VM_SHARED)) ==
