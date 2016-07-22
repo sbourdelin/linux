@@ -405,7 +405,7 @@ struct nested_vmx {
 	/* The host-usable pointer to the above */
 	struct page *current_vmcs12_page;
 	struct vmcs12 *current_vmcs12;
-	struct vmcs *current_shadow_vmcs;
+	struct loaded_vmcs current_shadow_vmcs;
 	/*
 	 * Indicates if the shadow vmcs must be updated with the
 	 * data hold by vmcs12
@@ -2191,6 +2191,15 @@ static void vmx_vcpu_pi_load(struct kvm_vcpu *vcpu, int cpu)
 			new.control) != old.control);
 }
 
+static void record_loaded_vmcs(struct loaded_vmcs *loaded_vmcs, int cpu)
+{
+	if (loaded_vmcs->vmcs) {
+		list_add(&loaded_vmcs->loaded_vmcss_on_cpu_link,
+			 &per_cpu(loaded_vmcss_on_cpu, cpu));
+		loaded_vmcs->cpu = cpu;
+	}
+}
+
 /*
  * Switches to specified vcpu, until a matching vcpu_put(), but assumes
  * vcpu mutex is already taken.
@@ -2202,15 +2211,13 @@ static void vmx_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 
 	if (!vmm_exclusive)
 		kvm_cpu_vmxon(phys_addr);
-	else if (vmx->loaded_vmcs->cpu != cpu)
+	else if (vmx->loaded_vmcs->cpu != cpu) {
 		loaded_vmcs_clear(vmx->loaded_vmcs);
+		if (vmx->nested.current_shadow_vmcs.vmcs)
+			loaded_vmcs_clear(&vmx->nested.current_shadow_vmcs);
+        }
 
 	if (per_cpu(current_vmcs, cpu) != vmx->loaded_vmcs->vmcs) {
-		per_cpu(current_vmcs, cpu) = vmx->loaded_vmcs->vmcs;
-		vmcs_load(vmx->loaded_vmcs->vmcs);
-	}
-
-	if (vmx->loaded_vmcs->cpu != cpu) {
 		struct desc_ptr *gdt = this_cpu_ptr(&host_gdt);
 		unsigned long sysenter_esp;
 
@@ -2225,10 +2232,14 @@ static void vmx_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 		 */
 		smp_rmb();
 
-		list_add(&vmx->loaded_vmcs->loaded_vmcss_on_cpu_link,
-			 &per_cpu(loaded_vmcss_on_cpu, cpu));
+		record_loaded_vmcs(vmx->loaded_vmcs, cpu);
+		record_loaded_vmcs(&vmx->nested.current_shadow_vmcs, cpu);
+
 		crash_enable_local_vmclear(cpu);
 		local_irq_enable();
+
+		per_cpu(current_vmcs, cpu) = vmx->loaded_vmcs->vmcs;
+		vmcs_load(vmx->loaded_vmcs->vmcs);
 
 		/*
 		 * Linux uses per-cpu TSS and GDT, so set these when switching
@@ -2239,8 +2250,6 @@ static void vmx_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 
 		rdmsrl(MSR_IA32_SYSENTER_ESP, sysenter_esp);
 		vmcs_writel(HOST_IA32_SYSENTER_ESP, sysenter_esp); /* 22.2.3 */
-
-		vmx->loaded_vmcs->cpu = cpu;
 	}
 
 	/* Setup TSC multiplier */
@@ -6933,6 +6942,34 @@ static int nested_vmx_check_vmptr(struct kvm_vcpu *vcpu, int exit_reason,
 	return 0;
 }
 
+static int setup_shadow_vmcs(struct vcpu_vmx *vmx)
+{
+	struct vmcs *shadow_vmcs;
+	int cpu;
+
+	shadow_vmcs = alloc_vmcs();
+	if (!shadow_vmcs)
+		return -ENOMEM;
+
+	/* mark vmcs as shadow */
+	shadow_vmcs->revision_id |= (1u << 31);
+	/* init shadow vmcs */
+	vmx->nested.current_shadow_vmcs.vmcs = shadow_vmcs;
+	loaded_vmcs_init(&vmx->nested.current_shadow_vmcs);
+
+	cpu = get_cpu();
+	local_irq_disable();
+	crash_disable_local_vmclear(cpu);
+
+	record_loaded_vmcs(&vmx->nested.current_shadow_vmcs, cpu);
+
+	crash_enable_local_vmclear(cpu);
+	local_irq_enable();
+	put_cpu();
+
+	return 0;
+}
+
 /*
  * Emulate the VMXON instruction.
  * Currently, we just remember that VMX is active, and do not save or even
@@ -6945,7 +6982,6 @@ static int handle_vmon(struct kvm_vcpu *vcpu)
 {
 	struct kvm_segment cs;
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
-	struct vmcs *shadow_vmcs;
 	const u64 VMXON_NEEDED_FEATURES = FEATURE_CONTROL_LOCKED
 		| FEATURE_CONTROL_VMXON_ENABLED_OUTSIDE_SMX;
 
@@ -6988,14 +7024,9 @@ static int handle_vmon(struct kvm_vcpu *vcpu)
 	}
 
 	if (enable_shadow_vmcs) {
-		shadow_vmcs = alloc_vmcs();
-		if (!shadow_vmcs)
-			return -ENOMEM;
-		/* mark vmcs as shadow */
-		shadow_vmcs->revision_id |= (1u << 31);
-		/* init shadow vmcs */
-		vmcs_clear(shadow_vmcs);
-		vmx->nested.current_shadow_vmcs = shadow_vmcs;
+		int ret = setup_shadow_vmcs(vmx);
+		if (ret < 0)
+			return ret;
 	}
 
 	INIT_LIST_HEAD(&(vmx->nested.vmcs02_pool));
@@ -7080,7 +7111,7 @@ static void free_nested(struct vcpu_vmx *vmx)
 	free_vpid(vmx->nested.vpid02);
 	nested_release_vmcs12(vmx);
 	if (enable_shadow_vmcs)
-		free_vmcs(vmx->nested.current_shadow_vmcs);
+		free_loaded_vmcs(&vmx->nested.current_shadow_vmcs);
 	/* Unpin physical memory we referred to in current vmcs02 */
 	if (vmx->nested.apic_access_page) {
 		nested_release_page(vmx->nested.apic_access_page);
@@ -7256,7 +7287,7 @@ static void copy_shadow_to_vmcs12(struct vcpu_vmx *vmx)
 	int i;
 	unsigned long field;
 	u64 field_value;
-	struct vmcs *shadow_vmcs = vmx->nested.current_shadow_vmcs;
+	struct vmcs *shadow_vmcs = vmx->nested.current_shadow_vmcs.vmcs;
 	const unsigned long *fields = shadow_read_write_fields;
 	const int num_fields = max_shadow_read_write_fields;
 
@@ -7305,7 +7336,7 @@ static void copy_vmcs12_to_shadow(struct vcpu_vmx *vmx)
 	int i, q;
 	unsigned long field;
 	u64 field_value = 0;
-	struct vmcs *shadow_vmcs = vmx->nested.current_shadow_vmcs;
+	struct vmcs *shadow_vmcs = vmx->nested.current_shadow_vmcs.vmcs;
 
 	vmcs_load(shadow_vmcs);
 
@@ -7485,10 +7516,13 @@ static int handle_vmptrld(struct kvm_vcpu *vcpu)
 		vmx->nested.current_vmcs12 = new_vmcs12;
 		vmx->nested.current_vmcs12_page = page;
 		if (enable_shadow_vmcs) {
+			struct vmcs *shadow_vmcs;
+
+			shadow_vmcs = vmx->nested.current_shadow_vmcs.vmcs;
 			vmcs_set_bits(SECONDARY_VM_EXEC_CONTROL,
 				      SECONDARY_EXEC_SHADOW_VMCS);
 			vmcs_write64(VMCS_LINK_POINTER,
-				     __pa(vmx->nested.current_shadow_vmcs));
+				     __pa(shadow_vmcs));
 			vmx->nested.sync_shadow_vmcs = true;
 		}
 	}
