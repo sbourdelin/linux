@@ -728,10 +728,10 @@ See also the examples in :ref:`control`.
 	  case the hardware calculates the gain value based on the lighting
 	  conditions which can change over time.
 
-	  .. note:: Setting a new value for a volatile control will have no
-	     effect and no ``V4L2_EVENT_CTRL_CH_VALUE`` will be sent, unless
-	     the ``V4L2_CTRL_FLAG_EXECUTE_ON_WRITE`` flag (see below) is
-	     also set. Otherwise the new value will just be ignored.
+	  .. note:: Setting a new value for a volatile control will be ignored
+             unless `V4L2_CTRL_FLAG_EXECUTE_ON_WRITE`` flag (see below) is also set.
+             Setting a new value for a volatile contol will never trigger a
+             ``V4L2_EVENT_CTRL_CH_VALUE`` event.
 
     -  .. row 9
 
