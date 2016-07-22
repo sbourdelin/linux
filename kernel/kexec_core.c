@@ -148,6 +148,7 @@ static struct page *kimage_alloc_page(struct kimage *image,
 int sanity_check_segment_list(struct kimage *image)
 {
 	int result, i;
+	unsigned long total_segments = 0;
 	unsigned long nr_segments = image->nr_segments;
 
 	/*
@@ -208,6 +209,21 @@ int sanity_check_segment_list(struct kimage *image)
 		if (image->segment[i].bufsz > image->segment[i].memsz)
 			return result;
 	}
+
+	/* Verity all segment size donnot exceed the specified size.
+	 * if segment size from user space is too large,  a large
+	 * amount of time will be wasted when allocating page. so,
+	 * softlockup may be come up.
+	 */
+	for (i = 0; i < nr_segments; i++) {
+		if (image->segment[i].memsz > (totalram_pages / 2))
+			return result;
+
+		total += image->segment[i].memsz;
+	}
+
+	if (total > (totalram_pages / 2))
+		return result;
 
 	/*
 	 * Verify we have good destination addresses.  Normally
