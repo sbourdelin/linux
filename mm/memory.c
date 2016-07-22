@@ -2262,6 +2262,41 @@ oom:
 	return VM_FAULT_OOM;
 }
 
+/**
+ * finish_mkrite_fault - finish page fault making PTE writeable once the page
+ *			 page is prepared
+ *
+ * @vma: virtual memory area
+ * @vmf: structure describing the fault
+ *
+ * This function handles all that is needed to finish a write page fault due
+ * to PTE being read-only once the mapped page is prepared. It handles locking
+ * of PTE and modifying it. The function returns 0 on success, error in case
+ * the PTE changed before we acquired PTE lock.
+ *
+ * The function expects the page to be locked or other protection against
+ * concurrent faults / writeback (such as DAX radix tree locks).
+ */
+int finish_mkwrite_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+	unsigned long address = (unsigned long)vmf->virtual_address;
+	pte_t *pte;
+	spinlock_t *ptl;
+
+	pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, address, &ptl);
+	/*
+	 * We might have raced with another page fault while we
+	 * released the pte_offset_map_lock.
+	 */
+	if (!pte_same(*pte, vmf->orig_pte)) {
+		pte_unmap_unlock(pte, ptl);
+		return -EBUSY;
+	}
+	wp_page_reuse(vma->vm_mm, vma, address, pte, ptl, vmf->orig_pte,
+		      vmf->page);
+	return 0;
+}
+
 /*
  * Handle write page faults for VM_MIXEDMAP or VM_PFNMAP for a VM_SHARED
  * mapping
@@ -2282,17 +2317,12 @@ static int wp_pfn_shared(struct mm_struct *mm,
 		ret = vma->vm_ops->pfn_mkwrite(vma, &vmf);
 		if (ret & VM_FAULT_ERROR)
 			return ret;
-		page_table = pte_offset_map_lock(mm, pmd, address, &ptl);
-		/*
-		 * We might have raced with another page fault while we
-		 * released the pte_offset_map_lock.
-		 */
-		if (!pte_same(*page_table, orig_pte)) {
-			pte_unmap_unlock(page_table, ptl);
+		if (finish_mkwrite_fault(vma, &vmf) < 0)
 			return 0;
-		}
+	} else {
+		wp_page_reuse(mm, vma, address, page_table, ptl, orig_pte,
+			      NULL);
 	}
-	wp_page_reuse(mm, vma, address, page_table, ptl, orig_pte, NULL);
 	return VM_FAULT_WRITE;
 }
 
@@ -2319,28 +2349,16 @@ static int wp_page_shared(struct mm_struct *mm, struct vm_area_struct *vma,
 			put_page(old_page);
 			return tmp;
 		}
-		/*
-		 * Since we dropped the lock we need to revalidate
-		 * the PTE as someone else may have changed it.  If
-		 * they did, we just return, as we can count on the
-		 * MMU to tell us if they didn't also make it writable.
-		 */
-		page_table = pte_offset_map_lock(mm, pmd, address,
-						 &ptl);
-		if (!pte_same(*page_table, orig_pte)) {
+		if (finish_mkwrite_fault(vma, &vmf) < 0) {
 			unlock_page(old_page);
-			pte_unmap_unlock(page_table, ptl);
 			put_page(old_page);
 			return 0;
 		}
-		wp_page_reuse(mm, vma, address, page_table, ptl, orig_pte,
-			      old_page);
 	} else {
 		wp_page_reuse(mm, vma, address, page_table, ptl, orig_pte,
 			      old_page);
 		lock_page(old_page);
 	}
-
 	fault_dirty_shared_page(vma, old_page);
 	put_page(old_page);
 	return VM_FAULT_WRITE;
