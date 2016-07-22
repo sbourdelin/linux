@@ -13678,10 +13678,12 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 			 */
 			intel_check_cpu_fifo_underruns(dev_priv);
 			intel_check_pch_fifo_underruns(dev_priv);
-
-			if (!crtc->state->active)
-				intel_update_watermarks(crtc);
 		}
+	}
+
+	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
+		if (needs_modeset(crtc->state) && !crtc->state->active)
+			intel_update_watermarks(crtc);
 	}
 
 	/* Only after disabling all output pipelines that will be changed can we
