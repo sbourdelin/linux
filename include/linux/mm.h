@@ -309,6 +309,8 @@ struct vm_fault {
 					 * VM_FAULT_DAX_LOCKED and fill in
 					 * entry here.
 					 */
+	pmd_t *pmd;			/* PMD we fault into */
+	pte_t orig_pte;			/* Value of PTE at the time of fault */
 	/* for ->map_pages() only */
 	pgoff_t max_pgoff;		/* map pages for offset from pgoff till
 					 * max_pgoff inclusive */
