@@ -879,10 +879,15 @@ int __dax_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 			goto unlock_entry;
 		if (!radix_tree_exceptional_entry(entry)) {
 			vmf->page = entry;
-			return VM_FAULT_LOCKED;
+			if (unlikely(PageHWPoison(entry))) {
+				put_locked_mapping_entry(mapping, vmf->pgoff,
+							 entry);
+				return VM_FAULT_HWPOISON;
+			}
 		}
-		vmf->entry = entry;
-		return VM_FAULT_DAX_LOCKED;
+		error = finish_fault(vma, vmf);
+		put_locked_mapping_entry(mapping, vmf->pgoff, entry);
+		return (error < 0) ? VM_FAULT_NOPAGE : VM_FAULT_DONE_COW;
 	}
 
 	if (!buffer_mapped(&bh)) {
