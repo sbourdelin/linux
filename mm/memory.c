@@ -2304,7 +2304,7 @@ static int wp_page_shared(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	get_page(old_page);
 
-	if (vma->vm_ops && vma->vm_ops->page_mkwrite) {
+	if (vma->vm_ops->page_mkwrite) {
 		int tmp;
 
 		pte_unmap_unlock(page_table, ptl);
