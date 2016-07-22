@@ -1154,6 +1154,15 @@ static int check_call(struct verifier_env *env, int func_id)
 		return -EINVAL;
 	}
 
+	if (func_id == BPF_FUNC_probe_write) {
+		pr_warn_once("************************************************\n");
+		pr_warn_once("* bpf_probe_write: Experimental Feature in use *\n");
+		pr_warn_once("* bpf_probe_write: Feature may corrupt memory  *\n");
+		pr_warn_once("************************************************\n");
+		pr_notice_ratelimited("bpf_probe_write in use by: %.16s-%d",
+				      current->comm, task_pid_nr(current));
+	}
+
 	/* eBPF programs must be GPL compatible to use GPL-ed functions */
 	if (!env->prog->gpl_compatible && fn->gpl_only) {
 		verbose("cannot call GPL only function from proprietary program\n");
