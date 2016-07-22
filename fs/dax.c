@@ -1218,6 +1218,12 @@ int dax_pfn_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
 	if (!entry || !radix_tree_exceptional_entry(entry))
 		goto out;
 	radix_tree_tag_set(&mapping->page_tree, index, PAGECACHE_TAG_DIRTY);
+	/*
+	 * If we race with somebody updating the PTE and finish_mkwrite_fault()
+	 * fails, we don't care. We need to return VM_FAULT_NOPAGE and retry
+	 * the fault in either case.
+	 */
+	finish_mkwrite_fault(vma, vmf);
 	put_unlocked_mapping_entry(mapping, index, entry);
 out:
 	spin_unlock_irq(&mapping->tree_lock);

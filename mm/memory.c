@@ -2315,7 +2315,7 @@ static int wp_pfn_shared(struct mm_struct *mm,
 			 linear_page_index(vma, address),
 			 FAULT_FLAG_WRITE|FAULT_FLAG_MKWRITE, orig_pte);
 		ret = vma->vm_ops->pfn_mkwrite(vma, &vmf);
-		if (ret & VM_FAULT_ERROR)
+		if (ret & VM_FAULT_ERROR || ret & VM_FAULT_NOPAGE)
 			return ret;
 		if (finish_mkwrite_fault(vma, &vmf) < 0)
 			return 0;
