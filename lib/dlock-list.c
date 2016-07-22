@@ -26,22 +26,38 @@
  */
 static struct lock_class_key dlock_list_key;
 
+struct dlock_list_head_percpu_caligned {
+	struct dlock_list_head_percpu head;
+} ____cacheline_aligned_in_smp;
+
 /**
  * alloc_dlock_list_head - Initialize and allocate the per-cpu list head
  * @dlist: Pointer to the dlock_list_head structure to be initialized
+ * @align: A boolean flag for cacheline alignment
  * Return: 0 if successful, -ENOMEM if memory allocation error
  *
  * This function does not allocate the dlock_list_head structure itself. The
  * callers will have to do their own memory allocation, if necessary. However,
  * this allows embedding the dlock_list_head structure directly into other
  * structures.
+ *
+ * As the percpu spinlocks can be accessed remotely from other CPUs, it may
+ * have a performance impact on other percpu data items resided in the same
+ * cacheline as the spinlock. This performance impact can be avoided by
+ * setting the align flag forcing cacheline alignment for the percpu head
+ * structure at the expense of some wasted memory space.
  */
-int alloc_dlock_list_head(struct dlock_list_head *dlist)
+int alloc_dlock_list_head(struct dlock_list_head *dlist, int align)
 {
 	struct dlock_list_head dlist_tmp;
 	int cpu;
 
-	dlist_tmp.head = alloc_percpu(struct dlock_list_head_percpu);
+	if (align)
+		dlist_tmp.head = (struct dlock_list_head_percpu __percpu *)
+			alloc_percpu(struct dlock_list_head_percpu_caligned);
+	else
+		dlist_tmp.head = alloc_percpu(struct dlock_list_head_percpu);
+
 	if (!dlist_tmp.head)
 		return -ENOMEM;
 
