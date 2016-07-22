@@ -7581,6 +7581,7 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
 	}
 #endif
 	dump_stack();
+	add_taint(TAINT_WARN, LOCKDEP_STILL_OK);
 }
 EXPORT_SYMBOL(___might_sleep);
 #endif
