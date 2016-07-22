@@ -1501,6 +1501,16 @@ static unsigned long scan_movable_pages(unsigned long start, unsigned long end)
 	return 0;
 }
 
+static struct page *new_node_page(struct page *page, unsigned long node,
+		int **result)
+{
+	if (PageHuge(page))
+		return alloc_huge_page_node(page_hstate(compound_head(page)),
+					node);
+	else
+		return __alloc_pages_node(node, GFP_HIGHUSER_MOVABLE, 0);
+}
+
 #define NR_OFFLINE_AT_ONCE_PAGES	(256)
 static int
 do_migrate_range(unsigned long start_pfn, unsigned long end_pfn)
@@ -1510,6 +1520,7 @@ do_migrate_range(unsigned long start_pfn, unsigned long end_pfn)
 	int move_pages = NR_OFFLINE_AT_ONCE_PAGES;
 	int not_managed = 0;
 	int ret = 0;
+	int nid = NUMA_NO_NODE;
 	LIST_HEAD(source);
 
 	for (pfn = start_pfn; pfn < end_pfn && move_pages > 0; pfn++) {
@@ -1564,12 +1575,24 @@ do_migrate_range(unsigned long start_pfn, unsigned long end_pfn)
 			goto out;
 		}
 
-		/*
-		 * alloc_migrate_target should be improooooved!!
-		 * migrate_pages returns # of failed pages.
-		 */
-		ret = migrate_pages(&source, alloc_migrate_target, NULL, 0,
-					MIGRATE_SYNC, MR_MEMORY_HOTPLUG);
+		for (pfn = start_pfn; pfn < end_pfn; pfn++) {
+			if (!pfn_valid(pfn))
+				continue;
+			page = pfn_to_page(pfn);
+			if (zone_idx(page_zone(page)) == ZONE_MOVABLE)
+				nid = next_node_in(page_to_nid(page),
+						node_online_map);
+			break;
+		}
+
+		/* Alloc new page from the next node if possible */
+		if (nid != NUMA_NO_NODE)
+			ret = migrate_pages(&source, new_node_page, NULL,
+					nid, MIGRATE_SYNC, MR_MEMORY_HOTPLUG);
+		else
+			ret = migrate_pages(&source, alloc_migrate_target, NULL,
+					0, MIGRATE_SYNC, MR_MEMORY_HOTPLUG);
+
 		if (ret)
 			putback_movable_pages(&source);
 	}
