@@ -104,12 +104,18 @@ struct acpi_button {
 	struct input_dev *input;
 	char phys[32];			/* for input device */
 	unsigned long pushed;
+	int sw_last_state;
+	unsigned long sw_last_time;
 	bool suspended;
 };
 
 static BLOCKING_NOTIFIER_HEAD(acpi_lid_notifier);
 static struct acpi_device *lid_device;
 static u8 lid_init_state = ACPI_BUTTON_LID_INIT_METHOD;
+
+static unsigned long lid_report_interval __read_mostly = 500;
+module_param(lid_report_interval, ulong, 0644);
+MODULE_PARM_DESC(lid_report_interval, "Interval (ms) between lid key events");
 
 /* --------------------------------------------------------------------------
                               FS Interface (/proc)
@@ -133,11 +139,22 @@ static int acpi_lid_evaluate_state(struct acpi_device *device)
 static int acpi_lid_notify_state(struct acpi_device *device, int state)
 {
 	struct acpi_button *button = acpi_driver_data(device);
+	unsigned long sw_tout;
 	int ret;
 
-	/* input layer checks if event is redundant */
+	/* Send the switch event */
+	sw_tout = button->sw_last_time +
+		  msecs_to_jiffies(lid_report_interval);
+	if (time_after(jiffies, sw_tout) &&
+	    (button->sw_last_state == !!state)) {
+		/* Send the complement switch event */
+		input_report_switch(button->input, SW_LID, state);
+		input_sync(button->input);
+	}
 	input_report_switch(button->input, SW_LID, !state);
 	input_sync(button->input);
+	button->sw_last_state = !!state;
+	button->sw_last_time = jiffies;
 
 	if (state)
 		pm_wakeup_event(&device->dev, 0);
@@ -407,6 +424,8 @@ static int acpi_button_add(struct acpi_device *device)
 		strcpy(name, ACPI_BUTTON_DEVICE_NAME_LID);
 		sprintf(class, "%s/%s",
 			ACPI_BUTTON_CLASS, ACPI_BUTTON_SUBCLASS_LID);
+		button->sw_last_state = !!acpi_lid_evaluate_state(device);
+		button->sw_last_time = jiffies;
 	} else {
 		printk(KERN_ERR PREFIX "Unsupported hid [%s]\n", hid);
 		error = -ENODEV;
