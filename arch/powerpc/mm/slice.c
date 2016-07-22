@@ -147,7 +147,7 @@ static struct slice_mask slice_mask_for_free(struct mm_struct *mm)
 	return ret;
 }
 
-static struct slice_mask slice_mask_for_size(struct mm_struct *mm, int psize)
+static struct slice_mask calc_slice_mask_for_size(struct mm_struct *mm, int psize)
 {
 	unsigned char *hpsizes;
 	int index, mask_index;
@@ -169,6 +169,36 @@ static struct slice_mask slice_mask_for_size(struct mm_struct *mm, int psize)
 	}
 
 	return ret;
+}
+
+static void recalc_slice_mask_cache(struct mm_struct *mm)
+{
+	mm->context.mask_4k = calc_slice_mask_for_size(mm, MMU_PAGE_4K);
+#ifdef CONFIG_PPC_64K_PAGES
+	mm->context.mask_64k = calc_slice_mask_for_size(mm, MMU_PAGE_64K);
+#endif
+# ifdef CONFIG_HUGETLB_PAGE
+	/* Radix does not come here */
+	mm->context.mask_16m = calc_slice_mask_for_size(mm, MMU_PAGE_16M);
+	mm->context.mask_16g = calc_slice_mask_for_size(mm, MMU_PAGE_16G);
+# endif
+}
+
+static struct slice_mask slice_mask_for_size(struct mm_struct *mm, int psize)
+{
+	if (psize == MMU_PAGE_4K)
+		return mm->context.mask_4k;
+#ifdef CONFIG_PPC_64K_PAGES
+	if (psize == MMU_PAGE_64K)
+		return mm->context.mask_64k;
+#endif
+# ifdef CONFIG_HUGETLB_PAGE
+	if (psize == MMU_PAGE_16M)
+		return mm->context.mask_16m;
+	if (psize == MMU_PAGE_16G)
+		return mm->context.mask_16g;
+# endif
+	BUG();
 }
 
 static int slice_check_fit(struct slice_mask mask, struct slice_mask available)
@@ -232,6 +262,8 @@ static void slice_convert(struct mm_struct *mm, struct slice_mask mask, int psiz
 		  mm->context.high_slices_psize);
 
 	spin_unlock_irqrestore(&slice_convert_lock, flags);
+
+	recalc_slice_mask_cache(mm);
 
 	copro_flush_all_slbs(mm);
 }
@@ -625,7 +657,7 @@ void slice_set_user_psize(struct mm_struct *mm, unsigned int psize)
 		goto bail;
 
 	mm->context.user_psize = psize;
-	wmb();
+	wmb(); /* Why? */
 
 	lpsizes = mm->context.low_slices_psize;
 	for (i = 0; i < SLICE_NUM_LOW; i++)
@@ -652,6 +684,9 @@ void slice_set_user_psize(struct mm_struct *mm, unsigned int psize)
 		  mm->context.low_slices_psize,
 		  mm->context.high_slices_psize);
 
+	spin_unlock_irqrestore(&slice_convert_lock, flags);
+	recalc_slice_mask_cache(mm);
+	return;
  bail:
 	spin_unlock_irqrestore(&slice_convert_lock, flags);
 }
