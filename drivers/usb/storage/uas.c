@@ -34,7 +34,6 @@
 
 struct uas_dev_info {
 	struct usb_interface *intf;
-	struct usb_device *udev;
 	struct usb_anchor cmd_urbs;
 	struct usb_anchor sense_urbs;
 	struct usb_anchor data_urbs;
@@ -424,7 +423,7 @@ static struct urb *uas_alloc_data_urb(struct uas_dev_info *devinfo, gfp_t gfp,
 				      struct scsi_cmnd *cmnd,
 				      enum dma_data_direction dir)
 {
-	struct usb_device *udev = devinfo->udev;
+	struct usb_device *udev = interface_to_usbdev(devinfo->intf);
 	struct uas_cmd_info *cmdinfo = (void *)&cmnd->SCp;
 	struct urb *urb = usb_alloc_urb(0, gfp);
 	struct scsi_data_buffer *sdb = (dir == DMA_FROM_DEVICE)
@@ -447,7 +446,7 @@ static struct urb *uas_alloc_data_urb(struct uas_dev_info *devinfo, gfp_t gfp,
 static struct urb *uas_alloc_sense_urb(struct uas_dev_info *devinfo, gfp_t gfp,
 				       struct scsi_cmnd *cmnd)
 {
-	struct usb_device *udev = devinfo->udev;
+	struct usb_device *udev = interface_to_usbdev(devinfo->intf);
 	struct uas_cmd_info *cmdinfo = (void *)&cmnd->SCp;
 	struct urb *urb = usb_alloc_urb(0, gfp);
 	struct sense_iu *iu;
@@ -474,7 +473,7 @@ static struct urb *uas_alloc_sense_urb(struct uas_dev_info *devinfo, gfp_t gfp,
 static struct urb *uas_alloc_cmd_urb(struct uas_dev_info *devinfo, gfp_t gfp,
 					struct scsi_cmnd *cmnd)
 {
-	struct usb_device *udev = devinfo->udev;
+	struct usb_device *udev = interface_to_usbdev(devinfo->intf);
 	struct scsi_device *sdev = cmnd->device;
 	struct uas_cmd_info *cmdinfo = (void *)&cmnd->SCp;
 	struct urb *urb = usb_alloc_urb(0, gfp);
@@ -741,7 +740,7 @@ static int uas_eh_bus_reset_handler(struct scsi_cmnd *cmnd)
 {
 	struct scsi_device *sdev = cmnd->device;
 	struct uas_dev_info *devinfo = sdev->hostdata;
-	struct usb_device *udev = devinfo->udev;
+	struct usb_device *udev = interface_to_usbdev(devinfo->intf);
 	unsigned long flags;
 	int err;
 
@@ -870,9 +869,9 @@ MODULE_DEVICE_TABLE(usb, uas_usb_ids);
 
 #undef UNUSUAL_DEV
 
-static int uas_switch_interface(struct usb_device *udev,
-				struct usb_interface *intf)
+static int uas_switch_interface(struct usb_interface *intf)
 {
+	struct usb_device *udev = interface_to_usbdev(intf);
 	int alt;
 
 	alt = uas_find_uas_alt_setting(intf);
@@ -886,7 +885,7 @@ static int uas_switch_interface(struct usb_device *udev,
 static int uas_configure_endpoints(struct uas_dev_info *devinfo)
 {
 	struct usb_host_endpoint *eps[4] = { };
-	struct usb_device *udev = devinfo->udev;
+	struct usb_device *udev = interface_to_usbdev(devinfo->intf);
 	int r;
 
 	r = uas_find_endpoints(devinfo->intf->cur_altsetting, eps);
@@ -918,7 +917,7 @@ static int uas_configure_endpoints(struct uas_dev_info *devinfo)
 
 static void uas_free_streams(struct uas_dev_info *devinfo)
 {
-	struct usb_device *udev = devinfo->udev;
+	struct usb_device *udev = interface_to_usbdev(devinfo->intf);
 	struct usb_host_endpoint *eps[3];
 
 	eps[0] = usb_pipe_endpoint(udev, devinfo->status_pipe);
@@ -938,7 +937,7 @@ static int uas_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	if (!uas_use_uas_driver(intf, id, &dev_flags))
 		return -ENODEV;
 
-	if (uas_switch_interface(udev, intf))
+	if (uas_switch_interface(intf))
 		return -ENODEV;
 
 	shost = scsi_host_alloc(&uas_host_template,
@@ -954,7 +953,6 @@ static int uas_probe(struct usb_interface *intf, const struct usb_device_id *id)
 
 	devinfo = (struct uas_dev_info *)shost->hostdata;
 	devinfo->intf = intf;
-	devinfo->udev = udev;
 	devinfo->resetting = 0;
 	devinfo->shutdown = 0;
 	devinfo->flags = dev_flags;
