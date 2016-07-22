@@ -90,6 +90,7 @@ static char acpi_aml_batch_prompt;
 static char acpi_aml_batch_roll;
 static unsigned long acpi_aml_log_state;
 static char *acpi_aml_batch_cmd = NULL;
+static char *acpi_aml_batch_cmds = NULL;
 static char *acpi_aml_batch_pos = NULL;
 
 static int acpi_aml_set_fl(int fd, int flags)
@@ -326,12 +327,65 @@ static void acpi_aml_loop(int fd)
 	}
 }
 
+static void acpi_aml_delete_batch(void)
+{
+	if (acpi_aml_batch_cmd) {
+		free(acpi_aml_batch_cmd);
+		acpi_aml_batch_cmd = NULL;
+	}
+}
+
+static bool acpi_aml_create_batch(char *cmd)
+{
+	int len;
+
+	acpi_aml_delete_batch();
+	len = strlen(cmd);
+	acpi_aml_batch_cmd = calloc(len + 2, 1);
+	if (!acpi_aml_batch_cmd) {
+		perror("calloc");
+		return false;
+	}
+	memcpy(acpi_aml_batch_cmd, cmd, len);
+	acpi_aml_batch_cmd[len] = '\n';
+	return true;
+}
+
+static void acpi_aml_batch(int fd)
+{
+	char *ptr, *cmd;
+	bool run = false;
+
+	cmd = ptr = acpi_aml_batch_cmds;
+	while (*ptr) {
+		if (*ptr == ',') {
+			/* Convert commas to spaces */
+			*ptr = ' ';
+		} else if (*ptr == ';') {
+			*ptr = '\0';
+			run = true;
+		}
+		ptr++;
+		if (run || (*ptr == '\0')) {
+			if (!acpi_aml_create_batch(cmd))
+				return;
+			ioctl(fd, ACPI_IOCTL_DEBUGGER_FLUSH);
+			acpi_aml_loop(fd);
+			run = 0;
+			cmd = ptr;
+			acpi_aml_delete_batch();
+		}
+	}
+}
+
 void usage(FILE *file, char *progname)
 {
 	fprintf(file, "usage: %s [-b cmd] [-f file] [-h]\n", progname);
 	fprintf(file, "\nOptions:\n");
-	fprintf(file, "  -b     Specify command to be executed in batch mode\n");
-	fprintf(file, "  -f     Specify interface file other than");
+	fprintf(file, "  -b     Specify commands to be executed in batch mode\n");
+	fprintf(file, "         Use ';' as command delimiters\n");
+	fprintf(file, "         Use ',' as spaces\n");
+	fprintf(file, "  -f     Specify interface file other than\n");
 	fprintf(file, "         /sys/kernel/debug/acpi/acpidbg\n");
 	fprintf(file, "  -h     Print this help message\n");
 }
@@ -340,27 +394,23 @@ int main(int argc, char **argv)
 {
 	int fd = -1;
 	int ch;
-	int len;
 	int ret = EXIT_SUCCESS;
 
 	while ((ch = getopt(argc, argv, "b:f:h")) != -1) {
 		switch (ch) {
 		case 'b':
-			if (acpi_aml_batch_cmd) {
+			if (acpi_aml_batch_cmds) {
 				fprintf(stderr, "Already specify %s\n",
-					acpi_aml_batch_cmd);
+					acpi_aml_batch_cmds);
 				ret = EXIT_FAILURE;
 				goto exit;
 			}
-			len = strlen(optarg);
-			acpi_aml_batch_cmd = calloc(len + 2, 1);
-			if (!acpi_aml_batch_cmd) {
-				perror("calloc");
+			acpi_aml_batch_cmds = strdup(optarg);
+			if (!acpi_aml_batch_cmds) {
+				perror("strdup");
 				ret = EXIT_FAILURE;
 				goto exit;
 			}
-			memcpy(acpi_aml_batch_cmd, optarg, len);
-			acpi_aml_batch_cmd[len] = '\n';
 			acpi_aml_mode = ACPI_AML_BATCH;
 			break;
 		case 'f':
@@ -389,8 +439,9 @@ int main(int argc, char **argv)
 	acpi_aml_set_fl(STDOUT_FILENO, O_NONBLOCK);
 
 	if (acpi_aml_mode == ACPI_AML_BATCH)
-		ioctl(fd, ACPI_IOCTL_DEBUGGER_FLUSH);
-	acpi_aml_loop(fd);
+		acpi_aml_batch(fd);
+	else
+		acpi_aml_loop(fd);
 
 exit:
 	if (fd >= 0)
