@@ -1379,6 +1379,34 @@ void __init print_IO_APICs(void)
 /* Where if anywhere is the i8259 connect in external int mode */
 static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
 
+/*
+ * Return false means the virtual wire mode via I/O APIC is inactive
+ */
+bool virtual_wire_via_ioapic(void)
+{
+	int apic, pin;
+
+	for_each_ioapic_pin(apic, pin) {
+		/* See if any of the pins is in ExtINT mode */
+		struct IO_APIC_route_entry entry = ioapic_read_entry(apic, pin);
+
+		/*
+		 * If the interrupt line is enabled and in ExtInt mode
+		 * I have found the pin where the i8259 is connected.
+		 */
+		if ((entry.mask == 0) && (entry.delivery_mode == dest_ExtINT))
+			return true;
+	}
+
+	/*
+	 * Virtual wire mode via I/O APIC requests
+	 * I/O APIC be connected to i8259 in chapter 3.6.2.2 of the MP v1.4 spec
+	 * If no pin in ExtInt mode,
+	 * the through-I/O-APIC virtual wire mode can be regarded inactive.
+	 */
+	return false;
+}
+
 void __init enable_IO_APIC(void)
 {
 	int i8259_apic, i8259_pin;
