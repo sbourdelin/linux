@@ -286,8 +286,6 @@ int arizona_irq_init(struct arizona *arizona)
 		case IRQF_TRIGGER_RISING:
 		case IRQF_TRIGGER_FALLING:
 			break;
-
-		case IRQ_TYPE_NONE:
 		default:
 			/* Device default */
 			arizona->pdata.irq_flags = IRQF_TRIGGER_LOW;
