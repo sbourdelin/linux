@@ -3018,6 +3018,38 @@ static void pnv_ioda_setup_pe_seg(struct pnv_ioda_pe *pe)
 	}
 }
 
+#ifdef CONFIG_DEBUG_FS
+static ssize_t pnv_pci_debug_write(struct file *filp,
+				   const char __user *user_buf,
+				   size_t count, loff_t *ppos)
+{
+	struct pci_controller *hose = filp->private_data;
+	struct pnv_phb *phb;
+	int ret = 0;
+
+	if (!hose)
+		return -EFAULT;
+
+	phb = hose->private_data;
+	if (!phb)
+		return -EFAULT;
+
+	ret = opal_pci_get_phb_diag_data2(phb->opal_id, phb->diag.blob,
+					  PNV_PCI_DIAG_BUF_SIZE);
+
+	if (!ret)
+		pnv_pci_dump_phb_diag_data(phb->hose, phb->diag.blob);
+
+	return ret < 0 ? ret : count;
+}
+
+static const struct file_operations pnv_pci_debug_ops = {
+	.open	= simple_open,
+	.llseek	= no_llseek,
+	.write	= pnv_pci_debug_write,
+};
+#endif /* CONFIG_DEBUG_FS */
+
 static void pnv_pci_ioda_create_dbgfs(void)
 {
 #ifdef CONFIG_DEBUG_FS
@@ -3036,6 +3068,9 @@ static void pnv_pci_ioda_create_dbgfs(void)
 		if (!phb->dbgfs)
 			pr_warning("%s: Error on creating debugfs on PHB#%x\n",
 				__func__, hose->global_number);
+
+		debugfs_create_file("regdump", 0200, phb->dbgfs, hose,
+				    &pnv_pci_debug_ops);
 	}
 #endif /* CONFIG_DEBUG_FS */
 }
