@@ -256,19 +256,16 @@ void power_supply_init_attrs(struct device_type *dev_type)
 
 static char *kstruprdup(const char *str, gfp_t gfp)
 {
-	char *ret, *ustr;
+	char *ustr;
 
-	ustr = ret = kmalloc(strlen(str) + 1, gfp);
+	ustr = kmalloc(strlen(str) + 1, gfp);
 
-	if (!ret)
+	if (!ustr)
 		return NULL;
 
-	while (*str)
-		*ustr++ = toupper(*str++);
+	strcpytoupper(ustr, str);
 
-	*ustr = 0;
-
-	return ret;
+	return ustr;
 }
 
 int power_supply_uevent(struct device *dev, struct kobj_uevent_env *env)
