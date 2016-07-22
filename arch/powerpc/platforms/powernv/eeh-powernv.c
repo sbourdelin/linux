@@ -1094,6 +1094,13 @@ static int pnv_eeh_reset(struct eeh_pe *pe, int option)
 	if (pe->type & EEH_PE_VF)
 		return pnv_eeh_reset_vf_pe(pe, option);
 
+	/*
+	 * If dealing with the root bus (or the bus underneath the
+	 * root port), we reset the bus underneath the root port.
+	 *
+	 * The cxl driver depends on this behaviour for bi-modal card
+	 * switching.
+	 */
 	if (pci_is_root_bus(bus) ||
 	    pci_is_root_bus(bus->parent))
 		return pnv_eeh_root_reset(hose, option);
