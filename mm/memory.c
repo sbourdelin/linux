@@ -2950,13 +2950,14 @@ late_initcall(fault_around_debugfs);
  * fault_around_pages() value (and therefore to page order).  This way it's
  * easier to guarantee that we don't cross page table boundaries.
  */
-static void do_fault_around(struct vm_area_struct *vma, unsigned long address,
-		pte_t *pte, pgoff_t pgoff, unsigned int flags)
+static void do_fault_around(struct vm_area_struct *vma, struct vm_fault *vmf,
+		pte_t *pte)
 {
 	unsigned long start_addr, nr_pages, mask;
-	pgoff_t max_pgoff;
-	struct vm_fault vmf;
+	pgoff_t pgoff = vmf->pgoff, max_pgoff;
+	struct vm_fault vmfaround;
 	int off;
+	unsigned long address = (unsigned long)vmf->virtual_address;
 
 	nr_pages = READ_ONCE(fault_around_bytes) >> PAGE_SHIFT;
 	mask = ~(nr_pages * PAGE_SIZE - 1) & PAGE_MASK;
@@ -2985,10 +2986,10 @@ static void do_fault_around(struct vm_area_struct *vma, unsigned long address,
 		pte++;
 	}
 
-	init_vmf(&vmf, vma, start_addr, pgoff, flags);
-	vmf.pte = pte;
-	vmf.max_pgoff = max_pgoff;
-	vma->vm_ops->map_pages(vma, &vmf);
+	init_vmf(&vmfaround, vma, start_addr, pgoff, vmf->flags);
+	vmfaround.pte = pte;
+	vmfaround.max_pgoff = max_pgoff;
+	vma->vm_ops->map_pages(vma, &vmfaround);
 }
 
 static int do_read_fault(struct mm_struct *mm, struct vm_area_struct *vma,
@@ -3006,7 +3007,7 @@ static int do_read_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 	 */
 	if (vma->vm_ops->map_pages && fault_around_bytes >> PAGE_SHIFT > 1) {
 		pte = pte_offset_map_lock(mm, pmd, address, &ptl);
-		do_fault_around(vma, address, pte, vmf->pgoff, vmf->flags);
+		do_fault_around(vma, vmf, pte);
 		if (!pte_same(*pte, orig_pte))
 			goto unlock_out;
 		pte_unmap_unlock(pte, ptl);
