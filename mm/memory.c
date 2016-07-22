@@ -3635,8 +3635,8 @@ out:
 	return -EINVAL;
 }
 
-static inline int follow_pte(struct mm_struct *mm, unsigned long address,
-			     pte_t **ptepp, spinlock_t **ptlp)
+int follow_pte(struct mm_struct *mm, unsigned long address, pte_t **ptepp,
+	       spinlock_t **ptlp)
 {
 	int res;
 
@@ -3645,6 +3645,7 @@ static inline int follow_pte(struct mm_struct *mm, unsigned long address,
 			   !(res = __follow_pte(mm, address, ptepp, ptlp)));
 	return res;
 }
+EXPORT_SYMBOL(follow_pte);
 
 /**
  * follow_pfn - look up PFN at a user virtual address
