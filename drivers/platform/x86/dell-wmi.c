@@ -222,6 +222,16 @@ static const struct key_entry dell_wmi_extra_keymap[] __initconst = {
 
 	/* Stealth mode toggle */
 	{ KE_IGNORE, 0x155, { KEY_RESERVED } },
+
+	/* Rugged magnetic keyboard/mouse events */
+	{ KE_IGNORE, 0x156, { KEY_RESERVED } },
+	{ KE_IGNORE, 0x157, { KEY_RESERVED } },
+
+	/* Rugged programmable (P1/P2/P3 keys) */
+	{ KE_KEY, 0x850, { KEY_PROG1 } },
+	{ KE_KEY, 0x851, { KEY_PROG2 } },
+	{ KE_KEY, 0x852, { KEY_PROG3 } },
+
 };
 
 static struct input_dev *dell_wmi_input_dev;
