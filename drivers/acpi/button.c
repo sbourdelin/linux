@@ -106,6 +106,8 @@ struct acpi_button {
 	unsigned long pushed;
 	int sw_last_state;
 	unsigned long sw_last_time;
+	int key_last_state;
+	unsigned long key_last_time;
 	bool suspended;
 };
 
@@ -139,7 +141,8 @@ static int acpi_lid_evaluate_state(struct acpi_device *device)
 static int acpi_lid_notify_state(struct acpi_device *device, int state)
 {
 	struct acpi_button *button = acpi_driver_data(device);
-	unsigned long sw_tout;
+	int keycode;
+	unsigned long sw_tout, key_tout;
 	int ret;
 
 	/* Send the switch event */
@@ -155,6 +158,20 @@ static int acpi_lid_notify_state(struct acpi_device *device, int state)
 	input_sync(button->input);
 	button->sw_last_state = !!state;
 	button->sw_last_time = jiffies;
+
+	/* Send the key event */
+	key_tout = button->key_last_time +
+		   msecs_to_jiffies(lid_report_interval);
+	if (time_after(jiffies, key_tout) ||
+	    (button->key_last_state != !!state)) {
+		keycode = state ? KEY_LID_OPEN : KEY_LID_CLOSE;
+		input_report_key(button->input, keycode, 1);
+		input_sync(button->input);
+		input_report_key(button->input, keycode, 0);
+		input_sync(button->input);
+		button->key_last_state = !!state;
+		button->key_last_time = jiffies;
+	}
 
 	if (state)
 		pm_wakeup_event(&device->dev, 0);
@@ -424,8 +441,9 @@ static int acpi_button_add(struct acpi_device *device)
 		strcpy(name, ACPI_BUTTON_DEVICE_NAME_LID);
 		sprintf(class, "%s/%s",
 			ACPI_BUTTON_CLASS, ACPI_BUTTON_SUBCLASS_LID);
-		button->sw_last_state = !!acpi_lid_evaluate_state(device);
-		button->sw_last_time = jiffies;
+		button->sw_last_state = button->key_last_state =
+			!!acpi_lid_evaluate_state(device);
+		button->sw_last_time = button->key_last_time = jiffies;
 	} else {
 		printk(KERN_ERR PREFIX "Unsupported hid [%s]\n", hid);
 		error = -ENODEV;
@@ -455,6 +473,8 @@ static int acpi_button_add(struct acpi_device *device)
 
 	case ACPI_BUTTON_TYPE_LID:
 		input_set_capability(input, EV_SW, SW_LID);
+		input_set_capability(input, EV_KEY, KEY_LID_OPEN);
+		input_set_capability(input, EV_KEY, KEY_LID_CLOSE);
 		break;
 	}
 

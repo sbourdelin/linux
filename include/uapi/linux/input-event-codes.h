@@ -641,6 +641,13 @@
  * e.g. teletext or data broadcast application (MHEG, MHP, HbbTV, etc.)
  */
 #define KEY_DATA			0x275
+/*
+ * Key events sent by the lid drivers.
+ * The drivers may not be able to send paired "open"/"close" events, in
+ * which case, they send KEY_LID_OPEN/KEY_LID_CLOSE instead of SW_LID.
+ */
+#define KEY_LID_OPEN			0x278
+#define KEY_LID_CLOSE			0x279
 
 #define BTN_TRIGGER_HAPPY		0x2c0
 #define BTN_TRIGGER_HAPPY1		0x2c0
