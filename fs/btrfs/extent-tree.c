@@ -7419,6 +7419,7 @@ static noinline int find_free_extent(struct btrfs_root *orig_root,
 				     u64 hint_byte, struct btrfs_key *ins,
 				     u64 flags, int delalloc)
 {
+	extern u32 sz_stripe;
 	int ret = 0;
 	struct btrfs_root *root = orig_root->fs_info->extent_root;
 	struct btrfs_free_cluster *last_ptr = NULL;
@@ -7748,6 +7749,7 @@ unclustered_alloc:
 			goto loop;
 		}
 checks:
+		root->stripesize = sz_stripe;
 		search_start = ALIGN(offset, root->stripesize);
 
 		/* move on to the next group */

@@ -2523,6 +2523,8 @@ int open_ctree(struct super_block *sb,
 	struct btrfs_root *tree_root;
 	struct btrfs_root *chunk_root;
 	int ret;
+	extern u32 sz_stripe;
+	extern u32 stripe_width;
 	int err = -EINVAL;
 	int num_backups_tried = 0;
 	int backup_index = 0;
@@ -2704,7 +2706,7 @@ int open_ctree(struct super_block *sb,
 		goto fail_alloc;
 	}
 
-	__setup_root(4096, 4096, 4096, tree_root,
+	__setup_root(4096, 4096, sz_stripe, tree_root,
 		     fs_info, BTRFS_ROOT_TREE_OBJECTID);
 
 	invalidate_bdev(fs_devices->latest_bdev);
@@ -2806,7 +2808,7 @@ int open_ctree(struct super_block *sb,
 
 	nodesize = btrfs_super_nodesize(disk_super);
 	sectorsize = btrfs_super_sectorsize(disk_super);
-	stripesize = sectorsize;
+	stripesize = sz_stripe;
 	fs_info->dirty_metadata_batch = nodesize * (1 + ilog2(nr_cpu_ids));
 	fs_info->delalloc_batch = sectorsize * 512 * (1 + ilog2(nr_cpu_ids));
 
@@ -4050,6 +4052,7 @@ static int btrfs_check_super_valid(struct btrfs_fs_info *fs_info,
 	u64 nodesize = btrfs_super_nodesize(sb);
 	u64 sectorsize = btrfs_super_sectorsize(sb);
 	int ret = 0;
+	extern u32 sz_stripe;
 
 	if (btrfs_super_magic(sb) != BTRFS_MAGIC) {
 		printk(KERN_ERR "BTRFS: no valid FS found\n");
@@ -4133,9 +4136,8 @@ static int btrfs_check_super_valid(struct btrfs_fs_info *fs_info,
 		       btrfs_super_bytes_used(sb));
 		ret = -EINVAL;
 	}
-	if (!is_power_of_2(btrfs_super_stripesize(sb))) {
-		btrfs_err(fs_info, "invalid stripesize %u",
-		       btrfs_super_stripesize(sb));
+	if (!is_power_of_2(sz_stripe)) {
+		btrfs_err(fs_info, "invalid stripesize %u", sz_stripe);
 		ret = -EINVAL;
 	}
 	if (btrfs_super_num_devices(sb) > (1UL << 31))

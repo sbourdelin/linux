@@ -2141,6 +2141,25 @@ static inline void btrfs_set_balance_data(struct extent_buffer *eb,
 	write_eb_member(eb, bi, struct btrfs_balance_item, data, ba);
 }
 
+static inline void btrfs_balance_raid(struct extent_buffer *eb,
+				      struct btrfs_balance_item *bi,
+				      struct btrfs_disk_balance_args *ba)
+{
+	extern u32 sz_stripe;
+	extern u32 stripe_width;
+
+	sz_stripe = ba->sz_stripe;
+	stripe_width = ((64 * 1024) / sz_stripe);
+	read_eb_member(eb, bi, struct btrfs_balance_item, data, ba);
+}
+
+static inline void btrfs_set_balance_raid(struct extent_buffer *eb,
+					struct btrfs_balance_item *bi,
+					struct btrfs_disk_balance_args *ba)
+{
+	write_eb_member(eb, bi, struct btrfs_balance_item, data, ba);
+}
+
 static inline void btrfs_balance_meta(struct extent_buffer *eb,
 				      struct btrfs_balance_item *bi,
 				      struct btrfs_disk_balance_args *ba)
@@ -2235,8 +2254,6 @@ BTRFS_SETGET_STACK_FUNCS(super_sectorsize, struct btrfs_super_block,
 			 sectorsize, 32);
 BTRFS_SETGET_STACK_FUNCS(super_nodesize, struct btrfs_super_block,
 			 nodesize, 32);
-BTRFS_SETGET_STACK_FUNCS(super_stripesize, struct btrfs_super_block,
-			 stripesize, 32);
 BTRFS_SETGET_STACK_FUNCS(super_root_dir, struct btrfs_super_block,
 			 root_dir_objectid, 64);
 BTRFS_SETGET_STACK_FUNCS(super_num_devices, struct btrfs_super_block,
