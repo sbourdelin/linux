@@ -42,12 +42,12 @@ int mthca_reset(struct mthca_dev *mdev)
 {
 	int i;
 	int err = 0;
-	u32 *hca_header    = NULL;
+	u32 *hca_header;
 	u32 *bridge_header = NULL;
 	struct pci_dev *bridge = NULL;
 	int bridge_pcix_cap = 0;
-	int hca_pcie_cap = 0;
-	int hca_pcix_cap = 0;
+	int hca_pcie_cap;
+	int hca_pcix_cap;
 
 	u16 devctl;
 	u16 linkctl;
