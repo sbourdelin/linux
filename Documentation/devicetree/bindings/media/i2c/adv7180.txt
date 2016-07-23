@@ -15,6 +15,10 @@ Required Properties :
 		"adi,adv7282"
 		"adi,adv7282-m"
 
+Optional Properties :
+- powerdown-gpios: reference to the GPIO connected to the powerdown pin,
+  if any.
+
 Optional Endpoint Properties :
 - newavmode: a boolean property to indicate the BT.656 bus is operating
   in Analog Device's NEWAVMODE. Valid for BT.656 busses only.
