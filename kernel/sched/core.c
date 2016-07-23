@@ -3151,8 +3151,17 @@ static inline void preempt_latency_stop(int val) { }
  */
 static noinline void __schedule_bug(struct task_struct *prev)
 {
+#ifdef CONFIG_DEBUG_PREEMPT
+	unsigned long preempt_disable_ip;
+#endif
+
 	if (oops_in_progress)
 		return;
+
+#ifdef CONFIG_DEBUG_PREEMPT
+	/* Save this before calling printk(), since that will clobber it */
+	preempt_disable_ip = current->preempt_disable_ip;
+#endif
 
 	printk(KERN_ERR "BUG: scheduling while atomic: %s/%d/0x%08x\n",
 		prev->comm, prev->pid, preempt_count());
@@ -3164,7 +3173,7 @@ static noinline void __schedule_bug(struct task_struct *prev)
 #ifdef CONFIG_DEBUG_PREEMPT
 	if (in_atomic_preempt_off()) {
 		pr_err("Preemption disabled at:");
-		print_ip_sym(current->preempt_disable_ip);
+		print_ip_sym(preempt_disable_ip);
 		pr_cont("\n");
 	}
 #endif
@@ -7549,6 +7558,9 @@ EXPORT_SYMBOL(__might_sleep);
 void ___might_sleep(const char *file, int line, int preempt_offset)
 {
 	static unsigned long prev_jiffy;	/* ratelimiting */
+#ifdef CONFIG_DEBUG_PREEMPT
+	unsigned long preempt_disable_ip;
+#endif
 
 	rcu_sleep_check(); /* WARN_ON_ONCE() by default, no rate limit reqd. */
 	if ((preempt_count_equals(preempt_offset) && !irqs_disabled() &&
@@ -7558,6 +7570,11 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
 	if (time_before(jiffies, prev_jiffy + HZ) && prev_jiffy)
 		return;
 	prev_jiffy = jiffies;
+
+#ifdef CONFIG_DEBUG_PREEMPT
+	/* Save this before calling printk(), since that will clobber it */
+	preempt_disable_ip = current->preempt_disable_ip;
+#endif
 
 	printk(KERN_ERR
 		"BUG: sleeping function called from invalid context at %s:%d\n",
@@ -7576,7 +7593,7 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
 #ifdef CONFIG_DEBUG_PREEMPT
 	if (!preempt_count_equals(preempt_offset)) {
 		pr_err("Preemption disabled at:");
-		print_ip_sym(current->preempt_disable_ip);
+		print_ip_sym(preempt_disable_ip);
 		pr_cont("\n");
 	}
 #endif
