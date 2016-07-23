@@ -191,7 +191,7 @@ static int ll_dir_filler(void *_hash, struct page *page0)
 		if (body->valid & OBD_MD_FLSIZE)
 			i_size_write(inode, body->size);
 
-		nrdpgs = (request->rq_bulk->bd_nob_transferred+PAGE_SIZE-1)
+		nrdpgs = (request->rq_bulk->bd_nob_transferred + PAGE_SIZE - 1)
 			 >> PAGE_SHIFT;
 		SetPageUptodate(page0);
 	}
