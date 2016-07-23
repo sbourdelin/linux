@@ -5377,8 +5377,10 @@ lpfc_sli4_driver_resource_setup(struct lpfc_hba *phba)
 	if (bf_get(lpfc_sli_intf_if_type, &phba->sli4_hba.sli_intf) ==
 	    LPFC_SLI_INTF_IF_TYPE_2) {
 		rc = lpfc_pci_function_reset(phba);
-		if (unlikely(rc))
+		if (unlikely(rc)) {
+			rc = -ENODEV;
 			goto out_free_mem;
+		}
 		phba->temp_sensor_support = 1;
 	}
 
@@ -10787,7 +10789,14 @@ lpfc_pci_probe_one_s4(struct pci_dev *pdev, const struct pci_device_id *pid)
 		/* Create NVME binding with nvme_fc_transport. This
 		 * ensures the vport is initialized.
 		 */
-		/* TODO: bind with nvme layer */
+		error = lpfc_create_nvme_lport(vport);
+		if (error) {
+			lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
+					"6004 NVME registration failed, "
+					"error x%x\n",
+					error);
+			goto out_disable_intr;
+		}
 	}
 
 	/* check for firmware upgrade or downgrade */
@@ -10858,8 +10867,8 @@ lpfc_pci_remove_one_s4(struct pci_dev *pdev)
 	lpfc_destroy_vport_work_array(phba, vports);
 
 	if (phba->cfg_nvme_io_channel) {
-		/* TODO: unbind with nvme layer */
 		/* The nvme pointer is invalid post call. */
+		lpfc_destroy_nvme_lport(vport->pnvme);
 		vport->pnvme = NULL;
 	}
 

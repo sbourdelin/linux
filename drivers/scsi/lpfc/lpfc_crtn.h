@@ -514,3 +514,6 @@ void lpfc_release_scsi_buf(struct lpfc_hba *, struct lpfc_scsi_buf *);
 struct lpfc_scsi_buf *lpfc_get_scsi_buf(struct lpfc_hba *,
 					struct lpfc_nodelist *);
 
+/* NVME interfaces. */
+int lpfc_create_nvme_lport(struct lpfc_vport *);
+void lpfc_destroy_nvme_lport(struct lpfc_nvme *);

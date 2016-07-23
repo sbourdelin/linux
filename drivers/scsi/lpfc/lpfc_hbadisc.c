@@ -4060,6 +4060,7 @@ lpfc_register_nvme_port(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp)
 	struct lpfc_nvme *pnvme = vport->pnvme;
 	struct lpfc_nvme_lport *lport;
 	struct lpfc_nvme_rport *rport;
+	struct nvme_fc_remote_port *remote_port;
 	struct nvme_fc_port_info rpinfo;
 	struct lpfc_nodelist *fndlp;
 
@@ -4152,7 +4153,30 @@ regit:
 		else
 			rpinfo.fabric_name = lport->localport->fabric_name;
 
-		/* TODO: bind with nvme layer - register remote nvme port */
+		ret = nvme_fc_register_remoteport(lport->localport, &rpinfo,
+						  &remote_port);
+		if (!ret) {
+			rport = remote_port->private;
+			rport->remoteport = remote_port;
+			rport->lport = lport;
+			rport->ndlp = ndlp;
+			ndlp->nrport = rport;
+			INIT_LIST_HEAD(&rport->list);
+			list_add_tail(&rport->list, &lport->rport_list);
+			lpfc_printf_vlog(vport, KERN_INFO, LOG_NVME | LOG_NODE,
+					 "6031 Binding new rport to "
+					 "lport %p using fabricName 0x%llx "
+					 "Rport WWNN 0x%llx, Rport WWPN 0x%llx "
+					 "DID x%06x Role x%x\n",
+					 lport,
+					 lport->localport->fabric_name,
+					 rpinfo.node_name, rpinfo.port_name,
+					 rpinfo.port_id, rpinfo.port_role);
+		} else
+			lpfc_printf_vlog(vport, KERN_ERR, LOG_NVME | LOG_NODE,
+					 "6031 RemotePort Registration failed "
+					 "err: %d, DID x%06x\n",
+					 ret, ndlp->nlp_DID);
 	} else {
 		ret = -EINVAL;
 		lpfc_printf_vlog(vport, KERN_INFO, LOG_NVME,
