@@ -891,6 +891,7 @@ u32 be_get_fw_log_level(struct be_adapter *adapter);
 int be_update_queues(struct be_adapter *adapter);
 int be_poll(struct napi_struct *napi, int budget);
 void be_eqd_update(struct be_adapter *adapter, bool force_update);
+void be_set_adapters_temperature_value(struct be_adapter *adapter, u8 temp);
 
 /*
  * internal function to initialize-cleanup roce device.

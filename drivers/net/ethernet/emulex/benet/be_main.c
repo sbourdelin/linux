@@ -53,6 +53,15 @@ static const struct pci_device_id be_dev_ids[] = {
 	{ 0 }
 };
 MODULE_DEVICE_TABLE(pci, be_dev_ids);
+
+struct adapter_list_node {
+	struct be_adapter *adapter;
+	struct list_head node;
+};
+
+static LIST_HEAD(adapters_list);
+static DEFINE_MUTEX(adapters_list_lock);
+
 /* UE Status Low CSR */
 static const char * const ue_status_low_desc[] = {
 	"CEV",
@@ -129,6 +138,40 @@ static const char * const ue_status_hi_desc[] = {
 				 BE_IF_FLAGS_BROADCAST | \
 				 BE_IF_FLAGS_MULTICAST | \
 				 BE_IF_FLAGS_PASS_L3L4_ERRORS)
+
+/* This procedure runs through adapters_list and sets the temperature for
+ * all functions of the same adapter. Since the temperature update is done
+ * by a single function in be_worker(), the other hwmon entries might remain
+ * with an invalid temperature.
+ */
+
+void be_set_adapters_temperature_value(struct be_adapter *adapter, u8 temp)
+{
+	struct adapter_list_node *adapter_lnode;
+	struct pci_bus *bus;
+	u8 bus_number, slot, dev;
+	u16 domain;
+
+	bus = adapter->pdev->bus;
+	domain = pci_domain_nr(bus);
+	bus_number = bus->number;
+	dev = PCI_SLOT(adapter->pdev->devfn);
+
+	mutex_lock(&adapters_list_lock);
+	list_for_each_entry(adapter_lnode, &adapters_list, node) {
+		bus = adapter_lnode->adapter->pdev->bus;
+		slot = PCI_SLOT(adapter_lnode->adapter->pdev->devfn);
+
+		if (pci_domain_nr(bus) == domain && bus->number == bus_number &&
+		    slot == dev) {
+			adapter_lnode->adapter->hwmon_info.be_on_die_temp
+								= temp;
+			if (unlikely(temp == BE_INVALID_DIE_TEMP))
+				adapter_lnode->adapter->be_get_temp_freq = 0;
+		}
+	}
+	mutex_unlock(&adapters_list_lock);
+}
 
 static void be_queue_free(struct be_adapter *adapter, struct be_queue_info *q)
 {
@@ -5285,6 +5328,7 @@ free_mbox:
 static void be_remove(struct pci_dev *pdev)
 {
 	struct be_adapter *adapter = pci_get_drvdata(pdev);
+	struct adapter_list_node *lnode, *tmp;
 
 	if (!adapter)
 		return;
@@ -5295,6 +5339,15 @@ static void be_remove(struct pci_dev *pdev)
 	be_cancel_err_detection(adapter);
 
 	unregister_netdev(adapter->netdev);
+
+	mutex_lock(&adapters_list_lock);
+	list_for_each_entry_safe(lnode, tmp, &adapters_list, node)
+		if (lnode->adapter == adapter) {
+			list_del(&lnode->node);
+			kfree(lnode);
+			break;
+		}
+	mutex_unlock(&adapters_list_lock);
 
 	be_clear(adapter);
 
@@ -5395,6 +5448,7 @@ static int be_probe(struct pci_dev *pdev, const struct pci_device_id *pdev_id)
 {
 	struct be_adapter *adapter;
 	struct net_device *netdev;
+	struct adapter_list_node *adapter_lnode;
 	int status = 0;
 
 	dev_info(&pdev->dev, "%s version is %s\n", DRV_NAME, DRV_VER);
@@ -5454,6 +5508,15 @@ static int be_probe(struct pci_dev *pdev, const struct pci_device_id *pdev_id)
 	be_roce_dev_add(adapter);
 
 	be_schedule_err_detection(adapter, ERR_DETECTION_DELAY);
+
+	adapter_lnode = kmalloc(sizeof(*adapter_lnode), GFP_KERNEL);
+	if (adapter_lnode) {
+		adapter_lnode->adapter = adapter;
+		mutex_lock(&adapters_list_lock);
+		list_add_tail(&adapter_lnode->node, &adapters_list);
+		mutex_unlock(&adapters_list_lock);
+	} else
+		dev_warn(&pdev->dev, "Couldn't be added to adapters_list\n");
 
 	/* On Die temperature not supported for VF. */
 	if (be_physfn(adapter) && IS_ENABLED(CONFIG_BE2NET_HWMON)) {

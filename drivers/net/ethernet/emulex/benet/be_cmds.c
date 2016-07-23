@@ -226,13 +226,12 @@ static void be_async_cmd_process(struct be_adapter *adapter,
 		if (base_status == MCC_STATUS_SUCCESS) {
 			struct be_cmd_resp_get_cntl_addnl_attribs *resp =
 							(void *)resp_hdr;
-			adapter->hwmon_info.be_on_die_temp =
-						resp->on_die_temperature;
-		} else {
-			adapter->be_get_temp_freq = 0;
-			adapter->hwmon_info.be_on_die_temp =
-						BE_INVALID_DIE_TEMP;
-		}
+			be_set_adapters_temperature_value(adapter,
+							  resp->on_die_temperature);
+		} else
+			be_set_adapters_temperature_value(adapter,
+							  BE_INVALID_DIE_TEMP);
+
 		return;
 	}
 }
