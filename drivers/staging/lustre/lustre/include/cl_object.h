@@ -726,8 +726,6 @@ struct cl_page {
 	struct mutex		cp_mutex;
 	/** Linkage of pages within cl_req. */
 	struct list_head	       cp_flight;
-	/** Transfer error. */
-	int		      cp_error;
 
 	/**
 	 * Page type. Only CPT_TRANSIENT is used so far. Immutable after
