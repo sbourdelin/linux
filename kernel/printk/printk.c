@@ -820,6 +820,7 @@ static int devkmsg_open(struct inode *inode, struct file *file)
 	user->seq = log_first_seq;
 	raw_spin_unlock_irq(&logbuf_lock);
 
+	user->prev = 0;
 	file->private_data = user;
 	return 0;
 }
