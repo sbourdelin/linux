@@ -1430,10 +1430,16 @@ lpfc_ns_cmd(struct lpfc_vport *vport, int cmdcode,
 		 */
 		if (((phba->cfg_enable_fc4_type == LPFC_ENABLE_BOTH) ||
 		     (phba->cfg_enable_fc4_type == LPFC_ENABLE_NVME)) &&
-		    (context == LPFC_FC4_TYPE_NVME))
+		    (context == LPFC_FC4_TYPE_NVME)) {
+			if ((vport == phba->pport) &&
+			    (phba->cfg_enable_nvmet == phba->brd_no)) {
+				CtReq->un.rff.fbits = (FC4_FEATURE_TARGET |
+					FC4_FEATURE_NVME_DISC);
+				lpfc_nvmet_create_targetport(phba);
+			}
 			CtReq->un.rff.type_code = context;
 
-		else if (((phba->cfg_enable_fc4_type == LPFC_ENABLE_BOTH) ||
+		} else if (((phba->cfg_enable_fc4_type == LPFC_ENABLE_BOTH) ||
 			    (phba->cfg_enable_fc4_type == LPFC_ENABLE_FCP)) &&
 			   (context == FC_TYPE_FCP))
 			CtReq->un.rff.type_code = context;

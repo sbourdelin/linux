@@ -34,6 +34,8 @@
 #include <scsi/fc/fc_fs.h>
 #include <linux/aer.h>
 
+#include <linux/nvme-fc-driver.h>
+
 #include "lpfc_hw4.h"
 #include "lpfc_hw.h"
 #include "lpfc_sli.h"
@@ -41,6 +43,8 @@
 #include "lpfc_nl.h"
 #include "lpfc_disc.h"
 #include "lpfc_scsi.h"
+#include "lpfc_nvme.h"
+#include "lpfc_nvmet.h"
 #include "lpfc.h"
 #include "lpfc_crtn.h"
 #include "lpfc_logmsg.h"
@@ -1819,8 +1823,20 @@ lpfc_sli_hbq_to_firmware_s4(struct lpfc_hba *phba, uint32_t hbqno,
 	struct lpfc_queue *hrq;
 	struct lpfc_queue *drq;
 
-	hrq = phba->sli4_hba.hdr_rq;
-	drq = phba->sli4_hba.dat_rq;
+	if (phba->cfg_enable_nvmet == NVME_TARGET_OFF) {
+		if (hbqno == LPFC_NVMET_HBQ)
+			return 0;
+		hrq = phba->sli4_hba.hdr_rq;
+		drq = phba->sli4_hba.dat_rq;
+	} else {
+		if (hbqno == LPFC_NVMET_HBQ) {
+			hrq = phba->sli4_hba.nvmet_hdr_rq;
+			drq = phba->sli4_hba.nvmet_dat_rq;
+		} else {
+			hrq = phba->sli4_hba.hdr_rq;
+			drq = phba->sli4_hba.dat_rq;
+		}
+	}
 
 	lockdep_assert_held(&phba->hbalock);
 	hrqe.address_lo = putPaddrLow(hbq_buf->hbuf.phys);
@@ -1847,9 +1863,22 @@ static struct lpfc_hbq_init lpfc_els_hbq = {
 	.add_count = 40,
 };
 
+/* HBQ for the NVMET ring if needed */
+static struct lpfc_hbq_init lpfc_nvmet_hbq = {
+	.rn = 1,
+	.entry_count = 128,
+	.mask_count = 0,
+	.profile = 0,
+	.ring_mask = (1 << LPFC_EXTRA_RING),
+	.buffer_count = 0,
+	.init_count = 40,
+	.add_count = 40,
+};
+
 /* Array of HBQs */
 struct lpfc_hbq_init *lpfc_hbq_defs[] = {
 	&lpfc_els_hbq,
+	&lpfc_nvmet_hbq,
 };
 
 /**
@@ -2438,8 +2467,8 @@ lpfc_complete_unsol_iocb(struct lpfc_hba *phba, struct lpfc_sli_ring *pring,
 
 	switch (fch_type) {
 	case LPFC_FC4_TYPE_NVME:
-		/* TODO: handle FC-4 LS requests */
-		/* fall-thru for failure */
+		lpfc_nvmet_unsol_ls_event(phba, pring, saveq);
+		return 1;
 	default:
 		break;
 	}
@@ -4364,6 +4393,8 @@ lpfc_sli_hbq_count(struct lpfc_hba *phba)
 	int i;
 
 	i = ARRAY_SIZE(lpfc_hbq_defs);
+	if (phba->cfg_enable_nvmet == phba->brd_no)
+		i--;
 	return i;
 }
 
@@ -4482,8 +4513,16 @@ lpfc_sli4_rb_setup(struct lpfc_hba *phba)
 	phba->hbq_in_use = 1;
 	phba->hbqs[LPFC_ELS_HBQ].entry_count =
 		lpfc_hbq_defs[LPFC_ELS_HBQ]->entry_count;
-	phba->hbq_count = 1;
-	lpfc_sli_hbqbuf_init_hbqs(phba, LPFC_ELS_HBQ);
+	if (phba->cfg_enable_nvmet == phba->brd_no) {
+		phba->hbqs[LPFC_NVMET_HBQ].entry_count =
+			lpfc_hbq_defs[LPFC_NVMET_HBQ]->entry_count;
+		phba->hbq_count = 2;
+		lpfc_sli_hbqbuf_init_hbqs(phba, LPFC_ELS_HBQ);
+		lpfc_sli_hbqbuf_init_hbqs(phba, LPFC_NVMET_HBQ);
+	} else {
+		phba->hbq_count = 1;
+		lpfc_sli_hbqbuf_init_hbqs(phba, LPFC_ELS_HBQ);
+	}
 	/* Initially populate or replenish the HBQs */
 	return 0;
 }
@@ -5123,6 +5162,9 @@ lpfc_sli4_arm_cqeq_intr(struct lpfc_hba *phba)
 			lpfc_sli4_eq_release(phba->sli4_hba.hba_eq[hba_eqidx],
 					     LPFC_QUEUE_REARM);
 	}
+
+	if (phba->cfg_enable_nvmet == phba->brd_no)
+		lpfc_sli4_cq_release(phba->sli4_hba.nvmet_cq, LPFC_QUEUE_REARM);
 
 	if (phba->cfg_fof)
 		lpfc_sli4_eq_release(phba->sli4_hba.fof_eq, LPFC_QUEUE_REARM);
@@ -12461,6 +12503,95 @@ lpfc_sli4_fp_handle_rel_wcqe(struct lpfc_hba *phba, struct lpfc_queue *cq,
 				"miss-matched qid: wcqe-qid=x%x\n", hba_wqid);
 }
 
+/**
+ * lpfc_sli4_nvmet_handle_rcqe - Process a receive-queue completion queue entry
+ * @phba: Pointer to HBA context object.
+ * @rcqe: Pointer to receive-queue completion queue entry.
+ *
+ * This routine process a receive-queue completion queue entry.
+ *
+ * Return: true if work posted to worker thread, otherwise false.
+ **/
+static bool
+lpfc_sli4_nvmet_handle_rcqe(struct lpfc_hba *phba, struct lpfc_queue *cq,
+			    struct lpfc_rcqe *rcqe)
+{
+	bool workposted = false;
+	struct lpfc_queue *hrq = phba->sli4_hba.nvmet_hdr_rq;
+	struct lpfc_queue *drq = phba->sli4_hba.nvmet_dat_rq;
+	struct hbq_dmabuf *dma_buf;
+	struct fc_frame_header *fc_hdr;
+	uint32_t status, rq_id;
+	unsigned long iflags;
+	uint32_t fctl;
+
+	/* sanity check on queue memory */
+	if (unlikely(!hrq) || unlikely(!drq))
+		return workposted;
+
+	if (bf_get(lpfc_cqe_code, rcqe) == CQE_CODE_RECEIVE_V1)
+		rq_id = bf_get(lpfc_rcqe_rq_id_v1, rcqe);
+	else
+		rq_id = bf_get(lpfc_rcqe_rq_id, rcqe);
+
+	if ((phba->cfg_enable_nvmet == NVME_TARGET_OFF) ||
+	    (rq_id != hrq->queue_id))
+		return workposted;
+
+	status = bf_get(lpfc_rcqe_status, rcqe);
+	switch (status) {
+	case FC_STATUS_RQ_BUF_LEN_EXCEEDED:
+		lpfc_printf_log(phba, KERN_ERR, LOG_SLI,
+				"2537 Receive Frame Truncated!!\n");
+		hrq->RQ_buf_trunc++;
+		break;
+	case FC_STATUS_RQ_SUCCESS:
+		lpfc_sli4_rq_release(hrq, drq);
+		spin_lock_irqsave(&phba->hbalock, iflags);
+		dma_buf = lpfc_sli_hbqbuf_get(
+			&phba->hbqs[LPFC_NVMET_HBQ].hbq_buffer_list);
+		if (!dma_buf) {
+			hrq->RQ_no_buf_found++;
+			spin_unlock_irqrestore(&phba->hbalock, iflags);
+			goto out;
+		}
+		spin_unlock_irqrestore(&phba->hbalock, iflags);
+
+		hrq->RQ_rcv_buf++;
+		fc_hdr = (struct fc_frame_header *)dma_buf->hbuf.virt;
+
+		/* Just some basic sanity checks on FCP Command frame */
+		fctl = (fc_hdr->fh_f_ctl[0] << 16 |
+		fc_hdr->fh_f_ctl[1] << 8 |
+		fc_hdr->fh_f_ctl[2]);
+		if (((fctl &
+		    (FC_FC_FIRST_SEQ | FC_FC_END_SEQ | FC_FC_SEQ_INIT)) !=
+		    (FC_FC_FIRST_SEQ | FC_FC_END_SEQ | FC_FC_SEQ_INIT)) ||
+		    (fc_hdr->fh_seq_cnt != 0)) /* 0 byte swapped is still 0 */
+			goto drop;
+
+		if (fc_hdr->fh_type == LPFC_FC4_TYPE_FCP) {
+			dma_buf->bytes_recv = bf_get(lpfc_rcqe_length,  rcqe);
+			lpfc_nvmet_unsol_fcp_event(
+				phba, &phba->sli.ring[LPFC_ELS_RING], dma_buf);
+			return false;
+		}
+drop:
+		lpfc_in_buf_free(phba, &dma_buf->dbuf);
+		break;
+	case FC_STATUS_INSUFF_BUF_NEED_BUF:
+	case FC_STATUS_INSUFF_BUF_FRM_DISC:
+		hrq->RQ_no_posted_buf++;
+		/* Post more buffers if possible */
+		spin_lock_irqsave(&phba->hbalock, iflags);
+		phba->hba_flag |= HBA_POST_RECEIVE_BUFFER;
+		spin_unlock_irqrestore(&phba->hbalock, iflags);
+		workposted = true;
+		break;
+	}
+out:
+	return workposted;
+}
 
 /**
  * lpfc_sli4_fp_handle_cqe - Process fast-path work queue completion entry
@@ -12511,8 +12642,8 @@ lpfc_sli4_fp_handle_cqe(struct lpfc_hba *phba, struct lpfc_queue *cq,
 	case CQE_CODE_RECEIVE:
 		phba->last_completion_time = jiffies;
 		if (cq->subtype == LPFC_NVMET) {
-			/* TODO: handle nvme tgt receive frames */
-			workposted = false;
+			workposted = lpfc_sli4_nvmet_handle_rcqe(
+				phba, cq, (struct lpfc_rcqe *)&wcqe);
 		}
 		break;
 	default:
@@ -12557,6 +12688,13 @@ lpfc_sli4_hba_handle_eqe(struct lpfc_hba *phba, struct lpfc_eqe *eqe,
 
 	/* Get the reference to the corresponding CQ */
 	cqid = bf_get_le32(lpfc_eqe_resource_id, eqe);
+
+	if (phba->sli4_hba.nvmet_cq &&
+	    (cqid == phba->sli4_hba.nvmet_cq->queue_id)) {
+		/* Process NVMET unsol rcv */
+		cq = phba->sli4_hba.nvmet_cq;
+		goto  process_cq;
+	}
 
 	if (phba->sli4_hba.nvme_cq_map &&
 	    (cqid == phba->sli4_hba.nvme_cq_map[qidx])) {
@@ -17523,6 +17661,7 @@ lpfc_sli_issue_wqe(struct lpfc_hba *phba, uint32_t ring_number,
 		    struct lpfc_iocbq *pwqe)
 {
 	union lpfc_wqe *wqe = &pwqe->wqe;
+	struct lpfc_nvmet_rcv_ctx *ctxp;
 	struct lpfc_queue *wq;
 	struct lpfc_sglq *sglq;
 	struct lpfc_sli_ring *pring;
@@ -17558,6 +17697,32 @@ lpfc_sli_issue_wqe(struct lpfc_hba *phba, uint32_t ring_number,
 		ring_number = MAX_SLI3_CONFIGURED_RINGS + pwqe->hba_wqidx;
 		pring = &phba->sli.ring[ring_number];
 		spin_lock_irqsave(&pring->ring_lock, iflags);
+		wq = phba->sli4_hba.hba_wq[pwqe->hba_wqidx];
+		bf_set(wqe_cqid, &wqe->generic.wqe_com,
+		      phba->sli4_hba.nvme_cq[pwqe->hba_wqidx]->queue_id);
+		if (lpfc_sli4_wq_put(wq, wqe)) {
+			spin_unlock_irqrestore(&pring->ring_lock, iflags);
+			return WQE_ERROR;
+		}
+		lpfc_sli_ringtxcmpl_put(phba, pring, pwqe);
+		spin_unlock_irqrestore(&pring->ring_lock, iflags);
+		return 0;
+	}
+	if (pwqe->iocb_flag & LPFC_IO_NVMET) {
+		/* hard code io_channel 0 for now */
+		pwqe->hba_wqidx = 0;
+		ring_number = MAX_SLI3_CONFIGURED_RINGS + pwqe->hba_wqidx;
+		pring = &phba->sli.ring[ring_number];
+
+		spin_lock_irqsave(&pring->ring_lock, iflags);
+		ctxp = pwqe->context2;
+		sglq = ctxp->hbq_buffer->sglq;
+		if (pwqe->sli4_xritag ==  NO_XRI) {
+			pwqe->sli4_lxritag = sglq->sli4_lxritag;
+			pwqe->sli4_xritag = sglq->sli4_xritag;
+		}
+		bf_set(wqe_xri_tag, &pwqe->wqe.xmit_bls_rsp.wqe_com,
+		       pwqe->sli4_xritag);
 		wq = phba->sli4_hba.hba_wq[pwqe->hba_wqidx];
 		bf_set(wqe_cqid, &wqe->generic.wqe_com,
 		      phba->sli4_hba.nvme_cq[pwqe->hba_wqidx]->queue_id);

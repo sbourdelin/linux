@@ -28,6 +28,8 @@
 #include <scsi/scsi_transport_fc.h>
 #include <scsi/scsi.h>
 
+#include <linux/nvme-fc-driver.h>
+
 #include "lpfc_hw4.h"
 #include "lpfc_hw.h"
 #include "lpfc_sli.h"
@@ -35,6 +37,8 @@
 #include "lpfc_nl.h"
 #include "lpfc_disc.h"
 #include "lpfc_scsi.h"
+#include "lpfc_nvme.h"
+#include "lpfc_nvmet.h"
 #include "lpfc.h"
 #include "lpfc_crtn.h"
 #include "lpfc_logmsg.h"
@@ -229,6 +233,9 @@ lpfc_mem_free(struct lpfc_hba *phba)
 	if (phba->lpfc_hrb_pool)
 		pci_pool_destroy(phba->lpfc_hrb_pool);
 	phba->lpfc_hrb_pool = NULL;
+	if (phba->txrdy_payload_pool)
+		pci_pool_destroy(phba->txrdy_payload_pool);
+	phba->txrdy_payload_pool = NULL;
 
 	if (phba->lpfc_hbq_pool)
 		pci_pool_destroy(phba->lpfc_hbq_pool);
@@ -542,7 +549,108 @@ lpfc_sli4_rb_free(struct lpfc_hba *phba, struct hbq_dmabuf *dmab)
 	pci_pool_free(phba->lpfc_hrb_pool, dmab->hbuf.virt, dmab->hbuf.phys);
 	pci_pool_free(phba->lpfc_drb_pool, dmab->dbuf.virt, dmab->dbuf.phys);
 	kfree(dmab);
-	return;
+}
+
+/**
+ * lpfc_sli4_nvmet_alloc - Allocate an SLI4 Receive buffer
+ * @phba: HBA to allocate a receive buffer for
+ *
+ * Description: Allocates a DMA-mapped receive buffer from the lpfc_hrb_pool PCI
+ * pool along a non-DMA-mapped container for it.
+ *
+ * Notes: Not interrupt-safe.  Must be called with no locks held.
+ *
+ * Returns:
+ *   pointer to HBQ on success
+ *   NULL on failure
+ **/
+struct hbq_dmabuf *
+lpfc_sli4_nvmet_alloc(struct lpfc_hba *phba)
+{
+	struct hbq_dmabuf *dma_buf;
+
+	dma_buf = kzalloc(sizeof(struct hbq_dmabuf), GFP_KERNEL);
+	if (!dma_buf)
+		return NULL;
+
+	dma_buf->hbuf.virt = pci_pool_alloc(phba->lpfc_hrb_pool, GFP_KERNEL,
+					    &dma_buf->hbuf.phys);
+	if (!dma_buf->hbuf.virt) {
+		kfree(dma_buf);
+		return NULL;
+	}
+	dma_buf->dbuf.virt = pci_pool_alloc(phba->lpfc_drb_pool, GFP_KERNEL,
+					    &dma_buf->dbuf.phys);
+	if (!dma_buf->dbuf.virt) {
+		pci_pool_free(phba->lpfc_hrb_pool, dma_buf->hbuf.virt,
+			      dma_buf->hbuf.phys);
+		kfree(dma_buf);
+		return NULL;
+	}
+	dma_buf->total_size = LPFC_DATA_BUF_SIZE;
+
+	dma_buf->context = kzalloc(sizeof(struct lpfc_nvmet_rcv_ctx),
+				   GFP_KERNEL);
+	if (!dma_buf->context) {
+		pci_pool_free(phba->lpfc_drb_pool, dma_buf->dbuf.virt,
+			      dma_buf->dbuf.phys);
+		pci_pool_free(phba->lpfc_hrb_pool, dma_buf->hbuf.virt,
+			      dma_buf->hbuf.phys);
+		kfree(dma_buf);
+		return NULL;
+	}
+
+	dma_buf->iocbq = lpfc_sli_get_iocbq(phba);
+	if (!dma_buf->iocbq) {
+		kfree(dma_buf->context);
+		pci_pool_free(phba->lpfc_drb_pool, dma_buf->dbuf.virt,
+			      dma_buf->dbuf.phys);
+		pci_pool_free(phba->lpfc_hrb_pool, dma_buf->hbuf.virt,
+			      dma_buf->hbuf.phys);
+		kfree(dma_buf);
+		return NULL;
+	}
+
+	dma_buf->iocbq->context1 = NULL;
+	dma_buf->sglq = __lpfc_sli_get_sglq(phba, dma_buf->iocbq);
+	if (!dma_buf->sglq) {
+		lpfc_sli_release_iocbq(phba, dma_buf->iocbq);
+		kfree(dma_buf->context);
+		pci_pool_free(phba->lpfc_drb_pool, dma_buf->dbuf.virt,
+			      dma_buf->dbuf.phys);
+		pci_pool_free(phba->lpfc_hrb_pool, dma_buf->hbuf.virt,
+			      dma_buf->hbuf.phys);
+		kfree(dma_buf);
+		return NULL;
+	}
+	return dma_buf;
+}
+
+/**
+ * lpfc_sli4_nvmet_free - Frees a receive buffer
+ * @phba: HBA buffer was allocated for
+ * @dmab: DMA Buffer container returned by lpfc_sli4_hbq_alloc
+ *
+ * Description: Frees both the container and the DMA-mapped buffers returned by
+ * lpfc_sli4_nvmet_alloc.
+ *
+ * Notes: Can be called with or without locks held.
+ *
+ * Returns: None
+ **/
+void
+lpfc_sli4_nvmet_free(struct lpfc_hba *phba, struct hbq_dmabuf *dmab)
+{
+	__lpfc_clear_active_sglq(phba, dmab->sglq->sli4_lxritag);
+	dmab->sglq->state = SGL_FREED;
+	dmab->sglq->ndlp = NULL;
+	list_add_tail(&dmab->sglq->list, &phba->sli4_hba.lpfc_sgl_list);
+
+	lpfc_sli_release_iocbq(phba, dmab->iocbq);
+	kfree(dmab->context);
+	pci_pool_free(phba->lpfc_hrb_pool, dmab->hbuf.virt, dmab->hbuf.phys);
+	pci_pool_free(phba->lpfc_drb_pool, dmab->dbuf.virt, dmab->dbuf.phys);
+	kfree(dmab);
 }
 
 /**

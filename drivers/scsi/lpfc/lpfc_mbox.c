@@ -2438,6 +2438,16 @@ lpfc_reg_fcfi(struct lpfc_hba *phba, struct lpfcMboxq *mbox)
 		bf_set(lpfc_reg_fcfi_rq_id0, reg_fcfi,
 		       phba->sli4_hba.hdr_rq->queue_id);
 		bf_set(lpfc_reg_fcfi_rq_id1, reg_fcfi, REG_FCF_INVALID_QID);
+	} else {
+		bf_set(lpfc_reg_fcfi_rq_id0, reg_fcfi,
+		       phba->sli4_hba.nvmet_hdr_rq->queue_id);
+		bf_set(lpfc_reg_fcfi_rq_id1, reg_fcfi,
+		       phba->sli4_hba.hdr_rq->queue_id);
+		bf_set(lpfc_reg_fcfi_type_match0, reg_fcfi, LPFC_FC4_TYPE_FCP);
+		bf_set(lpfc_reg_fcfi_type_mask0, reg_fcfi, 0xff);
+		bf_set(lpfc_reg_fcfi_rctl_match0, reg_fcfi,
+		       FC_RCTL_DD_UNSOL_CMD);
+		bf_set(lpfc_reg_fcfi_rctl_mask0, reg_fcfi, 0xff);
 	}
 	bf_set(lpfc_reg_fcfi_rq_id2, reg_fcfi, REG_FCF_INVALID_QID);
 	bf_set(lpfc_reg_fcfi_rq_id3, reg_fcfi, REG_FCF_INVALID_QID);

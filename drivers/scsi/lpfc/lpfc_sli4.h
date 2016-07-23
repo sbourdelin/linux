@@ -532,12 +532,15 @@ struct lpfc_sli4_hba {
 
 	struct lpfc_queue *mbx_cq; /* Slow-path mailbox complete queue */
 	struct lpfc_queue *els_cq; /* Slow-path ELS response complete queue */
+	struct lpfc_queue *nvmet_cq; /* NVMET unsol rcv complete queue */
 	struct lpfc_queue *nvmels_cq; /* NVMET LS complete queue */
 	struct lpfc_queue *mbx_wq; /* Slow-path MBOX work queue */
 	struct lpfc_queue *els_wq; /* Slow-path ELS work queue */
 	struct lpfc_queue *nvmels_wq; /* NVME LS work queue */
 	struct lpfc_queue *hdr_rq; /* Slow-path Header Receive queue */
 	struct lpfc_queue *dat_rq; /* Slow-path Data Receive queue */
+	struct lpfc_queue *nvmet_hdr_rq; /* NVME Header Receive queue */
+	struct lpfc_queue *nvmet_dat_rq; /* NVME Data Receive queue */
 
 	uint32_t fw_func_mode;	/* FW function protocol mode */
 	uint32_t ulp0_mode;	/* ULP0 protocol mode */

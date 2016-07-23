@@ -1671,7 +1671,9 @@ lpfc_cmpl_reglogin_reglogin_issue(struct lpfc_vport *vport,
 		lpfc_nlp_set_state(vport, ndlp, NLP_STE_PRLI_ISSUE);
 		lpfc_issue_els_prli(vport, ndlp, 0);
 	} else {
-		/* TODO: if pt2pt and NVME, bind with nvmet layer */
+		if ((vport->fc_flag & FC_PT2PT)  &&
+		    (phba->cfg_enable_nvmet == phba->brd_no))
+			lpfc_nvmet_create_targetport(phba);
 		ndlp->nlp_prev_state = NLP_STE_REG_LOGIN_ISSUE;
 		lpfc_nlp_set_state(vport, ndlp, NLP_STE_UNMAPPED_NODE);
 	}

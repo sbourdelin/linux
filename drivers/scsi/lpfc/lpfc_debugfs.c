@@ -45,6 +45,7 @@
 #include "lpfc_disc.h"
 #include "lpfc_scsi.h"
 #include "lpfc_nvme.h"
+#include "lpfc_nvmet.h"
 #include "lpfc.h"
 #include "lpfc_logmsg.h"
 #include "lpfc_crtn.h"
@@ -533,10 +534,12 @@ lpfc_debugfs_nodelist_data(struct lpfc_vport *vport, char *buf, int size)
 	int len = 0;
 	int cnt;
 	struct Scsi_Host *shost = lpfc_shost_from_vport(vport);
+	struct lpfc_hba  *phba = vport->phba;
 	struct lpfc_nodelist *ndlp;
 	unsigned char *statep;
 	struct lpfc_nvme_lport *lport;
 	struct lpfc_nvme_rport *rport;
+	struct lpfc_nvmet_tgtport *tgtp;
 	struct nvme_fc_remote_port *nrport;
 	struct lpfc_nvme *pnvme;
 
@@ -616,6 +619,34 @@ lpfc_debugfs_nodelist_data(struct lpfc_vport *vport, char *buf, int size)
 	}
 	spin_unlock_irq(shost->host_lock);
 
+	if ((phba->cfg_enable_nvmet == phba->brd_no) && phba->targetport) {
+		tgtp = (struct lpfc_nvmet_tgtport *)phba->targetport->private;
+		len += snprintf(buf+len, size-len,
+				"\nNVME Targetport Entry ...\n");
+
+		/* Port state is only one of two values for now. */
+		switch (tgtp->nvmet_state) {
+		case LPFC_NVME_INIT:
+			statep = "INIT";
+			break;
+		case LPFC_NVME_REG:
+			statep = "REGISTERED";
+			break;
+		case LPFC_NVME_ERROR:
+			statep = "ERROR";
+			break;
+		default:
+			statep = "UNKNOWN ";
+			break;
+		}
+		len += snprintf(buf+len, size-len,
+				"Targetport DID x%06x, FabricName x%llx, "
+				"PortState %s\n",
+				phba->targetport->port_id,
+				phba->targetport->fabric_name,
+				statep);
+		goto out_exit;
+	}
 	/* Now step through the NVME ports. Reset cnt to prevent infinite
 	 * loops.
 	 */
@@ -706,6 +737,66 @@ lpfc_debugfs_nodelist_data(struct lpfc_vport *vport, char *buf, int size)
 
 	spin_unlock_irq(shost->host_lock);
  out_exit:
+	return len;
+}
+
+/**
+ * lpfc_debugfs_nvmestat_data - Dump target node list to a buffer
+ * @vport: The vport to gather target node info from.
+ * @buf: The buffer to dump log into.
+ * @size: The maximum amount of data to process.
+ *
+ * Description:
+ * This routine dumps the NVME statistics associated with @vport
+ *
+ * Return Value:
+ * This routine returns the amount of bytes that were dumped into @buf and will
+ * not exceed @size.
+ **/
+static int
+lpfc_debugfs_nvmestat_data(struct lpfc_vport *vport, char *buf, int size)
+{
+	struct lpfc_hba   *phba = vport->phba;
+	struct lpfc_nvmet_tgtport *tgtp;
+	int len = 0;
+
+	if (phba->cfg_enable_nvmet == phba->brd_no) {
+		if (!phba->targetport)
+			return len;
+		tgtp = (struct lpfc_nvmet_tgtport *)phba->targetport->private;
+		len += snprintf(buf+len, size-len,
+				"\nNVME Targetport Statistics\n");
+		len += snprintf(buf+len, size-len,
+				"LS: Rcv %08x Drop %08x "
+				"Xmt %08x Drop %08x Cmpl %08x Err %08x\n",
+				tgtp->rcv_ls_req,
+				tgtp->rcv_ls_drop,
+				tgtp->xmt_ls_rsp,
+				tgtp->xmt_ls_drop,
+				tgtp->xmt_ls_rsp_cmpl,
+				tgtp->xmt_ls_rsp_error);
+
+		len += snprintf(buf+len, size-len,
+				"FCP: Rcv %08x Drop %08x "
+				"Xmt %08x Drop %08x Cmpl %08x Err %08x\n",
+				tgtp->rcv_fcp_cmd,
+				tgtp->rcv_fcp_drop,
+				tgtp->xmt_fcp_rsp,
+				tgtp->xmt_fcp_drop,
+				tgtp->xmt_fcp_rsp_cmpl,
+				tgtp->xmt_fcp_rsp_error);
+
+		len += snprintf(buf+len, size-len,
+				"ABORT: Xmt %08x Cmpl %08x Err %08x",
+				tgtp->xmt_abort_rsp,
+				tgtp->xmt_abort_cmpl,
+				tgtp->xmt_abort_rsp_error);
+
+		len +=  snprintf(buf+len, size-len, "\n");
+	} else
+		len += snprintf(buf+len, size-len,
+				"\nNVME Lport Statistics\n");
+
 	return len;
 }
 
@@ -1326,6 +1417,76 @@ lpfc_debugfs_dumpDataDif_release(struct inode *inode, struct file *file)
 }
 
 
+static int
+lpfc_debugfs_nvmestat_open(struct inode *inode, struct file *file)
+{
+	struct lpfc_vport *vport = inode->i_private;
+	struct lpfc_debug *debug;
+	int rc = -ENOMEM;
+
+	debug = kmalloc(sizeof(*debug), GFP_KERNEL);
+	if (!debug)
+		goto out;
+
+	 /* Round to page boundary */
+	debug->buffer = kmalloc(LPFC_NVMESTAT_SIZE, GFP_KERNEL);
+	if (!debug->buffer) {
+		kfree(debug);
+		goto out;
+	}
+
+	debug->len = lpfc_debugfs_nvmestat_data(vport, debug->buffer,
+		LPFC_NVMESTAT_SIZE);
+
+	debug->i_private = inode->i_private;
+	file->private_data = debug;
+
+	rc = 0;
+out:
+	return rc;
+}
+
+static ssize_t
+lpfc_debugfs_nvmestat_write(struct file *file, const char __user *buf,
+			    size_t nbytes, loff_t *ppos)
+{
+	struct lpfc_debug *debug = file->private_data;
+	struct lpfc_vport *vport = (struct lpfc_vport *)debug->i_private;
+	struct lpfc_hba   *phba = vport->phba;
+	struct lpfc_nvmet_tgtport *tgtp;
+	char mybuf[64];
+	char *pbuf;
+
+	if (!phba->targetport)
+		return -ENXIO;
+
+	if (nbytes > 64)
+		nbytes = 64;
+
+	/* Protect copy from user */
+	if (!access_ok(VERIFY_READ, buf, nbytes))
+		return -EFAULT;
+
+	memset(mybuf, 0, sizeof(mybuf));
+
+	if (copy_from_user(mybuf, buf, nbytes))
+		return -EFAULT;
+	pbuf = &mybuf[0];
+
+	tgtp = (struct lpfc_nvmet_tgtport *)phba->targetport->private;
+	if (strncmp(pbuf, "reset", strlen("reset")) == 0) {
+		tgtp->rcv_ls_req = 0;
+		tgtp->rcv_ls_drop = 0;
+		tgtp->xmt_ls_rsp = 0;
+		tgtp->xmt_ls_drop = 0;
+		tgtp->xmt_ls_rsp_error = 0;
+		tgtp->xmt_ls_rsp_cmpl = 0;
+
+		tgtp->rcv_fcp_drop = 0;
+		tgtp->rcv_fcp_cmd = 0;
+	}
+	return nbytes;
+}
 /*
  * ---------------------------------
  * iDiag debugfs file access methods
@@ -2458,6 +2619,84 @@ proc_cq:
 
 				/* Slow-path RQ data */
 				qp = phba->sli4_hba.dat_rq;
+				len += snprintf(pbuffer+len,
+					LPFC_QUE_INFO_GET_BUF_SIZE-len,
+					"\t\tDQID[%02d], "
+					"QE-CNT[%04d], QE-SIZE[%04d], "
+					"HOST-IDX[%04d], PORT-IDX[%04d]",
+					qp->queue_id,
+					qp->entry_count,
+					qp->entry_size,
+					qp->host_index,
+					qp->hba_index);
+
+				len +=  snprintf(pbuffer+len,
+					LPFC_QUE_INFO_GET_BUF_SIZE-len, "\n");
+			}
+
+			/* NVMET response CQ */
+			qp = phba->sli4_hba.nvmet_cq;
+			if (qp) {
+				len += snprintf(pbuffer+len,
+					LPFC_QUE_INFO_GET_BUF_SIZE-len,
+					"\tNVMET CQ info: ");
+				len += snprintf(pbuffer+len,
+					LPFC_QUE_INFO_GET_BUF_SIZE-len,
+					"AssocEQID[%02d]: "
+					"CQ-STAT[max:x%x relw:x%x "
+					"xabt:x%x wq:x%llx]\n",
+					qp->assoc_qid,
+					qp->q_cnt_1, qp->q_cnt_2,
+					qp->q_cnt_3,
+					(unsigned long long)qp->q_cnt_4);
+				len += snprintf(pbuffer+len,
+					LPFC_QUE_INFO_GET_BUF_SIZE-len,
+					"\tCQID [%02d], "
+					"QE-CNT[%04d], QE-SIZE[%04d], "
+					"HOST-IDX[%04d], PORT-IDX[%04d]",
+					qp->queue_id, qp->entry_count,
+					qp->entry_size, qp->host_index,
+					qp->hba_index);
+
+				/* Reset max counter */
+				qp->CQ_max_cqe = 0;
+
+				len +=  snprintf(pbuffer+len,
+					LPFC_QUE_INFO_GET_BUF_SIZE-len, "\n");
+				if (len >= max_cnt)
+					goto too_big;
+			}
+
+			if (phba->sli4_hba.nvmet_hdr_rq &&
+			    phba->sli4_hba.nvmet_dat_rq) {
+				/* Slow-path RQ header */
+				qp = phba->sli4_hba.nvmet_hdr_rq;
+
+				len += snprintf(pbuffer+len,
+				LPFC_QUE_INFO_GET_BUF_SIZE-len,
+					"\t\tNVMET RQ info: ");
+				len += snprintf(pbuffer+len,
+					LPFC_QUE_INFO_GET_BUF_SIZE-len,
+					"AssocCQID[%02d]: "
+					"RQ-STAT[nopost:x%x nobuf:x%x "
+					"trunc:x%x rcv:x%llx]\n",
+					qp->assoc_qid,
+					qp->q_cnt_1, qp->q_cnt_2,
+					qp->q_cnt_3,
+					(unsigned long long)qp->q_cnt_4);
+				len += snprintf(pbuffer+len,
+					LPFC_QUE_INFO_GET_BUF_SIZE-len,
+					"\t\tHQID[%02d], "
+					"QE-CNT[%04d], QE-SIZE[%04d], "
+					"HOST-IDX[%04d], PORT-IDX[%04d]\n",
+					qp->queue_id,
+					qp->entry_count,
+					qp->entry_size,
+					qp->host_index,
+					qp->hba_index);
+
+				/* Slow-path RQ data */
+				qp = phba->sli4_hba.nvmet_dat_rq;
 				len += snprintf(pbuffer+len,
 					LPFC_QUE_INFO_GET_BUF_SIZE-len,
 					"\t\tDQID[%02d], "
@@ -3923,6 +4162,16 @@ static const struct file_operations lpfc_debugfs_op_dumpHostSlim = {
 	.release =      lpfc_debugfs_release,
 };
 
+#undef lpfc_debugfs_op_nvmestat
+static const struct file_operations lpfc_debugfs_op_nvmestat = {
+	.owner =        THIS_MODULE,
+	.open =         lpfc_debugfs_nvmestat_open,
+	.llseek =       lpfc_debugfs_lseek,
+	.read =         lpfc_debugfs_read,
+	.write =	lpfc_debugfs_nvmestat_write,
+	.release =      lpfc_debugfs_release,
+};
+
 #undef lpfc_debugfs_op_dumpData
 static const struct file_operations lpfc_debugfs_op_dumpData = {
 	.owner =        THIS_MODULE,
@@ -4575,6 +4824,17 @@ lpfc_debugfs_initialize(struct lpfc_vport *vport)
 		goto debug_failed;
 	}
 
+	snprintf(name, sizeof(name), "nvmestat");
+	vport->debug_nvmestat =
+		debugfs_create_file(name, S_IFREG|S_IRUGO|S_IWUSR,
+				    vport->vport_debugfs_root,
+				    vport, &lpfc_debugfs_op_nvmestat);
+	if (!vport->debug_nvmestat) {
+		lpfc_printf_vlog(vport, KERN_ERR, LOG_INIT,
+				 "0811 Cannot create debugfs nvmestat\n");
+		goto debug_failed;
+	}
+
 	/*
 	 * The following section is for additional directories/files for the
 	 * physical port.
@@ -4746,6 +5006,10 @@ lpfc_debugfs_terminate(struct lpfc_vport *vport)
 	if (vport->debug_nodelist) {
 		debugfs_remove(vport->debug_nodelist); /* nodelist */
 		vport->debug_nodelist = NULL;
+	}
+	if (vport->debug_nvmestat) {
+		debugfs_remove(vport->debug_nvmestat); /* nvmestat */
+		vport->debug_nvmestat = NULL;
 	}
 	if (vport->vport_debugfs_root) {
 		debugfs_remove(vport->vport_debugfs_root); /* vportX */

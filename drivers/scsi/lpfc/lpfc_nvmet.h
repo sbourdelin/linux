@@ -4,6 +4,7 @@
  * Copyright (C) 2004-2016 Emulex.  All rights reserved.           *
  * EMULEX and SLI are trademarks of Emulex.                        *
  * www.emulex.com                                                  *
+ * Portions Copyright (C) 2004-2005 Christoph Hellwig              *
  *                                                                 *
  * This program is free software; you can redistribute it and/or   *
  * modify it under the terms of version 2 of the GNU General       *
@@ -16,18 +17,56 @@
  * TO BE LEGALLY INVALID.  See the GNU General Public License for  *
  * more details, a copy of which can be found in the file COPYING  *
  * included with this package.                                     *
- *******************************************************************/
+ ********************************************************************/
 
-#define LPFC_DRIVER_VERSION "11.2.0.1"
-#define LPFC_DRIVER_NAME		"lpfc"
+#define LPFC_MAX_NQN_SZ	256
 
-/* Used for SLI 2/3 */
-#define LPFC_SP_DRIVER_HANDLER_NAME	"lpfc:sp"
-#define LPFC_FP_DRIVER_HANDLER_NAME	"lpfc:fp"
+/* Used for NVME Target */
+struct lpfc_nvmet_tgtport {
+	struct lpfc_hba *phba;
+	enum nvme_state nvmet_state;
 
-/* Used for SLI4 */
-#define LPFC_DRIVER_HANDLER_NAME	"lpfc:"
+	/* Stats counters */
+	uint32_t rcv_ls_req;
+	uint32_t rcv_ls_drop;
+	uint32_t xmt_ls_rsp;
+	uint32_t xmt_ls_drop;
+	uint32_t xmt_ls_rsp_error;
+	uint32_t xmt_ls_rsp_cmpl;
 
-#define LPFC_MODULE_DESC "Emulex LightPulse Fibre Channel SCSI driver " \
-		LPFC_DRIVER_VERSION
-#define LPFC_COPYRIGHT "Copyright(c) 2004-2016 Emulex.  All rights reserved."
+	uint32_t rcv_fcp_cmd;
+	uint32_t rcv_fcp_drop;
+	uint32_t xmt_fcp_rsp_cmpl;
+	uint32_t xmt_fcp_rsp;
+	uint32_t xmt_fcp_drop;
+	uint32_t xmt_fcp_rsp_error;
+
+	uint32_t xmt_abort_rsp;
+	uint32_t xmt_abort_cmpl;
+	uint32_t xmt_abort_rsp_error;
+};
+
+struct lpfc_nvmet_rcv_ctx {
+	union {
+		struct nvmefc_tgt_ls_req ls_req;
+		struct nvmefc_tgt_fcp_req fcp_req;
+	} ctx;
+	struct lpfc_hba *phba;
+	struct lpfc_iocbq *wqeq;
+	dma_addr_t txrdy_phys;
+	uint32_t *txrdy;
+	uint32_t sid;
+	uint32_t offset;
+	uint16_t oxid;
+	uint16_t size;
+	uint16_t entry_cnt;
+	uint16_t state;
+	struct hbq_dmabuf *hbq_buffer;
+/* States */
+#define LPFC_NVMET_STE_RCV		1
+#define LPFC_NVMET_STE_DATA		2
+#define LPFC_NVMET_STE_ABORT		3
+#define LPFC_NVMET_STE_RSP		4
+#define LPFC_NVMET_STE_DONE		5
+};
+

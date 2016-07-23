@@ -234,6 +234,8 @@ struct hbq_dmabuf *lpfc_els_hbq_alloc(struct lpfc_hba *);
 void lpfc_els_hbq_free(struct lpfc_hba *, struct hbq_dmabuf *);
 struct hbq_dmabuf *lpfc_sli4_rb_alloc(struct lpfc_hba *);
 void lpfc_sli4_rb_free(struct lpfc_hba *, struct hbq_dmabuf *);
+struct hbq_dmabuf *lpfc_sli4_nvmet_alloc(struct lpfc_hba *);
+void lpfc_sli4_nvmet_free(struct lpfc_hba *, struct hbq_dmabuf *);
 void lpfc_sli4_build_dflt_fcf_record(struct lpfc_hba *, struct fcf_record *,
 			uint16_t);
 void lpfc_unregister_fcf(struct lpfc_hba *);
@@ -517,3 +519,9 @@ struct lpfc_scsi_buf *lpfc_get_scsi_buf(struct lpfc_hba *,
 /* NVME interfaces. */
 int lpfc_create_nvme_lport(struct lpfc_vport *);
 void lpfc_destroy_nvme_lport(struct lpfc_nvme *);
+int lpfc_nvmet_create_targetport(struct lpfc_hba *);
+void lpfc_nvmet_destroy_targetport(struct lpfc_hba *);
+void lpfc_nvmet_unsol_ls_event(struct lpfc_hba *, struct lpfc_sli_ring *,
+				struct lpfc_iocbq *);
+void lpfc_nvmet_unsol_fcp_event(struct lpfc_hba *, struct lpfc_sli_ring *,
+			       struct hbq_dmabuf *);

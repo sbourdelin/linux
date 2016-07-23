@@ -2193,7 +2193,11 @@ lpfc_issue_els_prli(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 		npr_nvme = (struct lpfc_nvme_prli *)pcmd;
 		bf_set(prli_type_code, npr_nvme, PRLI_NVME_TYPE);
 		bf_set(prli_estabImagePair, npr_nvme, 0);  /* Should be 0 */
-		bf_set(prli_init, npr_nvme, 1);
+		if (phba->cfg_enable_nvmet == phba->brd_no) {
+			bf_set(prli_tgt, npr_nvme, 1);
+			bf_set(prli_disc, npr_nvme, 1);
+		} else
+			bf_set(prli_init, npr_nvme, 1);
 		npr_nvme->word1 = cpu_to_be32(npr_nvme->word1);
 		npr_nvme->word4 = cpu_to_be32(npr_nvme->word4);
 		elsiocb->iocb_flag |= LPFC_PRLI_NVME_REQ;
@@ -4367,7 +4371,11 @@ lpfc_els_rsp_prli_acc(struct lpfc_vport *vport, struct lpfc_iocbq *oldiocb,
 		npr_nvme = (struct lpfc_nvme_prli *) pcmd;
 		bf_set(prli_type_code, npr_nvme, PRLI_NVME_TYPE);
 		bf_set(prli_estabImagePair, npr_nvme, 0);  /* Should be 0 */
-		bf_set(prli_init, npr_nvme, 1);
+		if (phba->cfg_enable_nvmet == phba->brd_no) {
+			bf_set(prli_tgt, npr_nvme, 1);
+			bf_set(prli_disc, npr_nvme, 1);
+		} else
+			bf_set(prli_init, npr_nvme, 1);
 		npr_nvme->word1 = cpu_to_be32(npr_nvme->word1);
 		npr_nvme->word4 = cpu_to_be32(npr_nvme->word4);
 	} else
@@ -5776,6 +5784,8 @@ lpfc_rscn_recovery_check(struct lpfc_vport *vport)
 		if (!NLP_CHK_NODE_ACT(ndlp) ||
 		    (ndlp->nlp_state == NLP_STE_UNUSED_NODE) ||
 		    !lpfc_rscn_payload_check(vport, ndlp->nlp_DID))
+			continue;
+		if (vport->phba->cfg_enable_nvmet == vport->phba->brd_no)
 			continue;
 		lpfc_disc_state_machine(vport, ndlp, NULL,
 					NLP_EVT_DEVICE_RECOVERY);
