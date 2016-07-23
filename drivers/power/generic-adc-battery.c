@@ -350,10 +350,8 @@ err_gpio:
 gpio_req_fail:
 	power_supply_unregister(adc_bat->psy);
 err_reg_fail:
-	for (chan = 0; chan < ARRAY_SIZE(gab_chan_name); chan++) {
-		if (adc_bat->channel[chan])
-			iio_channel_release(adc_bat->channel[chan]);
-	}
+	for (chan = 0; chan < ARRAY_SIZE(gab_chan_name); chan++)
+		iio_channel_release(adc_bat->channel[chan]);
 second_mem_fail:
 	kfree(psy_desc->properties);
 first_mem_fail:
@@ -373,11 +371,8 @@ static int gab_remove(struct platform_device *pdev)
 		gpio_free(pdata->gpio_charge_finished);
 	}
 
-	for (chan = 0; chan < ARRAY_SIZE(gab_chan_name); chan++) {
-		if (adc_bat->channel[chan])
-			iio_channel_release(adc_bat->channel[chan]);
-	}
-
+	for (chan = 0; chan < ARRAY_SIZE(gab_chan_name); chan++)
+		iio_channel_release(adc_bat->channel[chan]);
 	kfree(adc_bat->psy_desc.properties);
 	cancel_delayed_work(&adc_bat->bat_work);
 	return 0;
