@@ -19,6 +19,7 @@
 #ifndef __ASSEMBLY__
 
 #define IS_ERR_VALUE(x) unlikely((unsigned long)(void *)(x) >= (unsigned long)-MAX_ERRNO)
+#define IS_ERR_VALUE_U32(x) unlikely((unsigned int)(x) >= (unsigned int)-MAX_ERRNO)
 
 static inline void * __must_check ERR_PTR(long error)
 {
