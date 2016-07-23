@@ -35,9 +35,9 @@
 #define LPFC_NEMBED_MBOX_SGL_CNT		254
 
 /* Multi-queue arrangement for FCP EQ/CQ/WQ tuples */
-#define LPFC_FCP_IO_CHAN_DEF       4
-#define LPFC_FCP_IO_CHAN_MIN       1
-#define LPFC_FCP_IO_CHAN_MAX       16
+#define LPFC_HBA_IO_CHAN_MIN       1
+#define LPFC_HBA_IO_CHAN_DEF       4
+#define LPFC_HBA_IO_CHAN_MAX       32
 
 /* Number of channels used for Flash Optimized Fabric (FOF) operations */
 
@@ -107,6 +107,9 @@ enum lpfc_sli4_queue_subtype {
 	LPFC_MBOX,
 	LPFC_FCP,
 	LPFC_ELS,
+	LPFC_NVME,
+	LPFC_NVMET,
+	LPFC_NVME_LS,
 	LPFC_USOL
 };
 
@@ -379,10 +382,10 @@ struct lpfc_max_cfg_param {
 
 struct lpfc_hba;
 /* SLI4 HBA multi-fcp queue handler struct */
-struct lpfc_fcp_eq_hdl {
+struct lpfc_hba_eq_hdl {
 	uint32_t idx;
 	struct lpfc_hba *phba;
-	atomic_t fcp_eq_in_use;
+	atomic_t hba_eq_in_use;
 };
 
 /* Port Capabilities for SLI4 Parameters */
@@ -445,7 +448,7 @@ struct lpfc_sli4_lnk_info {
 	uint8_t optic_state;
 };
 
-#define LPFC_SLI4_HANDLER_CNT		(LPFC_FCP_IO_CHAN_MAX+ \
+#define LPFC_SLI4_HANDLER_CNT		(LPFC_HBA_IO_CHAN_MAX+ \
 					 LPFC_FOF_IO_CHAN_NUM)
 #define LPFC_SLI4_HANDLER_NAME_SZ	16
 
@@ -517,18 +520,22 @@ struct lpfc_sli4_hba {
 	struct lpfc_pc_sli4_params pc_sli4_params;
 	struct msix_entry *msix_entries;
 	uint8_t handler_name[LPFC_SLI4_HANDLER_CNT][LPFC_SLI4_HANDLER_NAME_SZ];
-	struct lpfc_fcp_eq_hdl *fcp_eq_hdl; /* FCP per-WQ handle */
+	struct lpfc_hba_eq_hdl *hba_eq_hdl; /* HBA per-WQ handle */
 
 	/* Pointers to the constructed SLI4 queues */
 	struct lpfc_queue **hba_eq;/* Event queues for HBA */
 	struct lpfc_queue **fcp_cq;/* Fast-path FCP compl queue */
-	struct lpfc_queue **fcp_wq;/* Fast-path FCP work queue */
+	struct lpfc_queue **nvme_cq;/* Fast-path FCP compl queue */
+	struct lpfc_queue **hba_wq;/* Fast-path FCP work queue */
 	uint16_t *fcp_cq_map;
+	uint16_t *nvme_cq_map;
 
 	struct lpfc_queue *mbx_cq; /* Slow-path mailbox complete queue */
 	struct lpfc_queue *els_cq; /* Slow-path ELS response complete queue */
+	struct lpfc_queue *nvmels_cq; /* NVMET LS complete queue */
 	struct lpfc_queue *mbx_wq; /* Slow-path MBOX work queue */
 	struct lpfc_queue *els_wq; /* Slow-path ELS work queue */
+	struct lpfc_queue *nvmels_wq; /* NVME LS work queue */
 	struct lpfc_queue *hdr_rq; /* Slow-path Header Receive queue */
 	struct lpfc_queue *dat_rq; /* Slow-path Data Receive queue */
 
@@ -694,7 +701,7 @@ struct lpfc_queue *lpfc_sli4_queue_alloc(struct lpfc_hba *, uint32_t,
 			uint32_t);
 void lpfc_sli4_queue_free(struct lpfc_queue *);
 int lpfc_eq_create(struct lpfc_hba *, struct lpfc_queue *, uint32_t);
-int lpfc_modify_fcp_eq_delay(struct lpfc_hba *, uint32_t);
+int lpfc_modify_hba_eq_delay(struct lpfc_hba *, uint32_t);
 int lpfc_cq_create(struct lpfc_hba *, struct lpfc_queue *,
 			struct lpfc_queue *, uint32_t, uint32_t);
 int32_t lpfc_mq_create(struct lpfc_hba *, struct lpfc_queue *,

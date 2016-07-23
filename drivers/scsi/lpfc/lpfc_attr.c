@@ -3026,6 +3026,17 @@ static DEVICE_ATTR(lpfc_devloss_tmo, S_IRUGO | S_IWUSR,
 		   lpfc_devloss_tmo_show, lpfc_devloss_tmo_store);
 
 /*
+ * lpfc_enable_fc4_type: Defines what FC4 types are supported.
+ * Supported Values:  1 - register just FCP
+ *                    2 - register just NVME
+ *                    3 - register both FCP and NVME
+ * is [1,3]. Default value is 1
+ */
+LPFC_ATTR_RW(enable_fc4_type, LPFC_ENABLE_FCP,
+	     LPFC_ENABLE_FCP, LPFC_ENABLE_BOTH,
+	     "Define fc4 type to register with fabric.");
+
+/*
 # lpfc_log_verbose: Only turn this flag on if you are willing to risk being
 # deluged with LOTS of information.
 # You can set a bit mask to record specific types of verbose messages:
@@ -4201,13 +4212,14 @@ lpfc_fcp_imax_store(struct device *dev, struct device_attribute *attr,
 	/*
 	 * Value range for the HBA is [5000,5000000]
 	 * The value for each EQ depends on how many EQs are configured.
+	 * Allow value == 0
 	 */
-	if (val < LPFC_MIN_IMAX || val > LPFC_MAX_IMAX)
+	if (val && (val < LPFC_MIN_IMAX || val > LPFC_MAX_IMAX))
 		return -EINVAL;
 
 	phba->cfg_fcp_imax = (uint32_t)val;
-	for (i = 0; i < phba->cfg_fcp_io_channel; i += LPFC_MAX_EQ_DELAY)
-		lpfc_modify_fcp_eq_delay(phba, i);
+	for (i = 0; i < phba->io_channel; i += LPFC_MAX_EQ_DELAY)
+		lpfc_modify_hba_eq_delay(phba, i);
 
 	return strlen(buf);
 }
@@ -4245,7 +4257,8 @@ lpfc_fcp_imax_init(struct lpfc_hba *phba, int val)
 		return 0;
 	}
 
-	if (val >= LPFC_MIN_IMAX && val <= LPFC_MAX_IMAX) {
+	if ((val >= LPFC_MIN_IMAX && val <= LPFC_MAX_IMAX) ||
+	    (val == 0)) {
 		phba->cfg_fcp_imax = val;
 		return 0;
 	}
@@ -4619,13 +4632,30 @@ LPFC_ATTR_R(use_msi, 2, 0, 2, "Use Message Signaled Interrupts (1) or "
 	    "MSI-X (2), if possible");
 
 /*
-# lpfc_fcp_io_channel: Set the number of FCP EQ/CQ/WQ IO channels
-#
-# Value range is [1,7]. Default value is 4.
-*/
-LPFC_ATTR_R(fcp_io_channel, LPFC_FCP_IO_CHAN_DEF, LPFC_FCP_IO_CHAN_MIN,
-	    LPFC_FCP_IO_CHAN_MAX,
+ * lpfc_fcp_io_channel: Set the number of FCP EQ/CQ/WQ IO channels
+ *
+ * Value range is [1,32]. Default value is 4.
+ */
+LPFC_ATTR_R(fcp_io_channel, LPFC_HBA_IO_CHAN_DEF,
+	    LPFC_HBA_IO_CHAN_MIN, LPFC_HBA_IO_CHAN_MAX,
 	    "Set the number of FCP I/O channels");
+
+/*
+ * lpfc_nvme_io_channel: Set the number of NVME EQ/CQ/WQ IO channels
+ *
+ * Value range is [1,32]. Default value is 4.
+ */
+LPFC_ATTR_R(nvme_io_channel, LPFC_HBA_IO_CHAN_DEF,
+	    LPFC_HBA_IO_CHAN_MIN, LPFC_HBA_IO_CHAN_MAX,
+	    "Set the number of NVME I/O channels");
+
+/*
+ * lpfc_enable_nvmet: Specify the lpfc instance number of NVME Target
+ *
+ */
+LPFC_ATTR_R(enable_nvmet, NVME_TARGET_OFF, NVME_TARGET_MIN,
+	    NVME_TARGET_OFF,
+	    "Specify lpfc instance number of NVME Target");
 
 /*
 # lpfc_enable_hba_reset: Allow or prevent HBA resets to the hardware.
@@ -4782,6 +4812,7 @@ struct device_attribute *lpfc_hba_attrs[] = {
 	&dev_attr_lpfc_peer_port_login,
 	&dev_attr_lpfc_nodev_tmo,
 	&dev_attr_lpfc_devloss_tmo,
+	&dev_attr_lpfc_enable_fc4_type,
 	&dev_attr_lpfc_fcp_class,
 	&dev_attr_lpfc_use_adisc,
 	&dev_attr_lpfc_first_burst_size,
@@ -4819,6 +4850,8 @@ struct device_attribute *lpfc_hba_attrs[] = {
 	&dev_attr_lpfc_fcp_imax,
 	&dev_attr_lpfc_fcp_cpu_map,
 	&dev_attr_lpfc_fcp_io_channel,
+	&dev_attr_lpfc_nvme_io_channel,
+	&dev_attr_lpfc_enable_nvmet,
 	&dev_attr_lpfc_enable_bg,
 	&dev_attr_lpfc_soft_wwnn,
 	&dev_attr_lpfc_soft_wwpn,
@@ -4866,6 +4899,7 @@ struct device_attribute *lpfc_vport_attrs[] = {
 	&dev_attr_lpfc_tgt_queue_depth,
 	&dev_attr_lpfc_nodev_tmo,
 	&dev_attr_lpfc_devloss_tmo,
+	&dev_attr_lpfc_enable_fc4_type,
 	&dev_attr_lpfc_hba_queue_depth,
 	&dev_attr_lpfc_peer_port_login,
 	&dev_attr_lpfc_restrict_login,
@@ -5815,6 +5849,8 @@ lpfc_get_cfgparam(struct lpfc_hba *phba)
 	lpfc_fcp_imax_init(phba, lpfc_fcp_imax);
 	lpfc_fcp_cpu_map_init(phba, lpfc_fcp_cpu_map);
 	lpfc_fcp_io_channel_init(phba, lpfc_fcp_io_channel);
+	lpfc_nvme_io_channel_init(phba, lpfc_nvme_io_channel);
+	lpfc_enable_nvmet_init(phba, lpfc_enable_nvmet);
 	lpfc_enable_hba_reset_init(phba, lpfc_enable_hba_reset);
 	lpfc_enable_hba_heartbeat_init(phba, lpfc_enable_hba_heartbeat);
 	lpfc_EnableXLane_init(phba, lpfc_EnableXLane);
@@ -5833,6 +5869,19 @@ lpfc_get_cfgparam(struct lpfc_hba *phba)
 	else
 		phba->cfg_poll = lpfc_poll;
 
+	/*
+	 * If the FC4 type is exclusively FCP, set the
+	 * nvme_io_channels to 0 to shutdown the runtime
+	 * nvme code paths.
+	 */
+	lpfc_enable_fc4_type_init(phba, lpfc_enable_fc4_type);
+	if (phba->cfg_enable_fc4_type == LPFC_ENABLE_FCP)
+		phba->cfg_nvme_io_channel = 0;
+
+	if (phba->cfg_fcp_io_channel > phba->cfg_nvme_io_channel)
+		phba->io_channel = phba->cfg_fcp_io_channel;
+	else
+		phba->io_channel = phba->cfg_nvme_io_channel;
 	phba->cfg_soft_wwnn = 0L;
 	phba->cfg_soft_wwpn = 0L;
 	lpfc_sg_seg_cnt_init(phba, lpfc_sg_seg_cnt);

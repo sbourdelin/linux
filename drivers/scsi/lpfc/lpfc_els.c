@@ -29,7 +29,6 @@
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_transport_fc.h>
 
-
 #include "lpfc_hw4.h"
 #include "lpfc_hw.h"
 #include "lpfc_sli.h"
@@ -1868,10 +1867,12 @@ lpfc_cmpl_els_plogi(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 
 	/* PLOGI completes to NPort <nlp_DID> */
 	lpfc_printf_vlog(vport, KERN_INFO, LOG_ELS,
-			 "0102 PLOGI completes to NPort x%x "
+			 "0102 PLOGI completes to NPort x%06x "
 			 "Data: x%x x%x x%x x%x x%x\n",
-			 ndlp->nlp_DID, irsp->ulpStatus, irsp->un.ulpWord[4],
-			 irsp->ulpTimeout, disc, vport->num_disc_nodes);
+			 ndlp->nlp_DID, ndlp->nlp_fc4_type,
+			 irsp->ulpStatus, irsp->un.ulpWord[4],
+			 disc, vport->num_disc_nodes);
+
 	/* Check to see if link went down during discovery */
 	if (lpfc_els_chk_latt(vport)) {
 		spin_lock_irq(shost->host_lock);
@@ -2049,14 +2050,17 @@ lpfc_cmpl_els_prli(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 		"PRLI cmpl:       status:x%x/x%x did:x%x",
 		irsp->ulpStatus, irsp->un.ulpWord[4],
 		ndlp->nlp_DID);
+
+	/* Ddriver supports multiple FC4 types.  Counters matter. */
+	vport->fc_prli_sent--;
+
 	/* PRLI completes to NPort <nlp_DID> */
 	lpfc_printf_vlog(vport, KERN_INFO, LOG_ELS,
-			 "0103 PRLI completes to NPort x%x "
+			 "0103 PRLI completes to NPort x%06x "
 			 "Data: x%x x%x x%x x%x\n",
 			 ndlp->nlp_DID, irsp->ulpStatus, irsp->un.ulpWord[4],
-			 irsp->ulpTimeout, vport->num_disc_nodes);
+			 vport->num_disc_nodes, ndlp->fc4_prli_sent);
 
-	vport->fc_prli_sent--;
 	/* Check to see if link went down during discovery */
 	if (lpfc_els_chk_latt(vport))
 		goto out;
@@ -2065,6 +2069,7 @@ lpfc_cmpl_els_prli(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 		/* Check for retry */
 		if (lpfc_els_retry(phba, cmdiocb, rspiocb)) {
 			/* ELS command is being retried */
+			ndlp->fc4_prli_sent--;
 			goto out;
 		}
 		/* PRLI failed */
@@ -2079,9 +2084,14 @@ lpfc_cmpl_els_prli(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 			lpfc_disc_state_machine(vport, ndlp, cmdiocb,
 						NLP_EVT_CMPL_PRLI);
 	} else
-		/* Good status, call state machine */
+		/* Good status, call state machine.  However, if another
+		 * PRLI is outstanding, don't call the state machine
+		 * because final disposition to Mapped or Unmapped is
+		 * completed there.
+		 */
 		lpfc_disc_state_machine(vport, ndlp, cmdiocb,
 					NLP_EVT_CMPL_PRLI);
+
 out:
 	lpfc_els_free_iocb(phba, cmdiocb);
 	return;
@@ -2115,11 +2125,25 @@ lpfc_issue_els_prli(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 	struct Scsi_Host *shost = lpfc_shost_from_vport(vport);
 	struct lpfc_hba *phba = vport->phba;
 	PRLI *npr;
+	struct lpfc_nvme_prli *npr_nvme;
 	struct lpfc_iocbq *elsiocb;
 	uint8_t *pcmd;
 	uint16_t cmdsize;
+	uint32_t local_nlp_type;
 
-	cmdsize = (sizeof(uint32_t) + sizeof(PRLI));
+	local_nlp_type = ndlp->nlp_fc4_type;
+
+ send_next_prli:
+	if (local_nlp_type & NLP_FC4_FCP)
+		cmdsize = (sizeof(uint32_t) + sizeof(PRLI));
+	else if (local_nlp_type & NLP_FC4_NVME)
+		cmdsize = (sizeof(uint32_t) + sizeof(struct lpfc_nvme_prli));
+	else {
+		lpfc_printf_vlog(vport, KERN_INFO, LOG_DISCOVERY,
+				 "3083 Unknown FC_TYPE x%x ndlp x%06x\n",
+				 ndlp->nlp_fc4_type, ndlp->nlp_DID);
+		return 1;
+	}
 	elsiocb = lpfc_prep_els_iocb(vport, 1, cmdsize, retry, ndlp,
 				     ndlp->nlp_DID, ELS_CMD_PRLI);
 	if (!elsiocb)
@@ -2128,29 +2152,55 @@ lpfc_issue_els_prli(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 	pcmd = (uint8_t *) (((struct lpfc_dmabuf *) elsiocb->context2)->virt);
 
 	/* For PRLI request, remainder of payload is service parameters */
-	memset(pcmd, 0, (sizeof(PRLI) + sizeof(uint32_t)));
+	memset(pcmd, 0, cmdsize);
 	*((uint32_t *) (pcmd)) = ELS_CMD_PRLI;
 	pcmd += sizeof(uint32_t);
 
-	/* For PRLI, remainder of payload is PRLI parameter page */
-	npr = (PRLI *) pcmd;
-	/*
-	 * If our firmware version is 3.20 or later,
-	 * set the following bits for FC-TAPE support.
-	 */
-	if (phba->vpd.rev.feaLevelHigh >= 0x02) {
-		npr->ConfmComplAllowed = 1;
-		npr->Retry = 1;
-		npr->TaskRetryIdReq = 1;
-	}
-	npr->estabImagePair = 1;
-	npr->readXferRdyDis = 1;
-	 if (vport->cfg_first_burst_size)
-		npr->writeXferRdyDis = 1;
+	if (local_nlp_type & NLP_FC4_FCP) {
+		/* Remainder of payload is FCP PRLI parameter page.
+		 * Note: this data structure is defined as
+		 * BE/LE in the structure definition so no
+		 * byte swap call is made.
+		 */
+		npr = (PRLI *)pcmd;
 
-	/* For FCP support */
-	npr->prliType = PRLI_FCP_TYPE;
-	npr->initiatorFunc = 1;
+		/*
+		 * If our firmware version is 3.20 or later,
+		 * set the following bits for FC-TAPE support.
+		 */
+		if (phba->vpd.rev.feaLevelHigh >= 0x02) {
+			npr->ConfmComplAllowed = 1;
+			npr->Retry = 1;
+			npr->TaskRetryIdReq = 1;
+		}
+		npr->estabImagePair = 1;
+		npr->readXferRdyDis = 1;
+		if (vport->cfg_first_burst_size)
+			npr->writeXferRdyDis = 1;
+
+		/* For FCP support */
+		npr->prliType = PRLI_FCP_TYPE;
+		npr->initiatorFunc = 1;
+		elsiocb->iocb_flag |= LPFC_PRLI_FCP_REQ;
+
+		/* Remove FCP type - processed. */
+		local_nlp_type &= ~NLP_FC4_FCP;
+	} else if (local_nlp_type & NLP_FC4_NVME) {
+		/* Remainder of payload is NVME PRLI parameter page.
+		 * This data structure is the newer definition that
+		 * uses bf macros so a byte swap is required.
+		 */
+		npr_nvme = (struct lpfc_nvme_prli *)pcmd;
+		bf_set(prli_type_code, npr_nvme, PRLI_NVME_TYPE);
+		bf_set(prli_estabImagePair, npr_nvme, 0);  /* Should be 0 */
+		bf_set(prli_init, npr_nvme, 1);
+		npr_nvme->word1 = cpu_to_be32(npr_nvme->word1);
+		npr_nvme->word4 = cpu_to_be32(npr_nvme->word4);
+		elsiocb->iocb_flag |= LPFC_PRLI_NVME_REQ;
+
+		/* Remove NVME type - processed. */
+		local_nlp_type &= ~NLP_FC4_NVME;
+	}
 
 	lpfc_debugfs_disc_trc(vport, LPFC_DISC_TRC_ELS_CMD,
 		"Issue PRLI:      did:x%x",
@@ -2169,7 +2219,20 @@ lpfc_issue_els_prli(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 		lpfc_els_free_iocb(phba, elsiocb);
 		return 1;
 	}
+
+	/* The vport counters are used for lpfc_scan_finished, but
+	 * the ndlp is used to track outstanding PRLIs for different
+	 * FC4 types.
+	 */
 	vport->fc_prli_sent++;
+	ndlp->fc4_prli_sent++;
+
+	/* The driver supports 2 FC4 types.  Make sure
+	 * a PRLI is issued for all types before exiting.
+	 */
+	if (local_nlp_type & (NLP_FC4_FCP | NLP_FC4_NVME))
+		goto send_next_prli;
+
 	return 0;
 }
 
@@ -4223,15 +4286,37 @@ lpfc_els_rsp_prli_acc(struct lpfc_vport *vport, struct lpfc_iocbq *oldiocb,
 {
 	struct lpfc_hba  *phba = vport->phba;
 	PRLI *npr;
+	struct lpfc_nvme_prli *npr_nvme;
 	lpfc_vpd_t *vpd;
 	IOCB_t *icmd;
 	IOCB_t *oldcmd;
 	struct lpfc_iocbq *elsiocb;
 	uint8_t *pcmd;
 	uint16_t cmdsize;
+	uint32_t prli_fc4_req, *req_payload;
+	struct lpfc_dmabuf *req_buf;
 	int rc;
 
-	cmdsize = sizeof(uint32_t) + sizeof(PRLI);
+	/* Need the incoming PRLI payload to determine if the ACC is for an
+	 * FC4 or NVME PRLI type.  The PRLI type is at word 1.
+	 */
+	req_buf = (struct lpfc_dmabuf *)oldiocb->context2;
+	req_payload = (((uint32_t *)req_buf->virt) + 1);
+
+	/* PRLI type payload is at byte 3 for FCP or NVME. */
+	prli_fc4_req = be32_to_cpu(*req_payload);
+	prli_fc4_req = (prli_fc4_req >> 24) & 0xff;
+	lpfc_printf_vlog(vport, KERN_INFO, LOG_ELS,
+			 "3092 PRLI_ACC:  Req Type x%x, Word1 x%08x\n",
+			 prli_fc4_req, *((uint32_t *)req_payload));
+
+	if (prli_fc4_req == PRLI_FCP_TYPE)
+		cmdsize = sizeof(uint32_t) + sizeof(PRLI);
+	else if (prli_fc4_req & PRLI_NVME_TYPE)
+		cmdsize = sizeof(uint32_t) + sizeof(struct lpfc_nvme_prli);
+	else
+		return 1;
+
 	elsiocb = lpfc_prep_els_iocb(vport, 0, cmdsize, oldiocb->retry, ndlp,
 		ndlp->nlp_DID, (ELS_CMD_ACC | (ELS_CMD_PRLI & ~ELS_RSP_MASK)));
 	if (!elsiocb)
@@ -4250,33 +4335,46 @@ lpfc_els_rsp_prli_acc(struct lpfc_vport *vport, struct lpfc_iocbq *oldiocb,
 			 ndlp->nlp_DID, ndlp->nlp_flag, ndlp->nlp_state,
 			 ndlp->nlp_rpi);
 	pcmd = (uint8_t *) (((struct lpfc_dmabuf *) elsiocb->context2)->virt);
+	memset(pcmd, 0, cmdsize);
 
 	*((uint32_t *) (pcmd)) = (ELS_CMD_ACC | (ELS_CMD_PRLI & ~ELS_RSP_MASK));
 	pcmd += sizeof(uint32_t);
 
 	/* For PRLI, remainder of payload is PRLI parameter page */
-	memset(pcmd, 0, sizeof(PRLI));
-
-	npr = (PRLI *) pcmd;
 	vpd = &phba->vpd;
-	/*
-	 * If the remote port is a target and our firmware version is 3.20 or
-	 * later, set the following bits for FC-TAPE support.
-	 */
-	if ((ndlp->nlp_type & NLP_FCP_TARGET) &&
-	    (vpd->rev.feaLevelHigh >= 0x02)) {
+
+	if (prli_fc4_req == PRLI_FCP_TYPE) {
+		/*
+		 * If the remote port is a target and our firmware version
+		 * is 3.20 or later, set the following bits for FC-TAPE
+		 * support.
+		 */
+		npr = (PRLI *) pcmd;
+		if ((ndlp->nlp_type & NLP_FCP_TARGET) &&
+		    (vpd->rev.feaLevelHigh >= 0x02)) {
+			npr->ConfmComplAllowed = 1;
+			npr->Retry = 1;
+			npr->TaskRetryIdReq = 1;
+		}
+		npr->acceptRspCode = PRLI_REQ_EXECUTED;
+		npr->estabImagePair = 1;
+		npr->readXferRdyDis = 1;
 		npr->ConfmComplAllowed = 1;
-		npr->Retry = 1;
-		npr->TaskRetryIdReq = 1;
-	}
-
-	npr->acceptRspCode = PRLI_REQ_EXECUTED;
-	npr->estabImagePair = 1;
-	npr->readXferRdyDis = 1;
-	npr->ConfmComplAllowed = 1;
-
-	npr->prliType = PRLI_FCP_TYPE;
-	npr->initiatorFunc = 1;
+		npr->prliType = PRLI_FCP_TYPE;
+		npr->initiatorFunc = 1;
+	} else if (prli_fc4_req & PRLI_NVME_TYPE) {
+		/* Respond with an NVME PRLI Type */
+		npr_nvme = (struct lpfc_nvme_prli *) pcmd;
+		bf_set(prli_type_code, npr_nvme, PRLI_NVME_TYPE);
+		bf_set(prli_estabImagePair, npr_nvme, 0);  /* Should be 0 */
+		bf_set(prli_init, npr_nvme, 1);
+		npr_nvme->word1 = cpu_to_be32(npr_nvme->word1);
+		npr_nvme->word4 = cpu_to_be32(npr_nvme->word4);
+	} else
+		lpfc_printf_vlog(vport, KERN_INFO, LOG_DISCOVERY,
+				 "3095 Unknown FC_TYPE x%x x%x ndlp x%06x\n",
+				 prli_fc4_req, ndlp->nlp_fc4_type,
+				 ndlp->nlp_DID);
 
 	lpfc_debugfs_disc_trc(vport, LPFC_DISC_TRC_ELS_RSP,
 		"Issue ACC PRLI:  did:x%x flg:x%x",
@@ -5968,9 +6066,11 @@ lpfc_els_handle_rscn(struct lpfc_vport *vport)
 	if (ndlp && NLP_CHK_NODE_ACT(ndlp)
 	    && ndlp->nlp_state == NLP_STE_UNMAPPED_NODE) {
 		/* Good ndlp, issue CT Request to NameServer */
-		if (lpfc_ns_cmd(vport, SLI_CTNS_GID_FT, 0, 0) == 0)
+		vport->gidft_inp = 0;
+		if (lpfc_issue_gidft(vport) == 0)
 			/* Wait for NameServer query cmpl before we can
-			   continue */
+			 * continue
+			 */
 			return 1;
 	} else {
 		/* If login to NameServer does not exist, issue one */

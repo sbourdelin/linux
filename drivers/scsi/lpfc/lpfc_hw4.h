@@ -348,6 +348,7 @@ struct lpfc_cqe {
 #define CQE_CODE_RECEIVE		0x4
 #define CQE_CODE_XRI_ABORTED		0x5
 #define CQE_CODE_RECEIVE_V1		0x9
+#define CQE_CODE_NVME_ERSP		0xd
 
 /*
  * Define mask value for xri_aborted and wcqe completed CQE extended status.
@@ -2891,6 +2892,9 @@ struct lpfc_sli4_parameters {
 #define cfg_mds_diags_SHIFT			1
 #define cfg_mds_diags_MASK			0x00000001
 #define cfg_mds_diags_WORD			word19
+#define cfg_nvme_SHIFT				3
+#define cfg_nvme_MASK				0x00000001
+#define cfg_nvme_WORD				word19
 };
 
 #define LPFC_SET_UE_RECOVERY		0x10
@@ -3642,6 +3646,9 @@ struct wqe_common {
 #define wqe_ebde_cnt_SHIFT    0
 #define wqe_ebde_cnt_MASK     0x0000000f
 #define wqe_ebde_cnt_WORD     word10
+#define wqe_nvme_SHIFT        4
+#define wqe_nvme_MASK         0x00000001
+#define wqe_nvme_WORD         word10
 #define wqe_oas_SHIFT         6
 #define wqe_oas_MASK          0x00000001
 #define wqe_oas_WORD          word10
@@ -3702,6 +3709,9 @@ struct wqe_common {
 #define LPFC_ELS_ID_FDISC	2
 #define LPFC_ELS_ID_LOGO	1
 #define LPFC_ELS_ID_DEFAULT	0
+#define wqe_irsp_SHIFT        4
+#define wqe_irsp_MASK         0x00000001
+#define wqe_irsp_WORD         word11
 #define wqe_wqec_SHIFT        7
 #define wqe_wqec_MASK         0x00000001
 #define wqe_wqec_WORD         word11
@@ -3882,6 +3892,50 @@ struct gen_req64_wqe {
 	uint32_t max_response_payload_len;
 };
 
+/* Define NVME PRLI request to fabric. NVME is a
+ * fabric-only protocol.
+ */
+struct lpfc_nvme_prli {
+	uint32_t word1;
+#define prli_estabImagePair_SHIFT       13
+#define prli_estabImagePair_MASK        0x00000001
+#define prli_estabImagePair_WORD        word1
+#define prli_type_code_ext_SHIFT        16
+#define prli_type_code_ext_MASK         0x000000ff
+#define prli_type_code_ext_WORD         word1
+#define prli_type_code_SHIFT            24
+#define prli_type_code_MASK             0x000000ff
+#define prli_type_code_WORD             word1
+	uint32_t word_rsvd2;
+	uint32_t word_rsvd3;
+	uint32_t word4;
+#define prli_disc_SHIFT                 3
+#define prli_disc_MASK                  0x00000001
+#define prli_disc_WORD                  word4
+#define prli_tgt_SHIFT                  4
+#define prli_tgt_MASK                   0x00000001
+#define prli_tgt_WORD                   word4
+#define prli_init_SHIFT                 5
+#define prli_init_MASK                  0x00000001
+#define prli_init_WORD                  word4
+#define prli_dovly_SHIFT                6
+#define prli_dovly_MASK                 0x00000001
+#define prli_dovly_WORD                 word4
+#define prli_conf_SHIFT                 7
+#define prli_conf_MASK                  0x00000001
+#define prli_conf_WORD                  word4
+#define prli_retry_SHIFT                8
+#define prli_retry_MASK                 0x00000001
+#define prli_retry_WORD                 word4
+#define prli_rec_SHIFT                  10
+#define prli_rec_MASK                   0x00000001
+#define prli_rec_WORD                   word4
+#define prli_fba_SHIFT                  16
+#define prli_fba_MASK                   0x00000001
+#define prli_fba_WORD                   word4
+	uint32_t first_burst_sz;
+};
+
 struct create_xri_wqe {
 	uint32_t rsrvd[5];           /* words 0-4 */
 	struct wqe_did	wqe_dest;  /* word 5 */
@@ -3954,6 +4008,39 @@ struct fcp_icmnd64_wqe {
 	uint32_t rsvd_12_15[4];        /* word 12-15 */
 };
 
+struct fcp_trsp64_wqe {
+	struct ulp_bde64 bde;
+	uint32_t response_len;
+	uint32_t rsvd_4_5[2];
+	struct wqe_common wqe_com;      /* words 6-11 */
+	uint32_t rsvd_12_15[4];         /* word 12-15 */
+};
+
+struct fcp_tsend64_wqe {
+	struct ulp_bde64 bde;
+	uint32_t payload_offset_len;
+	uint32_t relative_offset;
+	uint32_t reserved;
+	struct wqe_common wqe_com;     /* words 6-11 */
+	uint32_t fcp_data_len;         /* word 12 */
+	uint32_t word13;
+#define wqe_irsplen_SHIFT     24
+#define wqe_irsplen_MASK      0x000000ff
+#define wqe_irsplen_WORD      word13
+	uint32_t rsvd_14_15[2];        /* word 14-15 */
+};
+
+struct fcp_treceive64_wqe {
+	struct ulp_bde64 bde;
+	uint32_t payload_offset_len;
+	uint32_t relative_offset;
+	uint32_t reserved;
+	struct wqe_common wqe_com;     /* words 6-11 */
+	uint32_t fcp_data_len;         /* word 12 */
+	uint32_t rsvd_13_15[3];        /* word 13-15 */
+};
+#define TXRDY_PAYLOAD_LEN      12
+
 
 union lpfc_wqe {
 	uint32_t words[16];
@@ -3969,6 +4056,10 @@ union lpfc_wqe {
 	struct xmit_els_rsp64_wqe xmit_els_rsp;
 	struct els_request64_wqe els_req;
 	struct gen_req64_wqe gen_req;
+	struct fcp_trsp64_wqe fcp_trsp;
+	struct fcp_tsend64_wqe fcp_tsend;
+	struct fcp_treceive64_wqe fcp_treceive;
+
 };
 
 union lpfc_wqe128 {
@@ -3977,6 +4068,9 @@ union lpfc_wqe128 {
 	struct fcp_icmnd64_wqe fcp_icmd;
 	struct fcp_iread64_wqe fcp_iread;
 	struct fcp_iwrite64_wqe fcp_iwrite;
+	struct fcp_trsp64_wqe fcp_trsp;
+	struct fcp_tsend64_wqe fcp_tsend;
+	struct fcp_treceive64_wqe fcp_treceive;
 	struct xmit_seq64_wqe xmit_sequence;
 	struct gen_req64_wqe gen_req;
 };
@@ -3999,11 +4093,35 @@ struct lpfc_grp_hdr {
 	uint8_t revision[32];
 };
 
-#define FCP_COMMAND 0x0
-#define FCP_COMMAND_DATA_OUT 0x1
-#define ELS_COMMAND_NON_FIP 0xC
-#define ELS_COMMAND_FIP 0xD
-#define OTHER_COMMAND 0x8
+/* Defines for WQE command type */
+#define FCP_COMMAND		0x0
+#define NVME_READ_CMD		0x0
+#define FCP_COMMAND_DATA_OUT	0x1
+#define NVME_WRITE_CMD		0x1
+#define FCP_COMMAND_TRECEIVE	0x2
+#define FCP_COMMAND_TRSP	0x3
+#define FCP_COMMAND_TSEND	0x7
+#define OTHER_COMMAND		0x8
+#define ELS_COMMAND_NON_FIP	0xC
+#define ELS_COMMAND_FIP		0xD
+
+/* WQE Commands */
+#define CMD_ABORT_XRI_WQE       0x0F
+#define CMD_XMIT_SEQUENCE64_WQE 0x82
+#define CMD_XMIT_BCAST64_WQE    0x84
+#define CMD_ELS_REQUEST64_WQE   0x8A
+#define CMD_XMIT_ELS_RSP64_WQE  0x95
+#define CMD_XMIT_BLS_RSP64_WQE  0x97
+#define CMD_FCP_IWRITE64_WQE    0x98
+#define CMD_FCP_IREAD64_WQE     0x9A
+#define CMD_FCP_ICMND64_WQE     0x9C
+#define CMD_FCP_TSEND64_WQE     0x9F
+#define CMD_FCP_TRECEIVE64_WQE  0xA1
+#define CMD_FCP_TRSP64_WQE      0xA3
+#define CMD_GEN_REQUEST64_WQE   0xC2
+
+#define CMD_WQE_MASK            0xff
+
 
 #define LPFC_FW_DUMP	1
 #define LPFC_FW_RESET	2

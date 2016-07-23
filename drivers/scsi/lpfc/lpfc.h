@@ -114,6 +114,17 @@ enum lpfc_polling_flags {
 	DISABLE_FCP_RING_INT    = 0x2
 };
 
+/*
+ * Provide for FC4 TYPE x28 - NVME.  The
+ * bit mask for FCP and NVME is 0x8 identically
+ * because they are 32 bit positions distance.
+ */
+#define LPFC_FC4_TYPE_NVME	0x28
+#define LPFC_FC4_TYPE_FCP	0x8
+#define LPFC_FC4_TYPE_BLS	0x0
+#define LPFC_FC4_TYPE_BITMASK	0x00000100
+#define LPFC_RCTL_ABTS		0x81
+
 /* Provide DMA memory definitions the driver uses per port instance. */
 struct lpfc_dmabuf {
 	struct list_head list;
@@ -131,10 +142,14 @@ struct lpfc_dma_pool {
 struct hbq_dmabuf {
 	struct lpfc_dmabuf hbuf;
 	struct lpfc_dmabuf dbuf;
-	uint32_t size;
+	uint16_t total_size;
+	uint16_t bytes_recv;
 	uint32_t tag;
 	struct lpfc_cq_event cq_event;
 	unsigned long time_stamp;
+	void *context;
+	struct lpfc_iocbq *iocbq;
+	struct lpfc_sglq *sglq;
 };
 
 /* Priority bit.  Set value to exceed low water mark in lpfc_mem. */
@@ -367,7 +382,8 @@ struct lpfc_vport {
 	int32_t stopped;   /* HBA has not been restarted since last ERATT */
 	uint8_t fc_linkspeed;	/* Link speed after last READ_LA */
 
-	uint32_t num_disc_nodes;	/*in addition to hba_state */
+	uint32_t num_disc_nodes;	/* in addition to hba_state */
+	uint32_t gidft_inp;		/* cnt of outstanding GID_FTs */
 
 	uint32_t fc_nlp_cnt;	/* outstanding NODELIST requests */
 	uint32_t fc_rscn_id_cnt;	/* count of RSCNs payloads in list */
@@ -442,6 +458,10 @@ struct lpfc_vport {
 	uint16_t fdmi_num_disc;
 	uint32_t fdmi_hba_mask;
 	uint32_t fdmi_port_mask;
+
+	/* There is a single nvme instance per vport. */
+	struct lpfc_nvme *pnvme;
+	uint32_t last_fcp_wqidx;
 };
 
 struct hbq_s {
@@ -459,10 +479,9 @@ struct hbq_s {
 					       struct hbq_dmabuf *);
 };
 
-#define LPFC_MAX_HBQS  4
 /* this matches the position in the lpfc_hbq_defs array */
 #define LPFC_ELS_HBQ	0
-#define LPFC_EXTRA_HBQ	1
+#define LPFC_MAX_HBQS	1
 
 enum hba_temp_state {
 	HBA_NORMAL_TEMP,
@@ -696,6 +715,7 @@ struct lpfc_hba {
 	uint8_t  wwpn[8];
 	uint32_t RandomData[7];
 	uint8_t  fcp_embed_io;
+	uint8_t  nvme_support;	/* Firmware supports NVME */
 	uint8_t  mds_diags_support;
 
 	/* HBA Config Parameters */
@@ -721,6 +741,11 @@ struct lpfc_hba {
 	uint32_t cfg_fcp_imax;
 	uint32_t cfg_fcp_cpu_map;
 	uint32_t cfg_fcp_io_channel;
+	uint32_t cfg_nvme_io_channel;
+	uint32_t cfg_enable_nvmet;
+#define NVME_TARGET_OFF		0xffff
+#define NVME_TARGET_MIN		0
+#define NVME_TARGET_MAX		255
 	uint32_t cfg_total_seg_cnt;
 	uint32_t cfg_sg_seg_cnt;
 	uint32_t cfg_prot_sg_seg_cnt;
@@ -765,6 +790,11 @@ struct lpfc_hba {
 #define LPFC_FDMI_SUPPORT	1	/* FDMI supported? */
 	uint32_t cfg_enable_SmartSAN;
 	uint32_t cfg_enable_mds_diags;
+	uint32_t cfg_enable_fc4_type;
+#define LPFC_ENABLE_FCP  1
+#define LPFC_ENABLE_NVME 2
+#define LPFC_ENABLE_BOTH 3
+	uint32_t io_channel;	/* max of fcp or nvme io channels */
 	lpfc_vpd_t vpd;		/* vital product data */
 
 	struct pci_dev *pcidev;
@@ -779,7 +809,6 @@ struct lpfc_hba {
 	unsigned long data_flags;
 
 	uint32_t hbq_in_use;		/* HBQs in use flag */
-	struct list_head rb_pend_list;  /* Received buffers to be processed */
 	uint32_t hbq_count;	        /* Count of configured HBQs */
 	struct hbq_s hbqs[LPFC_MAX_HBQS]; /* local copy of hbq indicies  */
 

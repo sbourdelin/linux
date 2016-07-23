@@ -92,8 +92,10 @@ union CtCommandResponse {
 	uint32_t word;
 };
 
-#define FC4_FEATURE_INIT 0x2
-#define FC4_FEATURE_TARGET 0x1
+/* FC4 Feature bits for RFF_ID */
+#define FC4_FEATURE_TARGET	0x1
+#define FC4_FEATURE_INIT	0x2
+#define FC4_FEATURE_NVME_DISC	0x4
 
 struct lpfc_sli_ct_request {
 	/* Structure is in Big Endian format */
@@ -117,6 +119,16 @@ struct lpfc_sli_ct_request {
 			uint8_t AreaScope;
 			uint8_t Fc4Type;	/* for GID_FT requests */
 		} gid;
+		struct gid_ff {
+			uint8_t Flags;
+			uint8_t DomainScope;
+			uint8_t AreaScope;
+			uint8_t rsvd1;
+			uint8_t rsvd2;
+			uint8_t rsvd3;
+			uint8_t Fc4FBits;
+			uint8_t Fc4Type;
+		} gid_ff;
 		struct rft {
 			uint32_t PortId;	/* For RFT_ID requests */
 
@@ -161,6 +173,12 @@ struct lpfc_sli_ct_request {
 		struct gff_acc {
 			uint8_t fbits[128];
 		} gff_acc;
+		struct gft {
+			uint32_t PortId;
+		} gft;
+		struct gft_acc {
+			uint32_t fc4_types[8];
+		} gft_acc;
 #define FCP_TYPE_FEATURE_OFFSET 7
 		struct rff {
 			uint32_t PortId;
@@ -176,8 +194,12 @@ struct lpfc_sli_ct_request {
 #define  SLI_CT_REVISION        1
 #define  GID_REQUEST_SZ   (offsetof(struct lpfc_sli_ct_request, un) + \
 			   sizeof(struct gid))
+#define  GIDFF_REQUEST_SZ (offsetof(struct lpfc_sli_ct_request, un) + \
+			   sizeof(struct gid_ff))
 #define  GFF_REQUEST_SZ   (offsetof(struct lpfc_sli_ct_request, un) + \
 			   sizeof(struct gff))
+#define  GFT_REQUEST_SZ   (offsetof(struct lpfc_sli_ct_request, un) + \
+			   sizeof(struct gft))
 #define  RFT_REQUEST_SZ   (offsetof(struct lpfc_sli_ct_request, un) + \
 			   sizeof(struct rft))
 #define  RFF_REQUEST_SZ   (offsetof(struct lpfc_sli_ct_request, un) + \
@@ -273,6 +295,7 @@ struct lpfc_sli_ct_request {
 #define  SLI_CTNS_GNN_IP      0x0153
 #define  SLI_CTNS_GIPA_IP     0x0156
 #define  SLI_CTNS_GID_FT      0x0171
+#define  SLI_CTNS_GID_FF      0x01F1
 #define  SLI_CTNS_GID_PT      0x01A1
 #define  SLI_CTNS_RPN_ID      0x0212
 #define  SLI_CTNS_RNN_ID      0x0213
@@ -290,15 +313,16 @@ struct lpfc_sli_ct_request {
  * Port Types
  */
 
-#define  SLI_CTPT_N_PORT      0x01
-#define  SLI_CTPT_NL_PORT     0x02
-#define  SLI_CTPT_FNL_PORT    0x03
-#define  SLI_CTPT_IP          0x04
-#define  SLI_CTPT_FCP         0x08
-#define  SLI_CTPT_NX_PORT     0x7F
-#define  SLI_CTPT_F_PORT      0x81
-#define  SLI_CTPT_FL_PORT     0x82
-#define  SLI_CTPT_E_PORT      0x84
+#define SLI_CTPT_N_PORT		0x01
+#define SLI_CTPT_NL_PORT	0x02
+#define SLI_CTPT_FNL_PORT	0x03
+#define SLI_CTPT_IP		0x04
+#define SLI_CTPT_FCP		0x08
+#define SLI_CTPT_NVME		0x28
+#define SLI_CTPT_NX_PORT	0x7F
+#define SLI_CTPT_F_PORT		0x81
+#define SLI_CTPT_FL_PORT	0x82
+#define SLI_CTPT_E_PORT		0x84
 
 #define SLI_CT_LAST_ENTRY     0x80000000
 
@@ -680,6 +704,7 @@ typedef struct _PRLI {		/* Structure is in Big Endian format */
 	uint8_t prliType;	/* FC Parm Word 0, bit 24:31 */
 
 #define PRLI_FCP_TYPE 0x08
+#define PRLI_NVME_TYPE 0x28
 	uint8_t word0Reserved1;	/* FC Parm Word 0, bit 16:23 */
 
 #ifdef __BIG_ENDIAN_BITFIELD
@@ -4157,7 +4182,7 @@ typedef struct _IOCB {	/* IOCB structure */
 
 /* HBQ entries are 4 words each = 4k */
 #define LPFC_TOTAL_HBQ_SIZE (sizeof(struct lpfc_hbq_entry) *  \
-			     lpfc_sli_hbq_count())
+			     lpfc_sli_hbq_count(phba))
 
 struct lpfc_sli2_slim {
 	MAILBOX_t mbx;

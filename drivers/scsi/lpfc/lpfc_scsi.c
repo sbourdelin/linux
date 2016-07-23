@@ -923,7 +923,7 @@ lpfc_new_scsi_buf_s4(struct lpfc_vport *vport, int num_to_alloc)
 		phba->sli4_hba.scsi_xri_cnt++;
 		spin_unlock_irq(&phba->scsi_buf_list_get_lock);
 	}
-	lpfc_printf_log(phba, KERN_INFO, LOG_BG,
+	lpfc_printf_log(phba, KERN_INFO, LOG_BG | LOG_FCP,
 			"3021 Allocate %d out of %d requested new SCSI "
 			"buffers\n", bcnt, num_to_alloc);
 
@@ -949,7 +949,7 @@ lpfc_new_scsi_buf_s4(struct lpfc_vport *vport, int num_to_alloc)
  *   int - number of scsi buffers that were allocated.
  *   0 = failure, less than num_to_alloc is a partial failure.
  **/
-static inline int
+int
 lpfc_new_scsi_buf(struct lpfc_vport *vport, int num_to_alloc)
 {
 	return vport->phba->lpfc_new_scsi_buf(vport, num_to_alloc);
@@ -1048,7 +1048,7 @@ lpfc_get_scsi_buf_s4(struct lpfc_hba *phba, struct lpfc_nodelist *ndlp)
  *   NULL - Error
  *   Pointer to lpfc_scsi_buf - Success
  **/
-static struct lpfc_scsi_buf*
+struct lpfc_scsi_buf*
 lpfc_get_scsi_buf(struct lpfc_hba *phba, struct lpfc_nodelist *ndlp)
 {
 	return  phba->lpfc_get_scsi_buf(phba, ndlp);
@@ -1122,7 +1122,7 @@ lpfc_release_scsi_buf_s4(struct lpfc_hba *phba, struct lpfc_scsi_buf *psb)
  * This routine releases @psb scsi buffer by adding it to tail of @phba
  * lpfc_scsi_buf_list list.
  **/
-static void
+void
 lpfc_release_scsi_buf(struct lpfc_hba *phba, struct lpfc_scsi_buf *psb)
 {
 
@@ -4769,7 +4769,7 @@ lpfc_abort_handler(struct scsi_cmnd *cmnd)
 	icmd->ulpClass = cmd->ulpClass;
 
 	/* ABTS WQE must go to the same WQ as the WQE to be aborted */
-	abtsiocb->fcp_wqidx = iocb->fcp_wqidx;
+	abtsiocb->hba_wqidx = iocb->hba_wqidx;
 	abtsiocb->iocb_flag |= LPFC_USE_FCPWQIDX;
 	if (iocb->iocb_flag & LPFC_IO_FOF)
 		abtsiocb->iocb_flag |= LPFC_IO_FOF;
@@ -4782,7 +4782,7 @@ lpfc_abort_handler(struct scsi_cmnd *cmnd)
 	abtsiocb->iocb_cmpl = lpfc_sli_abort_fcp_cmpl;
 	abtsiocb->vport = vport;
 	if (phba->sli_rev == LPFC_SLI_REV4) {
-		ring_number = MAX_SLI3_CONFIGURED_RINGS + iocb->fcp_wqidx;
+		ring_number = MAX_SLI3_CONFIGURED_RINGS + iocb->hba_wqidx;
 		pring_s4 = &phba->sli.ring[ring_number];
 		/* Note: both hbalock and ring_lock must be set here */
 		spin_lock_irqsave(&pring_s4->ring_lock, iflags);

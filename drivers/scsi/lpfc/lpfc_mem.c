@@ -26,7 +26,6 @@
 
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_transport_fc.h>
-
 #include <scsi/scsi.h>
 
 #include "lpfc_hw4.h"
@@ -170,12 +169,15 @@ lpfc_mem_alloc(struct lpfc_hba *phba, int align)
 					LPFC_DEVICE_DATA_POOL_SIZE,
 					sizeof(struct lpfc_device_data));
 		if (!phba->device_data_mem_pool)
-			goto fail_free_hrb_pool;
+			goto fail_free_drb_pool;
 	} else {
 		phba->device_data_mem_pool = NULL;
 	}
 
 	return 0;
+fail_free_drb_pool:
+	pci_pool_destroy(phba->lpfc_drb_pool);
+	phba->lpfc_drb_pool = NULL;
  fail_free_hrb_pool:
 	pci_pool_destroy(phba->lpfc_hrb_pool);
 	phba->lpfc_hrb_pool = NULL;
@@ -458,7 +460,7 @@ lpfc_els_hbq_alloc(struct lpfc_hba *phba)
 		kfree(hbqbp);
 		return NULL;
 	}
-	hbqbp->size = LPFC_BPL_SIZE;
+	hbqbp->total_size = LPFC_BPL_SIZE;
 	return hbqbp;
 }
 
@@ -518,7 +520,7 @@ lpfc_sli4_rb_alloc(struct lpfc_hba *phba)
 		kfree(dma_buf);
 		return NULL;
 	}
-	dma_buf->size = LPFC_BPL_SIZE;
+	dma_buf->total_size = LPFC_DATA_BUF_SIZE;
 	return dma_buf;
 }
 
@@ -565,13 +567,13 @@ lpfc_in_buf_free(struct lpfc_hba *phba, struct lpfc_dmabuf *mp)
 		return;
 
 	if (phba->sli3_options & LPFC_SLI3_HBQ_ENABLED) {
+		hbq_entry = container_of(mp, struct hbq_dmabuf, dbuf);
 		/* Check whether HBQ is still in use */
 		spin_lock_irqsave(&phba->hbalock, flags);
 		if (!phba->hbq_in_use) {
 			spin_unlock_irqrestore(&phba->hbalock, flags);
 			return;
 		}
-		hbq_entry = container_of(mp, struct hbq_dmabuf, dbuf);
 		list_del(&hbq_entry->dbuf.list);
 		if (hbq_entry->tag == -1) {
 			(phba->hbqs[LPFC_ELS_HBQ].hbq_free_buffer)

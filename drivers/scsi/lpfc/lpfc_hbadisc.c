@@ -31,6 +31,9 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_transport_fc.h>
+#include <scsi/fc/fc_fs.h>
+
+#include <linux/nvme-fc-driver.h>
 
 #include "lpfc_hw4.h"
 #include "lpfc_hw.h"
@@ -39,6 +42,7 @@
 #include "lpfc_sli.h"
 #include "lpfc_sli4.h"
 #include "lpfc_scsi.h"
+#include "lpfc_nvme.h"
 #include "lpfc.h"
 #include "lpfc_logmsg.h"
 #include "lpfc_crtn.h"
@@ -3458,6 +3462,14 @@ lpfc_mbx_cmpl_reg_login(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 		spin_lock_irq(shost->host_lock);
 		ndlp->nlp_flag &= ~NLP_IGNR_REG_CMPL;
 		spin_unlock_irq(shost->host_lock);
+
+		/*
+		 * We cannot leave the RPI registered because
+		 * if we go thru discovery again for this ndlp
+		 * a subsequent REG_RPI will fail.
+		 */
+		ndlp->nlp_flag |= NLP_RPI_REGISTERED;
+		lpfc_unreg_rpi(vport, ndlp);
 	}
 
 	/* Call state machine */
@@ -3805,6 +3817,50 @@ lpfc_mbx_cmpl_fabric_reg_login(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	return;
 }
 
+ /*
+  * This routine will issue a GID_FT for each FC4 Type supported
+  * by the driver. ALL GID_FTs must complete before discovery is started.
+  */
+int
+lpfc_issue_gidft(struct lpfc_vport *vport)
+{
+	struct lpfc_hba *phba = vport->phba;
+
+	/* Good status, issue CT Request to NameServer */
+	if ((phba->cfg_enable_fc4_type == LPFC_ENABLE_BOTH) ||
+	    (phba->cfg_enable_fc4_type == LPFC_ENABLE_FCP)) {
+		if (lpfc_ns_cmd(vport, SLI_CTNS_GID_FT, 0, SLI_CTPT_FCP)) {
+			/* Cannot issue NameServer FCP Query, so finish up
+			 * discovery
+			 */
+			lpfc_printf_vlog(vport, KERN_ERR, LOG_SLI,
+					 "0604 Failed to issue GID_FT to "
+					 "FC TYPE %x. Finishing discovery.\n",
+					 FC_TYPE_FCP);
+			return 0;
+		}
+		vport->gidft_inp++;
+	}
+
+	if ((phba->cfg_enable_fc4_type == LPFC_ENABLE_BOTH) ||
+	    (phba->cfg_enable_fc4_type == LPFC_ENABLE_NVME)) {
+		if (lpfc_ns_cmd(vport, SLI_CTNS_GID_FT, 0, SLI_CTPT_NVME)) {
+			/* Cannot issue NameServer NVME Query, so finish up
+			 * discovery
+			 */
+			lpfc_printf_vlog(vport, KERN_ERR, LOG_SLI,
+					 "0605 Failed to issue GID_FT to "
+					 "FC_TYPE %x Finishing discovery: "
+					 "gidftinp %d\n",
+					 LPFC_FC4_TYPE_NVME, vport->gidft_inp);
+			if (vport->gidft_inp == 0)
+				return 0;
+		} else
+			vport->gidft_inp++;
+	}
+	return vport->gidft_inp;
+}
+
 /*
  * This routine handles processing a NameServer REG_LOGIN mailbox
  * command upon completion. It is setup in the LPFC_MBOXQ
@@ -3821,12 +3877,14 @@ lpfc_mbx_cmpl_ns_reg_login(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 
 	pmb->context1 = NULL;
 	pmb->context2 = NULL;
+	vport->gidft_inp = 0;
 
 	if (mb->mbxStatus) {
-out:
 		lpfc_printf_vlog(vport, KERN_ERR, LOG_ELS,
 				 "0260 Register NameServer error: 0x%x\n",
 				 mb->mbxStatus);
+
+out:
 		/* decrement the node reference count held for this
 		 * callback function.
 		 */
@@ -3870,20 +3928,29 @@ out:
 		lpfc_ns_cmd(vport, SLI_CTNS_RSNN_NN, 0, 0);
 		lpfc_ns_cmd(vport, SLI_CTNS_RSPN_ID, 0, 0);
 		lpfc_ns_cmd(vport, SLI_CTNS_RFT_ID, 0, 0);
-		lpfc_ns_cmd(vport, SLI_CTNS_RFF_ID, 0, 0);
+
+		if ((phba->cfg_enable_fc4_type == LPFC_ENABLE_BOTH) ||
+		    (phba->cfg_enable_fc4_type == LPFC_ENABLE_FCP))
+			lpfc_ns_cmd(vport, SLI_CTNS_RFF_ID, 0, FC_TYPE_FCP);
+
+		if ((phba->cfg_enable_fc4_type == LPFC_ENABLE_BOTH) ||
+		    (phba->cfg_enable_fc4_type == LPFC_ENABLE_NVME))
+			lpfc_ns_cmd(vport, SLI_CTNS_RFF_ID, 0,
+				    LPFC_FC4_TYPE_NVME);
 
 		/* Issue SCR just before NameServer GID_FT Query */
 		lpfc_issue_els_scr(vport, SCR_DID, 0);
 	}
 
 	vport->fc_ns_retry = 0;
-	/* Good status, issue CT Request to NameServer */
-	if (lpfc_ns_cmd(vport, SLI_CTNS_GID_FT, 0, 0)) {
-		/* Cannot issue NameServer Query, so finish up discovery */
+	if (lpfc_issue_gidft(vport) == 0)
 		goto out;
-	}
 
-	/* decrement the node reference count held for this
+	/*
+	 * At this point in time we may need to wait for multiple
+	 * SLI_CTNS_GID_FT CT commands to complete before we start discovery.
+	 *
+	 * decrement the node reference count held for this
 	 * callback function.
 	 */
 	lpfc_nlp_put(ndlp);
@@ -3986,6 +4053,178 @@ lpfc_unregister_remote_port(struct lpfc_nodelist *ndlp)
 	return;
 }
 
+static int
+lpfc_register_nvme_port(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp)
+{
+	int found = 0, ret = 0;
+	struct lpfc_nvme *pnvme = vport->pnvme;
+	struct lpfc_nvme_lport *lport;
+	struct lpfc_nvme_rport *rport;
+	struct nvme_fc_port_info rpinfo;
+	struct lpfc_nodelist *fndlp;
+
+	lpfc_printf_vlog(ndlp->vport, KERN_INFO, LOG_NVME,
+			 "6006 Register NVME LPORT. nvme %p, DID x%06x nlptype x%x\n",
+			 pnvme, ndlp->nlp_DID, ndlp->nlp_type);
+
+	/* Ensure the driver has a valid nvme interface. */
+	if (pnvme == NULL) {
+		lpfc_printf_vlog(vport, KERN_INFO, LOG_NODE | LOG_NVME,
+				 "6016 No NVME instance available. Error\n");
+		return -EINVAL;
+	}
+
+	if ((ndlp->nlp_type & NLP_FABRIC) && (ndlp->nlp_DID == Fabric_DID))  {
+		/* Update the Fabric name and local driver DID in
+		 * the nvme fc port data structure. For now, only
+		 * a single lport for FC.
+		 */
+		list_for_each_entry(lport, &pnvme->lport_list, list) {
+			lport->localport->fabric_name =
+				wwn_to_u64(ndlp->nlp_nodename.u.wwn);
+			lport->localport->port_role =
+				FC_PORT_ROLE_NVME_INITIATOR;
+			lport->localport->port_id = vport->fc_myDID;
+			lpfc_printf_vlog(vport, KERN_INFO, LOG_NVME,
+					 "6030 bound lport %p to "
+					 "FabricName x%llx, DID x%06x\n",
+					 lport,
+					 lport->localport->fabric_name,
+					 lport->localport->port_id);
+		}
+	} else if (ndlp->nlp_type & (NLP_NVME_TARGET | NLP_NVME_INITIATOR)) {
+		if (vport->fc_flag & FC_PT2PT) {
+			lport = list_get_first(&vport->pnvme->lport_list,
+					       struct lpfc_nvme_lport, list);
+			goto regit;
+		}
+		/* Find the rport's owning lport. */
+		fndlp = lpfc_findnode_did(vport, Fabric_DID);
+		if (!fndlp || !NLP_CHK_NODE_ACT(fndlp)) {
+			lpfc_printf_vlog(ndlp->vport, KERN_INFO, LOG_NODE,
+					 "6011 No Fabric DID.  Exiting.\n");
+			return -EINVAL;
+		}
+
+		list_for_each_entry(lport, &pnvme->lport_list, list) {
+			if (lport->localport->fabric_name !=
+			    wwn_to_u64(fndlp->nlp_nodename.u.wwn))
+				continue;
+			found = 1;
+			break;
+		}
+		if (!found) {
+			lpfc_printf_vlog(ndlp->vport, KERN_INFO, LOG_NVME,
+					 "6034 No lport available.\n");
+			return -EINVAL;
+		}
+regit:
+		/* The driver isn't expecting the rport wwn to change
+		 * but it might get a different DID on a different
+		 * fabric.
+		 */
+		list_for_each_entry(rport, &lport->rport_list, list) {
+			if (rport->remoteport->port_name !=
+			    wwn_to_u64(ndlp->nlp_portname.u.wwn))
+				continue;
+			lpfc_printf_vlog(ndlp->vport, KERN_INFO, LOG_NVME,
+					 "6035 Found lport %p, rport%p, "
+					 "nlp type x%x DID x%06x\n",
+					 lport, rport, ndlp->nlp_type,
+					 ndlp->nlp_DID);
+			return 0;
+		}
+
+		/* NVME rports are not preserved across devloss.
+		 * Just register this instance.
+		 */
+		rpinfo.port_id = ndlp->nlp_DID;
+		rpinfo.port_role = 0;
+		if (ndlp->nlp_type & NLP_NVME_TARGET)
+			rpinfo.port_role |= FC_PORT_ROLE_NVME_TARGET;
+		if (ndlp->nlp_type & NLP_NVME_INITIATOR)
+			rpinfo.port_role |= FC_PORT_ROLE_NVME_INITIATOR;
+		rpinfo.port_name = wwn_to_u64(ndlp->nlp_portname.u.wwn);
+		rpinfo.node_name = wwn_to_u64(ndlp->nlp_nodename.u.wwn);
+		if (vport->fc_flag & FC_PT2PT)
+			rpinfo.fabric_name =
+				wwn_to_u64(vport->fc_portname.u.wwn);
+		else
+			rpinfo.fabric_name = lport->localport->fabric_name;
+
+		/* TODO: bind with nvme layer - register remote nvme port */
+	} else {
+		ret = -EINVAL;
+		lpfc_printf_vlog(vport, KERN_INFO, LOG_NVME,
+				 "6027 Unknown nlp_type x%x on DID x%06x "
+				 "ndlp %p.  Not Registering nvme rport\n",
+				 ndlp->nlp_type, ndlp->nlp_DID, ndlp);
+	}
+	return ret;
+}
+
+static void
+lpfc_unregister_nvme_port(struct lpfc_nodelist *ndlp)
+{
+	struct lpfc_nvme *pnvme = ndlp->vport->pnvme;
+	struct lpfc_vport *vport = ndlp->vport;
+	struct lpfc_nvme_lport *lport;
+	struct lpfc_nvme_rport *rport;
+
+	if (pnvme == NULL)
+		return;
+
+	if ((ndlp->nlp_type & NLP_FABRIC) && (ndlp->nlp_DID == Fabric_DID)) {
+		/* Update the local port id and role to reflect the
+		 * new state.  The fabric name is needed to match. For
+		 * now, only a single lport for FC so this works.
+		 * To handle link recovery, fabric name changes will become
+		 * necessary.
+		 */
+		list_for_each_entry(lport, &pnvme->lport_list, list) {
+			if (lport->localport->fabric_name !=
+			    wwn_to_u64(ndlp->nlp_nodename.u.wwn))
+				continue;
+
+			lport->localport->port_id = 0;
+			lport->localport->port_role =
+					FC_PORT_ROLE_NVME_DISCOVERY;
+			lpfc_printf_vlog(vport, KERN_INFO, LOG_NVME,
+					 "6032 lport %p Fabric Name "
+					 "and DID cleared.\n",
+					 lport);
+		}
+	} else if (ndlp->nlp_type & (NLP_NVME_TARGET | NLP_NVME_INITIATOR)) {
+		/* Find the rport matching the ndlp wwn and update the
+		 * port and wwn's to reflect no connection.
+		 */
+		list_for_each_entry(lport, &pnvme->lport_list, list) {
+			if (lport->localport->fabric_name !=
+			    wwn_to_u64(ndlp->nlp_nodename.u.wwn))
+				continue;
+
+			/* The rports are not expected to change WWNs but
+			 * but the port_id and fabric name could be different
+			 * during recovery.  For NPIV-based rports that do
+			 * recover with new WWNs, a new rport should get
+			 * registered and added to the nvme_transport.
+			 */
+			list_for_each_entry(rport, &lport->rport_list, list) {
+				if (rport->remoteport->port_name !=
+				    wwn_to_u64(ndlp->nlp_portname.u.wwn))
+					continue;
+
+				rport->remoteport->port_id = 0;
+				rport->remoteport->port_role =
+					FC_PORT_ROLE_NVME_DISCOVERY;
+				lpfc_printf_vlog(vport, KERN_INFO, LOG_NVME,
+						 "6033 rport %p DID x%06x unreg.\n",
+						 rport, ndlp->nlp_DID);
+			}
+		}
+	}
+}
+
 static void
 lpfc_nlp_counters(struct lpfc_vport *vport, int state, int count)
 {
@@ -4029,6 +4268,7 @@ lpfc_nlp_state_cleanup(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 		       int old_state, int new_state)
 {
 	struct Scsi_Host *shost = lpfc_shost_from_vport(vport);
+	struct lpfc_hba *phba = vport->phba;
 
 	if (new_state == NLP_STE_UNMAPPED_NODE) {
 		ndlp->nlp_flag &= ~NLP_NODEV_REMOVE;
@@ -4039,23 +4279,50 @@ lpfc_nlp_state_cleanup(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 	if (new_state == NLP_STE_NPR_NODE)
 		ndlp->nlp_flag &= ~NLP_RCV_PLOGI;
 
-	/* Transport interface */
-	if (ndlp->rport && (old_state == NLP_STE_MAPPED_NODE ||
-			    old_state == NLP_STE_UNMAPPED_NODE)) {
-		vport->phba->nport_event_cnt++;
-		lpfc_unregister_remote_port(ndlp);
+	/* FCP and NVME Transport interface */
+	if ((old_state == NLP_STE_MAPPED_NODE ||
+	     old_state == NLP_STE_UNMAPPED_NODE)) {
+		if (ndlp->rport) {
+			vport->phba->nport_event_cnt++;
+			lpfc_unregister_remote_port(ndlp);
+		}
+
+		/* Notify the NVME transport of this rport's loss */
+		if (((phba->cfg_enable_fc4_type == LPFC_ENABLE_BOTH) ||
+		     (phba->cfg_enable_fc4_type == LPFC_ENABLE_NVME)) &&
+		    (vport->phba->cfg_enable_nvmet == NVME_TARGET_OFF) &&
+		    ((ndlp->nlp_fc4_type & NLP_FC4_NVME) ||
+		    (ndlp->nlp_DID == Fabric_DID))) {
+			vport->phba->nport_event_cnt++;
+			lpfc_unregister_nvme_port(ndlp);
+		}
 	}
+
+	/* FCP and NVME Transport interfaces */
 
 	if (new_state ==  NLP_STE_MAPPED_NODE ||
 	    new_state == NLP_STE_UNMAPPED_NODE) {
-		vport->phba->nport_event_cnt++;
-		/*
-		 * Tell the fc transport about the port, if we haven't
-		 * already. If we have, and it's a scsi entity, be
-		 * sure to unblock any attached scsi devices
-		 */
-		lpfc_register_remote_port(vport, ndlp);
+		if ((ndlp->nlp_fc4_type & NLP_FC4_FCP) ||
+		    (ndlp->nlp_DID == Fabric_DID)) {
+			vport->phba->nport_event_cnt++;
+			/*
+			 * Tell the fc transport about the port, if we haven't
+			 * already. If we have, and it's a scsi entity, be
+			 */
+			lpfc_register_remote_port(vport, ndlp);
+		}
+		/* Notify the NVME transport of this new rport. */
+		if (((phba->cfg_enable_fc4_type == LPFC_ENABLE_BOTH) ||
+		     (phba->cfg_enable_fc4_type == LPFC_ENABLE_NVME)) &&
+		    (vport->phba->cfg_enable_nvmet == NVME_TARGET_OFF)) {
+			if ((ndlp->nlp_fc4_type & NLP_FC4_NVME) ||
+			    (ndlp->nlp_DID == Fabric_DID)) {
+				vport->phba->nport_event_cnt++;
+				lpfc_register_nvme_port(vport, ndlp);
+			}
+		}
 	}
+
 	if ((new_state ==  NLP_STE_MAPPED_NODE) &&
 		(vport->stat_data_enabled)) {
 		/*
@@ -4212,6 +4479,7 @@ lpfc_initialize_node(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 	ndlp->vport = vport;
 	ndlp->phba = vport->phba;
 	ndlp->nlp_sid = NLP_NO_SID;
+	ndlp->nlp_fc4_type = NLP_FC4_NONE;
 	kref_init(&ndlp->kref);
 	NLP_INT_NODE_ACT(ndlp);
 	atomic_set(&ndlp->cmd_pending, 0);
@@ -5331,12 +5599,13 @@ lpfc_disc_timeout_handler(struct lpfc_vport *vport)
 	switch (vport->port_state) {
 
 	case LPFC_LOCAL_CFG_LINK:
-	/* port_state is identically  LPFC_LOCAL_CFG_LINK while waiting for
-	 * FAN
-	 */
-				/* FAN timeout */
+		/*
+		 * port_state is identically  LPFC_LOCAL_CFG_LINK while
+		 * waiting for FAN timeout
+		 */
 		lpfc_printf_vlog(vport, KERN_WARNING, LOG_DISCOVERY,
 				 "0221 FAN timeout\n");
+
 		/* Start discovery by sending FLOGI, clean up old rpis */
 		list_for_each_entry_safe(ndlp, next_ndlp, &vport->fc_nodes,
 					 nlp_listp) {
@@ -5407,8 +5676,8 @@ lpfc_disc_timeout_handler(struct lpfc_vport *vport)
 		if (vport->fc_ns_retry < LPFC_MAX_NS_RETRY) {
 			/* Try it one more time */
 			vport->fc_ns_retry++;
-			rc = lpfc_ns_cmd(vport, SLI_CTNS_GID_FT,
-					 vport->fc_ns_retry, 0);
+			vport->gidft_inp = 0;
+			rc = lpfc_issue_gidft(vport);
 			if (rc == 0)
 				break;
 		}
