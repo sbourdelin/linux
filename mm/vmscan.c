@@ -743,7 +743,7 @@ int remove_mapping(struct address_space *mapping, struct page *page)
 void putback_lru_page(struct page *page)
 {
 	bool is_unevictable;
-	int was_unevictable = PageUnevictable(page);
+	bool was_unevictable = PageUnevictable(page);
 
 	VM_BUG_ON_PAGE(PageLRU(page), page);
 

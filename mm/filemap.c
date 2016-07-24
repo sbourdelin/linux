@@ -645,7 +645,7 @@ static int __add_to_page_cache_locked(struct page *page,
 				      pgoff_t offset, gfp_t gfp_mask,
 				      void **shadowp)
 {
-	int huge = PageHuge(page);
+	bool huge = PageHuge(page);
 	struct mem_cgroup *memcg;
 	int error;
 

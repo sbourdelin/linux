@@ -1321,10 +1321,10 @@ static void prep_compound_gigantic_page(struct page *page, unsigned int order)
  * transparent huge pages.  See the PageTransHuge() documentation for more
  * details.
  */
-int PageHuge(struct page *page)
+bool PageHuge(struct page *page)
 {
 	if (!PageCompound(page))
-		return 0;
+		return false;
 
 	page = compound_head(page);
 	return page[1].compound_dtor == HUGETLB_PAGE_DTOR;
@@ -1335,10 +1335,10 @@ EXPORT_SYMBOL_GPL(PageHuge);
  * PageHeadHuge() only returns true for hugetlbfs head page, but not for
  * normal or transparent huge pages.
  */
-int PageHeadHuge(struct page *page_head)
+bool PageHeadHuge(struct page *page_head)
 {
 	if (!PageHead(page_head))
-		return 0;
+		return false;
 
 	return get_compound_page_dtor(page_head) == free_huge_page;
 }

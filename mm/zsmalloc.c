@@ -219,7 +219,7 @@ static void ClearPageHugeObject(struct page *page)
 	ClearPageOwnerPriv1(page);
 }
 
-static int PageHugeObject(struct page *page)
+static bool PageHugeObject(struct page *page)
 {
 	return PageOwnerPriv1(page);
 }
