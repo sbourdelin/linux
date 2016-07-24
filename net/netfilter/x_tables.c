@@ -1513,7 +1513,7 @@ xt_hook_ops_alloc(const struct xt_table *table, nf_hookfn *fn)
 	if (!num_hooks)
 		return ERR_PTR(-EINVAL);
 
-	ops = kmalloc(sizeof(*ops) * num_hooks, GFP_KERNEL);
+	ops = kmalloc(sizeof(*ops) * num_hooks, GFP_KERNEL | __GFP_ZERO);
 	if (ops == NULL)
 		return ERR_PTR(-ENOMEM);
 
