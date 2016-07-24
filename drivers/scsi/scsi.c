@@ -864,8 +864,7 @@ retry_pg83:
 		rcu_assign_pointer(sdev->vpd_pg83, vpd_buf);
 		mutex_unlock(&sdev->inquiry_mutex);
 		synchronize_rcu();
-		if (orig_vpd_buf)
-			kfree(orig_vpd_buf);
+		kfree(orig_vpd_buf);
 	}
 }
 
