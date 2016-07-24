@@ -1223,7 +1223,7 @@ void wilc_netdev_cleanup(struct wilc *wilc)
 			vif[i] = netdev_priv(wilc->vif[i]->ndev);
 	}
 
-	if (wilc && wilc->firmware) {
+	if (wilc) {
 		release_firmware(wilc->firmware);
 		wilc->firmware = NULL;
 	}
