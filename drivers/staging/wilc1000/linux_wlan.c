@@ -1094,8 +1094,6 @@ int wilc_mac_close(struct net_device *ndev)
 static int mac_ioctl(struct net_device *ndev, struct ifreq *req, int cmd)
 {
 	u8 *buff = NULL;
-	s8 rssi;
-	u32 size = 0, length = 0;
 	struct wilc_vif *vif;
 	s32 ret = 0;
 	struct wilc *wilc;
@@ -1110,8 +1108,7 @@ static int mac_ioctl(struct net_device *ndev, struct ifreq *req, int cmd)
 	case SIOCSIWPRIV:
 	{
 		struct iwreq *wrq = (struct iwreq *)req;
-
-		size = wrq->u.data.length;
+		u32 size = wrq->u.data.length;
 
 		if (size && wrq->u.data.pointer) {
 			buff = memdup_user(wrq->u.data.pointer,
@@ -1119,7 +1116,9 @@ static int mac_ioctl(struct net_device *ndev, struct ifreq *req, int cmd)
 			if (IS_ERR(buff))
 				return PTR_ERR(buff);
 
-			if (strncasecmp(buff, "RSSI", length) == 0) {
+			if (strncasecmp(buff, "RSSI", 0) == 0) {
+				s8 rssi;
+
 				ret = wilc_get_rssi(vif, &rssi);
 				netdev_info(ndev, "RSSI :%d\n", rssi);
 
