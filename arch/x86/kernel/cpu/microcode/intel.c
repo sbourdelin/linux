@@ -57,9 +57,44 @@ static struct mc_saved_data {
 
 /* Microcode blobs within the initrd. 0 if builtin. */
 static struct ucode_blobs {
-	unsigned long start;
 	bool valid;
 } blobs;
+
+#ifdef CONFIG_X86_32
+static unsigned long get_ucode_offset(bool is_from_initrd)
+{
+#ifdef CONFIG_BLK_DEV_INITRD
+	struct boot_params *params;
+
+	if (!is_from_initrd)
+		return 0;
+
+	/* We cannot use initrd_start because it is not set that early yet. */
+	params = (struct boot_params *)__pa_nodebug(&boot_params);
+	return params->hdr.ramdisk_image;
+#else /* CONFIG_BLK_DEV_INITRD */
+	return 0;
+#endif
+}
+#else /* CONFIG_X86_64 */
+static unsigned long get_ucode_offset(bool is_from_initrd)
+{
+#ifdef CONFIG_BLK_DEV_INITRD
+	unsigned long start;
+
+	if (!is_from_initrd)
+		return 0;
+
+	/* We cannot use initrd_start because it is not set that early yet. */
+	start  = (u64)boot_params.ext_ramdisk_image << 32;
+	start |= boot_params.hdr.ramdisk_image;
+	return (unsigned long)__va(start);
+	return start + PAGE_OFFSET;
+#else /* CONFIG_BLK_DEV_INITRD */
+	return 0;
+#endif
+}
+#endif /* CONFIG_X86_32 */
 
 /* Go through saved patches and find the one suitable for the current CPU. */
 static enum ucode_state
@@ -687,36 +722,23 @@ __scan_microcode_initrd(struct cpio_data *cd, struct ucode_blobs *blbp)
 	static __initdata char ucode_name[] = "kernel/x86/microcode/GenuineIntel.bin";
 	char *p = IS_ENABLED(CONFIG_X86_32) ? (char *)__pa_nodebug(ucode_name)
 						    : ucode_name;
-# ifdef CONFIG_X86_32
 	unsigned long start = 0, size;
+
+# ifdef CONFIG_X86_32
 	struct boot_params *params;
 
 	params = (struct boot_params *)__pa_nodebug(&boot_params);
 	size   = params->hdr.ramdisk_size;
 
-	/*
-	 * Set start only if we have an initrd image. We cannot use initrd_start
-	 * because it is not set that early yet.
-	 */
-	start = (size ? params->hdr.ramdisk_image : 0);
-
 # else /* CONFIG_X86_64 */
-	unsigned long start = 0, size;
-
 	size  = (u64)boot_params.ext_ramdisk_size << 32;
 	size |= boot_params.hdr.ramdisk_size;
-
-	if (size) {
-		start  = (u64)boot_params.ext_ramdisk_image << 32;
-		start |= boot_params.hdr.ramdisk_image;
-
-		start += PAGE_OFFSET;
-	}
 # endif
+	/* Set start only if we have an initrd image. */
+	start = (size ? get_ucode_offset(true) : 0);
 
 	*cd = find_cpio_data(p, (void *)start, size, NULL);
 	if (cd->data) {
-		blbp->start = start;
 		blbp->valid = true;
 
 		return UCODE_OK;
@@ -747,7 +769,8 @@ scan_microcode(struct mc_saved_data *mcs, unsigned long *mc_ptrs,
 			return ret;
 	}
 
-	return get_matching_model_microcode(blbp->start, cd.data, cd.size,
+	return get_matching_model_microcode(get_ucode_offset(blbp->valid),
+					    cd.data, cd.size,
 					    mcs, mc_ptrs, uci);
 }
 
@@ -764,7 +787,7 @@ _load_ucode_intel_bsp(struct mc_saved_data *mcs, unsigned long *mc_ptrs,
 	if (ret != UCODE_OK)
 		return;
 
-	ret = load_microcode(mcs, mc_ptrs, blbp->start, &uci);
+	ret = load_microcode(mcs, mc_ptrs, get_ucode_offset(blbp->valid), &uci);
 	if (ret != UCODE_OK)
 		return;
 
@@ -816,7 +839,7 @@ void load_ucode_intel_ap(void)
 		return;
 
 	collect_cpu_info_early(&uci);
-	ret = load_microcode(mcs, ptrs, blobs_p->start, &uci);
+	ret = load_microcode(mcs, ptrs, get_ucode_offset(blobs_p->valid), &uci);
 	if (ret != UCODE_OK)
 		return;
 
