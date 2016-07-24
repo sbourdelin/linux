@@ -1130,7 +1130,7 @@ static int mac_ioctl(struct net_device *ndev, struct ifreq *req, int cmd)
 				if (copy_to_user(wrq->u.data.pointer, buff, size)) {
 					netdev_err(ndev, "failed to copy\n");
 					ret = -EFAULT;
-					goto done;
+					goto free_buffer;
 				}
 			}
 		}
@@ -1144,11 +1144,9 @@ static int mac_ioctl(struct net_device *ndev, struct ifreq *req, int cmd)
 		goto done;
 	}
 	}
-
-done:
-
+free_buffer:
 	kfree(buff);
-
+done:
 	return ret;
 }
 
