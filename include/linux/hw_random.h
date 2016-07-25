@@ -45,7 +45,9 @@ struct hwrng {
 	unsigned short quality;
 
 	/* internal. */
+	bool is_active;
 	struct list_head list;
+	struct list_head active;
 	struct kref ref;
 	struct completion cleanup_done;
 };
