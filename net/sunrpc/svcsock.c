@@ -852,6 +852,9 @@ static unsigned int svc_tcp_restore_pages(struct svc_sock *svsk, struct svc_rqst
 		return 0;
 	len = svsk->sk_datalen;
 	npages = (len + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	WARN_ON_ONCE(npages > RPCSVC_MAXPAGES);
+	if (npages > RPCSVC_MAXPAGES)
+		npages = RPCSVC_MAXPAGES;
 	for (i = 0; i < npages; i++) {
 		if (rqstp->rq_pages[i] != NULL)
 			put_page(rqstp->rq_pages[i]);
@@ -871,6 +874,9 @@ static void svc_tcp_save_pages(struct svc_sock *svsk, struct svc_rqst *rqstp)
 		return;
 	len = svsk->sk_datalen;
 	npages = (len + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	WARN_ON_ONCE(npages > RPCSVC_MAXPAGES);
+	if (npages > RPCSVC_MAXPAGES)
+		npages = RPCSVC_MAXPAGES;
 	for (i = 0; i < npages; i++) {
 		svsk->sk_pages[i] = rqstp->rq_pages[i];
 		rqstp->rq_pages[i] = NULL;
@@ -885,6 +891,9 @@ static void svc_tcp_clear_pages(struct svc_sock *svsk)
 		goto out;
 	len = svsk->sk_datalen;
 	npages = (len + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	WARN_ON_ONCE(npages > RPCSVC_MAXPAGES);
+	if (npages > RPCSVC_MAXPAGES)
+		npages = RPCSVC_MAXPAGES;
 	for (i = 0; i < npages; i++) {
 		if (svsk->sk_pages[i] == NULL) {
 			WARN_ON_ONCE(1);
