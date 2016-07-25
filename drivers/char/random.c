@@ -1837,7 +1837,8 @@ randomize_range(unsigned long start, unsigned long end, unsigned long len)
 
 	if (end <= start + len)
 		return 0;
-	return PAGE_ALIGN(get_random_int() % range + start);
+
+	return PAGE_ALIGN(get_random_long() % range + start);
 }
 
 /* Interface for in-kernel drivers of true hardware RNGs.
