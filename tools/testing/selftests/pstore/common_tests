@@ -27,9 +27,9 @@ show_result() { # result_value
 }
 
 check_files_exist() { # type of pstorefs file
-    if [ -e ${1}-${backend}-0 ]; then
+    if [ -e ${1}0 ]; then
 	prlog "ok"
-	for f in `ls ${1}-${backend}-*`; do
+	for f in `ls ${1}*`; do
             prlog -e "\t${f}"
 	done
     else
@@ -49,6 +49,23 @@ operate_files() { # tested value, files, operation
 	done
     else
 	prlog " ... FAIL"
+	rc=1
+    fi
+}
+
+check_pmsg_content() { # pmsg filename
+    prev_uuid=`cat $TOP_DIR/prev_uuid`
+    if [ $? -eq 0 ]; then
+	nr_matched=`grep -c "$TEST_STRING_PATTERN" $1`
+	if [ "$nr_matched" = "1" ]; then
+	    grep -q "$TEST_STRING_PATTERN"$prev_uuid $1
+	    show_result $?
+	else
+	    prlog "FAIL"
+	    rc=1
+	fi
+    else
+	prlog "FAIL"
 	rc=1
     fi
 }

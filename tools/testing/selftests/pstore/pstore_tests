@@ -13,9 +13,8 @@ prlog -n "Checking pstore console is registered ... "
 dmesg | grep -q "console \[pstore"
 show_result $?
 
-prlog -n "Checking /dev/pmsg0 exists ... "
-test -e /dev/pmsg0
-show_result $?
+prlog -n "Checking /dev/pmsg files exist ... "
+check_files_exist /dev/pmsg
 
 prlog -n "Writing unique string to /dev/pmsg0 ... "
 if [ -e "/dev/pmsg0" ]; then
@@ -25,6 +24,17 @@ if [ -e "/dev/pmsg0" ]; then
 else
     prlog "FAIL"
     rc=1
+fi
+
+last_devpmsg=`ls -v /dev/pmsg* | tail -n1`
+prlog -n "Writing unique string to the last /dev/pmsgN "
+if [ "$last_devpmsg" = "/dev/pmsg0" ]; then
+    prlog "... No multiple /dev/pmsg* exists. We skip this testcase."
+else
+    prlog -n "(${last_devpmsg}) ... "
+    echo "${TEST_STRING_PATTERN}""$UUID" > ${last_devpmsg}
+    show_result $?
+
 fi
 
 exit $rc

@@ -35,13 +35,13 @@ fi
 cd ${mount_point}
 
 prlog -n "Checking dmesg files exist in pstore filesystem ... "
-check_files_exist dmesg
+check_files_exist dmesg-${backend}-
 
 prlog -n "Checking console files exist in pstore filesystem ... "
-check_files_exist console
+check_files_exist console-${backend}-
 
 prlog -n "Checking pmsg files exist in pstore filesystem ... "
-check_files_exist pmsg
+check_files_exist pmsg-${backend}-
 
 prlog -n "Checking dmesg files contain oops end marker"
 grep_end_trace() {
@@ -54,16 +54,19 @@ prlog -n "Checking console file contains oops end marker ... "
 grep -q "\---\[ end trace" console-${backend}-0
 show_result $?
 
-prlog -n "Checking pmsg file properly keeps the content written before crash ... "
-prev_uuid=`cat $TOP_DIR/prev_uuid`
-if [ $? -eq 0 ]; then
-    nr_matched=`grep -c "$TEST_STRING_PATTERN" pmsg-${backend}-0`
-    if [ $nr_matched -eq 1 ]; then
-	grep -q "$TEST_STRING_PATTERN"$prev_uuid pmsg-${backend}-0
-	show_result $?
+prlog -n "Checking pmsg-"${backend}"-0 properly keeps the content written before crash ... "
+check_pmsg_content pmsg-${backend}-0
+
+prlog -n "Checking the last pmsg area is detected "
+last_num_pmsg=`ls -v pmsg-* | tail -n1 | sed -e "s/^pmsg-${backend}-\([0-9]*\).*$/\1/"`
+last_num_devpmsg=`ls -v /dev/pmsg* | tail -n1 | sed -e "s/^\/dev\/pmsg\([0-9]*\).*$/\1/"`
+#checks the last number of pmsg-*-* and /dev/pmsg* correspond.
+if [ "$last_num_pmsg" -eq "$last_num_devpmsg" ]; then
+    if [ "$last_num_pmsg" = "0" ]; then
+	prlog "... No multiple pmsg-*-* exists. We skip this testcase."
     else
-	prlog "FAIL"
-	rc=1
+	prlog -n "(pmsg-${backend}-${last_num_pmsg}) ... "
+	check_pmsg_content pmsg-${backend}-${last_num_pmsg}
     fi
 else
     prlog "FAIL"
