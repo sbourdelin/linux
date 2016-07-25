@@ -129,6 +129,7 @@ extern void elf_set_personality(const struct elf32_hdr *);
 
 #ifdef CONFIG_MMU
 #ifdef CONFIG_VDSO
+/* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
 #define ARCH_DLINFO						\
 do {								\
 	NEW_AUX_ENT(AT_SYSINFO_EHDR,				\
