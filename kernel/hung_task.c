@@ -148,6 +148,9 @@ static void rcu_lock_break(void)
  */
 static void check_hung_uninterruptible_tasks(unsigned long timeout)
 {
+	/* we have only one watchdog() thread */
+	static struct task_struct *g_saved, *t_saved;
+
 	int max_count = sysctl_hung_task_check_count;
 	int batch_count = HUNG_TASK_BATCHING;
 	struct task_struct *g, *t;
@@ -160,18 +163,29 @@ static void check_hung_uninterruptible_tasks(unsigned long timeout)
 		return;
 
 	rcu_read_lock();
+	if (g_saved) {
+		g = g_saved;
+		t = t_saved;
+		g_saved = NULL;
+		goto resume;
+	}
+
 	for_each_process_thread(g, t) {
 		/* use "==" to skip the TASK_KILLABLE tasks waiting on NFS */
 		if (t->state == TASK_UNINTERRUPTIBLE)
 			check_hung_task(t, timeout);
 
-		if (!--max_count)
-			goto unlock;
-		if (!--batch_count) {
-			batch_count = HUNG_TASK_BATCHING;
+		if (!--max_count || !--batch_count) {
 			for_each_process_thread_break(g, t);
+			if (!max_count) {
+				g_saved = g;
+				t_saved = t;
+				goto unlock;
+			}
 			rcu_lock_break();
+ resume:
 			for_each_process_thread_continue(&g, &t);
+			batch_count = HUNG_TASK_BATCHING;
 		}
 	}
  unlock:
