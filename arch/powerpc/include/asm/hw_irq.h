@@ -30,8 +30,8 @@
 /*
  * flags for paca->soft_enabled
  */
-#define LAZY_INTERRUPT_ENABLED		1
-#define LAZY_INTERRUPT_DISABLED		0
+#define LAZY_INTERRUPT_ENABLED		0
+#define LAZY_INTERRUPT_DISABLED		1
 
 
 #endif /* CONFIG_PPC64 */
