@@ -69,6 +69,8 @@ struct boot_param_header {
  * OF address retreival & translation
  */
 
+extern int n_mem_addr_cells;
+
 /* Parse the ibm,dma-window property of an OF node into the busno, phys and
  * size parameters.
  */
@@ -81,8 +83,9 @@ extern void of_instantiate_rtc(void);
 extern int of_get_ibm_chip_id(struct device_node *np);
 
 /* The of_drconf_cell struct defines the layout of the LMB array
- * specified in the device tree property
- * ibm,dynamic-reconfiguration-memory/ibm,dynamic-memory
+ * specified in the device tree properties,
+ *     ibm,dynamic-reconfiguration-memory/ibm,dynamic-memory
+ *     ibm,dynamic-reconfiguration-memory/ibm,dynamic-memory-v2
  */
 struct of_drconf_cell {
 	u64	base_addr;
@@ -92,9 +95,39 @@ struct of_drconf_cell {
 	u32	flags;
 };
 
-#define DRCONF_MEM_ASSIGNED	0x00000008
-#define DRCONF_MEM_AI_INVALID	0x00000040
-#define DRCONF_MEM_RESERVED	0x00000080
+#define DRCONF_MEM_ASSIGNED		0x00000008
+#define DRCONF_MEM_AI_INVALID		0x00000040
+#define DRCONF_MEM_RESERVED		0x00000080
+
+	/* It is important to note that this structure can not
+	 * be safely mapped onto the memory containing the
+	 * 'ibm,dynamic-memory-v2'.  This structure represents
+	 * the order of the fields stored, but compiler alignment
+	 * may insert extra bytes of padding between the fields
+	 * 'num_seq_lmbs' and 'base_addr'.
+	 */
+struct of_drconf_cell_v2 {
+	u32	num_seq_lmbs;
+	u64	base_addr;
+	u32	drc_index;
+	u32	aa_index;
+	u32	flags;
+};
+
+
+static inline int dyn_mem_v2_len(int entries)
+{
+	int drconf_v2_cells = (n_mem_addr_cells + 4);
+	int drconf_v2_cells_len = (drconf_v2_cells * sizeof(unsigned int));
+	return (((entries) * drconf_v2_cells_len) +
+                (1 * sizeof(unsigned int)));
+}
+
+extern void read_drconf_cell_v2(struct of_drconf_cell_v2 *drmem,
+				const __be32 **cellp);
+extern void read_one_drc_info(int **info, char **drc_type, char **drc_name,
+			unsigned long int *fdi_p, unsigned long int *nsl_p,
+			unsigned long int *si_p, unsigned long int *ldi_p);
 
 /*
  * There are two methods for telling firmware what our capabilities are.

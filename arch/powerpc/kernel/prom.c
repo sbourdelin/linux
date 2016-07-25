@@ -56,6 +56,7 @@
 #include <asm/opal.h>
 #include <asm/fadump.h>
 #include <asm/debug.h>
+#include <asm/firmware.h>
 
 #include <mm/mmu_decl.h>
 
@@ -441,12 +442,12 @@ static int __init early_init_dt_scan_chosen_ppc(unsigned long node,
 
 #ifdef CONFIG_PPC_PSERIES
 /*
- * Interpret the ibm,dynamic-memory property in the
- * /ibm,dynamic-reconfiguration-memory node.
+ * Interpret the ibm,dynamic-memory property/ibm,dynamic-memory-v2
+ * in the /ibm,dynamic-reconfiguration-memory node.
  * This contains a list of memory blocks along with NUMA affinity
  * information.
  */
-static int __init early_init_dt_scan_drconf_memory(unsigned long node)
+static int __init early_init_dt_scan_drconf_memory_v1(unsigned long node)
 {
 	const __be32 *dm, *ls, *usm;
 	int l;
@@ -516,6 +517,105 @@ static int __init early_init_dt_scan_drconf_memory(unsigned long node)
 	memblock_dump_all();
 	return 0;
 }
+
+static int __init early_init_dt_scan_drconf_memory_v2(unsigned long node)
+{
+	const __be32 *dm, *ls, *usm;
+	int l;
+	unsigned long num_sets;
+	u64 size, base, memblock_size;
+	unsigned int is_kexec_kdump = 0, rngs;
+
+	ls = of_get_flat_dt_prop(node, "ibm,lmb-size", &l);
+	if (ls == NULL || l < dt_root_size_cells * sizeof(__be32))
+		return 0;
+	memblock_size = dt_mem_next_cell(dt_root_size_cells, &ls);
+
+	dm = of_get_flat_dt_prop(node, "ibm,dynamic-memory-v2", &l);
+	if (dm == NULL || l < sizeof(__be32))
+		return 0;
+
+	num_sets = of_read_number(dm++, 1);
+	if (l < (num_sets * (dt_root_addr_cells + 4) + 1) * sizeof(__be32))
+		return 0;
+
+	/* check if this is a kexec/kdump kernel. */
+	usm = of_get_flat_dt_prop(node, "linux,drconf-usable-memory", &l);
+	if (usm != NULL)
+		is_kexec_kdump = 1;
+
+	if (n_mem_addr_cells == 0)
+		n_mem_addr_cells = dt_root_addr_cells;
+
+	for (; num_sets != 0; --num_sets) {
+		struct of_drconf_cell_v2 drmem;
+		unsigned long nsl;
+
+		read_drconf_cell_v2(&drmem, &dm);
+		base = drmem.base_addr;
+		nsl = drmem.num_seq_lmbs;
+		size = memblock_size;
+
+		/* SKip this block if the reserved bit is set in flags
+		 * or if the block is not assigned to this partition
+		 */
+		if ((drmem.flags & DRCONF_MEM_RESERVED) ||
+		    !(drmem.flags & DRCONF_MEM_ASSIGNED))
+			continue;
+
+		for (; nsl != 0; nsl--) {
+			size = memblock_size;
+			rngs = 1;
+			if (is_kexec_kdump)
+				/*
+				 * For each memblock in ibm,dynamic-memory,
+				 * a corresponding entry in
+				 * linux,drconf-usable-memory property
+				 * contains a counter 'p' followed by 'p'
+				 * (base, size) duple.  Now read the counter
+				 * from linux,drconf-usable-memory property
+				 */
+				rngs = dt_mem_next_cell(dt_root_size_cells,
+							&usm);
+
+			if (rngs) {
+				do {
+					if (is_kexec_kdump) {
+						base = dt_mem_next_cell(
+							dt_root_addr_cells,
+							&usm);
+						size = dt_mem_next_cell(
+							dt_root_size_cells,
+							&usm);
+					}
+					if (iommu_is_off) {
+						if (base >= 0x80000000ul)
+							continue;
+						if ((base + size) >
+								0x80000000ul)
+							size = 0x80000000ul -
+								base;
+					}
+					memblock_add(base, size);
+				} while (--rngs);
+			}
+
+			base += size;
+		}
+	}
+
+	memblock_dump_all();
+	return 0;
+}
+
+static int __init early_init_dt_scan_drconf_memory(unsigned long node)
+{
+	if (firmware_has_feature(FW_FEATURE_RPS_DM2))
+		return early_init_dt_scan_drconf_memory_v2(node);
+	else
+		return early_init_dt_scan_drconf_memory_v1(node);
+}
+
 #else
 #define early_init_dt_scan_drconf_memory(node)	0
 #endif /* CONFIG_PPC_PSERIES */
