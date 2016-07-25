@@ -96,6 +96,18 @@ MODULE_DEVICE_TABLE(x86cpu, svm_cpu_id);
 #define AVIC_UNACCEL_ACCESS_OFFSET_MASK		0xFF0
 #define AVIC_UNACCEL_ACCESS_VECTOR_MASK		0xFFFFFFFF
 
+/* AVIC GATAG is encoded using VM and VCPU IDs */
+#define AVIC_VCPU_ID_BITS		8
+#define AVIC_VCPU_ID_MASK		((1 << AVIC_VCPU_ID_BITS) - 1)
+
+#define AVIC_VM_ID_BITS			24
+#define AVIC_VM_ID_MASK			((1 << AVIC_VM_ID_BITS) - 1)
+
+#define AVIC_GATAG(x, y)		(((x & AVIC_VM_ID_MASK) << AVIC_VCPU_ID_BITS) | \
+						(y & AVIC_VCPU_ID_MASK))
+#define AVIC_GATAG_TO_VMID(x)		((x >> AVIC_VCPU_ID_BITS) & AVIC_VM_ID_MASK)
+#define AVIC_GATAG_TO_VCPUID(x)		(x & AVIC_VM_ID_BITS)
+
 static bool erratum_383_found __read_mostly;
 
 static const u32 host_save_user_msrs[] = {
@@ -241,6 +253,10 @@ static int avic;
 #ifdef CONFIG_X86_LOCAL_APIC
 module_param(avic, int, S_IRUGO);
 #endif
+
+/* AVIC VM ID bit masks and lock */
+static unsigned long *avic_vm_id_bm;
+static DEFINE_SPINLOCK(avic_vm_id_lock);
 
 static void svm_set_cr0(struct kvm_vcpu *vcpu, unsigned long cr0);
 static void svm_flush_tlb(struct kvm_vcpu *vcpu);
@@ -1280,9 +1296,60 @@ static int avic_init_backing_page(struct kvm_vcpu *vcpu)
 	return 0;
 }
 
+static inline int avic_vm_id_init(void)
+{
+	if (avic_vm_id_bm)
+		return 0;
+
+	avic_vm_id_bm = kcalloc(BITS_TO_LONGS(AVIC_VM_ID_MASK),
+				sizeof(long), GFP_KERNEL);
+	if (!avic_vm_id_bm)
+		return -ENOMEM;
+	return 0;
+}
+
+static inline void avic_vm_id_deinit(void)
+{
+	if (!avic_vm_id_bm)
+		return;
+
+	kfree(avic_vm_id_bm);
+	avic_vm_id_bm = NULL;
+}
+
+static inline int avic_get_next_vm_id(void)
+{
+	int id;
+
+	spin_lock(&avic_vm_id_lock);
+
+	/* AVIC VM ID is one-based. */
+	id = find_next_zero_bit(avic_vm_id_bm, 1, 1);
+	if (id <= AVIC_VM_ID_MASK)
+		__set_bit(id, avic_vm_id_bm);
+	else
+		id = -EINVAL;
+
+	spin_unlock(&avic_vm_id_lock);
+	return id;
+}
+
+static inline int avic_free_vm_id(int id)
+{
+	if (id <= 0 || id > AVIC_VM_ID_MASK)
+		return -EINVAL;
+
+	spin_lock(&avic_vm_id_lock);
+	__clear_bit(id, avic_vm_id_bm);
+	spin_unlock(&avic_vm_id_lock);
+	return 0;
+}
+
 static void avic_vm_destroy(struct kvm *kvm)
 {
 	struct kvm_arch *vm_data = &kvm->arch;
+
+	avic_free_vm_id(vm_data->avic_vm_id);
 
 	if (vm_data->avic_logical_id_table_page)
 		__free_page(vm_data->avic_logical_id_table_page);
@@ -1299,6 +1366,10 @@ static int avic_vm_init(struct kvm *kvm)
 
 	if (!avic)
 		return 0;
+
+	vm_data->avic_vm_id = avic_get_next_vm_id();
+	if (vm_data->avic_vm_id < 0)
+		return vm_data->avic_vm_id;
 
 	/* Allocating physical APIC ID table (4KB) */
 	p_page = alloc_page(GFP_KERNEL);
@@ -5076,6 +5147,12 @@ static struct kvm_x86_ops svm_x86_ops = {
 
 static int __init svm_init(void)
 {
+	int ret;
+
+	ret = avic_vm_id_init();
+	if (ret)
+		return ret;
+
 	return kvm_init(&svm_x86_ops, sizeof(struct vcpu_svm),
 			__alignof__(struct vcpu_svm), THIS_MODULE);
 }
@@ -5083,6 +5160,7 @@ static int __init svm_init(void)
 static void __exit svm_exit(void)
 {
 	kvm_exit();
+	avic_vm_id_deinit();
 }
 
 module_init(svm_init)
