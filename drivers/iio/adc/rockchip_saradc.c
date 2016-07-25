@@ -280,6 +280,9 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
 		goto err_pclk;
 	}
 
+	/* Make sure ADC is disabled */
+	writel_relaxed(0, info->regs + SARADC_CTRL);
+
 	platform_set_drvdata(pdev, indio_dev);
 
 	indio_dev->name = dev_name(&pdev->dev);
