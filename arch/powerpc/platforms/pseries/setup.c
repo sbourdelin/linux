@@ -736,7 +736,7 @@ static void pseries_power_off(void)
  * Called very early, MMU is off, device-tree isn't unflattened
  */
 
-static int __init pseries_probe_fw_features(unsigned long node,
+int __init pseries_probe_fw_features(unsigned long node,
 					    const char *uname, int depth,
 					    void *data)
 {
@@ -770,6 +770,7 @@ static int __init pseries_probe_fw_features(unsigned long node,
 
 	return hypertas_found && vec5_found;
 }
+EXPORT_SYMBOL(pseries_probe_fw_features);
 
 static int __init pSeries_probe(void)
 {
