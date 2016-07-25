@@ -354,11 +354,17 @@ static int handle_dlpar_errorlog(struct pseries_hp_errorlog *hp_elog)
 	switch (hp_elog->id_type) {
 	case PSERIES_HP_ELOG_ID_DRC_COUNT:
 		hp_elog->_drc_u.drc_count =
-					be32_to_cpu(hp_elog->_drc_u.drc_count);
+				be32_to_cpu(hp_elog->_drc_u.drc_count);
 		break;
 	case PSERIES_HP_ELOG_ID_DRC_INDEX:
 		hp_elog->_drc_u.drc_index =
-					be32_to_cpu(hp_elog->_drc_u.drc_index);
+				be32_to_cpu(hp_elog->_drc_u.drc_index);
+		break;
+	case PSERIES_HP_ELOG_ID_DRC_IC:
+		hp_elog->_drc_u.indexed_count[0] =
+				be32_to_cpu(hp_elog->_drc_u.indexed_count[0]);
+		hp_elog->_drc_u.indexed_count[1] =
+				be32_to_cpu(hp_elog->_drc_u.indexed_count[1]);
 	}
 
 	switch (hp_elog->resource) {
@@ -459,7 +465,29 @@ static ssize_t dlpar_store(struct class *class, struct class_attribute *attr,
 		goto dlpar_store_out;
 	}
 
-	if (!strncmp(arg, "index", 5)) {
+	if (!strncmp(arg, "indexed-count", 13)) {
+		u32 index, count;
+		char *cstr, *istr;
+
+		hp_elog->id_type = PSERIES_HP_ELOG_ID_DRC_IC;
+		arg += strlen("indexed-count ");
+
+		cstr = kstrdup(arg, GFP_KERNEL);
+		istr = strchr(cstr, ' ');
+		*istr++ = '\0';
+
+		if (kstrtou32(cstr, 0, &count) || kstrtou32(istr, 0, &index)) {
+			rc = -EINVAL;
+			pr_err("Invalid index or count : \"%s\"\n", buf);
+			kfree(cstr);
+			goto dlpar_store_out;
+		}
+
+		kfree(cstr);
+
+		hp_elog->_drc_u.indexed_count[0] = cpu_to_be32(count);
+		hp_elog->_drc_u.indexed_count[1] = cpu_to_be32(index);
+	} else if (!strncmp(arg, "index", 5)) {
 		u32 index;
 
 		hp_elog->id_type = PSERIES_HP_ELOG_ID_DRC_INDEX;
