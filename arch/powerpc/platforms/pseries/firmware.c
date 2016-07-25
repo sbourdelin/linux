@@ -111,6 +111,8 @@ static __initdata struct vec5_fw_feature
 vec5_fw_features_table[] = {
 	{FW_FEATURE_TYPE1_AFFINITY,	OV5_TYPE1_AFFINITY},
 	{FW_FEATURE_PRRN,		OV5_PRRN},
+	{FW_FEATURE_RPS_DM2,		OV5_RPS_DM2},
+	{FW_FEATURE_RPS_DRC_INFO,	OV5_RPS_DRC_INFO},
 };
 
 void __init fw_vec5_feature_init(const char *vec5, unsigned long len)
