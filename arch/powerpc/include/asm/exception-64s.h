@@ -166,8 +166,8 @@ END_FTR_SECTION_NESTED(ftr,ftr,943)
 	OPT_SAVE_REG_TO_PACA(area+EX_CFAR, r10, CPU_FTR_CFAR);		\
 	SAVE_CTR(r10, area);						\
 	mfcr	r9;							\
-	extra(vec);							\
 	std	r11,area+EX_R11(r13);					\
+	extra(vec);							\
 	std	r12,area+EX_R12(r13);					\
 	GET_SCRATCH0(r10);						\
 	std	r10,area+EX_R13(r13)
@@ -403,12 +403,17 @@ label##_relon_hv:						\
 #define SOFTEN_VALUE_0xe82	PACA_IRQ_DBELL
 #define SOFTEN_VALUE_0xe60	PACA_IRQ_HMI
 #define SOFTEN_VALUE_0xe62	PACA_IRQ_HMI
+#define SOFTEN_VALUE_0xf01	PACA_IRQ_PMI
+#define SOFTEN_VALUE_0xf00	PACA_IRQ_PMI
 
 #define __SOFTEN_TEST(h, vec)						\
 	lbz	r10,PACASOFTIRQEN(r13);					\
 	cmpwi	r10,LAZY_INTERRUPT_DISABLED;				\
 	li	r10,SOFTEN_VALUE_##vec;					\
-	bge	masked_##h##interrupt
+	mflr	r11;							\
+	bgel	masked_##h##interrupt;					\
+	mtlr	r11;
+
 #define _SOFTEN_TEST(h, vec)	__SOFTEN_TEST(h, vec)
 
 #define SOFTEN_TEST_PR(vec)						\
@@ -438,6 +443,12 @@ label##_pSeries:							\
 	_MASKABLE_EXCEPTION_PSERIES(vec, label,				\
 				    EXC_STD, SOFTEN_TEST_PR)
 
+#define MASKABLE_EXCEPTION_PSERIES_OOL(vec, label)			\
+	.globl label##_pSeries;						\
+label##_pSeries:							\
+	EXCEPTION_PROLOG_1(PACA_EXGEN, SOFTEN_TEST_PR, vec);		\
+	EXCEPTION_PROLOG_PSERIES_1(label##_common, EXC_STD);
+
 #define MASKABLE_EXCEPTION_HV(loc, vec, label)				\
 	. = loc;							\
 	.globl label##_hv;						\
@@ -465,6 +476,13 @@ label##_hv:								\
 label##_relon_pSeries:							\
 	_MASKABLE_RELON_EXCEPTION_PSERIES(vec, label,			\
 					  EXC_STD, SOFTEN_NOTEST_PR)
+
+#define MASKABLE_RELON_EXCEPTION_PSERIES_OOL(vec, label)		\
+	.globl label##_relon_pSeries;					\
+label##_relon_pSeries:							\
+	EXCEPTION_PROLOG_1(PACA_EXGEN, SOFTEN_NOTEST_PR, vec);		\
+	EXCEPTION_PROLOG_PSERIES_1(label##_common, EXC_STD);
+
 
 #define MASKABLE_RELON_EXCEPTION_HV(loc, vec, label)			\
 	. = loc;							\

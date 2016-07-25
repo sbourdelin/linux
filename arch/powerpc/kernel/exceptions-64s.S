@@ -360,7 +360,11 @@ hv_doorbell_trampoline:
 performance_monitor_pseries_trampoline:
 	SET_SCRATCH0(r13)
 	EXCEPTION_PROLOG_0(PACA_EXGEN)
+BEGIN_FTR_SECTION
+	b	performance_monitor_hv
+FTR_SECTION_ELSE
 	b	performance_monitor_pSeries
+ALT_FTR_SECTION_END_IFSET(CPU_FTR_HVMODE)
 
 	. = 0xf20
 altivec_unavailable_pseries_trampoline:
@@ -602,8 +606,13 @@ END_FTR_SECTION_IFSET(CPU_FTR_CFAR)
 	KVM_HANDLER(PACA_EXGEN, EXC_HV, 0xe82)
 
 	/* moved from 0xf00 */
-	STD_EXCEPTION_PSERIES_OOL(0xf00, performance_monitor)
+BEGIN_FTR_SECTION
+	MASKABLE_EXCEPTION_HV_OOL(0xf01, performance_monitor)
+	KVM_HANDLER(PACA_EXGEN, EXC_HV, 0xf01)
+FTR_SECTION_ELSE
+	MASKABLE_EXCEPTION_PSERIES_OOL(0xf00, performance_monitor)
 	KVM_HANDLER(PACA_EXGEN, EXC_STD, 0xf00)
+ALT_FTR_SECTION_END_IFSET(CPU_FTR_HVMODE)
 	STD_EXCEPTION_PSERIES_OOL(0xf20, altivec_unavailable)
 	KVM_HANDLER(PACA_EXGEN, EXC_STD, 0xf20)
 	STD_EXCEPTION_PSERIES_OOL(0xf40, vsx_unavailable)
@@ -625,7 +634,11 @@ END_FTR_SECTION_IFSET(CPU_FTR_CFAR)
  */
 #define MASKED_INTERRUPT(_H)				\
 masked_##_H##interrupt:					\
-	std	r11,PACA_EXGEN+EX_R11(r13);		\
+	bgt	3f;					\
+	cmpwi	r10,PACA_IRQ_PMI;			\
+	bne	3f;					\
+	blr;						\
+3:	mtlr	r11;					\
 	lbz	r11,PACAIRQHAPPENED(r13);		\
 	or	r11,r11,r10;				\
 	stb	r11,PACAIRQHAPPENED(r13);		\
@@ -881,7 +894,11 @@ h_doorbell_relon_trampoline:
 performance_monitor_relon_pseries_trampoline:
 	SET_SCRATCH0(r13)
 	EXCEPTION_PROLOG_0(PACA_EXGEN)
+BEGIN_FTR_SECTION
+	b	performance_monitor_relon_hv
+FTR_SECTION_ELSE
 	b	performance_monitor_relon_pSeries
+ALT_FTR_SECTION_END_IFSET(CPU_FTR_HVMODE)
 
 	. = 0x4f20
 altivec_unavailable_relon_pseries_trampoline:
@@ -1138,7 +1155,11 @@ END_FTR_SECTION_IFSET(CPU_FTR_VSX)
 	STD_RELON_EXCEPTION_HV_OOL(0xe40, emulation_assist)
 	MASKABLE_RELON_EXCEPTION_HV_OOL(0xe80, h_doorbell)
 
-	STD_RELON_EXCEPTION_PSERIES_OOL(0xf00, performance_monitor)
+BEGIN_FTR_SECTION
+	MASKABLE_RELON_EXCEPTION_HV_OOL(0xf01, performance_monitor)
+FTR_SECTION_ELSE
+	MASKABLE_RELON_EXCEPTION_PSERIES_OOL(0xf00, performance_monitor)
+ALT_FTR_SECTION_END_IFSET(CPU_FTR_HVMODE)
 	STD_RELON_EXCEPTION_PSERIES_OOL(0xf20, altivec_unavailable)
 	STD_RELON_EXCEPTION_PSERIES_OOL(0xf40, vsx_unavailable)
 	STD_RELON_EXCEPTION_PSERIES_OOL(0xf60, facility_unavailable)
