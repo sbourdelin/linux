@@ -54,6 +54,7 @@ struct pstore_info {
 	size_t		bufsize;
 	struct mutex	read_mutex;	/* serialize open/read/close */
 	int		flags;
+	unsigned int	num_pmsg;
 	int		(*open)(struct pstore_info *psi);
 	int		(*close)(struct pstore_info *psi);
 	ssize_t		(*read)(u64 *id, enum pstore_type_id *type,
