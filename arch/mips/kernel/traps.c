@@ -20,7 +20,7 @@
 #include <linux/kexec.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
-#include <linux/module.h>
+#include <linux/extable.h>
 #include <linux/mm.h>
 #include <linux/sched.h>
 #include <linux/smp.h>
