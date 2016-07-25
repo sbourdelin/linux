@@ -400,7 +400,15 @@ static inline void hpte_init_native(void)
 }
 #endif
 
-extern void hpte_init_lpar(void);
+#ifdef CONFIG_PPC_PSERIES
+void hpte_init_pseries(void);
+#else
+static inline void hpte_init_pseries(void)
+{
+	panic("hpte_init_pseries: No LPAR hash table support compiled in!\n");
+}
+#endif
+
 extern void hpte_init_beat(void);
 extern void hpte_init_beat_v3(void);
 
