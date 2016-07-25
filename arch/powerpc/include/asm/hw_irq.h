@@ -65,9 +65,10 @@ static inline unsigned long arch_local_irq_disable(void)
 	unsigned long flags, zero;
 
 	asm volatile(
-		"li %1,0; lbz %0,%2(13); stb %1,%2(13)"
+		"li %1,%3; lbz %0,%2(13); stb %1,%2(13)"
 		: "=r" (flags), "=&r" (zero)
-		: "i" (offsetof(struct paca_struct, soft_enabled))
+		: "i" (offsetof(struct paca_struct, soft_enabled)),\
+		  "i" (LAZY_INTERRUPT_DISABLED)
 		: "memory");
 
 	return flags;
@@ -77,7 +78,7 @@ extern void arch_local_irq_restore(unsigned long);
 
 static inline void arch_local_irq_enable(void)
 {
-	arch_local_irq_restore(1);
+	arch_local_irq_restore(LAZY_INTERRUPT_ENABLED);
 }
 
 static inline unsigned long arch_local_irq_save(void)
@@ -87,7 +88,7 @@ static inline unsigned long arch_local_irq_save(void)
 
 static inline bool arch_irqs_disabled_flags(unsigned long flags)
 {
-	return flags == 0;
+	return flags == LAZY_INTERRUPT_DISABLED;
 }
 
 static inline bool arch_irqs_disabled(void)
@@ -107,9 +108,9 @@ static inline bool arch_irqs_disabled(void)
 	u8 _was_enabled;				\
 	__hard_irq_disable();				\
 	_was_enabled = local_paca->soft_enabled;	\
-	local_paca->soft_enabled = 0;			\
+	local_paca->soft_enabled = LAZY_INTERRUPT_DISABLED;\
 	local_paca->irq_happened |= PACA_IRQ_HARD_DIS;	\
-	if (_was_enabled)				\
+	if (_was_enabled == LAZY_INTERRUPT_ENABLED)	\
 		trace_hardirqs_off();			\
 } while(0)
 
@@ -132,7 +133,7 @@ static inline void may_hard_irq_enable(void)
 
 static inline bool arch_irq_disabled_regs(struct pt_regs *regs)
 {
-	return !regs->softe;
+	return (regs->softe == LAZY_INTERRUPT_DISABLED);
 }
 
 extern bool prep_irq_for_idle(void);

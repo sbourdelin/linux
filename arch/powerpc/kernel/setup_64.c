@@ -70,6 +70,7 @@
 #include <asm/hugetlb.h>
 #include <asm/epapr_hcalls.h>
 #include <asm/livepatch.h>
+#include <asm/hw_irq.h>
 
 #ifdef DEBUG
 #define DBG(fmt...) udbg_printf(fmt)
@@ -204,6 +205,8 @@ static void fixup_boot_paca(void)
 	get_paca()->cpu_start = 1;
 	/* Allow percpu accesses to work until we setup percpu data */
 	get_paca()->data_offset = 0;
+	/* Mark interrupts disabled in PACA */
+	get_paca()->soft_enabled = LAZY_INTERRUPT_DISABLED;
 }
 
 static void cpu_ready_for_interrupts(void)
