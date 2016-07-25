@@ -818,6 +818,7 @@ struct amd_irte_ops {
 };
 
 struct amd_ir_data {
+	u32 cached_ga_tag;
 	struct irq_2_irte irq_2_irte;
 	void *entry;	/* Pointer to union irte or struct irte_ga */
 	union {
