@@ -116,13 +116,29 @@
 #define   AFUD_EB_LEN(val)		EXTRACT_PPC_BITS(val, 8, 63)
 #define AFUD_READ_EB_OFF(afu)		AFUD_READ(afu, 0x48)
 
+/*
+ * Matches a given PCI vendor ID and device ID, but only for class 12
+ * (processing accelerators). Useful for bi-modal cards, such as the
+ * Mellanox ConnectX-4, which keep the same vendor/device ID
+ * post-mode-switch.
+ */
+#define PCI_DEVICE_ACCEL(vend, dev) \
+	.vendor = (vend), .device = (dev), \
+	.subvendor = PCI_ANY_ID, .subdevice = PCI_ANY_ID, \
+	.class = 0x120000, .class_mask = 0xff0000
+
 static const struct pci_device_id cxl_pci_tbl[] = {
+	/* FPGA devices */
 	{ PCI_DEVICE(PCI_VENDOR_ID_IBM, 0x0477), },
 	{ PCI_DEVICE(PCI_VENDOR_ID_IBM, 0x044b), },
 	{ PCI_DEVICE(PCI_VENDOR_ID_IBM, 0x04cf), },
 	{ PCI_DEVICE(PCI_VENDOR_ID_IBM, 0x0601), },
-	{ PCI_DEVICE_CLASS(0x120000, ~0), },
 
+	/* Mellanox ConnectX-4 */
+	{ PCI_DEVICE_ACCEL(PCI_VENDOR_ID_MELLANOX, 0x1013), },
+
+	/* Generic match for class 120000 devices, will be removed eventually */
+	{ PCI_DEVICE_CLASS(0x120000, ~0), },
 	{ }
 };
 MODULE_DEVICE_TABLE(pci, cxl_pci_tbl);
