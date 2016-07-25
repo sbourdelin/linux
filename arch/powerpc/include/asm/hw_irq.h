@@ -27,6 +27,13 @@
 #define PACA_IRQ_EE_EDGE	0x10 /* BookE only */
 #define PACA_IRQ_HMI		0x20
 
+/*
+ * flags for paca->soft_enabled
+ */
+#define LAZY_INTERRUPT_ENABLED		1
+#define LAZY_INTERRUPT_DISABLED		0
+
+
 #endif /* CONFIG_PPC64 */
 
 #ifndef __ASSEMBLY__
