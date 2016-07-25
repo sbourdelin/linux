@@ -43,6 +43,7 @@
 #include <asm/desc.h>
 #include <asm/debugreg.h>
 #include <asm/kvm_para.h>
+#include <asm/irq_remapping.h>
 
 #include <asm/virtext.h>
 #include "trace.h"
@@ -199,6 +200,16 @@ struct vcpu_svm {
 	struct page *avic_backing_page;
 	u64 *avic_physical_id_cache;
 	bool avic_is_running;
+
+	/*
+	 * Per-vcpu list of struct amd_iommu_pi_data:
+	 * This is used mainly to track interrupt remapping table entry (IRTE)
+	 * to be updated when the vcpu affinity changes. This avoid the need
+	 * for scanning for IRTE and try to match ga_tag in the IOMMU driver
+	 * (or using hashtable).
+	 */
+	struct list_head pi_list;
+	spinlock_t pi_list_lock;
 };
 
 #define AVIC_LOGICAL_ID_ENTRY_GUEST_PHYSICAL_ID_MASK	(0xFF)
@@ -1463,6 +1474,31 @@ free_avic:
 	return err;
 }
 
+static inline int
+avic_update_iommu(struct kvm_vcpu *vcpu, int cpu, phys_addr_t pa, bool r)
+{
+	int ret;
+	unsigned long flags;
+	struct vcpu_svm *svm = to_svm(vcpu);
+	struct amd_iommu_pi_data *pi;
+
+	if (!kvm_arch_has_assigned_device(vcpu->kvm))
+		return 0;
+
+	/*
+	 * Here, we go through the per-vcpu pi_list to update all existing
+	 * interrupt remapping table entry targeting this vcpu.
+	 */
+	spin_lock_irqsave(&svm->pi_list_lock, flags);
+	list_for_each_entry(pi, &svm->pi_list, node) {
+		ret = amd_iommu_update_ga(cpu, (pa & AVIC_HPA_MASK), r, pi);
+		if (ret)
+			break;
+	}
+	spin_unlock_irqrestore(&svm->pi_list_lock, flags);
+	return ret;
+}
+
 /**
  * This function is called during VCPU halt/unhalt.
  */
@@ -1485,9 +1521,16 @@ static void avic_set_running(struct kvm_vcpu *vcpu, bool is_run)
 	WARN_ON(is_run == !!(entry & AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK));
 
 	entry &= ~AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK;
-	if (is_run)
+	if (is_run) {
 		entry |= AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK;
-	WRITE_ONCE(*(svm->avic_physical_id_cache), entry);
+		WRITE_ONCE(*(svm->avic_physical_id_cache), entry);
+		avic_update_iommu(vcpu, h_physical_id,
+				  page_to_phys(svm->avic_backing_page), 1);
+	} else {
+		avic_update_iommu(vcpu, h_physical_id,
+				  page_to_phys(svm->avic_backing_page), 0);
+		WRITE_ONCE(*(svm->avic_physical_id_cache), entry);
+	}
 }
 
 static void avic_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
@@ -1514,6 +1557,9 @@ static void avic_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 		entry |= AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK;
 
 	WRITE_ONCE(*(svm->avic_physical_id_cache), entry);
+	avic_update_iommu(vcpu, h_physical_id,
+			  page_to_phys(svm->avic_backing_page),
+			  svm->avic_is_running);
 }
 
 static void avic_vcpu_put(struct kvm_vcpu *vcpu)
@@ -1525,6 +1571,10 @@ static void avic_vcpu_put(struct kvm_vcpu *vcpu)
 		return;
 
 	entry = READ_ONCE(*(svm->avic_physical_id_cache));
+	if (entry & AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK)
+		avic_update_iommu(vcpu, -1,
+				  page_to_phys(svm->avic_backing_page), 0);
+
 	entry &= ~AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK;
 	WRITE_ONCE(*(svm->avic_physical_id_cache), entry);
 }
@@ -1590,6 +1640,9 @@ static struct kvm_vcpu *svm_create_vcpu(struct kvm *kvm, unsigned int id)
 		err = avic_init_backing_page(&svm->vcpu);
 		if (err)
 			goto free_page4;
+
+		INIT_LIST_HEAD(&svm->pi_list);
+		spin_lock_init(&svm->pi_list_lock);
 	}
 
 	/* We initialize this flag to true to make sure that the is_running
@@ -4386,6 +4439,178 @@ static void svm_deliver_avic_intr(struct kvm_vcpu *vcpu, int vec)
 		kvm_vcpu_wake_up(vcpu);
 }
 
+static void svm_pi_list_add(struct vcpu_svm *svm, struct amd_iommu_pi_data *pi)
+{
+	bool found = false;
+	unsigned long flags;
+	struct amd_iommu_pi_data *cur;
+
+	spin_lock_irqsave(&svm->pi_list_lock, flags);
+	list_for_each_entry(cur, &svm->pi_list, node) {
+		if (cur->ir_data != pi->ir_data)
+			continue;
+		found = true;
+		break;
+	}
+	if (!found)
+		list_add(&pi->node, &svm->pi_list);
+	spin_unlock_irqrestore(&svm->pi_list_lock, flags);
+}
+
+static void svm_pi_list_del(struct vcpu_svm *svm, struct amd_iommu_pi_data *pi)
+{
+	unsigned long flags;
+	struct amd_iommu_pi_data *cur, *next;
+
+	spin_lock_irqsave(&svm->pi_list_lock, flags);
+	list_for_each_entry_safe(cur, next, &svm->pi_list, node) {
+		if (cur->ir_data != pi->ir_data)
+			continue;
+		list_del(&cur->node);
+		kfree(cur);
+		break;
+	}
+	spin_unlock_irqrestore(&svm->pi_list_lock, flags);
+}
+
+/*
+ * svm_update_pi_irte - set IRTE for Posted-Interrupts
+ *
+ * @kvm: kvm
+ * @host_irq: host irq of the interrupt
+ * @guest_irq: gsi of the interrupt
+ * @set: set or unset PI
+ * returns 0 on success, < 0 on failure
+ */
+static int svm_update_pi_irte(struct kvm *kvm, unsigned int host_irq,
+			      uint32_t guest_irq, bool set)
+{
+	struct kvm_kernel_irq_routing_entry *e;
+	struct kvm_irq_routing_table *irq_rt;
+	int idx, ret = -EINVAL;
+
+	if (!kvm_arch_has_assigned_device(kvm) ||
+	    !irq_remapping_cap(IRQ_POSTING_CAP))
+		return 0;
+
+	pr_debug("SVM: %s: host_irq=%#x, guest_irq=%#x, set=%#x\n",
+		 __func__, host_irq, guest_irq, set);
+
+	idx = srcu_read_lock(&kvm->irq_srcu);
+	irq_rt = srcu_dereference(kvm->irq_routing, &kvm->irq_srcu);
+	WARN_ON(guest_irq >= irq_rt->nr_rt_entries);
+
+	hlist_for_each_entry(e, &irq_rt->map[guest_irq], link) {
+		struct kvm_lapic_irq irq;
+		struct vcpu_data vcpu_info;
+		struct kvm_vcpu *vcpu = NULL;
+		struct vcpu_svm *svm = NULL;
+
+		if (e->type != KVM_IRQ_ROUTING_MSI)
+			continue;
+
+		/**
+		 * Note:
+		 * The HW cannot support posting multicast/broadcast
+		 * interrupts to a vCPU. So, we still use interrupt
+		 * remapping for these kind of interrupts.
+		 *
+		 * For lowest-priority interrupts, we only support
+		 * those with single CPU as the destination, e.g. user
+		 * configures the interrupts via /proc/irq or uses
+		 * irqbalance to make the interrupts single-CPU.
+		 */
+		kvm_set_msi_irq(e, &irq);
+		if (kvm_intr_is_single_vcpu(kvm, &irq, &vcpu)) {
+			svm = to_svm(vcpu);
+			vcpu_info.pi_desc_addr = page_to_phys(svm->avic_backing_page);
+			vcpu_info.vector = irq.vector;
+
+			trace_kvm_pi_irte_update(vcpu->vcpu_id, host_irq, e->gsi,
+						 vcpu_info.vector,
+						 vcpu_info.pi_desc_addr, set);
+
+			pr_debug("SVM: %s: use GA mode for irq %u\n", __func__,
+				 irq.vector);
+		} else {
+			set = false;
+
+			pr_debug("SVM: %s: use legacy intr remap mode for irq %u\n",
+				 __func__, irq.vector);
+		}
+
+		/**
+		 * When AVIC is disabled, we fall-back to setup
+		 * IRTE w/ legacy mode
+		 */
+		if (set && kvm_vcpu_apicv_active(&svm->vcpu)) {
+			struct amd_iommu_pi_data *pi_data;
+
+			/**
+			 * Allocating new amd_iommu_pi_data, which will get
+			 * add to the per-vcpu pi_list.
+			 */
+			pi_data = kzalloc(sizeof(struct amd_iommu_pi_data),
+					  GFP_KERNEL);
+			if (!pi_data) {
+				ret = -ENOMEM;
+				goto out;
+			}
+
+			/* Try to enable guest_mode in IRTE */
+			pi_data->ga_tag = AVIC_GATAG(kvm->arch.avic_vm_id,
+						     vcpu->vcpu_id);
+			pi_data->vcpu_data = &vcpu_info;
+			pi_data->is_guest_mode = true;
+			ret = irq_set_vcpu_affinity(host_irq, pi_data);
+
+			/**
+			 * We save the pointer to pi_data in the struct
+			 * vcpu_svm so that we can reference to them directly
+			 * when we update vcpu scheduling information in IOMMU
+			 * irte.
+			 */
+			if (!ret && pi_data->is_guest_mode)
+				svm_pi_list_add(svm, pi_data);
+		} else {
+			/* Use legacy mode in IRTE */
+			struct amd_iommu_pi_data pi;
+
+			/**
+			 * Here, pi is used to:
+			 * - Tell IOMMU to use legacy mode for this interrupt.
+			 * - Retrieve ga_tag of prior interrupt remapping data.
+			 */
+			pi.is_guest_mode = false;
+			ret = irq_set_vcpu_affinity(host_irq, &pi);
+
+			/**
+			 * We need to check if the interrupt was previously
+			 * setup with the guest_mode by checking if the ga_tag
+			 * was cached. If so, we need to clean up the per-vcpu
+			 * pi_list.
+			 */
+			if (!ret && pi.ga_tag) {
+				struct kvm_vcpu *vcpu = kvm_get_vcpu_by_id(kvm,
+						AVIC_GATAG_TO_VCPUID(pi.ga_tag));
+
+				if (vcpu)
+					svm_pi_list_del(to_svm(vcpu), &pi);
+			}
+		}
+
+		if (ret < 0) {
+			pr_err("%s: failed to update PI IRTE\n", __func__);
+			goto out;
+		}
+	}
+
+	ret = 0;
+out:
+	srcu_read_unlock(&kvm->irq_srcu, idx);
+	return ret;
+}
+
 static int svm_nmi_allowed(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_svm *svm = to_svm(vcpu);
@@ -5212,6 +5437,7 @@ static struct kvm_x86_ops svm_x86_ops = {
 
 	.pmu_ops = &amd_pmu_ops,
 	.deliver_posted_interrupt = svm_deliver_avic_intr,
+	.update_pi_irte = svm_update_pi_irte,
 };
 
 static int __init svm_init(void)
