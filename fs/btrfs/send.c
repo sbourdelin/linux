@@ -1167,6 +1167,7 @@ struct backref_ctx {
 	int found_itself;
 };
 
+#if 0
 static int __clone_root_cmp_bsearch(const void *key, const void *elt)
 {
 	u64 root = (u64)(uintptr_t)key;
@@ -1178,6 +1179,7 @@ static int __clone_root_cmp_bsearch(const void *key, const void *elt)
 		return 1;
 	return 0;
 }
+#endif
 
 static int __clone_root_cmp_sort(const void *e1, const void *e2)
 {
@@ -1191,6 +1193,7 @@ static int __clone_root_cmp_sort(const void *e1, const void *e2)
 	return 0;
 }
 
+#if 0
 /*
  * Called for every backref that is found for the current extent.
  * Results are collected in sctx->clone_roots->ino/offset/found_refs
@@ -1446,6 +1449,7 @@ out:
 	kfree(backref_ctx);
 	return ret;
 }
+#endif
 
 static int read_symlink(struct btrfs_root *root,
 			u64 ino,
@@ -5182,7 +5186,6 @@ static int process_extent(struct send_ctx *sctx,
 			  struct btrfs_path *path,
 			  struct btrfs_key *key)
 {
-	struct clone_root *found_clone = NULL;
 	int ret = 0;
 
 	if (S_ISLNK(sctx->cur_inode_mode))
@@ -5224,12 +5227,27 @@ static int process_extent(struct send_ctx *sctx,
 		}
 	}
 
+	/*
+	 * Current clone detection is both time and memory consuming.
+	 *
+	 * Time consuming is caused by iterating all backref of extent.
+	 * Memory consuming is caused by allocating "found_clone" every
+	 * time for a backref.
+	 *
+	 * XXX: Disabling it is never the best method, but at least it
+	 * won't cause OOM nor super long execution time.
+	 * The root fix needs to change the iteration basis, from iterating
+	 * file extents to iterating extents, so find_parent_nodes() and
+	 * backref walk should be called only once for one extent.
+	 */
+#if 0
 	ret = find_extent_clone(sctx, path, key->objectid, key->offset,
 			sctx->cur_inode_size, &found_clone);
 	if (ret != -ENOENT && ret < 0)
 		goto out;
+#endif
 
-	ret = send_write_or_clone(sctx, path, key, found_clone);
+	ret = send_write_or_clone(sctx, path, key, NULL);
 	if (ret)
 		goto out;
 out_hole:
