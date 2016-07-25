@@ -14,24 +14,50 @@ typedef struct
 #define local_read(l)	atomic_long_read(&(l)->a)
 #define local_set(l,i)	atomic_long_set(&(l)->a, (i))
 
-#define local_add(i,l)	atomic_long_add((i),(&(l)->a))
-#define local_sub(i,l)	atomic_long_sub((i),(&(l)->a))
-#define local_inc(l)	atomic_long_inc(&(l)->a)
-#define local_dec(l)	atomic_long_dec(&(l)->a)
+static __inline__ void local_add(long i, local_t *l)
+{
+	long t;
+	unsigned long flags;
+
+	flags = arch_local_irq_disable_var(2);
+	__asm__ __volatile__(
+	PPC_LL" %0,0(%2)\n\
+	add     %0,%1,%0\n"
+	PPC_STL" %0,0(%2)\n"
+	: "=&r" (t)
+	: "r" (i), "r" (&(l->a.counter)));
+	arch_local_irq_restore(flags);
+}
+
+static __inline__ void local_sub(long i, local_t *l)
+{
+	long t;
+	unsigned long flags;
+
+	flags = arch_local_irq_disable_var(2);
+	__asm__ __volatile__(
+	PPC_LL" %0,0(%2)\n\
+	subf    %0,%1,%0\n"
+	PPC_STL" %0,0(%2)\n"
+	: "=&r" (t)
+	: "r" (i), "r" (&(l->a.counter)));
+	arch_local_irq_restore(flags);
+}
 
 static __inline__ long local_add_return(long a, local_t *l)
 {
 	long t;
+	unsigned long flags;
 
+	flags = arch_local_irq_disable_var(2);
 	__asm__ __volatile__(
-"1:"	PPC_LLARX(%0,0,%2,0) "			# local_add_return\n\
+	PPC_LL" %0,0(%2)\n\
 	add	%0,%1,%0\n"
-	PPC405_ERR77(0,%2)
-	PPC_STLCX	"%0,0,%2 \n\
-	bne-	1b"
+	PPC_STL	"%0,0(%2)\n"
 	: "=&r" (t)
 	: "r" (a), "r" (&(l->a.counter))
 	: "cc", "memory");
+	arch_local_irq_restore(flags);
 
 	return t;
 }
@@ -41,16 +67,18 @@ static __inline__ long local_add_return(long a, local_t *l)
 static __inline__ long local_sub_return(long a, local_t *l)
 {
 	long t;
+	unsigned long flags;
+
+	flags = arch_local_irq_disable_var(2);
 
 	__asm__ __volatile__(
-"1:"	PPC_LLARX(%0,0,%2,0) "			# local_sub_return\n\
+"1:"	PPC_LL" %0,0(%2)\n\
 	subf	%0,%1,%0\n"
-	PPC405_ERR77(0,%2)
-	PPC_STLCX	"%0,0,%2 \n\
-	bne-	1b"
+	PPC_STL	"%0,0(%2)\n"
 	: "=&r" (t)
 	: "r" (a), "r" (&(l->a.counter))
 	: "cc", "memory");
+	arch_local_irq_restore(flags);
 
 	return t;
 }
@@ -58,16 +86,17 @@ static __inline__ long local_sub_return(long a, local_t *l)
 static __inline__ long local_inc_return(local_t *l)
 {
 	long t;
+	unsigned long flags;
 
+	flags = arch_local_irq_disable_var(2);
 	__asm__ __volatile__(
-"1:"	PPC_LLARX(%0,0,%1,0) "			# local_inc_return\n\
+"1:"	PPC_LL" %0,0(%1)\n\
 	addic	%0,%0,1\n"
-	PPC405_ERR77(0,%1)
-	PPC_STLCX	"%0,0,%1 \n\
-	bne-	1b"
+	PPC_STL "%0,0(%1)\n"
 	: "=&r" (t)
 	: "r" (&(l->a.counter))
 	: "cc", "xer", "memory");
+	arch_local_irq_restore(flags);
 
 	return t;
 }
@@ -85,19 +114,23 @@ static __inline__ long local_inc_return(local_t *l)
 static __inline__ long local_dec_return(local_t *l)
 {
 	long t;
+	unsigned long flags;
 
+	flags = arch_local_irq_disable_var(2);
 	__asm__ __volatile__(
-"1:"	PPC_LLARX(%0,0,%1,0) "			# local_dec_return\n\
+	PPC_LL" %0,0(%1)\n\
 	addic	%0,%0,-1\n"
-	PPC405_ERR77(0,%1)
-	PPC_STLCX	"%0,0,%1\n\
-	bne-	1b"
+	PPC_STL "%0,0(%1)\n"
 	: "=&r" (t)
 	: "r" (&(l->a.counter))
 	: "cc", "xer", "memory");
+	arch_local_irq_restore(flags);
 
 	return t;
 }
+
+#define local_inc(l)	local_inc_return(l)
+#define local_dec(l)	local_dec_return(l)
 
 #define local_cmpxchg(l, o, n) \
 	(cmpxchg_local(&((l)->a.counter), (o), (n)))
@@ -115,20 +148,21 @@ static __inline__ long local_dec_return(local_t *l)
 static __inline__ int local_add_unless(local_t *l, long a, long u)
 {
 	long t;
+	unsigned long flags;
 
+	flags = arch_local_irq_disable_var(2);
 	__asm__ __volatile__ (
-"1:"	PPC_LLARX(%0,0,%1,0) "			# local_add_unless\n\
+	PPC_LL" %0,0(%1)\n\
 	cmpw	0,%0,%3 \n\
 	beq-	2f \n\
 	add	%0,%2,%0 \n"
-	PPC405_ERR77(0,%2)
-	PPC_STLCX	"%0,0,%1 \n\
-	bne-	1b \n"
+	PPC_STL" %0,0(%1) \n"
 "	subf	%0,%2,%0 \n\
 2:"
 	: "=&r" (t)
 	: "r" (&(l->a.counter)), "r" (a), "r" (u)
 	: "cc", "memory");
+	arch_local_irq_restore(flags);
 
 	return t != u;
 }
@@ -145,19 +179,20 @@ static __inline__ int local_add_unless(local_t *l, long a, long u)
 static __inline__ long local_dec_if_positive(local_t *l)
 {
 	long t;
+	unsigned long flags;
 
+	flags = arch_local_irq_disable_var(2);
 	__asm__ __volatile__(
-"1:"	PPC_LLARX(%0,0,%1,0) "			# local_dec_if_positive\n\
+	PPC_LL" %0,0(%1)\n\
 	cmpwi	%0,1\n\
 	addi	%0,%0,-1\n\
 	blt-	2f\n"
-	PPC405_ERR77(0,%1)
-	PPC_STLCX	"%0,0,%1\n\
-	bne-	1b"
+	PPC_STL "%0,0(%1)\n"
 	"\n\
 2:"	: "=&b" (t)
 	: "r" (&(l->a.counter))
 	: "cc", "memory");
+	arch_local_irq_restore(flags);
 
 	return t;
 }
