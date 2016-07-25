@@ -126,3 +126,25 @@ file. Here is an example of usage:
  0 ffffffff811d9c54  ffffffff8101a7a0  __const_udelay <- native_machine_emergency_restart+0x110/0x1e0
  0 ffffffff811d9c34  ffffffff811d9c80  __delay <- __const_udelay+0x30/0x40
  0 ffffffff811d9d14  ffffffff811d9c3f  delay_tsc <- __delay+0xf/0x20
+
+6. Pmsg support
+
+Ramoops supports pmsg - logging userspace mesages in persistent store. By
+default, one pmsg area becomes available in ramoops. You can write data into
+/dev/pmsg0, e.g.:
+
+ # echo foo > /dev/pmsg0
+
+After reboot, the stored data can be read from pmsg-ramoops-0 on the pstore
+filesystem.
+
+You can specify size of the pmsg area by additional kernel command line, e.g.:
+
+ "ramoops.pmsg_size=0x1000"
+
+You can also use multiple pmsg areas, e.g.:
+
+ "ramoops.pmsg_size=0x1000,0x2000,..."
+
+Then, pmsg0, pmsg1, ... will appear on /dev. This is useful to control
+individual content aging or priority.

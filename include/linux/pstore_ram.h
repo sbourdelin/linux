@@ -72,6 +72,12 @@ ssize_t persistent_ram_ecc_string(struct persistent_ram_zone *prz,
  * Ramoops platform data
  * @mem_size	memory size for ramoops
  * @mem_address	physical memory address to contain ramoops
+ * @pmsg_size	array containing size of each pmsg area. 0 value in the array
+ *		indicates the end of the content. For example, if the following
+ *		array is given,
+ *		    .pmsg_size = { 0x1000, 0x2000, 0x0, 0x3000, };
+ *		then, pmsg areas are allocated for the first two size values
+ *		and '0x3000' is just ignored.
  */
 
 struct ramoops_platform_data {
@@ -81,7 +87,7 @@ struct ramoops_platform_data {
 	unsigned long	record_size;
 	unsigned long	console_size;
 	unsigned long	ftrace_size;
-	unsigned long	pmsg_size;
+	unsigned long	*pmsg_size;
 	int		dump_oops;
 	struct persistent_ram_ecc_info ecc_info;
 };
