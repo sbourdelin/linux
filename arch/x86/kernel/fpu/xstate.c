@@ -893,7 +893,7 @@ static void fpu__xfeature_set_non_init(struct xregs_state *xsave,
  *	address of the state in the xsave area or NULL if the state
  *	is not present or is in its 'init state'.
  */
-static void fpu__xfeature_set_state(int xstate_feature_mask,
+static int fpu__xfeature_set_state(int xstate_feature_mask,
 		void *xstate_feature_src, size_t len)
 {
 	struct xregs_state *xsave = &current->thread.fpu.state.xsave;
@@ -902,7 +902,7 @@ static void fpu__xfeature_set_state(int xstate_feature_mask,
 
 	if (!boot_cpu_has(X86_FEATURE_XSAVE)) {
 		WARN_ONCE(1, "%s() attempted with no xsave support", __func__);
-		return;
+		return -ENXIO;
 	}
 
 	/*
@@ -913,14 +913,16 @@ static void fpu__xfeature_set_state(int xstate_feature_mask,
 	fpu__current_fpstate_write_begin();
 
 	/*
-	 * This method *WILL* *NOT* work for compact-format
-	 * buffers.  If the 'xstate_feature_mask' is unset in
-	 * xcomp_bv then we may need to move other feature state
-	 * "up" in the buffer.
+	 * This method will not work on XSAVES compacted-format buffer
+	 * that do not have space allocated for the state we are trying
+	 * to set. Currently, the kernel always allocates space for all
+	 * enabled states. This check makes sure that holds true.
 	 */
-	if (xsave->header.xcomp_bv & xstate_feature_mask) {
+	if (!(xsave->header.xcomp_bv & xstate_feature_mask) &&\
+		using_compacted_format()) {
 		WARN_ON_ONCE(1);
-		goto out;
+		fpu__current_fpstate_write_end();
+		return -EINVAL;
 	}
 
 	/* find the location in the xsave buffer of the desired state */
@@ -940,12 +942,14 @@ static void fpu__xfeature_set_state(int xstate_feature_mask,
 	 * in the buffer now.
 	 */
 	fpu__xfeature_set_non_init(xsave, xstate_feature_mask);
-out:
+
 	/*
 	 * We are done writing to the 'fpu'.  Reenable preeption
 	 * and (possibly) move the fpstate back in to the fpregs.
 	 */
 	fpu__current_fpstate_write_end();
+
+	return 0;
 }
 
 #define NR_VALID_PKRU_BITS (CONFIG_NR_PROTECTION_KEYS * 2)
@@ -1014,9 +1018,8 @@ int arch_set_user_pkey_access(struct task_struct *tsk, int pkey,
 	 */
 	new_pkru_state.pad = 0;
 
-	fpu__xfeature_set_state(XFEATURE_MASK_PKRU, &new_pkru_state, sizeof(new_pkru_state));
-
-	return 0;
+	return fpu__xfeature_set_state(XFEATURE_MASK_PKRU, &new_pkru_state,
+			sizeof(new_pkru_state));
 }
 
 /*
