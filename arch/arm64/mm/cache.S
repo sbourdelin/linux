@@ -110,14 +110,16 @@ ENDPROC(__clean_dcache_area_pou)
  *	- end     - end address of region
  */
 ENTRY(__inval_cache_range)
+	sub	x1, x1, x0
 	/* FALLTHROUGH */
 
 /*
- *	__dma_inv_range(start, end)
+ *	__dma_inv_range(start, size)
  *	- start   - virtual start address of region
- *	- end     - virtual end address of region
+ *	- size    - size in question
  */
 __dma_inv_range:
+	add	x1, x1, x0
 	dcache_line_size x2, x3
 	sub	x3, x2, #1
 	tst	x1, x3				// end cache line aligned?
@@ -139,41 +141,42 @@ ENDPIPROC(__inval_cache_range)
 ENDPROC(__dma_inv_range)
 
 /*
- *	__dma_clean_range(start, end)
+ *	__clean_dcache_area_poc(kaddr, size)
+ *
+ * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
+ * 	are cleaned to the PoC.
+ *
+ *	- kaddr   - kernel address
+ *	- size    - size in question
+ */
+ENTRY(__clean_dcache_area_poc)
+	/* FALLTHROUGH */
+
+/*
+ *	__dma_clean_range(start, size)
  *	- start   - virtual start address of region
- *	- end     - virtual end address of region
+ *	- size    - size in question
  */
 __dma_clean_range:
-	dcache_line_size x2, x3
-	sub	x3, x2, #1
-	bic	x0, x0, x3
-1:
 alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
-	dc	cvac, x0
+	dcache_by_line_op cvac, sy, x0, x1, x2, x3
 alternative_else
-	dc	civac, x0
+	dcache_by_line_op civac, sy, x0, x1, x2, x3
 alternative_endif
-	add	x0, x0, x2
-	cmp	x0, x1
-	b.lo	1b
-	dsb	sy
 	ret
+ENDPIPROC(__clean_dcache_area_poc)
 ENDPROC(__dma_clean_range)
 
 /*
- *	__dma_flush_range(start, end)
+ *	__dma_flush_range(start, size)
+ *
+ *	clean & invalidate D / U line
+ *
  *	- start   - virtual start address of region
- *	- end     - virtual end address of region
+ *	- size    - size in question
  */
 ENTRY(__dma_flush_range)
-	dcache_line_size x2, x3
-	sub	x3, x2, #1
-	bic	x0, x0, x3
-1:	dc	civac, x0			// clean & invalidate D / U line
-	add	x0, x0, x2
-	cmp	x0, x1
-	b.lo	1b
-	dsb	sy
+	dcache_by_line_op civac, sy, x0, x1, x2, x3
 	ret
 ENDPIPROC(__dma_flush_range)
 
@@ -184,7 +187,6 @@ ENDPIPROC(__dma_flush_range)
  *	- dir	- DMA direction
  */
 ENTRY(__dma_map_area)
-	add	x1, x1, x0
 	cmp	w2, #DMA_FROM_DEVICE
 	b.eq	__dma_inv_range
 	b	__dma_clean_range
@@ -197,7 +199,6 @@ ENDPIPROC(__dma_map_area)
  *	- dir	- DMA direction
  */
 ENTRY(__dma_unmap_area)
-	add	x1, x1, x0
 	cmp	w2, #DMA_TO_DEVICE
 	b.ne	__dma_inv_range
 	ret
