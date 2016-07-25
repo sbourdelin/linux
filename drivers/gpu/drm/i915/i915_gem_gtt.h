@@ -54,6 +54,7 @@ typedef uint64_t gen8_ppgtt_pml4e_t;
 #define GEN6_PTE_UNCACHED		(1 << 1)
 #define GEN6_PTE_VALID			(1 << 0)
 
+#define	I915_NULL_PTE			0
 #define I915_PTES(pte_len)		(PAGE_SIZE / (pte_len))
 #define I915_PTE_MASK(pte_len)		(I915_PTES(pte_len) - 1)
 #define I915_PDES			512

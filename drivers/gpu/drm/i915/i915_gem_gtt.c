@@ -2368,7 +2368,7 @@ static void gen8_ggtt_insert_entries(struct i915_address_space *vm,
 	struct i915_ggtt *ggtt = i915_vm_to_ggtt(vm);
 	struct sgt_iter sgt_iter;
 	gen8_pte_t __iomem *gtt_entries;
-	gen8_pte_t gtt_entry;
+	gen8_pte_t gtt_entry = I915_NULL_PTE;
 	dma_addr_t addr;
 	int rpm_atomic_seq;
 	int i = 0;
@@ -2389,8 +2389,10 @@ static void gen8_ggtt_insert_entries(struct i915_address_space *vm,
 	 * of NUMA access patterns. Therefore, even with the way we assume
 	 * hardware should work, we must keep this posting read for paranoia.
 	 */
-	if (i != 0)
-		WARN_ON(readq(&gtt_entries[i-1]) != gtt_entry);
+	if (i != 0) {
+		gen8_pte_t last_gtt_entry = readq(&gtt_entries[i-1]);
+		WARN_ON(last_gtt_entry != gtt_entry);
+	}
 
 	/* This next bit makes the above posting read even more important. We
 	 * want to flush the TLBs only after we're certain all the PTE updates
@@ -2465,7 +2467,7 @@ static void gen6_ggtt_insert_entries(struct i915_address_space *vm,
 	struct i915_ggtt *ggtt = i915_vm_to_ggtt(vm);
 	struct sgt_iter sgt_iter;
 	gen6_pte_t __iomem *gtt_entries;
-	gen6_pte_t gtt_entry;
+	gen6_pte_t gtt_entry = I915_NULL_PTE;
 	dma_addr_t addr;
 	int rpm_atomic_seq;
 	int i = 0;
@@ -2479,14 +2481,17 @@ static void gen6_ggtt_insert_entries(struct i915_address_space *vm,
 		iowrite32(gtt_entry, &gtt_entries[i++]);
 	}
 
-	/* XXX: This serves as a posting read to make sure that the PTE has
+	/*
+	 * XXX: This serves as a posting read to make sure that the PTE has
 	 * actually been updated. There is some concern that even though
 	 * registers and PTEs are within the same BAR that they are potentially
 	 * of NUMA access patterns. Therefore, even with the way we assume
 	 * hardware should work, we must keep this posting read for paranoia.
 	 */
-	if (i != 0)
-		WARN_ON(readl(&gtt_entries[i-1]) != gtt_entry);
+	if (i != 0) {
+		gen8_pte_t last_gtt_entry = readl(&gtt_entries[i-1]);
+		WARN_ON(last_gtt_entry != gtt_entry);
+	}
 
 	/* This next bit makes the above posting read even more important. We
 	 * want to flush the TLBs only after we're certain all the PTE updates
