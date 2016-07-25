@@ -5377,6 +5377,75 @@ static inline int task_util(struct task_struct *p)
 	return p->se.avg.util_avg;
 }
 
+/*
+ * task_util_wake: Returns an updated estimate of the utilization contribution
+ * of a waking task. At wake-up the task blocked utilization contribution
+ * (cfs_rq->avg) may have decayed while the utilization tracking of the task
+ * (se->avg) hasn't yet.
+ * Note that this estimate isn't perfectly accurate as the 1ms boundaries used
+ * for updating util_avg in __update_load_avg() are not considered here. This
+ * results in an error of up to 1ms utilization decay/accumulation which leads
+ * to an absolute util_avg error margin of 1024*1024/LOAD_AVG_MAX ~= 22
+ * (for LOAD_AVG_MAX = 47742).
+ */
+static inline int task_util_wake(struct task_struct *p)
+{
+	struct cfs_rq *prev_cfs_rq = &task_rq(p)->cfs;
+	struct sched_avg *psa = &p->se.avg;
+	u64 cfs_rq_last_update, p_last_update, delta;
+	u32 util_decayed;
+
+	p_last_update = psa->last_update_time;
+
+	/*
+	 * Task on rq (exec()) should be load-tracking aligned already.
+	 * New tasks have no history and should use the init value.
+	 */
+	if (p->se.on_rq || !p_last_update)
+		return task_util(p);
+
+	cfs_rq_last_update = cfs_rq_last_update_time(prev_cfs_rq);
+	delta = cfs_rq_last_update - p_last_update;
+
+	if ((s64)delta <= 0)
+		return task_util(p);
+
+	delta >>= 20;
+
+	if (!delta)
+		return task_util(p);
+
+	util_decayed = decay_load((u64)psa->util_sum, delta);
+	util_decayed /= LOAD_AVG_MAX;
+
+	/*
+	 * psa->util_avg can be slightly out of date as it is only updated
+	 * when a 1ms boundary is crossed.
+	 * See 'decayed' in __update_load_avg()
+	 */
+	util_decayed = min_t(unsigned long, util_decayed, task_util(p));
+
+	return util_decayed;
+}
+
+/*
+ * cpu_util_wake: Compute cpu utilization with any contributions from
+ * the waking task p removed.
+ */
+static int cpu_util_wake(int cpu, struct task_struct *p)
+{
+	unsigned long util, capacity;
+
+	/* Task has no contribution or is new */
+	if (cpu != task_cpu(p) || !p->se.avg.last_update_time)
+		return cpu_util(cpu);
+
+	capacity = capacity_orig_of(cpu);
+	util = max_t(long, cpu_rq(cpu)->cfs.avg.util_avg - task_util_wake(p), 0);
+
+	return (util >= capacity) ? capacity : util;
+}
+
 static int wake_cap(struct task_struct *p, int cpu, int prev_cpu)
 {
 	long min_cap, max_cap;
