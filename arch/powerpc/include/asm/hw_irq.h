@@ -94,7 +94,7 @@ static inline unsigned long arch_local_irq_save(void)
 
 static inline bool arch_irqs_disabled_flags(unsigned long flags)
 {
-	return flags == LAZY_INTERRUPT_DISABLED;
+	return flags >= LAZY_INTERRUPT_DISABLED;
 }
 
 static inline bool arch_irqs_disabled(void)
@@ -139,7 +139,7 @@ static inline void may_hard_irq_enable(void)
 
 static inline bool arch_irq_disabled_regs(struct pt_regs *regs)
 {
-	return (regs->softe == LAZY_INTERRUPT_DISABLED);
+	return (regs->softe >= LAZY_INTERRUPT_DISABLED);
 }
 
 extern bool prep_irq_for_idle(void);

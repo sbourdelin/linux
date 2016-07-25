@@ -202,7 +202,7 @@ notrace void arch_local_irq_restore(unsigned long en)
 
 	/* Write the new soft-enabled value */
 	set_soft_enabled(en);
-	if (en == LAZY_INTERRUPT_DISABLED)
+	if (en >= LAZY_INTERRUPT_DISABLED)
 		return;
 	/*
 	 * From this point onward, we can take interrupts, preempt,
@@ -247,7 +247,7 @@ notrace void arch_local_irq_restore(unsigned long en)
 	}
 #endif /* CONFIG_TRACE_IRQFLAG */
 
-	set_soft_enabled(LAZY_INTERRUPT_DISABLED);
+	set_soft_enabled(en);
 
 	/*
 	 * Check if anything needs to be re-emitted. We haven't
