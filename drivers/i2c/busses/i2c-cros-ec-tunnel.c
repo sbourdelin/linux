@@ -154,7 +154,9 @@ static int ec_i2c_parse_response(const u8 *buf, struct i2c_msg i2c_msgs[],
 	resp = (const struct ec_response_i2c_passthru *)buf;
 	if (resp->i2c_status & EC_I2C_STATUS_TIMEOUT)
 		return -ETIMEDOUT;
-	else if (resp->i2c_status & EC_I2C_STATUS_ERROR)
+	else if (resp->i2c_status & EC_I2C_STATUS_NAK)
+		return -ENXIO;
+	else if (resp->i2c_status)
 		return -EREMOTEIO;
 
 	/* Other side could send us back fewer messages, but not more */
@@ -223,7 +225,7 @@ static int ec_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg i2c_msgs[],
 
 	result = ec_i2c_parse_response(msg->data, i2c_msgs, &num);
 	if (result < 0) {
-		dev_err(dev, "Error parsing EC i2c message %d\n", result);
+		dev_dbg(dev, "Error parsing EC i2c message %d\n", result);
 		goto exit;
 	}
 
