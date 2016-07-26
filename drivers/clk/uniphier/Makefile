@@ -4,3 +4,6 @@ clk-uniphier-y			+= clk-uniphier-fixed-factor.o
 clk-uniphier-y			+= clk-uniphier-fixed-rate.o
 clk-uniphier-y			+= clk-uniphier-gate.o
 clk-uniphier-y			+= clk-uniphier-mux.o
+clk-uniphier-y			+= clk-uniphier-sys.o
+clk-uniphier-y			+= clk-uniphier-mio.o
+clk-uniphier-y			+= clk-uniphier-peri.o
