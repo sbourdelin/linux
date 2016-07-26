@@ -81,11 +81,8 @@ extern void warn_slowpath_null(const char *file, const int line);
 	do { printk(arg); __WARN_TAINT(taint); } while (0)
 #endif
 
-/* used internally by panic.c */
-struct warn_args;
-
 void __warn(const char *file, int line, void *caller, unsigned taint,
-	    struct pt_regs *regs, struct warn_args *args);
+	    struct pt_regs *regs, const char *fmt, va_list args);
 
 #ifndef WARN_ON
 #define WARN_ON(condition) ({						\

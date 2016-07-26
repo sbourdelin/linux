@@ -475,13 +475,8 @@ void oops_exit(void)
 	kmsg_dump(KMSG_DUMP_OOPS);
 }
 
-struct warn_args {
-	const char *fmt;
-	va_list args;
-};
-
 void __warn(const char *file, int line, void *caller, unsigned taint,
-	    struct pt_regs *regs, struct warn_args *args)
+	    struct pt_regs *regs, const char *fmt, va_list args)
 {
 	disable_trace_on_warning();
 
@@ -495,8 +490,8 @@ void __warn(const char *file, int line, void *caller, unsigned taint,
 		pr_warn("WARNING: CPU: %d PID: %d at %pS\n",
 			raw_smp_processor_id(), current->pid, caller);
 
-	if (args)
-		vprintk(args->fmt, args->args);
+	if (fmt)
+		vprintk(fmt, args);
 
 	if (panic_on_warn) {
 		/*
@@ -525,31 +520,28 @@ void __warn(const char *file, int line, void *caller, unsigned taint,
 #ifdef WANT_WARN_ON_SLOWPATH
 void warn_slowpath_fmt(const char *file, int line, const char *fmt, ...)
 {
-	struct warn_args args;
+	va_list args;
 
-	args.fmt = fmt;
-	va_start(args.args, fmt);
-	__warn(file, line, __builtin_return_address(0), TAINT_WARN, NULL,
-	       &args);
-	va_end(args.args);
+	va_start(args, fmt);
+	__warn(file, line, __builtin_return_address(0), TAINT_WARN, NULL, fmt, args);
+	va_end(args);
 }
 EXPORT_SYMBOL(warn_slowpath_fmt);
 
 void warn_slowpath_fmt_taint(const char *file, int line,
 			     unsigned taint, const char *fmt, ...)
 {
-	struct warn_args args;
+	va_list args;
 
-	args.fmt = fmt;
-	va_start(args.args, fmt);
-	__warn(file, line, __builtin_return_address(0), taint, NULL, &args);
-	va_end(args.args);
+	va_start(args, fmt);
+	__warn(file, line, __builtin_return_address(0), taint, NULL, fmt, args);
+	va_end(args);
 }
 EXPORT_SYMBOL(warn_slowpath_fmt_taint);
 
 void warn_slowpath_null(const char *file, int line)
 {
-	__warn(file, line, __builtin_return_address(0), TAINT_WARN, NULL, NULL);
+	__warn(file, line, __builtin_return_address(0), TAINT_WARN, NULL, NULL, NULL);
 }
 EXPORT_SYMBOL(warn_slowpath_null);
 #endif

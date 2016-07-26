@@ -168,7 +168,7 @@ enum bug_trap_type report_bug(unsigned long bugaddr, struct pt_regs *regs)
 	if (warning) {
 		/* this is a WARN_ON rather than BUG/BUG_ON */
 		__warn(file, line, (void *)bugaddr, BUG_GET_TAINT(bug), regs,
-		       NULL);
+		       NULL, NULL);
 		return BUG_TRAP_TYPE_WARN;
 	}
 
