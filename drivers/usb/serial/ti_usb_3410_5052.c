@@ -969,7 +969,7 @@ static void ti_set_termios(struct tty_struct *tty,
 	if (tport == NULL)
 		return;
 
-	config = kmalloc(sizeof(*config), GFP_KERNEL);
+	config = kzalloc(sizeof(*config), GFP_KERNEL);
 	if (!config)
 		return;
 
