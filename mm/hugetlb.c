@@ -1146,6 +1146,10 @@ static int alloc_fresh_gigantic_page(struct hstate *h,
 
 	for_each_node_mask_to_alloc(h, nr_nodes, node, nodes_allowed) {
 		page = alloc_fresh_gigantic_page_node(h, node);
+
+		/* yield cpu */
+		cond_resched();
+
 		if (page)
 			return 1;
 	}
@@ -1381,6 +1385,10 @@ static int alloc_fresh_huge_page(struct hstate *h, nodemask_t *nodes_allowed)
 
 	for_each_node_mask_to_alloc(h, nr_nodes, node, nodes_allowed) {
 		page = alloc_fresh_huge_page_node(h, node);
+
+		/* yield cpu */
+		cond_resched();
+
 		if (page) {
 			ret = 1;
 			break;
