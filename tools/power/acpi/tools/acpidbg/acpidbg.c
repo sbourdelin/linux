@@ -15,7 +15,9 @@
 #include <stdbool.h>
 #include <fcntl.h>
 #include <assert.h>
+#include <sys/ioctl.h>
 #include <linux/circ_buf.h>
+#include <uapi/linux/acpi-ioctls.h>
 
 #define ACPI_AML_FILE		"/sys/kernel/debug/acpi/acpidbg"
 #define ACPI_AML_SEC_TICK	1
@@ -83,7 +85,6 @@ static const char *acpi_aml_file_path = ACPI_AML_FILE;
 static unsigned long acpi_aml_mode = ACPI_AML_INTERACTIVE;
 static bool acpi_aml_exit;
 
-static bool acpi_aml_batch_drain;
 static unsigned long acpi_aml_batch_state;
 static char acpi_aml_batch_prompt;
 static char acpi_aml_batch_roll;
@@ -239,11 +240,9 @@ static int acpi_aml_write_batch_log(int fd, struct circ_buf *crc)
 
 	p = &crc->buf[crc->tail];
 	len = circ_count_to_end(crc);
-	if (!acpi_aml_batch_drain) {
-		len = write(fd, p, len);
-		if (len < 0)
-			perror("write");
-	}
+	len = write(fd, p, len);
+	if (len < 0)
+		perror("write");
 	if (len > 0)
 		crc->tail = (crc->tail + len) & (ACPI_AML_BUF_SIZE - 1);
 	return len;
@@ -270,10 +269,7 @@ static void acpi_aml_loop(int fd)
 	if (acpi_aml_mode == ACPI_AML_BATCH) {
 		acpi_aml_log_state = ACPI_AML_LOG_START;
 		acpi_aml_batch_pos = acpi_aml_batch_cmd;
-		if (acpi_aml_batch_drain)
-			acpi_aml_batch_state = ACPI_AML_BATCH_READ_LOG;
-		else
-			acpi_aml_batch_state = ACPI_AML_BATCH_WRITE_CMD;
+		acpi_aml_batch_state = ACPI_AML_BATCH_WRITE_CMD;
 	}
 	acpi_aml_exit = false;
 	while (!acpi_aml_exit) {
@@ -327,39 +323,6 @@ static void acpi_aml_loop(int fd)
 					ACPI_AML_DO(STDOUT_FILENO, write, log, ret);
 			}
 		}
-	}
-}
-
-static bool acpi_aml_readable(int fd)
-{
-	fd_set rfds;
-	struct timeval tv;
-	int ret;
-	int maxfd = 0;
-
-	tv.tv_sec = 0;
-	tv.tv_usec = ACPI_AML_USEC_PEEK;
-	FD_ZERO(&rfds);
-	maxfd = acpi_aml_set_fd(fd, maxfd, &rfds);
-	ret = select(maxfd+1, &rfds, NULL, NULL, &tv);
-	if (ret < 0)
-		perror("select");
-	if (ret > 0 && FD_ISSET(fd, &rfds))
-		return true;
-	return false;
-}
-
-/*
- * This is a userspace IO flush implementation, replying on the prompt
- * characters and can be turned into a flush() call after kernel implements
- * .flush() filesystem operation.
- */
-static void acpi_aml_flush(int fd)
-{
-	while (acpi_aml_readable(fd)) {
-		acpi_aml_batch_drain = true;
-		acpi_aml_loop(fd);
-		acpi_aml_batch_drain = false;
 	}
 }
 
@@ -426,7 +389,7 @@ int main(int argc, char **argv)
 	acpi_aml_set_fl(STDOUT_FILENO, O_NONBLOCK);
 
 	if (acpi_aml_mode == ACPI_AML_BATCH)
-		acpi_aml_flush(fd);
+		ioctl(fd, ACPI_IOCTL_DEBUGGER_FLUSH);
 	acpi_aml_loop(fd);
 
 exit:
