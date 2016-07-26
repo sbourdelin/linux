@@ -62,7 +62,7 @@ struct workqueue_struct *bcache_wq;
 /* Superblock */
 
 static const char *read_super(struct cache_sb *sb, struct block_device *bdev,
-			      struct page **res)
+			      struct page **res, unsigned int *off)
 {
 	const char *err;
 	struct cache_sb *s;
@@ -192,6 +192,7 @@ static const char *read_super(struct cache_sb *sb, struct block_device *bdev,
 	err = NULL;
 
 	get_page(bh->b_page);
+	*off = (unsigned int) (bh->b_data - ((char *) page_address(bh->b_page)));
 	*res = bh->b_page;
 err:
 	put_bh(bh);
@@ -202,19 +203,19 @@ static void write_bdev_super_endio(struct bio *bio)
 {
 	struct cached_dev *dc = bio->bi_private;
 	/* XXX: error checking */
-
 	closure_put(&dc->sb_write);
 }
 
 static void __write_super(struct cache_sb *sb, struct bio *bio)
 {
-	struct cache_sb *out = page_address(bio->bi_io_vec[0].bv_page);
+	struct cache_sb *out = page_address(bio->bi_io_vec[0].bv_page) +
+			       bio->bi_io_vec[0].bv_offset;
 	unsigned i;
 
 	bio->bi_iter.bi_sector	= SB_SECTOR;
 	bio->bi_rw		= REQ_SYNC|REQ_META;
 	bio->bi_iter.bi_size	= SB_SIZE;
-	bch_bio_map(bio, NULL);
+	// bch_bio_map(bio, NULL);
 
 	out->offset		= cpu_to_le64(sb->offset);
 	out->version		= cpu_to_le64(sb->version);
@@ -1139,6 +1140,7 @@ static int cached_dev_init(struct cached_dev *dc, unsigned block_size)
 /* Cached device - bcache superblock */
 
 static void register_bdev(struct cache_sb *sb, struct page *sb_page,
+				 unsigned int sb_off,
 				 struct block_device *bdev,
 				 struct cached_dev *dc)
 {
@@ -1154,6 +1156,8 @@ static void register_bdev(struct cache_sb *sb, struct page *sb_page,
 	dc->sb_bio.bi_max_vecs	= 1;
 	dc->sb_bio.bi_io_vec	= dc->sb_bio.bi_inline_vecs;
 	dc->sb_bio.bi_io_vec[0].bv_page = sb_page;
+	dc->sb_bio.bi_io_vec[0].bv_len = SB_SIZE;
+	dc->sb_bio.bi_io_vec[0].bv_offset = sb_off;
 	get_page(sb_page);
 
 	if (cached_dev_init(dc, sb->block_size << 9))
@@ -1839,6 +1843,7 @@ static int cache_alloc(struct cache_sb *sb, struct cache *ca)
 }
 
 static int register_cache(struct cache_sb *sb, struct page *sb_page,
+				unsigned int sb_off,
 				struct block_device *bdev, struct cache *ca)
 {
 	char name[BDEVNAME_SIZE];
@@ -1853,6 +1858,8 @@ static int register_cache(struct cache_sb *sb, struct page *sb_page,
 	ca->sb_bio.bi_max_vecs	= 1;
 	ca->sb_bio.bi_io_vec	= ca->sb_bio.bi_inline_vecs;
 	ca->sb_bio.bi_io_vec[0].bv_page = sb_page;
+	ca->sb_bio.bi_io_vec[0].bv_len  = SB_SIZE;
+	ca->sb_bio.bi_io_vec[0].bv_offset = sb_off;
 	get_page(sb_page);
 
 	if (blk_queue_discard(bdev_get_queue(ca->bdev)))
@@ -1936,6 +1943,7 @@ static ssize_t register_bcache(struct kobject *k, struct kobj_attribute *attr,
 	struct cache_sb *sb = NULL;
 	struct block_device *bdev = NULL;
 	struct page *sb_page = NULL;
+	unsigned int sb_off;
 
 	if (!try_module_get(THIS_MODULE))
 		return -EBUSY;
@@ -1967,7 +1975,7 @@ static ssize_t register_bcache(struct kobject *k, struct kobj_attribute *attr,
 	if (set_blocksize(bdev, 4096))
 		goto err_close;
 
-	err = read_super(sb, bdev, &sb_page);
+	err = read_super(sb, bdev, &sb_page, &sb_off);
 	if (err)
 		goto err_close;
 
@@ -1977,14 +1985,14 @@ static ssize_t register_bcache(struct kobject *k, struct kobj_attribute *attr,
 			goto err_close;
 
 		mutex_lock(&bch_register_lock);
-		register_bdev(sb, sb_page, bdev, dc);
+		register_bdev(sb, sb_page, sb_off, bdev, dc);
 		mutex_unlock(&bch_register_lock);
 	} else {
 		struct cache *ca = kzalloc(sizeof(*ca), GFP_KERNEL);
 		if (!ca)
 			goto err_close;
 
-		if (register_cache(sb, sb_page, bdev, ca) != 0)
+		if (register_cache(sb, sb_page, sb_off, bdev, ca) != 0)
 			goto err_close;
 	}
 out:
