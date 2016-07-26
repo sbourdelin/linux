@@ -26,6 +26,7 @@
 #include <linux/resource_ext.h>
 #include <linux/device.h>
 #include <linux/property.h>
+#include <uapi/linux/acpi-ioctls.h>
 
 #ifndef _LINUX
 #define _LINUX
