@@ -144,7 +144,7 @@
 			compatible = "allwinner,sun8i-h3-dma";
 			reg = <0x01c02000 0x1000>;
 			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&ccu CLK_BUS_DMA>;
+			clocks = <&ccu CLK_H3_BUS_DMA>;
 			resets = <&ccu RST_BUS_DMA>;
 			#dma-cells = <1>;
 		};
@@ -152,10 +152,10 @@
 		mmc0: mmc@01c0f000 {
 			compatible = "allwinner,sun5i-a13-mmc";
 			reg = <0x01c0f000 0x1000>;
-			clocks = <&ccu CLK_BUS_MMC0>,
-				 <&ccu CLK_MMC0>,
-				 <&ccu CLK_MMC0_OUTPUT>,
-				 <&ccu CLK_MMC0_SAMPLE>;
+			clocks = <&ccu CLK_H3_BUS_MMC0>,
+				 <&ccu CLK_H3_MMC0>,
+				 <&ccu CLK_H3_MMC0_OUTPUT>,
+				 <&ccu CLK_H3_MMC0_SAMPLE>;
 			clock-names = "ahb",
 				      "mmc",
 				      "output",
@@ -171,10 +171,10 @@
 		mmc1: mmc@01c10000 {
 			compatible = "allwinner,sun5i-a13-mmc";
 			reg = <0x01c10000 0x1000>;
-			clocks = <&ccu CLK_BUS_MMC1>,
-				 <&ccu CLK_MMC1>,
-				 <&ccu CLK_MMC1_OUTPUT>,
-				 <&ccu CLK_MMC1_SAMPLE>;
+			clocks = <&ccu CLK_H3_BUS_MMC1>,
+				 <&ccu CLK_H3_MMC1>,
+				 <&ccu CLK_H3_MMC1_OUTPUT>,
+				 <&ccu CLK_H3_MMC1_SAMPLE>;
 			clock-names = "ahb",
 				      "mmc",
 				      "output",
@@ -190,10 +190,10 @@
 		mmc2: mmc@01c11000 {
 			compatible = "allwinner,sun5i-a13-mmc";
 			reg = <0x01c11000 0x1000>;
-			clocks = <&ccu CLK_BUS_MMC2>,
-				 <&ccu CLK_MMC2>,
-				 <&ccu CLK_MMC2_OUTPUT>,
-				 <&ccu CLK_MMC2_SAMPLE>;
+			clocks = <&ccu CLK_H3_BUS_MMC2>,
+				 <&ccu CLK_H3_MMC2>,
+				 <&ccu CLK_H3_MMC2_OUTPUT>,
+				 <&ccu CLK_H3_MMC2_SAMPLE>;
 			clock-names = "ahb",
 				      "mmc",
 				      "output",
@@ -218,10 +218,10 @@
 				    "pmu1",
 				    "pmu2",
 				    "pmu3";
-			clocks = <&ccu CLK_USB_PHY0>,
-				 <&ccu CLK_USB_PHY1>,
-				 <&ccu CLK_USB_PHY2>,
-				 <&ccu CLK_USB_PHY3>;
+			clocks = <&ccu CLK_H3_USB_PHY0>,
+				 <&ccu CLK_H3_USB_PHY1>,
+				 <&ccu CLK_H3_USB_PHY2>,
+				 <&ccu CLK_H3_USB_PHY3>;
 			clock-names = "usb0_phy",
 				      "usb1_phy",
 				      "usb2_phy",
@@ -242,7 +242,7 @@
 			compatible = "allwinner,sun8i-h3-ehci", "generic-ehci";
 			reg = <0x01c1b000 0x100>;
 			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&ccu CLK_BUS_EHCI1>, <&ccu CLK_BUS_OHCI1>;
+			clocks = <&ccu CLK_H3_BUS_EHCI1>, <&ccu CLK_H3_BUS_OHCI1>;
 			resets = <&ccu RST_BUS_EHCI1>, <&ccu RST_BUS_OHCI1>;
 			phys = <&usbphy 1>;
 			phy-names = "usb";
@@ -253,8 +253,8 @@
 			compatible = "allwinner,sun8i-h3-ohci", "generic-ohci";
 			reg = <0x01c1b400 0x100>;
 			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&ccu CLK_BUS_EHCI1>, <&ccu CLK_BUS_OHCI1>,
-				 <&ccu CLK_USB_OHCI1>;
+			clocks = <&ccu CLK_H3_BUS_EHCI1>, <&ccu CLK_H3_BUS_OHCI1>,
+				 <&ccu CLK_H3_USB_OHCI1>;
 			resets = <&ccu RST_BUS_EHCI1>, <&ccu RST_BUS_OHCI1>;
 			phys = <&usbphy 1>;
 			phy-names = "usb";
@@ -265,7 +265,7 @@
 			compatible = "allwinner,sun8i-h3-ehci", "generic-ehci";
 			reg = <0x01c1c000 0x100>;
 			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&ccu CLK_BUS_EHCI2>, <&ccu CLK_BUS_OHCI2>;
+			clocks = <&ccu CLK_H3_BUS_EHCI2>, <&ccu CLK_H3_BUS_OHCI2>;
 			resets = <&ccu RST_BUS_EHCI2>, <&ccu RST_BUS_OHCI2>;
 			phys = <&usbphy 2>;
 			phy-names = "usb";
@@ -276,8 +276,8 @@
 			compatible = "allwinner,sun8i-h3-ohci", "generic-ohci";
 			reg = <0x01c1c400 0x100>;
 			interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&ccu CLK_BUS_EHCI2>, <&ccu CLK_BUS_OHCI2>,
-				 <&ccu CLK_USB_OHCI2>;
+			clocks = <&ccu CLK_H3_BUS_EHCI2>, <&ccu CLK_H3_BUS_OHCI2>,
+				 <&ccu CLK_H3_USB_OHCI2>;
 			resets = <&ccu RST_BUS_EHCI2>, <&ccu RST_BUS_OHCI2>;
 			phys = <&usbphy 2>;
 			phy-names = "usb";
@@ -288,7 +288,7 @@
 			compatible = "allwinner,sun8i-h3-ehci", "generic-ehci";
 			reg = <0x01c1d000 0x100>;
 			interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&ccu CLK_BUS_EHCI3>, <&ccu CLK_BUS_OHCI3>;
+			clocks = <&ccu CLK_H3_BUS_EHCI3>, <&ccu CLK_H3_BUS_OHCI3>;
 			resets = <&ccu RST_BUS_EHCI3>, <&ccu RST_BUS_OHCI3>;
 			phys = <&usbphy 3>;
 			phy-names = "usb";
@@ -299,8 +299,8 @@
 			compatible = "allwinner,sun8i-h3-ohci", "generic-ohci";
 			reg = <0x01c1d400 0x100>;
 			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&ccu CLK_BUS_EHCI3>, <&ccu CLK_BUS_OHCI3>,
-				 <&ccu CLK_USB_OHCI3>;
+			clocks = <&ccu CLK_H3_BUS_EHCI3>, <&ccu CLK_H3_BUS_OHCI3>,
+				 <&ccu CLK_H3_USB_OHCI3>;
 			resets = <&ccu RST_BUS_EHCI3>, <&ccu RST_BUS_OHCI3>;
 			phys = <&usbphy 3>;
 			phy-names = "usb";
@@ -321,7 +321,7 @@
 			reg = <0x01c20800 0x400>;
 			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&ccu CLK_BUS_PIO>;
+			clocks = <&ccu CLK_H3_BUS_PIO>;
 			gpio-controller;
 			#gpio-cells = <3>;
 			interrupt-controller;
@@ -388,7 +388,7 @@
 			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
 			reg-shift = <2>;
 			reg-io-width = <4>;
-			clocks = <&ccu CLK_BUS_UART0>;
+			clocks = <&ccu CLK_H3_BUS_UART0>;
 			resets = <&ccu RST_BUS_UART0>;
 			dmas = <&dma 6>, <&dma 6>;
 			dma-names = "rx", "tx";
@@ -401,7 +401,7 @@
 			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
 			reg-shift = <2>;
 			reg-io-width = <4>;
-			clocks = <&ccu CLK_BUS_UART1>;
+			clocks = <&ccu CLK_H3_BUS_UART1>;
 			resets = <&ccu RST_BUS_UART1>;
 			dmas = <&dma 7>, <&dma 7>;
 			dma-names = "rx", "tx";
@@ -414,7 +414,7 @@
 			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
 			reg-shift = <2>;
 			reg-io-width = <4>;
-			clocks = <&ccu CLK_BUS_UART2>;
+			clocks = <&ccu CLK_H3_BUS_UART2>;
 			resets = <&ccu RST_BUS_UART2>;
 			dmas = <&dma 8>, <&dma 8>;
 			dma-names = "rx", "tx";
@@ -427,7 +427,7 @@
 			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
 			reg-shift = <2>;
 			reg-io-width = <4>;
-			clocks = <&ccu CLK_BUS_UART3>;
+			clocks = <&ccu CLK_H3_BUS_UART3>;
 			resets = <&ccu RST_BUS_UART3>;
 			dmas = <&dma 9>, <&dma 9>;
 			dma-names = "rx", "tx";

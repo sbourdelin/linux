@@ -20,43 +20,43 @@
 #include <dt-bindings/clock/sun8i-h3-ccu.h>
 #include <dt-bindings/reset/sun8i-h3-ccu.h>
 
-#define CLK_PLL_CPUX		0
-#define CLK_PLL_AUDIO_BASE	1
-#define CLK_PLL_AUDIO		2
-#define CLK_PLL_AUDIO_2X	3
-#define CLK_PLL_AUDIO_4X	4
-#define CLK_PLL_AUDIO_8X	5
-#define CLK_PLL_VIDEO		6
-#define CLK_PLL_VE		7
-#define CLK_PLL_DDR		8
-#define CLK_PLL_PERIPH0		9
-#define CLK_PLL_PERIPH0_2X	10
-#define CLK_PLL_GPU		11
-#define CLK_PLL_PERIPH1		12
-#define CLK_PLL_DE		13
+#define CLK_H3_PLL_CPUX		0
+#define CLK_H3_PLL_AUDIO_BASE	1
+#define CLK_H3_PLL_AUDIO	2
+#define CLK_H3_PLL_AUDIO_2X	3
+#define CLK_H3_PLL_AUDIO_4X	4
+#define CLK_H3_PLL_AUDIO_8X	5
+#define CLK_H3_PLL_VIDEO	6
+#define CLK_H3_PLL_VE		7
+#define CLK_H3_PLL_DDR		8
+#define CLK_H3_PLL_PERIPH0	9
+#define CLK_H3_PLL_PERIPH0_2X	10
+#define CLK_H3_PLL_GPU		11
+#define CLK_H3_PLL_PERIPH1	12
+#define CLK_H3_PLL_DE		13
 
 /* The CPUX clock is exported */
 
-#define CLK_AXI			15
-#define CLK_AHB1		16
-#define CLK_APB1		17
-#define CLK_APB2		18
-#define CLK_AHB2		19
+#define CLK_H3_AXI		15
+#define CLK_H3_AHB1		16
+#define CLK_H3_APB1		17
+#define CLK_H3_APB2		18
+#define CLK_H3_AHB2		19
 
 /* All the bus gates are exported */
 
 /* The first bunch of module clocks are exported */
 
-#define CLK_DRAM		96
+#define CLK_H3_DRAM		96
 
 /* All the DRAM gates are exported */
 
 /* Some more module clocks are exported */
 
-#define CLK_MBUS		113
+#define CLK_H3_MBUS		113
 
 /* And the GPU module clock is exported */
 
-#define CLK_NUMBER		(CLK_GPU + 1)
+#define CLK_H3_NUMBER		(CLK_H3_GPU + 1)
 
 #endif /* _CCU_SUN8I_H3_H_ */
