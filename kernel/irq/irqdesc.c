@@ -15,6 +15,7 @@
 #include <linux/radix-tree.h>
 #include <linux/bitmap.h>
 #include <linux/irqdomain.h>
+#include <linux/sysfs.h>
 
 #include "internals.h"
 
@@ -121,6 +122,145 @@ EXPORT_SYMBOL_GPL(nr_irqs);
 static DEFINE_MUTEX(sparse_irq_lock);
 static DECLARE_BITMAP(allocated_irqs, IRQ_BITMAP_BITS);
 
+struct kobject *irq_kobj;
+
+#define IRQ_ATTR_RO(_name) \
+static struct kobj_attribute _name##_attr = __ATTR_RO(_name)
+
+static ssize_t per_cpu_count_show(struct kobject *kobj,
+				  struct kobj_attribute *attr, char *buf)
+{
+	struct irq_desc *desc = container_of(kobj, struct irq_desc, kobj);
+	int i;
+	unsigned long flags;
+	ssize_t ret = 0;
+
+	raw_spin_lock_irqsave(&desc->lock, flags);
+	for_each_online_cpu(i) {
+		unsigned int c = kstat_irqs_cpu(desc->irq_data.irq, i);
+		if (!ret)
+			ret = sprintf(buf, "%u", c);
+		else
+			ret += scnprintf(buf+ret, PAGE_SIZE-ret, ",%u", c);
+	}
+	raw_spin_unlock_irqrestore(&desc->lock, flags);
+
+	if (ret)
+		ret += scnprintf(buf+ret, PAGE_SIZE-ret, "\n");
+
+	return ret;
+}
+IRQ_ATTR_RO(per_cpu_count);
+
+static ssize_t chip_name_show(struct kobject *kobj,
+			      struct kobj_attribute *attr, char *buf)
+{
+	struct irq_desc *desc = container_of(kobj, struct irq_desc, kobj);
+	unsigned long flags;
+	ssize_t ret = 0;
+
+	raw_spin_lock_irqsave(&desc->lock, flags);
+	if (desc->irq_data.chip->name)
+		ret = scnprintf(buf, PAGE_SIZE, "%s\n",
+				desc->irq_data.chip->name);
+	raw_spin_unlock_irqrestore(&desc->lock, flags);
+
+	return ret;
+}
+IRQ_ATTR_RO(chip_name);
+
+static ssize_t hwirq_show(struct kobject *kobj,
+			  struct kobj_attribute *attr, char *buf)
+{
+	struct irq_desc *desc = container_of(kobj, struct irq_desc, kobj);
+	unsigned long flags;
+	ssize_t ret = 0;
+
+	raw_spin_lock_irqsave(&desc->lock, flags);
+	if (desc->irq_data.domain)
+		ret = sprintf(buf, "%d\n", (int)desc->irq_data.hwirq);
+	raw_spin_unlock_irqrestore(&desc->lock, flags);
+
+	return ret;
+}
+IRQ_ATTR_RO(hwirq);
+
+static ssize_t type_show(struct kobject *kobj,
+			       struct kobj_attribute *attr, char *buf)
+{
+	struct irq_desc *desc = container_of(kobj, struct irq_desc, kobj);
+	unsigned long flags;
+	ssize_t ret = 0;
+
+	raw_spin_lock_irqsave(&desc->lock, flags);
+	ret = sprintf(buf, "%s\n",
+		      irqd_is_level_type(&desc->irq_data) ? "level" : "edge");
+	raw_spin_unlock_irqrestore(&desc->lock, flags);
+
+	return ret;
+
+}
+IRQ_ATTR_RO(type);
+
+static ssize_t name_show(struct kobject *kobj,
+			 struct kobj_attribute *attr, char *buf)
+{
+	struct irq_desc *desc = container_of(kobj, struct irq_desc, kobj);
+	unsigned long flags;
+	ssize_t ret = 0;
+
+	raw_spin_lock_irqsave(&desc->lock, flags);
+	if (desc->name)
+		ret = scnprintf(buf, PAGE_SIZE, "%s\n", desc->name);
+	raw_spin_unlock_irqrestore(&desc->lock, flags);
+
+	return ret;
+}
+IRQ_ATTR_RO(name);
+
+static ssize_t actions_show(struct kobject *kobj,
+			    struct kobj_attribute *attr, char *buf)
+{
+	struct irq_desc *desc = container_of(kobj, struct irq_desc, kobj);
+	struct irqaction *action;
+	unsigned long flags;
+	ssize_t ret = 0;
+
+	raw_spin_lock_irqsave(&desc->lock, flags);
+	for (action = desc->action; action != NULL; action = action->next) {
+		if (!ret)
+			ret = scnprintf(buf, PAGE_SIZE, "%s", action->name);
+		else
+			ret += scnprintf(buf+ret, PAGE_SIZE-ret, ",%s",
+					 action->name);
+	}
+	raw_spin_unlock_irqrestore(&desc->lock, flags);
+
+	if (ret)
+		ret += scnprintf(buf+ret, PAGE_SIZE-ret, "\n");
+
+	return ret;
+}
+IRQ_ATTR_RO(actions);
+
+static struct attribute *irq_attrs[] = {
+	&per_cpu_count_attr.attr,
+	&chip_name_attr.attr,
+	&hwirq_attr.attr,
+	&type_attr.attr,
+	&name_attr.attr,
+	&actions_attr.attr,
+	NULL
+};
+
+static void irq_kobj_release(struct kobject *kobj);
+
+static struct kobj_type irq_kobj_type = {
+	.release	= irq_kobj_release,
+	.sysfs_ops	= &kobj_sysfs_ops,
+	.default_attrs	= irq_attrs,
+};
+
 #ifdef CONFIG_SPARSE_IRQ
 
 static RADIX_TREE(irq_desc_tree, GFP_KERNEL);
@@ -187,6 +327,7 @@ static struct irq_desc *alloc_desc(int irq, int node, unsigned int flags,
 
 	desc_set_defaults(irq, desc, node, affinity, owner);
 	irqd_set(&desc->irq_data, flags);
+	kobject_init(&desc->kobj, &irq_kobj_type);
 
 	return desc;
 
@@ -197,13 +338,20 @@ err_desc:
 	return NULL;
 }
 
-static void delayed_free_desc(struct rcu_head *rhp)
+static void irq_kobj_release(struct kobject *kobj)
 {
-	struct irq_desc *desc = container_of(rhp, struct irq_desc, rcu);
+	struct irq_desc *desc = container_of(kobj, struct irq_desc, kobj);
 
 	free_masks(desc);
 	free_percpu(desc->kstat_irqs);
 	kfree(desc);
+}
+
+static void delayed_free_desc(struct rcu_head *rhp)
+{
+	struct irq_desc *desc = container_of(rhp, struct irq_desc, rcu);
+
+	kobject_put(&desc->kobj);
 }
 
 static void free_desc(unsigned int irq)
@@ -211,6 +359,7 @@ static void free_desc(unsigned int irq)
 	struct irq_desc *desc = irq_to_desc(irq);
 
 	unregister_irq_proc(irq, desc);
+	kobject_del(&desc->kobj);
 
 	/*
 	 * sparse_irq_lock protects also show_interrupts() and
@@ -261,6 +410,12 @@ static int alloc_descs(unsigned int start, unsigned int cnt, int node,
 			goto err;
 		mutex_lock(&sparse_irq_lock);
 		irq_insert_desc(start + i, desc);
+		if (irq_kobj) {
+			if (kobject_add(&desc->kobj, irq_kobj, "%d", start + i))
+				printk(KERN_WARNING
+				       "Fail to add kobject for irq %d\n",
+				       start + i);
+		}
 		mutex_unlock(&sparse_irq_lock);
 	}
 	return start;
@@ -339,6 +494,7 @@ int __init early_irq_init(void)
 		raw_spin_lock_init(&desc[i].lock);
 		lockdep_set_class(&desc[i].lock, &irq_desc_lock_class);
 		desc_set_defaults(i, &desc[i], node, NULL, NULL);
+		kobject_init(&desc[i].kobj, &irq_kobj_type);
 	}
 	return arch_early_irq_init();
 }
@@ -349,14 +505,27 @@ struct irq_desc *irq_to_desc(unsigned int irq)
 }
 EXPORT_SYMBOL(irq_to_desc);
 
+static void irq_kobj_release(struct kobject *kobj)
+{
+	struct irq_desc *desc = container_of(kobj, struct irq_desc, kobj);
+
+	/*
+	 * This irq_desc is statically allocated.  Simply zero its kobject
+	 * rather than kfree it.
+	 */
+	memset(&desc->kobj, 0, sizeof(desc->kobj));
+}
+
 static void free_desc(unsigned int irq)
 {
 	struct irq_desc *desc = irq_to_desc(irq);
 	unsigned long flags;
 
+	kobject_del(&desc->kobj);
 	raw_spin_lock_irqsave(&desc->lock, flags);
 	desc_set_defaults(irq, desc, irq_desc_get_node(desc), NULL, NULL);
 	raw_spin_unlock_irqrestore(&desc->lock, flags);
+	kobject_put(&desc->kobj);
 }
 
 static inline int alloc_descs(unsigned int start, unsigned int cnt, int node,
@@ -369,6 +538,11 @@ static inline int alloc_descs(unsigned int start, unsigned int cnt, int node,
 		struct irq_desc *desc = irq_to_desc(start + i);
 
 		desc->owner = owner;
+		if (irq_kobj)
+			if (kobject_add(&desc->kobj, irq_kobj, "%d", start + i))
+				printk(KERN_WARNING
+				       "Fail to add kobject for irq %d\n",
+				       start + i);
 	}
 	return start;
 }
@@ -730,3 +904,28 @@ unsigned int kstat_irqs_usr(unsigned int irq)
 	irq_unlock_sparse();
 	return sum;
 }
+
+static int __init irq_sysfs_init(void)
+{
+	int i;
+
+	irq_kobj = kobject_create_and_add("irq", kernel_kobj);
+	if (!irq_kobj)
+		return -ENOMEM;
+
+	irq_lock_sparse();
+	for (i = 0; i < nr_irqs; ++i) {
+		struct irq_desc *desc = irq_to_desc(i);
+
+		if (!desc)
+			continue;
+
+		if (kobject_add(&desc->kobj, irq_kobj, "%d", i))
+			printk(KERN_WARNING
+			       "Fail to add kobject for irq %d\n", i);
+	}
+	irq_unlock_sparse();
+
+	return 0;
+}
+postcore_initcall(irq_sysfs_init);

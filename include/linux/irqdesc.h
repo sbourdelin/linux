@@ -2,6 +2,7 @@
 #define _LINUX_IRQDESC_H
 
 #include <linux/rcupdate.h>
+#include <linux/kobject.h>
 
 /*
  * Core internal functions to deal with irq descriptors
@@ -92,6 +93,7 @@ struct irq_desc {
 	int			parent_irq;
 	struct module		*owner;
 	const char		*name;
+	struct kobject		kobj;
 } ____cacheline_internodealigned_in_smp;
 
 #ifdef CONFIG_SPARSE_IRQ
