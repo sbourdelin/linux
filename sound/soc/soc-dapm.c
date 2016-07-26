@@ -3493,6 +3493,7 @@ static int snd_soc_dai_link_event(struct snd_soc_dapm_widget *w,
 	const struct snd_soc_pcm_stream *config = w->params + w->params_select;
 	struct snd_pcm_substream substream;
 	struct snd_pcm_hw_params *params = NULL;
+	struct snd_pcm_runtime runtime;
 	u64 fmt;
 	int ret;
 
@@ -3540,6 +3541,8 @@ static int snd_soc_dai_link_event(struct snd_soc_dapm_widget *w,
 		= config->channels_max;
 
 	memset(&substream, 0, sizeof(substream));
+	memset(&runtime, 0, sizeof(runtime));
+	substream.runtime = &runtime;
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
