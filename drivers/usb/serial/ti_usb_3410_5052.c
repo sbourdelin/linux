@@ -740,7 +740,7 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 	}
 
 	if (tty)
-		ti_set_termios(tty, port, &tty->termios);
+		ti_set_termios(tty, port, NULL);
 
 	status = ti_send_ctrl_urb(serial, TI_OPEN_PORT, open_settings,
 				  TI_UART1_PORT + port_number);
@@ -780,7 +780,7 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 	usb_clear_halt(dev, port->read_urb->pipe);
 
 	if (tty)
-		ti_set_termios(tty, port, &tty->termios);
+		ti_set_termios(tty, port, NULL);
 
 	status = ti_send_ctrl_urb(serial, TI_OPEN_PORT, open_settings,
 				  TI_UART1_PORT + port_number);
@@ -992,6 +992,13 @@ static void ti_set_termios(struct tty_struct *tty,
 
 	cflag = tty->termios.c_cflag;
 	iflag = tty->termios.c_iflag;
+
+	if (old_termios &&
+		!tty_termios_hw_change(&tty->termios, old_termios) &&
+		tty->termios.c_iflag == old_termios->c_iflag) {
+		dev_dbg(&port->dev, "%s - nothing to change\n", __func__);
+		return;
+	}
 
 	dev_dbg(&port->dev,
 		"%s - cflag 0x%08x, iflag 0x%08x\n", __func__, cflag, iflag);
