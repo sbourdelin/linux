@@ -937,7 +937,6 @@ struct vm_area_struct *vma_merge(struct mm_struct *mm,
 {
 	pgoff_t pglen = (end - addr) >> PAGE_SHIFT;
 	struct vm_area_struct *area, *next;
-	int err;
 
 	/*
 	 * We later require that vma->vm_flags == vm_flags,
@@ -974,13 +973,11 @@ struct vm_area_struct *vma_merge(struct mm_struct *mm,
 				is_mergeable_anon_vma(prev->anon_vma,
 						      next->anon_vma, NULL)) {
 							/* cases 1, 6 */
-			err = vma_adjust(prev, prev->vm_start,
+			vma_adjust(prev, prev->vm_start,
 				next->vm_end, prev->vm_pgoff, NULL);
 		} else					/* cases 2, 5, 7 */
-			err = vma_adjust(prev, prev->vm_start,
+			vma_adjust(prev, prev->vm_start,
 				end, prev->vm_pgoff, NULL);
-		if (err)
-			return NULL;
 		khugepaged_enter_vma_merge(prev, vm_flags);
 		return prev;
 	}
@@ -994,13 +991,11 @@ struct vm_area_struct *vma_merge(struct mm_struct *mm,
 					     anon_vma, file, pgoff+pglen,
 					     vm_userfaultfd_ctx)) {
 		if (prev && addr < prev->vm_end)	/* case 4 */
-			err = vma_adjust(prev, prev->vm_start,
+			vma_adjust(prev, prev->vm_start,
 				addr, prev->vm_pgoff, NULL);
 		else					/* cases 3, 8 */
-			err = vma_adjust(area, addr, next->vm_end,
+			vma_adjust(area, addr, next->vm_end,
 				next->vm_pgoff - pglen, NULL);
-		if (err)
-			return NULL;
 		khugepaged_enter_vma_merge(area, vm_flags);
 		return area;
 	}
