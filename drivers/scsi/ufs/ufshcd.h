@@ -545,6 +545,12 @@ struct ufs_hba {
 
 	enum bkops_status urgent_bkops_lvl;
 	bool is_urgent_bkops_lvl_checked;
+
+	unsigned long purge_timeout;
+	bool is_purge_in_progress;
+	enum purge_status purge_status;
+	struct delayed_work purge_work;
+	struct scsi_cmnd *purge_cmd;
 };
 
 /* Returns true if clocks can be gated. Otherwise false */
