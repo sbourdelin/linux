@@ -4374,6 +4374,7 @@ static cycle_t e1000e_cyclecounter_read(const struct cyclecounter *cc)
 	switch (hw->mac.type) {
 	case e1000_82574:
 	case e1000_82583:
+	case e1000_pch_lpt:
 		systim = e1000e_sanitize_systim(hw, systim);
 		break;
 	default:
