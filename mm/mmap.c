@@ -43,6 +43,7 @@
 #include <linux/userfaultfd_k.h>
 #include <linux/moduleparam.h>
 #include <linux/pkeys.h>
+#include <linux/random.h>
 
 #include <asm/uaccess.h>
 #include <asm/cacheflush.h>
@@ -1582,6 +1583,24 @@ unacct_error:
 	return error;
 }
 
+/*
+ * Generate a random address within a range. This differs from randomize_addr() by randomizing
+ * on len sized chunks. This helps prevent fragmentation of the virtual memory map.
+ */
+static unsigned long randomize_mmap(unsigned long start, unsigned long end, unsigned long len)
+{
+	unsigned long slots;
+
+	if ((current->personality & ADDR_NO_RANDOMIZE) || !randomize_va_space)
+		return 0;
+
+	slots = (end - start)/len;
+	if (!slots)
+		return 0;
+
+	return PAGE_ALIGN(start + ((get_random_long() % slots) * len));
+}
+
 unsigned long unmapped_area(struct vm_unmapped_area_info *info)
 {
 	/*
@@ -1675,6 +1694,8 @@ found:
 	/* We found a suitable gap. Clip it with the original low_limit. */
 	if (gap_start < info->low_limit)
 		gap_start = info->low_limit;
+
+	gap_start = randomize_mmap(gap_start, gap_end, length) ? : gap_start;
 
 	/* Adjust gap address to the desired alignment */
 	gap_start += (info->align_offset - gap_start) & info->align_mask;
@@ -1775,6 +1796,9 @@ found:
 found_highest:
 	/* Compute highest gap address at the desired alignment */
 	gap_end -= info->length;
+
+	gap_end = randomize_mmap(gap_start, gap_end, length) ? : gap_end;
+
 	gap_end -= (gap_end - info->align_offset) & info->align_mask;
 
 	VM_BUG_ON(gap_end < info->low_limit);
