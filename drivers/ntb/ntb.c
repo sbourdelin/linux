@@ -54,6 +54,7 @@
 #include <linux/device.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/atomic.h>
 
 #include <linux/ntb.h>
 #include <linux/pci.h>
@@ -72,7 +73,61 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESCRIPTION);
 
 static struct bus_type ntb_bus;
+static struct ntb_bus_data ntb_data;
 static void ntb_dev_release(struct device *dev);
+
+static int ntb_gen_devid(struct ntb_dev *ntb)
+{
+	const char *name;
+	unsigned long *mask;
+	int id;
+
+	if (ntb_valid_sync_dev_ops(ntb) && ntb_valid_async_dev_ops(ntb)) {
+		name = "ntbAS%d";
+		mask = ntb_data.both_msk;
+	} else if (ntb_valid_sync_dev_ops(ntb)) {
+		name = "ntbS%d";
+		mask = ntb_data.sync_msk;
+	} else if (ntb_valid_async_dev_ops(ntb)) {
+		name = "ntbA%d";
+		mask = ntb_data.async_msk;
+	} else {
+		return -EINVAL;
+	}
+
+	for (id = 0; NTB_MAX_DEVID > id; id++) {
+		if (0 == test_and_set_bit(id, mask)) {
+			ntb->id = id;
+			break;
+		}
+	}
+
+	if (NTB_MAX_DEVID > id) {
+		dev_set_name(&ntb->dev, name, ntb->id);
+	} else {
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+static void ntb_free_devid(struct ntb_dev *ntb)
+{
+	unsigned long *mask;
+
+	if (ntb_valid_sync_dev_ops(ntb) && ntb_valid_async_dev_ops(ntb)) {
+		mask = ntb_data.both_msk;
+	} else if (ntb_valid_sync_dev_ops(ntb)) {
+		mask = ntb_data.sync_msk;
+	} else if (ntb_valid_async_dev_ops(ntb)) {
+		mask = ntb_data.async_msk;
+	} else {
+		/* It's impossible */
+		BUG();
+	}
+
+	clear_bit(ntb->id, mask);
+}
 
 int __ntb_register_client(struct ntb_client *client, struct module *mod,
 			  const char *mod_name)
@@ -99,13 +154,15 @@ EXPORT_SYMBOL(ntb_unregister_client);
 
 int ntb_register_device(struct ntb_dev *ntb)
 {
+	int ret;
+
 	if (!ntb)
 		return -EINVAL;
 	if (!ntb->pdev)
 		return -EINVAL;
 	if (!ntb->ops)
 		return -EINVAL;
-	if (!ntb_dev_ops_is_valid(ntb->ops))
+	if (!ntb_valid_sync_dev_ops(ntb) && !ntb_valid_async_dev_ops(ntb))
 		return -EINVAL;
 
 	init_completion(&ntb->released);
@@ -114,13 +171,21 @@ int ntb_register_device(struct ntb_dev *ntb)
 	ntb->dev.bus = &ntb_bus;
 	ntb->dev.parent = &ntb->pdev->dev;
 	ntb->dev.release = ntb_dev_release;
-	dev_set_name(&ntb->dev, "%s", pci_name(ntb->pdev));
 
 	ntb->ctx = NULL;
 	ntb->ctx_ops = NULL;
 	spin_lock_init(&ntb->ctx_lock);
 
-	return device_register(&ntb->dev);
+	/* No need to wait for completion if failed */
+	ret = ntb_gen_devid(ntb);
+	if (ret)
+		return ret;
+
+	ret = device_register(&ntb->dev);
+	if (ret)
+		ntb_free_devid(ntb);
+
+	return ret;
 }
 EXPORT_SYMBOL(ntb_register_device);
 
@@ -128,6 +193,7 @@ void ntb_unregister_device(struct ntb_dev *ntb)
 {
 	device_unregister(&ntb->dev);
 	wait_for_completion(&ntb->released);
+	ntb_free_devid(ntb);
 }
 EXPORT_SYMBOL(ntb_unregister_device);
 
@@ -190,6 +256,20 @@ void ntb_db_event(struct ntb_dev *ntb, int vector)
 	spin_unlock_irqrestore(&ntb->ctx_lock, irqflags);
 }
 EXPORT_SYMBOL(ntb_db_event);
+
+void ntb_msg_event(struct ntb_dev *ntb, enum NTB_MSG_EVENT ev,
+		   struct ntb_msg *msg)
+{
+	unsigned long irqflags;
+
+	spin_lock_irqsave(&ntb->ctx_lock, irqflags);
+	{
+		if (ntb->ctx_ops && ntb->ctx_ops->msg_event)
+			ntb->ctx_ops->msg_event(ntb->ctx, ev, msg);
+	}
+	spin_unlock_irqrestore(&ntb->ctx_lock, irqflags);
+}
+EXPORT_SYMBOL(ntb_msg_event);
 
 static int ntb_probe(struct device *dev)
 {

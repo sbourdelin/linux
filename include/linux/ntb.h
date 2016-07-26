@@ -159,13 +159,44 @@ static inline int ntb_client_ops_is_valid(const struct ntb_client_ops *ops)
 }
 
 /**
+ * struct ntb_msg - ntb driver message structure
+ * @type:	Message type.
+ * @payload:	Payload data to send to a peer
+ * @data:	Array of u32 data to send (size might be hw dependent)
+ */
+#define NTB_MAX_MSGSIZE 4
+struct ntb_msg {
+	union {
+		struct {
+			u32 type;
+			u32 payload[NTB_MAX_MSGSIZE - 1];
+		};
+		u32 data[NTB_MAX_MSGSIZE];
+	};
+};
+
+/**
+ * enum NTB_MSG_EVENT - message event types
+ * @NTB_MSG_NEW:	New message just arrived and passed to the handler
+ * @NTB_MSG_SENT:	Posted message has just been successfully sent
+ * @NTB_MSG_FAIL:	Posted message failed to be sent
+ */
+enum NTB_MSG_EVENT {
+	NTB_MSG_NEW,
+	NTB_MSG_SENT,
+	NTB_MSG_FAIL
+};
+
+/**
  * struct ntb_ctx_ops - ntb driver context operations
  * @link_event:		See ntb_link_event().
  * @db_event:		See ntb_db_event().
+ * @msg_event:		See ntb_msg_event().
  */
 struct ntb_ctx_ops {
 	void (*link_event)(void *ctx);
 	void (*db_event)(void *ctx, int db_vector);
+	void (*msg_event)(void *ctx, enum NTB_MSG_EVENT ev, struct ntb_msg *msg);
 };
 
 static inline int ntb_ctx_ops_is_valid(const struct ntb_ctx_ops *ops)
@@ -174,18 +205,24 @@ static inline int ntb_ctx_ops_is_valid(const struct ntb_ctx_ops *ops)
 	return
 		/* ops->link_event		&& */
 		/* ops->db_event		&& */
+		/* ops->msg_event		&& */
 		1;
 }
 
 /**
  * struct ntb_ctx_ops - ntb device operations
- * @mw_count:		See ntb_mw_count().
- * @mw_get_range:	See ntb_mw_get_range().
- * @mw_set_trans:	See ntb_mw_set_trans().
- * @mw_clear_trans:	See ntb_mw_clear_trans().
  * @link_is_up:		See ntb_link_is_up().
  * @link_enable:	See ntb_link_enable().
  * @link_disable:	See ntb_link_disable().
+ * @mw_count:		See ntb_mw_count().
+ * @mw_get_maprsc:	See ntb_mw_get_maprsc().
+ * @mw_set_trans:	See ntb_mw_set_trans().
+ * @mw_get_trans:	See ntb_mw_get_trans().
+ * @mw_get_align:	See ntb_mw_get_align().
+ * @peer_mw_count:	See ntb_peer_mw_count().
+ * @peer_mw_set_trans:	See ntb_peer_mw_set_trans().
+ * @peer_mw_get_trans:	See ntb_peer_mw_get_trans().
+ * @peer_mw_get_align:	See ntb_peer_mw_get_align().
  * @db_is_unsafe:	See ntb_db_is_unsafe().
  * @db_valid_mask:	See ntb_db_valid_mask().
  * @db_vector_count:	See ntb_db_vector_count().
@@ -210,21 +247,37 @@ static inline int ntb_ctx_ops_is_valid(const struct ntb_ctx_ops *ops)
  * @peer_spad_addr:	See ntb_peer_spad_addr().
  * @peer_spad_read:	See ntb_peer_spad_read().
  * @peer_spad_write:	See ntb_peer_spad_write().
+ * @msg_post:		See ntb_msg_post().
+ * @msg_size:		See ntb_msg_size().
  */
 struct ntb_dev_ops {
-	int (*mw_count)(struct ntb_dev *ntb);
-	int (*mw_get_range)(struct ntb_dev *ntb, int idx,
-			    phys_addr_t *base, resource_size_t *size,
-			resource_size_t *align, resource_size_t *align_size);
-	int (*mw_set_trans)(struct ntb_dev *ntb, int idx,
-			    dma_addr_t addr, resource_size_t size);
-	int (*mw_clear_trans)(struct ntb_dev *ntb, int idx);
-
 	int (*link_is_up)(struct ntb_dev *ntb,
 			  enum ntb_speed *speed, enum ntb_width *width);
 	int (*link_enable)(struct ntb_dev *ntb,
 			   enum ntb_speed max_speed, enum ntb_width max_width);
 	int (*link_disable)(struct ntb_dev *ntb);
+
+	int (*mw_count)(struct ntb_dev *ntb);
+	int (*mw_get_maprsc)(struct ntb_dev *ntb, int idx,
+			     phys_addr_t *base, resource_size_t *size);
+	int (*mw_get_align)(struct ntb_dev *ntb, int idx,
+			    resource_size_t *addr_align,
+			    resource_size_t *size_align,
+			    resource_size_t *size_max);
+	int (*mw_set_trans)(struct ntb_dev *ntb, int idx,
+			    dma_addr_t addr, resource_size_t size);
+	int (*mw_get_trans)(struct ntb_dev *ntb, int idx,
+			    dma_addr_t *addr, resource_size_t *size);
+
+	int (*peer_mw_count)(struct ntb_dev *ntb);
+	int (*peer_mw_get_align)(struct ntb_dev *ntb, int idx,
+				 resource_size_t *addr_align,
+				 resource_size_t *size_align,
+				 resource_size_t *size_max);
+	int (*peer_mw_set_trans)(struct ntb_dev *ntb, int idx,
+				 dma_addr_t addr, resource_size_t size);
+	int (*peer_mw_get_trans)(struct ntb_dev *ntb, int idx,
+				 dma_addr_t *addr, resource_size_t *size);
 
 	int (*db_is_unsafe)(struct ntb_dev *ntb);
 	u64 (*db_valid_mask)(struct ntb_dev *ntb);
@@ -259,47 +312,10 @@ struct ntb_dev_ops {
 			      phys_addr_t *spad_addr);
 	u32 (*peer_spad_read)(struct ntb_dev *ntb, int idx);
 	int (*peer_spad_write)(struct ntb_dev *ntb, int idx, u32 val);
+
+	int (*msg_post)(struct ntb_dev *ntb, struct ntb_msg *msg);
+	int (*msg_size)(struct ntb_dev *ntb);
 };
-
-static inline int ntb_dev_ops_is_valid(const struct ntb_dev_ops *ops)
-{
-	/* commented callbacks are not required: */
-	return
-		ops->mw_count				&&
-		ops->mw_get_range			&&
-		ops->mw_set_trans			&&
-		/* ops->mw_clear_trans			&& */
-		ops->link_is_up				&&
-		ops->link_enable			&&
-		ops->link_disable			&&
-		/* ops->db_is_unsafe			&& */
-		ops->db_valid_mask			&&
-
-		/* both set, or both unset */
-		(!ops->db_vector_count == !ops->db_vector_mask) &&
-
-		ops->db_read				&&
-		/* ops->db_set				&& */
-		ops->db_clear				&&
-		/* ops->db_read_mask			&& */
-		ops->db_set_mask			&&
-		ops->db_clear_mask			&&
-		/* ops->peer_db_addr			&& */
-		/* ops->peer_db_read			&& */
-		ops->peer_db_set			&&
-		/* ops->peer_db_clear			&& */
-		/* ops->peer_db_read_mask		&& */
-		/* ops->peer_db_set_mask		&& */
-		/* ops->peer_db_clear_mask		&& */
-		/* ops->spad_is_unsafe			&& */
-		ops->spad_count				&&
-		ops->spad_read				&&
-		ops->spad_write				&&
-		/* ops->peer_spad_addr			&& */
-		/* ops->peer_spad_read			&& */
-		ops->peer_spad_write			&&
-		1;
-}
 
 /**
  * struct ntb_client - client interested in ntb devices
@@ -310,8 +326,20 @@ struct ntb_client {
 	struct device_driver		drv;
 	const struct ntb_client_ops	ops;
 };
-
 #define drv_ntb_client(__drv) container_of((__drv), struct ntb_client, drv)
+
+/**
+ * struct ntb_bus_data - NTB bus data
+ * @sync_msk:	Synchroous devices mask
+ * @async_msk:	Asynchronous devices mask
+ * @both_msk:	Both sync and async devices mask
+ */
+#define NTB_MAX_DEVID (8*BITS_PER_LONG)
+struct ntb_bus_data {
+	unsigned long sync_msk[8];
+	unsigned long async_msk[8];
+	unsigned long both_msk[8];
+};
 
 /**
  * struct ntb_device - ntb device
@@ -332,13 +360,149 @@ struct ntb_dev {
 
 	/* private: */
 
+	/* device id */
+	int id;
 	/* synchronize setting, clearing, and calling ctx_ops */
 	spinlock_t			ctx_lock;
 	/* block unregister until device is fully released */
 	struct completion		released;
 };
-
 #define dev_ntb(__dev) container_of((__dev), struct ntb_dev, dev)
+
+/**
+ * ntb_valid_sync_dev_ops() - valid operations for synchronous hardware setup
+ * @ntb:	NTB device
+ *
+ * There might be two types of NTB hardware differed by the way of the settings
+ * configuration. The synchronous chips allows to set the memory windows by
+ * directly writing to the peer registers. Additionally there can be shared
+ * Scratchpad registers for synchronous information exchange. Client drivers
+ * should call this function to make sure the hardware supports the proper
+ * functionality.
+ */
+static inline int ntb_valid_sync_dev_ops(const struct ntb_dev *ntb)
+{
+	const struct ntb_dev_ops *ops = ntb->ops;
+
+	/* Commented callbacks are not required, but might be developed */
+	return	/* NTB link status ops */
+		ops->link_is_up					&&
+		ops->link_enable				&&
+		ops->link_disable				&&
+
+		/* Synchronous memory windows ops */
+		ops->mw_count					&&
+		ops->mw_get_maprsc				&&
+		/* ops->mw_get_align				&& */
+		/* ops->mw_set_trans				&& */
+		/* ops->mw_get_trans				&& */
+		ops->peer_mw_count				&&
+		ops->peer_mw_get_align				&&
+		ops->peer_mw_set_trans				&&
+		/* ops->peer_mw_get_trans			&& */
+
+		/* Doorbell ops */
+		/* ops->db_is_unsafe				&& */
+		ops->db_valid_mask				&&
+		/* both set, or both unset */
+		(!ops->db_vector_count == !ops->db_vector_mask)	&&
+		ops->db_read					&&
+		/* ops->db_set					&& */
+		ops->db_clear					&&
+		/* ops->db_read_mask				&& */
+		ops->db_set_mask				&&
+		ops->db_clear_mask				&&
+		/* ops->peer_db_addr				&& */
+		/* ops->peer_db_read				&& */
+		ops->peer_db_set				&&
+		/* ops->peer_db_clear				&& */
+		/* ops->peer_db_read_mask			&& */
+		/* ops->peer_db_set_mask			&& */
+		/* ops->peer_db_clear_mask			&& */
+
+		/* Scratchpad ops */
+		/* ops->spad_is_unsafe				&& */
+		ops->spad_count					&&
+		ops->spad_read					&&
+		ops->spad_write					&&
+		/* ops->peer_spad_addr				&& */
+		/* ops->peer_spad_read				&& */
+		ops->peer_spad_write				&&
+
+		/* Messages IO ops */
+		/* ops->msg_post				&& */
+		/* ops->msg_size				&& */
+		1;
+}
+
+/**
+ * ntb_valid_async_dev_ops() - valid operations for asynchronous hardware setup
+ * @ntb:	NTB device
+ *
+ * There might be two types of NTB hardware differed by the way of the settings
+ * configuration. The asynchronous chips does not allow to set the memory
+ * windows by directly writing to the peer registers. Instead it implements
+ * the additional method to communinicate between NTB nodes like messages.
+ * Scratchpad registers aren't likely supported by such hardware. Client
+ * drivers should call this function to make sure the hardware supports
+ * the proper functionality.
+ */
+static inline int ntb_valid_async_dev_ops(const struct ntb_dev *ntb)
+{
+	const struct ntb_dev_ops *ops = ntb->ops;
+
+	/* Commented callbacks are not required, but might be developed */
+	return	/* NTB link status ops */
+		ops->link_is_up					&&
+		ops->link_enable				&&
+		ops->link_disable				&&
+
+		/* Asynchronous memory windows ops */
+		ops->mw_count					&&
+		ops->mw_get_maprsc				&&
+		ops->mw_get_align				&&
+		ops->mw_set_trans				&&
+		/* ops->mw_get_trans				&& */
+		ops->peer_mw_count				&&
+		ops->peer_mw_get_align				&&
+		/* ops->peer_mw_set_trans			&& */
+		/* ops->peer_mw_get_trans			&& */
+
+		/* Doorbell ops */
+		/* ops->db_is_unsafe				&& */
+		ops->db_valid_mask				&&
+		/* both set, or both unset */
+		(!ops->db_vector_count == !ops->db_vector_mask)	&&
+		ops->db_read					&&
+		/* ops->db_set					&& */
+		ops->db_clear					&&
+		/* ops->db_read_mask				&& */
+		ops->db_set_mask				&&
+		ops->db_clear_mask				&&
+		/* ops->peer_db_addr				&& */
+		/* ops->peer_db_read				&& */
+		ops->peer_db_set				&&
+		/* ops->peer_db_clear				&& */
+		/* ops->peer_db_read_mask			&& */
+		/* ops->peer_db_set_mask			&& */
+		/* ops->peer_db_clear_mask			&& */
+
+		/* Scratchpad ops */
+		/* ops->spad_is_unsafe				&& */
+		/* ops->spad_count				&& */
+		/* ops->spad_read				&& */
+		/* ops->spad_write				&& */
+		/* ops->peer_spad_addr				&& */
+		/* ops->peer_spad_read				&& */
+		/* ops->peer_spad_write				&& */
+
+		/* Messages IO ops */
+		ops->msg_post					&&
+		ops->msg_size					&&
+		1;
+}
+
+
 
 /**
  * ntb_register_client() - register a client for interest in ntb devices
@@ -441,80 +605,20 @@ void ntb_link_event(struct ntb_dev *ntb);
 void ntb_db_event(struct ntb_dev *ntb, int vector);
 
 /**
- * ntb_mw_count() - get the number of memory windows
+ * ntb_msg_event() - notify driver context of event in messaging subsystem
  * @ntb:	NTB device context.
+ * @ev:		Event type caused the handler invocation
+ * @msg:	Message related to the event
  *
- * Hardware and topology may support a different number of memory windows.
- *
- * Return: the number of memory windows.
+ * Notify the driver context that there is some event happaned in the event
+ * subsystem. If NTB_MSG_NEW is emitted then the new message has just arrived.
+ * NTB_MSG_SENT is rised if some message has just been successfully sent to a
+ * peer. If a message failed to be sent then NTB_MSG_FAIL is emitted. The very
+ * last argument is used to pass the event related message. It discarded right
+ * after the handler returns.
  */
-static inline int ntb_mw_count(struct ntb_dev *ntb)
-{
-	return ntb->ops->mw_count(ntb);
-}
-
-/**
- * ntb_mw_get_range() - get the range of a memory window
- * @ntb:	NTB device context.
- * @idx:	Memory window number.
- * @base:	OUT - the base address for mapping the memory window
- * @size:	OUT - the size for mapping the memory window
- * @align:	OUT - the base alignment for translating the memory window
- * @align_size:	OUT - the size alignment for translating the memory window
- *
- * Get the range of a memory window.  NULL may be given for any output
- * parameter if the value is not needed.  The base and size may be used for
- * mapping the memory window, to access the peer memory.  The alignment and
- * size may be used for translating the memory window, for the peer to access
- * memory on the local system.
- *
- * Return: Zero on success, otherwise an error number.
- */
-static inline int ntb_mw_get_range(struct ntb_dev *ntb, int idx,
-				   phys_addr_t *base, resource_size_t *size,
-		resource_size_t *align, resource_size_t *align_size)
-{
-	return ntb->ops->mw_get_range(ntb, idx, base, size,
-			align, align_size);
-}
-
-/**
- * ntb_mw_set_trans() - set the translation of a memory window
- * @ntb:	NTB device context.
- * @idx:	Memory window number.
- * @addr:	The dma address local memory to expose to the peer.
- * @size:	The size of the local memory to expose to the peer.
- *
- * Set the translation of a memory window.  The peer may access local memory
- * through the window starting at the address, up to the size.  The address
- * must be aligned to the alignment specified by ntb_mw_get_range().  The size
- * must be aligned to the size alignment specified by ntb_mw_get_range().
- *
- * Return: Zero on success, otherwise an error number.
- */
-static inline int ntb_mw_set_trans(struct ntb_dev *ntb, int idx,
-				   dma_addr_t addr, resource_size_t size)
-{
-	return ntb->ops->mw_set_trans(ntb, idx, addr, size);
-}
-
-/**
- * ntb_mw_clear_trans() - clear the translation of a memory window
- * @ntb:	NTB device context.
- * @idx:	Memory window number.
- *
- * Clear the translation of a memory window.  The peer may no longer access
- * local memory through the window.
- *
- * Return: Zero on success, otherwise an error number.
- */
-static inline int ntb_mw_clear_trans(struct ntb_dev *ntb, int idx)
-{
-	if (!ntb->ops->mw_clear_trans)
-		return ntb->ops->mw_set_trans(ntb, idx, 0, 0);
-
-	return ntb->ops->mw_clear_trans(ntb, idx);
-}
+void ntb_msg_event(struct ntb_dev *ntb, enum NTB_MSG_EVENT ev,
+		   struct ntb_msg *msg);
 
 /**
  * ntb_link_is_up() - get the current ntb link state
@@ -542,9 +646,9 @@ static inline int ntb_link_is_up(struct ntb_dev *ntb,
  * @max_width:	The maximum link width expressed as the number of PCIe lanes.
  *
  * Enable the link on the secondary side of the ntb.  This can only be done
- * from the primary side of the ntb in primary or b2b topology.  The ntb device
- * should train the link to its maximum speed and width, or the requested speed
- * and width, whichever is smaller, if supported.
+ * from only one (primary or secondary) side of the ntb in primary or b2b
+ * topology.  The ntb device should train the link to its maximum speed and
+ * width, or the requested speed and width, whichever is smaller, if supported.
  *
  * Return: Zero on success, otherwise an error number.
  */
@@ -560,16 +664,214 @@ static inline int ntb_link_enable(struct ntb_dev *ntb,
  * @ntb:	NTB device context.
  *
  * Disable the link on the secondary side of the ntb.  This can only be
- * done from the primary side of the ntb in primary or b2b topology.  The ntb
- * device should disable the link.  Returning from this call must indicate that
- * a barrier has passed, though with no more writes may pass in either
- * direction across the link, except if this call returns an error number.
+ * done from only one (primary or secondary) side of the ntb in primary or b2b
+ * topology.  The ntb device should disable the link.  Returning from this call
+ * must indicate that a barrier has passed, though with no more writes may pass
+ * in either direction across the link, except if this call returns an error
+ * number.
  *
  * Return: Zero on success, otherwise an error number.
  */
 static inline int ntb_link_disable(struct ntb_dev *ntb)
 {
 	return ntb->ops->link_disable(ntb);
+}
+
+/**
+ * ntb_mw_count() - get the number of local memory windows
+ * @ntb:	NTB device context.
+ *
+ * Hardware and topology may support a different number of memory windows at
+ * local and remote devices
+ *
+ * Return: the number of memory windows.
+ */
+static inline int ntb_mw_count(struct ntb_dev *ntb)
+{
+	return ntb->ops->mw_count(ntb);
+}
+
+/**
+ * ntb_mw_get_maprsc() - get the range of a memory window to map
+ * @ntb:	NTB device context.
+ * @idx:	Memory window number.
+ * @base:	OUT - the base address for mapping the memory window
+ * @size:	OUT - the size for mapping the memory window
+ *
+ * Get the map range of a memory window. The base and size may be used for
+ * mapping the memory window to access the peer memory.
+ *
+ * Return: Zero on success, otherwise an error number.
+ */
+static inline int ntb_mw_get_maprsc(struct ntb_dev *ntb, int idx,
+				    phys_addr_t *base, resource_size_t *size)
+{
+	return ntb->ops->mw_get_maprsc(ntb, idx, base, size);
+}
+
+/**
+ * ntb_mw_get_align() - get memory window alignment of the local node
+ * @ntb:	NTB device context.
+ * @idx:	Memory window number.
+ * @addr_align:	OUT - the translated base address alignment of the memory window
+ * @size_align:	OUT - the translated memory size alignment of the memory window
+ * @size_max:	OUT - the translated memory maximum size
+ *
+ * Get the alignment parameters to allocate the proper memory window. NULL may
+ * be given for any output parameter if the value is not needed.
+ *
+ * Drivers of synchronous hardware don't have to support it.
+ *
+ * Return: Zero on success, otherwise an error number.
+ */
+static inline int ntb_mw_get_align(struct ntb_dev *ntb, int idx,
+				   resource_size_t *addr_align,
+				   resource_size_t *size_align,
+				   resource_size_t *size_max)
+{
+	if (!ntb->ops->mw_get_align)
+		return -EINVAL;
+
+	return ntb->ops->mw_get_align(ntb, idx, addr_align, size_align, size_max);
+}
+
+/**
+ * ntb_mw_set_trans() - set the translated base address of a peer memory window
+ * @ntb:	NTB device context.
+ * @idx:	Memory window number.
+ * @addr:	DMA memory address exposed by the peer.
+ * @size:	Size of the memory exposed by the peer.
+ *
+ * Set the translated base address of a memory window. The peer preliminary
+ * allocates a memory, then someway passes the address to the remote node, that
+ * finally sets up the memory window at the address, up to the size. The address
+ * and size must be aligned to the parameters specified by ntb_mw_get_align() of
+ * the local node and ntb_peer_mw_get_align() of the peer, which must return the
+ * same values. Zero size effectively disables the memory window.
+ *
+ * Drivers of synchronous hardware don't have to support it.
+ *
+ * Return: Zero on success, otherwise an error number.
+ */
+static inline int ntb_mw_set_trans(struct ntb_dev *ntb, int idx,
+				   dma_addr_t addr, resource_size_t size)
+{
+	if (!ntb->ops->mw_set_trans)
+		return -EINVAL;
+
+	return ntb->ops->mw_set_trans(ntb, idx, addr, size);
+}
+
+/**
+ * ntb_mw_get_trans() - get the translated base address of a memory window
+ * @ntb:	NTB device context.
+ * @idx:	Memory window number.
+ * @addr:	The dma memory address exposed by the peer.
+ * @size:	The size of the memory exposed by the peer.
+ *
+ * Get the translated base address of a memory window spicified for the local
+ * hardware and allocated by the peer. If the addr and size are zero, the
+ * memory window is effectively disabled.
+ *
+ * Return: Zero on success, otherwise an error number.
+ */
+static inline int ntb_mw_get_trans(struct ntb_dev *ntb, int idx,
+				   dma_addr_t *addr, resource_size_t *size)
+{
+	if (!ntb->ops->mw_get_trans)
+		return -EINVAL;
+
+	return ntb->ops->mw_get_trans(ntb, idx, addr, size);
+}
+
+/**
+ * ntb_peer_mw_count() - get the number of peer memory windows
+ * @ntb:	NTB device context.
+ *
+ * Hardware and topology may support a different number of memory windows at
+ * local and remote nodes.
+ *
+ * Return: the number of memory windows.
+ */
+static inline int ntb_peer_mw_count(struct ntb_dev *ntb)
+{
+	return ntb->ops->peer_mw_count(ntb);
+}
+
+/**
+ * ntb_peer_mw_get_align() - get memory window alignment of the peer
+ * @ntb:	NTB device context.
+ * @idx:	Memory window number.
+ * @addr_align:	OUT - the translated base address alignment of the memory window
+ * @size_align:	OUT - the translated memory size alignment of the memory window
+ * @size_max:	OUT - the translated memory maximum size
+ *
+ * Get the alignment parameters to allocate the proper memory window for the
+ * peer. NULL may be given for any output parameter if the value is not needed.
+ *
+ * Return: Zero on success, otherwise an error number.
+ */
+static inline int ntb_peer_mw_get_align(struct ntb_dev *ntb, int idx,
+					resource_size_t *addr_align,
+					resource_size_t *size_align,
+					resource_size_t *size_max)
+{
+	if (!ntb->ops->peer_mw_get_align)
+		return -EINVAL;
+
+	return ntb->ops->peer_mw_get_align(ntb, idx, addr_align, size_align,
+					   size_max);
+}
+
+/**
+ * ntb_peer_mw_set_trans() - set the translated base address of a peer
+ *			     memory window
+ * @ntb:	NTB device context.
+ * @idx:	Memory window number.
+ * @addr:	Local DMA memory address exposed to the peer.
+ * @size:	Size of the memory exposed to the peer.
+ *
+ * Set the translated base address of a memory window exposed to the peer.
+ * The local node preliminary allocates the window, then directly writes the
+ * address and size to the peer control registers. The address and size must
+ * be aligned to the parameters specified by ntb_peer_mw_get_align() of
+ * the local node and ntb_mw_get_align() of the peer, which must return the
+ * same values. Zero size effectively disables the memory window.
+ *
+ * Drivers of synchronous hardware must support it.
+ *
+ * Return: Zero on success, otherwise an error number.
+ */
+static inline int ntb_peer_mw_set_trans(struct ntb_dev *ntb, int idx,
+					dma_addr_t addr, resource_size_t size)
+{
+	if (!ntb->ops->peer_mw_set_trans)
+		return -EINVAL;
+
+	return ntb->ops->peer_mw_set_trans(ntb, idx, addr, size);
+}
+
+/**
+ * ntb_peer_mw_get_trans() - get the translated base address of a peer
+ *			     memory window
+ * @ntb:	NTB device context.
+ * @idx:	Memory window number.
+ * @addr:	Local dma memory address exposed to the peer.
+ * @size:	Size of the memory exposed to the peer.
+ *
+ * Get the translated base address of a memory window spicified for the peer
+ * hardware. If the addr and size are zero then the memory window is effectively
+ * disabled.
+ *
+ * Return: Zero on success, otherwise an error number.
+ */
+static inline int ntb_peer_mw_get_trans(struct ntb_dev *ntb, int idx,
+					dma_addr_t *addr, resource_size_t *size)
+{
+	if (!ntb->ops->peer_mw_get_trans)
+		return -EINVAL;
+
+	return ntb->ops->peer_mw_get_trans(ntb, idx, addr, size);
 }
 
 /**
@@ -751,6 +1053,8 @@ static inline int ntb_db_clear_mask(struct ntb_dev *ntb, u64 db_bits)
  * append one additional dma memory copy with the doorbell register as the
  * destination, after the memory copy operations.
  *
+ * This is unusual, and hardware may not be suitable to implement it.
+ *
  * Return: Zero on success, otherwise an error number.
  */
 static inline int ntb_peer_db_addr(struct ntb_dev *ntb,
@@ -901,10 +1205,15 @@ static inline int ntb_spad_is_unsafe(struct ntb_dev *ntb)
  *
  * Hardware and topology may support a different number of scratchpads.
  *
+ * Asynchronous hardware may not support it.
+ *
  * Return: the number of scratchpads.
  */
 static inline int ntb_spad_count(struct ntb_dev *ntb)
 {
+	if (!ntb->ops->spad_count)
+		return -EINVAL;
+
 	return ntb->ops->spad_count(ntb);
 }
 
@@ -915,10 +1224,15 @@ static inline int ntb_spad_count(struct ntb_dev *ntb)
  *
  * Read the local scratchpad register, and return the value.
  *
+ * Asynchronous hardware may not support it.
+ *
  * Return: The value of the local scratchpad register.
  */
 static inline u32 ntb_spad_read(struct ntb_dev *ntb, int idx)
 {
+	if (!ntb->ops->spad_read)
+		return 0;
+
 	return ntb->ops->spad_read(ntb, idx);
 }
 
@@ -930,10 +1244,15 @@ static inline u32 ntb_spad_read(struct ntb_dev *ntb, int idx)
  *
  * Write the value to the local scratchpad register.
  *
+ * Asynchronous hardware may not support it.
+ *
  * Return: Zero on success, otherwise an error number.
  */
 static inline int ntb_spad_write(struct ntb_dev *ntb, int idx, u32 val)
 {
+	if (!ntb->ops->spad_write)
+		return -EINVAL;
+
 	return ntb->ops->spad_write(ntb, idx, val);
 }
 
@@ -945,6 +1264,8 @@ static inline int ntb_spad_write(struct ntb_dev *ntb, int idx, u32 val)
  *
  * Return the address of the peer doorbell register.  This may be used, for
  * example, by drivers that offload memory copy operations to a dma engine.
+ *
+ * Asynchronous hardware may not support it.
  *
  * Return: Zero on success, otherwise an error number.
  */
@@ -964,10 +1285,15 @@ static inline int ntb_peer_spad_addr(struct ntb_dev *ntb, int idx,
  *
  * Read the peer scratchpad register, and return the value.
  *
+ * Asynchronous hardware may not support it.
+ *
  * Return: The value of the local scratchpad register.
  */
 static inline u32 ntb_peer_spad_read(struct ntb_dev *ntb, int idx)
 {
+	if (!ntb->ops->peer_spad_read)
+		return 0;
+
 	return ntb->ops->peer_spad_read(ntb, idx);
 }
 
@@ -979,11 +1305,59 @@ static inline u32 ntb_peer_spad_read(struct ntb_dev *ntb, int idx)
  *
  * Write the value to the peer scratchpad register.
  *
+ * Asynchronous hardware may not support it.
+ *
  * Return: Zero on success, otherwise an error number.
  */
 static inline int ntb_peer_spad_write(struct ntb_dev *ntb, int idx, u32 val)
 {
+	if (!ntb->ops->peer_spad_write)
+		return -EINVAL;
+
 	return ntb->ops->peer_spad_write(ntb, idx, val);
+}
+
+/**
+ * ntb_msg_post() - post the message to the peer
+ * @ntb:	NTB device context.
+ * @msg:	Message
+ *
+ * Post the message to a peer. It shall be delivered to the peer by the
+ * corresponding hardware method. The peer should be notified about the new
+ * message by calling the ntb_msg_event() handler of NTB_MSG_NEW event type.
+ * If delivery is fails for some reasong the local node will get NTB_MSG_FAIL
+ * event. Otherwise the NTB_MSG_SENT is emitted.
+ *
+ * Synchronous hardware may not support it.
+ *
+ * Return: Zero on success, otherwise an error number.
+ */
+static inline int ntb_msg_post(struct ntb_dev *ntb, struct ntb_msg *msg)
+{
+	if (!ntb->ops->msg_post)
+		return -EINVAL;
+
+	return ntb->ops->msg_post(ntb, msg);
+}
+
+/**
+ * ntb_msg_size() - size of the message data
+ * @ntb:	NTB device context.
+ *
+ * Different hardware may support different number of message registers. This
+ * callback shall return the number of those used for data sending and
+ * receiving including the type field.
+ *
+ * Synchronous hardware may not support it.
+ *
+ * Return: Zero on success, otherwise an error number.
+ */
+static inline int ntb_msg_size(struct ntb_dev *ntb)
+{
+	if (!ntb->ops->msg_size)
+		return 0;
+
+	return ntb->ops->msg_size(ntb);
 }
 
 #endif

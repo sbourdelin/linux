@@ -804,11 +804,8 @@ static int intel_ntb_mw_count(struct ntb_dev *ntb)
 	return ntb_ndev(ntb)->mw_count;
 }
 
-static int intel_ntb_mw_get_range(struct ntb_dev *ntb, int idx,
-				  phys_addr_t *base,
-				  resource_size_t *size,
-				  resource_size_t *align,
-				  resource_size_t *align_size)
+static int intel_ntb_mw_get_maprsc(struct ntb_dev *ntb, int idx,
+				   phys_addr_t *base, resource_size_t *size)
 {
 	struct intel_ntb_dev *ndev = ntb_ndev(ntb);
 	int bar;
@@ -828,17 +825,51 @@ static int intel_ntb_mw_get_range(struct ntb_dev *ntb, int idx,
 		*size = pci_resource_len(ndev->ntb.pdev, bar) -
 			(idx == ndev->b2b_idx ? ndev->b2b_off : 0);
 
-	if (align)
-		*align = pci_resource_len(ndev->ntb.pdev, bar);
+	return 0;
+}
 
-	if (align_size)
-		*align_size = 1;
+static int intel_ntb_peer_mw_count(struct ntb_dev *ntb)
+{
+	return ntb_ndev(ntb)->mw_count;
+}
+
+static int intel_ntb_peer_mw_get_align(struct ntb_dev *ntb, int idx,
+				       resource_size_t *addr_align,
+				       resource_size_t *size_align,
+				       resource_size_t *size_max)
+{
+	struct intel_ntb_dev *ndev = ntb_ndev(ntb);
+	resource_size_t bar_size, mw_size;
+	int bar;
+
+	if (idx >= ndev->b2b_idx && !ndev->b2b_off)
+		idx += 1;
+
+	bar = ndev_mw_to_bar(ndev, idx);
+	if (bar < 0)
+		return bar;
+
+	bar_size = pci_resource_len(ndev->ntb.pdev, bar);
+
+	if (idx == ndev->b2b_idx)
+		mw_size = bar_size - ndev->b2b_off;
+	else
+		mw_size = bar_size;
+
+	if (addr_align)
+		*addr_align = bar_size;
+
+	if (size_align)
+		*size_align = 1;
+
+	if (size_max)
+		*size_max = mw_size;
 
 	return 0;
 }
 
-static int intel_ntb_mw_set_trans(struct ntb_dev *ntb, int idx,
-				  dma_addr_t addr, resource_size_t size)
+static int intel_ntb_peer_mw_set_trans(struct ntb_dev *ntb, int idx,
+				       dma_addr_t addr, resource_size_t size)
 {
 	struct intel_ntb_dev *ndev = ntb_ndev(ntb);
 	unsigned long base_reg, xlat_reg, limit_reg;
@@ -2220,8 +2251,10 @@ static struct intel_b2b_addr xeon_b2b_dsd_addr = {
 /* operations for primary side of local ntb */
 static const struct ntb_dev_ops intel_ntb_ops = {
 	.mw_count		= intel_ntb_mw_count,
-	.mw_get_range		= intel_ntb_mw_get_range,
-	.mw_set_trans		= intel_ntb_mw_set_trans,
+	.mw_get_maprsc		= intel_ntb_mw_get_maprsc,
+	.peer_mw_count		= intel_ntb_peer_mw_count,
+	.peer_mw_get_align	= intel_ntb_peer_mw_get_align,
+	.peer_mw_set_trans	= intel_ntb_peer_mw_set_trans,
 	.link_is_up		= intel_ntb_link_is_up,
 	.link_enable		= intel_ntb_link_enable,
 	.link_disable		= intel_ntb_link_disable,

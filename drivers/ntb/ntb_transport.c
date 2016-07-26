@@ -673,7 +673,7 @@ static void ntb_free_mw(struct ntb_transport_ctx *nt, int num_mw)
 	if (!mw->virt_addr)
 		return;
 
-	ntb_mw_clear_trans(nt->ndev, num_mw);
+	ntb_peer_mw_set_trans(nt->ndev, num_mw, 0, 0);
 	dma_free_coherent(&pdev->dev, mw->buff_size,
 			  mw->virt_addr, mw->dma_addr);
 	mw->xlat_size = 0;
@@ -730,7 +730,8 @@ static int ntb_set_mw(struct ntb_transport_ctx *nt, int num_mw,
 	}
 
 	/* Notify HW the memory location of the receive buffer */
-	rc = ntb_mw_set_trans(nt->ndev, num_mw, mw->dma_addr, mw->xlat_size);
+	rc = ntb_peer_mw_set_trans(nt->ndev, num_mw, mw->dma_addr,
+				   mw->xlat_size);
 	if (rc) {
 		dev_err(&pdev->dev, "Unable to set mw%d translation", num_mw);
 		ntb_free_mw(nt, num_mw);
@@ -1060,7 +1061,11 @@ static int ntb_transport_probe(struct ntb_client *self, struct ntb_dev *ndev)
 	int node;
 	int rc, i;
 
-	mw_count = ntb_mw_count(ndev);
+	/* Synchronous hardware is only supported */
+	if (!ntb_valid_sync_dev_ops(ndev))
+		return -EINVAL;
+
+	mw_count = ntb_peer_mw_count(ndev);
 	if (ntb_spad_count(ndev) < (NUM_MWS + 1 + mw_count * 2)) {
 		dev_err(&ndev->dev, "Not enough scratch pad registers for %s",
 			NTB_TRANSPORT_NAME);
@@ -1094,8 +1099,12 @@ static int ntb_transport_probe(struct ntb_client *self, struct ntb_dev *ndev)
 	for (i = 0; i < mw_count; i++) {
 		mw = &nt->mw_vec[i];
 
-		rc = ntb_mw_get_range(ndev, i, &mw->phys_addr, &mw->phys_size,
-				      &mw->xlat_align, &mw->xlat_align_size);
+		rc = ntb_mw_get_maprsc(ndev, i, &mw->phys_addr, &mw->phys_size);
+		if (rc)
+			goto err1;
+
+		rc = ntb_peer_mw_get_align(ndev, i, &mw->xlat_align,
+					   &mw->xlat_align_size, NULL);
 		if (rc)
 			goto err1;
 
