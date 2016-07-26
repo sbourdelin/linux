@@ -208,6 +208,9 @@ static int __init sun4i_timer_init(struct device_node *node)
 	/* Make sure timer is stopped before playing with interrupts */
 	sun4i_clkevt_time_stop(0);
 
+	/* clear timer0 interrupt */
+	writel(0x1, timer_base + TIMER_IRQ_ST_REG);
+
 	sun4i_clockevent.cpumask = cpu_possible_mask;
 	sun4i_clockevent.irq = irq;
 
