@@ -2202,6 +2202,31 @@ out:
 	return err;
 }
 
+static unsigned int mmc_align_erase_size(struct mmc_card *card,
+					 unsigned int *from,
+					 unsigned int *to,
+					 unsigned int nr)
+{
+	unsigned int from_old = *from, nr_old = nr;
+	unsigned int from_new, nr_new;
+
+	from_new = round_up(from_old, card->erase_size);
+	if (nr_old > from_new - from_old)
+		nr_old -= from_new - from_old;
+	else
+		return 0;
+
+	nr_new = round_down(nr_old, card->erase_size);
+	if (nr_new == 0)
+		return 0;
+
+	/* 'from' and 'to' are inclusive */
+	*to = from_new + nr_new - 1;
+	*from = from_new;
+
+	return nr_new;
+}
+
 /**
  * mmc_erase - erase sectors.
  * @card: card to erase
@@ -2216,13 +2241,6 @@ int mmc_erase(struct mmc_card *card, unsigned int from, unsigned int nr,
 {
 	unsigned int rem, to = from + nr;
 	int err;
-
-	if (!(card->host->caps & MMC_CAP_ERASE) ||
-	    !(card->csd.cmdclass & CCC_ERASE))
-		return -EOPNOTSUPP;
-
-	if (!card->erase_size)
-		return -EOPNOTSUPP;
 
 	if (mmc_card_sd(card) && arg != MMC_ERASE_ARG)
 		return -EOPNOTSUPP;
@@ -2241,30 +2259,10 @@ int mmc_erase(struct mmc_card *card, unsigned int from, unsigned int nr,
 	}
 
 	if (arg == MMC_ERASE_ARG) {
-		rem = from % card->erase_size;
-		if (rem) {
-			rem = card->erase_size - rem;
-			from += rem;
-			if (nr > rem)
-				nr -= rem;
-			else
-				return 0;
-		}
-		rem = nr % card->erase_size;
-		if (rem)
-			nr -= rem;
+		rem = mmc_align_erase_size(card, &from, &to, nr);
+		if (rem == 0)
+			return 0;
 	}
-
-	if (nr == 0)
-		return 0;
-
-	to = from + nr;
-
-	if (to <= from)
-		return -EINVAL;
-
-	/* 'from' and 'to' are inclusive */
-	to -= 1;
 
 	/*
 	 * Special case where only one erase-group fits in the timeout budget:
