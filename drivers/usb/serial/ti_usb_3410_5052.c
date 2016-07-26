@@ -315,26 +315,27 @@ static int ti_port_remove(struct usb_serial_port *port);
 static int ti_open(struct tty_struct *tty, struct usb_serial_port *port);
 static void ti_close(struct usb_serial_port *port);
 static int ti_write(struct tty_struct *tty, struct usb_serial_port *port,
-		const unsigned char *data, int count);
+		    const unsigned char *data, int count);
 static int ti_write_room(struct tty_struct *tty);
 static int ti_chars_in_buffer(struct tty_struct *tty);
 static bool ti_tx_empty(struct usb_serial_port *port);
 static void ti_throttle(struct tty_struct *tty);
 static void ti_unthrottle(struct tty_struct *tty);
 static int ti_ioctl(struct tty_struct *tty,
-		unsigned int cmd, unsigned long arg);
+		    unsigned int cmd, unsigned long arg);
 static void ti_set_termios(struct tty_struct *tty,
-		struct usb_serial_port *port, struct ktermios *old_termios);
+			   struct usb_serial_port *port,
+			   struct ktermios *old_termios);
 static int ti_tiocmget(struct tty_struct *tty);
 static int ti_tiocmset(struct tty_struct *tty,
-		unsigned int set, unsigned int clear);
+		       unsigned int set, unsigned int clear);
 static void ti_break(struct tty_struct *tty, int break_state);
 static void ti_interrupt_callback(struct urb *urb);
 static void ti_bulk_in_callback(struct urb *urb);
 static void ti_bulk_out_callback(struct urb *urb);
 
 static void ti_recv(struct usb_serial_port *port, unsigned char *data,
-		int length);
+		    int length);
 static void ti_send(struct ti_port *tport);
 static int ti_set_mcr(struct ti_port *tport, unsigned int mcr);
 static int ti_get_lsr(struct ti_port *tport, u8 *lsr);
@@ -772,8 +773,10 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 		goto unlink_int_urb;
 	}
 
-	/* reset the data toggle on the bulk endpoints to work around bug in
-	 * host controllers where things get out of sync some times */
+	/*
+	 * reset the data toggle on the bulk endpoints to work around bug in
+	 * host controllers where things get out of sync some times
+	 */
 	usb_clear_halt(dev, port->write_urb->pipe);
 	usb_clear_halt(dev, port->read_urb->pipe);
 
@@ -868,7 +871,7 @@ static void ti_close(struct usb_serial_port *port)
 
 
 static int ti_write(struct tty_struct *tty, struct usb_serial_port *port,
-			const unsigned char *data, int count)
+		    const unsigned char *data, int count)
 {
 	struct ti_port *tport = usb_get_serial_port_data(port);
 
@@ -957,7 +960,7 @@ static void ti_unthrottle(struct tty_struct *tty)
 }
 
 static int ti_ioctl(struct tty_struct *tty,
-	unsigned int cmd, unsigned long arg)
+		    unsigned int cmd, unsigned long arg)
 {
 	struct usb_serial_port *port = tty->driver_data;
 
@@ -974,7 +977,8 @@ static int ti_ioctl(struct tty_struct *tty,
 
 
 static void ti_set_termios(struct tty_struct *tty,
-		struct usb_serial_port *port, struct ktermios *old_termios)
+			   struct usb_serial_port *port,
+			   struct ktermios *old_termios)
 {
 	struct ti_port *tport = usb_get_serial_port_data(port);
 	struct ti_uart_config *config;
@@ -1137,13 +1141,13 @@ static int ti_tiocmget(struct tty_struct *tty)
 	mcr = tport->tp_shadow_mcr;
 	spin_unlock_irqrestore(&tport->tp_lock, flags);
 
-	result = ((mcr & TI_MCR_DTR) ? TIOCM_DTR : 0)
-		| ((mcr & TI_MCR_RTS) ? TIOCM_RTS : 0)
-		| ((mcr & TI_MCR_LOOP) ? TIOCM_LOOP : 0)
-		| ((msr & TI_MSR_CTS) ? TIOCM_CTS : 0)
-		| ((msr & TI_MSR_CD) ? TIOCM_CAR : 0)
-		| ((msr & TI_MSR_RI) ? TIOCM_RI : 0)
-		| ((msr & TI_MSR_DSR) ? TIOCM_DSR : 0);
+	result = ((mcr & TI_MCR_DTR)	? TIOCM_DTR	: 0) |
+		 ((mcr & TI_MCR_RTS)	? TIOCM_RTS	: 0) |
+		 ((mcr & TI_MCR_LOOP)   ? TIOCM_LOOP	: 0) |
+		 ((msr & TI_MSR_CTS)	? TIOCM_CTS	: 0) |
+		 ((msr & TI_MSR_CD)	? TIOCM_CAR	: 0) |
+		 ((msr & TI_MSR_RI)	? TIOCM_RI	: 0) |
+		 ((msr & TI_MSR_DSR)	? TIOCM_DSR	: 0);
 
 	dev_dbg(&port->dev, "%s - 0x%04X\n", __func__, result);
 
@@ -1152,7 +1156,7 @@ static int ti_tiocmget(struct tty_struct *tty)
 
 
 static int ti_tiocmset(struct tty_struct *tty,
-				unsigned int set, unsigned int clear)
+		       unsigned int set, unsigned int clear)
 {
 	struct usb_serial_port *port = tty->driver_data;
 	struct ti_port *tport = usb_get_serial_port_data(port);
@@ -1364,7 +1368,7 @@ static void ti_bulk_out_callback(struct urb *urb)
 
 
 static void ti_recv(struct usb_serial_port *port, unsigned char *data,
-		int length)
+		    int length)
 {
 	int cnt;
 
