@@ -1135,6 +1135,7 @@ static int ipmr_mfc_add(struct net *net, struct mr_table *mrt,
 		if (!mrtsock)
 			c->mfc_flags |= MFC_STATIC;
 		write_unlock_bh(&mrt_lock);
+		c->mfc_un.res.lastuse = jiffies;
 		mroute_netlink_event(mrt, c, RTM_NEWROUTE);
 		return 0;
 	}
