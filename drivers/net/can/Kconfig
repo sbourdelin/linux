@@ -104,6 +104,16 @@ config CAN_JANZ_ICAN3
 	  This driver can also be built as a module. If so, the module will be
 	  called janz-ican3.ko.
 
+config CAN_MEN_Z192
+	tristate "MEN 16Z192-00 CAN Controller"
+	depends on MCB
+	---help---
+	  Driver for MEN 16Z192-00 CAN Controller IP-Core, which
+	  is connected to the MEN Chameleon Bus.
+
+	  This driver can also be built as a module. If so, the module will be
+	  called men_z192_can.ko.
+
 config CAN_RCAR
 	tristate "Renesas R-Car CAN controller"
 	depends on ARCH_RENESAS || ARM
