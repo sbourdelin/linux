@@ -847,7 +847,7 @@ int get_anon_bdev(dev_t *p)
 	else if (dev < 0)
 		return dev;
 
-	*p = MKDEV(0, dev & MINORMASK);
+	*p = MKDEV(0, dev);
 	return 0;
 }
 EXPORT_SYMBOL(get_anon_bdev);
