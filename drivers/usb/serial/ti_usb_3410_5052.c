@@ -601,7 +601,7 @@ static int ti_startup(struct usb_serial *serial)
 	/* determine device type */
 	if (serial->type == &ti_1port_device)
 		tdev->td_is_3410 = 1;
-	dev_dbg(&dev->dev, "%s - device type is %s\n", __func__,
+	dev_dbg(&dev->dev, "%s - device type is: %s\n", __func__,
 		tdev->td_is_3410 ? "3410" : "5052");
 
 	vid = le16_to_cpu(dev->descriptor.idVendor);
@@ -728,13 +728,14 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 		dev_dbg(&port->dev, "%s - start interrupt in urb\n", __func__);
 		urb = serial->port[0]->interrupt_in_urb;
 		if (!urb) {
-			dev_err(&port->dev, "%s - no interrupt urb\n", __func__);
+			dev_err(&port->dev, "no interrupt endpoint\n");
 			status = -EINVAL;
 			goto release_lock;
 		}
 		status = usb_submit_urb(urb, GFP_KERNEL);
 		if (status) {
-			dev_err(&port->dev, "%s - submit interrupt urb failed, %d\n", __func__, status);
+			dev_err(&port->dev, "failed to submit interrupt urb: %d\n",
+				status);
 			goto release_lock;
 		}
 	}
@@ -745,32 +746,29 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 	status = ti_send_ctrl_urb(serial, TI_OPEN_PORT, open_settings,
 				  TI_UART1_PORT + port_number);
 	if (status) {
-		dev_err(&port->dev, "%s - cannot send open command, %d\n",
-			__func__, status);
+		dev_err(&port->dev, "cannot send open command: %d\n", status);
 		goto unlink_int_urb;
 	}
 
 	status = ti_send_ctrl_urb(serial, TI_START_PORT, 0,
 				  TI_UART1_PORT + port_number);
 	if (status) {
-		dev_err(&port->dev, "%s - cannot send start command, %d\n",
-							__func__, status);
+		dev_err(&port->dev, "cannot send start command: %d\n", status);
 		goto unlink_int_urb;
 	}
 
 	status = ti_send_ctrl_urb(serial, TI_PURGE_PORT, TI_PURGE_INPUT,
 				  TI_UART1_PORT + port_number);
 	if (status) {
-		dev_err(&port->dev, "%s - cannot clear input buffers, %d\n",
-							__func__, status);
+		dev_err(&port->dev, "cannot clear input buffers: %d\n", status);
 		goto unlink_int_urb;
 	}
 
 	status = ti_send_ctrl_urb(serial, TI_PURGE_PORT, TI_PURGE_OUTPUT,
 				  TI_UART1_PORT + port_number);
 	if (status) {
-		dev_err(&port->dev, "%s - cannot clear output buffers, %d\n",
-							__func__, status);
+		dev_err(&port->dev, "cannot clear output buffers: %d\n",
+			status);
 		goto unlink_int_urb;
 	}
 
@@ -785,23 +783,23 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 	status = ti_send_ctrl_urb(serial, TI_OPEN_PORT, open_settings,
 				  TI_UART1_PORT + port_number);
 	if (status) {
-		dev_err(&port->dev, "%s - cannot send open command (2), %d\n",
-							__func__, status);
+		dev_err(&port->dev, "cannot send open command (2): %d\n",
+			status);
 		goto unlink_int_urb;
 	}
 
 	status = ti_send_ctrl_urb(serial, TI_START_PORT, 0,
 				  TI_UART1_PORT + port_number);
 	if (status) {
-		dev_err(&port->dev, "%s - cannot send start command (2), %d\n",
-							__func__, status);
+		dev_err(&port->dev, "cannot send start command (2): %d\n",
+			status);
 		goto unlink_int_urb;
 	}
 
 	/* start read urb */
 	urb = port->read_urb;
 	if (!urb) {
-		dev_err(&port->dev, "%s - no read urb\n", __func__);
+		dev_err(&port->dev, "no read urb\n");
 		status = -EINVAL;
 		goto unlink_int_urb;
 	}
@@ -809,8 +807,7 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 	urb->context = tport;
 	status = usb_submit_urb(urb, GFP_KERNEL);
 	if (status) {
-		dev_err(&port->dev, "%s - submit read urb failed, %d\n",
-							__func__, status);
+		dev_err(&port->dev, "failed to submit read urb: %d\n", status);
 		goto unlink_int_urb;
 	}
 
@@ -852,11 +849,10 @@ static void ti_close(struct usb_serial_port *port)
 	port_number = port->port_number;
 
 	status = ti_send_ctrl_urb(port->serial, TI_CLOSE_PORT, 0,
-				  TI_UART1_PORT + port_number);
+				  TI_UART1_PORT + port->port_number);
 	if (status)
 		dev_err(&port->dev,
-			"%s - cannot send close port command, %d\n"
-							, __func__, status);
+			"failed to send close port command: %d\n", status);
 
 	/* if mutex_lock is interrupted, continue anyway */
 	do_unlock = !mutex_lock_interruptible(&tdev->td_open_close_lock);
@@ -955,8 +951,8 @@ static void ti_unthrottle(struct tty_struct *tty)
 	if (I_IXOFF(tty) || C_CRTSCTS(tty)) {
 		status = ti_restart_read(tport, tty);
 		if (status)
-			dev_err(&port->dev, "%s - cannot restart read, %d\n",
-							__func__, status);
+			dev_err(&port->dev, "failed to restart read: %d\n",
+				status);
 	}
 }
 
@@ -1102,9 +1098,10 @@ static void ti_set_termios(struct tty_struct *tty,
 	status = ti_send_ctrl_data_urb(port->serial, TI_SET_CONFIG, 0,
 				       TI_UART1_PORT + port_number, config,
 				       sizeof(*config));
-	if (status)
-		dev_err(&port->dev, "%s - cannot set config on port %d, %d\n",
-					__func__, port_number, status);
+	if (status) {
+		dev_err(&port->dev, "cannot set config on port %d: %d\n",
+			port_number, status);
+	}
 
 	/* SET_CONFIG asserts RTS and DTR, reset them correctly */
 	mcr = tport->tp_shadow_mcr;
@@ -1115,10 +1112,11 @@ static void ti_set_termios(struct tty_struct *tty,
 		mcr |= TI_MCR_DTR | TI_MCR_RTS;
 
 	status = ti_set_mcr(tport, mcr);
-	if (status)
+	if (status) {
 		dev_err(&port->dev,
-			"%s - cannot set modem control on port %d, %d\n",
-						__func__, port_number, status);
+			"cannot set modem control on port %d: %d\n",
+			port_number, status);
+	}
 
 	kfree(config);
 }
@@ -1194,7 +1192,7 @@ static void ti_break(struct tty_struct *tty, int break_state)
 		tport->tp_uart_base_addr + TI_UART_OFFSET_LCR,
 		TI_LCR_BREAK, break_state == -1 ? TI_LCR_BREAK : 0);
 	if (status)
-		dev_dbg(&port->dev, "%s - error setting break, %d\n", __func__, status);
+		dev_dbg(&port->dev, "failed to set break: %d\n", status);
 }
 
 static int ti_get_port_from_code(unsigned char code)
@@ -1223,23 +1221,23 @@ static void ti_interrupt_callback(struct urb *urb)
 	case -ECONNRESET:
 	case -ENOENT:
 	case -ESHUTDOWN:
-		dev_dbg(&port->dev, "%s - urb shutting down, %d\n",
+		dev_dbg(&port->dev, "%s - urb shutting down: %d\n",
 			__func__, status);
 		return;
 	default:
-		dev_err(&port->dev, "%s - nonzero urb status, %d\n",
+		dev_dbg(&port->dev, "%s - nonzero urb status: %d\n",
 			__func__, status);
 		goto exit;
 	}
 
 	if (length != 2) {
-		dev_dbg(&port->dev, "%s - bad packet size, %d\n",
+		dev_dbg(&port->dev, "%s - bad packet size: %d\n",
 			__func__, length);
 		goto exit;
 	}
 
 	if (data[0] == TI_CODE_HARDWARE_ERROR) {
-		dev_err(&port->dev, "%s - hardware error, %d\n",
+		dev_err(&port->dev, "%s - hardware error: %d\n",
 			__func__, data[1]);
 		goto exit;
 	}
@@ -1251,14 +1249,13 @@ static void ti_interrupt_callback(struct urb *urb)
 		__func__, port_number, function, data[1]);
 
 	if (port_number >= port->serial->num_ports) {
-		dev_err(&port->dev, "%s - bad port number, %d\n",
-						__func__, port_number);
+		dev_err(&port->dev, "bad port number: %d\n", port_number);
 		goto exit;
 	}
 
 	switch (function) {
 	case TI_CODE_DATA_ERROR:
-		dev_err(&port->dev, "%s - DATA ERROR, port %d, data 0x%02X\n",
+		dev_dbg(&port->dev, "%s - DATA ERROR, port %d, data 0x%02X\n",
 			__func__, port_number, data[1]);
 		break;
 
@@ -1270,16 +1267,16 @@ static void ti_interrupt_callback(struct urb *urb)
 		break;
 
 	default:
-		dev_err(&port->dev, "%s - unknown interrupt code, 0x%02X\n",
-							__func__, data[1]);
+		dev_err(&port->dev, "unknown interrupt code: 0x%02X\n",
+			data[1]);
 		break;
 	}
 
 exit:
 	status = usb_submit_urb(urb, GFP_ATOMIC);
 	if (status)
-		dev_err(&port->dev, "%s - resubmit interrupt urb failed, %d\n",
-			__func__, status);
+		dev_err(&port->dev, "resubmit interrupt urb failed: %d\n",
+			status);
 }
 
 
@@ -1300,7 +1297,7 @@ static void ti_bulk_in_callback(struct urb *urb)
 		dev_dbg(dev, "%s - urb shutting down, %d\n", __func__, status);
 		return;
 	default:
-		dev_err(dev, "%s - nonzero urb status, %d\n",
+		dev_dbg(dev, "%s - nonzero urb status, %d\n",
 			__func__, status);
 	}
 
@@ -1308,7 +1305,7 @@ static void ti_bulk_in_callback(struct urb *urb)
 		goto exit;
 
 	if (status) {
-		dev_err(dev, "%s - stopping read!\n", __func__);
+		dev_err(dev, "stop reading\n");
 		return;
 	}
 
@@ -1336,8 +1333,7 @@ exit:
 
 	spin_unlock(&tport->tp_lock);
 	if (retval)
-		dev_err(dev, "%s - resubmit read urb failed, %d\n",
-			__func__, retval);
+		dev_err(dev, "failed to resubmit urb: %d\n", retval);
 }
 
 
@@ -1358,8 +1354,7 @@ static void ti_bulk_out_callback(struct urb *urb)
 		dev_dbg(&port->dev, "%s - urb shutting down, %d\n", __func__, status);
 		return;
 	default:
-		dev_err_console(port, "%s - nonzero urb status, %d\n",
-			__func__, status);
+		dev_err_console(port, "nonzero urb status: %d\n", status);
 	}
 
 	/* send any buffered data */
@@ -1375,8 +1370,8 @@ static void ti_recv(struct usb_serial_port *port, unsigned char *data,
 	do {
 		cnt = tty_insert_flip_string(&port->port, data, length);
 		if (cnt < length) {
-			dev_err(&port->dev, "%s - dropping data, %d bytes lost\n",
-						__func__, length - cnt);
+			dev_err(&port->dev, "dropping data: %d bytes lost\n",
+				length - cnt);
 			if (cnt == 0)
 				break;
 		}
@@ -1420,8 +1415,8 @@ static void ti_send(struct ti_port *tport)
 
 	result = usb_submit_urb(port->write_urb, GFP_ATOMIC);
 	if (result) {
-		dev_err_console(port, "%s - submit write urb failed, %d\n",
-							__func__, result);
+		dev_err_console(port, "failed to submit write urb: %d\n",
+				result);
 		tport->tp_write_urb_in_use = 0;
 		/* TODO: reschedule ti_send */
 	} else {
@@ -1474,8 +1469,8 @@ static int ti_get_lsr(struct ti_port *tport, u8 *lsr)
 				       TI_UART1_PORT + port_number, data, size);
 	if (status) {
 		dev_err(&port->dev,
-			"%s - get port status command failed, %d\n",
-							__func__, status);
+			"get port status command failed: %d\n",
+			status);
 		goto free_data;
 	}
 
@@ -1749,12 +1744,12 @@ static int ti_download_firmware(struct usb_serial *serial)
 
 check_firmware:
 	if (status) {
-		dev_err(&dev->dev, "%s - firmware not found\n", __func__);
+		dev_err(&dev->dev, "failed to request firmware: %d\n", status);
 		return -ENOENT;
 	}
 
 	if (fw_p->size > TI_FIRMWARE_BUF_SIZE) {
-		dev_err(&dev->dev, "%s - firmware too large %zu\n", __func__, fw_p->size);
+		dev_err(&dev->dev, "firmware too large: %zu\n", fw_p->size);
 		release_firmware(fw_p);
 		return -ENOENT;
 	}
