@@ -3005,6 +3005,10 @@ unsigned long long task_sched_runtime(struct task_struct *p)
 	 * thread, breaking clock_gettime().
 	 */
 	if (task_current(rq, p) && task_on_rq_queued(p)) {
+#if defined(CONFIG_FAIR_GROUP_SCHED)
+		prefetch((&p->se)->cfs_rq->curr);
+		prefetch(&(&p->se)->cfs_rq->curr->exec_start);
+#endif
 		update_rq_clock(rq);
 		p->sched_class->update_curr(rq);
 	}
