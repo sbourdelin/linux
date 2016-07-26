@@ -5,15 +5,17 @@
 
 #include "ccu_common.h"
 
+struct ccu_mux_fixed_prediv {
+	u8	index;
+	u16	div;
+};
+
 struct ccu_mux_internal {
 	u8		shift;
 	u8		width;
 	const u8	*table;
 
-	struct {
-		u8	index;
-		u16	div;
-	} fixed_prediv;
+	const struct ccu_mux_fixed_prediv	*fixed_predivs;
 
 	struct {
 		u8	index;
