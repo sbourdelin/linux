@@ -25,3 +25,35 @@ config NTB_PERF
 	 to and from the window without additional software interaction.
 
 	 If unsure, say N.
+
+config NTB_DB_TEST
+	tristate "NTB Doorbell Test Client"
+	help
+	 This is a driver to test doorbell subsystem of NTB bus devices.
+	 The design is similar to the ping pong although it exchanges the
+	 doorbell bits one-by-one, waiting for the peer response before getting
+	 to a next doorbell.
+
+	 If unsure, say N.
+
+config NTB_MSG_TEST
+	tristate "NTB Messaging Test Client"
+	help
+	 This is a driver to test messaging subsystem of NTB. It just creates
+	 one file in the DebugFS for each NTB device of asynchronous
+	 architecture. In order to send a message one can just write a text to
+	 the file. It will be immediately sent to the peer so user can get it
+	 by reading from the corresponding file.
+
+	 If unsure, say N.
+
+config NTB_MW_TEST
+	tristate "NTB Memory Windows Test Client"
+	help
+	 This is a driver to test memory sharing amongst devices. It creates a
+	 set of files in the DebugFS, one of which are used to write a text to
+	 outbound memory windows and anothers can be used to read data written
+	 by the peer to our inbound memory window.
+
+	 If unsure, say N.
+
