@@ -9,6 +9,8 @@ struct ccu_mux_internal {
 	u8	shift;
 	u8	width;
 
+	const u8	*table;
+
 	struct {
 		u8	index;
 		u8	div;
@@ -21,11 +23,15 @@ struct ccu_mux_internal {
 	} variable_prediv;
 };
 
-#define _SUNXI_CCU_MUX(_shift, _width)		\
-	{					\
-		.shift	= _shift,		\
-		.width	= _width,		\
+#define _SUNXI_CCU_MUX_TABLE(_shift, _width, _table)	\
+	{						\
+		.shift	= _shift,			\
+		.width	= _width,			\
+		.table	= _table,			\
 	}
+
+#define _SUNXI_CCU_MUX(_shift, _width)			\
+	_SUNXI_CCU_MUX_TABLE(_shift, _width, NULL)
 
 struct ccu_mux {
 	u16			reg;
@@ -47,11 +53,12 @@ struct ccu_mux {
 		}							\
 	}
 
-#define SUNXI_CCU_MUX_WITH_GATE(_struct, _name, _parents, _reg,		\
-				_shift, _width, _gate, _flags)		\
+#define SUNXI_CCU_MUX_TABLE_WITH_GATE(_struct, _name, _parents, _table,	\
+				      _reg,  _shift, _width, _gate,	\
+				      _flags)				\
 	struct ccu_mux _struct = {					\
 		.enable	= _gate,					\
-		.mux	= _SUNXI_CCU_MUX(_shift, _width),		\
+		.mux	= _SUNXI_CCU_MUX_TABLE(_shift, _width, _table),	\
 		.common	= {						\
 			.reg		= _reg,				\
 			.hw.init	= CLK_HW_INIT_PARENTS(_name,	\
@@ -60,6 +67,12 @@ struct ccu_mux {
 							      _flags),	\
 		}							\
 	}
+
+#define SUNXI_CCU_MUX_WITH_GATE(_struct, _name, _parents, _reg,		\
+				_shift, _width, _gate, _flags)		\
+	SUNXI_CCU_MUX_TABLE_WITH_GATE(_struct, _name, _parents, NULL,	\
+				      _reg,  _shift, _width, _gate,	\
+				      _flags)
 
 static inline struct ccu_mux *hw_to_ccu_mux(struct clk_hw *hw)
 {
