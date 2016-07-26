@@ -27,6 +27,7 @@
 #include "ccu_nm.h"
 #include "ccu_phase.h"
 
+#include "ccu-sun50i-a64.h"
 #include "ccu-sun8i-h3.h"
 
 static SUNXI_CCU_NKMP_WITH_GATE_LOCK(pll_cpux_clk, "pll-cpux",
@@ -99,8 +100,58 @@ static SUNXI_CCU_NK_WITH_GATE_LOCK_POSTDIV(pll_periph0_clk, "pll-periph0",
 					   2,		/* post-div */
 					   0);
 
+static SUNXI_CCU_NK_WITH_GATE_LOCK_POSTDIV(pll_periph1_a64_clk, "pll-periph1",
+					   "osc24M", 0x02c,
+					   8, 5,	/* N */
+					   4, 2,	/* K */
+					   BIT(31),	/* gate */
+					   BIT(28),	/* lock */
+					   2,		/* post-div */
+					   0);
+
+static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_video1_a64_clk, "pll-video1",
+					"osc24M", 0x030,
+					8, 7,		/* N */
+					0, 4,		/* M */
+					BIT(24),	/* frac enable */
+					BIT(25),	/* frac select */
+					270000000,	/* frac rate 0 */
+					297000000,	/* frac rate 1 */
+					BIT(31),	/* gate */
+					BIT(28),	/* lock */
+					0);
+
 static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_gpu_clk, "pll-gpu",
 					"osc24M", 0x038,
+					8, 7,		/* N */
+					0, 4,		/* M */
+					BIT(24),	/* frac enable */
+					BIT(25),	/* frac select */
+					270000000,	/* frac rate 0 */
+					297000000,	/* frac rate 1 */
+					BIT(31),	/* gate */
+					BIT(28),	/* lock */
+					0);
+
+/*
+ * The output function can be changed to something more complex that
+ * we do not handle yet.
+ *
+ * Hardcode the mode so that we don't fall in that case.
+ */
+#define SUN50I_A64_PLL_MIPI_REG		0x040
+
+static SUNXI_CCU_NKM_WITH_GATE_LOCK(pll_mipi_a64_clk, "pll-mipi",
+				    "pll-video0", 0x040,
+				    8, 4,	/* N */
+				    4, 2,	/* K */
+				    0, 4,	/* M */
+				    BIT(31),	/* gate */
+				    BIT(28),	/* lock */
+				    0);
+
+static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_hsic_a64_clk, "pll-hsic",
+					"osc24M", 0x044,
 					8, 7,		/* N */
 					0, 4,		/* M */
 					BIT(24),	/* frac enable */
@@ -131,6 +182,14 @@ static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_de_clk, "pll-de",
 					BIT(31),	/* gate */
 					BIT(28),	/* lock */
 					0);
+
+static SUNXI_CCU_NM_WITH_GATE_LOCK(pll_ddr1_a64_clk, "pll-ddr1",
+				   "osc24M", 0x04c,
+				   8, 7,	/* N */
+				   0, 2,	/* M */
+				   BIT(31),	/* gate */
+				   BIT(28),	/* lock */
+				   0);
 
 static const char * const cpux_parents[] = { "osc32k", "osc24M",
 					     "pll-cpux" , "pll-cpux" };
@@ -175,6 +234,15 @@ static struct clk_div_table apb1_div_table[] = {
 static SUNXI_CCU_DIV_TABLE(apb1_clk, "apb1", "ahb1",
 			   0x054, 8, 2, apb1_div_table, 0);
 
+static const char * const apb2_a64_parents[] = { "osc32k", "osc24M",
+						 "pll-periph0-2x" ,
+						 "pll-periph0-2x" };
+static SUNXI_CCU_MP_WITH_MUX(apb2_a64_clk, "apb2", apb2_a64_parents, 0x058,
+			     0, 5,	/* M */
+			     16, 2,	/* P */
+			     24, 2,	/* mux */
+			     0);
+
 static const char * const apb2_h3_parents[] = { "osc32k", "osc24M",
 						"pll-periph0" , "pll-periph0" };
 static SUNXI_CCU_MP_WITH_MUX(apb2_h3_clk, "apb2", apb2_h3_parents, 0x058,
@@ -205,6 +273,8 @@ static struct ccu_mux ahb2_clk = {
 	},
 };
 
+static SUNXI_CCU_GATE(bus_mipi_dsi_a64_clk,	"bus-mipi-dsi",	"ahb1",
+		      0x060, BIT(1), 0);
 static SUNXI_CCU_GATE(bus_ce_clk,	"bus-ce",	"ahb1",
 		      0x060, BIT(5), 0);
 static SUNXI_CCU_GATE(bus_dma_clk,	"bus-dma",	"ahb1",
@@ -292,6 +362,8 @@ static SUNXI_CCU_GATE(bus_i2c1_clk,	"bus-i2c1",	"apb2",
 		      0x06c, BIT(1), 0);
 static SUNXI_CCU_GATE(bus_i2c2_clk,	"bus-i2c2",	"apb2",
 		      0x06c, BIT(2), 0);
+static SUNXI_CCU_GATE(bus_scr_a64_clk,	"bus-scr",	"apb2",
+		      0x06c, BIT(5), 0);
 static SUNXI_CCU_GATE(bus_uart0_clk,	"bus-uart0",	"apb2",
 		      0x06c, BIT(16), 0);
 static SUNXI_CCU_GATE(bus_uart1_clk,	"bus-uart1",	"apb2",
@@ -300,6 +372,8 @@ static SUNXI_CCU_GATE(bus_uart2_clk,	"bus-uart2",	"apb2",
 		      0x06c, BIT(18), 0);
 static SUNXI_CCU_GATE(bus_uart3_clk,	"bus-uart3",	"apb2",
 		      0x06c, BIT(19), 0);
+static SUNXI_CCU_GATE(bus_uart4_a64_clk,	"bus-uart4",	"apb2",
+		      0x06c, BIT(20), 0);
 static SUNXI_CCU_GATE(bus_scr_h3_clk,	"bus-scr",	"apb2",
 		      0x06c, BIT(20), 0);
 
@@ -326,6 +400,15 @@ static SUNXI_CCU_MP_WITH_MUX_GATE(nand_clk, "nand", mod0_default_parents, 0x080,
 				  BIT(31),	/* gate */
 				  0);
 
+static const char * const mmc_default_parents[] = { "osc24M", "pll-periph0-2x",
+						    "pll-periph1-2x" };
+static SUNXI_CCU_MP_WITH_MUX_GATE(mmc0_a64_clk, "mmc0", mmc_default_parents, 0x088,
+				  0, 4,		/* M */
+				  16, 2,	/* P */
+				  24, 2,	/* mux */
+				  BIT(31),	/* gate */
+				  0);
+
 static SUNXI_CCU_MP_WITH_MUX_GATE(mmc0_h3_clk, "mmc0", mod0_default_parents, 0x088,
 				  0, 4,		/* M */
 				  16, 2,	/* P */
@@ -338,6 +421,13 @@ static SUNXI_CCU_PHASE(mmc0_sample_h3_clk, "mmc0_sample", "mmc0",
 static SUNXI_CCU_PHASE(mmc0_output_h3_clk, "mmc0_output", "mmc0",
 		       0x088, 8, 3, 0);
 
+static SUNXI_CCU_MP_WITH_MUX_GATE(mmc1_a64_clk, "mmc1", mmc_default_parents, 0x08c,
+				  0, 4,		/* M */
+				  16, 2,	/* P */
+				  24, 2,	/* mux */
+				  BIT(31),	/* gate */
+				  0);
+
 static SUNXI_CCU_MP_WITH_MUX_GATE(mmc1_h3_clk, "mmc1", mod0_default_parents, 0x08c,
 				  0, 4,		/* M */
 				  16, 2,	/* P */
@@ -349,6 +439,13 @@ static SUNXI_CCU_PHASE(mmc1_sample_h3_clk, "mmc1_sample", "mmc1",
 		       0x08c, 20, 3, 0);
 static SUNXI_CCU_PHASE(mmc1_output_h3_clk, "mmc1_output", "mmc1",
 		       0x08c, 8, 3, 0);
+
+static SUNXI_CCU_MP_WITH_MUX_GATE(mmc2_a64_clk, "mmc2", mmc_default_parents, 0x090,
+				  0, 4,		/* M */
+				  16, 2,	/* P */
+				  24, 2,	/* mux */
+				  BIT(31),	/* gate */
+				  0);
 
 static SUNXI_CCU_MP_WITH_MUX_GATE(mmc2_h3_clk, "mmc2", mod0_default_parents, 0x090,
 				  0, 4,		/* M */
@@ -369,6 +466,14 @@ static SUNXI_CCU_MP_WITH_MUX_GATE(ts_clk, "ts", ts_parents, 0x098,
 				  24, 2,	/* mux */
 				  BIT(31),	/* gate */
 				  0);
+
+static SUNXI_CCU_MP_WITH_MUX_GATE(ce_a64_clk, "ce", mmc_default_parents, 0x09c,
+				  0, 4,		/* M */
+				  16, 2,	/* P */
+				  24, 2,	/* mux */
+				  BIT(31),	/* gate */
+				  0);
+
 
 static SUNXI_CCU_MP_WITH_MUX_GATE(ce_h3_clk, "ce", mod0_default_parents, 0x09c,
 				  0, 4,		/* M */
@@ -409,18 +514,30 @@ static SUNXI_CCU_GATE(usb_phy0_clk,	"usb-phy0",	"osc24M",
 		      0x0cc, BIT(8), 0);
 static SUNXI_CCU_GATE(usb_phy1_clk,	"usb-phy1",	"osc24M",
 		      0x0cc, BIT(9), 0);
+static SUNXI_CCU_GATE(usb_hsic_a64_clk,	"usb-hsic",	"pll-hsic",
+		      0x0cc, BIT(10), 0);
 static SUNXI_CCU_GATE(usb_phy2_h3_clk,	"usb-phy2",	"osc24M",
 		      0x0cc, BIT(10), 0);
+static SUNXI_CCU_GATE(usb_hsic_12m_a64_clk,	"usb-hsic-12M",	"osc12M",
+		      0x0cc, BIT(11), 0);
 static SUNXI_CCU_GATE(usb_phy3_h3_clk,	"usb-phy3",	"osc24M",
 		      0x0cc, BIT(11), 0);
+static SUNXI_CCU_GATE(usb_ohci0_a64_clk,	"usb-ohci0",	"osc12M",
+		      0x0cc, BIT(16), 0);
 static SUNXI_CCU_GATE(usb_ohci0_h3_clk,	"usb-ohci0",	"osc24M",
 		      0x0cc, BIT(16), 0);
+static SUNXI_CCU_GATE(usb_ohci1_a64_clk,	"usb-ohci1",	"usb-ohci0",
+		      0x0cc, BIT(17), 0);
 static SUNXI_CCU_GATE(usb_ohci1_h3_clk,	"usb-ohci1",	"osc24M",
 		      0x0cc, BIT(17), 0);
 static SUNXI_CCU_GATE(usb_ohci2_h3_clk,	"usb-ohci2",	"osc24M",
 		      0x0cc, BIT(18), 0);
 static SUNXI_CCU_GATE(usb_ohci3_h3_clk,	"usb-ohci3",	"osc24M",
 		      0x0cc, BIT(19), 0);
+
+static const char * const dram_a64_parents[] = { "pll-ddr0", "pll-ddr1" };
+static SUNXI_CCU_M_WITH_MUX(dram_a64_clk, "dram", dram_a64_parents,
+			    0x0f4, 0, 4, 20, 2, CLK_IS_CRITICAL);
 
 static const char * const dram_h3_parents[] = { "pll-ddr0", "pll-periph0-2x" };
 static SUNXI_CCU_M_WITH_MUX(dram_h3_clk, "dram", dram_h3_parents,
@@ -439,9 +556,29 @@ static const char * const de_parents[] = { "pll-periph0-2x", "pll-de" };
 static SUNXI_CCU_M_WITH_MUX_GATE(de_clk, "de", de_parents,
 				 0x104, 0, 4, 24, 3, BIT(31), 0);
 
+static const char * const tcon0_a64_parents[] = { "pll-mipi", "pll-video0-2x" };
+static const u8 tcon0_a64_table[] = { 0, 2, };
+static SUNXI_CCU_MUX_TABLE_WITH_GATE(tcon0_a64_clk, "tcon0", tcon0_a64_parents,
+				     tcon0_a64_table, 0x118, 24, 3, BIT(31), 0);
+
 static const char * const tcon0_h3_parents[] = { "pll-video0" };
 static SUNXI_CCU_M_WITH_MUX_GATE(tcon0_h3_clk, "tcon0", tcon0_h3_parents,
 				 0x118, 0, 4, 24, 3, BIT(31), 0);
+
+static const char * const tcon1_a64_parents[] = { "pll-video0", "pll-video1" };
+static const u8 tcon1_a64_table[] = { 0, 2, };
+struct ccu_div tcon1_a64_clk = {
+	.enable		= BIT(31),
+	.div		= _SUNXI_CCU_DIV(0, 4),
+	.mux		= _SUNXI_CCU_MUX_TABLE(24, 3, tcon1_a64_table),
+	.common		= {
+		.reg		= 0x11c,
+		.hw.init	= CLK_HW_INIT_PARENTS("tcon1",
+						      tcon1_a64_parents,
+						      &ccu_div_ops,
+						      0),
+	},
+};
 
 static const char * const tve_h3_parents[] = { "pll-de", "pll-periph1" };
 static SUNXI_CCU_M_WITH_MUX_GATE(tve_h3_clk, "tve", tve_h3_parents,
@@ -458,6 +595,10 @@ static const char * const csi_sclk_parents[] = { "pll-periph0", "pll-periph1" };
 static SUNXI_CCU_M_WITH_MUX_GATE(csi_sclk_clk, "csi-sclk", csi_sclk_parents,
 				 0x134, 16, 4, 24, 3, BIT(31), 0);
 
+static const char * const csi_mclk_a64_parents[] = { "osc24M", "pll-video1", "pll-periph1" };
+static SUNXI_CCU_M_WITH_MUX_GATE(csi_mclk_a64_clk, "csi-mclk", csi_mclk_a64_parents,
+				 0x134, 0, 5, 8, 3, BIT(15), 0);
+
 static const char * const csi_mclk_h3_parents[] = { "osc24M", "pll-video0", "pll-periph0" };
 static SUNXI_CCU_M_WITH_MUX_GATE(csi_mclk_h3_clk, "csi-mclk", csi_mclk_h3_parents,
 				 0x134, 0, 5, 8, 3, BIT(15), 0);
@@ -467,8 +608,16 @@ static SUNXI_CCU_M_WITH_GATE(ve_clk, "ve", "pll-ve",
 
 static SUNXI_CCU_GATE(ac_dig_clk,	"ac-dig",	"pll-audio",
 		      0x140, BIT(31), 0);
+
+static SUNXI_CCU_GATE(ac_dig_4x_a64_clk,	"ac-dig-4x",	"pll-audio-4x",
+		      0x140, BIT(30), 0);
+
 static SUNXI_CCU_GATE(avs_clk,		"avs",		"osc24M",
 		      0x144, BIT(31), 0);
+
+static const char * const hdmi_a64_parents[] = { "pll-video0", "pll-video1" };
+static SUNXI_CCU_M_WITH_MUX_GATE(hdmi_a64_clk, "hdmi", hdmi_a64_parents,
+				 0x150, 0, 4, 24, 2, BIT(31), 0);
 
 static const char * const hdmi_h3_parents[] = { "pll-video0" };
 static SUNXI_CCU_M_WITH_MUX_GATE(hdmi_h3_clk, "hdmi", hdmi_h3_parents,
@@ -477,14 +626,25 @@ static SUNXI_CCU_M_WITH_MUX_GATE(hdmi_h3_clk, "hdmi", hdmi_h3_parents,
 static SUNXI_CCU_GATE(hdmi_ddc_clk,	"hdmi-ddc",	"osc24M",
 		      0x154, BIT(31), 0);
 
+static const char * const mbus_a64_parents[] = { "osc24M", "pll-periph0-2x",
+						 "pll-ddr0", "pll-ddr1" };
+static SUNXI_CCU_M_WITH_MUX_GATE(mbus_a64_clk, "mbus", mbus_a64_parents,
+				 0x15c, 0, 3, 24, 2, BIT(31), CLK_IS_CRITICAL);
+
 static const char * const mbus_h3_parents[] = { "osc24M", "pll-periph0-2x", "pll-ddr0" };
 static SUNXI_CCU_M_WITH_MUX_GATE(mbus_h3_clk, "mbus", mbus_h3_parents,
 				 0x15c, 0, 3, 24, 2, BIT(31), CLK_IS_CRITICAL);
+
+static const char * const dsi_dphy_a64_parents[] = { "pll-video0", "pll-periph0" };
+static SUNXI_CCU_M_WITH_MUX_GATE(dsi_dphy_a64_clk, "dsi-dphy", dsi_dphy_a64_parents,
+				 0x168, 0, 3, 24, 2, BIT(31), 0);
 
 static SUNXI_CCU_M_WITH_GATE(gpu_clk, "gpu", "pll-gpu",
 			     0x1a0, 0, 3, BIT(31), 0);
 
 /* Fixed Factor clocks */
+static CLK_FIXED_FACTOR(osc12M_a64_clk, "osc12M", "osc24M", 1, 2, 0);
+
 /* We hardcode the divider to 4 for now */
 static CLK_FIXED_FACTOR(pll_audio_clk, "pll-audio",
 			"pll-audio-base", 4, 1, CLK_SET_RATE_PARENT);
@@ -496,6 +656,10 @@ static CLK_FIXED_FACTOR(pll_audio_8x_clk, "pll-audio-8x",
 			"pll-audio-base", 1, 2, CLK_SET_RATE_PARENT);
 static CLK_FIXED_FACTOR(pll_periph0_2x_clk, "pll-periph0-2x",
 			"pll-periph0", 1, 2, 0);
+static CLK_FIXED_FACTOR(pll_periph1_2x_clk, "pll-periph1-2x",
+			"pll-periph1", 1, 2, 0);
+static CLK_FIXED_FACTOR(pll_video0_2x_clk, "pll-video0-2x",
+			"pll-video0", 1, 2, 0);
 
 static struct ccu_common *sun8i_h3_ccu_clks[] = {
 	&pll_cpux_clk.common,
@@ -825,3 +989,322 @@ static void __init sun8i_h3_ccu_setup(struct device_node *node)
 }
 CLK_OF_DECLARE(sun8i_h3_ccu, "allwinner,sun8i-h3-ccu",
 	       sun8i_h3_ccu_setup);
+
+static struct ccu_common *sun50i_a64_ccu_clks[] = {
+	&pll_cpux_clk.common,
+	&pll_audio_base_clk.common,
+	&pll_video0_clk.common,
+	&pll_ve_clk.common,
+	&pll_ddr0_clk.common,
+	&pll_periph0_clk.common,
+	&pll_periph1_a64_clk.common,
+	&pll_video1_a64_clk.common,
+	&pll_gpu_clk.common,
+	&pll_mipi_a64_clk.common,
+	&pll_hsic_a64_clk.common,
+	&pll_de_clk.common,
+	&pll_ddr1_a64_clk.common,
+	&cpux_clk.common,
+	&axi_clk.common,
+	&ahb1_clk.common,
+	&apb1_clk.common,
+	&apb2_a64_clk.common,
+	&ahb2_clk.common,
+	&bus_mipi_dsi_a64_clk.common,
+	&bus_ce_clk.common,
+	&bus_dma_clk.common,
+	&bus_mmc0_clk.common,
+	&bus_mmc1_clk.common,
+	&bus_mmc2_clk.common,
+	&bus_nand_clk.common,
+	&bus_dram_clk.common,
+	&bus_emac_clk.common,
+	&bus_ts_clk.common,
+	&bus_hstimer_clk.common,
+	&bus_spi0_clk.common,
+	&bus_spi1_clk.common,
+	&bus_otg_clk.common,
+	&bus_ehci0_clk.common,
+	&bus_ehci1_clk.common,
+	&bus_ohci0_clk.common,
+	&bus_ohci1_clk.common,
+	&bus_ve_clk.common,
+	&bus_tcon0_clk.common,
+	&bus_tcon1_clk.common,
+	&bus_deinterlace_clk.common,
+	&bus_csi_clk.common,
+	&bus_hdmi_clk.common,
+	&bus_de_clk.common,
+	&bus_gpu_clk.common,
+	&bus_msgbox_clk.common,
+	&bus_spinlock_clk.common,
+	&bus_codec_clk.common,
+	&bus_spdif_clk.common,
+	&bus_pio_clk.common,
+	&bus_ths_clk.common,
+	&bus_i2s0_clk.common,
+	&bus_i2s1_clk.common,
+	&bus_i2s2_clk.common,
+	&bus_i2c0_clk.common,
+	&bus_i2c1_clk.common,
+	&bus_i2c2_clk.common,
+	&bus_scr_a64_clk.common,
+	&bus_uart0_clk.common,
+	&bus_uart1_clk.common,
+	&bus_uart2_clk.common,
+	&bus_uart3_clk.common,
+	&bus_uart4_a64_clk.common,
+	&bus_dbg_clk.common,
+	&ths_clk.common,
+	&nand_clk.common,
+	&mmc0_a64_clk.common,
+	&mmc1_a64_clk.common,
+	&mmc2_a64_clk.common,
+	&ts_clk.common,
+	&ce_a64_clk.common,
+	&spi0_clk.common,
+	&spi1_clk.common,
+	&i2s0_clk.common,
+	&i2s1_clk.common,
+	&i2s2_clk.common,
+	&spdif_clk.common,
+	&usb_phy0_clk.common,
+	&usb_phy1_clk.common,
+	&usb_hsic_a64_clk.common,
+	&usb_hsic_12m_a64_clk.common,
+	&usb_ohci0_a64_clk.common,
+	&usb_ohci1_a64_clk.common,
+	&dram_a64_clk.common,
+	&dram_ve_clk.common,
+	&dram_csi_clk.common,
+	&dram_deinterlace_clk.common,
+	&dram_ts_clk.common,
+	&de_clk.common,
+	&tcon0_a64_clk.common,
+	&tcon1_a64_clk.common,
+	&deinterlace_clk.common,
+	&csi_misc_clk.common,
+	&csi_sclk_clk.common,
+	&csi_mclk_a64_clk.common,
+	&ve_clk.common,
+	&ac_dig_clk.common,
+	&ac_dig_4x_a64_clk.common,
+	&avs_clk.common,
+	&hdmi_a64_clk.common,
+	&hdmi_ddc_clk.common,
+	&mbus_a64_clk.common,
+	&dsi_dphy_a64_clk.common,
+	&gpu_clk.common,
+};
+
+static struct clk_hw_onecell_data sun50i_a64_hw_clks = {
+	.hws	= {
+		[CLK_A64_OSC_12M]	= &osc12M_a64_clk.hw,
+		[CLK_A64_PLL_CPUX]	= &pll_cpux_clk.common.hw,
+		[CLK_A64_PLL_AUDIO_BASE] = &pll_audio_base_clk.common.hw,
+		[CLK_A64_PLL_AUDIO]	= &pll_audio_clk.hw,
+		[CLK_A64_PLL_AUDIO_2X]	= &pll_audio_2x_clk.hw,
+		[CLK_A64_PLL_AUDIO_4X]	= &pll_audio_4x_clk.hw,
+		[CLK_A64_PLL_AUDIO_8X]	= &pll_audio_8x_clk.hw,
+		[CLK_A64_PLL_VIDEO0]	= &pll_video0_clk.common.hw,
+		[CLK_A64_PLL_VIDEO0_2X]	= &pll_video0_2x_clk.hw,
+		[CLK_A64_PLL_VE]	= &pll_ve_clk.common.hw,
+		[CLK_A64_PLL_DDR0]	= &pll_ddr0_clk.common.hw,
+		[CLK_A64_PLL_PERIPH0]	= &pll_periph0_clk.common.hw,
+		[CLK_A64_PLL_PERIPH0_2X] = &pll_periph0_2x_clk.hw,
+		[CLK_A64_PLL_PERIPH1]	= &pll_periph1_a64_clk.common.hw,
+		[CLK_A64_PLL_PERIPH1_2X] = &pll_periph1_2x_clk.hw,
+		[CLK_A64_PLL_VIDEO1]	= &pll_video1_a64_clk.common.hw,
+		[CLK_A64_PLL_GPU]	= &pll_gpu_clk.common.hw,
+		[CLK_A64_PLL_MIPI]  	= &pll_mipi_a64_clk.common.hw,
+		[CLK_A64_PLL_HSIC]	= &pll_hsic_a64_clk.common.hw,
+		[CLK_A64_PLL_DE]	= &pll_de_clk.common.hw,
+		[CLK_A64_PLL_DDR1]	= &pll_ddr1_a64_clk.common.hw,
+		[CLK_A64_CPUX]		= &cpux_clk.common.hw,
+		[CLK_A64_AXI]		= &axi_clk.common.hw,
+		[CLK_A64_AHB1]		= &ahb1_clk.common.hw,
+		[CLK_A64_APB1]		= &apb1_clk.common.hw,
+		[CLK_A64_APB2]		= &apb2_a64_clk.common.hw,
+		[CLK_A64_AHB2]		= &ahb2_clk.common.hw,
+		[CLK_A64_BUS_MIPI_DSI]	= &bus_mipi_dsi_a64_clk.common.hw,
+		[CLK_A64_BUS_CE]	= &bus_ce_clk.common.hw,
+		[CLK_A64_BUS_DMA]	= &bus_dma_clk.common.hw,
+		[CLK_A64_BUS_MMC0]	= &bus_mmc0_clk.common.hw,
+		[CLK_A64_BUS_MMC1]	= &bus_mmc1_clk.common.hw,
+		[CLK_A64_BUS_MMC2]	= &bus_mmc2_clk.common.hw,
+		[CLK_A64_BUS_NAND]	= &bus_nand_clk.common.hw,
+		[CLK_A64_BUS_DRAM]	= &bus_dram_clk.common.hw,
+		[CLK_A64_BUS_EMAC]	= &bus_emac_clk.common.hw,
+		[CLK_A64_BUS_TS]	= &bus_ts_clk.common.hw,
+		[CLK_A64_BUS_HSTIMER]	= &bus_hstimer_clk.common.hw,
+		[CLK_A64_BUS_SPI0]	= &bus_spi0_clk.common.hw,
+		[CLK_A64_BUS_SPI1]	= &bus_spi1_clk.common.hw,
+		[CLK_A64_BUS_OTG]	= &bus_otg_clk.common.hw,
+		[CLK_A64_BUS_EHCI0]	= &bus_ehci0_clk.common.hw,
+		[CLK_A64_BUS_EHCI1]	= &bus_ehci1_clk.common.hw,
+		[CLK_A64_BUS_OHCI0]	= &bus_ohci0_clk.common.hw,
+		[CLK_A64_BUS_OHCI1]	= &bus_ohci1_clk.common.hw,
+		[CLK_A64_BUS_VE]	= &bus_ve_clk.common.hw,
+		[CLK_A64_BUS_TCON0]	= &bus_tcon0_clk.common.hw,
+		[CLK_A64_BUS_TCON1]	= &bus_tcon1_clk.common.hw,
+		[CLK_A64_BUS_DEINTERLACE] = &bus_deinterlace_clk.common.hw,
+		[CLK_A64_BUS_CSI]	= &bus_csi_clk.common.hw,
+		[CLK_A64_BUS_HDMI]	= &bus_hdmi_clk.common.hw,
+		[CLK_A64_BUS_DE]	= &bus_de_clk.common.hw,
+		[CLK_A64_BUS_GPU]	= &bus_gpu_clk.common.hw,
+		[CLK_A64_BUS_MSGBOX]	= &bus_msgbox_clk.common.hw,
+		[CLK_A64_BUS_SPINLOCK]	= &bus_spinlock_clk.common.hw,
+		[CLK_A64_BUS_CODEC]	= &bus_codec_clk.common.hw,
+		[CLK_A64_BUS_SPDIF]	= &bus_spdif_clk.common.hw,
+		[CLK_A64_BUS_PIO]	= &bus_pio_clk.common.hw,
+		[CLK_A64_BUS_THS]	= &bus_ths_clk.common.hw,
+		[CLK_A64_BUS_I2S0]	= &bus_i2s0_clk.common.hw,
+		[CLK_A64_BUS_I2S1]	= &bus_i2s1_clk.common.hw,
+		[CLK_A64_BUS_I2S2]	= &bus_i2s2_clk.common.hw,
+		[CLK_A64_BUS_I2C0]	= &bus_i2c0_clk.common.hw,
+		[CLK_A64_BUS_I2C1]	= &bus_i2c1_clk.common.hw,
+		[CLK_A64_BUS_I2C2]	= &bus_i2c2_clk.common.hw,
+		[CLK_A64_BUS_UART0]	= &bus_uart0_clk.common.hw,
+		[CLK_A64_BUS_UART1]	= &bus_uart1_clk.common.hw,
+		[CLK_A64_BUS_UART2]	= &bus_uart2_clk.common.hw,
+		[CLK_A64_BUS_UART3]	= &bus_uart3_clk.common.hw,
+		[CLK_A64_BUS_UART4]	= &bus_uart4_a64_clk.common.hw,
+		[CLK_A64_BUS_SCR]	= &bus_scr_a64_clk.common.hw,
+		[CLK_A64_BUS_DBG]	= &bus_dbg_clk.common.hw,
+		[CLK_A64_THS]		= &ths_clk.common.hw,
+		[CLK_A64_NAND]		= &nand_clk.common.hw,
+		[CLK_A64_MMC0]		= &mmc0_a64_clk.common.hw,
+		[CLK_A64_MMC1]		= &mmc1_a64_clk.common.hw,
+		[CLK_A64_MMC2]		= &mmc2_a64_clk.common.hw,
+		[CLK_A64_TS]		= &ts_clk.common.hw,
+		[CLK_A64_CE]		= &ce_a64_clk.common.hw,
+		[CLK_A64_SPI0]		= &spi0_clk.common.hw,
+		[CLK_A64_SPI1]		= &spi1_clk.common.hw,
+		[CLK_A64_I2S0]		= &i2s0_clk.common.hw,
+		[CLK_A64_I2S1]		= &i2s1_clk.common.hw,
+		[CLK_A64_I2S2]		= &i2s2_clk.common.hw,
+		[CLK_A64_SPDIF]		= &spdif_clk.common.hw,
+		[CLK_A64_USB_PHY0]	= &usb_phy0_clk.common.hw,
+		[CLK_A64_USB_PHY1]	= &usb_phy1_clk.common.hw,
+		[CLK_A64_USB_HSIC]	= &usb_hsic_a64_clk.common.hw,
+		[CLK_A64_USB_HSIC_12M]	= &usb_hsic_12m_a64_clk.common.hw,
+		[CLK_A64_USB_OHCI0]	= &usb_ohci0_a64_clk.common.hw,
+		[CLK_A64_USB_OHCI1]	= &usb_ohci1_a64_clk.common.hw,
+		[CLK_A64_DRAM]		= &dram_a64_clk.common.hw,
+		[CLK_A64_DRAM_VE]	= &dram_ve_clk.common.hw,
+		[CLK_A64_DRAM_CSI]	= &dram_csi_clk.common.hw,
+		[CLK_A64_DRAM_DEINTERLACE] = &dram_deinterlace_clk.common.hw,
+		[CLK_A64_DRAM_TS]	= &dram_ts_clk.common.hw,
+		[CLK_A64_DE]		= &de_clk.common.hw,
+		[CLK_A64_TCON0]		= &tcon0_a64_clk.common.hw,
+		[CLK_A64_TCON1]		= &tcon1_a64_clk.common.hw,
+		[CLK_A64_DEINTERLACE]	= &deinterlace_clk.common.hw,
+		[CLK_A64_CSI_MISC]	= &csi_misc_clk.common.hw,
+		[CLK_A64_CSI_SCLK]	= &csi_sclk_clk.common.hw,
+		[CLK_A64_CSI_MCLK]	= &csi_mclk_a64_clk.common.hw,
+		[CLK_A64_VE]		= &ve_clk.common.hw,
+		[CLK_A64_AC_DIG]	= &ac_dig_clk.common.hw,
+		[CLK_A64_AC_DIG_4X]	= &ac_dig_4x_a64_clk.common.hw,
+		[CLK_A64_AVS]		= &avs_clk.common.hw,
+		[CLK_A64_HDMI]		= &hdmi_a64_clk.common.hw,
+		[CLK_A64_HDMI_DDC]	= &hdmi_ddc_clk.common.hw,
+		[CLK_A64_MBUS]		= &mbus_a64_clk.common.hw,
+		[CLK_A64_DSI_DPHY]	= &dsi_dphy_a64_clk.common.hw,
+		[CLK_A64_GPU]		= &gpu_clk.common.hw,
+	},
+	.num	= CLK_A64_NUMBER,
+};
+
+static struct ccu_reset_map sun50i_a64_ccu_resets[] = {
+	[RST_A64_USB_PHY0]		=  { 0x0cc, BIT(0) },
+	[RST_A64_USB_PHY1]		=  { 0x0cc, BIT(1) },
+	[RST_A64_USB_HSIC]		=  { 0x0cc, BIT(2) },
+
+
+	[RST_A64_MBUS]			=  { 0x0fc, BIT(31) },
+
+	[RST_A64_BUS_MIPI_DSI]		=  { 0x2c0, BIT(1) },
+	[RST_A64_BUS_CE]		=  { 0x2c0, BIT(5) },
+	[RST_A64_BUS_DMA]		=  { 0x2c0, BIT(6) },
+	[RST_A64_BUS_MMC0]		=  { 0x2c0, BIT(8) },
+	[RST_A64_BUS_MMC1]		=  { 0x2c0, BIT(9) },
+	[RST_A64_BUS_MMC2]		=  { 0x2c0, BIT(10) },
+	[RST_A64_BUS_NAND]		=  { 0x2c0, BIT(13) },
+	[RST_A64_BUS_DRAM]		=  { 0x2c0, BIT(14) },
+	[RST_A64_BUS_EMAC]		=  { 0x2c0, BIT(17) },
+	[RST_A64_BUS_TS]		=  { 0x2c0, BIT(18) },
+	[RST_A64_BUS_HSTIMER]		=  { 0x2c0, BIT(19) },
+	[RST_A64_BUS_SPI0]		=  { 0x2c0, BIT(20) },
+	[RST_A64_BUS_SPI1]		=  { 0x2c0, BIT(21) },
+	[RST_A64_BUS_OTG]		=  { 0x2c0, BIT(23) },
+	[RST_A64_BUS_EHCI0]		=  { 0x2c0, BIT(24) },
+	[RST_A64_BUS_EHCI1]		=  { 0x2c0, BIT(25) },
+	[RST_A64_BUS_OHCI0]		=  { 0x2c0, BIT(28) },
+	[RST_A64_BUS_OHCI1]		=  { 0x2c0, BIT(29) },
+
+	[RST_A64_BUS_VE]		=  { 0x2c4, BIT(0) },
+	[RST_A64_BUS_TCON0]		=  { 0x2c4, BIT(3) },
+	[RST_A64_BUS_TCON1]		=  { 0x2c4, BIT(4) },
+	[RST_A64_BUS_DEINTERLACE]	=  { 0x2c4, BIT(5) },
+	[RST_A64_BUS_CSI]		=  { 0x2c4, BIT(8) },
+	[RST_A64_BUS_HDMI0]		=  { 0x2c4, BIT(10) },
+	[RST_A64_BUS_HDMI1]		=  { 0x2c4, BIT(11) },
+	[RST_A64_BUS_DE]		=  { 0x2c4, BIT(12) },
+	[RST_A64_BUS_GPU]		=  { 0x2c4, BIT(20) },
+	[RST_A64_BUS_MSGBOX]		=  { 0x2c4, BIT(21) },
+	[RST_A64_BUS_SPINLOCK]		=  { 0x2c4, BIT(22) },
+	[RST_A64_BUS_DBG]		=  { 0x2c4, BIT(31) },
+
+	[RST_A64_BUS_LVDS]		=  { 0x2c8, BIT(0) },
+
+	[RST_A64_BUS_CODEC]		=  { 0x2d0, BIT(0) },
+	[RST_A64_BUS_SPDIF]		=  { 0x2d0, BIT(1) },
+	[RST_A64_BUS_THS]		=  { 0x2d0, BIT(8) },
+	[RST_A64_BUS_I2S0]		=  { 0x2d0, BIT(12) },
+	[RST_A64_BUS_I2S1]		=  { 0x2d0, BIT(13) },
+	[RST_A64_BUS_I2S2]		=  { 0x2d0, BIT(14) },
+
+	[RST_A64_BUS_I2C0]		=  { 0x2d4, BIT(0) },
+	[RST_A64_BUS_I2C1]		=  { 0x2d4, BIT(1) },
+	[RST_A64_BUS_I2C2]		=  { 0x2d4, BIT(2) },
+	[RST_A64_BUS_SCR]		=  { 0x2d4, BIT(5) },
+	[RST_A64_BUS_UART0]		=  { 0x2d4, BIT(16) },
+	[RST_A64_BUS_UART1]		=  { 0x2d4, BIT(17) },
+	[RST_A64_BUS_UART2]		=  { 0x2d4, BIT(18) },
+	[RST_A64_BUS_UART3]		=  { 0x2d4, BIT(19) },
+	[RST_A64_BUS_UART4]		=  { 0x2d4, BIT(20) },
+};
+
+static const struct sunxi_ccu_desc sun50i_a64_ccu_desc = {
+	.ccu_clks	= sun50i_a64_ccu_clks,
+	.num_ccu_clks	= ARRAY_SIZE(sun50i_a64_ccu_clks),
+
+	.hw_clks	= &sun50i_a64_hw_clks,
+
+	.resets		= sun50i_a64_ccu_resets,
+	.num_resets	= ARRAY_SIZE(sun50i_a64_ccu_resets),
+};
+
+static void __init sun50i_a64_ccu_setup(struct device_node *node)
+{
+	void __iomem *reg;
+	u32 val;
+
+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+	if (IS_ERR(reg)) {
+		pr_err("%s: Could not map the clock registers\n",
+		       of_node_full_name(node));
+		return;
+	}
+
+	/* Force the PLL-Audio-1x divider to 4 */
+	val = readl(reg + SUN8I_H3_PLL_AUDIO_REG);
+	val &= ~GENMASK(19, 16);
+	writel(val | (3 << 16), reg + SUN8I_H3_PLL_AUDIO_REG);
+
+	writel(0x515, reg + SUN50I_A64_PLL_MIPI_REG);
+
+	sunxi_ccu_probe(node, reg, &sun50i_a64_ccu_desc);
+}
+CLK_OF_DECLARE(sun50i_a64_ccu, "allwinner,sun50i-a64-ccu",
+	       sun50i_a64_ccu_setup);

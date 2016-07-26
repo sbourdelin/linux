@@ -51,8 +51,8 @@ config SUNXI_CCU_MP
 
 # SoC Drivers
 
-config SUN8I_H3_CCU
-	bool "Support for the Allwinner H3 CCU"
+config SUNXI_H3_A64_CCU_SUPPORT
+	bool
 	select SUNXI_CCU_DIV
 	select SUNXI_CCU_NK
 	select SUNXI_CCU_NKM
@@ -60,6 +60,15 @@ config SUN8I_H3_CCU
 	select SUNXI_CCU_NM
 	select SUNXI_CCU_MP
 	select SUNXI_CCU_PHASE
+
+config SUN8I_H3_CCU
+	bool "Support for the Allwinner H3 CCU"
+	select SUNXI_H3_A64_CCU_SUPPORT
 	default MACH_SUN8I
+
+config SUN50I_A64_CCU
+	bool "Support for the Allwinner A64 CCU"
+	select SUNXI_H3_A64_CCU_SUPPORT
+	default ARM64 && ARCH_SUNXI
 
 endif

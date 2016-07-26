@@ -17,4 +17,4 @@ obj-$(CONFIG_SUNXI_CCU_NM)	+= ccu_nm.o
 obj-$(CONFIG_SUNXI_CCU_MP)	+= ccu_mp.o
 
 # SoC support
-obj-$(CONFIG_SUN8I_H3_CCU)	+= ccu-sun8i-h3.o
+obj-$(CONFIG_SUNXI_H3_A64_CCU_SUPPORT)	+= ccu-sun8i-h3.o
