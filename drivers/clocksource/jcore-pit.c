@@ -154,7 +154,7 @@ static irqreturn_t jcore_timer_interrupt(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static void __init jcore_pit_init(struct device_node *node)
+static int __init jcore_pit_init(struct device_node *node)
 {
 	int err;
 	__iomem void *pit_base;
@@ -169,12 +169,14 @@ static void __init jcore_pit_init(struct device_node *node)
 	pit_base = of_iomap(node, 0);
 	if (!pit_base) {
 		pr_err("Error: Cannot map base address for J-Core PIT\n");
+		err = -ENXIO;
 		goto out;
 	}
 
 	pit_irq = irq_of_parse_and_map(node, 0);
 	if (!pit_irq) {
 		pr_err("Error: J-Core PIT has no IRQ\n");
+		err = -ENXIO;
 		goto out;
 	}
 
@@ -183,6 +185,7 @@ static void __init jcore_pit_init(struct device_node *node)
 	cs = kzalloc(sizeof *cs, GFP_KERNEL);
 	if (!cs) {
 		pr_err("Failed to allocate memory for clocksource\n");
+		err = ENOMEM;
 		goto out;
 	}
 	jcore_cs = &cs->cs;
@@ -207,12 +210,14 @@ static void __init jcore_pit_init(struct device_node *node)
 	pit_percpu = alloc_percpu(struct jcore_pit);
 	if (!pit_percpu) {
 		pr_err("Failed to allocate memory for clock event device\n");
+		err = ENOMEM;
 		goto out;
 	}
 
 	nb = kzalloc(sizeof *nb, GFP_KERNEL);
 	if (!nb) {
 		pr_err("Failed to allocate memory for J-Core PIT notifier\n");
+		err = ENOMEM;
 		goto out;
 	}
 
@@ -268,10 +273,11 @@ static void __init jcore_pit_init(struct device_node *node)
 
 	jcore_pit_local_init(this_cpu_ptr(pit_percpu));
 
-	return;
+	return 0;
 
 out:
 	pr_err("Could not initialize J-Core PIT driver\n");
+	return err;
 }
 
 CLOCKSOURCE_OF_DECLARE(jcore_pit, "jcore,pit", jcore_pit_init);
