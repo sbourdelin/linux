@@ -1082,4 +1082,19 @@ enum nft_trace_types {
 	__NFT_TRACETYPE_MAX
 };
 #define NFT_TRACETYPE_MAX (__NFT_TRACETYPE_MAX - 1)
+
+/**
+ * enum nft_nth_attributes - nf_tables nth expression netlink attributes
+ * @NFTA_NTH_UNSPEC: unspecified attribute
+ * @NFTA_NTH_DREG: destination register (NLA_U32)
+ * @NFTA_NTH_DATA: source data (NLA_NESTED)
+ */
+enum nft_nth_attributes {
+	NFTA_NTH_UNSPEC,
+	NFTA_NTH_DREG,
+	NFTA_NTH_DATA,
+	__NFTA_NTH_MAX
+};
+#define NFTA_NTH_MAX	(__NFTA_NTH_MAX - 1)
+
 #endif /* _LINUX_NF_TABLES_H */
