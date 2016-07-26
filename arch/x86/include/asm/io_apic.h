@@ -190,6 +190,7 @@ static inline unsigned int io_apic_read(unsigned int apic, unsigned int reg)
 }
 
 extern void setup_IO_APIC(void);
+extern bool virt_wire_through_ioapic(void);
 extern void enable_IO_APIC(void);
 extern void disable_IO_APIC(void);
 extern void setup_ioapic_dest(void);
@@ -231,6 +232,10 @@ static inline void io_apic_init_mappings(void) { }
 #define native_disable_io_apic		NULL
 
 static inline void setup_IO_APIC(void) { }
+static inline bool virt_wire_through_ioapic(void)
+{
+	return false;
+}
 static inline void enable_IO_APIC(void) { }
 static inline void setup_ioapic_dest(void) { }
 
