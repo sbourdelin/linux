@@ -66,6 +66,7 @@ static int __init qemu_e500_probe(void)
 }
 
 machine_arch_initcall(qemu_e500, mpc85xx_common_publish_devices);
+machine_arch_initcall(qemu_e500, fsl_rstcr_restart_register);
 
 define_machine(qemu_e500) {
 	.name			= "QEMU e500",
@@ -77,7 +78,6 @@ define_machine(qemu_e500) {
 	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
 #endif
 	.get_irq		= mpic_get_coreint_irq,
-	.restart		= fsl_rstcr_restart,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,
 };

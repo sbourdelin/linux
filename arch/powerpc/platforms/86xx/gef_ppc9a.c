@@ -196,6 +196,7 @@ static int __init gef_ppc9a_probe(void)
 }
 
 machine_arch_initcall(gef_ppc9a, mpc86xx_common_publish_devices);
+machine_arch_initcall(gef_ppc9a, fsl_rstcr_restart_register);
 
 define_machine(gef_ppc9a) {
 	.name			= "GE PPC9A",
@@ -204,7 +205,6 @@ define_machine(gef_ppc9a) {
 	.init_IRQ		= gef_ppc9a_init_irq,
 	.show_cpuinfo		= gef_ppc9a_show_cpuinfo,
 	.get_irq		= mpic_get_irq,
-	.restart		= fsl_rstcr_restart,
 	.time_init		= mpc86xx_time_init,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,

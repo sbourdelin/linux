@@ -73,6 +73,7 @@ static void __init socrates_setup_arch(void)
 }
 
 machine_arch_initcall(socrates, mpc85xx_common_publish_devices);
+machine_arch_initcall(socrates, fsl_rstcr_restart_register);
 
 /*
  * Called very early, device-tree isn't unflattened
@@ -91,7 +92,6 @@ define_machine(socrates) {
 	.setup_arch		= socrates_setup_arch,
 	.init_IRQ		= socrates_pic_init,
 	.get_irq		= mpic_get_irq,
-	.restart		= fsl_rstcr_restart,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,
 };

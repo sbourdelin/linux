@@ -86,6 +86,7 @@ static void __init mpc85xx_rdb_setup_arch(void)
 }
 
 machine_arch_initcall(p1023_rdb, mpc85xx_common_publish_devices);
+machine_arch_initcall(p1023_rdb, fsl_rstcr_restart_register);
 
 static void __init mpc85xx_rdb_pic_init(void)
 {
@@ -110,7 +111,6 @@ define_machine(p1023_rdb) {
 	.setup_arch		= mpc85xx_rdb_setup_arch,
 	.init_IRQ		= mpc85xx_rdb_pic_init,
 	.get_irq		= mpic_get_irq,
-	.restart		= fsl_rstcr_restart,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,
 #ifdef CONFIG_PCI

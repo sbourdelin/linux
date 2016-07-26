@@ -122,6 +122,7 @@ static int __init declare_of_platform_devices(void)
 }
 machine_arch_initcall(mpc86xx_hpcn, declare_of_platform_devices);
 machine_arch_initcall(mpc86xx_hpcn, swiotlb_setup_bus_notifier);
+machine_arch_initcall(mpc86xx_hpcn, fsl_rstcr_restart_register);
 
 define_machine(mpc86xx_hpcn) {
 	.name			= "MPC86xx HPCN",
@@ -130,7 +131,6 @@ define_machine(mpc86xx_hpcn) {
 	.init_IRQ		= mpc86xx_init_irq,
 	.show_cpuinfo		= mpc86xx_hpcn_show_cpuinfo,
 	.get_irq		= mpic_get_irq,
-	.restart		= fsl_rstcr_restart,
 	.time_init		= mpc86xx_time_init,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,

@@ -114,6 +114,7 @@ static void sbc8548_show_cpuinfo(struct seq_file *m)
 }
 
 machine_arch_initcall(sbc8548, mpc85xx_common_publish_devices);
+machine_arch_initcall(sbc8548, fsl_rstcr_restart_register);
 
 /*
  * Called very early, device-tree isn't unflattened
@@ -130,7 +131,6 @@ define_machine(sbc8548) {
 	.init_IRQ	= sbc8548_pic_init,
 	.show_cpuinfo	= sbc8548_show_cpuinfo,
 	.get_irq	= mpic_get_irq,
-	.restart	= fsl_rstcr_restart,
 #ifdef CONFIG_PCI
 	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
 	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,

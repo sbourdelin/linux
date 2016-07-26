@@ -87,6 +87,7 @@ static void stx_gp3_show_cpuinfo(struct seq_file *m)
 }
 
 machine_arch_initcall(stx_gp3, mpc85xx_common_publish_devices);
+machine_arch_initcall(stx_gp3, fsl_rstcr_restart_register);
 
 /*
  * Called very early, device-tree isn't unflattened
@@ -103,7 +104,6 @@ define_machine(stx_gp3) {
 	.init_IRQ		= stx_gp3_pic_init,
 	.show_cpuinfo		= stx_gp3_show_cpuinfo,
 	.get_irq		= mpic_get_irq,
-	.restart		= fsl_rstcr_restart,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,
 };

@@ -225,7 +225,6 @@ define_machine(corenet_generic) {
 #else
 	.get_irq		= mpic_get_coreint_irq,
 #endif
-	.restart		= fsl_rstcr_restart,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,
 #ifdef CONFIG_PPC64
@@ -236,6 +235,7 @@ define_machine(corenet_generic) {
 };
 
 machine_arch_initcall(corenet_generic, corenet_gen_publish_devices);
+machine_arch_initcall(corenet_generic, fsl_rstcr_restart_register);
 
 #ifdef CONFIG_SWIOTLB
 machine_arch_initcall(corenet_generic, swiotlb_setup_bus_notifier);

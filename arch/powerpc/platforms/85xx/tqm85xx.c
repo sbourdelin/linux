@@ -107,6 +107,7 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1520,
 		tqm85xx_ti1520_fixup);
 
 machine_arch_initcall(tqm85xx, mpc85xx_common_publish_devices);
+machine_arch_initcall(tqm85xx, fsl_rstcr_restart_register);
 
 static const char * const board[] __initconst = {
 	"tqc,tqm8540",
@@ -132,7 +133,6 @@ define_machine(tqm85xx) {
 	.init_IRQ		= tqm85xx_pic_init,
 	.show_cpuinfo		= tqm85xx_show_cpuinfo,
 	.get_irq		= mpic_get_irq,
-	.restart		= fsl_rstcr_restart,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,
 };

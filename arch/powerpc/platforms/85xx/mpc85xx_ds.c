@@ -178,6 +178,10 @@ machine_arch_initcall(mpc8544_ds, swiotlb_setup_bus_notifier);
 machine_arch_initcall(mpc8572_ds, swiotlb_setup_bus_notifier);
 machine_arch_initcall(p2020_ds, swiotlb_setup_bus_notifier);
 
+machine_arch_initcall(mpc8544_ds, fsl_rstcr_restart_register);
+machine_arch_initcall(mpc8572_ds, fsl_rstcr_restart_register);
+machine_arch_initcall(p2020_ds, fsl_rstcr_restart_register);
+
 /*
  * Called very early, device-tree isn't unflattened
  */
@@ -204,7 +208,6 @@ define_machine(mpc8544_ds) {
 	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
 #endif
 	.get_irq		= mpic_get_irq,
-	.restart		= fsl_rstcr_restart,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,
 };
@@ -219,7 +222,6 @@ define_machine(mpc8572_ds) {
 	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
 #endif
 	.get_irq		= mpic_get_irq,
-	.restart		= fsl_rstcr_restart,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,
 };
@@ -234,7 +236,6 @@ define_machine(p2020_ds) {
 	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
 #endif
 	.get_irq		= mpic_get_irq,
-	.restart		= fsl_rstcr_restart,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,
 };

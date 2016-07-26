@@ -130,6 +130,8 @@ machine_arch_initcall(p1022_rdk, mpc85xx_common_publish_devices);
 
 machine_arch_initcall(p1022_rdk, swiotlb_setup_bus_notifier);
 
+machine_arch_initcall(p1022_rdk, fsl_rstcr_restart_register);
+
 /*
  * Called very early, device-tree isn't unflattened
  */
@@ -148,7 +150,6 @@ define_machine(p1022_rdk) {
 	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
 #endif
 	.get_irq		= mpic_get_irq,
-	.restart		= fsl_rstcr_restart,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,
 };

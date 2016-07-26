@@ -56,6 +56,7 @@ static void __init p1010_rdb_setup_arch(void)
 
 machine_arch_initcall(p1010_rdb, mpc85xx_common_publish_devices);
 machine_arch_initcall(p1010_rdb, swiotlb_setup_bus_notifier);
+machine_arch_initcall(p1010_rdb, fsl_rstcr_restart_register);
 
 /*
  * Called very early, device-tree isn't unflattened
@@ -79,7 +80,6 @@ define_machine(p1010_rdb) {
 	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
 #endif
 	.get_irq		= mpic_get_irq,
-	.restart		= fsl_rstcr_restart,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,
 };

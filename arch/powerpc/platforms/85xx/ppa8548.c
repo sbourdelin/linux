@@ -75,6 +75,7 @@ static int __init declare_of_platform_devices(void)
 	return 0;
 }
 machine_device_initcall(ppa8548, declare_of_platform_devices);
+machine_arch_initcall(ppa8548, fsl_rstcr_restart_register);
 
 /*
  * Called very early, device-tree isn't unflattened
@@ -91,7 +92,6 @@ define_machine(ppa8548) {
 	.init_IRQ	= ppa8548_pic_init,
 	.show_cpuinfo	= ppa8548_show_cpuinfo,
 	.get_irq	= mpic_get_irq,
-	.restart	= fsl_rstcr_restart,
 	.calibrate_decr = generic_calibrate_decr,
 	.progress	= udbg_progress,
 };

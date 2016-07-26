@@ -43,6 +43,7 @@ static void __init bsc913x_rdb_setup_arch(void)
 }
 
 machine_device_initcall(bsc9131_rdb, mpc85xx_common_publish_devices);
+machine_arch_initcall(bsc9131_rdb, fsl_rstcr_restart_register);
 
 /*
  * Called very early, device-tree isn't unflattened
@@ -59,7 +60,6 @@ define_machine(bsc9131_rdb) {
 	.setup_arch		= bsc913x_rdb_setup_arch,
 	.init_IRQ		= bsc913x_rdb_pic_init,
 	.get_irq		= mpic_get_irq,
-	.restart		= fsl_rstcr_restart,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,
 };

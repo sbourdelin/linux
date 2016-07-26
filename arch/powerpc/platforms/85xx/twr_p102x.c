@@ -125,6 +125,7 @@ static void __init twr_p1025_setup_arch(void)
 }
 
 machine_arch_initcall(twr_p1025, mpc85xx_common_publish_devices);
+machine_arch_initcall(twr_p1025, fsl_rstcr_restart_register);
 
 static int __init twr_p1025_probe(void)
 {
@@ -140,7 +141,6 @@ define_machine(twr_p1025) {
 	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
 #endif
 	.get_irq		= mpic_get_irq,
-	.restart		= fsl_rstcr_restart,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,
 };

@@ -203,6 +203,7 @@ static int __init ge_imp3a_probe(void)
 machine_arch_initcall(ge_imp3a, mpc85xx_common_publish_devices);
 
 machine_arch_initcall(ge_imp3a, swiotlb_setup_bus_notifier);
+machine_arch_initcall(ge_imp3a, fsl_rstcr_restart_register);
 
 define_machine(ge_imp3a) {
 	.name			= "GE_IMP3A",
@@ -215,7 +216,6 @@ define_machine(ge_imp3a) {
 	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
 #endif
 	.get_irq		= mpic_get_irq,
-	.restart		= fsl_rstcr_restart,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,
 };

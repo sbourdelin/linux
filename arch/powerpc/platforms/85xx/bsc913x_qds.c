@@ -53,6 +53,7 @@ static void __init bsc913x_qds_setup_arch(void)
 }
 
 machine_arch_initcall(bsc9132_qds, mpc85xx_common_publish_devices);
+machine_arch_initcall(bsc9133_qds, fsl_rstcr_restart_register);
 
 /*
  * Called very early, device-tree isn't unflattened
@@ -72,7 +73,6 @@ define_machine(bsc9132_qds) {
 	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
 #endif
 	.get_irq		= mpic_get_irq,
-	.restart		= fsl_rstcr_restart,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,
 };

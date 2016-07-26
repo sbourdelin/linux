@@ -154,6 +154,7 @@ static void mpc85xx_ads_show_cpuinfo(struct seq_file *m)
 }
 
 machine_arch_initcall(mpc85xx_ads, mpc85xx_common_publish_devices);
+machine_arch_initcall(mpc85xx_ads, fsl_rstcr_restart_register);
 
 /*
  * Called very early, device-tree isn't unflattened
@@ -170,7 +171,6 @@ define_machine(mpc85xx_ads) {
 	.init_IRQ		= mpc85xx_ads_pic_init,
 	.show_cpuinfo		= mpc85xx_ads_show_cpuinfo,
 	.get_irq		= mpic_get_irq,
-	.restart		= fsl_rstcr_restart,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,
 };

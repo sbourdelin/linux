@@ -29,6 +29,7 @@
 #include <linux/fsl_devices.h>
 #include <linux/fs_enet_pd.h>
 #include <linux/fs_uart_pd.h>
+#include <linux/reboot.h>
 
 #include <linux/atomic.h>
 #include <asm/io.h>
@@ -194,9 +195,6 @@ static int __init setup_rstcr(void)
 		}
 	}
 
-	if (!rstcr && ppc_md.restart == fsl_rstcr_restart)
-		printk(KERN_ERR "No RSTCR register, warm reboot won't work\n");
-
 	of_node_put(np);
 
 	return 0;
@@ -204,15 +202,29 @@ static int __init setup_rstcr(void)
 
 arch_initcall(setup_rstcr);
 
-void __noreturn fsl_rstcr_restart(char *cmd)
+static int fsl_rstcr_restart(struct notifier_block *this,
+			     unsigned long mode, void *cmd)
 {
 	local_irq_disable();
 	if (rstcr)
 		/* set reset control register */
 		out_be32(rstcr, 0x2);	/* HRESET_REQ */
 
-	while (1) ;
+	return NOTIFY_DONE;
 }
+
+int fsl_rstcr_restart_register(void)
+{
+	static struct notifier_block restart_handler;
+
+	restart_handler.notifier_call = fsl_rstcr_restart;
+	restart_handler.priority = 128;
+
+	return register_restart_handler(&restart_handler);
+}
+EXPORT_SYMBOL(fsl_rstcr_restart_register);
+
+
 #endif
 
 #if defined(CONFIG_FB_FSL_DIU) || defined(CONFIG_FB_FSL_DIU_MODULE)

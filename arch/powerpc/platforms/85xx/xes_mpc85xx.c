@@ -139,6 +139,10 @@ machine_arch_initcall(xes_mpc8572, mpc85xx_common_publish_devices);
 machine_arch_initcall(xes_mpc8548, mpc85xx_common_publish_devices);
 machine_arch_initcall(xes_mpc8540, mpc85xx_common_publish_devices);
 
+machine_arch_initcall(xes_mpc8572, fsl_rstcr_restart_register);
+machine_arch_initcall(xes_mpc8548, fsl_rstcr_restart_register);
+machine_arch_initcall(xes_mpc8540, fsl_rstcr_restart_register);
+
 /*
  * Called very early, device-tree isn't unflattened
  */
@@ -167,7 +171,6 @@ define_machine(xes_mpc8572) {
 	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
 #endif
 	.get_irq		= mpic_get_irq,
-	.restart		= fsl_rstcr_restart,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,
 };
@@ -182,7 +185,6 @@ define_machine(xes_mpc8548) {
 	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
 #endif
 	.get_irq		= mpic_get_irq,
-	.restart		= fsl_rstcr_restart,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,
 };
@@ -197,7 +199,6 @@ define_machine(xes_mpc8540) {
 	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
 #endif
 	.get_irq		= mpic_get_irq,
-	.restart		= fsl_rstcr_restart,
 	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= udbg_progress,
 };
