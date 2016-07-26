@@ -304,7 +304,6 @@ struct ti_port {
 struct ti_device {
 	struct mutex		td_open_close_lock;
 	int			td_open_port_count;
-	struct usb_serial	*td_serial;
 	int			td_is_3410;
 	bool			td_rs485_only;
 };
@@ -351,7 +350,7 @@ static int ti_restart_read(struct ti_port *tport, struct tty_struct *tty);
 static int ti_write_byte(struct usb_serial_port *port, u32 addr,
 			 u8 mask, u8 byte);
 
-static int ti_download_firmware(struct ti_device *tdev);
+static int ti_download_firmware(struct usb_serial *serial);
 
 static int closing_wait = TI_DEFAULT_CLOSING_WAIT;
 
@@ -597,7 +596,6 @@ static int ti_startup(struct usb_serial *serial)
 		return -ENOMEM;
 
 	mutex_init(&tdev->td_open_close_lock);
-	tdev->td_serial = serial;
 	usb_set_serial_data(serial, tdev);
 
 	/* determine device type */
@@ -622,7 +620,7 @@ static int ti_startup(struct usb_serial *serial)
 
 	/* if we have only 1 configuration and 1 endpoint, download firmware */
 	if (dev->descriptor.bNumConfigurations == 1 && num_endpoints == 1) {
-		status = ti_download_firmware(tdev);
+		status = ti_download_firmware(serial);
 
 		if (status != 0)
 			goto free_tdev;
@@ -729,7 +727,7 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 	/* start interrupt urb the first time a port is opened on this device */
 	if (tdev->td_open_port_count == 0) {
 		dev_dbg(&port->dev, "%s - start interrupt in urb\n", __func__);
-		urb = tdev->td_serial->port[0]->interrupt_in_urb;
+		urb = serial->port[0]->interrupt_in_urb;
 		if (!urb) {
 			dev_err(&port->dev, "%s - no interrupt urb\n", __func__);
 			status = -EINVAL;
@@ -824,7 +822,7 @@ static int ti_open(struct tty_struct *tty, struct usb_serial_port *port)
 
 unlink_int_urb:
 	if (tdev->td_open_port_count == 0)
-		usb_kill_urb(port->serial->port[0]->interrupt_in_urb);
+		usb_kill_urb(serial->port[0]->interrupt_in_urb);
 release_lock:
 	mutex_unlock(&tdev->td_open_close_lock);
 	return status;
@@ -1661,16 +1659,18 @@ static int ti_do_download(struct usb_device *dev, int pipe,
 	return status;
 }
 
-static int ti_download_firmware(struct ti_device *tdev)
+static int ti_download_firmware(struct usb_serial *serial)
 {
 	int status;
 	int buffer_size;
 	u8 *buffer;
-	struct usb_device *dev = tdev->td_serial->dev;
-	unsigned int pipe = usb_sndbulkpipe(dev,
-		tdev->td_serial->port[0]->bulk_out_endpointAddress);
+	struct usb_device *dev = serial->dev;
+	struct ti_device *tdev = usb_get_serial_data(serial);
+	unsigned int pipe;
 	const struct firmware *fw_p;
 	char buf[32];
+
+	pipe = usb_sndbulkpipe(dev, serial->port[0]->bulk_out_endpointAddress);
 
 	if (le16_to_cpu(dev->descriptor.idVendor) == MXU1_VENDOR_ID) {
 		snprintf(buf,
