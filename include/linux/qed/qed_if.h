@@ -539,44 +539,30 @@ struct qed_common_ops {
 #define GET_FIELD(value, name) \
 	(((value) >> (name ## _SHIFT)) & name ## _MASK)
 
+__printf(3, 4)
+void qed_err(const char *name, int line, const char *fmt, ...);
+__printf(4, 5)
+void qed_notice(u32 level, const char *name, int line, const char *fmt, ...);
+__printf(4, 5)
+void qed_info(u32 level, const char *name, int line, const char *fmt, ...);
+__printf(4, 5)
+void qed_verbose(u32 level, const char *name, int line, const char *fmt, ...);
+
 /* Debug print definitions */
-#define DP_ERR(cdev, fmt, ...)						     \
-		pr_err("[%s:%d(%s)]" fmt,				     \
-		       __func__, __LINE__,				     \
-		       DP_NAME(cdev) ? DP_NAME(cdev) : "",		     \
-		       ## __VA_ARGS__)					     \
-
-#define DP_NOTICE(cdev, fmt, ...)				      \
-	do {							      \
-		if (unlikely((cdev)->dp_level <= QED_LEVEL_NOTICE)) { \
-			pr_notice("[%s:%d(%s)]" fmt,		      \
-				  __func__, __LINE__,		      \
-				  DP_NAME(cdev) ? DP_NAME(cdev) : "", \
-				  ## __VA_ARGS__);		      \
-								      \
-		}						      \
-	} while (0)
-
-#define DP_INFO(cdev, fmt, ...)					      \
-	do {							      \
-		if (unlikely((cdev)->dp_level <= QED_LEVEL_INFO)) {   \
-			pr_notice("[%s:%d(%s)]" fmt,		      \
-				  __func__, __LINE__,		      \
-				  DP_NAME(cdev) ? DP_NAME(cdev) : "", \
-				  ## __VA_ARGS__);		      \
-		}						      \
-	} while (0)
-
-#define DP_VERBOSE(cdev, module, fmt, ...)				\
-	do {								\
-		if (unlikely(((cdev)->dp_level <= QED_LEVEL_VERBOSE) &&	\
-			     ((cdev)->dp_module & module))) {		\
-			pr_notice("[%s:%d(%s)]" fmt,			\
-				  __func__, __LINE__,			\
-				  DP_NAME(cdev) ? DP_NAME(cdev) : "",	\
-				  ## __VA_ARGS__);			\
-		}							\
-	} while (0)
+#define DP_ERR(type, fmt, ...)						\
+	qed_err(DP_NAME(type), __LINE__, fmt, ##__VA_ARGS__)
+#define DP_NOTICE(type, fmt, ...)					\
+	qed_notice((type)->dp_level, DP_NAME(type), __LINE__,		\
+		   fmt, ##__VA_ARGS__)
+#define DP_INFO(type, fmt, ...)						\
+	qed_info((type)->dp_level, DP_NAME(type), __LINE__,		\
+		 fmt, ##__VA_ARGS__)
+#define DP_VERBOSE(type, module, fmt, ...)				\
+do {									\
+	if ((type)->dp_module & module)					\
+		qed_verbose((type)->dp_level, DP_NAME(type), __LINE__,	\
+			    fmt, ##__VA_ARGS__);			\
+} while (0)
 
 enum DP_LEVEL {
 	QED_LEVEL_VERBOSE	= 0x0,
