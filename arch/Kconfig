@@ -417,6 +417,41 @@ config GCC_PLUGIN_LATENT_ENTROPY
 	   * https://grsecurity.net/
 	   * https://pax.grsecurity.net/
 
+config GCC_PLUGIN_INITIFY
+	bool "Free more kernel memory after init"
+	depends on GCC_PLUGINS
+	help
+	  The kernel has a mechanism to free up code and data memory that is
+	  only used during kernel or module initialization.  Enabling this
+	  feature will teach the compiler to find more such code and data
+	  that can be freed after initialization.
+
+	  This plugin is the part of grsecurity/PaX. More information at:
+	   * https://grsecurity.net/
+	   * https://pax.grsecurity.net/
+
+config HAVE_GCC_PLUGIN_INITIFY_INIT_EXIT
+	bool
+	depends on GCC_PLUGINS
+	help
+	  Move functions to the exit section if they are called by __init and
+	  __exit functions too.
+
+config GCC_PLUGIN_INITIFY_INIT_EXIT
+	bool
+	depends on GCC_PLUGIN_INITIFY && HAVE_GCC_PLUGIN_INITIFY_INIT_EXIT
+
+config GCC_PLUGIN_INITIFY_VERBOSE
+	bool "Verbose"
+	depends on GCC_PLUGINS
+	depends on GCC_PLUGIN_INITIFY
+	help
+	  Print all initified strings and all functions which should be
+	  __init/__exit.
+	  Note that the candidates identified for __init/__exit markings
+	  depend on the current kernel configuration and thus should be verified
+	  manually before the source code is patched.
+
 config HAVE_CC_STACKPROTECTOR
 	bool
 	help
