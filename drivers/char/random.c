@@ -1822,22 +1822,13 @@ unsigned long get_random_long(void)
 EXPORT_SYMBOL(get_random_long);
 
 /*
- * randomize_range() returns a start address such that
- *
- *    [...... <range> .....]
- *  start                  end
- *
- * a <range> with size "len" starting at the return value is inside in the
- * area defined by [start, end], but is otherwise randomized.
+ * randomize_addr() returns a page aligned address within [start, start +
+ * range]
  */
 unsigned long
-randomize_range(unsigned long start, unsigned long end, unsigned long len)
+randomize_addr(unsigned long start, unsigned long range)
 {
-	unsigned long range = end - len - start;
-
-	if (end <= start + len)
-		return 0;
-	return PAGE_ALIGN(get_random_int() % range + start);
+	return PAGE_ALIGN(get_random_long() % range + start);
 }
 
 /* Interface for in-kernel drivers of true hardware RNGs.
