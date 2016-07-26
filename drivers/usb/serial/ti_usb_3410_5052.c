@@ -1111,6 +1111,9 @@ static void ti_set_termios(struct tty_struct *tty,
 	/* if baud rate is B0, clear RTS and DTR */
 	if (C_BAUD(tty) == B0)
 		mcr &= ~(TI_MCR_DTR | TI_MCR_RTS);
+	else if (old_termios && (old_termios->c_cflag & CBAUD) == B0)
+		mcr |= TI_MCR_DTR | TI_MCR_RTS;
+
 	status = ti_set_mcr(tport, mcr);
 	if (status)
 		dev_err(&port->dev,
