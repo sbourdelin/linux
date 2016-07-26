@@ -877,23 +877,21 @@ int cpdma_control_set(struct cpdma_ctlr *ctlr, int control, int value)
 	int ret;
 	u32 val;
 
+	if (!ctlr->params.has_ext_regs)
+		return -ENOTSUPP;
+
+	if (control < 0 || control >= ARRAY_SIZE(controls))
+		return -ENOENT;
+
+	if ((info->access & ACCESS_WO) != ACCESS_WO)
+		return -EPERM;
+
 	spin_lock_irqsave(&ctlr->lock, flags);
 
-	ret = -ENOTSUPP;
-	if (!ctlr->params.has_ext_regs)
+	if (ctlr->state != CPDMA_STATE_ACTIVE) {
+		ret = -EINVAL;
 		goto unlock_ret;
-
-	ret = -EINVAL;
-	if (ctlr->state != CPDMA_STATE_ACTIVE)
-		goto unlock_ret;
-
-	ret = -ENOENT;
-	if (control < 0 || control >= ARRAY_SIZE(controls))
-		goto unlock_ret;
-
-	ret = -EPERM;
-	if ((info->access & ACCESS_WO) != ACCESS_WO)
-		goto unlock_ret;
+	}
 
 	val  = dma_reg_read(ctlr, info->reg);
 	val &= ~(info->mask << info->shift);
