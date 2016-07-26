@@ -44,6 +44,11 @@ struct davinci_mcasp_pdata {
 	int clk_input_pin;
 
 	/*
+	 * Activate AHCLKX clock output in slave mode.
+	 */
+	bool ahclkx_en;
+
+	/*
 	 * This flag works when both clock and FS are outputs for the cpu
 	 * and makes clock more accurate (FS is not symmetrical and the
 	 * clock is very fast.

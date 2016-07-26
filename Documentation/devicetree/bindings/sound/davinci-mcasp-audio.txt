@@ -39,6 +39,10 @@ Optional properties:
   		 please refer to pinctrl-bindings.txt
 - fck_parent : Should contain a valid clock name which will be used as parent
 	       for the McASP fck
+- ahclkx-en: In case the MCASP runs in slave mode, e.g. i2s SCK and WS slave,
+             we can still provide the MCLK to a codec PLL using the AHCLKX
+             transmit clock output. This setup can be activated by using this
+             property. Clock master mode remains unaffected.
 
 Example:
 
