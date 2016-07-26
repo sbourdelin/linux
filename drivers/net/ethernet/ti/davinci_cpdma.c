@@ -542,24 +542,10 @@ int cpdma_chan_submit(struct cpdma_chan *chan, void *token, void *data,
 	u32				mode;
 	int				ret = 0;
 
-	spin_lock_irqsave(&chan->lock, flags);
-
-	if (chan->state == CPDMA_STATE_TEARDOWN) {
-		ret = -EINVAL;
-		goto unlock_ret;
-	}
-
-	if (chan->count >= chan->desc_num)	{
-		chan->stats.desc_alloc_fail++;
-		ret = -ENOMEM;
-		goto unlock_ret;
-	}
-
 	desc = cpdma_desc_alloc(ctlr->pool);
 	if (!desc) {
 		chan->stats.desc_alloc_fail++;
-		ret = -ENOMEM;
-		goto unlock_ret;
+		return -ENOMEM;
 	}
 
 	if (len < ctlr->params.min_packet_size) {
@@ -571,8 +557,7 @@ int cpdma_chan_submit(struct cpdma_chan *chan, void *token, void *data,
 	ret = dma_mapping_error(ctlr->dev, buffer);
 	if (ret) {
 		cpdma_desc_free(ctlr->pool, desc, 1);
-		ret = -EINVAL;
-		goto unlock_ret;
+		return -EINVAL;
 	}
 
 	mode = CPDMA_DESC_OWNER | CPDMA_DESC_SOP | CPDMA_DESC_EOP;
@@ -586,6 +571,19 @@ int cpdma_chan_submit(struct cpdma_chan *chan, void *token, void *data,
 	desc_write(desc, sw_buffer, buffer);
 	desc_write(desc, sw_len,    len);
 
+	spin_lock_irqsave(&chan->lock, flags);
+
+	if (chan->state == CPDMA_STATE_TEARDOWN) {
+		ret = -EINVAL;
+		goto unlock_free;
+	}
+
+	if (chan->count >= chan->desc_num)	{
+		chan->stats.desc_alloc_fail++;
+		ret = -ENOMEM;
+		goto unlock_free;
+	}
+
 	__cpdma_chan_submit(chan, desc);
 
 	if (chan->state == CPDMA_STATE_ACTIVE && chan->rxfree)
@@ -593,8 +591,12 @@ int cpdma_chan_submit(struct cpdma_chan *chan, void *token, void *data,
 
 	chan->count++;
 
-unlock_ret:
 	spin_unlock_irqrestore(&chan->lock, flags);
+	return 0;
+
+unlock_free:
+	spin_unlock_irqrestore(&chan->lock, flags);
+	cpdma_desc_free(ctlr->pool, desc, 1);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(cpdma_chan_submit);
