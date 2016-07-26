@@ -29,7 +29,8 @@ static struct dst_entry *__xfrm4_dst_lookup(struct net *net, struct flowi4 *fl4,
 	memset(fl4, 0, sizeof(*fl4));
 	fl4->daddr = daddr->a4;
 	fl4->flowi4_tos = tos;
-	fl4->flowi4_oif = oif;
+	if (!net->xfrm.sysctl_reset_oif)
+		fl4->flowi4_oif = oif;
 	if (saddr)
 		fl4->saddr = saddr->a4;
 
