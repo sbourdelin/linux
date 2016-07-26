@@ -207,6 +207,7 @@
  */
 #ifdef INITIFY_PLUGIN
 #define __nocapture(...) __attribute__((nocapture(__VA_ARGS__)))
+#define __unverified_nocapture(...) __attribute__((unverified_nocapture(__VA_ARGS__)))
 #endif
 
 /*
