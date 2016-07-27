@@ -30,7 +30,6 @@ static const int cfq_slice_sync = HZ / 10;
 static int cfq_slice_async = HZ / 25;
 static const int cfq_slice_async_rq = 2;
 static int cfq_slice_idle = HZ / 125;
-static const int cfq_target_latency = HZ * 3/10; /* 300 ms */
 static const int cfq_hist_divisor = 4;
 
 /*
@@ -227,8 +226,6 @@ struct cfq_data {
 	unsigned int cfq_slice[2];
 	unsigned int cfq_slice_async_rq;
 	unsigned int cfq_slice_idle;
-	unsigned int cfq_latency;
-	unsigned int cfq_target_latency;
 
 	/*
 	 * Fallback dummy cfqq for extreme OOM conditions
@@ -1463,7 +1460,7 @@ static bool cfq_may_dispatch(struct cfq_data *cfqd, struct cfq_queue *cfqq)
 	 * We also ramp up the dispatch depth gradually for async IO,
 	 * based on the last sync IO we serviced
 	 */
-	if (!cfq_cfqq_sync(cfqq) && cfqd->cfq_latency) {
+	if (!cfq_cfqq_sync(cfqq)) {
 		unsigned long last_sync = jiffies - cfqd->last_delayed_sync;
 		unsigned int depth;
 
@@ -2269,10 +2266,8 @@ static int cfq_init_queue(struct request_queue *q, struct elevator_type *e)
 	cfqd->cfq_back_penalty = cfq_back_penalty;
 	cfqd->cfq_slice[0] = cfq_slice_async;
 	cfqd->cfq_slice[1] = cfq_slice_sync;
-	cfqd->cfq_target_latency = cfq_target_latency;
 	cfqd->cfq_slice_async_rq = cfq_slice_async_rq;
 	cfqd->cfq_slice_idle = cfq_slice_idle;
-	cfqd->cfq_latency = 1;
 	cfqd->hw_tag = -1;
 	/*
 	 * we optimistically start assuming sync ops weren't delayed in last
@@ -2330,8 +2325,6 @@ SHOW_FUNCTION(cfq_slice_idle_show, cfqd->cfq_slice_idle, 1);
 SHOW_FUNCTION(cfq_slice_sync_show, cfqd->cfq_slice[1], 1);
 SHOW_FUNCTION(cfq_slice_async_show, cfqd->cfq_slice[0], 1);
 SHOW_FUNCTION(cfq_slice_async_rq_show, cfqd->cfq_slice_async_rq, 0);
-SHOW_FUNCTION(cfq_low_latency_show, cfqd->cfq_latency, 0);
-SHOW_FUNCTION(cfq_target_latency_show, cfqd->cfq_target_latency, 1);
 #undef SHOW_FUNCTION
 
 #define STORE_FUNCTION(__FUNC, __PTR, MIN, MAX, __CONV)			\
@@ -2363,12 +2356,26 @@ STORE_FUNCTION(cfq_slice_sync_store, &cfqd->cfq_slice[1], 1, UINT_MAX, 1);
 STORE_FUNCTION(cfq_slice_async_store, &cfqd->cfq_slice[0], 1, UINT_MAX, 1);
 STORE_FUNCTION(cfq_slice_async_rq_store, &cfqd->cfq_slice_async_rq, 1,
 		UINT_MAX, 0);
-STORE_FUNCTION(cfq_low_latency_store, &cfqd->cfq_latency, 0, 1, 0);
-STORE_FUNCTION(cfq_target_latency_store, &cfqd->cfq_target_latency, 1, UINT_MAX, 1);
 #undef STORE_FUNCTION
+
+static ssize_t cfq_fake_lat_show(struct elevator_queue *e, char *page)
+{
+	pr_warn_once("CFQ I/O SCHED: tried to read removed latency tunable");
+	return sprintf(page, "0\n");
+}
+
+static ssize_t
+cfq_fake_lat_store(struct elevator_queue *e, const char *page, size_t count)
+{
+	pr_warn_once("CFQ I/O SCHED: tried to write removed latency tunable");
+	return count;
+}
 
 #define CFQ_ATTR(name) \
 	__ATTR(name, S_IRUGO|S_IWUSR, cfq_##name##_show, cfq_##name##_store)
+
+#define CFQ_FAKE_LAT_ATTR(name) \
+	__ATTR(name, S_IRUGO|S_IWUSR, cfq_fake_lat_show, cfq_fake_lat_store)
 
 static struct elv_fs_entry cfq_attrs[] = {
 	CFQ_ATTR(quantum),
@@ -2380,8 +2387,8 @@ static struct elv_fs_entry cfq_attrs[] = {
 	CFQ_ATTR(slice_async),
 	CFQ_ATTR(slice_async_rq),
 	CFQ_ATTR(slice_idle),
-	CFQ_ATTR(low_latency),
-	CFQ_ATTR(target_latency),
+	CFQ_FAKE_LAT_ATTR(low_latency),
+	CFQ_FAKE_LAT_ATTR(target_latency),
 	__ATTR_NULL
 };
 
