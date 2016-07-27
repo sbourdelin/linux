@@ -4113,6 +4113,7 @@ static int mvneta_probe(struct platform_device *pdev)
 	if (bm_node && bm_node->data) {
 		pp->bm_priv = bm_node->data;
 		err = mvneta_bm_port_init(pdev, pp);
+		of_node_put(bm_node);
 		if (err < 0) {
 			dev_info(&pdev->dev, "use SW buffer management\n");
 			pp->bm_priv = NULL;
