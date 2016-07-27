@@ -497,36 +497,6 @@ static int exynos4_mct_dying_cpu(unsigned int cpu)
 	return 0;
 }
 
-<<<<<<< HEAD
-static int exynos4_mct_cpu_notify(struct notifier_block *self,
-					   unsigned long action, void *hcpu)
-{
-	struct mct_clock_event_device *mevt;
-
-	/*
-	 * Grab cpu pointer in each case to avoid spurious
-	 * preemptible warnings
-	 */
-	switch (action & ~CPU_TASKS_FROZEN) {
-	case CPU_STARTING:
-		mevt = this_cpu_ptr(&percpu_mct_tick);
-		exynos4_local_timer_setup(mevt);
-		break;
-	case CPU_DYING:
-		mevt = this_cpu_ptr(&percpu_mct_tick);
-		exynos4_local_timer_stop(mevt);
-		break;
-	}
-
-	return NOTIFY_OK;
-}
-
-static struct notifier_block exynos4_mct_cpu_nb = {
-	.notifier_call = exynos4_mct_cpu_notify,
-};
-
-=======
->>>>>>> linux-next/akpm-base
 static int __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
 {
 	int err, cpu;
@@ -584,11 +554,6 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
 	if (err)
 		goto out_irq;
 
-<<<<<<< HEAD
-	/* Immediately configure the timer on the boot CPU */
-	exynos4_local_timer_setup(mevt);
-=======
->>>>>>> linux-next/akpm-base
 	return 0;
 
 out_irq:

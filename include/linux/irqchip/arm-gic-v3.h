@@ -265,20 +265,6 @@
 
 #define GITS_BASER_NR_REGS		8
 
-<<<<<<< HEAD
-#define GITS_BASER_VALID		(1UL << 63)
-#define GITS_BASER_INDIRECT		(1UL << 62)
-#define GITS_BASER_nCnB			(0UL << 59)
-#define GITS_BASER_nC			(1UL << 59)
-#define GITS_BASER_RaWt			(2UL << 59)
-#define GITS_BASER_RaWb			(3UL << 59)
-#define GITS_BASER_WaWt			(4UL << 59)
-#define GITS_BASER_WaWb			(5UL << 59)
-#define GITS_BASER_RaWaWt		(6UL << 59)
-#define GITS_BASER_RaWaWb		(7UL << 59)
-#define GITS_BASER_CACHEABILITY_MASK	(7UL << 59)
-#define GITS_BASER_TYPE_SHIFT		(56)
-=======
 #define GITS_BASER_VALID			(1UL << 63)
 #define GITS_BASER_INDIRECT			(1ULL << 62)
 
@@ -302,7 +288,6 @@
 #define GITS_BASER_RaWaWb	GIC_BASER_CACHEABILITY(GITS_BASER, INNER, RaWaWb)
 
 #define GITS_BASER_TYPE_SHIFT			(56)
->>>>>>> linux-next/akpm-base
 #define GITS_BASER_TYPE(r)		(((r) >> GITS_BASER_TYPE_SHIFT) & 7)
 #define GITS_BASER_ENTRY_SIZE_SHIFT		(48)
 #define GITS_BASER_ENTRY_SIZE(r)	((((r) >> GITS_BASER_ENTRY_SIZE_SHIFT) & 0xff) + 1)
@@ -316,10 +301,7 @@
 #define GITS_BASER_PAGE_SIZE_MASK	(3UL << GITS_BASER_PAGE_SIZE_SHIFT)
 #define GITS_BASER_PAGES_MAX		256
 #define GITS_BASER_PAGES_SHIFT		(0)
-<<<<<<< HEAD
-=======
 #define GITS_BASER_NR_PAGES(r)		(((r) & 0xff) + 1)
->>>>>>> linux-next/akpm-base
 
 #define GITS_BASER_TYPE_NONE		0
 #define GITS_BASER_TYPE_DEVICE		1

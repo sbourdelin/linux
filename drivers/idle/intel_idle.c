@@ -1055,11 +1055,7 @@ static const struct idle_cpu idle_cpu_dnv = {
 static const struct x86_cpu_id intel_idle_ids[] __initconst = {
 	ICPU(INTEL_FAM6_NEHALEM_EP,		idle_cpu_nehalem),
 	ICPU(INTEL_FAM6_NEHALEM,		idle_cpu_nehalem),
-<<<<<<< HEAD
-	ICPU(INTEL_FAM6_WESTMERE2,		idle_cpu_nehalem),
-=======
 	ICPU(INTEL_FAM6_NEHALEM_G,		idle_cpu_nehalem),
->>>>>>> linux-next/akpm-base
 	ICPU(INTEL_FAM6_WESTMERE,		idle_cpu_nehalem),
 	ICPU(INTEL_FAM6_WESTMERE_EP,		idle_cpu_nehalem),
 	ICPU(INTEL_FAM6_NEHALEM_EX,		idle_cpu_nehalem),
@@ -1089,10 +1085,7 @@ static const struct x86_cpu_id intel_idle_ids[] __initconst = {
 	ICPU(INTEL_FAM6_SKYLAKE_X,		idle_cpu_skx),
 	ICPU(INTEL_FAM6_XEON_PHI_KNL,		idle_cpu_knl),
 	ICPU(INTEL_FAM6_ATOM_GOLDMONT,		idle_cpu_bxt),
-<<<<<<< HEAD
-=======
 	ICPU(INTEL_FAM6_ATOM_DENVERTON,		idle_cpu_dnv),
->>>>>>> linux-next/akpm-base
 	{}
 };
 

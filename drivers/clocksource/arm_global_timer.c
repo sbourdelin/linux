@@ -255,27 +255,6 @@ static int __init gt_clocksource_init(void)
 	return clocksource_register_hz(&gt_clocksource, gt_clk_rate);
 }
 
-<<<<<<< HEAD
-static int gt_cpu_notify(struct notifier_block *self, unsigned long action,
-			 void *hcpu)
-{
-	switch (action & ~CPU_TASKS_FROZEN) {
-	case CPU_STARTING:
-		gt_clockevents_init(this_cpu_ptr(gt_evt));
-		break;
-	case CPU_DYING:
-		gt_clockevents_stop(this_cpu_ptr(gt_evt));
-		break;
-	}
-
-	return NOTIFY_OK;
-}
-static struct notifier_block gt_cpu_nb = {
-	.notifier_call = gt_cpu_notify,
-};
-
-=======
->>>>>>> linux-next/akpm-base
 static int __init global_timer_of_register(struct device_node *np)
 {
 	struct clk *gt_clk;
@@ -342,18 +321,6 @@ static int __init global_timer_of_register(struct device_node *np)
 	if (err)
 		goto out_irq;
 
-<<<<<<< HEAD
-	/* Immediately configure the timer on the boot CPU */
-	err = gt_clocksource_init();
-	if (err)
-		goto out_irq;
-	
-	err = gt_clockevents_init(this_cpu_ptr(gt_evt));
-	if (err)
-		goto out_irq;
-
-=======
->>>>>>> linux-next/akpm-base
 	gt_delay_timer_init();
 
 	return 0;

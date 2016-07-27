@@ -301,11 +301,6 @@ static int __init armada_370_xp_timer_common_init(struct device_node *np)
 		pr_err("Failed to initialize clocksource mmio");
 		return res;
 	}
-<<<<<<< HEAD
-
-	register_cpu_notifier(&armada_370_xp_timer_cpu_nb);
-=======
->>>>>>> linux-next/akpm-base
 
 	armada_370_xp_evt = alloc_percpu(struct clock_event_device);
 	if (!armada_370_xp_evt)
@@ -324,18 +319,12 @@ static int __init armada_370_xp_timer_common_init(struct device_node *np)
 		return res;
 	}
 
-<<<<<<< HEAD
-	res = armada_370_xp_timer_setup(this_cpu_ptr(armada_370_xp_evt));
-	if (res) {
-		pr_err("Failed to setup timer");
-=======
 	res = cpuhp_setup_state(CPUHP_AP_ARMADA_TIMER_STARTING,
 				"AP_ARMADA_TIMER_STARTING",
 				armada_370_xp_timer_starting_cpu,
 				armada_370_xp_timer_dying_cpu);
 	if (res) {
 		pr_err("Failed to setup hotplug state and timer");
->>>>>>> linux-next/akpm-base
 		return res;
 	}
 

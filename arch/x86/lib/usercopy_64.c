@@ -5,11 +5,7 @@
  * Copyright 1997 Linus Torvalds
  * Copyright 2002 Andi Kleen <ak@suse.de>
  */
-<<<<<<< HEAD
-#include <linux/module.h>
-=======
 #include <linux/export.h>
->>>>>>> linux-next/akpm-base
 #include <linux/uaccess.h>
 
 /*

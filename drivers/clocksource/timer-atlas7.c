@@ -214,49 +214,16 @@ static int sirfsoc_local_timer_dying_cpu(unsigned int cpu)
 	return 0;
 }
 
-<<<<<<< HEAD
-static int sirfsoc_cpu_notify(struct notifier_block *self,
-			      unsigned long action, void *hcpu)
-{
-	/*
-	 * Grab cpu pointer in each case to avoid spurious
-	 * preemptible warnings
-	 */
-	switch (action & ~CPU_TASKS_FROZEN) {
-	case CPU_STARTING:
-		sirfsoc_local_timer_setup(this_cpu_ptr(sirfsoc_clockevent));
-		break;
-	case CPU_DYING:
-		sirfsoc_local_timer_stop(this_cpu_ptr(sirfsoc_clockevent));
-		break;
-	}
-
-	return NOTIFY_OK;
-}
-
-static struct notifier_block sirfsoc_cpu_nb = {
-	.notifier_call = sirfsoc_cpu_notify,
-};
-
-=======
->>>>>>> linux-next/akpm-base
 static int __init sirfsoc_clockevent_init(void)
 {
 	sirfsoc_clockevent = alloc_percpu(struct clock_event_device);
 	BUG_ON(!sirfsoc_clockevent);
 
-<<<<<<< HEAD
-	BUG_ON(register_cpu_notifier(&sirfsoc_cpu_nb));
-
-	/* Immediately configure the timer on the boot CPU */
-	return sirfsoc_local_timer_setup(this_cpu_ptr(sirfsoc_clockevent));
-=======
 	/* Install and invoke hotplug callbacks */
 	return cpuhp_setup_state(CPUHP_AP_MARCO_TIMER_STARTING,
 				 "AP_MARCO_TIMER_STARTING",
 				 sirfsoc_local_timer_starting_cpu,
 				 sirfsoc_local_timer_dying_cpu);
->>>>>>> linux-next/akpm-base
 }
 
 /* initialize the kernel jiffy timer source */

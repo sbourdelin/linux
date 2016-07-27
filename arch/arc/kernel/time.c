@@ -322,15 +322,6 @@ static int __init arc_clockevent_setup(struct device_node *node)
 	struct clock_event_device *evt = this_cpu_ptr(&arc_clockevent_device);
 	int ret;
 
-<<<<<<< HEAD
-	ret = register_cpu_notifier(&arc_timer_cpu_nb);
-	if (ret) {
-		pr_err("Failed to register cpu notifier");
-		return ret;
-	}
-
-=======
->>>>>>> linux-next/akpm-base
 	arc_timer_irq = irq_of_parse_and_map(node, 0);
 	if (arc_timer_irq <= 0) {
 		pr_err("clockevent: missing irq");
@@ -342,14 +333,6 @@ static int __init arc_clockevent_setup(struct device_node *node)
 		pr_err("clockevent: missing clk");
 		return ret;
 	}
-<<<<<<< HEAD
-
-	evt->irq = arc_timer_irq;
-	evt->cpumask = cpumask_of(smp_processor_id());
-	clockevents_config_and_register(evt, arc_timer_freq,
-					0, ARC_TIMER_MAX);
-=======
->>>>>>> linux-next/akpm-base
 
 	/* Needs apriori irq_set_percpu_devid() done in intc map function */
 	ret = request_percpu_irq(arc_timer_irq, timer_irq_handler,
@@ -359,10 +342,6 @@ static int __init arc_clockevent_setup(struct device_node *node)
 		return ret;
 	}
 
-<<<<<<< HEAD
-	enable_percpu_irq(arc_timer_irq, 0);
-
-=======
 	ret = cpuhp_setup_state(CPUHP_AP_ARC_TIMER_STARTING,
 				"AP_ARC_TIMER_STARTING",
 				arc_timer_starting_cpu,
@@ -371,7 +350,6 @@ static int __init arc_clockevent_setup(struct device_node *node)
 		pr_err("Failed to setup hotplug state");
 		return ret;
 	}
->>>>>>> linux-next/akpm-base
 	return 0;
 }
 
