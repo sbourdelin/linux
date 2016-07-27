@@ -786,6 +786,7 @@ static int  hns_mac_get_info(struct hns_mac_cb *mac_cb)
 		np = of_parse_phandle(mac_cb->dev->of_node, "phy-handle",
 				      mac_cb->mac_id);
 		mac_cb->phy_dev = of_phy_find_device(np);
+		of_node_put(np);
 		if (mac_cb->phy_dev) {
 			/* refcount is held by of_phy_find_device()
 			 * if the phy_dev is found
@@ -804,6 +805,7 @@ static int  hns_mac_get_info(struct hns_mac_cb *mac_cb)
 		np = of_parse_phandle(to_of_node(mac_cb->fw_port),
 				      "phy-handle", 0);
 		mac_cb->phy_dev = of_phy_find_device(np);
+		of_node_put(np);
 		if (mac_cb->phy_dev) {
 			/* refcount is held by of_phy_find_device()
 			 * if the phy_dev is found
@@ -813,9 +815,10 @@ static int  hns_mac_get_info(struct hns_mac_cb *mac_cb)
 				mac_cb->mac_id, np->name);
 		}
 
-		syscon = syscon_node_to_regmap(
-				of_parse_phandle(to_of_node(mac_cb->fw_port),
-						 "serdes-syscon", 0));
+		np = of_parse_phandle(to_of_node(mac_cb->fw_port),
+					"serdes-syscon", 0);
+		syscon = syscon_node_to_regmap(np);
+		of_node_put(np);
 		if (IS_ERR_OR_NULL(syscon)) {
 			dev_err(mac_cb->dev, "serdes-syscon is needed!\n");
 			return -EINVAL;
