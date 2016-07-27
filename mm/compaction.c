@@ -1461,7 +1461,7 @@ static enum compact_result compact_zone(struct zone *zone, struct compact_contro
 
 	cc->last_migrated_pfn = 0;
 
-	trace_mm_compaction_begin(start_pfn, cc->migrate_pfn,
+	trace_mm_compaction_begin(zone, start_pfn, cc->migrate_pfn,
 				cc->free_pfn, end_pfn, sync);
 
 	migrate_prep_local();
@@ -1633,7 +1633,7 @@ enum compact_result try_to_compact_pages(gfp_t gfp_mask, unsigned int order,
 	if (!order || !may_enter_fs || !may_perform_io)
 		return COMPACT_SKIPPED;
 
-	trace_mm_compaction_try_to_compact_pages(order, gfp_mask, mode);
+	trace_mm_compaction_try_to_compact_pages_begin(order, gfp_mask, mode);
 
 	/* Compact each zone in the list */
 	for_each_zone_zonelist_nodemask(zone, z, ac->zonelist, ac->high_zoneidx,
@@ -1718,6 +1718,8 @@ break_loop:
 	 */
 	if (rc > COMPACT_INACTIVE && all_zones_contended)
 		*contended = COMPACT_CONTENDED_LOCK;
+
+	trace_mm_compaction_try_to_compact_pages_end(rc, *contended);
 
 	return rc;
 }

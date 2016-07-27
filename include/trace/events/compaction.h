@@ -158,12 +158,15 @@ TRACE_EVENT(mm_compaction_migratepages,
 );
 
 TRACE_EVENT(mm_compaction_begin,
-	TP_PROTO(unsigned long zone_start, unsigned long migrate_pfn,
-		unsigned long free_pfn, unsigned long zone_end, bool sync),
+	TP_PROTO(struct zone *zone, unsigned long zone_start,
+		unsigned long migrate_pfn, unsigned long free_pfn,
+		unsigned long zone_end, bool sync),
 
-	TP_ARGS(zone_start, migrate_pfn, free_pfn, zone_end, sync),
+	TP_ARGS(zone, zone_start, migrate_pfn, free_pfn, zone_end, sync),
 
 	TP_STRUCT__entry(
+		__field(int, nid)
+		__field(int, zid)
 		__field(unsigned long, zone_start)
 		__field(unsigned long, migrate_pfn)
 		__field(unsigned long, free_pfn)
@@ -172,6 +175,8 @@ TRACE_EVENT(mm_compaction_begin,
 	),
 
 	TP_fast_assign(
+		__entry->nid = zone_to_nid(zone);
+		__entry->zid = zone_idx(zone);
 		__entry->zone_start = zone_start;
 		__entry->migrate_pfn = migrate_pfn;
 		__entry->free_pfn = free_pfn;
@@ -179,7 +184,9 @@ TRACE_EVENT(mm_compaction_begin,
 		__entry->sync = sync;
 	),
 
-	TP_printk("zone_start=0x%lx migrate_pfn=0x%lx free_pfn=0x%lx zone_end=0x%lx, mode=%s",
+	TP_printk("nid=%d zid=%d zone_start=0x%lx migrate_pfn=0x%lx free_pfn=0x%lx zone_end=0x%lx, mode=%s",
+		__entry->nid,
+		__entry->zid,
 		__entry->zone_start,
 		__entry->migrate_pfn,
 		__entry->free_pfn,
@@ -221,7 +228,7 @@ TRACE_EVENT(mm_compaction_end,
 		__print_symbolic(__entry->status, COMPACTION_STATUS))
 );
 
-TRACE_EVENT(mm_compaction_try_to_compact_pages,
+TRACE_EVENT(mm_compaction_try_to_compact_pages_begin,
 
 	TP_PROTO(
 		int order,
@@ -246,6 +253,27 @@ TRACE_EVENT(mm_compaction_try_to_compact_pages,
 		__entry->order,
 		__entry->gfp_mask,
 		(int)__entry->mode)
+);
+
+TRACE_EVENT(mm_compaction_try_to_compact_pages_end,
+
+	TP_PROTO(int rc, int contended),
+
+	TP_ARGS(rc, contended),
+
+	TP_STRUCT__entry(
+		__field(int, rc)
+		__field(int, contended)
+	),
+
+	TP_fast_assign(
+		__entry->rc = rc;
+		__entry->contended = contended;
+	),
+
+	TP_printk("rc=%s contended=%d",
+		__print_symbolic(__entry->rc, COMPACTION_STATUS),
+		__entry->contended)
 );
 
 DECLARE_EVENT_CLASS(mm_compaction_suitable_template,
