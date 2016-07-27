@@ -6782,17 +6782,24 @@ static void update_tracer_options(struct trace_array *tr)
 	mutex_unlock(&trace_types_lock);
 }
 
-static int instance_mkdir(const char *name)
+static int instance_mkdir(int instance_type, void *data)
 {
+	const char *name =  "tracing";
+	struct dentry *mnt_root = NULL;
 	struct trace_array *tr;
 	int ret;
 
 	mutex_lock(&trace_types_lock);
 
-	ret = -EEXIST;
-	list_for_each_entry(tr, &ftrace_trace_arrays, list) {
-		if (tr->name && strcmp(tr->name, name) == 0)
-			goto out_unlock;
+	if (instance_type == INSTANCE_MNT)
+		mnt_root = data;
+	else {
+		name = data;
+		ret = -EEXIST;
+		list_for_each_entry(tr, &ftrace_trace_arrays, list) {
+			if (tr->name && strcmp(tr->name, name) == 0)
+				goto out_unlock;
+		}
 	}
 
 	ret = -ENOMEM;
@@ -6823,9 +6830,14 @@ static int instance_mkdir(const char *name)
 	if (allocate_trace_buffers(tr, trace_buf_size) < 0)
 		goto out_free_tr;
 
-	tr->dir = tracefs_create_dir(name, trace_instance_dir);
-	if (!tr->dir)
-		goto out_free_tr;
+	if (instance_type == INSTANCE_MNT) {
+		mnt_root->d_inode->i_private = tr;
+		tr->dir = mnt_root;
+	} else {
+		tr->dir = tracefs_create_dir(name, trace_instance_dir);
+		if (!tr->dir)
+			goto out_free_tr;
+	}
 
 	ret = event_trace_add_tracer(tr->dir, tr);
 	if (ret) {
@@ -6856,8 +6868,10 @@ static int instance_mkdir(const char *name)
 
 }
 
-static int instance_rmdir(const char *name)
+static int instance_rmdir(int instance_type, void *data)
 {
+	const char *name =  "tracing";
+	struct dentry *mnt_root = NULL;
 	struct trace_array *tr;
 	int found = 0;
 	int ret;
@@ -6865,15 +6879,21 @@ static int instance_rmdir(const char *name)
 
 	mutex_lock(&trace_types_lock);
 
-	ret = -ENODEV;
-	list_for_each_entry(tr, &ftrace_trace_arrays, list) {
-		if (tr->name && strcmp(tr->name, name) == 0) {
-			found = 1;
-			break;
+	if (instance_type == INSTANCE_MNT) {
+		mnt_root = data;
+		tr = mnt_root->d_inode->i_private;
+	} else {
+		name = data;
+		ret = -ENODEV;
+		list_for_each_entry(tr, &ftrace_trace_arrays, list) {
+			if (tr->name && strcmp(tr->name, name) == 0) {
+				found = 1;
+				break;
+			}
 		}
+		if (!found)
+			goto out_unlock;
 	}
-	if (!found)
-		goto out_unlock;
 
 	ret = -EBUSY;
 	if (tr->ref || (tr->current_trace && tr->current_trace->ref))

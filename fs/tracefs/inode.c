@@ -51,9 +51,9 @@ static const struct file_operations tracefs_file_operations = {
 };
 
 static struct tracefs_dir_ops {
-	int (*mkdir)(const char *name);
-	int (*rmdir)(const char *name);
-} tracefs_ops;
+	int (*mkdir)(int instance_type, void *data);
+	int (*rmdir)(int instance_type, void *data);
+} tracefs_instance_ops;
 
 static char *get_dname(struct dentry *dentry)
 {
@@ -85,7 +85,7 @@ static int tracefs_syscall_mkdir(struct inode *inode, struct dentry *dentry, umo
 	 * mkdir routine to handle races.
 	 */
 	inode_unlock(inode);
-	ret = tracefs_ops.mkdir(name);
+	ret = tracefs_instance_ops.mkdir(INSTANCE_DIR, name);
 	inode_lock(inode);
 
 	kfree(name);
@@ -112,7 +112,7 @@ static int tracefs_syscall_rmdir(struct inode *inode, struct dentry *dentry)
 	inode_unlock(inode);
 	inode_unlock(dentry->d_inode);
 
-	ret = tracefs_ops.rmdir(name);
+	ret = tracefs_instance_ops.rmdir(INSTANCE_DIR, name);
 
 	inode_lock_nested(inode, I_MUTEX_PARENT);
 	inode_lock(dentry->d_inode);
@@ -142,12 +142,14 @@ struct tracefs_mount_opts {
 	kuid_t uid;
 	kgid_t gid;
 	umode_t mode;
+	int newinstance;
 };
 
 enum {
 	Opt_uid,
 	Opt_gid,
 	Opt_mode,
+	Opt_newinstance,
 	Opt_err
 };
 
@@ -155,14 +157,26 @@ static const match_table_t tokens = {
 	{Opt_uid, "uid=%u"},
 	{Opt_gid, "gid=%u"},
 	{Opt_mode, "mode=%o"},
+	{Opt_newinstance, "newinstance"},
 	{Opt_err, NULL}
 };
 
 struct tracefs_fs_info {
 	struct tracefs_mount_opts mount_opts;
+	struct super_block *sb;
 };
 
-static int tracefs_parse_options(char *data, struct tracefs_mount_opts *opts)
+static inline struct tracefs_fs_info *TRACEFS_SB(struct super_block *sb)
+{
+	return sb->s_fs_info;
+}
+
+#define PARSE_MOUNT		0
+#define PARSE_REMOUNT		1
+
+static int tracefs_parse_options(char *data,
+				 int op,
+				 struct tracefs_mount_opts *opts)
 {
 	substring_t args[MAX_OPT_ARGS];
 	int option;
@@ -172,6 +186,10 @@ static int tracefs_parse_options(char *data, struct tracefs_mount_opts *opts)
 	char *p;
 
 	opts->mode = TRACEFS_DEFAULT_MODE;
+
+	/* newinstance makes sense only on initial mount */
+	if (op == PARSE_MOUNT)
+		opts->newinstance = 0;
 
 	while ((p = strsep(&data, ",")) != NULL) {
 		if (!*p)
@@ -199,6 +217,11 @@ static int tracefs_parse_options(char *data, struct tracefs_mount_opts *opts)
 			if (match_octal(&args[0], &option))
 				return -EINVAL;
 			opts->mode = option & S_IALLUGO;
+			break;
+		case Opt_newinstance:
+			/* newinstance makes sense only on initial mount */
+			if (op == PARSE_MOUNT)
+				opts->newinstance = 1;
 			break;
 		/*
 		 * We might like to report bad mount options here;
@@ -231,7 +254,7 @@ static int tracefs_remount(struct super_block *sb, int *flags, char *data)
 	struct tracefs_fs_info *fsi = sb->s_fs_info;
 
 	sync_filesystem(sb);
-	err = tracefs_parse_options(data, &fsi->mount_opts);
+	err = tracefs_parse_options(data, PARSE_REMOUNT, &fsi->mount_opts);
 	if (err)
 		goto fail;
 
@@ -254,6 +277,8 @@ static int tracefs_show_options(struct seq_file *m, struct dentry *root)
 			   from_kgid_munged(&init_user_ns, opts->gid));
 	if (opts->mode != TRACEFS_DEFAULT_MODE)
 		seq_printf(m, ",mode=%o", opts->mode);
+	if (opts->newinstance)
+		seq_puts(m, ",newinstance");
 
 	return 0;
 }
@@ -264,53 +289,130 @@ static const struct super_operations tracefs_super_operations = {
 	.show_options	= tracefs_show_options,
 };
 
-static int trace_fill_super(struct super_block *sb, void *data, int silent)
+static void *new_tracefs_fs_info(struct super_block *sb)
 {
-	static struct tree_descr trace_files[] = {{""}};
 	struct tracefs_fs_info *fsi;
-	int err;
-
-	save_mount_options(sb, data);
 
 	fsi = kzalloc(sizeof(struct tracefs_fs_info), GFP_KERNEL);
-	sb->s_fs_info = fsi;
-	if (!fsi) {
-		err = -ENOMEM;
-		goto fail;
-	}
+	if (!fsi)
+		return NULL;
 
-	err = tracefs_parse_options(data, &fsi->mount_opts);
-	if (err)
-		goto fail;
+	fsi->mount_opts.mode = TRACEFS_DEFAULT_MODE;
+	fsi->sb = sb;
 
-	err  =  simple_fill_super(sb, TRACEFS_MAGIC, trace_files);
-	if (err)
-		goto fail;
+	return fsi;
+}
 
+static int trace_fill_super(struct super_block *sb, void *data, int silent)
+{
+	struct inode *inode;
+
+	sb->s_blocksize = PAGE_SIZE;
+	sb->s_blocksize_bits = PAGE_SHIFT;
+	sb->s_magic = TRACEFS_MAGIC;
 	sb->s_op = &tracefs_super_operations;
+	sb->s_time_gran = 1;
 
-	tracefs_apply_options(sb);
+	sb->s_fs_info = new_tracefs_fs_info(sb);
+	if (!sb->s_fs_info)
+		goto fail;
+
+	inode = new_inode(sb);
+	if (!inode)
+		goto fail;
+	inode->i_ino = 1;
+	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+	inode->i_mode = S_IFDIR | S_IRUGO | S_IXUGO | S_IWUSR;
+	inode->i_op = &simple_dir_inode_operations;
+	inode->i_fop = &simple_dir_operations;
+	set_nlink(inode, 2);
+
+	sb->s_root = d_make_root(inode);
+	if (sb->s_root)
+		return 0;
+
+	pr_err("get root dentry failed\n");
 
 	return 0;
 
 fail:
-	kfree(fsi);
-	sb->s_fs_info = NULL;
-	return err;
+	return -ENOMEM;
+}
+
+static int compare_init_tracefs_sb(struct super_block *s, void *p)
+{
+	if (tracefs_mount)
+		return tracefs_mount->mnt_sb == s;
+	return 0;
 }
 
 static struct dentry *trace_mount(struct file_system_type *fs_type,
 			int flags, const char *dev_name,
 			void *data)
 {
-	return mount_single(fs_type, flags, data, trace_fill_super);
+	int err;
+	struct tracefs_mount_opts opts;
+	struct super_block *s;
+
+	err = tracefs_parse_options(data, PARSE_MOUNT, &opts);
+	if (err)
+		return ERR_PTR(err);
+
+	/* Require newinstance for all user namespace mounts to ensure
+	 * the mount options are not changed.
+	 */
+	if ((current_user_ns() != &init_user_ns) && !opts.newinstance)
+		return ERR_PTR(-EINVAL);
+
+	if (opts.newinstance)
+		s = sget(fs_type, NULL, set_anon_super, flags, NULL);
+	else
+		s = sget(fs_type, compare_init_tracefs_sb, set_anon_super,
+			 flags, NULL);
+
+	if (IS_ERR(s))
+		return ERR_CAST(s);
+
+	if (!s->s_root) {
+		err = trace_fill_super(s, data, flags & MS_SILENT ? 1 : 0);
+		if (err)
+			goto out_undo_sget;
+		s->s_flags |= MS_ACTIVE;
+	}
+
+	if (opts.newinstance) {
+		err = tracefs_instance_ops.mkdir(INSTANCE_MNT, s->s_root);
+		if (err)
+			goto out_undo_sget;
+	}
+
+	memcpy(&(TRACEFS_SB(s))->mount_opts, &opts, sizeof(opts));
+
+	tracefs_apply_options(s);
+
+	return dget(s->s_root);
+
+out_undo_sget:
+	deactivate_locked_super(s);
+	return ERR_PTR(err);
+}
+
+static void trace_kill_sb(struct super_block *sb)
+{
+	struct tracefs_fs_info *fsi = TRACEFS_SB(sb);
+
+	if (fsi->mount_opts.newinstance)
+		tracefs_instance_ops.rmdir(INSTANCE_MNT, sb->s_root);
+
+	kfree(fsi);
+	kill_litter_super(sb);
 }
 
 static struct file_system_type trace_fs_type = {
 	.owner =	THIS_MODULE,
 	.name =		"tracefs",
 	.mount =	trace_mount,
-	.kill_sb =	kill_litter_super,
+	.kill_sb =	trace_kill_sb,
 };
 MODULE_ALIAS_FS("tracefs");
 
@@ -480,22 +582,23 @@ struct dentry *tracefs_create_dir(const char *name, struct dentry *parent)
  *
  * Returns the dentry of the instances directory.
  */
-struct dentry *tracefs_create_instance_dir(const char *name, struct dentry *parent,
-					  int (*mkdir)(const char *name),
-					  int (*rmdir)(const char *name))
+struct dentry *
+tracefs_create_instance_dir(const char *name, struct dentry *parent,
+			    int (*mkdir)(int instance_type, void *data),
+			    int (*rmdir)(int instance_type, void *data))
 {
 	struct dentry *dentry;
 
 	/* Only allow one instance of the instances directory. */
-	if (WARN_ON(tracefs_ops.mkdir || tracefs_ops.rmdir))
+	if (WARN_ON(tracefs_instance_ops.mkdir || tracefs_instance_ops.rmdir))
 		return NULL;
 
 	dentry = __create_dir(name, parent, &tracefs_dir_inode_operations);
 	if (!dentry)
 		return NULL;
 
-	tracefs_ops.mkdir = mkdir;
-	tracefs_ops.rmdir = rmdir;
+	tracefs_instance_ops.mkdir = mkdir;
+	tracefs_instance_ops.rmdir = rmdir;
 
 	return dentry;
 }
