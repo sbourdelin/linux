@@ -346,63 +346,101 @@ ip_proto_again:
 		hdr = __skb_header_pointer(skb, nhoff, sizeof(_hdr), data, hlen, &_hdr);
 		if (!hdr)
 			goto out_bad;
+
 		/*
-		 * Only look inside GRE if version zero and no
-		 * routing
-		 */
-		if (hdr->flags & (GRE_VERSION | GRE_ROUTING))
-			break;
-
-		proto = hdr->proto;
-		nhoff += 4;
-		if (hdr->flags & GRE_CSUM)
+		* Only look inside GRE if version zero and no
+		* routing
+		*/
+		if (!(hdr->flags & (GRE_VERSION | GRE_ROUTING))) {
+			proto = hdr->proto;
 			nhoff += 4;
-		if (hdr->flags & GRE_KEY) {
-			const __be32 *keyid;
-			__be32 _keyid;
+			if (hdr->flags & GRE_CSUM)
+				nhoff += 4;
+			if (hdr->flags & GRE_KEY) {
+				const __be32 *keyid;
+				__be32 _keyid;
 
-			keyid = __skb_header_pointer(skb, nhoff, sizeof(_keyid),
-						     data, hlen, &_keyid);
+				keyid = __skb_header_pointer(skb, nhoff, sizeof(_keyid),
+							     data, hlen, &_keyid);
 
-			if (!keyid)
-				goto out_bad;
+				if (!keyid)
+					goto out_bad;
 
-			if (dissector_uses_key(flow_dissector,
-					       FLOW_DISSECTOR_KEY_GRE_KEYID)) {
-				key_keyid = skb_flow_dissector_target(flow_dissector,
-								      FLOW_DISSECTOR_KEY_GRE_KEYID,
-								      target_container);
-				key_keyid->keyid = *keyid;
+				if (dissector_uses_key(flow_dissector,
+						       FLOW_DISSECTOR_KEY_GRE_KEYID)) {
+					key_keyid = skb_flow_dissector_target(flow_dissector,
+									      FLOW_DISSECTOR_KEY_GRE_KEYID,
+									      target_container);
+					key_keyid->keyid = *keyid;
+				}
+				nhoff += 4;
 			}
-			nhoff += 4;
-		}
-		if (hdr->flags & GRE_SEQ)
-			nhoff += 4;
-		if (proto == htons(ETH_P_TEB)) {
-			const struct ethhdr *eth;
-			struct ethhdr _eth;
+			if (hdr->flags & GRE_SEQ)
+				nhoff += 4;
+			if (proto == htons(ETH_P_TEB)) {
+				const struct ethhdr *eth;
+				struct ethhdr _eth;
 
-			eth = __skb_header_pointer(skb, nhoff,
-						   sizeof(_eth),
-						   data, hlen, &_eth);
-			if (!eth)
-				goto out_bad;
-			proto = eth->h_proto;
-			nhoff += sizeof(*eth);
+				eth = __skb_header_pointer(skb, nhoff,
+							   sizeof(_eth),
+							   data, hlen, &_eth);
+				if (!eth)
+					goto out_bad;
+				proto = eth->h_proto;
+				nhoff += sizeof(*eth);
 
-			/* Cap headers that we access via pointers at the
-			 * end of the Ethernet header as our maximum alignment
-			 * at that point is only 2 bytes.
+				/* Cap headers that we access via pointers at the
+				 * end of the Ethernet header as our maximum alignment
+				 * at that point is only 2 bytes.
+				 */
+				if (NET_IP_ALIGN)
+					hlen = nhoff;
+			}
+
+			key_control->flags |= FLOW_DIS_ENCAPSULATION;
+			if (flags & FLOW_DISSECTOR_F_STOP_AT_ENCAP)
+				goto out_good;
+
+			goto again;
+		} else if (hdr->proto == GRE_PROTO_PPP && (hdr->flags & GRE_VERSION) &&
+			(hdr->flags & GRE_KEY) &&
+			!(hdr->flags & (GRE_CSUM | GRE_ROUTING | GRE_STRICT | GRE_REC | GRE_FLAGS))) {
+			/* It should be the PPTP in GRE
+			 * We have checked the flags according to the
+			 * RFC 2637
 			 */
-			if (NET_IP_ALIGN)
-				hlen = nhoff;
+			struct ppp_frame {
+				/* address & control, just ignore it */
+				__be16 ignore;
+				__be16 proto;
+			} *frame, _frame;
+			int offset = 0;
+
+			/* Skip GRE header */
+			offset += 4;
+			/* Skip payload length and call id */
+			offset += 4;
+
+			if (hdr->flags & GRE_SEQ)
+				offset += 4;
+
+			if (hdr->flags & GRE_ACK)
+				offset += 4;
+
+			frame = skb_header_pointer(skb, nhoff + offset, sizeof(_frame), &_frame);
+			if (!frame)
+				goto out_bad;
+			if (frame->proto == __constant_htons(PPP_IP)) {
+				nhoff += (sizeof(*frame) + offset);
+				proto = __constant_htons(ETH_P_IP);
+				goto again;
+			} else if (frame->proto == __constant_htons(PPP_IPV6)) {
+				nhoff += (sizeof(*frame) + offset);
+				proto = __constant_htons(ETH_P_IPV6);
+				goto again;
+			}
 		}
-
-		key_control->flags |= FLOW_DIS_ENCAPSULATION;
-		if (flags & FLOW_DISSECTOR_F_STOP_AT_ENCAP)
-			goto out_good;
-
-		goto again;
+		break;
 	}
 	case NEXTHDR_HOP:
 	case NEXTHDR_ROUTING:
