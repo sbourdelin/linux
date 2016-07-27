@@ -6045,7 +6045,7 @@ sub process {
 		ERROR("NOT_UNIFIED_DIFF",
 		      "Does not appear to be a unified-diff format patch\n");
 	}
-	if ($is_patch && $filename ne '-' && $chk_signoff && $signoff == 0) {
+	if ($is_patch && $chk_signoff && $signoff == 0) {
 		ERROR("MISSING_SIGN_OFF",
 		      "Missing Signed-off-by: line(s)\n");
 	}
