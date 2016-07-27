@@ -38,7 +38,9 @@
  * Even better for latency, BFQ explicitly privileges the I/O of two
  * classes of time-sensitive applications: interactive and soft
  * real-time. This feature enables BFQ to provide applications in
- * these classes with a very low latency.
+ * these classes with a very low latency. Finally, BFQ also features
+ * additional heuristics for preserving both a low latency and a high
+ * throughput on NCQ-capable, rotational or flash-based devices.
  *
  * With respect to the version of BFQ presented in [1], and in the
  * papers cited therein, this implementation adds a hierarchical
@@ -5629,20 +5631,15 @@ static bool bfq_bfqq_may_idle(struct bfq_queue *bfqq)
 	 * The next variable takes into account the cases where idling
 	 * boosts the throughput.
 	 *
-	 * The value of the variable is computed considering that
-	 * idling is usually beneficial for the throughput if:
+	 * The value of the variable is computed considering, first, that
+	 * idling is virtually always beneficial for the throughput if:
 	 * (a) the device is not NCQ-capable, or
 	 * (b) regardless of the presence of NCQ, the device is rotational
-	 *     and the request pattern for bfqq is I/O-bound (possible
-	 *     throughput losses caused by granting idling to seeky queues
-	 *     are mitigated by the fact that, in all scenarios where
-	 *     boosting throughput is the best thing to do, i.e., in all
-	 *     symmetric scenarios, only a minimal idle time is allowed to
-	 *     seeky queues).
+	 *     and the request pattern for bfqq is I/O-bound and sequential.
 	 *
 	 * Secondly, and in contrast to the above item (b), idling an
 	 * NCQ-capable flash-based device would not boost the
-	 * throughput even with intense I/O; rather it would lower
+	 * throughput even with sequential I/O; rather it would lower
 	 * the throughput in proportion to how fast the device
 	 * is. Accordingly, the next variable is true if any of the
 	 * above conditions (a) and (b) is true, and, in particular,
@@ -5650,7 +5647,8 @@ static bool bfq_bfqq_may_idle(struct bfq_queue *bfqq)
 	 * device.
 	 */
 	idling_boosts_thr = !bfqd->hw_tag ||
-		(!blk_queue_nonrot(bfqd->queue) && bfq_bfqq_IO_bound(bfqq));
+		(!blk_queue_nonrot(bfqd->queue) && bfq_bfqq_IO_bound(bfqq) &&
+		 bfq_bfqq_idle_window(bfqq));
 
 	/*
 	 * The value of the next variable,
@@ -7457,7 +7455,7 @@ static int __init bfq_init(void)
 	if (ret)
 		goto err_pol_unreg;
 
-	pr_info("BFQ I/O-scheduler: v6");
+	pr_info("BFQ I/O-scheduler: v7r3");
 
 	return 0;
 
