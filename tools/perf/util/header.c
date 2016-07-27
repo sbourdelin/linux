@@ -256,7 +256,8 @@ static int __write_cpudesc(int fd, const char *cpuinfo_proc)
 			while (*q && isspace(*q))
 				q++;
 			if (q != (p+1))
-				while ((*r++ = *q++));
+				while ((*r++ = *q++))
+					;
 		}
 		p++;
 	}
@@ -278,6 +279,7 @@ static int write_cpudesc(int fd, struct perf_header *h __maybe_unused,
 
 	for (i = 0; i < ARRAY_SIZE(cpuinfo_procs); i++) {
 		int ret;
+
 		ret = __write_cpudesc(fd, cpuinfo_procs[i]);
 		if (ret >= 0)
 			return ret;
@@ -479,7 +481,7 @@ try_threads:
 	}
 	ret = 0;
 done:
-	if(fp)
+	if (fp)
 		fclose(fp);
 	free(buf);
 	return ret;
@@ -828,7 +830,7 @@ static int write_group_desc(int fd, struct perf_header *h __maybe_unused,
  * default get_cpuid(): nothing gets recorded
  * actual implementation must be in arch/$(ARCH)/util/header.c
  */
-int __attribute__ ((weak)) get_cpuid(char *buffer __maybe_unused,
+int __weak get_cpuid(char *buffer __maybe_unused,
 				     size_t sz __maybe_unused)
 {
 	return -1;
@@ -1036,24 +1038,28 @@ static int write_cache(int fd, struct perf_header *h __maybe_unused,
 		struct cpu_cache_level *c = &caches[i];
 
 		#define _W(v)					\
+		do {						\
 			ret = do_write(fd, &c->v, sizeof(u32));	\
 			if (ret < 0)				\
-				goto out;
+				goto out;			\
+		} while (0)
 
-		_W(level)
-		_W(line_size)
-		_W(sets)
-		_W(ways)
+		_W(level);
+		_W(line_size);
+		_W(sets);
+		_W(ways);
 		#undef _W
 
 		#define _W(v)						\
+		do {							\
 			ret = do_write_string(fd, (const char *) c->v);	\
 			if (ret < 0)					\
-				goto out;
+				goto out;				\
+		} while (0)
 
-		_W(type)
-		_W(size)
-		_W(map)
+		_W(type);
+		_W(size);
+		_W(map);
 		#undef _W
 	}
 
@@ -1570,6 +1576,7 @@ static int process_tracing_data(struct perf_file_section *section __maybe_unused
 				int fd, void *data)
 {
 	ssize_t ret = trace_report(fd, data, false);
+
 	return ret < 0 ? -1 : 0;
 }
 
@@ -2251,6 +2258,7 @@ int perf_header__fprintf_info(struct perf_session *session, FILE *fp, bool full)
 	struct header_print_data hd;
 	struct perf_header *header = &session->header;
 	int fd = perf_data_file__fd(session->file);
+
 	hd.fp = fp;
 	hd.full = full;
 
@@ -2759,8 +2767,8 @@ static int read_attr(int fd, struct perf_header *ph,
 	left = sz - PERF_ATTR_SIZE_VER0;
 	if (left) {
 		void *ptr = attr;
-		ptr += PERF_ATTR_SIZE_VER0;
 
+		ptr += PERF_ATTR_SIZE_VER0;
 		ret = readn(fd, ptr, left);
 	}
 	/* read perf_file_section, ids are read in caller */
@@ -3002,7 +3010,7 @@ perf_event__synthesize_event_update_scale(struct perf_tool *tool,
 
 	ev_data = (struct event_update_event_scale *) ev->data;
 	ev_data->scale = evsel->scale;
-	err = process(tool, (union perf_event*) ev, NULL, NULL);
+	err = process(tool, (union perf_event *) ev, NULL, NULL);
 	free(ev);
 	return err;
 }
@@ -3021,7 +3029,7 @@ perf_event__synthesize_event_update_name(struct perf_tool *tool,
 		return -ENOMEM;
 
 	strncpy(ev->data, evsel->name, len);
-	err = process(tool, (union perf_event*) ev, NULL, NULL);
+	err = process(tool, (union perf_event *) ev, NULL, NULL);
 	free(ev);
 	return err;
 }
@@ -3052,7 +3060,7 @@ perf_event__synthesize_event_update_cpus(struct perf_tool *tool,
 				 evsel->own_cpus,
 				 type, max);
 
-	err = process(tool, (union perf_event*) ev, NULL, NULL);
+	err = process(tool, (union perf_event *) ev, NULL, NULL);
 	free(ev);
 	return err;
 }
@@ -3146,9 +3154,8 @@ int perf_event__process_attr(struct perf_tool *tool __maybe_unused,
 	if (perf_evsel__alloc_id(evsel, 1, n_ids))
 		return -ENOMEM;
 
-	for (i = 0; i < n_ids; i++) {
+	for (i = 0; i < n_ids; i++)
 		perf_evlist__id_add(evlist, evsel, 0, i, event->attr.id[i]);
-	}
 
 	symbol_conf.nr_events = evlist->nr_entries;
 
@@ -3269,6 +3276,7 @@ int perf_event__process_tracing_data(struct perf_tool *tool __maybe_unused,
 	}
 	if (session->repipe) {
 		int retw = write(STDOUT_FILENO, buf, padding);
+
 		if (retw <= 0 || retw != padding) {
 			pr_err("%s: repiping tracing data padding", __func__);
 			return -1;
