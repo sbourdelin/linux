@@ -145,6 +145,7 @@ struct rpc_xprt_switch *xprt_switch_get(struct rpc_xprt_switch *xps)
 		return xps;
 	return NULL;
 }
+EXPORT_SYMBOL_GPL(xprt_switch_get);
 
 /**
  * xprt_switch_put - Release a reference to a rpc_xprt_switch
@@ -157,6 +158,7 @@ void xprt_switch_put(struct rpc_xprt_switch *xps)
 	if (xps != NULL)
 		kref_put(&xps->xps_kref, xprt_switch_free);
 }
+EXPORT_SYMBOL_GPL(xprt_switch_put);
 
 /**
  * rpc_xprt_switch_set_roundrobin - Set a round-robin policy on rpc_xprt_switch
