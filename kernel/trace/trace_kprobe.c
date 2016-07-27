@@ -1296,7 +1296,7 @@ static int register_kprobe_event(struct trace_kprobe *tk)
 	call->flags = TRACE_EVENT_FL_KPROBE;
 	call->class->reg = kprobe_register;
 	call->data = tk;
-	ret = trace_add_event_call(call);
+	ret = trace_add_event_call(call, NULL);
 	if (ret) {
 		pr_info("Failed to register kprobe event: %s\n",
 			trace_event_name(call));

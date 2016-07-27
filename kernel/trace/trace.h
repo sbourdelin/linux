@@ -245,6 +245,10 @@ struct trace_array {
 	struct list_head	events;
 	cpumask_var_t		tracing_cpumask; /* only trace on set CPUs */
 	int			ref;
+#ifdef CONFIG_UPROBE_EVENT
+	struct mutex		uprobe_lock;
+	struct list_head	uprobe_list;
+#endif
 #ifdef CONFIG_FUNCTION_TRACER
 	struct ftrace_ops	*ops;
 	/* function tracing enabled */
@@ -818,6 +822,14 @@ print_graph_function_flags(struct trace_iterator *iter, u32 flags)
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
 
 extern struct list_head ftrace_pids;
+
+#ifdef CONFIG_UPROBE_EVENT
+void uprobe_create_trace_files(struct trace_array *tr,
+			       struct dentry *parent);
+#else
+static inline void
+uprobe_create_trace_files(struct trace_array *tr, struct dentry *parent) { }
+#endif /* CONFIG_UPROBE_EVENT */
 
 #ifdef CONFIG_FUNCTION_TRACER
 extern bool ftrace_filter_param __initdata;

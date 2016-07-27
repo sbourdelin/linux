@@ -64,11 +64,9 @@ struct trace_uprobe {
 	(offsetof(struct trace_uprobe, tp.args) +	\
 	(sizeof(struct probe_arg) * (n)))
 
-static int register_uprobe_event(struct trace_uprobe *tu);
+static int register_uprobe_event(struct trace_array *tr,
+				 struct trace_uprobe *tu);
 static int unregister_uprobe_event(struct trace_uprobe *tu);
-
-static DEFINE_MUTEX(uprobe_lock);
-static LIST_HEAD(uprobe_list);
 
 struct uprobe_dispatch_data {
 	struct trace_uprobe	*tu;
@@ -288,11 +286,12 @@ static void free_trace_uprobe(struct trace_uprobe *tu)
 	kfree(tu);
 }
 
-static struct trace_uprobe *find_probe_event(const char *event, const char *group)
+static struct trace_uprobe *
+find_probe_event(struct trace_array *tr, const char *event, const char *group)
 {
 	struct trace_uprobe *tu;
 
-	list_for_each_entry(tu, &uprobe_list, list)
+	list_for_each_entry(tu, &tr->uprobe_list, list)
 		if (strcmp(trace_event_name(&tu->tp.call), event) == 0 &&
 		    strcmp(tu->tp.call.class->system, group) == 0)
 			return tu;
@@ -315,15 +314,16 @@ static int unregister_trace_uprobe(struct trace_uprobe *tu)
 }
 
 /* Register a trace_uprobe and probe_event */
-static int register_trace_uprobe(struct trace_uprobe *tu)
+static int register_trace_uprobe(struct trace_array *tr,
+				 struct trace_uprobe *tu)
 {
 	struct trace_uprobe *old_tu;
 	int ret;
 
-	mutex_lock(&uprobe_lock);
+	mutex_lock(&tr->uprobe_lock);
 
 	/* register as an event */
-	old_tu = find_probe_event(trace_event_name(&tu->tp.call),
+	old_tu = find_probe_event(tr, trace_event_name(&tu->tp.call),
 			tu->tp.call.class->system);
 	if (old_tu) {
 		/* delete old event */
@@ -332,16 +332,16 @@ static int register_trace_uprobe(struct trace_uprobe *tu)
 			goto end;
 	}
 
-	ret = register_uprobe_event(tu);
+	ret = register_uprobe_event(tr, tu);
 	if (ret) {
 		pr_warn("Failed to register probe event(%d)\n", ret);
 		goto end;
 	}
 
-	list_add_tail(&tu->list, &uprobe_list);
+	list_add_tail(&tu->list, &tr->uprobe_list);
 
 end:
-	mutex_unlock(&uprobe_lock);
+	mutex_unlock(&tr->uprobe_lock);
 
 	return ret;
 }
@@ -352,7 +352,7 @@ end:
  *
  *  - Remove uprobe: -:[GRP/]EVENT
  */
-static int create_trace_uprobe(int argc, char **argv)
+static int create_trace_uprobe(struct trace_array *tr, int argc, char **argv)
 {
 	struct trace_uprobe *tu;
 	struct inode *inode;
@@ -409,17 +409,17 @@ static int create_trace_uprobe(int argc, char **argv)
 			pr_info("Delete command needs an event name.\n");
 			return -EINVAL;
 		}
-		mutex_lock(&uprobe_lock);
-		tu = find_probe_event(event, group);
+		mutex_lock(&tr->uprobe_lock);
+		tu = find_probe_event(tr, event, group);
 
 		if (!tu) {
-			mutex_unlock(&uprobe_lock);
+			mutex_unlock(&tr->uprobe_lock);
 			pr_info("Event %s/%s doesn't exist.\n", group, event);
 			return -ENOENT;
 		}
 		/* delete an event */
 		ret = unregister_trace_uprobe(tu);
-		mutex_unlock(&uprobe_lock);
+		mutex_unlock(&tr->uprobe_lock);
 		return ret;
 	}
 
@@ -543,7 +543,7 @@ static int create_trace_uprobe(int argc, char **argv)
 		}
 	}
 
-	ret = register_trace_uprobe(tu);
+	ret = register_trace_uprobe(tr, tu);
 	if (ret)
 		goto error;
 	return 0;
@@ -560,37 +560,45 @@ fail_address_parse:
 	return ret;
 }
 
-static int cleanup_all_probes(void)
+static int cleanup_all_probes(struct trace_array *tr)
 {
 	struct trace_uprobe *tu;
 	int ret = 0;
 
-	mutex_lock(&uprobe_lock);
-	while (!list_empty(&uprobe_list)) {
-		tu = list_entry(uprobe_list.next, struct trace_uprobe, list);
+	mutex_lock(&tr->uprobe_lock);
+	while (!list_empty(&tr->uprobe_list)) {
+		tu = list_entry(tr->uprobe_list.next,
+				struct trace_uprobe,
+				list);
 		ret = unregister_trace_uprobe(tu);
 		if (ret)
 			break;
 	}
-	mutex_unlock(&uprobe_lock);
+	mutex_unlock(&tr->uprobe_lock);
 	return ret;
 }
 
 /* Probes listing interfaces */
 static void *probes_seq_start(struct seq_file *m, loff_t *pos)
 {
-	mutex_lock(&uprobe_lock);
-	return seq_list_start(&uprobe_list, *pos);
+	struct trace_array *tr = m->file->f_inode->i_private;
+
+	mutex_lock(&tr->uprobe_lock);
+	return seq_list_start(&tr->uprobe_list, *pos);
 }
 
 static void *probes_seq_next(struct seq_file *m, void *v, loff_t *pos)
 {
-	return seq_list_next(v, &uprobe_list, pos);
+	struct trace_array *tr = m->file->f_inode->i_private;
+
+	return seq_list_next(v, &tr->uprobe_list, pos);
 }
 
 static void probes_seq_stop(struct seq_file *m, void *v)
 {
-	mutex_unlock(&uprobe_lock);
+	struct trace_array *tr = m->file->f_inode->i_private;
+
+	mutex_unlock(&tr->uprobe_lock);
 }
 
 static int probes_seq_show(struct seq_file *m, void *v)
@@ -635,9 +643,10 @@ static const struct seq_operations probes_seq_op = {
 static int probes_open(struct inode *inode, struct file *file)
 {
 	int ret;
+	struct trace_array *tr = inode->i_private;
 
 	if ((file->f_mode & FMODE_WRITE) && (file->f_flags & O_TRUNC)) {
-		ret = cleanup_all_probes();
+		ret = cleanup_all_probes(tr);
 		if (ret)
 			return ret;
 	}
@@ -645,10 +654,72 @@ static int probes_open(struct inode *inode, struct file *file)
 	return seq_open(file, &probes_seq_op);
 }
 
+#define WRITE_BUFSIZE  4096
+
 static ssize_t probes_write(struct file *file, const char __user *buffer,
 			    size_t count, loff_t *ppos)
 {
-	return traceprobe_probes_write(file, buffer, count, ppos, create_trace_uprobe);
+	char *kbuf, *tmp;
+	char **argv;
+	int argc;
+	int ret = 0;
+	size_t done = 0;
+	size_t size;
+	struct trace_array *tr = file->f_inode->i_private;
+
+	kbuf = kmalloc(WRITE_BUFSIZE, GFP_KERNEL);
+	if (!kbuf)
+		return -ENOMEM;
+
+	while (done < count) {
+		size = count - done;
+
+		if (size >= WRITE_BUFSIZE)
+			size = WRITE_BUFSIZE - 1;
+
+		if (copy_from_user(kbuf, buffer + done, size)) {
+			ret = -EFAULT;
+			goto out;
+		}
+		kbuf[size] = '\0';
+		tmp = strchr(kbuf, '\n');
+
+		if (tmp) {
+			*tmp = '\0';
+			size = tmp - kbuf + 1;
+		} else if (done + size < count) {
+			pr_warn("Line length is too long: Should be less than %d\n",
+				WRITE_BUFSIZE);
+			ret = -EINVAL;
+			goto out;
+		}
+		done += size;
+		/* Remove comments */
+		tmp = strchr(kbuf, '#');
+
+		if (tmp)
+			*tmp = '\0';
+
+		argc = 0;
+		argv = argv_split(GFP_KERNEL, kbuf, &argc);
+		if (!argv) {
+			ret = -ENOMEM;
+			goto out;
+		}
+
+		if (argc)
+			ret = create_trace_uprobe(tr, argc, argv);
+
+		argv_free(argv);
+		if (ret)
+			goto out;
+	}
+	ret = done;
+
+out:
+	kfree(kbuf);
+
+	return ret;
 }
 
 static const struct file_operations uprobe_events_ops = {
@@ -1290,7 +1361,8 @@ static struct trace_event_functions uprobe_funcs = {
 	.trace		= print_uprobe_event
 };
 
-static int register_uprobe_event(struct trace_uprobe *tu)
+static int register_uprobe_event(struct trace_array *tr,
+				 struct trace_uprobe *tu)
 {
 	struct trace_event_call *call = &tu->tp.call;
 	int ret;
@@ -1312,7 +1384,7 @@ static int register_uprobe_event(struct trace_uprobe *tu)
 	call->flags = TRACE_EVENT_FL_UPROBE;
 	call->class->reg = trace_uprobe_register;
 	call->data = tu;
-	ret = trace_add_event_call(call);
+	ret = trace_add_event_call(call, tr);
 
 	if (ret) {
 		pr_info("Failed to register uprobe event: %s\n",
@@ -1338,20 +1410,20 @@ static int unregister_uprobe_event(struct trace_uprobe *tu)
 }
 
 /* Make a trace interface for controling probe points */
-static __init int init_uprobe_trace(void)
+void uprobe_create_trace_files(struct trace_array *tr,
+			       struct dentry *parent)
 {
-	struct dentry *d_tracer;
+	if (!tr) {
+		WARN(1, "Need a trace array for uprobe events");
+		return;
+	}
 
-	d_tracer = tracing_init_dentry();
-	if (IS_ERR(d_tracer))
-		return 0;
+	mutex_init(&tr->uprobe_lock);
+	INIT_LIST_HEAD(&tr->uprobe_list);
 
-	trace_create_file("uprobe_events", 0644, d_tracer,
-				    NULL, &uprobe_events_ops);
+	trace_create_file("uprobe_events", 0644, parent,
+				tr, &uprobe_events_ops);
 	/* Profile interface */
-	trace_create_file("uprobe_profile", 0444, d_tracer,
-				    NULL, &uprobe_profile_ops);
-	return 0;
+	trace_create_file("uprobe_profile", 0444, parent,
+				tr, &uprobe_profile_ops);
 }
-
-fs_initcall(init_uprobe_trace);

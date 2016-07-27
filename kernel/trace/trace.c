@@ -6966,6 +6966,8 @@ init_tracer_tracefs(struct trace_array *tr, struct dentry *d_tracer)
 			&tr->max_latency, &tracing_max_lat_fops);
 #endif
 
+	uprobe_create_trace_files(tr, d_tracer);
+
 	if (ftrace_create_function_files(tr, d_tracer))
 		WARN(1, "Could not allocate function filter files");
 

@@ -2441,15 +2441,20 @@ struct ftrace_module_file_ops;
 static void __add_event_to_tracers(struct trace_event_call *call);
 
 /* Add an additional event_call dynamically */
-int trace_add_event_call(struct trace_event_call *call)
+int trace_add_event_call(struct trace_event_call *call, struct trace_array *tr)
 {
 	int ret;
 	mutex_lock(&trace_types_lock);
 	mutex_lock(&event_mutex);
 
 	ret = __register_event(call, NULL);
-	if (ret >= 0)
-		__add_event_to_tracers(call);
+	if (ret >= 0) {
+		if (tr)
+			/* If a tracer is specified, add event only to it */
+			__trace_add_new_event(call, tr);
+		else
+			__add_event_to_tracers(call);
+	}
 
 	mutex_unlock(&event_mutex);
 	mutex_unlock(&trace_types_lock);
@@ -2609,6 +2614,10 @@ __trace_add_event_dirs(struct trace_array *tr)
 	int ret;
 
 	list_for_each_entry(call, &ftrace_events, list) {
+		/* Don't add dynamic uprobe events to new tracers */
+		if (call->flags & TRACE_EVENT_FL_UPROBE)
+			continue;
+
 		ret = __trace_add_new_event(call, tr);
 		if (ret < 0)
 			pr_warn("Could not create directory for event %s\n",
