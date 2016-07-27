@@ -501,5 +501,6 @@ struct ks_wlan_private {
 
 extern int ks_wlan_net_start(struct net_device *dev);
 extern int ks_wlan_net_stop(struct net_device *dev);
+extern void send_packet_complete(void *, void *);
 
 #endif /* _KS_WLAN_H */
