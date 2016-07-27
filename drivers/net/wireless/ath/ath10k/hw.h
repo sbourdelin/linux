@@ -409,7 +409,19 @@ struct ath10k_hw_params {
 		size_t board_size;
 		size_t board_ext_size;
 	} fw;
+
+	const struct ath10k_hw_rx_desc_ops *hw_rx_desc_ops;
 };
+
+struct htt_rx_desc;
+
+/* Defines needed for Rx descriptor abstraction */
+struct ath10k_hw_rx_desc_ops {
+	int (*rx_desc_get_l3_pad_bytes)(struct htt_rx_desc *rxd);
+};
+
+extern const struct ath10k_hw_rx_desc_ops qca988x_rx_desc_ops;
+extern const struct ath10k_hw_rx_desc_ops qca99x0_rx_desc_ops;
 
 /* Target specific defines for MAIN firmware */
 #define TARGET_NUM_VDEVS			8
