@@ -772,17 +772,38 @@ static inline int perf_cgroup_connect(int fd, struct perf_event *event,
 {
 	struct perf_cgroup *cgrp;
 	struct cgroup_subsys_state *css;
-	struct fd f = fdget(fd);
+	struct fd f;
 	int ret = 0;
 
-	if (!f.file)
-		return -EBADF;
+	if (fd != -1) {
+		f = fdget(fd);
+		if (!f.file)
+			return -EBADF;
 
-	css = css_tryget_online_from_dir(f.file->f_path.dentry,
-					 &perf_event_cgrp_subsys);
-	if (IS_ERR(css)) {
-		ret = PTR_ERR(css);
-		goto out;
+		css = css_tryget_online_from_dir(f.file->f_path.dentry,
+						 &perf_event_cgrp_subsys);
+		if (IS_ERR(css)) {
+			ret = PTR_ERR(css);
+			fdput(f);
+			return ret;
+		}
+	} else if (event->attach_state == PERF_ATTACH_TASK) {
+		/* Tracing on a PID. No need to set event->cgrp */
+		return ret;
+	} else if (current->nsproxy->cgroup_ns != &init_cgroup_ns) {
+		/* Don't set event->cgrp if task belongs to root cgroup */
+		if (task_css_is_root(current, perf_event_cgrp_id))
+			return ret;
+
+		css = task_css(current, perf_event_cgrp_id);
+		if (!css || !css_tryget_online(css))
+			return -ENOENT;
+	} else {
+		/*
+		 * perf invoked from global context and hence don't set
+		 * event->cgrp as all the events should be included
+		 */
+		return ret;
 	}
 
 	cgrp = container_of(css, struct perf_cgroup, css);
@@ -797,8 +818,10 @@ static inline int perf_cgroup_connect(int fd, struct perf_event *event,
 		perf_detach_cgroup(event);
 		ret = -EINVAL;
 	}
-out:
-	fdput(f);
+
+	if (fd != -1)
+		fdput(f);
+
 	return ret;
 }
 
@@ -8934,11 +8957,9 @@ perf_event_alloc(struct perf_event_attr *attr, int cpu,
 	if (!has_branch_stack(event))
 		event->attr.branch_sample_type = 0;
 
-	if (cgroup_fd != -1) {
-		err = perf_cgroup_connect(cgroup_fd, event, attr, group_leader);
-		if (err)
-			goto err_ns;
-	}
+	err = perf_cgroup_connect(cgroup_fd, event, attr, group_leader);
+	if (err)
+		goto err_ns;
 
 	pmu = perf_init_event(event);
 	if (!pmu)
