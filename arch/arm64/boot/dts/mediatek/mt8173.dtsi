@@ -713,7 +713,9 @@
 			compatible = "mediatek,mt8173-mmsys", "syscon";
 			reg = <0 0x14000000 0 0x1000>;
 			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+			clocks = <&topckgen CLK_TOP_MM_SEL>;
 			#clock-cells = <1>;
+			clock-frequency  = <400000000>;
 		};
 
 		ovl0: ovl@1400c000 {
