@@ -62,7 +62,7 @@ struct workqueue_struct *bcache_wq;
 /* Superblock */
 
 static const char *read_super(struct cache_sb *sb, struct block_device *bdev,
-			      struct page **res)
+			      void *sb_data)
 {
 	const char *err;
 	struct cache_sb *s;
@@ -191,8 +191,7 @@ static const char *read_super(struct cache_sb *sb, struct block_device *bdev,
 	sb->last_mount = get_seconds();
 	err = NULL;
 
-	get_page(bh->b_page);
-	*res = bh->b_page;
+	memcpy(sb_data, bh->b_data, SB_SIZE);
 err:
 	put_bh(bh);
 	return err;
@@ -206,15 +205,15 @@ static void write_bdev_super_endio(struct bio *bio)
 	closure_put(&dc->sb_write);
 }
 
-static void __write_super(struct cache_sb *sb, struct bio *bio)
+static void __write_super(struct cache_sb *sb, struct bio *bio, void *sb_data)
 {
-	struct cache_sb *out = page_address(bio->bi_io_vec[0].bv_page);
+	struct cache_sb *out = sb_data;
 	unsigned i;
 
 	bio->bi_iter.bi_sector	= SB_SECTOR;
 	bio->bi_rw		= REQ_SYNC|REQ_META;
 	bio->bi_iter.bi_size	= SB_SIZE;
-	bch_bio_map(bio, NULL);
+	bch_bio_map(bio, sb_data);
 
 	out->offset		= cpu_to_le64(sb->offset);
 	out->version		= cpu_to_le64(sb->version);
@@ -262,7 +261,7 @@ void bch_write_bdev_super(struct cached_dev *dc, struct closure *parent)
 	bio->bi_private = dc;
 
 	closure_get(cl);
-	__write_super(&dc->sb, bio);
+	__write_super(&dc->sb, bio, dc->sb_disk_data);
 
 	closure_return_with_destructor(cl, bch_write_bdev_super_unlock);
 }
@@ -308,7 +307,7 @@ void bcache_write_super(struct cache_set *c)
 		bio->bi_private = ca;
 
 		closure_get(cl);
-		__write_super(&ca->sb, bio);
+		__write_super(&ca->sb, bio, ca->sb_disk_data);
 	}
 
 	closure_return_with_destructor(cl, bcache_write_super_unlock);
@@ -1045,6 +1044,8 @@ void bch_cached_dev_release(struct kobject *kobj)
 {
 	struct cached_dev *dc = container_of(kobj, struct cached_dev,
 					     disk.kobj);
+
+	kfree(dc->sb_disk_data);
 	kfree(dc);
 	module_put(THIS_MODULE);
 }
@@ -1138,7 +1139,7 @@ static int cached_dev_init(struct cached_dev *dc, unsigned block_size)
 
 /* Cached device - bcache superblock */
 
-static void register_bdev(struct cache_sb *sb, struct page *sb_page,
+static void register_bdev(struct cache_sb *sb, void *sb_disk_data,
 				 struct block_device *bdev,
 				 struct cached_dev *dc)
 {
@@ -1152,9 +1153,8 @@ static void register_bdev(struct cache_sb *sb, struct page *sb_page,
 
 	bio_init(&dc->sb_bio);
 	dc->sb_bio.bi_max_vecs	= 1;
-	dc->sb_bio.bi_io_vec	= dc->sb_bio.bi_inline_vecs;
-	dc->sb_bio.bi_io_vec[0].bv_page = sb_page;
-	get_page(sb_page);
+	dc->sb_bio.bi_io_vec	= &dc->sb_bv[0];
+	dc->sb_disk_data	= sb_disk_data;
 
 	if (cached_dev_init(dc, sb->block_size << 9))
 		goto err;
@@ -1179,6 +1179,7 @@ static void register_bdev(struct cache_sb *sb, struct page *sb_page,
 	return;
 err:
 	pr_notice("error opening %s: %s", bdevname(bdev, name), err);
+	kfree(sb_disk_data);
 	bcache_device_stop(&dc->disk);
 }
 
@@ -1793,8 +1794,7 @@ void bch_cache_release(struct kobject *kobj)
 	for (i = 0; i < RESERVE_NR; i++)
 		free_fifo(&ca->free[i]);
 
-	if (ca->sb_bio.bi_inline_vecs[0].bv_page)
-		put_page(ca->sb_bio.bi_io_vec[0].bv_page);
+	kfree(ca->sb_disk_data);
 
 	if (!IS_ERR_OR_NULL(ca->bdev))
 		blkdev_put(ca->bdev, FMODE_READ|FMODE_WRITE|FMODE_EXCL);
@@ -1838,7 +1838,7 @@ static int cache_alloc(struct cache_sb *sb, struct cache *ca)
 	return 0;
 }
 
-static int register_cache(struct cache_sb *sb, struct page *sb_page,
+static int register_cache(struct cache_sb *sb, void *sb_disk_data,
 				struct block_device *bdev, struct cache *ca)
 {
 	char name[BDEVNAME_SIZE];
@@ -1851,16 +1851,17 @@ static int register_cache(struct cache_sb *sb, struct page *sb_page,
 
 	bio_init(&ca->sb_bio);
 	ca->sb_bio.bi_max_vecs	= 1;
-	ca->sb_bio.bi_io_vec	= ca->sb_bio.bi_inline_vecs;
-	ca->sb_bio.bi_io_vec[0].bv_page = sb_page;
-	get_page(sb_page);
+	ca->sb_bio.bi_io_vec	= &ca->sb_bv[0];
+	ca->sb_disk_data	= sb_disk_data;
 
 	if (blk_queue_discard(bdev_get_queue(ca->bdev)))
 		ca->discard = CACHE_DISCARD(&ca->sb);
 
 	ret = cache_alloc(sb, ca);
-	if (ret != 0)
+	if (ret != 0) {
+		err = "error calling cache_alloc";
 		goto err;
+	}
 
 	if (kobject_add(&ca->kobj, &part_to_dev(bdev->bd_part)->kobj, "bcache")) {
 		err = "error calling kobject_add";
@@ -1883,8 +1884,10 @@ out:
 	kobject_put(&ca->kobj);
 
 err:
-	if (err)
+	if (err) {
 		pr_notice("error opening %s: %s", bdevname(bdev, name), err);
+		kfree(sb_disk_data);
+	}
 
 	return ret;
 }
@@ -1935,13 +1938,14 @@ static ssize_t register_bcache(struct kobject *k, struct kobj_attribute *attr,
 	char *path = NULL;
 	struct cache_sb *sb = NULL;
 	struct block_device *bdev = NULL;
-	struct page *sb_page = NULL;
+	void *sb_disk_data = NULL;
 
 	if (!try_module_get(THIS_MODULE))
 		return -EBUSY;
 
 	if (!(path = kstrndup(buffer, size, GFP_KERNEL)) ||
-	    !(sb = kmalloc(sizeof(struct cache_sb), GFP_KERNEL)))
+	    !(sb = kmalloc(sizeof(struct cache_sb), GFP_KERNEL)) ||
+	    !(sb_disk_data = kmalloc(SB_SIZE, GFP_KERNEL)))
 		goto err;
 
 	err = "failed to open device";
@@ -1967,7 +1971,7 @@ static ssize_t register_bcache(struct kobject *k, struct kobj_attribute *attr,
 	if (set_blocksize(bdev, 4096))
 		goto err_close;
 
-	err = read_super(sb, bdev, &sb_page);
+	err = read_super(sb, bdev, sb_disk_data);
 	if (err)
 		goto err_close;
 
@@ -1977,20 +1981,23 @@ static ssize_t register_bcache(struct kobject *k, struct kobj_attribute *attr,
 			goto err_close;
 
 		mutex_lock(&bch_register_lock);
-		register_bdev(sb, sb_page, bdev, dc);
+		register_bdev(sb, sb_disk_data, bdev, dc);
+		sb_disk_data = NULL; /* Consumed or freed in register call */
 		mutex_unlock(&bch_register_lock);
 	} else {
 		struct cache *ca = kzalloc(sizeof(*ca), GFP_KERNEL);
 		if (!ca)
 			goto err_close;
 
-		if (register_cache(sb, sb_page, bdev, ca) != 0)
+		if (register_cache(sb, sb_disk_data, bdev, ca) != 0) {
+			sb_disk_data = NULL;
 			goto err_close;
+		}
+		sb_disk_data = NULL;
 	}
 out:
-	if (sb_page)
-		put_page(sb_page);
 	kfree(sb);
+	kfree(sb_disk_data);
 	kfree(path);
 	module_put(THIS_MODULE);
 	return ret;
