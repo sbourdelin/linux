@@ -169,6 +169,46 @@ TRACE_EVENT(mm_page_free,
 			__entry->order)
 );
 
+TRACE_EVENT(mm_slowpath_begin,
+
+	TP_PROTO(gfp_t gfp_mask, int order),
+
+	TP_ARGS(gfp_mask, order),
+
+	TP_STRUCT__entry(
+		__field(gfp_t, gfp_mask)
+		__field(int, order)
+	),
+
+	TP_fast_assign(
+		__entry->gfp_mask = gfp_mask;
+		__entry->order = order;
+	),
+
+	TP_printk("gfp_mask:%s order=%d",
+		show_gfp_flags(__entry->gfp_mask),
+		__entry->order)
+);
+
+TRACE_EVENT(mm_slowpath_end,
+
+	TP_PROTO(struct page *page),
+
+	TP_ARGS(page),
+
+	TP_STRUCT__entry(
+		__field(unsigned long, pfn)
+	),
+
+	TP_fast_assign(
+		__entry->pfn = page ? page_to_pfn(page) : -1UL;
+	),
+
+	TP_printk("page=%p pfn=%lu",
+		__entry->pfn != -1UL ? pfn_to_page(__entry->pfn) : NULL,
+		__entry->pfn != -1UL ? __entry->pfn : 0)
+);
+
 TRACE_EVENT(mm_page_free_batched,
 
 	TP_PROTO(struct page *page, int cold),
