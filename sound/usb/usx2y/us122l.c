@@ -390,7 +390,7 @@ static int usb_stream_hwdep_ioctl(struct snd_hwdep *hw, struct file *file,
 	if (cmd != SNDRV_USB_STREAM_IOCTL_SET_PARAMS)
 		return -ENOTTY;
 
-	cfg = memdup_user((void *)arg, sizeof(*cfg));
+	cfg = memdup_user((void __user *)arg, sizeof(*cfg));
 	if (IS_ERR(cfg))
 		return PTR_ERR(cfg);
 
