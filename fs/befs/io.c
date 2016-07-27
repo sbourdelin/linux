@@ -37,7 +37,7 @@ befs_bread_iaddr(struct super_block *sb, befs_inode_addr iaddr)
 	if (iaddr.allocation_group > befs_sb->num_ags) {
 		befs_error(sb, "BEFS: Invalid allocation group %u, max is %u",
 			   iaddr.allocation_group, befs_sb->num_ags);
-		goto error;
+		return NULL;
 	}
 
 	block = iaddr2blockno(sb, &iaddr);
@@ -49,15 +49,11 @@ befs_bread_iaddr(struct super_block *sb, befs_inode_addr iaddr)
 	if (bh == NULL) {
 		befs_error(sb, "Failed to read block %lu",
 			   (unsigned long)block);
-		goto error;
+		return NULL;
 	}
 
 	befs_debug(sb, "<--- %s", __func__);
 	return bh;
-
-      error:
-	befs_debug(sb, "<--- %s ERROR", __func__);
-	return NULL;
 }
 
 struct buffer_head *
