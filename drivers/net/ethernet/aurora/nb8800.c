@@ -1006,6 +1006,7 @@ static int nb8800_stop(struct net_device *dev)
 
 	netif_stop_queue(dev);
 	napi_disable(&priv->napi);
+	of_node_put(priv->phy_node);
 
 	nb8800_dma_stop(dev);
 	nb8800_mac_rx(dev, false);
@@ -1504,6 +1505,7 @@ static int nb8800_probe(struct platform_device *pdev)
 err_free_dma:
 	nb8800_dma_free(dev);
 err_free_bus:
+	of_node_put(priv->phy_node);
 	mdiobus_unregister(bus);
 err_disable_clk:
 	clk_disable_unprepare(priv->clk);
