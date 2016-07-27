@@ -71,6 +71,7 @@ struct sched_atom {
 };
 
 #define TASK_STATE_TO_CHAR_STR "RSDTtZXxKWP"
+#define TASK_STATE_MASK 0x7ff
 
 enum thread_state {
 	THREAD_SLEEPING = 0,
@@ -899,7 +900,7 @@ static char sched_out_state(u64 prev_state)
 {
 	const char *str = TASK_STATE_TO_CHAR_STR;
 
-	return str[prev_state];
+	return str[ffs(prev_state & TASK_STATE_MASK)];
 }
 
 static int
