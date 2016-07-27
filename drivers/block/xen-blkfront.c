@@ -210,6 +210,10 @@ struct blkfront_info
 	/* Save uncomplete reqs and bios for migration. */
 	struct list_head requests;
 	struct bio_list bio_list;
+	/* For dynamic configuration. */
+	unsigned int reconfiguring:1;
+	unsigned int max_ring_page_order;
+	unsigned int max_queues;
 };
 
 static unsigned int nr_minors;
@@ -1343,6 +1347,31 @@ static void blkif_free(struct blkfront_info *info, int suspend)
 	for (i = 0; i < info->nr_rings; i++)
 		blkif_free_ring(&info->rinfo[i]);
 
+	/* Remove old xenstore nodes. */
+	if (info->nr_ring_pages > 1)
+		xenbus_rm(XBT_NIL, info->xbdev->nodename, "ring-page-order");
+
+	if (info->nr_rings == 1) {
+		if (info->nr_ring_pages == 1) {
+			xenbus_rm(XBT_NIL, info->xbdev->nodename, "ring-ref");
+		} else {
+			for (i = 0; i < info->nr_ring_pages; i++) {
+				char ring_ref_name[RINGREF_NAME_LEN];
+
+				snprintf(ring_ref_name, RINGREF_NAME_LEN, "ring-ref%u", i);
+				xenbus_rm(XBT_NIL, info->xbdev->nodename, ring_ref_name);
+			}
+		}
+	} else {
+		xenbus_rm(XBT_NIL, info->xbdev->nodename, "multi-queue-num-queues");
+
+		for (i = 0; i < info->nr_rings; i++) {
+			char queuename[QUEUE_NAME_LEN];
+
+			snprintf(queuename, QUEUE_NAME_LEN, "queue-%u", i);
+			xenbus_rm(XBT_NIL, info->xbdev->nodename, queuename);
+		}
+	}
 	kfree(info->rinfo);
 	info->rinfo = NULL;
 	info->nr_rings = 0;
@@ -1756,15 +1785,20 @@ static int talk_to_blkback(struct xenbus_device *dev,
 	const char *message = NULL;
 	struct xenbus_transaction xbt;
 	int err;
-	unsigned int i, max_page_order = 0;
+	unsigned int i, backend_max_order = 0;
 	unsigned int ring_page_order = 0;
 
 	err = xenbus_scanf(XBT_NIL, info->xbdev->otherend,
-			   "max-ring-page-order", "%u", &max_page_order);
+			   "max-ring-page-order", "%u", &backend_max_order);
 	if (err != 1)
 		info->nr_ring_pages = 1;
 	else {
-		ring_page_order = min(xen_blkif_max_ring_order, max_page_order);
+		if (info->max_ring_page_order)
+			/* Dynamic configured through /sys. */
+			ring_page_order = min(info->max_ring_page_order, backend_max_order);
+		else
+			/* Default. */
+			ring_page_order = min(xen_blkif_max_ring_order, backend_max_order);
 		info->nr_ring_pages = 1 << ring_page_order;
 	}
 
@@ -1887,7 +1921,13 @@ static int negotiate_mq(struct blkfront_info *info)
 	if (err < 0)
 		backend_max_queues = 1;
 
-	info->nr_rings = min(backend_max_queues, xen_blkif_max_queues);
+	if (info->max_queues)
+		/* Dynamic configured through /sys */
+		info->nr_rings = min(backend_max_queues, info->max_queues);
+	else
+		/* Default. */
+		info->nr_rings = min(backend_max_queues, xen_blkif_max_queues);
+
 	/* We need at least one ring. */
 	if (!info->nr_rings)
 		info->nr_rings = 1;
@@ -2343,10 +2383,197 @@ static void blkfront_gather_backend_features(struct blkfront_info *info)
 			    NULL);
 	if (err)
 		info->max_indirect_segments = 0;
-	else
-		info->max_indirect_segments = min(indirect_segments,
-						  xen_blkif_max_segments);
+	else {
+		if (info->max_indirect_segments)
+			/* Dynamic configured through /sys */
+			info->max_indirect_segments = min(indirect_segments,
+							  info->max_indirect_segments);
+		else
+			info->max_indirect_segments = min(indirect_segments,
+							  xen_blkif_max_segments);
+	}
 }
+
+static ssize_t max_ring_page_order_show(struct device *dev,
+					struct device_attribute *attr, char *page)
+{
+	struct blkfront_info *info = dev_get_drvdata(dev);
+
+	return sprintf(page, "%u\n", get_order(info->nr_ring_pages * XEN_PAGE_SIZE));
+}
+
+static ssize_t max_indirect_segs_show(struct device *dev,
+				      struct device_attribute *attr, char *page)
+{
+	struct blkfront_info *info = dev_get_drvdata(dev);
+
+	return sprintf(page, "%u\n", info->max_indirect_segments);
+}
+
+static ssize_t max_queues_show(struct device *dev,
+			       struct device_attribute *attr, char *page)
+{
+	struct blkfront_info *info = dev_get_drvdata(dev);
+
+	return sprintf(page, "%u\n", info->nr_rings);
+}
+
+static ssize_t dynamic_reconfig_device(struct blkfront_info *info, ssize_t count)
+{
+	/*
+	 * Prevent new requests even to software request queue.
+	 */
+	blk_mq_freeze_queue(info->rq);
+
+	/*
+	 * Guarantee no uncompleted reqs.
+	 */
+	if (part_in_flight(&info->gd->part0) || info->reconfiguring) {
+		blk_mq_unfreeze_queue(info->rq);
+		pr_err("Dev:%s busy, please retry later.\n", dev_name(&info->xbdev->dev));
+		return -EBUSY;
+	}
+
+	/*
+	 * Frontend: 				Backend:
+	 * Freeze_queue()
+	 * Switch to XenbusStateClosed
+	 *					frontend_changed(StateClosed)
+	 *						> xen_blkif_disconnect()
+	 *						> Switch to XenbusStateClosed
+	 * blkback_changed(StateClosed)
+	 *	> blkfront_resume()
+	 *	> Switch to StateInitialised
+	 *					frontend_changed(StateInitialised):
+	 *						> reconnect
+	 *						> Switch to StateConnected
+	 * blkback_changed(StateConnected)
+	 *	> blkif_recover()
+	 *		> Also switch to StateConnected
+	 *		> Unfreeze_queue()
+	 */
+	info->reconfiguring = true;
+	xenbus_switch_state(info->xbdev, XenbusStateClosed);
+
+	return count;
+}
+
+static ssize_t max_indirect_segs_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	ssize_t ret;
+	unsigned int max_segs = 0, backend_max_segs = 0;
+	struct blkfront_info *info = dev_get_drvdata(dev);
+	int err;
+
+	ret = kstrtouint(buf, 10, &max_segs);
+	if (ret < 0)
+		return ret;
+
+	if (max_segs == info->max_indirect_segments)
+		return count;
+
+	err = xenbus_gather(XBT_NIL, info->xbdev->otherend,
+			    "feature-max-indirect-segments", "%u", &backend_max_segs,
+			    NULL);
+	if (err) {
+		pr_err("Backend %s doesn't support feature-indirect-segments.\n",
+			info->xbdev->otherend);
+		return -EOPNOTSUPP;
+	}
+
+	if (max_segs > backend_max_segs) {
+		pr_err("Invalid max indirect segment (%u), backend-max: %u.\n",
+			max_segs, backend_max_segs);
+		return -EINVAL;
+	}
+
+	info->max_indirect_segments = max_segs;
+
+	return dynamic_reconfig_device(info, count);
+}
+
+static ssize_t max_ring_page_order_store(struct device *dev,
+				 struct device_attribute *attr,
+				 const char *buf, size_t count)
+{
+	ssize_t ret;
+	unsigned int max_order = 0, backend_max_order = 0;
+	struct blkfront_info *info = dev_get_drvdata(dev);
+	int err;
+
+	ret = kstrtouint(buf, 10, &max_order);
+	if (ret < 0)
+		return ret;
+
+	if ((1 << max_order) == info->nr_ring_pages)
+		return count;
+
+	if (max_order > XENBUS_MAX_RING_GRANT_ORDER) {
+		pr_err("Invalid max_ring_page_order (%u), max: %u.\n",
+				max_order, XENBUS_MAX_RING_GRANT_ORDER);
+		return -EINVAL;
+	}
+
+	err = xenbus_scanf(XBT_NIL, info->xbdev->otherend,
+			   "max-ring-page-order", "%u", &backend_max_order);
+	if (err != 1) {
+		pr_err("Backend %s doesn't support feature multi-page-ring.\n",
+			info->xbdev->otherend);
+		return -EOPNOTSUPP;
+	}
+	if (max_order > backend_max_order) {
+		pr_err("Invalid max_ring_page_order (%u), backend supports max: %u.\n",
+			max_order, backend_max_order);
+		return -EINVAL;
+	}
+	info->max_ring_page_order = max_order;
+
+	return dynamic_reconfig_device(info, count);
+}
+
+static ssize_t max_queues_store(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	ssize_t ret;
+	unsigned int max_queues = 0, backend_max_queues = 0;
+	struct blkfront_info *info = dev_get_drvdata(dev);
+	int err;
+
+	ret = kstrtouint(buf, 10, &max_queues);
+	if (ret < 0)
+		return ret;
+
+	if (max_queues == info->nr_rings)
+		return count;
+
+	if (max_queues > num_online_cpus()) {
+		pr_err("Invalid max_queues (%u), can't bigger than online cpus: %u.\n",
+			max_queues, num_online_cpus());
+		return -EINVAL;
+	}
+
+	err = xenbus_scanf(XBT_NIL, info->xbdev->otherend,
+			   "multi-queue-max-queues", "%u", &backend_max_queues);
+	if (err != 1) {
+		pr_err("Backend %s doesn't support block multi queue.\n",
+			info->xbdev->otherend);
+		return -EOPNOTSUPP;
+	}
+	if (max_queues > backend_max_queues) {
+		pr_err("Invalid max_queues (%u), backend supports max: %u.\n",
+			max_queues, backend_max_queues);
+		return -EINVAL;
+	}
+	info->max_queues = max_queues;
+
+	return dynamic_reconfig_device(info, count);
+}
+
+static DEVICE_ATTR_RW(max_queues);
+static DEVICE_ATTR_RW(max_ring_page_order);
+static DEVICE_ATTR_RW(max_indirect_segs);
 
 /*
  * Invoked when the backend is finally 'ready' (and has told produced
@@ -2384,6 +2611,10 @@ static void blkfront_connect(struct blkfront_info *info)
 		 * supports indirect descriptors, and how many.
 		 */
 		blkif_recover(info);
+		if (info->reconfiguring) {
+			blk_mq_unfreeze_queue(info->rq);
+			info->reconfiguring = false;
+		}
 		return;
 
 	default:
@@ -2434,6 +2665,22 @@ static void blkfront_connect(struct blkfront_info *info)
 		return;
 	}
 
+	err = device_create_file(&info->xbdev->dev, &dev_attr_max_ring_page_order);
+	if (err)
+		goto fail;
+
+	err = device_create_file(&info->xbdev->dev, &dev_attr_max_indirect_segs);
+	if (err) {
+		device_remove_file(&info->xbdev->dev, &dev_attr_max_ring_page_order);
+		goto fail;
+	}
+
+	err = device_create_file(&info->xbdev->dev, &dev_attr_max_queues);
+	if (err) {
+		device_remove_file(&info->xbdev->dev, &dev_attr_max_ring_page_order);
+		device_remove_file(&info->xbdev->dev, &dev_attr_max_indirect_segs);
+		goto fail;
+	}
 	xenbus_switch_state(info->xbdev, XenbusStateConnected);
 
 	/* Kick pending requests. */
@@ -2444,6 +2691,12 @@ static void blkfront_connect(struct blkfront_info *info)
 	add_disk(info->gd);
 
 	info->is_ready = 1;
+	return;
+
+fail:
+	blkif_free(info, 0);
+	xlvbd_release_gendisk(info);
+	return;
 }
 
 /**
@@ -2491,8 +2744,16 @@ static void blkback_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosed:
-		if (dev->state == XenbusStateClosed)
+		if (dev->state == XenbusStateClosed) {
+			if (info->reconfiguring)
+				if (blkfront_resume(info->xbdev)) {
+					/* Resume failed. */
+					info->reconfiguring = false;
+					xenbus_switch_state(info->xbdev, XenbusStateClosed);
+					pr_err("Resume from dynamic configuration failed\n");
+				}
 			break;
+		}
 		/* Missed the backend's Closing state -- fallthrough */
 	case XenbusStateClosing:
 		if (info)
