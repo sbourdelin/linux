@@ -961,7 +961,7 @@ out:
 }
 EXPORT_SYMBOL_GPL(rpc_bind_new_program);
 
-void rpc_task_release_client(struct rpc_task *task)
+void rpc_task_release_client(struct rpc_task *task, int rm_xprt)
 {
 	struct rpc_clnt *clnt = task->tk_client;
 	struct rpc_xprt *xprt = task->tk_xprt;
@@ -976,9 +976,8 @@ void rpc_task_release_client(struct rpc_task *task)
 		rpc_release_client(clnt);
 	}
 
-	if (xprt != NULL) {
+	if (rm_xprt && xprt) {
 		task->tk_xprt = NULL;
-
 		xprt_put(xprt);
 	}
 }
@@ -988,7 +987,7 @@ void rpc_task_set_client(struct rpc_task *task, struct rpc_clnt *clnt)
 {
 
 	if (clnt != NULL) {
-		rpc_task_release_client(task);
+		rpc_task_release_client(task, 0);
 		if (task->tk_xprt == NULL)
 			task->tk_xprt = xprt_iter_get_next(&clnt->cl_xpi);
 		task->tk_client = clnt;
