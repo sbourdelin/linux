@@ -56,6 +56,12 @@
  * that gives better TLB efficiency.
  */
 #define DMA_ATTR_ALLOC_SINGLE_PAGES	(1UL << 7)
+/*
+ * DMA_ATTR_PRIVILEGED: used to indicate that the buffer is fully
+ * accessible at an elevated privilege level (and ideally inaccessible or
+ * at least read-only at lesser-privileged levels).
+ */
+#define DMA_ATTR_PRIVILEGED		(1UL << 8)
 
 /*
  * A dma_addr_t can hold any valid DMA or bus address for the platform.
