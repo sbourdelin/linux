@@ -506,6 +506,7 @@ static int calc_wheel_index(unsigned long expires, unsigned long clk)
 	}
 	return idx;
 }
+<<<<<<< HEAD
 
 /*
  * Enqueue the timer into the hash bucket, mark it pending in
@@ -531,6 +532,33 @@ __internal_add_timer(struct timer_base *base, struct timer_list *timer)
 static void
 trigger_dyntick_cpu(struct timer_base *base, struct timer_list *timer)
 {
+=======
+
+/*
+ * Enqueue the timer into the hash bucket, mark it pending in
+ * the bitmap and store the index in the timer flags.
+ */
+static void enqueue_timer(struct timer_base *base, struct timer_list *timer,
+			  unsigned int idx)
+{
+	hlist_add_head(&timer->entry, base->vectors + idx);
+	__set_bit(idx, base->pending_map);
+	timer_set_idx(timer, idx);
+}
+
+static void
+__internal_add_timer(struct timer_base *base, struct timer_list *timer)
+{
+	unsigned int idx;
+
+	idx = calc_wheel_index(timer->expires, base->clk);
+	enqueue_timer(base, timer, idx);
+}
+
+static void
+trigger_dyntick_cpu(struct timer_base *base, struct timer_list *timer)
+{
+>>>>>>> linux-next/akpm-base
 	if (!IS_ENABLED(CONFIG_NO_HZ_COMMON) || !base->nohz_active)
 		return;
 
@@ -1371,6 +1399,7 @@ static int __collect_expired_timers(struct timer_base *base,
  * Find the next pending bucket of a level. Search from level start (@offset)
  * + @clk upwards and if nothing there, search from start of the level
  * (@offset) up to @offset + clk.
+<<<<<<< HEAD
  */
 static int next_pending_bucket(struct timer_base *base, unsigned offset,
 			       unsigned clk)
@@ -1390,6 +1419,27 @@ static int next_pending_bucket(struct timer_base *base, unsigned offset,
  * Search the first expiring timer in the various clock levels. Caller must
  * hold base->lock.
  */
+=======
+ */
+static int next_pending_bucket(struct timer_base *base, unsigned offset,
+			       unsigned clk)
+{
+	unsigned pos, start = offset + clk;
+	unsigned end = offset + LVL_SIZE;
+
+	pos = find_next_bit(base->pending_map, end, start);
+	if (pos < end)
+		return pos - start;
+
+	pos = find_next_bit(base->pending_map, start, offset);
+	return pos < start ? pos + LVL_SIZE - start : -1;
+}
+
+/*
+ * Search the first expiring timer in the various clock levels. Caller must
+ * hold base->lock.
+ */
+>>>>>>> linux-next/akpm-base
 static unsigned long __next_timer_interrupt(struct timer_base *base)
 {
 	unsigned long clk, next, adj;
@@ -1630,7 +1680,7 @@ static inline void __run_timers(struct timer_base *base)
 /*
  * This function runs timers and the timer-tq in bottom half context.
  */
-static void run_timer_softirq(struct softirq_action *h)
+static __latent_entropy void run_timer_softirq(struct softirq_action *h)
 {
 	struct timer_base *base = this_cpu_ptr(&timer_bases[BASE_STD]);
 
@@ -1804,7 +1854,7 @@ static void migrate_timer_list(struct timer_base *new_base, struct hlist_head *h
 	}
 }
 
-static void migrate_timers(int cpu)
+int timers_dead_cpu(unsigned int cpu)
 {
 	struct timer_base *old_base;
 	struct timer_base *new_base;
@@ -1821,6 +1871,7 @@ static void migrate_timers(int cpu)
 		 */
 		spin_lock_irq(&new_base->lock);
 		spin_lock_nested(&old_base->lock, SINGLE_DEPTH_NESTING);
+<<<<<<< HEAD
 
 		BUG_ON(old_base->running_timer);
 
@@ -1832,28 +1883,21 @@ static void migrate_timers(int cpu)
 		put_cpu_ptr(&timer_bases);
 	}
 }
+=======
 
-static int timer_cpu_notify(struct notifier_block *self,
-				unsigned long action, void *hcpu)
-{
-	switch (action) {
-	case CPU_DEAD:
-	case CPU_DEAD_FROZEN:
-		migrate_timers((long)hcpu);
-		break;
-	default:
-		break;
+		BUG_ON(old_base->running_timer);
+>>>>>>> linux-next/akpm-base
+
+		for (i = 0; i < WHEEL_SIZE; i++)
+			migrate_timer_list(new_base, old_base->vectors + i);
+
+		spin_unlock(&old_base->lock);
+		spin_unlock_irq(&new_base->lock);
+		put_cpu_ptr(&timer_bases);
 	}
-
-	return NOTIFY_OK;
+	return 0;
 }
 
-static inline void timer_register_cpu_notifier(void)
-{
-	cpu_notifier(timer_cpu_notify, 0);
-}
-#else
-static inline void timer_register_cpu_notifier(void) { }
 #endif /* CONFIG_HOTPLUG_CPU */
 
 static void __init init_timer_cpu(int cpu)
@@ -1881,7 +1925,6 @@ void __init init_timers(void)
 {
 	init_timer_cpus();
 	init_timer_stats();
-	timer_register_cpu_notifier();
 	open_softirq(TIMER_SOFTIRQ, run_timer_softirq);
 }
 

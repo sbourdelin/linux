@@ -1172,12 +1172,6 @@ svc_process_common(struct svc_rqst *rqstp, struct kvec *argv, struct kvec *resv)
 	memset(rqstp->rq_argp, 0, procp->pc_argsize);
 	memset(rqstp->rq_resp, 0, procp->pc_ressize);
 
-	/* un-reserve some of the out-queue now that we have a
-	 * better idea of reply size
-	 */
-	if (procp->pc_xdrressize)
-		svc_reserve_auth(rqstp, procp->pc_xdrressize<<2);
-
 	/* Call the function that processes the request. */
 	if (!versp->vs_dispatch) {
 		/* Decode arguments */
@@ -1188,10 +1182,16 @@ svc_process_common(struct svc_rqst *rqstp, struct kvec *argv, struct kvec *resv)
 		*statp = procp->pc_func(rqstp, rqstp->rq_argp, rqstp->rq_resp);
 
 		/* Encode reply */
-		if (test_bit(RQ_DROPME, &rqstp->rq_flags)) {
+		if (*statp == rpc_drop_reply ||
+		    test_bit(RQ_DROPME, &rqstp->rq_flags)) {
 			if (procp->pc_release)
 				procp->pc_release(rqstp, NULL, rqstp->rq_resp);
 			goto dropit;
+		}
+		if (*statp == rpc_autherr_badcred) {
+			if (procp->pc_release)
+				procp->pc_release(rqstp, NULL, rqstp->rq_resp);
+			goto err_bad_auth;
 		}
 		if (*statp == rpc_success &&
 		    (xdr = procp->pc_encode) &&

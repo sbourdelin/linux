@@ -443,10 +443,11 @@ static irqreturn_t exynos4_mct_tick_isr(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static int exynos4_local_timer_setup(struct mct_clock_event_device *mevt)
+static int exynos4_mct_starting_cpu(unsigned int cpu)
 {
+	struct mct_clock_event_device *mevt =
+		per_cpu_ptr(&percpu_mct_tick, cpu);
 	struct clock_event_device *evt = &mevt->evt;
-	unsigned int cpu = smp_processor_id();
 
 	mevt->base = EXYNOS4_MCT_L_BASE(cpu);
 	snprintf(mevt->name, sizeof(mevt->name), "mct_tick%d", cpu);
@@ -480,8 +481,10 @@ static int exynos4_local_timer_setup(struct mct_clock_event_device *mevt)
 	return 0;
 }
 
-static void exynos4_local_timer_stop(struct mct_clock_event_device *mevt)
+static int exynos4_mct_dying_cpu(unsigned int cpu)
 {
+	struct mct_clock_event_device *mevt =
+		per_cpu_ptr(&percpu_mct_tick, cpu);
 	struct clock_event_device *evt = &mevt->evt;
 
 	evt->set_state_shutdown(evt);
@@ -491,8 +494,10 @@ static void exynos4_local_timer_stop(struct mct_clock_event_device *mevt)
 	} else {
 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
 	}
+	return 0;
 }
 
+<<<<<<< HEAD
 static int exynos4_mct_cpu_notify(struct notifier_block *self,
 					   unsigned long action, void *hcpu)
 {
@@ -520,10 +525,11 @@ static struct notifier_block exynos4_mct_cpu_nb = {
 	.notifier_call = exynos4_mct_cpu_notify,
 };
 
+=======
+>>>>>>> linux-next/akpm-base
 static int __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
 {
 	int err, cpu;
-	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
 	struct clk *mct_clk, *tick_clk;
 
 	tick_clk = np ? of_clk_get_by_name(np, "fin_pll") :
@@ -570,12 +576,19 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
 		}
 	}
 
-	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
+	/* Install hotplug callbacks which configure the timer on this CPU */
+	err = cpuhp_setup_state(CPUHP_AP_EXYNOS4_MCT_TIMER_STARTING,
+				"AP_EXYNOS4_MCT_TIMER_STARTING",
+				exynos4_mct_starting_cpu,
+				exynos4_mct_dying_cpu);
 	if (err)
 		goto out_irq;
 
+<<<<<<< HEAD
 	/* Immediately configure the timer on the boot CPU */
 	exynos4_local_timer_setup(mevt);
+=======
+>>>>>>> linux-next/akpm-base
 	return 0;
 
 out_irq:

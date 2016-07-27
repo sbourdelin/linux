@@ -12,7 +12,7 @@
 #include <linux/proc_fs.h>
 #include <linux/threads.h>
 #include <linux/kernel.h>
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <linux/sched.h>
@@ -554,7 +554,7 @@ static int uv_probe(void)
 	return apic == &apic_x2apic_uv_x;
 }
 
-static struct apic __refdata apic_x2apic_uv_x = {
+static struct apic apic_x2apic_uv_x __ro_after_init = {
 
 	.name				= "UV large system",
 	.probe				= uv_probe,

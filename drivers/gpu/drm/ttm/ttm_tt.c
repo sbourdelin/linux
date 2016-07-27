@@ -166,11 +166,15 @@ EXPORT_SYMBOL(ttm_tt_set_placement_caching);
 
 void ttm_tt_destroy(struct ttm_tt *ttm)
 {
-	if (unlikely(ttm == NULL))
+	int ret;
+
+	if (ttm == NULL)
 		return;
 
 	if (ttm->state == tt_bound) {
-		ttm_tt_unbind(ttm);
+		ret = ttm->func->unbind(ttm);
+		BUG_ON(ret);
+		ttm->state = tt_unbound;
 	}
 
 	if (ttm->state == tt_unbound)
@@ -251,17 +255,6 @@ void ttm_dma_tt_fini(struct ttm_dma_tt *ttm_dma)
 }
 EXPORT_SYMBOL(ttm_dma_tt_fini);
 
-void ttm_tt_unbind(struct ttm_tt *ttm)
-{
-	int ret;
-
-	if (ttm->state == tt_bound) {
-		ret = ttm->func->unbind(ttm);
-		BUG_ON(ret);
-		ttm->state = tt_unbound;
-	}
-}
-
 int ttm_tt_bind(struct ttm_tt *ttm, struct ttm_mem_reg *bo_mem)
 {
 	int ret = 0;
@@ -298,7 +291,7 @@ int ttm_tt_swapin(struct ttm_tt *ttm)
 	swap_storage = ttm->swap_storage;
 	BUG_ON(swap_storage == NULL);
 
-	swap_space = file_inode(swap_storage)->i_mapping;
+	swap_space = swap_storage->f_mapping;
 
 	for (i = 0; i < ttm->num_pages; ++i) {
 		from_page = shmem_read_mapping_page(swap_space, i);
@@ -347,7 +340,7 @@ int ttm_tt_swapout(struct ttm_tt *ttm, struct file *persistent_swap_storage)
 	} else
 		swap_storage = persistent_swap_storage;
 
-	swap_space = file_inode(swap_storage)->i_mapping;
+	swap_space = swap_storage->f_mapping;
 
 	for (i = 0; i < ttm->num_pages; ++i) {
 		from_page = ttm->pages[i];

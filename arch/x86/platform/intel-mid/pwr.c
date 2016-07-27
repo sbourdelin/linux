@@ -21,10 +21,16 @@
 
 #include <linux/delay.h>
 #include <linux/errno.h>
+<<<<<<< HEAD
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+=======
+#include <linux/interrupt.h>
+#include <linux/kernel.h>
+#include <linux/export.h>
+>>>>>>> linux-next/akpm-base
 #include <linux/mutex.h>
 #include <linux/pci.h>
 
@@ -407,7 +413,10 @@ static const struct pci_device_id mid_pwr_pci_ids[] = {
 	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_TANGIER), (kernel_ulong_t)&mid_info },
 	{}
 };
+<<<<<<< HEAD
 MODULE_DEVICE_TABLE(pci, mid_pwr_pci_ids);
+=======
+>>>>>>> linux-next/akpm-base
 
 static struct pci_driver mid_pwr_pci_driver = {
 	.name		= "intel_mid_pwr",
