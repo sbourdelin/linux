@@ -28,7 +28,8 @@ config IOSCHED_CFQ
 	  The CFQ I/O scheduler, now internally replaced by BFQ, tries
 	  to distribute bandwidth among all processes according to
 	  their weights, regardless of the device parameters and with
-	  any workload.
+	  any workload.  It also tries to guarantee a low latency to
+	  interactive applications.
 
 	  This is the default I/O scheduler.
 
