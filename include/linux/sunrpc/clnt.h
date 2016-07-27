@@ -189,6 +189,8 @@ int 		rpc_clnt_test_and_add_xprt(struct rpc_clnt *clnt,
 			struct rpc_xprt_switch *xps,
 			struct rpc_xprt *xprt,
 			void *dummy);
+int		rpc_clnt_test_xprt(struct rpc_clnt *clnt,
+			struct rpc_xprt *xprt);
 int		rpc_clnt_add_xprt(struct rpc_clnt *, struct xprt_create *,
 			int (*setup)(struct rpc_clnt *,
 				struct rpc_xprt_switch *,
