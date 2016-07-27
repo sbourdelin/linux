@@ -474,6 +474,12 @@ config NFT_META
 	  This option adds the "meta" expression that you can use to match and
 	  to set packet metainformation such as the packet mark.
 
+config NFT_NTH
+	tristate "Netfilter nf_tables nth module"
+	help
+	  This option adds the "nth" expression that you can use to match a
+	  packet every a specific given value.
+
 config NFT_CT
 	depends on NF_CONNTRACK
 	tristate "Netfilter nf_tables conntrack module"
