@@ -2277,8 +2277,13 @@ int btrfs_commit_transaction(struct btrfs_trans_handle *trans,
 
 	kmem_cache_free(btrfs_trans_handle_cachep, trans);
 
+	/*
+	 * If s_writers.frozen >= SB_FREEZE_FS, we can not handle delayed
+	 * iputs, otherwise it'll result in deallock about SB_FREEZE_FS.
+ 	 */
 	if (current != root->fs_info->transaction_kthread &&
-	    current != root->fs_info->cleaner_kthread)
+	    current != root->fs_info->cleaner_kthread &&
+	    root->fs_info->sb->s_writers.frozen >= SB_FREEZE_FS)
 		btrfs_run_delayed_iputs(root);
 
 	return ret;
