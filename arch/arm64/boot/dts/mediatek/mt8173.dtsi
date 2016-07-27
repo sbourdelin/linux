@@ -713,6 +713,8 @@
 			compatible = "mediatek,mt8173-mmsys", "syscon";
 			reg = <0 0x14000000 0 0x1000>;
 			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+			clocks = <&topckgen CLK_TOP_MM_SEL>;
+			clock-names = "mmsel";
 			#clock-cells = <1>;
 		};
 
@@ -881,8 +883,8 @@
 			interrupts = <GIC_SPI 194 IRQ_TYPE_LEVEL_LOW>;
 			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
 			clocks = <&mmsys CLK_MM_DPI_PIXEL>,
-				 <&mmsys CLK_MM_DPI_ENGINE>,
-				 <&apmixedsys CLK_APMIXED_TVDPLL>;
+					 <&mmsys CLK_MM_DPI_ENGINE>,
+					 <&apmixedsys CLK_APMIXED_TVDPLL>;
 			clock-names = "pixel", "engine", "pll";
 			status = "disabled";
 		};
