@@ -24,6 +24,7 @@
 #include <sound/hwdep.h>
 #include <sound/pcm.h>
 #include <sound/initval.h>
+#include <linux/compat.h>
 #define MODNAME "US122L"
 #include "usb_stream.c"
 #include "../usbaudio.h"
@@ -453,6 +454,18 @@ free:
 	return err;
 }
 
+#ifdef CONFIG_COMPAT
+static int usb_stream_hwdep_compat_ioctl(struct snd_hwdep *hw,
+					 struct file *file,
+					 unsigned int cmd, unsigned long arg)
+{
+	return usb_stream_hwdep_compat_ioctl(hw, file, cmd,
+					     (unsigned long)compat_ptr(arg));
+}
+#else
+#define usb_stream_hwdep_compat_ioctl NULL
+#endif
+
 #define SND_USB_STREAM_ID "USB STREAM"
 static int usb_stream_hwdep_new(struct snd_card *card)
 {
@@ -469,7 +482,7 @@ static int usb_stream_hwdep_new(struct snd_card *card)
 	hw->ops.open = usb_stream_hwdep_open;
 	hw->ops.release = usb_stream_hwdep_release;
 	hw->ops.ioctl = usb_stream_hwdep_ioctl;
-	hw->ops.ioctl_compat = usb_stream_hwdep_ioctl;
+	hw->ops.ioctl_compat = usb_stream_hwdep_compat_ioctl;
 	hw->ops.mmap = usb_stream_hwdep_mmap;
 	hw->ops.poll = usb_stream_hwdep_poll;
 
