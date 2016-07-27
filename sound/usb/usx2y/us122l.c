@@ -377,7 +377,7 @@ out:
 }
 
 static int usb_stream_hwdep_ioctl(struct snd_hwdep *hw, struct file *file,
-				  unsigned cmd, unsigned long arg)
+				  unsigned int cmd, unsigned long arg)
 {
 	struct usb_stream_config *cfg;
 	struct us122l *us122l = hw->private_data;
