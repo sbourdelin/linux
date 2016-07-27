@@ -1478,6 +1478,7 @@ static int emac_dev_open(struct net_device *ndev)
 	if (priv->phy_node) {
 		phydev = of_phy_connect(ndev, priv->phy_node,
 					&emac_adjust_link, 0, 0);
+		of_node_put(priv->phy_node);
 		if (!phydev) {
 			dev_err(emac_dev, "could not connect to phy %s\n",
 				priv->phy_node->full_name);
