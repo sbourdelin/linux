@@ -2614,6 +2614,24 @@ int rpc_clnt_test_and_add_xprt(struct rpc_clnt *clnt,
 }
 EXPORT_SYMBOL_GPL(rpc_clnt_test_and_add_xprt);
 
+int rpc_clnt_test_xprt(struct rpc_clnt *clnt, struct rpc_xprt *xprt)
+{
+	struct rpc_cred *cred;
+	struct rpc_task *task;
+	int status;
+
+	cred = authnull_ops.lookup_cred(NULL, NULL, 0);
+	task = rpc_call_null_helper(clnt, xprt, cred,
+				RPC_TASK_SOFT | RPC_TASK_SOFTCONN, NULL, NULL);
+	put_rpccred(cred);
+	if (IS_ERR(task))
+		return PTR_ERR(task);
+	status = task->tk_status;
+	rpc_put_task(task);
+	return status;
+}
+EXPORT_SYMBOL_GPL(rpc_clnt_test_xprt);
+
 /**
  * rpc_clnt_add_xprt - Add a new transport to a rpc_clnt
  * @clnt: pointer to struct rpc_clnt
