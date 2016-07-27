@@ -3435,7 +3435,7 @@ void *mlx5e_create_netdev(struct mlx5_core_dev *mdev,
 
 	priv = netdev_priv(netdev);
 
-	priv->wq = create_singlethread_workqueue("mlx5e");
+	priv->wq = alloc_ordered_workqueue("mlx5e", WQ_MEM_RECLAIM);
 	if (!priv->wq)
 		goto err_free_netdev;
 
