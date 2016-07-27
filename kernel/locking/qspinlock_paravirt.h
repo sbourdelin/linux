@@ -450,7 +450,28 @@ pv_wait_head_or_lock(struct qspinlock *lock, struct mcs_spinlock *node)
 				goto gotlock;
 			}
 		}
-		WRITE_ONCE(pn->state, vcpu_halted);
+		/*
+		 * lock holder vCPU             queue head vCPU
+		 * ----------------             ---------------
+		 * node->locked = 1;
+		 * <preemption>                 READ_ONCE(node->locked)
+		 *    ...                       pv_wait_head_or_lock():
+		 *                                SPIN_THRESHOLD loop;
+		 *                                pv_hash();
+		 *                                lock->locked = _Q_SLOW_VAL;
+		 *                                node->state  = vcpu_hashed;
+		 * pv_kick_node():
+		 *   cmpxchg(node->state,
+		 *      vcpu_halted, vcpu_hashed);
+		 *   lock->locked = _Q_SLOW_VAL;
+		 *   pv_hash();
+		 *
+		 * With preemption at the right moment, it is possible that both the
+		 * lock holder and queue head vCPUs can be racing to set node->state.
+		 * Making sure the state is never set to vcpu_halted will prevent this
+		 * racing from happening.
+		 */
+		WRITE_ONCE(pn->state, vcpu_hashed);
 		qstat_inc(qstat_pv_wait_head, true);
 		qstat_inc(qstat_pv_wait_again, waitcnt);
 		pv_wait(&l->locked, _Q_SLOW_VAL);
