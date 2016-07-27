@@ -24,7 +24,8 @@ SUB_DIRS = benchmarks 		\
 	   syscalls		\
 	   tm			\
 	   vphn         \
-	   math
+	   math		\
+	   ptrace
 
 endif
 
