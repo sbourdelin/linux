@@ -22,6 +22,7 @@ const struct ath10k_hw_regs qca988x_regs = {
 	.rtc_soc_base_address		= 0x00004000,
 	.rtc_wmac_base_address		= 0x00005000,
 	.soc_core_base_address		= 0x00009000,
+	.wlan_mac_base_address		= 0x00020000,
 	.ce_wrapper_base_address	= 0x00057000,
 	.ce0_base_address		= 0x00057400,
 	.ce1_base_address		= 0x00057800,
@@ -48,6 +49,7 @@ const struct ath10k_hw_regs qca6174_regs = {
 	.rtc_soc_base_address			= 0x00000800,
 	.rtc_wmac_base_address			= 0x00001000,
 	.soc_core_base_address			= 0x0003a000,
+	.wlan_mac_base_address			= 0x00020000,
 	.ce_wrapper_base_address		= 0x00034000,
 	.ce0_base_address			= 0x00034400,
 	.ce1_base_address			= 0x00034800,
@@ -74,6 +76,7 @@ const struct ath10k_hw_regs qca99x0_regs = {
 	.rtc_soc_base_address			= 0x00080000,
 	.rtc_wmac_base_address			= 0x00000000,
 	.soc_core_base_address			= 0x00082000,
+	.wlan_mac_base_address			= 0x00030000,
 	.ce_wrapper_base_address		= 0x0004d000,
 	.ce0_base_address			= 0x0004a000,
 	.ce1_base_address			= 0x0004a400,
@@ -109,6 +112,7 @@ const struct ath10k_hw_regs qca99x0_regs = {
 const struct ath10k_hw_regs qca4019_regs = {
 	.rtc_soc_base_address                   = 0x00080000,
 	.soc_core_base_address                  = 0x00082000,
+	.wlan_mac_base_address                  = 0x00030000,
 	.ce_wrapper_base_address                = 0x0004d000,
 	.ce0_base_address                       = 0x0004a000,
 	.ce1_base_address                       = 0x0004a400,
@@ -139,6 +143,7 @@ const struct ath10k_hw_regs qca4019_regs = {
 };
 
 const struct ath10k_hw_values qca988x_values = {
+	.mac_core_rev			= ATH10K_HW_MAC_CORE_ATH9K,
 	.rtc_state_val_on		= 3,
 	.ce_count			= 8,
 	.msi_assign_ce_max		= 7,
@@ -148,6 +153,7 @@ const struct ath10k_hw_values qca988x_values = {
 };
 
 const struct ath10k_hw_values qca6174_values = {
+	.mac_core_rev			= ATH10K_HW_MAC_CORE_ATH9K,
 	.rtc_state_val_on		= 3,
 	.ce_count			= 8,
 	.msi_assign_ce_max		= 7,
@@ -157,6 +163,7 @@ const struct ath10k_hw_values qca6174_values = {
 };
 
 const struct ath10k_hw_values qca99x0_values = {
+	.mac_core_rev			= ATH10K_HW_MAC_CORE_WAVE2,
 	.rtc_state_val_on		= 5,
 	.ce_count			= 12,
 	.msi_assign_ce_max		= 12,
@@ -166,6 +173,7 @@ const struct ath10k_hw_values qca99x0_values = {
 };
 
 const struct ath10k_hw_values qca9888_values = {
+	.mac_core_rev			= ATH10K_HW_MAC_CORE_WAVE2,
 	.rtc_state_val_on		= 3,
 	.ce_count			= 12,
 	.msi_assign_ce_max		= 12,
@@ -175,6 +183,7 @@ const struct ath10k_hw_values qca9888_values = {
 };
 
 const struct ath10k_hw_values qca4019_values = {
+	.mac_core_rev                   = ATH10K_HW_MAC_CORE_WAVE2,
 	.ce_count                       = 12,
 	.num_target_ce_config_wlan      = 10,
 	.ce_desc_meta_data_mask         = 0xFFF0,

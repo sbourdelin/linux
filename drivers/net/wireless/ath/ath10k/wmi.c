@@ -28,6 +28,7 @@
 #include "wmi-ops.h"
 #include "p2p.h"
 #include "hw.h"
+#include "hif.h"
 
 /* MAIN WMI cmd track */
 static struct wmi_cmd_map wmi_cmd_map = {
@@ -3096,6 +3097,121 @@ ath10k_wmi_op_pull_peer_kick_ev(struct ath10k *ar, struct sk_buff *skb,
 	return 0;
 }
 
+static void
+ath10k_ath9k_set_pdev_coverage_class(struct ath10k *ar, s16 value)
+{
+	u32 slottime_reg;
+	u32 slottime;
+	u32 timeout_reg;
+	u32 timeout;
+	u32 counters_freq_mhz = ar->hw_params.channel_counters_freq_hz / 1000;
+
+	/* The firmware does not support setting the coverage class. Instead
+	 * this function monitors and modifies the corresponding MAC registers.
+	 */
+
+	spin_lock_bh(&ar->data_lock);
+
+	/* Retrieve the current values of the two registers that need to be
+	 * adjusted.
+	 */
+	slottime_reg = ath10k_hif_read32(ar, WLAN_MAC_BASE_ADDRESS +
+					     ATH9K_MAC_IFS_SLOT);
+	timeout_reg = ath10k_hif_read32(ar, WLAN_MAC_BASE_ADDRESS +
+					    ATH9K_MAC_TIME_OUT);
+
+	if (value < 0)
+		value = ar->fw_coverage.coverage_class;
+
+	/* Break out if the coverage class and registers have the expected
+	 * value.
+	 */
+	if (value == ar->fw_coverage.coverage_class &&
+	    slottime_reg == ar->fw_coverage.reg_slottime_conf &&
+	    timeout_reg == ar->fw_coverage.reg_ack_cts_timeout_conf)
+		goto unlock;
+
+	/* Store new initial register values from the firmware. */
+	if (slottime_reg != ar->fw_coverage.reg_slottime_conf)
+		ar->fw_coverage.reg_slottime_orig = slottime_reg;
+	if (timeout_reg != ar->fw_coverage.reg_ack_cts_timeout_conf)
+		ar->fw_coverage.reg_ack_cts_timeout_orig = timeout_reg;
+
+	/* Calculat new value based on the (original) firmware calculation. */
+	slottime_reg = ar->fw_coverage.reg_slottime_orig;
+	timeout_reg = ar->fw_coverage.reg_ack_cts_timeout_orig;
+
+	/* Do some sanity checks on the slottime register. */
+	if (unlikely(slottime_reg % counters_freq_mhz)) {
+		ath10k_warn(ar,
+			    "Not adjusting coverage class timeouts, expected an integer microsecond slot time in HW register\n");
+
+		goto store_regs;
+	}
+
+	slottime = (slottime_reg & ATH9K_MAC_IFS_SLOT_M) / counters_freq_mhz;
+	if (unlikely(slottime != 9 && slottime != 20)) {
+		ath10k_warn(ar,
+			    "Not adjusting coverage class timeouts, expected a slot time of 9 or 20us in HW register. It is %uus.\n",
+			    slottime);
+
+		goto store_regs;
+	}
+
+	/* Recalculate the register values by adding the additional propagation
+	 * delay (3us per coverage class).
+	 */
+
+	slottime = (slottime_reg & ATH9K_MAC_IFS_SLOT_M);
+	slottime += value * 3 * counters_freq_mhz;
+	slottime = min_t(u32, slottime, ATH9K_MAC_IFS_SLOT_M);
+	slottime_reg = (slottime_reg & ~ATH9K_MAC_IFS_SLOT_M) | slottime;
+
+	/* Update ack timeout (lower halfword). */
+	timeout = (timeout_reg & ATH9K_MAC_TIME_OUT_ACK);
+	timeout = timeout >> ATH9K_MAC_TIME_OUT_ACK_S;
+	timeout += 3 * value * counters_freq_mhz;
+	timeout = min_t(u32, timeout, ATH9K_MAC_TIME_OUT_MAX);
+	timeout = (timeout << ATH9K_MAC_TIME_OUT_ACK_S)
+	timeout = timeout & ATH9K_MAC_TIME_OUT_ACK;
+	timeout_reg = (timeout_reg & ~ATH9K_MAC_TIME_OUT_ACK) | timeout;
+
+	/* Update cts timeout (upper halfword). */
+	timeout = (timeout_reg & ATH9K_MAC_TIME_OUT_CTS)
+	timeout = timeout >> ATH9K_MAC_TIME_OUT_CTS_S;
+	timeout += 3 * value * counters_freq_mhz;
+	timeout = min_t(u32, timeout, ATH9K_MAC_TIME_OUT_MAX);
+	timeout = (timeout << ATH9K_MAC_TIME_OUT_CTS_S)
+	timeout = timeout & ATH9K_MAC_TIME_OUT_CTS;
+	timeout_reg = (timeout_reg & ~ATH9K_MAC_TIME_OUT_CTS) | timeout;
+
+	ath10k_hif_write32(ar, WLAN_MAC_BASE_ADDRESS + 0x1070, slottime_reg);
+	ath10k_hif_write32(ar, WLAN_MAC_BASE_ADDRESS + 0x8014, timeout_reg);
+
+store_regs:
+	/* After an error we will not retry setting the coverage class. */
+	ar->fw_coverage.coverage_class = value;
+	ar->fw_coverage.reg_slottime_conf = slottime_reg;
+	ar->fw_coverage.reg_ack_cts_timeout_conf = timeout_reg;
+
+unlock:
+	spin_unlock_bh(&ar->data_lock);
+}
+
+static void
+ath10k_wmi_op_set_pdev_coverage_class(struct ath10k *ar, s16 value)
+{
+	switch (ar->hw_values->mac_core_rev) {
+	case ATH10K_HW_MAC_CORE_ATH9K:
+		ath10k_ath9k_set_pdev_coverage_class(ar, value);
+		break;
+	default:
+		if (value != -1)
+			ath10k_warn(ar, "Setting the coverage class is not supported for this chipset.");
+		break;
+	}
+}
+
 void ath10k_wmi_event_peer_sta_kickout(struct ath10k *ar, struct sk_buff *skb)
 {
 	struct wmi_peer_kick_ev_arg arg = {};
@@ -4992,6 +5108,12 @@ static void ath10k_wmi_op_rx(struct ath10k *ar, struct sk_buff *skb)
 		break;
 	}
 
+	/* Check and possibly reset the coverage class configuration override.
+	 * There are many conditions (in particular internal card resets) that
+	 * can cause the registers to be re-initialized.
+	 */
+	ath10k_wmi_op_set_pdev_coverage_class(ar, -1);
+
 out:
 	dev_kfree_skb(skb);
 }
@@ -5115,6 +5237,12 @@ static void ath10k_wmi_10_1_op_rx(struct ath10k *ar, struct sk_buff *skb)
 		ath10k_warn(ar, "Unknown eventid: %d\n", id);
 		break;
 	}
+
+	/* Check and possibly reset the coverage class configuration override.
+	 * There are many conditions (in particular internal card resets) that
+	 * can cause the registers to be re-initialized.
+	 */
+	ath10k_wmi_op_set_pdev_coverage_class(ar, -1);
 
 out:
 	dev_kfree_skb(skb);
@@ -5240,6 +5368,12 @@ static void ath10k_wmi_10_2_op_rx(struct ath10k *ar, struct sk_buff *skb)
 		break;
 	}
 
+	/* Check and possibly reset the coverage class configuration override.
+	 * There are many conditions (in particular internal card resets) that
+	 * can cause the registers to be re-initialized.
+	 */
+	ath10k_wmi_op_set_pdev_coverage_class(ar, -1);
+
 out:
 	dev_kfree_skb(skb);
 }
@@ -5322,6 +5456,12 @@ static void ath10k_wmi_10_4_op_rx(struct ath10k *ar, struct sk_buff *skb)
 		ath10k_warn(ar, "Unknown eventid: %d\n", id);
 		break;
 	}
+
+	/* Check and possibly reset the coverage class configuration override.
+	 * There are many conditions (in particular internal card resets) that
+	 * can cause the registers to be re-initialized.
+	 */
+	ath10k_wmi_op_set_pdev_coverage_class(ar, -1);
 
 out:
 	dev_kfree_skb(skb);
@@ -6017,6 +6157,7 @@ void ath10k_wmi_start_scan_init(struct ath10k *ar,
 		| WMI_SCAN_EVENT_COMPLETED
 		| WMI_SCAN_EVENT_BSS_CHANNEL
 		| WMI_SCAN_EVENT_FOREIGN_CHANNEL
+		| WMI_SCAN_EVENT_FOREIGN_CHANNEL_EXIT
 		| WMI_SCAN_EVENT_DEQUEUED;
 	arg->scan_ctrl_flags |= WMI_SCAN_CHAN_STAT_EVENT;
 	arg->n_bssids = 1;
@@ -7666,6 +7807,8 @@ static const struct wmi_ops wmi_ops = {
 	.pull_fw_stats = ath10k_wmi_main_op_pull_fw_stats,
 	.pull_roam_ev = ath10k_wmi_op_pull_roam_ev,
 
+	.set_pdev_coverage_class = ath10k_wmi_op_set_pdev_coverage_class,
+
 	.gen_pdev_suspend = ath10k_wmi_op_gen_pdev_suspend,
 	.gen_pdev_resume = ath10k_wmi_op_gen_pdev_resume,
 	.gen_pdev_set_rd = ath10k_wmi_op_gen_pdev_set_rd,
@@ -7739,6 +7882,8 @@ static const struct wmi_ops wmi_10_1_ops = {
 	.pull_rdy = ath10k_wmi_op_pull_rdy_ev,
 	.pull_roam_ev = ath10k_wmi_op_pull_roam_ev,
 
+	.set_pdev_coverage_class = ath10k_wmi_op_set_pdev_coverage_class,
+
 	.gen_pdev_suspend = ath10k_wmi_op_gen_pdev_suspend,
 	.gen_pdev_resume = ath10k_wmi_op_gen_pdev_resume,
 	.gen_pdev_set_param = ath10k_wmi_op_gen_pdev_set_param,
@@ -7808,6 +7953,8 @@ static const struct wmi_ops wmi_10_2_ops = {
 	.pull_rdy = ath10k_wmi_op_pull_rdy_ev,
 	.pull_roam_ev = ath10k_wmi_op_pull_roam_ev,
 
+	.set_pdev_coverage_class = ath10k_wmi_op_set_pdev_coverage_class,
+
 	.gen_pdev_suspend = ath10k_wmi_op_gen_pdev_suspend,
 	.gen_pdev_resume = ath10k_wmi_op_gen_pdev_resume,
 	.gen_pdev_set_param = ath10k_wmi_op_gen_pdev_set_param,
@@ -7874,6 +8021,8 @@ static const struct wmi_ops wmi_10_2_4_ops = {
 	.pull_rdy = ath10k_wmi_op_pull_rdy_ev,
 	.pull_roam_ev = ath10k_wmi_op_pull_roam_ev,
 
+	.set_pdev_coverage_class = ath10k_wmi_op_set_pdev_coverage_class,
+
 	.gen_pdev_suspend = ath10k_wmi_op_gen_pdev_suspend,
 	.gen_pdev_resume = ath10k_wmi_op_gen_pdev_resume,
 	.gen_pdev_set_param = ath10k_wmi_op_gen_pdev_set_param,
@@ -7937,6 +8086,8 @@ static const struct wmi_ops wmi_10_4_ops = {
 	.pull_rdy = ath10k_wmi_op_pull_rdy_ev,
 	.pull_roam_ev = ath10k_wmi_op_pull_roam_ev,
 	.get_txbf_conf_scheme = ath10k_wmi_10_4_txbf_conf_scheme,
+
+	.set_pdev_coverage_class = ath10k_wmi_op_set_pdev_coverage_class,
 
 	.gen_pdev_suspend = ath10k_wmi_op_gen_pdev_suspend,
 	.gen_pdev_resume = ath10k_wmi_op_gen_pdev_resume,

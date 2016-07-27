@@ -230,6 +230,7 @@ struct ath10k_hw_regs {
 	u32 rtc_soc_base_address;
 	u32 rtc_wmac_base_address;
 	u32 soc_core_base_address;
+	u32 wlan_mac_base_address;
 	u32 ce_wrapper_base_address;
 	u32 ce0_base_address;
 	u32 ce1_base_address;
@@ -257,6 +258,12 @@ extern const struct ath10k_hw_regs qca6174_regs;
 extern const struct ath10k_hw_regs qca99x0_regs;
 extern const struct ath10k_hw_regs qca4019_regs;
 
+enum ath10k_hw_mac_core_rev {
+	ATH10K_HW_MAC_CORE_UNKNOWN = 0,
+	ATH10K_HW_MAC_CORE_ATH9K,
+	ATH10K_HW_MAC_CORE_WAVE2,
+};
+
 struct ath10k_hw_values {
 	u32 rtc_state_val_on;
 	u8 ce_count;
@@ -264,6 +271,7 @@ struct ath10k_hw_values {
 	u8 num_target_ce_config_wlan;
 	u16 ce_desc_meta_data_mask;
 	u8 ce_desc_meta_data_lsb;
+	enum ath10k_hw_mac_core_rev mac_core_rev;
 };
 
 extern const struct ath10k_hw_values qca988x_values;
@@ -545,7 +553,7 @@ enum ath10k_hw_cc_wraparound_type {
 #define WLAN_SI_BASE_ADDRESS			0x00010000
 #define WLAN_GPIO_BASE_ADDRESS			0x00014000
 #define WLAN_ANALOG_INTF_BASE_ADDRESS		0x0001c000
-#define WLAN_MAC_BASE_ADDRESS			0x00020000
+#define WLAN_MAC_BASE_ADDRESS			ar->regs->wlan_mac_base_address
 #define EFUSE_BASE_ADDRESS			0x00030000
 #define FPGA_REG_BASE_ADDRESS			0x00039000
 #define WLAN_UART2_BASE_ADDRESS			0x00054c00
@@ -744,5 +752,23 @@ enum ath10k_hw_cc_wraparound_type {
 #define QCA9887_EEPROM_ADDR_LO_LSB		16
 
 #define RTC_STATE_V_GET(x) (((x) & RTC_STATE_V_MASK) >> RTC_STATE_V_LSB)
+
+/* Register definitions for ath10k cards that include a MAC which is based
+ * on ATH9k. This ath9k based MAC still has the same or at least similar
+ * registers.
+ * These registers are usually managed by the ath10k firmware. However by
+ * overriding them it is possible to support a few additional features; in this
+ * case setting the coverage class.
+ */
+#define ATH9K_MAC_TIME_OUT		0x8014
+#define ATH9K_MAC_TIME_OUT_MAX		0x00003FFF
+#define ATH9K_MAC_TIME_OUT_ACK		0x00003FFF
+#define ATH9K_MAC_TIME_OUT_ACK_S	0
+#define ATH9K_MAC_TIME_OUT_CTS		0x3FFF0000
+#define ATH9K_MAC_TIME_OUT_CTS_S	16
+
+#define ATH9K_MAC_IFS_SLOT		0x1070
+#define ATH9K_MAC_IFS_SLOT_M		0x0000FFFF
+#define ATH9K_MAC_IFS_SLOT_RESV0	0xFFFF0000
 
 #endif /* _HW_H_ */

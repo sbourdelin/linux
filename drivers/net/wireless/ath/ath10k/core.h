@@ -936,6 +936,16 @@ struct ath10k {
 	struct ath10k_thermal thermal;
 	struct ath10k_wow wow;
 
+	/* protected by data_lock */
+	struct {
+		s16 coverage_class;
+
+		u32 reg_slottime_conf;
+		u32 reg_slottime_orig;
+		u32 reg_ack_cts_timeout_conf;
+		u32 reg_ack_cts_timeout_orig;
+	} fw_coverage;
+
 	/* must be last */
 	u8 drv_priv[0] __aligned(sizeof(void *));
 };

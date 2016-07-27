@@ -5372,6 +5372,15 @@ static void ath10k_bss_info_changed(struct ieee80211_hw *hw,
 	mutex_unlock(&ar->conf_mutex);
 }
 
+static void ath10k_set_coverage_class(struct ieee80211_hw *hw,
+				      s16 value)
+{
+	struct ath10k *ar = hw->priv;
+
+	if (ath10k_wmi_pdev_set_coverage_class(ar, value) == -EOPNOTSUPP)
+		ath10k_warn(ar, "Modification of coverage class is not supported!\n");
+}
+
 static int ath10k_hw_scan(struct ieee80211_hw *hw,
 			  struct ieee80211_vif *vif,
 			  struct ieee80211_scan_request *hw_req)
@@ -7397,6 +7406,7 @@ static const struct ieee80211_ops ath10k_ops = {
 	.remove_interface		= ath10k_remove_interface,
 	.configure_filter		= ath10k_configure_filter,
 	.bss_info_changed		= ath10k_bss_info_changed,
+	.set_coverage_class		= ath10k_set_coverage_class,
 	.hw_scan			= ath10k_hw_scan,
 	.cancel_hw_scan			= ath10k_cancel_hw_scan,
 	.set_key			= ath10k_set_key,

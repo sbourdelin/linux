@@ -52,6 +52,8 @@ struct wmi_ops {
 	int (*pull_wow_event)(struct ath10k *ar, struct sk_buff *skb,
 			      struct wmi_wow_ev_arg *arg);
 	enum wmi_txbf_conf (*get_txbf_conf_scheme)(struct ath10k *ar);
+	void (*set_pdev_coverage_class)(struct ath10k *ar,
+					s16 value);
 
 	struct sk_buff *(*gen_pdev_suspend)(struct ath10k *ar, u32 suspend_opt);
 	struct sk_buff *(*gen_pdev_resume)(struct ath10k *ar);
@@ -1009,6 +1011,21 @@ ath10k_wmi_pdev_get_temperature(struct ath10k *ar)
 
 	return ath10k_wmi_cmd_send(ar, skb,
 				   ar->wmi.cmd->pdev_get_temperature_cmdid);
+}
+
+static inline int
+ath10k_wmi_pdev_set_coverage_class(struct ath10k *ar,
+				   s16 value)
+{
+	if (!ar->wmi.ops->set_pdev_coverage_class)
+		return -EOPNOTSUPP;
+
+	if (value < 0)
+		value = 0;
+
+	ar->wmi.ops->set_pdev_coverage_class(ar, value);
+
+	return 0;
 }
 
 static inline int
