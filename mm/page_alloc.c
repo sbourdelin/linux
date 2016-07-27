@@ -4523,6 +4523,52 @@ unsigned long get_max_pfn(void)
 }
 EXPORT_SYMBOL(get_max_pfn);
 
+static void mark_free_pages_bitmap(struct zone *zone, unsigned long start_pfn,
+	unsigned long end_pfn, unsigned long *bitmap, unsigned long len)
+{
+	unsigned long pfn, flags, page_num;
+	unsigned int order, t;
+	struct list_head *curr;
+
+	if (zone_is_empty(zone))
+		return;
+	end_pfn = min(start_pfn + len, end_pfn);
+	spin_lock_irqsave(&zone->lock, flags);
+
+	for_each_migratetype_order(order, t) {
+		list_for_each(curr, &zone->free_area[order].free_list[t]) {
+			pfn = page_to_pfn(list_entry(curr, struct page, lru));
+			if (pfn >= start_pfn && pfn <= end_pfn) {
+				page_num = 1UL << order;
+				if (pfn + page_num > end_pfn)
+					page_num = end_pfn - pfn;
+				bitmap_set(bitmap, pfn - start_pfn, page_num);
+			}
+		}
+	}
+
+	spin_unlock_irqrestore(&zone->lock, flags);
+}
+
+int get_free_pages(unsigned long start_pfn, unsigned long end_pfn,
+		unsigned long *bitmap, unsigned long len)
+{
+	struct zone *zone;
+	int ret = 0;
+
+	if (bitmap == NULL || start_pfn > end_pfn || start_pfn >= max_pfn)
+		return 0;
+	if (end_pfn < max_pfn)
+		ret = 1;
+	if (end_pfn >= max_pfn)
+		ret = 0;
+
+	for_each_populated_zone(zone)
+		mark_free_pages_bitmap(zone, start_pfn, end_pfn, bitmap, len);
+	return ret;
+}
+EXPORT_SYMBOL(get_free_pages);
+
 static void zoneref_set_zone(struct zone *zone, struct zoneref *zoneref)
 {
 	zoneref->zone = zone;
