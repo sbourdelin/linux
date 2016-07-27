@@ -67,7 +67,7 @@ int test_cp_abort(void)
 	/* 128 bytes for a full cache line */
 	char buf[128] __cacheline_aligned;
 	cpu_set_t cpuset;
-	int fd1[2], fd2[2], pid;
+	int fd1[2], fd2[2], pid, i;
 	char c;
 
 	/* only run this test on a P9 or later */
@@ -87,14 +87,14 @@ int test_cp_abort(void)
 	FAIL_IF(pid < 0);
 
 	if (!pid) {
-		for (int i = 0; i < NUM_LOOPS; i++) {
+		for (i = 0; i < NUM_LOOPS; i++) {
 			FAIL_IF((write(fd1[WRITE_FD], &c, 1)) != 1);
 			FAIL_IF((read(fd2[READ_FD], &c, 1)) != 1);
 			/* A paste succeeds if CR0 EQ bit is set */
 			FAIL_IF(paste(buf) & 0x20000000);
 		}
 	} else {
-		for (int i = 0; i < NUM_LOOPS; i++) {
+		for (i = 0; i < NUM_LOOPS; i++) {
 			FAIL_IF((read(fd1[READ_FD], &c, 1)) != 1);
 			copy(buf);
 			FAIL_IF((write(fd2[WRITE_FD], &c, 1) != 1));
