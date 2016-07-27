@@ -44,6 +44,7 @@
 #include <linux/printk.h>
 #include <linux/slab.h>
 #include <linux/sunrpc/clnt.h>
+#include <linux/sunrpc/addr.h>
 #include <linux/nfs.h>
 #include <linux/nfs4.h>
 #include <linux/nfs_fs.h>
@@ -7050,10 +7051,16 @@ static int nfs4_sp4_select_mode(struct nfs_client *clp,
 
 	return 0;
 }
+struct nfs41_test_xprt_data {
+	struct rpc_xprt *xprt;
+	struct rpc_xprt_switch *xps;
+};
 
 struct nfs41_exchange_id_data {
 	struct nfs41_exchange_id_res res;
 	struct nfs41_exchange_id_args args;
+	struct nfs41_test_xprt_data xdata;
+	int session_trunk;
 	int rpc_status;
 };
 
@@ -7068,6 +7075,10 @@ static void nfs4_exchange_id_done(struct rpc_task *task, void *data)
 
 	if (status == 0)
 		status = nfs4_check_cl_exchange_flags(cdata->res.flags);
+
+	if (cdata->session_trunk)
+		goto session_trunk;
+
 	if (status  == 0)
 		status = nfs4_sp4_select_mode(clp, &cdata->res.state_protect);
 
@@ -7105,7 +7116,15 @@ static void nfs4_exchange_id_done(struct rpc_task *task, void *data)
 			cdata->res.server_scope = NULL;
 		}
 	}
+out:
 	cdata->rpc_status = status;
+	return;
+
+session_trunk:
+	if (status == 0)
+		status = nfs4_detect_session_trunking(clp, &cdata->res,
+						      cdata->xdata.xprt);
+	goto out;
 }
 
 static void nfs4_exchange_id_release(void *data)
@@ -7114,6 +7133,10 @@ static void nfs4_exchange_id_release(void *data)
 					(struct nfs41_exchange_id_data *)data;
 
 	nfs_put_client(cdata->args.client);
+	if (cdata->session_trunk) {
+		xprt_put(cdata->xdata.xprt);
+		xprt_switch_put(cdata->xdata.xps);
+	}
 	kfree(cdata->res.impl_id);
 	kfree(cdata->res.server_scope);
 	kfree(cdata->res.server_owner);
@@ -7131,7 +7154,7 @@ static const struct rpc_call_ops nfs4_exchange_id_call_ops = {
  * Wrapper for EXCHANGE_ID operation.
  */
 static int _nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred,
-	u32 sp4_how)
+			u32 sp4_how, struct nfs41_test_xprt_data *xdata)
 {
 	nfs4_verifier verifier;
 	struct rpc_message msg = {
@@ -7150,6 +7173,11 @@ static int _nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred,
 
 	if (!atomic_inc_not_zero(&clp->cl_count))
 		goto out;
+
+	/* Don't test session trunking against the established mount rpc_xprt */
+	if (xdata &&
+	    xdata->xprt == rcu_access_pointer(clp->cl_rpcclient->cl_xprt))
+		return 1;
 
 	status = -ENOMEM;
 	calldata = kzalloc(sizeof(*calldata), GFP_NOFS);
@@ -7196,7 +7224,14 @@ static int _nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred,
 		status = -EINVAL;
 		goto out_impl_id;
 	}
-
+	if (xdata) {
+		calldata->session_trunk = 1;
+		calldata->xdata.xprt = xdata->xprt;
+		calldata->xdata.xps = xdata->xps;
+		task_setup_data.rpc_xprt = xdata->xprt;
+		task_setup_data.flags =
+				RPC_TASK_SOFT|RPC_TASK_SOFTCONN|RPC_TASK_ASYNC;
+	}
 	calldata->args.verifier = &verifier;
 	calldata->args.client = clp;
 #ifdef CONFIG_NFS_V4_1_MIGRATION
@@ -7217,9 +7252,13 @@ static int _nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred,
 		goto out_impl_id;
 	}
 
-	status = rpc_wait_for_completion_task(task);
-	if (!status)
+	if (!xdata) {
+		status = rpc_wait_for_completion_task(task);
+		if (!status)
+			status = calldata->rpc_status;
+	} else	/* session trunking test */
 		status = calldata->rpc_status;
+
 	rpc_put_task(task);
 out:
 	if (clp->cl_implid != NULL)
@@ -7262,13 +7301,59 @@ int nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
 	/* try SP4_MACH_CRED if krb5i/p	*/
 	if (authflavor == RPC_AUTH_GSS_KRB5I ||
 	    authflavor == RPC_AUTH_GSS_KRB5P) {
-		status = _nfs4_proc_exchange_id(clp, cred, SP4_MACH_CRED);
+		status = _nfs4_proc_exchange_id(clp, cred, SP4_MACH_CRED, NULL);
 		if (!status)
 			return 0;
 	}
 
 	/* try SP4_NONE */
-	return _nfs4_proc_exchange_id(clp, cred, SP4_NONE);
+	return _nfs4_proc_exchange_id(clp, cred, SP4_NONE, NULL);
+}
+
+/**
+ * nfs4_test_session_trunk
+ * Test the connection with an rpc null ping.
+ * Test for session trunking with an asynchronous exchange_id call.
+ * Upon success, add a new transport
+ * to the rpc_clnt
+ *
+ * @clnt: struct rpc_clnt to get new transport
+ * @xps:  the rpc_xprt_switch to hold the new transport
+ * @xprt: the rpc_xprt to test
+ * @data: call data for _nfs4_proc_exchange_id.
+ */
+int nfs4_test_session_trunk(struct rpc_clnt *clnt, struct rpc_xprt_switch *xps,
+			    struct rpc_xprt *xprt, void *data)
+{
+	struct nfs4_add_xprt_data *adata = (struct nfs4_add_xprt_data *)data;
+	struct nfs41_test_xprt_data xdata = {
+		.xprt = xprt,
+		.xps = xps,
+	};
+	u32 sp4_how;
+	int status;
+
+	dprintk("--> %s try %s\n", __func__,
+		xprt->address_strings[RPC_DISPLAY_ADDR]);
+
+	xprt = xprt_get(xprt);
+	/* Test the connection */
+	status = rpc_clnt_test_xprt(clnt, xprt);
+	if (status < 0) {
+		dprintk(" %s rpc_clnt_test_xprt failed for %s\n", __func__,
+			xprt->address_strings[RPC_DISPLAY_ADDR]);
+		xprt_put(xprt);
+		goto out;
+	}
+	xps = xprt_switch_get(xps);
+
+	sp4_how = (adata->clp->cl_sp4_flags == 0 ? SP4_NONE : SP4_MACH_CRED);
+
+	/* Test connection for session trunking. Async exchange_id call */
+	status = _nfs4_proc_exchange_id(adata->clp, adata->cred, sp4_how,
+					&xdata);
+out:
+	return status;
 }
 
 static int _nfs4_proc_destroy_clientid(struct nfs_client *clp,
