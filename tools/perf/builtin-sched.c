@@ -70,7 +70,8 @@ struct sched_atom {
 	struct task_desc	*wakee;
 };
 
-#define TASK_STATE_TO_CHAR_STR "RSDTtZXxKWP"
+/* TASK_STATE_MAX means the task is preempted(R+). Use '+' for it here. */
+#define TASK_STATE_TO_CHAR_STR "RSDTtXZxKWPN+"
 
 enum thread_state {
 	THREAD_SLEEPING = 0,
@@ -897,9 +898,10 @@ static int thread_atoms_insert(struct perf_sched *sched, struct thread *thread)
 
 static char sched_out_state(u64 prev_state)
 {
-	const char *str = TASK_STATE_TO_CHAR_STR;
+	const char str[] = TASK_STATE_TO_CHAR_STR;
+	unsigned int bit = prev_state ? __ffs(prev_state) + 1 : 0;
 
-	return str[prev_state];
+	return bit < sizeof(str) - 1 ? str[bit] : '?';
 }
 
 static int
@@ -915,7 +917,7 @@ add_sched_out_event(struct work_atoms *atoms,
 
 	atom->sched_out_time = timestamp;
 
-	if (run_state == 'R') {
+	if (run_state == 'R' || run_state == '+') {
 		atom->state = THREAD_WAIT_CPU;
 		atom->wake_up_time = atom->sched_out_time;
 	}
