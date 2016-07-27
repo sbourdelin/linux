@@ -320,8 +320,8 @@ static int ipip6_tunnel_get_prl(struct ip_tunnel *t,
 		 */
 		kp = kcalloc(ca, sizeof(*kp), GFP_ATOMIC);
 		if (!kp) {
-			ret = -ENOMEM;
-			goto out;
+			rcu_read_unlock();
+			return -ENOMEM;
 		}
 	}
 
@@ -337,7 +337,7 @@ static int ipip6_tunnel_get_prl(struct ip_tunnel *t,
 		if (kprl.addr != htonl(INADDR_ANY))
 			break;
 	}
-out:
+
 	rcu_read_unlock();
 
 	len = sizeof(*kp) * c;
