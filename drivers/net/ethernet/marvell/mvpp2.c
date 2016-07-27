@@ -5531,6 +5531,7 @@ static int mvpp2_phy_connect(struct mvpp2_port *port)
 
 	phy_dev = of_phy_connect(port->dev, port->phy_node, mvpp2_link_event, 0,
 				 port->phy_interface);
+	of_node_put(port->phy_node);
 	if (!phy_dev) {
 		netdev_err(port->dev, "cannot connect to phy\n");
 		return -ENODEV;
@@ -6234,6 +6235,7 @@ err_free_stats:
 err_free_irq:
 	irq_dispose_mapping(port->irq);
 err_free_netdev:
+	of_node_put(phy_node);
 	free_netdev(dev);
 	return err;
 }
