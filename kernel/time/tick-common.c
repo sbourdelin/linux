@@ -307,6 +307,9 @@ void tick_check_new_device(struct clock_event_device *newdev)
 	td = &per_cpu(tick_cpu_device, cpu);
 	curdev = td->evtdev;
 
+	if (!try_module_get(newdev->owner))
+		return;
+
 	/* cpu local device ? */
 	if (!tick_check_percpu(curdev, newdev, cpu))
 		goto out_bc;
@@ -315,8 +318,6 @@ void tick_check_new_device(struct clock_event_device *newdev)
 	if (!tick_check_preferred(curdev, newdev))
 		goto out_bc;
 
-	if (!try_module_get(newdev->owner))
-		return;
 
 	/*
 	 * Replace the eventually existing device by the new
