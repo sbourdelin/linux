@@ -72,6 +72,12 @@ static inline bool oom_task_origin(const struct task_struct *p)
 
 extern void mark_oom_victim(struct task_struct *tsk);
 
+static inline bool tsk_is_oom_victim(struct task_struct * tsk)
+{
+	return tsk->signal->oom_mm;
+}
+
+
 #ifdef CONFIG_MMU
 extern void wake_oom_reaper(struct task_struct *tsk);
 #else
