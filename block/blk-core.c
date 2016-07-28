@@ -1850,25 +1850,23 @@ static inline bool should_fail_request(struct hd_struct *part,
  */
 static inline int bio_check_eod(struct bio *bio, unsigned int nr_sectors)
 {
-	sector_t maxsector;
+	sector_t maxsector, sector;
 
 	if (!nr_sectors)
 		return 0;
 
 	/* Test device or partition size, when known. */
 	maxsector = i_size_read(bio->bi_bdev->bd_inode) >> 9;
-	if (maxsector) {
-		sector_t sector = bio->bi_iter.bi_sector;
+	sector = bio->bi_iter.bi_sector;
 
-		if (maxsector < nr_sectors || maxsector - nr_sectors < sector) {
-			/*
-			 * This may well happen - the kernel calls bread()
-			 * without checking the size of the device, e.g., when
-			 * mounting a device.
-			 */
-			handle_bad_sector(bio);
-			return 1;
-		}
+	if (maxsector < nr_sectors || maxsector - nr_sectors < sector) {
+		/*
+		 * This may well happen - the kernel calls bread()
+		 * without checking the size of the device, e.g., when
+		 * mounting a device.
+		 */
+		handle_bad_sector(bio);
+		return 1;
 	}
 
 	return 0;
