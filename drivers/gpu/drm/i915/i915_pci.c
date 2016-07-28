@@ -199,6 +199,7 @@ static const struct intel_device_info intel_ironlake_m_info = {
 	.need_gfx_hws = 1, .has_hotplug = 1, \
 	.has_fbc = 1, \
 	.has_runtime_pm = 1, \
+	.has_core_ring_freq = 1, \
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING, \
 	.has_llc = 1, \
 	GEN_DEFAULT_PIPEOFFSETS, \
@@ -217,6 +218,7 @@ static const struct intel_device_info intel_sandybridge_m_info = {
 	.gen = 7, .num_pipes = 3, \
 	.need_gfx_hws = 1, .has_hotplug = 1, \
 	.has_fbc = 1, \
+	.has_core_ring_freq = 1, \
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING, \
 	.has_llc = 1, \
 	GEN_DEFAULT_PIPEOFFSETS, \
