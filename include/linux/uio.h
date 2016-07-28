@@ -9,6 +9,7 @@
 #ifndef __LINUX_UIO_H
 #define __LINUX_UIO_H
 
+#include <linux/sched.h>
 #include <linux/kernel.h>
 #include <uapi/linux/uio.h>
 
@@ -84,6 +85,15 @@ size_t copy_page_from_iter(struct page *page, size_t offset, size_t bytes,
 			 struct iov_iter *i);
 size_t copy_to_iter(const void *addr, size_t bytes, struct iov_iter *i);
 size_t copy_from_iter(void *addr, size_t bytes, struct iov_iter *i);
+
+static inline size_t copy_from_iter_mm(struct mm_struct *mm, void *addr,
+		size_t bytes, struct iov_iter *i)
+{
+	size_t ret = copy_from_iter(addr, bytes, i);
+	if (!IS_ERR_VALUE(ret) && test_bit(MMF_UNSTABLE, &mm->flags))
+		return -EFAULT;
+	return ret;
+}
 size_t copy_from_iter_nocache(void *addr, size_t bytes, struct iov_iter *i);
 size_t iov_iter_zero(size_t bytes, struct iov_iter *);
 unsigned long iov_iter_alignment(const struct iov_iter *i);

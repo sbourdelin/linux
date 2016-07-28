@@ -76,6 +76,28 @@ static inline unsigned long __copy_from_user_nocache(void *to,
 #endif		/* ARCH_HAS_NOCACHE_UACCESS */
 
 /*
+ * A safe variant of __get_user for for use_mm() users to have a
+ * gurantee that the address space wasn't reaped in the background
+ */
+#define __get_user_mm(mm, x, ptr)				\
+({								\
+	int ___gu_err = __get_user(x, ptr);			\
+	if (!___gu_err && test_bit(MMF_UNSTABLE, &mm->flags))	\
+		___gu_err = -EFAULT;				\
+	___gu_err;						\
+})
+
+/* similar to __get_user_mm */
+static inline __must_check long __copy_from_user_mm(struct mm_struct *mm,
+		void *to, const void __user * from, unsigned long n)
+{
+	long ret = __copy_from_user(to, from, n);
+	if ((ret >= 0) && test_bit(MMF_UNSTABLE, &mm->flags))
+		return -EFAULT;
+	return ret;
+}
+
+/*
  * probe_kernel_read(): safely attempt to read from a location
  * @dst: pointer to the buffer that shall take the data
  * @src: address to read from
