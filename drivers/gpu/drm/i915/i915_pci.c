@@ -201,6 +201,7 @@ static const struct intel_device_info intel_ironlake_m_info = {
 	.has_runtime_pm = 1, \
 	.has_core_ring_freq = 1, \
 	.has_rc6 = 1, \
+	.has_rc6p = 1, \
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING, \
 	.has_llc = 1, \
 	GEN_DEFAULT_PIPEOFFSETS, \
@@ -268,7 +269,8 @@ static const struct intel_device_info intel_valleyview_d_info = {
 	.has_fpga_dbg = 1, \
 	.has_psr = 1, \
 	.has_runtime_pm = 1, \
-	.has_resource_streamer = 1
+	.has_resource_streamer = 1, \
+	.has_rc6p = 0 /*RC6p excludes HSW*/
 
 static const struct intel_device_info intel_haswell_d_info = {
 	HSW_FEATURES,
