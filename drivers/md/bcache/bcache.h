@@ -295,6 +295,7 @@ struct cached_dev {
 	struct cache_sb		sb;
 	struct bio		sb_bio;
 	struct bio_vec		sb_bv[1];
+	void			*sb_disk_data;
 	struct closure		sb_write;
 	struct semaphore	sb_write_mutex;
 
@@ -382,6 +383,7 @@ struct cache {
 	struct cache_sb		sb;
 	struct bio		sb_bio;
 	struct bio_vec		sb_bv[1];
+	void			*sb_disk_data;
 
 	struct kobject		kobj;
 	struct block_device	*bdev;
