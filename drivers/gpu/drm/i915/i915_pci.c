@@ -281,7 +281,8 @@ static const struct intel_device_info intel_haswell_m_info = {
 
 #define BDW_FEATURES \
 	HSW_FEATURES, \
-	BDW_COLORS
+	BDW_COLORS, \
+	.has_logical_ring_contexts = 1
 
 static const struct intel_device_info intel_broadwell_d_info = {
 	BDW_FEATURES,
@@ -322,6 +323,7 @@ static const struct intel_device_info intel_cherryview_info = {
 	.has_gmbus_irq = 1,
 	.has_fw_blc = 1,
 	.has_hw_contexts = 1,
+	.has_logical_ring_contexts = 1,
 	.display_mmio_offset = VLV_DISPLAY_BASE,
 	GEN_CHV_PIPEOFFSETS,
 	CURSOR_OFFSETS,
@@ -361,6 +363,7 @@ static const struct intel_device_info intel_broxton_info = {
 	.has_aux_irq = 1,
 	.has_gmbus_irq = 1,
 	.has_hw_contexts = 1,
+	.has_logical_ring_contexts = 1,
 	GEN_DEFAULT_PIPEOFFSETS,
 	IVB_CURSOR_OFFSETS,
 	BDW_COLORS,
