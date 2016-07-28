@@ -2216,6 +2216,7 @@ static int btrfs_freeze(struct super_block *sb)
 	struct btrfs_trans_handle *trans;
 	struct btrfs_root *root = btrfs_sb(sb)->tree_root;
 
+	atomic_set(&root->fs_info->fs_frozen, 1);
 	trans = btrfs_attach_transaction_barrier(root);
 	if (IS_ERR(trans)) {
 		/* no transaction, don't bother */
@@ -2224,6 +2225,14 @@ static int btrfs_freeze(struct super_block *sb)
 		return PTR_ERR(trans);
 	}
 	return btrfs_commit_transaction(trans, root);
+}
+
+static int btrfs_unfreeze(struct super_block *sb)
+{
+	struct btrfs_root *root = btrfs_sb(sb)->tree_root;
+
+	atomic_set(&root->fs_info->fs_frozen, 0);
+	return 0;
 }
 
 static int btrfs_show_devname(struct seq_file *m, struct dentry *root)
@@ -2274,6 +2283,7 @@ static const struct super_operations btrfs_super_ops = {
 	.statfs		= btrfs_statfs,
 	.remount_fs	= btrfs_remount,
 	.freeze_fs	= btrfs_freeze,
+	.unfreeze_fs	= btrfs_unfreeze,
 };
 
 static const struct file_operations btrfs_ctl_fops = {
