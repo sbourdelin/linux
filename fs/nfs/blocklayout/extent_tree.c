@@ -518,7 +518,7 @@ static __be32 *encode_scsi_range(struct pnfs_block_extent *be, __be32 *p)
 }
 
 static int ext_tree_encode_commit(struct pnfs_block_layout *bl, __be32 *p,
-		size_t buffer_size, size_t *count)
+		size_t buffer_size, size_t *count, __u64 *lastbyte)
 {
 	struct pnfs_block_extent *be;
 	int ret = 0;
@@ -541,6 +541,8 @@ static int ext_tree_encode_commit(struct pnfs_block_layout *bl, __be32 *p,
 		else
 			p = encode_block_extent(be, p);
 		be->be_tag = EXTENT_COMMITTING;
+		if ((ext_f_end(be) << SECTOR_SHIFT) - 1 > *lastbyte)
+			*lastbyte = (ext_f_end(be) << SECTOR_SHIFT) - 1;
 	}
 	spin_unlock(&bl->bl_ext_lock);
 
@@ -564,7 +566,7 @@ ext_tree_prepare_commit(struct nfs4_layoutcommit_args *arg)
 	arg->layoutupdate_pages = &arg->layoutupdate_page;
 
 retry:
-	ret = ext_tree_encode_commit(bl, start_p + 1, buffer_size, &count);
+	ret = ext_tree_encode_commit(bl, start_p + 1, buffer_size, &count, &arg->lastbytewritten);
 	if (unlikely(ret)) {
 		ext_tree_free_commitdata(arg, buffer_size);
 
