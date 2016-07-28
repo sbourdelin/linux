@@ -1627,7 +1627,8 @@ static void intel_ddi_pre_enable(struct intel_encoder *intel_encoder)
 	if (type == INTEL_OUTPUT_DP || type == INTEL_OUTPUT_EDP) {
 		struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
 
-		intel_dp_set_link_params(intel_dp, crtc->config);
+		intel_dp_set_link_params(intel_dp, crtc->config->port_clock,
+					 crtc->config->lane_count);
 
 		intel_ddi_init_dp_buf_reg(intel_encoder);
 

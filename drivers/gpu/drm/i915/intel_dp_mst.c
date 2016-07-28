@@ -174,7 +174,9 @@ static void intel_mst_pre_enable_dp(struct intel_encoder *encoder)
 
 		intel_ddi_clk_select(&intel_dig_port->base, intel_crtc->config);
 
-		intel_dp_set_link_params(intel_dp, intel_crtc->config);
+		intel_dp_set_link_params(intel_dp,
+					 intel_crtc->config->port_clock,
+					 intel_crtc->config->lane_count);
 
 		intel_ddi_init_dp_buf_reg(&intel_dig_port->base);
 
