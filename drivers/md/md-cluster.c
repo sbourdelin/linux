@@ -1266,7 +1266,6 @@ static struct md_cluster_operations cluster_ops = {
 
 static int __init cluster_init(void)
 {
-	pr_warn("md-cluster: EXPERIMENTAL. Use with caution\n");
 	pr_info("Registering Cluster MD functions\n");
 	register_md_cluster_operations(&cluster_ops, THIS_MODULE);
 	return 0;
