@@ -346,63 +346,103 @@ ip_proto_again:
 		hdr = __skb_header_pointer(skb, nhoff, sizeof(_hdr), data, hlen, &_hdr);
 		if (!hdr)
 			goto out_bad;
-		/*
-		 * Only look inside GRE if version zero and no
-		 * routing
-		 */
-		if (hdr->flags & (GRE_VERSION | GRE_ROUTING))
-			break;
 
-		proto = hdr->proto;
-		nhoff += 4;
-		if (hdr->flags & GRE_CSUM)
-			nhoff += 4;
-		if (hdr->flags & GRE_KEY) {
-			const __be32 *keyid;
-			__be32 _keyid;
+		/* Only look inside GRE without routing */
+		if (!(hdr->flags & GRE_ROUTING)) {
+			proto = hdr->proto;
 
-			keyid = __skb_header_pointer(skb, nhoff, sizeof(_keyid),
-						     data, hlen, &_keyid);
+			if (hdr->flags & GRE_VERSION) {
+				/* It should be the PPTP in GRE */
+				u8 _ppp_hdr[PPP_HDRLEN];
+				u8 *ppp_hdr;
+				int offset = 0;
 
-			if (!keyid)
-				goto out_bad;
+				/* Check the flags according to RFC 2637*/
+				if (!(proto == GRE_PROTO_PPP && (hdr->flags & GRE_KEY) &&
+				      !(hdr->flags & (GRE_CSUM | GRE_STRICT | GRE_REC | GRE_FLAGS)))) {
+					break;
+				}
 
-			if (dissector_uses_key(flow_dissector,
-					       FLOW_DISSECTOR_KEY_GRE_KEYID)) {
-				key_keyid = skb_flow_dissector_target(flow_dissector,
-								      FLOW_DISSECTOR_KEY_GRE_KEYID,
-								      target_container);
-				key_keyid->keyid = *keyid;
+				/* Skip GRE header */
+				offset += 4;
+				/* Skip payload length and call id */
+				offset += 4;
+
+				if (hdr->flags & GRE_SEQ)
+					offset += 4;
+
+				if (hdr->flags & GRE_ACK)
+					offset += 4;
+
+				ppp_hdr = skb_header_pointer(skb, nhoff + offset, sizeof(_ppp_hdr), _ppp_hdr);
+				if (!ppp_hdr)
+					goto out_bad;
+				proto = PPP_PROTOCOL(ppp_hdr);
+				if (proto == PPP_IP) {
+					nhoff += (PPP_HDRLEN + offset);
+					proto = htons(ETH_P_IP);
+					key_control->flags |= FLOW_DIS_ENCAPSULATION;
+					goto again;
+				} else if (proto == PPP_IPV6) {
+					nhoff += (PPP_HDRLEN + offset);
+					proto = htons(ETH_P_IPV6);
+					key_control->flags |= FLOW_DIS_ENCAPSULATION;
+					goto again;
+				}
+			} else {
+				/* Original GRE */
+				nhoff += 4;
+				if (hdr->flags & GRE_CSUM)
+					nhoff += 4;
+				if (hdr->flags & GRE_KEY) {
+					const __be32 *keyid;
+					__be32 _keyid;
+
+					keyid = __skb_header_pointer(skb, nhoff, sizeof(_keyid),
+								     data, hlen, &_keyid);
+
+					if (!keyid)
+						goto out_bad;
+
+					if (dissector_uses_key(flow_dissector,
+							       FLOW_DISSECTOR_KEY_GRE_KEYID)) {
+						key_keyid = skb_flow_dissector_target(flow_dissector,
+										      FLOW_DISSECTOR_KEY_GRE_KEYID,
+										      target_container);
+						key_keyid->keyid = *keyid;
+					}
+					nhoff += 4;
+				}
+				if (hdr->flags & GRE_SEQ)
+					nhoff += 4;
+				if (proto == htons(ETH_P_TEB)) {
+					const struct ethhdr *eth;
+					struct ethhdr _eth;
+
+					eth = __skb_header_pointer(skb, nhoff,
+								   sizeof(_eth),
+								   data, hlen, &_eth);
+					if (!eth)
+						goto out_bad;
+					proto = eth->h_proto;
+					nhoff += sizeof(*eth);
+
+					/* Cap headers that we access via pointers at the
+					 * end of the Ethernet header as our maximum alignment
+					 * at that point is only 2 bytes.
+					 */
+					if (NET_IP_ALIGN)
+						hlen = nhoff;
+				}
+
+				key_control->flags |= FLOW_DIS_ENCAPSULATION;
+				if (flags & FLOW_DISSECTOR_F_STOP_AT_ENCAP)
+					goto out_good;
+
+				goto again;
 			}
-			nhoff += 4;
 		}
-		if (hdr->flags & GRE_SEQ)
-			nhoff += 4;
-		if (proto == htons(ETH_P_TEB)) {
-			const struct ethhdr *eth;
-			struct ethhdr _eth;
-
-			eth = __skb_header_pointer(skb, nhoff,
-						   sizeof(_eth),
-						   data, hlen, &_eth);
-			if (!eth)
-				goto out_bad;
-			proto = eth->h_proto;
-			nhoff += sizeof(*eth);
-
-			/* Cap headers that we access via pointers at the
-			 * end of the Ethernet header as our maximum alignment
-			 * at that point is only 2 bytes.
-			 */
-			if (NET_IP_ALIGN)
-				hlen = nhoff;
-		}
-
-		key_control->flags |= FLOW_DIS_ENCAPSULATION;
-		if (flags & FLOW_DISSECTOR_F_STOP_AT_ENCAP)
-			goto out_good;
-
-		goto again;
+		break;
 	}
 	case NEXTHDR_HOP:
 	case NEXTHDR_ROUTING:
