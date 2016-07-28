@@ -1287,7 +1287,7 @@ static irqreturn_t ixgbevf_msix_other(int irq, void *data)
 	struct ixgbevf_adapter *adapter = data;
 	struct ixgbe_hw *hw = &adapter->hw;
 
-	hw->mac.get_link_status = 1;
+	hw->mac.get_link_status = true;
 
 	ixgbevf_service_event_schedule(adapter);
 
@@ -2114,7 +2114,7 @@ static void ixgbevf_up_complete(struct ixgbevf_adapter *adapter)
 	ixgbevf_save_reset_stats(adapter);
 	ixgbevf_init_last_counter_stats(adapter);
 
-	hw->mac.get_link_status = 1;
+	hw->mac.get_link_status = true;
 	mod_timer(&adapter->service_timer, jiffies);
 }
 
