@@ -57,6 +57,7 @@
 #define GEN2_FEATURES \
 	.gen=2, .num_pipes = 2, \
 	.has_overlay = 1, .overlay_needs_physical = 1, \
+	.has_gmch_display = 1, \
 	.ring_mask = RENDER_RING, \
 	GEN_DEFAULT_PIPEOFFSETS, \
 	CURSOR_OFFSETS
@@ -86,6 +87,7 @@ static const struct intel_device_info intel_i865g_info = {
 #define GEN3_FEATURES \
 	.gen = 3, .num_pipes = 2, \
 	.has_fw_blc = 1, \
+	.has_gmch_display = 1, \
 	.ring_mask = RENDER_RING, \
 	GEN_DEFAULT_PIPEOFFSETS, \
 	CURSOR_OFFSETS
@@ -243,6 +245,7 @@ static const struct intel_device_info intel_ivybridge_q_info = {
 	.has_gmbus_irq = 1, \
 	.has_fw_blc = 1, \
 	.has_hw_contexts = 1, \
+	.has_fw_blc = 1, \
 	.need_gfx_hws = 1, .has_hotplug = 1, \
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING, \
 	.display_mmio_offset = VLV_DISPLAY_BASE, \
@@ -329,6 +332,7 @@ static const struct intel_device_info intel_cherryview_info = {
 	.has_fw_blc = 1,
 	.has_hw_contexts = 1,
 	.has_logical_ring_contexts = 1,
+	.has_gmch_display = 1,
 	.display_mmio_offset = VLV_DISPLAY_BASE,
 	GEN_CHV_PIPEOFFSETS,
 	CURSOR_OFFSETS,
