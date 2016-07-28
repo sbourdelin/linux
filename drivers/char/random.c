@@ -1840,6 +1840,32 @@ randomize_range(unsigned long start, unsigned long end, unsigned long len)
 	return PAGE_ALIGN(get_random_int() % range + start);
 }
 
+/**
+ * randomize_addr - Generate a random, page aligned address
+ * @start:	The smallest acceptable address the caller will take.
+ * @range:	The size of the area, starting at @start, within which the
+ *		random address must fall.
+ *
+ * Before page alignment, the random address generated can be any value from
+ * @start, to @start + @range - 1 inclusive.
+ *
+ * If @start + @range would overflow, @range is capped.
+ *
+ * Return: A page aligned address within [start, start + range).  On error,
+ * @start is returned.
+ */
+unsigned long
+randomize_addr(unsigned long start, unsigned long range)
+{
+	if (range == 0)
+		return start;
+
+	if (start > ULONG_MAX - range)
+		range = ULONG_MAX - start;
+
+	return PAGE_ALIGN(get_random_long() % range + start);
+}
+
 /* Interface for in-kernel drivers of true hardware RNGs.
  * Those devices may produce endless random bits and will be throttled
  * when our pool is full.
