@@ -561,12 +561,6 @@ struct intel_crtc_state {
 	/* Selected dpll when shared or NULL. */
 	struct intel_shared_dpll *shared_dpll;
 
-	/*
-	 * - PORT_CLK_SEL for DDI ports on HSW/BDW.
-	 * - enum skl_dpll on SKL
-	 */
-	uint32_t ddi_pll_sel;
-
 	/* Actual register state of the dpll, for shared dpll cross-checking. */
 	struct intel_dpll_hw_state dpll_hw_state;
 
@@ -1106,7 +1100,7 @@ void intel_crt_reset(struct drm_encoder *encoder);
 
 /* intel_ddi.c */
 void intel_ddi_clk_select(struct intel_encoder *encoder,
-			  const struct intel_crtc_state *pipe_config);
+			  struct intel_shared_dpll *pll);
 void intel_prepare_ddi_buffer(struct intel_encoder *encoder);
 void hsw_fdi_link_train(struct drm_crtc *crtc);
 void intel_ddi_init(struct drm_device *dev, enum port port);
