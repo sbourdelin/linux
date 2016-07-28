@@ -16,6 +16,12 @@
  *	mm context.
  *	(Note: this routine is intended to be called only
  *	from a kernel thread context)
+ *
+ *	Do not use copy_from_user/__get_user from this context
+ *	and use the safe copy_from_user_mm/__get_user_mm because
+ *	the address space might got reclaimed behind the back by
+ *	the oom_reaper so an unexpected zero page might be
+ *	encountered.
  */
 void use_mm(struct mm_struct *mm)
 {
