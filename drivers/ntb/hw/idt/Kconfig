@@ -1,0 +1,21 @@
+config NTB_IDT
+	tristate "IDT PCIe-switch Non-Transparent Bridge support"
+	depends on PCI
+	help
+	 This driver supports NTB of cappable IDT PCIe-switches.
+
+	 If unsure, say N.
+
+# BAR's early enable quirks
+config NTB_IDT_QUIRKS
+	bool "Enable PCI fixups built-in kernel for IDT PCIe-switch"
+	depends on NTB_IDT
+	default y if NTB_IDT=y
+	select PCI_QUIRKS # NTB_IDT depends on PCI so it's ok to force quirks
+	help
+	 There are some configurations of IDT PCIe-switch which must be made
+	 before the kernel PCI subsystem starts bus-devices scan and
+	 initialization. For instance, the corresponding NT-function BARs must
+	 be enabled. This option builds the fixups into the kernel to bypass
+	 the basic IDT quirks.
+
