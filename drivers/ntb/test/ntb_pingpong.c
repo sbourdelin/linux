@@ -214,6 +214,11 @@ static int pp_probe(struct ntb_client *client,
 	struct pp_ctx *pp;
 	int rc;
 
+	/* Synchronous hardware is only supported */
+	if (!ntb_valid_sync_dev_ops(ntb)) {
+		return -EINVAL;
+	}
+
 	if (ntb_db_is_unsafe(ntb)) {
 		dev_dbg(&ntb->dev, "doorbell is unsafe\n");
 		if (!unsafe) {

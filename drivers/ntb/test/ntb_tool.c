@@ -675,8 +675,11 @@ static int tool_setup_mw(struct tool_ctx *tc, int idx, size_t req_size)
 	if (mw->peer)
 		return 0;
 
-	rc = ntb_mw_get_range(tc->ntb, idx, &base, &size, &align,
-			      &align_size);
+	rc = ntb_mw_get_maprsc(tc->ntb, idx, &base, &size);
+	if (rc)
+		return rc;
+
+	rc = ntb_peer_mw_get_align(tc->ntb, idx, &align, &align_size, NULL);
 	if (rc)
 		return rc;
 
@@ -689,7 +692,7 @@ static int tool_setup_mw(struct tool_ctx *tc, int idx, size_t req_size)
 	if (!mw->peer)
 		return -ENOMEM;
 
-	rc = ntb_mw_set_trans(tc->ntb, idx, mw->peer_dma, mw->size);
+	rc = ntb_peer_mw_set_trans(tc->ntb, idx, mw->peer_dma, mw->size);
 	if (rc)
 		goto err_free_dma;
 
@@ -716,7 +719,7 @@ static void tool_free_mw(struct tool_ctx *tc, int idx)
 	struct tool_mw *mw = &tc->mws[idx];
 
 	if (mw->peer) {
-		ntb_mw_clear_trans(tc->ntb, idx);
+		ntb_peer_mw_set_trans(tc->ntb, idx, 0, 0);
 		dma_free_coherent(&tc->ntb->pdev->dev, mw->size,
 				  mw->peer,
 				  mw->peer_dma);
@@ -751,8 +754,8 @@ static ssize_t tool_peer_mw_trans_read(struct file *filep,
 	if (!buf)
 		return -ENOMEM;
 
-	ntb_mw_get_range(mw->tc->ntb, mw->idx,
-			 &base, &mw_size, &align, &align_size);
+	ntb_mw_get_maprsc(mw->tc->ntb, mw->idx, &base, &mw_size);
+	ntb_peer_mw_get_align(mw->tc->ntb, mw->idx, &align, &align_size, NULL);
 
 	off += scnprintf(buf + off, buf_size - off,
 			 "Peer MW %d Information:\n", mw->idx);
@@ -827,8 +830,7 @@ static int tool_init_mw(struct tool_ctx *tc, int idx)
 	phys_addr_t base;
 	int rc;
 
-	rc = ntb_mw_get_range(tc->ntb, idx, &base, &mw->win_size,
-			      NULL, NULL);
+	rc = ntb_mw_get_maprsc(tc->ntb, idx, &base, &mw->win_size);
 	if (rc)
 		return rc;
 
@@ -913,6 +915,11 @@ static int tool_probe(struct ntb_client *self, struct ntb_dev *ntb)
 	int rc;
 	int i;
 
+	/* Synchronous hardware is only supported */
+	if (!ntb_valid_sync_dev_ops(ntb)) {
+		return -EINVAL;
+	}
+
 	if (ntb_db_is_unsafe(ntb))
 		dev_dbg(&ntb->dev, "doorbell is unsafe\n");
 
@@ -928,7 +935,7 @@ static int tool_probe(struct ntb_client *self, struct ntb_dev *ntb)
 	tc->ntb = ntb;
 	init_waitqueue_head(&tc->link_wq);
 
-	tc->mw_count = min(ntb_mw_count(tc->ntb), MAX_MWS);
+	tc->mw_count = min(ntb_peer_mw_count(tc->ntb), MAX_MWS);
 	for (i = 0; i < tc->mw_count; i++) {
 		rc = tool_init_mw(tc, i);
 		if (rc)

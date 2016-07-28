@@ -55,6 +55,7 @@
 #include <linux/pci.h>
 #include <linux/random.h>
 #include <linux/slab.h>
+#include <linux/sizes.h>
 #include <linux/ntb.h>
 
 #include "ntb_hw_amd.h"
@@ -84,11 +85,8 @@ static int amd_ntb_mw_count(struct ntb_dev *ntb)
 	return ntb_ndev(ntb)->mw_count;
 }
 
-static int amd_ntb_mw_get_range(struct ntb_dev *ntb, int idx,
-				phys_addr_t *base,
-				resource_size_t *size,
-				resource_size_t *align,
-				resource_size_t *align_size)
+static int amd_ntb_mw_get_maprsc(struct ntb_dev *ntb, int idx,
+				 phys_addr_t *base, resource_size_t *size)
 {
 	struct amd_ntb_dev *ndev = ntb_ndev(ntb);
 	int bar;
@@ -103,17 +101,40 @@ static int amd_ntb_mw_get_range(struct ntb_dev *ntb, int idx,
 	if (size)
 		*size = pci_resource_len(ndev->ntb.pdev, bar);
 
-	if (align)
-		*align = SZ_4K;
+	return 0;
+}
 
-	if (align_size)
-		*align_size = 1;
+static int amd_ntb_peer_mw_count(struct ntb_dev *ntb)
+{
+	return ntb_ndev(ntb)->mw_count;
+}
+
+static int amd_ntb_peer_mw_get_align(struct ntb_dev *ntb, int idx,
+				     resource_size_t *addr_align,
+				     resource_size_t *size_align,
+				     resource_size_t *size_max)
+{
+	struct amd_ntb_dev *ndev = ntb_ndev(ntb);
+	int bar;
+
+	bar = ndev_mw_to_bar(ndev, idx);
+	if (bar < 0)
+		return bar;
+
+	if (addr_align)
+		*addr_align = SZ_4K;
+
+	if (size_align)
+		*size_align = 1;
+
+	if (size_max)
+		*size_max = pci_resource_len(ndev->ntb.pdev, bar);
 
 	return 0;
 }
 
-static int amd_ntb_mw_set_trans(struct ntb_dev *ntb, int idx,
-				dma_addr_t addr, resource_size_t size)
+static int amd_ntb_peer_mw_set_trans(struct ntb_dev *ntb, int idx,
+				     dma_addr_t addr, resource_size_t size)
 {
 	struct amd_ntb_dev *ndev = ntb_ndev(ntb);
 	unsigned long xlat_reg, limit_reg = 0;
@@ -432,8 +453,10 @@ static int amd_ntb_peer_spad_write(struct ntb_dev *ntb,
 
 static const struct ntb_dev_ops amd_ntb_ops = {
 	.mw_count		= amd_ntb_mw_count,
-	.mw_get_range		= amd_ntb_mw_get_range,
-	.mw_set_trans		= amd_ntb_mw_set_trans,
+	.mw_get_maprsc		= amd_ntb_mw_get_maprsc,
+	.peer_mw_count		= amd_ntb_peer_mw_count,
+	.peer_mw_get_align	= amd_ntb_peer_mw_get_align,
+	.peer_mw_set_trans	= amd_ntb_peer_mw_set_trans,
 	.link_is_up		= amd_ntb_link_is_up,
 	.link_enable		= amd_ntb_link_enable,
 	.link_disable		= amd_ntb_link_disable,
