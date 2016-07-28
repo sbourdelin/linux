@@ -1,5 +1,4 @@
 
-
 	List of maintainers and how to submit kernel changes
 
 Please try to follow the guidelines below.  This will make things
@@ -7456,10 +7455,11 @@ L:	linux-kernel@vger.kernel.org
 S:	Supported
 F:	kernel/membarrier.c
 F:	include/uapi/linux/membarrier.h
-
+T:	git git://git.cmpxchg.org/linux-mmotm.git
 MEMORY MANAGEMENT
 L:	linux-mm@kvack.org
 W:	http://www.linux-mm.org
+
 S:	Maintained
 F:	include/linux/mm.h
 F:	include/linux/gfp.h
