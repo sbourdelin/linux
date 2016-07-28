@@ -1,4 +1,7 @@
 
+# We are fully aware of the dangers of __builtin_return_address() > 0
+KBUILD_CFLAGS += $(call cc-disable-warning,frame-address,)
+
 # Do not instrument the tracer itself:
 
 ifdef CONFIG_FUNCTION_TRACER
