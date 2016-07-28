@@ -577,7 +577,8 @@ void mlx5_pagealloc_cleanup(struct mlx5_core_dev *dev)
 
 int mlx5_pagealloc_start(struct mlx5_core_dev *dev)
 {
-	dev->priv.pg_wq = create_singlethread_workqueue("mlx5_page_allocator");
+	dev->priv.pg_wq = alloc_workqueue("mlx5_page_allocator",
+					  WQ_MEM_RECLAIM, 0);
 	if (!dev->priv.pg_wq)
 		return -ENOMEM;
 
