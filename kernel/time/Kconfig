@@ -193,5 +193,13 @@ config HIGH_RES_TIMERS
 	  hardware is not capable then this option only increases
 	  the size of the kernel image.
 
+config BOOT_TIME_PRESERVE
+	bool "Preserve Boot Time Support"
+	help
+	  This option enables Boot Time Preservation between Bootloader and
+	  Linux Kernel. It is based on the idea that the Bootloader (or any 
+	  other early firmware) will start the HW Timer and Linux Kernel will 
+	  count the time starting with the cycles elapsed since timer start.
+
 endmenu
 endif
