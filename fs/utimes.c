@@ -53,6 +53,7 @@ static int utimes_common(struct path *path, struct timespec *times)
 	int error;
 	struct iattr newattrs;
 	struct inode *inode = path->dentry->d_inode;
+	struct inode *real_inode = d_real(path->dentry)->d_inode;
 	struct inode *delegated_inode = NULL;
 
 	error = mnt_want_write(path->mnt);
@@ -93,7 +94,7 @@ static int utimes_common(struct path *path, struct timespec *times)
 		 * inode_change_ok() won't do it.
 		 */
 		error = -EACCES;
-                if (IS_IMMUTABLE(inode))
+                if (IS_IMMUTABLE(real_inode))
 			goto mnt_drop_write_and_out;
 
 		if (!inode_owner_or_capable(inode)) {
