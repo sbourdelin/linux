@@ -171,8 +171,6 @@ void zpci_debug_init_device(struct zpci_dev *zdev, const char *name)
 				S_IFREG | S_IRUGO | S_IWUSR,
 				zdev->debugfs_dev, zdev,
 				&debugfs_pci_perf_fops);
-	if (IS_ERR(zdev->debugfs_perf))
-		zdev->debugfs_perf = NULL;
 }
 
 void zpci_debug_exit_device(struct zpci_dev *zdev)
