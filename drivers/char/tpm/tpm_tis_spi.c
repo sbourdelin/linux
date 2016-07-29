@@ -48,8 +48,8 @@ struct tpm_tis_spi_phy {
 	struct tpm_tis_data priv;
 	struct spi_device *spi_device;
 
-	u8 tx_buf[MAX_SPI_FRAMESIZE + 4];
-	u8 rx_buf[MAX_SPI_FRAMESIZE + 4];
+	u8 tx_buf[MAX_SPI_FRAMESIZE + 4] ____cacheline_aligned;
+	u8 rx_buf[MAX_SPI_FRAMESIZE + 4] ____cacheline_aligned;
 };
 
 static inline struct tpm_tis_spi_phy *to_tpm_tis_spi_phy(struct tpm_tis_data *data)

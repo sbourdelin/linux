@@ -70,8 +70,8 @@
 struct st33zp24_spi_phy {
 	struct spi_device *spi_device;
 
-	u8 tx_buf[ST33ZP24_SPI_BUFFER_SIZE];
-	u8 rx_buf[ST33ZP24_SPI_BUFFER_SIZE];
+	u8 tx_buf[ST33ZP24_SPI_BUFFER_SIZE] ____cacheline_aligned;
+	u8 rx_buf[ST33ZP24_SPI_BUFFER_SIZE] ____cacheline_aligned;
 
 	int io_lpcpd;
 	int latency;
