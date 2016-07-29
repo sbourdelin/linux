@@ -102,6 +102,7 @@ static int __rvin_try_format_source(struct rvin_dev *vin,
 	struct v4l2_subdev_format format = {
 		.which = which,
 	};
+	enum v4l2_field field;
 	int ret;
 
 	sd = vin_to_source(vin);
@@ -114,12 +115,16 @@ static int __rvin_try_format_source(struct rvin_dev *vin,
 
 	format.pad = vin->src_pad_idx;
 
+	field = pix->field;
+
 	ret = v4l2_device_call_until_err(sd->v4l2_dev, 0, pad, set_fmt,
 					 pad_cfg, &format);
 	if (ret < 0)
 		goto cleanup;
 
 	v4l2_fill_pix_format(pix, &format.format);
+
+	pix->field = field;
 
 	source->width = pix->width;
 	source->height = pix->height;
