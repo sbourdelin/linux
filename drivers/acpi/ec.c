@@ -1676,8 +1676,10 @@ int __init acpi_ec_init(void)
 
 	/* Now register the driver for the EC */
 	result = acpi_bus_register_driver(&acpi_ec_driver);
-	if (result < 0)
+	if (result < 0) {
+		destroy_workqueue(ec_query_wq);
 		return -ENODEV;
+	}
 
 	return result;
 }
