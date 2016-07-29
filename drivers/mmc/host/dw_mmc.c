@@ -22,6 +22,8 @@
 #include <linux/ioport.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/pm_runtime.h>
+#include <linux/pm_opp.h>
 #include <linux/seq_file.h>
 #include <linux/slab.h>
 #include <linux/stat.h>
@@ -3024,6 +3026,9 @@ int dw_mci_probe(struct dw_mci *host)
 		host->bus_hz = clk_get_rate(host->ciu_clk);
 	}
 
+	pm_runtime_enable(host->dev);
+	pm_runtime_get_sync(host->dev);
+
 	if (!host->bus_hz) {
 		dev_err(host->dev,
 			"Platform data must supply bus speed\n");
@@ -3197,6 +3202,9 @@ err_clk_biu:
 	if (!IS_ERR(host->biu_clk))
 		clk_disable_unprepare(host->biu_clk);
 
+	pm_runtime_put(host->dev);
+	pm_runtime_disable(host->dev);
+
 	return ret;
 }
 EXPORT_SYMBOL(dw_mci_probe);
@@ -3226,6 +3234,9 @@ void dw_mci_remove(struct dw_mci *host)
 
 	if (!IS_ERR(host->biu_clk))
 		clk_disable_unprepare(host->biu_clk);
+
+	pm_runtime_put(host->dev);
+	pm_runtime_disable(host->dev);
 }
 EXPORT_SYMBOL(dw_mci_remove);
 
