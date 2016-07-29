@@ -35,6 +35,7 @@
 #include <linux/fscrypto.h>
 #include <linux/falloc.h>
 #include <linux/percpu-rwsem.h>
+#include <linux/random.h>
 #ifdef __KERNEL__
 #include <linux/compat.h>
 #endif
@@ -1490,6 +1491,9 @@ struct ext4_sb_info {
 
 	/* Precomputed FS UUID checksum for seeding other checksums */
 	__u32 s_csum_seed;
+
+	/* RND state for the file system */
+	struct rnd_state s_rnd_state;
 
 	/* Reclaim extents from extent status tree */
 	struct shrinker s_es_shrinker;

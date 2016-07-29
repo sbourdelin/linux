@@ -2969,7 +2969,7 @@ static struct ext4_li_request *ext4_li_request_new(struct super_block *sb,
 	 * spread the inode table initialization requests
 	 * better.
 	 */
-	elr->lr_next_sched = jiffies + (prandom_u32() %
+	elr->lr_next_sched = jiffies + (prandom_u32_state(&sbi->s_rnd_state) %
 				(EXT4_DEF_LI_MAX_START_DELAY * HZ));
 	return elr;
 }
@@ -3274,6 +3274,7 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	if (sb->s_bdev->bd_part)
 		sbi->s_sectors_written_start =
 			part_stat_read(sb->s_bdev->bd_part, sectors[1]);
+	_prandom_seed(&sbi->s_rnd_state, 0, true);
 
 	/* Cleanup superblock name */
 	strreplace(sb->s_id, '/', '!');

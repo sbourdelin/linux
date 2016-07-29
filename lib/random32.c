@@ -157,8 +157,7 @@ static u32 __extract_hwseed(void)
 	return val;
 }
 
-static void prandom_seed_early(struct rnd_state *state, u32 seed,
-			       bool mix_with_hwseed)
+void _prandom_seed(struct rnd_state *state, u32 seed, bool mix_with_hwseed)
 {
 #define LCG(x)	 ((x) * 69069U)	/* super-duper LCG */
 #define HWSEED() (mix_with_hwseed ? __extract_hwseed() : 0)
@@ -167,6 +166,7 @@ static void prandom_seed_early(struct rnd_state *state, u32 seed,
 	state->s3 = __seed(HWSEED() ^ LCG(state->s2),  16U);
 	state->s4 = __seed(HWSEED() ^ LCG(state->s3), 128U);
 }
+EXPORT_SYMBOL(_prandom_seed);
 
 /**
  *	prandom_seed - add entropy to pseudo random number generator
@@ -204,7 +204,7 @@ static int __init prandom_init(void)
 		struct rnd_state *state = &per_cpu(net_rand_state, i);
 		u32 weak_seed = (i + jiffies) ^ random_get_entropy();
 
-		prandom_seed_early(state, weak_seed, true);
+		_prandom_seed(state, weak_seed, true);
 		prandom_warmup(state);
 	}
 
@@ -429,7 +429,7 @@ static void __init prandom_state_selftest(void)
 	for (i = 0; i < ARRAY_SIZE(test1); i++) {
 		struct rnd_state state;
 
-		prandom_seed_early(&state, test1[i].seed, false);
+		_prandom_seed(&state, test1[i].seed, false);
 		prandom_warmup(&state);
 
 		if (test1[i].result != prandom_u32_state(&state))
@@ -444,7 +444,7 @@ static void __init prandom_state_selftest(void)
 	for (i = 0; i < ARRAY_SIZE(test2); i++) {
 		struct rnd_state state;
 
-		prandom_seed_early(&state, test2[i].seed, false);
+		_prandom_seed(&state, test2[i].seed, false);
 		prandom_warmup(&state);
 
 		for (j = 0; j < test2[i].iteration - 1; j++)

@@ -258,12 +258,12 @@ exit_thread:
  * Get a random new sequence number but make sure it is not greater than
  * EXT4_MMP_SEQ_MAX.
  */
-static unsigned int mmp_new_seq(void)
+static unsigned int mmp_new_seq(struct ext4_sb_info *sbi)
 {
 	u32 new_seq;
 
 	do {
-		new_seq = prandom_u32();
+		new_seq = prandom_u32_state(&sbi->s_rnd_state);
 	} while (new_seq > EXT4_MMP_SEQ_MAX);
 
 	return new_seq;
@@ -342,7 +342,7 @@ skip:
 	/*
 	 * write a new random sequence number.
 	 */
-	seq = mmp_new_seq();
+	seq = mmp_new_seq(EXT4_SB(sb));
 	mmp->mmp_seq = cpu_to_le32(seq);
 
 	retval = write_mmp_block(sb, bh);

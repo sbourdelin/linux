@@ -26,6 +26,7 @@ typedef enum {
 	attr_feature,
 	attr_pointer_ui,
 	attr_pointer_atomic,
+	attr_prandom_seed,
 } attr_id_t;
 
 typedef enum {
@@ -87,6 +88,21 @@ static ssize_t inode_readahead_blks_store(struct ext4_attr *a,
 		return -EINVAL;
 
 	sbi->s_inode_readahead_blks = t;
+	return count;
+}
+
+static ssize_t prandom_seed_store(struct ext4_attr *a,
+				  struct ext4_sb_info *sbi,
+				  const char *buf, size_t count)
+{
+	unsigned long t;
+	int ret;
+
+	ret = kstrtoul(skip_spaces(buf), 0, &t);
+	if (ret)
+		return ret;
+
+	_prandom_seed(&sbi->s_rnd_state, t, false);
 	return count;
 }
 
@@ -178,6 +194,7 @@ EXT4_RW_ATTR_SBI_UI(mb_stream_req, s_mb_stream_request);
 EXT4_RW_ATTR_SBI_UI(mb_group_prealloc, s_mb_group_prealloc);
 EXT4_RW_ATTR_SBI_UI(extent_max_zeroout_kb, s_extent_max_zeroout_kb);
 EXT4_ATTR(trigger_fs_error, 0200, trigger_test_error);
+EXT4_ATTR(prandom_seed, 0200, prandom_seed);
 EXT4_RW_ATTR_SBI_UI(err_ratelimit_interval_ms, s_err_ratelimit_state.interval);
 EXT4_RW_ATTR_SBI_UI(err_ratelimit_burst, s_err_ratelimit_state.burst);
 EXT4_RW_ATTR_SBI_UI(warning_ratelimit_interval_ms, s_warning_ratelimit_state.interval);
@@ -216,6 +233,7 @@ static struct attribute *ext4_attrs[] = {
 	ATTR_LIST(errors_count),
 	ATTR_LIST(first_error_time),
 	ATTR_LIST(last_error_time),
+	ATTR_LIST(prandom_seed),
 	NULL,
 };
 
@@ -313,6 +331,8 @@ static ssize_t ext4_attr_store(struct kobject *kobj,
 		return inode_readahead_blks_store(a, sbi, buf, len);
 	case attr_trigger_test_error:
 		return trigger_test_error(a, sbi, buf, len);
+	case attr_prandom_seed:
+		return prandom_seed_store(a, sbi, buf, len);
 	}
 	return 0;
 }

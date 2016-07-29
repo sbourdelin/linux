@@ -485,8 +485,10 @@ static int find_group_orlov(struct super_block *sb, struct inode *parent,
 			hinfo.seed = sbi->s_hash_seed;
 			ext4fs_dirhash(qstr->name, qstr->len, &hinfo);
 			grp = hinfo.hash;
-		} else
-			grp = prandom_u32();
+		} else {
+			grp = prandom_u32_state(&sbi->s_rnd_state);
+			pr_err("ext4 random: %lu\n", grp);
+		}
 		parent_group = (unsigned)grp % ngroups;
 		for (i = 0; i < ngroups; i++) {
 			g = (parent_group + i) % ngroups;
