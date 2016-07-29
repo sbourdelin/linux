@@ -168,6 +168,10 @@ FULL_PROXY_FUNC(write, ssize_t, filp,
 			loff_t *ppos),
 		ARGS(filp, buf, size, ppos));
 
+FULL_PROXY_FUNC(mmap, int, filp,
+		PROTO(struct file *filp, struct vm_area_struct *vma),
+		ARGS(filp, vma));
+
 FULL_PROXY_FUNC(unlocked_ioctl, long, filp,
 		PROTO(struct file *filp, unsigned int cmd, unsigned long arg),
 		ARGS(filp, cmd, arg));
@@ -224,6 +228,8 @@ static void __full_proxy_fops_init(struct file_operations *proxy_fops,
 		proxy_fops->write = full_proxy_write;
 	if (real_fops->poll)
 		proxy_fops->poll = full_proxy_poll;
+	if (real_fops->mmap)
+		proxy_fops->mmap = full_proxy_mmap;
 	if (real_fops->unlocked_ioctl)
 		proxy_fops->unlocked_ioctl = full_proxy_unlocked_ioctl;
 }
