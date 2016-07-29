@@ -818,7 +818,7 @@ int balance_internal(struct tree_balance *tb,
 	int order;
 	int insert_num, n, k;
 	struct buffer_head *S_new;
-	struct item_head new_insert_key;
+	struct item_head uninitialized_var(new_insert_key);
 	struct buffer_head *new_insert_ptr = NULL;
 	struct item_head *new_insert_key_addr = insert_key;
 
