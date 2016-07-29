@@ -319,7 +319,8 @@ static int map_lookup_elem(union bpf_attr *attr)
 		goto free_value;
 
 	err = -EFAULT;
-	if (copy_to_user(uvalue, value, value_size) != 0)
+	if (copy_to_user(uvalue, value,
+		map->value_size * num_online_cpus()) != 0)
 		goto free_value;
 
 	err = 0;
