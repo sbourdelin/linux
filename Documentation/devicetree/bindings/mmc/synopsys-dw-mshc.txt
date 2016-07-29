@@ -81,6 +81,8 @@ Optional properties:
 * dma-names: request names for generic DMA client binding. Must be "rx-tx".
   Refer to dma.txt for details.
 
+* power-domains: Must contain a reference to the PM domain, if available.
+
 Aliases:
 
 - All the MSHC controller nodes should be represented in the aliases node using
