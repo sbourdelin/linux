@@ -100,6 +100,7 @@ struct fsg_lun_config {
 	char removable;
 	char cdrom;
 	char nofua;
+	char inquiry_string[8 + 16 + 4 + 1];
 };
 
 struct fsg_config {
