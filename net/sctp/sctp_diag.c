@@ -40,10 +40,12 @@ static void inet_diag_msg_sctpasoc_fill(struct inet_diag_msg *r,
 	}
 
 	r->idiag_state = asoc->state;
-	r->idiag_timer = SCTP_EVENT_TIMEOUT_T3_RTX;
-	r->idiag_retrans = asoc->rtx_data_chunks;
-	r->idiag_expires = jiffies_to_msecs(
-		asoc->timeouts[SCTP_EVENT_TIMEOUT_T3_RTX] - jiffies);
+	if (asoc->timeouts[SCTP_EVENT_TIMEOUT_T3_RTX] > jiffies) {
+		r->idiag_timer = SCTP_EVENT_TIMEOUT_T3_RTX;
+		r->idiag_retrans = asoc->rtx_data_chunks;
+		r->idiag_expires = jiffies_to_msecs(
+			asoc->timeouts[SCTP_EVENT_TIMEOUT_T3_RTX] - jiffies);
+	}
 }
 
 static int inet_diag_msg_sctpladdrs_fill(struct sk_buff *skb,
