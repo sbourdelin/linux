@@ -2143,15 +2143,8 @@ static int i915_dump_lrc(struct seq_file *m, void *unused)
 		return ret;
 
 	list_for_each_entry(ctx, &dev_priv->context_list, link)
-<<<<<<< HEAD
-		if (ctx != dev_priv->kernel_context) {
-			for_each_engine(engine, dev_priv)
-				i915_dump_lrc_obj(m, ctx, engine);
-		}
-=======
 		for_each_engine(engine, dev_priv)
 			i915_dump_lrc_obj(m, ctx, engine);
->>>>>>> linux-next/akpm-base
 
 	mutex_unlock(&dev->struct_mutex);
 
