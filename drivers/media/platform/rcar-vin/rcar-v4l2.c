@@ -109,6 +109,7 @@ static int rvin_reset_format(struct rvin_dev *vin)
 		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
 	};
 	struct v4l2_mbus_framefmt *mf = &fmt.format;
+	v4l2_std_id std;
 	int ret;
 
 	fmt.pad = vin->src_pad_idx;
@@ -122,9 +123,19 @@ static int rvin_reset_format(struct rvin_dev *vin)
 	vin->format.colorspace	= mf->colorspace;
 	vin->format.field	= mf->field;
 
+	/* If we have a video standard use HW to deinterlace */
+	if (vin->format.field == V4L2_FIELD_ALTERNATE &&
+	    !v4l2_subdev_call(vin_to_source(vin), video, g_std, &std)) {
+		if (std & V4L2_STD_625_50)
+			vin->format.field = V4L2_FIELD_INTERLACED_TB;
+		else
+			vin->format.field = V4L2_FIELD_INTERLACED_BT;
+	}
+
 	switch (vin->format.field) {
 	case V4L2_FIELD_TOP:
 	case V4L2_FIELD_BOTTOM:
+	case V4L2_FIELD_ALTERNATE:
 		vin->format.height /= 2;
 		break;
 	case V4L2_FIELD_NONE:
@@ -222,6 +233,7 @@ static int __rvin_try_format(struct rvin_dev *vin,
 	switch (pix->field) {
 	case V4L2_FIELD_TOP:
 	case V4L2_FIELD_BOTTOM:
+	case V4L2_FIELD_ALTERNATE:
 		pix->height /= 2;
 		source->height /= 2;
 		break;
