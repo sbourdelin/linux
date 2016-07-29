@@ -36,7 +36,7 @@
 #include <linux/console.h>
 #include <linux/root_dev.h>
 #include <linux/highmem.h>
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/efi.h>
 #include <linux/init.h>
 #include <linux/edd.h>
@@ -210,9 +210,9 @@ EXPORT_SYMBOL(boot_cpu_data);
 
 
 #if !defined(CONFIG_X86_PAE) || defined(CONFIG_X86_64)
-__visible unsigned long mmu_cr4_features;
+__visible unsigned long mmu_cr4_features __ro_after_init;
 #else
-__visible unsigned long mmu_cr4_features = X86_CR4_PAE;
+__visible unsigned long mmu_cr4_features __ro_after_init = X86_CR4_PAE;
 #endif
 
 /* Boot loader ID and version as integers, for the benefit of proc_dointvec */

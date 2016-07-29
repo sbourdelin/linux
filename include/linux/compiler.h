@@ -17,7 +17,6 @@
 # define __release(x)	__context__(x,-1)
 # define __cond_lock(x,c)	((c) ? ({ __acquire(x); 1; }) : 0)
 # define __percpu	__attribute__((noderef, address_space(3)))
-# define __pmem		__attribute__((noderef, address_space(5)))
 #ifdef CONFIG_SPARSE_RCU_POINTER
 # define __rcu		__attribute__((noderef, address_space(4)))
 #else /* CONFIG_SPARSE_RCU_POINTER */
@@ -45,7 +44,6 @@ extern void __chk_io_ptr(const volatile void __iomem *);
 # define __cond_lock(x,c) (c)
 # define __percpu
 # define __rcu
-# define __pmem
 # define __private
 # define ACCESS_PRIVATE(p, member) ((p)->member)
 #endif /* __CHECKER__ */
@@ -406,6 +404,10 @@ static __always_inline void __write_once_size(volatile void *p, void *res, int s
  */
 #ifndef __attribute_const__
 # define __attribute_const__	/* unimplemented */
+#endif
+
+#ifndef __latent_entropy
+# define __latent_entropy
 #endif
 
 /*

@@ -33,7 +33,6 @@
 #include <linux/uaccess.h>
 #include <linux/perf_event.h>
 #include <linux/pm_runtime.h>
-#include <linux/perf_event.h>
 #include <asm/sections.h>
 #include <asm/local.h>
 
@@ -47,6 +46,8 @@ module_param_named(boot_enable, boot_enable, int, S_IRUGO);
 static int etm4_count;
 static struct etmv4_drvdata *etmdrvdata[NR_CPUS];
 static void etm4_set_default(struct etmv4_config *config);
+
+static enum cpuhp_state hp_online;
 
 static void etm4_os_unlock(struct etmv4_drvdata *drvdata)
 {
@@ -77,22 +78,8 @@ static int etm4_cpu_id(struct coresight_device *csdev)
 static int etm4_trace_id(struct coresight_device *csdev)
 {
 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-	unsigned long flags;
-	int trace_id = -1;
 
-	if (!local_read(&drvdata->mode))
-		return drvdata->trcid;
-
-	spin_lock_irqsave(&drvdata->spinlock, flags);
-
-	CS_UNLOCK(drvdata->base);
-	trace_id = readl_relaxed(drvdata->base + TRCTRACEIDR);
-	trace_id &= ETM_TRACEID_MASK;
-	CS_LOCK(drvdata->base);
-
-	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-
-	return trace_id;
+	return drvdata->trcid;
 }
 
 static void etm4_enable_hw(void *info)
@@ -111,8 +98,7 @@ static void etm4_enable_hw(void *info)
 	/* wait for TRCSTATR.IDLE to go up */
 	if (coresight_timeout(drvdata->base, TRCSTATR, TRCSTATR_IDLE_BIT, 1))
 		dev_err(drvdata->dev,
-			"timeout observed when probing at offset %#x\n",
-			TRCSTATR);
+			"timeout while waiting for Idle Trace Status\n");
 
 	writel_relaxed(config->pe_sel, drvdata->base + TRCPROCSELR);
 	writel_relaxed(config->cfg, drvdata->base + TRCCONFIGR);
@@ -184,8 +170,7 @@ static void etm4_enable_hw(void *info)
 	/* wait for TRCSTATR.IDLE to go back down to '0' */
 	if (coresight_timeout(drvdata->base, TRCSTATR, TRCSTATR_IDLE_BIT, 0))
 		dev_err(drvdata->dev,
-			"timeout observed when probing at offset %#x\n",
-			TRCSTATR);
+			"timeout while waiting for Idle Trace Status\n");
 
 	CS_LOCK(drvdata->base);
 
@@ -673,47 +658,44 @@ void etm4_config_trace_mode(struct etmv4_config *config)
 	config->addr_acc[ETM_DEFAULT_ADDR_COMP + 1] = addr_acc;
 }
 
-static int etm4_cpu_callback(struct notifier_block *nfb, unsigned long action,
-			    void *hcpu)
+static int etm4_online_cpu(unsigned int cpu)
 {
-	unsigned int cpu = (unsigned long)hcpu;
-
 	if (!etmdrvdata[cpu])
-		goto out;
+		return 0;
 
-	switch (action & (~CPU_TASKS_FROZEN)) {
-	case CPU_STARTING:
-		spin_lock(&etmdrvdata[cpu]->spinlock);
-		if (!etmdrvdata[cpu]->os_unlock) {
-			etm4_os_unlock(etmdrvdata[cpu]);
-			etmdrvdata[cpu]->os_unlock = true;
-		}
-
-		if (local_read(&etmdrvdata[cpu]->mode))
-			etm4_enable_hw(etmdrvdata[cpu]);
-		spin_unlock(&etmdrvdata[cpu]->spinlock);
-		break;
-
-	case CPU_ONLINE:
-		if (etmdrvdata[cpu]->boot_enable &&
-			!etmdrvdata[cpu]->sticky_enable)
-			coresight_enable(etmdrvdata[cpu]->csdev);
-		break;
-
-	case CPU_DYING:
-		spin_lock(&etmdrvdata[cpu]->spinlock);
-		if (local_read(&etmdrvdata[cpu]->mode))
-			etm4_disable_hw(etmdrvdata[cpu]);
-		spin_unlock(&etmdrvdata[cpu]->spinlock);
-		break;
-	}
-out:
-	return NOTIFY_OK;
+	if (etmdrvdata[cpu]->boot_enable && !etmdrvdata[cpu]->sticky_enable)
+		coresight_enable(etmdrvdata[cpu]->csdev);
+	return 0;
 }
 
-static struct notifier_block etm4_cpu_notifier = {
-	.notifier_call = etm4_cpu_callback,
-};
+static int etm4_starting_cpu(unsigned int cpu)
+{
+	if (!etmdrvdata[cpu])
+		return 0;
+
+	spin_lock(&etmdrvdata[cpu]->spinlock);
+	if (!etmdrvdata[cpu]->os_unlock) {
+		etm4_os_unlock(etmdrvdata[cpu]);
+		etmdrvdata[cpu]->os_unlock = true;
+	}
+
+	if (local_read(&etmdrvdata[cpu]->mode))
+		etm4_enable_hw(etmdrvdata[cpu]);
+	spin_unlock(&etmdrvdata[cpu]->spinlock);
+	return 0;
+}
+
+static int etm4_dying_cpu(unsigned int cpu)
+{
+	if (!etmdrvdata[cpu])
+		return 0;
+
+	spin_lock(&etmdrvdata[cpu]->spinlock);
+	if (local_read(&etmdrvdata[cpu]->mode))
+		etm4_disable_hw(etmdrvdata[cpu]);
+	spin_unlock(&etmdrvdata[cpu]->spinlock);
+	return 0;
+}
 
 static void etm4_init_trace_id(struct etmv4_drvdata *drvdata)
 {
@@ -728,12 +710,8 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
 	struct coresight_platform_data *pdata = NULL;
 	struct etmv4_drvdata *drvdata;
 	struct resource *res = &adev->res;
-	struct coresight_desc *desc;
+	struct coresight_desc desc = { 0 };
 	struct device_node *np = adev->dev.of_node;
-
-	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
-	if (!desc)
-		return -ENOMEM;
 
 	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
 	if (!drvdata)
@@ -767,8 +745,17 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
 				etm4_init_arch_data,  drvdata, 1))
 		dev_err(dev, "ETM arch init failed\n");
 
-	if (!etm4_count++)
-		register_hotcpu_notifier(&etm4_cpu_notifier);
+	if (!etm4_count++) {
+		cpuhp_setup_state_nocalls(CPUHP_AP_ARM_CORESIGHT4_STARTING,
+					  "AP_ARM_CORESIGHT4_STARTING",
+					  etm4_starting_cpu, etm4_dying_cpu);
+		ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
+						"AP_ARM_CORESIGHT4_ONLINE",
+						etm4_online_cpu, NULL);
+		if (ret < 0)
+			goto err_arch_supported;
+		hp_online = ret;
+	}
 
 	put_online_cpus();
 
@@ -780,13 +767,13 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
 	etm4_init_trace_id(drvdata);
 	etm4_set_default(&drvdata->config);
 
-	desc->type = CORESIGHT_DEV_TYPE_SOURCE;
-	desc->subtype.source_subtype = CORESIGHT_DEV_SUBTYPE_SOURCE_PROC;
-	desc->ops = &etm4_cs_ops;
-	desc->pdata = pdata;
-	desc->dev = dev;
-	desc->groups = coresight_etmv4_groups;
-	drvdata->csdev = coresight_register(desc);
+	desc.type = CORESIGHT_DEV_TYPE_SOURCE;
+	desc.subtype.source_subtype = CORESIGHT_DEV_SUBTYPE_SOURCE_PROC;
+	desc.ops = &etm4_cs_ops;
+	desc.pdata = pdata;
+	desc.dev = dev;
+	desc.groups = coresight_etmv4_groups;
+	drvdata->csdev = coresight_register(&desc);
 	if (IS_ERR(drvdata->csdev)) {
 		ret = PTR_ERR(drvdata->csdev);
 		goto err_arch_supported;
@@ -809,18 +796,21 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
 	return 0;
 
 err_arch_supported:
-	if (--etm4_count == 0)
-		unregister_hotcpu_notifier(&etm4_cpu_notifier);
+	if (--etm4_count == 0) {
+		cpuhp_remove_state_nocalls(CPUHP_AP_ARM_CORESIGHT4_STARTING);
+		if (hp_online)
+			cpuhp_remove_state_nocalls(hp_online);
+	}
 	return ret;
 }
 
 static struct amba_id etm4_ids[] = {
-	{       /* ETM 4.0 - Qualcomm */
-		.id	= 0x0003b95d,
-		.mask	= 0x0003ffff,
+	{       /* ETM 4.0 - Cortex-A53  */
+		.id	= 0x000bb95d,
+		.mask	= 0x000fffff,
 		.data	= "ETM 4.0",
 	},
-	{       /* ETM 4.0 - Juno board */
+	{       /* ETM 4.0 - Cortex-A57 */
 		.id	= 0x000bb95e,
 		.mask	= 0x000fffff,
 		.data	= "ETM 4.0",
