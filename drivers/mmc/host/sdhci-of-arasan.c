@@ -25,6 +25,8 @@
 #include <linux/of_device.h>
 #include <linux/phy/phy.h>
 #include <linux/regmap.h>
+#include <linux/pm_runtime.h>
+#include <linux/pm_opp.h>
 #include "sdhci-pltfm.h"
 
 #define SDHCI_ARASAN_CLK_CTRL_OFFSET	0x2c
@@ -515,6 +517,9 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
 		goto clk_dis_ahb;
 	}
 
+	pm_runtime_enable(host->dev);
+	pm_runtime_get_sync(host->dev);
+
 	sdhci_get_of_property(pdev);
 	pltfm_host->clk = clk_xin;
 
@@ -577,6 +582,8 @@ clk_dis_ahb:
 	clk_disable_unprepare(sdhci_arasan->clk_ahb);
 err_pltfm_free:
 	sdhci_pltfm_free(pdev);
+	pm_runtime_put(host->dev);
+	pm_runtime_disable(host->dev);
 	return ret;
 }
 
@@ -598,6 +605,9 @@ static int sdhci_arasan_remove(struct platform_device *pdev)
 	ret = sdhci_pltfm_unregister(pdev);
 
 	clk_disable_unprepare(clk_ahb);
+
+	pm_runtime_put(host->dev);
+	pm_runtime_disable(host->dev);
 
 	return ret;
 }
