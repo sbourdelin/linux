@@ -193,6 +193,8 @@ int nf_register_hook(struct nf_hook_ops *reg)
 	struct net *net, *last;
 	int ret;
 
+	/* prevent race with cleanup_net() */
+	mutex_lock(&net_mutex);
 	rtnl_lock();
 	for_each_net(net) {
 		ret = nf_register_net_hook(net, reg);
@@ -201,6 +203,7 @@ int nf_register_hook(struct nf_hook_ops *reg)
 	}
 	list_add_tail(&reg->list, &nf_hook_list);
 	rtnl_unlock();
+	mutex_unlock(&net_mutex);
 
 	return 0;
 rollback:
@@ -211,6 +214,7 @@ rollback:
 		nf_unregister_net_hook(net, reg);
 	}
 	rtnl_unlock();
+	mutex_unlock(&net_mutex);
 	return ret;
 }
 EXPORT_SYMBOL(nf_register_hook);
@@ -219,11 +223,14 @@ void nf_unregister_hook(struct nf_hook_ops *reg)
 {
 	struct net *net;
 
+	/* prevent race with cleanup_net() */
+	mutex_lock(&net_mutex);
 	rtnl_lock();
 	list_del(&reg->list);
 	for_each_net(net)
 		nf_unregister_net_hook(net, reg);
 	rtnl_unlock();
+	mutex_unlock(&net_mutex);
 }
 EXPORT_SYMBOL(nf_unregister_hook);
 
