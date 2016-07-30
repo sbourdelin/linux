@@ -405,8 +405,10 @@ nf_nat_setup_info(struct nf_conn *ct,
 		  const struct nf_nat_range *range,
 		  enum nf_nat_manip_type maniptype)
 {
+	struct net *net = nf_ct_net(ct);
 	struct nf_conntrack_tuple curr_tuple, new_tuple;
 	struct nf_conn_nat *nat;
+	unsigned int old_hash, old_reply_hash;
 
 	/* nat helper or nfctnetlink also setup binding */
 	nat = nf_ct_nat_ext_add(ct);
@@ -416,6 +418,11 @@ nf_nat_setup_info(struct nf_conn *ct,
 	NF_CT_ASSERT(maniptype == NF_NAT_MANIP_SRC ||
 		     maniptype == NF_NAT_MANIP_DST);
 	BUG_ON(nf_nat_initialized(ct, maniptype));
+
+	old_hash = hash_conntrack(net,
+				  &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple);
+	old_reply_hash = hash_conntrack(net,
+					&ct->tuplehash[IP_CT_DIR_REPLY].tuple);
 
 	/* What we've got will look like inverse of reply. Normally
 	 * this is what is in the conntrack, except for prior
@@ -459,6 +466,8 @@ nf_nat_setup_info(struct nf_conn *ct,
 		ct->status |= IPS_DST_NAT_DONE;
 	else
 		ct->status |= IPS_SRC_NAT_DONE;
+
+	nf_conntrack_ct_hash_bucket_update(ct, old_hash, old_reply_hash);
 
 	return NF_ACCEPT;
 }

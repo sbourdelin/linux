@@ -191,6 +191,9 @@ void *nf_ct_alloc_hashtable(unsigned int *sizep, int nulls);
 void nf_ct_free_hashtable(void *hash, unsigned int size);
 
 int nf_conntrack_hash_check_insert(struct nf_conn *ct);
+void nf_conntrack_ct_hash_bucket_update(struct nf_conn *ct,
+					unsigned int old_hash,
+					unsigned int old_reply_hash);
 bool nf_ct_delete(struct nf_conn *ct, u32 pid, int report);
 
 bool nf_ct_get_tuplepr(const struct sk_buff *skb, unsigned int nhoff,
@@ -297,6 +300,8 @@ int nf_conntrack_set_hashsize(const char *val, struct kernel_param *kp);
 int nf_conntrack_hash_resize(unsigned int hashsize);
 extern unsigned int nf_conntrack_htable_size;
 extern unsigned int nf_conntrack_max;
+u_int32_t hash_conntrack(const struct net *net,
+			 const struct nf_conntrack_tuple *tuple);
 
 struct nf_conn *nf_ct_tmpl_alloc(struct net *net,
 				 const struct nf_conntrack_zone *zone,

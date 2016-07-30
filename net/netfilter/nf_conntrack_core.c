@@ -181,11 +181,12 @@ static u32 __hash_conntrack(const struct net *net,
 	return reciprocal_scale(hash_conntrack_raw(tuple, net), size);
 }
 
-static u32 hash_conntrack(const struct net *net,
-			  const struct nf_conntrack_tuple *tuple)
+u32 hash_conntrack(const struct net *net,
+		   const struct nf_conntrack_tuple *tuple)
 {
 	return scale_hash(hash_conntrack_raw(tuple, net));
 }
+EXPORT_SYMBOL(hash_conntrack);
 
 bool
 nf_ct_get_tuple(const struct sk_buff *skb,
@@ -614,6 +615,52 @@ out:
 	return -EEXIST;
 }
 EXPORT_SYMBOL_GPL(nf_conntrack_hash_check_insert);
+
+/* Sometimes reply tuple of ct is changed by nat after ct is confirmed,
+ * hash bucket of ct has to be updated in this situation.
+ */
+void nf_conntrack_ct_hash_bucket_update(struct nf_conn *ct,
+					unsigned int old_hash,
+					unsigned int old_reply_hash)
+{
+	struct net *net;
+	unsigned int hash, reply_hash;
+	unsigned int sequence;
+
+	if (!ct || nf_ct_is_untracked(ct) || !nf_ct_is_confirmed(ct))
+		return;
+
+	net = nf_ct_net(ct);
+
+	local_bh_disable();
+	do {
+		sequence = read_seqcount_begin(&nf_conntrack_generation);
+	} while (nf_conntrack_double_lock(net, old_hash, old_reply_hash, sequence));
+
+	/* Remove from confirmed list */
+	hlist_nulls_del_rcu(&ct->tuplehash[IP_CT_DIR_ORIGINAL].hnnode);
+	hlist_nulls_del_rcu(&ct->tuplehash[IP_CT_DIR_REPLY].hnnode);
+
+	nf_conntrack_double_unlock(old_hash, old_reply_hash);
+
+	/* Make changes visible in other cores */
+	smp_wmb();
+
+	do {
+		sequence = read_seqcount_begin(&nf_conntrack_generation);
+		hash = hash_conntrack(net,
+				      &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple);
+		reply_hash = hash_conntrack(net,
+					    &ct->tuplehash[IP_CT_DIR_REPLY].tuple);
+	} while (nf_conntrack_double_lock(net, hash, reply_hash, sequence));
+
+	/* Insert to confirmed list again */
+	__nf_conntrack_hash_insert(ct, hash, reply_hash);
+
+	nf_conntrack_double_unlock(hash, reply_hash);
+	local_bh_enable();
+}
+EXPORT_SYMBOL_GPL(nf_conntrack_ct_hash_bucket_update);
 
 static inline void nf_ct_acct_update(struct nf_conn *ct,
 				     enum ip_conntrack_info ctinfo,
