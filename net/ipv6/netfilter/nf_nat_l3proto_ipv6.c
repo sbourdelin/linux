@@ -12,6 +12,7 @@
 #include <linux/skbuff.h>
 #include <linux/ipv6.h>
 #include <linux/netfilter.h>
+#include <linux/netfilter_bridge.h>
 #include <linux/netfilter_ipv6.h>
 #include <net/secure_seq.h>
 #include <net/checksum.h>
@@ -281,6 +282,12 @@ nf_nat_ipv6_fn(void *priv, struct sk_buff *skb,
 	if (nat == NULL)
 		return NF_ACCEPT;
 
+	if ((maniptype == NF_NAT_MANIP_SRC) &&
+	    nf_nat_initialized(ct, maniptype) &&
+	    (nat->help.snat_in_bridge != nf_nat_is_bridged_pkt(skb))) {
+		return NF_ACCEPT;
+	}
+
 	switch (ctinfo) {
 	case IP_CT_RELATED:
 	case IP_CT_RELATED_REPLY:
@@ -308,8 +315,14 @@ nf_nat_ipv6_fn(void *priv, struct sk_buff *skb,
 			if (ret != NF_ACCEPT)
 				return ret;
 
-			if (nf_nat_initialized(ct, HOOK2MANIP(state->hook)))
+			if (nf_nat_initialized(ct, HOOK2MANIP(state->hook))) {
+				if (maniptype == NF_NAT_MANIP_SRC) {
+					nfct_nat(ct)->help.snat_in_bridge =
+						nf_nat_is_bridged_pkt(skb);
+				}
+
 				break;
+			}
 
 			ret = nf_nat_alloc_null_binding(ct, state->hook);
 			if (ret != NF_ACCEPT)

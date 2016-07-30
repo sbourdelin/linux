@@ -18,12 +18,21 @@ enum nf_nat_manip_type {
 #include <linux/netfilter/nf_conntrack_pptp.h>
 #include <net/netfilter/nf_conntrack_extend.h>
 
+/* Check if packet is a bridged packet when do SNAT */
+#if defined(CONFIG_BRIDGE_NETFILTER)
+#define nf_nat_is_bridged_pkt(SKB) ((SKB)->nf_bridge && \
+				    ((SKB)->nf_bridge->physoutdev != NULL))
+#else
+#define nf_nat_is_bridged_pkt(SKB) 0
+#endif
+
 /* per conntrack: nat application helper private data */
 union nf_conntrack_nat_help {
 	/* insert nat helper private data here */
 #if defined(CONFIG_NF_NAT_PPTP) || defined(CONFIG_NF_NAT_PPTP_MODULE)
 	struct nf_nat_pptp nat_pptp_info;
 #endif
+	bool snat_in_bridge;
 };
 
 struct nf_conn;
