@@ -567,11 +567,13 @@ static void recv_daemon(struct md_thread *thread)
 	struct cluster_msg msg;
 	int ret;
 
+	mddev_lock_nointr(thread->mddev);
 	mutex_lock(&cinfo->recv_mutex);
 	/*get CR on Message*/
 	if (dlm_lock_sync(message_lockres, DLM_LOCK_CR)) {
 		pr_err("md/raid1:failed to get CR on MESSAGE\n");
 		mutex_unlock(&cinfo->recv_mutex);
+		mddev_unlock(thread->mddev);
 		return;
 	}
 
@@ -599,6 +601,7 @@ out:
 	if (unlikely(ret != 0))
 		pr_info("unlock msg failed return %d\n", ret);
 	mutex_unlock(&cinfo->recv_mutex);
+	mddev_unlock(thread->mddev);
 }
 
 /* lock_token()
