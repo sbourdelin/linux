@@ -315,6 +315,9 @@ nf_nat_ipv4_fn(void *priv, struct sk_buff *skb,
 				break;
 			}
 
+			if (nf_nat_is_bridged_pkt(skb))
+				break;
+
 			ret = nf_nat_alloc_null_binding(ct, state->hook);
 			if (ret != NF_ACCEPT)
 				return ret;
