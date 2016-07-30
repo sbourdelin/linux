@@ -72,10 +72,11 @@
 #include "p80211metastruct.h"
 #include "p80211req.h"
 
-static void p80211req_handlemsg(wlandevice_t *wlandev, struct p80211msg *msg);
-static void p80211req_mibset_mibget(wlandevice_t *wlandev,
-				   struct p80211msg_dot11req_mibget *mib_msg,
-				   int isget);
+static void p80211req_handlemsg(struct wlandevice *wlandev,
+				struct p80211msg *msg);
+static void p80211req_mibset_mibget(struct wlandevice *wlandev,
+				    struct p80211msg_dot11req_mibget *mib_msg,
+				    int isget);
 
 /*----------------------------------------------------------------
 * p80211req_dorequest
@@ -93,7 +94,7 @@ static void p80211req_mibset_mibget(wlandevice_t *wlandev,
 *	Potentially blocks the caller, so it's a good idea to
 *	not call this function from an interrupt context.
 ----------------------------------------------------------------*/
-int p80211req_dorequest(wlandevice_t *wlandev, u8 *msgbuf)
+int p80211req_dorequest(struct wlandevice *wlandev, u8 *msgbuf)
 {
 	struct p80211msg *msg = (struct p80211msg *) msgbuf;
 
@@ -149,7 +150,8 @@ int p80211req_dorequest(wlandevice_t *wlandev, u8 *msgbuf)
 * Call context:
 *	Process thread
 ----------------------------------------------------------------*/
-static void p80211req_handlemsg(wlandevice_t *wlandev, struct p80211msg *msg)
+static void p80211req_handlemsg(struct wlandevice *wlandev,
+				struct p80211msg *msg)
 {
 	switch (msg->msgcode) {
 
@@ -176,13 +178,14 @@ static void p80211req_handlemsg(wlandevice_t *wlandev, struct p80211msg *msg)
 	}			/* switch msg->msgcode */
 }
 
-static void p80211req_mibset_mibget(wlandevice_t *wlandev,
-				   struct p80211msg_dot11req_mibget *mib_msg,
-				   int isget)
+static void p80211req_mibset_mibget(struct wlandevice *wlandev,
+				    struct p80211msg_dot11req_mibget *mib_msg,
+				    int isget)
 {
-	p80211itemd_t *mibitem = (p80211itemd_t *) mib_msg->mibattribute.data;
-	p80211pstrd_t *pstr = (p80211pstrd_t *) mibitem->data;
-	u8 *key = mibitem->data + sizeof(p80211pstrd_t);
+	struct p80211itemd *mibitem =
+		(struct p80211itemd *)mib_msg->mibattribute.data;
+	struct p80211pstrd *pstr = (struct p80211pstrd *)mibitem->data;
+	u8 *key = mibitem->data + sizeof(struct p80211pstrd);
 
 	switch (mibitem->did) {
 	case DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey0:{

@@ -200,138 +200,138 @@
 /* The following structure types are used for the representation */
 /*  of ENUMint type metadata. */
 
-typedef struct p80211enumpair {
+struct p80211enumpair {
 	u32 val;
 	char *name;
-} p80211enumpair_t;
+};
 
-typedef struct p80211enum {
+struct p80211enum {
 	int nitems;
-	p80211enumpair_t *list;
-} p80211enum_t;
+	struct p80211enumpair *list;
+};
 
 /*----------------------------------------------------------------*/
 /* The following structure types are used to store data items in */
 /*  messages. */
 
 /* Template pascal string */
-typedef struct p80211pstr {
+struct p80211pstr {
 	u8 len;
-} __packed p80211pstr_t;
+} __packed;
 
-typedef struct p80211pstrd {
+struct p80211pstrd {
 	u8 len;
 	u8 data[0];
-} __packed p80211pstrd_t;
+} __packed;
 
 /* Maximum pascal string */
-typedef struct p80211pstr255 {
+struct p80211pstr255 {
 	u8 len;
 	u8 data[MAXLEN_PSTR255];
-} __packed p80211pstr255_t;
+} __packed;
 
 /* pascal string for macaddress and bssid */
-typedef struct p80211pstr6 {
+struct p80211pstr6 {
 	u8 len;
 	u8 data[MAXLEN_PSTR6];
-} __packed p80211pstr6_t;
+} __packed;
 
 /* pascal string for channel list */
-typedef struct p80211pstr14 {
+struct p80211pstr14 {
 	u8 len;
 	u8 data[MAXLEN_PSTR14];
-} __packed p80211pstr14_t;
+} __packed;
 
 /* pascal string for ssid */
-typedef struct p80211pstr32 {
+struct p80211pstr32 {
 	u8 len;
 	u8 data[MAXLEN_PSTR32];
-} __packed p80211pstr32_t;
+} __packed;
 
 /* MAC address array */
-typedef struct p80211macarray {
+struct p80211macarray {
 	u32 cnt;
 	u8 data[1][MAXLEN_PSTR6];
-} __packed p80211macarray_t;
+} __packed;
 
 /* prototype template */
-typedef struct p80211item {
+struct p80211item {
 	u32 did;
 	u16 status;
 	u16 len;
-} __packed p80211item_t;
+} __packed;
 
 /* prototype template w/ data item */
-typedef struct p80211itemd {
+struct p80211itemd {
 	u32 did;
 	u16 status;
 	u16 len;
 	u8 data[0];
-} __packed p80211itemd_t;
+} __packed;
 
 /* message data item for int, BOUNDEDINT, ENUMINT */
-typedef struct p80211item_uint32 {
+struct p80211item_uint32 {
 	u32 did;
 	u16 status;
 	u16 len;
 	u32 data;
-} __packed p80211item_uint32_t;
+} __packed;
 
 /* message data item for OCTETSTR, DISPLAYSTR */
-typedef struct p80211item_pstr6 {
+struct p80211item_pstr6 {
 	u32 did;
 	u16 status;
 	u16 len;
-	p80211pstr6_t data;
-} __packed p80211item_pstr6_t;
+	struct p80211pstr6 data;
+} __packed;
 
 /* message data item for OCTETSTR, DISPLAYSTR */
-typedef struct p80211item_pstr14 {
+struct p80211item_pstr14 {
 	u32 did;
 	u16 status;
 	u16 len;
-	p80211pstr14_t data;
-} __packed p80211item_pstr14_t;
+	struct p80211pstr14 data;
+} __packed;
 
 /* message data item for OCTETSTR, DISPLAYSTR */
-typedef struct p80211item_pstr32 {
+struct p80211item_pstr32 {
 	u32 did;
 	u16 status;
 	u16 len;
-	p80211pstr32_t data;
-} __packed p80211item_pstr32_t;
+	struct p80211pstr32 data;
+} __packed;
 
 /* message data item for OCTETSTR, DISPLAYSTR */
-typedef struct p80211item_pstr255 {
+struct p80211item_pstr255 {
 	u32 did;
 	u16 status;
 	u16 len;
-	p80211pstr255_t data;
-} __packed p80211item_pstr255_t;
+	struct p80211pstr255 data;
+} __packed;
 
 /* message data item for UNK 392, namely mib items */
-typedef struct p80211item_unk392 {
+struct p80211item_unk392 {
 	u32 did;
 	u16 status;
 	u16 len;
 	u8 data[MAXLEN_MIBATTRIBUTE];
-} __packed p80211item_unk392_t;
+} __packed;
 
 /* message data item for UNK 1025, namely p2 pdas */
-typedef struct p80211item_unk1024 {
+struct p80211item_unk1024 {
 	u32 did;
 	u16 status;
 	u16 len;
 	u8 data[1024];
-} __packed p80211item_unk1024_t;
+} __packed;
 
 /* message data item for UNK 4096, namely p2 download chunks */
-typedef struct p80211item_unk4096 {
+struct p80211item_unk4096 {
 	u32 did;
 	u16 status;
 	u16 len;
 	u8 data[4096];
-} __packed p80211item_unk4096_t;
+} __packed;
 
 struct catlistitem;
 
@@ -351,25 +351,25 @@ typedef u32(*p80211_valid_t) (struct catlistitem *, u32 did, u8 *itembuf);
 /*  The following are the external declarations */
 /*  for all enumerations  */
 
-extern p80211enum_t MKENUMNAME(truth);
-extern p80211enum_t MKENUMNAME(ifstate);
-extern p80211enum_t MKENUMNAME(powermgmt);
-extern p80211enum_t MKENUMNAME(bsstype);
-extern p80211enum_t MKENUMNAME(authalg);
-extern p80211enum_t MKENUMNAME(phytype);
-extern p80211enum_t MKENUMNAME(temptype);
-extern p80211enum_t MKENUMNAME(regdomain);
-extern p80211enum_t MKENUMNAME(ccamode);
-extern p80211enum_t MKENUMNAME(diversity);
-extern p80211enum_t MKENUMNAME(scantype);
-extern p80211enum_t MKENUMNAME(resultcode);
-extern p80211enum_t MKENUMNAME(reason);
-extern p80211enum_t MKENUMNAME(status);
-extern p80211enum_t MKENUMNAME(msgcode);
-extern p80211enum_t MKENUMNAME(msgitem_status);
+extern struct p80211enum MKENUMNAME(truth);
+extern struct p80211enum MKENUMNAME(ifstate);
+extern struct p80211enum MKENUMNAME(powermgmt);
+extern struct p80211enum MKENUMNAME(bsstype);
+extern struct p80211enum MKENUMNAME(authalg);
+extern struct p80211enum MKENUMNAME(phytype);
+extern struct p80211enum MKENUMNAME(temptype);
+extern struct p80211enum MKENUMNAME(regdomain);
+extern struct p80211enum MKENUMNAME(ccamode);
+extern struct p80211enum MKENUMNAME(diversity);
+extern struct p80211enum MKENUMNAME(scantype);
+extern struct p80211enum MKENUMNAME(resultcode);
+extern struct p80211enum MKENUMNAME(reason);
+extern struct p80211enum MKENUMNAME(status);
+extern struct p80211enum MKENUMNAME(msgcode);
+extern struct p80211enum MKENUMNAME(msgitem_status);
 
-extern p80211enum_t MKENUMNAME(lnxroam_reason);
+extern struct p80211enum MKENUMNAME(lnxroam_reason);
 
-extern p80211enum_t MKENUMNAME(p2preamble);
+extern struct p80211enum MKENUMNAME(p2preamble);
 
 #endif /* _P80211TYPES_H */
