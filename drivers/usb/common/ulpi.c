@@ -21,13 +21,13 @@
 
 int ulpi_read(struct ulpi *ulpi, u8 addr)
 {
-	return ulpi->ops->read(ulpi->ops, addr);
+	return ulpi->ops->read(ulpi->dev.parent, addr);
 }
 EXPORT_SYMBOL_GPL(ulpi_read);
 
 int ulpi_write(struct ulpi *ulpi, u8 addr, u8 val)
 {
-	return ulpi->ops->write(ulpi->ops, addr, val);
+	return ulpi->ops->write(ulpi->dev.parent, addr, val);
 }
 EXPORT_SYMBOL_GPL(ulpi_write);
 

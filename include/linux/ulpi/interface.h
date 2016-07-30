@@ -13,8 +13,8 @@ struct ulpi;
  */
 struct ulpi_ops {
 	struct device *dev;
-	int (*read)(struct ulpi_ops *ops, u8 addr);
-	int (*write)(struct ulpi_ops *ops, u8 addr, u8 val);
+	int (*read)(struct device *dev, u8 addr);
+	int (*write)(struct device *dev, u8 addr, u8 val);
 };
 
 struct ulpi *ulpi_register_interface(struct device *, struct ulpi_ops *);
