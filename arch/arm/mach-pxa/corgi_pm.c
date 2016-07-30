@@ -135,11 +135,9 @@ static unsigned long corgi_charger_wakeup(void)
 {
 	unsigned long ret;
 
-	ret = (!gpio_get_value(CORGI_GPIO_AC_IN) << GPIO_bit(CORGI_GPIO_AC_IN))
-		| (!gpio_get_value(CORGI_GPIO_KEY_INT)
-		<< GPIO_bit(CORGI_GPIO_KEY_INT))
-		| (!gpio_get_value(CORGI_GPIO_WAKEUP)
-		<< GPIO_bit(CORGI_GPIO_WAKEUP));
+	ret = !gpio_get_value(CORGI_GPIO_AC_IN)
+		|| !gpio_get_value(CORGI_GPIO_KEY_INT)
+		|| !gpio_get_value(CORGI_GPIO_WAKEUP);
 	return ret;
 }
 
