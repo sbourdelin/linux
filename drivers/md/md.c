@@ -7933,8 +7933,10 @@ void md_do_sync(struct md_thread *thread)
 		 * region.
 		 */
 		if (mddev->bitmap) {
+			mddev_lock_nointr(mddev);
 			mddev->pers->quiesce(mddev, 1);
 			mddev->pers->quiesce(mddev, 0);
+			mddev_unlock(mddev);
 		}
 	}
 
