@@ -53,6 +53,9 @@ static LIST_HEAD(deferred_probe_pending_list);
 static LIST_HEAD(deferred_probe_active_list);
 static struct workqueue_struct *deferred_wq;
 static atomic_t deferred_trigger_count = ATOMIC_INIT(0);
+static atomic_t deferred_self_trigger_count = ATOMIC_INIT(0);
+#define DEFERRED_SELF_TRIGGER_INTERVAL 30 /* 30 secs */
+#define DEFERRED_SELF_TRIGGER_ATTEMPTS 5  /* 5 times */
 
 /*
  * In some cases, like suspend to RAM or hibernation, It might be reasonable
@@ -115,10 +118,23 @@ static void deferred_probe_work_func(struct work_struct *work)
 	mutex_unlock(&deferred_probe_mutex);
 }
 static DECLARE_WORK(deferred_probe_work, deferred_probe_work_func);
+void driver_deferred_probe_trigger_wrapper(struct work_struct *work);
+static DECLARE_DELAYED_WORK(deferred_probe_trigger_work,
+			    driver_deferred_probe_trigger_wrapper);
 
 static void driver_deferred_probe_add(struct device *dev)
 {
+	int local_self_trigger_count;
+
 	mutex_lock(&deferred_probe_mutex);
+	local_self_trigger_count = atomic_read(&deferred_self_trigger_count);
+	if (list_empty(&deferred_probe_pending_list) &&
+	    local_self_trigger_count <= DEFERRED_SELF_TRIGGER_ATTEMPTS) {
+		cancel_delayed_work(&deferred_probe_trigger_work);
+		queue_delayed_work(deferred_wq, &deferred_probe_trigger_work,
+				   HZ * DEFERRED_SELF_TRIGGER_INTERVAL);
+	}
+
 	if (list_empty(&dev->p->deferred_probe)) {
 		dev_dbg(dev, "Added to deferred list\n");
 		list_add_tail(&dev->p->deferred_probe, &deferred_probe_pending_list);
@@ -199,6 +215,15 @@ void device_block_probing(void)
 void device_unblock_probing(void)
 {
 	defer_all_probes = false;
+	driver_deferred_probe_trigger();
+}
+
+/*
+ * Wrapper function for delayed trigger work requests
+ */
+void driver_deferred_probe_trigger_wrapper(struct work_struct *work)
+{
+	atomic_inc(&deferred_self_trigger_count);
 	driver_deferred_probe_trigger();
 }
 
