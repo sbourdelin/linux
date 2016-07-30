@@ -356,6 +356,11 @@ static int of_platform_bus_create(struct device_node *bus,
 	void *platform_data = NULL;
 	int rc = 0;
 
+	/* Always populate reserved-memory nodes. */
+	if (strict && strcmp(bus->full_name, "/reserved-memory") == 0) {
+		return of_platform_populate(bus, matches, lookup, parent);
+	}
+
 	/* Make sure it has a compatible property */
 	if (strict && (!of_get_property(bus, "compatible", NULL))) {
 		pr_debug("%s() - skipping %s, no compatible prop\n",
