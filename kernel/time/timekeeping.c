@@ -1509,6 +1509,7 @@ void __init timekeeping_init(void)
 
 /* time in seconds when suspend began for persistent clock */
 static struct timespec64 timekeeping_suspend_time;
+#define MAX_SLEEP_TIME 0x7fffffff
 
 /**
  * __timekeeping_inject_sleeptime - Internal function to add sleep interval
@@ -1520,7 +1521,8 @@ static struct timespec64 timekeeping_suspend_time;
 static void __timekeeping_inject_sleeptime(struct timekeeper *tk,
 					   struct timespec64 *delta)
 {
-	if (!timespec64_valid_strict(delta)) {
+	if (!timespec64_valid_strict(delta) ||
+	     delta->tv_sec > MAX_SLEEP_TIME) {
 		printk_deferred(KERN_WARNING
 				"__timekeeping_inject_sleeptime: Invalid "
 				"sleep delta value!\n");
