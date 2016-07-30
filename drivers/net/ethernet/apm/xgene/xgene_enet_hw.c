@@ -776,15 +776,11 @@ int xgene_enet_phy_connect(struct net_device *ndev)
 			netdev_err(ndev, "Could not connect to PHY\n");
 			return -ENODEV;
 		}
-
-		pdata->phy_dev = phy_dev;
 	} else {
 #ifdef CONFIG_ACPI
 		struct acpi_device *adev = acpi_phy_find_device(dev);
 		if (adev)
-			pdata->phy_dev =  adev->driver_data;
-
-		phy_dev = pdata->phy_dev;
+			phy_dev =  adev->driver_data;
 
 		if (!phy_dev ||
 		    phy_connect_direct(ndev, phy_dev, &xgene_enet_adjust_link,
@@ -795,6 +791,7 @@ int xgene_enet_phy_connect(struct net_device *ndev)
 #endif
 	}
 
+	pdata->phy_dev = phy_dev;
 	pdata->phy_speed = SPEED_UNKNOWN;
 	phy_dev->supported &= ~SUPPORTED_10baseT_Half &
 			      ~SUPPORTED_100baseT_Half &
