@@ -408,7 +408,7 @@ label##_relon_hv:						\
 	lbz	r10,PACASOFTIRQEN(r13);					\
 	cmpwi	r10,IRQ_DISABLE_LEVEL_LINUX;				\
 	li	r10,SOFTEN_VALUE_##vec;					\
-	beq	masked_##h##interrupt
+	bge	masked_##h##interrupt
 #define _SOFTEN_TEST(h, vec)	__SOFTEN_TEST(h, vec)
 
 #define SOFTEN_TEST_PR(vec)						\

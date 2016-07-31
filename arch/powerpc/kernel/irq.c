@@ -202,7 +202,7 @@ notrace void arch_local_irq_restore(unsigned long en)
 
 	/* Write the new soft-enabled value */
 	set_soft_enabled(en);
-	if (en == IRQ_DISABLE_LEVEL_LINUX)
+	if (en >= IRQ_DISABLE_LEVEL_LINUX)
 		return;
 	/*
 	 * From this point onward, we can take interrupts, preempt,

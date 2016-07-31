@@ -30,8 +30,8 @@
 /*
  * flags for paca->soft_enabled
  */
-#define IRQ_DISABLE_LEVEL_NONE		1
-#define IRQ_DISABLE_LEVEL_LINUX		0
+#define IRQ_DISABLE_LEVEL_NONE		0
+#define IRQ_DISABLE_LEVEL_LINUX		1
 
 
 #endif /* CONFIG_PPC64 */
@@ -94,7 +94,7 @@ static inline unsigned long arch_local_irq_save(void)
 
 static inline bool arch_irqs_disabled_flags(unsigned long flags)
 {
-	return flags == IRQ_DISABLE_LEVEL_LINUX;
+	return flags >= IRQ_DISABLE_LEVEL_LINUX;
 }
 
 static inline bool arch_irqs_disabled(void)
@@ -139,7 +139,7 @@ static inline void may_hard_irq_enable(void)
 
 static inline bool arch_irq_disabled_regs(struct pt_regs *regs)
 {
-	return (regs->softe == IRQ_DISABLE_LEVEL_LINUX);
+	return (regs->softe >= IRQ_DISABLE_LEVEL_LINUX);
 }
 
 extern bool prep_irq_for_idle(void);
