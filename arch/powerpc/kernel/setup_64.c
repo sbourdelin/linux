@@ -206,7 +206,7 @@ static void fixup_boot_paca(void)
 	/* Allow percpu accesses to work until we setup percpu data */
 	get_paca()->data_offset = 0;
 	/* Mark interrupts disabled in PACA */
-	get_paca()->soft_enabled = IRQ_DISABLE_LEVEL_LINUX;
+	set_soft_enabled(IRQ_DISABLE_LEVEL_LINUX);
 }
 
 static void cpu_ready_for_interrupts(void)
@@ -325,7 +325,7 @@ void __init early_setup(unsigned long dt_ptr)
 void early_setup_secondary(void)
 {
 	/* Mark interrupts enabled in PACA */
-	get_paca()->soft_enabled = 0;
+	set_soft_enabled(IRQ_DISABLE_LEVEL_LINUX);
 
 	/* Initialize the hash table or TLB handling */
 	early_init_mmu_secondary();
