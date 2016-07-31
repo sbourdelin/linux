@@ -615,7 +615,7 @@ static int nic_config_loopback(struct nicpf *nic, struct set_loopback *lbk)
 {
 	int bgx_idx, lmac_idx;
 
-	if (lbk->vf_id > MAX_LMAC)
+	if (lbk->vf_id >= MAX_LMAC)
 		return -1;
 
 	bgx_idx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[lbk->vf_id]);
