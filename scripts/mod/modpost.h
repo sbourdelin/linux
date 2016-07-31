@@ -119,6 +119,7 @@ struct module {
 	int has_cleanup;
 	struct buffer dev_table_buf;
 	char	     srcversion[25];
+	char	     kconfig_symbol[50];
 	int is_dot_o;
 };
 

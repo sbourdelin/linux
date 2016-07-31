@@ -42,6 +42,8 @@ static int sec_mismatch_fatal = 0;
 /* ignore missing files */
 static int ignore_missing_files;
 
+#define MOD_KSYMB_FILENAME "scripts/mod/Module.ksymb"
+
 enum export {
 	export_plain,      export_unused,     export_gpl,
 	export_unused_gpl, export_gpl_future, export_unknown
@@ -2245,6 +2247,50 @@ static void add_srcversion(struct buffer *b, struct module *mod)
 	}
 }
 
+static void get_kconfig_symbol(struct module *mod) {
+
+	unsigned long size, pos = 0;
+	void *file = grab_file(MOD_KSYMB_FILENAME, &size);
+	char *line, *short_name;
+
+	if (!file)
+		return;
+
+	short_name = strrchr(mod->name, '/');
+	short_name++;
+
+	while ((line = get_next_line(&pos, file, size))) {
+		char *modname, *kconfig_symbol, *p;
+
+		modname = line;
+		if (!(p = strchr(line, ' ')))
+			goto fail;
+		*p++ = '\0';
+		if (!strcmp(short_name, modname)) {
+			kconfig_symbol = p;
+			if ((p = strchr(kconfig_symbol, ' ')))
+				*p = '\0';
+			strcpy(mod->kconfig_symbol, kconfig_symbol);
+			break;
+		}
+	}
+	release_file(file, size);
+	return;
+fail:
+	release_file(file, size);
+	fatal("parse error in Module.ksymb file\n");
+}
+
+static void add_kconfig_symbol(struct buffer *b, struct module *mod)
+{
+	get_kconfig_symbol(mod);
+	if (mod->kconfig_symbol[0]) {
+		buf_printf(b, "\n");
+		buf_printf(b, "MODULE_INFO(kconfig_symbol, \"%s\");\n",
+			   mod->kconfig_symbol);
+	}
+}
+
 static void write_if_changed(struct buffer *b, const char *fname)
 {
 	char *tmp;
@@ -2478,6 +2524,7 @@ int main(int argc, char **argv)
 		add_depends(&buf, mod, modules);
 		add_moddevtable(&buf, mod);
 		add_srcversion(&buf, mod);
+		add_kconfig_symbol(&buf, mod);
 
 		sprintf(fname, "%s.mod.c", mod->name);
 		write_if_changed(&buf, fname);
