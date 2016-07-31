@@ -398,6 +398,7 @@ struct hci_dev {
 	bdaddr_t		rpa;
 
 	struct led_trigger	*power_led;
+	struct led_trigger	*tx_led, *rx_led;
 
 	int (*open)(struct hci_dev *hdev);
 	int (*close)(struct hci_dev *hdev);
