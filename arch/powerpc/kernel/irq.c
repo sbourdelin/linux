@@ -158,9 +158,16 @@ notrace unsigned int __check_irq_replay(void)
 	if ((happened & PACA_IRQ_DEC) || decrementer_check_overflow())
 		return 0x900;
 
+	/*
+	 * In masked_handler() for PMI, we disable MSR[EE] and return.
+	 * When replaying it, just enabling the MSR[EE] will do
+	 * trick, since the PMI are "level" triggered.
+	 */
+	local_paca->irq_happened &= ~PACA_IRQ_PMI;
+
 	/* Finally check if an external interrupt happened */
 	local_paca->irq_happened &= ~PACA_IRQ_EE;
-	if (happened & PACA_IRQ_EE)
+	if ((happened & PACA_IRQ_EE) || (happened & PACA_IRQ_PMI))
 		return 0x500;
 
 #ifdef CONFIG_PPC_BOOK3E
