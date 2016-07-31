@@ -147,6 +147,7 @@ my %objects;
 my $var;
 my $iflevel = 0;
 my @ifdeps;
+my @drv_objs;
 
 # prevent recursion
 my %read_kconfigs;
@@ -341,12 +342,31 @@ foreach my $makefile (@makefiles) {
 		    # The objects have a hash mapping to a reference
 		    # of an array of configs.
 		    $objects{$1} = \@arr;
+		    # Save objects corresponding to driver Makefiles
+		    if (index($makefile, "./drivers/") == 0) {
+			    push(@drv_objs, substr($obj, 0, -2));
+			}
 		}
 	    }
 	}
     }
     close($infile);
 }
+
+sub gen_module_kconfigs {
+
+	my $module_ksymb = $ENV{'objtree'}."/scripts/mod/Module.ksymb";
+	my $key;
+
+	open(my $ksymbfile, '>', $module_ksymb) || die "Can not open $module_ksymb for writing";
+
+	foreach (@drv_objs) {
+		print $ksymbfile "$_ " . "@{$objects{$_}}\n";
+	}
+	close $ksymbfile;
+}
+
+gen_module_kconfigs();
 
 my %modules;
 my $linfile;
