@@ -185,7 +185,7 @@ void gfs2_glock_put(struct gfs2_glock *gl)
  * Returns: true if its ok to grant the lock
  */
 
-static inline int may_grant(const struct gfs2_glock *gl, const struct gfs2_holder *gh)
+static int may_grant(const struct gfs2_glock *gl, const struct gfs2_holder *gh)
 {
 	const struct gfs2_holder *gh_head = list_entry(gl->gl_holders.next, const struct gfs2_holder, gh_list);
 	if ((gh->gh_state == LM_ST_EXCLUSIVE ||
@@ -296,7 +296,7 @@ restart:
  * @gl: the glock
  */
 
-static inline struct gfs2_holder *find_first_waiter(const struct gfs2_glock *gl)
+static struct gfs2_holder *find_first_waiter(const struct gfs2_glock *gl)
 {
 	struct gfs2_holder *gh;
 
@@ -500,7 +500,7 @@ __acquires(&gl->gl_lockref.lock)
  * @gl: the glock
  */
 
-static inline struct gfs2_holder *find_first_holder(const struct gfs2_glock *gl)
+static struct gfs2_holder *find_first_holder(const struct gfs2_glock *gl)
 {
 	struct gfs2_holder *gh;
 
@@ -882,7 +882,7 @@ void gfs2_print_dbg(struct seq_file *seq, const char *fmt, ...)
  * 
  */
 
-static inline void add_to_queue(struct gfs2_holder *gh)
+static void add_to_queue(struct gfs2_holder *gh)
 __releases(&gl->gl_lockref.lock)
 __acquires(&gl->gl_lockref.lock)
 {

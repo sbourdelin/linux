@@ -401,7 +401,7 @@ retry:
  * Returns: the distance in blocks
  */
 
-static inline unsigned int log_distance(struct gfs2_sbd *sdp, unsigned int newer,
+static unsigned int log_distance(struct gfs2_sbd *sdp, unsigned int newer,
 					unsigned int older)
 {
 	int dist;
@@ -889,12 +889,12 @@ void gfs2_log_shutdown(struct gfs2_sbd *sdp)
 	sdp->sd_log_tail = sdp->sd_log_head;
 }
 
-static inline int gfs2_jrnl_flush_reqd(struct gfs2_sbd *sdp)
+static int gfs2_jrnl_flush_reqd(struct gfs2_sbd *sdp)
 {
 	return (atomic_read(&sdp->sd_log_pinned) >= atomic_read(&sdp->sd_log_thresh1));
 }
 
-static inline int gfs2_ail_flush_reqd(struct gfs2_sbd *sdp)
+static int gfs2_ail_flush_reqd(struct gfs2_sbd *sdp)
 {
 	unsigned int used_blocks = sdp->sd_jdesc->jd_blocks - atomic_read(&sdp->sd_log_blks_free);
 	return used_blocks >= atomic_read(&sdp->sd_log_thresh2);

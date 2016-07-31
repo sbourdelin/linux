@@ -348,7 +348,7 @@ struct ea_list {
 	unsigned int ei_size;
 };
 
-static inline unsigned int gfs2_ea_strlen(struct gfs2_ea_header *ea)
+static unsigned int gfs2_ea_strlen(struct gfs2_ea_header *ea)
 {
 	switch (ea->ea_type) {
 	case GFS2_EATYPE_USR:

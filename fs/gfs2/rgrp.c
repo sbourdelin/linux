@@ -84,7 +84,7 @@ static int gfs2_rbm_find(struct gfs2_rbm *rbm, u8 state, u32 *minext,
  *
  */
 
-static inline void gfs2_setbit(const struct gfs2_rbm *rbm, bool do_clone,
+static void gfs2_setbit(const struct gfs2_rbm *rbm, bool do_clone,
 			       unsigned char new_state)
 {
 	unsigned char *byte1, *byte2, *end, cur_state;
@@ -126,7 +126,7 @@ static inline void gfs2_setbit(const struct gfs2_rbm *rbm, bool do_clone,
  * Returns: The two bit block state of the requested bit
  */
 
-static inline u8 gfs2_testbit(const struct gfs2_rbm *rbm)
+static u8 gfs2_testbit(const struct gfs2_rbm *rbm)
 {
 	struct gfs2_bitmap *bi = rbm_bi(rbm);
 	const u8 *buffer = bi->bi_bh->b_data + bi->bi_offset;
@@ -157,7 +157,7 @@ static inline u8 gfs2_testbit(const struct gfs2_rbm *rbm)
  * single test (on 64 bit arches).
  */
 
-static inline u64 gfs2_bit_search(const __le64 *ptr, u64 mask, u8 state)
+static u64 gfs2_bit_search(const __le64 *ptr, u64 mask, u8 state)
 {
 	u64 tmp;
 	static const u64 search[] = {
@@ -182,7 +182,7 @@ static inline u64 gfs2_bit_search(const __le64 *ptr, u64 mask, u8 state)
  *         -1 if the block range is before the start of the reservation
  *          0 if the block range overlaps with the reservation
  */
-static inline int rs_cmp(u64 blk, u32 len, struct gfs2_blkreserv *rs)
+static int rs_cmp(u64 blk, u32 len, struct gfs2_blkreserv *rs)
 {
 	u64 startblk = gfs2_rbm_to_block(&rs->rs_rbm);
 
@@ -483,7 +483,7 @@ void gfs2_rgrp_verify(struct gfs2_rgrpd *rgd)
 	}
 }
 
-static inline int rgrp_contains_block(struct gfs2_rgrpd *rgd, u64 block)
+static int rgrp_contains_block(struct gfs2_rgrpd *rgd, u64 block)
 {
 	u64 first = rgd->rd_data0;
 	u64 last = first + rgd->rd_data;
@@ -1935,7 +1935,7 @@ static bool gfs2_select_rgrp(struct gfs2_rgrpd **pos, const struct gfs2_rgrpd *b
  * If this is one of our preferred rgrps, it should be quicker to acquire,
  * because we tried to set ourselves up as dlm lock master.
  */
-static inline int fast_to_acquire(struct gfs2_rgrpd *rgd)
+static int fast_to_acquire(struct gfs2_rgrpd *rgd)
 {
 	struct gfs2_glock *gl = rgd->rd_gl;
 

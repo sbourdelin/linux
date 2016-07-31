@@ -96,12 +96,12 @@ static unsigned int gfs2_qd_hash(const struct gfs2_sbd *sdp,
 	return h & GFS2_QD_HASH_MASK;
 }
 
-static inline void spin_lock_bucket(unsigned int hash)
+static void spin_lock_bucket(unsigned int hash)
 {
         hlist_bl_lock(&qd_hash_table[hash]);
 }
 
-static inline void spin_unlock_bucket(unsigned int hash)
+static void spin_unlock_bucket(unsigned int hash)
 {
         hlist_bl_unlock(&qd_hash_table[hash]);
 }

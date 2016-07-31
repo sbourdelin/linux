@@ -245,7 +245,7 @@ static void find_metapath(const struct gfs2_sbd *sdp, u64 block,
 
 }
 
-static inline unsigned int metapath_branch_start(const struct metapath *mp)
+static unsigned int metapath_branch_start(const struct metapath *mp)
 {
 	if (mp->mp_list[0] == 0)
 		return 2;
@@ -262,7 +262,7 @@ static inline unsigned int metapath_branch_start(const struct metapath *mp)
  * metadata tree.
  */
 
-static inline __be64 *metapointer(unsigned int height, const struct metapath *mp)
+static __be64 *metapointer(unsigned int height, const struct metapath *mp)
 {
 	struct buffer_head *bh = mp->mp_bh[height];
 	unsigned int head_size = (height > 0) ?
@@ -334,7 +334,7 @@ static int lookup_metapath(struct gfs2_inode *ip, struct metapath *mp)
 	return ip->i_height;
 }
 
-static inline void release_metapath(struct metapath *mp)
+static void release_metapath(struct metapath *mp)
 {
 	int i;
 
@@ -360,7 +360,8 @@ static inline void release_metapath(struct metapath *mp)
  * Returns: The length of the extent (minimum of one block)
  */
 
-static inline unsigned int gfs2_extent_length(void *start, unsigned int len, __be64 *ptr, size_t limit, int *eob)
+static unsigned int gfs2_extent_length(void *start, unsigned int len,
+				       __be64 *ptr, size_t limit, int *eob)
 {
 	const __be64 *end = (start + len);
 	const __be64 *first = ptr;
@@ -381,7 +382,7 @@ static inline unsigned int gfs2_extent_length(void *start, unsigned int len, __b
 	return (ptr - first);
 }
 
-static inline void bmap_lock(struct gfs2_inode *ip, int create)
+static void bmap_lock(struct gfs2_inode *ip, int create)
 {
 	if (create)
 		down_write(&ip->i_rw_mutex);
@@ -389,7 +390,7 @@ static inline void bmap_lock(struct gfs2_inode *ip, int create)
 		down_read(&ip->i_rw_mutex);
 }
 
-static inline void bmap_unlock(struct gfs2_inode *ip, int create)
+static void bmap_unlock(struct gfs2_inode *ip, int create)
 {
 	if (create)
 		up_write(&ip->i_rw_mutex);
@@ -397,7 +398,7 @@ static inline void bmap_unlock(struct gfs2_inode *ip, int create)
 		up_read(&ip->i_rw_mutex);
 }
 
-static inline __be64 *gfs2_indirect_init(struct metapath *mp,
+static __be64 *gfs2_indirect_init(struct metapath *mp,
 					 struct gfs2_glock *gl, unsigned int i,
 					 unsigned offset, u64 bn)
 {

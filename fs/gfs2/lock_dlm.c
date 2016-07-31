@@ -44,7 +44,7 @@ extern struct workqueue_struct *gfs2_control_wq;
  * they are not scaled fixed point.
  */
 
-static inline void gfs2_update_stats(struct gfs2_lkstats *s, unsigned index,
+static void gfs2_update_stats(struct gfs2_lkstats *s, unsigned int index,
 				     s64 sample)
 {
 	s64 delta = sample - s->stats[index];
@@ -70,7 +70,7 @@ static inline void gfs2_update_stats(struct gfs2_lkstats *s, unsigned index,
  * TRY_1CB flags are set are classified as non-blocking. All
  * other DLM requests are counted as (potentially) blocking.
  */
-static inline void gfs2_update_reply_times(struct gfs2_glock *gl)
+static void gfs2_update_reply_times(struct gfs2_glock *gl)
 {
 	struct gfs2_pcpu_lkstats *lks;
 	const unsigned gltype = gl->gl_name.ln_type;
@@ -97,7 +97,7 @@ static inline void gfs2_update_reply_times(struct gfs2_glock *gl)
  * each dlm call.
  */
 
-static inline void gfs2_update_request_times(struct gfs2_glock *gl)
+static void gfs2_update_request_times(struct gfs2_glock *gl)
 {
 	struct gfs2_pcpu_lkstats *lks;
 	const unsigned gltype = gl->gl_name.ln_type;

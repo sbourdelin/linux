@@ -400,12 +400,12 @@ void gfs2_dir_hash_inval(struct gfs2_inode *ip)
 	kvfree(hc);
 }
 
-static inline int gfs2_dirent_sentinel(const struct gfs2_dirent *dent)
+static int gfs2_dirent_sentinel(const struct gfs2_dirent *dent)
 {
 	return dent->de_inum.no_addr == 0 || dent->de_inum.no_formal_ino == 0;
 }
 
-static inline int __gfs2_dirent_find(const struct gfs2_dirent *dent,
+static int __gfs2_dirent_find(const struct gfs2_dirent *dent,
 				     const struct qstr *name, int ret)
 {
 	if (!gfs2_dirent_sentinel(dent) &&
