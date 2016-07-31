@@ -757,6 +757,7 @@ static struct module_attribute modinfo_##field = {                    \
 
 MODINFO_ATTR(version);
 MODINFO_ATTR(srcversion);
+MODINFO_ATTR(kconfig_symbol);
 
 static char last_unloaded_module[MODULE_NAME_LEN+1];
 
