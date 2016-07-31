@@ -1246,18 +1246,20 @@ EXPORT_SYMBOL(drm_atomic_helper_commit);
  * Returns:
  * 0 on success, negative error code on failure.
  */
+
 int drm_atomic_helper_prepare_planes(struct drm_device *dev,
 				     struct drm_atomic_state *state)
 {
-	int nplanes = dev->mode_config.num_total_plane;
+	struct drm_plane *plane;
+	struct drm_plane_state *plane_state;
 	int ret, i;
 
-	for (i = 0; i < nplanes; i++) {
+	for_each_plane_in_state(state, plane, plane_state, i) {
 		const struct drm_plane_helper_funcs *funcs;
-		struct drm_plane *plane = state->planes[i];
-		struct drm_plane_state *plane_state = state->plane_states[i];
 
-		if (!plane)
+		plane->prepared = false;
+
+		if (plane->state->fb == plane_state->fb)
 			continue;
 
 		funcs = plane->helper_private;
@@ -1267,24 +1269,22 @@ int drm_atomic_helper_prepare_planes(struct drm_device *dev,
 			if (ret)
 				goto fail;
 		}
+		plane->prepared = true;
 	}
 
 	return 0;
 
 fail:
-	for (i--; i >= 0; i--) {
+	for_each_plane_in_state(state, plane, plane_state, i) {
 		const struct drm_plane_helper_funcs *funcs;
-		struct drm_plane *plane = state->planes[i];
-		struct drm_plane_state *plane_state = state->plane_states[i];
 
-		if (!plane)
+		if (!plane->prepared)
 			continue;
 
 		funcs = plane->helper_private;
 
 		if (funcs->cleanup_fb)
 			funcs->cleanup_fb(plane, plane_state);
-
 	}
 
 	return ret;
@@ -1526,6 +1526,9 @@ void drm_atomic_helper_cleanup_planes(struct drm_device *dev,
 
 	for_each_plane_in_state(old_state, plane, plane_state, i) {
 		const struct drm_plane_helper_funcs *funcs;
+
+		if (!plane->prepared)
+			continue;
 
 		funcs = plane->helper_private;
 

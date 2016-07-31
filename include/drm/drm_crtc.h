@@ -1531,6 +1531,7 @@ struct drm_plane {
 	uint32_t *format_types;
 	unsigned int format_count;
 	bool format_default;
+	bool prepared;
 
 	struct drm_crtc *crtc;
 	struct drm_framebuffer *fb;
