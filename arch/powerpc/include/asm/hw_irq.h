@@ -27,6 +27,13 @@
 #define PACA_IRQ_EE_EDGE	0x10 /* BookE only */
 #define PACA_IRQ_HMI		0x20
 
+/*
+ * flags for paca->soft_enabled
+ */
+#define IRQ_DISABLE_LEVEL_NONE		1
+#define IRQ_DISABLE_LEVEL_LINUX		0
+
+
 #endif /* CONFIG_PPC64 */
 
 #ifndef __ASSEMBLY__
