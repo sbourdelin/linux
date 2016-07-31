@@ -26,12 +26,16 @@
 #define PACA_IRQ_DEC		0x08 /* Or FIT */
 #define PACA_IRQ_EE_EDGE	0x10 /* BookE only */
 #define PACA_IRQ_HMI		0x20
+#define PACA_IRQ_PMI		0x40
 
 /*
  * flags for paca->soft_enabled
  */
 #define IRQ_DISABLE_LEVEL_NONE		0
 #define IRQ_DISABLE_LEVEL_LINUX		1
+#define IRQ_DISABLE_LEVEL_PMU		2
+
+#define MASK_IRQ_LEVEL		IRQ_DISABLE_LEVEL_LINUX | IRQ_DISABLE_LEVEL_PMU
 
 
 #endif /* CONFIG_PPC64 */

@@ -425,6 +425,8 @@ label##_relon_hv:						\
 #define SOFTEN_VALUE_0xe82	PACA_IRQ_DBELL
 #define SOFTEN_VALUE_0xe60	PACA_IRQ_HMI
 #define SOFTEN_VALUE_0xe62	PACA_IRQ_HMI
+#define SOFTEN_VALUE_0xf00	PACA_IRQ_PMI
+#define SOFTEN_VALUE_0xf01	PACA_IRQ_PMI
 
 #define __SOFTEN_TEST(h, vec, mask_lvl)					\
 	lbz	r10,PACASOFTIRQEN(r13);					\
@@ -462,6 +464,12 @@ label##_pSeries:							\
 	_MASKABLE_EXCEPTION_PSERIES(vec, label,				\
 				    EXC_STD, SOFTEN_TEST_PR, mask_lvl)
 
+#define MASKABLE_EXCEPTION_PSERIES_OOL(vec, label, mask_lvl)		\
+	.globl label##_pSeries;						\
+label##_pSeries:							\
+	__EXCEPTION_PROLOG_1(PACA_EXGEN, SOFTEN_TEST_PR, vec, mask_lvl);\
+	EXCEPTION_PROLOG_PSERIES_1(label##_common, EXC_STD);
+
 #define MASKABLE_EXCEPTION_HV(loc, vec, label, mask_lvl)		\
 	. = loc;							\
 	.globl label##_hv;						\
@@ -489,6 +497,12 @@ label##_hv:								\
 label##_relon_pSeries:							\
 	_MASKABLE_RELON_EXCEPTION_PSERIES(vec, label,			\
 					  EXC_STD, SOFTEN_NOTEST_PR, mask_lvl)
+
+#define MASKABLE_RELON_EXCEPTION_PSERIES_OOL(vec, label, mask_lvl)	\
+	.globl label##_relon_pSeries;					\
+label##_relon_pSeries:							\
+	__EXCEPTION_PROLOG_1(PACA_EXGEN, SOFTEN_NOTEST_PR, vec, mask_lvl);\
+	EXCEPTION_PROLOG_PSERIES_1(label##_common, EXC_STD);
 
 #define MASKABLE_RELON_EXCEPTION_HV(loc, vec, label, mask_lvl)		\
 	. = loc;							\
