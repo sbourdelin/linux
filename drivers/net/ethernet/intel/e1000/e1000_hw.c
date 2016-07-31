@@ -5390,7 +5390,7 @@ static s32 e1000_set_phy_mode(struct e1000_hw *hw)
 static s32 e1000_set_d3_lplu_state(struct e1000_hw *hw, bool active)
 {
 	s32 ret_val;
-	u16 phy_data;
+	u16 phy_data = 0;
 
 	if (hw->phy_type != e1000_phy_igp)
 		return E1000_SUCCESS;
