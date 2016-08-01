@@ -52,6 +52,7 @@
 #include <uapi/linux/netdevice.h>
 #include <uapi/linux/if_bonding.h>
 #include <uapi/linux/pkt_cls.h>
+#include <linux/hashtable.h>
 
 struct netpoll_info;
 struct device;
@@ -1778,6 +1779,9 @@ struct net_device {
 	unsigned int		num_tx_queues;
 	unsigned int		real_num_tx_queues;
 	struct Qdisc		*qdisc;
+#ifdef CONFIG_NET_SCHED
+	DECLARE_HASHTABLE	(qdisc_hash, 4);
+#endif
 	unsigned long		tx_queue_len;
 	spinlock_t		tx_global_lock;
 	int			watchdog_timeo;
