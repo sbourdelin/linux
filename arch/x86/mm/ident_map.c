@@ -3,15 +3,16 @@
  * included by both the compressed kernel and the regular kernel.
  */
 
-static void ident_pmd_init(unsigned long pmd_flag, pmd_t *pmd_page,
+static void ident_pmd_init(struct x86_mapping_info *info, pmd_t *pmd_page,
 			   unsigned long addr, unsigned long end)
 {
-	addr &= PMD_MASK;
-	for (; addr < end; addr += PMD_SIZE) {
-		pmd_t *pmd = pmd_page + pmd_index(addr);
+	int off = info->kernel_mapping ? pmd_index(__PAGE_OFFSET) : 0;
+
+	for (addr &= PMD_MASK; addr < end; addr += PMD_SIZE) {
+		pmd_t *pmd = pmd_page + pmd_index(addr) + off;
 
 		if (!pmd_present(*pmd))
-			set_pmd(pmd, __pmd(addr | pmd_flag));
+			set_pmd(pmd, __pmd(addr | info->pmd_flag));
 	}
 }
 
@@ -19,9 +20,10 @@ static int ident_pud_init(struct x86_mapping_info *info, pud_t *pud_page,
 			  unsigned long addr, unsigned long end)
 {
 	unsigned long next;
+	int off = info->kernel_mapping ? pud_index(__PAGE_OFFSET) : 0;
 
 	for (; addr < end; addr = next) {
-		pud_t *pud = pud_page + pud_index(addr);
+		pud_t *pud = pud_page + pud_index(addr) + off;
 		pmd_t *pmd;
 
 		next = (addr & PUD_MASK) + PUD_SIZE;
@@ -30,13 +32,13 @@ static int ident_pud_init(struct x86_mapping_info *info, pud_t *pud_page,
 
 		if (pud_present(*pud)) {
 			pmd = pmd_offset(pud, 0);
-			ident_pmd_init(info->pmd_flag, pmd, addr, next);
+			ident_pmd_init(info, pmd, addr, next);
 			continue;
 		}
 		pmd = (pmd_t *)info->alloc_pgt_page(info->context);
 		if (!pmd)
 			return -ENOMEM;
-		ident_pmd_init(info->pmd_flag, pmd, addr, next);
+		ident_pmd_init(info, pmd, addr, next);
 		set_pud(pud, __pud(__pa(pmd) | _KERNPG_TABLE));
 	}
 
