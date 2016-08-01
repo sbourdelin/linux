@@ -455,7 +455,7 @@ static const struct attribute_group xen_pmu_group = {
 	.attrs = xen_pmu_attrs,
 };
 
-static int __init xen_pmu_init(void)
+static int __init xen_sysfs_pmu_init(void)
 {
 	return sysfs_create_group(hypervisor_kobj, &xen_pmu_group);
 }
@@ -485,7 +485,7 @@ static int __init hyper_sysfs_init(void)
 		goto prop_out;
 #ifdef CONFIG_XEN_HAVE_VPMU
 	if (xen_initial_domain()) {
-		ret = xen_pmu_init();
+		ret = xen_sysfs_pmu_init();
 		if (ret) {
 			sysfs_remove_group(hypervisor_kobj,
 					   &xen_properties_group);
