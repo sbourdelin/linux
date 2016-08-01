@@ -682,6 +682,7 @@ void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size, pgprot_t prot)
 	const u64 dt_virt_base = __fix_to_virt(FIX_FDT);
 	int offset;
 	void *dt_virt;
+	int dt_header_map_size;
 
 	/*
 	 * Check whether the physical FDT address is set and meets the minimum
@@ -712,9 +713,18 @@ void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size, pgprot_t prot)
 	offset = dt_phys % SWAPPER_BLOCK_SIZE;
 	dt_virt = (void *)dt_virt_base + offset;
 
+	/*
+	 * fdt_check_header() maybe access any field of fdt header not
+	 * the first 8 bytes only, so map fdt header size at least for
+	 * checking fdt header without address fault more portably
+	 */
+	BUILD_BUG_ON(sizeof(struct fdt_header) > SWAPPER_BLOCK_SIZE);
+	dt_header_map_size = round_up(offset + sizeof(struct fdt_header),
+			SWAPPER_BLOCK_SIZE);
+
 	/* map the first chunk so we can read the size from the header */
 	create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE),
-			dt_virt_base, SWAPPER_BLOCK_SIZE, prot);
+			dt_virt_base, dt_header_map_size, prot);
 
 	if (fdt_check_header(dt_virt) != 0)
 		return NULL;
@@ -723,7 +733,7 @@ void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size, pgprot_t prot)
 	if (*size > MAX_FDT_SIZE)
 		return NULL;
 
-	if (offset + *size > SWAPPER_BLOCK_SIZE)
+	if (offset + *size > dt_header_map_size)
 		create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE), dt_virt_base,
 			       round_up(offset + *size, SWAPPER_BLOCK_SIZE), prot);
 
