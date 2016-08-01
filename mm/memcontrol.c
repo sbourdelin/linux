@@ -2543,6 +2543,11 @@ static int mem_cgroup_resize_memsw_limit(struct mem_cgroup *memcg,
 	return ret;
 }
 
+static inline bool soft_limit_tree_empty(struct mem_cgroup_tree_per_node *mctz)
+{
+	return RB_EMPTY_ROOT(&mctz->rb_root);
+}
+
 unsigned long mem_cgroup_soft_limit_reclaim(pg_data_t *pgdat, int order,
 					    gfp_t gfp_mask,
 					    unsigned long *total_scanned)
@@ -2559,6 +2564,9 @@ unsigned long mem_cgroup_soft_limit_reclaim(pg_data_t *pgdat, int order,
 		return 0;
 
 	mctz = soft_limit_tree_node(pgdat->node_id);
+	if (soft_limit_tree_empty(mctz))
+		return 0;
+
 	/*
 	 * This loop can run a while, specially if mem_cgroup's continuously
 	 * keep exceeding their soft limit and putting the system under
