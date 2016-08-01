@@ -1947,6 +1947,11 @@ static int nvme_pci_reset_ctrl(struct nvme_ctrl *ctrl)
 	return nvme_reset(to_nvme_dev(ctrl));
 }
 
+static int nvme_pci_alloc_user_cmb_wrapper(struct nvme_ctrl *ctrl, u64 size)
+{
+	return nvme_pci_alloc_user_cmb(to_nvme_dev(ctrl), size);
+}
+
 static const struct nvme_ctrl_ops nvme_pci_ctrl_ops = {
 	.module			= THIS_MODULE,
 	.reg_read32		= nvme_pci_reg_read32,
@@ -1956,6 +1961,7 @@ static const struct nvme_ctrl_ops nvme_pci_ctrl_ops = {
 	.free_ctrl		= nvme_pci_free_ctrl,
 	.post_scan		= nvme_pci_post_scan,
 	.submit_async_event	= nvme_pci_submit_async_event,
+	.alloc_user_cmb		= nvme_pci_alloc_user_cmb_wrapper,
 };
 
 static int nvme_dev_map(struct nvme_dev *dev)

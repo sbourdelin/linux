@@ -18,6 +18,8 @@
 
 struct nvme_dev;
 
+int nvme_pci_alloc_user_cmb(struct nvme_dev *dev, u64 size);
+
 void *nvme_alloc_cmb(struct nvme_dev *dev, size_t size, dma_addr_t *dma_addr);
 void nvme_free_cmb(struct nvme_dev *dev, void *addr, size_t size);
 

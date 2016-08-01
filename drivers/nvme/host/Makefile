@@ -5,4 +5,4 @@ nvme-core-y				:= core.o
 nvme-core-$(CONFIG_BLK_DEV_NVME_SCSI)	+= scsi.o
 nvme-core-$(CONFIG_NVM)			+= lightnvm.o
 
-nvme-y					+= pci.o
+nvme-y					+= pci.o dmabuf.o

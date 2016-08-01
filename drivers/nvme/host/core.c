@@ -1209,6 +1209,33 @@ out_unlock:
 	return ret;
 }
 
+static int nvme_alloc_user_cmb(struct nvme_ctrl *ctrl, struct nvme_ns *ns,
+			       struct nvme_alloc_user_cmb __user *ucmd)
+{
+	struct nvme_alloc_user_cmb cmd;
+	int status;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EACCES;
+	if (copy_from_user(&cmd, ucmd, sizeof(cmd)))
+		return -EFAULT;
+	if (cmd.flags || cmd.rsvd1 || cmd.opcode)
+		return -EINVAL;
+
+	if (!ctrl->ops->alloc_user_cmb)
+		return -ENOTTY;
+
+	status = ctrl->ops->alloc_user_cmb(ctrl, cmd.size);
+	if (status < 0)
+		return status;
+
+	cmd.fd = status;
+	if (copy_to_user(ucmd, &cmd, sizeof(cmd)))
+		return -EFAULT;
+
+	return 0;
+}
+
 static long nvme_dev_ioctl(struct file *file, unsigned int cmd,
 		unsigned long arg)
 {
@@ -1228,6 +1255,8 @@ static long nvme_dev_ioctl(struct file *file, unsigned int cmd,
 	case NVME_IOCTL_RESCAN:
 		nvme_queue_scan(ctrl);
 		return 0;
+	case NVME_IOCTL_ALLOC_USER_CMB:
+		return nvme_alloc_user_cmb(ctrl, NULL, argp);
 	default:
 		return -ENOTTY;
 	}
