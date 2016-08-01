@@ -127,7 +127,8 @@ _GLOBAL(csum_partial_copy_generic)
 	stw	r7,12(r1)
 	stw	r8,8(r1)
 
-	andi.	r0,r4,1			/* is destination address even ? */
+	rlwinm	r0,r4,3,0x8		/* is destination address even ? */
+	rlwnm	r6,r6,r0,0,31		/* swap bytes for odd destination */
 	cmplwi	cr7,r0,0
 	addic	r12,r6,0
 	addi	r6,r4,-4
