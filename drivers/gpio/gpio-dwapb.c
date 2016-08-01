@@ -317,7 +317,7 @@ static void dwapb_configure_irqs(struct dwapb_gpio *gpio,
 	}
 
 	irq_gc = irq_get_domain_generic_chip(gpio->domain, 0);
-	if (!irq_gc) {
+	if (IS_ERR(irq_gc)) {
 		irq_domain_remove(gpio->domain);
 		gpio->domain = NULL;
 		return;

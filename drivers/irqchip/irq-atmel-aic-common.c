@@ -122,7 +122,7 @@ static void __init aic_common_ext_irq_of_init(struct irq_domain *domain)
 
 	of_property_for_each_u32(node, "atmel,external-irqs", prop, p, hwirq) {
 		gc = irq_get_domain_generic_chip(domain, hwirq);
-		if (!gc) {
+		if (IS_ERR(gc)) {
 			pr_warn("AIC: external irq %d >= %d skip it\n",
 				hwirq, domain->revmap_size);
 			continue;

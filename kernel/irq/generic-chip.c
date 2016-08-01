@@ -340,10 +340,10 @@ irq_get_domain_generic_chip(struct irq_domain *d, unsigned int hw_irq)
 	int idx;
 
 	if (!dgc)
-		return NULL;
+		return ERR_PTR(-ENODEV);
 	idx = hw_irq / dgc->irqs_per_chip;
 	if (idx >= dgc->num_chips)
-		return NULL;
+		return ERR_PTR(-EINVAL);
 	return dgc->gc[idx];
 }
 EXPORT_SYMBOL_GPL(irq_get_domain_generic_chip);
@@ -368,13 +368,9 @@ int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
 	unsigned long flags;
 	int idx;
 
-	if (!d->gc)
-		return -ENODEV;
-
-	idx = hw_irq / dgc->irqs_per_chip;
-	if (idx >= dgc->num_chips)
-		return -EINVAL;
-	gc = dgc->gc[idx];
+	gc = irq_get_domain_generic_chip(d, hw_irq);
+	if (IS_ERR(gc))
+		return PTR_ERR(gc);
 
 	idx = hw_irq % dgc->irqs_per_chip;
 
@@ -417,15 +413,11 @@ void irq_unmap_generic_chip(struct irq_domain *d, unsigned int virq)
 	struct irq_domain_chip_generic *dgc = d->gc;
 	struct irq_chip_generic *gc;
 	unsigned int hw_irq = data->hwirq;
-	int chip_idx, irq_idx;
+	int irq_idx;
 
-	if (!d->gc)
+	gc = irq_get_domain_generic_chip(d, hw_irq);
+	if (IS_ERR(gc))
 		return;
-
-	chip_idx = hw_irq / dgc->irqs_per_chip;
-	if (chip_idx >= dgc->num_chips)
-		return;
-	gc = dgc->gc[chip_idx];
 
 	irq_idx = hw_irq % dgc->irqs_per_chip;
 
