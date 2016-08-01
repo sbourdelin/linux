@@ -246,6 +246,8 @@ void v4l_bound_align_image(unsigned int *w, unsigned int wmin,
 			   unsigned int hmax, unsigned int halign,
 			   unsigned int salign);
 
+int v4l2_s_selection(struct v4l2_selection *s, const struct v4l2_rect *r);
+
 struct v4l2_discrete_probe {
 	const struct v4l2_frmsize_discrete	*sizes;
 	int					num_sizes;

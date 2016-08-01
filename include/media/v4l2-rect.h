@@ -95,6 +95,21 @@ static inline bool v4l2_rect_same_size(const struct v4l2_rect *r1,
 }
 
 /**
+ * v4l2_rect_is_inside() - return true if inner is inside outer
+ * @inner: rectangle.
+ * @outer: rectangle.
+ *
+ * Return true if @inner fits inside @outer.
+ */
+static inline bool v4l2_rect_is_inside(const struct v4l2_rect *inner,
+				       const struct v4l2_rect *outer)
+{
+	return inner->left >= outer->left && inner->top >= outer->top &&
+	       inner->left + inner->width <= outer->left + outer->width &&
+	       inner->top + inner->height <= outer->top + outer->height;
+}
+
+/**
  * v4l2_rect_intersect() - calculate the intersection of two rects.
  * @r: intersection of @r1 and @r2.
  * @r1: rectangle.

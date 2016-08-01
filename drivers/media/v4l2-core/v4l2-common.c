@@ -61,6 +61,7 @@
 #include <media/v4l2-common.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-ctrls.h>
+#include <media/v4l2-rect.h>
 
 #include <linux/videodev2.h>
 
@@ -370,6 +371,30 @@ void v4l_bound_align_image(u32 *w, unsigned int wmin, unsigned int wmax,
 	}
 }
 EXPORT_SYMBOL_GPL(v4l_bound_align_image);
+
+/**
+ * v4l2_s_selection - Helper to check adjusted rectangle against constraint flags
+ *
+ * @s: pointer to &struct v4l2_selection containing the original rectangle
+ * @r: pointer to &struct v4l2_rect containing the adjusted rectangle.
+ *
+ * Returns -ERANGE if the adjusted rectangle doesn't fit the constraints
+ * or 0 if it is fine. On success it sets @s->r to @r.
+ */
+int v4l2_s_selection(struct v4l2_selection *s, const struct v4l2_rect *r)
+{
+	/* The original rect must lay inside the adjusted one */
+	if ((s->flags & V4L2_SEL_FLAG_GE) &&
+	    !v4l2_rect_is_inside(&s->r, r))
+		return -ERANGE;
+	/* The adjusted rect must lay inside the original one */
+	if ((s->flags & V4L2_SEL_FLAG_LE) &&
+	    !v4l2_rect_is_inside(r, &s->r))
+		return -ERANGE;
+	s->r = *r;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(v4l2_s_selection);
 
 const struct v4l2_frmsize_discrete *v4l2_find_nearest_format(
 		const struct v4l2_discrete_probe *probe,
