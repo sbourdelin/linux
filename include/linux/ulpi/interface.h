@@ -4,6 +4,7 @@
 #include <linux/types.h>
 
 struct ulpi;
+struct device;
 
 /**
  * struct ulpi_ops - ULPI register access
@@ -12,7 +13,6 @@ struct ulpi;
  * @write: write operation for ULPI register access
  */
 struct ulpi_ops {
-	struct device *dev;
 	int (*read)(struct device *dev, u8 addr);
 	int (*write)(struct device *dev, u8 addr, u8 val);
 };
