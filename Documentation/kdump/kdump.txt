@@ -394,6 +394,12 @@ Notes on loading the dump-capture kernel:
   dump. Hence generally it is useful either to build a UP dump-capture
   kernel or specify maxcpus=1 option while loading dump-capture kernel.
 
+* We should bring up a SMP dump-capture kernel if we intend to use multi-threads
+  programs with it, such as parallel dump feature of makedumpfile. Otherwise,
+  the multi-threads program may have a great performance degradation.
+  To bring up a SMP dump-capture kernel, we should specify maxcpus=[X] and
+  disable_cpu_apic=[Y] options while loading it.
+
 * For s390x there are two kdump modes: If a ELF header is specified with
   the elfcorehdr= kernel parameter, it is used by the kdump kernel as it
   is done on all other architectures. If no elfcorehdr= kernel parameter is
