@@ -68,6 +68,8 @@ cleanmediadocs:
 cleandocs:
 	$(Q)rm -rf $(BUILDDIR)
 
+endif # HAVE_SPHINX
+
 dochelp:
 	@echo  ' Linux kernel internal documentation in different formats (Sphinx):'
 	@echo  '  htmldocs        - HTML'
@@ -75,5 +77,3 @@ dochelp:
 	@echo  '  epubdocs        - EPUB'
 	@echo  '  xmldocs         - XML'
 	@echo  '  cleandocs       - clean all generated files'
-
-endif # HAVE_SPHINX
