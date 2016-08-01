@@ -44,6 +44,7 @@
 #include <linux/in.h>
 #include <linux/in6.h>
 #include <net/addrconf.h>
+#include <linux/dma-buf.h>
 
 #include <rdma/ib_verbs.h>
 #include <rdma/ib_cache.h>
@@ -1922,3 +1923,62 @@ void ib_drain_qp(struct ib_qp *qp)
 		ib_drain_rq(qp);
 }
 EXPORT_SYMBOL(ib_drain_qp);
+
+int ib_mr_attach_dmabuf(struct ib_mr *mr, struct dma_buf *dmabuf, int access)
+{
+	struct device *dev = mr->device->dma_device;
+	struct dma_buf_attachment *attach;
+	struct sg_table *sg;
+	int err;
+	int n;
+
+	get_dma_buf(dmabuf);
+
+	attach = dma_buf_attach(dmabuf, dev);
+	if (IS_ERR(attach)) {
+		dev_err(dev, "unable to attach to DMA-BUF object (from %s): %ld",
+			dmabuf->exp_name, PTR_ERR(attach));
+		err = PTR_ERR(attach);
+		goto put_dma_buf;
+	}
+
+	sg = dma_buf_map_attachment(attach, DMA_BIDIRECTIONAL);
+	if (IS_ERR(sg)) {
+		dev_err(dev, "unable to map a DMA-BUF object (from %s): %ld",
+			dmabuf->exp_name, PTR_ERR(sg));
+		err = PTR_ERR(sg);
+		goto detach;
+	}
+
+	n = ib_map_mr_sg_zbva(mr, sg->sgl, sg->nents, NULL, PAGE_SIZE);
+	if (unlikely(n != sg->nents)) {
+		dev_err(dev, "failed to map sg (%d/%d) of DMA-BUF object (from %s)\n",
+			n, sg->nents, dmabuf->exp_name);
+		err = n < 0 ? n : -EINVAL;
+		goto unmap;
+	}
+
+	mr->attach = attach;
+	mr->sg = sg;
+	return 0;
+
+unmap:
+	dma_buf_unmap_attachment(attach, sg, DMA_BIDIRECTIONAL);
+detach:
+	dma_buf_detach(dmabuf, attach);
+put_dma_buf:
+	dma_buf_put(dmabuf);
+	return err;
+}
+EXPORT_SYMBOL(ib_mr_attach_dmabuf);
+
+void ib_mr_detach_dmabuf(struct dma_buf_attachment *attach,
+			 struct sg_table *sg)
+{
+	struct dma_buf *dmabuf = attach->dmabuf;
+
+	dma_buf_unmap_attachment(attach, sg, DMA_BIDIRECTIONAL);
+	dma_buf_detach(dmabuf, attach);
+	dma_buf_put(dmabuf);
+}
+EXPORT_SYMBOL(ib_mr_detach_dmabuf);

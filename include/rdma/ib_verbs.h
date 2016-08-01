@@ -1465,6 +1465,9 @@ struct ib_mr {
 		struct ib_uobject	*uobject;	/* user */
 		struct list_head	qp_entry;	/* FR */
 	};
+	/* For MRs that expose a DMA-BUF */
+	struct dma_buf_attachment *attach;
+	struct sg_table *sg;
 };
 
 struct ib_mw {
@@ -3189,4 +3192,10 @@ int ib_sg_to_pages(struct ib_mr *mr, struct scatterlist *sgl, int sg_nents,
 void ib_drain_rq(struct ib_qp *qp);
 void ib_drain_sq(struct ib_qp *qp);
 void ib_drain_qp(struct ib_qp *qp);
+
+struct dma_buf;
+int ib_mr_attach_dmabuf(struct ib_mr *mr, struct dma_buf *dmabuf, int access);
+void ib_mr_detach_dmabuf(struct dma_buf_attachment *attach,
+			 struct sg_table *sg);
+
 #endif /* IB_VERBS_H */
