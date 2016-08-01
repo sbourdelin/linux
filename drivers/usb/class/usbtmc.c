@@ -549,7 +549,7 @@ static int send_request_dev_dep_msg_in(struct usbtmc_device_data *data, size_t t
 	/* Setup IO buffer for REQUEST_DEV_DEP_MSG_IN message
 	 * Refer to class specs for details
 	 */
-	buffer[0] = 2;
+	buffer[0] = 127;
 	buffer[1] = data->bTag;
 	buffer[2] = ~data->bTag;
 	buffer[3] = 0; /* Reserved */
@@ -677,8 +677,8 @@ static ssize_t usbtmc_read(struct file *filp, char __user *buf,
 				goto exit;
 			}
 
-			if (buffer[0] != 2) {
-				dev_err(dev, "Device sent reply with wrong MsgID: %u != 2\n", buffer[0]);
+			if (buffer[0] != 127) {
+				dev_err(dev, "Device sent reply with wrong MsgID: %u != 127\n", buffer[0]);
 				if (data->auto_abort)
 					usbtmc_ioctl_abort_bulk_in(data);
 				goto exit;
@@ -807,7 +807,7 @@ static ssize_t usbtmc_write(struct file *filp, const char __user *buf,
 		}
 
 		/* Setup IO buffer for DEV_DEP_MSG_OUT message */
-		buffer[0] = 1;
+		buffer[0] = 126;
 		buffer[1] = data->bTag;
 		buffer[2] = ~data->bTag;
 		buffer[3] = 0; /* Reserved */
