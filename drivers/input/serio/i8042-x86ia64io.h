@@ -510,6 +510,66 @@ static const struct dmi_system_id __initconst i8042_dmi_nomux_table[] = {
 	{ }
 };
 
+/*
+ * On some hardware just running the self test causes problems.
+ */
+static const struct dmi_system_id __initconst i8042_dmi_noselftest_table[] = {
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "ASUSTeK COMPUTER INC."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "K401LB"),
+		},
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "ASUSTeK COMPUTER INC."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "K501LB"),
+		},
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "ASUSTeK COMPUTER INC."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "K501LD"),
+		},
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "ASUSTeK COMPUTER INC."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "K501LX"),
+		},
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "ASUSTeK COMPUTER INC."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "X302LA"),
+		},
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "ASUSTeK COMPUTER INC."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "X450LCP"),
+		},
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "ASUSTeK COMPUTER INC."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "X450LD"),
+		},
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "ASUSTeK COMPUTER INC."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "X455LAB"),
+		},
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "ASUSTeK COMPUTER INC."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "X455LDB"),
+		},
+	},
+	{ }
+};
 static const struct dmi_system_id __initconst i8042_dmi_reset_table[] = {
 	{
 		/* MSI Wind U-100 */
@@ -1076,8 +1136,14 @@ static int __init i8042_platform_init(void)
 #endif
 
 #ifdef CONFIG_X86
-	if (dmi_check_system(i8042_dmi_reset_table))
-		i8042_reset = true;
+	/* Honor module parameter when value is not default */
+	if (i8042_reset == I8042_RESET_ON_RESUME) {
+		if (dmi_check_system(i8042_dmi_reset_table))
+			i8042_reset = I8042_RESET_ALWAYS;
+
+		if (dmi_check_system(i8042_dmi_noselftest_table))
+			i8042_reset = I8042_RESET_NEVER;
+	}
 
 	if (dmi_check_system(i8042_dmi_noloop_table))
 		i8042_noloop = true;
