@@ -25,6 +25,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/workqueue.h>
 
+#include <linux/usb/charger.h>
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
 #include <linux/usb.h>
@@ -578,11 +579,16 @@ EXPORT_SYMBOL_GPL(usb_gadget_vbus_connect);
  * reporting how much power the device may consume.  For example, this
  * could affect how quickly batteries are recharged.
  *
+ * It will also notify the USB charger how much power the device may
+ * consume if there is a USB charger linking with the gadget.
+ *
  * Returns zero on success, else negative errno.
  */
 int usb_gadget_vbus_draw(struct usb_gadget *gadget, unsigned mA)
 {
 	int ret = 0;
+
+	usb_charger_set_cur_limit_by_gadget(gadget, mA);
 
 	if (!gadget->ops->vbus_draw) {
 		ret = -EOPNOTSUPP;
@@ -965,6 +971,9 @@ static void usb_gadget_state_work(struct work_struct *work)
 	struct usb_gadget *gadget = work_to_gadget(work);
 	struct usb_udc *udc = gadget->udc;
 
+	/* when the gadget state is changed, then report to USB charger */
+	usb_charger_plug_by_gadget(gadget, gadget->state);
+
 	if (udc)
 		sysfs_notify(&udc->dev.kobj, NULL, "state");
 }
@@ -1134,6 +1143,10 @@ int usb_add_gadget_udc_release(struct device *parent, struct usb_gadget *gadget,
 	if (ret)
 		goto err4;
 
+	ret = usb_charger_init(gadget);
+	if (ret)
+		goto err5;
+
 	usb_gadget_set_state(gadget, USB_STATE_NOTATTACHED);
 	udc->vbus = true;
 
@@ -1153,6 +1166,9 @@ int usb_add_gadget_udc_release(struct device *parent, struct usb_gadget *gadget,
 	mutex_unlock(&udc_lock);
 
 	return 0;
+
+err5:
+	device_del(&udc->dev);
 
 err4:
 	list_del(&udc->list);
@@ -1262,6 +1278,7 @@ void usb_del_gadget_udc(struct usb_gadget *gadget)
 	kobject_uevent(&udc->dev.kobj, KOBJ_REMOVE);
 	flush_work(&gadget->work);
 	device_unregister(&udc->dev);
+	usb_charger_exit(gadget);
 	device_unregister(&gadget->dev);
 }
 EXPORT_SYMBOL_GPL(usb_del_gadget_udc);
