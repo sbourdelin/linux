@@ -86,4 +86,11 @@ config ST_REMOTEPROC
 	  processor framework.
 	  This can be either built-in or a loadable module.
 
+config ST_SLIM_REMOTEPROC
+	tristate "ST Slim remoteproc support"
+	help
+	  Say y here to support firmware loading on IP based around
+	  the Slim core.
+	  If unsure say N.
+
 endmenu
