@@ -19,6 +19,7 @@ Optional properties:
  - reset-names : must contain "ahb"
  - for cd, bus-width and additional generic mmc parameters
    please refer to mmc.txt within this directory
+ - allwinner,new-timings: the controller may accept the "New Timings" mode
 
 Examples:
 	- Within .dtsi:
