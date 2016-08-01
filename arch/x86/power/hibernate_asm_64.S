@@ -23,6 +23,16 @@
 #include <asm/processor-flags.h>
 #include <asm/frame.h>
 
+/*
+ * A global variable holds the page_offset when KASLR memory randomization
+ * is enabled.
+ */
+#ifdef CONFIG_RANDOMIZE_MEMORY
+#define __PAGE_OFFSET_REF __PAGE_OFFSET
+#else
+#define __PAGE_OFFSET_REF $__PAGE_OFFSET
+#endif
+
 ENTRY(swsusp_arch_suspend)
 	movq	$saved_context, %rax
 	movq	%rsp, pt_regs_sp(%rax)
@@ -72,7 +82,7 @@ ENTRY(restore_image)
 	/* code below has been relocated to a safe page */
 ENTRY(core_restore_code)
 	/* switch to temporary page tables */
-	movq	$__PAGE_OFFSET, %rcx
+	movq	__PAGE_OFFSET_REF, %rcx
 	subq	%rcx, %rax
 	movq	%rax, %cr3
 	/* flush TLB */
