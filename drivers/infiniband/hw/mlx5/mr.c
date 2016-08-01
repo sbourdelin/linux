@@ -39,6 +39,7 @@
 #include <rdma/ib_umem.h>
 #include <rdma/ib_umem_odp.h>
 #include <rdma/ib_verbs.h>
+#include <linux/dma-buf.h>
 #include "mlx5_ib.h"
 #include "user.h"
 
@@ -1447,6 +1448,8 @@ int mlx5_ib_dereg_mr(struct ib_mr *ibmr)
 	struct mlx5_ib_mr *mr = to_mmr(ibmr);
 	int npages = mr->npages;
 	struct ib_umem *umem = mr->umem;
+	struct dma_buf_attachment *attach = ibmr->attach;
+	struct sg_table *sg = ibmr->sg;
 
 #ifdef CONFIG_INFINIBAND_ON_DEMAND_PAGING
 	if (umem && umem->odp_data) {
@@ -1476,6 +1479,9 @@ int mlx5_ib_dereg_mr(struct ib_mr *ibmr)
 		ib_umem_release(umem);
 		atomic_sub(npages, &dev->mdev->priv.reg_pages);
 	}
+
+	if (attach)
+		ib_mr_detach_dmabuf(attach, sg);
 
 	return 0;
 }
@@ -1784,4 +1790,49 @@ int mlx5_ib_map_mr_sg(struct ib_mr *ibmr, struct scatterlist *sg, int sg_nents,
 				      DMA_TO_DEVICE);
 
 	return n;
+}
+
+struct ib_mr *mlx5_ib_reg_user_dma_buf_mr(struct ib_pd *pd,
+					  struct dma_buf *dmabuf,
+					  int mr_access_flags,
+					  struct ib_udata *udata)
+{
+	struct mlx5_ib_dev *dev = to_mdev(pd->device);
+	struct ib_mr *mr;
+	struct mlx5_ib_umr_context umr_context;
+	struct ib_reg_wr regwr = {};
+	int ret;
+
+	if (mr_access_flags & IB_ACCESS_ON_DEMAND) {
+		mlx5_ib_err(dev, "reg DMA-BUF MR with on-demand paging not supported");
+		return ERR_PTR(-EINVAL);
+	}
+
+	mr = ib_alloc_mr(pd, IB_MR_TYPE_MEM_REG,
+			 DIV_ROUND_UP(dmabuf->size, PAGE_SIZE));
+	if (IS_ERR(mr))
+		return mr;
+
+	ret = ib_mr_attach_dmabuf(mr, dmabuf, mr_access_flags);
+	if (ret)
+		goto dereg;
+
+	mlx5_ib_init_umr_context(&umr_context);
+	regwr.wr.wr_cqe = &umr_context.cqe;
+	regwr.wr.opcode = IB_WR_REG_MR;
+	regwr.mr = mr;
+	regwr.key = mr->lkey;
+	regwr.access = mr_access_flags;
+
+	ret = mlx5_ib_post_umr_sync(dev, &regwr.wr);
+	if (ret)
+		goto detach;
+
+	return mr;
+
+detach:
+	ib_mr_detach_dmabuf(mr->attach, mr->sg);
+dereg:
+	WARN_ON_ONCE(ib_dereg_mr(mr));
+	return ERR_PTR(ret);
 }
