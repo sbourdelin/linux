@@ -748,8 +748,13 @@ static int __init opal_init(void)
 
 	/* Initialize platform devices: IPMI backend, PRD & flash interface */
 	opal_pdev_init(opal_node, "ibm,opal-ipmi");
-	opal_pdev_init(opal_node, "ibm,opal-flash");
+	opal_pdev_init(opal_node, "ibm,opal-flash"); // old <= P8 flash location
 	opal_pdev_init(opal_node, "ibm,opal-prd");
+
+	/* New >= P9 flash location */
+	np = of_get_child_by_name(opal_node, "flash");
+	if (np)
+		opal_pdev_init(np, "ibm,opal-flash");
 
 	/* Initialise OPAL kmsg dumper for flushing console on panic */
 	opal_kmsg_init();
