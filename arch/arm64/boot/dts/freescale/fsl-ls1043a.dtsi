@@ -239,6 +239,12 @@
 			bus-width = <4>;
 		};
 
+		rcpm: rcpm@1ee2000 {
+			compatible = "fsl,ls1043a-rcpm", "fsl,qoriq-rcpm-2.1";
+			reg = <0x0 0x1ee2000 0x0 0x1000>;
+			fsl,#rcpm-wakeup-cells = <1>;
+		};
+
 		dspi0: dspi@2100000 {
 			compatible = "fsl,ls1043a-dspi", "fsl,ls1021a-v1.0-dspi";
 			#address-cells = <1>;
