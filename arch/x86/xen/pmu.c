@@ -547,8 +547,11 @@ void xen_pmu_init(int cpu)
 	return;
 
 fail:
-	pr_info_once("Could not initialize VPMU for cpu %d, error %d\n",
-		cpu, err);
+	if (err == -EOPNOTSUPP)
+		pr_info_once("VPMU usage disabled due to Xen settings\n");
+	else
+		pr_info_once("Could not initialize VPMU for cpu %d, error %d\n",
+			cpu, err);
 	free_pages((unsigned long)xenpmu_data, 0);
 }
 
