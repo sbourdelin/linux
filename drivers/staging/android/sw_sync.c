@@ -134,7 +134,7 @@ static void sync_timeline_signal(struct sync_timeline *obj, unsigned int inc)
  * NULL in case of error.
  */
 static struct sync_pt *sync_pt_create(struct sync_timeline *obj, int size,
-			     unsigned int value)
+				      unsigned int value)
 {
 	unsigned long flags;
 	struct sync_pt *pt;
@@ -204,13 +204,13 @@ static bool timeline_fence_enable_signaling(struct fence *fence)
 }
 
 static void timeline_fence_value_str(struct fence *fence,
-				    char *str, int size)
+				     char *str, int size)
 {
 	snprintf(str, size, "%d", fence->seqno);
 }
 
 static void timeline_fence_timeline_value_str(struct fence *fence,
-					     char *str, int size)
+					      char *str, int size)
 {
 	struct sync_timeline *parent = fence_parent(fence);
 

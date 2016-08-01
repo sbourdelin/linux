@@ -92,7 +92,7 @@ static void sync_print_fence(struct seq_file *s, struct fence *fence, bool show)
 	}
 
 	if (fence->ops->timeline_value_str &&
-		fence->ops->fence_value_str) {
+	    fence->ops->fence_value_str) {
 		char value[64];
 		bool success;
 
@@ -103,7 +103,7 @@ static void sync_print_fence(struct seq_file *s, struct fence *fence, bool show)
 			seq_printf(s, ": %s", value);
 
 			fence->ops->timeline_value_str(fence, value,
-						       sizeof(value));
+					sizeof(value));
 
 			if (strlen(value))
 				seq_printf(s, " / %s", value);
@@ -130,7 +130,7 @@ static void sync_print_obj(struct seq_file *s, struct sync_timeline *obj)
 }
 
 static void sync_print_sync_file(struct seq_file *s,
-				  struct sync_file *sync_file)
+				 struct sync_file *sync_file)
 {
 	int i;
 
