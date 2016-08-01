@@ -42,8 +42,10 @@
 #include <linux/types.h>
 #include <linux/io-64-nonatomic-lo-hi.h>
 #include <asm/unaligned.h>
+#include <linux/genalloc.h>
 
 #include "nvme.h"
+#include "nvme-pci.h"
 
 #define NVME_Q_DEPTH		1024
 #define NVME_AQ_DEPTH		256
@@ -99,6 +101,7 @@ struct nvme_dev {
 	dma_addr_t cmb_dma_addr;
 	u64 cmb_size;
 	u32 cmbsz;
+	struct gen_pool *cmb_pool;
 	struct nvme_ctrl ctrl;
 	struct completion ioq_wait;
 };
@@ -937,11 +940,17 @@ static void nvme_cancel_io(struct request *req, void *data, bool reserved)
 
 static void nvme_free_queue(struct nvme_queue *nvmeq)
 {
+	struct nvme_dev *dev = nvmeq->dev;
+
 	dma_free_coherent(nvmeq->q_dmadev, CQ_SIZE(nvmeq->q_depth),
 				(void *)nvmeq->cqes, nvmeq->cq_dma_addr);
 	if (nvmeq->sq_cmds)
 		dma_free_coherent(nvmeq->q_dmadev, SQ_SIZE(nvmeq->q_depth),
 					nvmeq->sq_cmds, nvmeq->sq_dma_addr);
+	if (nvmeq->sq_cmds_io)
+		nvme_free_cmb(dev, nvmeq->sq_cmds_io,
+			      roundup(SQ_SIZE(nvmeq->q_depth),
+				      dev->ctrl.page_size));
 	kfree(nvmeq);
 }
 
@@ -1032,10 +1041,12 @@ static int nvme_alloc_sq_cmds(struct nvme_dev *dev, struct nvme_queue *nvmeq,
 				int qid, int depth)
 {
 	if (qid && dev->cmb && use_cmb_sqes && NVME_CMB_SQS(dev->cmbsz)) {
-		unsigned offset = (qid - 1) * roundup(SQ_SIZE(depth),
-						      dev->ctrl.page_size);
-		nvmeq->sq_dma_addr = dev->cmb_dma_addr + offset;
-		nvmeq->sq_cmds_io = dev->cmb + offset;
+		nvmeq->sq_cmds_io =
+			nvme_alloc_cmb(dev, roundup(SQ_SIZE(depth),
+						    dev->ctrl.page_size),
+				       &nvmeq->sq_dma_addr);
+		if (!nvmeq->sq_cmds_io)
+			return -ENOMEM;
 	} else {
 		nvmeq->sq_cmds = dma_alloc_coherent(dev->dev, SQ_SIZE(depth),
 					&nvmeq->sq_dma_addr, GFP_KERNEL);
@@ -1339,6 +1350,7 @@ static void __iomem *nvme_map_cmb(struct nvme_dev *dev)
 	struct pci_dev *pdev = to_pci_dev(dev->dev);
 	void __iomem *cmb;
 	dma_addr_t dma_addr;
+	int ret;
 
 	if (!use_cmb_sqes)
 		return NULL;
@@ -1372,15 +1384,49 @@ static void __iomem *nvme_map_cmb(struct nvme_dev *dev)
 
 	dev->cmb_dma_addr = dma_addr;
 	dev->cmb_size = size;
+
+	dev->cmb_pool = gen_pool_create(PAGE_SHIFT, -1);
+	if (!dev->cmb_pool)
+		goto unmap;
+
+	ret = gen_pool_add_virt(dev->cmb_pool, (unsigned long)(uintptr_t)cmb,
+				dma_addr, size, -1);
+	if (ret)
+		goto destroy_pool;
+
 	return cmb;
+
+destroy_pool:
+	gen_pool_destroy(dev->cmb_pool);
+	dev->cmb_pool = NULL;
+unmap:
+	iounmap(cmb);
+	return NULL;
 }
 
 static inline void nvme_release_cmb(struct nvme_dev *dev)
 {
 	if (dev->cmb) {
+		gen_pool_destroy(dev->cmb_pool);
 		iounmap(dev->cmb);
 		dev->cmb = NULL;
 	}
+}
+
+void *nvme_alloc_cmb(struct nvme_dev *dev, size_t size, dma_addr_t *dma_addr)
+{
+	if (!dev->cmb_pool)
+		return NULL;
+
+	return gen_pool_dma_alloc(dev->cmb_pool, size, dma_addr);
+}
+
+void nvme_free_cmb(struct nvme_dev *dev, void *addr, size_t size)
+{
+	if (WARN_ON(!dev->cmb_pool))
+		return;
+
+	gen_pool_free(dev->cmb_pool, (unsigned long)(uintptr_t)addr, size);
 }
 
 static size_t db_bar_size(struct nvme_dev *dev, unsigned nr_io_queues)
