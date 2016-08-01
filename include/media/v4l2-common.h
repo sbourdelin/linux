@@ -246,6 +246,17 @@ void v4l_bound_align_image(unsigned int *w, unsigned int wmin,
 			   unsigned int hmax, unsigned int halign,
 			   unsigned int salign);
 
+/**
+ * v4l2_s_selection - Helper to check adjusted rectangle against constraint flags
+ *
+ * @s: pointer to &struct v4l2_selection containing the original rectangle
+ * @r: pointer to &struct v4l2_rect containing the adjusted rectangle.
+ *
+ * Returns -ERANGE if the adjusted rectangle doesn't fit the constraints
+ * or 0 if it is fine. On success it sets @s->r to @r.
+ */
+int v4l2_s_selection(struct v4l2_selection *s, const struct v4l2_rect *r);
+
 struct v4l2_discrete_probe {
 	const struct v4l2_frmsize_discrete	*sizes;
 	int					num_sizes;
