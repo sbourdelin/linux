@@ -1,0 +1,18 @@
+Hisilicon PWM controller
+
+Required properties:
+ - compatible: should be "hisilicon,hibvt-pwm" and one of the following:
+			"hisilicon,hi3516cv300-pwm".
+ - reg: physical base address and length of the controller's registers.
+ - clocks: phandle and clock specifier of the PWM reference clock.
+ - resets: offset address and offset bit for reset or unreset of the controller.
+ - pwm-nums: pwm number of the controller.
+
+Example:
+	pwm: pwm@12130000 {                                                                                                                                     
+		compatible = "hisilicon,hibvt-pwm";
+		reg = <0x12130000 0x10000>;
+		clocks = <&crg_ctrl HI3516CV300_PWM_CLK>;
+		resets = <&crg_ctrl 0x38 0>;
+		pwm-nums = <4>;
+	};
