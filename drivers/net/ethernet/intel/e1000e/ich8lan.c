@@ -155,6 +155,7 @@ static void e1000_gate_hw_phy_config_ich8lan(struct e1000_hw *hw, bool gate);
 static s32 e1000_disable_ulp_lpt_lp(struct e1000_hw *hw, bool force);
 static s32 e1000_setup_copper_link_pch_lpt(struct e1000_hw *hw);
 static s32 e1000_oem_bits_config_ich8lan(struct e1000_hw *hw, bool d0_state);
+static s32 e1000_reset_hw_ich8lan(struct e1000_hw *hw);
 
 static inline u16 __er16flash(struct e1000_hw *hw, unsigned long reg)
 {
@@ -459,8 +460,12 @@ static s32 e1000_init_phy_params_pchlan(struct e1000_hw *hw)
 	phy->id = e1000_phy_unknown;
 
 	ret_val = e1000_init_phy_workarounds_pchlan(hw);
-	if (ret_val)
-		return ret_val;
+	if (ret_val) {
+		e1000_reset_hw_ich8lan(hw);
+		ret_val = e1000_init_phy_workarounds_pchlan(hw);
+		if (ret_val)
+			return ret_val;
+	}
 
 	if (phy->id == e1000_phy_unknown)
 		switch (hw->mac.type) {
