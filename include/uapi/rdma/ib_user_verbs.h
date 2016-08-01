@@ -95,6 +95,7 @@ enum {
 	IB_USER_VERBS_EX_CMD_CREATE_QP = IB_USER_VERBS_CMD_CREATE_QP,
 	IB_USER_VERBS_EX_CMD_CREATE_FLOW = IB_USER_VERBS_CMD_THRESHOLD,
 	IB_USER_VERBS_EX_CMD_DESTROY_FLOW,
+	IB_USER_VERBS_EX_CMD_REG_DMA_BUF_MR,
 };
 
 /*
@@ -318,6 +319,23 @@ struct ib_uverbs_rereg_mr {
 struct ib_uverbs_rereg_mr_resp {
 	__u32 lkey;
 	__u32 rkey;
+};
+
+struct ib_uverbs_ex_reg_dma_buf_mr {
+	__u64 response;
+	__u32 fd;
+	__u32 access_flags;
+	__u32 pd_handle;
+	__u32 comp_mask;
+};
+
+struct ib_uverbs_ex_reg_dma_buf_mr_resp {
+	__u32 mr_handle;
+	__u32 lkey;
+	__u32 rkey;
+	__u32 comp_mask;
+	__u32 response_length;
+	__u32 reserved;
 };
 
 struct ib_uverbs_dereg_mr {

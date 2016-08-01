@@ -1677,6 +1677,7 @@ struct ib_dma_mapping_ops {
 };
 
 struct iw_cm_verbs;
+struct dma_buf;
 
 struct ib_port_immutable {
 	int                           pkey_tbl_len;
@@ -1866,6 +1867,11 @@ struct ib_device {
 						    int mr_access_flags,
 						    struct ib_pd *pd,
 						    struct ib_udata *udata);
+	struct ib_mr *             (*reg_user_dma_buf_mr)(
+					struct ib_pd *pd,
+					struct dma_buf *dmabuf,
+					int mr_access_flags,
+					struct ib_udata *udata);
 	int                        (*dereg_mr)(struct ib_mr *mr);
 	struct ib_mr *		   (*alloc_mr)(struct ib_pd *pd,
 					       enum ib_mr_type mr_type,

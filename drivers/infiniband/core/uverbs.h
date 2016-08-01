@@ -275,5 +275,6 @@ IB_UVERBS_DECLARE_EX_CMD(destroy_flow);
 IB_UVERBS_DECLARE_EX_CMD(query_device);
 IB_UVERBS_DECLARE_EX_CMD(create_cq);
 IB_UVERBS_DECLARE_EX_CMD(create_qp);
+IB_UVERBS_DECLARE_EX_CMD(reg_dma_buf_mr);
 
 #endif /* UVERBS_H */

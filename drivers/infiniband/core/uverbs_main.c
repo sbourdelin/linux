@@ -130,6 +130,7 @@ static int (*uverbs_ex_cmd_table[])(struct ib_uverbs_file *file,
 	[IB_USER_VERBS_EX_CMD_QUERY_DEVICE]	= ib_uverbs_ex_query_device,
 	[IB_USER_VERBS_EX_CMD_CREATE_CQ]	= ib_uverbs_ex_create_cq,
 	[IB_USER_VERBS_EX_CMD_CREATE_QP]        = ib_uverbs_ex_create_qp,
+	[IB_USER_VERBS_EX_CMD_REG_DMA_BUF_MR]   = ib_uverbs_ex_reg_dma_buf_mr,
 };
 
 static void ib_uverbs_add_one(struct ib_device *device);

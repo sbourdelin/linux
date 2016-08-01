@@ -37,6 +37,7 @@
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/sched.h>
+#include <linux/dma-buf.h>
 
 #include <asm/uaccess.h>
 
@@ -1122,6 +1123,116 @@ put_uobjs:
 
 	put_uobj_write(mr->uobject);
 
+	return ret;
+}
+
+int ib_uverbs_ex_reg_dma_buf_mr(struct ib_uverbs_file *file,
+				struct ib_device *ib_dev,
+				struct ib_udata *ucore, struct ib_udata *uhw)
+{
+	struct ib_uverbs_ex_reg_dma_buf_mr      cmd;
+	struct ib_uverbs_ex_reg_dma_buf_mr_resp resp;
+	struct ib_uobject           *uobj;
+	struct ib_pd                *pd;
+	struct ib_mr                *mr;
+	struct dma_buf		    *dmabuf;
+	int                          ret;
+
+	if (ucore->inlen < sizeof(cmd))
+		return -EINVAL;
+
+	ret = ib_copy_from_udata(&cmd, ucore, sizeof(cmd));
+	if (ret)
+		return ret;
+
+	if (cmd.comp_mask)
+		return -EINVAL;
+
+	if (ucore->outlen < (offsetof(typeof(resp), response_length) +
+			     sizeof(resp.response_length)))
+		return -ENOSPC;
+
+	ret = ib_check_mr_access(cmd.access_flags);
+	if (ret)
+		return ret;
+
+	dmabuf = dma_buf_get(cmd.fd);
+	if (IS_ERR(dmabuf))
+		return PTR_ERR(dmabuf);
+
+	uobj = kmalloc(sizeof(*uobj), GFP_KERNEL);
+	if (!uobj) {
+		ret = -ENOMEM;
+		goto err_dma_buf;
+	}
+
+	init_uobj(uobj, 0, file->ucontext, &mr_lock_class);
+	down_write(&uobj->mutex);
+
+	pd = idr_read_pd(cmd.pd_handle, file->ucontext);
+	if (!pd) {
+		ret = -EINVAL;
+		goto err_free;
+	}
+
+	if (!pd->device->reg_user_dma_buf_mr) {
+		ret = -EINVAL;
+		goto err_put;
+	}
+
+	mr = pd->device->reg_user_dma_buf_mr(pd, dmabuf, cmd.access_flags, uhw);
+	if (IS_ERR(mr)) {
+		ret = PTR_ERR(mr);
+		goto err_put;
+	}
+
+	mr->device  = pd->device;
+	mr->pd      = pd;
+	mr->uobject = uobj;
+
+	uobj->object = mr;
+	ret = idr_add_uobj(&ib_uverbs_mr_idr, uobj);
+	if (ret)
+		goto err_unreg;
+
+	memset(&resp, 0, sizeof(resp));
+	resp.lkey      = mr->lkey;
+	resp.rkey      = mr->rkey;
+	resp.mr_handle = uobj->id;
+	resp.response_length = sizeof(resp);
+
+	if (ib_copy_to_udata(ucore, &resp, resp.response_length)) {
+		ret = -EFAULT;
+		goto err_copy;
+	}
+
+	dma_buf_put(dmabuf);
+	put_pd_read(pd);
+
+	mutex_lock(&file->mutex);
+	list_add_tail(&uobj->list, &file->ucontext->mr_list);
+	mutex_unlock(&file->mutex);
+
+	uobj->live = 1;
+
+	up_write(&uobj->mutex);
+
+	return 0;
+
+err_copy:
+	idr_remove_uobj(&ib_uverbs_mr_idr, uobj);
+
+err_unreg:
+	ib_dereg_mr(mr);
+
+err_put:
+	put_pd_read(pd);
+
+err_free:
+	put_uobj_write(uobj);
+
+err_dma_buf:
+	dma_buf_put(dmabuf);
 	return ret;
 }
 
