@@ -255,6 +255,12 @@ void flush_tlb_page(struct vm_area_struct *vma, unsigned long start)
 			/* Synchronize with switch_mm. */
 			smp_mb();
 		}
+	} else {
+		/*
+		 * current->active_mm != mm
+		 * Synchronize with switch_mm.
+		 */
+		smp_mb();
 	}
 
 	if (cpumask_any_but(mm_cpumask(mm), smp_processor_id()) < nr_cpu_ids)
