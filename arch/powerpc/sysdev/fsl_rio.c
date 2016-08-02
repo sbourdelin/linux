@@ -697,6 +697,9 @@ int fsl_rio_setup(struct platform_device *dev)
 			((i == 0) ? RIO_INB_ATMU_REGS_PORT1_OFFSET :
 			RIO_INB_ATMU_REGS_PORT2_OFFSET));
 
+		/* Set to receive packets with any dest ID */
+		out_be32((priv->regs_win + RIO_ISR_AACR + i*0x80),
+			 RIO_ISR_AACR_AA);
 
 		/* Configure maintenance transaction window */
 		out_be32(&priv->maint_atmu_regs->rowbar,
