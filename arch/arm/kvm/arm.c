@@ -294,7 +294,8 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
 	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
 
 	/* Set up the timer */
-	kvm_timer_vcpu_init(vcpu);
+	if (vgic_present)
+		kvm_timer_vcpu_init(vcpu);
 
 	kvm_arm_reset_debug_ptr(vcpu);
 
@@ -1200,6 +1201,7 @@ static int init_subsystems(void)
 		break;
 	case -ENODEV:
 	case -ENXIO:
+		kvm_err("No useable vgic detected\n");
 		vgic_present = false;
 		err = 0;
 		break;
@@ -1210,9 +1212,13 @@ static int init_subsystems(void)
 	/*
 	 * Init HYP architected timer support
 	 */
-	err = kvm_timer_hyp_init();
-	if (err)
-		goto out;
+	if (vgic_present) {
+		err = kvm_timer_hyp_init();
+		if (err)
+			goto out;
+	} else {
+		static_branch_enable(&kvm_arch_timer_disabled);
+	}
 
 	kvm_perf_init();
 	kvm_coproc_table_init();

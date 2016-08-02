@@ -23,6 +23,8 @@
 #include <linux/hrtimer.h>
 #include <linux/workqueue.h>
 
+extern struct static_key_false kvm_arch_timer_disabled;
+
 struct arch_timer_kvm {
 	/* Virtual offset */
 	cycle_t			cntvoff;

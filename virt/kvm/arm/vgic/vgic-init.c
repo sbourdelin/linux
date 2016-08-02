@@ -56,6 +56,10 @@ void kvm_vgic_early_init(struct kvm *kvm)
 
 void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu)
 {
+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+
+	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
+	spin_lock_init(&vgic_cpu->ap_list_lock);
 }
 
 /* CREATION */
@@ -415,11 +419,6 @@ int kvm_vgic_hyp_init(void)
 	gic_kvm_info = gic_get_kvm_info();
 	if (!gic_kvm_info)
 		return -ENODEV;
-
-	if (!gic_kvm_info->maint_irq) {
-		kvm_err("No vgic maintenance irq\n");
-		return -ENXIO;
-	}
 
 	switch (gic_kvm_info->type) {
 	case GIC_V2:

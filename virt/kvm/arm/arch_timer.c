@@ -34,6 +34,8 @@ static struct timecounter *timecounter;
 static struct workqueue_struct *wqueue;
 static unsigned int host_vtimer_irq;
 
+DEFINE_STATIC_KEY_FALSE(kvm_arch_timer_disabled);
+
 void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
 {
 	vcpu->arch.timer_cpu.active_cleared_last = false;
@@ -41,6 +43,9 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
 
 static cycle_t kvm_phys_timer_read(void)
 {
+	if (static_branch_unlikely(&kvm_arch_timer_disabled))
+		return 0;
+
 	return timecounter->cc->read(timecounter->cc);
 }
 
@@ -104,6 +109,9 @@ static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu)
 {
 	cycle_t cval, now;
 
+	if (static_branch_unlikely(&kvm_arch_timer_disabled))
+		return 0;
+
 	cval = vcpu->arch.timer_cpu.cntv_cval;
 	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
 
@@ -147,6 +155,9 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
 static bool kvm_timer_irq_can_fire(struct kvm_vcpu *vcpu)
 {
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+
+	if (static_branch_unlikely(&kvm_arch_timer_disabled))
+		return false;
 
 	return !(timer->cntv_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
 		(timer->cntv_ctl & ARCH_TIMER_CTRL_ENABLE);
