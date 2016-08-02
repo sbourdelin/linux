@@ -193,9 +193,13 @@ static unsigned long pwm_samsung_calc_tin(struct samsung_pwm_chip *chip,
 	 * divider settings and choose the lowest divisor that can generate
 	 * frequencies lower than requested.
 	 */
-	for (div = variant->div_base; div < 4; ++div)
-		if ((rate >> (variant->bits + div)) < freq)
-			break;
+	if (fls(rate) <= variant->bits) {
+		div = variant->div_base;
+	} else {
+		for (div = variant->div_base; div < 4; ++div)
+			if ((rate >> (variant->bits + div)) < freq)
+				break;
+	}
 
 	pwm_samsung_set_divisor(chip, chan, BIT(div));
 
