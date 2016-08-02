@@ -648,6 +648,15 @@ static long vfio_pci_ioctl(void *device_data,
 	struct vfio_pci_device *vdev = device_data;
 	unsigned long minsz;
 
+	if (vdev->aer_error_in_progress && (cmd == VFIO_DEVICE_SET_IRQS ||
+	    cmd == VFIO_DEVICE_RESET || cmd == VFIO_DEVICE_PCI_HOT_RESET)) {
+		int ret;
+		ret = wait_for_completion_interruptible(
+			&vdev->aer_error_completion);
+		if (ret)
+			return ret;
+	}
+
 	if (cmd == VFIO_DEVICE_GET_INFO) {
 		struct vfio_device_info info;
 
@@ -663,6 +672,10 @@ static long vfio_pci_ioctl(void *device_data,
 
 		if (vdev->reset_works)
 			info.flags |= VFIO_DEVICE_FLAGS_RESET;
+
+		info.flags |= VFIO_DEVICE_FLAGS_AERPROCESS;
+		if (vdev->aer_error_in_progress)
+			info.flags |= VFIO_DEVICE_FLAGS_INAERPROCESS;
 
 		info.num_regions = VFIO_PCI_NUM_REGIONS + vdev->num_regions;
 		info.num_irqs = VFIO_PCI_NUM_IRQS;
@@ -1070,6 +1083,13 @@ static ssize_t vfio_pci_rw(void *device_data, char __user *buf,
 
 	switch (index) {
 	case VFIO_PCI_CONFIG_REGION_INDEX:
+		if (vdev->aer_error_in_progress && iswrite) {
+			int ret;
+			ret = wait_for_completion_interruptible(
+				&vdev->aer_error_completion);
+			if (ret)
+				return ret;
+		}
 		return vfio_pci_config_rw(vdev, buf, count, ppos, iswrite);
 
 	case VFIO_PCI_ROM_REGION_INDEX:
@@ -1228,6 +1248,7 @@ static int vfio_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	vdev->irq_type = VFIO_PCI_NUM_IRQS;
 	mutex_init(&vdev->igate);
 	spin_lock_init(&vdev->irqlock);
+	init_completion(&vdev->aer_error_completion);
 
 	ret = vfio_add_group_dev(&pdev->dev, &vfio_pci_ops, vdev);
 	if (ret) {
@@ -1300,6 +1321,11 @@ static pci_ers_result_t vfio_pci_aer_err_detected(struct pci_dev *pdev,
 
 	mutex_lock(&vdev->igate);
 
+	vdev->aer_error_in_progress = true;
+	reinit_completion(&vdev->aer_error_completion);
+	vfio_pci_set_irqs_ioctl(vdev, VFIO_IRQ_SET_DATA_NONE |
+				VFIO_IRQ_SET_ACTION_TRIGGER,
+				vdev->irq_type, 0, 0, NULL);
 	if (vdev->err_trigger)
 		eventfd_signal(vdev->err_trigger, 1);
 
@@ -1310,8 +1336,30 @@ static pci_ers_result_t vfio_pci_aer_err_detected(struct pci_dev *pdev,
 	return PCI_ERS_RESULT_CAN_RECOVER;
 }
 
+static void vfio_pci_aer_resume(struct pci_dev *pdev)
+{
+	struct vfio_pci_device *vdev;
+	struct vfio_device *device;
+
+	device = vfio_device_get_from_dev(&pdev->dev);
+	if (device == NULL)
+		return;
+
+	vdev = vfio_device_data(device);
+	if (vdev == NULL) {
+		vfio_device_put(device);
+		return;
+	}
+
+	vdev->aer_error_in_progress = false;
+	complete_all(&vdev->aer_error_completion);
+
+	vfio_device_put(device);
+}
+
 static const struct pci_error_handlers vfio_err_handlers = {
 	.error_detected = vfio_pci_aer_err_detected,
+	.resume         = vfio_pci_aer_resume,
 };
 
 static struct pci_driver vfio_pci_driver = {
