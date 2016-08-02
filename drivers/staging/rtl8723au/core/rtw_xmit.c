@@ -174,7 +174,7 @@ int _rtw_init_xmit_priv23a(struct xmit_priv *pxmitpriv,
 	rtw_alloc_hwxmits23a(padapter);
 	rtw_init_hwxmits23a(pxmitpriv->hwxmits, pxmitpriv->hwxmit_entry);
 
-	for (i = 0; i < 4; i ++)
+	for (i = 0; i < 4; i++)
 		pxmitpriv->wmm_para_seq[i] = i;
 
 	sema_init(&pxmitpriv->tx_retevt, 0);
@@ -640,7 +640,7 @@ static int xmitframe_addmic(struct rtw_adapter *padapter,
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
 	int curfragnum, length;
 	u8 *pframe, *payload, mic[8];
-	u8 priority[4]= {0x0, 0x0, 0x0, 0x0};
+	u8 priority[4] = {0x0, 0x0, 0x0, 0x0};
 	u8 hw_hdr_offset = 0;
 	int bmcst = is_multicast_ether_addr(pattrib->ra);
 
@@ -667,10 +667,10 @@ static int xmitframe_addmic(struct rtw_adapter *padapter,
 	if (pattrib->encrypt == WLAN_CIPHER_SUITE_TKIP) {
 		/* encode mic code */
 		if (stainfo) {
-			u8 null_key[16]={0x0, 0x0, 0x0, 0x0,
-					 0x0, 0x0, 0x0, 0x0,
-					 0x0, 0x0, 0x0, 0x0,
-					 0x0, 0x0, 0x0, 0x0};
+			u8 null_key[16] = {0x0, 0x0, 0x0, 0x0,
+					   0x0, 0x0, 0x0, 0x0,
+					   0x0, 0x0, 0x0, 0x0,
+					   0x0, 0x0, 0x0, 0x0};
 
 			pframe = pxmitframe->buf_addr + hw_hdr_offset;
 
@@ -902,8 +902,7 @@ static int rtw_make_wlanhdr(struct rtw_adapter *padapter, u8 *hdr,
 
 			if (psta->qos_option)
 				qos_option = true;
-		}
-		else {
+		} else {
 			RT_TRACE(_module_rtl871x_xmit_c_, _drv_err_,
 				 "fw_state:%x is not allowed to xmit frame\n",
 				 get_fwstate(pmlmepriv));
@@ -1190,7 +1189,7 @@ int rtw_xmitframe_coalesce23a(struct rtw_adapter *padapter, struct sk_buff *skb,
 		pdata += mem_sz;
 		data_len -= mem_sz;
 
-		if ((pattrib->icv_len >0) && (pattrib->bswenc)) {
+		if ((pattrib->icv_len > 0) && (pattrib->bswenc)) {
 			memcpy(pframe, pattrib->icv, pattrib->icv_len);
 			pframe += pattrib->icv_len;
 		}
@@ -1766,7 +1765,6 @@ void rtw_alloc_hwxmits23a(struct rtw_adapter *padapter)
 		hwxmits[4] .sta_queue = &pxmitpriv->be_pending;
 
 	} else if (pxmitpriv->hwxmit_entry == 4) {
-
 		/* pxmitpriv->vo_txqueue.head = 0; */
 		/* hwxmits[0] .phwtxqueue = &pxmitpriv->vo_txqueue; */
 		hwxmits[0] .sta_queue = &pxmitpriv->vo_pending;
@@ -1952,18 +1950,16 @@ int xmitframe_enqueue_for_sleeping_sta23a(struct rtw_adapter *padapter, struct x
 			/* spin_unlock_bh(&psta->sleep_q.lock); */
 
 			ret = true;
-
 		}
 
 		spin_unlock_bh(&psta->sleep_q.lock);
 
 		return ret;
-
 	}
 
 	spin_lock_bh(&psta->sleep_q.lock);
 
-	if (psta->state&WIFI_SLEEP_STATE) {
+	if (psta->state & WIFI_SLEEP_STATE) {
 		u8 wmmps_ac = 0;
 
 		if (pstapriv->sta_dz_bitmap & CHKBIT(psta->aid)) {
@@ -2017,9 +2013,7 @@ int xmitframe_enqueue_for_sleeping_sta23a(struct rtw_adapter *padapter, struct x
 			/*  */
 
 			ret = true;
-
 		}
-
 	}
 
 	spin_unlock_bh(&psta->sleep_q.lock);
@@ -2159,7 +2153,7 @@ void wakeup_sta_to_xmit23a(struct rtw_adapter *padapter, struct sta_info *psta)
 		/* update BCN for TIM IE */
 		update_mask = BIT(0);
 
-		if (psta->state&WIFI_SLEEP_STATE)
+		if (psta->state & WIFI_SLEEP_STATE)
 			psta->state ^= WIFI_SLEEP_STATE;
 
 		if (psta->state & WIFI_STA_ALIVE_CHK_STATE) {
