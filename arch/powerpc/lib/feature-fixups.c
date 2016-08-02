@@ -154,7 +154,7 @@ static void do_final_fixups(void)
 
 void apply_feature_fixups(void)
 {
-	struct cpu_spec *spec = *PTRRELOC(&cur_cpu_spec);
+	struct cpu_spec *spec = PTRRELOC(*PTRRELOC(&cur_cpu_spec));
 
 	/*
 	 * Apply the CPU-specific and firmware specific fixups to kernel text
