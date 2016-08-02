@@ -468,6 +468,7 @@ static void vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
  * Queries the KVM IO bus framework to get the ITS pointer from the given
  * doorbell address.
  * We then call vgic_its_trigger_msi() with the decoded data.
+ * According to the KVM_SIGNAL_MSI API description returns > 0 on success.
  */
 int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
 {
@@ -493,7 +494,7 @@ int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
 	vgic_its_trigger_msi(kvm, iodev->its, msi->devid, msi->data);
 	mutex_unlock(&iodev->its->its_lock);
 
-	return 0;
+	return 1;
 }
 
 /* Requires the its_lock to be held. */
