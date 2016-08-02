@@ -1555,16 +1555,22 @@ static int do_end_io(struct multipath *m, struct request *clone,
 	if (noretry_error(error))
 		return error;
 
-	if (mpio->pgpath)
+	/*
+	 * EBADE signals an reservation conflict.
+	 * We shouldn't fail the path here as we can communicate with
+	 * the target. We should failover to the next path, but in
+	 * doing so we might be causing a ping-pong between paths.
+	 * So just return the reservation conflict error.
+	 */
+	if (error == -EBADE)
+		r = error;
+	else if (mpio->pgpath)
 		fail_path(mpio->pgpath);
 
 	if (!atomic_read(&m->nr_valid_paths)) {
 		if (!test_bit(MPATHF_QUEUE_IF_NO_PATH, &m->flags)) {
 			if (!must_push_back_rq(m))
 				r = -EIO;
-		} else {
-			if (error == -EBADE)
-				r = error;
 		}
 	}
 
