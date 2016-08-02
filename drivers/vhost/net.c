@@ -1104,13 +1104,12 @@ static int vhost_net_set_features(struct vhost_net *n, u64 features)
 	}
 	mutex_lock(&n->dev.mutex);
 	if ((features & (1 << VHOST_F_LOG_ALL)) &&
-	    !vhost_log_access_ok(&n->dev)) {
-		mutex_unlock(&n->dev.mutex);
-		return -EFAULT;
-	}
+	    !vhost_log_access_ok(&n->dev))
+		goto out_unlock;
+
 	if ((features & (1ULL << VIRTIO_F_IOMMU_PLATFORM))) {
 		if (vhost_init_device_iotlb(&n->dev, true))
-			return -EFAULT;
+			goto out_unlock;
 	}
 
 	for (i = 0; i < VHOST_NET_VQ_MAX; ++i) {
@@ -1122,6 +1121,10 @@ static int vhost_net_set_features(struct vhost_net *n, u64 features)
 	}
 	mutex_unlock(&n->dev.mutex);
 	return 0;
+
+out_unlock:
+	mutex_unlock(&n->dev.mutex);
+	return -EFAULT;
 }
 
 static long vhost_net_set_owner(struct vhost_net *n)
