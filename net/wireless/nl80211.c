@@ -5471,9 +5471,49 @@ do {									    \
 	FILL_IN_MESH_PARAM_IF_SET(tb, cfg, rssi_threshold, -255, 0,
 				  mask, NL80211_MESHCONF_RSSI_THRESHOLD,
 				  nl80211_check_s32);
-	FILL_IN_MESH_PARAM_IF_SET(tb, cfg, ht_opmode, 0, 16,
+	FILL_IN_MESH_PARAM_IF_SET(tb, cfg, ht_opmode, 0,
+				  IEEE80211_HT_OP_MODE_PROTECTION |
+				  IEEE80211_HT_OP_MODE_NON_GF_STA_PRSNT |
+				  IEEE80211_HT_OP_MODE_NON_HT_STA_PRSNT,
 				  mask, NL80211_MESHCONF_HT_OPMODE,
 				  nl80211_check_u16);
+	if (tb[NL80211_MESHCONF_HT_OPMODE]) {
+		/*
+		 * Check HT operation mode based on IEEE 802.11 2012 8.4.2.59
+		 * HT Operation element.
+		 */
+		if (cfg->ht_opmode & (~(IEEE80211_HT_OP_MODE_PROTECTION |
+		    IEEE80211_HT_OP_MODE_NON_GF_STA_PRSNT |
+		    IEEE80211_HT_OP_MODE_NON_HT_STA_PRSNT)))
+			return -EINVAL;
+
+		if ((cfg->ht_opmode & IEEE80211_HT_OP_MODE_NON_GF_STA_PRSNT) &&
+		    (cfg->ht_opmode & IEEE80211_HT_OP_MODE_NON_HT_STA_PRSNT))
+			return -EINVAL;
+
+		switch (cfg->ht_opmode & IEEE80211_HT_OP_MODE_PROTECTION) {
+		case IEEE80211_HT_OP_MODE_PROTECTION_NONE:
+			if (cfg->ht_opmode &
+			    IEEE80211_HT_OP_MODE_NON_HT_STA_PRSNT)
+				return -EINVAL;
+			break;
+		case IEEE80211_HT_OP_MODE_PROTECTION_NONMEMBER:
+			if (!(cfg->ht_opmode &
+			    IEEE80211_HT_OP_MODE_NON_HT_STA_PRSNT))
+				return -EINVAL;
+			break;
+		case IEEE80211_HT_OP_MODE_PROTECTION_20MHZ:
+			if (cfg->ht_opmode &
+			    IEEE80211_HT_OP_MODE_NON_HT_STA_PRSNT)
+				return -EINVAL;
+			break;
+		case IEEE80211_HT_OP_MODE_PROTECTION_NONHT_MIXED:
+			if (!(cfg->ht_opmode &
+			    IEEE80211_HT_OP_MODE_NON_HT_STA_PRSNT))
+				return -EINVAL;
+			break;
+		}
+	}
 	FILL_IN_MESH_PARAM_IF_SET(tb, cfg, dot11MeshHWMPactivePathToRootTimeout,
 				  1, 65535, mask,
 				  NL80211_MESHCONF_HWMP_PATH_TO_ROOT_TIMEOUT,
