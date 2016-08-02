@@ -46,6 +46,7 @@ static enum bfi_ioc_state bfa_ioc_cb_get_cur_ioc_fwstate(struct bfa_ioc_s *ioc);
 static void bfa_ioc_cb_set_alt_ioc_fwstate(
 			struct bfa_ioc_s *ioc, enum bfi_ioc_state fwstate);
 static enum bfi_ioc_state bfa_ioc_cb_get_alt_ioc_fwstate(struct bfa_ioc_s *ioc);
+static bfa_status_t bfa_ioc_cb_pll_init(void __iomem *rb, enum bfi_asic_mode fcmode);
 
 static struct bfa_ioc_hwif_s hwif_cb;
 
@@ -361,7 +362,7 @@ bfa_ioc_cb_sync_complete(struct bfa_ioc_s *ioc)
 	}
 }
 
-bfa_status_t
+static bfa_status_t
 bfa_ioc_cb_pll_init(void __iomem *rb, enum bfi_asic_mode fcmode)
 {
 	u32	pll_sclk, pll_fclk, join_bits;

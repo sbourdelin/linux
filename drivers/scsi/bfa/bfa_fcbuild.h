@@ -273,9 +273,6 @@ u16	fc_gfn_req_build(struct fchs_s *fchs, void *pyld, u32 s_id, wwn_t wwn);
 
 void		fc_get_fc4type_bitmask(u8 fc4_type, u8 *bit_mask);
 
-void		fc_els_req_build(struct fchs_s *fchs, u32 d_id, u32 s_id,
-					 __be16 ox_id);
-
 enum fc_parse_status	fc_els_rsp_parse(struct fchs_s *fchs, int len);
 
 enum fc_parse_status	fc_plogi_rsp_parse(struct fchs_s *fchs, int len,

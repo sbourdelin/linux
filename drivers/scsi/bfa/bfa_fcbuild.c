@@ -172,7 +172,7 @@ fc_gsresp_fchdr_build(struct fchs_s *fchs, u32 d_id, u32 s_id, u16 ox_id)
 	fchs->ox_id = ox_id;
 }
 
-void
+static void
 fc_els_req_build(struct fchs_s *fchs, u32 d_id, u32 s_id, __be16 ox_id)
 {
 	memcpy(fchs, &fc_els_req_tmpl, sizeof(struct fchs_s));

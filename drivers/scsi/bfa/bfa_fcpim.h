@@ -39,10 +39,7 @@ struct bfa_itn_s {
 	bfa_isr_func_t isr;
 };
 
-void bfa_itn_create(struct bfa_s *bfa, struct bfa_rport_s *rport,
-		void (*isr)(struct bfa_s *bfa, struct bfi_msg_s *m));
 void bfa_itn_isr(struct bfa_s *bfa, struct bfi_msg_s *m);
-void bfa_iotag_attach(struct bfa_fcp_mod_s *fcp);
 void bfa_fcp_res_recfg(struct bfa_s *bfa, u16 num_ioim_fw, u16 max_ioim_fw);
 
 #define BFA_FCP_MOD(_hal)	(&(_hal)->modules.fcp_mod)
@@ -275,30 +272,13 @@ bfa_ioim_maxretry_reached(struct bfa_ioim_s *ioim)
 /*
  * function prototypes
  */
-void	bfa_ioim_attach(struct bfa_fcpim_s *fcpim);
 void	bfa_ioim_isr(struct bfa_s *bfa, struct bfi_msg_s *msg);
 void	bfa_ioim_good_comp_isr(struct bfa_s *bfa,
 					struct bfi_msg_s *msg);
-void	bfa_ioim_cleanup(struct bfa_ioim_s *ioim);
-void	bfa_ioim_cleanup_tm(struct bfa_ioim_s *ioim,
-					struct bfa_tskim_s *tskim);
-void	bfa_ioim_iocdisable(struct bfa_ioim_s *ioim);
-void	bfa_ioim_tov(struct bfa_ioim_s *ioim);
 
-void	bfa_tskim_attach(struct bfa_fcpim_s *fcpim);
 void	bfa_tskim_isr(struct bfa_s *bfa, struct bfi_msg_s *msg);
 void	bfa_tskim_iodone(struct bfa_tskim_s *tskim);
-void	bfa_tskim_iocdisable(struct bfa_tskim_s *tskim);
-void	bfa_tskim_cleanup(struct bfa_tskim_s *tskim);
 void	bfa_tskim_res_recfg(struct bfa_s *bfa, u16 num_tskim_fw);
-
-void	bfa_itnim_meminfo(struct bfa_iocfc_cfg_s *cfg, u32 *km_len);
-void	bfa_itnim_attach(struct bfa_fcpim_s *fcpim);
-void	bfa_itnim_iocdisable(struct bfa_itnim_s *itnim);
-void	bfa_itnim_isr(struct bfa_s *bfa, struct bfi_msg_s *msg);
-void	bfa_itnim_iodone(struct bfa_itnim_s *itnim);
-void	bfa_itnim_tskdone(struct bfa_itnim_s *itnim);
-bfa_boolean_t   bfa_itnim_hold_io(struct bfa_itnim_s *itnim);
 
 /*
  * bfa fcpim module API functions
@@ -368,11 +348,8 @@ struct bfa_ioim_s	*bfa_ioim_alloc(struct bfa_s *bfa,
 					struct bfa_itnim_s *itnim,
 					u16 nsgles);
 
-void		bfa_ioim_free(struct bfa_ioim_s *ioim);
 void		bfa_ioim_start(struct bfa_ioim_s *ioim);
 bfa_status_t	bfa_ioim_abort(struct bfa_ioim_s *ioim);
-void		bfa_ioim_delayed_comp(struct bfa_ioim_s *ioim,
-				      bfa_boolean_t iotov);
 /*
  * I/O completion notification.
  *
@@ -421,8 +398,6 @@ bfa_status_t	bfa_fcpim_lunmask_delete(struct bfa_s *bfa, u16 vf_id,
 bfa_status_t	bfa_fcpim_lunmask_add(struct bfa_s *bfa, u16 vf_id,
 				wwn_t *pwwn, wwn_t rpwwn, struct scsi_lun lun);
 bfa_status_t	bfa_fcpim_lunmask_clear(struct bfa_s *bfa);
-u16		bfa_fcpim_read_throttle(struct bfa_s *bfa);
-bfa_status_t	bfa_fcpim_write_throttle(struct bfa_s *bfa, u16 value);
 bfa_status_t	bfa_fcpim_throttle_set(struct bfa_s *bfa, u16 value);
 bfa_status_t	bfa_fcpim_throttle_get(struct bfa_s *bfa, void *buf);
 u16     bfa_fcpim_get_throttle_cfg(struct bfa_s *bfa, u16 drv_cfg_param);

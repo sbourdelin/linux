@@ -22,6 +22,11 @@
 
 BFA_TRC_FILE(HAL, CORE);
 
+static void bfa_iocfc_reset_queues(struct bfa_s *bfa);
+static void bfa_isr_unhandled(struct bfa_s *bfa, struct bfi_msg_s *m);
+static void bfa_iocfc_isr(void *bfaarg, struct bfi_mbmsg_s *m);
+static void bfa_isr_disable(struct bfa_s *bfa);
+
 /*
  * BFA module list terminated by NULL
  */
@@ -732,7 +737,7 @@ bfa_reqq_resume(struct bfa_s *bfa, int qid)
 	}
 }
 
-bfa_boolean_t
+static bfa_boolean_t
 bfa_isr_rspq(struct bfa_s *bfa, int qid)
 {
 	struct bfi_msg_s *m;
@@ -864,7 +869,7 @@ bfa_intx(struct bfa_s *bfa)
 	return BFA_TRUE;
 }
 
-void
+static void
 bfa_isr_enable(struct bfa_s *bfa)
 {
 	u32 umsk;
@@ -910,7 +915,7 @@ bfa_msix_reqq(struct bfa_s *bfa, int vec)
 	bfa_isr_reqq(bfa, vec - bfa->iocfc.hwif.cpe_vec_q0);
 }
 
-void
+static void
 bfa_isr_unhandled(struct bfa_s *bfa, struct bfi_msg_s *m)
 {
 	bfa_trc(bfa, m->mhdr.msg_class);
@@ -1328,7 +1333,7 @@ bfa_iocfc_cfgrsp(struct bfa_s *bfa)
 	}
 }
 
-void
+static void
 bfa_iocfc_reset_queues(struct bfa_s *bfa)
 {
 	int		q;
@@ -1483,7 +1488,7 @@ bfa_iocfc_reset_cbfn(void *bfa_arg)
 /*
  * Query IOC memory requirement information.
  */
-void
+static void
 bfa_iocfc_meminfo(struct bfa_iocfc_cfg_s *cfg, struct bfa_meminfo_s *meminfo,
 		  struct bfa_s *bfa)
 {
@@ -1529,7 +1534,7 @@ bfa_iocfc_meminfo(struct bfa_iocfc_cfg_s *cfg, struct bfa_meminfo_s *meminfo,
 /*
  * Query IOC memory requirement information.
  */
-void
+static void
 bfa_iocfc_attach(struct bfa_s *bfa, void *bfad, struct bfa_iocfc_cfg_s *cfg,
 		 struct bfa_pcidev_s *pcidev)
 {
@@ -1591,7 +1596,7 @@ bfa_iocfc_stop(struct bfa_s *bfa)
 	bfa_fsm_send_event(&bfa->iocfc, IOCFC_E_STOP);
 }
 
-void
+static void
 bfa_iocfc_isr(void *bfaarg, struct bfi_mbmsg_s *m)
 {
 	struct bfa_s		*bfa = bfaarg;

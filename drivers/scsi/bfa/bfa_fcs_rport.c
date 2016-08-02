@@ -143,6 +143,9 @@ static void	bfa_fcs_rport_sm_fc4_off_delete(struct bfa_fcs_rport_s *rport,
 						enum rport_event event);
 static void	bfa_fcs_rport_sm_delete_pending(struct bfa_fcs_rport_s *rport,
 						enum rport_event event);
+static void bfa_fcs_rpf_init(struct bfa_fcs_rport_s *rport);
+static void bfa_fcs_rpf_rport_online(struct bfa_fcs_rport_s *rport);
+static void bfa_fcs_rpf_rport_offline(struct bfa_fcs_rport_s *rport);
 
 static struct bfa_sm_table_s rport_sm_table[] = {
 	{BFA_SM(bfa_fcs_rport_sm_uninit), BFA_RPORT_UNINIT},
@@ -3321,7 +3324,7 @@ bfa_fcs_rpf_sm_offline(struct bfa_fcs_rpf_s *rpf, enum rpf_event event)
 /*
  * Called when Rport is created.
  */
-void
+static void
 bfa_fcs_rpf_init(struct bfa_fcs_rport_s *rport)
 {
 	struct bfa_fcs_rpf_s *rpf = &rport->rpf;
@@ -3335,7 +3338,7 @@ bfa_fcs_rpf_init(struct bfa_fcs_rport_s *rport)
 /*
  * Called when Rport becomes online
  */
-void
+static void
 bfa_fcs_rpf_rport_online(struct bfa_fcs_rport_s *rport)
 {
 	bfa_trc(rport->fcs, rport->pid);
@@ -3350,7 +3353,7 @@ bfa_fcs_rpf_rport_online(struct bfa_fcs_rport_s *rport)
 /*
  * Called when Rport becomes offline
  */
-void
+static void
 bfa_fcs_rpf_rport_offline(struct bfa_fcs_rport_s *rport)
 {
 	bfa_trc(rport->fcs, rport->pid);

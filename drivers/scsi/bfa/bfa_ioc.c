@@ -118,6 +118,14 @@ static enum bfi_ioc_img_ver_cmp_e bfa_ioc_fw_ver_patch_cmp(
 static enum bfi_ioc_img_ver_cmp_e bfa_ioc_flash_fwver_cmp(
 				struct bfa_ioc_s *ioc,
 				struct bfi_ioc_image_hdr_s *base_fwhdr);
+static void bfa_ioc_aen_post(struct bfa_ioc_s *ioc,
+			     enum bfa_ioc_aen_event event);
+static bfa_status_t bfa_ioc_boot(struct bfa_ioc_s *ioc, u32 boot_type,
+				 u32 boot_env);
+static bfa_status_t bfa_flash_raw_read(void __iomem *pci_bar, u32 offset,
+				       char *buf, u32 len);
+static void bfa_phy_intr(void *phyarg, struct bfi_mbmsg_s *msg);
+static void bfa_fru_intr(void *fruarg, struct bfi_mbmsg_s *msg);
 
 /*
  * IOC state machine definitions/declarations
@@ -1638,7 +1646,7 @@ bfa_ioc_fw_ver_patch_cmp(struct bfi_ioc_image_hdr_s *base_fwhdr,
 
 #define BFA_FLASH_PART_FWIMG_ADDR	0x100000 /* fw image address */
 
-bfa_status_t
+static bfa_status_t
 bfa_ioc_flash_img_get_chnk(struct bfa_ioc_s *ioc, u32 off,
 				u32 *fwimg)
 {
@@ -2192,7 +2200,7 @@ bfa_ioc_pf_fwmismatch(struct bfa_ioc_s *ioc)
 	bfa_ioc_aen_post(ioc, BFA_IOC_AEN_FWMISMATCH);
 }
 
-bfa_status_t
+static bfa_status_t
 bfa_ioc_pll_init(struct bfa_ioc_s *ioc)
 {
 
@@ -2223,7 +2231,7 @@ bfa_ioc_pll_init(struct bfa_ioc_s *ioc)
  * Interface used by diag module to do firmware boot with memory test
  * as the entry vector.
  */
-bfa_status_t
+static bfa_status_t
 bfa_ioc_boot(struct bfa_ioc_s *ioc, u32 boot_type, u32 boot_env)
 {
 	struct bfi_ioc_image_hdr_s *drv_fwhdr;
@@ -2297,7 +2305,7 @@ bfa_ioc_is_initialized(struct bfa_ioc_s *ioc)
 		(r32 != BFI_IOC_MEMTEST));
 }
 
-bfa_boolean_t
+static bfa_boolean_t
 bfa_ioc_msgget(struct bfa_ioc_s *ioc, void *mbmsg)
 {
 	__be32	*msgp = mbmsg;
@@ -2327,7 +2335,7 @@ bfa_ioc_msgget(struct bfa_ioc_s *ioc, void *mbmsg)
 	return BFA_TRUE;
 }
 
-void
+static void
 bfa_ioc_isr(struct bfa_ioc_s *ioc, struct bfi_mbmsg_s *m)
 {
 	union bfi_ioc_i2h_msg_u	*msg;
@@ -2667,7 +2675,7 @@ bfa_ioc_fw_mismatch(struct bfa_ioc_s *ioc)
  * Check if adapter is disabled -- both IOCs should be in a disabled
  * state.
  */
-bfa_boolean_t
+static bfa_boolean_t
 bfa_ioc_adapter_is_disabled(struct bfa_ioc_s *ioc)
 {
 	u32	ioc_state;
@@ -2691,7 +2699,7 @@ bfa_ioc_adapter_is_disabled(struct bfa_ioc_s *ioc)
 /*
  * Reset IOC fwstate registers.
  */
-void
+static void
 bfa_ioc_reset_fwstate(struct bfa_ioc_s *ioc)
 {
 	bfa_ioc_set_cur_ioc_fwstate(ioc, BFI_IOC_UNINIT);
@@ -2699,7 +2707,7 @@ bfa_ioc_reset_fwstate(struct bfa_ioc_s *ioc)
 }
 
 #define BFA_MFG_NAME "QLogic"
-void
+static void
 bfa_ioc_get_adapter_attr(struct bfa_ioc_s *ioc,
 			 struct bfa_adapter_attr_s *ad_attr)
 {
@@ -2826,7 +2834,7 @@ bfa_ioc_get_adapter_model(struct bfa_ioc_s *ioc, char *model)
 			BFA_MFG_NAME, ioc_attr->card_type);
 }
 
-enum bfa_ioc_state
+static enum bfa_ioc_state
 bfa_ioc_get_state(struct bfa_ioc_s *ioc)
 {
 	enum bfa_iocpf_state iocpf_st;
@@ -2917,7 +2925,7 @@ bfa_ioc_get_mfg_mac(struct bfa_ioc_s *ioc)
 /*
  * Send AEN notification
  */
-void
+static void
 bfa_ioc_aen_post(struct bfa_ioc_s *ioc, enum bfa_ioc_aen_event event)
 {
 	struct bfad_s *bfad = (struct bfad_s *)ioc->bfa->bfad;
@@ -3996,7 +4004,7 @@ bfa_sfp_speed_valid(struct bfa_sfp_s *sfp, enum bfa_port_speed portspeed)
 /*
  *	SFP hmbox handler
  */
-void
+static void
 bfa_sfp_intr(void *sfparg, struct bfi_mbmsg_s *msg)
 {
 	struct bfa_sfp_s *sfp = sfparg;
@@ -5036,7 +5044,7 @@ diag_portbeacon_comp(struct bfa_diag_s *diag)
 /*
  *	Diag hmbox handler
  */
-void
+static void
 bfa_diag_intr(void *diagarg, struct bfi_mbmsg_s *msg)
 {
 	struct bfa_diag_s *diag = diagarg;
@@ -5515,7 +5523,7 @@ bfa_phy_memclaim(struct bfa_phy_s *phy, u8 *dm_kva, u64 dm_pa,
 	dm_pa += BFA_ROUNDUP(BFA_PHY_DMA_BUF_SZ, BFA_DMA_ALIGN_SZ);
 }
 
-bfa_boolean_t
+static bfa_boolean_t
 bfa_phy_busy(struct bfa_ioc_s *ioc)
 {
 	void __iomem	*rb;
@@ -5710,7 +5718,7 @@ bfa_phy_read(struct bfa_phy_s *phy, u8 instance,
  * @param[in] phyarg - phy structure
  * @param[in] msg - message structure
  */
-void
+static void
 bfa_phy_intr(void *phyarg, struct bfi_mbmsg_s *msg)
 {
 	struct bfa_phy_s *phy = phyarg;
@@ -6582,7 +6590,7 @@ bfa_tfru_read(struct bfa_fru_s *fru, void *buf, u32 len, u32 offset,
  * @param[in] fruarg - fru structure
  * @param[in] msg - message structure
  */
-void
+static void
 bfa_fru_intr(void *fruarg, struct bfi_mbmsg_s *msg)
 {
 	struct bfa_fru_s *fru = fruarg;
@@ -6999,7 +7007,7 @@ bfa_raw_sem_get(void __iomem *bar)
 
 }
 
-bfa_status_t
+static bfa_status_t
 bfa_flash_sem_get(void __iomem *bar)
 {
 	u32 n = FLASH_BLOCKING_OP_MAX;
@@ -7012,13 +7020,13 @@ bfa_flash_sem_get(void __iomem *bar)
 	return BFA_STATUS_OK;
 }
 
-void
+static void
 bfa_flash_sem_put(void __iomem *bar)
 {
 	writel(0, (bar + FLASH_SEM_LOCK_REG));
 }
 
-bfa_status_t
+static bfa_status_t
 bfa_flash_raw_read(void __iomem *pci_bar, u32 offset, char *buf,
 		       u32 len)
 {

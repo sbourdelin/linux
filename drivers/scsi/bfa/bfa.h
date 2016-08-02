@@ -31,11 +31,6 @@ typedef void (*bfa_isr_func_t) (struct bfa_s *bfa, struct bfi_msg_s *m);
 typedef void (*bfa_cb_cbfn_status_t) (void *cbarg, bfa_status_t status);
 
 /*
- * Interrupt message handlers
- */
-void bfa_isr_unhandled(struct bfa_s *bfa, struct bfi_msg_s *m);
-
-/*
  * Request and response queue related defines
  */
 #define BFA_REQQ_NELEMS_MIN	(4)
@@ -299,19 +294,11 @@ struct bfa_iocfc_s {
 /*
  * FC specific IOC functions.
  */
-void bfa_iocfc_meminfo(struct bfa_iocfc_cfg_s *cfg,
-			struct bfa_meminfo_s *meminfo,
-			struct bfa_s *bfa);
-void bfa_iocfc_attach(struct bfa_s *bfa, void *bfad,
-		      struct bfa_iocfc_cfg_s *cfg,
-		      struct bfa_pcidev_s *pcidev);
 void bfa_iocfc_init(struct bfa_s *bfa);
 void bfa_iocfc_start(struct bfa_s *bfa);
 void bfa_iocfc_stop(struct bfa_s *bfa);
-void bfa_iocfc_isr(void *bfa, struct bfi_mbmsg_s *msg);
 void bfa_iocfc_set_snsbase(struct bfa_s *bfa, int seg_no, u64 snsbase_pa);
 bfa_boolean_t bfa_iocfc_is_operational(struct bfa_s *bfa);
-void bfa_iocfc_reset_queues(struct bfa_s *bfa);
 
 void bfa_msix_all(struct bfa_s *bfa, int vec);
 void bfa_msix_reqq(struct bfa_s *bfa, int vec);
@@ -413,8 +400,6 @@ void bfa_cb_init(void *bfad, bfa_status_t status);
 void bfa_cb_updateq(void *bfad, bfa_status_t status);
 
 bfa_boolean_t bfa_intx(struct bfa_s *bfa);
-void bfa_isr_enable(struct bfa_s *bfa);
-void bfa_isr_disable(struct bfa_s *bfa);
 
 void bfa_comp_deq(struct bfa_s *bfa, struct list_head *comp_q);
 void bfa_comp_process(struct bfa_s *bfa, struct list_head *comp_q);

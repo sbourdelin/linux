@@ -117,6 +117,8 @@ static void	hal_fcxp_tx_plog(struct bfa_s *bfa, u32 reqlen,
 static void	bfa_fcxp_qresume(void *cbarg);
 static void	bfa_fcxp_queue(struct bfa_fcxp_s *fcxp,
 				struct bfi_fcxp_send_req_s *send_req);
+static void bfa_fcxp_free(struct bfa_fcxp_s *fcxp);
+
 
 /*
  * forward declarations for LPS functions
@@ -143,6 +145,7 @@ static void bfa_lps_send_set_n2n_pid(struct bfa_lps_s *lps);
 static void bfa_lps_login_comp(struct bfa_lps_s *lps);
 static void bfa_lps_logout_comp(struct bfa_lps_s *lps);
 static void bfa_lps_cvl_event(struct bfa_lps_s *lps);
+static u8 bfa_lps_get_fwtag(struct bfa_s *bfa, u8 lp_tag);
 
 /*
  * forward declaration for LPS state machine
@@ -175,6 +178,10 @@ static void __bfa_cb_fcport_stats_clr(void *cbarg, bfa_boolean_t complete);
 static void bfa_fcport_stats_get_timeout(void *cbarg);
 static void bfa_fcport_stats_clr_timeout(void *cbarg);
 static void bfa_trunk_iocdisable(struct bfa_s *bfa);
+static bfa_boolean_t bfa_fcport_is_qos_enabled(struct bfa_s *bfa);
+static bfa_boolean_t bfa_fcport_is_ddport(struct bfa_s *bfa);
+static bfa_boolean_t bfa_fcport_is_trunk_enabled(struct bfa_s *bfa);
+static bfa_status_t bfa_fcport_is_pbcdisabled(struct bfa_s *bfa);
 
 /*
  * forward declaration for FC PORT state machine
@@ -256,6 +263,7 @@ static void		__bfa_cb_rport_online(void *cbarg,
 						bfa_boolean_t complete);
 static void		__bfa_cb_rport_offline(void *cbarg,
 						bfa_boolean_t complete);
+static void bfa_rport_set_lunmask(struct bfa_s *bfa, struct bfa_rport_s *rp);
 
 /*
  * forward declaration for RPORT state machine
@@ -373,7 +381,7 @@ bfa_plog_str(struct bfa_plog_s *plog, enum bfa_plog_mid mid,
 	}
 }
 
-void
+static void
 bfa_plog_intarr(struct bfa_plog_s *plog, enum bfa_plog_mid mid,
 		enum bfa_plog_eid event,
 		u16 misc, u32 *intarr, u32 num_ints)
@@ -400,7 +408,7 @@ bfa_plog_intarr(struct bfa_plog_s *plog, enum bfa_plog_mid mid,
 	}
 }
 
-void
+static void
 bfa_plog_fchdr(struct bfa_plog_s *plog, enum bfa_plog_mid mid,
 			enum bfa_plog_eid event,
 			u16 misc, struct fchs_s *fchdr)
@@ -420,7 +428,7 @@ bfa_plog_fchdr(struct bfa_plog_s *plog, enum bfa_plog_mid mid,
 	}
 }
 
-void
+static void
 bfa_plog_fchdr_and_pl(struct bfa_plog_s *plog, enum bfa_plog_mid mid,
 		      enum bfa_plog_eid event, u16 misc, struct fchs_s *fchdr,
 		      u32 pld_w0)
@@ -1021,7 +1029,7 @@ bfa_fcxp_get_rspbuf(struct bfa_fcxp_s *fcxp)
  *
  * @return		void
  */
-void
+static void
 bfa_fcxp_free(struct bfa_fcxp_s *fcxp)
 {
 	struct bfa_fcxp_mod_s *mod = fcxp->fcxp_mod;
@@ -1983,7 +1991,7 @@ bfa_lps_fdisclogo(struct bfa_lps_s *lps)
 	bfa_sm_send_event(lps, BFA_LPS_SM_LOGOUT);
 }
 
-u8
+static u8
 bfa_lps_get_fwtag(struct bfa_s *bfa, u8 lp_tag)
 {
 	struct bfa_lps_mod_s    *mod = BFA_LPS_MOD(bfa);
@@ -3803,7 +3811,7 @@ bfa_fcport_disable(struct bfa_s *bfa)
 }
 
 /* If PBC is disabled on port, return error */
-bfa_status_t
+static bfa_status_t
 bfa_fcport_is_pbcdisabled(struct bfa_s *bfa)
 {
 	struct bfa_fcport_s *fcport = BFA_FCPORT_MOD(bfa);
@@ -3865,7 +3873,7 @@ bfa_fcport_cfg_speed(struct bfa_s *bfa, enum bfa_port_speed speed)
 /*
  * Get current speed.
  */
-enum bfa_port_speed
+static enum bfa_port_speed
 bfa_fcport_get_speed(struct bfa_s *bfa)
 {
 	struct bfa_fcport_s *fcport = BFA_FCPORT_MOD(bfa);
@@ -3933,7 +3941,7 @@ bfa_fcport_get_topology(struct bfa_s *bfa)
 /**
  * Get config topology.
  */
-enum bfa_port_topology
+static enum bfa_port_topology
 bfa_fcport_get_cfg_topology(struct bfa_s *bfa)
 {
 	struct bfa_fcport_s *fcport = BFA_FCPORT_MOD(bfa);
@@ -4173,7 +4181,7 @@ bfa_fcport_is_dport(struct bfa_s *bfa)
 		BFA_PORT_ST_DPORT);
 }
 
-bfa_boolean_t
+static bfa_boolean_t
 bfa_fcport_is_ddport(struct bfa_s *bfa)
 {
 	struct bfa_fcport_s *fcport = BFA_FCPORT_MOD(bfa);
@@ -4268,7 +4276,7 @@ bfa_fcport_is_linkup(struct bfa_s *bfa)
 		 fcport->trunk.attr.state == BFA_TRUNK_ONLINE);
 }
 
-bfa_boolean_t
+static bfa_boolean_t
 bfa_fcport_is_qos_enabled(struct bfa_s *bfa)
 {
 	struct bfa_fcport_s *fcport = BFA_FCPORT_MOD(bfa);
@@ -4355,7 +4363,7 @@ bfa_fcport_get_bbcr_attr(struct bfa_s *bfa,
 	return BFA_STATUS_OK;
 }
 
-void
+static void
 bfa_fcport_dportenable(struct bfa_s *bfa)
 {
 	/*
@@ -4365,7 +4373,7 @@ bfa_fcport_dportenable(struct bfa_s *bfa)
 	bfa_port_set_dportenabled(&bfa->modules.port, BFA_TRUE);
 }
 
-void
+static void
 bfa_fcport_dportdisable(struct bfa_s *bfa)
 {
 	/*
@@ -4375,7 +4383,7 @@ bfa_fcport_dportdisable(struct bfa_s *bfa)
 	bfa_port_set_dportenabled(&bfa->modules.port, BFA_FALSE);
 }
 
-void
+static void
 bfa_fcport_ddportenable(struct bfa_s *bfa)
 {
 	/*
@@ -4384,7 +4392,7 @@ bfa_fcport_ddportenable(struct bfa_s *bfa)
 	bfa_sm_send_event(BFA_FCPORT_MOD(bfa), BFA_FCPORT_SM_DDPORTENABLE);
 }
 
-void
+static void
 bfa_fcport_ddportdisable(struct bfa_s *bfa)
 {
 	/*
@@ -5208,7 +5216,7 @@ bfa_rport_speed(struct bfa_rport_s *rport, enum bfa_port_speed speed)
 }
 
 /* Set Rport LUN Mask */
-void
+static void
 bfa_rport_set_lunmask(struct bfa_s *bfa, struct bfa_rport_s *rp)
 {
 	struct bfa_lps_mod_s	*lps_mod = BFA_LPS_MOD(bfa);

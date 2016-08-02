@@ -54,7 +54,6 @@ struct bfa_port_s {
 
 void	     bfa_port_attach(struct bfa_port_s *port, struct bfa_ioc_s *ioc,
 				void *dev, struct bfa_trc_mod_s *trcmod);
-void	bfa_port_notify(void *arg, enum bfa_ioc_event_e event);
 
 bfa_status_t bfa_port_get_stats(struct bfa_port_s *port,
 				 union bfa_port_stats_u *stats,

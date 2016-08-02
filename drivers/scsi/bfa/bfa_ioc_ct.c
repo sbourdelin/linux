@@ -50,6 +50,10 @@ static enum bfi_ioc_state bfa_ioc_ct_get_cur_ioc_fwstate(struct bfa_ioc_s *ioc);
 static void bfa_ioc_ct_set_alt_ioc_fwstate(
 			struct bfa_ioc_s *ioc, enum bfi_ioc_state fwstate);
 static enum bfi_ioc_state bfa_ioc_ct_get_alt_ioc_fwstate(struct bfa_ioc_s *ioc);
+static bfa_status_t bfa_ioc_ct_pll_init(void __iomem *rb,
+					enum bfi_asic_mode mode);
+static bfa_status_t bfa_ioc_ct2_pll_init(void __iomem *rb,
+					 enum bfi_asic_mode mode);
 
 static struct bfa_ioc_hwif_s hwif_ct;
 static struct bfa_ioc_hwif_s hwif_ct2;
@@ -372,7 +376,7 @@ bfa_ioc_ct_isr_mode_set(struct bfa_ioc_s *ioc, bfa_boolean_t msix)
 	writel(r32, rb + FNC_PERS_REG);
 }
 
-bfa_boolean_t
+static bfa_boolean_t
 bfa_ioc_ct2_lpu_read_stat(struct bfa_ioc_s *ioc)
 {
 	u32	r32;
@@ -586,7 +590,7 @@ bfa_ioc_ct2_poweron(struct bfa_ioc_s *ioc)
 		rb + HOSTFN_MSIX_VT_INDEX_MBOX_ERR);
 }
 
-bfa_status_t
+static bfa_status_t
 bfa_ioc_ct_pll_init(void __iomem *rb, enum bfi_asic_mode mode)
 {
 	u32	pll_sclk, pll_fclk, r32;
@@ -752,7 +756,7 @@ bfa_ioc_ct2_mem_init(void __iomem *rb)
 	writel(0, (rb + CT2_MBIST_CTL_REG));
 }
 
-void
+static void
 bfa_ioc_ct2_mac_reset(void __iomem *rb)
 {
 	/* put port0, port1 MAC & AHB in reset */
@@ -892,7 +896,7 @@ bfa_ioc_ct2_wait_till_nfc_running(void __iomem *rb)
 	WARN_ON(!(r32 == CT2_NFC_STATE_RUNNING));
 }
 
-bfa_status_t
+static bfa_status_t
 bfa_ioc_ct2_pll_init(void __iomem *rb, enum bfi_asic_mode mode)
 {
 	u32 wgn, r32, nfc_ver;

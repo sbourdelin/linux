@@ -38,6 +38,15 @@ struct bfa_fcs_mod_s {
 
 #define BFA_FCS_MODULE(_mod) { _mod ## _modinit, _mod ## _modexit }
 
+static void bfa_fcs_port_attach(struct bfa_fcs_s *fcs);
+static void bfa_fcs_uf_attach(struct bfa_fcs_s *fcs);
+static void bfa_fcs_fabric_attach(struct bfa_fcs_s *fcs);
+static void bfa_fcs_fabric_modinit(struct bfa_fcs_s *fcs);
+static void bfa_fcs_fabric_modexit(struct bfa_fcs_s *fcs);
+static void bfa_fcs_fabric_modstop(struct bfa_fcs_s *fcs);
+static void bfa_fcs_fabric_psymb_init(struct bfa_fcs_fabric_s *fabric);
+static void bfa_fcs_fabric_nsymb_init(struct bfa_fcs_fabric_s *fabric);
+
 static struct bfa_fcs_mod_s fcs_modules[] = {
 	{ bfa_fcs_port_attach, NULL, NULL },
 	{ bfa_fcs_uf_attach, NULL, NULL },
@@ -822,7 +831,7 @@ bfa_fcs_fabric_init(struct bfa_fcs_fabric_s *fabric)
 /*
  * Port Symbolic Name Creation for base port.
  */
-void
+static void
 bfa_fcs_fabric_psymb_init(struct bfa_fcs_fabric_s *fabric)
 {
 	struct bfa_lport_cfg_s *port_cfg = &fabric->bport.port_cfg;
@@ -883,7 +892,7 @@ bfa_fcs_fabric_psymb_init(struct bfa_fcs_fabric_s *fabric)
 /*
  * Node Symbolic Name Creation for base port and all vports
  */
-void
+static void
 bfa_fcs_fabric_nsymb_init(struct bfa_fcs_fabric_s *fabric)
 {
 	struct bfa_lport_cfg_s *port_cfg = &fabric->bport.port_cfg;
@@ -1130,7 +1139,7 @@ bfa_fcs_fabric_stop_comp(void *cbarg)
 /*
  * Attach time initialization.
  */
-void
+static void
 bfa_fcs_fabric_attach(struct bfa_fcs_s *fcs)
 {
 	struct bfa_fcs_fabric_s *fabric;
@@ -1158,7 +1167,7 @@ bfa_fcs_fabric_attach(struct bfa_fcs_s *fcs)
 	bfa_fcs_lport_attach(&fabric->bport, fabric->fcs, FC_VF_ID_NULL, NULL);
 }
 
-void
+static void
 bfa_fcs_fabric_modinit(struct bfa_fcs_s *fcs)
 {
 	bfa_sm_send_event(&fcs->fabric, BFA_FCS_FABRIC_SM_CREATE);
@@ -1168,7 +1177,7 @@ bfa_fcs_fabric_modinit(struct bfa_fcs_s *fcs)
 /*
  *   Module cleanup
  */
-void
+static void
 bfa_fcs_fabric_modexit(struct bfa_fcs_s *fcs)
 {
 	struct bfa_fcs_fabric_s *fabric;
@@ -1186,7 +1195,7 @@ bfa_fcs_fabric_modexit(struct bfa_fcs_s *fcs)
 /*
  * Fabric module stop -- stop FCS actions
  */
-void
+static void
 bfa_fcs_fabric_modstop(struct bfa_fcs_s *fcs)
 {
 	struct bfa_fcs_fabric_s *fabric;
@@ -1213,7 +1222,7 @@ bfa_fcs_fabric_modstart(struct bfa_fcs_s *fcs)
 /*
  *   Link up notification from BFA physical port module.
  */
-void
+static void
 bfa_fcs_fabric_link_up(struct bfa_fcs_fabric_s *fabric)
 {
 	bfa_trc(fabric->fcs, fabric->bport.port_cfg.pwwn);
@@ -1223,7 +1232,7 @@ bfa_fcs_fabric_link_up(struct bfa_fcs_fabric_s *fabric)
 /*
  *   Link down notification from BFA physical port module.
  */
-void
+static void
 bfa_fcs_fabric_link_down(struct bfa_fcs_fabric_s *fabric)
 {
 	bfa_trc(fabric->fcs, fabric->bport.port_cfg.pwwn);
@@ -1317,7 +1326,7 @@ bfa_fcs_fabric_get_switch_oui(struct bfa_fcs_fabric_s *fabric)
 /*
  *		Unsolicited frame receive handling.
  */
-void
+static void
 bfa_fcs_fabric_uf_recv(struct bfa_fcs_fabric_s *fabric, struct fchs_s *fchs,
 		       u16 len)
 {
@@ -1633,7 +1642,7 @@ bfa_fcs_port_event_handler(void *cbarg, enum bfa_port_linkstate event)
 	}
 }
 
-void
+static void
 bfa_fcs_port_attach(struct bfa_fcs_s *fcs)
 {
 	bfa_fcport_event_register(fcs->bfa, bfa_fcs_port_event_handler, fcs);
@@ -1706,7 +1715,7 @@ bfa_fcs_uf_recv(void *cbarg, struct bfa_uf_s *uf)
 	bfa_uf_free(uf);
 }
 
-void
+static void
 bfa_fcs_uf_attach(struct bfa_fcs_s *fcs)
 {
 	bfa_uf_recv_register(fcs->bfa, bfa_fcs_uf_recv, fcs);

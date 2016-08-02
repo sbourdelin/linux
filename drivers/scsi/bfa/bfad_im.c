@@ -28,7 +28,8 @@
 
 BFA_TRC_FILE(LDRV, IM);
 
-DEFINE_IDR(bfad_im_port_index);
+static DEFINE_IDR(bfad_im_port_index);
+static struct scsi_host_template bfad_im_vport_template;
 struct scsi_transport_template *bfad_im_scsi_transport_template;
 struct scsi_transport_template *bfad_im_scsi_vport_transport_template;
 static void bfad_im_itnim_work_handler(struct work_struct *work);
@@ -36,6 +37,14 @@ static int bfad_im_queuecommand(struct Scsi_Host *h, struct scsi_cmnd *cmnd);
 static int bfad_im_slave_alloc(struct scsi_device *sdev);
 static void bfad_im_fc_rport_add(struct bfad_im_port_s  *im_port,
 				struct bfad_itnim_s *itnim);
+static void bfad_destroy_workq(struct bfad_im_s *im);
+static void bfad_handle_qfull(struct bfad_itnim_s *itnim,
+			      struct scsi_device *sdev);
+static struct Scsi_Host * bfad_scsi_host_alloc(struct bfad_im_port_s *im_port,
+					       struct bfad_s *bfad);
+static bfa_status_t bfad_thread_workq(struct bfad_s *bfad);
+static void bfad_ramp_up_qdepth(struct bfad_itnim_s *itnim,
+				struct scsi_device *sdev);
 
 void
 bfa_cb_ioim_done(void *drv, struct bfad_ioim_s *dio,
@@ -740,7 +749,7 @@ bfad_im_probe_undo(struct bfad_s *bfad)
 	}
 }
 
-struct Scsi_Host *
+static struct Scsi_Host *
 bfad_scsi_host_alloc(struct bfad_im_port_s *im_port, struct bfad_s *bfad)
 {
 	struct scsi_host_template *sht;
@@ -768,7 +777,7 @@ bfad_scsi_host_free(struct bfad_s *bfad, struct bfad_im_port_s *im_port)
 	kfree(im_port);
 }
 
-void
+static void
 bfad_destroy_workq(struct bfad_im_s *im)
 {
 	if (im && im->drv_workq) {
@@ -778,7 +787,7 @@ bfad_destroy_workq(struct bfad_im_s *im)
 	}
 }
 
-bfa_status_t
+static bfa_status_t
 bfad_thread_workq(struct bfad_s *bfad)
 {
 	struct bfad_im_s      *im = bfad->im;
@@ -830,7 +839,7 @@ struct scsi_host_template bfad_im_scsi_host_template = {
 	.vendor_id = BFA_PCI_VENDOR_ID_BROCADE,
 };
 
-struct scsi_host_template bfad_im_vport_template = {
+static struct scsi_host_template bfad_im_vport_template = {
 	.module = THIS_MODULE,
 	.name = BFAD_DRIVER_NAME,
 	.info = bfad_im_info,
@@ -881,7 +890,7 @@ bfad_im_module_exit(void)
 	idr_destroy(&bfad_im_port_index);
 }
 
-void
+static void
 bfad_ramp_up_qdepth(struct bfad_itnim_s *itnim, struct scsi_device *sdev)
 {
 	struct scsi_device *tmp_sdev;
@@ -903,7 +912,7 @@ bfad_ramp_up_qdepth(struct bfad_itnim_s *itnim, struct scsi_device *sdev)
 	}
 }
 
-void
+static void
 bfad_handle_qfull(struct bfad_itnim_s *itnim, struct scsi_device *sdev)
 {
 	struct scsi_device *tmp_sdev;

@@ -38,27 +38,27 @@
 
 BFA_TRC_FILE(LDRV, BFAD);
 DEFINE_MUTEX(bfad_mutex);
-LIST_HEAD(bfad_list);
+static LIST_HEAD(bfad_list);
 
-static int	bfad_inst;
+int	bfad_inst;
 static int      num_sgpgs_parm;
 int		supported_fc4s;
-char		*host_name, *os_name, *os_patch;
-int		num_rports, num_ios, num_tms;
-int		num_fcxps, num_ufbufs;
-int		reqq_size, rspq_size, num_sgpgs;
-int		rport_del_timeout = BFA_FCS_RPORT_DEF_DEL_TIMEOUT;
+static char	*host_name, *os_name, *os_patch;
+static int	num_rports, num_ios, num_tms;
+static int	num_fcxps, num_ufbufs;
+static int	reqq_size, rspq_size, num_sgpgs;
+static int	rport_del_timeout = BFA_FCS_RPORT_DEF_DEL_TIMEOUT;
 int		bfa_lun_queue_depth = BFAD_LUN_QUEUE_DEPTH;
-int		bfa_io_max_sge = BFAD_IO_MAX_SGE;
+static int	bfa_io_max_sge = BFAD_IO_MAX_SGE;
 int		bfa_log_level = 3; /* WARNING log level */
-int		ioc_auto_recover = BFA_TRUE;
+static int	ioc_auto_recover = BFA_TRUE;
 int		bfa_linkup_delay = -1;
-int		fdmi_enable = BFA_TRUE;
-int		pcie_max_read_reqsz;
+static int	fdmi_enable = BFA_TRUE;
+static int	pcie_max_read_reqsz;
 int		bfa_debugfs_enable = 1;
-int		msix_disable_cb = 0, msix_disable_ct = 0;
+static int	msix_disable_cb = 0, msix_disable_ct = 0;
 int		max_xfer_size = BFAD_MAX_SECTORS >> 1;
-int		max_rport_logins = BFA_FCS_MAX_RPORT_LOGINS;
+static int	max_rport_logins = BFA_FCS_MAX_RPORT_LOGINS;
 
 /* Firmware releated */
 u32	bfi_image_cb_size, bfi_image_ct_size, bfi_image_ct2_size;
@@ -163,6 +163,19 @@ static void
 bfad_sm_failed(struct bfad_s *bfad, enum bfad_sm_event event);
 static void
 bfad_sm_fcs_exit(struct bfad_s *bfad, enum bfad_sm_event event);
+
+static bfa_status_t
+bfad_cfg_pport(struct bfad_s *bfad, enum bfa_lport_role role);
+static bfa_status_t bfad_start_ops(struct bfad_s *bfad);
+
+static void bfad_fcs_stop(struct bfad_s *bfad);
+static void bfad_init_timer(struct bfad_s *bfad);
+static int  bfad_install_msix_handler(struct bfad_s *bfad);
+static void bfad_stop(struct bfad_s *bfad);
+static void bfad_uncfg_pport(struct bfad_s *bfad);
+static int  bfad_worker(void *ptr);
+static int  bfad_setup_intr(struct bfad_s *bfad);
+static void bfad_remove_intr(struct bfad_s *bfad);
 
 /*
  * Beginning state for the driver instance, awaiting the pci_probe event
@@ -527,7 +540,7 @@ bfa_fcb_pbc_vport_create(struct bfad_s *bfad, struct bfi_pbc_vport_s pbc_vport)
 	list_add_tail(&vport->list_entry, &bfad->pbc_vport_list);
 }
 
-void
+static void
 bfad_hal_mem_release(struct bfad_s *bfad)
 {
 	struct bfa_meminfo_s *hal_meminfo = &bfad->meminfo;
@@ -555,7 +568,7 @@ bfad_hal_mem_release(struct bfad_s *bfad)
 	memset(hal_meminfo, 0, sizeof(struct bfa_meminfo_s));
 }
 
-void
+static void
 bfad_update_hal_cfg(struct bfa_iocfc_cfg_s *bfa_cfg)
 {
 	if (num_rports > 0)
@@ -589,7 +602,7 @@ bfad_update_hal_cfg(struct bfa_iocfc_cfg_s *bfa_cfg)
 	num_sgpgs = bfa_cfg->drvcfg.num_sgpgs;
 }
 
-bfa_status_t
+static bfa_status_t
 bfad_hal_mem_alloc(struct bfad_s *bfad)
 {
 	struct bfa_meminfo_s *hal_meminfo = &bfad->meminfo;
@@ -691,7 +704,7 @@ ext:
 	return rc;
 }
 
-void
+static void
 bfad_bfa_tmo(unsigned long data)
 {
 	struct bfad_s	      *bfad = (struct bfad_s *) data;
@@ -716,7 +729,7 @@ bfad_bfa_tmo(unsigned long data)
 		  jiffies + msecs_to_jiffies(BFA_TIMER_FREQ));
 }
 
-void
+static void
 bfad_init_timer(struct bfad_s *bfad)
 {
 	init_timer(&bfad->hal_tmo);
@@ -727,7 +740,7 @@ bfad_init_timer(struct bfad_s *bfad)
 		  jiffies + msecs_to_jiffies(BFA_TIMER_FREQ));
 }
 
-int
+static int
 bfad_pci_init(struct pci_dev *pdev, struct bfad_s *bfad)
 {
 	int		rc = -ENODEV;
@@ -808,7 +821,7 @@ out:
 	return rc;
 }
 
-void
+static void
 bfad_pci_uninit(struct pci_dev *pdev, struct bfad_s *bfad)
 {
 	pci_iounmap(pdev, bfad->pci_bar0_kva);
@@ -819,7 +832,7 @@ bfad_pci_uninit(struct pci_dev *pdev, struct bfad_s *bfad)
 	pci_disable_device(pdev);
 }
 
-bfa_status_t
+static bfa_status_t
 bfad_drv_init(struct bfad_s *bfad)
 {
 	bfa_status_t	rc;
@@ -880,7 +893,7 @@ bfad_drv_uninit(struct bfad_s *bfad)
 	bfad->bfad_flags &= ~BFAD_DRV_INIT_DONE;
 }
 
-void
+static void
 bfad_drv_start(struct bfad_s *bfad)
 {
 	unsigned long	flags;
@@ -896,7 +909,7 @@ bfad_drv_start(struct bfad_s *bfad)
 		flush_workqueue(bfad->im->drv_workq);
 }
 
-void
+static void
 bfad_fcs_stop(struct bfad_s *bfad)
 {
 	unsigned long	flags;
@@ -911,7 +924,7 @@ bfad_fcs_stop(struct bfad_s *bfad)
 	bfa_sm_send_event(bfad, BFAD_E_FCS_EXIT_COMP);
 }
 
-void
+static void
 bfad_stop(struct bfad_s *bfad)
 {
 	unsigned long	flags;
@@ -926,7 +939,7 @@ bfad_stop(struct bfad_s *bfad)
 	bfa_sm_send_event(bfad, BFAD_E_EXIT_COMP);
 }
 
-bfa_status_t
+static bfa_status_t
 bfad_cfg_pport(struct bfad_s *bfad, enum bfa_lport_role role)
 {
 	int		rc = BFA_STATUS_OK;
@@ -953,7 +966,7 @@ out:
 	return rc;
 }
 
-void
+static void
 bfad_uncfg_pport(struct bfad_s *bfad)
 {
 	if ((supported_fc4s & BFA_LPORT_ROLE_FCP_IM) &&
@@ -967,8 +980,9 @@ bfad_uncfg_pport(struct bfad_s *bfad)
 	bfad->bfad_flags &= ~BFAD_CFG_PPORT_DONE;
 }
 
-bfa_status_t
-bfad_start_ops(struct bfad_s *bfad) {
+static bfa_status_t
+bfad_start_ops(struct bfad_s *bfad)
+{
 
 	int	retval;
 	unsigned long	flags;
@@ -1072,7 +1086,7 @@ bfad_start_ops(struct bfad_s *bfad) {
 	return BFA_STATUS_OK;
 }
 
-int
+static int
 bfad_worker(void *ptr)
 {
 	struct bfad_s *bfad = ptr;
@@ -1094,7 +1108,7 @@ bfad_worker(void *ptr)
 /*
  *  BFA driver interrupt functions
  */
-irqreturn_t
+static irqreturn_t
 bfad_intx(int irq, void *dev_id)
 {
 	struct bfad_s	*bfad = dev_id;
@@ -1172,7 +1186,7 @@ bfad_init_msix_entry(struct bfad_s *bfad, struct msix_entry *msix_entries,
 
 }
 
-int
+static int
 bfad_install_msix_handler(struct bfad_s *bfad)
 {
 	int i, error = 0;
@@ -1208,7 +1222,7 @@ bfad_install_msix_handler(struct bfad_s *bfad)
 /*
  * Setup MSIX based interrupt.
  */
-int
+static int
 bfad_setup_intr(struct bfad_s *bfad)
 {
 	int error;
@@ -1277,7 +1291,7 @@ line_based:
 	return 0;
 }
 
-void
+static void
 bfad_remove_intr(struct bfad_s *bfad)
 {
 	int	i;
@@ -1297,7 +1311,7 @@ bfad_remove_intr(struct bfad_s *bfad)
 /*
  * PCI probe entry.
  */
-int
+static int
 bfad_pci_probe(struct pci_dev *pdev, const struct pci_device_id *pid)
 {
 	struct bfad_s	*bfad;
@@ -1398,7 +1412,7 @@ out:
 /*
  * PCI remove entry.
  */
-void
+static void
 bfad_pci_remove(struct pci_dev *pdev)
 {
 	struct bfad_s	      *bfad = pci_get_drvdata(pdev);
@@ -1498,7 +1512,7 @@ bfad_pci_error_detected(struct pci_dev *pdev, pci_channel_state_t state)
 	return ret;
 }
 
-int
+static int
 restart_bfa(struct bfad_s *bfad)
 {
 	unsigned long flags;
@@ -1629,7 +1643,7 @@ bfad_pci_resume(struct pci_dev *pdev)
 	spin_unlock_irqrestore(&bfad->bfad_lock, flags);
 }
 
-struct pci_device_id bfad_id_table[] = {
+static struct pci_device_id bfad_id_table[] = {
 	{
 		.vendor = BFA_PCI_VENDOR_ID_BROCADE,
 		.device = BFA_PCI_DEVICE_ID_FC_8G2P,

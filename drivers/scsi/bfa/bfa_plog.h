@@ -144,13 +144,5 @@ struct bfa_plog_s {
 void bfa_plog_init(struct bfa_plog_s *plog);
 void bfa_plog_str(struct bfa_plog_s *plog, enum bfa_plog_mid mid,
 			enum bfa_plog_eid event, u16 misc, char *log_str);
-void bfa_plog_intarr(struct bfa_plog_s *plog, enum bfa_plog_mid mid,
-			enum bfa_plog_eid event, u16 misc,
-			u32 *intarr, u32 num_ints);
-void bfa_plog_fchdr(struct bfa_plog_s *plog, enum bfa_plog_mid mid,
-		enum bfa_plog_eid event, u16 misc, struct fchs_s *fchdr);
-void bfa_plog_fchdr_and_pl(struct bfa_plog_s *plog, enum bfa_plog_mid mid,
-			enum bfa_plog_eid event, u16 misc,
-			struct fchs_s *fchdr, u32 pld_w0);
 
 #endif /* __BFA_PORTLOG_H__ */

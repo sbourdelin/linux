@@ -454,7 +454,6 @@ void	bfa_sfp_attach(struct bfa_sfp_s *sfp, struct bfa_ioc_s *ioc,
 			void *dev, struct bfa_trc_mod_s *trcmod);
 
 void	bfa_sfp_memclaim(struct bfa_sfp_s *diag, u8 *dm_kva, u64 dm_pa);
-void	bfa_sfp_intr(void *bfaarg, struct bfi_mbmsg_s *msg);
 
 bfa_status_t	bfa_sfp_show(struct bfa_sfp_s *sfp, struct sfp_mem_s *sfpmem,
 			     bfa_cb_sfp_t cbfn, void *cbarg);
@@ -516,8 +515,6 @@ void bfa_flash_attach(struct bfa_flash_s *flash, struct bfa_ioc_s *ioc,
 		void *dev, struct bfa_trc_mod_s *trcmod, bfa_boolean_t mincfg);
 void bfa_flash_memclaim(struct bfa_flash_s *flash,
 		u8 *dm_kva, u64 dm_pa, bfa_boolean_t mincfg);
-bfa_status_t    bfa_flash_raw_read(void __iomem *pci_bar_kva,
-				u32 offset, char *buf, u32 len);
 
 /*
  *	DIAG module specific
@@ -689,7 +686,6 @@ struct bfa_phy_s {
 #define BFA_PHY(__bfa)	(&(__bfa)->modules.phy)
 #define BFA_MEM_PHY_DMA(__bfa)	(&(BFA_PHY(__bfa)->phy_dma))
 
-bfa_boolean_t bfa_phy_busy(struct bfa_ioc_s *ioc);
 bfa_status_t bfa_phy_get_attr(struct bfa_phy_s *phy, u8 instance,
 			struct bfa_phy_attr_s *attr,
 			bfa_cb_phy_t cbfn, void *cbarg);
@@ -708,7 +704,6 @@ void bfa_phy_attach(struct bfa_phy_s *phy, struct bfa_ioc_s *ioc,
 		void *dev, struct bfa_trc_mod_s *trcmod, bfa_boolean_t mincfg);
 void bfa_phy_memclaim(struct bfa_phy_s *phy,
 		u8 *dm_kva, u64 dm_pa, bfa_boolean_t mincfg);
-void bfa_phy_intr(void *phyarg, struct bfi_mbmsg_s *msg);
 
 /*
  * FRU module specific
@@ -758,7 +753,6 @@ void bfa_fru_attach(struct bfa_fru_s *fru, struct bfa_ioc_s *ioc,
 		void *dev, struct bfa_trc_mod_s *trcmod, bfa_boolean_t mincfg);
 void bfa_fru_memclaim(struct bfa_fru_s *fru,
 		u8 *dm_kva, u64 dm_pa, bfa_boolean_t mincfg);
-void bfa_fru_intr(void *fruarg, struct bfi_mbmsg_s *msg);
 
 /*
  * Driver Config( dconf) specific
@@ -845,7 +839,6 @@ void bfa_ioc_mbox_register(struct bfa_ioc_s *ioc,
 		bfa_ioc_mbox_mcfunc_t *mcfuncs);
 void bfa_ioc_mbox_isr(struct bfa_ioc_s *ioc);
 void bfa_ioc_mbox_send(struct bfa_ioc_s *ioc, void *ioc_msg, int len);
-bfa_boolean_t bfa_ioc_msgget(struct bfa_ioc_s *ioc, void *mbmsg);
 void bfa_ioc_mbox_regisr(struct bfa_ioc_s *ioc, enum bfi_mclass mc,
 		bfa_ioc_mbox_mcfunc_t cbfn, void *cbarg);
 
@@ -856,11 +849,6 @@ void bfa_ioc_mbox_regisr(struct bfa_ioc_s *ioc, enum bfi_mclass mc,
 #define bfa_ioc_pll_init_asic(__ioc) \
 	((__ioc)->ioc_hwif->ioc_pll_init((__ioc)->pcidev.pci_bar_kva, \
 			   (__ioc)->asic_mode))
-
-bfa_status_t bfa_ioc_pll_init(struct bfa_ioc_s *ioc);
-bfa_status_t bfa_ioc_cb_pll_init(void __iomem *rb, enum bfi_asic_mode mode);
-bfa_status_t bfa_ioc_ct_pll_init(void __iomem *rb, enum bfi_asic_mode mode);
-bfa_status_t bfa_ioc_ct2_pll_init(void __iomem *rb, enum bfi_asic_mode mode);
 
 #define bfa_ioc_isr_mode_set(__ioc, __msix) do {			\
 	if ((__ioc)->ioc_hwif->ioc_isr_mode_set)			\
@@ -891,17 +879,12 @@ void bfa_ioc_enable(struct bfa_ioc_s *ioc);
 void bfa_ioc_disable(struct bfa_ioc_s *ioc);
 bfa_boolean_t bfa_ioc_intx_claim(struct bfa_ioc_s *ioc);
 
-bfa_status_t bfa_ioc_boot(struct bfa_ioc_s *ioc, u32 boot_type,
-		u32 boot_env);
-void bfa_ioc_isr(struct bfa_ioc_s *ioc, struct bfi_mbmsg_s *msg);
 void bfa_ioc_error_isr(struct bfa_ioc_s *ioc);
 bfa_boolean_t bfa_ioc_is_operational(struct bfa_ioc_s *ioc);
 bfa_boolean_t bfa_ioc_is_initialized(struct bfa_ioc_s *ioc);
 bfa_boolean_t bfa_ioc_is_disabled(struct bfa_ioc_s *ioc);
 bfa_boolean_t bfa_ioc_is_acq_addr(struct bfa_ioc_s *ioc);
 bfa_boolean_t bfa_ioc_fw_mismatch(struct bfa_ioc_s *ioc);
-bfa_boolean_t bfa_ioc_adapter_is_disabled(struct bfa_ioc_s *ioc);
-void bfa_ioc_reset_fwstate(struct bfa_ioc_s *ioc);
 enum bfa_ioc_type_e bfa_ioc_get_type(struct bfa_ioc_s *ioc);
 void bfa_ioc_get_adapter_serial_num(struct bfa_ioc_s *ioc, char *serial_num);
 void bfa_ioc_get_adapter_fw_ver(struct bfa_ioc_s *ioc, char *fw_ver);
@@ -910,11 +893,8 @@ void bfa_ioc_get_adapter_model(struct bfa_ioc_s *ioc, char *model);
 void bfa_ioc_get_adapter_manufacturer(struct bfa_ioc_s *ioc,
 		char *manufacturer);
 void bfa_ioc_get_pci_chip_rev(struct bfa_ioc_s *ioc, char *chip_rev);
-enum bfa_ioc_state bfa_ioc_get_state(struct bfa_ioc_s *ioc);
 
 void bfa_ioc_get_attr(struct bfa_ioc_s *ioc, struct bfa_ioc_attr_s *ioc_attr);
-void bfa_ioc_get_adapter_attr(struct bfa_ioc_s *ioc,
-		struct bfa_adapter_attr_s *ad_attr);
 void bfa_ioc_debug_memclaim(struct bfa_ioc_s *ioc, void *dbg_fwsave);
 bfa_status_t bfa_ioc_debug_fwsave(struct bfa_ioc_s *ioc, void *trcdata,
 		int *trclen);
@@ -928,7 +908,6 @@ void bfa_ioc_fwver_get(struct bfa_ioc_s *ioc,
 			struct bfi_ioc_image_hdr_s *fwhdr);
 bfa_boolean_t bfa_ioc_fwver_cmp(struct bfa_ioc_s *ioc,
 			struct bfi_ioc_image_hdr_s *fwhdr);
-void bfa_ioc_aen_post(struct bfa_ioc_s *ioc, enum bfa_ioc_aen_event event);
 bfa_status_t bfa_ioc_fw_stats_get(struct bfa_ioc_s *ioc, void *stats);
 bfa_status_t bfa_ioc_fw_stats_clear(struct bfa_ioc_s *ioc);
 void bfa_ioc_debug_save_ftrc(struct bfa_ioc_s *ioc);
@@ -960,8 +939,6 @@ bfa_status_t bfa_ablk_optrom_en(struct bfa_ablk_s *ablk,
 bfa_status_t bfa_ablk_optrom_dis(struct bfa_ablk_s *ablk,
 		bfa_ablk_cbfn_t cbfn, void *cbarg);
 
-bfa_status_t bfa_ioc_flash_img_get_chnk(struct bfa_ioc_s *ioc, u32 off,
-				u32 *fwimg);
 /*
  * bfa mfg wwn API functions
  */
