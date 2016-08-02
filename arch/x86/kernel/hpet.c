@@ -1076,14 +1076,12 @@ void hpet_unregister_irq_handler(rtc_irq_handler handler)
 EXPORT_SYMBOL_GPL(hpet_unregister_irq_handler);
 
 /*
- * Timer 1 for RTC emulation. We use one shot mode, as periodic mode
- * is not supported by all HPET implementations for timer 1.
- *
- * hpet_rtc_timer_init() is called when the rtc is initialized.
+ * hpet_rtc_timer_counter_init() is called before interrupt can be
+ * registered
  */
-int hpet_rtc_timer_init(void)
+int hpet_rtc_timer_counter_init(void)
 {
-	unsigned int cfg, cnt, delta;
+	unsigned int cnt, delta;
 	unsigned long flags;
 
 	if (!is_hpet_enabled())
@@ -1108,6 +1106,22 @@ int hpet_rtc_timer_init(void)
 	hpet_writel(cnt, HPET_T1_CMP);
 	hpet_t1_cmp = cnt;
 
+	local_irq_restore(flags);
+
+	return 1;
+}
+EXPORT_SYMBOL_GPL(hpet_rtc_timer_counter_init);
+
+/*
+ * hpet_rtc_timer_enable() is called during RTC initialization
+ */
+int hpet_rtc_timer_enable(void)
+{
+	unsigned int cfg;
+	unsigned long flags;
+
+	local_irq_save(flags);
+
 	cfg = hpet_readl(HPET_T1_CFG);
 	cfg &= ~HPET_TN_PERIODIC;
 	cfg |= HPET_TN_ENABLE | HPET_TN_32BIT;
@@ -1116,6 +1130,21 @@ int hpet_rtc_timer_init(void)
 	local_irq_restore(flags);
 
 	return 1;
+}
+EXPORT_SYMBOL_GPL(hpet_rtc_timer_enable);
+
+/*
+ * Timer 1 for RTC emulation. We use one shot mode, as periodic mode
+ * is not supported by all HPET implementations for timer 1.
+ *
+ * hpet_rtc_timer_init() is called when the rtc is initialized.
+ */
+int hpet_rtc_timer_init(void)
+{
+	if (!hpet_rtc_timer_counter_init())
+		return 0;
+
+	return hpet_rtc_timer_enable();
 }
 EXPORT_SYMBOL_GPL(hpet_rtc_timer_init);
 
