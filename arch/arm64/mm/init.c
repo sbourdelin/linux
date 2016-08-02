@@ -324,6 +324,13 @@ void __init bootmem_init(void)
 
 	high_memory = __va((max << PAGE_SHIFT) - 1) + 1;
 	memblock_dump_all();
+
+	if (!memblock_debug)
+		__memblock_dump_all();
+	/*
+	 * extern void memblock_patch_verify(void);
+	 */
+	memblock_patch_verify();
 }
 
 #ifndef CONFIG_SPARSEMEM_VMEMMAP

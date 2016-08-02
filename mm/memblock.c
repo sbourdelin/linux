@@ -994,7 +994,10 @@ void __init_memblock __next_mem_range_rev(u64 *idx, int nid, ulong flags,
 
 	if (*idx == (u64)ULLONG_MAX) {
 		idx_a = type_a->cnt - 1;
-		idx_b = type_b->cnt;
+		if (type_b != NULL)
+			idx_b = type_b->cnt;
+		else
+			idx_b = 0;
 	}
 
 	for (; idx_a >= 0; idx_a--) {
@@ -1697,6 +1700,31 @@ void __init_memblock __memblock_dump_all(void)
 
 	memblock_dump(&memblock.memory, "memory");
 	memblock_dump(&memblock.reserved, "reserved");
+}
+
+void __init_memblock memblock_patch_verify(void)
+{
+	u64 i;
+	phys_addr_t this_start, this_end;
+
+	pr_info("in %s: memory\n", __func__);
+	for_each_mem_range_rev(i, &memblock.memory, NULL, NUMA_NO_NODE,
+			MEMBLOCK_NONE, &this_start, &this_end, NULL)
+		pr_info("[%#016llx]\t[%#016llx-%#016llx]\n",
+				i, this_start, this_end);
+
+	pr_info("in %s: reserved\n", __func__);
+	for_each_mem_range_rev(i, &memblock.reserved, NULL, NUMA_NO_NODE,
+			MEMBLOCK_NONE, &this_start, &this_end, NULL)
+		pr_info("[%#016llx]\t[%#016llx-%#016llx]\n",
+				i, this_start, this_end);
+
+	pr_info("in %s: memory X reserved\n", __func__);
+	for_each_mem_range_rev(i, &memblock.memory, &memblock.reserved,
+			NUMA_NO_NODE, MEMBLOCK_NONE,
+			&this_start, &this_end, NULL)
+		pr_info("[%#016llx]\t[%#016llx-%#016llx]\n",
+				i, this_start, this_end);
 }
 
 void __init memblock_allow_resize(void)
