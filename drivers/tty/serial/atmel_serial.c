@@ -1915,7 +1915,6 @@ static void atmel_shutdown(struct uart_port *port)
 	 * Clear out any scheduled tasklets before
 	 * we destroy the buffers
 	 */
-	tasklet_disable(&atmel_port->tasklet);
 	tasklet_kill(&atmel_port->tasklet);
 
 	/*
