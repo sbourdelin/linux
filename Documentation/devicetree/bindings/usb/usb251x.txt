@@ -1,0 +1,27 @@
+SMSC USB 2.0 Hi-Speed Hub Controller
+
+Required properties:
+- compatible = "smsc,usb251x";
+- reg = <0x2c>;
+
+Optional properties:
+- smsc,usb251x-cfg-data1 : u8, set configuration data 1 (byte 0x06)
+- smsc,usb251x-cfg-data2 : u8, set configuration data 2 (byte 0x07)
+- smsc,usb251x-cfg-data3 : u8, set configuration data 3 (byte 0x08)
+- smsc,usb251x-portmap12 : u8, set port mapping for ports 1 and 2 (byte 0xfb)
+- smsc,usb251x-portmap34 : u8, set port mapping for ports 3 and 4 (byte 0xfc)
+- smsc,usb251x-portmap56 : u8, set port mapping for ports 5 and 6 (byte 0xfd)
+- smsc,usb251x-portmap7 : u8, set port mapping for port 7 (byte 0xfe)
+- smsc,usb251x-status-command : u8, configure smbus behaviour (byte 0xff)
+
+Example:
+
+	usb251x: usb251x@2c {
+		compatible = "smsc,usb251x";
+		reg = <0x2c>;
+		smsc,usb251x-cfg-data3 = <0x09>;
+		smsc,usb251x-portmap12 = <0x21>;
+		smsc,usb251x-portmap12 = <0x43>;
+		smsc,usb251x-status-command = <0x1>;
+	};
+
