@@ -3357,6 +3357,39 @@ struct perf_read_data {
 	int ret;
 };
 
+static inline bool can_read_inactive(struct perf_event *event)
+{
+	return event->cpu >= 0 &&
+		(event->pmu_event_flags & PMUEF_READ_CPU_PKG);
+}
+
+static int find_cpu_to_read(struct perf_event *event)
+{
+	bool active = event->state == PERF_EVENT_STATE_ACTIVE;
+	int event_cpu = active ? event->oncpu : event->cpu;
+	int local_cpu = smp_processor_id();
+	u16 local_pkg, event_pkg;
+
+	if (event_cpu < 0)
+		return -1;
+
+	if (event->pmu_event_flags & PMUEF_READ_CPU_PKG) {
+		/*
+		 * Event with PMUEF_READ_CPU_PKG can be read in local CPU if:
+		 *   - CPU where event runs is on local CPU's pkg, or
+		 *   - event is bound to a CPU on local CPU's pkg
+		 *     (even if event is not in active state).
+		 */
+		event_pkg =  topology_physical_package_id(event_cpu);
+		local_pkg =  topology_physical_package_id(local_cpu);
+
+		if (event_pkg == local_pkg)
+			return local_cpu;
+	}
+
+	return event_cpu;
+}
+
 /*
  * Cross CPU call to read the hardware event
  */
@@ -3367,6 +3400,7 @@ static void __perf_event_read(void *info)
 	struct perf_event_context *ctx = event->ctx;
 	struct perf_cpu_context *cpuctx = __get_cpu_context(ctx);
 	struct pmu *pmu = event->pmu;
+	bool active, read_inactive = can_read_inactive(event);
 
 	/*
 	 * If this is a task context, we need to check whether it is
@@ -3375,7 +3409,7 @@ static void __perf_event_read(void *info)
 	 * event->count would have been updated to a recent sample
 	 * when the event was scheduled out.
 	 */
-	if (ctx->task && cpuctx->task_ctx != ctx)
+	if (ctx->task && cpuctx->task_ctx != ctx && !read_inactive)
 		return;
 
 	raw_spin_lock(&ctx->lock);
@@ -3385,7 +3419,9 @@ static void __perf_event_read(void *info)
 	}
 
 	update_event_times(event);
-	if (event->state != PERF_EVENT_STATE_ACTIVE)
+
+	active = event->state == PERF_EVENT_STATE_ACTIVE;
+	if (!active && !read_inactive)
 		goto unlock;
 
 	if (!data->group) {
@@ -3400,7 +3436,8 @@ static void __perf_event_read(void *info)
 
 	list_for_each_entry(sub, &event->sibling_list, group_entry) {
 		update_event_times(sub);
-		if (sub->state == PERF_EVENT_STATE_ACTIVE) {
+		active = sub->state == PERF_EVENT_STATE_ACTIVE;
+		if (active || can_read_inactive(sub)) {
 			/*
 			 * Use sibling's PMU rather than @event's since
 			 * sibling could be on different (eg: software) PMU.
@@ -3478,19 +3515,17 @@ u64 perf_event_read_local(struct perf_event *event)
 
 static int perf_event_read(struct perf_event *event, bool group)
 {
-	int ret = 0;
+	int ret = 0, cpu_to_read;
 
-	/*
-	 * If event is enabled and currently active on a CPU, update the
-	 * value in the event structure:
-	 */
-	if (event->state == PERF_EVENT_STATE_ACTIVE) {
+	cpu_to_read = find_cpu_to_read(event);
+
+	if (cpu_to_read >= 0) {
 		struct perf_read_data data = {
 			.event = event,
 			.group = group,
 			.ret = 0,
 		};
-		ret = smp_call_function_single(event->oncpu,
+		ret = smp_call_function_single(cpu_to_read,
 					       __perf_event_read, &data, 1);
 		ret = ret ? : data.ret;
 	} else if (event->state == PERF_EVENT_STATE_INACTIVE) {

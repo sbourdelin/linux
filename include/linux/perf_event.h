@@ -681,8 +681,20 @@ struct perf_event {
 #endif
 
 	struct list_head		sb_list;
+
+	/* Per-event flags to generic code set by PMU. */
+	int				pmu_event_flags;
+
 #endif /* CONFIG_PERF_EVENTS */
 };
+
+/*
+ * Flags for pmu_event_flags.
+ *
+ * PMUEF_READ_CPU_PKG: A CPU event (or cgroup event) that can be read in
+ *     any CPU in event->cpu's package, even if inactive.
+ */
+#define PMUEF_READ_CPU_PKG		BIT(0)
 
 /**
  * struct perf_event_context - event context structure
