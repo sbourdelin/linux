@@ -537,14 +537,12 @@ bfa_status_t bfa_fcport_cfg_topology(struct bfa_s *bfa,
 				     enum bfa_port_topology topo);
 enum bfa_port_topology bfa_fcport_get_topology(struct bfa_s *bfa);
 bfa_status_t bfa_fcport_cfg_hardalpa(struct bfa_s *bfa, u8 alpa);
-bfa_boolean_t bfa_fcport_get_hardalpa(struct bfa_s *bfa, u8 *alpa);
 u8 bfa_fcport_get_myalpa(struct bfa_s *bfa);
 bfa_status_t bfa_fcport_clr_hardalpa(struct bfa_s *bfa);
 bfa_status_t bfa_fcport_cfg_maxfrsize(struct bfa_s *bfa, u16 maxsize);
 u16 bfa_fcport_get_maxfrsize(struct bfa_s *bfa);
 u8 bfa_fcport_get_rx_bbcredit(struct bfa_s *bfa);
 void bfa_fcport_get_attr(struct bfa_s *bfa, struct bfa_port_attr_s *attr);
-wwn_t bfa_fcport_get_wwn(struct bfa_s *bfa, bfa_boolean_t node);
 void bfa_fcport_event_register(struct bfa_s *bfa,
 			void (*event_cbfn) (void *cbarg,
 			enum bfa_port_linkstate event), void *event_cbarg);
@@ -563,7 +561,6 @@ bfa_status_t bfa_fcport_get_stats(struct bfa_s *bfa,
 			struct bfa_cb_pending_q_s *cb);
 bfa_status_t bfa_fcport_clear_stats(struct bfa_s *bfa,
 			struct bfa_cb_pending_q_s *cb);
-void bfa_fcport_cfg_faa(struct bfa_s *bfa, u8 state);
 bfa_status_t bfa_fcport_cfg_bbcr(struct bfa_s *bfa,
 			bfa_boolean_t on_off, u8 bb_scn);
 bfa_status_t bfa_fcport_get_bbcr_attr(struct bfa_s *bfa,
@@ -628,8 +625,6 @@ void bfa_fcxp_send(struct bfa_fcxp_s *fcxp, struct bfa_rport_s *rport,
 		   bfa_cb_fcxp_send_t cbfn,
 		   void *cbarg,
 		   u32 rsp_maxlen, u8 rsp_timeout);
-bfa_status_t bfa_fcxp_abort(struct bfa_fcxp_s *fcxp);
-u32 bfa_fcxp_get_reqbufsz(struct bfa_fcxp_s *fcxp);
 u32 bfa_fcxp_get_maxrsp(struct bfa_s *bfa);
 void bfa_fcxp_res_recfg(struct bfa_s *bfa, u16 num_fcxp_fw);
 

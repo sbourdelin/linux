@@ -301,7 +301,6 @@ bfa_status_t	bfad_vf_create(struct bfad_s *bfad, u16 vf_id,
 			       struct bfa_lport_cfg_s *port_cfg);
 void		bfad_hcb_comp(void *arg, bfa_status_t status);
 
-void		bfad_drv_uninit(struct bfad_s *bfad);
 void		bfad_debugfs_init(struct bfad_port_s *port);
 void		bfad_debugfs_exit(struct bfad_port_s *port);
 

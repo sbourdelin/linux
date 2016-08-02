@@ -277,7 +277,6 @@ void	bfa_ioim_good_comp_isr(struct bfa_s *bfa,
 					struct bfi_msg_s *msg);
 
 void	bfa_tskim_isr(struct bfa_s *bfa, struct bfi_msg_s *msg);
-void	bfa_tskim_iodone(struct bfa_tskim_s *tskim);
 void	bfa_tskim_res_recfg(struct bfa_s *bfa, u16 num_tskim_fw);
 
 /*
