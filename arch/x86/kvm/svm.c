@@ -1577,7 +1577,7 @@ static unsigned long svm_get_rflags(struct kvm_vcpu *vcpu)
 static void svm_set_rflags(struct kvm_vcpu *vcpu, unsigned long rflags)
 {
        /*
-        * Any change of EFLAGS.VM is accompained by a reload of SS
+        * Any change of EFLAGS.VM is accompanied by a reload of SS
         * (caused by either a task switch or an inter-privilege IRET),
         * so we do not need to update the CPL here.
         */
@@ -4940,6 +4940,12 @@ out:
 static void svm_handle_external_intr(struct kvm_vcpu *vcpu)
 {
 	local_irq_enable();
+	/*
+	 * We must have an instruction with interrupts enabled, so
+	 * the timer interrupt isn't delayed by the interrupt shadow.
+	 */
+	asm("nop");
+	local_irq_disable();
 }
 
 static void svm_sched_in(struct kvm_vcpu *vcpu, int cpu)
@@ -4955,7 +4961,7 @@ static inline void avic_post_state_restore(struct kvm_vcpu *vcpu)
 	avic_handle_ldr_update(vcpu);
 }
 
-static struct kvm_x86_ops svm_x86_ops = {
+static struct kvm_x86_ops svm_x86_ops __ro_after_init = {
 	.cpu_has_kvm_support = has_svm,
 	.disabled_by_bios = is_disabled,
 	.hardware_setup = svm_hardware_setup,

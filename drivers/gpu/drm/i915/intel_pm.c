@@ -3997,6 +3997,7 @@ skl_compute_wm(struct drm_atomic_state *state)
 					 &changed);
 		if (ret)
 			return ret;
+<<<<<<< HEAD
 
 		if (changed)
 			results->dirty_pipes |= drm_crtc_mask(crtc);
@@ -4009,6 +4010,20 @@ skl_compute_wm(struct drm_atomic_state *state)
 		skl_compute_wm_results(crtc->dev, pipe_wm, results, intel_crtc);
 	}
 
+=======
+
+		if (changed)
+			results->dirty_pipes |= drm_crtc_mask(crtc);
+
+		if ((results->dirty_pipes & drm_crtc_mask(crtc)) == 0)
+			/* This pipe's WM's did not change */
+			continue;
+
+		intel_cstate->update_wm_pre = true;
+		skl_compute_wm_results(crtc->dev, pipe_wm, results, intel_crtc);
+	}
+
+>>>>>>> linux-next/akpm-base
 	return 0;
 }
 
@@ -4892,7 +4907,8 @@ void gen6_rps_idle(struct drm_i915_private *dev_priv)
 		else
 			gen6_set_rps(dev_priv, dev_priv->rps.idle_freq);
 		dev_priv->rps.last_adj = 0;
-		I915_WRITE(GEN6_PMINTRMSK, 0xffffffff);
+		I915_WRITE(GEN6_PMINTRMSK,
+			   gen6_sanitize_rps_pm_mask(dev_priv, ~0));
 	}
 	mutex_unlock(&dev_priv->rps.hw_lock);
 
