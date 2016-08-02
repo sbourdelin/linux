@@ -865,14 +865,12 @@ int irq_domain_xlate_onetwocell(struct irq_domain *d,
 				const u32 *intspec, unsigned int intsize,
 				unsigned long *out_hwirq, unsigned int *out_type)
 {
-	if (WARN_ON(intsize < 1))
-		return -EINVAL;
-	*out_hwirq = intspec[0];
 	if (intsize > 1)
-		*out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
+		return irq_domain_xlate_twocell(d, ctrlr, intspec, intsize,
+						out_hwirq, out_type);
 	else
-		*out_type = IRQ_TYPE_NONE;
-	return 0;
+		return irq_domain_xlate_onecell(d, ctrlr, intspec, intsize,
+						out_hwirq, out_type);
 }
 EXPORT_SYMBOL_GPL(irq_domain_xlate_onetwocell);
 
