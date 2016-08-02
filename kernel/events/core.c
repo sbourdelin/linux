@@ -1392,6 +1392,8 @@ ctx_group_list(struct perf_event *event, struct perf_event_context *ctx)
 static void
 list_add_event(struct perf_event *event, struct perf_event_context *ctx)
 {
+	struct perf_cpu_context *cpuctx;
+
 	lockdep_assert_held(&ctx->lock);
 
 	WARN_ON_ONCE(event->attach_state & PERF_ATTACH_CONTEXT);
@@ -1412,8 +1414,21 @@ list_add_event(struct perf_event *event, struct perf_event_context *ctx)
 		list_add_tail(&event->group_entry, list);
 	}
 
-	if (is_cgroup_event(event))
-		ctx->nr_cgroups++;
+	if (is_cgroup_event(event)) {
+		/*
+		 * If there are no more cgroup events, set cgrp in context
+		 * so event_filter_match works.
+		 */
+		if (!ctx->nr_cgroups++) {
+			/*
+			 * Because cgroup events are always per-cpu events,
+			 * this will always be called from the right CPU.
+			 */
+			cpuctx = __get_cpu_context(ctx);
+			cpuctx->cgrp = event->cgrp;
+		}
+	}
+
 
 	list_add_rcu(&event->event_entry, &ctx->event_list);
 	ctx->nr_events++;
@@ -1595,18 +1610,18 @@ list_del_event(struct perf_event *event, struct perf_event_context *ctx)
 	event->attach_state &= ~PERF_ATTACH_CONTEXT;
 
 	if (is_cgroup_event(event)) {
-		ctx->nr_cgroups--;
-		/*
-		 * Because cgroup events are always per-cpu events, this will
-		 * always be called from the right CPU.
-		 */
-		cpuctx = __get_cpu_context(ctx);
 		/*
 		 * If there are no more cgroup events then clear cgrp to avoid
 		 * stale pointer in update_cgrp_time_from_cpuctx().
 		 */
-		if (!ctx->nr_cgroups)
+		if (!--ctx->nr_cgroups) {
+			/*
+			 * Because cgroup events are always per-cpu events,
+			 * this will always be called from the right CPU.
+			 */
+			cpuctx = __get_cpu_context(ctx);
 			cpuctx->cgrp = NULL;
+		}
 	}
 
 	ctx->nr_events--;
