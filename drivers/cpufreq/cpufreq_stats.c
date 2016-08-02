@@ -14,6 +14,9 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/cputime.h>
+#include <linux/types.h>
+
+#define CPUFREQ_PSEUDO_FREQ_TABLE_COUNT (16)
 
 static DEFINE_SPINLOCK(cpufreq_stats_lock);
 
@@ -25,6 +28,7 @@ struct cpufreq_stats {
 	unsigned int last_index;
 	u64 *time_in_state;
 	unsigned int *freq_table;
+	bool pseudo_freq_table;
 #ifdef CONFIG_CPU_FREQ_STAT_DETAILS
 	unsigned int *trans_table;
 #endif
@@ -130,9 +134,17 @@ static struct attribute_group stats_attr_group = {
 static int freq_table_get_index(struct cpufreq_stats *stats, unsigned int freq)
 {
 	int index;
-	for (index = 0; index < stats->max_state; index++)
-		if (stats->freq_table[index] == freq)
-			return index;
+
+	if (stats->pseudo_freq_table) {
+		for (index = 0; index < stats->max_state; index++)
+			if (stats->freq_table[index] >= freq)
+				return index;
+	} else {
+		for (index = 0; index < stats->max_state; index++)
+			if (stats->freq_table[index] == freq)
+				return index;
+	}
+
 	return -1;
 }
 
@@ -154,14 +166,14 @@ void cpufreq_stats_free_table(struct cpufreq_policy *policy)
 
 void cpufreq_stats_create_table(struct cpufreq_policy *policy)
 {
-	unsigned int i = 0, count = 0, ret = -ENOMEM;
+	unsigned int i = 0, count = 0, ret = -ENOMEM, step_size;
 	struct cpufreq_stats *stats;
 	unsigned int alloc_size;
 	struct cpufreq_frequency_table *pos, *table;
 
-	/* We need cpufreq table for creating stats table */
+	/* We need cpufreq table or min < max for creating stats table */
 	table = policy->freq_table;
-	if (unlikely(!table))
+	if (!table && !(policy->min < policy->max))
 		return;
 
 	/* stats already initialized */
@@ -173,8 +185,20 @@ void cpufreq_stats_create_table(struct cpufreq_policy *policy)
 		return;
 
 	/* Find total allocation size */
-	cpufreq_for_each_valid_entry(pos, table)
-		count++;
+	if (table) {
+		cpufreq_for_each_valid_entry(pos, table)
+			count++;
+	} else {
+		stats->pseudo_freq_table = true;
+		count = CPUFREQ_PSEUDO_FREQ_TABLE_COUNT;
+		step_size = (policy->max - policy->min + 1) / count;
+
+		/* count is larger than min-max range */
+		if (!step_size) {
+			count = policy->max - policy->min + 1;
+			step_size = 1;
+		}
+	}
 
 	alloc_size = count * sizeof(int) + count * sizeof(u64);
 
@@ -195,10 +219,17 @@ void cpufreq_stats_create_table(struct cpufreq_policy *policy)
 
 	stats->max_state = count;
 
-	/* Find valid-unique entries */
-	cpufreq_for_each_valid_entry(pos, table)
-		if (freq_table_get_index(stats, pos->frequency) == -1)
-			stats->freq_table[i++] = pos->frequency;
+	if (table) {
+		/* Find valid-unique entries */
+		cpufreq_for_each_valid_entry(pos, table)
+			if (freq_table_get_index(stats, pos->frequency) == -1)
+				stats->freq_table[i++] = pos->frequency;
+	} else {
+		/* Create a pseudo frequency table */
+		for (i = 0 ; i < count ; i++)
+			stats->freq_table[i] = policy->min + i * step_size;
+		stats->freq_table[count-1] = policy->max;
+	}
 
 	stats->state_num = i;
 	stats->last_time = get_jiffies_64();
@@ -231,8 +262,14 @@ void cpufreq_stats_record_transition(struct cpufreq_policy *policy,
 	new_index = freq_table_get_index(stats, new_freq);
 
 	/* We can't do stats->time_in_state[-1]= .. */
-	if (old_index == -1 || new_index == -1 || old_index == new_index)
+	if (old_index == -1 || new_index == -1)
 		return;
+
+	if (old_index == new_index) {
+		if (stats->pseudo_freq_table)
+			stats->total_trans++;
+		return;
+	}
 
 	cpufreq_stats_update(stats);
 
