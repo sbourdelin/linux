@@ -42,7 +42,7 @@ static LIST_HEAD(bfad_list);
 
 int	bfad_inst;
 static int      num_sgpgs_parm;
-int		supported_fc4s;
+int		bfa_supported_fc4s;
 static char	*host_name, *os_name, *os_patch;
 static int	num_rports, num_ios, num_tms;
 static int	num_fcxps, num_ufbufs;
@@ -57,7 +57,7 @@ static int	fdmi_enable = BFA_TRUE;
 static int	pcie_max_read_reqsz;
 int		bfa_debugfs_enable = 1;
 static int	msix_disable_cb = 0, msix_disable_ct = 0;
-int		max_xfer_size = BFAD_MAX_SECTORS >> 1;
+int		bfa_max_xfer_size = BFAD_MAX_SECTORS >> 1;
 static int	max_rport_logins = BFA_FCS_MAX_RPORT_LOGINS;
 
 /* Firmware releated */
@@ -143,7 +143,7 @@ MODULE_PARM_DESC(pcie_max_read_reqsz, "PCIe max read request size, default=0 "
 module_param(bfa_debugfs_enable, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(bfa_debugfs_enable, "Enables debugfs feature, default=1,"
 		" Range[false:0|true:1]");
-module_param(max_xfer_size, int, S_IRUGO | S_IWUSR);
+module_param_named(max_xfer_size, bfa_max_xfer_size, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(max_xfer_size, "default=32MB,"
 		" Range[64k|128k|256k|512k|1024k|2048k]");
 module_param(max_rport_logins, int, S_IRUGO | S_IWUSR);
@@ -945,7 +945,7 @@ bfad_cfg_pport(struct bfad_s *bfad, enum bfa_lport_role role)
 	int		rc = BFA_STATUS_OK;
 
 	/* Allocate scsi_host for the physical port */
-	if ((supported_fc4s & BFA_LPORT_ROLE_FCP_IM) &&
+	if ((bfa_supported_fc4s & BFA_LPORT_ROLE_FCP_IM) &&
 	    (role & BFA_LPORT_ROLE_FCP_IM)) {
 		if (bfad->pport.im_port == NULL) {
 			rc = BFA_STATUS_FAILED;
@@ -969,7 +969,7 @@ out:
 static void
 bfad_uncfg_pport(struct bfad_s *bfad)
 {
-	if ((supported_fc4s & BFA_LPORT_ROLE_FCP_IM) &&
+	if ((bfa_supported_fc4s & BFA_LPORT_ROLE_FCP_IM) &&
 	    (bfad->pport.roles & BFA_LPORT_ROLE_FCP_IM)) {
 		bfad_im_scsi_host_free(bfad, bfad->pport.im_port);
 		bfad_im_port_clean(bfad->pport.im_port);
@@ -990,10 +990,10 @@ bfad_start_ops(struct bfad_s *bfad)
 	struct bfa_fcs_driver_info_s driver_info;
 
 	/* Limit min/max. xfer size to [64k-32MB] */
-	if (max_xfer_size < BFAD_MIN_SECTORS >> 1)
-		max_xfer_size = BFAD_MIN_SECTORS >> 1;
-	if (max_xfer_size > BFAD_MAX_SECTORS >> 1)
-		max_xfer_size = BFAD_MAX_SECTORS >> 1;
+	if (bfa_max_xfer_size < BFAD_MIN_SECTORS >> 1)
+		bfa_max_xfer_size = BFAD_MIN_SECTORS >> 1;
+	if (bfa_max_xfer_size > BFAD_MAX_SECTORS >> 1)
+		bfa_max_xfer_size = BFAD_MAX_SECTORS >> 1;
 
 	/* Fill the driver_info info to fcs*/
 	memset(&driver_info, 0, sizeof(driver_info));
@@ -1734,7 +1734,7 @@ bfad_init(void)
 	}
 
 	if (strcmp(FCPI_NAME, " fcpim") == 0)
-		supported_fc4s |= BFA_LPORT_ROLE_FCP_IM;
+		bfa_supported_fc4s |= BFA_LPORT_ROLE_FCP_IM;
 
 	bfa_auto_recover = ioc_auto_recover;
 	bfa_fcs_rport_set_del_timeout(rport_del_timeout);

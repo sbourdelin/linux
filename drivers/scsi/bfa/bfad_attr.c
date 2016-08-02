@@ -416,7 +416,7 @@ bfad_im_vport_create(struct fc_vport *fc_vport, bool disable)
 			sizeof(fc_host_supported_fc4s(vshost)));
 
 		/* For FCP type 0x08 */
-		if (supported_fc4s & BFA_LPORT_ROLE_FCP_IM)
+		if (bfa_supported_fc4s & BFA_LPORT_ROLE_FCP_IM)
 			fc_host_supported_fc4s(vshost)[2] = 1;
 
 		/* For fibre channel services type 0x20 */

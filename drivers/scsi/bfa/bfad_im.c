@@ -759,8 +759,8 @@ bfad_scsi_host_alloc(struct bfad_im_port_s *im_port, struct bfad_s *bfad)
 	else
 		sht = &bfad_im_vport_template;
 
-	if (max_xfer_size != BFAD_MAX_SECTORS >> 1)
-		sht->max_sectors = max_xfer_size << 1;
+	if (bfa_max_xfer_size != BFAD_MAX_SECTORS >> 1)
+		sht->max_sectors = bfa_max_xfer_size << 1;
 
 	sht->sg_tablesize = bfad->cfg_data.io_max_sge;
 
@@ -1065,7 +1065,7 @@ bfad_fc_host_init(struct bfad_im_port_s *im_port)
 
 	memset(fc_host_supported_fc4s(host), 0,
 	       sizeof(fc_host_supported_fc4s(host)));
-	if (supported_fc4s & BFA_LPORT_ROLE_FCP_IM)
+	if (bfa_supported_fc4s & BFA_LPORT_ROLE_FCP_IM)
 		/* For FCP type 0x08 */
 		fc_host_supported_fc4s(host)[2] = 1;
 	/* For fibre channel services type 0x20 */

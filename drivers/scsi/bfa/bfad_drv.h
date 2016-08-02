@@ -311,8 +311,8 @@ int bfad_get_linkup_delay(struct bfad_s *bfad);
 extern int      bfa_lun_queue_depth;
 extern int      bfa_log_level;
 extern int      bfa_linkup_delay;
-extern int      supported_fc4s;
-extern int	max_xfer_size;
+extern int      bfa_supported_fc4s;
+extern int	bfa_max_xfer_size;
 extern int bfa_debugfs_enable;
 extern struct mutex bfad_mutex;
 
