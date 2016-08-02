@@ -730,7 +730,9 @@ struct perf_event_context {
 	u64				parent_gen;
 	u64				generation;
 	int				pin_count;
+#ifdef CONFIG_CGROUP_PERF
 	int				nr_cgroups;	 /* cgroup evts */
+#endif
 	void				*task_ctx_data; /* pmu specific data */
 	struct rcu_head			rcu_head;
 };
@@ -756,7 +758,9 @@ struct perf_cpu_context {
 	unsigned int			hrtimer_active;
 
 	struct pmu			*unique_pmu;
+#ifdef CONFIG_CGROUP_PERF
 	struct perf_cgroup		*cgrp;
+#endif
 };
 
 struct perf_output_handle {
