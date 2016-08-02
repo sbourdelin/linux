@@ -253,6 +253,7 @@
 #define AUDIT_OBJ_LEV_HIGH	23
 #define AUDIT_LOGINUID_SET	24
 #define AUDIT_SESSIONID	25	/* Session ID */
+#define AUDIT_SESSIONID_SET	26	/* Session ID set or not */
 
 				/* These are ONLY useful when checking
 				 * at syscall exit time (AUDIT_AT_EXIT). */
