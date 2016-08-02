@@ -662,6 +662,8 @@ static int uncore_pmu_event_init(struct perf_event *event)
 	event->cpu = box->cpu;
 	event->pmu_private = box;
 
+	event->pmu_event_flags = PMUEF_READ_CPU_PKG;
+
 	event->hw.idx = -1;
 	event->hw.last_tag = ~0ULL;
 	event->hw.extra_reg.idx = EXTRA_REG_NONE;
