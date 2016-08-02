@@ -3997,7 +3997,6 @@ skl_compute_wm(struct drm_atomic_state *state)
 					 &changed);
 		if (ret)
 			return ret;
-<<<<<<< HEAD
 
 		if (changed)
 			results->dirty_pipes |= drm_crtc_mask(crtc);
@@ -4010,20 +4009,6 @@ skl_compute_wm(struct drm_atomic_state *state)
 		skl_compute_wm_results(crtc->dev, pipe_wm, results, intel_crtc);
 	}
 
-=======
-
-		if (changed)
-			results->dirty_pipes |= drm_crtc_mask(crtc);
-
-		if ((results->dirty_pipes & drm_crtc_mask(crtc)) == 0)
-			/* This pipe's WM's did not change */
-			continue;
-
-		intel_cstate->update_wm_pre = true;
-		skl_compute_wm_results(crtc->dev, pipe_wm, results, intel_crtc);
-	}
-
->>>>>>> linux-next/akpm-base
 	return 0;
 }
 

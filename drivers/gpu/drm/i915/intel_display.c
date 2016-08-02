@@ -5338,17 +5338,10 @@ static int skl_cdclk_decimal(int cdclk)
 static int bxt_de_pll_vco(struct drm_i915_private *dev_priv, int cdclk)
 {
 	int ratio;
-<<<<<<< HEAD
 
 	if (cdclk == dev_priv->cdclk_pll.ref)
 		return 0;
 
-=======
-
-	if (cdclk == dev_priv->cdclk_pll.ref)
-		return 0;
-
->>>>>>> linux-next/akpm-base
 	switch (cdclk) {
 	default:
 		MISSING_CASE(cdclk);
@@ -5574,7 +5567,6 @@ static void
 skl_dpll0_update(struct drm_i915_private *dev_priv)
 {
 	u32 val;
-<<<<<<< HEAD
 
 	dev_priv->cdclk_pll.ref = 24000;
 	dev_priv->cdclk_pll.vco = 0;
@@ -5594,27 +5586,6 @@ skl_dpll0_update(struct drm_i915_private *dev_priv)
 		    DPLL_CTRL1_OVERRIDE(SKL_DPLL0)))
 		return;
 
-=======
-
-	dev_priv->cdclk_pll.ref = 24000;
-	dev_priv->cdclk_pll.vco = 0;
-
-	val = I915_READ(LCPLL1_CTL);
-	if ((val & LCPLL_PLL_ENABLE) == 0)
-		return;
-
-	if (WARN_ON((val & LCPLL_PLL_LOCK) == 0))
-		return;
-
-	val = I915_READ(DPLL_CTRL1);
-
-	if (WARN_ON((val & (DPLL_CTRL1_HDMI_MODE(SKL_DPLL0) |
-			    DPLL_CTRL1_SSC(SKL_DPLL0) |
-			    DPLL_CTRL1_OVERRIDE(SKL_DPLL0))) !=
-		    DPLL_CTRL1_OVERRIDE(SKL_DPLL0)))
-		return;
-
->>>>>>> linux-next/akpm-base
 	switch (val & DPLL_CTRL1_LINK_RATE_MASK(SKL_DPLL0)) {
 	case DPLL_CTRL1_LINK_RATE(DPLL_CTRL1_LINK_RATE_810, SKL_DPLL0):
 	case DPLL_CTRL1_LINK_RATE(DPLL_CTRL1_LINK_RATE_1350, SKL_DPLL0):
@@ -5635,15 +5606,9 @@ skl_dpll0_update(struct drm_i915_private *dev_priv)
 void skl_set_preferred_cdclk_vco(struct drm_i915_private *dev_priv, int vco)
 {
 	bool changed = dev_priv->skl_preferred_vco_freq != vco;
-<<<<<<< HEAD
 
 	dev_priv->skl_preferred_vco_freq = vco;
 
-=======
-
-	dev_priv->skl_preferred_vco_freq = vco;
-
->>>>>>> linux-next/akpm-base
 	if (changed)
 		intel_update_max_cdclk(&dev_priv->drm);
 }
@@ -5729,12 +5694,6 @@ static bool skl_cdclk_wait_for_pcu_ready(struct drm_i915_private *dev_priv)
 	return _wait_for(skl_cdclk_pcu_ready(dev_priv), 3000, 10) == 0;
 }
 
-<<<<<<< HEAD
-	return false;
-}
-
-=======
->>>>>>> linux-next/akpm-base
 static void skl_set_cdclk(struct drm_i915_private *dev_priv, int cdclk, int vco)
 {
 	struct drm_device *dev = &dev_priv->drm;
@@ -6759,7 +6718,6 @@ static int broxton_get_display_clock_speed(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	u32 divider;
 	int div, vco;
-<<<<<<< HEAD
 
 	bxt_de_pll_update(dev_priv);
 
@@ -6767,15 +6725,6 @@ static int broxton_get_display_clock_speed(struct drm_device *dev)
 	if (vco == 0)
 		return dev_priv->cdclk_pll.ref;
 
-=======
-
-	bxt_de_pll_update(dev_priv);
-
-	vco = dev_priv->cdclk_pll.vco;
-	if (vco == 0)
-		return dev_priv->cdclk_pll.ref;
-
->>>>>>> linux-next/akpm-base
 	divider = I915_READ(CDCLK_CTL) & BXT_CDCLK_CD2X_DIV_SEL_MASK;
 
 	switch (divider) {
@@ -11097,8 +11046,6 @@ static bool pageflip_finished(struct intel_crtc *crtc,
 }
 
 void intel_finish_page_flip_cs(struct drm_i915_private *dev_priv, int pipe)
-<<<<<<< HEAD
-=======
 {
 	struct drm_device *dev = &dev_priv->drm;
 	struct drm_crtc *crtc = dev_priv->pipe_to_crtc_mapping[pipe];
@@ -11168,7 +11115,6 @@ static int intel_gen2_queue_flip(struct drm_device *dev,
 				 struct drm_i915_gem_object *obj,
 				 struct drm_i915_gem_request *req,
 				 uint32_t flags)
->>>>>>> linux-next/akpm-base
 {
 	struct drm_device *dev = &dev_priv->drm;
 	struct drm_crtc *crtc = dev_priv->pipe_to_crtc_mapping[pipe];

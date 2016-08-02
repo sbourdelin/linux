@@ -314,7 +314,6 @@ void rockchip_drm_fb_suspend(struct drm_device *drm)
 	drm_fb_helper_set_suspend(&priv->fbdev_helper, 1);
 	console_unlock();
 }
-<<<<<<< HEAD
 
 void rockchip_drm_fb_resume(struct drm_device *drm)
 {
@@ -333,26 +332,6 @@ static int rockchip_drm_sys_suspend(struct device *dev)
 	drm_kms_helper_poll_disable(drm);
 	rockchip_drm_fb_suspend(drm);
 
-=======
-
-void rockchip_drm_fb_resume(struct drm_device *drm)
-{
-	struct rockchip_drm_private *priv = drm->dev_private;
-
-	console_lock();
-	drm_fb_helper_set_suspend(&priv->fbdev_helper, 0);
-	console_unlock();
-}
-
-static int rockchip_drm_sys_suspend(struct device *dev)
-{
-	struct drm_device *drm = dev_get_drvdata(dev);
-	struct rockchip_drm_private *priv = drm->dev_private;
-
-	drm_kms_helper_poll_disable(drm);
-	rockchip_drm_fb_suspend(drm);
-
->>>>>>> linux-next/akpm-base
 	priv->state = drm_atomic_helper_suspend(drm);
 	if (IS_ERR(priv->state)) {
 		rockchip_drm_fb_resume(drm);
@@ -460,13 +439,9 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
 		}
 
 		of_node_put(iommu);
-<<<<<<< HEAD
-		component_match_add(dev, &match, compare_of, port->parent);
-=======
 		of_node_get(port->parent);
 		component_match_add_release(dev, &match, release_of,
 					    compare_of, port->parent);
->>>>>>> linux-next/akpm-base
 		of_node_put(port);
 	}
 

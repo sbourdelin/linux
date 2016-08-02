@@ -320,14 +320,11 @@ static int compare_of(struct device *dev, void *data)
 	return dev->of_node == data;
 }
 
-<<<<<<< HEAD
-=======
 static void release_of(struct device *dev, void *data)
 {
 	of_node_put(data);
 }
 
->>>>>>> linux-next/akpm-base
 static int sti_init(struct drm_device *ddev)
 {
 	struct sti_private *private;
