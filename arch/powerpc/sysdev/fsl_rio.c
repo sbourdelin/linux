@@ -298,7 +298,7 @@ int fsl_map_inb_mem(struct rio_mport *mport, dma_addr_t lstart,
 	u32 riwar;
 	int i;
 
-	if ((size & (size - 1)) != 0 || size > 0x400000000UL)
+	if ((size & (size - 1)) != 0 || size > 0x400000000ULL)
 		return -EINVAL;
 
 	base_size_log = ilog2(size);
