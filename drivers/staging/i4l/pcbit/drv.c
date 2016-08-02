@@ -73,7 +73,7 @@ int pcbit_init_dev(int board, int mem_base, int irq)
 	struct pcbit_dev *dev;
 	isdn_if *dev_if;
 
-	if ((dev = kzalloc(sizeof(struct pcbit_dev), GFP_KERNEL)) == NULL)
+	if (!(dev = kzalloc(sizeof(struct pcbit_dev), GFP_KERNEL)))
 	{
 		printk("pcbit_init: couldn't malloc pcbit_dev struct\n");
 		return -ENOMEM;
@@ -306,7 +306,7 @@ static void pcbit_block_timer(unsigned long data)
 
 	dev = chan2dev(chan);
 
-	if (dev == NULL) {
+	if (!dev) {
 		printk(KERN_DEBUG "pcbit: chan2dev failed\n");
 		return;
 	}
@@ -333,7 +333,7 @@ static int pcbit_xmit(int driver, int chnum, int ack, struct sk_buff *skb)
 	struct pcbit_dev *dev;
 
 	dev = finddev(driver);
-	if (dev == NULL)
+	if (!dev)
 	{
 		printk("finddev returned NULL");
 		return -1;
@@ -358,7 +358,7 @@ static int pcbit_xmit(int driver, int chnum, int ack, struct sk_buff *skb)
 		 * see net/core/dev.c
 		 */
 #ifdef BLOCK_TIMER
-		if (chan->block_timer.function == NULL) {
+		if (!chan->block_timer.function) {
 			init_timer(&chan->block_timer);
 			chan->block_timer.function =  &pcbit_block_timer;
 			chan->block_timer.data = (long) chan;
@@ -422,7 +422,7 @@ static int pcbit_writecmd(const u_char __user *buf, int len, int driver, int cha
 		/* this is the hard part */
 		/* dumb board */
 		/* get it into kernel space */
-		if ((ptr = kmalloc(len, GFP_KERNEL)) == NULL)
+		if (!(ptr = kmalloc(len, GFP_KERNEL)))
 			return -ENOMEM;
 		if (copy_from_user(ptr, buf, len)) {
 			kfree(ptr);
@@ -1048,7 +1048,7 @@ static void pcbit_set_msn(struct pcbit_dev *dev, char *list)
 #ifdef DEBUG
 		printk(KERN_DEBUG "msn: %s\n", ptr->msn);
 #endif
-		if (dev->msn_list == NULL)
+		if (!dev->msn_list)
 			dev->msn_list = ptr;
 		else
 			back->next = ptr;
@@ -1066,7 +1066,7 @@ static int pcbit_check_msn(struct pcbit_dev *dev, char *msn)
 
 	for (ptr = dev->msn_list; ptr; ptr = ptr->next) {
 
-		if (ptr->msn == NULL)
+		if (!ptr->msn)
 			return 1;
 
 		if (strcmp(ptr->msn, msn) == 0)

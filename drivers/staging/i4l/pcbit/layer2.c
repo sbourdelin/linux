@@ -83,8 +83,7 @@ pcbit_l2_write(struct pcbit_dev *dev, ulong msg, ushort refnum,
 		dev_kfree_skb(skb);
 		return -1;
 	}
-	if ((frame = kmalloc(sizeof(struct frame_buf),
-			     GFP_ATOMIC)) == NULL) {
+	if (!(frame = kmalloc(sizeof(struct frame_buf), GFP_ATOMIC))) {
 		dev_kfree_skb(skb);
 		return -1;
 	}
@@ -104,7 +103,7 @@ pcbit_l2_write(struct pcbit_dev *dev, ulong msg, ushort refnum,
 
 	spin_lock_irqsave(&dev->lock, flags);
 
-	if (dev->write_queue == NULL) {
+	if (!dev->write_queue) {
 		dev->write_queue = frame;
 		spin_unlock_irqrestore(&dev->lock, flags);
 		pcbit_transmit(dev);
@@ -252,7 +251,7 @@ pcbit_transmit(struct pcbit_dev *dev)
 
 		spin_lock_irqsave(&dev->lock, flags);
 
-		if (frame->skb == NULL || frame->copied == frame->skb->len) {
+		if (!frame->skb || frame->copied == frame->skb->len) {
 
 			dev->write_queue = frame->next;
 
@@ -352,7 +351,7 @@ pcbit_receive(struct pcbit_dev *dev)
 		}
 		frame = kzalloc(sizeof(struct frame_buf), GFP_ATOMIC);
 
-		if (frame == NULL) {
+		if (!frame) {
 			printk(KERN_WARNING "kmalloc failed\n");
 			return;
 		}
