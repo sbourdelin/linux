@@ -889,7 +889,8 @@ static int blk_mq_hctx_next_cpu(struct blk_mq_hw_ctx *hctx)
 	if (hctx->queue->nr_hw_queues == 1)
 		return WORK_CPU_UNBOUND;
 
-	if (--hctx->next_cpu_batch <= 0) {
+	if (--hctx->next_cpu_batch <= 0 ||
+	    !cpumask_test_cpu(hctx->next_cpu, cpu_online_mask)) {
 		int cpu = hctx->next_cpu, next_cpu;
 
 		next_cpu = cpumask_next(hctx->next_cpu, hctx->cpumask);
@@ -899,7 +900,8 @@ static int blk_mq_hctx_next_cpu(struct blk_mq_hw_ctx *hctx)
 		hctx->next_cpu = next_cpu;
 		hctx->next_cpu_batch = BLK_MQ_CPU_WORK_BATCH;
 
-		return cpu;
+		return (cpumask_test_cpu(cpu, cpu_online_mask)) ?
+			cpu : blk_mq_hctx_next_cpu(hctx);
 	}
 
 	return hctx->next_cpu;
