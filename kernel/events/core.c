@@ -3490,9 +3490,9 @@ static int perf_event_read(struct perf_event *event, bool group)
 			.group = group,
 			.ret = 0,
 		};
-		smp_call_function_single(event->oncpu,
-					 __perf_event_read, &data, 1);
-		ret = data.ret;
+		ret = smp_call_function_single(event->oncpu,
+					       __perf_event_read, &data, 1);
+		ret = ret ? : data.ret;
 	} else if (event->state == PERF_EVENT_STATE_INACTIVE) {
 		struct perf_event_context *ctx = event->ctx;
 		unsigned long flags;
