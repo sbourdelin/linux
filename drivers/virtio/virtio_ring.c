@@ -328,6 +328,7 @@ static inline int virtqueue_add(struct virtqueue *_vq,
 		if (out_sgs)
 			vq->notify(&vq->vq);
 		END_USE(vq);
+		kfree(desc);
 		return -ENOSPC;
 	}
 
