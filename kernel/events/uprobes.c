@@ -37,6 +37,7 @@
 #include <linux/percpu-rwsem.h>
 #include <linux/task_work.h>
 #include <linux/shmem_fs.h>
+#include <linux/kprobes.h>
 
 #include <linux/uprobes.h>
 
@@ -1997,6 +1998,7 @@ int uprobe_pre_sstep_notifier(struct pt_regs *regs)
 	set_thread_flag(TIF_UPROBE);
 	return 1;
 }
+NOKPROBE_SYMBOL(uprobe_pre_sstep_notifier);
 
 /*
  * uprobe_post_sstep_notifier gets called in interrupt context as part of notifier
@@ -2014,6 +2016,7 @@ int uprobe_post_sstep_notifier(struct pt_regs *regs)
 	set_thread_flag(TIF_UPROBE);
 	return 1;
 }
+NOKPROBE_SYMBOL(uprobe_post_sstep_notifier);
 
 static struct notifier_block uprobe_exception_nb = {
 	.notifier_call		= arch_uprobe_exception_notify,
