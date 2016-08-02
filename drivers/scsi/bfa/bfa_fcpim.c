@@ -2363,9 +2363,7 @@ bfa_fcpim_lunmask_delete(struct bfa_s *bfa, u16 vf_id, wwn_t *pwwn,
 			 wwn_t rpwwn, struct scsi_lun lun)
 {
 	struct bfa_lun_mask_s	*lunm_list;
-	struct bfa_rport_s	*rp = NULL;
 	struct bfa_fcs_lport_s *port = NULL;
-	struct bfa_fcs_rport_s *rp_fcs;
 	int	i;
 
 	/* in min cfg lunm_list could be NULL but  no commands should run. */
@@ -2383,9 +2381,7 @@ bfa_fcpim_lunmask_delete(struct bfa_s *bfa, u16 vf_id, wwn_t *pwwn,
 				vf_id, *pwwn);
 		if (port) {
 			*pwwn = port->port_cfg.pwwn;
-			rp_fcs = bfa_fcs_lport_get_rport_by_pwwn(port, rpwwn);
-			if (rp_fcs)
-				rp = rp_fcs->bfa_rport;
+			(void)bfa_fcs_lport_get_rport_by_pwwn(port, rpwwn);
 		}
 	}
 
