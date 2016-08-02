@@ -4,6 +4,10 @@ libtraceevent-y += trace-seq.o
 libtraceevent-y += parse-filter.o
 libtraceevent-y += parse-utils.o
 libtraceevent-y += kbuffer-parse.o
+libtraceevent-y += str_error_r.o
+
+str_error_r.o: ../str_error_r.c
+	$(call if_changed_dep,cc_o_c)
 
 plugin_jbd2-y         += plugin_jbd2.o
 plugin_hrtimer-y      += plugin_hrtimer.o
