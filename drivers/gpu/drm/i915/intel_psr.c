@@ -105,10 +105,10 @@ static void intel_psr_write_vsc(struct intel_dp *intel_dp,
 
 static void vlv_psr_setup_vsc(struct intel_dp *intel_dp)
 {
-	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
-	struct drm_device *dev = intel_dig_port->base.base.dev;
+	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
+	struct drm_device *dev = dig_port->base.base.dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
-	struct drm_crtc *crtc = intel_dig_port->base.base.crtc;
+	struct drm_crtc *crtc = dig_port->base.base.crtc;
 	enum pipe pipe = to_intel_crtc(crtc)->pipe;
 	uint32_t val;
 
@@ -376,8 +376,8 @@ static bool intel_psr_match_conditions(struct intel_dp *intel_dp)
 
 static void intel_psr_activate(struct intel_dp *intel_dp)
 {
-	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
-	struct drm_device *dev = intel_dig_port->base.base.dev;
+	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
+	struct drm_device *dev = dig_port->base.base.dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
 
 	WARN_ON(I915_READ(EDP_PSR_CTL) & EDP_PSR_ENABLE);
@@ -405,10 +405,10 @@ static void intel_psr_activate(struct intel_dp *intel_dp)
  */
 void intel_psr_enable(struct intel_dp *intel_dp)
 {
-	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
-	struct drm_device *dev = intel_dig_port->base.base.dev;
+	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
+	struct drm_device *dev = dig_port->base.base.dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
-	struct intel_crtc *crtc = to_intel_crtc(intel_dig_port->base.base.crtc);
+	struct intel_crtc *crtc = to_intel_crtc(dig_port->base.base.crtc);
 
 	if (!HAS_PSR(dev)) {
 		DRM_DEBUG_KMS("PSR not supported on this platform\n");
@@ -492,11 +492,11 @@ unlock:
 
 static void vlv_psr_disable(struct intel_dp *intel_dp)
 {
-	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
-	struct drm_device *dev = intel_dig_port->base.base.dev;
+	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
+	struct drm_device *dev = dig_port->base.base.dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_crtc *intel_crtc =
-		to_intel_crtc(intel_dig_port->base.base.crtc);
+		to_intel_crtc(dig_port->base.base.crtc);
 	uint32_t val;
 
 	if (dev_priv->psr.active) {
@@ -522,8 +522,8 @@ static void vlv_psr_disable(struct intel_dp *intel_dp)
 
 static void hsw_psr_disable(struct intel_dp *intel_dp)
 {
-	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
-	struct drm_device *dev = intel_dig_port->base.base.dev;
+	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
+	struct drm_device *dev = dig_port->base.base.dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
 
 	if (dev_priv->psr.active) {
@@ -552,8 +552,8 @@ static void hsw_psr_disable(struct intel_dp *intel_dp)
  */
 void intel_psr_disable(struct intel_dp *intel_dp)
 {
-	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
-	struct drm_device *dev = intel_dig_port->base.base.dev;
+	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
+	struct drm_device *dev = dig_port->base.base.dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
 
 	mutex_lock(&dev_priv->psr.lock);
