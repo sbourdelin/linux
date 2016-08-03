@@ -795,6 +795,9 @@ struct snd_soc_component_driver {
 	int probe_order;
 	int remove_order;
 };
+#define COMPONENT_FUNC(name, func)		\
+	.name		= func,			\
+	.num_##name	= ARRAY_SIZE(func)
 
 struct snd_soc_component {
 	const char *name;
