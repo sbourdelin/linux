@@ -268,7 +268,7 @@ static int kvm_vfio_create(struct kvm_device *dev, u32 type)
 	struct kvm_vfio *kv;
 
 	/* Only one VFIO "device" per VM */
-	list_for_each_entry(tmp, &dev->kvm->devices, vm_node)
+	list_for_each_entry_rcu(tmp, &dev->kvm->devices, vm_node)
 		if (tmp->ops == &kvm_vfio_ops)
 			return -EBUSY;
 
