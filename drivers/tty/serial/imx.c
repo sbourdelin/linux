@@ -1202,8 +1202,14 @@ static int imx_startup(struct uart_port *port)
 
 	/* Can we enable the DMA support? */
 	if (is_imx6q_uart(sport) && !uart_console(port) &&
-	    !sport->dma_is_inited)
-		imx_uart_dma_init(sport);
+	    !sport->dma_is_inited) {
+		retval = imx_uart_dma_init(sport);
+		if (retval) {
+			clk_disable_unprepare(sport->clk_per);
+			clk_disable_unprepare(sport->clk_ipg);
+			return retval;
+		}
+	}
 
 	spin_lock_irqsave(&sport->port.lock, flags);
 	/* Reset fifo's and state machines */
