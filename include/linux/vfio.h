@@ -17,6 +17,7 @@
 #include <linux/workqueue.h>
 #include <linux/poll.h>
 #include <uapi/linux/vfio.h>
+#include <linux/mdev.h>
 
 #define VFIO_PCI_OFFSET_SHIFT   40
 
@@ -82,7 +83,11 @@ struct vfio_iommu_driver_ops {
 					struct iommu_group *group);
 	void		(*detach_group)(void *iommu_data,
 					struct iommu_group *group);
-
+	long		(*pin_pages)(void *iommu_data, unsigned long *user_pfn,
+				     long npage, int prot,
+				     unsigned long *phys_pfn);
+	long		(*unpin_pages)(void *iommu_data, unsigned long *pfn,
+				       long npage);
 };
 
 extern int vfio_register_iommu_driver(const struct vfio_iommu_driver_ops *ops);
@@ -133,6 +138,12 @@ static inline long vfio_spapr_iommu_eeh_ioctl(struct iommu_group *group,
 	return -ENOTTY;
 }
 #endif /* CONFIG_EEH */
+
+extern long vfio_pin_pages(struct mdev_device *mdev, unsigned long *user_pfn,
+			   long npage, int prot, unsigned long *phys_pfn);
+
+extern long vfio_unpin_pages(struct mdev_device *mdev, unsigned long *pfn,
+			     long npage);
 
 /*
  * IRQfd - generic
