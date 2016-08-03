@@ -185,6 +185,7 @@
 
 /* PowerDown Control Register bits */
 #define TRCPDCR_PU			BIT(3)
+#define TRCPDSR_POWER			BIT(0)
 
 /* secure state access levels */
 #define ETM_EXLEVEL_S_APP		BIT(8)
