@@ -4,6 +4,7 @@
  * Derived from asm-i386/semaphore.h
  */
 
+#include <linux/fault-inject.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -12,6 +13,28 @@
 #include <linux/atomic.h>
 
 #include "rwsem.h"
+
+#ifdef CONFIG_FAIL_RW_SEMAPHORE
+DECLARE_FAULT_ATTR(fail_rwsem);
+
+static int __init fail_rwsem_debugfs(void)
+{
+	struct dentry *dir = fault_create_debugfs_attr("fail_rwsem",
+		NULL, &fail_rwsem);
+	return PTR_ERR_OR_ZERO(dir);
+}
+late_initcall(fail_rwsem_debugfs);
+
+static inline bool should_fail_rwsem(struct rw_semaphore *sem)
+{
+	return should_fail(&fail_rwsem, 1);
+}
+#else
+static inline bool should_fail_rwsem(struct rw_semaphore *sem)
+{
+	return false;
+}
+#endif
 
 /*
  * lock for reading
@@ -32,8 +55,12 @@ EXPORT_SYMBOL(down_read);
  */
 int down_read_trylock(struct rw_semaphore *sem)
 {
-	int ret = __down_read_trylock(sem);
+	int ret;
 
+	if (should_fail_rwsem(sem))
+		return 0;
+
+	ret = __down_read_trylock(sem);
 	if (ret == 1) {
 		rwsem_acquire_read(&sem->dep_map, 0, 1, _RET_IP_);
 		rwsem_set_reader_owned(sem);
@@ -81,8 +108,12 @@ EXPORT_SYMBOL(down_write_killable);
  */
 int down_write_trylock(struct rw_semaphore *sem)
 {
-	int ret = __down_write_trylock(sem);
+	int ret;
 
+	if (should_fail_rwsem(sem))
+		return 0;
+
+	ret = __down_write_trylock(sem);
 	if (ret == 1) {
 		rwsem_acquire(&sem->dep_map, 0, 1, _RET_IP_);
 		rwsem_set_owner(sem);
