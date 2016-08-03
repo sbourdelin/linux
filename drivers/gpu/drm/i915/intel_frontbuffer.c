@@ -96,7 +96,7 @@ void intel_fb_obj_invalidate(struct drm_i915_gem_object *obj,
 		mutex_unlock(&dev_priv->fb_tracking.lock);
 	}
 
-	intel_psr_invalidate(dev, obj->frontbuffer_bits);
+	intel_psr_invalidate(dev_priv, obj->frontbuffer_bits);
 	intel_edp_drrs_invalidate(dev, obj->frontbuffer_bits);
 	intel_fbc_invalidate(dev_priv, obj->frontbuffer_bits, origin);
 }
@@ -128,7 +128,7 @@ static void intel_frontbuffer_flush(struct drm_device *dev,
 		return;
 
 	intel_edp_drrs_flush(dev, frontbuffer_bits);
-	intel_psr_flush(dev, frontbuffer_bits, origin);
+	intel_psr_flush(dev_priv, frontbuffer_bits, origin);
 	intel_fbc_flush(dev_priv, frontbuffer_bits, origin);
 }
 
@@ -191,7 +191,7 @@ void intel_frontbuffer_flip_prepare(struct drm_device *dev,
 	dev_priv->fb_tracking.busy_bits &= ~frontbuffer_bits;
 	mutex_unlock(&dev_priv->fb_tracking.lock);
 
-	intel_psr_single_frame_update(dev, frontbuffer_bits);
+	intel_psr_single_frame_update(dev_priv, frontbuffer_bits);
 }
 
 /**
