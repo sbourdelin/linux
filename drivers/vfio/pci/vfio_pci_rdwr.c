@@ -18,6 +18,7 @@
 #include <linux/uaccess.h>
 #include <linux/io.h>
 #include <linux/vgaarb.h>
+#include <linux/vfio.h>
 
 #include "vfio_pci_private.h"
 
