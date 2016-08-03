@@ -198,5 +198,15 @@ config SYSCON_REBOOT_MODE
 	  register, then the bootloader can read it to take different
 	  action according to the mode.
 
+config SRAM_REBOOT_MODE
+	bool "Generic SRAM reboot mode driver"
+	select REBOOT_MODE
+	select SRAM
+	help
+	 Say y here will enable reboot mode driver. This will
+	 get reboot mode arguments and store it in an SRAM
+	 address, then the bootloader can read it to take different
+	 action according to the mode.
+
 endif
 
