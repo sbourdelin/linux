@@ -1877,7 +1877,7 @@ static void pnv_pci_phb3_tce_invalidate(struct pnv_ioda_pe *pe, bool rm,
 					unsigned shift, unsigned long index,
 					unsigned long npages)
 {
-	__be64 __iomem *invalidate = pnv_ioda_get_inval_reg(pe->phb, false);
+	__be64 __iomem *invalidate = pnv_ioda_get_inval_reg(pe->phb, rm);
 	unsigned long start, end, inc;
 
 	/* We'll invalidate DMA address in PE scope */
@@ -1935,10 +1935,12 @@ static void pnv_pci_ioda2_tce_invalidate(struct iommu_table *tbl,
 			pnv_pci_phb3_tce_invalidate(pe, rm, shift,
 						    index, npages);
 		else if (rm)
+		{
 			opal_rm_pci_tce_kill(phb->opal_id,
 					     OPAL_PCI_TCE_KILL_PAGES,
 					     pe->pe_number, 1u << shift,
 					     index << shift, npages);
+		}
 		else
 			opal_pci_tce_kill(phb->opal_id,
 					  OPAL_PCI_TCE_KILL_PAGES,
