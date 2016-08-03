@@ -23,6 +23,7 @@
 #include <linux/io.h>
 #include <linux/list_sort.h>
 #include <linux/of_address.h>
+#include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 
@@ -384,6 +385,8 @@ static int sram_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, sram);
 
+	of_platform_default_populate(pdev->dev.of_node,
+						NULL, &pdev->dev);
 	dev_dbg(sram->dev, "SRAM pool: %zu KiB @ 0x%p\n",
 		gen_pool_size(sram->pool) / 1024, sram->virt_base);
 
