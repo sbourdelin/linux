@@ -1,0 +1,235 @@
+VFIO Mediated devices [1]
+-------------------------------------------------------------------------------
+
+There are more and more use cases/demands to virtualize the DMA devices which
+doesn't have SR_IOV capability built-in. To do this, drivers of different
+devices had to develop their own management interface and set of APIs and then
+integrate it to user space software. We've identified common requirements and
+unified management interface for such devices to make user space software
+integration easier.
+
+The VFIO driver framework provides unified APIs for direct device access. It is
+an IOMMU/device agnostic framework for exposing direct device access to
+user space, in a secure, IOMMU protected environment. This framework is
+used for multiple devices like GPUs, network adapters and compute accelerators.
+With direct device access, virtual machines or user space applications have
+direct access of physical device. This framework is reused for mediated devices.
+
+Mediated core driver provides a common interface for mediated device management
+that can be used by drivers of different devices. This module provides a generic
+interface to create/destroy mediated device, add/remove it to mediated bus
+driver, add/remove device to IOMMU group. It also provides an interface to
+register different types of bus drivers, for example, Mediated VFIO PCI driver
+is designed for mediated PCI devices and supports VFIO APIs. Similarly, driver
+can be designed to support any type of mediated device and added to this
+framework. Mediated bus driver add/delete mediated device to VFIO Group.
+
+Below is the high Level block diagram, with NVIDIA, Intel and IBM devices
+as example, since these are the devices which are going to actively use
+this module as of now. NVIDIA and Intel uses vfio_mpci.ko module for their GPUs
+which are PCI devices. There has to be different bus driver for Channel I/O
+devices, vfio_mccw.ko.
+
+
+     +---------------+
+     |               |
+     | +-----------+ |  mdev_register_driver() +--------------+
+     | |           | +<------------------------+              |
+     | |           | |                         |              |
+     | |  mdev     | +------------------------>+ vfio_mpci.ko |<-> VFIO user
+     | |  bus      | |     probe()/remove()    |              |    APIs
+     | |  driver   | |                         |              |
+     | |           | |                         +--------------+
+     | |           | |  mdev_register_driver() +--------------+
+     | |           | +<------------------------+              |
+     | |           | |                         |              |
+     | |           | +------------------------>+ vfio_mccw.ko |<-> VFIO user
+     | +-----------+ |     probe()/remove()    |              |    APIs
+     |               |                         |              |
+     |  MDEV CORE    |                         +--------------+
+     |   MODULE      |
+     |   mdev.ko     |
+     | +-----------+ |  mdev_register_device() +--------------+
+     | |           | +<------------------------+              |
+     | |           | |                         |  nvidia.ko   |<-> physical
+     | |           | +------------------------>+              |    device
+     | |           | |        callbacks        +--------------+
+     | | Physical  | |
+     | |  device   | |  mdev_register_device() +--------------+
+     | | interface | |<------------------------+              |
+     | |           | |                         |  i915.ko     |<-> physical
+     | |           | +------------------------>+              |    device
+     | |           | |        callbacks        +--------------+
+     | |           | |
+     | |           | |  mdev_register_device() +--------------+
+     | |           | +<------------------------+              |
+     | |           | |                         | ccw_device.ko|<-> physical
+     | |           | +------------------------>+              |    device
+     | |           | |        callbacks        +--------------+
+     | +-----------+ |
+     +---------------+
+
+
+Registration Interfaces
+-------------------------------------------------------------------------------
+
+Mediated core driver provides two types of registration interfaces:
+
+1. Registration interface for mediated bus driver:
+-------------------------------------------------
+     /*
+      * struct mdev_driver [2] - Mediated device's driver
+      * @name: driver name
+      * @probe: called when new device created
+      * @remove: called when device removed
+      * @match: called when new device or driver is added for this bus.
+      * Return 1 if given device can be handled by given driver and zero
+      * otherwise.
+      * @driver: device driver structure
+      */
+     struct mdev_driver {
+	     const char *name;
+	     int  (*probe)  (struct device *dev);
+	     void (*remove) (struct device *dev);
+	     int  (*match)(struct device *dev);
+	     struct device_driver    driver;
+     };
+
+Mediated bus driver for mdev should use this interface to register and
+unregister with core driver respectively:
+
+extern int  mdev_register_driver(struct mdev_driver *drv, struct module *owner);
+extern void mdev_unregister_driver(struct mdev_driver *drv);
+
+Mediated bus driver is responsible to add/delete mediated devices to/from VFIO
+group when devices are bound and unbound to the driver.
+
+2. Physical device driver interface:
+-----------------------------------
+This interface [3] provides a set of APIs to manage physical device related work
+in its driver. APIs are:
+
+* dev_attr_groups: attributes of the parent device.
+* mdev_attr_groups: attributes of the mediated device.
+* supported_config: to provide supported configuration list by the driver.
+* create: to allocate basic resources in driver for a mediated device.
+* destroy: to free resources in driver when mediated device is destroyed.
+* reset: to free and reallocate resources in driver on mediated device reset.
+* start: to initiate mediated device initialization process from driver.
+* stop: to teardown mediated device process during teardown.
+* read : read emulation callback.
+* write: write emulation callback.
+* set_irqs: gives interrupt configuration information that VMM sets.
+* get_region_info: to provide region size and its flags for the mediated device.
+* validate_map_request: to validate remap pfn request.
+
+Drivers should use this interface to register and unregister device to mdev core
+driver respectively:
+
+extern int  mdev_register_device(struct device *dev,
+                                 const struct parent_ops *ops);
+extern void mdev_unregister_device(struct device *dev);
+
+Physical Mapping tracking APIs:
+-------------------------------
+Core module supports to keep track of physical mappings for each mdev device.
+APIs to be used by mediated device bus driver to add and delete mappings to
+tracking logic:
+    int mdev_add_phys_mapping(struct mdev_device *mdev,
+                              struct address_space *mapping,
+                              unsigned long addr, unsigned long size)
+    void mdev_del_phys_mapping(struct mdev_device *mdev, unsigned long addr)
+
+API to be used by vendor driver to invalidate mapping:
+    int mdev_device_invalidate_mapping(struct mdev_device *mdev,
+                                       unsigned long addr, unsigned long size)
+
+Mediated device management interface via sysfs
+-------------------------------------------------------------------------------
+This is the interface that allows user space software, like libvirt, to query
+and configure mediated device in a HW agnostic fashion. This management
+interface provide flexibility to underlying physical device's driver to support
+mediated device hotplug, multiple mediated devices per virtual machine, multiple
+mediated devices from different physical devices, etc.
+
+Under per-physical device sysfs:
+--------------------------------
+
+* mdev_supported_types: (read only)
+    List the current supported mediated device types and its details.
+
+* mdev_create: (write only)
+	Create a mediated device on target physical device.
+	Input syntax: <UUID:idx:params>
+	where,
+		UUID: mediated device's UUID
+		idx: mediated device index inside a VM
+		params: extra parameters required by driver
+	Example:
+	# echo "12345678-1234-1234-1234-123456789abc:0:0" >
+				 /sys/bus/pci/devices/0000\:05\:00.0/mdev_create
+
+* mdev_destroy: (write only)
+	Destroy a mediated device on a target physical device.
+	Input syntax: <UUID:idx>
+	where,
+		UUID: mediated device's UUID
+		idx: mediated device index inside a VM
+	Example:
+	# echo "12345678-1234-1234-1234-123456789abc:0" >
+			       /sys/bus/pci/devices/0000\:05\:00.0/mdev_destroy
+
+Under mdev class sysfs /sys/class/mdev/:
+----------------------------------------
+
+* mdev_start: (write only)
+	This trigger the registration interface to notify the driver to
+	commit mediated device resource for target VM.
+	The mdev_start function is a synchronized call, successful return of
+	this call will indicate all the requested mdev resource has been fully
+	committed, the VMM should continue.
+	Input syntax: <UUID>
+	Example:
+	# echo "12345678-1234-1234-1234-123456789abc" >
+						/sys/class/mdev/mdev_start
+
+* mdev_stop: (write only)
+	This trigger the registration interface to notify the driver to
+	release resources of mediated device of target VM.
+	Input syntax: <UUID>
+	Example:
+	# echo "12345678-1234-1234-1234-123456789abc" >
+						 /sys/class/mdev/mdev_stop
+
+Mediated device Hotplug:
+-----------------------
+
+To support mediated device hotplug, <mdev_create> and <mdev_destroy> can be
+accessed during VM runtime, and the corresponding registration callback is
+invoked to allow driver to support hotplug.
+
+Translation APIs for Mediated device
+------------------------------------------------------------------------------
+
+Below APIs are provided for user pfn to host pfn translation in VFIO driver:
+
+extern long vfio_pin_pages(struct mdev_device *mdev, unsigned long *user_pfn,
+                           long npage, int prot, unsigned long *phys_pfn);
+
+extern long vfio_unpin_pages(struct mdev_device *mdev, unsigned long *pfn,
+                             long npage);
+
+These functions call back into the backend IOMMU module using two callbacks of
+struct vfio_iommu_driver_ops, pin_pages and unpin_pages [4]. Currently these are
+supported in TYPE1 IOMMU module. To enable the same for other IOMMU backend
+modules, such as PPC64 sPAPR module, they need to provide these two callback
+functions.
+
+References
+-------------------------------------------------------------------------------
+
+[1] See Documentation/vfio.txt for more information on VFIO.
+[2] struct mdev_driver in include/linux/mdev.h
+[3] struct parent_ops in include/linux/mdev.h
+[4] struct vfio_iommu_driver_ops in include/linux/vfio.h
+
