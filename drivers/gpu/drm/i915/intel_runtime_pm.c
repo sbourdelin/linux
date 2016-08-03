@@ -420,6 +420,10 @@ static void hsw_set_power_well(struct drm_i915_private *dev_priv,
 	BIT(POWER_DOMAIN_MODESET) |			\
 	BIT(POWER_DOMAIN_AUX_A) |			\
 	BIT(POWER_DOMAIN_INIT))
+#define SKL_DISPLAY_PSR_BLOCK_POWER_DOMAINS (		\
+	BIT(POWER_DOMAIN_MODESET) |			\
+	BIT(POWER_DOMAIN_AUX_A)	|			\
+	BIT(POWER_DOMAIN_INIT))
 
 #define BXT_DISPLAY_POWERWELL_2_POWER_DOMAINS (		\
 	BIT(POWER_DOMAIN_TRANSCODER_A) |		\
@@ -441,6 +445,10 @@ static void hsw_set_power_well(struct drm_i915_private *dev_priv,
 	BXT_DISPLAY_POWERWELL_2_POWER_DOMAINS |		\
 	BIT(POWER_DOMAIN_MODESET) |			\
 	BIT(POWER_DOMAIN_AUX_A) |			\
+	BIT(POWER_DOMAIN_INIT))
+#define BXT_DISPLAY_PSR_BLOCK_POWER_DOMAINS (		\
+	BIT(POWER_DOMAIN_MODESET) |			\
+	BIT(POWER_DOMAIN_AUX_A)	|			\
 	BIT(POWER_DOMAIN_INIT))
 #define BXT_DPIO_CMN_A_POWER_DOMAINS (			\
 	BIT(POWER_DOMAIN_PORT_DDI_A_LANES) |		\
@@ -907,6 +915,35 @@ static void bxt_verify_ddi_phy_power_wells(struct drm_i915_private *dev_priv)
 	if (power_well->count > 0)
 		bxt_ddi_phy_verify_state(dev_priv,
 					 bxt_power_well_to_phy(power_well));
+}
+
+static bool gen9_psr_blk_power_well_enabled(struct drm_i915_private *dev_priv,
+					    struct i915_power_well *power_well)
+{
+	return (dev_priv->psr.rpm_block);
+}
+
+static void gen9_psr_blk_power_well_enable(struct drm_i915_private *dev_priv,
+					   struct i915_power_well *power_well)
+{
+	intel_psr_rpm_block(dev_priv);
+
+	WARN_ON(dev_priv->psr.active);
+}
+
+static void gen9_psr_blk_power_well_disable(struct drm_i915_private *dev_priv,
+					    struct i915_power_well *power_well)
+{
+	intel_psr_rpm_unblock(dev_priv);
+}
+
+static void gen9_psr_blk_power_well_sync_hw(struct drm_i915_private *dev_priv,
+					    struct i915_power_well *power_well)
+{
+	if (power_well->count > 0)
+		gen9_psr_blk_power_well_enable(dev_priv, power_well);
+	else
+		gen9_psr_blk_power_well_disable(dev_priv, power_well);
 }
 
 static bool gen9_dc_off_power_well_enabled(struct drm_i915_private *dev_priv,
@@ -1910,6 +1947,13 @@ static const struct i915_power_well_ops gen9_dc_off_power_well_ops = {
 	.is_enabled = gen9_dc_off_power_well_enabled,
 };
 
+static const struct i915_power_well_ops gen9_psr_blk_power_well_ops = {
+	.sync_hw = gen9_psr_blk_power_well_sync_hw,
+	.enable = gen9_psr_blk_power_well_enable,
+	.disable = gen9_psr_blk_power_well_disable,
+	.is_enabled = gen9_psr_blk_power_well_enabled,
+};
+
 static const struct i915_power_well_ops bxt_dpio_cmn_power_well_ops = {
 	.sync_hw = bxt_dpio_cmn_power_well_sync_hw,
 	.enable = bxt_dpio_cmn_power_well_enable,
@@ -2097,6 +2141,12 @@ static struct i915_power_well skl_power_wells[] = {
 		.data = SKL_DISP_PW_DC_OFF,
 	},
 	{
+		.name = "PSR Block",
+		.domains = SKL_DISPLAY_PSR_BLOCK_POWER_DOMAINS,
+		.ops = &gen9_psr_blk_power_well_ops,
+		.data = SKL_DISP_PW_PSR_BLOCK,
+	},
+	{
 		.name = "power well 2",
 		.domains = SKL_DISPLAY_POWERWELL_2_POWER_DOMAINS,
 		.ops = &skl_power_well_ops,
@@ -2146,6 +2196,12 @@ static struct i915_power_well bxt_power_wells[] = {
 		.domains = BXT_DISPLAY_DC_OFF_POWER_DOMAINS,
 		.ops = &gen9_dc_off_power_well_ops,
 		.data = SKL_DISP_PW_DC_OFF,
+	},
+	{
+		.name = "PSR Block",
+		.domains = BXT_DISPLAY_PSR_BLOCK_POWER_DOMAINS,
+		.ops = &gen9_psr_blk_power_well_ops,
+		.data = SKL_DISP_PW_PSR_BLOCK,
 	},
 	{
 		.name = "power well 2",

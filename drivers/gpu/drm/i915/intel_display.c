@@ -14818,8 +14818,6 @@ static void intel_setup_outputs(struct drm_device *dev)
 	if (SUPPORTS_TV(dev))
 		intel_tv_init(dev);
 
-	intel_psr_init(dev_priv);
-
 	for_each_intel_encoder(dev, encoder) {
 		encoder->base.possible_crtcs = encoder->crtc_mask;
 		encoder->base.possible_clones =

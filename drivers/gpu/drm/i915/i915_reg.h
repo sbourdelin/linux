@@ -718,6 +718,7 @@ enum skl_disp_power_wells {
 	/* Not actual bit groups. Used as IDs for lookup_power_well() */
 	SKL_DISP_PW_ALWAYS_ON,
 	SKL_DISP_PW_DC_OFF,
+	SKL_DISP_PW_PSR_BLOCK,
 
 	BXT_DPIO_CMN_A,
 	BXT_DPIO_CMN_BC,
