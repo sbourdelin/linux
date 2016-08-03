@@ -523,7 +523,7 @@ void intel_audio_codec_enable(struct intel_encoder *intel_encoder)
 						     adjusted_mode);
 
 	mutex_lock(&dev_priv->av_mutex);
-	intel_dig_port->audio_connector = connector;
+	intel_encoder->audio_connector = connector;
 	/* referred in audio callbacks */
 	dev_priv->dig_port_map[port] = intel_encoder;
 	mutex_unlock(&dev_priv->av_mutex);
@@ -552,7 +552,7 @@ void intel_audio_codec_disable(struct intel_encoder *intel_encoder)
 		dev_priv->display.audio_codec_disable(intel_encoder);
 
 	mutex_lock(&dev_priv->av_mutex);
-	intel_dig_port->audio_connector = NULL;
+	intel_encoder->audio_connector = NULL;
 	dev_priv->dig_port_map[port] = NULL;
 	mutex_unlock(&dev_priv->av_mutex);
 
@@ -707,7 +707,6 @@ static int i915_audio_component_get_eld(struct device *dev, int port,
 {
 	struct drm_i915_private *dev_priv = dev_to_i915(dev);
 	struct intel_encoder *intel_encoder;
-	struct intel_digital_port *intel_dig_port;
 	const u8 *eld;
 	int ret = -EINVAL;
 
@@ -716,10 +715,9 @@ static int i915_audio_component_get_eld(struct device *dev, int port,
 	/* intel_encoder might be NULL for DP MST */
 	if (intel_encoder) {
 		ret = 0;
-		intel_dig_port = enc_to_dig_port(&intel_encoder->base);
-		*enabled = intel_dig_port->audio_connector != NULL;
+		*enabled = intel_encoder->audio_connector != NULL;
 		if (*enabled) {
-			eld = intel_dig_port->audio_connector->eld;
+			eld = intel_encoder->audio_connector->eld;
 			ret = drm_eld_size(eld);
 			memcpy(buf, eld, min(max_bytes, ret));
 		}
