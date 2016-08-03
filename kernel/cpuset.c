@@ -1015,6 +1015,33 @@ static void cpuset_migrate_mm(struct mm_struct *mm, const nodemask_t *from,
 	}
 }
 
+
+/*
+ *Fix the race between fork and update_cpumask or update_nodemask.
+ *Scenario as follows:
+ *1)A process fork a child process, the child process have
+ *inherited the parent process cpus_allowed,mems_allowed
+ *Before being added cset->tasks list.
+ *2)Update_cpumask or update_nodemask change the parent's allowed
+ *to a new value, *but the child still is the old value
+ *after being added cset->tasks list.
+ */
+static void cpuset_fork(struct task_struct *task)
+{
+	nodemask_t cpuset_mems_allowed;
+
+	mutex_lock(&cpuset_mutex);
+	rcu_read_lock();
+
+	do_set_cpus_allowed(task, task_cs(task)->effective_cpus);
+
+	guarantee_online_mems(task_cs(task), &cpuset_mems_allowed);
+	task->mems_allowed = cpuset_mems_allowed;
+
+	rcu_read_unlock();
+	mutex_unlock(&cpuset_mutex);
+}
+
 static void cpuset_post_attach(void)
 {
 	flush_workqueue(cpuset_migrate_mm_wq);
@@ -2087,6 +2114,7 @@ struct cgroup_subsys cpuset_cgrp_subsys = {
 	.cancel_attach	= cpuset_cancel_attach,
 	.attach		= cpuset_attach,
 	.post_attach	= cpuset_post_attach,
+	.fork   = cpuset_fork,
 	.bind		= cpuset_bind,
 	.legacy_cftypes	= files,
 	.early_init	= true,
