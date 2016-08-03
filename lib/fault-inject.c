@@ -63,7 +63,7 @@ static bool fail_task(struct fault_attr *attr, struct task_struct *task)
 
 #ifdef CONFIG_FAULT_INJECTION_STACKTRACE_FILTER
 
-static bool fail_stacktrace(struct fault_attr *attr)
+static bool fail_stacktrace(struct fault_attr *attr, unsigned int *hash)
 {
 	struct stack_trace trace;
 	int depth = attr->stacktrace_depth;
@@ -88,12 +88,20 @@ static bool fail_stacktrace(struct fault_attr *attr)
 			       entries[n] < attr->require_end)
 			found = true;
 	}
+
+	if (IS_ENABLED(CONFIG_FAULT_INJECTION_AT_NEW_CALLSITES)) {
+		const char *start = (const char *) &entries[0];
+		const char *end = (const char *) &entries[trace.nr_entries];
+
+		*hash = full_name_hash(0, start, end - start);
+	}
+
 	return found;
 }
 
 #else
 
-static inline bool fail_stacktrace(struct fault_attr *attr)
+static inline bool fail_stacktrace(struct fault_attr *attr, unsigned int *hash)
 {
 	return true;
 }
@@ -134,6 +142,8 @@ out:
 
 bool should_fail(struct fault_attr *attr, ssize_t size)
 {
+	unsigned int hash = 0;
+
 	/* No need to check any other properties if the probability is 0 */
 	if (attr->probability == 0)
 		return false;
@@ -149,6 +159,24 @@ bool should_fail(struct fault_attr *attr, ssize_t size)
 		return false;
 	}
 
+	if (!fail_stacktrace(attr, &hash))
+		return false;
+
+	if (IS_ENABLED(CONFIG_FAULT_INJECTION_AT_NEW_CALLSITES)) {
+		static unsigned long seen_hashtable[4 * 1024];
+
+		hash &= 8 * sizeof(seen_hashtable) - 1;
+		if (!test_and_set_bit(hash & (BITS_PER_LONG - 1),
+			&seen_hashtable[hash / BITS_PER_LONG]))
+		{
+			/*
+			 * If it's the first time we see this stacktrace, fail it
+			 * without a second thought.
+			 */
+			goto fail;
+		}
+	}
+
 	if (attr->interval > 1) {
 		attr->count++;
 		if (attr->count % attr->interval)
@@ -158,9 +186,7 @@ bool should_fail(struct fault_attr *attr, ssize_t size)
 	if (attr->probability <= prandom_u32() % 100)
 		return false;
 
-	if (!fail_stacktrace(attr))
-		return false;
-
+fail:
 	return __fail(attr);
 }
 EXPORT_SYMBOL_GPL(should_fail);

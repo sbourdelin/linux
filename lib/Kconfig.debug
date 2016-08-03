@@ -1701,6 +1701,35 @@ config FAULT_INJECTION_STACKTRACE_FILTER
 	help
 	  Provide stacktrace filter for fault-injection capabilities
 
+config FAULT_INJECTION_AT_NEW_CALLSITES
+	bool "Inject fault the first time at a new callsite"
+	depends on FAULT_INJECTION_STACKTRACE_FILTER
+	help
+	  Without this, fault injection uses a combination of randomness
+	  and frequency to determine where to inject faults. The problem
+	  with this is that code paths which are executed very rarely get
+	  proportional amounts of faults injected.
+
+	  A better heuristic is to look at the actual callchain leading
+	  up to the possible failure point; if we see a callchain that
+	  we've never seen up until this point, chances are it's a rare
+	  one and we should definitely inject a fault here (since we
+	  might not get the chance again later).
+
+	  This uses a probabilistic set structure (similar to a bloom
+	  filter) to determine whether we have seen a particular
+	  callchain before by hashing the stack trace and atomically
+	  testing/setting a bit corresponding to the current callchain.
+
+	  There is a possibility of false negatives (i.e. we think we
+	  have seen a particular callchain before when in fact we
+	  haven't, therefore we don't inject a fault where we should
+	  have). We might use some sort of random seed here, but the
+	  additional complexity doesn't seem worth it to me.
+
+	  This finds a lot more bugs than just plain fault injection,
+	  but comes with a small additional overhead.
+
 config LATENCYTOP
 	bool "Latency measuring infrastructure"
 	depends on DEBUG_KERNEL
