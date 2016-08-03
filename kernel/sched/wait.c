@@ -277,10 +277,17 @@ void abort_exclusive_wait(wait_queue_head_t *q, wait_queue_t *wait,
 			unsigned int mode, void *key)
 {
 	unsigned long flags;
+	long wake_up;
 
-	__set_current_state(TASK_RUNNING);
+	/* Serialize against try_to_wake_up() */
+	raw_spin_lock_irqsave(&current->pi_lock, flags);
+	wake_up = current->state & (TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE);
+	if (wake_up)
+		__set_current_state(TASK_RUNNING);
+	raw_spin_unlock_irqrestore(&current->pi_lock, flags);
+
 	spin_lock_irqsave(&q->lock, flags);
-	if (!list_empty(&wait->task_list))
+	if (wake_up)
 		list_del_init(&wait->task_list);
 	else if (waitqueue_active(q))
 		__wake_up_locked_key(q, mode, key);
