@@ -6,6 +6,8 @@
 #include <linux/if_vlan.h>
 #include <net/ip.h>
 #include <net/ipv6.h>
+#include <net/gre.h>
+#include <net/pptp.h>
 #include <linux/igmp.h>
 #include <linux/icmp.h>
 #include <linux/sctp.h>
@@ -338,71 +340,102 @@ mpls:
 ip_proto_again:
 	switch (ip_proto) {
 	case IPPROTO_GRE: {
-		struct gre_hdr {
-			__be16 flags;
-			__be16 proto;
-		} *hdr, _hdr;
+		struct gre_base_hdr *hdr, _hdr;
 
 		hdr = __skb_header_pointer(skb, nhoff, sizeof(_hdr), data, hlen, &_hdr);
 		if (!hdr)
 			goto out_bad;
-		/*
-		 * Only look inside GRE if version zero and no
-		 * routing
-		 */
-		if (hdr->flags & (GRE_VERSION | GRE_ROUTING))
-			break;
 
-		proto = hdr->proto;
-		nhoff += 4;
-		if (hdr->flags & GRE_CSUM)
-			nhoff += 4;
-		if (hdr->flags & GRE_KEY) {
-			const __be32 *keyid;
-			__be32 _keyid;
+		/* Only look inside GRE without routing */
+		if (!(hdr->flags & GRE_ROUTING)) {
+			int offset = 0;
 
-			keyid = __skb_header_pointer(skb, nhoff, sizeof(_keyid),
-						     data, hlen, &_keyid);
+			proto = hdr->protocol;
 
-			if (!keyid)
-				goto out_bad;
-
-			if (dissector_uses_key(flow_dissector,
-					       FLOW_DISSECTOR_KEY_GRE_KEYID)) {
-				key_keyid = skb_flow_dissector_target(flow_dissector,
-								      FLOW_DISSECTOR_KEY_GRE_KEYID,
-								      target_container);
-				key_keyid->keyid = *keyid;
+			if (hdr->flags & GRE_VERSION) {
+				/* Maybe PPTP in GRE */
+				if (!(proto == GRE_PROTO_PPP && (hdr->flags & GRE_KEY) &&
+				     (hdr->flags & GRE_VERSION) == GRE_VERSION_1))
+					break;
 			}
-			nhoff += 4;
+
+			offset += sizeof(struct gre_base_hdr);
+
+			if (hdr->flags & GRE_CSUM)
+				offset += sizeof(__be32);
+
+			if (hdr->flags & GRE_KEY) {
+				const __be32 *keyid;
+				__be32 _keyid;
+
+				keyid = __skb_header_pointer(skb, nhoff + offset, sizeof(_keyid),
+							     data, hlen, &_keyid);
+
+				if (!keyid)
+					goto out_bad;
+
+				if (dissector_uses_key(flow_dissector,
+						       FLOW_DISSECTOR_KEY_GRE_KEYID)) {
+					key_keyid = skb_flow_dissector_target(flow_dissector,
+									      FLOW_DISSECTOR_KEY_GRE_KEYID,
+									      target_container);
+					key_keyid->keyid = *keyid;
+				}
+				offset += sizeof(_keyid);
+			}
+
+			if (hdr->flags & GRE_SEQ)
+				offset += sizeof(((struct pptp_gre_header *)0)->seq);
+
+			if (hdr->flags & GRE_ACK)
+				offset += sizeof(((struct pptp_gre_header *)0)->ack);
+
+			if (proto == GRE_PROTO_PPP) {
+				u8 _ppp_hdr[PPP_HDRLEN];
+				u8 *ppp_hdr;
+
+				ppp_hdr = skb_header_pointer(skb, nhoff + offset,
+							     sizeof(_ppp_hdr), _ppp_hdr);
+				if (!ppp_hdr)
+					goto out_bad;
+
+				proto = PPP_PROTOCOL(ppp_hdr);
+				if (proto == PPP_IP)
+					proto = htons(ETH_P_IP);
+				else if (proto == PPP_IPV6)
+					proto = htons(ETH_P_IPV6);
+				else
+					break;
+
+				offset += PPP_HDRLEN;
+			} else if (proto == htons(ETH_P_TEB)) {
+				const struct ethhdr *eth;
+				struct ethhdr _eth;
+
+				eth = __skb_header_pointer(skb, nhoff + offset,
+							   sizeof(_eth),
+							   data, hlen, &_eth);
+				if (!eth)
+					goto out_bad;
+				proto = eth->h_proto;
+				offset += sizeof(*eth);
+
+				/* Cap headers that we access via pointers at the
+				 * end of the Ethernet header as our maximum alignment
+				 * at that point is only 2 bytes.
+				 */
+				if (NET_IP_ALIGN)
+					hlen = (nhoff + offset);
+			}
+
+			nhoff += offset;
+			key_control->flags |= FLOW_DIS_ENCAPSULATION;
+			if (flags & FLOW_DISSECTOR_F_STOP_AT_ENCAP)
+				goto out_good;
+
+			goto again;
 		}
-		if (hdr->flags & GRE_SEQ)
-			nhoff += 4;
-		if (proto == htons(ETH_P_TEB)) {
-			const struct ethhdr *eth;
-			struct ethhdr _eth;
-
-			eth = __skb_header_pointer(skb, nhoff,
-						   sizeof(_eth),
-						   data, hlen, &_eth);
-			if (!eth)
-				goto out_bad;
-			proto = eth->h_proto;
-			nhoff += sizeof(*eth);
-
-			/* Cap headers that we access via pointers at the
-			 * end of the Ethernet header as our maximum alignment
-			 * at that point is only 2 bytes.
-			 */
-			if (NET_IP_ALIGN)
-				hlen = nhoff;
-		}
-
-		key_control->flags |= FLOW_DIS_ENCAPSULATION;
-		if (flags & FLOW_DISSECTOR_F_STOP_AT_ENCAP)
-			goto out_good;
-
-		goto again;
+		break;
 	}
 	case NEXTHDR_HOP:
 	case NEXTHDR_ROUTING:
