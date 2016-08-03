@@ -488,6 +488,8 @@ struct octeon_device {
 
 	/* private flags to control driver-specific features through ethtool */
 	u32 priv_flags;
+
+	void *watchdog_task;
 };
 
 #define  OCT_DRV_ONLINE 1
