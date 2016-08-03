@@ -1729,6 +1729,36 @@ long vfio_external_check_extension(struct vfio_group *group, unsigned long arg)
 EXPORT_SYMBOL_GPL(vfio_external_check_extension);
 
 /**
+ * External user API for containers, exported by symbols to be linked
+ * dynamically.
+ *
+ */
+struct vfio_container *vfio_container_get_ext(struct file *filep)
+{
+	struct vfio_container *container = filep->private_data;
+
+	if (filep->f_op != &vfio_fops)
+		return ERR_PTR(-EINVAL);
+
+	vfio_container_get(container);
+
+	return container;
+}
+EXPORT_SYMBOL_GPL(vfio_container_get_ext);
+
+void vfio_container_put_ext(struct vfio_container *container)
+{
+	vfio_container_put(container);
+}
+EXPORT_SYMBOL_GPL(vfio_container_put_ext);
+
+void *vfio_container_get_iommu_data_ext(struct vfio_container *container)
+{
+	return container->iommu_data;
+}
+EXPORT_SYMBOL_GPL(vfio_container_get_iommu_data_ext);
+
+/**
  * Sub-module support
  */
 /*

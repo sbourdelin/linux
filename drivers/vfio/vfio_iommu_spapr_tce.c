@@ -1331,6 +1331,21 @@ const struct vfio_iommu_driver_ops tce_iommu_driver_ops = {
 	.detach_group	= tce_iommu_detach_group,
 };
 
+struct iommu_table *vfio_container_spapr_tce_table_get_ext(void *iommu_data,
+		u64 offset)
+{
+	struct tce_container *container = iommu_data;
+	struct iommu_table *tbl = NULL;
+
+	if (tce_iommu_find_table(container, offset, &tbl) < 0)
+		return NULL;
+
+	iommu_table_get(tbl);
+
+	return tbl;
+}
+EXPORT_SYMBOL_GPL(vfio_container_spapr_tce_table_get_ext);
+
 static int __init tce_iommu_init(void)
 {
 	return vfio_register_iommu_driver(&tce_iommu_driver_ops);
@@ -1348,4 +1363,3 @@ MODULE_VERSION(DRIVER_VERSION);
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
-
