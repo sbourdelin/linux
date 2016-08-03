@@ -1023,16 +1023,20 @@ intel_attached_encoder(struct drm_connector *connector)
 	return to_intel_connector(connector)->encoder;
 }
 
-static inline struct intel_digital_port *
-enc_to_dig_port(struct drm_encoder *encoder)
-{
-	return container_of(encoder, struct intel_digital_port, base.base);
-}
-
 static inline struct intel_dp_mst_encoder *
 enc_to_mst(struct drm_encoder *encoder)
 {
 	return container_of(encoder, struct intel_dp_mst_encoder, base.base);
+}
+
+static inline struct intel_digital_port *
+enc_to_dig_port(struct drm_encoder *encoder)
+{
+	if (encoder->encoder_type == DRM_MODE_ENCODER_DPMST)
+		return enc_to_mst(encoder)->primary;
+	else
+		return container_of(encoder, struct intel_digital_port,
+				    base.base);
 }
 
 static inline struct intel_dp *enc_to_intel_dp(struct drm_encoder *encoder)
