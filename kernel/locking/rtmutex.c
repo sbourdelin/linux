@@ -10,6 +10,7 @@
  *
  *  See Documentation/locking/rt-mutex-design.txt for details.
  */
+#include <linux/fault-inject.h>
 #include <linux/spinlock.h>
 #include <linux/export.h>
 #include <linux/sched.h>
@@ -1465,6 +1466,28 @@ rt_mutex_timed_lock(struct rt_mutex *lock, struct hrtimer_sleeper *timeout)
 }
 EXPORT_SYMBOL_GPL(rt_mutex_timed_lock);
 
+#ifdef CONFIG_FAIL_RT_MUTEX
+DECLARE_FAULT_ATTR(fail_rtmutex);
+
+static int __init fail_rtmutex_debugfs(void)
+{
+	struct dentry *dir = fault_create_debugfs_attr("fail_rtmutex",
+		NULL, &fail_rtmutex);
+	return PTR_ERR_OR_ZERO(dir);
+}
+late_initcall(fail_rtmutex_debugfs);
+
+static inline bool should_fail_rtmutex(struct rt_mutex *lock)
+{
+	return should_fail(&fail_rtmutex, 1);
+}
+#else
+static inline bool should_fail_rtmutex(struct rt_mutex *lock)
+{
+	return false;
+}
+#endif
+
 /**
  * rt_mutex_trylock - try to lock a rt_mutex
  *
@@ -1479,6 +1502,9 @@ EXPORT_SYMBOL_GPL(rt_mutex_timed_lock);
 int __sched rt_mutex_trylock(struct rt_mutex *lock)
 {
 	if (WARN_ON_ONCE(in_irq() || in_nmi() || in_serving_softirq()))
+		return 0;
+
+	if (should_fail_rtmutex(lock))
 		return 0;
 
 	return rt_mutex_fasttrylock(lock, rt_mutex_slowtrylock);
