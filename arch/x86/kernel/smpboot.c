@@ -340,7 +340,7 @@ static void __init smp_init_package_map(void)
 		ncpus = 1;
 	}
 
-	__max_logical_packages = DIV_ROUND_UP(total_cpus, ncpus);
+	__max_logical_packages = total_cpus;
 
 	/*
 	 * Possibly larger than what we need as the number of apic ids per
