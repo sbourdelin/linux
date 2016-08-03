@@ -2320,6 +2320,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			Note that if CONFIG_MODULE_SIG_FORCE is set, that
 			is always true, so this option does nothing.
 
+	module_blacklist=  [KNL] Do not load a comma-separated list of
+			modules.  Useful for debugging problem modules.
+
 	mousedev.tap_time=
 			[MOUSE] Maximum time between finger touching and
 			leaving touchpad surface for touch to be considered
@@ -2884,6 +2887,11 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			Halt all CPUs after the first oops has been printed for
 			the specified number of seconds.  This is to be used if
 			your oopses keep scrolling off the screen.
+
+	extra_latent_entropy
+			Enable a very simple form of latent entropy extraction
+			from the first 4GB of memory as the bootmem allocator
+			passes the memory pages to the buddy allocator.
 
 	pcbit=		[HW,ISDN]
 
@@ -3873,6 +3881,12 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			kernel's sunrpc client considers to be privileged
 			using these two parameters to set the minimum and
 			maximum port values.
+
+	sunrpc.svc_rpc_per_connection_limit=
+			[NFS,SUNRPC]
+			Limit the number of requests that the server will
+			process in parallel from a single connection.
+			The default value is 0 (no limit).
 
 	sunrpc.pool_mode=
 			[NFS]

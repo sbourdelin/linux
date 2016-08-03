@@ -288,6 +288,9 @@ void __init jump_label_init(void)
 	BUILD_BUG_ON((int)ATOMIC_INIT(0) != 0);
 	BUILD_BUG_ON((int)ATOMIC_INIT(1) != 1);
 
+	if (static_key_initialized)
+		return;
+
 	jump_label_lock();
 	jump_label_sort_entries(iter_start, iter_stop);
 
@@ -337,11 +340,14 @@ static int __jump_label_mod_text_reserved(void *start, void *end)
 {
 	struct module *mod;
 
+	preempt_disable();
 	mod = __module_text_address((unsigned long)start);
+	WARN_ON_ONCE(__module_text_address((unsigned long)end) != mod);
+	preempt_enable();
+
 	if (!mod)
 		return 0;
 
-	WARN_ON_ONCE(__module_text_address((unsigned long)end) != mod);
 
 	return __jump_label_text_reserved(mod->jump_entries,
 				mod->jump_entries + mod->num_jump_entries,

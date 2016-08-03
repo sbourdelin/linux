@@ -1004,6 +1004,7 @@ N:	meson
 ARM/Annapurna Labs ALPINE ARCHITECTURE
 M:	Tsahee Zidenberg <tsahee@annapurnalabs.com>
 M:	Antoine Tenart <antoine.tenart@free-electrons.com>
+L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
 S:	Maintained
 F:	arch/arm/mach-alpine/
 F:	arch/arm/boot/dts/alpine*
@@ -3494,6 +3495,7 @@ F:	Documentation/ABI/testing/sysfs-class-cxl
 CXLFLASH (IBM Coherent Accelerator Processor Interface CAPI Flash) SCSI DRIVER
 M:	Manoj N. Kumar <manoj@linux.vnet.ibm.com>
 M:	Matthew R. Ochs <mrochs@linux.vnet.ibm.com>
+M:	Uma Krishnan <ukrishn@linux.vnet.ibm.com>
 L:	linux-scsi@vger.kernel.org
 S:	Supported
 F:	drivers/scsi/cxlflash/
@@ -5831,7 +5833,15 @@ M:	Tyrel Datwyler <tyreld@linux.vnet.ibm.com>
 L:	linux-scsi@vger.kernel.org
 S:	Supported
 F:	drivers/scsi/ibmvscsi/ibmvscsi*
-F:	drivers/scsi/ibmvscsi/viosrp.h
+F:	include/scsi/viosrp.h
+
+IBM Power Virtual SCSI Device Target Driver
+M:	Bryant G. Ly <bryantly@linux.vnet.ibm.com>
+M:	Michael Cyr <mikecyr@linux.vnet.ibm.com>
+L:	linux-scsi@vger.kernel.org
+L:	target-devel@vger.kernel.org
+S:	Supported
+F:	drivers/scsi/ibmvscsi_tgt/
 
 IBM Power Virtual FC Device Drivers
 M:	Tyrel Datwyler <tyreld@linux.vnet.ibm.com>
@@ -9233,6 +9243,16 @@ W:	http://www.st.com/spear
 S:	Maintained
 F:	drivers/pinctrl/spear/
 
+PISTACHIO SOC SUPPORT
+M:      James Hartley <james.hartley@imgtec.com>
+M:      Ionela Voinescu <ionela.voinescu@imgtec.com>
+L:      linux-mips@linux-mips.org
+S:      Maintained
+F:      arch/mips/pistachio/
+F:      arch/mips/include/asm/mach-pistachio/
+F:      arch/mips/boot/dts/pistachio/
+F:      arch/mips/configs/pistachio*_defconfig
+
 PKTCDVD DRIVER
 M:	Jiri Kosina <jikos@kernel.org>
 S:	Maintained
@@ -9811,10 +9831,14 @@ L:	rtc-linux@googlegroups.com
 Q:	http://patchwork.ozlabs.org/project/rtc-linux/list/
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git
 S:	Maintained
+F:	Documentation/devicetree/bindings/rtc/
 F:	Documentation/rtc.txt
 F:	drivers/rtc/
 F:	include/linux/rtc.h
 F:	include/uapi/linux/rtc.h
+F:	include/linux/rtc/
+F:	include/linux/platform_data/rtc-*
+F:	tools/testing/selftests/timers/rtctest.c
 
 REALTEK AUDIO CODECS
 M:	Bard Liao <bardliao@realtek.com>
@@ -12385,6 +12409,19 @@ L:	linux-media@vger.kernel.org
 S:	Maintained
 F:	drivers/media/v4l2-core/videobuf2-*
 F:	include/media/videobuf2-*
+
+VIRTIO AND VHOST VSOCK DRIVER
+M:	Stefan Hajnoczi <stefanha@redhat.com>
+L:	kvm@vger.kernel.org
+L:	virtualization@lists.linux-foundation.org
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	include/linux/virtio_vsock.h
+F:	include/uapi/linux/virtio_vsock.h
+F:	net/vmw_vsock/virtio_transport_common.c
+F:	net/vmw_vsock/virtio_transport.c
+F:	drivers/vhost/vsock.c
+F:	drivers/vhost/vsock.h
 
 VIRTUAL SERIO DEVICE DRIVER
 M:	Stephen Chandler Paul <thatslyude@gmail.com>
