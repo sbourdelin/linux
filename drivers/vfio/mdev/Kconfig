@@ -1,0 +1,12 @@
+
+config VFIO_MDEV
+    tristate "Mediated device driver framework"
+    depends on VFIO
+    default n
+    help
+        Provides a framework to virtualize device.
+	See Documentation/vfio-mediated-device.txt for more details.
+
+        If you don't know what do here, say N.
+
+
