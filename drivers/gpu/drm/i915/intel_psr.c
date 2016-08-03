@@ -660,6 +660,49 @@ static void intel_psr_exit(struct drm_i915_private *dev_priv)
 }
 
 /**
+ * intel_psr_rpm_block - PSR blocker for Runtime PM.
+ * @dev_priv: DRM i915 private device
+ *
+ * This function provides a psr blocker scheme for runtime PM.
+ * In case runtime PM domains need to block PSR for any reason
+ * this function needs to be called.
+ * It will immediately force PSR exit and prevent PSR to get activated.
+ */
+void intel_psr_rpm_block(struct drm_i915_private *dev_priv)
+{
+	mutex_lock(&dev_priv->psr.lock);
+	if (!dev_priv->psr.enabled)
+		goto unlock;
+
+	dev_priv->psr.rpm_block = true;
+
+	if (dev_priv->psr.active)
+		intel_psr_exit(dev_priv);
+unlock:
+	mutex_unlock(&dev_priv->psr.lock);
+}
+
+/**
+ * intel_psr_rpm_unblock - PSR unblocker for Runtime PM.
+ * @dev_priv: DRM i915 private device
+ *
+ * This function unblock PSR. Should only be called by RPM
+ * after the domain in question had blocked PSR but now is being put.
+ */
+void intel_psr_rpm_unblock(struct drm_i915_private *dev_priv)
+{
+	mutex_lock(&dev_priv->psr.lock);
+	if (!dev_priv->psr.enabled)
+		goto unlock;
+
+	dev_priv->psr.rpm_block = false;
+
+	schedule_delayed_work(&dev_priv->psr.work, msecs_to_jiffies(100));
+unlock:
+	mutex_unlock(&dev_priv->psr.lock);
+}
+
+/**
  * intel_psr_single_frame_update - Single Frame Update
  * @dev_priv: DRM i915 private device
  * @frontbuffer_bits: frontbuffer plane tracking bits

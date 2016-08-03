@@ -1567,6 +1567,8 @@ void intel_psr_flush(struct drm_i915_private *dev_priv,
 		     unsigned frontbuffer_bits,
 		     enum fb_op_origin origin);
 void intel_psr_init(struct drm_i915_private *dev_priv);
+void intel_psr_rpm_block(struct drm_i915_private *dev_priv);
+void intel_psr_rpm_unblock(struct drm_i915_private *dev_priv);
 void intel_psr_single_frame_update(struct drm_i915_private *dev_priv,
 				   unsigned frontbuffer_bits);
 
