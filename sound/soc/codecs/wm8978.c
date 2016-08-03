@@ -999,12 +999,11 @@ static struct snd_soc_codec_driver soc_codec_dev_wm8978 = {
 	.resume =	wm8978_resume,
 	.set_bias_level = wm8978_set_bias_level,
 
-	.controls = wm8978_snd_controls,
-	.num_controls = ARRAY_SIZE(wm8978_snd_controls),
-	.dapm_widgets = wm8978_dapm_widgets,
-	.num_dapm_widgets = ARRAY_SIZE(wm8978_dapm_widgets),
-	.dapm_routes = wm8978_dapm_routes,
-	.num_dapm_routes = ARRAY_SIZE(wm8978_dapm_routes),
+	.component_driver = {
+		COMPONENT_FUNC(controls,	wm8978_snd_controls),
+		COMPONENT_FUNC(dapm_widgets,	wm8978_dapm_widgets),
+		COMPONENT_FUNC(dapm_routes,	wm8978_dapm_routes),
+	},
 };
 
 static const struct regmap_config wm8978_regmap_config = {
