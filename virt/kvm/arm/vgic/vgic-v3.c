@@ -289,6 +289,12 @@ int vgic_v3_map_resources(struct kvm *kvm)
 		goto out;
 	}
 
+	ret = vgic_register_its_iodevs(kvm);
+	if (ret) {
+		kvm_err("Unable to register VGIC ITS MMIO regions\n");
+		goto out;
+	}
+
 	dist->ready = true;
 
 out:

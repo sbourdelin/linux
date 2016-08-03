@@ -1288,13 +1288,13 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu)
 		its_sync_lpi_pending_table(vcpu);
 }
 
-static int vgic_its_init_its(struct kvm *kvm, struct vgic_its *its)
+static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
 {
 	struct vgic_io_device *iodev = &its->iodev;
 	int ret;
 
-	if (its->initialized)
-		return 0;
+	if (!its->initialized)
+		return -EBUSY;
 
 	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
 		return -ENXIO;
@@ -1310,9 +1310,6 @@ static int vgic_its_init_its(struct kvm *kvm, struct vgic_its *its)
 	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, iodev->base_addr,
 				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
 	mutex_unlock(&kvm->slots_lock);
-
-	if (!ret)
-		its->initialized = true;
 
 	return ret;
 }
@@ -1435,9 +1432,6 @@ static int vgic_its_set_attr(struct kvm_device *dev,
 		if (type != KVM_VGIC_ITS_ADDR_TYPE)
 			return -ENODEV;
 
-		if (its->initialized)
-			return -EBUSY;
-
 		if (copy_from_user(&addr, uaddr, sizeof(addr)))
 			return -EFAULT;
 
@@ -1453,7 +1447,9 @@ static int vgic_its_set_attr(struct kvm_device *dev,
 	case KVM_DEV_ARM_VGIC_GRP_CTRL:
 		switch (attr->attr) {
 		case KVM_DEV_ARM_VGIC_CTRL_INIT:
-			return vgic_its_init_its(dev->kvm, its);
+			its->initialized = true;
+
+			return 0;
 		}
 		break;
 	}
@@ -1497,4 +1493,44 @@ int kvm_vgic_register_its_device(void)
 {
 	return kvm_register_device_ops(&kvm_arm_vgic_its_ops,
 				       KVM_DEV_TYPE_ARM_VGIC_ITS);
+}
+
+/*
+ * Registers all ITSes with the kvm_io_bus framework.
+ * To follow the existing VGIC initialization sequence, this has to be
+ * done as late as possible, just before the first VCPU runs.
+ */
+int vgic_register_its_iodevs(struct kvm *kvm)
+{
+	struct kvm_device *dev;
+	int ret = 0;
+
+	mutex_lock(&kvm->devices_lock);
+
+	list_for_each_entry(dev, &kvm->devices, vm_node) {
+		if (dev->ops != &kvm_arm_vgic_its_ops)
+			continue;
+
+		ret = vgic_register_its_iodev(kvm, dev->private);
+		if (ret)
+			break;
+	}
+
+	if (ret) {
+		/* Iterate backwards to roll back previous registrations. */
+		for (dev = list_prev_entry(dev, vm_node);
+		     &dev->vm_node != &kvm->devices;
+		     dev = list_prev_entry(dev, vm_node)) {
+			struct vgic_its *its = dev->private;
+
+			if (dev->ops != &kvm_arm_vgic_its_ops)
+				continue;
+
+			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+						  &its->iodev.dev);
+		}
+	}
+
+	mutex_unlock(&kvm->devices_lock);
+	return ret;
 }
