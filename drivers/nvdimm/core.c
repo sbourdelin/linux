@@ -366,6 +366,7 @@ struct nvdimm_bus *__nvdimm_bus_register(struct device *parent,
 	return nvdimm_bus;
  err:
 	put_device(&nvdimm_bus->dev);
+	kfree(nvdimm_bus);
 	return NULL;
 }
 EXPORT_SYMBOL_GPL(__nvdimm_bus_register);
