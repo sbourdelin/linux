@@ -105,8 +105,6 @@ static inline int test_ti_thread_flag(struct thread_info *ti, int flag)
 
 #define tif_need_resched() test_thread_flag(TIF_NEED_RESCHED)
 
-<<<<<<< HEAD
-=======
 #if defined TIF_RESTORE_SIGMASK && !defined HAVE_SET_RESTORE_SIGMASK
 /*
  * An arch can define its own version of set_restore_sigmask() to get the
@@ -172,7 +170,6 @@ static inline void check_object_size(const void *ptr, unsigned long n,
 { }
 #endif /* CONFIG_HARDENED_USERCOPY */
 
->>>>>>> linux-next/akpm-base
 #endif	/* __KERNEL__ */
 
 #endif /* _LINUX_THREAD_INFO_H */
