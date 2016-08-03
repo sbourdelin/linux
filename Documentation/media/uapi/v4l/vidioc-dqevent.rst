@@ -564,6 +564,15 @@ call.
 	  an input. This can come from an input connector or from a video
 	  decoder.
 
+    -  .. row 2
+
+       -  ``V4L2_EVENT_SRC_CH_LOCK_STATUS``
+
+       -  0x0002
+
+       -  This event gets triggered when there is a signal lock or
+	  unlock detected at the input of a video decoder.
+
 
 Return Value
 ============
