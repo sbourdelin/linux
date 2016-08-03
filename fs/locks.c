@@ -2648,8 +2648,14 @@ static int locks_show(struct seq_file *f, void *v)
 {
 	struct locks_iterator *iter = f->private;
 	struct file_lock *fl, *bfl;
+	struct pid_namespace *proc_pidns = file_inode(f->file)->i_sb->s_fs_info;
+	struct pid_namespace *current_pidns = task_active_pid_ns(current);
 
 	fl = hlist_entry(v, struct file_lock, fl_link);
+
+	if ((current_pidns != &init_pid_ns) && fl->fl_nspid
+	    && (proc_pidns != ns_of_pid(fl->fl_nspid)))
+		return 0;
 
 	lock_get_status(f, fl, iter->li_pos, "");
 
