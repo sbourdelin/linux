@@ -3648,7 +3648,7 @@ i915_pipe_crc_read(struct file *filep, char __user *user_buf, size_t count,
 
 	spin_unlock_irq(&pipe_crc->lock);
 
-	return bytes_read;
+	return PIPE_CRC_LINE_LEN;
 }
 
 static const struct file_operations i915_pipe_crc_fops = {
