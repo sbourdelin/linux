@@ -196,6 +196,7 @@ getname_flags(const char __user *filename, int flags, int *empty)
 		}
 	}
 
+	memcpy((char *)result->name, filename, len);
 	result->uptr = filename;
 	result->aname = NULL;
 	audit_getname(result);
