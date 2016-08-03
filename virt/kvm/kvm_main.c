@@ -616,6 +616,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
 	mutex_init(&kvm->irq_lock);
 	mutex_init(&kvm->slots_lock);
 	atomic_set(&kvm->users_count, 1);
+	mutex_init(&kvm->devices_lock);
 	INIT_LIST_HEAD(&kvm->devices);
 
 	r = kvm_arch_init_vm(kvm, type);
@@ -694,6 +695,11 @@ static void kvm_destroy_devices(struct kvm *kvm)
 {
 	struct kvm_device *dev, *tmp;
 
+	/*
+	 * We do not need to take the devices_lock here, because nobody else
+	 * has a reference to the struct kvm at this point and therefore
+	 * cannot access the devices list anyhow.
+	 */
 	list_for_each_entry_safe(dev, tmp, &kvm->devices, vm_node) {
 		list_del(&dev->vm_node);
 		dev->ops->destroy(dev);
@@ -2842,7 +2848,9 @@ static int kvm_ioctl_create_device(struct kvm *kvm,
 		return ret;
 	}
 
+	mutex_lock(&kvm->devices_lock);
 	list_add(&dev->vm_node, &kvm->devices);
+	mutex_unlock(&kvm->devices_lock);
 	kvm_get_kvm(kvm);
 	cd->fd = ret;
 	return 0;

@@ -266,11 +266,18 @@ static int kvm_vfio_create(struct kvm_device *dev, u32 type)
 {
 	struct kvm_device *tmp;
 	struct kvm_vfio *kv;
+	int err = 0;
 
 	/* Only one VFIO "device" per VM */
+	mutex_lock(&dev->kvm->devices_lock);
 	list_for_each_entry(tmp, &dev->kvm->devices, vm_node)
-		if (tmp->ops == &kvm_vfio_ops)
-			return -EBUSY;
+		if (tmp->ops == &kvm_vfio_ops) {
+			err = -EBUSY;
+			break;
+		}
+	mutex_unlock(&dev->kvm->devices_lock);
+	if (err)
+		return err;
 
 	kv = kzalloc(sizeof(*kv), GFP_KERNEL);
 	if (!kv)
