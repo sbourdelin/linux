@@ -1314,7 +1314,9 @@ static void octeon_destroy_resources(struct octeon_device *oct)
 	case OCT_DEV_PCI_MAP_DONE:
 
 		/* Soft reset the octeon device before exiting */
-		oct->fn_list.soft_reset(oct);
+		if (!(OCTEON_CN23XX_PF(oct)) ||
+		    (OCTEON_CN23XX_PF(oct) && (oct->octeon_id == 0)))
+			oct->fn_list.soft_reset(oct);
 
 		octeon_unmap_pci_barx(oct, 0);
 		octeon_unmap_pci_barx(oct, 1);
@@ -3793,6 +3795,9 @@ static void nic_starter(struct work_struct *work)
 		return;
 	}
 
+	if (oct->fw_locked)
+		cn23xx_fw_unlock(oct);
+
 	atomic_set(&oct->status, OCT_DEV_RUNNING);
 
 	if (oct->app_mode && oct->app_mode == CVM_DRV_NIC_APP) {
@@ -3818,6 +3823,7 @@ static void nic_starter(struct work_struct *work)
 static int octeon_device_init(struct octeon_device *octeon_dev)
 {
 	int j, ret;
+	int fw_locked = 0, fw_loaded = 0;
 	char bootcmd[] = "\n";
 	struct octeon_device_priv *oct_priv =
 		(struct octeon_device_priv *)octeon_dev->priv;
@@ -3839,15 +3845,43 @@ static int octeon_device_init(struct octeon_device *octeon_dev)
 
 	octeon_dev->app_mode = CVM_DRV_INVALID_APP;
 
-	/* Do a soft reset of the Octeon device. */
-	if (octeon_dev->fn_list.soft_reset(octeon_dev))
+	if (OCTEON_CN23XX_PF(octeon_dev)) {
+		cn23xx_fw_lock(octeon_dev);
+		fw_locked = 1;
+		if (!cn23xx_fw_loaded(octeon_dev)) {
+			fw_loaded = 0;
+			/* Do a soft reset of the Octeon device. */
+			if (octeon_dev->fn_list.soft_reset(octeon_dev)) {
+				cn23xx_fw_unlock(octeon_dev);
+				return 1;
+			}
+			/*Lock again soft reset equivalent to unlock */
+			cn23xx_fw_lock(octeon_dev);
+			/* things might have changed */
+			if (!cn23xx_fw_loaded(octeon_dev)) {
+				fw_loaded = 0;
+			} else {
+				cn23xx_fw_unlock(octeon_dev);
+				fw_locked = 0;
+				fw_loaded = 1;
+			}
+		} else {
+			cn23xx_fw_unlock(octeon_dev);
+			fw_locked = 0;
+			fw_loaded = 1;
+		}
+	} else if (octeon_dev->fn_list.soft_reset(octeon_dev)) {
 		return 1;
+	}
 
 	/* Initialize the dispatch mechanism used to push packets arriving on
 	 * Octeon Output queues.
 	 */
-	if (octeon_init_dispatch_list(octeon_dev))
+	if (octeon_init_dispatch_list(octeon_dev)) {
+		if (fw_locked)
+			cn23xx_fw_unlock(octeon_dev);
 		return 1;
+	}
 
 	octeon_register_dispatch_fn(octeon_dev, OPCODE_NIC,
 				    OPCODE_NIC_CORE_DRV_ACTIVE,
@@ -3866,6 +3900,8 @@ static int octeon_device_init(struct octeon_device *octeon_dev)
 	if (OCTEON_CN23XX_PF(octeon_dev)) {
 		ret = octeon_dev->fn_list.setup_device_regs(octeon_dev);
 		if (ret) {
+			if (fw_locked)
+				cn23xx_fw_lock(octeon_dev);
 			dev_err(&octeon_dev->pci_dev->dev, "OCTEON: Failed to configure device registers\n");
 			return ret;
 		}
@@ -3875,6 +3911,8 @@ static int octeon_device_init(struct octeon_device *octeon_dev)
 	 */
 	if (octeon_setup_sc_buffer_pool(octeon_dev)) {
 		dev_err(&octeon_dev->pci_dev->dev, "sc buffer pool allocation failed\n");
+		if (fw_locked)
+			cn23xx_fw_unlock(octeon_dev);
 		return 1;
 	}
 	atomic_set(&octeon_dev->status, OCT_DEV_SC_BUFF_POOL_INIT_DONE);
@@ -3886,6 +3924,8 @@ static int octeon_device_init(struct octeon_device *octeon_dev)
 		/* On error, release any previously allocated queues */
 		for (j = 0; j < octeon_dev->num_iqs; j++)
 			octeon_delete_instr_queue(octeon_dev, j);
+		if (fw_locked)
+			cn23xx_fw_unlock(octeon_dev);
 		return 1;
 	}
 	atomic_set(&octeon_dev->status, OCT_DEV_INSTR_QUEUE_INIT_DONE);
@@ -3895,6 +3935,8 @@ static int octeon_device_init(struct octeon_device *octeon_dev)
 	 */
 	if (octeon_setup_response_list(octeon_dev)) {
 		dev_err(&octeon_dev->pci_dev->dev, "Response list allocation failed\n");
+		if (fw_locked)
+			cn23xx_fw_unlock(octeon_dev);
 		return 1;
 	}
 	atomic_set(&octeon_dev->status, OCT_DEV_RESP_LIST_INIT_DONE);
@@ -3904,6 +3946,8 @@ static int octeon_device_init(struct octeon_device *octeon_dev)
 		/* Release any previously allocated queues */
 		for (j = 0; j < octeon_dev->num_oqs; j++)
 			octeon_delete_droq(octeon_dev, j);
+		if (fw_locked)
+			cn23xx_fw_unlock(octeon_dev);
 		return 1;
 	}
 
@@ -3912,6 +3956,8 @@ static int octeon_device_init(struct octeon_device *octeon_dev)
 	if (OCTEON_CN23XX_PF(octeon_dev)) {
 		if (octeon_allocate_ioq_vector(octeon_dev)) {
 			dev_err(&octeon_dev->pci_dev->dev, "OCTEON: ioq vector allocation failed\n");
+			if (fw_locked)
+				cn23xx_fw_unlock(octeon_dev);
 			return 1;
 		}
 
@@ -3946,56 +3992,76 @@ static int octeon_device_init(struct octeon_device *octeon_dev)
 
 	atomic_set(&octeon_dev->status, OCT_DEV_IO_QUEUES_DONE);
 
-	dev_dbg(&octeon_dev->pci_dev->dev, "Waiting for DDR initialization...\n");
+	if ((!OCTEON_CN23XX_PF(octeon_dev)) ||
+	    (OCTEON_CN23XX_PF(octeon_dev) && !fw_loaded)) {
+		dev_dbg(&octeon_dev->pci_dev->dev, "Waiting for DDR initialization...\n");
+		if (ddr_timeout == 0) {
+			dev_info(&octeon_dev->pci_dev->dev,
+				 "WAITING. Set ddr_timeout to non-zero value to proceed with initialization.\n");
+		}
 
-	if (ddr_timeout == 0)
-		dev_info(&octeon_dev->pci_dev->dev, "WAITING. Set ddr_timeout to non-zero value to proceed with initialization.\n");
+		schedule_timeout_uninterruptible(HZ * LIO_RESET_SECS);
 
-	schedule_timeout_uninterruptible(HZ * LIO_RESET_SECS);
-
-	/* Wait for the octeon to initialize DDR after the soft-reset. */
-	while (ddr_timeout == 0) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		if (schedule_timeout(HZ / 10)) {
-			/* user probably pressed Control-C */
+		/* Wait for the octeon to initialize DDR after the soft-reset.*/
+		while (ddr_timeout == 0) {
+			set_current_state(TASK_INTERRUPTIBLE);
+			if (schedule_timeout(HZ / 10)) {
+				/* user probably pressed Control-C */
+				return 1;
+			}
+		}
+		ret = octeon_wait_for_ddr_init(octeon_dev, &ddr_timeout);
+		if (ret) {
+			dev_err(&octeon_dev->pci_dev->dev,
+				"DDR not initialized. Please confirm that board is configured to boot from Flash, ret: %d\n",
+				ret);
+			if (fw_locked)
+				cn23xx_fw_unlock(octeon_dev);
 			return 1;
 		}
-	}
-	ret = octeon_wait_for_ddr_init(octeon_dev, &ddr_timeout);
-	if (ret) {
-		dev_err(&octeon_dev->pci_dev->dev,
-			"DDR not initialized. Please confirm that board is configured to boot from Flash, ret: %d\n",
-			ret);
-		return 1;
-	}
 
-	if (octeon_wait_for_bootloader(octeon_dev, 1000) != 0) {
-		dev_err(&octeon_dev->pci_dev->dev, "Board not responding\n");
-		return 1;
-	}
+		if (octeon_wait_for_bootloader(octeon_dev, 1000) != 0) {
+			dev_err(&octeon_dev->pci_dev->dev, "Board not responding\n");
+			if (fw_locked)
+				cn23xx_fw_unlock(octeon_dev);
+			return 1;
+		}
 
-	/* Divert uboot to take commands from host instead. */
-	ret = octeon_console_send_cmd(octeon_dev, bootcmd, 50);
+		/* Divert uboot to take commands from host instead. */
+		ret = octeon_console_send_cmd(octeon_dev, bootcmd, 50);
 
-	dev_dbg(&octeon_dev->pci_dev->dev, "Initializing consoles\n");
-	ret = octeon_init_consoles(octeon_dev);
-	if (ret) {
-		dev_err(&octeon_dev->pci_dev->dev, "Could not access board consoles\n");
-		return 1;
-	}
-	ret = octeon_add_console(octeon_dev, 0);
-	if (ret) {
-		dev_err(&octeon_dev->pci_dev->dev, "Could not access board console\n");
-		return 1;
-	}
+		dev_dbg(&octeon_dev->pci_dev->dev, "Initializing consoles\n");
+		ret = octeon_init_consoles(octeon_dev);
+		if (ret) {
+			dev_err(&octeon_dev->pci_dev->dev, "Could not access board consoles\n");
+			if (fw_locked)
+				cn23xx_fw_unlock(octeon_dev);
+			return 1;
+		}
+		ret = octeon_add_console(octeon_dev, 0);
+		if (ret) {
+			dev_err(&octeon_dev->pci_dev->dev, "Could not access board console\n");
+			if (fw_locked)
+				cn23xx_fw_unlock(octeon_dev);
+			return 1;
+		}
 
-	atomic_set(&octeon_dev->status, OCT_DEV_CONSOLE_INIT_DONE);
+		atomic_set(&octeon_dev->status, OCT_DEV_CONSOLE_INIT_DONE);
 
-	dev_dbg(&octeon_dev->pci_dev->dev, "Loading firmware\n");
-	ret = load_firmware(octeon_dev);
-	if (ret) {
-		dev_err(&octeon_dev->pci_dev->dev, "Could not load firmware to board\n");
-		return 1;
+		dev_dbg(&octeon_dev->pci_dev->dev, "Loading firmware\n");
+		ret = load_firmware(octeon_dev);
+		if (ret) {
+			dev_err(&octeon_dev->pci_dev->dev, "Could not load firmware to board\n");
+			if (fw_locked)
+				cn23xx_fw_unlock(octeon_dev);
+			return 1;
+		}
+		/* set bit 1 of SLI_SCRATCH_1 to indicate that firmware is
+		 * loaded
+		 */
+		if (OCTEON_CN23XX_PF(octeon_dev))
+			octeon_write_csr64(octeon_dev, CN23XX_SLI_SCRATCH1,
+					   2ULL);
 	}
 
 	handshake[octeon_dev->octeon_id].init_ok = 1;
@@ -4011,6 +4077,8 @@ static int octeon_device_init(struct octeon_device *octeon_dev)
 		       octeon_dev->droq[j]->pkts_credit_reg);
 
 	/* Packets can start arriving on the output queues from this point. */
+	if (fw_locked)
+		octeon_dev->fw_locked = 1;
 
 	return 0;
 }

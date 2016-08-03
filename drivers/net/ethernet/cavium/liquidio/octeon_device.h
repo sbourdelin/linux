@@ -473,6 +473,8 @@ struct octeon_device {
 
 	struct octeon_pf_vf_hs_word pfvf_hsword;
 
+	int fw_locked;
+
 	int msix_on;
 
 	/** IOq information of it's corresponding MSI-X interrupt. */
