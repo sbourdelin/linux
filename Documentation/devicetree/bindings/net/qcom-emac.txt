@@ -1,0 +1,66 @@
+Qualcomm EMAC Gigabit Ethernet Controller
+
+Required properties:
+- compatible : Should be "qcom,fsm9900-emac".
+- reg : Offset and length of the register regions for the device
+- reg-names : Register region names referenced in 'reg' above.
+	Required register resource entries are:
+	"base"   : EMAC controller base register block.
+	"csr"    : EMAC wrapper register block.
+	"sgmii"  : EMAC SGMII PHY register block.
+	Optional register resource entries are:
+	"ptp"    : EMAC PTP (1588) register block.
+- interrupts : Interrupt numbers used by this controller
+- interrupt-names : Interrupt resource names referenced in 'interrupts' above.
+	Required interrupt resource entries are:
+	"emac_core0"   : EMAC core0 interrupt.
+	"sgmii_irq"   : EMAC SGMII interrupt.
+- mac-address               : The 6-byte MAC address. If present, it is the
+			      default MAC address.
+
+Optional properties:
+- phy-version : the version of the integrated emac phy, either 1 or 2.
+
+The external phy child node:
+- compatible : Should be "qcom,fsm9900-emac-phy".
+- reg : The phy address
+
+Example:
+soc {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	dma-ranges = <0 0 0xffffffff>;
+
+	emac0: ethernet@feb20000 {
+		compatible = "qcom,fsm9900-emac";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		phy-version = <1>;
+		reg-names = "base", "csr", "ptp", "sgmii";
+		reg =   <0xfeb20000 0x10000>,
+			<0xfeb36000 0x1000>,
+			<0xfeb3c000 0x4000>,
+			<0xfeb38000 0x400>;
+		interrupt-parent = <&emac0>;
+		#interrupt-cells = <1>;
+		interrupts = <76 80>;
+		interrupt-names = "emac_core0", "sgmii_irq";
+		phy0: ethernet-phy@0 {
+			compatible = "qcom,fsm9900-emac-phy";
+			reg = <0>;
+		}
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&mdio_pins_a>;
+	};
+
+	tlmm: pinctrl@fd510000 {
+		compatible = "qcom,fsm9900-pinctrl";
+
+		mdio_pins_a: mdio {
+			state {
+				pins = "gpio123", "gpio124";
+				function = "mdio";
+			};
+		};
+	};
