@@ -142,6 +142,9 @@ struct net {
 #endif
 	struct sock		*diag_nlsk;
 	atomic_t		fnhe_genid;
+#ifdef CONFIG_NETPOLICY
+	struct proc_dir_entry	*proc_netpolicy;
+#endif /* CONFIG_NETPOLICY */
 };
 
 #include <linux/seq_file_net.h>
