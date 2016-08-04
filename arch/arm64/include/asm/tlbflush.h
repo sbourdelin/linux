@@ -71,7 +71,10 @@ static inline void local_flush_tlb_all(void)
 	isb();
 }
 
-static inline void flush_tlb_all(void)
+void __flush_tlb_all_ipi(void);
+void __flush_tlb_mm_ipi(struct mm_struct *mm);
+
+static inline void __flush_tlb_all_tlbi(void)
 {
 	dsb(ishst);
 	asm("tlbi	vmalle1is");
@@ -79,7 +82,17 @@ static inline void flush_tlb_all(void)
 	isb();
 }
 
-static inline void flush_tlb_mm(struct mm_struct *mm)
+static inline void flush_tlb_all(void)
+{
+	if (cpus_have_cap(ARM64_HAS_NO_BCAST_TLBI)) {
+		__flush_tlb_all_ipi();
+		return;
+	}
+
+	__flush_tlb_all_tlbi();
+}
+
+static inline void __flush_tlb_mm_tlbi(struct mm_struct *mm)
 {
 	unsigned long asid = ASID(mm) << 48;
 
@@ -88,8 +101,18 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
 	dsb(ish);
 }
 
-static inline void flush_tlb_page(struct vm_area_struct *vma,
-				  unsigned long uaddr)
+static inline void flush_tlb_mm(struct mm_struct *mm)
+{
+	if (cpus_have_cap(ARM64_HAS_NO_BCAST_TLBI)) {
+		__flush_tlb_mm_ipi(mm);
+		return;
+	}
+
+	__flush_tlb_mm_tlbi(mm);
+}
+
+static inline void __flush_tlb_page_tlbi(struct vm_area_struct *vma,
+		unsigned long uaddr)
 {
 	unsigned long addr = uaddr >> 12 | (ASID(vma->vm_mm) << 48);
 
@@ -98,15 +121,26 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
 	dsb(ish);
 }
 
+static inline void flush_tlb_page(struct vm_area_struct *vma,
+		unsigned long uaddr)
+{
+	if (cpus_have_cap(ARM64_HAS_NO_BCAST_TLBI)) {
+		__flush_tlb_mm_ipi(vma->vm_mm);
+		return;
+	}
+
+	__flush_tlb_page_tlbi(vma, uaddr);
+}
+
 /*
  * This is meant to avoid soft lock-ups on large TLB flushing ranges and not
  * necessarily a performance improvement.
  */
 #define MAX_TLB_RANGE	(1024UL << PAGE_SHIFT)
 
-static inline void __flush_tlb_range(struct vm_area_struct *vma,
-				     unsigned long start, unsigned long end,
-				     bool last_level)
+static inline void __flush_tlb_range_tlbi(struct vm_area_struct *vma,
+		unsigned long start, unsigned long end,
+		bool last_level)
 {
 	unsigned long asid = ASID(vma->vm_mm) << 48;
 	unsigned long addr;
@@ -129,13 +163,26 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
 	dsb(ish);
 }
 
+static inline void __flush_tlb_range(struct vm_area_struct *vma,
+		unsigned long start, unsigned long end,
+		bool last_level)
+{
+	if (cpus_have_cap(ARM64_HAS_NO_BCAST_TLBI)) {
+		__flush_tlb_mm_ipi(vma->vm_mm);
+		return;
+	}
+
+	__flush_tlb_range_tlbi(vma, start, end, last_level);
+}
+
 static inline void flush_tlb_range(struct vm_area_struct *vma,
-				   unsigned long start, unsigned long end)
+		unsigned long start, unsigned long end)
 {
 	__flush_tlb_range(vma, start, end, false);
 }
 
-static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end)
+static inline void __flush_tlb_kernel_range_tlbi(unsigned long start,
+		unsigned long end)
 {
 	unsigned long addr;
 
@@ -154,17 +201,38 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
 	isb();
 }
 
-/*
- * Used to invalidate the TLB (walk caches) corresponding to intermediate page
- * table levels (pgd/pud/pmd).
- */
-static inline void __flush_tlb_pgtable(struct mm_struct *mm,
-				       unsigned long uaddr)
+static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end)
+{
+	if (cpus_have_cap(ARM64_HAS_NO_BCAST_TLBI)) {
+		__flush_tlb_all_ipi();
+		return;
+	}
+
+	__flush_tlb_kernel_range_tlbi(start, end);
+}
+
+static inline void __flush_tlb_pgtable_tlbi(struct mm_struct *mm,
+		unsigned long uaddr)
 {
 	unsigned long addr = uaddr >> 12 | (ASID(mm) << 48);
 
 	asm("tlbi	vae1is, %0" : : "r" (addr));
 	dsb(ish);
+}
+
+/*
+ * Used to invalidate the TLB (walk caches) corresponding to intermediate page
+ * table levels (pgd/pud/pmd).
+ */
+static inline void __flush_tlb_pgtable(struct mm_struct *mm,
+		unsigned long uaddr)
+{
+	if (cpus_have_cap(ARM64_HAS_NO_BCAST_TLBI)) {
+		__flush_tlb_mm_ipi(mm);
+		return;
+	}
+
+	__flush_tlb_pgtable_tlbi(mm, uaddr);
 }
 
 #endif

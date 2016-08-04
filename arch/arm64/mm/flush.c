@@ -27,6 +27,24 @@
 
 #include "mm.h"
 
+static void flush_tlb_local(void *info)
+{
+	local_flush_tlb_all();
+}
+
+static void flush_tlb_mm_local(void *info)
+{
+	unsigned long asid = (unsigned long)info;
+
+	asm volatile("\n"
+	"  dsb     nshst\n"
+	"  tlbi    aside1, %0\n"
+	"  dsb     nsh\n"
+	"  isb     sy"
+	: : "r" (asid)
+	);
+}
+
 void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
 		       unsigned long end)
 {
@@ -93,6 +111,34 @@ void flush_dcache_page(struct page *page)
 		clear_bit(PG_dcache_clean, &page->flags);
 }
 EXPORT_SYMBOL(flush_dcache_page);
+
+void __flush_tlb_mm_ipi(struct mm_struct *mm)
+{
+	unsigned long asid;
+
+	if (!mm) {
+		flush_tlb_all();
+	} else {
+		asid = ASID(mm) << 48;
+		/* Make sure page table modifications are visible. */
+		dsb(ishst);
+		/* IPI to all CPUs to do local flush. */
+		on_each_cpu(flush_tlb_mm_local, (void *)asid, 1);
+	}
+}
+EXPORT_SYMBOL(__flush_tlb_mm_ipi);
+
+void __flush_tlb_all_ipi(void)
+{
+	/* Make sure page table modifications are visible. */
+	dsb(ishst);
+	if (num_online_cpus() <= 1)
+		local_flush_tlb_all();
+	else
+		/* IPI to all CPUs to do local flush. */
+		on_each_cpu(flush_tlb_local, NULL, 1);
+}
+EXPORT_SYMBOL(__flush_tlb_all_ipi);
 
 /*
  * Additional functions defined in assembly.
