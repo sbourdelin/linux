@@ -122,6 +122,7 @@ static unsigned long i915_stolen_to_physical(struct drm_device *dev)
 		 * always at TOUD? Ie. is it always the last
 		 * one to be allocated by the BIOS?
 		 */
+		if (0) /* https://bugs.freedesktop.org/show_bug.cgi?id=96473 */
 		pci_bus_read_config_word(dev->pdev->bus, PCI_DEVFN(0, 0),
 					 I865_TOUD, &toud);
 
