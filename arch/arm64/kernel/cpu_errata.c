@@ -92,6 +92,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
 		MIDR_RANGE(MIDR_THUNDERX, 0x00, 0x01),
 	},
 #endif
+#ifdef CONFIG_CAVIUM_ERRATUM_26026
+	{
+	/* Cavium ThunderX, pass 1.x */
+		.desc = "Cavium erratum 26026",
+		.capability = ARM64_HAS_NO_BCAST_TLBI,
+		MIDR_RANGE(MIDR_THUNDERX, 0x00, 0x01),
+	},
+#endif
 #ifdef CONFIG_CAVIUM_ERRATUM_27456
 	{
 	/* Cavium ThunderX, T88 pass 1.x - 2.1 */
