@@ -62,6 +62,8 @@ struct sched_param {
 
 #include <asm/processor.h>
 
+#include <linux/netpolicy.h>
+
 #define SCHED_ATTR_SIZE_VER0	48	/* sizeof first published struct */
 
 /*
@@ -1922,6 +1924,9 @@ struct task_struct {
 	int pagefault_disabled;
 #ifdef CONFIG_MMU
 	struct task_struct *oom_reaper_list;
+#endif
+#ifdef CONFIG_NETPOLICY
+	struct netpolicy_instance task_netpolicy;
 #endif
 /* CPU-specific state of this task */
 	struct thread_struct thread;

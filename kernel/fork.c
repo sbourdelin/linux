@@ -1451,6 +1451,12 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	p->sequential_io_avg	= 0;
 #endif
 
+#ifdef CONFIG_NETPOLICY
+	p->task_netpolicy.ptr = (void *)p;
+	if (is_net_policy_valid(p->task_netpolicy.policy))
+		netpolicy_register(&p->task_netpolicy, p->task_netpolicy.policy);
+#endif
+
 	/* Perform scheduler related setup. Assign this task to a CPU. */
 	retval = sched_fork(clone_flags, p);
 	if (retval)
