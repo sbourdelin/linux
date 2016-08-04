@@ -2212,7 +2212,7 @@ static int i40e_get_rss_hash_opts(struct i40e_pf *pf, struct ethtool_rxnfc *cmd)
 
 /**
  * i40e_get_ethtool_fdir_all - Populates the rule count of a command
- * @pf: Pointer to the physical function struct
+ * @vsi: Pointer to the VSI struct
  * @cmd: The command to get or set Rx flow classification rules
  * @rule_locs: Array of used rule locations
  *
@@ -2221,19 +2221,20 @@ static int i40e_get_rss_hash_opts(struct i40e_pf *pf, struct ethtool_rxnfc *cmd)
  *
  * Returns 0 on success or -EMSGSIZE if entry not found
  **/
-static int i40e_get_ethtool_fdir_all(struct i40e_pf *pf,
+static int i40e_get_ethtool_fdir_all(struct i40e_vsi *vsi,
 				     struct ethtool_rxnfc *cmd,
 				     u32 *rule_locs)
 {
 	struct i40e_fdir_filter *rule;
 	struct hlist_node *node2;
+	struct i40e_pf *pf = vsi->back;
 	int cnt = 0;
 
 	/* report total rule count */
 	cmd->data = i40e_get_fd_cnt_all(pf);
 
 	hlist_for_each_entry_safe(rule, node2,
-				  &pf->fdir_filter_list, fdir_node) {
+				  &vsi->fdir_filter_list, fdir_node) {
 		if (cnt == cmd->rule_cnt)
 			return -EMSGSIZE;
 
@@ -2248,7 +2249,7 @@ static int i40e_get_ethtool_fdir_all(struct i40e_pf *pf,
 
 /**
  * i40e_get_ethtool_fdir_entry - Look up a filter based on Rx flow
- * @pf: Pointer to the physical function struct
+ * @vsi: Pointer to the VSI struct
  * @cmd: The command to get or set Rx flow classification rules
  *
  * This function looks up a filter based on the Rx flow classification
@@ -2256,16 +2257,17 @@ static int i40e_get_ethtool_fdir_all(struct i40e_pf *pf,
  *
  * Returns 0 on success or -EINVAL if filter not found
  **/
-static int i40e_get_ethtool_fdir_entry(struct i40e_pf *pf,
+static int i40e_get_ethtool_fdir_entry(struct i40e_vsi *vsi,
 				       struct ethtool_rxnfc *cmd)
 {
 	struct ethtool_rx_flow_spec *fsp =
 			(struct ethtool_rx_flow_spec *)&cmd->fs;
 	struct i40e_fdir_filter *rule = NULL;
 	struct hlist_node *node2;
+	struct i40e_pf *pf = vsi->back;
 
 	hlist_for_each_entry_safe(rule, node2,
-				  &pf->fdir_filter_list, fdir_node) {
+				  &vsi->fdir_filter_list, fdir_node) {
 		if (fsp->location <= rule->fd_id)
 			break;
 	}
@@ -2293,7 +2295,7 @@ static int i40e_get_ethtool_fdir_entry(struct i40e_pf *pf,
 	else
 		fsp->ring_cookie = rule->q_index;
 
-	if (rule->dest_vsi != pf->vsi[pf->lan_vsi]->id) {
+	if (rule->dest_vsi != vsi->id) {
 		struct i40e_vsi *vsi;
 
 		vsi = i40e_find_vsi_from_id(pf, rule->dest_vsi);
@@ -2330,16 +2332,16 @@ static int i40e_get_rxnfc(struct net_device *netdev, struct ethtool_rxnfc *cmd,
 		ret = i40e_get_rss_hash_opts(pf, cmd);
 		break;
 	case ETHTOOL_GRXCLSRLCNT:
-		cmd->rule_cnt = pf->fdir_pf_active_filters;
+		cmd->rule_cnt = vsi->fdir_active_filters;
 		/* report total rule count */
 		cmd->data = i40e_get_fd_cnt_all(pf);
 		ret = 0;
 		break;
 	case ETHTOOL_GRXCLSRULE:
-		ret = i40e_get_ethtool_fdir_entry(pf, cmd);
+		ret = i40e_get_ethtool_fdir_entry(vsi, cmd);
 		break;
 	case ETHTOOL_GRXCLSRLALL:
-		ret = i40e_get_ethtool_fdir_all(pf, cmd, rule_locs);
+		ret = i40e_get_ethtool_fdir_all(vsi, cmd, rule_locs);
 		break;
 	default:
 		break;
@@ -2535,7 +2537,6 @@ static int i40e_update_ethtool_fdir_entry(struct i40e_vsi *vsi,
 					  struct ethtool_rxnfc *cmd)
 {
 	struct i40e_fdir_filter *rule, *parent;
-	struct i40e_pf *pf = vsi->back;
 	struct hlist_node *node2;
 	int err = -EINVAL;
 
@@ -2543,7 +2544,7 @@ static int i40e_update_ethtool_fdir_entry(struct i40e_vsi *vsi,
 	rule = NULL;
 
 	hlist_for_each_entry_safe(rule, node2,
-				  &pf->fdir_filter_list, fdir_node) {
+				  &vsi->fdir_filter_list, fdir_node) {
 		/* hash found, or no matching entry */
 		if (rule->fd_id >= sw_idx)
 			break;
@@ -2558,7 +2559,7 @@ static int i40e_update_ethtool_fdir_entry(struct i40e_vsi *vsi,
 			err = i40e_add_del_fdir(vsi, rule, false);
 		hlist_del(&rule->fdir_node);
 		kfree(rule);
-		pf->fdir_pf_active_filters--;
+		vsi->fdir_active_filters--;
 	}
 
 	/* If no input this was a delete, err should be 0 if a rule was
@@ -2575,10 +2576,10 @@ static int i40e_update_ethtool_fdir_entry(struct i40e_vsi *vsi,
 		hlist_add_behind(&input->fdir_node, &parent->fdir_node);
 	else
 		hlist_add_head(&input->fdir_node,
-			       &pf->fdir_filter_list);
+			       &vsi->fdir_filter_list);
 
 	/* update counts */
-	pf->fdir_pf_active_filters++;
+	vsi->fdir_active_filters++;
 
 	return 0;
 }

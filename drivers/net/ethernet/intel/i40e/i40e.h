@@ -296,8 +296,6 @@ struct i40e_pf {
 	u8 atr_sample_rate;
 	bool wol_en;
 
-	struct hlist_head fdir_filter_list;
-	u16 fdir_pf_active_filters;
 	unsigned long fd_flush_timestamp;
 	u32 fd_flush_cnt;
 	u32 fd_add_err;
@@ -446,7 +444,6 @@ struct i40e_pf {
 	u32 npar_min_bw;
 
 	u32 ioremap_len;
-	u32 fd_inv;
 	u16 phy_led_val;
 	enum devlink_eswitch_mode eswitch_mode;
 };
@@ -528,6 +525,10 @@ struct i40e_vsi {
 	u64 tx_lost_interrupt;
 	u32 rx_buf_failed;
 	u32 rx_page_failed;
+
+	struct hlist_head fdir_filter_list;
+	u16 fdir_active_filters;
+	u32 fd_inv;
 
 	/* These are containers of ring pointers, allocated at run-time */
 	struct i40e_ring **rx_rings;

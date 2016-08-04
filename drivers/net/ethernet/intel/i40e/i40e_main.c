@@ -3080,25 +3080,46 @@ static void i40e_set_vsi_rx_mode(struct i40e_vsi *vsi)
 }
 
 /**
- * i40e_fdir_filter_restore - Restore the Sideband Flow Director filters
- * @vsi: Pointer to the targeted VSI
+ * i40e_vsi_fdir_filter_restore - Restore the Sideband Flow Director filters
+ * @vsi: Pointer to VSI
  *
  * This function replays the hlist on the hw where all the SB Flow Director
- * filters were saved.
+ * filters were saved for a VSI.
  **/
-static void i40e_fdir_filter_restore(struct i40e_vsi *vsi)
+
+static void i40e_vsi_fdir_filter_restore(struct i40e_vsi *vsi)
 {
 	struct i40e_fdir_filter *filter;
-	struct i40e_pf *pf = vsi->back;
 	struct hlist_node *node;
+
+	hlist_for_each_entry_safe(filter, node,
+				  &vsi->fdir_filter_list, fdir_node) {
+		i40e_add_del_fdir(vsi, filter, true);
+	}
+}
+
+
+/**
+ * i40e_fdir_filter_restore - Restore the Sideband Flow Director filters
+ * @pf: Pointer to PF
+ *
+ * This function calls i40_vsi_fdi_filter_restore() for all the VSIs
+ * associated with the PF that have flow director filters.
+ **/
+static void i40e_fdir_filter_restore(struct i40e_pf *pf)
+{
+	struct i40e_vf *vf;
+	int i;
 
 	if (!(pf->flags & I40E_FLAG_FD_SB_ENABLED))
 		return;
 
-	hlist_for_each_entry_safe(filter, node,
-				  &pf->fdir_filter_list, fdir_node) {
-		i40e_add_del_fdir(vsi, filter, true);
+	for (i = 0; i < pf->num_alloc_vfs; i++) {
+		vf = &(pf->vf[i]);
+		i40e_vsi_fdir_filter_restore(pf->vsi[vf->lan_vsi_idx]);
 	}
+
+	i40e_vsi_fdir_filter_restore(pf->vsi[pf->lan_vsi]);
 }
 
 /**
@@ -5219,7 +5240,7 @@ static int i40e_up_complete(struct i40e_vsi *vsi)
 				dev_info(&pf->pdev->dev, "Forcing ATR off, sideband rules for TCP/IPv4 exist\n");
 			pf->fd_tcp_rule = 0;
 		}
-		i40e_fdir_filter_restore(vsi);
+		i40e_fdir_filter_restore(pf);
 	}
 
 	/* On the next run of the service_task, notify any clients of the new
@@ -5485,23 +5506,43 @@ err_setup_tx:
 }
 
 /**
+ * i40e_vsi_fdir_filter_exit - Cleans up the Flow Director accounting
+ * @vsi: Pointer to VSI
+ *
+ * This function destroys the hlist where all the Flow Director
+ * filters were saved for a VSI.
+ **/
+static void i40e_vsi_fdir_filter_exit(struct i40e_vsi *vsi)
+{
+	struct i40e_fdir_filter *filter;
+	struct hlist_node *node;
+
+	hlist_for_each_entry_safe(filter, node, &vsi->fdir_filter_list,
+				  fdir_node) {
+		hlist_del(&filter->fdir_node);
+		kfree(filter);
+	}
+	vsi->fdir_active_filters = 0;
+}
+
+/**
  * i40e_fdir_filter_exit - Cleans up the Flow Director accounting
  * @pf: Pointer to PF
  *
- * This function destroys the hlist where all the Flow Director
+ * This function destroys the hlist's where all the Flow Director
  * filters were saved.
  **/
 static void i40e_fdir_filter_exit(struct i40e_pf *pf)
 {
-	struct i40e_fdir_filter *filter;
-	struct hlist_node *node2;
+	struct i40e_vf *vf;
+	int i;
 
-	hlist_for_each_entry_safe(filter, node2,
-				  &pf->fdir_filter_list, fdir_node) {
-		hlist_del(&filter->fdir_node);
-		kfree(filter);
+	for (i = 0; i < pf->num_alloc_vfs; i++) {
+		vf = &(pf->vf[i]);
+		i40e_vsi_fdir_filter_exit(pf->vsi[vf->lan_vsi_idx]);
 	}
-	pf->fdir_pf_active_filters = 0;
+
+	i40e_vsi_fdir_filter_exit(pf->vsi[pf->lan_vsi]);
 }
 
 /**
@@ -5885,14 +5926,37 @@ u32 i40e_get_global_fd_count(struct i40e_pf *pf)
 }
 
 /**
+ * i40e_vsi_fd_inv_clean - Function to reenabe FD ATR or SB if disabled
+ * @vsi: Pointer to VSI
+ **/
+static void i40e_vsi_fd_inv_clean(struct i40e_vsi *vsi)
+{
+	struct i40e_fdir_filter *filter;
+	struct hlist_node *node;
+
+	if (!vsi->fd_inv)
+		return;
+
+	hlist_for_each_entry_safe(filter, node, &vsi->fdir_filter_list,
+				  fdir_node) {
+		if (filter->fd_id == vsi->fd_inv) {
+			hlist_del(&filter->fdir_node);
+			kfree(filter);
+			vsi->fdir_active_filters--;
+		}
+	}
+}
+
+
+/**
  * i40e_fdir_check_and_reenable - Function to reenabe FD ATR or SB if disabled
  * @pf: board private structure
  **/
 void i40e_fdir_check_and_reenable(struct i40e_pf *pf)
 {
-	struct i40e_fdir_filter *filter;
+	struct i40e_vf *vf;
 	u32 fcnt_prog, fcnt_avail;
-	struct hlist_node *node;
+	int i;
 
 	if (test_bit(__I40E_FD_FLUSH_REQUESTED, &pf->state))
 		return;
@@ -5923,16 +5987,35 @@ void i40e_fdir_check_and_reenable(struct i40e_pf *pf)
 	}
 
 	/* if hw had a problem adding a filter, delete it */
-	if (pf->fd_inv > 0) {
-		hlist_for_each_entry_safe(filter, node,
-					  &pf->fdir_filter_list, fdir_node) {
-			if (filter->fd_id == pf->fd_inv) {
-				hlist_del(&filter->fdir_node);
-				kfree(filter);
-				pf->fdir_pf_active_filters--;
-			}
-		}
+
+	for (i = 0; i < pf->num_alloc_vfs; i++) {
+		vf = &(pf->vf[i]);
+		i40e_vsi_fd_inv_clean(pf->vsi[vf->lan_vsi_idx]);
 	}
+	i40e_vsi_fd_inv_clean(pf->vsi[pf->lan_vsi]);
+}
+
+/**
+ * i40e_pf_get_fdir_active_filters - Returns the numbe of active filters
+ * associated with a PF
+ *
+ * @pf: Pointer to PF
+ *
+ **/
+static u16 i40e_pf_get_fdir_active_filters(struct i40e_pf *pf)
+{
+	struct i40e_vf *vf;
+	u16 cnt = 0;
+	int i;
+
+	for (i = 0; i < pf->num_alloc_vfs; i++) {
+		vf = &(pf->vf[i]);
+		cnt += pf->vsi[vf->lan_vsi_idx]->fdir_active_filters;
+	}
+
+	cnt += pf->vsi[pf->lan_vsi]->fdir_active_filters;
+
+	return cnt;
 }
 
 #define I40E_MIN_FD_FLUSH_INTERVAL 10
@@ -5961,7 +6044,7 @@ static void i40e_fdir_flush_and_replay(struct i40e_pf *pf)
 	 */
 	min_flush_time = pf->fd_flush_timestamp +
 			 (I40E_MIN_FD_FLUSH_SB_ATR_UNSTABLE * HZ);
-	fd_room = pf->fdir_pf_filter_count - pf->fdir_pf_active_filters;
+	fd_room = pf->fdir_pf_filter_count - i40e_pf_get_fdir_active_filters(pf);
 
 	if (!(time_after(jiffies, min_flush_time)) &&
 	    (fd_room < I40E_FDIR_BUFFER_HEAD_ROOM_FOR_ATR)) {
@@ -5989,7 +6072,7 @@ static void i40e_fdir_flush_and_replay(struct i40e_pf *pf)
 		dev_warn(&pf->pdev->dev, "FD table did not flush, needs more time\n");
 	} else {
 		/* replay sideband filters */
-		i40e_fdir_filter_restore(pf->vsi[pf->lan_vsi]);
+		i40e_fdir_filter_restore(pf);
 		if (!disable_atr)
 			pf->flags |= I40E_FLAG_FD_ATR_ENABLED;
 		clear_bit(__I40E_FD_FLUSH_REQUESTED, &pf->state);
@@ -6004,7 +6087,7 @@ static void i40e_fdir_flush_and_replay(struct i40e_pf *pf)
  **/
 u32 i40e_get_current_atr_cnt(struct i40e_pf *pf)
 {
-	return i40e_get_current_fd_count(pf) - pf->fdir_pf_active_filters;
+	return i40e_get_current_fd_count(pf) - i40e_pf_get_fdir_active_filters(pf);
 }
 
 /* We can see up to 256 filter programming desc in transit if the filters are
@@ -6719,6 +6802,7 @@ static void i40e_fdir_teardown(struct i40e_pf *pf)
 	int i;
 
 	i40e_fdir_filter_exit(pf);
+
 	for (i = 0; i < pf->num_alloc_vsi; i++) {
 		if (pf->vsi[i] && pf->vsi[i]->type == I40E_VSI_FDIR) {
 			i40e_vsi_release(pf->vsi[i]);
@@ -8654,7 +8738,6 @@ bool i40e_set_ntuple(struct i40e_pf *pf, netdev_features_t features)
 		pf->auto_disable_flags &= ~I40E_FLAG_FD_SB_ENABLED;
 		/* reset fd counters */
 		pf->fd_add_err = pf->fd_atr_cnt = pf->fd_tcp_rule = 0;
-		pf->fdir_pf_active_filters = 0;
 		pf->flags |= I40E_FLAG_FD_ATR_ENABLED;
 		if (I40E_DEBUG_FD & pf->hw.debug_mask)
 			dev_info(&pf->pdev->dev, "ATR re-enabled.\n");
