@@ -52,6 +52,7 @@
 #include <uapi/linux/netdevice.h>
 #include <uapi/linux/if_bonding.h>
 #include <uapi/linux/pkt_cls.h>
+#include <linux/netpolicy.h>
 
 struct netpoll_info;
 struct device;
@@ -1120,6 +1121,9 @@ struct netdev_xdp {
  * int (*ndo_xdp)(struct net_device *dev, struct netdev_xdp *xdp);
  *	This function is used to set or query state related to XDP on the
  *	netdevice. See definition of enum xdp_netdev_command for details.
+ * int(*ndo_netpolicy_init)(struct net_device *dev,
+ *			    struct netpolicy_info *info);
+ *	This function is used to init and get supported policy.
  *
  */
 struct net_device_ops {
@@ -1306,6 +1310,10 @@ struct net_device_ops {
 						       int needed_headroom);
 	int			(*ndo_xdp)(struct net_device *dev,
 					   struct netdev_xdp *xdp);
+#ifdef CONFIG_NETPOLICY
+	int			(*ndo_netpolicy_init)(struct net_device *dev,
+						      struct netpolicy_info *info);
+#endif /* CONFIG_NETPOLICY */
 };
 
 /**
@@ -1620,6 +1628,8 @@ enum netdev_priv_flags {
  *			switch port.
  *
  *	@proc_dev:	device node in proc to configure device net policy
+ *	@netpolicy:	NET policy related information of net device
+ *	@np_lock:	protect the state of NET policy
  *
  *	FIXME: cleanup struct net_device such that network protocol info
  *	moves out.
@@ -1892,6 +1902,8 @@ struct net_device {
 #ifdef CONFIG_PROC_FS
 	struct proc_dir_entry	*proc_dev;
 #endif /* CONFIG_PROC_FS */
+	struct netpolicy_info	*netpolicy;
+	spinlock_t		np_lock;
 #endif /* CONFIG_NETPOLICY */
 };
 #define to_net_dev(d) container_of(d, struct net_device, dev)
