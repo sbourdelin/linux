@@ -2385,6 +2385,17 @@ static unsigned long xs_reconnect_delay(const struct rpc_xprt *xprt)
 	return 0;
 }
 
+static void xs_reconnect_backoff(struct rpc_xprt *xprt)
+{
+	xprt->reestablish_timeout <<= 1;
+	if (xprt->reestablish_timeout > xprt->timeout->to_maxval)
+		xprt->reestablish_timeout = xprt->timeout->to_maxval;
+	if (xprt->reestablish_timeout > XS_TCP_MAX_REEST_TO)
+		xprt->reestablish_timeout = XS_TCP_MAX_REEST_TO;
+	if (xprt->reestablish_timeout < XS_TCP_INIT_REEST_TO)
+		xprt->reestablish_timeout = XS_TCP_INIT_REEST_TO;
+}
+
 /**
  * xs_connect - connect a socket to a remote endpoint
  * @xprt: pointer to transport structure
@@ -2415,12 +2426,8 @@ static void xs_connect(struct rpc_xprt *xprt, struct rpc_task *task)
 		xs_reset_transport(transport);
 
 		delay = xs_reconnect_delay(xprt);
+		xs_reconnect_backoff(xprt);
 
-		xprt->reestablish_timeout <<= 1;
-		if (xprt->reestablish_timeout < XS_TCP_INIT_REEST_TO)
-			xprt->reestablish_timeout = XS_TCP_INIT_REEST_TO;
-		if (xprt->reestablish_timeout > XS_TCP_MAX_REEST_TO)
-			xprt->reestablish_timeout = XS_TCP_MAX_REEST_TO;
 	} else
 		dprintk("RPC:       xs_connect scheduled xprt %p\n", xprt);
 
