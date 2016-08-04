@@ -187,12 +187,14 @@ int x2apic_dead_cpu(unsigned int this_cpu)
 
 static int x2apic_cluster_probe(void)
 {
+	int ret;
+
 	if (!x2apic_mode)
 		return 0;
 
-	cpuhp_setup_state(CPUHP_X2APIC_PREPARE, "X2APIC_PREPARE",
+	ret = cpuhp_setup_state(CPUHP_X2APIC_PREPARE, "X2APIC_PREPARE",
 			  x2apic_prepare_cpu, x2apic_dead_cpu);
-	return 1;
+	return ret < 0 ? 0 : 1;
 }
 
 static const struct cpumask *x2apic_cluster_target_cpus(void)
