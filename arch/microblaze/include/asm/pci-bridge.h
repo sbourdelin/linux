@@ -121,9 +121,6 @@ extern int early_write_config_word(struct pci_controller *hose, int bus,
 extern int early_write_config_dword(struct pci_controller *hose, int bus,
 			int dev_fn, int where, u32 val);
 
-extern int early_find_capability(struct pci_controller *hose, int bus,
-				 int dev_fn, int cap);
-
 extern void setup_indirect_pci(struct pci_controller *hose,
 			       resource_size_t cfg_addr,
 			       resource_size_t cfg_data, u32 flags);
