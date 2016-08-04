@@ -176,6 +176,10 @@ void refresh_zone_stat_thresholds(void)
 
 	/* Zero current pgdat thresholds */
 	for_each_online_pgdat(pgdat) {
+		if (!pgdat->per_cpu_nodestats) {
+			pr_err("No nodestats for node %d\n", pgdat->node_id);
+			continue;
+		}
 		for_each_online_cpu(cpu) {
 			per_cpu_ptr(pgdat->per_cpu_nodestats, cpu)->stat_threshold = 0;
 		}
@@ -184,6 +188,10 @@ void refresh_zone_stat_thresholds(void)
 	for_each_populated_zone(zone) {
 		struct pglist_data *pgdat = zone->zone_pgdat;
 		unsigned long max_drift, tolerate_drift;
+		if (!pgdat->per_cpu_nodestats) {
+			pr_err("No per cpu nodestats\n");
+			continue;
+		}
 
 		threshold = calculate_normal_threshold(zone);
 
@@ -701,6 +709,8 @@ static int refresh_cpu_vm_stats(bool do_pagesets)
 	for_each_online_pgdat(pgdat) {
 		struct per_cpu_nodestat __percpu *p = pgdat->per_cpu_nodestats;
 
+		if (!p)
+			continue;
 		for (i = 0; i < NR_VM_NODE_STAT_ITEMS; i++) {
 			int v;
 
@@ -748,6 +758,8 @@ void cpu_vm_stats_fold(int cpu)
 	for_each_online_pgdat(pgdat) {
 		struct per_cpu_nodestat *p;
 
+		if (!pgdat->per_cpu_nodestats)
+			continue;
 		p = per_cpu_ptr(pgdat->per_cpu_nodestats, cpu);
 
 		for (i = 0; i < NR_VM_NODE_STAT_ITEMS; i++)

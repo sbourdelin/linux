@@ -184,8 +184,9 @@ static inline unsigned long node_page_state_snapshot(pg_data_t *pgdat,
 
 #ifdef CONFIG_SMP
 	int cpu;
-	for_each_online_cpu(cpu)
-		x += per_cpu_ptr(pgdat->per_cpu_nodestats, cpu)->vm_node_stat_diff[item];
+	if (pgdat->per_cpu_nodestats)
+		for_each_online_cpu(cpu)
+			x += per_cpu_ptr(pgdat->per_cpu_nodestats, cpu)->vm_node_stat_diff[item];
 
 	if (x < 0)
 		x = 0;
