@@ -91,6 +91,8 @@
 #include <asm/hardwall.h>
 #endif
 #include <trace/events/oom.h>
+#include <linux/netpolicy.h>
+#include <linux/ctype.h>
 #include "internal.h"
 #include "fd.h"
 
@@ -2811,6 +2813,65 @@ static int proc_pid_personality(struct seq_file *m, struct pid_namespace *ns,
 	return err;
 }
 
+#ifdef CONFIG_NETPOLICY
+static int proc_net_policy_show(struct seq_file *m, void *v)
+{
+	struct inode *inode = m->private;
+	struct task_struct *task = get_proc_task(inode);
+
+	if (is_net_policy_valid(task->task_netpolicy.policy))
+		seq_printf(m, "%s\n", policy_name[task->task_netpolicy.policy]);
+
+	return 0;
+}
+
+static int proc_net_policy_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, proc_net_policy_show, inode);
+}
+
+static ssize_t proc_net_policy_write(struct file *file, const char __user *buf,
+				     size_t count, loff_t *ppos)
+{
+	struct inode *inode = file_inode(file);
+	struct task_struct *task = get_proc_task(inode);
+	char name[POLICY_NAME_LEN_MAX];
+	int i, ret;
+
+	if (count >= POLICY_NAME_LEN_MAX)
+		return -EINVAL;
+
+	if (copy_from_user(name, buf, count))
+		return -EINVAL;
+
+	for (i = 0; i < count - 1; i++)
+		name[i] = toupper(name[i]);
+	name[POLICY_NAME_LEN_MAX - 1] = 0;
+
+	for (i = 0; i < NET_POLICY_MAX; i++) {
+		if (!strncmp(name, policy_name[i], strlen(policy_name[i]))) {
+			ret = netpolicy_register(&task->task_netpolicy, i);
+			if (ret)
+				return ret;
+			break;
+		}
+	}
+
+	if (i == NET_POLICY_MAX)
+		return -EINVAL;
+
+	return count;
+}
+
+static const struct file_operations proc_net_policy_operations = {
+	.open		= proc_net_policy_open,
+	.write		= proc_net_policy_write,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+};
+#endif /* CONFIG_NETPOLICY */
+
 /*
  * Thread groups
  */
@@ -2910,6 +2971,9 @@ static const struct pid_entry tgid_base_stuff[] = {
 	REG("timers",	  S_IRUGO, proc_timers_operations),
 #endif
 	REG("timerslack_ns", S_IRUGO|S_IWUGO, proc_pid_set_timerslack_ns_operations),
+#if IS_ENABLED(CONFIG_NETPOLICY)
+	REG("net_policy", S_IRUSR|S_IWUSR, proc_net_policy_operations),
+#endif
 };
 
 static int proc_tgid_base_readdir(struct file *file, struct dir_context *ctx)
