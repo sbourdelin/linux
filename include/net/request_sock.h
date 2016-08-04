@@ -101,7 +101,9 @@ reqsk_alloc(const struct request_sock_ops *ops, struct sock *sk_listener,
 	sk_tx_queue_clear(req_to_sk(req));
 	req->saved_syn = NULL;
 	atomic_set(&req->rsk_refcnt, 0);
-
+#ifdef CONFIG_NETPOLICY
+	memcpy(&req_to_sk(req)->sk_netpolicy, &sk_listener->sk_netpolicy, sizeof(sk_listener->sk_netpolicy));
+#endif
 	return req;
 }
 

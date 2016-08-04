@@ -70,6 +70,7 @@
 #include <net/checksum.h>
 #include <net/tcp_states.h>
 #include <linux/net_tstamp.h>
+#include <linux/netpolicy.h>
 
 /*
  * This structure really needs to be cleaned up.
@@ -141,6 +142,7 @@ typedef __u64 __bitwise __addrpair;
  *		%SO_OOBINLINE settings, %SO_TIMESTAMPING settings
  *	@skc_incoming_cpu: record/match cpu processing incoming packets
  *	@skc_refcnt: reference count
+ *	@skc_netpolicy: per socket net policy
  *
  *	This is the minimal network layer representation of sockets, the header
  *	for struct sock and struct inet_timewait_sock.
@@ -200,6 +202,10 @@ struct sock_common {
 		struct sock	*skc_listener; /* request_sock */
 		struct inet_timewait_death_row *skc_tw_dr; /* inet_timewait_sock */
 	};
+
+#ifdef CONFIG_NETPOLICY
+	struct netpolicy_instance    skc_netpolicy;
+#endif
 	/*
 	 * fields between dontcopy_begin/dontcopy_end
 	 * are not copied in sock_copy()
@@ -339,6 +345,9 @@ struct sock {
 #define sk_incoming_cpu		__sk_common.skc_incoming_cpu
 #define sk_flags		__sk_common.skc_flags
 #define sk_rxhash		__sk_common.skc_rxhash
+#ifdef CONFIG_NETPOLICY
+#define sk_netpolicy		__sk_common.skc_netpolicy
+#endif
 
 	socket_lock_t		sk_lock;
 	struct sk_buff_head	sk_receive_queue;
