@@ -1347,6 +1347,8 @@ static int amdgpu_ttm_debugfs_init(struct amdgpu_device *adev)
 				  adev, &amdgpu_ttm_vram_fops);
 	if (IS_ERR(ent))
 		return PTR_ERR(ent);
+	if (!ent)
+		return -ENOMEM;
 	i_size_write(ent->d_inode, adev->mc.mc_vram_size);
 	adev->mman.vram = ent;
 
@@ -1355,6 +1357,8 @@ static int amdgpu_ttm_debugfs_init(struct amdgpu_device *adev)
 				  adev, &amdgpu_ttm_gtt_fops);
 	if (IS_ERR(ent))
 		return PTR_ERR(ent);
+	if (!ent)
+		return -ENOMEM;
 	i_size_write(ent->d_inode, adev->mc.gtt_size);
 	adev->mman.gtt = ent;
 
