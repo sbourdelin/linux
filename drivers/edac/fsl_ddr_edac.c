@@ -22,6 +22,7 @@
 
 #include <linux/of_platform.h>
 #include <linux/of_device.h>
+#include <linux/of_address.h>
 #include "edac_module.h"
 #include "edac_core.h"
 #include "fsl_ddr_edac.h"

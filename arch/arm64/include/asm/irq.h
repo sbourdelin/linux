@@ -11,6 +11,10 @@
 #include <asm-generic/irq.h>
 #include <asm/thread_info.h>
 
+#ifndef NO_IRQ
+#define NO_IRQ	((unsigned int)(-1))
+#endif
+
 struct pt_regs;
 
 DECLARE_PER_CPU(unsigned long [IRQ_STACK_SIZE/sizeof(long)], irq_stack);
