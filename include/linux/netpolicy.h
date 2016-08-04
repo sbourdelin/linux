@@ -108,6 +108,14 @@ struct netpolicy_instance {
 	struct work_struct	fc_wk;		/* flow classification work */
 	atomic_t		fc_wk_cnt;	/* flow classification work number */
 	struct netpolicy_flow_spec flow;	/* flow information */
+	/* For fast path */
+	atomic_t		rx_queue;
+	atomic_t		tx_queue;
+	struct work_struct	get_rx_wk;
+	atomic_t		get_rx_wk_cnt;
+	struct work_struct	get_tx_wk;
+	atomic_t		get_tx_wk_cnt;
+	int			sys_map_version;
 };
 
 /* check if policy is valid */
