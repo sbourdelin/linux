@@ -127,6 +127,7 @@ struct dw_hdmi {
 	void __iomem *regs;
 	bool sink_is_hdmi;
 	bool sink_has_audio;
+	bool sink_supports_ai;
 
 	struct mutex mutex;		/* for state below and previous_mode */
 	enum drm_connector_force force;	/* mutex-protected force state */
@@ -215,6 +216,21 @@ static void hdmi_set_cts_n(struct dw_hdmi *hdmi, unsigned int cts,
 	hdmi_writeb(hdmi, (n >> 16) & 0x0f, HDMI_AUD_N3);
 	hdmi_writeb(hdmi, (n >> 8) & 0xff, HDMI_AUD_N2);
 	hdmi_writeb(hdmi, n & 0xff, HDMI_AUD_N1);
+
+	/* Set ISCR1, ISCR2, and ACP packets to automatic scheduling */
+	if (hdmi->sink_supports_ai) {
+		dev_dbg(hdmi->dev, "sink supports AI packets\n");
+		hdmi_writeb(hdmi, 0x06, HDMI_FC_ISCR1_0);
+		hdmi_writeb(hdmi, 0x03, HDMI_FC_DATAUTO0);
+		hdmi_writeb(hdmi, 0x01, HDMI_FC_DATAUTO1);
+		hdmi_writeb(hdmi, 0x11, HDMI_FC_DATAUTO2);
+	} else {
+		dev_dbg(hdmi->dev, "sink does not support AI packets\n");
+		hdmi_writeb(hdmi, 0x00, HDMI_FC_ISCR1_0);
+		hdmi_writeb(hdmi, 0x00, HDMI_FC_DATAUTO0);
+		hdmi_writeb(hdmi, 0x00, HDMI_FC_DATAUTO1);
+		hdmi_writeb(hdmi, 0x00, HDMI_FC_DATAUTO2);
+	}
 
 	/* Set Frame Composer Audio Sample sampling frequency */
 	if (hdmi->dev_type == DWC_HDMI) {
@@ -1474,8 +1490,13 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
 		/* Store the ELD */
 		drm_edid_to_eld(connector, edid);
 		kfree(edid);
+
+		hdmi->sink_supports_ai = connector->eld[5] & (0x1 << 1);
 	} else {
 		dev_dbg(hdmi->dev, "failed to get edid\n");
+		hdmi->sink_is_hdmi = false;
+		hdmi->sink_has_audio = false;
+		hdmi->sink_supports_ai = false;
 	}
 
 	return ret;
