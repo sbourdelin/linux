@@ -7,6 +7,10 @@ Properties:
 		  "fsl,qoriq-memory-controller".
 - reg		: Address and size of DDR controller registers
 - interrupts	: Error interrupt of DDR controller
+- little-endian	: Specifies little-endian access to registers
+- big-endian	: Specifies big-endian access to registers
+
+If both little-endian and big-endian are omitted, big-endian will be used.
 
 Example 1:
 
@@ -14,6 +18,7 @@ Example 1:
 		compatible = "fsl,bsc9132-memory-controller";
 		reg = <0x2000 0x1000>;
 		interrupts = <16 2 1 8>;
+		big-endian;
 	};
 
 
@@ -24,4 +29,5 @@ Example 2:
 				"fsl,qoriq-memory-controller";
 		reg = <0x8000 0x1000>;
 		interrupts = <16 2 1 23>;
+		big-endian;
 	};
