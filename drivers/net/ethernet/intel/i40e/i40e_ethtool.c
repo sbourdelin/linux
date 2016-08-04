@@ -2396,6 +2396,46 @@ static u64 i40e_get_rss_hash_bits(struct ethtool_rxnfc *nfc, u64 i_setc)
 }
 
 /**
+ * i40e_vf_netdev_get_rxnfc - command to get VF's RX flow classification rules
+ * @netdev: vf representor network interface device structure
+ * @cmd: ethtool rxnfc command
+ *
+ * Returns Success if the command is supported.
+ **/
+static int i40e_vf_netdev_get_rxnfc(struct net_device *netdev,
+				    struct ethtool_rxnfc *cmd, u32 *rule_locs)
+{
+	struct i40e_vf_netdev_priv *priv = netdev_priv(netdev);
+	struct i40e_vf *vf = priv->vf;
+	struct i40e_pf *pf = vf->pf;
+	struct i40e_vsi *vsi = pf->vsi[vf->lan_vsi_idx];
+	int ret = -EOPNOTSUPP;
+
+	switch (cmd->cmd) {
+	case ETHTOOL_GRXRINGS:
+		cmd->data = vsi->num_queue_pairs;
+		ret = 0;
+		break;
+	case ETHTOOL_GRXCLSRLCNT:
+		cmd->rule_cnt = vsi->fdir_active_filters;
+		/* report total rule count */
+		cmd->data = i40e_get_fd_cnt_all(pf);
+		ret = 0;
+		break;
+	case ETHTOOL_GRXCLSRULE:
+		ret = i40e_get_ethtool_fdir_entry(vsi, cmd);
+		break;
+	case ETHTOOL_GRXCLSRLALL:
+		ret = i40e_get_ethtool_fdir_all(vsi, cmd, rule_locs);
+		break;
+	default:
+		break;
+	}
+
+	return ret;
+}
+
+/**
  * i40e_set_rss_hash_opt - Enable/Disable flow types for RSS hash
  * @pf: pointer to the physical function struct
  * @cmd: ethtool rxnfc command
@@ -2735,6 +2775,36 @@ static int i40e_set_rxnfc(struct net_device *netdev, struct ethtool_rxnfc *cmd)
 	case ETHTOOL_SRXFH:
 		ret = i40e_set_rss_hash_opt(pf, cmd);
 		break;
+	case ETHTOOL_SRXCLSRLINS:
+		ret = i40e_add_fdir_ethtool(vsi, cmd);
+		break;
+	case ETHTOOL_SRXCLSRLDEL:
+		ret = i40e_del_fdir_entry(vsi, cmd);
+		break;
+	default:
+		break;
+	}
+
+	return ret;
+}
+
+/**
+ * i40e_vf_netdev_set_rxnfc - command to set VF's RX flow classification rules
+ * @netdev: VF representor's network interface device structure
+ * @cmd: ethtool rxnfc command
+ *
+ * Returns Success if the command is supported.
+ **/
+static int i40e_vf_netdev_set_rxnfc(struct net_device *netdev,
+				    struct ethtool_rxnfc *cmd)
+{
+	struct i40e_vf_netdev_priv *priv = netdev_priv(netdev);
+	struct i40e_vf *vf = priv->vf;
+	struct i40e_pf *pf = vf->pf;
+	struct i40e_vsi *vsi = pf->vsi[vf->lan_vsi_idx];
+	int ret = -EOPNOTSUPP;
+
+	switch (cmd->cmd) {
 	case ETHTOOL_SRXCLSRLINS:
 		ret = i40e_add_fdir_ethtool(vsi, cmd);
 		break;
@@ -3178,6 +3248,8 @@ static const struct ethtool_ops i40e_vf_netdev_ethtool_ops = {
 	.get_strings		= i40e_vf_netdev_ethtool_get_strings,
 	.get_ethtool_stats      = i40e_vf_netdev_ethtool_get_stats,
 	.get_sset_count         = i40e_vf_netdev_ethtool_get_sset_count,
+	.get_rxnfc		= i40e_vf_netdev_get_rxnfc,
+	.set_rxnfc		= i40e_vf_netdev_set_rxnfc,
 };
 
 void i40e_set_vf_netdev_ethtool_ops(struct net_device *netdev)
