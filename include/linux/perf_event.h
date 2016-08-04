@@ -168,6 +168,9 @@ struct hw_perf_event {
 	/* Last sync'ed generation of filters */
 	unsigned long			addr_filters_gen;
 
+	/* HW specific configuration */
+	void				*drv_configs;
+
 /*
  * hw_perf_event::state flags; used to track the PERF_EF_* state.
  */
@@ -442,6 +445,12 @@ struct pmu {
 	 * Filter events for PMU-specific reasons.
 	 */
 	int (*filter_match)		(struct perf_event *event); /* optional */
+
+	/*
+	 * PMU driver specific configuration.
+	 */
+	int (*set_drv_configs)		(struct perf_event *event,
+					 void __user *arg); /* optional */
 };
 
 /**
