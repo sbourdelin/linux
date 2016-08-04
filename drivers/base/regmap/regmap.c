@@ -93,6 +93,20 @@ bool regmap_writeable(struct regmap *map, unsigned int reg)
 	return true;
 }
 
+bool regmap_cached(struct regmap *map, unsigned int reg)
+{
+	if (map->cache == REGCACHE_NONE)
+		return false;
+
+	if (!map->cache_ops)
+		return false;
+
+	if (map->max_register && reg > map->max_register)
+		return false;
+
+	return true;
+}
+
 bool regmap_readable(struct regmap *map, unsigned int reg)
 {
 	if (!map->reg_read)
