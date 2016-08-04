@@ -1834,7 +1834,7 @@ static bool tcp_tso_should_defer(struct sock *sk, struct sk_buff *skb,
 	skb_mstamp_get(&now);
 	age = skb_mstamp_us_delta(&now, &head->skb_mstamp);
 	/* If next ACK is likely to come too late (half srtt), do not defer */
-	if (age < (tp->srtt_us >> 4))
+	if (age > (tp->srtt_us >> 4))
 		goto send_now;
 
 	/* Ok, it looks like it is advisable to defer. */
