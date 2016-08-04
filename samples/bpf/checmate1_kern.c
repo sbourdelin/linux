@@ -3,6 +3,7 @@
 #include <linux/in.h>
 #include <linux/checmate.h>
 #include "bpf_helpers.h"
+#include <linux/version.h>
 
 SEC("checmate")
 int prog(struct checmate_ctx *ctx)
@@ -24,4 +25,4 @@ int prog(struct checmate_ctx *ctx)
 }
 
 char _license[] SEC("license") = "GPL";
-
+u32 _version SEC("version") = LINUX_VERSION_CODE;
