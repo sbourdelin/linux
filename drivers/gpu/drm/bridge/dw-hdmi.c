@@ -215,6 +215,29 @@ static void hdmi_set_cts_n(struct dw_hdmi *hdmi, unsigned int cts,
 	hdmi_writeb(hdmi, (n >> 16) & 0x0f, HDMI_AUD_N3);
 	hdmi_writeb(hdmi, (n >> 8) & 0xff, HDMI_AUD_N2);
 	hdmi_writeb(hdmi, n & 0xff, HDMI_AUD_N1);
+
+	/* Set Frame Composer Audio Sample sampling frequency */
+	if (hdmi->dev_type == DWC_HDMI) {
+		u8 val = 0x0;
+
+		switch (hdmi->sample_rate) {
+		case 32000:
+			val = 0x3;
+			break;
+		case 44100:
+			val = 0x0;
+			break;
+		case 48000:
+			val = 0x2;
+			break;
+		default:
+			dev_err(hdmi->dev, "unsupported sample rate (%d)\n",
+					hdmi->sample_rate);
+			return;
+		}
+
+		hdmi_writeb(hdmi, val, HDMI_FC_AUDSCHNL7);
+	}
 }
 
 static unsigned int hdmi_compute_n(unsigned int freq, unsigned long pixel_clk)
@@ -833,7 +856,7 @@ static int hdmi_phy_configure(struct dw_hdmi *hdmi, unsigned char prep,
 	dw_hdmi_phy_gen2_txpwron(hdmi, 1);
 	dw_hdmi_phy_gen2_pddq(hdmi, 0);
 
-	if (hdmi->dev_type == RK3288_HDMI)
+	if ((hdmi->dev_type == RK3288_HDMI) || (hdmi->dev_type == DWC_HDMI))
 		dw_hdmi_phy_enable_spare(hdmi, 1);
 
 	/*Wait for PHY PLL lock */
