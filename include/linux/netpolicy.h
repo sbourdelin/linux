@@ -27,6 +27,7 @@ enum netpolicy_traffic {
 	NETPOLICY_RXTX,
 };
 
+#define POLICY_NAME_LEN_MAX	64
 extern const char *policy_name[];
 
 struct netpolicy_dev_info {
