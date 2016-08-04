@@ -42,6 +42,7 @@ struct si2157_dev {
 
 #define SI2157_CHIPTYPE_SI2157 0
 #define SI2157_CHIPTYPE_SI2146 1
+#define SI2157_CHIPTYPE_SI2158 2
 
 /* firmware command struct */
 #define SI2157_ARGLEN      30

@@ -103,12 +103,21 @@ static int si2157_init(struct dvb_frontend *fe)
 		goto warm;
 
 	/* power up */
-	if (dev->chiptype == SI2157_CHIPTYPE_SI2146) {
-		memcpy(cmd.args, "\xc0\x05\x01\x00\x00\x0b\x00\x00\x01", 9);
-		cmd.wlen = 9;
-	} else {
-		memcpy(cmd.args, "\xc0\x00\x0c\x00\x00\x01\x01\x01\x01\x01\x01\x02\x00\x00\x01", 15);
-		cmd.wlen = 15;
+	switch (dev->chiptype) {
+		case SI2157_CHIPTYPE_SI2146:
+			memcpy(cmd.args, "\xc0\x05\x01\x00\x00\x0b\x00\x00\x01", 9);
+			cmd.wlen = 9;
+			break;
+
+		case SI2157_CHIPTYPE_SI2158:
+			memcpy(cmd.args, "\xC0\x00\x00\x00\x00\x01\x01\x01\x01\x01\x01\x02\x00\x00\x01", 15);
+			cmd.wlen = 15;
+			break;
+
+		default:
+			memcpy(cmd.args, "\xc0\x00\x0c\x00\x00\x01\x01\x01\x01\x01\x01\x02\x00\x00\x01", 15);
+			cmd.wlen = 15;
+			break;
 	}
 	cmd.rlen = 1;
 	ret = si2157_cmd_execute(client, &cmd);
@@ -203,6 +212,16 @@ skip_fw_download:
 	ret = si2157_cmd_execute(client, &cmd);
 	if (ret)
 		goto err;
+
+	/* start tuner? */
+	if (SI2157_CHIPTYPE_SI2158 == dev->chiptype) {
+		memcpy(cmd.args, "\xC0\x00\x0C", 3);
+		cmd.wlen = 3;
+		cmd.rlen = 1;
+		ret = si2157_cmd_execute(client, &cmd);
+		if (ret)
+			goto err;
+	}
 
 	/* query firmware version */
 	memcpy(cmd.args, "\x11", 1);
@@ -506,8 +525,9 @@ static int si2157_remove(struct i2c_client *client)
 }
 
 static const struct i2c_device_id si2157_id_table[] = {
-	{"si2157", SI2157_CHIPTYPE_SI2157},
 	{"si2146", SI2157_CHIPTYPE_SI2146},
+	{"si2157", SI2157_CHIPTYPE_SI2157},
+	{"si2158", SI2157_CHIPTYPE_SI2158},
 	{}
 };
 MODULE_DEVICE_TABLE(i2c, si2157_id_table);
