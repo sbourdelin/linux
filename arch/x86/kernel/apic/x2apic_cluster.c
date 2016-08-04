@@ -165,6 +165,8 @@ int x2apic_prepare_cpu(unsigned int cpu)
 		return -ENOMEM;
 	}
 
+	cpumask_set_cpu(cpu, per_cpu(cpus_in_cluster, cpu));
+
 	return 0;
 }
 
@@ -185,12 +187,9 @@ int x2apic_dead_cpu(unsigned int this_cpu)
 
 static int x2apic_cluster_probe(void)
 {
-	int cpu = smp_processor_id();
-
 	if (!x2apic_mode)
 		return 0;
 
-	cpumask_set_cpu(cpu, per_cpu(cpus_in_cluster, cpu));
 	cpuhp_setup_state(CPUHP_X2APIC_PREPARE, "X2APIC_PREPARE",
 			  x2apic_prepare_cpu, x2apic_dead_cpu);
 	return 1;
