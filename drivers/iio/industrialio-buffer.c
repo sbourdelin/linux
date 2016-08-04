@@ -107,6 +107,7 @@ ssize_t iio_buffer_read_first_n_outer(struct file *filp, char __user *buf,
 {
 	struct iio_dev *indio_dev = filp->private_data;
 	struct iio_buffer *rb = indio_dev->buffer;
+	DEFINE_WAIT_FUNC(wait, woken_wake_function);
 	size_t datum_size;
 	size_t to_wait;
 	int ret;
@@ -132,10 +133,13 @@ ssize_t iio_buffer_read_first_n_outer(struct file *filp, char __user *buf,
 		to_wait = min_t(size_t, n / datum_size, rb->watermark);
 
 	do {
-		ret = wait_event_interruptible(rb->pollq,
-		      iio_buffer_ready(indio_dev, rb, to_wait, n / datum_size));
-		if (ret)
-			return ret;
+		add_wait_queue(&rb->pollq, &wait);
+		while (!iio_buffer_ready(indio_dev, rb, to_wait,
+					 n / datum_size)) {
+			wait_woken(&wait, TASK_INTERRUPTIBLE,
+				   MAX_SCHEDULE_TIMEOUT);
+		}
+		remove_wait_queue(&rb->pollq, &wait);
 
 		if (!indio_dev->info)
 			return -ENODEV;
