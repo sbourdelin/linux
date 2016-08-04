@@ -1,0 +1,32 @@
+XILINX GMIITORGMII Converter Driver Device Tree Bindings
+--------------------------------------------------------
+
+The Gigabit Media Independent Interface (GMII) to Reduced Gigabit Media
+Independent Interface (RGMII) core provides the RGMII between RGMII-compliant
+Ethernet physical media devices (PHY) and the Gigabit Ethernet controller.
+This core can be used in all three modes of operation(10/100/1000 Mb/s).
+The Management Data Input/Output (MDIO) interface is used to configure the
+Speed of operation. This core can switch dynamically between the three
+Different speed modes by configuring the conveter register through mdio write.
+
+The MDIO is a bus to which the PHY devices are connected.  For each
+device that exists on this bus, a child node should be created.  See
+the definition of the PHY node in booting-without-of.txt for an example
+of how to define a PHY.
+
+Required properties:
+  - compatible : Should be "xilinx,gmiitorgmii"
+  - reg : The ID number for the phy, usually a small integer
+
+Example:
+	mdio {
+                #address-cells = <1>;
+                #size-cells = <0>;
+		ethernet-phy@0 {
+			......
+		};
+                gmii_to_rgmii: gmii_to_rgmii@8 {
+                        compatible = "xilinx,gmiitorgmii";
+                        reg = <8>;
+                };
+        };
