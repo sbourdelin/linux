@@ -1314,6 +1314,8 @@ struct ethtool_per_queue_op {
 
 #define ETHTOOL_GLINKSETTINGS	0x0000004c /* Get ethtool_link_settings */
 #define ETHTOOL_SLINKSETTINGS	0x0000004d /* Set ethtool_link_settings */
+#define ETHTOOL_GBANDWIDTH	0x0000004e /* Get ethtool per queue bandwidth */
+#define ETHTOOL_SBANDWIDTH	0x0000004f /* Set ethtool per queue bandwidth */
 
 
 /* compatibility with older code */

@@ -273,6 +273,8 @@ bool ethtool_convert_link_mode_to_legacy_u32(u32 *legacy_u32,
  *	a TX queue has this number, return -EINVAL. If only a RX queue or a TX
  *	queue has this number, ignore the inapplicable fields.
  *	Returns a negative error code or zero.
+ * @get_per_queue_bandwidth: get per-queue bandwidth
+ * @set_per_queue_bandwidth: set per-queue bandwidth
  * @get_link_ksettings: When defined, takes precedence over the
  *	%get_settings method. Get various device settings
  *	including Ethernet link settings. The %cmd and
@@ -368,6 +370,8 @@ struct ethtool_ops {
 					  struct ethtool_coalesce *);
 	int	(*set_per_queue_coalesce)(struct net_device *, u32,
 					  struct ethtool_coalesce *);
+	int	(*get_per_queue_bandwidth)(struct net_device *, u32, int *);
+	int	(*set_per_queue_bandwidth)(struct net_device *, u32, int);
 	int	(*get_link_ksettings)(struct net_device *,
 				      struct ethtool_link_ksettings *);
 	int	(*set_link_ksettings)(struct net_device *,
