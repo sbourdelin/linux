@@ -1357,11 +1357,16 @@ static struct vm_struct *__get_vm_area_node(unsigned long size,
 {
 	struct vmap_area *va;
 	struct vm_struct *area;
+	int ioremap_size_order;
 
 	BUG_ON(in_interrupt());
-	if (flags & VM_IOREMAP)
-		align = 1ul << clamp_t(int, fls_long(size),
-				       PAGE_SHIFT, IOREMAP_MAX_ORDER);
+	if (flags & VM_IOREMAP) {
+		ioremap_size_order = fls_long(size);
+		if (is_power_of_2(size) && size != 1)
+			ioremap_size_order--;
+		align = 1ul << clamp_t(int, ioremap_size_order, PAGE_SHIFT,
+				IOREMAP_MAX_ORDER);
+	}
 
 	size = PAGE_ALIGN(size);
 	if (unlikely(!size))
