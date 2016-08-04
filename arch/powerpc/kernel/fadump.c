@@ -330,6 +330,7 @@ int __init fadump_reserve_mem(void)
 	}
 	fw_dump.reserve_dump_area_start = base;
 	fw_dump.reserve_dump_area_size = size;
+	set_dma_reserve(size/PAGE_SIZE);
 	return 1;
 }
 
