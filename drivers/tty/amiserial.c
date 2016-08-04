@@ -880,7 +880,6 @@ static int rs_write(struct tty_struct * tty, const unsigned char *buf, int count
 		/* set a pending Tx Interrupt, transmitter should restart now */
 		custom.intreq = IF_SETCLR | IF_TBE;
 		mb();
-		local_irq_restore(flags);
 	}
 	return ret;
 }
