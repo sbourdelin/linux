@@ -475,6 +475,11 @@ static int check_boot_cpu_online_pm_callback(struct notifier_block *nb,
 
 static int __init check_boot_cpu_online_init(void)
 {
+	if (cpus_have_cap(ARM64_HAS_NO_BCAST_TLBI)) {
+		pr_err("Can't hibernate: missing broadcast TLBI support.\n");
+		return -EINVAL;
+	}
+
 	/*
 	 * Set this pm_notifier callback with a lower priority than
 	 * cpu_hotplug_pm_callback, so that cpu_hotplug_pm_callback will be
