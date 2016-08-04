@@ -3266,6 +3266,7 @@ struct netdev_queue *netdev_pick_tx(struct net_device *dev,
 				    struct sk_buff *skb,
 				    void *accel_priv)
 {
+	struct sock *sk = skb->sk;
 	int queue_index = 0;
 
 #ifdef CONFIG_XPS
@@ -3280,8 +3281,23 @@ struct netdev_queue *netdev_pick_tx(struct net_device *dev,
 		if (ops->ndo_select_queue)
 			queue_index = ops->ndo_select_queue(dev, skb, accel_priv,
 							    __netdev_pick_tx);
-		else
-			queue_index = __netdev_pick_tx(dev, skb);
+		else {
+#ifdef CONFIG_NETPOLICY
+			struct netpolicy_instance *instance;
+
+			queue_index = -1;
+			if (dev->netpolicy && sk) {
+				instance = netpolicy_find_instance(sk);
+				if (instance) {
+					if (!instance->dev)
+						instance->dev = dev;
+					queue_index = netpolicy_pick_queue(instance, false);
+				}
+			}
+			if (queue_index < 0)
+#endif
+				queue_index = __netdev_pick_tx(dev, skb);
+		}
 
 		if (!accel_priv)
 			queue_index = netdev_cap_txqueue(dev, queue_index);
