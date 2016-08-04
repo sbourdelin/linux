@@ -279,6 +279,7 @@ void __init jump_label_init(void)
 	struct static_key *key = NULL;
 	struct jump_entry *iter;
 
+<<<<<<< HEAD
 	/*
 	 * Since we are initializing the static_key.enabled field with
 	 * with the 'raw' int values (to avoid pulling in atomic.h) in
@@ -287,6 +288,10 @@ void __init jump_label_init(void)
 	 */
 	BUILD_BUG_ON((int)ATOMIC_INIT(0) != 0);
 	BUILD_BUG_ON((int)ATOMIC_INIT(1) != 1);
+=======
+	if (static_key_initialized)
+		return;
+>>>>>>> linux-next/akpm-base
 
 	jump_label_lock();
 	jump_label_sort_entries(iter_start, iter_stop);
