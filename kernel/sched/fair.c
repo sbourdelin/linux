@@ -2622,7 +2622,7 @@ static __always_inline u64 decay_load(u64 val, u64 n)
 
 	if (!n)
 		return val;
-	else if (unlikely(n > LOAD_AVG_PERIOD * 63))
+	else if (unlikely(n > LOAD_AVG_PERIOD * 47))
 		return 0;
 
 	/* after bounds checking we can collapse to 32-bit */
