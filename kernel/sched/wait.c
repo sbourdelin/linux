@@ -429,18 +429,20 @@ int __sched
 __wait_on_bit_lock(wait_queue_head_t *wq, struct wait_bit_queue *q,
 			wait_bit_action_f *action, unsigned mode)
 {
+	struct wait_bit_key *const key = &q->key;
+
 	do {
 		int ret;
 
 		prepare_to_wait_exclusive(wq, &q->wait, mode);
-		if (!test_bit(q->key.bit_nr, q->key.flags))
+		if (!test_bit(key->bit_nr, key->flags))
 			continue;
-		ret = action(&q->key, mode);
+		ret = action(key, mode);
 		if (!ret)
 			continue;
-		abort_exclusive_wait(wq, &q->wait, mode, &q->key);
+		abort_exclusive_wait(wq, &q->wait, mode, key);
 		return ret;
-	} while (test_and_set_bit(q->key.bit_nr, q->key.flags));
+	} while (test_and_set_bit(key->bit_nr, key->flags));
 	finish_wait(wq, &q->wait);
 	return 0;
 }
