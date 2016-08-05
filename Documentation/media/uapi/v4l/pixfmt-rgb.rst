@@ -20,3 +20,4 @@ RGB Formats
     pixfmt-srggb12
     pixfmt-srggb12p
     pixfmt-srggb14
+    pixfmt-srggb14p
