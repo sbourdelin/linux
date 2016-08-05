@@ -259,6 +259,7 @@ EXPORT_SYMBOL(finish_wait);
  * abort_exclusive_wait - abort exclusive waiting in a queue
  * @q: waitqueue waited on
  * @wait: wait descriptor
+ * @wake_up_next: Whether or not to wake up another exclusive waiter
  * @mode: runstate of the waiter to be woken
  * @key: key to identify a wait bit queue or %NULL
  *
@@ -266,19 +267,12 @@ EXPORT_SYMBOL(finish_wait);
  * the wait descriptor from the given waitqueue if still
  * queued.
  *
- * Wakes up the next waiter to prevent waiter starvation
- * when an exclusive waiter aborts and is woken up
- * concurrently and no one wakes up the next waiter. Note:
- * even when a signal is pending it is possible that
- * __wake_up_common() wakes up the current thread and hence
- * that @wait has been removed from the wait queue @q. Hence
- * test whether there are more waiters on the wait queue
- * even if @wait is not on the wait queue @q. This approach
- * will cause a spurious wakeup if a signal is delivered and
- * no other thread calls __wake_up_common() concurrently.
+ * Wakes up the next waiter if @wake_up_next is set to prevent
+ * waiter starvation when an exclusive waiter aborts and is
+ * woken up concurrently and no one wakes up the next waiter.
  */
 void abort_exclusive_wait(wait_queue_head_t *q, wait_queue_t *wait,
-			unsigned int mode, void *key)
+			  bool wake_up_next, unsigned int mode, void *key)
 {
 	unsigned long flags;
 
@@ -286,7 +280,7 @@ void abort_exclusive_wait(wait_queue_head_t *q, wait_queue_t *wait,
 	spin_lock_irqsave(&q->lock, flags);
 	if (!list_empty(&wait->task_list))
 		list_del_init(&wait->task_list);
-	if (waitqueue_active(q))
+	if (wake_up_next && waitqueue_active(q))
 		__wake_up_locked_key(q, mode, key);
 	spin_unlock_irqrestore(&q->lock, flags);
 }
@@ -440,7 +434,8 @@ __wait_on_bit_lock(wait_queue_head_t *wq, struct wait_bit_queue *q,
 		ret = action(key, mode);
 		if (!ret)
 			continue;
-		abort_exclusive_wait(wq, &q->wait, mode, key);
+		abort_exclusive_wait(wq, &q->wait,
+				test_bit(key->bit_nr, key->flags), mode, key);
 		return ret;
 	} while (test_and_set_bit(key->bit_nr, key->flags));
 	finish_wait(wq, &q->wait);
