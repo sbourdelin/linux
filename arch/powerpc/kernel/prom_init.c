@@ -863,47 +863,53 @@ static int __init prom_count_smt_threads(void)
 
 }
 
+static void fixup_nr_cores(void)
+{
+	u32 cores;
+	unsigned char *ptcores;
+
+	/* We need to tell the FW about the number of cores we support.
+	 *
+	 * To do that, we count the number of threads on the first core
+	 * (we assume this is the same for all cores) and use it to
+	 * divide NR_CPUS.
+	 */
+
+	/* The core value may start at an odd address. If such a word
+	 * access is made at a cache line boundary, this leads to an
+	 * exception which may not be handled at this time.
+	 * Forcing a per byte access to avoid exception.
+	 */
+	ptcores = &ibm_architecture_vec[IBM_ARCH_VEC_NRCORES_OFFSET];
+	cores = 0;
+	cores |= ptcores[0] << 24;
+	cores |= ptcores[1] << 16;
+	cores |= ptcores[2] << 8;
+	cores |= ptcores[3];
+	if (cores != NR_CPUS) {
+		prom_printf("WARNING ! "
+			    "ibm_architecture_vec structure inconsistent: %lu!\n",
+			    cores);
+	} else {
+		cores = DIV_ROUND_UP(NR_CPUS, prom_count_smt_threads());
+		prom_printf("Max number of cores passed to firmware: %lu (NR_CPUS = %lu)\n",
+			    cores, NR_CPUS);
+		ptcores[0] = (cores >> 24) & 0xff;
+		ptcores[1] = (cores >> 16) & 0xff;
+		ptcores[2] = (cores >> 8) & 0xff;
+		ptcores[3] = cores & 0xff;
+	}
+}
 
 static void __init prom_send_capabilities(void)
 {
 	ihandle root;
 	prom_arg_t ret;
-	u32 cores;
-	unsigned char *ptcores;
 
 	root = call_prom("open", 1, 1, ADDR("/"));
 	if (root != 0) {
-		/* We need to tell the FW about the number of cores we support.
-		 *
-		 * To do that, we count the number of threads on the first core
-		 * (we assume this is the same for all cores) and use it to
-		 * divide NR_CPUS.
-		 */
 
-		/* The core value may start at an odd address. If such a word
-		 * access is made at a cache line boundary, this leads to an
-		 * exception which may not be handled at this time.
-		 * Forcing a per byte access to avoid exception.
-		 */
-		ptcores = &ibm_architecture_vec[IBM_ARCH_VEC_NRCORES_OFFSET];
-		cores = 0;
-		cores |= ptcores[0] << 24;
-		cores |= ptcores[1] << 16;
-		cores |= ptcores[2] << 8;
-		cores |= ptcores[3];
-		if (cores != NR_CPUS) {
-			prom_printf("WARNING ! "
-				    "ibm_architecture_vec structure inconsistent: %lu!\n",
-				    cores);
-		} else {
-			cores = DIV_ROUND_UP(NR_CPUS, prom_count_smt_threads());
-			prom_printf("Max number of cores passed to firmware: %lu (NR_CPUS = %lu)\n",
-				    cores, NR_CPUS);
-			ptcores[0] = (cores >> 24) & 0xff;
-			ptcores[1] = (cores >> 16) & 0xff;
-			ptcores[2] = (cores >> 8) & 0xff;
-			ptcores[3] = cores & 0xff;
-		}
+		fixup_nr_cores();
 
 		/* try calling the ibm,client-architecture-support method */
 		prom_printf("Calling ibm,client-architecture-support...");
