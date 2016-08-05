@@ -2622,7 +2622,15 @@ static __always_inline u64 decay_load(u64 val, u64 n)
 
 	if (!n)
 		return val;
-	else if (unlikely(n > LOAD_AVG_PERIOD * 63))
+	/*
+	 * Kernel can support maximum number of processes and threads up to
+	 * 2^29 and task has highest weight 88761 with nice=-20.
+	 *
+	 *     maximum load = 2^29 * 88761 < 2^46
+	 *
+	 * So pass 46 periods can ensure maximum load to be decayed to zero.
+	 */
+	else if (unlikely(n >= LOAD_AVG_PERIOD * 46))
 		return 0;
 
 	/* after bounds checking we can collapse to 32-bit */
