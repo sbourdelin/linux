@@ -222,11 +222,11 @@ static int fsl_usb2_mph_dr_of_probe(struct platform_device *ofdev)
 	pdata->controller_ver = usb_get_ver_info(np);
 
 	/* Activate Erratum by reading property in device tree */
-	if (of_get_property(np, "fsl,usb-erratum-a007792", NULL))
+	if (of_property_read_bool(np, "fsl,usb-erratum-a007792"))
 		pdata->has_fsl_erratum_a007792 = 1;
 	else
 		pdata->has_fsl_erratum_a007792 = 0;
-	if (of_get_property(np, "fsl,usb-erratum-a005275", NULL))
+	if (of_property_read_bool(np, "fsl,usb-erratum-a005275"))
 		pdata->has_fsl_erratum_a005275 = 1;
 	else
 		pdata->has_fsl_erratum_a005275 = 0;
@@ -235,7 +235,7 @@ static int fsl_usb2_mph_dr_of_probe(struct platform_device *ofdev)
 	 * Determine whether phy_clk_valid needs to be checked
 	 * by reading property in device tree
 	 */
-	if (of_get_property(np, "phy-clk-valid", NULL))
+	if (of_property_read_bool(np, "phy-clk-valid"))
 		pdata->check_phy_clk_valid = 1;
 	else
 		pdata->check_phy_clk_valid = 0;
