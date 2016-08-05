@@ -580,9 +580,8 @@ _GLOBAL(__bswapdi2)
 	rlwimi  r9,r4,24,0,7
 	rlwimi  r10,r3,24,0,7
 	rlwimi  r9,r4,24,16,23
-	rlwimi  r10,r3,24,16,23
+	rlwimi  r4,r3,24,16,23
 	mr      r3,r9
-	mr      r4,r10
 	blr
 
 #ifdef CONFIG_SMP
