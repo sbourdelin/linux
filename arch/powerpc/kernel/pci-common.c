@@ -77,29 +77,23 @@ EXPORT_SYMBOL(get_pci_dma_ops);
  */
 static int get_phb_number(struct device_node *dn)
 {
-	int ret, phb_id = -1;
+	int ret, phb_id;
 	u64 prop;
 
 	/*
-	 * Try fixed PHB numbering first, by checking archs and reading
-	 * the respective device-tree properties. Firstly, try powernv by
-	 * reading "ibm,opal-phbid", only present in OPAL environment.
+	 * On powernv machines we should have the "ibm,opal-phbid" property, if
+	 * so use that so that PHB numbers are predictable.
 	 */
 	ret = of_property_read_u64(dn, "ibm,opal-phbid", &prop);
-	if (ret)
-		ret = of_property_read_u32_index(dn, "reg", 1, (u32 *)&prop);
-
-	if (!ret)
+	if (ret == 0) {
 		phb_id = (int)(prop & (MAX_PHBS - 1));
 
-	/* We need to be sure to not use the same PHB number twice. */
-	if ((phb_id >= 0) && !test_and_set_bit(phb_id, phb_bitmap))
-		return phb_id;
+		/* Make sure never to use the same PHB number twice. */
+		if (!test_and_set_bit(phb_id, phb_bitmap))
+			return phb_id;
+	}
 
-	/*
-	 * If not pseries nor powernv, or if fixed PHB numbering tried to add
-	 * the same PHB number twice, then fallback to dynamic PHB numbering.
-	 */
+	/* If fixed PHB numbering failed, fallback to dynamic PHB numbering. */
 	phb_id = find_first_zero_bit(phb_bitmap, MAX_PHBS);
 	BUG_ON(phb_id >= MAX_PHBS);
 	set_bit(phb_id, phb_bitmap);
