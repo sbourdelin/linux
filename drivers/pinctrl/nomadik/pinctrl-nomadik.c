@@ -1110,7 +1110,7 @@ static int nmk_gpio_probe(struct platform_device *dev)
 		return PTR_ERR(nmk_chip);
 	}
 
-	if (of_get_property(np, "st,supports-sleepmode", NULL))
+	if (of_property_read_bool(np, "st,supports-sleepmode"))
 		supports_sleepmode = true;
 	else
 		supports_sleepmode = false;
