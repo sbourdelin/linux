@@ -952,6 +952,12 @@ When kbuild executes, the following steps are followed (roughly):
 	$(KBUILD_ARFLAGS) set by the top level Makefile to "D" (deterministic
 	mode) if this option is supported by $(AR).
 
+    KBUILD_MODPOST_TOOL   Arch-specific command to run after module link
+
+        $(KBUILD_MODPOST_TOOL) is used to add an arch-specific pass over
+        modules after their final link. E.g., powerpc uses this to adjust
+        relative branches of "alternate code patching" sections.
+
     ARCH_CPPFLAGS, ARCH_AFLAGS, ARCH_CFLAGS   Overrides the kbuild defaults
 
 	These variables are appended to the KBUILD_CPPFLAGS,
