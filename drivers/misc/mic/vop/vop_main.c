@@ -229,7 +229,7 @@ static void vop_reset(struct virtio_device *dev)
 		__func__, dev->id.device);
 
 	vop_reset_inform_host(dev);
-	complete_all(&vdev->reset_done);
+	complete(&vdev->reset_done);
 }
 
 /*
