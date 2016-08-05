@@ -266,12 +266,16 @@ EXPORT_SYMBOL(finish_wait);
  * the wait descriptor from the given waitqueue if still
  * queued.
  *
- * Wakes up the next waiter if the caller is concurrently
- * woken up through the queue.
- *
- * This prevents waiter starvation where an exclusive waiter
- * aborts and is woken up concurrently and no one wakes up
- * the next waiter.
+ * Wakes up the next waiter to prevent waiter starvation
+ * when an exclusive waiter aborts and is woken up
+ * concurrently and no one wakes up the next waiter. Note:
+ * even when a signal is pending it is possible that
+ * __wake_up_common() wakes up the current thread and hence
+ * that @wait has been removed from the wait queue @q. Hence
+ * test whether there are more waiters on the wait queue
+ * even if @wait is not on the wait queue @q. This approach
+ * will cause a spurious wakeup if a signal is delivered and
+ * no other thread calls __wake_up_common() concurrently.
  */
 void abort_exclusive_wait(wait_queue_head_t *q, wait_queue_t *wait,
 			unsigned int mode, void *key)
@@ -282,7 +286,7 @@ void abort_exclusive_wait(wait_queue_head_t *q, wait_queue_t *wait,
 	spin_lock_irqsave(&q->lock, flags);
 	if (!list_empty(&wait->task_list))
 		list_del_init(&wait->task_list);
-	else if (waitqueue_active(q))
+	if (waitqueue_active(q))
 		__wake_up_locked_key(q, mode, key);
 	spin_unlock_irqrestore(&q->lock, flags);
 }
