@@ -63,9 +63,47 @@ void btrfs_free_qgroup_config(struct btrfs_fs_info *fs_info);
 struct btrfs_delayed_extent_op;
 int btrfs_qgroup_prepare_account_extents(struct btrfs_trans_handle *trans,
 					 struct btrfs_fs_info *fs_info);
-struct btrfs_qgroup_extent_record
-*btrfs_qgroup_insert_dirty_extent(struct btrfs_delayed_ref_root *delayed_refs,
-				  struct btrfs_qgroup_extent_record *record);
+
+/*
+ * Insert one dirty extent record into delayed_refs for qgroup.
+ * Caller must ensure the delayed_refs are already locked and quota is enabled.
+ *
+ * Return 0 if there is no existing dirty extent record for that bytenr, and
+ * insert that record into delayed_refs.
+ * Return > 0 if there is already existing dirty extent record for that bytenr.
+ * Caller then can free the record structure.
+ * Error is not possible
+ *
+ * For caller needs better encapsulated interface, call
+ * btrfs_qgroup_record_dirty_extent(), which will handle locks and memory
+ * allocation.
+ */
+int _btrfs_qgroup_insert_dirty_extent(
+		struct btrfs_delayed_ref_root *delayed_refs,
+		struct btrfs_qgroup_extent_record *record);
+
+/*
+ * Info qgroup to track one extent, so at trans commit time qgroup can
+ * update qgroup accounts for that extent.
+ *
+ * That extent can be either meta or data.
+ * This function can be called several times for any extent and won't cause
+ * any qgroup incorrectness.
+ * As long as dirty extent is recorded, qgroup can hardly go wrong.
+ *
+ * This function should be called when owner of extent is changed and the
+ * code uses hack to avoid normal inc/dev_extent_ref().
+ * For example, swapping two tree blocks in balance or modifying file extent
+ * disk bytenr manually.
+ *
+ * Return 0 if the operation is done.
+ * Return <0 for error, like memory allocation failure or invalid parameter
+ * (NULL trans)
+ */
+int btrfs_qgroup_record_dirty_extent(struct btrfs_trans_handle *trans,
+		struct btrfs_fs_info *fs_info, u64 bytenr, u64 num_bytes,
+		gfp_t gfp_flag);
+
 int
 btrfs_qgroup_account_extent(struct btrfs_trans_handle *trans,
 			    struct btrfs_fs_info *fs_info,
