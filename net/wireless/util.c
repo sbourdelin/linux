@@ -1553,6 +1553,27 @@ bool ieee80211_chandef_to_operating_class(struct cfg80211_chan_def *chandef,
 }
 EXPORT_SYMBOL(ieee80211_chandef_to_operating_class);
 
+static bool diff_beacon_interval_supported(struct wiphy *wiphy)
+{
+	const struct ieee80211_iface_combination *c;
+	int i, j;
+
+	for (i = 0; i < wiphy->n_iface_combinations; i++) {
+		c = &wiphy->iface_combinations[i];
+
+		if (!c->supp_diff_beacon_int)
+			continue;
+
+		for (j = 0; j < c->n_limits; j++)
+			if (c->limits[j].types &
+				(BIT(NL80211_IFTYPE_AP) |
+				  BIT(NL80211_IFTYPE_P2P_GO)))
+				return true;
+	}
+
+	return false;
+}
+
 int cfg80211_validate_beacon_int(struct cfg80211_registered_device *rdev,
 				 u32 beacon_int)
 {
@@ -1565,7 +1586,8 @@ int cfg80211_validate_beacon_int(struct cfg80211_registered_device *rdev,
 	list_for_each_entry(wdev, &rdev->wiphy.wdev_list, list) {
 		if (!wdev->beacon_interval)
 			continue;
-		if (wdev->beacon_interval != beacon_int) {
+		if (wdev->beacon_interval != beacon_int &&
+		    !diff_beacon_interval_supported(&rdev->wiphy)) {
 			res = -EINVAL;
 			break;
 		}

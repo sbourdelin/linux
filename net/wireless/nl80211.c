@@ -1020,6 +1020,9 @@ static int nl80211_put_iface_combinations(struct wiphy *wiphy,
 		     nla_put_u32(msg, NL80211_IFACE_COMB_RADAR_DETECT_REGIONS,
 				c->radar_detect_regions)))
 			goto nla_put_failure;
+		if (c->supp_diff_beacon_int &&
+		    nla_put_flag(msg, NL80211_IFACE_COMB_DIFF_BEACON_INTERVAL))
+			goto nla_put_failure;
 
 		nla_nest_end(msg, nl_combi);
 	}

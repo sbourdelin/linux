@@ -485,7 +485,7 @@ static int wiphy_verify_combinations(struct wiphy *wiphy)
 	int i, j;
 
 	for (i = 0; i < wiphy->n_iface_combinations; i++) {
-		u32 cnt = 0;
+		u32 cnt = 0, ap_cnt;
 		u16 all_iftypes = 0;
 
 		c = &wiphy->iface_combinations[i];
@@ -517,6 +517,7 @@ static int wiphy_verify_combinations(struct wiphy *wiphy)
 		if (WARN_ON(!c->n_limits))
 			return -EINVAL;
 
+		ap_cnt = 0;
 		for (j = 0; j < c->n_limits; j++) {
 			u16 types = c->limits[j].types;
 
@@ -538,6 +539,9 @@ static int wiphy_verify_combinations(struct wiphy *wiphy)
 				return -EINVAL;
 
 			cnt += c->limits[j].max;
+			ap_cnt += (types & (BIT(NL80211_IFTYPE_AP) |
+					    BIT(NL80211_IFTYPE_P2P_GO))) ?
+					c->limits[j].max : 0;
 			/*
 			 * Don't advertise an unsupported type
 			 * in a combination.
@@ -545,6 +549,13 @@ static int wiphy_verify_combinations(struct wiphy *wiphy)
 			if (WARN_ON((wiphy->interface_modes & types) != types))
 				return -EINVAL;
 		}
+
+		/*
+		 * Different beacon interval allowed only in AP or P2P_GO
+		 * multi-interface combinations.
+		 */
+		if (WARN_ON(c->supp_diff_beacon_int && (ap_cnt < 2)))
+			return -EINVAL;
 
 		/* You can't even choose that many! */
 		if (WARN_ON(cnt < c->max_interfaces))
