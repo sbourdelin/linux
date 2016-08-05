@@ -679,6 +679,7 @@ unsigned char ibm_architecture_vec[] = {
 	W(0xffffffff),			/* virt_base */
 	W(0xffffffff),			/* virt_size */
 	W(0xffffffff),			/* load_base */
+#define IBM_ARCH_VEC_MIN_RMA_OFFSET	108
 	W(256),				/* 256MB min RMA */
 	W(0xffffffff),			/* full client load */
 	0,				/* min RMA percentage of total RAM */
@@ -867,6 +868,10 @@ static void fixup_nr_cores(void)
 {
 	u32 cores;
 	unsigned char *ptcores;
+	static bool fixup_nr_cores_done = false;
+
+	if (fixup_nr_cores_done)
+		return;
 
 	/* We need to tell the FW about the number of cores we support.
 	 *
@@ -898,6 +903,41 @@ static void fixup_nr_cores(void)
 		ptcores[1] = (cores >> 16) & 0xff;
 		ptcores[2] = (cores >> 8) & 0xff;
 		ptcores[3] = cores & 0xff;
+		fixup_nr_cores_done = true;
+	}
+}
+
+static void __init fixup_rma_size(void)
+{
+	int rc;
+	u64 size;
+	unsigned char *min_rmap;
+	phandle optnode;
+	char str[64];
+
+	optnode = call_prom("finddevice", 1, 1, ADDR("/options"));
+	if (!PHANDLE_VALID(optnode))
+		prom_panic("Cannot find /options");
+
+	/*
+	 * If a prior boot specified a new RMA size, use that size in
+	 * ibm_architecture_vec[]. See also increase_rma_size().
+	 */
+	size = 0ULL;
+	memset(str, 0, sizeof(str));
+	rc = prom_getprop(optnode, "ibm,new-rma-size", &str, sizeof(str));
+	if (rc <= 0)
+		return;
+
+	size = prom_strtoul(str, NULL);
+	min_rmap = &ibm_architecture_vec[IBM_ARCH_VEC_MIN_RMA_OFFSET];
+
+	if (size) {
+		prom_printf("Using RMA size %lu from ibm,new-rma-size.\n", size);
+		min_rmap[0] = (size >> 24) & 0xff;
+		min_rmap[1] = (size >> 16) & 0xff;
+		min_rmap[2] = (size >> 8) & 0xff;
+		min_rmap[3] = size & 0xff;
 	}
 }
 
@@ -910,6 +950,8 @@ static void __init prom_send_capabilities(void)
 	if (root != 0) {
 
 		fixup_nr_cores();
+
+		fixup_rma_size();
 
 		/* try calling the ibm,client-architecture-support method */
 		prom_printf("Calling ibm,client-architecture-support...");
@@ -946,6 +988,46 @@ static void __init prom_send_capabilities(void)
 	}
 #endif /* __BIG_ENDIAN__ */
 }
+
+static void __init increase_rma_size(void)
+{
+	int rc;
+	u64 size;
+	char str[64];
+	phandle optnode;
+
+	optnode = call_prom("finddevice", 1, 1, ADDR("/options"));
+	if (!PHANDLE_VALID(optnode))
+		prom_panic("Cannot find /options");
+
+	/*
+	 * If we already increased the RMA size, return.
+	 */
+	size = 0ULL;
+	memset(str, 0, sizeof(str));
+	rc = prom_getprop(optnode, "ibm,new-rma-size", &str, sizeof(str));
+
+	size = prom_strtoul(str, NULL);
+	if (size == 512ULL) {
+		prom_printf("RMA size already at %lu.\n", size);
+		return;
+	}
+	/*
+	 * Otherwise, set the ibm,new-rma-size property and initiate a CAS
+	 * reboot so the RMA size can take effect. See also init_rma_size().
+	 */
+	memset(str, 0, 4);
+	memcpy(str, "512", 3);
+	prom_printf("Setting ibm,new-rma-size property to %s\n", str);
+	rc = prom_setprop(optnode, "/options", "ibm,new-rma-size", &str,
+					strlen(str)+1);
+
+	/* Force a reboot. Will work only if ibm,fw-override-cas==false */
+	prom_send_capabilities();
+
+	prom_printf("No CAS initiated reboot? Try setting ibm,fw-override-cas to 'false' in Open Firmware\n");
+}
+
 #endif /* #if defined(CONFIG_PPC_PSERIES) || defined(CONFIG_PPC_POWERNV) */
 
 /*
@@ -2027,9 +2109,11 @@ static void __init *make_room(unsigned long *mem_start, unsigned long *mem_end,
 		room = alloc_top - alloc_bottom;
 		if (room > DEVTREE_CHUNK_SIZE)
 			room = DEVTREE_CHUNK_SIZE;
-		if (room < PAGE_SIZE)
+		if (room < PAGE_SIZE) {
+			increase_rma_size();
 			prom_panic("No memory for flatten_device_tree "
 				   "(no room)\n");
+		}
 		chunk = alloc_up(room, 0);
 		if (chunk == 0)
 			prom_panic("No memory for flatten_device_tree "
