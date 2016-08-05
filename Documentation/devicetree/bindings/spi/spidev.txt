@@ -1,0 +1,16 @@
+* SPIDEV
+
+spidev is a device driver to access to SPI devices using normal userspace I/O calls.
+To make an SPI device compatible with this drivers add:
+
+Required properties:
+- compatible : should be "spidev".
+
+Example:
+
+spidev0: spi@0 {
+	compatible = "spidev";
+	reg = <0>;
+	spi-max-frequency = <1000000>;
+	status = "okay";
+};
