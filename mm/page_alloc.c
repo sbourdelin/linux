@@ -6127,7 +6127,7 @@ static unsigned long __init early_calculate_totalpages(void)
 		unsigned long pages = end_pfn - start_pfn;
 
 		totalpages += pages;
-		if (pages)
+		if (!node_isset(nid, node_states[N_MEMORY]) && pages)
 			node_set_state(nid, N_MEMORY);
 	}
 	return totalpages;
@@ -6149,6 +6149,7 @@ static void __init find_zone_movable_pfns_for_nodes(void)
 	unsigned long totalpages = early_calculate_totalpages();
 	int usable_nodes = nodes_weight(node_states[N_MEMORY]);
 	struct memblock_region *r;
+	bool avoid_loop = false;
 
 	/* Need to find movable_zone earlier when movable_node is specified. */
 	find_usable_zone_for_movable();
@@ -6309,6 +6310,8 @@ restart:
 			required_kernelcore -= min(required_kernelcore,
 								size_pages);
 			kernelcore_remaining -= size_pages;
+			if (!required_kernelcore && avoid_loop)
+				goto out2;
 			if (!kernelcore_remaining)
 				break;
 		}
@@ -6321,9 +6324,10 @@ restart:
 	 * satisfied
 	 */
 	usable_nodes--;
-	if (usable_nodes && required_kernelcore > usable_nodes)
+	if (usable_nodes && required_kernelcore > usable_nodes) {
+		avoid_loop = true;
 		goto restart;
-
+	}
 out2:
 	/* Align start of ZONE_MOVABLE on all nids to MAX_ORDER_NR_PAGES */
 	for (nid = 0; nid < MAX_NUMNODES; nid++)
