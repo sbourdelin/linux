@@ -535,11 +535,6 @@ struct hv_dynmem_device {
 	bool host_specified_ha_region;
 
 	/*
-	 * State to synchronize hot-add.
-	 */
-	struct completion  ol_waitevent;
-	bool ha_waiting;
-	/*
 	 * This thread handles hot-add
 	 * requests from the host as well as notifying
 	 * the host with regards to memory pressure in
@@ -583,10 +578,6 @@ static int hv_memory_notifier(struct notifier_block *nb, unsigned long val,
 		if (val == MEM_ONLINE ||
 		    mutex_is_locked(&dm_device.ha_region_mutex))
 			mutex_unlock(&dm_device.ha_region_mutex);
-		if (dm_device.ha_waiting) {
-			dm_device.ha_waiting = false;
-			complete(&dm_device.ol_waitevent);
-		}
 		break;
 
 	case MEM_OFFLINE:
@@ -644,9 +635,6 @@ static void hv_mem_hot_add(unsigned long start, unsigned long size,
 
 		has->covered_end_pfn +=  processed_pfn;
 
-		init_completion(&dm_device.ol_waitevent);
-		dm_device.ha_waiting = true;
-
 		mutex_unlock(&dm_device.ha_region_mutex);
 		nid = memory_add_physaddr_to_nid(PFN_PHYS(start_pfn));
 		ret = add_memory(nid, PFN_PHYS((start_pfn)),
@@ -670,13 +658,6 @@ static void hv_mem_hot_add(unsigned long start, unsigned long size,
 			break;
 		}
 
-		/*
-		 * Wait for the memory block to be onlined.
-		 * Since the hot add has succeeded, it is ok to
-		 * proceed even if the pages in the hot added region
-		 * have not been "onlined" within the allowed time.
-		 */
-		wait_for_completion_timeout(&dm_device.ol_waitevent, 5*HZ);
 		mutex_lock(&dm_device.ha_region_mutex);
 		post_status(&dm_device);
 	}
