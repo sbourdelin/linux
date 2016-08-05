@@ -569,6 +569,21 @@ static void intel_dsi_pre_enable(struct intel_encoder *encoder)
 		I915_WRITE(DSPCLK_GATE_D, val);
 	}
 
+	if (IS_BROXTON(dev)) {
+		u32 val;
+		/*
+		 * Bring the MIPI IO out of reset and power up
+		 * the DSI regulator.
+		 */
+		val = I915_READ(BXT_P_CR_GT_DISP_PWRON);
+		val |= MIPIO_RST_CTRL;
+		I915_WRITE(BXT_P_CR_GT_DISP_PWRON, val);
+
+		I915_WRITE(BXT_DSI_CFG, STRAP_SELECT);
+		I915_WRITE(BXT_DSI_TXCNTRL, HS_IO_CONTROL_SELECT);
+	}
+
+
 	/* put device in ready state */
 	intel_dsi_device_ready(encoder);
 
