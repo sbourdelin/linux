@@ -1009,7 +1009,7 @@ scif_get_node_info_resp(struct scif_dev *scifdev, struct scifmsg *msg)
 		mutex_lock(&scif_info.conflock);
 		scif_info.maxid = msg->payload[1];
 		scif_info.total = msg->payload[2];
-		complete_all(node_info);
+		complete(node_info);
 		mutex_unlock(&scif_info.conflock);
 	}
 }
