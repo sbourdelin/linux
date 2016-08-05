@@ -69,7 +69,7 @@ static irqreturn_t tifm_7xx1_isr(int irq, void *dev_id)
 	writel(irq_status, fm->addr + FM_INTERRUPT_STATUS);
 
 	if (fm->finish_me)
-		complete_all(fm->finish_me);
+		complete(fm->finish_me);
 	else if (!fm->socket_change_set)
 		writel(TIFM_IRQ_ENABLE, fm->addr + FM_SET_INTERRUPT_ENABLE);
 	else
