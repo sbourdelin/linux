@@ -1439,6 +1439,12 @@ $(DOC_TARGETS): scripts_basic FORCE
 	$(Q)$(MAKE) $(build)=Documentation -f $(srctree)/Documentation/Makefile.sphinx $@
 	$(Q)$(MAKE) $(build)=Documentation/DocBook $@
 
+DOC_NITPIC_TARGETS := mediadocs
+PHONY += $(DOC_NITPIC_TARGETS)
+$(DOC_NITPIC_TARGETS): scripts_basic FORCE
+	$(Q)$(MAKE) $(build)=scripts build_docproc build_check-lc_ctype
+	$(Q)$(MAKE) $(build)=Documentation -f $(srctree)/Documentation/Makefile.sphinx $@
+
 else # KBUILD_EXTMOD
 
 ###
