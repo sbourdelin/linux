@@ -80,7 +80,7 @@ static int si2157_init(struct dvb_frontend *fe)
 	struct i2c_client *client = fe->tuner_priv;
 	struct si2157_dev *dev = i2c_get_clientdata(client);
 	struct dtv_frontend_properties *c = &fe->dtv_property_cache;
-	int ret, len, remaining;
+	int ret, len, remaining, fw_chunk, inc;
 	struct si2157_cmd cmd;
 	const struct firmware *fw;
 	const char *fw_name;
@@ -103,12 +103,12 @@ static int si2157_init(struct dvb_frontend *fe)
 		goto warm;
 
 	/* power up */
-	if (dev->chiptype == SI2157_CHIPTYPE_SI2146) {
-		memcpy(cmd.args, "\xc0\x05\x01\x00\x00\x0b\x00\x00\x01", 9);
-		cmd.wlen = 9;
-	} else {
+	if (dev->chiptype == SI2157_CHIPTYPE_SI2157) {
 		memcpy(cmd.args, "\xc0\x00\x0c\x00\x00\x01\x01\x01\x01\x01\x01\x02\x00\x00\x01", 15);
 		cmd.wlen = 15;
+	} else {
+		memcpy(cmd.args, "\xc0\x05\x01\x00\x00\x0b\x00\x00\x01", 9);
+		cmd.wlen = 9;
 	}
 	cmd.rlen = 1;
 	ret = si2157_cmd_execute(client, &cmd);
@@ -131,11 +131,17 @@ static int si2157_init(struct dvb_frontend *fe)
 	#define SI2157_A30 ('A' << 24 | 57 << 16 | '3' << 8 | '0' << 0)
 	#define SI2147_A30 ('A' << 24 | 47 << 16 | '3' << 8 | '0' << 0)
 	#define SI2146_A10 ('A' << 24 | 46 << 16 | '1' << 8 | '0' << 0)
+	#define SI2173_A31 ('A' << 24 | 73 << 16 | '3' << 8 | '1' << 0)
 
 	switch (chip_id) {
 	case SI2158_A20:
 	case SI2148_A20:
 		fw_name = SI2158_A20_FIRMWARE;
+		fw_chunk = 17;
+		break;
+	case SI2173_A31:
+		fw_name = SI2173_A31_FIRMWARE;
+		fw_chunk = 8;
 		break;
 	case SI2157_A30:
 	case SI2147_A30:
@@ -164,25 +170,29 @@ static int si2157_init(struct dvb_frontend *fe)
 		goto err;
 	}
 
-	/* firmware should be n chunks of 17 bytes */
-	if (fw->size % 17 != 0) {
+	/* firmware should be n chunks of 8 or 17 bytes */
+	if (fw->size % fw_chunk != 0) {
 		dev_err(&client->dev, "firmware file '%s' is invalid\n",
 				fw_name);
 		ret = -EINVAL;
 		goto err_release_firmware;
 	}
 
-	dev_info(&client->dev, "downloading firmware from file '%s'\n",
-			fw_name);
+	dev_info(&client->dev, "downloading firmware from file '%s', size %zu bytes\n",
+			fw_name, fw->size);
 
-	for (remaining = fw->size; remaining > 0; remaining -= 17) {
-		len = fw->data[fw->size - remaining];
+	if (fw_chunk == 8)
+		inc = 0;
+	else
+		inc = 1;
+	for (remaining = fw->size; remaining > 0; remaining -= fw_chunk) {
+		len = fw_chunk == 8 ? 8 : fw->data[fw->size - remaining];
 		if (len > SI2157_ARGLEN) {
 			dev_err(&client->dev, "Bad firmware length\n");
 			ret = -EINVAL;
 			goto err_release_firmware;
 		}
-		memcpy(cmd.args, &fw->data[(fw->size - remaining) + 1], len);
+		memcpy(cmd.args, &fw->data[(fw->size - remaining) + inc], len);
 		cmd.wlen = len;
 		cmd.rlen = 1;
 		ret = si2157_cmd_execute(client, &cmd);
@@ -371,7 +381,7 @@ static int si2157_get_if_frequency(struct dvb_frontend *fe, u32 *frequency)
 
 static const struct dvb_tuner_ops si2157_ops = {
 	.info = {
-		.name           = "Silicon Labs Si2146/2147/2148/2157/2158",
+		.name           = "Silicon Labs Si2146/2147/2148/2157/2158/2173",
 		.frequency_min  = 42000000,
 		.frequency_max  = 870000000,
 	},
@@ -395,7 +405,11 @@ static void si2157_stat_work(struct work_struct *work)
 
 	memcpy(cmd.args, "\x42\x00", 2);
 	cmd.wlen = 2;
-	cmd.rlen = 12;
+	if (dev->chiptype == SI2157_CHIPTYPE_SI2173) {
+		cmd.rlen = 9;
+	} else {
+		cmd.rlen = 12;
+	}
 	ret = si2157_cmd_execute(client, &cmd);
 	if (ret)
 		goto err;
@@ -470,9 +484,13 @@ static int si2157_probe(struct i2c_client *client,
 	}
 #endif
 
-	dev_info(&client->dev, "Silicon Labs %s successfully attached\n",
+	dev_info(&client->dev, "Silicon Labs %s (chiptype %d) successfully attached\n",
 			dev->chiptype == SI2157_CHIPTYPE_SI2146 ?
-			"Si2146" : "Si2147/2148/2157/2158");
+			"Si2146" : 
+			dev->chiptype == SI2157_CHIPTYPE_SI2173 ?
+			"Si2173" :
+                        "Si2147/2148/2157/2158",
+			dev->chiptype);
 
 	return 0;
 
@@ -506,6 +524,7 @@ static int si2157_remove(struct i2c_client *client)
 }
 
 static const struct i2c_device_id si2157_id_table[] = {
+	{"si2173", SI2157_CHIPTYPE_SI2173},
 	{"si2157", SI2157_CHIPTYPE_SI2157},
 	{"si2146", SI2157_CHIPTYPE_SI2146},
 	{}
@@ -528,3 +547,4 @@ MODULE_DESCRIPTION("Silicon Labs Si2146/2147/2148/2157/2158 silicon tuner driver
 MODULE_AUTHOR("Antti Palosaari <crope@iki.fi>");
 MODULE_LICENSE("GPL");
 MODULE_FIRMWARE(SI2158_A20_FIRMWARE);
+MODULE_FIRMWARE(SI2173_A31_FIRMWARE);

@@ -360,6 +360,7 @@ int cx231xx_afe_update_power_control(struct cx231xx *dev,
 	case CX231XX_BOARD_HAUPPAUGE_USB2_FM_PAL:
 	case CX231XX_BOARD_HAUPPAUGE_USB2_FM_NTSC:
 	case CX231XX_BOARD_OTG102:
+	case CX231XX_BOARD_TERRATEC_CNRG_HTC_HD:
 		if (avmode == POLARIS_AVMODE_ANALOGT_TV) {
 			while (afe_power_status != (FLD_PWRDN_TUNING_BIAS |
 						FLD_PWRDN_ENABLE_PLL)) {
@@ -599,7 +600,8 @@ int cx231xx_set_video_input_mux(struct cx231xx *dev, u8 input)
 				return status;
 			}
 		}
-		if (dev->tuner_type == TUNER_NXP_TDA18271)
+		if ((dev->tuner_type == TUNER_NXP_TDA18271) ||
+		    (dev->tuner_type == TUNER_SI2173))
 			status = cx231xx_set_decoder_video_input(dev,
 							CX231XX_VMUX_TELEVISION,
 							INPUT(input)->vmux);
@@ -906,7 +908,8 @@ int cx231xx_set_decoder_video_input(struct cx231xx *dev,
 
 			status = vid_blk_write_word(dev, AFE_CTRL, value);
 
-			if (dev->tuner_type == TUNER_NXP_TDA18271) {
+			if ((dev->tuner_type == TUNER_NXP_TDA18271) ||
+			    (dev->tuner_type == TUNER_SI2173)) {
 				status = vid_blk_read_word(dev, PIN_CTRL,
 				 &value);
 				status = vid_blk_write_word(dev, PIN_CTRL,
@@ -1197,6 +1200,7 @@ int cx231xx_set_audio_decoder_input(struct cx231xx *dev,
 					cx231xx_set_field(FLD_SIF_EN, 1));
 			break;
 		case TUNER_NXP_TDA18271:
+		case TUNER_SI2173:
 			/* Normal mode: SIF passthrough at 14.32 MHz */
 			status = cx231xx_read_modify_write_i2c_dword(dev,
 					VID_BLK_I2C_ADDRESS,

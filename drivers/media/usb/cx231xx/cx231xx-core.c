@@ -52,7 +52,7 @@ MODULE_PARM_DESC(alt, "alternate setting to use for video endpoint");
 
 #define cx231xx_isocdbg(fmt, arg...) do {\
 	if (core_debug) \
-		printk(KERN_INFO "%s %s :"fmt, \
+		printk(KERN_INFO "%s %s :"fmt" ", \
 			 dev->name, __func__ , ##arg); } while (0)
 
 /*****************************************************************
@@ -272,6 +272,7 @@ static int __usb_control_msg(struct cx231xx *dev, unsigned int pipe,
 	if (reg_debug) {
 		if (unlikely(rc < 0)) {
 			printk(KERN_CONT "FAILED!\n");
+			dump_stack();
 			return rc;
 		}
 
