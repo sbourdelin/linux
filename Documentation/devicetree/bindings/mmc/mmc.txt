@@ -27,8 +27,6 @@ Optional properties:
   logic it is sufficient to not specify wp-gpios property in the absence of a WP
   line.
 - max-frequency: maximum operating clock frequency
-- no-1-8-v: when present, denotes that 1.8v card voltage is not supported on
-  this system, even if the controller claims it is.
 - cap-sd-highspeed: SD high-speed timing is supported
 - cap-mmc-highspeed: MMC high-speed timing is supported
 - sd-uhs-sdr12: SD UHS SDR12 speed is supported
@@ -40,6 +38,7 @@ Optional properties:
 - cap-mmc-hw-reset: eMMC hardware reset is supported
 - cap-sdio-irq: enable SDIO IRQ signalling on this interface
 - full-pwr-cycle: full power cycle of the card is supported
+- mmc-ddr-3_3v: eMMC high-speed DDR mode(3.3V I/O) is supported
 - mmc-ddr-1_8v: eMMC high-speed DDR mode(1.8V I/O) is supported
 - mmc-ddr-1_2v: eMMC high-speed DDR mode(1.2V I/O) is supported
 - mmc-hs200-1_8v: eMMC HS200 mode(1.8V I/O) is supported
@@ -52,6 +51,10 @@ Optional properties:
 - no-sdio: controller is limited to send sdio cmd during initialization
 - no-sd: controller is limited to send sd cmd during initialization
 - no-mmc: controller is limited to send mmc cmd during initialization
+
+Deprecated properties:
+- no-1-8-v: when present, denotes that 1.8v card voltage is not supported on
+  this system, even if the controller claims it is.
 
 *NOTE* on CD and WP polarity. To use common for all SD/MMC host controllers line
 polarity properties, we have to fix the meaning of the "normal" and "inverted"
