@@ -4928,16 +4928,24 @@ nfsd4_free_stateid(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 		ret = nfserr_locks_held;
 		break;
 	case NFS4_LOCK_STID:
-		ret = check_stateid_generation(stateid, &s->sc_stateid, 1);
-		if (ret)
-			break;
+		spin_unlock(&cl->cl_lock);
 		stp = openlockstateid(s);
+		mutex_lock(&stp->st_mutex);
+		ret = check_stateid_generation(stateid, &s->sc_stateid, 1);
+		if (ret) {
+			mutex_unlock(&stp->st_mutex);
+			goto out;
+		}
 		ret = nfserr_locks_held;
 		if (check_for_locks(stp->st_stid.sc_file,
-				    lockowner(stp->st_stateowner)))
-			break;
+				    lockowner(stp->st_stateowner))) {
+			mutex_unlock(&stp->st_mutex);
+			goto out;
+		}
+		spin_lock(&cl->cl_lock);
 		WARN_ON(!unhash_lock_stateid(stp));
 		spin_unlock(&cl->cl_lock);
+		mutex_unlock(&stp->st_mutex);
 		nfs4_put_stid(s);
 		ret = nfs_ok;
 		goto out;
