@@ -97,6 +97,45 @@ static int prism2_domibset_pstr32(wlandevice_t *wlandev,
 	return p80211req_dorequest(wlandev, (u8 *)&msg);
 }
 
+static int prism2_key_index_to_did(u8 key_index, u32 *did)
+{
+	int err = 0;
+
+	if (!did) {
+		err = -EINVAL;
+		goto exit;
+	}
+
+	switch (key_index) {
+	case 0:
+		*did =
+		DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey0;
+		break;
+
+	case 1:
+		*did =
+		DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey1;
+		break;
+
+	case 2:
+		*did =
+		DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey2;
+		break;
+
+	case 3:
+		*did =
+		DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey3;
+		break;
+
+	default:
+		err = -EINVAL;
+		break;
+	}
+
+exit:
+	return err;
+}
+
 /* The interface functions, called by the cfg80211 layer */
 static int prism2_change_virtual_intf(struct wiphy *wiphy,
 				      struct net_device *dev,
@@ -154,33 +193,15 @@ static int prism2_add_key(struct wiphy *wiphy, struct net_device *dev,
 	case WLAN_CIPHER_SUITE_WEP40:
 	case WLAN_CIPHER_SUITE_WEP104:
 		result = prism2_domibset_uint32(wlandev,
-						DIDmib_dot11smt_dot11PrivacyTable_dot11WEPDefaultKeyID,
-						key_index);
+			DIDmib_dot11smt_dot11PrivacyTable_dot11WEPDefaultKeyID,
+			key_index);
 		if (result)
 			goto exit;
 
 		/* send key to driver */
-		switch (key_index) {
-		case 0:
-			did = DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey0;
-			break;
-
-		case 1:
-			did = DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey1;
-			break;
-
-		case 2:
-			did = DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey2;
-			break;
-
-		case 3:
-			did = DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey3;
-			break;
-
-		default:
-			err = -EINVAL;
+		err = prism2_key_index_to_did(key_index, &did);
+		if (err)
 			goto exit;
-		}
 
 		result = prism2_domibset_pstr32(wlandev, did,
 						params->key_len, params->key);
@@ -243,31 +264,9 @@ static int prism2_del_key(struct wiphy *wiphy, struct net_device *dev,
 	 */
 
 	/* send key to driver */
-	switch (key_index) {
-	case 0:
-		did =
-		    DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey0;
-		break;
-
-	case 1:
-		did =
-		    DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey1;
-		break;
-
-	case 2:
-		did =
-		    DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey2;
-		break;
-
-	case 3:
-		did =
-		    DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey3;
-		break;
-
-	default:
-		err = -EINVAL;
+	err = prism2_key_index_to_did(key_index, &did);
+	if (err)
 		goto exit;
-	}
 
 	result = prism2_domibset_pstr32(wlandev, did, 13, "0000000000000");
 
@@ -424,7 +423,8 @@ static int prism2_scan(struct wiphy *wiphy,
 			msg2.beaconperiod.data,
 			ie_buf,
 			ie_len,
-			(msg2.signal.data - 65536) * 100, /* Conversion to signed type */
+			/* Conversion to signed type */
+			(msg2.signal.data - 65536) * 100,
 			GFP_KERNEL
 		);
 
@@ -460,8 +460,8 @@ static int prism2_set_wiphy_params(struct wiphy *wiphy, u32 changed)
 			data = wiphy->rts_threshold;
 
 		result = prism2_domibset_uint32(wlandev,
-						DIDmib_dot11mac_dot11OperationTable_dot11RTSThreshold,
-						data);
+			DIDmib_dot11mac_dot11OperationTable_dot11RTSThreshold,
+			data);
 		if (result) {
 			err = -EFAULT;
 			goto exit;
@@ -475,8 +475,8 @@ static int prism2_set_wiphy_params(struct wiphy *wiphy, u32 changed)
 			data = wiphy->frag_threshold;
 
 		result = prism2_domibset_uint32(wlandev,
-						DIDmib_dot11mac_dot11OperationTable_dot11FragmentationThreshold,
-						data);
+		DIDmib_dot11mac_dot11OperationTable_dot11FragmentationThreshold,
+		data);
 		if (result) {
 			err = -EFAULT;
 			goto exit;
@@ -505,8 +505,8 @@ static int prism2_connect(struct wiphy *wiphy, struct net_device *dev,
 	if (channel) {
 		chan = ieee80211_frequency_to_channel(channel->center_freq);
 		result = prism2_domibset_uint32(wlandev,
-						DIDmib_dot11phy_dot11PhyDSSSTable_dot11CurrentChannel,
-						chan);
+			DIDmib_dot11phy_dot11PhyDSSSTable_dot11CurrentChannel,
+			chan);
 		if (result)
 			goto exit;
 	}
@@ -527,33 +527,15 @@ static int prism2_connect(struct wiphy *wiphy, struct net_device *dev,
 	if (is_wep) {
 		if (sme->key) {
 			result = prism2_domibset_uint32(wlandev,
-				DIDmib_dot11smt_dot11PrivacyTable_dot11WEPDefaultKeyID,
-				sme->key_idx);
+			DIDmib_dot11smt_dot11PrivacyTable_dot11WEPDefaultKeyID,
+			sme->key_idx);
 			if (result)
 				goto exit;
 
 			/* send key to driver */
-			switch (sme->key_idx) {
-			case 0:
-				did = DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey0;
-				break;
-
-			case 1:
-				did = DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey1;
-				break;
-
-			case 2:
-				did = DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey2;
-				break;
-
-			case 3:
-				did = DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey3;
-				break;
-
-			default:
-				err = -EINVAL;
+			err = prism2_key_index_to_did(sme->key_idx, &did);
+			if (err)
 				goto exit;
-			}
 
 			result = prism2_domibset_pstr32(wlandev,
 							did, sme->key_len,
@@ -567,14 +549,14 @@ static int prism2_connect(struct wiphy *wiphy, struct net_device *dev,
 		 * seems reasonable anyways
 		 */
 		result = prism2_domibset_uint32(wlandev,
-						DIDmib_dot11smt_dot11PrivacyTable_dot11PrivacyInvoked,
-						P80211ENUM_truth_true);
+			DIDmib_dot11smt_dot11PrivacyTable_dot11PrivacyInvoked,
+			P80211ENUM_truth_true);
 		if (result)
 			goto exit;
 
 		result = prism2_domibset_uint32(wlandev,
-						DIDmib_dot11smt_dot11PrivacyTable_dot11ExcludeUnencrypted,
-						P80211ENUM_truth_true);
+		    DIDmib_dot11smt_dot11PrivacyTable_dot11ExcludeUnencrypted,
+		    P80211ENUM_truth_true);
 		if (result)
 			goto exit;
 
@@ -583,14 +565,14 @@ static int prism2_connect(struct wiphy *wiphy, struct net_device *dev,
 		 * and exclude unencrypted
 		 */
 		result = prism2_domibset_uint32(wlandev,
-						DIDmib_dot11smt_dot11PrivacyTable_dot11PrivacyInvoked,
-						P80211ENUM_truth_false);
+			DIDmib_dot11smt_dot11PrivacyTable_dot11PrivacyInvoked,
+			P80211ENUM_truth_false);
 		if (result)
 			goto exit;
 
 		result = prism2_domibset_uint32(wlandev,
-						DIDmib_dot11smt_dot11PrivacyTable_dot11ExcludeUnencrypted,
-						P80211ENUM_truth_false);
+		    DIDmib_dot11smt_dot11PrivacyTable_dot11ExcludeUnencrypted,
+		    P80211ENUM_truth_false);
 		if (result)
 			goto exit;
 	}

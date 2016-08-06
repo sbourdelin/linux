@@ -1348,7 +1348,7 @@ typedef struct hfa384x {
 
 	hfa384x_InfFrame_t *scanresults;
 
-	struct prism2sta_authlist authlist;	/* Authenticated station list. */
+	struct prism2sta_authlist authlist;	/* Authenticated station list.*/
 	unsigned int accessmode;		/* Access mode. */
 	struct prism2sta_accesslist allow;	/* Allowed station list. */
 	struct prism2sta_accesslist deny;	/* Denied station list. */
