@@ -4,6 +4,7 @@
  * Distribute under GPLv2
  *
  * Copyright (c) 2006 Rafael J. Wysocki <rjw@sisk.pl>
+ * Copyright (c) 2015 Pavel Machek <pavel@ucw.cz>
  */
 
 #include <linux/gfp.h>
@@ -14,12 +15,29 @@
 #include <asm/pgtable.h>
 #include <asm/mmzone.h>
 #include <asm/sections.h>
+#include <asm/suspend.h>
+#include <asm/tlbflush.h>
 
 /* Defined in hibernate_asm_32.S */
 extern int restore_image(void);
 
+/*
+ * Address to jump to in the last phase of restore in order to get to the image
+ * kernel's text (this value is passed in the image header).
+ */
+unsigned long restore_jump_address __visible;
+unsigned long jump_address_phys;
+
+/*
+ * Value of the cr3 register from before the hibernation (this value is passed
+ * in the image header).
+ */
+unsigned long restore_cr3 __visible;
+
 /* Pointer to the temporary resume page tables */
 pgd_t *resume_pg_dir;
+
+void *relocated_restore_code __visible;
 
 /* The following three functions are based on the analogous code in
  * arch/x86/mm/init_32.c
@@ -142,6 +160,9 @@ static inline void resume_init_first_level_page_table(pgd_t *pg_dir)
 #endif
 }
 
+#define RESTORE_MAGIC	0x1bea1e0UL
+#include "hibernate.c"
+
 int swsusp_arch_resume(void)
 {
 	int error;
@@ -152,6 +173,10 @@ int swsusp_arch_resume(void)
 
 	resume_init_first_level_page_table(resume_pg_dir);
 	error = resume_physical_mapping_init(resume_pg_dir);
+	if (error)
+		return error;
+
+	error = reallocate_restore_code();
 	if (error)
 		return error;
 

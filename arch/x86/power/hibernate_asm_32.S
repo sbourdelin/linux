@@ -1,5 +1,14 @@
 /*
- * This may not use any stack, nor any variable that is not "NoSave":
+ * Hibernation support for i386
+ *
+ * Distribute under GPLv2.
+ *
+ * Copyright 2007 Rafael J. Wysocki <rjw@sisk.pl>
+ * Copyright 2005 Andi Kleen <ak@suse.de>
+ * Copyright 2004, 2015 Pavel Machek <pavel@ucw.cz>
+ *
+ * swsusp_arch_resume must not use any stack or any nonlocal variables while
+ * copying pages:
  *
  * Its rewriting one kernel image with another. What is stack in "old"
  * image could very well be data page in "new" image, and overwriting
@@ -23,6 +32,10 @@ ENTRY(swsusp_arch_suspend)
 	pushfl
 	popl saved_context_eflags
 
+	/* save cr3 */
+	movl	%cr3, %eax
+	movl	%eax, restore_cr3
+
 	call swsusp_save
 	ret
 
@@ -38,9 +51,27 @@ ENTRY(restore_image)
 	movl	%cr3, %eax;  # flush TLB
 	movl	%eax, %cr3
 1:
+
+	/* prepare to jump to the image kernel */
+	movl	restore_jump_address, %eax
+	movl	restore_cr3, %ebx
+
+#if 0
+	FIXME
+	/* prepare to switch to temporary page tables */
+	movq    temp_level4_pgt(%rip), %rax
+	movq    mmu_cr4_features(%rip), %rbx
+#endif
+	
+	/* prepare to copy image data to their original locations */
 	movl	restore_pblist, %edx
+
+	/* jump to relocated restore code */
+	movl	relocated_restore_code, %ecx
+	jmpl	*%ecx
 	.p2align 4,,7
 
+ENTRY(core_restore_code)
 copy_loop:
 	testl	%edx, %edx
 	jz	done
@@ -48,7 +79,7 @@ copy_loop:
 	movl	pbe_address(%edx), %esi
 	movl	pbe_orig_address(%edx), %edi
 
-	movl	$1024, %ecx
+	movl	$(PAGE_SIZE >> 2), %ecx
 	rep
 	movsl
 
@@ -57,6 +88,20 @@ copy_loop:
 	.p2align 4,,7
 
 done:
+	/* jump to the restore_registers address from the image header */
+	jmpl	*%eax
+	/*
+	 * NOTE: This assumes that the boot kernel's text mapping covers the
+	 * image kernel's page containing restore_registers and the address of
+	 * this page is the same as in the image kernel's text mapping (it
+	 * should always be true, because the text mapping is linear, starting
+	 * from 0, and is supposed to cover the entire kernel text for every
+	 * kernel).
+	 *
+	 * code below belongs to the image kernel
+	 */
+
+ENTRY(restore_registers)
 	/* go back to the original page tables */
 	movl	$swapper_pg_dir, %eax
 	subl	$__PAGE_OFFSET, %eax
@@ -80,5 +125,8 @@ done:
 	lgdt saved_context_gdt_desc(%eax)
 
 	xorl	%eax, %eax
+
+	/* tell the hibernation core that we've just restored the memory */
+	movl	%eax, in_suspend
 
 	ret
