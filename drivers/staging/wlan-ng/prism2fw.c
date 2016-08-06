@@ -200,7 +200,8 @@ static int validate_identity(void);
 * Returns:
 *	0	- success
 *	~0	- failure
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 static int prism2_fwtry(struct usb_device *udev, wlandevice_t *wlandev)
 {
 	const struct firmware *fw_entry = NULL;
@@ -237,7 +238,8 @@ static int prism2_fwtry(struct usb_device *udev, wlandevice_t *wlandev)
 * Returns:
 *	0	- success
 *	~0	- failure
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 static int prism2_fwapply(const struct ihex_binrec *rfptr,
 			  wlandevice_t *wlandev)
 {
@@ -387,7 +389,8 @@ out:
 * Returns:
 *	0	success
 *	~0	failure
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 static int crcimage(struct imgchunk *fchunk, unsigned int nfchunks,
 	     struct s3crcrec *s3crc, unsigned int ns3crc)
 {
@@ -448,7 +451,8 @@ static int crcimage(struct imgchunk *fchunk, unsigned int nfchunks,
 *
 * Returns:
 *	nothing
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 static void free_chunks(struct imgchunk *fchunk, unsigned int *nfchunks)
 {
 	int i;
@@ -471,7 +475,8 @@ static void free_chunks(struct imgchunk *fchunk, unsigned int *nfchunks)
 *
 * Returns:
 *	nothing
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 static void free_srecs(void)
 {
 	ns3data = 0;
@@ -498,7 +503,8 @@ static void free_srecs(void)
 * Returns:
 *	0	- success
 *	~0	- failure (probably an errno)
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 static int mkimage(struct imgchunk *clist, unsigned int *ccnt)
 {
 	int result = 0;
@@ -589,7 +595,8 @@ static int mkimage(struct imgchunk *clist, unsigned int *ccnt)
 * Returns:
 *	0	- success
 *	~0	- failure (probably an errno)
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 static int mkpdrlist(struct pda *pda)
 {
 	u16 *pda16 = (u16 *) pda->buf;
@@ -659,7 +666,8 @@ static int mkpdrlist(struct pda *pda)
 * Returns:
 *	0	success
 *	~0	failure
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 static int plugimage(struct imgchunk *fchunk, unsigned int nfchunks,
 	      struct s3plugrec *s3plug, unsigned int ns3plug, struct pda *pda)
 {
@@ -765,7 +773,8 @@ static int plugimage(struct imgchunk *fchunk, unsigned int nfchunks,
 * Returns:
 *	0	- success
 *	~0	- failure (probably an errno)
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 static int read_cardpda(struct pda *pda, wlandevice_t *wlandev)
 {
 	int result = 0;
@@ -860,7 +869,8 @@ static int read_cardpda(struct pda *pda, wlandevice_t *wlandev)
 * Returns:
 *	0	- success
 *	~0	- failure (probably an errno)
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 static int read_fwfile(const struct ihex_binrec *record)
 {
 	int		i;
@@ -981,7 +991,8 @@ static int read_fwfile(const struct ihex_binrec *record)
 * Returns:
 *	0	success
 *	~0	failure
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 static int writeimage(wlandevice_t *wlandev, struct imgchunk *fchunk,
 	       unsigned int nfchunks)
 {

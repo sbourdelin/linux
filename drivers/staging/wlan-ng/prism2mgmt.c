@@ -112,7 +112,8 @@
 * Call context:
 *	process thread  (usually)
 *	interrupt
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 int prism2mgmt_scan(wlandevice_t *wlandev, void *msgp)
 {
 	int result = 0;
@@ -365,7 +366,8 @@ exit:
 * Call context:
 *	process thread  (usually)
 *	interrupt
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 int prism2mgmt_scan_results(wlandevice_t *wlandev, void *msgp)
 {
 	int result = 0;
@@ -524,7 +526,8 @@ exit:
 * Call context:
 *	process thread  (usually)
 *	interrupt
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 int prism2mgmt_start(wlandevice_t *wlandev, void *msgp)
 {
 	int result = 0;
@@ -707,7 +710,8 @@ done:
 *
 * Call context:
 *	process thread  (usually)
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 int prism2mgmt_readpda(wlandevice_t *wlandev, void *msgp)
 {
 	hfa384x_t *hw = wlandev->priv;
@@ -773,7 +777,8 @@ int prism2mgmt_readpda(wlandevice_t *wlandev, void *msgp)
 *
 * Call context:
 *	process thread  (usually)
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 int prism2mgmt_ramdl_state(wlandevice_t *wlandev, void *msgp)
 {
 	hfa384x_t *hw = wlandev->priv;
@@ -828,7 +833,8 @@ int prism2mgmt_ramdl_state(wlandevice_t *wlandev, void *msgp)
 *
 * Call context:
 *	process thread  (usually)
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 int prism2mgmt_ramdl_write(wlandevice_t *wlandev, void *msgp)
 {
 	hfa384x_t *hw = wlandev->priv;
@@ -889,7 +895,8 @@ int prism2mgmt_ramdl_write(wlandevice_t *wlandev, void *msgp)
 *
 * Call context:
 *	process thread  (usually)
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 int prism2mgmt_flashdl_state(wlandevice_t *wlandev, void *msgp)
 {
 	int result = 0;
@@ -960,7 +967,8 @@ int prism2mgmt_flashdl_state(wlandevice_t *wlandev, void *msgp)
 *
 * Call context:
 *	process thread  (usually)
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 int prism2mgmt_flashdl_write(wlandevice_t *wlandev, void *msgp)
 {
 	hfa384x_t *hw = wlandev->priv;
@@ -1020,7 +1028,8 @@ int prism2mgmt_flashdl_write(wlandevice_t *wlandev, void *msgp)
 * Call context:
 *	process thread  (usually)
 *	interrupt
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 int prism2mgmt_autojoin(wlandevice_t *wlandev, void *msgp)
 {
 	hfa384x_t *hw = wlandev->priv;
@@ -1091,7 +1100,8 @@ int prism2mgmt_autojoin(wlandevice_t *wlandev, void *msgp)
 * Call context:
 *	process thread  (usually)
 *	interrupt
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 int prism2mgmt_wlansniff(wlandevice_t *wlandev, void *msgp)
 {
 	int result = 0;

@@ -122,7 +122,8 @@ MODULE_PARM_DESC(wlan_wext_write, "enable write wireless extensions");
 *
 * Returns:
 *	nothing
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 static int p80211knetdev_init(netdevice_t *netdev)
 {
 	/* Called in response to register_netdev */
@@ -145,7 +146,8 @@ static int p80211knetdev_init(netdevice_t *netdev)
 *
 * Returns:
 *	zero on success, non-zero otherwise
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 static int p80211knetdev_open(netdevice_t *netdev)
 {
 	int result = 0;		/* success */
@@ -180,7 +182,8 @@ static int p80211knetdev_open(netdevice_t *netdev)
 *
 * Returns:
 *	zero on success, non-zero otherwise
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 static int p80211knetdev_stop(netdevice_t *netdev)
 {
 	int result = 0;
@@ -207,7 +210,8 @@ static int p80211knetdev_stop(netdevice_t *netdev)
 *	nothing
 * Side effects:
 *
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 void p80211netdev_rx(wlandevice_t *wlandev, struct sk_buff *skb)
 {
 	/* Enqueue for post-irq processing */
@@ -316,7 +320,8 @@ static void p80211netdev_rx_bh(unsigned long arg)
 *
 * Returns:
 *	zero on success, non-zero on failure.
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 static int p80211knetdev_hard_start_xmit(struct sk_buff *skb,
 					 netdevice_t *netdev)
 {
@@ -445,7 +450,8 @@ failed:
 *
 * Returns:
 *	nothing
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 static void p80211knetdev_set_multicast_list(netdevice_t *dev)
 {
 	wlandevice_t *wlandev = dev->ml_priv;
@@ -530,7 +536,8 @@ static int p80211netdev_ethtool(wlandevice_t *wlandev, void __user *useraddr)
 * Call Context:
 *	Process thread (ioctl caller).  TODO: SMP support may require
 *	locks.
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 static int p80211knetdev_do_ioctl(netdevice_t *dev, struct ifreq *ifr, int cmd)
 {
 	int result = 0;
@@ -609,7 +616,8 @@ bail:
 *		-and errors returned by: p80211req_dorequest(..)
 *
 * by: Collin R. Mulliner <collin@mulliner.org>
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 static int p80211knetdev_set_mac_address(netdevice_t *dev, void *addr)
 {
 	struct sockaddr *new_addr = addr;
@@ -672,7 +680,8 @@ static int p80211knetdev_set_mac_address(netdevice_t *dev, void *addr)
 static int wlan_change_mtu(netdevice_t *dev, int new_mtu)
 {
 	/* 2312 is max 802.11 payload, 20 is overhead, (ether + llc +snap)
-	   and another 8 for wep. */
+	 * and another 8 for wep.
+	 */
 	if ((new_mtu < 68) || (new_mtu > (2312 - 20 - 8)))
 		return -EINVAL;
 
@@ -716,7 +725,8 @@ static const struct net_device_ops p80211_netdev_ops = {
 *	interrupt though.  When we add support for statically
 *	compiled drivers, this function will be called in the
 *	context of the kernel startup code.
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 int wlan_setup(wlandevice_t *wlandev, struct device *physdev)
 {
 	int result = 0;
@@ -782,7 +792,8 @@ int wlan_setup(wlandevice_t *wlandev, struct device *physdev)
 *	interrupt though.  When we add support for statically
 *	compiled drivers, this function will be called in the
 *	context of the kernel startup code.
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 void wlan_unsetup(wlandevice_t *wlandev)
 {
 	struct wireless_dev *wdev;
@@ -816,7 +827,8 @@ void wlan_unsetup(wlandevice_t *wlandev)
 *	zero on success, non-zero otherwise.
 * Call Context:
 *	Can be either interrupt or not.
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 int register_wlandev(wlandevice_t *wlandev)
 {
 	return register_netdev(wlandev->netdev);
@@ -838,7 +850,8 @@ int register_wlandev(wlandevice_t *wlandev)
 *	zero on success, non-zero otherwise.
 * Call Context:
 *	Can be either interrupt or not.
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 int unregister_wlandev(wlandevice_t *wlandev)
 {
 	struct sk_buff *skb;
@@ -881,7 +894,8 @@ int unregister_wlandev(wlandevice_t *wlandev)
 *
 * Call context:
 *	Usually interrupt.
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 void p80211netdev_hwremoved(wlandevice_t *wlandev)
 {
 	wlandev->hwremoved = 1;
@@ -911,7 +925,8 @@ void p80211netdev_hwremoved(wlandevice_t *wlandev)
 *
 * Call context:
 *	interrupt
-----------------------------------------------------------------*/
+* ----------------------------------------------------------------
+*/
 static int p80211_rx_typedrop(wlandevice_t *wlandev, u16 fc)
 {
 	u16 ftype;

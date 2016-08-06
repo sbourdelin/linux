@@ -255,8 +255,8 @@ static struct mibrec mibtab[] = {
 * Call context:
 *	process thread  (usually)
 *	interrupt
-----------------------------------------------------------------*/
-
+* ----------------------------------------------------------------
+*/
 int prism2mgmt_mibset_mibget(wlandevice_t *wlandev, void *msgp)
 {
 	hfa384x_t *hw = wlandev->priv;
@@ -369,8 +369,8 @@ done:
 *       0   - Success.
 *       ~0  - Error.
 *
-----------------------------------------------------------------*/
-
+* ----------------------------------------------------------------
+*/
 static int prism2mib_bytearea2pstr(struct mibrec *mib,
 				   int isget,
 				   wlandevice_t *wlandev,
@@ -419,8 +419,8 @@ static int prism2mib_bytearea2pstr(struct mibrec *mib,
 *       0   - Success.
 *       ~0  - Error.
 *
-----------------------------------------------------------------*/
-
+* ----------------------------------------------------------------
+*/
 static int prism2mib_uint32(struct mibrec *mib,
 			    int isget,
 			    wlandevice_t *wlandev,
@@ -466,8 +466,8 @@ static int prism2mib_uint32(struct mibrec *mib,
 *       0   - Success.
 *       ~0  - Error.
 *
-----------------------------------------------------------------*/
-
+* ----------------------------------------------------------------
+*/
 static int prism2mib_flag(struct mibrec *mib,
 			  int isget,
 			  wlandevice_t *wlandev,
@@ -523,8 +523,8 @@ static int prism2mib_flag(struct mibrec *mib,
 *       0   - Success.
 *       ~0  - Error.
 *
-----------------------------------------------------------------*/
-
+* ----------------------------------------------------------------
+*/
 static int prism2mib_wepdefaultkey(struct mibrec *mib,
 				   int isget,
 				   wlandevice_t *wlandev,
@@ -573,8 +573,8 @@ static int prism2mib_wepdefaultkey(struct mibrec *mib,
 *       0   - Success.
 *       ~0  - Error.
 *
-----------------------------------------------------------------*/
-
+* ----------------------------------------------------------------
+*/
 static int prism2mib_privacyinvoked(struct mibrec *mib,
 				    int isget,
 				    wlandevice_t *wlandev,
@@ -615,8 +615,8 @@ static int prism2mib_privacyinvoked(struct mibrec *mib,
 *       0   - Success.
 *       ~0  - Error.
 *
-----------------------------------------------------------------*/
-
+* ----------------------------------------------------------------
+*/
 static int prism2mib_excludeunencrypted(struct mibrec *mib,
 					int isget,
 					wlandevice_t *wlandev,
@@ -651,8 +651,8 @@ static int prism2mib_excludeunencrypted(struct mibrec *mib,
 *       0   - Success.
 *       ~0  - Error.
 *
-----------------------------------------------------------------*/
-
+* ----------------------------------------------------------------
+*/
 static int prism2mib_fragmentationthreshold(struct mibrec *mib,
 					    int isget,
 					    wlandevice_t *wlandev,
@@ -697,8 +697,8 @@ static int prism2mib_fragmentationthreshold(struct mibrec *mib,
 *       0   - Success.
 *       ~0  - Error.
 *
-----------------------------------------------------------------*/
-
+* ----------------------------------------------------------------
+*/
 static int prism2mib_priv(struct mibrec *mib,
 			  int isget,
 			  wlandevice_t *wlandev,
@@ -749,8 +749,8 @@ static int prism2mib_priv(struct mibrec *mib,
 * Returns:
 *	Nothing
 *
-----------------------------------------------------------------*/
-
+* ----------------------------------------------------------------
+*/
 void prism2mgmt_pstr2bytestr(struct hfa384x_bytestr *bytestr,
 			     p80211pstrd_t *pstr)
 {
@@ -771,8 +771,8 @@ void prism2mgmt_pstr2bytestr(struct hfa384x_bytestr *bytestr,
 * Returns:
 *	Nothing
 *
-----------------------------------------------------------------*/
-
+* ----------------------------------------------------------------
+*/
 void prism2mgmt_bytestr2pstr(struct hfa384x_bytestr *bytestr,
 			     p80211pstrd_t *pstr)
 {
@@ -793,8 +793,8 @@ void prism2mgmt_bytestr2pstr(struct hfa384x_bytestr *bytestr,
 * Returns:
 *	Nothing
 *
-----------------------------------------------------------------*/
-
+* ----------------------------------------------------------------
+*/
 void prism2mgmt_bytearea2pstr(u8 *bytearea, p80211pstrd_t *pstr, int len)
 {
 	pstr->len = (u8) len;
