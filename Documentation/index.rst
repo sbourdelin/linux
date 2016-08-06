@@ -6,8 +6,6 @@
 Welcome to The Linux Kernel's documentation!
 ============================================
 
-Nothing for you to see here *yet*. Please move along.
-
 Contents:
 
 .. toctree::
