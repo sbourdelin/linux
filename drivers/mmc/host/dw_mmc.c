@@ -1281,6 +1281,9 @@ static inline void dw_mci_set_power_reg(struct dw_mci_slot *slot,
 {
 	u32 regs;
 
+	if (test_bit(DW_MMC_CARD_PWR_INVERT, &slot->flags))
+		enable = !enable;
+
 	if (enable) {
 		regs = mci_readl(slot->host, PWREN);
 		regs |= (1 << slot->id);
