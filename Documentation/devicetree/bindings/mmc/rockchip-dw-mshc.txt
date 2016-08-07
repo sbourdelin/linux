@@ -30,6 +30,12 @@ Optional Properties:
   probing, low speeds or in case where all phases work at tuning time.
   If not specified 0 deg will be used.
 
+* rockchip,power-invert: Invert the power control of PWREN register. If adding
+  it, the card should be in power-on state when the power io outputs high level
+  voltage, and it should be in power-off state when outputing low level voltage.
+  otherwise the behaviour of power control should be the opposite way which is
+  the default policy of dw mshc.
+
 Example:
 
 	rkdwmmc0@12200000 {
