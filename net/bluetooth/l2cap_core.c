@@ -433,11 +433,11 @@ static void l2cap_chan_timeout(struct work_struct *work)
 	l2cap_chan_put(chan);
 }
 
-struct l2cap_chan *l2cap_chan_create(void)
+static struct l2cap_chan *__l2cap_chan_create(size_t priv_size)
 {
 	struct l2cap_chan *chan;
 
-	chan = kzalloc(sizeof(*chan), GFP_ATOMIC);
+	chan = kzalloc(sizeof(*chan) + priv_size, GFP_ATOMIC);
 	if (!chan)
 		return NULL;
 
@@ -463,7 +463,24 @@ struct l2cap_chan *l2cap_chan_create(void)
 
 	return chan;
 }
+
+struct l2cap_chan *l2cap_chan_create(void)
+{
+	return __l2cap_chan_create(0);
+}
 EXPORT_SYMBOL_GPL(l2cap_chan_create);
+
+struct l2cap_chan *l2cap_chan_create_priv(size_t priv_size)
+{
+	struct l2cap_chan *chan = __l2cap_chan_create(priv_size);
+
+	/* let's point data pointer to private space */
+	if (chan)
+		chan->data = chan->priv;
+
+	return chan;
+}
+EXPORT_SYMBOL_GPL(l2cap_chan_create_priv);
 
 static void l2cap_chan_destroy(struct kref *kref)
 {

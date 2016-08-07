@@ -598,6 +598,9 @@ struct l2cap_chan {
 	void			*data;
 	const struct l2cap_ops	*ops;
 	struct mutex		lock;
+
+	/* must be last */
+	u8 priv[0] __aligned(sizeof(void *));
 };
 
 struct l2cap_ops {
@@ -925,6 +928,7 @@ int l2cap_add_psm(struct l2cap_chan *chan, bdaddr_t *src, __le16 psm);
 int l2cap_add_scid(struct l2cap_chan *chan,  __u16 scid);
 
 struct l2cap_chan *l2cap_chan_create(void);
+struct l2cap_chan *l2cap_chan_create_priv(size_t priv_size);
 void l2cap_chan_close(struct l2cap_chan *chan, int reason);
 int l2cap_chan_connect(struct l2cap_chan *chan, __le16 psm, u16 cid,
 		       bdaddr_t *dst, u8 dst_type);
