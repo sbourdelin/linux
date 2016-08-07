@@ -1538,15 +1538,11 @@ static int seq_ioctl_create_queue(struct snd_seq_client *client, void *arg)
 }
 
 /* DELETE_QUEUE ioctl() */
-static int seq_ioctl_delete_queue(struct snd_seq_client *client,
-				  void __user *arg)
+static int seq_ioctl_delete_queue(struct snd_seq_client *client, void *arg)
 {
-	struct snd_seq_queue_info info;
+	struct snd_seq_queue_info *info = arg;
 
-	if (copy_from_user(&info, arg, sizeof(info)))
-		return -EFAULT;
-
-	return snd_seq_queue_delete(client->number, info.queue);
+	return snd_seq_queue_delete(client->number, info->queue);
 }
 
 /* GET_QUEUE_INFO ioctl() */
