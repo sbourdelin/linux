@@ -1862,18 +1862,14 @@ static int seq_ioctl_set_client_pool(struct snd_seq_client *client, void *arg)
 
 
 /* REMOVE_EVENTS ioctl() */
-static int seq_ioctl_remove_events(struct snd_seq_client *client,
-				   void __user *arg)
+static int seq_ioctl_remove_events(struct snd_seq_client *client, void *arg)
 {
-	struct snd_seq_remove_events info;
-
-	if (copy_from_user(&info, arg, sizeof(info)))
-		return -EFAULT;
+	struct snd_seq_remove_events *info = arg;
 
 	/*
 	 * Input mostly not implemented XXX.
 	 */
-	if (info.remove_mode & SNDRV_SEQ_REMOVE_INPUT) {
+	if (info->remove_mode & SNDRV_SEQ_REMOVE_INPUT) {
 		/*
 		 * No restrictions so for a user client we can clear
 		 * the whole fifo
@@ -1882,8 +1878,8 @@ static int seq_ioctl_remove_events(struct snd_seq_client *client,
 			snd_seq_fifo_clear(client->data.user.fifo);
 	}
 
-	if (info.remove_mode & SNDRV_SEQ_REMOVE_OUTPUT)
-		snd_seq_queue_remove_cells(client->number, &info);
+	if (info->remove_mode & SNDRV_SEQ_REMOVE_OUTPUT)
+		snd_seq_queue_remove_cells(client->number, info);
 
 	return 0;
 }
