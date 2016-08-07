@@ -1276,10 +1276,25 @@ static void dw_mci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	spin_unlock_bh(&host->lock);
 }
 
+static inline void dw_mci_set_power_reg(struct dw_mci_slot *slot,
+					bool enable)
+{
+	u32 regs;
+
+	if (enable) {
+		regs = mci_readl(slot->host, PWREN);
+		regs |= (1 << slot->id);
+		mci_writel(slot->host, PWREN, regs);
+	} else {
+		regs = mci_readl(slot->host, PWREN);
+		regs &= ~(1 << slot->id);
+		mci_writel(slot->host, PWREN, regs);
+	}
+}
+
 static int dw_mci_set_power(struct mmc_host *mmc, struct mmc_ios *ios)
 {
 	struct dw_mci_slot *slot = mmc_priv(mmc);
-	u32 regs;
 
 	switch (ios->power_mode) {
 	case MMC_POWER_UP:
@@ -1291,9 +1306,7 @@ static int dw_mci_set_power(struct mmc_host *mmc, struct mmc_ios *ios)
 			return -EINVAL;
 		}
 		set_bit(DW_MMC_CARD_NEED_INIT, &slot->flags);
-		regs = mci_readl(slot->host, PWREN);
-		regs |= (1 << slot->id);
-		mci_writel(slot->host, PWREN, regs);
+		dw_mci_set_power_reg(slot, true);
 		break;
 	case MMC_POWER_ON:
 		if (!slot->host->vqmmc_enabled) {
@@ -1325,10 +1338,7 @@ static int dw_mci_set_power(struct mmc_host *mmc, struct mmc_ios *ios)
 		if (!IS_ERR(mmc->supply.vqmmc) && slot->host->vqmmc_enabled)
 			regulator_disable(mmc->supply.vqmmc);
 		slot->host->vqmmc_enabled = false;
-
-		regs = mci_readl(slot->host, PWREN);
-		regs &= ~(1 << slot->id);
-		mci_writel(slot->host, PWREN, regs);
+		dw_mci_set_power_reg(slot, false);
 		break;
 	default:
 		break;
