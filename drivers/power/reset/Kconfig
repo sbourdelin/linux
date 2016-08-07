@@ -190,6 +190,7 @@ config REBOOT_MODE
 config SYSCON_REBOOT_MODE
 	tristate "Generic SYSCON regmap reboot mode driver"
 	depends on OF
+	depends on HAS_IOMEM
 	select REBOOT_MODE
 	select MFD_SYSCON
 	help
