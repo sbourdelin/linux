@@ -112,7 +112,7 @@
 *  + single master mode means no use of repeated starts
 *  + multi master mode means use of repeated starts
 *  Default is single master.
-*  Default can be overriden by setting the compile switch DRXDAP_SINGLE_MASTER.
+*  Default can be overridden by setting the compile switch DRXDAP_SINGLE_MASTER.
 *
 * Slave:
 * Single/multi master selected via the flags in the FASI protocol.

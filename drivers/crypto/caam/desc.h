@@ -123,7 +123,7 @@ struct sec4_sg_entry {
  */
 #define HDR_REVERSE		0x00000800
 
-/* Propogate DNR property to SharedDesc */
+/* Propagate DNR property to SharedDesc */
 #define HDR_PROP_DNR		0x00000800
 
 /* JobDesc/SharedDesc share property */

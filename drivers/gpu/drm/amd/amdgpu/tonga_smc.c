@@ -71,7 +71,7 @@ static int tonga_copy_bytes_to_smc(struct amdgpu_device *adev, uint32_t smc_star
 
 	spin_lock_irqsave(&adev->smc_idx_lock, flags);
 	while (byte_count >= 4) {
-		/* Bytes are written into the SMC addres space with the MSB first */
+		/* Bytes are written into the SMC address space with the MSB first */
 		data = (src[0] << 24) + (src[1] << 16) + (src[2] << 8) + src[3];
 
 		result = tonga_set_smc_sram_address(adev, addr, limit);

@@ -821,7 +821,7 @@ lpfc_test_rrq_active(struct lpfc_hba *phba, struct lpfc_nodelist *ndlp,
  *
  * This function takes the hbalock.
  * The active bit is always set in the active rrq xri_bitmap even
- * if there is no slot avaiable for the other rrq information.
+ * if there is no slot available for the other rrq information.
  *
  * returns 0 rrq actived for this xri
  *         < 0 No memory or invalid ndlp.
@@ -4506,7 +4506,7 @@ lpfc_sli4_rb_setup(struct lpfc_hba *phba)
  * @phba: Pointer to HBA context object.
  * @sli_mode: sli mode - 2/3
  *
- * This function is called by the sli intialization code path
+ * This function is called by the sli initialization code path
  * to issue config_port mailbox command. This function restarts the
  * HBA firmware and issues a config_port mailbox command to configure
  * the SLI interface in the sli mode specified by sli_mode
@@ -4646,11 +4646,11 @@ do_prep_failed:
 
 
 /**
- * lpfc_sli_hba_setup - SLI intialization function
+ * lpfc_sli_hba_setup - SLI initialization function
  * @phba: Pointer to HBA context object.
  *
- * This function is the main SLI intialization function. This function
- * is called by the HBA intialization code, HBA reset code and HBA
+ * This function is the main SLI initialization function. This function
+ * is called by the HBA initialization code, HBA reset code and HBA
  * error attention handler code. Caller is not required to hold any
  * locks. This function issues config_port mailbox command to configure
  * the SLI, setup iocb rings and HBQ rings. In the end the function
@@ -6276,7 +6276,7 @@ lpfc_sli4_repost_els_sgl_list(struct lpfc_hba *phba)
 	/* free the els sgls failed to post */
 	lpfc_free_sgl_list(phba, &free_sgl_list);
 
-	/* push els sgls posted to the availble list */
+	/* push els sgls posted to the available list */
 	if (!list_empty(&post_sgl_list)) {
 		spin_lock_irq(&phba->hbalock);
 		spin_lock(&pring->ring_lock);
@@ -6293,11 +6293,11 @@ lpfc_sli4_repost_els_sgl_list(struct lpfc_hba *phba)
 }
 
 /**
- * lpfc_sli4_hba_setup - SLI4 device intialization PCI function
+ * lpfc_sli4_hba_setup - SLI4 device initialization PCI function
  * @phba: Pointer to HBA context object.
  *
- * This function is the main SLI4 device intialization PCI function. This
- * function is called by the HBA intialization code, HBA reset code and
+ * This function is the main SLI4 device initialization PCI function. This
+ * function is called by the HBA initialization code, HBA reset code and
  * HBA error attention handler code. Caller is not required to hold any
  * locks.
  **/
@@ -8137,7 +8137,7 @@ __lpfc_sli_issue_iocb_s3(struct lpfc_hba *phba, uint32_t ring_number,
  * If the IOCB contains a BPL then the list of BDE's is
  * converted to sli4_sge's. If the IOCB contains a single
  * BDE then it is converted to a single sli_sge.
- * The IOCB is still in cpu endianess so the contents of
+ * The IOCB is still in cpu endianness so the contents of
  * the bpl can be used without byte swapping.
  *
  * Returns valid XRI = Success, NO_XRI = Failure.
@@ -11387,7 +11387,7 @@ unplug_error:
  * device-level interrupt handler. When the PCI slot is in error recovery
  * or the HBA is undergoing initialization, the interrupt handler will not
  * process the interrupt. The SCSI FCP fast-path ring event are handled in
- * the intrrupt context. This function is called without any lock held.
+ * the interrupt context. This function is called without any lock held.
  * It gets the hbalock to access and update SLI data structures.
  *
  * This function returns IRQ_HANDLED when interrupt is handled else it
@@ -12678,7 +12678,7 @@ lpfc_sli4_fof_handle_eqe(struct lpfc_hba *phba, struct lpfc_eqe *eqe)
  * device-level interrupt handler. When the PCI slot is in error recovery
  * or the HBA is undergoing initialization, the interrupt handler will not
  * process the interrupt. The Flash Optimized Fabric ring event are handled in
- * the intrrupt context. This function is called without any lock held.
+ * the interrupt context. This function is called without any lock held.
  * It gets the hbalock to access and update SLI data structures. Note that,
  * the EQ to CQ are one-to-one map such that the EQ index is
  * equal to that of CQ index.
@@ -12767,7 +12767,7 @@ lpfc_sli4_fof_intr_handler(int irq, void *dev_id)
  * device-level interrupt handler. When the PCI slot is in error recovery
  * or the HBA is undergoing initialization, the interrupt handler will not
  * process the interrupt. The SCSI FCP fast-path ring event are handled in
- * the intrrupt context. This function is called without any lock held.
+ * the interrupt context. This function is called without any lock held.
  * It gets the hbalock to access and update SLI data structures. Note that,
  * the FCP EQ to FCP CQ are one-to-one map such that the FCP EQ index is
  * equal to that of FCP CQ index.
@@ -16524,7 +16524,7 @@ next_priority:
 		/*
 		 * If next fcf index is not found check if there are lower
 		 * Priority level fcf's in the fcf_priority list.
-		 * Set up the rr_bmask with all of the avaiable fcf bits
+		 * Set up the rr_bmask with all of the available fcf bits
 		 * at that level and continue the selection process.
 		 */
 		if (lpfc_check_next_fcf_pri_level(phba))

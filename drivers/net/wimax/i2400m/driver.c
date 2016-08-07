@@ -852,7 +852,7 @@ EXPORT_SYMBOL_GPL(i2400m_reset);
  *
  * Returns: 0 if ok, < 0 errno code on error.
  *
- * Sets up basic device comunication infrastructure, boots the ROM to
+ * Sets up basic device communication infrastructure, boots the ROM to
  * read the MAC address, registers with the WiMAX and network stacks
  * and then brings up the device.
  */

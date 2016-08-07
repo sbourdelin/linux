@@ -1452,7 +1452,7 @@ static struct rt6_info *__ip6_route_redirect(struct net *net,
 	struct fib6_node *fn;
 
 	/* Get the "current" route for this destination and
-	 * check if the redirect has come from approriate router.
+	 * check if the redirect has come from appropriate router.
 	 *
 	 * RFC 4861 specifies that redirects should only be
 	 * accepted if they come from the nexthop to the target.

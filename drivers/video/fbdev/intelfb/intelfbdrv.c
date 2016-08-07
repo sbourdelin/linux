@@ -933,9 +933,7 @@ static __inline__ int var_to_refresh(const struct fb_var_screeninfo *var)
 	return (1000000000 / var->pixclock * 1000 + 500) / xtot / ytot;
 }
 
-/***************************************************************
- *                Various intialisation functions              *
- ***************************************************************/
+/* Various initialisation functions */
 
 static void get_initial_mode(struct intelfb_info *dinfo)
 {

@@ -112,7 +112,7 @@ void iscsit_put_tiqn_for_login(struct iscsi_tiqn *tiqn)
 
 /*
  * Note that IQN formatting is expected to be done in userspace, and
- * no explict IQN format checks are done here.
+ * no explicit IQN format checks are done here.
  */
 struct iscsi_tiqn *iscsit_add_tiqn(unsigned char *buf)
 {

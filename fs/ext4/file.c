@@ -253,7 +253,7 @@ static int ext4_dax_pmd_fault(struct vm_area_struct *vma, unsigned long addr,
 
 /*
  * Handle write fault for VM_MIXEDMAP mappings. Similarly to ext4_dax_fault()
- * handler we check for races agaist truncate. Note that since we cycle through
+ * handler we check for races against truncate. Note that since we cycle through
  * i_mmap_sem, we are sure that also any hole punching that began before we
  * were called is finished by now and so if it included part of the file we
  * are working on, our pte will get unmapped and the check for pte_same() in

@@ -987,7 +987,7 @@ static struct qla_tgt_sess *qlt_create_sess(
 
 	/*
 	 * Determine if this fc_port->port_name is allowed to access
-	 * target mode using explict NodeACLs+MappedLUNs, or using
+	 * target mode using explicit NodeACLs+MappedLUNs, or using
 	 * TPG demo mode.  If this is successful a target mode FC nexus
 	 * is created.
 	 */
@@ -2798,7 +2798,7 @@ int qlt_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type,
 			    CTIO7_FLAGS_DONT_RET_CTIO);
 
 			/* qlt_24xx_init_ctio_to_isp will correct
-			 * all neccessary fields that's part of CTIO7.
+			 * all necessary fields that's part of CTIO7.
 			 * There should be no residual of CTIO-CRC2 data.
 			 */
 			qlt_24xx_init_ctio_to_isp((struct ctio7_to_24xx *)ctio,
@@ -5657,7 +5657,7 @@ static void qlt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 					 * received and processed.
 					 * Unfortunately, the firmware has a
 					 * silly requirement that all aborted
-					 * exchanges must be explicitely
+					 * exchanges must be explicitly
 					 * terminated, otherwise it refuses to
 					 * send responses for the abort
 					 * requests. So, we have to

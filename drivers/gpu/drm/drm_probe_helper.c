@@ -190,8 +190,8 @@ EXPORT_SYMBOL(drm_kms_helper_poll_enable_locked);
  *    - drm_mode_validate_basic() performs basic sanity checks
  *    - drm_mode_validate_size() filters out modes larger than @maxX and @maxY
  *      (if specified)
- *    - drm_mode_validate_flag() checks the modes againt basic connector
- *      capabilites (interlace_allowed,doublescan_allowed,stereo_allowed)
+ *    - drm_mode_validate_flag() checks the modes against basic connector
+ *      capabilities (interlace_allowed,doublescan_allowed,stereo_allowed)
  *    - the optional connector ->mode_valid() helper can perform driver and/or
  *      hardware specific checks
  *
@@ -484,7 +484,7 @@ EXPORT_SYMBOL(drm_kms_helper_poll_enable);
  * drm_kms_helper_poll_init - initialize and enable output polling
  * @dev: drm_device
  *
- * This function intializes and then also enables output polling support for
+ * This function initializes and then also enables output polling support for
  * @dev. Drivers which do not have reliable hotplug support in hardware can use
  * this helper infrastructure to regularly poll such connectors for changes in
  * their connection state.

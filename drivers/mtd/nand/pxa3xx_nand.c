@@ -1305,7 +1305,7 @@ static void nand_cmdfunc_extended(struct mtd_info *mtd,
 			break;
 
 		/*
-		 * After a splitted program command sequence has issued
+		 * After a split program command sequence has issued
 		 * the command dispatch, the command sequence is complete.
 		 */
 		if (info->cur_chunk == (info->ntotalchunks + 1) &&
@@ -1321,7 +1321,7 @@ static void nand_cmdfunc_extended(struct mtd_info *mtd,
 				ext_cmd_type = EXT_CMD_TYPE_NAKED_RW;
 
 		/*
-		 * If a splitted program command has no more data to transfer,
+		 * If a split program command has no more data to transfer,
 		 * the command dispatch must be issued to complete.
 		 */
 		} else if (command == NAND_CMD_PAGEPROG &&
@@ -1705,7 +1705,7 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
 	/*
 	 * If the page size is bigger than the FIFO size, let's check
 	 * we are given the right variant and then switch to the extended
-	 * (aka splitted) command handling,
+	 * (aka split) command handling,
 	 */
 	if (mtd->writesize > PAGE_CHUNK_SIZE) {
 		if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370) {

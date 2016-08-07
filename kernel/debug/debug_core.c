@@ -163,7 +163,7 @@ early_param("nokgdbroundup", opt_nokgdbroundup);
 
 /*
  * Weak aliases for breakpoint management,
- * can be overriden by architectures when needed:
+ * can be overridden by architectures when needed:
  */
 int __weak kgdb_arch_set_breakpoint(struct kgdb_bkpt *bpt)
 {

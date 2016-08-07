@@ -2067,7 +2067,7 @@ struct be_cmd_resp_get_stats_v2 {
 	struct be_hw_stats_v2 hw_stats;
 };
 
-/************** get fat capabilites *******************/
+/************** get fat capabilities *******************/
 #define MAX_MODULES 27
 #define MAX_MODES 4
 #define MODE_UART 0

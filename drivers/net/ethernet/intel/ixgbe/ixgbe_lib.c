@@ -862,7 +862,7 @@ static int ixgbe_alloc_q_vector(struct ixgbe_adapter *adapter,
 	/* initialize pointer to rings */
 	ring = q_vector->ring;
 
-	/* intialize ITR */
+	/* initialize ITR */
 	if (txr_count && !rxr_count) {
 		/* tx only vector */
 		if (adapter->tx_itr_setting == 1)

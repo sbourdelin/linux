@@ -66,7 +66,7 @@ int dlm_add_lkb_callback(struct dlm_lkb *lkb, uint32_t flags, int mode,
 		 * Suppress some redundant basts here, do more on removal.
 		 * Don't even add a bast if the callback just before it
 		 * is a bast for the same mode or a more restrictive mode.
-		 * (the addional > PR check is needed for PR/CW inversion)
+		 * (the additional > PR check is needed for PR/CW inversion)
 		 */
 
 		if ((i > 0) && (flags & DLM_CB_BAST) &&

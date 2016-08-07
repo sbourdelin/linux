@@ -802,7 +802,7 @@ resource_size_t pcibios_align_resource(void *, const struct resource *,
 				resource_size_t);
 void pcibios_update_irq(struct pci_dev *, int irq);
 
-/* Weak but can be overriden by arch */
+/* Weak but can be overridden by arch */
 void pci_fixup_cardbus(struct pci_bus *);
 
 /* Generic PCI functions used internally */

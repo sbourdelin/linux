@@ -229,7 +229,7 @@ static int rsi_usb_reg_write(struct usb_device *usbdev,
 
 /**
  * rsi_rx_done_handler() - This function is called when a packet is received
- *			   from USB stack. This is callback to recieve done.
+ *			   from USB stack. This is callback to receive done.
  * @urb: Received URB.
  *
  * Return: None.
@@ -516,7 +516,7 @@ err:
 
 /**
  * rsi_disconnect() - This function performs the reverse of the probe function,
- *		      it deintialize the driver structure.
+ *		      it deinitialize the driver structure.
  * @pfunction: Pointer to the USB interface structure.
  *
  * Return: None.

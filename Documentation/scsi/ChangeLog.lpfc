@@ -182,7 +182,7 @@ Changes from 20050201 to 20050208
 	* Integrated Christoph Hellwig's patch from 1/30: Some fixes in
 	  the evt handling area.
 	* Integrated Christoph Hellwig's patch from 1/30: Remove usage of
-	  intr_inited variable. The interrupt initilization from OS side
+	  intr_inited variable. The interrupt initialization from OS side
 	  now happens in lpfc_probe_one().
 	* Integrated Christoph Hellwig's patch from 1/30: remove shim
 	  lpfc_alloc_transport_attr - remove shim lpfc_alloc_shost_attrs -

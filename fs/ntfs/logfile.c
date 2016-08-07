@@ -422,7 +422,7 @@ static int ntfs_check_and_load_restart_page(struct inode *vi,
 			&& post_read_mst_fixup((NTFS_RECORD*)trp,
 			le32_to_cpu(rp->system_page_size))) {
 		/*
-		 * A multi sector tranfer error was detected.  We only need to
+		 * A multi sector transfer error was detected.  We only need to
 		 * abort if the restart page contents exceed the multi sector
 		 * transfer fixup of the first sector.
 		 */
@@ -535,7 +535,7 @@ bool ntfs_check_logfile(struct inode *log_vi, RESTART_PAGE_HEADER **rp)
 	 * page header is at the beginning of a page we only need to search at
 	 * what could be the beginning of a page (for each page size) rather
 	 * than scanning the whole file byte by byte.  If all potential places
-	 * contain empty and uninitialzed records, the log file can be assumed
+	 * contain empty and uninitialized records, the log file can be assumed
 	 * to be empty.
 	 */
 	for (pos = 0; pos < size; pos <<= 1) {

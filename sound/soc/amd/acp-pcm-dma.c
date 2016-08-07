@@ -506,7 +506,7 @@ static int acp_init(void __iomem *acp_mmio)
 	return 0;
 }
 
-/* Deintialize ACP */
+/* Deinitialize ACP */
 static int acp_deinit(void __iomem *acp_mmio)
 {
 	u32 val;
@@ -776,7 +776,7 @@ static int acp_dma_prepare(struct snd_pcm_substream *substream)
 		*/
 		acp_dma_start(rtd->acp_mmio, SYSRAM_TO_ACP_CH_NUM, false);
 
-		/* ACP SRAM (2 periods of buffer size) is intially filled with
+		/* ACP SRAM (2 periods of buffer size) is initially filled with
 		 * zeros. Before rendering starts, 2nd half of SRAM will be
 		 * filled with valid audio data DMA'ed from first half of system
 		 * RAM and 1st half of SRAM will be filled with Zeros. This is

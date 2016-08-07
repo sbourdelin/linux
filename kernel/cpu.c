@@ -1360,7 +1360,7 @@ static bool cpuhp_is_ap_state(enum cpuhp_state state)
 {
 	/*
 	 * The extra check for CPUHP_TEARDOWN_CPU is only for documentation
-	 * purposes as that state is handled explicitely in cpu_down.
+	 * purposes as that state is handled explicitly in cpu_down.
 	 */
 	return state > CPUHP_BRINGUP_CPU && state != CPUHP_TEARDOWN_CPU;
 }

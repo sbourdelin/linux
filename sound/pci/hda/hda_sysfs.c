@@ -652,7 +652,7 @@ static struct hda_patch_item patch_items[NUM_LINE_MODES] = {
 	},
 };
 
-/* check the line starting with '[' -- change the parser mode accodingly */
+/* check the line starting with '[' -- change the parser mode accordingly */
 static int parse_line_mode(char *buf, struct hda_bus *bus)
 {
 	int i;

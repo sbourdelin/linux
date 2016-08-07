@@ -774,7 +774,7 @@ static int ipw_get_ordinal(struct ipw_priv *priv, u32 ord, void *val, u32 * len)
 		 *
 		 * This table consist of six values, each containing
 		 *     - dword containing the starting offset of the data
-		 *     - dword containing the lengh in the first 16bits
+		 *     - dword containing the length in the first 16bits
 		 *       and the count in the second 16bits
 		 */
 
@@ -3974,7 +3974,7 @@ static void ipw_send_disassociate(struct ipw_priv *priv, int quiet)
 		return;
 	}
 
-	IPW_DEBUG_ASSOC("Disassocation attempt from %pM "
+	IPW_DEBUG_ASSOC("Disassociation attempt from %pM "
 			"on channel %d.\n",
 			priv->assoc_request.bssid,
 			priv->assoc_request.channel);
@@ -5196,7 +5196,7 @@ static void ipw_rx_queue_restock(struct ipw_priv *priv)
  * Move all used packet from rx_used to rx_free, allocating a new SKB for each.
  * Also restock the Rx queue via ipw_rx_queue_restock.
  *
- * This is called as a scheduled work item (except for during intialization)
+ * This is called as a scheduled work item (except for during initialization)
  */
 static void ipw_rx_queue_replenish(void *data)
 {
@@ -10038,7 +10038,7 @@ static struct iw_statistics *ipw_get_wireless_stats(struct net_device *dev)
 	/* if hw is disabled, then ipw_get_ordinal() can't be called.
 	 * netdev->get_wireless_stats seems to be called before fw is
 	 * initialized.  STATUS_ASSOCIATED will only be set if the hw is up
-	 * and associated; if not associcated, the values are all meaningless
+	 * and associated; if not associated, the values are all meaningless
 	 * anyway, so set them all to NULL and INVALID */
 	if (!(priv->status & STATUS_ASSOCIATED)) {
 		wstats->miss.beacon = 0;

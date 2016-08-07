@@ -21,7 +21,7 @@
 #  1. Boot up the kernel that you want to stream line the config on.
 #  2. Change directory to the directory holding the source of the
 #       kernel that you just booted.
-#  3. Copy the configuraton file to this directory as .config
+#  3. Copy the configuration file to this directory as .config
 #  4. Have all your devices that you need modules for connected and
 #      operational (make sure that their corresponding modules are loaded)
 #  5. Run this script redirecting the output to some other file

@@ -1968,7 +1968,7 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *engine)
 static void
 logical_ring_default_vfuncs(struct intel_engine_cs *engine)
 {
-	/* Default vfuncs which can be overriden by each engine. */
+	/* Default vfuncs which can be overridden by each engine. */
 	engine->init_hw = gen8_init_common_ring;
 	engine->emit_request = gen8_emit_request;
 	engine->emit_flush = gen8_emit_flush;

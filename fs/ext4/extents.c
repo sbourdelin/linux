@@ -3154,17 +3154,17 @@ static int ext4_ext_zeroout(struct inode *inode, struct ext4_extent *ex)
  * @handle: the journal handle
  * @inode: the file inode
  * @path: the path to the extent
- * @split: the logical block where the extent is splitted.
+ * @split: the logical block where the extent is split.
  * @split_flags: indicates if the extent could be zeroout if split fails, and
  *		 the states(init or unwritten) of new extents.
  * @flags: flags used to insert new extent to extent tree.
  *
  *
  * Splits extent [a, b] into two extents [a, @split) and [@split, b], states
- * of which are deterimined by split_flag.
+ * of which are determined by split_flag.
  *
  * There are two cases:
- *  a> the extent are splitted into two extent.
+ *  a> the extent are split into two extent.
  *  b> split is not needed, and just mark the extent.
  *
  * return 0 on success.

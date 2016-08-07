@@ -389,7 +389,7 @@ static void encode_cb_sequence4args(struct xdr_stream *xdr,
  *		void;
  *	};
  *
- * Our current back channel implmentation supports a single backchannel
+ * Our current back channel implementation supports a single backchannel
  * with a single slot.
  */
 static int decode_cb_sequence4resok(struct xdr_stream *xdr,

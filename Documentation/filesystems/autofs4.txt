@@ -255,7 +255,7 @@ up.
 
 There is an option with indirect mounts to consider each of the leaves
 that has been mounted on instead of considering the top-level names.
-This is intended for compatability with version 4 of autofs and should
+This is intended for compatibility with version 4 of autofs and should
 be considered as deprecated.
 
 When autofs considers a directory it checks the `last_used` time and

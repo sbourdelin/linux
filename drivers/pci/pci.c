@@ -2725,7 +2725,7 @@ void pci_request_acs(void)
 }
 
 /**
- * pci_std_enable_acs - enable ACS on devices using standard ACS capabilites
+ * pci_std_enable_acs - enable ACS on devices using standard ACS capabilities
  * @dev: the PCI device
  */
 static void pci_std_enable_acs(struct pci_dev *dev)

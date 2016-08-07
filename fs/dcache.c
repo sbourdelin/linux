@@ -3390,7 +3390,7 @@ char *dentry_path(struct dentry *dentry, char *buf, int buflen)
 	}
 	retval = __dentry_path(dentry, buf, buflen);
 	if (!IS_ERR(retval) && p)
-		*p = '/';	/* restore '/' overriden with '\0' */
+		*p = '/';	/* restore '/' overridden with '\0' */
 	return retval;
 Elong:
 	return ERR_PTR(-ENAMETOOLONG);

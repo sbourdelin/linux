@@ -2603,7 +2603,7 @@ static DEVICE_ATTR(board_tracer, S_IRUGO, _ctl_board_tracer_show, NULL);
  * @cdev - pointer to embedded class device
  * @buf - the buffer returned
  *
- * This is for firmware implemention for deboucing device
+ * This is for firmware implementation for deboucing device
  * removal events.
  *
  * A sysfs 'read-only' shost attribute.
@@ -2624,7 +2624,7 @@ static DEVICE_ATTR(io_delay, S_IRUGO, _ctl_io_delay_show, NULL);
  * @cdev - pointer to embedded class device
  * @buf - the buffer returned
  *
- * This is for firmware implemention for deboucing device
+ * This is for firmware implementation for deboucing device
  * removal events.
  *
  * A sysfs 'read-only' shost attribute.
@@ -3082,7 +3082,7 @@ static DEVICE_ATTR(host_trace_buffer_enable, S_IRUGO | S_IWUSR,
 	_ctl_host_trace_buffer_enable_show,
 	_ctl_host_trace_buffer_enable_store);
 
-/*********** diagnostic trigger suppport *********************************/
+/*********** diagnostic trigger support *********************************/
 
 /**
  * _ctl_diag_trigger_master_show - show the diag_trigger_master attribute
@@ -3299,7 +3299,7 @@ _ctl_diag_trigger_mpi_store(struct device *cdev,
 static DEVICE_ATTR(diag_trigger_mpi, S_IRUGO | S_IWUSR,
 	_ctl_diag_trigger_mpi_show, _ctl_diag_trigger_mpi_store);
 
-/*********** diagnostic trigger suppport *** END ****************************/
+/*********** diagnostic trigger support *** END ****************************/
 
 
 

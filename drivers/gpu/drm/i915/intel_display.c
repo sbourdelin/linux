@@ -5795,7 +5795,7 @@ static void skl_sanitize_cdclk(struct drm_i915_private *dev_priv)
 	uint32_t cdctl, expected;
 
 	/*
-	 * check if the pre-os intialized the display
+	 * check if the pre-os initialized the display
 	 * There is SWF18 scratchpad register defined which is set by the
 	 * pre-os which can be used by the OS drivers to check the status
 	 */

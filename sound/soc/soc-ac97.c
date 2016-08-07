@@ -169,7 +169,7 @@ static void snd_soc_ac97_free_gpio(struct snd_ac97 *ac97)
  * snd_soc_alloc_ac97_codec() - Allocate new a AC'97 device
  * @codec: The CODEC for which to create the AC'97 device
  *
- * Allocated a new snd_ac97 device and intializes it, but does not yet register
+ * Allocated a new snd_ac97 device and initializes it, but does not yet register
  * it. The caller is responsible to either call device_add(&ac97->dev) to
  * register the device, or to call put_device(&ac97->dev) to free the device.
  *

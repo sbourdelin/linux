@@ -904,7 +904,7 @@ static enum parse_state usbvision_parse_lines_420(struct usb_usbvision *usbvisio
 	if ((frame->curline + 1) >= frame->frmheight)
 		return parse_state_next_frame;
 
-	block_split = (pixel_per_line%y_block_size) ? 1 : 0;	/* are some blocks splitted into different lines? */
+	block_split = (pixel_per_line%y_block_size) ? 1 : 0;	/* are some blocks split into different lines? */
 
 	y_odd_offset = (pixel_per_line / y_block_size) * (y_block_size + uv_block_size)
 			+ block_split * uv_block_size;

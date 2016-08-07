@@ -63,7 +63,7 @@ static inline void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
 {
 	unsigned long pfn = PFN_DOWN(handle);
 	/*
-	 * Dom0 is mapped 1:1, while the Linux page can be spanned accross
+	 * Dom0 is mapped 1:1, while the Linux page can be spanned across
 	 * multiple Xen page, it's not possible to have a mix of local and
 	 * foreign Xen page. Dom0 is mapped 1:1, so calling pfn_valid on a
 	 * foreign mfn will always return false. If the page is local we can

@@ -82,7 +82,7 @@ static struct brcmf_firmware_mapping brcmf_pcie_fwnames[] = {
 
 #define BRCMF_PCIE_REG_MAP_SIZE			(32 * 1024)
 
-/* backplane addres space accessed by BAR0 */
+/* backplane address space accessed by BAR0 */
 #define	BRCMF_PCIE_BAR0_WINDOW			0x80
 #define BRCMF_PCIE_BAR0_REG_SIZE		0x1000
 #define	BRCMF_PCIE_BAR0_WRAPPERBASE		0x70

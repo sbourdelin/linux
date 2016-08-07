@@ -185,7 +185,7 @@ void blk_queue_split(struct request_queue *q, struct bio **bio,
 	bio_set_flag(res, BIO_SEG_VALID);
 
 	if (split) {
-		/* there isn't chance to merge the splitted bio */
+		/* there isn't chance to merge the split bio */
 		split->bi_rw |= REQ_NOMERGE;
 
 		bio_chain(split, *bio);

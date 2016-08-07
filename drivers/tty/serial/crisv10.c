@@ -57,7 +57,7 @@ static char *serial_version = "$Revision: 1.25 $";
 #endif
 
 /*
- * All of the compatibilty code so we can compile serial.c against
+ * All of the compatibility code so we can compile serial.c against
  * older kernels is hidden in serial_compat.h
  */
 #if defined(LOCAL_HEADERS)
@@ -2496,7 +2496,7 @@ ser_interrupt(int irq, void *dev_id)
 	 *  - async data will be handled above (sync will be ignored).
 	 *  - tx_started flag will prevent us from trying to send again and
 	 *    we will exit fast - no need to unblock serial irq.
-	 *  - Next (sync) serial interrupt handler will be runned with
+	 *  - Next (sync) serial interrupt handler will be run with
 	 *    disabled interrupt due to restore_flags() at end of function,
 	 *    so sync handler will not be preempted or reentered.
 	 */

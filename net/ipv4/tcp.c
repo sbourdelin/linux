@@ -1479,7 +1479,7 @@ static struct sk_buff *tcp_recv_skb(struct sock *sk, u32 seq, u32 *off)
 			return skb;
 		}
 		/* This looks weird, but this can happen if TCP collapsing
-		 * splitted a fat GRO packet, while we released socket lock
+		 * split a fat GRO packet, while we released socket lock
 		 * in skb_splice_bits()
 		 */
 		sk_eat_skb(sk, skb);

@@ -167,7 +167,7 @@ void sun4v_mach_sir(void);
  * Service Processor, and/or automatically restarting the gues.
  *
  * The 'timeout' parameter is specified in milliseconds, however the
- * implementated granularity is given by the 'watchdog-resolution'
+ * implemented granularity is given by the 'watchdog-resolution'
  * property in the 'platform' node of the guest's machine description.
  * The largest allowed timeout value is specified by the
  * 'watchdog-max-timeout' property of the 'platform' node.

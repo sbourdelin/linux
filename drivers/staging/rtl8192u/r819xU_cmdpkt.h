@@ -82,7 +82,7 @@ typedef struct tag_cmd_pkt_set_configuration {
 	u32	mask;
 } cmpk_set_cfg_t;
 
-/* 4. Both side : TX/RX query configuraton packet. The query structure is the
+/* 4. Both side : TX/RX query configuration packet. The query structure is the
       same as set configuration. */
 #define		cmpk_query_cfg_t	cmpk_set_cfg_t
 

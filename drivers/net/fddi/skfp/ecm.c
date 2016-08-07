@@ -21,7 +21,7 @@
 */
 
 /*
- * Hardware independent state machine implemantation
+ * Hardware independent state machine implementation
  * The following external SMT functions are referenced :
  *
  * 		queue_event()

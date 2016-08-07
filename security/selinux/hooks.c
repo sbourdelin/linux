@@ -729,7 +729,7 @@ static int selinux_set_mnt_opts(struct super_block *sb,
 	 * we need to skip the double mount verification.
 	 *
 	 * This does open a hole in which we will not notice if the first
-	 * mount using this sb set explict options and a second mount using
+	 * mount using this sb set explicit options and a second mount using
 	 * this sb does not set any security options.  (The first options
 	 * will be used for both mounts)
 	 */

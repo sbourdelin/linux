@@ -1820,7 +1820,7 @@ struct cfg80211_deauth_request {
  * struct cfg80211_disassoc_request - Disassociation request data
  *
  * This structure provides information needed to complete IEEE 802.11
- * disassocation.
+ * disassociation.
  *
  * @bss: the BSS to disassociate from
  * @ie: Extra IEs to add to Disassociation frame or %NULL
@@ -2227,7 +2227,7 @@ struct cfg80211_update_ft_ies_params {
  * This structure provides information needed to transmit a mgmt frame
  *
  * @chan: channel to use
- * @offchan: indicates wether off channel operation is required
+ * @offchan: indicates whether off channel operation is required
  * @wait: duration for ROC
  * @buf: buffer to transmit
  * @len: buffer length
@@ -4450,7 +4450,7 @@ void cfg80211_ibss_joined(struct net_device *dev, const u8 *bssid,
  * @dev: network device
  * @macaddr: the MAC address of the new candidate
  * @ie: information elements advertised by the peer candidate
- * @ie_len: lenght of the information elements buffer
+ * @ie_len: length of the information elements buffer
  * @gfp: allocation flags
  *
  * This function notifies cfg80211 that the mesh peer candidate has been

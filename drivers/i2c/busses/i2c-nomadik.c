@@ -166,7 +166,7 @@ struct i2c_nmk_client {
  * @sm: speed mode
  * @stop: stop condition.
  * @xfer_complete: acknowledge completion for a I2C message.
- * @result: controller propogated result.
+ * @result: controller propagated result.
  */
 struct nmk_i2c_dev {
 	struct i2c_vendor_data		*vendor;

@@ -298,7 +298,7 @@ void drm_minor_release(struct drm_minor *minor)
  * is allocated with drm_dev_alloc(), usually from bus-specific ->probe()
  * callbacks implemented by the driver. The driver then needs to initialize all
  * the various subsystems for the drm device like memory management, vblank
- * handling, modesetting support and intial output configuration plus obviously
+ * handling, modesetting support and initial output configuration plus obviously
  * initialize all the corresponding hardware bits. Finally when everything is up
  * and running and ready for userspace the device instance can be published
  * using drm_dev_register().

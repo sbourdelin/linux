@@ -3183,7 +3183,7 @@ prism2_init_local_data(struct prism2_helper_functions *funcs, int card_idx,
 	local->manual_retry_count = -1;
 	local->rts_threshold = 2347;
 	local->fragm_threshold = 2346;
-	local->rssi_to_dBm = 100; /* default; to be overriden by
+	local->rssi_to_dBm = 100; /* default; to be overridden by
 				   * cnfDbmAdjust, if available */
 	local->auth_algs = PRISM2_AUTH_OPEN | PRISM2_AUTH_SHARED_KEY;
 	local->sram_type = -1;

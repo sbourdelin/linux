@@ -1175,7 +1175,7 @@ typedef enum {
 } sctp_endpoint_type_t;
 
 /*
- * A common base class to bridge the implmentation view of a
+ * A common base class to bridge the implementation view of a
  * socket (usually listening) endpoint versus an association's
  * local endpoint.
  * This common structure is useful for several purposes:

@@ -63,7 +63,7 @@ static void build_instantiation_desc(u32 *desc, int handle, int do_sk)
 
 		/*
 		 * load 1 to clear written reg:
-		 * resets the done interrrupt and returns the RNG to idle.
+		 * resets the done interrupt and returns the RNG to idle.
 		 */
 		append_load_imm_u32(desc, 1, LDST_SRCDST_WORD_CLRW);
 
@@ -148,7 +148,7 @@ static inline int run_descriptor_deco0(struct device *ctrldev, u32 *desc,
 	do {
 		deco_dbg_reg = rd_reg32(&deco->desc_dbg);
 		/*
-		 * If an error occured in the descriptor, then
+		 * If an error occurred in the descriptor, then
 		 * the DECO status field will be set to 0x0D
 		 */
 		if ((deco_dbg_reg & DESC_DBG_DECO_STAT_MASK) ==
@@ -269,7 +269,7 @@ static int deinstantiate_rng(struct device *ctrldev, int state_handle_mask)
 		/*
 		 * If the corresponding bit is set, then it means the state
 		 * handle was initialized by us, and thus it needs to be
-		 * deintialized as well
+		 * deinitialized as well
 		 */
 		if ((1 << sh_idx) & state_handle_mask) {
 			/*
@@ -393,7 +393,7 @@ static void kick_trng(struct platform_device *pdev, int ent_delay)
 
 /**
  * caam_get_era() - Return the ERA of the SEC on SoC, based
- * on "sec-era" propery in the DTS. This property is updated by u-boot.
+ * on "sec-era" property in the DTS. This property is updated by u-boot.
  **/
 int caam_get_era(void)
 {
@@ -562,7 +562,7 @@ static int caam_probe(struct platform_device *pdev)
 		      (sizeof(dma_addr_t) == sizeof(u64) ? MCFGR_LONG_PTR : 0));
 
 	/*
-	 *  Read the Compile Time paramters and SCFGR to determine
+	 *  Read the Compile Time parameters and SCFGR to determine
 	 * if Virtualization is enabled for this platform
 	 */
 	scfgr = rd_reg32(&ctrl->scfgr);

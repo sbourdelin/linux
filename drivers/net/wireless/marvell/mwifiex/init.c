@@ -447,8 +447,7 @@ mwifiex_adapter_cleanup(struct mwifiex_adapter *adapter)
 }
 
 /*
- *  This function intializes the lock variables and
- *  the list heads.
+ *  This function initializes the lock variables and the list heads.
  */
 int mwifiex_init_lock_list(struct mwifiex_adapter *adapter)
 {

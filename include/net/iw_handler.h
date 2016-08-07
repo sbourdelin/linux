@@ -37,7 +37,7 @@
  * -------------------------------
  * The new driver API is just a bunch of standard functions (handlers),
  * each handling a specific Wireless Extension. The driver just export
- * the list of handler it supports, and those will be called apropriately.
+ * the list of handler it supports, and those will be called appropriately.
  *
  * I tried to keep the main advantage of the previous API (simplicity,
  * efficiency and light weight), and also I provide a good dose of backward
@@ -139,7 +139,7 @@
  * example to distinguish setting max rate and basic rate), I would
  * break the prototype. Using iwreq_data is more flexible.
  * 3) Also, the above form is not generic (see above).
- * 4) I don't expect driver developper using the wrong field of the
+ * 4) I don't expect driver developer using the wrong field of the
  * union (Doh !), so static typechecking doesn't add much value.
  * 5) Lastly, you can skip the union by doing :
  *	static int mydriver_ioctl_setrate(struct net_device *dev,

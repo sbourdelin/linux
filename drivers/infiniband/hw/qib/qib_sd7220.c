@@ -1128,7 +1128,7 @@ static int qib_sd_setvals(struct qib_devdata *dd)
  * be the location in some channel of the register to be modified
  * The caller can specify use of the "gang write" option of EPB,
  * in which case we use the specified channel data for any fields
- * not explicitely written.
+ * not explicitly written.
  */
 static int ibsd_mod_allchnls(struct qib_devdata *dd, int loc, int val,
 			     int mask)
