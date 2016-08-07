@@ -233,6 +233,9 @@ static int __init lowpan_init_module(void)
 {
 	int err = 0;
 
+	BUILD_BUG_ON(sizeof(struct lowpan_802154_cb) >
+		     FIELD_SIZEOF(struct sk_buff, cb));
+
 	err = lowpan_net_frag_init();
 	if (err < 0)
 		goto out;
