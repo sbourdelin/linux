@@ -68,15 +68,8 @@
  * possible inline data.
  */
 #define LOWPAN_NHC_MAX_HDR_LEN	(sizeof(struct udphdr))
-/* Max IPHC Header len without IPv6 hdr specific inline data.
- * Useful for getting the "extra" bytes we need at worst case compression.
- *
- * LOWPAN_IPHC + CID + LOWPAN_NHC_MAX_ID_LEN
- */
-#define LOWPAN_IPHC_MAX_HEADER_LEN	(2 + 1 + LOWPAN_NHC_MAX_ID_LEN)
 /* Maximum worst case IPHC header buffer size */
 #define LOWPAN_IPHC_MAX_HC_BUF_LEN	(sizeof(struct ipv6hdr) +	\
-					 LOWPAN_IPHC_MAX_HEADER_LEN +	\
 					 LOWPAN_NHC_MAX_HDR_LEN)
 /* SCI/DCI is 4 bit width, so we have maximum 16 entries */
 #define LOWPAN_IPHC_CTX_TABLE_SIZE	(1 << 4)
