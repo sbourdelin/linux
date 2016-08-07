@@ -1281,7 +1281,6 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	struct dw_mci_slot *slot = mmc_priv(mmc);
 	const struct dw_mci_drv_data *drv_data = slot->host->drv_data;
 	u32 regs;
-	int ret;
 
 	switch (ios->bus_width) {
 	case MMC_BUS_WIDTH_4:
@@ -1319,15 +1318,12 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 	switch (ios->power_mode) {
 	case MMC_POWER_UP:
-		if (!IS_ERR(mmc->supply.vmmc)) {
-			ret = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc,
-					ios->vdd);
-			if (ret) {
-				dev_err(slot->host->dev,
-					"failed to enable vmmc regulator\n");
-				/*return, if failed turn on vmmc*/
-				return;
-			}
+		if (!IS_ERR(mmc->supply.vmmc) &&
+		    mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, ios->vdd)) {
+			dev_err(slot->host->dev,
+				"failed to enable vmmc regulator\n");
+			/*return, if failed turn on vmmc*/
+			return;
 		}
 		set_bit(DW_MMC_CARD_NEED_INIT, &slot->flags);
 		regs = mci_readl(slot->host, PWREN);
@@ -1336,14 +1332,10 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		break;
 	case MMC_POWER_ON:
 		if (!slot->host->vqmmc_enabled) {
-			if (!IS_ERR(mmc->supply.vqmmc)) {
-				ret = regulator_enable(mmc->supply.vqmmc);
-				if (ret < 0)
-					dev_err(slot->host->dev,
-						"failed to enable vqmmc\n");
-				else
-					slot->host->vqmmc_enabled = true;
-
+			if (!IS_ERR(mmc->supply.vqmmc) &&
+			    regulator_enable(mmc->supply.vqmmc)) {
+				dev_err(slot->host->dev,
+					"failed to enable vqmmc\n");
 			} else {
 				/* Keep track so we don't reset again */
 				slot->host->vqmmc_enabled = true;
