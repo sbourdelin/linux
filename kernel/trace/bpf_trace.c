@@ -376,6 +376,36 @@ static const struct bpf_func_proto bpf_get_current_task_proto = {
 	.ret_type	= RET_INTEGER,
 };
 
+#ifdef CONFIG_CGROUPS
+static u64 bpf_current_in_cgroup(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5)
+{
+	struct bpf_map *map = (struct bpf_map *)(long)r1;
+	struct css_set *cset;
+	struct cgroup *cgrp;
+	u32 idx = (u32)r2;
+
+	if (unlikely(in_interrupt()))
+		return -EINVAL;
+
+	cgrp = fetch_arraymap_ptr(map, idx);
+
+	if (unlikely(IS_ERR(cgrp)))
+		return PTR_ERR(cgrp);
+
+	cset = task_css_set(current);
+
+	return cgroup_is_descendant(cset->dfl_cgrp, cgrp);
+}
+
+static const struct bpf_func_proto bpf_current_in_cgroup_proto = {
+	.func           = bpf_current_in_cgroup,
+	.gpl_only       = false,
+	.ret_type       = RET_INTEGER,
+	.arg1_type      = ARG_CONST_MAP_PTR,
+	.arg2_type      = ARG_ANYTHING,
+};
+#endif /* CONFIG_CGROUPS */
+
 static const struct bpf_func_proto *tracing_func_proto(enum bpf_func_id func_id)
 {
 	switch (func_id) {
@@ -407,6 +437,10 @@ static const struct bpf_func_proto *tracing_func_proto(enum bpf_func_id func_id)
 		return &bpf_perf_event_read_proto;
 	case BPF_FUNC_probe_write_user:
 		return bpf_get_probe_write_proto();
+#ifdef CONFIG_CGROUPS
+	case BPF_FUNC_current_in_cgroup:
+		return &bpf_current_in_cgroup_proto;
+#endif
 	default:
 		return NULL;
 	}

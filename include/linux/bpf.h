@@ -319,4 +319,28 @@ extern const struct bpf_func_proto bpf_get_stackid_proto;
 void bpf_user_rnd_init_once(void);
 u64 bpf_user_rnd_u32(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5);
 
+#ifdef CONFIG_CGROUPS
+/* Helper to fetch a cgroup pointer based on index.
+ * @map: a cgroup arraymap
+ * @idx: index of the item you want to fetch
+ *
+ * Returns pointer on success,
+ * Error code if item not found, or out-of-bounds access
+ */
+static inline struct cgroup *fetch_arraymap_ptr(struct bpf_map *map, int idx)
+{
+	struct cgroup *cgrp;
+	struct bpf_array *array = container_of(map, struct bpf_array, map);
+
+	if (unlikely(idx >= array->map.max_entries))
+		return ERR_PTR(-E2BIG);
+
+	cgrp = READ_ONCE(array->ptrs[idx]);
+	if (unlikely(!cgrp))
+		return ERR_PTR(-EAGAIN);
+
+	return cgrp;
+}
+#endif /* CONFIG_CGROUPS */
+
 #endif /* _LINUX_BPF_H */

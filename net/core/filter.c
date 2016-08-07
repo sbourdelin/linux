@@ -2302,21 +2302,18 @@ static u64 bpf_skb_in_cgroup(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5)
 {
 	struct sk_buff *skb = (struct sk_buff *)(long)r1;
 	struct bpf_map *map = (struct bpf_map *)(long)r2;
-	struct bpf_array *array = container_of(map, struct bpf_array, map);
 	struct cgroup *cgrp;
 	struct sock *sk;
-	u32 i = (u32)r3;
+	u32 idx = (u32)r3;
 
 	sk = skb->sk;
 	if (!sk || !sk_fullsock(sk))
 		return -ENOENT;
 
-	if (unlikely(i >= array->map.max_entries))
-		return -E2BIG;
+	cgrp = fetch_arraymap_ptr(map, idx);
 
-	cgrp = READ_ONCE(array->ptrs[i]);
-	if (unlikely(!cgrp))
-		return -EAGAIN;
+	if (unlikely(IS_ERR(cgrp)))
+		return PTR_ERR(cgrp);
 
 	return cgroup_is_descendant(sock_cgroup_ptr(&sk->sk_cgrp_data), cgrp);
 }
