@@ -1149,38 +1149,34 @@ static int seq_ioctl_system_info(struct snd_seq_client *client, void *arg)
 
 
 /* RUNNING_MODE ioctl() */
-static int seq_ioctl_running_mode(struct snd_seq_client *client,
-				  void __user *arg)
+static int seq_ioctl_running_mode(struct snd_seq_client *client, void *arg)
 {
-	struct snd_seq_running_info info;
+	struct snd_seq_running_info *info = arg;
 	struct snd_seq_client *cptr;
 	int err = 0;
 
-	if (copy_from_user(&info, arg, sizeof(info)))
-		return -EFAULT;
-
 	/* requested client number */
-	cptr = snd_seq_client_use_ptr(info.client);
+	cptr = snd_seq_client_use_ptr(info->client);
 	if (cptr == NULL)
 		return -ENOENT;		/* don't change !!! */
 
 #ifdef SNDRV_BIG_ENDIAN
-	if (! info.big_endian) {
+	if (!info->big_endian) {
 		err = -EINVAL;
 		goto __err;
 	}
 #else
-	if (info.big_endian) {
+	if (info->big_endian) {
 		err = -EINVAL;
 		goto __err;
 	}
 
 #endif
-	if (info.cpu_mode > sizeof(long)) {
+	if (info->cpu_mode > sizeof(long)) {
 		err = -EINVAL;
 		goto __err;
 	}
-	cptr->convert32 = (info.cpu_mode < sizeof(long));
+	cptr->convert32 = (info->cpu_mode < sizeof(long));
  __err:
 	snd_seq_client_unlock(cptr);
 	return err;
