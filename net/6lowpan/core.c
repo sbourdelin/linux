@@ -45,6 +45,14 @@ static struct header_ops header_ops = {
 	.create	= lowpan_header_create,
 };
 
+int lowpan_dev_init(struct net_device *dev)
+{
+	netdev_lockdep_set_classes(dev);
+
+	return 0;
+}
+EXPORT_SYMBOL(lowpan_dev_init);
+
 int lowpan_register_netdevice(struct net_device *dev,
 			      enum lowpan_lltypes lltype)
 {
