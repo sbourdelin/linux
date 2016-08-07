@@ -18,6 +18,33 @@
 
 #include "6lowpan_i.h"
 
+/* TODO I think AF_PACKET DGRAM (sending/receiving) RAW (sending) makes no
+ * sense here. We should disable it, the right use-case would be AF_INET6
+ * RAW/DGRAM sockets.
+ */
+static int lowpan_header_create(struct sk_buff *skb, struct net_device *dev,
+				unsigned short type, const void *daddr,
+				const void *saddr, unsigned int len)
+{
+	struct lowpan_addr_info *info = lowpan_addr_info(skb);
+
+	if (WARN_ON_ONCE(type != ETH_P_IPV6))
+		return -EINVAL;
+
+	memcpy(info->daddr, daddr, dev->addr_len);
+
+	if (saddr)
+		memcpy(info->saddr, saddr, dev->addr_len);
+	else
+		memcpy(info->saddr, dev->dev_addr, dev->addr_len);
+
+	return 0;
+}
+
+static struct header_ops header_ops = {
+	.create	= lowpan_header_create,
+};
+
 int lowpan_register_netdevice(struct net_device *dev,
 			      enum lowpan_lltypes lltype)
 {
@@ -27,6 +54,14 @@ int lowpan_register_netdevice(struct net_device *dev,
 	dev->type = ARPHRD_6LOWPAN;
 	dev->mtu = IPV6_MIN_MTU;
 	dev->priv_flags |= IFF_NO_QUEUE;
+
+	dev->header_ops = &header_ops;
+
+	/* We need at least headroom for lowpan_addr_info to get necessary
+	 * address information from header create to xmit callback.
+	 */
+	if (dev->needed_headroom < sizeof(struct lowpan_addr_info))
+		dev->needed_headroom += sizeof(struct lowpan_addr_info);
 
 	lowpan_dev(dev)->lltype = lltype;
 

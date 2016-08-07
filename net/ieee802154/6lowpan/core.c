@@ -54,10 +54,6 @@
 
 static int open_count;
 
-static struct header_ops lowpan_header_ops = {
-	.create	= lowpan_header_create,
-};
-
 static int lowpan_dev_init(struct net_device *ldev)
 {
 	netdev_lockdep_set_classes(ldev);
@@ -106,7 +102,6 @@ static void lowpan_setup(struct net_device *ldev)
 	ldev->flags		= IFF_BROADCAST | IFF_MULTICAST;
 
 	ldev->netdev_ops	= &lowpan_netdev_ops;
-	ldev->header_ops	= &lowpan_header_ops;
 	ldev->destructor	= free_netdev;
 	ldev->features		|= NETIF_F_NETNS_LOCAL;
 }
