@@ -1297,23 +1297,19 @@ static int seq_ioctl_create_port(struct snd_seq_client *client, void *arg)
 /* 
  * DELETE PORT ioctl() 
  */
-static int seq_ioctl_delete_port(struct snd_seq_client *client,
-				 void __user *arg)
+static int seq_ioctl_delete_port(struct snd_seq_client *client, void *arg)
 {
-	struct snd_seq_port_info info;
+	struct snd_seq_port_info *info = arg;
 	int err;
 
-	/* set passed parameters */
-	if (copy_from_user(&info, arg, sizeof(info)))
-		return -EFAULT;
-	
 	/* it is not allowed to remove the port for an another client */
-	if (info.addr.client != client->number)
+	if (info->addr.client != client->number)
 		return -EPERM;
 
-	err = snd_seq_delete_port(client, info.addr.port);
+	err = snd_seq_delete_port(client, info->addr.port);
 	if (err >= 0)
-		snd_seq_system_client_ev_port_exit(client->number, info.addr.port);
+		snd_seq_system_client_ev_port_exit(client->number,
+						   info->addr.port);
 	return err;
 }
 
