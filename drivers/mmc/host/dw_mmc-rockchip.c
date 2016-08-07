@@ -24,6 +24,7 @@ struct dw_mci_rockchip_priv_data {
 	struct clk		*drv_clk;
 	struct clk		*sample_clk;
 	int			default_sample_phase;
+	bool			power_invert;
 };
 
 static void dw_mci_rk3288_set_ios(struct dw_mci *host, struct mmc_ios *ios)
@@ -66,6 +67,10 @@ static void dw_mci_rk3288_set_ios(struct dw_mci *host, struct mmc_ios *ios)
 	/* Make sure we use phases which we can enumerate with */
 	if (!IS_ERR(priv->sample_clk))
 		clk_set_phase(priv->sample_clk, priv->default_sample_phase);
+
+	/* Make sure we need to invert the output of PWREN */
+	if (priv->power_invert)
+		set_bit(DW_MMC_CARD_PWR_INVERT, &host->cur_slot->flags);
 
 	/*
 	 * Set the drive phase offset based on speed mode to achieve hold times.
@@ -266,6 +271,9 @@ static int dw_mci_rk3288_parse_dt(struct dw_mci *host)
 	if (of_property_read_u32(np, "rockchip,default-sample-phase",
 					&priv->default_sample_phase))
 		priv->default_sample_phase = 0;
+
+	if (of_property_read_bool(np, "rockchip,power-invert"))
+		priv->power_invert = true;
 
 	priv->drv_clk = devm_clk_get(host->dev, "ciu-drive");
 	if (IS_ERR(priv->drv_clk))
