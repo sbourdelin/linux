@@ -62,8 +62,10 @@ EXPORT_SYMBOL(lowpan_register_netdev);
 
 void lowpan_unregister_netdevice(struct net_device *dev)
 {
+	dev_hold(dev);
 	unregister_netdevice(dev);
 	lowpan_dev_debugfs_exit(dev);
+	dev_put(dev);
 }
 EXPORT_SYMBOL(lowpan_unregister_netdevice);
 
