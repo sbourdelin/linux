@@ -87,21 +87,6 @@ static int snd_seq_deliver_single_event(struct snd_seq_client *client,
 
 /*
  */
- 
-static inline mm_segment_t snd_enter_user(void)
-{
-	mm_segment_t fs = get_fs();
-	set_fs(get_ds());
-	return fs;
-}
-
-static inline void snd_leave_user(mm_segment_t fs)
-{
-	set_fs(fs);
-}
-
-/*
- */
 static inline unsigned short snd_seq_file_flags(struct file *file)
 {
         switch (file->f_mode & (FMODE_READ | FMODE_WRITE)) {
