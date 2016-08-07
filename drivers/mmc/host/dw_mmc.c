@@ -1276,45 +1276,10 @@ static void dw_mci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	spin_unlock_bh(&host->lock);
 }
 
-static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+static int dw_mci_set_power(struct mmc_host *mmc, struct mmc_ios *ios)
 {
 	struct dw_mci_slot *slot = mmc_priv(mmc);
-	const struct dw_mci_drv_data *drv_data = slot->host->drv_data;
 	u32 regs;
-
-	switch (ios->bus_width) {
-	case MMC_BUS_WIDTH_4:
-		slot->ctype = SDMMC_CTYPE_4BIT;
-		break;
-	case MMC_BUS_WIDTH_8:
-		slot->ctype = SDMMC_CTYPE_8BIT;
-		break;
-	default:
-		/* set default 1 bit mode */
-		slot->ctype = SDMMC_CTYPE_1BIT;
-	}
-
-	regs = mci_readl(slot->host, UHS_REG);
-
-	/* DDR mode set */
-	if (ios->timing == MMC_TIMING_MMC_DDR52 ||
-	    ios->timing == MMC_TIMING_UHS_DDR50 ||
-	    ios->timing == MMC_TIMING_MMC_HS400)
-		regs |= ((0x1 << slot->id) << 16);
-	else
-		regs &= ~((0x1 << slot->id) << 16);
-
-	mci_writel(slot->host, UHS_REG, regs);
-	slot->host->timing = ios->timing;
-
-	/*
-	 * Use mirror of ios->clock to prevent race with mmc
-	 * core ios update when finding the minimum.
-	 */
-	slot->clock = ios->clock;
-
-	if (drv_data && drv_data->set_ios)
-		drv_data->set_ios(slot->host, ios);
 
 	switch (ios->power_mode) {
 	case MMC_POWER_UP:
@@ -1322,8 +1287,8 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		    mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, ios->vdd)) {
 			dev_err(slot->host->dev,
 				"failed to enable vmmc regulator\n");
-			/*return, if failed turn on vmmc*/
-			return;
+
+			return -EINVAL;
 		}
 		set_bit(DW_MMC_CARD_NEED_INIT, &slot->flags);
 		regs = mci_readl(slot->host, PWREN);
@@ -1368,6 +1333,52 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	default:
 		break;
 	}
+
+	return 0;
+}
+
+static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+{
+	struct dw_mci_slot *slot = mmc_priv(mmc);
+	const struct dw_mci_drv_data *drv_data = slot->host->drv_data;
+	u32 regs;
+
+	switch (ios->bus_width) {
+	case MMC_BUS_WIDTH_4:
+		slot->ctype = SDMMC_CTYPE_4BIT;
+		break;
+	case MMC_BUS_WIDTH_8:
+		slot->ctype = SDMMC_CTYPE_8BIT;
+		break;
+	default:
+		/* set default 1 bit mode */
+		slot->ctype = SDMMC_CTYPE_1BIT;
+	}
+
+	regs = mci_readl(slot->host, UHS_REG);
+
+	/* DDR mode set */
+	if (ios->timing == MMC_TIMING_MMC_DDR52 ||
+	    ios->timing == MMC_TIMING_UHS_DDR50 ||
+	    ios->timing == MMC_TIMING_MMC_HS400)
+		regs |= ((0x1 << slot->id) << 16);
+	else
+		regs &= ~((0x1 << slot->id) << 16);
+
+	mci_writel(slot->host, UHS_REG, regs);
+	slot->host->timing = ios->timing;
+
+	/*
+	 * Use mirror of ios->clock to prevent race with mmc
+	 * core ios update when finding the minimum.
+	 */
+	slot->clock = ios->clock;
+
+	if (drv_data && drv_data->set_ios)
+		drv_data->set_ios(slot->host, ios);
+
+	if (dw_mci_set_power(mmc, ios))
+		return;
 
 	if (slot->host->state == STATE_WAITING_CMD11_DONE && ios->clock != 0)
 		slot->host->state = STATE_IDLE;
