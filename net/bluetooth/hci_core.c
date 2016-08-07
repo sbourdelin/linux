@@ -955,6 +955,7 @@ struct hci_dev *hci_dev_get(int index)
 	read_unlock(&hci_dev_list_lock);
 	return hdev;
 }
+EXPORT_SYMBOL(hci_dev_get);
 
 /* ---- Inquiry support ---- */
 
@@ -2941,6 +2942,7 @@ void hci_copy_identity_address(struct hci_dev *hdev, bdaddr_t *bdaddr,
 		*bdaddr_type = ADDR_LE_DEV_PUBLIC;
 	}
 }
+EXPORT_SYMBOL(hci_copy_identity_address);
 
 /* Alloc HCI device */
 struct hci_dev *hci_alloc_dev(void)
