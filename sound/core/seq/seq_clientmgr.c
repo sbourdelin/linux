@@ -2248,23 +2248,6 @@ static const struct seq_ioctl_table {
 	{ 0, NULL, 0 },
 };
 
-static int seq_do_ioctl(struct snd_seq_client *client, unsigned int cmd,
-			    void __user *arg)
-{
-	const struct seq_ioctl_table *p;
-
-	if (! arg)
-		return -EFAULT;
-	for (p = ioctl_tables; p->cmd; p++) {
-		if (p->cmd == cmd)
-			return p->func(client, arg);
-	}
-	pr_debug("ALSA: seq unknown ioctl() 0x%x (type='%c', number=0x%02x)\n",
-		   cmd, _IOC_TYPE(cmd), _IOC_NR(cmd));
-	return -ENOTTY;
-}
-
-
 static long snd_seq_ioctl(struct file *file, unsigned int cmd,
 			  unsigned long arg)
 {
@@ -2509,16 +2492,23 @@ EXPORT_SYMBOL(snd_seq_kernel_client_dispatch);
 int snd_seq_kernel_client_ctl(int clientid, unsigned int cmd, void *arg)
 {
 	struct snd_seq_client *client;
-	mm_segment_t fs;
-	int result;
+	const struct seq_ioctl_table *p;
 
 	client = clientptr(clientid);
 	if (client == NULL)
 		return -ENXIO;
-	fs = snd_enter_user();
-	result = seq_do_ioctl(client, cmd, (void __force __user *)arg);
-	snd_leave_user(fs);
-	return result;
+
+	for (p = ioctl_tables; p->cmd > 0; ++p) {
+		if (p->cmd == cmd)
+			break;
+	}
+	if (p->cmd == 0) {
+		pr_debug("ALSA: seq unknown ioctl() 0x%x (type='%c', number=0x%02x)\n",
+			 cmd, _IOC_TYPE(cmd), _IOC_NR(cmd));
+		return -ENOTTY;
+	}
+
+	return p->func(client, arg);
 }
 
 EXPORT_SYMBOL(snd_seq_kernel_client_ctl);
