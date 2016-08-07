@@ -1923,25 +1923,24 @@ static int seq_ioctl_get_subscription(struct snd_seq_client *client, void *arg)
 /*
  * get subscription info - check only its presence
  */
-static int seq_ioctl_query_subs(struct snd_seq_client *client, void __user *arg)
+static int seq_ioctl_query_subs(struct snd_seq_client *client, void *arg)
 {
+	struct snd_seq_query_subs *subs = arg;
 	int result = -ENXIO;
 	struct snd_seq_client *cptr = NULL;
 	struct snd_seq_client_port *port = NULL;
-	struct snd_seq_query_subs subs;
 	struct snd_seq_port_subs_info *group;
 	struct list_head *p;
 	int i;
 
-	if (copy_from_user(&subs, arg, sizeof(subs)))
-		return -EFAULT;
-
-	if ((cptr = snd_seq_client_use_ptr(subs.root.client)) == NULL)
+	cptr = snd_seq_client_use_ptr(subs->root.client);
+	if (cptr == NULL)
 		goto __end;
-	if ((port = snd_seq_port_use_ptr(cptr, subs.root.port)) == NULL)
+	port = snd_seq_port_use_ptr(cptr, subs->root.port);
+	if (cptr == NULL)
 		goto __end;
 
-	switch (subs.type) {
+	switch (subs->type) {
 	case SNDRV_SEQ_QUERY_SUBS_READ:
 		group = &port->c_src;
 		break;
@@ -1954,22 +1953,22 @@ static int seq_ioctl_query_subs(struct snd_seq_client *client, void __user *arg)
 
 	down_read(&group->list_mutex);
 	/* search for the subscriber */
-	subs.num_subs = group->count;
+	subs->num_subs = group->count;
 	i = 0;
 	result = -ENOENT;
 	list_for_each(p, &group->list_head) {
-		if (i++ == subs.index) {
+		if (i++ == subs->index) {
 			/* found! */
 			struct snd_seq_subscribers *s;
-			if (subs.type == SNDRV_SEQ_QUERY_SUBS_READ) {
+			if (subs->type == SNDRV_SEQ_QUERY_SUBS_READ) {
 				s = list_entry(p, struct snd_seq_subscribers, src_list);
-				subs.addr = s->info.dest;
+				subs->addr = s->info.dest;
 			} else {
 				s = list_entry(p, struct snd_seq_subscribers, dest_list);
-				subs.addr = s->info.sender;
+				subs->addr = s->info.sender;
 			}
-			subs.flags = s->info.flags;
-			subs.queue = s->info.queue;
+			subs->flags = s->info.flags;
+			subs->queue = s->info.queue;
 			result = 0;
 			break;
 		}
@@ -1981,10 +1980,7 @@ static int seq_ioctl_query_subs(struct snd_seq_client *client, void __user *arg)
 		snd_seq_port_unlock(port);
 	if (cptr)
 		snd_seq_client_unlock(cptr);
-	if (result >= 0) {
-		if (copy_to_user(arg, &subs, sizeof(subs)))
-			return -EFAULT;
-	}
+
 	return result;
 }
 
