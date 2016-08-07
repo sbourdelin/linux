@@ -1677,16 +1677,12 @@ int snd_seq_set_queue_tempo(int client, struct snd_seq_queue_tempo *tempo)
 
 EXPORT_SYMBOL(snd_seq_set_queue_tempo);
 
-static int seq_ioctl_set_queue_tempo(struct snd_seq_client *client,
-				     void __user *arg)
+static int seq_ioctl_set_queue_tempo(struct snd_seq_client *client, void *arg)
 {
+	struct snd_seq_queue_tempo *tempo = arg;
 	int result;
-	struct snd_seq_queue_tempo tempo;
 
-	if (copy_from_user(&tempo, arg, sizeof(tempo)))
-		return -EFAULT;
-
-	result = snd_seq_set_queue_tempo(client->number, &tempo);
+	result = snd_seq_set_queue_tempo(client->number, tempo);
 	return result < 0 ? result : 0;
 }
 
