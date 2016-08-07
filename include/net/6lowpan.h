@@ -78,6 +78,8 @@
 #define LOWPAN_DISPATCH_IPHC		0x60 /* 011xxxxx = ... */
 #define LOWPAN_DISPATCH_IPHC_MASK	0xe0
 
+#define LOWPAN_IFNAME_TEMPLATE "6lo%d"
+
 static inline bool lowpan_is_ipv6(u8 dispatch)
 {
 	return dispatch == LOWPAN_DISPATCH_IPV6;
