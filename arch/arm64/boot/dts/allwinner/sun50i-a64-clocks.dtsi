@@ -1,0 +1,140 @@
+/*
+ * Allwinner A64 clocks
+ *
+ * Copyright (c) 2016 ARM Ltd
+ *
+ * This file is licensed under a dual GPLv2 or BSD license.
+ *
+ */
+
+	osc24M: osc24M_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <24000000>;
+		clock-output-names = "osc24M";
+	};
+
+	osc32k: osc32k_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <32768>;
+		clock-output-names = "osc32k";
+	};
+
+	periph0_2x: periph0_2x_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <1200000000>;
+		clock-output-names = "periph0_2x";
+	};
+
+	periph0: periph0_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-factor-clock";
+		clock-div = <2>;
+		clock-mult = <1>;
+		clocks = <&periph0_2x>;
+		clock-output-names = "periph0";
+	};
+
+	periph1: periph1_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <600000000>;
+		clock-output-names = "periph1";
+	};
+
+	ahb1: ahb1_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <200000000>;
+		clock-output-names = "ahb1";
+	};
+
+	ahb2: ahb2_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <300000000>;
+		clock-output-names = "ahb2";
+	};
+
+	apb1: apb1_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <100000000>;
+		clock-output-names = "apb1";
+	};
+
+	apb2: apb2_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <24000000>;
+		clock-output-names = "apb2";
+	};
+
+	bus_gates: bus_gates_clk@1c20060 {
+		#clock-cells = <1>;
+		compatible = "allwinner,sun50i-a64-bus-gates-clk",
+			     "allwinner,sunxi-multi-bus-gates-clk";
+		reg = <0x01c20060 0x14>;
+		ahb1_parent {
+			clocks = <&ahb1>;
+			clock-indices = <1>, <5>,
+					<6>, <8>,
+					<9>, <10>,
+					<13>, <14>,
+					<18>, <19>,
+					<20>, <21>,
+					<23>, <24>,
+					<25>, <28>,
+					<32>, <35>,
+					<36>, <37>,
+					<40>, <43>,
+					<44>, <52>,
+					<53>, <54>,
+					<135>;
+			clock-output-names = "bus_mipidsi", "bus_ce",
+					"bus_dma", "bus_mmc0",
+					"bus_mmc1", "bus_mmc2",
+					"bus_nand", "bus_sdram",
+					"bus_ts", "bus_hstimer",
+					"bus_spi0", "bus_spi1",
+					"bus_otg", "bus_otg_ehci0",
+					"bus_ehci0", "bus_otg_ohci0",
+					"bus_ve", "bus_lcd0",
+					"bus_lcd1", "bus_deint",
+					"bus_csi", "bus_hdmi",
+					"bus_de", "bus_gpu",
+					"bus_msgbox", "bus_spinlock",
+					"bus_dbg";
+		};
+		ahb2_parent {
+			clocks = <&ahb2>;
+			clock-indices = <17>, <29>;
+			clock-output-names = "bus_gmac", "bus_ohci0";
+		};
+		apb1_parent {
+			clocks = <&apb1>;
+			clock-indices = <64>, <65>,
+					<69>, <72>,
+					<76>, <77>,
+					<78>;
+			clock-output-names = "bus_codec", "bus_spdif",
+					"bus_pio", "bus_ths",
+					"bus_i2s0", "bus_i2s1",
+					"bus_i2s2";
+		};
+		abp2_parent {
+			clocks = <&apb2>;
+			clock-indices = <96>, <97>,
+					<98>, <101>,
+					<112>, <113>,
+					<114>, <115>,
+					<116>;
+			clock-output-names = "bus_i2c0", "bus_i2c1",
+					"bus_i2c2", "bus_scr",
+					"bus_uart0", "bus_uart1",
+					"bus_uart2", "bus_uart3",
+					"bus_uart4";
+		};
+	};
