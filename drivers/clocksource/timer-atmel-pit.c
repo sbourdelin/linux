@@ -261,6 +261,9 @@ static int __init at91sam926x_pit_dt_init(struct device_node *node)
 		return PTR_ERR(data->mck);
 	}
 
+	if (clk_prepare_enable(data->mck))
+		panic(pr_fmt("Unable to enable mck\n"));
+
 	/* Get the interrupts property */
 	data->irq = irq_of_parse_and_map(node, 0);
 	if (!data->irq) {
