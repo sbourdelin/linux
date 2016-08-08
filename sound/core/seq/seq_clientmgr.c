@@ -1572,35 +1572,32 @@ static int snd_seq_ioctl_get_queue_info(struct snd_seq_client *client,
 
 /* SET_QUEUE_INFO ioctl() */
 static int snd_seq_ioctl_set_queue_info(struct snd_seq_client *client,
-					void __user *arg)
+					void *arg)
 {
-	struct snd_seq_queue_info info;
+	struct snd_seq_queue_info *info = arg;
 	struct snd_seq_queue *q;
 
-	if (copy_from_user(&info, arg, sizeof(info)))
-		return -EFAULT;
-
-	if (info.owner != client->number)
+	if (info->owner != client->number)
 		return -EINVAL;
 
 	/* change owner/locked permission */
-	if (snd_seq_queue_check_access(info.queue, client->number)) {
-		if (snd_seq_queue_set_owner(info.queue, client->number, info.locked) < 0)
+	if (snd_seq_queue_check_access(info->queue, client->number)) {
+		if (snd_seq_queue_set_owner(info->queue, client->number, info->locked) < 0)
 			return -EPERM;
-		if (info.locked)
-			snd_seq_queue_use(info.queue, client->number, 1);
+		if (info->locked)
+			snd_seq_queue_use(info->queue, client->number, 1);
 	} else {
 		return -EPERM;
 	}	
 
-	q = queueptr(info.queue);
-	if (! q)
+	q = queueptr(info->queue);
+	if (!q)
 		return -EINVAL;
 	if (q->owner != client->number) {
 		queuefree(q);
 		return -EPERM;
 	}
-	strlcpy(q->name, info.name, sizeof(q->name));
+	strlcpy(q->name, info->name, sizeof(q->name));
 	queuefree(q);
 
 	return 0;
