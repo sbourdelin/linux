@@ -45,6 +45,44 @@ static LIST_HEAD(muram_block_list);
 #define OF_MAX_ADDR_CELLS	4
 #define GENPOOL_OFFSET		(4096 * 8)
 
+static int cpm_muram_pool_init(void)
+{
+	struct device_node *np;
+	struct resource r;
+	int i = 0;
+	int ret = 0;
+
+	if (muram_pool)
+		return 0;
+
+	np = of_find_compatible_node(NULL, NULL, "fsl,cpm-muram-data");
+	if (!np) {
+		/* try legacy bindings */
+		np = of_find_node_by_name(NULL, "data-only");
+		if (!np) {
+			pr_err("Cannot find CPM muram data node");
+			ret = -ENODEV;
+			goto out;
+		}
+	}
+
+	muram_pool = gen_pool_create(0, -1);
+
+	while (of_address_to_resource(np, i++, &r) == 0) {
+		ret = gen_pool_add(muram_pool, r.start - muram_pbase +
+				   GENPOOL_OFFSET, resource_size(&r), -1);
+		if (ret) {
+			pr_err("QE: couldn't add muram to pool!\n");
+			gen_pool_destroy(muram_pool);
+			goto out;
+		}
+	}
+
+out:
+	of_node_put(np);
+	return ret;
+}
+
 int cpm_muram_init(void)
 {
 	struct device_node *np;
@@ -65,39 +103,28 @@ int cpm_muram_init(void)
 		if (!np) {
 			pr_err("Cannot find CPM muram data node");
 			ret = -ENODEV;
-			goto out_muram;
+			goto out;
 		}
 	}
 
-	muram_pool = gen_pool_create(0, -1);
 	muram_pbase = of_translate_address(np, zero);
 	if (muram_pbase == (phys_addr_t)OF_BAD_ADDR) {
 		pr_err("Cannot translate zero through CPM muram node");
 		ret = -ENODEV;
-		goto out_pool;
+		goto out;
 	}
 
 	while (of_address_to_resource(np, i++, &r) == 0) {
 		if (r.end > max)
 			max = r.end;
-		ret = gen_pool_add(muram_pool, r.start - muram_pbase +
-				   GENPOOL_OFFSET, resource_size(&r), -1);
-		if (ret) {
-			pr_err("QE: couldn't add muram to pool!\n");
-			goto out_pool;
-		}
 	}
 
 	muram_vbase = ioremap(muram_pbase, max - muram_pbase + 1);
 	if (!muram_vbase) {
 		pr_err("Cannot map QE muram");
 		ret = -ENOMEM;
-		goto out_pool;
 	}
-	goto out_muram;
-out_pool:
-	gen_pool_destroy(muram_pool);
-out_muram:
+out:
 	of_node_put(np);
 	return ret;
 }
@@ -115,6 +142,9 @@ static unsigned long cpm_muram_alloc_common(unsigned long size,
 {
 	struct muram_block *entry;
 	unsigned long start;
+
+	if (!muram_pool && cpm_muram_pool_init())
+		goto out2;
 
 	start = gen_pool_alloc_algo(muram_pool, size, algo, data);
 	if (!start)
