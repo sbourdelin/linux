@@ -32,8 +32,7 @@ EXPORT_SYMBOL(node_data);
 nodemask_t numa_nodes_parsed __initdata;
 static int cpu_to_node_map[NR_CPUS] = { [0 ... NR_CPUS-1] = NUMA_NO_NODE };
 
-static int numa_distance_cnt;
-static u8 *numa_distance;
+static u8 numa_distance[MAX_NUMNODES][MAX_NUMNODES];
 static bool numa_off;
 
 static __init int numa_parse_early_param(char *opt)
@@ -247,59 +246,6 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
 }
 
 /**
- * numa_free_distance
- *
- * The current table is freed.
- */
-void __init numa_free_distance(void)
-{
-	size_t size;
-
-	if (!numa_distance)
-		return;
-
-	size = numa_distance_cnt * numa_distance_cnt *
-		sizeof(numa_distance[0]);
-
-	memblock_free(__pa(numa_distance), size);
-	numa_distance_cnt = 0;
-	numa_distance = NULL;
-}
-
-/**
- *
- * Create a new NUMA distance table.
- *
- */
-static int __init numa_alloc_distance(void)
-{
-	size_t size;
-	u64 phys;
-	int i, j;
-
-	size = nr_node_ids * nr_node_ids * sizeof(numa_distance[0]);
-	phys = memblock_find_in_range(0, PFN_PHYS(max_pfn),
-				      size, PAGE_SIZE);
-	if (WARN_ON(!phys))
-		return -ENOMEM;
-
-	memblock_reserve(phys, size);
-
-	numa_distance = __va(phys);
-	numa_distance_cnt = nr_node_ids;
-
-	/* fill with the default distances */
-	for (i = 0; i < numa_distance_cnt; i++)
-		for (j = 0; j < numa_distance_cnt; j++)
-			numa_distance[i * numa_distance_cnt + j] = i == j ?
-				LOCAL_DISTANCE : REMOTE_DISTANCE;
-
-	pr_debug("Initialized distance table, cnt=%d\n", numa_distance_cnt);
-
-	return 0;
-}
-
-/**
  * numa_set_distance - Set inter node NUMA distance from node to node.
  * @from: the 'from' node to set distance
  * @to: the 'to'  node to set distance
@@ -314,12 +260,7 @@ static int __init numa_alloc_distance(void)
  */
 void __init numa_set_distance(int from, int to, int distance)
 {
-	if (!numa_distance) {
-		pr_warn_once("Warning: distance table not allocated yet\n");
-		return;
-	}
-
-	if (from >= numa_distance_cnt || to >= numa_distance_cnt ||
+	if (from >= MAX_NUMNODES || to >= MAX_NUMNODES ||
 			from < 0 || to < 0) {
 		pr_warn_once("Warning: node ids are out of bound, from=%d to=%d distance=%d\n",
 			    from, to, distance);
@@ -333,7 +274,7 @@ void __init numa_set_distance(int from, int to, int distance)
 		return;
 	}
 
-	numa_distance[from * numa_distance_cnt + to] = distance;
+	numa_distance[from][to] = distance;
 }
 
 /**
@@ -341,9 +282,9 @@ void __init numa_set_distance(int from, int to, int distance)
  */
 int __node_distance(int from, int to)
 {
-	if (from >= numa_distance_cnt || to >= numa_distance_cnt)
+	if (from >= MAX_NUMNODES || to >= MAX_NUMNODES)
 		return from == to ? LOCAL_DISTANCE : REMOTE_DISTANCE;
-	return numa_distance[from * numa_distance_cnt + to];
+	return numa_distance[from][to];
 }
 EXPORT_SYMBOL(__node_distance);
 
@@ -383,11 +324,6 @@ static int __init numa_init(int (*init_func)(void))
 	nodes_clear(numa_nodes_parsed);
 	nodes_clear(node_possible_map);
 	nodes_clear(node_online_map);
-	numa_free_distance();
-
-	ret = numa_alloc_distance();
-	if (ret < 0)
-		return ret;
 
 	ret = init_func();
 	if (ret < 0)
