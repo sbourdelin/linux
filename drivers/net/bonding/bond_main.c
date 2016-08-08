@@ -1489,11 +1489,7 @@ int bond_enslave(struct net_device *bond_dev, struct net_device *slave_dev)
 		 */
 		memcpy(addr.sa_data, bond_dev->dev_addr, bond_dev->addr_len);
 		addr.sa_family = slave_dev->type;
-		res = dev_set_mac_address(slave_dev, &addr);
-		if (res) {
-			netdev_dbg(bond_dev, "Error %d calling set_mac_address\n", res);
-			goto err_restore_mtu;
-		}
+		dev_set_mac_address(slave_dev, &addr);
 	}
 
 	/* set slave flag before open to prevent IPv6 addrconf */
@@ -1777,7 +1773,6 @@ err_restore_mac:
 		dev_set_mac_address(slave_dev, &addr);
 	}
 
-err_restore_mtu:
 	dev_set_mtu(slave_dev, new_slave->original_mtu);
 
 err_free:
