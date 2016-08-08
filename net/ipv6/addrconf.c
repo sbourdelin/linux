@@ -4967,7 +4967,6 @@ static inline void __snmp6_fill_stats64(u64 *stats, void __percpu *mib,
 
 	BUG_ON(pad < 0);
 
-	memset(buff, 0, sizeof(buff));
 	buff[0] = IPSTATS_MIB_MAX;
 
 	for_each_possible_cpu(c) {
