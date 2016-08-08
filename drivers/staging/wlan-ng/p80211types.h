@@ -205,20 +205,11 @@ typedef struct p80211enumpair {
 	char *name;
 } p80211enumpair_t;
 
-typedef struct p80211enum {
-	int nitems;
-	p80211enumpair_t *list;
-} p80211enum_t;
-
 /*----------------------------------------------------------------*/
 /* The following structure types are used to store data items in */
 /*  messages. */
 
 /* Template pascal string */
-typedef struct p80211pstr {
-	u8 len;
-} __packed p80211pstr_t;
-
 typedef struct p80211pstrd {
 	u8 len;
 	u8 data[0];
@@ -301,14 +292,6 @@ typedef struct p80211item_pstr32 {
 	p80211pstr32_t data;
 } __packed p80211item_pstr32_t;
 
-/* message data item for OCTETSTR, DISPLAYSTR */
-typedef struct p80211item_pstr255 {
-	u32 did;
-	u16 status;
-	u16 len;
-	p80211pstr255_t data;
-} __packed p80211item_pstr255_t;
-
 /* message data item for UNK 392, namely mib items */
 typedef struct p80211item_unk392 {
 	u32 did;
@@ -345,31 +328,5 @@ typedef void (*p80211_totext_t) (struct catlistitem *, u32 did, u8 *itembuf,
 typedef void (*p80211_fromtext_t) (struct catlistitem *, u32 did, u8 *itembuf,
 				   char *textbuf);
 typedef u32(*p80211_valid_t) (struct catlistitem *, u32 did, u8 *itembuf);
-
-/*----------------------------------------------------------------*/
-/* Enumeration Lists */
-/*  The following are the external declarations */
-/*  for all enumerations  */
-
-extern p80211enum_t MKENUMNAME(truth);
-extern p80211enum_t MKENUMNAME(ifstate);
-extern p80211enum_t MKENUMNAME(powermgmt);
-extern p80211enum_t MKENUMNAME(bsstype);
-extern p80211enum_t MKENUMNAME(authalg);
-extern p80211enum_t MKENUMNAME(phytype);
-extern p80211enum_t MKENUMNAME(temptype);
-extern p80211enum_t MKENUMNAME(regdomain);
-extern p80211enum_t MKENUMNAME(ccamode);
-extern p80211enum_t MKENUMNAME(diversity);
-extern p80211enum_t MKENUMNAME(scantype);
-extern p80211enum_t MKENUMNAME(resultcode);
-extern p80211enum_t MKENUMNAME(reason);
-extern p80211enum_t MKENUMNAME(status);
-extern p80211enum_t MKENUMNAME(msgcode);
-extern p80211enum_t MKENUMNAME(msgitem_status);
-
-extern p80211enum_t MKENUMNAME(lnxroam_reason);
-
-extern p80211enum_t MKENUMNAME(p2preamble);
 
 #endif /* _P80211TYPES_H */
