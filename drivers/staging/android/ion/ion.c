@@ -1109,6 +1109,24 @@ static void ion_dma_buf_kunmap(struct dma_buf *dmabuf, unsigned long offset,
 {
 }
 
+static void ion_clean_buffer(struct ion_buffer *buffer)
+{
+	struct scatterlist *sg;
+	int i;
+
+	for_each_sg(buffer->sg_table->sgl, sg, buffer->sg_table->orig_nents, i)
+		kernel_force_cache_clean(sg_page(sg), sg->length);
+}
+
+static void ion_invalidate_buffer(struct ion_buffer *buffer)
+{
+	struct scatterlist *sg;
+	int i;
+
+	for_each_sg(buffer->sg_table->sgl, sg, buffer->sg_table->orig_nents, i)
+		kernel_force_cache_invalidate(sg_page(sg), sg->length);
+}
+
 static int ion_dma_buf_begin_cpu_access(struct dma_buf *dmabuf,
 					enum dma_data_direction direction)
 {
@@ -1124,6 +1142,11 @@ static int ion_dma_buf_begin_cpu_access(struct dma_buf *dmabuf,
 	mutex_lock(&buffer->lock);
 	vaddr = ion_buffer_kmap_get(buffer);
 	mutex_unlock(&buffer->lock);
+
+	if (direction != DMA_TO_DEVICE) {
+		ion_invalidate_buffer(buffer);
+	}
+
 	return PTR_ERR_OR_ZERO(vaddr);
 }
 
@@ -1135,6 +1158,12 @@ static int ion_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
 	mutex_lock(&buffer->lock);
 	ion_buffer_kmap_put(buffer);
 	mutex_unlock(&buffer->lock);
+
+	if (direction == DMA_FROM_DEVICE) {
+		ion_invalidate_buffer(buffer);
+	} else {
+		ion_clean_buffer(buffer);
+	}
 
 	return 0;
 }
@@ -1265,6 +1294,8 @@ static int ion_sync_for_device(struct ion_client *client, int fd)
 {
 	struct dma_buf *dmabuf;
 	struct ion_buffer *buffer;
+
+	WARN_ONCE(1, "This API is deprecated in favor of the dma_buf ioctl\n");
 
 	dmabuf = dma_buf_get(fd);
 	if (IS_ERR(dmabuf))
