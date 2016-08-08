@@ -82,6 +82,8 @@ else
 ifeq ($(call cc-option-yn,-mbig-endian),y)
 override CC	+= -mbig-endian
 override AS	+= -mbig-endian
+override CROSS32CC += -mbig-endian
+override CROSS32AS += -mbig-endian
 endif
 override LD	+= -EB
 LDEMULATION	:= ppc
