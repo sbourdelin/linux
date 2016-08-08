@@ -1652,31 +1652,26 @@ static int snd_seq_ioctl_get_queue_status(struct snd_seq_client *client,
 
 /* GET_QUEUE_TEMPO ioctl() */
 static int snd_seq_ioctl_get_queue_tempo(struct snd_seq_client *client,
-					 void __user *arg)
+					 void *arg)
 {
-	struct snd_seq_queue_tempo tempo;
+	struct snd_seq_queue_tempo *tempo = arg;
 	struct snd_seq_queue *queue;
 	struct snd_seq_timer *tmr;
 
-	if (copy_from_user(&tempo, arg, sizeof(tempo)))
-		return -EFAULT;
-
-	queue = queueptr(tempo.queue);
+	queue = queueptr(tempo->queue);
 	if (queue == NULL)
 		return -EINVAL;
-	memset(&tempo, 0, sizeof(tempo));
-	tempo.queue = queue->queue;
+	memset(tempo, 0, sizeof(*tempo));
+	tempo->queue = queue->queue;
 	
 	tmr = queue->timer;
 
-	tempo.tempo = tmr->tempo;
-	tempo.ppq = tmr->ppq;
-	tempo.skew_value = tmr->skew;
-	tempo.skew_base = tmr->skew_base;
+	tempo->tempo = tmr->tempo;
+	tempo->ppq = tmr->ppq;
+	tempo->skew_value = tmr->skew;
+	tempo->skew_base = tmr->skew_base;
 	queuefree(queue);
 
-	if (copy_to_user(arg, &tempo, sizeof(tempo)))
-		return -EFAULT;
 	return 0;
 }
 
@@ -1692,15 +1687,12 @@ int snd_seq_set_queue_tempo(int client, struct snd_seq_queue_tempo *tempo)
 EXPORT_SYMBOL(snd_seq_set_queue_tempo);
 
 static int snd_seq_ioctl_set_queue_tempo(struct snd_seq_client *client,
-					 void __user *arg)
+					 void *arg)
 {
+	struct snd_seq_queue_tempo *tempo = arg;
 	int result;
-	struct snd_seq_queue_tempo tempo;
 
-	if (copy_from_user(&tempo, arg, sizeof(tempo)))
-		return -EFAULT;
-
-	result = snd_seq_set_queue_tempo(client->number, &tempo);
+	result = snd_seq_set_queue_tempo(client->number, tempo);
 	return result < 0 ? result : 0;
 }
 
