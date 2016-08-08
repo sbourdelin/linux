@@ -331,7 +331,7 @@ int pci_find_next_ext_capability(struct pci_dev *dev, int start, int cap)
 	if (header == 0)
 		return 0;
 
-	while (ttl-- > 0) {
+	while (ttl-- > 0 && header != -1) {
 		if (PCI_EXT_CAP_ID(header) == cap && pos != start)
 			return pos;
 
