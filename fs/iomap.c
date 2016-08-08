@@ -461,12 +461,13 @@ int iomap_fiemap(struct inode *inode, struct fiemap_extent_info *fi,
 {
 	struct fiemap_ctx ctx;
 	loff_t ret;
+	int flags = 0;
 
 	memset(&ctx, 0, sizeof(ctx));
 	ctx.fi = fi;
 	ctx.prev.type = IOMAP_HOLE;
 
-	ret = fiemap_check_flags(fi, FIEMAP_FLAG_SYNC);
+	ret = fiemap_check_flags(fi, FIEMAP_FLAG_SYNC | FIEMAP_FLAG_XATTR);
 	if (ret)
 		return ret;
 
@@ -476,9 +477,15 @@ int iomap_fiemap(struct inode *inode, struct fiemap_extent_info *fi,
 			return ret;
 	}
 
+	if (fi->fi_flags & FIEMAP_FLAG_XATTR)
+		flags |= IOMAP_ATTR;
+
 	while (len > 0) {
-		ret = iomap_apply(inode, start, len, 0, ops, &ctx,
+		ret = iomap_apply(inode, start, len, flags, ops, &ctx,
 				iomap_fiemap_actor);
+		/* inode with no attribute mapping will give ENOENT */
+		if (ret == -ENOENT)
+			break;
 		if (ret < 0)
 			return ret;
 		if (ret == 0)

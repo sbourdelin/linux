@@ -36,6 +36,7 @@ struct iomap {
  */
 #define IOMAP_WRITE		(1 << 0)
 #define IOMAP_ZERO		(1 << 1)
+#define IOMAP_ATTR		(1 << 2)	/* operate on attributes */
 
 struct iomap_ops {
 	/*

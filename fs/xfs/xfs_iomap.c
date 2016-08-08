@@ -989,9 +989,21 @@ xfs_file_iomap_begin(
 	struct xfs_bmbt_irec	imap;
 	xfs_fileoff_t		offset_fsb, end_fsb;
 	int			nimaps = 1, error = 0;
+	int			bmflags = XFS_BMAPI_ENTIRE;
 
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return -EIO;
+
+	/* Attribute fork can only be read via this interface */
+	if (flags & IOMAP_ATTR) {
+		if (flags & ~IOMAP_ATTR)
+			return -EINVAL;
+		/* if there are no attribute fork or extents, return ENOENT */
+		if (!XFS_IFORK_Q(ip) || !ip->i_d.di_anextents)
+			return -ENOENT;
+		ASSERT(ip->i_d.di_aformat != XFS_DINODE_FMT_LOCAL);
+		bmflags |= XFS_BMAPI_ATTRFORK;
+	}
 
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 
@@ -1002,7 +1014,7 @@ xfs_file_iomap_begin(
 	end_fsb = XFS_B_TO_FSB(mp, offset + length);
 
 	error = xfs_bmapi_read(ip, offset_fsb, end_fsb - offset_fsb, &imap,
-			       &nimaps, XFS_BMAPI_ENTIRE);
+			       &nimaps, bmflags);
 	if (error) {
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		return error;
