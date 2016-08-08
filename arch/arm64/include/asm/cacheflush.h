@@ -149,4 +149,9 @@ int set_memory_rw(unsigned long addr, int numpages);
 int set_memory_x(unsigned long addr, int numpages);
 int set_memory_nx(unsigned long addr, int numpages);
 
+#define ARCH_HAS_FORCE_CACHE 1
+
+void kernel_force_cache_clean(struct page *page, size_t size);
+void kernel_force_cache_invalidate(struct page *page, size_t size);
+
 #endif
