@@ -2180,7 +2180,7 @@ static int snd_seq_ioctl_query_next_port(struct snd_seq_client *client,
 
 static const struct seq_ioctl_table {
 	unsigned int cmd;
-	int (*func)(struct snd_seq_client *client, void __user * arg);
+	int (*func)(struct snd_seq_client *client, void *arg);
 } ioctl_tables[] = {
 	{ SNDRV_SEQ_IOCTL_PVERSION, seq_ioctl_pversion },
 	{ SNDRV_SEQ_IOCTL_CLIENT_ID, seq_ioctl_client_id },
@@ -2233,14 +2233,57 @@ static int snd_seq_do_ioctl(struct snd_seq_client *client, unsigned int cmd,
 }
 
 
-static long snd_seq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+static long snd_seq_ioctl(struct file *file, unsigned int cmd,
+			  unsigned long arg)
 {
 	struct snd_seq_client *client = file->private_data;
+	const struct seq_ioctl_table *p;
+	/* To use kernel stack for ioctl data. */
+	union ioctl_arg {
+		int pversion;
+		int client_id;
+		struct snd_seq_system_info	system_info;
+		struct snd_seq_running_info	running_info;
+		struct snd_seq_client_info	client_info;
+		struct snd_seq_port_info	port_info;
+		struct snd_seq_port_subscribe	port_subscribe;
+		struct snd_seq_queue_info	queue_info;
+		struct snd_seq_queue_status	queue_status;
+		struct snd_seq_queue_tempo	tempo;
+		struct snd_seq_queue_timer	queue_timer;
+		struct snd_seq_queue_client	queue_client;
+		struct snd_seq_client_pool	client_pool;
+		struct snd_seq_remove_events	remove_events;
+		struct snd_seq_query_subs	query_subs;
+	} buf = {0};
+	int err;
 
 	if (snd_BUG_ON(!client))
 		return -ENXIO;
+
+	for (p = ioctl_tables; p->cmd > 0; ++p) {
+		if (p->cmd == cmd)
+			break;
+	}
+	if (p->cmd == 0)
+		return -ENOTTY;
+
+	/*
+	 * All of ioctl commands for ALSA sequencer get an argument of size
+	 * within 13 bits. We can safely pick up the size from the command.
+	 * On the other hand, some commands includes a bug of 'read' or 'write',
+	 * thus we cannot utilize information from the access fields.
+	 */
+	if (copy_from_user(&buf, (const void __user *)arg, _IOC_SIZE(p->cmd)))
+		return -EFAULT;
 		
-	return snd_seq_do_ioctl(client, cmd, (void __user *) arg);
+	err = p->func(client, &buf);
+	if (err >= 0) {
+		if (copy_to_user((void __user *)arg, &buf, _IOC_SIZE(p->cmd)))
+			return -EFAULT;
+	}
+
+	return err;
 }
 
 #ifdef CONFIG_COMPAT
