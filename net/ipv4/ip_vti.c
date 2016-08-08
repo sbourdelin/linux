@@ -48,6 +48,7 @@ static struct rtnl_link_ops vti_link_ops __read_mostly;
 
 static int vti_net_id __read_mostly;
 static int vti_tunnel_init(struct net_device *dev);
+static void vti_tunnel_uninit(struct net_device *dev);
 
 static int vti_input(struct sk_buff *skb, int nexthdr, __be32 spi,
 		     int encap_type)
@@ -359,7 +360,7 @@ vti_tunnel_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 static const struct net_device_ops vti_netdev_ops = {
 	.ndo_init	= vti_tunnel_init,
-	.ndo_uninit	= ip_tunnel_uninit,
+	.ndo_uninit	= vti_tunnel_uninit,
 	.ndo_start_xmit	= vti_tunnel_xmit,
 	.ndo_do_ioctl	= vti_tunnel_ioctl,
 	.ndo_change_mtu	= ip_tunnel_change_mtu,
@@ -390,6 +391,17 @@ static int vti_tunnel_init(struct net_device *dev)
 	netif_keep_dst(dev);
 
 	return ip_tunnel_init(dev);
+}
+
+static void vti_tunnel_uninit(struct net_device *dev)
+{
+	struct ip_tunnel *tunnel = netdev_priv(dev);
+	struct net *net = tunnel->net;
+
+	ip_tunnel_uninit(dev);
+
+	if (!net_eq(net, dev_net(dev)))
+		xfrm_garbage_collect(net);
 }
 
 static void __net_init vti_fb_tunnel_init(struct net_device *dev)
