@@ -1255,30 +1255,27 @@ static int snd_seq_ioctl_set_client_info(struct snd_seq_client *client,
 /* 
  * CREATE PORT ioctl() 
  */
-static int snd_seq_ioctl_create_port(struct snd_seq_client *client,
-				     void __user *arg)
+static int snd_seq_ioctl_create_port(struct snd_seq_client *client, void *arg)
 {
+	struct snd_seq_port_info *info = arg;
 	struct snd_seq_client_port *port;
-	struct snd_seq_port_info info;
 	struct snd_seq_port_callback *callback;
 
-	if (copy_from_user(&info, arg, sizeof(info)))
-		return -EFAULT;
-
 	/* it is not allowed to create the port for an another client */
-	if (info.addr.client != client->number)
+	if (info->addr.client != client->number)
 		return -EPERM;
 
-	port = snd_seq_create_port(client, (info.flags & SNDRV_SEQ_PORT_FLG_GIVEN_PORT) ? info.addr.port : -1);
+	port = snd_seq_create_port(client, (info->flags & SNDRV_SEQ_PORT_FLG_GIVEN_PORT) ? info->addr.port : -1);
 	if (port == NULL)
 		return -ENOMEM;
 
-	if (client->type == USER_CLIENT && info.kernel) {
+	if (client->type == USER_CLIENT && info->kernel) {
 		snd_seq_delete_port(client, port->addr.port);
 		return -EINVAL;
 	}
 	if (client->type == KERNEL_CLIENT) {
-		if ((callback = info.kernel) != NULL) {
+		callback = info->kernel;
+		if (callback != NULL) {
 			if (callback->owner)
 				port->owner = callback->owner;
 			port->private_data = callback->private_data;
@@ -1291,13 +1288,10 @@ static int snd_seq_ioctl_create_port(struct snd_seq_client *client,
 		}
 	}
 
-	info.addr = port->addr;
+	info->addr = port->addr;
 
-	snd_seq_set_port_info(port, &info);
+	snd_seq_set_port_info(port, info);
 	snd_seq_system_client_ev_port_start(port->addr.client, port->addr.port);
-
-	if (copy_to_user(arg, &info, sizeof(info)))
-		return -EFAULT;
 
 	return 0;
 }
@@ -1305,23 +1299,19 @@ static int snd_seq_ioctl_create_port(struct snd_seq_client *client,
 /* 
  * DELETE PORT ioctl() 
  */
-static int snd_seq_ioctl_delete_port(struct snd_seq_client *client,
-				     void __user *arg)
+static int snd_seq_ioctl_delete_port(struct snd_seq_client *client, void *arg)
 {
-	struct snd_seq_port_info info;
+	struct snd_seq_port_info *info = arg;
 	int err;
 
-	/* set passed parameters */
-	if (copy_from_user(&info, arg, sizeof(info)))
-		return -EFAULT;
-	
 	/* it is not allowed to remove the port for an another client */
-	if (info.addr.client != client->number)
+	if (info->addr.client != client->number)
 		return -EPERM;
 
-	err = snd_seq_delete_port(client, info.addr.port);
+	err = snd_seq_delete_port(client, info->addr.port);
 	if (err >= 0)
-		snd_seq_system_client_ev_port_exit(client->number, info.addr.port);
+		snd_seq_system_client_ev_port_exit(client->number,
+						   info->addr.port);
 	return err;
 }
 
