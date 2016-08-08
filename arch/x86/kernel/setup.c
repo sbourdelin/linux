@@ -936,8 +936,6 @@ void __init setup_arch(char **cmdline_p)
 
 	x86_init.oem.arch_setup();
 
-	kernel_randomize_memory();
-
 	iomem_resource.end = (1ULL << boot_cpu_data.x86_phys_bits) - 1;
 	setup_memory_map();
 	parse_setup_data();
@@ -1070,6 +1068,8 @@ void __init setup_arch(char **cmdline_p)
 
 	high_memory = (void *)__va(max_pfn * PAGE_SIZE - 1) + 1;
 #endif
+
+	kernel_randomize_memory();
 
 	/*
 	 * Find and reserve possible boot-time SMP configuration:
