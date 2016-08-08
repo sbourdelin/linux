@@ -1114,9 +1114,12 @@ static unsigned int snd_seq_poll(struct file *file, poll_table * wait)
 /*-----------------------------------------------------*/
 
 
-static int seq_ioctl_pversion(struct snd_seq_client *client, void __user *arg)
+static int seq_ioctl_pversion(struct snd_seq_client *client, void *arg)
 {
-	return put_user(SNDRV_SEQ_VERSION, (int __user *)arg) ? -EFAULT : 0;
+	int *version = arg;
+
+	*version = SNDRV_SEQ_VERSION;
+	return 0;
 }
 
 static int seq_ioctl_client_id(struct snd_seq_client *client, void __user *arg)
