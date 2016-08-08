@@ -518,4 +518,8 @@ static inline void secure_flush_area(const void *addr, size_t size)
 	outer_flush_range(phys, phys + size);
 }
 
+#define ARCH_HAS_FORCE_CACHE 1
+void kernel_force_cache_clean(struct page *page, size_t size);
+void kernel_force_cache_invalidate(struct page *page, size_t size);
+
 #endif

@@ -1,8 +1,10 @@
 #ifdef CONFIG_MMU
 #include <linux/list.h>
 #include <linux/vmalloc.h>
+#include <linux/dma-mapping.h>
 
 #include <asm/pgtable.h>
+
 
 /* the upper-most page table pointer */
 extern pmd_t *top_pmd;
@@ -97,3 +99,9 @@ void arm_mm_memblock_reserve(void);
 void dma_contiguous_remap(void);
 
 unsigned long __clear_cr(unsigned long mask);
+
+void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
+	size_t size, enum dma_data_direction dir);
+
+void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
+	size_t size, enum dma_data_direction dir);
