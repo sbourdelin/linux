@@ -2168,7 +2168,7 @@ static int snd_seq_ioctl_query_next_port(struct snd_seq_client *client,
 
 /* -------------------------------------------------------- */
 
-static struct seq_ioctl_table {
+static const struct seq_ioctl_table {
 	unsigned int cmd;
 	int (*func)(struct snd_seq_client *client, void __user * arg);
 } ioctl_tables[] = {
@@ -2207,7 +2207,7 @@ static struct seq_ioctl_table {
 static int snd_seq_do_ioctl(struct snd_seq_client *client, unsigned int cmd,
 			    void __user *arg)
 {
-	struct seq_ioctl_table *p;
+	const struct seq_ioctl_table *p;
 
 	switch (cmd) {
 	case SNDRV_SEQ_IOCTL_PVERSION:
