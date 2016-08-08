@@ -23,6 +23,7 @@
 #include <linux/seq_file.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/cacheflush.h>
 #include "ion.h"
 #include "ion_priv.h"
 
@@ -70,8 +71,7 @@ static struct page *alloc_buffer_page(struct ion_system_heap *heap,
 		page = alloc_pages(gfp_flags | __GFP_COMP, order);
 		if (!page)
 			return NULL;
-		ion_pages_sync_for_device(NULL, page, PAGE_SIZE << order,
-						DMA_BIDIRECTIONAL);
+		kernel_force_cache_clean(page, PAGE_SIZE << order);
 	}
 
 	return page;
@@ -360,7 +360,7 @@ static int ion_system_contig_heap_allocate(struct ion_heap *heap,
 
 	buffer->priv_virt = table;
 
-	ion_pages_sync_for_device(NULL, page, len, DMA_BIDIRECTIONAL);
+	kernel_force_cache_clean(page, len);
 
 	return 0;
 
