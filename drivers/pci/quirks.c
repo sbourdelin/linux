@@ -4428,3 +4428,18 @@ static void quirk_intel_qat_vf_cap(struct pci_dev *pdev)
 	}
 }
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443, quirk_intel_qat_vf_cap);
+
+/*
+ * The PCIe slot capabilities for Intel compatible Hot-swap backplane advertise
+ * attention and power indicators, but will do the wrong thing if used in a
+ * standard way. Ignore these.
+ */
+static void quirk_hsbp(struct pci_dev *pdev)
+{
+	pdev->ignore_aip = 1;
+	pdev->ignore_pip = 1;
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x2030, quirk_hsbp);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x2031, quirk_hsbp);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x2032, quirk_hsbp);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x2033, quirk_hsbp);
