@@ -465,6 +465,9 @@ static inline struct radix_tree_node *entry_to_node(void *ptr)
 static __always_inline void **
 radix_tree_next_slot(void **slot, struct radix_tree_iter *iter, unsigned flags)
 {
+	if (unlikely(!slot))
+		return NULL;
+
 	if (flags & RADIX_TREE_ITER_TAGGED) {
 		void *canon = slot;
 
