@@ -51,7 +51,6 @@ static const int cfq_hist_divisor = 4;
 
 #define CFQQ_SEEK_THR		(sector_t)(8 * 100)
 #define CFQQ_CLOSE_THR		(sector_t)(8 * 1024)
-#define CFQQ_SECT_THR_NONROT	(sector_t)(2 * 32)
 #define CFQQ_SEEKY(cfqq)	(hweight32(cfqq->seek_history) > 32/8)
 
 #define RQ_CIC(rq)		icq_to_cic((rq)->elv.icq)
@@ -2714,8 +2713,7 @@ static bool cfq_should_idle(struct cfq_data *cfqd, struct cfq_queue *cfqq)
 		return false;
 
 	/* We do for queues that were marked with idle window flag. */
-	if (cfq_cfqq_idle_window(cfqq) &&
-	   !(blk_queue_nonrot(cfqd->queue) && cfqd->hw_tag))
+	if (cfq_cfqq_idle_window(cfqq))
 		return true;
 
 	/*
@@ -2736,14 +2734,6 @@ static void cfq_arm_slice_timer(struct cfq_data *cfqd)
 	struct cfq_io_cq *cic;
 	u64 sl, group_idle = 0;
 	u64 now = ktime_get_ns();
-
-	/*
-	 * SSD device without seek penalty, disable idling. But only do so
-	 * for devices that support queuing, otherwise we still have a problem
-	 * with sync vs async workloads.
-	 */
-	if (blk_queue_nonrot(cfqd->queue) && cfqd->hw_tag)
-		return;
 
 	WARN_ON(!RB_EMPTY_ROOT(&cfqq->sort_list));
 	WARN_ON(cfq_cfqq_slice_new(cfqq));
@@ -3611,7 +3601,6 @@ cfq_update_io_seektime(struct cfq_data *cfqd, struct cfq_queue *cfqq,
 		       struct request *rq)
 {
 	sector_t sdist = 0;
-	sector_t n_sec = blk_rq_sectors(rq);
 	if (cfqq->last_request_pos) {
 		if (cfqq->last_request_pos < blk_rq_pos(rq))
 			sdist = blk_rq_pos(rq) - cfqq->last_request_pos;
@@ -3620,10 +3609,7 @@ cfq_update_io_seektime(struct cfq_data *cfqd, struct cfq_queue *cfqq,
 	}
 
 	cfqq->seek_history <<= 1;
-	if (blk_queue_nonrot(cfqd->queue))
-		cfqq->seek_history |= (n_sec < CFQQ_SECT_THR_NONROT);
-	else
-		cfqq->seek_history |= (sdist > CFQQ_SEEK_THR);
+	cfqq->seek_history |= (sdist > CFQQ_SEEK_THR);
 }
 
 /*
