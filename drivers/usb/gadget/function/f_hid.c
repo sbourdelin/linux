@@ -362,12 +362,6 @@ static int f_hidg_open(struct inode *inode, struct file *fd)
 /*-------------------------------------------------------------------------*/
 /*                                usb_function                             */
 
-static inline struct usb_request *hidg_alloc_ep_req(struct usb_ep *ep,
-						    unsigned length)
-{
-	return alloc_ep_req(ep, length, length);
-}
-
 static void hidg_set_report_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	struct f_hidg *hidg = (struct f_hidg *) req->context;
@@ -549,8 +543,8 @@ static int hidg_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 		 */
 		for (i = 0; i < hidg->qlen && status == 0; i++) {
 			struct usb_request *req =
-					hidg_alloc_ep_req(hidg->out_ep,
-							  hidg->report_length);
+				alloc_ep_req(hidg->out_ep,
+					hidg->report_length);
 			if (req) {
 				req->complete = hidg_set_report_complete;
 				req->context  = hidg;

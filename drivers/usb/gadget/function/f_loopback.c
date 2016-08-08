@@ -306,13 +306,6 @@ static void disable_loopback(struct f_loopback *loop)
 	VDBG(cdev, "%s disabled\n", loop->function.name);
 }
 
-static inline struct usb_request *lb_alloc_ep_req(struct usb_ep *ep, int len)
-{
-	struct f_loopback	*loop = ep->driver_data;
-
-	return alloc_ep_req(ep, len, loop->buflen);
-}
-
 static int alloc_requests(struct usb_composite_dev *cdev,
 			  struct f_loopback *loop)
 {
@@ -333,7 +326,7 @@ static int alloc_requests(struct usb_composite_dev *cdev,
 		if (!in_req)
 			goto fail;
 
-		out_req = lb_alloc_ep_req(loop->out_ep, 0);
+		out_req = alloc_ep_req(loop->out_ep, loop->buflen);
 		if (!out_req)
 			goto fail_in;
 

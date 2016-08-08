@@ -208,12 +208,6 @@ static struct usb_gadget_strings *midi_strings[] = {
 	NULL,
 };
 
-static inline struct usb_request *midi_alloc_ep_req(struct usb_ep *ep,
-						    unsigned length)
-{
-	return alloc_ep_req(ep, length, length);
-}
-
 static const uint8_t f_midi_cin_length[] = {
 	0, 0, 2, 3, 3, 1, 2, 3, 3, 3, 3, 3, 2, 2, 3, 1
 };
@@ -365,7 +359,7 @@ static int f_midi_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	/* pre-allocate write usb requests to use on f_midi_transmit. */
 	while (kfifo_avail(&midi->in_req_fifo)) {
 		struct usb_request *req =
-			midi_alloc_ep_req(midi->in_ep, midi->buflen);
+			alloc_ep_req(midi->in_ep, midi->buflen);
 
 		if (req == NULL)
 			return -ENOMEM;
@@ -379,7 +373,7 @@ static int f_midi_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	/* allocate a bunch of read buffers and queue them all at once. */
 	for (i = 0; i < midi->qlen && err == 0; i++) {
 		struct usb_request *req =
-			midi_alloc_ep_req(midi->out_ep, midi->buflen);
+			alloc_ep_req(midi->out_ep, midi->buflen);
 
 		if (req == NULL)
 			return -ENOMEM;
