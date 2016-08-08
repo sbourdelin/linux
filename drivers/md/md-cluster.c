@@ -406,7 +406,7 @@ static void remove_suspend_info(struct mddev *mddev, int slot)
 	spin_lock_irq(&cinfo->suspend_lock);
 	__remove_suspend_info(cinfo, slot);
 	spin_unlock_irq(&cinfo->suspend_lock);
-	mddev->pers->quiesce(mddev, 2);
+	mddev->pers->quiesce(mddev, 2, false);
 }
 
 
@@ -452,14 +452,14 @@ static void process_suspend_info(struct mddev *mddev,
 	s->slot = slot;
 	s->lo = lo;
 	s->hi = hi;
-	mddev->pers->quiesce(mddev, 1);
-	mddev->pers->quiesce(mddev, 0);
+	mddev->pers->quiesce(mddev, 1, false);
+	mddev->pers->quiesce(mddev, 0, false);
 	spin_lock_irq(&cinfo->suspend_lock);
 	/* Remove existing entry (if exists) before adding */
 	__remove_suspend_info(cinfo, slot);
 	list_add(&s->list, &cinfo->suspend_list);
 	spin_unlock_irq(&cinfo->suspend_lock);
-	mddev->pers->quiesce(mddev, 2);
+	mddev->pers->quiesce(mddev, 2, false);
 }
 
 static void process_add_new_disk(struct mddev *mddev, struct cluster_msg *cmsg)

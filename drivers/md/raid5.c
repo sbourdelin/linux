@@ -7623,7 +7623,8 @@ static void raid5_finish_reshape(struct mddev *mddev)
 	}
 }
 
-static void raid5_quiesce(struct mddev *mddev, int state)
+static void raid5_quiesce(struct mddev *mddev, int state,
+	bool reconfig_mutex_locked)
 {
 	struct r5conf *conf = mddev->private;
 
@@ -7657,7 +7658,7 @@ static void raid5_quiesce(struct mddev *mddev, int state)
 		unlock_all_device_hash_locks_irq(conf);
 		break;
 	}
-	r5l_quiesce(conf->log, state);
+	r5l_quiesce(conf->log, state, reconfig_mutex_locked);
 }
 
 static void *raid45_takeover_raid0(struct mddev *mddev, int level)

@@ -279,7 +279,8 @@ static void linear_status (struct seq_file *seq, struct mddev *mddev)
 	seq_printf(seq, " %dk rounding", mddev->chunk_sectors / 2);
 }
 
-static void linear_quiesce(struct mddev *mddev, int state)
+static void linear_quiesce(struct mddev *mddev, int state,
+	bool reconfig_mutex_locked)
 {
 }
 

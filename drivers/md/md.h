@@ -500,7 +500,7 @@ struct md_personality
 	 * 1 - no new requests allowed
 	 * others - reserved
 	 */
-	void (*quiesce) (struct mddev *mddev, int state);
+	void (*quiesce) (struct mddev *mddev, int state, bool reconfig_mutex_locked);
 	/* takeover is used to transition an array from one
 	 * personality to another.  The new personality must be able
 	 * to handle the data in the current layout.

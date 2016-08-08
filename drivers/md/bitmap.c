@@ -2044,7 +2044,7 @@ int bitmap_resize(struct bitmap *bitmap, sector_t blocks,
 	}
 
 	if (!init)
-		bitmap->mddev->pers->quiesce(bitmap->mddev, 1);
+		bitmap->mddev->pers->quiesce(bitmap->mddev, 1, true);
 
 	store.file = bitmap->storage.file;
 	bitmap->storage.file = NULL;
@@ -2158,7 +2158,7 @@ int bitmap_resize(struct bitmap *bitmap, sector_t blocks,
 
 	if (!init) {
 		bitmap_unplug(bitmap);
-		bitmap->mddev->pers->quiesce(bitmap->mddev, 0);
+		bitmap->mddev->pers->quiesce(bitmap->mddev, 0, true);
 	}
 	ret = 0;
 err:
@@ -2207,9 +2207,9 @@ location_store(struct mddev *mddev, const char *buf, size_t len)
 			goto out;
 		}
 		if (mddev->pers) {
-			mddev->pers->quiesce(mddev, 1);
+			mddev->pers->quiesce(mddev, 1, true);
 			bitmap_destroy(mddev);
-			mddev->pers->quiesce(mddev, 0);
+			mddev->pers->quiesce(mddev, 0, true);
 		}
 		mddev->bitmap_info.offset = 0;
 		if (mddev->bitmap_info.file) {
@@ -2246,7 +2246,7 @@ location_store(struct mddev *mddev, const char *buf, size_t len)
 			mddev->bitmap_info.offset = offset;
 			if (mddev->pers) {
 				struct bitmap *bitmap;
-				mddev->pers->quiesce(mddev, 1);
+				mddev->pers->quiesce(mddev, 1, true);
 				bitmap = bitmap_create(mddev, -1);
 				if (IS_ERR(bitmap))
 					rv = PTR_ERR(bitmap);
@@ -2256,7 +2256,7 @@ location_store(struct mddev *mddev, const char *buf, size_t len)
 					if (rv)
 						mddev->bitmap_info.offset = 0;
 				}
-				mddev->pers->quiesce(mddev, 0);
+				mddev->pers->quiesce(mddev, 0, true);
 				if (rv) {
 					bitmap_destroy(mddev);
 					goto out;

@@ -3773,7 +3773,8 @@ static void raid10_free(struct mddev *mddev, void *priv)
 	kfree(conf);
 }
 
-static void raid10_quiesce(struct mddev *mddev, int state)
+static void raid10_quiesce(struct mddev *mddev, int state,
+	bool reconfig_mutex_locked)
 {
 	struct r10conf *conf = mddev->private;
 

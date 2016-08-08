@@ -3135,7 +3135,8 @@ static int raid1_reshape(struct mddev *mddev)
 	return 0;
 }
 
-static void raid1_quiesce(struct mddev *mddev, int state)
+static void raid1_quiesce(struct mddev *mddev, int state,
+	bool reconfig_mutex_locked)
 {
 	struct r1conf *conf = mddev->private;
 

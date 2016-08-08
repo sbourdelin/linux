@@ -821,7 +821,7 @@ static void r5l_wake_reclaim(struct r5l_log *log, sector_t space)
 	md_wakeup_thread(log->reclaim_thread);
 }
 
-void r5l_quiesce(struct r5l_log *log, int state)
+void r5l_quiesce(struct r5l_log *log, int state, bool reconfig_mutex_locked)
 {
 	struct mddev *mddev;
 	if (!log || state == 2)

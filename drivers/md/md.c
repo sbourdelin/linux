@@ -312,7 +312,7 @@ void mddev_suspend(struct mddev *mddev)
 		return;
 	synchronize_rcu();
 	wait_event(mddev->sb_wait, atomic_read(&mddev->active_io) == 0);
-	mddev->pers->quiesce(mddev, 1);
+	mddev->pers->quiesce(mddev, 1, true);
 
 	del_timer_sync(&mddev->safemode_timer);
 }
@@ -323,7 +323,7 @@ void mddev_resume(struct mddev *mddev)
 	if (--mddev->suspended)
 		return;
 	wake_up(&mddev->sb_wait);
-	mddev->pers->quiesce(mddev, 0);
+	mddev->pers->quiesce(mddev, 0, true);
 
 	set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
 	md_wakeup_thread(mddev->thread);
@@ -4664,11 +4664,11 @@ suspend_lo_store(struct mddev *mddev, const char *buf, size_t len)
 	mddev->suspend_lo = new;
 	if (new >= old)
 		/* Shrinking suspended region */
-		mddev->pers->quiesce(mddev, 2);
+		mddev->pers->quiesce(mddev, 2, true);
 	else {
 		/* Expanding suspended region - need to wait */
-		mddev->pers->quiesce(mddev, 1);
-		mddev->pers->quiesce(mddev, 0);
+		mddev->pers->quiesce(mddev, 1, true);
+		mddev->pers->quiesce(mddev, 0, true);
 	}
 	err = 0;
 unlock:
@@ -4707,11 +4707,11 @@ suspend_hi_store(struct mddev *mddev, const char *buf, size_t len)
 	mddev->suspend_hi = new;
 	if (new <= old)
 		/* Shrinking suspended region */
-		mddev->pers->quiesce(mddev, 2);
+		mddev->pers->quiesce(mddev, 2, true);
 	else {
 		/* Expanding suspended region - need to wait */
-		mddev->pers->quiesce(mddev, 1);
-		mddev->pers->quiesce(mddev, 0);
+		mddev->pers->quiesce(mddev, 1, true);
+		mddev->pers->quiesce(mddev, 0, true);
 	}
 	err = 0;
 unlock:
@@ -5509,8 +5509,8 @@ static void mddev_detach(struct mddev *mddev)
 			   atomic_read(&bitmap->behind_writes) == 0);
 	}
 	if (mddev->pers && mddev->pers->quiesce) {
-		mddev->pers->quiesce(mddev, 1);
-		mddev->pers->quiesce(mddev, 0);
+		mddev->pers->quiesce(mddev, 1, true);
+		mddev->pers->quiesce(mddev, 0, true);
 	}
 	md_unregister_thread(&mddev->thread);
 	if (mddev->queue)
@@ -6321,7 +6321,7 @@ static int set_bitmap_file(struct mddev *mddev, int fd)
 		return -ENOENT; /* cannot remove what isn't there */
 	err = 0;
 	if (mddev->pers) {
-		mddev->pers->quiesce(mddev, 1);
+		mddev->pers->quiesce(mddev, 1, true);
 		if (fd >= 0) {
 			struct bitmap *bitmap;
 
@@ -6336,7 +6336,7 @@ static int set_bitmap_file(struct mddev *mddev, int fd)
 			bitmap_destroy(mddev);
 			fd = -1; /* make sure to put the file */
 		}
-		mddev->pers->quiesce(mddev, 0);
+		mddev->pers->quiesce(mddev, 0, true);
 	}
 	if (fd < 0) {
 		struct file *f = mddev->bitmap_info.file;
@@ -6617,7 +6617,7 @@ static int update_array_info(struct mddev *mddev, mdu_array_info_t *info)
 				mddev->bitmap_info.default_offset;
 			mddev->bitmap_info.space =
 				mddev->bitmap_info.default_space;
-			mddev->pers->quiesce(mddev, 1);
+			mddev->pers->quiesce(mddev, 1, true);
 			bitmap = bitmap_create(mddev, -1);
 			if (!IS_ERR(bitmap)) {
 				mddev->bitmap = bitmap;
@@ -6626,7 +6626,7 @@ static int update_array_info(struct mddev *mddev, mdu_array_info_t *info)
 				rv = PTR_ERR(bitmap);
 			if (rv)
 				bitmap_destroy(mddev);
-			mddev->pers->quiesce(mddev, 0);
+			mddev->pers->quiesce(mddev, 0, true);
 		} else {
 			/* remove the bitmap */
 			if (!mddev->bitmap) {
@@ -6650,9 +6650,9 @@ static int update_array_info(struct mddev *mddev, mdu_array_info_t *info)
 				mddev->bitmap_info.nodes = 0;
 				md_cluster_ops->leave(mddev);
 			}
-			mddev->pers->quiesce(mddev, 1);
+			mddev->pers->quiesce(mddev, 1, true);
 			bitmap_destroy(mddev);
-			mddev->pers->quiesce(mddev, 0);
+			mddev->pers->quiesce(mddev, 0, true);
 			mddev->bitmap_info.offset = 0;
 		}
 	}
@@ -7945,8 +7945,8 @@ void md_do_sync(struct md_thread *thread)
 		 * region.
 		 */
 		if (mddev->bitmap) {
-			mddev->pers->quiesce(mddev, 1);
-			mddev->pers->quiesce(mddev, 0);
+			mddev->pers->quiesce(mddev, 1, false);
+			mddev->pers->quiesce(mddev, 0, false);
 		}
 	}
 
