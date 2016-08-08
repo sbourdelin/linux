@@ -804,6 +804,12 @@ struct controller *pcie_init(struct pcie_device *dev)
 	}
 	ctrl->pcie = dev;
 	pcie_capability_read_dword(pdev, PCI_EXP_SLTCAP, &slot_cap);
+
+	if (pdev->ignore_aip)
+		slot_cap &= ~PCI_EXP_SLTCAP_AIP;
+	if (pdev->ignore_pip)
+		slot_cap &= ~PCI_EXP_SLTCAP_PIP;
+
 	ctrl->slot_cap = slot_cap;
 	mutex_init(&ctrl->ctrl_lock);
 	init_waitqueue_head(&ctrl->queue);

@@ -308,6 +308,8 @@ struct pci_dev {
 						   powered on/off by the
 						   corresponding bridge */
 	unsigned int	ignore_hotplug:1;	/* Ignore hotplug events */
+	unsigned int	ignore_aip:1;		/* Ignore attention indicator */
+	unsigned int	ignore_pip:1;		/* Ignore power indicator */
 	unsigned int	d3_delay;	/* D3->D0 transition time in ms */
 	unsigned int	d3cold_delay;	/* D3cold->D0 transition time in ms */
 
