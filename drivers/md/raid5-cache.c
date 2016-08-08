@@ -97,6 +97,7 @@ struct r5l_log {
 
 	bool need_cache_flush;
 	bool in_teardown;
+	bool reconfig_mutex_locked;
 };
 
 /*
@@ -712,7 +713,7 @@ static void r5l_write_super_and_discard_space(struct r5l_log *log,
 	 * md_check_recovery() fails, so the PENDING never get cleared. The
 	 * in_teardown check workaround this issue.
 	 */
-	if (!log->in_teardown) {
+	if (!log->in_teardown || !log->reconfig_mutex_locked) {
 		set_mask_bits(&mddev->flags, 0,
 			      BIT(MD_CHANGE_DEVS) | BIT(MD_CHANGE_PENDING));
 		md_wakeup_thread(mddev->thread);
@@ -826,6 +827,7 @@ void r5l_quiesce(struct r5l_log *log, int state, bool reconfig_mutex_locked)
 	struct mddev *mddev;
 	if (!log || state == 2)
 		return;
+	log->reconfig_mutex_locked = reconfig_mutex_locked;
 	if (state == 0) {
 		log->in_teardown = 0;
 		/*
@@ -850,6 +852,7 @@ void r5l_quiesce(struct r5l_log *log, int state, bool reconfig_mutex_locked)
 		md_unregister_thread(&log->reclaim_thread);
 		r5l_do_reclaim(log);
 	}
+	log->reconfig_mutex_locked = false;
 }
 
 bool r5l_log_disk_error(struct r5conf *conf)
