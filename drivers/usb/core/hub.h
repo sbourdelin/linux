@@ -78,6 +78,7 @@ struct usb_hub {
 	struct delayed_work	init_work;
 	struct work_struct      events;
 	struct usb_port		**ports;
+	struct list_head	pwrseq_on_list; /* powered pwrseq node list */
 };
 
 /**
@@ -166,3 +167,14 @@ static inline int hub_port_debounce_be_stable(struct usb_hub *hub,
 {
 	return hub_port_debounce(hub, port1, false);
 }
+
+#if IS_ENABLED(CONFIG_PWRSEQ_GENERIC)
+int hub_pwrseq_on(struct usb_hub *hub);
+void hub_pwrseq_off(struct usb_hub *hub);
+#else
+static inline int hub_pwrseq_on(struct usb_hub *hub)
+{
+	return 0;
+}
+static inline void hub_pwrseq_off(struct usb_hub *hub) {}
+#endif /* CONFIG_PWRSEQ_GENERIC */
