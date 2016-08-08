@@ -1129,6 +1129,16 @@ static unsigned int snd_seq_poll(struct file *file, poll_table * wait)
 /*-----------------------------------------------------*/
 
 
+static int seq_ioctl_pversion(struct snd_seq_client *client, void __user *arg)
+{
+	return put_user(SNDRV_SEQ_VERSION, (int __user *)arg) ? -EFAULT : 0;
+}
+
+static int seq_ioctl_client_id(struct snd_seq_client *client, void __user *arg)
+{
+	return put_user(client->number, (int __user *)arg) ? -EFAULT : 0;
+}
+
 /* SYSTEM_INFO ioctl() */
 static int snd_seq_ioctl_system_info(struct snd_seq_client *client, void __user *arg)
 {
@@ -2172,6 +2182,8 @@ static const struct seq_ioctl_table {
 	unsigned int cmd;
 	int (*func)(struct snd_seq_client *client, void __user * arg);
 } ioctl_tables[] = {
+	{ SNDRV_SEQ_IOCTL_PVERSION, seq_ioctl_pversion },
+	{ SNDRV_SEQ_IOCTL_CLIENT_ID, seq_ioctl_client_id },
 	{ SNDRV_SEQ_IOCTL_SYSTEM_INFO, snd_seq_ioctl_system_info },
 	{ SNDRV_SEQ_IOCTL_RUNNING_MODE, snd_seq_ioctl_running_mode },
 	{ SNDRV_SEQ_IOCTL_GET_CLIENT_INFO, snd_seq_ioctl_get_client_info },
@@ -2208,15 +2220,6 @@ static int snd_seq_do_ioctl(struct snd_seq_client *client, unsigned int cmd,
 			    void __user *arg)
 {
 	const struct seq_ioctl_table *p;
-
-	switch (cmd) {
-	case SNDRV_SEQ_IOCTL_PVERSION:
-		/* return sequencer version number */
-		return put_user(SNDRV_SEQ_VERSION, (int __user *)arg) ? -EFAULT : 0;
-	case SNDRV_SEQ_IOCTL_CLIENT_ID:
-		/* return the id of this client */
-		return put_user(client->number, (int __user *)arg) ? -EFAULT : 0;
-	}
 
 	if (! arg)
 		return -EFAULT;
