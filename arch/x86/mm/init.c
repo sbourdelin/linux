@@ -130,6 +130,14 @@ void  __init early_alloc_pgt_buf(void)
 	unsigned long tables = INIT_PGT_BUF_SIZE;
 	phys_addr_t base;
 
+	/*
+	 * Depending on the machine e860 memory layout and the PUD alignement.
+	 * We may need twice more pages when KASLR memoy randomization is
+	 * enabled.
+	 */
+	if (IS_ENABLED(CONFIG_RANDOMIZE_MEMORY))
+		tables *= 2;
+
 	base = __pa(extend_brk(tables, PAGE_SIZE));
 
 	pgt_buf_start = base >> PAGE_SHIFT;
