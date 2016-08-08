@@ -72,6 +72,7 @@ struct aer_rpc {
 					 * recovery on the same
 					 * root port hierarchy
 					 */
+	int pos;			/* position of AER capability */
 };
 
 struct aer_broadcast_data {
