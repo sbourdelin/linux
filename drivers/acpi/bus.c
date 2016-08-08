@@ -1124,6 +1124,7 @@ static int __init acpi_init(void)
 	acpi_sleep_proc_init();
 	acpi_wakeup_device_init();
 	acpi_debugger_init();
+	acpi_set_processor_mapping();
 	return 0;
 }
 
