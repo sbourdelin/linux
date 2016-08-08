@@ -1770,38 +1770,31 @@ static int snd_seq_ioctl_set_queue_timer(struct snd_seq_client *client,
 
 /* GET_QUEUE_CLIENT ioctl() */
 static int snd_seq_ioctl_get_queue_client(struct snd_seq_client *client,
-					  void __user *arg)
+					  void *arg)
 {
-	struct snd_seq_queue_client info;
+	struct snd_seq_queue_client *info = arg;
 	int used;
 
-	if (copy_from_user(&info, arg, sizeof(info)))
-		return -EFAULT;
-
-	used = snd_seq_queue_is_used(info.queue, client->number);
+	used = snd_seq_queue_is_used(info->queue, client->number);
 	if (used < 0)
 		return -EINVAL;
-	info.used = used;
-	info.client = client->number;
+	info->used = used;
+	info->client = client->number;
 
-	if (copy_to_user(arg, &info, sizeof(info)))
-		return -EFAULT;
 	return 0;
 }
 
 
 /* SET_QUEUE_CLIENT ioctl() */
 static int snd_seq_ioctl_set_queue_client(struct snd_seq_client *client,
-					  void __user *arg)
+					  void *arg)
 {
+	struct snd_seq_queue_client *info = arg;
 	int err;
-	struct snd_seq_queue_client info;
 
-	if (copy_from_user(&info, arg, sizeof(info)))
-		return -EFAULT;
-
-	if (info.used >= 0) {
-		err = snd_seq_queue_use(info.queue, client->number, info.used);
+	if (info->used >= 0) {
+		err = snd_seq_queue_use(info->queue, client->number,
+					info->used);
 		if (err < 0)
 			return err;
 	}
