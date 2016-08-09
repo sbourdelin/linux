@@ -92,7 +92,7 @@ static const u16 mic_x100_intr_init[] = {
 #define MIC_X100_BSP_INTERRUPT_VECTOR 229
 
 extern struct mic_hw_ops mic_x100_ops;
-extern struct mic_smpt_ops mic_x100_smpt_ops;
+extern const struct mic_smpt_ops mic_x100_smpt_ops;
 extern struct mic_hw_intr_ops mic_x100_intr_ops;
 
 #endif

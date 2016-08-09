@@ -82,7 +82,7 @@ struct mic_device {
 	struct pci_dev *pdev;
 	struct mutex mic_mutex;
 	struct mic_hw_intr_ops *intr_ops;
-	struct mic_smpt_ops *smpt_ops;
+	const struct mic_smpt_ops *smpt_ops;
 	struct mic_smpt_info *smpt;
 	struct mic_intr_info *intr_info;
 	struct mic_irq_info irq_info;

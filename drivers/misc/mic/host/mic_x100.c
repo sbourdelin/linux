@@ -546,7 +546,7 @@ static void mic_x100_smpt_hw_init(struct mic_device *mdev)
 	info->base = 0x8000000000ULL;
 }
 
-struct mic_smpt_ops mic_x100_smpt_ops = {
+const struct mic_smpt_ops mic_x100_smpt_ops = {
 	.init = mic_x100_smpt_hw_init,
 	.set = mic_x100_smpt_set,
 };
