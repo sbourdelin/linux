@@ -1362,6 +1362,7 @@ static int ibmveth_change_mtu(struct net_device *dev, int new_mtu)
 	/* Deactivate all the buffer pools so that the next loop can activate
 	   only the buffer pools necessary to hold the new MTU */
 	if (netif_running(adapter->netdev)) {
+		netif_tx_disable(dev);
 		need_restart = 1;
 		adapter->pool_config = 1;
 		ibmveth_close(adapter->netdev);
@@ -1378,14 +1379,18 @@ static int ibmveth_change_mtu(struct net_device *dev, int new_mtu)
 						ibmveth_get_desired_dma
 						(viodev));
 			if (need_restart) {
-				return ibmveth_open(adapter->netdev);
+				rc = ibmveth_open(adapter->netdev);
+				netif_wake_queue(dev);
+				return rc;
 			}
 			return 0;
 		}
 	}
 
-	if (need_restart && (rc = ibmveth_open(adapter->netdev)))
+	if (need_restart && (rc = ibmveth_open(adapter->netdev))) {
+		netif_wake_queue(dev);
 		return rc;
+	}
 
 	return -EINVAL;
 }
