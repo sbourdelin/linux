@@ -36,7 +36,7 @@
 #define LINK_WAIT_IATU_MIN		9000
 #define LINK_WAIT_IATU_MAX		10000
 
-/* Synopsis specific PCIE configuration registers */
+/* Synopsys specific PCIE configuration registers */
 #define PCIE_PORT_LINK_CONTROL		0x710
 #define PORT_LINK_MODE_MASK		(0x3f << 16)
 #define PORT_LINK_MODE_1_LANES		(0x1 << 16)
@@ -253,7 +253,7 @@ static void dw_pcie_prog_outbound_atu(struct pcie_port *pp, int index,
 		}
 
 		if (val == PCIE_ATU_ENABLE)
-			break;
+			return;
 
 		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
 	}
@@ -646,10 +646,10 @@ int dw_pcie_host_init(struct pcie_port *pp)
 		}
 	}
 
+	pp->iatu_unroll_status = dw_pcie_get_atu_mode(pp);
+
 	if (pp->ops->host_init)
 		pp->ops->host_init(pp);
-
-	pp->iatu_unroll_status = dw_pcie_get_atu_mode(pp);
 
 	pp->root_bus_nr = pp->busn->start;
 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
