@@ -160,7 +160,7 @@ struct fmc_device {
 	unsigned long flags;
 	struct module *owner;		/* char device must pin it */
 	struct fmc_fru_id id;		/* for EEPROM-based match */
-	struct fmc_operations *op;	/* carrier-provided */
+	const struct fmc_operations *op;/* carrier-provided */
 	int irq;			/* according to host bus. 0 == none */
 	int eeprom_len;			/* Usually 8kB, may be less */
 	int eeprom_addr;		/* 0x50, 0x52 etc */

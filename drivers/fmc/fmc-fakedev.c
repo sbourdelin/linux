@@ -231,7 +231,7 @@ static int ff_validate(struct fmc_device *fmc, struct fmc_driver *drv)
 
 
 
-static struct fmc_operations ff_fmc_operations = {
+static const struct fmc_operations ff_fmc_operations = {
 	.read32 =		ff_readl,
 	.write32 =		ff_writel,
 	.reprogram =		ff_reprogram,
