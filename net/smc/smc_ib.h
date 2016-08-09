@@ -16,6 +16,8 @@
 #define SMC_MAX_PORTS			2	/* Max # of ports */
 #define SMC_GID_SIZE			sizeof(union ib_gid)
 
+#define SMC_IB_MAX_SEND_SGE		2
+
 struct smc_ib_devices {			/* list of smc ib devices definition */
 	struct list_head	list;
 	spinlock_t		lock;	/* protects list of smc ib devices */
@@ -27,6 +29,10 @@ struct smc_ib_device {				/* ib-device infos for smc */
 	struct list_head	list;
 	struct ib_device	*ibdev;
 	struct ib_port_attr	pattr[SMC_MAX_PORTS];	/* ib dev. port attrs */
+	struct ib_cq		*roce_cq_send;	/* send completion queue */
+	struct ib_cq		*roce_cq_recv;	/* recv completion queue */
+	struct tasklet_struct	send_tasklet;	/* called by send cq handler */
+	struct tasklet_struct	recv_tasklet;	/* called by recv cq handler */
 	char			mac[SMC_MAX_PORTS][6]; /* mac address per port*/
 	union ib_gid		gid[SMC_MAX_PORTS]; /* gid per port */
 	u8			initialized : 1; /* ib dev CQ, evthdl done */
@@ -34,6 +40,7 @@ struct smc_ib_device {				/* ib-device infos for smc */
 
 struct smc_sock;
 struct smc_buf_desc;
+struct smc_link;
 
 int smc_ib_register_client(void) __init;
 void smc_ib_unregister_client(void);
@@ -41,5 +48,9 @@ bool smc_ib_port_active(struct smc_ib_device *, u8);
 int smc_ib_remember_port_attr(struct smc_ib_device *, u8);
 int smc_ib_buf_map(struct smc_ib_device *, int, struct smc_buf_desc *,
 		   enum dma_data_direction);
+void smc_ib_dealloc_protection_domain(struct smc_link *);
+int smc_ib_create_protection_domain(struct smc_link *);
+void smc_ib_destroy_queue_pair(struct smc_link *);
+int smc_ib_create_queue_pair(struct smc_link *);
 
 #endif

@@ -27,6 +27,10 @@ enum smc_state {		/* possible states of an SMC socket */
 
 struct smc_link_group;
 
+struct smc_wr_rx_hdr {	/* common prefix part of LLC and CDC to demultiplex */
+	u8			type;
+} __packed;
+
 struct smc_connection {
 	struct rb_node		alert_node;
 	struct smc_link_group	*lgr;		/* link group of connection */
