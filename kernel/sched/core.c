@@ -74,6 +74,7 @@
 #include <linux/context_tracking.h>
 #include <linux/compiler.h>
 #include <linux/frame.h>
+#include <linux/isolation.h>
 
 #include <asm/switch_to.h>
 #include <asm/tlb.h>
@@ -662,6 +663,19 @@ bool sched_can_stop_tick(struct rq *rq)
 	return true;
 }
 #endif /* CONFIG_NO_HZ_FULL */
+
+#ifdef CONFIG_TASK_ISOLATION
+void _task_isolation_debug(int cpu, const char *type)
+{
+	struct rq *rq = cpu_rq(cpu);
+	struct task_struct *task = try_get_task_struct(&rq->curr);
+
+	if (task) {
+		task_isolation_debug_task(cpu, task, type);
+		put_task_struct(task);
+	}
+}
+#endif
 
 void sched_avg_update(struct rq *rq)
 {
