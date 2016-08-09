@@ -1011,7 +1011,7 @@ static void si2165_release(struct dvb_frontend *fe)
 	kfree(state);
 }
 
-static struct dvb_frontend_ops si2165_ops = {
+static const struct dvb_frontend_ops si2165_ops = {
 	.info = {
 		.name = "Silicon Labs ",
 		 /* For DVB-C */

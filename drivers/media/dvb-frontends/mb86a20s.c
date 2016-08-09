@@ -2058,7 +2058,7 @@ static void mb86a20s_release(struct dvb_frontend *fe)
 	kfree(state);
 }
 
-static struct dvb_frontend_ops mb86a20s_ops;
+static const struct dvb_frontend_ops mb86a20s_ops;
 
 struct dvb_frontend *mb86a20s_attach(const struct mb86a20s_config *config,
 				    struct i2c_adapter *i2c)
@@ -2106,7 +2106,7 @@ error:
 }
 EXPORT_SYMBOL(mb86a20s_attach);
 
-static struct dvb_frontend_ops mb86a20s_ops = {
+static const struct dvb_frontend_ops mb86a20s_ops = {
 	.delsys = { SYS_ISDBT },
 	/* Use dib8000 values per default */
 	.info = {

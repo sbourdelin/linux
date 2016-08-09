@@ -308,7 +308,7 @@ static void gp8psk_fe_release(struct dvb_frontend* fe)
 	kfree(state);
 }
 
-static struct dvb_frontend_ops gp8psk_fe_ops;
+static const struct dvb_frontend_ops gp8psk_fe_ops;
 
 struct dvb_frontend * gp8psk_fe_attach(struct dvb_usb_device *d)
 {
@@ -328,7 +328,7 @@ success:
 }
 
 
-static struct dvb_frontend_ops gp8psk_fe_ops = {
+static const struct dvb_frontend_ops gp8psk_fe_ops = {
 	.delsys = { SYS_DVBS },
 	.info = {
 		.name			= "Genpix DVB-S",
