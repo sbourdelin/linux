@@ -2625,11 +2625,10 @@ static inline void verify_mm_writelocked(struct mm_struct *mm)
  *  anonymous maps.  eventually we may be able to do some
  *  brk-specific accounting here.
  */
-static int do_brk(unsigned long addr, unsigned long len)
+static int do_brk_flags(unsigned long addr, unsigned long len, unsigned long flags)
 {
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma, *prev;
-	unsigned long flags;
 	struct rb_node **rb_link, *rb_parent;
 	pgoff_t pgoff = addr >> PAGE_SHIFT;
 	int error;
@@ -2638,7 +2637,7 @@ static int do_brk(unsigned long addr, unsigned long len)
 	if (!len)
 		return 0;
 
-	flags = VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT | mm->def_flags;
+	flags |= VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT | mm->def_flags;
 
 	error = get_unmapped_area(NULL, addr, len, 0, MAP_FIXED);
 	if (offset_in_page(error))
@@ -2706,7 +2705,12 @@ out:
 	return 0;
 }
 
-int vm_brk(unsigned long addr, unsigned long len)
+static int do_brk(unsigned long addr, unsigned long len)
+{
+	return do_brk_flags(addr, len, 0);
+}
+
+int vm_brk_flags(unsigned long addr, unsigned long len, unsigned long flags)
 {
 	struct mm_struct *mm = current->mm;
 	int ret;
@@ -2715,12 +2719,18 @@ int vm_brk(unsigned long addr, unsigned long len)
 	if (down_write_killable(&mm->mmap_sem))
 		return -EINTR;
 
-	ret = do_brk(addr, len);
+	ret = do_brk_flags(addr, len, flags);
 	populate = ((mm->def_flags & VM_LOCKED) != 0);
 	up_write(&mm->mmap_sem);
 	if (populate && !ret)
 		mm_populate(addr, len);
 	return ret;
+}
+EXPORT_SYMBOL(vm_brk_flags);
+
+int vm_brk(unsigned long addr, unsigned long len)
+{
+	return vm_brk_flags(addr, len, 0);
 }
 EXPORT_SYMBOL(vm_brk);
 
