@@ -102,18 +102,10 @@ static int ehci_hcd_sead3_drv_probe(struct platform_device *pdev)
 	if (usb_disabled())
 		return -ENODEV;
 
-	if (pdev->dev.of_node) {
-		irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
-		if (!irq) {
-			dev_err(&pdev->dev, "failed to map IRQ\n");
-			return -ENODEV;
-		}
-	} else {
-		if (pdev->resource[1].flags != IORESOURCE_IRQ) {
-			pr_debug("resource[1] is not IORESOURCE_IRQ");
-			return -ENOMEM;
-		}
-		irq = pdev->resource[1].start;
+	irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
+	if (!irq) {
+		dev_err(&pdev->dev, "failed to map IRQ\n");
+		return -ENODEV;
 	}
 
 	hcd = usb_create_hcd(&ehci_sead3_hc_driver, &pdev->dev, "SEAD-3");
