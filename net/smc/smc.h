@@ -14,6 +14,8 @@
 #include <linux/types.h>
 #include <net/sock.h>
 
+#include "smc_ib.h"
+
 #define SMCPROTO_SMC		0	/* SMC protocol */
 
 enum smc_state {		/* possible states of an SMC socket */
@@ -23,9 +25,19 @@ enum smc_state {		/* possible states of an SMC socket */
 	SMC_LISTEN	= 10,
 };
 
+struct smc_link_group;
+
+struct smc_connection {
+	struct rb_node		alert_node;
+	struct smc_link_group	*lgr;		/* link group of connection */
+	u32			alert_token_local; /* unique conn. id */
+	u8			peer_conn_idx;	/* from tcp handshake */
+};
+
 struct smc_sock {				/* smc sock container */
 	struct sock		sk;
 	struct socket		*clcsock;	/* internal tcp socket */
+	struct smc_connection	conn;		/* smc connection */
 	struct sockaddr		*addr;		/* inet connect address */
 	struct smc_sock		*listen_smc;	/* listen parent */
 	struct work_struct	tcp_listen_work;/* handle tcp socket accepts */
@@ -45,6 +57,24 @@ static inline struct smc_sock *smc_sk(const struct sock *sk)
 
 extern u8	local_systemid[SMC_SYSTEMID_LEN]; /* unique system identifier */
 
+/* convert an u32 value into network byte order, store it into a 3 byte field */
+static inline void hton24(u8 *net, u32 host)
+{
+	__be32 t;
+
+	t = cpu_to_be32(host);
+	memcpy(net, ((u8 *)&t) + 1, 3);
+}
+
+/* convert a received 3 byte field into host byte order*/
+static inline u32 ntoh24(u8 *net)
+{
+	__be32 t = 0;
+
+	memcpy(((u8 *)&t) + 1, net, 3);
+	return be32_to_cpu(t);
+}
+
 #ifdef CONFIG_XFRM
 static inline bool using_ipsec(struct smc_sock *smc)
 {
@@ -58,6 +88,11 @@ static inline bool using_ipsec(struct smc_sock *smc)
 }
 #endif
 
+struct smc_clc_msg_local;
+
 int smc_netinfo_by_tcpsk(struct socket *, __be32 *, u8 *);
+void smc_conn_free(struct smc_connection *);
+int smc_conn_create(struct smc_sock *, __be32, struct smc_ib_device *, u8,
+		    struct smc_clc_msg_local *, int);
 
 #endif	/* _SMC_H */
