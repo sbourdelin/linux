@@ -64,6 +64,7 @@
 #include <linux/debugfs.h>
 #include <linux/userfaultfd_k.h>
 #include <linux/dax.h>
+#include <linux/backing-dev.h>
 
 #include <asm/io.h>
 #include <asm/mmu_context.h>
@@ -2105,11 +2106,13 @@ static inline int wp_page_reuse(struct fault_env *fe, pte_t orig_pte,
 		put_page(page);
 
 		if ((dirtied || page_mkwrite) && mapping) {
+			struct inode *inode = mapping->host;
 			/*
 			 * Some device drivers do not set page.mapping
 			 * but still dirty their pages
 			 */
-			balance_dirty_pages_ratelimited(mapping);
+			balance_dirty_pages_ratelimited(inode_to_bdi(inode),
+							inode->i_sb);
 		}
 
 		if (!page_mkwrite)
@@ -3291,11 +3294,13 @@ static int do_shared_fault(struct fault_env *fe, pgoff_t pgoff)
 	mapping = page_rmapping(fault_page);
 	unlock_page(fault_page);
 	if ((dirtied || vma->vm_ops->page_mkwrite) && mapping) {
+		struct inode *inode = mapping->host;
 		/*
 		 * Some device drivers do not set page.mapping but still
 		 * dirty their pages
 		 */
-		balance_dirty_pages_ratelimited(mapping);
+		balance_dirty_pages_ratelimited(inode_to_bdi(inode),
+						inode->i_sb);
 	}
 
 	if (!vma->vm_ops->page_mkwrite)
