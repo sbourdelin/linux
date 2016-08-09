@@ -53,6 +53,22 @@ const struct uverbs_type *uverbs_get_type(const struct ib_device *ibdev,
 	return types->types[type];
 }
 
+const struct uverbs_action *uverbs_get_action(const struct uverbs_type *type,
+					      uint16_t action)
+{
+	const struct uverbs_type_actions_group *actions_group;
+	int ret = type->dist(&action, type->priv);
+
+	if (ret >= type->num_groups)
+		return NULL;
+
+	actions_group = type->action_groups[ret];
+	if (action >= actions_group->num_actions)
+		return NULL;
+
+	return actions_group->actions[action];
+}
+
 static int uverbs_lock_object(struct ib_uobject *uobj,
 			      enum uverbs_idr_access access)
 {

@@ -361,6 +361,7 @@ ssize_t ib_uverbs_get_context(struct ib_uverbs_file *file,
 	}
 
 	file->ucontext = ucontext;
+	ucontext->ufile = file;
 
 	fd_install(resp.async_fd, filp);
 
