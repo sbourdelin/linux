@@ -1975,6 +1975,7 @@ ASCII LCD DRIVER
 M:	Paul Burton <paul.burton@imgtec.com>
 S:	Maintained
 F:	Documentation/devicetree/bindings/ascii-lcd.txt
+F:	drivers/auxdisplay/ascii-lcd.c
 
 ASUS NOTEBOOKS AND EEEPC ACPI/WMI EXTRAS DRIVERS
 M:	Corentin Chary <corentin.chary@gmail.com>
