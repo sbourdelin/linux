@@ -167,3 +167,385 @@ void uverbs_free_pd(const struct uverbs_type_alloc_action *type_alloc_action,
 }
 EXPORT_SYMBOL(uverbs_free_pd);
 
+enum {
+	UVERBS_UHW_IN,
+	UVERBS_UHW_OUT,
+};
+
+DECLARE_UVERBS_ATTR_SPEC(
+	uverbs_uhw_compat_spec,
+	UVERBS_ATTR_PTR_IN(UVERBS_UHW_IN, 0),
+	UVERBS_ATTR_PTR_OUT(UVERBS_UHW_OUT, 0));
+EXPORT_SYMBOL(uverbs_uhw_compat_spec);
+
+static void create_udata(struct uverbs_attr_array *vendor,
+			 struct ib_udata *udata)
+{
+	/*
+	 * This is for ease of conversion. The purpose is to convert all vendors
+	 * to use uverbs_attr_array instead of ib_udata.
+	 * Assume attr == 0 is input and attr == 1 is output.
+	 */
+	void * __user inbuf;
+	size_t inbuf_len = 0;
+	void * __user outbuf;
+	size_t outbuf_len = 0;
+
+	if (vendor) {
+		WARN_ON(vendor->num_attrs > 2);
+
+		if (vendor->attrs[0].valid) {
+			inbuf = vendor->attrs[0].cmd_attr.ptr;
+			inbuf_len = vendor->attrs[0].cmd_attr.len;
+		}
+
+		if (vendor->num_attrs == 2 && vendor->attrs[1].valid) {
+			outbuf = vendor->attrs[1].cmd_attr.ptr;
+			outbuf_len = vendor->attrs[1].cmd_attr.len;
+		}
+	}
+	INIT_UDATA_BUF_OR_NULL(udata, inbuf, outbuf, inbuf_len, outbuf_len);
+}
+
+DECLARE_UVERBS_ATTR_SPEC(
+	uverbs_get_context_spec,
+	UVERBS_ATTR_PTR_OUT(GET_CONTEXT_RESP,
+			    sizeof(struct ib_uverbs_get_context_resp)));
+EXPORT_SYMBOL(uverbs_get_context_spec);
+
+int uverbs_get_context(struct ib_device *ib_dev,
+		       struct ib_uverbs_file *file,
+		       struct uverbs_attr_array *common,
+		       struct uverbs_attr_array *vendor,
+		       void *priv)
+{
+	struct ib_udata uhw;
+	struct ib_uverbs_get_context_resp resp;
+	struct ib_ucontext		 *ucontext;
+	struct file			 *filp;
+	int ret;
+
+	if (!common->attrs[GET_CONTEXT_RESP].valid)
+		return -EINVAL;
+
+	/* Temporary, only until vendors get the new uverbs_attr_array */
+	create_udata(vendor, &uhw);
+
+	mutex_lock(&file->mutex);
+
+	if (file->ucontext) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	ucontext = ib_dev->alloc_ucontext(ib_dev, &uhw);
+	if (IS_ERR(ucontext)) {
+		ret = PTR_ERR(ucontext);
+		goto err;
+	}
+
+	ucontext->device = ib_dev;
+	ib_uverbs_uobject_type_initialize_ucontext(ucontext);
+
+	rcu_read_lock();
+	ucontext->tgid = get_task_pid(current->group_leader, PIDTYPE_PID);
+	rcu_read_unlock();
+	ucontext->closing = 0;
+
+#ifdef CONFIG_INFINIBAND_ON_DEMAND_PAGING
+	ucontext->umem_tree = RB_ROOT;
+	init_rwsem(&ucontext->umem_rwsem);
+	ucontext->odp_mrs_count = 0;
+	INIT_LIST_HEAD(&ucontext->no_private_counters);
+
+	if (!(ib_dev->attrs.device_cap_flags & IB_DEVICE_ON_DEMAND_PAGING))
+		ucontext->invalidate_range = NULL;
+
+#endif
+
+	resp.num_comp_vectors = file->device->num_comp_vectors;
+
+	ret = get_unused_fd_flags(O_CLOEXEC);
+	if (ret < 0)
+		goto err_free;
+	resp.async_fd = ret;
+
+	filp = ib_uverbs_alloc_event_file(file, ib_dev, 1);
+	if (IS_ERR(filp)) {
+		ret = PTR_ERR(filp);
+		goto err_fd;
+	}
+
+	if (copy_to_user(common->attrs[GET_CONTEXT_RESP].cmd_attr.ptr,
+			 &resp, sizeof(resp))) {
+		ret = -EFAULT;
+		goto err_file;
+	}
+
+	file->ucontext = ucontext;
+	ucontext->ufile = file;
+
+	fd_install(resp.async_fd, filp);
+
+	mutex_unlock(&file->mutex);
+
+	return 0;
+
+err_file:
+	ib_uverbs_free_async_event_file(file);
+	fput(filp);
+
+err_fd:
+	put_unused_fd(resp.async_fd);
+
+err_free:
+	put_pid(ucontext->tgid);
+
+err:
+	mutex_unlock(&file->mutex);
+	return ret;
+}
+EXPORT_SYMBOL(uverbs_get_context);
+DECLARE_UVERBS_CTX_ACTION(uverbs_action_get_context, uverbs_get_context, NULL,
+			  &uverbs_get_context_spec, &uverbs_uhw_compat_spec);
+EXPORT_SYMBOL(uverbs_action_get_context);
+
+DECLARE_UVERBS_ATTR_SPEC(
+	uverbs_query_device_spec,
+	UVERBS_ATTR_PTR_OUT(QUERY_DEVICE_RESP, sizeof(struct ib_uverbs_query_device_resp)),
+	UVERBS_ATTR_PTR_OUT(QUERY_DEVICE_ODP, sizeof(struct ib_uverbs_odp_caps)),
+	UVERBS_ATTR_PTR_OUT(QUERY_DEVICE_TIMESTAMP_MASK, sizeof(__u64)),
+	UVERBS_ATTR_PTR_OUT(QUERY_DEVICE_HCA_CORE_CLOCK, sizeof(__u64)),
+	UVERBS_ATTR_PTR_OUT(QUERY_DEVICE_CAP_FLAGS, sizeof(__u64)));
+EXPORT_SYMBOL(uverbs_query_device_spec);
+
+int uverbs_query_device_handler(struct ib_device *ib_dev,
+				struct ib_ucontext *ucontext,
+				struct uverbs_attr_array *common,
+				struct uverbs_attr_array *vendor,
+				void *priv)
+{
+	struct ib_device_attr attr = {};
+	struct ib_udata uhw;
+	int err;
+
+	/* Temporary, only until vendors get the new uverbs_attr_array */
+	create_udata(vendor, &uhw);
+
+	err = ib_dev->query_device(ib_dev, &attr, &uhw);
+	if (err)
+		return err;
+
+	if (common->attrs[QUERY_DEVICE_RESP].valid) {
+		struct ib_uverbs_query_device_resp resp = {};
+
+		uverbs_copy_query_dev_fields(ib_dev, &resp, &attr);
+		if (copy_to_user(common->attrs[QUERY_DEVICE_RESP].cmd_attr.ptr,
+				 &resp, sizeof(resp)))
+			return -EFAULT;
+	}
+
+#ifdef CONFIG_INFINIBAND_ON_DEMAND_PAGING
+	if (common->attrs[QUERY_DEVICE_ODP].valid) {
+		struct ib_uverbs_odp_caps odp_caps;
+
+		odp_caps.general_caps = attr.odp_caps.general_caps;
+		odp_caps.per_transport_caps.rc_odp_caps =
+			attr.odp_caps.per_transport_caps.rc_odp_caps;
+		odp_caps.per_transport_caps.uc_odp_caps =
+			attr.odp_caps.per_transport_caps.uc_odp_caps;
+		odp_caps.per_transport_caps.ud_odp_caps =
+			attr.odp_caps.per_transport_caps.ud_odp_caps;
+
+		if (copy_to_user(common->attrs[QUERY_DEVICE_ODP].cmd_attr.ptr,
+				 &odp_caps, sizeof(odp_caps)))
+			return -EFAULT;
+	}
+#endif
+	if (UVERBS_COPY_TO(common, QUERY_DEVICE_TIMESTAMP_MASK,
+			   &attr.timestamp_mask) == -EFAULT)
+		return -EFAULT;
+
+	if (UVERBS_COPY_TO(common, QUERY_DEVICE_HCA_CORE_CLOCK,
+			   &attr.hca_core_clock) == -EFAULT)
+		return -EFAULT;
+
+	if (UVERBS_COPY_TO(common, QUERY_DEVICE_CAP_FLAGS,
+			   &attr.device_cap_flags) == -EFAULT)
+		return -EFAULT;
+
+	return 0;
+}
+EXPORT_SYMBOL(uverbs_query_device_handler);
+DECLARE_UVERBS_ACTION(uverbs_action_query_device, uverbs_query_device_handler, NULL,
+		      &uverbs_query_device_spec, &uverbs_uhw_compat_spec);
+EXPORT_SYMBOL(uverbs_action_query_device);
+
+DECLARE_UVERBS_ATTR_SPEC(
+	uverbs_alloc_pd_spec,
+	UVERBS_ATTR_IDR(ALLOC_PD_HANDLE, UVERBS_TYPE_PD,
+			UVERBS_IDR_ACCESS_NEW));
+EXPORT_SYMBOL(uverbs_alloc_pd_spec);
+
+int uverbs_alloc_pd_handler(struct ib_device *ib_dev,
+			    struct ib_ucontext *ucontext,
+			    struct uverbs_attr_array *common,
+			    struct uverbs_attr_array *vendor,
+			    void *priv)
+{
+	struct ib_udata uhw;
+	struct ib_uobject *uobject;
+	struct ib_pd *pd;
+
+	if (!common->attrs[ALLOC_PD_HANDLE].valid)
+		return -EINVAL;
+
+	/* Temporary, only until vendors get the new uverbs_attr_array */
+	create_udata(vendor, &uhw);
+
+	pd = ib_dev->alloc_pd(ib_dev, ucontext, &uhw);
+	if (IS_ERR(pd))
+		return PTR_ERR(pd);
+
+	uobject = common->attrs[ALLOC_PD_HANDLE].obj_attr.uobject;
+	pd->device  = ib_dev;
+	pd->uobject = uobject;
+	uobject->object = pd;
+	pd->local_mr = NULL;
+	atomic_set(&pd->usecnt, 0);
+
+	return 0;
+}
+EXPORT_SYMBOL(uverbs_alloc_pd_handler);
+DECLARE_UVERBS_ACTION(uverbs_action_alloc_pd, uverbs_alloc_pd_handler, NULL,
+		      &uverbs_alloc_pd_spec, &uverbs_uhw_compat_spec);
+EXPORT_SYMBOL(uverbs_action_alloc_pd);
+
+DECLARE_UVERBS_ATTR_SPEC(
+	uverbs_reg_mr_spec,
+	UVERBS_ATTR_IDR(REG_MR_HANDLE, UVERBS_TYPE_MR, UVERBS_IDR_ACCESS_NEW),
+	UVERBS_ATTR_IDR(REG_MR_PD_HANDLE, UVERBS_TYPE_PD, UVERBS_IDR_ACCESS_READ),
+	UVERBS_ATTR_PTR_IN(REG_MR_CMD, sizeof(struct ib_uverbs_ioctl_reg_mr)),
+	UVERBS_ATTR_PTR_OUT(REG_MR_RESP, sizeof(struct ib_uverbs_ioctl_reg_mr_resp)));
+EXPORT_SYMBOL(uverbs_reg_mr_spec);
+
+int uverbs_reg_mr_handler(struct ib_device *ib_dev,
+			  struct ib_ucontext *ucontext,
+			  struct uverbs_attr_array *common,
+			  struct uverbs_attr_array *vendor,
+			  void *priv)
+{
+	struct ib_uverbs_ioctl_reg_mr		cmd;
+	struct ib_uverbs_ioctl_reg_mr_resp	resp;
+	struct ib_udata uhw;
+	struct ib_uobject *uobject;
+	struct ib_pd                *pd;
+	struct ib_mr                *mr;
+	int                          ret;
+
+	if (!common->attrs[REG_MR_HANDLE].valid ||
+	    !common->attrs[REG_MR_PD_HANDLE].valid ||
+	    !common->attrs[REG_MR_CMD].valid ||
+	    !common->attrs[REG_MR_RESP].valid)
+		return -EINVAL;
+
+	if (copy_from_user(&cmd, common->attrs[REG_MR_CMD].cmd_attr.ptr, sizeof(cmd)))
+		return -EFAULT;
+
+	if ((cmd.start & ~PAGE_MASK) != (cmd.hca_va & ~PAGE_MASK))
+		return -EINVAL;
+
+	ret = ib_check_mr_access(cmd.access_flags);
+	if (ret)
+		return ret;
+
+	/* Temporary, only until vendors get the new uverbs_attr_array */
+	create_udata(vendor, &uhw);
+
+	uobject = common->attrs[REG_MR_HANDLE].obj_attr.uobject;
+	pd = common->attrs[REG_MR_PD_HANDLE].obj_attr.uobject->object;
+
+	if (cmd.access_flags & IB_ACCESS_ON_DEMAND) {
+		if (!(pd->device->attrs.device_cap_flags &
+		      IB_DEVICE_ON_DEMAND_PAGING)) {
+			pr_debug("ODP support not available\n");
+			return -EINVAL;
+		}
+	}
+
+	mr = pd->device->reg_user_mr(pd, cmd.start, cmd.length, cmd.hca_va,
+				     cmd.access_flags, &uhw);
+	if (IS_ERR(mr))
+		return PTR_ERR(mr);
+
+	mr->device  = pd->device;
+	mr->pd      = pd;
+	mr->uobject = uobject;
+	atomic_inc(&pd->usecnt);
+	uobject->object = mr;
+
+	resp.lkey      = mr->lkey;
+	resp.rkey      = mr->rkey;
+
+	if (copy_to_user(common->attrs[REG_MR_RESP].cmd_attr.ptr,
+			 &resp, sizeof(resp))) {
+		ret = -EFAULT;
+		goto err;
+	}
+
+	return 0;
+
+err:
+	ib_dereg_mr(mr);
+	return ret;
+}
+EXPORT_SYMBOL(uverbs_reg_mr_handler);
+
+DECLARE_UVERBS_ACTION(uverbs_action_reg_mr, uverbs_reg_mr_handler, NULL,
+		      &uverbs_reg_mr_spec, &uverbs_uhw_compat_spec);
+EXPORT_SYMBOL(uverbs_action_reg_mr);
+
+DECLARE_UVERBS_ACTIONS(
+	uverbs_actions_mr,
+	ADD_UVERBS_ACTION_PTR(UVERBS_MR_REG, &uverbs_action_reg_mr),
+);
+EXPORT_SYMBOL(uverbs_actions_mr);
+
+DECLARE_UVERBS_ACTIONS(
+	uverbs_actions_pd,
+	ADD_UVERBS_ACTION_PTR(UVERBS_PD_ALLOC, &uverbs_action_alloc_pd),
+);
+EXPORT_SYMBOL(uverbs_actions_pd);
+
+DECLARE_UVERBS_ACTIONS(
+	uverbs_actions_device,
+	ADD_UVERBS_ACTION_PTR(UVERBS_DEVICE_QUERY, &uverbs_action_query_device),
+	ADD_UVERBS_ACTION_PTR(UVERBS_DEVICE_ALLOC_CONTEXT, &uverbs_action_get_context),
+);
+EXPORT_SYMBOL(uverbs_actions_device);
+
+DECLARE_UVERBS_TYPE(uverbs_type_mr,
+		    /* 1 is used in order to free the MR after all the MWs */
+		    &UVERBS_TYPE_ALLOC(1, uverbs_free_mr),
+		    &uverbs_actions_mr);
+EXPORT_SYMBOL(uverbs_type_mr);
+
+DECLARE_UVERBS_TYPE(uverbs_type_pd,
+		    /* 2 is used in order to free the PD after all objects */
+		    &UVERBS_TYPE_ALLOC(2, uverbs_free_pd),
+		    &uverbs_actions_pd);
+EXPORT_SYMBOL(uverbs_type_pd);
+
+DECLARE_UVERBS_TYPE(uverbs_type_device, NULL, &uverbs_actions_device);
+EXPORT_SYMBOL(uverbs_type_device);
+
+DECLARE_UVERBS_TYPES(uverbs_types,
+		     ADD_UVERBS_TYPE(UVERBS_TYPE_DEVICE, uverbs_type_device),
+		     ADD_UVERBS_TYPE(UVERBS_TYPE_PD, uverbs_type_pd),
+		     ADD_UVERBS_TYPE(UVERBS_TYPE_MR, uverbs_type_mr),
+);
+EXPORT_SYMBOL(uverbs_types);
+
+DECLARE_UVERBS_TYPES_GROUP(uverbs_types_group, &uverbs_types);
+EXPORT_SYMBOL(uverbs_types_group);
+
