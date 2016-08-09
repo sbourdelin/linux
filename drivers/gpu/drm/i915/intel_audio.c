@@ -335,11 +335,11 @@ static void hsw_audio_codec_enable(struct drm_connector *connector,
 
 	tmp &= ~AUD_CONFIG_N_PROG_ENABLE;
 	if (audio_rate_need_prog(intel_crtc, adjusted_mode)) {
-		if (!acomp)
+		if (!acomp) {
 			rate = 0;
-		else if (port >= PORT_A && port <= PORT_E)
+		} else if (port >= PORT_A && port <= PORT_E) {
 			rate = acomp->aud_sample_rate[port];
-		else {
+		} else {
 			DRM_ERROR("invalid port: %d\n", port);
 			rate = 0;
 		}
