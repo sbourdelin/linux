@@ -174,8 +174,6 @@ struct ib_ucq_object {
 	u32			async_events_reported;
 };
 
-void idr_remove_uobj(struct ib_uobject *uobj);
-
 struct file *ib_uverbs_alloc_event_file(struct ib_uverbs_file *uverbs_file,
 					struct ib_device *ib_dev,
 					int is_async);
@@ -197,6 +195,13 @@ void ib_uverbs_event_handler(struct ib_event_handler *handler,
 void ib_uverbs_dealloc_xrcd(struct ib_uverbs_device *dev, struct ib_xrcd *xrcd);
 
 int uverbs_dealloc_mw(struct ib_mw *mw);
+void ib_uverbs_release_ucq(struct ib_uverbs_file *file,
+			   struct ib_uverbs_event_file *ev_file,
+			   struct ib_ucq_object *uobj);
+void ib_uverbs_release_uevent(struct ib_uverbs_file *file,
+			      struct ib_uevent_object *uobj);
+void ib_uverbs_detach_umcast(struct ib_qp *qp,
+			     struct ib_uqp_object *uobj);
 
 struct ib_uverbs_flow_spec {
 	union {

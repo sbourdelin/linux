@@ -64,5 +64,38 @@ struct uverbs_action_std_ctx_handler {
 	void *priv;
 };
 
+void uverbs_free_ah(const struct uverbs_type_alloc_action *type_alloc_action,
+		    struct ib_uobject *uobject);
+void uverbs_free_flow(const struct uverbs_type_alloc_action *type_alloc_action,
+		      struct ib_uobject *uobject);
+void uverbs_free_mw(const struct uverbs_type_alloc_action *type_alloc_action,
+		    struct ib_uobject *uobject);
+void uverbs_free_qp(const struct uverbs_type_alloc_action *type_alloc_action,
+		    struct ib_uobject *uobject);
+void uverbs_free_srq(const struct uverbs_type_alloc_action *type_alloc_action,
+		     struct ib_uobject *uobject);
+void uverbs_free_cq(const struct uverbs_type_alloc_action *type_alloc_action,
+		    struct ib_uobject *uobject);
+void uverbs_free_mr(const struct uverbs_type_alloc_action *type_alloc_action,
+		    struct ib_uobject *uobject);
+void uverbs_free_xrcd(const struct uverbs_type_alloc_action *type_alloc_action,
+		      struct ib_uobject *uobject);
+void uverbs_free_pd(const struct uverbs_type_alloc_action *type_alloc_action,
+		    struct ib_uobject *uobject);
+
+enum uverbs_common_types {
+	UVERBS_TYPE_DEVICE, /* Don't use IDRs here */
+	UVERBS_TYPE_PD,
+	UVERBS_TYPE_CQ,
+	UVERBS_TYPE_QP,
+	UVERBS_TYPE_SRQ,
+	UVERBS_TYPE_AH,
+	UVERBS_TYPE_MR,
+	UVERBS_TYPE_MW,
+	UVERBS_TYPE_FLOW,
+	UVERBS_TYPE_XRCD,
+	UVERBS_TYPE_LAST,
+};
+
 #endif
 
