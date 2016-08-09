@@ -2408,7 +2408,6 @@ int ata_dev_configure(struct ata_device *dev)
 
 	/* initialize to-be-configured parameters */
 	dev->flags &= ~ATA_DFLAG_CFG_MASK;
-	dev->max_sectors = 0;
 	dev->cdb_len = 0;
 	dev->n_sectors = 0;
 	dev->cylinders = 0;
@@ -2610,10 +2609,8 @@ int ata_dev_configure(struct ata_device *dev)
 				     dma_dir_string);
 	}
 
-	/* determine max_sectors */
-	dev->max_sectors = ATA_MAX_SECTORS;
-	if (dev->flags & ATA_DFLAG_LBA48)
-		dev->max_sectors = ATA_MAX_SECTORS_LBA48;
+	if (!(dev->flags & ATA_DFLAG_LBA48))
+		dev->max_sectors = ATA_MAX_SECTORS;
 
 	/* Limit PATA drive on SATA cable bridge transfers to udma5,
 	   200 sectors */
