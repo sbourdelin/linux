@@ -1412,6 +1412,7 @@ static int usb_resume_both(struct usb_device *udev, pm_message_t msg)
 static void choose_wakeup(struct usb_device *udev, pm_message_t msg)
 {
 	int	w;
+	int	ret;
 
 	/* Remote wakeup is needed only when we actually go to sleep.
 	 * For things like FREEZE and QUIESCE, if the device is already
@@ -1431,8 +1432,12 @@ static void choose_wakeup(struct usb_device *udev, pm_message_t msg)
 	/* If the device is autosuspended with the wrong wakeup setting,
 	 * autoresume now so the setting can be changed.
 	 */
-	if (udev->state == USB_STATE_SUSPENDED && w != udev->do_remote_wakeup)
-		pm_runtime_resume(&udev->dev);
+	if (udev->state == USB_STATE_SUSPENDED && w != udev->do_remote_wakeup) {
+		ret = pm_runtime_resume(&udev->dev);
+		if (ret == -ESHUTDOWN)
+			pm_runtime_set_suspended(&udev->dev);
+	}
+
 	udev->do_remote_wakeup = w;
 }
 
