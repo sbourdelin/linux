@@ -39,6 +39,7 @@ struct dlock_list_head {
 
 struct dlock_list_heads {
 	struct dlock_list_head *heads;
+	int nhead;
 };
 
 /*
@@ -58,6 +59,7 @@ struct dlock_list_node {
  */
 struct dlock_list_iter {
 	int index;
+	int nhead;
 	struct dlock_list_head *head, *entry;
 };
 
@@ -65,6 +67,7 @@ struct dlock_list_iter {
 	{					\
 		.index = -1,			\
 		.head = (dlist)->heads,		\
+		.nhead = (dlist)->nhead,	\
 	}
 
 #define DEFINE_DLOCK_LIST_ITER(s, heads)	\

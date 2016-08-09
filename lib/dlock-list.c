@@ -28,6 +28,71 @@
  */
 static struct lock_class_key dlock_list_key;
 
+/*
+ * Mapping CPU number to dlock list index.
+ */
+static DEFINE_PER_CPU_READ_MOSTLY(int, cpu2list);
+static int nr_dlists;
+
+/*
+ * Initialize cpu2list mapping table & nr_dlists;
+ *
+ * All the sibling CPUs of a sibling group will map to the same dlock list so
+ * as to reduce the number of dlock lists to be maintained while minimizing
+ * cacheline contention.
+ *
+ * As the sibling masks are set up in the core initcall phase, this function
+ * has to be done in the postcore phase to get the right data. An alloc can
+ * be called before init. In this case, we just do a simple 1-1 mapping
+ * between CPU and dlock list head. After init, multiple CPUs may map to the
+ * same dlock list head.
+ */
+static int __init cpu2list_init(void)
+{
+	int idx, cpu;
+	int nr_siblings;
+	cpumask_var_t sibling_mask;
+	static struct cpumask mask __initdata;
+
+	/*
+	 * Check # of sibling CPUs for CPU 0
+	 */
+	sibling_mask = topology_sibling_cpumask(0);
+	if (!sibling_mask)
+		goto done;
+	nr_siblings = cpumask_weight(sibling_mask);
+	if (nr_siblings == 1)
+		goto done;
+
+	cpumask_setall(&mask);
+	idx = 0;
+	for_each_possible_cpu(cpu) {
+		int scpu;
+
+		if (!cpumask_test_cpu(cpu, &mask))
+			continue;
+		sibling_mask = topology_sibling_cpumask(cpu);
+		for_each_cpu(scpu, sibling_mask) {
+			per_cpu(cpu2list, scpu) = idx;
+			cpumask_clear_cpu(scpu, &mask);
+		}
+		idx++;
+	}
+
+	/*
+	 * nr_dlists can only be set after cpu2list_map is properly initialized.
+	 */
+	smp_mb();
+	nr_dlists = nr_cpu_ids/nr_siblings;
+
+	WARN_ON(cpumask_weight(&mask) != 0);
+	WARN_ON(idx > nr_dlists);
+	pr_info("dlock-list: %d head entries per dlock list.\n", nr_dlists);
+done:
+	return 0;
+}
+postcore_initcall(cpu2list_init);
+
 /**
  * alloc_dlock_list_heads - Initialize and allocate the list of head entries
  * @dlist: Pointer to the dlock_list_heads structure to be initialized
@@ -42,13 +107,14 @@ int alloc_dlock_list_heads(struct dlock_list_heads *dlist)
 {
 	int idx;
 
-	dlist->heads = kcalloc(nr_cpu_ids, sizeof(struct dlock_list_head),
+	dlist->nhead = nr_dlists ? nr_dlists : nr_cpu_ids;
+	dlist->heads = kcalloc(dlist->nhead, sizeof(struct dlock_list_head),
 			       GFP_KERNEL);
 
 	if (!dlist->heads)
 		return -ENOMEM;
 
-	for (idx = 0; idx < nr_cpu_ids; idx++) {
+	for (idx = 0; idx < dlist->nhead; idx++) {
 		struct dlock_list_head *head = &dlist->heads[idx];
 
 		INIT_LIST_HEAD(&head->list);
@@ -69,6 +135,7 @@ void free_dlock_list_heads(struct dlock_list_heads *dlist)
 {
 	kfree(dlist->heads);
 	dlist->heads = NULL;
+	dlist->nhead = 0;
 }
 
 /**
@@ -84,7 +151,7 @@ bool dlock_list_empty(struct dlock_list_heads *dlist)
 {
 	int idx;
 
-	for (idx = 0; idx < nr_cpu_ids; idx++)
+	for (idx = 0; idx < dlist->nhead; idx++)
 		if (!list_empty(&dlist->heads[idx].list))
 			return false;
 	return true;
@@ -102,7 +169,9 @@ bool dlock_list_empty(struct dlock_list_heads *dlist)
 void dlock_list_add(struct dlock_list_node *node,
 		    struct dlock_list_heads *dlist)
 {
-	struct dlock_list_head *head = &dlist->heads[smp_processor_id()];
+	int cpu = smp_processor_id();
+	int idx = (dlist->nhead < nr_cpu_ids) ? per_cpu(cpu2list, cpu) : cpu;
+	struct dlock_list_head *head = &dlist->heads[idx];
 
 	/*
 	 * There is no need to disable preemption
@@ -175,7 +244,7 @@ next_list:
 	/*
 	 * Try next list
 	 */
-	if (++iter->index >= nr_cpu_ids)
+	if (++iter->index >= iter->nhead)
 		return NULL;	/* All the entries iterated */
 
 	if (list_empty(&iter->head[iter->index].list))
