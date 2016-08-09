@@ -103,7 +103,7 @@ befs_check_sb(struct super_block *sb)
 		return BEFS_ERR;
 	}
 
-	if (befs_sb->log_start != befs_sb->log_end) {
+	if (befs_sb->log_start != befs_sb->log_end || befs_sb->flags == BEFS_DIRTY) {
 		befs_error(sb, "Filesystem not clean! There are blocks in the "
 			   "journal. You must boot into BeOS and mount this volume "
 			   "to make it clean.");
