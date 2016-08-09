@@ -179,7 +179,7 @@ struct pn533 {
 
 	struct device *dev;
 	void *phy;
-	struct pn533_phy_ops *phy_ops;
+	const struct pn533_phy_ops *phy_ops;
 };
 
 typedef int (*pn533_send_async_complete_t) (struct pn533 *dev, void *arg,
@@ -226,7 +226,7 @@ struct pn533 *pn533_register_device(u32 device_type,
 				u32 protocols,
 				enum pn533_protocol_type protocol_type,
 				void *phy,
-				struct pn533_phy_ops *phy_ops,
+				const struct pn533_phy_ops *phy_ops,
 				struct pn533_frame_ops *fops,
 				struct device *dev,
 				struct device *parent);
