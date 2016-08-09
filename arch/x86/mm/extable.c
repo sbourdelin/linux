@@ -62,7 +62,7 @@ EXPORT_SYMBOL(ex_handler_rdmsr_unsafe);
 bool ex_handler_wrmsr_unsafe(const struct exception_table_entry *fixup,
 			     struct pt_regs *regs, int trapnr)
 {
-	if (pr_warn_once("unchecked MSR access error: WRMSR to 0x%x (tried to write 0x%08x%08x) at rIP: 0x%lx (%pF)\n",
+	if (pr_warn_once("unchecked MSR access error: WRMSR to 0x%x (tried to write 0x%08x%08x) at RIP: 0x%lx (%pF)\n",
 			 (unsigned int)regs->cx, (unsigned int)regs->dx,
 			 (unsigned int)regs->ax,  regs->ip, (void *)regs->ip))
 		show_stack_regs(regs);
