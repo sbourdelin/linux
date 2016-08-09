@@ -45,6 +45,8 @@ befs_load_sb(struct super_block *sb, befs_super_block * disk_sb)
 	befs_sb->ag_shift = fs32_to_cpu(sb, disk_sb->ag_shift);
 	befs_sb->num_ags = fs32_to_cpu(sb, disk_sb->num_ags);
 
+	befs_sb->flags = fs32_to_cpu(sb, disk_sb->flags);
+
 	befs_sb->log_blocks = fsrun_to_cpu(sb, disk_sb->log_blocks);
 	befs_sb->log_start = fs64_to_cpu(sb, disk_sb->log_start);
 	befs_sb->log_end = fs64_to_cpu(sb, disk_sb->log_end);
