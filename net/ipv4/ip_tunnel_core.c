@@ -73,8 +73,9 @@ void iptunnel_xmit(struct sock *sk, struct rtable *rt, struct sk_buff *skb,
 	skb_dst_set(skb, &rt->dst);
 	memset(IPCB(skb), 0, sizeof(*IPCB(skb)));
 
-	if (skb_iif && proto == IPPROTO_UDP) {
-		/* Arrived from an ingress interface and got udp encapuslated.
+	if (skb_iif && (proto == IPPROTO_UDP || proto == IPPROTO_GRE)) {
+		/* Arrived from an ingress interface and got udp or gre
+		 * encapsulated.
 		 * The encapsulated network segment length may exceed dst mtu.
 		 * Allow IP Fragmentation of segments.
 		 */
