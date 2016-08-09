@@ -20,6 +20,7 @@
  */
 
 #include <linux/err.h>
+#include <linux/of_irq.h>
 #include <linux/platform_device.h>
 
 static int ehci_sead3_setup(struct usb_hcd *hcd)
@@ -96,15 +97,25 @@ static int ehci_hcd_sead3_drv_probe(struct platform_device *pdev)
 {
 	struct usb_hcd *hcd;
 	struct resource *res;
-	int ret;
+	int ret, irq;
 
 	if (usb_disabled())
 		return -ENODEV;
 
-	if (pdev->resource[1].flags != IORESOURCE_IRQ) {
-		pr_debug("resource[1] is not IORESOURCE_IRQ");
-		return -ENOMEM;
+	if (pdev->dev.of_node) {
+		irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
+		if (!irq) {
+			dev_err(&pdev->dev, "failed to map IRQ\n");
+			return -ENODEV;
+		}
+	} else {
+		if (pdev->resource[1].flags != IORESOURCE_IRQ) {
+			pr_debug("resource[1] is not IORESOURCE_IRQ");
+			return -ENOMEM;
+		}
+		irq = pdev->resource[1].start;
 	}
+
 	hcd = usb_create_hcd(&ehci_sead3_hc_driver, &pdev->dev, "SEAD-3");
 	if (!hcd)
 		return -ENOMEM;
@@ -121,8 +132,7 @@ static int ehci_hcd_sead3_drv_probe(struct platform_device *pdev)
 	/* Root hub has integrated TT. */
 	hcd->has_tt = 1;
 
-	ret = usb_add_hcd(hcd, pdev->resource[1].start,
-			  IRQF_SHARED);
+	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
 	if (ret == 0) {
 		platform_set_drvdata(pdev, hcd);
 		device_wakeup_enable(hcd->self.controller);
@@ -172,12 +182,19 @@ static const struct dev_pm_ops sead3_ehci_pmops = {
 #define SEAD3_EHCI_PMOPS NULL
 #endif
 
+static const struct of_device_id sead3_ehci_of_match[] = {
+	{ .compatible = "mti,sead3-ehci" },
+	{},
+};
+MODULE_DEVICE_TABLE(of, sead3_ehci_of_match);
+
 static struct platform_driver ehci_hcd_sead3_driver = {
 	.probe		= ehci_hcd_sead3_drv_probe,
 	.remove		= ehci_hcd_sead3_drv_remove,
 	.shutdown	= usb_hcd_platform_shutdown,
 	.driver = {
 		.name	= "sead3-ehci",
+		.of_match_table = sead3_ehci_of_match,
 		.pm	= SEAD3_EHCI_PMOPS,
 	}
 };
