@@ -26,7 +26,14 @@ enum smc_state {		/* possible states of an SMC socket */
 struct smc_sock {				/* smc sock container */
 	struct sock		sk;
 	struct socket		*clcsock;	/* internal tcp socket */
-	u8			use_fallback : 1; /* fallback to tcp */
+	struct sockaddr		*addr;		/* inet connect address */
+	struct smc_sock		*listen_smc;	/* listen parent */
+	struct work_struct	tcp_listen_work;/* handle tcp socket accepts */
+	struct work_struct	smc_listen_work;/* prepare new accept socket */
+	struct list_head	accept_q;	/* sockets to be accepted */
+	spinlock_t		accept_q_lock;	/* protects accept_q */
+	u8			use_fallback : 1, /* fallback to tcp */
+				clc_started : 1;/* smc_connect_rdma ran */
 };
 
 static inline struct smc_sock *smc_sk(const struct sock *sk)
@@ -37,5 +44,20 @@ static inline struct smc_sock *smc_sk(const struct sock *sk)
 #define SMC_SYSTEMID_LEN		8
 
 extern u8	local_systemid[SMC_SYSTEMID_LEN]; /* unique system identifier */
+
+#ifdef CONFIG_XFRM
+static inline bool using_ipsec(struct smc_sock *smc)
+{
+	return (smc->clcsock->sk->sk_policy[0] ||
+		smc->clcsock->sk->sk_policy[1]) ? 1 : 0;
+}
+#else
+static inline bool using_ipsec(struct smc_sock *smc)
+{
+	return 0;
+}
+#endif
+
+int smc_netinfo_by_tcpsk(struct socket *, __be32 *, u8 *);
 
 #endif	/* _SMC_H */
