@@ -273,7 +273,8 @@ void fuse_release_common(struct file *file, int opcode)
 	 * synchronous RELEASE is allowed (and desirable) in this case
 	 * because the server can be trusted not to screw up.
 	 */
-	fuse_file_put(ff, ff->fc->destroy_req != NULL);
+	fuse_file_put(ff, (ff->fc->destroy_req != NULL) &&
+		      !ff->fc->async_flush);
 }
 
 static int fuse_open(struct inode *inode, struct file *file)
@@ -394,13 +395,19 @@ static void fuse_sync_writes(struct inode *inode)
 	fuse_release_nowrite(inode);
 }
 
+static void fuse_flush_end(struct fuse_conn *fc, struct fuse_req *req)
+{
+	if (req->out.h.error == -ENOSYS)
+		fc->no_flush = 1;
+}
+
 static int fuse_flush(struct file *file, fl_owner_t id)
 {
 	struct inode *inode = file_inode(file);
 	struct fuse_conn *fc = get_fuse_conn(inode);
 	struct fuse_file *ff = file->private_data;
 	struct fuse_req *req;
-	struct fuse_flush_in inarg;
+	struct fuse_flush_in *inarg;
 	int err;
 
 	if (is_bad_inode(inode))
@@ -423,20 +430,28 @@ static int fuse_flush(struct file *file, fl_owner_t id)
 
 	req = fuse_get_req_nofail_nopages(fc, file);
 	memset(&inarg, 0, sizeof(inarg));
-	inarg.fh = ff->fh;
-	inarg.lock_owner = fuse_lock_owner_id(fc, id);
+	inarg = &req->misc.flush_in;
+	inarg->fh = ff->fh;
+	inarg->lock_owner = fuse_lock_owner_id(fc, id);
 	req->in.h.opcode = FUSE_FLUSH;
 	req->in.h.nodeid = get_node_id(inode);
 	req->in.numargs = 1;
-	req->in.args[0].size = sizeof(inarg);
-	req->in.args[0].value = &inarg;
-	__set_bit(FR_FORCE, &req->flags);
-	fuse_request_send(fc, req);
-	err = req->out.h.error;
-	fuse_put_request(fc, req);
-	if (err == -ENOSYS) {
-		fc->no_flush = 1;
+	req->in.args[0].size = sizeof(struct fuse_flush_in);
+	req->in.args[0].value = inarg;
+	if (fc->async_flush) {
+		req->end = fuse_flush_end;
+		__set_bit(FR_BACKGROUND, &req->flags);
+		fuse_request_send_background(fc, req);
 		err = 0;
+	} else {
+		__set_bit(FR_FORCE, &req->flags);
+		fuse_request_send(fc, req);
+		err = req->out.h.error;
+		fuse_put_request(fc, req);
+		if (err == -ENOSYS) {
+			fc->no_flush = 1;
+			err = 0;
+		}
 	}
 	return err;
 }

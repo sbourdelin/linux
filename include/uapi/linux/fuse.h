@@ -108,6 +108,9 @@
  *
  *  7.25
  *  - add FUSE_PARALLEL_DIROPS
+ *
+ *  7.26
+ *  - add FUSE_ASYNC_FLUSH
  */
 
 #ifndef _LINUX_FUSE_H
@@ -143,7 +146,7 @@
 #define FUSE_KERNEL_VERSION 7
 
 /** Minor version number of this interface */
-#define FUSE_KERNEL_MINOR_VERSION 25
+#define FUSE_KERNEL_MINOR_VERSION 26
 
 /** The node ID of the root inode */
 #define FUSE_ROOT_ID 1
@@ -238,6 +241,7 @@ struct fuse_file_lock {
  * FUSE_WRITEBACK_CACHE: use writeback cache for buffered writes
  * FUSE_NO_OPEN_SUPPORT: kernel supports zero-message opens
  * FUSE_PARALLEL_DIROPS: allow parallel lookups and readdir
+ * FUSE_ASYNC_FLUSH: asynchronous flush and release
  */
 #define FUSE_ASYNC_READ		(1 << 0)
 #define FUSE_POSIX_LOCKS	(1 << 1)
@@ -258,6 +262,7 @@ struct fuse_file_lock {
 #define FUSE_WRITEBACK_CACHE	(1 << 16)
 #define FUSE_NO_OPEN_SUPPORT	(1 << 17)
 #define FUSE_PARALLEL_DIROPS    (1 << 18)
+#define FUSE_ASYNC_FLUSH	(1 << 19)
 
 /**
  * CUSE INIT request/reply flags

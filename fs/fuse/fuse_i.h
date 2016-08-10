@@ -350,6 +350,7 @@ struct fuse_req {
 			struct fuse_req *next;
 		} write;
 		struct fuse_notify_retrieve_in retrieve_in;
+		struct fuse_flush_in flush_in;
 	} misc;
 
 	/** page vector */
@@ -623,6 +624,9 @@ struct fuse_conn {
 
 	/** Is lseek not implemented by fs? */
 	unsigned no_lseek:1;
+
+	/** Does the filesystem want async flush? */
+	unsigned async_flush:1;
 
 	/** The number of requests waiting for completion */
 	atomic_t num_waiting;
