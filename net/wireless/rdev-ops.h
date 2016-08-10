@@ -1050,11 +1050,10 @@ rdev_set_mcast_rate(struct cfg80211_registered_device *rdev,
 		    struct net_device *dev,
 		    int mcast_rate[NUM_NL80211_BANDS])
 {
-	int ret = -ENOTSUPP;
+	int ret;
 
 	trace_rdev_set_mcast_rate(&rdev->wiphy, dev, mcast_rate);
-	if (rdev->ops->set_mcast_rate)
-		ret = rdev->ops->set_mcast_rate(&rdev->wiphy, dev, mcast_rate);
+	ret = rdev->ops->set_mcast_rate(&rdev->wiphy, dev, mcast_rate);
 	trace_rdev_return_int(&rdev->wiphy, ret);
 	return ret;
 }
