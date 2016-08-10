@@ -1,0 +1,35 @@
+* Rockchip rk3399 dmc device
+
+Required properties:
+- compatible: Must be "rockchip,rk3399-dmc".
+- devfreq-events: Node to get ddr loading, Refer to
+		  Documentation/devicetree/bindings/devfreq/rockchip-dif.txt
+- interrupts: The interrupt number to the cpu. The interrupt specifier format
+	      depends on the interrupt controller. 
+- clocks: Phandles for clock specified in "clock-names" property
+- clock-names : The name of clock used by the DFI, must be "pclk_ddr_mon";
+- operating-points-v2: Refer to Documentation/devicetree/bindings/power/opp.txt
+		       for details.
+- center-supply: Dmc supply node.
+- status: Marks the node enabled/disabled.
+
+Optional properties:
+- ddr_timing: ddr timing need to pass to arm trust firmware
+- upthreshold: the upthreshold to simpleondeamnd policy
+- downdifferential: The downdifferential to simpleondeamnd policy
+
+Example:
+	dmc: dmc {
+		compatible = "rockchip,rk3399-dmc";
+		devfreq-events = <&dfi>;
+		interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&cru SCLK_DDRCLK>;
+		clock-names = "dmc_clk";
+		ddr_timing = <&ddr_timing>;
+		operating-points-v2 = <&dmc_opp_table>;
+		center-supply = <&ppvar_centerlogic>;
+		upthreshold = <15>;
+		downdifferential = <10>;
+		status = "disabled";
+	};
+
