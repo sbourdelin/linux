@@ -308,6 +308,20 @@ static int read_unwind_spec_debug_frame(struct dso *dso,
 		dso__data_put_fd(dso);
 	}
 
+	/*
+	 * With split debug info, the file without debug info may not have a
+	 * .debug_frame, so check the symsrc too.
+	 */
+	if (ofs == 0 && dso->symsrc_filename) {
+		fd = open(dso->symsrc_filename, O_RDONLY);
+		if (fd < 0)
+			return -EINVAL;
+
+		ofs = elf_section_offset(fd, ".debug_frame");
+		dso->data.debug_frame_offset = ofs;
+		close(fd);
+	}
+
 	*offset = ofs;
 	if (*offset)
 		return 0;
