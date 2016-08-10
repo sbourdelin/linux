@@ -1047,6 +1047,17 @@ static void pcibios_setup_device(struct pci_dev *dev)
 
 int pcibios_add_device(struct pci_dev *dev)
 {
+	struct pci_controller *phb = pci_bus_to_host(dev->bus);
+
+	pr_debug("PCI %s, pci_dev %p, phb %p\n", dev_name(&dev->dev), dev, phb);
+
+	if (!phb)
+		pr_warn("%s: PCI device %s has null PHB; refcount bug!",
+			__func__, dev_name(&dev->dev)); /* WARN_ON ahead */
+
+	/* locking: see comment on pcibios_release_device(). */
+	controller_get(phb);
+
 	/*
 	 * We can only call pcibios_setup_device() after bus setup is complete,
 	 * since some of the platform specific DMA setup code depends on it.
@@ -1060,6 +1071,20 @@ int pcibios_add_device(struct pci_dev *dev)
 #endif /* CONFIG_PCI_IOV */
 
 	return 0;
+}
+
+void pcibios_add_bus(struct pci_bus *bus)
+{
+	struct pci_controller *phb = pci_bus_to_host(bus);
+
+	pr_debug("PCI %s, pci_bus %p, phb %p\n", dev_name(&bus->dev), bus, phb);
+
+	if (!phb)
+		pr_warn("%s: PCI bus %s has null PHB; refcount bug!",
+			__func__, dev_name(&bus->dev)); /* WARN_ON ahead */
+
+	/* locking: see comment on pcibios_release_device(). */
+	controller_get(phb);
 }
 
 void pcibios_setup_bus_devices(struct pci_bus *bus)

@@ -131,8 +131,8 @@ struct pci_controller {
 
 	/*
 	 * Reference counting for the structures:
-	 * - TODO pci_dev
-	 * - TODO pci_bus
+	 * - pci_dev
+	 * - pci_bus
 	 * - TODO pci_dn
 	 * - TODO eeh_pe
 	 * - TODO eeh_dev

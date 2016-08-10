@@ -55,15 +55,44 @@ EXPORT_SYMBOL_GPL(pci_find_bus_by_node);
  * @dev: PCI device
  *
  * The function is called before releasing the indicated PCI device.
+ *
+ * The locking for kref_get() and kref_put() of the PHB/pci_controller
+ * in pcibios_(add|release)_device() and pcibios_(add|remove)_bus() is
+ * satisfied by the pci_rescan_remove_lock mutex (required for rescan/
+ * remove paths of PCI devices/buses; the scan path doesn't require it,
+ * as there is only addition of devices/buses - no removal at all.)
  */
 void pcibios_release_device(struct pci_dev *dev)
 {
 	struct pci_controller *phb = pci_bus_to_host(dev->bus);
 
+	pr_debug("PCI %s, pci_dev %p, phb %p\n", dev_name(&dev->dev), dev, phb);
+
 	eeh_remove_device(dev);
 
 	if (phb->controller_ops.release_device)
 		phb->controller_ops.release_device(dev);
+
+	if (unlikely(!phb))
+		pr_warn("%s: PCI device %s has null PHB; refcount bug!",
+			__func__, dev_name(&dev->dev)); /* WARN_ON ahead */
+
+	/* locking: see comment on pcibios_release_device(). */
+	controller_put(phb);
+}
+
+void pcibios_remove_bus(struct pci_bus *bus)
+{
+	struct pci_controller *phb = pci_bus_to_host(bus);
+
+	pr_debug("PCI %s, pci_bus %p, phb %p\n", dev_name(&bus->dev), bus, phb);
+
+	if (unlikely(!phb))
+		pr_warn("%s: PCI bus %s has null PHB; refcount bug!",
+			__func__, dev_name(&bus->dev)); /* WARN_ON ahead */
+
+	/* locking: see comment on pcibios_release_device(). */
+	controller_put(phb);
 }
 
 /**

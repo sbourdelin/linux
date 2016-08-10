@@ -142,6 +142,7 @@ struct pci_dev *of_create_pci_dev(struct device_node *node,
 	dev->devfn = devfn;
 	dev->multifunction = 0;		/* maybe a lie? */
 	dev->needs_freset = 0;		/* pcie fundamental reset required */
+	dev->sysdata = bus->sysdata;	/* inherit bus's phb for phb->refcount */
 	set_pcie_port_type(dev);
 
 	pci_dev_assign_slot(dev);
