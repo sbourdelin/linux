@@ -47,13 +47,13 @@ unsigned int vdso_total_pages __read_mostly;
 static union vdso_data_store vdso_data_store __page_aligned_data;
 static struct vdso_data *vdso_data = &vdso_data_store.data;
 
-static struct page *vdso_data_page;
-static struct vm_special_mapping vdso_data_mapping = {
+static struct page *vdso_data_page __read_mostly;
+static const struct vm_special_mapping vdso_data_mapping = {
 	.name = "[vvar]",
 	.pages = &vdso_data_page,
 };
 
-static struct vm_special_mapping vdso_text_mapping = {
+static struct vm_special_mapping vdso_text_mapping __read_mostly = {
 	.name = "[vdso]",
 };
 
