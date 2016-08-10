@@ -593,6 +593,7 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	struct at24_data *at24;
 	int err;
 	unsigned i, num_addresses;
+	char c;
 
 	if (client->dev.platform_data) {
 		chip = *(struct at24_platform_data *)client->dev.platform_data;
@@ -779,6 +780,15 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	/* export data to kernel code */
 	if (chip.setup)
 		chip.setup(at24->nvmem, chip.context);
+
+	err = at24_read(at24, 0, &c, 1);
+	if (err) {
+		dev_err(&client->dev,
+			"error reading the test byte from EEPROM: %d\n", err);
+		nvmem_unregister(at24->nvmem);
+		err = -ENODEV;
+		goto err_clients;
+	}
 
 	return 0;
 
