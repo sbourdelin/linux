@@ -422,6 +422,12 @@ struct sdhci_host {
 #define SDHCI_QUIRK2_ACMD23_BROKEN			(1<<14)
 /* Broken Clock divider zero in controller */
 #define SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN		(1<<15)
+/*
+ * If the base clock can be scalable, then there should be no further
+ * clock dividing as the input clock itself will be scaled down to
+ * required frequency.
+ */
+#define SDHCI_QUIRK2_ALWAYS_USE_BASE_CLOCK		(1<<16)
 
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */
