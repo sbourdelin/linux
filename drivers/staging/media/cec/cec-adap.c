@@ -1049,6 +1049,9 @@ static int cec_config_thread_func(void *arg)
 
 configured:
 	if (adap->log_addrs.log_addr_mask == 0) {
+		if (!(las->flags & CEC_LOG_ADDRS_FL_ALLOW_UNREG_FALLBACK))
+			goto unconfigure;
+
 		/* Fall back to unregistered */
 		las->log_addr[0] = CEC_LOG_ADDR_UNREGISTERED;
 		las->log_addr_mask = 1 << las->log_addr[0];
