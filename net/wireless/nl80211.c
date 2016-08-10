@@ -10890,6 +10890,9 @@ static int nl80211_del_tx_ts(struct sk_buff *skb, struct genl_info *info)
 	u8 tsid;
 	int err;
 
+	if (!(rdev->wiphy.features & NL80211_FEATURE_SUPPORTS_WMM_ADMISSION))
+		return -EOPNOTSUPP;
+
 	if (!info->attrs[NL80211_ATTR_TSID] || !info->attrs[NL80211_ATTR_MAC])
 		return -EINVAL;
 

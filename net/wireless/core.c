@@ -579,6 +579,10 @@ int wiphy_register(struct wiphy *wiphy)
 		     !rdev->ops->tdls_cancel_channel_switch)))
 		return -EINVAL;
 
+	if (WARN_ON((wiphy->features & NL80211_FEATURE_SUPPORTS_WMM_ADMISSION)
+		    && (!rdev->ops->add_tx_ts || !rdev->ops->del_tx_ts)))
+		return -EINVAL;
+
 	/*
 	 * if a wiphy has unsupported modes for regulatory channel enforcement,
 	 * opt-out of enforcement checking
