@@ -1034,13 +1034,12 @@ rdev_start_radar_detection(struct cfg80211_registered_device *rdev,
 			   struct cfg80211_chan_def *chandef,
 			   u32 cac_time_ms)
 {
-	int ret = -ENOTSUPP;
+	int ret;
 
 	trace_rdev_start_radar_detection(&rdev->wiphy, dev, chandef,
 					 cac_time_ms);
-	if (rdev->ops->start_radar_detection)
-		ret = rdev->ops->start_radar_detection(&rdev->wiphy, dev,
-						       chandef, cac_time_ms);
+	ret = rdev->ops->start_radar_detection(&rdev->wiphy, dev,
+					       chandef, cac_time_ms);
 	trace_rdev_return_int(&rdev->wiphy, ret);
 	return ret;
 }

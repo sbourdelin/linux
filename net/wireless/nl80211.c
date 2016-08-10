@@ -6826,6 +6826,9 @@ static int nl80211_start_radar_detection(struct sk_buff *skb,
 	unsigned int cac_time_ms;
 	int err;
 
+	if (!rdev->ops->start_radar_detection)
+		return -EOPNOTSUPP;
+
 	dfs_region = reg_get_dfs_region(wdev->wiphy);
 	if (dfs_region == NL80211_DFS_UNSET)
 		return -EINVAL;
@@ -6845,14 +6848,12 @@ static int nl80211_start_radar_detection(struct sk_buff *skb,
 	if (err < 0)
 		return err;
 
+	/* 0 value means no dfs is required so bail out */
 	if (err == 0)
 		return -EINVAL;
 
 	if (!cfg80211_chandef_dfs_usable(wdev->wiphy, &chandef))
 		return -EINVAL;
-
-	if (!rdev->ops->start_radar_detection)
-		return -EOPNOTSUPP;
 
 	cac_time_ms = cfg80211_chandef_dfs_cac_time(&rdev->wiphy, &chandef);
 	if (WARN_ON(!cac_time_ms))
