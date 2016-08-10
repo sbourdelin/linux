@@ -854,12 +854,15 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	 * The starting device has been given the rproc->cached_table as the
 	 * resource table. The address of the vring along with the other
 	 * allocated resources (carveouts etc) is stored in cached_table.
-	 * In order to pass this information to the remote device we must
-	 * copy this information to device memory.
+	 * In order to pass this information to the remote device we must copy
+	 * this information to device memory. We also update the table_ptr so
+	 * that any subsequent changes will be applied to the loaded version.
 	 */
 	loaded_table = rproc_find_loaded_rsc_table(rproc, fw);
-	if (loaded_table)
+	if (loaded_table) {
 		memcpy(loaded_table, rproc->cached_table, tablesz);
+		rproc->table_ptr = loaded_table;
+	}
 
 	/* power up the remote processor */
 	ret = rproc->ops->start(rproc);
@@ -868,13 +871,6 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 		goto clean_up;
 	}
 
-	/*
-	 * Update table_ptr so that all subsequent vring allocations and
-	 * virtio fields manipulation update the actual loaded resource table
-	 * in device memory.
-	 */
-	rproc->table_ptr = loaded_table;
-
 	rproc->state = RPROC_RUNNING;
 
 	dev_info(dev, "remote processor %s is now up\n", rproc->name);
@@ -882,6 +878,7 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	return 0;
 
 clean_up:
+	rproc->table_ptr = rproc->cached_table;
 	rproc_resource_cleanup(rproc);
 	rproc_disable_iommu(rproc);
 	return ret;
