@@ -1431,8 +1431,11 @@ static void choose_wakeup(struct usb_device *udev, pm_message_t msg)
 	/* If the device is autosuspended with the wrong wakeup setting,
 	 * autoresume now so the setting can be changed.
 	 */
-	if (udev->state == USB_STATE_SUSPENDED && w != udev->do_remote_wakeup)
-		pm_runtime_resume(&udev->dev);
+	if (udev->state == USB_STATE_SUSPENDED && w != udev->do_remote_wakeup) {
+		if (pm_runtime_resume(&udev->dev) == -ESHUTDOWN)
+			pm_runtime_set_suspended(&udev->dev);
+	}
+
 	udev->do_remote_wakeup = w;
 }
 
