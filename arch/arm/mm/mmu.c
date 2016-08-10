@@ -1183,7 +1183,7 @@ void __init sanity_check_meminfo(void)
 			if (reg->size > size_limit) {
 				phys_addr_t overlap_size = reg->size - size_limit;
 
-				pr_notice("Truncating RAM at %pa-%pa to -%pa",
+				pr_notice("Truncating RAM at %pa-%pa to -%pa\n",
 					  &block_start, &block_end, &vmalloc_limit);
 				memblock_remove(vmalloc_limit, overlap_size);
 				block_end = vmalloc_limit;
