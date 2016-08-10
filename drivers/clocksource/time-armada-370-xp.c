@@ -354,10 +354,10 @@ static int __init armada_370_xp_timer_common_init(struct device_node *np)
 
 static int __init armada_xp_timer_init(struct device_node *np)
 {
-	struct clk *clk = of_clk_get_by_name(np, "fixed");
+	struct clk *clk;
 	int ret;
 
-	clk = of_clk_get(np, 0);
+	clk = of_clk_get_by_name(np, "fixed");
 	if (IS_ERR(clk)) {
 		pr_err("Failed to get clock");
 		return PTR_ERR(clk);
