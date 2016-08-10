@@ -846,6 +846,7 @@ static int sun4i_codec_probe(struct platform_device *pdev)
 	card = sun4i_codec_create_card(&pdev->dev);
 	if (!card) {
 		dev_err(&pdev->dev, "Failed to create our card\n");
+		ret = -ENOMEM;
 		goto err_unregister_codec;
 	}
 
