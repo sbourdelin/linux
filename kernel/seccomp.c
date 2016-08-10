@@ -609,8 +609,20 @@ static int __seccomp_filter(int this_syscall, const struct seccomp_data *sd,
 		 * Terminating the task now avoids executing a system
 		 * call that may not be intended.
 		 */
-		if (fatal_signal_pending(current))
+		if (fatal_signal_pending(current)) {
+			/*
+			 * Swallow the signals we will never deliver.
+			 * If we do not do this, the PTRACE_EVENT_EXIT will
+			 * be suppressed by those signals.
+			 */
+			siginfo_t info;
+
+			spin_lock_irq(&current->sighand->siglock);
+			while (dequeue_signal(current, &current->blocked, &info));
+			spin_unlock_irq(&current->sighand->siglock);
+
 			do_exit(SIGSYS);
+		}
 		/* Check if the tracer forced the syscall to be skipped. */
 		this_syscall = syscall_get_nr(current, task_pt_regs(current));
 		if (this_syscall < 0)
