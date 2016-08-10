@@ -489,7 +489,6 @@ static void ks7010_rw_function(struct work_struct *work)
 	struct hw_info_t *hw;
 	struct ks_wlan_private *priv;
 	unsigned char rw_data;
-	int retval;
 
 	hw = container_of(work, struct hw_info_t, rw_wq.work);
 	priv = container_of(hw, struct ks_wlan_private, ks_wlan_hw);
@@ -538,9 +537,7 @@ static void ks7010_rw_function(struct work_struct *work)
 	}
 
 	/* read (WriteStatus/ReadDataSize FN1:00_0014) */
-	retval =
-	    ks7010_sdio_read(priv, WSTATUS_RSIZE, &rw_data, sizeof(rw_data));
-	if (retval) {
+	if (ks7010_sdio_read(priv, WSTATUS_RSIZE, &rw_data, sizeof(rw_data))) {
 		DPRINTK(1, " error : WSTATUS_RSIZE=%02X psstatus=%d\n", rw_data,
 			atomic_read(&priv->psstatus.status));
 		goto release_host;
@@ -708,7 +705,6 @@ static void trx_device_exit(struct ks_wlan_private *priv)
 static int ks7010_sdio_update_index(struct ks_wlan_private *priv, u32 index)
 {
 	int rc = 0;
-	int retval;
 	unsigned char *data_buf;
 
 	data_buf = kmalloc(sizeof(u32), GFP_KERNEL);
@@ -716,14 +712,12 @@ static int ks7010_sdio_update_index(struct ks_wlan_private *priv, u32 index)
 		return 1;
 
 	memcpy(data_buf, &index, sizeof(index));
-	retval = ks7010_sdio_write(priv, WRITE_INDEX, data_buf, sizeof(index));
-	if (retval) {
+	if (ks7010_sdio_write(priv, WRITE_INDEX, data_buf, sizeof(index))) {
 		rc = 2;
 		goto free_buf;
 	}
 
-	retval = ks7010_sdio_write(priv, READ_INDEX, data_buf, sizeof(index));
-	if (retval)
+	if (ks7010_sdio_write(priv, READ_INDEX, data_buf, sizeof(index)))
 		rc = 3;
  free_buf:
 	kfree(data_buf);
