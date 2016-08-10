@@ -118,8 +118,8 @@ extern const struct cpumask *cpu_coregroup_mask(int cpu);
 #define topology_core_cpumask(cpu)		(per_cpu(cpu_core_map, cpu))
 #define topology_sibling_cpumask(cpu)		(per_cpu(cpu_sibling_map, cpu))
 
-extern unsigned int __max_logical_packages;
-#define topology_max_packages()			(__max_logical_packages)
+extern unsigned int logical_packages;
+#define topology_max_packages()			(logical_packages)
 
 extern int __max_smt_threads;
 
