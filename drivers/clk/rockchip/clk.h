@@ -112,6 +112,12 @@ struct clk;
 #define RK3399_PMU_CLKGATE_CON(x)	((x) * 0x4 + 0x100)
 #define RK3399_PMU_SOFTRST_CON(x)	((x) * 0x4 + 0x110)
 
+/*
+ * for COMPOSITE_DDRCLK div_flag
+ * it means set use sip call to set ddr clock in bl31
+ */
+#define ROCKCHIP_DDRCLK_SIP		0x01
+
 enum rockchip_pll_type {
 	pll_rk3036,
 	pll_rk3066,
@@ -281,6 +287,14 @@ struct clk *rockchip_clk_register_mmc(const char *name,
 				const char *const *parent_names, u8 num_parents,
 				void __iomem *reg, int shift);
 
+struct clk *rockchip_clk_register_ddrclk(const char *name, int flags,
+					 const char *const *parent_names,
+					 u8 num_parents, int mux_offset,
+					 int mux_shift, int mux_width,
+					 int div_shift, int div_width,
+					 int ddr_flags, void __iomem *reg_base,
+					 spinlock_t *lock);
+
 #define ROCKCHIP_INVERTER_HIWORD_MASK	BIT(0)
 
 struct clk *rockchip_clk_register_inverter(const char *name,
@@ -299,6 +313,7 @@ enum rockchip_clk_branch_type {
 	branch_mmc,
 	branch_inverter,
 	branch_factor,
+	branch_ddrc,
 };
 
 struct rockchip_clk_branch {
@@ -486,6 +501,24 @@ struct rockchip_clk_branch {
 		.div_flags	= df,				\
 		.gate_offset	= -1,				\
 		.child		= ch,				\
+	}
+
+#define COMPOSITE_DDRCLK(_id, cname, pnames, f, mo, ms, mw,	\
+			 ds, dw, df)				\
+	{							\
+		.id		= _id,				\
+		.branch_type	= branch_ddrc,			\
+		.name		= cname,			\
+		.parent_names	= pnames,			\
+		.num_parents	= ARRAY_SIZE(pnames),		\
+		.flags		= f,				\
+		.muxdiv_offset  = mo,                           \
+		.mux_shift      = ms,                           \
+		.mux_width      = mw,                           \
+		.div_shift      = ds,                           \
+		.div_width      = dw,                           \
+		.div_flags	= df,				\
+		.gate_offset    = -1,                           \
 	}
 
 #define MUX(_id, cname, pnames, f, o, s, w, mf)			\
