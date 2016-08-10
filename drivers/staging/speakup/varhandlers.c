@@ -309,18 +309,6 @@ int spk_set_mask_bits(const char *input, const int which, const int how)
 	return 0;
 }
 
-char *spk_strlwr(char *s)
-{
-	char *p;
-
-	if (!s)
-		return NULL;
-
-	for (p = s; *p; p++)
-		*p = tolower(*p);
-	return s;
-}
-
 char *spk_s2uchar(char *start, char *dest)
 {
 	int val;
