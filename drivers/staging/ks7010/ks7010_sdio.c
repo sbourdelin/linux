@@ -331,7 +331,7 @@ static void tx_device_task(void *dev)
 {
 	struct ks_wlan_private *priv = (struct ks_wlan_private *)dev;
 	struct tx_device_buffer *sp;
-	int rc = 0;
+	int rc;
 
 	DPRINTK(4, "\n");
 	if (cnt_txqbody(priv) > 0
@@ -366,7 +366,7 @@ int ks_wlan_hw_tx(struct ks_wlan_private *priv, void *p, unsigned long size,
 		  void (*complete_handler) (void *arg1, void *arg2),
 		  void *arg1, void *arg2)
 {
-	int result = 0;
+	int result;
 	struct hostif_hdr *hdr;
 	hdr = (struct hostif_hdr *)p;
 
@@ -747,7 +747,7 @@ static int ks7010_sdio_data_compare(struct ks_wlan_private *priv, u32 address,
 static int ks7010_upload_firmware(struct ks_wlan_private *priv,
 				  struct ks_sdio_card *card)
 {
-	unsigned int size, offset, n = 0;
+	unsigned int size, offset, n;
 	unsigned char *rom_buf;
 	unsigned char rw_data = 0;
 	int retval, rc = 0;
