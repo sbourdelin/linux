@@ -122,7 +122,8 @@ bool __skb_flow_dissect(const struct sk_buff *skb,
 
 	if (!data) {
 		data = skb->data;
-		proto = skb->protocol;
+		proto = skb_vlan_tag_present(skb) ?
+			 skb->vlan_proto : skb->protocol;
 		nhoff = skb_network_offset(skb);
 		hlen = skb_headlen(skb);
 	}
@@ -240,13 +241,6 @@ ipv6:
 	}
 	case htons(ETH_P_8021AD):
 	case htons(ETH_P_8021Q): {
-		const struct vlan_hdr *vlan;
-		struct vlan_hdr _vlan;
-
-		vlan = __skb_header_pointer(skb, nhoff, sizeof(_vlan), data, hlen, &_vlan);
-		if (!vlan)
-			goto out_bad;
-
 		if (dissector_uses_key(flow_dissector,
 				       FLOW_DISSECTOR_KEY_VLANID)) {
 			key_tags = skb_flow_dissector_target(flow_dissector,
@@ -256,8 +250,7 @@ ipv6:
 			key_tags->vlan_id = skb_vlan_tag_get_id(skb);
 		}
 
-		proto = vlan->h_vlan_encapsulated_proto;
-		nhoff += sizeof(*vlan);
+		proto = skb->protocol;
 		goto again;
 	}
 	case htons(ETH_P_PPP_SES): {
