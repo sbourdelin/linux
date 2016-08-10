@@ -1,0 +1,21 @@
+Common remoteproc properties
+
+A remoteproc node represents the mechanism and resources needed for controlling
+a co-processor's life cycle; including loading firmware, booting, shutting down
+and handling exceptions.
+
+
+= Consumer properties
+A consumer node referencing a remoteproc node, so that it can requests life
+cycle transitions can use the following properties:
+
+- rprocs:
+	Usage: required
+	Value type: <prop-encoded-array>
+	Definition: a list of phandle references to remoteproc nodes
+
+- rproc-names:
+	Usage: optional
+	Value type: <stringlist>
+	Definition: a list of strings naming each entry in "rprocs", allowing
+		    consumer drivers to look up remoteprocs by name
