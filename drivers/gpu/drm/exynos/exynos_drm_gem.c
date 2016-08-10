@@ -265,6 +265,20 @@ int exynos_drm_gem_create_ioctl(struct drm_device *dev, void *data,
 	struct exynos_drm_gem *exynos_gem;
 	int ret;
 
+	/*
+	 * Check if non-contiguous GEM memory is requested without IOMMU.
+	 * If so, allocate contiguous GEM memory.
+	 *
+	 * There is no point in attempting to allocate non-contiguous memory,
+	 * only to return error from exynos_drm_framebuffer_init() which leads
+	 * to display manager failing to start.
+	*/
+	if (!is_drm_iommu_supported(dev) &&
+	    (args->flags & EXYNOS_BO_NONCONTIG)) {
+		args->flags &= ~EXYNOS_BO_NONCONTIG;
+		args->flags |= EXYNOS_BO_CONTIG;
+	}
+
 	exynos_gem = exynos_drm_gem_create(dev, args->flags, args->size);
 	if (IS_ERR(exynos_gem))
 		return PTR_ERR(exynos_gem);
