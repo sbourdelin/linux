@@ -11,6 +11,9 @@ FILES = audio.h.rst ca.h.rst dmx.h.rst frontend.h.rst net.h.rst video.h.rst \
 TARGETS := $(addprefix $(BUILDDIR)/, $(FILES))
 
 htmldocs: $(BUILDDIR) ${TARGETS}
+epubdocs: $(BUILDDIR) ${TARGETS}
+xmldocs: $(BUILDDIR) ${TARGETS}
+pdfdocs: $(BUILDDIR) ${TARGETS}
 
 $(BUILDDIR):
 	$(Q)mkdir -p $@

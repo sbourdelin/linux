@@ -53,9 +53,11 @@ else # HAVE_RST2PDF
 endif # HAVE_RST2PDF
 
 epubdocs:
+	$(MAKE) BUILDDIR=$(BUILDDIR) -f $(srctree)/Documentation/media/Makefile $@
 	$(call cmd,sphinx,epub)
 
 xmldocs:
+	$(MAKE) BUILDDIR=$(BUILDDIR) -f $(srctree)/Documentation/media/Makefile $@
 	$(call cmd,sphinx,xml)
 
 # no-ops for the Sphinx toolchain
