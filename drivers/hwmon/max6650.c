@@ -41,14 +41,14 @@
 #include <linux/err.h>
 
 /*
- * Insmod parameters
+ * Insmod parameters (for backward compatibility)
  */
 
 /* fan_voltage: 5=5V fan, 12=12V fan, 0=don't change */
 static int fan_voltage;
 /* prescaler: Possible values are 1, 2, 4, 8, 16 or 0 for don't change */
 static int prescaler;
-/* clock: The clock frequency of the chip the driver should assume */
+/* clock: The clock frequency of the chip (max6651 can be clocked externally) */
 static int clock = 254000;
 
 module_param(fan_voltage, int, S_IRUGO);
@@ -566,6 +566,15 @@ static int max6650_init_client(struct max6650_data *data,
 	struct device *dev = &client->dev;
 	int config;
 	int err = -EIO;
+	u32 voltage;
+	u32 prescale;
+
+	if (of_property_read_u32(client->dev.of_node, "fan-voltage",
+				 &voltage))
+		voltage = fan_voltage;
+	if (of_property_read_u32(client->dev.of_node, "fan-prescale",
+				 &prescale))
+		prescale = prescaler;
 
 	config = i2c_smbus_read_byte_data(client, MAX6650_REG_CONFIG);
 
@@ -574,7 +583,7 @@ static int max6650_init_client(struct max6650_data *data,
 		return err;
 	}
 
-	switch (fan_voltage) {
+	switch (voltage) {
 	case 0:
 		break;
 	case 5:
@@ -584,14 +593,10 @@ static int max6650_init_client(struct max6650_data *data,
 		config |= MAX6650_CFG_V12;
 		break;
 	default:
-		dev_err(dev, "illegal value for fan_voltage (%d)\n",
-			fan_voltage);
+		dev_err(dev, "illegal value for fan_voltage (%d)\n", voltage);
 	}
 
-	dev_info(dev, "Fan voltage is set to %dV.\n",
-		 (config & MAX6650_CFG_V12) ? 12 : 5);
-
-	switch (prescaler) {
+	switch (prescale) {
 	case 0:
 		break;
 	case 1:
@@ -614,10 +619,11 @@ static int max6650_init_client(struct max6650_data *data,
 			 | MAX6650_CFG_PRESCALER_16;
 		break;
 	default:
-		dev_err(dev, "illegal value for prescaler (%d)\n", prescaler);
+		dev_err(dev, "illegal value for prescaler (%d)\n", prescale);
 	}
 
-	dev_info(dev, "Prescaler is set to %d.\n",
+	dev_info(dev, "Fan voltage: %dV, prescaler: %d.\n",
+		 (config & MAX6650_CFG_V12) ? 12 : 5,
 		 1 << (config & MAX6650_CFG_PRESCALER_MASK));
 
 	/*

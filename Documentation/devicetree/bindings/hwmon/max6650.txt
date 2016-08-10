@@ -1,0 +1,20 @@
+Bindings for MAX6651 and MAX6650 I2C fan controllers
+
+Required properties:
+- compatible : One of "max6650" or "max6651"
+- reg        : I2C address
+
+Optional properties:
+- fan-voltage    : The supply voltage of the fan. Valid values are 5 and 12.
+                   Default is to use the chip's current setting.
+- fan-prescale   : Pre-scaling value as per datasheet. Valid are 1, 2, 4, 8, 16.
+                   Default is to use the chip's current setting.
+ 
+
+Example:
+	fan-max6650: max6650@1b {
+		reg = <0x1b>;
+		compatible = "max6650";
+		fan-voltage = <12>;
+		fan-prescale = <4>;
+	};
