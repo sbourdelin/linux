@@ -273,7 +273,17 @@ static __always_inline cputime_t steal_account_process_time(cputime_t maxtime)
 		steal = paravirt_steal_clock(smp_processor_id());
 		steal -= this_rq()->prev_steal_time;
 
-		steal_cputime = min(nsecs_to_cputime(steal), maxtime);
+		steal_cputime = nsecs_to_cputime(steal);
+		if (steal_cputime > 32 * maxtime) {
+			/*
+			 * Guest and host steal time values are way out of
+			 * sync. Sync up the guest steal time with the host.
+			 */
+			this_rq()->prev_steal_time +=
+					cputime_to_nsecs(steal_cputime);
+			return 0;
+		}
+		steal_cputime = min(steal_cputime, maxtime);
 		account_steal_time(steal_cputime);
 		this_rq()->prev_steal_time += cputime_to_nsecs(steal_cputime);
 
