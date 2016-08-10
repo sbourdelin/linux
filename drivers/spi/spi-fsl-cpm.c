@@ -258,6 +258,9 @@ static unsigned long fsl_spi_cpm_get_pram(struct mpc8xxx_spi *mspi)
 	/* QE but with a dynamic pram location? */
 	if (mspi->flags & SPI_QE) {
 		pram_ofs = cpm_muram_alloc(SPI_PRAM_SIZE, 64);
+		if (IS_ERR_VALUE(pram_ofs))
+			return pram_ofs;
+
 		qe_issue_cmd(QE_ASSIGN_PAGE_TO_DEVICE, mspi->subblock,
 			     QE_CR_PROTOCOL_UNSPECIFIED, pram_ofs);
 		return pram_ofs;
@@ -269,9 +272,13 @@ static unsigned long fsl_spi_cpm_get_pram(struct mpc8xxx_spi *mspi)
 
 	if (mspi->flags & SPI_CPM2) {
 		pram_ofs = cpm_muram_alloc(SPI_PRAM_SIZE, 64);
+		if (IS_ERR_VALUE(pram_ofs))
+			goto error_pram;
+
 		out_be16(spi_base, pram_ofs);
 	}
 
+error_pram:
 	iounmap(spi_base);
 	return pram_ofs;
 }
