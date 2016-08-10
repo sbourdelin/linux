@@ -145,10 +145,22 @@ void pcibios_free_controller(struct pci_controller *phb)
 	list_del(&phb->list_node);
 	spin_unlock(&hose_spinlock);
 
-	if (phb->is_dynamic)
+	/* if the associated pci_host_bridge has a release_fn(), rely on that. */
+	if (!phb->bridge->release_fn && phb->is_dynamic)
 		kfree(phb);
 }
 EXPORT_SYMBOL_GPL(pcibios_free_controller);
+
+void pcibios_host_bridge_release(struct pci_host_bridge *bridge)
+{
+	struct pci_controller *phb = (struct pci_controller *) bridge->release_data;
+
+	pr_debug("domain %d, dynamic %d\n", phb->global_number, phb->is_dynamic);
+
+	if (phb->is_dynamic)
+		kfree(phb);
+}
+EXPORT_SYMBOL_GPL(pcibios_host_bridge_release);
 
 /*
  * The function is used to return the minimal alignment
@@ -1646,6 +1658,7 @@ void pcibios_scan_phb(struct pci_controller *hose)
 		return;
 	}
 	hose->bus = bus;
+	hose->bridge = pci_find_host_bridge(bus);
 
 	/* Get probe mode and perform scan */
 	mode = PCI_PROBE_NORMAL;
