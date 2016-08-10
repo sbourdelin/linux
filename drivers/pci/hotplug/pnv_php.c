@@ -11,6 +11,7 @@
 
 #include <linux/libfdt.h>
 #include <linux/module.h>
+#include <linux/delay.h>
 #include <linux/pci.h>
 #include <linux/pci_hotplug.h>
 
@@ -434,6 +435,12 @@ static int pnv_php_enable(struct pnv_php_slot *php_slot, bool rescan)
 	if (unlikely(ret))
 		return ret;
 
+	/* Take two seconds as settlement time. Otherwise, the firmware
+	 * of PCI adapter behind the PCI slot isn't functional completely
+	 * in time. It causes initializing failure reported from device
+	 * driver as observed on Sumsung NVME adapter (144d:a821).
+	 */
+	msleep(2000);
 scan:
 	if (presence == OPAL_PCI_SLOT_PRESENT) {
 		if (rescan) {
