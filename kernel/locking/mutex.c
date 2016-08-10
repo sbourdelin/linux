@@ -55,6 +55,7 @@ __mutex_init(struct mutex *lock, const char *name, struct lock_class_key *key)
 	mutex_clear_owner(lock);
 #ifdef CONFIG_MUTEX_SPIN_ON_OWNER
 	osq_lock_init(&lock->osq);
+	lock->waiter_spinning = false;
 #endif
 
 	debug_mutex_init(lock, name, key);
@@ -337,9 +338,21 @@ static bool mutex_optimistic_spin(struct mutex *lock,
 		 */
 		if (!osq_lock(&lock->osq))
 			goto done;
+	} else {
+		/*
+		 * Turn on the waiter spinning flag to discourage the spinner
+		 * from getting the lock.
+		 */
+		lock->waiter_spinning = true;
 	}
 
-	while (true) {
+	/*
+	 * The cpu_relax_lowlatency() call is a compiler barrier which forces
+	 * everything in this loop to be re-loaded. We don't need memory
+	 * barriers as we'll eventually observe the right values at the cost
+	 * of a few extra spins.
+	 */
+	for (;; cpu_relax_lowlatency()) {
 		struct task_struct *owner;
 
 		if (use_ww_ctx && ww_ctx->acquired > 0) {
@@ -356,6 +369,17 @@ static bool mutex_optimistic_spin(struct mutex *lock,
 			 */
 			if (READ_ONCE(ww->ctx))
 				break;
+		}
+
+		/*
+		 * For regular opt-spinner, it waits until the waiter_spinning
+		 * flag isn't set. This will ensure forward progress for
+		 * the waiter spinner.
+		 */
+		if (!waiter && READ_ONCE(lock->waiter_spinning)) {
+			if (need_resched())
+				break;
+			continue;
 		}
 
 		/*
@@ -390,18 +414,12 @@ static bool mutex_optimistic_spin(struct mutex *lock,
 		 */
 		if (!owner && (need_resched() || rt_task(task)))
 			break;
-
-		/*
-		 * The cpu_relax() call is a compiler barrier which forces
-		 * everything in this loop to be re-loaded. We don't need
-		 * memory barriers as we'll eventually observe the right
-		 * values at the cost of a few extra spins.
-		 */
-		cpu_relax_lowlatency();
 	}
 
 	if (!waiter)
 		osq_unlock(&lock->osq);
+	else
+		lock->waiter_spinning = false;
 done:
 	/*
 	 * If we fell out of the spin path because of need_resched(),
