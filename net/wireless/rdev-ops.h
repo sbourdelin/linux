@@ -1063,11 +1063,10 @@ static inline int
 rdev_set_coalesce(struct cfg80211_registered_device *rdev,
 		  struct cfg80211_coalesce *coalesce)
 {
-	int ret = -ENOTSUPP;
+	int ret;
 
 	trace_rdev_set_coalesce(&rdev->wiphy, coalesce);
-	if (rdev->ops->set_coalesce)
-		ret = rdev->ops->set_coalesce(&rdev->wiphy, coalesce);
+	ret = rdev->ops->set_coalesce(&rdev->wiphy, coalesce);
 	trace_rdev_return_int(&rdev->wiphy, ret);
 	return ret;
 }
