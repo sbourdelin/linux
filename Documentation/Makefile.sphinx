@@ -49,13 +49,16 @@ ifeq ($(HAVE_RST2PDF),0)
 	$(warning The Python 'rst2pdf' module was not found. Make sure you have the module installed to produce PDF output.)
 	@echo "  SKIP    Sphinx $@ target."
 else # HAVE_RST2PDF
+	$(MAKE) BUILDDIR=$(BUILDDIR) -f $(srctree)/Documentation/media/Makefile $@
 	$(call cmd,sphinx,pdf)
 endif # HAVE_RST2PDF
 
 epubdocs:
+	$(MAKE) BUILDDIR=$(BUILDDIR) -f $(srctree)/Documentation/media/Makefile $@
 	$(call cmd,sphinx,epub)
 
 xmldocs:
+	$(MAKE) BUILDDIR=$(BUILDDIR) -f $(srctree)/Documentation/media/Makefile $@
 	$(call cmd,sphinx,xml)
 
 # no-ops for the Sphinx toolchain
