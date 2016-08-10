@@ -114,6 +114,8 @@ struct pci_controller *pcibios_alloc_controller(struct device_node *dev)
 	phb = zalloc_maybe_bootmem(sizeof(struct pci_controller), GFP_KERNEL);
 	if (phb == NULL)
 		return NULL;
+
+	kref_init(&phb->refcount); /* use first reference for hose_list entry */
 	spin_lock(&hose_spinlock);
 	phb->global_number = get_phb_number(dev);
 	list_add_tail(&phb->list_node, &hose_list);
@@ -130,12 +132,53 @@ struct pci_controller *pcibios_alloc_controller(struct device_node *dev)
 		PHB_SET_NODE(phb, nid);
 	}
 #endif
+
+	pr_debug("PCI domain %d, phb %p, phb->is_dynamic %d\n",
+		phb->global_number, phb, phb->is_dynamic);
+
 	return phb;
 }
 EXPORT_SYMBOL_GPL(pcibios_alloc_controller);
 
+void controller_get(struct pci_controller *phb)
+{
+	if (unlikely(!phb)) {
+		pr_warn("%s: null PHB; refcount bug!\n", __func__);
+		WARN_ON(1);
+	} else {
+		pr_debug("PCI domain %d, phb %p\n", phb->global_number, phb);
+		kref_get(&phb->refcount);
+	}
+}
+
+void controller_put(struct pci_controller *phb)
+{
+	if (unlikely(!phb)) {
+		pr_warn("%s: null PHB; refcount bug!\n", __func__);
+		WARN_ON(1);
+	} else {
+		pr_debug("PCI domain %d, phb %p\n", phb->global_number, phb);
+		kref_put(&phb->refcount, controller_free);
+	}
+}
+
+void controller_free(struct kref *kref)
+{
+	struct pci_controller *phb = container_of(kref, struct pci_controller,
+							refcount);
+
+	pr_info("%s: PCI domain: %d, phb %p, phb->is_dynamic %d\n",
+		__func__, phb->global_number, phb, phb->is_dynamic);
+
+	if (phb->is_dynamic)
+		kfree(phb);
+}
+
 void pcibios_free_controller(struct pci_controller *phb)
 {
+	pr_debug("PCI domain %d, phb %p, phb->is_dynamic %d\n",
+		phb->global_number, phb, phb->is_dynamic);
+
 	spin_lock(&hose_spinlock);
 
 	/* Clear bit of phb_bitmap to allow reuse of this PHB number. */
@@ -143,10 +186,8 @@ void pcibios_free_controller(struct pci_controller *phb)
 		clear_bit(phb->global_number, phb_bitmap);
 
 	list_del(&phb->list_node);
+	controller_put(phb);
 	spin_unlock(&hose_spinlock);
-
-	if (phb->is_dynamic)
-		kfree(phb);
 }
 EXPORT_SYMBOL_GPL(pcibios_free_controller);
 

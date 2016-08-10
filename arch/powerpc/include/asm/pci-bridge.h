@@ -10,6 +10,7 @@
 #include <linux/pci.h>
 #include <linux/list.h>
 #include <linux/ioport.h>
+#include <linux/kref.h>
 
 struct device_node;
 
@@ -128,8 +129,22 @@ struct pci_controller {
 	struct pci_dn *pci_data;
 #endif	/* CONFIG_PPC64 */
 
+	/*
+	 * Reference counting for the structures:
+	 * - TODO pci_dev
+	 * - TODO pci_bus
+	 * - TODO pci_dn
+	 * - TODO eeh_pe
+	 * - TODO eeh_dev
+	 */
+	struct kref refcount;
+
 	void *private_data;
 };
+
+void controller_get(struct pci_controller *phb);
+void controller_put(struct pci_controller *phb);
+void controller_free(struct kref *kref);
 
 /* These are used for config access before all the PCI probing
    has been done. */
