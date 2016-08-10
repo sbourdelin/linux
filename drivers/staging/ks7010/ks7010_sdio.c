@@ -10,6 +10,8 @@
  *   published by the Free Software Foundation.
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/firmware.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/sdio_func.h>
