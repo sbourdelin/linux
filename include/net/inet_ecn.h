@@ -119,14 +119,14 @@ struct ipv6hdr;
  */
 static inline int IP6_ECN_set_ce(struct sk_buff *skb, struct ipv6hdr *iph)
 {
-	__be32 from, to;
+	__wsum from, to;
 
 	if (INET_ECN_is_not_ect(ipv6_get_dsfield(iph)))
 		return 0;
 
-	from = *(__be32 *)iph;
-	to = from | htonl(INET_ECN_CE << 20);
-	*(__be32 *)iph = to;
+	from = *(__wsum *)iph;
+	to = from | (__force __wsum)htonl(INET_ECN_CE << 20);
+	*(__wsum *)iph = to;
 	if (skb->ip_summed == CHECKSUM_COMPLETE)
 		skb->csum = csum_add(csum_sub(skb->csum, from), to);
 	return 1;
