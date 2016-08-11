@@ -201,10 +201,12 @@ up_fail:
  */
 void update_vsyscall(struct timekeeper *tk)
 {
+	register u32 tmp;
 	u32 use_syscall = strcmp(tk->tkr_mono.clock->name, "arch_sys_counter");
 
-	++vdso_data->tb_seq_count;
-	smp_wmb();
+	tmp = smp_load_acquire(&vdso_data->tb_seq_count);
+	++tmp;
+	smp_store_release(&vdso_data->tb_seq_count, tmp);
 
 	vdso_data->use_syscall			= use_syscall;
 	vdso_data->xtime_coarse_sec		= tk->xtime_sec;
@@ -227,8 +229,9 @@ void update_vsyscall(struct timekeeper *tk)
 		vdso_data->cs_shift		= tk->tkr_mono.shift;
 	}
 
-	smp_wmb();
-	++vdso_data->tb_seq_count;
+	tmp = smp_load_acquire(&vdso_data->tb_seq_count);
+	++tmp;
+	smp_store_release(&vdso_data->tb_seq_count, tmp);
 }
 
 void update_vsyscall_tz(void)
