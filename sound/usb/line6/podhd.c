@@ -57,6 +57,9 @@ struct usb_line6_podhd {
 
 	/* Firmware version */
 	int firmware_version;
+
+	/* Flag whether the sysfs files were created */
+	int devfiles_created;
 };
 
 static struct snd_ratden podhd_ratden = {
@@ -177,16 +180,37 @@ static ssize_t firmware_version_show(struct device *dev,
 static DEVICE_ATTR_RO(firmware_version);
 static DEVICE_ATTR_RO(serial_number);
 
-static struct attribute *podhd_dev_attrs[] = {
-	&dev_attr_firmware_version.attr,
-	&dev_attr_serial_number.attr,
-	NULL
-};
+/*
+ *       Create sysfs entries.
+ */
+static int podhd_create_attrs(struct device *dev)
+{
+	int err;
+	struct usb_interface *interface = to_usb_interface(dev);
+	struct usb_line6_podhd *pod = usb_get_intfdata(interface);
 
-static const struct attribute_group podhd_dev_attr_group = {
-	.name = "podhd",
-	.attrs = podhd_dev_attrs,
-};
+	err = device_create_file(dev, &dev_attr_firmware_version);
+	if (err < 0)
+		return err;
+	err = device_create_file(dev, &dev_attr_serial_number);
+	if (err < 0)
+		return err;
+
+	pod->devfiles_created = 1;
+	return 0;
+}
+
+static void podhd_remove_attrs(struct device *dev)
+{
+	struct usb_interface *interface = to_usb_interface(dev);
+	struct usb_line6_podhd *pod = usb_get_intfdata(interface);
+
+	if (pod->devfiles_created) {
+		device_remove_file(dev, &dev_attr_firmware_version);
+		device_remove_file(dev, &dev_attr_serial_number);
+		pod->devfiles_created = 0;
+	}
+}
 
 /*
  * POD X3 startup procedure.
@@ -281,6 +305,14 @@ static int podhd_startup_finalize(struct usb_line6_podhd *pod)
 {
 	struct usb_line6 *line6 = &pod->line6;
 
+	if (pod->line6.properties->capabilities & LINE6_CAP_CONTROL) {
+		/* create sysfs entries: */
+		int err = podhd_create_attrs(line6->ifcdev);
+
+		if (err < 0)
+			return err;
+	}
+
 	/* ALSA audio interface: */
 	return snd_card_register(line6->card);
 }
@@ -288,8 +320,11 @@ static int podhd_startup_finalize(struct usb_line6_podhd *pod)
 static void podhd_disconnect(struct usb_line6 *line6)
 {
 	struct usb_line6_podhd *pod = (struct usb_line6_podhd *)line6;
+	struct device *dev = line6->ifcdev;
 
 	if (pod->line6.properties->capabilities & LINE6_CAP_CONTROL) {
+		podhd_remove_attrs(dev);
+
 		del_timer_sync(&pod->startup_timer);
 		cancel_work_sync(&pod->startup_work);
 	}
@@ -305,13 +340,6 @@ static int podhd_init(struct usb_line6 *line6,
 	struct usb_line6_podhd *pod = (struct usb_line6_podhd *) line6;
 
 	line6->disconnect = podhd_disconnect;
-
-	if (pod->line6.properties->capabilities & LINE6_CAP_CONTROL) {
-		/* create sysfs entries: */
-		err = snd_card_add_dev_attr(line6->card, &podhd_dev_attr_group);
-		if (err < 0)
-			return err;
-	}
 
 	/* initialize MIDI subsystem: */
 	err = line6_init_midi(line6);
