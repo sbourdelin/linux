@@ -722,6 +722,8 @@ static int sd_setup_discard_cmnd(struct scsi_cmnd *cmd)
 	if (!page)
 		return BLKPREP_DEFER;
 
+	rq->timeout = SD_TIMEOUT;
+
 	switch (sdkp->provisioning_mode) {
 	case SD_LBP_UNMAP:
 		buf = page_address(page);
@@ -746,6 +748,7 @@ static int sd_setup_discard_cmnd(struct scsi_cmnd *cmd)
 		put_unaligned_be32(nr_sectors, &cmd->cmnd[10]);
 
 		len = sdkp->device->sector_size;
+		rq->timeout = SD_WRITE_SAME_TIMEOUT;
 		break;
 
 	case SD_LBP_WS10:
@@ -758,6 +761,7 @@ static int sd_setup_discard_cmnd(struct scsi_cmnd *cmd)
 		put_unaligned_be16(nr_sectors, &cmd->cmnd[7]);
 
 		len = sdkp->device->sector_size;
+		rq->timeout = SD_WRITE_SAME_TIMEOUT;
 		break;
 
 	default:
@@ -766,8 +770,6 @@ static int sd_setup_discard_cmnd(struct scsi_cmnd *cmd)
 	}
 
 	rq->completion_data = page;
-	rq->timeout = SD_TIMEOUT;
-
 	cmd->transfersize = len;
 	cmd->allowed = SD_MAX_RETRIES;
 
