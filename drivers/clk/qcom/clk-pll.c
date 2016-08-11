@@ -268,6 +268,7 @@ static void clk_pll_configure(struct clk_pll *pll, struct regmap *regmap,
 	val |= config->mn_ena_mask;
 	val |= config->main_output_mask;
 	val |= config->aux_output_mask;
+	val |= config->early_output_mask;
 
 	mask = config->vco_mask;
 	mask |= config->pre_div_mask;
@@ -275,6 +276,7 @@ static void clk_pll_configure(struct clk_pll *pll, struct regmap *regmap,
 	mask |= config->mn_ena_mask;
 	mask |= config->main_output_mask;
 	mask |= config->aux_output_mask;
+	mask |= config->early_output_mask;
 
 	regmap_update_bits(regmap, pll->config_reg, mask, val);
 }
