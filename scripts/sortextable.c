@@ -70,7 +70,6 @@ cleanup(void)
 {
 	if (!mmap_failed)
 		munmap(ehdr_curr, sb.st_size);
-	close(fd_map);
 }
 
 static void __attribute__((noreturn))
@@ -91,7 +90,13 @@ static void *mmap_file(char const *fname)
 	void *addr;
 
 	fd_map = open(fname, O_RDWR);
-	if (fd_map < 0 || fstat(fd_map, &sb) < 0) {
+
+	if (fd_map < 0) {
+		perror("open");
+		fail_file();
+		return MAP_FAILED;
+	}
+	if (fstat(fd_map, &sb) < 0) {
 		perror(fname);
 		fail_file();
 	}
@@ -106,6 +111,7 @@ static void *mmap_file(char const *fname)
 		fprintf(stderr, "Could not mmap file: %s\n", fname);
 		fail_file();
 	}
+	close(fd_map);
 	return addr;
 }
 
@@ -269,6 +275,9 @@ do_file(char const *const fname)
 {
 	table_sort_t custom_sort;
 	Elf32_Ehdr *ehdr = mmap_file(fname);
+
+	if (ehdr == MAP_FAILED)
+		return;
 
 	ehdr_curr = ehdr;
 	switch (ehdr->e_ident[EI_DATA]) {
