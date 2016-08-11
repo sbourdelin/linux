@@ -1205,7 +1205,7 @@ static int kbl_init_workarounds(struct intel_engine_cs *engine)
 				   GEN9_GAPS_TSV_CREDIT_DISABLE));
 
 	/* WaDisableDynamicCreditSharing:kbl */
-	if (IS_KBL_REVID(dev_priv, 0, KBL_REVID_B0))
+	if (IS_KBL_REVID(dev_priv, 0, KBL_REVID_A0))
 		WA_SET_BIT(GAMT_CHKN_BIT_REG,
 			   GAMT_CHKN_DISABLE_DYNAMIC_CREDIT_SHARING);
 
