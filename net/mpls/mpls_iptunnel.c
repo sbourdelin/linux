@@ -90,8 +90,15 @@ static int mpls_xmit(struct sk_buff *skb)
 	if (skb_cow(skb, hh_len + new_header_size))
 		goto drop;
 
+	skb_reset_mac_header(skb);
+	skb_reset_inner_headers(skb);
+	skb->encapsulation = 1;
+
 	skb_push(skb, new_header_size);
+
 	skb_reset_network_header(skb);
+	skb_reset_transport_header(skb);
+	skb_set_inner_protocol(skb, skb->protocol);
 
 	skb->dev = out_dev;
 	skb->protocol = htons(ETH_P_MPLS_UC);
