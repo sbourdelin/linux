@@ -58,6 +58,11 @@ struct posix_acl *get_cached_acl_rcu(struct inode *inode, int type)
 }
 EXPORT_SYMBOL(get_cached_acl_rcu);
 
+static bool is_uncached_acl_sentinel(struct posix_acl *acl)
+{
+	return is_uncached_acl(acl) && acl != ACL_NOT_CACHED;
+}
+
 void set_cached_acl(struct inode *inode, int type, struct posix_acl *acl)
 {
 	struct posix_acl **p = acl_by_type(inode, type);
@@ -66,6 +71,8 @@ void set_cached_acl(struct inode *inode, int type, struct posix_acl *acl)
 	old = xchg(p, posix_acl_dup(acl));
 	if (!is_uncached_acl(old))
 		posix_acl_release(old);
+	else if (is_uncached_acl_sentinel(old))
+		wake_up_all(generic_waitqueue(p));
 }
 EXPORT_SYMBOL(set_cached_acl);
 
@@ -76,6 +83,8 @@ static void __forget_cached_acl(struct posix_acl **p)
 	old = xchg(p, ACL_NOT_CACHED);
 	if (!is_uncached_acl(old))
 		posix_acl_release(old);
+	else if (is_uncached_acl_sentinel(old))
+		wake_up_all(generic_waitqueue(p));
 }
 
 void forget_cached_acl(struct inode *inode, int type)
@@ -110,7 +119,9 @@ static void __complete_get_acl(struct posix_acl **p, struct posix_acl *acl)
 	struct posix_acl *sentinel = uncached_acl_sentinel(current);
 
 	posix_acl_dup(acl);
-	if (cmpxchg(p, sentinel, acl) != sentinel)
+	if (cmpxchg(p, sentinel, acl) == sentinel)
+		wake_up_all(generic_waitqueue(p));
+	else
 		posix_acl_release(acl);
 }
 
@@ -129,7 +140,8 @@ static void __abort_get_acl(struct posix_acl **p)
 {
 	struct posix_acl *sentinel = uncached_acl_sentinel(current);
 
-	cmpxchg(p, sentinel, ACL_NOT_CACHED);
+	if (cmpxchg(p, sentinel, ACL_NOT_CACHED) == sentinel)
+		wake_up_all(generic_waitqueue(p));
 }
 
 void abort_get_acl(struct inode *inode, int type)
@@ -165,6 +177,7 @@ struct posix_acl *get_acl(struct inode *inode, int type)
 	struct posix_acl **p;
 	struct posix_acl *acl;
 
+repeat:
 	acl = get_cached_acl(inode, type);
 	if (!is_uncached_acl(acl))
 		return acl;
@@ -182,12 +195,28 @@ struct posix_acl *get_acl(struct inode *inode, int type)
 	}
 
 	p = acl_by_type(inode, type);
-	__prepare_get_acl(p);
+	if (!__prepare_get_acl(p)) {
+		wait_queue_head_t *wq = generic_waitqueue(p);
+		DEFINE_WAIT(wait);
+
+		for(;;) {
+			prepare_to_wait(wq, &wait, TASK_INTERRUPTIBLE);
+			smp_mb();
+			if (!is_uncached_acl_sentinel(*p))
+				break;
+			io_schedule();
+		}
+		finish_wait(wq, &wait);
+		if (signal_pending(current))
+			return ERR_PTR(-ERESTARTSYS);
+		goto repeat;
+	}
 
 	/*
 	 * Normally, the ACL returned by ->get_acl will be cached.
 	 * A filesystem can prevent that by calling
-	 * forget_cached_acl(inode, type) in ->get_acl.
+	 * forget_cached_acl(inode, type) in ->get_acl, preferably
+	 * early in ->get_acl to avoid serializing concurrent readers.
 	 */
 	acl = inode->i_op->get_acl(inode, type);
 
