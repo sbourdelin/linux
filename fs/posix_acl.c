@@ -91,17 +91,79 @@ void forget_all_cached_acls(struct inode *inode)
 }
 EXPORT_SYMBOL(forget_all_cached_acls);
 
+static bool __prepare_get_acl(struct posix_acl **p)
+{
+	struct posix_acl *sentinel = uncached_acl_sentinel(current);
+
+	return cmpxchg(p, ACL_NOT_CACHED, sentinel) == ACL_NOT_CACHED;
+}
+
+bool prepare_get_acl(struct inode *inode, int type)
+{
+	return __prepare_get_acl(acl_by_type(inode, type));
+}
+EXPORT_SYMBOL(prepare_get_acl);
+
+/* Only cache the ACL if our sentinel is still in place. */
+static void __complete_get_acl(struct posix_acl **p, struct posix_acl *acl)
+{
+	struct posix_acl *sentinel = uncached_acl_sentinel(current);
+
+	posix_acl_dup(acl);
+	if (cmpxchg(p, sentinel, acl) != sentinel)
+		posix_acl_release(acl);
+}
+
+void complete_get_acl(struct inode *inode, int type, struct posix_acl *acl)
+{
+	return __complete_get_acl(acl_by_type(inode, type), acl);
+}
+EXPORT_SYMBOL(complete_get_acl);
+
+/* Remove our sentinel upon failure. */
+/*
+ * Remove our sentinel so that we don't block future attempts
+ * to cache the ACL.
+ */
+static void __abort_get_acl(struct posix_acl **p)
+{
+	struct posix_acl *sentinel = uncached_acl_sentinel(current);
+
+	cmpxchg(p, sentinel, ACL_NOT_CACHED);
+}
+
+void abort_get_acl(struct inode *inode, int type)
+{
+	__abort_get_acl(acl_by_type(inode, type));
+}
+EXPORT_SYMBOL(abort_get_acl);
+
+
+/**
+ * get_acl  -  Get the ACL of an inode
+ *
+ * This function is called without holding the inode mutex, so when fetching an
+ * uncached ACL from the filesystem, we can race with other get_acl or set_acl
+ * requests.  We must make sure not to override ACLs set with set_acl in the
+ * meantime.
+ *
+ * To do that, we change ->i_acl (or ->i_default_acl) from ACL_NOT_CACHED to a
+ * sentinel value that indicates that get_acl is in progress (prepare_get_acl).
+ * For these sentinel values, is_uncached_acl(sentinel) is always true.
+ *
+ * When we get back an ACL from the filesystem, we update the cached ACL only
+ * if our sentinel value is still in place ( complete_get_acl).
+ *
+ * A competing set_acl will replace our sentinel with the new ACL, and
+ * complete_get_acl will leave that new ACL untouched.
+ *
+ * When get_acl fails, we remove our sentinel so that future attempts to cache
+ * the ACL can succeed (abort_get_acl).
+ */
 struct posix_acl *get_acl(struct inode *inode, int type)
 {
-	void *sentinel;
 	struct posix_acl **p;
 	struct posix_acl *acl;
-
-	/*
-	 * The sentinel is used to detect when another operation like
-	 * set_cached_acl() or forget_cached_acl() races with get_acl().
-	 * It is guaranteed that is_uncached_acl(sentinel) is true.
-	 */
 
 	acl = get_cached_acl(inode, type);
 	if (!is_uncached_acl(acl))
@@ -110,25 +172,7 @@ struct posix_acl *get_acl(struct inode *inode, int type)
 	if (!IS_POSIXACL(inode))
 		return NULL;
 
-	sentinel = uncached_acl_sentinel(current);
-	p = acl_by_type(inode, type);
-
 	/*
-	 * If the ACL isn't being read yet, set our sentinel.  Otherwise, the
-	 * current value of the ACL will not be ACL_NOT_CACHED and so our own
-	 * sentinel will not be set; another task will update the cache.  We
-	 * could wait for that other task to complete its job, but it's easier
-	 * to just call ->get_acl to fetch the ACL ourself.  (This is going to
-	 * be an unlikely race.)
-	 */
-	if (cmpxchg(p, ACL_NOT_CACHED, sentinel) != ACL_NOT_CACHED)
-		/* fall through */ ;
-
-	/*
-	 * Normally, the ACL returned by ->get_acl will be cached.
-	 * A filesystem can prevent that by calling
-	 * forget_cached_acl(inode, type) in ->get_acl.
-	 *
 	 * If the filesystem doesn't have a get_acl() function at all, we'll
 	 * just create the negative cache entry.
 	 */
@@ -136,23 +180,23 @@ struct posix_acl *get_acl(struct inode *inode, int type)
 		set_cached_acl(inode, type, NULL);
 		return NULL;
 	}
+
+	p = acl_by_type(inode, type);
+	__prepare_get_acl(p);
+
+	/*
+	 * Normally, the ACL returned by ->get_acl will be cached.
+	 * A filesystem can prevent that by calling
+	 * forget_cached_acl(inode, type) in ->get_acl.
+	 */
 	acl = inode->i_op->get_acl(inode, type);
 
 	if (IS_ERR(acl)) {
-		/*
-		 * Remove our sentinel so that we don't block future attempts
-		 * to cache the ACL.
-		 */
-		cmpxchg(p, sentinel, ACL_NOT_CACHED);
+		__abort_get_acl(p);
 		return acl;
 	}
 
-	/*
-	 * Cache the result, but only if our sentinel is still in place.
-	 */
-	posix_acl_dup(acl);
-	if (unlikely(cmpxchg(p, sentinel, acl) != sentinel))
-		posix_acl_release(acl);
+	__complete_get_acl(p, acl);
 	return acl;
 }
 EXPORT_SYMBOL(get_acl);
