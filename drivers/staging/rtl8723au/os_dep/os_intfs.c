@@ -283,14 +283,13 @@ static u32 rtw_classify8021d(struct sk_buff *skb)
 	 */
 	if (skb->priority >= 256 && skb->priority <= 263)
 		return skb->priority - 256;
-	switch (skb->protocol) {
-	case htons(ETH_P_IP):
+
+	if (skb->protocol == htons(ETH_P_IP)) {
 		dscp = ip_hdr(skb)->tos & 0xfc;
-		break;
-	default:
-		return 0;
+		return dscp >> 5;
 	}
-	return dscp >> 5;
+
+	return 0;
 }
 
 static u16 rtw_select_queue(struct net_device *dev, struct sk_buff *skb,
