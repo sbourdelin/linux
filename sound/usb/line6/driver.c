@@ -14,9 +14,11 @@
 #include <linux/export.h>
 #include <linux/slab.h>
 #include <linux/usb.h>
+#include <linux/circ_buf.h>
 
 #include <sound/core.h>
 #include <sound/initval.h>
+#include <sound/hwdep.h>
 
 #include "capture.h"
 #include "driver.h"
@@ -315,8 +317,11 @@ static void line6_data_received(struct urb *urb)
 				line6->process_message(line6);
 		}
 	} else {
+		line6->buffer_message = urb->transfer_buffer;
+		line6->message_length = urb->actual_length;
 		if (line6->process_message)
 			line6->process_message(line6);
+		line6->buffer_message = NULL;
 	}
 
 	line6_start_listen(line6);
@@ -522,6 +527,163 @@ static void line6_get_interval(struct usb_line6 *line6)
 	}
 }
 
+
+/* Enable buffering of incoming messages, flush the buffer */
+static int line6_hwdep_open(struct snd_hwdep *hw, struct file *file)
+{
+	struct usb_line6 *line6 = hw->private_data;
+
+	/* NOTE: hwdep already provides atomicity (exclusive == true), but for
+	 * sure... */
+	if (test_and_set_bit(0, &line6->buffer_circular.active))
+		return -EBUSY;
+
+	line6->buffer_circular.head = 0;
+	line6->buffer_circular.tail = 0;
+	sema_init(&line6->buffer_circular.sem, 0);
+
+	line6->buffer_circular.active = 1;
+
+	line6->buffer_circular.data =
+		kmalloc(LINE6_MESSAGE_MAXLEN * LINE6_MESSAGE_MAXCOUNT, GFP_KERNEL);
+	if (!line6->buffer_circular.data) {
+		return -ENOMEM;
+	}
+	line6->buffer_circular.data_len =
+		kmalloc(sizeof(*line6->buffer_circular.data_len) *
+			LINE6_MESSAGE_MAXCOUNT, GFP_KERNEL);
+	if (!line6->buffer_circular.data_len) {
+		kfree(line6->buffer_circular.data);
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+/* Stop buffering */
+static int line6_hwdep_release(struct snd_hwdep *hw, struct file *file)
+{
+	struct usb_line6 *line6 = hw->private_data;
+
+	/* By this time, no readers are waiting, we can safely recreate the
+	 * semaphore at next open. */
+	line6->buffer_circular.active = 0;
+
+	kfree(line6->buffer_circular.data);
+	kfree(line6->buffer_circular.data_len);
+	return 0;
+}
+
+/* Read from circular buffer, return to user */
+static long
+line6_hwdep_read(struct snd_hwdep *hwdep, char __user *buf, long count,
+					loff_t *offset)
+{
+	struct usb_line6 *line6 = hwdep->private_data;
+	unsigned long tail;
+
+	if (down_interruptible(&line6->buffer_circular.sem)) {
+		return -ERESTARTSYS;
+	}
+	/* There must an item now in the buffer... */
+
+	tail = line6->buffer_circular.tail;
+
+	if (line6->buffer_circular.data_len[tail] > count) {
+		/* Buffer too small; allow re-read of the current item... */
+		up(&line6->buffer_circular.sem);
+		return -EINVAL;
+	}
+
+	if (copy_to_user(buf,
+		&line6->buffer_circular.data[tail * LINE6_MESSAGE_MAXLEN],
+		line6->buffer_circular.data_len[tail])
+	) {
+		rv = -EFAULT;
+		goto end;
+	} else {
+		rv = line6->buffer_circular.data_len[tail];
+	}
+
+	smp_store_release(&line6->buffer_circular.tail,
+				(tail + 1) & (LINE6_MESSAGE_MAXCOUNT - 1));
+
+	return 0;
+}
+
+/* Write directly (no buffering) to device by user*/
+static long
+line6_hwdep_write(struct snd_hwdep *hwdep, const char __user *data, long count,
+					loff_t *offset)
+{
+	struct usb_line6 *line6 = hwdep->private_data;
+	int rv;
+	char *data_copy;
+
+	data_copy = kmalloc(count, GFP_ATOMIC);
+	if (!data_copy)
+		return -ENOMEM;
+
+	if (copy_from_user(data_copy, data, count))
+		rv = -EFAULT;
+	else
+		rv = line6_send_raw_message(line6, data_copy, count);
+
+	kfree(data_copy);
+	return rv;
+}
+
+static const struct snd_hwdep_ops hwdep_ops = {
+	.open    = line6_hwdep_open,
+	.release = line6_hwdep_release,
+	.read    = line6_hwdep_read,
+	.write   = line6_hwdep_write,
+};
+
+/* Insert into circular buffer */
+static void line6_hwdep_push_message(struct usb_line6 *line6)
+{
+	unsigned long head = line6->buffer_circular.head;
+	/* The spin_unlock() and next spin_lock() provide needed ordering. */
+	unsigned long tail = ACCESS_ONCE(line6->buffer_circular.tail);
+
+	if (!line6->buffer_circular.active)
+		return;
+
+	if (CIRC_SPACE(head, tail, LINE6_MESSAGE_MAXCOUNT) >= 1) {
+		unsigned char *item = &line6->buffer_circular.data[
+			head * LINE6_MESSAGE_MAXLEN];
+		memcpy(item, line6->buffer_message, line6->message_length);
+		line6->buffer_circular.data_len[head] = line6->message_length;
+
+		smp_store_release(&line6->buffer_circular.head,
+				  (head + 1) & (LINE6_MESSAGE_MAXCOUNT - 1));
+		up(&line6->buffer_circular.sem);
+	}
+}
+
+static int line6_hwdep_init(struct usb_line6 *line6)
+{
+	int err;
+	struct snd_hwdep *hwdep;
+
+	/* TODO: usb_driver_claim_interface(); */
+	line6->process_message = line6_hwdep_push_message;
+
+	line6->buffer_circular.active = 0;
+	err = snd_hwdep_new(line6->card, "config", 0, &hwdep);
+	if (err < 0)
+		goto end;
+	strcpy(hwdep->name, "config");
+	hwdep->iface = SNDRV_HWDEP_IFACE_LINE6;
+	hwdep->ops = hwdep_ops;
+	hwdep->private_data = line6;
+	hwdep->exclusive = true;
+
+end:
+	return err;
+}
+
 static int line6_init_cap_control(struct usb_line6 *line6)
 {
 	int ret;
@@ -539,6 +701,10 @@ static int line6_init_cap_control(struct usb_line6 *line6)
 		line6->buffer_message = kmalloc(LINE6_MESSAGE_MAXLEN, GFP_KERNEL);
 		if (!line6->buffer_message)
 			return -ENOMEM;
+	} else {
+		ret = line6_hwdep_init(line6);
+		if (ret < 0)
+			return ret;
 	}
 
 	ret = line6_start_listen(line6);
@@ -716,3 +882,4 @@ EXPORT_SYMBOL_GPL(line6_resume);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
+

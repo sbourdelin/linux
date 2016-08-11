@@ -33,6 +33,8 @@
 #define LINE6_TIMEOUT (1)
 #define LINE6_BUFSIZE_LISTEN (64)
 #define LINE6_MESSAGE_MAXLEN (256)
+/* Must be 2^n; 4k packets are common, MAXLEN * MAXCOUNT should be bigger... */
+#define LINE6_MESSAGE_MAXCOUNT (1 << 5)
 
 /*
 	Line 6 MIDI control commands
@@ -154,6 +156,16 @@ struct usb_line6 {
 
 	/* Length of message to be processed, generated from MIDI layer  */
 	int message_length;
+
+	/* Circular buffer for non-MIDI control messages */
+	struct {
+		int active;
+		char *data;
+		int *data_len;
+		unsigned long head, tail;
+		/* Actually is up'd # of items in the buffer - times */
+		struct semaphore sem;
+	} buffer_circular;
 
 	/* If MIDI is supported, buffer_message contains the pre-processed data;
 	 * otherwise the data is only in urb_listen (buffer_incoming). */
