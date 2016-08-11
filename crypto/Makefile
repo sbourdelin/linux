@@ -123,7 +123,12 @@ obj-$(CONFIG_CRYPTO_JITTERENTROPY) += jitterentropy_rng.o
 CFLAGS_jitterentropy.o = -O0
 jitterentropy_rng-y := jitterentropy.o jitterentropy-kcapi.o
 obj-$(CONFIG_CRYPTO_LRNG) += lrng.o
-lrng-y += lrng_base.o lrng_kcapi.o
+lrng-y += lrng_base.o
+ifeq ($(CONFIG_CRYPTO_DRBG),y)
+lrng-y += lrng_kcapi.o
+else
+lrng-y += lrng_standalone.o
+endif
 obj-$(CONFIG_CRYPTO_TEST) += tcrypt.o
 obj-$(CONFIG_CRYPTO_GHASH) += ghash-generic.o
 obj-$(CONFIG_CRYPTO_USER_API) += af_alg.o
