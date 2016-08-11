@@ -208,7 +208,7 @@ void enable_kernel_fp(void)
 EXPORT_SYMBOL(enable_kernel_fp);
 
 static int restore_fp(struct task_struct *tsk) {
-	if (tsk->thread.load_fp) {
+	if (tsk->thread.load_fp || MSR_TM_ACTIVE(tsk->thread.regs->msr)) {
 		load_fp_state(&current->thread.fp_state);
 		current->thread.load_fp++;
 		return 1;
@@ -278,7 +278,8 @@ EXPORT_SYMBOL_GPL(flush_altivec_to_thread);
 
 static int restore_altivec(struct task_struct *tsk)
 {
-	if (cpu_has_feature(CPU_FTR_ALTIVEC) && tsk->thread.load_vec) {
+	if (cpu_has_feature(CPU_FTR_ALTIVEC) &&
+		(tsk->thread.load_vec || MSR_TM_ACTIVE(tsk->thread.regs->msr))) {
 		load_vr_state(&tsk->thread.vr_state);
 		tsk->thread.used_vr = 1;
 		tsk->thread.load_vec++;
@@ -464,7 +465,8 @@ void restore_math(struct pt_regs *regs)
 {
 	unsigned long msr;
 
-	if (!current->thread.load_fp && !loadvec(current->thread))
+	if (!MSR_TM_ACTIVE(regs->msr) &&
+		!current->thread.load_fp && !loadvec(current->thread))
 		return;
 
 	msr = regs->msr;
