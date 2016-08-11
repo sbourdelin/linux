@@ -113,6 +113,11 @@ static int wait_for_pll_offline(struct clk_alpha_pll *pll, u32 mask)
 #define PLL_OFFLINE_ACK		BIT(28)
 #define PLL_ACTIVE_FLAG		BIT(30)
 
+/* alpha pll with dynamic update support */
+#define PLL_UPDATE		BIT(22)
+#define PLL_HW_LOGIC_BYPASS	BIT(23)
+#define PLL_ACK_LATCH		BIT(29)
+
 void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 			     const struct alpha_pll_config *config)
 {
@@ -138,6 +143,37 @@ void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 	if (pll->flags & SUPPORTS_VOTE_FSM)
 		qcom_pll_set_fsm_mode(regmap, pll->offset + PLL_MODE, 6, 0);
 
+	if (pll->flags & SUPPORTS_DYNAMIC_UPDATE)
+		regmap_update_bits(regmap, pll->offset + PLL_MODE,
+				   PLL_HW_LOGIC_BYPASS,
+				   PLL_HW_LOGIC_BYPASS);
+}
+
+static int clk_alpha_pll_dynamic_update(struct clk_alpha_pll *pll)
+{
+	u32 val;
+
+	/* Latch the input to the PLL */
+	regmap_update_bits(pll->clkr.regmap, pll->offset + PLL_MODE,
+			   PLL_UPDATE, PLL_UPDATE);
+
+	/* Wait for 2 reference cycle before checking ACK bit */
+	udelay(1);
+
+	regmap_read(pll->clkr.regmap, pll->offset + PLL_MODE, &val);
+	if (!(val & PLL_ACK_LATCH)) {
+		WARN(1, "PLL latch failed. Output may be unstable!\n");
+		return -EINVAL;
+	}
+
+	/* Return latch input to 0 */
+	regmap_update_bits(pll->clkr.regmap, pll->offset + PLL_MODE,
+			   PLL_UPDATE, 0);
+
+	/* Wait for PLL output to stabilize */
+	udelay(100);
+
+	return 0;
 }
 
 static int clk_alpha_pll_hwfsm_enable(struct clk_hw *hw)
@@ -366,6 +402,7 @@ clk_alpha_pll_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
 static int clk_alpha_pll_set_rate(struct clk_hw *hw, unsigned long rate,
 				  unsigned long prate)
 {
+	int enabled;
 	struct clk_alpha_pll *pll = to_clk_alpha_pll(hw);
 	const struct pll_vco *vco;
 	u32 l, off = pll->offset;
@@ -377,6 +414,11 @@ static int clk_alpha_pll_set_rate(struct clk_hw *hw, unsigned long rate,
 		pr_err("alpha pll not in a valid vco range\n");
 		return -EINVAL;
 	}
+
+	enabled = hw->init->ops->is_enabled(hw);
+
+	if (!(pll->flags & SUPPORTS_DYNAMIC_UPDATE) && enabled)
+		hw->init->ops->disable(hw);
 
 	a <<= (ALPHA_REG_BITWIDTH - ALPHA_BITWIDTH);
 
@@ -390,6 +432,12 @@ static int clk_alpha_pll_set_rate(struct clk_hw *hw, unsigned long rate,
 
 	regmap_update_bits(pll->clkr.regmap, off + PLL_USER_CTL, PLL_ALPHA_EN,
 			   PLL_ALPHA_EN);
+
+	if (!(pll->flags & SUPPORTS_DYNAMIC_UPDATE) && enabled)
+		hw->init->ops->enable(hw);
+
+	if (pll->flags & SUPPORTS_DYNAMIC_UPDATE)
+		clk_alpha_pll_dynamic_update(pll);
 
 	return 0;
 }

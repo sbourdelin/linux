@@ -36,6 +36,7 @@ struct clk_alpha_pll {
 	size_t num_vco;
 
 #define SUPPORTS_VOTE_FSM	BIT(0)
+#define SUPPORTS_DYNAMIC_UPDATE	BIT(1)
 	u8 flags;
 	struct clk_regmap clkr;
 };
