@@ -384,7 +384,7 @@ static int gpr_set(struct task_struct *target, const struct user_regset *regset,
 
 /*
  * Regardless of transactions, 'fp_state' holds the current running
- * value of all FPR registers and 'transact_fp' holds the last checkpointed
+ * value of all FPR registers and 'ckfp_state' holds the last checkpointed
  * value of all FPR registers for the current transaction.
  *
  * Userspace interface buffer layout:
@@ -422,7 +422,7 @@ static int fpr_get(struct task_struct *target, const struct user_regset *regset,
 
 /*
  * Regardless of transactions, 'fp_state' holds the current running
- * value of all FPR registers and 'transact_fp' holds the last checkpointed
+ * value of all FPR registers and 'ckfp_state' holds the last checkpointed
  * value of all FPR registers for the current transaction.
  *
  * Userspace interface buffer layout:
@@ -486,7 +486,7 @@ static int vr_active(struct task_struct *target,
 
 /*
  * Regardless of transactions, 'vr_state' holds the current running
- * value of all the VMX registers and 'transact_vr' holds the last
+ * value of all the VMX registers and 'ckvr_state' holds the last
  * checkpointed value of all the VMX registers for the current
  * transaction to fall back on in case it aborts.
  *
@@ -533,7 +533,7 @@ static int vr_get(struct task_struct *target, const struct user_regset *regset,
 
 /*
  * Regardless of transactions, 'vr_state' holds the current running
- * value of all the VMX registers and 'transact_vr' holds the last
+ * value of all the VMX registers and 'ckvr_state' holds the last
  * checkpointed value of all the VMX registers for the current
  * transaction to fall back on in case it aborts.
  *
@@ -597,7 +597,7 @@ static int vsr_active(struct task_struct *target,
 
 /*
  * Regardless of transactions, 'fp_state' holds the current running
- * value of all FPR registers and 'transact_fp' holds the last
+ * value of all FPR registers and 'ckfp_state' holds the last
  * checkpointed value of all FPR registers for the current
  * transaction.
  *
@@ -630,7 +630,7 @@ static int vsr_get(struct task_struct *target, const struct user_regset *regset,
 
 /*
  * Regardless of transactions, 'fp_state' holds the current running
- * value of all FPR registers and 'transact_fp' holds the last
+ * value of all FPR registers and 'ckfp_state' holds the last
  * checkpointed value of all FPR registers for the current
  * transaction.
  *
@@ -925,7 +925,7 @@ static int tm_cfpr_active(struct task_struct *target,
  *
  * This function gets in transaction checkpointed FPR registers.
  *
- * When the transaction is active 'transact_fp' holds the checkpointed
+ * When the transaction is active 'ckfp_state' holds the checkpointed
  * values for the current transaction to fall back on if it aborts
  * in between. This function gets those checkpointed FPR registers.
  * The userspace interface buffer layout is as follows.
@@ -955,8 +955,8 @@ static int tm_cfpr_get(struct task_struct *target,
 
 	/* copy to local buffer then write that out */
 	for (i = 0; i < 32 ; i++)
-		buf[i] = target->thread.TS_TRANS_FPR(i);
-	buf[32] = target->thread.transact_fp.fpscr;
+		buf[i] = target->thread.TS_CKFPR(i);
+	buf[32] = target->thread.ckfp_state.fpscr;
 	return user_regset_copyout(&pos, &count, &kbuf, &ubuf, buf, 0, -1);
 }
 
@@ -971,7 +971,7 @@ static int tm_cfpr_get(struct task_struct *target,
  *
  * This function sets in transaction checkpointed FPR registers.
  *
- * When the transaction is active 'transact_fp' holds the checkpointed
+ * When the transaction is active 'ckfp_state' holds the checkpointed
  * FPR register values for the current transaction to fall back on
  * if it aborts in between. This function sets these checkpointed
  * FPR registers. The userspace interface buffer layout is as follows.
@@ -1004,8 +1004,8 @@ static int tm_cfpr_set(struct task_struct *target,
 	if (i)
 		return i;
 	for (i = 0; i < 32 ; i++)
-		target->thread.TS_TRANS_FPR(i) = buf[i];
-	target->thread.transact_fp.fpscr = buf[32];
+		target->thread.TS_CKFPR(i) = buf[i];
+	target->thread.ckfp_state.fpscr = buf[32];
 	return 0;
 }
 
@@ -1040,7 +1040,7 @@ static int tm_cvmx_active(struct task_struct *target,
  *
  * This function gets in transaction checkpointed VMX registers.
  *
- * When the transaction is active 'transact_vr' and 'transact_vrsave' hold
+ * When the transaction is active 'ckvr_state' and 'ckvrsave' hold
  * the checkpointed values for the current transaction to fall
  * back on if it aborts in between. The userspace interface buffer
  * layout is as follows.
@@ -1072,7 +1072,7 @@ static int tm_cvmx_get(struct task_struct *target,
 	flush_altivec_to_thread(target);
 
 	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf,
-					&target->thread.transact_vr, 0,
+					&target->thread.ckvr_state, 0,
 					33 * sizeof(vector128));
 	if (!ret) {
 		/*
@@ -1083,7 +1083,7 @@ static int tm_cvmx_get(struct task_struct *target,
 			u32 word;
 		} vrsave;
 		memset(&vrsave, 0, sizeof(vrsave));
-		vrsave.word = target->thread.transact_vrsave;
+		vrsave.word = target->thread.ckvrsave;
 		ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf, &vrsave,
 						33 * sizeof(vector128), -1);
 	}
@@ -1102,7 +1102,7 @@ static int tm_cvmx_get(struct task_struct *target,
  *
  * This function sets in transaction checkpointed VMX registers.
  *
- * When the transaction is active 'transact_vr' and 'transact_vrsave' hold
+ * When the transaction is active 'ckvr_state' and 'ckvrsave' hold
  * the checkpointed values for the current transaction to fall
  * back on if it aborts in between. The userspace interface buffer
  * layout is as follows.
@@ -1133,7 +1133,7 @@ static int tm_cvmx_set(struct task_struct *target,
 	flush_altivec_to_thread(target);
 
 	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
-					&target->thread.transact_vr, 0,
+					&target->thread.ckvr_state, 0,
 					33 * sizeof(vector128));
 	if (!ret && count > 0) {
 		/*
@@ -1144,11 +1144,11 @@ static int tm_cvmx_set(struct task_struct *target,
 			u32 word;
 		} vrsave;
 		memset(&vrsave, 0, sizeof(vrsave));
-		vrsave.word = target->thread.transact_vrsave;
+		vrsave.word = target->thread.ckvrsave;
 		ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, &vrsave,
 						33 * sizeof(vector128), -1);
 		if (!ret)
-			target->thread.transact_vrsave = vrsave.word;
+			target->thread.ckvrsave = vrsave.word;
 	}
 
 	return ret;
@@ -1186,7 +1186,7 @@ static int tm_cvsx_active(struct task_struct *target,
  *
  * This function gets in transaction checkpointed VSX registers.
  *
- * When the transaction is active 'transact_fp' holds the checkpointed
+ * When the transaction is active 'ckfp_state' holds the checkpointed
  * values for the current transaction to fall back on if it aborts
  * in between. This function gets those checkpointed VSX registers.
  * The userspace interface buffer layout is as follows.
@@ -1216,7 +1216,7 @@ static int tm_cvsx_get(struct task_struct *target,
 	flush_vsx_to_thread(target);
 
 	for (i = 0; i < 32 ; i++)
-		buf[i] = target->thread.transact_fp.fpr[i][TS_VSRLOWOFFSET];
+		buf[i] = target->thread.ckfp_state.fpr[i][TS_VSRLOWOFFSET];
 	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf,
 				  buf, 0, 32 * sizeof(double));
 
@@ -1234,7 +1234,7 @@ static int tm_cvsx_get(struct task_struct *target,
  *
  * This function sets in transaction checkpointed VSX registers.
  *
- * When the transaction is active 'transact_fp' holds the checkpointed
+ * When the transaction is active 'ckfp_state' holds the checkpointed
  * VSX register values for the current transaction to fall back on
  * if it aborts in between. This function sets these checkpointed
  * FPR registers. The userspace interface buffer layout is as follows.
@@ -1267,7 +1267,7 @@ static int tm_cvsx_set(struct task_struct *target,
 				 buf, 0, 32 * sizeof(double));
 	if (!ret)
 		for (i = 0; i < 32 ; i++)
-			target->thread.transact_fp.fpr[i][TS_VSRLOWOFFSET] = buf[i];
+			target->thread.ckfp_state.fpr[i][TS_VSRLOWOFFSET] = buf[i];
 
 	return ret;
 }
