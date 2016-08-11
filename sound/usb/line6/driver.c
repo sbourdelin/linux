@@ -479,13 +479,14 @@ static void line6_destruct(struct snd_card *card)
 	struct usb_device *usbdev = line6->usbdev;
 
 	/* free buffer memory first: */
-	if (line6->properties->capabilities & LINE6_CAP_CONTROL_MIDI)
+	if (line6->buffer_message)
 		kfree(line6->buffer_message);
 
 	kfree(line6->buffer_listen);
 
 	/* then free URBs: */
 	usb_free_urb(line6->urb_listen);
+	line6->urb_listen = NULL;
 
 	/* decrement reference counters: */
 	usb_put_dev(usbdev);
