@@ -244,7 +244,7 @@ befs_bt_read_node(struct super_block *sb, const befs_data_stream *ds,
  *   Read the superblock and rootnode of the b+tree.
  *   Drill down through the interior nodes using befs_find_key().
  *   Once at the correct leaf node, use befs_find_key() again to get the
- *   actuall value stored with the key.
+ *   actual value stored with the key.
  */
 int
 befs_btree_find(struct super_block *sb, const befs_data_stream *ds,
@@ -405,7 +405,7 @@ befs_find_key(struct super_block *sb, struct befs_btree_node *node,
  * @keysize: Length of the returned key
  * @value: Value stored with the returned key
  *
- * Heres how it works: Key_no is the index of the key/value pair to 
+ * Here's how it works: Key_no is the index of the key/value pair to
  * return in keybuf/value.
  * Bufsize is the size of keybuf (BEFS_NAME_LEN+1 is a good size). Keysize is 
  * the number of characters in the key (just a convenience).
@@ -540,7 +540,6 @@ befs_btree_read(struct super_block *sb, const befs_data_stream *ds,
  * @this_node: Buffer to return the leafnode in
  * @node_off: Pointer to offset of current node within datastream. Modified
  * 		by the function.
- *
  *
  * Helper function for btree traverse. Moves the current position to the 
  * start of the first leaf node.
@@ -715,7 +714,7 @@ befs_bt_get_key(struct super_block *sb, struct befs_btree_node *node,
  *
  * Returns 0 if @key1 and @key2 are equal.
  * Returns >0 if @key1 is greater.
- * Returns <0 if @key2 is greater..
+ * Returns <0 if @key2 is greater.
  */
 static int
 befs_compare_strings(const void *key1, int keylen1,
