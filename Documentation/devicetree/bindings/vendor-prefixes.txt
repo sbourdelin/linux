@@ -256,6 +256,7 @@ ste	ST-Ericsson
 stericsson	ST-Ericsson
 syna	Synaptics Inc.
 synology	Synology, Inc.
+sunchip	Shenzhen Sunchip Technology Co., Ltd
 SUNW	Sun Microsystems, Inc
 tbs	TBS Technologies
 tcg	Trusted Computing Group
