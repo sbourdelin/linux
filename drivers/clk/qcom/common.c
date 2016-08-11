@@ -25,6 +25,14 @@
 #include "reset.h"
 #include "gdsc.h"
 
+#define PLL_LOCK_COUNT_SHIFT	8
+#define PLL_LOCK_COUNT_MASK	0x3f
+#define PLL_BIAS_COUNT_SHIFT	14
+#define PLL_BIAS_COUNT_MASK	0x3f
+#define PLL_VOTE_FSM_ENA	BIT(20)
+#define PLL_DYN_FSM_ENA		BIT(20)
+#define PLL_VOTE_FSM_RESET	BIT(21)
+
 struct qcom_cc {
 	struct qcom_reset_controller reset;
 	struct clk_onecell_data data;
@@ -73,6 +81,27 @@ qcom_cc_map(struct platform_device *pdev, const struct qcom_cc_desc *desc)
 	return devm_regmap_init_mmio(dev, base, desc->config);
 }
 EXPORT_SYMBOL_GPL(qcom_cc_map);
+
+void
+qcom_pll_set_fsm_mode(struct regmap *map, u32 reg, u8 bias_count, u8 lock_count)
+{
+	u32 val;
+	u32 mask;
+
+	/* De-assert reset to FSM */
+	regmap_update_bits(map, reg, PLL_VOTE_FSM_RESET, 0);
+
+	/* Program bias count and lock count */
+	val = bias_count << PLL_BIAS_COUNT_SHIFT |
+		lock_count << PLL_LOCK_COUNT_SHIFT;
+	mask = PLL_BIAS_COUNT_MASK << PLL_BIAS_COUNT_SHIFT;
+	mask |= PLL_LOCK_COUNT_MASK << PLL_LOCK_COUNT_SHIFT;
+	regmap_update_bits(map, reg, mask, val);
+
+	/* Enable PLL FSM voting */
+	regmap_update_bits(map, reg, PLL_VOTE_FSM_ENA, PLL_VOTE_FSM_ENA);
+}
+EXPORT_SYMBOL_GPL(qcom_pll_set_fsm_mode);
 
 static void qcom_cc_del_clk_provider(void *data)
 {
