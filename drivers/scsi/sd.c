@@ -452,6 +452,8 @@ max_write_same_blocks_store(struct device *dev, struct device_attribute *attr,
 {
 	struct scsi_disk *sdkp = to_scsi_disk(dev);
 	struct scsi_device *sdp = sdkp->device;
+	unsigned int logical_block_size = sdp->sector_size;
+	unsigned int max_ws16_blocks = SD_MAX_WS16_BLOCKS / logical_block_size;
 	unsigned long max;
 	int err;
 
@@ -468,7 +470,7 @@ max_write_same_blocks_store(struct device *dev, struct device_attribute *attr,
 
 	if (max == 0)
 		sdp->no_write_same = 1;
-	else if (max <= SD_MAX_WS16_BLOCKS) {
+	else if (max <= max_ws16_blocks) {
 		sdp->no_write_same = 0;
 		sdkp->max_ws_blocks = max;
 	}
@@ -635,6 +637,7 @@ static void sd_config_discard(struct scsi_disk *sdkp, unsigned int mode)
 {
 	struct request_queue *q = sdkp->disk->queue;
 	unsigned int logical_block_size = sdkp->device->sector_size;
+	unsigned int max_ws16_blocks = SD_MAX_WS16_BLOCKS / logical_block_size;
 	unsigned int max_blocks = 0;
 
 	q->limits.discard_zeroes_data = 0;
@@ -668,12 +671,12 @@ static void sd_config_discard(struct scsi_disk *sdkp, unsigned int mode)
 
 	case SD_LBP_UNMAP:
 		max_blocks = min_not_zero(sdkp->max_unmap_blocks,
-					  (u32)SD_MAX_WS16_BLOCKS);
+					  (u32)max_ws16_blocks);
 		break;
 
 	case SD_LBP_WS16:
 		max_blocks = min_not_zero(sdkp->max_ws_blocks,
-					  (u32)SD_MAX_WS16_BLOCKS);
+					  (u32)max_ws16_blocks);
 		q->limits.discard_zeroes_data = sdkp->lbprz;
 		break;
 
@@ -793,6 +796,7 @@ static void sd_config_write_same(struct scsi_disk *sdkp)
 {
 	struct request_queue *q = sdkp->disk->queue;
 	unsigned int logical_block_size = sdkp->device->sector_size;
+	unsigned int max_ws16_blocks = SD_MAX_WS16_BLOCKS / logical_block_size;
 
 	if (sdkp->device->no_write_same) {
 		sdkp->max_ws_blocks = 0;
@@ -806,7 +810,7 @@ static void sd_config_write_same(struct scsi_disk *sdkp)
 	 */
 	if (sdkp->max_ws_blocks > SD_MAX_WS10_BLOCKS)
 		sdkp->max_ws_blocks = min_not_zero(sdkp->max_ws_blocks,
-						   (u32)SD_MAX_WS16_BLOCKS);
+						   (u32)max_ws16_blocks);
 	else if (sdkp->ws16 || sdkp->ws10 || sdkp->device->no_report_opcodes)
 		sdkp->max_ws_blocks = min_not_zero(sdkp->max_ws_blocks,
 						   (u32)SD_MAX_WS10_BLOCKS);

@@ -47,7 +47,7 @@ enum {
 	SD_DEF_XFER_BLOCKS = 0xffff,
 	SD_MAX_XFER_BLOCKS = 0xffffffff,
 	SD_MAX_WS10_BLOCKS = 0xffff,
-	SD_MAX_WS16_BLOCKS = 0x7fffff,
+	SD_MAX_WS16_BLOCKS = 0xffffffff,
 };
 
 enum {
