@@ -18,39 +18,45 @@
 
 #include "midi.h"
 
-#define USB_INTERVALS_PER_SECOND 1000
+/* USB 1.1 speed configuration */
+#define USB_LOW_INTERVALS_PER_SECOND (1000)
+#define USB_LOW_ISO_BUFFERS (2)
+
+/* USB 2.0+ speed configuration */
+#define USB_HIGH_INTERVALS_PER_SECOND (8000)
+#define USB_HIGH_ISO_BUFFERS (16)
 
 /* Fallback USB interval and max packet size values */
-#define LINE6_FALLBACK_INTERVAL 10
-#define LINE6_FALLBACK_MAXPACKETSIZE 16
+#define LINE6_FALLBACK_INTERVAL (10)
+#define LINE6_FALLBACK_MAXPACKETSIZE (16)
 
-#define LINE6_TIMEOUT 1
-#define LINE6_BUFSIZE_LISTEN 32
-#define LINE6_MESSAGE_MAXLEN 256
+#define LINE6_TIMEOUT (1)
+#define LINE6_BUFSIZE_LISTEN (64)
+#define LINE6_MESSAGE_MAXLEN (256)
 
 /*
 	Line 6 MIDI control commands
 */
-#define LINE6_PARAM_CHANGE   0xb0
-#define LINE6_PROGRAM_CHANGE 0xc0
-#define LINE6_SYSEX_BEGIN    0xf0
-#define LINE6_SYSEX_END      0xf7
-#define LINE6_RESET          0xff
+#define LINE6_PARAM_CHANGE   (0xb0)
+#define LINE6_PROGRAM_CHANGE (0xc0)
+#define LINE6_SYSEX_BEGIN    (0xf0)
+#define LINE6_SYSEX_END      (0xf7)
+#define LINE6_RESET          (0xff)
 
 /*
 	MIDI channel for messages initiated by the host
 	(and eventually echoed back by the device)
 */
-#define LINE6_CHANNEL_HOST   0x00
+#define LINE6_CHANNEL_HOST   (0x00)
 
 /*
 	MIDI channel for messages initiated by the device
 */
-#define LINE6_CHANNEL_DEVICE 0x02
+#define LINE6_CHANNEL_DEVICE (0x02)
 
-#define LINE6_CHANNEL_UNKNOWN 5	/* don't know yet what this is good for */
+#define LINE6_CHANNEL_UNKNOWN (5)	/* don't know yet what this is good for */
 
-#define LINE6_CHANNEL_MASK 0x0f
+#define LINE6_CHANNEL_MASK (0x0f)
 
 #define CHECK_STARTUP_PROGRESS(x, n)	\
 do {					\
@@ -109,8 +115,12 @@ struct usb_line6 {
 	/* Properties */
 	const struct line6_properties *properties;
 
-	/* Interval (ms) */
+	/* Interval (frames) */
 	int interval;
+	int intervals_per_second;
+
+	/* Number of isochronous URBs used for frame transfers */
+	int iso_buffers;
 
 	/* Maximum size of USB packet */
 	int max_packet_size;
