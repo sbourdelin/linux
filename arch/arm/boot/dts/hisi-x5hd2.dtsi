@@ -413,6 +413,7 @@
 				compatible = "hisilicon,hix5hd2-clock";
 				reg = <0 0x2000>;
 				#clock-cells = <1>;
+				#reset-cells = <2>;
 			};
 		};
 
@@ -436,18 +437,24 @@
 		};
 
 		gmac0: ethernet@1840000 {
-			compatible = "hisilicon,hix5hd2-gmac";
+			compatible = "hisilicon,hix5hd2-gemac", "hisilicon,hisi-gemac-v1";
 			reg = <0x1840000 0x1000>,<0x184300c 0x4>;
 			interrupts = <0 71 4>;
-			clocks = <&clock HIX5HD2_MAC0_CLK>;
+			clocks = <&clock HIX5HD2_MAC0_CLK>, <&clock HIX5HD2_MAC_IFC0_CLK>;
+			clock-names = "mac_core", "mac_ifc";
+			resets = <&clock 0xcc 8>, <&clock 0xcc 10>, <&clock 0x120 4>;
+			reset-names = "mac_core", "mac_ifc", "phy";
 			status = "disabled";
 		};
 
 		gmac1: ethernet@1841000 {
-			compatible = "hisilicon,hix5hd2-gmac";
+			compatible = "hisilicon,hix5hd2-gemac", "hisilicon,hisi-gemac-v1";
 			reg = <0x1841000 0x1000>,<0x1843010 0x4>;
 			interrupts = <0 72 4>;
-			clocks = <&clock HIX5HD2_MAC1_CLK>;
+			clocks = <&clock HIX5HD2_MAC1_CLK>, <&clock HIX5HD2_MAC_IFC1_CLK>;
+			clock-names = "mac_core", "mac_ifc";
+			resets = <&clock 0xcc 9>, <&clock 0xcc 11>, <&clock 0x168 2>;
+			reset-names = "mac_core", "mac_ifc", "phy";
 			status = "disabled";
 		};
 

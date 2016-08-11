@@ -57,6 +57,7 @@
 	#size-cells = <0>;
 	phy-handle = <&phy2>;
 	phy-mode = "mii";
+	hisilicon,phy-reset-delays-us = <1000 1000 20000>;
 	/* Placeholder, overwritten by bootloader */
 	mac-address = [00 00 00 00 00 00];
 	status = "okay";
@@ -71,6 +72,7 @@
 	#size-cells = <0>;
 	phy-handle = <&phy1>;
 	phy-mode = "rgmii";
+	hisilicon,phy-reset-delays-us = <10000 10000 30000>;
 	/* Placeholder, overwritten by bootloader */
 	mac-address = [00 00 00 00 00 00];
 	status = "okay";
