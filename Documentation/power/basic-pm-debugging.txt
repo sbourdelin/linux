@@ -36,6 +36,13 @@ button to make the system resume).
 If neither "platform" nor "shutdown" hibernation mode works, you will need to
 identify what goes wrong.
 
+Besides, if all the modes described above work, "test_resume" mode can be used to
+verify if the snapshot data written to swap device can be successfully restored
+to memory:
+# echo test_resume > /sys/power/disk
+# echo disk > /sys/power/state
+If everything goes well, the system will resume back without BIOSes involved in.
+
 a) Test modes of hibernation
 
 To find out why hibernation fails on your system, you can use a special testing
