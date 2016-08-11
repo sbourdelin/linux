@@ -120,6 +120,7 @@
 #include <linux/mroute.h>
 #endif
 #include <net/l3mdev.h>
+#include <net/net_cgroup.h>
 
 
 /* The inetsw table contains everything that inet_create needs to
@@ -497,6 +498,13 @@ int inet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		inet->inet_saddr = 0;  /* Use device */
 
 	/* Make sure we are allowed to bind here. */
+	if (!net_cgroup_bind_allowed(snum)) {
+		inet->inet_saddr = 0;
+		inet->inet_rcv_saddr = 0;
+		err = -EACCES;
+		goto out_release_sock;
+	}
+
 	if ((snum || !inet->bind_address_no_port) &&
 	    sk->sk_prot->get_port(sk, snum)) {
 		inet->inet_saddr = inet->inet_rcv_saddr = 0;

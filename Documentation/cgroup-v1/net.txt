@@ -7,3 +7,49 @@ properties for each process group:
 * listen port ranges
 * dscp ranges
 * udp port usage and limit
+
+bind port ranges
+----------------
+This property controls which ports the processes in a cgroup are allowed
+to bind to. If a process in a cgroup tries to bind a socket to a port
+that is not within the range(s) permitted by the cgroup, it will receive an
+EACCES error.
+
+This property is exposed to userspace through the 'net.bind_port_ranges' file,
+as ranges of ports that the processes can bind to (as described in the HOW TO
+INTERACT WITH RANGES FILES section).
+
+listen port ranges
+------------------
+This property controls which ports the processes in a cgroup are allowed
+to listen on. If a process in a cgroup tries to listen using a socket
+bound to a port that is not within the range(s) permitted by the cgroup,
+it will receive an EACCES error.
+
+This property is exposed to userspace through the 'net.listen_port_ranges' file,
+as ranges of ports that the processes can listen on (as described in the HOW TO
+INTERACT WITH RANGES FILES section).
+
+HOW TO INTERACT WITH RANGES FILES
+---------------------------------
+Some cgroup properties can be expressed as ranges of allowed integers. From
+userspace, you can get or set them by accessing the cgroup file corresponding to
+the property you want to interact with. To set the ranges, write a list of
+comma-separated ranges to the file, where each range could be either a pair of
+integers separated by a hyphen (-), or just an individual integer. For example,
+say you want a cgroup to allow the integers 100 through 200 (inclusive), 300
+through 320 (inclusive) and 350. Then you can write the string
+"100-200,300-320,350" to the file. When reading the file, any individual
+integers will be read as a "start-end" range where the start and end are equal.
+The example above would be read as "100-200,300-320,350-350".
+
+The controller imposes the invariant that the ranges allowed by any cgroup must
+be a subset (or equal set) of the ranges allowed by its parent (i.e., a cgroup
+does not allow any integers not allowed by its parent cgroup). This constraint
+allows you to ensure that not only are the processes in any given cgroup
+contrained by its ranges, but so are the processes in any of the cgroup's
+descendants. The way this is enforced is by two things: 1) when a cgroup is
+initialized, its ranges are inherited from its parent, and 2) when attempting to
+set the ranges of a cgroup, the kernel ensures that the invariant is true for
+the current cgroup and all its children, or otherwise fails to change the ranges
+with error EINVAL.

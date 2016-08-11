@@ -66,6 +66,7 @@
 #include <linux/mroute6.h>
 
 #include "ip6_offload.h"
+#include <net/net_cgroup.h>
 
 MODULE_AUTHOR("Cast of dozens");
 MODULE_DESCRIPTION("IPv6 protocol stack for Linux");
@@ -380,6 +381,12 @@ int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		np->saddr = addr->sin6_addr;
 
 	/* Make sure we are allowed to bind here. */
+	if (!net_cgroup_bind_allowed(snum)) {
+		inet_reset_saddr(sk);
+		err = -EACCES;
+		goto out;
+	}
+
 	if ((snum || !inet->bind_address_no_port) &&
 	    sk->sk_prot->get_port(sk, snum)) {
 		inet_reset_saddr(sk);
