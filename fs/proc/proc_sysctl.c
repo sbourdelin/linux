@@ -850,6 +850,8 @@ static int proc_sys_compare(const struct dentry *dentry,
 		return 1;
 	if (memcmp(name->name, str, len))
 		return 1;
+	if (!PROC_I(dentry->d_inode)->sysctl->unregistering == 0)
+		return 0;
 	head = rcu_dereference(PROC_I(inode)->sysctl);
 	return !head || !sysctl_is_seen(head);
 }
