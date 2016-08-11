@@ -208,7 +208,7 @@ static struct device *add_child(struct i2c_client *client, const char *name,
 	if (pdata) {
 		status = platform_device_add_data(pdev, pdata, pdata_len);
 		if (status < 0) {
-			dev_dbg(&pdev->dev, "can't add platform_data\n");
+			dev_err(&pdev->dev, "can't add platform_data\n");
 			goto put_device;
 		}
 	}
@@ -221,7 +221,7 @@ static struct device *add_child(struct i2c_client *client, const char *name,
 
 		status = platform_device_add_resources(pdev, &r, 1);
 		if (status < 0) {
-			dev_dbg(&pdev->dev, "can't add irq\n");
+			dev_err(&pdev->dev, "can't add irq\n");
 			goto put_device;
 		}
 	}
@@ -234,7 +234,6 @@ static struct device *add_child(struct i2c_client *client, const char *name,
 
 put_device:
 	platform_device_put(pdev);
-	dev_err(&client->dev, "failed to add device %s\n", name);
 	return ERR_PTR(status);
 }
 
