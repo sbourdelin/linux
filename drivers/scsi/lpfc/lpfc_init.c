@@ -7343,7 +7343,7 @@ lpfc_sli4_queue_create(struct lpfc_hba *phba)
 		if (phba->fcp_embed_io) {
 			qdesc = lpfc_sli4_queue_alloc(phba,
 						      LPFC_WQE128_SIZE,
-						      LPFC_WQE128_DEF_COUNT);
+						      phba->sli4_hba.wq_ecount);
 		} else {
 			qdesc = lpfc_sli4_queue_alloc(phba,
 						      phba->sli4_hba.wq_esize,
