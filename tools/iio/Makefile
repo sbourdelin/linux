@@ -1,5 +1,6 @@
 CC = $(CROSS_COMPILE)gcc
-CFLAGS += -Wall -g -D_GNU_SOURCE
+KBUILD_OUTPUT ?= /lib/modules/$(shell uname -r)/build
+CFLAGS += -Wall -g -D_GNU_SOURCE -I$(KBUILD_OUTPUT)/usr/include
 
 BINDIR=usr/bin
 INSTALL_PROGRAM=install -m 755 -p
