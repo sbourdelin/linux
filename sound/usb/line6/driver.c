@@ -482,7 +482,7 @@ static void line6_get_interval(struct usb_line6 *line6)
 	}
 }
 
-static int line6_init_cap_control(struct usb_line6 *line6)
+static int line6_init_cap_control_midi(struct usb_line6 *line6)
 {
 	int ret;
 
@@ -572,8 +572,8 @@ int line6_probe(struct usb_interface *interface,
 
 	line6_get_interval(line6);
 
-	if (properties->capabilities & LINE6_CAP_CONTROL) {
-		ret = line6_init_cap_control(line6);
+	if (properties->capabilities & LINE6_CAP_CONTROL_MIDI) {
+		ret = line6_init_cap_control_midi(line6);
 		if (ret < 0)
 			goto error;
 	}
@@ -643,7 +643,7 @@ int line6_suspend(struct usb_interface *interface, pm_message_t message)
 
 	snd_power_change_state(line6->card, SNDRV_CTL_POWER_D3hot);
 
-	if (line6->properties->capabilities & LINE6_CAP_CONTROL)
+	if (line6->properties->capabilities & LINE6_CAP_CONTROL_MIDI)
 		line6_stop_listen(line6);
 
 	if (line6pcm != NULL) {
@@ -662,7 +662,7 @@ int line6_resume(struct usb_interface *interface)
 {
 	struct usb_line6 *line6 = usb_get_intfdata(interface);
 
-	if (line6->properties->capabilities & LINE6_CAP_CONTROL)
+	if (line6->properties->capabilities & LINE6_CAP_CONTROL_MIDI)
 		line6_start_listen(line6);
 
 	snd_power_change_state(line6->card, SNDRV_CTL_POWER_D0);
