@@ -34,6 +34,7 @@
 
 #include <linux/errqueue.h>
 #include <asm/uaccess.h>
+#include <net/net_cgroup.h>
 
 static bool ipv6_mapped_addr_any(const struct in6_addr *a)
 {
@@ -972,6 +973,14 @@ int ip6_datagram_send_ctl(struct net *net, struct sock *sk,
 			tc = *(int *)CMSG_DATA(cmsg);
 			if (tc < -1 || tc > 0xff)
 				goto exit_f;
+
+			/* tc is 8-bit tclass, we need to rightshift 2 to get
+			 * the 6-bit dscp field
+			 */
+			if (!net_cgroup_dscp_allowed(tc >> 2)) {
+				err = -EACCES;
+				goto exit_f;
+			}
 
 			err = 0;
 			ipc6->tclass = tc;

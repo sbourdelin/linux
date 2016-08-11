@@ -21,6 +21,9 @@
 #define MIN_PORT_VALUE		0
 #define MAX_PORT_VALUE		65535
 
+#define MIN_DSCP_VALUE		0
+#define MAX_DSCP_VALUE		63
+
 /* Deriving MAX_ENTRIES from MAX_WRITE_SIZE as a rough estimate */
 #define MAX_ENTRIES ((MAX_WRITE_SIZE - offsetof(struct net_ranges, range)) /   \
 		     BYTES_PER_ENTRY)
@@ -161,7 +164,10 @@ cgrp_css_alloc(struct cgroup_subsys_state *parent_css)
 				MIN_PORT_VALUE, MAX_PORT_VALUE) ||
 		    alloc_init_net_ranges(
 				&netcg->whitelists[NETCG_LISTEN_RANGES],
-				MIN_PORT_VALUE, MAX_PORT_VALUE)) {
+				MIN_PORT_VALUE, MAX_PORT_VALUE) ||
+		    alloc_init_net_ranges(
+				&netcg->whitelists[NETCG_DSCP_RANGES],
+				MIN_DSCP_VALUE, MAX_DSCP_VALUE)) {
 			free_net_cgroup(netcg);
 			/* if any of these cause an error, return ENOMEM */
 			return ERR_PTR(-ENOMEM);
@@ -178,7 +184,11 @@ cgrp_css_alloc(struct cgroup_subsys_state *parent_css)
 		    alloc_copy_net_ranges(
 				&netcg->whitelists[NETCG_LISTEN_RANGES],
 				MIN_PORT_VALUE, MAX_PORT_VALUE,
-				&parent_netcg->whitelists[NETCG_LISTEN_RANGES])) {
+				&parent_netcg->whitelists[NETCG_LISTEN_RANGES]) ||
+		    alloc_copy_net_ranges(
+				&netcg->whitelists[NETCG_DSCP_RANGES],
+				MIN_DSCP_VALUE, MAX_DSCP_VALUE,
+				&parent_netcg->whitelists[NETCG_DSCP_RANGES])) {
 			free_net_cgroup(netcg);
 			/* if any of these cause an error, return ENOMEM */
 			return ERR_PTR(-ENOMEM);
@@ -236,6 +246,12 @@ bool net_cgroup_listen_allowed(u16 port)
 	return net_cgroup_value_allowed(port, NETCG_LISTEN_RANGES);
 }
 EXPORT_SYMBOL_GPL(net_cgroup_listen_allowed);
+
+bool net_cgroup_dscp_allowed(u8 dscp)
+{
+	return net_cgroup_value_allowed(dscp, NETCG_DSCP_RANGES);
+}
+EXPORT_SYMBOL_GPL(net_cgroup_dscp_allowed);
 
 static s64 net_udp_read_s64(struct cgroup_subsys_state *css, struct cftype *cft)
 {
@@ -631,6 +647,20 @@ static struct cftype ss_files[] = {
 		.seq_show	= net_read_ranges,
 		.write		= net_write_ranges,
 		.private	= NETCG_BIND_RANGES,
+		.max_write_len	= MAX_WRITE_SIZE,
+	},
+	{
+		.name		= "dscp_ranges",
+		.flags		= CFTYPE_ONLY_ON_ROOT,
+		.seq_show	= net_read_ranges,
+		.private	= NETCG_DSCP_RANGES,
+	},
+	{
+		.name		= "dscp_ranges",
+		.flags		= CFTYPE_NOT_ON_ROOT,
+		.seq_show	= net_read_ranges,
+		.write		= net_write_ranges,
+		.private	= NETCG_DSCP_RANGES,
 		.max_write_len	= MAX_WRITE_SIZE,
 	},
 	{

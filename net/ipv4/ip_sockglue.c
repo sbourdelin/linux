@@ -42,6 +42,7 @@
 #include <net/transp_v6.h>
 #endif
 #include <net/ip_fib.h>
+#include <net/net_cgroup.h>
 
 #include <linux/errqueue.h>
 #include <asm/uaccess.h>
@@ -289,6 +290,11 @@ int ip_cmsg_send(struct sock *sk, struct msghdr *msg, struct ipcm_cookie *ipc,
 			val = *(int *)CMSG_DATA(cmsg);
 			if (val < 0 || val > 255)
 				return -EINVAL;
+			/* val is 8-bit tos, we need to rightshift 2 to get the
+			 * 6-bit dscp field
+			 */
+			if (!net_cgroup_dscp_allowed(val >> 2))
+				return -EACCES;
 			ipc->tos = val;
 			ipc->priority = rt_tos2priority(ipc->tos);
 			break;
@@ -726,6 +732,13 @@ static int do_ip_setsockopt(struct sock *sk, int level,
 		if (sk->sk_type == SOCK_STREAM) {
 			val &= ~INET_ECN_MASK;
 			val |= inet->tos & INET_ECN_MASK;
+		}
+		/* val is 8-bit tos, we need to rightshift 2 to get the
+		 * 6-bit dscp field
+		 */
+		if (!net_cgroup_dscp_allowed(val >> 2)) {
+			err = -EACCES;
+			break;
 		}
 		if (inet->tos != val) {
 			inet->tos = val;

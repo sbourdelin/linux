@@ -23,6 +23,7 @@
 enum {
 	NETCG_LISTEN_RANGES,
 	NETCG_BIND_RANGES,
+	NETCG_DSCP_RANGES,
 	NETCG_NUM_RANGE_TYPES
 };
 
@@ -73,6 +74,7 @@ struct net_cgroup {
 
 bool net_cgroup_bind_allowed(u16 port);
 bool net_cgroup_listen_allowed(u16 port);
+bool net_cgroup_dscp_allowed(u8 dscp);
 bool net_cgroup_acquire_udp_port(void);
 void net_cgroup_release_udp_port(void);
 
@@ -82,6 +84,10 @@ static inline bool net_cgroup_bind_allowed(u16 port)
 	return true;
 }
 static inline bool net_cgroup_listen_allowed(u16 port)
+{
+	return true;
+}
+static inline bool net_cgroup_dscp_allowed(u8 dscp)
 {
 	return true;
 }

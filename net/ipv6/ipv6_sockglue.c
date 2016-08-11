@@ -52,6 +52,7 @@
 #include <net/udplite.h>
 #include <net/xfrm.h>
 #include <net/compat.h>
+#include <net/net_cgroup.h>
 
 #include <asm/uaccess.h>
 
@@ -338,6 +339,13 @@ static int do_ipv6_setsockopt(struct sock *sk, int level, int optname,
 		/* RFC 3542, 6.5: default traffic class of 0x0 */
 		if (val == -1)
 			val = 0;
+		/* val is 8-bit tclass, we need to rightshift 2 to get the 6-bit
+		 * dscp field
+		 */
+		if (!net_cgroup_dscp_allowed(val >> 2)) {
+			retv = -EACCES;
+			break;
+		}
 		np->tclass = val;
 		retv = 0;
 		break;

@@ -30,6 +30,20 @@ This property is exposed to userspace through the 'net.listen_port_ranges' file,
 as ranges of ports that the processes can listen on (as described in the HOW TO
 INTERACT WITH RANGES FILES section).
 
+dscp ranges
+-----------
+This property controls which dscp values the processes in a cgroup are
+allowed to use. A process in a cgroup will receive an EACCES error if it
+tries to do any of these things:
+* set a socket's IP_TOS option to a value whose dscp field (bits 7:2) is
+  outside the range
+* use a socket to send a message in which the IP_TOS ancillary data is
+  set to a value whose dscp field is outside the range
+
+This property is exposed to userspace through the 'net.dscp_ranges' file, as
+ranges of dscp values that the process can use (as described in the HOW TO
+INTERACT WITH RANGES FILES section).
+
 udp port usage and limit
 ------------------------
 This property controls the limit of udp ports that can be used by the
