@@ -54,6 +54,15 @@ ifeq ($(CONFIG_ARM64_MODULE_PLTS),y)
 KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm64/kernel/module.lds
 endif
 
+ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+  CC_FLAGS_FTRACE := -fprolog-pad=2
+  KBUILD_CPPFLAGS += -DCC_USING_PROLOG_PAD
+  ifeq ($(call cc-option,-fprolog-pad=2),)
+    $(warning Cannot use CONFIG_DYNAMIC_FTRACE_WITH_REGS: \
+             -fprolog-pad not supported by compiler)
+  endif
+endif
+
 # Default value
 head-y		:= arch/arm64/kernel/head.o
 
