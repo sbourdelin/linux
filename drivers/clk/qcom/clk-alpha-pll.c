@@ -112,6 +112,29 @@ static int wait_for_pll_offline(struct clk_alpha_pll *pll, u32 mask)
 #define PLL_OFFLINE_ACK		BIT(28)
 #define PLL_ACTIVE_FLAG		BIT(30)
 
+void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
+			     const struct alpha_pll_config *config)
+{
+	u32 val, mask;
+
+	regmap_write(regmap, pll->offset + PLL_CONFIG_CTL,
+		     config->config_ctl_val);
+
+	val = config->main_output_mask;
+	val |= config->aux_output_mask;
+	val |= config->aux2_output_mask;
+	val |= config->early_output_mask;
+	val |= config->post_div_val;
+
+	mask = config->main_output_mask;
+	mask |= config->aux_output_mask;
+	mask |= config->aux2_output_mask;
+	mask |= config->early_output_mask;
+	mask |= config->post_div_mask;
+
+	regmap_update_bits(regmap, pll->offset + PLL_USER_CTL, mask, val);
+}
+
 static int clk_alpha_pll_hwfsm_enable(struct clk_hw *hw)
 {
 	int ret;
