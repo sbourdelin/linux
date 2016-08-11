@@ -7780,6 +7780,10 @@ static int nl80211_join_ibss(struct sk_buff *skb, struct genl_info *info)
 			return -EINVAL;
 	}
 
+	err = cfg80211_validate_beacon_int(rdev, ibss.beacon_interval);
+	if (err)
+		return err;
+
 	if (!rdev->ops->join_ibss)
 		return -EOPNOTSUPP;
 
@@ -9255,6 +9259,10 @@ static int nl80211_join_mesh(struct sk_buff *skb, struct genl_info *info)
 		if (setup.beacon_interval < 10 ||
 		    setup.beacon_interval > 10000)
 			return -EINVAL;
+
+		err = cfg80211_validate_beacon_int(rdev, setup.beacon_interval);
+		if (err)
+			return err;
 	}
 
 	if (info->attrs[NL80211_ATTR_DTIM_PERIOD]) {
