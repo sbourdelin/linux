@@ -808,26 +808,14 @@ static inline bool hw_brk_match(struct arch_hw_breakpoint *a,
 static void tm_reclaim_thread(struct thread_struct *thr,
 			      struct thread_info *ti, uint8_t cause)
 {
-	unsigned long msr_diff = 0;
+	unsigned long msr_diff = thr->regs->msr;
 
-	/*
-	 * If FP/VSX registers have been already saved to the
-	 * thread_struct, move them to the transact_fp array.
-	 * We clear the TIF_RESTORE_TM bit since after the reclaim
-	 * the thread will no longer be transactional.
-	 */
 	if (test_ti_thread_flag(ti, TIF_RESTORE_TM)) {
-		msr_diff = thr->ckpt_regs.msr & ~thr->regs->msr;
-		if (msr_diff & MSR_FP)
-			memcpy(&thr->transact_fp, &thr->fp_state,
-			       sizeof(struct thread_fp_state));
-		if (msr_diff & MSR_VEC)
-			memcpy(&thr->transact_vr, &thr->vr_state,
-			       sizeof(struct thread_vr_state));
-		clear_ti_thread_flag(ti, TIF_RESTORE_TM);
-		msr_diff &= MSR_FP | MSR_VEC | MSR_VSX | MSR_FE0 | MSR_FE1;
-	}
+		msr_diff = (thr->ckpt_regs.msr & ~thr->regs->msr)
+			& (MSR_FP | MSR_VEC | MSR_VSX | MSR_FE0 | MSR_FE1);
 
+		clear_ti_thread_flag(ti, TIF_RESTORE_TM);
+	}
 	/*
 	 * Use the current MSR TM suspended bit to track if we have
 	 * checkpointed state outstanding.
@@ -846,7 +834,9 @@ static void tm_reclaim_thread(struct thread_struct *thr,
 	if (!MSR_TM_SUSPENDED(mfmsr()))
 		return;
 
-	tm_reclaim(thr, thr->regs->msr, cause);
+	giveup_all(container_of(thr, struct task_struct, thread));
+
+	tm_reclaim(thr, msr_diff, cause);
 
 	/* Having done the reclaim, we now have the checkpointed
 	 * FP/VSX values in the registers.  These might be valid
@@ -948,7 +938,7 @@ static inline void tm_recheckpoint_new_task(struct task_struct *new)
 	 * If the task was using FP, we non-lazily reload both the original and
 	 * the speculative FP register states.  This is because the kernel
 	 * doesn't see if/when a TM rollback occurs, so if we take an FP
-	 * unavoidable later, we are unable to determine which set of FP regs
+	 * unavailable later, we are unable to determine which set of FP regs
 	 * need to be restored.
 	 */
 	if (!new->thread.regs)
@@ -964,35 +954,27 @@ static inline void tm_recheckpoint_new_task(struct task_struct *new)
 		 "(new->msr 0x%lx, new->origmsr 0x%lx)\n",
 		 new->pid, new->thread.regs->msr, msr);
 
-	/* This loads the checkpointed FP/VEC state, if used */
 	tm_recheckpoint(&new->thread, msr);
 
-	/* This loads the speculative FP/VEC state, if used */
-	if (msr & MSR_FP) {
-		do_load_up_transact_fpu(&new->thread);
-		new->thread.regs->msr |=
-			(MSR_FP | new->thread.fpexc_mode);
-	}
-#ifdef CONFIG_ALTIVEC
-	if (msr & MSR_VEC) {
-		do_load_up_transact_altivec(&new->thread);
-		new->thread.regs->msr |= MSR_VEC;
-	}
-#endif
-	/* We may as well turn on VSX too since all the state is restored now */
-	if (msr & MSR_VSX)
-		new->thread.regs->msr |= MSR_VSX;
+	/*
+	 * The checkpointed state has been restored but the live state has
+	 * not, ensure all the math functionality is turned off to trigger
+	 * restore_math() to reload.
+	 */
+	new->thread.regs->msr &= ~(MSR_FP | MSR_VEC | MSR_VSX);
 
 	TM_DEBUG("*** tm_recheckpoint of pid %d complete "
 		 "(kernel msr 0x%lx)\n",
 		 new->pid, mfmsr());
 }
 
-static inline void __switch_to_tm(struct task_struct *prev)
+static inline void __switch_to_tm(struct task_struct *prev,
+		struct task_struct *new)
 {
 	if (cpu_has_feature(CPU_FTR_TM)) {
 		tm_enable();
 		tm_reclaim_task(prev);
+		tm_recheckpoint_new_task(new);
 	}
 }
 
@@ -1028,7 +1010,7 @@ void restore_tm_state(struct pt_regs *regs)
 
 #else
 #define tm_recheckpoint_new_task(new)
-#define __switch_to_tm(prev)
+#define __switch_to_tm(prev, new)
 #endif /* CONFIG_PPC_TRANSACTIONAL_MEM */
 
 static inline void save_sprs(struct thread_struct *t)
@@ -1189,10 +1171,10 @@ struct task_struct *__switch_to(struct task_struct *prev,
 	 */
 	save_sprs(&prev->thread);
 
-	__switch_to_tm(prev);
-
 	/* Save FPU, Altivec, VSX and SPE state */
 	giveup_all(prev);
+
+	__switch_to_tm(prev, new);
 
 	/*
 	 * We can't take a PMU exception inside _switch() since there is a
@@ -1200,8 +1182,6 @@ struct task_struct *__switch_to(struct task_struct *prev,
 	 * of sync. Hard disable here.
 	 */
 	hard_irq_disable();
-
-	tm_recheckpoint_new_task(new);
 
 	/*
 	 * Call restore_sprs() before calling _switch(). If we move it after
@@ -1438,8 +1418,7 @@ int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
 	 * tm_recheckpoint_new_task() (on the same task) to restore the
 	 * checkpointed state back and the TM mode.
 	 */
-	__switch_to_tm(src);
-	tm_recheckpoint_new_task(src);
+	__switch_to_tm(src, src);
 
 	*dst = *src;
 
