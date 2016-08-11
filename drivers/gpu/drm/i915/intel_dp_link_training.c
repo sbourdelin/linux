@@ -150,7 +150,9 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp)
 		uint8_t link_status[DP_LINK_STATUS_SIZE];
 
 		drm_dp_link_train_clock_recovery_delay(intel_dp->dpcd);
-		if (!intel_dp_get_link_status(intel_dp, link_status)) {
+
+		if (drm_dp_dpcd_read_link_status(&intel_dp->aux, link_status)
+						 <= 0) {
 			DRM_ERROR("failed to get link status\n");
 			break;
 		}
@@ -258,7 +260,9 @@ intel_dp_link_training_channel_equalization(struct intel_dp *intel_dp)
 		}
 
 		drm_dp_link_train_channel_eq_delay(intel_dp->dpcd);
-		if (!intel_dp_get_link_status(intel_dp, link_status)) {
+
+		if (drm_dp_dpcd_read_link_status(&intel_dp->aux, link_status)
+						 <= 0) {
 			DRM_ERROR("failed to get link status\n");
 			break;
 		}
