@@ -541,8 +541,7 @@ static int line6_hwdep_open(struct snd_hwdep *hw, struct file *file)
 	line6->buffer_circular.head = 0;
 	line6->buffer_circular.tail = 0;
 	sema_init(&line6->buffer_circular.sem, 0);
-
-	line6->buffer_circular.active = 1;
+	spin_lock_init(&line6->buffer_circular.read_lock);
 
 	line6->buffer_circular.data =
 		kmalloc(LINE6_MESSAGE_MAXLEN * LINE6_MESSAGE_MAXCOUNT, GFP_KERNEL);
@@ -567,7 +566,7 @@ static int line6_hwdep_release(struct snd_hwdep *hw, struct file *file)
 
 	/* By this time, no readers are waiting, we can safely recreate the
 	 * semaphore at next open. */
-	line6->buffer_circular.active = 0;
+	clear_bit(0, &line6->buffer_circular.active);
 
 	kfree(line6->buffer_circular.data);
 	kfree(line6->buffer_circular.data_len);
@@ -581,18 +580,23 @@ line6_hwdep_read(struct snd_hwdep *hwdep, char __user *buf, long count,
 {
 	struct usb_line6 *line6 = hwdep->private_data;
 	unsigned long tail;
+	long rv = 0;
 
 	if (down_interruptible(&line6->buffer_circular.sem)) {
 		return -ERESTARTSYS;
 	}
 	/* There must an item now in the buffer... */
 
+	spin_lock(&line6->buffer_circular.read_lock);
+
 	tail = line6->buffer_circular.tail;
 
 	if (line6->buffer_circular.data_len[tail] > count) {
 		/* Buffer too small; allow re-read of the current item... */
 		up(&line6->buffer_circular.sem);
-		return -EINVAL;
+
+		rv = -EINVAL;
+		goto end;
 	}
 
 	if (copy_to_user(buf,
@@ -608,7 +612,9 @@ line6_hwdep_read(struct snd_hwdep *hwdep, char __user *buf, long count,
 	smp_store_release(&line6->buffer_circular.tail,
 				(tail + 1) & (LINE6_MESSAGE_MAXCOUNT - 1));
 
-	return 0;
+end:
+	spin_unlock(&line6->buffer_circular.read_lock);
+	return rv;
 }
 
 /* Write directly (no buffering) to device by user*/

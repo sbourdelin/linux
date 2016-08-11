@@ -159,12 +159,13 @@ struct usb_line6 {
 
 	/* Circular buffer for non-MIDI control messages */
 	struct {
-		int active;
+		unsigned long active;
 		char *data;
 		int *data_len;
 		unsigned long head, tail;
 		/* Actually is up'd # of items in the buffer - times */
 		struct semaphore sem;
+		spinlock_t read_lock;
 	} buffer_circular;
 
 	/* If MIDI is supported, buffer_message contains the pre-processed data;
