@@ -24,3 +24,5 @@ obj-$(CONFIG_X86_BIGSMP)	+= bigsmp_32.o
 
 # For 32bit, probe_32 need to be listed last
 obj-$(CONFIG_X86_LOCAL_APIC)	+= probe_$(BITS).o
+
+obj-$(CONFIG_X86_PARAVIRQ)	+= paravirq.o

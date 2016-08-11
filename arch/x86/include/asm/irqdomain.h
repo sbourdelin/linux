@@ -60,4 +60,10 @@ extern void arch_init_htirq_domain(struct irq_domain *domain);
 static inline void arch_init_htirq_domain(struct irq_domain *domain) { }
 #endif
 
+#ifdef CONFIG_X86_PARAVIRQ
+extern void arch_init_paravirq_domain(struct irq_domain *domain);
+#else
+static inline void arch_init_paravirq_domain(struct irq_domain *domain) { }
+#endif
+
 #endif

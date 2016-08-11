@@ -436,6 +436,7 @@ int __init arch_early_irq_init(void)
 
 	arch_init_msi_domain(x86_vector_domain);
 	arch_init_htirq_domain(x86_vector_domain);
+	arch_init_paravirq_domain(x86_vector_domain);
 
 	BUG_ON(!alloc_cpumask_var(&vector_cpumask, GFP_KERNEL));
 	BUG_ON(!alloc_cpumask_var(&vector_searchmask, GFP_KERNEL));

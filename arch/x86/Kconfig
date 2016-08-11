@@ -757,6 +757,14 @@ config PARAVIRT_TIME_ACCOUNTING
 
 	  If in doubt, say N here.
 
+config X86_PARAVIRQ
+	bool "Enable paravirq irq_domain"
+	depends on PARAVIRT && X86_LOCAL_APIC
+	default n
+	---help---
+	  This option enables paravirq irq_domain for interrupts injected
+	  by the hypervisor using Intel VT-x technology.
+
 config PARAVIRT_CLOCK
 	bool
 
