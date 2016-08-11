@@ -1101,6 +1101,8 @@ void __init setup_arch(char **cmdline_p)
 		efi_find_mirror();
 	}
 
+	reserve_bios_regions();
+
 	/*
 	 * The EFI specification says that boot service code won't be called
 	 * after ExitBootServices(). This is, in fact, a lie.
@@ -1129,7 +1131,15 @@ void __init setup_arch(char **cmdline_p)
 
 	early_trap_pf_init();
 
-	setup_real_mode();
+	/*
+	 * Update mmu_cr4_features (and, indirectly, trampoline_cr4_features)
+	 * with the current CR4 value.  This may not be necessary, but
+	 * auditing all the early-boot CR4 manipulation would be needed to
+	 * rule it out.
+	 */
+	if (boot_cpu_data.cpuid_level >= 0)
+		/* A CPU has %cr4 if and only if it has CPUID. */
+		mmu_cr4_features = __read_cr4();
 
 	memblock_set_current_limit(get_max_mapped());
 
@@ -1177,13 +1187,6 @@ void __init setup_arch(char **cmdline_p)
 	x86_init.paging.pagetable_init();
 
 	kasan_init();
-
-	if (boot_cpu_data.cpuid_level >= 0) {
-		/* A CPU has %cr4 if and only if it has CPUID */
-		mmu_cr4_features = __read_cr4();
-		if (trampoline_cr4_features)
-			*trampoline_cr4_features = mmu_cr4_features;
-	}
 
 #ifdef CONFIG_X86_32
 	/* sync back kernel address range */
