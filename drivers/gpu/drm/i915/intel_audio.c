@@ -282,14 +282,9 @@ static void hsw_audio_codec_enable(struct drm_connector *connector,
 	struct drm_i915_private *dev_priv = to_i915(connector->dev);
 	struct intel_crtc *intel_crtc = to_intel_crtc(encoder->base.crtc);
 	enum pipe pipe = intel_crtc->pipe;
-	struct i915_audio_component *acomp = dev_priv->audio_component;
 	const uint8_t *eld = connector->eld;
-	struct intel_digital_port *intel_dig_port =
-		enc_to_dig_port(&encoder->base);
-	enum port port = intel_dig_port->port;
 	uint32_t tmp;
 	int len, i;
-	int n, rate;
 
 	DRM_DEBUG_KMS("Enable audio codec on pipe %c, %u bytes ELD\n",
 		      pipe_name(pipe), drm_eld_size(eld));
@@ -335,19 +330,20 @@ static void hsw_audio_codec_enable(struct drm_connector *connector,
 
 	tmp &= ~AUD_CONFIG_N_PROG_ENABLE;
 	if (audio_rate_need_prog(intel_crtc, adjusted_mode)) {
-		if (!acomp)
-			rate = 0;
-		else if (port >= PORT_A && port <= PORT_E)
+		enum port port = enc_to_dig_port(&encoder->base)->port;
+		struct i915_audio_component *acomp = dev_priv->audio_component;
+		int rate, n;
+
+		rate = 0;
+		if (acomp && port >= PORT_A && port <= PORT_E) {
 			rate = acomp->aud_sample_rate[port];
-		else {
-			DRM_ERROR("invalid port: %d\n", port);
-			rate = 0;
+
+			n = audio_config_get_n(adjusted_mode, rate);
+			DRM_DEBUG_KMS("port %d audio rate %d => N=%x\n",
+				      port, rate, n);
+			if (n)
+				tmp = audio_config_setup_n_reg(n, tmp);
 		}
-		n = audio_config_get_n(adjusted_mode, rate);
-		if (n != 0)
-			tmp = audio_config_setup_n_reg(n, tmp);
-		else
-			DRM_DEBUG_KMS("no suitable N value is found\n");
 	}
 
 	I915_WRITE(HSW_AUD_CFG(pipe), tmp);
