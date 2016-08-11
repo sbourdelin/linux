@@ -661,7 +661,7 @@ void seq_putc(struct seq_file *m, char c)
 }
 EXPORT_SYMBOL(seq_putc);
 
-void seq_puts(struct seq_file *m, const char *s)
+void (seq_puts)(struct seq_file *m, const char *s)
 {
 	int len = strlen(s);
 

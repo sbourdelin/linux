@@ -116,7 +116,18 @@ void seq_vprintf(struct seq_file *m, const char *fmt, va_list args);
 __printf(2, 3)
 void seq_printf(struct seq_file *m, const char *fmt, ...);
 void seq_putc(struct seq_file *m, char c);
-void seq_puts(struct seq_file *m, const char *s);
+
+void (seq_puts)(struct seq_file *m, const char *s);
+/* Hack to allow constant strings to use compile-time calculated lengths */
+# define seq_puts(seq, string)						\
+do {									\
+	if (__builtin_constant_p(string) &&				\
+	    (sizeof(string) != sizeof(const char *)))			\
+		seq_write(seq, string, sizeof(string) - 1);		\
+	else								\
+		(seq_puts)(seq, string);				\
+} while (0)
+
 void seq_put_decimal_ull(struct seq_file *m, char delimiter,
 			 unsigned long long num);
 void seq_put_decimal_ll(struct seq_file *m, char delimiter, long long num);
