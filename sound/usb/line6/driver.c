@@ -600,6 +600,10 @@ line6_hwdep_read(struct snd_hwdep *hwdep, char __user *buf, long count,
 		goto end;
 	}
 
+	/* Release lock while copying the stuff. Since there is only one reader,
+	 * the data is going nowhere, so this should be safe. */
+	spin_unlock(&line6->buffer_circular.read_lock);
+
 	if (copy_to_user(buf,
 		&line6->buffer_circular.data[tail * LINE6_MESSAGE_MAXLEN],
 		line6->buffer_circular.data_len[tail])
@@ -610,6 +614,7 @@ line6_hwdep_read(struct snd_hwdep *hwdep, char __user *buf, long count,
 		rv = line6->buffer_circular.data_len[tail];
 	}
 
+	spin_lock(&line6->buffer_circular.read_lock);
 	smp_store_release(&line6->buffer_circular.tail,
 				(tail + 1) & (LINE6_MESSAGE_MAXCOUNT - 1));
 
