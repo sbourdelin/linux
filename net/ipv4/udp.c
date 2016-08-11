@@ -114,6 +114,7 @@
 #include <net/busy_poll.h>
 #include "udp_impl.h"
 #include <net/sock_reuseport.h>
+#include <net/net_cgroup.h>
 
 struct udp_table udp_table __read_mostly;
 EXPORT_SYMBOL(udp_table);
@@ -318,6 +319,11 @@ scan_primary_hash:
 			goto fail_unlock;
 	}
 found:
+	/* Make sure it's UDP (and not UDP-lite) and it's unhashed! */
+	if (sk->sk_protocol == IPPROTO_UDP && sk_unhashed(sk) &&
+	    !net_cgroup_acquire_udp_port())
+		goto fail_unlock;
+
 	inet_sk(sk)->inet_num = snum;
 	udp_sk(sk)->udp_port_hash = snum;
 	udp_sk(sk)->udp_portaddr_hash ^= snum;
@@ -1388,6 +1394,8 @@ void udp_lib_unhash(struct sock *sk)
 		if (rcu_access_pointer(sk->sk_reuseport_cb))
 			reuseport_detach_sock(sk);
 		if (sk_del_node_init_rcu(sk)) {
+			if (sk->sk_protocol == IPPROTO_UDP)
+				net_cgroup_release_udp_port();
 			hslot->count--;
 			inet_sk(sk)->inet_num = 0;
 			sock_prot_inuse_add(sock_net(sk), sk->sk_prot, -1);

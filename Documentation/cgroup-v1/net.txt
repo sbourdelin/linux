@@ -30,6 +30,32 @@ This property is exposed to userspace through the 'net.listen_port_ranges' file,
 as ranges of ports that the processes can listen on (as described in the HOW TO
 INTERACT WITH RANGES FILES section).
 
+udp port usage and limit
+------------------------
+This property controls the limit of udp ports that can be used by the
+processes in a cgroup. The controller manages udp statistics (usage, limit, etc)
+for each cgroup. Every cgroup also keeps track of the udp ports acquired by its
+descendants. If a process tries to acquire a port when its cgroup has
+already reached its limit, it will fail with error EACCES. It will also fail if
+one of the cgroup's ancestors has reached its limit. There are 5 files
+exposed to userspace to configure this property:
+
+* 'net.udp_usage': Reading this file gives the number of udp ports used by
+processes in this cgroup and all its descendants.
+* 'net.udp_limit': Writing this file sets the total number of udp ports
+that can be used by processes in this cgroup and all
+its descendants. This file can also be read.
+* 'net.udp_maxusage': Reading this file gives the highest value of
+net.udp_usage that has been seen for this cgroup.
+* 'net.udp_failcnt': Reading this file gives the number of times a
+process in this cgroup or one of its descendants has attempted to acquire a
+udp port but failed because the limit of this cgroup was reached.
+* 'net.udp_underflowcnt': Reading this file gives the number of times a
+process in this cgroup or one of its descendants released a udp port when the
+usage value of this cgroup was 0.
+
+When a new cgroup is created, its udp limit is copied from its parent.
+
 HOW TO INTERACT WITH RANGES FILES
 ---------------------------------
 Some cgroup properties can be expressed as ranges of allowed integers. From

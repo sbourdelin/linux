@@ -25,6 +25,31 @@
 #define MAX_ENTRIES ((MAX_WRITE_SIZE - offsetof(struct net_ranges, range)) /   \
 		     BYTES_PER_ENTRY)
 
+#define DEFAULT_UDP_LIMIT	-1
+#define UDP_FBITS		32
+#define UDP_FMASK		(((u64)1 << UDP_FBITS) - 1)
+
+/* Upper 32 bits are 'limit' and lower 32 bits are 'usage' */
+static s32 get_udp_limit(u64 limitandusage)
+{
+	return (s32)(limitandusage >> UDP_FBITS);
+}
+
+static s32 get_udp_usage(u64 limitandusage)
+{
+	return (s32)(limitandusage & UDP_FMASK);
+}
+
+static u64 set_udp_usage(u64 limitandusage, s32 usage)
+{
+	return (u64)((limitandusage & ~UDP_FMASK) | usage);
+}
+
+static u64 set_udp_limit_usage(s32 limit, s32 usage)
+{
+	return (u64)(((u64)limit << UDP_FBITS) | usage);
+}
+
 static struct net_cgroup *css_to_net_cgroup(struct cgroup_subsys_state *css)
 {
 	return css ? container_of(css, struct net_cgroup, css) : NULL;
@@ -120,6 +145,7 @@ cgrp_css_alloc(struct cgroup_subsys_state *parent_css)
 {
 	struct net_cgroup *netcg;
 	struct net_cgroup *parent_netcg = css_to_net_cgroup(parent_css);
+	s32 parent_udp_limit;
 
 	netcg = kzalloc(sizeof(*netcg), GFP_KERNEL);
 	if (!netcg)
@@ -140,6 +166,9 @@ cgrp_css_alloc(struct cgroup_subsys_state *parent_css)
 			/* if any of these cause an error, return ENOMEM */
 			return ERR_PTR(-ENOMEM);
 		}
+		/* and set no limit on udp ports */
+		atomic64_set(&netcg->udp_stats.udp_limitandusage,
+			     set_udp_limit_usage(DEFAULT_UDP_LIMIT, 0));
 	} else {
 		/* if not root, then, inherit ranges from parent */
 		if (alloc_copy_net_ranges(
@@ -154,6 +183,11 @@ cgrp_css_alloc(struct cgroup_subsys_state *parent_css)
 			/* if any of these cause an error, return ENOMEM */
 			return ERR_PTR(-ENOMEM);
 		}
+		/* and inherit udp port limit from parent */
+		parent_udp_limit = get_udp_limit(atomic64_read(
+			&parent_netcg->udp_stats.udp_limitandusage));
+		atomic64_set(&netcg->udp_stats.udp_limitandusage,
+			     set_udp_limit_usage(parent_udp_limit, 0));
 	}
 
 	return &netcg->css;
@@ -202,6 +236,212 @@ bool net_cgroup_listen_allowed(u16 port)
 	return net_cgroup_value_allowed(port, NETCG_LISTEN_RANGES);
 }
 EXPORT_SYMBOL_GPL(net_cgroup_listen_allowed);
+
+static s64 net_udp_read_s64(struct cgroup_subsys_state *css, struct cftype *cft)
+{
+	struct  net_cgroup *netcg = css_to_net_cgroup(css);
+	s32 value = 0;
+
+	switch (cft->private) {
+	case NETCG_LIMIT_UDP:
+		value = get_udp_limit(
+			atomic64_read(&netcg->udp_stats.udp_limitandusage));
+		break;
+	case NETCG_USAGE_UDP:
+		value = get_udp_usage(
+			atomic64_read(&netcg->udp_stats.udp_limitandusage));
+		break;
+	case NETCG_MAXUSAGE_UDP:
+		value = atomic_read(&netcg->udp_stats.udp_maxusage);
+		break;
+	case NETCG_FAILCNT_UDP:
+		value = atomic_read(&netcg->udp_stats.udp_failcnt);
+		break;
+	case NETCG_UNDERFLOWCNT_UDP:
+		value = atomic_read(&netcg->udp_stats.udp_underflowcnt);
+		break;
+	default:
+		value = 0; /* this shouldn't happen */
+		break;
+	}
+
+	return (s64)value;
+}
+
+static int net_udp_write_s64(struct cgroup_subsys_state *css,
+			     struct cftype *cft, s64 val)
+{
+	struct net_cgroup *netcg = css_to_net_cgroup(css);
+	s32 oldlimit, usage;
+	u64     limitandusage, oldbits, newbits;
+
+	/* Make sure that 'val' is a 32 bit int */
+	if (val != (s32)val || val < -1)
+		return -EINVAL;
+
+	limitandusage = atomic64_read(&netcg->udp_stats.udp_limitandusage);
+	for (;;) {
+		oldlimit = get_udp_limit(limitandusage);
+		usage = get_udp_usage(limitandusage);
+		if (unlikely(oldlimit == (s32)val))
+			break;
+		newbits = set_udp_limit_usage((s32)val, usage);
+		oldbits = atomic64_cmpxchg(&netcg->udp_stats.udp_limitandusage,
+					   limitandusage, newbits);
+		if (likely(oldbits == limitandusage))
+			break;
+		limitandusage = oldbits;
+	}
+
+	return 0;
+}
+
+static bool try_inc_udp_usage(struct net_cgroup *netcg)
+{
+	s32 limit, usage, oldusage, maxusage;
+	u64 limitandusage, newbits, oldbits;
+
+	limitandusage = atomic64_read(&netcg->udp_stats.udp_limitandusage);
+	for (;;) {
+		usage = get_udp_usage(limitandusage);
+		limit = get_udp_limit(limitandusage);
+		/* Default indicates no restriction. */
+		if ((limit != DEFAULT_UDP_LIMIT) && unlikely(usage >= limit)) {
+			atomic_inc(&netcg->udp_stats.udp_failcnt);
+			return false;
+		}
+		/* Increment the usage irrespective of the fact that there is
+		 * limit set or not to record the usage.
+		 */
+		++usage;
+		newbits = set_udp_usage(limitandusage, usage);
+		oldbits = atomic64_cmpxchg(&netcg->udp_stats.udp_limitandusage,
+					   limitandusage, newbits);
+		if (likely(oldbits == limitandusage))
+			break;
+		limitandusage = oldbits;
+	}
+
+	maxusage = atomic_read(&netcg->udp_stats.udp_maxusage);
+
+	while (usage > maxusage) {
+		oldusage = atomic_cmpxchg(&netcg->udp_stats.udp_maxusage,
+					  maxusage, usage);
+		if (likely(oldusage == maxusage))
+			break;
+		maxusage = oldusage;
+	}
+	return true;
+}
+
+static bool try_dec_udp_usage(struct net_cgroup *netcg)
+{
+	s32 usage;
+	u64 limitandusage, newbits, oldbits;
+
+	limitandusage = atomic64_read(&netcg->udp_stats.udp_limitandusage);
+	for (;;) {
+		usage = get_udp_usage(limitandusage);
+		if (unlikely(usage <= 0)) {
+			atomic_inc(&netcg->udp_stats.udp_underflowcnt);
+			return false;
+		}
+		--usage;
+		newbits = set_udp_usage(limitandusage, usage);
+		oldbits = atomic64_cmpxchg(&netcg->udp_stats.udp_limitandusage,
+					   limitandusage, newbits);
+		if (likely(oldbits == limitandusage))
+			break;
+		limitandusage = oldbits;
+	}
+
+	return true;
+}
+
+/* The feature exposes following values through the cgroup interface:
+ * (1) udp_limit: Maximum number of UDP ports that processes from this
+ *                container can use.
+ * (2) udp_usage: Current usage of UDP ports by processes in this container.
+ * (3) udp_maxusage: The peak usage of UDP ports since container creation.
+ * (4) udp_failcnt: Number of port allocation requests failed because of
+ *                  ports depletion for this container.
+ * (5) udp_underflowcnt: Number of port release requests that would have
+ *                       pushed the usage below zero (see description below).
+ *
+ * Caveats:
+ *    If a process is moved to a different container, the udp sockets are not
+ * accounted for that process in the destination container. When that process
+ * finishes; that much credit will not be returned to the source container.
+ * This will create some sort of discrepancy at both source and destination
+ * containers. This transfer would create a pseudo-permanent transfer of port
+ * credits to the destination container. The trasfer effect will be nullified
+ * only if all the processes in this destination container stop using the udp
+ * ports momentarily and total usage drops to ZERO (since we do not allow the
+ * usage count to go negative, the pseudo-permanent transfer gets nullified
+ * at the destination container). It's assumed that this kind of process
+ * migration is minimal.
+ *    The limitandusage (64 bit) field holds limit in upper 32 bits and current
+ * usage in lower 32 bits. Since this is one field, the check and update atomic
+ * operations eliminate possible mismatch on multi-core systems.
+ */
+bool net_cgroup_acquire_udp_port(void)
+{
+	struct net_cgroup *netcg;
+	struct net_cgroup *curr;
+	struct net_cgroup *curr2;
+	bool success = true;
+
+	rcu_read_lock();
+	netcg = task_to_net_cgroup(current);
+
+	/* iterate this net_cgroup and its ancestors, attempting increment the
+	 * usage at each step
+	 */
+	for (curr = netcg;
+	     net_cgroup_to_parent(curr);
+	     curr = net_cgroup_to_parent(curr)) {
+		if (!try_inc_udp_usage(curr)) {
+			/* get out if any one ancestor fails */
+			success = false;
+			break;
+		}
+	}
+
+	if (!success) {
+		/* one of the ancestors failed to increment its usage. now, we
+		 * need to undo all the increments we did
+		 */
+		for (curr2 = netcg;
+		     curr2 != curr;
+		     curr2 = net_cgroup_to_parent(curr2)) {
+			try_dec_udp_usage(curr2);
+		}
+	}
+
+	rcu_read_unlock();
+	return success;
+}
+EXPORT_SYMBOL_GPL(net_cgroup_acquire_udp_port);
+
+void net_cgroup_release_udp_port(void)
+{
+	struct net_cgroup *netcg;
+	struct net_cgroup *curr;
+
+	rcu_read_lock();
+	netcg = task_to_net_cgroup(current);
+
+	/* iterate this net_cgroup and its ancestors, attempting decrement the
+	 * usage at each step
+	 */
+	for (curr = netcg;
+	     net_cgroup_to_parent(curr);
+	     curr = net_cgroup_to_parent(curr)) {
+		try_dec_udp_usage(curr);
+	}
+	rcu_read_unlock();
+}
+EXPORT_SYMBOL_GPL(net_cgroup_release_udp_port);
 
 /* Returns true if the range r is a subset of at least one of the ranges in
  * rs, and returns false otherwise.
@@ -392,6 +632,39 @@ static struct cftype ss_files[] = {
 		.write		= net_write_ranges,
 		.private	= NETCG_BIND_RANGES,
 		.max_write_len	= MAX_WRITE_SIZE,
+	},
+	{
+		.name		= "udp_limit",
+		.flags		= CFTYPE_ONLY_ON_ROOT,
+		.read_s64	= net_udp_read_s64,
+		.private	= NETCG_LIMIT_UDP,
+	},
+	{
+		.name		= "udp_limit",
+		.flags		= CFTYPE_NOT_ON_ROOT,
+		.read_s64	= net_udp_read_s64,
+		.write_s64	= net_udp_write_s64,
+		.private	= NETCG_LIMIT_UDP,
+	},
+	{
+		.name		= "udp_usage",
+		.read_s64	= net_udp_read_s64,
+		.private	= NETCG_USAGE_UDP,
+	},
+	{
+		.name		= "udp_maxusage",
+		.read_s64	= net_udp_read_s64,
+		.private	= NETCG_MAXUSAGE_UDP,
+	},
+	{
+		.name		= "udp_failcnt",
+		.read_s64	= net_udp_read_s64,
+		.private	= NETCG_FAILCNT_UDP,
+	},
+	{
+		.name		= "udp_underflowcnt",
+		.read_s64	= net_udp_read_s64,
+		.private	= NETCG_UNDERFLOWCNT_UDP,
 	},
 	{ }	/* terminate */
 };
