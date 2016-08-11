@@ -4716,6 +4716,8 @@ exit:
 
 static int brcmf_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *ndev)
 {
+	struct brcmf_cfg80211_info *cfg = wiphy_to_cfg(wiphy);
+	struct net_device *primary_ndev = cfg_to_ndev(cfg);
 	struct brcmf_if *ifp = netdev_priv(ndev);
 	s32 err;
 	struct brcmf_fil_bss_enable_le bss_enable;
@@ -4723,7 +4725,8 @@ static int brcmf_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *ndev)
 
 	brcmf_dbg(TRACE, "Enter\n");
 
-	if (ifp->vif->wdev.iftype == NL80211_IFTYPE_AP) {
+	if ((ifp->vif->wdev.iftype == NL80211_IFTYPE_AP) &&
+	    (ndev == primary_ndev)) {
 		/* Due to most likely deauths outstanding we sleep */
 		/* first to make sure they get processed by fw. */
 		msleep(400);
