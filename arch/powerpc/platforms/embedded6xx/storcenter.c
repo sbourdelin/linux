@@ -34,7 +34,7 @@ static int __init storcenter_device_probe(void)
 	of_platform_bus_probe(NULL, storcenter_of_bus, NULL);
 	return 0;
 }
-machine_device_initcall(storcenter, storcenter_device_probe);
+machine_arch_initcall(storcenter, storcenter_device_probe);
 
 
 static int __init storcenter_add_bridge(struct device_node *dev)

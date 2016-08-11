@@ -48,7 +48,7 @@ static int __init mpc834x_itx_declare_of_platform_devices(void)
 	mpc83xx_declare_of_platform_devices();
 	return of_platform_bus_probe(NULL, mpc834x_itx_ids, NULL);
 }
-machine_device_initcall(mpc834x_itx, mpc834x_itx_declare_of_platform_devices);
+machine_arch_initcall(mpc834x_itx, mpc834x_itx_declare_of_platform_devices);
 
 /* ************************************************************************
  *

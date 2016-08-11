@@ -302,7 +302,7 @@ static int __init declare_of_platform_devices(void)
 
 	return 0;
 }
-machine_device_initcall(ep8248e, declare_of_platform_devices);
+machine_arch_initcall(ep8248e, declare_of_platform_devices);
 
 /*
  * Called very early, device-tree isn't unflattened

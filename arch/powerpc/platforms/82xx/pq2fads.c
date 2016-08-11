@@ -180,7 +180,7 @@ static int __init declare_of_platform_devices(void)
 	of_platform_bus_probe(NULL, of_bus_ids, NULL);
 	return 0;
 }
-machine_device_initcall(pq2fads, declare_of_platform_devices);
+machine_arch_initcall(pq2fads, declare_of_platform_devices);
 
 define_machine(pq2fads)
 {

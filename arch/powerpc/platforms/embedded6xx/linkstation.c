@@ -32,7 +32,7 @@ static int __init declare_of_platform_devices(void)
 	of_platform_bus_probe(NULL, of_bus_ids, NULL);
 	return 0;
 }
-machine_device_initcall(linkstation, declare_of_platform_devices);
+machine_arch_initcall(linkstation, declare_of_platform_devices);
 
 static int __init linkstation_add_bridge(struct device_node *dev)
 {

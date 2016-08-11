@@ -160,7 +160,7 @@ static int __init declare_of_platform_devices(void)
 
 	return 0;
 }
-machine_device_initcall(ep88xc, declare_of_platform_devices);
+machine_arch_initcall(ep88xc, declare_of_platform_devices);
 
 define_machine(ep88xc) {
 	.name = "Embedded Planet EP88xC",

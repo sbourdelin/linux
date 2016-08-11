@@ -33,7 +33,7 @@ static int __init virtex_device_probe(void)
 
 	return 0;
 }
-machine_device_initcall(virtex, virtex_device_probe);
+machine_arch_initcall(virtex, virtex_device_probe);
 
 static int __init virtex_probe(void)
 {

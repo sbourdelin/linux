@@ -47,7 +47,7 @@ static int __init iss4xx_device_probe(void)
 
 	return 0;
 }
-machine_device_initcall(iss4xx, iss4xx_device_probe);
+machine_arch_initcall(iss4xx, iss4xx_device_probe);
 
 /* We can have either UICs or MPICs */
 static void __init iss4xx_init_irq(void)

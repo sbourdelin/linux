@@ -97,5 +97,5 @@ static int __init gamecube_device_probe(void)
 	of_platform_bus_probe(NULL, gamecube_of_bus, NULL);
 	return 0;
 }
-device_initcall(gamecube_device_probe);
+arch_initcall(gamecube_device_probe);
 

@@ -40,7 +40,7 @@ static int __init warp_device_probe(void)
 	of_platform_bus_probe(NULL, warp_of_bus, NULL);
 	return 0;
 }
-machine_device_initcall(warp, warp_device_probe);
+machine_arch_initcall(warp, warp_device_probe);
 
 static int __init warp_probe(void)
 {

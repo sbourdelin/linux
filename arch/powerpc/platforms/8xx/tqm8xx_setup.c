@@ -136,7 +136,7 @@ static int __init declare_of_platform_devices(void)
 
 	return 0;
 }
-machine_device_initcall(tqm8xx, declare_of_platform_devices);
+machine_arch_initcall(tqm8xx, declare_of_platform_devices);
 
 define_machine(tqm8xx) {
 	.name			= "TQM8xx",

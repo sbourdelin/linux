@@ -242,5 +242,5 @@ static int __init wii_device_probe(void)
 	of_platform_bus_probe(NULL, wii_of_bus, NULL);
 	return 0;
 }
-device_initcall(wii_device_probe);
+arch_initcall(wii_device_probe);
 

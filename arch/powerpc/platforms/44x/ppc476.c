@@ -118,7 +118,7 @@ static int __init ppc47x_device_probe(void)
 
 	return 0;
 }
-machine_device_initcall(ppc47x, ppc47x_device_probe);
+machine_arch_initcall(ppc47x, ppc47x_device_probe);
 
 static void __init ppc47x_init_irq(void)
 {

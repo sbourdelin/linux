@@ -47,7 +47,7 @@ static int __init ppc460ex_device_probe(void)
 
 	return 0;
 }
-machine_device_initcall(canyonlands, ppc460ex_device_probe);
+machine_arch_initcall(canyonlands, ppc460ex_device_probe);
 
 /* Using this code only for the Canyonlands board.  */
 

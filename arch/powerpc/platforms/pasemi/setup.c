@@ -407,7 +407,7 @@ static int __init pasemi_publish_devices(void)
 
 	return 0;
 }
-machine_device_initcall(pasemi, pasemi_publish_devices);
+machine_arch_initcall(pasemi, pasemi_publish_devices);
 
 
 /*

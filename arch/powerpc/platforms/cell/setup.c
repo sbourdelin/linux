@@ -185,7 +185,7 @@ static int __init cell_publish_devices(void)
 
 	return 0;
 }
-machine_subsys_initcall(cell, cell_publish_devices);
+machine_arch_initcall(cell, cell_publish_devices);
 
 static void __init mpic_init_IRQ(void)
 {

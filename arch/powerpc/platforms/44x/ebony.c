@@ -42,7 +42,7 @@ static int __init ebony_device_probe(void)
 
 	return 0;
 }
-machine_device_initcall(ebony, ebony_device_probe);
+machine_arch_initcall(ebony, ebony_device_probe);
 
 /*
  * Called very early, MMU is off, device-tree isn't unflattened

@@ -39,7 +39,7 @@ static int __init ppc40x_device_probe(void)
 
 	return 0;
 }
-machine_device_initcall(ppc40x_simple, ppc40x_device_probe);
+machine_arch_initcall(ppc40x_simple, ppc40x_device_probe);
 
 /* This is the list of boards that can be supported by this simple
  * platform code.  This does _not_ mean the boards are compatible,

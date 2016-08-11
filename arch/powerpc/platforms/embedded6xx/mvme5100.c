@@ -204,7 +204,7 @@ static int __init probe_of_platform_devices(void)
 	return 0;
 }
 
-machine_device_initcall(mvme5100, probe_of_platform_devices);
+machine_arch_initcall(mvme5100, probe_of_platform_devices);
 
 define_machine(mvme5100) {
 	.name			= "MVME5100",

@@ -42,7 +42,7 @@ static int __init sam440ep_device_probe(void)
 
 	return 0;
 }
-machine_device_initcall(sam440ep, sam440ep_device_probe);
+machine_arch_initcall(sam440ep, sam440ep_device_probe);
 
 static int __init sam440ep_probe(void)
 {

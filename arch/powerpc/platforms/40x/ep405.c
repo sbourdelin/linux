@@ -62,7 +62,7 @@ static int __init ep405_device_probe(void)
 
 	return 0;
 }
-machine_device_initcall(ep405, ep405_device_probe);
+machine_arch_initcall(ep405, ep405_device_probe);
 
 static void __init ep405_init_bcsr(void)
 {
