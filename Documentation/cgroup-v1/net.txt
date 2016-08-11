@@ -1,0 +1,9 @@
+Networking cgroup
+=================
+
+The net cgroup controller keeps track of the following networking related
+properties for each process group:
+* bind port ranges
+* listen port ranges
+* dscp ranges
+* udp port usage and limit

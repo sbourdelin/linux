@@ -278,6 +278,16 @@ config CGROUP_NET_CLASSID
 	  Cgroup subsystem for use as general purpose socket classid marker that is
 	  being used in cls_cgroup and for netfilter matching.
 
+config CGROUP_NET
+	bool "Networking cgroup"
+	depends on CGROUPS
+	---help---
+	  Cgroup subsystem for use in managing several networking properties,
+	  such as restricting which ports are available for processes to bind
+	  and listen on, restricting which dscp values processes can use with
+	  their sockets, and limiting the number of udp ports that can be
+	  acquired by processes from the cgroup.
+
 config NET_RX_BUSY_POLL
 	bool
 	default y
