@@ -48,6 +48,7 @@ struct clk_pll {
 	u32	l_reg;
 	u32	m_reg;
 	u32	n_reg;
+	u32	alpha_reg;
 	u32	config_reg;
 	u32	mode_reg;
 	u32	status_reg;
@@ -70,6 +71,7 @@ struct pll_config {
 	u16 l;
 	u32 m;
 	u32 n;
+	u32 alpha;
 	u32 vco_val;
 	u32 vco_mask;
 	u32 pre_div_val;

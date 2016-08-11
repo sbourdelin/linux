@@ -255,8 +255,12 @@ static void clk_pll_configure(struct clk_pll *pll, struct regmap *regmap,
 	u32 mask;
 
 	regmap_write(regmap, pll->l_reg, config->l);
-	regmap_write(regmap, pll->m_reg, config->m);
-	regmap_write(regmap, pll->n_reg, config->n);
+	if (pll->alpha_reg) {
+		regmap_write(regmap, pll->alpha_reg, config->alpha);
+	} else {
+		regmap_write(regmap, pll->m_reg, config->m);
+		regmap_write(regmap, pll->n_reg, config->n);
+	}
 
 	val = config->vco_val;
 	val |= config->pre_div_val;
