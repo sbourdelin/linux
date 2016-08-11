@@ -390,9 +390,9 @@ EXPORT_SYMBOL(sas_remove_host);
  */
 u64 sas_get_address(struct scsi_device *sdev)
 {
-	struct sas_end_device *rdev = sas_sdev_to_rdev(sdev);
+	struct sas_rphy *rphy = target_to_rphy(sdev->sdev_target);
 
-	return rdev->rphy.identify.sas_address;
+	return rphy->identify.sas_address;
 }
 EXPORT_SYMBOL(sas_get_address);
 
