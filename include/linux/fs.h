@@ -578,7 +578,7 @@ struct posix_acl;
 static inline struct posix_acl *
 uncached_acl_sentinel(struct task_struct *task)
 {
-	return (void *)task + 1;
+	return (struct posix_acl *)((unsigned long)task | 1);
 }
 
 static inline bool
