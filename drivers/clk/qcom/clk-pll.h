@@ -52,9 +52,12 @@ struct clk_pll {
 	u32	config_reg;
 	u32	mode_reg;
 	u32	status_reg;
+	u32	config_ctl_reg;
 	u8	status_bit;
 	u8	post_div_width;
 	u8	post_div_shift;
+	unsigned long min_rate;
+	unsigned long max_rate;
 
 	const struct pll_freq_tbl *freq_tbl;
 
@@ -64,6 +67,7 @@ struct clk_pll {
 extern const struct clk_ops clk_pll_ops;
 extern const struct clk_ops clk_pll_vote_ops;
 extern const struct clk_ops clk_pll_sr2_ops;
+extern const struct clk_ops clk_pll_dynamic_ops;
 
 #define to_clk_pll(_hw) container_of(to_clk_regmap(_hw), struct clk_pll, clkr)
 
@@ -78,6 +82,8 @@ struct pll_config {
 	u32 pre_div_mask;
 	u32 post_div_val;
 	u32 post_div_mask;
+	u32 config_ctl_val;
+	u32 config_ctl_hi_val;
 	u32 mn_ena_mask;
 	u32 main_output_mask;
 	u32 aux_output_mask;
@@ -88,5 +94,6 @@ void clk_pll_configure_sr(struct clk_pll *pll, struct regmap *regmap,
 		const struct pll_config *config, bool fsm_mode);
 void clk_pll_configure_sr_hpm_lp(struct clk_pll *pll, struct regmap *regmap,
 		const struct pll_config *config, bool fsm_mode);
-
+void clk_pll_configure_dynamic(struct clk_pll *pll, struct regmap *regmap,
+		const struct pll_config *config);
 #endif
