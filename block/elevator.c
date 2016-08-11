@@ -368,6 +368,8 @@ void elv_dispatch_sort(struct request_queue *q, struct request *rq)
 
 		if ((req_op(rq) == REQ_OP_DISCARD) != (req_op(pos) == REQ_OP_DISCARD))
 			break;
+		if ((req_op(rq) == REQ_OP_SECURE_ERASE) != (req_op(pos) == REQ_OP_SECURE_ERASE))
+			break;
 		if (rq_data_dir(rq) != rq_data_dir(pos))
 			break;
 		if (pos->cmd_flags & stop_flags)
