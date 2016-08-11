@@ -254,11 +254,13 @@ lpfc_mem_free(struct lpfc_hba *phba)
 			      pool->elements[i].phys);
 	kfree(pool->elements);
 
-	pci_pool_destroy(phba->lpfc_mbuf_pool);
+	if (phba->lpfc_mbuf_pool)
+		pci_pool_destroy(phba->lpfc_mbuf_pool);
 	phba->lpfc_mbuf_pool = NULL;
 
 	/* Free DMA buffer memory pool */
-	pci_pool_destroy(phba->lpfc_scsi_dma_buf_pool);
+	if (phba->lpfc_scsi_dma_buf_pool)
+		pci_pool_destroy(phba->lpfc_scsi_dma_buf_pool);
 	phba->lpfc_scsi_dma_buf_pool = NULL;
 
 	/* Free Device Data memory pool */
