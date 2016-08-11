@@ -17,6 +17,16 @@ Required properties:
 - phy-handle: see ethernet.txt [1].
 - mac-address: see ethernet.txt [1].
 - clocks: clock phandle and specifier pair.
+- clock-names: contain the clock name "mac_core" and "mac_ifc".
+- resets: should contain the phandle to the MAC core reset signal(required),
+	the MAC interface reset signal(required)
+	and the PHY reset signal(optional).
+- reset-names: contain the reset signal name "mac_core"(required),
+	"mac_ifc"(required) and "phy"(optional).
+- hisilicon,phy-reset-delays-us: triplet of delays if PHY reset signal given.
+	The 1st cell is reset pre-delay in micro seconds.
+	The 2nd cell is reset pulse in micro seconds.
+	The 3rd cell is reset post-delay in micro seconds.
 
 - PHY subnode: inherits from phy binding [2]
 
@@ -33,7 +43,11 @@ Example:
 		phy-mode = "mii";
 		phy-handle = <&phy2>;
 		mac-address = [00 00 00 00 00 00];
-		clocks = <&clock HIX5HD2_MAC0_CLK>;
+		clocks = <&clock HIX5HD2_MAC0_CLK>, <&clock HIX5HD2_MAC_IFC0_CLK>;
+		clock-names = "mac_core", "mac_ifc";
+		resets = <&clock 0xcc 8>, <&clock 0xcc 10>, <&clock 0x120 4>;
+		reset-names = "mac_core", "mac_ifc", "phy";
+		hisilicon,phy-reset-delays-us = <10000 10000 30000>;
 
 		phy2: ethernet-phy@2 {
 			reg = <2>;
