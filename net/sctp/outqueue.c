@@ -1193,7 +1193,7 @@ sctp_flush_out:
 						      send_ready);
 		packet = &t->packet;
 		if (!sctp_packet_empty(packet))
-			error = sctp_packet_transmit(packet, gfp);
+			error = sctp_packet_transmit(packet, gfp) ? : error;
 
 		/* Clear the burst limited state, if any */
 		sctp_transport_burst_reset(t);
