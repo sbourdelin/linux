@@ -2295,6 +2295,7 @@ static unsigned int ata_scsiop_inq_89(struct ata_scsi_args *args, u8 *rbuf)
 static unsigned int ata_scsiop_inq_b0(struct ata_scsi_args *args, u8 *rbuf)
 {
 	u16 min_io_sectors;
+	u32 sector_size;
 
 	rbuf[1] = 0xb0;
 	rbuf[3] = 0x3c;		/* required VPD size with unmap support */
@@ -2309,17 +2310,27 @@ static unsigned int ata_scsiop_inq_b0(struct ata_scsi_args *args, u8 *rbuf)
 	min_io_sectors = 1 << ata_id_log2_per_physical_sector(args->id);
 	put_unaligned_be16(min_io_sectors, &rbuf[6]);
 
-	/*
-	 * Optimal unmap granularity.
-	 *
-	 * The ATA spec doesn't even know about a granularity or alignment
-	 * for the TRIM command.  We can leave away most of the unmap related
-	 * VPD page entries, but we have specifify a granularity to signal
-	 * that we support some form of unmap - in thise case via WRITE SAME
-	 * with the unmap bit set.
-	 */
+	sector_size = ata_id_logical_sector_size(args->id);
 	if (ata_id_has_trim(args->id)) {
-		put_unaligned_be64(65535 * ATA_MAX_TRIM_RNUM, &rbuf[36]);
+		/*
+		 * Maximum write same length.
+		 *
+		 * Avoid overflow in discard_max_bytes and write_same_max_bytes
+		 * with AF 4Kn drives. Also make them consistent among drives
+		 * with different logical sector sizes.
+		 */
+		put_unaligned_be64(65535 * ATA_MAX_TRIM_RNUM /
+				   (sector_size / 512), &rbuf[36]);
+
+		/*
+		 * Optimal unmap granularity.
+		 *
+		 * The ATA spec doesn't even know about a granularity or alignment
+		 * for the TRIM command.  We can leave away most of the unmap related
+		 * VPD page entries, but we have specifify a granularity to signal
+		 * that we support some form of unmap - in thise case via WRITE SAME
+		 * with the unmap bit set.
+		 */
 		put_unaligned_be32(1, &rbuf[28]);
 	}
 
