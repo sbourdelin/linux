@@ -116,6 +116,7 @@ static int __init clps711x_timer_init(struct device_node *np)
 	case CLPS711X_CLKSRC_CLOCKEVENT:
 		return _clps711x_clkevt_init(clock, base, irq);
 	default:
+		iounmap(base);
 		return -EINVAL;
 	}
 }
