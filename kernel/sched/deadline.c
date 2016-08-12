@@ -641,11 +641,15 @@ static enum hrtimer_restart dl_task_timer(struct hrtimer *timer)
 		goto unlock;
 	}
 
-	enqueue_task_dl(rq, p, ENQUEUE_REPLENISH);
-	if (dl_task(rq->curr))
-		check_preempt_curr_dl(rq, p, 0);
-	else
-		resched_curr(rq);
+	if (unlikely(!rq->online))
+		replenish_dl_entity(dl_se, dl_se);
+	else {
+		enqueue_task_dl(rq, p, ENQUEUE_REPLENISH);
+		if (dl_task(rq->curr))
+			check_preempt_curr_dl(rq, p, 0);
+		else
+			resched_curr(rq);
+	}
 
 #ifdef CONFIG_SMP
 	/*
