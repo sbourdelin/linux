@@ -2639,6 +2639,11 @@ int ata_dev_configure(struct ata_device *dev)
 		dev->max_sectors = min_t(unsigned int, ATA_MAX_SECTORS_1024,
 					 dev->max_sectors);
 
+	/* For disk devices, max sectors set here will only be used as
+	 * max_dev_sectors. We should never expect max sectors horkage
+	 * that sets the value larger than BLK_DEF_MAX_SECTORS to work
+	 * for non-ATAPI devices. */
+
 	if (dev->horkage & ATA_HORKAGE_MAX_SEC_LBA48)
 		dev->max_sectors = ATA_MAX_SECTORS_LBA48;
 

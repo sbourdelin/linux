@@ -1204,13 +1204,25 @@ static int ata_scsi_dev_config(struct scsi_device *sdev,
 	if (!ata_id_has_unload(dev->id))
 		dev->flags |= ATA_DFLAG_NO_UNLOAD;
 
-	/* configure max sectors */
-	blk_queue_max_hw_sectors(q, dev->max_sectors);
-
 	if (dev->class == ATA_DEV_ATAPI) {
 		void *buf;
 
 		sdev->sector_size = ATA_SECT_SIZE;
+
+		/*
+		 * max_hw_sectors is supposed to be host controller limit, it is
+		 * changed here only to make sure ATA_HORKAGE_MAX_SEC_LBA48 that
+		 * is needed by a few ATAPI devices works.
+		 *
+		 * Unlike the SCSI disk driver, the SCSI cdrom (sr) driver will
+		 * not further change max_sectors. Therefore, the value that is
+		 * also set here is guaranteed to be the effective one.
+		 *
+		 * For disk devices, we should only report dev->max_sectors in
+		 * the Maximum Transfer Length field on the Block Limits VPD
+		 * (which CD/DVD devices are not supposed to have).
+		 */
+		blk_queue_max_hw_sectors(q, dev->max_sectors);
 
 		/* set DMA padding */
 		blk_queue_update_dma_pad(q, ATA_DMA_PAD_SZ - 1);
@@ -2308,6 +2320,13 @@ static unsigned int ata_scsiop_inq_b0(struct ata_scsi_args *args, u8 *rbuf)
 	 */
 	min_io_sectors = 1 << ata_id_log2_per_physical_sector(args->id);
 	put_unaligned_be16(min_io_sectors, &rbuf[6]);
+
+	/*
+	 * Maximum transfer length.
+	 *
+	 * This will be used by the SCSI disk driver to set max_dev_sectors.
+	 */
+	put_unaligned_be32(args->dev->max_sectors, &rbuf[8]);
 
 	/*
 	 * Optimal unmap granularity.
