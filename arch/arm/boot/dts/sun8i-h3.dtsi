@@ -441,6 +441,16 @@
 			status = "disabled";
 		};
 
+		hwspinlock: hwspinlock@1c18000 {
+			compatible = "allwinner,sun8i-hwspinlock";
+			reg = <0x01c18000 0x400>;
+			resets = <&ccu RST_BUS_SPINLOCK>;
+			reset-names = "ahb";
+			clocks = <&ccu CLK_BUS_SPINLOCK>;
+			clock-names = "ahb";
+			status = "disabled";
+		};
+
 		gic: interrupt-controller@01c81000 {
 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
 			reg = <0x01c81000 0x1000>,
