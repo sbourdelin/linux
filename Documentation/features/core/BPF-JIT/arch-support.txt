@@ -1,6 +1,6 @@
 #
 # Feature name:          BPF-JIT
-#         Kconfig:       HAVE_BPF_JIT
+#         Kconfig:       HAVE_CBPF_JIT or HAVE_EBPF_JIT
 #         description:   arch supports BPF JIT optimizations
 #
     -----------------------
