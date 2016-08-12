@@ -190,9 +190,10 @@ static int x2apic_cluster_probe(void)
 	if (!x2apic_mode)
 		return 0;
 
-	cpumask_set_cpu(cpu, per_cpu(cpus_in_cluster, cpu));
 	cpuhp_setup_state(CPUHP_X2APIC_PREPARE, "X2APIC_PREPARE",
 			  x2apic_prepare_cpu, x2apic_dead_cpu);
+	cpumask_set_cpu(cpu, per_cpu(cpus_in_cluster, cpu));
+
 	return 1;
 }
 
