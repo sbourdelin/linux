@@ -282,6 +282,7 @@ struct proc_maps_private {
 	struct mm_struct *mm;
 #ifdef CONFIG_MMU
 	struct vm_area_struct *tail_vma;
+	struct mem_size_stats *mss;
 #endif
 #ifdef CONFIG_NUMA
 	struct mempolicy *task_mempolicy;
@@ -298,6 +299,8 @@ extern const struct file_operations proc_pid_smaps_operations;
 extern const struct file_operations proc_tid_smaps_operations;
 extern const struct file_operations proc_clear_refs_operations;
 extern const struct file_operations proc_pagemap_operations;
+extern const struct file_operations proc_totmaps_operations;
+
 
 extern unsigned long task_vsize(struct mm_struct *);
 extern unsigned long task_statm(struct mm_struct *,

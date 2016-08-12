@@ -246,6 +246,9 @@ static int proc_map_release(struct inode *inode, struct file *file)
 	struct seq_file *seq = file->private_data;
 	struct proc_maps_private *priv = seq->private;
 
+	if (!priv)
+		return 0;
+
 	if (priv->mm)
 		mmdrop(priv->mm);
 
@@ -810,6 +813,75 @@ static int show_smap(struct seq_file *m, void *v, int is_pid)
 	return 0;
 }
 
+static void add_smaps_sum(struct mem_size_stats *mss,
+		struct mem_size_stats *mss_sum)
+{
+	mss_sum->resident += mss->resident;
+	mss_sum->pss += mss->pss;
+	mss_sum->shared_clean += mss->shared_clean;
+	mss_sum->shared_dirty += mss->shared_dirty;
+	mss_sum->private_clean += mss->private_clean;
+	mss_sum->private_dirty += mss->private_dirty;
+	mss_sum->referenced += mss->referenced;
+	mss_sum->anonymous += mss->anonymous;
+	mss_sum->anonymous_thp += mss->anonymous_thp;
+	mss_sum->swap += mss->swap;
+}
+
+static int totmaps_proc_show(struct seq_file *m, void *data)
+{
+	struct proc_maps_private *priv = m->private;
+	struct mm_struct *mm = priv->mm;
+	struct vm_area_struct *vma;
+	struct mem_size_stats mss_sum;
+
+	memset(&mss_sum, 0, sizeof(mss_sum));
+	down_read(&mm->mmap_sem);
+	hold_task_mempolicy(priv);
+
+	for (vma = mm->mmap; vma != priv->tail_vma; vma = vma->vm_next) {
+		struct mem_size_stats mss;
+		struct mm_walk smaps_walk = {
+			.pmd_entry = smaps_pte_range,
+			.mm = vma->vm_mm,
+			.private = &mss,
+		};
+
+		if (vma->vm_mm && !is_vm_hugetlb_page(vma)) {
+			memset(&mss, 0, sizeof(mss));
+			walk_page_vma(vma, &smaps_walk);
+			add_smaps_sum(&mss, &mss_sum);
+		}
+	}
+
+	seq_printf(m,
+		   "Rss:            %8lu kB\n"
+		   "Pss:            %8lu kB\n"
+		   "Shared_Clean:   %8lu kB\n"
+		   "Shared_Dirty:   %8lu kB\n"
+		   "Private_Clean:  %8lu kB\n"
+		   "Private_Dirty:  %8lu kB\n"
+		   "Referenced:     %8lu kB\n"
+		   "Anonymous:      %8lu kB\n"
+		   "AnonHugePages:  %8lu kB\n"
+		   "Swap:           %8lu kB\n",
+		   mss_sum.resident >> 10,
+		   (unsigned long)(mss_sum.pss >> (10 + PSS_SHIFT)),
+		   mss_sum.shared_clean  >> 10,
+		   mss_sum.shared_dirty  >> 10,
+		   mss_sum.private_clean >> 10,
+		   mss_sum.private_dirty >> 10,
+		   mss_sum.referenced >> 10,
+		   mss_sum.anonymous >> 10,
+		   mss_sum.anonymous_thp >> 10,
+		   mss_sum.swap >> 10);
+
+	release_task_mempolicy(priv);
+	up_read(&mm->mmap_sem);
+
+	return 0;
+}
+
 static int show_pid_smap(struct seq_file *m, void *v)
 {
 	return show_smap(m, v, 1);
@@ -819,6 +891,28 @@ static int show_tid_smap(struct seq_file *m, void *v)
 {
 	return show_smap(m, v, 0);
 }
+
+static void *m_totmaps_start(struct seq_file *p, loff_t *pos)
+{
+	return NULL + (*pos == 0);
+}
+
+static void *m_totmaps_next(struct seq_file *p, void *v, loff_t *pos)
+{
+	++*pos;
+	return NULL;
+}
+
+static void m_totmaps_stop(struct seq_file *p, void *v)
+{
+}
+
+static const struct seq_operations proc_totmaps_op = {
+	.start	= m_totmaps_start,
+	.next	= m_totmaps_next,
+	.stop	= m_totmaps_stop,
+	.show	= totmaps_proc_show
+};
 
 static const struct seq_operations proc_pid_smaps_op = {
 	.start	= m_start,
@@ -844,6 +938,39 @@ static int tid_smaps_open(struct inode *inode, struct file *file)
 	return do_maps_open(inode, file, &proc_tid_smaps_op);
 }
 
+static int totmaps_open(struct inode *inode, struct file *file)
+{
+	struct proc_maps_private *priv = NULL;
+	struct seq_file *seq;
+	int ret;
+
+	ret = do_maps_open(inode, file, &proc_totmaps_op);
+	if (ret)
+		goto error;
+
+	seq = file->private_data;
+	priv = seq->private;
+
+	/*
+	 * We need to grab references to the task_struct
+	 * at open time, because there's a potential information
+	 * leak where the totmaps file is opened and held open
+	 * while the underlying pid to task mapping changes
+	 * underneath it
+	 */
+	priv->task = get_proc_task(inode);
+	if (!priv->task) {
+		ret = -ESRCH;
+		goto error;
+	}
+
+	return 0;
+
+error:
+	proc_map_release(inode, file);
+	return ret;
+}
+
 const struct file_operations proc_pid_smaps_operations = {
 	.open		= pid_smaps_open,
 	.read		= seq_read,
@@ -853,6 +980,13 @@ const struct file_operations proc_pid_smaps_operations = {
 
 const struct file_operations proc_tid_smaps_operations = {
 	.open		= tid_smaps_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= proc_map_release,
+};
+
+const struct file_operations proc_totmaps_operations = {
+	.open		= totmaps_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= proc_map_release,
