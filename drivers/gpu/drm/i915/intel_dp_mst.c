@@ -352,13 +352,23 @@ static enum drm_mode_status
 intel_dp_mst_mode_valid(struct drm_connector *connector,
 			struct drm_display_mode *mode)
 {
+	int req_pbn = 0;
+	int avail_pbn = 0;
+	struct intel_connector *intel_connector = to_intel_connector(connector);
+	struct intel_dp *intel_dp = intel_connector->mst_port;
+	struct drm_dp_mst_topology_mgr *mgr = &intel_dp->mst_mgr;
+	struct drm_dp_mst_port *port = (struct drm_dp_mst_port *) (intel_connector->port);
 	int max_dotclk = to_i915(connector->dev)->max_dotclk_freq;
 
-	/* TODO - validate mode against available PBN for link */
+	avail_pbn = drm_dp_mst_get_avail_pbn(mgr, port);
+	req_pbn = drm_dp_calc_pbn_mode(mode->clock, 24);
+	if (req_pbn > avail_pbn)
+		return MODE_H_ILLEGAL;
+
 	if (mode->clock < 10000)
 		return MODE_CLOCK_LOW;
 
-	if (mode->flags & DRM_MODE_FLAG_DBLCLK)
+        if (mode->flags & DRM_MODE_FLAG_DBLCLK)
 		return MODE_H_ILLEGAL;
 
 	if (mode->clock > max_dotclk)
