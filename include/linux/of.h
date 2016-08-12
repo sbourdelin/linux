@@ -616,6 +616,23 @@ static inline int of_machine_is_compatible(const char *compat)
 	return 0;
 }
 
+static inline int of_add_property(struct device_node *np, struct property *prop)
+{
+	return -ENOTSUPP;
+}
+
+static inline int of_remove_property(struct device_node *np,
+				     struct property *prop)
+{
+	return -ENOTSUPP;
+}
+
+static inline int of_update_property(struct device_node *np,
+				     struct property *newprop)
+{
+	return -ENOTSUPP;
+}
+
 static inline bool of_console_check(const struct device_node *dn, const char *name, int index)
 {
 	return false;

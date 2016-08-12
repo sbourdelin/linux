@@ -1738,6 +1738,7 @@ int of_add_property(struct device_node *np, struct property *prop)
 
 	return rc;
 }
+EXPORT_SYMBOL(of_add_property);
 
 int __of_remove_property(struct device_node *np, struct property *prop)
 {
@@ -1797,6 +1798,7 @@ int of_remove_property(struct device_node *np, struct property *prop)
 
 	return rc;
 }
+EXPORT_SYMBOL(of_remove_property);
 
 int __of_update_property(struct device_node *np, struct property *newprop,
 		struct property **oldpropp)
@@ -1873,6 +1875,7 @@ int of_update_property(struct device_node *np, struct property *newprop)
 
 	return rc;
 }
+EXPORT_SYMBOL(of_update_property);
 
 static void of_alias_add(struct alias_prop *ap, struct device_node *np,
 			 int id, const char *stem, int stem_len)
