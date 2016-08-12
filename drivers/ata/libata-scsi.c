@@ -1204,13 +1204,25 @@ static int ata_scsi_dev_config(struct scsi_device *sdev,
 	if (!ata_id_has_unload(dev->id))
 		dev->flags |= ATA_DFLAG_NO_UNLOAD;
 
-	/* configure max sectors */
-	blk_queue_max_hw_sectors(q, dev->max_sectors);
-
 	if (dev->class == ATA_DEV_ATAPI) {
 		void *buf;
 
 		sdev->sector_size = ATA_SECT_SIZE;
+
+		/*
+		 * We are setting the limit here merely because CD/DVD device does not
+		 * have Block Limits VPD.
+		 *
+		 * Supposedly dev->max_sectors should be left shifted by
+		 * (ilog2(sdev->sector_size) - 9). But since ATAPI class device has a
+		 * static logical sector size of 512 (ATA_SECT_SIZE), the shift became
+		 * unnecessary.
+		 */
+		q->limits.max_dev_sectors = dev->max_sectors;
+		/* Make max_dev_sectors effective by adjusting max_sectors accordingly,
+		   while leave max_hw_sectors, which is supposed to be host controller
+		   limit, untouched. */
+		blk_queue_max_hw_sectors(q, queue_max_hw_sectors(q));
 
 		/* set DMA padding */
 		blk_queue_update_dma_pad(q, ATA_DMA_PAD_SZ - 1);
@@ -2308,6 +2320,13 @@ static unsigned int ata_scsiop_inq_b0(struct ata_scsi_args *args, u8 *rbuf)
 	 */
 	min_io_sectors = 1 << ata_id_log2_per_physical_sector(args->id);
 	put_unaligned_be16(min_io_sectors, &rbuf[6]);
+
+	/*
+	 * Maximum transfer length.
+	 *
+	 * This will be used by the SCSI disk driver to set max_dev_sectors.
+	 */
+	put_unaligned_be32(args->dev->max_sectors, &rbuf[8]);
 
 	/*
 	 * Optimal unmap granularity.
