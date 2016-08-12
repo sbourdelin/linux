@@ -1016,10 +1016,15 @@ xfs_file_iomap_begin(
 		 * number pulled out of thin air as a best guess for initial
 		 * testing.
 		 *
+		 * xfs_iomap_write_delay() only works if the length passed in is
+		 * >= one filesystem block. Hence we need to clamp the minimum
+		 * length we map, too.
+		 *
 		 * Note that the values needs to be less than 32-bits wide until
 		 * the lower level functions are updated.
 		 */
 		length = min_t(loff_t, length, 1024 * PAGE_SIZE);
+		length = max_t(loff_t, length, (1 << inode->i_blkbits));
 		if (xfs_get_extsz_hint(ip)) {
 			/*
 			 * xfs_iomap_write_direct() expects the shared lock. It
