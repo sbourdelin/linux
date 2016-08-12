@@ -39,6 +39,7 @@
 #include <linux/compiler.h>
 #include <linux/hugetlb.h>
 
+#include <linux/cma.h>
 #include <asm/page.h>
 #include <asm/sections.h>
 
@@ -46,7 +47,9 @@
 #include <crypto/sha.h>
 #include "kexec_internal.h"
 
+#define CRASH_ALIGN		(16 << 20)
 DEFINE_MUTEX(kexec_mutex);
+DEFINE_MUTEX(kexec_mutex_low);
 
 /* Per cpu memory for storing cpu states in case of system crash. */
 note_buf_t __percpu *crash_notes;
@@ -57,6 +60,7 @@ u32 vmcoreinfo_note[VMCOREINFO_NOTE_SIZE/4];
 size_t vmcoreinfo_size;
 size_t vmcoreinfo_max_size = sizeof(vmcoreinfo_data);
 
+static struct page *pages, *pages_low;
 /* Flag to indicate we are going to kexec a new kernel */
 bool kexec_in_progress = false;
 
@@ -971,6 +975,85 @@ unlock:
 	mutex_unlock(&kexec_mutex);
 	return ret;
 }
+#ifdef CONFIG_KEXEC_CMA
+#ifdef CONFIG_X86
+	size_t crash_get_memory_size_low(void)
+	{
+		size_t size = 0;
+
+		mutex_lock(&kexec_mutex_low);
+		if (crashk_low_res.end != crashk_low_res.start)
+			size = resource_size(&crashk_low_res);
+		mutex_unlock(&kexec_mutex_low);
+		return size;
+	}
+	int crash_free_memory(unsigned int size)
+	{
+		int ret;
+
+		if (!crashk_cma)
+			return 0;
+		ret = cma_release(crashk_cma, pages, size >> PAGE_SHIFT);
+
+		if (!ret) {
+			pr_info("Crash memory release failed");
+			return ret;
+		}
+		release_resource(&crashk_res);
+		return 0;
+	}
+
+	int crash_alloc_memory(unsigned int size)
+	{
+		if (!crashk_cma)
+			return 0;
+		pages = cma_alloc(crashk_cma, size >> PAGE_SHIFT, KEXEC_CRASH_MEM_ALIGN);
+
+		if (!pages) {
+			pr_info("Memory for crash kernel not allocated");
+			return -ENOMEM;
+		}
+
+		crashk_res.start = page_to_pfn(pages) << PAGE_SHIFT;
+		crashk_res.end = crashk_res.start + size - 1;
+		insert_resource(&iomem_resource, &crashk_res);
+		return 0;
+	}
+
+	int crash_free_memory_low(void)
+	{
+		int ret;
+
+		if (!crashk_cma_low)
+			return 0;
+		ret = cma_release(crashk_cma_low, pages_low, cma_get_size(crashk_cma_low) >> PAGE_SHIFT);
+
+		if (!ret) {
+			pr_info("Crash low memory release failed");
+			return ret;
+		}
+		release_resource(&crashk_low_res);
+		return 0;
+	}
+
+	int crash_alloc_memory_low(void)
+	{
+		if (!crashk_cma_low)
+			return 0;
+		pages = cma_alloc(crashk_cma_low, cma_get_size(crashk_cma_low) >> PAGE_SHIFT, KEXEC_CRASH_MEM_ALIGN);
+
+		if (!pages) {
+			pr_info("Low memory for crash kernel not allocated");
+			return -ENOMEM;
+		}
+
+		crashk_low_res.start = page_to_pfn(pages) << PAGE_SHIFT;
+		crashk_low_res.end = crashk_low_res.start + cma_get_size(crashk_cma_low) - 1;
+		insert_resource(&iomem_resource, &crashk_low_res);
+		return 0;
+	}
+#endif
+#endif
 
 static u32 *append_elf_note(u32 *buf, char *name, unsigned type, void *data,
 			    size_t data_len)
