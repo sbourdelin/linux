@@ -1121,6 +1121,7 @@ int arizona_dev_init(struct arizona *arizona)
 		break;
 	default:
 		dev_err(arizona->dev, "Unknown device ID: %x\n", reg);
+		ret = -EINVAL;
 		goto err_reset;
 	}
 
@@ -1280,12 +1281,14 @@ int arizona_dev_init(struct arizona *arizona)
 		break;
 	default:
 		dev_err(arizona->dev, "Unknown device ID %x\n", reg);
+		ret = -EINVAL;
 		goto err_reset;
 	}
 
 	if (!subdevs) {
 		dev_err(arizona->dev,
 			"No kernel support for device ID %x\n", reg);
+		ret = -EINVAL;
 		goto err_reset;
 	}
 
