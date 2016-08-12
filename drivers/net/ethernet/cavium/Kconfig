@@ -48,7 +48,7 @@ config LIQUIDIO
 	select LIBCRC32C
 	---help---
 	  This driver supports Cavium LiquidIO Intelligent Server Adapters
-	  based on CN66XX and CN68XX chips.
+	  based on CN66XX, CN68XX and CN23XX chips.
 
 	  To compile this driver as a module, choose M here: the module
 	  will be called liquidio.  This is recommended.
@@ -59,7 +59,7 @@ config OCTEON_MGMT_ETHERNET
 	select PHYLIB
 	select MDIO_OCTEON
 	default y
-	help
+	---help---
 	  Enable the ethernet driver for the management
 	  port on Cavium Networks' Octeon CN57XX, CN56XX, CN55XX,
 	  CN54XX, CN52XX, and CN6XXX chips.
