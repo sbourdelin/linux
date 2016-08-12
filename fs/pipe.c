@@ -1115,12 +1115,12 @@ long pipe_fcntl(struct file *file, unsigned int cmd, unsigned long arg)
 	case F_SETPIPE_SZ: {
 		unsigned int size, nr_pages;
 
+		ret = -EINVAL;
+		if (!arg || arg > INT_MAX)
+			goto out;
+
 		size = round_pipe_size(arg);
 		nr_pages = size >> PAGE_SHIFT;
-
-		ret = -EINVAL;
-		if (!nr_pages)
-			goto out;
 
 		if (!capable(CAP_SYS_RESOURCE) && size > pipe_max_size) {
 			ret = -EPERM;
