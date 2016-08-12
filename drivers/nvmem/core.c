@@ -619,6 +619,7 @@ struct nvmem_device *of_nvmem_device_get(struct device_node *np, const char *id)
 
 	struct device_node *nvmem_np;
 	int index;
+	struct nvmem_device *nvmem;
 
 	index = of_property_match_string(np, "nvmem-names", id);
 
@@ -626,7 +627,9 @@ struct nvmem_device *of_nvmem_device_get(struct device_node *np, const char *id)
 	if (!nvmem_np)
 		return ERR_PTR(-EINVAL);
 
-	return __nvmem_device_get(nvmem_np, NULL, NULL);
+	nvmem = __nvmem_device_get(nvmem_np, NULL, NULL);
+	of_node_put(nvmem_np);
+	return nvmem;
 }
 EXPORT_SYMBOL_GPL(of_nvmem_device_get);
 #endif
@@ -768,12 +771,16 @@ struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
 		return ERR_PTR(-EINVAL);
 
 	nvmem_np = of_get_next_parent(cell_np);
-	if (!nvmem_np)
+	if (!nvmem_np) {
+		of_node_put(cell_np);
 		return ERR_PTR(-EINVAL);
+	}
 
 	nvmem = __nvmem_device_get(nvmem_np, NULL, NULL);
-	if (IS_ERR(nvmem))
+	if (IS_ERR(nvmem)) {
+		of_node_put(cell_np);
 		return ERR_CAST(nvmem);
+	}
 
 	addr = of_get_property(cell_np, "reg", &len);
 	if (!addr || (len < 2 * sizeof(u32))) {
@@ -813,6 +820,7 @@ struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
 	}
 
 	nvmem_cell_add(cell);
+	of_node_put(cell_np);
 
 	return cell;
 
@@ -821,6 +829,7 @@ err_sanity:
 
 err_mem:
 	__nvmem_device_put(nvmem);
+	of_node_put(cell_np);
 
 	return ERR_PTR(rval);
 }
