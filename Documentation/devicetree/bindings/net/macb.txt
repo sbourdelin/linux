@@ -20,7 +20,7 @@ Required properties:
 - phy-mode: See ethernet.txt file in the same directory.
 - clock-names: Tuple listing input clock names.
 	Required elements: 'pclk', 'hclk'
-	Optional elements: 'tx_clk'
+	Optional elements: 'tx_clk', 'rx_clk'
 - clocks: Phandles to input clocks.
 
 Optional properties for PHY child node:
