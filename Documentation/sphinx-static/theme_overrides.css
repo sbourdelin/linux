@@ -42,6 +42,14 @@
     caption a.headerlink { opacity: 0; }
     caption a.headerlink:hover { opacity: 1; }
 
+
+    /* literal blocks (e.g. parsed-literal directive) */
+
+    pre.literal-block {
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
     /* inline literal: drop the borderbox and red color */
 
     code, .rst-content tt, .rst-content code {
