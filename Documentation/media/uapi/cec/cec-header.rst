@@ -6,5 +6,5 @@
 CEC Header File
 ***************
 
-.. kernel-include:: $BUILDDIR/cec.h.rst
-
+.. parse-header:: include/linux/cec.h
+   :exceptions: cec.h.exceptions

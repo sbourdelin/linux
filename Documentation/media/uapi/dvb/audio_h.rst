@@ -6,4 +6,5 @@
 DVB Audio Header File
 *********************
 
-.. kernel-include:: $BUILDDIR/audio.h.rst
+.. parse-header:: include/uapi/linux/dvb/audio.h
+   :exceptions: audio.h.exceptions

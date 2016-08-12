@@ -6,4 +6,5 @@
 DVB Video Header File
 *********************
 
-.. kernel-include:: $BUILDDIR/video.h.rst
+.. parse-header:: include/uapi/linux/dvb/video.h
+   :exceptions: video.h.exceptions

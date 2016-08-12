@@ -6,4 +6,5 @@
 DVB Demux Header File
 *********************
 
-.. kernel-include:: $BUILDDIR/dmx.h.rst
+.. parse-header:: include/uapi/linux/dvb/dmx.h
+   :exceptions: dmx.h.exceptions

@@ -6,4 +6,5 @@
 DVB Frontend Header File
 ************************
 
-.. kernel-include:: $BUILDDIR/frontend.h.rst
+.. parse-header:: include/uapi/linux/dvb/frontend.h
+   :exceptions: frontend.h.exceptions
