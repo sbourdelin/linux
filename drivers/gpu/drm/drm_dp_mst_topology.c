@@ -43,6 +43,8 @@ static bool dump_dp_payload_table(struct drm_dp_mst_topology_mgr *mgr,
 				  char *buf);
 static int test_calc_pbn_mode(void);
 
+int drm_dp_mst_get_avail_pbn(struct drm_dp_mst_topology_mgr *mgr, struct drm_dp_mst_port *port);
+
 static void drm_dp_put_port(struct drm_dp_mst_port *port);
 
 static int drm_dp_dpcd_write_payload(struct drm_dp_mst_topology_mgr *mgr,
@@ -2729,6 +2731,16 @@ static int test_calc_pbn_mode(void)
 	}
 	return 0;
 }
+
+int drm_dp_mst_get_avail_pbn(struct drm_dp_mst_topology_mgr *mgr, struct drm_dp_mst_port *port)
+{
+        port = drm_dp_get_validated_port_ref(mgr,port);
+        if (port)
+                return port->available_pbn;
+
+        return -EINVAL;
+}
+EXPORT_SYMBOL(drm_dp_mst_get_avail_pbn);
 
 /* we want to kick the TX after we've ack the up/down IRQs. */
 static void drm_dp_mst_kick_tx(struct drm_dp_mst_topology_mgr *mgr)
