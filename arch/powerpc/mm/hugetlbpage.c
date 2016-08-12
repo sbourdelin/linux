@@ -68,7 +68,7 @@ static int __hugepte_alloc(struct mm_struct *mm, hugepd_t *hpdp,
 #ifdef CONFIG_PPC_FSL_BOOK3E
 	int i;
 	int num_hugepd = 1 << (pshift - pdshift);
-	cachep = hugepte_cache;
+	cachep = PGT_CACHE(1);
 #else
 	cachep = PGT_CACHE(pdshift - pshift);
 #endif
@@ -411,7 +411,7 @@ static void hugepd_free_rcu_callback(struct rcu_head *head)
 	unsigned int i;
 
 	for (i = 0; i < batch->index; i++)
-		kmem_cache_free(hugepte_cache, batch->ptes[i]);
+		kmem_cache_free(PGT_CACHE(1), batch->ptes[i]);
 
 	free_page((unsigned long)batch);
 }
@@ -425,7 +425,7 @@ static void hugepd_free(struct mmu_gather *tlb, void *hugepte)
 	if (atomic_read(&tlb->mm->mm_users) < 2 ||
 	    cpumask_equal(mm_cpumask(tlb->mm),
 			  cpumask_of(smp_processor_id()))) {
-		kmem_cache_free(hugepte_cache, hugepte);
+		kmem_cache_free(PGT_CACHE(1), hugepte);
 		put_cpu_var(hugepd_freelist_cur);
 		return;
 	}
@@ -792,7 +792,6 @@ static int __init hugepage_setup_sz(char *str)
 __setup("hugepagesz=", hugepage_setup_sz);
 
 #ifdef CONFIG_PPC_FSL_BOOK3E
-struct kmem_cache *hugepte_cache;
 static int __init hugetlbpage_init(void)
 {
 	int psize;
@@ -815,9 +814,8 @@ static int __init hugetlbpage_init(void)
 	 * Create a kmem cache for hugeptes.  The bottom bits in the pte have
 	 * size information encoded in them, so align them to allow this
 	 */
-	hugepte_cache =  kmem_cache_create("hugepte-cache", sizeof(pte_t),
-					   HUGEPD_SHIFT_MASK + 1, 0, NULL);
-	if (hugepte_cache == NULL)
+	pgtable_cache_add(1, NULL);
+	if (!PGT_CACHE(1))
 		panic("%s: Unable to create kmem cache for hugeptes\n",
 		      __func__);
 
