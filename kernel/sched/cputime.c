@@ -263,7 +263,12 @@ void account_idle_time(cputime_t cputime)
 		cpustat[CPUTIME_IDLE] += (__force u64) cputime;
 }
 
-static __always_inline cputime_t steal_account_process_time(cputime_t maxtime)
+/*
+ * When a guest is interrupted for a longer amount of time, missed clock
+ * ticks are not redelivered later. Due to that, this function may on
+ * occasion account more time than the calling functions think elapsed.
+ */
+static __always_inline cputime_t steal_account_process_time(void)
 {
 #ifdef CONFIG_PARAVIRT
 	if (static_key_false(&paravirt_steal_enabled)) {
@@ -273,7 +278,7 @@ static __always_inline cputime_t steal_account_process_time(cputime_t maxtime)
 		steal = paravirt_steal_clock(smp_processor_id());
 		steal -= this_rq()->prev_steal_time;
 
-		steal_cputime = min(nsecs_to_cputime(steal), maxtime);
+		steal_cputime = nsecs_to_cputime(steal);
 		account_steal_time(steal_cputime);
 		this_rq()->prev_steal_time += cputime_to_nsecs(steal_cputime);
 
@@ -290,7 +295,7 @@ static inline cputime_t account_other_time(cputime_t max)
 {
 	cputime_t accounted;
 
-	accounted = steal_account_process_time(max);
+	accounted = steal_account_process_time();
 
 	if (accounted < max)
 		accounted += irqtime_account_hi_update(max - accounted);
@@ -486,7 +491,7 @@ void account_process_tick(struct task_struct *p, int user_tick)
 	}
 
 	cputime = cputime_one_jiffy;
-	steal = steal_account_process_time(cputime);
+	steal = steal_account_process_time();
 
 	if (steal >= cputime)
 		return;
