@@ -176,7 +176,6 @@ static long do_sys_ftruncate(unsigned int fd, loff_t length, int small)
 	if (!S_ISREG(inode->i_mode) || !(f.file->f_mode & FMODE_WRITE))
 		goto out_putf;
 
-	error = -EINVAL;
 	/* Cannot ftruncate over 2^31 bytes without large file support */
 	if (small && length > MAX_NON_LFS)
 		goto out_putf;
