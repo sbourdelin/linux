@@ -20,7 +20,7 @@
 #include <asm/pgtable.h>
 #include <asm/sections.h>
 
-u64 module_alloc_base __read_mostly;
+u64 module_alloc_base __ro_after_init;
 u16 memstart_offset_seed __initdata;
 
 static __init u64 get_kaslr_seed(void *fdt)
