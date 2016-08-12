@@ -641,6 +641,11 @@ static enum hrtimer_restart dl_task_timer(struct hrtimer *timer)
 		goto unlock;
 	}
 
+#ifdef CONFIG_SMP
+	if (unlikely(!rq->online))
+		goto offline;
+#endif
+
 	enqueue_task_dl(rq, p, ENQUEUE_REPLENISH);
 	if (dl_task(rq->curr))
 		check_preempt_curr_dl(rq, p, 0);
@@ -648,6 +653,7 @@ static enum hrtimer_restart dl_task_timer(struct hrtimer *timer)
 		resched_curr(rq);
 
 #ifdef CONFIG_SMP
+offline:
 	/*
 	 * Perform balancing operations here; after the replenishments.  We
 	 * cannot drop rq->lock before this, otherwise the assertion in
@@ -659,6 +665,7 @@ static enum hrtimer_restart dl_task_timer(struct hrtimer *timer)
 	 * XXX figure out if select_task_rq_dl() deals with offline cpus.
 	 */
 	if (unlikely(!rq->online)) {
+		replenish_dl_entity(dl_se, dl_se);
 		lockdep_unpin_lock(&rq->lock, rf.cookie);
 		rq = dl_task_offline_migration(rq, p);
 		rf.cookie = lockdep_pin_lock(&rq->lock);
