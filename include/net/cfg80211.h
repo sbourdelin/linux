@@ -2939,6 +2939,8 @@ struct ieee80211_iface_limit {
  *	only in special cases.
  * @radar_detect_widths: bitmap of channel widths supported for radar detection
  * @radar_detect_regions: bitmap of regions supported for radar detection
+ * @diff_beacon_int_gcd: This interface combination supports different beacon
+ *	intervals in multiple of GCD value.
  *
  * With this structure the driver can describe which interface
  * combinations it supports concurrently.
@@ -2970,6 +2972,7 @@ struct ieee80211_iface_limit {
  *	.n_limits = ARRAY_SIZE(limits2),
  *	.max_interfaces = 8,
  *	.num_different_channels = 1,
+ *	.diff_beacon_int_gcd = 100,
  *  };
  *
  *
@@ -2997,6 +3000,7 @@ struct ieee80211_iface_combination {
 	bool beacon_int_infra_match;
 	u8 radar_detect_widths;
 	u8 radar_detect_regions;
+	u32 diff_beacon_int_gcd;
 };
 
 struct ieee80211_txrx_stypes {

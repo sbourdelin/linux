@@ -1553,20 +1553,52 @@ bool ieee80211_chandef_to_operating_class(struct cfg80211_chan_def *chandef,
 }
 EXPORT_SYMBOL(ieee80211_chandef_to_operating_class);
 
+struct diff_beacon_int {
+	u32 beacon_int;
+	bool valid;
+};
+
+static void
+cfg80211_validate_diff_beacon_int(const struct ieee80211_iface_combination *c,
+				  void *data)
+{
+	struct diff_beacon_int *diff_bi = data;
+
+	if (c->diff_beacon_int_gcd &&
+	    !(diff_bi->beacon_int % c->diff_beacon_int_gcd))
+		diff_bi->valid = true;
+}
+
 int cfg80211_validate_beacon_int(struct cfg80211_registered_device *rdev,
-				 u32 beacon_int)
+				 enum nl80211_iftype iftype, u32 beacon_int)
 {
 	struct wireless_dev *wdev;
 	int res = 0;
+	int iftype_num[NUM_NL80211_IFTYPES];
 
 	if (beacon_int < 10 || beacon_int > 10000)
 		return -EINVAL;
+
+	memset(iftype_num, 0, sizeof(iftype_num));
+	list_for_each_entry(wdev, &rdev->wiphy.wdev_list, list) {
+		if (!wdev->beacon_interval)
+			continue;
+		iftype_num[wdev->iftype]++;
+	}
+	iftype_num[iftype]++;
 
 	list_for_each_entry(wdev, &rdev->wiphy.wdev_list, list) {
 		if (!wdev->beacon_interval)
 			continue;
 		if (wdev->beacon_interval != beacon_int) {
-			res = -EINVAL;
+			struct diff_beacon_int diff_bi = { beacon_int, false };
+
+			res = cfg80211_iter_combinations(&rdev->wiphy, 0, 0, iftype_num,
+							 cfg80211_validate_diff_beacon_int,
+							 &diff_bi);
+			if (res)
+				return res;
+			res = (diff_bi.valid) ? 0 : -EINVAL;
 			break;
 		}
 	}
