@@ -592,8 +592,10 @@ static void hda_jackpoll_work(struct work_struct *work)
 	struct hda_codec *codec =
 		container_of(work, struct hda_codec, jackpoll_work.work);
 
+	mutex_lock(&codec->jack_mutex);
 	snd_hda_jack_set_dirty_all(codec);
 	snd_hda_jack_poll_all(codec);
+	mutex_unlock(&codec->jack_mutex);
 
 	if (!codec->jackpoll_interval)
 		return;
@@ -837,6 +839,7 @@ int snd_hda_codec_new(struct hda_bus *bus, struct snd_card *card,
 	codec->addr = codec_addr;
 	mutex_init(&codec->spdif_mutex);
 	mutex_init(&codec->control_mutex);
+	mutex_init(&codec->jack_mutex);
 	snd_array_init(&codec->mixers, sizeof(struct hda_nid_item), 32);
 	snd_array_init(&codec->nids, sizeof(struct hda_nid_item), 32);
 	snd_array_init(&codec->init_pins, sizeof(struct hda_pincfg), 16);
@@ -3002,8 +3005,12 @@ static void hda_call_codec_resume(struct hda_codec *codec)
 
 	if (codec->jackpoll_interval)
 		hda_jackpoll_work(&codec->jackpoll_work.work);
-	else
+	else {
 		snd_hda_jack_report_sync(codec);
+		/* Some hw requires a little time to settle things */
+		schedule_delayed_work(&codec->jackpoll_work,
+					msecs_to_jiffies(100));
+	}
 	atomic_dec(&codec->core.in_pm);
 }
 

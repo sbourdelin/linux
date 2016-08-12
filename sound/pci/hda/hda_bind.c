@@ -42,8 +42,10 @@ static void hda_codec_unsol_event(struct hdac_device *dev, unsigned int ev)
 {
 	struct hda_codec *codec = container_of(dev, struct hda_codec, core);
 
+	mutex_lock(&codec->jack_mutex);
 	if (codec->patch_ops.unsol_event)
 		codec->patch_ops.unsol_event(codec, ev);
+	mutex_unlock(&codec->jack_mutex);
 }
 
 /**
