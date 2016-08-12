@@ -668,3 +668,9 @@ config ZONE_DEVICE
 
 config FRAME_VECTOR
 	bool
+config KEXEC_CMA
+	bool "Use CMA for Kexec crash kernel"
+	depends on CMA
+	help
+	  This configuration option is to use CMA for Kexec.
+	  CMA helps us to allocate memory for crash kernel at runtime.
