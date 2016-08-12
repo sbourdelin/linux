@@ -78,11 +78,7 @@ static inline int amd_iommu_create_irq_domain(struct amd_iommu *iommu)
 extern int amd_iommu_complete_ppr(struct pci_dev *pdev, int pasid,
 				  int status, int tag);
 
-#ifndef CONFIG_AMD_IOMMU_STATS
-
 static inline void amd_iommu_stats_init(void) { }
-
-#endif /* !CONFIG_AMD_IOMMU_STATS */
 
 static inline bool is_rd890_iommu(struct pci_dev *pdev)
 {
