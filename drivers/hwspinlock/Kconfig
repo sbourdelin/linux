@@ -42,6 +42,17 @@ config HWSPINLOCK_SIRF
 	  It's safe to say n here if you're not interested in SIRF hardware
 	  spinlock or just want a bare minimum kernel.
 
+config HWSPINLOCK_SUN8I
+	tristate "Allwinner sun8i Hardware Spinlock device"
+	depends on ARCH_SUNXI
+	select HWSPINLOCK
+	help
+	  Say y here to support the Allwinner Hardware Mutex functionality, which
+	  provides a synchronisation mechanism for the various processors on
+	  the SoC.
+
+	  If unsure, say N.
+
 config HSEM_U8500
 	tristate "STE Hardware Semaphore functionality"
 	depends on ARCH_U8500
