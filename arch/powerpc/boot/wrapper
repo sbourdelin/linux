@@ -140,6 +140,8 @@ while [ "$#" -gt 0 ]; do
     shift
 done
 
+LD=${LD:-${CROSS}ld}
+
 if [ -n "$dts" ]; then
     if [ ! -r "$dts" -a -r "$object/dts/$dts" ]; then
 	dts="$object/dts/$dts"
@@ -417,7 +419,7 @@ if [ "$platform" != "miboot" ]; then
     if [ -n "$link_address" ] ; then
         text_start="-Ttext $link_address"
     fi
-    ${CROSS}ld -m $format -T $lds $text_start $pie -o "$ofile" \
+    ${LD} -m $format -T $lds $text_start $pie -o "$ofile" \
 	$platformo $tmp $object/wrapper.a
     rm $tmp
 fi

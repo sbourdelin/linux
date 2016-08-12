@@ -65,6 +65,10 @@ endif
 
 UTS_MACHINE := $(OLDARCH)
 
+ifdef CONFIG_PPC_USE_GOLD
+LD := $(LD).gold
+endif
+
 ifeq ($(CONFIG_CPU_LITTLE_ENDIAN),y)
 override LD	+= -EL
 override CROSS32AS += -mlittle-endian

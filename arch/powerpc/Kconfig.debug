@@ -19,6 +19,13 @@ config PPC_WERROR
 	depends on !PPC_DISABLE_WERROR
 	default y
 
+config PPC_USE_GOLD
+	bool "Build with the gold linker"
+	depends on DEBUG_KERNEL && !COMPILE_TEST
+	default n
+	  Build the kernel with the ld.gold linker, rather than ld.bfd.
+	  If you don't know what this means say N.
+
 config PRINT_STACK_DEPTH
 	int "Stack depth to print" if DEBUG_KERNEL
 	default 64
