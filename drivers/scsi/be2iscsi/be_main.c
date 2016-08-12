@@ -3286,8 +3286,10 @@ static int beiscsi_create_eqs(struct beiscsi_hba *phba,
 		eq_vaddress = pci_alloc_consistent(phba->pcidev,
 						     num_eq_pages * PAGE_SIZE,
 						     &paddr);
-		if (!eq_vaddress)
+		if (!eq_vaddress) {
+			ret = -ENOMEM;
 			goto create_eq_error;
+		}
 
 		mem->va = eq_vaddress;
 		ret = be_fill_queue(eq, phba->params.num_eq_entries,
@@ -3349,8 +3351,11 @@ static int beiscsi_create_cqs(struct beiscsi_hba *phba,
 		cq_vaddress = pci_alloc_consistent(phba->pcidev,
 						     num_cq_pages * PAGE_SIZE,
 						     &paddr);
-		if (!cq_vaddress)
+		if (!cq_vaddress) {
+			ret = -ENOMEM;
 			goto create_cq_error;
+		}
+
 		ret = be_fill_queue(cq, phba->params.num_cq_entries,
 				    sizeof(struct sol_cqe), cq_vaddress);
 		if (ret) {
@@ -5635,6 +5640,7 @@ static int beiscsi_dev_probe(struct pci_dev *pcidev,
 	if (!phba) {
 		dev_err(&pcidev->dev,
 			"beiscsi_dev_probe - Failed in beiscsi_hba_alloc\n");
+		ret = -ENOMEM;
 		goto disable_pci;
 	}
 
@@ -5754,6 +5760,7 @@ static int beiscsi_dev_probe(struct pci_dev *pcidev,
 		beiscsi_log(phba, KERN_ERR, BEISCSI_LOG_INIT,
 			    "BM_%d : beiscsi_dev_probe-"
 			    "Failed to allocate work queue\n");
+		ret = -ENOMEM;
 		goto free_twq;
 	}
 
