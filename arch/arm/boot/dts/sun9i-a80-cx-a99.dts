@@ -1,0 +1,256 @@
+/*
+ * sun9i-a80-cx-a99.dts - Device Tree file for the Sunchip CX-A99 board.
+ *
+ * Copyright (C) 2016 Rask Ingemann Lamberten <ccc94453@vip.cybercity.dk>
+ * 
+ * This file is dual-licensed: you can use it either under the terms
+ * of the GPL or the X11 license, at your option. Note that this dual
+ * licensing only applies to this file, and not this project as a
+ * whole.
+ *
+ *  a) This file is free software; you can redistribute it and/or
+ *     modify it under the terms of the GNU General Public License as
+ *     published by the Free Software Foundation; either version 2 of the
+ *     License, or (at your option) any later version.
+ *
+ *     This file is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ * Or, alternatively,
+ *
+ *  b) Permission is hereby granted, free of charge, to any person
+ *     obtaining a copy of this software and associated documentation
+ *     files (the "Software"), to deal in the Software without
+ *     restriction, including without limitation the rights to use,
+ *     copy, modify, merge, publish, distribute, sublicense, and/or
+ *     sell copies of the Software, and to permit persons to whom the
+ *     Software is furnished to do so, subject to the following
+ *     conditions:
+ *
+ *     The above copyright notice and this permission notice shall be
+ *     included in all copies or substantial portions of the Software.
+ *
+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ *     OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+/* The Sunchip CX-A99 board is found in several similar Android TV box
+ * products, such as:
+ *
+ * Instabox Fantasy A8 (no external antenna)
+ * Jesurun CS-Q8 (ships with larger remote control)
+ * Jesurun Maxone
+ * Rikomagic (RKM) MK80/MK80LE
+ * Tronsmart Draco AW80 Meta/Telos
+ *
+ * See <URL:https://linux-sunxi.org/Sunchip_cx_a99> for more information.
+ */
+
+/dts-v1/;
+#include "sun9i-a80.dtsi"
+#include "sunxi-common-regulators.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/pinctrl/sun4i-a10.h>
+
+/ {
+	model = "Sunchip CX-A99";
+	compatible = "sunchip,cx-a99", "allwinner,sun9i-a80";
+
+	aliases {
+		serial0 = &uart0;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	leds {
+		compatible = "gpio-leds";
+		pinctrl-names = "default";
+		pinctrl-0 = <&led_pins_cx_a99>;
+
+		blue {
+			gpios = <&pio 6 10 GPIO_ACTIVE_HIGH>;	/* PG10 */
+			label = "cx-a99:blue:normal";
+			default-state = "on";
+		};
+
+		red {
+			gpios = <&pio 6 11 GPIO_ACTIVE_HIGH>;	/* PG11 */
+			label = "cx-a99:red:standby";
+		};
+	};
+
+	/* Power supply for the four Cortex-A15 cores. */
+	reg_vdd_cpub: oz80120 {
+		compatible = "regulator-gpio";
+		regulator-name = "vdd-cpub";
+
+		regulator-boot-on;
+		regulator-always-on;
+		regulator-type = "voltage";
+		regulator-min-microvolt = < 800000>;
+		regulator-max-microvolt = <1100000>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&vdd_cpub_r_pins_cx_a99>;
+		enable-gpio = <&r_pio 0 2 GPIO_ACTIVE_HIGH>;	/* PL2 */
+		enable-active-high;
+		gpios = <&r_pio 0 3 GPIO_ACTIVE_HIGH>,		/* PL3 */
+			<&r_pio 0 4 GPIO_ACTIVE_HIGH>,		/* PL4 */
+			<&r_pio 0 5 GPIO_ACTIVE_HIGH>;		/* PL5 */
+		/* There appears to be an external pull-up on PL3. */
+		gpios-states = <1 0 0>;
+		states = <	 750000 0x7
+				 800000 0x3
+				 850000 0x5
+				 900000 0x1
+				 950000 0x6
+				1000000 0x2
+				1100000 0x4
+				1200000 0x0>;
+	};
+};
+
+&ehci0 {
+	status = "okay";
+};
+
+&ehci2 {
+	status = "okay";
+};
+
+&mmc0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&mmc0_pins>, <&mmc0_cd_pin_cx_a99>;
+	vmmc-supply = <&reg_vcc3v3>;
+	bus-width = <4>;
+	cd-gpios = <&pio 7 17 GPIO_ACTIVE_LOW>; /* PH17 */
+	status = "okay";
+};
+
+&mmc2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&mmc2_8bit_pins>;
+	vmmc-supply = <&reg_vcc3v3>;
+	bus-width = <8>;
+	non-removable;
+	status = "okay";
+};
+
+&osc32k {
+	clocks = <&ac100_rtc 0>;
+};
+
+&pio {
+	led_pins_cx_a99: led-pins {
+		allwinner,pins = "PG10", "PG11";
+		allwinner,function = "gpio_out";
+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+	};
+
+	mmc0_cd_pin_cx_a99: mmc0_cd {
+		allwinner,pins = "PH17";
+		allwinner,function = "gpio_in";
+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+	};
+};
+
+/* Each GPIO controls VBUS for a port on the GL850G hub connected to ehci0;
+   PL7 for port 1, the USB connector closest to the 12 V power connector, and
+   PL8 for port 2, the USB connector next to the (micro)SD card slot.
+   Note: The regulators are not chained like this in reality, but
+   regulator-fixed doesn't support a gpio list, and allwinner,sun9i-a80-usb-phy
+   doesn't support more than one supply, so this will have to do (for now). */
+&reg_usb1_vbus {
+	pinctrl-0 = <&usb1_vbus_r_pin_cx_a99>;
+	gpio = <&r_pio 0 7 GPIO_ACTIVE_HIGH>;	/* PL7 */
+	status = "okay";
+};
+
+&reg_usb2_vbus {
+	pinctrl-0 = <&usb2_vbus_r_pin_cx_a99>;
+	gpio = <&r_pio 0 8 GPIO_ACTIVE_HIGH>;	/* PL8 */
+	vin-supply = <&reg_usb1_vbus>;
+	status = "okay";
+};
+
+&r_ir {
+	status = "okay";
+};
+
+&r_pio {
+	usb1_vbus_r_pin_cx_a99: usb0_vbus_pin {
+		allwinner,pins = "PL7";
+		allwinner,function = "gpio_out";
+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+	};
+
+	usb2_vbus_r_pin_cx_a99: usb1_vbus_pin {
+		allwinner,pins = "PL8";
+		allwinner,function = "gpio_out";
+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+	};
+
+	vdd_cpub_r_pins_cx_a99: regulator_r_pins {
+		allwinner,pins = "PL2", "PL3", "PL4", "PL5";
+		allwinner,function = "gpio_out";
+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+	};
+};
+
+&r_rsb {
+	status = "okay";
+
+	ac100: codec@e89 {
+		compatible = "x-powers,ac100";
+		reg = <0xe89>;
+
+		ac100_codec: codec {
+			compatible = "x-powers,ac100-codec";
+			interrupt-parent = <&r_pio>;
+			interrupts = <0 9 IRQ_TYPE_LEVEL_LOW>;	/* PL9 */
+			#clock-cells = <0>;
+			clock-output-names = "4M_adda";
+		};
+
+		ac100_rtc: rtc {
+			compatible = "x-powers,ac100-rtc";
+			interrupt-parent = <&nmi_intc>;
+			interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+			clocks = <&ac100_codec>;
+			#clock-cells = <1>;
+			clock-output-names = "cko1_rtc", "cko2_rtc", "cko3_rtc";
+		};
+	};
+};
+
+/* 5-pin connector: 1 = GND (small triangle), 2 = GND, 3 = 3.3 V, 4 = RX, 5 = TX. */
+&uart0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart0_pins_a>;
+	status = "okay";
+};
+
+/* The port has two V_bus supplies. See workaround at reg_usb1_vbus. */
+&usbphy1 {
+	phy-supply = <&reg_usb2_vbus>;
+	status = "okay";
+};
+
+&usbphy3 {
+	status = "okay";
+};
