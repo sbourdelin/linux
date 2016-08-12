@@ -23,11 +23,16 @@ Required properties:
 			with the Wakeup M3 processor
 - interrupts:		Contains the interrupt information for the wkup_m3
 			interrupt that signals the MPU.
-- ti,rproc:		phandle to the wkup_m3 rproc node so the IPC driver
+- rprocs:		phandle to the wkup_m3 rproc node so the IPC driver
 			can boot it.
 - mboxes:		phandles used by IPC framework to get correct mbox
 			channel for communication. Must point to appropriate
 			mbox_wkupm3 child node.
+
+Deprecated properties:
+----------------------
+- ti,rproc:		This property has been replaced with the "rprocs"
+			property.
 
 Example:
 --------
@@ -48,7 +53,7 @@ Example:
 				compatible = "ti,am3352-wkup-m3-ipc";
 				reg = <0x1324 0x24>;
 				interrupts = <78>;
-				ti,rproc = <&wkup_m3>;
+				rprocs = <&wkup_m3>;
 				mboxes = <&mailbox &mbox_wkupm3>;
 			};
 

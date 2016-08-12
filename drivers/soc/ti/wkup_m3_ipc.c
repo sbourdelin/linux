@@ -1,7 +1,7 @@
 /*
  * AMx3 Wkup M3 IPC driver
  *
- * Copyright (C) 2015 Texas Instruments, Inc.
+ * Copyright (C) 2015-2016 Texas Instruments, Inc.
  *
  * Dave Gerlach <d-gerlach@ti.com>
  *
@@ -390,6 +390,8 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct task_struct *task;
 	struct wkup_m3_ipc *m3_ipc;
+	struct property *nprop, *oprop;
+	const char nprop_name[] = "rprocs";
 
 	m3_ipc = devm_kzalloc(dev, sizeof(*m3_ipc), GFP_KERNEL);
 	if (!m3_ipc)
@@ -413,6 +415,28 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(dev, "request_irq failed\n");
 		return ret;
+	}
+
+	/* provide compatibility for older DTBs using ti,rproc property */
+	nprop = of_find_property(dev->of_node, "rprocs", NULL);
+	if (!nprop) {
+		oprop = of_find_property(dev->of_node, "ti,rproc", NULL);
+		if (!oprop) {
+			dev_err(&pdev->dev, "node is missing ti,rproc property\n");
+			return -ENODEV;
+		}
+
+		nprop = kzalloc(sizeof(*nprop) + sizeof(nprop_name),
+				GFP_KERNEL);
+		if (!nprop)
+			return -ENOMEM;
+
+		nprop->name = (char *)nprop + sizeof(*nprop);
+		snprintf(nprop->name, sizeof(nprop_name), nprop_name);
+		nprop->value = oprop->value;
+		nprop->length = oprop->length;
+		of_update_property(dev->of_node, nprop);
+		of_remove_property(dev->of_node, oprop);
 	}
 
 	m3_ipc->mbox_client.dev = dev;
