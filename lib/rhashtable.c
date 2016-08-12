@@ -30,7 +30,8 @@
 
 #define HASH_DEFAULT_SIZE	64UL
 #define HASH_MIN_SIZE		4U
-#define BUCKET_LOCKS_PER_CPU   128UL
+#define BUCKET_LOCKS_PER_CPU	max_t(unsigned int, \
+				      2 * L1_CACHE_BYTES / sizeof(spinlock_t), 1)
 
 static u32 head_hashfn(struct rhashtable *ht,
 		       const struct bucket_table *tbl,
@@ -63,14 +64,10 @@ EXPORT_SYMBOL_GPL(lockdep_rht_bucket_is_held);
 static int alloc_bucket_locks(struct rhashtable *ht, struct bucket_table *tbl,
 			      gfp_t gfp)
 {
-	unsigned int i, size;
-#if defined(CONFIG_PROVE_LOCKING)
-	unsigned int nr_pcpus = 2;
-#else
 	unsigned int nr_pcpus = num_possible_cpus();
-#endif
+	unsigned int i, size;
 
-	nr_pcpus = min_t(unsigned int, nr_pcpus, 32UL);
+	nr_pcpus = min_t(unsigned int, nr_pcpus, 64UL);
 	size = roundup_pow_of_two(nr_pcpus * ht->p.locks_mul);
 
 	/* Never allocate more than 0.5 locks per bucket */
@@ -83,6 +80,9 @@ static int alloc_bucket_locks(struct rhashtable *ht, struct bucket_table *tbl,
 			tbl->locks = vmalloc(size * sizeof(spinlock_t));
 		else
 #endif
+		if (gfp != GFP_KERNEL)
+			gfp |= __GFP_NOWARN | __GFP_NORETRY;
+
 		tbl->locks = kmalloc_array(size, sizeof(spinlock_t),
 					   gfp);
 		if (!tbl->locks)
