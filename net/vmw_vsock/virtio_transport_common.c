@@ -774,12 +774,22 @@ virtio_transport_recv_connected(struct sock *sk,
 		pkt->off = 0;
 
 		spin_lock_bh(&vvs->rx_lock);
-		virtio_transport_inc_rx_pkt(vvs, pkt);
-		list_add_tail(&pkt->list, &vvs->rx_queue);
-		spin_unlock_bh(&vvs->rx_lock);
+		if (vvs->rx_bytes + pkt->len <= vvs->buf_size) {
+			virtio_transport_inc_rx_pkt(vvs, pkt);
+			list_add_tail(&pkt->list, &vvs->rx_queue);
+			spin_unlock_bh(&vvs->rx_lock);
 
-		sk->sk_data_ready(sk);
-		return err;
+			sk->sk_data_ready(sk);
+			return err;
+		} else {
+			/* Sender is ignoring our buf_alloc */
+			spin_unlock_bh(&vvs->rx_lock);
+
+			virtio_transport_reset(vsk, pkt);
+			virtio_transport_do_close(vsk, true);
+			break;
+		}
+
 	case VIRTIO_VSOCK_OP_CREDIT_UPDATE:
 		sk->sk_write_space(sk);
 		break;
