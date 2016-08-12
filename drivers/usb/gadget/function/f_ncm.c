@@ -20,6 +20,8 @@
 #include <linux/device.h>
 #include <linux/etherdevice.h>
 #include <linux/crc32.h>
+#include <crypto/hash.h>
+#include <linux/scatterlist.h>
 
 #include <linux/usb/cdc.h>
 
@@ -80,6 +82,10 @@ struct f_ncm {
 	struct hrtimer			task_timer;
 
 	bool				timer_stopping;
+
+	/* For scatter/gather crc32 */
+	struct crypto_ahash		*tfm;
+	struct scatterlist		sg[MAX_SKB_FRAGS + 1];
 };
 
 static inline struct f_ncm *func_to_ncm(struct usb_function *f)
@@ -1017,6 +1023,25 @@ static struct sk_buff *package_for_tx(struct f_ncm *ncm)
 	return skb2;
 }
 
+static u32 skb_crc(struct f_ncm *ncm, struct sk_buff *skb)
+{
+	AHASH_REQUEST_ON_STACK(req, ncm->tfm);
+	__le32 crc = cpu_to_le32(~(u32)0);
+
+	sg_init_table(ncm->sg, MAX_SKB_FRAGS + 1);
+	skb_to_sgvec(skb, ncm->sg, 0, skb->len);
+
+	crypto_ahash_setkey(ncm->tfm, (void *)&crc, sizeof(crc));
+
+	ahash_request_set_tfm(req, ncm->tfm);
+	ahash_request_set_callback(req, 0, NULL, NULL);
+	ahash_request_set_crypt(req, ncm->sg, (void *)&crc, skb->len);
+
+	crypto_ahash_digest(req);
+
+	return ~le32_to_cpu(crc);
+}
+
 static struct sk_buff *ncm_wrap_ntb(struct gether *port,
 				    struct sk_buff *skb)
 {
@@ -1040,13 +1065,11 @@ static struct sk_buff *ncm_wrap_ntb(struct gether *port,
 	if (skb) {
 		/* Add the CRC if required up front */
 		if (ncm->is_crc) {
-			uint32_t	crc;
-			__le16		*crc_pos;
+			u32	crc;
+			__le32	*crc_pos;
 
-			crc = ~crc32_le(~0,
-					skb->data,
-					skb->len);
-			crc_pos = (void *) skb_put(skb, sizeof(uint32_t));
+			crc = skb_crc(ncm, skb);
+			crc_pos = (void *) skb_put(skb, sizeof(u32));
 			put_unaligned_le32(crc, crc_pos);
 		}
 
@@ -1130,7 +1153,7 @@ static struct sk_buff *ncm_wrap_ntb(struct gether *port,
 		ntb_data = (void *) skb_put(ncm->skb_tx_data, dgram_pad);
 		memset(ntb_data, 0, dgram_pad);
 		ntb_data = (void *) skb_put(ncm->skb_tx_data, skb->len);
-		memcpy(ntb_data, skb->data, skb->len);
+		skb_copy_bits(skb, 0, ntb_data, skb->len);
 		dev_kfree_skb_any(skb);
 		skb = NULL;
 
@@ -1513,6 +1536,12 @@ static int ncm_bind(struct usb_configuration *c, struct usb_function *f)
 	if (status)
 		goto fail;
 
+	ncm->tfm = crypto_alloc_ahash("crc32", 0, CRYPTO_ALG_ASYNC);
+	if (IS_ERR(ncm->tfm)) {
+		usb_free_all_descriptors(f);
+		goto fail;
+	}
+
 	/*
 	 * NOTE:  all that is done without knowing or caring about
 	 * the network link ... which is unavailable to this code
@@ -1607,6 +1636,8 @@ static struct usb_function_instance *ncm_alloc_inst(void)
 		return ERR_CAST(net);
 	}
 
+	opts->net->features |= NETIF_F_SG;
+
 	config_group_init_type_name(&opts->func_inst.group, "", &ncm_func_type);
 
 	return &opts->func_inst;
@@ -1633,6 +1664,8 @@ static void ncm_unbind(struct usb_configuration *c, struct usb_function *f)
 
 	hrtimer_cancel(&ncm->task_timer);
 	tasklet_kill(&ncm->tx_tasklet);
+
+	crypto_free_ahash(ncm->tfm);
 
 	ncm_string_defs[0].id = 0;
 	usb_free_all_descriptors(f);
