@@ -223,12 +223,11 @@ static unsigned char *cfag12864b_cache;
 static DEFINE_MUTEX(cfag12864b_mutex);
 static unsigned char cfag12864b_updating;
 static void cfag12864b_update(struct work_struct *delayed_work);
-static struct workqueue_struct *cfag12864b_workqueue;
 static DECLARE_DELAYED_WORK(cfag12864b_work, cfag12864b_update);
 
 static void cfag12864b_queue(void)
 {
-	queue_delayed_work(cfag12864b_workqueue, &cfag12864b_work,
+	schedule_delayed_work(&cfag12864b_work,
 		HZ / cfag12864b_rate);
 }
 
@@ -256,8 +255,7 @@ void cfag12864b_disable(void)
 
 	if (cfag12864b_updating) {
 		cfag12864b_updating = 0;
-		cancel_delayed_work(&cfag12864b_work);
-		flush_workqueue(cfag12864b_workqueue);
+		cancel_delayed_work_sync(&cfag12864b_work);
 	}
 
 	mutex_unlock(&cfag12864b_mutex);
@@ -357,18 +355,11 @@ static int __init cfag12864b_init(void)
 		goto bufferalloced;
 	}
 
-	cfag12864b_workqueue = create_singlethread_workqueue(CFAG12864B_NAME);
-	if (cfag12864b_workqueue == NULL)
-		goto cachealloced;
-
 	cfag12864b_clear();
 	cfag12864b_on();
 
 	cfag12864b_inited = 1;
 	return 0;
-
-cachealloced:
-	kfree(cfag12864b_cache);
 
 bufferalloced:
 	free_page((unsigned long) cfag12864b_buffer);
@@ -381,7 +372,6 @@ static void __exit cfag12864b_exit(void)
 {
 	cfag12864b_disable();
 	cfag12864b_off();
-	destroy_workqueue(cfag12864b_workqueue);
 	kfree(cfag12864b_cache);
 	free_page((unsigned long) cfag12864b_buffer);
 }
