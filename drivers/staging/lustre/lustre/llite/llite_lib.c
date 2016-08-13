@@ -1201,23 +1201,23 @@ int ll_setattr_raw(struct dentry *dentry, struct iattr *attr, bool hsm_import)
 
 	/* We mark all of the fields "set" so MDS/OST does not re-set them */
 	if (attr->ia_valid & ATTR_CTIME) {
-		attr->ia_ctime = CURRENT_TIME;
+		attr->ia_ctime = current_time(inode);
 		attr->ia_valid |= ATTR_CTIME_SET;
 	}
 	if (!(attr->ia_valid & ATTR_ATIME_SET) &&
 	    (attr->ia_valid & ATTR_ATIME)) {
-		attr->ia_atime = CURRENT_TIME;
+		attr->ia_atime = current_time(inode);
 		attr->ia_valid |= ATTR_ATIME_SET;
 	}
 	if (!(attr->ia_valid & ATTR_MTIME_SET) &&
 	    (attr->ia_valid & ATTR_MTIME)) {
-		attr->ia_mtime = CURRENT_TIME;
+		attr->ia_mtime = current_time(inode);
 		attr->ia_valid |= ATTR_MTIME_SET;
 	}
 
 	if (attr->ia_valid & (ATTR_MTIME | ATTR_CTIME))
-		CDEBUG(D_INODE, "setting mtime %lu, ctime %lu, now = %llu\n",
-		       LTIME_S(attr->ia_mtime), LTIME_S(attr->ia_ctime),
+		CDEBUG(D_INODE, "setting mtime %llu, ctime %llu, now = %llu\n",
+		       (long long)LTIME_S(attr->ia_mtime), (long long)LTIME_S(attr->ia_ctime),
 		       (s64)ktime_get_real_seconds());
 
 	/* We always do an MDS RPC, even if we're only changing the size;
@@ -1503,9 +1503,9 @@ void ll_update_inode(struct inode *inode, struct lustre_md *md)
 	}
 	if (body->valid & OBD_MD_FLMTIME) {
 		if (body->mtime > LTIME_S(inode->i_mtime)) {
-			CDEBUG(D_INODE, "setting ino %lu mtime from %lu to %llu\n",
-			       inode->i_ino, LTIME_S(inode->i_mtime),
-			       body->mtime);
+			CDEBUG(D_INODE, "setting ino %lu mtime from %llu to %llu\n",
+			       inode->i_ino, (unsigned long long)LTIME_S(inode->i_mtime),
+			       (unsigned long long)body->mtime);
 			LTIME_S(inode->i_mtime) = body->mtime;
 		}
 		lli->lli_mtime = body->mtime;

@@ -50,9 +50,9 @@ void obdo_refresh_inode(struct inode *dst, struct obdo *src, u32 valid)
 
 	if (valid & (OBD_MD_FLCTIME | OBD_MD_FLMTIME))
 		CDEBUG(D_INODE,
-		       "valid %#llx, cur time %lu/%lu, new %llu/%llu\n",
-		       src->o_valid, LTIME_S(dst->i_mtime),
-		       LTIME_S(dst->i_ctime), src->o_mtime, src->o_ctime);
+		       "valid %#llx, cur time %llu/%llu, new %llu/%llu\n",
+		       src->o_valid, (unsigned long long)LTIME_S(dst->i_mtime),
+		       (unsigned long long)LTIME_S(dst->i_ctime), src->o_mtime, src->o_ctime);
 
 	if (valid & OBD_MD_FLATIME && src->o_atime > LTIME_S(dst->i_atime))
 		LTIME_S(dst->i_atime) = src->o_atime;

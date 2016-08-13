@@ -725,8 +725,8 @@ static void ll_update_times(struct ptlrpc_request *request,
 	LASSERT(body);
 	if (body->valid & OBD_MD_FLMTIME &&
 	    body->mtime > LTIME_S(inode->i_mtime)) {
-		CDEBUG(D_INODE, "setting fid "DFID" mtime from %lu to %llu\n",
-		       PFID(ll_inode2fid(inode)), LTIME_S(inode->i_mtime),
+		CDEBUG(D_INODE, "setting fid "DFID" mtime from %llu to %llu\n",
+		       PFID(ll_inode2fid(inode)), (unsigned long long)LTIME_S(inode->i_mtime),
 		       body->mtime);
 		LTIME_S(inode->i_mtime) = body->mtime;
 	}
