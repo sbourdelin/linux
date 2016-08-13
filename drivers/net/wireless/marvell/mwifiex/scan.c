@@ -883,7 +883,8 @@ mwifiex_config_scan(struct mwifiex_private *priv,
 		       sizeof(scan_cfg_out->specific_bssid));
 
 		if (adapter->ext_scan &&
-		    !is_zero_ether_addr(scan_cfg_out->specific_bssid)) {
+		    !is_zero_ether_addr_unaligned(
+				scan_cfg_out->specific_bssid)) {
 			bssid_tlv =
 				(struct mwifiex_ie_types_bssid_list *)tlv_pos;
 			bssid_tlv->header.type = cpu_to_le16(TLV_TYPE_BSSID);
