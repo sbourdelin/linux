@@ -219,6 +219,14 @@ EBUSY
        -  Several flags giving more information about the format. See
 	  :ref:`dv-bt-flags` for a description of the flags.
 
+    -  .. row 17
+
+       -  __u32
+
+       -  ``reserved[14]``
+
+       -  Reserved for future extensions. Drivers and applications must set
+          the array to zero.
 
 
 .. _v4l2-dv-timings:
