@@ -134,6 +134,31 @@ static int snd_rawmidi_runtime_create(struct snd_rawmidi_substream *substream)
 	return 0;
 }
 
+/**
+ * snd_rawmidi_substream_break - break rawmidi substream
+ * @substream: the rawmidi substream.
+ *
+ * When logical channel between system and device for MIDI transmitssion is
+ * under disorder, call this helper to notify it to userspace. Once broken,
+ * the substream should be closed in userspace, because there's no
+ * operation for userspace applications to recover from this state.
+ */
+void snd_rawmidi_substream_break(struct snd_rawmidi_substream *substream)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&substream->runtime->lock, flags);
+	substream->runtime->error = true;
+	spin_unlock_irqrestore(&substream->runtime->lock, flags);
+
+	/* Kick event listener. */
+	if (runtime->event)
+		schedule_work(&runtime->event_work);
+
+	wake_up(&runtime->sleep);
+}
+EXPORT_SYMBOL(snd_rawmidi_substream_break);
+
 static int snd_rawmidi_runtime_free(struct snd_rawmidi_substream *substream)
 {
 	struct snd_rawmidi_runtime *runtime = substream->runtime;

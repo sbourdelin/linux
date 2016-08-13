@@ -191,4 +191,6 @@ long snd_rawmidi_kernel_read(struct snd_rawmidi_substream *substream,
 long snd_rawmidi_kernel_write(struct snd_rawmidi_substream *substream,
 			      const unsigned char *buf, long count);
 
+void snd_rawmidi_substream_break(struct snd_rawmidi_substream *substream);
+
 #endif /* __SOUND_RAWMIDI_H */
