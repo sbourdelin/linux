@@ -43,14 +43,11 @@ static char scsi_dev_flags[256];
  * settings that differ from the default, includes black-listed (broken)
  * devices. The entries here are added to the tail of scsi_dev_info_list
  * via scsi_dev_info_list_init.
- *
- * Do not add to this list, use the command line or proc interface to add
- * to the scsi_dev_info_list. This table will eventually go away.
  */
 static struct {
 	char *vendor;
 	char *model;
-	char *revision;	/* revision known to be bad, unused */
+	char *revision;	/* XXX revision known to be bad, unused XXX */
 	unsigned flags;
 } scsi_static_device_list[] __initdata = {
 	/*
