@@ -12,6 +12,8 @@ struct tss_struct;
 void __switch_to_xtra(struct task_struct *prev_p, struct task_struct *next_p,
 		      struct tss_struct *tss);
 
+asmlinkage void ret_from_fork(void);
+
 /* data that is pointed to by thread.sp */
 struct inactive_task_frame {
 #ifdef CONFIG_X86_64
