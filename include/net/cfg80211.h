@@ -2939,6 +2939,11 @@ struct ieee80211_iface_limit {
  *	only in special cases.
  * @radar_detect_widths: bitmap of channel widths supported for radar detection
  * @radar_detect_regions: bitmap of regions supported for radar detection
+ * @diff_beacon_int_gcd_min: This interface combination supports different
+ *	beacon intervals.
+ *	= 0 - all beacon intervals for different interface must be same.
+ *	> 0 - different beacon intervals must have a GCD that's at
+ *	least as big as this value.
  *
  * With this structure the driver can describe which interface
  * combinations it supports concurrently.
@@ -2959,7 +2964,7 @@ struct ieee80211_iface_limit {
  *  };
  *
  *
- * 2. Allow #{AP, P2P-GO} <= 8, channels = 1, 8 total:
+ * 2. Allow #{AP, P2P-GO} <= 8, diff BI min gcd = 10, channels = 1, 8 total:
  *
  *  struct ieee80211_iface_limit limits2[] = {
  *	{ .max = 8, .types = BIT(NL80211_IFTYPE_AP) |
@@ -2970,6 +2975,7 @@ struct ieee80211_iface_limit {
  *	.n_limits = ARRAY_SIZE(limits2),
  *	.max_interfaces = 8,
  *	.num_different_channels = 1,
+ *	.diff_beacon_int_gcd_min = 10,
  *  };
  *
  *
@@ -2997,6 +3003,7 @@ struct ieee80211_iface_combination {
 	bool beacon_int_infra_match;
 	u8 radar_detect_widths;
 	u8 radar_detect_regions;
+	u32 diff_beacon_int_gcd_min;
 };
 
 struct ieee80211_txrx_stypes {
