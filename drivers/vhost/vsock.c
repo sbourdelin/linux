@@ -15,8 +15,10 @@
 #include <net/sock.h>
 #include <linux/virtio_vsock.h>
 #include <linux/vhost.h>
+#include <linux/skbuff.h>
 
 #include <net/af_vsock.h>
+#include <uapi/linux/vsockmon.h>
 #include "vhost.h"
 
 #define VHOST_VSOCK_DEFAULT_HOST_CID	2
@@ -44,6 +46,68 @@ struct vhost_vsock {
 
 	u32 guest_cid;
 };
+
+static struct sk_buff *
+virtio_vsock_pkt_to_vsockmon_skb(struct virtio_vsock_pkt *pkt)
+{
+	struct sk_buff *skb;
+	struct af_vsockmon_hdr *hdr;
+	unsigned char *t_hdr, *payload;
+
+	u32 skb_len = sizeof(*hdr) + sizeof(pkt->hdr) +
+		pkt->len;
+
+	skb = alloc_skb(skb_len, GFP_ATOMIC);
+	if (!skb)
+		return NULL;
+
+	hdr = (struct af_vsockmon_hdr *) skb_put(skb, sizeof(*hdr));
+
+	hdr->src_cid = pkt->hdr.src_cid;
+	hdr->src_port = pkt->hdr.src_port;
+	hdr->dst_cid = pkt->hdr.dst_cid;
+	hdr->dst_port = pkt->hdr.dst_port;
+	hdr->t = cpu_to_le16(AF_VSOCK_T_VIRTIO);
+	hdr->len = cpu_to_le16(sizeof(pkt->hdr));
+
+	switch(cpu_to_le16(pkt->hdr.op)) {
+	case VIRTIO_VSOCK_OP_REQUEST:
+	case VIRTIO_VSOCK_OP_RESPONSE:
+		hdr->op = cpu_to_le16(AF_VSOCK_OP_CONNECT);
+		break;
+	case VIRTIO_VSOCK_OP_RST:
+	case VIRTIO_VSOCK_OP_SHUTDOWN:
+		hdr->op = cpu_to_le16(AF_VSOCK_OP_DISCONNECT);
+		break;
+	case VIRTIO_VSOCK_OP_RW:
+		hdr->op = cpu_to_le16(AF_VSOCK_OP_PAYLOAD);
+		break;
+	case VIRTIO_VSOCK_OP_CREDIT_UPDATE:
+	case VIRTIO_VSOCK_OP_CREDIT_REQUEST:
+		hdr->op = cpu_to_le16(AF_VSOCK_OP_CONTROL);
+		break;
+	default:
+		hdr->op = cpu_to_le16(AF_VSOCK_OP_UNKNOWN);
+		break;
+	}
+
+	t_hdr = skb_put(skb, sizeof(pkt->hdr));
+	memcpy(t_hdr, &pkt->hdr, sizeof(pkt->hdr));
+
+	if (pkt->len) {
+		payload = skb_put(skb, pkt->len);
+		memcpy(payload, pkt->buf, pkt->len);
+	}
+
+	return skb;
+}
+
+static void vsock_deliver_tap_pkt(struct virtio_vsock_pkt *pkt)
+{
+	struct sk_buff *skb = virtio_vsock_pkt_to_vsockmon_skb(pkt);
+	if (skb)
+		vsock_deliver_tap(skb);
+}
 
 static u32 vhost_transport_get_local_cid(void)
 {
@@ -167,6 +231,11 @@ vhost_transport_do_send_pkt(struct vhost_vsock *vsock,
 			if (val + 1 == tx_vq->num)
 				restart_tx = true;
 		}
+
+		/* Deliver to monitoring devices all correctly transmitted
+		 * packets.
+		 */
+		vsock_deliver_tap_pkt(pkt);
 
 		virtio_transport_free_pkt(pkt);
 	}
@@ -337,6 +406,9 @@ static void vhost_vsock_handle_tx_kick(struct vhost_work *work)
 		}
 
 		len = pkt->len;
+
+		/* Deliver to monitoring devices all received packets */
+		vsock_deliver_tap_pkt(pkt);
 
 		/* Only accept correctly addressed packets */
 		if (le64_to_cpu(pkt->hdr.src_cid) == vsock->guest_cid)
