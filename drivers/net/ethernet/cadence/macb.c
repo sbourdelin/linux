@@ -421,7 +421,7 @@ static int macb_mii_probe(struct net_device *dev)
 static int macb_mii_init(struct macb *bp)
 {
 	struct macb_platform_data *pdata;
-	struct device_node *np;
+	struct device_node *np, *np1;
 	int err = -ENXIO, i;
 
 	/* Enable management port */
@@ -445,7 +445,13 @@ static int macb_mii_init(struct macb *bp)
 	dev_set_drvdata(&bp->dev->dev, bp->mii_bus);
 
 	np = bp->pdev->dev.of_node;
-	if (np) {
+	np1 = of_get_parent(bp->phy_node);
+	if (np1) {
+		of_node_put(np1);
+		err = of_mdiobus_register(bp->mii_bus, np1);
+		if (err)
+			goto err_out_unregister_bus;
+	} else if (np) {
 		/* try dt phy registration */
 		err = of_mdiobus_register(bp->mii_bus, np);
 
@@ -2976,6 +2982,7 @@ static int macb_probe(struct platform_device *pdev)
 	} else {
 		bp->phy_interface = err;
 	}
+	bp->phy_node = of_parse_phandle(np, "phy-handle", 0);
 
 	/* IP specific init */
 	err = init(pdev);

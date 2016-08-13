@@ -845,6 +845,7 @@ struct macb {
 	unsigned int		jumbo_max_len;
 
 	u32			wol;
+	struct device_node	*phy_node;
 };
 
 static inline bool macb_is_gem(struct macb *bp)
