@@ -129,6 +129,7 @@ static int snd_rawmidi_runtime_create(struct snd_rawmidi_substream *substream)
 		return -ENOMEM;
 	}
 	runtime->appl_ptr = runtime->hw_ptr = 0;
+	runtime->error = false;
 	substream->runtime = runtime;
 	return 0;
 }
@@ -191,7 +192,10 @@ int snd_rawmidi_drain_output(struct snd_rawmidi_substream *substream)
 		rmidi_warn(substream->rmidi,
 			   "rawmidi drain error (avail = %li, buffer_size = %li)\n",
 			   (long)runtime->avail, (long)runtime->buffer_size);
-		err = -EIO;
+		if (runtime->error)
+			err = -EPIPE;
+		else
+			err = -EIO;
 	}
 	runtime->drain = 0;
 	if (err != -ERESTARTSYS) {
@@ -210,14 +214,19 @@ int snd_rawmidi_drain_input(struct snd_rawmidi_substream *substream)
 {
 	unsigned long flags;
 	struct snd_rawmidi_runtime *runtime = substream->runtime;
+	int err;
 
 	snd_rawmidi_input_trigger(substream, 0);
 	runtime->drain = 0;
 	spin_lock_irqsave(&runtime->lock, flags);
 	runtime->appl_ptr = runtime->hw_ptr = 0;
 	runtime->avail = 0;
+	if (runtime->error)
+		err = -EPIPE;
+	else
+		err = 0;
 	spin_unlock_irqrestore(&runtime->lock, flags);
-	return 0;
+	return err;
 }
 EXPORT_SYMBOL(snd_rawmidi_drain_input);
 
@@ -628,10 +637,13 @@ int snd_rawmidi_output_params(struct snd_rawmidi_substream *substream,
 {
 	char *newbuf;
 	struct snd_rawmidi_runtime *runtime = substream->runtime;
+	int err;
 	
 	if (substream->append && substream->use_count > 1)
 		return -EBUSY;
-	snd_rawmidi_drain_output(substream);
+	err = snd_rawmidi_drain_output(substream);
+	if (err < 0)
+		return err;
 	if (params->buffer_size < 32 || params->buffer_size > 1024L * 1024L) {
 		return -EINVAL;
 	}
@@ -658,8 +670,11 @@ int snd_rawmidi_input_params(struct snd_rawmidi_substream *substream,
 {
 	char *newbuf;
 	struct snd_rawmidi_runtime *runtime = substream->runtime;
+	int err;
 
-	snd_rawmidi_drain_input(substream);
+	err = snd_rawmidi_drain_input(substream);
+	if (err < 0)
+		return err;
 	if (params->buffer_size < 32 || params->buffer_size > 1024L * 1024L) {
 		return -EINVAL;
 	}
@@ -946,6 +961,10 @@ static long snd_rawmidi_kernel_read1(struct snd_rawmidi_substream *substream,
 
 	spin_lock_irqsave(&runtime->lock, flags);
 	while (count > 0 && runtime->avail) {
+		if (runtime->error) {
+			spin_lock_irqrestore(&runtime->lock, flags);
+			return -EPIPE;
+		}
 		count1 = runtime->buffer_size - runtime->appl_ptr;
 		if (count1 > count)
 			count1 = count;
@@ -1017,6 +1036,8 @@ static ssize_t snd_rawmidi_read(struct file *file, char __user *buf, size_t coun
 				return -ENODEV;
 			if (signal_pending(current))
 				return result > 0 ? result : -ERESTARTSYS;
+			if (runtime->error)
+				return -EPIPE;
 			if (!runtime->avail)
 				return result > 0 ? result : -EIO;
 			spin_lock_irq(&runtime->lock);
@@ -1244,6 +1265,10 @@ static long snd_rawmidi_kernel_write1(struct snd_rawmidi_substream *substream,
 		}
 	}
 	while (count > 0 && runtime->avail > 0) {
+		if (runtime->error) {
+			result = -EPIPE;
+			goto _end;
+		}
 		count1 = runtime->buffer_size - runtime->appl_ptr;
 		if (count1 > count)
 			count1 = count;
@@ -1321,6 +1346,8 @@ static ssize_t snd_rawmidi_write(struct file *file, const char __user *buf,
 				return -ENODEV;
 			if (signal_pending(current))
 				return result > 0 ? result : -ERESTARTSYS;
+			if (runtime->error)
+				return -EPIPE;
 			if (!runtime->avail && !timeout)
 				return result > 0 ? result : -EIO;
 			spin_lock_irq(&runtime->lock);
@@ -1348,6 +1375,8 @@ static ssize_t snd_rawmidi_write(struct file *file, const char __user *buf,
 			remove_wait_queue(&runtime->sleep, &wait);
 			if (signal_pending(current))
 				return result > 0 ? result : -ERESTARTSYS;
+			if (runtime->error)
+				return -EPIPE;
 			if (runtime->avail == last_avail && !timeout)
 				return result > 0 ? result : -EIO;
 			spin_lock_irq(&runtime->lock);
@@ -1375,11 +1404,33 @@ static unsigned int snd_rawmidi_poll(struct file *file, poll_table * wait)
 	}
 	mask = 0;
 	if (rfile->input != NULL) {
+		runtime = rfile->input->runtime;
+
+		/* Logical channel for communication is broken. */
+		spin_lock_irq(&runtime->lock);
+		if (runtime->error)
+			mask |= POLLERR;
+		spin_unlock_irq(&runtime->lock);
+
+		/*
+		 * ALSA rawmidi character devices are available for
+		 * bi-directional communication, thus it's impossible to use
+		 * POLLHUP/POLLRDHUP due to logical contradiction with POLLOUT,
+		 * even if any drivers detects peers' disconnection.
+		 */
 		if (snd_rawmidi_ready(rfile->input))
 			mask |= POLLIN | POLLRDNORM;
 	}
 	if (rfile->output != NULL) {
-		if (snd_rawmidi_ready(rfile->output))
+		runtime = rfile->output->runtime;
+
+		/* Logical channel for communication is broken. */
+		spin_lock_irq(&runtime->lock);
+		if (runtime->error)
+			mask |= POLLERR;
+		spin_unlock_irq(&runtime->lock);
+
+		if (!(mask & POLLERR) && snd_rawmidi_ready(rfile->output))
 			mask |= POLLOUT | POLLWRNORM;
 	}
 	return mask;

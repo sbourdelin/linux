@@ -76,6 +76,7 @@ struct snd_rawmidi_runtime {
 	size_t avail_min;	/* min avail for wakeup */
 	size_t avail;		/* max used buffer for wakeup */
 	size_t xruns;		/* over/underruns counter */
+	bool error;		/* Transmission channel is under disorder. */
 	/* misc */
 	spinlock_t lock;
 	wait_queue_head_t sleep;
