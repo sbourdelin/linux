@@ -105,6 +105,21 @@ static inline bool is_zero_ether_addr(const u8 *addr)
 }
 
 /**
+ * is_zero_ether_addr_unaligned - Determine if given Ethernet address is all zeros.
+ * @addr: Pointer to a six-byte array containing the Ethernet address
+ *
+ * Return true if the address is all zeroes.
+ */
+static inline bool is_zero_ether_addr_unaligned(const u8 *addr)
+{
+#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
+	return is_zero_ether_addr(addr);
+#else
+	return (addr[0] | addr[1] | addr[2] | addr[3] | addr[4] | addr[5]) == 0;
+#endif
+}
+
+/**
  * is_multicast_ether_addr - Determine if the Ethernet address is a multicast.
  * @addr: Pointer to a six-byte array containing the Ethernet address
  *
