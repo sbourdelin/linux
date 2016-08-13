@@ -932,6 +932,8 @@ size_t crash_get_memory_size(void)
 	mutex_lock(&kexec_mutex);
 	if (crashk_res.end != crashk_res.start)
 		size = resource_size(&crashk_res);
+	if (crashk_low_res.end != crashk_low_res.start)
+		size += resource_size(&crashk_low_res);
 	mutex_unlock(&kexec_mutex);
 	return size;
 }
@@ -949,7 +951,7 @@ int crash_shrink_memory(unsigned long new_size)
 {
 	int ret = 0;
 	unsigned long start, end;
-	unsigned long old_size;
+	unsigned long low_size, old_size;
 	struct resource *ram_res;
 
 	mutex_lock(&kexec_mutex);
@@ -958,6 +960,17 @@ int crash_shrink_memory(unsigned long new_size)
 		ret = -ENOENT;
 		goto unlock;
 	}
+
+	start = crashk_low_res.start;
+	end = crashk_low_res.end;
+	low_size = (end == 0) ? 0 : end - start + 1;
+	/* Do not shrink crashk_low_res. */
+	if (new_size <= low_size) {
+		ret = -EINVAL;
+		goto unlock;
+	}
+
+	new_size -= low_size;
 	start = crashk_res.start;
 	end = crashk_res.end;
 	old_size = (end == 0) ? 0 : end - start + 1;
