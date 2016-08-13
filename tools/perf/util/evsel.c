@@ -2341,7 +2341,7 @@ u64 perf_evsel__intval(struct perf_evsel *evsel, struct perf_sample *sample,
 	if (!field)
 		return 0;
 
-	return field ? format_field__intval(field, sample, evsel->needs_swap) : 0;
+	return format_field__intval(field, sample, evsel->needs_swap);
 }
 
 bool perf_evsel__fallback(struct perf_evsel *evsel, int err,
