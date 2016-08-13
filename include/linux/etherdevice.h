@@ -90,11 +90,13 @@ static inline bool is_link_local_ether_addr(const u8 *addr)
  * @addr: Pointer to a six-byte array containing the Ethernet address
  *
  * Return true if the address is all zeroes.
- *
- * Please note: addr must be aligned to u16.
  */
 static inline bool is_zero_ether_addr(const u8 *addr)
 {
+	if ((u32)addr & 0x1)
+		return (addr[0] | addr[1] | addr[2] | addr[3] | addr[4] |
+			addr[5]) == 0;
+
 #if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
 	return ((*(const u32 *)addr) | (*(const u16 *)(addr + 4))) == 0;
 #else
