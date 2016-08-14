@@ -16,6 +16,8 @@
 #include <drm/drm_crtc_helper.h>
 #include "udl_drv.h"
 
+#define NR_USB_REQUEST_CHANNEL 0x12
+
 /* dummy connector to just get EDID,
    all UDL appear to have a DVI-D */
 
@@ -52,6 +54,26 @@ error:
 	kfree(block);
 	kfree(rbuf);
 	return NULL;
+}
+
+/*
+ * This is necessary before we can communicate with the display controller.
+ */
+static int udl_select_std_channel(struct udl_device *udl)
+{
+	int ret;
+	u8 set_def_chn[] = {0x57, 0xCD, 0xDC, 0xA7,
+			    0x1C, 0x88, 0x5E, 0x15,
+			    0x60, 0xFE, 0xC6, 0x97,
+			    0x16, 0x3D, 0x47, 0xF2};
+
+	ret = usb_control_msg(udl->udev,
+			      usb_sndctrlpipe(udl->udev, 0),
+			      NR_USB_REQUEST_CHANNEL,
+			      (USB_DIR_OUT | USB_TYPE_VENDOR), 0, 0,
+			      set_def_chn, sizeof(set_def_chn),
+			      USB_CTRL_SET_TIMEOUT);
+	return ret < 0 ? ret : 0;
 }
 
 static int udl_get_modes(struct drm_connector *connector)
@@ -139,6 +161,7 @@ static const struct drm_connector_funcs udl_connector_funcs = {
 int udl_connector_init(struct drm_device *dev, struct drm_encoder *encoder)
 {
 	struct drm_connector *connector;
+	int ret;
 
 	connector = kzalloc(sizeof(struct drm_connector), GFP_KERNEL);
 	if (!connector)
@@ -146,6 +169,10 @@ int udl_connector_init(struct drm_device *dev, struct drm_encoder *encoder)
 
 	drm_connector_init(dev, connector, &udl_connector_funcs, DRM_MODE_CONNECTOR_DVII);
 	drm_connector_helper_add(connector, &udl_connector_helper_funcs);
+
+	ret = udl_select_std_channel(connector->dev->dev_private);
+	if (ret)
+		DRM_ERROR("Selecting channel failed err %x\n", ret);
 
 	drm_connector_register(connector);
 	drm_mode_connector_attach_encoder(connector, encoder);
