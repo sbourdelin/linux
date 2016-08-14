@@ -23,12 +23,18 @@
 #include <net/ip.h>
 #include <net/flow_dissector.h>
 
+#include <net/dst.h>
+#include <net/dst_metadata.h>
+#include <net/vxlan.h>
+
 struct fl_flow_key {
 	int	indev_ifindex;
 	struct flow_dissector_key_control control;
 	struct flow_dissector_key_basic basic;
 	struct flow_dissector_key_eth_addrs eth;
 	struct flow_dissector_key_addrs ipaddrs;
+	struct flow_dissector_key_ipv4_addrs enc_ipv4;
+	struct flow_dissector_key_keyid enc_key_id;
 	union {
 		struct flow_dissector_key_ipv4_addrs ipv4;
 		struct flow_dissector_key_ipv6_addrs ipv6;
@@ -123,11 +129,27 @@ static int fl_classify(struct sk_buff *skb, const struct tcf_proto *tp,
 	struct cls_fl_filter *f;
 	struct fl_flow_key skb_key;
 	struct fl_flow_key skb_mkey;
+	struct ip_tunnel_info *info;
 
 	if (!atomic_read(&head->ht.nelems))
 		return -1;
 
 	fl_clear_masked_range(&skb_key, &head->mask);
+
+	info = skb_tunnel_info(skb);
+	if (info) {
+		struct ip_tunnel_key *key = &info->key;
+		netdev_err(skb->dev, "%s:%d saddr: %pI4, daddr: %pI4 vni: %d tos: %#x ttl: %#x src_port: %d dst_port: %d\n",
+			      __func__, __LINE__,
+			      &key->u.ipv4.src, &key->u.ipv4.dst,
+			      be32_to_cpu(vxlan_tun_id_to_vni(key->tun_id)),
+			      key->tos, key->ttl,
+			      ntohs(key->tp_src), ntohs(key->tp_dst));
+		skb_key.enc_ipv4.src = key->u.ipv4.src;
+		skb_key.enc_ipv4.dst = key->u.ipv4.dst;
+		skb_key.enc_key_id.keyid = vxlan_tun_id_to_vni(key->tun_id);
+	}
+
 	skb_key.indev_ifindex = skb->skb_iif;
 	/* skb_flow_dissect() does not set n_proto in case an unknown protocol,
 	 * so do it rather here.
@@ -293,6 +315,12 @@ static const struct nla_policy fl_policy[TCA_FLOWER_MAX + 1] = {
 	[TCA_FLOWER_KEY_TCP_DST]	= { .type = NLA_U16 },
 	[TCA_FLOWER_KEY_UDP_SRC]	= { .type = NLA_U16 },
 	[TCA_FLOWER_KEY_UDP_DST]	= { .type = NLA_U16 },
+
+	[TCA_FLOWER_KEY_ENC_IPV4_SRC]	= { .type = NLA_U32 },
+	[TCA_FLOWER_KEY_ENC_IPV4_SRC_MASK] = { .type = NLA_U32 },
+	[TCA_FLOWER_KEY_ENC_IPV4_DST]	= { .type = NLA_U32 },
+	[TCA_FLOWER_KEY_ENC_IPV4_DST_MASK] = { .type = NLA_U32 },
+	[TCA_FLOWER_KEY_ENC_KEY_ID]	= { .type = NLA_U32 },
 };
 
 static void fl_set_key_val(struct nlattr **tb,
@@ -371,6 +399,20 @@ static int fl_set_key(struct net *net, struct nlattr **tb,
 		fl_set_key_val(tb, &key->tp.dst, TCA_FLOWER_KEY_UDP_DST,
 			       &mask->tp.dst, TCA_FLOWER_UNSPEC,
 			       sizeof(key->tp.dst));
+	}
+
+	if (tb[TCA_FLOWER_KEY_ENC_IPV4_SRC] ||
+	    tb[TCA_FLOWER_KEY_ENC_IPV4_DST] ||
+	    tb[TCA_FLOWER_KEY_ENC_KEY_ID]) {
+		fl_set_key_val(tb, &key->enc_ipv4.src, TCA_FLOWER_KEY_ENC_IPV4_SRC,
+			       &mask->enc_ipv4.src, TCA_FLOWER_KEY_ENC_IPV4_SRC_MASK,
+			       sizeof(key->enc_ipv4.src));
+		fl_set_key_val(tb, &key->enc_ipv4.dst, TCA_FLOWER_KEY_ENC_IPV4_DST,
+			       &mask->enc_ipv4.dst, TCA_FLOWER_KEY_ENC_IPV4_DST_MASK,
+			       sizeof(key->enc_ipv4.dst));
+		fl_set_key_val(tb, &key->enc_key_id, TCA_FLOWER_KEY_ENC_KEY_ID,
+			       &mask->enc_key_id, TCA_FLOWER_KEY_ENC_KEY_ID,
+			       sizeof(key->enc_key_id));
 	}
 
 	return 0;
@@ -751,6 +793,17 @@ static int fl_dump(struct net *net, struct tcf_proto *tp, unsigned long fh,
 		  fl_dump_key_val(skb, &key->tp.dst, TCA_FLOWER_KEY_UDP_DST,
 				  &mask->tp.dst, TCA_FLOWER_UNSPEC,
 				  sizeof(key->tp.dst))))
+		goto nla_put_failure;
+
+	if (fl_dump_key_val(skb, &key->enc_ipv4.src, TCA_FLOWER_KEY_ENC_IPV4_SRC,
+			    &mask->enc_ipv4.src, TCA_FLOWER_KEY_ENC_IPV4_SRC_MASK,
+			    sizeof(key->enc_ipv4.src)) ||
+	    fl_dump_key_val(skb, &key->enc_ipv4.dst, TCA_FLOWER_KEY_ENC_IPV4_DST,
+			    &mask->enc_ipv4.dst, TCA_FLOWER_KEY_ENC_IPV4_DST_MASK,
+			    sizeof(key->enc_ipv4.dst)) ||
+	    fl_dump_key_val(skb, &key->enc_key_id, TCA_FLOWER_KEY_ENC_KEY_ID,
+			    &mask->enc_key_id, TCA_FLOWER_KEY_ENC_KEY_ID,
+			    sizeof(key->enc_key_id)))
 		goto nla_put_failure;
 
 	nla_put_u32(skb, TCA_FLOWER_FLAGS, f->flags);
