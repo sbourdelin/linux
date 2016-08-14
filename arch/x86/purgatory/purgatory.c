@@ -39,7 +39,7 @@ static int copy_backup_region(void)
 	return 0;
 }
 
-int verify_sha256_digest(void)
+static int verify_sha256_digest(void)
 {
 	struct sha_region *ptr, *end;
 	u8 digest[SHA256_DIGEST_SIZE];
