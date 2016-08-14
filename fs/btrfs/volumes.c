@@ -4923,12 +4923,15 @@ int btrfs_finish_chunk_alloc(struct btrfs_trans_handle *trans,
 
 	ret = btrfs_insert_item(trans, chunk_root, &key, chunk, item_size);
 	if (ret == 0 && map->type & BTRFS_BLOCK_GROUP_SYSTEM) {
-		/*
-		 * TODO: Cleanup of inserted chunk root in case of
-		 * failure.
-		 */
 		ret = btrfs_add_system_chunk(chunk_root, &key, chunk,
 					     item_size);
+		if (ret) {
+			/*
+			 * Cleanup of inserted chunk root in case of
+			 * failure.
+			 */
+			goto out;
+		}
 	}
 
 out:
