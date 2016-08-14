@@ -148,6 +148,8 @@ static int nft_nat_init(const struct nft_ctx *ctx, const struct nft_expr *expr,
 	family = ntohl(nla_get_be32(tb[NFTA_NAT_FAMILY]));
 	if (family != ctx->afi->family)
 		return -EOPNOTSUPP;
+	if (family > U8_MAX)
+		return -EINVAL;
 
 	switch (family) {
 	case NFPROTO_IPV4:
