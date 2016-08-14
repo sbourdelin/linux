@@ -2902,8 +2902,8 @@ L:	linux-media@vger.kernel.org
 T:	git git://linuxtv.org/media_tree.git
 W:	http://linuxtv.org
 S:	Supported
-F:	Documentation/cec.txt
-F:	Documentation/DocBook/media/v4l/cec*
+F:	Documentation/media/kapi/cec-core.rst
+F:	Documentation/media/uapi/cec/
 F:	drivers/staging/media/cec/
 F:	drivers/media/cec-edid.c
 F:	drivers/media/rc/keymaps/rc-cec.c
