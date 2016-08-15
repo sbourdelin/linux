@@ -88,8 +88,7 @@ MODULE_VERSION(DRV_VERSION "-" DRV_BUILD_ID);
 
 /* debugging macro */
 #define skd_dbg(skdev, fmt, ...)					\
-	pr_debug("%s:%s:%d " fmt,					\
-		 (skdev)->name, __func__, __LINE__, ##__VA_ARGS__)
+	pr_debug("%s: " fmt, (skdev)->name, ##__VA_ARGS__)
 
 #define PCI_VENDOR_ID_STEC      0x1B39
 #define PCI_DEVICE_ID_S1120     0x0001
