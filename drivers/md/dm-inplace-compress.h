@@ -10,7 +10,8 @@ struct dm_icomp_super_block {
 	u8 comp_alg;
 } __packed;
 
-#define DMCP_COMP_ALG_LZO 0
+#define DMCP_COMP_ALG_LZO 1
+#define DMCP_COMP_ALG_842 0
 
 #ifdef __KERNEL__
 struct dm_icomp_compressor_data {
@@ -21,6 +22,11 @@ struct dm_icomp_compressor_data {
 static inline int lzo_comp_len(int comp_len)
 {
 	return lzo1x_worst_compress(comp_len);
+}
+
+static inline int nx842_comp_len(int comp_len)
+{
+	return comp_len;
 }
 
 /*
