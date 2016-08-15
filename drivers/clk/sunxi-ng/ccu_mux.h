@@ -6,8 +6,9 @@
 #include "ccu_common.h"
 
 struct ccu_mux_internal {
-	u8	shift;
-	u8	width;
+	u8		shift;
+	u8		width;
+	const u8	*table;
 
 	struct {
 		u8	index;
@@ -20,6 +21,13 @@ struct ccu_mux_internal {
 		u8	width;
 	} variable_prediv;
 };
+
+#define SUNXI_CLK_MUX_TABLE(_shift, _width, _table)	\
+	{						\
+		.shift	= _shift,			\
+		.width	= _width,			\
+		.table	= _table,			\
+	}
 
 #define SUNXI_CLK_MUX(_shift, _width)	\
 	{					\
