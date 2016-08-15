@@ -1434,7 +1434,6 @@ static void dm_icomp_handle_write_comp(struct dm_icomp_req *req)
 		req->result = -EIO;
 		return;
 	}
-	dm_icomp_bio_copy(req->bio, 0, io->decomp_data, count << 9, true);
 
 	/* compress data */
 	comp_len = io->comp_len;
