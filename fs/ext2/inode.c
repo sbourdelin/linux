@@ -773,6 +773,12 @@ int ext2_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_
 	if (ret > 0) {
 		bh_result->b_size = (ret << inode->i_blkbits);
 		ret = 0;
+	} else if (ret == 0 && IS_DAX(inode)) {
+		/*
+		 * We have hit a hole.  Tell DAX it is 4k in size so that it
+		 * uses PTE faults.
+		 */
+		bh_result->b_size = PAGE_SIZE;
 	}
 	return ret;
 
