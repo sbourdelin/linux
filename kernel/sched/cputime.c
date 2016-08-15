@@ -263,6 +263,11 @@ void account_idle_time(cputime_t cputime)
 		cpustat[CPUTIME_IDLE] += (__force u64) cputime;
 }
 
+/*
+ * After a host system is overloaded, the missed clock ticks are not
+ * redelivered to guest later. Due to that, this function may on
+ * occasion account more time than the calling functions think elapsed.
+ */
 static __always_inline cputime_t steal_account_process_time(cputime_t maxtime)
 {
 #ifdef CONFIG_PARAVIRT
@@ -371,7 +376,7 @@ static void irqtime_account_process_tick(struct task_struct *p, int user_tick,
 	 * idle, or potentially user or system time. Due to rounding,
 	 * other time can exceed ticks occasionally.
 	 */
-	other = account_other_time(cputime);
+	other = account_other_time(ULONG_MAX);
 	if (other >= cputime)
 		return;
 	cputime -= other;
@@ -486,7 +491,7 @@ void account_process_tick(struct task_struct *p, int user_tick)
 	}
 
 	cputime = cputime_one_jiffy;
-	steal = steal_account_process_time(cputime);
+	steal = steal_account_process_time(ULONG_MAX);
 
 	if (steal >= cputime)
 		return;
@@ -516,7 +521,7 @@ void account_idle_ticks(unsigned long ticks)
 	}
 
 	cputime = jiffies_to_cputime(ticks);
-	steal = steal_account_process_time(cputime);
+	steal = steal_account_process_time(ULONG_MAX);
 
 	if (steal >= cputime)
 		return;
