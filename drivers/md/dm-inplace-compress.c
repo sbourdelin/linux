@@ -453,6 +453,12 @@ static int dm_icomp_read_or_create_super(struct dm_icomp_info *info)
 	info->data_blocks = data_blocks;
 	info->data_start = (1 + meta_blocks) << DMCP_BLOCK_SECTOR_SHIFT;
 
+	if ((data_blocks << DMCP_BLOCK_SECTOR_SHIFT) < info->ti->len) {
+		info->ti->error =
+			"Insufficient sectors to satisfy requested size";
+		return -ENOMEM;
+	}
+
 	addr = kzalloc(DMCP_BLOCK_SIZE, GFP_KERNEL);
 	if (!addr) {
 		info->ti->error = "Cannot allocate super";
