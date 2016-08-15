@@ -1154,7 +1154,6 @@ void ath9k_calculate_summary_state(struct ath_softc *sc,
 		bool changed = (iter_data.primary_sta != ctx->primary_sta);
 
 		if (iter_data.primary_sta) {
-			iter_data.beacons = true;
 			ath9k_set_assoc_state(sc, iter_data.primary_sta,
 					      changed);
 			ctx->primary_sta = iter_data.primary_sta;
@@ -1166,10 +1165,12 @@ void ath9k_calculate_summary_state(struct ath_softc *sc,
 			if (ath9k_hw_mci_is_enabled(sc->sc_ah))
 				ath9k_mci_update_wlan_channels(sc, true);
 		}
+	} else if (iter_data.beacons) {
+		sc->nbcnvifs = iter_data.nbcnvifs;
+		ath9k_beacon_config(sc, iter_data.primary_beacon_vif,
+				    iter_data.beacons);
 	}
-	sc->nbcnvifs = iter_data.nbcnvifs;
-	ath9k_beacon_config(sc, iter_data.primary_beacon_vif,
-			    iter_data.beacons);
+
 	ath9k_hw_set_interrupts(ah);
 
 	if (ah->slottime != iter_data.slottime) {
