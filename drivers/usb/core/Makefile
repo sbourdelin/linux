@@ -9,5 +9,6 @@ usbcore-y += port.o of.o
 
 usbcore-$(CONFIG_PCI)		+= hcd-pci.o
 usbcore-$(CONFIG_ACPI)		+= usb-acpi.o
+usbcore-$(CONFIG_PWRSEQ_GENERIC) += pwrseq.o
 
 obj-$(CONFIG_USB)		+= usbcore.o
