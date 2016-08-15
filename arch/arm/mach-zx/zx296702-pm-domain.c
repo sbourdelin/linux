@@ -189,7 +189,6 @@ static const struct of_device_id zx296702_pm_domain_matches[] __initconst = {
 static struct platform_driver zx296702_pd_driver __initdata = {
 	.driver = {
 		.name = "zx-powerdomain",
-		.owner = THIS_MODULE,
 		.of_match_table = zx296702_pm_domain_matches,
 	},
 	.probe = zx296702_pd_probe,
