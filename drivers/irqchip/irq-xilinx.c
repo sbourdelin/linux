@@ -15,6 +15,7 @@
 #include <linux/of_address.h>
 #include <linux/io.h>
 #include <linux/bug.h>
+#include <linux/of_irq.h>
 
 static void __iomem *intc_baseaddr;
 
@@ -135,11 +136,26 @@ static const struct irq_domain_ops xintc_irq_domain_ops = {
 	.map = xintc_map,
 };
 
+static void xil_intc_irq_handler(struct irq_desc *desc)
+{
+	u32 pending = get_irq();
+
+	if (pending != -1U) {
+		while (true) {
+			pending = get_irq();
+			generic_handle_irq(pending);
+			if (pending == -1U)
+				break;
+		}
+	}
+}
+
 static int __init xilinx_intc_of_init(struct device_node *intc,
 					     struct device_node *parent)
 {
 	u32 nr_irq, intr_mask;
-	int ret;
+	int ret, irq;
+	struct device_node *parent_node;
 
 	intc_baseaddr = of_iomap(intc, 0);
 	BUG_ON(!intc_baseaddr);
@@ -187,6 +203,16 @@ static int __init xilinx_intc_of_init(struct device_node *intc,
 	 * and commits this patch.  ~~gcl */
 	root_domain = irq_domain_add_linear(intc, nr_irq, &xintc_irq_domain_ops,
 							(void *)intr_mask);
+
+	parent_node = of_irq_find_parent(intc);
+	if (parent_node) {
+		irq = irq_of_parse_and_map(intc, 0);
+		if (irq)
+			irq_set_chained_handler_and_data(irq,
+							 xil_intc_irq_handler,
+							 root_domain);
+
+	}
 
 	irq_set_default_host(root_domain);
 
