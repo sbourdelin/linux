@@ -67,6 +67,16 @@ struct xdr_buf {
 			len;		/* Length of XDR encoded message */
 };
 
+static inline void
+xdr_buf_init(struct xdr_buf *buf, __be32 *start, size_t len)
+{
+	memset(buf, 0, sizeof(*buf));
+
+	buf->head[0].iov_base = start;
+	buf->head[0].iov_len = len;
+	buf->buflen = len;
+}
+
 /*
  * pre-xdr'ed macros.
  */
