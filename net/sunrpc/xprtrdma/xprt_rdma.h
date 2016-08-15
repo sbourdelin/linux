@@ -285,16 +285,27 @@ struct rpcrdma_mr_seg {		/* chunk descriptors */
 	char		*mr_offset;	/* kva if no page, else offset */
 };
 
-#define RPCRDMA_MAX_IOVS	(2)
+/* Reserve enough Send SGEs to send a maximum size inline request:
+ * - RPC-over-RDMA header
+ * - xdr_buf head iovec
+ * - RPCRDMA_MAX_INLINE bytes, possibly unaligned, in pages
+ * - xdr_buf tail iovec
+ */
+enum {
+	RPCRDMA_MAX_SEND_PAGES = PAGE_SIZE + RPCRDMA_MAX_INLINE - 1,
+	RPCRDMA_MAX_PAGE_SGES = (RPCRDMA_MAX_SEND_PAGES >> PAGE_SHIFT) + 1,
+	RPCRDMA_MAX_SEND_SGES = 1 + 1 + RPCRDMA_MAX_PAGE_SGES + 1,
+};
 
 struct rpcrdma_buffer;
 struct rpcrdma_req {
 	struct list_head	rl_free;
+	unsigned int		rl_mapped_pages;
 	unsigned int		rl_connect_cookie;
 	struct rpcrdma_buffer	*rl_buffer;
 	struct rpcrdma_rep	*rl_reply;
 	struct ib_send_wr	rl_send_wr;
-	struct ib_sge		rl_send_iov[RPCRDMA_MAX_IOVS];
+	struct ib_sge		rl_send_sge[RPCRDMA_MAX_SEND_SGES];
 	struct rpcrdma_regbuf	*rl_rdmabuf;	/* xprt header */
 	struct rpcrdma_regbuf	*rl_sendbuf;	/* rq_snd_buf */
 	struct rpcrdma_regbuf	*rl_recvbuf;	/* rq_rcv_buf */
@@ -528,6 +539,12 @@ void rpcrdma_reply_handler(struct rpcrdma_rep *);
 /*
  * RPC/RDMA protocol calls - xprtrdma/rpc_rdma.c
  */
+bool rpcrdma_prepare_hdr_sge(struct rpcrdma_xprt *, struct rpcrdma_req *, u32);
+bool rpcrdma_prepare_msg_sge(struct rpcrdma_xprt *, struct rpcrdma_req *,
+			     struct xdr_buf *);
+bool rpcrdma_prepare_msg_sges(struct rpcrdma_xprt *, struct rpcrdma_req *,
+			      struct xdr_buf *);
+void rpcrdma_pages_unmap(struct rpcrdma_xprt *, struct rpcrdma_req *);
 int rpcrdma_marshal_req(struct rpc_rqst *);
 void rpcrdma_set_max_header_sizes(struct rpcrdma_xprt *);
 
