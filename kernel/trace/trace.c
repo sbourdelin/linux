@@ -40,6 +40,7 @@
 #include <linux/poll.h>
 #include <linux/nmi.h>
 #include <linux/fs.h>
+#include <linux/trace.h>
 #include <linux/sched/rt.h>
 
 #include "trace.h"
@@ -2128,6 +2129,127 @@ void trace_buffer_unlock_commit_regs(struct trace_array *tr,
 	ftrace_trace_userstack(buffer, flags, pc);
 }
 
+static inline void
+trace_generic_commit(struct trace_array *tr,
+	       struct ring_buffer_event *event)
+{
+	struct trace_entry *entry;
+	struct trace_export *export = tr->export;
+	unsigned int size = 0;
+
+	entry = ring_buffer_event_data(event);
+
+	trace_entry_size(size, entry->type);
+	if (!size)
+		return;
+
+	if (export->write)
+		export->write((char *)entry, size);
+}
+
+static inline void
+trace_rb_commit(struct trace_array *tr,
+	       struct ring_buffer_event *event)
+{
+	__buffer_unlock_commit(tr->trace_buffer.buffer, event);
+}
+
+static DEFINE_MUTEX(trace_export_lock);
+
+static struct trace_export trace_export_rb __read_mostly = {
+	.name		= "rb",
+	.commit	= trace_rb_commit,
+	.next		= NULL,
+};
+static struct trace_export *trace_exports_list __read_mostly = &trace_export_rb;
+
+inline void
+trace_exports(struct trace_array *tr, struct ring_buffer_event *event)
+{
+	struct trace_export *export;
+
+	preempt_disable_notrace();
+
+	for (export = rcu_dereference_raw_notrace(trace_exports_list);
+	     export && export->commit;
+	     export = rcu_dereference_raw_notrace(export->next)) {
+		tr->export = export;
+		export->commit(tr, event);
+	}
+
+	preempt_enable_notrace();
+}
+
+static void
+add_trace_export(struct trace_export **list, struct trace_export *export)
+{
+	export->next = *list;
+	/*
+	 * We are entering export into the list but another
+	 * CPU might be walking that list. We need to make sure
+	 * the export->next pointer is valid before another CPU sees
+	 * the export pointer included into the list.
+	 */
+	rcu_assign_pointer(*list, export);
+
+}
+
+static int
+rm_trace_export(struct trace_export **list, struct trace_export *export)
+{
+	struct trace_export **p;
+
+	for (p = list; *p != &trace_export_rb; p = &(*p)->next)
+		if (*p == export)
+			break;
+
+	if (*p != export)
+		return -1;
+
+	*p = (*p)->next;
+
+	return 0;
+}
+
+int register_trace_export(struct trace_export *export)
+{
+	if (!export->write) {
+		pr_warn("trace_export must have the write() call back.\n");
+		return -1;
+	}
+
+	if (!export->name) {
+		pr_warn("trace_export must have a name.\n");
+		return -1;
+	}
+
+	mutex_lock(&trace_export_lock);
+
+	export->tr = trace_exports_list->tr;
+	export->commit = trace_generic_commit;
+
+	add_trace_export(&trace_exports_list, export);
+
+	mutex_unlock(&trace_export_lock);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(register_trace_export);
+
+int unregister_trace_export(struct trace_export *export)
+{
+	int ret;
+
+	mutex_lock(&trace_export_lock);
+
+	ret = rm_trace_export(&trace_exports_list, export);
+
+	mutex_unlock(&trace_export_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(unregister_trace_export);
+
 void
 trace_function(struct trace_array *tr,
 	       unsigned long ip, unsigned long parent_ip, unsigned long flags,
@@ -2147,7 +2269,7 @@ trace_function(struct trace_array *tr,
 	entry->parent_ip		= parent_ip;
 
 	if (!call_filter_check_discard(call, entry, buffer, event))
-		__buffer_unlock_commit(buffer, event);
+		trace_exports(tr, event);
 }
 
 #ifdef CONFIG_STACKTRACE

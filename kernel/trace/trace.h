@@ -260,6 +260,7 @@ struct trace_array {
 	/* function tracing enabled */
 	int			function_enabled;
 #endif
+	struct trace_export	*export;
 };
 
 enum {
@@ -301,6 +302,13 @@ static inline struct trace_array *top_trace_array(void)
 		break;					\
 	}
 
+#undef IF_SIZE
+#define IF_SIZE(size, var, etype, id)		\
+		if (var == id) {		\
+			size = (sizeof(etype));	\
+			break;			\
+		}
+
 /* Will cause compile errors if type is not found. */
 extern void __ftrace_bad_type(void);
 
@@ -336,6 +344,29 @@ extern void __ftrace_bad_type(void);
 		IF_ASSIGN(var, ent, struct ftrace_graph_ret_entry,	\
 			  TRACE_GRAPH_RET);		\
 		__ftrace_bad_type();					\
+	} while (0)
+
+/*
+ * The trace_entry_size return the size of specific trace type
+ *
+ * IF_SIZE(size, var);
+ *
+ * Where "var" is just the given trace type.
+ */
+#define trace_entry_size(size, var)					\
+	do {								\
+		IF_SIZE(size, var, struct ftrace_entry, TRACE_FN);	\
+		IF_SIZE(size, var, struct stack_entry, TRACE_STACK);	\
+		IF_SIZE(size, var, struct userstack_entry,		\
+			TRACE_USER_STACK);				\
+		IF_SIZE(size, var, struct print_entry, TRACE_PRINT);	\
+		IF_SIZE(size, var, struct bprint_entry, TRACE_BPRINT);	\
+		IF_SIZE(size, var, struct bputs_entry, TRACE_BPUTS);	\
+		IF_SIZE(size, var, struct trace_branch, TRACE_BRANCH);	\
+		IF_SIZE(size, var, struct ftrace_graph_ent_entry,	\
+			TRACE_GRAPH_ENT);				\
+		IF_SIZE(size, var, struct ftrace_graph_ret_entry,	\
+			TRACE_GRAPH_RET);				\
 	} while (0)
 
 /*
