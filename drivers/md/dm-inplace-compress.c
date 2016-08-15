@@ -1025,6 +1025,12 @@ static void dm_icomp_read_one_extent(struct dm_icomp_req *req, u64 block,
 {
 	struct dm_icomp_io_range *io;
 
+	if (block+(data_sectors>>DMCP_BLOCK_SECTOR_SHIFT) >=
+			req->info->data_blocks) {
+		req->result = -EIO;
+		return;
+	}
+
 	io = dm_icomp_create_io_range(req, data_sectors << 9,
 		logical_sectors << 9);
 	if (!io) {
@@ -1063,7 +1069,9 @@ again:
 
 	block_index = first_block_index + (logical_sectors >>
 				DMCP_BLOCK_SECTOR_SHIFT);
-	if ((block_index << DMCP_BLOCK_SECTOR_SHIFT) < bio_end_sector(req->bio))
+	if (((block_index << DMCP_BLOCK_SECTOR_SHIFT) <
+			 bio_end_sector(req->bio)) &&
+			((block_index) < req->info->data_blocks))
 		goto again;
 
 	/* A shortcut if all data is in already */
