@@ -617,8 +617,7 @@ static int page_cache_tree_insert(struct address_space *mapping,
 			if (node)
 				workingset_node_pages_dec(node);
 			/* Wakeup waiters for exceptional entry lock */
-			dax_wake_mapping_entry_waiter(mapping, page->index,
-						      false);
+			dax_wake_mapping_entry_waiter(slot, false);
 		}
 	}
 	radix_tree_replace_slot(slot, page);
