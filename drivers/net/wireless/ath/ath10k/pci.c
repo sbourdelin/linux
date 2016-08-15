@@ -2725,6 +2725,7 @@ static int ath10k_pci_hif_fetch_cal_eeprom(struct ath10k *ar, void **data,
 	return 0;
 
 err_free:
+	kfree(caldata);
 	kfree(data);
 
 	return -EINVAL;
