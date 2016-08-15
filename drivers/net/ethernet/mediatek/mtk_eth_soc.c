@@ -904,9 +904,6 @@ release_desc:
 	wmb();
 	mtk_w32(eth, ring->calc_idx, MTK_QRX_CRX_IDX0);
 
-	if (done < budget)
-		mtk_w32(eth, MTK_RX_DONE_INT, MTK_QMTK_INT_STATUS);
-
 	return done;
 }
 
@@ -1025,8 +1022,10 @@ static int mtk_napi_rx(struct napi_struct *napi, int budget)
 	struct mtk_eth *eth = container_of(napi, struct mtk_eth, rx_napi);
 	u32 status, mask;
 	int rx_done = 0;
+	int remain_budget = budget;
 
 	mtk_handle_status_irq(eth);
+poll_again:
 	mtk_w32(eth, MTK_RX_DONE_INT, MTK_QMTK_INT_STATUS);
 	rx_done = mtk_poll_rx(napi, budget, eth);
 
@@ -1037,14 +1036,14 @@ static int mtk_napi_rx(struct napi_struct *napi, int budget)
 			 "done rx %d, intr 0x%08x/0x%x\n",
 			 rx_done, status, mask);
 	}
-
-	if (rx_done == budget)
+	if (rx_done == remain_budget)
 		return budget;
 
 	status = mtk_r32(eth, MTK_QMTK_INT_STATUS);
-	if (status & MTK_RX_DONE_INT)
-		return budget;
-
+	if (status & MTK_RX_DONE_INT) {
+		remain_budget -= rx_done;
+		goto poll_again;
+	}
 	napi_complete(napi);
 	mtk_irq_enable(eth, MTK_RX_DONE_INT);
 
