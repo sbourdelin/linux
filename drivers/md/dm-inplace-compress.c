@@ -977,7 +977,7 @@ static struct dm_icomp_io_range *dm_icomp_create_io_read_range(
 	io->comp_kmap = (segments == 1);
 	/* note down the requested length for decompress buffer.
 	 * but dont allocate it yet.
-	 /
+	 */
 	io->decomp_req_len = decomp_len;
 	return io;
 }
@@ -1375,8 +1375,13 @@ static int dm_icomp_handle_write_modify(struct dm_icomp_io_range *io,
 	}
 
 	dm_icomp_get_req(req);
-	if (ret == 1)
+
+	if (ret == 1) {
 		io->io_req.mem.ptr.addr = io->decomp_data + (offset << 9);
+		dm_icomp_release_comp_buffer(io);
+	} else
+		dm_icomp_release_decomp_buffer(io);
+
 	io->io_region.count = comp_len >> 9;
 	io->io_region.sector = start + req->info->data_start;
 
@@ -1443,8 +1448,11 @@ static void dm_icomp_handle_write_comp(struct dm_icomp_req *req)
 	io->io_region.sector = req->bio->bi_iter.bi_sector +
 			 req->info->data_start;
 
-	if (ret == 1)
+	if (ret == 1) {
 		io->io_req.mem.ptr.addr = io->decomp_data;
+		dm_icomp_release_comp_buffer(io);
+	} else
+		dm_icomp_release_decomp_buffer(io);
 
 	io->io_region.count = comp_len >> 9;
 	io->io_req.bi_rw = req->bio->bi_rw;
