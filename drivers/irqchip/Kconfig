@@ -203,6 +203,10 @@ config XTENSA_MX
 	bool
 	select IRQ_DOMAIN
 
+config XILINX_IRQ
+	bool
+	select IRQ_DOMAIN
+
 config IRQ_CROSSBAR
 	bool
 	help
