@@ -343,6 +343,12 @@ config DM_MIRROR
          Allow volume managers to mirror logical volumes, also
          needed for live data migration tools such as 'pvmove'.
 
+config DM_INPLACE_COMPRESS
+       tristate "Inplace Compression target"
+       depends on BLK_DEV_DM
+       ---help---
+         Allow volume managers to compress data for SSD.
+
 config DM_LOG_USERSPACE
 	tristate "Mirror userspace logging"
 	depends on DM_MIRROR && NET
