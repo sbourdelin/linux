@@ -3,6 +3,7 @@
 #include <linux/types.h>
 
 #define DMCP_SUPER_MAGIC 0x106526c206506c09
+#define DMCP_COMPRESS_MAGIC 0xfaceecaf
 struct dm_icomp_super_block {
 	__le64 magic;
 	__le64 meta_blocks;

@@ -984,19 +984,21 @@ static int dm_icomp_io_range_compress(struct dm_icomp_info *info,
 		DMWARN("CO Error %d ", ret);
 
 	atomic64_add(decomp_len, &info->uncompressed_write_size);
-	if (ret || decomp_len < actual_comp_len + sizeof(u32) + 512) {
+	if (ret || decomp_len < actual_comp_len + 2*sizeof(u32) + 512) {
 		*comp_len = decomp_len;
 		atomic64_add(*comp_len, &info->compressed_write_size);
 		return 1;
 	}
 
 	*comp_len = round_up(actual_comp_len, 512);
-	if (*comp_len - actual_comp_len < sizeof(u32))
+	if (*comp_len - actual_comp_len < 2*sizeof(u32))
 		*comp_len += 512;
 	atomic64_add(*comp_len, &info->compressed_write_size);
 	addr = io->comp_data + *comp_len;
 	addr--;
 	*addr = cpu_to_le32(actual_comp_len);
+	addr--;
+	*addr = cpu_to_le32(DMCP_COMPRESS_MAGIC);
 	return 0;
 }
 
@@ -1020,13 +1022,19 @@ static int dm_icomp_io_range_decompress(struct dm_icomp_info *info,
 	addr = comp_data + comp_len;
 	addr--;
 	comp_len = le32_to_cpu(*addr);
+	addr--;
 
-	tfm = info->tfm[get_cpu()];
-	ret = crypto_comp_decompress(tfm, comp_data, comp_len,
-		decomp_data, &decomp_len);
-	put_cpu();
-	if (ret)
-		return -EINVAL;
+	if (comp_len == decomp_len)
+		return 1;
+	if (le32_to_cpu(*addr) == DMCP_COMPRESS_MAGIC) {
+		tfm = info->tfm[get_cpu()];
+		ret = crypto_comp_decompress(tfm, comp_data, comp_len,
+			decomp_data, &decomp_len);
+		put_cpu();
+		if (ret)
+			return -EINVAL;
+	} else
+		memset(decomp_data, 0, decomp_len);
 	return 0;
 }
 
