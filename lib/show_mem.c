@@ -8,6 +8,7 @@
 #include <linux/mm.h>
 #include <linux/quicklist.h>
 #include <linux/cma.h>
+#include <linux/vm_event_item.h>
 
 void show_mem(unsigned int filter)
 {
@@ -16,6 +17,19 @@ void show_mem(unsigned int filter)
 
 	printk("Mem-Info:\n");
 	show_free_areas(filter);
+
+#ifdef CONFIG_COMPACTION
+	if (filter & SHOW_COMPACTION_STATS) {
+		printk("compaction_stall:%lu compaction_fail:%lu "
+		       "compact_migrate_scanned:%lu compact_free_scanned:%lu "
+		       "compact_isolated:%lu "
+		       "pgmigrate_success:%lu pgmigrate_fail:%lu\n",
+		       global_page_state(COMPACTSTALL), global_page_state(COMPACTFAIL),
+		       global_page_state(COMPACTMIGRATE_SCANNED), global_page_state(COMPACTFREE_SCANNED),
+		       global_page_state(COMPACTISOLATED),
+		       global_page_state(PGMIGRATE_SUCCESS), global_page_state(PGMIGRATE_FAIL));
+	}
+#endif
 
 	for_each_online_pgdat(pgdat) {
 		unsigned long flags;
