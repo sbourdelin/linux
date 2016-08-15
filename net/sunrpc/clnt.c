@@ -1768,7 +1768,7 @@ rpc_xdr_encode(struct rpc_task *task)
 		     req->rq_buffer,
 		     req->rq_callsize);
 	xdr_buf_init(&req->rq_rcv_buf,
-		     (__be32 *)((char *)req->rq_buffer + req->rq_callsize),
+		     req->rq_rbuffer,
 		     req->rq_rcvsize);
 
 	p = rpc_encode_header(task);
