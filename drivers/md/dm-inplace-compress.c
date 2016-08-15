@@ -19,10 +19,12 @@ static struct dm_icomp_compressor_data compressors[] = {
 	[DMCP_COMP_ALG_LZO] = {
 		.name = "lzo",
 		.comp_len = lzo_comp_len,
+		.max_comp_len = lzo_max_comp_len,
 	},
 	[DMCP_COMP_ALG_842] = {
 		.name = "842",
 		.comp_len = nx842_comp_len,
+		.max_comp_len = nx842_max_comp_len,
 	},
 };
 static int default_compressor = -1;
@@ -848,6 +850,14 @@ static inline int dm_icomp_compressor_len(struct dm_icomp_info *info, int len)
 	return len;
 }
 
+static inline int dm_icomp_compressor_maxlen(struct dm_icomp_info *info,
+		int len)
+{
+	if (compressors[info->comp_alg].max_comp_len)
+		return compressors[info->comp_alg].max_comp_len(len);
+	return len;
+}
+
 /*
  * caller should set region.sector, region.count. bi_rw. IO always to/from
  * comp_data
@@ -919,6 +929,25 @@ static void dm_icomp_bio_copy(struct bio *bio, off_t bio_off, void *buf,
 	}
 }
 
+static int dm_icomp_mod_to_max_io_range(struct dm_icomp_info *info,
+			 struct dm_icomp_io_range *io)
+{
+	unsigned int maxlen = dm_icomp_compressor_maxlen(info, io->decomp_len);
+
+	if (maxlen <= io->comp_len)
+		return -ENOSPC;
+	io->io_req.mem.ptr.addr = io->comp_data =
+		dm_icomp_krealloc(io->comp_data, maxlen,
+			io->comp_len, GFP_NOIO);
+	if (!io->comp_data) {
+		DMWARN("UNFORTUNE allocation failure ");
+		io->comp_len = 0;
+		return -ENOSPC;
+	}
+	io->comp_len = maxlen;
+	return 0;
+}
+
 /*
  * return value:
  * < 0 : error
@@ -940,7 +969,17 @@ static int dm_icomp_io_range_compress(struct dm_icomp_info *info,
 	ret = crypto_comp_compress(tfm, decomp_data, decomp_len,
 		io->comp_data, &actual_comp_len);
 
+	if (ret || actual_comp_len > io->comp_len) {
+		ret = dm_icomp_mod_to_max_io_range(info, io);
+		if (!ret) {
+			actual_comp_len = io->comp_len;
+			ret = crypto_comp_compress(tfm, decomp_data, decomp_len,
+				io->comp_data, &actual_comp_len);
+		}
+	}
+
 	put_cpu();
+
 	if (ret < 0)
 		DMWARN("CO Error %d ", ret);
 

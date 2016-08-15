@@ -17,14 +17,25 @@ struct dm_icomp_super_block {
 struct dm_icomp_compressor_data {
 	char *name;
 	int (*comp_len)(int comp_len);
+	int (*max_comp_len)(int comp_len);
 };
 
 static inline int lzo_comp_len(int comp_len)
+{
+	return lzo1x_worst_compress(comp_len) >> 1;
+}
+
+static inline int lzo_max_comp_len(int comp_len)
 {
 	return lzo1x_worst_compress(comp_len);
 }
 
 static inline int nx842_comp_len(int comp_len)
+{
+	return (comp_len>>4)*7; /* less than half: 7/16 */
+}
+
+static inline int nx842_max_comp_len(int comp_len)
 {
 	return comp_len;
 }
