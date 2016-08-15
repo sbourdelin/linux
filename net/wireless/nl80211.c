@@ -409,6 +409,10 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 		.len = VHT_MUMIMO_GROUPS_DATA_LEN
 	},
 	[NL80211_ATTR_MU_MIMO_FOLLOW_MAC_ADDR] = { .len = ETH_ALEN },
+	[NL80211_ATTR_HT_ENABLED] { .type = NLA_U8 },
+	[NL80211_ATTR_VHT_ENABLED] { .type = NLA_U8 },
+	[NL80211_ATTR_REQUIRE_HT] { .type = NLA_U8 },
+	[NL80211_ATTR_REQUIRE_VHT] { .type = NLA_U8 },
 };
 
 /* policy for the key attributes */
@@ -3556,6 +3560,30 @@ static int nl80211_start_ap(struct sk_buff *skb, struct genl_info *info)
 		if (IS_ERR(params.acl))
 			return PTR_ERR(params.acl);
 	}
+
+	if (info->attrs[NL80211_ATTR_HT_ENABLED])
+		params.ht_enabled = nla_get_u8(
+			info->attrs[NL80211_ATTR_HT_ENABLED]);
+	else
+		params.ht_enabled = HT_VHT_NOT_INDICATED;
+
+	if (info->attrs[NL80211_ATTR_VHT_ENABLED])
+		params.vht_enabled = nla_get_u8(
+			info->attrs[NL80211_ATTR_VHT_ENABLED]);
+	else
+		params.vht_enabled = HT_VHT_NOT_INDICATED;
+
+	if (info->attrs[NL80211_ATTR_REQUIRE_HT])
+		params.require_ht = nla_get_u8(
+			info->attrs[NL80211_ATTR_REQUIRE_HT]);
+	else
+		params.require_ht = HT_VHT_NOT_INDICATED;
+
+	if (info->attrs[NL80211_ATTR_REQUIRE_VHT])
+		params.require_vht = nla_get_u8(
+			info->attrs[NL80211_ATTR_REQUIRE_VHT]);
+	else
+		params.require_vht = HT_VHT_NOT_INDICATED;
 
 	wdev_lock(wdev);
 	err = rdev_start_ap(rdev, dev, &params);

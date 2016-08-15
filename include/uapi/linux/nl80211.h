@@ -1867,6 +1867,17 @@ enum nl80211_commands {
  * @NL80211_ATTR_MESH_PEER_AID: Association ID for the mesh peer (u16). This is
  *	used to pull the stored data for mesh peer in power save state.
  *
+ * @NL80211_ATTR_HT_ENABLED: u8 value to indicate if HT capability is enabled.
+ *	0=disabled, 1=enabled, not being included as being no value available
+ * @NL80211_ATTR_VHT_ENABLED: u8 value to indicate if VHT capability is enabled.
+ *	0=disabled, 1=enabled, not being included as being no value available
+ * @NL80211_ATTR_REQUIRE_HT: u8 value to require stations to support HT phy.
+ *	0=not required, 1=required, not being included as being no value
+ *	available
+ * @NL80211_ATTR_REQUIRE_VHT: u8 value to require stations to support VHT phy.
+ *	0=not required, 1=required, not being included as being no value
+ *	available
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2260,6 +2271,11 @@ enum nl80211_attrs {
 	NL80211_ATTR_MEASUREMENT_DURATION_MANDATORY,
 
 	NL80211_ATTR_MESH_PEER_AID,
+
+	NL80211_ATTR_HT_ENABLED,
+	NL80211_ATTR_VHT_ENABLED,
+	NL80211_ATTR_REQUIRE_HT,
+	NL80211_ATTR_REQUIRE_VHT,
 
 	/* add attributes here, update the policy in nl80211.c */
 

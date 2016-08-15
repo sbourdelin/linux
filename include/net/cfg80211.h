@@ -676,6 +676,12 @@ struct cfg80211_acl_data {
 	struct mac_address mac_addrs[];
 };
 
+enum ht_vht_support {
+	HT_VHT_DISABLED,
+	HT_VHT_ENABLED,
+	HT_VHT_NOT_INDICATED
+};
+
 /**
  * struct cfg80211_ap_settings - AP configuration
  *
@@ -700,6 +706,10 @@ struct cfg80211_acl_data {
  *	MAC address based access control
  * @pbss: If set, start as a PCP instead of AP. Relevant for DMG
  *	networks.
+ * @ht_enabled: if HT capability is enabled/disabled/not indicated
+ * @vht_enabled: if VHT capability is enabled/disabled/not indicated
+ * @require_ht: require stations to support HT PHY
+ * @require_vht: require stations to support VHT PHY
  */
 struct cfg80211_ap_settings {
 	struct cfg80211_chan_def chandef;
@@ -719,6 +729,11 @@ struct cfg80211_ap_settings {
 	bool p2p_opp_ps;
 	const struct cfg80211_acl_data *acl;
 	bool pbss;
+	enum ht_vht_support ht_enabled;
+	enum ht_vht_support vht_enabled;
+	enum ht_vht_support require_ht;
+	enum ht_vht_support require_vht;
+
 };
 
 /**
