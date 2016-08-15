@@ -774,6 +774,23 @@ static void dm_icomp_get_req(struct dm_icomp_req *req)
 	atomic_inc(&req->io_pending);
 }
 
+static void *dm_icomp_kmalloc(size_t size, gfp_t flags)
+{
+	return  kmalloc(size, flags);
+}
+
+static void *dm_icomp_krealloc(void *addr, size_t size,
+		 size_t orig_size, gfp_t flags)
+{
+	return krealloc(addr, size, flags);
+}
+
+static void dm_icomp_kfree(void *addr, unsigned int size)
+{
+	kfree(addr);
+}
+
+
 static void dm_icomp_free_io_range(struct dm_icomp_io_range *io)
 {
 	kfree(io->decomp_data);
