@@ -115,7 +115,9 @@ struct dm_icomp_meta_io {
 struct dm_icomp_io_range {
 	struct dm_io_request io_req;
 	struct dm_io_region io_region;
+	int decomp_kmap;	/* Is the decomp_data kmapped'? */
 	void *decomp_data;
+	void *decomp_real_data; /* holds the actual start of the buffer */
 	unsigned int decomp_req_len;/* originally requested length */
 	unsigned int decomp_len; /* actual allocated/mapped length */
 	void *comp_data;
