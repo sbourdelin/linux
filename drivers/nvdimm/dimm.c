@@ -26,6 +26,13 @@ static int nvdimm_probe(struct device *dev)
 	struct nvdimm_drvdata *ndd;
 	int rc;
 
+	rc = nvdimm_check_config_data(dev);
+	if (rc == -ENOENT)
+		/* not required for non-aliased nvdimm, ex. NVDIMM-N */
+		return 0;
+	else
+		return rc;
+
 	ndd = kzalloc(sizeof(*ndd), GFP_KERNEL);
 	if (!ndd)
 		return -ENOMEM;
@@ -71,6 +78,9 @@ static int nvdimm_probe(struct device *dev)
 static int nvdimm_remove(struct device *dev)
 {
 	struct nvdimm_drvdata *ndd = dev_get_drvdata(dev);
+
+	if (!ndd)
+		return 0;
 
 	nvdimm_bus_lock(dev);
 	dev_set_drvdata(dev, NULL);
