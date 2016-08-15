@@ -34,7 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 struct rpc_buffer {
 	size_t	len;
-	char	data[];
+	__be32	data[];
 };
 
 static inline int rpc_reply_expected(struct rpc_task *task)
