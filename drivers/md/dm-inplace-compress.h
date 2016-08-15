@@ -116,7 +116,8 @@ struct dm_icomp_io_range {
 	struct dm_io_request io_req;
 	struct dm_io_region io_region;
 	void *decomp_data;
-	unsigned int decomp_len;
+	unsigned int decomp_req_len;/* originally requested length */
+	unsigned int decomp_len; /* actual allocated/mapped length */
 	void *comp_data;
 	unsigned int comp_len; /* For write, this is estimated */
 	struct list_head next;
