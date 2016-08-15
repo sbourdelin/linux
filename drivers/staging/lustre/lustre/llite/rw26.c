@@ -53,7 +53,7 @@
 
 #include "../include/lustre_lite.h"
 #include "llite_internal.h"
-#include "../include/linux/lustre_compat25.h"
+#include "linux/lustre_compat25.h"
 
 /**
  * Implements Linux VM address_space::invalidatepage() method. This method is

@@ -34,7 +34,7 @@
 #define __LUSTRE_LU_OBJECT_H
 
 #include <stdarg.h>
-#include "../../include/linux/libcfs/libcfs.h"
+#include "linux/libcfs/libcfs.h"
 #include "lustre/lustre_idl.h"
 #include "lu_ref.h"
 

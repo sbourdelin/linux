@@ -48,7 +48,7 @@
 #include <linux/dcache.h>
 #include "lustre_intent.h"
 #include "lustre_handles.h"
-#include "../../include/linux/libcfs/libcfs.h"
+#include "linux/libcfs/libcfs.h"
 #include "obd_class.h"
 #include "lustre/lustre_idl.h"
 #include "lustre_lib.h"

@@ -31,7 +31,7 @@
  */
 
 #define DEBUG_SUBSYSTEM S_LDLM
-#include "../../include/linux/libcfs/libcfs.h"
+#include "linux/libcfs/libcfs.h"
 
 #include "../include/lustre_dlm.h"
 #include "../include/lustre_lib.h"

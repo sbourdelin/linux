@@ -45,7 +45,7 @@
 #include "../lustre_ha.h"
 
 #include <linux/rbtree.h>
-#include "../../include/linux/lustre_compat25.h"
+#include "linux/lustre_compat25.h"
 #include <linux/pagemap.h>
 
 /* lprocfs.c */

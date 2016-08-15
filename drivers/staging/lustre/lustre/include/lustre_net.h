@@ -50,9 +50,9 @@
  * @{
  */
 
-#include "../../include/linux/libcfs/libcfs.h"
-#include "../../include/linux/lnet/nidstr.h"
-#include "../../include/linux/lnet/api.h"
+#include "linux/libcfs/libcfs.h"
+#include "linux/lnet/nidstr.h"
+#include "linux/lnet/api.h"
 #include "lustre/lustre_idl.h"
 #include "lustre_ha.h"
 #include "lustre_sec.h"

@@ -87,8 +87,8 @@
 #ifndef _LUSTRE_IDL_H_
 #define _LUSTRE_IDL_H_
 
-#include "../../../include/linux/libcfs/libcfs.h"
-#include "../../../include/linux/lnet/types.h"
+#include "linux/libcfs/libcfs.h"
+#include "linux/lnet/types.h"
 
 /* Defn's shared with user-space. */
 #include "lustre_user.h"

@@ -40,12 +40,12 @@
 
 #define DEBUG_SUBSYSTEM S_CLASS
 
-#include "../../include/linux/libcfs/libcfs.h"
+#include "linux/libcfs/libcfs.h"
 
 # include <linux/module.h>
 
 /* hash_long() */
-#include "../../include/linux/libcfs/libcfs_hash.h"
+#include "linux/libcfs/libcfs_hash.h"
 #include "../include/obd_class.h"
 #include "../include/obd_support.h"
 #include "../include/lustre_disk.h"

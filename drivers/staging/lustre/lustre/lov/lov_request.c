@@ -32,7 +32,7 @@
 
 #define DEBUG_SUBSYSTEM S_LOV
 
-#include "../../include/linux/libcfs/libcfs.h"
+#include "linux/libcfs/libcfs.h"
 
 #include "../include/obd_class.h"
 #include "../include/lustre/lustre_idl.h"

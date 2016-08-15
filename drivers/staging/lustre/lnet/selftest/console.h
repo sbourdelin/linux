@@ -39,10 +39,10 @@
 #ifndef __LST_CONSOLE_H__
 #define __LST_CONSOLE_H__
 
-#include "../../include/linux/libcfs/libcfs.h"
-#include "../../include/linux/lnet/lnet.h"
-#include "../../include/linux/lnet/lib-types.h"
-#include "../../include/linux/lnet/lnetst.h"
+#include "linux/libcfs/libcfs.h"
+#include "linux/lnet/lnet.h"
+#include "linux/lnet/lib-types.h"
+#include "linux/lnet/lnetst.h"
 #include "selftest.h"
 #include "conrpc.h"
 

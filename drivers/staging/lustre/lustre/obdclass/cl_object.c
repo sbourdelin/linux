@@ -46,13 +46,13 @@
 
 #define DEBUG_SUBSYSTEM S_CLASS
 
-#include "../../include/linux/libcfs/libcfs.h"
+#include "linux/libcfs/libcfs.h"
 /* class_put_type() */
 #include "../include/obd_class.h"
 #include "../include/obd_support.h"
 #include "../include/lustre_fid.h"
 #include <linux/list.h>
-#include "../../include/linux/libcfs/libcfs_hash.h"	/* for cfs_hash stuff */
+#include "linux/libcfs/libcfs_hash.h"	/* for cfs_hash stuff */
 #include "../include/cl_object.h"
 #include "cl_internal.h"
 

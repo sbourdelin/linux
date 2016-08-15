@@ -37,7 +37,7 @@
 #define __FID_INTERNAL_H
 
 #include "../include/lustre/lustre_idl.h"
-#include "../../include/linux/libcfs/libcfs.h"
+#include "linux/libcfs/libcfs.h"
 
 /* Functions used internally in module. */
 

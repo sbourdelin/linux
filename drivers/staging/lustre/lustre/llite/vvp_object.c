@@ -36,7 +36,7 @@
 
 #define DEBUG_SUBSYSTEM S_LLITE
 
-#include "../../include/linux/libcfs/libcfs.h"
+#include "linux/libcfs/libcfs.h"
 
 #include "../include/obd.h"
 #include "../include/lustre_lite.h"

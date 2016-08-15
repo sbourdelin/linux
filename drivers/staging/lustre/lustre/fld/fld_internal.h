@@ -39,7 +39,7 @@
 
 #include "../include/lustre/lustre_idl.h"
 
-#include "../../include/linux/libcfs/libcfs.h"
+#include "linux/libcfs/libcfs.h"
 #include "../include/lustre_req_layout.h"
 #include "../include/lustre_fld.h"
 

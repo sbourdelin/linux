@@ -25,7 +25,7 @@
  * Copyright (c) 2013, Intel Corporation.
  */
 
-#include "../../include/linux/libcfs/libcfs.h"
+#include "linux/libcfs/libcfs.h"
 #include "../include/lustre/lustre_errno.h"
 
 /*
