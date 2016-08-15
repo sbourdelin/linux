@@ -12282,6 +12282,7 @@ static void intel_dump_pipe_config(struct intel_crtc *crtc,
 
 	DRM_DEBUG_KMS("planes on this crtc\n");
 	list_for_each_entry(plane, &dev->mode_config.plane_list, head) {
+		const char *format_name;
 		intel_plane = to_intel_plane(plane);
 		if (intel_plane->pipe != crtc->pipe)
 			continue;
@@ -12294,11 +12295,12 @@ static void intel_dump_pipe_config(struct intel_crtc *crtc,
 			continue;
 		}
 
+		format_name = drm_get_format_name(fb->pixel_format);
+
 		DRM_DEBUG_KMS("[PLANE:%d:%s] enabled",
 			      plane->base.id, plane->name);
 		DRM_DEBUG_KMS("\tFB:%d, fb = %ux%u format = %s",
-			      fb->base.id, fb->width, fb->height,
-			      drm_get_format_name(fb->pixel_format));
+			      fb->base.id, fb->width, fb->height, format_name);
 		DRM_DEBUG_KMS("\tscaler:%d src %dx%d+%d+%d dst %dx%d+%d+%d\n",
 			      state->scaler_id,
 			      state->src.x1 >> 16, state->src.y1 >> 16,
@@ -12307,6 +12309,8 @@ static void intel_dump_pipe_config(struct intel_crtc *crtc,
 			      state->dst.x1, state->dst.y1,
 			      drm_rect_width(&state->dst),
 			      drm_rect_height(&state->dst));
+
+		kfree(format_name);
 	}
 }
 
@@ -14936,6 +14940,7 @@ static int intel_framebuffer_init(struct drm_device *dev,
 	unsigned int aligned_height;
 	int ret;
 	u32 pitch_limit, stride_alignment;
+	const char *format_name;
 
 	WARN_ON(!mutex_is_locked(&dev->struct_mutex));
 
@@ -15009,16 +15014,18 @@ static int intel_framebuffer_init(struct drm_device *dev,
 		break;
 	case DRM_FORMAT_XRGB1555:
 		if (INTEL_INFO(dev)->gen > 3) {
-			DRM_DEBUG("unsupported pixel format: %s\n",
-				  drm_get_format_name(mode_cmd->pixel_format));
+			format_name = drm_get_format_name(mode_cmd->pixel_format);
+			DRM_DEBUG("unsupported pixel format: %s\n", format_name);
+			kfree(format_name);
 			return -EINVAL;
 		}
 		break;
 	case DRM_FORMAT_ABGR8888:
 		if (!IS_VALLEYVIEW(dev) && !IS_CHERRYVIEW(dev) &&
 		    INTEL_INFO(dev)->gen < 9) {
-			DRM_DEBUG("unsupported pixel format: %s\n",
-				  drm_get_format_name(mode_cmd->pixel_format));
+			format_name = drm_get_format_name(mode_cmd->pixel_format);
+			DRM_DEBUG("unsupported pixel format: %s\n", format_name);
+			kfree(format_name);
 			return -EINVAL;
 		}
 		break;
@@ -15026,15 +15033,17 @@ static int intel_framebuffer_init(struct drm_device *dev,
 	case DRM_FORMAT_XRGB2101010:
 	case DRM_FORMAT_XBGR2101010:
 		if (INTEL_INFO(dev)->gen < 4) {
-			DRM_DEBUG("unsupported pixel format: %s\n",
-				  drm_get_format_name(mode_cmd->pixel_format));
+			format_name = drm_get_format_name(mode_cmd->pixel_format);
+			DRM_DEBUG("unsupported pixel format: %s\n", format_name);
+			kfree(format_name);
 			return -EINVAL;
 		}
 		break;
 	case DRM_FORMAT_ABGR2101010:
 		if (!IS_VALLEYVIEW(dev) && !IS_CHERRYVIEW(dev)) {
-			DRM_DEBUG("unsupported pixel format: %s\n",
-				  drm_get_format_name(mode_cmd->pixel_format));
+			format_name = drm_get_format_name(mode_cmd->pixel_format);
+			DRM_DEBUG("unsupported pixel format: %s\n", format_name);
+			kfree(format_name);
 			return -EINVAL;
 		}
 		break;
@@ -15043,14 +15052,16 @@ static int intel_framebuffer_init(struct drm_device *dev,
 	case DRM_FORMAT_YVYU:
 	case DRM_FORMAT_VYUY:
 		if (INTEL_INFO(dev)->gen < 5) {
-			DRM_DEBUG("unsupported pixel format: %s\n",
-				  drm_get_format_name(mode_cmd->pixel_format));
+			format_name = drm_get_format_name(mode_cmd->pixel_format);
+			DRM_DEBUG("unsupported pixel format: %s\n", format_name);
+			kfree(format_name);
 			return -EINVAL;
 		}
 		break;
 	default:
-		DRM_DEBUG("unsupported pixel format: %s\n",
-			  drm_get_format_name(mode_cmd->pixel_format));
+		format_name = drm_get_format_name(mode_cmd->pixel_format);
+		DRM_DEBUG("unsupported pixel format: %s\n", format_name);
+		kfree(format_name);
 		return -EINVAL;
 	}
 
