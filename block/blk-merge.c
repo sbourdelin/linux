@@ -85,7 +85,8 @@ static inline unsigned get_max_io_size(struct request_queue *q,
 static struct bio *blk_bio_segment_split(struct request_queue *q,
 					 struct bio *bio,
 					 struct bio_set *bs,
-					 unsigned *segs)
+					 unsigned *segs,
+					 bool *no_merge)
 {
 	struct bio_vec bv, bvprv, *bvprvp = NULL;
 	struct bvec_iter iter;
@@ -94,8 +95,33 @@ static struct bio *blk_bio_segment_split(struct request_queue *q,
 	bool do_split = true;
 	struct bio *new = NULL;
 	const unsigned max_sectors = get_max_io_size(q, bio);
+	unsigned bvecs = 0;
+
+	*no_merge = true;
 
 	bio_for_each_segment(bv, bio, iter) {
+		/*
+		 * With arbitrary bio size, the incoming bio may be very
+		 * big. We have to split the bio into small bios so that
+		 * each holds at most BIO_MAX_PAGES bvecs because
+		 * bio_clone() can fail to allocate big bvecs.
+		 *
+		 * It should have been better to apply the limit per
+		 * request queue in which bio_clone() is involved,
+		 * instead of globally. The biggest blocker is
+		 * bio_clone() in bio bounce.
+		 *
+		 * If bio is splitted by this reason, we should allow
+		 * to continue bios merging.
+		 *
+		 * TODO: deal with bio bounce's bio_clone() gracefully
+		 * and convert the global limit into per-queue limit.
+		 */
+		if (bvecs++ >= BIO_MAX_PAGES) {
+			*no_merge = false;
+			goto split;
+		}
+
 		/*
 		 * If the queue doesn't support SG gaps and adding this
 		 * offset would create a gap, disallow it.
@@ -171,13 +197,15 @@ void blk_queue_split(struct request_queue *q, struct bio **bio,
 {
 	struct bio *split, *res;
 	unsigned nsegs;
+	bool no_merge_for_split = true;
 
 	if (bio_op(*bio) == REQ_OP_DISCARD)
 		split = blk_bio_discard_split(q, *bio, bs, &nsegs);
 	else if (bio_op(*bio) == REQ_OP_WRITE_SAME)
 		split = blk_bio_write_same_split(q, *bio, bs, &nsegs);
 	else
-		split = blk_bio_segment_split(q, *bio, q->bio_split, &nsegs);
+		split = blk_bio_segment_split(q, *bio, q->bio_split, &nsegs,
+				&no_merge_for_split);
 
 	/* physical segments can be figured out during splitting */
 	res = split ? split : *bio;
@@ -186,7 +214,8 @@ void blk_queue_split(struct request_queue *q, struct bio **bio,
 
 	if (split) {
 		/* there isn't chance to merge the splitted bio */
-		split->bi_opf |= REQ_NOMERGE;
+		if (no_merge_for_split)
+			split->bi_opf |= REQ_NOMERGE;
 
 		bio_chain(split, *bio);
 		trace_block_split(q, split, (*bio)->bi_iter.bi_sector);
