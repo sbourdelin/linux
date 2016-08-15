@@ -120,6 +120,7 @@ struct dm_icomp_io_range {
 	void *decomp_real_data; /* holds the actual start of the buffer */
 	unsigned int decomp_req_len;/* originally requested length */
 	unsigned int decomp_len; /* actual allocated/mapped length */
+	int comp_kmap;          /* Is the comp_data kmapped'? */
 	void *comp_data;
 	unsigned int comp_len; /* For write, this is estimated */
 	struct list_head next;
