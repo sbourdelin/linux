@@ -207,7 +207,7 @@ static size_t callchain__fprintf_graph(FILE *fp, struct rb_root *root,
 			 * displayed twice.
 			 */
 			if (!i++ && field_order == NULL &&
-			    sort_order && !prefixcmp(sort_order, "sym"))
+			    (sort_order == NULL || !prefixcmp(sort_order, "sym")))
 				continue;
 			if (!printed) {
 				ret += callchain__fprintf_left_margin(fp, left_margin);
