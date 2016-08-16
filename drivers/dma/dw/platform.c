@@ -129,6 +129,12 @@ dw_dma_parse_dt(struct platform_device *pdev)
 	if (of_property_read_bool(np, "is_private"))
 		pdata->is_private = true;
 
+	if (of_property_read_bool(np, "is_memcpy"))
+		pdata->is_memcpy = true;
+
+	if (of_property_read_bool(np, "is_nollp"))
+		pdata->is_nollp = true;
+
 	if (!of_property_read_u32(np, "chan_allocation_order", &tmp))
 		pdata->chan_allocation_order = (unsigned char)tmp;
 
