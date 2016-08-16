@@ -9,6 +9,8 @@
 #include <linux/elf.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/sched.h>
+#include <linux/vmalloc.h>
 
 #include <asm/cache.h>
 #include <asm/opcodes.h>
@@ -25,9 +27,24 @@
 						    (PLT_ENT_STRIDE - 8))
 #endif
 
+#define PLT_HASH_SHIFT		10
+#define PLT_HASH_SIZE		(1 << PLT_HASH_SHIFT)
+#define PLT_HASH_MASK		(PLT_HASH_SIZE - 1)
+
 struct plt_entries {
 	u32	ldr[PLT_ENT_COUNT];
 	u32	lit[PLT_ENT_COUNT];
+};
+
+struct plt_hash_entry {
+	struct plt_hash_entry *next;
+	Elf32_Rel const *plt;
+};
+
+struct plt_hash_table {
+	struct plt_hash_entry *table[PLT_HASH_SIZE];
+	size_t used;
+	struct plt_hash_entry entry[0];
 };
 
 static bool in_init(const struct module *mod, u32 addr)
@@ -100,7 +117,7 @@ static int duplicate_rel(Elf32_Addr base, const Elf32_Rel *rel, int num,
 }
 
 /* Count how many PLT entries we may need */
-static unsigned int count_plts(Elf32_Addr base, const Elf32_Rel *rel, int num)
+static unsigned int _count_plts(Elf32_Addr base, const Elf32_Rel *rel, int num)
 {
 	unsigned int ret = 0;
 	int i;
@@ -127,6 +144,98 @@ static unsigned int count_plts(Elf32_Addr base, const Elf32_Rel *rel, int num)
 #endif
 		}
 	return ret;
+}
+
+static unsigned int hash_plt(Elf32_Rel const *plt, Elf32_Addr base, u32 mask)
+{
+	u32 const *loc = (u32 *)(base + plt->r_offset);
+	u32 hash = (plt->r_info >> 8) ^ (*loc & mask);
+	return hash & PLT_HASH_MASK;
+}
+
+static bool
+same_plts(Elf32_Rel const *a, Elf32_Rel const *b, Elf32_Addr base, u32 mask)
+{
+	u32 const *loc1;
+	u32 const *loc2;
+
+	if (a->r_info != b->r_info)
+		return false;
+
+	loc1 = (u32 *)(base + a->r_offset);
+	loc2 = (u32 *)(base + b->r_offset);
+
+	return ((*loc1 ^ *loc2) & mask) == 0;
+}
+
+static int hash_insert_plt(struct plt_hash_table *table, Elf32_Rel const *plt,
+			   Elf32_Addr base, u32 mask)
+{
+	unsigned int hash = hash_plt(plt, base, mask);
+	struct plt_hash_entry *entry;
+
+	for (entry = table->table[hash]; entry; entry = entry->next)
+		if (same_plts(entry->plt, plt, base, mask))
+			return 0;
+
+	entry = &table->entry[table->used++];
+	entry->next = table->table[hash];
+	entry->plt = plt;
+	table->table[hash] = entry;
+
+	return 1;
+}
+
+static size_t count_plts(Elf32_Addr base, Elf32_Rel const *rel, int num)
+{
+	struct plt_hash_table *table;
+	size_t plts;
+	u32 mask;
+	int i;
+
+	/* count PLTs first to optimize memory usage */
+	for (plts = i = 0; i < num; i++) {
+		switch (ELF32_R_TYPE(rel[i].r_info)) {
+		case R_ARM_CALL:
+		case R_ARM_PC24:
+		case R_ARM_JUMP24:
+#ifdef CONFIG_THUMB2_KERNEL
+		case R_ARM_THM_CALL:
+		case R_ARM_THM_JUMP24:
+#endif
+			plts++;
+			break;
+		}
+	}
+
+	table = vzalloc(sizeof(struct plt_hash_table) +
+			sizeof(struct plt_hash_entry) * plts);
+	if (!table) {
+		/* fall-back to O(n^2) counting on memory shortage */
+		return _count_plts(base, rel, num);
+	}
+
+	for (plts = i = 0; i < num; i++) {
+		switch (ELF32_R_TYPE(rel[i].r_info)) {
+		case R_ARM_CALL:
+		case R_ARM_PC24:
+		case R_ARM_JUMP24:
+			mask = __opcode_to_mem_arm(0x00ffffff);
+			plts += hash_insert_plt(table, &rel[i], base, mask);
+			break;
+#ifdef CONFIG_THUMB2_KERNEL
+		case R_ARM_THM_CALL:
+		case R_ARM_THM_JUMP24:
+			mask = __opcode_to_mem_thumb32(0x07ff2fff);
+			plts += hash_insert_plt(table, &rel[i], base, mask);
+			break;
+#endif
+		}
+	}
+
+	vfree(table);
+
+	return plts;
 }
 
 int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
