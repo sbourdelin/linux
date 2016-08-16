@@ -129,6 +129,16 @@ static inline int hpet_rtc_dropped_irq(void)
 	return 0;
 }
 
+static inline int hpet_rtc_timer_counter_init(void)
+{
+	return 0;
+}
+
+static inline int hpet_rtc_timer_enable(void)
+{
+	return 0;
+}
+
 static inline int hpet_rtc_timer_init(void)
 {
 	return 0;
@@ -710,6 +720,7 @@ cmos_do_probe(struct device *dev, struct resource *ports, int rtc_irq)
 		goto cleanup1;
 	}
 
+	hpet_rtc_timer_counter_init();
 	if (is_valid_irq(rtc_irq)) {
 		irq_handler_t rtc_cmos_int_handler;
 
@@ -732,7 +743,7 @@ cmos_do_probe(struct device *dev, struct resource *ports, int rtc_irq)
 			goto cleanup1;
 		}
 	}
-	hpet_rtc_timer_init();
+	hpet_rtc_timer_enable();
 
 	/* export at least the first block of NVRAM */
 	nvram.size = address_space - NVRAM_OFFSET;
