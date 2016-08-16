@@ -18,51 +18,35 @@ void reset_control_put(struct reset_control *rstc);
 struct reset_control *__devm_reset_control_get(struct device *dev,
 				     const char *id, int index, int shared);
 
-int __must_check device_reset(struct device *dev);
-
-static inline int device_reset_optional(struct device *dev)
-{
-	return device_reset(dev);
-}
+int device_reset(struct device *dev);
 
 #else
 
 static inline int reset_control_reset(struct reset_control *rstc)
 {
-	WARN_ON(1);
 	return 0;
 }
 
 static inline int reset_control_assert(struct reset_control *rstc)
 {
-	WARN_ON(1);
 	return 0;
 }
 
 static inline int reset_control_deassert(struct reset_control *rstc)
 {
-	WARN_ON(1);
 	return 0;
 }
 
 static inline int reset_control_status(struct reset_control *rstc)
 {
-	WARN_ON(1);
 	return 0;
 }
 
 static inline void reset_control_put(struct reset_control *rstc)
 {
-	WARN_ON(1);
 }
 
-static inline int __must_check device_reset(struct device *dev)
-{
-	WARN_ON(1);
-	return -ENOTSUPP;
-}
-
-static inline int device_reset_optional(struct device *dev)
+static inline int device_reset(struct device *dev)
 {
 	return -ENOTSUPP;
 }
@@ -101,9 +85,6 @@ static inline struct reset_control *__devm_reset_control_get(
 static inline struct reset_control *
 __must_check reset_control_get_exclusive(struct device *dev, const char *id)
 {
-#ifndef CONFIG_RESET_CONTROLLER
-	WARN_ON(1);
-#endif
 	return __of_reset_control_get(dev ? dev->of_node : NULL, id, 0, 0);
 }
 
@@ -135,18 +116,6 @@ static inline struct reset_control *reset_control_get_shared(
 #ifndef CONFIG_RESET_CONTROLLER
 	WARN_ON(1);
 #endif
-	return __of_reset_control_get(dev ? dev->of_node : NULL, id, 0, 1);
-}
-
-static inline struct reset_control *reset_control_get_optional_exclusive(
-					struct device *dev, const char *id)
-{
-	return __of_reset_control_get(dev ? dev->of_node : NULL, id, 0, 0);
-}
-
-static inline struct reset_control *reset_control_get_optional_shared(
-					struct device *dev, const char *id)
-{
 	return __of_reset_control_get(dev ? dev->of_node : NULL, id, 0, 1);
 }
 
@@ -264,9 +233,6 @@ static inline struct reset_control *
 __must_check devm_reset_control_get_exclusive(struct device *dev,
 					      const char *id)
 {
-#ifndef CONFIG_RESET_CONTROLLER
-	WARN_ON(1);
-#endif
 	return __devm_reset_control_get(dev, id, 0, 0);
 }
 
@@ -285,18 +251,6 @@ static inline struct reset_control *devm_reset_control_get_shared(
 #ifndef CONFIG_RESET_CONTROLLER
 	WARN_ON(1);
 #endif
-	return __devm_reset_control_get(dev, id, 0, 1);
-}
-
-static inline struct reset_control *devm_reset_control_get_optional_exclusive(
-					struct device *dev, const char *id)
-{
-	return __devm_reset_control_get(dev, id, 0, 0);
-}
-
-static inline struct reset_control *devm_reset_control_get_optional_shared(
-					struct device *dev, const char *id)
-{
 	return __devm_reset_control_get(dev, id, 0, 1);
 }
 
@@ -338,6 +292,40 @@ devm_reset_control_get_shared_by_index(struct device *dev, int index)
 	WARN_ON(1);
 #endif
 	return __devm_reset_control_get(dev, NULL, index, 1);
+}
+
+/*
+ * TEMPORARY calls to use during transition:
+ *
+ *   _optional variants will be deprecated.
+ */
+static inline int device_reset_optional(struct device *dev)
+{
+	return device_reset(dev);
+}
+
+static inline struct reset_control *reset_control_get_optional_exclusive(
+					struct device *dev, const char *id)
+{
+	return reset_control_get_exclusive(dev, id);
+}
+
+static inline struct reset_control *reset_control_get_optional_shared(
+					struct device *dev, const char *id)
+{
+	return reset_control_get_shared(dev, id);
+}
+
+static inline struct reset_control *devm_reset_control_get_optional_exclusive(
+					struct device *dev, const char *id)
+{
+	return devm_reset_control_get_exclusive(dev, id);
+}
+
+static inline struct reset_control *devm_reset_control_get_optional_shared(
+					struct device *dev, const char *id)
+{
+	return devm_reset_control_get_shared(dev, id);
 }
 
 /*
