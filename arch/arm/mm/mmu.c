@@ -1196,7 +1196,7 @@ void __init sanity_check_meminfo(void)
 				pr_notice("Truncating RAM at %pa-%pa",
 					  &block_start, &block_end);
 				block_end = vmalloc_limit;
-				pr_cont(" to -%pa", &block_end);
+				pr_cont(" to -%pa\n", &block_end);
 				memblock_remove(vmalloc_limit, overlap_size);
 				should_use_highmem = true;
 			}
