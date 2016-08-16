@@ -336,17 +336,6 @@ config HAVE_ARCH_SECCOMP_FILTER
 	    results in the system call being skipped immediately.
 	  - seccomp syscall wired up
 
-	  For best performance, an arch should use seccomp_phase1 and
-	  seccomp_phase2 directly.  It should call seccomp_phase1 for all
-	  syscalls if TIF_SECCOMP is set, but seccomp_phase1 does not
-	  need to be called from a ptrace-safe context.  It must then
-	  call seccomp_phase2 if seccomp_phase1 returns anything other
-	  than SECCOMP_PHASE1_OK or SECCOMP_PHASE1_SKIP.
-
-	  As an additional optimization, an arch may provide seccomp_data
-	  directly to seccomp_phase1; this avoids multiple calls
-	  to the syscall_xyz helpers for every syscall.
-
 config SECCOMP_FILTER
 	def_bool y
 	depends on HAVE_ARCH_SECCOMP_FILTER && SECCOMP && NET
@@ -393,6 +382,24 @@ config GCC_PLUGIN_SANCOV
 	  basic blocks. It supports all gcc versions with plugin support (from
 	  gcc-4.5 on). It is based on the commit "Add fuzzing coverage support"
 	  by Dmitry Vyukov <dvyukov@google.com>.
+
+config GCC_PLUGIN_LATENT_ENTROPY
+	bool "Generate some entropy during boot and runtime"
+	depends on GCC_PLUGINS
+	help
+	  By saying Y here the kernel will instrument some kernel code to
+	  extract some entropy from both original and artificially created
+	  program state.  This will help especially embedded systems where
+	  there is little 'natural' source of entropy normally.  The cost
+	  is some slowdown of the boot process (about 0.5%) and fork and
+	  irq processing.
+
+	  Note that entropy extracted this way is not cryptographically
+	  secure!
+
+	  This plugin was ported from grsecurity/PaX. More information at:
+	   * https://grsecurity.net/
+	   * https://pax.grsecurity.net/
 
 config HAVE_CC_STACKPROTECTOR
 	bool

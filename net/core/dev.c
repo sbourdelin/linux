@@ -3855,7 +3855,7 @@ int netif_rx_ni(struct sk_buff *skb)
 }
 EXPORT_SYMBOL(netif_rx_ni);
 
-static void net_tx_action(struct softirq_action *h)
+static __latent_entropy void net_tx_action(struct softirq_action *h)
 {
 	struct softnet_data *sd = this_cpu_ptr(&softnet_data);
 
@@ -5171,7 +5171,7 @@ out_unlock:
 	return work;
 }
 
-static void net_rx_action(struct softirq_action *h)
+static __latent_entropy void net_rx_action(struct softirq_action *h)
 {
 	struct softnet_data *sd = this_cpu_ptr(&softnet_data);
 	unsigned long time_limit = jiffies + 2;
@@ -6045,8 +6045,7 @@ void *netdev_lower_dev_get_private(struct net_device *dev,
 EXPORT_SYMBOL(netdev_lower_dev_get_private);
 
 
-int dev_get_nest_level(struct net_device *dev,
-		       bool (*type_check)(const struct net_device *dev))
+int dev_get_nest_level(struct net_device *dev)
 {
 	struct net_device *lower = NULL;
 	struct list_head *iter;
@@ -6056,15 +6055,12 @@ int dev_get_nest_level(struct net_device *dev,
 	ASSERT_RTNL();
 
 	netdev_for_each_lower_dev(dev, lower, iter) {
-		nest = dev_get_nest_level(lower, type_check);
+		nest = dev_get_nest_level(lower);
 		if (max_nest < nest)
 			max_nest = nest;
 	}
 
-	if (type_check(dev))
-		max_nest++;
-
-	return max_nest;
+	return max_nest + 1;
 }
 EXPORT_SYMBOL(dev_get_nest_level);
 
@@ -7629,6 +7625,9 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 	INIT_LIST_HEAD(&dev->all_adj_list.lower);
 	INIT_LIST_HEAD(&dev->ptype_all);
 	INIT_LIST_HEAD(&dev->ptype_specific);
+#ifdef CONFIG_NET_SCHED
+	hash_init(dev->qdisc_hash);
+#endif
 	dev->priv_flags = IFF_XMIT_DST_RELEASE | IFF_XMIT_DST_RELEASE_PERM;
 	setup(dev);
 
