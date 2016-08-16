@@ -202,19 +202,19 @@ static void mc34708_print_revision(struct mc13xxx *mc13xxx, u32 revision)
 }
 
 /* These are only exported for mc13xxx-i2c and mc13xxx-spi */
-struct mc13xxx_variant mc13xxx_variant_mc13783 = {
+const struct mc13xxx_variant mc13xxx_variant_mc13783 = {
 	.name = "mc13783",
 	.print_revision = mc13xxx_print_revision,
 };
 EXPORT_SYMBOL_GPL(mc13xxx_variant_mc13783);
 
-struct mc13xxx_variant mc13xxx_variant_mc13892 = {
+const struct mc13xxx_variant mc13xxx_variant_mc13892 = {
 	.name = "mc13892",
 	.print_revision = mc13xxx_print_revision,
 };
 EXPORT_SYMBOL_GPL(mc13xxx_variant_mc13892);
 
-struct mc13xxx_variant mc13xxx_variant_mc34708 = {
+const struct mc13xxx_variant mc13xxx_variant_mc34708 = {
 	.name = "mc34708",
 	.print_revision = mc34708_print_revision,
 };

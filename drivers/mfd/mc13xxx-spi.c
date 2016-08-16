@@ -162,7 +162,7 @@ static int mc13xxx_spi_probe(struct spi_device *spi)
 	} else {
 		const struct spi_device_id *id_entry = spi_get_device_id(spi);
 
-		mc13xxx->variant = (void *)id_entry->driver_data;
+		mc13xxx->variant = (const struct mc13xxx_variant *)id_entry->driver_data;
 	}
 
 	return mc13xxx_common_init(&spi->dev);

@@ -24,7 +24,7 @@ struct mc13xxx_variant {
 	void (*print_revision)(struct mc13xxx *mc13xxx, u32 revision);
 };
 
-extern struct mc13xxx_variant
+extern const struct mc13xxx_variant
 		mc13xxx_variant_mc13783,
 		mc13xxx_variant_mc13892,
 		mc13xxx_variant_mc34708;

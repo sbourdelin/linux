@@ -82,7 +82,7 @@ static int mc13xxx_i2c_probe(struct i2c_client *client,
 			of_match_device(mc13xxx_dt_ids, &client->dev);
 		mc13xxx->variant = of_id->data;
 	} else {
-		mc13xxx->variant = (void *)id->driver_data;
+		mc13xxx->variant = (const struct mc13xxx_variant *)id->driver_data;
 	}
 
 	return mc13xxx_common_init(&client->dev);
