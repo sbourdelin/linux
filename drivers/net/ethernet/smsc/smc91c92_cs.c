@@ -1637,6 +1637,7 @@ static void smc_reset(struct net_device *dev)
     unsigned int ioaddr = dev->base_addr;
     struct smc_private *smc = netdev_priv(dev);
     int i;
+    unsigned long flags;
 
     netdev_dbg(dev, "smc91c92 reset called.\n");
 
@@ -1647,6 +1648,7 @@ static void smc_reset(struct net_device *dev)
     outw(RCR_SOFTRESET, ioaddr + RCR);
     udelay(10);
 
+    spin_lock_irqsave(&smc->lock, flags);
     /* Clear the transmit and receive configuration registers. */
     outw(RCR_CLEAR, ioaddr + RCR);
     outw(TCR_CLEAR, ioaddr + TCR);
@@ -1699,6 +1701,7 @@ static void smc_reset(struct net_device *dev)
     SMC_SELECT_BANK(2);
     outw((IM_EPH_INT | IM_RX_OVRN_INT | IM_RCV_INT) << 8,
 	 ioaddr + INTERRUPT);
+    spin_unlock_irqrestore(&smc->lock, flags);
 }
 
 /*======================================================================
