@@ -351,17 +351,17 @@ struct exception_table_entry {
 extern void ia64_handle_exception (struct pt_regs *regs, const struct exception_table_entry *e);
 extern const struct exception_table_entry *search_exception_tables (unsigned long addr);
 
-static inline int
-ia64_done_with_exception (struct pt_regs *regs)
-{
-	const struct exception_table_entry *e;
-	e = search_exception_tables(regs->cr_iip + ia64_psr(regs)->ri);
-	if (e) {
-		ia64_handle_exception(regs, e);
-		return 1;
-	}
-	return 0;
-}
+#define ia64_done_with_exception(regs)					  \
+({									  \
+	int __ex_ret = 0;						  \
+	const struct exception_table_entry *e;				  \
+	e = search_exception_tables((regs)->cr_iip + ia64_psr(regs)->ri); \
+	if (e) {							  \
+		ia64_handle_exception(regs, e);				  \
+		__ex_ret = 1;						  \
+	}								  \
+	__ex_ret;							  \
+})
 
 #define ARCH_HAS_TRANSLATE_MEM_PTR	1
 static __inline__ void *
