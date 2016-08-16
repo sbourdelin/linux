@@ -348,8 +348,8 @@ struct exception_table_entry {
 	int fixup;	/* location-relative continuation addr.; if bit 2 is set, r9 is set to 0 */
 };
 
-extern void ia64_handle_exception (struct pt_regs *regs, const struct exception_table_entry *e);
-extern const struct exception_table_entry *search_exception_tables (unsigned long addr);
+extern void ia64_handle_exception(struct pt_regs *regs,
+				  const struct exception_table_entry *e);
 
 #define ia64_done_with_exception(regs)					  \
 ({									  \
