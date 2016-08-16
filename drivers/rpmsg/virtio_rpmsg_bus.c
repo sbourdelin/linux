@@ -271,7 +271,7 @@ static int virtio_rpmsg_announce_destroy(struct rpmsg_device *rpdev)
 	return err;
 }
 
-static const struct rpmsg_device virtio_rpmsg_ops = {
+static const struct rpmsg_channel virtio_rpmsg_ops = {
 	.create_ept = virtio_rpmsg_create_ept,
 	.destroy_ept = virtio_rpmsg_destroy_ept,
 	.send = virtio_rpmsg_send,
@@ -292,6 +292,7 @@ static const struct rpmsg_device virtio_rpmsg_ops = {
 static struct rpmsg_device *rpmsg_create_channel(struct virtproc_info *vrp,
 						 struct rpmsg_channel_info *chinfo)
 {
+	struct rpmsg_channel *rpch;
 	struct rpmsg_device *rpdev;
 	struct device *tmp, *dev = &vrp->vdev->dev;
 	int ret;
@@ -306,13 +307,14 @@ static struct rpmsg_device *rpmsg_create_channel(struct virtproc_info *vrp,
 		return NULL;
 	}
 
-	rpdev = kzalloc(sizeof(*rpdev), GFP_KERNEL);
-	if (!rpdev)
+	rpch = kzalloc(sizeof(*rpch), GFP_KERNEL);
+	if (!rpch)
 		return NULL;
 
 	/* Assign callbacks for rpmsg_channel */
-	*rpdev = virtio_rpmsg_ops;
+	*rpch = virtio_rpmsg_ops;
 
+	rpdev = &rpch->rpdev;
 	rpdev->vrp = vrp;
 	rpdev->src = chinfo->src;
 	rpdev->dst = chinfo->dst;
