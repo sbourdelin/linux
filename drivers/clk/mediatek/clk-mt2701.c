@@ -791,6 +791,8 @@ static void mtk_infrasys_init(struct device_node *node)
 	if (r)
 		pr_err("%s(): could not register clock provider: %d\n",
 			__func__, r);
+
+	mtk_register_reset_controller(node, 2, 0x30);
 }
 
 static const struct mtk_gate_regs peri0_cg_regs = {
@@ -911,6 +913,8 @@ static void mtk_pericfg_init(struct device_node *node)
 	if (r)
 		pr_err("%s(): could not register clock provider: %d\n",
 			__func__, r);
+
+	mtk_register_reset_controller(node, 2, 0x0);
 }
 
 #define MT8590_PLL_FMAX		(2000 * MHZ)
