@@ -41,6 +41,8 @@
 #include <linux/virtio_ids.h>
 #include <linux/virtio_ring.h>
 #include <asm/byteorder.h>
+#include <linux/of.h>
+#include <linux/of_platform.h>
 
 #include "remoteproc_internal.h"
 
@@ -1191,6 +1193,81 @@ out:
 }
 EXPORT_SYMBOL(rproc_shutdown);
 
+#ifdef CONFIG_OF
+/**
+ * of_get_rproc_by_index() - lookup and obtain a reference to an rproc
+ * @np: node to search for rproc phandle
+ * @index: index into the phandle list
+ *
+ * This function increments the remote processor's refcount, so always
+ * use rproc_put() to decrement it back once rproc isn't needed anymore.
+ *
+ * Returns a pointer to the rproc struct on success or an appropriate error
+ * code otherwise.
+ */
+struct rproc *of_get_rproc_by_index(struct device_node *np, int index)
+{
+	struct rproc *rproc = NULL, *r;
+	struct device_node *rproc_np;
+
+	if (index < 0) {
+		pr_err("Invalid index: %d\n", index);
+		return ERR_PTR(-EINVAL);
+	}
+
+	rproc_np = of_parse_phandle(np, "rprocs", index);
+	if (!rproc_np) {
+		/* Unfortunately we have to support this, at least for now */
+		rproc_np = of_parse_phandle(np, "ti,rproc", index);
+		if (!rproc_np) {
+			pr_err("Failed to obtain phandle\n");
+			return ERR_PTR(-ENODEV);
+		}
+	}
+
+	mutex_lock(&rproc_list_mutex);
+	list_for_each_entry(r, &rproc_list, node) {
+		if (r->dev.parent && r->dev.parent->of_node == rproc_np) {
+			get_device(&r->dev);
+			rproc = r;
+			break;
+		}
+	}
+	mutex_unlock(&rproc_list_mutex);
+
+	of_node_put(rproc_np);
+
+	if (!rproc)
+		pr_err("Could not find rproc, deferring\n");
+
+	return rproc ?: ERR_PTR(-EPROBE_DEFER);
+}
+EXPORT_SYMBOL(of_get_rproc_by_index);
+
+/**
+ * of_get_rproc_by_name() - lookup and obtain a reference to an rproc
+ * @np: node to search for rproc
+ * @name: name of the remoteproc from device's point of view
+ *
+ * This function increments the remote processor's refcount, so always
+ * use rproc_put() to decrement it back once rproc isn't needed anymore.
+ *
+ * Returns a pointer to the rproc struct on success or an appropriate error
+ * code otherwise.
+ */
+struct rproc *of_get_rproc_by_name(struct device_node *np, const char *name)
+{
+	int index;
+
+	if (unlikely(!name))
+		return ERR_PTR(-EINVAL);
+
+	index = of_property_match_string(np, "rproc-names", name);
+
+	return of_get_rproc_by_index(np, index);
+}
+EXPORT_SYMBOL(of_get_rproc_by_name);
+
 /**
  * rproc_get_by_phandle() - find a remote processor by phandle
  * @phandle: phandle to the rproc
@@ -1203,7 +1280,6 @@ EXPORT_SYMBOL(rproc_shutdown);
  *
  * Returns the rproc handle on success, and NULL on failure.
  */
-#ifdef CONFIG_OF
 struct rproc *rproc_get_by_phandle(phandle phandle)
 {
 	struct rproc *rproc = NULL, *r;
