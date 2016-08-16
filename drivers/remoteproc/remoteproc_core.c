@@ -1269,47 +1269,24 @@ struct rproc *of_get_rproc_by_name(struct device_node *np, const char *name)
 EXPORT_SYMBOL(of_get_rproc_by_name);
 
 /**
- * rproc_get_by_phandle() - find a remote processor by phandle
- * @phandle: phandle to the rproc
+ * of_get_rproc() - lookup and obtain a reference to an rproc
+ * @np: node to search for rproc
  *
- * Finds an rproc handle using the remote processor's phandle, and then
- * return a handle to the rproc.
+ * Finds an rproc handle using the default remote processor's phandle,
+ * and then returns a handle to the rproc.
  *
  * This function increments the remote processor's refcount, so always
  * use rproc_put() to decrement it back once rproc isn't needed anymore.
  *
- * Returns the rproc handle on success, and NULL on failure.
+ * Returns a pointer to the rproc struct on success or an appropriate error
+ * code otherwise.
  */
-struct rproc *rproc_get_by_phandle(phandle phandle)
+struct rproc *of_get_rproc(struct device_node *np)
 {
-	struct rproc *rproc = NULL, *r;
-	struct device_node *np;
-
-	np = of_find_node_by_phandle(phandle);
-	if (!np)
-		return NULL;
-
-	mutex_lock(&rproc_list_mutex);
-	list_for_each_entry(r, &rproc_list, node) {
-		if (r->dev.parent && r->dev.parent->of_node == np) {
-			rproc = r;
-			get_device(&rproc->dev);
-			break;
-		}
-	}
-	mutex_unlock(&rproc_list_mutex);
-
-	of_node_put(np);
-
-	return rproc;
+	return of_get_rproc_by_index(np, 0);
 }
-#else
-struct rproc *rproc_get_by_phandle(phandle phandle)
-{
-	return NULL;
-}
+EXPORT_SYMBOL(of_get_rproc);
 #endif
-EXPORT_SYMBOL(rproc_get_by_phandle);
 
 /**
  * rproc_add() - register a remote processor

@@ -385,7 +385,6 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	int irq, ret;
-	phandle rproc_phandle;
 	struct rproc *m3_rproc;
 	struct resource *res;
 	struct task_struct *task;
@@ -430,16 +429,9 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
 		return PTR_ERR(m3_ipc->mbox);
 	}
 
-	if (of_property_read_u32(dev->of_node, "ti,rproc", &rproc_phandle)) {
-		dev_err(&pdev->dev, "could not get rproc phandle\n");
-		ret = -ENODEV;
-		goto err_free_mbox;
-	}
-
-	m3_rproc = rproc_get_by_phandle(rproc_phandle);
-	if (!m3_rproc) {
-		dev_err(&pdev->dev, "could not get rproc handle\n");
-		ret = -EPROBE_DEFER;
+	m3_rproc = of_get_rproc(dev->of_node);
+	if (IS_ERR(m3_rproc)) {
+		ret = PTR_ERR(m3_rproc);
 		goto err_free_mbox;
 	}
 

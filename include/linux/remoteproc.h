@@ -515,7 +515,7 @@ extern struct rproc *of_get_rproc_by_index(struct device_node *np,
 					   int index);
 extern struct rproc *of_get_rproc_by_name(struct device_node *np,
 					  const char *name);
-extern struct rproc *rproc_get_by_phandle(phandle phandle);
+extern struct rproc *of_get_rproc(struct device_node *np);
 #else
 static inline
 struct rproc *of_get_rproc_by_index(struct device_node *np, int index)
@@ -528,7 +528,7 @@ struct rproc *of_get_rproc_by_name(struct device_node *np, const char *name)
 	return NULL;
 }
 static inline
-struct rproc *rproc_get_by_phandle(phandle phandle)
+struct rproc *of_get_rproc(struct device_node *np)
 {
 	return NULL;
 }
