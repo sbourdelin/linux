@@ -100,5 +100,7 @@ unsigned long cpu_khz_from_msr(void)
 #ifdef CONFIG_X86_LOCAL_APIC
 	lapic_timer_frequency = (freq * 1000) / HZ;
 #endif
+
+	setup_force_cpu_cap(X86_FEATURE_TSC_RELIABLE);
 	return res;
 }
