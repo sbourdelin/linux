@@ -1570,10 +1570,7 @@ static int mxs_lradc_probe_touchscreen(struct mxs_lradc *lradc,
 
 static int mxs_lradc_probe(struct platform_device *pdev)
 {
-	const struct of_device_id *of_id =
-		of_match_device(mxs_lradc_dt_ids, &pdev->dev);
-	const struct mxs_lradc_of_config *of_cfg =
-		&mxs_lradc_of_config[(enum mxs_lradc_id)of_id->data];
+	const struct mxs_lradc_of_config *of_cfg;
 	struct device *dev = &pdev->dev;
 	struct device_node *node = dev->of_node;
 	struct mxs_lradc *lradc;
@@ -1591,7 +1588,8 @@ static int mxs_lradc_probe(struct platform_device *pdev)
 	}
 
 	lradc = iio_priv(iio);
-	lradc->soc = (enum mxs_lradc_id)of_id->data;
+	lradc->soc = (enum mxs_lradc_id)of_device_get_match_data(&pdev->dev);
+	of_cfg = &mxs_lradc_of_config[lradc->soc];
 
 	/* Grab the memory area */
 	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
