@@ -1200,6 +1200,29 @@ int of_property_read_u32_index(const struct device_node *np,
 EXPORT_SYMBOL_GPL(of_property_read_u32_index);
 
 /**
+ * of_property_read_s32_index - Find and read a s32 from a multi-value property.
+ *
+ * @np:		device node from which the property value is to be read.
+ * @propname:	name of the property to be searched.
+ * @index:	index of the u32 in the list of values
+ * @out_value:	pointer to return value, modified only if no error.
+ *
+ * Search for a property in a device node and read nth 32-bit value from
+ * it. Returns 0 on success, -EINVAL if the property does not exist,
+ * -ENODATA if property does not have a value, and -EOVERFLOW if the
+ * property data isn't large enough.
+ *
+ * The out_value is modified only if a valid s32 value can be decoded.
+ */
+int of_property_read_s32_index(const struct device_node *np,
+			       const char *propname, u32 index, s32 *out_value)
+{
+	return of_property_read_u32_index(np, propname, index,
+		(u32 *)out_value);
+}
+EXPORT_SYMBOL_GPL(of_property_read_s32_index);
+
+/**
  * of_property_read_u8_array - Find and read an array of u8 from a property.
  *
  * @np:		device node from which the property value is to be read.
