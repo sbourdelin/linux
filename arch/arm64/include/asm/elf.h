@@ -145,6 +145,7 @@ typedef struct user_fpsimd_state elf_fpregset_t;
 do {									\
 	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
 		    (elf_addr_t)current->mm->context.vdso);		\
+	NEW_AUX_ENT(AT_TASKSZ, TASK_SIZE);				\
 } while (0)
 
 #define ARCH_HAS_SETUP_ADDITIONAL_PAGES
