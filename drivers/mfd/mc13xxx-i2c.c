@@ -78,9 +78,7 @@ static int mc13xxx_i2c_probe(struct i2c_client *client,
 	}
 
 	if (client->dev.of_node) {
-		const struct of_device_id *of_id =
-			of_match_device(mc13xxx_dt_ids, &client->dev);
-		mc13xxx->variant = of_id->data;
+		mc13xxx->variant = of_device_get_match_data(&client->dev);
 	} else {
 		mc13xxx->variant = (const struct mc13xxx_variant *)id->driver_data;
 	}

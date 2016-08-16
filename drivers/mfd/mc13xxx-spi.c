@@ -155,10 +155,7 @@ static int mc13xxx_spi_probe(struct spi_device *spi)
 	}
 
 	if (spi->dev.of_node) {
-		const struct of_device_id *of_id =
-			of_match_device(mc13xxx_dt_ids, &spi->dev);
-
-		mc13xxx->variant = of_id->data;
+		mc13xxx->variant = of_device_get_match_data(&spi->dev);
 	} else {
 		const struct spi_device_id *id_entry = spi_get_device_id(spi);
 
