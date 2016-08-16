@@ -490,6 +490,23 @@ static void dw_mci_translate_sglist(struct dw_mci *host, struct mmc_data *data,
 				length -= desc_len;
 
 				/*
+				 * OWN bit should be clear by IDMAC after
+				 * finishing transfer. Let's wait for the
+				 * asynchronous operation of IDMAC and cpu
+				 * to make sure that we do not rely on the
+				 * order of Qos of bus and architecture.
+				 * Otherwise we could see a race condition
+				 * here that the former write operation of
+				 * IDMAC(to clear the OWN bit) reach right
+				 * after the later new configuration of desc
+				 * which makes value of desc been covered
+				 * leading to DMA_SUSPEND state as IDMAC fecth
+				 * the wrong desc then.
+				 */
+				while ((readl(&desc->des0) & IDMAC_DES0_OWN))
+					;
+
+				/*
 				 * Set the OWN bit and disable interrupts
 				 * for this descriptor
 				 */
@@ -533,6 +550,23 @@ static void dw_mci_translate_sglist(struct dw_mci *host, struct mmc_data *data,
 					   length : DW_MCI_DESC_DATA_LENGTH;
 
 				length -= desc_len;
+
+				/*
+				 * OWN bit should be clear by IDMAC after
+				 * finishing transfer. Let's wait for the
+				 * asynchronous operation of IDMAC and cpu
+				 * to make sure that we do not rely on the
+				 * order of Qos of bus and architecture.
+				 * Otherwise we could see a race condition
+				 * here that the former write operation of
+				 * IDMAC(to clear the OWN bit) reach right
+				 * after the later new configuration of desc
+				 * which makes value of desc been covered
+				 * leading to DMA_SUSPEND state as IDMAC fecth
+				 * the wrong desc then.
+				 */
+				while ((readl(&desc->des0) & IDMAC_DES0_OWN))
+					;
 
 				/*
 				 * Set the OWN bit and disable interrupts
