@@ -1726,8 +1726,9 @@ static void __vb2_dqbuf(struct vb2_buffer *vb)
 }
 
 /**
- * vb2_dqbuf() - Dequeue a buffer to the userspace
+ * vb2_core_dqbuf() - Dequeue a buffer to the userspace
  * @q:		videobuf2 queue
+ * @pindex:	id number of the buffer
  * @pb:		buffer structure passed from userspace to vidioc_dqbuf handler
  *		in driver
  * @nonblocking: if true, this call will not sleep waiting for a buffer if no
