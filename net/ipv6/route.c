@@ -3244,6 +3244,14 @@ static int rt6_fill_node(struct net *net,
 	if (rtnl_put_cacheinfo(skb, &rt->dst, 0, expires, rt->dst.error) < 0)
 		goto nla_put_failure;
 
+	/* Can't rely on expires == 0. It is zero if no expires flag,
+	 * or if the timing is precisely at expiry. So, recheck the flag.
+	 */
+	if (rt->rt6i_flags & RTF_EXPIRES)
+		if (nla_put_u32(skb, RTA_EXPIRES,
+                                 expires > 0 ? expires / HZ : 0))
+			goto nla_put_failure;
+
 	if (nla_put_u8(skb, RTA_PREF, IPV6_EXTRACT_PREF(rt->rt6i_flags)))
 		goto nla_put_failure;
 
