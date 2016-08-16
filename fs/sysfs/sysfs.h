@@ -32,7 +32,8 @@ int sysfs_add_file(struct kernfs_node *parent,
 		   const struct attribute *attr, bool is_bin);
 int sysfs_add_file_mode_ns(struct kernfs_node *parent,
 			   const struct attribute *attr, bool is_bin,
-			   umode_t amode, const void *ns);
+			   umode_t amode, kuid_t uid, kgid_t gid,
+			   const void *ns);
 
 /*
  * symlink.c
