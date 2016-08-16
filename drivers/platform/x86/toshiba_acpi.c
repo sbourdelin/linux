@@ -1839,7 +1839,7 @@ static ssize_t kbd_backlight_mode_show(struct device *dev,
 	if (toshiba_kbd_illum_status_get(toshiba, &time) < 0)
 		return -EIO;
 
-	return sprintf(buf, "%i\n", time & SCI_KBD_MODE_MASK);
+	return sprintf(buf, "0x%x\n", time & SCI_KBD_MODE_MASK);
 }
 static DEVICE_ATTR_RW(kbd_backlight_mode);
 
