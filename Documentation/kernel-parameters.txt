@@ -3587,6 +3587,10 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			      reboot_cpu is s[mp]#### with #### being the processor
 					to be used for rebooting.
 
+	recovery= 	[KNL]
+			Recovery root filesystem. This partition is attempted as
+			root in case default root filesystem does not mount.
+
 	relax_domain_level=
 			[KNL, SMP] Set scheduler's default relax_domain_level.
 			See Documentation/cgroup-v1/cpusets.txt.

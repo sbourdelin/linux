@@ -39,8 +39,11 @@ int __initdata rd_doload;	/* 1 = load RAM disk, 0 = don't load */
 
 int root_mountflags = MS_RDONLY | MS_SILENT;
 static char * __initdata root_device_name;
+static char * __initdata recovery_device_name;
 static char __initdata saved_root_name[64];
+static char __initdata saved_recovery_name[64];
 static int root_wait;
+static int recovery_attempt;
 
 dev_t ROOT_DEV;
 
@@ -298,6 +301,15 @@ static int __init root_dev_setup(char *line)
 
 __setup("root=", root_dev_setup);
 
+static int __init recovery_setup(char *line)
+{
+	strlcpy(saved_recovery_name, line, sizeof(saved_recovery_name));
+	recovery_attempt = 1;
+	return 1;
+}
+
+__setup("recovery=", recovery_setup);
+
 static int __init rootwait_setup(char *str)
 {
 	if (*str)
@@ -384,6 +396,7 @@ void __init mount_block_root(char *name, int flags)
 					__GFP_NOTRACK_FALSE_POSITIVE);
 	char *fs_names = page_address(page);
 	char *p;
+	int err;
 #ifdef CONFIG_BLOCK
 	char b[BDEVNAME_SIZE];
 #else
@@ -393,7 +406,7 @@ void __init mount_block_root(char *name, int flags)
 	get_fs_names(fs_names);
 retry:
 	for (p = fs_names; *p; p += strlen(p)+1) {
-		int err = do_mount_root(name, p, flags, root_mount_data);
+		err = do_mount_root(name, p, flags, root_mount_data);
 		switch (err) {
 			case 0:
 				goto out;
@@ -401,6 +414,31 @@ retry:
 			case -EINVAL:
 				continue;
 		}
+		if (!(flags & MS_RDONLY)) {
+			pr_warn("Retrying rootfs mount as read-only.\n");
+			flags |= MS_RDONLY;
+			goto retry;
+		}
+		if (recovery_device_name && recovery_attempt) {
+			recovery_attempt = 0;
+
+			ROOT_DEV = name_to_dev_t(recovery_device_name);
+			if (strncmp(recovery_device_name, "/dev/", 5) == 0)
+				recovery_device_name += 5;
+
+			pr_warn("Unable to mount rootfs at %s, error %d\n",
+				root_device_name, err);
+			pr_warn("Attempting %s for recovery as requested.\n",
+				recovery_device_name);
+
+			err = create_dev("/dev/root", ROOT_DEV);
+			if (err < 0)
+				pr_emerg("Failed to create /dev/root: %d\n", err);
+
+			root_device_name = recovery_device_name;
+			goto retry;
+		}
+
 	        /*
 		 * Allow the user to distinguish between failed sys_open
 		 * and bad superblock on root device.
@@ -419,10 +457,6 @@ retry:
 		       "explicit textual name for \"root=\" boot option.\n");
 #endif
 		panic("VFS: Unable to mount root fs on %s", b);
-	}
-	if (!(flags & MS_RDONLY)) {
-		flags |= MS_RDONLY;
-		goto retry;
 	}
 
 	printk("List of all partitions:\n");
@@ -566,6 +600,9 @@ void __init prepare_namespace(void)
 	wait_for_device_probe();
 
 	md_run_setup();
+
+	if (saved_recovery_name[0])
+		recovery_device_name = saved_recovery_name;
 
 	if (saved_root_name[0]) {
 		root_device_name = saved_root_name;
