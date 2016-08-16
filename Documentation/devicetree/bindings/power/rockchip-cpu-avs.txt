@@ -1,0 +1,37 @@
+Rockchip cpu avs device tree bindings
+-------------------------------------
+
+Under the same frequency, the operating voltage tends to decrease with
+increasing leakage. so it is necessary to adjust opp's voltage according
+to leakage for power.
+
+
+Required properties:
+- compatible: Should be one of the following.
+  - "rockchip,rk3399-cpu-avs" - for RK3399 SoCs.
+- leakage-volt-<name>: Named leakage-volt property. At runtime, the
+  platform can find a cpu's cluster_id according to it's cpu_id and match
+  leakage-volt-<name> property. The property is an array of 3-tuples
+  items, and each item consists of leakage and voltage like
+  <min-leakage-mA max-leakage-mA vol-uV>.
+	min-leakage: minimum leakage in mA.
+	max-leakage: maximum leakage in mA.
+	vol: voltage in microvolt.
+
+Example:
+
+	cpu_avs: cpu-avs {
+		compatible = "rockchip,rk3399-cpu-avs";
+		leakage-volt-cluster0 = <
+		/*  mA        mA         uV*/
+		    0         100        0
+		    101       200        (-25000)
+		    201       300        (-50000)
+		>;
+		leakage-volt-cluster1 = <
+		/*  mA        mA         uV*/
+		    0         100        0
+		    101       200        (-25000)
+		    201       300        (-50000)
+		>;
+	};
