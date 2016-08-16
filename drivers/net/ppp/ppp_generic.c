@@ -162,6 +162,37 @@ struct ppp {
 			 |SC_MULTILINK|SC_MP_SHORTSEQ|SC_MP_XSHORTSEQ \
 			 |SC_COMP_TCP|SC_REJ_COMP_TCP|SC_MUST_COMP)
 
+struct chennel_lock {
+	spinlock_t lock;
+	u32 owner;
+	u32 lock_cnt;
+};
+
+#define PPP_CHANNEL_LOCK_INIT(cl) \
+	cl.owner = -1; \
+	cl.lock_cnt = 0; \
+	spin_lock_init(&cl.lock)
+
+#define PPP_CHANNEL_LOCK_BH(cl) \
+	do { \
+		local_bh_disable(); \
+		if (cl.owner != smp_processor_id()) { \
+			spin_lock(&cl.lock); \
+			cl.owner = smp_processor_id(); \
+		} \
+		cl.lock_cnt++; \
+	} while (0)
+
+#define PPP_CHANNEL_UNLOCK_BH(cl) \
+	do { \
+		cl.lock_cnt--; \
+		if (cl.lock_cnt == 0) { \
+			cl.owner = -1; \
+			spin_unlock(&cl.lock); \
+		} \
+		local_bh_enable(); \
+	} while (0)
+
 /*
  * Private data structure for each channel.
  * This includes the data structure used for multilink.
@@ -171,7 +202,7 @@ struct channel {
 	struct list_head list;		/* link in all/new_channels list */
 	struct ppp_channel *chan;	/* public channel data structure */
 	struct rw_semaphore chan_sem;	/* protects `chan' during chan ioctl */
-	spinlock_t	downl;		/* protects `chan', file.xq dequeue */
+	struct chennel_lock downl;	/* protects `chan', file.xq dequeue */
 	struct ppp	*ppp;		/* ppp unit we're connected to */
 	struct net	*chan_net;	/* the net channel belongs to */
 	struct list_head clist;		/* link in list of channels per unit */
@@ -1597,7 +1628,7 @@ ppp_push(struct ppp *ppp)
 		list = list->next;
 		pch = list_entry(list, struct channel, clist);
 
-		spin_lock_bh(&pch->downl);
+		PPP_CHANNEL_LOCK_BH(pch->downl);
 		if (pch->chan) {
 			if (pch->chan->ops->start_xmit(pch->chan, skb))
 				ppp->xmit_pending = NULL;
@@ -1606,7 +1637,7 @@ ppp_push(struct ppp *ppp)
 			kfree_skb(skb);
 			ppp->xmit_pending = NULL;
 		}
-		spin_unlock_bh(&pch->downl);
+		PPP_CHANNEL_UNLOCK_BH(pch->downl);
 		return;
 	}
 
@@ -1736,7 +1767,7 @@ static int ppp_mp_explode(struct ppp *ppp, struct sk_buff *skb)
 		}
 
 		/* check the channel's mtu and whether it is still attached. */
-		spin_lock_bh(&pch->downl);
+		PPP_CHANNEL_LOCK_BH(pch->downl);
 		if (pch->chan == NULL) {
 			/* can't use this channel, it's being deregistered */
 			if (pch->speed == 0)
@@ -1744,7 +1775,7 @@ static int ppp_mp_explode(struct ppp *ppp, struct sk_buff *skb)
 			else
 				totspeed -= pch->speed;
 
-			spin_unlock_bh(&pch->downl);
+			PPP_CHANNEL_UNLOCK_BH(pch->downl);
 			pch->avail = 0;
 			totlen = len;
 			totfree--;
@@ -1795,7 +1826,7 @@ static int ppp_mp_explode(struct ppp *ppp, struct sk_buff *skb)
 		 */
 		if (flen <= 0) {
 			pch->avail = 2;
-			spin_unlock_bh(&pch->downl);
+			PPP_CHANNEL_UNLOCK_BH(pch->downl);
 			continue;
 		}
 
@@ -1840,14 +1871,14 @@ static int ppp_mp_explode(struct ppp *ppp, struct sk_buff *skb)
 		len -= flen;
 		++ppp->nxseq;
 		bits = 0;
-		spin_unlock_bh(&pch->downl);
+		PPP_CHANNEL_UNLOCK_BH(pch->downl);
 	}
 	ppp->nxchan = i;
 
 	return 1;
 
  noskb:
-	spin_unlock_bh(&pch->downl);
+	PPP_CHANNEL_UNLOCK_BH(pch->downl);
 	if (ppp->debug & 1)
 		netdev_err(ppp->dev, "PPP: no memory (fragment)\n");
 	++ppp->dev->stats.tx_errors;
@@ -1865,7 +1896,7 @@ ppp_channel_push(struct channel *pch)
 	struct sk_buff *skb;
 	struct ppp *ppp;
 
-	spin_lock_bh(&pch->downl);
+	PPP_CHANNEL_LOCK_BH(pch->downl);
 	if (pch->chan) {
 		while (!skb_queue_empty(&pch->file.xq)) {
 			skb = skb_dequeue(&pch->file.xq);
@@ -1879,7 +1910,7 @@ ppp_channel_push(struct channel *pch)
 		/* channel got deregistered */
 		skb_queue_purge(&pch->file.xq);
 	}
-	spin_unlock_bh(&pch->downl);
+	PPP_CHANNEL_UNLOCK_BH(pch->downl);
 	/* see if there is anything from the attached unit to be sent */
 	if (skb_queue_empty(&pch->file.xq)) {
 		read_lock_bh(&pch->upl);
@@ -2520,7 +2551,7 @@ int ppp_register_net_channel(struct net *net, struct ppp_channel *chan)
 	pch->lastseq = -1;
 #endif /* CONFIG_PPP_MULTILINK */
 	init_rwsem(&pch->chan_sem);
-	spin_lock_init(&pch->downl);
+	PPP_CHANNEL_LOCK_INIT(pch->downl);
 	rwlock_init(&pch->upl);
 
 	spin_lock_bh(&pn->all_channels_lock);
@@ -2599,9 +2630,9 @@ ppp_unregister_channel(struct ppp_channel *chan)
 	 * the channel's start_xmit or ioctl routine before we proceed.
 	 */
 	down_write(&pch->chan_sem);
-	spin_lock_bh(&pch->downl);
+	PPP_CHANNEL_LOCK_BH(pch->downl);
 	pch->chan = NULL;
-	spin_unlock_bh(&pch->downl);
+	PPP_CHANNEL_UNLOCK_BH(pch->downl);
 	up_write(&pch->chan_sem);
 	ppp_disconnect_channel(pch);
 
