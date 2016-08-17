@@ -30,15 +30,18 @@
 #define TIMER_ME_GLOBAL			BIT(0)
 #define CR_TIMER_REV			0x10
 
+#define TIMER_0_OFFSET			0x20
+#define TIMER_N_SIZE			0x20
 /* Timer specific registers */
-#define TIMER_CFG			0x20
+#define TIMER_N_CFG			0x0
+#define TIMER_N_RELOAD_VALUE		0x4
+#define TIMER_N_CURRENT_VALUE		0x8
+#define TIMER_N_CURRENT_OVERFLOW_VALUE	0xC
+#define TIMER_N_IRQ_STATUS		0x10
+#define TIMER_N_IRQ_CLEAR		0x14
+#define TIMER_N_IRQ_MASK		0x18
+
 #define TIMER_ME_LOCAL			BIT(0)
-#define TIMER_RELOAD_VALUE		0x24
-#define TIMER_CURRENT_VALUE		0x28
-#define TIMER_CURRENT_OVERFLOW_VALUE	0x2C
-#define TIMER_IRQ_STATUS		0x30
-#define TIMER_IRQ_CLEAR			0x34
-#define TIMER_IRQ_MASK			0x38
 
 #define PERIP_TIMER_CONTROL		0x90
 
@@ -58,13 +61,13 @@ static struct pistachio_clocksource pcs_gpt;
 
 static inline u32 gpt_readl(void __iomem *base, u32 offset, u32 gpt_id)
 {
-	return readl(base + 0x20 * gpt_id + offset);
+	return readl(base + TIMER_0_OFFSET + TIMER_N_SIZE * gpt_id + offset);
 }
 
 static inline void gpt_writel(void __iomem *base, u32 value, u32 offset,
 		u32 gpt_id)
 {
-	writel(value, base + 0x20 * gpt_id + offset);
+	writel(value, base + TIMER_0_OFFSET + TIMER_N_SIZE * gpt_id + offset);
 }
 
 static cycle_t notrace
@@ -80,8 +83,8 @@ pistachio_clocksource_read_cycles(struct clocksource *cs)
 	 */
 
 	raw_spin_lock_irqsave(&pcs->lock, flags);
-	overflw = gpt_readl(pcs->base, TIMER_CURRENT_OVERFLOW_VALUE, 0);
-	counter = gpt_readl(pcs->base, TIMER_CURRENT_VALUE, 0);
+	overflw = gpt_readl(pcs->base, TIMER_N_CURRENT_OVERFLOW_VALUE, 0);
+	counter = gpt_readl(pcs->base, TIMER_N_CURRENT_VALUE, 0);
 	raw_spin_unlock_irqrestore(&pcs->lock, flags);
 
 	return (cycle_t)~counter;
@@ -98,13 +101,13 @@ static void pistachio_clksrc_set_mode(struct clocksource *cs, int timeridx,
 	struct pistachio_clocksource *pcs = to_pistachio_clocksource(cs);
 	u32 val;
 
-	val = gpt_readl(pcs->base, TIMER_CFG, timeridx);
+	val = gpt_readl(pcs->base, TIMER_N_CFG, timeridx);
 	if (enable)
 		val |= TIMER_ME_LOCAL;
 	else
 		val &= ~TIMER_ME_LOCAL;
 
-	gpt_writel(pcs->base, val, TIMER_CFG, timeridx);
+	gpt_writel(pcs->base, val, TIMER_N_CFG, timeridx);
 }
 
 static void pistachio_clksrc_enable(struct clocksource *cs, int timeridx)
@@ -113,7 +116,7 @@ static void pistachio_clksrc_enable(struct clocksource *cs, int timeridx)
 
 	/* Disable GPT local before loading reload value */
 	pistachio_clksrc_set_mode(cs, timeridx, false);
-	gpt_writel(pcs->base, RELOAD_VALUE, TIMER_RELOAD_VALUE, timeridx);
+	gpt_writel(pcs->base, RELOAD_VALUE, TIMER_N_RELOAD_VALUE, timeridx);
 	pistachio_clksrc_set_mode(cs, timeridx, true);
 }
 
@@ -202,10 +205,10 @@ static int __init pistachio_clksrc_of_init(struct device_node *node)
 	rate = clk_get_rate(fast_clk);
 
 	/* Disable irq's for clocksource usage */
-	gpt_writel(pcs_gpt.base, 0, TIMER_IRQ_MASK, 0);
-	gpt_writel(pcs_gpt.base, 0, TIMER_IRQ_MASK, 1);
-	gpt_writel(pcs_gpt.base, 0, TIMER_IRQ_MASK, 2);
-	gpt_writel(pcs_gpt.base, 0, TIMER_IRQ_MASK, 3);
+	gpt_writel(pcs_gpt.base, 0, TIMER_N_IRQ_MASK, 0);
+	gpt_writel(pcs_gpt.base, 0, TIMER_N_IRQ_MASK, 1);
+	gpt_writel(pcs_gpt.base, 0, TIMER_N_IRQ_MASK, 2);
+	gpt_writel(pcs_gpt.base, 0, TIMER_N_IRQ_MASK, 3);
 
 	/* Enable timer block */
 	writel(TIMER_ME_GLOBAL, pcs_gpt.base);
