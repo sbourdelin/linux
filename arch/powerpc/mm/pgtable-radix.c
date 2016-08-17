@@ -527,3 +527,26 @@ int radix__has_transparent_hugepage(void)
 	return 0;
 }
 #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
+
+#ifdef CONFIG_MEMORY_HOTPLUG
+int radix__create_section_mapping(unsigned long start, unsigned long end)
+{
+	unsigned long page_size = 1 << mmu_psize_defs[mmu_linear_psize].shift;
+
+	/* Align to the page size of the linear mapping. */
+	start = _ALIGN_DOWN(start, page_size);
+
+	for (; start < end; start += page_size) {
+		int rc = radix__map_kernel_page(start, __pa(start),
+						PAGE_KERNEL, page_size);
+	        if (rc)
+			return rc;
+	}
+
+	return 0;
+}
+
+void radix__remove_section_mapping(unsigned long start, unsigned long end)
+{
+}
+#endif /* CONFIG_MEMORY_HOTPLUG */

@@ -19,12 +19,20 @@
 static inline int create_section_mapping(unsigned long start,
 					 unsigned long end)
 {
+	if (radix_enabled())
+		return radix__create_section_mapping(start, end);
+
 	return hash__create_section_mapping(start, end);
 }
 
 static inline int remove_section_mapping(unsigned long start,
 					 unsigned long end)
 {
+	if (radix_enabled()) {
+		radix__remove_section_mapping(start, end);
+		return 0;
+	}
+
 	return hash__remove_section_mapping(start, end);
 }
 
