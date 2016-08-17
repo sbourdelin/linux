@@ -1144,6 +1144,14 @@ config CGROUP_PERF
 
 	  Say N if unsure.
 
+config CGROUP_BPF
+	bool "Enable eBPF programs in cgroups"
+	depends on BPF_SYSCALL
+	help
+	  This options allows cgroups to accommodate eBPF programs that
+	  can be used for network traffic filtering and accounting. See
+	  Documentation/networking/filter.txt for more information.
+
 config CGROUP_DEBUG
 	bool "Example controller"
 	default n

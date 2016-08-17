@@ -62,6 +62,7 @@
 #include <linux/proc_ns.h>
 #include <linux/nsproxy.h>
 #include <linux/file.h>
+#include <linux/bpf.h>
 #include <net/sock.h>
 
 /*
@@ -5460,6 +5461,14 @@ static int cgroup_destroy_locked(struct cgroup *cgrp)
 	/* initiate massacre of all css's */
 	for_each_css(css, ssid, cgrp)
 		kill_css(css);
+
+#ifdef CONFIG_CGROUP_BPF
+	if (cgrp->bpf_ingress)
+		bpf_prog_put(cgrp->bpf_ingress);
+
+	if (cgrp->bpf_egress)
+		bpf_prog_put(cgrp->bpf_egress);
+#endif
 
 	/*
 	 * Remove @cgrp directory along with the base files.  @cgrp has an
