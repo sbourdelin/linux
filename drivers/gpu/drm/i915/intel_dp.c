@@ -2862,17 +2862,6 @@ static void chv_dp_post_pll_disable(struct intel_encoder *encoder)
 	chv_phy_post_pll_disable(encoder);
 }
 
-/*
- * Fetch AUX CH registers 0x202 - 0x207 which contain
- * link status information
- */
-bool
-intel_dp_get_link_status(struct intel_dp *intel_dp, uint8_t link_status[DP_LINK_STATUS_SIZE])
-{
-	return drm_dp_dpcd_read(&intel_dp->aux, DP_LANE0_1_STATUS, link_status,
-				DP_LINK_STATUS_SIZE) == DP_LINK_STATUS_SIZE;
-}
-
 /* These are source-specific values. */
 uint8_t
 intel_dp_voltage_max(struct intel_dp *intel_dp)
@@ -3871,8 +3860,8 @@ intel_dp_check_link_status(struct intel_dp *intel_dp)
 
 	WARN_ON(!drm_modeset_is_locked(&dev->mode_config.connection_mutex));
 
-	if (!intel_dp_get_link_status(intel_dp, link_status)) {
-		DRM_ERROR("Failed to get link status\n");
+	if (drm_dp_dpcd_read_link_status(&intel_dp->aux, link_status) <= 0) {
+		DRM_ERROR("failed to get link status\n");
 		return;
 	}
 
