@@ -94,6 +94,7 @@ struct Qdisc {
 	seqcount_t		running;
 	struct gnet_stats_queue	qstats;
 	unsigned long		state;
+	unsigned long __percpu	*cpu_state;
 	struct Qdisc            *next_sched;
 	struct sk_buff		*skb_bad_txq;
 	struct rcu_head		rcu_head;

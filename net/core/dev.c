@@ -2272,8 +2272,14 @@ static void __netif_reschedule(struct Qdisc *q)
 
 void __netif_schedule(struct Qdisc *q)
 {
-	if (!test_and_set_bit(__QDISC_STATE_SCHED, &q->state))
+	if (q->flags & TCQ_F_NOLOCK) {
+		unsigned long *s = this_cpu_ptr(q->cpu_state);
+
+		if (!test_and_set_bit(__QDISC_STATE_SCHED, s))
+			__netif_reschedule(q);
+	} else if (!test_and_set_bit(__QDISC_STATE_SCHED, &q->state)) {
 		__netif_reschedule(q);
+	}
 }
 EXPORT_SYMBOL(__netif_schedule);
 
@@ -3925,15 +3931,23 @@ static void net_tx_action(struct softirq_action *h)
 			if (!(q->flags & TCQ_F_NOLOCK)) {
 				root_lock = qdisc_lock(q);
 				spin_lock(root_lock);
-			}
-			/* We need to make sure head->next_sched is read
-			 * before clearing __QDISC_STATE_SCHED
-			 */
-			smp_mb__before_atomic();
-			clear_bit(__QDISC_STATE_SCHED, &q->state);
-			qdisc_run(q);
-			if (!(q->flags & TCQ_F_NOLOCK))
+
+				/* We need to make sure head->next_sched is read
+				 * before clearing __QDISC_STATE_SCHED
+				 */
+				smp_mb__before_atomic();
+				clear_bit(__QDISC_STATE_SCHED, &q->state);
+
+				qdisc_run(q);
+
 				spin_unlock(root_lock);
+			} else {
+				unsigned long *s = this_cpu_ptr(q->cpu_state);
+
+				smp_mb__before_atomic();
+				clear_bit(__QDISC_STATE_SCHED, s);
+				__qdisc_run(q);
+			}
 		}
 	}
 }

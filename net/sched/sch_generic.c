@@ -171,6 +171,7 @@ static void try_bulk_dequeue_skb_slow(struct Qdisc *q,
 			if (qdisc_is_percpu_stats(q)) {
 				qdisc_qstats_cpu_backlog_inc(q, nskb);
 				qdisc_qstats_cpu_qlen_inc(q);
+				set_thread_flag(TIF_NEED_RESCHED);
 			} else {
 				qdisc_qstats_backlog_inc(q, nskb);
 				q->q.qlen++;
@@ -766,6 +767,10 @@ struct Qdisc *qdisc_create_dflt(struct netdev_queue *dev_queue,
 		sch->skb_bad_txq_cpu = alloc_percpu(struct bad_txq_cell);
 		if (!sch->skb_bad_txq_cpu)
 			goto errout;
+
+		sch->cpu_state = alloc_percpu(unsigned long);
+		if (!sch->cpu_state)
+			goto errout;
 	}
 
 	return sch;
@@ -1039,7 +1044,16 @@ static bool some_qdisc_is_busy(struct net_device *dev)
 		q = dev_queue->qdisc_sleeping;
 
 		if (q->flags & TCQ_F_NOLOCK) {
-			val = test_bit(__QDISC_STATE_SCHED, &q->state);
+			int i;
+
+			for_each_possible_cpu(i) {
+				unsigned long *s;
+
+				s = per_cpu_ptr(q->cpu_state, i);
+				val = test_bit(__QDISC_STATE_SCHED, s);
+				if (val)
+					break;
+			}
 		} else {
 			root_lock = qdisc_lock(q);
 			spin_lock_bh(root_lock);
