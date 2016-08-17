@@ -115,6 +115,10 @@ do {								\
 extern int dcache_bsize;
 extern int icache_bsize;
 extern int ucache_bsize;
+extern long il1cache_shape;
+extern long dl1cache_shape;
+extern long l2cache_shape;
+extern long l3cache_shape;
 
 /* vDSO has arch_setup_additional_pages */
 #define ARCH_HAS_SETUP_ADDITIONAL_PAGES
@@ -155,6 +159,10 @@ do {									\
 	NEW_AUX_ENT(AT_DCACHEBSIZE, dcache_bsize);			\
 	NEW_AUX_ENT(AT_ICACHEBSIZE, icache_bsize);			\
 	NEW_AUX_ENT(AT_UCACHEBSIZE, ucache_bsize);			\
+	NEW_AUX_ENT(AT_L1I_CACHESHAPE, il1cache_shape);			\
+	NEW_AUX_ENT(AT_L1D_CACHESHAPE, dl1cache_shape);			\
+	NEW_AUX_ENT(AT_L2_CACHESHAPE, l2cache_shape);			\
+	NEW_AUX_ENT(AT_L3_CACHESHAPE, l3cache_shape);			\
 	VDSO_AUX_ENT(AT_SYSINFO_EHDR, current->mm->context.vdso_base);	\
 } while (0)
 

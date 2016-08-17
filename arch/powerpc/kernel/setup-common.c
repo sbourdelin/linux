@@ -94,7 +94,10 @@ EXPORT_SYMBOL_GPL(boot_cpuid);
 int dcache_bsize;
 int icache_bsize;
 int ucache_bsize;
-
+long il1cache_shape = -1;
+long dl1cache_shape = -1;
+long l2cache_shape = -1;
+long l3cache_shape = -1;
 
 unsigned long klimit = (unsigned long) _end;
 
