@@ -16,8 +16,18 @@
 #endif /* CONFIG_SPARSEMEM */
 
 #ifdef CONFIG_MEMORY_HOTPLUG
-extern int create_section_mapping(unsigned long start, unsigned long end);
-extern int remove_section_mapping(unsigned long start, unsigned long end);
+static inline int create_section_mapping(unsigned long start,
+					 unsigned long end)
+{
+	return hash__create_section_mapping(start, end);
+}
+
+static inline int remove_section_mapping(unsigned long start,
+					 unsigned long end)
+{
+	return hash__remove_section_mapping(start, end);
+}
+
 #ifdef CONFIG_NUMA
 extern int hot_add_scn_to_nid(unsigned long scn_addr);
 #else
