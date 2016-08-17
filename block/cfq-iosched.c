@@ -2524,6 +2524,32 @@ static void cfq_remove_request(struct request *rq)
 	}
 }
 
+#ifdef CONFIG_BOOST_URGENT_ASYNC_WB
+static struct request *
+cfq_find_async_wb_req(struct request_queue *q, sector_t sector)
+{
+	struct cfq_data *cfqd = q->elevator->elevator_data;
+	struct cfq_queue *cfqq;
+	struct request *found_req = NULL;
+	int i;
+
+	for (i = 0; i < IOPRIO_BE_NR; i++) {
+		cfqq = cfqd->root_group->async_cfqq[1][i];
+		if (cfqq) {
+			if (cfqq->queued[0])
+				found_req = elv_rb_find_incl(&cfqq->sort_list,
+							      sector);
+			if (found_req) {
+				cfq_remove_request(found_req);
+				return found_req;
+			}
+		}
+	}
+
+	return NULL;
+}
+#endif
+
 static int cfq_merge(struct request_queue *q, struct request **req,
 		     struct bio *bio)
 {
@@ -4735,6 +4761,9 @@ static struct elevator_type iosched_cfq = {
 		.elevator_add_req_fn =		cfq_insert_request,
 		.elevator_activate_req_fn =	cfq_activate_request,
 		.elevator_deactivate_req_fn =	cfq_deactivate_request,
+#ifdef CONFIG_BOOST_URGENT_ASYNC_WB
+		.elevator_find_async_wb_req_fn = cfq_find_async_wb_req,
+#endif
 		.elevator_completed_req_fn =	cfq_completed_request,
 		.elevator_former_req_fn =	elv_rb_former_request,
 		.elevator_latter_req_fn =	elv_rb_latter_request,

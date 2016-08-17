@@ -343,6 +343,30 @@ struct request *elv_rb_find(struct rb_root *root, sector_t sector)
 }
 EXPORT_SYMBOL(elv_rb_find);
 
+#ifdef CONFIG_BOOST_URGENT_ASYNC_WB
+struct request *elv_rb_find_incl(struct rb_root *root, sector_t sector)
+{
+	struct rb_node *n = root->rb_node;
+	struct request *rq;
+
+	while (n) {
+		rq = rb_entry(n, struct request, rb_node);
+
+		if (sector < blk_rq_pos(rq))
+			n = n->rb_left;
+		else if (sector > blk_rq_pos(rq)) {
+			if (sector < blk_rq_pos(rq) + blk_rq_sectors(rq))
+				return rq;
+			n = n->rb_right;
+		} else
+			return rq;
+	}
+
+	return NULL;
+}
+EXPORT_SYMBOL(elv_rb_find_incl);
+#endif
+
 /*
  * Insert rq into dispatch queue of q.  Queue lock must be held on
  * entry.  rq is sort instead into the dispatch queue. To be used by
