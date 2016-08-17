@@ -315,6 +315,21 @@ static void __setup_offsets(struct vb2_buffer *vb)
 	}
 }
 
+ /**
+ * __vb2_unmap_dmabuf() - unmap dma-buf attached to buffer planes
+ */
+static void __vb2_unmap_dmabuf(struct vb2_buffer *vb)
+{
+	int i;
+
+	for (i = 0; i < vb->num_planes; ++i) {
+		if (!vb->planes[i].dbuf_mapped)
+			continue;
+		call_void_memop(vb, unmap_dmabuf, vb->planes[i].mem_priv);
+		vb->planes[i].dbuf_mapped = 0;
+	}
+}
+
 static void vb2_done_work(struct work_struct *work)
 {
 	struct vb2_buffer *vb = container_of(work, struct vb2_buffer,
@@ -348,6 +363,9 @@ static void vb2_done_work(struct work_struct *work)
 			__enqueue_in_driver(vb);
 		break;
 	default:
+		if (q->memory == VB2_MEMORY_DMABUF)
+			__vb2_unmap_dmabuf(vb);
+
 		/* Inform any processes that may be waiting for buffers */
 		wake_up(&q->done_wq);
 		break;
@@ -1725,23 +1743,11 @@ EXPORT_SYMBOL_GPL(vb2_wait_for_all_buffers);
  */
 static void __vb2_dqbuf(struct vb2_buffer *vb)
 {
-	struct vb2_queue *q = vb->vb2_queue;
-	unsigned int i;
-
 	/* nothing to do if the buffer is already dequeued */
 	if (vb->state == VB2_BUF_STATE_DEQUEUED)
 		return;
 
 	vb->state = VB2_BUF_STATE_DEQUEUED;
-
-	/* unmap DMABUF buffer */
-	if (q->memory == VB2_MEMORY_DMABUF)
-		for (i = 0; i < vb->num_planes; ++i) {
-			if (!vb->planes[i].dbuf_mapped)
-				continue;
-			call_void_memop(vb, unmap_dmabuf, vb->planes[i].mem_priv);
-			vb->planes[i].dbuf_mapped = 0;
-		}
 }
 
 /**
@@ -1884,6 +1890,9 @@ static void __vb2_queue_cancel(struct vb2_queue *q)
 			call_void_vb_qop(vb, buf_finish, vb);
 		}
 		__vb2_dqbuf(vb);
+
+		if (q->memory == VB2_MEMORY_DMABUF)
+			__vb2_unmap_dmabuf(vb);
 	}
 }
 
