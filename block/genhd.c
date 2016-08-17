@@ -595,9 +595,10 @@ exit:
  * This function registers the partitioning information in @disk
  * with the kernel.
  *
- * FIXME: error handling
+ * RETURNS:
+ * 0 on success, -errno on failure.
  */
-void device_add_disk(struct device *parent, struct gendisk *disk)
+int device_add_disk(struct device *parent, struct gendisk *disk)
 {
 	struct backing_dev_info *bdi;
 	dev_t devt;
@@ -613,10 +614,8 @@ void device_add_disk(struct device *parent, struct gendisk *disk)
 	disk->flags |= GENHD_FL_UP;
 
 	retval = blk_alloc_devt(&disk->part0, &devt);
-	if (retval) {
-		WARN_ON(1);
-		return;
-	}
+	if (retval)
+		goto fail;
 	disk_to_dev(disk)->devt = devt;
 
 	/* ->major and ->first_minor aren't supposed to be
@@ -625,16 +624,26 @@ void device_add_disk(struct device *parent, struct gendisk *disk)
 	disk->major = MAJOR(devt);
 	disk->first_minor = MINOR(devt);
 
-	disk_alloc_events(disk);
+	retval = disk_alloc_events(disk);
+	if (retval)
+		goto fail;
 
 	/* Register BDI before referencing it from bdev */
 	bdi = &disk->queue->backing_dev_info;
-	bdi_register_owner(bdi, disk_to_dev(disk));
+	retval = bdi_register_owner(bdi, disk_to_dev(disk));
+	if (retval)
+		goto fail;
 
-	blk_register_region(disk_devt(disk), disk->minors, NULL,
-			    exact_match, exact_lock, disk);
-	register_disk(parent, disk);
-	blk_register_queue(disk);
+	retval = blk_register_region(disk_devt(disk), disk->minors, NULL,
+				     exact_match, exact_lock, disk);
+	if (retval)
+		goto fail;
+	retval = register_disk(parent, disk);
+	if (retval)
+		goto fail;
+	retval = blk_register_queue(disk);
+	if (retval)
+		goto fail;
 
 	/*
 	 * Take an extra ref on queue which will be put on disk_release()
@@ -644,10 +653,20 @@ void device_add_disk(struct device *parent, struct gendisk *disk)
 
 	retval = sysfs_create_link(&disk_to_dev(disk)->kobj, &bdi->dev->kobj,
 				   "bdi");
-	WARN_ON(retval);
+	if (retval)
+		goto fail;
 
-	disk_add_events(disk);
-	blk_integrity_add(disk);
+	retval = disk_add_events(disk);
+	if (retval)
+		goto fail;
+
+	retval = blk_integrity_add(disk);
+	if (retval)
+		goto fail;
+	return 0;
+fail:
+	WARN_ON(retval);
+	return retval;
 }
 EXPORT_SYMBOL(device_add_disk);
 
