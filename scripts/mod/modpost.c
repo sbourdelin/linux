@@ -2245,6 +2245,12 @@ static void add_srcversion(struct buffer *b, struct module *mod)
 	}
 }
 
+static void add_kconfig_symbol(struct buffer *b, struct module *mod)
+{
+	buf_printf(b, "\n");
+	buf_printf(b, "MODULE_INFO(kconfig_symbol, KBUILD_KSYMB);\n");
+}
+
 static void write_if_changed(struct buffer *b, const char *fname)
 {
 	char *tmp;
@@ -2478,6 +2484,7 @@ int main(int argc, char **argv)
 		add_depends(&buf, mod, modules);
 		add_moddevtable(&buf, mod);
 		add_srcversion(&buf, mod);
+		add_kconfig_symbol(&buf, mod);
 
 		sprintf(fname, "%s.mod.c", mod->name);
 		write_if_changed(&buf, fname);
