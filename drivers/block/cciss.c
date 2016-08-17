@@ -1575,7 +1575,7 @@ static int cciss_bigpassthru(ctlr_info_t *h, void __user *argp)
 	unsigned char **buff;
 	int *buff_size;
 	u64bit temp64;
-	BYTE sg_used = 0;
+	BYTE sg_used;
 	int status;
 	int i;
 	DECLARE_COMPLETION_ONSTACK(wait);
@@ -1616,6 +1616,7 @@ static int cciss_bigpassthru(ctlr_info_t *h, void __user *argp)
 	}
 	left = ioc->buf_size;
 	data_ptr = ioc->buf;
+	sg_used = 0;
 	while (left) {
 		sz = (left > ioc->malloc_size) ? ioc->malloc_size : left;
 		buff_size[sg_used] = sz;
