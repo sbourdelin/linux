@@ -122,8 +122,9 @@ config HAVE_HARDENED_USERCOPY_ALLOCATOR
 	bool
 	help
 	  The heap allocator implements __check_heap_object() for
-	  validating memory ranges against heap object sizes in
-	  support of CONFIG_HARDENED_USERCOPY.
+	  validating memory ranges against heap object sizes in support
+	  of CONFIG_HARDENED_USERCOPY. It must mark all managed pages as
+	  PageSlab(), or set __GFP_COMP for multi-page allocations.
 
 config HAVE_ARCH_HARDENED_USERCOPY
 	bool

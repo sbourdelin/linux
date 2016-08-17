@@ -172,6 +172,15 @@ static inline const char *check_heap_object(const void *ptr, unsigned long n,
 		return NULL;
 	}
 
+#ifndef CONFIG_HAVE_HARDENED_USERCOPY_ALLOCATOR
+	/*
+	 * If the allocator isn't marking multi-page allocations as
+	 * either __GFP_COMP or PageSlab, we cannot correctly perform
+	 * bounds checking of multi-page allocations, so we stop here.
+	 */
+	return NULL;
+#endif
+
 	/* Allow kernel data region (if not marked as Reserved). */
 	if (ptr >= (const void *)_sdata && end <= (const void *)_edata)
 		return NULL;
@@ -192,7 +201,7 @@ static inline const char *check_heap_object(const void *ptr, unsigned long n,
 		return NULL;
 
 	/*
-	 * Reject if range is entirely either Reserved (i.e. special or
+	 * Allow if range is entirely either Reserved (i.e. special or
 	 * device memory), or CMA. Otherwise, reject since the object spans
 	 * several independently allocated pages.
 	 */
