@@ -1049,6 +1049,8 @@ static int kaweth_probe(
 		/* Download the firmware */
 		dev_info(dev, "Downloading firmware...\n");
 		kaweth->firmware_buf = (__u8 *)__get_free_page(GFP_KERNEL);
+		if (!kaweth->firmware_buf)
+				return -ENOMEM;
 		if ((result = kaweth_download_firmware(kaweth,
 						      "kaweth/new_code.bin",
 						      100,
