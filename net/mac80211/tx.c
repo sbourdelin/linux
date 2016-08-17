@@ -1074,6 +1074,64 @@ ieee80211_tx_h_calculate_duration(struct ieee80211_tx_data *tx)
 	return TX_CONTINUE;
 }
 
+static void ieee80211_gen_crypto_iv(struct ieee80211_key_conf *conf,
+					   struct sta_info *sta, struct sk_buff *skb)
+{
+	struct ieee80211_sub_if_data *sdata;
+	u64 pn;
+	u8 *crypto_hdr;
+	u8 pn_offs = 0;
+
+	if (!conf || !sta || !(conf->flags & IEEE80211_KEY_FLAG_GENERATE_IV))
+		return;
+
+	sdata = sta->sdata;
+
+	switch (sdata->vif.type) {
+	case NL80211_IFTYPE_STATION:
+		if (sdata->u.mgd.use_4addr) {
+			pn_offs = 30;
+			break;
+		}
+		pn_offs = 24;
+		break;
+	case NL80211_IFTYPE_AP_VLAN:
+		if (sdata->wdev.use_4addr) {
+			pn_offs = 30;
+			break;
+		}
+		/* fall through */
+	case NL80211_IFTYPE_ADHOC:
+	case NL80211_IFTYPE_AP:
+		pn_offs = 24;
+		break;
+	default:
+		return;
+	}
+
+	if (sta->sta.wme) {
+		pn_offs += 2;
+	}
+
+	crypto_hdr = skb->data + pn_offs;
+	switch (conf->cipher) {
+	case WLAN_CIPHER_SUITE_CCMP:
+	case WLAN_CIPHER_SUITE_CCMP_256:
+	case WLAN_CIPHER_SUITE_GCMP:
+	case WLAN_CIPHER_SUITE_GCMP_256:
+		pn = atomic64_inc_return(&conf->tx_pn);
+		crypto_hdr[0] = pn;
+		crypto_hdr[1] = pn >> 8;
+		crypto_hdr[4] = pn >> 16;
+		crypto_hdr[5] = pn >> 24;
+		crypto_hdr[6] = pn >> 32;
+		crypto_hdr[7] = pn >> 40;
+		break;
+	}
+}
+
+
+
 /* actual transmit path */
 
 static bool ieee80211_tx_prep_agg(struct ieee80211_tx_data *tx,
@@ -1502,6 +1560,11 @@ struct sk_buff *ieee80211_tx_dequeue(struct ieee80211_hw *hw,
 		struct sta_info *sta = container_of(txq->sta, struct sta_info,
 						    sta);
 		struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
+
+		if (info->control.hw_key) {
+			ieee80211_gen_crypto_iv(info->control.hw_key,
+			container_of(txq->sta, struct sta_info, sta), skb);
+		}
 
 		hdr->seq_ctrl = ieee80211_tx_next_seq(sta, txq->tid);
 		if (test_bit(IEEE80211_TXQ_AMPDU, &txqi->flags))
@@ -2874,7 +2937,6 @@ void ieee80211_check_fast_xmit(struct sta_info *sta)
 			if (gen_iv) {
 				(build.hdr + build.hdr_len)[3] =
 					0x20 | (build.key->conf.keyidx << 6);
-				build.pn_offs = build.hdr_len;
 			}
 			if (gen_iv || iv_spc)
 				build.hdr_len += IEEE80211_CCMP_HDR_LEN;
@@ -2885,7 +2947,6 @@ void ieee80211_check_fast_xmit(struct sta_info *sta)
 			if (gen_iv) {
 				(build.hdr + build.hdr_len)[3] =
 					0x20 | (build.key->conf.keyidx << 6);
-				build.pn_offs = build.hdr_len;
 			}
 			if (gen_iv || iv_spc)
 				build.hdr_len += IEEE80211_GCMP_HDR_LEN;
@@ -3289,24 +3350,8 @@ static bool ieee80211_xmit_fast(struct ieee80211_sub_if_data *sdata,
 	sta->tx_stats.bytes[skb_get_queue_mapping(skb)] += skb->len;
 	sta->tx_stats.packets[skb_get_queue_mapping(skb)]++;
 
-	if (fast_tx->pn_offs) {
-		u64 pn;
-		u8 *crypto_hdr = skb->data + fast_tx->pn_offs;
-
-		switch (fast_tx->key->conf.cipher) {
-		case WLAN_CIPHER_SUITE_CCMP:
-		case WLAN_CIPHER_SUITE_CCMP_256:
-		case WLAN_CIPHER_SUITE_GCMP:
-		case WLAN_CIPHER_SUITE_GCMP_256:
-			pn = atomic64_inc_return(&fast_tx->key->conf.tx_pn);
-			crypto_hdr[0] = pn;
-			crypto_hdr[1] = pn >> 8;
-			crypto_hdr[4] = pn >> 16;
-			crypto_hdr[5] = pn >> 24;
-			crypto_hdr[6] = pn >> 32;
-			crypto_hdr[7] = pn >> 40;
-			break;
-		}
+	if (fast_tx->key && !local->ops->wake_tx_queue) {
+		ieee80211_gen_crypto_iv(&fast_tx->key->conf, sta, skb);
 	}
 
 	if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN)

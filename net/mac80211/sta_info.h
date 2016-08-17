@@ -266,7 +266,6 @@ struct sta_ampdu_mlme {
  * @hdr_len: actual 802.11 header length
  * @sa_offs: offset of the SA
  * @da_offs: offset of the DA
- * @pn_offs: offset where to put PN for crypto (or 0 if not needed)
  * @band: band this will be transmitted on, for tx_info
  * @rcu_head: RCU head to free this struct
  *
@@ -277,7 +276,7 @@ struct sta_ampdu_mlme {
 struct ieee80211_fast_tx {
 	struct ieee80211_key *key;
 	u8 hdr_len;
-	u8 sa_offs, da_offs, pn_offs;
+	u8 sa_offs, da_offs;
 	u8 band;
 	u8 hdr[30 + 2 + IEEE80211_FAST_XMIT_MAX_IV +
 	       sizeof(rfc1042_header)] __aligned(2);
