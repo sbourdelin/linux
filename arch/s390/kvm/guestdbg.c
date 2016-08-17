@@ -239,7 +239,7 @@ int kvm_s390_import_bp_data(struct kvm_vcpu *vcpu,
 		wp_info = kmalloc(size, GFP_KERNEL);
 		if (!wp_info) {
 			ret = -ENOMEM;
-			goto error;
+			goto free_bp_data;
 		}
 	}
 	size = nr_bp * sizeof(*bp_info);
@@ -247,7 +247,7 @@ int kvm_s390_import_bp_data(struct kvm_vcpu *vcpu,
 		bp_info = kmalloc(size, GFP_KERNEL);
 		if (!bp_info) {
 			ret = -ENOMEM;
-			goto error;
+			goto free_wp_info;
 		}
 	}
 
@@ -257,7 +257,7 @@ int kvm_s390_import_bp_data(struct kvm_vcpu *vcpu,
 			ret = __import_wp_info(vcpu, &bp_data[i],
 					       &wp_info[nr_wp]);
 			if (ret)
-				goto error;
+				goto free_bp_info;
 			nr_wp++;
 			break;
 		case KVM_HW_BP:
@@ -273,10 +273,12 @@ int kvm_s390_import_bp_data(struct kvm_vcpu *vcpu,
 	vcpu->arch.guestdbg.nr_hw_wp = nr_wp;
 	vcpu->arch.guestdbg.hw_wp_info = wp_info;
 	return 0;
-error:
-	kfree(bp_data);
-	kfree(wp_info);
+free_bp_info:
 	kfree(bp_info);
+free_wp_info:
+	kfree(wp_info);
+free_bp_data:
+	kfree(bp_data);
 	return ret;
 }
 
