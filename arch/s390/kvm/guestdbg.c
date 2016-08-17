@@ -217,16 +217,9 @@ int kvm_s390_import_bp_data(struct kvm_vcpu *vcpu,
 		return -EINVAL;
 
 	size = dbg->arch.nr_hw_bp * sizeof(*bp_data);
-	bp_data = kmalloc(size, GFP_KERNEL);
-	if (!bp_data) {
-		ret = -ENOMEM;
-		goto error;
-	}
-
-	if (copy_from_user(bp_data, dbg->arch.hw_bp, size)) {
-		ret = -EFAULT;
-		goto error;
-	}
+	bp_data = memdup_user(dbg->arch.hw_bp, size);
+	if (IS_ERR(bp_data))
+		return PTR_ERR(bp_data);
 
 	for (i = 0; i < dbg->arch.nr_hw_bp; i++) {
 		switch (bp_data[i].type) {
