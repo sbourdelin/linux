@@ -1348,7 +1348,6 @@ void setup_local_APIC(void)
 	 * Actually disabling the focus CPU check just makes the hang less
 	 * frequent as it makes the interrupt distributon model be more
 	 * like LRU than MRU (the short-term load is more even across CPUs).
-	 * See also the comment in end_level_ioapic_irq().  --macro
 	 */
 
 	/*
