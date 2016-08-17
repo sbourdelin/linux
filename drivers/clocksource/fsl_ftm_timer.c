@@ -248,7 +248,7 @@ static int __init ftm_clocksource_init(unsigned long freq)
 	return 0;
 }
 
-static int __init __ftm_clk_init(struct device_node *np, char *cnt_name,
+static unsigned long __init __ftm_clk_init(struct device_node *np, char *cnt_name,
 				 char *ftm_name)
 {
 	struct clk *clk;
@@ -257,19 +257,19 @@ static int __init __ftm_clk_init(struct device_node *np, char *cnt_name,
 	clk = of_clk_get_by_name(np, cnt_name);
 	if (IS_ERR(clk)) {
 		pr_err("ftm: Cannot get \"%s\": %ld\n", cnt_name, PTR_ERR(clk));
-		return PTR_ERR(clk);
+		return 0;
 	}
 	err = clk_prepare_enable(clk);
 	if (err) {
 		pr_err("ftm: clock failed to prepare+enable \"%s\": %d\n",
 			cnt_name, err);
-		return err;
+		return 0;
 	}
 
 	clk = of_clk_get_by_name(np, ftm_name);
 	if (IS_ERR(clk)) {
 		pr_err("ftm: Cannot get \"%s\": %ld\n", ftm_name, PTR_ERR(clk));
-		return PTR_ERR(clk);
+		return 0;
 	}
 	err = clk_prepare_enable(clk);
 	if (err)
@@ -281,17 +281,10 @@ static int __init __ftm_clk_init(struct device_node *np, char *cnt_name,
 
 static unsigned long __init ftm_clk_init(struct device_node *np)
 {
-	unsigned long freq;
-
-	freq = __ftm_clk_init(np, "ftm-evt-counter-en", "ftm-evt");
-	if (freq <= 0)
+	if (!__ftm_clk_init(np, "ftm-evt-counter-en", "ftm-evt"))
 		return 0;
 
-	freq = __ftm_clk_init(np, "ftm-src-counter-en", "ftm-src");
-	if (freq <= 0)
-		return 0;
-
-	return freq;
+	return __ftm_clk_init(np, "ftm-src-counter-en", "ftm-src");
 }
 
 static int __init ftm_calc_closest_round_cyc(unsigned long freq)
