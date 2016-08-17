@@ -822,6 +822,132 @@ static int bpf_obj_get(const union bpf_attr *attr)
 	return bpf_obj_get_user(u64_to_ptr(attr->pathname));
 }
 
+static int bpf_prog_attach(const union bpf_attr *attr)
+{
+	bool is_ingress = false;
+	int err = 0;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	/* Flags are unused for now */
+	if (attr->attach_flags != 0)
+		return -EINVAL;
+
+	switch (attr->attach_type) {
+
+#ifdef CONFIG_CGROUP_BPF
+	case BPF_ATTACH_TYPE_CGROUP_INGRESS:
+		is_ingress = true;
+		/* fall through */
+
+	case BPF_ATTACH_TYPE_CGROUP_EGRESS: {
+		struct bpf_prog *prog, *old_prog, **progp;
+		struct cgroup_subsys_state *pos;
+		struct cgroup *cgrp;
+
+		prog = bpf_prog_get_type(attr->attach_bpf_fd,
+					 BPF_PROG_TYPE_CGROUP_SOCKET_FILTER);
+		if (IS_ERR(prog))
+			return PTR_ERR(prog);
+
+		cgrp = cgroup_get_from_fd(attr->target_fd);
+		if (IS_ERR(cgrp)) {
+			err = PTR_ERR(cgrp);
+			bpf_prog_put(prog);
+			return err;
+		}
+
+		/* Reject installation of a program if any ancestor has one. */
+		for (pos = cgrp->self.parent; pos; pos = pos->parent) {
+			struct cgroup *parent;
+
+			css_get(pos);
+			parent = container_of(pos, struct cgroup, self);
+
+			if ((is_ingress  && parent->bpf_ingress) ||
+			    (!is_ingress && parent->bpf_egress))
+				err = -EEXIST;
+
+			css_put(pos);
+		}
+
+		if (err < 0) {
+			bpf_prog_put(prog);
+			return err;
+		}
+
+		progp = is_ingress ? &cgrp->bpf_ingress : &cgrp->bpf_egress;
+
+		rcu_read_lock();
+		old_prog = rcu_dereference(*progp);
+		rcu_assign_pointer(*progp, prog);
+
+		if (old_prog)
+			bpf_prog_put(old_prog);
+
+		rcu_read_unlock();
+		cgroup_put(cgrp);
+
+		break;
+	}
+#endif /* CONFIG_CGROUP_BPF */
+
+	default:
+		return -EINVAL;
+	}
+
+	return err;
+}
+
+static int bpf_prog_detach(const union bpf_attr *attr)
+{
+	int err = 0;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	switch (attr->attach_type) {
+
+#ifdef CONFIG_CGROUP_BPF
+	case BPF_ATTACH_TYPE_CGROUP_INGRESS:
+	case BPF_ATTACH_TYPE_CGROUP_EGRESS: {
+		struct bpf_prog *prog, **progp;
+		struct cgroup *cgrp;
+
+		cgrp = cgroup_get_from_fd(attr->target_fd);
+		if (IS_ERR(cgrp))
+			return PTR_ERR(cgrp);
+
+		progp = attr->attach_type == BPF_ATTACH_TYPE_CGROUP_INGRESS ?
+			&cgrp->bpf_ingress :
+			&cgrp->bpf_egress;
+
+		rcu_read_lock();
+		prog = rcu_dereference(*progp);
+
+		if (prog) {
+			rcu_assign_pointer(*progp, NULL);
+			bpf_prog_put(prog);
+		} else {
+			err = -ENOENT;
+		}
+
+		rcu_read_unlock();
+		cgroup_put(cgrp);
+
+		break;
+	}
+#endif /* CONFIG_CGROUP_BPF */
+
+	default:
+		err = -EINVAL;
+		break;
+	}
+
+	return err;
+}
+
 SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, size)
 {
 	union bpf_attr attr = {};
@@ -887,6 +1013,12 @@ SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, siz
 		break;
 	case BPF_OBJ_GET:
 		err = bpf_obj_get(&attr);
+		break;
+	case BPF_PROG_ATTACH:
+		err = bpf_prog_attach(&attr);
+		break;
+	case BPF_PROG_DETACH:
+		err = bpf_prog_detach(&attr);
 		break;
 	default:
 		err = -EINVAL;
