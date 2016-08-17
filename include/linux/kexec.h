@@ -304,8 +304,8 @@ int parse_crashkernel_high(char *cmdline, unsigned long long system_ram,
 		unsigned long long *crash_size, unsigned long long *crash_base);
 int parse_crashkernel_low(char *cmdline, unsigned long long system_ram,
 		unsigned long long *crash_size, unsigned long long *crash_base);
-int crash_shrink_memory(unsigned long new_size);
-size_t crash_get_memory_size(void);
+int crash_shrink_memory(struct resource *res, unsigned long new_size);
+size_t crash_get_memory_size(struct resource *res);
 void crash_free_reserved_phys_range(unsigned long begin, unsigned long end);
 
 int __weak arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
