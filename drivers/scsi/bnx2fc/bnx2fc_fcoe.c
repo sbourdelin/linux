@@ -479,7 +479,7 @@ static int bnx2fc_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	__skb_queue_tail(&bg->fcoe_rx_list, skb);
 	if (bg->fcoe_rx_list.qlen == 1)
-		wake_up_process(bg->kthread);
+		schedule_work(&bg->work);
 
 	spin_unlock(&bg->fcoe_rx_list.lock);
 
@@ -489,26 +489,20 @@ err:
 	return -1;
 }
 
-static int bnx2fc_l2_rcv_thread(void *arg)
+static void bnx2fc_l2_rcv_work(struct work_struct *work_s)
 {
-	struct fcoe_percpu_s *bg = arg;
+	struct fcoe_percpu_s *bg;
 	struct sk_buff *skb;
 
-	set_user_nice(current, MIN_NICE);
-	set_current_state(TASK_INTERRUPTIBLE);
-	while (!kthread_should_stop()) {
-		schedule();
-		spin_lock_bh(&bg->fcoe_rx_list.lock);
-		while ((skb = __skb_dequeue(&bg->fcoe_rx_list)) != NULL) {
-			spin_unlock_bh(&bg->fcoe_rx_list.lock);
-			bnx2fc_recv_frame(skb);
-			spin_lock_bh(&bg->fcoe_rx_list.lock);
-		}
-		__set_current_state(TASK_INTERRUPTIBLE);
+	bg = container_of(work_s, struct fcoe_percpu_s, work);
+
+	spin_lock_bh(&bg->fcoe_rx_list.lock);
+	while ((skb = __skb_dequeue(&bg->fcoe_rx_list)) != NULL) {
 		spin_unlock_bh(&bg->fcoe_rx_list.lock);
+		bnx2fc_recv_frame(skb);
+		spin_lock_bh(&bg->fcoe_rx_list.lock);
 	}
-	__set_current_state(TASK_RUNNING);
-	return 0;
+	spin_unlock_bh(&bg->fcoe_rx_list.lock);
 }
 
 
@@ -2574,7 +2568,6 @@ static int bnx2fc_slave_configure(struct scsi_device *sdev)
 static int __init bnx2fc_mod_init(void)
 {
 	struct fcoe_percpu_s *bg;
-	struct task_struct *l2_thread;
 	int rc = 0;
 	unsigned int cpu = 0;
 	struct bnx2fc_percpu_s *p;
@@ -2607,17 +2600,7 @@ static int __init bnx2fc_mod_init(void)
 
 	bg = &bnx2fc_global;
 	skb_queue_head_init(&bg->fcoe_rx_list);
-	l2_thread = kthread_create(bnx2fc_l2_rcv_thread,
-				   (void *)bg,
-				   "bnx2fc_l2_thread");
-	if (IS_ERR(l2_thread)) {
-		rc = PTR_ERR(l2_thread);
-		goto free_wq;
-	}
-	wake_up_process(l2_thread);
-	spin_lock_bh(&bg->fcoe_rx_list.lock);
-	bg->kthread = l2_thread;
-	spin_unlock_bh(&bg->fcoe_rx_list.lock);
+	INIT_WORK(&bg->work, bnx2fc_l2_rcv_work);
 
 	for_each_possible_cpu(cpu) {
 		p = &per_cpu(bnx2fc_percpu, cpu);
@@ -2630,8 +2613,6 @@ static int __init bnx2fc_mod_init(void)
 
 	return 0;
 
-free_wq:
-	destroy_workqueue(bnx2fc_wq);
 release_bt:
 	bnx2fc_release_transport();
 detach_ft:
@@ -2644,9 +2625,6 @@ static void __exit bnx2fc_mod_exit(void)
 {
 	LIST_HEAD(to_be_deleted);
 	struct bnx2fc_hba *hba, *next;
-	struct fcoe_percpu_s *bg;
-	struct task_struct *l2_thread;
-	struct sk_buff *skb;
 	unsigned int cpu = 0;
 
 	/*
@@ -2676,18 +2654,7 @@ static void __exit bnx2fc_mod_exit(void)
 	}
 	cnic_unregister_driver(CNIC_ULP_FCOE);
 
-	/* Destroy global thread */
-	bg = &bnx2fc_global;
-	spin_lock_bh(&bg->fcoe_rx_list.lock);
-	l2_thread = bg->kthread;
-	bg->kthread = NULL;
-	while ((skb = __skb_dequeue(&bg->fcoe_rx_list)) != NULL)
-		kfree_skb(skb);
-
-	spin_unlock_bh(&bg->fcoe_rx_list.lock);
-
-	if (l2_thread)
-		kthread_stop(l2_thread);
+	flush_work(&bnx2fc_global.work);
 
 	for_each_possible_cpu(cpu) {
 		struct bnx2fc_percpu_s *p;
