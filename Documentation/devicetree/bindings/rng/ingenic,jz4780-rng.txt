@@ -1,0 +1,12 @@
+Ingenic jz4780 RNG driver
+
+Required properties:
+- compatible : Should be "ingenic,jz4780-rng"
+- reg : Specifies base physical address and size of the registers.
+
+Example:
+
+rng: rng@100000D8 {
+	compatible = "ingenic,jz4780-rng";
+	reg = <0x100000D8 0x8>;
+};
