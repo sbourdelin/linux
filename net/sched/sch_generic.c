@@ -44,6 +44,43 @@ EXPORT_SYMBOL(default_qdisc_ops);
  * - ingress filtering is also serialized via qdisc root lock
  * - updates to tree and tree walking are only done under the rtnl mutex.
  */
+static inline struct sk_buff *qdisc_dequeue_skb_bad_txq(struct Qdisc *sch)
+{
+	if (sch->skb_bad_txq_cpu) {
+		struct bad_txq_cell *cell = this_cpu_ptr(sch->skb_bad_txq_cpu);
+
+		return cell->skb;
+	}
+
+	return sch->skb_bad_txq;
+}
+
+static inline void qdisc_enqueue_skb_bad_txq(struct Qdisc *sch,
+					     struct sk_buff *skb)
+{
+	if (sch->skb_bad_txq_cpu) {
+		struct bad_txq_cell *cell = this_cpu_ptr(sch->skb_bad_txq_cpu);
+
+		cell->skb = skb;
+		__netif_schedule(sch);
+		return;
+	}
+
+	sch->skb_bad_txq = skb;
+}
+
+static inline void qdisc_null_skb_bad_txq(struct Qdisc *sch)
+{
+	if (sch->skb_bad_txq_cpu) {
+		struct bad_txq_cell *cell = this_cpu_ptr(sch->skb_bad_txq_cpu);
+
+		cell->skb = NULL;
+		return;
+	}
+
+	sch->skb_bad_txq = NULL;
+}
+
 static inline struct sk_buff *qdisc_dequeue_gso_skb(struct Qdisc *sch)
 {
 	if (sch->gso_cpu_skb)
@@ -129,9 +166,15 @@ static void try_bulk_dequeue_skb_slow(struct Qdisc *q,
 		if (!nskb)
 			break;
 		if (unlikely(skb_get_queue_mapping(nskb) != mapping)) {
-			q->skb_bad_txq = nskb;
-			qdisc_qstats_backlog_inc(q, nskb);
-			q->q.qlen++;
+			qdisc_enqueue_skb_bad_txq(q, nskb);
+
+			if (qdisc_is_percpu_stats(q)) {
+				qdisc_qstats_cpu_backlog_inc(q, nskb);
+				qdisc_qstats_cpu_qlen_inc(q);
+			} else {
+				qdisc_qstats_backlog_inc(q, nskb);
+				q->q.qlen++;
+			}
 			break;
 		}
 		skb->next = nskb;
@@ -160,7 +203,7 @@ static struct sk_buff *dequeue_skb(struct Qdisc *q, bool *validate,
 			qdisc_null_gso_skb(q);
 
 			if (qdisc_is_percpu_stats(q)) {
-				qdisc_qstats_cpu_backlog_inc(q, skb);
+				qdisc_qstats_cpu_backlog_dec(q, skb);
 				qdisc_qstats_cpu_qlen_dec(q);
 			} else {
 				qdisc_qstats_backlog_dec(q, skb);
@@ -171,14 +214,19 @@ static struct sk_buff *dequeue_skb(struct Qdisc *q, bool *validate,
 		return skb;
 	}
 	*validate = true;
-	skb = q->skb_bad_txq;
+	skb = qdisc_dequeue_skb_bad_txq(q);
 	if (unlikely(skb)) {
 		/* check the reason of requeuing without tx lock first */
 		txq = skb_get_tx_queue(txq->dev, skb);
 		if (!netif_xmit_frozen_or_stopped(txq)) {
-			q->skb_bad_txq = NULL;
-			qdisc_qstats_backlog_dec(q, skb);
-			q->q.qlen--;
+			qdisc_null_skb_bad_txq(q);
+			if (qdisc_is_percpu_stats(q)) {
+				qdisc_qstats_cpu_backlog_dec(q, skb);
+				qdisc_qstats_cpu_qlen_dec(q);
+			} else {
+				qdisc_qstats_backlog_dec(q, skb);
+				q->q.qlen--;
+			}
 			goto bulk;
 		}
 		return NULL;
@@ -714,6 +762,10 @@ struct Qdisc *qdisc_create_dflt(struct netdev_queue *dev_queue,
 		sch->gso_cpu_skb = alloc_percpu(struct gso_cell);
 		if (!sch->gso_cpu_skb)
 			goto errout;
+
+		sch->skb_bad_txq_cpu = alloc_percpu(struct bad_txq_cell);
+		if (!sch->skb_bad_txq_cpu)
+			goto errout;
 	}
 
 	return sch;
@@ -744,6 +796,20 @@ void qdisc_reset(struct Qdisc *qdisc)
 			cell = per_cpu_ptr(qdisc->gso_cpu_skb, i);
 			if (cell) {
 				kfree_skb_list(cell->skb);
+				cell->skb = NULL;
+			}
+		}
+	}
+
+	if (qdisc->skb_bad_txq_cpu) {
+		int i;
+
+		for_each_possible_cpu(i) {
+			struct bad_txq_cell *cell;
+
+			cell = per_cpu_ptr(qdisc->skb_bad_txq_cpu, i);
+			if (cell) {
+				kfree_skb(cell->skb);
 				cell = NULL;
 			}
 		}
@@ -777,6 +843,19 @@ static void qdisc_rcu_free(struct rcu_head *head)
 		}
 
 		free_percpu(qdisc->gso_cpu_skb);
+	}
+
+	if (qdisc->skb_bad_txq_cpu) {
+		int i;
+
+		for_each_possible_cpu(i) {
+			struct bad_txq_cell *cell;
+
+			cell = per_cpu_ptr(qdisc->skb_bad_txq_cpu, i);
+			kfree_skb(cell->skb);
+		}
+
+		free_percpu(qdisc->skb_bad_txq_cpu);
 	}
 
 	kfree((char *) qdisc - qdisc->padded);
