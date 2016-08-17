@@ -207,7 +207,7 @@ int kvm_s390_import_bp_data(struct kvm_vcpu *vcpu,
 			    struct kvm_guest_debug *dbg)
 {
 	int ret = 0, nr_wp = 0, nr_bp = 0, i, size;
-	struct kvm_hw_breakpoint *bp_data = NULL;
+	struct kvm_hw_breakpoint *bp_data;
 	struct kvm_hw_wp_info_arch *wp_info = NULL;
 	struct kvm_hw_bp_info_arch *bp_info = NULL;
 
