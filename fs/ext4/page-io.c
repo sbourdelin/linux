@@ -370,6 +370,10 @@ static int io_submit_init_bio(struct ext4_io_submit *io,
 	bio->bi_private = ext4_get_io_end(io->io_end);
 	io->io_bio = bio;
 	io->io_next_block = bh->b_blocknr;
+#ifdef CONFIG_BOOST_URGENT_ASYNC_WB
+	if (io->io_wbc->sync_mode == WB_SYNC_NONE)
+		bio->bi_flags |= (1 << BIO_ASYNC_WB);
+#endif
 	return 0;
 }
 
@@ -415,6 +419,13 @@ int ext4_bio_write_page(struct ext4_io_submit *io,
 
 	BUG_ON(!PageLocked(page));
 	BUG_ON(PageWriteback(page));
+
+#ifdef CONFIG_BOOST_URGENT_ASYNC_WB
+	if (wbc->sync_mode == WB_SYNC_NONE) {
+		SetPagePlugged(page);
+		SetPageAsyncWB(page);
+	}
+#endif
 
 	if (keep_towrite)
 		set_page_writeback_keepwrite(page);
