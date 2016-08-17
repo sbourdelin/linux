@@ -1468,6 +1468,7 @@ intel_hdmi_detect(struct drm_connector *connector, bool force)
 	struct intel_hdmi *intel_hdmi = intel_attached_hdmi(connector);
 	struct drm_i915_private *dev_priv = to_i915(connector->dev);
 	bool live_status = false;
+	int attempts = 1;
 	unsigned int try;
 
 	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n",
@@ -1478,12 +1479,27 @@ intel_hdmi_detect(struct drm_connector *connector, bool force)
 	/*
 	 * Live status register is not reliable on all intel platforms.
 	 * So consider live_status only for certain platforms, for
-	 * others, read EDID to determine presence of sink.
+	 * others, read EDID to determine presence of sink, unless
+	 * the users explicitly disables live status reads. For users
+	 * who have broken displays we offer the option to use
+	 * live status with an extra delay.
 	 */
+	switch (i915.live_status) {
+	case 0:
+		live_status = true;
+		break;
+	case 1:
+		attempts = 9;
+		break;
+	default:
+	case -1:
+		break;
+	}
+
 	if (INTEL_INFO(dev_priv)->gen < 7 || IS_IVYBRIDGE(dev_priv))
 		live_status = true;
 
-	for (try = 0; !live_status && try < 9; try++) {
+	for (try = 0; !live_status && try < attempts; try++) {
 		if (try)
 			msleep(10);
 		live_status = intel_digital_port_connected(dev_priv,

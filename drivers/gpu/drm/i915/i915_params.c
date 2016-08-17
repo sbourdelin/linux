@@ -61,6 +61,7 @@ struct i915_params i915 __read_mostly = {
 	.inject_load_failure = 0,
 	.enable_dpcd_backlight = false,
 	.enable_gvt = false,
+	.live_status = -1,
 };
 
 module_param_named(modeset, i915.modeset, int, 0400);
@@ -227,3 +228,10 @@ MODULE_PARM_DESC(enable_dpcd_backlight,
 module_param_named(enable_gvt, i915.enable_gvt, bool, 0400);
 MODULE_PARM_DESC(enable_gvt,
 	"Enable support for Intel GVT-g graphics virtualization host support(default:false)");
+
+module_param_named(live_status, i915.live_status, int, 0600);
+MODULE_PARM_DESC(live_status,
+	"Enable live status detection "
+	"(-1=auto [default], "
+	  "0=disabled, "
+	  "1=enabled with extra delay)");
