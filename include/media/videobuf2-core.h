@@ -242,6 +242,9 @@ struct vb2_buffer {
 
 	struct list_head	queued_entry;
 	struct list_head	done_entry;
+
+	struct work_struct	done_work;
+
 #ifdef CONFIG_VIDEO_ADV_DEBUG
 	/*
 	 * Counters for how often these buffer-related ops are
@@ -522,6 +525,8 @@ struct vb2_queue {
 
 	struct vb2_fileio_data		*fileio;
 	struct vb2_threadio_data	*threadio;
+
+	struct workqueue_struct		*vb2_workqueue;
 
 #ifdef CONFIG_VIDEO_ADV_DEBUG
 	/*

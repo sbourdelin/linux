@@ -315,6 +315,45 @@ static void __setup_offsets(struct vb2_buffer *vb)
 	}
 }
 
+static void vb2_done_work(struct work_struct *work)
+{
+	struct vb2_buffer *vb = container_of(work, struct vb2_buffer,
+					     done_work);
+	struct vb2_queue *q = vb->vb2_queue;
+	unsigned long flags;
+	unsigned int plane;
+
+	/* sync buffers */
+	for (plane = 0; plane < vb->num_planes; ++plane)
+		call_void_memop(vb, finish, vb->planes[plane].mem_priv);
+
+	spin_lock_irqsave(&q->done_lock, flags);
+	if (vb->state == VB2_BUF_STATE_QUEUED ||
+	    vb->state == VB2_BUF_STATE_REQUEUEING) {
+		vb->state = VB2_BUF_STATE_QUEUED;
+	} else {
+		/* Add the buffer to the done buffers list */
+		list_add_tail(&vb->done_entry, &q->done_list);
+	}
+	atomic_dec(&q->owned_by_drv_count);
+	spin_unlock_irqrestore(&q->done_lock, flags);
+
+	trace_vb2_buf_done(q, vb);
+
+	switch (vb->state) {
+	case VB2_BUF_STATE_QUEUED:
+		break;
+	case VB2_BUF_STATE_REQUEUEING:
+		if (q->start_streaming_called)
+			__enqueue_in_driver(vb);
+		break;
+	default:
+		/* Inform any processes that may be waiting for buffers */
+		wake_up(&q->done_wq);
+		break;
+	}
+}
+
 /**
  * __vb2_queue_alloc() - allocate videobuf buffer structures and (for MMAP type)
  * video buffer memory for all buffers/planes on the queue and initializes the
@@ -330,6 +369,10 @@ static int __vb2_queue_alloc(struct vb2_queue *q, enum vb2_memory memory,
 	struct vb2_buffer *vb;
 	int ret;
 
+	q->vb2_workqueue = alloc_ordered_workqueue("vb2_wq", 0);
+	if (!q->vb2_workqueue)
+		return buffer;
+
 	for (buffer = 0; buffer < num_buffers; ++buffer) {
 		/* Allocate videobuf buffer structures */
 		vb = kzalloc(q->buf_struct_size, GFP_KERNEL);
@@ -344,6 +387,8 @@ static int __vb2_queue_alloc(struct vb2_queue *q, enum vb2_memory memory,
 		vb->index = q->num_buffers + buffer;
 		vb->type = q->type;
 		vb->memory = memory;
+		INIT_WORK(&vb->done_work, vb2_done_work);
+
 		for (plane = 0; plane < num_planes; ++plane) {
 			vb->planes[plane].length = plane_sizes[plane];
 			vb->planes[plane].min_length = plane_sizes[plane];
@@ -982,7 +1027,6 @@ void vb2_buffer_done(struct vb2_buffer *vb, enum vb2_buffer_state state)
 {
 	struct vb2_queue *q = vb->vb2_queue;
 	unsigned long flags;
-	unsigned int plane;
 
 	if (WARN_ON(vb->state != VB2_BUF_STATE_ACTIVE))
 		return;
@@ -1003,36 +1047,11 @@ void vb2_buffer_done(struct vb2_buffer *vb, enum vb2_buffer_state state)
 	dprintk(4, "done processing on buffer %d, state: %d\n",
 			vb->index, state);
 
-	/* sync buffers */
-	for (plane = 0; plane < vb->num_planes; ++plane)
-		call_void_memop(vb, finish, vb->planes[plane].mem_priv);
-
 	spin_lock_irqsave(&q->done_lock, flags);
-	if (state == VB2_BUF_STATE_QUEUED ||
-	    state == VB2_BUF_STATE_REQUEUEING) {
-		vb->state = VB2_BUF_STATE_QUEUED;
-	} else {
-		/* Add the buffer to the done buffers list */
-		list_add_tail(&vb->done_entry, &q->done_list);
-		vb->state = state;
-	}
-	atomic_dec(&q->owned_by_drv_count);
+	vb->state = state;
 	spin_unlock_irqrestore(&q->done_lock, flags);
 
-	trace_vb2_buf_done(q, vb);
-
-	switch (state) {
-	case VB2_BUF_STATE_QUEUED:
-		return;
-	case VB2_BUF_STATE_REQUEUEING:
-		if (q->start_streaming_called)
-			__enqueue_in_driver(vb);
-		return;
-	default:
-		/* Inform any processes that may be waiting for buffers */
-		wake_up(&q->done_wq);
-		break;
-	}
+	queue_work(q->vb2_workqueue, &vb->done_work);
 }
 EXPORT_SYMBOL_GPL(vb2_buffer_done);
 
@@ -1810,6 +1829,12 @@ static void __vb2_queue_cancel(struct vb2_queue *q)
 	 */
 	if (q->start_streaming_called)
 		call_void_qop(q, stop_streaming, q);
+
+	if (q->vb2_workqueue) {
+		flush_workqueue(q->vb2_workqueue);
+		destroy_workqueue(q->vb2_workqueue);
+		q->vb2_workqueue = NULL;
+	}
 
 	/*
 	 * If you see this warning, then the driver isn't cleaning up properly
