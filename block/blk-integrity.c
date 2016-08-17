@@ -450,13 +450,17 @@ void blk_integrity_revalidate(struct gendisk *disk)
 			~BDI_CAP_STABLE_WRITES;
 }
 
-void blk_integrity_add(struct gendisk *disk)
+int blk_integrity_add(struct gendisk *disk)
 {
-	if (kobject_init_and_add(&disk->integrity_kobj, &integrity_ktype,
-				 &disk_to_dev(disk)->kobj, "%s", "integrity"))
-		return;
+	int rc;
+
+	rc = kobject_init_and_add(&disk->integrity_kobj, &integrity_ktype,
+				  &disk_to_dev(disk)->kobj, "%s", "integrity");
+	if (rc)
+		return rc;
 
 	kobject_uevent(&disk->integrity_kobj, KOBJ_ADD);
+	return 0;
 }
 
 void blk_integrity_del(struct gendisk *disk)
