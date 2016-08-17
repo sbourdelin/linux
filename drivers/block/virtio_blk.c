@@ -522,10 +522,10 @@ virtblk_cache_type_show(struct device *dev, struct device_attribute *attr,
 	return snprintf(buf, 40, "%s\n", virtblk_cache_types[writeback]);
 }
 
-static const struct device_attribute dev_attr_cache_type_ro =
+static struct device_attribute dev_attr_cache_type_ro =
 	__ATTR(cache_type, S_IRUGO,
 	       virtblk_cache_type_show, NULL);
-static const struct device_attribute dev_attr_cache_type_rw =
+static struct device_attribute dev_attr_cache_type_rw =
 	__ATTR(cache_type, S_IRUGO|S_IWUSR,
 	       virtblk_cache_type_show, virtblk_cache_type_store);
 
@@ -550,6 +550,26 @@ static struct blk_mq_ops virtio_mq_ops = {
 static unsigned int virtblk_queue_depth;
 module_param_named(queue_depth, virtblk_queue_depth, uint, 0444);
 
+static struct attribute *virtblk_attrs_ro[] = {
+	&dev_attr_serial.attr,
+	&dev_attr_cache_type_ro.attr,
+	NULL
+};
+
+static struct attribute *virtblk_attrs_rw[] = {
+	&dev_attr_serial.attr,
+	&dev_attr_cache_type_rw.attr,
+	NULL
+};
+
+static struct attribute_group virtblk_attr_group_ro = {
+	.attrs		= virtblk_attrs_ro,
+};
+
+static struct attribute_group virtblk_attr_group_rw = {
+	.attrs		= virtblk_attrs_rw,
+};
+
 static int virtblk_probe(struct virtio_device *vdev)
 {
 	struct virtio_blk *vblk;
@@ -560,6 +580,7 @@ static int virtblk_probe(struct virtio_device *vdev)
 	u32 v, blk_size, sg_elems, opt_io_size;
 	u16 min_io_size;
 	u8 physical_block_exp, alignment_offset;
+	struct attribute_group *attr_group;
 
 	if (!vdev->config->get) {
 		dev_err(&vdev->dev, "%s failure: config access disabled\n",
@@ -719,19 +740,14 @@ static int virtblk_probe(struct virtio_device *vdev)
 
 	virtio_device_ready(vdev);
 
-	device_add_disk(&vdev->dev, vblk->disk, NULL);
-	err = device_create_file(disk_to_dev(vblk->disk), &dev_attr_serial);
+	if (virtio_has_feature(vdev, VIRTIO_BLK_F_CONFIG_WCE))
+		attr_group = &virtblk_attr_group_rw;
+	else
+		attr_group = &virtblk_attr_group_ro;
+	err = device_add_disk(&vdev->dev, vblk->disk, attr_group);
 	if (err)
 		goto out_del_disk;
 
-	if (virtio_has_feature(vdev, VIRTIO_BLK_F_CONFIG_WCE))
-		err = device_create_file(disk_to_dev(vblk->disk),
-					 &dev_attr_cache_type_rw);
-	else
-		err = device_create_file(disk_to_dev(vblk->disk),
-					 &dev_attr_cache_type_ro);
-	if (err)
-		goto out_del_disk;
 	return 0;
 
 out_del_disk:
