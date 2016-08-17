@@ -78,6 +78,7 @@ struct Qdisc {
 	 */
 	struct sk_buff		*gso_skb ____cacheline_aligned_in_smp;
 	struct sk_buff_head	q;
+	atomic_t		qlen_atomic;
 	struct gnet_stats_basic_packed bstats;
 	seqcount_t		running;
 	struct gnet_stats_queue	qstats;
@@ -247,6 +248,11 @@ static inline void qdisc_cb_private_validate(const struct sk_buff *skb, int sz)
 	BUILD_BUG_ON(sizeof(qcb->data) < sz);
 }
 
+static inline int qdisc_qlen_atomic(const struct Qdisc *q)
+{
+	return atomic_read(&q->qlen_atomic);
+}
+
 static inline int qdisc_qlen_cpu(const struct Qdisc *q)
 {
 	return this_cpu_ptr(q->cpu_qstats)->qlen;
@@ -254,8 +260,11 @@ static inline int qdisc_qlen_cpu(const struct Qdisc *q)
 
 static inline int qdisc_qlen(const struct Qdisc *q)
 {
+	/* current default is to use atomic ops for qdisc qlen when
+	 * running with TCQ_F_NOLOCK.
+	 */
 	if (q->flags & TCQ_F_NOLOCK)
-		return qdisc_qlen_cpu(q);
+		return qdisc_qlen_atomic(q);
 
 	return q->q.qlen;
 }
@@ -593,6 +602,16 @@ static inline void qdisc_qstats_cpu_backlog_inc(struct Qdisc *sch,
 	struct gnet_stats_queue *q = this_cpu_ptr(sch->cpu_qstats);
 
 	q->backlog += qdisc_pkt_len(skb);
+}
+
+static inline void qdisc_qstats_atomic_qlen_inc(struct Qdisc *sch)
+{
+	atomic_inc(&sch->qlen_atomic);
+}
+
+static inline void qdisc_qstats_atomic_qlen_dec(struct Qdisc *sch)
+{
+	atomic_dec(&sch->qlen_atomic);
 }
 
 static inline void qdisc_qstats_cpu_qlen_inc(struct Qdisc *sch)
