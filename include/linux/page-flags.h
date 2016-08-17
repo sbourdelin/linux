@@ -105,6 +105,10 @@ enum pageflags {
 	PG_young,
 	PG_idle,
 #endif
+#ifdef CONFIG_BOOST_URGENT_ASYNC_WB
+	PG_asyncwb,
+	PG_plugged,
+#endif
 	__NR_PAGEFLAGS,
 
 	/* Filesystems */
@@ -349,6 +353,14 @@ TESTPAGEFLAG(Young, young, PF_ANY)
 SETPAGEFLAG(Young, young, PF_ANY)
 TESTCLEARFLAG(Young, young, PF_ANY)
 PAGEFLAG(Idle, idle, PF_ANY)
+#endif
+
+#ifdef CONFIG_BOOST_URGENT_ASYNC_WB
+PAGEFLAG(AsyncWB, asyncwb, PF_ANY)
+PAGEFLAG(Plugged, plugged, PF_ANY) TESTCLEARFLAG(Plugged, plugged, PF_ANY)
+#else
+PAGEFLAG_FALSE(AsyncWB)
+PAGEFLAG_FALSE(Plugged) TESTCLEARFLAG_FALSE(Plugged)
 #endif
 
 /*

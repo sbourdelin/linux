@@ -1694,6 +1694,23 @@ out:
 	return ret;
 }
 
+#ifdef CONFIG_BOOST_URGENT_ASYNC_WB
+void clear_plugged_flag_in_bio(struct bio *bio)
+{
+	if (bio_flagged(bio, BIO_ASYNC_WB)) {
+		struct bio_vec bv;
+		struct bvec_iter iter;
+
+		bio_for_each_segment(bv, bio, iter) {
+			if (TestClearPagePlugged(bv.bv_page)) {
+				smp_mb__after_atomic();
+				wake_up_page(bv.bv_page, PG_plugged);
+			}
+		}
+	}
+}
+#endif
+
 void init_request_from_bio(struct request *req, struct bio *bio)
 {
 	req->cmd_type = REQ_TYPE_FS;
@@ -1701,6 +1718,11 @@ void init_request_from_bio(struct request *req, struct bio *bio)
 	req->cmd_flags |= bio->bi_rw & REQ_COMMON_MASK;
 	if (bio->bi_rw & REQ_RAHEAD)
 		req->cmd_flags |= REQ_FAILFAST_MASK;
+
+#ifdef CONFIG_BOOST_URGENT_ASYNC_WB
+	if (bio_flagged(bio, BIO_ASYNC_WB))
+		req->cmd_flags |= REQ_ASYNC_WB;
+#endif
 
 	req->errors = 0;
 	req->__sector = bio->bi_iter.bi_sector;
@@ -1752,6 +1774,9 @@ static blk_qc_t blk_queue_bio(struct request_queue *q, struct bio *bio)
 	el_ret = elv_merge(q, &req, bio);
 	if (el_ret == ELEVATOR_BACK_MERGE) {
 		if (bio_attempt_back_merge(q, req, bio)) {
+#ifdef CONFIG_BOOST_URGENT_ASYNC_WB
+			clear_plugged_flag_in_bio(bio);
+#endif
 			elv_bio_merged(q, req, bio);
 			if (!attempt_back_merge(q, req))
 				elv_merged_request(q, req, el_ret);
@@ -1759,6 +1784,9 @@ static blk_qc_t blk_queue_bio(struct request_queue *q, struct bio *bio)
 		}
 	} else if (el_ret == ELEVATOR_FRONT_MERGE) {
 		if (bio_attempt_front_merge(q, req, bio)) {
+#ifdef CONFIG_BOOST_URGENT_ASYNC_WB
+			clear_plugged_flag_in_bio(bio);
+#endif
 			elv_bio_merged(q, req, bio);
 			if (!attempt_front_merge(q, req))
 				elv_merged_request(q, req, el_ret);

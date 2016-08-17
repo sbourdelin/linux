@@ -120,6 +120,7 @@ struct bio {
 #define BIO_QUIET	6	/* Make BIO Quiet */
 #define BIO_CHAIN	7	/* chained bio, ->bi_remaining in effect */
 #define BIO_REFFED	8	/* bio has elevated ->bi_cnt */
+#define BIO_ASYNC_WB	9	/* flushed as asynchronous I/O by kworker */
 
 /*
  * Flags starting here get preserved by bio_reset() - this includes
@@ -188,6 +189,7 @@ enum rq_flag_bits {
 	__REQ_PM,		/* runtime pm request */
 	__REQ_HASHED,		/* on IO scheduler merge hash */
 	__REQ_MQ_INFLIGHT,	/* track inflight for MQ */
+	__REQ_ASYNC_WB,		/* flushed as asynchronous I/O by kworker */
 	__REQ_NR_BITS,		/* stops here */
 };
 
@@ -241,6 +243,7 @@ enum rq_flag_bits {
 #define REQ_PM			(1ULL << __REQ_PM)
 #define REQ_HASHED		(1ULL << __REQ_HASHED)
 #define REQ_MQ_INFLIGHT		(1ULL << __REQ_MQ_INFLIGHT)
+#define REQ_ASYNC_WB		(1ULL << __REQ_ASYNC_WB)
 
 typedef unsigned int blk_qc_t;
 #define BLK_QC_T_NONE	-1U

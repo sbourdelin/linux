@@ -35,6 +35,10 @@ typedef int (elevator_set_req_fn) (struct request_queue *, struct request *,
 typedef void (elevator_put_req_fn) (struct request *);
 typedef void (elevator_activate_req_fn) (struct request_queue *, struct request *);
 typedef void (elevator_deactivate_req_fn) (struct request_queue *, struct request *);
+#ifdef CONFIG_BOOST_URGENT_ASYNC_WB
+typedef struct request *(elevator_find_async_wb_req_fn) (struct request_queue *,
+							 sector_t sector);
+#endif
 
 typedef int (elevator_init_fn) (struct request_queue *,
 				struct elevator_type *e);
@@ -53,6 +57,9 @@ struct elevator_ops
 	elevator_add_req_fn *elevator_add_req_fn;
 	elevator_activate_req_fn *elevator_activate_req_fn;
 	elevator_deactivate_req_fn *elevator_deactivate_req_fn;
+#ifdef CONFIG_BOOST_URGENT_ASYNC_WB
+	elevator_find_async_wb_req_fn *elevator_find_async_wb_req_fn;
+#endif
 
 	elevator_completed_req_fn *elevator_completed_req_fn;
 
@@ -123,6 +130,9 @@ extern void elv_dispatch_sort(struct request_queue *, struct request *);
 extern void elv_dispatch_add_tail(struct request_queue *, struct request *);
 extern void elv_add_request(struct request_queue *, struct request *, int);
 extern void __elv_add_request(struct request_queue *, struct request *, int);
+#ifdef CONFIG_BOOST_URGENT_ASYNC_WB
+extern void elv_boost_async_wb_req(struct request_queue *, struct page *);
+#endif
 extern int elv_merge(struct request_queue *, struct request **, struct bio *);
 extern void elv_merge_requests(struct request_queue *, struct request *,
 			       struct request *);

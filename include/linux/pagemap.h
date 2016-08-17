@@ -498,14 +498,26 @@ static inline void wait_on_page_locked(struct page *page)
 		wait_on_page_bit(compound_head(page), PG_locked);
 }
 
+#ifdef CONFIG_BOOST_URGENT_ASYNC_WB
+static inline void wait_on_page_plugged(struct page *page)
+{
+	if (PagePlugged(page))
+		wait_on_page_bit(page, PG_plugged);
+}
+#endif
+
 /* 
  * Wait for a page to complete writeback
  */
+#ifdef CONFIG_BOOST_URGENT_ASYNC_WB
+extern void wait_on_page_writeback(struct page *page);
+#else
 static inline void wait_on_page_writeback(struct page *page)
 {
 	if (PageWriteback(page))
 		wait_on_page_bit(page, PG_writeback);
 }
+#endif
 
 extern void end_page_writeback(struct page *page);
 void wait_for_stable_page(struct page *page);

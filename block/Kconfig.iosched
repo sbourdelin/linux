@@ -39,6 +39,15 @@ config CFQ_GROUP_IOSCHED
 	---help---
 	  Enable group IO scheduling in CFQ.
 
+config BOOST_URGENT_ASYNC_WB
+	bool "Enable boosting urgent asynchronous writeback (EXPERIMENTAL)"
+	default n
+	---help---
+	  Enabling this option allows I/O scheduler convert the urgent
+	  asynchronous I/Os, which are flushed by kworker but its completion
+	  is still being waited by another process, into synchronous I/Os for
+	  better responsiveness.
+
 choice
 	prompt "Default I/O scheduler"
 	default DEFAULT_CFQ

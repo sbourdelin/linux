@@ -598,6 +598,20 @@ void __elv_add_request(struct request_queue *q, struct request *rq, int where)
 
 	rq->q = q;
 
+#ifdef CONFIG_BOOST_URGENT_ASYNC_WB
+	if (rq->cmd_flags & REQ_ASYNC_WB) {
+		struct req_iterator iter;
+		struct bio_vec bvec;
+
+		rq_for_each_segment(bvec, rq, iter) {
+			if (TestClearPagePlugged(bvec.bv_page)) {
+				smp_mb__after_atomic();
+				wake_up_page(bvec.bv_page, PG_plugged);
+			}
+		}
+	}
+#endif
+
 	if (rq->cmd_flags & REQ_SOFTBARRIER) {
 		/* barriers are scheduling boundary, update end_sector */
 		if (rq->cmd_type == REQ_TYPE_FS) {
@@ -680,6 +694,109 @@ void elv_add_request(struct request_queue *q, struct request *rq, int where)
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 EXPORT_SYMBOL(elv_add_request);
+
+#ifdef CONFIG_BOOST_URGENT_ASYNC_WB
+void elv_boost_async_wb_req(struct request_queue *q, struct page *page)
+{
+	struct elevator_queue *e = q->elevator;
+	struct request *new_req, *found_req = NULL;
+	struct buffer_head *bh, *head;
+	struct bio *bio;
+	int i, scnt = 0;
+	sector_t sectors[MAX_BUF_PER_PAGE];
+	sector_t start_sect, end_sect, part_start = 0;
+	struct block_device *bdev;
+	elevator_find_async_wb_req_fn *find_async_wb_req_fn;
+
+	if (!e)
+		return;
+	find_async_wb_req_fn = e->type->ops.elevator_find_async_wb_req_fn;
+	if (!find_async_wb_req_fn)
+		return;
+
+	wait_on_page_plugged(page);
+	if (!PageAsyncWB(page))
+		return;
+
+	spin_lock(&page->mapping->private_lock);
+	if (!page_has_buffers(page)) {
+		spin_unlock(&page->mapping->private_lock);
+		return;
+	}
+	head = page_buffers(page);
+	bdev = head->b_bdev;
+	if (bdev != bdev->bd_contains) {
+		struct hd_struct *p = bdev->bd_part;
+
+		part_start = p->start_sect;
+	}
+	bh = head;
+	do {
+		sectors[scnt++] = bh->b_blocknr * (bh->b_size >> 9)
+				  + part_start;
+		bh = bh->b_this_page;
+	} while (bh != head);
+	spin_unlock(&page->mapping->private_lock);
+
+	spin_lock_irq(q->queue_lock);
+	for (i = 0; i < scnt; i++) {
+		found_req = find_async_wb_req_fn(q, sectors[i]);
+
+		if (found_req) {
+			start_sect = blk_rq_pos(found_req);
+			end_sect = blk_rq_pos(found_req) +
+				   blk_rq_sectors(found_req);
+
+			spin_unlock_irq(q->queue_lock);
+			new_req = blk_get_request(q, REQ_WRITE | REQ_SYNC,
+						  GFP_ATOMIC);
+			spin_lock_irq(q->queue_lock);
+
+			if (IS_ERR(new_req)) {
+				found_req->cmd_flags |= REQ_PRIO;
+				q->elevator->type->ops.elevator_add_req_fn(q,
+								     found_req);
+			} else {
+				new_req->bio = found_req->bio;
+				new_req->biotail = found_req->biotail;
+				found_req->bio = found_req->biotail = NULL;
+				for (bio = new_req->bio; bio;
+				     bio = bio->bi_next)
+					bio->bi_rw |= REQ_SYNC;
+				new_req->cpu = found_req->cpu;
+				new_req->cmd_flags = found_req->cmd_flags |
+						     REQ_SYNC;
+				new_req->cmd_type = found_req->cmd_type;
+				new_req->__sector = blk_rq_pos(found_req);
+				new_req->__data_len = blk_rq_bytes(found_req);
+				new_req->nr_phys_segments =
+						found_req->nr_phys_segments;
+				new_req->rq_disk = found_req->rq_disk;
+				new_req->ioprio = task_nice_ioprio(current);
+				new_req->part = found_req->part;
+
+				if (q->last_merge == found_req)
+					q->last_merge = NULL;
+				elv_rqhash_del(q, found_req);
+				q->nr_sorted--;
+				__blk_put_request(q, found_req);
+				q->elevator->type->ops.elevator_add_req_fn(q,
+								       new_req);
+			}
+
+			while (i < scnt - 1) {
+				if (sectors[i + 1] >= start_sect &&
+				    sectors[i + 1] < end_sect)
+					i++;
+				else
+					break;
+			}
+		}
+	}
+	spin_unlock_irq(q->queue_lock);
+}
+EXPORT_SYMBOL(elv_boost_async_wb_req);
+#endif
 
 struct request *elv_latter_request(struct request_queue *q, struct request *rq)
 {

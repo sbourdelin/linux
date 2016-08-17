@@ -837,6 +837,37 @@ void unlock_page(struct page *page)
 }
 EXPORT_SYMBOL(unlock_page);
 
+#ifdef CONFIG_BOOST_URGENT_ASYNC_WB
+void wait_on_page_writeback(struct page *page)
+{
+	struct buffer_head *head;
+	struct block_device *bdev;
+	struct request_queue *q = NULL;
+
+	if (PageWriteback(page)) {
+		if (PageAsyncWB(page)) {
+			spin_lock(&page->mapping->private_lock);
+			if (!page_has_buffers(page)) {
+				spin_unlock(&page->mapping->private_lock);
+				goto wait;
+			}
+			head = page_buffers(page);
+			get_bh(head);
+			spin_unlock(&page->mapping->private_lock);
+			bdev = head->b_bdev;
+			if (bdev)
+				q = bdev->bd_queue;
+			if (q)
+				elv_boost_async_wb_req(q, page);
+			put_bh(head);
+			ClearPageAsyncWB(page);
+		}
+wait:
+		wait_on_page_bit(page, PG_writeback);
+	}
+}
+#endif
+
 /**
  * end_page_writeback - end writeback against a page
  * @page: the page
@@ -854,6 +885,14 @@ void end_page_writeback(struct page *page)
 		ClearPageReclaim(page);
 		rotate_reclaimable_page(page);
 	}
+
+#ifdef CONFIG_BOOST_URGENT_ASYNC_WB
+	ClearPageAsyncWB(page);
+	if (TestClearPagePlugged(page)) {
+		smp_mb__after_atomic();
+		wake_up_page(page, PG_plugged);
+	}
+#endif
 
 	if (!test_clear_page_writeback(page))
 		BUG();
