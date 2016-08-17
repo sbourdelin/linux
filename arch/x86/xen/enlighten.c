@@ -285,6 +285,12 @@ static void __init xen_banner(void)
 	       version >> 16, version & 0xffff, extra.extraversion,
 	       xen_feature(XENFEAT_mmu_pt_update_preserve_ad) ? " (preserve-AD)" : "");
 }
+
+static bool xen_ignore(u64 s, u64 e)
+{
+	return false;
+}
+
 /* Check if running on Xen version (major, minor) or later */
 bool
 xen_running_on_version_or_later(unsigned int major, unsigned int minor)
@@ -1575,7 +1581,7 @@ asmlinkage __visible void __init xen_start_kernel(void)
 		x86_init.resources.memory_setup = xen_memory_setup;
 	x86_init.oem.arch_setup = xen_arch_setup;
 	x86_init.oem.banner = xen_banner;
-
+	x86_platform.is_untracked_pat_range = xen_ignore;
 	xen_init_time_ops();
 
 	/*
