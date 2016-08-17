@@ -177,7 +177,7 @@ static struct attribute *aoe_attrs[] = {
 	NULL,
 };
 
-static const struct attribute_group attr_group = {
+static struct attribute_group attr_group = {
 	.attrs = aoe_attrs,
 };
 
@@ -219,11 +219,6 @@ aoedisk_rm_debugfs(struct aoedev *d)
 	d->debugfs = NULL;
 }
 
-static int
-aoedisk_add_sysfs(struct aoedev *d)
-{
-	return sysfs_create_group(&disk_to_dev(d->gd)->kobj, &attr_group);
-}
 void
 aoedisk_rm_sysfs(struct aoedev *d)
 {
@@ -417,8 +412,7 @@ aoeblk_gdalloc(void *vp)
 
 	spin_unlock_irqrestore(&d->lock, flags);
 
-	device_add_disk(NULL, gd, NULL);
-	aoedisk_add_sysfs(d);
+	device_add_disk(NULL, gd, &attr_group);
 	aoedisk_add_debugfs(d);
 
 	spin_lock_irqsave(&d->lock, flags);
