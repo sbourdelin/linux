@@ -167,6 +167,12 @@ static int push_mpls(struct sk_buff *skb, struct sw_flow_key *key,
 		skb->mac_len);
 	skb_reset_mac_header(skb);
 
+	/* for GSO: set MPLS as network header and encapsulated protocol
+	 * header as inner network header
+	 */
+	skb_set_network_header(skb, skb->mac_len);
+	skb_set_inner_network_header(skb, skb->mac_len + MPLS_HLEN);
+
 	new_mpls_lse = (__be32 *)skb_mpls_header(skb);
 	*new_mpls_lse = mpls->mpls_lse;
 
