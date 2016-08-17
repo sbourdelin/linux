@@ -1969,6 +1969,7 @@ static int __init atari_floppy_init (void)
 		if (!unit[i].disk->queue)
 			goto Enomem;
 		set_capacity(unit[i].disk, MAX_DISK_SIZE * 2);
+		/* FIXME: handle error. */
 		device_add_disk(NULL, unit[i].disk, NULL);
 	}
 

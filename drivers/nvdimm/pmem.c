@@ -309,6 +309,7 @@ static int pmem_attach_disk(struct device *dev,
 		return -ENOMEM;
 	nvdimm_badblocks_populate(nd_region, &pmem->bb, res);
 	disk->bb = &pmem->bb;
+	/* FIXME: handle error. */
 	device_add_disk(dev, disk, NULL);
 
 	if (devm_add_action_or_reset(dev, pmem_release_disk, disk))

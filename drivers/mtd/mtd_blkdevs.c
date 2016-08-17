@@ -434,6 +434,7 @@ int add_mtd_blktrans_dev(struct mtd_blktrans_dev *new)
 	if (new->readonly)
 		set_disk_ro(gd, 1);
 
+	/* FIXME: handle error. */
 	device_add_disk(&new->mtd->dev, gd, new->disk_attributes);
 	return 0;
 error4:

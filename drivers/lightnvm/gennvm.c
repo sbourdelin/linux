@@ -90,6 +90,7 @@ static int gen_create_tgt(struct nvm_dev *dev, struct nvm_ioctl_create *create)
 	blk_queue_max_hw_sectors(tqueue, 8 * dev->ops->max_phys_sect);
 
 	set_capacity(tdisk, tt->capacity(targetdata));
+	/* FIXME: handle error. */
 	device_add_disk(NULL, tdisk, NULL);
 
 	t->type = tt;

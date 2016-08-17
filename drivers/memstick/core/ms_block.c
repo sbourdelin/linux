@@ -2161,6 +2161,7 @@ static int msb_init_disk(struct memstick_dev *card)
 		set_disk_ro(msb->disk, 1);
 
 	msb_start(card);
+	/* FIXME: handle error. */
 	device_add_disk(&card->dev, msb->disk, NULL);
 	dbg("Disk added");
 	return 0;

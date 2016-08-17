@@ -4028,6 +4028,7 @@ skip_create_disk:
 	set_capacity(dd->disk, capacity);
 
 	/* Enable the block device and add it to /dev */
+	/* FIXME: handle error. */
 	device_add_disk(&dd->pdev->dev, dd->disk, &mtip_attr_group);
 
 	dd->bdev = bdget_disk(dd->disk, 0);

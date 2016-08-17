@@ -1779,6 +1779,7 @@ static int ide_cd_probe(ide_drive_t *drive)
 	ide_cd_read_toc(drive, &sense);
 	g->fops = &idecd_ops;
 	g->flags |= GENHD_FL_REMOVABLE | GENHD_FL_BLOCK_EVENTS_ON_EXCL_WRITE;
+	/* FIXME: handle error. */
 	device_add_disk(&drive->gendev, g, NULL);
 	return 0;
 

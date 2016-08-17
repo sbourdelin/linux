@@ -1514,6 +1514,7 @@ static struct mapped_device *alloc_dev(int minor)
 	md->disk->queue = md->queue;
 	md->disk->private_data = md;
 	sprintf(md->disk->disk_name, "dm-%d", minor);
+	/* FIXME: handle error. */
 	device_add_disk(NULL, md->disk, NULL);
 	format_dev_t(md->name, MKDEV(_major, minor));
 

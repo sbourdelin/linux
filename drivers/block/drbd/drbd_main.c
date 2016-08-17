@@ -2897,6 +2897,7 @@ enum drbd_ret_code drbd_create_device(struct drbd_config_context *adm_ctx, unsig
 		goto out_idr_remove_vol;
 	}
 
+	/* FIXME: handle error. */
 	device_add_disk(NULL, disk, NULL);
 
 	/* inherit the connection state */

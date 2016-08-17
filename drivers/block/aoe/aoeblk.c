@@ -412,6 +412,7 @@ aoeblk_gdalloc(void *vp)
 
 	spin_unlock_irqrestore(&d->lock, flags);
 
+	/* FIXME: handle error. */
 	device_add_disk(NULL, gd, &attr_group);
 	aoedisk_add_debugfs(d);
 

@@ -1972,6 +1972,7 @@ static int cciss_add_disk(ctlr_info_t *h, struct gendisk *disk,
 	/* allows the interrupt handler to start the queue */
 	wmb();
 	h->drv[drv_index]->queue = disk->queue;
+	/* FIXME: handle error. */
 	device_add_disk(&h->drv[drv_index]->dev, disk, NULL);
 	return 0;
 

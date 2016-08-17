@@ -1686,6 +1686,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, unsigned nsid)
 	if (ns->type == NVME_NS_LIGHTNVM)
 		return;
 
+	/* FIXME: handle error. */
 	device_add_disk(ctrl->device, ns->disk, &nvme_ns_attr_group);
 	return;
  out_free_disk:

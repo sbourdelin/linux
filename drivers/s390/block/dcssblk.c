@@ -655,6 +655,7 @@ dcssblk_add_store(struct device *dev, struct device_attribute *attr, const char 
 		goto put_dev;
 
 	get_device(&dev_info->dev);
+	/* FIXME: handle error. */
 	device_add_disk(&dev_info->dev, dev_info->gd, NULL);
 
 	switch (dev_info->segment_type) {

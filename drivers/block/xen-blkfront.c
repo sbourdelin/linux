@@ -2442,6 +2442,7 @@ static void blkfront_connect(struct blkfront_info *info)
 	for (i = 0; i < info->nr_rings; i++)
 		kick_pending_request_queues(&info->rinfo[i]);
 
+	/* FIXME: handle error. */
 	device_add_disk(&info->xbdev->dev, info->gd, NULL);
 
 	info->is_ready = 1;

@@ -866,6 +866,7 @@ void bch_cached_dev_run(struct cached_dev *dc)
 		closure_sync(&cl);
 	}
 
+	/* FIXME: handle error. */
 	device_add_disk(NULL, d->disk, NULL);
 	bd_link_disk_holder(dc->bdev, dc->disk.disk);
 	/* won't show up in the uevent file, use udevadm monitor -e instead
@@ -1229,6 +1230,7 @@ static int flash_dev_run(struct cache_set *c, struct uuid_entry *u)
 
 	bcache_device_attach(d, c, u - c->uuids);
 	bch_flash_dev_request_init(d);
+	/* FIXME: handle error. */
 	device_add_disk(NULL, d->disk, NULL);
 
 	if (kobject_add(&d->kobj, &disk_to_dev(d->disk)->kobj, "bcache"))

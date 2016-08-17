@@ -287,6 +287,7 @@ static int nsblk_attach_disk(struct nd_namespace_blk *nsblk)
 	disk->flags		= GENHD_FL_EXT_DEVT;
 	nvdimm_namespace_disk_name(&nsblk->common, disk->disk_name);
 	set_capacity(disk, 0);
+	/* FIXME: handle error. */
 	device_add_disk(dev, disk, NULL);
 
 	if (devm_add_action_or_reset(dev, nd_blk_release_disk, disk))

@@ -1057,6 +1057,7 @@ static int ace_setup(struct ace_device *ace)
 	ace_revalidate_disk(ace->gd);
 
 	/* Make the sysace device 'live' */
+	/* FIXME: handle error. */
 	device_add_disk(NULL, ace->gd, NULL);
 
 	return 0;

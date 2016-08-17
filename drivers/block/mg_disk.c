@@ -1006,6 +1006,7 @@ static int mg_probe(struct platform_device *plat_dev)
 
 	set_capacity(host->gd, host->n_sectors);
 
+	/* FIXME: handle error. */
 	device_add_disk(NULL, host->gd, NULL);
 
 	return err;

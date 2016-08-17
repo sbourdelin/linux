@@ -1253,6 +1253,7 @@ static int mspro_block_init_disk(struct memstick_dev *card)
 	set_capacity(msb->disk, capacity);
 	dev_dbg(&card->dev, "capacity set %ld\n", capacity);
 
+	/* FIXME: handle error. */
 	device_add_disk(&card->dev, msb->disk, NULL);
 	msb->active = 1;
 	return 0;

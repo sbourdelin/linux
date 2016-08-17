@@ -767,6 +767,7 @@ static int __init hd_init(void)
 
 	/* Let them fly */
 	for (drive = 0; drive < NR_HD; drive++)
+		/* FIXME: handle error. */
 		device_add_disk(NULL, hd_gendisk[drive], NULL);
 
 	return 0;

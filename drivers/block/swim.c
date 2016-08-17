@@ -858,6 +858,7 @@ static int swim_floppy_init(struct swim_priv *swd)
 		swd->unit[drive].disk->private_data = &swd->unit[drive];
 		swd->unit[drive].disk->queue = swd->queue;
 		set_capacity(swd->unit[drive].disk, 2880);
+		/* FIXME: handle error. */
 		device_add_disk(NULL, swd->unit[drive].disk, NULL);
 	}
 

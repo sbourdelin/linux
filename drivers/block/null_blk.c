@@ -740,6 +740,7 @@ static int null_add_dev(void)
 	disk->queue		= nullb->q;
 	strncpy(disk->disk_name, nullb->disk_name, DISK_NAME_LEN);
 
+	/* FIXME: handle error. */
 	device_add_disk(NULL, disk, NULL);
 
 done:

@@ -416,6 +416,7 @@ static int ide_gd_probe(ide_drive_t *drive)
 	if (drive->dev_flags & IDE_DFLAG_REMOVABLE)
 		g->flags = GENHD_FL_REMOVABLE;
 	g->fops = &ide_gd_ops;
+	/* FIXME: handle error. */
 	device_add_disk(&drive->gendev, g, NULL);
 	return 0;
 
