@@ -255,7 +255,7 @@ static void cpu_ready_for_interrupts(void)
 
 void __init early_setup(unsigned long dt_ptr)
 {
-	static __initdata struct paca_struct boot_paca;
+	static struct paca_struct boot_paca __initdata ;
 
 	/* -------- printk is _NOT_ safe to use here ! ------- */
 
@@ -482,13 +482,59 @@ static bool __init parse_cache_info(struct device_node *np,
 	return success;
 }
 
+static void __init populate_p8_cache_info(void)
+{
+	static const struct ppc_cache_info p8_l1i __initconst  = {
+		.size = 0x8000,
+		.line_size = 128,
+		.block_size = 128,
+		.log_block_size = 7,
+		.blocks_per_page = PAGE_SIZE / 128,
+		.sets = 32
+	};
+	static const struct ppc_cache_info p8_l1d __initconst  = {
+		.size = 0x10000,
+		.line_size = 128,
+		.block_size = 128,
+		.log_block_size = 7,
+		.blocks_per_page = PAGE_SIZE / 128,
+		.sets = 64
+	};
+	static const struct ppc_cache_info p8_l2 __initconst  = {
+		.size = 0x80000,
+		.line_size = 128,
+		.sets = 512
+	};
+	static const struct ppc_cache_info p8_l3 __initconst  = {
+		.size = 0x800000,
+		.line_size = 128,
+		.sets = 8192
+	};
+	ppc64_caches.l1i = p8_l1i;
+	ppc64_caches.l1d = p8_l1d;
+	ppc64_caches.l2 = p8_l2;
+	ppc64_caches.l3 = p8_l3;
+}
+
 void __init initialize_cache_info(void)
 {
-	struct device_node *cpu, *l2, *l3 = NULL;
+	struct device_node *cpu = NULL, *l2, *l3 = NULL;
+	u32 pvr;
 
 	DBG(" -> initialize_cache_info()\n");
 
-	cpu = of_find_node_by_type(NULL, "cpu");
+	/*
+	 * All shipping POWER8 machines have a firmware bug that
+	 * puts incorrect information in the device-tree. This will
+	 * be (hopefully) fixed for future chips but for now hard
+	 * code the values if we are running on one of these
+	 */
+	pvr = PVR_VER(mfspr(SPRN_PVR));
+	if (pvr == PVR_POWER8 || pvr == PVR_POWER8E ||
+	    pvr == PVR_POWER8NVL)
+		populate_p8_cache_info();
+	else
+		cpu = of_find_node_by_type(NULL, "cpu");
 
 	/*
 	 * We're assuming *all* of the CPUs have the same
