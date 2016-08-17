@@ -967,6 +967,12 @@ qdisc_create(struct net_device *dev, struct netdev_queue *dev_queue,
 				goto err_out4;
 		}
 
+		if (sch->flags & TCQ_F_NOLOCK) {
+			sch->gso_cpu_skb = alloc_percpu(struct gso_cell);
+			if (!sch->gso_cpu_skb)
+				goto err_out4;
+		}
+
 		if (tca[TCA_STAB]) {
 			stab = qdisc_get_stab(tca[TCA_STAB]);
 			if (IS_ERR(stab)) {
@@ -1015,6 +1021,7 @@ err_out:
 err_out4:
 	free_percpu(sch->cpu_bstats);
 	free_percpu(sch->cpu_qstats);
+	free_percpu(sch->gso_cpu_skb);
 	/*
 	 * Any broken qdiscs that would require a ops->reset() here?
 	 * The qdisc was never in action so it shouldn't be necessary.
