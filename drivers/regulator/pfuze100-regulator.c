@@ -56,6 +56,8 @@
 #define PFUZE100_VGEN5VOL	0x70
 #define PFUZE100_VGEN6VOL	0x71
 
+#define PFUZE3000_LDOGCTL	0x69
+
 enum chips { PFUZE100, PFUZE200, PFUZE3000 = 3 };
 
 struct pfuze_regulator {
@@ -510,6 +512,32 @@ static const struct regmap_config pfuze_regmap_config = {
 	.cache_type = REGCACHE_RBTREE,
 };
 
+static int set_low_power_mode(struct pfuze_chip *pfuze_chip)
+{
+	struct device *dev = pfuze_chip->dev;
+	struct device_node *np;
+	unsigned int value;
+	int ret;
+
+	np = of_node_get(dev->of_node);
+	if (!np)
+		return -EINVAL;
+
+	if (!of_device_is_compatible(np, "fsl,pfuze3000"))
+		return 0;
+
+	if (of_find_property(np, "fsl,low-power-mode-disabled", NULL))
+		value = 1;
+	else
+		value = 0;
+
+	ret = regmap_write(pfuze_chip->regmap, PFUZE3000_LDOGCTL, value);
+	if (ret)
+		return ret;
+
+	return 0;
+};
+
 static int pfuze100_regulator_probe(struct i2c_client *client,
 				    const struct i2c_device_id *id)
 {
@@ -634,6 +662,10 @@ static int pfuze100_regulator_probe(struct i2c_client *client,
 			return PTR_ERR(pfuze_chip->regulators[i]);
 		}
 	}
+
+	ret = set_low_power_mode(pfuze_chip);
+	if (ret)
+		return ret;
 
 	return 0;
 }

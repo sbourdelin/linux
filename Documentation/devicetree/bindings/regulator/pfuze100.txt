@@ -4,6 +4,12 @@ Required properties:
 - compatible: "fsl,pfuze100", "fsl,pfuze200", "fsl,pfuze3000"
 - reg: I2C slave address
 
+Optional property (only for pfuze3000):
+- fsl,low-power-mode-disabled: This is a boolean property that when present
+			     indicates that the pfzue3000 will not enter
+			     low power mode when the system goes to
+			     suspend.
+
 Required child node:
 - regulators: This is the list of child nodes that specify the regulator
   initialization data for defined regulators. Please refer to below doc
