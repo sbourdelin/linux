@@ -36,6 +36,16 @@ static inline void nft_set_pktinfo(struct nft_pktinfo *pkt,
 	pkt->pf = pkt->xt.family = state->pf;
 }
 
+static inline void nft_set_pktinfo_unspec(struct nft_pktinfo *pkt,
+					  struct sk_buff *skb,
+					  const struct nf_hook_state *state)
+{
+	nft_set_pktinfo(pkt, skb, state);
+	pkt->tprot = IPPROTO_RAW;
+	pkt->xt.thoff = 0;
+	pkt->xt.fragoff = 0;
+}
+
 /**
  * 	struct nft_verdict - nf_tables verdict
  *

@@ -102,7 +102,7 @@ nft_do_chain_netdev(void *priv, struct sk_buff *skb,
 		nft_netdev_set_pktinfo_ipv6(&pkt, skb, state);
 		break;
 	default:
-		nft_set_pktinfo(&pkt, skb, state);
+		nft_set_pktinfo_unspec(&pkt, skb, state);
 		break;
 	}
 
