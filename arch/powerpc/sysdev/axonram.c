@@ -158,6 +158,15 @@ static const struct block_device_operations axon_ram_devops = {
 	.direct_access	= axon_ram_direct_access
 };
 
+static struct attribute *axon_attrs[] = {
+	&dev_attr_ecc.attr,
+	NULL,
+};
+
+static struct attribute_group axon_attr_group = {
+	.attrs = axon_attrs,
+};
+
 /**
  * axon_ram_probe - probe() method for platform driver
  * @device: see platform_driver method
@@ -237,7 +246,12 @@ static int axon_ram_probe(struct platform_device *device)
 	set_capacity(bank->disk, bank->size >> AXON_RAM_SECTOR_SHIFT);
 	blk_queue_make_request(bank->disk->queue, axon_ram_make_request);
 	blk_queue_logical_block_size(bank->disk->queue, AXON_RAM_SECTOR_SIZE);
-	device_add_disk(&device->dev, bank->disk, NULL);
+	rc = device_add_disk(&device->dev, bank->disk, &axon_attr_group);
+	if (rc != 0) {
+		dev_err(&device->dev, "Cannot create disk\n");
+		rc = -EFAULT;
+		goto failed;
+	}
 
 	bank->irq_id = irq_of_parse_and_map(device->dev.of_node, 0);
 	if (bank->irq_id == NO_IRQ) {
@@ -251,13 +265,6 @@ static int axon_ram_probe(struct platform_device *device)
 	if (rc != 0) {
 		dev_err(&device->dev, "Cannot register ECC interrupt handler\n");
 		bank->irq_id = NO_IRQ;
-		rc = -EFAULT;
-		goto failed;
-	}
-
-	rc = device_create_file(&device->dev, &dev_attr_ecc);
-	if (rc != 0) {
-		dev_err(&device->dev, "Cannot create sysfs file\n");
 		rc = -EFAULT;
 		goto failed;
 	}
