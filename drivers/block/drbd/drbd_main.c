@@ -2897,7 +2897,7 @@ enum drbd_ret_code drbd_create_device(struct drbd_config_context *adm_ctx, unsig
 		goto out_idr_remove_vol;
 	}
 
-	add_disk(disk);
+	device_add_disk(NULL, disk);
 
 	/* inherit the connection state */
 	device->state.conn = first_connection(resource)->cstate;

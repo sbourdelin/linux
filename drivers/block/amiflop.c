@@ -1738,7 +1738,7 @@ static int __init fd_probe_drives(void)
 		sprintf(disk->disk_name, "fd%d", drive);
 		disk->private_data = &unit[drive];
 		set_capacity(disk, 880*2);
-		add_disk(disk);
+		device_add_disk(NULL, disk);
 	}
 	if ((drives > 0) || (nomem == 0)) {
 		if (drives == 0)

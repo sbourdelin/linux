@@ -4299,8 +4299,8 @@ static int st_probe(struct device *dev)
 	tpnt->disk = disk;
 	disk->private_data = &tpnt->driver;
 	disk->queue = SDp->request_queue;
-	/* SCSI tape doesn't register this gendisk via add_disk().  Manually
-	 * take queue reference that release_disk() expects. */
+	/* SCSI tape doesn't register this gendisk via device_add_disk().
+	 * Manually take queue reference that release_disk() expects. */
 	if (!blk_get_queue(disk->queue))
 		goto out_put_disk;
 	tpnt->driver = &st_template;

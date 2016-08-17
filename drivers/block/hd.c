@@ -767,7 +767,7 @@ static int __init hd_init(void)
 
 	/* Let them fly */
 	for (drive = 0; drive < NR_HD; drive++)
-		add_disk(hd_gendisk[drive]);
+		device_add_disk(NULL, hd_gendisk[drive]);
 
 	return 0;
 

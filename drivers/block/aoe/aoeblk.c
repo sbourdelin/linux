@@ -345,7 +345,7 @@ static const struct block_device_operations aoe_bdops = {
 	.owner = THIS_MODULE,
 };
 
-/* alloc_disk and add_disk can sleep */
+/* alloc_disk and device_add_disk can sleep */
 void
 aoeblk_gdalloc(void *vp)
 {
@@ -417,7 +417,7 @@ aoeblk_gdalloc(void *vp)
 
 	spin_unlock_irqrestore(&d->lock, flags);
 
-	add_disk(gd);
+	device_add_disk(NULL, gd);
 	aoedisk_add_sysfs(d);
 	aoedisk_add_debugfs(d);
 

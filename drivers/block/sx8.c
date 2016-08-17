@@ -1333,7 +1333,7 @@ static void carm_fsm_task (struct work_struct *work)
 				struct gendisk *disk = port->disk;
 
 				set_capacity(disk, port->capacity);
-				add_disk(disk);
+				device_add_disk(NULL, disk);
 				activated++;
 			}
 

@@ -2785,7 +2785,7 @@ static int pkt_setup_dev(dev_t dev, dev_t* pkt_dev)
 	disk->events = pd->bdev->bd_disk->events;
 	disk->async_events = pd->bdev->bd_disk->async_events;
 
-	add_disk(disk);
+	device_add_disk(NULL, disk);
 
 	pkt_sysfs_dev_new(pd);
 	pkt_debugfs_dev_new(pd);

@@ -723,7 +723,7 @@ static int sr_probe(struct device *dev)
 
 	/*
 	 * Initialize block layer runtime PM stuffs before the
-	 * periodic event checking request gets started in add_disk.
+	 * periodic event checking request gets started in device_add_disk.
 	 */
 	blk_pm_runtime_init(sdev->request_queue, dev);
 

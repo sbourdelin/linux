@@ -448,7 +448,7 @@ static int osdblk_init_disk(struct osdblk_device *osdev)
 
 	/* finally, announce the disk to the world */
 	set_capacity(disk, obj_size / 512ULL);
-	add_disk(disk);
+	device_add_disk(NULL, disk);
 
 	printk(KERN_INFO "%s: Added of size 0x%llx\n",
 		disk->disk_name, (unsigned long long)obj_size);

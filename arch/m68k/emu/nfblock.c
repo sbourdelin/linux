@@ -138,7 +138,7 @@ static int __init nfhd_init_one(int id, u32 blocks, u32 bsize)
 	set_capacity(dev->disk, (sector_t)blocks * (bsize / 512));
 	dev->disk->queue = dev->queue;
 
-	add_disk(dev->disk);
+	device_add_disk(NULL, dev->disk);
 
 	list_add_tail(&dev->list, &nfhd_list);
 

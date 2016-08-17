@@ -4605,7 +4605,7 @@ static void __exit floppy_module_exit(void)
 		blk_cleanup_queue(disks[drive]->queue);
 
 		/*
-		 * These disks have not called add_disk().  Don't put down
+		 * These disks have not called device_add_disk().  Don't put down
 		 * queue reference in put_disk().
 		 */
 		if (!(allowed_drive_mask & (1 << drive)) ||

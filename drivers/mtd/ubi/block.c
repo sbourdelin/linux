@@ -445,7 +445,7 @@ int ubiblock_create(struct ubi_volume_info *vi)
 	mutex_unlock(&devices_mutex);
 
 	/* Must be the last step: anyone can call file ops from now on */
-	add_disk(dev->gd);
+	device_add_disk(NULL, dev->gd);
 	dev_info(disk_to_dev(dev->gd), "created from ubi%d:%d(%s)",
 		 dev->ubi_num, dev->vol_id, vi->name);
 	return 0;

@@ -989,7 +989,7 @@ static int __init pf_init(void)
 			continue;
 		disk->private_data = pf;
 		disk->queue = pf_queue;
-		add_disk(disk);
+		device_add_disk(NULL, disk);
 	}
 	return 0;
 }

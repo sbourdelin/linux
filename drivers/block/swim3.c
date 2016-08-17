@@ -1240,7 +1240,7 @@ static int swim3_attach(struct macio_dev *mdev,
 	disk->flags |= GENHD_FL_REMOVABLE;
 	sprintf(disk->disk_name, "fd%d", index);
 	set_capacity(disk, 2880);
-	add_disk(disk);
+	device_add_disk(NULL, disk);
 
 	return 0;
 }

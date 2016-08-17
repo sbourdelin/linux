@@ -549,7 +549,7 @@ static struct brd_device *brd_init_one(int i, bool *new)
 
 	brd = brd_alloc(i);
 	if (brd) {
-		add_disk(brd->brd_disk);
+		device_add_disk(NULL, brd->brd_disk);
 		list_add_tail(&brd->brd_list, &brd_devices);
 	}
 	*new = true;
@@ -617,7 +617,7 @@ static int __init brd_init(void)
 	/* point of no return */
 
 	list_for_each_entry(brd, &brd_devices, brd_list)
-		add_disk(brd->brd_disk);
+		device_add_disk(NULL, brd->brd_disk);
 
 	blk_register_region(MKDEV(RAMDISK_MAJOR, 0), 1UL << MINORBITS,
 				  THIS_MODULE, brd_probe, NULL, NULL);
