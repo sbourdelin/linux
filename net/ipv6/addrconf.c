@@ -135,6 +135,7 @@ static int ipv6_count_addresses(struct inet6_dev *idev);
 static int ipv6_generate_stable_address(struct in6_addr *addr,
 					u8 dad_count,
 					const struct inet6_dev *idev);
+static void dev_disable_change(struct inet6_dev *idev);
 
 /*
  *	Configured unicast address hash table
@@ -1945,6 +1946,12 @@ lock_errdad:
 
 			pr_info("%s: IPv6 being disabled!\n",
 				ifp->idev->dev->name);
+			spin_unlock_bh(&ifp->lock);
+			addrconf_dad_stop(ifp, 1);
+			rtnl_lock();
+			dev_disable_change(idev);
+			rtnl_unlock();
+			return;
 		}
 	}
 
