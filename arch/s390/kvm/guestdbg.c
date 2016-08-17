@@ -216,7 +216,7 @@ int kvm_s390_import_bp_data(struct kvm_vcpu *vcpu,
 	else if (dbg->arch.nr_hw_bp > MAX_BP_COUNT)
 		return -EINVAL;
 
-	size = dbg->arch.nr_hw_bp * sizeof(struct kvm_hw_breakpoint);
+	size = dbg->arch.nr_hw_bp * sizeof(*bp_data);
 	bp_data = kmalloc(size, GFP_KERNEL);
 	if (!bp_data) {
 		ret = -ENOMEM;
@@ -241,7 +241,7 @@ int kvm_s390_import_bp_data(struct kvm_vcpu *vcpu,
 		}
 	}
 
-	size = nr_wp * sizeof(struct kvm_hw_wp_info_arch);
+	size = nr_wp * sizeof(*wp_info);
 	if (size > 0) {
 		wp_info = kmalloc(size, GFP_KERNEL);
 		if (!wp_info) {
@@ -249,7 +249,7 @@ int kvm_s390_import_bp_data(struct kvm_vcpu *vcpu,
 			goto error;
 		}
 	}
-	size = nr_bp * sizeof(struct kvm_hw_bp_info_arch);
+	size = nr_bp * sizeof(*bp_info);
 	if (size > 0) {
 		bp_info = kmalloc(size, GFP_KERNEL);
 		if (!bp_info) {
