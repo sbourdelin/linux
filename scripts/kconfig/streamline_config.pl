@@ -128,9 +128,11 @@ my @config_file = read_config;
 # Parse options
 my $localmodconfig = 0;
 my $localyesconfig = 0;
+my $genmoduleksymb = 0;
 
 GetOptions("localmodconfig" => \$localmodconfig,
-	   "localyesconfig" => \$localyesconfig);
+	   "localyesconfig" => \$localyesconfig,
+	   "genmoduleksymb" => \$genmoduleksymb);
 
 # Get the build source and top level Kconfig file (passed in)
 my $ksource = ($ARGV[0] ? $ARGV[0] : '.');
@@ -147,6 +149,7 @@ my %objects;
 my $var;
 my $iflevel = 0;
 my @ifdeps;
+my @drv_objs;
 
 # prevent recursion
 my %read_kconfigs;
@@ -346,6 +349,31 @@ foreach my $makefile (@makefiles) {
 	}
     }
     close($infile);
+}
+
+foreach my $obj_key ( keys %objects )
+{
+	my @config_options = @{$objects{$obj_key}};
+	# Last index of array is 0 is equivalent to array's size is 1
+	if ( $#config_options == 0) {
+		push(@drv_objs, $obj_key);
+	}
+}
+
+sub gen_module_kconfigs {
+	my $module_ksymb = $ENV{'srctree'}."/scripts/Module.ksymb";
+
+	open(my $ksymbfile, '>', $module_ksymb) || die "Can not open $module_ksymb for writing";
+
+	foreach (@drv_objs) {
+		print $ksymbfile "$_" . "_KCONF=" . "@{$objects{$_}}\n";
+	}
+	close($ksymbfile);
+}
+
+if ($genmoduleksymb) {
+	gen_module_kconfigs();
+	exit(0);
 }
 
 my %modules;
