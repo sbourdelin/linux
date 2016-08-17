@@ -1556,6 +1556,7 @@ enum ieee80211_key_flags {
  * @tx_pn: PN used for TX keys, may be used by the driver as well if it
  *	needs to do software PN assignment by itself (e.g. due to TSO)
  * @flags: key flags, see &enum ieee80211_key_flags.
+ * @pn_offs: offset where to put PN for crypto (or 0 if not needed)
  * @keyidx: the key index (0-3)
  * @keylen: key material length
  * @key: key material. For ALG_TKIP the key is encoded as a 256-bit (32 byte)
@@ -1573,6 +1574,7 @@ struct ieee80211_key_conf {
 	u8 iv_len;
 	u8 hw_key_idx;
 	u8 flags;
+	u8 pn_offs;
 	s8 keyidx;
 	u8 keylen;
 	u8 key[0];
