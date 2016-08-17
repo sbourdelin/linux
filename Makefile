@@ -219,6 +219,10 @@ VPATH		:= $(srctree)$(if $(KBUILD_EXTMOD),:$(KBUILD_EXTMOD))
 
 export srctree objtree VPATH
 
+KSYMB_GENERATOR := $(objtree)/scripts/kconfig/streamline_config.pl
+ksymb_gen_command = perl $(KSYMB_GENERATOR) --genmoduleksymb $(objtree) $(Kconfig)
+ksymb_update := $(shell objtree=$(objtree) srctree=$(srctree) $(ksymb_gen_command))
+
 # SUBARCH tells the usermode build what the underlying arch is.  That is set
 # first, and if a usermode build is happening, the "ARCH=um" on the command
 # line overrides the setting of ARCH below.  If a native build is happening,
