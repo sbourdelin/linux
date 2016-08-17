@@ -1572,11 +1572,11 @@ static int cciss_bigpassthru(ctlr_info_t *h, void __user *argp)
 {
 	BIG_IOCTL_Command_struct *ioc;
 	CommandList_struct *c;
-	unsigned char **buff = NULL;
-	int *buff_size = NULL;
+	unsigned char **buff;
+	int *buff_size;
 	u64bit temp64;
 	BYTE sg_used = 0;
-	int status = 0;
+	int status;
 	int i;
 	DECLARE_COMPLETION_ONSTACK(wait);
 	__u32 left;
