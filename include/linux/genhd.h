@@ -413,7 +413,8 @@ static inline void free_part_info(struct hd_struct *part)
 extern void part_round_stats(int cpu, struct hd_struct *part);
 
 /* block/genhd.c */
-extern int device_add_disk(struct device *parent, struct gendisk *disk);
+extern int device_add_disk(struct device *parent, struct gendisk *disk,
+			   struct attribute_group *attr_group);
 
 extern void del_gendisk(struct gendisk *gp);
 extern struct gendisk *get_gendisk(dev_t dev, int *partno);

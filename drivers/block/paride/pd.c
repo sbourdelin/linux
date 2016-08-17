@@ -906,7 +906,7 @@ static int pd_detect(void)
 	for (unit = 0, disk = pd; unit < PD_UNITS; unit++, disk++) {
 		if (disk->gd) {
 			set_capacity(disk->gd, disk->capacity);
-			device_add_disk(NULL, disk->gd);
+			device_add_disk(NULL, disk->gd, NULL);
 			found = 1;
 		}
 	}

@@ -3175,7 +3175,7 @@ DAC960_Probe(struct pci_dev *dev, const struct pci_device_id *entry)
 
   for (disk = 0; disk < DAC960_MaxLogicalDrives; disk++) {
         set_capacity(Controller->disks[disk], disk_size(Controller, disk));
-        device_add_disk(NULL, Controller->disks[disk]);
+        device_add_disk(NULL, Controller->disks[disk], NULL);
   }
   DAC960_CreateProcEntries(Controller);
   return 0;

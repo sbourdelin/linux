@@ -598,7 +598,8 @@ exit:
  * RETURNS:
  * 0 on success, -errno on failure.
  */
-int device_add_disk(struct device *parent, struct gendisk *disk)
+int device_add_disk(struct device *parent, struct gendisk *disk,
+		    struct attribute_group *attr_group)
 {
 	struct backing_dev_info *bdi;
 	dev_t devt;
@@ -659,6 +660,13 @@ int device_add_disk(struct device *parent, struct gendisk *disk)
 	retval = disk_add_events(disk);
 	if (retval)
 		goto fail;
+
+	if (attr_group) {
+		retval = sysfs_create_group(&disk_to_dev(disk)->kobj,
+					    attr_group);
+		if (retval)
+			goto fail;
+	}
 
 	retval = blk_integrity_add(disk);
 	if (retval)

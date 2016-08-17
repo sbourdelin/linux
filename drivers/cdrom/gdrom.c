@@ -817,7 +817,7 @@ static int probe_gdrom(struct platform_device *devptr)
 	gd.toc = kzalloc(sizeof(struct gdromtoc), GFP_KERNEL);
 	if (!gd.toc)
 		goto probe_fail_toc;
-	device_add_disk(NULL, gd.disk);
+	device_add_disk(NULL, gd.disk, NULL);
 	return 0;
 
 probe_fail_toc:

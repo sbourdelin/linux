@@ -417,7 +417,7 @@ aoeblk_gdalloc(void *vp)
 
 	spin_unlock_irqrestore(&d->lock, flags);
 
-	device_add_disk(NULL, gd);
+	device_add_disk(NULL, gd, NULL);
 	aoedisk_add_sysfs(d);
 	aoedisk_add_debugfs(d);
 

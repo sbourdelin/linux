@@ -1096,7 +1096,7 @@ static int __init mm_init(void)
 		disk->private_data = &cards[i];
 		disk->queue = cards[i].queue;
 		set_capacity(disk, cards[i].mm_size << 1);
-		device_add_disk(NULL, disk);
+		device_add_disk(NULL, disk, NULL);
 	}
 
 	init_battery_timer();

@@ -288,7 +288,7 @@ static int __init simdisk_setup(struct simdisk *dev, int which,
 	dev->gd->private_data = dev;
 	snprintf(dev->gd->disk_name, 32, "simdisk%d", which);
 	set_capacity(dev->gd, 0);
-	device_add_disk(NULL, dev->gd);
+	device_add_disk(NULL, dev->gd, NULL);
 
 	dev->procfile = proc_create_data(tmp, 0644, procdir, &fops, dev);
 	return 0;

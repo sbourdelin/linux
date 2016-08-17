@@ -1794,7 +1794,7 @@ static int loop_add(struct loop_device **l, int i)
 	disk->private_data	= lo;
 	disk->queue		= lo->lo_queue;
 	sprintf(disk->disk_name, "loop%d", i);
-	device_add_disk(NULL, disk);
+	device_add_disk(NULL, disk, NULL);
 	*l = lo;
 	return lo->lo_number;
 
