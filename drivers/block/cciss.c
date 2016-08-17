@@ -1593,26 +1593,26 @@ static int cciss_bigpassthru(ctlr_info_t *h, void __user *argp)
 	if ((ioc->buf_size < 1) &&
 	    (ioc->Request.Type.Direction != XFER_NONE)) {
 		status = -EINVAL;
-		goto cleanup1;
+		goto free_ioc;
 	}
 	/* Check kmalloc limits  using all SGs */
 	if (ioc->malloc_size > MAX_KMALLOC_SIZE) {
 		status = -EINVAL;
-		goto cleanup1;
+		goto free_ioc;
 	}
 	if (ioc->buf_size > ioc->malloc_size * MAXSGENTRIES) {
 		status = -EINVAL;
-		goto cleanup1;
-	}
-	buff = kzalloc(MAXSGENTRIES * sizeof(char *), GFP_KERNEL);
-	if (!buff) {
-		status = -ENOMEM;
-		goto cleanup1;
+		goto free_ioc;
 	}
 	buff_size = kmalloc(MAXSGENTRIES * sizeof(int), GFP_KERNEL);
 	if (!buff_size) {
 		status = -ENOMEM;
-		goto cleanup1;
+		goto free_ioc;
+	}
+	buff = kzalloc(MAXSGENTRIES * sizeof(char *), GFP_KERNEL);
+	if (!buff) {
+		status = -ENOMEM;
+		goto free_size;
 	}
 	left = ioc->buf_size;
 	data_ptr = ioc->buf;
@@ -1622,12 +1622,12 @@ static int cciss_bigpassthru(ctlr_info_t *h, void __user *argp)
 		buff[sg_used] = kmalloc(sz, GFP_KERNEL);
 		if (buff[sg_used] == NULL) {
 			status = -ENOMEM;
-			goto cleanup1;
+			goto free_buffer;
 		}
 		if (ioc->Request.Type.Direction == XFER_WRITE) {
 			if (copy_from_user(buff[sg_used], data_ptr, sz)) {
 				status = -EFAULT;
-				goto cleanup1;
+				goto free_buffer;
 			}
 		} else {
 			memset(buff[sg_used], 0, sz);
@@ -1639,7 +1639,7 @@ static int cciss_bigpassthru(ctlr_info_t *h, void __user *argp)
 	c = cmd_special_alloc(h);
 	if (!c) {
 		status = -ENOMEM;
-		goto cleanup1;
+		goto free_buffer;
 	}
 	c->cmd_type = CMD_IOCTL_PEND;
 	c->Header.ReplyQueue = 0;
@@ -1674,7 +1674,7 @@ static int cciss_bigpassthru(ctlr_info_t *h, void __user *argp)
 	if (copy_to_user(argp, ioc, sizeof(*ioc))) {
 		cmd_special_free(h, c);
 		status = -EFAULT;
-		goto cleanup1;
+		goto free_buffer;
 	}
 	if (ioc->Request.Type.Direction == XFER_READ) {
 		/* Copy the data out of the buffer we created */
@@ -1683,20 +1683,20 @@ static int cciss_bigpassthru(ctlr_info_t *h, void __user *argp)
 			if (copy_to_user(ptr, buff[i], buff_size[i])) {
 				cmd_special_free(h, c);
 				status = -EFAULT;
-				goto cleanup1;
+				goto free_buffer;
 			}
 			ptr += buff_size[i];
 		}
 	}
 	cmd_special_free(h, c);
 	status = 0;
-cleanup1:
-	if (buff) {
-		for (i = 0; i < sg_used; i++)
-			kfree(buff[i]);
-		kfree(buff);
-	}
+free_buffer:
+	for (i = 0; i < sg_used; i++)
+		kfree(buff[i]);
+	kfree(buff);
+free_size:
 	kfree(buff_size);
+free_ioc:
 	kfree(ioc);
 	return status;
 }
