@@ -248,9 +248,14 @@ int sanity_check_segment_list(struct kimage *image)
 			mstart = image->segment[i].mem;
 			mend = mstart + image->segment[i].memsz - 1;
 			/* Ensure we are within the crash kernel limits */
-			if ((mstart < phys_to_boot_phys(crashk_res.start)) ||
-			    (mend > phys_to_boot_phys(crashk_res.end)))
-				return -EADDRNOTAVAIL;
+			if ((mstart >= phys_to_boot_phys(crashk_res.start)) &&
+			    (mend <= phys_to_boot_phys(crashk_res.end)))
+				continue;
+			if ((mstart >= phys_to_boot_phys(crashk_low_res.start)) &&
+			    (mend <= phys_to_boot_phys(crashk_low_res.end)))
+				continue;
+
+			return -EADDRNOTAVAIL;
 		}
 	}
 
