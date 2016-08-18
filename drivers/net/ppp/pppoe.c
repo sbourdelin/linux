@@ -697,7 +697,7 @@ static int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 			goto err_put;
 		}
 
-		sk->sk_state = PPPOX_CONNECTED;
+		sk->sk_state |= PPPOX_CONNECTED;
 	}
 
 	po->num = sp->sa_addr.pppoe.sid;

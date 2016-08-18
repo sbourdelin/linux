@@ -774,7 +774,7 @@ static int pppol2tp_connect(struct socket *sock, struct sockaddr *uservaddr,
 out_no_ppp:
 	/* This is how we get the session context from the socket. */
 	sk->sk_user_data = session;
-	sk->sk_state = PPPOX_CONNECTED;
+	sk->sk_state |= PPPOX_CONNECTED;
 	l2tp_info(session, PPPOL2TP_MSG_CONTROL, "%s: created\n",
 		  session->name);
 
@@ -856,7 +856,7 @@ static int pppol2tp_getname(struct socket *sock, struct sockaddr *uaddr,
 	error = -ENOTCONN;
 	if (sk == NULL)
 		goto end;
-	if (sk->sk_state != PPPOX_CONNECTED)
+	if (!(sk->sk_state & PPPOX_CONNECTED))
 		goto end;
 
 	error = -EBADF;
