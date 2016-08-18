@@ -80,6 +80,19 @@ static u32 get_alt_insn(struct alt_instr *alt, u32 *insnptr, u32 *altinsnptr)
 			offset = target - (unsigned long)insnptr;
 			insn = aarch64_set_branch_offset(insn, offset);
 		}
+	} else if (aarch64_insn_is_adrp(insn)) {
+		s32 orig_offset, new_offset;
+		unsigned long target;
+
+		/*
+		 * If we're replacing an adrp instruction, which uses PC-relative
+		 * immediate addressing, adjust the offset to reflect the new
+		 * PC. adrp operates on 4K aligned addresses.
+		 */
+		orig_offset  = aarch64_insn_adrp_get_offset(insn);
+		target = ((unsigned long)altinsnptr & ~0xfffUL) + orig_offset;
+		new_offset = target - ((unsigned long)insnptr & ~0xfffUL);
+		insn = aarch64_insn_adrp_set_offset(insn, new_offset);
 	}
 
 	return insn;
