@@ -553,10 +553,10 @@ int rmi_read_register_desc(struct rmi_device *d, u16 addr,
 		goto free_struct_buff;
 
 	reg = find_first_bit(rdesc->presense_map, RMI_REG_DESC_PRESENSE_BITS);
-	map_offset = 0;
 	for (i = 0; i < rdesc->num_registers; i++) {
 		struct rmi_register_desc_item *item = &rdesc->registers[i];
 		int reg_size = struct_buf[offset];
+		map_offset = 0;
 
 		++offset;
 		if (reg_size == 0) {
