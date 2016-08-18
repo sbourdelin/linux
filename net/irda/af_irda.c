@@ -871,6 +871,8 @@ static int irda_accept(struct socket *sock, struct socket *newsock, int flags)
 	 * Jean II
 	 */
 	while (1) {
+		DEFINE_WAIT(wait);
+
 		skb = skb_dequeue(&sk->sk_receive_queue);
 		if (skb)
 			break;
@@ -880,10 +882,17 @@ static int irda_accept(struct socket *sock, struct socket *newsock, int flags)
 		if (flags & O_NONBLOCK)
 			goto out;
 
-		err = wait_event_interruptible(*(sk_sleep(sk)),
-					skb_peek(&sk->sk_receive_queue));
-		if (err)
+		if (signal_pending(current)) {
+			err = -EINTR;
 			goto out;
+		}
+
+		prepare_to_wait_exclusive(sk_sleep(sk), &wait,
+			TASK_INTERRUPTIBLE);
+		release_sock(sk);
+		schedule();
+		lock_sock(sk);
+		finish_wait(sk_sleep(sk), &wait);
 	}
 
 	newsk = newsock->sk;
