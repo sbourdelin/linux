@@ -66,6 +66,7 @@
 #include <net/net_namespace.h>
 #include <net/icmp.h>
 #include <net/inet_hashtables.h>
+#include <net/secure_seq.h>
 #include <net/tcp.h>
 #include <net/transp_v6.h>
 #include <net/ipv6.h>
@@ -96,12 +97,16 @@ static int tcp_v4_md5_hash_hdr(char *md5_hash, const struct tcp_md5sig_key *key,
 struct inet_hashinfo tcp_hashinfo;
 EXPORT_SYMBOL(tcp_hashinfo);
 
-static  __u32 tcp_v4_init_sequence(const struct sk_buff *skb)
+static u32 tcp_v4_init_sequence(const struct sk_buff *skb, u32 *tsoff)
 {
-	return secure_tcp_sequence_number(ip_hdr(skb)->daddr,
-					  ip_hdr(skb)->saddr,
-					  tcp_hdr(skb)->dest,
-					  tcp_hdr(skb)->source);
+	struct secure_tcp_seq s;
+
+	s = secure_tcp_sequence_number(ip_hdr(skb)->daddr,
+				       ip_hdr(skb)->saddr,
+				       tcp_hdr(skb)->dest,
+				       tcp_hdr(skb)->source);
+	*tsoff = s.tsoff;
+	return s.seq;
 }
 
 int tcp_twsk_unique(struct sock *sk, struct sock *sktw, void *twp)
@@ -234,11 +239,16 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	sk->sk_gso_type = SKB_GSO_TCPV4;
 	sk_setup_caps(sk, &rt->dst);
 
-	if (!tp->write_seq && likely(!tp->repair))
-		tp->write_seq = secure_tcp_sequence_number(inet->inet_saddr,
-							   inet->inet_daddr,
-							   inet->inet_sport,
-							   usin->sin_port);
+	if (!tp->write_seq && likely(!tp->repair)) {
+		struct secure_tcp_seq seq;
+
+		seq = secure_tcp_sequence_number(inet->inet_saddr,
+						 inet->inet_daddr,
+						 inet->inet_sport,
+						 usin->sin_port);
+		tp->write_seq = seq.seq;
+		tp->tsoffset = seq.tsoff;
+	}
 
 	inet->inet_id = tp->write_seq ^ jiffies;
 

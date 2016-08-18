@@ -101,12 +101,16 @@ static void inet6_sk_rx_dst_set(struct sock *sk, const struct sk_buff *skb)
 	}
 }
 
-static __u32 tcp_v6_init_sequence(const struct sk_buff *skb)
+static u32 tcp_v6_init_sequence(const struct sk_buff *skb, u32 *tsoff)
 {
-	return secure_tcpv6_sequence_number(ipv6_hdr(skb)->daddr.s6_addr32,
-					    ipv6_hdr(skb)->saddr.s6_addr32,
-					    tcp_hdr(skb)->dest,
-					    tcp_hdr(skb)->source);
+	struct secure_tcp_seq s;
+
+	s = secure_tcpv6_sequence_number(ipv6_hdr(skb)->daddr.s6_addr32,
+					 ipv6_hdr(skb)->saddr.s6_addr32,
+					 tcp_hdr(skb)->dest,
+					 tcp_hdr(skb)->source);
+	*tsoff = s.tsoff;
+	return s.seq;
 }
 
 static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
@@ -278,12 +282,16 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 
 	sk_set_txhash(sk);
 
-	if (!tp->write_seq && likely(!tp->repair))
-		tp->write_seq = secure_tcpv6_sequence_number(np->saddr.s6_addr32,
-							     sk->sk_v6_daddr.s6_addr32,
-							     inet->inet_sport,
-							     inet->inet_dport);
+	if (!tp->write_seq && likely(!tp->repair)) {
+		struct secure_tcp_seq seq;
 
+		seq = secure_tcpv6_sequence_number(np->saddr.s6_addr32,
+						   sk->sk_v6_daddr.s6_addr32,
+						   inet->inet_sport,
+						   inet->inet_dport);
+		tp->write_seq = seq.seq;
+		tp->tsoffset = seq.tsoff;
+	}
 	err = tcp_connect(sk);
 	if (err)
 		goto late_failure;

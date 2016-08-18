@@ -40,11 +40,13 @@ static u32 seq_scale(u32 seq)
 #endif
 
 #if IS_ENABLED(CONFIG_IPV6)
-__u32 secure_tcpv6_sequence_number(const __be32 *saddr, const __be32 *daddr,
-				   __be16 sport, __be16 dport)
+struct secure_tcp_seq
+secure_tcpv6_sequence_number(const __be32 *saddr, const __be32 *daddr,
+			     __be16 sport, __be16 dport)
 {
 	u32 secret[MD5_MESSAGE_BYTES / 4];
 	u32 hash[MD5_DIGEST_WORDS];
+	struct secure_tcp_seq seq;
 	u32 i;
 
 	net_secret_init();
@@ -58,7 +60,9 @@ __u32 secure_tcpv6_sequence_number(const __be32 *saddr, const __be32 *daddr,
 
 	md5_transform(hash, secret);
 
-	return seq_scale(hash[0]);
+	seq.seq = seq_scale(hash[0]);
+	seq.tsoff = hash[1];
+	return seq;
 }
 EXPORT_SYMBOL(secure_tcpv6_sequence_number);
 
@@ -86,10 +90,11 @@ EXPORT_SYMBOL(secure_ipv6_port_ephemeral);
 
 #ifdef CONFIG_INET
 
-__u32 secure_tcp_sequence_number(__be32 saddr, __be32 daddr,
-				 __be16 sport, __be16 dport)
+struct secure_tcp_seq secure_tcp_sequence_number(__be32 saddr, __be32 daddr,
+						 __be16 sport, __be16 dport)
 {
 	u32 hash[MD5_DIGEST_WORDS];
+	struct secure_tcp_seq seq;
 
 	net_secret_init();
 	hash[0] = (__force u32)saddr;
@@ -99,7 +104,9 @@ __u32 secure_tcp_sequence_number(__be32 saddr, __be32 daddr,
 
 	md5_transform(hash, net_secret);
 
-	return seq_scale(hash[0]);
+	seq.seq = seq_scale(hash[0]);
+	seq.tsoff = hash[1];
+	return seq;
 }
 
 u32 secure_ipv4_port_ephemeral(__be32 saddr, __be32 daddr, __be16 dport)
