@@ -218,64 +218,6 @@ static void __rwsem_mark_wake(struct rw_semaphore *sem,
 }
 
 /*
- * Wait for the read lock to be granted
- */
-__visible
-struct rw_semaphore __sched *rwsem_down_read_failed(struct rw_semaphore *sem)
-{
-	long count, adjustment = 0;
-	struct rwsem_waiter waiter;
-	struct task_struct *tsk = current;
-	WAKE_Q(wake_q);
-
-	/*
-	 * Undo read bias from down_read operation to stop active locking.
-	 * Doing that after taking the wait_lock may block writer lock
-	 * stealing for too long impacting system performance.
-	 */
-	atomic_long_add(-RWSEM_ACTIVE_READ_BIAS, &sem->count);
-
-	waiter.task = tsk;
-	waiter.type = RWSEM_WAITING_FOR_READ;
-
-	raw_spin_lock_irq(&sem->wait_lock);
-	if (list_empty(&sem->wait_list))
-		adjustment = RWSEM_WAITING_BIAS;
-	list_add_tail(&waiter.list, &sem->wait_list);
-
-	/* we're now waiting on the lock */
-	if (adjustment)
-		count = atomic_long_add_return(adjustment, &sem->count);
-	else
-		count = atomic_long_read(&sem->count);
-
-	/*
-	 * If there are no active locks, wake the front queued process(es).
-	 *
-	 * If there are no writers and we are first in the queue,
-	 * wake our own waiter to join the existing active readers !
-	 */
-	if (count == RWSEM_WAITING_BIAS ||
-	    (count > RWSEM_WAITING_BIAS && adjustment))
-		__rwsem_mark_wake(sem, RWSEM_WAKE_ANY, &wake_q);
-
-	raw_spin_unlock_irq(&sem->wait_lock);
-	wake_up_q(&wake_q);
-
-	/* wait to be given the lock */
-	while (true) {
-		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
-		if (!waiter.task)
-			break;
-		schedule();
-	}
-
-	__set_task_state(tsk, TASK_RUNNING);
-	return sem;
-}
-EXPORT_SYMBOL(rwsem_down_read_failed);
-
-/*
  * This function must be called with the sem->wait_lock held to prevent
  * race conditions between checking the rwsem wait list and setting the
  * sem->count accordingly.
@@ -515,6 +457,64 @@ static inline bool reader_spinning_enabled(struct rw_semaphore *sem)
 	return false;
 }
 #endif
+
+/*
+ * Wait for the read lock to be granted
+ */
+__visible
+struct rw_semaphore __sched *rwsem_down_read_failed(struct rw_semaphore *sem)
+{
+	long count, adjustment = 0;
+	struct rwsem_waiter waiter;
+	struct task_struct *tsk = current;
+	WAKE_Q(wake_q);
+
+	/*
+	 * Undo read bias from down_read operation to stop active locking.
+	 * Doing that after taking the wait_lock may block writer lock
+	 * stealing for too long impacting system performance.
+	 */
+	atomic_long_add(-RWSEM_ACTIVE_READ_BIAS, &sem->count);
+
+	waiter.task = tsk;
+	waiter.type = RWSEM_WAITING_FOR_READ;
+
+	raw_spin_lock_irq(&sem->wait_lock);
+	if (list_empty(&sem->wait_list))
+		adjustment = RWSEM_WAITING_BIAS;
+	list_add_tail(&waiter.list, &sem->wait_list);
+
+	/* we're now waiting on the lock */
+	if (adjustment)
+		count = atomic_long_add_return(adjustment, &sem->count);
+	else
+		count = atomic_long_read(&sem->count);
+
+	/*
+	 * If there are no active locks, wake the front queued process(es).
+	 *
+	 * If there are no writers and we are first in the queue,
+	 * wake our own waiter to join the existing active readers !
+	 */
+	if (count == RWSEM_WAITING_BIAS ||
+	    (count > RWSEM_WAITING_BIAS && adjustment))
+		__rwsem_mark_wake(sem, RWSEM_WAKE_ANY, &wake_q);
+
+	raw_spin_unlock_irq(&sem->wait_lock);
+	wake_up_q(&wake_q);
+
+	/* wait to be given the lock */
+	while (true) {
+		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
+		if (!waiter.task)
+			break;
+		schedule();
+	}
+
+	__set_task_state(tsk, TASK_RUNNING);
+	return sem;
+}
+EXPORT_SYMBOL(rwsem_down_read_failed);
 
 /*
  * Wait until we successfully acquire the write lock
