@@ -34,6 +34,7 @@
 #include <linux/serial_core.h>
 #include <linux/delay.h>
 #include <linux/mutex.h>
+#include <linux/uart_device.h>
 
 #include <asm/irq.h>
 #include <asm/uaccess.h>
@@ -2800,6 +2801,10 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
 
 	uart_configure_port(drv, state, uport);
 
+	uport->ctrlr = uart_controller_alloc(uport->dev, 0);
+	uport->ctrlr->port = uport;
+	uart_controller_add(uport->ctrlr);
+
 	num_groups = 2;
 	if (uport->attr_group)
 		num_groups++;
@@ -3026,6 +3031,9 @@ void uart_insert_char(struct uart_port *port, unsigned int status,
 		 unsigned int overrun, unsigned int ch, unsigned int flag)
 {
 	struct tty_port *tport = &port->state->port;
+
+	if (uart_controller_rx(port->ctrlr, ch) >= 0)
+		return;
 
 	if ((status & port->ignore_status_mask & ~overrun) == 0)
 		if (tty_insert_flip_char(tport, ch, flag) == 0)

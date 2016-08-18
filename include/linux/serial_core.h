@@ -155,6 +155,7 @@ struct uart_port {
 
 	unsigned int		read_status_mask;	/* driver specific */
 	unsigned int		ignore_status_mask;	/* driver specific */
+	struct uart_controller	*ctrlr;
 	struct uart_state	*state;			/* pointer to parent state */
 	struct uart_icount	icount;			/* statistics */
 
