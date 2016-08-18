@@ -7069,8 +7069,9 @@ static int dattrs_equal(struct sched_domain_attr *cur, int idx_cur,
  *
  * Call with hotplug lock held
  */
-void partition_sched_domains(int ndoms_new, cpumask_var_t doms_new[],
-			     struct sched_domain_attr *dattr_new)
+static void __partition_sched_domains(int ndoms_new, cpumask_var_t doms_new[],
+			     struct sched_domain_attr *dattr_new,
+			     int need_domain_rebuild)
 {
 	int i, j, n;
 	int new_topology;
@@ -7081,7 +7082,7 @@ void partition_sched_domains(int ndoms_new, cpumask_var_t doms_new[],
 	unregister_sched_domain_sysctl();
 
 	/* Let architecture update cpu core mappings. */
-	new_topology = arch_update_cpu_topology();
+	new_topology = arch_update_cpu_topology() | need_domain_rebuild;
 
 	n = doms_new ? ndoms_new : 0;
 
@@ -7130,6 +7131,24 @@ match2:
 	register_sched_domain_sysctl();
 
 	mutex_unlock(&sched_domains_mutex);
+}
+
+/*
+ * Generate sched domains only when the cpumask or domain attr changes
+ */
+void partition_sched_domains(int ndoms_new, cpumask_var_t doms_new[],
+			     struct sched_domain_attr *dattr_new)
+{
+	__partition_sched_domains(ndoms_new, doms_new, dattr_new, 0);
+}
+
+/*
+ * Generate new sched domains always
+ */
+void regen_partition_sched_domains(int ndoms_new, cpumask_var_t doms_new[],
+			     struct sched_domain_attr *dattr_new)
+{
+	__partition_sched_domains(ndoms_new, doms_new, dattr_new, 1);
 }
 
 static int num_cpus_frozen;	/* used to mark begin/end of suspend/resume */

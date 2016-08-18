@@ -794,10 +794,12 @@ done:
  * which has that flag enabled, or if any cpuset with a non-empty
  * 'cpus' is removed, then call this routine to rebuild the
  * scheduler's dynamic sched domains.
+ * If forced flag is set, then we will always regenerate all new
+ * sched domains.
  *
  * Call with cpuset_mutex held.  Takes get_online_cpus().
  */
-static void rebuild_sched_domains_locked(void)
+static void rebuild_sched_domains_locked(bool rebuild_all)
 {
 	struct sched_domain_attr *attr;
 	cpumask_var_t *doms;
@@ -818,12 +820,17 @@ static void rebuild_sched_domains_locked(void)
 	ndoms = generate_sched_domains(&doms, &attr);
 
 	/* Have scheduler rebuild the domains */
-	partition_sched_domains(ndoms, doms, attr);
+	if (rebuild_all)
+		/* Will rebuild a complete set of all sched domains */
+		regen_partition_sched_domains(ndoms, doms, attr);
+	else
+		/* Rebuild only sched domains with changed cpu masks */
+		partition_sched_domains(ndoms, doms, attr);
 out:
 	put_online_cpus();
 }
 #else /* !CONFIG_SMP */
-static void rebuild_sched_domains_locked(void)
+static void rebuild_sched_domains_locked(bool forced)
 {
 }
 #endif /* CONFIG_SMP */
@@ -831,7 +838,18 @@ static void rebuild_sched_domains_locked(void)
 void rebuild_sched_domains(void)
 {
 	mutex_lock(&cpuset_mutex);
-	rebuild_sched_domains_locked();
+	rebuild_sched_domains_locked(false);
+	mutex_unlock(&cpuset_mutex);
+}
+
+/*
+ * Similar to rebuild_sched domains, but will force
+ * all sched domains to be always rebuilt.
+ */
+void regenerate_sched_domains(void)
+{
+	mutex_lock(&cpuset_mutex);
+	rebuild_sched_domains_locked(true);
 	mutex_unlock(&cpuset_mutex);
 }
 
@@ -919,7 +937,7 @@ static void update_cpumasks_hier(struct cpuset *cs, struct cpumask *new_cpus)
 	rcu_read_unlock();
 
 	if (need_rebuild_sched_domains)
-		rebuild_sched_domains_locked();
+		rebuild_sched_domains_locked(false);
 }
 
 /**
@@ -1267,7 +1285,7 @@ static int update_relax_domain_level(struct cpuset *cs, s64 val)
 		cs->relax_domain_level = val;
 		if (!cpumask_empty(cs->cpus_allowed) &&
 		    is_sched_load_balance(cs))
-			rebuild_sched_domains_locked();
+			rebuild_sched_domains_locked(true);
 	}
 
 	return 0;
@@ -1333,7 +1351,7 @@ static int update_flag(cpuset_flagbits_t bit, struct cpuset *cs,
 	spin_unlock_irq(&callback_lock);
 
 	if (!cpumask_empty(trialcs->cpus_allowed) && balance_flag_changed)
-		rebuild_sched_domains_locked();
+		rebuild_sched_domains_locked(false);
 
 	if (spread_flag_changed)
 		update_tasks_flags(cs);

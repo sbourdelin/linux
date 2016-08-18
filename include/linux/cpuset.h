@@ -102,6 +102,8 @@ extern int current_cpuset_is_being_rebound(void);
 
 extern void rebuild_sched_domains(void);
 
+extern void regenerate_sched_domains(void);
+
 extern void cpuset_print_current_mems_allowed(void);
 
 /*
