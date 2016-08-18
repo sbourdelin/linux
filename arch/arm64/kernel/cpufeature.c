@@ -46,6 +46,13 @@ unsigned int compat_elf_hwcap2 __read_mostly;
 
 DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
 
+/*
+ * If we have mismatched cache line sizes, we need to emulate access to
+ * CTRL_EL0. To avoid a lookup everytime (via read_system_reg()), cache
+ * the table entry for CTR_EL0.
+ */
+struct arm64_ftr_reg *sys_ctr_ftr;
+
 #define __ARM64_FTR_BITS(SIGNED, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
 	{						\
 		.sign = SIGNED,				\
@@ -461,6 +468,8 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
 		init_cpu_ftr_reg(SYS_MVFR2_EL1, info->reg_mvfr2);
 	}
 
+	/* Keep track of the CTR feature register */
+	sys_ctr_ftr = get_arm64_ftr_reg(SYS_CTR_EL0);
 }
 
 static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
