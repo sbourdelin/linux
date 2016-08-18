@@ -387,6 +387,7 @@ static int audit_field_valid(struct audit_entry *entry, struct audit_field *f)
 	case AUDIT_FILTERKEY:
 		break;
 	case AUDIT_LOGINUID_SET:
+	case AUDIT_SESSIONID_SET:
 		if ((f->val != 0) && (f->val != 1))
 			return -EINVAL;
 	/* FALL THROUGH */
@@ -478,6 +479,8 @@ static struct audit_entry *audit_data_to_entry(struct audit_rule_data *data,
 				goto exit_free;
 			break;
 		case AUDIT_SESSIONID:
+			if (!sessionid_valid(f->val))
+				goto exit_free;
 		case AUDIT_ARCH:
 			entry->rule.arch_f = f;
 			break;

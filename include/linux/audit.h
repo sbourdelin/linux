@@ -554,6 +554,16 @@ static inline bool audit_loginuid_set(struct task_struct *tsk)
 	return uid_valid(audit_get_loginuid(tsk));
 }
 
+static inline bool sessionid_valid(unsigned int sessionid)
+{
+	return sessionid != (unsigned int) -1;
+}
+
+static inline bool audit_sessionid_set(struct task_struct *tsk)
+{
+	return sessionid_valid(audit_get_sessionid(tsk));
+}
+
 static inline void audit_log_string(struct audit_buffer *ab, const char *buf)
 {
 	audit_log_n_string(ab, buf, strlen(buf));
