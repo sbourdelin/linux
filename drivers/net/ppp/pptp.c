@@ -103,12 +103,21 @@ static int add_chan(struct pppox_sock *sock,
 	static int call_id;
 
 	spin_lock(&chan_lock);
-	if (!sa->call_id)	{
+	if (!sa->call_id) {
+		bool from_start = (call_id == 0);
+
 		call_id = find_next_zero_bit(callid_bitmap, MAX_CALLID, call_id + 1);
 		if (call_id == MAX_CALLID) {
-			call_id = find_next_zero_bit(callid_bitmap, MAX_CALLID, 1);
-			if (call_id == MAX_CALLID)
+			if (unlikely(from_start)) {
+				call_id = 0;
 				goto out_err;
+			} else {
+				call_id = find_next_zero_bit(callid_bitmap, MAX_CALLID, 1);
+				if (call_id == MAX_CALLID) {
+					call_id = 0;
+					goto out_err;
+				}
+			}
 		}
 		sa->call_id = call_id;
 	} else if (test_bit(sa->call_id, callid_bitmap)) {
@@ -656,8 +665,10 @@ static int __init pptp_init_module(void)
 	pr_info("PPTP driver version " PPTP_DRIVER_VERSION "\n");
 
 	callid_sock = vzalloc((MAX_CALLID + 1) * sizeof(void *));
-	if (!callid_sock)
+	if (!callid_sock) {
+		pr_err("PPTP: can't alloc callid_sock mem");
 		return -ENOMEM;
+	}
 
 	err = gre_add_protocol(&gre_pptp_protocol, GREPROTO_PPTP);
 	if (err) {
