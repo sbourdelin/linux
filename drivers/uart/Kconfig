@@ -1,0 +1,17 @@
+#
+# UART slave driver configuration
+#
+menuconfig UART_DEV
+	tristate "UART device support"
+	help
+	  Support for devices connected via a UART
+
+if UART_DEV
+
+config UART_DEV_LOOPBACK
+	tristate "Loopback Test Driver"
+	help
+	  This option enables a loopback test driver. Anything received from
+	  the connected device will be echoed back.
+
+endif
