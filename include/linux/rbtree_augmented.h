@@ -96,10 +96,11 @@ rbstatic const struct rb_augment_callbacks rbname = {			\
 
 #define	RB_RED		0
 #define	RB_BLACK	1
+#define RB_COLOR_MASK	 1UL
 
-#define __rb_parent(pc)    ((struct rb_node *)(pc & ~3))
+#define __rb_parent(pc)    ((struct rb_node *)(pc & RB_PARENT_MASK))
 
-#define __rb_color(pc)     ((pc) & 1)
+#define __rb_color(pc)     ((pc) & RB_COLOR_MASK)
 #define __rb_is_black(pc)  __rb_color(pc)
 #define __rb_is_red(pc)    (!__rb_color(pc))
 #define rb_color(rb)       __rb_color((rb)->__rb_parent_color)

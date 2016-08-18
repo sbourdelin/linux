@@ -44,8 +44,10 @@ struct rb_root {
 	struct rb_node *rb_node;
 };
 
+#define RB_PARENT_MASK	 (~((unsigned long)sizeof(long) - 1))
 
-#define rb_parent(r)   ((struct rb_node *)((r)->__rb_parent_color & ~3))
+#define rb_parent(r)   \
+	((struct rb_node *)((r)->__rb_parent_color & RB_PARENT_MASK))
 
 #define RB_ROOT	(struct rb_root) { NULL, }
 #define	rb_entry(ptr, type, member) container_of(ptr, type, member)
