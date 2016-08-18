@@ -121,7 +121,7 @@ void numa_store_cpu_info(unsigned int cpu)
 void __init early_map_cpu_to_node(unsigned int cpu, int nid)
 {
 	/* fallback to node 0 */
-	if (nid < 0 || nid >= MAX_NUMNODES)
+	if (nid < 0 || nid >= MAX_NUMNODES || numa_off)
 		nid = 0;
 
 	cpu_to_node_map[cpu] = nid;
