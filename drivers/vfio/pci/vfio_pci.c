@@ -297,6 +297,7 @@ static void vfio_pci_disable(struct vfio_pci_device *vdev)
 	struct vfio_pci_dummy_resource *dummy_res, *tmp;
 	int i, bar;
 
+	pci_disable_sriov(pdev);
 	/* Stop the device from further DMA */
 	pci_clear_master(pdev);
 
@@ -1314,12 +1315,25 @@ static const struct pci_error_handlers vfio_err_handlers = {
 	.error_detected = vfio_pci_aer_err_detected,
 };
 
+static int vfio_pci_sriov_configure(struct pci_dev *pdev, int num_vfs)
+{
+	if (!num_vfs) {
+		pci_disable_sriov(pdev);
+		return 0;
+	}
+
+	return pci_enable_sriov_with_override(pdev,
+					      num_vfs,
+					     "vfio-pci");
+}
+
 static struct pci_driver vfio_pci_driver = {
-	.name		= "vfio-pci",
-	.id_table	= NULL, /* only dynamic ids */
-	.probe		= vfio_pci_probe,
-	.remove		= vfio_pci_remove,
-	.err_handler	= &vfio_err_handlers,
+	.name		 = "vfio-pci",
+	.id_table	 = NULL, /* only dynamic ids */
+	.probe		 = vfio_pci_probe,
+	.remove		 = vfio_pci_remove,
+	.err_handler	 = &vfio_err_handlers,
+	.sriov_configure = vfio_pci_sriov_configure,
 };
 
 struct vfio_devices {
