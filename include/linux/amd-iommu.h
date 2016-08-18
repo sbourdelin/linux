@@ -21,6 +21,19 @@
 #define _ASM_X86_AMD_IOMMU_H
 
 #include <linux/types.h>
+#include <linux/msi.h>
+
+struct irq_2_irte {
+	u16 devid; /* Device ID for IRTE table */
+	u16 index; /* Index into IRTE table*/
+};
+
+struct amd_ir_data {
+	struct irq_2_irte irq_2_irte;
+	struct msi_msg msi_entry;
+	void *entry;    /* Pointer to union irte or struct irte_ga */
+	void *ref;      /* Pointer to the actual irte */
+};
 
 #ifdef CONFIG_AMD_IOMMU
 
@@ -179,10 +192,19 @@ static inline int amd_iommu_detect(void) { return -ENODEV; }
 /* IOMMU AVIC Function */
 extern int amd_iommu_register_ga_log_notifier(int (*notifier)(u32));
 
+extern int
+amd_iommu_update_ga(u32 cpu, u64 base, bool is_run, struct amd_ir_data *ir_data);
+
 #else /* defined(CONFIG_AMD_IOMMU) && defined(CONFIG_IRQ_REMAP) */
 
 static inline int
 amd_iommu_register_ga_log_notifier(int (*notifier)(u32))
+{
+	return 0;
+}
+
+static inline int
+amd_iommu_update_ga(u32 cpu, u64 base, bool is_run, struct amd_ir_data *ir_data);
 {
 	return 0;
 }

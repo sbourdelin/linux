@@ -802,17 +802,6 @@ struct irte_ga {
 	union irte_ga_hi hi;
 };
 
-struct irq_2_irte {
-	u16 devid; /* Device ID for IRTE table */
-	u16 index; /* Index into IRTE table*/
-};
-
-struct amd_ir_data {
-	struct irq_2_irte irq_2_irte;
-	struct msi_msg msi_entry;
-	void *entry;    /* Pointer to union irte or struct irte_ga */
-};
-
 struct amd_irte_ops {
 	void (*prepare)(void *, u32, u32, u8, u32);
 	void (*activate)(void *, u16, u16);
