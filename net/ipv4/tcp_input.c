@@ -128,6 +128,8 @@ int sysctl_tcp_invalid_ratelimit __read_mostly = HZ/2;
 #define REXMIT_LOST	1 /* retransmit packets marked lost */
 #define REXMIT_NEW	2 /* FRTO-style transmit of unsent/new packets */
 
+#define TSECR_MAX_DELAY		TCP_RTO_MAX
+
 /* Adapt the MSS value used to make delayed ack decision to the
  * real world.
  */
@@ -5165,6 +5167,30 @@ static int tcp_copy_to_iovec(struct sock *sk, struct sk_buff *skb, int hlen)
 	return err;
 }
 
+static bool tcp_validate_tsecr(struct sock *sk, const struct tcphdr *th)
+{
+	const struct tcp_sock *tp = tcp_sk(sk);
+	const struct sk_buff *skb = NULL;
+	u32 ts_low;
+
+	if (sysctl_tcp_timestamps != 2 || !tp->rx_opt.tstamp_ok)
+		return true;
+
+	/* packet has no timestamp but connection is supposed to */
+	if (!tp->rx_opt.saw_tstamp)
+		return false;
+
+	ts_low = tp->retrans_stamp;
+	if (ts_low == 0) {
+		skb = tcp_write_queue_head(sk);
+		ts_low = skb ? tcp_skb_timestamp(skb) : tp->lsndtime;
+	}
+
+	ts_low -= TSECR_MAX_DELAY;
+
+	return between(tp->rx_opt.rcv_tsecr, ts_low, tcp_time_stamp);
+}
+
 /* Does PAWS and seqno based validation of an incoming segment, flags will
  * play significant role here.
  */
@@ -5252,6 +5278,15 @@ syn_challenge:
 			TCP_INC_STATS(sock_net(sk), TCP_MIB_INERRS);
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPSYNCHALLENGE);
 		tcp_send_challenge_ack(sk, skb);
+		goto discard;
+	}
+
+	if (TCP_SKB_CB(skb)->seq == tp->rcv_nxt ||
+	    TCP_SKB_CB(skb)->seq == TCP_SKB_CB(skb)->end_seq)
+		return true;
+
+	/* last step: ofo and not pure ack: check tsecr */
+	if (!tcp_validate_tsecr(sk, th)) {
 		goto discard;
 	}
 

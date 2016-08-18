@@ -609,8 +609,12 @@ tcp_syn_retries - INTEGER
 	with the current initial RTO of 1second. With this the final timeout
 	for an active TCP connection attempt will happen after 127seconds.
 
-tcp_timestamps - BOOLEAN
-	Enable timestamps as defined in RFC1323.
+tcp_timestamps - INTEGER
+	0: Disabled.
+	1: Enable timestamps as defined in RFC1323.
+	2: Like 1, but also drop segments that arrive out-of-order if
+	their echo timestamp (TSecr) is outside of an expected range.
+	Default: 1
 
 tcp_min_tso_segs - INTEGER
 	Minimal number of segments per TSO frame.
