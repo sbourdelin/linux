@@ -111,7 +111,8 @@ void uart_write_wakeup(struct uart_port *port)
 	 * closed.  No cookie for you.
 	 */
 	BUG_ON(!state);
-	tty_wakeup(state->port.tty);
+	if (state->port.tty)
+		tty_wakeup(state->port.tty);
 }
 
 static void uart_stop(struct tty_struct *tty)

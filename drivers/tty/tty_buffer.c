@@ -528,6 +528,8 @@ static void flush_to_ldisc(struct work_struct *work)
 
 void tty_flip_buffer_push(struct tty_port *port)
 {
+	if (!port->tty)
+		return;
 	tty_schedule_flip(port);
 }
 EXPORT_SYMBOL(tty_flip_buffer_push);
