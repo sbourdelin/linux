@@ -176,7 +176,7 @@ void __init gic_clocksource_init(unsigned int frequency)
 	gic_start_count();
 }
 
-static void __init gic_clocksource_of_init(struct device_node *node)
+static int __init gic_clocksource_of_init(struct device_node *node)
 {
 	struct clk *clk;
 	int ret;
