@@ -193,7 +193,8 @@ static inline void __downgrade_write(struct rw_semaphore *sem)
 		     "1:\n\t"
 		     "# ending __downgrade_write\n"
 		     : "+m" (sem->count)
-		     : "a" (sem), "er" (-RWSEM_WAITING_BIAS)
+		     : "a" (sem), "er" (-RWSEM_ACTIVE_WRITE_BIAS +
+					 RWSEM_ACTIVE_READ_BIAS)
 		     : "memory", "cc");
 }
 

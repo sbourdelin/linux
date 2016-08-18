@@ -141,7 +141,7 @@ __downgrade_write (struct rw_semaphore *sem)
 
 	do {
 		old = atomic_long_read(&sem->count);
-		new = old - RWSEM_WAITING_BIAS;
+		new = old - RWSEM_ACTIVE_WRITE_BIAS + RWSEM_ACTIVE_READ_BIAS;
 	} while (atomic_long_cmpxchg_release(&sem->count, old, new) != old);
 
 	if (old < 0)

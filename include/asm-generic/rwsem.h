@@ -106,8 +106,8 @@ static inline void __downgrade_write(struct rw_semaphore *sem)
 	 * read-locked region is ok to be re-ordered into the
 	 * write side. As such, rely on RELEASE semantics.
 	 */
-	tmp = atomic_long_add_return_release(-RWSEM_WAITING_BIAS,
-				     (atomic_long_t *)&sem->count);
+	tmp = atomic_long_add_return_release(-RWSEM_ACTIVE_WRITE_BIAS +
+			RWSEM_ACTIVE_READ_BIAS, (atomic_long_t *)&sem->count);
 	if (tmp < 0)
 		rwsem_downgrade_wake(sem);
 }
