@@ -345,8 +345,11 @@ static void bl_write_cleanup(struct work_struct *work)
 		u64 end = (hdr->args.offset + hdr->args.count +
 			PAGE_SIZE - 1) & (loff_t)PAGE_MASK;
 
+		spin_lock(&hdr->inode->i_lock);
+		bl->bl_layout.plh_lwb = hdr->args.offset + hdr->res.count;
 		ext_tree_mark_written(bl, start >> SECTOR_SHIFT,
 					(end - start) >> SECTOR_SHIFT);
+		spin_unlock(&hdr->inode->i_lock);
 	}
 
 	pnfs_ld_write_done(hdr);
