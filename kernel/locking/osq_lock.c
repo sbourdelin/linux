@@ -124,6 +124,11 @@ bool osq_lock(struct optimistic_spin_queue *lock)
 
 		cpu_relax_lowlatency();
 	}
+	/*
+	 * Add an acquire memory barrier for pairing with the release barrier
+	 * in unlock.
+	 */
+	smp_acquire__after_ctrl_dep();
 	return true;
 
 unqueue:
@@ -198,13 +203,20 @@ void osq_unlock(struct optimistic_spin_queue *lock)
 	 * Second most likely case.
 	 */
 	node = this_cpu_ptr(&osq_node);
-	next = xchg(&node->next, NULL);
-	if (next) {
-		WRITE_ONCE(next->locked, 1);
+	next = xchg_relaxed(&node->next, NULL);
+	if (next)
+		goto unlock;
+
+	next = osq_wait_next(lock, node, NULL);
+	if (unlikely(!next)) {
+		/*
+		 * In the unlikely event that the OSQ is empty, we need to
+		 * provide a proper release barrier.
+		 */
+		smp_mb();
 		return;
 	}
 
-	next = osq_wait_next(lock, node, NULL);
-	if (next)
-		WRITE_ONCE(next->locked, 1);
+unlock:
+	smp_store_release(&next->locked, 1);
 }
