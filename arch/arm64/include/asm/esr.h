@@ -109,6 +109,54 @@
 	((ESR_ELx_EC_BRK64 << ESR_ELx_EC_SHIFT) | ESR_ELx_IL |	\
 	 ((imm) & 0xffff))
 
+/* ISS field definitions for System instruction traps */
+#define ESR_ELx_SYS64_ISS_RES0_SHIFT	22
+#define ESR_ELx_SYS64_ISS_RES0_MASK	(UL(0x7) << ESR_ELx_SYS64_ISS_RES0_SHIFT)
+#define ESR_ELx_SYS64_ISS_DIR_MASK	0x1
+#define ESR_ELx_SYS64_ISS_DIR_READ	0x1
+#define ESR_ELx_SYS64_ISS_DIR_WRITE	0x0
+
+#define ESR_ELx_SYS64_ISS_RT_SHIFT	5
+#define ESR_ELx_SYS64_ISS_RT_MASK	(UL(0x1f) << ESR_ELx_SYS64_ISS_RT_SHIFT)
+#define ESR_ELx_SYS64_ISS_CRm_SHIFT	1
+#define ESR_ELx_SYS64_ISS_CRm_MASK	(UL(0xf) << ESR_ELx_SYS64_ISS_CRm_SHIFT)
+#define ESR_ELx_SYS64_ISS_CRn_SHIFT	10
+#define ESR_ELx_SYS64_ISS_CRn_MASK	(UL(0xf) << ESR_ELx_SYS64_ISS_CRn_SHIFT)
+#define ESR_ELx_SYS64_ISS_Op1_SHIFT	14
+#define ESR_ELx_SYS64_ISS_Op1_MASK	(UL(0x7) << ESR_ELx_SYS64_ISS_Op1_SHIFT)
+#define ESR_ELx_SYS64_ISS_Op2_SHIFT	17
+#define ESR_ELx_SYS64_ISS_Op2_MASK	(UL(0x7) << ESR_ELx_SYS64_ISS_Op2_SHIFT)
+#define ESR_ELx_SYS64_ISS_Op0_SHIFT	20
+#define ESR_ELx_SYS64_ISS_Op0_MASK	(UL(0x3) << ESR_ELx_SYS64_ISS_Op0_SHIFT)
+#define ESR_ELx_SYS64_ISS_SYS_MASK	(ESR_ELx_SYS64_ISS_Op0_MASK | \
+					 ESR_ELx_SYS64_ISS_Op1_MASK | \
+					 ESR_ELx_SYS64_ISS_Op2_MASK | \
+					 ESR_ELx_SYS64_ISS_CRn_MASK | \
+					 ESR_ELx_SYS64_ISS_CRm_MASK)
+#define ESR_ELx_SYS64_ISS_SYS_VAL(Op0, Op1, Op2, CRn, CRm) \
+					(((Op0) << ESR_ELx_SYS64_ISS_Op0_SHIFT) | \
+					 ((Op1) << ESR_ELx_SYS64_ISS_Op1_SHIFT) | \
+					 ((Op2) << ESR_ELx_SYS64_ISS_Op2_SHIFT) | \
+					 ((CRn) << ESR_ELx_SYS64_ISS_CRn_SHIFT) | \
+					 ((CRm) << ESR_ELx_SYS64_ISS_CRm_SHIFT))
+/*
+ * User space cache operations have the following sysreg encoding
+ * in System instructions.
+ * Op0=1, Op1=3, Op2=1, CRn=7, CRm={ 5, 10, 11, 14 }, WRITE (L=0)
+ */
+#define ESR_ELx_SYS64_ISS_CRm_DC_CIVAC	14
+#define ESR_ELx_SYS64_ISS_CRm_DC_CVAU	11
+#define ESR_ELx_SYS64_ISS_CRm_DC_CVAC	10
+#define ESR_ELx_SYS64_ISS_CRm_IC_IVAU	5
+
+#define ESR_ELx_SYS64_ISS_U_CACHE_OP_MASK	(ESR_ELx_SYS64_ISS_Op0_MASK | \
+						 ESR_ELx_SYS64_ISS_Op1_MASK | \
+						 ESR_ELx_SYS64_ISS_Op2_MASK | \
+						 ESR_ELx_SYS64_ISS_CRn_MASK | \
+						 ESR_ELx_SYS64_ISS_DIR_MASK)
+#define ESR_ELx_SYS64_ISS_U_CACHE_OP_VAL \
+				(ESR_ELx_SYS64_ISS_SYS_VAL(1, 3, 1, 7, 0) | \
+				 ESR_ELx_SYS64_ISS_DIR_WRITE)
 #ifndef __ASSEMBLY__
 #include <asm/types.h>
 
