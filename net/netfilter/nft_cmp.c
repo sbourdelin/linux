@@ -84,8 +84,13 @@ static int nft_cmp_init(const struct nft_ctx *ctx, const struct nft_expr *expr,
 	if (err < 0)
 		return err;
 
-	priv->op  = ntohl(nla_get_be32(tb[NFTA_CMP_OP]));
+	if (desc.len > U8_MAX)
+		return -ERANGE;
 	priv->len = desc.len;
+	priv->op  = ntohl(nla_get_be32(tb[NFTA_CMP_OP]));
+	if (priv->op >= NFT_CMP_MAX)
+		return -ERANGE;
+
 	return 0;
 }
 
