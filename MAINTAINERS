@@ -980,6 +980,7 @@ ARM/Allwinner sunXi SoC support
 M:	Maxime Ripard <maxime.ripard@free-electrons.com>
 M:	Chen-Yu Tsai <wens@csie.org>
 L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
+L:	linux-sunxi@googlegroups.com
 S:	Maintained
 N:	sun[x456789]i
 
