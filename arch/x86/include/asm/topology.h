@@ -146,4 +146,30 @@ struct pci_bus;
 int x86_pci_root_bus_node(int bus);
 void x86_pci_root_bus_resources(int bus, struct list_head *resources);
 
+#ifdef CONFIG_SCHED_ITMT
+DECLARE_PER_CPU_READ_MOSTLY(int, sched_core_priority);
+
+static inline bool sched_asym_prefer(int a, int b)
+{
+	return per_cpu(sched_core_priority, a) > per_cpu(sched_core_priority, b);
+}
+
+#define sched_asym_prefer sched_asym_prefer
+
+/* Interface to set priority of a cpu */
+void sched_set_itmt_core_prio(int prio, int core_cpu);
+
+/* Interface to notify scheduler that system supports ITMT */
+void set_sched_itmt(bool support_itmt);
+
+#else /* CONFIG_SCHED_ITMT */
+
+static inline void set_sched_itmt(bool support_itmt)
+{
+}
+static inline void sched_set_itmt_core_prio(int prio, int core_cpu)
+{
+}
+#endif /* CONFIG_SCHED_ITMT */
+
 #endif /* _ASM_X86_TOPOLOGY_H */
