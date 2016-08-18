@@ -35,6 +35,7 @@
 #include <linux/lockdep.h>
 #include <linux/user_namespace.h>
 #include "internal.h"
+#include <trace/events/vmscan.h>
 
 
 static LIST_HEAD(super_blocks);
@@ -64,6 +65,7 @@ static unsigned long super_cache_scan(struct shrinker *shrink,
 	long	inodes;
 
 	sb = container_of(shrink, struct super_block, s_shrink);
+	trace_mm_shrinker_callback(shrink, sb->s_type->name);
 
 	/*
 	 * Deadlock avoidance.  We may hold various FS locks, and we don't want

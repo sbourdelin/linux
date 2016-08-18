@@ -283,6 +283,27 @@ TRACE_EVENT(mm_shrink_slab_end,
 		__entry->retval)
 );
 
+TRACE_EVENT(mm_shrinker_callback,
+	TP_PROTO(struct shrinker *shr, const char *shrinker_name),
+
+	TP_ARGS(shr, shrinker_name),
+
+	TP_STRUCT__entry(
+		__field(struct shrinker *, shr)
+		__array(char, shrinker_name, SHRINKER_NAME_LEN)
+	),
+
+	TP_fast_assign(
+		__entry->shr = shr;
+		strlcpy(__entry->shrinker_name, shrinker_name,
+		       	SHRINKER_NAME_LEN);
+	),
+
+	TP_printk("shrinker:%p shrinker_name:%s",
+		__entry->shr,
+		__entry->shrinker_name)
+);
+
 DECLARE_EVENT_CLASS(mm_vmscan_lru_isolate_template,
 
 	TP_PROTO(int classzone_idx,
