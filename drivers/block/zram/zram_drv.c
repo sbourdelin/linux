@@ -120,15 +120,15 @@ static inline bool valid_io_request(struct zram *zram,
 	u64 end, bound;
 
 	/* unaligned request */
-	if (unlikely(start & (ZRAM_SECTOR_PER_LOGICAL_BLOCK - 1)))
+	if (unlikely(!IS_ALIGNED(start, ZRAM_SECTOR_PER_LOGICAL_BLOCK)))
 		return false;
-	if (unlikely(size & (ZRAM_LOGICAL_BLOCK_SIZE - 1)))
+	if (unlikely(!IS_ALIGNED(size, ZRAM_LOGICAL_BLOCK_SIZE)))
 		return false;
 
 	end = start + (size >> SECTOR_SHIFT);
 	bound = zram->disksize >> SECTOR_SHIFT;
 	/* out of range range */
-	if (unlikely(start >= bound || end > bound || start > end))
+	if (unlikely(start >= bound || end > bound))
 		return false;
 
 	/* I/O request is valid */
