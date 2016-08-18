@@ -144,6 +144,13 @@ static struct platform_driver rockchip_efuse_driver = {
 	},
 };
 
-module_platform_driver(rockchip_efuse_driver);
+static int __init rockchip_efuse_module_init(void)
+{
+	return platform_driver_probe(&rockchip_efuse_driver,
+				     rockchip_efuse_probe);
+}
+
+subsys_initcall(rockchip_efuse_module_init);
+
 MODULE_DESCRIPTION("rockchip_efuse driver");
 MODULE_LICENSE("GPL v2");
