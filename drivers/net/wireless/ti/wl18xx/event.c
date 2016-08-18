@@ -217,5 +217,27 @@ int wl18xx_process_mailbox_events(struct wl1271 *wl)
 	if (vector & FW_LOGGER_INDICATION)
 		wlcore_event_fw_logger(wl);
 
+	if (vector & RX_BA_WIN_SIZE_CHANGE_EVENT_ID) {
+		struct wl12xx_vif *wlvif;
+		struct ieee80211_vif *vif;
+		u8 link_id = mbox->rx_ba_link_id;
+		u8 win_size = mbox->rx_ba_win_size;
+		const u8 *addr;
+
+		wlvif = wl->links[link_id].wlvif;
+		vif = wl12xx_wlvif_to_vif(wlvif);
+
+		/* Call MAC routine to update win_size and stop all link active
+		 * BA sessions. This routine returns 0 on failure or previous
+		 * win_size on success
+		 */
+		if (wlvif->bss_type != BSS_TYPE_AP_BSS)
+			addr = vif->bss_conf.bssid;
+		else
+			addr = wl->links[link_id].addr;
+
+		ieee80211_change_rx_ba_max_subframes(vif, addr, win_size);
+	}
+
 	return 0;
 }
