@@ -162,7 +162,7 @@ static int audio_config_get_n(struct intel_crtc *crtc,
 	if (intel_crtc_has_type(crtc->config, INTEL_OUTPUT_HDMI)) {
 		for (i = 0; i < ARRAY_SIZE(aud_ncts); i++) {
 			if ((rate == aud_ncts[i].sample_rate) &&
-			    (adjusted_mode->clock == aud_ncts[i].clock)) {
+			    (adjusted_mode->crtc_clock == aud_ncts[i].clock)) {
 				return aud_ncts[i].n;
 			}
 		}
@@ -257,8 +257,8 @@ static void audio_m_cts_setup(struct drm_device *dev,
 static bool audio_rate_need_prog(struct intel_crtc *crtc,
 				 const struct drm_display_mode *adjusted_mode)
 {
-	if (((adjusted_mode->clock == TMDS_297M) ||
-		 (adjusted_mode->clock == TMDS_296M)) &&
+	if (((adjusted_mode->crtc_clock == TMDS_297M) ||
+	     (adjusted_mode->crtc_clock == TMDS_296M)) &&
 		intel_crtc_has_type(crtc->config, INTEL_OUTPUT_HDMI))
 		return true;
 	else if (((crtc->config->port_clock == LC_540M) ||
@@ -750,7 +750,7 @@ static int i915_audio_component_sync_audio_rate(struct device *dev,
 	struct drm_i915_private *dev_priv = dev_to_i915(dev);
 	struct intel_encoder *intel_encoder;
 	struct intel_crtc *crtc;
-	struct drm_display_mode *mode;
+	struct drm_display_mode *adjusted_mode;
 	struct i915_audio_component *acomp = dev_priv->audio_component;
 	enum pipe pipe = INVALID_PIPE;
 	u32 tmp;
@@ -782,20 +782,20 @@ static int i915_audio_component_sync_audio_rate(struct device *dev,
 
 	DRM_DEBUG_KMS("pipe %c connects port %c\n",
 				  pipe_name(pipe), port_name(port));
-	mode = &crtc->config->base.adjusted_mode;
+	adjusted_mode = &crtc->config->base.adjusted_mode;
 
 	/* port must be valid now, otherwise the pipe will be invalid */
 	acomp->aud_sample_rate[port] = rate;
 
 	/* 2. check whether to set the N/CTS/M manually or not */
-	if (!audio_rate_need_prog(crtc, mode)) {
+	if (!audio_rate_need_prog(crtc, adjusted_mode)) {
 		tmp = I915_READ(HSW_AUD_CFG(pipe));
 		tmp &= ~AUD_CONFIG_N_PROG_ENABLE;
 		I915_WRITE(HSW_AUD_CFG(pipe), tmp);
 		goto unlock;
 	}
 
-	n = audio_config_get_n(crtc, mode, rate);
+	n = audio_config_get_n(crtc, adjusted_mode, rate);
 	if (n == 0) {
 		DRM_DEBUG_KMS("Using automatic mode for N value on port %c\n",
 					  port_name(port));
