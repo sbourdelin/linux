@@ -3033,7 +3033,7 @@ EXPORT_SYMBOL_GPL(usb_hcd_platform_shutdown);
 
 /*-------------------------------------------------------------------------*/
 
-#if defined(CONFIG_USB_MON) || defined(CONFIG_USB_MON_MODULE)
+#if IS_ENABLED(CONFIG_USB_MON)
 
 const struct usb_mon_operations *mon_ops;
 
