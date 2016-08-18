@@ -51,6 +51,13 @@ struct of_dev_auxdata {
 	{ .compatible = _compat, .phys_addr = _phys, .name = _name, \
 	  .platform_data = _pdata }
 
+#ifdef CONFIG_OF_LATE_NODES
+struct of_late_device_node {
+	struct device_node *late_device_node;
+	struct device *late_node_parent;
+	struct list_head late_node;
+};
+#endif
 extern const struct of_device_id of_default_bus_match_table[];
 
 /* Platform drivers register/unregister */
@@ -76,6 +83,13 @@ extern int of_platform_default_populate(struct device_node *root,
 					const struct of_dev_auxdata *lookup,
 					struct device *parent);
 extern void of_platform_depopulate(struct device *parent);
+#ifdef CONFIG_OF_LATE_NODES
+extern int of_platform_populate_late_nodes(struct device_node *root,
+				const struct of_device_id *matches,
+				const struct of_dev_auxdata *lookup);
+
+extern int of_device_is_late_node(const struct device_node *device);
+#endif
 #else
 static inline int of_platform_populate(struct device_node *root,
 					const struct of_device_id *matches,

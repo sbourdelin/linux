@@ -63,6 +63,13 @@ config OF_ADDRESS
 config OF_ADDRESS_PCI
 	bool
 
+config OF_LATE_NODES
+	def_bool n
+	depends on OF_ADDRESS
+	help
+	 This option makes probe of certain device nodes at late init,
+	 whichever device nodes have a late_init property true.
+
 config OF_IRQ
 	def_bool y
 	depends on !SPARC && IRQ_DOMAIN

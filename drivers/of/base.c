@@ -304,6 +304,7 @@ const void *__of_get_property(const struct device_node *np,
 	return pp ? pp->value : NULL;
 }
 
+
 /*
  * Find a property with a given name for a given node
  * and return the value.
@@ -317,6 +318,26 @@ const void *of_get_property(const struct device_node *np, const char *name,
 }
 EXPORT_SYMBOL(of_get_property);
 
+int of_set_property(const struct device_node *np, const char *name,
+			const void *val, int len)
+{
+	struct property *pp;
+	int lenp;
+
+	if (!np)
+		return -ENOENT;
+
+	pp = of_find_property(np, name, &lenp);
+	if (pp) {
+		memcpy(pp->value, val, len);
+		pp->length = len;
+		}
+	else
+		return -ENOENT;
+	return 0;
+
+}
+EXPORT_SYMBOL(of_set_property);
 /*
  * arch_match_cpu_phys_id - Match the given logical CPU and physical id
  *

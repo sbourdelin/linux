@@ -64,6 +64,11 @@ EXPORT_SYMBOL(of_find_device_by_node);
  * mechanism for creating devices from device tree nodes.
  */
 
+#ifdef CONFIG_OF_LATE_NODES
+static LIST_HEAD(late_device_node_list);
+static int of_add_late_device_node(struct device_node *bus,
+					struct device *parent);
+#endif
 /**
  * of_device_make_bus_id - Use the device node data to assign a unique name
  * @dev: pointer to device structure that is linked to a device tree node
@@ -368,6 +373,12 @@ static int of_platform_bus_create(struct device_node *bus,
 		return 0;
 	}
 
+#ifdef CONFIG_OF_LATE_NODES
+	if (of_device_is_late_node(bus)) {
+		of_add_late_device_node(bus, parent);
+		return 0;
+	}
+#endif
 	auxdata = of_dev_lookup(lookup, bus);
 	if (auxdata) {
 		bus_id = auxdata->name;
@@ -630,4 +641,102 @@ void of_platform_register_reconfig_notifier(void)
 }
 #endif /* CONFIG_OF_DYNAMIC */
 
+#ifdef CONFIG_OF_LATE_NODES
+/**
+ * of_device_is_late_node() - check a device node whether it is late init node.
+ * @device: pointer to device tree node.
+ *
+ * Checks if late_init property of device node holds true and rturn true
+ *
+ * Returns 0 on success, < 0 on failure.
+ */
+int of_device_is_late_node(const struct device_node *device)
+{
+	const char *status;
+	int statlen;
+
+	status = of_get_property(device, "late_init", &statlen);
+	if (status == NULL)
+		return 0;
+
+	if (statlen > 0) {
+		if (!strcmp(status, "true"))
+			return 1;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(of_device_is_late_node);
+
+/**
+ * of_add_late_device_node() - add late init device node to late_device_node_list
+ * @bus: pointer to device tree node.
+ * @parent: parent for new device
+ *
+ * This function add a late init node to a list of late init nodes
+ *
+ * Returns 0 on success, < 0 on failure.
+ */
+static int of_add_late_device_node(struct device_node *bus, struct device *parent)
+{
+	struct of_late_device_node *late_dev_node;
+	char *data = "false";
+	int len;
+
+	late_dev_node = kmalloc(sizeof(struct of_late_device_node), GFP_KERNEL);
+
+	if (!late_dev_node)
+		return -ENOMEM;
+
+	late_dev_node->late_device_node = bus;
+	late_dev_node->late_node_parent = parent;
+	INIT_LIST_HEAD(&late_dev_node->late_node);
+
+	if (list_empty(&late_dev_node->late_node)) {
+		pr_debug("added to late device node list\n");
+		list_add_tail(&late_dev_node->late_node, &late_device_node_list);
+	}
+
+	len = strlen(data) + 1;
+		of_set_property(bus, "late_init", (void *)data, len);
+	return 0;
+}
+
+/**
+ * of_platform_populate_late_nodes() - Populate late init platform devices
+ * @root: parent of the first level to probe or NULL for the root of the tree
+ * @matches: match table, NULL to use the default
+ * @lookup: auxdata table for matching id and platform_data with device nodes
+ *
+ * This function walks late init node link list,
+ * and creates platform devices from nodes.
+ *
+ * Returns 0 on success, < 0 on failure.
+ */
+int of_platform_populate_late_nodes(struct device_node *root,
+			const struct of_device_id *matches,
+			const struct of_dev_auxdata *lookup)
+{
+	struct device_node *child;
+	struct of_late_device_node *temp;
+	static struct device *parent;
+	int rc = 0;
+
+	while (!list_empty(&late_device_node_list)) {
+		temp = list_first_entry(&late_device_node_list,
+					struct of_late_device_node, late_node);
+		child = temp->late_device_node;
+		parent = temp->late_node_parent;
+
+		rc = of_platform_bus_create(child, matches, lookup, parent, true);
+		list_del_init(&temp->late_node);
+		kfree(temp);
+		if (rc)
+			break;
+	}
+
+	return rc;
+}
+EXPORT_SYMBOL_GPL(of_platform_populate_late_nodes);
+#endif /* CONFIG_OF_LATE_NODES */
 #endif /* CONFIG_OF_ADDRESS */
