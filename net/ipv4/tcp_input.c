@@ -5287,6 +5287,7 @@ syn_challenge:
 
 	/* last step: ofo and not pure ack: check tsecr */
 	if (!tcp_validate_tsecr(sk, th)) {
+		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPTSECRFAIL);
 		goto discard;
 	}
 
