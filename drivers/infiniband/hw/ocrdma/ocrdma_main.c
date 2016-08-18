@@ -444,6 +444,16 @@ void ocrdma_update_link_state(struct ocrdma_dev *dev, u8 lstate)
 		ocrdma_dispatch_port_active(dev);
 }
 
+void ocrdma_print_tech_preview_status(void)
+{
+	printk(KERN_INFO
+	       "*************************************************************\n");
+	printk(KERN_INFO
+	       "RoCE supported at Tech Preview level in all OCE141XX Adapters\n");
+	printk(KERN_INFO
+	       "*************************************************************\n");
+}
+
 static struct ocrdma_driver ocrdma_drv = {
 	.name			= "ocrdma_driver",
 	.add			= ocrdma_add,
@@ -456,6 +466,7 @@ static int __init ocrdma_init_module(void)
 {
 	int status;
 
+	ocrdma_print_tech_preview_status();
 	ocrdma_init_debugfs();
 
 	status = be_roce_register_driver(&ocrdma_drv);
